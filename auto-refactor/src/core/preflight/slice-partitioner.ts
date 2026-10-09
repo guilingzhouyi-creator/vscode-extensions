@@ -117,6 +117,20 @@ export class SharedContextCache {
 }
 
 /**
+ * Tests whether any requested analyzer belongs to the target category set.
+ *
+ * @param needed - Analyzers required by file.
+ * @param analyzerSet - Active analyzer set for current category.
+ * @returns True if at least one category analyzer matches.
+ */
+function hasAnyCategoryAnalyzer(
+    needed: readonly string[],
+    analyzerSet: ReadonlySet<string>,
+): boolean {
+    return needed.some((a) => analyzerSet.has(a));
+}
+
+/**
  * Partitions activated analyzers and files into mutually disjoint review slices.
  *
  * @param activation - Sparse activation outcome.
@@ -142,10 +156,18 @@ export function partitionReviewSlices(
         modernity_governance: [],
         security_safety: [],
     };
+    const categorySets: Record<SliceCategory, Set<string>> = {
+        lexical_hygiene: new Set(),
+        ast_complexity: new Set(),
+        architecture_coupling: new Set(),
+        modernity_governance: new Set(),
+        security_safety: new Set(),
+    };
 
     for (const aId of activation.activatedAnalyzers) {
         const cat = ANALYZER_SLICE_DOMAIN[aId] || 'modernity_governance';
         categoryAnalyzers[cat].push(aId);
+        categorySets[cat].add(aId);
     }
 
     const slices: ReviewSlice[] = [];
@@ -158,11 +180,11 @@ export function partitionReviewSlices(
         // Find all selected files that need at least one analyzer from this category
         const relevantFiles: string[] = [];
         let sliceWorkload = 0;
+        const analyzerSet = categorySets[cat];
 
         for (const f of activation.selectedFiles) {
             const needed = activation.fileAnalyzerMap[f] || [];
-            const hasCategoryAnalyzer = analyzers.some((a) => needed.includes(a));
-            if (hasCategoryAnalyzer) {
+            if (hasAnyCategoryAnalyzer(needed, analyzerSet)) {
                 relevantFiles.push(f);
                 const eloc = entryMap.get(f)?.eloc.estimatedEloc || 50;
                 sliceWorkload += eloc * analyzers.length;

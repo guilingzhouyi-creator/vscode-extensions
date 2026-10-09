@@ -88,6 +88,67 @@ export interface AuditFinalizationOutcome {
     };
 }
 
+/** Computes aggregate estimated ELOC across all indexed project entries */
+function computeTotalProjectEloc(indexStore: PreflightAuditIndexStore): number {
+    let total = 0;
+    for (const entry of indexStore.getAllEntries()) {
+        total += entry.eloc.estimatedEloc;
+    }
+    return total;
+}
+
+/** Calculates estimated blast radius ELOC from expansion result or default fallback */
+function computeBlastRadiusEloc(
+    auditedEloc: number,
+    expansionResult?: ExpansionTraceResult,
+): number {
+    const estimatedRadius = expansionResult?.totalAuditedCount
+        ? expansionResult.totalAuditedCount * 80
+        : 100;
+    return Math.max(auditedEloc, estimatedRadius);
+}
+
+/**
+ * Evaluates composite gate verdict with early returns using flat guard clauses.
+ * Pure decision function ensuring deterministic policy enforcement.
+ *
+ * @param hasBlockingErrors - Whether blocking audit findings were emitted.
+ * @param mode - Review scope mode.
+ * @param domain - Optional specialized domain.
+ * @param scopeAssessment - Normalized Bayesian scope assessment.
+ * @returns Frozen GateVerdictSummary.
+ */
+export function evaluateGateVerdict(
+    hasBlockingErrors: boolean,
+    mode: AuditScopeMode,
+    domain: string | undefined,
+    scopeAssessment: ScopeNormalizedAssessment,
+): GateVerdictSummary {
+    if (hasBlockingErrors) {
+        return Object.freeze({ pass: false, code: 'FAIL_BLOCKING_ERRORS' });
+    }
+
+    if (mode === 'CHANGESET') {
+        const deltaQ = scopeAssessment.changesetDelta?.deltaQ ?? 0;
+        if (deltaQ < -1.0) {
+            return Object.freeze({ pass: false, code: 'FAIL_REGRESSION_DELTA' });
+        }
+        return Object.freeze({ pass: true, code: 'PASS_CHANGESET_LOCAL' });
+    }
+
+    if (mode === 'PROJECT') {
+        if (scopeAssessment.projectBaseline.mean < 80.0) {
+            return Object.freeze({ pass: false, code: 'FAIL_PROJECT_BASELINE' });
+        }
+        return Object.freeze({ pass: true, code: 'PASS_PROJECT_FULL' });
+    }
+
+    return Object.freeze({
+        pass: true,
+        code: `PASS_DOMAIN_${domain || 'SPECIALIZED'}`,
+    });
+}
+
 /**
  * Preflight Audit Controller — Substantive Orchestration Facade.
  */
@@ -203,16 +264,12 @@ export class PreflightAuditController {
         // Finalize audit bus aggregation
         const busResult = planResult.auditBus.finalize();
 
-        // Total project ELOC estimate
-        let elocTotalProject = 0;
-        for (const entry of planResult.indexStore.getAllEntries()) {
-            elocTotalProject += entry.eloc.estimatedEloc;
-        }
-
-        const estimatedRadius = planResult.expansionResult?.totalAuditedCount
-            ? planResult.expansionResult.totalAuditedCount * 80
-            : 100;
-        const elocBlastRadius = Math.max(busResult.totalAuditedEloc, estimatedRadius);
+        // Total project ELOC and blast radius estimation
+        const elocTotalProject = computeTotalProjectEloc(planResult.indexStore);
+        const elocBlastRadius = computeBlastRadiusEloc(
+            busResult.totalAuditedEloc,
+            planResult.expansionResult,
+        );
 
         // Scope-normalized Bayesian quantification
         const scopeAssessment = normalizeScopeQuality({
@@ -229,34 +286,14 @@ export class PreflightAuditController {
             weights,
         });
 
-        // Formulate composite gate verdict
+        // Formulate composite gate verdict via flat decision function
         const hasBlockingErrors = busResult.findingsBySeverity.error > 0;
-        let pass = !hasBlockingErrors;
-        let code = 'PASS';
-
-        if (hasBlockingErrors) {
-            pass = false;
-            code = 'FAIL_BLOCKING_ERRORS';
-        } else if (planResult.scopeDecision.mode === 'CHANGESET') {
-            const deltaQ = scopeAssessment.changesetDelta?.deltaQ ?? 0;
-            if (deltaQ < -1.0) {
-                pass = false;
-                code = 'FAIL_REGRESSION_DELTA';
-            } else {
-                code = 'PASS_CHANGESET_LOCAL';
-            }
-        } else if (planResult.scopeDecision.mode === 'PROJECT') {
-            if (scopeAssessment.projectBaseline.mean < 80.0) {
-                pass = false;
-                code = 'FAIL_PROJECT_BASELINE';
-            } else {
-                code = 'PASS_PROJECT_FULL';
-            }
-        } else {
-            code = `PASS_DOMAIN_${planResult.scopeDecision.domain || 'SPECIALIZED'}`;
-        }
-
-        const gateVerdict: GateVerdictSummary = Object.freeze({ pass, code });
+        const gateVerdict = evaluateGateVerdict(
+            hasBlockingErrors,
+            planResult.scopeDecision.mode,
+            planResult.scopeDecision.domain,
+            scopeAssessment,
+        );
 
         // Update audited baseline
         const targetLedgerDir = params.ledgerDir ?? planResult.ledgerDir ?? '.refactor-trajectory';

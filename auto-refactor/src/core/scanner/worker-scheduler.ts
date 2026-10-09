@@ -259,6 +259,50 @@ async function processSingleHybridFile(
     }
 }
 
+/** Parameters for the detached top-level hybrid phase execution. */
+export interface HybridPhaseContext {
+    batch: { idx: number; rel: string }[];
+    absRoot: string;
+    preloaded?: Map<string, Buffer>;
+    runAnalyzersFn: (
+        rel: string,
+        content: string,
+    ) => Promise<{ issues: Issue[]; metric: FileMetric | null }>;
+    isAborted: () => boolean;
+    onResult: (idx: number, result: { issues: Issue[]; metric: FileMetric | null }) => void;
+    onError: (err: unknown) => void;
+    onProgress?: () => void;
+}
+
+/**
+ * Top-level pure execution of the hybrid startup phase.
+ * Processes initial files concurrently without deeply nested closures (Depth <= 2).
+ *
+ * @param ctx - Context object configuring the hybrid execution phase.
+ */
+export async function executeHybridPhase(ctx: HybridPhaseContext): Promise<void> {
+    const { batch, absRoot, preloaded, runAnalyzersFn, isAborted, onResult, onError, onProgress } =
+        ctx;
+    await pMap(batch, HYBRID_CONCURRENCY, async (fileItem) => {
+        if (isAborted()) return;
+        const { result, error } = await processSingleHybridFile(
+            fileItem,
+            absRoot,
+            preloaded,
+            runAnalyzersFn,
+        );
+        if (error) {
+            onError(error);
+            return;
+        }
+        if (isAborted()) return;
+        onResult(fileItem.idx, result);
+        if (onProgress) {
+            onProgress();
+        }
+    });
+}
+
 function normalizeWorkerResults(
     rawResults: unknown,
 ): { file: string; issues: Issue[]; metric: FileMetric | null }[] {
@@ -323,6 +367,38 @@ function updateArrivalTelemetry(
             break;
         }
     }
+}
+
+/**
+ * Spawns a pool of worker threads.
+ *
+ * @param count - Number of worker threads to spawn.
+ * @param workerPath - Path to worker script file.
+ * @param config - Scan configuration.
+ * @param descs - Analyzer descriptors.
+ * @param trackTelemetry - Whether to track worker spawn start timestamps.
+ * @returns Spawned workers, spawn start times, and any spawn error encountered.
+ */
+export function spawnWorkerPoolThreads(
+    count: number,
+    workerPath: string,
+    config: ScanConfig,
+    descs: WorkerAnalyzerDesc[],
+    trackTelemetry: boolean,
+): { workers: Worker[]; spawnStartTimes: number[]; error?: unknown } {
+    const workers: Worker[] = [];
+    const spawnStartTimes: number[] = [];
+    for (let k = 0; k < count; k++) {
+        const workerSpawnStartTimeMs = trackTelemetry ? nowMs() : 0;
+        try {
+            const w = new Worker(workerPath, { workerData: { config, analyzerDescs: descs } });
+            workers.push(w);
+            spawnStartTimes.push(workerSpawnStartTimeMs);
+        } catch (e) {
+            return { workers, spawnStartTimes, error: e };
+        }
+    }
+    return { workers, spawnStartTimes };
 }
 
 /**
@@ -559,21 +635,22 @@ export async function dispatchBatches(
         const processHybrid = async (batch: { idx: number; rel: string }[]): Promise<void> => {
             if (T) T.hybridFiles = batch.length;
             const hybridStartTimeMs = T ? nowMs() : 0;
-            await pMap(batch, HYBRID_CONCURRENCY, async (fileItem) => {
-                if (failed) return;
-                const { result, error } = await processSingleHybridFile(
-                    fileItem,
-                    absRoot,
-                    opts.preloaded,
-                    runAnalyzersFn,
-                );
-                if (error) {
-                    fail(error);
-                    return;
-                }
-                results[fileItem.idx] = result;
-                completed++;
-                if (T) T.hybridDone++;
+            await executeHybridPhase({
+                batch,
+                absRoot,
+                preloaded: opts.preloaded,
+                runAnalyzersFn,
+                isAborted: () => failed,
+                onResult: (idx, res) => {
+                    results[idx] = res;
+                    completed++;
+                },
+                onError: (err) => fail(err),
+                onProgress: T
+                    ? () => {
+                          T.hybridDone++;
+                      }
+                    : undefined,
             });
             if (T) T.hybridMs = nowMs() - hybridStartTimeMs;
             finishIfDone();
@@ -729,19 +806,19 @@ export async function dispatchBatches(
             for (let k = 0; k < opts.workers.length; k++) {
                 wire(opts.workers[k], k, 0);
             }
-        } else {
-            for (let k = 0; k < n; k++) {
-                let w: Worker;
-                const workerSpawnStartTimeMs = T ? nowMs() : 0;
-                try {
-                    w = new Worker(workerPath, { workerData: { config, analyzerDescs: descs } });
-                } catch (e) {
-                    fail(e);
-                    return;
-                }
-                workers.push(w);
-                wire(w, k, workerSpawnStartTimeMs);
-            }
+            return;
+        }
+
+        const spawned = spawnWorkerPoolThreads(n, workerPath, config, descs, Boolean(T));
+        for (const w of spawned.workers) {
+            workers.push(w);
+        }
+        if (spawned.error) {
+            fail(spawned.error);
+            return;
+        }
+        for (let k = 0; k < spawned.workers.length; k++) {
+            wire(spawned.workers[k], k, spawned.spawnStartTimes[k]);
         }
     });
 }

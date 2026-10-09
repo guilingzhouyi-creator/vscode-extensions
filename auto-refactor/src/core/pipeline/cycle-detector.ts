@@ -94,6 +94,44 @@ function advanceDfs(
 }
 
 /**
+ * Executes a single DFS traversal step across the explicit frame stack.
+ *
+ * Flattens the BLACK/GRAY/WHITE three-color state transitions into an atomic step:
+ * - When all neighbors of current top frame are processed, marks node BLACK and pops stack.
+ * - When a neighbor is GRAY, records a cycle back-edge.
+ * - When a neighbor is WHITE, advances DFS into that child.
+ */
+function stepDfsFrame(
+    frameStack: DfsFrame[],
+    visited: Map<string, number>,
+    activePath: string[],
+    edges: Map<string, Set<string>>,
+    seenCycleKeys: Set<string>,
+    cycles: string[][],
+): void {
+    const top = frameStack[frameStack.length - 1];
+
+    if (top.idx >= top.neighbors.length) {
+        visited.set(top.node, BLACK);
+        frameStack.pop();
+        activePath.pop();
+        return;
+    }
+
+    const next = top.neighbors[top.idx++];
+    const state = visited.get(next) ?? WHITE;
+
+    if (state === GRAY) {
+        recordCycleIfNew(activePath, next, seenCycleKeys, cycles);
+        return;
+    }
+
+    if (state === WHITE) {
+        advanceDfs(next, edges, visited, activePath, frameStack);
+    }
+}
+
+/**
  * Detect dependency cycles with an iterative three-color (WHITE/GRAY/BLACK) DFS over the
  * graph's forward edges. An explicit frame stack removes the V8 call-stack limit, so deeply
  * nested dependency chains cannot overflow.
@@ -131,26 +169,7 @@ export function detectDependencyCycles(
         ];
 
         while (frameStack.length > 0) {
-            const top = frameStack[frameStack.length - 1];
-
-            if (top.idx >= top.neighbors.length) {
-                visited.set(top.node, BLACK);
-                frameStack.pop();
-                activePath.pop();
-                continue;
-            }
-
-            const next = top.neighbors[top.idx++];
-            const state = visited.get(next) ?? WHITE;
-
-            if (state === GRAY) {
-                recordCycleIfNew(activePath, next, seenCycleKeys, cycles);
-                continue;
-            }
-
-            if (state === WHITE) {
-                advanceDfs(next, edges, visited, activePath, frameStack);
-            }
+            stepDfsFrame(frameStack, visited, activePath, edges, seenCycleKeys, cycles);
         }
     }
 
@@ -206,26 +225,7 @@ export async function detectDependencyCyclesAsync(
                 await governor.yieldEventLoop();
             }
 
-            const top = frameStack[frameStack.length - 1];
-
-            if (top.idx >= top.neighbors.length) {
-                visited.set(top.node, BLACK);
-                frameStack.pop();
-                activePath.pop();
-                continue;
-            }
-
-            const next = top.neighbors[top.idx++];
-            const state = visited.get(next) ?? WHITE;
-
-            if (state === GRAY) {
-                recordCycleIfNew(activePath, next, seenCycleKeys, cycles);
-                continue;
-            }
-
-            if (state === WHITE) {
-                advanceDfs(next, edges, visited, activePath, frameStack);
-            }
+            stepDfsFrame(frameStack, visited, activePath, edges, seenCycleKeys, cycles);
         }
     }
 

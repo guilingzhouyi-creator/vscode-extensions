@@ -14,6 +14,17 @@ import type { SemanticGraph } from '../index';
 import { UnifiedLanguageAdapter } from './base';
 import { buildCanonicalSymbolId, normalizeCanonicalPath } from './path-utils';
 
+/** Keywords excluded from being treated as callee invocations. */
+export const PYTHON_KEYWORD_CALL_EXCLUSIONS: ReadonlySet<string> = new Set([
+    'if',
+    'while',
+    'for',
+    'elif',
+    'with',
+    'assert',
+    'return',
+]);
+
 /**
  * Concrete adapter translating Python files into SemanticGraph representations.
  */
@@ -202,7 +213,7 @@ export class PythonSemanticAdapter extends UnifiedLanguageAdapter {
         while ((match = callRegex.exec(trimmed)) !== null) {
             const callee = match[1];
             // Filter keywords that look like function calls
-            if (['if', 'while', 'for', 'elif', 'with', 'assert', 'return'].includes(callee)) {
+            if (PYTHON_KEYWORD_CALL_EXCLUSIONS.has(callee)) {
                 continue;
             }
             const calleeId = buildCanonicalSymbolId(this.language, filePath, callee);

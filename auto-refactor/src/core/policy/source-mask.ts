@@ -150,7 +150,7 @@ const EXTENSION_LANGUAGE: Record<string, string> = {
 };
 
 /** Characters that, immediately before a `/`, mean the slash opens a regex literal. */
-const REGEX_PREFIX_CHARS = '([{,=:!&|?;+-*%<>';
+const REGEX_PREFIX_CHARS = new Set('([{,=:!&|?;+-*%<>');
 
 /** Flag characters consumed after a regex literal's closing slash. */
 const REGEX_FLAG_RE = /[a-z]/i;
@@ -317,7 +317,7 @@ function opensRegexLiteral(line: string, index: number): boolean {
     for (let back = index - 1; back >= 0; back -= 1) {
         const char = line[back];
         if (char === ' ' || char === '\t') continue;
-        return REGEX_PREFIX_CHARS.includes(char);
+        return REGEX_PREFIX_CHARS.has(char);
     }
     return true;
 }
@@ -349,6 +349,17 @@ function scanQuotedSpan(
 }
 
 /**
+ * Advance past regex trailing flags starting at the character immediately after closing slash.
+ */
+function consumeRegexFlags(line: string, startIndex: number): number {
+    let cursor = startIndex;
+    while (cursor < line.length && REGEX_FLAG_RE.test(line[cursor])) {
+        cursor++;
+    }
+    return cursor;
+}
+
+/**
  * Scan forward through a regular expression literal body and trailing flags.
  */
 function scanRegexSpan(line: string, startIndex: number): number {
@@ -360,14 +371,18 @@ function scanRegexSpan(line: string, startIndex: number): number {
             cursor += 2;
             continue;
         }
-        if (rc === '[') inClass = true;
-        else if (rc === ']') inClass = false;
-        else if (rc === '/' && !inClass) {
+        if (rc === '[') {
+            inClass = true;
             cursor++;
-            while (cursor < line.length && REGEX_FLAG_RE.test(line[cursor])) {
-                cursor++;
-            }
-            break;
+            continue;
+        }
+        if (rc === ']') {
+            inClass = false;
+            cursor++;
+            continue;
+        }
+        if (rc === '/' && !inClass) {
+            return consumeRegexFlags(line, cursor + 1);
         }
         cursor++;
     }

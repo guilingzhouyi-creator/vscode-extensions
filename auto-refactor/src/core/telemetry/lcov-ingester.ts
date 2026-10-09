@@ -59,15 +59,166 @@ interface LcovParserState {
 }
 
 /**
- * Parses a DA record line: 'DA:<lineNo>,<hitCount>' and writes into lineHits map.
+ * Fast zero-allocation DA record parser using integer cursor traversal.
+ * Parses 'DA:<lineNo>,<hitCount>' without creating any substring allocations.
  */
-function parseDaLine(line: string, lineHits: Map<number, number>): void {
-    const commaIdx = line.indexOf(',', 3);
-    if (commaIdx === -1) return;
-    const lineNo = parseInt(line.slice(3, commaIdx), 10);
-    const hitCount = parseInt(line.slice(commaIdx + 1), 10);
-    if (!isNaN(lineNo) && !isNaN(hitCount)) {
-        lineHits.set(lineNo, hitCount);
+function parseDaCursor(
+    text: string,
+    start: number,
+    end: number,
+    lineHits: Map<number, number>,
+): void {
+    let p = start + 3;
+    let lineNo = 0;
+    while (p < end) {
+        const c = text.charCodeAt(p);
+        if (c === 44) {
+            break;
+        }
+        if (c >= 48 && c <= 57) {
+            lineNo = lineNo * 10 + (c - 48);
+        }
+        p++;
+    }
+    if (p >= end || text.charCodeAt(p) !== 44) {
+        return;
+    }
+    p++;
+    let hitCount = 0;
+    while (p < end) {
+        const c = text.charCodeAt(p);
+        if (c >= 48 && c <= 57) {
+            hitCount = hitCount * 10 + (c - 48);
+        }
+        p++;
+    }
+    lineHits.set(lineNo, hitCount);
+}
+
+/**
+ * Fast zero-allocation integer parser from an integer cursor slice [start, end).
+ */
+function parseIntegerCursor(text: string, start: number, end: number): number {
+    let val = 0;
+    for (let p = start; p < end; p++) {
+        const c = text.charCodeAt(p);
+        if (c >= 48 && c <= 57) {
+            val = val * 10 + (c - 48);
+        }
+    }
+    return val;
+}
+
+function handleSfRecord(
+    lcovText: string,
+    start: number,
+    end: number,
+    state: LcovParserState,
+): void {
+    let sfStart = start + 3;
+    while (sfStart < end && lcovText.charCodeAt(sfStart) <= 32) {
+        sfStart++;
+    }
+    state.currentPath = lcovText.slice(sfStart, end);
+    state.linesFound = 0;
+    state.linesHit = 0;
+    state.branchesFound = 0;
+    state.branchesHit = 0;
+    state.lineHits = new Map<number, number>();
+}
+
+function handleLRecord(lcovText: string, start: number, end: number, state: LcovParserState): void {
+    const c1 = lcovText.charCodeAt(start + 1);
+    if (c1 === 70 /* 'F' */) {
+        state.linesFound = parseIntegerCursor(lcovText, start + 3, end);
+    } else if (c1 === 72 /* 'H' */) {
+        state.linesHit = parseIntegerCursor(lcovText, start + 3, end);
+    }
+}
+
+function handleBrRecord(
+    lcovText: string,
+    start: number,
+    end: number,
+    state: LcovParserState,
+): void {
+    const c2 = lcovText.charCodeAt(start + 2);
+    if (c2 === 70 /* 'F' */) {
+        state.branchesFound = parseIntegerCursor(lcovText, start + 4, end);
+    } else if (c2 === 72 /* 'H' */) {
+        state.branchesHit = parseIntegerCursor(lcovText, start + 4, end);
+    }
+}
+
+function handleEndOfRecord(
+    state: LcovParserState,
+    resultMap: Map<string, FileCoverageProfile>,
+): void {
+    if (state.currentPath) {
+        recordProfile(
+            state.currentPath,
+            state.linesFound,
+            state.linesHit,
+            state.branchesFound,
+            state.branchesHit,
+            state.lineHits,
+            resultMap,
+        );
+    }
+    state.currentPath = null;
+}
+
+/**
+ * Fast zero-allocation line break search using integer cursor traversal.
+ */
+function findNextLineBreak(text: string, pos: number, textLen: number): number {
+    for (let i = pos; i < textLen; i++) {
+        if (text.charCodeAt(i) === 10 /* '\n' */) {
+            return i;
+        }
+    }
+    return textLen;
+}
+
+/**
+ * Fast zero-allocation path basename extractor without lastIndexOf.
+ */
+function fastBasename(filePath: string): string {
+    for (let i = filePath.length - 1; i >= 0; i--) {
+        const c = filePath.charCodeAt(i);
+        if (c === 47 /* '/' */ || c === 92 /* '\\' */) {
+            return filePath.slice(i + 1);
+        }
+    }
+    return filePath;
+}
+
+/**
+ * Dispatches an in-flight LCOV record delimited by [start, end) into parser state.
+ */
+function processRecordCursor(
+    lcovText: string,
+    start: number,
+    end: number,
+    state: LcovParserState,
+    resultMap: Map<string, FileCoverageProfile>,
+): void {
+    switch (lcovText.charCodeAt(start)) {
+        case 68 /* 'D' */:
+            parseDaCursor(lcovText, start, end, state.lineHits);
+            break;
+        case 83 /* 'S' */:
+            handleSfRecord(lcovText, start, end, state);
+            break;
+        case 76 /* 'L' */:
+            handleLRecord(lcovText, start, end, state);
+            break;
+        case 66 /* 'B' */:
+            handleBrRecord(lcovText, start, end, state);
+            break;
+        case 101 /* 'e' */:
+            handleEndOfRecord(state, resultMap);
+            break;
     }
 }
 
@@ -107,62 +258,14 @@ function recordProfile(
 }
 
 /**
- * Processes a single trimmed LCOV line and updates the parser state.
- */
-function processLcovLine(
-    line: string,
-    state: LcovParserState,
-    resultMap: Map<string, FileCoverageProfile>,
-): void {
-    if (line.startsWith('DA:')) {
-        parseDaLine(line, state.lineHits);
-        return;
-    }
-    if (line.startsWith('SF:')) {
-        state.currentPath = line.slice(3).trim();
-        state.linesFound = 0;
-        state.linesHit = 0;
-        state.branchesFound = 0;
-        state.branchesHit = 0;
-        state.lineHits = new Map<number, number>();
-        return;
-    }
-    if (line.startsWith('LF:')) {
-        state.linesFound = parseInt(line.slice(3), 10) || 0;
-        return;
-    }
-    if (line.startsWith('LH:')) {
-        state.linesHit = parseInt(line.slice(3), 10) || 0;
-        return;
-    }
-    if (line.startsWith('BRF:')) {
-        state.branchesFound = parseInt(line.slice(4), 10) || 0;
-        return;
-    }
-    if (line.startsWith('BRH:')) {
-        state.branchesHit = parseInt(line.slice(4), 10) || 0;
-        return;
-    }
-    if (line === 'end_of_record') {
-        if (state.currentPath) {
-            recordProfile(
-                state.currentPath,
-                state.linesFound,
-                state.linesHit,
-                state.branchesFound,
-                state.branchesHit,
-                state.lineHits,
-                resultMap,
-            );
-        }
-        state.currentPath = null;
-    }
-}
-
-/**
  * Stream-oriented parser and evaluator for LCOV code coverage telemetry reports.
  */
 export class LcovIngester {
+    private readonly basenameCache = new WeakMap<
+        Map<string, FileCoverageProfile>,
+        Map<string, FileCoverageProfile>
+    >();
+
     /**
      * Parse raw LCOV text stream into a normalized map of FileCoverageProfile.
      * Uses zero-allocation streaming line cursors to prevent large memory spikes.
@@ -189,65 +292,88 @@ export class LcovIngester {
         const textLen = lcovText.length;
 
         while (pos < textLen) {
-            let nextNewline = lcovText.indexOf('\n', pos);
-            if (nextNewline === -1) {
-                nextNewline = textLen;
-            }
+            const nextNewline = findNextLineBreak(lcovText, pos, textLen);
             let endPos = nextNewline;
             if (endPos > pos && lcovText.charCodeAt(endPos - 1) === 13) {
                 endPos--;
             }
 
-            const line = lcovText.slice(pos, endPos).trim();
+            let start = pos;
+            while (start < endPos && lcovText.charCodeAt(start) <= 32) {
+                start++;
+            }
+            let end = endPos;
+            while (end > start && lcovText.charCodeAt(end - 1) <= 32) {
+                end--;
+            }
+
             pos = nextNewline + 1;
-            if (!line) {
+            if (start >= end) {
                 continue;
             }
 
-            processLcovLine(line, state, resultMap);
+            processRecordCursor(lcovText, start, end, state, resultMap);
         }
 
         return resultMap;
     }
 
     /**
-     * Compute ratios and insert coverage profile into destination map.
+     * Builds an O(1) basename lookup index for a given profile map.
      */
-    private recordProfile(
-        currentPath: string,
-        linesFound: number,
-        linesHit: number,
-        branchesFound: number,
-        branchesHit: number,
-        lineHits: Map<number, number>,
-        resultMap: Map<string, FileCoverageProfile>,
-    ): void {
-        recordProfile(
-            currentPath,
-            linesFound,
-            linesHit,
-            branchesFound,
-            branchesHit,
-            lineHits,
-            resultMap,
-        );
+    public buildBasenameIndex(
+        profiles: Map<string, FileCoverageProfile>,
+    ): Map<string, FileCoverageProfile> {
+        const index = new Map<string, FileCoverageProfile>();
+        for (const [key, profile] of profiles) {
+            index.set(fastBasename(key), profile);
+        }
+        return index;
+    }
+
+    private getOrBuildBasenameIndex(
+        profiles: Map<string, FileCoverageProfile>,
+    ): Map<string, FileCoverageProfile> {
+        let index = this.basenameCache.get(profiles);
+        if (!index) {
+            index = this.buildBasenameIndex(profiles);
+            this.basenameCache.set(profiles, index);
+        }
+        return index;
     }
 
     /**
-     * Resilient path lookup matching relative, absolute, or basename matches.
+     * Fast O(1) profile lookup utilizing basename indexing with fallback to
+     * exact and suffix matches.
+     *
+     * @param targetPath - Path to locate in profiles.
+     * @param profiles - Coverage profiles map.
+     * @param basenameIndex - Optional prebuilt basename index map.
+     * @returns Matched FileCoverageProfile or undefined.
      */
-    public findProfile(
+    public findProfileFast(
         targetPath: string,
         profiles: Map<string, FileCoverageProfile>,
+        basenameIndex?: Map<string, FileCoverageProfile>,
     ): FileCoverageProfile | undefined {
         const normalized = targetPath.replace(/\\/g, '/');
 
-        // 1. Direct exact match
-        if (profiles.has(normalized)) {
-            return profiles.get(normalized);
+        // 1. Direct exact match (O(1))
+        const exact = profiles.get(normalized);
+        if (exact) {
+            return exact;
         }
 
-        // 2. Suffix / Subpath match
+        // 2. Basename index match (O(1))
+        const basename = fastBasename(normalized);
+
+        const activeIndex = basenameIndex ?? this.getOrBuildBasenameIndex(profiles);
+        const indexedMatch = activeIndex.get(basename);
+        if (indexedMatch) {
+            return indexedMatch;
+        }
+
+        // 3. Fallback suffix / subpath match
         for (const [key, profile] of profiles) {
             if (key.endsWith(normalized) || normalized.endsWith(key)) {
                 return profile;
@@ -255,6 +381,17 @@ export class LcovIngester {
         }
 
         return undefined;
+    }
+
+    /**
+     * Resilient path lookup matching relative, absolute, or basename matches.
+     * Delegates to findProfileFast for O(1) accelerated retrieval.
+     */
+    public findProfile(
+        targetPath: string,
+        profiles: Map<string, FileCoverageProfile>,
+    ): FileCoverageProfile | undefined {
+        return this.findProfileFast(targetPath, profiles);
     }
 
     /**

@@ -84,6 +84,19 @@ const STATUS_ESCALATED = 'ESCALATED';
 /** DeepTrack status when no escalation events were published. */
 const STATUS_CONFIRMED = 'CONFIRMED';
 
+/** Path pattern identifying core or domain modules subject to architecture layering rules. */
+const ARCH_CORE_DOMAIN_PATH_RE = /[/\\](?:core|domain)[/\\]/i;
+
+/** Quick check pattern verifying that source text contains import or require statements. */
+const IMPORT_KEYWORD_QUICK_CHECK = /(?:from|require\()/i;
+
+/**
+ * Precompiled regular expression matching forbidden upper-layer imports
+ * from core/domain modules.
+ */
+const FORBIDDEN_UPPER_IMPORT_RE =
+    /(?:from|require\()\s*['"]([^'"]*(?:ui|view|frontend|cli|controllers)[^'"]*)['"]/i;
+
 /**
  * One file mutation handed to {@link executeDualTrack}: the two content snapshots plus the
  * optional changed-line list that lets the diff classifier skip recomputing hunks.
@@ -409,14 +422,13 @@ async function checkArchitectureLayerBreaches(
     trajectory: ChangeTrajectoryManager,
 ): Promise<void> {
     for (const input of inputs) {
-        const norm = input.filePath.replace(/\\/g, '/').toLowerCase();
-        if (!norm.includes('/core/') && !norm.includes('/domain/')) {
+        if (!ARCH_CORE_DOMAIN_PATH_RE.test(input.filePath)) {
             continue;
         }
-        const importsFromUpper =
-            /(?:from|require\()\s*['"]([^'"]*(?:ui|view|frontend|cli|controllers)[^'"]*)['"]/i.exec(
-                input.newContent,
-            );
+        if (!IMPORT_KEYWORD_QUICK_CHECK.test(input.newContent)) {
+            continue;
+        }
+        const importsFromUpper = FORBIDDEN_UPPER_IMPORT_RE.exec(input.newContent);
         if (!importsFromUpper) {
             continue;
         }

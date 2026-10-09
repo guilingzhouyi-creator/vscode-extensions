@@ -48,30 +48,96 @@ function normPath(p: string): string {
     return p.replace(/\\/g, '/').toLowerCase();
 }
 
-/** Finds 1st-order direct upstream callers who import the target file */
-function findDirectCallers(targetFile: string, indexStore: PreflightAuditIndexStore): string[] {
-    const callers: string[] = [];
-    const targetNorm = normPath(targetFile);
-    const targetBase = targetNorm.split('/').pop()?.split('.')[0] || '';
+/** Extracts normalized base name without directory and extension */
+function extractBaseName(p: string): string {
+    const norm = normPath(p);
+    return norm.split('/').pop()?.split('.')[0] || '';
+}
+
+/**
+ * Builds an inverted index mapping imported base-name to calling files.
+ * Precomputes reverse dependencies in single O(N*M) pass; queries are O(1).
+ */
+function buildReverseDependencyIndex(
+    indexStore: PreflightAuditIndexStore,
+): Map<string, string[]> {
+    const reverseIndex = new Map<string, string[]>();
+    const seenBases = new Set<string>();
 
     for (const entry of indexStore.getAllEntries()) {
-        if (normPath(entry.filePath) === targetNorm) continue;
+        const caller = entry.filePath;
+        seenBases.clear();
 
         for (const imp of entry.deps.imports) {
-            const impNorm = normPath(imp);
-            if (impNorm.includes(targetBase) || impNorm.endsWith(targetBase)) {
-                callers.push(entry.filePath);
-                break;
+            const base = extractBaseName(imp);
+            if (!base || seenBases.has(base)) {
+                continue;
+            }
+            seenBases.add(base);
+
+            const callers = reverseIndex.get(base);
+            if (callers) {
+                callers.push(caller);
+            } else {
+                reverseIndex.set(base, [caller]);
             }
         }
     }
-    return callers;
+
+    return reverseIndex;
+}
+
+/** Finds 1st-order direct upstream callers who import the target file */
+function findDirectCallers(
+    targetFile: string,
+    reverseIndexOrStore: ReadonlyMap<string, readonly string[]> | PreflightAuditIndexStore,
+): string[] {
+    const reverseIndex =
+        'getAllEntries' in reverseIndexOrStore
+            ? buildReverseDependencyIndex(reverseIndexOrStore)
+            : reverseIndexOrStore;
+
+    const targetNorm = normPath(targetFile);
+    const targetBase = extractBaseName(targetFile);
+    if (!targetBase) {
+        return [];
+    }
+
+    const callers = reverseIndex.get(targetBase);
+    if (!callers || callers.length === 0) {
+        return [];
+    }
+
+    return callers.filter((caller) => normPath(caller) !== targetNorm);
+}
+
+/**
+ * Ingests direct callers into the target collection and global audited set.
+ * Returns true if the cumulative audited count hits or exceeds maxLimit.
+ */
+function ingestCallers(
+    callers: readonly string[],
+    targetSet: Set<string>,
+    auditedSet: Set<string>,
+    maxLimit: number,
+): boolean {
+    for (const caller of callers) {
+        if (auditedSet.has(caller)) {
+            continue;
+        }
+        targetSet.add(caller);
+        auditedSet.add(caller);
+        if (auditedSet.size >= maxLimit) {
+            return true;
+        }
+    }
+    return false;
 }
 
 /** Expands 1st-order neighborhood callers */
 function expandFirstOrder(
     seedFiles: readonly string[],
-    indexStore: PreflightAuditIndexStore,
+    reverseIndex: ReadonlyMap<string, readonly string[]>,
     auditedSet: Set<string>,
     firstOrderSet: Set<string>,
     maxLimit: number,
@@ -81,15 +147,10 @@ function expandFirstOrder(
             return `Expansion limit reached (${maxLimit} files) during 1st-order tracing`;
         }
 
-        const callers = findDirectCallers(seed, indexStore);
-        for (const caller of callers) {
-            if (!auditedSet.has(caller)) {
-                firstOrderSet.add(caller);
-                auditedSet.add(caller);
-                if (auditedSet.size >= maxLimit) {
-                    return `Expansion limit reached (${maxLimit} files) during 1st-order tracing`;
-                }
-            }
+        const callers = findDirectCallers(seed, reverseIndex);
+        const limitReached = ingestCallers(callers, firstOrderSet, auditedSet, maxLimit);
+        if (limitReached) {
+            return `Expansion limit reached (${maxLimit} files) during 1st-order tracing`;
         }
     }
     return null;
@@ -116,6 +177,7 @@ function shouldExpandNeighbor(
 /** Expands conditional 2nd-order neighborhood callers */
 function expandSecondOrder(
     firstOrderSet: Set<string>,
+    reverseIndex: ReadonlyMap<string, readonly string[]>,
     indexStore: PreflightAuditIndexStore,
     auditedSet: Set<string>,
     secondOrderSet: Set<string>,
@@ -132,15 +194,10 @@ function expandSecondOrder(
             continue;
         }
 
-        const secondCallers = findDirectCallers(neighbor, indexStore);
-        for (const sc of secondCallers) {
-            if (!auditedSet.has(sc)) {
-                secondOrderSet.add(sc);
-                auditedSet.add(sc);
-                if (auditedSet.size >= maxLimit) {
-                    return `Expansion limit reached (${maxLimit} files) during 2nd-order tracing`;
-                }
-            }
+        const secondCallers = findDirectCallers(neighbor, reverseIndex);
+        const limitReached = ingestCallers(secondCallers, secondOrderSet, auditedSet, maxLimit);
+        if (limitReached) {
+            return `Expansion limit reached (${maxLimit} files) during 2nd-order tracing`;
         }
     }
     return null;
@@ -186,13 +243,14 @@ export function traceProgressiveExpansion(
     const maxLimit = options.maxExpansionLimit ?? DEFAULT_MAX_EXPANSION_LIMIT;
     const confidence = options.defaultConfidence ?? DEFAULT_CONFIDENCE;
 
+    const reverseIndex = buildReverseDependencyIndex(indexStore);
     const auditedSet = new Set<string>(seedFiles);
     const firstOrderSet = new Set<string>();
     const secondOrderSet = new Set<string>();
 
     const firstReason = expandFirstOrder(
         seedFiles,
-        indexStore,
+        reverseIndex,
         auditedSet,
         firstOrderSet,
         maxLimit,
@@ -203,6 +261,7 @@ export function traceProgressiveExpansion(
 
     const secondReason = expandSecondOrder(
         firstOrderSet,
+        reverseIndex,
         indexStore,
         auditedSet,
         secondOrderSet,

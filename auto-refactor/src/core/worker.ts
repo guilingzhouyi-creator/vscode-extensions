@@ -517,26 +517,58 @@ interface WorkerResultItem {
     symbols?: { definitions: SymbolDefinition[]; references: SymbolReference[] };
 }
 
-function runOne(
+/** Computes elapsed time since `startTimeMs` when AR_TIMING is active. */
+function getElapsed(startTimeMs: number): number {
+    return AR_TIMING && startTimeMs > 0 ? nowMs() - startTimeMs : 0;
+}
+
+/** Resolves the TypeScript SourceFile either from the AST or via legacy fallback creation. */
+function resolveSourceFile(
+    ast: NormalizedAst | null,
+    legacyCount: number,
+    adapterId: string,
     file: string,
-    absPath: string | undefined,
-    content: string | undefined,
+    content: string,
+): ts.SourceFile | undefined {
+    return ast?.sourceFile ?? createLegacySourceFile(legacyCount, adapterId, file, content);
+}
+
+/** Resolves the effective AST root node between parse AST and projection root. */
+function resolveAstRoot(ast: NormalizedAst | null, rootForCtx: NormalizedNode): NormalizedNode {
+    return ast?.root || rootForCtx;
+}
+
+/** Safely extracts symbol definitions and references when projector is absent. */
+function safeExtractSymbols(
+    proj: NodeProjector | null,
+    rootNode: NormalizedNode,
+    file: string,
+): { definitions: SymbolDefinition[]; references: SymbolReference[] } | undefined {
+    if (proj !== null) return undefined;
+    try {
+        return collectSymbols(rootNode, file);
+    } catch {
+        return undefined;
+    }
+}
+
+/**
+ * Executes the complete parse, analyze, metric collection, and symbol extraction pipeline.
+ */
+function executeScanPipeline(
+    file: string,
+    content: string,
     cfg: ScanConfig,
     instances: LoadedAnalyzer[],
 ): WorkerResultItem {
-    const c = loadFileContent(absPath, content);
-    if (c === null) {
-        return { file, issues: [] as Issue[], metric: null as FileMetric | null };
-    }
-
     const adapter = adapterFor(file, cfg.parser);
     const t0 = AR_TIMING ? nowMs() : 0;
     const { streaming, legacy } = splitAnalyzers(instances);
-    const tFilter = AR_TIMING ? nowMs() - t0 : 0;
+    const tFilter = getElapsed(t0);
 
     const { proj, ast, rootForCtx } = initAstOrProjector(
         adapter,
-        c,
+        content,
         file,
         streaming.map((a) => a.name),
         legacy.length,
@@ -547,12 +579,12 @@ function runOne(
     if (languageIssue) issues.push(languageIssue);
 
     const tSf0 = AR_TIMING ? nowMs() : 0;
-    const sf = ast?.sourceFile ?? createLegacySourceFile(legacy.length, adapter.id, file, c);
-    const tSf = AR_TIMING ? nowMs() - tSf0 : 0;
+    const sf = resolveSourceFile(ast, legacy.length, adapter.id, file, content);
+    const tSf = getElapsed(tSf0);
 
     const tLine0 = AR_TIMING ? nowMs() : 0;
-    const lineStats = countLineStats(c);
-    const tLine = AR_TIMING ? nowMs() - tLine0 : 0;
+    const lineStats = countLineStats(content);
+    const tLine = getElapsed(tLine0);
 
     const metricCollector = new FileMetricCollector();
     const entries = createAnalyzerEntries(
@@ -560,7 +592,7 @@ function runOne(
         metricCollector,
         rootForCtx,
         file,
-        c,
+        content,
         adapter,
         sf,
         cfg,
@@ -573,7 +605,7 @@ function runOne(
         entries,
         adapter,
         ast,
-        c,
+        content,
         file,
         streaming,
         sf,
@@ -581,33 +613,43 @@ function runOne(
         lineStats,
     );
     issues.push(...streamResult.issues);
-    const tStream = AR_TIMING ? nowMs() - tStream0 : 0;
+    const tStream = getElapsed(tStream0);
 
     const tLegacy0 = AR_TIMING ? nowMs() : 0;
+    const astRoot = resolveAstRoot(ast, rootForCtx);
     issues.push(
         ...executeLegacyAnalyzers(
             legacy,
             sf,
             file,
-            c,
-            ast?.root || rootForCtx,
+            content,
+            astRoot,
             adapter,
             cfg,
             lineStats,
         ),
     );
-    const tLegacy = AR_TIMING ? nowMs() - tLegacy0 : 0;
+    const tLegacy = getElapsed(tLegacy0);
 
     recordWorkerPerf(tLine, tFilter, tSf, streaming.length, tStream, tLegacy);
 
     const metric = streamResult.metricCollector.metric;
-    let symbols: { definitions: SymbolDefinition[]; references: SymbolReference[] } | undefined;
-    try {
-        symbols = proj === null ? collectSymbols(ast?.root || rootForCtx, file) : undefined;
-    } catch {
-        /* best-effort symbol collection */
-    }
+    const symbols = safeExtractSymbols(proj, astRoot, file);
     return { file, issues, metric, symbols };
+}
+
+function runOne(
+    file: string,
+    absPath: string | undefined,
+    content: string | undefined,
+    cfg: ScanConfig,
+    instances: LoadedAnalyzer[],
+): WorkerResultItem {
+    const c = loadFileContent(absPath, content);
+    if (c === null) {
+        return { file, issues: [] as Issue[], metric: null as FileMetric | null };
+    }
+    return executeScanPipeline(file, c, cfg, instances);
 }
 
 interface WorkerTaskMessage {

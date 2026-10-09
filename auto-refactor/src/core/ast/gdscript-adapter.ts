@@ -114,7 +114,13 @@ function collectTolerantCallSpans(rawLine: string): TolerantCallSpan[] {
     const callRe = new RegExp(TOLERANT_CALL_RE.source, 'g');
     let cm: RegExpExecArray | null;
     while ((cm = callRe.exec(rawLine)) !== null) {
-        const openIdx = cm.index + cm[0].lastIndexOf('(');
+        let openIdx = cm.index + cm[0].length - 1;
+        while (openIdx >= cm.index && rawLine.charCodeAt(openIdx) !== 0x28) {
+            openIdx--;
+        }
+        if (openIdx < cm.index) {
+            continue;
+        }
         const closeIdx = findCallClosingParen(rawLine, openIdx);
         if (closeIdx !== -1) {
             spans.push({ open: openIdx, close: closeIdx });

@@ -153,6 +153,81 @@ function computeMaxPredecessorDepth(importedFiles: string[], depths: Map<string,
     return currentMax;
 }
 
+/** Checks whether character code is a path separator */
+function isSlash(code: number): boolean {
+    return code === 47 || code === 92;
+}
+
+/** Advances index past contiguous path separators */
+function skipSlashes(p: string, from: number, len: number): number {
+    let i = from;
+    while (i < len && isSlash(p.charCodeAt(i))) {
+        i++;
+    }
+    return i;
+}
+
+/** Finds index of next path separator */
+function findNextSlash(p: string, from: number, len: number): number {
+    let i = from;
+    while (i < len && !isSlash(p.charCodeAt(i))) {
+        i++;
+    }
+    return i;
+}
+
+/** Intermediate decomposed path segments */
+interface ExtractedPathParts {
+    readonly p0: string;
+    readonly p1: string;
+    readonly partsCount: number;
+}
+
+/**
+ * Tokenizes leading path segments into prefix elements.
+ */
+function tokenizePathPrefix(filePath: string): ExtractedPathParts {
+    const len = filePath.length;
+    let i = skipSlashes(filePath, 0, len);
+    if (i >= len) {
+        return { p0: '', p1: '', partsCount: 0 };
+    }
+
+    const segments: string[] = [];
+    while (i < len && segments.length < 3) {
+        const next = findNextSlash(filePath, i, len);
+        segments.push(filePath.substring(i, next));
+        i = skipSlashes(filePath, next, len);
+    }
+
+    const hasRemaining = i < len ? 1 : 0;
+    const isSrcOrLib = segments[0] === 'src' || segments[0] === 'lib';
+    const start = isSrcOrLib ? 1 : 0;
+    const partsCount = (segments.length - start) + hasRemaining;
+    const p0 = segments[start] ?? '';
+    const p1 = segments[start + 1] ?? '';
+
+    return { p0, p1, partsCount };
+}
+
+/**
+ * Fast low-allocation extraction of module group key.
+ * Avoids split/filter/slice arrays by tokenizing path segments on the fly.
+ *
+ * @param filePath - Path to cluster
+ * @returns Semantic module group key
+ */
+export function extractModuleGroupKeyFast(filePath: string): string {
+    const { p0, p1, partsCount } = tokenizePathPrefix(filePath);
+    if (partsCount <= 1) {
+        return 'root';
+    }
+    if (partsCount === 2) {
+        return p0;
+    }
+    return `${p0}/${p1}`;
+}
+
 /**
  * Multi-dimensional Tensor-Parallel Partitioner.
  */
@@ -280,18 +355,7 @@ export class TensorPartitioner {
         const clusters = new Map<string, string[]>();
 
         for (const file of files) {
-            const normalized = file.replace(/\\/g, '/').replace(/^\/+/, '');
-            const segments = normalized.split('/').filter(Boolean);
-            const startIdx = segments[0] === 'src' || segments[0] === 'lib' ? 1 : 0;
-            const parts = segments.slice(startIdx);
-
-            let key = 'root';
-            if (parts.length === 2) {
-                key = parts[0];
-            } else if (parts.length > 2) {
-                key = `${parts[0]}/${parts[1]}`;
-            }
-
+            const key = extractModuleGroupKeyFast(file);
             let group = clusters.get(key);
             if (!group) {
                 group = [];

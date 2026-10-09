@@ -325,30 +325,19 @@ function injectSharedExperts(active: Set<string>, allSet: Set<string>, isDocOnly
  * @returns The active/skipped partition, the rounded activation ratio, the matched categories,
  *          and a human-readable reason string for reporting.
  */
-export function routeDiffToAnalyzers(
+/**
+ * Resolves and collects active analyzers for a diff classification based on
+ * category routing, shared experts, custom extensions, and language gating.
+ */
+function collectTargetAnalyzers(
     classification: DiffClassificationResult,
-    options: RouterOptions = {},
-): SparseRouteResult {
-    const all = options.availableAnalyzers
-        ? [...options.availableAnalyzers]
-        : [...ALL_BUILTIN_ANALYZERS];
-    const allSet = new Set(all);
-
-    if (options.forceFull) {
-        return {
-            activeAnalyzers: allSet,
-            skippedAnalyzers: new Set(),
-            activationRatio: 1.0,
-            categories: Array.from(classification.categories),
-            reason: 'Forced full scan requested',
-        };
-    }
-
+    options: RouterOptions,
+    all: string[],
+    allSet: Set<string>,
+): Set<string> {
     const active = new Set<string>();
-    const matchedCategories: DiffSemanticCategory[] = [];
 
     for (const cat of classification.categories) {
-        matchedCategories.push(cat);
         const targets = resolveCategoryTargets(cat, options.archetype);
         for (const a of targets) {
             if (allSet.has(a)) {
@@ -374,12 +363,57 @@ export function routeDiffToAnalyzers(
         applyLanguageGating(active, classification.language);
     }
 
+    return active;
+}
+
+/**
+ * Computes the partition of skipped analyzers not included in the active analyzer set.
+ */
+function partitionSkippedAnalyzers(all: string[], active: Set<string>): Set<string> {
     const skipped = new Set<string>();
     for (const a of all) {
         if (!active.has(a)) {
             skipped.add(a);
         }
     }
+    return skipped;
+}
+
+/**
+ * Select the minimum sufficient analyzer subset for a diff classification.
+ *
+ * Pure and synchronous: forceFull short-circuits to every available analyzer, otherwise the
+ * union of matrix targets for the classified categories is intersected with the available set.
+ * Custom analyzers are added unconditionally, and an empty selection widens to all available
+ * analyzers so the router always prefers a wider scan over a missed one.
+ *
+ * @param classification - Diff classification whose categories select the matrix rows to union.
+ * @param options - Candidate set, always-active custom analyzers, and the forceFull override.
+ * @returns The active/skipped partition, the rounded activation ratio, the matched categories,
+ *          and a human-readable reason string for reporting.
+ */
+export function routeDiffToAnalyzers(
+    classification: DiffClassificationResult,
+    options: RouterOptions = {},
+): SparseRouteResult {
+    const all = options.availableAnalyzers
+        ? [...options.availableAnalyzers]
+        : [...ALL_BUILTIN_ANALYZERS];
+    const allSet = new Set(all);
+
+    if (options.forceFull) {
+        return {
+            activeAnalyzers: allSet,
+            skippedAnalyzers: new Set(),
+            activationRatio: 1.0,
+            categories: Array.from(classification.categories),
+            reason: 'Forced full scan requested',
+        };
+    }
+
+    const matchedCategories = Array.from(classification.categories);
+    const active = collectTargetAnalyzers(classification, options, all, allSet);
+    const skipped = partitionSkippedAnalyzers(all, active);
 
     const ratio = Number(
         (active.size / Math.max(1, all.length)).toFixed(ACTIVATION_RATIO_DECIMALS),

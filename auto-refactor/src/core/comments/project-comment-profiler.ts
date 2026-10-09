@@ -98,6 +98,36 @@ function appendComment(comments: string[], text: string): void {
     }
 }
 
+function isQuoteChar(ch: string): boolean {
+    return ch === '"' || ch === "'" || ch === '`';
+}
+
+function tryScanAnyComment(
+    content: string,
+    index: number,
+    isLineStart: boolean,
+): { comment: string; nextIdx: number; isLineStart: boolean } | null {
+    const ch = content[index];
+    if (ch === '/') {
+        return tryScanSlashComment(content, index);
+    }
+    if (ch === '#' && isLineStart && content[index + 1] !== '!') {
+        const res = scanLineComment(content, index + 1);
+        return { comment: res.comment, nextIdx: res.nextIdx, isLineStart: true };
+    }
+    return null;
+}
+
+function advanceLineStartState(ch: string, current: boolean): boolean {
+    if (ch === '\n' || ch === '\r') {
+        return true;
+    }
+    if (ch !== ' ' && ch !== '\t') {
+        return false;
+    }
+    return current;
+}
+
 /**
  * Rapidly extracts all raw comment text lines from source content.
  * Single-pass cursor scanner skipping string literals and recognizing
@@ -115,36 +145,21 @@ export function extractRawCommentText(content: string): string {
     while (i < len) {
         const ch = content[i];
 
-        if (ch === '"' || ch === "'" || ch === '`') {
+        if (isQuoteChar(ch)) {
             i = skipStringLiteral(content, i);
             isLineStart = false;
             continue;
         }
 
-        if (ch === '/') {
-            const slashRes = tryScanSlashComment(content, i);
-            if (slashRes) {
-                appendComment(comments, slashRes.comment);
-                i = slashRes.nextIdx;
-                isLineStart = slashRes.isLineStart;
-                continue;
-            }
-        }
-
-        if (ch === '#' && isLineStart && content[i + 1] !== '!') {
-            const res = scanLineComment(content, i + 1);
-            appendComment(comments, res.comment);
-            i = res.nextIdx;
-            isLineStart = true;
+        const commentScan = tryScanAnyComment(content, i, isLineStart);
+        if (commentScan) {
+            appendComment(comments, commentScan.comment);
+            i = commentScan.nextIdx;
+            isLineStart = commentScan.isLineStart;
             continue;
         }
 
-        if (ch === '\n' || ch === '\r') {
-            isLineStart = true;
-        } else if (ch !== ' ' && ch !== '\t') {
-            isLineStart = false;
-        }
-
+        isLineStart = advanceLineStartState(ch, isLineStart);
         i++;
     }
 

@@ -70,6 +70,103 @@ function extractModuleGroupKey(filePath: string): string {
 }
 
 /**
+ * Clusters files into groups by module affinity.
+ */
+function clusterFilesByModule(files: string[]): Map<string, string[]> {
+    const clusters = new Map<string, string[]>();
+    for (const file of files) {
+        const key = extractModuleGroupKey(file);
+        const group = clusters.get(key) ?? [];
+        group.push(file);
+        clusters.set(key, group);
+    }
+    return clusters;
+}
+
+/**
+ * Calculates estimated compute workload for a single file based on effective code lines and role.
+ */
+function resolveFileWorkload(file: string, fileContents?: Map<string, string>): number {
+    const content = fileContents?.get(file) ?? '';
+    const density = analyzeCodeDensity(content, file);
+    const roleInference = inferFineGrainedFileRole(file, content.slice(0, 300));
+    const roleFactor = roleInference.role === 'algorithm_computation' ? 1.5 : 1.0;
+    return Math.max(1, Math.round(density.effectiveCodeLines * roleFactor));
+}
+
+/**
+ * Assembles a frozen review partition record for packed files.
+ */
+function buildPartitionRecord(
+    moduleKey: string,
+    sequence: number,
+    files: string[],
+    workload: number,
+    activeDomains: ReviewerDomain[],
+): ReviewPartition {
+    const dominantRole = inferFineGrainedFileRole(files[0]).role;
+    const sanitizedKey = moduleKey.replace(/[^a-zA-Z0-9_-]/g, '-');
+    return {
+        id: `part-${sanitizedKey}-${sequence}`,
+        primaryFiles: files,
+        contextFiles: [],
+        estimatedWorkload: workload,
+        activeDomains,
+        dominantRole,
+    };
+}
+
+/**
+ * Packs files within a module cluster into balanced partitions respecting max file limits.
+ */
+function packClusterFiles(
+    moduleKey: string,
+    clusterFiles: string[],
+    maxFilesPerPartition: number,
+    fileContents: Map<string, string> | undefined,
+    activeDomains: ReviewerDomain[],
+    nextSeq: () => number,
+): ReviewPartition[] {
+    const partitions: ReviewPartition[] = [];
+    let currentFiles: string[] = [];
+    let currentWorkload = 0;
+
+    for (const file of clusterFiles) {
+        const fileWorkload = resolveFileWorkload(file, fileContents);
+        currentFiles.push(file);
+        currentWorkload += fileWorkload;
+
+        if (currentFiles.length >= maxFilesPerPartition) {
+            partitions.push(
+                buildPartitionRecord(
+                    moduleKey,
+                    nextSeq(),
+                    currentFiles,
+                    currentWorkload,
+                    activeDomains,
+                ),
+            );
+            currentFiles = [];
+            currentWorkload = 0;
+        }
+    }
+
+    if (currentFiles.length > 0) {
+        partitions.push(
+            buildPartitionRecord(
+                moduleKey,
+                nextSeq(),
+                currentFiles,
+                currentWorkload,
+                activeDomains,
+            ),
+        );
+    }
+
+    return partitions;
+}
+
+/**
  * Dynamic reviewer partitioner clustering files by semantic affinity.
  */
 export class DynamicPartitioner {
@@ -97,63 +194,30 @@ export class DynamicPartitioner {
         }
 
         const activeDomains = targetDomains ?? DEFAULT_DOMAIN_BINDINGS.map((b) => b.domain);
+        const clusters = clusterFilesByModule(files);
+        return this.packAllClusters(clusters, fileContents, activeDomains);
+    }
 
-        // 1. Group files by module affinity
-        const clusters = new Map<string, string[]>();
-        for (const file of files) {
-            const key = extractModuleGroupKey(file);
-            const group = clusters.get(key) ?? [];
-            group.push(file);
-            clusters.set(key, group);
-        }
-
-        // 2. Pack files into balanced partitions based on workload
+    private packAllClusters(
+        clusters: Map<string, string[]>,
+        fileContents: Map<string, string> | undefined,
+        activeDomains: ReviewerDomain[],
+    ): ReviewPartition[] {
         const partitions: ReviewPartition[] = [];
         let partitionSeq = 1;
+        const nextSeq = () => partitionSeq++;
 
         for (const [moduleKey, clusterFiles] of clusters.entries()) {
-            let currentFiles: string[] = [];
-            let currentWorkload = 0;
-
-            for (const file of clusterFiles) {
-                const content = fileContents?.get(file) ?? '';
-                const density = analyzeCodeDensity(content, file);
-                const roleInference = inferFineGrainedFileRole(file, content.slice(0, 300));
-
-                const roleFactor = roleInference.role === 'algorithm_computation' ? 1.5 : 1.0;
-                const fileWorkload = Math.max(
-                    1,
-                    Math.round(density.effectiveCodeLines * roleFactor),
-                );
-
-                currentFiles.push(file);
-                currentWorkload += fileWorkload;
-
-                if (currentFiles.length >= this.maxFilesPerPartition) {
-                    const dominantRole = inferFineGrainedFileRole(currentFiles[0]).role;
-                    partitions.push({
-                        id: `part-${moduleKey.replace(/[^a-zA-Z0-9_-]/g, '-')}-${partitionSeq++}`,
-                        primaryFiles: currentFiles,
-                        contextFiles: [],
-                        estimatedWorkload: currentWorkload,
-                        activeDomains,
-                        dominantRole,
-                    });
-                    currentFiles = [];
-                    currentWorkload = 0;
-                }
-            }
-
-            if (currentFiles.length > 0) {
-                const dominantRole = inferFineGrainedFileRole(currentFiles[0]).role;
-                partitions.push({
-                    id: `part-${moduleKey.replace(/[^a-zA-Z0-9_-]/g, '-')}-${partitionSeq++}`,
-                    primaryFiles: currentFiles,
-                    contextFiles: [],
-                    estimatedWorkload: currentWorkload,
-                    activeDomains,
-                    dominantRole,
-                });
+            const clusterPartitions = packClusterFiles(
+                moduleKey,
+                clusterFiles,
+                this.maxFilesPerPartition,
+                fileContents,
+                activeDomains,
+                nextSeq,
+            );
+            for (const cp of clusterPartitions) {
+                partitions.push(cp);
             }
         }
 
