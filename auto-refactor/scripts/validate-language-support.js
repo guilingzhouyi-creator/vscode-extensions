@@ -221,15 +221,29 @@ async function run() {
     // The in-process path delegates per-file analysis to scanner/analyzerRunner, so the guard is
     // asserted at BOTH ends: the delegation in analyzer.js and the guard call in the module that
     // now owns it. Moving either one can no longer drop the fail-closed wiring silently.
-    const guardWiring = [
-      ['../dist/core/analyzer.js', 'runFileAnalyzers'],
-      ['../dist/core/scanner/analyzer-runner.js', 'unsupportedLanguageDiagnostic'],
-      ['../dist/core/worker.js', 'unsupportedLanguageDiagnostic'],
-    ];
-    for (const [modulePath, needle] of guardWiring) {
-      const source = fs.readFileSync(path.join(__dirname, modulePath), 'utf8');
-      assert.ok(source.includes(needle), modulePath + ' must stay wired to the fail-closed guard');
-    }
+    const analyzerSource = fs.readFileSync(
+      path.join(__dirname, '../dist/core/analyzer.js'),
+      'utf8',
+    );
+    assert.ok(
+      analyzerSource.includes('runFileAnalyzers'),
+      '../dist/core/analyzer.js must stay wired to the fail-closed guard',
+    );
+
+    const runnerSource = fs.readFileSync(
+      path.join(__dirname, '../dist/core/scanner/analyzer-runner.js'),
+      'utf8',
+    );
+    assert.ok(
+      runnerSource.includes('unsupportedLanguageDiagnostic'),
+      '../dist/core/scanner/analyzer-runner.js must stay wired to the fail-closed guard',
+    );
+
+    const workerSource = fs.readFileSync(path.join(__dirname, '../dist/core/worker.js'), 'utf8');
+    assert.ok(
+      workerSource.includes('unsupportedLanguageDiagnostic'),
+      '../dist/core/worker.js must stay wired to the fail-closed guard',
+    );
     console.log('  [PASS] both execution paths remain wired to the guard');
 
     // Coverage diagnostics: a specialized analyzer that never ran must not look like a clean
@@ -241,8 +255,9 @@ async function run() {
       include: ['**/*.py'],
       logLevel: 'silent',
     });
+    const defaultDisabled = new Set(defaultPy.summary.disabledAnalyzers || []);
     assert.ok(
-      (defaultPy.summary.disabledAnalyzers || []).includes('python-modern'),
+      defaultDisabled.has('python-modern'),
       'a disabled built-in analyzer must be listed in the summary',
     );
     assert.ok(
@@ -256,8 +271,9 @@ async function run() {
       configFile: path.join(root, 'probe-enable-python-modern.json'),
       logLevel: 'silent',
     });
+    const enabledDisabled = new Set(enabledPy.summary.disabledAnalyzers || []);
     assert.ok(
-      !(enabledPy.summary.disabledAnalyzers || []).includes('python-modern'),
+      !enabledDisabled.has('python-modern'),
       'enabling the analyzer removes it from the disabled list',
     );
     assert.ok(

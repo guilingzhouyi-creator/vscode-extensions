@@ -55,8 +55,7 @@ function check(payload, label) {
   return true;
 }
 
-(async () => {
-  // 1) real payload: samples scan
+async function testRealSamplesPayload() {
   const r = await scan({
     root: path.join(__dirname, '..', 'samples'),
     configFile: path.join(__dirname, '..', 'samples', 'auto-refactor.config.json'),
@@ -82,8 +81,9 @@ function check(payload, label) {
     perFile.push({ file: m.file, issues, metric: m });
   }
   check(perFile, 'samples-real');
+}
 
-  // 2) edge payloads
+function testEdgeCraftedPayloads() {
   const edges = [
     { file: 'a.ts', issues: [], metric: null },
     {
@@ -225,8 +225,9 @@ function check(payload, label) {
     },
   ];
   check(edges, 'edge-crafted');
+}
 
-  // 3) suggestion presence fidelity (undefined vs present must survive)
+function testSuggestionPresenceFidelity() {
   const sug = [
     {
       file: 's.ts',
@@ -247,8 +248,9 @@ function check(payload, label) {
   const sugBack = decodeResults(encodeResults(sug));
   console.log(('suggestion' in sugBack[0].issues[0] ? 'FAIL' : 'PASS') + ' suggestion-absent');
   if ('suggestion' in sugBack[0].issues[0]) process.exitCode = 1;
+}
 
-  // 4) symbols presence and deep graph fidelity (undefined vs present, 100% equivalence)
+function testSymbolsGraphFidelity() {
   const symPresPayload = [
     {
       file: 'has-sym.ts',
@@ -289,6 +291,13 @@ function check(payload, label) {
   } else {
     console.log('PASS symbols-deep-equivalence (definitions & references 100% preserved)');
   }
+}
+
+(async () => {
+  await testRealSamplesPayload();
+  testEdgeCraftedPayloads();
+  testSuggestionPresenceFidelity();
+  testSymbolsGraphFidelity();
 
   if (!process.exitCode) console.log('ALL ROUND-TRIP CHECKS PASS');
 })();

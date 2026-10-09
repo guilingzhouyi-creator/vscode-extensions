@@ -184,22 +184,8 @@ async function ablate(api, cfgDir, apiOpts) {
   }
 }
 
-async function main() {
-  const update = process.argv.includes('--update');
-  const maskMod = require(path.join(ROOT, 'dist/core/policy/source-mask'));
-  const api = require(path.join(ROOT, 'dist/api'));
-  const rules = require(path.join(ROOT, 'dist/core/governance/rules/compressionBounds'));
-  const benchDir = path.join(ROOT, 'bench');
-  fs.mkdirSync(benchDir, { recursive: true });
-
-  // `--ablate` answers "where does the scan time actually go?" instead of "is this path slower than
-  // it was?"; it is a separate mode because it takes minutes rather than seconds.
-  if (process.argv.includes('--ablate')) {
-    await ablate(api, benchDir, { root: ROOT, cache: false, logLevel: 'error' });
-    return;
-  }
-
-  const files = tsFiles(path.join(ROOT, 'src'));
+function loadCorpus(root) {
+  const files = tsFiles(path.join(root, 'src'));
   // Pre-read outside every timed region: the benchmark measures code, not the filesystem.
   const corpus = files.map((f) => ({ path: f, content: fs.readFileSync(f, 'utf8') }));
   const bytes = corpus.reduce((sum, f) => sum + f.content.length, 0);
@@ -209,38 +195,11 @@ async function main() {
     `\n=== Hot paths over ${files.length} files / ${totalLines} lines / ${bytes} bytes ` +
       `(best of ${ROUNDS}, I/O excluded) ===`,
   );
+  return { corpus, bytes };
+}
 
-  const results = {};
-
-  results['mask-source'] = best('mask-source', () => {
-    for (const f of corpus) maskMod.maskSourceText(f.content, CFG_TS);
-  });
-
-  // The per-file context, mask included, is built OUTSIDE the timed region: this path measures the
-  // rules themselves, not the masker. Folding the mask in would hide a rule-level regression.
-  const ruleContexts = corpus.map((f) => ({
-    node: null,
-    ctx: {},
-    depth: 0,
-    className: null,
-    binding: null,
-    capabilities: { languageId: 'typescript' },
-    filePath: f.path,
-    content: f.content,
-    lines: f.content.split('\n'),
-    masked: maskMod.maskSourceText(f.content, CFG_TS).masked,
-  }));
-
-  results['cmp-rules'] = best('cmp-rules', () => {
-    for (const ctx of ruleContexts) {
-      rules.GiantExpressionRule.checkFile(ctx);
-      rules.SingleLineMultiSemanticRule.checkFile(ctx);
-      rules.CallbackDepthRule.checkFile(ctx);
-      rules.CognitiveDensityRule.checkFile(ctx);
-    }
-  });
-
-  const cfgDir = path.join(ROOT, 'bench');
+async function runGovernanceScan(api, root, benchDir) {
+  const cfgDir = benchDir;
   fs.mkdirSync(cfgDir, { recursive: true });
   const cfgPath = path.join(cfgDir, '.hot-paths-config.json');
   fs.writeFileSync(
@@ -254,7 +213,7 @@ async function main() {
   for (let round = 0; round < ROUNDS; round += 1) {
     const started = process.hrtime.bigint();
     const report = await api.scan({
-      root: ROOT,
+      root,
       configFile: cfgPath,
       cache: false,
       logLevel: 'error',
@@ -265,8 +224,10 @@ async function main() {
   console.log(
     `  ${'governance-scan'.padEnd(28)} ${scanBest.toFixed(1)} ms  (${issueCount} issues)`,
   );
-  results['governance-scan'] = Number(scanBest.toFixed(1));
+  return Number(scanBest.toFixed(1));
+}
 
+function evaluateAgainstBaseline(results, bytes, update) {
   const previous = readBaseline();
 
   console.log('\n=== Baseline comparison ===');
@@ -307,6 +268,56 @@ async function main() {
     process.exit(1);
   }
   console.log('\nAll hot paths within their per-path tolerance of the baseline.');
+}
+
+async function main() {
+  const update = process.argv.includes('--update');
+  const maskMod = require(path.join(ROOT, 'dist/core/policy/source-mask'));
+  const api = require(path.join(ROOT, 'dist/api'));
+  const rules = require(path.join(ROOT, 'dist/core/governance/rules/compressionBounds'));
+  const benchDir = path.join(ROOT, 'bench');
+  fs.mkdirSync(benchDir, { recursive: true });
+
+  // `--ablate` answers "where does the scan time actually go?" instead of "is this path slower than
+  // it was?"; it is a separate mode because it takes minutes rather than seconds.
+  if (process.argv.includes('--ablate')) {
+    await ablate(api, benchDir, { root: ROOT, cache: false, logLevel: 'error' });
+    return;
+  }
+
+  const { corpus, bytes } = loadCorpus(ROOT);
+  const results = {};
+
+  results['mask-source'] = best('mask-source', () => {
+    for (const f of corpus) maskMod.maskSourceText(f.content, CFG_TS);
+  });
+
+  // The per-file context, mask included, is built OUTSIDE the timed region: this path measures the
+  // rules themselves, not the masker. Folding the mask in would hide a rule-level regression.
+  const ruleContexts = corpus.map((f) => ({
+    node: null,
+    ctx: {},
+    depth: 0,
+    className: null,
+    binding: null,
+    capabilities: { languageId: 'typescript' },
+    filePath: f.path,
+    content: f.content,
+    lines: f.content.split('\n'),
+    masked: maskMod.maskSourceText(f.content, CFG_TS).masked,
+  }));
+
+  results['cmp-rules'] = best('cmp-rules', () => {
+    for (const ctx of ruleContexts) {
+      rules.GiantExpressionRule.checkFile(ctx);
+      rules.SingleLineMultiSemanticRule.checkFile(ctx);
+      rules.CallbackDepthRule.checkFile(ctx);
+      rules.CognitiveDensityRule.checkFile(ctx);
+    }
+  });
+
+  results['governance-scan'] = await runGovernanceScan(api, ROOT, benchDir);
+  evaluateAgainstBaseline(results, bytes, update);
 }
 
 main().catch((error) => {

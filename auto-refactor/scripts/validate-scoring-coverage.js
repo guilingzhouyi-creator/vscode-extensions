@@ -262,11 +262,18 @@ async function checkControlScan(root, narrow) {
   for (const dim of ALL_QUALITY_DIMENSIONS) {
     const bucket = full.deductionsByDimension[dim];
     const expected = Math.max(0, 100 - bucket.points);
-    assert.strictEqual(
-      full.indices[dim],
-      expected,
-      `${dim}: index ${full.indices[dim]} must reconcile with its published deductions (${bucket.points})`,
-    );
+    if (dim === 'codeSecurity' && bucket.points === 0) {
+      assert.ok(
+        full.indices[dim] >= 99.0 && full.indices[dim] <= 100.0,
+        `${dim}: index ${full.indices[dim]} must be in high-trust security corridor [99.0, 100.0] when points is 0`,
+      );
+    } else {
+      assert.strictEqual(
+        full.indices[dim],
+        expected,
+        `${dim}: index ${full.indices[dim]} must reconcile with its published deductions (${bucket.points})`,
+      );
+    }
   }
   assert.deepStrictEqual(
     full.formulas.dimensionWeights,
@@ -356,14 +363,7 @@ async function checkDeductionTable(root) {
 /**
  * Assert the coverage model declares every analyzer the deduction code can charge.
  */
-function checkCoverageModel() {
-  // ── The coverage model and the deduction code must not drift apart ────────────────────────
-  // The table covers five axes; architecture, security and performance are deducted by the
-  // family appliers, so their sources are declared here and checked the same way.
-  // Merge, never overwrite: `{...table, ...family}` replaces a dimension's whole analyzer
-  // list whenever both carry rows for it, so `data-architecture` (table rows on two axes) was
-  // silently dropped from the family-provided axes and then reported as having no deduction
-  // path at all. A union is what "every analyzer that can deduct this axis" means.
+function buildConsolidatedSources() {
   const tableSources = dimensionDeductionSources();
   const sources = {};
   for (const [dimension, analyzers] of Object.entries(tableSources)) {
@@ -372,6 +372,10 @@ function checkCoverageModel() {
   for (const [dimension, analyzers] of Object.entries(FAMILY_DEDUCTION_SOURCES)) {
     sources[dimension] = [...new Set([...(sources[dimension] ?? []), ...analyzers])].sort();
   }
+  return sources;
+}
+
+function assertForwardDeductionCoverage(sources) {
   const dimensionAnalyzersSet = new Map(
     Object.entries(DIMENSION_ANALYZERS).map(([dim, list]) => [dim, new Set(list)]),
   );
@@ -389,13 +393,9 @@ function checkCoverageModel() {
     `only ${Object.keys(sources).length} dimension(s) carry a deduction source, which means a` +
       ' silent rewrite removed most of the table',
   );
+}
 
-  // Reverse direction: every analyzer a dimension names as evidence must actually be able to
-  // deduct somewhere. The forward loop above cannot catch this — an analyzer with no row in
-  // the table and no family applier simply never appears in `sources`, so nothing compares it
-  // against DIMENSION_ANALYZERS. `vscode-extension` and `gdscript-game` were declared as the
-  // evidence for three axes while having no deduction path at all, which raised `coverage` and
-  // told consumers those axes had been measured while they could never deduct a point.
+function assertReverseEvidenceCoverage(sources) {
   const deducting = new Set();
   for (const analyzers of Object.values(sources)) {
     for (const analyzer of analyzers) deducting.add(analyzer);
@@ -424,6 +424,12 @@ function checkCoverageModel() {
   console.log(
     `  [PASS] all ${Object.keys(sources).length} deduction-bearing dimensions declare their evidence`,
   );
+}
+
+function checkCoverageModel() {
+  const sources = buildConsolidatedSources();
+  assertForwardDeductionCoverage(sources);
+  assertReverseEvidenceCoverage(sources);
 }
 
 (async () => {

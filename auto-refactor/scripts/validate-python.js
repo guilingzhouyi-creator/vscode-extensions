@@ -129,14 +129,16 @@ async function run() {
     assert.strictEqual(byName.get('classify'), 5, 'function CC must be 1 + for + if + and + elif');
     console.log('  [PASS] complexity measured exactly (Widget.render=5, classify=5)');
 
-    const magic = report.issues
-      .filter((i) => i.rule === 'magic-number')
-      .map((i) => String(i.detail.value));
+    const magicSet = new Set(
+      report.issues
+        .filter((i) => i.rule === 'magic-number')
+        .map((i) => String(i.detail.value)),
+    );
     for (const expected of ['10', '100', '2', '3']) {
-      assert.ok(magic.includes(expected), `magic number ${expected} must be reported`);
+      assert.ok(magicSet.has(expected), `magic number ${expected} must be reported`);
     }
-    assert.ok(!magic.includes('5'), 'MAX_RETRIES = 5 is const-bound and must stay silent');
-    assert.ok(!magic.includes('0') && !magic.includes('1'), 'trivial numbers stay silent');
+    assert.ok(!magicSet.has('5'), 'MAX_RETRIES = 5 is const-bound and must stay silent');
+    assert.ok(!magicSet.has('0') && !magicSet.has('1'), 'trivial numbers stay silent');
     console.log('  [PASS] const-bound/trivial numbers skipped, real magic numbers reported');
 
     assert.strictEqual(

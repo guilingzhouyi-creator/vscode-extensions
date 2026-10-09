@@ -119,8 +119,15 @@ function testDomainPrefixClustering() {
 
   for (const finding of clusterFindings) {
     assert.strictEqual(finding.reason, 'domain_prefix_clustering');
+    const rawTokens = finding.suggestedDomainDirectory.toLowerCase().split(/[/\\]+/);
+    const pathTokens = new Set();
+    for (const token of rawTokens) {
+      if (token) {
+        pathTokens.add(token);
+      }
+    }
     assert.ok(
-      finding.suggestedDomainDirectory.includes('player'),
+      pathTokens.has('player'),
       'Directory suggestion should incorporate clustered domain tokens',
     );
   }

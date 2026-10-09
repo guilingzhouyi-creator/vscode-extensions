@@ -43,14 +43,17 @@ function generateSampleSource(lineCount, variation = 0) {
   return lines.join('\n');
 }
 
-async function runDeepStressSuite() {
-  console.log('================================================================');
-  console.log('🔥 PRAXIS DIFF SUBSTRATE: DEEP INTEGRATED STRESS & PROFILING 🔥');
-  console.log('================================================================\n');
+function measureAverageMs(fn, iterations) {
+  let totalMs = 0;
+  for (let i = 0; i < iterations; i++) {
+    const start = performance.now();
+    fn();
+    totalMs += performance.now() - start;
+  }
+  return totalMs / iterations;
+}
 
-  // -------------------------------------------------------------
-  // Test 1: 1,000 Files Integrated Pipeline Stress Test
-  // -------------------------------------------------------------
+async function runMultiFilePipelineStress() {
   console.log('1. Multi-File Stream Pipeline Stress (1,000 Files, 100 Modified):');
   console.log('----------------------------------------------------------------');
 
@@ -145,66 +148,42 @@ async function runDeepStressSuite() {
     `- RSS Delta                 : ${((memAfter.rss - memBefore.rss) / (1024 * 1024)).toFixed(2)} MB\n`,
   );
 
-  // -------------------------------------------------------------
-  // Test 2: Fine-Grained Hotspot Profiling (Microsecond Breakdown)
-  // -------------------------------------------------------------
+  return { graph, baseContent, modContent };
+}
+
+function runHotspotMicroBreakdown(graph) {
   console.log('2. Execution Hotspot Micro-Breakdown (5,000 Lines, 10 Edits):');
   console.log('----------------------------------------------------------------');
 
   const src5k_A = generateSampleSource(5000, 0);
   const src5k_B = generateSampleSource(5000, 1);
-
   const iters = 50;
 
   // Profiling Step A: SWAR ASCII Scan
   const buf5k = Buffer.from(src5k_B, 'utf8');
-  let tA = 0;
-  for (let i = 0; i < iters; i++) {
-    const s = performance.now();
-    isPureAsciiSWAR64(buf5k);
-    tA += performance.now() - s;
-  }
-  const avgSWAR = tA / iters;
+  const avgSWAR = measureAverageMs(() => isPureAsciiSWAR64(buf5k), iters);
 
   // Profiling Step B: computeLineStartsAndHashes
-  let tB = 0;
-  for (let i = 0; i < iters; i++) {
-    const s = performance.now();
-    computeLineStartsAndHashes(src5k_A);
-    tB += performance.now() - s;
-  }
-  const avgStartsHashes = tB / iters;
+  const avgStartsHashes = measureAverageMs(() => computeLineStartsAndHashes(src5k_A), iters);
 
   // Profiling Step C: fastDiff SES (Myers + Histogram)
   const idxA = computeLineStartsAndHashes(src5k_A);
   const idxB = computeLineStartsAndHashes(src5k_B);
   const linesA = src5k_A.split('\n');
   const linesB = src5k_B.split('\n');
-  let tC = 0;
-  for (let i = 0; i < iters; i++) {
-    const s = performance.now();
-    fastDiff(linesA, linesB, idxA.hashes, idxB.hashes);
-    tC += performance.now() - s;
-  }
-  const avgFastDiff = tC / iters;
+  const avgFastDiff = measureAverageMs(
+    () => fastDiff(linesA, linesB, idxA.hashes, idxB.hashes),
+    iters,
+  );
 
   // Profiling Step D: computeDetailedHunks (Slicing + AST Enclosing)
-  let tD = 0;
-  for (let i = 0; i < iters; i++) {
-    const s = performance.now();
-    computeDetailedHunks(src5k_A, src5k_B);
-    tD += performance.now() - s;
-  }
-  const avgHunks = tD / iters;
+  const avgHunks = measureAverageMs(() => computeDetailedHunks(src5k_A, src5k_B), iters);
 
   // Profiling Step E: Dependency Graph 1000-Node BFS
-  let tE = 0;
-  for (let i = 0; i < iters * 10; i++) {
-    const s = performance.now();
-    graph.getAffectedFiles('src/module_42.ts', 10);
-    tE += performance.now() - s;
-  }
-  const avgGraphBFS = tE / (iters * 10);
+  const avgGraphBFS = measureAverageMs(
+    () => graph.getAffectedFiles('src/module_42.ts', 10),
+    iters * 10,
+  );
 
   console.log(
     `- 1. SWAR 64-bit ASCII Scan       : ${avgSWAR.toFixed(4)} ms (${((avgSWAR / avgHunks) * 100).toFixed(1)}% of total)`,
@@ -219,10 +198,9 @@ async function runDeepStressSuite() {
   console.log(
     `- 5. Graph 1000-Node Reverse BFS  : ${avgGraphBFS.toFixed(4)} ms (${(avgGraphBFS * 1000).toFixed(1)} μs)\n`,
   );
+}
 
-  // -------------------------------------------------------------
-  // Test 3: Agent Structured Metadata Context Fidelity Benchmark
-  // -------------------------------------------------------------
+function runMetadataFidelityBenchmark(baseContent, modContent) {
   console.log('3. Agent Structured Metadata Context Fidelity & Readability Test:');
   console.log('----------------------------------------------------------------');
 
@@ -264,6 +242,16 @@ async function runDeepStressSuite() {
     `- Structured Metadata Payload Density        : ${jsonSize} bytes (Zero Token Overhead for Source File)`,
   );
   console.log(`- Agent Semantic Decision Readiness          : 🚀 100% ZERO-CODE-READ READY\n`);
+}
+
+async function runDeepStressSuite() {
+  console.log('================================================================');
+  console.log('🔥 PRAXIS DIFF SUBSTRATE: DEEP INTEGRATED STRESS & PROFILING 🔥');
+  console.log('================================================================\n');
+
+  const { graph, baseContent, modContent } = await runMultiFilePipelineStress();
+  runHotspotMicroBreakdown(graph);
+  runMetadataFidelityBenchmark(baseContent, modContent);
 
   console.log('================================================================');
   console.log('🏆 DEEP STRESS & AGENT METADATA BENCHMARK COMPLETE');

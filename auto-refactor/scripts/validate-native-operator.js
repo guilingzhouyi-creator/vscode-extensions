@@ -153,10 +153,7 @@ const TEST_CORPUS = [
   },
 ];
 
-function runValidation() {
-  console.log('=== [Native Operator Validation] Testing Rust Kernel & Dual-Track Parity ===');
-
-  // 1. Verify Status and Capabilities
+function validateStatusAndCapabilities() {
   const status = getNativeCoreStatus();
   console.log(`[Status] Active Engine: ${status.activeEngine} (version: ${status.version})`);
   console.log(`[Status] Capabilities: ${status.capabilities.join(', ')}`);
@@ -168,8 +165,9 @@ function runValidation() {
   assert.ok(status.capabilities.includes('tarjan-scc'), 'Capability tarjan-scc missing');
   assert.ok(status.capabilities.includes('dominator-tree'), 'Capability dominator-tree missing');
   assert.ok(status.capabilities.includes('dataflow-solver'), 'Capability dataflow-solver missing');
+}
 
-  // 2. Multilingual Matrix Dual-Track Equivalence
+function validateMultilingualMatrix() {
   console.log(`[Matrix] Validating ${TEST_CORPUS.length} multilingual test cases...`);
   for (let idx = 0; idx < TEST_CORPUS.length; idx++) {
     const testCase = TEST_CORPUS[idx];
@@ -179,7 +177,6 @@ function runValidation() {
     const rustRes = nativeCore.maskSourceCode(testCase.source, config);
     const shimRes = shim.maskSourceCode(testCase.source, config);
 
-    // Byte-for-byte raw lines equivalence
     assert.strictEqual(
       rustRes.raw.length,
       shimRes.raw.length,
@@ -193,7 +190,6 @@ function runValidation() {
       );
     }
 
-    // Byte-for-byte masked lines equivalence
     assert.strictEqual(
       rustRes.masked.length,
       shimRes.masked.length,
@@ -207,7 +203,6 @@ function runValidation() {
       );
     }
 
-    // Line counts equivalence
     assert.strictEqual(
       rustRes.lines,
       shimRes.lines,
@@ -220,8 +215,9 @@ function runValidation() {
     );
   }
   console.log('✓ All multilingual corpus test cases achieved 100% byte equivalence.');
+}
 
-  // 3. Real Repository Files Regression Test
+function validateRealFilesRegression() {
   const realFiles = [
     path.resolve(__dirname, '..', 'src', 'core', 'policy', 'source-mask.ts'),
     path.resolve(__dirname, '..', 'src', 'core', 'native', 'native-bridge.ts'),
@@ -249,8 +245,9 @@ function runValidation() {
     }
     console.log(`  ✓ ${path.basename(filePath)}: ${rustRes.lines} lines, 100% byte-matched.`);
   }
+}
 
-  // 4. Parity of Graph and Diff Operators
+function validateDiffAndGraphParity() {
   console.log('[Diff & Graph] Verifying graph analysis and diff hunk parity...');
   const edges = [
     ['moduleA', 'moduleB'],
@@ -276,8 +273,9 @@ function runValidation() {
     assert.strictEqual(diffRust[i].lines.length, diffShim[i].lines.length);
   }
   console.log('✓ Diff and Graph operators parity verified.');
+}
 
-  // 5. Parity of Clone and Duplication Operators
+function validateCloneAndDuplicationParity() {
   console.log('[Clone & Duplication] Verifying duplicate lines and clone detection parity...');
   const dupSamples = [
     'line 1\nline 2\nline 1\n\nline 1\n',
@@ -292,7 +290,6 @@ function runValidation() {
   }
   console.log('  ✓ Duplicate line counting 100% equivalent across all samples.');
 
-  // Clone block detection
   const cloneLines = [];
   for (let i = 0; i < 7; i++) {
     cloneLines.push(`    const value_${i} = computeNumber(${i});`);
@@ -312,7 +309,6 @@ function runValidation() {
   }
   console.log('  ✓ Intra-file clone block detection 100% equivalent.');
 
-  // MinHash signature & LSH similarity pair detection
   const fileA = 'function calcA() {\n  const x = 10;\n  const y = 20;\n  return x + y;\n}\n';
   const fileB = 'function calcA() {\n  const x = 10;\n  const y = 20;\n  return x + y;\n}\n';
   const fileC = 'function unrelatedService() {\n  const name = "user";\n  console.log(name);\n}\n';
@@ -339,11 +335,11 @@ function runValidation() {
     assert.strictEqual(pairsRust[i].similarity, pairsShim[i].similarity);
   }
   console.log('  ✓ MinHash signature generation & LSH clone pair detection 100% equivalent.');
+}
 
-  // 6. Parity of Dominator Tree and Dataflow Fixed-Point Solver
+function validateDominatorAndDataflowParity() {
   console.log('[Dominator & Dataflow] Verifying dominator tree and dataflow solver parity...');
 
-  // Diamond CFG
   const diamondEdges = [
     ['Entry', 'A'],
     ['Entry', 'B'],
@@ -361,7 +357,6 @@ function runValidation() {
   assert.deepStrictEqual(domDiamondRust.loopHeaders, domDiamondShim.loopHeaders);
   assert.deepStrictEqual(domDiamondRust.backEdges, domDiamondShim.backEdges);
 
-  // Loop CFG with back-edges
   const loopEdges = [
     ['Header', 'Body'],
     ['Body', 'Latch'],
@@ -380,7 +375,6 @@ function runValidation() {
   assert.deepStrictEqual(domLoopRust.backEdges, domLoopShim.backEdges, 'Back edges parity');
   assert.strictEqual(domLoopRust.loopHeaders.includes('Header'), true);
 
-  // Dataflow fixed point solver parity
   const flowEdges = [
     ['N0', 'N1'],
     ['N1', 'N2'],
@@ -411,8 +405,9 @@ function runValidation() {
   assert.deepStrictEqual(flowRust.inSets, flowShim.inSets, 'Dataflow In-sets parity');
   assert.deepStrictEqual(flowRust.outSets, flowShim.outSets, 'Dataflow Out-sets parity');
   console.log('  ✓ Dominator tree and Dataflow solver 100% equivalent.');
+}
 
-  // 7. Parity of Multi-Pattern Match Operator
+function validatePatternMatchParity() {
   console.log('[Pattern Match] Verifying fast multi-pattern matching parity...');
   const patternCorpus = [
     'const API_KEY = "sk-1234567890abcdef"; // secret key',
@@ -433,15 +428,16 @@ function runValidation() {
     assert.strictEqual(matchesRust[i].matchText, matchesShim[i].matchText);
   }
   console.log('  ✓ Multi-pattern matching 100% equivalent.');
+}
 
-  // 8. Fuzzing & Mutation Stream Stress Parity
+let seed = 123456789;
+function pseudoRandom() {
+  seed = (seed * 1664525 + 1013904223) >>> 0;
+  return seed / 4294967296;
+}
+
+function validateFuzzingMutationParity() {
   console.log('[Fuzzing & Mutation] Running 40 deterministic mutation fuzzing rounds...');
-  let seed = 123456789;
-  function pseudoRandom() {
-    seed = (seed * 1664525 + 1013904223) >>> 0;
-    return seed / 4294967296;
-  }
-
   const fuzzTokens = [
     '// line comment',
     '/* block comment */',
@@ -505,8 +501,9 @@ function runValidation() {
     }
   }
   console.log('  ✓ 40 rounds of deterministic mutation fuzzing achieved 100% byte equivalence.');
+}
 
-  // 9. Random Directed Graph Equivalence
+function validateRandomGraphEquivalence() {
   console.log('[Random Graph] Verifying random DAG and cyclic graph SCC parity...');
   for (let g = 0; g < 5; g++) {
     const nodeCount = 10 + g * 2;
@@ -526,7 +523,19 @@ function runValidation() {
     );
   }
   console.log('  ✓ Random graph topology analysis parity verified.');
+}
 
+function runValidation() {
+  console.log('=== [Native Operator Validation] Testing Rust Kernel & Dual-Track Parity ===');
+  validateStatusAndCapabilities();
+  validateMultilingualMatrix();
+  validateRealFilesRegression();
+  validateDiffAndGraphParity();
+  validateCloneAndDuplicationParity();
+  validateDominatorAndDataflowParity();
+  validatePatternMatchParity();
+  validateFuzzingMutationParity();
+  validateRandomGraphEquivalence();
   console.log('=== [Native Operator Validation] SUCCESS: All assertions passed. ===');
 }
 

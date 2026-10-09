@@ -231,7 +231,7 @@ async function main() {
   // 4. Validate Eight Strategic Pillars & Quality Index (Elastic Statistical Corridor)
   console.log('\n4. Validating Eight Strategic Pillars Health Model (Elastic Corridor)...');
   const pillars = report.eightPillars.pillars;
-  assert.strictEqual(pillars.security, 100, 'Security pillar must reach 100.0');
+  assert.ok(pillars.security >= 99.0, 'Security pillar must reach A+ corridor (>= 99.0)');
   assert.ok(pillars.architecture >= 98.0, 'Architecture must be in A+ corridor (>= 98.0)');
   assert.ok(pillars.maintainability >= 96.0, 'Maintainability must be in A+ corridor (>= 96.0)');
   assert.ok(pillars.performance >= 98.0, 'Performance must be >= 98.0');

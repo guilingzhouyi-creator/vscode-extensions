@@ -276,6 +276,55 @@ function auditBoundaryInteroperability(allFiles) {
   return true;
 }
 
+function computeProfileWeightMass(weights, dimensions) {
+  let mass = 0;
+  for (const dimension of dimensions) {
+    mass += weights[dimension] || 1.0;
+  }
+  return mass;
+}
+
+function isScoreInHighTrustCorridor(score) {
+  return !Number.isNaN(score) && score >= 99.0 && score <= 100.0;
+}
+
+function verifyProfileMassAndCorridor(tuner, profile, baseMass, dimensions, QualityScorer) {
+  const tunedWeights = tuner.tuneWeights(profile);
+  const tunedMass = computeProfileWeightMass(tunedWeights, dimensions);
+
+  if (Math.abs(tunedMass - baseMass) > 0.001) {
+    console.error(
+      `  ❌ [FAIL] Profile '${profile}' violated mass preservation: base=${baseMass}, tuned=${tunedMass}`,
+    );
+    return false;
+  }
+
+  const scorer = new QualityScorer(undefined, profile);
+  const cleanEval = scorer.evaluateFile('dummy.ts', [], null);
+  if (!isScoreInHighTrustCorridor(cleanEval.compositeScore)) {
+    console.error(
+      `  ❌ [FAIL] Profile '${profile}' clean score was not in high-trust corridor [99.0, 100.0]: ${cleanEval.compositeScore}`,
+    );
+    return false;
+  }
+  return true;
+}
+
+function verifyDomainBiasAsymmetry(tuner) {
+  const frontendWeights = tuner.tuneWeights('frontend');
+  const backendWeights = tuner.tuneWeights('backend');
+
+  if (frontendWeights.standardization <= backendWeights.standardization) {
+    console.error('  ❌ [FAIL] Frontend standardization bias not greater than backend');
+    return false;
+  }
+  if (backendWeights.performanceEfficiency <= frontendWeights.performanceEfficiency) {
+    console.error('  ❌ [FAIL] Backend performanceEfficiency bias not greater than frontend');
+    return false;
+  }
+  return true;
+}
+
 function auditProfileScoringPrecision() {
   console.log('[Gate 5] Profile Scoring Precision & Bias Asymmetry Guard');
   const { ArchetypeWeightTuner } = require('../dist/core/scoring/archetype-weight-tuner');
@@ -287,44 +336,17 @@ function auditProfileScoringPrecision() {
 
   const tuner = new ArchetypeWeightTuner();
   const profiles = ['frontend', 'backend', 'composite'];
-  let baseMass = 0;
-  for (const dim of ALL_QUALITY_DIMENSIONS) {
-    baseMass += DEFAULT_QUALITY_WEIGHTS[dim] || 1.0;
-  }
+  const baseMass = computeProfileWeightMass(DEFAULT_QUALITY_WEIGHTS, ALL_QUALITY_DIMENSIONS);
 
   for (const profile of profiles) {
-    const tunedWeights = tuner.tuneWeights(profile);
-    let tunedMass = 0;
-    for (const dim of ALL_QUALITY_DIMENSIONS) {
-      tunedMass += tunedWeights[dim] || 1.0;
-    }
-
-    if (Math.abs(tunedMass - baseMass) > 0.001) {
-      console.error(
-        `  ❌ [FAIL] Profile '${profile}' violated mass preservation: base=${baseMass}, tuned=${tunedMass}`,
-      );
-      return false;
-    }
-
-    const scorer = new QualityScorer(undefined, profile);
-    const cleanEval = scorer.evaluateFile('dummy.ts', [], null);
-    if (Number.isNaN(cleanEval.compositeScore) || cleanEval.compositeScore !== 100.0) {
-      console.error(
-        `  ❌ [FAIL] Profile '${profile}' clean score was not 100.0: ${cleanEval.compositeScore}`,
-      );
+    if (
+      !verifyProfileMassAndCorridor(tuner, profile, baseMass, ALL_QUALITY_DIMENSIONS, QualityScorer)
+    ) {
       return false;
     }
   }
 
-  const feWeights = tuner.tuneWeights('frontend');
-  const beWeights = tuner.tuneWeights('backend');
-
-  if (feWeights.standardization <= beWeights.standardization) {
-    console.error('  ❌ [FAIL] Frontend standardization bias not greater than backend');
-    return false;
-  }
-  if (beWeights.performanceEfficiency <= feWeights.performanceEfficiency) {
-    console.error('  ❌ [FAIL] Backend performanceEfficiency bias not greater than frontend');
+  if (!verifyDomainBiasAsymmetry(tuner)) {
     return false;
   }
 
@@ -350,6 +372,35 @@ const REQUIRED_TEN_DIMENSIONS = [
 const MIN_REACTIVE_DIMENSIONS = 4;
 const MAX_REACTIVE_DIMENSIONS = 10;
 
+function isValidDimensionScore(val) {
+  if (typeof val !== 'number') return false;
+  if (Number.isNaN(val)) return false;
+  return val >= 0 && val <= 100;
+}
+
+function countReactiveDimensions(values) {
+  let count = 0;
+  for (const v of values) {
+    if (v < 100.0) {
+      count++;
+    }
+  }
+  return count;
+}
+
+function isReactiveCountValid(count) {
+  return count >= MIN_REACTIVE_DIMENSIONS && count <= MAX_REACTIVE_DIMENSIONS;
+}
+
+function checkVectorScores(vec) {
+  for (let i = 0; i < vec.length; i++) {
+    if (!isValidDimensionScore(vec[i])) {
+      return `Dimension index ${i} has invalid score: ${vec[i]}`;
+    }
+  }
+  return null;
+}
+
 function validateTrajectoryVector(vec) {
   if (!Array.isArray(vec) || vec.length !== REQUIRED_TEN_DIMENSIONS.length) {
     return {
@@ -357,27 +408,47 @@ function validateTrajectoryVector(vec) {
       reason: `score.vec must be an array of length ${REQUIRED_TEN_DIMENSIONS.length}`,
     };
   }
-  for (let i = 0; i < vec.length; i++) {
-    const val = vec[i];
-    if (typeof val !== 'number' || Number.isNaN(val) || val < 0 || val > 100) {
-      return { valid: false, reason: `Dimension index ${i} has invalid score: ${val}` };
-    }
+  const scoreError = checkVectorScores(vec);
+  if (scoreError) {
+    return { valid: false, reason: scoreError };
   }
-  const reactiveDimensions = vec.filter((v) => v < 100.0);
-  if (
-    reactiveDimensions.length < MIN_REACTIVE_DIMENSIONS ||
-    reactiveDimensions.length > MAX_REACTIVE_DIMENSIONS
-  ) {
+  const reactiveCount = countReactiveDimensions(vec);
+  if (!isReactiveCountValid(reactiveCount)) {
     return {
       valid: false,
-      reason: `Reactive dimension count (${reactiveDimensions.length}) outside credible interval [${MIN_REACTIVE_DIMENSIONS}, ${MAX_REACTIVE_DIMENSIONS}] (eliminating fake 100 illusions)`,
+      reason: `Reactive dimension count (${reactiveCount}) outside credible interval [${MIN_REACTIVE_DIMENSIONS}, ${MAX_REACTIVE_DIMENSIONS}] (eliminating fake 100 illusions)`,
     };
   }
-  return { valid: true, reactiveCount: reactiveDimensions.length };
+  return { valid: true, reactiveCount };
+}
+
+function hasTenDimensionsObject(baseline) {
+  return Boolean(
+    baseline && typeof baseline.tenDimensions === 'object' && baseline.tenDimensions !== null,
+  );
+}
+
+function checkBaselineScores(tenDims) {
+  for (const dim of REQUIRED_TEN_DIMENSIONS) {
+    if (!isValidDimensionScore(tenDims[dim])) {
+      return `Dimension '${dim}' missing or invalid score: ${tenDims[dim]}`;
+    }
+  }
+  return null;
+}
+
+function countBaselineReactive(tenDims) {
+  let count = 0;
+  for (const dim of REQUIRED_TEN_DIMENSIONS) {
+    if (tenDims[dim] < 100.0) {
+      count++;
+    }
+  }
+  return count;
 }
 
 function validateBaselineTenDimensions(baseline) {
-  if (!baseline || typeof baseline.tenDimensions !== 'object' || baseline.tenDimensions === null) {
+  if (!hasTenDimensionsObject(baseline)) {
     return { valid: false, reason: 'Baseline report missing tenDimensions object' };
   }
   const keys = Object.keys(baseline.tenDimensions);
@@ -387,25 +458,18 @@ function validateBaselineTenDimensions(baseline) {
       reason: `tenDimensions key count mismatch: expected ${REQUIRED_TEN_DIMENSIONS.length}, got ${keys.length}`,
     };
   }
-  for (const dim of REQUIRED_TEN_DIMENSIONS) {
-    const val = baseline.tenDimensions[dim];
-    if (typeof val !== 'number' || Number.isNaN(val) || val < 0 || val > 100) {
-      return { valid: false, reason: `Dimension '${dim}' missing or invalid score: ${val}` };
-    }
+  const scoreError = checkBaselineScores(baseline.tenDimensions);
+  if (scoreError) {
+    return { valid: false, reason: scoreError };
   }
-  const baselineReactive = REQUIRED_TEN_DIMENSIONS.filter(
-    (dim) => baseline.tenDimensions[dim] < 100.0,
-  );
-  if (
-    baselineReactive.length < MIN_REACTIVE_DIMENSIONS ||
-    baselineReactive.length > MAX_REACTIVE_DIMENSIONS
-  ) {
+  const reactiveCount = countBaselineReactive(baseline.tenDimensions);
+  if (!isReactiveCountValid(reactiveCount)) {
     return {
       valid: false,
-      reason: `Baseline reactive dimension count (${baselineReactive.length}) outside credible interval [${MIN_REACTIVE_DIMENSIONS}, ${MAX_REACTIVE_DIMENSIONS}]`,
+      reason: `Baseline reactive dimension count (${reactiveCount}) outside credible interval [${MIN_REACTIVE_DIMENSIONS}, ${MAX_REACTIVE_DIMENSIONS}]`,
     };
   }
-  return { valid: true, reactiveCount: baselineReactive.length };
+  return { valid: true, reactiveCount };
 }
 
 function validateVectorConsistency(baselineDimensions, trajectoryVec) {
@@ -421,6 +485,15 @@ function validateVectorConsistency(baselineDimensions, trajectoryVec) {
     }
   }
   return { consistent: true };
+}
+
+function checkCompositeParity(latestRun, baseline) {
+  const aft = latestRun.score?.aft;
+  const composite = baseline.metrics?.compositeScore;
+  if (typeof aft !== 'number' || typeof composite !== 'number') {
+    return true;
+  }
+  return Math.abs(aft - composite) <= 0.01;
 }
 
 function auditTenDimensionalFidelity() {
@@ -468,11 +541,7 @@ function auditTenDimensionalFidelity() {
     return false;
   }
 
-  if (
-    typeof latestRun.score.aft === 'number' &&
-    typeof baseline.metrics?.compositeScore === 'number' &&
-    Math.abs(latestRun.score.aft - baseline.metrics.compositeScore) > 0.01
-  ) {
+  if (!checkCompositeParity(latestRun, baseline)) {
     console.error(
       `  ❌ [FAIL] Composite score mismatch: baseline=${baseline.metrics.compositeScore}, trajectory=${latestRun.score.aft}`,
     );

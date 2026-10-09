@@ -137,6 +137,102 @@ function normalize(r) {
  * @returns A promise that settles to undefined after the report; pass/fail is communicated through
  *   the process exit code rather than through this value.
  */
+function buildIssueLookup(issues) {
+  const countsByRuleLineVal = new Map();
+  const countsByRuleVal = new Map();
+
+  for (const i of issues) {
+    const rule = i.rule;
+    const line = i.location && i.location.start ? i.location.start.line : undefined;
+    const val = i.detail && i.detail.value !== undefined ? String(i.detail.value) : undefined;
+    if (val !== undefined) {
+      const rvKey = `${rule}|${val}`;
+      countsByRuleVal.set(rvKey, (countsByRuleVal.get(rvKey) || 0) + 1);
+      if (line !== undefined) {
+        const rlvKey = `${rule}|${line}|${val}`;
+        countsByRuleLineVal.set(rlvKey, (countsByRuleLineVal.get(rlvKey) || 0) + 1);
+      }
+    }
+  }
+
+  return {
+    hsAt: (line, val) => countsByRuleLineVal.get(`hardcoded-string|${line}|${val}`) || 0,
+    mnAt: (line, val) => countsByRuleLineVal.get(`magic-number|${line}|${String(val)}`) || 0,
+    dupVal: (val) => countsByRuleVal.get(`duplicate-literal|${String(val)}`) || 0,
+  };
+}
+
+const KEYPOINT_SPECS = [
+  {
+    evaluate: (lookup) => {
+      const n1 = ["'admin'", "'user'", "'guest'"].map((v) => lookup.hsAt(2, v)).filter(Boolean).length;
+      return {
+        pass: n1 === 3,
+        passMsg: '① type Role string literals → 3 hardcoded-string (line 2)',
+        failMsg: `① type Role hardcoded-string count=${n1}`,
+      };
+    },
+  },
+  {
+    evaluate: (lookup) => {
+      const cnt = lookup.dupVal(100);
+      return {
+        pass: cnt === 1,
+        passMsg: '② @deco({length:100}) → 100 in duplicate-literal group (decorator arg descended)',
+        failMsg: `② 100 duplicate-literal=${cnt}`,
+      };
+    },
+  },
+  {
+    evaluate: (lookup) => {
+      const hs = lookup.hsAt(21, "'strict'");
+      const mn = lookup.mnAt(21, 3);
+      return {
+        pass: hs === 1 && mn === 1,
+        passMsg: "③ as const → 'strict' hardcoded-string + 3 magic-number (line 21)",
+        failMsg: `③ as const literals missing (strict=${hs}, 3=${mn})`,
+      };
+    },
+  },
+  {
+    evaluate: (lookup) => {
+      const dep = lookup.hsAt(26, "'./dep'");
+      const other = lookup.hsAt(27, "'./other'");
+      return {
+        pass: dep === 1 && other === 1,
+        passMsg: '④ export * / export {x} from → hardcoded-string (lines 26,27)',
+        failMsg: `④ export sources (dep=${dep}, other=${other})`,
+      };
+    },
+  },
+  {
+    evaluate: (_lookup, widget) => {
+      if (!widget) {
+        return { pass: false, failMsg: '⑤ widget.ts metric missing' };
+      }
+      const expFn = 4;
+      const expDepth = 3;
+      const ok = widget.functions === expFn && widget.maxNestingDepth === expDepth;
+      return {
+        pass: ok,
+        passMsg: `⑤ StaticBlock: functions=${widget.functions}, maxNestingDepth=${widget.maxNestingDepth} (expect ${expFn}/${expDepth})`,
+        failMsg: `⑤ StaticBlock metrics (functions=${widget.functions}/${expFn}, maxNestingDepth=${widget.maxNestingDepth}/${expDepth})`,
+      };
+    },
+  },
+];
+
+function runKeypointSpecs(specs, lookup, widget, pass, fail) {
+  for (const spec of specs) {
+    const res = spec.evaluate(lookup, widget);
+    if (res.pass) {
+      pass(res.passMsg);
+    } else {
+      fail(res.failMsg);
+    }
+  }
+}
+
 async function main() {
   fs.mkdirSync(SRC, { recursive: true });
   fs.writeFileSync(path.join(SRC, 'widget.ts'), CONTENT);
@@ -181,75 +277,10 @@ async function main() {
   }
 
   const issues = JSON.parse(out1).issues;
-  const hsAt = (line, val) =>
-    issues.filter(
-      (i) =>
-        i.rule === 'hardcoded-string' &&
-        i.location.start.line === line &&
-        i.detail &&
-        i.detail.value === val,
-    ).length;
-  const mnAt = (line, val) =>
-    issues.filter(
-      (i) =>
-        i.rule === 'magic-number' &&
-        i.location.start.line === line &&
-        i.detail &&
-        i.detail.value === String(val),
-    ).length;
-  const dupVal = (val) =>
-    issues.filter(
-      (i) => i.rule === 'duplicate-literal' && i.detail && i.detail.value === String(val),
-    ).length;
+  const lookup = buildIssueLookup(issues);
   const widget = r1.fileMetrics.find((m) => m.file.endsWith('widget.ts'));
 
-  // ① type Role string type literals → hardcoded-string (line 2, tolerated=false)
-  const n1 = ["'admin'", "'user'", "'guest'"].map((v) => hsAt(2, v)).filter(Boolean).length;
-  if (n1 === 3) {
-    pass(`① type Role string literals → 3 hardcoded-string (line 2)`);
-  } else {
-    fail(`① type Role hardcoded-string count=${n1}`);
-  }
-
-  // ② @deco({length:100}) → 100 literal descended (duplicate-literal group;
-  // 4 occurrences across decorator + run fn)
-  if (dupVal(100) === 1) {
-    pass(`② @deco({length:100}) → 100 in duplicate-literal group (decorator arg descended)`);
-  } else {
-    fail(`② 100 duplicate-literal=${dupVal(100)}`);
-  }
-
-  // ③ as const literals not lost
-  if (hsAt(21, "'strict'") === 1 && mnAt(21, 3) === 1) {
-    pass(`③ as const → 'strict' hardcoded-string + 3 magic-number (line 21)`);
-  } else {
-    fail(`③ as const literals missing (strict=${hsAt(21, "'strict'")}, 3=${mnAt(21, 3)})`);
-  }
-
-  // ④ export * from / export {x} from → hardcoded-string (source materialized, not tolerated)
-  if (hsAt(26, "'./dep'") === 1 && hsAt(27, "'./other'") === 1) {
-    pass(`④ export * / export {x} from → hardcoded-string (lines 26,27)`);
-  } else {
-    fail(`④ export sources (dep=${hsAt(26, "'./dep'")}, other=${hsAt(27, "'./other'")})`);
-  }
-
-  // ⑤ StaticBlock: inner functions counted + maxNestingDepth (Block-wrap parity)
-  if (!widget) {
-    fail('⑤ widget.ts metric missing');
-  } else {
-    const expFn = 4; // deco + helper + run + copy getter
-    // static block statements +1 via StaticBlock increasesNesting; run body Block +1; if +1
-    const expDepth = 3;
-    if (widget.functions === expFn && widget.maxNestingDepth === expDepth) {
-      pass(
-        `⑤ StaticBlock: functions=${widget.functions}, maxNestingDepth=${widget.maxNestingDepth} (expect ${expFn}/${expDepth})`,
-      );
-    } else {
-      fail(
-        `⑤ StaticBlock metrics (functions=${widget.functions}/${expFn}, maxNestingDepth=${widget.maxNestingDepth}/${expDepth})`,
-      );
-    }
-  }
+  runKeypointSpecs(KEYPOINT_SPECS, lookup, widget, pass, fail);
 
   console.log(failed === 0 ? '\nT04 KEY POINTS: ALL PASS' : `\nT04 KEY POINTS: ${failed} FAILED`);
   cleanup();

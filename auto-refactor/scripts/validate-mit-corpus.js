@@ -28,6 +28,15 @@ const { inferFineGrainedFileRole } = require('../dist/core/intelligence/file-rol
 const { ConstantsAnalyzer } = require('../dist/analyzers/constants');
 const { createSourceFile } = require('../dist/utils/ast');
 
+const CONSTANT_RULES_SET = new Set(['hardcoded-string', 'duplicate-literal', 'magic-number']);
+
+function containsConstKeyword(suggestion) {
+  if (!suggestion) return false;
+  if (suggestion.startsWith('const ')) return true;
+  const tokens = new Set(suggestion.trim().split(/\s+/));
+  return tokens.has('const');
+}
+
 let total = 0;
 let passed = 0;
 
@@ -125,7 +134,7 @@ async function main() {
     const pyStringIssue = pyIssues.find((i) => i.rule === 'hardcoded-string');
     if (pyStringIssue && pyStringIssue.suggestion) {
       assert.strictEqual(
-        pyStringIssue.suggestion.includes('const '),
+        containsConstKeyword(pyStringIssue.suggestion),
         false,
         'Python suggestion must not contain "const"',
       );
@@ -268,12 +277,12 @@ async function main() {
       const rep = await scan({ root: bottlePath, include: ['bottle.py'] });
       assert.strictEqual(rep.summary.filesScanned, 1);
       const pyConstIssues = (rep.issues || []).filter(
-        (i) => (i.suggestion && i.rule.includes('constant')) || i.rule === 'hardcoded-string',
+        (i) => (i.suggestion && (CONSTANT_RULES_SET.has(i.rule) || i.rule.includes('constant'))),
       );
       for (const iss of pyConstIssues.slice(0, 10)) {
         if (iss.suggestion) {
           assert.strictEqual(
-            iss.suggestion.includes('const '),
+            containsConstKeyword(iss.suggestion),
             false,
             `Python suggestion must not contain "const": ${iss.suggestion}`,
           );
