@@ -500,11 +500,38 @@ function resolveGuardIfSpan(lines: string[], idx: number): number {
     return -1;
 }
 
-function findFunctionOpeningBrace(lines: string[], start: number): number {
-    for (let braceIdx = start; braceIdx < lines.length && braceIdx < start + 5; braceIdx++) {
-        if (lines[braceIdx].includes('{')) return braceIdx;
+function buildBraceLineIndexSet(lines: string[]): Set<number> {
+    const set = new Set<number>();
+    for (let i = 0; i < lines.length; i++) {
+        if (/\{/.test(lines[i])) {
+            set.add(i);
+        }
+    }
+    return set;
+}
+
+function findFunctionOpeningBraceIndexed(
+    braceSet: Set<number>,
+    start: number,
+    maxLines: number,
+): number {
+    const limit = Math.min(maxLines, start + 5);
+    for (let braceIdx = start; braceIdx < limit; braceIdx++) {
+        if (braceSet.has(braceIdx)) return braceIdx;
     }
     return -1;
+}
+
+/**
+ * Locate the opening brace index for a function starting at or after the start index.
+ *
+ * @param lines - Array of source code lines.
+ * @param start - Starting line index to begin searching for opening brace.
+ * @returns 0-based line index of the opening brace, or -1 if not found.
+ */
+export function findFunctionOpeningBrace(lines: string[], start: number): number {
+    const braceSet = buildBraceLineIndexSet(lines);
+    return findFunctionOpeningBraceIndexed(braceSet, start, lines.length);
 }
 
 function countConsecutiveGuardClauses(
@@ -538,12 +565,13 @@ function auditGuardClausePatternsBrace(
     threshold: number,
     issues: Issue[],
 ): void {
+    const braceSet = buildBraceLineIndexSet(lines);
     for (let i = 0; i < lines.length; i++) {
         const trimmed = lines[i].trim();
         if (!/\b(?:function|fn|func)\s+[A-Za-z_]\w*/.test(trimmed) || trimmed.endsWith(';'))
             continue;
 
-        const braceIdx = findFunctionOpeningBrace(lines, i);
+        const braceIdx = findFunctionOpeningBraceIndexed(braceSet, i, lines.length);
         if (braceIdx === -1) continue;
 
         const { count, firstIfLine } = countConsecutiveGuardClauses(lines, braceIdx + 1);

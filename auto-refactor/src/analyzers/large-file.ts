@@ -120,6 +120,45 @@ function checkFailThreshold(
     return null;
 }
 
+function evaluateLinesOrLocWarn(
+    m: FileMetric,
+    t: Record<string, any>,
+    density: any,
+    zoneProfile: any,
+): string | null {
+    const effectiveLoc = getEvaluatedEffectiveLoc(density, zoneProfile);
+    if (t.effectiveLocWarn && effectiveLoc >= t.effectiveLocWarn) {
+        return `effective LOC ${effectiveLoc} >= warn threshold ${t.effectiveLocWarn} (raw lines: ${m.lines})`;
+    }
+    if (m.lines >= t.fileLinesWarn) {
+        const effWarn = t.effectiveLocWarn || 400;
+        const skipWarn = zoneProfile && zoneProfile.embeddedTestLines > 0 && effectiveLoc < effWarn;
+        if (!skipWarn) {
+            return `lines ${m.lines} >= warn threshold ${t.fileLinesWarn}`;
+        }
+    }
+    return null;
+}
+
+function evaluateFunctionsWarn(m: FileMetric, t: Record<string, any>): string | null {
+    if (m.functions >= t.fileFunctionsWarn) {
+        return `functions ${m.functions} >= warn threshold ${t.fileFunctionsWarn}`;
+    }
+    return null;
+}
+
+function evaluateEntanglementWarn(
+    hasReasons: boolean,
+    zoneProfile: any,
+    t: Record<string, any>,
+): string | null {
+    const elasticActive = t.enableElasticBudget || t.flagZonePartitioner;
+    if (hasReasons && !zoneProfile.isDecoupled && elasticActive) {
+        return `high intra-file entanglement (EI: ${zoneProfile.entanglementIndex})`;
+    }
+    return null;
+}
+
 function collectWarnReasons(
     m: FileMetric,
     t: Record<string, any>,
@@ -127,27 +166,21 @@ function collectWarnReasons(
     zoneProfile: any,
 ): string[] {
     const reasons: string[] = [];
-    const effectiveLoc = getEvaluatedEffectiveLoc(density, zoneProfile);
-    if (t.effectiveLocWarn && effectiveLoc >= t.effectiveLocWarn) {
-        reasons.push(
-            `effective LOC ${effectiveLoc} >= warn threshold ${t.effectiveLocWarn} (raw lines: ${m.lines})`,
-        );
-    } else if (m.lines >= t.fileLinesWarn) {
-        const effWarn = t.effectiveLocWarn || 400;
-        const skipWarn = zoneProfile && zoneProfile.embeddedTestLines > 0 && effectiveLoc < effWarn;
-        if (!skipWarn) {
-            reasons.push(`lines ${m.lines} >= warn threshold ${t.fileLinesWarn}`);
-        }
+    const locReason = evaluateLinesOrLocWarn(m, t, density, zoneProfile);
+    if (locReason) {
+        reasons.push(locReason);
     }
-    if (m.functions >= t.fileFunctionsWarn) {
-        reasons.push(`functions ${m.functions} >= warn threshold ${t.fileFunctionsWarn}`);
+    const fnReason = evaluateFunctionsWarn(m, t);
+    if (fnReason) {
+        reasons.push(fnReason);
     }
-    const elasticActive = t.enableElasticBudget || t.flagZonePartitioner;
-    if (reasons.length > 0 && !zoneProfile.isDecoupled && elasticActive) {
-        reasons.push(`high intra-file entanglement (EI: ${zoneProfile.entanglementIndex})`);
+    const entanglementReason = evaluateEntanglementWarn(reasons.length > 0, zoneProfile, t);
+    if (entanglementReason) {
+        reasons.push(entanglementReason);
     }
     return reasons;
 }
+
 
 function evaluateThresholdSeverity(
     m: FileMetric,

@@ -598,32 +598,25 @@ function buildGateMetrics(
     });
 }
 
-async function handleGateCommand(args: string[]): Promise<void> {
-    const { stage, root } = parseGateOptions(args);
-    const { evaluateCompositeGate } = require('./core/praxis/composite-quality-gate');
-    const { recordToVector } = require('./core/trajectory');
-    const { scan } = require('./api');
+function resolveGateConfigFile(root: string): string | undefined {
     const fs = require('fs');
     const path = require('path');
-
     const configPath = path.join(root, 'auto-refactor.config.json');
-    const configFile = fs.existsSync(configPath) ? configPath : undefined;
-    const scanResult = await scan({ root, configFile, logLevel: 'warn' });
-    const issues = scanResult.issues || [];
-    const unsuppressedErrors = issues.filter(
+    return fs.existsSync(configPath) ? configPath : undefined;
+}
+
+function extractUnsuppressedErrors(issues: any[]): any[] {
+    return (issues || []).filter(
         (issue: any) => issue.severity === 'error' && !issue.suppression,
     );
-    const staticPass = unsuppressedErrors.length === 0;
-    const regressionCount = unsuppressedErrors.length;
-    const totalFiles = scanResult.summary?.filesScanned || 1;
+}
 
-    const fileMetrics = scanResult.fileMetrics || [];
-    const { processedEloc, density, ratio } = computeProcessedDensityAndRatio(
-        fileMetrics,
-        totalFiles,
-    );
-
-    const historicalBeforeScore = await readHistoricalMeanScore(root);
+function resolveGateScores(
+    scanResult: any,
+    staticPass: boolean,
+    historicalBeforeScore: number | undefined,
+): { currentScore: number; beforeScore: number; scoreVector: number[] } {
+    const { recordToVector } = require('./core/trajectory');
     let currentScore = staticPass ? 100.0 : 80.0;
     if (
         typeof scanResult.qualityScore?.compositeScore === 'number' &&
@@ -632,13 +625,51 @@ async function handleGateCommand(args: string[]): Promise<void> {
         currentScore = scanResult.qualityScore.compositeScore;
     }
     const beforeScore = historicalBeforeScore ?? currentScore;
-    const resolvedDebtPoints = staticPass ? 10 : 0;
-    const addedDebtPoints = regressionCount * 5;
-
     let scoreVector = new Array(10).fill(currentScore);
     if (scanResult.qualityScore?.indices) {
         scoreVector = recordToVector(scanResult.qualityScore.indices);
     }
+    return { currentScore, beforeScore, scoreVector };
+}
+
+async function executeGateScan(root: string): Promise<{
+    scanResult: any;
+    unsuppressedErrors: any[];
+    staticPass: boolean;
+}> {
+    const { scan } = require('./api');
+    const configFile = resolveGateConfigFile(root);
+    const scanResult = await scan({ root, configFile, logLevel: 'warn' });
+    const unsuppressedErrors = extractUnsuppressedErrors(scanResult.issues);
+    const staticPass = unsuppressedErrors.length === 0;
+    return { scanResult, unsuppressedErrors, staticPass };
+}
+
+async function prepareGateEvaluation(
+    root: string,
+    scanData: { scanResult: any; unsuppressedErrors: any[]; staticPass: boolean },
+): Promise<{
+    staticPass: boolean;
+    counters: any;
+    metrics: any;
+}> {
+    const { scanResult, unsuppressedErrors, staticPass } = scanData;
+    const regressionCount = unsuppressedErrors.length;
+    const totalFiles = scanResult.summary?.filesScanned || 1;
+    const fileMetrics = scanResult.fileMetrics || [];
+    const { processedEloc, density, ratio } = computeProcessedDensityAndRatio(
+        fileMetrics,
+        totalFiles,
+    );
+
+    const historicalBeforeScore = await readHistoricalMeanScore(root);
+    const { currentScore, beforeScore, scoreVector } = resolveGateScores(
+        scanResult,
+        staticPass,
+        historicalBeforeScore,
+    );
+    const resolvedDebtPoints = staticPass ? 10 : 0;
+    const addedDebtPoints = regressionCount * 5;
 
     const counters = buildTrajectoryCounters(processedEloc, density, ratio);
     const metrics = buildGateMetrics(
@@ -651,15 +682,28 @@ async function handleGateCommand(args: string[]): Promise<void> {
         regressionCount,
         unsuppressedErrors,
     );
+    return { staticPass, counters, metrics };
+}
 
-    const result = evaluateCompositeGate({
+function evaluateGateStatus(
+    stage: import('./core/praxis/composite-quality-gate').GateStage,
+    evalData: { staticPass: boolean; counters: any; metrics: any },
+): { summaryText: string; passed: boolean } {
+    const { evaluateCompositeGate } = require('./core/praxis/composite-quality-gate');
+    return evaluateCompositeGate({
         stage,
-        staticPass,
+        staticPass: evalData.staticPass,
         dynamicPass: true,
-        counters: counters as any,
-        metrics,
+        counters: evalData.counters,
+        metrics: evalData.metrics,
     });
+}
 
+async function handleGateCommand(args: string[]): Promise<void> {
+    const { stage, root } = parseGateOptions(args);
+    const scanData = await executeGateScan(root);
+    const evalData = await prepareGateEvaluation(root, scanData);
+    const result = evaluateGateStatus(stage, evalData);
     process.stdout.write(result.summaryText + '\n');
     process.exit(result.passed ? 0 : 1);
 }

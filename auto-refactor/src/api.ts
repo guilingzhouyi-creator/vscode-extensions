@@ -27,7 +27,6 @@ import type {
     DiffStats,
     DiffDeltaReport,
     ScanDiffOptions,
-    Issue,
     CommentLevel,
     SecurityLevel,
     UnsupportedLanguageSeverity,
@@ -485,44 +484,51 @@ export async function scanDiffDelta(
     return { report: r.report as DiffDeltaReport, stats: r.stats };
 }
 
+/** Git status porcelain prefixes indicating rename or copy operations. */
+const GIT_RENAME_STATUS_PREFIXES = new Set([
+    'R', 'RM', 'RD', 'RC', 'RA', 'R ', ' R', 'MR', 'DR', 'CR', 'C',
+]);
+
+function isGitRenameStatus(status: string): boolean {
+    return GIT_RENAME_STATUS_PREFIXES.has(status) || status.startsWith('R');
+}
+
+function parseGitPorcelainLine(line: string): string | null {
+    const trimmed = line.trim();
+    if (!trimmed) return null;
+    const parts = trimmed.split(/\s+/);
+    const raw = parts.slice(1).join(' ').replace(/^"|"$/g, '');
+    const arrowIdx = isGitRenameStatus(parts[0]) ? raw.indexOf(' -> ') : -1;
+    const target = (arrowIdx !== -1 ? raw.slice(arrowIdx + 4) : raw).trim();
+    return target ? target.replace(/\\/g, '/') : null;
+}
+
 async function collectGitChangedFiles(root: string): Promise<string[]> {
-    const changedFiles: string[] = [];
     try {
         const cp = require('child_process');
         const { promisify } = require('util');
         const execFileAsync = promisify(cp.execFile);
+        const nulPath = process.platform === 'win32' ? 'NUL' : '/dev/null';
         const gitEnv = {
             ...process.env,
             GIT_TERMINAL_PROMPT: '0',
-            ...(process.env.GIT_CONFIG_GLOBAL
-                ? {}
-                : {
-                      GIT_CONFIG_GLOBAL: process.platform === 'win32' ? 'NUL' : '/dev/null',
-                  }),
-            ...(process.env.GIT_CONFIG_SYSTEM
-                ? {}
-                : {
-                      GIT_CONFIG_SYSTEM: process.platform === 'win32' ? 'NUL' : '/dev/null',
-                  }),
+            GIT_CONFIG_GLOBAL: process.env.GIT_CONFIG_GLOBAL || nulPath,
+            GIT_CONFIG_SYSTEM: process.env.GIT_CONFIG_SYSTEM || nulPath,
         };
         const { stdout: out } = await execFileAsync('git', ['status', '--porcelain'], {
             cwd: root,
             encoding: 'utf8',
             env: gitEnv,
         });
+        const changedFiles: string[] = [];
         for (const line of (out || '').split(/\r?\n/)) {
-            const trimmed = line.trim();
-            if (!trimmed) continue;
-            const parts = trimmed.split(/\s+/);
-            const raw = parts.slice(1).join(' ').replace(/^"|"$/g, '');
-            // Renames arrive as `old -> new`; only the destination is scanned.
-            const target = (raw.includes(' -> ') ? raw.split(' -> ').pop()! : raw).trim();
-            if (target) changedFiles.push(target.replace(/\\/g, '/'));
+            const parsed = parseGitPorcelainLine(line);
+            if (parsed) changedFiles.push(parsed);
         }
-    } catch (_gitErr) {
-        // Ignore: git unavailable, not a repository, or execution error.
+        return changedFiles;
+    } catch {
+        return [];
     }
-    return changedFiles;
 }
 
 function createEmptyDiffReport(config: ScanConfig): ScanReport {

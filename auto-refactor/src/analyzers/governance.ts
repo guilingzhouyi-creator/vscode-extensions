@@ -69,6 +69,66 @@ function dispatchGovernanceRules(
     }
 }
 
+function resolveGovernanceLocation(v: GovernanceViolation, filePath: string): IssueLocation {
+    return {
+        file: filePath,
+        start: { line: v.line, column: v.column },
+        end: { line: v.endLine ?? v.line, column: v.endColumn ?? v.column + 1 },
+    };
+}
+
+function resolveGovernanceDetail(
+    v: GovernanceViolation,
+    rule: GovernanceRule | undefined,
+    targetLanguage: string,
+): GovernanceIssueDetail {
+    const category = rule?.category || 'standardization';
+    const risk = rule?.risk || 'medium';
+    const rationale = rule?.rationale || '';
+    const isFixable = rule?.isFixable ?? false;
+    const fixable = v.fixable !== undefined ? v.fixable : isFixable;
+
+    return {
+        category,
+        risk,
+        rationale,
+        fixable,
+        targetLanguage,
+        ruleId: v.ruleId,
+        suggestedPatch: v.suggestedPatch,
+        ...v.customDetail,
+    };
+}
+
+function buildGovernanceIssue(
+    issueId: string,
+    analyzerName: string,
+    v: GovernanceViolation,
+    rule: GovernanceRule | undefined,
+    loc: IssueLocation,
+    detail: GovernanceIssueDetail,
+    actionable?: AgentActionablePayload,
+): Issue {
+    const severity = rule?.severity || 'warning';
+    const issue: Issue = {
+        id: issueId,
+        analyzer: analyzerName,
+        rule: v.ruleId,
+        severity,
+        message: v.message,
+        location: loc,
+        detail,
+        suggestion: v.suggestion,
+    };
+    if (actionable) {
+        issue.actionable = actionable;
+    }
+    if (v.evidence) {
+        issue.evidence = v.evidence;
+    }
+    return issue;
+}
+
 /**
  * Static governance analyzer enforcing architectural boundaries,
  * language profiles, and safety rules.
@@ -298,49 +358,12 @@ export class GovernanceAnalyzer implements Analyzer {
         seenIds.add(issueId);
 
         const rule = this.registry.get(v.ruleId);
-        const category = rule?.category || 'standardization';
-        const severity = rule?.severity || 'warning';
-        const risk = rule?.risk || 'medium';
-        const rationale = rule?.rationale || '';
-        const isFixable = rule?.isFixable ?? false;
-        const fixable = v.fixable !== undefined ? v.fixable : isFixable;
-
-        const loc: IssueLocation = {
-            file: ctx.filePath,
-            start: { line: v.line, column: v.column },
-            end: { line: v.endLine ?? v.line, column: v.endColumn ?? v.column + 1 },
-        };
-
-        const detail: GovernanceIssueDetail = {
-            category,
-            risk,
-            rationale,
-            fixable,
-            targetLanguage: this.capabilities.languageId,
-            ruleId: v.ruleId,
-            suggestedPatch: v.suggestedPatch,
-            ...v.customDetail,
-        };
-
-        const issue: Issue = {
-            id: issueId,
-            analyzer: this.name,
-            rule: v.ruleId,
-            severity,
-            message: v.message,
-            location: loc,
-            detail,
-            suggestion: v.suggestion,
-        };
+        const loc = resolveGovernanceLocation(v, ctx.filePath);
+        const detail = resolveGovernanceDetail(v, rule, this.capabilities.languageId);
         const actionable = this.deriveGovernanceActionable(v, loc);
-        if (actionable) {
-            issue.actionable = actionable;
-        }
-        if (v.evidence) {
-            issue.evidence = v.evidence;
-        }
-        issues.push(issue);
+        issues.push(buildGovernanceIssue(issueId, this.name, v, rule, loc, detail, actionable));
     }
+
 
     finalize(ctx: AnalyzerContext): Issue[] {
         // Source-code governance (naming, headers, type rules) does not apply to documentation

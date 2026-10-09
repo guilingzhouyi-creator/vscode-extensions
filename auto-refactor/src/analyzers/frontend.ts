@@ -166,33 +166,30 @@ function auditDomDepthAndAnimationReflow(file: string, rawLines: string[], issue
 
 /**
  * Counts non-empty property declaration lines in an interface body in a single pass
- * without heap allocation.
+ * without heap allocation or nested indexOf calls (PRF-ALG-002).
  */
 function countInterfaceBodyProps(body: string): number {
     let count = 0;
-    let lineStart = 0;
+    let hasVisibleCharOnLine = false;
     const len = body.length;
 
-    while (lineStart < len) {
-        let lineEnd = body.indexOf('\n', lineStart);
-        if (lineEnd === -1) {
-            lineEnd = len;
-        }
-        let hasContent = false;
-        for (let i = lineStart; i < lineEnd; i++) {
-            const ch = body.charCodeAt(i);
-            if (ch > 32) {
-                hasContent = true;
-                break;
+    for (let i = 0; i < len; i++) {
+        const ch = body.charCodeAt(i);
+        if (ch === 10 /* '\n' */) {
+            if (hasVisibleCharOnLine) {
+                count++;
+                hasVisibleCharOnLine = false;
             }
+        } else if (ch > 32) {
+            hasVisibleCharOnLine = true;
         }
-        if (hasContent) {
-            count++;
-        }
-        lineStart = lineEnd + 1;
+    }
+    if (hasVisibleCharOnLine) {
+        count++;
     }
     return count;
 }
+
 
 /**
  * Audits component complexity and duplication patterns (UI-ENG-003).

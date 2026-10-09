@@ -195,36 +195,49 @@ function applyListValueFlag(opt: CliOptions, arg: string, val: string): boolean 
     return false;
 }
 
-function applySpecialValueFlag(opt: CliOptions, arg: string, val: string): boolean {
-    if (arg === 'parser') {
+type SpecialValueHandler = (opt: CliOptions, val: string) => void;
+
+const SPECIAL_VALUE_HANDLERS: Record<string, SpecialValueHandler> = {
+    parser: (opt, val) => {
         opt.parser = val === STR_OXC ? STR_OXC : LANGUAGE_TYPESCRIPT;
-        return true;
-    }
-    if (arg === 'log-level') {
+    },
+    'log-level': (opt, val) => {
         opt.logLevel = val as LogLevel;
-        return true;
+    },
+    'comment-level': (opt, val) => {
+        if (VALID_COMMENT_LEVELS.has(val)) {
+            opt.commentLevel = val as CommentLevel;
+        }
+    },
+    'security-level': (opt, val) => {
+        if (VALID_SECURITY_LEVELS.has(val)) {
+            opt.securityLevel = val as SecurityLevel;
+        }
+    },
+    'fail-on-severity': (opt, val) => {
+        if (VALID_SEVERITIES.has(val)) {
+            opt.failOnSeverity = val as Severity;
+        }
+    },
+    'baseline-granularity': (opt, val) => {
+        if (val === STR_ID || val === STR_GROUPED) {
+            opt.baselineGranularity = val;
+        }
+    },
+    format: (opt, val) => {
+        if (VALID_FORMATS.has(val)) {
+            opt.format = val as OutputFormat;
+        }
+    },
+};
+
+function applySpecialValueFlag(opt: CliOptions, arg: string, val: string): boolean {
+    const handler = SPECIAL_VALUE_HANDLERS[arg];
+    if (!handler) {
+        return false;
     }
-    if (arg === 'comment-level') {
-        if (VALID_COMMENT_LEVELS.has(val)) opt.commentLevel = val as CommentLevel;
-        return true;
-    }
-    if (arg === 'security-level') {
-        if (VALID_SECURITY_LEVELS.has(val)) opt.securityLevel = val as SecurityLevel;
-        return true;
-    }
-    if (arg === 'fail-on-severity') {
-        if (VALID_SEVERITIES.has(val)) opt.failOnSeverity = val as Severity;
-        return true;
-    }
-    if (arg === 'baseline-granularity') {
-        if (val === STR_ID || val === STR_GROUPED) opt.baselineGranularity = val;
-        return true;
-    }
-    if (arg === 'format') {
-        if (VALID_FORMATS.has(val)) opt.format = val as OutputFormat;
-        return true;
-    }
-    return false;
+    handler(opt, val);
+    return true;
 }
 
 function applyValueFlag(opt: CliOptions, arg: string, val: string): void {
