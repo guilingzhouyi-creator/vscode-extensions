@@ -23,6 +23,22 @@
 - **机读/执行轨（Machine & Agent Track）**：位于 `src/core/messages/`、`src/core/rules/entries/` 与 `src/core/guidance/`，底层规则注册表（`RULE_REGISTRY`）与内核诊断统一为 **100% 国际工业英文标准**（涵盖所有 `summary` 与 `remediation` 规范元数据），输出高 Token 密度、确定性的 SARIF 2.1.0 诊断载荷与 CAPP 智能体修复提示词，并作为工作区单源规则目录（`scripts/common/rule-catalog.json`）的唯一真源底座。
 - **人读/呈现轨（Human & Presentation Track）**：由 **Praxis 表现层**（`src/core/praxis/presentation/`）与 `PraxisI18nProvider` 独占承载，采用模块化领域分包双语字典（`zh-cn/` 与 `en/`），面向人类工程师与 IDE 富文本诊断卡片（`PraxisDiagnosticCard`）提供完整、专业、细粒度的人机可读本地化转译与交互式修复指引。
 
+### 1.3 主题码 (Topic) 标准缩写与编号序列连续性契约
+
+规则标识符严格遵循 `FAMILY-TOPIC-NNN` 三段式定长结构（`RULE_ID_PATTERN`），其中：
+- **`FAMILY`**：规则族前缀（2~6 位大写字母，对应 32 个受控领域族）；
+- **`TOPIC`**：领域主题码（推荐标准 3 位大写字母，少数历史特例如 `DISP`、`FLAT`、`SIZE`、`WRAP` 为 4 位），单源登记于 `src/core/rules/topic-catalog.ts` 的 `CANONICAL_TOPIC_CATALOG` 词典中；
+- **`NNN`**：三位定长十进制整数序列（`001` ~ `999`）。
+
+#### 编号序列连续性公理（Sequence Continuity Invariant）
+1. **默认单调自增起点**：除受控豁免外，所有规则族的主题序列必须严格以 `001` 作为首条规则，且同一 `FAMILY-TOPIC` 内部必须连续递增，严禁存在序列空洞（如出现 `001`、`003` 跳跃）；
+2. **历史特例单源锁定（Historical Sequence Anomalies）**：全库目前锁定唯 5 处由于跨域配对或主题码演进由 `002` 起跳的历史特例，已全量记录于 `HISTORICAL_SEQUENCE_ANOMALIES` 中，并由门禁脚本 `validate-rules-registry.js` 常态化严格校验：
+   - `ARCH-DEC-002`：解耦规则跨域配对（与命名解耦 `NAM-DEC-001` 配对，区分 AST 解析器解耦与符号命名解耦）；
+   - `ARCH-DSP-002`：分发器演进配对（与 4 字母前身主题码 `ARCH-DISP-001` 单行透传跳板规则配对，专指分发器控制流复杂度）；
+   - `GOV-RTC-002`：基线路径重命名追踪诊断规则，与引擎单调棘轮门禁协同保障；
+   - `NAM-JRG-002`：变量黑话标记规则，历史版本中变量级黑话校验收敛至代码卫生规则 `HYG-STB-002`；
+   - `SIM-FLAT-002`：深层嵌套控制流扁平化阈值规则，与浅层前置卫语句规则 `SIM-GUARD-001` 互补协同。
+
 ---
 
 ## 2. 内置分析器工厂矩阵（共 30 个）

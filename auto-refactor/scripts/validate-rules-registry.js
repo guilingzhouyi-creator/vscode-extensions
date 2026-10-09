@@ -7,10 +7,10 @@
  * Dependencies & Triggers: `npm run validate-rules-registry` (part of `npm test`); imports
  *     ../dist/core/rules/registry and statically scans src/**\/*.ts for emitted id literals
  * Responsibilities: Assert registry uniqueness and non-empty summary/remediation; assert the
- *     canonical pattern on canonical entries and a legacy reason on legacy ones; assert the
- *     emitted-id set equals the registered-id set (no orphans in either direction); assert the
- *     family prefix of canonical ids matches their declared family; report documentation coverage
- *     (a number that later batches must raise, not a hidden gap)
+ *     canonical pattern on canonical entries and a legacy reason on legacy ones; assert canonical
+ *     topic taxonomy and sequence continuity across all 32 families; assert the emitted-id set
+ *     equals the registered-id set (no orphans in either direction); assert the family prefix of
+ *     canonical ids matches their declared family; report documentation coverage
  * Exit Semantics & Design Rationale: Rejects on the first structural violation and exits 1 so CI
  *     fails loudly. Documentation coverage is printed instead of failing while the docs generator
  *     is still being rolled out; the coverage number is stable output so a regression is visible
@@ -30,6 +30,9 @@ const {
   RULE_ID_PATTERN,
   getRule,
   rulesForAnalyzer,
+  auditTopicAndSequenceContinuity,
+  CANONICAL_TOPIC_CATALOG,
+  HISTORICAL_SEQUENCE_ANOMALIES,
 } = require('../dist/core/rules/registry');
 
 const { LEGACY_RULE_ALIASES } = require('../dist/core/rules/aliases');
@@ -145,6 +148,24 @@ function validateRegistryIntegrity(ids) {
   );
 }
 
+function validateTopicAndSequenceContinuity() {
+  const audit = auditTopicAndSequenceContinuity(RULE_REGISTRY);
+  assert.deepStrictEqual(
+    audit.unregisteredTopics,
+    [],
+    `found uncataloged rule topics: ${audit.unregisteredTopics.join(', ')}`,
+  );
+  assert.deepStrictEqual(
+    audit.unexpectedGaps,
+    [],
+    `found unexpected rule sequence gaps: ${audit.unexpectedGaps.join('; ')}`,
+  );
+  assert.strictEqual(audit.valid, true, 'topic taxonomy and sequence continuity must be valid');
+  console.log(
+    `  [PASS] topic catalog and sequence continuity: ${Object.keys(CANONICAL_TOPIC_CATALOG).length} families, ${Object.keys(HISTORICAL_SEQUENCE_ANOMALIES).length} locked historical anomalies, 0 gaps`,
+  );
+}
+
 function validateEmittedRules(ids) {
   const aliasTargets = new Set(Object.values(LEGACY_RULE_ALIASES));
   const aliasSource = 'src/core/rules/aliases.ts'; // stored repo-relative, POSIX separators
@@ -236,6 +257,7 @@ function validateNamingAndDocs(ids) {
 function run() {
   const ids = RULE_REGISTRY.map((rule) => rule.id);
   validateRegistryIntegrity(ids);
+  validateTopicAndSequenceContinuity();
   validateEmittedRules(ids);
   validateAnalyzerRegistries();
   validateNamingAndDocs(ids);

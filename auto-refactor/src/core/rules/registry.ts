@@ -24,6 +24,12 @@ import type { RuleDefinition } from './types';
 
 export type { RuleDefinition, RuleFamily, RuleSeverity } from './types';
 export { RULE_ID_PATTERN, defineRule } from './types';
+export {
+    CANONICAL_TOPIC_CATALOG,
+    HISTORICAL_SEQUENCE_ANOMALIES,
+    auditTopicAndSequenceContinuity,
+} from './topic-catalog';
+export type { TopicDescriptor, SequenceAnomalyRecord, SequenceAuditResult } from './topic-catalog';
 
 /** Every rule id the engine can emit, sorted by id for stable output. */
 export const RULE_REGISTRY: readonly RuleDefinition[] = [
