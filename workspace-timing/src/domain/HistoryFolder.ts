@@ -1,21 +1,20 @@
 /**
- * HistoryFolder — 历史折叠引擎（纯函数）
- *
- * 职责：把超出保留窗的原始会话按自然日折叠进 dailyTotals 沉淀层，
- *       使"永久全历史统计"与"有界存储/查询成本"并存。
- *
- * 边界：纯计算，无 I/O、无 VS Code 依赖；幂等——调用方以返回的
- *       keptSessions 替换原列表并持久化 updatedDailyTotals 后，
- *       同一批会话不会二次折叠（它们已不在输入里）。
- *
- * 折叠规则：
- *   - 以 endMs < cutoffStartMs 判定整条过期（不切割会话，kept 恒为合法区间）；
- *   - 过期会话经 splitByNaturalDay 拆段按日累加；
- *   - sessionCount 记入会话起始自然日（与 TimeAggregator.dailyStats 口径一致）；
- *   - start/end 非法的脏数据直接清除（与聚合层跳过行为对齐）。
+ * Module: HistoryFolder — History Folding Engine (Pure Function)
+ * File Path: src/domain/HistoryFolder.ts
+ * Architecture Role: Domain layer stateless folding and memory-bounded recycling engine
+ * Dependencies & Triggers: domain/models.ts, domain/TimeAggregator.ts; triggered by SessionManager
+ * Responsibilities: Fold expired and overflow work/idle sessions into dailyTotals buckets, recycle old week data, enforce bounded memory
+ * Exit Semantics & Design Rationale: Pure calculation with zero I/O and zero VS Code dependencies; idempotent; preserves total durations and session counts across raw and aggregated layers
  */
 
-import { TimeSession, DailyTotalsMap, MAX_SESSIONS_PER_DAY, DEFAULT_MAX_SESSIONS, MS_PER_DAY } from './models';
+import {
+    TimeSession,
+    IdleSession,
+    DailyTotalsMap,
+    MAX_SESSIONS_PER_DAY,
+    DEFAULT_MAX_SESSIONS,
+    MS_PER_DAY,
+} from './models';
 import { TimeAggregator, localDateStr, parseLocalDate } from './TimeAggregator';
 
 export interface HistoryFoldOptions {
@@ -31,8 +30,20 @@ export interface HistoryFoldOptions {
     now?: number;
 }
 
-export type FoldOptions = HistoryFoldOptions;
-export type RecycleOptions = HistoryFoldOptions;
+export interface FoldResult {
+    /** 保留在原始层的会话（未过期且未超容量） */
+    keptSessions: TimeSession[];
+    /** 合并后的完整日桶表（既有桶 + 本次折叠增量） */
+    updatedDailyTotals: DailyTotalsMap;
+    /** 本次实际折叠的会话条数（0 = 无事发生，调用方可跳过写回） */
+    foldedSessionCount: number;
+}
+
+export interface IdleFoldResult {
+    keptIdleSessions: IdleSession[];
+    updatedDailyTotals: DailyTotalsMap;
+    foldedIdleCount: number;
+}
 
 /**
  * 计算折叠截止点：今天本地零点 - retentionDays 天。
@@ -45,156 +56,72 @@ export function foldCutoffStartMs(retentionDays: number, now = Date.now()): numb
     return todayStart - retentionDays * MS_PER_DAY;
 }
 
-export interface FoldResult {
-    /** 保留在原始层的会话（未过期且未超容量） */
-    keptSessions: TimeSession[];
-    /** 合并后的完整日桶表（既有桶 + 本次折叠增量） */
-    updatedDailyTotals: DailyTotalsMap;
-    /** 本次实际折叠的会话条数（0 = 无事发生，调用方可跳过写回） */
-    foldedSessionCount: number;
-}
-
-/** 将一组会话按自然日拆分累加进日桶表，返回成功折叠条数 */
-function foldSessionsIntoTotals(sessions: readonly TimeSession[], totals: DailyTotalsMap): number {
-    let count = 0;
-    for (const s of sessions) {
-        if (!(s.endMs > s.startMs) || s.startMs <= 0) continue; // 脏数据清除
-        const segs = TimeAggregator.splitByNaturalDay(s.startMs, s.endMs);
-        for (let i = 0; i < segs.length; i++) {
-            const key = localDateStr(segs[i].startMs);
-            const bucket = totals[key] ?? { totalMs: 0, sessionCount: 0 };
-            bucket.totalMs += segs[i].durationMs;
-            if (i === 0) bucket.sessionCount += 1;
-            totals[key] = bucket;
-        }
-        count++;
+/** 深度拷贝既有日桶，防止原地突变与键注入污染 */
+function cloneTotals(existingTotals?: DailyTotalsMap): DailyTotalsMap {
+    const totals: DailyTotalsMap = {};
+    for (const [k, v] of Object.entries(existingTotals ?? {})) {
+        totals[k] = { ...v };
     }
-    return count;
+    return totals;
 }
 
-/**
- * 依据时间窗过滤会话，清洗脏数据并划分保留与折叠会话。
- *
- * @param sessions - 原始会话集合
- * @param cutoffStartMs - 时间截止时间戳
- * @returns 划分后的保留会话与待折叠会话元组
- */
-function filterSessionsByCutoff(
-    sessions: readonly TimeSession[],
+/** 依据截止时间戳过滤条目，清洗脏数据并划分保留与折叠集合 */
+function filterByCutoff<T extends { startMs: number; endMs: number }>(
+    items: readonly T[],
     cutoffStartMs: number,
-): { kept: TimeSession[]; toFold: TimeSession[] } {
-    const kept: TimeSession[] = [];
-    const toFold: TimeSession[] = [];
-
-    for (const s of sessions) {
-        if (!(s.endMs > s.startMs) || s.startMs <= 0) continue; // 脏数据清除
-        if (cutoffStartMs > 0 && s.endMs < cutoffStartMs) {
-            toFold.push(s);
+): { kept: T[]; toFold: T[] } {
+    const kept: T[] = [];
+    const toFold: T[] = [];
+    for (const item of items) {
+        if (!(item.endMs > item.startMs) || item.startMs <= 0) continue;
+        if (cutoffStartMs > 0 && item.endMs < cutoffStartMs) {
+            toFold.push(item);
         } else {
-            kept.push(s);
+            kept.push(item);
         }
     }
     return { kept, toFold };
 }
 
-/**
- * 将过期及超容量会话折叠进日桶（双阈值无损回收）。
- * @param sessions 当前全部原始会话
- * @param existingTotals 既有沉淀桶（可为 undefined）
- * @param cutoffStartMs 折叠截止点（当日零点时刻戳）；0 = 不按时间折叠
- * @param maxSessions 原始会话最大保留条数；0 = 不按条数折叠
- */
-export function foldExpiredSessions(
-    sessions: readonly TimeSession[],
-    existingTotals: DailyTotalsMap | undefined,
-    cutoffStartMs: number,
-    maxSessions: number = 0,
-): FoldResult {
-    const totals: DailyTotalsMap = {};
-    for (const [k, v] of Object.entries(existingTotals ?? {})) {
-        totals[k] = { totalMs: v.totalMs, sessionCount: v.sessionCount };
-    }
-
-    // 空会话快退
-    if (sessions.length === 0) {
-        return { keptSessions: [], updatedDailyTotals: totals, foldedSessionCount: 0 };
-    }
-
-    // 1. 时间窗阈值过滤（retentionDays）
-    const { kept: timeFilteredKept, toFold } = filterSessionsByCutoff(sessions, cutoffStartMs);
-    let kept = timeFilteredKept;
-    let foldedCount = foldSessionsIntoTotals(toFold, totals);
-
-    // 2. 条数容量阈值截断（maxSessions）
-    // 若剩余会话仍超出 maxSessions 容量，将最旧的超出部分按 FIFO 折叠入日桶
-    if (maxSessions > 0 && kept.length > maxSessions) {
-        const excessCount = kept.length - maxSessions;
-        const excessSessions = kept.slice(0, excessCount);
-        kept = kept.slice(excessCount);
-        foldedCount += foldSessionsIntoTotals(excessSessions, totals);
-    }
-
-    return { keptSessions: kept, updatedDailyTotals: totals, foldedSessionCount: foldedCount };
-}
-
-/**
- * 跨周会话归零清理：
- * 将早于当前自然周周一零点的旧周会话折叠进 dailyTotals，
- * 从 sessions 中全量清除归零，新周会话从 0 开始累计。
- */
-export function prunePriorWeekSessions(
-    sessions: readonly TimeSession[],
-    totals: DailyTotalsMap,
-    now: number,
-): { kept: TimeSession[]; foldedCount: number } {
-    const weekStart = TimeAggregator.weekStartStr(new Date(now));
-    const weekStartMs = parseLocalDate(weekStart);
-
-    const kept: TimeSession[] = [];
-    const toFold: TimeSession[] = [];
-
-    for (const s of sessions) {
-        if (!(s.endMs > s.startMs) || s.startMs <= 0) continue; // 脏数据清除
-        if (s.endMs <= weekStartMs) {
-            toFold.push(s);
+/** 依据周起点时间戳过滤条目（旧周条目划分入 toFold） */
+function filterByWeekStart<T extends { startMs: number; endMs: number }>(
+    items: readonly T[],
+    weekStartMs: number,
+): { kept: T[]; toFold: T[] } {
+    const kept: T[] = [];
+    const toFold: T[] = [];
+    for (const item of items) {
+        if (!(item.endMs > item.startMs) || item.startMs <= 0) continue;
+        if (item.endMs <= weekStartMs) {
+            toFold.push(item);
         } else {
-            kept.push(s);
+            kept.push(item);
         }
     }
-
-    const foldedCount = foldSessionsIntoTotals(toFold, totals);
-    return { kept, foldedCount };
+    return { kept, toFold };
 }
 
-/**
- * 单日会话上限截断（每日最高 20 条）：
- * 同一自然日内超过 maxPerDay 的会话，按 FIFO 将最远（最旧）的会话折叠进 dailyTotals，
- * 仅保留最新 20 条。
- */
-export function pruneDailyOverflowSessions(
-    sessions: readonly TimeSession[],
-    totals: DailyTotalsMap,
+/** 按自然日分组并对超出 maxPerDay 的最旧条目执行截断拆分 */
+function partitionByDailyLimit<T extends { startMs: number; endMs: number }>(
+    items: readonly T[],
     maxPerDay: number,
-): { kept: TimeSession[]; foldedCount: number } {
-    if (maxPerDay <= 0 || sessions.length <= maxPerDay) {
-        return { kept: [...sessions], foldedCount: 0 };
+): { kept: T[]; toFold: T[] } {
+    if (maxPerDay <= 0 || items.length <= maxPerDay) {
+        return { kept: [...items], toFold: [] };
     }
-
-    const dayGroups = new Map<string, TimeSession[]>();
-    for (const s of sessions) {
-        if (!(s.endMs > s.startMs) || s.startMs <= 0) continue;
-        const key = localDateStr(s.startMs);
+    const dayGroups = new Map<string, T[]>();
+    for (const item of items) {
+        if (!(item.endMs > item.startMs) || item.startMs <= 0) continue;
+        const key = localDateStr(item.startMs);
         let list = dayGroups.get(key);
         if (!list) {
             list = [];
             dayGroups.set(key, list);
         }
-        list.push(s);
+        list.push(item);
     }
-
-    const kept: TimeSession[] = [];
-    const toFold: TimeSession[] = [];
-
+    const kept: T[] = [];
+    const toFold: T[] = [];
     for (const list of dayGroups.values()) {
         if (list.length <= maxPerDay) {
             kept.push(...list);
@@ -205,36 +132,118 @@ export function pruneDailyOverflowSessions(
         toFold.push(...list.slice(0, excess));
         kept.push(...list.slice(excess));
     }
-
     kept.sort((a, b) => a.startMs - b.startMs);
+    return { kept, toFold };
+}
+
+/** 累加单个自然日工作切段到日桶表 */
+function accumulateDaySegment(
+    seg: { startMs: number; durationMs: number; manualMs?: number; aiMs?: number },
+    isFirstSegment: boolean,
+    totals: DailyTotalsMap,
+): void {
+    const key = localDateStr(seg.startMs);
+    const bucket = totals[key] ?? { totalMs: 0, sessionCount: 0 };
+    bucket.totalMs += seg.durationMs;
+    bucket.manualMs = (bucket.manualMs ?? 0) + (typeof seg.manualMs === 'number' ? seg.manualMs : seg.durationMs);
+    bucket.aiMs = (bucket.aiMs ?? 0) + (typeof seg.aiMs === 'number' ? seg.aiMs : 0);
+    if (isFirstSegment) {
+        bucket.sessionCount += 1;
+    }
+    totals[key] = bucket;
+}
+
+/** 将一组工作会话按自然日拆分累加进日桶表，返回成功折叠条数 */
+function foldSessionsIntoTotals(sessions: readonly TimeSession[], totals: DailyTotalsMap): number {
+    let count = 0;
+    for (const s of sessions) {
+        if (!(s.endMs > s.startMs) || s.startMs <= 0) continue;
+        const segs = TimeAggregator.splitByNaturalDay(s.startMs, s.endMs, s.manualMs, s.aiMs);
+        for (let i = 0; i < segs.length; i++) {
+            accumulateDaySegment(segs[i], i === 0, totals);
+        }
+        count++;
+    }
+    return count;
+}
+
+/** 将一组空闲段按自然日拆分累加进日桶表，返回成功折叠条数 */
+function foldIdleSessionsIntoTotals(idleSessions: readonly IdleSession[], totals: DailyTotalsMap): number {
+    let count = 0;
+    for (const is of idleSessions) {
+        if (!(is.endMs > is.startMs) || is.startMs <= 0) continue;
+        const segs = TimeAggregator.splitByNaturalDay(is.startMs, is.endMs);
+        for (let i = 0; i < segs.length; i++) {
+            const key = localDateStr(segs[i].startMs);
+            const bucket = totals[key] ?? { totalMs: 0, sessionCount: 0 };
+            bucket.idleTotalMs = (bucket.idleTotalMs ?? 0) + segs[i].durationMs;
+            if (i === 0) {
+                bucket.idleSessionCount = (bucket.idleSessionCount ?? 0) + 1;
+            }
+            totals[key] = bucket;
+        }
+        count++;
+    }
+    return count;
+}
+
+/** 将过期及超容量工作会话折叠进日桶 */
+export function foldExpiredSessions(
+    sessions: readonly TimeSession[],
+    existingTotals: DailyTotalsMap | undefined,
+    cutoffStartMs: number,
+    maxSessions: number = 0,
+): FoldResult {
+    const totals = cloneTotals(existingTotals);
+    if (sessions.length === 0) {
+        return { keptSessions: [], updatedDailyTotals: totals, foldedSessionCount: 0 };
+    }
+
+    const { kept: timeFilteredKept, toFold } = filterByCutoff(sessions, cutoffStartMs);
+    let kept = timeFilteredKept;
+    let foldedCount = foldSessionsIntoTotals(toFold, totals);
+
+    if (maxSessions > 0 && kept.length > maxSessions) {
+        const excessCount = kept.length - maxSessions;
+        const excessSessions = kept.slice(0, excessCount);
+        kept = kept.slice(excessCount);
+        foldedCount += foldSessionsIntoTotals(excessSessions, totals);
+    }
+
+    return { keptSessions: kept, updatedDailyTotals: totals, foldedSessionCount: foldedCount };
+}
+
+/** 跨周工作会话归零清理 */
+export function prunePriorWeekSessions(
+    sessions: readonly TimeSession[],
+    totals: DailyTotalsMap,
+    now: number,
+): { kept: TimeSession[]; foldedCount: number } {
+    const weekStart = TimeAggregator.weekStartStr(new Date(now));
+    const weekStartMs = parseLocalDate(weekStart);
+    const { kept, toFold } = filterByWeekStart(sessions, weekStartMs);
     const foldedCount = foldSessionsIntoTotals(toFold, totals);
     return { kept, foldedCount };
 }
 
-/**
- * 完整会话自动回收引擎（纯函数）：
- * 1. 跨周全条目归零（每周统一清理旧周会话入 dailyTotals）；
- * 2. 单日会话上限（每日最高 20 条，淘汰最远条目入 dailyTotals）；
- * 3. 时间窗与总容量上限截断。
- *
- * 数学守恒定理：dailyStats(keptSessions) ∪ updatedDailyTotals ≡ dailyStats(originalSessions)
- * 会话总时长在裁剪前后严格无损，会话计数不重不漏。
- *
- * @param sessions - 输入会话序列
- * @param existingTotals - 既有日汇总桶集合
- * @param options - 回收策略选项（跨周/单日上限/容量阈值）
- * @returns 截断后保留的会话集与更新后的日汇总桶
- */
+/** 单日工作会话上限截断（每日最高 maxPerDay 条） */
+export function pruneDailyOverflowSessions(
+    sessions: readonly TimeSession[],
+    totals: DailyTotalsMap,
+    maxPerDay: number,
+): { kept: TimeSession[]; foldedCount: number } {
+    const { kept, toFold } = partitionByDailyLimit(sessions, maxPerDay);
+    const foldedCount = foldSessionsIntoTotals(toFold, totals);
+    return { kept, foldedCount };
+}
+
+/** 完整工作会话自动回收引擎 */
 export function recycleSessions(
     sessions: readonly TimeSession[],
     existingTotals: DailyTotalsMap | undefined,
     options?: HistoryFoldOptions,
 ): FoldResult {
-    const totals: DailyTotalsMap = {};
-    for (const [k, v] of Object.entries(existingTotals ?? {})) {
-        totals[k] = { totalMs: v.totalMs, sessionCount: v.sessionCount };
-    }
-
+    const totals = cloneTotals(existingTotals);
     if (sessions.length === 0) {
         return { keptSessions: [], updatedDailyTotals: totals, foldedSessionCount: 0 };
     }
@@ -248,21 +257,18 @@ export function recycleSessions(
     let currentSessions = sessions;
     let totalFolded = 0;
 
-    // 1. 每周统一清理全条目归零（旧周会话折叠进日桶并从内存移除）
     if (pruneWeekly) {
         const weekRes = prunePriorWeekSessions(currentSessions, totals, now);
         currentSessions = weekRes.kept;
         totalFolded += weekRes.foldedCount;
     }
 
-    // 2. 单日会话上限（每日最高 20 条，淘汰最远条目入日桶）
     if (maxPerDay > 0) {
         const dailyRes = pruneDailyOverflowSessions(currentSessions, totals, maxPerDay);
         currentSessions = dailyRes.kept;
         totalFolded += dailyRes.foldedCount;
     }
 
-    // 3. 时间窗与总容量上限截断
     const cutoff = foldCutoffStartMs(retentionDays, now);
     const foldRes = foldExpiredSessions(currentSessions, totals, cutoff, maxSessions);
     totalFolded += foldRes.foldedSessionCount;
@@ -274,13 +280,97 @@ export function recycleSessions(
     };
 }
 
-/**
- * 解析并标准化折叠选项，消除外部多态入参在主流程的分支复杂度。
- */
-function parseFoldOptions(options: number | HistoryFoldOptions, defaultNow: number): HistoryFoldOptions {
-    if (typeof options === 'number') {
-        return { retentionDays: options, now: defaultNow };
+/** 将过期及超容量空闲段折叠进日桶 */
+export function foldExpiredIdleSessions(
+    idleSessions: readonly IdleSession[],
+    existingTotals: DailyTotalsMap | undefined,
+    cutoffStartMs: number,
+    maxSessions: number = 0,
+): { kept: IdleSession[]; updatedDailyTotals: DailyTotalsMap; foldedCount: number } {
+    const totals = cloneTotals(existingTotals);
+    if (idleSessions.length === 0) {
+        return { kept: [], updatedDailyTotals: totals, foldedCount: 0 };
     }
+    const { kept: timeFiltered, toFold } = filterByCutoff(idleSessions, cutoffStartMs);
+    let kept = timeFiltered;
+    let foldedCount = foldIdleSessionsIntoTotals(toFold, totals);
+    if (maxSessions > 0 && kept.length > maxSessions) {
+        const excessCount = kept.length - maxSessions;
+        const excess = kept.slice(0, excessCount);
+        kept = kept.slice(excessCount);
+        foldedCount += foldIdleSessionsIntoTotals(excess, totals);
+    }
+    return { kept, updatedDailyTotals: totals, foldedCount };
+}
+
+/** 跨周空闲段归零清理 */
+export function prunePriorWeekIdleSessions(
+    idleSessions: readonly IdleSession[],
+    totals: DailyTotalsMap,
+    now: number,
+): { kept: IdleSession[]; foldedCount: number } {
+    const weekStart = TimeAggregator.weekStartStr(new Date(now));
+    const weekStartMs = parseLocalDate(weekStart);
+    const { kept, toFold } = filterByWeekStart(idleSessions, weekStartMs);
+    const foldedCount = foldIdleSessionsIntoTotals(toFold, totals);
+    return { kept, foldedCount };
+}
+
+/** 单日空闲段上限截断 */
+export function pruneDailyOverflowIdleSessions(
+    idleSessions: readonly IdleSession[],
+    totals: DailyTotalsMap,
+    maxPerDay: number,
+): { kept: IdleSession[]; foldedCount: number } {
+    const { kept, toFold } = partitionByDailyLimit(idleSessions, maxPerDay);
+    const foldedCount = foldIdleSessionsIntoTotals(toFold, totals);
+    return { kept, foldedCount };
+}
+
+/** 完整空闲段自动回收引擎（控制有界内存） */
+export function recycleIdleSessions(
+    idleSessions: readonly IdleSession[],
+    existingTotals: DailyTotalsMap | undefined,
+    options?: HistoryFoldOptions,
+): { keptIdleSessions: IdleSession[]; updatedDailyTotals: DailyTotalsMap; foldedIdleCount: number } {
+    const totals = cloneTotals(existingTotals);
+    if (idleSessions.length === 0) {
+        return { keptIdleSessions: [], updatedDailyTotals: totals, foldedIdleCount: 0 };
+    }
+    const now = options?.now ?? Date.now();
+    const pruneWeekly = options?.pruneWeekly ?? true;
+    const maxPerDay = options?.maxPerDay ?? MAX_SESSIONS_PER_DAY;
+    const maxSessions = options?.maxSessions ?? DEFAULT_MAX_SESSIONS;
+    const retentionDays = options?.retentionDays ?? 0;
+
+    let current = idleSessions;
+    let totalFolded = 0;
+
+    if (pruneWeekly) {
+        const weekRes = prunePriorWeekIdleSessions(current, totals, now);
+        current = weekRes.kept;
+        totalFolded += weekRes.foldedCount;
+    }
+
+    if (maxPerDay > 0) {
+        const dailyRes = pruneDailyOverflowIdleSessions(current, totals, maxPerDay);
+        current = dailyRes.kept;
+        totalFolded += dailyRes.foldedCount;
+    }
+
+    const cutoff = foldCutoffStartMs(retentionDays, now);
+    const foldRes = foldExpiredIdleSessions(current, totals, cutoff, maxSessions);
+    totalFolded += foldRes.foldedCount;
+
+    return {
+        keptIdleSessions: foldRes.kept,
+        updatedDailyTotals: foldRes.updatedDailyTotals,
+        foldedIdleCount: totalFolded,
+    };
+}
+
+/** 解析并标准化折叠选项 */
+function parseFoldOptions(options: HistoryFoldOptions, defaultNow: number): HistoryFoldOptions {
     return {
         retentionDays: options.retentionDays || 0,
         maxSessions: options.maxSessions || 0,
@@ -292,19 +382,32 @@ function parseFoldOptions(options: number | HistoryFoldOptions, defaultNow: numb
 
 /**
  * 迁移与标准化（启动恢复、还原或运行期回收）：
- * 补齐 dailyTotals 并执行时间与容量双阈值折叠。
- * 幂等：对同一数据重复调用结果不变。
+ * 补齐 dailyTotals 并对工作会话与空闲会话执行双轨时间与容量双阈值折叠。
+ * 内存有界性：原始会话与空闲记录均受严格条数与时间窗口约束，溢出部分无损沉淀至日桶。
  */
 export function migrateToFolded(
-    data: { sessions?: readonly TimeSession[]; dailyTotals?: DailyTotalsMap },
-    options: number | HistoryFoldOptions,
+    data: {
+        sessions?: readonly TimeSession[];
+        idleSessions?: readonly IdleSession[];
+        dailyTotals?: DailyTotalsMap;
+    },
+    options: HistoryFoldOptions,
     now = Date.now(),
-): { sessions: TimeSession[]; dailyTotals: DailyTotalsMap; foldedSessionCount: number } {
+): {
+    sessions: TimeSession[];
+    idleSessions: IdleSession[];
+    dailyTotals: DailyTotalsMap;
+    foldedSessionCount: number;
+    foldedIdleCount: number;
+} {
     const opt = parseFoldOptions(options, now);
     const recycleResult = recycleSessions(data.sessions ?? [], data.dailyTotals, opt);
+    const idleResult = recycleIdleSessions(data.idleSessions ?? [], recycleResult.updatedDailyTotals, opt);
     return {
         sessions: recycleResult.keptSessions,
-        dailyTotals: recycleResult.updatedDailyTotals,
+        idleSessions: idleResult.keptIdleSessions,
+        dailyTotals: idleResult.updatedDailyTotals,
         foldedSessionCount: recycleResult.foldedSessionCount,
+        foldedIdleCount: idleResult.foldedIdleCount,
     };
 }

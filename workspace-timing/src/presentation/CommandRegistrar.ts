@@ -18,7 +18,7 @@ import { TimeAggregator } from '../domain/TimeAggregator';
 import { exportTimingToFile, exportAggregatedToFile } from './dashboardMessages';
 
 export class CommandRegistrar {
-    private readonly disposables: vscode.Disposable[] = [];
+    private readonly subscriptions: vscode.Disposable[] = [];
 
     register(
         context: vscode.ExtensionContext,
@@ -30,7 +30,7 @@ export class CommandRegistrar {
         this.registerDataControlCommands(orchestrator, statusBar, globalAggregator);
         this.registerViewAndExportCommands(context, orchestrator, statusBar);
 
-        for (const d of this.disposables) {
+        for (const d of this.subscriptions) {
             context.subscriptions.push(d);
         }
 
@@ -191,7 +191,7 @@ export class CommandRegistrar {
 
     private registerCommand(id: string, handler: (...args: unknown[]) => unknown): void {
         const disposable = vscode.commands.registerCommand(id, handler);
-        this.disposables.push(disposable);
+        this.subscriptions.push(disposable);
     }
 
     /** 降级模式提示：当前未打开工作区 */
@@ -256,10 +256,10 @@ export class CommandRegistrar {
     }
 
     dispose(): void {
-        for (const d of this.disposables) {
+        for (const d of this.subscriptions) {
             d.dispose();
         }
-        this.disposables.length = 0;
+        this.subscriptions.length = 0;
         log(LogLevel.Debug, 'CommandRegistrar: disposed');
     }
 }

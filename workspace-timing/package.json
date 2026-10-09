@@ -190,10 +190,24 @@
           "maximum": 168,
           "description": "Weekly work limit in hours (default: 40h)"
         },
-        "workspaceTiming.cloudSync.enabled": {
+        "workspaceTiming.idleTimeoutMinutes": {
+          "type": "integer",
+          "default": 5,
+          "minimum": 0,
+          "maximum": 120,
+          "description": "空闲超时判定分钟数（设为 0 表示不启用） | Idle timeout in minutes before pausing timing (0 = disabled)"
+        },
+        "workspaceTiming.aiDetectionEnabled": {
           "type": "boolean",
-          "default": false,
-          "description": "Cloud sync (placeholder, coming soon)"
+          "default": true,
+          "description": "启用 AI/外部文件改动智能检测 | Enable smart detection for AI/Agent external file modifications"
+        },
+        "workspaceTiming.aiCooldownSeconds": {
+          "type": "integer",
+          "default": 120,
+          "minimum": 10,
+          "maximum": 600,
+          "description": "AI 协作活跃冷却观察窗口（秒） | AI activity cooldown observation window in seconds"
         }
       }
     },

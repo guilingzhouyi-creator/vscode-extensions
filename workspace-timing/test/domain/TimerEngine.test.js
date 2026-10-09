@@ -178,4 +178,78 @@ describe('TimerEngine（计时核心）', () => {
     });
   });
 
+  it('双轨工时：switchMode 切换模式且停止时满足守恒律 durationMs === manualMs + aiMs', () => {
+    withFixedNow('2026-10-04T12:00:00', () => {
+      const eng = new TimerEngine();
+      const now = Date.now();
+      eng.start();
+      eng._sessionStartMs = now - 100000;
+      eng._segmentStartMs = now - 100000;
+      eng.switchMode('ai');
+      eng._segmentStartMs = now - 40000; // 模拟在 AI 模式工作 40 秒，先前人工 60 秒
+      eng._sessionManualAccMs = 60000;
+      const elapsed = eng.stop();
+      assert.strictEqual(elapsed, 100000);
+      assert.strictEqual(eng.data.sessions.length, 1);
+      const s = eng.data.sessions[0];
+      assert.strictEqual(s.manualMs, 60000);
+      assert.strictEqual(s.aiMs, 40000);
+      assert.strictEqual(s.durationMs, s.manualMs + s.aiMs, '严格满足工时守恒律');
+      assert.strictEqual(eng.data.manualTotalMs, 60000);
+      assert.strictEqual(eng.data.aiTotalMs, 40000);
+    });
+  });
+
+  it('空闲追踪：pauseForIdle 追溯截断与 resumeFromIdle 记入 idleSessions', () => {
+    withFixedNow('2026-10-04T12:00:00', () => {
+      const eng = new TimerEngine();
+      const now = Date.now();
+      eng.start();
+      eng._sessionStartMs = now - 600000;
+      eng._segmentStartMs = now - 600000;
+
+      // 追溯截断到 5 分钟前（离开时刻）
+      const idleStart = now - 300000;
+      const truncated = eng.pauseForIdle(idleStart);
+      assert.strictEqual(truncated, 300000, '截断多余的空闲检测时间');
+      assert.strictEqual(eng.isRunning, false);
+      assert.strictEqual(eng.isPausedIdle, true);
+      assert.strictEqual(eng.data.totalMs, 300000);
+
+      // 用户回到电脑前：唤醒恢复
+      const resumeTime = now + 600000; // 离席持续了 15 分钟
+      const idleElapsed = eng.resumeFromIdle(resumeTime);
+      assert.strictEqual(idleElapsed, 900000, '离开时长应为 15 分钟 (900000ms)');
+      assert.strictEqual(eng.isRunning, true);
+      assert.strictEqual(eng.isPausedIdle, false);
+      assert.strictEqual(eng.data.idleSessions.length, 1);
+      assert.strictEqual(eng.data.idleSessions[0].startMs, idleStart);
+      assert.strictEqual(eng.data.idleSessions[0].endMs, resumeTime);
+      assert.strictEqual(eng.data.idleSessions[0].durationMs, 900000);
+    });
+  });
+
+  it('多维计数器：今日手动、AI 与离开时长在运行态与空闲态均正确结算', () => {
+    withFixedNow('2026-10-04T12:00:00', () => {
+      const eng = new TimerEngine();
+      const now = Date.now();
+      eng.start();
+      eng._sessionStartMs = now - 120000;
+      eng.data.currentSessionStartMs = now - 120000;
+      eng._segmentStartMs = now;
+      eng._sessionManualAccMs = 60000;
+      eng._sessionAiAccMs = 60000;
+      eng._currentMode = 'ai';
+
+      // 运行中指标
+      assert.strictEqual(eng.getTodayManualMs(), 60000);
+      assert.strictEqual(eng.getTodayAiMs(), 60000);
+      assert.ok(eng.getTodayAiMs() >= 60000);
+
+      // 空闲态指标
+      eng.pauseForIdle(now);
+      assert.strictEqual(eng.isPausedIdle, true);
+      assert.ok(eng.getTodayIdleMs() >= 0);
+    });
+  });
 });

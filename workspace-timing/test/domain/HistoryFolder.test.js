@@ -14,6 +14,7 @@ const {
   prunePriorWeekSessions,
   pruneDailyOverflowSessions,
   recycleSessions,
+  recycleIdleSessions,
 } = require('../../out/domain/HistoryFolder.js');
 const { TimeAggregator } = require('../../out/domain/TimeAggregator.js');
 const { setLogLevel, LogLevel } = require('../../out/integration/Logger.js');
@@ -107,9 +108,9 @@ describe('HistoryFolder（历史折叠引擎）', () => {
         session(t0 + 3600000, t0 + 7200000),
       ],
     };
-    const first = migrateToFolded(data, 45);
+    const first = migrateToFolded(data, { retentionDays: 45 });
     const second = migrateToFolded(
-      { sessions: first.sessions, dailyTotals: first.dailyTotals }, 45);
+      { sessions: first.sessions, dailyTotals: first.dailyTotals }, { retentionDays: 45 });
     assert.strictEqual(second.foldedSessionCount, 0);
     assert.deepStrictEqual(second.sessions, first.sessions);
     assert.deepStrictEqual(second.dailyTotals, first.dailyTotals);
@@ -254,5 +255,44 @@ describe('HistoryFolder（历史折叠引擎）', () => {
     const allFoldedMs = Object.values(res.updatedDailyTotals).reduce((sum, b) => sum + b.totalMs, 0);
     const keptMs = res.keptSessions.reduce((sum, s) => sum + s.durationMs, 0);
     assert.strictEqual(allFoldedMs + keptMs, 10000 + 22 * 2000, '总时长完全守恒');
+  });
+
+  it('recycleIdleSessions 与 migrateToFolded：空闲离开段有界内存回收与日桶折叠', () => {
+    const weekStartStr = TimeAggregator.weekStartStr(new Date(t0));
+    const weekStartMs = new Date(`${weekStartStr}T00:00:00`).getTime();
+
+    // 1 条旧周空闲段 + 25 条今日空闲段
+    const priorIdle = { startMs: weekStartMs - 86400000, endMs: weekStartMs - 86400000 + 60000, durationMs: 60000, reason: 'idle_timeout' };
+    const todayIdles = [];
+    for (let i = 0; i < 25; i++) {
+      todayIdles.push({
+        startMs: t0 + i * 10000,
+        endMs: t0 + (i + 1) * 10000,
+        durationMs: 10000,
+        reason: 'idle_timeout',
+      });
+    }
+
+    const data = {
+      sessions: [session(t0 + 1000, t0 + 2000)],
+      idleSessions: [priorIdle, ...todayIdles],
+      dailyTotals: {},
+    };
+
+    const res = migrateToFolded(data, {
+      now: t0,
+      maxPerDay: 20,
+      pruneWeekly: true,
+      maxSessions: 140,
+    });
+
+    // 旧周 1 条 + 今日溢出 5 条 = 6 条折叠入日桶，保留最新 20 条
+    assert.strictEqual(res.foldedIdleCount, 6, '旧周与今日超额空闲记录应折叠');
+    assert.strictEqual(res.idleSessions.length, 20, '应严格保留 20 条活跃空闲记录');
+
+    // 验证日桶中 idleTotalMs 与 idleSessionCount 正确累加且守恒
+    const totalFoldedIdleMs = Object.values(res.dailyTotals).reduce((sum, b) => sum + (b.idleTotalMs || 0), 0);
+    const totalKeptIdleMs = res.idleSessions.reduce((sum, is) => sum + is.durationMs, 0);
+    assert.strictEqual(totalFoldedIdleMs + totalKeptIdleMs, 60000 + 25 * 10000, '空闲总时长严格守恒');
   });
 });

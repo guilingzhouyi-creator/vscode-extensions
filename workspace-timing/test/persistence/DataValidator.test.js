@@ -6,6 +6,7 @@
 
 const assert = require('assert');
 const { validateTimingData } = require('../../out/persistence/DataValidator.js');
+const { LATEST_VERSION } = require('../../out/domain/models.js');
 
 function validFile(overrides = {}) {
     return Object.assign({
@@ -21,7 +22,7 @@ describe('DataValidator（还原校验器）', () => {
     it('合法文件通过并补齐 version/lastSavedAtMs', () => {
         const r = validateTimingData(validFile({ version: 1 }));
         assert.ok(r.ok);
-        assert.strictEqual(r.data.version, 2, '应标准化为 LATEST_VERSION');
+        assert.strictEqual(r.data.version, LATEST_VERSION, '应标准化为 LATEST_VERSION');
         assert.strictEqual(r.data.totalMs, 1000);
         assert.strictEqual(r.data.currentSessionStartMs, 0, '还原后强制从干净状态开始');
         assert.ok(typeof r.data.lastSavedAtMs === 'number');
@@ -65,5 +66,38 @@ describe('DataValidator（还原校验器）', () => {
 
         const without = validateTimingData(validFile());
         assert.ok(without.ok && without.data.dailyTotals === undefined);
+    });
+
+    it('v3 数据迁移：历史数据自动补齐 manualMs, aiMs, manualTotalMs, aiTotalMs 与 idleSessions', () => {
+        const v2Data = validFile({
+            version: 2,
+            totalMs: 5000,
+            sessions: [{ startMs: 100, endMs: 200, durationMs: 100 }],
+        });
+        const r = validateTimingData(v2Data);
+        assert.ok(r.ok);
+        assert.strictEqual(r.data.version, LATEST_VERSION);
+        assert.strictEqual(r.data.manualTotalMs, 5000);
+        assert.strictEqual(r.data.aiTotalMs, 0);
+        assert.deepStrictEqual(r.data.idleSessions, []);
+        assert.strictEqual(r.data.sessions[0].manualMs, 100);
+        assert.strictEqual(r.data.sessions[0].aiMs, 0);
+    });
+
+    it('idleSessions 校验：过滤脏空闲记录（倒挂/非正历时），保留合法空闲记录', () => {
+        const r = validateTimingData(validFile({
+            version: 3,
+            idleSessions: [
+                { startMs: 100, endMs: 200, durationMs: 100, reason: 'idle_timeout' },
+                { startMs: 200, endMs: 100, durationMs: 100 }, // 倒挂
+                { startMs: 0, endMs: 200, durationMs: 200 },   // 非正起点
+                null,
+                { startMs: 'bad', endMs: 200, durationMs: 100 },
+            ],
+        }));
+        assert.ok(r.ok);
+        assert.strictEqual(r.data.idleSessions.length, 1);
+        assert.strictEqual(r.data.idleSessions[0].durationMs, 100);
+        assert.strictEqual(r.data.idleSessions[0].reason, 'idle_timeout');
     });
 });

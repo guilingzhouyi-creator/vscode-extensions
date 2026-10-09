@@ -13,6 +13,10 @@ export interface DailyChartEntry {
     weekday: string;
     /** 当日毫秒数 */
     totalMs: number;
+    /** 当日手动编码毫秒数 */
+    manualMs?: number;
+    /** 当日 AI 辅助毫秒数 */
+    aiMs?: number;
 }
 
 /** 周报趋势一条（每周） */
@@ -53,6 +57,18 @@ export interface DashboardData {
     totalMs: number;
     todayMs: number;
     sessionsCount: number;
+    /** 今日手动编码时长 (ms) */
+    manualTodayMs?: number;
+    /** 今日 AI 辅助时长 (ms) */
+    aiTodayMs?: number;
+    /** 今日空闲/离开时长 (ms) */
+    idleTodayMs?: number;
+    /** 累计手动总时长 (ms) */
+    manualTotalMs?: number;
+    /** 累计 AI 总时长 (ms) */
+    aiTotalMs?: number;
+    /** 累计空闲离开总时长 (ms) */
+    idleTotalMs?: number;
     /** 最近 7 天每日数据，用于柱状图 */
     dailyStats: DailyChartEntry[];
     /** 活动时间线热力图（近 12 周，按日） */
@@ -90,6 +106,12 @@ export interface DashboardData {
     weeklyLimitEnabled: boolean;
     /** 周工作时长上限（小时） */
     weeklyLimitHours: number;
+    /** 空闲超时判定分钟数 */
+    idleTimeoutMinutes?: number;
+    /** 是否启用 AI 协作改动检测 */
+    aiDetectionEnabled?: boolean;
+    /** AI 协作冷却秒数 */
+    aiCooldownSeconds?: number;
 }
 
 /** 面板消息协议 */

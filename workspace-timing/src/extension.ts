@@ -45,11 +45,13 @@ import { init as initI18n } from './i18n/index';
 
 // Integration
 import { ConfigWatcher, readTimingConfig } from './integration/ConfigWatcher';
+import { ActivityWatcher } from './integration/ActivityWatcher';
 
 let orchestrator: TimerOrchestrator | null = null;
 let statusBar: StatusBarController | null = null;
 let commandRegistrar: CommandRegistrar | null = null;
 let configWatcher: ConfigWatcher | null = null;
+let activityWatcher: ActivityWatcher | null = null;
 let scheduler: Scheduler | null = null;
 // 全局聚合器提升到模块级：命令注册（clearGlobal）需要在 activate 作用域之外访问。
 let globalAggregatorRef: GlobalAggregator | null = null;
@@ -146,13 +148,13 @@ export function activate(context: vscode.ExtensionContext): void {
             statusBar = new StatusBarController();
             statusBar.show();
 
-            // 状态栏 + 面板 tick（今日 + 累计）
+            // 状态栏 + 面板 tick（今日 + 累计 + 双轨与空闲）
             // 面板数据刷新节流：状态栏每秒更新，但 getDashboardData() 含全量 sessions 聚合（O(N)），
             // 面板不可见/无面板时跳过，且每秒刷新会造成 CPU/内存压力。面板数据降为每 5 秒刷新。
             let lastPanelUpdateMs = 0;
             const PANEL_REFRESH_INTERVAL_MS = 5000;
-            orchestrator.onTick(({ totalMs, todayMs }) => {
-                statusBar?.updateTime(todayMs, totalMs);
+            orchestrator.onTick((tickData) => {
+                statusBar?.updateTime(tickData.todayMs, tickData.totalMs, tickData);
                 const now = Date.now();
                 // 面板必须存在且可见才聚合：隐藏面板的 updateData 本就空转，聚合纯属浪费
                 if (DashboardPanel.currentPanel?.isVisible && orchestrator
@@ -173,11 +175,35 @@ export function activate(context: vscode.ExtensionContext): void {
             // Dashboard 面板消息路由（分发逻辑见 presentation/dashboardMessages.ts）
             DashboardPanel.setMessageHandler(createDashboardMessageHandler(getRouterContext()));
 
+            // Integration 层：活动监听（编辑器交互、外部文件系统与 Git 变动检测）
+            activityWatcher = new ActivityWatcher(
+                {
+                    idleTimeoutMinutes: cfg.idleTimeoutMinutes,
+                    aiDetectionEnabled: cfg.aiDetectionEnabled,
+                    aiCooldownSeconds: cfg.aiCooldownSeconds,
+                },
+                {
+                    onActivity: (mode, ts) => {
+                        void orchestrator?.handleActivity(mode, ts);
+                    },
+                    onIdle: (ts) => {
+                        void orchestrator?.handleIdleTimeout(ts);
+                    },
+                    onModeChange: (mode) => {
+                        if (mode !== 'idle') {
+                            orchestrator?.handleModeChange(mode);
+                        }
+                    },
+                },
+            );
+            activityWatcher.start();
+
             // Integration 层（配置变更监听；语言热切换时按新语言重建面板）
             configWatcher = new ConfigWatcher(
                 orchestrator,
                 statusBar,
                 () => DashboardPanel.recreateForLocale(),
+                activityWatcher,
             );
             configWatcher.start();
 
@@ -209,6 +235,9 @@ export async function deactivate(): Promise<void> {
     log(LogLevel.Info, 'WorkspaceTiming: deactivating...');
 
     try {
+        // 停止活动监听
+        activityWatcher?.dispose();
+
         // 停止配置监听
         configWatcher?.stop();
 

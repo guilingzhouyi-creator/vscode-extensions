@@ -45,7 +45,13 @@ export class StatusBarController {
     private _totalMs: number = 0;
     /** 上次渲染的文本（变更检测，避免每秒无谓重绘） */
     private _lastText: string = '';
+    private _lastA11yLabel: string = '';
     private _visible: boolean = false;
+
+    private _todayManualMs: number = 0;
+    private _todayAiMs: number = 0;
+    private _todayIdleMs: number = 0;
+    private _activityMode: string = 'manual';
 
     constructor() {
         this.statusBarItem = vscode.window.createStatusBarItem(
@@ -65,19 +71,47 @@ export class StatusBarController {
     }
 
     /** 更新计时数据并刷新显示 */
-    updateTime(todayMs: number, totalMs: number): void {
+    updateTime(
+        todayMs: number,
+        totalMs: number,
+        extra?: {
+            todayManualMs?: number;
+            todayAiMs?: number;
+            todayIdleMs?: number;
+            activityMode?: string;
+        },
+    ): void {
         this._todayMs = todayMs;
         this._totalMs = totalMs;
+        if (extra?.todayManualMs !== undefined) this._todayManualMs = extra.todayManualMs;
+        if (extra?.todayAiMs !== undefined) this._todayAiMs = extra.todayAiMs;
+        if (extra?.todayIdleMs !== undefined) this._todayIdleMs = extra.todayIdleMs;
+        if (extra?.activityMode !== undefined) this._activityMode = extra.activityMode;
         this.refresh();
     }
 
     /** 同步更新 Tooltip、Name 与无障碍信息，确保语言热切换与模式切换即时生效 */
     private updateTooltipAndA11y(rawText: string): void {
-        const nextTooltip = format(
-            t()['statusBar.tooltipWithMode'],
-            t()['statusBar.tooltip'],
-            statusBarModeLabel(this._mode),
-        );
+        let activityLabel = '';
+        if (this._activityMode === 'paused_idle') {
+            activityLabel = t()['statusBar.idle'];
+        } else if (this._activityMode === 'ai') {
+            activityLabel = t()['statusBar.ai'];
+        }
+
+        const nextTooltip = activityLabel
+            ? format(
+                t()['statusBar.tooltipWithActivity'],
+                t()['statusBar.tooltip'],
+                statusBarModeLabel(this._mode),
+                activityLabel,
+            )
+            : format(
+                t()['statusBar.tooltipWithMode'],
+                t()['statusBar.tooltip'],
+                statusBarModeLabel(this._mode),
+            );
+
         if (this.statusBarItem.tooltip !== nextTooltip) {
             this.statusBarItem.tooltip = nextTooltip;
         }
@@ -88,10 +122,13 @@ export class StatusBarController {
         }
 
         const a11yLabel = rawText ? `${title}: ${rawText}` : title;
-        this.statusBarItem.accessibilityInformation = {
-            label: a11yLabel,
-            role: 'button',
-        };
+        if (this._lastA11yLabel !== a11yLabel) {
+            this._lastA11yLabel = a11yLabel;
+            this.statusBarItem.accessibilityInformation = {
+                label: a11yLabel,
+                role: 'button',
+            };
+        }
     }
 
     /** 刷新状态栏显示 */
@@ -108,13 +145,11 @@ export class StatusBarController {
         let text: string;
         switch (this._mode) {
             case 'today-total':
-                // 复用既有 i18n 模板（zh: 今日 {0} · 累计 {1}），不硬编码中文
                 text = format(t()['statusBar.todayTotal'],
                     TimeAggregator.formatDurationCompact(this._todayMs),
                     TimeAggregator.formatDurationCompact(this._totalMs));
                 break;
             case 'total-today':
-                // 复用既有 i18n 模板（zh: 累计 {0} · 今日 {1}），不再硬编码中文
                 text = format(t()['statusBar.totalToday'],
                     TimeAggregator.formatDurationCompact(this._totalMs),
                     TimeAggregator.formatDurationCompact(this._todayMs));
@@ -124,7 +159,14 @@ export class StatusBarController {
                 break;
         }
 
-        const displayText = `$(watch) ${text}`;
+        let icon = '$(watch)';
+        if (this._activityMode === 'paused_idle') {
+            icon = '$(debug-pause)';
+        } else if (this._activityMode === 'ai') {
+            icon = '$(sparkle)';
+        }
+
+        const displayText = `${icon} ${text}`;
 
         // 仅在文本实际变化时更新，避免每秒触发 VS Code 状态栏重绘
         if (displayText !== this._lastText) {

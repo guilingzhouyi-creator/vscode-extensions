@@ -31,7 +31,6 @@ const zhCN: I18nStrings = {
   'export.filter.md': 'Markdown 文件 (*.md)',
   'export.filter.json': 'JSON 文件 (*.json)',
   'export.filter.all': '所有文件',
-  'toast.cloudSyncPlaceholder': '☁️ 云端同步功能即将推出，敬请期待',
 
   // 报表导出（Markdown）
   'report.daily.title': '📅 日报 · {0}',
@@ -193,6 +192,31 @@ const zhCN: I18nStrings = {
   'panel.toast.exportWeeklyRequested': '已请求导出周报',
   'panel.toast.exportAggregatedRequested': '已请求导出聚合数据',
   'panel.toast.clearHistoryRequested': '已请求清除历史明细',
+
+  // 活动模式与状态
+  'activity.mode.manual': '人工编码',
+  'activity.mode.ai': 'AI 协作中',
+  'activity.mode.idle': '离开中',
+  'status.idle': '离开中',
+  'status.ai': 'AI 协作中',
+  'statusBar.idle': '离开中',
+  'statusBar.ai': 'AI 协作中',
+  'statusBar.tooltipWithActivity': '{0}（{1} · {2}）',
+
+  // 面板徽标
+  'panel.js.badgeIdle': '离开中',
+  'panel.js.badgeAi': 'AI 协作中',
+
+  // 配置项：空闲超时与 AI 协作检测
+  'panel.set.idleTimeout.name': '空闲超时判定 (分钟)',
+  'panel.set.idleTimeout.tip': '无键盘输入且无文件变动超过该时长后，自动暂停计时并标记为离开中；<br>设为 0 表示不启用空闲判定',
+  'panel.set.idleTimeout.desc': '空闲超时分钟数（0 为不自动暂停）',
+  'panel.set.aiDetection.name': 'AI 协作检测',
+  'panel.set.aiDetection.tip': '智能识别外部文件写入与 Git 变更；<br>在键盘静默时自动判定为 AI 协作编码模式',
+  'panel.set.aiDetection.desc': '开启后自动识别 AI/Agent 外部文件改动与工作流',
+  'panel.set.aiCooldown.name': 'AI 协作冷却窗口 (秒)',
+  'panel.set.aiCooldown.tip': 'AI 文件写入停止后维持协作活跃状态的时长；<br>冷却期过后若无新活动将转入空闲',
+  'panel.set.aiCooldown.desc': 'AI 协作判定维持冷却秒数',
 };
 
 export default zhCN;

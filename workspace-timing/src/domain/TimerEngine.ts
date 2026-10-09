@@ -1,40 +1,65 @@
 /**
- * TimerEngine — 计时核心
- *
- * 职责：start / stop / elapsed 计算
- * 边界：不关心存储、不关心 UI、不关心禁用策略
- * 依赖：domain/models.ts, domain/TimeAggregator.ts
+ * Module: TimerEngine — Core Timing Engine with Dual-Track and Idle Session Support
+ * File Path: src/domain/TimerEngine.ts
+ * Architecture Role: Domain layer timing state machine and duration calculation core
+ * Dependencies & Triggers: domain/models.ts, domain/TimeAggregator.ts; triggered by SessionManager / Scheduler
+ * Responsibilities: Track active durations across manual/ai activity modes, manage idle pause and retroactive resume, calculate O(1) today metrics
+ * Exit Semantics & Design Rationale: Pure TypeScript domain entity with zero VS Code / I/O dependencies; maintains mathematical conservation law totalMs = manualTotalMs + aiTotalMs
  */
 
-import { WorkspaceTimingData, ReadonlyTimingData, TimeSession, MS_PER_DAY, createEmptyTimingData } from './models';
+import {
+    WorkspaceTimingData,
+    ReadonlyTimingData,
+    TimeSession,
+    IdleSession,
+    ActivityMode,
+    MS_PER_DAY,
+    createEmptyTimingData,
+} from './models';
 import { localDateStr, parseLocalDate, splitByNaturalDay } from './TimeAggregator';
 
+/** 模式常量（消除硬编码重复字面量） */
+const MODE_MANUAL: ActivityMode = 'manual';
+const MODE_AI: ActivityMode = 'ai';
+
 export interface TimerSnapshot {
-    /** 当前累计总时长 (ms) */
     totalMs: number;
-    /** 当前会话已持续时长 (ms) */
+    manualTotalMs: number;
+    aiTotalMs: number;
+    idleTotalMs: number;
     sessionElapsedMs: number;
-    /** 当前总时长（含本次会话） */
+    sessionManualMs: number;
+    sessionAiMs: number;
     currentTotalMs: number;
+    currentMode: ActivityMode;
 }
 
 export class TimerEngine {
     private _data: WorkspaceTimingData;
     private _sessionStartMs: number = 0;
+    private _segmentStartMs: number = 0;
+    private _sessionManualAccMs: number = 0;
+    private _sessionAiAccMs: number = 0;
     private _running: boolean = false;
+    private _pausedIdle: boolean = false;
+    private _idleStartMs: number = 0;
+    private _currentMode: ActivityMode = MODE_MANUAL;
 
     // ── 今日累计增量计数器（O(1) 状态栏路径）──
-    /** 计数器归属的本地日键（YYYY-MM-DD） */
     private _todayKey: string = '';
-    /** 今日已结束会话的累计（不含进行中会话残段） */
     private _todayEndedMs: number = 0;
-    /** 数据被整体替换（恢复/还原/折叠）后需惰性重算一次 */
+    private _todayEndedManualMs: number = 0;
+    private _todayEndedAiMs: number = 0;
+    private _todayEndedIdleMs: number = 0;
     private _todayDirty: boolean = true;
 
     constructor(data?: WorkspaceTimingData) {
         this._data = data
             ? TimerEngine.withFrozenSessions(data)
             : { ...createEmptyTimingData(), sessions: TimerEngine.frozenSessions([]) };
+        if (this._data.idleTotalMs === undefined) {
+            this._data.idleTotalMs = TimerEngine.computeInitialIdleTotal(this._data);
+        }
         this._todayDirty = true;
     }
 
@@ -49,23 +74,87 @@ export class TimerEngine {
         return Math.max(0, Math.min(e, dayStart + MS_PER_DAY) - Math.max(s, dayStart));
     }
 
-    /** 惰性重算（日切或数据替换后每自然日/每替换至多一次 O(N)，其余时刻不再发生） */
-    private recomputeTodayEnded(): void {
-        const dayStart = this.todayStartMs;
-        const dayEnd = dayStart + MS_PER_DAY;
-        let total = 0;
-        for (const s of this._data.sessions) {
-            if (s.endMs <= dayStart) continue;
-            total += Math.max(0, Math.min(s.endMs, dayEnd) - Math.max(s.startMs, dayStart));
+    /** 初始化空闲历史总时长（O(1) 状态栏常驻前置计算） */
+    private static computeInitialIdleTotal(data: WorkspaceTimingData): number {
+        if (typeof data.idleTotalMs === 'number' && Number.isFinite(data.idleTotalMs) && data.idleTotalMs >= 0) {
+            return data.idleTotalMs;
         }
-        this._todayEndedMs = total;
+        let total = 0;
+        for (const is of (data.idleSessions ?? [])) total += is.durationMs;
+        for (const bucket of Object.values(data.dailyTotals ?? {})) total += (bucket.idleTotalMs ?? 0);
+        return total;
     }
 
-    /**
-     * 今日已结束会话累计（增量维护）：
-     * 会话封存事件 O(1) 叠加今日段；数据替换/日切时惰性重算一次。
-     */
-    getTodayEndedMs(): number {
+    /** 提取日桶预聚合统计（纯函数） */
+    private static extractBucketTotals(bucket?: { totalMs?: number; manualMs?: number; aiMs?: number; idleTotalMs?: number }): {
+        total: number;
+        manual: number;
+        ai: number;
+        idle: number;
+    } {
+        if (!bucket) {
+            return { total: 0, manual: 0, ai: 0, idle: 0 };
+        }
+        return {
+            total: bucket.totalMs ?? 0,
+            manual: bucket.manualMs ?? (bucket.totalMs ?? 0),
+            ai: bucket.aiMs ?? 0,
+            idle: bucket.idleTotalMs ?? 0,
+        };
+    }
+
+    /** 计算单个会话与今日区间的模式分摊（纯函数） */
+    private static partitionSessionOverlap(
+        s: TimeSession,
+        overlap: number,
+    ): { manual: number; ai: number } {
+        const dur = s.durationMs > 0 ? s.durationMs : (s.endMs - s.startMs);
+        const aiMs = s.aiMs;
+        if (dur > 0 && typeof aiMs === 'number' && typeof s.manualMs === 'number') {
+            const aiPart = Math.round(overlap * (aiMs / dur));
+            return {
+                ai: aiPart,
+                manual: overlap - aiPart,
+            };
+        }
+        return {
+            ai: 0,
+            manual: overlap,
+        };
+    }
+
+    /** 惰性重算（日切或数据替换后每自然日/每替换至多一次 O(N)） */
+    private recomputeTodayEnded(): void {
+        const initial = TimerEngine.extractBucketTotals(this._data.dailyTotals?.[this._todayKey]);
+        let total = initial.total;
+        let manual = initial.manual;
+        let ai = initial.ai;
+        let idle = initial.idle;
+
+        for (const s of this._data.sessions) {
+            const overlap = this.todayOverlap(s.startMs, s.endMs);
+            if (overlap <= 0) continue;
+            total += overlap;
+            const parts = TimerEngine.partitionSessionOverlap(s, overlap);
+            ai += parts.ai;
+            manual += parts.manual;
+        }
+
+        for (const is of (this._data.idleSessions ?? [])) {
+            const overlap = this.todayOverlap(is.startMs, is.endMs);
+            if (overlap > 0) {
+                idle += overlap;
+            }
+        }
+
+        this._todayEndedMs = total;
+        this._todayEndedManualMs = manual;
+        this._todayEndedAiMs = ai;
+        this._todayEndedIdleMs = idle;
+    }
+
+    /** 确保今日日键与增量计数器处于最新鲜状态 */
+    private ensureTodayFresh(): void {
         const key = localDateStr(Date.now());
         if (key !== this._todayKey) {
             this._todayKey = key;
@@ -75,141 +164,301 @@ export class TimerEngine {
             this.recomputeTodayEnded();
             this._todayDirty = false;
         }
+    }
+
+    /** 计算当前未固化段的手动与 AI 累计 */
+    private computeCurrentSegments(endTimeMs: number): { manual: number; ai: number } {
+        const segElapsed = Math.max(0, endTimeMs - this._segmentStartMs);
+        return {
+            manual: this._sessionManualAccMs + (this._currentMode === MODE_MANUAL ? segElapsed : 0),
+            ai: this._sessionAiAccMs + (this._currentMode === MODE_AI ? segElapsed : 0),
+        };
+    }
+
+    /** 重置/设置会话内部指针 */
+    private resetSessionPointers(startMs: number): void {
+        this._sessionStartMs = startMs;
+        this._segmentStartMs = startMs;
+        this._sessionManualAccMs = 0;
+        this._sessionAiAccMs = 0;
+        this._data.currentSessionStartMs = startMs;
+        if (startMs > 0) this._data.lastSavedAtMs = startMs;
+    }
+
+    /** 今日已结束会话累计（增量维护） */
+    getTodayEndedMs(): number {
+        this.ensureTodayFresh();
         return this._todayEndedMs;
     }
 
-    /**
-     * 今日总计（O(1)）= 已结束会话今日累计 + 进行中会话今日残段。
-     * 状态栏每秒读取的热点路径——替代原 O(N) 扫描 + 3s TTL 缓存方案。
-     */
-    getTodayMs(): number {
-        const ended = this.getTodayEndedMs();
-        let running = 0;
-        if (this._running && this._data.currentSessionStartMs > 0) {
-            running = Math.max(0, Date.now() - Math.max(this._data.currentSessionStartMs, this.todayStartMs));
-        }
-        return ended + running;
+    /** 今日手动已结束与进行中累计 (O(1)) */
+    getTodayManualMs(): number {
+        this.ensureTodayFresh();
+        if (!this._running || this._data.currentSessionStartMs <= 0) return this._todayEndedManualMs;
+        const now = Date.now();
+        const overlap = Math.max(0, now - Math.max(this._data.currentSessionStartMs, this.todayStartMs));
+        if (overlap <= 0) return this._todayEndedManualMs;
+        const segs = this.computeCurrentSegments(now);
+        return this._todayEndedManualMs + Math.round(overlap * (segs.manual / Math.max(1, segs.manual + segs.ai)));
     }
 
-    /**
-     * 冻结 sessions 数组副本：对外只读视图的运行期兜底。
-     * 内部一律以「替换新数组」而非「原地 push」演进（仅会话边界事件触发，
-     * 非每秒热点），外部对 getter 视图的 push/splice 在编译期（ReadonlyArray）
-     * 与运行期（Object.freeze）双重被拒。
-     */
+    /** 今日 AI 已结束与进行中累计 (O(1)) */
+    getTodayAiMs(): number {
+        this.ensureTodayFresh();
+        if (!this._running || this._data.currentSessionStartMs <= 0) return this._todayEndedAiMs;
+        const now = Date.now();
+        const overlap = Math.max(0, now - Math.max(this._data.currentSessionStartMs, this.todayStartMs));
+        if (overlap <= 0) return this._todayEndedAiMs;
+        const segs = this.computeCurrentSegments(now);
+        return this._todayEndedAiMs + Math.round(overlap * (segs.ai / Math.max(1, segs.manual + segs.ai)));
+    }
+
+    /** 今日空闲累计 (O(1)) */
+    getTodayIdleMs(): number {
+        this.ensureTodayFresh();
+        if (!this._pausedIdle || this._idleStartMs <= 0) return this._todayEndedIdleMs;
+        return this._todayEndedIdleMs + Math.max(0, Date.now() - Math.max(this._idleStartMs, this.todayStartMs));
+    }
+
+    /** 今日总计（O(1)）= 已结束会话今日累计 + 进行中会话今日残段 */
+    getTodayMs(): number {
+        this.ensureTodayFresh();
+        if (!this._running || this._data.currentSessionStartMs <= 0) return this._todayEndedMs;
+        return this._todayEndedMs + Math.max(0, Date.now() - Math.max(this._data.currentSessionStartMs, this.todayStartMs));
+    }
+
     private static frozenSessions(sessions: readonly TimeSession[]): TimeSession[] {
         return Object.freeze([...sessions]) as TimeSession[];
     }
 
-    /** 以冻结 sessions 副本标准化外部传入数据 */
+    private static frozenIdleSessions(idleSessions: readonly IdleSession[]): IdleSession[] {
+        return Object.freeze([...idleSessions]) as IdleSession[];
+    }
+
     private static withFrozenSessions(data: WorkspaceTimingData): WorkspaceTimingData {
-        return { ...data, sessions: TimerEngine.frozenSessions(data.sessions) };
+        return {
+            ...data,
+            sessions: TimerEngine.frozenSessions(data.sessions ?? []),
+            idleSessions: TimerEngine.frozenIdleSessions(data.idleSessions ?? []),
+        };
     }
 
-    /**
-     * 获取内部数据（只读快照）。
-     * sessions 冻结为 ReadonlyArray——外部 push/splice 等突变在编译期即被拒绝，
-     * 写路径只能经 start/stop/rotateSession/resumeFromSleep/replaceData 受控接口。
-     */
-    get data(): ReadonlyTimingData {
-        return this._data;
+    get data(): ReadonlyTimingData { return this._data; }
+    get isRunning(): boolean { return this._running; }
+    get isPausedIdle(): boolean { return this._pausedIdle; }
+    get currentMode(): ActivityMode { return this._currentMode; }
+
+    /** 切换当前模式 */
+    switchMode(newMode: ActivityMode): void {
+        if (this._currentMode === newMode) return;
+        if (this._running) {
+            const now = Date.now();
+            const elapsed = Math.max(0, now - this._segmentStartMs);
+            if (this._currentMode === MODE_AI) {
+                this._sessionAiAccMs += elapsed;
+            } else {
+                this._sessionManualAccMs += elapsed;
+            }
+            this._segmentStartMs = now;
+        }
+        this._currentMode = newMode;
     }
 
-    /** 是否正在运行 */
-    get isRunning(): boolean {
-        return this._running;
-    }
-
-    /**
-     * 开始计时。
-     * @precondition !this.isRunning
-     * @postcondition this.isRunning === true && this._data.currentSessionStartMs === Date.now()
-     */
+    /** 开始计时 */
     start(): void {
         if (this._running) return;
         this._running = true;
-        this._sessionStartMs = Date.now();
-        this._data.currentSessionStartMs = this._sessionStartMs;
+        this._pausedIdle = false;
+        this._idleStartMs = 0;
+        this.resetSessionPointers(Date.now());
     }
 
-    /**
-     * 停止计时并固化本次会话。
-     * @precondition 无要求（幂等；若未运行直接返回 0）
-     * @postcondition this.isRunning === false && this._data.currentSessionStartMs === 0 && this._data.totalMs >= prevTotalMs
-     * @returns 本次会话历时 (ms)
-     */
+    /** 停止计时并固化本次会话 */
     stop(): number {
-        if (!this._running) return 0;
+        if (!this._running) {
+            if (this._pausedIdle) {
+                this._pausedIdle = false;
+                this._idleStartMs = 0;
+            }
+            return 0;
+        }
         this._running = false;
+        this._pausedIdle = false;
+        this._idleStartMs = 0;
 
         const now = Date.now();
-        // 时钟回拨防御：elapsed 不允许为负（否则 totalMs 会被扣减、sessions 出现负时长）
-        const elapsed = Math.max(0, now - this._sessionStartMs);
+        const totalSessionElapsed = Math.max(0, now - this._sessionStartMs);
+        const segs = this.computeCurrentSegments(now);
+        let finalManual = segs.manual;
+        let finalAi = segs.ai;
+        if (finalManual + finalAi !== totalSessionElapsed) {
+            if (this._currentMode === MODE_AI) {
+                finalAi = Math.max(0, totalSessionElapsed - this._sessionManualAccMs);
+            } else {
+                finalManual = Math.max(0, totalSessionElapsed - this._sessionAiAccMs);
+            }
+        }
 
-        // 累加到 total
-        this._data.totalMs += elapsed;
+        this._data.totalMs += totalSessionElapsed;
+        this._data.manualTotalMs = (this._data.manualTotalMs ?? 0) + finalManual;
+        this._data.aiTotalMs = (this._data.aiTotalMs ?? 0) + finalAi;
         this._data.currentSessionStartMs = 0;
         this._data.lastSavedAtMs = now;
 
-        // 记录会话（替换式演进，保持对外视图冻结语义）；今日计数器 O(1) 叠加本次会话的今日段
-        this.getTodayEndedMs();
-        this._todayEndedMs += this.todayOverlap(this._sessionStartMs, now);
+        this.ensureTodayFresh();
+        const overlap = this.todayOverlap(this._sessionStartMs, now);
+        if (overlap > 0 && totalSessionElapsed > 0) {
+            const aiOverlap = Math.round(overlap * (finalAi / totalSessionElapsed));
+            this._todayEndedAiMs += aiOverlap;
+            this._todayEndedManualMs += (overlap - aiOverlap);
+            this._todayEndedMs += overlap;
+        } else if (overlap > 0) {
+            this._todayEndedManualMs += overlap;
+            this._todayEndedMs += overlap;
+        }
         this._data.sessions = TimerEngine.frozenSessions([
             ...this._data.sessions,
-            { startMs: this._sessionStartMs, endMs: now, durationMs: elapsed },
+            {
+                startMs: this._sessionStartMs,
+                endMs: now,
+                durationMs: totalSessionElapsed,
+                manualMs: finalManual,
+                aiMs: finalAi,
+            },
         ]);
+        return totalSessionElapsed;
+    }
 
+    /** 空闲追溯暂停：截断当前进行中的会话至 idleStartMs 并固化 */
+    pauseForIdle(idleStartMs: number): number {
+        if (!this._running) return 0;
+        this._running = false;
+        this._pausedIdle = true;
+        this._idleStartMs = idleStartMs;
+
+        const effectiveEnd = Math.max(this._sessionStartMs, idleStartMs);
+        const elapsed = Math.max(0, effectiveEnd - this._sessionStartMs);
+
+        let finalManual = 0;
+        let finalAi = 0;
+        if (effectiveEnd >= this._segmentStartMs) {
+            const segs = this.computeCurrentSegments(effectiveEnd);
+            finalManual = segs.manual;
+            finalAi = segs.ai;
+        } else {
+            const currentElapsed = Math.max(1, this._sessionManualAccMs + this._sessionAiAccMs);
+            finalManual = Math.round(elapsed * (this._sessionManualAccMs / currentElapsed));
+            finalAi = elapsed - finalManual;
+        }
+
+        this._data.totalMs += elapsed;
+        this._data.manualTotalMs = (this._data.manualTotalMs ?? 0) + finalManual;
+        this._data.aiTotalMs = (this._data.aiTotalMs ?? 0) + finalAi;
+        this._data.currentSessionStartMs = 0;
+        this._data.lastSavedAtMs = effectiveEnd;
+
+        this.ensureTodayFresh();
+        if (elapsed > 0) {
+            const overlap = this.todayOverlap(this._sessionStartMs, effectiveEnd);
+            if (overlap > 0) {
+                const aiOverlap = Math.round(overlap * (finalAi / elapsed));
+                this._todayEndedAiMs += aiOverlap;
+                this._todayEndedManualMs += (overlap - aiOverlap);
+                this._todayEndedMs += overlap;
+            }
+            this._data.sessions = TimerEngine.frozenSessions([
+                ...this._data.sessions,
+                {
+                    startMs: this._sessionStartMs,
+                    endMs: effectiveEnd,
+                    durationMs: elapsed,
+                    manualMs: finalManual,
+                    aiMs: finalAi,
+                },
+            ]);
+        }
+
+        this.resetSessionPointers(0);
         return elapsed;
     }
 
-    /**
-     * 跨午夜自然日会话切分与轮转：
-     * 将当前运行中会话截至 boundaryMs（昨日 23:59:59.999/次日零点）封存入 sessions[] 并累加 totalMs，
-     * 同时无缝开启从 boundaryMs 起算的新会话段。
-     * @returns 封存的昨日会话段时长 (ms)
-     */
+    /** 空闲唤醒恢复：记录离开区间至 idleSessions 并开启新会话 */
+    resumeFromIdle(resumeMs: number, idleStartMs: number = 0): number {
+        const effectiveStart = Math.max(1, idleStartMs || this._idleStartMs);
+        const effectiveEnd = Math.max(effectiveStart, resumeMs);
+        const idleDuration = effectiveEnd - effectiveStart;
+
+        this.ensureTodayFresh();
+        if (idleDuration > 0) {
+            const idleEntry: IdleSession = {
+                startMs: effectiveStart,
+                endMs: effectiveEnd,
+                durationMs: idleDuration,
+                reason: 'idle_timeout',
+            };
+            this._data.idleSessions = TimerEngine.frozenIdleSessions([
+                ...(this._data.idleSessions ?? []),
+                idleEntry,
+            ]);
+            this._data.idleTotalMs = (this._data.idleTotalMs ?? 0) + idleDuration;
+            this._todayEndedIdleMs += this.todayOverlap(effectiveStart, effectiveEnd);
+        }
+
+        this._pausedIdle = false;
+        this._idleStartMs = 0;
+        this._running = true;
+        this.resetSessionPointers(effectiveEnd);
+        return idleDuration;
+    }
+
+    /** 跨午夜自然日会话切分与轮转 */
     rotateSession(boundaryMs: number): number {
         if (!this._running) return 0;
-        void this.getTodayEndedMs(); // 刷新当日键（新密封段属昨日，今日段自然归零）
+        this.ensureTodayFresh();
 
         const elapsed = Math.max(0, boundaryMs - this._sessionStartMs);
         this._data.totalMs += elapsed;
 
         if (elapsed > 0) {
+            const segs = this.computeCurrentSegments(boundaryMs);
+            this._data.manualTotalMs = (this._data.manualTotalMs ?? 0) + segs.manual;
+            this._data.aiTotalMs = (this._data.aiTotalMs ?? 0) + segs.ai;
+
             this._data.sessions = TimerEngine.frozenSessions([
                 ...this._data.sessions,
-                { startMs: this._sessionStartMs, endMs: boundaryMs, durationMs: elapsed },
+                {
+                    startMs: this._sessionStartMs,
+                    endMs: boundaryMs,
+                    durationMs: elapsed,
+                    manualMs: segs.manual,
+                    aiMs: segs.ai,
+                },
             ]);
-            // 密封段的今日部分计入计数器（真实跨日场景 overlap=0，同日 rotate 场景=密封时长）
             this._todayEndedMs += this.todayOverlap(this._sessionStartMs, boundaryMs);
         }
 
-        this._sessionStartMs = boundaryMs;
-        this._data.currentSessionStartMs = boundaryMs;
-        this._data.lastSavedAtMs = boundaryMs;
-
+        this.resetSessionPointers(boundaryMs);
         return elapsed;
     }
 
-    /**
-     * 系统休眠/挂起恢复处理：
-     * 将休眠前的会话段封存截至 sleepStartMs，休眠时间不计入时长，
-     * 并在唤醒时刻 resumeMs 重新开启活跃会话段。
-     * @returns 封存的休眠前会话段时长 (ms)
-     */
+    /** 系统休眠/挂起恢复处理 */
     resumeFromSleep(sleepStartMs: number, resumeMs: number): number {
         if (!this._running) return 0;
-        this.getTodayEndedMs(); // 刷新当日键（休眠跨日场景）
+        this.ensureTodayFresh();
         const sealedToday = this.todayOverlap(this._sessionStartMs, sleepStartMs);
 
         const elapsed = Math.max(0, sleepStartMs - this._sessionStartMs);
         this._data.totalMs += elapsed;
 
         if (elapsed > 0) {
-            const segs = splitByNaturalDay(this._sessionStartMs, sleepStartMs);
-            const segmentedSessions = segs.length > 0
-                ? segs
-                : [{ startMs: this._sessionStartMs, endMs: sleepStartMs, durationMs: elapsed }];
+            const segs = this.computeCurrentSegments(sleepStartMs);
+            this._data.manualTotalMs = (this._data.manualTotalMs ?? 0) + segs.manual;
+            this._data.aiTotalMs = (this._data.aiTotalMs ?? 0) + segs.ai;
+
+            const split = splitByNaturalDay(this._sessionStartMs, sleepStartMs, segs.manual, segs.ai);
+            const segmentedSessions = split.length > 0
+                ? split
+                : [{ startMs: this._sessionStartMs, endMs: sleepStartMs, durationMs: elapsed, manualMs: segs.manual, aiMs: segs.ai }];
             this._data.sessions = TimerEngine.frozenSessions([
                 ...this._data.sessions,
                 ...segmentedSessions,
@@ -217,39 +466,60 @@ export class TimerEngine {
             this._todayEndedMs += sealedToday;
         }
 
-        this._sessionStartMs = resumeMs;
-        this._data.currentSessionStartMs = resumeMs;
-        this._data.lastSavedAtMs = resumeMs;
-
+        this.resetSessionPointers(resumeMs);
         return elapsed;
     }
 
-    /** 获取当前快照（不停止计时） */
+    /** 获取当前快照（不停止计时，O(1) 状态读取，消除循环分配） */
     snapshot(): TimerSnapshot {
-        // 时钟回拨防御：进行中会话历时不为负
-        const sessionElapsed = this._running
-            ? Math.max(0, Date.now() - this._sessionStartMs)
+        let sessionManual = 0;
+        let sessionAi = 0;
+        if (this._running) {
+            const segs = this.computeCurrentSegments(Date.now());
+            sessionManual = segs.manual;
+            sessionAi = segs.ai;
+        }
+        const sessionElapsed = sessionManual + sessionAi;
+        const runningIdle = (this._pausedIdle && this._idleStartMs > 0)
+            ? Math.max(0, Date.now() - this._idleStartMs)
             : 0;
+        const idleTotal = (this._data.idleTotalMs ?? 0) + runningIdle;
 
         return {
             totalMs: this._data.totalMs,
+            manualTotalMs: (this._data.manualTotalMs ?? 0) + sessionManual,
+            aiTotalMs: (this._data.aiTotalMs ?? 0) + sessionAi,
+            idleTotalMs: idleTotal,
             sessionElapsedMs: sessionElapsed,
+            sessionManualMs: sessionManual,
+            sessionAiMs: sessionAi,
             currentTotalMs: this._data.totalMs + sessionElapsed,
+            currentMode: this._currentMode,
         };
     }
 
     /** 替换内部数据（用于崩溃恢复后加载）；sessions 经冻结副本标准化 */
     replaceData(data: WorkspaceTimingData): void {
-        this._data = TimerEngine.withFrozenSessions(data);
+        const frozen = TimerEngine.withFrozenSessions(data);
+        if (frozen.idleTotalMs === undefined) {
+            frozen.idleTotalMs = TimerEngine.computeInitialIdleTotal(frozen);
+        }
+        this._data = frozen;
         this._todayDirty = true;
     }
 
     /** 重置所有计时数据 */
     reset(): void {
         this._data = { ...createEmptyTimingData(), sessions: TimerEngine.frozenSessions([]) };
-        this._sessionStartMs = 0;
+        this.resetSessionPointers(0);
         this._running = false;
+        this._pausedIdle = false;
+        this._idleStartMs = 0;
+        this._data.idleTotalMs = 0;
         this._todayEndedMs = 0;
+        this._todayEndedManualMs = 0;
+        this._todayEndedAiMs = 0;
+        this._todayEndedIdleMs = 0;
         this._todayDirty = false;
         this._todayKey = localDateStr(Date.now());
     }

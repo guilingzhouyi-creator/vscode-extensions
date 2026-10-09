@@ -21,6 +21,7 @@ import {
     SLEEP_DETECT_GAP_MS,
     sanitizeJournalFlushIntervalMs,
     sanitizeFullSaveIntervalMs,
+    ActivityMode,
 } from '../domain/models';
 
 export interface SchedulerOptions {
@@ -37,6 +38,10 @@ export interface SchedulerOptions {
 export interface StatusBarDisplayData {
     totalMs: number;
     todayMs: number;
+    todayManualMs?: number;
+    todayAiMs?: number;
+    todayIdleMs?: number;
+    activityMode?: ActivityMode | 'paused_idle';
 }
 
 const MSG_STATUS_BAR_UPDATE_FAILED = 'Scheduler: status bar update tick failed';
@@ -151,46 +156,77 @@ export class Scheduler {
 
         // 2. 心跳定时器：每秒推入时间片 + 跨午夜与休眠检测 + 尝试 flush + 更新状态栏
         this.statusBarTimer = setInterval(() => {
-            try {
-                const now = Date.now();
-                const deltaMs = now - this._lastTickMs;
-                this._lastTickMs = now;
-
-                // 休眠唤醒检测：真实时间跃迁超过心跳间隔 + 容差阈值
-                if (deltaMs > SLEEP_DETECT_GAP_MS) {
-                    const sleepStartMs = now - deltaMs;
-                    void this.sessionManager.handleSystemResume(sleepStartMs, now);
-                    this._currentDayStr = TimeAggregator.todayStr();
-                    return;
-                }
-
-                // 跨午夜自然日更替检测
-                const todayStr = TimeAggregator.todayStr();
-                if (todayStr !== this._currentDayStr) {
-                    this._currentDayStr = todayStr;
-                    void this.sessionManager.rotateSessionAtMidnight();
-                }
-
-                // 仅在启用 journal 时推入切片与尝试 flush
-                if (this.options.journalEnabled) {
-                    this.journal.push({ timestamp: now, deltaMs: this.options.statusBarUpdateIntervalMs });
-                    void this.flushOnce();
-                }
-
-                // 驱动状态栏更新
-                if (this.statusBarCallback) {
-                    const snap = this.sessionManager.snapshot;
-                    this.statusBarCallback({
-                        totalMs: snap.currentTotalMs,
-                        todayMs: this.sessionManager.getTodayMs(),
-                    });
-                }
-            } catch (err) {
-                log(LogLevel.Error, MSG_STATUS_BAR_UPDATE_FAILED, err as Error);
-            }
+            this.onHeartbeat();
         }, this.options.statusBarUpdateIntervalMs);
 
         log(LogLevel.Info, 'Scheduler: started');
+    }
+
+    /** 状态栏与切片心跳驱动单次步进 */
+    private onHeartbeat(): void {
+        try {
+            const now = Date.now();
+            const deltaMs = now - this._lastTickMs;
+            this._lastTickMs = now;
+
+            if (this.checkSystemResume(now, deltaMs)) {
+                return;
+            }
+            this.checkMidnightRotation();
+            this.pushSliceAndFlush(now);
+            this.notifyStatusBar();
+        } catch (err) {
+            log(LogLevel.Error, MSG_STATUS_BAR_UPDATE_FAILED, err as Error);
+        }
+    }
+
+    /** 休眠唤醒检测：真实时间跃迁超过心跳间隔 + 容差阈值 */
+    private checkSystemResume(now: number, deltaMs: number): boolean {
+        if (deltaMs <= SLEEP_DETECT_GAP_MS) {
+            return false;
+        }
+        const sleepStartMs = now - deltaMs;
+        void this.sessionManager.handleSystemResume(sleepStartMs, now);
+        this._currentDayStr = TimeAggregator.todayStr();
+        return true;
+    }
+
+    /** 跨午夜自然日更替检测 */
+    private checkMidnightRotation(): void {
+        const todayStr = TimeAggregator.todayStr();
+        if (todayStr !== this._currentDayStr) {
+            this._currentDayStr = todayStr;
+            void this.sessionManager.rotateSessionAtMidnight();
+        }
+    }
+
+    /** 仅在未处于空闲暂停且启用 journal 时推入切片与尝试 flush */
+    private pushSliceAndFlush(now: number): void {
+        if (!this.sessionManager.isPausedIdle && this.options.journalEnabled) {
+            this.journal.push({
+                timestamp: now,
+                deltaMs: this.options.statusBarUpdateIntervalMs,
+                mode: this.sessionManager.currentMode,
+            });
+            void this.flushOnce();
+        }
+    }
+
+    /** 驱动状态栏更新 */
+    private notifyStatusBar(): void {
+        if (!this.statusBarCallback) {
+            return;
+        }
+        const snap = this.sessionManager.snapshot;
+        const mode = this.sessionManager.isPausedIdle ? 'paused_idle' : snap?.currentMode;
+        this.statusBarCallback({
+            totalMs: snap?.currentTotalMs ?? 0,
+            todayMs: this.sessionManager.getTodayMs(),
+            todayManualMs: this.sessionManager.getTodayManualMs?.() ?? 0,
+            todayAiMs: this.sessionManager.getTodayAiMs?.() ?? 0,
+            todayIdleMs: this.sessionManager.getTodayIdleMs?.() ?? 0,
+            activityMode: mode,
+        });
     }
 
     /** 单次 journal flush（带防重入守卫） */

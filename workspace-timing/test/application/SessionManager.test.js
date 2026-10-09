@@ -158,7 +158,6 @@ describe('SessionManager（跨午夜与休眠管理）', () => {
 
         // 验证：今日会话新起点为今日零点，昨日 1 小时不计入今日
         assert.strictEqual(timer.data.currentSessionStartMs, todayZero);
-        sessionManager.invalidateTodayCache();
         const todayMs = sessionManager.getTodayMs();
         assert.ok(Math.abs(todayMs - (Date.now() - todayZero)) < 50, '昨天的时长不计入今日');
     });

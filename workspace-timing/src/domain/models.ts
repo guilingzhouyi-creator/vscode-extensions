@@ -6,8 +6,11 @@
  * 零外部依赖。
  */
 
-/** 数据格式当前版本：数据存储格式版本 2（扩充 dailyTotals 沉淀层） */
-export const LATEST_VERSION = 2;
+/** 数据格式当前版本：数据存储格式版本 3（双轨模式 manual/ai、idleSessions 与沉淀层） */
+export const LATEST_VERSION = 3;
+
+/** 计时活动模式枚举：手动编码 vs AI 辅助协作 */
+export type ActivityMode = 'manual' | 'ai';
 
 // ─── 基础单位转换常数（消灭魔法数字）──────────────
 export const SECONDS_PER_MINUTE = 60;
@@ -29,6 +32,7 @@ export const ORCHESTRATOR_STATES = {
     SAVING: 'saving',
     STOPPED: 'stopped',
     ERROR: 'error',
+    PAUSED_IDLE: 'paused_idle',
 } as const;
 export type OrchestratorState = typeof ORCHESTRATOR_STATES[keyof typeof ORCHESTRATOR_STATES];
 
@@ -87,92 +91,126 @@ export const MAX_FULL_SAVE_MS = 600000;
 /** 原始会话保留窗合法域 [0, 3650] 天 */
 export const MAX_RAW_RETENTION_DAYS = 3650;
 
+/** 空闲超时分钟数合法域 [0, 120]（0 为关闭空闲检测） */
+export const MIN_IDLE_TIMEOUT_MINUTES = 0;
+export const MAX_IDLE_TIMEOUT_MINUTES = 120;
+export const DEFAULT_IDLE_TIMEOUT_MINUTES = 5;
+
+/** AI 冷却秒数合法域 [10, 600] */
+export const MIN_AI_COOLDOWN_SECONDS = 10;
+export const MAX_AI_COOLDOWN_SECONDS = 600;
+export const DEFAULT_AI_COOLDOWN_SECONDS = 120;
+
+/** AI 检测默认开关 */
+export const DEFAULT_AI_DETECTION_ENABLED = true;
+
 /**
  * 数值净化器：非法输入（非数字/NaN/Infinity）回退 fallback，合法输入钳制到 [min, max]。
  * 供配置读取（ConfigWatcher）与热更新（Scheduler）共用，杜绝双真源漂移。
  */
 export function clampNumber(
-  val: unknown,
-  min: number,
-  max: number,
-  fallback: number,
+    val: unknown,
+    min: number,
+    max: number,
+    fallback: number,
 ): number {
-  if (val === null || val === undefined || typeof val === 'boolean') return fallback;
-  if (typeof val === 'string' && val.trim() === '') return fallback;
-  const n = typeof val === 'number' ? val : Number(val);
-  if (!Number.isFinite(n)) return fallback;
-  return Math.min(max, Math.max(min, Math.round(n)));
+    if (val === null || val === undefined || typeof val === 'boolean') return fallback;
+    if (typeof val === 'string' && val.trim() === '') return fallback;
+    const n = typeof val === 'number' ? val : Number(val);
+    if (!Number.isFinite(n)) return fallback;
+    return Math.min(max, Math.max(min, Math.round(n)));
 }
 
 export function sanitizeRingBufferCapacity(val: unknown): number {
-  return clampNumber(val, MIN_RING_BUFFER_CAPACITY, MAX_RING_BUFFER_CAPACITY, DEFAULT_RING_BUFFER_CAP);
+    return clampNumber(val, MIN_RING_BUFFER_CAPACITY, MAX_RING_BUFFER_CAPACITY, DEFAULT_RING_BUFFER_CAP);
 }
 
 export function sanitizeJournalFlushIntervalMs(val: unknown): number {
-  return clampNumber(val, MIN_JOURNAL_FLUSH_MS, MAX_JOURNAL_FLUSH_MS, DEFAULT_JOURNAL_FLUSH_MS);
+    return clampNumber(val, MIN_JOURNAL_FLUSH_MS, MAX_JOURNAL_FLUSH_MS, DEFAULT_JOURNAL_FLUSH_MS);
 }
 
 export function sanitizeFullSaveIntervalMs(val: unknown): number {
-  return clampNumber(val, MIN_FULL_SAVE_MS, MAX_FULL_SAVE_MS, MS_PER_MINUTE);
+    return clampNumber(val, MIN_FULL_SAVE_MS, MAX_FULL_SAVE_MS, MS_PER_MINUTE);
 }
 
 export function sanitizeHistoryRawRetentionDays(val: unknown): number {
-  return clampNumber(val, 0, MAX_RAW_RETENTION_DAYS, DEFAULT_RAW_RETENTION_DAYS);
+    return clampNumber(val, 0, MAX_RAW_RETENTION_DAYS, DEFAULT_RAW_RETENTION_DAYS);
 }
 
 export function sanitizeMaxSessions(val: unknown): number {
-  return clampNumber(val, 0, Number.MAX_SAFE_INTEGER, DEFAULT_MAX_SESSIONS);
+    return clampNumber(val, 0, Number.MAX_SAFE_INTEGER, DEFAULT_MAX_SESSIONS);
+}
+
+export function sanitizeIdleTimeoutMinutes(val: unknown): number {
+    return clampNumber(val, MIN_IDLE_TIMEOUT_MINUTES, MAX_IDLE_TIMEOUT_MINUTES, DEFAULT_IDLE_TIMEOUT_MINUTES);
+}
+
+export function sanitizeAiDetectionEnabled(val: unknown): boolean {
+    if (val === undefined || val === null) return DEFAULT_AI_DETECTION_ENABLED;
+    return val === true || val === 'true';
+}
+
+export function sanitizeAiCooldownSeconds(val: unknown): number {
+    return clampNumber(val, MIN_AI_COOLDOWN_SECONDS, MAX_AI_COOLDOWN_SECONDS, DEFAULT_AI_COOLDOWN_SECONDS);
 }
 
 const STATUS_BAR_MODES: ReadonlySet<string> = new Set(['today-total', 'total-today', 'compact']);
 
 /** 状态栏模式净化：非枚举值（手写配置漂移）回退默认 */
 export function sanitizeStatusBarMode(val: unknown): StatusBarMode {
-  if (isString(val) && STATUS_BAR_MODES.has(val)) return val as StatusBarMode;
-  return DEFAULT_CONFIG.statusBarMode;
+    if (isString(val) && STATUS_BAR_MODES.has(val)) return val as StatusBarMode;
+    return DEFAULT_CONFIG.statusBarMode;
 }
 
 const LOCALES: ReadonlySet<string> = new Set(['auto', 'zh-CN', 'en']);
 
 /** 语言净化：非枚举值（手写配置漂移）回退 auto */
 export function sanitizeLocale(val: unknown): Locale {
-  if (isString(val) && LOCALES.has(val)) return val as Locale;
-  return DEFAULT_CONFIG.locale;
+    if (isString(val) && LOCALES.has(val)) return val as Locale;
+    return DEFAULT_CONFIG.locale;
 }
 
 /** 字符串类型守卫（复用避免字面量 'string' 散布） */
 function isString(val: unknown): val is string {
-  return typeof val === 'string';
+    return typeof val === 'string';
 }
 
 /** 校验并钳制周工作时长上限（小时），非法输入（非数字/NaN/Infinity/越界）自动纠偏到 [1, 168] */
 export function sanitizeWeeklyLimitHours(val: unknown): number {
-  let n: number;
-  if (typeof val === 'number') {
-    n = val;
-  } else if (isString(val)) {
-    n = parseInt(val, RADIX_DECIMAL);
-  } else {
-    return DEFAULT_WEEKLY_LIMIT_HOURS;
-  }
-  if (!Number.isFinite(n) || Number.isNaN(n)) {
-    return DEFAULT_WEEKLY_LIMIT_HOURS;
-  }
-  const rounded = Math.round(n);
-  return Math.min(MAX_WEEKLY_LIMIT_HOURS, Math.max(MIN_WEEKLY_LIMIT_HOURS, rounded));
+    let n: number;
+    if (typeof val === 'number') {
+        n = val;
+    } else if (isString(val)) {
+        n = parseInt(val, RADIX_DECIMAL);
+    } else {
+        return DEFAULT_WEEKLY_LIMIT_HOURS;
+    }
+    if (!Number.isFinite(n) || Number.isNaN(n)) {
+        return DEFAULT_WEEKLY_LIMIT_HOURS;
+    }
+    const rounded = Math.round(n);
+    return Math.min(MAX_WEEKLY_LIMIT_HOURS, Math.max(MIN_WEEKLY_LIMIT_HOURS, rounded));
 }
 
 /** 校验周工作时长上限开关 */
 export function sanitizeWeeklyLimitEnabled(val: unknown): boolean {
-  return val === true || val === 'true';
+    return val === true || val === 'true';
 }
 
 /** 单日聚合沉淀（折叠层）：某自然日的时长与会话数 */
 export interface DailyTotal {
-  /** 该日累计时长 (ms) */
-  totalMs: number;
-  /** 该日会话数（会话归属其起始自然日，与 TimeAggregator 口径一致） */
-  sessionCount: number;
+    /** 该日累计时长 (ms) */
+    totalMs: number;
+    /** 该日会话数（会话归属其起始自然日，与 TimeAggregator 口径一致） */
+    sessionCount: number;
+    /** 该日手动编码累计时长 (ms) */
+    manualMs?: number;
+    /** 该日 AI 辅助累计时长 (ms) */
+    aiMs?: number;
+    /** 该日空闲累计总时长 (ms) */
+    idleTotalMs?: number;
+    /** 该日空闲段总次数 */
+    idleSessionCount?: number;
 }
 
 /** 日桶表：key = 本地日期 "YYYY-MM-DD" */
@@ -180,80 +218,114 @@ export type DailyTotalsMap = Record<string, DailyTotal>;
 
 /** 一条原子时间片 — 用于缓存层和 journal */
 export interface TimeSlice {
-  /** 时间片结束时间戳 (Date.now()) */
-  timestamp: number;
-  /** 本片时长 (ms)，通常是 1000（1 秒） */
-  deltaMs: number;
+    /** 时间片结束时间戳 (Date.now()) */
+    timestamp: number;
+    /** 本片时长 (ms)，通常是 1000（1 秒） */
+    deltaMs: number;
+    /** 时间片活动模式 */
+    mode?: ActivityMode;
+}
+
+/** 空闲段记录 */
+export interface IdleSession {
+    /** 空闲开始时间戳 */
+    startMs: number;
+    /** 空闲结束时间戳 */
+    endMs: number;
+    /** 空闲历时 (ms) */
+    durationMs: number;
+    /** 空闲原因描述 */
+    reason?: string;
 }
 
 /** 单次会话记录 */
 export interface TimeSession {
-  /** 会话开始时间戳 (Date.now()) */
-  startMs: number;
-  /** 会话结束时间戳 */
-  endMs: number;
-  /** 本次会话时长 (ms) */
-  durationMs: number;
+    /** 会话开始时间戳 (Date.now()) */
+    startMs: number;
+    /** 会话结束时间戳 */
+    endMs: number;
+    /** 本次会话时长 (ms) */
+    durationMs: number;
+    /** 手动编码时长 (ms) */
+    manualMs?: number;
+    /** AI 辅助时长 (ms) */
+    aiMs?: number;
 }
 
 /** 工作区计时主数据 */
 export interface WorkspaceTimingData {
-  /** 持久化数据结构演进版本号（当前版本：LATEST_VERSION） */
-  version: number;
+    /** 持久化数据结构演进版本号（当前版本：LATEST_VERSION） */
+    version: number;
 
-  /** 累计总时长 (ms) */
-  totalMs: number;
+    /** 累计总时长 (ms) */
+    totalMs: number;
 
-  /** 当前会话开始时间戳；0 表示无活跃会话 */
-  currentSessionStartMs: number;
+    /** 累计手动总时长 (ms) */
+    manualTotalMs?: number;
 
-  /** 上次持久化时间戳 */
-  lastSavedAtMs: number;
+    /** 累计 AI 总时长 (ms) */
+    aiTotalMs?: number;
 
-  /** 该工作区是否启用计时 */
-  isEnabled: boolean;
+    /** 累计空闲离开总时长 (ms) */
+    idleTotalMs?: number;
 
-  /** 历史会话列表 */
-  sessions: TimeSession[];
+    /** 当前会话开始时间戳；0 表示无活跃会话 */
+    currentSessionStartMs: number;
 
-  /**
-   * 日聚合沉淀层（数据存储格式版本 2 及以上）：超出原始保留窗的会话按日折叠于此。
-   * 口径与 TimeAggregator 完全一致；缺省（数据存储格式版本 1 数据）表示尚未迁移。
-   */
-  dailyTotals?: DailyTotalsMap;
+    /** 上次持久化时间戳 */
+    lastSavedAtMs: number;
 
-  /** 扩展元数据容器 — 供插件/第三方使用 */
-  metadata?: TimingMetadata;
+    /** 该工作区是否启用计时 */
+    isEnabled: boolean;
+
+    /** 历史会话列表 */
+    sessions: TimeSession[];
+
+    /** 空闲记录列表 */
+    idleSessions?: readonly IdleSession[];
+
+    /**
+     * 日聚合沉淀层（数据存储格式版本 2 及以上）：超出原始保留窗的会话按日折叠于此。
+     * 口径与 TimeAggregator 完全一致；缺省（数据存储格式版本 1 数据）表示尚未迁移。
+     */
+    dailyTotals?: DailyTotalsMap;
+
+    /** 扩展元数据容器 — 供插件/第三方使用 */
+    metadata?: TimingMetadata;
 }
 
 /** 扩展元数据结构 */
 export interface TimingMetadata {
-  lastJournalTs?: number | string;
-  foldedSessionCount?: number;
-  journalPlaybackCount?: number;
-  [key: string]: unknown;
+    lastJournalTs?: number | string;
+    foldedSessionCount?: number;
+    journalPlaybackCount?: number;
+    [key: string]: unknown;
 }
 
 /** 创建一个空的 WorkspaceTimingData */
 export function createEmptyTimingData(): WorkspaceTimingData {
-  return {
-    version: LATEST_VERSION,
-    totalMs: 0,
-    currentSessionStartMs: 0,
-    lastSavedAtMs: 0,
-    isEnabled: true,
-    sessions: [],
-    dailyTotals: {},
-  };
+    return {
+        version: LATEST_VERSION,
+        totalMs: 0,
+        manualTotalMs: 0,
+        aiTotalMs: 0,
+        currentSessionStartMs: 0,
+        lastSavedAtMs: 0,
+        isEnabled: true,
+        sessions: [],
+        idleSessions: [],
+        dailyTotals: {},
+    };
 }
 
 /**
  * TimerEngine 对外暴露的只读数据视图：
- * sessions 冻结为只读数组（ReadonlyArray），越权突变在编译期报错；
+ * sessions 与 idleSessions 冻结为只读数组（ReadonlyArray），越权突变在编译期报错；
  * 其余字段经 Readonly 浅冻结。内部可变副本仅 TimerEngine 私有持有。
  */
-export type ReadonlyTimingData = Readonly<Omit<WorkspaceTimingData, 'sessions'>> & {
-  readonly sessions: readonly TimeSession[];
+export type ReadonlyTimingData = Readonly<Omit<WorkspaceTimingData, 'sessions' | 'idleSessions'>> & {
+    readonly sessions: readonly TimeSession[];
+    readonly idleSessions?: readonly IdleSession[];
 };
 
 export type Locale = 'auto' | 'zh-CN' | 'en';
@@ -263,53 +335,62 @@ export type StatusBarMode = 'today-total' | 'total-today' | 'compact';
 
 /** 插件配置模型 */
 export interface TimingConfig {
-  /** 工作区级启用开关 */
-  enabled: boolean;
-  /** 全局禁用开关 */
-  globalDisabled: boolean;
-  /** 界面语言：auto=跟随 VS Code 显示语言 */
-  locale: Locale;
-  /** 状态栏显示开关 */
-  statusBarEnabled: boolean;
-  /** 是否启用 JSON 文件备份 */
-  backupToFile: boolean;
-  /** 是否启用 journal 崩溃保护 */
-  journalEnabled: boolean;
-  /** RingBuffer 容量 */
-  ringBufferCapacity: number;
-  /** journal flush 间隔 (ms) */
-  journalFlushIntervalMs: number;
-  /** 全量存盘间隔 (ms) */
-  fullSaveIntervalMs: number;
-  /** 状态栏初始显示模式（点击状态栏循环切换并持久化） */
-  statusBarMode: StatusBarMode;
-  /** 历史会话保留上限（0 = 不限）。兜底安全值；常规治理走 rawRetentionDays 折叠 */
-  maxSessions: number;
-  /** 原始会话保留窗（天）：超窗会话按日折叠进 dailyTotals；0=不折叠（保留全量原始明细） */
-  historyRawRetentionDays: number;
-  /** 破坏性操作（重置/清除历史/还原）前自动写安全快照 */
-  safetySnapshot: boolean;
-  /** 周工作时长上限开关（默认不开启） */
-  weeklyLimitEnabled: boolean;
-  /** 周工作时长上限（小时，默认 40h） */
-  weeklyLimitHours: number;
+    /** 工作区级启用开关 */
+    enabled: boolean;
+    /** 全局禁用开关 */
+    globalDisabled: boolean;
+    /** 界面语言：auto=跟随 VS Code 显示语言 */
+    locale: Locale;
+    /** 状态栏显示开关 */
+    statusBarEnabled: boolean;
+    /** 是否启用 JSON 文件备份 */
+    backupToFile: boolean;
+    /** 是否启用 journal 崩溃保护 */
+    journalEnabled: boolean;
+    /** RingBuffer 容量 */
+    ringBufferCapacity: number;
+    /** journal flush 间隔 (ms) */
+    journalFlushIntervalMs: number;
+    /** 全量存盘间隔 (ms) */
+    fullSaveIntervalMs: number;
+    /** 状态栏初始显示模式（点击状态栏循环切换并持久化） */
+    statusBarMode: StatusBarMode;
+    /** 历史会话保留上限（0 = 不限）。兜底安全值；常规治理走 rawRetentionDays 折叠 */
+    maxSessions: number;
+    /** 原始会话保留窗（天）：超窗会话按日折叠进 dailyTotals；0=不折叠（保留全量原始明细） */
+    historyRawRetentionDays: number;
+    /** 破坏性操作（重置/清除历史/还原）前自动写安全快照 */
+    safetySnapshot: boolean;
+    /** 周工作时长上限开关（默认不开启） */
+    weeklyLimitEnabled: boolean;
+    /** 周工作时长上限（小时，默认 40h） */
+    weeklyLimitHours: number;
+    /** 空闲超时分钟数（0 为关闭） */
+    idleTimeoutMinutes: number;
+    /** 是否启用 AI 活动检测 */
+    aiDetectionEnabled: boolean;
+    /** AI 检测冷却秒数 */
+    aiCooldownSeconds: number;
 }
 
 /** 默认配置 */
 export const DEFAULT_CONFIG: TimingConfig = {
-  enabled: true,
-  globalDisabled: false,
-  locale: 'auto',
-  historyRawRetentionDays: DEFAULT_RAW_RETENTION_DAYS,
-  safetySnapshot: true,
-  weeklyLimitEnabled: false,
-  weeklyLimitHours: DEFAULT_WEEKLY_LIMIT_HOURS,
-  statusBarEnabled: true,
-  backupToFile: true,
-  journalEnabled: true,
-  ringBufferCapacity: DEFAULT_RING_BUFFER_CAP,
-  journalFlushIntervalMs: DEFAULT_JOURNAL_FLUSH_MS,
-  fullSaveIntervalMs: MS_PER_MINUTE,
-  statusBarMode: 'today-total',
-  maxSessions: DEFAULT_MAX_SESSIONS,
+    enabled: true,
+    globalDisabled: false,
+    locale: 'auto',
+    historyRawRetentionDays: DEFAULT_RAW_RETENTION_DAYS,
+    safetySnapshot: true,
+    weeklyLimitEnabled: false,
+    weeklyLimitHours: DEFAULT_WEEKLY_LIMIT_HOURS,
+    statusBarEnabled: true,
+    backupToFile: true,
+    journalEnabled: true,
+    ringBufferCapacity: DEFAULT_RING_BUFFER_CAP,
+    journalFlushIntervalMs: DEFAULT_JOURNAL_FLUSH_MS,
+    fullSaveIntervalMs: MS_PER_MINUTE,
+    statusBarMode: 'today-total',
+    maxSessions: DEFAULT_MAX_SESSIONS,
+    idleTimeoutMinutes: DEFAULT_IDLE_TIMEOUT_MINUTES,
+    aiDetectionEnabled: DEFAULT_AI_DETECTION_ENABLED,
+    aiCooldownSeconds: DEFAULT_AI_COOLDOWN_SECONDS,
 };

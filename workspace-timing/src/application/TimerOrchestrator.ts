@@ -24,6 +24,7 @@ import {
     LATEST_VERSION,
     ORCHESTRATOR_STATES,
     OrchestratorState,
+    ActivityMode,
 } from '../domain/models';
 import { validateTimingData } from '../persistence/DataValidator';
 import { migrateToFolded } from '../domain/HistoryFolder';
@@ -31,7 +32,7 @@ import { TimeAggregator } from '../domain/TimeAggregator';
 import { DashboardData } from '../domain/dashboard-types';
 import { GlobalAggregator } from './GlobalAggregator';
 import { DisableManager, DisableState } from './DisableManager';
-import { Scheduler } from './Scheduler';
+import { Scheduler, StatusBarDisplayData } from './Scheduler';
 import { exportCSV, exportAggregatedCSV, exportReport, ReportKind } from './exporters/index';
 import { buildDashboardData } from './DashboardDataAssembler';
 import { LogLevel, log } from '../integration/Logger';
@@ -53,6 +54,9 @@ const DASHBOARD_CONFIG_DIRECT_MAP: ReadonlyArray<[keyof DashboardData, keyof Tim
     ['maxSessions', 'maxSessions'],
     ['historyRawRetentionDays', 'historyRawRetentionDays'],
     ['safetySnapshot', 'safetySnapshot'],
+    ['idleTimeoutMinutes', 'idleTimeoutMinutes'],
+    ['aiDetectionEnabled', 'aiDetectionEnabled'],
+    ['aiCooldownSeconds', 'aiCooldownSeconds'],
 ];
 
 export class TimerOrchestrator {
@@ -112,7 +116,7 @@ export class TimerOrchestrator {
     }
 
     /** 注册心跳回调（状态栏与面板刷新） */
-    onTick(cb: (data: { totalMs: number; todayMs: number }) => void): void {
+    onTick(cb: (data: StatusBarDisplayData) => void): void {
         this.scheduler.onStatusBarUpdate(cb);
     }
 
@@ -220,9 +224,47 @@ export class TimerOrchestrator {
             data: this.timer.data,
             currentTotalMs: snap.currentTotalMs,
             todayMs: this.sessionManager.getTodayMs(),
+            manualTodayMs: this.sessionManager.getTodayManualMs(),
+            aiTodayMs: this.sessionManager.getTodayAiMs(),
+            idleTodayMs: this.sessionManager.getTodayIdleMs(),
+            manualTotalMs: snap.manualTotalMs,
+            aiTotalMs: snap.aiTotalMs,
+            idleTotalMs: snap.idleTotalMs,
             config: this.disableManager.config,
             global: globalSnap,
         });
+    }
+
+    /**
+     * 响应活动监测器心跳（人工输入或 AI 协作中）
+     */
+    async handleActivity(mode: ActivityMode, timestampMs: number): Promise<void> {
+        if (this._state === ORCHESTRATOR_STATES.PAUSED_IDLE) {
+            log(LogLevel.Info, `TimerOrchestrator: resuming from idle (activity detected: ${mode})`);
+            await this.sessionManager.handleIdleResume(timestampMs);
+            this._state = ORCHESTRATOR_STATES.RUNNING;
+            this._onStateChange?.(this._state);
+        }
+        this.sessionManager.switchMode(mode);
+    }
+
+    /**
+     * 响应活动监测器空闲超时
+     */
+    async handleIdleTimeout(idleStartMs: number): Promise<void> {
+        if (this._state === ORCHESTRATOR_STATES.RUNNING) {
+            log(LogLevel.Info, `TimerOrchestrator: pausing for idle (idleStartMs=${idleStartMs})`);
+            await this.sessionManager.handleIdlePause(idleStartMs);
+            this._state = ORCHESTRATOR_STATES.PAUSED_IDLE;
+            this._onStateChange?.(this._state);
+        }
+    }
+
+    /**
+     * 响应活动模式切换
+     */
+    handleModeChange(mode: ActivityMode): void {
+        this.sessionManager.switchMode(mode);
     }
 
     /**

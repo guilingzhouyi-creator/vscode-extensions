@@ -8,13 +8,15 @@
  *   - weekly-aggregator: 周报统计、多周趋势与全历史日报序列
  *   - heatmap-aggregator: 24 周活动热力图网格构建与聚合
  */
+
+import { TimeSession } from './models';
+
 // 子领域纯函数与类型对外统一导出
 export {
     localDateStr,
     parseLocalDate,
     todayStr,
     weekStartStr,
-    splitByNaturalDay,
     eachDaySegment,
 } from './aggregator/date-utils';
 
@@ -63,14 +65,60 @@ import * as WeeklyAgg from './aggregator/weekly-aggregator';
 import * as HeatmapAgg from './aggregator/heatmap-aggregator';
 
 /**
+ * 将区间 [startMs, endMs) 按本地自然日切分为 TimeSession 片段。
+ * 若传入 manualMs / aiMs，各自然日切片按时长等比切分分配 manualMs 与 aiMs，确保切片守恒。
+ */
+export function splitByNaturalDay(
+    startMs: number,
+    endMs: number,
+    manualMs?: number,
+    aiMs?: number,
+): TimeSession[] {
+    const out: TimeSession[] = [];
+    if (!(startMs > 0) || !(endMs > startMs)) return out;
+    const totalDuration = endMs - startMs;
+    const hasManualAi = typeof manualMs === 'number' && typeof aiMs === 'number';
+    let remainingManual = hasManualAi ? manualMs! : 0;
+    let remainingAi = hasManualAi ? aiMs! : 0;
+
+    DateUtils.eachDaySegment(startMs, endMs, (_date, segStart, segEnd) => {
+        const segDuration = segEnd - segStart;
+        if (!hasManualAi) {
+            out.push({ startMs: segStart, endMs: segEnd, durationMs: segDuration });
+            return;
+        }
+        const ratio = totalDuration > 0 ? (segDuration / totalDuration) : 0;
+        const segManual = Math.min(remainingManual, Math.round(manualMs! * ratio));
+        const segAi = Math.min(remainingAi, segDuration - segManual);
+        remainingManual -= segManual;
+        remainingAi -= segAi;
+        out.push({
+            startMs: segStart,
+            endMs: segEnd,
+            durationMs: segDuration,
+            manualMs: segManual,
+            aiMs: segAi,
+        });
+    });
+
+    if (hasManualAi && out.length > 0) {
+        const last = out[out.length - 1];
+        last.manualMs = (last.manualMs ?? 0) + remainingManual;
+        last.aiMs = (last.aiMs ?? 0) + remainingAi;
+        last.durationMs = (last.manualMs ?? 0) + (last.aiMs ?? 0);
+    }
+    return out;
+}
+
+/**
  * 时间聚合器统一门面对象（深层只读冻结，聚合 5 个子领域纯函数模块）
  */
 export const TimeAggregator = Object.freeze({
     /** 今天的本地日期字符串 (YYYY-MM-DD) */
     todayStr: DateUtils.todayStr,
 
-    /** 将区间 [startMs, endMs) 按本地自然日切分为 TimeSession 片段 */
-    splitByNaturalDay: DateUtils.splitByNaturalDay,
+    /** 将区间 [startMs, endMs) 按本地自然日切分为 TimeSession 片段（支持 manualMs / aiMs 双轨守恒切分） */
+    splitByNaturalDay,
 
     /** 计算时间戳所在周的起始日（周一）本地日期字符串 */
     weekStartStr: DateUtils.weekStartStr,
@@ -119,4 +167,3 @@ export const TimeAggregator = Object.freeze({
 });
 
 export type TimeAggregator = typeof TimeAggregator;
-

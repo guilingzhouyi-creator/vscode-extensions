@@ -28,6 +28,12 @@ export interface AssembleContext {
     data: ReadonlyTimingData;
     currentTotalMs: number;
     todayMs: number;
+    manualTodayMs?: number;
+    aiTodayMs?: number;
+    idleTodayMs?: number;
+    manualTotalMs?: number;
+    aiTotalMs?: number;
+    idleTotalMs?: number;
     config: TimingConfig;
     global: GlobalSnapshot;
 }
@@ -99,6 +105,12 @@ export function buildDashboardData(ctx: AssembleContext): DashboardData {
     return {
         totalMs: currentTotalMs,
         todayMs,
+        manualTodayMs: ctx.manualTodayMs,
+        aiTodayMs: ctx.aiTodayMs,
+        idleTodayMs: ctx.idleTodayMs,
+        manualTotalMs: ctx.manualTotalMs,
+        aiTotalMs: ctx.aiTotalMs,
+        idleTotalMs: ctx.idleTotalMs,
         sessionsCount: effectiveSessions,
         dailyStats: TimeAggregator.last7Days(
             data.sessions,
@@ -127,5 +139,8 @@ export function buildDashboardData(ctx: AssembleContext): DashboardData {
         safetySnapshot: config.safetySnapshot ?? true,
         weeklyLimitEnabled: config.weeklyLimitEnabled ?? false,
         weeklyLimitHours: config.weeklyLimitHours ?? DEFAULT_WEEKLY_LIMIT_HOURS,
+        idleTimeoutMinutes: config.idleTimeoutMinutes,
+        aiDetectionEnabled: config.aiDetectionEnabled,
+        aiCooldownSeconds: config.aiCooldownSeconds,
     };
 }

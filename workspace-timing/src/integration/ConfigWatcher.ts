@@ -1,8 +1,10 @@
 /**
- * ConfigWatcher — 配置变更监听器
- *
- * 职责：监听 VS Code 设置变更，同步到 DisableManager 和其他模块
- * 边界：只做配置变更通知，不做业务决策
+ * Module: ConfigWatcher — Configuration Change Listener & Persistence Mapper
+ * File Path: src/integration/ConfigWatcher.ts
+ * Architecture Role: Integration layer configuration observer and persistence gateway
+ * Dependencies & Triggers: Consumes vscode.workspace configuration events; triggers RuntimeConfigPort, StatusBarLike, and i18n locale updates
+ * Responsibilities: Read and sanitize workspace timing configurations, map persistence fields to VS Code settings, observe configuration changes, and notify downstream runtime ports
+ * Exit Semantics & Design Rationale: Pure configuration observer with no domain business logic; sanitizes user inputs at boundary to prevent state corruption; safely disposes listeners on stop
  */
 
 import * as vscode from 'vscode';
@@ -19,6 +21,9 @@ import {
     sanitizeMaxSessions,
     sanitizeStatusBarMode,
     sanitizeLocale,
+    sanitizeIdleTimeoutMinutes,
+    sanitizeAiDetectionEnabled,
+    sanitizeAiCooldownSeconds,
 } from '../domain/models';
 import { DashboardData } from '../domain/dashboard-types';
 import { LogLevel, log } from './Logger';
@@ -30,12 +35,6 @@ const CONFIG_KEY_ENABLED = 'enabled';
 /**
  * 读取当前用户配置（唯一入口，避免多处重复实现导致配置漂移）。
  * 供 ConfigWatcher 与 extension.ts 初始化共用，保证初始化/运行期配置同源。
- *
- * 所有数值型配置经 domain/models 的净化器钳制（与 package.json 的
- * minimum/maximum、面板输入框 min/max 属性三方一致，见 models.ts 边界单一真源）：
- * - ringBufferCapacity < 1 会使 RingBuffer 构造抛异常，导致扩展激活失败；
- * - flush/save 间隔 <= 0 会让 setInterval 以 ~1ms 疯狂触发（CPU/I/O 热点）；
- * - 超出上界的值一律钳回合法域，杜绝手写配置越界。
  */
 export function readTimingConfig(): TimingConfig {
     const cfg = vscode.workspace.getConfiguration(CONFIG_SECTION);
@@ -61,23 +60,21 @@ export function readTimingConfig(): TimingConfig {
         safetySnapshot: cfg.get<boolean>('storage.safetySnapshot', DEFAULT_CONFIG.safetySnapshot),
         weeklyLimitEnabled: sanitizeWeeklyLimitEnabled(cfg.get('weeklyLimit.enabled', DEFAULT_CONFIG.weeklyLimitEnabled)),
         weeklyLimitHours: sanitizeWeeklyLimitHours(cfg.get('weeklyLimit.hours', DEFAULT_CONFIG.weeklyLimitHours)),
+        idleTimeoutMinutes: sanitizeIdleTimeoutMinutes(cfg.get('idleTimeoutMinutes', DEFAULT_CONFIG.idleTimeoutMinutes)),
+        aiDetectionEnabled: sanitizeAiDetectionEnabled(cfg.get('aiDetectionEnabled', DEFAULT_CONFIG.aiDetectionEnabled)),
+        aiCooldownSeconds: sanitizeAiCooldownSeconds(cfg.get('aiCooldownSeconds', DEFAULT_CONFIG.aiCooldownSeconds)),
     };
 }
 
 /**
  * 持久化字段映射表（声明式单一事实源）。
- *   field    → 入参触达名（TimingConfig / DashboardData 历史双轨名，如 isEnabled=enabled）
- *   key      → VS Code settings 键（相对 workspaceTiming 段）
- *   sanitize → 写入前净化器（可选）
- * 新增可持久化字段只需在此登记，不再增长 if 链。
  */
 const PERSIST_FIELDS: ReadonlyArray<{
     field: string;
     key: string;
     sanitize?: (v: unknown) => unknown;
 }> = [
-    { field: 'isEnabled', key: CONFIG_KEY_ENABLED },   // DashboardData 历史触达名
-    { field: CONFIG_KEY_ENABLED, key: CONFIG_KEY_ENABLED },     // TimingConfig 本名
+    { field: CONFIG_KEY_ENABLED, key: CONFIG_KEY_ENABLED },
     { field: 'globalDisabled', key: 'globalDisabled' },
     { field: 'locale', key: 'locale' },
     { field: 'statusBarEnabled', key: 'statusBar.enabled' },
@@ -92,6 +89,9 @@ const PERSIST_FIELDS: ReadonlyArray<{
     { field: 'safetySnapshot', key: 'storage.safetySnapshot' },
     { field: 'weeklyLimitEnabled', key: 'weeklyLimit.enabled', sanitize: sanitizeWeeklyLimitEnabled },
     { field: 'weeklyLimitHours', key: 'weeklyLimit.hours', sanitize: sanitizeWeeklyLimitHours },
+    { field: 'idleTimeoutMinutes', key: 'idleTimeoutMinutes', sanitize: sanitizeIdleTimeoutMinutes },
+    { field: 'aiDetectionEnabled', key: 'aiDetectionEnabled', sanitize: sanitizeAiDetectionEnabled },
+    { field: 'aiCooldownSeconds', key: 'aiCooldownSeconds', sanitize: sanitizeAiCooldownSeconds },
 ];
 
 /**
@@ -102,7 +102,13 @@ export async function persistTimingConfig(
     target: vscode.ConfigurationTarget = vscode.ConfigurationTarget.Global,
 ): Promise<void> {
     const config = vscode.workspace.getConfiguration(CONFIG_SECTION);
-    const record = partial as Record<string, unknown>;
+    const rawRecord = partial as Record<string, unknown>;
+    const record: Record<string, unknown> = {
+        ...rawRecord,
+        ...(rawRecord.isEnabled !== undefined && rawRecord.enabled === undefined
+            ? { enabled: rawRecord.isEnabled }
+            : {}),
+    };
     const touched: string[] = [];
     const promises = PERSIST_FIELDS
         .filter(({ field }) => record[field] !== undefined)
@@ -134,12 +140,21 @@ export interface RuntimeConfigPort {
     applyConfig(config: TimingConfig): void;
 }
 
-export class ConfigWatcher {
-    private readonly disposables: vscode.Disposable[] = [];
+export interface ActivityWatcherLike {
+    updateConfig(options: {
+        idleTimeoutMinutes?: number;
+        aiDetectionEnabled?: boolean;
+        aiCooldownSeconds?: number;
+    }): void;
+}
+
+export class ConfigWatcher implements vscode.Disposable {
+    private readonly subscriptions: vscode.Disposable[] = [];
     private readonly orchestrator: RuntimeConfigPort;
     private readonly statusBar: StatusBarLike;
     /** 面板按新语言重建策略（由组合根注入，无面板打开时静默跳过） */
     private readonly recreatePanel: () => void;
+    private readonly activityWatcher?: ActivityWatcherLike | null;
     /** 上次应用的语言设置（undefined=尚未应用过首轮） */
     private _lastLocale: string | undefined = undefined;
 
@@ -147,32 +162,29 @@ export class ConfigWatcher {
         orchestrator: RuntimeConfigPort,
         statusBar: StatusBarLike,
         recreatePanel: () => void,
+        activityWatcher?: ActivityWatcherLike | null,
     ) {
         this.orchestrator = orchestrator;
         this.statusBar = statusBar;
         this.recreatePanel = recreatePanel;
+        this.activityWatcher = activityWatcher;
     }
 
     /** 开始监听配置变更 */
     start(): void {
-        this.disposables.push(
+        this.subscriptions.push(
             vscode.workspace.onDidChangeConfiguration(e => {
                 if (!e.affectsConfiguration(CONFIG_SECTION)) return;
 
                 try {
-                    // 云端同步检测：检测用户尝试开启云端同步 → 提示即将推出
-                    this.checkCloudSyncPlaceholder(e);
-
                     const config = this.readConfig();
                     this.applyConfig(config);
                 } catch (err) {
-                    // 单次配置变更处理失败不应阻塞后续变更
                     log(LogLevel.Error, 'ConfigWatcher: failed to apply config change', err as Error);
                 }
             }),
         );
 
-        // 读取初始配置
         const config = this.readConfig();
         this.applyConfig(config);
 
@@ -186,54 +198,45 @@ export class ConfigWatcher {
 
     /** 应用配置到各模块 */
     private applyConfig(config: TimingConfig): void {
-        // 0. 语言切换：热生效（面板重建 + 状态栏重渲染）；命令标题需窗口重载（VS Code 限制）
         if (config.locale !== undefined && config.locale !== this._lastLocale) {
             const isFirstApply = this._lastLocale === undefined;
             this._lastLocale = config.locale;
             setLocale(resolveLocale(config.locale));
             if (!isFirstApply) {
-                // 面板开着 → 按新语言重建（重建策略由组合根注入，含面板存在性判断）
                 this.recreatePanel();
                 log(LogLevel.Info, 'ConfigWatcher: locale changed, dashboard recreated');
             }
         }
 
-        // 1. 更新 DisableManager + 可变配置分发 + 禁用状态编排（经窄端口，门面内聚处理）
         this.orchestrator.applyConfig(config);
 
-        // 2. 更新 StatusBar（显示开关 + 初始显示模式）
         this.statusBar.updateConfig({
             enabled: config.statusBarEnabled,
             mode: config.statusBarMode,
         });
 
+        if (this.activityWatcher) {
+            this.activityWatcher.updateConfig({
+                idleTimeoutMinutes: config.idleTimeoutMinutes,
+                aiDetectionEnabled: config.aiDetectionEnabled,
+                aiCooldownSeconds: config.aiCooldownSeconds,
+            });
+        }
+
         log(LogLevel.Debug,
             `ConfigWatcher: config applied (enabled=${config.enabled}, globalDisabled=${config.globalDisabled})`);
     }
 
-    /**
-     * 云端同步开关变更检测：
-     * 用户尝试开启 cloudSync.enabled 时给出「即将推出」提示。
-     * 当前阶段仅作为后续云端同步的扩展接口预留，未启用远端传输通道。
-     */
-    private checkCloudSyncPlaceholder(e: vscode.ConfigurationChangeEvent): void {
-        if (!e.affectsConfiguration('workspaceTiming.cloudSync')) return;
-
-        const cfg = vscode.workspace.getConfiguration('workspaceTiming.cloudSync');
-        const enabled = cfg.get<boolean>(CONFIG_KEY_ENABLED, false);
-
-        if (enabled) {
-            // 提示用户：云端同步功能即将推出
-            vscode.window.showInformationMessage(t()['toast.cloudSyncPlaceholder']);
-            log(LogLevel.Info, 'ConfigWatcher: cloud sync prompt triggered');
-        }
-    }
-
-    /** 停止监听 */
+    /** 停止监听并释放资源 */
     stop(): void {
-        for (const d of this.disposables) {
+        for (const d of this.subscriptions) {
             d.dispose();
         }
-        this.disposables.length = 0;
+        this.subscriptions.length = 0;
+    }
+
+    /** vscode.Disposable 契约接口实现 */
+    dispose(): void {
+        this.stop();
     }
 }

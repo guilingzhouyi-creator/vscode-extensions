@@ -10,7 +10,9 @@ import {
     WorkspaceTimingData,
     LATEST_VERSION,
     DailyTotalsMap,
+    DailyTotal,
     TimeSession,
+    IdleSession,
     MS_PER_DAY,
     TimingMetadata,
 } from '../domain/models';
@@ -54,9 +56,20 @@ function validateTopLevelFields(o: Record<string, unknown>): string | null {
     return null;
 }
 
+function sanitizeManualAndAi(manualMs: unknown, aiMs: unknown, cleanDuration: number): { manual: number; ai: number } {
+    if (!isFiniteNumber(manualMs) || !isFiniteNumber(aiMs) || manualMs < 0 || aiMs < 0) {
+        return { manual: cleanDuration, ai: 0 };
+    }
+    if (manualMs + aiMs === cleanDuration) {
+        return { manual: manualMs, ai: aiMs };
+    }
+    const cleanManual = Math.min(cleanDuration, manualMs);
+    return { manual: cleanManual, ai: cleanDuration - cleanManual };
+}
+
 function sanitizeSessionEntry(s: unknown): TimeSession | null {
     if (!isRecord(s)) return null;
-    const { startMs, endMs, durationMs } = s;
+    const { startMs, endMs, durationMs, manualMs, aiMs } = s;
     if (!isFiniteNumber(startMs) || !isFiniteNumber(endMs)) return null;
     if (startMs <= 0 || endMs < startMs) return null;
 
@@ -65,7 +78,15 @@ function sanitizeSessionEntry(s: unknown): TimeSession | null {
         ? Math.min(durationMs, endMs - startMs)
         : endMs - startMs;
 
-    return { startMs, endMs, durationMs: cleanDuration };
+    const { manual: cleanManual, ai: cleanAi } = sanitizeManualAndAi(manualMs, aiMs, cleanDuration);
+
+    return {
+        startMs,
+        endMs,
+        durationMs: cleanDuration,
+        manualMs: cleanManual,
+        aiMs: cleanAi,
+    };
 }
 
 function sanitizeSessions(rawSessions: unknown[]): TimeSession[] {
@@ -81,27 +102,73 @@ function sanitizeSessions(rawSessions: unknown[]): TimeSession[] {
     return sessions;
 }
 
+function sanitizeIdleEntry(item: unknown): IdleSession | null {
+    if (!isRecord(item)) return null;
+    const { startMs, endMs, durationMs, reason } = item;
+    if (!isFiniteNumber(startMs) || !isFiniteNumber(endMs)) return null;
+    if (startMs <= 0 || endMs < startMs) return null;
+    const cleanDur = isFiniteNumber(durationMs) && durationMs >= 0
+        ? Math.min(durationMs, endMs - startMs)
+        : endMs - startMs;
+    return {
+        startMs,
+        endMs,
+        durationMs: cleanDur,
+        reason: typeof reason === 'string' ? reason : undefined,
+    };
+}
+
+function sanitizeIdleSessions(raw: unknown): IdleSession[] {
+    if (!Array.isArray(raw)) return [];
+    const list: IdleSession[] = [];
+    for (const item of raw) {
+        const clean = sanitizeIdleEntry(item);
+        if (clean) {
+            list.push(clean);
+        }
+    }
+    list.sort((a, b) => a.startMs - b.startMs);
+    return list;
+}
+
+function getNonNegativeNumber(v: unknown): number | undefined {
+    return isFiniteNumber(v) && v >= 0 ? v : undefined;
+}
+
+function sanitizeDailyEntry(v: unknown): DailyTotal | null {
+    if (!isRecord(v)) return null;
+    const totalMs = getNonNegativeNumber(v.totalMs);
+    const sessionCount = getNonNegativeNumber(v.sessionCount);
+    if (totalMs === undefined || sessionCount === undefined) return null;
+
+    const entry: DailyTotal = {
+        totalMs: Math.min(totalMs, MS_PER_DAY),
+        sessionCount: Math.floor(sessionCount),
+    };
+    const manualMs = getNonNegativeNumber(v.manualMs);
+    if (manualMs !== undefined) entry.manualMs = manualMs;
+    const aiMs = getNonNegativeNumber(v.aiMs);
+    if (aiMs !== undefined) entry.aiMs = aiMs;
+    const idleTotalMs = getNonNegativeNumber(v.idleTotalMs);
+    if (idleTotalMs !== undefined) entry.idleTotalMs = idleTotalMs;
+    const idleCount = getNonNegativeNumber(v.idleSessionCount);
+    if (idleCount !== undefined) entry.idleSessionCount = Math.floor(idleCount);
+    return entry;
+}
+
 function sanitizeDailyTotals(rawTotals: unknown): DailyTotalsMap | undefined {
     if (!isRecord(rawTotals)) {
         return undefined;
     }
     const dailyTotals: DailyTotalsMap = {};
     for (const [key, v] of Object.entries(rawTotals)) {
-        if (!ISO_DATE_PATTERN.test(key) || !isRecord(v)) {
+        if (!ISO_DATE_PATTERN.test(key)) {
             continue;
         }
-        if (!isFiniteNumber(v.totalMs) || v.totalMs < 0) {
-            continue;
+        const entry = sanitizeDailyEntry(v);
+        if (entry) {
+            dailyTotals[key] = entry;
         }
-        if (!isFiniteNumber(v.sessionCount) || v.sessionCount < 0) {
-            continue;
-        }
-        // 钳制单日上限总时长不超过 24 小时（MS_PER_DAY）
-        const clampedMs = Math.min(v.totalMs, MS_PER_DAY);
-        dailyTotals[key] = {
-            totalMs: clampedMs,
-            sessionCount: Math.floor(v.sessionCount),
-        };
     }
     return dailyTotals;
 }
@@ -126,6 +193,28 @@ function sanitizeMetadata(rawMeta: unknown): TimingMetadata | undefined {
     return Object.keys(meta).length > 0 ? meta : undefined;
 }
 
+function resolveTotalsDistribution(
+    totalMs: number,
+    rawManual: unknown,
+    rawAi: unknown,
+): { manualTotalMs: number; aiTotalMs: number } {
+    const manualTotal = isFiniteNumber(rawManual) && rawManual >= 0
+        ? rawManual
+        : totalMs;
+    const aiTotal = isFiniteNumber(rawAi) && rawAi >= 0
+        ? rawAi
+        : 0;
+
+    if (manualTotal + aiTotal === totalMs) {
+        return { manualTotalMs: manualTotal, aiTotalMs: aiTotal };
+    }
+    return { manualTotalMs: totalMs, aiTotalMs: 0 };
+}
+
+function resolveIdleTotalMs(rawIdleTotal: unknown): number | undefined {
+    return isFiniteNumber(rawIdleTotal) && rawIdleTotal >= 0 ? rawIdleTotal : undefined;
+}
+
 /** 校验并净化一份外部计时数据 */
 export function validateTimingData(raw: unknown): ValidationResult {
     if (!isRecord(raw)) {
@@ -138,16 +227,25 @@ export function validateTimingData(raw: unknown): ValidationResult {
     }
 
     const sessions = sanitizeSessions(raw.sessions as unknown[]);
+    const idleSessions = sanitizeIdleSessions(raw.idleSessions);
     const dailyTotals = sanitizeDailyTotals(raw.dailyTotals);
     const metadata = sanitizeMetadata(raw.metadata);
 
+    const totalMs = raw.totalMs as number;
+    const { manualTotalMs, aiTotalMs } = resolveTotalsDistribution(totalMs, raw.manualTotalMs, raw.aiTotalMs);
+    const idleTotalMs = resolveIdleTotalMs(raw.idleTotalMs);
+
     const data: WorkspaceTimingData = {
         version: LATEST_VERSION,
-        totalMs: raw.totalMs as number,
+        totalMs,
+        manualTotalMs,
+        aiTotalMs,
+        ...(idleTotalMs !== undefined ? { idleTotalMs } : {}),
         currentSessionStartMs: 0, // 还原后一律从干净状态重新开始
         lastSavedAtMs: Date.now(),
         isEnabled: raw.isEnabled !== false,
         sessions,
+        idleSessions,
         ...(dailyTotals ? { dailyTotals } : {}),
         ...(metadata ? { metadata } : {}),
     };

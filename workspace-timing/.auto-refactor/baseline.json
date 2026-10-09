@@ -1,0 +1,182 @@
+{
+  "version": "1.2.0",
+  "granularity": "grouped",
+  "timestamp": "2026-10-09T08:10:13.494Z",
+  "groups": [
+    {
+      "key": "governance|GOV-FIL-001|src/application/DashboardDataAssembler.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
+    },
+    {
+      "key": "constants|hardcoded-string|src/application/GlobalAggregator.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
+    },
+    {
+      "key": "constants|hardcoded-string|src/application/RecoveryService.ts",
+      "count": 4,
+      "severities": {
+        "warning": 4
+      }
+    },
+    {
+      "key": "constants|hardcoded-string|src/application/Scheduler.ts",
+      "count": 2,
+      "severities": {
+        "warning": 2
+      }
+    },
+    {
+      "key": "constants|hardcoded-string|src/application/SessionManager.ts",
+      "count": 2,
+      "severities": {
+        "warning": 2
+      }
+    },
+    {
+      "key": "constants|hardcoded-string|src/application/TimerOrchestrator.ts",
+      "count": 11,
+      "severities": {
+        "warning": 11
+      }
+    },
+    {
+      "key": "constants|hardcoded-string|src/application/exporters/AggregatedCsvExporter.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
+    },
+    {
+      "key": "constants|hardcoded-string|src/application/exporters/CsvExporter.ts",
+      "count": 2,
+      "severities": {
+        "warning": 2
+      }
+    },
+    {
+      "key": "constants|hardcoded-string|src/application/exporters/ReportExporter.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
+    },
+    {
+      "key": "constants|hardcoded-string|src/cache/JournalWriter.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
+    },
+    {
+      "key": "governance|GOV-FIL-001|src/domain/HistoryFolder.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
+    },
+    {
+      "key": "constants|hardcoded-string|src/extension.ts",
+      "count": 6,
+      "severities": {
+        "warning": 6
+      }
+    },
+    {
+      "key": "constants|hardcoded-string|src/integration/ConfigWatcher.ts",
+      "count": 14,
+      "severities": {
+        "warning": 14
+      }
+    },
+    {
+      "key": "governance|GOV-FIL-001|src/integration/Logger.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
+    },
+    {
+      "key": "governance|GOV-DBG-001|src/integration/Logger.ts",
+      "count": 2,
+      "severities": {
+        "info": 2
+      }
+    },
+    {
+      "key": "governance|GOV-FIL-001|src/persistence/DataValidator.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
+    },
+    {
+      "key": "constants|hardcoded-string|src/persistence/FileStorageProvider.ts",
+      "count": 4,
+      "severities": {
+        "warning": 4
+      }
+    },
+    {
+      "key": "constants|hardcoded-string|src/persistence/GlobalStorageProvider.ts",
+      "count": 3,
+      "severities": {
+        "warning": 3
+      }
+    },
+    {
+      "key": "constants|hardcoded-string|src/persistence/JournalStorageProvider.ts",
+      "count": 3,
+      "severities": {
+        "warning": 3
+      }
+    },
+    {
+      "key": "constants|hardcoded-string|src/persistence/StorageCoordinator.ts",
+      "count": 2,
+      "severities": {
+        "warning": 2
+      }
+    },
+    {
+      "key": "constants|hardcoded-string|src/persistence/WorkspaceStateProvider.ts",
+      "count": 4,
+      "severities": {
+        "warning": 4
+      }
+    },
+    {
+      "key": "constants|hardcoded-string|src/presentation/CommandRegistrar.ts",
+      "count": 12,
+      "severities": {
+        "warning": 12
+      }
+    },
+    {
+      "key": "constants|hardcoded-string|src/presentation/DashboardPanel.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
+    },
+    {
+      "key": "constants|hardcoded-string|src/presentation/StatusBarController.ts",
+      "count": 5,
+      "severities": {
+        "warning": 5
+      }
+    },
+    {
+      "key": "constants|hardcoded-string|src/presentation/dashboardMessages.ts",
+      "count": 5,
+      "severities": {
+        "warning": 5
+      }
+    }
+  ]
+}

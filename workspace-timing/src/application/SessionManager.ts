@@ -8,6 +8,7 @@
 import { TimerEngine, TimerSnapshot } from '../domain/TimerEngine';
 import {
     WorkspaceTimingData,
+    ActivityMode,
     DEFAULT_RAW_RETENTION_DAYS,
     DEFAULT_SESSION_CAP,
     MAX_SESSIONS_PER_DAY,
@@ -76,7 +77,11 @@ export class SessionManager {
     foldIfNeeded(): void {
         const data = this.timer.data;
         const foldResult = migrateToFolded(
-            { sessions: data.sessions, dailyTotals: data.dailyTotals },
+            {
+                sessions: data.sessions,
+                idleSessions: data.idleSessions,
+                dailyTotals: data.dailyTotals,
+            },
             {
                 retentionDays: this._rawRetentionDays,
                 maxSessions: this.maxSessions,
@@ -84,15 +89,17 @@ export class SessionManager {
                 pruneWeekly: true,
             },
         );
-        if (foldResult.foldedSessionCount === 0) return;
+        if (foldResult.foldedSessionCount === 0 && foldResult.foldedIdleCount === 0) return;
         this.timer.replaceData({
             ...data,
             sessions: foldResult.sessions,
+            idleSessions: foldResult.idleSessions,
             dailyTotals: foldResult.dailyTotals,
         });
         log(
             LogLevel.Info,
-            `SessionManager: folded ${foldResult.foldedSessionCount} expired/overflow session(s) into ` +
+            `SessionManager: folded ${foldResult.foldedSessionCount} session(s) and ` +
+                `${foldResult.foldedIdleCount} idle session(s) into ` +
                 `${Object.keys(foldResult.dailyTotals).length} daily bucket(s)`,
         );
     }
@@ -101,13 +108,6 @@ export class SessionManager {
      * 显式触发会话生命周期自动回收。
      */
     autoRecycleSessions(): void {
-        this.foldIfNeeded();
-    }
-
-    /**
-     * recycleSessions 别名方法。
-     */
-    recycleSessions(): void {
         this.foldIfNeeded();
     }
 
@@ -128,12 +128,6 @@ export class SessionManager {
     get snapshot(): TimerSnapshot {
         return this.timer.snapshot();
     }
-
-    /**
-     * 今日累计缓存失效通知。
-     * @deprecated TimerEngine 内部已自动置脏维护，本方法作为向后兼容空调用保留。
-     */
-    invalidateTodayCache(): void {}
 
     /**
      * 执行崩溃恢复流程并开启当前工作区新会话。
@@ -295,5 +289,62 @@ export class SessionManager {
             sessions: [...this.timer.data.sessions],
             metadata: { ...this.timer.data.metadata, lastJournalTs: String(boundaryMs) },
         });
+    }
+
+    /** 是否正处于空闲离开暂停态 */
+    get isPausedIdle(): boolean {
+        return this.timer.isPausedIdle;
+    }
+
+    /** 当前活动模式 */
+    get currentMode(): ActivityMode {
+        return this.timer.currentMode;
+    }
+
+    /** 切换活动模式 */
+    switchMode(mode: ActivityMode): void {
+        this.timer.switchMode(mode);
+    }
+
+    /**
+     * 处理空闲超时自动暂停：追溯截断至离开时刻
+     */
+    async handleIdlePause(idleStartMs: number): Promise<void> {
+        if (!this._sessionActive) return;
+        log(LogLevel.Info, `SessionManager: handling idle pause (retroactive to ${idleStartMs})`);
+
+        this.timer.pauseForIdle(idleStartMs);
+        this.foldIfNeeded();
+        this.advanceJournalWatermark(idleStartMs);
+
+        await this.journal.truncate();
+        await this.saveCheckpoint();
+    }
+
+    /**
+     * 处理空闲唤醒恢复
+     */
+    async handleIdleResume(resumeMs: number, idleStartMs: number = 0): Promise<void> {
+        if (!this._sessionActive) return;
+        log(LogLevel.Info, `SessionManager: handling idle resume (at ${resumeMs})`);
+
+        this.timer.resumeFromIdle(resumeMs, idleStartMs);
+        this.advanceJournalWatermark(resumeMs);
+        await this.saveCheckpoint();
+    }
+
+    /** 获取今日手动工时 */
+    getTodayManualMs(): number {
+        return this.timer.getTodayManualMs();
+    }
+
+    /** 获取今日 AI 工时 */
+    getTodayAiMs(): number {
+        return this.timer.getTodayAiMs();
+    }
+
+    /** 获取今日空闲离开工时 */
+    getTodayIdleMs(): number {
+        return this.timer.getTodayIdleMs();
     }
 }

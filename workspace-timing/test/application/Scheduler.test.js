@@ -28,11 +28,16 @@ function makeSessionFake() {
     const calls = { checkpoints: 0, resumes: [], rotations: 0 };
     return {
         calls,
+        isPausedIdle: false,
+        currentMode: 'manual',
         // 真实 SessionManager 的 snapshot 是 getter，这里保持同形
         get snapshot() {
-            return { totalMs: 1000, sessionElapsedMs: 0, currentTotalMs: 1000 };
+            return { totalMs: 1000, sessionElapsedMs: 0, currentTotalMs: 1000, currentMode: 'manual' };
         },
         getTodayMs() { return 500; },
+        getTodayManualMs() { return 500; },
+        getTodayAiMs() { return 0; },
+        getTodayIdleMs() { return 0; },
         async saveCheckpoint() { calls.checkpoints++; },
         async handleSystemResume(sleepStartMs, resumeMs) {
             calls.resumes.push({ sleepStartMs, resumeMs });

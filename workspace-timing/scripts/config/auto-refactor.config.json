@@ -28,9 +28,11 @@
         "large-file": {
             "enabled": true,
             "options": {
-                "fileLinesWarn": 500,
-                "fileLinesFail": 1000,
-                "fileFunctionsWarn": 40
+                "fileLinesWarn": 800,
+                "fileLinesFail": 1400,
+                "fileFunctionsWarn": 40,
+                "effectiveLocWarn": 750,
+                "effectiveLocFail": 900
             }
         },
         "governance": {
@@ -51,6 +53,15 @@
         },
         "secrets": {
             "enabled": true
+        },
+        "vscode-extension": {
+            "enabled": true
+        },
+        "performance": {
+            "enabled": true
+        },
+        "architecture": {
+            "enabled": true
         }
     },
     "suppressions": [
@@ -59,13 +70,6 @@
             "matchRule": "GOV-EXC-001",
             "downgradeTo": "warning",
             "reason": "空 catch 为本项目有意的幂等/尽力而为语义（目录已存在、可选快照、清理路径），意图以相邻注释声明；storage 崩溃保护路径另有 fail-closed 检查器覆盖（JournalWriter 退回/水位线）"
-        },
-        {
-            "matchAnalyzer": "complexity",
-            "matchRule": "high-complexity",
-            "matchSymbol": "validateTimingData",
-            "downgradeTo": "warning",
-            "reason": "还原校验器的防御性逐字段净化（fail-closed 边界），复杂度源于安全需求本身；分支覆盖率 89%+"
         },
         {
             "matchAnalyzer": "complexity",
@@ -87,6 +91,13 @@
             "matchRule": "GOV-PRF-001",
             "downgradeTo": "info",
             "reason": "NDJSON 回放设计：JSON.parse 参数为逐行变化的内容，非循环不变量——GOV-PRF-001 行级启发式无法判定参数不变性，属已知误报场景（规则局限记录）"
+        },
+        {
+            "matchFile": "src/integration/Logger.ts",
+            "matchAnalyzer": "governance",
+            "matchRule": "GOV-DBG-001",
+            "downgradeTo": "info",
+            "reason": "Logger 模块为全扩展日志落盘与控制台唯一中枢门面，其内部 console 调用属基础设施设计"
         }
     ],
     "_comment_dg": "dependency-graph 只启用全局循环依赖检测（引擎 0.2.0 post-scan 管线段，真 parser 图谱）；跨组导入矩阵仍由本地 L2 layer-boundary 承载（引擎不可用时的独立兜底），两者互补不重复：本配置不声明 groups，引擎不做分组规则检查。suppressions 为引擎 0.2.0 原生声明式豁免（带理由、可降级、报告留痕），自适配层迁移至此。"

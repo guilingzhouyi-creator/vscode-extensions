@@ -40,8 +40,6 @@ export interface I18nStrings {
     'export.filter.md': string;
     'export.filter.json': string;
     'export.filter.all': string;
-    // 云端同步提示文案
-    'toast.cloudSyncPlaceholder': string;
 
     // 报表导出（Markdown）
     'report.daily.title': string;
@@ -208,4 +206,29 @@ export interface I18nStrings {
     'panel.toast.exportWeeklyRequested': string;
     'panel.toast.exportAggregatedRequested': string;
     'panel.toast.clearHistoryRequested': string;
+
+    // 活动模式与状态
+    'activity.mode.manual': string;
+    'activity.mode.ai': string;
+    'activity.mode.idle': string;
+    'status.idle': string;
+    'status.ai': string;
+    'statusBar.idle': string;
+    'statusBar.ai': string;
+    'statusBar.tooltipWithActivity': string;
+
+    // 面板徽标
+    'panel.js.badgeIdle': string;
+    'panel.js.badgeAi': string;
+
+    // 配置项：空闲超时与 AI 协作检测
+    'panel.set.idleTimeout.name': string;
+    'panel.set.idleTimeout.tip': string;
+    'panel.set.idleTimeout.desc': string;
+    'panel.set.aiDetection.name': string;
+    'panel.set.aiDetection.tip': string;
+    'panel.set.aiDetection.desc': string;
+    'panel.set.aiCooldown.name': string;
+    'panel.set.aiCooldown.tip': string;
+    'panel.set.aiCooldown.desc': string;
 }

@@ -31,7 +31,6 @@ const en: I18nStrings = {
   'export.filter.md': 'Markdown Files (*.md)',
   'export.filter.json': 'JSON Files (*.json)',
   'export.filter.all': 'All Files',
-  'toast.cloudSyncPlaceholder': '☁️ Cloud sync is coming soon — stay tuned!',
 
   // Report export (Markdown)
   'report.daily.title': '📅 Daily Report · {0}',
@@ -193,6 +192,31 @@ const en: I18nStrings = {
   'panel.toast.exportWeeklyRequested': 'Weekly report export requested',
   'panel.toast.exportAggregatedRequested': 'Aggregated CSV export requested',
   'panel.toast.clearHistoryRequested': 'Clear history requested',
+
+  // Activity modes and statuses
+  'activity.mode.manual': 'Manual Coding',
+  'activity.mode.ai': 'AI Assisting',
+  'activity.mode.idle': 'Away',
+  'status.idle': 'Away',
+  'status.ai': 'AI Assisting',
+  'statusBar.idle': 'Away',
+  'statusBar.ai': 'AI Assisting',
+  'statusBar.tooltipWithActivity': '{0} ({1} · {2})',
+
+  // Panel badges
+  'panel.js.badgeIdle': 'Away',
+  'panel.js.badgeAi': 'AI Assisting',
+
+  // Configuration: Idle timeout and AI detection
+  'panel.set.idleTimeout.name': 'Idle Timeout (Minutes)',
+  'panel.set.idleTimeout.tip': 'Automatically pause timing and mark as away after no keyboard or file activity;<br>set to 0 to disable idle detection.',
+  'panel.set.idleTimeout.desc': 'Idle timeout in minutes (0 to disable automatic pause)',
+  'panel.set.aiDetection.name': 'AI Activity Detection',
+  'panel.set.aiDetection.tip': 'Intelligently detects external file writes and Git changes;<br>switches to AI assisting mode when typing is silent.',
+  'panel.set.aiDetection.desc': 'Automatically detect AI/Agent external file changes',
+  'panel.set.aiCooldown.name': 'AI Cooldown Window (Seconds)',
+  'panel.set.aiCooldown.tip': 'Duration to maintain AI active state after file writes stop;<br>switches to away once cooldown expires with no further activity.',
+  'panel.set.aiCooldown.desc': 'AI activity cooldown duration in seconds',
 };
 
 export default en;
