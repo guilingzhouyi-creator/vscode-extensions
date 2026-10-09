@@ -51,59 +51,82 @@ export interface SequenceAnomalyRecord {
  * Authoritative locked registry of the 5 historical rules starting at 002.
  * All other canonical topics across all 32 families strictly start at 001.
  */
-export const HISTORICAL_SEQUENCE_ANOMALIES: Readonly<Record<string, SequenceAnomalyRecord>> = Object.freeze({
-    'ARCH-DEC-002': {
-        ruleId: 'ARCH-DEC-002',
-        family: 'ARCH',
-        topic: 'DEC',
-        expectedStart: '001',
-        actualStart: '002',
-        rationale: 'Paired across domains with naming decoupling rule NAM-DEC-001 (AST parser decoupling vs symbol decoupling).',
-    },
-    'ARCH-DSP-002': {
-        ruleId: 'ARCH-DSP-002',
-        family: 'ARCH',
-        topic: 'DSP',
-        expectedStart: '001',
-        actualStart: '002',
-        rationale: 'Paired with 4-letter predecessor topic ARCH-DISP-001 (dispatcher pass-through vs dispatcher complexity).',
-    },
-    'GOV-RTC-002': {
-        ruleId: 'GOV-RTC-002',
-        family: 'GOV',
-        topic: 'RTC',
-        expectedStart: '001',
-        actualStart: '002',
-        rationale: 'Baseline path rename tracking diagnostic rule, paired with engine-level monotonic ratchet gate.',
-    },
-    'NAM-JRG-002': {
-        ruleId: 'NAM-JRG-002',
-        family: 'NAM',
-        topic: 'JRG',
-        expectedStart: '001',
-        actualStart: '002',
-        rationale: 'Historical jargon marker rule (variable jargon check consolidated into hygiene rule HYG-STB-002).',
-    },
-    'SIM-FLAT-002': {
-        ruleId: 'SIM-FLAT-002',
-        family: 'SIM',
-        topic: 'FLAT',
-        expectedStart: '001',
-        actualStart: '002',
-        rationale: 'Deep control-flow flattening threshold rule (AR:SIM:002), paired with early guard return rule SIM-GUARD-001 (AR:SIM:013).',
-    },
-});
+export const HISTORICAL_SEQUENCE_ANOMALIES: Readonly<Record<string, SequenceAnomalyRecord>> =
+    Object.freeze({
+        'ARCH-DEC-002': {
+            ruleId: 'ARCH-DEC-002',
+            family: 'ARCH',
+            topic: 'DEC',
+            expectedStart: '001',
+            actualStart: '002',
+            rationale:
+                'Paired across domains with naming decoupling rule NAM-DEC-001 (AST parser decoupling vs symbol decoupling).',
+        },
+        'ARCH-DSP-002': {
+            ruleId: 'ARCH-DSP-002',
+            family: 'ARCH',
+            topic: 'DSP',
+            expectedStart: '001',
+            actualStart: '002',
+            rationale:
+                'Paired with 4-letter predecessor topic ARCH-DISP-001 (dispatcher pass-through vs dispatcher complexity).',
+        },
+        'GOV-RTC-002': {
+            ruleId: 'GOV-RTC-002',
+            family: 'GOV',
+            topic: 'RTC',
+            expectedStart: '001',
+            actualStart: '002',
+            rationale:
+                'Baseline path rename tracking diagnostic rule, paired with engine-level monotonic ratchet gate.',
+        },
+        'NAM-JRG-002': {
+            ruleId: 'NAM-JRG-002',
+            family: 'NAM',
+            topic: 'JRG',
+            expectedStart: '001',
+            actualStart: '002',
+            rationale:
+                'Historical jargon marker rule (variable jargon check consolidated into hygiene rule HYG-STB-002).',
+        },
+        'SIM-FLAT-002': {
+            ruleId: 'SIM-FLAT-002',
+            family: 'SIM',
+            topic: 'FLAT',
+            expectedStart: '001',
+            actualStart: '002',
+            rationale:
+                'Deep control-flow flattening threshold rule (AR:SIM:002), paired with early guard return rule SIM-GUARD-001 (AR:SIM:013).',
+        },
+    });
 
 /**
  * Canonical Topic Taxonomy covering all 32 rule families and their recognized topics.
  */
 export const CANONICAL_TOPIC_CATALOG: Readonly<Record<string, readonly string[]>> = Object.freeze({
     ARCH: [
-        'ABS', 'BLR', 'BND', 'CFG', 'DEC', 'DIR', 'DISP', 'DSP',
-        'FAC', 'GLB', 'HDL', 'LAY', 'LEAK', 'MOD', 'MON', 'RES',
-        'ROL', 'SKL', 'STK', 'TMP', 'UTL',
+        'ABS',
+        'BLR',
+        'BND',
+        'CFG',
+        'DEC',
+        'DIR',
+        'DISP',
+        'DSP',
+        'FAC',
+        'GLB',
+        'HDL',
+        'LAY',
+        'LEAK',
+        'MOD',
+        'MON',
+        'RES',
+        'ROL',
+        'SKL',
+        'STK',
+        'TMP',
+        'UTL',
     ],
-    ARC: ['LAY'],
     BIG: ['SIZE'],
     CMP: ['CAL', 'DEN', 'EXP', 'LIN'],
     CMT: ['BAN', 'CON', 'DOC', 'ENG', 'HDR', 'INT', 'LNG', 'MOJI', 'SEP', 'TRM', 'VMD', 'WID'],
@@ -113,31 +136,138 @@ export const CANONICAL_TOPIC_CATALOG: Readonly<Record<string, readonly string[]>
     DEP: ['INV', 'LAZ', 'ORD', 'RES', 'WLD'],
     DOC: ['DUP', 'FEN', 'LNK', 'TRM'],
     ERR: ['PRP'],
-    GATE: ['AST', 'BUDGET', 'ERR', 'FAC', 'HOOK', 'HYG', 'ISO', 'MSG', 'PAIR', 'PROC', 'ROUTE', 'SSOT', 'SYS'],
+    GATE: [
+        'AST',
+        'BUDGET',
+        'ERR',
+        'FAC',
+        'HOOK',
+        'HYG',
+        'ISO',
+        'MSG',
+        'PAIR',
+        'PROC',
+        'ROUTE',
+        'SSOT',
+        'SYS',
+    ],
     GDM: [
-        'BAR', 'BND', 'CONNECT', 'DEB', 'EXPORT', 'EXT', 'FSM', 'I18N',
-        'ISO', 'LOC', 'NOD', 'ONREADY', 'POL', 'POOL', 'PRF', 'RES',
-        'RPC', 'SIG', 'TOK', 'TOOL', 'UNI', 'VRT', 'WEAK', 'YIELD',
+        'BAR',
+        'BND',
+        'CONNECT',
+        'DEB',
+        'EXPORT',
+        'EXT',
+        'FSM',
+        'I18N',
+        'ISO',
+        'LOC',
+        'NOD',
+        'ONREADY',
+        'POL',
+        'POOL',
+        'PRF',
+        'RES',
+        'RPC',
+        'SIG',
+        'TOK',
+        'TOOL',
+        'UNI',
+        'VRT',
+        'WEAK',
+        'YIELD',
     ],
     GOM: ['CTX', 'ERR', 'STYLE'],
     GOV: [
-        'AGN', 'ARC', 'BLS', 'DAT', 'DBG', 'EXC', 'FIL', 'GAM',
-        'LOG', 'MNT', 'MSG', 'PRF', 'RTC', 'RUL', 'SAN', 'SLC',
-        'STD', 'TRJ', 'TYP',
+        'AGN',
+        'ARC',
+        'BLS',
+        'DAT',
+        'DBG',
+        'EXC',
+        'FIL',
+        'GAM',
+        'LOG',
+        'MNT',
+        'MSG',
+        'PRF',
+        'RTC',
+        'RUL',
+        'SAN',
+        'SLC',
+        'STD',
+        'TRJ',
+        'TYP',
     ],
     HYG: ['BLT', 'CLN', 'DED', 'EMP', 'EXC', 'NAM', 'SGL', 'STB', 'WRAP'],
-    NAM: ['ABR', 'COL', 'DEC', 'DIR', 'FIL', 'GLB', 'JRG', 'LEN', 'MBR', 'RES', 'SGL', 'TYP', 'VAG'],
+    NAM: [
+        'ABR',
+        'COL',
+        'DEC',
+        'DIR',
+        'FIL',
+        'GLB',
+        'JRG',
+        'LEN',
+        'MBR',
+        'RES',
+        'SGL',
+        'TYP',
+        'VAG',
+    ],
     NUM: ['PREC'],
     PRF: ['ALG', 'IO', 'LEAK', 'MEM', 'POL'],
     PROD: ['HYG'],
     PS: ['ALIAS', 'CMDLET', 'DOC', 'ERROR', 'PARAM', 'SAFE', 'SEC', 'TRAP', 'VERB'],
-    PYM: ['ABC', 'ASYNC', 'DATETIME', 'DEFAULT', 'FSTRING', 'GENERIC', 'IMPORT', 'OPEN', 'PATH', 'RAISE', 'SHADOW', 'SLOTS', 'UNION'],
+    PYM: [
+        'ABC',
+        'ASYNC',
+        'DATETIME',
+        'DEFAULT',
+        'FSTRING',
+        'GENERIC',
+        'IMPORT',
+        'OPEN',
+        'PATH',
+        'RAISE',
+        'SHADOW',
+        'SLOTS',
+        'UNION',
+    ],
     RSM: ['CLONE', 'EXTERN', 'FORMAT', 'MACRO', 'STR', 'TRY', 'UNWRAP'],
     SEC: ['EXP', 'LEAK', 'VUL'],
-    SH: ['ARRAY', 'CMD', 'COND', 'DEPR', 'DOC', 'ECHO', 'EOL', 'ERR', 'EXIT', 'INIT', 'QUOTE', 'READ', 'SAFE', 'SEC', 'TRAP'],
+    SH: [
+        'ARRAY',
+        'CMD',
+        'COND',
+        'DEPR',
+        'DOC',
+        'ECHO',
+        'EOL',
+        'ERR',
+        'EXIT',
+        'INIT',
+        'QUOTE',
+        'READ',
+        'SAFE',
+        'SEC',
+        'TRAP',
+    ],
     SIM: ['ARGS', 'BOOL', 'COMC', 'ELSE', 'EMPTY', 'FLAT', 'GUARD', 'IMM', 'LONG', 'PRNT', 'TRN'],
     STDLIB: ['ALLOC', 'CONST', 'PANIC', 'PORT', 'RECURSION', 'UNSAFE'],
-    TSM: ['ANY', 'ARGS', 'CTOR', 'DISP', 'INCLUDES', 'REPLACE', 'REQUIRE', 'SPREAD', 'SUBSTR', 'TYPE', 'VAR'],
+    TSM: [
+        'ANY',
+        'ARGS',
+        'CTOR',
+        'DISP',
+        'INCLUDES',
+        'REPLACE',
+        'REQUIRE',
+        'SPREAD',
+        'SUBSTR',
+        'TYPE',
+        'VAR',
+    ],
     TST: ['DBT', 'DEN', 'FLT', 'ILS', 'SKP', 'TAU', 'TOP'],
     UI: ['ENG'],
     VSC: ['I18N', 'MEM', 'PERF', 'UI'],
@@ -148,7 +278,10 @@ export const CANONICAL_TOPIC_CATALOG: Readonly<Record<string, readonly string[]>
  */
 const CANONICAL_TOPIC_SETS: Readonly<Record<string, ReadonlySet<string>>> = Object.freeze(
     Object.fromEntries(
-        Object.entries(CANONICAL_TOPIC_CATALOG).map(([family, topics]) => [family, new Set(topics)]),
+        Object.entries(CANONICAL_TOPIC_CATALOG).map(([family, topics]) => [
+            family,
+            new Set(topics),
+        ]),
     ),
 );
 
@@ -167,7 +300,9 @@ export interface SequenceAuditResult {
 /**
  * Extract family, topic, and number from a canonical rule definition.
  */
-function extractRuleKey(rule: RuleDefinition): { family: string; topic: string; num: number } | null {
+function extractRuleKey(
+    rule: RuleDefinition,
+): { family: string; topic: string; num: number } | null {
     if (!rule.canonical) return null;
     const parts = rule.id.split('-');
     if (parts.length < 3) return null;
@@ -239,7 +374,9 @@ function checkTopicSequence(groupKey: string, nums: readonly number[]): string[]
  * @param rules - List of rule definitions to audit.
  * @returns Verification result with detailed gap diagnostics.
  */
-export function auditTopicAndSequenceContinuity(rules: readonly RuleDefinition[]): SequenceAuditResult {
+export function auditTopicAndSequenceContinuity(
+    rules: readonly RuleDefinition[],
+): SequenceAuditResult {
     const unregisteredSet = new Set<string>();
     const topicNumberMap = collectTopicNumbers(rules, unregisteredSet);
     const unexpectedGaps: string[] = [];

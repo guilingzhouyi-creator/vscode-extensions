@@ -38,7 +38,6 @@ export type RuleFamily =
     | 'PRF'
     | 'SEC'
     | 'ARCH'
-    | 'ARC'
     | 'PYM'
     | 'DOC'
     | 'CONST'
@@ -96,8 +95,6 @@ export const RULE_FAMILY_PERFORMANCE = 'PRF';
 export const RULE_FAMILY_SECURITY = 'SEC';
 /** Canonical rule-family prefix for architecture consistency rules. */
 export const RULE_FAMILY_ARCHITECTURE = 'ARCH';
-/** Canonical rule-family prefix for ARC architectural rules. */
-export const RULE_FAMILY_ARC = 'ARC';
 /** Canonical rule-family prefix for Python modernization rules. */
 export const RULE_FAMILY_PYTHON_MODERN = 'PYM';
 /** Canonical rule-family prefix for documentation rules. */

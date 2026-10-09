@@ -76,40 +76,40 @@ const PERCENT_SCALE = 100;
  * union; custom analyzers loaded from config stay outside it and are handled separately.
  */
 export const ALL_BUILTIN_ANALYZERS = [
-    ANALYZER_CONSTANTS,
-    ANALYZER_LARGE_FILE,
-    ANALYZER_COMPLEXITY,
-    ANALYZER_GOVERNANCE,
-    ANALYZER_DEPENDENCY_GRAPH,
-    ANALYZER_SECRETS,
-    ANALYZER_ARCHITECTURE,
-    ANALYZER_PERFORMANCE,
-    ANALYZER_COMMENTS,
+    // Stage 0: 物理底线与紧急安全
     ANALYZER_HYGIENE,
+    ANALYZER_SHELL_LINT,
+    ANALYZER_LARGE_FILE,
+    ANALYZER_SECRETS,
     ANALYZER_SECURITY,
-    // Specialized packs and doc rules are routable too: they belong to the general candidate set,
-    // and leaving them out here silently dropped them from every category route (the built-in
-    // registry in core/config.ts and the analyzer factories both list them). Kept in sync by the
-    // cross-registry assertion in scripts/validate-rules-registry.js.
+    // Stage 1: 文本规范、词法符号与文档
+    ANALYZER_COMMENTS,
+    ANALYZER_NAMING,
+    ANALYZER_CONSTANTS,
+    ANALYZER_DOCS,
+    ANALYZER_PRODUCTION_HYGIENE,
+    // Stage 2: 单文件语法 AST、控制流与语言现代化
     ANALYZER_SIMPLIFY,
-    ANALYZER_PYTHON_MODERN,
+    ANALYZER_COMPLEXITY,
+    ANALYZER_STDLIB,
     ANALYZER_TYPESCRIPT_MODERN,
+    ANALYZER_PYTHON_MODERN,
     ANALYZER_RUST_MODERN,
     ANALYZER_GDSCRIPT_MODERN,
-    ANALYZER_DOCS,
-    ANALYZER_DATA_ARCHITECTURE,
-    ANALYZER_TEST_MODERNITY,
-    ANALYZER_DEPENDENCY_LAYOUT,
-    ANALYZER_NAMING,
     ANALYZER_GO_MODERN,
-    ANALYZER_SHELL_LINT,
-    ANALYZER_STDLIB,
+    ANALYZER_FRONTEND,
+    // Stage 3: 领域架构契约、数据流与全工程拓扑
+    ANALYZER_PERFORMANCE,
+    ANALYZER_ARCHITECTURE,
+    ANALYZER_DATA_ARCHITECTURE,
+    ANALYZER_DEPENDENCY_LAYOUT,
+    ANALYZER_DEPENDENCY_GRAPH,
+    ANALYZER_GATE_ARCHITECTURE,
     ANALYZER_GDSCRIPT_GAME,
     ANALYZER_VSCODE_EXTENSION,
-    ANALYZER_GATE_ARCHITECTURE,
-    ANALYZER_FRONTEND,
-    ANALYZER_PRODUCTION_HYGIENE,
     ANALYZER_CLIENT_EXPOSURE,
+    ANALYZER_TEST_MODERNITY,
+    ANALYZER_GOVERNANCE,
 ] as const;
 
 /**

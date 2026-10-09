@@ -15,8 +15,8 @@
 | :--- | :--- | :--- |
 | **Layer 1：全域安全与卫生底线** | `SEC` / `HYG` / `ERR` / `CMT` / `DOC` / `SIM` | 凭证防泄露、注入防御、错误吞没拦截、注释质量 (ECD-C) 与文档结构完整性 |
 | **Layer 2：语言族现代化与标准库** | `TSM` / `PYM` / `RSM` / `GOM` / `GDM` / `SHL` / `STD` | TypeScript、Python、Rust、Go、GDScript、Shell 现代语法惯用法与手写轮子替换 |
-| **Layer 3：架构拓扑、治理、数据与性能** | `ARC` / `GOV` / `DAT` / `PRF` / `DEP` / `NAM` / `CST` | 分层单向依赖、多 Agent 冲突 (`GOV-AGN-001`)、切片破坏 (`GOV-SLC-001`)、轨迹回归 (`GOV-TRJ-001`)、N+1 查询与热循环零分配 |
-| **Layer 4：领域专精与测试现代性** | `GME` / `VSC` / `TST` / `CLR` + 15 条 Legacy Aliases | Godot 4 游戏引擎契约、VS Code 扩展清单规范、测试有效覆盖深度与历史规则平滑迁移窗口 |
+| **Layer 3：架构拓扑、治理、数据与性能** | `ARCH` / `GOV` / `DAT` / `PRF` / `DEP` / `NAM` / `CST` | 分层单向依赖、多 Agent 冲突 (`GOV-AGN-001`)、切片破坏 (`GOV-SLC-001`)、轨迹回归 (`GOV-TRJ-001`)、N+1 查询与热循环零分配 |
+| **Layer 4：领域专精与测试现代性** | `GME`（代码真源映射为 `GDM`）/ `VSC` / `TST` / `CLR` + 15 条 Legacy Aliases | Godot 4 游戏引擎契约（规划为 `GME` 前缀，代码真源统一由 `GDM` 规则族与 `gdscript-game` 分析器承载）、VS Code 扩展清单规范、测试有效覆盖深度与历史规则平滑迁移窗口 |
 
 ### 1.2 双轨文案分层契约（Dual-Track Wording Architecture）
 

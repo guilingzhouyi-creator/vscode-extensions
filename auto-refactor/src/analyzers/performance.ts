@@ -156,7 +156,15 @@ export class PerformanceAnalyzer implements Analyzer {
 
         this.auditAllocations(nextLine.trimmed, lineIdx, ctx, scanConfig, loopStack, issues);
         this.auditLinearLookups(nextLine.trimmed, lineIdx, ctx, scanConfig, loopStack, issues);
-        this.auditIo(nextLine.trimmed, nextLine.lineText, lineIdx, scanConfig, scanState, ctx, issues);
+        this.auditIo(
+            nextLine.trimmed,
+            nextLine.lineText,
+            lineIdx,
+            scanConfig,
+            scanState,
+            ctx,
+            issues,
+        );
         this.auditBraces(nextLine.trimmed, scanConfig, loopStack);
     }
 
@@ -200,7 +208,14 @@ export class PerformanceAnalyzer implements Analyzer {
         issues: Issue[],
     ): void {
         if (scanConfig.checkIO && !scanConfig.syncIoAllowlisted) {
-            this.checkBlockingIo(trimmed, lineText, lineIdx, scanState.inAsyncFunction, ctx, issues);
+            this.checkBlockingIo(
+                trimmed,
+                lineText,
+                lineIdx,
+                scanState.inAsyncFunction,
+                ctx,
+                issues,
+            );
         }
     }
 
@@ -409,5 +424,3 @@ export class PerformanceAnalyzer implements Analyzer {
         };
     }
 }
-
-
