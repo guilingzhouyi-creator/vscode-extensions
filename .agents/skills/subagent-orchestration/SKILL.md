@@ -57,7 +57,7 @@ description: >-
 | :--- | :--- | :--- | :--- |
 | **`explore`** | 只读探索与依赖图分析 | 严禁写文件；仅输出调用拓扑与死代码证据 | `enable_write_tools: false` |
 | **`construct`** | 业务特性与增量代码生产 | 严格限制在 Path Jail 内；强制平铺控制流 (CC<=15, Depth<=4) | `enable_write_tools: true` |
-| **`review`** | 静态审查与规则匹配分析 | 严禁直接改代码；对照 385 规则库输出精确行号与质性依据 | `enable_write_tools: false` |
+| **`review`** | 静态审查与规则匹配分析 | 严禁直接改代码；对照 402 规则库输出精确行号与质性依据 | `enable_write_tools: false` |
 | **`refactor`** | 结构消融与复杂度平铺 | 优先消除循环内瞬态分配；消除空包跳板；动态稀释比 <= 1:3 | `enable_write_tools: true` |
 | **`guardian`** | 复合门禁防御与质量裁决 | 严禁改业务代码；执行测试与门禁并执行一票否决裁决 | `enable_write_tools: true` (限测试) |
 
@@ -82,7 +82,7 @@ description: >-
 在大型特性演进或复杂重构中，推荐实施 **Explore/Review 先行 $\rightarrow$ Construct/Refactor 施工 $\rightarrow$ Guardian 复核** 闭环流：
 1. **第一阶段：只读审查勘测 (`enable_write_tools: false`)**：
    - 调度 `review` 或 `explore` 姿态专员，物理拔除写入工具；
-   - 专员全量读取 AST、跨文件引用图与 385 规则库，输出精确违规行号、调用链以及质性重构方案；
+   - 专员全量读取 AST、跨文件引用图与 402 规则库，输出精确违规行号、调用链以及质性重构方案；
 2. **第二阶段：定点施工重构 (`enable_write_tools: true`)**：
    - 调度 `construct` 或 `refactor` 姿态专员，赋予独占文件列表的写权限；
    - 专员严格按第一阶段输出的方案在 Path Jail 范围内实施小步改动，禁止蔓延扩写；
@@ -106,11 +106,12 @@ node .agents/skills/subagent-orchestration/scripts/synthesize-subagent.js --pres
 node .agents/skills/subagent-orchestration/scripts/synthesize-subagent.js --all
 ```
 
-常用预置别名速查：
-* `wt-construct` / `wt-review` / `wt-refactor`
-* `ar-construct` / `ar-review` / `ar-refactor`
-* `wg-construct` / `wg-review` / `wg-refactor`
-* `infra-guardian` / `workspace-guardian`
+常用预置别名速查矩阵（20 个预置）：
+* **`vs-extension`**：`wt-construct` / `wt-review` / `wt-refactor` / `wt-explore`
+* **`cli-engine`**：`ar-construct` / `ar-review` / `ar-refactor` / `ar-explore`
+* **`game-engine`**：`wg-construct` / `wg-review` / `wg-refactor` / `wg-explore`
+* **`infra-tool`**：`infra-construct` / `infra-review` / `infra-refactor` / `infra-explore` / `infra-guardian`
+* **`workspace-meta`**：`workspace-review` / `workspace-refactor` / `workspace-guardian`
 
 ### 步骤 2：注册定义动态 SubAgent (`define_subagent`)
 使用脚本输出的 `defineArgs` 调用 `define_subagent` 工具：
@@ -139,18 +140,15 @@ invoke_subagent({
 });
 ```
 
-### 步骤 4：主 Agent 交叉全量复审 SOP (Cross-Review SOP)
-SubAgent 汇报任务完成并返回消息后，主 Agent **绝对不能盲目信任其汇报文本**，必须严格执行以下交叉复审 SOP：
-1. **核实改动范围与 Path Jail 契约**：
-   - 主 Agent 执行 `git status` 与 `git diff --name-only`；
-   - 严密比对修改文件列表是否严格受限于原定独占 Path Jail 列表；若发现越界修改未授权文件，必须立即回滚越界部分；
-2. **核验改动质性内容与代码卫生**：
-   - 抽检核心文件的 Diff 内容，检查是否破坏已有注释、是否引入空文件、是否引入未经登记的规则 ID、控制流嵌套是否超标；
-3. **主会话独立执行验证验证命令**：
-   - 主 Agent 在自身会话中亲自运行验证命令（如 `pwsh -File scripts/ps1/audit-all.ps1 -Fast`）；
-   - 确保测试与门禁真实退出码为 0，且无隐性断言失败；
-4. **统一提交或汇报**：
-   - 交叉复审全部合格后，由主 Agent 统一向用户交割或推进下一步作业。
+### 步骤 4：主 Agent 交叉全量复审 SOP (Cross-Review 7 步闭环)
+SubAgent 汇报任务完成并返回消息后，主 Agent **绝对不能盲目信任其汇报文本**，必须严格独立执行 7 步交叉复审闭环：
+1. **物理范围与 Path Jail 契约核验**：主 Agent 执行 `git status` 与 `git diff --name-only`，比对修改文件是否严格局限于独占 Path Jail 授权列表；严禁发生越界修改；
+2. **物理卫生与排版契约审计**：检查新增与修改文件，零 0 字节文件，PowerShell 脚本严格保持 CRLF 换行，其余文件严格保持 LF 换行；
+3. **AST 切片复杂度与双轨体积预审**：运行 `node scripts/common/evaluate-eloc-budget.js`，核实函数单切片 $\text{CC} \le 15, \text{Depth} \le 4, \text{Noise} \le 4.0$，单文件 $\text{ELOC} \le 900, \text{LOC} \le 1400$；
+4. **代码注释与架构契约审查**：核查模块头部是否具备六字段 JSDoc，零敏捷过程黑话代号（如 `p[0-9]+`、`W1-W9`），零幽灵假逻辑分支；
+5. **门面实质承载与跳板消融核验**：针对重构与导出入口，核查是否满足 $\text{ELOC} \ge 15$ 或不可变封装，彻底消融单行空包跳板；
+6. **项目专属构建与全量测试回归**：主 Agent 在主会话中亲自执行领域编译与回归测试（如 `npm run build && node scripts/gate-self.js && npm test`），确保 153/153 套测试套件 100% 通过；
+7. **全工作区统一审查终审**：执行 `pwsh -File scripts/ps1/audit-all.ps1 -Fast`，确认工作区五大核心子系统基石得分 100% 绿色通行后方可交割。
 
 ---
 

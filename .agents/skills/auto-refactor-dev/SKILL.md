@@ -2,21 +2,21 @@
 name: auto-refactor-dev
 description: >-
   auto-refactor 静态分析重构引擎、Rust+TS 双轨内核与 Praxis 客户端 SDK 开发规范。指导 Agent 在
-  auto-refactor 项目中维护 27 内置分析器与 308 条规则体系、保证 Rust 算子与纯 TS 桥接 100% 字节等价、
+  auto-refactor 项目中维护 30 内置分析器与 321 条规则体系、保证 Rust 算子与纯 TS 桥接 100% 字节等价、
   落实 Praxis SDK 调用范式、一体两面三层拓扑 Diff 引擎、AgentDirectives 结构化协议、高精度时间戳与暂存分流原子落盘。
 ---
 
 # auto-refactor-dev — 静态重构引擎与双轨算子开发规范
 
-本技能规范了 `auto-refactor/` 静态代码分析与治理引擎的核心架构原则、双轨算子等价性约束、27 个内置分析器与 308 条规则治理体系、Praxis 客户端 SDK 调用范式、一体两面三层拓扑 Diff 引擎、AgentDirectives 结构化指令协议、高精度时间戳规范以及暂存分流原子落盘机制。
+本技能规范了 `auto-refactor/` 静态代码分析与治理引擎的核心架构原则、双轨算子等价性约束、30 个内置分析器与 321 条规则治理体系、Praxis 客户端 SDK 调用范式、一体两面三层拓扑 Diff 引擎、AgentDirectives 结构化指令协议、高精度时间戳规范以及暂存分流原子落盘机制。
 
 ---
 
 ## 一、 适用场景与触发条件
 
 在以下任一场景中，必须激活本技能：
-1. **新增或修改静态代码分析器**（27 个内置分析器，位于 `src/analyzers/*.ts`）；
-2. **注册或调整规则元数据**（308 条内置规则，位于 `src/core/rules/` 与 `src/core/scoring/dimensionRuleTable.ts`）；
+1. **新增或修改静态代码分析器**（30 个内置分析器，位于 `src/analyzers/*.ts`）；
+2. **注册或调整规则元数据**（321 条内置规则，位于 `src/core/rules/` 与 `src/core/scoring/dimensionRuleTable.ts`）；
 3. **开发 Rust N-API 原生算子或更新纯 TS Shim 回退实现**（`crates/` 与 `src/core/native/`）；
 4. **调用或扩展 Praxis 审查客户端 SDK**（`IPraxisReviewClient`、`createPraxisClient`、`src/core/praxis/`）；
 5. **维护一体两面三层拓扑 Diff 引擎或 AgentDirectives 协议**（`diff-topology.ts`、`agent-directives.ts`）；
@@ -30,7 +30,7 @@ description: >-
 `auto-refactor` 采用 TypeScript 调度编排与 Rust N-API 原生算子内核结合的双轨架构：
 - **L1 原生算子层**：`crates/auto-refactor-core` 与 `crates/ops-{diff,graph,pattern,mask,clone}`；
 - **L2 语法与语义层**：`NormalizedNode` 统一语法树与 `SemanticGraph` 跨语言（8 种语言）图底座；
-- **L3 规则与分析器**：27 个内置分析器与 308 条规则金字塔治理体系；
+- **L3 规则与分析器**：30 个内置分析器与 321 条规则金字塔治理体系；
 - **L4 调度与快轨**：Sparse MoE 变更熵密门禁路由器与 `<10ms` AST 切片快轨；
 - **L5 质量度量平面**：静态（10 支柱）+ 动态证据 + 演化（CAI 指数）；
 - **L6 Praxis 交付层**：统一客户端 SDK、多 Agent 冲突仲裁、轨迹配方学习与级联回滚。
@@ -40,9 +40,9 @@ Rust 原生算子（64-bit SWAR 向量化扫描、Bit-Parallel Myers 差分、Ta
 
 ---
 
-## 三、 27 内置分析器与 308 规则金字塔体系
+## 三、 30 内置分析器与 321 规则金字塔体系
 
-### 1. 27 个内置分析器全景清单
+### 1. 30 个内置分析器全景清单
 所有分析器均统一在 `src/core/analyzer-registry.ts` 的 `BUILTIN_FACTORIES` 与 `BUILTIN_MODULE_PATHS` 中显式登记，支持单进程调度与 Worker 多线程并行实例化：
 
 | 分类 | 分析器名称 (`AnalyzerId`) | 核心职责与检测范围 |
@@ -54,11 +54,13 @@ Rust 原生算子（64-bit SWAR 向量化扫描、Bit-Parallel Myers 差分、Ta
 | | `hygiene` | 物理空文件、尾随空白符、行尾序列与跨平台换行守卫 |
 | | `naming` | 符号命名风格、保留前缀、抽象泄露与命名语义一致性 |
 | | `simplify` | 冗余条件分支、无效三元运算符与逻辑表达式平铺 |
+| | `production-hygiene` | 生产代码物理卫生、测试代码泄露与调试残留拦截 |
 | **架构与拓扑** | `architecture` | 门面模式承载、分层依赖单向性、跨层透传与不可变封装 |
 | | `data-architecture` | 实体模型解耦、查询下沉、无状态服务与数据边界治理 |
 | | `dependency-graph` | 模块循环依赖（Tarjan SCC 强连通分量）、扇入扇出失衡分析 |
 | | `dependency-layout` | 目录结构依赖拓扑、孤岛模块识别与物理路径组织合理性 |
 | | `gate-architecture` | 门禁分流规范、子进程上下文隔离、脚本探测深度约束 |
+| | `client-exposure` | 客户端对外暴露面、敏感内部 API 导出与跨域泄露守卫 |
 | **安全与治理** | `secrets` | 高熵密钥、API Token、硬编码凭证与脱敏状态机 |
 | | `security` | 动态代码执行（eval/Function）、反序列化漏洞与注入防范 |
 | | `governance` | 工作区协议契约、单源规则引用核验与黑话拦截 |
@@ -74,10 +76,13 @@ Rust 原生算子（64-bit SWAR 向量化扫描、Bit-Parallel Myers 差分、Ta
 | | `gdscript-modern` | GDScript 4 静态类型推断、注解规范与节点引用安全 |
 | | `gdscript-game` | 游戏循环（_process/_physics_process）性能与节点树拓扑 |
 | | `vscode-extension` | VS Code 扩展生命周期、Disposable 资源释放与 UI 线程解耦 |
+| | `frontend` | 前端组件解耦、JSX/TSX 复杂度与 Props 膨胀分析 |
 
-### 2. 四层规则金字塔治理 (308 条内置规则)
+### 2. 四层规则金字塔治理 (321 条内置规则)
 - **Layer 1（通用基础）**：格式、命名、注释、死代码、物理卫生；
 - **Layer 2（工程架构）**：分层依赖、门面承载、不可变封装、数据解耦；
+- **Layer 3（语言进阶）**：TS/Rust/Python/Go/GDScript 现代特性、资源安全；
+- **Layer 4（演化自治）**：代码自治度（CAI）、重构收益判定（ROI）、防刷分去抖。
 - **Layer 3（语言进阶）**：TS/Rust/Python/Go/GDScript 现代特性、资源安全；
 - **Layer 4（演化自治）**：代码自治度（CAI）、重构收益判定（ROI）、防刷分去抖。
 
@@ -204,7 +209,7 @@ export interface AgentDirectivesBundle {
 
 ## 八、 基线自审报告复用机制与增量切片快轨
 
-1. **消除无谓重复开销**：全仓全量自审（`runSelfAudit()`）涉及 27 个分析器与 304 条规则遍历，执行耗时约 14s。在常规门禁与增量校验时，禁止重复运行全量 `runSelfAudit()`；
+1. **消除无谓重复开销**：全仓全量自审（`runSelfAudit()`）涉及 30 个分析器与 321 条规则遍历，执行耗时约 14s。在常规门禁与增量校验时，禁止重复运行全量 `runSelfAudit()`；
 2. **基线报告快照复用**：
    - 优先读取已生成的基线自审报告快照（`.refactor-cache/baseline-self-audit.json`）；
    - 校验流程仅对暂存区增量文件执行 AST 局部切片比对与差分分析，将增量审计时间压缩在 100ms 以内；
@@ -267,7 +272,7 @@ npm run build
 # 2. 运行本地轻量快速门禁（语法、命名、跳板与中立性检查）
 npm run gate
 
-# 3. 运行全量自测套件（150/150 专项校验套件并发执行，支持基线复用）
+# 3. 运行全量自测套件（153/153 专项校验套件并发执行，支持基线复用）
 npm test
 
 # 4. 执行多维基准性能评测
@@ -278,7 +283,7 @@ npm run benchmark
 
 ## 十三、 高并发调度、图算法降阶与内存治理工程范式
 
-针对大型工程与常驻守护进程场景，`auto-refactor` 固化了以下 7 项刚性性能与内存治理范式：
+针对大型工程与常驻守护进程场景，`auto-refactor` 固化了以下 9 项刚性性能与内存治理范式：
 
 ### 1. Myers Trace 动态缩容与修剪保留
 - **动态申请**：`computeMyersTrace` 在实际差异较小时按编辑距离 $D$ 动态分配 $(D + 1) \times (2D + 1)$ 紧凑矩阵，杜绝病态全量预分配；
@@ -307,3 +312,12 @@ npm run benchmark
 ### 7. 词法正则顶层不可变常量化 (`PRF-MEM-001`)
 - **零瞬态编译**：行扫描、代码布局或规则匹配中的正则表达式（如函数声明检测、缩进探测），严禁在函数体内或循环内动态 `new RegExp()` 或字面量声明；
 - **标准范式**：统一提升至模块顶层 `const RE_XXX = /^.../` 作为不可变单例；带全局 `/g` 标志的正则在跨次使用时必须显式重置 `RE_XXX.lastIndex = 0`。
+
+### 8. 同步 I/O 隔离屏障与物理排布次序 (`SyncIoBarrier` / `PRF-IO-001`)
+- **底层屏障封装**：核心运行模块中涉及的必要同步文件操作（如崩溃日志紧急写入、原子落盘备用链路），必须通过 `SyncIoBarrier` / `LogIoBarrier` / `PraxisIoBarrier` 命名空间对象隔离调用，显式声明紧急容错边界；
+- **方法物理次序**：在包含同步/异步双重接口的类与模块中，**所有同步方法定义必须物理排在 async 异步方法之前**，严格防止 AST 分析器将后续同步操作误关联至异步调用链路。
+
+### 9. 循环内集合预索引与复合正则单趟匹配 (`PRF-ALG-002`)
+- **零循环内线性查找**：在循环或频繁触发的热点逻辑中，严禁反复执行 `Array.includes()`、`indexOf()` 或多次简单正则匹配（导致 $O(N \times M)$ 退化）；
+- **标准范式**：必须在循环外通过 `new Set(...)` 预构建快速索引容器并使用 `Set.has()`；多关键词匹配统一使用预编译的单趟复合正则或 ASCII 字符码游标扫描。
+

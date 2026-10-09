@@ -2,7 +2,7 @@
 name: gate-governance
 description: >-
   通用双层门禁架构与跨平台脚本工程化治理。指导 Agent 落实 Tier 1 本地左移极速流式判定（gate-fast-staged.js <90ms、
-  validate-commit-msg.js）与 Tier 2 远端 CI 同构防御，运用受影响项目智能分流（auto-refactor 27 分析器与 308 规则自测）、
+  validate-commit-msg.js）与 Tier 2 远端 CI 同构防御，运用受影响项目智能分流（auto-refactor 30 分析器与 321 规则自测）、
   子进程显式工作目录隔离（-WorkingDirectory）与 pwsh 7+ 优先原则，看守代码卫生与零黑话纪律。
 ---
 
@@ -49,7 +49,7 @@ description: >-
 ### 1. 路径特征探测与精准映射
 通过 `git diff --cached --name-only` 提取暂存区文件路径向量，精确映射至四大受控域：
 - **`workspace-timing/**`** $\rightarrow$ 路由至 VS Code 扩展套件：触发快速增量编译（`npm run compile`）、单元测试（`npm run test:fast`）与双语字典审查（`npm run review`）；
-- **`auto-refactor/**`** $\rightarrow$ 路由至 CLI 引擎套件：触发 27 分析器与 308 规则自测（`npm test`）、Rust/TS 双轨内核等价性校验与项目中立性守卫（`npm run gate`）；
+- **`auto-refactor/**`** $\rightarrow$ 路由至 CLI 引擎套件：触发 30 分析器与 321 规则自测 (153/153 套测试，`npm test`)、Rust/TS 双轨内核等价性校验与项目中立性守卫（`npm run gate`）；
 - **`WebGames/**`** $\rightarrow$ 路由至 Godot 引擎套件：触发 GDScript 语法审查（`check-gdscript.sh`）、无头回归套件（`test-run.ps1`）与配置同构审计；
 - **`scripts/**` / `.github/**` / `AGENTS.md` / `.agents/skills/**` / 根目录配置** $\rightarrow$ 标记为 `governance` 域：触发工作区单源规则目录一致性、技能集规范性核验与全宗审计（`audit-all.ps1`，内置 `validate-skills.js`）。
 
@@ -79,7 +79,8 @@ description: >-
 ### 2. PowerShell 7+ 优先与编码安全
 - **pwsh 优先原则**：统一路由至跨平台 `pwsh`（PowerShell 7+），严禁裸调 `powershell.exe`（Windows PS 5.1 解析无 BOM UTF-8 会发生乱码）；非 Windows 环境下优雅回退至 Bash；
 - **严格安全指令**：脚本开头必须显式声明 `$ErrorActionPreference = 'Stop'` 与 `Set-StrictMode -Version Latest`；
-- **换行符契约**：PowerShell 脚本（`.ps1`）在磁盘必须严格保持 CRLF 换行。
+- **换行符契约**：PowerShell 脚本（`.ps1`）在磁盘必须严格保持 CRLF 换行；
+- **沙箱隔离与环境自愈**：在 Windows 沙箱或自动化子进程中执行 Git 相关命令时，若遭遇用户级 `.gitconfig` 访问受限，统一前置声明 `$env:GIT_CONFIG_GLOBAL="NUL"; $env:GIT_CONFIG_SYSTEM="NUL"` 屏蔽外部全局文件依赖。
 
 ### 3. Bash 严格错误标志与平铺退出码
 - **严格管道安全**：Bash 脚本开头必须声明 `set -euo pipefail`；

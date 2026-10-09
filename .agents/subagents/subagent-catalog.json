@@ -38,6 +38,13 @@
       "model": "inherit",
       "workspaceMode": "inherit"
     },
+    "wt-explore": {
+      "archetype": "vs-extension",
+      "posture": "explore",
+      "description": "workspace-timing 扩展上下文、五层解耦与设计方案探索调查专员",
+      "model": "inherit",
+      "workspaceMode": "inherit"
+    },
     "ar-construct": {
       "archetype": "cli-engine",
       "posture": "construct",
@@ -56,6 +63,13 @@
       "archetype": "cli-engine",
       "posture": "refactor",
       "description": "auto-refactor 算子性能排毒、门面规范化与双轨体积控制专员",
+      "model": "inherit",
+      "workspaceMode": "inherit"
+    },
+    "ar-explore": {
+      "archetype": "cli-engine",
+      "posture": "explore",
+      "description": "auto-refactor 规则拓扑、AST算子与架构变动探索调查专员",
       "model": "inherit",
       "workspaceMode": "inherit"
     },
@@ -80,10 +94,59 @@
       "model": "inherit",
       "workspaceMode": "inherit"
     },
+    "wg-explore": {
+      "archetype": "game-engine",
+      "posture": "explore",
+      "description": "WebGames 游戏模块、配置图谱与四阶段设计探索调查专员",
+      "model": "inherit",
+      "workspaceMode": "inherit"
+    },
+    "infra-construct": {
+      "archetype": "infra-tool",
+      "posture": "construct",
+      "description": "全工作区跨平台脚本工程化、构建流水线与门禁功能增量编写专员",
+      "model": "inherit",
+      "workspaceMode": "inherit"
+    },
+    "infra-review": {
+      "archetype": "infra-tool",
+      "posture": "review",
+      "description": "全工作区构建脚本、跨平台防御契约与工作目录隔离审查专员",
+      "model": "inherit",
+      "workspaceMode": "inherit"
+    },
+    "infra-refactor": {
+      "archetype": "infra-tool",
+      "posture": "refactor",
+      "description": "全工作区脚本复杂度平铺、同构对齐与平台防御加固专员",
+      "model": "inherit",
+      "workspaceMode": "inherit"
+    },
+    "infra-explore": {
+      "archetype": "infra-tool",
+      "posture": "explore",
+      "description": "全工作区构建工具链、平台兼容与门禁基准探索调查专员",
+      "model": "inherit",
+      "workspaceMode": "inherit"
+    },
     "infra-guardian": {
       "archetype": "infra-tool",
       "posture": "guardian",
       "description": "全工作区跨平台脚本工程化、工作目录隔离与双层门禁守卫专员",
+      "model": "inherit",
+      "workspaceMode": "inherit"
+    },
+    "workspace-review": {
+      "archetype": "workspace-meta",
+      "posture": "review",
+      "description": "全工作区跨项目统一审查、单源规则目录与五大支柱一致性审查专员",
+      "model": "inherit",
+      "workspaceMode": "inherit"
+    },
+    "workspace-refactor": {
+      "archetype": "workspace-meta",
+      "posture": "refactor",
+      "description": "全工作区规则去重、配置收口与元数据治理重构专员",
       "model": "inherit",
       "workspaceMode": "inherit"
     },

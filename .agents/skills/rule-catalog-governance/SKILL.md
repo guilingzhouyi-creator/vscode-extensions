@@ -2,13 +2,13 @@
 name: rule-catalog-governance
 description: >-
   全工作区单源规则目录（SSOT）、元数据一致性与规则反虚构治理规范。指导 Agent 聚合
-  385 条跨项目静态分析与审查规则（autoRefactor: 304, workspaceTiming: 38, webGames: 43）、
+  402 条跨项目静态分析与审查规则（autoRefactor: 321, workspaceTiming: 45, webGames: 56, globalTooling: 7）、
   在三大项目中规范注册新规则、防范规则 ID 虚构（RCFG-RULE-DRIFT）并执行单源一致性验证。
 ---
 
 # rule-catalog-governance — 全仓单源规则目录与元数据一致性治理
 
-本技能规范了工作区 385 条静态分析与审查规则的单源聚合机制（Single Source of Truth, SSOT）、三大项目规范注册流程、规则防虚构门禁（`RCFG-RULE-DRIFT`）以及客观度量求真数学公理。
+本技能规范了工作区 402 条静态分析与审查规则的单源聚合机制（Single Source of Truth, SSOT）、三大项目规范注册流程、规则防虚构门禁（`RCFG-RULE-DRIFT`）以及客观度量求真数学公理。
 
 ---
 
@@ -28,16 +28,17 @@ description: >-
 工作区维护全局唯一的规则真源注册表，任何规则必须在注册表中登记后方可在代码、配置、分析报告或提交说明中生效：
 - **SSOT 文件路径**：`scripts/common/rule-catalog.json`
 - **生成与聚合脚本**：`scripts/common/generate-rule-catalog.js`
-- **纳管规模与形态**：跨三大项目聚合 385 条活跃规则，结构元数据定义如下：
+- **纳管规模与形态**：跨三大项目聚合 402 条活跃规则，结构元数据定义如下：
   ```json
   {
     "schema": "workspace-rule-catalog/v1",
-    "generatedAt": "2026-10-06T05:37:40.000Z",
-    "totalRules": 385,
+    "generatedAt": "2026-10-09T05:25:00.000Z",
+    "totalRules": 402,
     "counts": {
-      "autoRefactor": 304,
-      "workspaceTiming": 38,
-      "webGames": 43
+      "autoRefactor": 321,
+      "workspaceTiming": 45,
+      "webGames": 56,
+      "globalTooling": 7
     },
     "rules": [
       {
@@ -53,10 +54,11 @@ description: >-
   }
   ```
 
-### 规则分布矩阵 (385 条活跃规则)：
-1. **`autoRefactor` (304 条)**：涵盖 27 个内置分析器（architecture, data-architecture, test-modernity, dependency-layout, naming, gate-architecture 等）与四层金字塔体系；
-2. **`workspaceTiming` (38 条)**：涵盖 VS Code 扩展审查体系的 L0~L5 六层刚性防线（编译、存储崩溃安全、聚合守恒、i18n、性能与 UI 对比度）；
-3. **`webGames` (43 条)**：涵盖 Godot 游戏工程的文档治理（`DOC-`、`LINK-`）、高性能脚本契约（`ADV-`）与配置架构审查规则。
+### 规则分布矩阵 (402 条活跃规则)：
+1. **`autoRefactor` (321 条)**：涵盖 30 个内置分析器（architecture, data-architecture, test-modernity, dependency-layout, naming, gate-architecture 等）与四层金字塔体系；
+2. **`workspaceTiming` (45 条)**：涵盖 VS Code 扩展审查体系的 L0~L5 六层刚性防线（编译、存储崩溃安全、聚合守恒、i18n、性能与 UI 对比度）及进阶门禁规则；
+3. **`webGames` (56 条)**：涵盖 Godot 游戏工程的文档治理（`DOC-`、`LINK-`）、高性能脚本契约（`ADV-`）与配置架构审查规则；
+4. **`globalTooling` (7 条)**：涵盖跨平台门禁契约、脚本工作目录隔离与 AST 切片复杂度守卫（`GATE-`）。
 
 ---
 
@@ -64,17 +66,17 @@ description: >-
 
 向工作区新增或调整规则时，必须依项目标准流程落户，严禁未注册先引用：
 
-### 1. `auto-refactor` 规则注册工作流 (304 规则体系)
+### 1. `auto-refactor` 规则注册工作流 (321 规则体系)
 - **规则定义声明**：在 `auto-refactor/src/core/rules/entries/` 对应家族文件中创建规则对象（继承 `RuleDefinition`），填写真实 `id`、`title`、`severity`、`analyzer` 与 `dimension`；
 - **分值权重绑定**：在 `auto-refactor/src/core/scoring/dimensionRuleTable.ts` 中分配对应的扣分权重，严格遵守单规则跨维度扣分约束 `MAX_AXES_PER_FINDING <= 4`；
 - **自测套件闭环**：在 `auto-refactor/tests/rules/` 编写专属单元测试，并在 `scripts/test-parallel.js` 中注册验证脚本，确保无孤儿测试用例；
 - **原生 Rust 内核等价同步**：若规则涉及原生算子分析，必须确保 Rust 内核与 TS shim 达到 100% 字节等价性。
 
-### 2. `workspace-timing` 审查规则注册工作流 (38 规则体系)
+### 2. `workspace-timing` 审查规则注册工作流 (45 规则体系)
 - **单源配置文件**：在 `workspace-timing/scripts/config/review-rules.json` 中统一登记；
 - **规则层级代号**：使用严格的 `L0~L5` 六层体系前缀（如 `L0-COMPILE`、`L1-STORAGE-CRASH`、`L2-TIMING-CONSERVATION`、`L3-I18N-COVERAGE`），并附带对应触发审查命令与阻断级别。
 
-### 3. `WebGames` 文档与代码规范注册工作流 (43 规则体系)
+### 3. `WebGames` 文档与代码规范注册工作流 (56 规则体系)
 - **配置与门禁脚本**：在 `WebGames/scripts/config/docs_governance_rules.json` 或 `WebGames/scripts/py/audit_docs.py` 中登记规则元数据；
 - **前缀体系**：对齐文档治理规范（`DOC-`、`LINK-`）与引擎高性能契约（`ADV-`）。
 

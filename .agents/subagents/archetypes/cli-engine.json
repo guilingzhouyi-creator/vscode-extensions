@@ -9,7 +9,7 @@
   },
   "associatedSkills": ["auto-refactor-dev"],
   "rigidAxioms": [
-    "27 分析器与 304 条规则体系全量自测，零孤儿用例与规则漂移 (RCFG-RULE-DRIFT)",
+    "30 分析器与 321 条内置规则体系自测全通过 (153/153 套测试)，零孤儿用例与规则漂移 (RCFG-RULE-DRIFT)",
     "Rust 原生算子内核与 pure-TS shim 必须保持 100% 字节等价",
     "循环体内严禁动态编译 RegExp 或瞬态堆分配 (CPX-SPACE-001)",
     "门面层必须满足 ELOC >= 15 或 Object.freeze 不可变保障，零空包跳板 (ARCH-ABS-001 / ARCH-FAC-001)"
