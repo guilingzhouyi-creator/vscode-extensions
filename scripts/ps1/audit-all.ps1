@@ -290,47 +290,43 @@ $dimDefinitions = @(
 )
 
 # 计算各子系统归一化得分 [0.0 ~ 100.0]（纯客观连续度量，杜绝硬编码 100.0 与断崖 0.0）
-$SCORE_FLOOR = 40.0
+$SCORE_FLOOR = 15.0
 
-# 1. 物理卫生基石得分（理论上限 99.8，全合规 99.8，门禁失败平滑降级）
-$scoreHygiene = if ($statusHygiene -eq "PASS") { 99.8 } else { [math]::Max($SCORE_FLOOR, 99.8 - 30.0) }
+# 1. 物理卫生基石得分（理论上限 99.8，全合规 99.8，门禁失败扣除 70.0 惩罚分并受 15.0 刚性下界保护）
+$scoreHygiene = if ($statusHygiene -eq "PASS") { 99.8 } else { [math]::Max($SCORE_FLOOR, [math]::Round(99.8 - 70.0, 1)) }
 
-# 2. 单源规则目录基石得分（理论上限 99.8，402 规则单源一致 99.8，门禁失败平滑降级）
-$scoreRules   = if ($statusRules -eq "PASS") { 99.8 } else { [math]::Max($SCORE_FLOOR, 99.8 - 35.0) }
+# 2. 单源规则目录基石得分（理论上限 99.8，402 规则单源一致 99.8，门禁失败扣除 70.0 惩罚分并受 15.0 刚性下界保护）
+$scoreRules   = if ($statusRules -eq "PASS") { 99.8 } else { [math]::Max($SCORE_FLOOR, [math]::Round(99.8 - 70.0, 1)) }
 
-# 3. auto-refactor 质量基线得分（真源自审综合分 98.8，门禁失败扣除 25.0 惩罚分）
+# 3. auto-refactor 质量基线得分（真源自审综合分 98.8，门禁失败扣除 70.0 惩罚分并受 15.0 刚性下界保护）
 $baseAr = if ($null -ne $compositeScore) { [double]$compositeScore } else { 98.8 }
-$scoreAr = if ($statusAr -eq "PASS") { $baseAr } else { [math]::Max($SCORE_FLOOR, [math]::Round($baseAr - 25.0, 1)) }
+$scoreAr = if ($statusAr -eq "PASS") { $baseAr } else { [math]::Max($SCORE_FLOOR, [math]::Round($baseAr - 70.0, 1)) }
 
-# 4. workspace-timing 审查门禁得分（理论上限 99.6，读取 report-latest.json，按通过率与 142 个 warning 真实衰减至 94.6）
-$scoreWt = if ($statusWt -eq "PASS") {
-    $wtReportPath = Join-Path $repoRoot "workspace-timing\reports\review\report-latest.json"
-    $calculatedWt = 94.6
-    try {
-        if (Test-Path $wtReportPath) {
-            $wtData = Get-Content -Path $wtReportPath -Raw -Encoding utf8 | ConvertFrom-Json
-            if ($wtData -and $wtData.summary -and $wtData.summary.checks -gt 0) {
-                $totalChecks = [double]$wtData.summary.checks
-                $passChecks = if ($wtData.summary.byStatus -and $wtData.summary.byStatus.PASS) { [double]$wtData.summary.byStatus.PASS } else { 0.0 }
-                $warnCount = if ($wtData.summary.bySeverity -and $wtData.summary.bySeverity.warning) { [double]$wtData.summary.bySeverity.warning } else { 0.0 }
-                $errCount = if ($wtData.summary.bySeverity -and $wtData.summary.bySeverity.error) { [double]$wtData.summary.bySeverity.error } else { 0.0 }
-                if ($totalChecks -gt 0) {
-                    $ratio = $passChecks / $totalChecks
-                    $rawWt = (99.6 * $ratio) - ($warnCount * 0.035) - ($errCount * 5.0)
-                    $calculatedWt = [math]::Max($SCORE_FLOOR, [math]::Round($rawWt, 1))
-                }
+# 4. workspace-timing 审查门禁得分（理论上限 99.6，读取 report-latest.json，按通过率与 142 个 warning 真实衰减至 94.6，门禁失败扣除 70.0 惩罚分）
+$baseWt = 94.6
+$wtReportPath = Join-Path $repoRoot "workspace-timing\reports\review\report-latest.json"
+try {
+    if (Test-Path $wtReportPath) {
+        $wtData = Get-Content -Path $wtReportPath -Raw -Encoding utf8 | ConvertFrom-Json
+        if ($wtData -and $wtData.summary -and $wtData.summary.checks -gt 0) {
+            $totalChecks = [double]$wtData.summary.checks
+            $passChecks = if ($wtData.summary.byStatus -and $wtData.summary.byStatus.PASS) { [double]$wtData.summary.byStatus.PASS } else { 0.0 }
+            $warnCount = if ($wtData.summary.bySeverity -and $wtData.summary.bySeverity.warning) { [double]$wtData.summary.bySeverity.warning } else { 0.0 }
+            $errCount = if ($wtData.summary.bySeverity -and $wtData.summary.bySeverity.error) { [double]$wtData.summary.bySeverity.error } else { 0.0 }
+            if ($totalChecks -gt 0) {
+                $ratio = $passChecks / $totalChecks
+                $rawWt = (99.6 * $ratio) - ($warnCount * 0.035) - ($errCount * 5.0)
+                $baseWt = [math]::Max($SCORE_FLOOR, [math]::Round($rawWt, 1))
             }
         }
-    } catch {
-        $calculatedWt = 94.6
     }
-    $calculatedWt
-} else {
-    [math]::Max($SCORE_FLOOR, 94.6 - 30.0)
+} catch {
+    $baseWt = 94.6
 }
+$scoreWt = if ($statusWt -eq "PASS") { $baseWt } else { [math]::Max($SCORE_FLOOR, [math]::Round($baseWt - 70.0, 1)) }
 
-# 5. WebGames 配置架构得分（理论上限 99.7，全合规 99.7，门禁失败平滑降级）
-$scoreWg = if ($statusWg -eq "PASS") { 99.7 } else { [math]::Max($SCORE_FLOOR, 99.7 - 30.0) }
+# 5. WebGames 配置架构得分（理论上限 99.7，全合规 99.7，门禁失败扣除 70.0 惩罚分并受 15.0 刚性下界保护）
+$scoreWg = if ($statusWg -eq "PASS") { 99.7 } else { [math]::Max($SCORE_FLOOR, [math]::Round(99.7 - 70.0, 1)) }
 
 if ($Json) {
     $qualityVectorObj = if ($null -ne $tenDimensions) {

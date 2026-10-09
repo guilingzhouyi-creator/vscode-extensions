@@ -175,26 +175,33 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG"
     }
   } catch (_) {}
 
-  const scoreHygiene = statusHygiene === "PASS" ? 100.0 : 0.0;
-  const scoreRules = statusRules === "PASS" ? 100.0 : 0.0;
-  const scoreAr = statusAr === "PASS" ? (compositeScore !== null ? Number(compositeScore) : 98.8) : 0.0;
+  const SCORE_FLOOR = 15.0;
 
-  let scoreWt = 0.0;
-  if (statusWt === "PASS") {
-    scoreWt = 99.3;
-    try {
-      if (fs.existsSync(wtReportFile)) {
-        const wtJson = JSON.parse(fs.readFileSync(wtReportFile, "utf8"));
-        const checks = wtJson.summary?.checks ?? 0;
-        const passed = wtJson.summary?.byStatus?.PASS ?? 0;
-        if (checks > 0) {
-          scoreWt = passed === checks ? 99.3 : Number(((passed / checks) * 99.3).toFixed(1));
-        }
+  const scoreHygiene = statusHygiene === "PASS" ? 99.8 : Math.max(SCORE_FLOOR, Number((99.8 - 70.0).toFixed(1)));
+  const scoreRules = statusRules === "PASS" ? 99.8 : Math.max(SCORE_FLOOR, Number((99.8 - 70.0).toFixed(1)));
+  const baseAr = compositeScore !== null ? Number(compositeScore) : 98.8;
+  const scoreAr = statusAr === "PASS" ? baseAr : Math.max(SCORE_FLOOR, Number((baseAr - 70.0).toFixed(1)));
+
+  let baseWt = 94.6;
+  try {
+    if (fs.existsSync(wtReportFile)) {
+      const wtJson = JSON.parse(fs.readFileSync(wtReportFile, "utf8"));
+      const checks = Number(wtJson.summary?.checks ?? 0);
+      const passed = Number(wtJson.summary?.byStatus?.PASS ?? 0);
+      const warnCount = Number(wtJson.summary?.bySeverity?.warning ?? 0);
+      const errCount = Number(wtJson.summary?.bySeverity?.error ?? 0);
+      if (checks > 0) {
+        const ratio = passed / checks;
+        const rawWt = (99.6 * ratio) - (warnCount * 0.035) - (errCount * 5.0);
+        baseWt = Math.max(SCORE_FLOOR, Number(rawWt.toFixed(1)));
       }
-    } catch (_) {}
+    }
+  } catch (_) {
+    baseWt = 94.6;
   }
+  const scoreWt = statusWt === "PASS" ? baseWt : Math.max(SCORE_FLOOR, Number((baseWt - 70.0).toFixed(1)));
 
-  const scoreWg = statusWg === "PASS" ? 100.0 : 0.0;
+  const scoreWg = statusWg === "PASS" ? 99.7 : Math.max(SCORE_FLOOR, Number((99.7 - 70.0).toFixed(1)));
 
   if (jsonMode) {
     const summary = {
@@ -288,9 +295,9 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG"
   console.log("│" + padCell(subHeader) + "│");
 
   const subItems = [
-    { prefix: " 1. 工作区物理卫生  ", score: scoreHygiene, tag: "(零空文件/同构)" },
-    { prefix: " 2. 单源规则目录    ", score: scoreRules,   tag: "(402规则/SSOT)" },
-    { prefix: " 3. auto-refactor   ", score: scoreAr,      tag: "(CLI静态引擎)" },
+    { prefix: " 1. 工作区物理卫生  ", score: scoreHygiene, tag: "(零空文件/同构) " },
+    { prefix: " 2. 单源规则目录    ", score: scoreRules,   tag: "(402规则/SSOT)  " },
+    { prefix: " 3. auto-refactor   ", score: scoreAr,      tag: "(CLI静态引擎)   " },
     { prefix: " 4. workspace-timing", score: scoreWt,      tag: "(VSCode扩展门禁)" },
     { prefix: " 5. WebGames配置架构", score: scoreWg,      tag: "(卡拉尔领域配置)" }
   ];
@@ -306,7 +313,7 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG"
 
   console.log(borderMid);
 
-  const dimHeader = " ── [全工作区十维微观工程质量指数] " + "─".repeat(28);
+  const dimHeader = " ── [全工作区十维工程质量全景指数] " + "─".repeat(28);
   console.log("│" + padCell(dimHeader) + "│");
 
   const dims = [
@@ -343,18 +350,25 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG"
 
   if (summaryFile) {
     const passBadge = (s) => (s === "PASS" ? "✅ PASS" : "❌ FAIL");
-    let md = "## 🌐 全工作区跨项目统一审查与十维质量看板\n\n";
-    md += "### 📊 审查检查项 / 子系统判定\n\n";
-    md += "| 审查检查项 / 子系统 | 判定结果 | 覆盖范围 |\n";
-    md += "| :--- | :---: | :--- |\n";
-    md += `| **1. 工作区零空文件物理卫生** | ${passBadge(statusHygiene)} (${scoreHygiene.toFixed(1)}) | 全仓代码/脚本/配置 |\n`;
-    md += `| **2. 单源规则目录一致性 (SSOT)** | ${passBadge(statusRules)} (${scoreRules.toFixed(1)}) | 单源规则总目录 |\n`;
-    md += `| **3. auto-refactor 质量基线** | ${passBadge(statusAr)} (${scoreAr.toFixed(1)}) | 质量模型 / 并行自审 |\n`;
-    md += `| **4. workspace-timing 审查门禁** | ${passBadge(statusWt)} (${scoreWt.toFixed(1)}) | L0~L5 / 并行门禁 |\n`;
-    md += `| **5. WebGames 配置架构审查** | ${passBadge(statusWg)} (${scoreWg.toFixed(1)}) | 领域配置 / 并行审查 |\n\n`;
+    let md = "## 🌐 全工作区跨项目统一审查与十维质量全景看板\n\n";
+    if (compositeScore !== null) {
+      const sStr = Number(compositeScore).toFixed(1);
+      const gStr = grade ? ` (Grade: **${grade}**)` : "";
+      const aStr = autonomyRate ? ` &nbsp;|&nbsp; **自研率**: **${autonomyRate}%**` : "";
+      const dStr = totalDebt !== null ? ` &nbsp;|&nbsp; **技术债总量**: **${totalDebt} 项**` : "";
+      md += `> **综合健康分**: **${sStr}**${gStr}${aStr}${dStr}\n\n`;
+    }
+    md += "### 📊 全工作区五大核心子系统基石得分\n\n";
+    md += "| 序号 | 核心子系统 | 判定结果 | 归一化得分 | 进度可视化 | 覆盖说明 |\n";
+    md += "| :---: | :--- | :---: | :---: | :--- | :--- |\n";
+    md += `| 1 | 工作区物理卫生 | ${passBadge(statusHygiene)} | ${scoreHygiene.toFixed(1)} | \`${makeBar(scoreHygiene, 20)}\` | 全仓零空文件/同构契约 |\n`;
+    md += `| 2 | 单源规则目录 | ${passBadge(statusRules)} | ${scoreRules.toFixed(1)} | \`${makeBar(scoreRules, 20)}\` | 402规则/SSOT一致性 |\n`;
+    md += `| 3 | auto-refactor | ${passBadge(statusAr)} | ${scoreAr.toFixed(1)} | \`${makeBar(scoreAr, 20)}\` | CLI静态引擎质量基线 |\n`;
+    md += `| 4 | workspace-timing | ${passBadge(statusWt)} | ${scoreWt.toFixed(1)} | \`${makeBar(scoreWt, 20)}\` | VSCode扩展审查门禁 |\n`;
+    md += `| 5 | WebGames配置架构 | ${passBadge(statusWg)} | ${scoreWg.toFixed(1)} | \`${makeBar(scoreWg, 20)}\` | 卡拉尔领域配置审查 |\n\n`;
     md += `> **耗时**: ${elapsedSec}s &nbsp;|&nbsp; **全局状态**: ${globalStatus}\n\n`;
 
-    md += "### 🎯 全工作区十维工程质量看板\n\n";
+    md += "### 🎯 全工作区十维工程质量全景指数\n\n";
     if (tenDimensions && compositeScore !== null) {
       const gText = grade ? ` (Grade: **${grade}**)` : "";
       const aText = autonomyRate ? ` &nbsp;|&nbsp; **自研率**: **${autonomyRate}%**` : "";
