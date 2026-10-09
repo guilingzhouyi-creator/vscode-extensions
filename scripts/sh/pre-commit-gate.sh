@@ -82,6 +82,17 @@ elif echo "$STAGED_FILES" | grep -q '^workspace-timing/'; then
     echo "  ✔ [Gate 8] workspace-timing 仅文档/配置变更，跳过增量编译"
 fi
 
+TOUCHED_WT_DOC=$(echo "$STAGED_FILES" | grep -E '^workspace-timing/(CHANGELOG\.md|README\.md|package\.json)' || true)
+if [[ -n "$TOUCHED_WT_DOC" ]]; then
+    echo "  ▶ 触发 workspace-timing 文档布局与变更日志真实性门禁 (L3-DOC-LAYOUT)..."
+    if ! (cd workspace-timing && "$NODE_BIN" scripts/dist/audit/text-layout.js >/dev/null 2>&1); then
+        echo "❌ [FAIL] Gate 8: workspace-timing 文档文本布局或变更日志真实性核验未通过！"
+        FAILED=1
+    else
+        echo "  ✔ [PASS] workspace-timing 文档布局与变更日志真实性校验通过"
+    fi
+fi
+
 if [[ -n "$TOUCHED_AR_COMPILE" ]]; then
     echo "  ▶ 触发 auto-refactor 增量编译校验..."
     if ! (cd auto-refactor && "$NPM_BIN" run build >/dev/null 2>&1); then

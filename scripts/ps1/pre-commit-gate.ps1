@@ -91,6 +91,18 @@ if ($hasWtCompile) {
     Write-Host "  ✔ [Gate 8] workspace-timing 仅文档/配置变更，跳过增量编译" -ForegroundColor Green
 }
 
+$hasWtDoc = $stagedFiles | Where-Object { $_ -match "^workspace-timing/(CHANGELOG\.md|README\.md|package\.json)" }
+if ($hasWtDoc) {
+    Write-Host "  ▶ 触发 workspace-timing 文档布局与变更日志真实性门禁 (L3-DOC-LAYOUT)..." -ForegroundColor Cyan
+    $docProc = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/dist/audit/text-layout.js" -WorkingDirectory (Join-Path $repoRoot "workspace-timing") -NoNewWindow -PassThru -Wait
+    if ($docProc.ExitCode -ne 0) {
+        Write-Host "❌ [FAIL] Gate 8: workspace-timing 文档文本布局或变更日志真实性核验未通过！" -ForegroundColor Red
+        $failed = $true
+    } else {
+        Write-Host "  ✔ [PASS] workspace-timing 文档布局与变更日志真实性校验通过" -ForegroundColor Green
+    }
+}
+
 if ($hasArCompile) {
     Write-Host "  ▶ 触发 auto-refactor 增量编译校验..." -ForegroundColor Cyan
     $process = Start-Process -FilePath $npmCmd -ArgumentList "run", "build" -WorkingDirectory (Join-Path $repoRoot "auto-refactor") -NoNewWindow -PassThru -Wait

@@ -1,10 +1,10 @@
 {
   "schema": "workspace-rule-catalog/v1",
-  "generatedAt": "2026-10-09T10:52:03.488Z",
-  "totalRules": 402,
+  "generatedAt": "2026-10-09T12:11:39.791Z",
+  "totalRules": 406,
   "counts": {
     "autoRefactor": 321,
-    "workspaceTiming": 45,
+    "workspaceTiming": 49,
     "webGames": 56,
     "globalTooling": 7
   },
@@ -808,6 +808,27 @@
       "summary": "文档文本布局契约：CHANGELOG keep-a-changelog 结构/版本同步/列表风格 + README 必需节/路线图版本同步 (DOC-CL-006)"
     },
     {
+      "id": "DOC-CL-007",
+      "project": "workspace-timing",
+      "family": "L3",
+      "severity": "error",
+      "summary": "文档文本布局契约：CHANGELOG keep-a-changelog 结构/版本同步/列表风格 + README 必需节/路线图版本同步 (DOC-CL-007)"
+    },
+    {
+      "id": "DOC-CL-008",
+      "project": "workspace-timing",
+      "family": "L3",
+      "severity": "error",
+      "summary": "文档文本布局契约：CHANGELOG keep-a-changelog 结构/版本同步/列表风格 + README 必需节/路线图版本同步 (DOC-CL-008)"
+    },
+    {
+      "id": "DOC-CL-009",
+      "project": "workspace-timing",
+      "family": "L3",
+      "severity": "error",
+      "summary": "文档文本布局契约：CHANGELOG keep-a-changelog 结构/版本同步/列表风格 + README 必需节/路线图版本同步 (DOC-CL-009)"
+    },
+    {
       "id": "DOC-DUP-001",
       "project": "auto-refactor",
       "family": "DOC",
@@ -841,6 +862,13 @@
       "family": "L3",
       "severity": "error",
       "summary": "文档文本布局契约：CHANGELOG keep-a-changelog 结构/版本同步/列表风格 + README 必需节/路线图版本同步 (DOC-RD-002)"
+    },
+    {
+      "id": "DOC-RD-003",
+      "project": "workspace-timing",
+      "family": "L3",
+      "severity": "error",
+      "summary": "文档文本布局契约：CHANGELOG keep-a-changelog 结构/版本同步/列表风格 + README 必需节/路线图版本同步 (DOC-RD-003)"
     },
     {
       "id": "DOC-TRM-001",
