@@ -5,6 +5,7 @@
  * Dependencies & Triggers: 依赖 models、RingBuffer、ICacheStrategy、IJournalStore 及 Logger；由调度器心跳周期性触发。
  * Responsibilities: 缓冲时间切片；两阶段提交批量刷盘 (peekAll -> appendBatch -> advance)；截断清理与内存防数据复活；异步互斥保护。
  * Exit Semantics & Design Rationale: 两阶段提交保证底层 I/O 异常时缓冲无损并支持重试；截断时同步清空内存队列彻底消除脏数据复活。
+ * Contract Invariant & Boundary Fallback: Two-phase commit invariants guarantee zero data loss on I/O failure; flush advance monotonicity ensures crash consistency fallback.
  */
 
 import {

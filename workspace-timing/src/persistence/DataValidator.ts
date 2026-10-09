@@ -5,6 +5,7 @@
  * Dependencies & Triggers: 依赖 domain/models 核心模型与版本常量；在从外部文件或备份恢复计时数据时触发执行。
  * Responsibilities: 顶层结构完整性检查；会话条目时长守恒约束修复与排序；历史折叠日桶规范化；双轨时长配比合规性裁决。
  * Exit Semantics & Design Rationale: 纯函数设计，只读阻断异常数据；自动修复与净化向前兼容 v3 模式，确保流入持久层的数据结构绝对可信。
+ * Contract Invariant & Boundary Fallback: Non-negative timestamp invariant (totalMs >= 0, durationMs >= 0); session duration conservation (manual + ai <= duration); schema fallback on malformed external data.
  */
 
 import {

@@ -5,6 +5,7 @@
  * Dependencies & Triggers: 聚合 models 及 aggregator/* 子模块；由应用层 TimerEngine、RecoveryService 及展示层交互驱动。
  * Responsibilities: 对外统一暴露日期与时长计算接口；提供跨自然日切分 splitByNaturalDay 算法并保障时长守恒；不可变冻结门面对象。
  * Exit Semantics & Design Rationale: Object.freeze 确保门面对象运行时不可变；跨午夜切分严格保障 manualMs + aiMs 比例分配与总时长精确守恒。
+ * Contract Invariant & Boundary Fallback: Temporal conservation invariant (sum of split durations == original duration; manualMs + aiMs == durationMs); day boundary midnight splitting guarantees zero time leakage.
  */
 
 import { TimeSession } from './models';

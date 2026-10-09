@@ -5,6 +5,7 @@
  * Dependencies & Triggers: 依赖 models、constants-chart、date-utils、daily-aggregator；在周报渲染、柱状图绘制与报告导出时触发。
  * Responsibilities: 计算全历史周汇总 weeklyStats；生成近 7 日柱状图序列 last7Days；生成近 N 周趋势序列 weeklyTrend；提取周峰值与活跃天数 weeklySummary。
  * Exit Semantics & Design Rationale: 跨周日跨午夜会话按切分片段精确归属自然周；多源合并（折叠日桶 + 原始会话 + 进行中会话）确保时长绝对守恒。
+ * Contract Invariant & Boundary Fallback: Temporal conservation invariant (7 daily totals sum to weekly totalMs); boundary guards for rolling 7-day windows against partial week bounds.
  */
 
 import { DailyTotalsMap, TimeSession } from '../models';

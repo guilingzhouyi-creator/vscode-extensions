@@ -5,6 +5,7 @@
  * Dependencies & Triggers: 依赖 models、date-utils、duration-formatter；在状态栏更新、面板刷新及导出报告时按需执行。
  * Responsibilities: 计算今日累计时长 todayMs（含未闭合活跃会话）；按日汇总会话 dailyStats；计算单日 24 小时分布与高峰时段 dailyDetail。
  * Exit Semantics & Design Rationale: 纯函数设计，无副作用；按本地自然日严格裁剪边界，规避夏令时/跨午夜引起的重复计算与死循环。
+ * Contract Invariant & Boundary Fallback: Conservation invariant across daily buckets (sum of 24 hourly buckets == daily totalMs); boundary clamping ensures sessions never project into negative or future time bounds.
  */
 
 import { TimeSession, MS_PER_HOUR } from '../models';
