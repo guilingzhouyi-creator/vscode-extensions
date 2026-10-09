@@ -22,7 +22,15 @@ import { ALL_QUALITY_DIMENSIONS } from './scoringTypes';
 // carry its own copy (95/85/75/65/50) which disagreed with the snapshot model, so the same
 // 92 points read as A+ on one surface and A on the other. It also had no NaN case, which
 // graded unmeasured input as F.
-import { resolveQualityGrade, SCORE_ROUNDING } from './scorer-formulas';
+import {
+    computeSecurityCeiling,
+    DIMENSION_MAX_SCORE,
+    resolveQualityGrade,
+    SCORE_ROUNDING,
+} from './scorer-formulas';
+
+/** Default fallback security ceiling for unmeasured scopes. */
+export const DEFAULT_SECURITY_CEILING = computeSecurityCeiling();
 
 /**
  * Scored function-level quality record.
@@ -112,17 +120,21 @@ export function scoreFileQuality(
 
     // 2. Risk penalty and ceilings
     const riskResult = computeRiskWeightedPenalties(allIssues);
+    const loc = Math.max(1, content ? content.split('\n').length : 1);
+    const scaleFactor = Math.max(1, loc / 100);
+    const securityCeiling = computeSecurityCeiling(null, scaleFactor);
 
-    // 3. Base dimension indices (starts at 100, deducted by riskResult.dimensionPenalties)
+    // 3. Base dimension indices (starts at securityCeiling or 100, deducted by riskResult.dimensionPenalties)
     const indices: Record<QualityDimension, number> = {} as Record<QualityDimension, number>;
     for (const dim of ALL_QUALITY_DIMENSIONS) {
         let dimPenalty = riskResult.dimensionPenalties?.[dim] ?? 0;
         if (dim === 'maintainability' && densityResult.isLowDensity) {
             dimPenalty += 15;
         }
+        const baseScore = dim === 'codeSecurity' ? securityCeiling : DIMENSION_MAX_SCORE;
         indices[dim] = Math.max(
             0,
-            Math.round((100 - dimPenalty) * SCORE_ROUNDING) / SCORE_ROUNDING,
+            Math.round((baseScore - dimPenalty) * SCORE_ROUNDING) / SCORE_ROUNDING,
         );
     }
 
@@ -147,7 +159,7 @@ export function scoreFileQuality(
         effectiveDensity: densityResult.effectiveDensity,
         functions: [],
         issues: allIssues,
-        loc: Math.max(1, content ? content.split('\n').length : 1),
+        loc,
     };
 }
 
@@ -204,7 +216,9 @@ function buildModuleScores(modMap: Map<string, FileQualityScore[]>): ModuleQuali
                 pillarSums[p] += f.eightPillars.pillars[p];
             }
             for (const d of ALL_QUALITY_DIMENSIONS) {
-                dimSums[d] += f.tenDimensions?.[d] ?? 100;
+                const fallback =
+                    d === 'codeSecurity' ? DEFAULT_SECURITY_CEILING : DIMENSION_MAX_SCORE;
+                dimSums[d] += f.tenDimensions?.[d] ?? fallback;
             }
         }
 
@@ -277,7 +291,9 @@ function buildDomainScores(
                 pillarSums[p] += m.pillars[p];
             }
             for (const d of ALL_QUALITY_DIMENSIONS) {
-                dimSums[d] += m.tenDimensions?.[d] ?? 100;
+                const fallback =
+                    d === 'codeSecurity' ? DEFAULT_SECURITY_CEILING : DIMENSION_MAX_SCORE;
+                dimSums[d] += m.tenDimensions?.[d] ?? fallback;
             }
         }
 
@@ -352,77 +368,128 @@ function computeProjectPillars(
 }
 
 /**
- * Aggregates file quality scores into module, domain, and project levels.
- *
- * @param fileScores - List of individual file scores to aggregate.
- * @returns Fully aggregated project-level quality score.
+ * Creates an empty project score structure when no files are provided.
  */
-export function aggregateProjectScore(fileScores: FileQualityScore[]): ProjectQualityScore {
-    if (fileScores.length === 0) {
-        const emptyDimensions: Record<QualityDimension, number> = {} as Record<
-            QualityDimension,
-            number
-        >;
-        for (const d of ALL_QUALITY_DIMENSIONS) emptyDimensions[d] = 100.0;
-        const emptyPillars = synthesizeEightPillars(emptyDimensions);
-        return {
-            compositeScore: 100.0,
-            grade: 'A+',
-            eightPillars: emptyPillars,
-            tenDimensions: emptyDimensions,
-            effectiveCodeDensity: 1.0,
-            domains: [],
-            totalFiles: 0,
-            totalIssues: 0,
-            fatalCount: 0,
-        };
-    }
-
-    const domainMap = new Map<string, Map<string, FileQualityScore[]>>();
-    let totalIssues = 0;
-    let fatalCount = 0;
-    let totalDensity = 0;
-
-    for (const file of fileScores) {
-        totalIssues += file.issues.length;
-        fatalCount += file.issues.filter((i) => i.severity === 'error').length;
-        totalDensity += file.effectiveDensity;
-
-        const moduleMap = getOrCreateDomainModuleMap(domainMap, file.domainName);
-        let list = moduleMap.get(file.moduleName);
-        if (!list) {
-            list = [];
-            moduleMap.set(file.moduleName, list);
-        }
-        list.push(file);
-    }
-
-    const domains = buildDomainScores(domainMap);
-    const projectPillars = computeProjectPillars(fileScores, fatalCount);
-
-    const projectDimSums: Record<QualityDimension, number> = {} as Record<
+function createEmptyProjectScore(): ProjectQualityScore {
+    const emptyDimensions: Record<QualityDimension, number> = {} as Record<
         QualityDimension,
         number
     >;
     for (const d of ALL_QUALITY_DIMENSIONS) {
+        emptyDimensions[d] =
+            d === 'codeSecurity' ? DEFAULT_SECURITY_CEILING : DIMENSION_MAX_SCORE;
+    }
+    const emptyPillars = synthesizeEightPillars(emptyDimensions);
+    return {
+        compositeScore: emptyPillars.compositeScore,
+        grade: resolveQualityGrade(emptyPillars.compositeScore),
+        eightPillars: emptyPillars,
+        tenDimensions: emptyDimensions,
+        effectiveCodeDensity: 1.0,
+        domains: [],
+        totalFiles: 0,
+        totalIssues: 0,
+        fatalCount: 0,
+    };
+}
+
+/**
+ * Accumulated file-level metrics across the project.
+ */
+interface AccumulatedProjectMetrics {
+    readonly domainMap: Map<string, Map<string, FileQualityScore[]>>;
+    readonly totalIssues: number;
+    readonly fatalCount: number;
+    readonly totalDensity: number;
+    readonly totalLoc: number;
+    readonly projectDimSums: Record<QualityDimension, number>;
+}
+
+/**
+ * Counts error-level findings across an issue list.
+ */
+function countFatalIssues(issues: FileQualityScore['issues']): number {
+    let count = 0;
+    for (let i = 0; i < issues.length; i++) {
+        if (issues[i].severity === 'error') {
+            count++;
+        }
+    }
+    return count;
+}
+
+/**
+ * Records a file into domain and module hierarchy groupings.
+ */
+function recordDomainModule(
+    domainMap: Map<string, Map<string, FileQualityScore[]>>,
+    file: FileQualityScore,
+): void {
+    const moduleMap = getOrCreateDomainModuleMap(domainMap, file.domainName);
+    let list = moduleMap.get(file.moduleName);
+    if (!list) {
+        list = [];
+        moduleMap.set(file.moduleName, list);
+    }
+    list.push(file);
+}
+
+/**
+ * Adds file dimension scores into weighted project dimension sums.
+ */
+function accumulateDimensionSums(
+    projectDimSums: Record<QualityDimension, number>,
+    file: FileQualityScore,
+    fileLoc: number,
+): void {
+    const fDims = file.tenDimensions;
+    for (const d of ALL_QUALITY_DIMENSIONS) {
+        const fallback = d === 'codeSecurity' ? DEFAULT_SECURITY_CEILING : DIMENSION_MAX_SCORE;
+        const dimScore = fDims?.[d] ?? fallback;
+        projectDimSums[d] += dimScore * fileLoc;
+    }
+}
+
+/**
+ * Accumulates issues, lines of code, and dimension penalties across files.
+ */
+function accumulateProjectMetrics(fileScores: FileQualityScore[]): AccumulatedProjectMetrics {
+    const domainMap = new Map<string, Map<string, FileQualityScore[]>>();
+    let totalIssues = 0;
+    let fatalCount = 0;
+    let totalDensity = 0;
+    let totalLoc = 0;
+
+    const projectDimSums: Record<QualityDimension, number> = {} as Record<QualityDimension, number>;
+    for (const d of ALL_QUALITY_DIMENSIONS) {
         projectDimSums[d] = 0;
     }
-    let totalLoc = 0;
-    const fileCount = fileScores.length;
-    for (let i = 0; i < fileCount; i++) {
-        const file = fileScores[i];
+
+    for (const file of fileScores) {
+        totalIssues += file.issues.length;
+        fatalCount += countFatalIssues(file.issues);
+        totalDensity += file.effectiveDensity;
+
+        recordDomainModule(domainMap, file);
+
         const fileLoc = Math.max(
             1,
             typeof file.loc === 'number' && Number.isFinite(file.loc) ? file.loc : 1,
         );
         totalLoc += fileLoc;
-        const fDims = file.tenDimensions;
-        for (const d of ALL_QUALITY_DIMENSIONS) {
-            const dimScore = fDims?.[d] ?? 100;
-            projectDimSums[d] += dimScore * fileLoc;
-        }
+        accumulateDimensionSums(projectDimSums, file, fileLoc);
     }
 
+    return { domainMap, totalIssues, fatalCount, totalDensity, totalLoc, projectDimSums };
+}
+
+/**
+ * Computes LOC-weighted ten-dimension project scores.
+ */
+function computeWeightedProjectDimensions(
+    projectDimSums: Record<QualityDimension, number>,
+    totalLoc: number,
+): Record<QualityDimension, number> {
     const safeTotalLoc = Math.max(1, totalLoc);
     const projectDimensions: Record<QualityDimension, number> = {} as Record<
         QualityDimension,
@@ -432,7 +499,16 @@ export function aggregateProjectScore(fileScores: FileQualityScore[]): ProjectQu
         projectDimensions[d] =
             Math.round((projectDimSums[d] / safeTotalLoc) * SCORE_ROUNDING) / SCORE_ROUNDING;
     }
+    return projectDimensions;
+}
 
+/**
+ * Finalizes synthesized eight pillars with primary weights and composite score.
+ */
+function finalizeProjectEightPillars(
+    projectDimensions: Record<QualityDimension, number>,
+    projectPillars: Record<PrimaryQualityPillar, number>,
+): EightPillarBreakdown {
     const synthesized = synthesizeEightPillars(
         projectDimensions,
         projectPillars.data,
@@ -444,18 +520,40 @@ export function aggregateProjectScore(fileScores: FileQualityScore[]): ProjectQu
     for (const p of ALL_PRIMARY_PILLARS) {
         finalCompositeSum += projectPillars[p] * synthesized.weights[p];
     }
-    const finalComposite = Math.round(finalCompositeSum * SCORE_ROUNDING) / SCORE_ROUNDING;
-    synthesized.compositeScore = finalComposite;
+    synthesized.compositeScore =
+        Math.round(finalCompositeSum * SCORE_ROUNDING) / SCORE_ROUNDING;
+    return synthesized;
+}
+
+/**
+ * Aggregates file quality scores into module, domain, and project levels.
+ *
+ * @param fileScores - List of individual file scores to aggregate.
+ * @returns Fully aggregated project-level quality score.
+ */
+export function aggregateProjectScore(fileScores: FileQualityScore[]): ProjectQualityScore {
+    if (fileScores.length === 0) {
+        return createEmptyProjectScore();
+    }
+
+    const metrics = accumulateProjectMetrics(fileScores);
+    const domains = buildDomainScores(metrics.domainMap);
+    const projectPillars = computeProjectPillars(fileScores, metrics.fatalCount);
+    const projectDimensions = computeWeightedProjectDimensions(
+        metrics.projectDimSums,
+        metrics.totalLoc,
+    );
+    const synthesized = finalizeProjectEightPillars(projectDimensions, projectPillars);
 
     return {
-        compositeScore: finalComposite,
-        grade: resolveQualityGrade(finalComposite),
+        compositeScore: synthesized.compositeScore,
+        grade: resolveQualityGrade(synthesized.compositeScore),
         eightPillars: synthesized,
         tenDimensions: projectDimensions,
-        effectiveCodeDensity: Math.round((totalDensity / fileScores.length) * 100) / 100,
+        effectiveCodeDensity: Math.round((metrics.totalDensity / fileScores.length) * 100) / 100,
         domains,
         totalFiles: fileScores.length,
-        totalIssues,
-        fatalCount,
+        totalIssues: metrics.totalIssues,
+        fatalCount: metrics.fatalCount,
     };
 }

@@ -341,56 +341,72 @@ export function extractClarificationRequest(issue: Issue): AgentClarificationReq
 }
 
 /**
- * Format a single finding into an ultra-compact CAPP single-line directive.
- *
- * @param issue - Static analysis finding.
- * @returns Structured and rendered CompactGuardDirective.
+ * Table-driven mapping from Issue severity to compact directive severity verdict.
  */
-export function formatCompactGuardDirective(issue: Issue): CompactGuardDirective {
-    const sev: CompactDirectiveSeverity =
-        issue.severity === SEVERITY_ERROR
-            ? VERDICT_BLOCK
-            : issue.severity === SEVERITY_WARNING
-              ? VERDICT_WARN
-              : VERDICT_INFO;
-    const filePath = issue.location?.file || 'unknown';
-    const file =
-        filePath.includes('/') || filePath.includes('\\')
-            ? filePath.split(/[/\\]/).pop() || filePath
-            : filePath;
-    const line = issue.location?.start?.line ?? 1;
-    const ruleId = issue.rule;
+const DIRECTIVE_SEVERITY_MAP: Record<string, CompactDirectiveSeverity> = {
+    [SEVERITY_ERROR]: VERDICT_BLOCK,
+    [SEVERITY_WARNING]: VERDICT_WARN,
+    info: VERDICT_INFO,
+};
 
-    const clarify = extractClarificationRequest(issue);
-    if (clarify) {
-        const question = (clarify.promptQuestion || issue.message || '')
-            .replace(/\s+/g, ' ')
-            .trim();
-        const optKeys = (clarify.candidateOptions || [])
-            .map((o) => (typeof o === 'string' ? o : o.key))
-            .join(',');
-        const defKey =
-            clarify.defaultChoiceKey ||
-            (clarify.candidateOptions?.[0]
-                ? typeof clarify.candidateOptions[0] === 'string'
-                    ? clarify.candidateOptions[0]
-                    : clarify.candidateOptions[0].key
-                : 'default');
-        const renderedDirective = `[CLARIFY|${sev}|${ruleId}] ${file}:${line} -> ${question} ?opts=[${optKeys}] def=${defKey}`;
-
-        return {
-            severity: sev,
-            ruleId,
-            file,
-            line,
-            summary: question,
-            actionable: issue.actionable,
-            directiveType: 'CLARIFY',
-            clarificationRequest: clarify,
-            renderedDirective,
-        };
+function resolveDirectiveSeverity(severity: string | undefined): CompactDirectiveSeverity {
+    if (severity && severity in DIRECTIVE_SEVERITY_MAP) {
+        return DIRECTIVE_SEVERITY_MAP[severity];
     }
+    return VERDICT_INFO;
+}
 
+function resolveFileBasename(filePath: string | undefined): string {
+    const raw = filePath || 'unknown';
+    if (!raw.includes('/') && !raw.includes('\\')) {
+        return raw;
+    }
+    return raw.split(/[/\\]/).pop() || raw;
+}
+
+function renderClarifyDirective(
+    issue: Issue,
+    clarify: AgentClarificationRequest,
+    sev: CompactDirectiveSeverity,
+    file: string,
+    line: number,
+): CompactGuardDirective {
+    const ruleId = issue.rule;
+    const question = (clarify.promptQuestion || issue.message || '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    const optKeys = (clarify.candidateOptions || [])
+        .map((o) => (typeof o === 'string' ? o : o.key))
+        .join(',');
+    const firstOpt = clarify.candidateOptions?.[0];
+    const fallbackKey = firstOpt
+        ? typeof firstOpt === 'string'
+            ? firstOpt
+            : firstOpt.key
+        : 'default';
+    const defKey = clarify.defaultChoiceKey || fallbackKey;
+    const renderedDirective = `[CLARIFY|${sev}|${ruleId}] ${file}:${line} -> ${question} ?opts=[${optKeys}] def=${defKey}`;
+
+    return {
+        severity: sev,
+        ruleId,
+        file,
+        line,
+        summary: question,
+        actionable: issue.actionable,
+        directiveType: 'CLARIFY',
+        clarificationRequest: clarify,
+        renderedDirective,
+    };
+}
+
+function renderGuardDirective(
+    issue: Issue,
+    sev: CompactDirectiveSeverity,
+    file: string,
+    line: number,
+): CompactGuardDirective {
+    const ruleId = issue.rule;
     const summary = (issue.message || '').replace(/\s+/g, ' ').trim();
     const fixHint = issue.suggestion ? issue.suggestion.replace(/\s+/g, ' ').trim() : undefined;
     const fixPart = fixHint ? ` Fix: ${fixHint}` : '';
@@ -411,6 +427,24 @@ export function formatCompactGuardDirective(issue: Issue): CompactGuardDirective
         directiveType: 'GUARD',
         renderedDirective,
     };
+}
+
+/**
+ * Format a single finding into an ultra-compact CAPP single-line directive.
+ *
+ * @param issue - Static analysis finding.
+ * @returns Structured and rendered CompactGuardDirective.
+ */
+export function formatCompactGuardDirective(issue: Issue): CompactGuardDirective {
+    const sev = resolveDirectiveSeverity(issue.severity);
+    const file = resolveFileBasename(issue.location?.file);
+    const line = issue.location?.start?.line ?? 1;
+
+    const clarify = extractClarificationRequest(issue);
+    if (clarify) {
+        return renderClarifyDirective(issue, clarify, sev, file, line);
+    }
+    return renderGuardDirective(issue, sev, file, line);
 }
 
 /**

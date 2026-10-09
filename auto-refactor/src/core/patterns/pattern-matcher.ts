@@ -32,7 +32,10 @@ import type { FlowAnalysisResult } from '../cfg/types';
 /** Variable assignment extraction pattern: const/let/var x = ... or x := ... */
 const VARIABLE_ASSIGNMENT_RE = /(?:const|let|var)\s+([a-zA-Z0-9_$]+)\s*=/;
 
-/** Compiled representation of boundary isolation targets and indicators for high-performance matching. */
+/**
+ * Compiled representation of boundary isolation targets and indicators
+ * for high-performance matching.
+ */
 interface CompiledBoundaryTarget {
     readonly id: string;
     readonly matcher: RegExp;
@@ -60,6 +63,19 @@ function escapeRegExp(str: string): string {
     return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+/** Global RegExp object cache pool to eliminate redundant allocations (PRF-MEM-001). */
+const REGEXP_CACHE_POOL = new Map<string, RegExp>();
+
+function getOrCreateRegExp(pattern: string, flags?: string): RegExp {
+    const key = flags ? `${flags}:${pattern}` : pattern;
+    let cached = REGEXP_CACHE_POOL.get(key);
+    if (!cached) {
+        cached = new RegExp(pattern, flags);
+        REGEXP_CACHE_POOL.set(key, cached);
+    }
+    return cached;
+}
+
 /**
  * Compiles and indexes boundary isolation rules into unified expressions and target mappings.
  *
@@ -68,22 +84,21 @@ function escapeRegExp(str: string): string {
  */
 function compileBoundaryPattern(pattern: BoundaryIsolationPattern): CompiledBoundaryPattern {
     const stringIndicators: string[] = [];
-    const fileRegexes: RegExp[] = [];
-    const headerRegexes: RegExp[] = [];
+    const indicatorRegexSet = new Set<RegExp>();
 
     for (let i = 0; i < pattern.sourceLayerIndicators.length; i++) {
         const ind = pattern.sourceLayerIndicators[i];
         if (typeof ind === 'string') {
             stringIndicators.push(ind);
         } else {
-            fileRegexes.push(ind);
-            headerRegexes.push(ind);
+            indicatorRegexSet.add(ind);
         }
     }
+    const indicatorRegexes = Array.from(indicatorRegexSet);
 
     const filePathRegex =
         stringIndicators.length > 0
-            ? new RegExp(
+            ? getOrCreateRegExp(
                   stringIndicators
                       .map((s) => escapeRegExp(s.toLowerCase()))
                       .join('|'),
@@ -92,7 +107,7 @@ function compileBoundaryPattern(pattern: BoundaryIsolationPattern): CompiledBoun
 
     const headerRegex =
         stringIndicators.length > 0
-            ? new RegExp(stringIndicators.map((s) => escapeRegExp(s)).join('|'))
+            ? getOrCreateRegExp(stringIndicators.map((s) => escapeRegExp(s)).join('|'))
             : null;
 
     const targets: CompiledBoundaryTarget[] = [];
@@ -101,15 +116,19 @@ function compileBoundaryPattern(pattern: BoundaryIsolationPattern): CompiledBoun
     for (let i = 0; i < pattern.forbiddenTargets.length; i++) {
         const t = pattern.forbiddenTargets[i];
         if (typeof t === 'string') {
+            const escaped = escapeRegExp(t);
             targets.push({
                 id: t,
-                matcher: new RegExp(escapeRegExp(t)),
+                matcher: getOrCreateRegExp(escaped),
             });
-            targetPatternStrings.push(escapeRegExp(t));
+            targetPatternStrings.push(escaped);
         } else {
+            const matcher = t.global
+                ? getOrCreateRegExp(t.source, t.flags.replace('g', ''))
+                : t;
             targets.push({
                 id: t.source,
-                matcher: t.global ? new RegExp(t.source, t.flags.replace('g', '')) : t,
+                matcher,
             });
             targetPatternStrings.push(t.source);
         }
@@ -117,14 +136,14 @@ function compileBoundaryPattern(pattern: BoundaryIsolationPattern): CompiledBoun
 
     const targetsFilterRegex =
         targetPatternStrings.length > 0
-            ? new RegExp(targetPatternStrings.join('|'))
+            ? getOrCreateRegExp(targetPatternStrings.join('|'))
             : null;
 
     return {
         filePathRegex,
-        fileRegexes,
+        fileRegexes: indicatorRegexes,
         headerRegex,
-        headerRegexes,
+        headerRegexes: indicatorRegexes,
         targets,
         targetsFilterRegex,
     };
@@ -232,7 +251,8 @@ function recordUntrackedViolation(
 }
 
 /**
- * Evaluates an acquisition line, extracting variable assignment or recording unregistered violation.
+ * Evaluates an acquisition line, extracting variable assignment or recording
+ * unregistered violation.
  *
  * @param line - Current source line text.
  * @param lineNum - 1-based source line number.

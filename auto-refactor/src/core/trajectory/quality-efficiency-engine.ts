@@ -117,6 +117,71 @@ function computeDimensionDeltas(
 }
 
 /**
+ * Normalizes technical debt delta inputs into a complete TechnicalDebtDelta object.
+ */
+export function normalizeDebtDelta(partial?: Partial<TechnicalDebtDelta>): TechnicalDebtDelta {
+    const addedDebtPoints = partial?.addedDebtPoints ?? 0;
+    const resolvedDebtPoints = partial?.resolvedDebtPoints ?? 0;
+    const netDebtCleared = partial?.netDebtCleared ?? resolvedDebtPoints - addedDebtPoints;
+    return {
+        addedDebtPoints,
+        resolvedDebtPoints,
+        netDebtCleared,
+        regressionFindingsCount: partial?.regressionFindingsCount ?? 0,
+        regressionFindingIds: partial?.regressionFindingIds ?? [],
+    };
+}
+
+/**
+ * Resolves raw and anti-gaming suppressed semantic delta Q.
+ */
+export function resolveSemanticDeltaQ(
+    beforeScore: number,
+    afterScore: number,
+    counters: ElocCounters,
+    sliceDeltaQ?: number,
+): number {
+    const unroundedDelta =
+        typeof sliceDeltaQ === 'number' && sliceDeltaQ !== 0
+            ? sliceDeltaQ
+            : afterScore - beforeScore;
+    const rawDeltaQ = Math.round(unroundedDelta * 10000) / 10000;
+
+    // Mathematical Anti-Gaming Rule: If semantic ELOC is 0 but changed > 0,
+    // positive rawDeltaQ is suppressed.
+    if (counters.semantic === 0 && counters.changed > 0 && rawDeltaQ > 0) {
+        return 0;
+    }
+    return rawDeltaQ;
+}
+
+/**
+ * Computes QED, ReviewYield, and RegressionDensity efficiency indices.
+ */
+export function computeEfficiencyIndices(
+    deltaQSemantic: number,
+    counters: ElocCounters,
+    debtDelta: TechnicalDebtDelta,
+): { qed: number; reviewYield: number; regressionDensity: number } {
+    // 1. QED = ΔQ_semantic / max(1, ELOC_semantic)
+    const effectiveSemanticEloc = Math.max(1, counters.semantic);
+    const qed = Math.round((deltaQSemantic / effectiveSemanticEloc) * 10000) / 10000;
+
+    // 2. ReviewYield = (Debt_net + max(0, ΔQ_semantic)) / max(1, ELOC_processed / 1000)
+    const processedKiloEloc = Math.max(1, counters.processed / 1000);
+    const positiveDeltaQ = Math.max(0, deltaQSemantic);
+    const reviewYield =
+        Math.round(((debtDelta.netDebtCleared + positiveDeltaQ) / processedKiloEloc) * 100) / 100;
+
+    // 3. RegressionDensity = RegressionFindings / max(0.001, ELOC_semantic / 1000)
+    const semanticKiloEloc = Math.max(0.001, counters.semantic / 1000);
+    const regressionDensity =
+        Math.round((debtDelta.regressionFindingsCount / semanticKiloEloc) * 100) / 100;
+
+    return { qed, reviewYield, regressionDensity };
+}
+
+/**
  * Computes comprehensive trajectory quality metrics from Before/After states and ELOC counters.
  *
  * @param params - Input parameters for quality trajectory evaluation.
@@ -138,58 +203,25 @@ export function computeTrajectoryQualityMetrics(params: {
     debtDelta?: Partial<TechnicalDebtDelta>;
     sliceDeltaQ?: number;
 }): TrajectoryQualityMetrics {
-    const { beforeScore, afterScore, scoreVector, beforeVector, counters } = params;
-
-    const debtDelta: TechnicalDebtDelta = {
-        addedDebtPoints: params.debtDelta?.addedDebtPoints ?? 0,
-        resolvedDebtPoints: params.debtDelta?.resolvedDebtPoints ?? 0,
-        netDebtCleared:
-            params.debtDelta?.netDebtCleared ??
-            (params.debtDelta?.resolvedDebtPoints ?? 0) - (params.debtDelta?.addedDebtPoints ?? 0),
-        regressionFindingsCount: params.debtDelta?.regressionFindingsCount ?? 0,
-        regressionFindingIds: params.debtDelta?.regressionFindingIds ?? [],
-    };
-
-    const unroundedDelta =
-        typeof params.sliceDeltaQ === 'number' && params.sliceDeltaQ !== 0
-            ? params.sliceDeltaQ
-            : afterScore - beforeScore;
-    const rawDeltaQ = Math.round(unroundedDelta * 10000) / 10000;
-
-    // Mathematical Anti-Gaming Rule: If semantic ELOC is 0 but changed > 0,
-    // positive rawDeltaQ is suppressed.
-    let deltaQSemantic = rawDeltaQ;
-    if (counters.semantic === 0 && counters.changed > 0 && rawDeltaQ > 0) {
-        deltaQSemantic = 0;
-    }
-
-    // 1. QED = ΔQ_semantic / max(1, ELOC_semantic)
-    const effectiveSemanticEloc = Math.max(1, counters.semantic);
-    const qed = Math.round((deltaQSemantic / effectiveSemanticEloc) * 10000) / 10000;
-
-    // 2. ReviewYield = (Debt_net + max(0, ΔQ_semantic)) / max(1, ELOC_processed / 1000)
-    const processedKiloEloc = Math.max(1, counters.processed / 1000);
-    const positiveDeltaQ = Math.max(0, deltaQSemantic);
-    const reviewYield =
-        Math.round(((debtDelta.netDebtCleared + positiveDeltaQ) / processedKiloEloc) * 100) / 100;
-
-    // 3. RegressionDensity = RegressionFindings / max(0.001, ELOC_semantic / 1000)
-    const semanticKiloEloc = Math.max(0.001, counters.semantic / 1000);
-    const regressionDensity =
-        Math.round((debtDelta.regressionFindingsCount / semanticKiloEloc) * 100) / 100;
-
-    // 4. Dimension Deltas & Anti-Gaming Penalty
-    const dimensionDeltas = computeDimensionDeltas(scoreVector, beforeVector);
-    const gamingPenalty = calculateAntiGamingPenalty(counters, debtDelta);
+    const debtDelta = normalizeDebtDelta(params.debtDelta);
+    const deltaQSemantic = resolveSemanticDeltaQ(
+        params.beforeScore,
+        params.afterScore,
+        params.counters,
+        params.sliceDeltaQ,
+    );
+    const indices = computeEfficiencyIndices(deltaQSemantic, params.counters, debtDelta);
+    const dimensionDeltas = computeDimensionDeltas(params.scoreVector, params.beforeVector);
+    const gamingPenalty = calculateAntiGamingPenalty(params.counters, debtDelta);
 
     return {
-        qed,
-        reviewYield,
-        regressionDensity,
+        qed: indices.qed,
+        reviewYield: indices.reviewYield,
+        regressionDensity: indices.regressionDensity,
         deltaQSemantic,
-        beforeScore,
-        afterScore,
-        scoreVector,
+        beforeScore: params.beforeScore,
+        afterScore: params.afterScore,
+        scoreVector: params.scoreVector,
         dimensionDeltas,
         debtDelta,
         gamingPenalty,

@@ -399,27 +399,59 @@ function isConflictCandidate(content: string, start: number, len: number): boole
 }
 
 /**
- * Detects git conflict markers in content or hunks.
- * Streams through text using linear index pointers to avoid massive array allocations.
+ * Fast O(1) substring check for potential git conflict marker prefixes.
  */
-function detectConflictMarkers(content?: string, _hunks?: ReviewDiffHunk[]): DiffConflictMarker[] {
-    if (!content) {
-        return [];
-    }
+function hasConflictSignature(content: string): boolean {
+    return (
+        content.includes('<<<<<<<') || content.includes('=======') || content.includes('>>>>>>>')
+    );
+}
 
+function detectConflictMarkersFromHunks(hunks: ReviewDiffHunk[]): DiffConflictMarker[] {
+    const markers: DiffConflictMarker[] = [];
+    for (const hunk of hunks) {
+        for (const line of hunk.lines) {
+            const text = line.content;
+            if (isConflictCandidate(text, 0, text.length)) {
+                const lineNo = line.lineNoNew ?? line.lineNoOld ?? hunk.newSpan.startLine;
+                const marker = checkConflictLine(text, lineNo);
+                if (marker) {
+                    markers.push(marker);
+                }
+            }
+        }
+    }
+    return markers;
+}
+
+/**
+ * Fast zero-allocation line break search using integer cursor traversal.
+ */
+function findNextLineBreak(text: string, pos: number, len: number): number {
+    for (let i = pos; i < len; i++) {
+        if (text.charCodeAt(i) === 10 /* \n */) {
+            return i;
+        }
+    }
+    return len;
+}
+
+function getEffectiveLineEnd(text: string, start: number, end: number): number {
+    return end > start && text.charCodeAt(end - 1) === 13 /* \r */ ? end - 1 : end;
+}
+
+/**
+ * Scans content string for conflict markers using integer cursors.
+ */
+function detectConflictMarkersFromContent(content: string): DiffConflictMarker[] {
     const markers: DiffConflictMarker[] = [];
     const len = content.length;
     let lineStart = 0;
     let lineNumber = 1;
 
     while (lineStart < len) {
-        const nextNewline = content.indexOf('\n', lineStart);
-        const lineEnd = nextNewline === -1 ? len : nextNewline;
-        let effectiveEnd = lineEnd;
-
-        if (effectiveEnd > lineStart && content.charCodeAt(effectiveEnd - 1) === 13 /* \r */) {
-            effectiveEnd--;
-        }
+        const lineEnd = findNextLineBreak(content, lineStart, len);
+        const effectiveEnd = getEffectiveLineEnd(content, lineStart, lineEnd);
 
         if (isConflictCandidate(content, lineStart, effectiveEnd - lineStart)) {
             const line = content.slice(lineStart, effectiveEnd);
@@ -429,11 +461,25 @@ function detectConflictMarkers(content?: string, _hunks?: ReviewDiffHunk[]): Dif
             }
         }
 
-        lineStart = nextNewline === -1 ? len : nextNewline + 1;
+        lineStart = lineEnd === len ? len : lineEnd + 1;
         lineNumber++;
     }
 
     return markers;
+}
+
+/**
+ * Detects git conflict markers in content or hunks.
+ * Streams through text using linear index pointers to avoid massive array allocations.
+ */
+function detectConflictMarkers(content?: string, hunks?: ReviewDiffHunk[]): DiffConflictMarker[] {
+    if (hunks && hunks.length > 0) {
+        return detectConflictMarkersFromHunks(hunks);
+    }
+    if (!content || !hasConflictSignature(content)) {
+        return [];
+    }
+    return detectConflictMarkersFromContent(content);
 }
 
 /**

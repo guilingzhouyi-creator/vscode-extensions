@@ -116,6 +116,54 @@ export function checkJsTsSilentExceptions(lines: readonly string[]): GovernanceV
 }
 
 /**
+ * Checks a Python except block body starting after the except header.
+ *
+ * @param lines - File lines.
+ * @param startIndex - Line index immediately after the line containing `except:`.
+ * @param indent - Column indentation of the parent `except` keyword.
+ * @param headerTrimmed - Trimmed header line to check for inline rationale.
+ * @returns Object indicating if the block was closed with only pseudo-catch statements.
+ */
+function inspectPythonPseudoCatch(
+    lines: readonly string[],
+    startIndex: number,
+    indent: number,
+    headerTrimmed: string,
+): { isPseudoCatch: boolean; hasRationale: boolean; lastIndex: number } {
+    let hasRationale = hasDocumentedRationale(headerTrimmed);
+    let statementCount = 0;
+    let dummyCount = 0;
+    let j = startIndex;
+
+    while (j < lines.length) {
+        const nextLine = lines[j];
+        const nextTrimmed = nextLine.trim();
+
+        if (!nextTrimmed || nextTrimmed.startsWith('#')) {
+            if (hasDocumentedRationale(nextTrimmed)) {
+                hasRationale = true;
+            }
+            j++;
+            continue;
+        }
+
+        const nextIndent = nextLine.search(/\S/);
+        if (nextIndent <= indent) {
+            break;
+        }
+
+        statementCount++;
+        if (isPseudoCatchStatement(nextTrimmed)) {
+            dummyCount++;
+        }
+        j++;
+    }
+
+    const isPseudoCatch = statementCount > 0 && statementCount === dummyCount;
+    return { isPseudoCatch, hasRationale, lastIndex: j };
+}
+
+/**
  * Audits Python lines for GOV-EXC-003 violations.
  *
  * @param lines - Array of source lines.
@@ -127,57 +175,29 @@ export function checkPythonSilentExceptions(lines: readonly string[]): Governanc
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
         const trimmed = line.trim();
-        if (trimmed.startsWith('#')) {
+        if (trimmed.startsWith('#') || !PY_EXCEPT_HEAD_RE.test(trimmed) || !trimmed.endsWith(':')) {
             continue;
         }
 
-        if (PY_EXCEPT_HEAD_RE.test(trimmed) && trimmed.endsWith(':')) {
-            const indent = line.search(/\S/);
-            let hasRationale = hasDocumentedRationale(trimmed);
-            let statementCount = 0;
-            let dummyCount = 0;
-            let j = i + 1;
-
-            while (j < lines.length) {
-                const nextLine = lines[j];
-                const nextTrimmed = nextLine.trim();
-
-                if (!nextTrimmed || nextTrimmed.startsWith('#')) {
-                    if (hasDocumentedRationale(nextTrimmed)) {
-                        hasRationale = true;
-                    }
-                    j++;
-                    continue;
-                }
-
-                const nextIndent = nextLine.search(/\S/);
-                if (nextIndent <= indent) {
-                    break;
-                }
-
-                statementCount++;
-                if (isPseudoCatchStatement(nextTrimmed)) {
-                    dummyCount++;
-                }
-                j++;
-            }
-
-            if (statementCount > 0 && statementCount === dummyCount && !hasRationale) {
-                violations.push({
-                    ruleId: GOV_EXC_SILENT_RULE_ID,
-                    message:
-                        'Pseudo-catch except block silently swallows exceptions with dummy ' +
-                        'statements and no documented rationale.',
-                    line: i + 1,
-                    column: line.indexOf('except') + 1,
-                    suggestion:
-                        'Log the caught exception, re-raise it, or document why silent handling ' +
-                        'is intentional (e.g. # best-effort or # expected).',
-                    fixable: false,
-                });
-                i = j - 1;
-            }
+        const indent = line.search(/\S/);
+        const block = inspectPythonPseudoCatch(lines, i + 1, indent, trimmed);
+        if (!block.isPseudoCatch || block.hasRationale) {
+            continue;
         }
+
+        violations.push({
+            ruleId: GOV_EXC_SILENT_RULE_ID,
+            message:
+                'Pseudo-catch except block silently swallows exceptions with dummy ' +
+                'statements and no documented rationale.',
+            line: i + 1,
+            column: line.indexOf('except') + 1,
+            suggestion:
+                'Log the caught exception, re-raise it, or document why silent handling ' +
+                'is intentional (e.g. # best-effort or # expected).',
+            fixable: false,
+        });
+        i = block.lastIndex - 1;
     }
 
     return violations;

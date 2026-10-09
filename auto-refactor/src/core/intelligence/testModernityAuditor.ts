@@ -238,122 +238,168 @@ function createTestSite(
  * @param options - Configuration options.
  * @returns Detected test modernity issues.
  */
-export function auditTestSource(
-    filePath: string,
-    content: string,
-    options: TestModernityOptions = {},
-): Issue[] {
-    const lines = content.split('\n');
-    const sites: TestSite[] = [];
-    const ext = filePath.slice(filePath.lastIndexOf('.')).toLowerCase();
+/**
+ * Single-file test site collection state machine for AST-free modernity auditing.
+ */
+class TestSiteCollector {
+    private readonly filePath: string;
+    private readonly content: string;
+    private readonly ext: string;
+    private readonly sites: TestSite[] = [];
+    private currentTestName: string | null = null;
+    private currentLine = 1;
+    private currentAssertions = 0;
+    private currentMockAssertions = 0;
+    private inSkippedBlock = false;
 
-    let currentTestName: string | null = null;
-    let currentLine = 1;
-    let currentAssertions = 0;
-    let currentMockAssertions = 0;
-    let inSkippedBlock = false;
+    constructor(filePath: string, content: string) {
+        this.filePath = filePath;
+        this.content = content;
+        this.ext = filePath.slice(filePath.lastIndexOf('.')).toLowerCase();
+    }
 
-    const flushCurrentTest = () => {
-        if (!currentTestName) return;
-        if (currentAssertions === 0 && !inSkippedBlock) {
-            sites.push(
-                createTestSite(filePath, currentLine, currentTestName, {
+    public collect(): TestSite[] {
+        const lines = this.content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+            this.processLine(lines[i].trim(), i + 1);
+        }
+        this.flushCurrentTest();
+        return this.sites;
+    }
+
+    private flushCurrentTest(): void {
+        if (!this.currentTestName) {
+            return;
+        }
+        if (this.currentAssertions === 0 && !this.inSkippedBlock) {
+            this.sites.push(
+                createTestSite(this.filePath, this.currentLine, this.currentTestName, {
                     isTautological: true,
                 }),
             );
         } else if (
-            currentAssertions > 0 &&
-            currentMockAssertions === currentAssertions &&
-            !inSkippedBlock
+            this.currentAssertions > 0 &&
+            this.currentMockAssertions === this.currentAssertions &&
+            !this.inSkippedBlock
         ) {
-            sites.push(
-                createTestSite(filePath, currentLine, currentTestName, {
+            this.sites.push(
+                createTestSite(this.filePath, this.currentLine, this.currentTestName, {
                     isMockOnly: true,
                 }),
             );
         }
-        currentTestName = null;
-        currentAssertions = 0;
-        currentMockAssertions = 0;
-        inSkippedBlock = false;
-    };
+        this.currentTestName = null;
+        this.currentAssertions = 0;
+        this.currentMockAssertions = 0;
+        this.inSkippedBlock = false;
+    }
 
-    for (let i = 0; i < lines.length; i++) {
-        const trimmed = lines[i].trim();
-        const lineNum = i + 1;
-
+    private processLine(trimmed: string, lineNum: number): void {
         if (isSkipMarkerLine(trimmed)) {
-            inSkippedBlock = true;
-            continue;
+            this.inSkippedBlock = true;
+            return;
         }
         if (isCommentLine(trimmed)) {
-            continue;
+            return;
         }
 
-        const decl = matchTestDeclaration(trimmed, ext);
+        const decl = matchTestDeclaration(trimmed, this.ext);
         if (decl) {
-            flushCurrentTest();
-            currentTestName = decl.testName;
-            currentLine = lineNum;
-            if (inSkippedBlock || decl.isSkipped) {
-                sites.push(
-                    createTestSite(filePath, lineNum, currentTestName, {
-                        isSkipped: true,
-                    }),
-                );
-                inSkippedBlock = false;
-            }
-            continue;
+            this.handleTestDeclaration(decl, lineNum);
+            return;
         }
 
-        if (!currentTestName) {
-            continue;
+        if (!this.currentTestName) {
+            return;
         }
 
+        this.handleAssertionLine(trimmed, lineNum);
+    }
+
+    private handleTestDeclaration(
+        decl: NonNullable<ReturnType<typeof matchTestDeclaration>>,
+        lineNum: number,
+    ): void {
+        this.flushCurrentTest();
+        this.currentTestName = decl.testName;
+        this.currentLine = lineNum;
+        if (this.inSkippedBlock || decl.isSkipped) {
+            this.sites.push(
+                createTestSite(this.filePath, lineNum, this.currentTestName, {
+                    isSkipped: true,
+                }),
+            );
+            this.inSkippedBlock = false;
+        }
+    }
+
+    private handleAssertionLine(trimmed: string, lineNum: number): void {
         if (isTautologicalLine(trimmed)) {
-            currentAssertions++;
-            sites.push(
-                createTestSite(filePath, lineNum, currentTestName, {
+            this.currentAssertions++;
+            this.sites.push(
+                createTestSite(this.filePath, lineNum, this.currentTestName!, {
                     isTautological: true,
                 }),
             );
-            continue;
+            return;
         }
 
-        if (isObsoleteContractLine(trimmed, content)) {
-            currentAssertions++;
-            sites.push(
-                createTestSite(filePath, lineNum, currentTestName, {
+        if (isObsoleteContractLine(trimmed, this.content)) {
+            this.currentAssertions++;
+            this.sites.push(
+                createTestSite(this.filePath, lineNum, this.currentTestName!, {
                     referencesDeprecatedContract: true,
                     contractVersion: 'V1',
                     activeContractVersion: 'V3',
                 }),
             );
-            continue;
+            return;
         }
 
         if (isMockAssertionLine(trimmed)) {
-            currentAssertions++;
-            currentMockAssertions++;
-            continue;
+            this.currentAssertions++;
+            this.currentMockAssertions++;
+            return;
         }
 
         if (isGeneralAssertionLine(trimmed)) {
-            currentAssertions++;
+            this.currentAssertions++;
         }
     }
+}
 
-    flushCurrentTest();
+/**
+ * Escalates rule severities to error under strict or fatal configuration.
+ */
+function escalateSeverities(issues: Issue[], options: TestModernityOptions): void {
+    if (!options.strict && !options.tautologicalIsFatal) {
+        return;
+    }
+    for (const issue of issues) {
+        if (issue.rule === 'TST-TAU-001' || issue.rule === 'TST-ILS-001') {
+            issue.severity = 'error';
+        }
+    }
+}
 
+/**
+ * Audits test source code across multiple languages for integrity illusions,
+ * tautological assertions, and orphaned skipped tests.
+ *
+ * @param filePath - Path to the test file.
+ * @param content - Test file content string.
+ * @param options - Configuration options.
+ * @returns Detected test modernity issues.
+ */
+export function auditTestSource(
+    filePath: string,
+    content: string,
+    options: TestModernityOptions = {},
+): Issue[] {
+    const collector = new TestSiteCollector(filePath, content);
+    const sites = collector.collect();
     const issues = analyzeTestModernitySites(sites, [], options);
-    if (options.strict || options.tautologicalIsFatal) {
-        for (const issue of issues) {
-            if (issue.rule === 'TST-TAU-001' || issue.rule === 'TST-ILS-001') {
-                issue.severity = 'error';
-            }
-        }
-    }
-
+    escalateSeverities(issues, options);
     return issues;
 }
 

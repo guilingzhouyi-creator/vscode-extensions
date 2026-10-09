@@ -27,17 +27,8 @@ const INIT_METHOD_PREFIX = '_init';
 const MAX_WRAPPER_LINE_COUNT = 4;
 
 /** Exemption keywords in comments or decorators indicating legitimate delegation. */
-const EXEMPTION_MARKERS = [
-    '@deprecated',
-    '@override',
-    'adapter',
-    'facade',
-    'shim',
-    'backward compat',
-    'forward compat',
-    'interface implementation',
-    'delegate',
-];
+const EXEMPTION_MARKERS_RE =
+    /@deprecated|@override|adapter|facade|shim|backward compat|forward compat|interface implementation|delegate/i;
 
 const RESERVED_CONTROL_KEYWORDS = new Set([
     'catch',
@@ -60,11 +51,9 @@ const RESERVED_CONTROL_KEYWORDS = new Set([
 function hasExemptionMarker(lines: readonly string[], startLineIdx: number): boolean {
     const lookback = Math.max(0, startLineIdx - 5);
     for (let i = lookback; i <= startLineIdx; i++) {
-        const line = lines[i]?.toLowerCase() || '';
-        for (const marker of EXEMPTION_MARKERS) {
-            if (line.includes(marker)) {
-                return true;
-            }
+        const line = lines[i];
+        if (line && EXEMPTION_MARKERS_RE.test(line)) {
+            return true;
         }
     }
     return false;

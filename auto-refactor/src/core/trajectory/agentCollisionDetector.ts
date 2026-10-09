@@ -117,13 +117,13 @@ type CycleResult = { cycle: string[]; edges: DependencyEdge[] };
  * Extracts unique non-base agent IDs contributing to a cycle.
  */
 function extractUniqueAgentsFromCycle(edges: DependencyEdge[]): string[] {
-    const agentUids: string[] = [];
+    const agentUids = new Set<string>();
     for (const e of edges) {
-        if (e.agentUid !== '__base__' && !agentUids.includes(e.agentUid)) {
-            agentUids.push(e.agentUid);
+        if (e.agentUid !== '__base__') {
+            agentUids.add(e.agentUid);
         }
     }
-    return agentUids;
+    return Array.from(agentUids);
 }
 
 /**

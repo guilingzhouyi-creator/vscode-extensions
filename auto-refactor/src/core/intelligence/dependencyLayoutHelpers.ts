@@ -94,6 +94,22 @@ export const EXEMPTION_MARKER_MAP: ReadonlyMap<string, ExemptionReason> = new Ma
     ['break circular', 'cycle-breaker'],
 ]);
 
+/** Precompiled composite regular expression for audited exemption markers. */
+const EXEMPTION_REGEX =
+    /@lazy|deferred load|@optional|optional dependency|@platform|platform-specific|break circular|cycle/i;
+
+/** Lookup table from lowercased marker tokens to canonical exemption reasons. */
+const EXEMPTION_LOOKUP: Record<string, ExemptionReason> = {
+    '@lazy': 'lazy',
+    'deferred load': 'lazy',
+    '@optional': 'optional',
+    'optional dependency': 'optional',
+    '@platform': 'platform',
+    'platform-specific': 'platform',
+    'break circular': 'cycle-breaker',
+    cycle: 'cycle-breaker',
+};
+
 /**
  * Determine import category based on language and module specifier.
  *
@@ -133,6 +149,54 @@ export function categorizeImport(specifier: string, language: string): ImportCat
     return CATEGORY_THIRD_PARTY;
 }
 
+/** Maximum capacity of precompiled custom exemption regex cache (bounded LRU). */
+const CUSTOM_EXEMPTION_CACHE_CAPACITY = 50;
+
+/** LRU cache map for compiled composite custom exemption marker regexes. */
+const customExemptionRegexCache = new Map<string, RegExp>();
+
+/**
+ * Retrieve or compile a composite regular expression for custom exemption markers.
+ * Caches compiled regex in a bounded Map to eliminate per-call regex compilation
+ * and inner loop includes (PRF-ALG-002).
+ *
+ * @param customExemptions - Array of custom exemption token strings.
+ * @returns Precompiled RegExp or null if empty.
+ */
+export function getOrCreateCustomExemptionRegex(
+    customExemptions: readonly string[],
+): RegExp | null {
+    if (!customExemptions || customExemptions.length === 0) {
+        return null;
+    }
+    const cacheKey = customExemptions.join('\0');
+    const cachedRegex = customExemptionRegexCache.get(cacheKey);
+    if (cachedRegex) {
+        customExemptionRegexCache.delete(cacheKey);
+        customExemptionRegexCache.set(cacheKey, cachedRegex);
+        return cachedRegex;
+    }
+
+    const validTokens = customExemptions.filter((token) => token && token.trim().length > 0);
+    if (validTokens.length === 0) {
+        return null;
+    }
+
+    if (customExemptionRegexCache.size >= CUSTOM_EXEMPTION_CACHE_CAPACITY) {
+        const oldestKey = customExemptionRegexCache.keys().next().value;
+        if (oldestKey !== undefined) {
+            customExemptionRegexCache.delete(oldestKey);
+        }
+    }
+
+    const escapedPattern = validTokens
+        .map((token) => token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+        .join('|');
+    const compiledRegex = new RegExp(escapedPattern, 'i');
+    customExemptionRegexCache.set(cacheKey, compiledRegex);
+    return compiledRegex;
+}
+
 /**
  * Inspect in-function import comments for audited exemption tags.
  *
@@ -144,14 +208,18 @@ export function extractExemptionReason(
     surroundingComment: string,
     customExemptions?: string[],
 ): ExemptionReason | undefined {
-    const lower = surroundingComment.toLowerCase();
-    if (customExemptions && customExemptions.some((m) => lower.includes(m.toLowerCase()))) {
-        return 'lazy';
+    if (!surroundingComment) {
+        return undefined;
     }
-    for (const [marker, reason] of EXEMPTION_MARKER_MAP) {
-        if (lower.includes(marker)) {
-            return reason;
+    if (customExemptions && customExemptions.length > 0) {
+        const customRegex = getOrCreateCustomExemptionRegex(customExemptions);
+        if (customRegex && customRegex.test(surroundingComment)) {
+            return 'lazy';
         }
+    }
+    const match = surroundingComment.match(EXEMPTION_REGEX);
+    if (match) {
+        return EXEMPTION_LOOKUP[match[0].toLowerCase()];
     }
     return undefined;
 }

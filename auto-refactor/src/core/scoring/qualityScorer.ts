@@ -131,7 +131,7 @@ export class QualityScorer {
         // Snapshot the linear totals before the curve consumes them: the index curve is not
         // invertible from the index alone, so the report has to carry both.
         const linearPoints = { ...deductionPoints };
-        const rawScores = applyScaleDampedScores(deductionPoints, scaleFactor);
+        const rawScores = applyScaleDampedScores(deductionPoints, scaleFactor, metric);
         const effectivePoints = {} as Record<QualityDimension, number>;
         for (const dim of ALL_QUALITY_DIMENSIONS) {
             effectivePoints[dim] = effectivePenaltyFromIndex(rawScores[dim]);
@@ -168,7 +168,8 @@ export class QualityScorer {
             formulas: {
                 indexMapping:
                     'density dims: index = 100 * H / (H + linearPoints / scaleFactor), H = ' +
-                    `${SATURATION_HALFPOINT}; absolute dims: index = max(0, 100 - linearPoints)`,
+                    `${SATURATION_HALFPOINT}; codeSecurity: index = max(0, securityCeiling - linearPoints); ` +
+                    'absolute dims: index = max(0, 100 - linearPoints)',
                 saturationHalfpoint: SATURATION_HALFPOINT,
                 dimensionScaleMode: { ...DIMENSION_SCALE_MODE },
                 composite:
@@ -271,7 +272,8 @@ export class QualityScorer {
             formulas: {
                 indexMapping:
                     'density dims: index = 100 * H / (H + linearPoints / scaleFactor), H = ' +
-                    `${SATURATION_HALFPOINT}; absolute dims: index = max(0, 100 - linearPoints)`,
+                    `${SATURATION_HALFPOINT}; codeSecurity: index = max(0, securityCeiling - linearPoints); ` +
+                    'absolute dims: index = max(0, 100 - linearPoints)',
                 saturationHalfpoint: SATURATION_HALFPOINT,
                 dimensionScaleMode: { ...DIMENSION_SCALE_MODE },
                 composite:

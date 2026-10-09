@@ -63,6 +63,15 @@ export const DEFAULT_METRIC_LINES = 50;
 export const PERCENT_SCALE = 100;
 
 /**
+ * Evaluates whether an analyzer is enabled under the given ScanConfig.
+ */
+function isAnalyzerActive(id: string, config?: ScanConfig): boolean {
+    if (config === undefined) return true;
+    const declaration = config.analyzers?.[id];
+    return declaration !== undefined && declaration.enabled !== false;
+}
+
+/**
  * Determine which quality dimensions were evaluated under the given scan configuration.
  *
  * @param config - Optional ScanConfig to inspect enabled analyzers.
@@ -74,17 +83,25 @@ export function calculateEvaluatedDimensions(config?: ScanConfig): {
     evaluatedDimensions: QualityDimension[];
 } {
     const evaluatedBy: Partial<Record<QualityDimension, string[]>> = {};
+    const notEvaluated: QualityDimension[] = [];
+    const evaluatedDimensions: QualityDimension[] = [];
+
     for (const dim of ALL_QUALITY_DIMENSIONS) {
-        evaluatedBy[dim] = DIMENSION_ANALYZERS[dim].filter((id) => {
-            if (config === undefined) return true;
-            const declaration = config.analyzers?.[id];
-            return declaration !== undefined && declaration.enabled !== false;
-        });
+        const declared = DIMENSION_ANALYZERS[dim];
+        const active: string[] = [];
+        for (const id of declared) {
+            if (isAnalyzerActive(id, config)) {
+                active.push(id);
+            }
+        }
+        evaluatedBy[dim] = active;
+        if (active.length === 0) {
+            notEvaluated.push(dim);
+        } else {
+            evaluatedDimensions.push(dim);
+        }
     }
-    const notEvaluated = ALL_QUALITY_DIMENSIONS.filter(
-        (dim) => (evaluatedBy[dim] ?? []).length === 0,
-    );
-    const evaluatedDimensions = ALL_QUALITY_DIMENSIONS.filter((dim) => !notEvaluated.includes(dim));
+
     return { evaluatedBy, notEvaluated, evaluatedDimensions };
 }
 
@@ -357,49 +374,125 @@ export function calculateConfidence(
 export const SATURATION_HALFPOINT = 30;
 
 /**
- * Computes scores across all dimensions, applying scale-normalized hyperbolic density
- * dampening across non-absolute dimensions to eliminate discontinuous step-cliffs.
+ * Compute the theoretical code security ceiling based on attack surface exposure.
  *
- * `absolute` dimensions (such as codeSecurity) score by absolute defect count: one
- * hard-coded credential is one defect whether the file is 20 or 500 lines, so scaling its
- * penalty by size would understate it. All other dimensions uniformly adopt hyperbolic
+ * Implements the Dual-Track Bounded Subtractive Model, breaking the hardcoded 100.0
+ * ceiling. Clean code ceiling falls in [99.50, 100.00] (or [99.20, 99.80]) depending on
+ * exported symbols (API attack surface) and code volume (LOC attack surface).
+ *
+ * @param metric - Optional precomputed lexical file metric.
+ * @param scaleFactor - Optional file scale factor relative to 100 LOC baseline (defaults to 1).
+ * @returns Attack-surface-damped theoretical maximum security score.
+ */
+export function computeSecurityCeiling(metric?: FileMetric | null, scaleFactor = 1): number {
+    const expSymbols = metric?.exportedSymbols ?? 0;
+    const lines = metric?.nonBlankLines ?? scaleFactor * 100;
+    const expTerm = 0.6 * Math.min(1.0, expSymbols / 30);
+    const locTerm = 0.4 * Math.min(1.0, lines / 500);
+    const discount = 0.5 * (expTerm + locTerm);
+    return Math.round((DIMENSION_MAX_SCORE - discount) * SCORE_ROUNDING) / SCORE_ROUNDING;
+}
+
+/**
+ * Computes scores across all dimensions, applying scale-normalized hyperbolic density
+ * dampening across non-absolute dimensions and dual-track bounded subtractive scoring for
+ * codeSecurity to eliminate discontinuous step-cliffs and hardcoded 100.0 ceilings.
+ *
+ * `absolute` dimensions score by absolute defect count. For codeSecurity, an attack surface
+ * exposure ceiling is derived via `computeSecurityCeiling` (factoring in exported symbols
+ * and non-blank lines), scoring clean code at the dynamic ceiling and deducting defect
+ * penalties directly against that bound. All other dimensions uniformly adopt hyperbolic
  * density decay using `effectiveScale = Math.max(1, safeScale)` rather than switching
  * modes at `scaleFactor <= 1`, ensuring continuous behavior across all file sizes.
  * Numeric guards ensure non-finite inputs resolve cleanly to valid scores.
  *
  * @param deductionPoints - Net penalty points per dimension.
  * @param scaleFactor - Ratio of file lines to baseline (100 LOC).
+ * @param metric - Optional precomputed lexical file metric for attack surface ceiling derivation.
  * @returns Dimension scores mapped in [0, 100].
  */
-export function applyScaleDampedScores(
-    deductionPoints: Record<QualityDimension, number>,
-    scaleFactor: number,
-): Record<QualityDimension, number> {
-    const rawScores = {} as Record<QualityDimension, number>;
+/**
+ * Normalizes input scale factor to a safe positive number >= 1.
+ */
+function sanitizeScaleFactor(scaleFactor: number): number {
     const safeScale =
         typeof scaleFactor === 'number' && Number.isFinite(scaleFactor) && scaleFactor > 0
             ? scaleFactor
             : 1;
-    const effectiveScale = Math.max(1, safeScale);
+    return Math.max(1, safeScale);
+}
+
+/**
+ * Normalizes raw deduction point to a non-negative finite number.
+ */
+function sanitizeDeduction(raw: number | undefined): number {
+    return typeof raw === 'number' && Number.isFinite(raw) ? Math.max(0, raw) : 0;
+}
+
+/**
+ * Computes dimension score for codeSecurity taking attack surface ceiling into account.
+ */
+function computeSecurityDimensionScore(rawPoints: number, securityCeiling: number): number {
+    if (rawPoints <= 0) {
+        return securityCeiling;
+    }
+    const absoluteScore = Math.max(
+        0,
+        Math.round((securityCeiling - rawPoints) * SCORE_ROUNDING) / SCORE_ROUNDING,
+    );
+    return Number.isFinite(absoluteScore) ? absoluteScore : securityCeiling;
+}
+
+/**
+ * Computes standard dimension score using either absolute count or hyperbolic density decay.
+ */
+function computeStandardDimensionScore(
+    dim: QualityDimension,
+    rawPoints: number,
+    effectiveScale: number,
+): number {
+    if (rawPoints <= 0) {
+        return DIMENSION_MAX_SCORE;
+    }
+    if (DIMENSION_SCALE_MODE[dim] === 'absolute') {
+        const absoluteScore = Math.max(0, DIMENSION_MAX_SCORE - rawPoints);
+        return Number.isFinite(absoluteScore) ? absoluteScore : DIMENSION_MAX_SCORE;
+    }
+    const density = rawPoints / effectiveScale;
+    const score = (DIMENSION_MAX_SCORE * SATURATION_HALFPOINT) / (SATURATION_HALFPOINT + density);
+    return Number.isFinite(score)
+        ? Math.max(0, Math.min(DIMENSION_MAX_SCORE, score))
+        : DIMENSION_MAX_SCORE;
+}
+
+/**
+ * Dispatches dimension score calculation based on dimension type.
+ */
+function resolveDimensionScore(
+    dim: QualityDimension,
+    rawPoints: number,
+    securityCeiling: number,
+    effectiveScale: number,
+): number {
+    if (dim === 'codeSecurity') {
+        return computeSecurityDimensionScore(rawPoints, securityCeiling);
+    }
+    return computeStandardDimensionScore(dim, rawPoints, effectiveScale);
+}
+
+export function applyScaleDampedScores(
+    deductionPoints: Record<QualityDimension, number>,
+    scaleFactor: number,
+    metric?: FileMetric | null,
+): Record<QualityDimension, number> {
+    const rawScores = {} as Record<QualityDimension, number>;
+    const effectiveScale = sanitizeScaleFactor(scaleFactor);
+    const securityScale = metric !== undefined ? effectiveScale : 1;
+    const securityCeiling = computeSecurityCeiling(metric, securityScale);
 
     for (const dim of ALL_QUALITY_DIMENSIONS) {
-        const raw = deductionPoints[dim];
-        const rawPoints = typeof raw === 'number' && Number.isFinite(raw) ? Math.max(0, raw) : 0;
-        if (rawPoints <= 0) {
-            rawScores[dim] = DIMENSION_MAX_SCORE;
-            continue;
-        }
-        if (DIMENSION_SCALE_MODE[dim] === 'absolute') {
-            const absoluteScore = Math.max(0, DIMENSION_MAX_SCORE - rawPoints);
-            rawScores[dim] = Number.isFinite(absoluteScore) ? absoluteScore : DIMENSION_MAX_SCORE;
-        } else {
-            const density = rawPoints / effectiveScale;
-            const score =
-                (DIMENSION_MAX_SCORE * SATURATION_HALFPOINT) / (SATURATION_HALFPOINT + density);
-            rawScores[dim] = Number.isFinite(score)
-                ? Math.max(0, Math.min(DIMENSION_MAX_SCORE, score))
-                : DIMENSION_MAX_SCORE;
-        }
+        const rawPoints = sanitizeDeduction(deductionPoints[dim]);
+        rawScores[dim] = resolveDimensionScore(dim, rawPoints, securityCeiling, effectiveScale);
     }
     return rawScores;
 }

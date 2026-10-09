@@ -95,17 +95,22 @@ function isLikelyObjectStart(trimmed: string): boolean {
     );
 }
 
+/** Pattern matching parenthesis indicating call or expression. */
+const HAS_PAREN_RE = /\(/;
+
+/** Control flow statements indicating non-trivial dispatch logic. */
+const CONTROL_FLOW_STMT_RE = /(?:for|while|if)\s/;
+
+/** Allowed prefix statements for trivial constant mappings. */
+const ALLOWED_TRIVIAL_PREFIX_RE = /^(?:return|case)\s/;
+
 function isTrivialConstantMapping(branchLines: readonly string[]): boolean {
     for (const line of branchLines) {
         const trimmed = line.trim();
-        if (
-            trimmed.includes('(') &&
-            !trimmed.startsWith('return ') &&
-            !trimmed.startsWith('case ')
-        ) {
+        if (HAS_PAREN_RE.test(trimmed) && !ALLOWED_TRIVIAL_PREFIX_RE.test(trimmed)) {
             return false;
         }
-        if (trimmed.includes('for ') || trimmed.includes('while ') || trimmed.includes('if ')) {
+        if (CONTROL_FLOW_STMT_RE.test(trimmed)) {
             return false;
         }
     }

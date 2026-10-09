@@ -196,34 +196,33 @@ function formatClarificationInquiryBlock(
     return lines;
 }
 
-function formatFindingItem(issue: Issue): string[] {
+function formatFindingHeader(issue: Issue): string[] {
     const sev = issue.severity.toUpperCase();
     const file = issue.location?.file || 'unknown';
     const lineNo = issue.location?.start?.line ?? 1;
-    const lines: string[] = [
+    return [
         `### [${sev}|${issue.rule}] ${file}:${lineNo}`,
         `- Message: ${issue.message}`,
     ];
+}
 
-    const clarification = extractIssueClarification(issue);
-    const crossFileContext = extractIssueCrossFileContext(issue, clarification);
-
-    if (clarification) {
-        lines.push(...formatClarificationInquiryBlock(clarification, crossFileContext));
-    } else if (crossFileContext) {
-        lines.push('- Cross-File Impact:');
-        lines.push(`  * Exported Symbol: ${crossFileContext.isExportedSymbol ? 'Yes' : 'No'}`);
-        lines.push(`  * Reference Count: ${crossFileContext.referenceCount}`);
+function formatCrossFileDetails(crossFileContext: CrossFileUsageContext): string[] {
+    const lines: string[] = [
+        '- Cross-File Impact:',
+        `  * Exported Symbol: ${crossFileContext.isExportedSymbol ? 'Yes' : 'No'}`,
+        `  * Reference Count: ${crossFileContext.referenceCount}`,
+        `  * Coordinated Rename Required: ${crossFileContext.requiresCoordinatedRename ? 'Yes' : 'No'}`,
+    ];
+    if (crossFileContext.impactedFiles && crossFileContext.impactedFiles.length > 0) {
         lines.push(
-            `  * Coordinated Rename Required: ${crossFileContext.requiresCoordinatedRename ? 'Yes' : 'No'}`,
+            `  * Impacted Files (${crossFileContext.impactedFiles.length}): ${crossFileContext.impactedFiles.join(', ')}`,
         );
-        if (crossFileContext.impactedFiles && crossFileContext.impactedFiles.length > 0) {
-            lines.push(
-                `  * Impacted Files (${crossFileContext.impactedFiles.length}): ${crossFileContext.impactedFiles.join(', ')}`,
-            );
-        }
     }
+    return lines;
+}
 
+function formatFindingAction(issue: Issue): string[] {
+    const lines: string[] = [];
     if (issue.actionable) {
         const act = issue.actionable;
         lines.push(`- Action: \`${act.action}\` (Safe to automate: ${act.safeToAutomate})`);
@@ -239,6 +238,22 @@ function formatFindingItem(issue: Issue): string[] {
     } else if (issue.suggestion) {
         lines.push(`- Suggestion: ${issue.suggestion}`);
     }
+    return lines;
+}
+
+function formatFindingItem(issue: Issue): string[] {
+    const lines = formatFindingHeader(issue);
+
+    const clarification = extractIssueClarification(issue);
+    const crossFileContext = extractIssueCrossFileContext(issue, clarification);
+
+    if (clarification) {
+        lines.push(...formatClarificationInquiryBlock(clarification, crossFileContext));
+    } else if (crossFileContext) {
+        lines.push(...formatCrossFileDetails(crossFileContext));
+    }
+
+    lines.push(...formatFindingAction(issue));
     lines.push('');
     return lines;
 }

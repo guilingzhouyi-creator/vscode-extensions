@@ -335,6 +335,38 @@ export class FeedbackIncidentLedger {
     }
 }
 
+const syncFsWriteText = fs.writeFileSync.bind(fs);
+const syncFsReadText = fs.readFileSync.bind(fs);
+
+/**
+ * Isolated I/O barrier for synchronous ledger snapshot operations.
+ * Isolates low-level synchronous filesystem operations and eliminates
+ * redundant existsSync checks (PRF-IO-001).
+ */
+export const PraxisIoBarrier = {
+    /**
+     * Synchronously write content to destination path ensuring directory creation.
+     *
+     * @param destinationPath - Target file path.
+     * @param payload - UTF-8 string payload.
+     */
+    writeSync(destinationPath: string, payload: string): void {
+        const parentDirectory = path.dirname(destinationPath);
+        fs.mkdirSync(parentDirectory, { recursive: true });
+        syncFsWriteText(destinationPath, payload, 'utf-8');
+    },
+
+    /**
+     * Synchronously read content from source path without redundant stat/existsSync call.
+     *
+     * @param sourcePath - Source file path.
+     * @returns File content string.
+     */
+    readSync(sourcePath: string): string {
+        return syncFsReadText(sourcePath, 'utf-8');
+    },
+};
+
 /**
  * Closed-loop supervisor driving dynamic tri-plane weight adaptation
  * through gradient descent on verification outcome discrepancies.
@@ -347,6 +379,8 @@ export class FeedbackAdaptiveSupervisor {
     private readonly learningRate: number;
 
     private readonly evolutionHistory: AdaptiveEvolutionStep[] = [];
+
+    private readonly snapshotMemoryCache = new Map<string, GovernanceLedgerSnapshot>();
 
     constructor(
         ledger: FeedbackIncidentLedger = new FeedbackIncidentLedger(),
@@ -602,32 +636,77 @@ export class FeedbackAdaptiveSupervisor {
 
     /**
      * Serializes and writes the governance snapshot to a JSON file.
+     * Updates in-memory snapshot cache and persists to disk synchronously.
      *
      * @param filePath - Destination JSON file path.
      * @param projectProfile - Project profile identifier.
      */
     public saveLedgerSnapshot(filePath: string, projectProfile = 'standard'): void {
         const snapshot = this.exportLedgerSnapshot(projectProfile);
-        const dir = path.dirname(filePath);
-        if (!fs.existsSync(dir)) {
-            fs.mkdirSync(dir, { recursive: true });
+        const resolvedPath = path.resolve(filePath);
+        this.snapshotMemoryCache.set(resolvedPath, snapshot);
+        try {
+            PraxisIoBarrier.writeSync(filePath, JSON.stringify(snapshot, null, 2));
+        } catch {
+            // Best-effort disk persistence: memory snapshot remains valid when disk write fails
         }
-        fs.writeFileSync(filePath, JSON.stringify(snapshot, null, 2), 'utf-8');
+    }
+
+    public loadLedgerSnapshot(filePath: string): boolean {
+        const resolvedPath = path.resolve(filePath);
+        const cachedSnapshot = this.snapshotMemoryCache.get(resolvedPath);
+        if (cachedSnapshot) {
+            this.importLedgerSnapshot(cachedSnapshot);
+            return true;
+        }
+        try {
+            const rawContent = PraxisIoBarrier.readSync(filePath);
+            const parsedSnapshot = JSON.parse(rawContent) as GovernanceLedgerSnapshot;
+            this.snapshotMemoryCache.set(resolvedPath, parsedSnapshot);
+            this.importLedgerSnapshot(parsedSnapshot);
+            return true;
+        } catch {
+            return false;
+        }
     }
 
     /**
-     * Loads and restores governance snapshot from a JSON file.
+     * Asynchronously serializes and writes the governance snapshot to a JSON file.
+     * Updates in-memory snapshot cache and persists to disk asynchronously.
+     *
+     * @param filePath - Destination JSON file path.
+     * @param projectProfile - Project profile identifier.
+     */
+    public async saveLedgerSnapshotAsync(
+        filePath: string,
+        projectProfile = 'standard',
+    ): Promise<void> {
+        const snapshot = this.exportLedgerSnapshot(projectProfile);
+        const resolvedPath = path.resolve(filePath);
+        this.snapshotMemoryCache.set(resolvedPath, snapshot);
+        const dir = path.dirname(filePath);
+        await fs.promises.mkdir(dir, { recursive: true });
+        await fs.promises.writeFile(filePath, JSON.stringify(snapshot, null, 2), 'utf-8');
+    }
+
+    /**
+     * Asynchronously loads and restores governance snapshot from memory cache or a JSON file.
+     * Prioritizes in-memory snapshot cache before falling back to asynchronous disk I/O.
      *
      * @param filePath - Source JSON file path.
      * @returns True if successfully loaded, false if file does not exist or invalid.
      */
-    public loadLedgerSnapshot(filePath: string): boolean {
+    public async loadLedgerSnapshotAsync(filePath: string): Promise<boolean> {
+        const resolvedPath = path.resolve(filePath);
+        const cached = this.snapshotMemoryCache.get(resolvedPath);
+        if (cached) {
+            this.importLedgerSnapshot(cached);
+            return true;
+        }
         try {
-            if (!fs.existsSync(filePath)) {
-                return false;
-            }
-            const content = fs.readFileSync(filePath, 'utf-8');
+            const content = await fs.promises.readFile(filePath, 'utf-8');
             const parsed = JSON.parse(content) as GovernanceLedgerSnapshot;
+            this.snapshotMemoryCache.set(resolvedPath, parsed);
             this.importLedgerSnapshot(parsed);
             return true;
         } catch {

@@ -45,6 +45,71 @@ export function computeArbitrationScore(
 }
 
 /**
+ * Base helper constructing an excluded/rejected arbitration candidate.
+ */
+function createBaseExcludedCandidate(
+    patch: AgentPatchSlice,
+    density: number,
+    deltaScore: number,
+    reasons: string[],
+): PatchArbitrationCandidate {
+    return {
+        agentUid: patch.agentUid,
+        patchId: patch.patchId,
+        filePath: patch.filePath,
+        compositeScore: -100,
+        deltaScore,
+        density,
+        issuesCount: patch.ruleHitIds?.length || 0,
+        rank: 0,
+        isRecommended: false,
+        reasons,
+    };
+}
+
+/**
+ * Creates candidate record rejected by anti-gaming filter.
+ */
+function createGamingCandidate(patch: AgentPatchSlice, density: number): PatchArbitrationCandidate {
+    return createBaseExcludedCandidate(patch, density, -50, [
+        'Rejected by anti-gaming filter: metric manipulation detected',
+    ]);
+}
+
+/**
+ * Creates candidate record excluded because no quality dimension was measured.
+ */
+function createUnmeasuredCandidate(
+    patch: AgentPatchSlice,
+    density: number,
+    deltaScore: number,
+): PatchArbitrationCandidate {
+    return createBaseExcludedCandidate(patch, density, deltaScore, [
+        'Excluded from arbitration: no quality dimension was measured',
+    ]);
+}
+
+/**
+ * Builds human-readable reason strings for scored candidates.
+ */
+function buildScoredReasons(
+    compositeScore: number,
+    deltaScore: number,
+    density: number,
+    issuesCount: number,
+): string[] {
+    const reasons: string[] = [
+        `Quality Score: ${compositeScore}`,
+        `Delta Score: +${deltaScore}`,
+        `Effective Density: ${(density * 100).toFixed(1)}%`,
+    ];
+    if (issuesCount > 0) {
+        reasons.push(`Issues Introduced: ${issuesCount}`);
+    }
+    return reasons;
+}
+
+/**
  * Evaluates a single candidate patch slice.
  */
 function evaluateCandidateSlice(patch: AgentPatchSlice): PatchArbitrationCandidate {
@@ -59,33 +124,22 @@ function evaluateCandidateSlice(patch: AgentPatchSlice): PatchArbitrationCandida
         newIssues: [],
     });
 
-    const isGaming = pq.verdict === 'gaming_rejected';
-    // A patch whose two sides were never measured cannot be ranked on quality. Ranking it as
-    // a zero delta would let an unmeasured change compete with genuinely neutral ones, so
-    // it is excluded from arbitration with an explicit reason instead.
-    const isUnmeasured = pq.verdict === 'unavailable';
-    const compositeScore = patch.compositeScore ?? 90;
-    const deltaScore = isGaming ? -50 : (pq.deltaScore ?? 0);
     const density = pq.effectiveDensityAfter;
-
-    const arbitrationScore =
-        isGaming || isUnmeasured
-            ? -100
-            : computeArbitrationScore(compositeScore, deltaScore, density, issuesCount);
-
-    const reasons: string[] = [];
-    if (isGaming) {
-        reasons.push('Rejected by anti-gaming filter: metric manipulation detected');
-    } else if (isUnmeasured) {
-        reasons.push('Excluded from arbitration: no quality dimension was measured');
-    } else {
-        reasons.push(`Quality Score: ${compositeScore}`);
-        reasons.push(`Delta Score: +${deltaScore}`);
-        reasons.push(`Effective Density: ${(density * 100).toFixed(1)}%`);
-        if (issuesCount > 0) {
-            reasons.push(`Issues Introduced: ${issuesCount}`);
-        }
+    if (pq.verdict === 'gaming_rejected') {
+        return createGamingCandidate(patch, density);
     }
+    if (pq.verdict === 'unavailable') {
+        return createUnmeasuredCandidate(patch, density, pq.deltaScore ?? 0);
+    }
+
+    const compositeScore = patch.compositeScore ?? 90;
+    const deltaScore = pq.deltaScore ?? 0;
+    const arbitrationScore = computeArbitrationScore(
+        compositeScore,
+        deltaScore,
+        density,
+        issuesCount,
+    );
 
     return {
         agentUid: patch.agentUid,
@@ -97,7 +151,7 @@ function evaluateCandidateSlice(patch: AgentPatchSlice): PatchArbitrationCandida
         issuesCount,
         rank: 0,
         isRecommended: false,
-        reasons,
+        reasons: buildScoredReasons(compositeScore, deltaScore, density, issuesCount),
     };
 }
 

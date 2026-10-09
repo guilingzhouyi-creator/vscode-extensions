@@ -310,17 +310,57 @@ export function applyQualityDimensionDeductions(
  *
  * @returns Analyzer ids per dimension, one entry per table row (an id may repeat).
  */
-export function dimensionDeductionSources(): Record<QualityDimension, string[]> {
-    // Accumulated as delimited text so the loop allocates nothing and runs no linear search.
-    const joined = new Map<QualityDimension, string>();
+let cachedDeductionSources: Record<QualityDimension, string[]> | null = null;
+
+/**
+ * Builds the mapping of quality dimensions to deduction analyzer IDs.
+ * Pre-allocates buckets for all 10 quality dimensions outside the loop
+ * to ensure zero transient Set heap allocations inside the loop (PRF-MEM-001).
+ *
+ * @returns Analyzer ids per dimension, one entry per table row (an id may repeat).
+ */
+export function buildDimensionDeductionSources(): Record<QualityDimension, string[]> {
+    const buckets: Record<QualityDimension, Set<string>> = {
+        architectureConsistency: new Set<string>(),
+        semanticPurity: new Set<string>(),
+        codeSecurity: new Set<string>(),
+        performanceEfficiency: new Set<string>(),
+        standardization: new Set<string>(),
+        modernity: new Set<string>(),
+        maintainability: new Set<string>(),
+        commentQuality: new Set<string>(),
+        duplication: new Set<string>(),
+        techDebtRisk: new Set<string>(),
+    };
+
     for (const rule of DIMENSION_RULES) {
-        joined.set(rule.dimension, (joined.get(rule.dimension) ?? '') + rule.analyzer + '|');
+        buckets[rule.dimension].add(rule.analyzer);
     }
+
     const result = {} as Record<QualityDimension, string[]>;
-    for (const [dimension, analyzers] of joined) {
-        result[dimension] = analyzers.split('|').filter(Boolean).sort();
+    for (const [dimensionKey, analyzerSet] of Object.entries(buckets) as [
+        QualityDimension,
+        Set<string>,
+    ][]) {
+        if (analyzerSet.size > 0) {
+            result[dimensionKey] = Array.from(analyzerSet).sort();
+        }
     }
     return result;
+}
+
+/**
+ * List the analyzers that can deduct each dimension, derived from the rule table.
+ * Caches results from buildDimensionDeductionSources to prevent repeated computation.
+ *
+ * @returns Analyzer ids per dimension, one entry per table row (an id may repeat).
+ */
+export function dimensionDeductionSources(): Record<QualityDimension, string[]> {
+    if (cachedDeductionSources) {
+        return cachedDeductionSources;
+    }
+    cachedDeductionSources = buildDimensionDeductionSources();
+    return cachedDeductionSources;
 }
 
 /**
@@ -344,8 +384,10 @@ export function dimensionDeductionSources(): Record<QualityDimension, string[]> 
  */
 export type DebtTier = 1 | 2 | 3;
 
-const TIER1_PREFIXES = ['SEC', 'ARCH', 'DEP-INV'] as const;
-const TIER1_KEYWORDS = ['LEAK', 'CIRCULAR'] as const;
+const TIER1_PREFIX_RE = /^(?:SEC|ARCH|DEP-INV)/;
+const TIER1_KEYWORD_RE = /LEAK|CIRCULAR/;
+const TIER2_PREFIX_RE = /^(?:CPX|CMP|DAT|TST-DBT)/;
+const TIER2_ANALYZER_RE = /complexity|maintainability/;
 
 export function isTier1CriticalDebt(rule: string, analyzer: string, severity: string): boolean {
     if (severity === FRAGMENT_ERROR) {
@@ -356,33 +398,16 @@ export function isTier1CriticalDebt(rule: string, analyzer: string, severity: st
         return true;
     }
     const r = (rule ?? '').toUpperCase();
-    for (const prefix of TIER1_PREFIXES) {
-        if (r.startsWith(prefix)) {
-            return true;
-        }
-    }
-    for (const keyword of TIER1_KEYWORDS) {
-        if (r.includes(keyword)) {
-            return true;
-        }
-    }
-    return false;
+    return TIER1_PREFIX_RE.test(r) || TIER1_KEYWORD_RE.test(r);
 }
-
-const TIER2_PREFIXES = ['CPX', 'CMP', 'DAT', 'TST-DBT'] as const;
 
 export function isTier2EvolutionaryDebt(rule: string, analyzer: string): boolean {
     const a = (analyzer ?? '').toLowerCase();
-    if (a.includes('complexity') || a.includes('maintainability')) {
+    if (TIER2_ANALYZER_RE.test(a)) {
         return true;
     }
     const r = (rule ?? '').toUpperCase();
-    for (const prefix of TIER2_PREFIXES) {
-        if (r.startsWith(prefix)) {
-            return true;
-        }
-    }
-    return false;
+    return TIER2_PREFIX_RE.test(r);
 }
 
 /**
@@ -393,37 +418,47 @@ export function isTier2EvolutionaryDebt(rule: string, analyzer: string): boolean
  */
 export function classifyDebtTier(issue: Issue): DebtTier {
     const severity = issue.severity ?? '';
-    if (severity === FRAGMENT_ERROR) {
+    const analyzer = issue.analyzer ?? '';
+    const rule = issue.rule ?? '';
+
+    if (isTier1CriticalDebt(rule, analyzer, severity)) {
         return 1;
     }
-
-    const analyzer = (issue.analyzer ?? '').toLowerCase();
-    if (analyzer.includes('security')) {
-        return 1;
-    }
-
-    const rule = (issue.rule ?? '').toUpperCase();
-    for (const prefix of TIER1_PREFIXES) {
-        if (rule.startsWith(prefix)) {
-            return 1;
-        }
-    }
-    for (const keyword of TIER1_KEYWORDS) {
-        if (rule.includes(keyword)) {
-            return 1;
-        }
-    }
-
-    if (analyzer.includes('complexity') || analyzer.includes('maintainability')) {
+    if (isTier2EvolutionaryDebt(rule, analyzer)) {
         return 2;
     }
-    for (const prefix of TIER2_PREFIXES) {
-        if (rule.startsWith(prefix)) {
-            return 2;
-        }
-    }
-
     return 3;
+}
+
+function getBaseSeverityDeduction(
+    isError: boolean,
+    message: string,
+): { points: number; rationale: string } {
+    return {
+        points: isError ? DEDUCTION_ERROR_TECH_DEBT : DEDUCTION_WARNING_TECH_DEBT,
+        rationale: isError
+            ? ScoringRationales.ERROR_TECH_DEBT(message)
+            : ScoringRationales.WARNING_TECH_DEBT(message),
+    };
+}
+
+function resolveDebtDimension(
+    rule: string | undefined,
+    claimed?: Set<QualityDimension> | number,
+): QualityDimension {
+    const hasPriorClaim =
+        typeof claimed === 'number' ? claimed !== 0 : Boolean(claimed && claimed.size > 0);
+    if (hasPriorClaim) {
+        return DIMENSION_TECH_DEBT_RISK;
+    }
+    return familyDimensionOf(rule ?? '') ?? DIMENSION_TECH_DEBT_RISK;
+}
+
+function getTierPenaltyScale(issue: Issue): number {
+    const tier = classifyDebtTier(issue);
+    if (tier === 3) return 0.0;
+    if (tier === 2) return 0.5;
+    return 1.0;
 }
 
 /**
@@ -448,56 +483,21 @@ function applySeverityDeductions(
     claimed?: Set<QualityDimension> | number,
     line?: number,
 ): void {
-    // The table and the family map can name different axes for one id (GOV-TYP deducts
-    // semanticPurity in the table but routes to architectureConsistency by family), so
-    // membership of the exact routed axis is not enough to detect an existing charge.
-    // Any prior charge means this finding is already represented; the severity penalty
-    // then belongs to debt rather than to a second quality axis.
-    const hasPriorClaim =
-        typeof claimed === 'number' ? claimed !== 0 : Boolean(claimed && claimed.size > 0);
-    const debtDimension = hasPriorClaim
-        ? DIMENSION_TECH_DEBT_RISK
-        : (familyDimensionOf(issue.rule ?? '') ?? DIMENSION_TECH_DEBT_RISK);
-
-    // Tiered debt isolation for techDebtRisk
-    if (debtDimension === DIMENSION_TECH_DEBT_RISK) {
-        const tier = classifyDebtTier(issue);
-        if (tier === 3) {
-            // Tier 3 code smells do not penetrate into techDebtRisk
-            return;
-        }
-        if (tier === 2) {
-            // Tier 2 evolutionary debt penetrates with 50% damping
-            const penalty =
-                issue.severity === FRAGMENT_ERROR
-                    ? Math.round(DEDUCTION_ERROR_TECH_DEBT * 0.5)
-                    : Math.round(DEDUCTION_WARNING_TECH_DEBT * 0.5);
-            const rationale =
-                issue.severity === FRAGMENT_ERROR
-                    ? ScoringRationales.ERROR_TECH_DEBT(issue.message)
-                    : ScoringRationales.WARNING_TECH_DEBT(issue.message);
-            apply(debtDimension, penalty, rationale, issue.rule, line);
-            return;
-        }
+    const isError = issue.severity === FRAGMENT_ERROR;
+    const isWarning = issue.severity === FRAGMENT_WARNING;
+    if (!isError && !isWarning) {
+        return;
     }
 
-    if (issue.severity === FRAGMENT_ERROR) {
-        apply(
-            debtDimension,
-            DEDUCTION_ERROR_TECH_DEBT,
-            ScoringRationales.ERROR_TECH_DEBT(issue.message),
-            issue.rule,
-            line,
-        );
-    } else if (issue.severity === FRAGMENT_WARNING) {
-        apply(
-            debtDimension,
-            DEDUCTION_WARNING_TECH_DEBT,
-            ScoringRationales.WARNING_TECH_DEBT(issue.message),
-            issue.rule,
-            line,
-        );
+    const debtDimension = resolveDebtDimension(issue.rule, claimed);
+    const scale = debtDimension === DIMENSION_TECH_DEBT_RISK ? getTierPenaltyScale(issue) : 1.0;
+    if (scale <= 0) {
+        return;
     }
+
+    const base = getBaseSeverityDeduction(isError, issue.message);
+    const penalty = Math.round(base.points * scale);
+    apply(debtDimension, penalty, base.rationale, issue.rule, line);
 }
 
 /**

@@ -288,6 +288,68 @@ export function classifyArchitecturalTier(filePath: string): string {
 }
 
 /**
+ * Evaluates whether blast radius scan should be skipped for this file.
+ */
+function shouldSkipBlastRadiusScan(ctx: RuleEvaluationContext): boolean {
+    if (isToolOrTestScript(ctx.filePath)) {
+        return true;
+    }
+    return !ctx.content.includes('import') && !ctx.content.includes('require');
+}
+
+/**
+ * Extracts target path from an import or require regex match.
+ */
+function extractTargetFromImportMatch(match: RegExpExecArray): string | undefined {
+    return match[1] || match[2] || match[3];
+}
+
+/**
+ * Collects architectural tiers imported or required by the file.
+ */
+function collectImportedTiers(filePath: string, lines: readonly string[]): Set<string> {
+    const currentTier = classifyArchitecturalTier(filePath);
+    const tiers = new Set<string>();
+    if (currentTier !== 'other') {
+        tiers.add(currentTier);
+    }
+
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        IMPORT_OR_REQUIRE_RE.lastIndex = 0;
+        let match: RegExpExecArray | null;
+        while ((match = IMPORT_OR_REQUIRE_RE.exec(line)) !== null) {
+            const targetPath = extractTargetFromImportMatch(match);
+            if (targetPath) {
+                const tier = classifyArchitecturalTier(targetPath);
+                if (tier !== 'other') {
+                    tiers.add(tier);
+                }
+            }
+        }
+    }
+    return tiers;
+}
+
+/**
+ * Constructs governance violation for cross-tier monolithic coupling.
+ */
+function buildBlastRadiusViolation(tiers: Set<string>): GovernanceViolation[] {
+    const tierList = Array.from(tiers).sort().join(', ');
+    return [
+        {
+            ruleId: 'GOV-BLS-001',
+            message: `Cross-tier coupling detected across ${tiers.size} architectural tiers (${tierList}). Breach of atomic tier boundary.`,
+            line: 1,
+            column: 1,
+            suggestion:
+                'Decouple cross-tier imports through domain interfaces, dependency injection, or split into atomic modules.',
+            fixable: false,
+        },
+    ];
+}
+
+/**
  * GOV-BLS-001: Cross-Tier Monolithic Staging Blast Radius Guard.
  * Flags single files that directly couple >= 3 orthogonal architectural tiers.
  */
@@ -301,48 +363,13 @@ export const BlastRadiusGuardRule: GovernanceRule = {
         'Monolithic coupling across multiple orthogonal tiers (docs, config, domain, contracts, tooling) increases blast radius and impedes atomic review.',
     isFixable: false,
     checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
-        if (isToolOrTestScript(ctx.filePath)) {
-            return null;
-        }
-        if (!ctx.content.includes('import') && !ctx.content.includes('require')) {
+        if (shouldSkipBlastRadiusScan(ctx)) {
             return null;
         }
 
-        const currentTier = classifyArchitecturalTier(ctx.filePath);
-        const tiers = new Set<string>();
-        if (currentTier !== 'other') {
-            tiers.add(currentTier);
-        }
-
-        const lines = ctx.lines;
-        for (let i = 0; i < lines.length; i++) {
-            const line = lines[i];
-            let match: RegExpExecArray | null;
-            IMPORT_OR_REQUIRE_RE.lastIndex = 0;
-            while ((match = IMPORT_OR_REQUIRE_RE.exec(line)) !== null) {
-                const targetPath = match[1] || match[2] || match[3];
-                if (targetPath) {
-                    const tier = classifyArchitecturalTier(targetPath);
-                    if (tier !== 'other') {
-                        tiers.add(tier);
-                    }
-                }
-            }
-        }
-
+        const tiers = collectImportedTiers(ctx.filePath, ctx.lines);
         if (tiers.size >= 3) {
-            const tierList = Array.from(tiers).sort().join(', ');
-            return [
-                {
-                    ruleId: 'GOV-BLS-001',
-                    message: `Cross-tier coupling detected across ${tiers.size} architectural tiers (${tierList}). Breach of atomic tier boundary.`,
-                    line: 1,
-                    column: 1,
-                    suggestion:
-                        'Decouple cross-tier imports through domain interfaces, dependency injection, or split into atomic modules.',
-                    fixable: false,
-                },
-            ];
+            return buildBlastRadiusViolation(tiers);
         }
 
         return null;

@@ -166,6 +166,24 @@ export function evaluateCargoMaturity(root: string): MaturityTier | undefined {
 }
 
 /**
+ * Safely loads and parses package.json from the project root if it exists.
+ *
+ * @param root - Project root directory path.
+ * @returns Parsed JSON object or undefined if absent or unreadable.
+ */
+function safeLoadPackageJson(root: string): Record<string, any> | undefined {
+    const pkgPath = path.join(root, MANIFEST_PACKAGE_JSON);
+    if (!fs.existsSync(pkgPath)) {
+        return undefined;
+    }
+    try {
+        return JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+    } catch {
+        return undefined;
+    }
+}
+
+/**
  * Classify the project maturity tier from its path, package manifest, and build files.
  *
  * Demo paths, demo-like package names, and version '0.0.0' map to 'demo'; missing tests or a
@@ -182,18 +200,7 @@ export function detectMaturityTier(root: string, pkg?: Record<string, any>): Mat
         return TIER_DEMO;
     }
 
-    let packageData = pkg;
-    if (!packageData) {
-        const pkgPath = path.join(root, MANIFEST_PACKAGE_JSON);
-        if (fs.existsSync(pkgPath)) {
-            try {
-                packageData = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-            } catch {
-                // ignore
-            }
-        }
-    }
-
+    const packageData = pkg ?? safeLoadPackageJson(root);
     if (packageData) {
         const tier = evaluatePackageMaturity(root, packageData);
         if (tier) return tier;
