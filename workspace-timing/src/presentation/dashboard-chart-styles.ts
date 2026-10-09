@@ -72,6 +72,7 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       fill: url(#acGradient);
     }
     /* 节点契约：微型同心发光数据节点，仅在非零活跃日展示，零值平原无噪点 */
+    /* 节点光晕契约：微型同心发光外圈，悬浮放大并应用平滑微阴影滤镜 */
     .ac-dot-halo {
       fill: rgba(56, 189, 248, 0.22);
       stroke: rgba(56, 189, 248, 0.75);
@@ -81,6 +82,7 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), fill 0.2s ease, stroke 0.2s ease, filter 0.2s ease;
       cursor: pointer;
     }
+    /* 节点核心契约：同心圆高亮白色内核，禁用指针捕获避免阻断悬停 */
     .ac-dot-core {
       fill: #ffffff;
       pointer-events: none;
@@ -97,6 +99,7 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
     .ac-dot-group:hover .ac-dot-core {
       transform: scale(1.23);
     }
+    /* 峰值高亮契约：当前周期工时最高峰数据节点切换翠绿高光色系 */
     .ac-dot-group.is-peak .ac-dot-halo {
       stroke: #34d399;
       fill: rgba(16, 185, 129, 0.28);
@@ -125,12 +128,15 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       pointer-events: none;
       user-select: none;
     }
+    /* 峰值标签契约：峰值日期胶囊药丸文本采用纯白强化对比度 */
     .ac-pill-text.is-peak {
       fill: #ffffff;
     }
+    /* 零值弱化契约：无活动空白日期药丸文本降低不透明度弱化噪点 */
     .ac-pill-text.is-zero {
       fill: rgba(255, 255, 255, 0.55);
     }
+    /* 悬停激活契约：光标经过胶囊标签时高亮边框并加深背景遮罩 */
     .ac-pill-group:hover .ac-pill-bg {
       stroke: #38bdf8;
       fill: rgba(15, 23, 42, 0.98);
@@ -215,6 +221,7 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       min-width: 10px;
       align-items: center;
     }
+    /* 单元格布局契约：单日活动色块保持 1:1 正方形纵横比与平滑缩放变换 */
     .hm-cell {
       width: 100%;
       max-width: 14px;
@@ -226,11 +233,14 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       transition: transform 0.15s ease, filter 0.15s ease;
       cursor: pointer;
     }
+    /* 色阶梯度契约：GitHub 风格 4 阶工时强度离散分布映射 */
     .hm-cell.l1 { background: #0e4429; border: 1px solid rgba(57, 211, 83, 0.2); }
     .hm-cell.l2 { background: #006d32; border: 1px solid rgba(57, 211, 83, 0.4); }
     .hm-cell.l3 { background: #26a641; }
     .hm-cell.l4 { background: #39d353; box-shadow: 0 0 4px rgba(57, 211, 83, 0.5); }
+    /* 未来边界契约：尚未到达的未来日期透明度衰减且禁用交互指针 */
     .hm-cell.future { opacity: 0.25; cursor: default; }
+    /* 悬停放大契约：非未来日期单元格悬浮展示白光微外边框与层级置顶 */
     .hm-cell:not(.future):hover {
       transform: scale(1.25);
       z-index: 2;
@@ -367,6 +377,7 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       padding-right: 2px;
       margin-right: 1px;
     }
+    /* 槽位轨道契约：小时分栏立柱背景轨道，提供半透明纵深槽道 */
     .hourly-slot-track {
       width: 100%;
       height: 100%;
@@ -380,6 +391,7 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
     .hourly-slot:hover .hourly-slot-track {
       background: rgba(255, 255, 255, 0.05);
     }
+    /* 柱状几何契约：硬件加速 scaleY 纵向伸缩变换，避免触发浏览器重排 reflow */
     .hourly-bar {
       width: 100%;
       min-width: 2px;
@@ -394,10 +406,12 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
     .hourly-slot:hover .hourly-bar {
       filter: brightness(1.25);
     }
+    /* 峰值柱状契约：全天工作时长最高峰小时立柱渲染青绿高光渐变 */
     .hourly-bar.is-peak {
       background: linear-gradient(180deg, #10b981, #06b6d4);
       box-shadow: 0 0 10px rgba(16, 185, 129, 0.45);
     }
+    /* 底部基线契约：立柱槽位底部基线指示线，有活动时切换高亮青蓝 */
     .hourly-slot-base {
       width: 100%;
       height: 2px;
@@ -485,6 +499,7 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       flex-shrink: 0;
       font-family: var(--vscode-editor-font-family, monospace);
     }
+    /* 趋势轨道契约：近多周工时对比条背景凹槽与圆角溢出裁剪 */
     .trend-track {
       position: relative;
       flex: 1;
@@ -493,6 +508,7 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       background: color-mix(in srgb, var(--input-bg) 80%, transparent);
       overflow: hidden;
     }
+    /* 标杆基线契约：周目标基准分割红线与光晕投影指示 */
     .trend-divider-mark {
       position: absolute;
       top: 0;
@@ -505,6 +521,7 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       pointer-events: none;
       transform: translateX(-50%);
     }
+    /* 进度填充契约：硬件加速 scaleX 水平填充变换与平滑缓动 */
     .trend-fill {
       width: 100%;
       height: 100%;
@@ -518,6 +535,7 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
     .trend-fill.is-over {
       box-shadow: 0 0 8px rgba(239, 68, 68, 0.55);
     }
+    /* 数值排版契约：右对齐等宽数字排版，超时超限时自适应警示红 */
     .trend-value {
       width: 72px;
       text-align: right;
@@ -569,12 +587,14 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       color: var(--description);
       margin-left: 6px;
     }
+    /* 对比轨道契约：工作区工时横向对比背景槽，圆角抗锯齿裁剪 */
     .ws-compare-track {
       height: 8px;
       border-radius: 4px;
       background: color-mix(in srgb, var(--input-bg) 80%, transparent);
       overflow: hidden;
     }
+    /* 对比进度契约：多工作区工时占比渐变进度条与硬件加速变换 */
     .ws-compare-fill {
       width: 100%;
       height: 100%;
@@ -691,10 +711,12 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       transform: none !important;
     }
 
+    /* 浮层展示契约：帮助图标悬停时触发淡入上浮动画展示说明气泡 */
     .help-icon:hover .tooltip {
       display: block;
       animation: fadeInUp 0.15s ease both;
     }
+    /* 三角指示契约：CSS Border 纯样式构建底部居中指向三角箭头 */
     .help-icon .tooltip::after {
       content: '';
       position: absolute;
