@@ -16,7 +16,7 @@
  *     backtick-quoted strings. Rules are keyword-anchored; a missed modernization is
  *     preferred over a false positive.
  */
-import type { Analyzer, AnalyzerContext, Issue, Severity } from '../core/types';
+import type { Analyzer, AnalyzerContext, Issue, Severity, AgentActionType } from '../core/types';
 import { SEVERITY_WARNING, SEVERITY_INFO } from '../core/types';
 import { ANALYZER_GO_MODERN } from '../core/scoring/dimensionLiterals';
 import { maskSourceText, type SourceMaskConfig } from '../core/policy/source-mask';
@@ -144,6 +144,42 @@ const PACKAGE_COMMENT_RULE: LineRule = {
 
 // --- Issue factory ---
 
+const GOM_ACTIONABLE_MAP: Record<
+    string,
+    { action: AgentActionType; code: string; safeToAutomate: boolean; templateSnippet: string }
+> = {
+    'GOM-ERR-001': {
+        action: 'apply_guard_clause',
+        code: 'AR:GOM:001',
+        safeToAutomate: false,
+        templateSnippet: 'if err != nil { return err }',
+    },
+    'GOM-CTX-001': {
+        action: 'simplify_control_flow',
+        code: 'AR:GOM:002',
+        safeToAutomate: false,
+        templateSnippet: 'func $1(ctx context.Context, $2)',
+    },
+    'GOM-STYLE-001': {
+        action: 'rename_symbol',
+        code: 'AR:GOM:003',
+        safeToAutomate: false,
+        templateSnippet: 'func ($1 *$2) $3()',
+    },
+    'GOM-STYLE-002': {
+        action: 'rename_symbol',
+        code: 'AR:GOM:004',
+        safeToAutomate: false,
+        templateSnippet: 'err$1',
+    },
+    'GOM-STYLE-003': {
+        action: 'insert_comment_contract',
+        code: 'AR:GOM:005',
+        safeToAutomate: false,
+        templateSnippet: '// Package $1 provides ...',
+    },
+};
+
 function makeIssue(
     file: string,
     lineIndex: number,
@@ -154,6 +190,16 @@ function makeIssue(
     detail: Record<string, unknown>,
 ): Issue {
     const line = lineIndex + 1;
+    const mapped = GOM_ACTIONABLE_MAP[rule];
+    const actionable = mapped
+        ? {
+              action: mapped.action,
+              code: mapped.code,
+              safeToAutomate: mapped.safeToAutomate,
+              templateSnippet: mapped.templateSnippet,
+          }
+        : undefined;
+
     return {
         id: `${ANALYZER_GO_MODERN}:${rule}:${file}:${line}`,
         analyzer: ANALYZER_GO_MODERN,
@@ -163,6 +209,7 @@ function makeIssue(
         location: { file, start: { line, column: 1 }, end: { line, column: 1 } },
         detail,
         suggestion,
+        ...(actionable ? { actionable } : {}),
     };
 }
 

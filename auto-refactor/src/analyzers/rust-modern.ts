@@ -18,7 +18,7 @@
  *     char literals and lifetimes are preserved while raw string bodies are zeroed to avoid false
  *     positives. Every rule stays keyword-anchored and adheres to canonical naming.
  */
-import type { Analyzer, AnalyzerContext, Issue, Severity } from '../core/types';
+import type { Analyzer, AnalyzerContext, Issue, Severity, AgentActionType } from '../core/types';
 import { SEVERITY_WARNING, SEVERITY_INFO } from '../core/types';
 import { ANALYZER_RUST_MODERN } from '../core/scoring/dimensionLiterals';
 import { maskSourceText, type SourceMaskConfig } from '../core/policy/source-mask';
@@ -416,6 +416,78 @@ function scanAsyncLockIssues(file: string, raw: string[], masked: string[], out:
     }
 }
 
+const RSM_ACTIONABLE_MAP: Record<
+    string,
+    { action: AgentActionType; code: string; safeToAutomate: boolean; templateSnippet: string }
+> = {
+    'RSM-TRY-001': {
+        action: 'replace_token',
+        code: 'AR:RSM:001',
+        safeToAutomate: true,
+        templateSnippet: '$1?',
+    },
+    'RSM-EXTERN-001': {
+        action: 'replace_token',
+        code: 'AR:RSM:002',
+        safeToAutomate: false,
+        templateSnippet: 'use $1::$2;',
+    },
+    'RSM-MACRO-001': {
+        action: 'replace_token',
+        code: 'AR:RSM:003',
+        safeToAutomate: false,
+        templateSnippet: 'use $1::{$2};',
+    },
+    'RSM-STR-001': {
+        action: 'replace_token',
+        code: 'AR:RSM:004',
+        safeToAutomate: false,
+        templateSnippet: '&str',
+    },
+    'RSM-CLONE-001': {
+        action: 'replace_token',
+        code: 'AR:RSM:005',
+        safeToAutomate: false,
+        templateSnippet: '&$1',
+    },
+    'RSM-UNWRAP-001': {
+        action: 'apply_guard_clause',
+        code: 'AR:RSM:006',
+        safeToAutomate: false,
+        templateSnippet: '$1.context("$2")?',
+    },
+    'RSM-CAST-001': {
+        action: 'replace_token',
+        code: 'AR:RSM:007',
+        safeToAutomate: false,
+        templateSnippet: '$1::try_from($2)?',
+    },
+    'RSM-FORMAT-001': {
+        action: 'replace_token',
+        code: 'AR:RSM:008',
+        safeToAutomate: false,
+        templateSnippet: 'format!("{var}")',
+    },
+    'RSM-ELSE-001': {
+        action: 'apply_guard_clause',
+        code: 'AR:RSM:009',
+        safeToAutomate: false,
+        templateSnippet: 'let $1 = $2 else { return $3; };',
+    },
+    'RSM-FIND-001': {
+        action: 'replace_token',
+        code: 'AR:RSM:010',
+        safeToAutomate: false,
+        templateSnippet: '$1.iter().find(|$2| $3)',
+    },
+    'RSM-LOCK-001': {
+        action: 'apply_guard_clause',
+        code: 'AR:RSM:011',
+        safeToAutomate: false,
+        templateSnippet: 'drop($guard);',
+    },
+};
+
 /**
  * Build one finding anchored to a source line.
  *
@@ -438,6 +510,16 @@ function makeIssue(
     detail: Record<string, unknown>,
 ): Issue {
     const line = lineIndex + 1;
+    const mapped = RSM_ACTIONABLE_MAP[rule];
+    const actionable = mapped
+        ? {
+              action: mapped.action,
+              code: mapped.code,
+              safeToAutomate: mapped.safeToAutomate,
+              templateSnippet: mapped.templateSnippet,
+          }
+        : undefined;
+
     return {
         id: `${ANALYZER_RUST_MODERN}:${rule}:${file}:${line}`,
         analyzer: ANALYZER_RUST_MODERN,
@@ -447,6 +529,7 @@ function makeIssue(
         location: { file, start: { line, column: 1 }, end: { line, column: 1 } },
         detail,
         suggestion,
+        ...(actionable ? { actionable } : {}),
     };
 }
 

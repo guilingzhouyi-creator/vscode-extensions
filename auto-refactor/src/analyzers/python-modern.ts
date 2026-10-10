@@ -15,7 +15,7 @@
  *     content-oriented; the heuristics are keyword-anchored so a missed modernization is
  *     preferred over a wrong rewrite suggestion.
  */
-import type { Analyzer, AnalyzerContext, Issue } from '../core/types';
+import type { Analyzer, AnalyzerContext, Issue, AgentActionType } from '../core/types';
 import { SEVERITY_WARNING, SEVERITY_ERROR } from '../core/types';
 
 const BLOCK_OPEN_RE = /:\s*(?:#.*)?$/;
@@ -102,6 +102,90 @@ interface ShadowingOptions {
     enabled: boolean;
     ignoreNames: Set<string>;
 }
+
+const PYM_ACTIONABLE_MAP: Record<
+    string,
+    { action: AgentActionType; code: string; safeToAutomate: boolean; templateSnippet: string }
+> = {
+    'PYM-PATH-001': {
+        action: 'replace_token',
+        code: 'AR:PYM:001',
+        safeToAutomate: false,
+        templateSnippet: 'Path($1) / $2',
+    },
+    'PYM-RAISE-001': {
+        action: 'apply_guard_clause',
+        code: 'AR:PYM:002',
+        safeToAutomate: false,
+        templateSnippet: 'raise $1 from $2',
+    },
+    'PYM-DEFAULT-001': {
+        action: 'apply_guard_clause',
+        code: 'AR:PYM:003',
+        safeToAutomate: false,
+        templateSnippet: '$1: $2 = None',
+    },
+    'PYM-DATETIME-001': {
+        action: 'replace_token',
+        code: 'AR:PYM:004',
+        safeToAutomate: true,
+        templateSnippet: 'datetime.UTC',
+    },
+    'PYM-UNION-001': {
+        action: 'replace_token',
+        code: 'AR:PYM:005',
+        safeToAutomate: true,
+        templateSnippet: '$1 | None',
+    },
+    'PYM-SLOTS-001': {
+        action: 'replace_token',
+        code: 'AR:PYM:006',
+        safeToAutomate: false,
+        templateSnippet: '@dataclass(slots=True)',
+    },
+    'PYM-ASYNC-001': {
+        action: 'apply_guard_clause',
+        code: 'AR:PYM:007',
+        safeToAutomate: false,
+        templateSnippet: 'await asyncio.to_thread($1)',
+    },
+    'PYM-OPEN-001': {
+        action: 'apply_guard_clause',
+        code: 'AR:PYM:008',
+        safeToAutomate: false,
+        templateSnippet: 'with open($1) as $2:',
+    },
+    'PYM-SHADOW-001': {
+        action: 'rename_symbol',
+        code: 'AR:PYM:009',
+        safeToAutomate: false,
+        templateSnippet: '$1_renamed',
+    },
+    'PYM-FSTRING-001': {
+        action: 'replace_token',
+        code: 'AR:PYM:010',
+        safeToAutomate: false,
+        templateSnippet: 'f"{$1}"',
+    },
+    'PYM-GENERIC-001': {
+        action: 'replace_token',
+        code: 'AR:PYM:011',
+        safeToAutomate: true,
+        templateSnippet: '$1[$2]',
+    },
+    'PYM-ABC-001': {
+        action: 'replace_token',
+        code: 'AR:PYM:012',
+        safeToAutomate: true,
+        templateSnippet: 'from collections.abc import $1',
+    },
+    'PYM-IMPORT-001': {
+        action: 'simplify_control_flow',
+        code: 'AR:PYM:013',
+        safeToAutomate: false,
+        templateSnippet: 'import $1',
+    },
+};
 
 type PyEmitter = (
     lineIdx: number,
@@ -204,6 +288,16 @@ export class PythonModernAnalyzer implements Analyzer {
             suggestion: string,
             detail: Record<string, unknown>,
         ): void => {
+            const mapped = PYM_ACTIONABLE_MAP[rule];
+            const actionable = mapped
+                ? {
+                      action: mapped.action,
+                      code: mapped.code,
+                      safeToAutomate: mapped.safeToAutomate,
+                      templateSnippet: mapped.templateSnippet,
+                  }
+                : undefined;
+
             issues.push({
                 id: `python-modern:${rule}:${file}:${lineIdx + 1}`,
                 analyzer: this.name,
@@ -217,6 +311,7 @@ export class PythonModernAnalyzer implements Analyzer {
                 },
                 detail,
                 suggestion,
+                ...(actionable ? { actionable } : {}),
             });
         };
     }

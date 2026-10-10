@@ -17,7 +17,7 @@
  *     (its arguments are string literals, which the mask blanks), so it checks both views: the
  *     masked text proves the call is real code, the raw text proves the Godot 3 signature.
  */
-import type { Analyzer, AnalyzerContext, Issue, Severity } from '../core/types';
+import type { Analyzer, AnalyzerContext, Issue, Severity, AgentActionType } from '../core/types';
 import { SEVERITY_WARNING, SEVERITY_INFO } from '../core/types';
 import { ANALYZER_GDSCRIPT_MODERN } from '../core/scoring/dimensionLiterals';
 import { maskSourceText, type SourceMaskConfig } from '../core/policy/source-mask';
@@ -114,6 +114,138 @@ const LINE_RULES: LineRule[] = [
     },
 ];
 
+const GDM_ACTIONABLE_MAP: Record<
+    string,
+    { action: AgentActionType; code: string; safeToAutomate: boolean; templateSnippet: string }
+> = {
+    'GDM-YIELD-001': {
+        action: 'replace_token',
+        code: 'AR:GDM:001',
+        safeToAutomate: false,
+        templateSnippet: 'await $1.$2',
+    },
+    'GDM-EXPORT-001': {
+        action: 'replace_token',
+        code: 'AR:GDM:002',
+        safeToAutomate: false,
+        templateSnippet: '@export var $1: $2',
+    },
+    'GDM-ONREADY-001': {
+        action: 'replace_token',
+        code: 'AR:GDM:003',
+        safeToAutomate: true,
+        templateSnippet: '@onready var $1 = $2',
+    },
+    'GDM-TOOL-001': {
+        action: 'replace_token',
+        code: 'AR:GDM:004',
+        safeToAutomate: true,
+        templateSnippet: '@tool',
+    },
+    'GDM-POOL-001': {
+        action: 'replace_token',
+        code: 'AR:GDM:005',
+        safeToAutomate: true,
+        templateSnippet: 'Packed$1Array',
+    },
+    'GDM-RPC-001': {
+        action: 'replace_token',
+        code: 'AR:GDM:006',
+        safeToAutomate: false,
+        templateSnippet: '@rpc func $1()',
+    },
+    'GDM-CONNECT-001': {
+        action: 'replace_token',
+        code: 'AR:GDM:007',
+        safeToAutomate: false,
+        templateSnippet: '$1.connect($2.$3)',
+    },
+    'GDM-POOL-002': {
+        action: 'apply_guard_clause',
+        code: 'AR:GDM:008',
+        safeToAutomate: false,
+        templateSnippet: 'super.reset_state()',
+    },
+    'GDM-DEB-001': {
+        action: 'apply_guard_clause',
+        code: 'AR:GDM:009',
+        safeToAutomate: false,
+        templateSnippet: 'btn.pressed_debounced.connect($1)',
+    },
+    'GDM-FSM-001': {
+        action: 'apply_guard_clause',
+        code: 'AR:GDM:010',
+        safeToAutomate: false,
+        templateSnippet: 'fsm.transition_to($1)',
+    },
+    'GDM-WEAK-001': {
+        action: 'replace_token',
+        code: 'AR:GDM:011',
+        safeToAutomate: false,
+        templateSnippet: 'weakref($1)',
+    },
+    'GDM-RES-001': {
+        action: 'simplify_control_flow',
+        code: 'AR:GDM:012',
+        safeToAutomate: false,
+        templateSnippet: 'apply_responsive_layout()',
+    },
+    'GDM-UNI-001': {
+        action: 'simplify_control_flow',
+        code: 'AR:GDM:013',
+        safeToAutomate: false,
+        templateSnippet: 'store.dispatch($1)',
+    },
+    'GDM-LOC-001': {
+        action: 'decompose_module',
+        code: 'AR:GDM:014',
+        safeToAutomate: false,
+        templateSnippet: '# Split into sub-views',
+    },
+    'GDM-EXT-001': {
+        action: 'replace_token',
+        code: 'AR:GDM:015',
+        safeToAutomate: false,
+        templateSnippet: 'extends BaseScreen',
+    },
+    'GDM-TOK-001': {
+        action: 'replace_token',
+        code: 'AR:GDM:016',
+        safeToAutomate: false,
+        templateSnippet: 'ThemeConstants.$1',
+    },
+    'GDM-BAR-001': {
+        action: 'replace_token',
+        code: 'AR:GDM:017',
+        safeToAutomate: false,
+        templateSnippet: 'StatusBar.new()',
+    },
+    'GDM-VRT-001': {
+        action: 'replace_token',
+        code: 'AR:GDM:018',
+        safeToAutomate: false,
+        templateSnippet: 'VirtualList.new()',
+    },
+    'GDM-I18N-001': {
+        action: 'replace_token',
+        code: 'AR:GDM:019',
+        safeToAutomate: false,
+        templateSnippet: 'tr("$1")',
+    },
+    'GDM-NOD-001': {
+        action: 'replace_token',
+        code: 'AR:GDM:020',
+        safeToAutomate: false,
+        templateSnippet: '@onready var $1 = %$1',
+    },
+    'GDM-BND-001': {
+        action: 'decouple_facade',
+        code: 'AR:GDM:021',
+        safeToAutomate: false,
+        templateSnippet: 'presenter.bind($1)',
+    },
+};
+
 /**
  * Build one finding anchored to a source line.
  *
@@ -136,6 +268,16 @@ function makeIssue(
     detail: Record<string, unknown>,
 ): Issue {
     const line = lineIndex + 1;
+    const mapped = GDM_ACTIONABLE_MAP[rule];
+    const actionable = mapped
+        ? {
+              action: mapped.action,
+              code: mapped.code,
+              safeToAutomate: mapped.safeToAutomate,
+              templateSnippet: mapped.templateSnippet,
+          }
+        : undefined;
+
     return {
         id: `${ANALYZER_GDSCRIPT_MODERN}:${rule}:${file}:${line}`,
         analyzer: ANALYZER_GDSCRIPT_MODERN,
@@ -145,6 +287,7 @@ function makeIssue(
         location: { file, start: { line, column: 1 }, end: { line, column: 1 } },
         detail,
         suggestion,
+        ...(actionable ? { actionable } : {}),
     };
 }
 

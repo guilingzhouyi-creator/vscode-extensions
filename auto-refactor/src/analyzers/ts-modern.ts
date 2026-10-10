@@ -155,18 +155,74 @@ const LINE_RULES: LineRule[] = [
  */
 const TSM_ACTIONABLE_MAP: Record<
     string,
-    { action: AgentActionType; code: string; safeToAutomate: boolean }
+    { action: AgentActionType; code: string; safeToAutomate: boolean; templateSnippet: string }
 > = {
-    'TSM-VAR-001': { action: 'replace_token', code: 'AR:TSM:001', safeToAutomate: false },
-    'TSM-CTOR-001': { action: 'replace_token', code: 'AR:TSM:002', safeToAutomate: false },
-    'TSM-ARGS-001': { action: 'split_function', code: 'AR:TSM:003', safeToAutomate: false },
-    'TSM-SPREAD-001': { action: 'replace_token', code: 'AR:TSM:004', safeToAutomate: false },
-    'TSM-INCLUDES-001': { action: 'replace_token', code: 'AR:TSM:005', safeToAutomate: false },
-    'TSM-SUBSTR-001': { action: 'replace_token', code: 'AR:TSM:006', safeToAutomate: false },
-    'TSM-REPLACE-001': { action: 'replace_token', code: 'AR:TSM:007', safeToAutomate: false },
-    'TSM-ANY-001': { action: 'replace_token', code: 'AR:TSM:008', safeToAutomate: false },
-    'TSM-TYPE-001': { action: 'replace_token', code: 'AR:TSM:009', safeToAutomate: false },
-    'TSM-REQUIRE-001': { action: 'replace_token', code: 'AR:TSM:010', safeToAutomate: false },
+    'TSM-VAR-001': {
+        action: 'replace_token',
+        code: 'AR:TSM:001',
+        safeToAutomate: false,
+        templateSnippet: 'const $1 = $2;',
+    },
+    'TSM-CTOR-001': {
+        action: 'replace_token',
+        code: 'AR:TSM:002',
+        safeToAutomate: false,
+        templateSnippet: '[]',
+    },
+    'TSM-ARGS-001': {
+        action: 'split_function',
+        code: 'AR:TSM:003',
+        safeToAutomate: false,
+        templateSnippet: '(...args: unknown[]) => { ... }',
+    },
+    'TSM-SPREAD-001': {
+        action: 'replace_token',
+        code: 'AR:TSM:004',
+        safeToAutomate: false,
+        templateSnippet: '{ ...target, ...source }',
+    },
+    'TSM-INCLUDES-001': {
+        action: 'replace_token',
+        code: 'AR:TSM:005',
+        safeToAutomate: false,
+        templateSnippet: '$1.includes($2)',
+    },
+    'TSM-SUBSTR-001': {
+        action: 'replace_token',
+        code: 'AR:TSM:006',
+        safeToAutomate: false,
+        templateSnippet: '$1.slice($2, $2 + $3)',
+    },
+    'TSM-REPLACE-001': {
+        action: 'replace_token',
+        code: 'AR:TSM:007',
+        safeToAutomate: false,
+        templateSnippet: '$1.replaceAll($2, $3)',
+    },
+    'TSM-ANY-001': {
+        action: 'replace_token',
+        code: 'AR:TSM:008',
+        safeToAutomate: false,
+        templateSnippet: 'unknown',
+    },
+    'TSM-TYPE-001': {
+        action: 'replace_token',
+        code: 'AR:TSM:009',
+        safeToAutomate: false,
+        templateSnippet: 'import type { $1 } from $2;',
+    },
+    'TSM-REQUIRE-001': {
+        action: 'replace_token',
+        code: 'AR:TSM:010',
+        safeToAutomate: false,
+        templateSnippet: 'import $1 from $2;',
+    },
+    'TSM-DISP-001': {
+        action: 'apply_guard_clause',
+        code: 'AR:TSM:011',
+        safeToAutomate: false,
+        templateSnippet: 'context.subscriptions.push($1);',
+    },
 };
 
 function makeIssue(
@@ -186,6 +242,7 @@ function makeIssue(
               action: mapped.action,
               code: mapped.code,
               safeToAutomate: mapped.safeToAutomate,
+              templateSnippet: mapped.templateSnippet,
           }
         : undefined;
 
