@@ -59,7 +59,7 @@ func register_screen(screen_id: String, scene_path: String) -> void:
 	# 场景缓存失效：路径更新后重载新场景
 	_scene_cache.erase(screen_id)
 
-## 查询 Screen 是否已注册（供 ViewRouter 等外部安全访问注册表）
+## 查询 Screen 是否已注册（供外部安全访问注册表）
 func has_screen(screen_id: String) -> bool:
 	return _screen_registry.has(screen_id)
 

@@ -1,7 +1,7 @@
 # ==============================================================================
 # 卡拉尔世界引擎 (Kalar World Engine) - 前端架构与导航测试套件
 # 文件路径: res://tests/unit/frontend/test_frontend_architecture_and_bootstrap.gd
-# 职责: 验证 AppRoot 6 层视口层级拓扑、NavManager 分层导航栈、ViewRouter 兼容代理
+# 职责: 验证 AppRoot 6 层视口层级拓扑、NavManager 分层导航栈与注册表查询
 # ==============================================================================
 class_name TestFrontendArchitectureAndBootstrap
 extends RefCounted
@@ -10,7 +10,7 @@ static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
 	results.append(_test_app_root_viewport_layers())
 	results.append(_test_nav_manager_stack_and_history())
-	results.append(_test_view_router_compatibility_adapter())
+	results.append(_test_nav_manager_screen_registry())
 	results.append(_test_toast_and_loading_dispatch())
 
 	var all_passed := true
@@ -113,13 +113,13 @@ static func _test_nav_manager_stack_and_history() -> Dictionary:
 	nav.free()
 	return {"test": test_name, "passed": passed}
 
-## 3. 验证 ViewRouter 兼容代理穿透
-static func _test_view_router_compatibility_adapter() -> Dictionary:
-	var test_name := "test_view_router_compatibility_adapter"
-	var vr := ViewRouter.get_instance()
-	var has_account := vr.has_view("account_entry")
-	var has_hud := vr.has_view("main_hud")
-	var has_invalid := vr.has_view("non_existing_view_xyz")
+## 3. 验证 NavManager 屏幕注册表查询能力
+static func _test_nav_manager_screen_registry() -> Dictionary:
+	var test_name := "test_nav_manager_screen_registry"
+	var nav := NavManager.get_instance()
+	var has_account := nav.has_screen("account_entry")
+	var has_hud := nav.has_screen("main_hud")
+	var has_invalid := nav.has_screen("non_existing_view_xyz")
 
 	var passed := (has_account and has_hud and not has_invalid)
 	return {"test": test_name, "passed": passed}
