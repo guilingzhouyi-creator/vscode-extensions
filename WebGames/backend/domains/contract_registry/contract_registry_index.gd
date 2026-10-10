@@ -15,7 +15,6 @@ const EntryClass = preload("res://backend/domains/contract_registry/contract_reg
 
 const SUPPORTED_SCHEMA_VERSION: int = 1
 const CONTRACT_CONFIG_PATH_PRIMARY: String = "res://config/infrastructure/contracts.json"
-const CONTRACT_CONFIG_PATH_FALLBACK: String = "res://backend/config/contracts.json"
 
 static var _instance: ContractRegistryIndex = null
 static var _entries: Array = []
@@ -45,15 +44,11 @@ static func ensure_loaded() -> void:
 	_instance._load_from_config()
 
 
-## 从 contracts.json 装载契约条目：主/备路径探测、JSON 解析、schema 版本校验、
+## 从 contracts.json 装载契约条目：主配置路径、JSON 解析、schema 版本校验、
 ## infra_domains 与 entries 装配；任一步失败 emit_error 并置 _loaded 防重复装载
-## 读取契约配置文件文本（含主备路径探测与错误广播）
+## 读取契约配置文件文本（固化单一真源 CONTRACT_CONFIG_PATH_PRIMARY）
 func _read_config_file_text() -> String:
 	var path := CONTRACT_CONFIG_PATH_PRIMARY
-	if not FileAccess.file_exists(path):
-		path = CONTRACT_CONFIG_PATH_FALLBACK
-		ErrorReporter.emit_error(DOMAIN_NAME, "CONFIG_FALLBACK_USED", "ContractRegistryIndex: 主配置缺失 %s，回退后备路径 %s（请收敛双配置源）" % [CONTRACT_CONFIG_PATH_PRIMARY, CONTRACT_CONFIG_PATH_FALLBACK])
-
 	if not FileAccess.file_exists(path):
 		ErrorReporter.emit_error(DOMAIN_NAME, "CONFIG_FILE_NOT_FOUND", "ContractRegistryIndex: 未找到配置文件: %s" % path)
 		return ""
@@ -117,7 +112,7 @@ func _unpack_registry_sections(dict: Dictionary) -> bool:
 	_rebuild_indexes()
 	return true
 
-## 从 contracts.json 装载契约条目：主/备路径探测、JSON 解析、schema 版本校验、
+## 从 contracts.json 装载契约条目：主配置路径、JSON 解析、schema 版本校验、
 ## infra_domains 与 entries 装配；任一步失败 emit_error 并置 _loaded 防重复装载
 func _load_from_config() -> void:
 	_entries.clear()

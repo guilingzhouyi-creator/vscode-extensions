@@ -3,13 +3,6 @@
     "force_sync_in_tests": true
   },
   "primary": {
-    "archive_dir": "user://saves",
-    "extension": ".kalar_save",
-    "atomic_rename": true,
-    "backup_suffix": ".bak",
-    "temp_suffix": ".tmp",
-    "hash_algorithm": "sha256",
-    "signature_salt": "kalar_primary_v1",
     "minimal_state": {
       "max_restore_budget_ms": 10.0
     }

@@ -242,7 +242,7 @@ static func test_atomic_write_interruption_preserves_original() -> Dictionary:
 static func test_empty_save_blocked_guard() -> Dictionary:
 	SaveDataAccessLayer.reset_for_tests()
 	# 在没有注册任何 provider 的情况下尝试保存
-	var result := SaveDataAccessLayer.save_game("test_empty_slot_p68", {})
+	var result := SaveDataAccessLayer.save_game("test_empty_slot", {})
 	var success := bool(result.get("success", false))
 	var error_code := String(result.get("error_code", ""))
 

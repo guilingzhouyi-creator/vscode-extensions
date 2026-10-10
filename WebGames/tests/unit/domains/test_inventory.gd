@@ -16,6 +16,8 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_unequip_item_ref_helper())
 	# F-1（TC-INV-11）：restore 深载荷唯一入口
 	results.append(test_restore_deep_payload_only())
+	# Phase 106（TC-INV-12）：自动签发 SRV_ 前缀合法 UID
+	results.append(test_auto_generated_srv_uid_validity())
 	# 物品属性双 UID 联动与隐藏特殊词缀体系
 	var affix_res := TestItemAttributeAffixSystemPipeline.run_all_tests()
 	results.append_array(affix_res.get("results", []))
@@ -163,4 +165,25 @@ static func test_restore_deep_payload_only() -> Dictionary:
 	return {
 		"test": "TC-INV-11: restore 深载荷唯一入口（重建一致/缺载荷空容器）",
 		"passed": passed
+	}
+
+static func test_auto_generated_srv_uid_validity() -> Dictionary:
+	var inv := WearableInventoryAggregate.new()
+	var chest_armor := ItemEntity.new()
+	chest_armor.category = "ARMOR_EQUIPMENT"
+	chest_armor.volume_slots = 10
+	inv.equip_item("CHEST", chest_armor)
+	var raw_item := ItemEntity.new()
+	raw_item.item_id = "RAW_SWORD"
+	raw_item.volume_slots = 2
+	raw_item.mass_kg = 1.0
+	raw_item.item_uid = ""
+	var add_ok := inv.add_item(raw_item)
+	var uid_valid := ItemUIDGenerator.validate_uid(raw_item.item_uid)
+	var srv_prefix_ok := raw_item.item_uid.begins_with("SRV_")
+	var passed := add_ok and uid_valid and srv_prefix_ok
+	return {
+		"test": "TC-INV-12: 入包空 UID 自动签发 SRV_ 且 SHA-256 校验合规 (Inv-BC1-1)",
+		"passed": passed,
+		"item_uid": raw_item.item_uid
 	}

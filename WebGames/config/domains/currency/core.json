@@ -14,7 +14,8 @@
     "copper": 1,
     "silver": 100,
     "gold": 10000,
-    "platinum": 1000000
+    "platinum": 1000000,
+    "mana_monocrystals": 12000
   },
   "coin_mass_kg": {
     "copper": 0.01,

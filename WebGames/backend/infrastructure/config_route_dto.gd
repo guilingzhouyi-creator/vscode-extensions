@@ -13,7 +13,7 @@ enum RouteResolutionMode {
 	EXACT_SUBTABLE,      # 精确子表匹配 (如 "domains.combat.damage_formulas")
 	LEGACY_COMPAT_ALIAS, # 向后兼容单表别名重定向 (如 "domains.combat" -> "domains.combat.mechanics")
 	SUBTABLE_FALLBACK,   # 子表跨表路径回退 (如 "domains.combat" 下寻址 "kinetic/energy_coef" 回退到 damage_formulas)
-	DIRECT_PASSTHROUGH   # 未拆分单表直通 (如 "domains.inventory")
+	DIRECT_PASSTHROUGH   # 未拆分子表直通（适用于未分级的通用基础设施表）
 }
 
 var root_layer: String = ""              # infrastructure / domains / frontend / narratives

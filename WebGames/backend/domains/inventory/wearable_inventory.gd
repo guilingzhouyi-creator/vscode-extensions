@@ -10,6 +10,7 @@
 class_name WearableInventoryAggregate extends RefCounted
 
 const InventoryMetricSnapshotClass = preload("res://backend/domains/inventory/inventory_metric_snapshot.gd")
+const ItemUIDGenerator = preload("res://backend/domains/item_namespace_registry/item_uid_generator.gd")
 
 # ==============================================================================
 # 一、仓储状态（含增量度量缓存）
@@ -99,12 +100,12 @@ func can_add_item(item: ItemEntity, race_bonus: float = 0.0) -> bool:
 		return false
 	return true
 
-## 入包：校验通过后追加（空 UID 生成 INV_ 前缀 ID，置容器态与属主，增量累加缓存）
+## 入包：校验通过后追加（空 UID 生成 SRV_ 前缀 ID，置容器态与属主，增量累加缓存）
 func add_item(item: ItemEntity, race_bonus: float = 0.0) -> bool:
 	if not can_add_item(item, race_bonus):
 		return false
 	if item.item_uid.is_empty():
-		item.item_uid = UniqueIdGenerator.next_id("INV_")
+		item.item_uid = ItemUIDGenerator.generate_uid("SRV_")
 	storage_items.append(item)
 	item.container_state = "INVENTORY"
 	if not owner_account_id.is_empty():

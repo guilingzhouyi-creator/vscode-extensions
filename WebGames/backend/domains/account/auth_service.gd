@@ -16,18 +16,10 @@ const HudEventContract = preload("res://backend/domains/world_state/hud_event_co
 const DOMAIN_ACCOUNT_CONFIG: String = "domains.account"
 
 # ==============================================================================
-# 一、会话状态与鉴权状态枚举
+# 一、会话状态与口令加盐
 # ==============================================================================
 
 static var _sessions: Dictionary = {}
-
-## 鉴权状态机：未认证 / 本地认证 / 云认证 / 会话过期
-enum AuthState {
-	UNAUTHENTICATED,
-	AUTHENTICATED_LOCAL,
-	AUTHENTICATED_CLOUD,
-	SESSION_EXPIRED
-}
 
 ## 口令加盐读取（config/domains/account.json auth/salt；空盐历史档经 login-time 重铸迁移链自动升级）
 static func _salt() -> String:

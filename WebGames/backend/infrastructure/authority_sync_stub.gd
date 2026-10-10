@@ -47,11 +47,9 @@ func diff_snapshot(old_state: Dictionary, new_state: Dictionary) -> Dictionary:
 			diff[k] = new_state[k]
 	return {"success": true, "diff": diff, "has_diff": not diff.is_empty()}
 
-## 配置驱动：同步模式经 infrastructure.admin 预留（支持 run/mode 与 sync/mode 配置路径）
+## 配置驱动：同步模式经 infrastructure.admin 预留（统一读取 sync/mode 配置路径）
 static func current_sync_mode() -> SyncMode:
-	var mode_str: String = GameConfig.get_string("infrastructure.admin", "sync/mode", "")
-	if mode_str.is_empty():
-		mode_str = GameConfig.get_string("infrastructure.admin", "run/mode", "offline_text")
+	var mode_str: String = GameConfig.get_string("infrastructure.admin", "sync/mode", "offline_text")
 	if mode_str == "online_authority" or mode_str == "online":
 		return SyncMode.ONLINE_AUTHORITY
 	return SyncMode.OFFLINE_TEXT

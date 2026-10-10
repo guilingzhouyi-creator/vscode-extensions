@@ -37,7 +37,7 @@ static func run_all_tests() -> Dictionary:
 
 ## TC-SV-06: legacy 旧档降级兼容（Inv-SV-4）
 static func test_legacy_save_fallback_compatibility() -> Dictionary:
-	var legacy_slot := "test_legacy_save_p68"
+	var legacy_slot := "test_legacy_save"
 	var save_dir: String = SaveManager._save_dir()
 	SaveManager.ensure_save_directory()
 	var file_path := save_dir + legacy_slot + SaveManager._save_extension()

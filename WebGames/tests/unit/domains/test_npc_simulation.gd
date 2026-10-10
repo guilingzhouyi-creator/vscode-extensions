@@ -39,6 +39,6 @@ static func test_npc_demise_and_legacy() -> Dictionary:
 	var disciple := AutonomousNPCEntity.new()
 	disciple.personal_name = "青年剑客"
 
-	var res = NPCLifeCycleAndLegacyFSM.process_npc_natural_demise(master, disciple)
+	var res = NPCDemiseLegacyService.process_npc_natural_demise(master, disciple)
 	var passed = (disciple.wallet.gold == 500) and (res.legacy_book != null)
 	return { "test": "TC-NPC-03: 寿元大限著书立说与衣钵交接流水线", "passed": passed, "gold": disciple.wallet.gold }

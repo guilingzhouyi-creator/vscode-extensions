@@ -83,8 +83,8 @@ static func _test_npc_legacy_idempotent() -> Dictionary:
 	master.wallet.gold = 300
 	var disciple := AutonomousNPCEntity.new()
 	disciple.personal_name = "传人"
-	var first := NPCLifeCycleAndLegacyFSM.process_npc_natural_demise(master, disciple)
-	var second := NPCLifeCycleAndLegacyFSM.process_npc_natural_demise(master, disciple)
+	var first := NPCDemiseLegacyService.process_npc_natural_demise(master, disciple)
+	var second := NPCDemiseLegacyService.process_npc_natural_demise(master, disciple)
 	var passed = first.get("success", false) and second.get("code", "") == "LEGACY_ALREADY_COMMITTED"
 	return { "test": "TC-TWE-S4-04: 重复传承幂等（第二次 LEGACY_ALREADY_COMMITTED）", "passed": passed }
 

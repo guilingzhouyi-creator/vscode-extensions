@@ -1,7 +1,7 @@
 # ==============================================================================
 # 单元测试：灰度发布版本编排与底层动态更新流水线测试套件
 # 文件路径: res://tests/integration/pipelines/test_version_governance_pipeline.gd
-# 职责: 验证灰度分群、动态 PCK 挂载、版本激活门禁、单机/联机双轨隔离与 P72 推送信道全链路
+# 职责: 验证灰度分群、动态 PCK 挂载、版本激活门禁、单机/联机双轨隔离与推送信道全链路
 # ==============================================================================
 class_name TestVersionGovernancePipeline
 extends RefCounted
@@ -196,10 +196,10 @@ static func _test_config_hotfix_reload_without_restart() -> Dictionary:
 	return {"test": tname, "name": tname, "passed": true, "message": "配置热更无须重启进程，单调版本递增闭环"}
 
 # ==============================================================================
-# 8. P72 EventBus 0x0500 信道广播与控制面信令闭环断言
+# 8. EventBus 0x0500 信道广播与控制面信令闭环断言
 # ==============================================================================
 static func _test_eventbus_channel_0x0500_telemetry_and_dispatch() -> Dictionary:
-	var tname := "TC-VG-08: P72 EventBus 0x0500 信道广播与控制面信令闭环断言"
+	var tname := "TC-VG-08: EventBus 0x0500 信道广播与控制面信令闭环断言"
 	var bus := EventBusCore.get_instance()
 
 	var received := {"token": null}
@@ -224,7 +224,7 @@ static func _test_eventbus_channel_0x0500_telemetry_and_dispatch() -> Dictionary
 
 
 	token_sub.unbind()
-	return {"test": tname, "name": tname, "passed": true, "message": "P72 0x0500 控制面信道同步派发与强一致闭环断言通过"}
+	return {"test": tname, "name": tname, "passed": true, "message": "0x0500 控制面信道同步派发与强一致闭环断言通过"}
 
 # ==============================================================================
 # 9. 纯数学哈希分群均匀散列断言

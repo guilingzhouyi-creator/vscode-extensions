@@ -80,22 +80,18 @@ func quick_restore_minimal_state(slot_id: String) -> Dictionary:
 func _extract_minimal_state(slot_id: String, data: Dictionary, meta: Dictionary) -> MinimumWorldStateDTO:
 	var account_data: Dictionary = data.get("account", {})
 	var char_data: Dictionary = data.get("character", {})
-	if char_data.is_empty():
-		char_data = data.get("character_info", {})
 	var life_data: Dictionary = data.get("lifecycle", {})
 	var wallet_data: Dictionary = data.get("currency_economy", {})
-	if wallet_data.is_empty():
-		wallet_data = data.get("wallet", {})
 
-	var account_id: String = String(account_data.get("account_id", data.get("account_id", DEFAULT_ACCOUNT_ID)))
-	var char_name: String = String(char_data.get("name", char_data.get("character_name", slot_id)))
+	var account_id: String = String(account_data.get("account_id", DEFAULT_ACCOUNT_ID))
+	var char_name: String = String(char_data.get("name", slot_id))
 	var world_mode: String = String(data.get("world_mode", DEFAULT_WORLD_MODE))
 
 	var dto := MinimumWorldStateDTO.new(account_id, slot_id, char_name, world_mode)
 	dto.level = int(char_data.get("level", 1))
-	dto.current_hp = float(life_data.get("hp", life_data.get("current_hp", DEFAULT_MAX_HP)))
+	dto.current_hp = float(life_data.get("hp", DEFAULT_MAX_HP))
 	dto.max_hp = float(life_data.get("max_hp", DEFAULT_MAX_HP))
-	dto.play_time_seconds = int(meta.get("play_time_seconds", data.get("play_time_seconds", 0)))
+	dto.play_time_seconds = int(meta.get("play_time_seconds", 0))
 	dto.prologue_completed = bool(data.get("prologue_completed", false))
 	dto.currency_summary = {
 		"gold": int(wallet_data.get("gold", 0)),

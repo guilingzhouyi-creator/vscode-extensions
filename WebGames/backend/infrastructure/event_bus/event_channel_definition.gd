@@ -3,7 +3,7 @@
 # 文件路径: res://backend/infrastructure/event_bus/event_channel_definition.gd
 # 架构定位: Event Broker / Decoupling Foundation
 # 跨域依赖: 上游: 全域 47 业务域服务、GM追缴、网络层 | 下游: EventChannel, EventSubscriberToken | 配置: config/infrastructure/event_bus.json | 信号: 全域领域事件中心分发
-# 职责说明: 路由唯一真源常量表。整型信道热路径零字符串切分与匹配。 与旧版/P71字符串频道的迁移对齐映射表置于 config/infrastructure/event_bus_config.json。
+# 职责说明: 路由唯一真源常量表。整型信道热路径零字符串切分与匹配。与旧版字符串频道的迁移对齐映射表置于 config/infrastructure/event_bus_config.json。
 # 设计依据: 事件总线解耦规范 / 前后端通信隔离契约
 # ==============================================================================
 

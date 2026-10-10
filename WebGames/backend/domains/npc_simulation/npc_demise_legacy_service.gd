@@ -1,15 +1,15 @@
 # ==============================================================================
 # 模块归属: 业务领域层 (Domains · 剧情、任务与社交集群 (Narrative & Social))
-# 文件路径: res://backend/domains/npc_simulation/npc_legacy_fsm.gd
-# 架构定位: Domain FSM / Lifecycle Session Engine
+# 文件路径: res://backend/domains/npc_simulation/npc_demise_legacy_service.gd
+# 架构定位: Domain Service / Lifecycle Session Engine
 # 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/npc.json | 信号: EventBus 领域广播
 # 职责说明: 寿元大限著书立说、自然坐化与遗产门徒交接。 著书参数与叙事文案由 config/npc.json、config/narratives/npc.json 驱动。
 # 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
-class_name NPCLifeCycleAndLegacyFSM extends RefCounted
+class_name NPCDemiseLegacyService extends RefCounted
 
-## 幂等提交索引（）：来源 NPC 仅能成功提交一次传承（防重复发书/转账）。
+## 幂等提交索引：来源 NPC 仅能成功提交一次传承（防重复发书/转账）。
 ## 生命周期与存档一致；超过配置保留窗口后由压缩清理（S3 契约）。
 static var _committed_npc_ids: Dictionary = {}
 
@@ -18,7 +18,7 @@ static func process_npc_natural_demise(
 	npc: AutonomousNPCEntity,
 	successor_npc: AutonomousNPCEntity
 ) -> Dictionary:
-	# 0. 来源校验 + 幂等（）：来源 NPC 必须有效且未提交过传承
+	# 0. 来源校验 + 幂等：来源 NPC 必须有效且未提交过传承
 	if npc == null or npc.npc_id.is_empty():
 		return { "success": false, "code": "NPC_INVALID" }
 	if _committed_npc_ids.has(npc.npc_id):

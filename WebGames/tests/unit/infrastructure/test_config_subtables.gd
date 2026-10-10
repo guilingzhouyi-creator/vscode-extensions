@@ -24,6 +24,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_subtable_key_builder())
 	results.append(test_storage_catalog_subtables())
 	results.append(test_table_path_multi_level())
+	results.append(test_generic_alias_resolution_without_primary_map())
 
 	var all_passed: bool = true
 	for r in results:
@@ -113,3 +114,17 @@ static func test_table_path_multi_level() -> Dictionary:
 	var not_sub: bool = not ConfigRouterEngine.is_subtable("domains.inventory")
 	var passed: bool = is_sub and not_sub
 	return { "test": "TC-SUB-08: 多级子表分段判定与单表直通识别", "passed": passed }
+
+static func test_generic_alias_resolution_without_primary_map() -> Dictionary:
+	var resolved_inv := ConfigRouterEngine.resolve_table_name("domains.inventory")
+	var resolved_acc := ConfigRouterEngine.resolve_table_name("domains.account")
+	var resolved_cbt := ConfigRouterEngine.resolve_table_name("domains.combat")
+	var ok_inv: bool = (resolved_inv == "domains.inventory.core")
+	var ok_acc: bool = (resolved_acc == "domains.account.core")
+	var ok_cbt: bool = (resolved_cbt == "domains.combat.mechanics")
+	var passed: bool = ok_inv and ok_acc and ok_cbt
+	return {
+		"test": "TC-SUB-09: 通用别名规则自然承接子表解析（52条冗余别名消融断言 Inv-BC2-1）",
+		"passed": passed
+	}
+

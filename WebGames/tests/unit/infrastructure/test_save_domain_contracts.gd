@@ -108,7 +108,7 @@ static func test_unified_contract_signatures() -> Dictionary:
 
 ## TC-SV-03: 信封契约保持与原子写签名机制（Inv-SV-2）
 static func test_envelope_contract_integrity() -> Dictionary:
-	var slot := "test_envelope_slot_p68"
+	var slot := "test_envelope_slot"
 	var payload := {
 		"data": {
 			"inventory": { "equipped_payloads": {}, "owner_account_id": "acc_001" },
