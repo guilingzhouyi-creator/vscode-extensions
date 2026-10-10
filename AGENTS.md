@@ -65,9 +65,10 @@
 
 ### 6. SubAgent 委托与多智能体调度公理
 - **严禁裸调用原生 SubAgent**：在当前会话或任何新开会话中，当接收到 SubAgent 委托或并行施工指令时，严禁直接调用未经约束的原生 `self` 或擅自跨级切换高开销模型；SubAgent 在模型上必须与主会话保持同构一致，通过 `Model: "inherit"` 继承主会话配置（当前主会话为 Gemini 3.8 Flash，思考强度 effort=High），完整保留高强度深度推理能力并锁定 Flash 算力成本；必须依据任务所属领域（`vs-extension`, `cli-engine`, `game-engine`, `infra-tool`, `workspace-meta`, `skill-governance`）与姿态（`construct`, `review`, `refactor`, `explore`, `guardian`），通过 [subagent-catalog.json](.agents/subagents/subagent-catalog.json) 匹配或运行 `node .agents/skills/subagent-orchestration/scripts/synthesize-subagent.js` 合成出对应专员；
-- **四重防线契约注入**：派发前必须调用 `define_subagent` 注入 5 层系统契约（含 Path Jail 授权与禁止目录、所属领域专属公理、交割前强制自检命令）；审查（`review`）与探索（`explore`）姿态必须硬性配置 `enable_write_tools: false` 从物理工具层面剥夺写权限；`invoke_subagent` 必须显式指定 `Model: "inherit"`（或受控 `"flash"`），并使用包含范围与验收清单的标准任务外壳；
+- **五层契约注入与资深编写纪律**：派发前必须调用 `define_subagent` 注入 5 层系统契约（含 Path Jail 授权与禁止目录、所属领域专属公理、交割前强制自检命令）；SubAgent 必须从首行代码起内化资深工程师规范（卫语句提前返回平铺控制流、循环体内零瞬态堆分配 `CPX-SPACE-001` / `ADV-PRF-002`、消融单行透传跳板 `ARCH-ABS-001`、门面实质承载 `ARCH-FAC-001` 及标准六字段 JSDoc 模块头部契约）；审查（`review`）与探索（`explore`）姿态必须硬性配置 `enable_write_tools: false` 从物理工具层面剥夺写权限；`invoke_subagent` 必须显式指定 `Model: "inherit"`（或受控 `"flash"`），并使用包含范围与验收清单的标准任务外壳；
+- **“测试通过非达标”防线公理**：测试全绿仅代表功能逻辑未断裂，绝不等同于符合 Auto 审查系统，更不等于通过门禁系统；SubAgent 交割前必须自主闭环本领域三重验证（构建编译 + 单元/集成测试 + 领域静态规则预审/复杂度核算），严禁仅跑单测便声称完成；
 - **物理沙箱防冲突（Path Jail 与独占文件集）**：SubAgent 严禁触碰所属领域授权路径之外的任何文件；并行重构/施工（`construct`/`refactor`）时，每个 SubAgent 必须绑定完全正交、互不重叠的独占文件列表（Zero-Intersection Path Jail），严禁跨专员并发写入同一文件；跨项目并行写推荐使用 `Workspace: "branch"` 隔离；
-- **主 Agent 全量交叉复审闭环（Cross-Review Closed-Loop）**：任何 SubAgent 完成施工交割后，主 Agent 必须独立进行沙箱隔离审计、TypeScript 编译、门面治理检查、自审棘轮基线（`gate-self.js`）以及全量测试套件（153/153）的交叉复审，确认 100% 通过后方可交付。
+- **主 Agent 独立交叉复审闭环（Cross-Review Closed-Loop）**：主 Agent 履行总架构师复核职责，绝不盲从 SubAgent 汇报；SubAgent 完成施工交割后，主 Agent 必须独立进行沙箱隔离审计、构建与静态规则核查、AST 复杂度切片校验、门面治理检查、自审棘轮基线（`gate-self.js`）以及全量测试套件的交叉复审，确认测试、静态规则与门禁三轨 100% 通过后方可交付。
 
 ---
 
@@ -93,19 +94,23 @@
 8. **跳板消融红线**：严禁创建或保留有效代码 $\le 3$ 行且仅向单一目标透传的空包跳板文件；门面层违反实质承载预算强制触发 `ARCH-FAC-001` 阻断；
 9. **客观求实红线**：提交信息严禁夹带敷衍（`CMG-STY-001`）、夸大（`CMG-STY-002`）、贬损（`CMG-STY-003`）或元叙事口号（`CMG-STY-004`）；`[Verification]` 严禁程序化流水账（`CMG-STY-005`）与执行数字统计流水账（`CMG-STY-006`）；
 10. **度量求真红线**：严禁在评分算法与自研度量中注入虚假倍率或固定加分；严禁使用伪造的统计误差区间；
-11. **SubAgent 违规委派红线**：严禁在未装配 Path Jail 物理禁区、未注入领域公理或脱离主会话同构模型约束的情况下直接委派未经约束的原生 SubAgent（`self`）；审查类姿态严禁挂载写入权限；并行施工专员严禁触碰重叠文件；SubAgent 交割后必须由主 Agent 开展全量交叉复审（违者一票否决）；
+11. **SubAgent 违规委派红线**：严禁在未装配 Path Jail 物理禁区、未注入资深工程规范或脱离主会话同构模型约束的情况下直接委派未经约束的原生 SubAgent（`self`）；审查类姿态严禁挂载写入权限；并行施工专员严禁触碰重叠文件；SubAgent 仅凭测试通过而未闭环静态规则自检即交割者一票否决；SubAgent 交割后必须由主 Agent 开展全量独立交叉复审（违者一票否决）；
 12. **零高危技术债与防反弹红线**：全工作区 High/Critical Debt 历史性归零（0 项），新增改动与重构严禁引入新的 High/Critical 技术债务反弹，必须保持 0 项刚性基线（违者一票否决）。
 
 ---
 
 ## 五、 Agent 标准作业闭环（SOP）
 
-1. **意图澄清与查验指针**：接到自然语言任务后，先进行意图完整性审查；若需求模糊、报障缺失上下文或疑似 X-Y 问题，激活逆向提问工程协议（[interview-me](.agents/skills/interview-me/SKILL.md)）向用户进行单点交互质询，明确真实目标与边界；随后依据意图查阅 §一 路由矩阵，精读对应项目的 SSOT 指针与关联 Skill，明确架构边界与红线；
+1. **意图澄清与查验指针**：接到自然语言任务后，先进行意图完整性审查；若需求模糊、报障缺失上下文或疑似 X-Y 问题，激活逆向提问工程协议（[interview-me](.agents/skills/interview-me/SKILL.md)）向用户进行单点交互质询，明确真实目标与边界；涉及复杂长会话治理时，遵循 [context-engineering](.agents/skills/context-engineering/SKILL.md) 75% 预算阈值与渐进式披露规范；随后依据意图查阅 §一 路由矩阵，精读对应项目的 SSOT 指针与关联 Skill，明确架构边界与红线；
 2. **作业与委托分流**：
    - **单域直接作业**：操作严格限定在当前任务所属的项目内，严禁跨项目扩散修改；涉及方案调整严格遵守“先细则获批、后编码施工”；
-   - **多智能体/SubAgent 委派**：必须通过 `node .agents/skills/subagent-orchestration/scripts/synthesize-subagent.js` 合成专员并调用 `define_subagent` 注入契约，严格锁定 `Model: "inherit"`（同构继承主会话 Gemini 3.8 Flash + High effort）；审查类姿态剥夺写权限；施工类姿态分配完全正交的独占文件列表（Zero-Intersection Path Jail）；
-3. **主 Agent 交叉复审与本地预审**：SubAgent 施工交割后，主 Agent 必须独立执行沙箱隔离审计、构建自检与交叉验证；提交前在本地依次运行离线门禁预审：
-   - 暂存区检查：`pwsh -File scripts/ps1/pre-commit-gate.ps1`
-   - 提交信息检查：`pwsh -File scripts/ps1/commit-msg-gate.ps1 <path-to-msg>`
+   - **多智能体/SubAgent 委派**：必须通过 `node .agents/skills/subagent-orchestration/scripts/synthesize-subagent.js` 合成专员并调用 `define_subagent` 注入契约，严格锁定 `Model: "inherit"`（同构继承主会话 Gemini 3.8 Flash + High effort）；强制注入资深工程师规范与“测试通过非达标”公理；审查类姿态剥夺写权限；施工类姿态分配完全正交的独占文件列表（Zero-Intersection Path Jail）；
+3. **主 Agent 独立交叉复审与本地预审（四重递进防线闭环）**：SubAgent 施工交割后，主 Agent 必须履行总架构师复查职责，绝不盲从单测通过报告，独立闭环四重防线交叉验证：
+   - ① **沙箱与越界审计**：核验 SubAgent 修改范围是否严格受限于 Path Jail 授权路径，无未授权文件污染；
+   - ② **对抗性怀疑与资深架构审计**：激活 [doubt-driven-development](.agents/skills/doubt-driven-development/SKILL.md) 扮演对抗性审查员进行假设证伪；复查控制流是否平铺直叙（卫语句提前返回、$\text{CC}\le 15$、$\text{Depth}\le 4$）、循环内是否实现零瞬态堆分配（`CPX-SPACE-001`）、是否消融单行跳板（`ARCH-ABS-001`）且门面具备实质承载（`ARCH-FAC-001`）、是否呈现六字段 JSDoc 头部契约；
+   - ③ **独立构建与静态规则核查**：严格依据 [constraint-driven-development](.agents/skills/constraint-driven-development/SKILL.md) 拦截消音与断言弱化；主 Agent 独立执行所属项目的构建自检与静态分析（`npm run review` / `npm run gate` / `npm test`），确认 Auto 审查规则全部通行；
+   - ④ **本地门禁预审**：提交前在本地依次运行离线门禁预审：
+     - 暂存区检查：`pwsh -File scripts/ps1/pre-commit-gate.ps1`
+     - 提交信息检查：`pwsh -File scripts/ps1/commit-msg-gate.ps1 <path-to-msg>`
 4. **全量回归**：改动落地后，执行对应项目专属全量测试及全工作区统一审查（`pwsh -File scripts/ps1/audit-all.ps1`），确保 100% 绿色通行后方可交割。
 

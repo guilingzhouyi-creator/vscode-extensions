@@ -236,21 +236,21 @@ fi
 RET=1
 # 失败重试 1 次
 for attempt in 1 2; do
+  STATUS=0
   if [[ "$MODE" == "pr" ]]; then
     if [[ "$PUT_MODE" == "true" ]]; then
-      cnb pulls put-pull-labels "${ARGS[@]}" >/dev/null 2>&1
+      cnb pulls put-pull-labels "${ARGS[@]}" >/dev/null 2>&1 || STATUS=$?
     else
-      cnb pulls post-pull-labels "${ARGS[@]}" >/dev/null 2>&1
+      cnb pulls post-pull-labels "${ARGS[@]}" >/dev/null 2>&1 || STATUS=$?
     fi
-    RET=$?
   else
     if [[ "$PUT_MODE" == "true" ]]; then
-      cnb issues put-issue-labels "${ARGS[@]}" >/dev/null 2>&1
+      cnb issues put-issue-labels "${ARGS[@]}" >/dev/null 2>&1 || STATUS=$?
     else
-      cnb issues post-issue-labels "${ARGS[@]}" >/dev/null 2>&1
+      cnb issues post-issue-labels "${ARGS[@]}" >/dev/null 2>&1 || STATUS=$?
     fi
-    RET=$?
   fi
+  RET=$STATUS
   [[ $RET -eq 0 ]] && break
   echo "⚠️ 第 ${attempt} 次打标签调用返回非 0（$RET），重试..."
 done

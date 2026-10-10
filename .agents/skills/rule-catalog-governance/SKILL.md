@@ -2,7 +2,7 @@
 name: rule-catalog-governance
 description: >-
   全工作区单源规则目录（SSOT）、元数据一致性与规则反虚构治理规范。指导 Agent 聚合
-  410 条跨项目静态分析与审查规则（autoRefactor: 325, workspaceTiming: 49, webGames: 56, globalTooling: 7）、
+  410 条跨项目静态分析与审查规则（autoRefactor: 325, workspaceTiming: 49, webGames: 52, globalTooling: 7）、
   落实标准 3-3-3 命名拓扑与 104 项权威词典、三阶双轨别名等价网络、底层完备诊断与表现层语义去重双层解耦公理、
   跨项目规则族前缀命名空间边界及防范规则 ID 虚构（RCFG-RULE-DRIFT）。
 ---
@@ -38,7 +38,7 @@ description: >-
     "counts": {
       "autoRefactor": 325,
       "workspaceTiming": 49,
-      "webGames": 56,
+      "webGames": 52,
       "globalTooling": 7
     },
     "rules": [
@@ -58,7 +58,7 @@ description: >-
 ### 规则分布矩阵 (410 条活跃规则)：
 1. **`autoRefactor` (325 条)**：涵盖 30 个内置分析器（architecture, data-architecture, test-modernity, dependency-layout, naming, gate-architecture 等）与四层金字塔体系；
 2. **`workspaceTiming` (49 条)**：涵盖 VS Code 扩展审查体系的 L0~L5 六层刚性防线（编译、存储崩溃安全、聚合守恒、i18n、性能与 UI 对比度）及进阶门禁与测试预算规则；
-3. **`webGames` (56 条)**：涵盖 Godot 游戏工程的文档治理（`DOC-`、`LINK-`）、高性能脚本契约（`ADV-`）与配置架构审查规则；
+3. **`webGames` (52 条)**：涵盖 Godot 游戏工程的文档治理（`DOC-`、`LINK-`）、高性能脚本契约（`ADV-`）与配置架构审查规则；
 4. **`globalTooling` (7 条)**：涵盖提交规范与禁词风格拦截（`CMG-STY-001`~`006`）及四大受控项目归属声明守卫（`CMG-PRJ-001`）。
 
 ---

@@ -123,13 +123,15 @@ if (-not $Json) {
     Write-Host "=================================================================" -ForegroundColor Cyan
 }
 
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+
 $startTime = [System.Diagnostics.Stopwatch]::StartNew()
 $failed = $false
 
 # 1. 物理卫生与零空文件看守
 if (-not $Json) { Write-Host "▶ [1/5] 检查全工作区物理卫生、同构脚本与零空文件..." -ForegroundColor Gray }
-$res = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-no-empty-files.js" -NoNewWindow -PassThru -Wait
-$resIso = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-script-isomorphism.js" -NoNewWindow -PassThru -Wait
+$res = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-no-empty-files.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
+$resIso = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-script-isomorphism.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
 $codeEmpty = $res.ExitCode
 $codeIso = $resIso.ExitCode
 if ($codeEmpty -ne 0 -or $codeIso -ne 0) {
@@ -141,8 +143,8 @@ if ($codeEmpty -ne 0 -or $codeIso -ne 0) {
 
 # 2. 单源规则注册表与目录一致性及技能集规范
 if (-not $Json) { Write-Host "▶ [2/5] 聚合与校验全工作区单源规则目录与技能集规范..." -ForegroundColor Gray }
-$res = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/generate-rule-catalog.js" -NoNewWindow -PassThru -Wait
-$resSkills = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-skills.js" -NoNewWindow -PassThru -Wait
+$res = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/generate-rule-catalog.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
+$resSkills = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-skills.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
 $codeCatalog = $res.ExitCode
 $codeSkills = $resSkills.ExitCode
 if ($codeCatalog -ne 0 -or $codeSkills -ne 0) {
@@ -153,7 +155,6 @@ if ($codeCatalog -ne 0 -or $codeSkills -ne 0) {
 }
 
 # 3, 4, 5. 多项目并行并发审查调度 (auto-refactor [3/5], workspace-timing [4/5], WebGames [5/5])
-$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $autoRefactorDir = Join-Path $repoRoot "auto-refactor"
 $workspaceTimingDir = Join-Path $repoRoot "workspace-timing"
 
