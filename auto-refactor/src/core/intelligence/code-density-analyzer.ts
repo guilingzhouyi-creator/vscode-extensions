@@ -79,35 +79,51 @@ const LINE_WEIGHTS: Record<LineClassificationKind, number> = {
     FRAMEWORK_SCAFFOLD: 0.2,
 };
 
+interface BlockCommentDelimiter {
+    open: string;
+    close: string;
+}
+
+const BLOCK_COMMENT_DELIMITERS: readonly BlockCommentDelimiter[] = [
+    { open: '/*', close: '*/' },
+    { open: '<#', close: '#>' },
+    { open: '"""', close: '"""' },
+    { open: "'''", close: "'''" },
+    { open: '<!--', close: '-->' },
+];
+
 /**
- * Classifies block comment continuation or opening.
+ * Classifies block comment continuation or opening across languages
+ * (C-style, PowerShell, Python/GDScript docstrings, HTML/XML).
  */
 function classifyBlockComment(
     trimmed: string,
-    inBlockComment: boolean,
-): { kind: LineClassificationKind; nextInBlockComment: boolean } | null {
-    if (inBlockComment) {
-        const commentEndIndex = trimmed.indexOf('*/');
+    activeCloseToken: string | null,
+): { kind: LineClassificationKind; nextCloseToken: string | null } | null {
+    if (activeCloseToken !== null) {
+        const commentEndIndex = trimmed.indexOf(activeCloseToken);
         if (commentEndIndex !== -1) {
-            const rest = trimmed.slice(commentEndIndex + 2).trim();
+            const rest = trimmed.slice(commentEndIndex + activeCloseToken.length).trim();
             return {
                 kind: rest.length > 0 ? 'EFFECTIVE_CODE' : 'COMMENT_LINE',
-                nextInBlockComment: false,
+                nextCloseToken: null,
             };
         }
-        return { kind: 'COMMENT_LINE', nextInBlockComment: true };
+        return { kind: 'COMMENT_LINE', nextCloseToken: activeCloseToken };
     }
 
-    if (trimmed.startsWith('/*')) {
-        const commentEndIndex = trimmed.indexOf('*/', 2);
-        if (commentEndIndex !== -1) {
-            const rest = trimmed.slice(commentEndIndex + 2).trim();
-            return {
-                kind: rest.length > 0 ? 'EFFECTIVE_CODE' : 'COMMENT_LINE',
-                nextInBlockComment: false,
-            };
+    for (const delimiter of BLOCK_COMMENT_DELIMITERS) {
+        if (trimmed.startsWith(delimiter.open)) {
+            const commentEndIndex = trimmed.indexOf(delimiter.close, delimiter.open.length);
+            if (commentEndIndex !== -1) {
+                const rest = trimmed.slice(commentEndIndex + delimiter.close.length).trim();
+                return {
+                    kind: rest.length > 0 ? 'EFFECTIVE_CODE' : 'COMMENT_LINE',
+                    nextCloseToken: null,
+                };
+            }
+            return { kind: 'COMMENT_LINE', nextCloseToken: delimiter.close };
         }
-        return { kind: 'COMMENT_LINE', nextInBlockComment: true };
     }
 
     return null;
@@ -145,24 +161,24 @@ function classifySingleLine(trimmed: string, isFileGenerated: boolean): LineClas
  * Classifies an individual physical line of source text.
  *
  * @param line - Raw line text without trailing line break
- * @param inBlockComment - Whether currently inside a multi-line block comment
+ * @param activeCloseToken - Closer if currently inside a multi-line block comment
  * @param isFileGenerated - Whether entire file is flagged as auto-generated
- * @returns Classification kind and next block comment state
+ * @returns Classification kind and next active block comment closer
  */
 function classifyLine(
     line: string,
-    inBlockComment: boolean,
+    activeCloseToken: string | null,
     isFileGenerated: boolean,
-): { kind: LineClassificationKind; nextInBlockComment: boolean } {
+): { kind: LineClassificationKind; nextCloseToken: string | null } {
     const trimmed = line.trim();
 
     // 1. Blank line
     if (!trimmed) {
-        return { kind: 'BLANK_LINE', nextInBlockComment: inBlockComment };
+        return { kind: 'BLANK_LINE', nextCloseToken: activeCloseToken };
     }
 
     // 2. Block comment check
-    const blockResult = classifyBlockComment(trimmed, inBlockComment);
+    const blockResult = classifyBlockComment(trimmed, activeCloseToken);
     if (blockResult) {
         return blockResult;
     }
@@ -170,7 +186,7 @@ function classifyLine(
     // 3. Single-line pattern dispatch
     return {
         kind: classifySingleLine(trimmed, isFileGenerated),
-        nextInBlockComment: false,
+        nextCloseToken: null,
     };
 }
 
@@ -204,16 +220,16 @@ export function analyzeCodeDensity(content: string, filePath?: string): CodeDens
             )) ||
         (lines.length > 0 && AUTO_GENERATED_PATTERN.test(lines[0]));
 
-    let inBlockComment = false;
+    let activeCloseToken: string | null = null;
     let weightedSum = 0;
 
     for (const line of lines) {
-        const { kind, nextInBlockComment } = classifyLine(
+        const { kind, nextCloseToken } = classifyLine(
             line,
-            inBlockComment,
+            activeCloseToken,
             Boolean(isFileGenerated),
         );
-        inBlockComment = nextInBlockComment;
+        activeCloseToken = nextCloseToken;
         counts[kind]++;
         weightedSum += LINE_WEIGHTS[kind];
     }

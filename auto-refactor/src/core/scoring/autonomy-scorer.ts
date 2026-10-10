@@ -402,7 +402,7 @@ function accumulateFileMetric(
             ? prefetchedContent
             : loadFileRawContent(metric, config, fileContents);
     const provenance = classifyFileProvenance(metric.file, rawContent.slice(0, 500));
-    const eloc = metric.lines || 1;
+    const eloc = (metric as any).nonBlankLines || metric.lines || 1;
 
     if (provenance === 'in_tree_vendor') {
         state.vendorFiles++;

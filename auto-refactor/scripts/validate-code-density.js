@@ -76,6 +76,33 @@ async function testLineSpectrumClassification() {
   );
   assert.ok(metrics.effectiveDensity > 0 && metrics.effectiveDensity < 1.0);
 
+  // Multi-language block comments assertion (Python docstrings & PowerShell block comments)
+  const pythonDocstringSample = [
+    '"""',
+    'Module documentation header',
+    'Explaining package semantics in detail',
+    '"""',
+    'def calculate_total(a, b):',
+    '    return a + b',
+  ].join('\n');
+  const pyMetrics = analyzeCodeDensity(pythonDocstringSample, 'calc.py');
+  assert.strictEqual(pyMetrics.classificationCounts.COMMENT_LINE, 4);
+  assert.strictEqual(pyMetrics.classificationCounts.EFFECTIVE_CODE, 2);
+
+  const psHelpSample = [
+    '<#',
+    '.SYNOPSIS',
+    '    Commandlet help and documentation.',
+    '#>',
+    'function Invoke-Task {',
+    '    Write-Output "Task"',
+    '}',
+  ].join('\n');
+  const psMetrics = analyzeCodeDensity(psHelpSample, 'task.ps1');
+  assert.strictEqual(psMetrics.classificationCounts.COMMENT_LINE, 4);
+  assert.strictEqual(psMetrics.classificationCounts.EFFECTIVE_CODE, 2);
+  assert.strictEqual(psMetrics.classificationCounts.FORMATTED_WRAP, 1);
+
   console.log('  ✔ 9 line spectrum categories classified and weighted correctly');
   console.log(
     `    - Physical: ${metrics.physicalLines}, Effective: ${metrics.effectiveCodeLines}, Density: ${metrics.effectiveDensity}`,

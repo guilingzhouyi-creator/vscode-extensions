@@ -45,7 +45,10 @@ export const PROTOTYPE_COMPLEXITY_WARN = 15;
 export const PROTOTYPE_COMPLEXITY_FAIL = 25;
 /** File line warning threshold for industrial tier. */
 export const INDUSTRIAL_FILE_LINES_WARN = 350;
-/** File line failure threshold for industrial tier (aligned with 1400 LOC ceiling to avoid ELOC/LOC inversion). */
+/**
+ * File line failure threshold for industrial tier
+ * (aligned with 1400 LOC ceiling to prevent ELOC/LOC threshold inversion).
+ */
 export const INDUSTRIAL_FILE_LINES_FAIL = 1_400;
 /** Complexity warning threshold for industrial tier. */
 export const INDUSTRIAL_COMPLEXITY_WARN = 8;
