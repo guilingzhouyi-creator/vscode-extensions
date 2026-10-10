@@ -31,7 +31,7 @@ Write-Host "=================================================================" -
 
 $npmCmd = if ($IsWindows -or $env:OS -match "Windows") { "npm.cmd" } else { "npm" }
 $nodeCmd = if ($IsWindows -or $env:OS -match "Windows") { "node.exe" } else { "node" }
-$pythonCmd = if (Get-Command python3 -ErrorAction SilentlyContinue) { "python3" } elseif (Get-Command python -ErrorAction SilentlyContinue) { "python" } else { "py" }
+$pythonCmd = if (Get-Command python -ErrorAction SilentlyContinue) { "python" } elseif (Get-Command python3.12 -ErrorAction SilentlyContinue) { "python3.12" } elseif (Get-Command python3 -ErrorAction SilentlyContinue) { "python3" } else { "py" }
 $failed = $false
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "../..")).Path

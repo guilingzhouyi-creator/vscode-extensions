@@ -245,16 +245,17 @@ fn scan_raw_string_ascii(
     let mut cursor = pos + 1;
     while cursor < len {
         out[cursor] = b' ';
-        if line[cursor] == b'"' {
-            if cursor + 1 + hashes <= len
-                && line[cursor + 1..cursor + 1 + hashes].iter().all(|&c| c == b'#')
-            {
-                for offset in 1..=hashes {
-                    out[cursor + offset] = b' ';
-                }
-                state.raw_string = None;
-                return Some(cursor + 1 + hashes);
+        if line[cursor] == b'"'
+            && cursor + 1 + hashes <= len
+            && line[cursor + 1..cursor + 1 + hashes]
+                .iter()
+                .all(|&c| c == b'#')
+        {
+            for offset in 1..=hashes {
+                out[cursor + offset] = b' ';
             }
+            state.raw_string = None;
+            return Some(cursor + 1 + hashes);
         }
         cursor += 1;
     }
@@ -273,14 +274,17 @@ fn step_raw_string_continuation_ascii(
     len: usize,
 ) -> usize {
     out[index] = b' ';
-    if line[index] == b'"' && index + 1 + hashes <= len {
-        if line[index + 1..index + 1 + hashes].iter().all(|&c| c == b'#') {
-            for offset in 1..=hashes {
-                out[index + offset] = b' ';
-            }
-            state.raw_string = None;
-            return index + 1 + hashes;
+    if line[index] == b'"'
+        && index + 1 + hashes <= len
+        && line[index + 1..index + 1 + hashes]
+            .iter()
+            .all(|&c| c == b'#')
+    {
+        for offset in 1..=hashes {
+            out[index + offset] = b' ';
         }
+        state.raw_string = None;
+        return index + 1 + hashes;
     }
     index + 1
 }
@@ -288,10 +292,7 @@ fn step_raw_string_continuation_ascii(
 #[inline]
 fn is_raw_string_candidate_ascii(line: &[u8], index: usize, len: usize) -> bool {
     let b = line[index];
-    b == b'r'
-        || ((b == b'b' || b == b'c')
-            && index + 1 < len
-            && line[index + 1] == b'r')
+    b == b'r' || ((b == b'b' || b == b'c') && index + 1 < len && line[index + 1] == b'r')
 }
 
 #[inline]
@@ -508,18 +509,17 @@ fn scan_raw_string_u16(
     let mut cursor = pos + 1;
     while cursor < len {
         out[cursor] = 0x20;
-        if units[cursor] == b'"' as u16 {
-            if cursor + 1 + hashes <= len
-                && units[cursor + 1..cursor + 1 + hashes]
-                    .iter()
-                    .all(|&c| c == b'#' as u16)
-            {
-                for offset in 1..=hashes {
-                    out[cursor + offset] = 0x20;
-                }
-                state.raw_string = None;
-                return Some(cursor + 1 + hashes);
+        if units[cursor] == b'"' as u16
+            && cursor + 1 + hashes <= len
+            && units[cursor + 1..cursor + 1 + hashes]
+                .iter()
+                .all(|&c| c == b'#' as u16)
+        {
+            for offset in 1..=hashes {
+                out[cursor + offset] = 0x20;
             }
+            state.raw_string = None;
+            return Some(cursor + 1 + hashes);
         }
         cursor += 1;
     }
@@ -538,14 +538,17 @@ fn step_raw_string_continuation_u16(
     len: usize,
 ) -> usize {
     out[index] = 0x20;
-    if units[index] == b'"' as u16 && index + 1 + hashes <= len {
-        if units[index + 1..index + 1 + hashes].iter().all(|&c| c == b'#' as u16) {
-            for offset in 1..=hashes {
-                out[index + offset] = 0x20;
-            }
-            state.raw_string = None;
-            return index + 1 + hashes;
+    if units[index] == b'"' as u16
+        && index + 1 + hashes <= len
+        && units[index + 1..index + 1 + hashes]
+            .iter()
+            .all(|&c| c == b'#' as u16)
+    {
+        for offset in 1..=hashes {
+            out[index + offset] = 0x20;
         }
+        state.raw_string = None;
+        return index + 1 + hashes;
     }
     index + 1
 }
@@ -846,7 +849,10 @@ mod tests {
         let res = mask_source_code(code, &rust_config());
         assert_eq!(res.lines, 2);
         assert_eq!(res.masked[0], "let s =                  ; let next = 10;");
-        assert_eq!(res.masked[1], "let s2 =         ; let s3 =                                  ;");
+        assert_eq!(
+            res.masked[1],
+            "let s2 =         ; let s3 =                                  ;"
+        );
     }
 
     #[test]
@@ -873,9 +879,6 @@ mod tests {
     fn test_rust_byte_raw_string() {
         let code = "let b = br#\"hello\"#; let c = cr\"cstr\";";
         let res = mask_source_code(code, &rust_config());
-        assert_eq!(
-            res.masked[0],
-            "let b =            ; let c =         ;"
-        );
+        assert_eq!(res.masked[0], "let b =            ; let c =         ;");
     }
 }
