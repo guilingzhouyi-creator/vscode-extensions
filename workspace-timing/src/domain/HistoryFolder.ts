@@ -393,6 +393,56 @@ function parseFoldOptions(options: HistoryFoldOptions, defaultNow: number): Hist
     };
 }
 
+/** 按本地自然日聚合原始有效会话历时 */
+function aggregateRawDayTotals(sessions: readonly TimeSession[]): Map<string, number> {
+    const dayTotals = new Map<string, number>();
+    for (const s of sessions) {
+        if (s.startMs > 0 && s.endMs > s.startMs) {
+            const date = localDateStr(s.startMs);
+            dayTotals.set(date, (dayTotals.get(date) ?? 0) + s.durationMs);
+        }
+    }
+    return dayTotals;
+}
+
+/** 判定日桶是否属于镜像重复注入或异常超限条目 */
+function isRedundantDailyBucket(bucketTotal: number, rawTotal?: number): boolean {
+    if (rawTotal === undefined) {
+        return false;
+    }
+    return bucketTotal === rawTotal || bucketTotal + rawTotal > MS_PER_DAY;
+}
+
+/**
+ * 清除已在原始会话集合中重复注入或超限膨胀的日桶冗余条目（数据自愈不变量）。
+ * 若日桶时长与 sessions 当日累计完全相等（镜像重复注入）或两者相加超过 24h，予以剔除；
+ * 正常的单日部分折叠（两者不相等且总和未超 24h）予以完整保留。
+ */
+export function sanitizeOverlappingDailyTotals(
+    dailyTotals: DailyTotalsMap | undefined,
+    sessions: readonly TimeSession[],
+): DailyTotalsMap | undefined {
+    if (!dailyTotals || sessions.length === 0) {
+        return dailyTotals;
+    }
+    const dayTotals = aggregateRawDayTotals(sessions);
+    const cleaned: DailyTotalsMap = {};
+    let pruned = false;
+
+    for (const [date, bucket] of Object.entries(dailyTotals)) {
+        if (isRedundantDailyBucket(bucket.totalMs, dayTotals.get(date))) {
+            pruned = true;
+            continue;
+        }
+        cleaned[date] = bucket;
+    }
+
+    if (!pruned) {
+        return dailyTotals;
+    }
+    return Object.keys(cleaned).length > 0 ? cleaned : undefined;
+}
+
 /**
  * 迁移与标准化（启动恢复、还原或运行期回收）：
  * 补齐 dailyTotals 并对工作会话与空闲会话执行双轨时间与容量双阈值折叠。
@@ -414,7 +464,8 @@ export function migrateToFolded(
     foldedIdleCount: number;
 } {
     const opt = parseFoldOptions(options, now);
-    const recycleResult = recycleSessions(data.sessions ?? [], data.dailyTotals, opt);
+    const sanitizedTotals = sanitizeOverlappingDailyTotals(data.dailyTotals, data.sessions ?? []);
+    const recycleResult = recycleSessions(data.sessions ?? [], sanitizedTotals, opt);
     const idleResult = recycleIdleSessions(data.idleSessions ?? [], recycleResult.updatedDailyTotals, opt);
     return {
         sessions: recycleResult.keptSessions,

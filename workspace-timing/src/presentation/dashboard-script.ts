@@ -110,17 +110,38 @@ export function buildDashboardScript(labels: Record<string, string>): string {
         setValue('numAiCooldown', data.aiCooldownSeconds ?? 60);
 
         // 对比契约：跨工作区对比视图渲染
-        renderWorkspaceCompare(data.workspaceList, data.workspaceCount, data.globalTotalMs);
+        try {
+          renderWorkspaceCompare(data.workspaceList, data.workspaceCount, data.globalTotalMs);
+        } catch (err) {
+          console.error('[workspace-timing] renderWorkspaceCompare failed', err);
+        }
 
         // 指标契约：周报关键指标（日均/活跃天/最活跃日） + 多周趋势 + 今日明细
-        renderWeeklySummary(data.weeklySummary, data.weeklyTrend, data.weeklyLimitEnabled, data.weeklyLimitHours);
-        renderTodayDetail(data.todayDetail, data.chartDualTrackDisplay !== false);
+        try {
+          renderWeeklySummary(data.weeklySummary, data.weeklyTrend, data.weeklyLimitEnabled, data.weeklyLimitHours);
+        } catch (err) {
+          console.error('[workspace-timing] renderWeeklySummary failed', err);
+        }
+
+        try {
+          renderTodayDetail(data.todayDetail, data.chartDualTrackDisplay !== false);
+        } catch (err) {
+          console.error('[workspace-timing] renderTodayDetail failed', err);
+        }
 
         // 矩阵契约：活动时间线热力图矩阵渲染
-        renderHeatmap(data.heatmap);
+        try {
+          renderHeatmap(data.heatmap);
+        } catch (err) {
+          console.error('[workspace-timing] renderHeatmap failed', err);
+        }
 
         // 算法契约：周报活跃曲线常驻渲染（双曲线支持）
-        renderActiveCurve(data.dailyStats, data.chartDualTrackDisplay !== false);
+        try {
+          renderActiveCurve(data.dailyStats, data.chartDualTrackDisplay !== false);
+        } catch (err) {
+          console.error('[workspace-timing] renderActiveCurve failed', err);
+        }
 
         pendingData = data;
       }
@@ -679,7 +700,7 @@ export function buildDashboardScript(labels: Record<string, string>): string {
       }
 
       // ---- 今日明细渲染 ----
-      function renderTodayDetail(detail) {
+      function renderTodayDetail(detail, isDualTrack) {
         const section = document.getElementById('todaySection');
         const listEl = document.getElementById('sessionList');
         const emptyEl = document.getElementById('sessionEmpty');

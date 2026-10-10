@@ -89,7 +89,7 @@ describe('RecoveryService（崩溃恢复编排）', () => {
     assert.strictEqual(data.totalMs, 5000);
   });
 
-  it('journal 回放：切片合成会话段并入日桶，totalMs 累加', async () => {
+  it('journal 回放：切片合成会话段进入 sessions，totalMs 累加（防日桶重复膨胀）', async () => {
     const base = emptyData();
     base.totalMs = 1000;
     const now = Date.now();
@@ -102,11 +102,11 @@ describe('RecoveryService（崩溃恢复编排）', () => {
     const journal = new FakeJournal(slices);
     const data = await makeRecovery(store, journal).recover(45);
     assert.strictEqual(data.totalMs, 4000, '1000 + 3×1000');
-    assert.ok(data.sessions.length >= 1, '回放应合成会话段');
+    assert.ok(data.sessions.length >= 1, '回放应合成活跃会话段');
     assert.strictEqual(journal.truncateCalls, 1, '回放成功后应清空 journal');
     const today = new Date();
     const key = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-    assert.ok(data.dailyTotals[key], '合成段应同步入日桶');
+    assert.strictEqual(data.dailyTotals[key], undefined, '未过期活跃会话保留在 sessions，严禁同日重复注入 dailyTotals');
   });
 
   it('水位线去重：metadata.lastJournalTs 之下的旧切片不重复累计', async () => {

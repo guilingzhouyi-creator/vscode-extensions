@@ -252,4 +252,27 @@ describe('TimerEngine（计时核心）', () => {
       assert.ok(eng.getTodayIdleMs() >= 0);
     });
   });
+
+  it('防时间膨胀：当 dailyTotals 与今日 sessions 重合时，优先以原始会话为准，单日不翻倍', () => {
+    withFixedNow('2026-10-10T15:00:00', () => {
+      const eng = new TimerEngine();
+      const noon = new Date('2026-10-10T12:00:00').getTime();
+      const todayKey = '2026-10-10';
+      eng.replaceData({
+        version: 3,
+        totalMs: 3600000,
+        currentSessionStartMs: 0,
+        lastSavedAtMs: noon + 3600000,
+        isEnabled: true,
+        sessions: [
+          { startMs: noon, endMs: noon + 3600000, durationMs: 3600000, manualMs: 3600000, aiMs: 0 },
+        ],
+        dailyTotals: {
+          [todayKey]: { totalMs: 3600000, sessionCount: 1 },
+        },
+      });
+      // 必须严格等于 3600000ms (1h)，绝不能翻倍成 7200000ms (2h)
+      assert.strictEqual(eng.getTodayMs(), 3600000, '今日会话重叠时严格去重不翻倍');
+    });
+  });
 });

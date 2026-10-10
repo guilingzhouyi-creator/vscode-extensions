@@ -134,14 +134,17 @@ export class TimerEngine {
         };
     }
 
-    /** 惰性重算（日切或数据替换后每自然日/每替换至多一次 O(N)） */
-    private recomputeTodayEnded(): void {
-        const initial = TimerEngine.extractBucketTotals(this._data.dailyTotals?.[this._todayKey]);
-        let total = initial.total;
-        let manual = initial.manual;
-        let ai = initial.ai;
-        let idle = initial.idle;
+    /** 合并已折叠日桶指标与原始会话指标（防时间膨胀不变量） */
+    private static canMergeBucketMetric(initialTotal: number, rawTotal: number): boolean {
+        if (initialTotal <= 0) return false;
+        if (rawTotal === 0) return true;
+        return initialTotal !== rawTotal && rawTotal + initialTotal <= MS_PER_DAY;
+    }
 
+    private computeRawTodayWork(): { total: number; manual: number; ai: number } {
+        let total = 0;
+        let manual = 0;
+        let ai = 0;
         for (const s of this._data.sessions) {
             const overlap = this.todayOverlap(s.startMs, s.endMs);
             if (overlap <= 0) continue;
@@ -150,18 +153,31 @@ export class TimerEngine {
             ai += parts.ai;
             manual += parts.manual;
         }
+        return { total, manual, ai };
+    }
 
+    private computeRawTodayIdle(): number {
+        let idle = 0;
         for (const is of (this._data.idleSessions ?? [])) {
             const overlap = this.todayOverlap(is.startMs, is.endMs);
-            if (overlap > 0) {
-                idle += overlap;
-            }
+            if (overlap > 0) idle += overlap;
         }
+        return idle;
+    }
 
-        this._todayEndedMs = total;
-        this._todayEndedManualMs = manual;
-        this._todayEndedAiMs = ai;
-        this._todayEndedIdleMs = idle;
+    /** 惰性重算（日切或数据替换后每自然日/每替换至多一次 O(N)） */
+    private recomputeTodayEnded(): void {
+        const rawWork = this.computeRawTodayWork();
+        const rawIdle = this.computeRawTodayIdle();
+        const initial = TimerEngine.extractBucketTotals(this._data.dailyTotals?.[this._todayKey]);
+
+        const shouldMergeWork = TimerEngine.canMergeBucketMetric(initial.total, rawWork.total);
+        const shouldMergeIdle = TimerEngine.canMergeBucketMetric(initial.idle, rawIdle);
+
+        this._todayEndedMs = rawWork.total + (shouldMergeWork ? initial.total : 0);
+        this._todayEndedManualMs = rawWork.manual + (shouldMergeWork ? initial.manual : 0);
+        this._todayEndedAiMs = rawWork.ai + (shouldMergeWork ? initial.ai : 0);
+        this._todayEndedIdleMs = rawIdle + (shouldMergeIdle ? initial.idle : 0);
     }
 
     /** 确保今日日键与增量计数器处于最新鲜状态 */

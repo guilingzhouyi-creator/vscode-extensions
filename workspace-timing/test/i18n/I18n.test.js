@@ -140,4 +140,12 @@ describe('i18n（面板词条完整性）', () => {
       assert.ok(!forbidden.test(String(v)), `en[${k}] 暴露内部技术术语: ${v}`);
     }
   });
+
+  it('脚本契约：renderTodayDetail 声明包含 isDualTrack 形参且 updateUI 具有防御容灾保护', () => {
+    const { buildDashboardScript } = require('../../out/presentation/dashboard-script.js');
+    const script = buildDashboardScript({});
+    assert.ok(script.includes('function renderTodayDetail(detail, isDualTrack)'), 'renderTodayDetail 必须声明 isDualTrack 参数以防 ReferenceError');
+    assert.ok(script.includes('renderHeatmap failed'), 'updateUI 应包含 renderHeatmap 容灾防御');
+    assert.ok(script.includes('renderActiveCurve failed'), 'updateUI 应包含 renderActiveCurve 容灾防御');
+  });
 });

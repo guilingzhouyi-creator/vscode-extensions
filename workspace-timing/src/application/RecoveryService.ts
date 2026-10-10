@@ -16,10 +16,9 @@ import {
     MS_PER_SECOND,
     DEFAULT_RAW_RETENTION_DAYS,
     DEFAULT_SESSION_CAP,
-    DailyTotalsMap,
     TimeSlice,
 } from '../domain/models';
-import { TimeAggregator, localDateStr } from '../domain/TimeAggregator';
+import { TimeAggregator } from '../domain/TimeAggregator';
 import { migrateToFolded } from '../domain/HistoryFolder';
 import { IJournalStore } from '../cache/IJournalStore';
 import { LogLevel, log } from '../integration/Logger';
@@ -31,22 +30,6 @@ const SLICE_CONTINUITY_GAP_MS = 3 * MS_PER_SECOND;
 export interface IRecoveryStore {
     load(): Promise<{ data: WorkspaceTimingData | null; source: string }>;
     save(data: WorkspaceTimingData, forceFileBackup?: boolean): Promise<void>;
-}
-
-/** 合成会话段累入日桶 */
-function addSegsToDaily(
-    totals: DailyTotalsMap | undefined,
-    segs: { startMs: number; durationMs: number }[],
-): DailyTotalsMap {
-    const map: DailyTotalsMap = totals ? { ...totals } : {};
-    for (const seg of segs) {
-        const key = localDateStr(seg.startMs);
-        const bucket = map[key] ?? { totalMs: 0, sessionCount: 0 };
-        bucket.totalMs += seg.durationMs;
-        bucket.sessionCount += 1;
-        map[key] = bucket;
-    }
-    return map;
 }
 
 export class RecoveryService {
@@ -134,7 +117,6 @@ export class RecoveryService {
         for (const run of runs) {
             const segs = TimeAggregator.splitByNaturalDay(run.startMs, run.endMs);
             data.sessions.push(...segs);
-            data.dailyTotals = addSegsToDaily(data.dailyTotals, segs);
             synthesized += segs.length;
         }
 
@@ -213,7 +195,6 @@ export class RecoveryService {
             data.totalMs += elapsed;
             const segs = TimeAggregator.splitByNaturalDay(data.currentSessionStartMs, maxCompensatedEnd);
             data.sessions.push(...segs);
-            data.dailyTotals = addSegsToDaily(data.dailyTotals, segs);
             log(LogLevel.Info, `RecoveryService: compensated unfinished session: +${elapsed}ms`);
         }
     }

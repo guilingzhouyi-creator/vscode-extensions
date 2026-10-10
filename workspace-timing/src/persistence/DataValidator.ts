@@ -18,6 +18,7 @@ import {
     MS_PER_DAY,
     TimingMetadata,
 } from '../domain/models';
+import { sanitizeOverlappingDailyTotals } from '../domain/HistoryFolder';
 
 export interface ValidationResult {
     ok: boolean;
@@ -232,7 +233,8 @@ export function validateTimingData(raw: unknown): ValidationResult {
 
     const sessions = sanitizeSessions(raw.sessions as unknown[]);
     const idleSessions = sanitizeIdleSessions(raw.idleSessions);
-    const dailyTotals = sanitizeDailyTotals(raw.dailyTotals);
+    const rawDailyTotals = sanitizeDailyTotals(raw.dailyTotals);
+    const dailyTotals = sanitizeOverlappingDailyTotals(rawDailyTotals, sessions);
     const metadata = sanitizeMetadata(raw.metadata);
 
     const totalMs = raw.totalMs as number;

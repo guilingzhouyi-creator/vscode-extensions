@@ -100,4 +100,22 @@ describe('DataValidator（还原校验器）', () => {
         assert.strictEqual(r.data.idleSessions[0].durationMs, 100);
         assert.strictEqual(r.data.idleSessions[0].reason, 'idle_timeout');
     });
+
+    it('自愈清洗：当 dailyTotals 中存在与未折叠 sessions 镜像重叠的日期时，自动剔除冗余日桶', () => {
+        const noon = new Date('2026-10-10T12:00:00').getTime();
+        const dateStr = '2026-10-10';
+        const r = validateTimingData(validFile({
+            sessions: [
+                { startMs: noon, endMs: noon + 3600000, durationMs: 3600000, manualMs: 3600000, aiMs: 0 },
+            ],
+            dailyTotals: {
+                [dateStr]: { totalMs: 3600000, sessionCount: 1 },
+                '2026-01-01': { totalMs: 7200000, sessionCount: 2 },
+            },
+        }));
+        assert.ok(r.ok);
+        assert.strictEqual(r.data.dailyTotals[dateStr], undefined, '重叠日桶应被剔除');
+        assert.ok(r.data.dailyTotals['2026-01-01'], '非重叠历史日桶应完整保留');
+        assert.strictEqual(r.data.dailyTotals['2026-01-01'].totalMs, 7200000);
+    });
 });
