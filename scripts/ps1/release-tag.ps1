@@ -1,17 +1,15 @@
-<#
-==============================================================================
-模块归属: 跨平台构建工具链 (Release · 发布闭环与标签发布)
-文件路径: scripts/ps1/release-tag.ps1
-架构定位: 发布流水线编排器 (Windows PowerShell)
-依赖与触发: 触发方: 发布负责人 CLI | 上游: version-bump.ps1 / package.ps1 | 下游: Git Tag / GitHub Release | 运行时: pwsh 7+
-职责说明: 编排版本递增、构建验证、资产校验、Git 提交与发布标签创建的完整交付闭环
-退出语义与设计依据: 退出码: 0=成功, 1=业务阻断, 2=用法错误 | 设计依据: AGENTS.md 统一发布工具链
-------------------------------------------------------------------------------
-用法示例:
-  pwsh -File scripts/ps1/release-tag.ps1 -Ext workspace-timing -Mode patch -Message 'vX.Y.Z — 标题'
-  pwsh -File scripts/ps1/release-tag.ps1 -Ext workspace-timing -Mode patch -Message 'vX.Y.Z — 标题' -NoPush
-==============================================================================
-#>
+# ==============================================================================
+# 模块归属: 跨平台构建工具链 (Release · 发布闭环与标签发布)
+# 文件路径: scripts/ps1/release-tag.ps1
+# 架构定位: 发布流水线编排器 (Windows PowerShell)
+# 依赖与触发: 触发方: 发布负责人 CLI | 上游: version-bump.ps1 / package.ps1 | 下游: Git Tag / GitHub Release | 运行时: pwsh 7+
+# 职责说明: 编排版本递增、构建验证、资产校验、Git 提交与发布标签创建的完整交付闭环
+# 退出语义与设计依据: 退出码: 0=成功, 1=业务阻断, 2=用法错误 | 设计依据: AGENTS.md 统一发布工具链
+# ------------------------------------------------------------------------------
+# 用法示例:
+#   pwsh -File scripts/ps1/release-tag.ps1 -Ext workspace-timing -Mode patch -Message 'vX.Y.Z — 标题'
+#   pwsh -File scripts/ps1/release-tag.ps1 -Ext workspace-timing -Mode patch -Message 'vX.Y.Z — 标题' -NoPush
+# ==============================================================================
 [CmdletBinding()]
 param(
     [Parameter(Position = 0, Mandatory = $true)]
