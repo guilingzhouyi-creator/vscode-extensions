@@ -364,7 +364,6 @@ export class GovernanceAnalyzer implements Analyzer {
         issues.push(buildGovernanceIssue(issueId, this.name, v, rule, loc, detail, actionable));
     }
 
-
     finalize(ctx: AnalyzerContext): Issue[] {
         // Source-code governance (naming, headers, type rules) does not apply to documentation
         // prose: markdown is audited by the dedicated `docs` analyzer instead.

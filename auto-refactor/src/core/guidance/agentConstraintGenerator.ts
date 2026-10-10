@@ -372,9 +372,7 @@ function renderClarifyDirective(
     line: number,
 ): CompactGuardDirective {
     const ruleId = issue.rule;
-    const question = (clarify.promptQuestion || issue.message || '')
-        .replace(/\s+/g, ' ')
-        .trim();
+    const question = (clarify.promptQuestion || issue.message || '').replace(/\s+/g, ' ').trim();
     const optKeys = (clarify.candidateOptions || [])
         .map((o) => (typeof o === 'string' ? o : o.key))
         .join(',');

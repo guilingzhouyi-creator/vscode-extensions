@@ -130,9 +130,7 @@ async function run() {
     console.log('  [PASS] complexity measured exactly (Widget.render=5, classify=5)');
 
     const magicSet = new Set(
-      report.issues
-        .filter((i) => i.rule === 'magic-number')
-        .map((i) => String(i.detail.value)),
+      report.issues.filter((i) => i.rule === 'magic-number').map((i) => String(i.detail.value)),
     );
     for (const expected of ['10', '100', '2', '3']) {
       assert.ok(magicSet.has(expected), `magic number ${expected} must be reported`);

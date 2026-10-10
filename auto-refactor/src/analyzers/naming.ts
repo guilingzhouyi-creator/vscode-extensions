@@ -40,12 +40,7 @@ import {
     type NamingActionablePayload,
 } from './naming-candidate-helper';
 
-export {
-    NamingMessages,
-    ALLOWED_SHORT_NAMES,
-    MAX_VARIABLE_NAME_LENGTH,
-    MAX_FUNCTION_NAME_LENGTH,
-};
+export { NamingMessages, ALLOWED_SHORT_NAMES, MAX_VARIABLE_NAME_LENGTH, MAX_FUNCTION_NAME_LENGTH };
 
 /**
  * Tunable options for NamingAnalyzer.
@@ -185,7 +180,19 @@ export class NamingAnalyzer implements Analyzer {
             opts,
             this.getSymbolIndex(ctx),
             (line, column, rule, message, severity, detail, suggestion, actionable) => {
-                issues.push(this.mkIssue(ctx, line, column, rule, message, severity, detail, suggestion, actionable));
+                issues.push(
+                    this.mkIssue(
+                        ctx,
+                        line,
+                        column,
+                        rule,
+                        message,
+                        severity,
+                        detail,
+                        suggestion,
+                        actionable,
+                    ),
+                );
             },
         );
     }
@@ -208,7 +215,19 @@ export class NamingAnalyzer implements Analyzer {
             opts,
             this.getSymbolIndex(ctx),
             (line, column, rule, message, severity, detail, suggestion, actionable) => {
-                issues.push(this.mkIssue(ctx, line, column, rule, message, severity, detail, suggestion, actionable));
+                issues.push(
+                    this.mkIssue(
+                        ctx,
+                        line,
+                        column,
+                        rule,
+                        message,
+                        severity,
+                        detail,
+                        suggestion,
+                        actionable,
+                    ),
+                );
             },
         );
     }
@@ -298,7 +317,8 @@ export class NamingAnalyzer implements Analyzer {
         const isClass = ts.isClassExpression(init);
         if (isFn || isClass) return;
 
-        // Composite object dictionaries (ObjectLiteralExpression, ArrayLiteralExpression, or with as const)
+        // Composite object dictionaries (ObjectLiteralExpression,
+        // ArrayLiteralExpression, or with as const)
         // are permitted to use camelCase (or UPPER_SNAKE_CASE).
         if (isCompositeLiteral(init)) {
             return;
@@ -534,7 +554,19 @@ export class NamingAnalyzer implements Analyzer {
                     opts,
                     this.getSymbolIndex(ctx),
                     (line, column, rule, message, severity, detail, suggestion, actionable) => {
-                        issues.push(this.mkIssue(ctx, line, column, rule, message, severity, detail, suggestion, actionable));
+                        issues.push(
+                            this.mkIssue(
+                                ctx,
+                                line,
+                                column,
+                                rule,
+                                message,
+                                severity,
+                                detail,
+                                suggestion,
+                                actionable,
+                            ),
+                        );
                     },
                 );
             }

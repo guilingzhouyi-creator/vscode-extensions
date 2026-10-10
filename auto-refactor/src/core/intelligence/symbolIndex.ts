@@ -93,7 +93,7 @@ export const DECLARATION_KIND_MAP: ReadonlyMap<NodeKind, SymbolKind> = new Map([
 ]);
 
 /** Map a language-neutral node kind to a declaration kind, or null when it declares nothing. */
-function declarationKindOf(kind: NodeKind): SymbolKind | null {
+function _declarationKindOf(kind: NodeKind): SymbolKind | null {
     return DECLARATION_KIND_MAP.get(kind) ?? null;
 }
 

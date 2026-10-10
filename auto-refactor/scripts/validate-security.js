@@ -57,7 +57,10 @@ function testDefaultSecretsDetection() {
     },
     {
       name: 'GitHub PAT Token',
-      line: 'const pat = "' + ['github', 'pat', '123456789012345678901234567890_12345678901234567890'].join('_') + '";',
+      line:
+        'const pat = "' +
+        ['github', 'pat', '123456789012345678901234567890_12345678901234567890'].join('_') +
+        '";',
       expectedKind: 'github-pat',
     },
     {

@@ -280,7 +280,8 @@ export class TsModernAnalyzer implements Analyzer {
             if (trimmed.length === 0) continue;
 
             const isStartOfDisposable = ISOLATED_DISPOSABLE_RE.test(line);
-            if (isStartOfDisposable && openParenDepth === 0 && !isPassedAsArgPreviousLine(masked, i)) {
+            const notPassedAsArg = !isPassedAsArgPreviousLine(masked, i);
+            if (isStartOfDisposable && openParenDepth === 0 && notPassedAsArg) {
                 const m = line.match(ISOLATED_DISPOSABLE_RE)!;
                 const col = findFirstNonWhitespaceColumn(line);
                 out.push(
@@ -587,10 +588,7 @@ interface ImportClauseRecord {
     names: string[];
 }
 
-function collectImportClauses(
-    masked: string[],
-    importLines: Set<number>,
-): ImportClauseRecord[] {
+function collectImportClauses(masked: string[], importLines: Set<number>): ImportClauseRecord[] {
     const records: ImportClauseRecord[] = [];
     for (const index of importLines) {
         const clause = NAMED_IMPORT_RE.exec(masked[index]);

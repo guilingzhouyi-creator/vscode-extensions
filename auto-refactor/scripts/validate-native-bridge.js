@@ -25,7 +25,7 @@ const {
   nativeHistogramDiff,
   nativeAnalyzeDependencyGraph,
   nativeFastPatternMatch,
-  nativeMaskSourceCode,
+  _nativeMaskSourceCode,
   PureJsNativeShim,
 } = require('../dist/api');
 
@@ -187,11 +187,12 @@ async function testRustRawStringMaskingDualTrack() {
     },
     {
       name: 'Multiline raw string with internal comments and quotes',
-      source: 'const R = r#"/* not a comment */\nline 2 // still inside\nend"#; // real comment\nconst B = 2;',
+      source:
+        'const R = r#"/* not a comment */\nline 2 // still inside\nend"#; // real comment\nconst B = 2;',
     },
     {
       name: 'Lifetimes and raw identifiers preservation',
-      source: "fn verify<'a>(r#type: &'a str) -> &str {\n    r#\"hello try!()\"#\n}",
+      source: 'fn verify<\'a>(r#type: &\'a str) -> &str {\n    r#"hello try!()"#\n}',
     },
     {
       name: 'Byte and C-string raw string literals',
@@ -250,7 +251,9 @@ async function testRustRawStringMaskingDualTrack() {
     }
   }
 
-  console.log('  ✔ Rust raw string literals masked with 100% byte equivalence between pure TS and native Rust');
+  console.log(
+    '  ✔ Rust raw string literals masked with 100% byte equivalence between pure TS and native Rust',
+  );
 }
 
 async function testMicroBenchmark() {

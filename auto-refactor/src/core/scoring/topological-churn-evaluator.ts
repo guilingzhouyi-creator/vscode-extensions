@@ -76,8 +76,7 @@ export class TopologicalChurnEvaluator {
         }
 
         const thirtyDaysAgo = this.nowTimestamp - 30 * 24 * 3600 * 1000;
-        const frozenThresholdAgo =
-            this.nowTimestamp - this.frozenThresholdDays * 24 * 3600 * 1000;
+        const frozenThresholdAgo = this.nowTimestamp - this.frozenThresholdDays * 24 * 3600 * 1000;
 
         let churn30dCommits = 0;
         for (const commit of history.recentCommits) {

@@ -36,10 +36,7 @@ const RETURN_TRUE_RE = /return\s+[Tt]rue/;
 const KEYWORD_PASS = 'pass';
 
 /** Languages supported for modern JavaScript/TypeScript construct checks. */
-const JS_TS_LANGUAGES: ReadonlySet<string> = new Set([
-    'typescript',
-    'javascript',
-]);
+const JS_TS_LANGUAGES: ReadonlySet<string> = new Set(['typescript', 'javascript']);
 
 /** GDScript pass keyword set library. */
 const GDSCRIPT_PASS_KEYWORDS: ReadonlySet<string> = new Set(['pass']);
@@ -64,10 +61,7 @@ const EXEMPT_PATH_TOKENS: ReadonlySet<string> = new Set([
 ]);
 
 /** Directory segments exempted from rule ID catalog verification. */
-const EXEMPT_DIRECTORIES: ReadonlySet<string> = new Set([
-    'rules',
-    'reports',
-]);
+const EXEMPT_DIRECTORIES: ReadonlySet<string> = new Set(['rules', 'reports']);
 
 /** Identifiers on lines to skip when inspecting for rule references. */
 const RULE_INTEGRITY_SKIP_IDENTIFIERS: ReadonlySet<string> = new Set([
@@ -76,7 +70,10 @@ const RULE_INTEGRITY_SKIP_IDENTIFIERS: ReadonlySet<string> = new Set([
     'RuleCatalogIntegrityRule',
 ]);
 
-/** Rule family prefixes from partner projects and global gates exempted from local registry resolution. */
+/**
+ * Rule family prefixes from partner projects and global gates exempted from
+ * local registry resolution.
+ */
 const EXEMPT_RULE_FAMILY_PREFIXES: ReadonlySet<string> = new Set([
     'ADV',
     'WT',
@@ -314,7 +311,8 @@ let cachedRegistryLength = 0;
 let registeredCanonicalFormsCache: Set<string> | null = null;
 
 /**
- * Returns the set of canonical 3-letter forms of registered rules, refreshing if registry size changed.
+ * Returns the set of canonical 3-letter forms of registered rules, refreshing
+ * if registry size changed.
  */
 function getRegisteredCanonicalForms(): Set<string> {
     if (registeredCanonicalFormsCache === null || cachedRegistryLength !== RULE_REGISTRY.length) {

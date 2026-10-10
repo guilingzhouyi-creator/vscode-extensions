@@ -187,13 +187,17 @@ export class ConstantsAnalyzer implements Analyzer {
     }
 
     private passLiteralClusters(ctx: AnalyzerContext, issues: Issue[]): void {
-        const enabled = Boolean(ctx.options?.checkConstantClusters || ctx.options?.constantGovernance);
+        const enabled = Boolean(
+            ctx.options?.checkConstantClusters || ctx.options?.constantGovernance,
+        );
         if (!enabled) return;
         issues.push(...scanNearLiteralClusters(this.literals, ctx.filePath));
     }
 
     private passConstantLayout(ctx: AnalyzerContext, issues: Issue[]): void {
-        const enabled = Boolean(ctx.options?.checkConstantLayout || ctx.options?.constantGovernance);
+        const enabled = Boolean(
+            ctx.options?.checkConstantLayout || ctx.options?.constantGovernance,
+        );
         if (!enabled || !ctx.content) return;
         issues.push(...checkConstantLayoutAndScope(ctx.content, ctx.filePath));
     }
@@ -230,7 +234,9 @@ export class ConstantsAnalyzer implements Analyzer {
     }
 
     private passConstantTopology(ctx: AnalyzerContext, issues: Issue[]): void {
-        const enabled = Boolean(ctx.options?.checkConstantTopology || ctx.options?.constantGovernance);
+        const enabled = Boolean(
+            ctx.options?.checkConstantTopology || ctx.options?.constantGovernance,
+        );
         if (!enabled || !ctx.content) return;
         this.executeTopologyPass(ctx, issues);
     }

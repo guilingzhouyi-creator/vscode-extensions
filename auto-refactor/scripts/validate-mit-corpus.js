@@ -277,7 +277,7 @@ async function main() {
       const rep = await scan({ root: bottlePath, include: ['bottle.py'] });
       assert.strictEqual(rep.summary.filesScanned, 1);
       const pyConstIssues = (rep.issues || []).filter(
-        (i) => (i.suggestion && (CONSTANT_RULES_SET.has(i.rule) || i.rule.includes('constant'))),
+        (i) => i.suggestion && (CONSTANT_RULES_SET.has(i.rule) || i.rule.includes('constant')),
       );
       for (const iss of pyConstIssues.slice(0, 10)) {
         if (iss.suggestion) {

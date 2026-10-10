@@ -99,9 +99,7 @@ function compileBoundaryPattern(pattern: BoundaryIsolationPattern): CompiledBoun
     const filePathRegex =
         stringIndicators.length > 0
             ? getOrCreateRegExp(
-                  stringIndicators
-                      .map((s) => escapeRegExp(s.toLowerCase()))
-                      .join('|'),
+                  stringIndicators.map((s) => escapeRegExp(s.toLowerCase())).join('|'),
               )
             : null;
 
@@ -123,9 +121,7 @@ function compileBoundaryPattern(pattern: BoundaryIsolationPattern): CompiledBoun
             });
             targetPatternStrings.push(escaped);
         } else {
-            const matcher = t.global
-                ? getOrCreateRegExp(t.source, t.flags.replace('g', ''))
-                : t;
+            const matcher = t.global ? getOrCreateRegExp(t.source, t.flags.replace('g', '')) : t;
             targets.push({
                 id: t.source,
                 matcher,
@@ -135,9 +131,7 @@ function compileBoundaryPattern(pattern: BoundaryIsolationPattern): CompiledBoun
     }
 
     const targetsFilterRegex =
-        targetPatternStrings.length > 0
-            ? getOrCreateRegExp(targetPatternStrings.join('|'))
-            : null;
+        targetPatternStrings.length > 0 ? getOrCreateRegExp(targetPatternStrings.join('|')) : null;
 
     return {
         filePathRegex,
@@ -365,10 +359,7 @@ export function matchResourceLifecycle(
  * @param blockingCalls - Regular expressions identifying blocking operations.
  * @returns Matched blocking function name, or null if none matched.
  */
-function findBlockingCallInLine(
-    line: string,
-    blockingCalls: readonly RegExp[],
-): string | null {
+function findBlockingCallInLine(line: string, blockingCalls: readonly RegExp[]): string | null {
     for (let i = 0; i < blockingCalls.length; i++) {
         const match = blockingCalls[i].exec(line);
         if (match) {
@@ -416,10 +407,7 @@ export function matchBlockingCalls(
  * @param scopes - Hot-path scope boundary regular expressions.
  * @returns Trimmed matched scope name, or null if line is not a hot-path scope header.
  */
-function findMatchingScope(
-    line: string,
-    scopes: readonly RegExp[],
-): string | null {
+function findMatchingScope(line: string, scopes: readonly RegExp[]): string | null {
     for (let i = 0; i < scopes.length; i++) {
         const match = scopes[i].exec(line);
         if (match) {

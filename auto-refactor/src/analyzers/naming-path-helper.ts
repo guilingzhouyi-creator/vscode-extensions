@@ -207,15 +207,9 @@ interface FileNamingTarget {
     ext: string;
 }
 
-type FileNamingStrategy = (
-    target: FileNamingTarget,
-    mkIssue: IssueFactory,
-) => Issue | null;
+type FileNamingStrategy = (target: FileNamingTarget, mkIssue: IssueFactory) => Issue | null;
 
-function auditJsTsFileName(
-    target: FileNamingTarget,
-    mkIssue: IssueFactory,
-): Issue | null {
+function auditJsTsFileName(target: FileNamingTarget, mkIssue: IssueFactory): Issue | null {
     const { filePath, baseName, nameWithoutExt, ext } = target;
     const isKebab = /^[a-z0-9]+(-[a-z0-9]+)*$/.test(nameWithoutExt);
     if (isKebab) return null;
@@ -235,10 +229,7 @@ function auditJsTsFileName(
     );
 }
 
-function auditSnakeFileName(
-    target: FileNamingTarget,
-    mkIssue: IssueFactory,
-): Issue | null {
+function auditSnakeFileName(target: FileNamingTarget, mkIssue: IssueFactory): Issue | null {
     const { filePath, baseName, nameWithoutExt, ext } = target;
     const cleaned = ext === '.py' ? nameWithoutExt.replace(/^_(?!_)/, '') : nameWithoutExt;
     const isSnake =

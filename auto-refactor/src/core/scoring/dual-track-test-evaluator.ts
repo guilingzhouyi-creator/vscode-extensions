@@ -16,10 +16,7 @@
  */
 
 import * as path from 'path';
-import type {
-    IntraFileZoneProfile,
-    SemanticZoneSegment,
-} from '../intelligence/zone-partitioner';
+import type { IntraFileZoneProfile, SemanticZoneSegment } from '../intelligence/zone-partitioner';
 import { ZONE_EMBEDDED_TEST } from '../intelligence/zone-partitioner';
 import { RULE_TST_TOP_001 } from './dimensionLiterals';
 
@@ -271,8 +268,7 @@ const PERMITTED_ZONE_CONTRACTS: readonly PermittedZoneContractRule[] = [
                             action: 'relocate_test_zone',
                             rule: RULE_TST_TOP_001,
                             targetFile: ctx.filePath,
-                            rationale:
-                                `Add #[cfg(test)] attribute to isolate test suite from release builds.`,
+                            rationale: `Add #[cfg(test)] attribute to isolate test suite from release builds.`,
                         },
                     },
                 };
@@ -300,8 +296,7 @@ const PERMITTED_ZONE_CONTRACTS: readonly PermittedZoneContractRule[] = [
                             action: 'annotate_test_intent',
                             rule: RULE_TST_TOP_001,
                             targetFile: ctx.filePath,
-                            rationale:
-                                `Add doc comments with 'Case:' and 'Assertion:' for machine-readability.`,
+                            rationale: `Add doc comments with 'Case:' and 'Assertion:' for machine-readability.`,
                         },
                     },
                 };

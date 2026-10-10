@@ -141,7 +141,8 @@ function checkSnakeNaming(
  * File Path: src/analyzers/hygiene.ts
  * Architecture Role: Defensive pure fallback utility computing 32-bit FNV-1a hashes
  *   of meaningful source lines when native clone detection is unavailable or fails.
- * Dependencies & Triggers: Triggered only inside the catch block of HygieneAnalyzer.auditCloneBlocks.
+ * Dependencies & Triggers: Triggered only inside the catch block
+ *   of HygieneAnalyzer.auditCloneBlocks.
  * Responsibilities:
  *   1. Extract individual lines from raw file content.
  *   2. Filter out blank lines, comments (// and #), and solitary braces ({ and }).
@@ -236,23 +237,10 @@ export class HygieneAnalyzer implements Analyzer {
             if (file.endsWith('.py')) this.auditPythonNaming(content, file, ctx, issues);
         }
 
-        this.auditLineHygiene(
-            content,
-            len,
-            file,
-            checkDead,
-            checkStubs,
-            ctx,
-            issues,
-        );
+        this.auditLineHygiene(content, len, file, checkDead, checkStubs, ctx, issues);
 
         if (checkClones) {
-            this.auditCloneBlocks(
-                content,
-                minCloneLines,
-                ctx,
-                issues,
-            );
+            this.auditCloneBlocks(content, minCloneLines, ctx, issues);
         }
 
         if (opts.checkWrappers !== false) {

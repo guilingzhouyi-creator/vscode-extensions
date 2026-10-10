@@ -32,24 +32,16 @@ const SCRATCH_NODE_STACK: NormalizedNode[] = [];
 const SCRATCH_DEPTH_STACK: number[] = [];
 
 /** Node kinds targeted by trivial pass-through wrapper detection. */
-const TARGET_WRAPPER_KINDS: ReadonlySet<string> = new Set([
-    NodeKind.Function,
-    NodeKind.Method,
-]);
+const TARGET_WRAPPER_KINDS: ReadonlySet<string> = new Set([NodeKind.Function, NodeKind.Method]);
 
 /** Return keyword library for pass-through wrapper verification. */
 const RETURN_KEYWORDS: ReadonlySet<string> = new Set(['return']);
 
 /** File basenames exempted from lossy precision rounding checks. */
-const EXEMPT_PRECISION_FILENAMES: ReadonlySet<string> = new Set([
-    'compact-ledger-store.ts',
-]);
+const EXEMPT_PRECISION_FILENAMES: ReadonlySet<string> = new Set(['compact-ledger-store.ts']);
 
 /** Keywords and identifiers triggering lossy precision checks. */
-const PRECISION_TRIGGER_TOKENS: ReadonlySet<string> = new Set([
-    'Math',
-    'toFixed',
-]);
+const PRECISION_TRIGGER_TOKENS: ReadonlySet<string> = new Set(['Math', 'toFixed']);
 
 const KEYWORD_RETURN = 'return';
 

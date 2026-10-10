@@ -606,9 +606,7 @@ function resolveGateConfigFile(root: string): string | undefined {
 }
 
 function extractUnsuppressedErrors(issues: any[]): any[] {
-    return (issues || []).filter(
-        (issue: any) => issue.severity === 'error' && !issue.suppression,
-    );
+    return (issues || []).filter((issue: any) => issue.severity === 'error' && !issue.suppression);
 }
 
 function resolveGateScores(

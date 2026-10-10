@@ -122,8 +122,8 @@ const SCATTERED_CONFIG_PATTERNS = ['config.', 'Config.', 'GameConfig.', 'readFil
 const SCALE_SCORE_SMALL_PROJECT = 90;
 const SCALE_SCORE_STANDARD_PROJECT = 80;
 
-const DOMAIN_SEGMENT = '/domain/';
-const CORE_SEGMENT = '/core/';
+const _DOMAIN_SEGMENT = '/domain/';
+const _CORE_SEGMENT = '/core/';
 const DOMAIN_OR_CORE_RE = /\/(?:domain|core)\//;
 
 /** Immutable set of standard structural keys ignored during config key extraction. */
@@ -174,12 +174,7 @@ function extractDeclaredKeys(content: string): Set<string> {
 function collectObjectKeys(obj: unknown, keys: Set<string>, depth = 0): void {
     if (!obj || typeof obj !== 'object' || depth > 5) return;
     for (const [k, v] of Object.entries(obj)) {
-        if (
-            k &&
-            k.length >= 2 &&
-            isNaN(Number(k)) &&
-            !IGNORED_CONFIG_KEYS.has(k)
-        ) {
+        if (k && k.length >= 2 && isNaN(Number(k)) && !IGNORED_CONFIG_KEYS.has(k)) {
             keys.add(k);
         }
         if (v && typeof v === 'object') {
@@ -189,11 +184,11 @@ function collectObjectKeys(obj: unknown, keys: Set<string>, depth = 0): void {
 }
 
 /**
- * Partitions files into configuration definitions and general source files.
+ * Tests whether a normalized path matches any of the configuration file patterns.
  *
- * @param files - All scan files under review.
+ * @param normPath - Normalized file path to test.
  * @param patterns - Regular expressions identifying configuration file paths.
- * @returns Divided arrays of configuration files and source files.
+ * @returns True if the path matches any pattern, false otherwise.
  */
 function matchesConfigFile(normPath: string, patterns: readonly RegExp[]): boolean {
     for (let i = 0; i < patterns.length; i++) {

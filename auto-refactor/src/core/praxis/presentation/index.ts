@@ -16,18 +16,12 @@ export * from './presentation-types';
 export * from './presentation-adapter';
 export * from './semantic-correlation';
 
-import {
-    SEMANTIC_OVERLAP_GROUPS,
-    aggregateSemanticOverlappingCards,
-} from './semantic-correlation';
+import { SEMANTIC_OVERLAP_GROUPS, aggregateSemanticOverlappingCards } from './semantic-correlation';
 import {
     defaultPraxisPresentationService,
     createPraxisPresentationService,
 } from './presentation-adapter';
-import {
-    defaultPraxisI18nProvider,
-    createPraxisI18nProvider,
-} from './i18n-provider';
+import { defaultPraxisI18nProvider, createPraxisI18nProvider } from './i18n-provider';
 
 /**
  * Frozen presentation module facade contract guaranteeing immutability.

@@ -200,10 +200,7 @@ function formatFindingHeader(issue: Issue): string[] {
     const sev = issue.severity.toUpperCase();
     const file = issue.location?.file || 'unknown';
     const lineNo = issue.location?.start?.line ?? 1;
-    return [
-        `### [${sev}|${issue.rule}] ${file}:${lineNo}`,
-        `- Message: ${issue.message}`,
-    ];
+    return [`### [${sev}|${issue.rule}] ${file}:${lineNo}`, `- Message: ${issue.message}`];
 }
 
 function formatCrossFileDetails(crossFileContext: CrossFileUsageContext): string[] {

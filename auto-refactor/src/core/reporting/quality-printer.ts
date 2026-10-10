@@ -115,9 +115,7 @@ export function printQualityScoreAssessment(
     for (const [dim, val] of Object.entries(q.indices)) {
         const isNotEvaluated = notEvaluatedSet.has(dim as QualityDimension);
         const valText = isNotEvaluated ? 'N/A [NOT EVALUATED]' : (val as number).toFixed(1);
-        process.stdout.write(
-            `  • ${dim.padEnd(QUALITY_DIMENSION_LABEL_WIDTH)}: ${valText}\n`,
-        );
+        process.stdout.write(`  • ${dim.padEnd(QUALITY_DIMENSION_LABEL_WIDTH)}: ${valText}\n`);
     }
     if (triPlane) {
         renderTriPlaneVector(triPlane);

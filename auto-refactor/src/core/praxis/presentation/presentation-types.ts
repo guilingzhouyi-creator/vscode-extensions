@@ -111,7 +111,10 @@ export interface PraxisPresentationOptions {
     includeQuickFix?: boolean;
     /** Base URL for rule documentation links */
     docsBaseUrl?: string;
-    /** Whether to aggregate semantically overlapping cards at presentation level (defaults to true) */
+    /**
+     * Whether to aggregate semantically overlapping cards at presentation
+     * level (defaults to true).
+     */
     aggregateOverlaps?: boolean;
 }
 

@@ -407,8 +407,7 @@ export class SimplifyAnalyzer implements Analyzer {
         opts: SimplifyOptions,
         issues: Issue[],
     ): void {
-        const self = this;
-        function walk(node: ts.Node): void {
+        const walk = (node: ts.Node): void => {
             if (
                 ts.isFunctionDeclaration(node) ||
                 ts.isMethodDeclaration(node) ||
@@ -416,10 +415,10 @@ export class SimplifyAnalyzer implements Analyzer {
                 ts.isFunctionExpression(node) ||
                 ts.isConstructorDeclaration(node)
             ) {
-                self.auditFunctionParameters(node, sf, ctx, opts, issues);
+                this.auditFunctionParameters(node, sf, ctx, opts, issues);
             }
             ts.forEachChild(node, walk);
-        }
+        };
         walk(sf);
     }
 

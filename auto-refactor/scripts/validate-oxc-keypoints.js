@@ -165,7 +165,9 @@ function buildIssueLookup(issues) {
 const KEYPOINT_SPECS = [
   {
     evaluate: (lookup) => {
-      const n1 = ["'admin'", "'user'", "'guest'"].map((v) => lookup.hsAt(2, v)).filter(Boolean).length;
+      const n1 = ["'admin'", "'user'", "'guest'"]
+        .map((v) => lookup.hsAt(2, v))
+        .filter(Boolean).length;
       return {
         pass: n1 === 3,
         passMsg: '① type Role string literals → 3 hardcoded-string (line 2)',

@@ -104,8 +104,7 @@ function recordUnboundedCycleIssue(
         codeDomain: 'recursion-lifecycle',
         currentBehavior: `Mutual recursive invocation cycle: ${cycleKey}`,
         semanticEvidenceChain: evidence,
-        triggerCondition:
-            'Cyclic call path detected without verifiable base-case depth guard',
+        triggerCondition: 'Cyclic call path detected without verifiable base-case depth guard',
         risk: 'Potential call-stack exhaustion (StackOverflowError) under pathological or cyclic input graphs.',
         blastRadius: [file],
         isDeterministic: true,
@@ -133,8 +132,7 @@ function recordUnboundedCycleIssue(
             end: { line: primaryLine, column: MAX_SCORE_CAP },
         },
         detail,
-        suggestion:
-            'Convert to iterative stack loop or pass a bounded depth counter.',
+        suggestion: 'Convert to iterative stack loop or pass a bounded depth counter.',
         evidence: {
             confidence: 0.9,
             requiresRuntime: false,
@@ -263,12 +261,10 @@ function buildAmplificationIoIssue(symbol: string, site: LoopSite): Issue {
         blastRadius: [site.file],
         isDeterministic: true,
         requiresManualConfirm: false,
-        suggestedFix:
-            'Batch I/O operations outside the loop or buffer into a batch write.',
+        suggestedFix: 'Batch I/O operations outside the loop or buffer into a batch write.',
         impactedCallers: [],
         impactedTests: [],
-        verificationMethod:
-            'Profile I/O operation count under varying collection sizes.',
+        verificationMethod: 'Profile I/O operation count under varying collection sizes.',
         ruleVersion: '1.0.0',
         configVersion: '0.3.0',
         canAutofix: false,

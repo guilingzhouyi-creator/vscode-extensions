@@ -294,7 +294,8 @@ export class TestModernityAnalyzer implements Analyzer {
 
         for (let c = 0; c < caseRecords.length; c++) {
             const record = caseRecords[c];
-            if (record.assertionsCount > 0 && record.mockAssertionsCount === record.assertionsCount) {
+            const isAllMock = record.mockAssertionsCount === record.assertionsCount;
+            if (record.assertionsCount > 0 && isAllMock) {
                 const key = `${record.line}:${record.name}`;
                 if (!reportedMockKeys.has(key)) {
                     reportedMockKeys.add(key);

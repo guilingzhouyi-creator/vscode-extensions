@@ -181,7 +181,6 @@ function collectWarnReasons(
     return reasons;
 }
 
-
 function evaluateThresholdSeverity(
     m: FileMetric,
     t: Record<string, any>,

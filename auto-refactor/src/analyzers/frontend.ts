@@ -190,7 +190,6 @@ function countInterfaceBodyProps(body: string): number {
     return count;
 }
 
-
 /**
  * Audits component complexity and duplication patterns (UI-ENG-003).
  */

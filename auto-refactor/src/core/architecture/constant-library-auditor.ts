@@ -118,7 +118,7 @@ export function isAlreadyInConstantLibrary(filePath: string): boolean {
 }
 
 /** Canonical domain module filenames for constant library topology. */
-const CANONICAL_MODULE_NAMES: readonly string[] = Object.freeze([
+const _CANONICAL_MODULE_NAMES: readonly string[] = Object.freeze([
     'ast-tokens.ts',
     'rule-codes.ts',
     'system-tokens.ts',
@@ -169,7 +169,8 @@ export function auditConstantLibraryTopology(
 
     const targetDir = deriveTargetDirectory(Array.from(uniqueFiles));
 
-    // Pre-allocated domain symbol sets pool declared outside loop to eliminate transient heap allocation
+    // Pre-allocated domain symbol sets pool declared outside loop
+    // to eliminate transient heap allocation
     const moduleNameToSymbolSetMap = new Map<string, Set<string>>([
         ['ast-tokens.ts', new Set<string>()],
         ['rule-codes.ts', new Set<string>()],

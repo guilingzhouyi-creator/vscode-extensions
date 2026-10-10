@@ -1,6 +1,105 @@
 {
   "version": "1.2.0",
   "granularity": "grouped",
-  "timestamp": "2026-09-22T13:33:37.349Z",
-  "groups": []
+  "timestamp": "2026-10-10T04:46:37.488Z",
+  "groups": [
+    {
+      "key": "comments|CMT-LNG-001|scripts/run-self-audit.js",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
+    },
+    {
+      "key": "comments|CMT-DOC-001|src/analyzers/secrets.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
+    },
+    {
+      "key": "comments|CMT-LNG-001|src/core/analyzer-registry.ts",
+      "count": 3,
+      "severities": {
+        "warning": 3
+      }
+    },
+    {
+      "key": "comments|CMT-DOC-001|src/core/architecture/structured-resource-topology.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
+    },
+    {
+      "key": "comments|CMT-LNG-001|src/core/config/config.ts",
+      "count": 3,
+      "severities": {
+        "warning": 3
+      }
+    },
+    {
+      "key": "comments|CMT-DOC-001|src/core/diff/myers-algorithm.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
+    },
+    {
+      "key": "comments|CMT-DOC-001|src/core/intelligence/contextSlice.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
+    },
+    {
+      "key": "comments|CMT-DOC-001|src/core/intelligence/semanticComplexity.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
+    },
+    {
+      "key": "comments|CMT-INT-001|src/core/praxis/presentation/semantic-correlation.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
+    },
+    {
+      "key": "comments|CMT-DOC-001|src/core/preflight/scope-normalizer.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
+    },
+    {
+      "key": "comments|CMT-LNG-001|src/core/router/sparseRuleRouter.ts",
+      "count": 3,
+      "severities": {
+        "warning": 3
+      }
+    },
+    {
+      "key": "comments|CMT-CON-001|src/core/scanner/worker-scheduler.ts",
+      "count": 1,
+      "severities": {
+        "info": 1
+      }
+    },
+    {
+      "key": "comments|CMT-DOC-001|src/core/scoring/dimensionDeductions.ts",
+      "count": 2,
+      "severities": {
+        "warning": 2
+      }
+    },
+    {
+      "key": "comments|CMT-DOC-001|src/core/scoring/scorer-formulas.ts",
+      "count": 1,
+      "severities": {
+        "warning": 1
+      }
+    }
+  ]
 }

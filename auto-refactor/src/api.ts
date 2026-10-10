@@ -486,7 +486,17 @@ export async function scanDiffDelta(
 
 /** Git status porcelain prefixes indicating rename or copy operations. */
 const GIT_RENAME_STATUS_PREFIXES = new Set([
-    'R', 'RM', 'RD', 'RC', 'RA', 'R ', ' R', 'MR', 'DR', 'CR', 'C',
+    'R',
+    'RM',
+    'RD',
+    'RC',
+    'RA',
+    'R ',
+    ' R',
+    'MR',
+    'DR',
+    'CR',
+    'C',
 ]);
 
 function isGitRenameStatus(status: string): boolean {
@@ -613,7 +623,9 @@ function evaluateGateExitCode(report: ScanReport, config: ScanConfig): number {
     const rank = { info: 0, warning: 1, error: 2 } as const;
     const threshold = config.failOnSeverity
         ? rank[config.failOnSeverity]
-        : (config.failOnIssue ? 2 : 99);
+        : config.failOnIssue
+          ? 2
+          : 99;
     // A suppressed finding stays in the report for auditing but never decides a gate: that is
     // the documented contract of `suppression` (report.schema.json) and what gate-self.js
     // already assumed, so the exit code must agree with it instead of counting the finding.

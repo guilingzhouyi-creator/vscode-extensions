@@ -488,7 +488,10 @@ function maskDefaultWhitelist(line: string): string {
         sanitized = sanitized.replace(DEFAULT_WHITELIST_COMPILED.asciiRe, ' __WHITELIST_TERM__ ');
     }
     if (DEFAULT_WHITELIST_COMPILED.nonAsciiRe) {
-        sanitized = sanitized.replace(DEFAULT_WHITELIST_COMPILED.nonAsciiRe, ' __WHITELIST_TERM__ ');
+        sanitized = sanitized.replace(
+            DEFAULT_WHITELIST_COMPILED.nonAsciiRe,
+            ' __WHITELIST_TERM__ ',
+        );
     }
     return sanitized;
 }
@@ -516,10 +519,7 @@ function getOrCompileCustomWhitelist(whitelist: readonly string[]): {
  * @param customWhitelist - Optional whitelist entries to mask
  * @returns Line with custom whitelisted terms masked
  */
-export function maskCustomWhitelist(
-    line: string,
-    customWhitelist?: readonly string[],
-): string {
+export function maskCustomWhitelist(line: string, customWhitelist?: readonly string[]): string {
     if (!line || !customWhitelist || customWhitelist.length === 0) {
         return line;
     }
@@ -644,7 +644,7 @@ function collectLinePatterns(
 }
 
 /** Check pattern match on a single line */
-function checkLinePatterns(
+function _checkLinePatterns(
     sanitized: string,
     rawLine: string,
     lineNum: number,
@@ -695,7 +695,7 @@ function collectLineAsciiPatterns(
 }
 
 /** Check ascii regex patterns on a single line */
-function checkLineAsciiPatterns(
+function _checkLineAsciiPatterns(
     sanitized: string,
     rawLine: string,
     lineNum: number,

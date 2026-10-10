@@ -124,7 +124,8 @@ export function scoreFileQuality(
     const scaleFactor = Math.max(1, loc / 100);
     const securityCeiling = computeSecurityCeiling(null, scaleFactor);
 
-    // 3. Base dimension indices (starts at securityCeiling or 100, deducted by riskResult.dimensionPenalties)
+    // 3. Base dimension indices (starts at securityCeiling or 100,
+    //    deducted by riskResult.dimensionPenalties)
     const indices: Record<QualityDimension, number> = {} as Record<QualityDimension, number>;
     for (const dim of ALL_QUALITY_DIMENSIONS) {
         let dimPenalty = riskResult.dimensionPenalties?.[dim] ?? 0;
@@ -376,8 +377,7 @@ function createEmptyProjectScore(): ProjectQualityScore {
         number
     >;
     for (const d of ALL_QUALITY_DIMENSIONS) {
-        emptyDimensions[d] =
-            d === 'codeSecurity' ? DEFAULT_SECURITY_CEILING : DIMENSION_MAX_SCORE;
+        emptyDimensions[d] = d === 'codeSecurity' ? DEFAULT_SECURITY_CEILING : DIMENSION_MAX_SCORE;
     }
     const emptyPillars = synthesizeEightPillars(emptyDimensions);
     return {
@@ -520,8 +520,7 @@ function finalizeProjectEightPillars(
     for (const p of ALL_PRIMARY_PILLARS) {
         finalCompositeSum += projectPillars[p] * synthesized.weights[p];
     }
-    synthesized.compositeScore =
-        Math.round(finalCompositeSum * SCORE_ROUNDING) / SCORE_ROUNDING;
+    synthesized.compositeScore = Math.round(finalCompositeSum * SCORE_ROUNDING) / SCORE_ROUNDING;
     return synthesized;
 }
 

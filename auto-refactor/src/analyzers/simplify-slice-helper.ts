@@ -557,8 +557,10 @@ function invertBinaryOperator(kind: ts.SyntaxKind): string | null {
 
 /**
  * Invert a conditional expression into its complementary guard form.
- * @param expr
- * @param sf
+ *
+ * @param expr - Expression AST node to invert.
+ * @param sf - Source file providing text tokens.
+ * @returns Inverted conditional code snippet string.
  */
 export function invertConditionExpression(expr: ts.Expression, sf: ts.SourceFile): string {
     if (ts.isBinaryExpression(expr)) {
@@ -619,8 +621,10 @@ function collectNestedIfConditions(
 
 /**
  * Generate flattened early-return guard clauses from deeply nested if conditions.
- * @param node
- * @param sf
+ *
+ * @param node - Target function AST node.
+ * @param sf - Source file providing syntax text.
+ * @returns Flattened early-return guard clause string, or null if not applicable.
  */
 export function generateInvertedConditionSnippet(
     node: ts.FunctionDeclaration | ts.MethodDeclaration | ts.ArrowFunction | ts.FunctionExpression,
@@ -656,8 +660,10 @@ export function generateInvertedConditionSnippet(
 
 /**
  * Generate a refactoring template encapsulating multiple parameters into a typed options object.
- * @param functionName
- * @param params
+ *
+ * @param functionName - Name of the function being refactored.
+ * @param params - Array of parameter descriptor objects.
+ * @returns Refactoring snippet code string.
  */
 export function generateParameterObjectSnippet(
     functionName: string,
@@ -693,8 +699,10 @@ const functionLineCache = new WeakMap<
 
 /**
  * Find the function-like AST node located closest to a specified line number.
- * @param sf
- * @param targetLine
+ *
+ * @param sf - Source file to inspect.
+ * @param targetLine - 1-based target line number.
+ * @returns Function-like AST node or null if none found.
  */
 export function findTsFunctionAtLine(
     sf: ts.SourceFile,

@@ -107,9 +107,7 @@ const TRIPLE_QUOTE_SINGLE = "'''";
 const PYTHON_TRIPLE_QUOTES: ReadonlySet<string> = Object.freeze(
     new Set([TRIPLE_QUOTE_DOUBLE, TRIPLE_QUOTE_SINGLE]),
 );
-const PYTHON_ROOT_IMPORT_KEYWORDS: ReadonlySet<string> = Object.freeze(
-    new Set(['import', 'from']),
-);
+const PYTHON_ROOT_IMPORT_KEYWORDS: ReadonlySet<string> = Object.freeze(new Set(['import', 'from']));
 const PYTHON_TRIPLE_QUOTE_PATTERN = /"""|'''/;
 
 function countMarkerOccurrences(line: string, marker: string): number {

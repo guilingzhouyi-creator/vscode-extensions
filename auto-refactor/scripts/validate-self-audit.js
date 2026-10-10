@@ -61,7 +61,7 @@ const REPORT_REQUIRED_ROOT_KEYS = [
 /**
  * Validates canonical report schema invariants.
  *
- * @param {object} report - Parsed report object.
+ * @param report - Parsed report object.
  */
 function validateReportSchema(report) {
   assert.ok(report && typeof report === 'object', 'Report must be a non-null object');
@@ -91,7 +91,7 @@ function validateReportSchema(report) {
 /**
  * Validates immutable AuditSnapshot quintuple metadata.
  *
- * @param {object} report - Self-audit report.
+ * @param report - Self-audit report.
  */
 function validateSnapshotMetadata(report) {
   console.log('3. Validating Immutable Snapshot Metadata...');
@@ -111,8 +111,8 @@ function validateSnapshotMetadata(report) {
 /**
  * Validates scope and execution performance thresholds.
  *
- * @param {object} report - Self-audit report.
- * @param {number} elapsedSec - Elapsed wall time in seconds.
+ * @param report - Self-audit report.
+ * @param elapsedSec - Elapsed wall time in seconds.
  */
 function validateScopeAndPerformance(report, elapsedSec) {
   console.log('4. Validating Audit Scope & Performance Thresholds...');
@@ -129,7 +129,7 @@ function validateScopeAndPerformance(report, elapsedSec) {
 /**
  * Validates the 8 strategic pillars, composite score (>= 85), and code density (>= 0.85).
  *
- * @param {object} report - Self-audit report.
+ * @param report - Self-audit report.
  */
 function validateEightPillarsAndMetrics(report) {
   console.log('5. Validating Eight Strategic Pillars Health Model...');
@@ -143,7 +143,10 @@ function validateEightPillarsAndMetrics(report) {
       `Pillar ${pillar} must be 0..100: ${val}`,
     );
     const weight = report.eightPillars.weights?.[pillar];
-    assert.ok(typeof weight === 'number' && weight > 0, `Pillar ${pillar} must have positive weight`);
+    assert.ok(
+      typeof weight === 'number' && weight > 0,
+      `Pillar ${pillar} must have positive weight`,
+    );
     weightSum += weight;
   }
   assert.ok(Math.abs(weightSum - 1.0) < 0.001, `Pillar weights sum must be 1.0: ${weightSum}`);
@@ -171,7 +174,7 @@ function validateEightPillarsAndMetrics(report) {
 /**
  * Validates the ten-dimensional quality vector subsystem integration.
  *
- * @param {object} report - Self-audit report.
+ * @param report - Self-audit report.
  */
 function validateTenDimensions(report) {
   console.log('6. Validating Ten-Dimensional Scoring Subsystem Integration...');
@@ -205,7 +208,7 @@ function validateTenDimensions(report) {
 /**
  * Validates technical debt ledger tiering.
  *
- * @param {object} report - Self-audit report.
+ * @param report - Self-audit report.
  */
 function validateDebtLedger(report) {
   console.log('7. Validating Technical Debt Ledger Tiering...');
@@ -228,7 +231,7 @@ function validateDebtLedger(report) {
 /**
  * Validates the baseline report file on disk and schema parity with in-memory report.
  *
- * @param {object} report - In-memory report produced by runner.
+ * @param report - In-memory report produced by runner.
  */
 function validateBaselineFileOnDisk(report) {
   console.log('2. Validating Baseline Report File on Disk & Schema Parity...');

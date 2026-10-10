@@ -58,9 +58,7 @@ function extractBaseName(p: string): string {
  * Builds an inverted index mapping imported base-name to calling files.
  * Precomputes reverse dependencies in single O(N*M) pass; queries are O(1).
  */
-function buildReverseDependencyIndex(
-    indexStore: PreflightAuditIndexStore,
-): Map<string, string[]> {
+function buildReverseDependencyIndex(indexStore: PreflightAuditIndexStore): Map<string, string[]> {
     const reverseIndex = new Map<string, string[]>();
     const seenBases = new Set<string>();
 

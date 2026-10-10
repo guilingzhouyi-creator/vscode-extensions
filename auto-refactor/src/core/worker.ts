@@ -618,16 +618,7 @@ function executeScanPipeline(
     const tLegacy0 = AR_TIMING ? nowMs() : 0;
     const astRoot = resolveAstRoot(ast, rootForCtx);
     issues.push(
-        ...executeLegacyAnalyzers(
-            legacy,
-            sf,
-            file,
-            content,
-            astRoot,
-            adapter,
-            cfg,
-            lineStats,
-        ),
+        ...executeLegacyAnalyzers(legacy, sf, file, content, astRoot, adapter, cfg, lineStats),
     );
     const tLegacy = getElapsed(tLegacy0);
 

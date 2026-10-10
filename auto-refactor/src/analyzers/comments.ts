@@ -151,13 +151,18 @@ const COMMENT_MARKERS: readonly string[] = Object.freeze(['//', '/*', '*/', '#',
 const CHAR_CODE_LF = 10;
 const CHAR_CODE_CR = 13;
 const COMMENT_URL_OR_INLINE_CODE_RE = /https?:\/\/\S+|`[^`]{20,}`/;
-const HEADER_COMMENT_PREFIX_RE = /^\s*(\/\/|\/\*|\*|#|##|""")/ ;
-const SIX_FIELD_PATTERNS: ReadonlyArray<{ readonly en: string; readonly zh: string; readonly regex: RegExp }> =
-    Object.freeze(SIX_FIELD_HEADERS_EN.map((en, i) => {
+const HEADER_COMMENT_PREFIX_RE = /^\s*(\/\/|\/\*|\*|#|##|""")/;
+const SIX_FIELD_PATTERNS: ReadonlyArray<{
+    readonly en: string;
+    readonly zh: string;
+    readonly regex: RegExp;
+}> = Object.freeze(
+    SIX_FIELD_HEADERS_EN.map((en, i) => {
         const zh = SIX_FIELD_HEADERS_ZH[i];
         const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         return Object.freeze({ en, zh, regex: new RegExp(`${esc(en)}|${esc(zh)}`) });
-    }));
+    }),
+);
 
 /**
  * Self-referential analyzer that enforces this repository's comment and header contract.
@@ -403,15 +408,33 @@ export class CommentAnalyzer implements Analyzer {
         ctx: AnalyzerContext,
         issues: Issue[],
     ): void {
-        if (line.length <= MAX_COMMENT_WIDTH || directiveRe.test(body) || COMMENT_URL_OR_INLINE_CODE_RE.test(body)) {
+        const isExempt =
+            line.length <= MAX_COMMENT_WIDTH ||
+            directiveRe.test(body) ||
+            COMMENT_URL_OR_INLINE_CODE_RE.test(body);
+        if (isExempt) {
             return;
         }
         const desc = CommentMessages.COMMENT_WIDTH(line.length, MAX_COMMENT_WIDTH);
-        issues.push(this.mkIssue(ctx, lineIdx, 'CMT-WID-001', desc.message, SEVERITY_WARNING,
-            { file, width: line.length, limit: MAX_COMMENT_WIDTH }, desc.suggestion));
+        issues.push(
+            this.mkIssue(
+                ctx,
+                lineIdx,
+                'CMT-WID-001',
+                desc.message,
+                SEVERITY_WARNING,
+                { file, width: line.length, limit: MAX_COMMENT_WIDTH },
+                desc.suggestion,
+            ),
+        );
     }
 
-    private recordSeparatorLine(body: string, lineNo: number, shortLines: number[], longLines: number[]): void {
+    private recordSeparatorLine(
+        body: string,
+        lineNo: number,
+        shortLines: number[],
+        longLines: number[],
+    ): void {
         if (BARE_SEPARATOR_RE.test(body)) return;
         if (SHORT_SEPARATOR_RE.test(body)) shortLines.push(lineNo);
         else if (LONG_SEPARATOR_RE.test(body)) longLines.push(lineNo);
@@ -427,8 +450,17 @@ export class CommentAnalyzer implements Analyzer {
     ): void {
         if (lineCount >= BANNER_LINE_LIMIT || !body.startsWith('═')) return;
         const desc = CommentMessages.BANNER_SMALL_FILE(lineCount, BANNER_LINE_LIMIT);
-        issues.push(this.mkIssue(ctx, lineIdx, 'CMT-BAN-001', desc.message, SEVERITY_WARNING,
-            { file, lineCount, limit: BANNER_LINE_LIMIT }, desc.suggestion));
+        issues.push(
+            this.mkIssue(
+                ctx,
+                lineIdx,
+                'CMT-BAN-001',
+                desc.message,
+                SEVERITY_WARNING,
+                { file, lineCount, limit: BANNER_LINE_LIMIT },
+                desc.suggestion,
+            ),
+        );
     }
 
     private auditCommentTerminology(
@@ -438,11 +470,22 @@ export class CommentAnalyzer implements Analyzer {
         ctx: AnalyzerContext,
         issues: Issue[],
     ): void {
-        if (isExemptCommentTerminologyPath(file) || !DEFAULT_RULES_FAST_CANDIDATE_RE.test(body)) return;
+        if (isExemptCommentTerminologyPath(file) || !DEFAULT_RULES_FAST_CANDIDATE_RE.test(body)) {
+            return;
+        }
         for (const finding of auditTerminologyProse(body)) {
             const desc = CommentMessages.BANNED_TERMINOLOGY(finding.term, finding.message);
-            issues.push(this.mkIssue(ctx, lineIdx, 'CMT-TRM-001', desc.message, SEVERITY_WARNING,
-                { file, term: finding.term, category: finding.category, line: lineIdx + 1 }, desc.suggestion));
+            issues.push(
+                this.mkIssue(
+                    ctx,
+                    lineIdx,
+                    'CMT-TRM-001',
+                    desc.message,
+                    SEVERITY_WARNING,
+                    { file, term: finding.term, category: finding.category, line: lineIdx + 1 },
+                    desc.suggestion,
+                ),
+            );
         }
     }
 
@@ -562,13 +605,27 @@ export class CommentAnalyzer implements Analyzer {
         return !trimmed.startsWith('#!') && HEADER_COMMENT_PREFIX_RE.test(trimmed);
     }
 
-    private auditSixFields(headerText: string, file: string, ctx: AnalyzerContext, issues: Issue[]): void {
+    private auditSixFields(
+        headerText: string,
+        file: string,
+        ctx: AnalyzerContext,
+        issues: Issue[],
+    ): void {
         for (let i = 0; i < SIX_FIELD_PATTERNS.length; i++) {
             const field = SIX_FIELD_PATTERNS[i];
             if (field.regex.test(headerText)) continue;
             const desc = CommentMessages.MISSING_HEADER_FIELD(`${field.en} / ${field.zh}`);
-            issues.push(this.mkIssue(ctx, 0, 'CMT-HDR-002', desc.message, SEVERITY_WARNING,
-                { file, missingField: `${field.en} (${field.zh})` }, desc.suggestion));
+            issues.push(
+                this.mkIssue(
+                    ctx,
+                    0,
+                    'CMT-HDR-002',
+                    desc.message,
+                    SEVERITY_WARNING,
+                    { file, missingField: `${field.en} (${field.zh})` },
+                    desc.suggestion,
+                ),
+            );
         }
     }
 

@@ -80,8 +80,7 @@ export const LAYER_DISPATCH_RULES: readonly LayerDispatchRule[] = [
     {
         layer: 'interface',
         matches: (lower, imports) =>
-            INTERFACE_PATH_RE.test(lower) ||
-            imports.some((i) => FORBIDDEN_HEADLESS_IMPORTS.has(i)),
+            INTERFACE_PATH_RE.test(lower) || imports.some((i) => FORBIDDEN_HEADLESS_IMPORTS.has(i)),
     },
     {
         layer: 'infrastructure',

@@ -203,7 +203,7 @@ function tokenizePathPrefix(filePath: string): ExtractedPathParts {
     const hasRemaining = i < len ? 1 : 0;
     const isSrcOrLib = segments[0] === 'src' || segments[0] === 'lib';
     const start = isSrcOrLib ? 1 : 0;
-    const partsCount = (segments.length - start) + hasRemaining;
+    const partsCount = segments.length - start + hasRemaining;
     const p0 = segments[start] ?? '';
     const p1 = segments[start + 1] ?? '';
 

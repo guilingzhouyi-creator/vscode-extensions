@@ -137,7 +137,6 @@ import {
 } from './dimensionLiterals';
 import { FRONTEND_DIMENSION_RULES, type DimensionRule } from './dimension-rule-table-frontend';
 export type { DimensionRule };
-import type { QualityDimension } from './scoringTypes';
 
 /** Hygiene rule flagging naming drift (kebab-case / snake_case violations). */
 const RULE_HYG_NAMING = 'HYG-NAM-001';

@@ -289,7 +289,7 @@ function runBenchmark() {
     const maskRes = results.find((r) => r.operator === 'SIMD Source Mask');
     if (maskRes) {
       assert.ok(
-        maskRes.speedup >= 0.70,
+        maskRes.speedup >= 0.7,
         `SIMD source mask speedup ratio (${maskRes.speedup.toFixed(2)}x) should be >= 0.70x`,
       );
     }

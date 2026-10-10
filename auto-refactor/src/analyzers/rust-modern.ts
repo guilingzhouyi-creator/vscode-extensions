@@ -64,7 +64,8 @@ const FORMAT_CALL_RE = /\b(?:println|print|eprintln|eprint|format|panic|write|wr
 const POSITIONAL_PLACEHOLDER_RE = /!\s*\(\s*"[^"]*\{\}/;
 
 /** Positional format call spanning multiple lines. */
-const MULTILINE_FORMAT_RE = /\b(?:println|print|eprintln|eprint|format|panic|write|writeln)!\s*\([^;]*"[^"]*\{\}/;
+const MULTILINE_FORMAT_RE =
+    /\b(?:println|print|eprintln|eprint|format|panic|write|writeln)!\s*\([^;]*"[^"]*\{\}/;
 
 /** Function declaration prefix. */
 const FN_DECL_RE = /\bfn\s+[A-Za-z_]\w*/;
@@ -86,7 +87,6 @@ const STD_LOCK_RE = /(?:std::sync::(?:Mutex|RwLock)|\.(?:lock|read|write)\s*\(\s
 
 /** `.await` expression. */
 const AWAIT_RE = /\.await\b/;
-
 
 /** State for tracking function signature parameter lists across lines. */
 interface FnSigState {
@@ -300,7 +300,8 @@ function isLetElseCandidate(lines: string[], startIndex: number): boolean {
     }
     const elseStart = ifEnd + 1 + elseMatch[0].length - 1;
     const elseEnd = findMatchingBrace(chunk, elseStart);
-    const elseBody = elseEnd !== -1 ? chunk.slice(elseStart + 1, elseEnd) : chunk.slice(elseStart + 1);
+    const elseBody =
+        elseEnd !== -1 ? chunk.slice(elseStart + 1, elseEnd) : chunk.slice(elseStart + 1);
     return /\b(?:return|break)\b/.test(elseBody);
 }
 
@@ -354,12 +355,14 @@ function resolveAsyncFnScope(
 }
 
 /**
- * Record issues for synchronous std lock guards held across `.await` points.
+ * Record findings for synchronous std guard instances held across `.await` points.
  *
  * @param file - Relative file path.
  * @param raw - Raw source lines.
  * @param lines - Masked source lines.
  * @param scope - Body line range of async function.
+ * @param scope.bodyStart - Starting line index of function body.
+ * @param scope.bodyEnd - Ending line index of function body.
  * @param out - Issue accumulator list.
  */
 function collectLocksAcrossAwait(
@@ -393,7 +396,7 @@ function collectLocksAcrossAwait(
 }
 
 /**
- * Scan all async functions in file for std lock guards held across `.await`.
+ * Scan all async functions in file for std guard instances held across `.await`.
  *
  * @param file - Relative file path.
  * @param raw - Raw source lines.
@@ -464,15 +467,9 @@ function scanLineRules(
     for (const rule of LINE_RULES) {
         if (!rule.pattern.test(code)) continue;
         out.push(
-            makeIssue(
-                file,
-                index,
-                rule.rule,
-                rule.severity,
-                rule.message,
-                rule.suggestion,
-                { line: raw[index].trim() },
-            ),
+            makeIssue(file, index, rule.rule, rule.severity, rule.message, rule.suggestion, {
+                line: raw[index].trim(),
+            }),
         );
     }
 
@@ -572,4 +569,3 @@ export class RustModernAnalyzer implements Analyzer {
         return out;
     }
 }
-

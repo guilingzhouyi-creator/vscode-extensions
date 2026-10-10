@@ -82,9 +82,31 @@ const NAMED_LITERAL_RE = /\b(true|false|nil|iota)\b/g;
 const CALL_EXPR_RE = /([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)*)\s*\(/g;
 
 const CALL_KEYWORD_EXCLUSIONS = new Set([
-    'if', 'for', 'switch', 'select', 'func', 'return', 'go', 'defer', 'case', 'type',
-    'var', 'const', 'package', 'import', 'range', 'make', 'new', 'len', 'cap',
-    'append', 'copy', 'delete', 'close', 'panic', 'recover',
+    'if',
+    'for',
+    'switch',
+    'select',
+    'func',
+    'return',
+    'go',
+    'defer',
+    'case',
+    'type',
+    'var',
+    'const',
+    'package',
+    'import',
+    'range',
+    'make',
+    'new',
+    'len',
+    'cap',
+    'append',
+    'copy',
+    'delete',
+    'close',
+    'panic',
+    'recover',
 ]);
 
 /** Struct field: `Name Type` inside a struct (detected by indentation context) */
@@ -365,9 +387,7 @@ function parseSimpleStatement(
  * @param floatMatches - Array of RegExp match objects for float literals on the line.
  * @returns Immutable ReadonlySet of 0-based character indices covered by float literals.
  */
-function collectFloatOccupiedPositions(
-    floatMatches: RegExpMatchArray[],
-): ReadonlySet<number> {
+function collectFloatOccupiedPositions(floatMatches: RegExpMatchArray[]): ReadonlySet<number> {
     if (floatMatches.length === 0) return EMPTY_NUMERIC_POSITION_SET;
     const occupied = new Set<number>();
     for (const fm of floatMatches) {

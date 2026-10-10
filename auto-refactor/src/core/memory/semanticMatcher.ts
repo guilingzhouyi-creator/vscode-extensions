@@ -63,8 +63,7 @@ function checkFastPathAstMatch(
         return null;
     }
     const delta =
-        (newDomains[0]?.span.startLine ?? 1) -
-        (oldRecord.codeDomains[0]?.span.startLine ?? 1);
+        (newDomains[0]?.span.startLine ?? 1) - (oldRecord.codeDomains[0]?.span.startLine ?? 1);
     return {
         unaffectedDomains: newDomains,
         impactedDomains: [],

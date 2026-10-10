@@ -118,6 +118,9 @@ function computeDimensionDeltas(
 
 /**
  * Normalizes technical debt delta inputs into a complete TechnicalDebtDelta object.
+ *
+ * @param partial - Optional partial debt delta input to normalize.
+ * @returns Fully populated TechnicalDebtDelta structure with zero defaults.
  */
 export function normalizeDebtDelta(partial?: Partial<TechnicalDebtDelta>): TechnicalDebtDelta {
     const addedDebtPoints = partial?.addedDebtPoints ?? 0;
@@ -134,6 +137,12 @@ export function normalizeDebtDelta(partial?: Partial<TechnicalDebtDelta>): Techn
 
 /**
  * Resolves raw and anti-gaming suppressed semantic delta Q.
+ *
+ * @param beforeScore - Quality score before modifications.
+ * @param afterScore - Quality score after modifications.
+ * @param counters - ELOC counters for the reviewed changes.
+ * @param sliceDeltaQ - Optional precomputed slice delta Q score.
+ * @returns Anti-gaming arbitrated semantic delta Q score.
  */
 export function resolveSemanticDeltaQ(
     beforeScore: number,
@@ -157,6 +166,11 @@ export function resolveSemanticDeltaQ(
 
 /**
  * Computes QED, ReviewYield, and RegressionDensity efficiency indices.
+ *
+ * @param deltaQSemantic - Semantic quality score delta.
+ * @param counters - ELOC counters for processed and semantic lines.
+ * @param debtDelta - Technical debt change structure.
+ * @returns Efficiency metrics: QED, review yield, and regression density.
  */
 export function computeEfficiencyIndices(
     deltaQSemantic: number,

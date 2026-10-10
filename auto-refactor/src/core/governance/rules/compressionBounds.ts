@@ -23,10 +23,7 @@ import { safeRegexMatch } from '../../../utils/safe-regex';
 const MAINTAINABILITY_CATEGORY = 'maintainability';
 
 /** Languages this family is declared for as an immutable set library. */
-const CMP_SUPPORTED_LANGUAGES: ReadonlySet<string> = new Set([
-    'typescript',
-    'javascript',
-]);
+const CMP_SUPPORTED_LANGUAGES: ReadonlySet<string> = new Set(['typescript', 'javascript']);
 
 /** Languages this family is declared for in the GovernanceRule SPI contract. */
 const CMP_LANGUAGES: string[] = Array.from(CMP_SUPPORTED_LANGUAGES);

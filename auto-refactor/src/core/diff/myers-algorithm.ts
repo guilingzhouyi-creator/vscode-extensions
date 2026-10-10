@@ -348,8 +348,18 @@ const CONTEXT_MARGIN = 3;
 
 /**
  * Emits a contiguous run of equal diff operations.
+ *
+ * @param target - Destination diff operation accumulator array.
+ * @param startA - Starting line index in source A.
+ * @param startB - Starting line index in source B.
+ * @param count - Number of consecutive equal lines to append.
  */
-export function emitEqualRun(target: DiffOp[], startA: number, startB: number, count: number): void {
+export function emitEqualRun(
+    target: DiffOp[],
+    startA: number,
+    startB: number,
+    count: number,
+): void {
     for (let i = 0; i < count; i++) {
         target.push({ type: DIFF_OP_EQUAL, aIdx: startA + i, bIdx: startB + i });
     }

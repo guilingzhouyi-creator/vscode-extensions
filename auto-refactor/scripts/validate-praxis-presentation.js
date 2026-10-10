@@ -215,9 +215,17 @@ async function testSemanticOverlapAggregation() {
 
   // 1. Aggregation enabled (default behavior)
   const payloadAggregated = defaultPraxisPresentationService.toPresentation(agentPrompt);
-  assert.strictEqual(payloadAggregated.cards.length, 1, 'Expected 2 issues to be aggregated into 1 card');
+  assert.strictEqual(
+    payloadAggregated.cards.length,
+    1,
+    'Expected 2 issues to be aggregated into 1 card',
+  );
   const primaryCard = payloadAggregated.cards[0];
-  assert.strictEqual(primaryCard.ruleId, 'HYG-STB-002', 'Error severity should be elected as primary card');
+  assert.strictEqual(
+    primaryCard.ruleId,
+    'HYG-STB-002',
+    'Error severity should be elected as primary card',
+  );
   assert.strictEqual(primaryCard.severity, 'block');
   assert.deepStrictEqual(primaryCard.correlatedRules, ['GOV-SAN-001']);
   assert.strictEqual(primaryCard.correlationCount, 1);
@@ -229,7 +237,11 @@ async function testSemanticOverlapAggregation() {
   const payloadDisabled = defaultPraxisPresentationService.toPresentation(agentPrompt, {
     aggregateOverlaps: false,
   });
-  assert.strictEqual(payloadDisabled.cards.length, 2, 'Expected 2 cards when aggregateOverlaps is false');
+  assert.strictEqual(
+    payloadDisabled.cards.length,
+    2,
+    'Expected 2 cards when aggregateOverlaps is false',
+  );
   assert.strictEqual(payloadDisabled.cards[0].ruleId, 'HYG-STB-002');
   assert.strictEqual(payloadDisabled.cards[1].ruleId, 'GOV-SAN-001');
   assert.strictEqual(payloadDisabled.cards[0].correlatedRules, undefined);
@@ -242,7 +254,9 @@ async function testSemanticOverlapAggregation() {
   assert.deepStrictEqual(aggregateSemanticOverlappingCards([]), []);
   assert.strictEqual(aggregateSemanticOverlappingCards([primaryCard]).length, 1);
 
-  console.log('  ✔ Semantic overlap successfully aggregated cards by severity and collected correlated rules');
+  console.log(
+    '  ✔ Semantic overlap successfully aggregated cards by severity and collected correlated rules',
+  );
 }
 
 async function runAll() {

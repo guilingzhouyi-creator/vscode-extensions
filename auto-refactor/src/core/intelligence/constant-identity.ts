@@ -243,7 +243,10 @@ const RE_CONSTANT_FILE =
 /** File pattern matching rule, status, or error code file names. */
 const RE_CODE_FILE = /(?:^|[\\/]|[-_.])(?:[a-z0-9-_]*[-_.])?codes?\.[a-z0-9]+$/;
 
-/** File pattern matching metadata catalog, recipe catalog, archetype, terminology, or rule tables. */
+/**
+ * File pattern matching metadata catalog, recipe catalog, archetype, terminology,
+ * or rule tables.
+ */
 const RE_METADATA_CATALOG_FILE =
     /(?:^|[\\/])(?:[a-z0-9-_.]*?)(?:catalog|recipe|archetype|terminology|shim|table|ruletable|dimension)[a-z0-9-_.]*\.[a-z0-9]+$/i;
 
@@ -364,8 +367,7 @@ function hasConstantTableCharacteristics(content: string): boolean {
         .map((l) => l.trim())
         .filter(
             (l) =>
-                l.length > 0 &&
-                !EXCLUDED_STATEMENT_PREFIXES.some((prefix) => l.startsWith(prefix)),
+                l.length > 0 && !EXCLUDED_STATEMENT_PREFIXES.some((prefix) => l.startsWith(prefix)),
         );
 
     return isConstantContentDominant(lines);

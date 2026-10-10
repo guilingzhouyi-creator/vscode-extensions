@@ -19,6 +19,7 @@ import type { AgentActionablePayload, AnalyzerContext, Severity } from '../core/
 import { SEVERITY_WARNING } from '../core/types';
 import type { DiagnosticDescriptor } from '../core/messages/types';
 
+/** Candidate naming proposal derived by the inference pipeline. */
 export interface NamingCandidate {
     readonly name: string;
     readonly confidence: number;
@@ -26,12 +27,14 @@ export interface NamingCandidate {
     readonly rationale: string;
 }
 
+/** Summary of a cross-file symbol reference site. */
 export interface CrossFileReferenceSummary {
     readonly file: string;
     readonly line: number | null;
     readonly caller?: string | null;
 }
 
+/** Usage context tracking cross-file references for an identifier. */
 export interface CrossFileUsageContext {
     readonly symbolName: string;
     readonly definitionFile: string;
@@ -40,6 +43,7 @@ export interface CrossFileUsageContext {
     readonly isCrossFile: boolean;
 }
 
+/** Machine-actionable proposal suggesting identifier standardization. */
 export interface StandardizationProposal {
     readonly originalName: string;
     readonly suggestedName: string;
@@ -49,6 +53,7 @@ export interface StandardizationProposal {
     readonly safeToAutomate: boolean;
 }
 
+/** Request requiring clarification or human judgment for ambiguous naming. */
 export interface ClarificationRequest {
     readonly symbolName: string;
     readonly filePath: string;
@@ -58,22 +63,62 @@ export interface ClarificationRequest {
     readonly requiresHumanReview: boolean;
 }
 
+/** Actionable payload attaching naming proposals or clarification requests. */
 export interface NamingActionablePayload extends AgentActionablePayload {
     standardizationProposal?: StandardizationProposal;
     clarificationRequest?: ClarificationRequest;
 }
 
+/** Rule code for variable name length constraints. */
 export const RULE_NAM_LEN_001 = 'NAM-LEN-001';
+
+/** Rule code for function and method name length constraints. */
 export const RULE_NAM_LEN_002 = 'NAM-LEN-002';
+
+/** Rule code for unapproved abbreviation checks. */
 export const RULE_NAM_ABR_001 = 'NAM-ABR-001';
 
+/** Maximum permitted length for variable identifiers. */
 export const MAX_VARIABLE_NAME_LENGTH = 42;
+
+/** Maximum permitted length for function and method identifiers. */
 export const MAX_FUNCTION_NAME_LENGTH = 50;
 
+/** Allowed short identifier names commonly accepted across domains. */
 export const ALLOWED_SHORT_NAMES: ReadonlySet<string> = new Set([
-    'x', 'y', 'z', 'dx', 'dy', 'w', 'h', 'id', 'ip', 'i', 'j', 'k', '_',
-    'ts', 'fs', 'cp', 'vm', 'db', 'fd', 'fn', 'cb', 'el', 'sf', 'ns', 'op',
-    're', 'ex', 'ev', 'ok', 'no', 'ch', 'tx', 'rx',
+    'x',
+    'y',
+    'z',
+    'dx',
+    'dy',
+    'w',
+    'h',
+    'id',
+    'ip',
+    'i',
+    'j',
+    'k',
+    '_',
+    'ts',
+    'fs',
+    'cp',
+    'vm',
+    'db',
+    'fd',
+    'fn',
+    'cb',
+    'el',
+    'sf',
+    'ns',
+    'op',
+    're',
+    'ex',
+    'ev',
+    'ok',
+    'no',
+    'ch',
+    'tx',
+    'rx',
 ]);
 
 /**
@@ -110,19 +155,36 @@ export const COMMON_ABBREVIATIONS: Readonly<Record<string, string>> = Object.fre
  * Unapproved abbreviations triggering NAM-ABR-001 warnings.
  */
 export const UNAPPROVED_ABBREVIATION_SET = new Set([
-    'usr', 'mgr', 'btn', 'cnt', 'ptr', 'cur', 'auth_mgr', 'tbl', 'chk', 'cb',
+    'usr',
+    'mgr',
+    'btn',
+    'cnt',
+    'ptr',
+    'cur',
+    'auth_mgr',
+    'tbl',
+    'chk',
+    'cb',
 ]);
 
 /**
  * Polysemic abbreviations that introduce semantic ambiguity.
  */
-export const POLYSEMIC_ABBREVIATIONS = new Set([
-    'cur', 'res', 'sec', 'auth', 'doc', 'cnt',
-]);
+export const POLYSEMIC_ABBREVIATIONS = new Set(['cur', 'res', 'sec', 'auth', 'doc', 'cnt']);
 
 const PRIMITIVE_TYPE_NAMES = new Set([
-    'string', 'number', 'boolean', 'any', 'unknown', 'void',
-    'never', 'symbol', 'bigint', 'object', 'undefined', 'null',
+    'string',
+    'number',
+    'boolean',
+    'any',
+    'unknown',
+    'void',
+    'never',
+    'symbol',
+    'bigint',
+    'object',
+    'undefined',
+    'null',
 ]);
 
 /**
@@ -138,19 +200,22 @@ export const NamingMessages = {
     FUNCTION_NAME_TOO_LONG: (name: string): DiagnosticDescriptor => ({
         message: `Function or method name '${name}' is excessively long (>= ${MAX_FUNCTION_NAME_LENGTH} characters); consider simplifying or decomposing.`,
         suggestion: `Refactor '${name}' to reduce verbosity or decompose responsibilities into smaller procedures.`,
-        rationale: 'Overly long function names indicate procedural clutter and responsibility bloat.',
+        rationale:
+            'Overly long function names indicate procedural clutter and responsibility bloat.',
         risk: 'Low',
     }),
     VARIABLE_NAME_TOO_SHORT: (name: string): DiagnosticDescriptor => ({
         message: `Local variable name '${name}' is too short (<= 2 characters) and not in permitted whitelist.`,
         suggestion: `Rename '${name}' to an expressive identifier conveying purpose and type.`,
-        rationale: 'Cryptic 1-2 character variables outside standard math/loop coordinates impair readability.',
+        rationale:
+            'Cryptic 1-2 character variables outside standard math/loop coordinates impair readability.',
         risk: 'Low',
     }),
     VARIABLE_NAME_TOO_LONG: (name: string): DiagnosticDescriptor => ({
         message: `Variable name '${name}' is overly qualified or verbose (>= ${MAX_VARIABLE_NAME_LENGTH} characters).`,
         suggestion: `Simplify '${name}' to focus on core semantic domain entity.`,
-        rationale: 'Excessive variable length creates line noise and typically signals missing module scope boundaries.',
+        rationale:
+            'Excessive variable length creates line noise and typically signals missing module scope boundaries.',
         risk: 'Low',
     }),
     UNAPPROVED_ABBREVIATION: (
@@ -162,7 +227,8 @@ export const NamingMessages = {
         suggestion: expanded
             ? `Expand abbreviation '${unapproved}' to full word '${expanded}' (e.g. rename to candidate).`
             : `Expand abbreviated token '${unapproved}' into standard unabbreviated English term.`,
-        rationale: 'Truncated abbreviations create cognitive burden and inconsistency across teams.',
+        rationale:
+            'Truncated abbreviations create cognitive burden and inconsistency across teams.',
         risk: 'Low',
     }),
 };
@@ -217,6 +283,9 @@ function extractTypeName(typeNode: ts.TypeNode): { typeName: string; isArray: bo
 
 /**
  * Infer naming candidate from AST explicit type annotation (Stage 1).
+ *
+ * @param node - AST node with optional type annotation.
+ * @returns Inferred naming candidate or null if none found.
  */
 export function inferFromExplicitType(node: ts.Node | undefined): NamingCandidate | null {
     if (!node) return null;
@@ -268,7 +337,10 @@ const STATIC_VERB_RULES: ReadonlyArray<{ pattern: RegExp; replace: (rest: string
     { pattern: /^fetch([A-Z].*)$/, replace: (rest) => `fetched${rest}` },
     { pattern: /^build([A-Z].*)$/, replace: (rest) => `built${rest}` },
     { pattern: /^load([A-Z].*)$/, replace: (rest) => `loaded${rest}` },
-    { pattern: /^create([A-Z].*)$/, replace: (rest) => rest.charAt(0).toLowerCase() + rest.slice(1) },
+    {
+        pattern: /^create([A-Z].*)$/,
+        replace: (rest) => rest.charAt(0).toLowerCase() + rest.slice(1),
+    },
     { pattern: /^get([A-Z].*)$/, replace: (rest) => rest.charAt(0).toLowerCase() + rest.slice(1) },
     { pattern: /^find([A-Z].*)$/, replace: (rest) => `found${rest}` },
     { pattern: /^calculate([A-Z].*)$/, replace: (rest) => `calculated${rest}` },
@@ -288,6 +360,9 @@ function transformCallName(fnName: string): string | null {
 
 /**
  * Infer naming candidate from assignment call initializer (Stage 2).
+ *
+ * @param node - AST node containing an initializer.
+ * @returns Inferred naming candidate or null if none found.
  */
 export function inferFromInitializerCall(node: ts.Node | undefined): NamingCandidate | null {
     if (!node) return null;
@@ -347,6 +422,9 @@ function hasSegmentSeparators(name: string): boolean {
 /**
  * Tokenize an identifier into discrete semantic morpheme tokens.
  * Accurately parses camelCase, PascalCase, snake_case, and UPPER_SNAKE_CASE.
+ *
+ * @param name - Identifier string to tokenize.
+ * @returns Array of morpheme token strings.
  */
 export function tokenizeIdentifier(name: string): string[] {
     if (!name) return [];
@@ -366,6 +444,9 @@ export function tokenizeIdentifier(name: string): string[] {
 
 /**
  * Infer naming candidate from abbreviation expansion dictionary (Stage 3).
+ *
+ * @param name - Identifier name to analyze.
+ * @returns Inferred naming candidate or null if no expansion possible.
  */
 export function inferFromAbbreviationDictionary(name: string): NamingCandidate | null {
     if (!name) return null;
@@ -389,9 +470,13 @@ export function inferFromAbbreviationDictionary(name: string): NamingCandidate |
         const expanded = COMMON_ABBREVIATIONS[tokenLower];
         if (expanded) {
             hasExpanded = true;
-            return idx === 0 ? expanded.toLowerCase() : expanded.charAt(0).toUpperCase() + expanded.slice(1);
+            return idx === 0
+                ? expanded.toLowerCase()
+                : expanded.charAt(0).toUpperCase() + expanded.slice(1);
         }
-        return idx === 0 ? token.charAt(0).toLowerCase() + token.slice(1) : token.charAt(0).toUpperCase() + token.slice(1);
+        return idx === 0
+            ? token.charAt(0).toLowerCase() + token.slice(1)
+            : token.charAt(0).toUpperCase() + token.slice(1);
     });
 
     if (!hasExpanded) return null;
@@ -409,6 +494,10 @@ export function inferFromAbbreviationDictionary(name: string): NamingCandidate |
 
 /**
  * Three-stage naming candidate inference pipeline.
+ *
+ * @param name - Identifier name to analyze.
+ * @param node - Optional AST node for structural type inference.
+ * @returns Array of deduplicated naming candidates sorted by confidence.
  */
 export function inferNamingCandidates(name: string, node?: ts.Node): NamingCandidate[] {
     const candidates: NamingCandidate[] = [];
@@ -444,8 +533,13 @@ export function inferNamingCandidates(name: string, node?: ts.Node): NamingCandi
 
 /**
  * Find unapproved abbreviation in an identifier.
+ *
+ * @param name - Identifier name to inspect.
+ * @returns Unapproved abbreviation record or null if compliant.
  */
-export function findUnapprovedAbbreviation(name: string): { unapproved: string; expanded?: string } | null {
+export function findUnapprovedAbbreviation(
+    name: string,
+): { unapproved: string; expanded?: string } | null {
     if (!name) return null;
     const lower = name.toLowerCase();
 
@@ -464,8 +558,12 @@ export function findUnapprovedAbbreviation(name: string): { unapproved: string; 
     return null;
 }
 
+/** Lightweight contract representing a cross-file symbol query index. */
 export interface SymbolIndexLike {
-    crossFileReferencesTo(name: string, definitionFile: string): Array<{
+    crossFileReferencesTo(
+        name: string,
+        definitionFile: string,
+    ): Array<{
         file: string;
         line?: number | null;
         caller?: string | null;
@@ -474,6 +572,11 @@ export interface SymbolIndexLike {
 
 /**
  * Inspect cross-file usage context for a given symbol.
+ *
+ * @param symbolName - Name of the symbol to query.
+ * @param filePath - Current file path defining or using the symbol.
+ * @param symbolIndex - Optional symbol index service.
+ * @returns Cross-file usage context summary.
  */
 export function inspectCrossFileContext(
     symbolName: string,
@@ -509,6 +612,10 @@ export function inspectCrossFileContext(
 
 /**
  * Evaluate ambiguity across inferred candidates and token semantics.
+ *
+ * @param name - Identifier name under review.
+ * @param candidates - List of inferred naming candidates.
+ * @returns Ambiguity assessment containing flags and explanation reasons.
  */
 export function evaluateNamingAmbiguity(
     name: string,
@@ -536,7 +643,9 @@ export function evaluateNamingAmbiguity(
     if (candidates.length >= 2) {
         const diff = Math.abs(top.confidence - candidates[1].confidence);
         if (diff < 0.05) {
-            reasons.push(`Ambiguous candidate contest between '${top.name}' and '${candidates[1].name}'`);
+            reasons.push(
+                `Ambiguous candidate contest between '${top.name}' and '${candidates[1].name}'`,
+            );
         }
     }
 
@@ -547,9 +656,7 @@ export function evaluateNamingAmbiguity(
 }
 
 /** Immutable set of syntax kinds identifying export modifiers. */
-const EXPORT_MODIFIER_KINDS: ReadonlySet<ts.SyntaxKind> = new Set([
-    ts.SyntaxKind.ExportKeyword,
-]);
+const EXPORT_MODIFIER_KINDS: ReadonlySet<ts.SyntaxKind> = new Set([ts.SyntaxKind.ExportKeyword]);
 
 function hasExportModifier(modifiers?: readonly ts.ModifierLike[]): boolean {
     if (!modifiers) return false;
@@ -563,6 +670,9 @@ function hasExportModifier(modifiers?: readonly ts.ModifierLike[]): boolean {
 
 /**
  * Determine if an AST node has an export modifier.
+ *
+ * @param node - AST node to inspect.
+ * @returns True if the node or an enclosing declaration is exported.
  */
 export function isNodeExported(node?: ts.Node): boolean {
     if (!node) return false;
@@ -581,6 +691,16 @@ export function isNodeExported(node?: ts.Node): boolean {
 
 /**
  * Build machine-actionable payload with standardization proposal or clarification request.
+ *
+ * @param name - Identifier name under review.
+ * @param node - Optional AST node of the symbol.
+ * @param ruleCode - Relevant naming rule code ID.
+ * @param ctx - Current analyzer execution context.
+ * @param pos - Source code position coordinates.
+ * @param pos.line - 0-based source line index.
+ * @param pos.character - 0-based source character offset.
+ * @param symbolIndex - Optional symbol index for cross-file queries.
+ * @returns Actionable payload containing proposals or clarification options.
  */
 export function buildNamingActionable(
     name: string,
@@ -635,7 +755,9 @@ export function buildNamingActionable(
 
     const reasons = [...ambiguity.reasons];
     if (isCrossFileExported) {
-        reasons.unshift(`Exported symbol has ${crossCtx.crossFileReferenceCount} cross-file reference(s)`);
+        reasons.unshift(
+            `Exported symbol has ${crossCtx.crossFileReferenceCount} cross-file reference(s)`,
+        );
     } else if (isExported && reasons.length === 0) {
         reasons.unshift('Exported symbol boundary requires external consumer verification');
     }
@@ -679,6 +801,18 @@ export type NamingIssueEmitter = (
 /**
  * Audits a function or method name for minimum/maximum length constraints
  * and unapproved abbreviation patterns.
+ *
+ * @param name - Function or method identifier name.
+ * @param node - AST declaration node.
+ * @param pos - Position coordinates of the identifier.
+ * @param pos.line - 0-based line number.
+ * @param pos.character - 0-based character offset.
+ * @param ctx - Analyzer execution context.
+ * @param opts - Naming audit options.
+ * @param opts.checkLengths - Flag whether length bounds are enabled.
+ * @param opts.checkAbbreviations - Flag whether abbreviation checks are enabled.
+ * @param symbolIndex - Optional symbol index service.
+ * @param emitIssue - Callback to emit diagnostic issues.
  */
 export function auditFunctionNameLengthsAndAbbreviations(
     name: string,
@@ -692,7 +826,14 @@ export function auditFunctionNameLengthsAndAbbreviations(
     if (opts.checkLengths !== false) {
         if (name.length < 3) {
             const desc = NamingMessages.FUNCTION_NAME_TOO_SHORT(name);
-            const actionable = buildNamingActionable(name, node, RULE_NAM_LEN_002, ctx, pos, symbolIndex);
+            const actionable = buildNamingActionable(
+                name,
+                node,
+                RULE_NAM_LEN_002,
+                ctx,
+                pos,
+                symbolIndex,
+            );
             emitIssue(
                 pos.line + 1,
                 pos.character + 1,
@@ -705,7 +846,14 @@ export function auditFunctionNameLengthsAndAbbreviations(
             );
         } else if (name.length >= MAX_FUNCTION_NAME_LENGTH) {
             const desc = NamingMessages.FUNCTION_NAME_TOO_LONG(name);
-            const actionable = buildNamingActionable(name, node, RULE_NAM_LEN_002, ctx, pos, symbolIndex);
+            const actionable = buildNamingActionable(
+                name,
+                node,
+                RULE_NAM_LEN_002,
+                ctx,
+                pos,
+                symbolIndex,
+            );
             emitIssue(
                 pos.line + 1,
                 pos.character + 1,
@@ -722,8 +870,19 @@ export function auditFunctionNameLengthsAndAbbreviations(
     if (opts.checkAbbreviations !== false) {
         const abbr = findUnapprovedAbbreviation(name);
         if (abbr) {
-            const desc = NamingMessages.UNAPPROVED_ABBREVIATION(name, abbr.unapproved, abbr.expanded);
-            const actionable = buildNamingActionable(name, node, RULE_NAM_ABR_001, ctx, pos, symbolIndex);
+            const desc = NamingMessages.UNAPPROVED_ABBREVIATION(
+                name,
+                abbr.unapproved,
+                abbr.expanded,
+            );
+            const actionable = buildNamingActionable(
+                name,
+                node,
+                RULE_NAM_ABR_001,
+                ctx,
+                pos,
+                symbolIndex,
+            );
             emitIssue(
                 pos.line + 1,
                 pos.character + 1,
@@ -741,6 +900,19 @@ export function auditFunctionNameLengthsAndAbbreviations(
 /**
  * Audits a variable or binding identifier for minimum/maximum length constraints
  * and unapproved abbreviation patterns.
+ *
+ * @param name - Variable identifier name.
+ * @param decl - AST declaration node.
+ * @param isTopLevel - True if variable is declared at module top-level scope.
+ * @param pos - Position coordinates of the identifier.
+ * @param pos.line - 0-based line number.
+ * @param pos.character - 0-based character offset.
+ * @param ctx - Analyzer execution context.
+ * @param opts - Naming audit options.
+ * @param opts.checkLengths - Flag whether length bounds are enabled.
+ * @param opts.checkAbbreviations - Flag whether abbreviation checks are enabled.
+ * @param symbolIndex - Optional symbol index service.
+ * @param emitIssue - Callback to emit diagnostic issues.
  */
 export function auditVariableNameLengthsAndAbbreviations(
     name: string,
@@ -755,7 +927,14 @@ export function auditVariableNameLengthsAndAbbreviations(
     if (opts.checkLengths !== false) {
         if (!isTopLevel && name.length <= 2 && !ALLOWED_SHORT_NAMES.has(name)) {
             const desc = NamingMessages.VARIABLE_NAME_TOO_SHORT(name);
-            const actionable = buildNamingActionable(name, decl, RULE_NAM_LEN_001, ctx, pos, symbolIndex);
+            const actionable = buildNamingActionable(
+                name,
+                decl,
+                RULE_NAM_LEN_001,
+                ctx,
+                pos,
+                symbolIndex,
+            );
             emitIssue(
                 pos.line + 1,
                 pos.character + 1,
@@ -766,9 +945,19 @@ export function auditVariableNameLengthsAndAbbreviations(
                 desc.suggestion,
                 actionable,
             );
-        } else if (name.length >= MAX_VARIABLE_NAME_LENGTH && (!isTopLevel || !/^[A-Z][A-Z0-9_]*$/.test(name))) {
+        } else if (
+            name.length >= MAX_VARIABLE_NAME_LENGTH &&
+            (!isTopLevel || !/^[A-Z][A-Z0-9_]*$/.test(name))
+        ) {
             const desc = NamingMessages.VARIABLE_NAME_TOO_LONG(name);
-            const actionable = buildNamingActionable(name, decl, RULE_NAM_LEN_001, ctx, pos, symbolIndex);
+            const actionable = buildNamingActionable(
+                name,
+                decl,
+                RULE_NAM_LEN_001,
+                ctx,
+                pos,
+                symbolIndex,
+            );
             emitIssue(
                 pos.line + 1,
                 pos.character + 1,
@@ -785,8 +974,19 @@ export function auditVariableNameLengthsAndAbbreviations(
     if (opts.checkAbbreviations !== false) {
         const abbr = findUnapprovedAbbreviation(name);
         if (abbr) {
-            const desc = NamingMessages.UNAPPROVED_ABBREVIATION(name, abbr.unapproved, abbr.expanded);
-            const actionable = buildNamingActionable(name, decl, RULE_NAM_ABR_001, ctx, pos, symbolIndex);
+            const desc = NamingMessages.UNAPPROVED_ABBREVIATION(
+                name,
+                abbr.unapproved,
+                abbr.expanded,
+            );
+            const actionable = buildNamingActionable(
+                name,
+                decl,
+                RULE_NAM_ABR_001,
+                ctx,
+                pos,
+                symbolIndex,
+            );
             emitIssue(
                 pos.line + 1,
                 pos.character + 1,
@@ -803,6 +1003,17 @@ export function auditVariableNameLengthsAndAbbreviations(
 
 /**
  * Audits a member or property declaration for unapproved abbreviations.
+ *
+ * @param memberName - Member identifier name.
+ * @param member - AST member declaration node.
+ * @param pos - Position coordinates of the member.
+ * @param pos.line - 0-based line number.
+ * @param pos.character - 0-based character offset.
+ * @param ctx - Analyzer execution context.
+ * @param opts - Naming audit options.
+ * @param opts.checkAbbreviations - Flag whether abbreviation checks are enabled.
+ * @param symbolIndex - Optional symbol index service.
+ * @param emitIssue - Callback to emit diagnostic issues.
  */
 export function auditMemberAbbreviation(
     memberName: string,
@@ -816,8 +1027,19 @@ export function auditMemberAbbreviation(
     if (opts.checkAbbreviations === false) return;
     const abbr = findUnapprovedAbbreviation(memberName);
     if (abbr) {
-        const desc = NamingMessages.UNAPPROVED_ABBREVIATION(memberName, abbr.unapproved, abbr.expanded);
-        const actionable = buildNamingActionable(memberName, member, RULE_NAM_ABR_001, ctx, pos, symbolIndex);
+        const desc = NamingMessages.UNAPPROVED_ABBREVIATION(
+            memberName,
+            abbr.unapproved,
+            abbr.expanded,
+        );
+        const actionable = buildNamingActionable(
+            memberName,
+            member,
+            RULE_NAM_ABR_001,
+            ctx,
+            pos,
+            symbolIndex,
+        );
         emitIssue(
             pos.line + 1,
             pos.character + 1,
@@ -832,12 +1054,20 @@ export function auditMemberAbbreviation(
 }
 
 const SCALAR_SYNTAX_KINDS = new Set<ts.SyntaxKind>([
-    ts.SyntaxKind.NumericLiteral, ts.SyntaxKind.StringLiteral, ts.SyntaxKind.NoSubstitutionTemplateLiteral,
-    ts.SyntaxKind.TrueKeyword, ts.SyntaxKind.FalseKeyword, ts.SyntaxKind.BigIntLiteral, ts.SyntaxKind.RegularExpressionLiteral,
+    ts.SyntaxKind.NumericLiteral,
+    ts.SyntaxKind.StringLiteral,
+    ts.SyntaxKind.NoSubstitutionTemplateLiteral,
+    ts.SyntaxKind.TrueKeyword,
+    ts.SyntaxKind.FalseKeyword,
+    ts.SyntaxKind.BigIntLiteral,
+    ts.SyntaxKind.RegularExpressionLiteral,
 ]);
 
 /**
  * Strips type assertions and parenthesization from a constant initializer.
+ *
+ * @param expr - Expression AST node to unwrap.
+ * @returns Deeply unwrapped inner expression node.
  */
 export function unwrapConstantInitializer(expr: ts.Expression): ts.Expression {
     let current = expr;
@@ -854,6 +1084,9 @@ export function unwrapConstantInitializer(expr: ts.Expression): ts.Expression {
 
 /**
  * Checks whether an expression represents a composite collection/object literal.
+ *
+ * @param expr - Expression AST node to inspect.
+ * @returns True if expression is an object or array literal.
  */
 export function isCompositeLiteral(expr: ts.Expression): boolean {
     const unwrapped = unwrapConstantInitializer(expr);
@@ -862,20 +1095,28 @@ export function isCompositeLiteral(expr: ts.Expression): boolean {
 
 /**
  * Checks whether an expression is a scalar primitive literal.
+ *
+ * @param expr - Expression AST node to inspect.
+ * @returns True if expression is a scalar primitive literal.
  */
 export function isScalarLiteral(expr: ts.Expression): boolean {
     let unwrapped = unwrapConstantInitializer(expr);
-    if (
+    const isUnaryPlusOrMinus =
         ts.isPrefixUnaryExpression(unwrapped) &&
-        (unwrapped.operator === ts.SyntaxKind.PlusToken || unwrapped.operator === ts.SyntaxKind.MinusToken)
-    ) {
-        unwrapped = unwrapped.operand;
+        (unwrapped.operator === ts.SyntaxKind.PlusToken ||
+            unwrapped.operator === ts.SyntaxKind.MinusToken);
+    if (isUnaryPlusOrMinus) {
+        unwrapped = (unwrapped as ts.PrefixUnaryExpression).operand;
     }
     return SCALAR_SYNTAX_KINDS.has(unwrapped.kind);
 }
 
 /**
  * Checks whether an AST node is a single-line or single-expression arrow function.
+ *
+ * @param node - AST node to test.
+ * @param sf - Source file providing position offsets.
+ * @returns True if node is a single-line or concise-body arrow function.
  */
 export function isSimpleArrowFunction(node: ts.Node, sf: ts.SourceFile): boolean {
     if (!ts.isArrowFunction(node)) return false;
@@ -885,4 +1126,3 @@ export function isSimpleArrowFunction(node: ts.Node, sf: ts.SourceFile): boolean
     if (!ts.isBlock(node.body)) return true;
     return node.body.statements.length <= 1;
 }
-

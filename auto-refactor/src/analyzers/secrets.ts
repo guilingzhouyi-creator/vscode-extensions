@@ -221,13 +221,7 @@ export class SecretsAnalyzer implements Analyzer {
             if (issues.length >= cap) break;
             const { lineText, nextStart } = this.extractNextLine(content, lineStart, len);
 
-            const matchedSecret = this.checkSecretPatterns(
-                lineText,
-                patterns,
-                line,
-                ctx,
-                issues,
-            );
+            const matchedSecret = this.checkSecretPatterns(lineText, patterns, line, ctx, issues);
             if (!matchedSecret && entropy.enabled) {
                 this.checkEntropyTokens(lineText, entropy, line, ctx, issues);
             }

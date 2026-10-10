@@ -187,7 +187,10 @@ function applyListValueFlag(opt: CliOptions, arg: string, val: string): boolean 
         return true;
     }
     if (arg === 'analyzers' || arg === 'fix-rules') {
-        const items = val.split(',').map((s) => s.trim()).filter(Boolean);
+        const items = val
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean);
         if (arg === 'analyzers') opt.analyzers = items;
         else opt.fixRules = items;
         return true;
@@ -330,7 +333,8 @@ function resolveNextValue(
     nextToken: string | undefined,
 ): { val: string; consumedNext: boolean } {
     if (hasInline) return { val: value, consumedNext: false };
-    if (nextToken === undefined || nextToken.startsWith('--')) return { val: '', consumedNext: false };
+    if (nextToken === undefined || nextToken.startsWith('--'))
+        return { val: '', consumedNext: false };
     return { val: nextToken, consumedNext: true };
 }
 

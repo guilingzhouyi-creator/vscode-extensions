@@ -135,7 +135,8 @@ function shouldIncludeFile(
 }
 
 /**
- * Reads directory entries safely, returning an empty list for unreadable or inaccessible directories.
+ * Reads directory entries safely, returning an empty list for unreadable
+ * or inaccessible directories.
  *
  * @param dir - Absolute path of directory to inspect.
  * @returns Array of dirent items, or empty array if access fails.

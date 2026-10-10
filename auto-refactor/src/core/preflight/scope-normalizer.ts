@@ -215,8 +215,7 @@ export function synthesizeChangesetScope(ctx: ScopeSynthesisContext): ModeSynthe
 
     // Scales prior variance according to uncalibrated confidence
     // and project distance from ceiling
-    const priorUncertainty =
-        ((100 - priorProjectMean) / 2) * (1 - priorProjectConfidence) + 0.1;
+    const priorUncertainty = ((100 - priorProjectMean) / 2) * (1 - priorProjectConfidence) + 0.1;
     const sigma0 = Math.max(0.1, priorUncertainty);
     const var0 = sigma0 * sigma0;
 
@@ -319,19 +318,14 @@ export function normalizeScopeQuality(params: ScopeNormalizationParams): ScopeNo
 
     // Table-driven mode-specific score synthesis
     const synthesizer = SYNTHESIZER_REGISTRY[mode] ?? synthesizeDomainScope;
-    const {
-        projectMean,
-        standardError,
-        changesetDelta,
-        domainAssessment,
-        explanation,
-    } = synthesizer({
-        params,
-        sliceAfterScore,
-        dimCoverage,
-        compositeConfidence,
-        activeDims,
-    });
+    const { projectMean, standardError, changesetDelta, domainAssessment, explanation } =
+        synthesizer({
+            params,
+            sliceAfterScore,
+            dimCoverage,
+            compositeConfidence,
+            activeDims,
+        });
 
     const ciLower = Math.max(0, Math.round((projectMean - 1.96 * standardError) * 100) / 100);
     const ciUpper = Math.min(100, Math.round((projectMean + 1.96 * standardError) * 100) / 100);
