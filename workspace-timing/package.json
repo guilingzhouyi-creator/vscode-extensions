@@ -242,7 +242,10 @@
     "review:gate": "npm run scripts:build && node scripts/dist/review/run-review.js --gate",
     "review:strict": "npm run scripts:build && node scripts/dist/review/run-review.js --gate --strict",
     "review:selftest": "npm run scripts:build && node scripts/dist/review/run-review.js --self-test",
-    "refactor:scan": "npm run scripts:build && node scripts/dist/tooling/refactor-adapter.js"
+    "refactor:scan": "npm run scripts:build && node scripts/dist/tooling/refactor-adapter.js",
+    "bump:dry-run": "pwsh -NoProfile -File ../scripts/ps1/version-bump.ps1 workspace-timing patch -DryRun",
+    "bump:patch": "pwsh -NoProfile -File ../scripts/ps1/version-bump.ps1 workspace-timing patch",
+    "bump:minor": "pwsh -NoProfile -File ../scripts/ps1/version-bump.ps1 workspace-timing minor"
   },
   "c8": {
     "include": [
