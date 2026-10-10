@@ -137,16 +137,40 @@ function classifyHashLine(line, inTripleQuote, quoteChar) {
   return { isBlank: false, isComment: false, inBlock: false, quoteChar: '' };
 }
 
+function classifyPowerShellLine(line, inBlock) {
+  const trimmed = line.trim();
+  if (trimmed.length === 0) return { isBlank: true, isComment: false, inBlock };
+  if (inBlock) {
+    const endIdx = trimmed.indexOf('#>');
+    if (endIdx === -1) return { isBlank: false, isComment: true, inBlock: true };
+    const rest = trimmed.slice(endIdx + 2).trim();
+    return { isBlank: false, isComment: rest.length === 0, inBlock: false };
+  }
+  if (trimmed.startsWith('<#')) {
+    const endIdx = trimmed.indexOf('#>', 2);
+    if (endIdx === -1) return { isBlank: false, isComment: true, inBlock: true };
+    const rest = trimmed.slice(endIdx + 2).trim();
+    return { isBlank: false, isComment: rest.length === 0, inBlock: false };
+  }
+  if (trimmed.startsWith('#')) return { isBlank: false, isComment: true, inBlock: false };
+  return { isBlank: false, isComment: false, inBlock: false };
+}
+
 function calculateEloc(content, ext) {
   const lines = content.split(/\r?\n/);
   const totalLoc = lines.length;
   let eloc = 0;
-  const isHash = ext === '.gd' || ext === '.py' || ext === '.sh';
+  const isPowerShell = ext === '.ps1';
+  const isHash = ext === '.gd' || ext === '.py' || ext === '.sh' || ext === '.bash';
   let inBlock = false;
   let quoteChar = '';
 
   for (const line of lines) {
-    if (isHash) {
+    if (isPowerShell) {
+      const res = classifyPowerShellLine(line, inBlock);
+      inBlock = res.inBlock;
+      if (!res.isBlank && !res.isComment) eloc++;
+    } else if (isHash) {
       const res = classifyHashLine(line, inBlock, quoteChar);
       inBlock = res.inBlock;
       quoteChar = res.quoteChar;
@@ -183,8 +207,8 @@ function validateFileEol(file, buffer, gate2Violations) {
 function validateFileVolume(file, content, gate5Violations) {
   const norm = file.replace(/\\/g, '/');
   if (
-    !/\.(?:ts|gd|js|py)$/i.test(file) ||
-    /(?:dist\/|out\/|fixtures\/|baseline|reports\/|\.d\.ts$)/.test(norm)
+    !/\.(?:ts|gd|js|py|sh|ps1|mjs|cjs)$/i.test(file) ||
+    /(?:dist\/|out\/|fixtures\/|baseline|reports\/|\.d\.ts$|corpus)/.test(norm)
   ) {
     return;
   }

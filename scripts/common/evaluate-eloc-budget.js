@@ -106,6 +106,45 @@ function classifyHashStyleLine(line, inTripleQuote, quoteChar) {
 }
 
 /**
+ * Checks whether a line in a PowerShell script (.ps1) is a comment or blank,
+ * handling single-line '#' comments and multi-line '<# ... #>' block comments.
+ *
+ * @param {string} line
+ * @param {boolean} inBlockComment
+ * @returns {{ isBlank: boolean, isComment: boolean, inBlock: boolean }}
+ */
+function classifyPowerShellLine(line, inBlockComment) {
+  const trimmed = line.trim();
+  if (trimmed.length === 0) {
+    return { isBlank: true, isComment: false, inBlock: inBlockComment };
+  }
+
+  if (inBlockComment) {
+    const endIdx = trimmed.indexOf('#>');
+    if (endIdx === -1) {
+      return { isBlank: false, isComment: true, inBlock: true };
+    }
+    const rest = trimmed.slice(endIdx + 2).trim();
+    return { isBlank: false, isComment: rest.length === 0, inBlock: false };
+  }
+
+  if (trimmed.startsWith('<#')) {
+    const endIdx = trimmed.indexOf('#>', 2);
+    if (endIdx === -1) {
+      return { isBlank: false, isComment: true, inBlock: true };
+    }
+    const rest = trimmed.slice(endIdx + 2).trim();
+    return { isBlank: false, isComment: rest.length === 0, inBlock: false };
+  }
+
+  if (trimmed.startsWith('#')) {
+    return { isBlank: false, isComment: true, inBlock: false };
+  }
+
+  return { isBlank: false, isComment: false, inBlock: false };
+}
+
+/**
  * Evaluates semantic code volume metrics for given file content.
  *
  * @param {string} content - Raw source code
@@ -119,13 +158,17 @@ function evaluateCodeMetrics(content, ext) {
   let commentLines = 0;
   let eloc = 0;
 
+  const isPowerShell = ext === '.ps1';
   const isHashLang = ext === '.gd' || ext === '.py' || ext === '.sh' || ext === '.bash';
   let inBlock = false;
   let quoteChar = '';
 
   for (const line of lines) {
     let result;
-    if (isHashLang) {
+    if (isPowerShell) {
+      result = classifyPowerShellLine(line, inBlock);
+      inBlock = result.inBlock;
+    } else if (isHashLang) {
       result = classifyHashStyleLine(line, inBlock, quoteChar);
       inBlock = result.inBlock;
       quoteChar = result.quoteChar;
@@ -425,7 +468,8 @@ function isAuditableCodeFile(file) {
     normalized.includes('/fixtures/') ||
     normalized.includes('/baseline') ||
     normalized.includes('/reports/') ||
-    normalized.includes('/archive/')
+    normalized.includes('/archive/') ||
+    normalized.includes('corpus')
   ) {
     return false;
   }
@@ -524,4 +568,5 @@ module.exports = {
   evaluateDynamicEnvelope,
   classifyCStyleLine,
   classifyHashStyleLine,
+  classifyPowerShellLine,
 };
