@@ -1,11 +1,11 @@
 {
   "schema": "workspace-rule-catalog/v1",
-  "generatedAt": "2026-10-09T12:49:47.196Z",
+  "generatedAt": "2026-10-10T03:23:43.344Z",
   "totalRules": 410,
   "counts": {
     "autoRefactor": 325,
     "workspaceTiming": 49,
-    "webGames": 56,
+    "webGames": 52,
     "globalTooling": 7
   },
   "rules": [
@@ -98,7 +98,7 @@
       "project": "WebGames",
       "family": "ADV",
       "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/.auto-refactor-cache/frontend-scan-report-v2.json)"
+      "summary": "WebGames domain gate rule (source: WebGames/docs/README.md)"
     },
     {
       "id": "ADV-PRF-003",

@@ -310,7 +310,7 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG"
 
   const sysDefinitions = [
     { num: " 1.", name: "工作区物理卫生",   score: scoreHygiene, note: "(零空文件/同构)" },
-    { num: " 2.", name: "单源规则目录",     score: scoreRules,   note: "(402规则/SSOT)" },
+    { num: " 2.", name: "单源规则目录",     score: scoreRules,   note: "(410规则/SSOT)" },
     { num: " 3.", name: "auto-refactor",    score: scoreAr,      note: "(CLI静态引擎基线)" },
     { num: " 4.", name: "workspace-timing", score: scoreWt,      note: "(VSCode扩展门禁)" },
     { num: " 5.", name: "WebGames配置架构", score: scoreWg,      note: "(卡拉尔领域配置)" }
@@ -387,7 +387,7 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG"
     md += "| 序号 | 核心子系统 | 判定结果 | 归一化得分 | 进度可视化 | 覆盖说明 |\n";
     md += "| :---: | :--- | :---: | :---: | :--- | :--- |\n";
     md += `| 1 | 工作区物理卫生 | ${passBadge(statusHygiene)} | ${scoreHygiene.toFixed(1)} | \`${makeBar(scoreHygiene, 20)}\` | 全仓零空文件/同构契约 |\n`;
-    md += `| 2 | 单源规则目录 | ${passBadge(statusRules)} | ${scoreRules.toFixed(1)} | \`${makeBar(scoreRules, 20)}\` | 402规则/SSOT一致性 |\n`;
+    md += `| 2 | 单源规则目录 | ${passBadge(statusRules)} | ${scoreRules.toFixed(1)} | \`${makeBar(scoreRules, 20)}\` | 410规则/SSOT一致性 |\n`;
     md += `| 3 | auto-refactor | ${passBadge(statusAr)} | ${scoreAr.toFixed(1)} | \`${makeBar(scoreAr, 20)}\` | CLI静态引擎质量基线 |\n`;
     md += `| 4 | workspace-timing | ${passBadge(statusWt)} | ${scoreWt.toFixed(1)} | \`${makeBar(scoreWt, 20)}\` | VSCode扩展审查门禁 |\n`;
     md += `| 5 | WebGames配置架构 | ${passBadge(statusWg)} | ${scoreWg.toFixed(1)} | \`${makeBar(scoreWg, 20)}\` | 卡拉尔领域配置审查 |\n\n`;

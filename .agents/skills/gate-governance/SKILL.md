@@ -2,7 +2,7 @@
 name: gate-governance
 description: >-
   通用双层门禁架构与跨平台脚本工程化治理。指导 Agent 落实 Tier 1 本地左移极速流式判定（gate-fast-staged.js <90ms、
-  validate-commit-msg.js）与 Tier 2 远端 CI 同构防御，运用受影响项目智能分流（auto-refactor 30 分析器与 321 规则自测）、
+  validate-commit-msg.js）与 Tier 2 远端 CI 同构防御，运用受影响项目智能分流（auto-refactor 30 分析器与 325 规则自测）、
   子进程显式工作目录隔离（-WorkingDirectory）与 pwsh 7+ 优先原则，看守代码卫生与零黑话纪律。
 ---
 
@@ -23,7 +23,7 @@ description: >-
   2. **换行契约守卫**：PowerShell 脚本（`.ps1`）在磁盘必须严格保持 CRLF 换行；Bash（`.sh`）、GDScript（`.gd`）、TypeScript/JavaScript（`.ts`/`.js`）、Markdown（`.md`）与 JSON（`.json`）严格保持 LF 换行；
   3. **缩进契约守卫**：TypeScript 源码保持 4 空格缩进，其余源码与配置文件保持 2 空格缩进；
   4. **密钥与敏感信息守卫**：拦截硬编码 Token、API 密钥与绝对路径；
-  5. **单文件双轨体积与 1:3 动态包络**：看守有效代码行 $\text{ELOC} \le 900$ 与物理行 $\text{LOC} \le 1400$ 预算及高负荷契约注释密度；
+  5. **单文件双轨体积与 1:3 动态包络**：看守有效代码行 $\text{ELOC} \le 900$ 与物理行 $\text{LOC} \le 1400$ 预算、1:3 动态反推包络及 $\text{ELOC} \ge 600$ 高负荷契约注释密度 $\ge 8\%$；
   6. **AST 切片局部复杂度守卫 (`GATE-AST-001`)**：暂存区生产代码切片受单函数圈复杂度 $\text{CC} \le 15$（分发器与探针弹性包络 20~25）、控制流嵌套深度 $\text{Depth} \le 4$、单行噪声比 $\text{Noise} \le 4.0$ 刚性约束。
 - **`commit-msg`（单进程统一提交信息流式检验）**：
   由 `validate-commit-msg.js` 驱动，毫秒级流式完成提交说明各项合规校验：
@@ -33,7 +33,7 @@ description: >-
   4. **6 类禁词风格与零黑话拦截**：严格拦截临时敷衍（`CMG-STY-001`）、过度夸大（`CMG-STY-002`）、过度贬损（`CMG-STY-003`）、风格元叙事（`CMG-STY-004`）、程序化流水账（`CMG-STY-005`）与执行数字量词（`CMG-STY-006`）；拦截任何施工批次代号；
   5. **单源规则反虚构 (`RCFG-RULE-DRIFT`)**：提交信息中引用的所有规则 ID 必须在 `scripts/common/rule-catalog.json` 中真实登记。
 - **`pre-push`（全域双重回归与基线看守）**：
-  结合智能分流调度执行受影响项目的全量单元测试、跨模块静态审查与质量基线 Ratchet。
+  结合智能分流调度执行受影响项目的全量单元测试、跨模块静态审查、零高危技术债务防线与质量基线 Ratchet。
 
 ### 2. 第二层：远端主干看守 (Tier 2 Remote CI Gate)
 - 远端 CI 流水线（`.github/workflows/`）完整镜像本地 Tier 1 全套判定（Hygiene + AST Slice + Style + Test + Audit）；
@@ -49,7 +49,7 @@ description: >-
 ### 1. 路径特征探测与精准映射
 通过 `git diff --cached --name-only` 提取暂存区文件路径向量，精确映射至四大受控域：
 - **`workspace-timing/**`** $\rightarrow$ 路由至 VS Code 扩展套件：触发快速增量编译（`npm run compile`）、单元测试（`npm run test:fast`）与双语字典审查（`npm run review`）；
-- **`auto-refactor/**`** $\rightarrow$ 路由至 CLI 引擎套件：触发 30 分析器与 321 规则自测 (153/153 套测试，`npm test`)、Rust/TS 双轨内核等价性校验与项目中立性守卫（`npm run gate`）；
+- **`auto-refactor/**`** $\rightarrow$ 路由至 CLI 引擎套件：触发 30 分析器与 325 规则自测 (153/153 套测试，`npm test`)、Rust/TS 双轨内核等价性校验与项目中立性守卫（`npm run gate`）；
 - **`WebGames/**`** $\rightarrow$ 路由至 Godot 引擎套件：触发 GDScript 语法审查（`check-gdscript.sh`）、无头回归套件（`test-run.ps1`）与配置同构审计；
 - **`scripts/**` / `.github/**` / `AGENTS.md` / `.agents/skills/**` / 根目录配置** $\rightarrow$ 标记为 `governance` 域：触发工作区单源规则目录一致性、技能集规范性核验与全宗审计（`audit-all.ps1`，内置 `validate-skills.js`）。
 
@@ -92,3 +92,14 @@ description: >-
 
 1. **零施工黑话**：门禁脚本日志、测试断言输出与提交检查中，严禁出现任何施工批次代号（`p[0-9]+`、`phase[0-9]+`、`st[0-9]+`、`temp`、`new`、`v[0-9]+`、`wip` 等）；
 2. **客观质性断言**：门禁日志输出必须陈述纯粹客观的技术事实与输入输出质性结论，禁止输出“退出码0”或统计数字等形式主义流水账。
+
+---
+
+## 六、 常用门禁命令与零高危技术债务防线
+
+1. **零高危技术债务防线**：全工作区 High/Critical 技术债务历史性归零（0 项），门禁系统一票否决任何导致债务反弹的改动；
+2. **常用本地预审命令矩阵**：
+   - 暂存区极速体检：`pwsh -File scripts/ps1/pre-commit-gate.ps1`
+   - 提交信息预审：`pwsh -File scripts/ps1/commit-msg-gate.ps1 <msg-file>`
+   - 双轨体积评估：`node scripts/common/evaluate-eloc-budget.js`
+   - 全工作区快速统一审查：`pwsh -File scripts/ps1/audit-all.ps1 -Fast`

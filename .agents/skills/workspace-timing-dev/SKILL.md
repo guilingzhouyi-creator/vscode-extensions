@@ -84,7 +84,7 @@ description: >-
 ## 五、 UI 100% 双语字典与暗色对比度视觉契约
 
 ### 1. 100% 双语字典覆盖
-- 界面文案必须通过 `i18n.t(key)` 提取，严格在 `src/i18n/locales/zh-CN.json` 与 `en.json` 中镜像双向对齐；
+- 界面文案必须通过 `i18n.t(key)` 提取，严格在 `src/i18n/zh-CN.ts` 与 `src/i18n/en.ts`（及扩展清单 `package.nls.json` / `package.nls.zh-cn.json`）中镜像双向对齐；
 - **一票否决**：严禁在 HTML 模板、TS 逻辑、状态栏提示或弹窗中使用硬编码中英文；
 - 严禁向用户暴露底层存储术语（如 RingBuffer、NDJSON、dailyTotals 等内部技术实现）。
 
@@ -92,6 +92,10 @@ description: >-
 - 面板样式所有色彩必须通过 `:root` 声明的主题 CSS 变量（`var(--vscode-*)`）驱动；
 - SVG 图标与活跃折线图刻度文字强制使用纯白 `#ffffff` 或主题适配明亮变量，严禁默认回退为暗黑色文字（导致在深色主题下不可见）；
 - 严格遵循 WCAG AA 级以上色彩对比度标准。
+
+### 3. 产品交付物与工程日志严格隔离契约
+- 面向用户的扩展 `README.md` 严格定位为商用级产品发布展示页，严禁平铺开发路线图与内部施工标记；
+- 面向用户的 `CHANGELOG.md` 严格以用户价值与体验提升为导向，绝对严禁泄露内部架构重构黑话（如消融单行跳板、RingBuffer崩溃安全、AST切片局部复杂度等工程治理术语）。
 
 ---
 
@@ -102,20 +106,21 @@ description: >-
 ### 1. 门禁分流调度与对应指令
 当修改触及 `workspace-timing/**` 路径时，门禁系统触发三阶递进校验：
 1. **增量极速编译**：`npm run compile`（严格基于 `tsconfig.json` 的 `isolatedModules` 与无 `declaration` 快速发射）；
-2. **单元测试与回归套件**：`npm run test:fast`（执行 90+ 单元测试，重点看守会话折叠、跨日切分、时长守恒与崩溃回放）；
-3. **专有规则审查门禁**：`npm run review`（执行 `scripts/review.js` 检查 L0~L5 六层共 45 条规则）。
+2. **单元测试与回归套件**：`npm run test:fast`（执行 145 项单元测试，重点看守会话折叠、跨日切分、时长守恒与崩溃回放）；
+3. **专有规则审查门禁**：`npm run review`（执行 `scripts/dist/review/run-review.js` 检查 L0~L5 六层共 49 条规则）。
 
-### 2. 45 条审查规则单一真源对齐 (SSOT)
+### 2. 49 条审查规则单一真源对齐 (SSOT)
 - 审查规则单一真源登记于 `workspace-timing/scripts/config/review-rules.json`，并自动聚合至全仓 `scripts/common/rule-catalog.json`；
 - 规则严格划分为六层前缀：
   - `L0-COMPILE`：代码必须 100% 编译通过；
   - `L1-STORAGE-CRASH`：原子替换、快照前置与崩溃安全防护；
   - `L2-TIMING-CONSERVATION`：跨日拆分与时长守恒契约；
   - `L3-I18N-COVERAGE`：中英文双语字典 100% 镜像与硬编码字面量拦截；
-  - `L4-PERF-RESOURCE`：定时器无泄漏清理、高频循环零瞬态堆分配与 Disposable 资源解耦；
-  - `L5-UI-CONTRAST`：主题 CSS 变量驱动与暗色高对比度视觉合规；
+  - `L4-PERF-RESOURCE` / `L4-TEST-BUDGET`：定时器无泄漏清理、高频循环零瞬态堆分配与测试耗时基准预算（`TB-REGRESSION`）；
+  - `L5-UI-CONTRAST` / `L5-REFACTOR`：主题 CSS 变量驱动、暗色高对比度视觉合规与重构适配；
 - 严禁在审查脚本或提交说明中发射未在规则库登记的规则代号；
-- 核心源码文件受单文件双轨体积（ELOC <= 900 / LOC <= 1400）与 1:3 动态包络约束，模块入口首行必须规范呈现六字段 JSDoc 架构契约。
+- 核心源码文件受单文件双轨体积（$\text{ELOC} \le 900 / \text{LOC} \le 1400$）、1:3 动态反推包络与高负荷逻辑（$\text{ELOC} \ge 600$）注释密度 $\ge 8\%$ 约束，模块入口首行必须规范呈现六字段 JSDoc 架构契约与算法不变式；
+- 全工作区 High/Critical 技术债务历史性归零（0 项），新增改动与重构严禁引入任何技术债务反弹（一票否决）。
 
 ---
 
@@ -130,10 +135,10 @@ cd workspace-timing
 # 1. 极速增量编译 TypeScript
 npm run compile
 
-# 2. 运行快速单元测试套件（90+ 用例，包含折叠/聚合/i18n契约）
+# 2. 运行快速单元测试套件（145 项用例，包含折叠/聚合/i18n/双轨工时契约）
 npm run test:fast
 
-# 3. 运行扩展 L0~L5 六层权重审查门禁（45 规则看守）
+# 3. 运行扩展 L0~L5 六层权重审查门禁（49 规则看守）
 npm run review
 
 # 4. 同步 Webview 静态资源

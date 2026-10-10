@@ -8,6 +8,7 @@
     "forbiddenPrefixes": ["workspace-timing/src/", "auto-refactor/src/", "WebGames/backend/", "scripts/ps1/", "scripts/sh/"]
   },
   "associatedSkills": [
+    "skill-governance",
     "rule-catalog-governance",
     "complexity-budget",
     "docs-archive-governance",
@@ -17,7 +18,7 @@
   ],
   "rigidAxioms": [
     "零空文件：全仓严禁创建或遗留 0 字节文件或纯空白字符文件",
-    "单源规则目录 (rule-catalog.json) 收录 402 条规则，规则 ID 零虚构 (RCFG-RULE-DRIFT)",
+    "单源规则目录 (rule-catalog.json) 收录 410 条规则，规则 ID 零虚构 (RCFG-RULE-DRIFT)",
     "技能同构等价：.agents/skills/ 与插件包技能目录必须保持 100% 字节等价，修改后必须执行同步",
     "零黑话纪律：严禁在技能文档、模板或提交中使用施工批次代号 (p[0-9]+, Phase_[0-9]+, ST[0-9]+)",
     "零高危技术债：全工作区 High/Critical 债务历史性归零 (0 项)，严禁引入技术债反弹"

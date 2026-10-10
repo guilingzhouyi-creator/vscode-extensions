@@ -143,7 +143,7 @@ export function consumeTrajectoryStream(lines: readonly string[]): TrajectorySte
 2. **反向动态逻辑下限**：
    当 $\text{LOC} \ge 250$ 时，强制要求 $\text{ELOC} \ge \lfloor \text{LOC} / 3.0 \rfloor$（即纯代码语义密度 $\ge 33.3\%$）。大体量文件必须承载相称的业务逻辑，杜绝冗余排版。
 3. **高负荷契约注释密度约束**：
-   当 $\text{ELOC} \ge 600$ 时，要求注释占比 $\ge 8\%$（$\text{Comments} / \text{LOC} \ge 0.08$）。严禁为了规避物理行数上限而删减状态机契约、算法原理或 JSDoc 关键文档。
+   当 $\text{ELOC} \ge 600$ 时，要求注释占比 $\ge 8\%$（$\text{Comments} / \text{LOC} \ge 0.08$），违者触发动态包络告警。严禁为了规避物理行数上限而删减状态机契约、算法原理或 JSDoc 关键文档。
 
 ### 3. 高内聚模块的重构治理原则
 - **坚决杜绝机械物理碎片化**：处于合法双轨包络内（$\text{ELOC} \le 900, \text{LOC} \le 1400$）且高内聚的模块（如 700~800 行的领域聚合器或复杂视图逻辑），严禁单纯为了压低数字而机械切碎为多个 50 行的孤立文件，严防破坏领域封装与调用局部性；
@@ -292,4 +292,5 @@ pwsh -File scripts/ps1/pre-commit-gate.ps1
 - 暂存区所有改动文件均严格位于 1:3 双向动态包络安全带内；
 - 头部六字段 JSDoc 契约完整，无注水式注释与敏捷过程代号；
 - 复杂核心算法显式声明降级边界与前置等长不变式；
-- 循环体与热路径零瞬态堆分配，无 `CPX-SPACE-001` 违规。
+- 循环体与热路径零瞬态堆分配，无 `CPX-SPACE-001` 违规；
+- 全工作区 High/Critical 技术债务历史性归零（0 项），重构改动严禁引入任何技术债务反弹（一票否决）。

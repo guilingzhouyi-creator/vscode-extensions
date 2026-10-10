@@ -112,7 +112,7 @@ pwsh -File scripts/ps1/commit-msg-gate.ps1 "$dir\commit_batch_N.txt"
 ```powershell
 pwsh -File scripts/ps1/pre-commit-gate.ps1
 ```
-*检查项目：零空文件、换行契约（ps1 CRLF，其余 LF）、TypeScript 4 空格缩进/其余 2 空格、敏感信息防泄漏、单文件双轨体积预算（ELOC<=900, LOC<=1400）及 AST 切片局部复杂度（CC<=15, Depth<=4, Noise<=4.0）。*
+*检查项目：零空文件、换行契约（ps1 CRLF，其余 LF）、TypeScript 4 空格缩进/其余 2 空格、敏感信息防泄漏、单文件双轨体积预算（ELOC<=900, LOC<=1400）、1:3 动态反推包络、高负荷注释密度 >= 8% 及 AST 切片局部复杂度（CC<=15, Depth<=4, Noise<=4.0）。*
 
 #### 暂存区 AST 切片复杂度阻断自愈指引 (AST Complexity Remediation)
 若预审触发 `GATE-AST-001`（`CC > 15`）或控制流嵌套超标（`Depth > 4`）：
@@ -127,6 +127,9 @@ git commit -F "$dir\commit_batch_N.txt"
 ```
 提交完成后执行 `git status -s` 核查工作树剩余文件，继续推进下一批。
 
+> [!CAUTION] 产品发布更新日志防污染隔离
+> Git 提交说明陈述的是对代码库的**内部工程技术事实**；**严禁**直接将包含工程重构黑话的提交说明复制给用户端的 `CHANGELOG.md` 或 Release Notes。用户交付文档必须保持纯粹的用户功能与价值导向。
+
 ---
 
 ## 四、 最终全域双重回归验收
@@ -138,7 +141,9 @@ git commit -F "$dir\commit_batch_N.txt"
    # 断言全仓各子系统与各维度静态审查 100% 绿色通行
    ```
 2. **引擎及子项目无头回归测试**：
-   依改动领域执行对应测试套件，断言全量测试通过且无未决缺陷。
+   依改动领域执行对应测试套件，断言全量测试通过且无未决缺陷；
+3. **全工作区零高危技术债务防线**：
+   断言全仓未引入任何 High/Critical 技术债务反弹，保持 0 项历史刚性基线（一票否决）。
 
 ---
 

@@ -10,7 +10,7 @@
   "associatedSkills": ["rule-catalog-governance", "complexity-budget", "batch-commit"],
   "rigidAxioms": [
     "零空文件：全仓严禁创建或遗留 0 字节文件或纯空白字符文件",
-    "单源规则目录 (rule-catalog.json) 收录 402 条规则 (autoRefactor: 321, workspaceTiming: 45, webGames: 56, globalTooling: 7)，规则 ID 零虚构 (RCFG-RULE-DRIFT)",
+    "单源规则目录 (rule-catalog.json) 收录 410 条规则 (autoRefactor: 325, workspaceTiming: 49, webGames: 56, globalTooling: 7)，规则 ID 零虚构 (RCFG-RULE-DRIFT)",
     "提交规范：必须声明 [Project: ...]，有效字数 >= 30，零黑话与纯客观技术事实",
     "单文件双轨体积 (ELOC <= 900 / LOC <= 1400) 与 AST 切片预算 (CC <= 15, Depth <= 4)"
   ],

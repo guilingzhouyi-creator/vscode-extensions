@@ -58,7 +58,7 @@ description: >-
 | :--- | :--- | :--- | :--- |
 | **`explore`** | 只读探索与依赖图分析 | 严禁写文件；仅输出调用拓扑与死代码证据 | `enable_write_tools: false` |
 | **`construct`** | 业务特性与增量代码生产 | 严格限制在 Path Jail 内；强制平铺控制流 (CC<=15, Depth<=4) | `enable_write_tools: true` |
-| **`review`** | 静态审查与规则匹配分析 | 严禁直接改代码；对照 402 规则库输出精确行号与质性依据 | `enable_write_tools: false` |
+| **`review`** | 静态审查与规则匹配分析 | 严禁直接改代码；对照 410 规则库输出精确行号与质性依据 | `enable_write_tools: false` |
 | **`refactor`** | 结构消融与复杂度平铺 | 优先消除循环内瞬态分配；消除空包跳板；动态稀释比 <= 1:3 | `enable_write_tools: true` |
 | **`guardian`** | 复合门禁防御与质量裁决 | 严禁改业务代码；执行测试与门禁并执行一票否决裁决 | `enable_write_tools: true` (限测试) |
 
@@ -91,7 +91,7 @@ description: >-
 在大型特性演进或复杂重构中，推荐实施 **Explore/Review 先行 $\rightarrow$ Construct/Refactor 施工 $\rightarrow$ Guardian 复核** 闭环流：
 1. **第一阶段：只读审查勘测 (`enable_write_tools: false`)**：
    - 调度 `review` 或 `explore` 姿态专员，物理拔除写入工具；
-   - 专员全量读取 AST、跨文件引用图与 402 规则库，输出精确违规行号、调用链以及质性重构方案；
+   - 专员全量读取 AST、跨文件引用图与 410 规则库，输出精确违规行号、调用链以及质性重构方案；
 2. **第二阶段：定点施工重构 (`enable_write_tools: true`)**：
    - 调度 `construct` 或 `refactor` 姿态专员，赋予独占文件列表的写权限；
    - 专员严格按第一阶段输出的方案在 Path Jail 范围内实施小步改动，禁止蔓延扩写；
@@ -154,8 +154,8 @@ invoke_subagent({
 SubAgent 汇报任务完成并返回消息后，主 Agent **绝对不能盲目信任其汇报文本**，必须严格独立执行 8 步交叉复审闭环：
 1. **① 沙箱隔离审计 (Path Jail Guard Audit)**：主 Agent 执行 `git status` 与 `git diff --name-only`，比对修改文件是否严格局限于独占 Path Jail 授权列表，严禁发生越界修改；
 2. **② TypeScript 静态编译 (Static Typecheck & Build Gate)**：在受影响项目执行 `npm run build` 或 `npm run compile`，确保 TypeScript 编译器 100% 静态编译通过，0 编译错误，0 类型告警；
-3. **③ 领域微门禁自检 (Domain Micro-Gate Checks)**：针对涉及子域执行专属微门禁脚本（如 `node scripts/common/validate-skills.js`、`node scripts/common/sync-skills.js --check`、`node workspace-timing/scripts/check-i18n.js`），确保领域专有契约完备；
-4. **④ 规则与单源目录防虚构校验 (Rule Catalog Anti-Hallucination Gate)**：执行 `node scripts/common/generate-rule-catalog.js` 与 `node scripts/common/validate-commit-msg-rules.js`，核实 402 条规则目录计数零漂移，提交说明零虚构规则 ID（`RCFG-RULE-DRIFT`）；
+3. **③ 领域微门禁自检 (Domain Micro-Gate Checks)**：针对涉及子域执行专属微门禁脚本（如 `node scripts/common/validate-skills.js`、`node scripts/common/sync-skills.js --check`、`node scripts/common/evaluate-eloc-budget.js`），核查单文件双轨体积（$\text{ELOC} \le 900 / \text{LOC} \le 1400$）、1:3 动态包络及高负荷注释密度 $\ge 8\%$；
+4. **④ 规则与单源目录防虚构校验 (Rule Catalog Anti-Hallucination Gate)**：执行 `node scripts/common/generate-rule-catalog.js` 与 `node scripts/common/validate-commit-msg-rules.js`，核实 410 条规则目录计数零漂移，提交说明零虚构规则 ID（`RCFG-RULE-DRIFT`）；
 5. **⑤ 门面实质承载与跳板排查 (Facade Substance & Anti-Trampoline Guard)**：执行 `node auto-refactor/scripts/validate-facade-governance.js`，核查门面导出满足 $\text{ELOC} \ge 15$ 或具备 `Object.freeze` 不可变封装，彻底消融空包跳板（`ARCH-ABS-001`）；
 6. **⑥ 自审棘轮基线防反弹 (Self-Audit Monotonic Ratchet Baseline Gate)**：执行 `node auto-refactor/scripts/gate-self.js`，确保 `0 newBlocking error`，全仓历史基线单调收敛，零 High/Critical 技术债务反弹（一票否决）；
 7. **⑦ 全量自动化测试套件 (Comprehensive Test Suite Regression)**：执行 `npm test`，确保 153/153 套测试套件并发绿色通过，0 挂起，纯 TS 回退与 Rust 原生算子 100% 字节等价；

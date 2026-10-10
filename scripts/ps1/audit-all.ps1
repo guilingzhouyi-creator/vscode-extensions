@@ -306,7 +306,7 @@ $SCORE_FLOOR = 15.0
 # 1. 物理卫生基石得分（理论上限 99.8，全合规 99.8，门禁失败扣除 70.0 惩罚分并受 15.0 刚性下界保护）
 $scoreHygiene = if ($statusHygiene -eq "PASS") { 99.8 } else { [math]::Max($SCORE_FLOOR, [math]::Round(99.8 - 70.0, 1)) }
 
-# 2. 单源规则目录基石得分（理论上限 99.8，402 规则单源一致 99.8，门禁失败扣除 70.0 惩罚分并受 15.0 刚性下界保护）
+# 2. 单源规则目录基石得分（理论上限 99.8，410 规则单源一致 99.8，门禁失败扣除 70.0 惩罚分并受 15.0 刚性下界保护）
 $scoreRules   = if ($statusRules -eq "PASS") { 99.8 } else { [math]::Max($SCORE_FLOOR, [math]::Round(99.8 - 70.0, 1)) }
 
 # 3. auto-refactor 质量基线得分（真源自审综合分 98.8，门禁失败扣除 70.0 惩罚分并受 15.0 刚性下界保护）
@@ -405,7 +405,7 @@ Write-Host $sep1 -ForegroundColor Cyan
 
 $sysDefinitions = @(
     @{ num = " 1."; name = "工作区物理卫生";   score = $scoreHygiene; note = "(零空文件/同构)" },
-    @{ num = " 2."; name = "单源规则目录";     score = $scoreRules;   note = "(402规则/SSOT)" },
+    @{ num = " 2."; name = "单源规则目录";     score = $scoreRules;   note = "(410规则/SSOT)" },
     @{ num = " 3."; name = "auto-refactor";    score = $scoreAr;      note = "(CLI静态引擎基线)" },
     @{ num = " 4."; name = "workspace-timing"; score = $scoreWt;      note = "(VSCode扩展门禁)" },
     @{ num = " 5."; name = "WebGames配置架构"; score = $scoreWg;      note = "(卡拉尔领域配置)" }
@@ -500,7 +500,7 @@ if ($env:GITHUB_STEP_SUMMARY) {
         $badgeWg      = if ($statusWg -eq "PASS") { "✅ PASS" } else { "❌ FAIL" }
 
         [void]$md.AppendLine(("| 1 | 工作区物理卫生 | {0} | {1:F1} | `[{2}]` | 全仓零空文件/同构契约 |" -f $badgeHygiene, $scoreHygiene, (Get-ProgressBar $scoreHygiene)))
-        [void]$md.AppendLine(("| 2 | 单源规则目录 | {0} | {1:F1} | `[{2}]` | 402规则/SSOT一致性 |" -f $badgeRules, $scoreRules, (Get-ProgressBar $scoreRules)))
+        [void]$md.AppendLine(("| 2 | 单源规则目录 | {0} | {1:F1} | `[{2}]` | 410规则/SSOT一致性 |" -f $badgeRules, $scoreRules, (Get-ProgressBar $scoreRules)))
         [void]$md.AppendLine(("| 3 | auto-refactor | {0} | {1:F1} | `[{2}]` | CLI静态引擎质量基线 |" -f $badgeAr, $scoreAr, (Get-ProgressBar $scoreAr)))
         [void]$md.AppendLine(("| 4 | workspace-timing | {0} | {1:F1} | `[{2}]` | VSCode扩展审查门禁 |" -f $badgeWt, $scoreWt, (Get-ProgressBar $scoreWt)))
         [void]$md.AppendLine(("| 5 | WebGames配置架构 | {0} | {1:F1} | `[{2}]` | 卡拉尔领域配置审查 |" -f $badgeWg, $scoreWg, (Get-ProgressBar $scoreWg)))

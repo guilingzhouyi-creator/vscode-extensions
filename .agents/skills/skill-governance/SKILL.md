@@ -2,7 +2,7 @@
 name: skill-governance
 description: >-
   工作区技能集工程化结构、生命周期与同构分发治理规范。指导 Agent 遵循 JIT 渐进式披露原则，
-  规范维护 12 项研发技能的四件套物理布局（SKILL.md、references、templates、scripts）、
+  规范维护 15 项研发技能的四件套物理布局（SKILL.md、references、templates、scripts）、
   YAML Frontmatter 语法契约、双目录（.agents/skills 与插件包）100% 字节等价性同步与自动化门禁验证。
 ---
 
@@ -82,7 +82,9 @@ description: >-
 2. **零空文件**：严禁创建或保留 0 字节物理空文件或纯空白字符文件（`HYG-EMP-001`）；
 3. **单源规则反虚构 (`RCFG-RULE-DRIFT`)**：技能正文中提及的所有大写规则 ID（如 `ARCH-FAC-001`、`ADV-PRF-002`、`GATE-AST-001`）必须在 `scripts/common/rule-catalog.json` 中真实登记；
 4. **相对链接卫生 (`LINK-ABS-FILE-URI`)**：所有超链接必须为有效的相对路径，严禁使用 Windows 盘符绝对路径或 `file:///` URI；目标物理文件必须真实存在；
-5. **零黑话与零敏捷代号**：严禁使用 `Phase_{NN}`、`ST{NN}`、`p[0-9]+` 等敏捷施工临时代号，一律采用客观技术主题命名。
+5. **零黑话与零敏捷代号**：严禁使用 `Phase_{NN}`、`ST{NN}`、`p[0-9]+` 等敏捷施工临时代号，一律采用客观技术主题命名；
+6. **单文件双轨体积与契约注释密度**：技能模板与伴生代码文件同样受 $\text{ELOC} \le 900, \text{LOC} \le 1400$ 双轨体积红线与 1:3 动态反推包络约束；高负荷代码（$\text{ELOC} \ge 600$）契约注释密度必须达到 8% 及以上；
+7. **全仓零高危技术债务与防反弹红线**：全工作区 High/Critical 技术债务历史性归零（0 项），技能演进与重构坚决捍卫 0 项基线，严禁引入任何高危债务反弹。
 
 ---
 

@@ -2,14 +2,14 @@
 name: auto-refactor-dev
 description: >-
   auto-refactor 静态分析重构引擎、Rust+TS 双轨内核与 Praxis 客户端 SDK 开发规范。指导 Agent 在
-  auto-refactor 项目中维护 30 内置分析器与 321 条规则体系、保证 Rust 算子与纯 TS 桥接 100% 字节等价、
+  auto-refactor 项目中维护 30 内置分析器与 325 条规则体系、保证 Rust 算子与纯 TS 桥接 100% 字节等价、
   落实四阶段分析器流水线拓扑 (Stage 0~3) 与有序装配意义、Praxis 表现层语义聚合引擎与 correlatedRules 消费规范、
   一体两面三层拓扑 Diff 引擎、AgentDirectives 结构化协议、高精度时间戳与暂存分流原子落盘。
 ---
 
 # auto-refactor-dev — 静态重构引擎与双轨算子开发规范
 
-本技能规范了 `auto-refactor/` 静态代码分析与治理引擎的核心架构原则、双轨算子等价性约束、30 个内置分析器的四阶段流水线拓扑（Stage 0~3）与有序装配意义、321 条规则治理体系、Praxis 客户端 SDK 与表现层语义聚合引擎（`semantic-correlation.ts`）、一体两面三层拓扑 Diff 引擎、AgentDirectives 结构化指令协议、高精度时间戳规范以及暂存分流原子落盘机制。
+本技能规范了 `auto-refactor/` 静态代码分析与治理引擎的核心架构原则、双轨算子等价性约束、30 个内置分析器的四阶段流水线拓扑（Stage 0~3）与有序装配意义、325 条规则治理体系、Praxis 客户端 SDK 与表现层语义聚合引擎（`semantic-correlation.ts`）、一体两面三层拓扑 Diff 引擎、AgentDirectives 结构化指令协议、高精度时间戳规范以及暂存分流原子落盘机制。
 
 ---
 
@@ -17,7 +17,7 @@ description: >-
 
 在以下任一场景中，必须激活本技能：
 1. **新增或修改静态代码分析器**（30 个内置分析器，位于 `src/analyzers/*.ts`）；
-2. **注册或调整规则元数据**（321 条内置规则，位于 `src/core/rules/` 与 `src/core/scoring/dimensionRuleTable.ts`）；
+2. **注册或调整规则元数据**（325 条内置规则，位于 `src/core/rules/` 与 `src/core/scoring/dimensionRuleTable.ts`）；
 3. **开发 Rust N-API 原生算子或更新纯 TS Shim 回退实现**（`crates/` 与 `src/core/native/`）；
 4. **调用或扩展 Praxis 审查客户端 SDK**（`IPraxisReviewClient`、`createPraxisClient`、`src/core/praxis/`）；
 5. **维护一体两面三层拓扑 Diff 引擎或 AgentDirectives 协议**（`diff-topology.ts`、`agent-directives.ts`）；
@@ -31,7 +31,7 @@ description: >-
 `auto-refactor` 采用 TypeScript 调度编排与 Rust N-API 原生算子内核结合的双轨架构：
 - **L1 原生算子层**：`crates/auto-refactor-core` 与 `crates/ops-{diff,graph,pattern,mask,clone}`；
 - **L2 语法与语义层**：`NormalizedNode` 统一语法树与 `SemanticGraph` 跨语言（8 种语言）图底座；
-- **L3 规则与分析器**：30 个内置分析器与 321 条规则金字塔治理体系；
+- **L3 规则与分析器**：30 个内置分析器与 325 条规则金字塔治理体系；
 - **L4 调度与快轨**：Sparse MoE 变更熵密门禁路由器与 `<10ms` AST 切片快轨；
 - **L5 质量度量平面**：静态（10 支柱）+ 动态证据 + 演化（CAI 指数）；
 - **L6 Praxis 交付层**：统一客户端 SDK、多 Agent 冲突仲裁、轨迹配方学习与级联回滚。
@@ -91,7 +91,7 @@ Rust 原生算子（64-bit SWAR 向量化扫描、Bit-Parallel Myers 差分、Ta
   * Sparse MoE 稀疏路由器依据文件变更熵及文件角色，按需激活特定阶段分析器，将增量分析耗时压缩至 `<100ms`；
   * 分析器采用按需工厂实例化，杜绝全量 30 个分析器在引擎冷启动时同时吃满 V8 堆内存，彻底消除常驻后台服务内存泄漏。
 
-### 3. 四层规则金字塔治理 (321 条内置规则)
+### 3. 四层规则金字塔治理 (325 条内置规则)
 - **Layer 1（通用基础）**：格式、命名、注释、死代码、物理卫生；
 - **Layer 2（工程架构）**：分层依赖、门面承载、不可变封装、数据解耦；
 - **Layer 3（语言进阶）**：TS/Rust/Python/Go/GDScript 现代特性、资源安全；
@@ -101,6 +101,11 @@ Rust 原生算子（64-bit SWAR 向量化扫描、Bit-Parallel Myers 差分、Ta
 - **规则 ID 规范**：遵循 Canonical 格式 `FAMILY-TOPIC-NNN`（如 `ARCH-FAC-001`、`GATE-AST-001`、`ADV-PRF-002`）；
 - **单源登记**：新增规则必须在 `src/core/rules/` 导出，在 `src/core/scoring/dimensionRuleTable.ts` 绑定权重，并同步在 `scripts/common/rule-catalog.json` 全局真源中完成注册；
 - **单 Finding 扣分预算红线**：单个 Finding 扣分维度上限严格受限：$$\text{AxesPerFinding} \le 4$$ 严禁单一违规向全维度大面积滥扣分。
+
+### 5. 双轨体积、动态包络与高负荷契约注释守卫
+- **双轨体积红线**：分析器与核心逻辑模块受有效代码行 $\text{ELOC} \le 900$、物理代码行 $\text{LOC} \le 1400$ 绝对红线约束；
+- **1:3 动态反推包络**：严格执行 1:3 代码密度比反推包络，避免逻辑过度稀释或机械物理碎片化；
+- **高负荷契约注释密度守卫**：当文件有效逻辑 $\text{ELOC} \ge 600$ 时，契约与架构解释性注释占比必须 $\ge 8\%$，严禁超大复杂模块裸奔。
 
 ---
 
@@ -260,7 +265,7 @@ export interface AgentDirectivesBundle {
 
 ## 九、 基线自审报告复用机制与增量切片快轨
 
-1. **消除无谓重复开销**：全仓全量自审（`runSelfAudit()`）涉及 30 个分析器与 321 条规则遍历，执行耗时约 14s。在常规门禁与增量校验时，禁止重复运行全量 `runSelfAudit()`；
+1. **消除无谓重复开销**：全仓全量自审（`runSelfAudit()`）涉及 30 个分析器与 325 条规则遍历，执行耗时约 14s。在常规门禁与增量校验时，禁止重复运行全量 `runSelfAudit()`；
 2. **基线报告快照复用**：
    - 优先读取已生成的基线自审报告快照（`.refactor-cache/baseline-self-audit.json`）；
    - 校验流程仅对暂存区增量文件执行 AST 局部切片比对与差分分析，将增量审计时间压缩在 100ms 以内；
@@ -295,6 +300,7 @@ export interface AgentDirectivesBundle {
 4. **分层滚动持久化**：
    - 质量轨迹持久化存储至 `.refactor-trajectory/`，采用紧凑 NDJSON 格式（单条记录 $<350\text{B}$）；
    - 长期总空间预算约束在 $\le 2\text{MB}$，自动按周期滚动压缩与归档。
+5. **零高危技术债务防线**：全工作区 High/Critical 技术债务历史性归零（0 项），新增分析器与规则改动严禁引入任何技术债务反弹（一票否决）。
 
 ---
 

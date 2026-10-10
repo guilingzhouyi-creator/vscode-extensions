@@ -67,11 +67,13 @@ bash scripts/sh/version-bump.sh workspace-timing patch
 bash scripts/sh/version-bump.sh workspace-timing minor --dry-run
 ```
 
-### 2. Keep-a-Changelog 自动化迁移
+### 2. Keep-a-Changelog 自动化迁移与用户日志防污染契约
 脚本执行版本递增时，自动校验并迁移 `CHANGELOG.md`：
-1. 校验必须存在 `## [Unreleased]` 区块且内容包含有效技术事实；
-2. 自动将 `[Unreleased]` 中的修改内容封存至新版本标题 `## [vX.Y.Z] - YYYY-MM-DD`；
-3. 在顶部重新开辟空白的 `## [Unreleased]` 区块供下一轮开发周期使用。
+1. 校验必须存在 `## [Unreleased]` 区块且内容包含有效面向用户的质性事实；
+2. **产品更新日志防工程污染铁律**：`CHANGELOG.md` 是面向宿主最终用户的发布窗口，**绝对严禁**出现内部工程重构黑话（如消融跳板、AST切片局部复杂度、双向包络收敛、SubAgent装配、153套测试全通过等内部治理术语）；技术升级必须转换为面向用户体验的表述（如“优化后台数据持久化可靠性”、“降低扩展运行期内存占用”）；
+3. **README 产品发布页铁律**：扩展顶层 `README.md` 严格定位为商用级产品展示页，严禁平铺开发路线图、施工批次或内部架构细节；
+4. 自动将 `[Unreleased]` 中的修改内容封存至新版本标题 `## [vX.Y.Z] - YYYY-MM-DD`；
+5. 在顶部重新开辟空白的 `## [Unreleased]` 区块供下一轮开发周期使用。
 
 ---
 
@@ -92,8 +94,9 @@ bash scripts/sh/release-tag.sh workspace-timing patch --message "v0.5.1 — 标�
 2. **打包资产健全性 (`check-display-assets.sh`)**：
    - 必须包含 `images/icon.png`（128x128 像素标准图标）；
    - 必须包含 `images/banner.png`（发布展示横幅）；
-   - `README.md` 与 `CHANGELOG.md` 必须存在且排版合规；
-3. **自动化发布流水线触发**：推送附带 `vX.Y.Z` 前缀的 Git Tag 后，自动触发 `.github/workflows/release.yml`，由自动化代理（CI Agent）在隔离容器中完成远端构建与 GitHub Release 产物发布。
+   - `README.md` 与 `CHANGELOG.md` 必须存在且排版合规，绝无工程重构黑话泄漏；
+3. **全仓零高危技术债务防线**：全工作区 High/Critical 技术债务历史性归零（0 项），发布前必须确认 0 项债务反弹；
+4. **自动化发布流水线触发**：推送附带 `vX.Y.Z` 前缀的 Git Tag 后，自动触发 `.github/workflows/release.yml`，由自动化代理（CI Agent）在隔离容器中完成远端构建与 GitHub Release 产物发布。
 
 ---
 
@@ -112,7 +115,8 @@ bash scripts/sh/version-bump.sh workspace-timing patch --dry-run
 **质性断言标准**：
 - 产物目录结构完整，无失效幽灵注册表指针；
 - 打包展示资产（128x128 图标与横幅）齐全合规；
-- 工作树干净且流水线前置校验无未决异常。
+- README 与 CHANGELOG 严格面向用户价值，无内部工程黑话与施工代号泄漏；
+- 全仓 High/Critical 技术债务保持 0 项刚性基线，工作树干净且流水线前置校验无未决异常。
 
 ---
 

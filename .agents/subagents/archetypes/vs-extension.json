@@ -7,7 +7,11 @@
     "allowedPrefixes": ["workspace-timing/"],
     "forbiddenPrefixes": ["auto-refactor/", "WebGames/", "scripts/"]
   },
-  "associatedSkills": ["workspace-timing-dev"],
+  "associatedSkills": [
+    "workspace-timing-dev",
+    "product-release-docs",
+    "test-benchmark-engineering"
+  ],
   "rigidAxioms": [
     "严格遵守五层架构单向依赖：presentation -> application -> domain -> persistence -> integration",
     "UI 文本 100% 接入双语字典 (zh-CN/en)，严禁在 TS/Webview 中硬编码未翻译文案与内部黑话",
