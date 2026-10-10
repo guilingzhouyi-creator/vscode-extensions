@@ -230,4 +230,13 @@ export interface I18nStrings {
     'panel.set.aiCooldown.name': string;
     'panel.set.aiCooldown.tip': string;
     'panel.set.aiCooldown.desc': string;
+
+    /** 双轨图表展示配置与图例契约 (Dual-track chart configuration and legend contracts) */
+    'panel.set.chartDualTrack.name': string;
+    'panel.set.chartDualTrack.tip': string;
+    'panel.set.chartDualTrack.desc': string;
+    'panel.weekly.legendManual': string;
+    'panel.weekly.legendAi': string;
+    'panel.weekly.legendRatio': string;
+    'panel.today.hourlyStackedTooltip': string;
 }

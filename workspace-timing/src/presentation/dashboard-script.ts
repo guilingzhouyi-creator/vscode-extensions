@@ -104,19 +104,20 @@ export function buildDashboardScript(labels: Record<string, string>): string {
         setValue('numMaxSessions', data.maxSessions);
         setChecked('chkWeeklyLimit', data.weeklyLimitEnabled);
         setValue('numWeeklyLimitHours', data.weeklyLimitHours || 40);
+        setChecked('chkChartDualTrack', data.chartDualTrackDisplay !== false);
 
         // 对比契约：跨工作区对比视图渲染
         renderWorkspaceCompare(data.workspaceList, data.workspaceCount, data.globalTotalMs);
 
         // 指标契约：周报关键指标（日均/活跃天/最活跃日） + 多周趋势 + 今日明细
         renderWeeklySummary(data.weeklySummary, data.weeklyTrend, data.weeklyLimitEnabled, data.weeklyLimitHours);
-        renderTodayDetail(data.todayDetail);
+        renderTodayDetail(data.todayDetail, data.chartDualTrackDisplay !== false);
 
         // 矩阵契约：活动时间线热力图矩阵渲染
         renderHeatmap(data.heatmap);
 
-        // 算法契约：周报活跃曲线常驻渲染（5 级精细 Y 轴刻度）
-        renderActiveCurve(data.dailyStats);
+        // 算法契约：周报活跃曲线常驻渲染（双曲线支持）
+        renderActiveCurve(data.dailyStats, data.chartDualTrackDisplay !== false);
 
         pendingData = data;
       }
@@ -235,11 +236,12 @@ export function buildDashboardScript(labels: Record<string, string>): string {
           .replace(/'/g, '&#039;');
       }
 
-      // ---- 周报活跃曲线渲染（常驻展示，5 级精细 Y 轴刻度，对标高级可视化）----
-      function renderActiveCurve(dailyStats) {
+      // ---- 周报活跃曲线渲染（常驻展示，支持双轨同轴对比，5 级精细 Y 轴刻度）----
+      function renderActiveCurve(dailyStats, isDualTrack) {
         const el = document.getElementById('activeCurve');
         const emptyEl = document.getElementById('chartEmpty');
         const weekTotalEl = document.getElementById('weekTotal');
+        const legendEl = document.getElementById('acLegend');
         if (!el) return;
 
         if (typeof ResizeObserver !== 'undefined' && !activeCurveResizeObserver) {
@@ -251,7 +253,7 @@ export function buildDashboardScript(labels: Record<string, string>): string {
                 if (Math.abs(w - cachedActiveCurveWidth) > 2) {
                   cachedActiveCurveWidth = w;
                   if (pendingData && pendingData.dailyStats) {
-                    renderActiveCurve(pendingData.dailyStats);
+                    renderActiveCurve(pendingData.dailyStats, pendingData.chartDualTrackDisplay !== false);
                   }
                 }
               }
@@ -266,6 +268,7 @@ export function buildDashboardScript(labels: Record<string, string>): string {
           el.innerHTML = '';
           if (emptyEl) emptyEl.style.display = 'block';
           if (weekTotalEl) weekTotalEl.style.display = 'none';
+          if (legendEl) legendEl.style.display = 'none';
           return;
         }
 
@@ -295,14 +298,31 @@ export function buildDashboardScript(labels: Record<string, string>): string {
           }
         }
 
+        const dualTrack = isDualTrack !== false;
+        if (legendEl) {
+          legendEl.style.display = dualTrack ? 'inline-flex' : 'none';
+        }
+
         // 计算各天数据点物理坐标 (cx, cy)
         const pts = data.map((d, i) => {
           const cx = PAD_LEFT + (i / (data.length - 1)) * DRAW_W;
-          const cy = d.totalMs > 0
-            ? BASE_Y - (d.totalMs / maxVal) * EFFECTIVE_H
-            : BASE_Y;
+          const cy = d.totalMs > 0 ? BASE_Y - (d.totalMs / maxVal) * EFFECTIVE_H : BASE_Y;
           return [cx, cy];
         });
+
+        const ptsManual = dualTrack ? data.map((d, i) => {
+          const cx = PAD_LEFT + (i / (data.length - 1)) * DRAW_W;
+          const mMs = d.manualMs !== undefined ? d.manualMs : (d.totalMs || 0);
+          const cy = mMs > 0 ? BASE_Y - (mMs / maxVal) * EFFECTIVE_H : BASE_Y;
+          return [cx, cy];
+        }) : pts;
+
+        const ptsAi = dualTrack ? data.map((d, i) => {
+          const cx = PAD_LEFT + (i / (data.length - 1)) * DRAW_W;
+          const aMs = d.aiMs !== undefined ? d.aiMs : 0;
+          const cy = aMs > 0 ? BASE_Y - (aMs / maxVal) * EFFECTIVE_H : BASE_Y;
+          return [cx, cy];
+        }) : [];
 
         // Fritsch-Carlson 单调三次 Hermite 样条算法（零下冲、零穿模、保单调性）
         function buildMonotonePath(pList, bY) {
@@ -375,12 +395,23 @@ export function buildDashboardScript(labels: Record<string, string>): string {
           return pathResult;
         }
 
-        const linePath = buildMonotonePath(pts, BASE_Y);
+        const linePath = buildMonotonePath(ptsManual, BASE_Y);
         const areaPath = linePath +
-          ' L ' + pts[pts.length - 1][0].toFixed(1) + ',' + BASE_Y.toFixed(1) +
-          ' L ' + pts[0][0].toFixed(1) + ',' + BASE_Y.toFixed(1) + ' Z';
+          ' L ' + ptsManual[ptsManual.length - 1][0].toFixed(1) + ',' + BASE_Y.toFixed(1) +
+          ' L ' + ptsManual[0][0].toFixed(1) + ',' + BASE_Y.toFixed(1) + ' Z';
 
-        // 5 级精细水平网格与左端参考刻度（0%, 25%, 50%, 75%, 100% 精细划分，显式 fill="#ffffff" 确保亮白清晰）
+        let aiSvg = '';
+        if (dualTrack && ptsAi.length > 0) {
+          const lineAiPath = buildMonotonePath(ptsAi, BASE_Y);
+          const areaAiPath = lineAiPath +
+            ' L ' + ptsAi[ptsAi.length - 1][0].toFixed(1) + ',' + BASE_Y.toFixed(1) +
+            ' L ' + ptsAi[0][0].toFixed(1) + ',' + BASE_Y.toFixed(1) + ' Z';
+          aiSvg =
+            '<path class="ac-area-ai" d="' + areaAiPath + '"></path>' +
+            '<path class="ac-line-ai" d="' + lineAiPath + '"></path>';
+        }
+
+        // 5 级精细水平网格与左端参考刻度
         const yLevels = [
           { ratio: 1.0, val: maxVal, isBase: false },
           { ratio: 0.75, val: Math.round(maxVal * 0.75), isBase: false },
@@ -400,7 +431,6 @@ export function buildDashboardScript(labels: Record<string, string>): string {
             '<text class="ac-grid-label" fill="#ffffff" x="' + (PAD_LEFT - 16) + '" y="' + (y + 4).toFixed(1) + '" text-anchor="end">' + valText + '</text>';
         }
 
-        // 性能契约：7 组悬浮胶囊数值标签 + 同心圆节点 + 底部双层 X 轴标尺，流式拼接消除中间堆数组分配 (CPX-SPACE-001)
         let elementsSvg = '';
         for (let i = 0; i < data.length; i++) {
           const d = data[i];
@@ -410,7 +440,16 @@ export function buildDashboardScript(labels: Record<string, string>): string {
           const hasTime = d.totalMs > 0;
           const durStr = hasTime ? formatDuration(d.totalMs) : '0';
 
-          // 悬浮胶囊标签：仅在有工时的活跃日展示，避免零工时日期出现冗余堆叠（鲜亮纯白字体）
+          const mMs = d.manualMs !== undefined ? d.manualMs : (d.totalMs || 0);
+          const aMs = d.aiMs !== undefined ? d.aiMs : 0;
+          let detailSub = '';
+          if (dualTrack && hasTime && (mMs > 0 || aMs > 0)) {
+            const mPct = Math.round((mMs / d.totalMs) * 100);
+            const aPct = 100 - mPct;
+            detailSub = (L['panel.weekly.legendManual'] || 'Manual') + ' ' + formatDuration(mMs) + ' ' + mPct + '% · ' +
+                        (L['panel.weekly.legendAi'] || 'AI') + ' ' + formatDuration(aMs) + ' ' + aPct + '%';
+          }
+
           let pillGroup = '';
           if (hasTime) {
             const pillY = Math.max(cy - 16, 15);
@@ -418,24 +457,44 @@ export function buildDashboardScript(labels: Record<string, string>): string {
             const halfW = pillW / 2;
             const pillTextCls = isPeak ? 'ac-pill-text is-peak' : 'ac-pill-text';
             const pillBgCls = isPeak ? 'ac-pill-bg is-peak' : 'ac-pill-bg';
+            const tipText = detailSub ? (durStr + ' (' + detailSub + ')') : durStr;
+            const subElem = detailSub ? '<text class="ac-pill-sub" x="0" y="21">' + detailSub + '</text>' : '';
             pillGroup =
               '<g class="ac-pill-group" transform="translate(' + cx.toFixed(1) + ',' + pillY.toFixed(1) + ')">' +
+                '<title>' + tipText + '</title>' +
                 '<rect class="' + pillBgCls + '" x="-' + halfW.toFixed(1) + '" y="-13" width="' + pillW.toFixed(1) + '" height="22" rx="11"/>' +
                 '<text class="' + pillTextCls + '" fill="#ffffff" x="0" y="2">' + durStr + '</text>' +
+                subElem +
               '</g>';
           }
 
-          // 数据节点：零工时日期不绘制节点，仅在活跃日绘制高亮光点
           let dotGroup = '';
           if (hasTime) {
-            dotGroup =
-              '<g class="ac-dot-group' + (isPeak ? ' is-peak' : '') + '">' +
-                '<circle class="ac-dot-halo" cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="5"/>' +
-                '<circle class="ac-dot-core" cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="2.6"/>' +
-              '</g>';
+            if (dualTrack) {
+              const cyM = ptsManual[i][1];
+              dotGroup +=
+                '<g class="ac-dot-group manual' + (isPeak ? ' is-peak' : '') + '">' +
+                  '<circle class="ac-dot-halo" cx="' + cx.toFixed(1) + '" cy="' + cyM.toFixed(1) + '" r="4.5"/>' +
+                  '<circle class="ac-dot-core" cx="' + cx.toFixed(1) + '" cy="' + cyM.toFixed(1) + '" r="2.2"/>' +
+                '</g>';
+              if (aMs > 0 && ptsAi[i]) {
+                const cyA = ptsAi[i][1];
+                dotGroup +=
+                  '<g class="ac-dot-group ai">' +
+                    '<circle class="ac-dot-halo-ai" cx="' + cx.toFixed(1) + '" cy="' + cyA.toFixed(1) + '" r="4.5"/>' +
+                    '<circle class="ac-dot-core-ai" cx="' + cx.toFixed(1) + '" cy="' + cyA.toFixed(1) + '" r="2.2"/>' +
+                  '</g>';
+              }
+            } else {
+              dotGroup =
+                '<g class="ac-dot-group' + (isPeak ? ' is-peak' : '') + '">' +
+                  '<circle class="ac-dot-halo" cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="5"/>' +
+                  '<circle class="ac-dot-core" cx="' + cx.toFixed(1) + '" cy="' + cy.toFixed(1) + '" r="2.6"/>' +
+                '</g>';
+            }
           }
 
-          // 底部双层 X 轴标尺（第一行周几鲜亮纯白，第二行对应数值鲜亮纯白）
+          // 底部双层 X 轴标尺
           const dateCls = 'ac-axis-date';
           const valCls = isPeak ? 'ac-axis-val is-peak' : (hasTime ? 'ac-axis-val' : 'ac-axis-val is-zero');
           const valFill = hasTime ? '#ffffff' : 'rgba(255, 255, 255, 0.55)';
@@ -466,10 +525,20 @@ export function buildDashboardScript(labels: Record<string, string>): string {
                 '<stop offset="60%" stop-color="#818cf8" stop-opacity="0.08"/>' +
                 '<stop offset="100%" stop-color="#38bdf8" stop-opacity="0.0"/>' +
               '</linearGradient>' +
+              '<linearGradient id="acLineAiGradient" x1="0" y1="0" x2="1" y2="0">' +
+                '<stop offset="0%" stop-color="#10b981"/>' +
+                '<stop offset="100%" stop-color="#34d399"/>' +
+              '</linearGradient>' +
+              '<linearGradient id="acGradientAi" x1="0" y1="0" x2="0" y2="1">' +
+                '<stop offset="0%" stop-color="#34d399" stop-opacity="0.22"/>' +
+                '<stop offset="60%" stop-color="#10b981" stop-opacity="0.05"/>' +
+                '<stop offset="100%" stop-color="#34d399" stop-opacity="0.0"/>' +
+              '</linearGradient>' +
             '</defs>' +
             '<title>' + tip + '</title>' +
             gridSvg +
             '<path class="ac-area" d="' + areaPath + '"></path>' +
+            aiSvg +
             '<path class="ac-line" d="' + linePath + '"></path>' +
             elementsSvg +
           '</svg>';
@@ -680,14 +749,14 @@ export function buildDashboardScript(labels: Record<string, string>): string {
           emptyEl.style.display = 'block';
         }
 
-        // 按小时分布（24 根柱，峰值小时高亮）
-        renderHourly(detail.hourly, detail.peakHour, hourlyEl, hourlyTitle, hourlyAxis);
+        // 按小时分布（24 根柱，支持双色垂直堆叠）
+        renderHourly(detail.hourly, detail.peakHour, hourlyEl, hourlyTitle, hourlyAxis, isDualTrack);
       }
 
       // ---- 按小时分布柱状图 ----
       let currentHourlyBadgeDefault = '';
 
-      function renderHourly(hourly, peakHour, el, titleEl, axisEl) {
+      function renderHourly(hourly, peakHour, el, titleEl, axisEl, isDualTrack) {
         const wrapper = document.getElementById('hourlyWrapper');
         const badgeEl = document.getElementById('hourlyBadge');
         if (!el || !titleEl) return;
@@ -705,12 +774,17 @@ export function buildDashboardScript(labels: Record<string, string>): string {
 
         // 展开为 0..23 的类型化数组（缺省小时为 0），单趟循环合并填充与极值统计 (CPX-SPACE-001)
         const hours = new Float64Array(24);
+        const hoursManual = new Float64Array(24);
+        const hoursAi = new Float64Array(24);
         let maxVal = 1;
         for (let i = 0; i < buckets.length; i++) {
           const b = buckets[i];
           if (b.hour >= 0 && b.hour <= 23) {
-            hours[b.hour] = b.totalMs;
-            if (b.totalMs > maxVal) maxVal = b.totalMs;
+            const tot = b.totalMs || 0;
+            hours[b.hour] = tot;
+            hoursManual[b.hour] = b.manualMs !== undefined ? b.manualMs : tot;
+            hoursAi[b.hour] = b.aiMs !== undefined ? b.aiMs : 0;
+            if (tot > maxVal) maxVal = tot;
           }
         }
 
@@ -747,14 +821,20 @@ export function buildDashboardScript(labels: Record<string, string>): string {
           });
         }
 
-        // 局部属性 patch：若已有 24 根柱子则原地更新 CSS 变量与属性，保持 DOM 存活让 CSS 过渡生效
-        const canPatch = el.children.length === 24;
+        const dualTrack = isDualTrack !== false;
+        const canPatch = el.children.length === 24 && Boolean(el.__isDualTrack) === dualTrack;
+        el.__isDualTrack = dualTrack;
         let hourlyHtml = '';
 
         for (let h = 0; h < 24; h++) {
           const ms = hours[h];
+          const mMs = hoursManual[h];
+          const aMs = hoursAi[h];
           const pct = ms > 0 ? Math.max((ms / maxVal) * 100, 6) : 0;
           const scale = (pct / 100).toFixed(4);
+          const manualScale = (ms > 0 ? (mMs / maxVal) : 0).toFixed(4);
+          const aiScale = (ms > 0 ? (aMs / maxVal) : 0).toFixed(4);
+
           const isPeak = (ms > 0 && h === peakHour) ? ' is-peak' : '';
           const isPeakSlot = (ms > 0 && h === peakHour) ? ' is-peak-slot' : '';
           const hasAct = ms > 0 ? ' has-activity' : '';
@@ -764,26 +844,51 @@ export function buildDashboardScript(labels: Record<string, string>): string {
           const nextH = String(h + 1).padStart(2, '0') + ':00';
           const timeRange = curH + ' - ' + nextH;
           const durStr = ms > 0 ? formatDuration(ms) : L['panel.today.hourlyIdle'];
+
+          let dualDetailTag = '';
+          if (dualTrack && ms > 0 && (mMs > 0 || aMs > 0)) {
+            const mPct = Math.round((mMs / ms) * 100);
+            const aPct = 100 - mPct;
+            dualDetailTag = ' (' + (L['panel.weekly.legendManual'] || 'Manual') + ' ' + formatDuration(mMs) + ' ' + mPct + '% · ' +
+                            (L['panel.weekly.legendAi'] || 'AI') + ' ' + formatDuration(aMs) + ' ' + aPct + '%)';
+          }
+
           const peakTag = (ms > 0 && h === peakHour) ? ' (' + L['panel.today.hourlyPeak'] + ')' : '';
-          const tip = timeRange + ' : ' + durStr + peakTag;
+          const fullDurInfo = durStr + dualDetailTag + peakTag;
+          const tip = timeRange + ' : ' + fullDurInfo;
           const slotCls = 'hourly-slot' + isPeakSlot + hasAct + isPeriodDivider;
-          const barCls = 'hourly-bar' + isPeak;
 
           if (canPatch) {
             const slot = el.children[h];
             if (slot.className !== slotCls) slot.className = slotCls;
             slot.setAttribute('data-timerange', timeRange);
-            slot.setAttribute('data-dur', durStr + peakTag);
+            slot.setAttribute('data-dur', fullDurInfo);
             slot.title = tip;
             const bar = slot.querySelector('.hourly-bar');
             if (bar) {
-              if (bar.className !== barCls) bar.className = barCls;
-              bar.style.setProperty('--bar-scale', scale);
+              if (dualTrack) {
+                bar.style.setProperty('--manual-scale', manualScale);
+                bar.style.setProperty('--ai-scale', aiScale);
+              } else {
+                const barCls = 'hourly-bar' + isPeak;
+                if (bar.className !== barCls) bar.className = barCls;
+                bar.style.setProperty('--bar-scale', scale);
+              }
             }
           } else {
-            hourlyHtml += '<div class="' + slotCls + '" data-timerange="' + timeRange + '" data-dur="' + durStr + peakTag + '" title="' + tip + '">' +
+            let barInnerHtml = '';
+            if (dualTrack) {
+              barInnerHtml =
+                '<div class="hourly-bar is-stacked" style="--manual-scale:' + manualScale + ';--ai-scale:' + aiScale + ';">' +
+                  '<div class="hourly-bar-manual"></div>' +
+                  '<div class="hourly-bar-ai"></div>' +
+                '</div>';
+            } else {
+              barInnerHtml = '<div class="hourly-bar' + isPeak + '" style="--bar-scale:' + scale + ';"></div>';
+            }
+            hourlyHtml += '<div class="' + slotCls + '" data-timerange="' + timeRange + '" data-dur="' + fullDurInfo + '" title="' + tip + '">' +
               '<div class="hourly-slot-track">' +
-                '<div class="' + barCls + '" style="--bar-scale:' + scale + ';"></div>' +
+                barInnerHtml +
               '</div>' +
               '<div class="hourly-slot-base"></div>' +
             '</div>';

@@ -138,6 +138,10 @@ ${DASHBOARD_CHART_STYLES}
           </div>
         </div>
         <div class="weekly-curve-actions">
+          <div class="ac-legend" id="acLegend">
+            <div class="ac-legend-item"><span class="ac-legend-dot manual"></span><span>${args.labels['panel.weekly.legendManual']}</span></div>
+            <div class="ac-legend-item"><span class="ac-legend-dot ai"></span><span>${args.labels['panel.weekly.legendAi']}</span></div>
+          </div>
           <button class="btn btn-secondary" id="btnExportWeekly">${args.labels['panel.weekly.exportBtn']}</button>
         </div>
       </div>
@@ -245,6 +249,14 @@ ${DASHBOARD_CHART_STYLES}
         name: args.labels['panel.set.globalDisabled.name'],
         tip: args.labels['panel.set.globalDisabled.tip'],
         desc: args.labels['panel.set.globalDisabled.desc'],
+      })}
+      ${renderSettingRow({
+        id: 'chkChartDualTrack',
+        dataKey: 'chartDualTrackDisplay',
+        type: 'toggle',
+        name: args.labels['panel.set.chartDualTrack.name'],
+        tip: args.labels['panel.set.chartDualTrack.tip'],
+        desc: args.labels['panel.set.chartDualTrack.desc'],
       })}
       ${renderSettingRow({
         id: 'chkStatusBar',

@@ -24,6 +24,7 @@ import {
     sanitizeIdleTimeoutMinutes,
     sanitizeAiDetectionEnabled,
     sanitizeAiCooldownSeconds,
+    sanitizeChartDualTrackDisplay,
 } from '../domain/models';
 import { DashboardData } from '../domain/dashboard-types';
 import { LogLevel, log } from './Logger';
@@ -63,6 +64,8 @@ export function readTimingConfig(): TimingConfig {
         idleTimeoutMinutes: sanitizeIdleTimeoutMinutes(cfg.get('idleTimeoutMinutes', DEFAULT_CONFIG.idleTimeoutMinutes)),
         aiDetectionEnabled: sanitizeAiDetectionEnabled(cfg.get('aiDetectionEnabled', DEFAULT_CONFIG.aiDetectionEnabled)),
         aiCooldownSeconds: sanitizeAiCooldownSeconds(cfg.get('aiCooldownSeconds', DEFAULT_CONFIG.aiCooldownSeconds)),
+        chartDualTrackDisplay: sanitizeChartDualTrackDisplay(
+            cfg.get<boolean>('chartDualTrackDisplay', DEFAULT_CONFIG.chartDualTrackDisplay)),
     };
 }
 
@@ -92,6 +95,7 @@ const PERSIST_FIELDS: ReadonlyArray<{
     { field: 'idleTimeoutMinutes', key: 'idleTimeoutMinutes', sanitize: sanitizeIdleTimeoutMinutes },
     { field: 'aiDetectionEnabled', key: 'aiDetectionEnabled', sanitize: sanitizeAiDetectionEnabled },
     { field: 'aiCooldownSeconds', key: 'aiCooldownSeconds', sanitize: sanitizeAiCooldownSeconds },
+    { field: 'chartDualTrackDisplay', key: 'chartDualTrackDisplay', sanitize: sanitizeChartDualTrackDisplay },
 ];
 
 /**

@@ -143,5 +143,6 @@ export function buildDashboardData(ctx: AssembleContext): DashboardData {
         idleTimeoutMinutes: config.idleTimeoutMinutes,
         aiDetectionEnabled: config.aiDetectionEnabled,
         aiCooldownSeconds: config.aiCooldownSeconds,
+        chartDualTrackDisplay: config.chartDualTrackDisplay ?? true,
     };
 }

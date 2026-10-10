@@ -42,6 +42,10 @@ export const DASHBOARD_BASE_STYLES = /* css */ `
       --glass-bg: color-mix(in srgb, var(--vscode-editorWidget-background, #1e2430) 82%, var(--bg));
       --glass-border: rgba(255, 255, 255, 0.08);
       --glass-shadow: 0 6px 20px rgba(0, 0, 0, 0.22);
+      --bar-scale: 0;
+      --fill-scale: 0;
+      --manual-scale: 0;
+      --ai-scale: 0;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }

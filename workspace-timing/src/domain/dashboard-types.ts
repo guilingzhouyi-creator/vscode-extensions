@@ -22,6 +22,10 @@ export interface DailyChartEntry {
     manualMs?: number;
     /** 契约时长：当日 AI 辅助毫秒数 (>= 0) */
     aiMs?: number;
+    /** 契约占比：当日手动编码占比百分比 (0~100) */
+    manualRatio?: number;
+    /** 契约占比：当日 AI 辅助占比百分比 (0~100) */
+    aiRatio?: number;
 }
 
 /**
@@ -126,6 +130,8 @@ export interface DashboardData {
     aiDetectionEnabled?: boolean;
     /** AI 协作冷却秒数 */
     aiCooldownSeconds?: number;
+    /** 是否启用图表双轨堆叠与对比显示 */
+    chartDualTrackDisplay?: boolean;
 }
 
 /**

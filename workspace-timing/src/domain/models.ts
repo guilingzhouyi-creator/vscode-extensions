@@ -161,6 +161,15 @@ export function sanitizeAiCooldownSeconds(val: unknown): number {
     return clampNumber(val, MIN_AI_COOLDOWN_SECONDS, MAX_AI_COOLDOWN_SECONDS, DEFAULT_AI_COOLDOWN_SECONDS);
 }
 
+/** 双轨图表展示默认开关（周报双曲线与今日堆叠直方图） */
+export const DEFAULT_CHART_DUAL_TRACK_DISPLAY = true;
+
+/** 双轨图表展示开关净化 */
+export function sanitizeChartDualTrackDisplay(val: unknown): boolean {
+    if (val === undefined || val === null) return DEFAULT_CHART_DUAL_TRACK_DISPLAY;
+    return val === true || val === 'true';
+}
+
 const STATUS_BAR_MODES: ReadonlySet<string> = new Set(['today-total', 'total-today', 'compact']);
 
 /** 状态栏模式净化：非枚举值（手写配置漂移）回退默认 */
@@ -395,6 +404,8 @@ export interface TimingConfig {
     aiDetectionEnabled: boolean;
     /** AI 检测冷却秒数 */
     aiCooldownSeconds: number;
+    /** 是否在图表中启用双轨（人工与 AI）堆叠与曲线对比展示 */
+    chartDualTrackDisplay: boolean;
 }
 
 /** 默认配置 */
@@ -417,4 +428,5 @@ export const DEFAULT_CONFIG: TimingConfig = {
     idleTimeoutMinutes: DEFAULT_IDLE_TIMEOUT_MINUTES,
     aiDetectionEnabled: DEFAULT_AI_DETECTION_ENABLED,
     aiCooldownSeconds: DEFAULT_AI_COOLDOWN_SECONDS,
+    chartDualTrackDisplay: DEFAULT_CHART_DUAL_TRACK_DISPLAY,
 };

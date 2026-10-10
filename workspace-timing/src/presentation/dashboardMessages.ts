@@ -105,6 +105,11 @@ export function createDashboardMessageHandler(ctx: MessageRouterContext): Dashbo
         const handler = MESSAGE_STRATEGIES[msg.type];
         if (handler) {
             void handler(ctx, msg as never);
+        } else if ((msg as { type: string }).type === 'saveSettings') {
+            const payload = (msg as { payload: Partial<any> }).payload;
+            if (payload) {
+                void MESSAGE_STRATEGIES.updateConfig(ctx, { type: 'updateConfig', payload });
+            }
         }
     };
 }

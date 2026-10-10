@@ -12,6 +12,16 @@ import { TimeSession, MS_PER_HOUR } from '../models';
 import { eachDaySegment, localDateStr, parseLocalDate } from './date-utils';
 import { formatTime } from './duration-formatter';
 
+const PERCENT_BASE = 100;
+
+/** 会话时长切片与双轨工时分配载荷 */
+interface SessionDurationSlice {
+    startMs: number;
+    endMs: number;
+    manualMs?: number;
+    aiMs?: number;
+}
+
 /** 按日聚合统计 */
 export interface DailyStats {
     date: string; // "2026-06-16"
@@ -26,14 +36,20 @@ export interface DailySessionEntry {
     durationMs: number;
     startLabel: string;
     endLabel: string;
+    manualMs?: number;
+    aiMs?: number;
     /** 是否为当前正在进行中的活动尾部会话 */
     isRunningTail?: boolean;
 }
 
-/** 按小时分布（每日 24 小时桶） */
+/** 按小时分布（每日 24 小时桶，双轨堆叠契约） */
 export interface HourlyBucket {
     hour: number;
     totalMs: number;
+    manualMs: number;
+    aiMs: number;
+    manualRatio: number;
+    aiRatio: number;
     sessionCount: number;
 }
 
@@ -97,13 +113,24 @@ export function dailyStats(sessions: readonly TimeSession[]): DailyStats[] {
 }
 
 /**
- * 将区间 [startMs, endMs) 按小时切分并累加到 hourMap。
+ * 将区间 [startMs, endMs) 按小时切分并累加到 hourMap，支持 manualMs 与 aiMs 等比守恒分配。
  */
 function addToHourly(
-    hourMap: Map<number, { totalMs: number; count: number }>,
-    startMs: number,
-    endMs: number,
+    hourMap: Map<number, { totalMs: number; manualMs: number; aiMs: number; count: number }>,
+    slice: SessionDurationSlice,
 ): void {
+    const { startMs, endMs } = slice;
+    const totalDuration = endMs - startMs;
+    if (totalDuration <= 0) return;
+
+    let remainingDuration = totalDuration;
+    let remainingManual = slice.manualMs ?? 0;
+    let remainingAi = slice.aiMs ?? 0;
+    if (remainingManual + remainingAi !== totalDuration) {
+        remainingManual = totalDuration;
+        remainingAi = 0;
+    }
+
     let cursor = startMs;
     let first = true;
     while (cursor < endMs) {
@@ -115,8 +142,27 @@ function addToHourly(
         if (segEnd <= cursor) {
             segEnd = Math.min(endMs, cursor + MS_PER_HOUR);
         }
-        const entry = hourMap.get(d.getHours()) ?? { totalMs: 0, count: 0 };
-        entry.totalMs += segEnd - cursor;
+        const segDuration = segEnd - cursor;
+
+        let segManual: number;
+        let segAi: number;
+        if (segEnd >= endMs || segDuration >= remainingDuration) {
+            segManual = remainingManual;
+            segAi = remainingAi;
+        } else {
+            const ratio = segDuration / remainingDuration;
+            segManual = Math.round(remainingManual * ratio);
+            segManual = Math.max(0, Math.min(segDuration, segManual));
+            segAi = segDuration - segManual;
+            remainingDuration -= segDuration;
+            remainingManual -= segManual;
+            remainingAi -= segAi;
+        }
+
+        const entry = hourMap.get(d.getHours()) ?? { totalMs: 0, manualMs: 0, aiMs: 0, count: 0 };
+        entry.totalMs += segDuration;
+        entry.manualMs += segManual;
+        entry.aiMs += segAi;
         if (first) entry.count++;
         first = false;
         hourMap.set(d.getHours(), entry);
@@ -153,12 +199,13 @@ function computeActiveWindow(hourly: readonly HourlyBucket[]): string {
 }
 
 /**
- * 获取指定日期的会话明细
+ * 获取指定日期的会话明细（支持双轨时长与活动模式透传）
  */
 export function dailyDetail(
     sessions: readonly TimeSession[],
     dateStr: string,
     currentSessionStartMs = 0,
+    currentActivityMode: 'manual' | 'ai' = 'manual',
 ): DailyDetail {
     const dayStartMs = parseLocalDate(dateStr);
     const [y, m, d] = dateStr.split('-').map(Number);
@@ -166,37 +213,93 @@ export function dailyDetail(
 
     const entries: DailySessionEntry[] = [];
 
-    const clipToDay = (startMs: number, endMs: number, running: boolean): void => {
+    const clipToDay = (
+        target: SessionDurationSlice,
+        running: boolean,
+    ): void => {
+        const { startMs, endMs } = target;
         if (startMs >= dayEndMs || endMs <= dayStartMs) return;
         const visStart = Math.max(startMs, dayStartMs);
         const visEnd = Math.min(endMs, dayEndMs);
+        const durationMs = visEnd - visStart;
+        if (durationMs <= 0) return;
+
         const isRunningTail = running && visEnd >= Date.now();
+        const totalSessionDuration = endMs - startMs;
+        let entryManualMs: number;
+        let entryAiMs: number;
+
+        if (totalSessionDuration <= 0) {
+            entryManualMs = durationMs;
+            entryAiMs = 0;
+        } else if (durationMs === totalSessionDuration) {
+            const m = target.manualMs ?? durationMs;
+            const a = target.aiMs ?? 0;
+            if (m + a === durationMs) {
+                entryManualMs = m;
+                entryAiMs = a;
+            } else {
+                entryManualMs = Math.min(durationMs, Math.max(0, m));
+                entryAiMs = durationMs - entryManualMs;
+            }
+        } else {
+            const m = target.manualMs ?? totalSessionDuration;
+            const ratio = durationMs / totalSessionDuration;
+            entryManualMs = Math.round(m * ratio);
+            entryManualMs = Math.max(0, Math.min(durationMs, entryManualMs));
+            entryAiMs = durationMs - entryManualMs;
+        }
+
         entries.push({
             startMs: visStart,
             endMs: visEnd,
-            durationMs: visEnd - visStart,
+            durationMs,
             startLabel: formatTime(visStart),
             endLabel: formatTime(visEnd),
+            manualMs: entryManualMs,
+            aiMs: entryAiMs,
             isRunningTail,
         });
     };
 
     for (const s of sessions) {
         if (s.endMs <= dayStartMs || s.startMs >= dayEndMs) continue;
-        clipToDay(s.startMs, s.endMs, false);
+        clipToDay(s, false);
     }
     if (currentSessionStartMs > 0) {
-        clipToDay(currentSessionStartMs, Date.now(), true);
+        const now = Date.now();
+        const isAi = currentActivityMode === 'ai';
+        const runningDur = Math.max(0, now - currentSessionStartMs);
+        const curManual = isAi ? 0 : runningDur;
+        const curAi = isAi ? runningDur : 0;
+        clipToDay({ startMs: currentSessionStartMs, endMs: now, manualMs: curManual, aiMs: curAi }, true);
     }
 
     entries.sort((a, b) => a.startMs - b.startMs);
 
-    const hourMap = new Map<number, { totalMs: number; count: number }>();
+    const hourMap = new Map<number, { totalMs: number; manualMs: number; aiMs: number; count: number }>();
     for (const e of entries) {
-        addToHourly(hourMap, e.startMs, e.endMs);
+        addToHourly(hourMap, e);
     }
     const hourly: HourlyBucket[] = Array.from(hourMap.entries())
-        .map(([hour, v]) => ({ hour, totalMs: v.totalMs, sessionCount: v.count }))
+        .map(([hour, v]) => {
+            let manualRatio = 0;
+            let aiRatio = 0;
+            if (v.totalMs > 0) {
+                manualRatio = Math.round((v.manualMs / v.totalMs) * PERCENT_BASE);
+                manualRatio = Math.max(0, Math.min(PERCENT_BASE, manualRatio));
+                aiRatio = PERCENT_BASE - manualRatio;
+            }
+            return {
+                hour,
+                totalMs: v.totalMs,
+                manualMs: v.manualMs,
+                aiMs: v.aiMs,
+                manualRatio,
+                aiRatio,
+                sessionCount: v.count,
+            };
+        })
         .sort((a, b) => a.hour - b.hour);
 
     const totalMs = entries.reduce((sum, e) => sum + e.durationMs, 0);

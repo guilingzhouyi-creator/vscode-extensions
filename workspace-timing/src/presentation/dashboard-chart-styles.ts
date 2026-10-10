@@ -56,6 +56,36 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       fill: #ffffff;
       opacity: 0.85;
     }
+    /* 图例契约：双轨对比图例规范与微阴影 */
+    .ac-legend {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 11px;
+      color: var(--description);
+      user-select: none;
+      margin-right: 6px;
+    }
+    .ac-legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .ac-legend-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      display: inline-block;
+      flex-shrink: 0;
+    }
+    .ac-legend-dot.manual {
+      background: #38bdf8;
+      box-shadow: 0 0 6px rgba(56, 189, 248, 0.5);
+    }
+    .ac-legend-dot.ai {
+      background: #34d399;
+      box-shadow: 0 0 6px rgba(52, 211, 153, 0.5);
+    }
     /* 算法契约：单调三次样条拟合路径，搭配青蓝向亮绿渐变与发光微阴影 */
     .ac-line {
       fill: none;
@@ -64,9 +94,20 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       stroke-linejoin: round;
       stroke-linecap: round;
     }
+    /* 双轨 AI 矢量曲线与向下衰减遮罩 */
+    .ac-line-ai {
+      fill: none;
+      stroke: url(#acLineAiGradient);
+      stroke-width: 2.2;
+      stroke-linejoin: round;
+      stroke-linecap: round;
+    }
     /* 视觉契约：自曲线向下衰减至透明底的 SVG LinearGradient Mask */
     .ac-area {
       fill: url(#acGradient);
+    }
+    .ac-area-ai {
+      fill: url(#acGradientAi);
     }
     /* 节点契约：微型同心发光数据节点，仅在非零活跃日展示，零值平原无噪点 */
     /* 节点光晕契约：微型同心发光外圈，悬浮放大并应用平滑微阴影滤镜 */
@@ -79,6 +120,15 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), fill 0.2s ease, stroke 0.2s ease, filter 0.2s ease;
       cursor: pointer;
     }
+    .ac-dot-halo-ai {
+      fill: rgba(52, 211, 153, 0.22);
+      stroke: rgba(52, 211, 153, 0.8);
+      stroke-width: 1.5;
+      transform-box: fill-box;
+      transform-origin: center;
+      transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), fill 0.2s ease, stroke 0.2s ease;
+      cursor: pointer;
+    }
     /* 节点核心契约：同心圆高亮白色内核，禁用指针捕获避免阻断悬停 */
     .ac-dot-core {
       fill: #ffffff;
@@ -86,6 +136,12 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       transform-box: fill-box;
       transform-origin: center;
       transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .ac-dot-core-ai {
+      fill: #ffffff;
+      pointer-events: none;
+      transform-box: fill-box;
+      transform-origin: center;
     }
     .ac-dot-group:hover .ac-dot-halo {
       transform: scale(1.4);
@@ -121,6 +177,21 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       text-anchor: middle;
       pointer-events: none;
       user-select: none;
+    }
+    /* 悬停副信息标签（人工与 AI 明细比例） */
+    .ac-pill-sub {
+      font-size: 9.5px;
+      font-weight: 500;
+      font-family: var(--vscode-editor-font-family, monospace);
+      fill: rgba(255, 255, 255, 0.85);
+      text-anchor: middle;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+      pointer-events: none;
+      user-select: none;
+    }
+    .ac-pill-group:hover .ac-pill-sub {
+      opacity: 1;
     }
     /* 峰值标签契约：峰值日期胶囊药丸文本采用纯白强化对比度 */
     .ac-pill-text.is-peak {
@@ -394,7 +465,42 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       transform-origin: bottom;
       transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), filter 0.2s ease;
     }
-    .hourly-slot:hover .hourly-bar {
+    /* 柱状双色堆叠契约：--manual-scale 与 --ai-scale 硬件加速垂直堆叠 */
+    .hourly-bar.is-stacked {
+      width: 100%;
+      min-width: 2px;
+      height: 100%;
+      position: relative;
+      background: transparent;
+      transform: none;
+    }
+    .hourly-bar-manual {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 100%;
+      border-radius: 2px 2px 0 0;
+      background: linear-gradient(180deg, rgba(56, 189, 248, 0.75), rgba(59, 130, 246, 0.5));
+      transform: scaleY(var(--manual-scale, 0));
+      transform-origin: bottom;
+      transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), filter 0.2s ease;
+    }
+    .hourly-bar-ai {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 100%;
+      border-radius: 2px 2px 0 0;
+      background: linear-gradient(180deg, #34d399, #10b981);
+      transform: translateY(calc(-100% * var(--manual-scale, 0))) scaleY(var(--ai-scale, 0));
+      transform-origin: bottom;
+      transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), filter 0.2s ease;
+    }
+    .hourly-slot:hover .hourly-bar,
+    .hourly-slot:hover .hourly-bar-manual,
+    .hourly-slot:hover .hourly-bar-ai {
       filter: brightness(1.25);
     }
     /* 峰值柱状契约：全天工作时长最高峰小时立柱渲染青绿高光渐变 */

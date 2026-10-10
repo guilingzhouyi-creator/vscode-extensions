@@ -226,6 +226,15 @@ const zhCN: I18nStrings = {
   'panel.set.aiCooldown.name': 'AI 协作冷却窗口 (秒)',
   'panel.set.aiCooldown.tip': 'AI 文件写入停止后维持协作活跃状态的时长；<br>冷却期过后若无新活动将转入空闲',
   'panel.set.aiCooldown.desc': 'AI 协作判定维持冷却秒数',
+
+  // 双轨图表展示与图例
+  'panel.set.chartDualTrack.name': '双轨图表展示',
+  'panel.set.chartDualTrack.tip': '在周报曲线与今日小时分布中分离展示人工编码与 AI 协作时长；<br>关闭后合并展示总工时',
+  'panel.set.chartDualTrack.desc': '在图表中展示人工与 AI 双轨堆叠与对比曲线',
+  'panel.weekly.legendManual': '人工开发与审阅',
+  'panel.weekly.legendAi': 'AI 自主协作',
+  'panel.weekly.legendRatio': 'AI 占比',
+  'panel.today.hourlyStackedTooltip': '{0} · {1} (人工 {2} {3}% · AI {4} {5}%)',
 };
 
 export default zhCN;

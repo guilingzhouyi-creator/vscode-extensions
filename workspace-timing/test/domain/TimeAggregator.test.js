@@ -504,4 +504,58 @@ describe('TimeAggregator：多周趋势与比例刻度计算', () => {
         assert.strictEqual(trend[0].totalMs, 3600000, '本周包含原始会话 1h');
         assert.strictEqual(trend[2].totalMs, 5 * 3600000, '上上周包含折叠桶 5h');
     });
+
+    it('双轨图表数据契约：last7Days 与 dailyDetail 满足人工与 AI 绝对守恒律与比例计算', () => {
+        const todayStr = TimeAggregator.todayStr();
+        const todayStartMs = parseLocalDate(todayStr);
+
+        // 创建两个会话：
+        // 会话 1：10:00 - 11:00 (1h)，人工 40m，AI 20m
+        // 会话 2：14:00 - 15:00 (1h)，纯 AI 60m
+        const s1 = {
+            startMs: todayStartMs + 10 * 3600000,
+            endMs: todayStartMs + 11 * 3600000,
+            durationMs: 3600000,
+            manualMs: 40 * 60000,
+            aiMs: 20 * 60000,
+        };
+        const s2 = {
+            startMs: todayStartMs + 14 * 3600000,
+            endMs: todayStartMs + 15 * 3600000,
+            durationMs: 3600000,
+            manualMs: 0,
+            aiMs: 3600000,
+        };
+
+        // 1. 测试 last7Days
+        const days = TimeAggregator.last7Days([s1, s2], 0, 'zh-CN');
+        assert.strictEqual(days.length, 7);
+        const todayBucket = days[days.length - 1];
+        assert.strictEqual(todayBucket.totalMs, 7200000, '今日总时长 2h');
+        assert.strictEqual(todayBucket.manualMs, 40 * 60000, '今日手动工时 40m');
+        assert.strictEqual(todayBucket.aiMs, 80 * 60000, '今日 AI 工时 80m');
+        assert.strictEqual(todayBucket.manualMs + todayBucket.aiMs, todayBucket.totalMs, '时间守恒律');
+        assert.strictEqual(todayBucket.manualRatio, 33, '手动比例约 33%');
+        assert.strictEqual(todayBucket.aiRatio, 67, 'AI 比例约 67%');
+        assert.strictEqual(todayBucket.manualRatio + todayBucket.aiRatio, 100, '百分比和为 100%');
+
+        // 2. 测试 dailyDetail 的 24 小时桶
+        const detail = TimeAggregator.dailyDetail([s1, s2], todayStr);
+        assert.strictEqual(detail.totalMs, 7200000);
+        const h10 = detail.hourly.find(h => h.hour === 10);
+        assert.ok(h10, '应存在 10 点桶');
+        assert.strictEqual(h10.totalMs, 3600000);
+        assert.strictEqual(h10.manualMs, 40 * 60000);
+        assert.strictEqual(h10.aiMs, 20 * 60000);
+        assert.strictEqual(h10.manualRatio, 67);
+        assert.strictEqual(h10.aiRatio, 33);
+
+        const h14 = detail.hourly.find(h => h.hour === 14);
+        assert.ok(h14, '应存在 14 点桶');
+        assert.strictEqual(h14.totalMs, 3600000);
+        assert.strictEqual(h14.manualMs, 0);
+        assert.strictEqual(h14.aiMs, 3600000);
+        assert.strictEqual(h14.manualRatio, 0);
+        assert.strictEqual(h14.aiRatio, 100);
+    });
 });

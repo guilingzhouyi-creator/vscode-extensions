@@ -226,6 +226,15 @@ const en: I18nStrings = {
   'panel.set.aiCooldown.name': 'AI Cooldown Window (Seconds)',
   'panel.set.aiCooldown.tip': 'Duration to maintain AI active state after file writes stop;<br>switches to away once cooldown expires with no further activity.',
   'panel.set.aiCooldown.desc': 'AI activity cooldown duration in seconds',
+
+  // Dual-track chart display and legend
+  'panel.set.chartDualTrack.name': 'Dual-Track Chart Display',
+  'panel.set.chartDualTrack.tip': 'Display separate manual coding and AI collaboration durations in weekly curves and daily hourly distributions;<br>Turn off to display combined total duration.',
+  'panel.set.chartDualTrack.desc': 'Display manual and AI dual-track stacked bars and curves in charts',
+  'panel.weekly.legendManual': 'Manual Dev & Review',
+  'panel.weekly.legendAi': 'AI Autonomous Collaboration',
+  'panel.weekly.legendRatio': 'AI Ratio',
+  'panel.today.hourlyStackedTooltip': '{0} · {1} (Manual {2} {3}% · AI {4} {5}%)',
 };
 
 export default en;

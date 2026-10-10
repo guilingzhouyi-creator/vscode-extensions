@@ -14,6 +14,7 @@ import { eachDaySegment, localDateStr, parseLocalDate, weekKeyOf, weekStartStr }
 import { DailyStats, dailyStats } from './daily-aggregator';
 
 const DAYS_TO_SUNDAY = 6;
+const PERCENT_BASE = 100;
 
 /** 按周聚合统计 */
 export interface WeeklyStats {
@@ -116,13 +117,28 @@ export function last7Days(
     sessions: readonly TimeSession[],
     currentSessionStartMs = 0,
     locale: 'zh-CN' | 'en' = 'zh-CN',
-): { label: string; weekday: string; totalMs: number }[] {
+    currentActivityMode: 'manual' | 'ai' = 'manual',
+): {
+    label: string;
+    weekday: string;
+    totalMs: number;
+    manualMs: number;
+    aiMs: number;
+    manualRatio: number;
+    aiRatio: number;
+}[] {
     const weekdayNames = locale === 'en'
         ? ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
         : ['日', '一', '二', '三', '四', '五', '六'];
     const today = new Date();
 
-    const dayMap = new Map<string, { label: string; weekday: string; totalMs: number }>();
+    const dayMap = new Map<string, {
+        label: string;
+        weekday: string;
+        totalMs: number;
+        manualMs: number;
+        aiMs: number;
+    }>();
     for (let i = DAYS_TO_SUNDAY; i >= 0; i--) {
         const d = new Date(today.getFullYear(), today.getMonth(), today.getDate() - i);
         const dateStr = localDateStr(d.getTime());
@@ -130,27 +146,76 @@ export function last7Days(
             label: dateStr.slice(ISO_DATE_MD_START),
             weekday: weekdayNames[d.getDay()],
             totalMs: 0,
+            manualMs: 0,
+            aiMs: 0,
         });
     }
 
     const firstDayStartMs = parseLocalDate(dayMap.keys().next().value as string);
     for (const s of sessions) {
         if (s.endMs <= firstDayStartMs) continue;
+        const totalSessionDuration = s.endMs - s.startMs;
+        if (totalSessionDuration <= 0) continue;
+
+        const sManual = s.manualMs ?? totalSessionDuration;
+        const sAi = s.aiMs ?? 0;
+
         eachDaySegment(s.startMs, s.endMs, (date, segStart, segEnd) => {
             const bucket = dayMap.get(date);
-            if (bucket) bucket.totalMs += segEnd - segStart;
+            if (!bucket) return;
+            const segDuration = segEnd - segStart;
+            bucket.totalMs += segDuration;
+
+            if (segDuration === totalSessionDuration) {
+                bucket.manualMs += sManual;
+                bucket.aiMs += sAi;
+            } else {
+                const ratio = segDuration / totalSessionDuration;
+                let segManual = Math.round(sManual * ratio);
+                segManual = Math.max(0, Math.min(segDuration, segManual));
+                const segAi = segDuration - segManual;
+                bucket.manualMs += segManual;
+                bucket.aiMs += segAi;
+            }
         });
     }
 
     if (currentSessionStartMs > 0) {
         const now = Date.now();
-        eachDaySegment(currentSessionStartMs, now, (date, segStart, segEnd) => {
-            const bucket = dayMap.get(date);
-            if (bucket) bucket.totalMs += segEnd - segStart;
-        });
+        if (now > currentSessionStartMs) {
+            const isAi = currentActivityMode === 'ai';
+            eachDaySegment(currentSessionStartMs, now, (date, segStart, segEnd) => {
+                const bucket = dayMap.get(date);
+                if (!bucket) return;
+                const segDuration = segEnd - segStart;
+                bucket.totalMs += segDuration;
+                if (isAi) {
+                    bucket.aiMs += segDuration;
+                } else {
+                    bucket.manualMs += segDuration;
+                }
+            });
+        }
     }
 
-    return Array.from(dayMap.values());
+    return Array.from(dayMap.values()).map(entry => {
+        let manualRatio = 0;
+        let aiRatio = 0;
+        if (entry.totalMs > 0) {
+            manualRatio = Math.round((entry.manualMs / entry.totalMs) * PERCENT_BASE);
+            manualRatio = Math.max(0, Math.min(PERCENT_BASE, manualRatio));
+            aiRatio = PERCENT_BASE - manualRatio;
+        }
+        return {
+            label: entry.label,
+            weekday: entry.weekday,
+            totalMs: entry.totalMs,
+            manualMs: entry.manualMs,
+            aiMs: entry.aiMs,
+            manualRatio,
+            aiRatio,
+        };
+    });
 }
 
 /**

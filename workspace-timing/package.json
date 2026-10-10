@@ -208,6 +208,11 @@
           "minimum": 10,
           "maximum": 600,
           "description": "AI 协作活跃冷却观察窗口（秒） | AI activity cooldown observation window in seconds"
+        },
+        "workspaceTiming.chartDualTrackDisplay": {
+          "type": "boolean",
+          "default": true,
+          "description": "在周报与日报图表中展示人工与 AI 双轨堆叠和曲线对比 | Display manual and AI dual-track stacked bars and curves in daily and weekly charts"
         }
       }
     },
