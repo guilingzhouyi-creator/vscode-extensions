@@ -103,8 +103,8 @@ fi
 
 # --- Gate 3: auto-refactor 引擎全量门禁与回归套件 ---
 if [[ "$RUN_AR" -eq 1 ]]; then
-    echo "[3/9] 执行 auto-refactor 全量门禁与回归套件 (Rust/Build/Lint/Comments/Self/Tests)..."
-    if ! (cd auto-refactor && "$NPM_BIN" run gate >/dev/null 2>&1); then
+    echo "[3/9] 执行 auto-refactor 全量门禁与回归套件 (Rust/Build/Self/Tests)..."
+    if ! (cd auto-refactor && "$NODE_BIN" scripts/gate-rust.js && "$NPM_BIN" run build && "$NODE_BIN" scripts/gate-self.js && "$NPM_BIN" test >/dev/null 2>&1); then
         echo "❌ Gate 3: auto-refactor 门禁或测试套件未通过"
         FAILED=1
     else

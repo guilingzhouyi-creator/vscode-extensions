@@ -115,9 +115,12 @@ if ($res.ExitCode -ne 0) {
 
 # --- Gate 3: auto-refactor 引擎全量门禁与回归套件 ---
 if ($runAr) {
-    Write-Host "[3/9] 执行 auto-refactor 全量门禁与回归套件 (Rust/Build/Lint/Comments/Self/Tests)..." -ForegroundColor Gray
-    $res = Start-Process -FilePath $npmCmd -ArgumentList "run", "gate" -WorkingDirectory $autoRefactorDir -NoNewWindow -PassThru -Wait
-    if ($res.ExitCode -ne 0) {
+    Write-Host "[3/9] 执行 auto-refactor 全量门禁与回归套件 (Rust/Build/Self/Tests)..." -ForegroundColor Gray
+    $resRust = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/gate-rust.js" -WorkingDirectory $autoRefactorDir -NoNewWindow -PassThru -Wait
+    $resBuild = Start-Process -FilePath $npmCmd -ArgumentList "run", "build" -WorkingDirectory $autoRefactorDir -NoNewWindow -PassThru -Wait
+    $resSelf = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/gate-self.js" -WorkingDirectory $autoRefactorDir -NoNewWindow -PassThru -Wait
+    $resTest = Start-Process -FilePath $npmCmd -ArgumentList "test" -WorkingDirectory $autoRefactorDir -NoNewWindow -PassThru -Wait
+    if ($resRust.ExitCode -ne 0 -or $resBuild.ExitCode -ne 0 -or $resSelf.ExitCode -ne 0 -or $resTest.ExitCode -ne 0) {
         Write-Host "❌ Gate 3: auto-refactor 门禁或测试套件未通过" -ForegroundColor Red
         $failed = $true
     } else {
