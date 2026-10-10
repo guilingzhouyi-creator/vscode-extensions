@@ -1,0 +1,15 @@
+{
+  "$schema": "../../../subagents/schemas/posture.schema.json",
+  "posture": "custom-posture",
+  "displayName": "自定义作业姿态名称",
+  "model": "inherit",
+  "toolPermissions": {
+    "enableWriteTools": true,
+    "enableMcpTools": false,
+    "enableSubagentTools": false
+  },
+  "behaviorRules": [
+    "严格受限于所属领域的 Path Jail 目录范围，严禁修改非授权路径",
+    "完成改动后必须自主执行该领域 localVerification 命令验证 100% 通过后方可交割"
+  ]
+}

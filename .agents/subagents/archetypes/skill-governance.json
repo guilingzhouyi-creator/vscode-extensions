@@ -5,7 +5,7 @@
   "allowedExtensions": [".md", ".json", ".js", ".ts", ".ps1", ".sh"],
   "pathJail": {
     "allowedPrefixes": [".agents/skills/", ".agents/plugins/workspace-governance/skills/"],
-    "forbiddenPrefixes": ["workspace-timing/src/", "auto-refactor/src/", "WebGames/backend/", "scripts/ps1/", "scripts/sh/"]
+    "forbiddenPrefixes": ["workspace-timing/", "auto-refactor/", "WebGames/", "scripts/ps1/", "scripts/sh/"]
   },
   "associatedSkills": [
     "skill-governance",

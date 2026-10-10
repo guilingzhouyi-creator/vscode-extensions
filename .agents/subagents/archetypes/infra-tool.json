@@ -5,7 +5,7 @@
   "allowedExtensions": [".js", ".ps1", ".sh", ".py", ".json", ".md"],
   "pathJail": {
     "allowedPrefixes": ["scripts/"],
-    "forbiddenPrefixes": ["workspace-timing/src/", "auto-refactor/src/", "WebGames/backend/"]
+    "forbiddenPrefixes": ["workspace-timing/", "auto-refactor/", "WebGames/", ".agents/"]
   },
   "associatedSkills": ["gate-governance", "release-package-workflow"],
   "rigidAxioms": [

@@ -41,5 +41,23 @@
       "items": { "type": "string" }
     }
   },
-  "additionalProperties": false
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "posture": { "enum": ["review", "explore"] }
+        }
+      },
+      "then": {
+        "properties": {
+          "toolPermissions": {
+            "properties": {
+              "enableWriteTools": { "const": false }
+            }
+          }
+        }
+      }
+    }
+  ]
 }

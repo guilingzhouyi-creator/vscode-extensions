@@ -168,7 +168,7 @@
     "skill-review": {
       "archetype": "skill-governance",
       "posture": "review",
-      "description": "技能集元数据、相对死链、402 规则引用与滞后项审查专员",
+      "description": "技能集元数据、相对死链、410 规则引用与滞后项审查专员",
       "model": "inherit",
       "workspaceMode": "inherit"
     },

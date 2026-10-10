@@ -7,16 +7,20 @@
     "allowedPrefixes": ["WebGames/"],
     "forbiddenPrefixes": ["workspace-timing/", "auto-refactor/", "scripts/"]
   },
-  "associatedSkills": ["webgames-workflow"],
+  "associatedSkills": [
+    "webgames-workflow",
+    "complexity-budget"
+  ],
   "rigidAxioms": [
+    "改动必须先立四阶段方案细则（严格仅 4 份文件），获批后方可编码",
     "全域数据统经 GameConfig.get_* 读取，严禁根目录平铺配置",
     "视图表现层零业务计算，数据一律经 apply_snapshot() 单向注入",
     "高承压对象池循环内零瞬态堆分配 (ADV-PRF-002)，必须实现 reset_state()",
     "单文件有效代码行严格受限 ELOC <= 900 / LOC <= 1400，杜绝单体巨文件"
   ],
   "localVerification": [
-    "python3.12 WebGames/scripts/py/audit_config.py --strict",
-    "python3.12 WebGames/scripts/py/audit_gd.py",
-    "python3.12 WebGames/scripts/py/audit_docs.py"
+    "python scripts/py/audit_config.py --strict",
+    "python scripts/py/audit_runner.py",
+    "pwsh scripts/ps1/audit-all.ps1"
   ]
 }

@@ -5,10 +5,11 @@
   "allowedExtensions": [".ts", ".js", ".json", ".md"],
   "pathJail": {
     "allowedPrefixes": ["workspace-timing/"],
-    "forbiddenPrefixes": ["auto-refactor/", "WebGames/", "scripts/"]
+    "forbiddenPrefixes": ["auto-refactor/", "WebGames/", "scripts/", ".agents/"]
   },
   "associatedSkills": [
     "workspace-timing-dev",
+    "complexity-budget",
     "product-release-docs",
     "test-benchmark-engineering"
   ],

@@ -1,0 +1,21 @@
+{
+  "$schema": "../../../subagents/schemas/archetype.schema.json",
+  "archetype": "custom-domain",
+  "displayName": "自定义领域原型名称",
+  "rootDirectory": "path/to/domain",
+  "allowedExtensions": [".ts", ".js", ".json", ".md"],
+  "pathJail": {
+    "allowedPrefixes": ["path/to/domain/"],
+    "forbiddenPrefixes": ["other-domain-1/", "other-domain-2/"]
+  },
+  "associatedSkills": [
+    "complexity-budget"
+  ],
+  "rigidAxioms": [
+    "单文件双轨体积严格受限 ELOC <= 900 / LOC <= 1400",
+    "采用平铺控制流与卫语句，单函数圈复杂度 CC <= 15，嵌套深度 Depth <= 4"
+  ],
+  "localVerification": [
+    "npm test"
+  ]
+}

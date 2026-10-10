@@ -47,12 +47,12 @@ description: >-
 
 | 领域原型 (`archetype`) | 适用项目与物理沙箱 (Path Jail) | 关联 SSOT 技能 | 典型本地门禁验证命令 |
 | :--- | :--- | :--- | :--- |
-| **`vs-extension`** | `workspace-timing/` (VS Code 扩展) | `workspace-timing-dev` | `npm run compile && npm run test:fast && npm run review` |
-| **`cli-engine`** | `auto-refactor/` (Node/Rust 双轨静态分析) | `auto-refactor-dev` | `npm run build && node scripts/gate-self.js && npm test` |
-| **`game-engine`** | `WebGames/` (Godot 4 游戏引擎与配置驱动) | `webgames-workflow` | `python3.12 WebGames/scripts/py/audit_config.py --strict` |
-| **`infra-tool`** | `scripts/` (全仓跨平台门禁与打包脚本) | `gate-governance` | `pwsh -File scripts/ps1/audit-all.ps1 -Fast` |
-| **`workspace-meta`** | 全仓顶层元治理、单源规则总目录、物理卫生 | `rule-catalog-governance` | `node scripts/common/generate-rule-catalog.js` |
-| **`skill-governance`** | `.agents/skills/`, 插件包 `skills/` | `rule-catalog-governance` | `node scripts/common/validate-skills.js && node scripts/common/sync-skills.js --check` |
+| **`vs-extension`** | `workspace-timing/` (VS Code 扩展) | `workspace-timing-dev`, `complexity-budget` | `npm run compile && npm run test:fast && npm run review` |
+| **`cli-engine`** | `auto-refactor/` (Node/Rust 双轨静态分析) | `auto-refactor-dev`, `facade-discipline` | `npm run build && node scripts/gate-self.js && npm test` |
+| **`game-engine`** | `WebGames/` (Godot 4 游戏引擎与配置驱动) | `webgames-workflow`, `complexity-budget` | `python scripts/py/audit_config.py --strict && pwsh scripts/ps1/audit-all.ps1` |
+| **`infra-tool`** | `scripts/` (全仓跨平台门禁与打包脚本) | `gate-governance`, `release-package-workflow` | `pwsh -File scripts/ps1/audit-all.ps1 -Fast` |
+| **`workspace-meta`** | 全仓顶层元治理、单源规则总目录、物理卫生 | `rule-catalog-governance`, `complexity-budget` | `node scripts/common/generate-rule-catalog.js` |
+| **`skill-governance`** | `.agents/skills/`, 插件包 `skills/` | `skill-governance`, `rule-catalog-governance` | `node scripts/common/validate-skills.js && node scripts/common/sync-skills.js --check` |
 
 | 作业姿态 (`posture`) | 姿态意图与权限控制 | 核心行为准则 | 推荐工具开关 |
 | :--- | :--- | :--- | :--- |
@@ -151,14 +151,24 @@ invoke_subagent({
 ```
 
 ### 步骤 4：主 Agent 8 步交叉复审闭环 SOP (Cross-Review Closed-Loop)
-SubAgent 汇报任务完成并返回消息后，主 Agent **绝对不能盲目信任其汇报文本**，必须严格独立执行 8 步交叉复审闭环：
-1. **① 沙箱隔离审计 (Path Jail Guard Audit)**：主 Agent 执行 `git status` 与 `git diff --name-only`，比对修改文件是否严格局限于独占 Path Jail 授权列表，严禁发生越界修改；
-2. **② TypeScript 静态编译 (Static Typecheck & Build Gate)**：在受影响项目执行 `npm run build` 或 `npm run compile`，确保 TypeScript 编译器 100% 静态编译通过，0 编译错误，0 类型告警；
-3. **③ 领域微门禁自检 (Domain Micro-Gate Checks)**：针对涉及子域执行专属微门禁脚本（如 `node scripts/common/validate-skills.js`、`node scripts/common/sync-skills.js --check`、`node scripts/common/evaluate-eloc-budget.js`），核查单文件双轨体积（$\text{ELOC} \le 900 / \text{LOC} \le 1400$）、1:3 动态包络及高负荷注释密度 $\ge 8\%$；
-4. **④ 规则与单源目录防虚构校验 (Rule Catalog Anti-Hallucination Gate)**：执行 `node scripts/common/generate-rule-catalog.js` 与 `node scripts/common/validate-commit-msg-rules.js`，核实 410 条规则目录计数零漂移，提交说明零虚构规则 ID（`RCFG-RULE-DRIFT`）；
-5. **⑤ 门面实质承载与跳板排查 (Facade Substance & Anti-Trampoline Guard)**：执行 `node auto-refactor/scripts/validate-facade-governance.js`，核查门面导出满足 $\text{ELOC} \ge 15$ 或具备 `Object.freeze` 不可变封装，彻底消融空包跳板（`ARCH-ABS-001`）；
-6. **⑥ 自审棘轮基线防反弹 (Self-Audit Monotonic Ratchet Baseline Gate)**：执行 `node auto-refactor/scripts/gate-self.js`，确保 `0 newBlocking error`，全仓历史基线单调收敛，零 High/Critical 技术债务反弹（一票否决）；
-7. **⑦ 全量自动化测试套件 (Comprehensive Test Suite Regression)**：执行 `npm test`，确保 153/153 套测试套件并发绿色通过，0 挂起，纯 TS 回退与 Rust 原生算子 100% 字节等价；
+SubAgent 汇报任务完成并返回消息后，主 Agent **绝对不能盲目信任其汇报文本**，必须严格独立执行 8 步交叉复审闭环（依据所属领域自适应路由）：
+1. **① 沙箱隔离审计 (Path Jail Guard Audit)**：主 Agent 执行 `git status` 与 `git diff --name-only`，比对修改文件是否严格局限于独占 Path Jail 授权列表，严禁发生跨领域越界修改；
+2. **② 领域编译构建自检 (Domain Build & Compile Gate)**：在受影响项目子目录执行类型与编译检查（`workspace-timing`: `npm run compile`; `auto-refactor`: `npm run build`; `WebGames`: `python scripts/py/audit_config.py --strict`；`scripts/`: 平台语法检查），确保 0 编译错误，0 类型告警；
+3. **③ 体积与复杂度双轨预算 (Complexity & Volume Budget Gate)**：执行 `node scripts/common/evaluate-eloc-budget.js`，核查单文件双轨体积（$\text{ELOC} \le 900 / \text{LOC} \le 1400$）、AST 切片守卫（$\text{CC} \le 15, \text{Depth} \le 4, \text{Noise} \le 4.0$）、1:3 动态包络及高负荷注释密度 $\ge 8\%$；
+4. **④ 单源规则目录与防虚构校验 (Rule Catalog Anti-Drift Gate)**：执行 `node scripts/common/generate-rule-catalog.js`，核实 410 条规则目录计数零漂移，任何汇报与提交说明零虚构规则 ID（`RCFG-RULE-DRIFT`）；
+5. **⑤ 领域专属架构守卫 (Domain Specialized Architectural Guard)**：
+   - `auto-refactor`：执行 `node auto-refactor/scripts/validate-facade-governance.js`（消融空包跳板 `ARCH-ABS-001`）与 `node auto-refactor/scripts/validate-project-neutrality.js`（项目中立性）；
+   - `workspace-timing`：执行 `cd workspace-timing && npm run review`（五层解耦与双语字典覆盖）；
+   - `WebGames`：执行 `cd WebGames && python scripts/py/audit_runner.py`（配置驱动与循环零瞬态堆分配 `ADV-PRF-002`）；
+   - `infra-tool`：执行 `pwsh -File scripts/ps1/pre-commit-gate.ps1`；
+   - `skill-governance`：执行 `node scripts/common/validate-skills.js` 与 `node scripts/common/sync-skills.js --check`；
+6. **⑥ 自审棘轮基线防反弹 (Monotonic Ratchet Baseline & Zero-High-Debt Gate)**：
+   - 若涉及 `auto-refactor`，执行 `node auto-refactor/scripts/gate-self.js`，确保 `0 newBlocking error`，全仓历史基线单调收敛；
+   - 全仓刚性看守：严禁引入任何 High/Critical 技术债务反弹，历史性清零（0 项）红线一票否决；
+7. **⑦ 受影响领域自动化回归测试 (Domain Test Suite Regression)**：
+   - `auto-refactor`：`cd auto-refactor && npm test`（153/153 套测试并发绿色通过，TS/Rust 100% 字节等价）；
+   - `workspace-timing`：`cd workspace-timing && npm run test:fast`（145 用例绿色通过）；
+   - `WebGames`：`cd WebGames && pwsh scripts/ps1/audit-all.ps1`；
 8. **⑧ 工作区五大支柱统一审查 (Workspace Five-Pillar Unified Audit)**：执行 `pwsh -File scripts/ps1/audit-all.ps1 -Fast`，全工作区五大基石（架构、质量、门禁、类型、卫生）综合评分必须 $\ge 98$ 分，全绿通行。
 
 ---
@@ -173,3 +183,20 @@ SubAgent 汇报任务完成并返回消息后，主 Agent **绝对不能盲目�
    node .agents/skills/subagent-orchestration/scripts/validate-subagent-catalog.js
    ```
    确保 100% 通过验证。
+
+---
+
+## 六、 渐进披露参考指南与实操样板 (References & Templates)
+
+为遵循 JIT 渐进披露原则并降低 Agent 顶层上下文负荷，深水区设计理论与开箱即用骨架已全面收口下沉至子目录：
+
+### 1. 技术参考指南 (`references/`)
+- [四重防线立体防御机制](references/four-layer-defense-architecture.md)：平台工具剥夺、沙箱约束、系统契约与交叉复审的分层设计；
+- [独占 Zero-Intersection Path Jail 机制](references/zero-intersection-path-jail.md)：数学正交公理、路径粒度规范与跨项目并行隔离模式；
+- [主 Agent 8 步交叉复审协议](references/cross-review-closed-loop-protocol.md)：领域自适应路由矩阵与历史债务单调收敛原则。
+
+### 2. 开箱即用实操样板 (`templates/`)
+- [施工类独占文件任务外壳](templates/task-shell-construct.md)：增量生产与定点重构的标准任务 Prompt 外壳；
+- [审查类只读客观事实任务外壳](templates/task-shell-review.md)：静态审查与规则匹配的只读任务 Prompt 外壳；
+- [新增领域原型配置脚手架](templates/archetype-scaffold.json)：新增业务领域原型时的标准 JSON 模式模板；
+- [新增作业姿态配置脚手架](templates/posture-scaffold.json)：新增作业姿态时的标准 JSON 模式模板。
