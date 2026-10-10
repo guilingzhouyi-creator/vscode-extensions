@@ -9,6 +9,11 @@
   },
   "associatedSkills": [
     "workspace-timing-dev",
+    "spec-driven-development",
+    "test-driven-development",
+    "code-simplification",
+    "debugging-and-error-recovery",
+    "interview-me",
     "complexity-budget",
     "product-release-docs",
     "test-benchmark-engineering"

@@ -100,7 +100,7 @@
 
 ## 五、 Agent 标准作业闭环（SOP）
 
-1. **查验指针**：接到任务后，依据意图查阅 §一 路由矩阵，精读对应项目的 SSOT 指针与关联 Skill，明确架构边界与红线；
+1. **意图澄清与查验指针**：接到自然语言任务后，先进行意图完整性审查；若需求模糊、报障缺失上下文或疑似 X-Y 问题，激活逆向提问工程协议（[interview-me](.agents/skills/interview-me/SKILL.md)）向用户进行单点交互质询，明确真实目标与边界；随后依据意图查阅 §一 路由矩阵，精读对应项目的 SSOT 指针与关联 Skill，明确架构边界与红线；
 2. **作业与委托分流**：
    - **单域直接作业**：操作严格限定在当前任务所属的项目内，严禁跨项目扩散修改；涉及方案调整严格遵守“先细则获批、后编码施工”；
    - **多智能体/SubAgent 委派**：必须通过 `node .agents/skills/subagent-orchestration/scripts/synthesize-subagent.js` 合成专员并调用 `define_subagent` 注入契约，严格锁定 `Model: "inherit"`（同构继承主会话 Gemini 3.8 Flash + High effort）；审查类姿态剥夺写权限；施工类姿态分配完全正交的独占文件列表（Zero-Intersection Path Jail）；

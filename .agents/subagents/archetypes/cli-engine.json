@@ -9,6 +9,11 @@
   },
   "associatedSkills": [
     "auto-refactor-dev",
+    "spec-driven-development",
+    "test-driven-development",
+    "code-simplification",
+    "debugging-and-error-recovery",
+    "interview-me",
     "facade-discipline",
     "complexity-budget",
     "telemetry-statistical-modeling",

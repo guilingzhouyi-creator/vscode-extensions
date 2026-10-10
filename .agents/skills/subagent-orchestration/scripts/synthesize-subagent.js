@@ -54,13 +54,13 @@ function resolveIntent(intent) {
     archKey = 'workspace-meta';
   }
 
-  if (/重构|refactor|消融|解耦|瘦身|优化|降重|平铺|收敛/.test(text)) {
+  if (/重构|refactor|消融|解耦|瘦身|优化|降重|平铺|收敛|精简|simplif|跳板/.test(text)) {
     postKey = 'refactor';
-  } else if (/开发|编码|实现|特性|construct|增量|编写|生产|新建|新增|创建/.test(text)) {
+  } else if (/开发|编码|实现|特性|construct|增量|编写|生产|新建|新增|创建|tdd|测试驱动|spec|规格|契约/.test(text)) {
     postKey = 'construct';
   } else if (/守卫|巡检|guardian|门禁裁决|看守|防反弹|防御/.test(text)) {
     postKey = 'guardian';
-  } else if (/探索|调研|排查|explore|探针|调查|勘测|拓扑|调用链/.test(text)) {
+  } else if (/探索|调研|排查|explore|探针|调查|勘测|拓扑|调用链|排错|debug|质询|interview|缺陷|故障/.test(text)) {
     postKey = 'explore';
   } else if (/审查|review|检查|合规|诊断|(?:^|[^态])分析/.test(text)) {
     postKey = 'review';
