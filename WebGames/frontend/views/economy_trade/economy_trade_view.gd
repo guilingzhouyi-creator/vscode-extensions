@@ -216,54 +216,6 @@ func _load_mock_snapshot() -> void:
 	shop_shelves = FrontendSnapshot.read_array(economy, "shop_items")
 	price_trend_history = FrontendSnapshot.read_array(economy, "price_trend")
 
-# ==============================================================================
-# 子面板方法委托转发（保证向后兼容与外部调用契约）
-# ==============================================================================
-
-func _init_tab_titles() -> void:
-	_get_tabs()._init_tab_titles()
-
-func _init_static_text() -> void:
-	_get_tabs()._init_static_text()
-
-func _init_auction_tab() -> void:
-	_get_tabs()._init_auction_tab()
-
-func _populate_auction_list() -> void:
-	_get_tabs()._populate_auction_list()
-
-func _populate_auction_my_list() -> void:
-	_get_tabs()._populate_auction_my_list()
-
-func _init_logistics_tab() -> void:
-	_get_tabs()._init_logistics_tab()
-
-func _populate_caravan_list() -> void:
-	_get_tabs()._populate_caravan_list()
-
-func _update_logistics_status(index: int) -> void:
-	_get_tabs()._update_logistics_status(index)
-
-func _init_price_trend_tab() -> void:
-	_get_tabs()._init_price_trend_tab()
-
-func _refresh_price_trend_display() -> void:
-	_get_tabs()._refresh_price_trend_display()
-
-func _init_exchange_tab() -> void:
-	_get_tabs()._init_exchange_tab()
-
-func _get_currency_copper_value(index: int) -> int:
-	return _get_tabs()._get_currency_copper_value(index)
-
-func _refresh_exchange_display() -> void:
-	_get_tabs()._refresh_exchange_display()
-
-func _init_resource_pool_tab() -> void:
-	_get_tabs()._init_resource_pool_tab()
-
-func _populate_resource_pools() -> void:
-	_get_tabs()._populate_resource_pools()
 
 # ==============================================================================
 # Tab 1: 钱包资产 (WALLET) 初始化与渲染

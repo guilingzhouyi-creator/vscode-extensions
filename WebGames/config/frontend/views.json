@@ -219,9 +219,6 @@
   },
   "fe05_economy_trade": {
     "default_shop_title": "瓦尔兰老铁匠杂货铺",
-    "gold_to_copper": 10000,
-    "silver_to_copper": 100,
-    "crystal_to_copper": 12000,
     "sell_back_ratio": 0.7,
     "commodity_prices": {},
     "default_shop_items": [

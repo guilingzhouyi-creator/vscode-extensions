@@ -8,12 +8,13 @@ extends IEconomyService
 
 const RULES_SECTION := "frontend.views"
 const RULES_KEY := "fe05_economy_trade"
+const CURRENCY_SECTION := "domains.currency"
 
 func get_rules() -> Dictionary:
 	return {
-		"copper_per_gold": GameConfig.get_int(RULES_SECTION, RULES_KEY + "/gold_to_copper", 10000),
-		"copper_per_silver": GameConfig.get_int(RULES_SECTION, RULES_KEY + "/silver_to_copper", 100),
-		"copper_per_crystal": GameConfig.get_int(RULES_SECTION, RULES_KEY + "/crystal_to_copper", 12000),
+		"copper_per_gold": GameConfig.get_int(CURRENCY_SECTION, "rates/gold", 10000),
+		"copper_per_silver": GameConfig.get_int(CURRENCY_SECTION, "rates/silver", 100),
+		"copper_per_crystal": GameConfig.get_int(CURRENCY_SECTION, "rates/mana_monocrystals", 12000),
 		"sell_back_ratio": GameConfig.get_float(RULES_SECTION, RULES_KEY + "/sell_back_ratio", 0.7),
 	}
 

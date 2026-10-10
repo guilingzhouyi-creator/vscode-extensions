@@ -1,7 +1,7 @@
 # ==============================================================================
 # 卡拉尔世界引擎 (Kalar World Engine) - 前端 UI 状态与 Mock 服务测试套件
 # 文件路径: res://tests/unit/frontend/test_frontend_ui_state_and_mock.gd
-# 职责: 验证 UIStateContainer 5 态流转、HudViewModel P71 约束、Mock 服务与弱引用注册表
+# 职责: 验证 UIStateContainer 5 态流转、HudViewModel 约束、Mock 服务与弱引用注册表
 # ==============================================================================
 class_name TestFrontendUiStateAndMock
 extends TestCase
@@ -10,7 +10,7 @@ static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
 	results.append(_test_ui_state_container_transitions())
 	results.append(_test_ui_state_container_retry_callback())
-	results.append(_test_hud_view_model_p71_invariants())
+	results.append(_test_hud_view_model_invariants())
 	results.append(_test_mock_service_container_and_auth())
 	results.append(_test_ui_binding_registry_weakref())
 	return TestCase.pack_results("frontend_ui_state_and_mock", results)
@@ -47,8 +47,8 @@ static func _test_ui_state_container_retry_callback() -> Dictionary:
 	container.free()
 	return TestCase.make_result("ui_state_container_retry_callback", ok)
 
-## 3. 验证角色三层解耦链严格遵循 P71 约束与零除防御（HudViewModel 已归并至该链）
-static func _test_hud_view_model_p71_invariants() -> Dictionary:
+## 3. 验证角色三层解耦链严格遵循约束与零除防御（HudViewModel 已归并至该链）
+static func _test_hud_view_model_invariants() -> Dictionary:
 	# 故意注入非法的 0/负上限
 	var dto := CharacterHudDecoupled.CharacterTransportDTO.new()
 	dto.nickname = "阿尔托莉雅"
@@ -65,7 +65,7 @@ static func _test_hud_view_model_p71_invariants() -> Dictionary:
 	var wallet_ok: bool = wallet_copper_ok and (domain.monocrystals == 5)
 
 	var ok := TestCase.assert_true(zero_div_prevented and wallet_ok, "角色解耦模型零除防护与钱包守卫有效")
-	return TestCase.make_result("hud_view_model_p71_invariants", ok)
+	return TestCase.make_result("hud_view_model_invariants", ok)
 
 ## 4. 验证 Mock 服务契约（注入零延迟实例同步断言）与容器装配完整性
 static func _test_mock_service_container_and_auth() -> Dictionary:

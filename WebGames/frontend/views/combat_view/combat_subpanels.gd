@@ -45,42 +45,79 @@ func refresh_boss_parts() -> void:
 	if not view._boss_parts_list:
 		return
 
-	for child in view._boss_parts_list.get_children():
-		child.queue_free()
+	var existing_children: Array = view._boss_parts_list.get_children()
+	var parts_count: int = view.boss_parts.size()
 
-	for part in view.boss_parts:
-		var row := HBoxContainer.new()
-		row.alignment = BoxContainer.ALIGNMENT_BEGIN
-		row.set("theme_override_constants/separation", 6)
-
-		var name_lbl := Label.new()
-		name_lbl.text = str(part.get("part_name", "?"))
-		name_lbl.add_theme_font_size_override("font_size", 11)
-		name_lbl.custom_minimum_size = Vector2(80, 0)
-		row.add_child(name_lbl)
-
-		var bar: ProgressBar = KStatusBarClass.create_bar(float(part.get("hp", 0.0)), float(part.get("max_hp", 100.0)))
-		bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		if bool(part.get("is_broken", false)):
-			bar.modulate = DesignTokens.COLOR_DISABLED_DIM
-			name_lbl.modulate = DesignTokens.COLOR_DISABLED_DIM
-		row.add_child(bar)
-
-		var status_lbl := Label.new()
-		status_lbl.text = UIIntermediary.text("ui.fe04.part.status_broken") if bool(part.get("is_broken", false)) else UIIntermediary.text("ui.fe04.part.status_intact")
-		status_lbl.add_theme_font_size_override("font_size", 11)
-		status_lbl.add_theme_color_override("font_color",
-			DesignTokens.COLOR_DANGER_DEFAULT if bool(part.get("is_broken", false)) else DesignTokens.COLOR_SUCCESS_DEFAULT)
-		status_lbl.custom_minimum_size = Vector2(24, 0)
-		row.add_child(status_lbl)
-
-		var part_name: String = str(part.get("part_name", ""))
+	for i in range(parts_count):
+		var part = view.boss_parts[i]
+		var part_name: String = str(part.get("part_name", "?"))
+		var hp: float = float(part.get("hp", 0.0))
+		var max_hp: float = float(part.get("max_hp", 100.0))
 		var is_broken: bool = bool(part.get("is_broken", false))
-		row.gui_input.connect(func(event: InputEvent):
-			if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-				show_part_break_detail(part_name, is_broken))
 
-		view._boss_parts_list.add_child(row)
+		var row: HBoxContainer
+		if i < existing_children.size():
+			row = existing_children[i] as HBoxContainer
+			row.visible = true
+		else:
+			row = _create_boss_part_row()
+			view._boss_parts_list.add_child(row)
+
+		_update_boss_part_row(row, part_name, hp, max_hp, is_broken)
+
+	for i in range(parts_count, existing_children.size()):
+		var child := existing_children[i] as CanvasItem
+		if child != null:
+			child.visible = false
+
+func _create_boss_part_row() -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_BEGIN
+	row.set("theme_override_constants/separation", 6)
+
+	var name_lbl := Label.new()
+	name_lbl.add_theme_font_size_override("font_size", 11)
+	name_lbl.custom_minimum_size = Vector2(80, 0)
+	row.add_child(name_lbl)
+
+	var bar: ProgressBar = KStatusBarClass.create_bar(0.0, 100.0)
+	bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(bar)
+
+	var status_lbl := Label.new()
+	status_lbl.add_theme_font_size_override("font_size", 11)
+	status_lbl.custom_minimum_size = Vector2(24, 0)
+	row.add_child(status_lbl)
+
+	row.gui_input.connect(_on_boss_part_gui_input.bind(row))
+	return row
+
+func _update_boss_part_row(row: HBoxContainer, part_name: String, hp: float, max_hp: float, is_broken: bool) -> void:
+	row.set_meta("part_name", part_name)
+	row.set_meta("is_broken", is_broken)
+
+	var name_lbl := row.get_child(0) as Label
+	var bar := row.get_child(1) as ProgressBar
+	var status_lbl := row.get_child(2) as Label
+
+	if name_lbl != null:
+		name_lbl.text = part_name
+		name_lbl.modulate = DesignTokens.COLOR_DISABLED_DIM if is_broken else Color.WHITE
+
+	if bar != null:
+		KStatusBarClass.refresh_bar(bar, null, hp, max_hp)
+		bar.modulate = DesignTokens.COLOR_DISABLED_DIM if is_broken else Color.WHITE
+
+	if status_lbl != null:
+		status_lbl.text = UIIntermediary.text("ui.fe04.part.status_broken") if is_broken else UIIntermediary.text("ui.fe04.part.status_intact")
+		status_lbl.add_theme_color_override("font_color",
+			DesignTokens.COLOR_DANGER_DEFAULT if is_broken else DesignTokens.COLOR_SUCCESS_DEFAULT)
+
+func _on_boss_part_gui_input(event: InputEvent, row: HBoxContainer) -> void:
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		var part_name: String = str(row.get_meta("part_name", ""))
+		var is_broken: bool = bool(row.get_meta("is_broken", false))
+		show_part_break_detail(part_name, is_broken)
 
 func show_part_break_detail(part_name: String, is_broken: bool) -> void:
 	var view: CombatView = _view
