@@ -18,7 +18,7 @@
  *     [] for non-shell content. Heuristics are conservative — a missed finding is
  *     preferred over a false positive.
  */
-import type { Analyzer, AnalyzerContext, Issue, Severity } from '../core/types';
+import type { Analyzer, AnalyzerContext, Issue, Severity, AgentActionType } from '../core/types';
 import { SEVERITY_WARNING, SEVERITY_INFO } from '../core/types';
 import { maskSourceText, type SourceMaskConfig } from '../core/policy/source-mask';
 import {
@@ -59,6 +59,24 @@ import {
     checkShellInteractiveSafety,
 } from './shell-lint-rules';
 
+const SHELL_ACTIONABLE_MAP: Record<
+    string,
+    { action: AgentActionType; code: string; safeToAutomate: boolean; templateSnippet: string }
+> = {
+    'SH-ERR-001': {
+        action: 'replace_token',
+        code: 'AR:SHL:001',
+        safeToAutomate: true,
+        templateSnippet: 'set -euo pipefail',
+    },
+    'SH-QUOTE-001': {
+        action: 'replace_token',
+        code: 'AR:SHL:002',
+        safeToAutomate: false,
+        templateSnippet: '"$VAR"',
+    },
+};
+
 /**
  * Shell / PowerShell lint analyzer.
  */
@@ -90,6 +108,18 @@ export class ShellLintAnalyzer implements Analyzer {
             this.analyzePowerShell(content, file, emit);
         }
 
+        for (const iss of issues) {
+            if (!iss.actionable && SHELL_ACTIONABLE_MAP[iss.rule]) {
+                const mapped = SHELL_ACTIONABLE_MAP[iss.rule];
+                iss.actionable = {
+                    action: mapped.action,
+                    code: mapped.code,
+                    safeToAutomate: mapped.safeToAutomate,
+                    templateSnippet: mapped.templateSnippet,
+                };
+            }
+        }
+
         return issues;
     }
 
@@ -102,6 +132,15 @@ export class ShellLintAnalyzer implements Analyzer {
             suggestion: string,
             detail: Record<string, unknown>,
         ): void => {
+            const mapped = SHELL_ACTIONABLE_MAP[rule];
+            const actionable = mapped
+                ? {
+                      action: mapped.action,
+                      code: mapped.code,
+                      safeToAutomate: mapped.safeToAutomate,
+                      templateSnippet: mapped.templateSnippet,
+                  }
+                : undefined;
             issues.push({
                 id: `shell-lint:${rule}:${file}:${lineIdx + 1}`,
                 analyzer: this.name,
@@ -115,6 +154,7 @@ export class ShellLintAnalyzer implements Analyzer {
                 },
                 detail,
                 suggestion,
+                actionable,
             });
         };
     }

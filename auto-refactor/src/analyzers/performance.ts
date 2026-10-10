@@ -13,7 +13,7 @@
  *   C-like languages let one line scanner serve the polyglot file set; PRF-IO-001 is escalated
  *   to error inside async functions or _process/_physics_process/tick/render contexts.
  */
-import type { Analyzer, AnalyzerContext, Issue } from '../core/types';
+import type { Analyzer, AnalyzerContext, Issue, AgentActionType } from '../core/types';
 import { PerformanceMessages } from '../core/messages';
 import { detectUnboundedGrowth } from '../core/intelligence/dataFlow';
 
@@ -66,6 +66,46 @@ const RULE_PRF_ALG_002 = 'PRF-ALG-002';
 const RULE_PRF_MEM_001 = 'PRF-MEM-001';
 const RULE_PRF_MEM_002 = 'PRF-MEM-002';
 const RULE_PRF_IO_001 = 'PRF-IO-001';
+
+const PRF_ACTIONABLE_MAP: Record<
+    string,
+    { action: AgentActionType; code: string; safeToAutomate: boolean; templateSnippet: string }
+> = {
+    'loop-transient-allocation': {
+        action: 'hoist_declaration',
+        code: 'AR:PRF:001',
+        safeToAutomate: false,
+        templateSnippet:
+            'const scratch = []; // hoist allocation outside loop\nfor (...) { scratch.length = 0; }',
+    },
+    'PRF-MEM-001': {
+        action: 'hoist_declaration',
+        code: 'AR:PRF:001',
+        safeToAutomate: false,
+        templateSnippet:
+            'const scratch = []; // hoist allocation outside loop\nfor (...) { scratch.length = 0; }',
+    },
+    'PRF-MEM-002': {
+        action: 'hoist_declaration',
+        code: 'AR:PRF:001',
+        safeToAutomate: false,
+        templateSnippet:
+            'const scratch = []; // hoist allocation outside loop\nfor (...) { scratch.length = 0; }',
+    },
+    'expensive-loop-operation': {
+        action: 'hoist_declaration',
+        code: 'AR:PRF:002',
+        safeToAutomate: false,
+        templateSnippet:
+            'const cachedValue = computeExpensive();\nfor (...) { /* use cachedValue */ }',
+    },
+    'regex-in-loop': {
+        action: 'hoist_declaration',
+        code: 'AR:PRF:003',
+        safeToAutomate: false,
+        templateSnippet: 'const PATTERN = /.../;\nfor (...) { PATTERN.test(...); }',
+    },
+};
 
 /**
  * Detect performance hazards in one source file with a single line-oriented pass: nested loops
@@ -125,6 +165,18 @@ export class PerformanceAnalyzer implements Analyzer {
 
         if (opts.checkUnboundedGrowth === true) {
             issues.push(...detectUnboundedGrowth(ctx.filePath, content));
+        }
+
+        for (const iss of issues) {
+            if (!iss.actionable && PRF_ACTIONABLE_MAP[iss.rule]) {
+                const mapped = PRF_ACTIONABLE_MAP[iss.rule];
+                iss.actionable = {
+                    action: mapped.action,
+                    code: mapped.code,
+                    safeToAutomate: mapped.safeToAutomate,
+                    templateSnippet: mapped.templateSnippet,
+                };
+            }
         }
 
         return issues;
@@ -412,6 +464,15 @@ export class PerformanceAnalyzer implements Analyzer {
     ): Issue {
         const line = lineIdx + 1;
         const file = ctx.filePath.replace(/\\/g, '/');
+        const mapped = PRF_ACTIONABLE_MAP[rule];
+        const actionable = mapped
+            ? {
+                  action: mapped.action,
+                  code: mapped.code,
+                  safeToAutomate: mapped.safeToAutomate,
+                  templateSnippet: mapped.templateSnippet,
+              }
+            : undefined;
         return {
             id: `${this.name}:${rule}:${file}:${line}`,
             analyzer: this.name,
@@ -421,6 +482,7 @@ export class PerformanceAnalyzer implements Analyzer {
             location: { file, start: { line, column: 1 }, end: { line, column: 1 } },
             detail,
             suggestion,
+            actionable,
         };
     }
 }

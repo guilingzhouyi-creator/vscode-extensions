@@ -25,7 +25,7 @@
  * Patterns are fully configurable; `maxIssuesPerFile` caps flood on vendored content.
  */
 
-import type { Analyzer, AnalyzerContext, Issue, Severity, SecurityLevel } from '../core/types';
+import type { Analyzer, AnalyzerContext, Issue, Severity, SecurityLevel, AgentActionType } from '../core/types';
 import { SecretMessages } from '../core/messages/secrets';
 import {
     auditRegexSafety,
@@ -62,6 +62,18 @@ const CHAR_CODE_CR = 13;
 
 /** Maximum regex-source characters included in a secret finding's message. */
 const REGEX_SOURCE_PREVIEW_LENGTH = 40;
+
+const SECRETS_ACTIONABLE_MAP: Record<
+    string,
+    { action: AgentActionType; code: string; safeToAutomate: boolean; templateSnippet: string }
+> = {
+    'secret-detected': {
+        action: 'extract_constant',
+        code: 'AR:SCR:001',
+        safeToAutomate: false,
+        templateSnippet: 'process.env.SECRET_KEY',
+    },
+};
 
 /**
  * Optional configuration for secret detection.
@@ -230,6 +242,18 @@ export class SecretsAnalyzer implements Analyzer {
             lineStart = nextStart;
         }
 
+        for (const iss of issues) {
+            if (!iss.actionable && SECRETS_ACTIONABLE_MAP[iss.rule]) {
+                const mapped = SECRETS_ACTIONABLE_MAP[iss.rule];
+                iss.actionable = {
+                    action: mapped.action,
+                    code: mapped.code,
+                    safeToAutomate: mapped.safeToAutomate,
+                    templateSnippet: mapped.templateSnippet,
+                };
+            }
+        }
+
         return issues;
     }
 
@@ -352,6 +376,15 @@ export class SecretsAnalyzer implements Analyzer {
         suggestion?: string,
     ): Issue {
         const file = ctx.filePath.replace(/\\/g, '/');
+        const mapped = SECRETS_ACTIONABLE_MAP[rule];
+        const actionable = mapped
+            ? {
+                  action: mapped.action,
+                  code: mapped.code,
+                  safeToAutomate: mapped.safeToAutomate,
+                  templateSnippet: mapped.templateSnippet,
+              }
+            : undefined;
         return {
             id: `${this.name}:${rule}:${file}:${line}`,
             analyzer: this.name,
@@ -363,6 +396,7 @@ export class SecretsAnalyzer implements Analyzer {
             suggestion:
                 suggestion ||
                 'Extract credentials from source code; inject via environment variables or secret managers',
+            actionable,
         };
     }
 }

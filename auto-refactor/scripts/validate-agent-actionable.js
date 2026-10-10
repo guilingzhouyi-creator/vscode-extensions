@@ -116,6 +116,108 @@ var legacyBinding = 42;
   assert.strictEqual(comcIssue.actionable.code, 'AR:SIM:003');
   console.log('✔ [PASS] SimplifyAnalyzer emits actionable payload for commented code');
 
+  // 5. Test RustModernAnalyzer outputting actionable and templateSnippet
+  const { RustModernAnalyzer } = require('../dist/analyzers/rust-modern');
+  const rustAnalyzer = new RustModernAnalyzer();
+  const rustTryCode = `
+pub fn do_work() -> Result<(), String> {
+    try!(inner());
+    Ok(())
+}
+`;
+  const rsmIssues = rustAnalyzer.finalize({
+    filePath: 'src/sample.rs',
+    content: rustTryCode,
+    options: {},
+  });
+  const tryIssue = rsmIssues.find((i) => i.rule === 'RSM-TRY-001');
+  assert.ok(tryIssue, 'Must find RSM-TRY-001 issue');
+  assert.ok(tryIssue.actionable, 'RSM-TRY-001 must carry actionable payload');
+  assert.strictEqual(tryIssue.actionable.action, 'replace_token');
+  assert.strictEqual(tryIssue.actionable.code, 'AR:RSM:001');
+  assert.strictEqual(tryIssue.actionable.templateSnippet, '$1?');
+  console.log('✔ [PASS] RustModernAnalyzer emits actionable payload and templateSnippet for try! macro');
+
+  // 6. Test PythonModernAnalyzer outputting actionable and templateSnippet
+  const { PythonModernAnalyzer } = require('../dist/analyzers/python-modern');
+  const pyAnalyzer = new PythonModernAnalyzer();
+  const pyCode = `
+import os
+def get_path():
+    return os.path.join("a", "b")
+`;
+  const pyIssues = pyAnalyzer.finalize({
+    filePath: 'src/sample.py',
+    content: pyCode,
+    options: {},
+  });
+  const pathIssue = pyIssues.find((i) => i.rule === 'PYM-PATH-001');
+  assert.ok(pathIssue, 'Must find PYM-PATH-001 issue');
+  assert.ok(pathIssue.actionable, 'PYM-PATH-001 must carry actionable payload');
+  assert.strictEqual(pathIssue.actionable.action, 'replace_token');
+  assert.strictEqual(pathIssue.actionable.code, 'AR:PYM:001');
+  assert.ok(pathIssue.actionable.templateSnippet, 'Must provide templateSnippet for PYM-PATH-001');
+  console.log('✔ [PASS] PythonModernAnalyzer emits actionable payload and templateSnippet for os.path');
+
+  // 7. Test ArchitectureAnalyzer outputting actionable and templateSnippet
+  const { ArchitectureAnalyzer } = require('../dist/analyzers/architecture');
+  const archAnalyzer = new ArchitectureAnalyzer();
+  const facadeCode = `
+export * from './internal-sub';
+`;
+  const archIssues = archAnalyzer.analyze(null, {
+    filePath: 'src/facade.ts',
+    content: facadeCode,
+    options: {},
+    config: {},
+  });
+  const archFacIssue = archIssues.find((i) => i.rule === 'ARCH-FAC-001' || i.rule === 'facade-without-payload');
+  assert.ok(archFacIssue, 'Must find facade issue');
+  assert.ok(archFacIssue.actionable, 'Architecture issue must carry actionable payload');
+  assert.strictEqual(archFacIssue.actionable.code, 'AR:ARC:001');
+  assert.ok(archFacIssue.actionable.templateSnippet, 'Must provide templateSnippet for ARCH-FAC-001');
+  console.log('✔ [PASS] ArchitectureAnalyzer emits actionable payload and templateSnippet for facade rules');
+
+  // 8. Test PerformanceAnalyzer outputting actionable and templateSnippet
+  const { PerformanceAnalyzer } = require('../dist/analyzers/performance');
+  const perfAnalyzer = new PerformanceAnalyzer();
+  const perfCode = `
+function processBatch(items: string[]) {
+    for (const item of items) {
+        const temp = new Array(100);
+    }
+}
+`;
+  const perfIssues = perfAnalyzer.analyze(null, {
+    filePath: 'src/batch.ts',
+    content: perfCode,
+    options: {},
+  });
+  const loopAllocIssue = perfIssues.find((i) => i.rule === 'loop-transient-allocation' || i.rule === 'PRF-MEM-001');
+  assert.ok(loopAllocIssue, 'Must find loop allocation issue');
+  assert.ok(loopAllocIssue.actionable, 'Performance issue must carry actionable payload');
+  assert.strictEqual(loopAllocIssue.actionable.code, 'AR:PRF:001');
+  assert.ok(loopAllocIssue.actionable.templateSnippet, 'Must provide templateSnippet for loop transient allocation');
+  console.log('✔ [PASS] PerformanceAnalyzer emits actionable payload and templateSnippet for loop allocation');
+
+  // 9. Test ShellLintAnalyzer outputting actionable and templateSnippet
+  const { ShellLintAnalyzer } = require('../dist/analyzers/shell-lint');
+  const shellAnalyzer = new ShellLintAnalyzer();
+  const shCode = `#!/bin/bash
+echo $UNQUOTED_VAR
+`;
+  const shIssues = shellAnalyzer.finalize({
+    filePath: 'scripts/run.sh',
+    content: shCode,
+    options: {},
+  });
+  const quoteIssue = shIssues.find((i) => i.rule === 'SH-QUOTE-001');
+  assert.ok(quoteIssue, 'Must find SH-QUOTE-001 issue');
+  assert.ok(quoteIssue.actionable, 'Shell issue must carry actionable payload');
+  assert.strictEqual(quoteIssue.actionable.code, 'AR:SHL:002');
+  assert.strictEqual(quoteIssue.actionable.templateSnippet, '"$VAR"');
+  console.log('✔ [PASS] ShellLintAnalyzer emits actionable payload and templateSnippet for unquoted variables');
+
   console.log('✔ [PASS] All Agent-Actionable diagnostic contracts verified successfully.');
 }
 
@@ -123,3 +225,4 @@ main().catch((err) => {
   console.error(err);
   process.exit(1);
 });
+

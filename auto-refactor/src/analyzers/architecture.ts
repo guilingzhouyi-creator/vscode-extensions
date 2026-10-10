@@ -16,7 +16,14 @@
  *   and checkDtoCredentialLeakage let teams stage adoption rather than flip an all-or-nothing
  *   gate.
  */
-import type { Analyzer, AnalyzerContext, Issue, ArchitectureLayer, Severity } from '../core/types';
+import type {
+    Analyzer,
+    AnalyzerContext,
+    Issue,
+    ArchitectureLayer,
+    Severity,
+    AgentActionType,
+} from '../core/types';
 import { SEVERITY_WARNING, SEVERITY_ERROR } from '../core/types';
 import { inferDirectorySemantic } from '../core/profiler/projectProfiler';
 import { ArchitectureMessages } from '../core/messages/architecture';
@@ -64,6 +71,60 @@ const DEFAULT_FORBIDDEN_DOMAIN_IMPORTS = (
 ).split(' ');
 
 const DISALLOWED_PARSER_PACKAGES = ['oxc-parser', '@babel/parser', 'tree-sitter', 'ts-morph/dist'];
+
+const ARCH_ACTIONABLE_MAP: Record<
+    string,
+    { action: AgentActionType; code: string; safeToAutomate: boolean; templateSnippet: string }
+> = {
+    'ARCH-FAC-001': {
+        action: 'decouple_facade',
+        code: 'AR:ARC:001',
+        safeToAutomate: false,
+        templateSnippet: 'export const ModuleFacade = Object.freeze({ ... });',
+    },
+    'facade-without-payload': {
+        action: 'decouple_facade',
+        code: 'AR:ARC:001',
+        safeToAutomate: false,
+        templateSnippet: 'export const ModuleFacade = Object.freeze({ ... });',
+    },
+    'ARCH-ABS-001': {
+        action: 'replace_token',
+        code: 'AR:ARC:002',
+        safeToAutomate: false,
+        templateSnippet: '// Melt single-target trampoline; import directly from source',
+    },
+    'trampoline-export': {
+        action: 'replace_token',
+        code: 'AR:ARC:002',
+        safeToAutomate: false,
+        templateSnippet: '// Melt single-target trampoline; import directly from source',
+    },
+    'ARCH-LEAK-001': {
+        action: 'narrow_scope',
+        code: 'AR:ARC:003',
+        safeToAutomate: false,
+        templateSnippet: '// Invert dependency via interface or port/adapter',
+    },
+    'layer-inversion': {
+        action: 'narrow_scope',
+        code: 'AR:ARC:003',
+        safeToAutomate: false,
+        templateSnippet: '// Invert dependency via interface or port/adapter',
+    },
+    'ARCH-DIR-001': {
+        action: 'decompose_module',
+        code: 'AR:ARC:004',
+        safeToAutomate: false,
+        templateSnippet: '// Extract shared contracts to domain-level shared module',
+    },
+    'cyclic-dependency': {
+        action: 'decompose_module',
+        code: 'AR:ARC:004',
+        safeToAutomate: false,
+        templateSnippet: '// Extract shared contracts to domain-level shared module',
+    },
+};
 
 /** ASCII code of carriage return, stripped from CRLF line endings before per-line analysis. */
 const CARRIAGE_RETURN_CHAR_CODE = 13;
@@ -210,7 +271,7 @@ export class ArchitectureAnalyzer implements Analyzer {
         if (opts.enforceCleanLayers === false) {
             return [];
         }
-        if (ctx.config.archetype === 'stdlib' || ctx.config.archetype === 'systems_runtime') {
+        if (ctx.config?.archetype === 'stdlib' || ctx.config?.archetype === 'systems_runtime') {
             return [];
         }
 
@@ -247,6 +308,18 @@ export class ArchitectureAnalyzer implements Analyzer {
             issues.push(...cfgResult.issues);
         }
 
+        for (const iss of issues) {
+            if (!iss.actionable && ARCH_ACTIONABLE_MAP[iss.rule]) {
+                const mapped = ARCH_ACTIONABLE_MAP[iss.rule];
+                iss.actionable = {
+                    action: mapped.action,
+                    code: mapped.code,
+                    safeToAutomate: mapped.safeToAutomate,
+                    templateSnippet: mapped.templateSnippet,
+                };
+            }
+        }
+
         return issues;
     }
 
@@ -259,7 +332,7 @@ export class ArchitectureAnalyzer implements Analyzer {
         forbiddenModules: Set<string>,
         issues: Issue[],
     ): void {
-        const thresholdHeadless = (ctx.config.thresholds as ArchitectureThresholds | undefined)
+        const thresholdHeadless = (ctx.config?.thresholds as ArchitectureThresholds | undefined)
             ?.headlessDisallowedImports;
         const customHeadless = opts.headlessDisallowedImports ?? thresholdHeadless;
         const customHeadlessSet = customHeadless ? new Set(customHeadless) : undefined;
@@ -874,6 +947,15 @@ export class ArchitectureAnalyzer implements Analyzer {
     ): Issue {
         const line = lineIdx + 1;
         const file = ctx.filePath.replace(/\\/g, '/');
+        const mapped = ARCH_ACTIONABLE_MAP[rule];
+        const actionable = mapped
+            ? {
+                  action: mapped.action,
+                  code: mapped.code,
+                  safeToAutomate: mapped.safeToAutomate,
+                  templateSnippet: mapped.templateSnippet,
+              }
+            : undefined;
         return {
             id: `${this.name}:${rule}:${file}:${line}`,
             analyzer: this.name,
@@ -883,6 +965,7 @@ export class ArchitectureAnalyzer implements Analyzer {
             location: { file, start: { line, column: 1 }, end: { line, column: 1 } },
             detail,
             suggestion,
+            actionable,
         };
     }
 }

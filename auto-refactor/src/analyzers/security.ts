@@ -29,7 +29,7 @@
  * Implements both streaming `visit`/`finalize` and standalone `analyze` contracts.
  */
 
-import type { Analyzer, AnalyzerContext, Issue, SecurityLevel } from '../core/types';
+import type { Analyzer, AnalyzerContext, Issue, SecurityLevel, AgentActionType } from '../core/types';
 import { SEVERITY_WARNING, SEVERITY_ERROR } from '../core/types';
 import { ANALYZER_SECURITY } from '../core/scoring/dimensionLiterals';
 import type { NormalizedNode } from '../core/ast/multilang';
@@ -104,6 +104,41 @@ const SECURITY_FAST_FILTER_TOKENS: readonly string[] = [
 /** Default per-file finding cap used when `SecurityOptions.maxIssuesPerFile` is omitted. */
 const DEFAULT_MAX_ISSUES_PER_FILE = 50;
 
+const SEC_ACTIONABLE_MAP: Record<
+    string,
+    { action: AgentActionType; code: string; safeToAutomate: boolean; templateSnippet: string }
+> = {
+    'SEC-VUL-001': {
+        action: 'replace_token',
+        code: 'AR:SEC:001',
+        safeToAutomate: false,
+        templateSnippet: 'JSON.parse($1)',
+    },
+    'SEC-VUL-003': {
+        action: 'replace_token',
+        code: 'AR:SEC:002',
+        safeToAutomate: false,
+        templateSnippet: 'Object.create(null)',
+    },
+    'SEC-VUL-004': {
+        action: 'replace_token',
+        code: 'AR:SEC:003',
+        safeToAutomate: false,
+        templateSnippet: 'crypto.randomUUID()',
+    },
+};
+
+function resolveSecurityActionable(rule: string) {
+    const mapped = SEC_ACTIONABLE_MAP[rule];
+    if (!mapped) return undefined;
+    return {
+        action: mapped.action,
+        code: mapped.code,
+        safeToAutomate: mapped.safeToAutomate,
+        templateSnippet: mapped.templateSnippet,
+    };
+}
+
 /**
  * Security analyzer for dynamic execution, injection, weak crypto, and data-leakage patterns.
  *
@@ -138,24 +173,39 @@ export class SecurityAnalyzer implements Analyzer {
         const cap = opts.maxIssuesPerFile ?? DEFAULT_MAX_ISSUES_PER_FILE;
         const issues: Issue[] = [];
 
-        // Exempt tests, mocks, fixtures, and samples from strict security gates
         const isTestOrFixture = /(?:tests?|specs?|fixtures?|samples?|benchmark|dist|mock)/i.test(
             file,
         );
 
-        // High-performance fast path: pre-screen large files via native SIMD multi-pattern matcher
-        if (content.length > 5000) {
-            const hits = nativeCore.fastPatternMatch(
-                content,
-                SECURITY_FAST_FILTER_TOKENS as string[],
-            );
-            if (hits.length === 0) {
-                return [];
-            }
+        if (this.shouldSkipByFastFilter(content)) {
+            return [];
         }
 
-        const lines = content.split(/\r?\n/);
+        this.scanLines(content, file, isTestOrFixture, opts, level, cap, issues);
+        this.attachActionables(issues);
 
+        return issues;
+    }
+
+    private shouldSkipByFastFilter(content: string): boolean {
+        if (content.length <= 5000) return false;
+        const hits = nativeCore.fastPatternMatch(
+            content,
+            SECURITY_FAST_FILTER_TOKENS as string[],
+        );
+        return hits.length === 0;
+    }
+
+    private scanLines(
+        content: string,
+        file: string,
+        isTestOrFixture: boolean,
+        opts: SecurityOptions,
+        level: SecurityLevel,
+        cap: number,
+        issues: Issue[],
+    ): void {
+        const lines = content.split(/\r?\n/);
         for (let idx = 0; idx < lines.length; idx++) {
             if (issues.length >= cap) break;
             const lineNum = idx + 1;
@@ -185,8 +235,14 @@ export class SecurityAnalyzer implements Analyzer {
                 this.auditFullCompliance(trimmed, lineText, lineNum, file, opts, issues);
             }
         }
+    }
 
-        return issues;
+    private attachActionables(issues: Issue[]): void {
+        for (const iss of issues) {
+            if (!iss.actionable && SEC_ACTIONABLE_MAP[iss.rule]) {
+                iss.actionable = resolveSecurityActionable(iss.rule);
+            }
+        }
     }
 
     /**
@@ -227,6 +283,7 @@ export class SecurityAnalyzer implements Analyzer {
                     snippet: trimmed,
                 },
                 suggestion: SecurityMessages.ARBITRARY_CODE_EXECUTION.suggestion,
+                actionable: resolveSecurityActionable('SEC-VUL-001'),
             });
         }
     }
@@ -285,6 +342,7 @@ export class SecurityAnalyzer implements Analyzer {
                     snippet: trimmed,
                 },
                 suggestion: SecurityMessages.PROTOTYPE_POLLUTION.suggestion,
+                actionable: resolveSecurityActionable('SEC-VUL-003'),
             });
         }
     }
@@ -358,6 +416,7 @@ export class SecurityAnalyzer implements Analyzer {
                     snippet: trimmed,
                 },
                 suggestion: SecurityMessages.INSECURE_RANDOMNESS.suggestion,
+                actionable: resolveSecurityActionable('SEC-VUL-004'),
             });
         }
     }
@@ -541,6 +600,7 @@ export class SecurityAnalyzer implements Analyzer {
                 function: node.name,
             },
             suggestion: SecurityMessages.ARBITRARY_CODE_EXECUTION.suggestion,
+            actionable: resolveSecurityActionable('SEC-VUL-001'),
         });
     }
 
