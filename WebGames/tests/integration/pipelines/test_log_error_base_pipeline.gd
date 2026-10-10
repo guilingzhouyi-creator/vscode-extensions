@@ -499,7 +499,6 @@ static func _test_lg_19_zero_push_error_in_contract_registry() -> Dictionary:
 		"res://backend/domains/gacha_wish/gacha_banner_entity.gd": "T2",
 		"res://backend/domains/game_settings/game_settings_aggregate.gd": "T2",
 		"res://backend/domains/notification_red_dot/red_dot_tree_fsm.gd": "T2",
-		"res://frontend/navigation/view_router.gd": "T2",
 		# 畸形快照/畸形 DTO 运行时守卫告警（契约要求不静默）：
 		"res://backend/domains/inventory/wearable_inventory.gd": "T2",
 		"res://backend/domains/contract_registry/domain_view_mapping_snapshot.gd": "T2",
