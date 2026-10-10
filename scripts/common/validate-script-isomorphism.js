@@ -32,6 +32,7 @@ const REQUIRED_ISOMORPHIC_PAIRS = [
   'package',
   'pre-commit-gate',
   'pre-push-gate',
+  'release-tag',
   'version-bump',
 ];
 
@@ -41,6 +42,7 @@ const REQUIRED_ISOMORPHIC_PAIRS = [
 const REQUIRED_FLAG_ALIGNMENTS = {
   'audit-all': ['Fast', 'Json'],
   package: ['HotSync'],
+  'release-tag': ['DryRun', 'NoPush'],
   'version-bump': ['DryRun'],
 };
 
@@ -113,7 +115,11 @@ function auditFlagAlignment(baseName, ps1Content, shContent) {
 
   for (const flag of requiredFlags) {
     const ps1Has = ps1Content.includes(flag);
-    const shHas = shContent.includes(`-${flag}`) || shContent.includes(`--${flag.toLowerCase()}`);
+    const kebab = flag.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
+    const shHas =
+      shContent.includes(`-${flag}`) ||
+      shContent.includes(`--${flag.toLowerCase()}`) ||
+      shContent.includes(`--${kebab}`);
     if (!ps1Has || !shHas) {
       errors.push(`Flag '${flag}' alignment missing (ps1: ${ps1Has}, sh: ${shHas})`);
     }
