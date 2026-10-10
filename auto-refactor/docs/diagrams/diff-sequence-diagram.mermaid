@@ -1,19 +1,31 @@
 sequenceDiagram
     participant Agent as Praxis Agent / Cell
+    participant Client as PraxisReviewClient SDK
     participant SliceSvc as PraxisSliceAuditService
+    participant PresAdapter as PraxisPresentationAdapter
     participant DiffStream as scanDiffStream
     participant MultiSvc as PraxisMultiAgentGovernanceService
     participant Ring as CircularDiffBuffer (R4)
     participant Rollback as PraxisRollbackEngine
 
-    Agent->>SliceSvc: 1. Inner-loop edit -> auditAgentSlice(input)
-    SliceSvc-->>Agent: Sub-10ms CAPP Prompt + Sparse MoE Plan
-    Agent->>DiffStream: 2. Submit patch -> scanDiffStream(inputs)
-    DiffStream->>Ring: 3. Push enriched ReviewDiffHunk (evict oldest to R4 Uint8Array)
-    DiffStream->>Rollback: 4. Record TaskCard hunk anchor
-    Agent->>MultiSvc: 5. Cell merge gate -> reviewMultiAgentPatches(patches)
-    alt Collision or GOV-AGN-001 Cycle Detected
-        MultiSvc->>Rollback: 6a. Trigger revertCard(cardId) atomic LIFO rollback
-    else Approved
-        MultiSvc-->>Agent: 6b. Merge to Cell Branch & update Trajectory Learning
+    Agent->>Client: 1. Inner-loop edit -> reviewFile(filePath, content)
+    Client->>SliceSvc: 2. Invoke auditSlice(input) via Sparse MoE
+    SliceSvc-->>Client: Sub-10ms AST slice verdict + CAPP compact prompt
+    Client->>PresAdapter: 3. Invoke fromSliceVerdict(verdict, target)
+    Note over PresAdapter: 4. 并查集语义去重聚合<br/>(11 组 SEMANTIC_OVERLAP_GROUPS)<br/>同坐标高严重度选举主卡，次级入 correlatedRules
+    PresAdapter-->>Client: 生成 PraxisPresentationPayload (富文本本地化卡片)
+    Client-->>Agent: 5. 派发一体两面双载荷 (Agent: directivesMarkdown / Human: UI cards)
+    
+    Agent->>Client: 6. 提交分支补丁 -> evaluateMergeGate(src, target, hunks)
+    Client->>DiffStream: 7. 推送增量事件流 scanDiffStream
+    DiffStream->>Ring: 8. 环形缓冲缓存 Hunk (淘汰转储 Uint8Array R4)
+    DiffStream->>Rollback: 9. 记录 TaskCard 锚点
+    Client->>MultiSvc: 10. 多智能体合入仲裁 reviewMultiAgentPatches
+    alt 依赖死锁或 GOV-AGN-001 冲突
+        MultiSvc->>Rollback: 11a. 触发 revertCard(cardId) 原子 LIFO 逆序回滚
+        Rollback-->>Client: 返回回滚修复结果
+        Client-->>Agent: 阻断合入 (Blocked)
+    else 门禁通过 Approved
+        MultiSvc-->>Client: 11b. 批准合入
+        Client-->>Agent: 派发 DualFacedDiffResult (Agent: 符号闭包 / Human: 视觉徽标与卡片)
     end

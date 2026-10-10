@@ -1,7 +1,7 @@
 # 📚 auto-refactor 分层技术文档与 Praxis 交付中心 | Documentation Hub
 
-> **当前文档基线**：`auto-refactor` v0.4.0（对齐 TypeScript + Rust N-API 六算子核、八语言语义 IR、四层 243 规则金字塔、三平面质量度量与 Praxis 六大治理门面）。  
-> **历史文档封存位置**：重编前全部旧版文档与早期设计草稿已完整封存至 [`archive/auto-refactor/docs-snapshot-20260928/`](../../archive/auto-refactor/docs-snapshot-20260928/) 与 [`archive/auto-refactor/docs-legacy/`](../../archive/auto-refactor/docs-legacy/)。
+> **当前文档基线**：`auto-refactor` v0.4.0（对齐 TypeScript + Rust N-API 六算子核、八语言语义 IR、30 内置分析器与 325 规则体系、153/153 测试套件、三平面质量度量与 Praxis 统一开发者 SDK 门面）。  
+> **历史文档封存位置**：全量历史技术文档已完整封存至 [`archive/auto-refactor/docs-snapshot-20261010/`](../../archive/auto-refactor/docs-snapshot-20261010/) 与 [`archive/auto-refactor/docs-snapshot-20260928/`](../../archive/auto-refactor/docs-snapshot-20260928/)。
 
 ---
 
@@ -25,26 +25,26 @@
 * [03-praxis-integration-guide.md](./03-incremental-and-diff/03-praxis-integration-guide.md)：`CircularDiffBuffer` 环形缓冲、`Uint8Array` R4 二进制冷存淘汰与 `SemanticPraxisContextEnricher` 作用域富集指南。
 
 ### 🔍 L4. 四层规则金字塔与内置分析器矩阵 (`04-analyzers-and-rules/`)
-* [01-builtin-rules.md](./04-analyzers-and-rules/01-builtin-rules.md)：四层规则金字塔、26 个内置分析器包、机读英文 + 人读中文双轨文案契约，以及 **243 条全量内置规则权威字典（243/243 门禁覆盖）**。
+* [01-builtin-rules.md](./04-analyzers-and-rules/01-builtin-rules.md)：四层规则金字塔、30 个内置分析器包、机读英文 + 人读中文双轨文案契约，以及 **325 条全量内置规则权威字典（325/325 门禁覆盖）**。
 * [02-custom-analyzer-plugin.md](./04-analyzers-and-rules/02-custom-analyzer-plugin.md)：声明式 `PatternKernel` 与编程式 `Analyzer` 插件开发规范、`cacheCustom` 安全隔离及评分表接入流程。
 
 ### 📊 L5. 配置契约、三平面质量度量与性能基准 (`05-specs-and-benchmarks/`)
-* [01-config-and-reports.md](./05-specs-and-benchmarks/01-config-and-reports.md)：`auto-refactor.config.json` 完整 Schema、阈值与作用域抑制 (`suppressions`)、JSON / SARIF 2.1.0 / Text 报告与退出码契约。
-* [02-performance-benchmarks.md](./05-specs-and-benchmarks/02-performance-benchmarks.md)：6 大核心算子性能基准台账、消融测试与防劣化回归护栏。
-* [03-comment-and-header-standard.md](./05-specs-and-benchmarks/03-comment-and-header-standard.md)：规范六字段文件头契约、有效注释密度 (ECD-C) 算法与 `gate:comments` 门禁。
+* [01-config-and-reports.md](./05-specs-and-benchmarks/01-config-and-reports.md)：`auto-refactor.config.json` 完整 Schema、30 分析器与 325 规则默认阈值、`.refactor-trajectory/` 紧凑账本规范 (< 350B, *Ms) 与 JSON/SARIF/Text 报告契约。
+* [02-performance-benchmarks.md](./05-specs-and-benchmarks/02-performance-benchmarks.md)：6 大核心算子性能基准台账（SWAR 6,448 MB/s, BPM 17.8 µs）、153/153 测试套件全量自测与防劣化回归护栏。
+* [03-comment-and-header-standard.md](./05-specs-and-benchmarks/03-comment-and-header-standard.md)：规范六字段模块头契约 (`CMT-HDR-001`)、有效注释密度 (ECD-C) 算法模型与真实注释规则字典。
 * [04-cross-language-generalization.md](./05-specs-and-benchmarks/04-cross-language-generalization.md)：项目中立性不变量 (`validate-project-neutrality`) 与文件语义角色自动推导 (`file-role-inference.ts`)。
-* [05-consumer-integration.md](./05-specs-and-benchmarks/05-consumer-integration.md)：`baseline.json` 1.2.0 信用消耗语义、单向收紧棘轮以及 `workspace-timing` / `WebGames` 兄弟工程接入范式。
+* [05-consumer-integration.md](./05-specs-and-benchmarks/05-consumer-integration.md)：`baseline.json` 1.2.0 信用消耗语义、零高危债务防线 (`critical = 0, high = 0`) 以及 `workspace-timing` / `WebGames` 差异化接入范式。
 * [06-modernization-program.md](./05-specs-and-benchmarks/06-modernization-program.md)：五大语言现代化规则包 (`*-modern`)、常量单一真源拓扑治理与结构债 ABC 分类治理法。
-* [07-quantified-quality-standard.md](./05-specs-and-benchmarks/07-quantified-quality-standard.md)：静态十大支柱 + 动态遥测 + 演化反馈的三平面质量融合模型与代码自治度指数 (`AutonomyScorer` / CAI)。
+* [07-quantified-quality-standard.md](./05-specs-and-benchmarks/07-quantified-quality-standard.md)：10 细粒度维度到 8 战略支柱映射、双曲饱和衰减、安全动态天花板、三平面风险共振 ($S^{1.0} \cdot D^{1.2} \cdot H^{0.8}$) 与 **CAI 2.0 纯客观 6 维自研率**（Jeffreys Beta 后验）。
 
 ### 🤝 L6. 对接 Praxis 团队专属交付专层 (`06-praxis-delivery/`)
-* [PRAXIS_HANDOFF_REPORT.md](./PRAXIS_HANDOFF_REPORT.md)：**Praxis 团队对接交付总报告（Executive Handoff）**。
-* [01-praxis-architecture-and-spi-contracts.md](./06-praxis-delivery/01-praxis-architecture-and-spi-contracts.md)：`PraxisCardContext`、`ReviewDiffHunk`、`PraxisVerdict` 数据模型与五大 SPI 扩展插槽契约手册。
-* [02-praxis-six-governance-services-api.md](./06-praxis-delivery/02-praxis-six-governance-services-api.md)：六大核心治理服务门面（Diff 审查、Sub-10ms 切片审计、多 Agent 冲突仲裁、轨迹配方学习、反馈自适应监督器、原子回滚与流式推流）完整 API 手册。
-* [03-praxis-integration-runbook-and-acceptance.md](./06-praxis-delivery/03-praxis-integration-runbook-and-acceptance.md)：端到端 TypeScript 联调代码范例、故障降级 SLA 与自动化验收矩阵。
+* [PRAXIS_HANDOFF_REPORT.md](./PRAXIS_HANDOFF_REPORT.md)：**Praxis 团队对接交付总报告（Executive Handoff）**（30 分析器、325 规则体系、153/153 测试套件）。
+* [01-praxis-architecture-and-spi-contracts.md](./06-praxis-delivery/01-praxis-architecture-and-spi-contracts.md)：`PraxisCardContext`、`ReviewDiffHunk` 数据模型，底层差分 AST 完备性与表现层去重双层解耦公理，以及**六大核心 SPI 扩展插槽**（含表现层 SPI）。
+* [02-praxis-six-governance-services-api.md](./06-praxis-delivery/02-praxis-six-governance-services-api.md)：七大核心治理服务与统一开发者 SDK 门面 [`PraxisReviewClient`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/praxis-review-client.ts) (`createPraxisClient`) API 完整手册。
+* [03-praxis-integration-runbook-and-acceptance.md](./06-praxis-delivery/03-praxis-integration-runbook-and-acceptance.md)：端到端 TypeScript 联调代码范例、11 组 `SEMANTIC_OVERLAP_GROUPS` 并查集去重消费规范与 **153/153 自动化验收矩阵**。
 
 ### 📐 架构图表 (`diagrams/`)
-* [class-diagram.mermaid](./diagrams/class-diagram.mermaid)：六层架构核心类图。
-* [sequence-diagram.mermaid](./diagrams/sequence-diagram.mermaid)：双轨扫描与三平面质量评分时序图。
-* [diff-class-diagram.mermaid](./diagrams/diff-class-diagram.mermaid)：Praxis 六大治理门面与 SPI 类图。
-* [diff-sequence-diagram.mermaid](./diagrams/diff-sequence-diagram.mermaid)：Praxis 多 Agent 切片审计与卡级原子回滚时序图。
+* [class-diagram.mermaid](./diagrams/class-diagram.mermaid)：核心引擎类图（引入 `AutonomyScorer`, `RiskFusionEngine`, `PraxisReviewClient`）。
+* [sequence-diagram.mermaid](./diagrams/sequence-diagram.mermaid)：双轨扫描、三平面风险共振评分与 CAI 自研率终结时序图。
+* [diff-class-diagram.mermaid](./diagrams/diff-class-diagram.mermaid)：Praxis 治理门面、`PraxisReviewClient` SDK 与 `PraxisPresentationAdapter` 类图。
+* [diff-sequence-diagram.mermaid](./diagrams/diff-sequence-diagram.mermaid)：Praxis 多 Agent 切片审计、11 组并查集语义聚合与一体两面双载荷派发时序图。

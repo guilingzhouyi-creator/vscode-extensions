@@ -4,13 +4,22 @@ sequenceDiagram
     participant Cache as CacheStore (L1 + L2)
     participant Router as SparseMoEGateRouter
     participant Native as Rust N-API / NativeBridge
-    participant Scorer as Tri-Plane QualityScorer
+    participant Scorer as Static QualityScorer (10-Dim & 8-Pillar)
+    participant Fusion as RiskFusionEngine (Tri-Plane Q_total)
+    participant Autonomy as AutonomyScorer (CAI 2.0 & Jeffreys Beta)
+    participant Finalizer as finalizeReport (Ratchet & Ledger)
 
     Caller->>API: 1. Invoke scan(options)
     API->>Cache: 2. Probe L1/L2 cache by Composite Fingerprint
-    Cache-->>API: Hit unchanged files & topology edges
+    Cache-->>API: Return cached clean files & dependency edges
     API->>Router: 3. Compute active analyzers for dirty files (CED MoE)
     Router->>Native: 4. Execute oxc Mode A + ops-mask + ops-graph + ops-clone
-    Native-->>API: Emit normalized issues + SemanticGraph edges
-    API->>Scorer: 5. Run finalizeReport (Cycle Pass + Ratchet + 10-Pillar Score + CAI)
-    Scorer-->>Caller: 6. Return deterministic ScanReport
+    Native-->>API: Emit normalized issues + AST + SemanticGraph edges
+    API->>Scorer: 5. Compute static 10-dim indices (hyperbolic decay & security ceiling)
+    Scorer-->>API: Return static score & 8 primary pillars breakdown
+    API->>Fusion: 6. Fuse static + dynamic telemetry + history (Risk = S^1.0 · D^1.2 · H^0.8)
+    Fusion-->>API: Return cross-plane fused risks & Q_total unified score
+    API->>Autonomy: 7. Evaluate 6-dim in-house autonomy & Jeffreys Beta(0.5, 0.5) credible interval
+    Autonomy-->>API: Return CAI composite index, L1~L5 grade, SDK inventory
+    API->>Finalizer: 8. Execute suppressions, cycle validation, Baseline 1.2.0 ratchet, append ledger
+    Finalizer-->>Caller: 9. Emit complete deterministic ScanReport (JSON / SARIF / Text)

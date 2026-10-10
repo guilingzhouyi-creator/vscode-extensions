@@ -1,4 +1,40 @@
 classDiagram
+    class IPraxisReviewClient {
+        <<interface>>
+        +reviewWorkspace(options) Promise~PraxisWorkspaceReviewVerdict~
+        +reviewFile(filePath, content, options) Promise~PraxisFileReviewVerdict~
+        +reviewDiff(input, options) Promise~PraxisDiffGovernanceResult~
+        +evaluateMergeGate(source, target, hunks) Promise~PraxisMergeGateVerdict~
+    }
+
+    class PraxisReviewClient {
+        -SemanticGraph graph
+        -IPraxisDiffGovernanceService diffService
+        -IPraxisSliceAuditService sliceService
+        -SparseMoEGateRouter sparseRouter
+        +reviewWorkspace(options) Promise~PraxisWorkspaceReviewVerdict~
+        +reviewFile(filePath, content, options) Promise~PraxisFileReviewVerdict~
+        +reviewDiff(input, options) Promise~PraxisDiffGovernanceResult~
+        +evaluateMergeGate(source, target, hunks) Promise~PraxisMergeGateVerdict~
+        +clearSemanticGraph() void
+    }
+
+    class IPraxisPresentationService {
+        <<interface>>
+        +toPresentation(agentPrompt, options) PraxisPresentationPayload
+        +fromSliceVerdict(verdict, target, options) PraxisPresentationPayload
+        +fromScanReport(report, options) PraxisPresentationPayload
+        +auditAndPresent(input, options, callGraph) Promise~PraxisPresentationPayload~
+    }
+
+    class PraxisPresentationAdapter {
+        -IPraxisI18nProvider i18n
+        +toPresentation(agentPrompt, options) PraxisPresentationPayload
+        +fromSliceVerdict(verdict, target, options) PraxisPresentationPayload
+        +fromScanReport(report, options) PraxisPresentationPayload
+        +aggregateOverlappingCards(cards) PraxisDiagnosticCard[]
+    }
+
     class IPraxisDiffGovernanceService {
         <<interface>>
         +reviewDiff(input, options) Promise~PraxisDiffGovernanceResult~
@@ -36,7 +72,14 @@ classDiagram
     class PraxisRollbackEngine {
         +recordCardHunk(cardId, filePath, content, hunk) void
         +revertCard(cardId) CardRollbackResult
+        +revertDiffHunk(hunk) RevertedHunkResult
     }
 
+    PraxisReviewClient ..|> IPraxisReviewClient : implements
+    PraxisPresentationAdapter ..|> IPraxisPresentationService : implements
+    PraxisReviewClient --> IPraxisDiffGovernanceService : delegates diff review
+    PraxisReviewClient --> IPraxisSliceAuditService : delegates slice audit
+    PraxisReviewClient --> IPraxisPresentationService : generates UI payloads
     IPraxisDiffGovernanceService ..> PraxisRollbackEngine : coordinates rollback
     IPraxisSliceAuditService ..> IPraxisDiffGovernanceService : escalates L3A
+    IPraxisMultiAgentGovernanceService ..> PraxisRollbackEngine : triggers LIFO revert on collision

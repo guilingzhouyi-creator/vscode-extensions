@@ -1,162 +1,128 @@
 # 03. Praxis 团队联调操作手册与交付验收矩阵
 
 > **所属层级**：L6 Praxis 团队交付专层 (`docs/06-praxis-delivery/`)  
-> **对应代码真源**：`src/api.ts`、`scripts/validate-praxis-foundation.js`、`scripts/validate-self-slice-audit.js`、`scripts/validate-feedback-adaptive-supervisor.js`
+> **对应代码真源**：[`praxis-review-client.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/praxis-review-client.ts)、[`semantic-correlation.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/presentation/semantic-correlation.ts)、[`presentation-adapter.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/presentation/presentation-adapter.ts)、[`sliceAuditService.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/sliceAuditService.ts)、[`scripts/test-parallel.js`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/scripts/test-parallel.js)
 
 ---
 
 ## 1. 快速接入与环境要求
 
-### 1.1 运行时依赖契约
-
+### 1.1 运行时环境契约
 - **Node.js 版本**：`>= 20.0.0`
-- **构建产物入口**：CommonJS 入口 `dist/api.js`，TypeScript 类型声明入口 `dist/api.d.ts`
-- **原生算子加速（自动探测）**：若 `crates/*/index.node` 存在则自动启用 Rust N-API 原生加速；若在无编译工具链的沙箱环境中运行，`src/core/native/native-bridge.ts` 自动无缝切换至 100% 字节等价的纯 TypeScript 算子实现，调用方无需编写任何平台判断分支。
+- **模块入口**：CommonJS `dist/api.js`，TypeScript 类型声明 `dist/api.d.ts`
+- **Rust N-API 原生算子自动降级**：
+  - 若 `crates/*/index.node` 存在，自动启用 Rust 原生加速；
+  - 若处于无编译环境的沙箱或轻量容器中，[`native-bridge.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/native/native-bridge.ts) 自动无缝降级至 100% 字节等价的纯 TypeScript 算子实现，调用端零感知。
 
 ---
 
-## 2. 端到端集成代码范例
+## 2. 端到端最佳实践：基于 `createPraxisClient` 的双载荷审查
 
-### 2.1 场景一：单 Agent 增量编码切片毫秒级自审与 CAPP 指令生成
-
-```ts
-import {
-    defaultPraxisSliceAuditService,
-    CallGraph,
-} from 'auto-refactor';
-
-async function runAgentInnerLoopAudit() {
-    const callGraph = new CallGraph();
-    callGraph.addEdge('src/controllers/order.ts', 'createOrder', 'src/services/payment.ts', 'chargeCard');
-
-    const sliceInput = {
-        filePath: 'src/services/payment.ts',
-        oldContent: 'export function chargeCard(amount: number): boolean { return amount > 0; }',
-        newContent: 'export function chargeCard(amount: number, currency: string): boolean { return amount > 0; }',
-        changedLines: [1],
-    };
-
-    // 1. 获取结构化切片审计裁决与 Sparse MoE 路由计划
-    const verdict = await defaultPraxisSliceAuditService.auditSlice(sliceInput, callGraph);
-    console.log('Bypass Ratio:', verdict.routingPlan.bypassRatio);
-    console.log('Impact Files:', verdict.callImpact?.affectedCallers);
-
-    // 2. 生成可直接注入 Agent Prompt 的紧凑英文修复指令 (CAPP)
-    const capp = await defaultPraxisSliceAuditService.auditAgentSlice(sliceInput, callGraph);
-    console.log('CAPP Prompt:\n', capp.formattedPrompt);
-}
-```
-
-### 2.2 场景二：多 Agent 并发补丁合入前冲突与循环依赖仲裁
+Praxis 推荐统一使用 [`createPraxisClient`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/praxis-review-client.ts) 进行代码审查，一次调用即可同时获得给 **AI Agent 消费的机器指令** 与给 **人类审查者消费的 UI 诊断卡片**：
 
 ```ts
-import { defaultPraxisMultiAgentGovernanceService } from 'auto-refactor';
+import { createPraxisClient } from 'auto-refactor';
 
-async function arbitrateCellMerge() {
-    const result = await defaultPraxisMultiAgentGovernanceService.reviewMultiAgentPatches(
-        [
-            {
-                agentId: 'agent-alpha',
-                cardId: 'card-101',
-                filePath: 'src/auth/token.ts',
-                beforeContent: 'export const v = 1;',
-                afterContent: 'import { user } from "../user/profile";\nexport const v = 2;',
-                addedImports: [{ from: 'src/auth/token.ts', to: 'src/user/profile.ts' }],
-            },
-            {
-                agentId: 'agent-beta',
-                cardId: 'card-102',
-                filePath: 'src/user/profile.ts',
-                beforeContent: 'export const user = "a";',
-                afterContent: 'import { v } from "../auth/token";\nexport const user = "b";',
-                addedImports: [{ from: 'src/user/profile.ts', to: 'src/auth/token.ts' }],
-            },
-        ],
-        { duplicateWorkThreshold: 0.5 },
-    );
-
-    if (result.verdict !== 'approved') {
-        console.error('Merge Blocked:', result.blockingIssues.map((i) => `${i.rule}: ${i.message}`));
-    }
-}
-```
-
-### 2.3 场景三：流式 Diff 订阅、环形缓冲 R4 冷存转储与卡级原子回滚
-
-```ts
-import {
-    scanDiffStream,
-    CircularDiffBuffer,
-    PraxisRollbackEngine,
-    createDefaultPraxisHooks,
-} from 'auto-refactor';
-
-async function streamAndRollbackDemo() {
-    const rollbackEngine = new PraxisRollbackEngine();
-    const ringBuffer = new CircularDiffBuffer({
-        capacity: 64,
-        flushIntervalMs: 0,
-        onEvictToR4: (payload, archiveId) => {
-            console.log(`Evicted ${payload.byteLength} bytes to R4 archive: ${archiveId}`);
+async function executePraxisReview() {
+    // 1. 初始化客户端实例（配置根路径、默认多智能体上下文与本地化语言）
+    const client = createPraxisClient({
+        root: process.cwd(),
+        defaultLocale: 'zh-CN',
+        defaultCardContext: {
+            cardId: 'card-payment-refactor-01',
+            cellId: 'cell-checkout',
+            agentUid: 'agent-coder-9',
         },
     });
 
-    const oldText = 'const timeout = 1000;\nexport function init() {}\n';
-    const newText = 'const timeout = 5000;\nexport function init() {}\n';
+    // 2. 发起全工作区/增量代码审查
+    const verdict = await client.reviewWorkspace({
+        failOnSeverity: 'warning',
+        includeDualFacedPresentation: true,
+    });
 
-    for await (const event of scanDiffStream(
-        [
-            {
-                kind: 'full',
-                filePath: 'src/net/client.ts',
-                oldContent: oldText,
-                newContent: newText,
-            },
-        ],
-        { praxisHooks: createDefaultPraxisHooks() },
-    )) {
-        if (event.type === 'hunk_ready' && event.hunk) {
-            ringBuffer.push(event.hunk);
-            rollbackEngine.recordCardHunk('card-net-01', 'src/net/client.ts', newText, event.hunk);
-        }
+    console.log(`审查状态: ${verdict.status}`); // 'passed' | 'warning' | 'blocked'
+
+    // 3. 【机器平面消费】直接注入 AI Agent Prompt 上下文
+    if (verdict.directivesMarkdown) {
+        console.log('=== 供 Agent 消费的 Markdown 指令 ===');
+        console.log(verdict.directivesMarkdown);
+    }
+    if (verdict.cappDirectiveText) {
+        console.log('=== 超紧凑 CAPP 单行 DSL ===', verdict.cappDirectiveText);
     }
 
-    // 当下游门禁或集成测试失败时，按任务卡一键逆序原子回滚
-    const rollbackResult = rollbackEngine.revertCard('card-net-01');
-    console.log('Rolled back files:', Array.from(rollbackResult.restoredContents.keys()));
-    ringBuffer.dispose();
+    // 4. 【表现平面消费】渲染至 IDE WebView 或 PR 审查卡片
+    if (verdict.presentationPayload) {
+        const { summaryText, cards } = verdict.presentationPayload;
+        console.log(`=== 表现层概要: ${summaryText} ===`);
+        for (const card of cards) {
+            console.log(`[${card.badgeText}] ${card.file}:${card.line} - ${card.title}`);
+            console.log(`  修复建议: ${card.remediation}`);
+            if (card.correlatedRules && card.correlatedRules.length > 0) {
+                console.log(`  🔗 并查集已合并关联规则: ${card.correlatedRules.join(', ')}`);
+            }
+        }
+    }
 }
 ```
 
 ---
 
-## 3. 交付验收矩阵与自动化门禁脚本清单
+## 3. `SEMANTIC_OVERLAP_GROUPS` 并查集去重消费规范
 
-Praxis 团队在版本升级或 CI 集成验收时，可直接运行以下内置验证套件确认全部交付能力 100% 达标：
+在密集代码重构中，一个局部坏味道往往会并发触发 3~4 条相关规则（例如深层嵌套同时触发圈复杂度、卫语句缺失与扁平化建议）。为了消除开发者认知疲劳，[`semantic-correlation.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/presentation/semantic-correlation.ts) 维护了 **11 组语义重叠规则族**，并在表现层通过并查集算法聚合：
 
-| 验收域 | 验证命令 / 脚本路径 | 核心断言内容 | 验收标准 |
-| :--- | :--- | :--- | :---: |
-| **Diff 算子与五大 SPI 基座** | `npm run validate-praxis`<br/>(`scripts/validate-praxis-foundation.js`) | FNV-1a 行哈希、Myers Diff、Hunk 构建、`CircularDiffBuffer` R4 二进制转储、`L3A` 升级判定、`scanDiffStream` 事件流、Hunk/Card 原子回滚 | 6 大测试块全 PASS |
-| **增量 AST 切片与自审门禁** | `npm run validate-self-slice-audit`<br/>(`scripts/validate-self-slice-audit.js`) | `ASTSliceExtractor` 边界提取、Sparse MoE 激活旁路率、局部切片自审门禁零漏报 | 100% PASS |
-| **反馈自适应权重监督器** | `npm run validate-feedback-adaptive-supervisor`<br/>(`scripts/validate-feedback-adaptive-supervisor.js`) | 事故台账记录、$(W_s, W_d, W_f)$ 凸投影归一化、规则置信度阻尼、模式稳定性加分、快照持久化恢复 | 100% PASS |
-| **变更质量仲裁器** | `npm run validate-change-quality-arbiter`<br/>(`scripts/validate-change-quality-arbiter.js`) | 补丁前后质量分差分、恶化阻断、重构净收益判定 | 100% PASS |
-| **三平面风险融合引擎** | `npm run validate-risk-fusion-engine`<br/>(`scripts/validate-risk-fusion-engine.js`) | 静态评分、动态遥测与演化风险融合计算确定性 | 100% PASS |
-| **智能体配额与可操作性** | `npm run validate-agent-quota-gateway` &<br/>`npm run validate-agent-actionable` | Agent 并发配额限流与 CAPP 提示词可执行性验证 | 100% PASS |
+### 3.1 十一组语义重叠规则族权威清单
+
+```ts
+export const SEMANTIC_OVERLAP_GROUPS: ReadonlyArray<ReadonlySet<string>> = Object.freeze([
+    new Set(['HYG-STB-002', 'GOV-SAN-001']),                              // 1. 空占位符与清理消毒
+    new Set(['NAM-FIL-001', 'GOV-FIL-001']),                              // 2. 文件命名与文件治理
+    new Set(['ARCH-FAC-001', 'ARCH-ABS-001']),                            // 3. 工厂模式与抽象泄漏
+    new Set(['SIM-FLAT-002', 'SIM-GUARD-001', 'CPX-NEST-001', 'CPX-NEST-002']), // 4. 控制流嵌套与扁平卫语句
+    new Set(['HYG-WRAP-001', 'ARCH-FAC-001']),                            // 5. 冗余封装与工厂边界
+    new Set(['HYG-CLN-001', 'CPX-RED-001']),                              // 6. 代码克隆与冗余分支
+    new Set(['SEC-LEAK-001', 'GOV-SAN-001']),                             // 7. 凭据泄露与敏感消毒
+    new Set(['GDM-POOL-001', 'PRF-MEM-001', 'PRF-MEM-002']),              // 8. 对象池与内存瞬态分配
+    new Set(['ARCH-DISP-001', 'ARCH-DSP-002']),                           // 9. 动态分发与调度契约
+    new Set(['NAM-DIR-001', 'ARCH-DIR-001']),                             // 10. 目录命名与架构分层
+    new Set(['NAM-ABR-001', 'NAM-VAG-001']),                              // 11. 模糊缩写与歧义命名
+]);
+```
+
+### 3.2 并查集算法机制与双端消费规范
+1. **坐标匹配与并查集归并**：
+   - 针对相同文件与相同起始行（`file` + `line`）的多条诊断卡片；
+   - 若卡片规则属于同一重叠族，并查集算法执行 `union(cardA, cardB)`。
+2. **主卡选举与元数据保留**：
+   - **严重度权重优先级**：`block (4) > warn (3) > info (2) > pass (1)`；
+   - 选举集合内严重度最高的卡片作为唯一主卡展示，其余次级规则写入主卡的 `correlatedRules: string[]` 元数据。
+3. **双端差异化消费原则**：
+   - **UI 呈现端**：仅渲染主卡，在折叠标签中显示「同时关联：X 规则」，界面清晰清爽；
+   - **Agent 执行端**：底层仍保留完整的 325 条细粒度规则诊断与 `sourceAgentDirective`，确保 AI 智能体拥有 100% 的准确依据以产出无遗漏的补丁。
 
 ---
 
-## 4. 异常处理与降级保障契约
+## 4. 交付验收矩阵与 153/153 自动化门禁
 
-| 异常工况 | 引擎内置自愈与降级策略 | 对 Praxis 调用方的影响 |
-| :--- | :--- | :--- |
-| **语法残缺代码（Agent 编写中途未闭合括号）** | `ASTSliceExtractor` 与词法状态机自动回退至行级括号深度启发式切片 | 永不抛出未捕获语法异常，`auditSlice` 正常返回降级切片诊断 |
-| **守护进程未启动或命名管道受限** | `scanWarm` / `scanDiff` 自动透明回退至进程内冷扫描 (`in-process fallback`) | 报告字节级 100% 一致，仅首次冷扫耗时增加，零中断 |
-| **Native `.node` 二进制缺失或平台不匹配** | `NativeBridge` 自动切换至纯 TypeScript/JS 等价算子 (`native-*-shim.ts`) | 语义与输出 100% 等价（由 `validate-native-parity` 门禁锁死） |
+Praxis 交付以 **153/153 套自动化门禁套件**（148 套独立并行验证套件 + 5 套串行守护进程套件）为刚性验收基线：
+
+| 验收核心域 | 验证命令 / 脚本路径 | 核心断言内容 | 验收标准 |
+| :--- | :--- | :--- | :---: |
+| **规则完整性与注册一致性** | `npm run validate-rules-registry` | 30 个分析器与 325 条注册规则 100% 覆盖无孤儿规则 | **PASS** |
+| **Praxis 统一 SDK 与双载荷** | `npm run validate-praxis-presentation` | `createPraxisClient` 全工作区、单文件、双载荷与 i18n 汉化 | **PASS** |
+| **11 组语义重叠并查集去重** | `npm run validate-dual-faced-presentation` | 验证并查集 `findRoot`/`union` 正确归并，次级规则沉淀到元数据 | **PASS** |
+| **毫秒级切片与 Sparse MoE 路由** | `npm run validate-self-slice-audit` | 单切片执行时延 **< 10ms**，分析器绕过率 $\ge 70\%$ | **PASS** |
+| **Rust N-API 与纯 TS 字节等价性** | `npm run validate-native-parity` | 6 大原生算子与纯 TS Shim 逐字节等价无漂移 | **PASS** |
+| **自研率 CAI 与贝叶斯置信区间** | `npm run validate-autonomy-scorer` | 6 维正交自研率、L1~L5 边界、Jeffreys Beta(0.5, 0.5) 置信下界 | **PASS** |
+| **三平面风险融合与共振放大** | `npm run validate-risk-fusion-engine` | $Risk = S^{1.0} \cdot D^{1.2} \cdot H^{0.8}$，双向确认升级 Critical | **PASS** |
+| **全量自动化测试套件矩阵** | `npm test` | **153/153 全量测试套件并行与串行回归验证** | **153/153 PASS** |
 
 ---
 
 ## 5. 关联文档导航
 
-- [Praxis 团队对接交付总报告 (Executive Handoff)](../PRAXIS_HANDOFF_REPORT.md)
-- [01. Praxis 对接架构全景与五大 SPI 契约手册](./01-praxis-architecture-and-spi-contracts.md)
-- [02. Praxis 六大核心治理服务门面 API 手册](./02-praxis-six-governance-services-api.md)
+- [01. Praxis 对接架构全景与六大 SPI 契约手册](./01-praxis-architecture-and-spi-contracts.md)
+- [02. Praxis 七大核心治理服务与开发者 SDK 门面手册](./02-praxis-six-governance-services-api.md)
+- [PRAXIS_HANDOFF_REPORT.md](../PRAXIS_HANDOFF_REPORT.md)

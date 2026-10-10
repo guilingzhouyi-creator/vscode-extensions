@@ -3,6 +3,7 @@ classDiagram
         +ScanConfig config
         +scan() Promise~ScanReport~
         +scanFiles(files) Promise~Issue[]~
+        +scanDiff(input) Promise~ScanReport~
     }
 
     class DualTrackPipeline {
@@ -20,13 +21,25 @@ classDiagram
     }
 
     class NativeBridge {
-        +computeDominators(edges) number[]
-        +maskSource(source, lang) string
-        +detectClones(tokens) ClonePair[]
+        +maskSourceCode(content, config) NativeMaskedSource
+        +computeHistogramDiff(oldContent, newContent) NativeDiffHunk[]
+        +analyzeDependencyGraph(edges) NativeGraphAnalysis
+        +computeMinHash(content, perms) number[]
     }
 
     class QualityScorer {
         +evaluateQualityScore(issues, stats) QualityScoreAssessment
+        +synthesizeEightPillars(indices) EightPillarBreakdown
+    }
+
+    class RiskFusionEngine {
+        +evaluateIssue(staticRisk, dynamicRisk, history) FusedIssueRisk
+        +fuseIssueRisks(staticRisk, dynamicRisk, factor) FusedIssueRisk
+    }
+
+    class AutonomyScorer {
+        +evaluateProjectAutonomy(fileMetrics, issues, config) AutonomyEvaluation
+        +computeBayesianAutonomyConfidence(score, loc, files) AutonomyConfidence
     }
 
     class PraxisDiffGovernanceService {
@@ -34,9 +47,20 @@ classDiagram
         +enrichHunks(filePath, hunks, graph) ReviewDiffHunk[]
     }
 
+    class PraxisReviewClient {
+        +reviewWorkspace(options) Promise~PraxisWorkspaceReviewVerdict~
+        +reviewFile(filePath, content, options) Promise~PraxisFileReviewVerdict~
+        +reviewDiff(input, options) Promise~PraxisDiffGovernanceResult~
+        +evaluateMergeGate(source, target, hunks) Promise~PraxisMergeGateVerdict~
+    }
+
     Scanner --> DualTrackPipeline : orchestrates
     DualTrackPipeline --> SparseMoEGateRouter : routes analyzers
     Scanner --> SemanticGraph : projects AST
     Scanner --> NativeBridge : accelerates kernels
-    Scanner --> QualityScorer : quantifies 10 pillars
-    PraxisDiffGovernanceService --> SemanticGraph : enriches impact closure
+    Scanner --> QualityScorer : quantifies 10 dimensions
+    Scanner --> RiskFusionEngine : fuses cross-plane risks
+    Scanner --> AutonomyScorer : evaluates CAI 6-dim autonomy
+    PraxisReviewClient --> Scanner : orchestrates review
+    PraxisReviewClient --> PraxisDiffGovernanceService : delegates diff review
+    PraxisReviewClient --> SemanticGraph : queries impact topology

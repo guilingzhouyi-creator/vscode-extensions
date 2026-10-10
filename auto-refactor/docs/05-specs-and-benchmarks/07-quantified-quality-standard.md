@@ -1,157 +1,181 @@
 # 07. 三平面质量量化模型与代码自治度 (CAI) 规范
 
 > **所属层级**：L5 规范、三平面质量度量与性能基准 (`docs/05-specs-and-benchmarks/`)  
-> **对应代码真源**：`src/core/scoring/qualityScorer.ts`、`src/core/scoring/dimensionRuleTable.ts`、`src/core/scoring/fusion-scorer.ts`、`src/core/scoring/autonomy-scorer.ts`、`src/core/dynamic/`、`src/core/evolution/`
+> **对应代码真源**：[`scoringTypes.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/scoring/scoringTypes.ts)、[`eightPillarModel.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/scoring/eightPillarModel.ts)、[`scorer-formulas.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/scoring/scorer-formulas.ts)、[`riskWeightModel.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/scoring/riskWeightModel.ts)、[`risk-fusion-engine.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/scoring/risk-fusion-engine.ts)、[`autonomy-scorer.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/scoring/autonomy-scorer.ts)
 
 ---
 
 ## 1. 三平面质量度量体系全景 (Tri-Plane Quality Architecture)
 
-为了彻底克服传统静态评分「可被空代码稀释刷分、脱离线上运行真实表现、缺乏历史演进视角」的三大缺陷，`auto-refactor` 构建了 **静态平面 ($S$) + 动态运行平面 ($D$) + 演化与反馈平面 ($F$)** 的三平面融合质量模型：
+传统静态代码分析极易被注水代码稀释、脱离线上真实运行时表现、且缺乏历史演进视角。`auto-refactor` 构建了 **静态质量平面 ($S$) + 动态运行平面 ($D$) + 演化反馈平面 ($F$)** 的三平面融合质量模型：
 
 ```mermaid
-flowchart LR
-    subgraph StaticPlane["1. 静态质量平面 (Static Plane - S)"]
-        PILLARS["10 大战略质量支柱<br/>(dimensionRuleTable.ts 单一真源)"]
-        CURVE["倒数型密度饱和曲线<br/>(杜绝注水稀释刷分)"]
-        GEO["加权几何平均短板惩罚<br/>(任一核心支柱崩溃即拉低总分)"]
+flowchart TD
+    subgraph S["1. 静态质量平面 (Static Plane - S)"]
+        D10["10 大细粒度质量维度 (QualityDimension)"] --> P8["8 大战略支柱 (PrimaryQualityPillar)"]
+        P8 --> HYP["双曲饱和衰减模型 (Reciprocal Hyperbolic Saturation)"]
+        HYP --> CEIL["安全暴露面动态天花板 & 致命支柱硬顶"]
+        CEIL --> GEO["加权几何平均综合评分 (Floor = 15)"]
     end
 
-    subgraph DynamicPlane["2. 动态遥测平面 (Dynamic Plane - D)"]
-        COV["测试覆盖率与契约深度 (CBCR / EMTD)"]
-        LAT["运行时 P99 延迟与内存水位 (DynamicEvidenceDTO)"]
+    subgraph D["2. 动态遥测平面 (Dynamic Plane - D)"]
+        HOT["运行时热点调用频次与延迟分布 (P99)"]
+        RES["内存瞬态堆分配与锁竞争压强"]
     end
 
-    subgraph FeedbackPlane["3. 演化与反馈平面 (Feedback Plane - F)"]
-        GIT["Git 历史热点与修改震荡度 (src/core/evolution/)"]
-        SUP["FeedbackAdaptiveSupervisor<br/>(线上事故台账 + 梯度下降权重演化)"]
+    subgraph F["3. 演化反馈平面 (Feedback Plane - F)"]
+        EVO["历史 Churn 震荡度与缺陷修复记录"]
+        SUP["FeedbackAdaptiveSupervisor 动态权重演化"]
     end
 
-    FUSION["三平面风险融合引擎 (fusion-scorer.ts)<br/>Q_total = Ws*S + Wd*D + Wf*F"]
-    CAI["代码自治度评估器 (autonomy-scorer.ts)<br/>Code Autonomy Index (CAI)"]
+    S --> FUSION["三平面非线性风险共振引擎 (RiskFusionEngine)<br/>Risk_i = S_i^α · D_i^β · H_i^γ (α=1.0, β=1.2, γ=0.8)"]
+    D --> FUSION
+    F --> FUSION
+    FUSION --> Q_TOTAL["统一质量综合评级: Q_total = Ws·Qs + Wd·Qd + Wf·Qf"]
 
-    StaticPlane --> FUSION
-    DynamicPlane --> FUSION
-    FeedbackPlane --> FUSION
-    FUSION --> CAI
+    CAI_ENG["客观代码自研率引擎 (AutonomyScorer)<br/>6 维正交自研率 + Jeffreys Beta(0.5, 0.5) 共轭后验"] --> CAI_OUT["代码自治度评估 (CAI 2.0 & L1~L5)"]
 ```
 
 ---
 
-## 2. 静态质量平面：十大战略支柱与数学公式
+## 2. 静态质量平面：十大维度与八大战略支柱映射
 
-### 2.1 十大战略质量支柱 (`scoringTypes.ts`)
+静态分析在底层通过 **10 个细粒度维度 (`QualityDimension`)** 进行精确违规扣分，并在高阶统一汇聚为面向工程决策的 **8 大战略支柱 (`PrimaryQualityPillar`)**：
 
-静态评分覆盖以下 10 个正交质量维度，其规则扣分映射关系 100% 集中定义于单一数据表 `src/core/scoring/dimensionRuleTable.ts`（由 `npm run validate-scoring-coverage` 门禁锁死）：
+### 2.1 维度与支柱映射矩阵 (`DIMENSION_TO_PILLAR_MAP`)
 
-| 维度 ID | 中文名称 | 默认权重 | 关联核心证据分析器 (`DIMENSION_ANALYZERS`) |
-| :--- | :--- | :---: | :--- |
-| `architecture` | 架构拓扑与解耦度 | `0.15` | `architecture`, `dependency-graph`, `dependency-layout`, `data-architecture` |
-| `security` | 安全性与凭证防御 | `0.15` | `security`, `secrets` |
-| `reliability` | 可靠性与错误处理 | `0.12` | `governance`, `hygiene`, `shell-lint` |
-| `performance` | 算法与内存性能 | `0.10` | `performance`, `gdscript-game` |
-| `maintainability` | 可维护性与内聚度 | `0.12` | `complexity`, `large-file`, `structured-clarity`, `simplify` |
-| `testQuality` | 测试现代性与契约覆盖 | `0.10` | `test-modernity` |
-| `codeHygiene` | 代码卫生与命名规范 | `0.08` | `hygiene`, `constants`, `naming` |
-| `modernity` | 语言惯用法现代性 | `0.06` | `ts-modern`, `python-modern`, `rust-modern`, `go-modern`, `gdscript-modern`, `stdlib` |
-| `documentation` | 文档与有效注释密度 | `0.06` | `comments`, `docs` |
-| `techDebtRisk` | 综合技术债风险 | `0.06` | 全分析器严重度回退汇聚 |
+根据 [`eightPillarModel.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/scoring/eightPillarModel.ts) 单一真源，10 大细粒度维度与 8 大战略支柱映射如下：
 
-### 2.2 倒数型密度饱和曲线（防稀释刷分机制）
-
-设某维度 $k$ 的有效违规扣分总和为 $P_k$，有效代码规模归一化因子为 $V_{\text{eff}}$（基于认知成本加权的 Effective KLOC，防止通过塞入大量无分支 getter/setter 稀释分母）。维度得分 $S_k \in (0, 100]$ 采用**无硬截断倒数饱和公式**：
-
-$$D_k = \frac{P_k}{V_{\text{eff}}}, \qquad S_k = \frac{100}{1 + \alpha_k \cdot D_k^{\beta_k}}$$
-
-- **核心数学性质**：当违规密度 $D_k = 0$ 时，$S_k = 100$；随着违规密度上升，$S_k$ 严格单调递减且渐近趋于 $0$，绝不会像线性截断公式那样在扣满 100 分后对后续新增违规失去分辨力。
-
-### 2.3 加权算术-几何混合聚合（短板惩罚律）
-
-为防止「其余 9 个维度满分，但安全维度发生严重密钥泄露（$S_{\text{security}} = 15$）却依然拿到 90+ 高分」的失真现象，静态总分 $S_{\text{static}}$ 結合加权算术平均 $M_{\text{arith}}$ 与加权几何平均 $M_{\text{geom}}$：
-
-$$M_{\text{arith}} = \sum_{k=1}^{10} w_k S_k, \qquad M_{\text{geom}} = \prod_{k=1}^{10} \left(\max(S_k, \epsilon)\right)^{w_k}$$
-
-$$S_{\text{static}} = (1 - \lambda) \cdot M_{\text{arith}} + \lambda \cdot M_{\text{geom}}$$
-
-当任一关键支柱得分跌破红线时，几何平均项迅速拉低整体得分，强制优先偿还核心短板。
-
-### 2.4 历史演化轨迹速度与 Churn 阻尼模型 (Trajectory Quality Velocity)
-
-在评估重构历史与 Bad-to-Good 轨迹时，若仅计算简单的得分差值 $\Delta S = S_{\text{after}} - S_{\text{before}}$，容易使破坏性的大范围代码重写（高 Code Churn）掩盖稳定性风险。为此系统引入**反向 Churn 阻尼速度公式**：
-
-$$\Delta Q_{\text{velocity}} = (S_{\text{after}} - S_{\text{before}}) \cdot \frac{1}{1 + \gamma \cdot \text{churnRatio}}$$
-
-- 其中 $\text{churnRatio} = \frac{\Delta \text{LOC}_{\text{modified}} + \Delta \text{LOC}_{\text{deleted}}}{\text{LOC}_{\text{total}}}$，$\gamma = 0.5$（默认阻尼系数）。
-- **性质**：净收益相同时，改动局部、低侵入性的重构获得最高演进速度得分；大范围高扰动改动将受到阻尼衰减惩罚。
-
-### 2.5 重构配方泛化指数 (Recipe Generalization Index)
-
-对于提取出的重构配方 $R$，其跨项目复用价值与可信度由**支持度比率、熵分散度与平均质量增益**联合决定：
-
-$$G(R) = \left(\frac{N_{\text{support}}}{N_{\text{trials}}}\right) \cdot (1 - H_{\text{norm}}) \cdot \max(0, \overline{\Delta S})$$
-
-- $H_{\text{norm}} \in [0, 1]$ 为结果分布的归一化信息熵，低熵代表跨文件应用时效果稳定可复现。
-
-### 2.6 参数团簇二次方惩罚与间接开销效用模型 (Parameter Clump & Indirection Utility)
-
-1. **参数团簇二次方惩罚（$P_{\text{clump}}$）**：
-   $$P_{\text{clump}} = \max(0, N_{\text{params}} - \theta)^2 \cdot \sqrt{\text{CC}}$$
-   *当参数量超过阈值 $\theta = 4$ 时，惩罚以二次方递增并受控制流圈复杂度 $\text{CC}$ 加权，倒逼向 DTO 演进。*
-
-2. **架构内聚与间接开销效用比（$U_{\text{arch}}$）**：
-   $$U_{\text{arch}} = \frac{\text{Cohesion}(\mathcal{F})}{1 + \alpha \cdot \text{Depth}_{\text{indirection}} + \beta \cdot \text{Alloc}_{\text{overhead}}}$$
-   *防止为了拆分而过度抽象造成贫血对象与深层间接委托栈，保持参数化与函数性能的动态平衡。*
-
-### 2.7 循环热路径堆分配与对象池守恒律 (Allocation Pressure & Pool Conservation)
-
-1. **热循环瞬态堆分配指数（$P_{\text{alloc}}$）**：
-   $$P_{\text{alloc}} = N_{\text{alloc}} \cdot (\text{nestingDepth} + 1)^2$$
-   *循环内每次 `.new()` 或瞬态堆分配，随循环嵌套深度以二次方激增惩罚。*
-
-2. **对象池生命周期守恒度（$\Phi_{\text{pool}}$）**：
-   $$\Phi_{\text{pool}} = \frac{N_{\text{acquire}} - N_{\text{escapes}}}{N_{\text{acquire}}} \cdot \mathbb{I}(\text{hasResetState})$$
-   *必须具备完整 `reset_state()` 状态重置方可获得池化有效性积分，杜绝复用脏数据与外部悬挂引用。*
-
-### 2.8 Hook 解耦、并发 CAS、数据纯度与缓存自愈公式
-
-| 指标名称 | 数学公式 | 业务与架构内化含义 |
-| :--- | :--- | :--- |
-| **Hook 配置解耦率** ($R_{\text{hook}}$) | $R_{\text{hook}} = \frac{N_{\text{hook}}}{N_{\text{hook}} + N_{\text{hardcode}}}$ | 衡量核心链路流转由配置 Hook 驱动的比例，杜绝下游分支硬编码。 |
-| **并发重入安全指数** ($S_{\text{cas}}$) | $S_{\text{cas}} = \frac{N_{\text{guarded}}}{N_{\text{total\_async}}}$ | 异步状态机与退出流程中受原子 CAS/短路标志保护的覆盖比率。 |
-| **数据流纯度分数** ($H_{\text{purity}}$) | $H_{\text{purity}} = \max(0, 1 - \frac{N_{\text{escaped}}}{N_{\text{edges}}})$ | 全链路 DTO 与上下文在跨域流转中无意外变异与引用逃逸的纯度。 |
-| **缓存保鲜与防御度** ($C_{\text{cache}}$) | $C_{\text{cache}} = \frac{N_{\text{versioned}}}{N_{\text{total}}} \cdot (1 - \text{LeakRatio})$ | 静态单例缓存支持版本校验与自愈失效钩子且无直接字典外露的健康度。 |
-| **DTO 向后兼容指数** ($B_{\text{compat}}$) | $B_{\text{compat}} = \frac{N_{\text{bridged}}}{N_{\text{refactored}}}$ | 参数封装为 DTO 时具备 1-to-N 参数静态工厂与重载桥接的平滑度。 |
-| **模式接地一致性率** ($G_{\text{ground}}$) | $G_{\text{ground}} = \frac{N_{\text{grounded}}}{N_{\text{total\_domain}}}$ | 路由字面量、配置键与 Hook 标识符在 Schema 中严格登记的接地率。 |
-
-### 2.9 Bad-to-Good 典型架构演化配方全集
-
-| 配方标识 | 配方名称 | 典型 Bad 模式 | 规范 Good 模式 | 对应转换算子 |
-| :--- | :--- | :--- | :--- | :--- |
-| `REC-SPLIT` | 长函数子任务拆分 | 40+ 行包含折扣、税率、运费等的多分支单体函数 | 拆分为独立高内聚纯函数子例程与简洁编排器 | `split-function` |
-| `REC-PARAM` | 选项参数对象封装 | 5+ 个散落的位置标量参数签名 | 聚合为结构化 Options / Config 接口 | `introduce-parameter-object` |
-| `REC-STRAT` | 条件分支转策略分发 | 膨胀的 `switch/case` 或 `elif` 分支串 | 声明式策略映射字典 (`Record<string, Handler>`) | `extract-strategy` |
-| `REC-GUARD` | 防御性边界守卫注入 | 缺少入参非空与异常保护的裸调用 | 顶层提前退出 Guard 与安全异常捕获边界 | `inject-null-guard` |
-| `REC-POOL` | 静态对象池与状态重置 | 循环高频触发 `.new()` / `.duplicate(true)` 造成 GC 抖动 | 静态有界对象池 + `acquire/release` + `reset_state` | `introduce-object-pool`<br/>`inject-reset-state` |
-| `REC-CAS` | 状态机 CAS 防重入守卫 | 异步与事件触发中缺少并发互斥标志导致状态撕裂 | 引入原子 `_is_executing` 布尔锁与入口短路防御 | `inject-cas-guard` |
-| `REC-HOTCFG` | 配置缓存自愈与版本重载 | 高频调用 `GameConfig.get_*` 直查配置字典 | 静态版本化缓存 + `invalidate_cache()` 失效钩子 | `inject-cache-invalidation` |
-| `REC-DTO` | 强类型 Context DTO 聚合 | 业务服务接口层 6+ 个标量入参形成 Data Clump | 聚合为强类型 Context DTO 并提供向后兼容桥接重载 | `introduce-dto-context` |
-| `REC-HOOK` | 流程生命周期 Hook 解耦 | 流程引擎中以 `if step == 1/2/3` 硬编码下游流转 | 统一向 `HookRegistry` 分发上下文，由配置 Hook 驱动 | `inject-hook-dispatch` |
+| 八大战略支柱 (`PrimaryQualityPillar`) | 默认权重 | 汇聚归属的细粒度维度 (`QualityDimension`) | 核心评估关注点 |
+| :--- | :---: | :--- | :--- |
+| **`architecture`** | `0.15` | `architectureConsistency` | 模块单向依赖解耦、循环导入拦截、架构边界纯度 |
+| **`maintainability`** | `0.15` | `maintainability` | 单函数圈复杂度、单文件物理/有效代码行、深度嵌套 |
+| **`performance`** | `0.15` | `performanceEfficiency` | 循环内瞬态分配、低效算法复杂度、大对象无界膨胀 |
+| **`data`** | `0.10` | `duplication`, `semanticPurity` | 重复字面量治理、常量单源拓扑、数据流纯度与无逃逸 |
+| **`testing`** | `0.15` | `modernity` (或测试契约覆盖) | 测试框架现代性、同义反复断言拦截、跳过测试项治理 |
+| **`reliability`** | `0.10` | `semanticPurity`, `techDebtRisk` | 异常安全、空值防护、全局技术债风险收敛 |
+| **`security`** | `0.10` | `codeSecurity` | 敏感密钥硬编码拦截、未转义注入防御、客户端暴露面 |
+| **`extensibility`** | `0.10` | `standardization`, `commentQuality`, `duplication` | 代码规范性、六字段模块头、ECD-C 有效注释密度 |
 
 ---
 
-## 3. 动态平面、演化平面与代码自治度 (CAI)
+## 3. 静态评分数学内核：衰减、天花板与几何平均
 
-1. **动态遥测注入 (`DynamicEvidenceDTO` & `src/core/dynamic/`)**：
-   - 通过 `--telemetry <path>` 或编程式 `telemetryData` 注入单元/集成测试覆盖率、运行时热路径延迟分布与异常崩溃计数；
-   - `RiskFusionEngine` (`src/core/scoring/fusion-scorer.ts`) 将静态复杂度热点与动态低覆盖/高延迟热点做交叉乘积放大，精准定位高危代码区。
-2. **代码自治度指数 (`AutonomyScorer` — Code Autonomy Index, CAI)**：
-   - 位于 `src/core/scoring/autonomy-scorer.ts`，综合度量一个代码库对「AI 智能体自主安全演进」的友好程度；
-   - 评估五大自治支柱：**契约明确度（Type & Header Clarity）**、**模块隔离度（Blast Radius Containment）**、**自检守卫完备度（Self-Verification Guards）**、**诊断可操作性（Agent Actionability）** 与 **回滚原子性（Rollback Safety）**，输出 `L1`（人工重度辅助）至 `L5`（全闭环无人值守演进）的自治等级评定。
+### 3.1 双曲饱和衰减模型 (Hyperbolic Saturation Decay)
+
+为了消除传统线性扣分「超量扣分直接跌穿 0 分导致失真」以及负指数衰减在极端负债下缺乏区分度的弊端，[`scorer-formulas.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/scoring/scorer-formulas.ts) 采用**倒数型双曲饱和衰减公式**：
+
+$$\text{density} = \frac{\text{rawPoints}}{\text{effectiveScale}}, \qquad \text{Score} = \frac{\text{DIMENSION\_MAX\_SCORE} \times \text{SATURATION\_HALFPOINT}}{\text{SATURATION\_HALFPOINT} + \text{density}}$$
+
+- **核心常数**：$\text{DIMENSION\_MAX\_SCORE} = 100$，半饱和密度常数 $\text{SATURATION\_HALFPOINT} = 30$；
+- **数学性质**：
+  - 当无任何扣分时（$\text{density} = 0$），$\text{Score} = 100$；
+  - 当违规密度恰好达到半饱和点（$\text{density} = 30$）时，$\text{Score} = 50.0$；
+  - 当负债密度趋向于无穷大时，得分单调渐近趋于 $0$，严格维持单调序，绝不提前死锁在 0 分。
+
+### 3.2 安全暴露面动态天花板与致命支柱硬顶 (Ceilings)
+
+1. **安全暴露面动态天花板 (`computeSecurityCeiling`)**：
+   干净代码的安全上限绝非盲目给满 100 分，而是根据 API 攻击暴露面动态测定：
+   $$\text{expTerm} = 0.6 \cdot \min\left(1.0, \frac{\text{expSymbols}}{30}\right), \quad \text{locTerm} = 0.4 \cdot \min\left(1.0, \frac{\text{lines}}{500}\right)$$
+   $$\text{discount} = 0.5 \cdot (\text{expTerm} + \text{locTerm}), \quad \text{securityCeiling} = 100.0 - \text{discount} \in [99.50, 100.00]$$
+   安全得分在天花板基础上直接扣减违规：$\text{Score}_{\text{security}} = \max(0, \text{securityCeiling} - \text{rawPoints})$。
+
+2. **致命支柱硬顶约束 (`PillarCeilingConstraint`)**：
+   当出现不可宽恕的架构硬伤时，强制对所在支柱施加最高分上限，彻底杜绝被海量水代码稀释：
+   - **架构致命违规**（如跨层逆向穿透）：$\text{MaxScore}_{\text{architecture}} \le 40$；
+   - **性能致命违规**（如超高复杂度死循环）：$\text{MaxScore}_{\text{performance}} \le 45$；
+   - **安全致命违规**（如高危明文密钥泄露）：$\text{MaxScore}_{\text{security}} \le 30$。
+
+### 3.3 加权几何平均短板惩罚律 (Weighted Geometric Mean)
+
+为贯彻「一处崩塌即全盘警惕」的短板惩罚哲学，静态综合得分采用加权几何平均，设定刚性下限 $\text{COMPOSITE\_INDEX\_FLOOR} = 15$：
+
+$$\text{CompositeScore} = \exp\left( \frac{\sum_{i \in \text{Evaluated}} w_i \ln\left(\max(15, \text{index}_i)\right)}{\sum_{i \in \text{Evaluated}} w_i} \right)$$
+
+- **短板放大效应**：若 9 个维度满分 100，但 1 个核心维度因致命缺陷跌入 15 分下限，算术平均仍高达 91.5（掩盖危机），而加权几何平均将直接暴跌至 75 分以下，强制倒逼解决根本缺陷。
 
 ---
 
-## 4. 关联文档导航
+## 4. 三平面风险融合引擎与非线性共振模型
 
-- [01. 四层规则金字塔、26 个内置分析器与 243 条全量规则字典](../04-analyzers-and-rules/01-builtin-rules.md)
-- [02. Praxis 六大核心治理服务门面 API 手册](../06-praxis-delivery/02-praxis-six-governance-services-api.md)
+[`risk-fusion-engine.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/scoring/risk-fusion-engine.ts) 实现了静态分析、运行时遥测与历史演化的跨平面共振：
 
+$$Risk_i = S_i^{\alpha} \cdot D_i^{\beta} \cdot H_i^{\gamma}$$
+
+- **默认指数敏感度系数**：
+  $$\alpha = 1.0 \quad (\text{静态推理基准}), \qquad \beta = 1.2 \quad (\text{动态事实优先倾斜}), \qquad \gamma = 0.8 \quad (\text{历史缺陷敏感度})$$
+
+### 4.1 跨平面三相仲裁逻辑
+1. **双向印证共振放大 (Dual Confirmation)**：
+   若静态风险 $S_i \ge 3.0$ 且动态热点 $D_i \ge 3.0$，判定为线上真实热路径高危缺陷，风险乘以 **$1.3\times$**，融合分 $\ge 12.0$ 即连带升级为 **`critical`**。
+2. **单向冷路径噪声抑制 (Single-Sided Dampening)**：
+   若静态显示高复杂度（$S_i \ge 2.0$），但动态遥测证实为极低频冷路径（$D_i \le 0.5$），风险施加 **$0.35\times$** 抑制折扣，自动降级为 `low` 或 `informational`。
+3. **隐蔽运行时瓶颈捕获 (Hidden Bottleneck)**：
+   若静态评分由于表面简单未扣分（$S_i \le 1.0$），但运行时出现严重锁竞争或延迟尖刺（$D_i \ge 5.0$），强制上调风险，捕获隐蔽瓶颈。
+
+### 4.2 统一多维综合质量评分 ($Q_{total}$)
+
+$$Q_{\text{total}} = W_s \cdot Q_s + W_d \cdot Q_d + W_f \cdot Q_f$$
+
+自适应权重向量 $W = (W_s, W_d, W_f)$ 根据项目领域动态微调：
+- 核心框架库：$W_s = 0.55, W_d = 0.30, W_f = 0.15$；
+- 密集算法库：$W_s = 0.35, W_d = 0.50, W_f = 0.15$；
+- 遥测缺失环境自动退化：$W_s = 0.85, W_d = 0.00, W_f = 0.15$。
+
+---
+
+## 5. 客观代码自研率指数 (Code Autonomy Index — CAI 2.0)
+
+废黜任何主观虚构的定性指标，[`autonomy-scorer.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/scoring/autonomy-scorer.ts) 建立了**基于代码真源与依赖拓扑的纯客观六大正交自研率模型**：
+
+### 5.1 六大正交自研率维度 (`AutonomyDimensions`)
+
+| 维度标识符 | 数学代号 | 归一化权重 | 计算公式与测量物理量纲 |
+| :--- | :---: | :---: | :--- |
+| **`effectiveLocAutonomy`** | $R_{\text{loc}}$ | `0.30` | $\frac{\text{ELOC}_{\text{proprietary}}}{\text{ELOC}_{\text{proprietary}} + \text{ELOC}_{\text{vendor}} + \text{ELOC}_{\text{generated}}} \times 100$ |
+| **`symbolCallAutonomy`** | $R_{\text{call}}$ | `0.20` | $\frac{\text{Calls}_{\text{internal}}}{\text{Calls}_{\text{internal}} + \text{Calls}_{\text{external\_sdk}}} \times 100$ |
+| **`domainKernelDensity`** | $R_{\text{domain}}$ | `0.15` | $\frac{\text{ELOC}_{\text{core\_domain}}}{\text{ELOC}_{\text{proprietary}}} \times 100$（算法与核心业务逻辑占比） |
+| **`codeOriginality`** | $R_{\text{pure}}$ | `0.15` | $\max(0, 100 - \min(30, N_{\text{clones}} \times 1.5))$（扣除大块无序复制代码） |
+| **`supplyChainResilience`** | $R_{\text{supply}}$ | `0.10` | 抵抗外部传递依赖爆炸：$100 - (d \cdot 0.5 + \sqrt{t} \cdot 0.8 + \max(0, \text{depth}-1) \cdot 2.0)$ |
+| **`criticalPathAutonomy`** | $R_{\text{critical}}$ | `0.10` | 安全/鉴权/加密/主分发核心路径中自研符号调用比例 |
+
+$$\text{CAI} = \sum_{k=1}^6 w_k R_k \in [0.0, 100.0]$$
+
+### 5.2 五级自治度等级划分 (`AutonomyGrade`)
+
+根据综合自研率得分判定严格定性等级：
+
+| 自治等级 | 得分阈值 | 行业定性与架构特征 |
+| :--- | :---: | :--- |
+| **`L5_INDEPENDENT`** | $\ge 95.0$ | **完全自主研发**：核心算法与领域模型 100% 自研，极度轻量且精准的外部依赖 |
+| **`L4_HIGH_AUTONOMY`** | $\ge 85.0$ | **高自主度**：核心业务内核自主实现，规范集成标准开源生态 |
+| **`L3_BALANCED`** | $\ge 70.0$ | **均衡依赖**：核心业务自研，与主流框架和云平台中度深度绑定 |
+| **`L2_FRAMEWORK_DEPENDENT`** | $\ge 50.0$ | **框架依赖型**：实质性业务逻辑作为第三方 SDK 胶水代码存在 |
+| **`L1_SHALLOW_WRAPPER`** | $< 50.0$ | **浅层封装型**：以接口转发与第三方实现套壳为主，自研价值极低 |
+
+### 5.3 严格贝叶斯置信区间 (Jeffreys Beta Conjugate Prior)
+
+为了防止「仅有单个文件的小项目因无第三方依赖直接虚标为 L5 独立项目」，引擎引入无信息无偏的 **Jeffreys 先验 $\text{Beta}(0.5, 0.5)$** 计算 $95\%$ 置信区间：
+
+1. **样本充分度比率 ($S$)**：
+   $$S = \left(1 - e^{-\frac{\text{effectiveLoc}}{4000}}\right) \cdot \left(1 - e^{-\frac{\text{totalFiles}}{8}}\right) \in [0.0, 1.0]$$
+   当 $S < 0.45$ 时，显式打标 `isLowConfidence = true`。
+
+2. **共轭后验分布更新**：
+   - 有效样本量：$N_{\text{eff}} = \max\left(2, \operatorname{round}\left(\frac{\text{effectiveLoc}}{100} + \text{Calls}_{\text{total}}\right)\right)$；
+   - 观测胜率：$p = \frac{\text{CAI}}{100}$，观测正样本 $k = p \cdot N_{\text{eff}}$；
+   - 后验参数：$\alpha = k + 0.5, \quad \beta = N_{\text{eff}} - k + 0.5$；
+   - 后验均值与可信平滑分：$\text{CredibleScore} = \frac{\alpha}{\alpha + \beta} \times 100$。
+
+3. **95% 置信上下界导出**：
+   $$\text{Var} = \frac{\alpha \beta}{(\alpha + \beta)^2 (\alpha + \beta + 1)}, \qquad \text{Margin} = 1.95996 \cdot \sqrt{\text{Var}} \times 100$$
+   $$\text{LowerBound} = \max(0.0, \text{CredibleScore} - \text{Margin}), \quad \text{UpperBound} = \min(100.0, \text{CredibleScore} + \text{Margin})$$
+
+---
+
+## 6. 关联文档导航
+
+- [01. 配置模式与多格式报告契约](./01-config-and-reports.md)
+- [02. 全维性能基准与原生算子加速台账](./02-performance-benchmarks.md)
+- [03. 规范文件头与有效注释密度 (ECD-C) 规范](./03-comment-and-header-standard.md)

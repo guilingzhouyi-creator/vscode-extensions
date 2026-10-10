@@ -1,73 +1,60 @@
-# 01. Praxis 对接架构全景与五大 SPI 契约手册
+# 01. Praxis 对接架构全景与六大 SPI 契约手册
 
 > **所属层级**：L6 Praxis 团队交付专层 (`docs/06-praxis-delivery/`)  
-> **对应代码真源**：`src/core/praxis/contracts.ts`、`src/core/praxis/defaults.ts`、`src/core/praxis/semanticEnricher.ts`、`src/core/praxis/index.ts`
+> **对应代码真源**：[`contracts.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/contracts.ts)、[`defaults.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/defaults.ts)、[`presentation-types.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/presentation/presentation-types.ts)、[`presentation-adapter.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/presentation/presentation-adapter.ts)、[`semanticEnricher.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/semanticEnricher.ts)
 
 ---
 
-## 1. 设计目标与架构定位
+## 1. 设计目标与底层完备-表现去重双层解耦公理
 
-`auto-refactor` 为 Praxis 多智能体（Multi-Agent）/ 多工作单元（Multi-Cell）研发体系提供了一套**零编译器阻塞、强类型约束、支持毫秒级流式治理与卡级原子回滚**的扩展子系统。
+`auto-refactor` 为 Praxis 多智能体（Multi-Agent）与分形工作单元（Multi-Cell）研发体系提供了一套**高内聚、接口驱动、双面呈现（Dual-Faced）的治理子系统**。
 
-核心设计遵循三条工程不变量：
-
-1. **契约与实现彻底解耦**：`src/core/praxis/contracts.ts` 仅声明编译期 TypeScript 接口与类型别名，零运行时开销，确保 Praxis 各业务 Cell 可按需注入自定义适配器或直接使用内置默认实现。
-2. **双向语义对齐**：将底层行级差分（`AttributedDiffLine` / `ReviewDiffHunk`）与顶层跨语言语义图（`SemanticGraph` / `CallGraph` / `ModuleDependencyGraph`）自动缝合，使每个 Diff Hunk 均携带外围符号作用域与跨文件逆向影响闭包。
-3. **两级门禁与三级回滚联动**：支持小规模低风险变更自动放行或原位修复（`minor_fix_needed`），对越界或破坏性变更自动触发 `L3A` 架构仲裁升级（`shouldEscalateToL3A: true`），并支持按 Hunk、按 TaskCard 乃至按依赖链的一键原子回滚。
+核心设计严格贯彻 **底层差分 AST 完备性与表现层去重双层解耦公理 (Dual-Faceted Decoupling Axiom)**：
 
 ```mermaid
-flowchart LR
-    subgraph PraxisCell["Praxis 执行与审查单元 (Cells)"]
-        CARD["PraxisCardContext<br/>(Card / Cell / Agent UID)"]
-        PATCH["DiffInput / AgentPatchSlice"]
+flowchart TD
+    DIFF["原始补丁与代码输入 (DiffInput / AST Slice)"] --> CORE["auto-refactor 核心差分与语法分析底座"]
+    
+    subgraph MachinePlane["【底层机器平面】100% 完整性保真 (Machine Fidelity)"]
+        AST_COMPLETE["完整差分 AST 语法证据<br/>(保留全量行号/列号/325 规则全集)"]
+        CAPP["CAPP 紧凑指令流 (Compact Agent Prompt)"]
     end
-
-    subgraph SPI["五大核心 SPI 扩展端口 (src/core/praxis/contracts.ts)"]
-        SPI1["1. IPraxisAttributionResolver<br/>身份与任务卡溯源"]
-        SPI2["2. IPraxisContextEnricher<br/>AST/LSP 作用域与闭包富集"]
-        SPI3["3. IPraxisThresholdPolicy<br/>熔断阈值与 L3A 升级策略"]
-        SPI4["4. IPraxisHumanFaceStorage<br/>环形缓冲与 R4 二进制淘汰"]
-        SPI5["5. IPraxisRollbackGatekeeper<br/>分形分支门禁与原子回滚"]
+    
+    subgraph HumanPlane["【表现层 UI 平面】认知抗疲劳聚合 (Human Ergonomics)"]
+        UNION_FIND["并查集语义聚合 (11 组 SEMANTIC_OVERLAP_GROUPS)"]
+        CARDS["富文本本地化诊断卡片 (PraxisDiagnosticCard)"]
     end
-
-    subgraph Engine["auto-refactor 核心引擎底座"]
-        SEM["SemanticGraph & CallGraph"]
-        RING["CircularDiffBuffer"]
-        RBK["PraxisRollbackEngine"]
-    end
-
-    CARD --> SPI1
-    PATCH --> SPI2
-    SPI1 --> SPI3
-    SPI2 --> SPI3
-    SPI2 <--> SEM
-    SPI3 --> SPI4
-    SPI3 --> SPI5
-    SPI4 <--> RING
-    SPI5 <--> RBK
+    
+    CORE --> AST_COMPLETE
+    AST_COMPLETE --> CAPP
+    CAPP --> IPres["表现层适配器 SPI (IPraxisPresentationService)"]
+    IPres --> UNION_FIND
+    UNION_FIND --> CARDS
+    UNION_FIND -.->|将次级违规聚拢至| META["correlatedRules 元数据列表"]
 ```
+
+1. **机器平面（底层保真）**：底层静态分析引擎维持 100% 规则检出完备性与 AST 细节，严禁在扫描阶段做粗暴丢弃，确保 Agent 执行自动化重构时具备完整无损的结构上下文。
+2. **表现平面（人读降噪）**：人类审查者极易在同位置并发的多条重叠诊断前产生认知疲劳。表现层 SPI 经由并查集对同坐标关联规则执行聚合成单张主卡，将次级规则沉淀至 `correlatedRules` 元数据中，实现「既不丢失底层诊断，又让人眼审查清爽高效」。
 
 ---
 
 ## 2. 核心领域数据模型
 
-### 2.1 动态任务卡上下文 (`PraxisCardContext<TMeta>`)
+### 2.1 任务卡上下文 (`PraxisCardContext<TMeta>`)
 
-用于在多智能体并发流水线中标识任意代码变更的归属单元与级联依赖关系：
+在多智能体流水线中精准标定每一次修改的单元归属与追溯链路：
 
 | 字段名 | 类型 | 必填 | 语义说明 |
 | :--- | :--- | :---: | :--- |
 | `cardId` | `string` | 是 | 任务卡全局唯一标识（例如 `card-auth-refactor-042`） |
-| `cardType` | `string` | 否 | 动态卡片类型（如 `'build'` \| `'review'` \| `'test'` \| `'refactor'`） |
-| `cellId` | `string` | 是 | 所属 Praxis 工作单元（Cell）标识 |
-| `agentUid` | `string` | 是 | 执行本次修改的智能体唯一标识（如 `'agent-coder-alpha'`） |
-| `checkpointId` | `string` | 否 | 关联的会话检查点快照 ID，用于级联回滚锚定 |
-| `parentCardIds` | `string[]` | 否 | 上游父任务卡 ID 列表，回滚本卡时可据此推导下游级联撤回范围 |
-| `customData` | `TMeta` | 否 | 业务方自定义泛型载荷，引擎在流转与回放过程中无损透传 |
+| `cardType` | `string` | 否 | 动态卡片类别（`'build'` \| `'review'` \| `'test'` \| `'refactor'`） |
+| `cellId` | `string` | 是 | 所属 Praxis 工作单元（Cell）编号 |
+| `agentUid` | `string` | 是 | 执行本次代码修改的智能体唯一 ID（如 `'agent-coder-alpha'`） |
+| `checkpointId` | `string` | 否 | 关联的会话快照标识，用于锚定多文件原子回滚点 |
+| `parentCardIds` | `string[]` | 否 | 上游父卡 ID 列表，回滚本卡时级联推导下游受影响任务 |
+| `customData` | `TMeta` | 否 | 业务端自定义扩展元数据，引擎在全流程中透明无损传递 |
 
-### 2.2 溯源差分行 (`AttributedDiffLine<TMeta>`) 与审查块 (`ReviewDiffHunk<TMeta>`)
-
-`computeDetailedHunks` 与 `PraxisDiffGovernanceService` 将原始文本对比转化为具备符号上下文与风险度量的结构化 Hunk：
+### 2.2 溯源差分行 (`AttributedDiffLine`) 与审查块 (`ReviewDiffHunk`)
 
 ```ts
 export interface AttributedDiffLine<TMeta = Record<string, unknown>> {
@@ -99,132 +86,76 @@ export interface ReviewDiffHunk<TMeta = Record<string, unknown>> {
 }
 ```
 
-### 2.3 审查裁决载荷 (`PraxisVerdict`)
-
-| 字段名 | 类型 | 说明 |
-| :--- | :--- | :--- |
-| `status` | `'passed' \| 'minor_fix_needed' \| 'major_rework_needed'` | 门禁三级状态：通过 / 局部微调 / 重大返工 |
-| `isMajorChange` | `boolean` | 变更规模或影响面是否跨越主干安全阈值 |
-| `shouldEscalateToL3A` | `boolean` | 是否必须上报至 Praxis `L3A` 首席架构仲裁节点 |
-| `targetCallbackChannel` | `string` | 异步审查回调路由通道名 |
-| `suggestedPatch` | `string` | 自动生成的修复补丁或重构建议片段 |
-| `violations` | `string[]` | 命中的规范化规则 ID 与违规摘要列表 |
-
 ---
 
-## 3. 五大 SPI 扩展插槽详解
+## 3. 六大 SPI 扩展插槽契约规范
 
-### 3.1 插槽一：动态身份与任务卡溯源 (`IPraxisAttributionResolver`)
+Praxis 各业务 Cell 可按需实现以下六大核心 SPI 扩展端口，未显式注入时引擎自动启用内置默认实现：
 
-- **职责**：根据文件路径与行号区间 `{ startLine, endLine }`，实时反查当前修改归属的 `PraxisCardContext`。
-- **接口签名**：
-  ```ts
-  export interface IPraxisAttributionResolver<TMeta = Record<string, unknown>> {
-      resolveAttribution(
-          filePath: string,
-          lineSpan: { startLine: number; endLine: number },
-      ): Promise<PraxisCardContext<TMeta> | null> | PraxisCardContext<TMeta> | null;
-  }
-  ```
-- **内置实现**：`DefaultPraxisAttributionResolver`（维护内存态区间映射表，支持 `registerAttribution` 动态注入任务卡归属）。
-
-### 3.2 插槽二：AST 与跨文件语义富集器 (`IPraxisContextEnricher`)
-
-- **职责**：为单个 `ReviewDiffHunk` 注入所在函数/类符号名（`enclosingSymbol`）、符号类别（`symbolKind`）、外围语法作用域范围（`scopeRange`）以及跨文件逆向依赖闭包（`impactFiles`）。
-- **接口签名**：
-  ```ts
-  export interface IPraxisContextEnricher {
-      enrichHunk(
-          filePath: string,
-          hunk: ReviewDiffHunk,
-      ): Promise<PraxisEnrichedContext> | PraxisEnrichedContext;
-  }
-  ```
-- **内置双实现**：
-  - `DefaultPraxisContextEnricher`：基于正则与轻量启发式词法扫描，零语法树构建开销，适合极速流式预览。
-  - `SemanticPraxisContextEnricher`（位于 `src/core/praxis/semanticEnricher.ts`）：深度绑定 `SemanticGraph`，精准提取跨语言符号边界并调用 `graph.getBackwardImpact(filePath, symbolName)` 计算真实下游受影响文件集合。
-
-### 3.3 插槽三：熔断阈值与 L3A 升级策略 (`IPraxisThresholdPolicy`)
-
-- **职责**：综合评估 Hunk 的增删行数、作用域敏感度与逆向冲击半径，判定是否触发 `L3A` 架构审查升级。
-- **接口签名**：
-  ```ts
-  export interface IPraxisThresholdPolicy {
-      evaluateChange(
-          filePath: string,
-          hunk: ReviewDiffHunk,
-          context: PraxisEnrichedContext,
-      ): Promise<PraxisVerdict> | PraxisVerdict;
-  }
-  ```
-- **内置实现**：`DefaultPraxisThresholdPolicy`（当单 Hunk 变更行数超限或受影响下游文件数超阈值时，自动置 `isMajorChange = true` 且 `shouldEscalateToL3A = true`）。
-
-### 3.4 插槽四：人机界面环形缓冲与 R4 冷存淘汰 (`IPraxisHumanFaceStorage`)
-
-- **职责**：配合 `CircularDiffBuffer` 管理人读审查界面的高吞吐 Diff 块驻留，并在容量溢出时将最旧 Hunk 序列化为紧凑 `Uint8Array` 转储至 Praxis R4 二进制归档层。
-- **接口签名**：
-  ```ts
-  export interface IPraxisHumanFaceStorage {
-      appendDiffChunk(chunk: ReviewDiffHunk): Promise<void> | void;
-      flushPeriodicSnapshot(): Promise<void> | void;
-      evictToR4Archive(
-          evictedPayload: Uint8Array,
-      ): Promise<{ archiveId: string }> | { archiveId: string };
-  }
-  ```
-- **内置实现**：`DefaultPraxisHumanFaceStorage`（提供内存队列缓存与确定性 `r4-archive-*` 归档回执生成）。
-
-### 3.5 插槽五：卡级联动回滚与分形分支门禁 (`IPraxisRollbackGatekeeper`)
-
-- **职责**：提供单 Hunk 逆向补丁撤回、整张 TaskCard 多文件逆序级联回滚，以及分形 Git 分支合入前门禁终审（`checkMergeGate`）。
-- **接口签名**：
-  ```ts
-  export interface IPraxisRollbackGatekeeper {
-      revertDiffHunk(
-          filePath: string,
-          hunkId: string,
-      ): Promise<{ success: boolean; patch: string }> | { success: boolean; patch: string };
-
-      revertTaskCard(
-          cardId: string,
-      ):
-          | Promise<{ affectedFiles: string[]; rolledBackCheckpoints: string[] }>
-          | { affectedFiles: string[]; rolledBackCheckpoints: string[] };
-
-      checkMergeGate(
-          sourceBranch: string,
-          targetBranch: string,
-          diffPayload: ReviewDiffHunk[],
-      ):
-          | Promise<{ approved: boolean; reason?: string; violations?: string[] }>
-          | { approved: boolean; reason?: string; violations?: string[] };
-  }
-  ```
-- **内置实现**：`DefaultPraxisRollbackGatekeeper` 与底层 `PraxisRollbackEngine`（`src/core/rollback.ts`）。
-
----
-
-## 4. 插件钩子组合装配 (`createDefaultPraxisHooks`)
-
-Praxis 消费方可通过 `createDefaultPraxisHooks(overrides)` 一键获取五大 SPI 的标准组合，并仅覆盖需要定制的端口：
-
-```ts
-import {
-    createDefaultPraxisHooks,
-    SemanticPraxisContextEnricher,
-    SemanticGraph,
-} from 'auto-refactor';
-
-const graph = new SemanticGraph();
-const hooks = createDefaultPraxisHooks({
-    contextEnricher: new SemanticPraxisContextEnricher(graph),
-});
+```mermaid
+flowchart LR
+    SPI1["1. IPraxisAttributionResolver<br/>(任务卡身份溯源)"]
+    SPI2["2. IPraxisContextEnricher<br/>(AST 与语义图富集)"]
+    SPI3["3. IPraxisThresholdPolicy<br/>(熔断与 L3A 升级判定)"]
+    SPI4["4. IPraxisHumanFaceStorage<br/>(环形缓冲 R4 归档)"]
+    SPI5["5. IPraxisRollbackGatekeeper<br/>(分支门禁与原子回滚)"]
+    SPI6["6. IPraxisPresentationService<br/>(表现层双载荷渲染与去重)"]
 ```
 
+### 3.1 SPI-1：动态身份与任务卡溯源 (`IPraxisAttributionResolver`)
+- **核心职责**：根据文件路径与行区间 `{ startLine, endLine }` 实时反查修改归属的 `PraxisCardContext`。
+- **内置实现**：[`DefaultPraxisAttributionResolver`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/defaults.ts)，维护内存区间索引并支持 `registerAttribution` 动态注入。
+
+### 3.2 SPI-2：AST 与跨文件语义富集器 (`IPraxisContextEnricher`)
+- **核心职责**：为 Hunk 注入所处符号名、语法节点类型与跨文件逆向受影响集合（`impactFiles`）。
+- **内置实现**：[`SemanticPraxisContextEnricher`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/semanticEnricher.ts)，深度绑定 [`SemanticGraph`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/semantic/semanticGraph.ts)。
+
+### 3.3 SPI-3：熔断阈值与 L3A 升级策略 (`IPraxisThresholdPolicy`)
+- **核心职责**：依据代码增删行数、作用域敏感度与爆炸半径，判定是否上报 Praxis 首席架构师仲裁（`shouldEscalateToL3A: true`）。
+- **内置实现**：[`DefaultPraxisThresholdPolicy`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/defaults.ts)。
+
+### 3.4 SPI-4：环形缓冲与 R4 二进制归档 (`IPraxisHumanFaceStorage`)
+- **核心职责**：维护高频流式 Diff 环形队列，将淘汰记录转储为压缩二进制，杜绝长生命周期进程内存泄漏。
+- **内置实现**：[`CircularDiffBuffer`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/defaults.ts)。
+
+### 3.5 SPI-5：分形分支门禁与原子回滚 (`IPraxisRollbackGatekeeper`)
+- **核心职责**：合入前校验分支不变式，支持单 Hunk 或整卡多文件的原子逆序无损回滚。
+- **内置实现**：[`DefaultPraxisRollbackGatekeeper`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/defaults.ts)。
+
+### 3.6 SPI-6：表现层双面载荷适配器 (`IPraxisPresentationService`)
+- **核心职责**：将机器端纯净 CAPP 指令转化为人读 UI 诊断卡片，并执行 11 组语义并查集去重。
+- **接口签名**：
+  ```ts
+  export interface IPraxisPresentationService {
+      toPresentation(
+          agentPrompt: CompactAgentPrompt,
+          options?: PraxisPresentationOptions,
+      ): PraxisPresentationPayload;
+      
+      fromSliceVerdict(
+          verdict: PraxisSliceAuditVerdict,
+          target: string,
+          options?: PraxisPresentationOptions,
+      ): PraxisPresentationPayload;
+      
+      fromScanReport(
+          report: ScanReport,
+          options?: PraxisPresentationOptions,
+      ): PraxisPresentationPayload;
+      
+      auditAndPresent(
+          input: PraxisSliceAuditInput,
+          options?: PraxisPresentationOptions,
+          callGraph?: CallGraph,
+      ): Promise<PraxisPresentationPayload>;
+  }
+  ```
+- **内置实现**：[`PraxisPresentationAdapter`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/presentation/presentation-adapter.ts)。
+
 ---
 
-## 5. 关联文档导航
+## 4. 关联文档导航
 
 - [02. Praxis 六大核心治理服务门面 API 手册](./02-praxis-six-governance-services-api.md)
 - [03. Praxis 团队联调操作手册与交付验收矩阵](./03-praxis-integration-runbook-and-acceptance.md)
-- [Praxis 分形 Git 工作树与多级门禁回滚规范](../01-architecture/04-praxis-git-fractal-and-gating-spec.md)
+- [PRAXIS_HANDOFF_REPORT.md](../PRAXIS_HANDOFF_REPORT.md)

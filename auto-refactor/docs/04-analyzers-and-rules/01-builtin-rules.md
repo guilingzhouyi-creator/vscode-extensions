@@ -7,27 +7,27 @@
 
 ## 1. 四层规则金字塔与双轨文案架构
 
-`auto-refactor` 将全部 **325 条内置规则**（含 **310 条规范化 `FAMILY-TOPIC-NNN` 规则**与 **15 条向后兼容别名规则**）统一收拢于 `src/core/rules/registry.ts` 单一真源注册表中，并由 `npm run validate-rules-registry` 门禁在每次构建时强制校验「发射集 = 注册集 = 文档覆盖集（325/325）」。
+`auto-refactor` 将全部 **325 条内置规则**（含 **310 条规范化 `FAMILY-TOPIC-NNN` 规则**与 **15 条向后兼容别名规则**）统一收拢于 `src/core/rules/registry.ts` 单一真源注册表中，并由 `npm run validate-rules-registry` 门禁在每次构建时强制校验「发射集 = 注册集 = 文档覆盖集（325/325）」。在工作区全域单源规则目录快照（`scripts/common/rule-catalog.json`）中，活跃规则规模保持 **410 条全仓 SSOT 活跃规则**。
 
 ### 1.1 四层规则金字塔拓扑
 
-| 金字塔层级 | 包含规则族前缀 | 核心守护边界 |
-| :--- | :--- | :--- |
-| **Layer 1：全域安全与卫生底线** | `SEC` / `HYG` / `ERR` / `CMT` / `DOC` / `SIM` | 凭证防泄露、注入防御、错误吞没拦截、注释质量 (ECD-C) 与文档结构完整性 |
-| **Layer 2：语言族现代化与标准库** | `TSM` / `PYM` / `RSM` / `GOM` / `GDM` / `SHL` / `STD` | TypeScript、Python、Rust、Go、GDScript、Shell 现代语法惯用法与手写轮子替换 |
-| **Layer 3：架构拓扑、治理、数据与性能** | `ARCH` / `GOV` / `DAT` / `PRF` / `DEP` / `NAM` / `CST` | 分层单向依赖、多 Agent 冲突 (`GOV-AGN-001`)、切片破坏 (`GOV-SLC-001`)、轨迹回归 (`GOV-TRJ-001`)、N+1 查询与热循环零分配 |
-| **Layer 4：领域专精与测试现代性** | `GME`（代码真源映射为 `GDM`）/ `VSC` / `TST` / `CLR` + 15 条 Legacy Aliases | Godot 4 游戏引擎契约（规划为 `GME` 前缀，代码真源统一由 `GDM` 规则族与 `gdscript-game` 分析器承载）、VS Code 扩展清单规范、测试有效覆盖深度与历史规则平滑迁移窗口 |
+| 金字塔层级 | 规则数量 | 包含规则族前缀 | 核心守护边界 |
+| :--- | :---: | :--- | :--- |
+| **Layer 1：全域安全与卫生底线** | 49 条 | `SEC` / `HYG` / `ERR` / `CMT` / `DOC` / `SIM` | 凭证防泄露、注入防御、错误吞没拦截、代码物理卫生、注释质量 (ECD-C) 与文档结构完整性 |
+| **Layer 2：语言族现代化与标准库** | 98 条 | `TSM` / `PYM` / `RSM` / `GOM` / `GDM` / `SH` / `PS` (`SHL`) / `STDLIB` (`STD`) / `UI` / `PROD` | TypeScript、Python、Rust、Go、GDScript、Shell、PowerShell 现代语法惯用法、标准库手写轮子替换与前端工程现代化 |
+| **Layer 3：架构拓扑、治理、数据与性能** | 141 条 | `ARCH` / `GOV` / `DAT` / `PRF` / `DEP` / `NAM` / `CONST` / `CPX` / `GATE` / `CMP` / `NUM` | 分层单向依赖、架构防腐、多 Agent 协作防冲突 (`GOV-AGN-001`)、切片破坏防范 (`GOV-SLC-001`)、轨迹回归检验 (`GOV-TRJ-001`)、N+1 数据库查询阻断与热循环零分配 |
+| **Layer 4：领域专精、测试现代性与历史兼容** | 37 条 | `GDM` (`gdscript-game`) / `VSC` / `TST` / `SEC` (`client-exposure`) + 15 条 Legacy Aliases | Godot 4 游戏引擎运行态契约、VS Code 扩展清单与事件规范、测试有效覆盖深度与历史规则平滑迁移过渡窗口 |
 
 ### 1.2 双轨文案分层契约（Dual-Track Wording Architecture）
 
-- **机读/执行轨（Machine & Agent Track）**：位于 `src/core/messages/`、`src/core/rules/entries/` 与 `src/core/guidance/`，底层规则注册表（`RULE_REGISTRY`）与内核诊断统一为 **100% 国际工业英文标准**（涵盖所有 `summary` 与 `remediation` 规范元数据），输出高 Token 密度、确定性的 SARIF 2.1.0 诊断载荷与 CAPP 智能体修复提示词，并作为工作区单源规则目录（`scripts/common/rule-catalog.json`）的唯一真源底座。
+- **机读/执行轨（Machine & Agent Track）**：位于 `src/core/messages/`、`src/core/rules/entries/` 与 `src/core/guidance/`，底层规则注册表（`RULE_REGISTRY`）与内核诊断统一为 **100% 国际工业英文标准**（涵盖所有 `summary` 与 `remediation` 规范元数据），输出高 Token 密度、确定性的 SARIF 2.1.0 诊断载荷与 CAPP 智能体修复提示词，并作为工作区单源规则目录（`scripts/common/rule-catalog.json`，410 条全仓 SSOT）的唯一真源底座。
 - **人读/呈现轨（Human & Presentation Track）**：由 **Praxis 表现层**（`src/core/praxis/presentation/`）与 `PraxisI18nProvider` 独占承载，采用模块化领域分包双语字典（`zh-cn/` 与 `en/`），面向人类工程师与 IDE 富文本诊断卡片（`PraxisDiagnosticCard`）提供完整、专业、细粒度的人机可读本地化转译与交互式修复指引。
 
-### 1.3 主题码 (Topic) 标准缩写、标准 3-3-3 拓扑规划与编号序列连续性契约
+### 1.3 标准 3-3-3 命名拓扑公理、权威三字母映射与三阶双轨别名等价网络
 
 规则标识符严格遵循 `FAMILY-TOPIC-NNN` 三段式结构（`RULE_ID_PATTERN`），其中：
 - **`FAMILY`**：规则族前缀（2~6 位大写字母，对应 30 个受控领域族）；
-- **`TOPIC`**：领域主题码（推荐标准 3 位大写字母，存量历史包含部分 4~9 位扩展主题码），单源登记于 `src/core/rules/topic-catalog.ts` 的 `CANONICAL_TOPIC_CATALOG` 词典中；
+- **`TOPIC`**：领域主题码（标准 3 位大写字母，存量历史包含部分 4~9 位扩展主题码），单源登记于 `src/core/rules/topic-catalog.ts` 的 `CANONICAL_TOPIC_CATALOG` 词典中；
 - **`NNN`**：三位定长十进制整数序列（`001` ~ `999`）。
 
 #### 1.3.1 标准 3-3-3 拓扑规划愿景（Standard 3-3-3 Topology Vision）
@@ -39,16 +39,18 @@
 纯函数 `isStandard333RuleId(ruleId)` 作为全库统一的拓扑判据，以零额外开销实现对规则 ID 是否满足标准 3-3-3 拓扑的确定性断言。
 
 #### 1.3.2 权威三字母映射机制（CANONICAL_3LETTER_GLOSSARY）
-当前规则库处于现代化规范演进阶段，存量规则中尚存 80 个因历史演进保留的非 3 字母主题码（例如 `ARGS`、`FLAT`、`DISP`、`RECURSION`、`DATETIME`、`ONREADY` 等，涉及 96 条规则）。为保障分类学平滑收敛，引擎建立了以下刚性机制：
-1. **单一真源映射词典**：`src/core/rules/topic-catalog.ts` 声明并冻结 `CANONICAL_3LETTER_GLOSSARY`，为全部存量非标主题码预先分配确切的 3 字母权威映射（如 `FLAT -> FLT`、`DISP -> DSP`、`RECURSION -> REC`、`DATETIME -> DTT`、`ONREADY -> RDY`、`CONNECT -> CNT`、`WRAP -> WRP` 等）；
+当前规则库处于现代化规范演进阶段，存量规则中尚存部分因历史演进保留的非 3 字母主题码（例如 `ARGS`、`FLAT`、`DISP`、`RECURSION`、`DATETIME`、`ONREADY` 等）。为保障分类学平滑收敛，引擎建立了以下刚性机制：
+1. **单一真源映射词典**：`src/core/rules/topic-catalog.ts` 声明并冻结包含 104+ 项（注册 107 项）的 `CANONICAL_3LETTER_GLOSSARY`，为全部存量非标主题码预先分配确切的 3 字母权威映射（如 `FLAT -> FLT`、`DISP -> DSP`、`RECURSION -> REC`、`DATETIME -> DTT`、`ONREADY -> RDY`、`CONNECT -> CNT`、`WRAP -> WRP`、`CAST -> CST`、`ELSE -> ELS`、`FIND -> FND`、`LOCK -> LCK` 等）；
 2. **门禁 100% 覆盖率断言**：门禁脚本 `scripts/validate-rules-registry.js` 新增 `validateTopicGlossaryCoverage()` 校验环节，通过纯函数 `auditNonStandardTopicCoverage(RULE_REGISTRY)` 强制断言：所有已注册的 canonical 规则中长度 != 3 的主题码，必须在 `CANONICAL_3LETTER_GLOSSARY` 中保持 100% 完备映射（`missingGlossaryEntries === []`），杜绝任何未经收敛规划的非标主题逃逸入库；
 3. **单源投影工具**：提供 `toCanonicalRuleId()` 与 `normalizeTopicCode()` 纯函数，确保多源输入与历史 ID 能够单向确定性投影为规范三字母形态。
 
-#### 1.3.3 双轨别名平滑演进策略（Dual-Track Alias Evolution Strategy）
-规则 ID 是工程配置、基线压制清单（Baseline Ratchet）以及存量 SARIF 报告的持久化契约锚点。引擎恪守「平滑演进、零静默破坏」的设计底线：
-1. **存量规则零破坏**：当前发版中，所有已分配的规范规则 ID 保持既有行为与标识符绝对稳定，严禁执行破坏性的静默重命名；
-2. **双轨别名过渡窗口**：当规则从扩展主题码向 3-3-3 拓扑标准码演进时，必须通过 `src/core/rules/aliases.ts`（`LEGACY_RULE_ALIASES`）注册平滑别名，维持至少一个主版本的双轨兼容窗口，引擎内核与 CLI 在解析旧规则 ID 时自动重定向至标准目标；
-3. **双轨验证闭环**：通过 `validate-rules-registry.js`（验证发射集与注册集双向一致）与 `validate-rule-aliases.js`（验证别名目标唯一性与注册表存在性），共同保障双轨演进期间零孤儿规则、零虚构 ID。
+#### 1.3.3 三阶双轨别名等价网络（areAliasForms）
+规则 ID 是工程配置、基线压制清单（Baseline Ratchet）以及存量 SARIF 报告的持久化契约锚点。引擎通过 `src/core/rules/aliases.ts` 中的 `areAliasForms(left, right)` 实现了 **三阶双轨别名等价网络**：
+1. **阶一：字面精确等价**：若 `left === right`，直接判定匹配（O(1) 短路）；
+2. **阶二：历史别名规范映射等价**：基于 `LEGACY_RULE_ALIASES` 字典，若 `canonicalRuleId(left) === canonicalRuleId(right)`，判定为同一规则的现代与历史标识（15 条存量别名平滑支持）；
+3. **阶三：标准 3 字母拓扑归一化等价**：通过 `toCanonicalRuleId(left) === toCanonicalRuleId(right)`，将非标多字母主题码投影为标准 3-3-3 拓扑形式后断言等价。
+
+该网络使得消费方无论在基线配置中使用历史旧名称（如 `clean-layer-violation`）、存量扩展名称还是最新 3-3-3 规范名称，引擎均能透明互认，达成「零静默破坏」的平滑演进。
 
 #### 1.3.4 编号序列连续性公理（Sequence Continuity Invariant）
 1. **默认单调自增起点**：除受控豁免外，所有规则族的主题序列必须严格以 `001` 作为首条规则，且同一 `FAMILY-TOPIC` 内部必须连续递增，严禁存在序列空洞（如出现 `001`、`003` 跳跃）；
@@ -61,11 +63,18 @@
 
 ---
 
-## 2. 内置分析器工厂矩阵（共 30 个）
+## 2. 四阶段分析器流水线拓扑与装配矩阵（共 30 个）
 
-注册于 `src/core/analyzer-registry.ts` 的内置分析器包清单如下：
+注册于 `src/core/analyzer-registry.ts` 的 30 个内置分析器统一按四阶段流水线拓扑编排装配，具备严格的阶段依赖与短路熔断机制：
 
-`architecture`、`client-exposure`、`comments`、`complexity`、`constants`、`data-architecture`、`dependency-graph`、`dependency-layout`、`docs`、`frontend`、`gate-architecture`、`gdscript-game`、`gdscript-modern`、`go-modern`、`governance`、`hygiene`、`large-file`、`naming`、`performance`、`production-hygiene`、`python-modern`、`rust-modern`、`secrets`、`security`、`shell-lint`、`simplify`、`stdlib`、`test-modernity`、`ts-modern`、`vscode-extension`。
+### 2.1 四阶段流水线装配与短路机制
+
+| 流水线阶段 | 分析器清单（共 30 个） | 阶段核心职责与装配目标 | 短路与跳过机制 (Short-circuit Rationale) |
+| :--- | :--- | :--- | :--- |
+| **Stage 0：物理底线与紧急安全** (5) | `hygiene`, `shell-lint`, `large-file`, `secrets`, `security` | 文件系统物理完整性校验、0 字节占位文件拦截、高熵敏感凭证扫描、代码注入漏洞防御与巨型大文件物理尺寸审查 | **致命阻断与快速熔断**：若文件物理尺寸超出预算，短路跳过后续高开销 AST 解析避免 OOM；命中高危硬编码凭证或恶意代码注入时快速标记阻断。 |
+| **Stage 1：文本规范、词法符号与文档** (5) | `comments`, `naming`, `constants`, `docs`, `production-hygiene` | 注释质量 (ECD-C)、命名契约与工程黑话、常量单一真源与局部遮蔽、Markdown 结构与死链、生产路径调试语句残留 | **纯文本/脱敏快路径**：直接面向脱敏文本与分词流操作，无需构建重量级语义图；对非目标文件（如非 Markdown 文档）短路跳过文档分析。 |
+| **Stage 2：单文件语法 AST、控制流与语言现代化** (9) | `simplify`, `complexity`, `stdlib`, `ts-modern`, `python-modern`, `rust-modern`, `gdscript-modern`, `go-modern`, `frontend` | 单文件 AST 规范化节点 (`NormalizedNode`)、控制流图 (`ControlFlowGraph`) 圈复杂度度量、各语言现代语法惯用法与标准库手写轮子替换 | **稀疏路由 (Sparse MoE Router) 剪枝**：基于差异语义分类 (`DiffSemanticCategory`) 与文件类型，仅激活相关语言分析器，跳过 80%~95% 不相关规则遍历。 |
+| **Stage 3：领域架构契约、数据流与全工程拓扑** (11) | `performance`, `architecture`, `data-architecture`, `dependency-layout`, `dependency-graph`, `gate-architecture`, `gdscript-game`, `vscode-extension`, `client-exposure`, `test-modernity`, `governance` | 跨文件依赖图 (`DependencyGraph`) 环路检测、Clean/DDD 架构分层守卫、数据流与 N+1 查询拦截、多 Agent 协作防漂移、游戏引擎与扩展专精契约 | **拓扑缓存增量收敛**：依赖 Stage 0~2 提炼的符号与图事实；当模块导出与架构边界未变更时，通过 `TopologyCacheManager` 命中 L2 缓存，跳过全图重计算。 |
 
 ---
 
@@ -137,17 +146,13 @@
 | `GDM-EXT-001` | <a id="gdm-ext-001"></a>`gdscript-modern` | `GDM` | `warning` | `gdscript` | 表现层主视图控制器未继承 BaseScreen 或 BaseModal 基类。 | 主视图控制器应继承 BaseScreen（全屏视图）或 BaseModal（模态弹窗），接入标准生命周期与快照装配契约。 |
 | `GDM-FSM-001` | <a id="gdm-fsm-001"></a>`gdscript-modern` | `GDM` | `warning` | `gdscript` | 有限状态机私有状态变量被就地直接赋值，破坏状态迁移守卫与进出钩子。 | 必须通过 fsm.transition_to(target_state, payload) 方法触发合法状态流转。 |
 | `GDM-I18N-001` | <a id="gdm-i18n-001"></a>`gdscript-modern` | `GDM` | `warning` | `gdscript` | 表现层 UI 文本未通过 UIIntermediary / 国际化键名绑定，存在裸字符串硬编码。 | UI 文本必须采用 tr(KEY) 或通过 UIIntermediary 进行响应式国际化绑定。 |
-| `GDM-ISO-001` | <a id="gdm-iso-001"></a>`gdscript-game` | `GDM` | `error` | `gdscript` | 无头领域逻辑层直接引用视图层或场景树节点破坏解耦架构。 | 领域逻辑与表现层解耦，通过数据快照或纯状态机通信。 |
 | `GDM-LOC-001` | <a id="gdm-loc-001"></a>`gdscript-modern` | `GDM` | `warning` | `gdscript` | 表现层视图脚本行数超出物理预算上限（LOC <= 450 行）。 | 将复杂子组件、列表项渲染、数据转换器或伴生逻辑拆分为独立组件或伴生控制器。 |
 | `GDM-NOD-001` | <a id="gdm-nod-001"></a>`gdscript-modern` | `GDM` | `warning` | `gdscript` | 视图层脚本中出现飘移的相对节点路径（如 get_parent()、find_child() 或长跨级相对索引）。 | 节点引用应使用显式 @onready %UniqueNode 或类型化依赖注入，禁止易脆弱的相对层级寻址。 |
 | `GDM-ONREADY-001` | <a id="gdm-onready-001"></a>`gdscript-modern` | `GDM` | `warning` | `gdscript` | 使用 onready 关键字。 | 改用 @onready 注解。 |
-| `GDM-POL-001` | <a id="gdm-pol-001"></a>`gdscript-game` | `GDM` | `error` | `gdscript` | 对象池获取后未实现或未调用 reset_state 契约。 | 池化对象实现 reset_state() 并确保在 acquire/release 时重置状态。 |
 | `GDM-POOL-001` | <a id="gdm-pool-001"></a>`gdscript-modern` | `GDM` | `warning` | `gdscript` | 使用 Pool*Array 类型。 | 改用 Packed*Array 系列类型。 |
 | `GDM-POOL-002` | <a id="gdm-pool-002"></a>`gdscript-modern` | `GDM` | `warning` | `gdscript` | 对象池 reset_state 未调用基类重置方法破坏契约。 | 在 reset_state() 内部添加 super.reset_state() 调用以确保父类状态正确清理。 |
-| `GDM-PRF-001` | <a id="gdm-prf-001"></a>`gdscript-game` | `GDM` | `error` | `gdscript` | 循环或高频执行路径中瞬态堆分配导致掉帧风险。 | 在循环外预分配集合、使用对象池或复用缓冲区实例。 |
 | `GDM-RES-001` | <a id="gdm-res-001"></a>`gdscript-modern` | `GDM` | `warning` | `gdscript` | UI 布局脚本中硬编码固定分辨率或绝对像素尺寸，破坏多端响应式适配。 | 改用 Anchors Preset 锚点系统、自适应容器或 DesignTokens 相对尺寸基准。 |
 | `GDM-RPC-001` | <a id="gdm-rpc-001"></a>`gdscript-modern` | `GDM` | `warning` | `gdscript` | 使用 remote/master/puppet/slave 函数修饰符。 | 改用 @rpc 注解。 |
-| `GDM-SIG-001` | <a id="gdm-sig-001"></a>`gdscript-game` | `GDM` | `warning` | `gdscript` | 信号连接后缺少对应断开逻辑导致生命周期悬挂泄漏。 | 在生命周期结束前调用 disconnect 或接入自动管理连接。 |
 | `GDM-TOK-001` | <a id="gdm-tok-001"></a>`gdscript-modern` | `GDM` | `warning` | `gdscript` | 表现层视图硬编码 Color(...) 字面量或裸色值，破坏 DesignTokens 单一真源。 | 从 DesignTokens 获取语义化色彩常量（如 DesignTokens.COLOR_*），确保主题与多端视觉统一。 |
 | `GDM-TOOL-001` | <a id="gdm-tool-001"></a>`gdscript-modern` | `GDM` | `warning` | `gdscript` | 使用裸 tool 关键字。 | 改用首行 @tool 注解。 |
 | `GDM-UNI-001` | <a id="gdm-uni-001"></a>`gdscript-modern` | `GDM` | `warning` | `gdscript` | 表现层视图就地修改只读 Snapshot DTO 属性，破坏 CQRS 单向数据流与单一真源。 | 视图应将快照视为不可变只读数据，通过派发 Command 意图或调用领域边界服务请求变更。 |
@@ -162,6 +167,15 @@
 | `PROD-HYG-001` | <a id="prod-hyg-001"></a>`production-hygiene` | `PROD` | `error` | `all` | 生产构建产物包含调试输出、未决标记或绝对路径。 | 配置打包构建工具移除 console、注释与源码绝对路径。 |
 | `PROD-HYG-002` | <a id="prod-hyg-002"></a>`production-hygiene` | `PROD` | `error` | `all` | 生产环境暴露 Source Map 或 sourceMappingURL 指令。 | 关闭公共 Source Map 或仅上传至内部私有崩溃追踪服务。 |
 | `PROD-HYG-003` | <a id="prod-hyg-003"></a>`production-hygiene` | `PROD` | `error` | `all` | 敏感后端环境变量泄露至客户端代码包。 | 确保密钥留在服务端，前端仅使用公开环境变量前缀。 |
+| `PS-ALIAS-001` | <a id="ps-alias-001"></a>`shell-lint` | `PS` | `info` | `powershell` | PowerShell 脚本使用了不推荐的命令别名。 | 替换为规范的 Cmdlet 全称。 |
+| `PS-CMDLET-001` | <a id="ps-cmdlet-001"></a>`shell-lint` | `PS` | `info` | `powershell` | 函数命名不符合 Verb-Noun 动名词规范。 | 使用标准审批动词与名词重构函数名。 |
+| `PS-DOC-001` | <a id="ps-doc-001"></a>`shell-lint` | `PS` | `warning` | `powershell` | PowerShell 脚本缺少标准帮助文档注释块（.SYNOPSIS / .DESCRIPTION）。 | 在脚本头部编写标准帮助注释块（<# .SYNOPSIS ... #>）。 |
+| `PS-ERROR-001` | <a id="ps-error-001"></a>`shell-lint` | `PS` | `warning` | `powershell` | PowerShell 中存在空 catch 或未捕获的错误。 | 补充错误捕获处理与告警日志。 |
+| `PS-PARAM-001` | <a id="ps-param-001"></a>`shell-lint` | `PS` | `info` | `powershell` | 参数块缺失 [CmdletBinding()] 或参数未声明强类型。 | 添加 [CmdletBinding()] 并为参数声明类型。 |
+| `PS-SAFE-001` | <a id="ps-safe-001"></a>`shell-lint` | `PS` | `warning` | `powershell` | 非交互式或无终端环境下裸用 Read-Host 阻塞执行。 | 增加交互式宿主守卫（$Host.UI）或改用参数传递输入。 |
+| `PS-SEC-001` | <a id="ps-sec-001"></a>`shell-lint` | `PS` | `error` | `powershell` | 使用 Invoke-Expression (iex) 动态执行不可信变量，存在代码注入隐患。 | 避免使用 Invoke-Expression，改用参数化 Cmdlet 或 call operator (&)。 |
+| `PS-TRAP-001` | <a id="ps-trap-001"></a>`shell-lint` | `PS` | `warning` | `powershell` | 申请受控系统资源（FileStream/Mutex 等）后缺少 try-finally 释放保护。 | 使用 try/finally 块或 Dispose() 确保异常路径下资源可靠释放。 |
+| `PS-VERB-001` | <a id="ps-verb-001"></a>`shell-lint` | `PS` | `info` | `powershell` | 使用了未批准的 PowerShell 动词。 | 改用 Get-Verb 批准的标准动词。 |
 | `PYM-ABC-001` | <a id="pym-abc-001"></a>`python-modern` | `PYM` | `error` | `python` | 从 typing 导入 collections.abc 抽象类型。 | 改从 collections.abc 导入。 |
 | `PYM-ASYNC-001` | <a id="pym-async-001"></a>`python-modern` | `PYM` | `error` | `python` | async 函数内阻塞调用或未 await 的同步 ORM 调用。 | 改用 async 等价物（asyncio/httpx/异步仓储）。 |
 | `PYM-DATETIME-001` | <a id="pym-datetime-001"></a>`python-modern` | `PYM` | `error` | `python` | timezone.utc 用法。 | 改用 datetime.UTC（PEP 615）。 |
@@ -186,10 +200,27 @@
 | `RSM-STR-001` | <a id="rsm-str-001"></a>`rust-modern` | `RSM` | `warning` | `rust` | 签名使用 &String 参数。 | 改用 &str（或 impl AsRef<str>）。 |
 | `RSM-TRY-001` | <a id="rsm-try-001"></a>`rust-modern` | `RSM` | `warning` | `rust` | 使用 try! 宏。 | 改用 ? 运算符，可嵌入更大的表达式。 |
 | `RSM-UNWRAP-001` | <a id="rsm-unwrap-001"></a>`rust-modern` | `RSM` | `warning` | `rust` | 对可失败结果调用 unwrap()。 | 改用 ? 传播，或用 expect 说明不变式。 |
-| `SEC-EXP-001` | <a id="sec-exp-001"></a>`client-exposure` | `SEC` | `error` | `all` | 内部或管理 API 端点暴露在客户端代码中。 | 通过受保护的后端网关反向代理并移除内部暴露路径。 |
-| `SEC-EXP-002` | <a id="sec-exp-002"></a>`client-exposure` | `SEC` | `error` | `all` | 前端以 CSS 隐藏或按钮禁用代替服务端鉴权。 | 在服务端对敏感操作进行基于角色的鉴权校验。 |
-| `SEC-EXP-003` | <a id="sec-exp-003"></a>`client-exposure` | `SEC` | `warning` | `all` | 关闭的 Feature Flag 仍然将完整实现代码打包下发。 | 采用构建期代码擦除或动态代码分割隔离未发布功能。 |
-| `SEC-EXP-004` | <a id="sec-exp-004"></a>`client-exposure` | `SEC` | `error` | `all` | 未发布或测试演练路由静态打包暴露在生产路由中。 | 在构建期通过环境判定过滤排除开发与测试路由。 |
+| `SH-ARRAY-001` | <a id="sh-array-001"></a>`shell-lint` | `SH` | `info` | `shell` | 使用 $* 代替了 "$@" 导致单词分割失效。 | 使用 "$@" 保持各个位置参数的独立性。 |
+| `SH-CMD-001` | <a id="sh-cmd-001"></a>`shell-lint` | `SH` | `info` | `shell` | 使用了已过时的反引号命令替换语法。 | 改用现代标准的 $(...) 命令替换语法。 |
+| `SH-COND-001` | <a id="sh-cond-001"></a>`shell-lint` | `SH` | `warning` | `shell` | Bash 脚本在复合条件或正则匹配中使用脆弱的单中括号 [ ... ] 语法。 | 在 Bash 脚本中改用标准的 [[ ... ]] 双中括号测试语法，或遵循严格 POSIX 测试规范。 |
+| `SH-DEPR-001` | <a id="sh-depr-001"></a>`shell-lint` | `SH` | `info` | `shell` | 使用了单中括号 [ 或旧式废弃测试语法。 | 在 Bash 脚本中改用现代标准的 [[ 测试语法。 |
+| `SH-DOC-001` | <a id="sh-doc-001"></a>`shell-lint` | `SH` | `warning` | `shell` | Shell 脚本头部缺少模块与职责元数据说明注释。 | 在脚本头部添加包含模块、描述与退出语义的规范注释。 |
+| `SH-ECHO-001` | <a id="sh-echo-001"></a>`shell-lint` | `SH` | `info` | `shell` | 使用了不可移植的 echo -e / echo -n。 | 改用 POSIX 标准统一的 printf 命令。 |
+| `SH-EOL-001` | <a id="sh-eol-001"></a>`shell-lint` | `SH` | `error` | `shell` | Shell 脚本包含 Windows CRLF 换行符，在 Linux 运行期引发语法解析崩溃。 | 严格采用 LF (0x0A) 换行符保存 Shell 脚本。 |
+| `SH-ERR-001` | <a id="sh-err-001"></a>`shell-lint` | `SH` | `warning` | `shell` | 关键命令执行后未进行错误退出码判定。 | 通过 \|\| exit 或 set -e 强化错误退出机制。 |
+| `SH-EXIT-001` | <a id="sh-exit-001"></a>`shell-lint` | `SH` | `warning` | `shell` | set -e 模式下裸调预期可能失败的命令，引发脚本意外熔断。 | 采用 command \|\| status=$? 或 if 判定安全捕获退出码。 |
+| `SH-INIT-001` | <a id="sh-init-001"></a>`shell-lint` | `SH` | `warning` | `shell` | Shell 脚本头部未声明 set -euo pipefail 严格模式。 | 在脚本开头声明 set -euo pipefail 提升鲁棒性。 |
+| `SH-QUOTE-001` | <a id="sh-quote-001"></a>`shell-lint` | `SH` | `warning` | `shell` | 参数展开未加双引号保护存在单词拆分与通配隐患。 | 对变量引用使用 "$var" 进行双引号保护。 |
+| `SH-READ-001` | <a id="sh-read-001"></a>`shell-lint` | `SH` | `info` | `shell` | read 命令未携带 -r 参数导致反斜杠被转义篡改。 | 使用 read -r 读取原始输入文本。 |
+| `SH-SAFE-001` | <a id="sh-safe-001"></a>`shell-lint` | `SH` | `warning` | `shell` | read 命令缺少超时 (-t) 或终端守护，CI 环境下易导致死锁。 | 为交互式读取添加超时或增加 [ -t 0 ] 终端判断。 |
+| `SH-SEC-001` | <a id="sh-sec-001"></a>`shell-lint` | `SH` | `error` | `shell` | 使用 eval 拼接变量执行动态指令，存在任意命令注入高危漏洞。 | 消除 eval 动态拼接，改用函数、数组或直接参数化调用。 |
+| `SH-TRAP-001` | <a id="sh-trap-001"></a>`shell-lint` | `SH` | `warning` | `shell` | 创建临时文件/目录后缺少 EXIT 陷阱清理，导致磁盘垃圾残留。 | 声明 trap 'rm -rf "$tmp"' EXIT 确保退出时清理临时文件。 |
+| `STDLIB-ALLOC-001` | <a id="stdlib-alloc-001"></a>`stdlib` | `STDLIB` | `error` | `all` | 裸机与 no_std 系统运行环境下隐式堆逃逸与动态重分配静态拦截。 | 在 no_std / core 作用域下使用固定容量栈缓冲、借用切片或预分配内存池，避免裸调 Box::new / malloc。 |
+| `STDLIB-CONST-001` | <a id="stdlib-const-001"></a>`stdlib` | `STDLIB` | `warning` | `all` | 标准库密码学与哈希敏感比较严禁分支时间泄漏，强制常量时间恒定延迟比对。 | 使用恒定时间累加比对（如 constant_time_eq / subtle::ConstantTimeEq），严禁在字节不匹配时提前 return false。 |
+| `STDLIB-PANIC-001` | <a id="stdlib-panic-001"></a>`stdlib` | `STDLIB` | `warning` | `all` | 系统标准库公开接口严禁逃逸裸 panic/unwrap/abort，强制 Result/Option 或有界 error 返回。 | 对可能失败的公开 API 采用 Result<T, E> 或显式 error code 表达错误，内部调用使用 match 或 ? 操作符解包。 |
+| `STDLIB-PORT-001` | <a id="stdlib-port-001"></a>`stdlib` | `STDLIB` | `warning` | `all` | 底层平台条件编译 #[cfg(...)] 缺少未知平台或未支持目标架构时的 fallback 阻断。 | 在特定操作系统/目标平台条件编译块末尾添加 compile_error! 或通用软实现作为兜底后备。 |
+| `STDLIB-RECURSION-001` | <a id="stdlib-recursion-001"></a>`stdlib` | `STDLIB` | `warning` | `all` | 底层核心算法无界深层递归缺乏显式栈深检查或上限防卫。 | 为递归算法引入显式 depth 计数限制，或改用显式工作栈与迭代平铺展开循环。 |
+| `STDLIB-UNSAFE-001` | <a id="stdlib-unsafe-001"></a>`stdlib` | `STDLIB` | `error` | `all` | Rust/C++ 底层 unsafe 块强制附带 SAFETY: 契约证明，缺失即阻断。 | 在每个 unsafe 块或函数前编写 SAFETY: 契约注释，明确记录调用者必须保证的前置条件与内存安全不变量。 |
 | `TSM-ANY-001` | <a id="tsm-any-001"></a>`ts-modern` | `TSM` | `warning` | `typescript, javascript` | 显式 any 关闭了该值的类型检查。 | 改用 unknown 加收窄，或精确的泛型/联合类型。 |
 | `TSM-ARGS-001` | <a id="tsm-args-001"></a>`ts-modern` | `TSM` | `warning` | `typescript, javascript` | 使用 arguments 对象。 | 改用剩余参数（...args），可被类型系统检查。 |
 | `TSM-CTOR-001` | <a id="tsm-ctor-001"></a>`ts-modern` | `TSM` | `warning` | `typescript, javascript` | 用 new 调用 Array/Object/String/Number/Boolean 包装构造器。 | 改用字面量或 String()/Number()/Boolean() 原始转换。 |
@@ -210,6 +241,56 @@
 
 | 规则 ID | 所属分析器 | 规则族 | 默认级别 | 适用语言 | 规则中文摘要 (`summary`) | 修复与重构指引 (`remediation`) |
 | :--- | :--- | :--- | :---: | :--- | :--- | :--- |
+| `ARCH-ABS-001` | <a id="arch-abs-001"></a>`architecture` | `ARCH` | `warning` | `all` | 过度抽象与非必要间接层：为少量共性引入跨层深层转发跳板、跨域依赖反转或循环依赖。 | 消除负收益间接跳板与人为抽象，容许领域隔离的局部正当实现。 |
+| `ARCH-BLR-001` | <a id="arch-blr-001"></a>`architecture` | `ARCH` | `warning` | `all` | 文件边界失衡：单文件内多个高复杂度函数缺乏语义关联，职责异常聚合。 | 按语义与状态边界将文件拆分为高内聚的独立领域模块。 |
+| `ARCH-BND-001` | <a id="arch-bnd-001"></a>`architecture` | `ARCH` | `warning` | `all` | 跨业务域内部穿透：绕过公共导出 Facade 契约直接访问非公开内部实现。 | 通过模块顶层公共导出 API 访问，禁止直接引用 /internal/ 或 /private/。 |
+| `ARCH-CFG-001` | <a id="arch-cfg-001"></a>`architecture` | `ARCH` | `info` | `all` | 环境配置泄漏：纯领域业务模型内部直接读取环境变量或底层磁盘配置。 | 将环境配置提升到应用装配层解析，并以强类型参数注入领域对象。 |
+| `ARCH-CFG-002` | <a id="arch-cfg-002"></a>`architecture` | `ARCH` | `warning` | `all` | 声明的配置项在全库代码中从未参与任何决策、控制流或计算（死配置）。 | 移除无用死配置项或补充对应业务开关/策略引用。 |
+| `ARCH-CFG-003` | <a id="arch-cfg-003"></a>`architecture` | `ARCH` | `warning` | `all` | 同一配置项在多处重复定义，破坏配置单一真源。 | 收敛重复配置到单一配置表或继承层级中。 |
+| `ARCH-CFG-004` | <a id="arch-cfg-004"></a>`architecture` | `ARCH` | `warning` | `all` | 隐式配置散落：业务代码中散落硬编码环境变量读取或隐式调优参数。 | 将散落的环境变量与调优参数提取至统一配置对象并通过参数注入。 |
+| `ARCH-CFG-005` | <a id="arch-cfg-005"></a>`architecture` | `ARCH` | `warning` | `all` | 配置访问散落：未通过统一配置层或注册表，跨层无序散落访问配置。 | 建立统一配置访问层或注册表，集中收口配置读取。 |
+| `ARCH-CFG-006` | <a id="arch-cfg-006"></a>`architecture` | `ARCH` | `warning` | `all` | 配置业务强耦合：领域模型直接绑定具体配置文件物理格式或磁盘解析。 | 通过接口或类型化策略对象解耦，由外层装配并注入领域核心。 |
+| `ARCH-CFG-007` | <a id="arch-cfg-007"></a>`architecture` | `ARCH` | `info` | `all` | 配置过度抽象：简单静态配置引入多重不必要间接封装与透传层。 | 按项目规模裁剪冗余封装，平铺轻量配置访问。 |
+| `ARCH-CFG-008` | <a id="arch-cfg-008"></a>`architecture` | `ARCH` | `warning` | `all` | 配置表根目录平铺蔓延反模式：超过阈值的大量配置平铺于根目录，缺乏领域同构分层。 | 建立领域同构目录（如 config/domains/<域>/core.json），统一分域收拢并消除根目录平铺散落。 |
+| `ARCH-CFG-009` | <a id="arch-cfg-009"></a>`architecture` | `ARCH` | `warning` | `all` | 配置子表路由契约违规：未登记的子表配置脱离主核心路由契约，缺乏点分泛化路由与热重载看守。 | 将子表登记至主配置表并接入点分路由与细粒度热重载守卫。 |
+| `ARCH-DEC-002` | <a id="arch-dec-002"></a>`architecture` | `ARCH` | `warning` | `all` | 多语言 AST 解析与适配器逻辑必须独立解耦为适配器模块，分析器主体严禁混杂语法树构造细节或深耦合特定语言适配器实现。 | 将多语言 AST 构造逻辑抽取至 `src/core/semantic/adapters/` 独立适配器，分析器仅面向 `NormalizedNode` 或多态接口。 |
+| `ARCH-DIR-001` | <a id="arch-dir-001"></a>`architecture` | `ARCH` | `warning` | `all` | 倒置依赖，在领域层定义接口契约，由外层实现。 | 核心逆流：领域层 (Domain) 反向依赖外层应用层/基础设施/接口层。 |
+| `ARCH-DIR-002` | <a id="arch-dir-002"></a>`architecture` | `ARCH` | `warning` | `all` | 引入用例服务 (Application Service) 统筹业务流。 | 越层穿透：接口层控制器绕过应用层直接直连基础设施实现。 |
+| `ARCH-DIR-003` | <a id="arch-dir-003"></a>`architecture` | `ARCH` | `error` | `all` | 形式分层假象：目录结构表面隔离，但调用关系与数据流发生逆向越层。 | 调整调用依赖流向，由内层领域定义契约接口并交由基础设施层实现。 |
+| `ARCH-DISP-001` | <a id="arch-disp-001"></a>`architecture` | `ARCH` | `warning` | `all` | Monolithic dispatchers with excessive branches (> 8) tightly couple domain logic, violating the Open-Closed Principle. | 重构为基于字典/Map 的查表分发 (Table-Driven) 或策略模式 (Strategy Pattern)，解耦各分支业务逻辑。 |
+| `ARCH-DSP-002` | <a id="arch-dsp-002"></a>`architecture` | `ARCH` | `warning` | `all` | Dispatcher closure fragmentation: Object literal defines excessive inline function closures (>= 15), causing closure explosion and function inflation. | 重构为按职责正交划分的 switch 分发函数（单函数圈复杂度 <= 10）或顶层具名处理函数，消除闭包碎片化。 |
+| `ARCH-FAC-001` | <a id="arch-fac-001"></a>`architecture` | `ARCH` | `warning` | `all` | 门面层实质性承载缺失：门面/网关模块缺乏领域编排、模式自验或不可变性冻结，退化为无意义转发层。 | 实现实质性编排、不可变冻结与模式自验，或消除空壳转发门面包装。 |
+| `ARCH-GLB-001` | <a id="arch-glb-001"></a>`architecture` | `ARCH` | `warning` | `all` | 隐式全局可变状态：模块间通过顶层全局变量或单例产生隐式强耦合。 | 重构为依赖注入或按需创建实例，消除共享可变静态单例。 |
+| `ARCH-HDL-001` | <a id="arch-hdl-001"></a>`architecture` | `ARCH` | `error` | `all` | 无头架构违规：核心业务逻辑或计算模块直接绑定 UI/IDE 视图框架。 | 解除核心计算与展示框架依赖，保持无头独立执行与测试能力。 |
+| `ARCH-LEAK-001` | <a id="arch-leak-001"></a>`architecture` | `ARCH` | `warning` | `all` | 领域模型使用 POJO/原生实体，隔离外部框架专有类型。 | 职责泄漏：纯领域模型直接引用或泄漏外部框架库 (Express/Vue/Godot/ORM)。 |
+| `ARCH-LEAK-002` | <a id="arch-leak-002"></a>`architecture` | `ARCH` | `warning` | `all` | 分层越界：外层实现被内层直接反向引用（Clean/DDD 层序反转）。 | 把依赖改回单向（内层定义接口、外层实现），或把该文件移入正确层。 |
+| `ARCH-ROL-001` | <a id="arch-rol-001"></a>`architecture` | `ARCH` | `warning` | `all` | 文件本体角色失衡与伪共享库：文件承担过多易变状态或高耦合业务逻辑，却被跨域频繁引用作为共享库。 | 剥离核心领域状态，明确稳定输入输出边界，构建真正低耦合的共享库。 |
+| `ARCH-ROL-002` | <a id="arch-rol-002"></a>`architecture` | `ARCH` | `warning` | `all` | 业务模块承载无界公共能力：领域业务模块内部私自承载与导出通用基础设施或公共计算能力。 | 将通用能力下沉至对应共享层或基础设施层，确保领域模块职责专注单一。 |
+| `ARCH-SKL-001` | <a id="arch-skl-001"></a>`architecture` | `ARCH` | `info` | `all` | 策略骨架复用候选：检测到具有同构前置校验与收尾步骤的复杂流程。 | 提取公共执行骨架（模板方法/高阶函数编排），将差异步骤作为策略注入。 |
+| `ARCH-TMP-001` | <a id="arch-tmp-001"></a>`architecture` | `ARCH` | `warning` | `all` | 巨石视图/模板渲染器未解耦：单函数规模超标且包含深度 HTML/SVG/DSL 模板字符串拼接，缺少局部组件化。 | 拆解为领域正交的局部组件（Header/Card/Graph Partials），由结构化 ViewModel 驱动渲染。 |
+| `ARCH-UTL-001` | <a id="arch-utl-001"></a>`architecture` | `ARCH` | `warning` | `all` | 高异构耦合工具库反模式：检测到承担混杂多域职责的通用工具模块。 | 按四分流治理原则重构：纯算子进入算法库、常量进入常量库、规则进入策略库、通用转换进入基础层。 |
+| `CMP-CAL-001` | <a id="cmp-cal-001"></a>`governance` | `CMP` | `warning` | `typescript, javascript` | Deeply nested inline callback chains create callback hell, complicate exception propagation, and mask race conditions. | 降低回调嵌套深度：改用 async/await、Promise 链扁平化或抽取具名顶层函数。 |
+| `CMP-DEN-001` | <a id="cmp-den-001"></a>`governance` | `CMP` | `warning` | `typescript, javascript` | Dense syntactic packing of bitwise, arithmetic and conditional operators without naming or spacing exceeds human cognitive chunking capacity. | 降低认知密度：添加适当空白与具名中间常量，拆分高密度算式或位运算组合。 |
+| `CMP-EXP-001` | <a id="cmp-exp-001"></a>`governance` | `CMP` | `warning` | `typescript, javascript` | Giant expressions with deeply nested ternaries or unbounded logical chains create cognitive overload and obscure branching logic. | 将巨型嵌套三元或长逻辑链拆分为具名中间变量或 if-else 分支。 |
+| `CMP-LIN-001` | <a id="cmp-lin-001"></a>`governance` | `CMP` | `warning` | `typescript, javascript` | Cramming multiple distinct statements or side-effects onto a single line impairs stack traces, debug stepping, and code readability. | 将单行内的多个语句或副作用拆分为独立代码行，遵循单行单一语义原则。 |
+| `CONST-CLU-001` | <a id="const-clu-001"></a>`constants` | `CONST` | `warning` | `all` | 同调用域内存在未抽取的同源硬编码字面量（状态码/协议值/路径/事件名），应一揽子打包抽取。 | 结合临近代码域聚类建议，将同一语义族的同源字面量一并抽离为常量，避免遗留散乱硬编码。 |
+| `CONST-DRF-001` | <a id="const-drf-001"></a>`constants` | `CONST` | `warning` | `all` | 跨文件同源语义常量存在命名分裂或数值微小漂移，必须建立单一真源（SSOT）。 | 将多文件维护的同源常量统一定义在领域或协议共享常量库中，并消除数值或命名漂移。 |
+| `CONST-LAY-001` | <a id="const-lay-001"></a>`constants` | `CONST` | `warning` | `all` | 模块级稳定常量在依赖区后必须进入首个正式代码声明域，严禁散落在函数内部、文件中段或业务逻辑之间。 | 将模块级常量统一定义在文件导入声明（import/require）之后、任何函数/类声明之前的常量区。 |
+| `CONST-LIB-001` | <a id="const-lib-001"></a>`constants` | `CONST` | `warning` | `all` | 大规模常量散落于业务代码文件中，缺乏集中分层的常量库目录结构。 | 根据 Agent 建议的目录拓扑与分片模块，在 constants/ 集中归档并提供统一 index.ts 导出。 |
+| `CONST-OWN-001` | <a id="const-own-001"></a>`constants` | `CONST` | `warning` | `all` | 共享常量所有权分层错误，严禁塞入全局大杂烩 constants 文件或藏匿在底层私有模块。 | 按照所有权四层模型，分流至 Module-Private、Domain-Shared、Protocol-Shared 或 System-Config。 |
+| `CONST-SCP-001` | <a id="const-scp-001"></a>`constants` | `CONST` | `warning` | `all` | 单函数局部不变量、延迟初始化值或受限生命周期资源禁止滥用扩大作用域提升至顶层。 | 保持局部不变量在单函数或局部代码块内部的作用域范围，避免盲目提升至文件全局。 |
+| `CONST-SCP-002` | <a id="const-scp-002"></a>`constants` | `CONST` | `info` | `all` | 单函数体内散落的多处同类局部硬编码应在函数头部统一定义为局部常量。 | 在当前函数头部集中声明局部 const 常量并替换函数内部各处的散落字面量。 |
+| `CPX-AMP-001` | <a id="cpx-amp-001"></a>`complexity` | `CPX` | `warning` | `all` | 复杂度放大陷阱：在迭代或热点调用链中隐式嵌套阻塞 I/O 或序列化。 | 将 I/O 与序列化批量汇聚在循环外部执行。 |
+| `CPX-BUD-001` | <a id="cpx-bud-001"></a>`complexity` | `CPX` | `warning` | `all` | 超出弹性复杂度预算：综合语言、角色、代码域与清晰度测算的预算超标。 | 根据角色与职责拆分函数，或将多重嵌套扁平化为策略表/状态机。 |
+| `CPX-HOP-001` | <a id="cpx-hop-001"></a>`complexity` | `CPX` | `warning` | `all` | 机械式拆分投机：通过制造大量单行薄转发包装函数人为压低复杂度。 | 消除无意义的透传转发包装，聚焦于语义重用与领域内聚。 |
+| `CPX-JST-001` | <a id="cpx-jst-001"></a>`complexity` | `CPX` | `warning` | `all` | 非必要设计失控复杂度：高复杂度来自无序嵌套和职责堆积，缺乏算法/状态机证明。 | 梳理核心职责，解离混合流程并分离副作用。 |
+| `CPX-NEST-001` | <a id="cpx-nest-001"></a>`complexity` | `CPX` | `warning` | `all` | 失控深层控制流嵌套：控制流嵌套层级超出该上下文类型的弹性预算（业务代码>3层，状态机/解析器>5层）。 | 利用提前返回（Guard Clauses）扁平化控制流，或将复杂分支独立为子状态处理函数。 |
+| `CPX-NEST-002` | <a id="cpx-nest-002"></a>`complexity` | `CPX` | `warning` | `all` | 深层长跨度控制流跳跃：在深层嵌套（>=4层）且距函数头超长跨度处执行非结构化控制流逃逸（return/break/throw）。 | 利用局部卫语句提前校验，或将深层长跨度闭环提取为纯函数子算子以缩短认知跳跃距离。 |
+| `CPX-REC-001` | <a id="cpx-rec-001"></a>`complexity` | `CPX` | `error` | `all` | 跨函数/跨文件无终止保障的递归或互递归调用链。 | 引入显式深度累加参数与终止保护，或改写为迭代工作列表。 |
+| `CPX-RED-001` | <a id="cpx-red-001"></a>`complexity` | `CPX` | `warning` | `all` | 分布式冗余复杂度超标：跨多个文件存在高度相似的算法流程、计算或校验逻辑，累积形成隐性系统复杂度。 | 评估逻辑共性并依据领域边界进行抽离，或消除局部开发复制。 |
+| `CPX-SPACE-001` | <a id="cpx-space-001"></a>`complexity` | `CPX` | `warning` | `all` | 热点循环内无界瞬态内存分配与重复全量物化。 | 将对象/缓冲区分配提升到循环外，循环内执行就地重置与复用。 |
+| `CPX-STM-001` | <a id="cpx-stm-001"></a>`complexity` | `CPX` | `info` | `all` | 状态机分派结构规范：状态机多层分支内存在过长单分支逻辑（>30 LOC），降低了分派骨架的清晰度。 | 将状态机单分支过长逻辑提取为独立动作处理器，保留纯粹的状态转移分派骨架。 |
+| `CPX-TIME-001` | <a id="cpx-time-001"></a>`complexity` | `CPX` | `warning` | `all` | 跨函数/跨文件无界多项式时间复杂度：嵌套迭代调用链引发高开销。 | 将内层数据预先构建为 Map/Set 索引，降低复合复杂度至 O(N)。 |
 | `DAT-DEF-001` | <a id="dat-def-001"></a>`data-architecture` | `DAT` | `info` | `all` | 受信内部领域边界内的冗余重复防御性校验。 | 在信任边界执行一次性完整校验，内部领域对象依托不可变类型保证。 |
 | `DAT-LAY-001` | <a id="dat-lay-001"></a>`data-architecture` | `DAT` | `warning` | `all` | 数据访问抽象泄漏：业务核心直接操纵持久化驱动或底层存储细节。 | 将存储驱动调用封装在仓储接口实现内，领域层仅依赖仓储契约。 |
 | `DAT-NPL-001` | <a id="dat-npl-001"></a>`data-architecture` | `DAT` | `error` | `all` | 迭代与映射上下文中的 N+1 查询与重复存储调用。 | 将循环内查询提升至外层使用批量 IN 查询或 DataLoader 批量加载。 |
@@ -302,62 +383,34 @@
 | `PRF-POL-003` | <a id="prf-pol-003"></a>`performance` | `PRF` | `warning` | `all` | 负收益过度池化：对极小轻量纯值对象或冷路径过度引入池化管理开销，得不偿失。 | 移除负收益池化包装层，直接采用值对象或短生命周期瞬态分配。 |
 | `PRF-POL-004` | <a id="prf-pol-004"></a>`performance` | `PRF` | `warning` | `all` | 流式数据分块加载缺乏环形缓冲复用：在流式 I/O、分块循环读取或异步回调中反复实例化临时 Buffer，造成高频内存碎片与 GC 停顿。 | 引入环形缓冲区（RingBuffer）或接入定长字节缓冲池（BufferPool），实现零拷贝槽位循环复用。 |
 
-### Layer 4 — 领域框架专精、测试现代性与历史兼容层 (Domain Specialization & Legacy Aliases)
+### Layer 4 — 领域框架专精、测试现代性与历史兼容层 (Domain Specialization, Test Modernity & Legacy Aliases)
 
 | 规则 ID | 所属分析器 | 规则族 | 默认级别 | 适用语言 | 规则中文摘要 (`summary`) | 修复与重构指引 (`remediation`) |
 | :--- | :--- | :--- | :---: | :--- | :--- | :--- |
+| `GDM-ISO-001` | <a id="gdm-iso-001"></a>`gdscript-game` | `GDM` | `error` | `gdscript` | 无头领域逻辑层直接引用视图层或场景树节点破坏解耦架构。 | 领域逻辑与表现层解耦，通过数据快照或纯状态机通信。 |
+| `GDM-POL-001` | <a id="gdm-pol-001"></a>`gdscript-game` | `GDM` | `error` | `gdscript` | 对象池获取后未实现或未调用 reset_state 契约。 | 池化对象实现 reset_state() 并确保在 acquire/release 时重置状态。 |
+| `GDM-PRF-001` | <a id="gdm-prf-001"></a>`gdscript-game` | `GDM` | `error` | `gdscript` | 循环或高频执行路径中瞬态堆分配导致掉帧风险。 | 在循环外预分配集合、使用对象池或复用缓冲区实例。 |
+| `GDM-SIG-001` | <a id="gdm-sig-001"></a>`gdscript-game` | `GDM` | `warning` | `gdscript` | 信号连接后缺少对应断开逻辑导致生命周期悬挂泄漏。 | 在生命周期结束前调用 disconnect 或接入自动管理连接。 |
+| `SEC-EXP-001` | <a id="sec-exp-001"></a>`client-exposure` | `SEC` | `error` | `all` | 内部或管理 API 端点暴露在客户端代码中。 | 通过受保护的后端网关反向代理并移除内部暴露路径。 |
+| `SEC-EXP-002` | <a id="sec-exp-002"></a>`client-exposure` | `SEC` | `error` | `all` | 前端以 CSS 隐藏或按钮禁用代替服务端鉴权。 | 在服务端对敏感操作进行基于角色的鉴权校验。 |
+| `SEC-EXP-003` | <a id="sec-exp-003"></a>`client-exposure` | `SEC` | `warning` | `all` | 关闭的 Feature Flag 仍然将完整实现代码打包下发。 | 采用构建期代码擦除或动态代码分割隔离未发布功能。 |
+| `SEC-EXP-004` | <a id="sec-exp-004"></a>`client-exposure` | `SEC` | `error` | `all` | 未发布或测试演练路由静态打包暴露在生产路由中。 | 在构建期通过环境判定过滤排除开发与测试路由。 |
+| `TST-DBT-001` | <a id="tst-dbt-001"></a>`test-modernity` | `TST` | `info` | `all` | 未登记里程碑收敛计划或责任人的滞后测试技术债务。 | 在测试债务登记表中补全责任 Agent 及目标收敛里程碑。 |
+| `TST-DEN-001` | <a id="tst-den-001"></a>`test-modernity` | `TST` | `info` | `all` | 关键业务模块的有效现代化测试密度 (EMTD) 或当前业务承接率 (CBCR) 低于阈值。 | 补齐高风险语义单元的契约测试与边界测试，提高实际故障感知能力。 |
+| `TST-FLT-001` | <a id="tst-flt-001"></a>`test-modernity` | `TST` | `warning` | `all` | 浮点断言脆弱性：测试直接对裸浮点字面量进行全等断言而缺乏容差控制或公式推导。 | 通过数学公式推导预期值或使用容差断言（如 toBeCloseTo 或 is_equal_approx）。 |
+| `TST-ILS-001` | <a id="tst-ils-001"></a>`test-modernity` | `TST` | `warning` | `all` | 测试完整性幻觉：测试仅校验 Mock 配置或绑定已废弃业务契约。 | 将测试迁移至验证活跃业务契约与实际领域状态变化。 |
+| `TST-SKP-001` | <a id="tst-skp-001"></a>`test-modernity` | `TST` | `warning` | `all` | 核心业务域中长期滞留的跳过、隔离或未执行测试用例。 | 修复并恢复测试用例，或正式登记入测试债务清单并设定收敛里程碑。 |
+| `TST-TAU-001` | <a id="tst-tau-001"></a>`test-modernity` | `TST` | `warning` | `all` | 缺乏真实业务断言或包含恒真断言的无效测试。 | 替换恒真断言为针对业务实体输出和错误边界的有效验证。 |
+| `TST-TOP-001` | <a id="tst-top-001"></a>`test-modernity` | `TST` | `warning` | `all` | 多语言测试拓扑双轨纪律：严禁在 TS/GDScript 等语言生产代码中内嵌测试代码域，强化 Rust 计算库物理分区与面向 Agent 可读注释契约。 | 将内嵌在非 Rust 生产文件中的测试逻辑迁移至显式独立测试文件（如 *.test.ts），Rust 计算库测试必须置于 #[cfg(test)] 尾部分区并补充 Agent 可读注释。 |
+| `VSC-I18N-001` | <a id="vsc-i18n-001"></a>`vscode-extension` | `VSC` | `warning` | `typescript, javascript` | 用户可见消息使用硬编码字符串字面量未接入国际化字典。 | 使用 vscode.l10n.t(...) 或双语字典常量进行包装。 |
+| `VSC-MEM-001` | <a id="vsc-mem-001"></a>`vscode-extension` | `VSC` | `error` | `typescript, javascript` | VS Code Disposable 资源创建后未压入 context.subscriptions。 | 使用 context.subscriptions.push(...) 注册或纳入复合 Disposable 管理。 |
+| `VSC-PERF-001` | <a id="vsc-perf-001"></a>`vscode-extension` | `VSC` | `warning` | `typescript, javascript` | 在 Extension Host 主线程执行同步文件 I/O 阻塞编辑器 UI。 | 改用 fs.promises 或 vscode.workspace.fs 异步 I/O 接口。 |
+| `VSC-PERF-002` | <a id="vsc-perf-002"></a>`vscode-extension` | `VSC` | `warning` | `typescript, javascript` | Webview CSS 动效直接过渡或动画几何布局属性引发浏览器昂贵重排（Reflow）。 | 将几何属性（width/height/top/left 等）动效替换为 transform 或 opacity 等 GPU 合成层属性。 |
+| `VSC-UI-001` | <a id="vsc-ui-001"></a>`vscode-extension` | `VSC` | `warning` | `typescript, javascript` | Webview 集合列表渲染缺少有界密度控制或折叠收起能力（超过 5 项列表缺乏折叠与导出旁置布局）。 | 为 Webview 动态集合列表实现阈值折叠控件与紧凑密度布局，保障大数据集下信息层次清晰。 |
+| `VSC-UI-002` | <a id="vsc-ui-002"></a>`vscode-extension` | `VSC` | `error` | `typescript, javascript` | Webview 视图样式包含硬编码单色颜色值，破坏 VS Code 主题动态自适应契约。 | 将硬编码颜色替换为 VS Code CSS 主题变量（如 var(--vscode-editor-foreground) 等）。 |
+| `VSC-UI-003` | <a id="vsc-ui-003"></a>`vscode-extension` | `VSC` | `warning` | `typescript, javascript` | Webview 表单交互输入控件缺少无障碍名称或标签绑定（WCAG 4.1.2）。 | 为表单控件补充 aria-label、aria-labelledby 或显式绑定 <label for="...">。 |
 | `analyzer-error` | <a id="analyzer-error"></a>`engine` | `LANG` | `info` | `all` | 分析器在单文件上抛异常（failOnAnalyzerError 可升为 error）。（计划迁移至 `ENG-RUN-001`） | 修复分析器缺陷；已知外部数据问题可保持 info 留痕。 |
-| `ARCH-ABS-001` | <a id="arch-abs-001"></a>`architecture` | `ARCH` | `warning` | `all` | 过度抽象与非必要间接层：为少量共性引入跨层深层转发跳板、跨域依赖反转或循环依赖。 | 消除负收益间接跳板与人为抽象，容许领域隔离的局部正当实现。 |
-| `ARCH-BLR-001` | <a id="arch-blr-001"></a>`architecture` | `ARCH` | `warning` | `all` | 文件边界失衡：单文件内多个高复杂度函数缺乏语义关联，职责异常聚合。 | 按语义与状态边界将文件拆分为高内聚的独立领域模块。 |
-| `ARCH-BND-001` | <a id="arch-bnd-001"></a>`architecture` | `ARCH` | `warning` | `all` | 跨业务域内部穿透：绕过公共导出 Facade 契约直接访问非公开内部实现。 | 通过模块顶层公共导出 API 访问，禁止直接引用 /internal/ 或 /private/。 |
-| `ARCH-CFG-001` | <a id="arch-cfg-001"></a>`architecture` | `ARCH` | `info` | `all` | 环境配置泄漏：纯领域业务模型内部直接读取环境变量或底层磁盘配置。 | 将环境配置提升到应用装配层解析，并以强类型参数注入领域对象。 |
-| `ARCH-CFG-002` | <a id="arch-cfg-002"></a>`architecture` | `ARCH` | `warning` | `all` | 声明的配置项在全库代码中从未参与任何决策、控制流或计算（死配置）。 | 移除无用死配置项或补充对应业务开关/策略引用。 |
-| `ARCH-CFG-003` | <a id="arch-cfg-003"></a>`architecture` | `ARCH` | `warning` | `all` | 同一配置项在多处重复定义，破坏配置单一真源。 | 收敛重复配置到单一配置表或继承层级中。 |
-| `ARCH-CFG-004` | <a id="arch-cfg-004"></a>`architecture` | `ARCH` | `warning` | `all` | 隐式配置散落：业务代码中散落硬编码环境变量读取或隐式调优参数。 | 将散落的环境变量与调优参数提取至统一配置对象并通过参数注入。 |
-| `ARCH-CFG-005` | <a id="arch-cfg-005"></a>`architecture` | `ARCH` | `warning` | `all` | 配置访问散落：未通过统一配置层或注册表，跨层无序散落访问配置。 | 建立统一配置访问层或注册表，集中收口配置读取。 |
-| `ARCH-CFG-006` | <a id="arch-cfg-006"></a>`architecture` | `ARCH` | `warning` | `all` | 配置业务强耦合：领域模型直接绑定具体配置文件物理格式或磁盘解析。 | 通过接口或类型化策略对象解耦，由外层装配并注入领域核心。 |
-| `ARCH-CFG-007` | <a id="arch-cfg-007"></a>`architecture` | `ARCH` | `info` | `all` | 配置过度抽象：简单静态配置引入多重不必要间接封装与透传层。 | 按项目规模裁剪冗余封装，平铺轻量配置访问。 |
-| `ARCH-CFG-008` | <a id="arch-cfg-008"></a>`architecture` | `ARCH` | `warning` | `all` | 配置表根目录平铺蔓延反模式：超过阈值的大量配置平铺于根目录，缺乏领域同构分层。 | 建立领域同构目录（如 config/domains/<域>/core.json），统一分域收拢并消除根目录平铺散落。 |
-| `ARCH-CFG-009` | <a id="arch-cfg-009"></a>`architecture` | `ARCH` | `warning` | `all` | 配置子表路由契约违规：未登记的子表配置脱离主核心路由契约，缺乏点分泛化路由与热重载看守。 | 将子表登记至主配置表并接入点分路由与细粒度热重载守卫。 |
-| `ARCH-DEC-002` | <a id="arch-dec-002"></a>`architecture` | `ARCH` | `warning` | `all` | 多语言 AST 解析与适配器逻辑必须独立解耦为适配器模块，分析器主体严禁混杂语法树构造细节或深耦合特定语言适配器实现。 | 将多语言 AST 构造逻辑抽取至 `src/core/semantic/adapters/` 独立适配器，分析器仅面向 `NormalizedNode` 或多态接口。 |
-| `ARCH-DIR-001` | <a id="arch-dir-001"></a>`architecture` | `ARCH` | `warning` | `all` | 倒置依赖，在领域层定义接口契约，由外层实现。 | 核心逆流：领域层 (Domain) 反向依赖外层应用层/基础设施/接口层。 |
-| `ARCH-DIR-002` | <a id="arch-dir-002"></a>`architecture` | `ARCH` | `warning` | `all` | 引入用例服务 (Application Service) 统筹业务流。 | 越层穿透：接口层控制器绕过应用层直接直连基础设施实现。 |
-| `ARCH-DIR-003` | <a id="arch-dir-003"></a>`architecture` | `ARCH` | `error` | `all` | 形式分层假象：目录结构表面隔离，但调用关系与数据流发生逆向越层。 | 调整调用依赖流向，由内层领域定义契约接口并交由基础设施层实现。 |
-| `ARCH-DISP-001` | <a id="arch-disp-001"></a>`architecture` | `ARCH` | `warning` | `all` | Monolithic dispatchers with excessive branches (> 8) tightly couple domain logic, violating the Open-Closed Principle. | 重构为基于字典/Map 的查表分发 (Table-Driven) 或策略模式 (Strategy Pattern)，解耦各分支业务逻辑。 |
-| `ARCH-DSP-002` | <a id="arch-dsp-002"></a>`architecture` | `ARCH` | `warning` | `all` | Dispatcher closure fragmentation: Object literal defines excessive inline function closures (>= 15), causing closure explosion and function inflation. | 重构为按职责正交划分的 switch 分发函数（单函数圈复杂度 <= 10）或顶层具名处理函数，消除闭包碎片化。 |
-| `ARCH-FAC-001` | <a id="arch-fac-001"></a>`architecture` | `ARCH` | `warning` | `all` | 门面层实质性承载缺失：门面/网关模块缺乏领域编排、模式自验或不可变性冻结，退化为无意义转发层。 | 实现实质性编排、不可变冻结与模式自验，或消除空壳转发门面包装。 |
-| `ARCH-GLB-001` | <a id="arch-glb-001"></a>`architecture` | `ARCH` | `warning` | `all` | 隐式全局可变状态：模块间通过顶层全局变量或单例产生隐式强耦合。 | 重构为依赖注入或按需创建实例，消除共享可变静态单例。 |
-| `ARCH-HDL-001` | <a id="arch-hdl-001"></a>`architecture` | `ARCH` | `error` | `all` | 无头架构违规：核心业务逻辑或计算模块直接绑定 UI/IDE 视图框架。 | 解除核心计算与展示框架依赖，保持无头独立执行与测试能力。 |
-| `ARCH-LEAK-001` | <a id="arch-leak-001"></a>`architecture` | `ARCH` | `warning` | `all` | 领域模型使用 POJO/原生实体，隔离外部框架专有类型。 | 职责泄漏：纯领域模型直接引用或泄漏外部框架库 (Express/Vue/Godot/ORM)。 |
-| `ARCH-LEAK-002` | <a id="arch-leak-002"></a>`architecture` | `ARCH` | `warning` | `all` | 分层越界：外层实现被内层直接反向引用（Clean/DDD 层序反转）。 | 把依赖改回单向（内层定义接口、外层实现），或把该文件移入正确层。 |
-| `ARCH-ROL-001` | <a id="arch-rol-001"></a>`architecture` | `ARCH` | `warning` | `all` | 文件本体角色失衡与伪共享库：文件承担过多易变状态或高耦合业务逻辑，却被跨域频繁引用作为共享库。 | 剥离核心领域状态，明确稳定输入输出边界，构建真正低耦合的共享库。 |
-| `ARCH-ROL-002` | <a id="arch-rol-002"></a>`architecture` | `ARCH` | `warning` | `all` | 业务模块承载无界公共能力：领域业务模块内部私自承载与导出通用基础设施或公共计算能力。 | 将通用能力下沉至对应共享层或基础设施层，确保领域模块职责专注单一。 |
-| `ARCH-SKL-001` | <a id="arch-skl-001"></a>`architecture` | `ARCH` | `info` | `all` | 策略骨架复用候选：检测到具有同构前置校验与收尾步骤的复杂流程。 | 提取公共执行骨架（模板方法/高阶函数编排），将差异步骤作为策略注入。 |
-| `ARCH-TMP-001` | <a id="arch-tmp-001"></a>`architecture` | `ARCH` | `warning` | `all` | 巨石视图/模板渲染器未解耦：单函数规模超标且包含深度 HTML/SVG/DSL 模板字符串拼接，缺少局部组件化。 | 拆解为领域正交的局部组件（Header/Card/Graph Partials），由结构化 ViewModel 驱动渲染。 |
-| `ARCH-UTL-001` | <a id="arch-utl-001"></a>`architecture` | `ARCH` | `warning` | `all` | 高异构耦合工具库反模式：检测到承担混杂多域职责的通用工具模块。 | 按四分流治理原则重构：纯算子进入算法库、常量进入常量库、规则进入策略库、通用转换进入基础层。 |
 | `clean-layer-violation` | <a id="clean-layer-violation"></a>`architecture` | `ARCH` | `error` | `all` | 增量管线中的分层越界（clean-layer 口径）。（计划迁移至 `ARCH-CLN-001`） | 按层序调整依赖方向或把实现下沉/上提到正确层。 |
-| `CMP-CAL-001` | <a id="cmp-cal-001"></a>`governance` | `CMP` | `warning` | `typescript, javascript` | Deeply nested inline callback chains create callback hell, complicate exception propagation, and mask race conditions. | 降低回调嵌套深度：改用 async/await、Promise 链扁平化或抽取具名顶层函数。 |
-| `CMP-DEN-001` | <a id="cmp-den-001"></a>`governance` | `CMP` | `warning` | `typescript, javascript` | Dense syntactic packing of bitwise, arithmetic and conditional operators without naming or spacing exceeds human cognitive chunking capacity. | 降低认知密度：添加适当空白与具名中间常量，拆分高密度算式或位运算组合。 |
-| `CMP-EXP-001` | <a id="cmp-exp-001"></a>`governance` | `CMP` | `warning` | `typescript, javascript` | Giant expressions with deeply nested ternaries or unbounded logical chains create cognitive overload and obscure branching logic. | 将巨型嵌套三元或长逻辑链拆分为具名中间变量或 if-else 分支。 |
-| `CMP-LIN-001` | <a id="cmp-lin-001"></a>`governance` | `CMP` | `warning` | `typescript, javascript` | Cramming multiple distinct statements or side-effects onto a single line impairs stack traces, debug stepping, and code readability. | 将单行内的多个语句或副作用拆分为独立代码行，遵循单行单一语义原则。 |
-| `CONST-CLU-001` | <a id="const-clu-001"></a>`constants` | `CONST` | `warning` | `all` | 同调用域内存在未抽取的同源硬编码字面量（状态码/协议值/路径/事件名），应一揽子打包抽取。 | 结合临近代码域聚类建议，将同一语义族的同源字面量一并抽离为常量，避免遗留散乱硬编码。 |
-| `CONST-DRF-001` | <a id="const-drf-001"></a>`constants` | `CONST` | `warning` | `all` | 跨文件同源语义常量存在命名分裂或数值微小漂移，必须建立单一真源（SSOT）。 | 将多文件维护的同源常量统一定义在领域或协议共享常量库中，并消除数值或命名漂移。 |
-| `CONST-LAY-001` | <a id="const-lay-001"></a>`constants` | `CONST` | `warning` | `all` | 模块级稳定常量在依赖区后必须进入首个正式代码声明域，严禁散落在函数内部、文件中段或业务逻辑之间。 | 将模块级常量统一定义在文件导入声明（import/require）之后、任何函数/类声明之前的常量区。 |
-| `CONST-LIB-001` | <a id="const-lib-001"></a>`constants` | `CONST` | `warning` | `all` | 大规模常量散落于业务代码文件中，缺乏集中分层的常量库目录结构。 | 根据 Agent 建议的目录拓扑与分片模块，在 constants/ 集中归档并提供统一 index.ts 导出。 |
-| `CONST-OWN-001` | <a id="const-own-001"></a>`constants` | `CONST` | `warning` | `all` | 共享常量所有权分层错误，严禁塞入全局大杂烩 constants 文件或藏匿在底层私有模块。 | 按照所有权四层模型，分流至 Module-Private、Domain-Shared、Protocol-Shared 或 System-Config。 |
-| `CONST-SCP-001` | <a id="const-scp-001"></a>`constants` | `CONST` | `warning` | `all` | 单函数局部不变量、延迟初始化值或受限生命周期资源禁止滥用扩大作用域提升至顶层。 | 保持局部不变量在单函数或局部代码块内部的作用域范围，避免盲目提升至文件全局。 |
-| `CONST-SCP-002` | <a id="const-scp-002"></a>`constants` | `CONST` | `info` | `all` | 单函数体内散落的多处同类局部硬编码应在函数头部统一定义为局部常量。 | 在当前函数头部集中声明局部 const 常量并替换函数内部各处的散落字面量。 |
-| `CPX-AMP-001` | <a id="cpx-amp-001"></a>`complexity` | `CPX` | `warning` | `all` | 复杂度放大陷阱：在迭代或热点调用链中隐式嵌套阻塞 I/O 或序列化。 | 将 I/O 与序列化批量汇聚在循环外部执行。 |
-| `CPX-BUD-001` | <a id="cpx-bud-001"></a>`complexity` | `CPX` | `warning` | `all` | 超出弹性复杂度预算：综合语言、角色、代码域与清晰度测算的预算超标。 | 根据角色与职责拆分函数，或将多重嵌套扁平化为策略表/状态机。 |
-| `CPX-HOP-001` | <a id="cpx-hop-001"></a>`complexity` | `CPX` | `warning` | `all` | 机械式拆分投机：通过制造大量单行薄转发包装函数人为压低复杂度。 | 消除无意义的透传转发包装，聚焦于语义重用与领域内聚。 |
-| `CPX-JST-001` | <a id="cpx-jst-001"></a>`complexity` | `CPX` | `warning` | `all` | 非必要设计失控复杂度：高复杂度来自无序嵌套和职责堆积，缺乏算法/状态机证明。 | 梳理核心职责，解离混合流程并分离副作用。 |
-| `CPX-NEST-001` | <a id="cpx-nest-001"></a>`complexity` | `CPX` | `warning` | `all` | 失控深层控制流嵌套：控制流嵌套层级超出该上下文类型的弹性预算（业务代码>3层，状态机/解析器>5层）。 | 利用提前返回（Guard Clauses）扁平化控制流，或将复杂分支独立为子状态处理函数。 |
-| `CPX-NEST-002` | <a id="cpx-nest-002"></a>`complexity` | `CPX` | `warning` | `all` | 深层长跨度控制流跳跃：在深层嵌套（>=4层）且距函数头超长跨度处执行非结构化控制流逃逸（return/break/throw）。 | 利用局部卫语句提前校验，或将深层长跨度闭环提取为纯函数子算子以缩短认知跳跃距离。 |
-| `CPX-REC-001` | <a id="cpx-rec-001"></a>`complexity` | `CPX` | `error` | `all` | 跨函数/跨文件无终止保障的递归或互递归调用链。 | 引入显式深度累加参数与终止保护，或改写为迭代工作列表。 |
-| `CPX-RED-001` | <a id="cpx-red-001"></a>`complexity` | `CPX` | `warning` | `all` | 分布式冗余复杂度超标：跨多个文件存在高度相似的算法流程、计算或校验逻辑，累积形成隐性系统复杂度。 | 评估逻辑共性并依据领域边界进行抽离，或消除局部开发复制。 |
-| `CPX-SPACE-001` | <a id="cpx-space-001"></a>`complexity` | `CPX` | `warning` | `all` | 热点循环内无界瞬态内存分配与重复全量物化。 | 将对象/缓冲区分配提升到循环外，循环内执行就地重置与复用。 |
-| `CPX-STM-001` | <a id="cpx-stm-001"></a>`complexity` | `CPX` | `info` | `all` | 状态机分派结构规范：状态机多层分支内存在过长单分支逻辑（>30 LOC），降低了分派骨架的清晰度。 | 将状态机单分支过长逻辑提取为独立动作处理器，保留纯粹的状态转移分派骨架。 |
-| `CPX-TIME-001` | <a id="cpx-time-001"></a>`complexity` | `CPX` | `warning` | `all` | 跨函数/跨文件无界多项式时间复杂度：嵌套迭代调用链引发高开销。 | 将内层数据预先构建为 Map/Set 索引，降低复合复杂度至 O(N)。 |
 | `disallowed-import` | <a id="disallowed-import"></a>`dependency-graph` | `DEP` | `error` | `all` | 声明式导入边界违规：跨组依赖或未授权外部包。（计划迁移至 `DEP-IMP-001`） | 按配置的 allowGroups/allowExternal 调整导入，或显式登记豁免。 |
 | `duplicate-literal` | <a id="duplicate-literal"></a>`constants` | `LEGACY` | `warning` | `all` | 自动聚合多处行号并提示提取共享常量。（计划迁移至 `CST-DUP-001`） | 同一文件内相同字面量出现频次超标（默认 ≥ 3 次）。 |
 | `expensive-loop-operation` | <a id="expensive-loop-operation"></a>`performance` | `PRF` | `error` | `all` | 循环体内执行昂贵深拷贝（.duplicate(true)）或阻塞式序列化与IO。（计划迁移至 `PRF-CLON-001`） | 消除热路径内的深拷贝操作，改用只读视图或轻量引用。 |
@@ -368,57 +421,15 @@
 | `large-file` | <a id="large-file"></a>`large-file` | `BIG` | `warning` | `all` | 文件行数/函数数超过阈值。（计划迁移至 `BIG-SIZE-001`） | 按职责拆分模块，或把工具函数迁到专属文件。 |
 | `loop-transient-allocation` | <a id="loop-transient-allocation"></a>`performance` | `PRF` | `warning` | `all` | 循环体内瞬态堆分配（ADV-PRF-002），违背零瞬态分配契约。（计划迁移至 `PRF-TRAN-001`） | 将对象实例化提升到循环外或使用对象池模式（ADV-POOL-001）。 |
 | `nested-constant` | <a id="nested-constant"></a>`constants` | `LEGACY` | `warning` | `all` | 严禁常量化嵌套：禁止冗余常量别名引用、深层嵌套常量对象与作用域内部伪常量。（计划迁移至 `CST-NST-001`） | 将常量直接内联或提升至模块顶层单源声明，消除无意义的间接别名与深层对象嵌套。 |
-| `PS-ALIAS-001` | <a id="ps-alias-001"></a>`shell-lint` | `PS` | `info` | `powershell` | PowerShell 脚本使用了不推荐的命令别名。 | 替换为规范的 Cmdlet 全称。 |
-| `PS-CMDLET-001` | <a id="ps-cmdlet-001"></a>`shell-lint` | `PS` | `info` | `powershell` | 函数命名不符合 Verb-Noun 动名词规范。 | 使用标准审批动词与名词重构函数名。 |
-| `PS-DOC-001` | <a id="ps-doc-001"></a>`shell-lint` | `PS` | `warning` | `powershell` | PowerShell 脚本缺少标准帮助文档注释块（.SYNOPSIS / .DESCRIPTION）。 | 在脚本头部编写标准帮助注释块（<# .SYNOPSIS ... #>）。 |
-| `PS-ERROR-001` | <a id="ps-error-001"></a>`shell-lint` | `PS` | `warning` | `powershell` | PowerShell 中存在空 catch 或未捕获的错误。 | 补充错误捕获处理与告警日志。 |
-| `PS-PARAM-001` | <a id="ps-param-001"></a>`shell-lint` | `PS` | `info` | `powershell` | 参数块缺失 [CmdletBinding()] 或参数未声明强类型。 | 添加 [CmdletBinding()] 并为参数声明类型。 |
-| `PS-SAFE-001` | <a id="ps-safe-001"></a>`shell-lint` | `PS` | `warning` | `powershell` | 非交互式或无终端环境下裸用 Read-Host 阻塞执行。 | 增加交互式宿主守卫（$Host.UI）或改用参数传递输入。 |
-| `PS-SEC-001` | <a id="ps-sec-001"></a>`shell-lint` | `PS` | `error` | `powershell` | 使用 Invoke-Expression (iex) 动态执行不可信变量，存在代码注入隐患。 | 避免使用 Invoke-Expression，改用参数化 Cmdlet 或 call operator (&)。 |
-| `PS-TRAP-001` | <a id="ps-trap-001"></a>`shell-lint` | `PS` | `warning` | `powershell` | 申请受控系统资源（FileStream/Mutex 等）后缺少 try-finally 释放保护。 | 使用 try/finally 块或 Dispose() 确保异常路径下资源可靠释放。 |
-| `PS-VERB-001` | <a id="ps-verb-001"></a>`shell-lint` | `PS` | `info` | `powershell` | 使用了未批准的 PowerShell 动词。 | 改用 Get-Verb 批准的标准动词。 |
 | `secret-detected` | <a id="secret-detected"></a>`secrets` | `LEGACY` | `error` | `all` | 疑似硬编码凭据（按模式识别）。（计划迁移至 `SEC-TOK-001`） | 撤销并轮换该凭据；改为从环境/密钥管理读取。 |
-| `SH-ARRAY-001` | <a id="sh-array-001"></a>`shell-lint` | `SH` | `info` | `shell` | 使用 $* 代替了 "$@" 导致单词分割失效。 | 使用 "$@" 保持各个位置参数的独立性。 |
-| `SH-CMD-001` | <a id="sh-cmd-001"></a>`shell-lint` | `SH` | `info` | `shell` | 使用了已过时的反引号命令替换语法。 | 改用现代标准的 $(...) 命令替换语法。 |
-| `SH-COND-001` | <a id="sh-cond-001"></a>`shell-lint` | `SH` | `warning` | `shell` | Bash 脚本在复合条件或正则匹配中使用脆弱的单中括号 [ ... ] 语法。 | 在 Bash 脚本中改用标准的 [[ ... ]] 双中括号测试语法，或遵循严格 POSIX 测试规范。 |
-| `SH-DEPR-001` | <a id="sh-depr-001"></a>`shell-lint` | `SH` | `info` | `shell` | 使用了单中括号 [ 或旧式废弃测试语法。 | 在 Bash 脚本中改用现代标准的 [[ 测试语法。 |
-| `SH-DOC-001` | <a id="sh-doc-001"></a>`shell-lint` | `SH` | `warning` | `shell` | Shell 脚本头部缺少模块与职责元数据说明注释。 | 在脚本头部添加包含模块、描述与退出语义的规范注释。 |
-| `SH-ECHO-001` | <a id="sh-echo-001"></a>`shell-lint` | `SH` | `info` | `shell` | 使用了不可移植的 echo -e / echo -n。 | 改用 POSIX 标准统一的 printf 命令。 |
-| `SH-EOL-001` | <a id="sh-eol-001"></a>`shell-lint` | `SH` | `error` | `shell` | Shell 脚本包含 Windows CRLF 换行符，在 Linux 运行期引发语法解析崩溃。 | 严格采用 LF (0x0A) 换行符保存 Shell 脚本。 |
-| `SH-ERR-001` | <a id="sh-err-001"></a>`shell-lint` | `SH` | `warning` | `shell` | 关键命令执行后未进行错误退出码判定。 | 通过 \|\| exit 或 set -e 强化错误退出机制。 |
-| `SH-EXIT-001` | <a id="sh-exit-001"></a>`shell-lint` | `SH` | `warning` | `shell` | set -e 模式下裸调预期可能失败的命令，引发脚本意外熔断。 | 采用 command \|\| status=$? 或 if 判定安全捕获退出码。 |
-| `SH-INIT-001` | <a id="sh-init-001"></a>`shell-lint` | `SH` | `warning` | `shell` | Shell 脚本头部未声明 set -euo pipefail 严格模式。 | 在脚本开头声明 set -euo pipefail 提升鲁棒性。 |
-| `SH-QUOTE-001` | <a id="sh-quote-001"></a>`shell-lint` | `SH` | `warning` | `shell` | 参数展开未加双引号保护存在单词拆分与通配隐患。 | 对变量引用使用 "$var" 进行双引号保护。 |
-| `SH-READ-001` | <a id="sh-read-001"></a>`shell-lint` | `SH` | `info` | `shell` | read 命令未携带 -r 参数导致反斜杠被转义篡改。 | 使用 read -r 读取原始输入文本。 |
-| `SH-SAFE-001` | <a id="sh-safe-001"></a>`shell-lint` | `SH` | `warning` | `shell` | read 命令缺少超时 (-t) 或终端守护，CI 环境下易导致死锁。 | 为交互式读取添加超时或增加 [ -t 0 ] 终端判断。 |
-| `SH-SEC-001` | <a id="sh-sec-001"></a>`shell-lint` | `SH` | `error` | `shell` | 使用 eval 拼接变量执行动态指令，存在任意命令注入高危漏洞。 | 消除 eval 动态拼接，改用函数、数组或直接参数化调用。 |
-| `SH-TRAP-001` | <a id="sh-trap-001"></a>`shell-lint` | `SH` | `warning` | `shell` | 创建临时文件/目录后缺少 EXIT 陷阱清理，导致磁盘垃圾残留。 | 声明 trap 'rm -rf "$tmp"' EXIT 确保退出时清理临时文件。 |
-| `STDLIB-ALLOC-001` | <a id="stdlib-alloc-001"></a>`stdlib` | `STDLIB` | `error` | `all` | 裸机与 no_std 系统运行环境下隐式堆逃逸与动态重分配静态拦截。 | 在 no_std / core 作用域下使用固定容量栈缓冲、借用切片或预分配内存池，避免裸调 Box::new / malloc。 |
-| `STDLIB-CONST-001` | <a id="stdlib-const-001"></a>`stdlib` | `STDLIB` | `warning` | `all` | 标准库密码学与哈希敏感比较严禁分支时间泄漏，强制常量时间恒定延迟比对。 | 使用恒定时间累加比对（如 constant_time_eq / subtle::ConstantTimeEq），严禁在字节不匹配时提前 return false。 |
-| `STDLIB-PANIC-001` | <a id="stdlib-panic-001"></a>`stdlib` | `STDLIB` | `warning` | `all` | 系统标准库公开接口严禁逃逸裸 panic/unwrap/abort，强制 Result/Option 或有界 error 返回。 | 对可能失败的公开 API 采用 Result<T, E> 或显式 error code 表达错误，内部调用使用 match 或 ? 操作符解包。 |
-| `STDLIB-PORT-001` | <a id="stdlib-port-001"></a>`stdlib` | `STDLIB` | `warning` | `all` | 底层平台条件编译 #[cfg(...)] 缺少未知平台或未支持目标架构时的 fallback 阻断。 | 在特定操作系统/目标平台条件编译块末尾添加 compile_error! 或通用软实现作为兜底后备。 |
-| `STDLIB-RECURSION-001` | <a id="stdlib-recursion-001"></a>`stdlib` | `STDLIB` | `warning` | `all` | 底层核心算法无界深层递归缺乏显式栈深检查或上限防卫。 | 为递归算法引入显式 depth 计数限制，或改用显式工作栈与迭代平铺展开循环。 |
-| `STDLIB-UNSAFE-001` | <a id="stdlib-unsafe-001"></a>`stdlib` | `STDLIB` | `error` | `all` | Rust/C++ 底层 unsafe 块强制附带 SAFETY: 契约证明，缺失即阻断。 | 在每个 unsafe 块或函数前编写 SAFETY: 契约注释，明确记录调用者必须保证的前置条件与内存安全不变量。 |
-| `TST-DBT-001` | <a id="tst-dbt-001"></a>`test-modernity` | `TST` | `info` | `all` | 未登记里程碑收敛计划或责任人的滞后测试技术债务。 | 在测试债务登记表中补全责任 Agent 及目标收敛里程碑。 |
-| `TST-DEN-001` | <a id="tst-den-001"></a>`test-modernity` | `TST` | `info` | `all` | 关键业务模块的有效现代化测试密度 (EMTD) 或当前业务承接率 (CBCR) 低于阈值。 | 补齐高风险语义单元的契约测试与边界测试，提高实际故障感知能力。 |
-| `TST-FLT-001` | <a id="tst-flt-001"></a>`test-modernity` | `TST` | `warning` | `all` | 浮点断言脆弱性：测试直接对裸浮点字面量进行全等断言而缺乏容差控制或公式推导。 | 通过数学公式推导预期值或使用容差断言（如 toBeCloseTo 或 is_equal_approx）。 |
-| `TST-ILS-001` | <a id="tst-ils-001"></a>`test-modernity` | `TST` | `warning` | `all` | 测试完整性幻觉：测试仅校验 Mock 配置或绑定已废弃业务契约。 | 将测试迁移至验证活跃业务契约与实际领域状态变化。 |
-| `TST-SKP-001` | <a id="tst-skp-001"></a>`test-modernity` | `TST` | `warning` | `all` | 核心业务域中长期滞留的跳过、隔离或未执行测试用例。 | 修复并恢复测试用例，或正式登记入测试债务清单并设定收敛里程碑。 |
-| `TST-TAU-001` | <a id="tst-tau-001"></a>`test-modernity` | `TST` | `warning` | `all` | 缺乏真实业务断言或包含恒真断言的无效测试。 | 替换恒真断言为针对业务实体输出和错误边界的有效验证。 |
-| `TST-TOP-001` | <a id="tst-top-001"></a>`test-modernity` | `TST` | `warning` | `all` | 多语言测试拓扑双轨纪律：严禁在 TS/GDScript 等语言生产代码中内嵌测试代码域，强化 Rust 计算库物理分区与面向 Agent 可读注释契约。 | 将内嵌在非 Rust 生产文件中的测试逻辑迁移至显式独立测试文件（如 *.test.ts），Rust 计算库测试必须置于 #[cfg(test)] 尾部分区并补充 Agent 可读注释。 |
 | `unused-export` | <a id="unused-export"></a>`dependency-graph` | `DEP` | `warning` | `all` | 导出符号无人引用（TS/JS 口径；Python 无 export 关键字不参与）。（计划迁移至 `DEP-UNX-001`） | 删除无人使用的导出，或把它收回模块内部。 |
 | `unused-module` | <a id="unused-module"></a>`dependency-graph` | `DEP` | `warning` | `all` | 模块无人导入（非入口白名单内）。（计划迁移至 `DEP-UNM-001`） | 删除该模块，或把入口 glob 加入 entryGlobs。 |
-| `VSC-I18N-001` | <a id="vsc-i18n-001"></a>`vscode-extension` | `VSC` | `warning` | `typescript, javascript` | 用户可见消息使用硬编码字符串字面量未接入国际化字典。 | 使用 vscode.l10n.t(...) 或双语字典常量进行包装。 |
-| `VSC-MEM-001` | <a id="vsc-mem-001"></a>`vscode-extension` | `VSC` | `error` | `typescript, javascript` | VS Code Disposable 资源创建后未压入 context.subscriptions。 | 使用 context.subscriptions.push(...) 注册或纳入复合 Disposable 管理。 |
-| `VSC-PERF-001` | <a id="vsc-perf-001"></a>`vscode-extension` | `VSC` | `warning` | `typescript, javascript` | 在 Extension Host 主线程执行同步文件 I/O 阻塞编辑器 UI。 | 改用 fs.promises 或 vscode.workspace.fs 异步 I/O 接口。 |
-| `VSC-PERF-002` | <a id="vsc-perf-002"></a>`vscode-extension` | `VSC` | `warning` | `typescript, javascript` | Webview CSS 动效直接过渡或动画几何布局属性引发浏览器昂贵重排（Reflow）。 | 将几何属性（width/height/top/left 等）动效替换为 transform 或 opacity 等 GPU 合成层属性。 |
-| `VSC-UI-001` | <a id="vsc-ui-001"></a>`vscode-extension` | `VSC` | `warning` | `typescript, javascript` | Webview 集合列表渲染缺少有界密度控制或折叠收起能力（超过 5 项列表缺乏折叠与导出旁置布局）。 | 为 Webview 动态集合列表实现阈值折叠控件与紧凑密度布局，保障大数据集下信息层次清晰。 |
-| `VSC-UI-002` | <a id="vsc-ui-002"></a>`vscode-extension` | `VSC` | `error` | `typescript, javascript` | Webview 视图样式包含硬编码单色颜色值，破坏 VS Code 主题动态自适应契约。 | 将硬编码颜色替换为 VS Code CSS 主题变量（如 var(--vscode-editor-foreground) 等）。 |
-| `VSC-UI-003` | <a id="vsc-ui-003"></a>`vscode-extension` | `VSC` | `warning` | `typescript, javascript` | Webview 表单交互输入控件缺少无障碍名称或标签绑定（WCAG 4.1.2）。 | 为表单控件补充 aria-label、aria-labelledby 或显式绑定 <label for="...">。 |
 
 ---
 
 ## 4. 关联文档导航
 
 - [02. 自定义分析器插件与语义模式扩展规范](./02-custom-analyzer-plugin.md)
+- [04. 跨语言泛化审查与项目中立性规范](../05-specs-and-benchmarks/04-cross-language-generalization.md)
+- [06. 多语言现代化规则包与常量单源治理](../05-specs-and-benchmarks/06-modernization-program.md)
 - [07. 三平面质量量化模型与代码自治度 (CAI) 规范](../05-specs-and-benchmarks/07-quantified-quality-standard.md)
