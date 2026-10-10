@@ -39,7 +39,7 @@ const LOCAL_DECL_RE =
     /(?:^|\s)(?:function|class|interface|type|const|let|var|enum|def|struct|fn)\s+[a-zA-Z0-9_$]+/;
 
 const SUBSTANTIVE_PAYLOAD_RE =
-    /(?:Object\.freeze|deepFreeze|assert\(|assert\.|throw\s+new\s+|typeof\s+|instanceof\s+|normalizeLocale|getRuleText)/;
+    /(?:Object\.freeze|deepFreeze|readonly\s+|Readonly<|assert\(|assert\.|throw\s+new\s+|typeof\s+|instanceof\s+|\.validate\(|\.parse\(|\.safeParse\(|sanitize|normalize)/i;
 
 const FACADE_PATH_HINT_RE = /(?:facade|gateway|adapter|aggregator)/i;
 

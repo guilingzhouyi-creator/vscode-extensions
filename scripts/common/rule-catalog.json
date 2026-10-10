@@ -1,11 +1,11 @@
 {
   "schema": "workspace-rule-catalog/v1",
-  "generatedAt": "2026-10-10T11:34:19.625Z",
-  "totalRules": 410,
+  "generatedAt": "2026-10-10T16:44:19.543Z",
+  "totalRules": 414,
   "counts": {
-    "autoRefactor": 325,
+    "autoRefactor": 329,
     "workspaceTiming": 49,
-    "webGames": 52,
+    "webGames": 53,
     "globalTooling": 7
   },
   "rules": [
@@ -885,6 +885,20 @@
       "summary": "Identical literal frequency exceeds threshold in the same file (default >= 3 occurrences)."
     },
     {
+      "id": "ERR-FLT-001",
+      "project": "auto-refactor",
+      "family": "ERR",
+      "severity": "warning",
+      "summary": "Unhandled floating promise: asynchronous operation executed without await, return, void, or .catch() error handler."
+    },
+    {
+      "id": "ERR-MSG-001",
+      "project": "auto-refactor",
+      "family": "ERR",
+      "severity": "warning",
+      "summary": "Vague or empty error diagnostic message: thrown error lacks actionable diagnostic context, root cause details, or troubleshooting hints."
+    },
+    {
       "id": "ERR-PRP-001",
       "project": "auto-refactor",
       "family": "ERR",
@@ -1550,6 +1564,13 @@
       "summary": "Zero-byte empty file, blank comment-only file, or hollow shell file lacking AST semantic payload."
     },
     {
+      "id": "HYG-EOL-001",
+      "project": "auto-refactor",
+      "family": "HYG",
+      "severity": "error",
+      "summary": "Physical line endings contract violation (PowerShell scripts must be CRLF, other source files must be LF)."
+    },
+    {
       "id": "HYG-EXC-001",
       "project": "auto-refactor",
       "family": "HYG",
@@ -1583,6 +1604,13 @@
       "family": "HYG",
       "severity": "warning",
       "summary": "Temporary construction phase jargon (`pXX`, `phaseXX`, `stXX`, `wip`) leaking into code or comments."
+    },
+    {
+      "id": "HYG-SUP-001",
+      "project": "auto-refactor",
+      "family": "HYG",
+      "severity": "error",
+      "summary": "Unannotated compiler or linter suppression directive (@ts-ignore, @ts-nocheck, eslint-disable, # noqa) without approved exemption."
     },
     {
       "id": "HYG-WRAP-001",

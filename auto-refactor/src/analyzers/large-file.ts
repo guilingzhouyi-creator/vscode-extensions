@@ -349,6 +349,10 @@ export class LargeFileAnalyzer implements Analyzer {
             return [];
         }
 
+        if (ext === '.md' || ext === '.markdown') {
+            return [];
+        }
+
         if (isStdlibExempt(ctx.config.archetype, roleInference.role, m.lines)) {
             return [];
         }

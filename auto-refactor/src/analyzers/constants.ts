@@ -52,6 +52,7 @@ import {
     TEST_SUITE_BENIGN_TOKENS,
     AST_PARSER_BENIGN_TOKENS,
     SCHEMA_PROPERTY_TOKENS,
+    WEB_AND_DOM_BENIGN_TOKENS,
     SUGGESTED_NAME_INTEGER_LIMIT,
     SUGGESTED_NAME_MAX_WORDS,
     NUM_KIND,
@@ -444,6 +445,8 @@ export class ConstantsAnalyzer implements Analyzer {
         if (isTest && TEST_SUITE_BENIGN_TOKENS.has(lower)) return true;
         if (isDataOrConfig && SCHEMA_PROPERTY_TOKENS.has(lower)) return true;
         if (isAlgorithm && AST_PARSER_BENIGN_TOKENS.has(lower)) return true;
+        if (WEB_AND_DOM_BENIGN_TOKENS.has(lower)) return true;
+        if (/^(?:#[a-zA-Z0-9_-]+|\.[a-zA-Z0-9_-]+)$/.test(lower)) return true;
         return false;
     }
 

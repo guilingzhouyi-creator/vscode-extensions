@@ -139,7 +139,7 @@ export const CANONICAL_TOPIC_CATALOG: Readonly<Record<string, readonly string[]>
     DAT: ['DEF', 'LAY', 'NPL', 'QRY', 'RES', 'SER'],
     DEP: ['INV', 'LAZ', 'ORD', 'RES', 'WLD'],
     DOC: ['DUP', 'FEN', 'LNK', 'TRM'],
-    ERR: ['PRP'],
+    ERR: ['FLT', 'MSG', 'PRP'],
     GATE: [
         'AST',
         'BUDGET',
@@ -203,7 +203,7 @@ export const CANONICAL_TOPIC_CATALOG: Readonly<Record<string, readonly string[]>
         'TRJ',
         'TYP',
     ],
-    HYG: ['BLT', 'CLN', 'DED', 'EMP', 'EXC', 'NAM', 'SGL', 'STB', 'WRAP'],
+    HYG: ['BLT', 'CLN', 'DED', 'EMP', 'EOL', 'EXC', 'NAM', 'SGL', 'STB', 'SUP', 'WRAP'],
     NAM: [
         'ABR',
         'COL',

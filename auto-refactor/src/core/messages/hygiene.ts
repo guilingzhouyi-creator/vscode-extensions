@@ -127,4 +127,56 @@ export const HygieneMessages = {
             'Duplicated code clusters lead to divergent maintenance and incomplete bugfixes across copies.',
         risk: RISK_MEDIUM,
     }),
+
+    // HYG-EOL-001
+    /**
+     * Build the HYG-EOL-001 descriptor for physical line endings contract violation.
+     */
+    LINE_ENDINGS_MISMATCH: (file: string, expected: string, actual: string): DiagnosticDescriptor => ({
+        message: `Line endings contract violation in '${file}': Expected ${expected} but detected ${actual}`,
+        suggestion: `Standardize line endings to ${expected} to comply with workspace physical hygiene contract`,
+        rationale:
+            'Inconsistent line endings trigger unnecessary git diff noise and platform-specific execution errors.',
+        risk: 'High',
+    }),
+
+    // HYG-SUP-001
+    /**
+     * Build the HYG-SUP-001 descriptor for unannotated compiler or linter suppression directives.
+     */
+    SUPPRESSION_DIRECTIVE: (directive: string): DiagnosticDescriptor => ({
+        message: `Unannotated compiler or linter suppression directive detected: '${directive}'`,
+        suggestion:
+            'Resolve the underlying type or lint error directly instead of silencing it with suppression comments',
+        rationale:
+            'Suppressing compiler and lint errors hides architectural rot, type safety defects, and potential runtime crashes.',
+        risk: 'High',
+    }),
+
+    // ERR-FLT-001
+    /**
+     * Build the ERR-FLT-001 descriptor for an unhandled or floating promise invocation.
+     */
+    FLOATING_PROMISE: (expression: string): DiagnosticDescriptor => ({
+        message: `Floating promise detected without handling: '${expression}'. Unhandled promises trigger silent async failures and memory leaks`,
+        suggestion:
+            'Explicitly await, return, void, or attach a .catch() handler to the promise',
+        rationale:
+            'Floating unhandled promises in asynchronous workflows bypass error handling pipelines and lead to unhandled rejections or silent background hangs.',
+        risk: 'High',
+    }),
+
+    // ERR-MSG-001
+    /**
+     * Build the ERR-MSG-001 descriptor for vague or empty error diagnostic throws.
+     */
+    VAGUE_ERROR_MESSAGE: (expression: string): DiagnosticDescriptor => ({
+        message: `Vague or empty error throw diagnostic detected: '${expression}'. Thrown errors must provide actionable context and diagnostic hints`,
+        suggestion:
+            'Provide descriptive troubleshooting context, expected vs actual values, and root cause hints (conforming to ESR diagnostic quality standards)',
+        rationale:
+            'Opaque error messages lacking diagnostic specificity increase triage time and obscure failure causes in production logs.',
+        risk: RISK_MEDIUM,
+    }),
 } as const;
+

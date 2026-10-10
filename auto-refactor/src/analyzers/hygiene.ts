@@ -232,6 +232,38 @@ export class HygieneAnalyzer implements Analyzer {
             return issues;
         }
 
+        if (file.endsWith('.ps1')) {
+            if (!content.includes('\r\n') && content.includes('\n')) {
+                const desc = HygieneMessages.LINE_ENDINGS_MISMATCH(file, 'CRLF', 'LF');
+                issues.push(
+                    this.mkIssue(
+                        ctx,
+                        0,
+                        'HYG-EOL-001',
+                        desc.message,
+                        'error',
+                        { file, expected: 'CRLF', actual: 'LF' },
+                        desc.suggestion,
+                    ),
+                );
+            }
+        } else if (/\.(?:ts|js|json|md|sh|rs|py|gd)$/.test(file)) {
+            if (content.includes('\r\n')) {
+                const desc = HygieneMessages.LINE_ENDINGS_MISMATCH(file, 'LF', 'CRLF');
+                issues.push(
+                    this.mkIssue(
+                        ctx,
+                        0,
+                        'HYG-EOL-001',
+                        desc.message,
+                        'error',
+                        { file, expected: 'LF', actual: 'CRLF' },
+                        desc.suggestion,
+                    ),
+                );
+            }
+        }
+
         if (checkNaming) {
             this.auditFileNaming(file, ctx, issues);
             if (file.endsWith('.py')) this.auditPythonNaming(content, file, ctx, issues);
@@ -514,6 +546,66 @@ export class HygieneAnalyzer implements Analyzer {
                     desc.suggestion,
                 ),
             );
+        }
+
+        const SUPPRESSION_DIRECTIVE_RE =
+            /^\s*(?:\/\/|\/\*|#|\*)\s*(?:@ts-(?:ignore|expect-error|nocheck)|eslint-disable|biome-ignore|#\s*noqa)\b/i;
+        if (SUPPRESSION_DIRECTIVE_RE.test(trimmed)) {
+            const match = trimmed.match(SUPPRESSION_DIRECTIVE_RE);
+            const directive = match ? match[0].trim() : trimmed;
+            const desc = HygieneMessages.SUPPRESSION_DIRECTIVE(directive);
+            issues.push(
+                this.mkIssue(
+                    ctx,
+                    lineIdx,
+                    'HYG-SUP-001',
+                    desc.message,
+                    'error',
+                    { line: lineIdx + 1, directive },
+                    desc.suggestion,
+                ),
+            );
+        }
+
+        if (
+            !trimmed.startsWith('//') &&
+            !trimmed.startsWith('*') &&
+            !trimmed.startsWith('/*') &&
+            !trimmed.startsWith('#')
+        ) {
+            const VAGUE_THROW_RE =
+                /^\s*(?:throw\s+new\s+[A-Za-z0-9_$]*(?:Error|Exception)\s*\(\s*(?:['"]\s*['"]|['"](?:error|failed|err|invalid|unknown|bad|bug|oops|exception)['"]\s*)?\)|throw\s+['"][a-zA-Z0-9_\-\s]{0,8}['"]\s*;?|raise\s+[A-Za-z0-9_$]*(?:Exception|Error)\s*\(\s*(?:['"]\s*['"]|['"](?:error|failed|err)['"]\s*)?\))/i;
+            if (VAGUE_THROW_RE.test(trimmed)) {
+                const desc = HygieneMessages.VAGUE_ERROR_MESSAGE(trimmed);
+                issues.push(
+                    this.mkIssue(
+                        ctx,
+                        lineIdx,
+                        'ERR-MSG-001',
+                        desc.message,
+                        SEVERITY_WARNING,
+                        { line: lineIdx + 1, expression: trimmed },
+                        desc.suggestion,
+                    ),
+                );
+            }
+
+            const FLOATING_PROMISE_RE =
+                /^\s*(?:Promise\.(?:all|allSettled|race|resolve|reject)|new\s+Promise)\s*\(/;
+            if (FLOATING_PROMISE_RE.test(trimmed)) {
+                const desc = HygieneMessages.FLOATING_PROMISE(trimmed);
+                issues.push(
+                    this.mkIssue(
+                        ctx,
+                        lineIdx,
+                        'ERR-FLT-001',
+                        desc.message,
+                        SEVERITY_WARNING,
+                        { line: lineIdx + 1, expression: trimmed },
+                        desc.suggestion,
+                    ),
+                );
+            }
         }
     }
 

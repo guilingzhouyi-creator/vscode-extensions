@@ -267,6 +267,32 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#doc-trm-001',
     }),
     defineRule({
+        id: 'ERR-FLT-001',
+        family: RULE_FAMILY_ERROR,
+        analyzer: ANALYZER_HYGIENE,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            'Unhandled floating promise: asynchronous operation executed without await, return, void, or .catch() error handler.',
+        remediation:
+            'Awaited via await, return to caller, void discarded with void operator, or handle via .catch() to ensure asynchronous reliability.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#err-flt-001',
+    }),
+    defineRule({
+        id: 'ERR-MSG-001',
+        family: RULE_FAMILY_ERROR,
+        analyzer: ANALYZER_HYGIENE,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            'Vague or empty error diagnostic message: thrown error lacks actionable diagnostic context, root cause details, or troubleshooting hints.',
+        remediation:
+            'Provide clear diagnostic context, expected versus actual states, and root cause hints to maintain high debuggability (ESR diagnostic standard).',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#err-msg-001',
+    }),
+    defineRule({
         id: 'ERR-PRP-001',
         family: RULE_FAMILY_ERROR,
         analyzer: ANALYZER_HYGIENE,
@@ -329,6 +355,19 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#hyg-emp-001',
     }),
     defineRule({
+        id: 'HYG-EOL-001',
+        family: RULE_FAMILY_HYGIENE,
+        analyzer: ANALYZER_HYGIENE,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_ERROR,
+        summary:
+            'Physical line endings contract violation (PowerShell scripts must be CRLF, other source files must be LF).',
+        remediation:
+            'Convert file line endings to match the workspace physical hygiene contract (.ps1 CRLF, others LF).',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#hyg-eol-001',
+    }),
+    defineRule({
         id: 'HYG-EXC-001',
         family: RULE_FAMILY_HYGIENE,
         analyzer: ANALYZER_HYGIENE,
@@ -386,6 +425,19 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
             'Temporary construction phase jargon (`pXX`, `phaseXX`, `stXX`, `wip`) leaking into code or comments.',
         remediation: 'Replace temporary construction jargon with enduring domain terms.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#hyg-stb-002',
+    }),
+    defineRule({
+        id: 'HYG-SUP-001',
+        family: RULE_FAMILY_HYGIENE,
+        analyzer: ANALYZER_HYGIENE,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_ERROR,
+        summary:
+            'Unannotated compiler or linter suppression directive (@ts-ignore, @ts-nocheck, eslint-disable, # noqa) without approved exemption.',
+        remediation:
+            'Address the underlying type or lint error directly instead of silencing it with suppression comments, or register an approved exemption.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#hyg-sup-001',
     }),
     defineRule({
         id: 'HYG-WRAP-001',
