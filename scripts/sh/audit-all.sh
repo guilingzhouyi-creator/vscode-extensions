@@ -55,7 +55,11 @@ START_TIME=$("$NODE_BIN" -e 'process.stdout.write(Date.now().toString())')
 
 # 1. 物理卫生与零空文件看守
 if [[ "$JSON_MODE" -eq 0 ]]; then echo "▶ [1/5] 检查全工作区物理卫生、同构脚本与零空文件..."; fi
-if ! "$NODE_BIN" scripts/common/validate-no-empty-files.js >/dev/null 2>&1 || ! "$NODE_BIN" scripts/common/validate-script-isomorphism.js >/dev/null 2>&1; then
+CODE_EMPTY=0
+"$NODE_BIN" scripts/common/validate-no-empty-files.js >/dev/null 2>&1 || CODE_EMPTY=$?
+CODE_ISO=0
+"$NODE_BIN" scripts/common/validate-script-isomorphism.js >/dev/null 2>&1 || CODE_ISO=$?
+if [[ "$CODE_EMPTY" -ne 0 || "$CODE_ISO" -ne 0 ]]; then
     STATUS_HYGIENE="FAIL"
     FAILED=1
 else
@@ -64,7 +68,11 @@ fi
 
 # 2. 单源规则注册表与目录一致性及技能集规范
 if [[ "$JSON_MODE" -eq 0 ]]; then echo "▶ [2/5] 聚合与校验全工作区单源规则目录与技能集规范..."; fi
-if ! "$NODE_BIN" scripts/common/generate-rule-catalog.js >/dev/null 2>&1 || ! "$NODE_BIN" scripts/common/validate-skills.js >/dev/null 2>&1; then
+CODE_CATALOG=0
+"$NODE_BIN" scripts/common/generate-rule-catalog.js >/dev/null 2>&1 || CODE_CATALOG=$?
+CODE_SKILLS=0
+"$NODE_BIN" scripts/common/validate-skills.js >/dev/null 2>&1 || CODE_SKILLS=$?
+if [[ "$CODE_CATALOG" -ne 0 || "$CODE_SKILLS" -ne 0 ]]; then
     STATUS_RULES="FAIL"
     FAILED=1
 else
@@ -147,6 +155,10 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG"
   const statusWt = process.argv[7];
   const statusWg = process.argv[8];
   const rootDir = process.argv[9];
+  const codeEmpty = Number(process.argv[10] || 0);
+  const codeIso = Number(process.argv[11] || 0);
+  const codeCatalog = Number(process.argv[12] || 0);
+  const codeSkills = Number(process.argv[13] || 0);
   const baselineFile = path.join(rootDir, "auto-refactor", "reports", "self-audit-baseline.json");
   const wtReportFile = path.join(rootDir, "workspace-timing", "reports", "review", "report-latest.json");
   const summaryFile = process.env.GITHUB_STEP_SUMMARY;
@@ -177,31 +189,91 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG"
 
   const SCORE_FLOOR = 15.0;
 
-  const scoreHygiene = statusHygiene === "PASS" ? 99.8 : Math.max(SCORE_FLOOR, Number((99.8 - 70.0).toFixed(1)));
-  const scoreRules = statusRules === "PASS" ? 99.8 : Math.max(SCORE_FLOOR, Number((99.8 - 70.0).toFixed(1)));
-  const baseAr = compositeScore !== null ? Number(compositeScore) : 98.8;
-  const scoreAr = statusAr === "PASS" ? baseAr : Math.max(SCORE_FLOOR, Number((baseAr - 70.0).toFixed(1)));
+  // 1. 物理卫生基石得分（动态判定：零空文件/跳板与同构脚本对双项全合规 100.0，按违规项比例连续度量）
+  let hygienePassedCount = 0;
+  if (codeEmpty === 0) hygienePassedCount += 1;
+  if (codeIso === 0) hygienePassedCount += 1;
+  const scoreHygiene = hygienePassedCount === 2 ? 100.0 : Math.max(SCORE_FLOOR, Number((100.0 * (hygienePassedCount / 2.0)).toFixed(1)));
 
-  let baseWt = 94.6;
+  // 2. 单源规则目录基石得分（基于 410 规则 SSOT 一致性与技能文档字节等价比对动态判定）
+  const ruleCatalogPath = path.join(rootDir, "scripts", "common", "rule-catalog.json");
+  let catalogRuleCount = 0;
   try {
-    if (fs.existsSync(wtReportFile)) {
-      const wtJson = JSON.parse(fs.readFileSync(wtReportFile, "utf8"));
-      const checks = Number(wtJson.summary?.checks ?? 0);
-      const passed = Number(wtJson.summary?.byStatus?.PASS ?? 0);
-      const warnCount = Number(wtJson.summary?.bySeverity?.warning ?? 0);
-      const errCount = Number(wtJson.summary?.bySeverity?.error ?? 0);
-      if (checks > 0) {
-        const ratio = passed / checks;
-        const rawWt = (99.6 * ratio) - (warnCount * 0.035) - (errCount * 5.0);
-        baseWt = Math.max(SCORE_FLOOR, Number(rawWt.toFixed(1)));
+    if (fs.existsSync(ruleCatalogPath)) {
+      const catalogObj = JSON.parse(fs.readFileSync(ruleCatalogPath, "utf8"));
+      if (catalogObj && catalogObj.totalRules) {
+        catalogRuleCount = Number(catalogObj.totalRules);
       }
     }
   } catch (_) {
-    baseWt = 94.6;
+    catalogRuleCount = 0;
   }
-  const scoreWt = statusWt === "PASS" ? baseWt : Math.max(SCORE_FLOOR, Number((baseWt - 70.0).toFixed(1)));
 
-  const scoreWg = statusWg === "PASS" ? 99.7 : Math.max(SCORE_FLOOR, Number((99.7 - 70.0).toFixed(1)));
+  let scoreRules = SCORE_FLOOR;
+  if (statusRules === "PASS" && catalogRuleCount >= 410) {
+    scoreRules = 100.0;
+  } else if (statusRules === "PASS" && catalogRuleCount > 0) {
+    scoreRules = Math.max(SCORE_FLOOR, Number((100.0 * (catalogRuleCount / 410.0)).toFixed(1)));
+  } else {
+    let rulesPassedCount = 0;
+    if (codeCatalog === 0) rulesPassedCount += 1;
+    if (codeSkills === 0) rulesPassedCount += 1;
+    scoreRules = Math.max(SCORE_FLOOR, Number((100.0 * (rulesPassedCount / 2.0)).toFixed(1)));
+  }
+
+  // 3. auto-refactor 质量基线得分（基于自审综合基线动态读取，门禁失败动态连续衰减）
+  const baseAr = compositeScore !== null ? Number(compositeScore) : 100.0;
+  const scoreAr = statusAr === "PASS" ? baseAr : Math.max(SCORE_FLOOR, Number((baseAr - 60.0).toFixed(1)));
+
+  // 4. workspace-timing 审查门禁得分（基于 report-latest.json 真实 checks/pass/warn 连续计算，移除硬编码 94.6）
+  let baseWt = null;
+  try {
+    if (fs.existsSync(wtReportFile)) {
+      const wtJson = JSON.parse(fs.readFileSync(wtReportFile, "utf8"));
+      if (wtJson && wtJson.summary && wtJson.summary.checks > 0) {
+        const totalChecks = Number(wtJson.summary.checks);
+        const passChecks = wtJson.summary.byStatus?.PASS ? Number(wtJson.summary.byStatus.PASS) : 0;
+        const warnCount = wtJson.summary.bySeverity?.warning ? Number(wtJson.summary.bySeverity.warning) : 0;
+        const errCount = wtJson.summary.bySeverity?.error ? Number(wtJson.summary.bySeverity.error) : 0;
+        if (totalChecks > 0) {
+          const ratio = passChecks / totalChecks;
+          const rawWt = (100.0 * ratio) - (warnCount * 0.035) - (errCount * 5.0);
+          baseWt = Math.max(SCORE_FLOOR, Number(rawWt.toFixed(1)));
+        }
+      }
+    }
+  } catch (_) {
+    baseWt = null;
+  }
+
+  if (baseWt === null) {
+    baseWt = statusWt === "PASS" ? 100.0 : SCORE_FLOOR;
+  }
+  const scoreWt = statusWt === "PASS" ? baseWt : Math.max(SCORE_FLOOR, Number((baseWt - 60.0).toFixed(1)));
+
+  // 5. WebGames 配置架构得分（基于架构护栏执行通过状态动态判定，移除写死 99.7）
+  const scoreWg = statusWg === "PASS" ? 100.0 : Math.max(SCORE_FLOOR, Number((100.0 - 60.0).toFixed(1)));
+
+  // 全工作区综合健康分（五大核心子系统基石分平权加权各占 20%：0.2 * (Hygiene + Rules + AR + WT + WG)）
+  const workspaceHealthScore = Number((0.2 * (scoreHygiene + scoreRules + scoreAr + scoreWt + scoreWg)).toFixed(2));
+  const wsHealthStr = workspaceHealthScore % 1 === 0 ? workspaceHealthScore.toFixed(1) : String(workspaceHealthScore);
+
+  function getGradeTag(score) {
+    if (score >= 95.0) return "[A+]";
+    if (score >= 90.0) return "[A ]";
+    if (score >= 85.0) return "[B+]";
+    if (score >= 80.0) return "[B ]";
+    if (score >= 75.0) return "[C+]";
+    if (score >= 70.0) return "[C ]";
+    if (score >= 60.0) return "[D ]";
+    return "[F ]";
+  }
+
+  function getGradeFromScore(score) {
+    return getGradeTag(score).replace("[", "").replace("]", "").trim();
+  }
+
+  const wsGrade = getGradeFromScore(workspaceHealthScore);
 
   if (jsonMode) {
     const summary = {
@@ -222,7 +294,9 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG"
         workspaceTiming: scoreWt,
         webGames: scoreWg
       },
-      compositeScore,
+      workspaceHealthScore,
+      compositeScore: workspaceHealthScore,
+      arCompositeScore: compositeScore,
       tenDimensions,
       qualityVector
     };
@@ -286,7 +360,7 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG"
   const sepTitle1 = "─ [全工作区五大核心子系统基石得分] ";
   const sep1 = "├" + sepTitle1 + "─".repeat(targetWidth - strWidth(sepTitle1)) + "┤";
 
-  const sepTitle2 = "─ [全工作区十维工程质量全景指数] ";
+  const sepTitle2 = "─ [auto-refactor 静态引擎十维工程质量全景指数] ";
   const sep2 = "├" + sepTitle2 + "─".repeat(targetWidth - strWidth(sepTitle2)) + "┤";
 
   console.log("");
@@ -296,15 +370,10 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG"
   console.log(formatDashboardRow(" ".repeat(titlePad) + titleText, targetWidth));
   console.log(borderMid);
 
-  if (compositeScore !== null) {
-    const csNum = Number(compositeScore);
-    const csStr = csNum % 1 === 0 ? csNum.toFixed(1) : csNum.toFixed(2);
-    let summaryText = `综合健康分: ${csStr}`;
-    if (grade) summaryText += ` (${grade})`;
-    if (autonomyRate != null) summaryText += ` | 自研率: ${Number(autonomyRate).toFixed(2)}%`;
-    if (totalDebt != null) summaryText += ` | 技术债总量: ${totalDebt} 项`;
-    console.log(formatDashboardRow(" " + summaryText, targetWidth));
-  }
+  let summaryText = `综合健康分: ${wsHealthStr} (${wsGrade})`;
+  if (autonomyRate != null) summaryText += ` | 自研率: ${Number(autonomyRate).toFixed(2)}%`;
+  if (totalDebt != null) summaryText += ` | 技术债总量: ${totalDebt} 项`;
+  console.log(formatDashboardRow(" " + summaryText, targetWidth));
 
   console.log(sep1);
 
@@ -331,16 +400,16 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG"
   console.log(sep2);
 
   const dimDefinitions = [
-    { num: " 1.", name: "架构一致", key: "architectureConsistency", note: "[A+] 分层边界解耦" },
-    { num: " 2.", name: "语义纯度", key: "semanticPurity", note: "[A+] 纯函数数据流" },
-    { num: " 3.", name: "代码安全", key: "codeSecurity", note: "[A+] 输入安全防御" },
-    { num: " 4.", name: "性能预算", key: "performanceEfficiency", note: "[A+] 零循环堆分配" },
-    { num: " 5.", name: "标准化",   key: "standardization", note: "[B ] 命名契约标准" },
-    { num: " 6.", name: "现代化",   key: "modernity", note: "[A+] 现代语法API" },
-    { num: " 7.", name: "可维护性", key: "maintainability", note: "[A+] 控制流复杂度" },
-    { num: " 8.", name: "注释质量", key: "commentQuality", note: "[A+] JSDoc契约完备" },
-    { num: " 9.", name: "重复率",   key: "duplication", note: "[A-] DRY原则去重" },
-    { num: "10.", name: "技术债风险", key: "techDebtRisk", note: "[A+] 零高危债务防线" }
+    { num: " 1.", name: "架构一致", key: "architectureConsistency", desc: "分层边界解耦", labelEn: "架构一致 (Architecture Consistency)" },
+    { num: " 2.", name: "语义纯度", key: "semanticPurity", desc: "纯函数数据流", labelEn: "语义纯度 (Semantic Purity)" },
+    { num: " 3.", name: "代码安全", key: "codeSecurity", desc: "输入安全防御", labelEn: "代码安全 (Code Security)" },
+    { num: " 4.", name: "性能预算", key: "performanceEfficiency", desc: "零循环堆分配", labelEn: "性能预算 (Performance Efficiency)" },
+    { num: " 5.", name: "标准化",   key: "standardization", desc: "命名契约标准", labelEn: "标准化 (Standardization)" },
+    { num: " 6.", name: "现代化",   key: "modernity", desc: "现代语法API", labelEn: "现代化 (Modernity)" },
+    { num: " 7.", name: "可维护性", key: "maintainability", desc: "控制流复杂度", labelEn: "可维护性 (Maintainability)" },
+    { num: " 8.", name: "注释质量", key: "commentQuality", desc: "JSDoc契约完备", labelEn: "注释质量 (Comment Quality)" },
+    { num: " 9.", name: "重复率",   key: "duplication", desc: "DRY原则去重", labelEn: "重复率 (Duplication)" },
+    { num: "10.", name: "技术债风险", key: "techDebtRisk", desc: "零高危债务防线", labelEn: "技术债风险 (Tech Debt Risk)" }
   ];
 
   if (tenDimensions && compositeScore !== null) {
@@ -350,15 +419,17 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG"
       const isNotEvaluated = rawScore == null || isNaN(parsedScore) || parsedScore <= 0;
       let bar = " ".repeat(20);
       let scoreStr = "   N/A";
+      let gradeTag = "[N/A]";
       if (!isNotEvaluated) {
         bar = makeBar(parsedScore, 20);
         scoreStr = (Number.isInteger(parsedScore) ? parsedScore.toFixed(1) : String(Math.round(parsedScore * 100) / 100)).padStart(6);
+        gradeTag = getGradeTag(parsedScore);
       }
       const col1 = d.num.padEnd(4);
       const col2 = alignCell(d.name, 17);
       const col3 = bar;
       const col4 = scoreStr;
-      const col5 = " " + d.note;
+      const col5 = " " + gradeTag + " " + d.desc;
       const rowContent = col1 + col2 + col3 + " " + col4 + col5;
       console.log(formatDashboardRow(rowContent, targetWidth));
     }
@@ -376,48 +447,35 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG"
   if (summaryFile) {
     const passBadge = (s) => (s === "PASS" ? "✅ PASS" : "❌ FAIL");
     let md = "## 🌐 全工作区跨项目统一审查与十维质量全景看板\n\n";
-    if (compositeScore !== null) {
-      const sStr = Number(compositeScore).toFixed(1);
-      const gStr = grade ? ` (Grade: **${grade}**)` : "";
-      const aStr = autonomyRate ? ` &nbsp;|&nbsp; **自研率**: **${autonomyRate}%**` : "";
-      const dStr = totalDebt !== null ? ` &nbsp;|&nbsp; **技术债总量**: **${totalDebt} 项**` : "";
-      md += `> **综合健康分**: **${sStr}**${gStr}${aStr}${dStr}\n\n`;
-    }
+    const gStr = ` (Grade: **${wsGrade}**)`;
+    const aStr = autonomyRate ? ` &nbsp;|&nbsp; **自研率**: **${autonomyRate}%**` : "";
+    const dStr = totalDebt !== null ? ` &nbsp;|&nbsp; **技术债总量**: **${totalDebt} 项**` : "";
+    md += `> **综合健康分**: **${wsHealthStr}**${gStr}${aStr}${dStr}\n\n`;
     md += "### 📊 全工作区五大核心子系统基石得分\n\n";
     md += "| 序号 | 核心子系统 | 判定结果 | 归一化得分 | 进度可视化 | 覆盖说明 |\n";
     md += "| :---: | :--- | :---: | :---: | :--- | :--- |\n";
-    md += `| 1 | 工作区物理卫生 | ${passBadge(statusHygiene)} | ${scoreHygiene.toFixed(1)} | \`${makeBar(scoreHygiene, 20)}\` | 全仓零空文件/同构契约 |\n`;
-    md += `| 2 | 单源规则目录 | ${passBadge(statusRules)} | ${scoreRules.toFixed(1)} | \`${makeBar(scoreRules, 20)}\` | 410规则/SSOT一致性 |\n`;
-    md += `| 3 | auto-refactor | ${passBadge(statusAr)} | ${scoreAr.toFixed(1)} | \`${makeBar(scoreAr, 20)}\` | CLI静态引擎质量基线 |\n`;
-    md += `| 4 | workspace-timing | ${passBadge(statusWt)} | ${scoreWt.toFixed(1)} | \`${makeBar(scoreWt, 20)}\` | VSCode扩展审查门禁 |\n`;
-    md += `| 5 | WebGames配置架构 | ${passBadge(statusWg)} | ${scoreWg.toFixed(1)} | \`${makeBar(scoreWg, 20)}\` | 卡拉尔领域配置审查 |\n\n`;
+    md += `| 1 | 工作区物理卫生 | ${passBadge(statusHygiene)} | ${scoreHygiene.toFixed(1)} | \`[${makeBar(scoreHygiene, 20)}]\` | 全仓零空文件/同构契约 |\n`;
+    md += `| 2 | 单源规则目录 | ${passBadge(statusRules)} | ${scoreRules.toFixed(1)} | \`[${makeBar(scoreRules, 20)}]\` | 410规则/SSOT一致性 |\n`;
+    md += `| 3 | auto-refactor | ${passBadge(statusAr)} | ${scoreAr.toFixed(1)} | \`[${makeBar(scoreAr, 20)}]\` | CLI静态引擎质量基线 |\n`;
+    md += `| 4 | workspace-timing | ${passBadge(statusWt)} | ${scoreWt.toFixed(1)} | \`[${makeBar(scoreWt, 20)}]\` | VSCode扩展审查门禁 |\n`;
+    md += `| 5 | WebGames配置架构 | ${passBadge(statusWg)} | ${scoreWg.toFixed(1)} | \`[${makeBar(scoreWg, 20)}]\` | 卡拉尔领域配置审查 |\n\n`;
     md += `> **耗时**: ${elapsedSec}s &nbsp;|&nbsp; **全局状态**: ${globalStatus}\n\n`;
 
-    md += "### 🎯 全工作区十维工程质量全景指数\n\n";
+    md += "### 🎯 auto-refactor 静态引擎十维工程质量全景指数\n\n";
     if (tenDimensions && compositeScore !== null) {
-      const gText = grade ? ` (Grade: **${grade}**)` : "";
-      const aText = autonomyRate ? ` &nbsp;|&nbsp; **自研率**: **${autonomyRate}%**` : "";
-      const dText = totalDebt !== null ? ` &nbsp;|&nbsp; **技术债总量**: **${totalDebt} 项**` : "";
-      md += `> **综合健康分**: **${compositeScore}**${gText}${dText}${aText}\n\n`;
       md += "| 序号 | 质量维度 | 得分 | 进度可视化 |\n";
       md += "| :---: | :--- | :---: | :--- |\n";
-      const dimsEn = [
-        { num: "1", name: "架构一致 (Architecture Consistency)", key: "architectureConsistency" },
-        { num: "2", name: "语义纯度 (Semantic Purity)", key: "semanticPurity" },
-        { num: "3", name: "代码安全 (Code Security)", key: "codeSecurity" },
-        { num: "4", name: "性能预算 (Performance Efficiency)", key: "performanceEfficiency" },
-        { num: "5", name: "标准化 (Standardization)", key: "standardization" },
-        { num: "6", name: "现代化 (Modernity)", key: "modernity" },
-        { num: "7", name: "可维护性 (Maintainability)", key: "maintainability" },
-        { num: "8", name: "注释质量 (Comment Quality)", key: "commentQuality" },
-        { num: "9", name: "重复率 (Duplication)", key: "duplication" },
-        { num: "10", name: "技术债风险 (Tech Debt Risk)", key: "techDebtRisk" }
-      ];
-      for (const d of dimsEn) {
-        const score = Number(tenDimensions[d.key] ?? 0);
-        const bar = makeBar(score, 20);
-        const scoreStr = score % 1 === 0 ? score.toFixed(1) : String(Math.round(score * 100) / 100);
-        md += `| ${d.num} | ${d.name} | ${scoreStr} | \`${bar}\` |\n`;
+      for (const d of dimDefinitions) {
+        const rawScore = tenDimensions[d.key];
+        const parsedScore = Number(rawScore ?? 0);
+        const isNotEvaluated = rawScore == null || isNaN(parsedScore) || parsedScore <= 0;
+        let bar = " ".repeat(20);
+        let scoreStr = "N/A";
+        if (!isNotEvaluated) {
+          bar = makeBar(parsedScore, 20);
+          scoreStr = parsedScore % 1 === 0 ? parsedScore.toFixed(1) : String(Math.round(parsedScore * 100) / 100);
+        }
+        md += `| ${d.num.trim().replace(".", "")} | ${d.labelEn} | ${scoreStr} | \`[${bar}]\` |\n`;
       }
     } else {
       md += "> ⚠️ [离线基线快照未就绪 - 优雅降级模式]\n";
@@ -427,7 +485,7 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG"
       fs.appendFileSync(summaryFile, md, "utf8");
     } catch (_) {}
   }
-' "$START_TIME" "$FAILED" "$JSON_MODE" "$STATUS_HYGIENE" "$STATUS_RULES" "$STATUS_AR" "$STATUS_WT" "$STATUS_WG" "$ROOT_DIR"
+' "$START_TIME" "$FAILED" "$JSON_MODE" "$STATUS_HYGIENE" "$STATUS_RULES" "$STATUS_AR" "$STATUS_WT" "$STATUS_WG" "$ROOT_DIR" "$CODE_EMPTY" "$CODE_ISO" "$CODE_CATALOG" "$CODE_SKILLS"
 
 if [[ "$JSON_MODE" -eq 1 ]]; then
     exit "$FAILED"

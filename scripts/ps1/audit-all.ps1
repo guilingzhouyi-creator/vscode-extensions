@@ -89,6 +89,25 @@ function Get-ProgressBar {
     return ("█" * $filled) + ("░" * $empty)
 }
 
+function Get-GradeTag {
+    [CmdletBinding()]
+    param([double]$Score)
+    if ($Score -ge 95.0) { return "[A+]" }
+    if ($Score -ge 90.0) { return "[A ]" }
+    if ($Score -ge 85.0) { return "[B+]" }
+    if ($Score -ge 80.0) { return "[B ]" }
+    if ($Score -ge 75.0) { return "[C+]" }
+    if ($Score -ge 70.0) { return "[C ]" }
+    if ($Score -ge 60.0) { return "[D ]" }
+    return "[F ]"
+}
+
+function Get-GradeFromScore {
+    [CmdletBinding()]
+    param([double]$Score)
+    return (Get-GradeTag $Score).Replace("[", "").Replace("]", "").Trim()
+}
+
 if (-not $env:GIT_CONFIG_GLOBAL) { $env:GIT_CONFIG_GLOBAL = 'NUL' }
 if (-not $env:GIT_CONFIG_SYSTEM) { $env:GIT_CONFIG_SYSTEM = 'NUL' }
 if (-not $env:GIT_CONFIG_NOSYSTEM) { $env:GIT_CONFIG_NOSYSTEM = '1' }
@@ -111,7 +130,9 @@ $failed = $false
 if (-not $Json) { Write-Host "▶ [1/5] 检查全工作区物理卫生、同构脚本与零空文件..." -ForegroundColor Gray }
 $res = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-no-empty-files.js" -NoNewWindow -PassThru -Wait
 $resIso = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-script-isomorphism.js" -NoNewWindow -PassThru -Wait
-if ($res.ExitCode -ne 0 -or $resIso.ExitCode -ne 0) {
+$codeEmpty = $res.ExitCode
+$codeIso = $resIso.ExitCode
+if ($codeEmpty -ne 0 -or $codeIso -ne 0) {
     $statusHygiene = "FAIL"
     $failed = $true
 } else {
@@ -122,7 +143,9 @@ if ($res.ExitCode -ne 0 -or $resIso.ExitCode -ne 0) {
 if (-not $Json) { Write-Host "▶ [2/5] 聚合与校验全工作区单源规则目录与技能集规范..." -ForegroundColor Gray }
 $res = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/generate-rule-catalog.js" -NoNewWindow -PassThru -Wait
 $resSkills = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-skills.js" -NoNewWindow -PassThru -Wait
-if ($res.ExitCode -ne 0 -or $resSkills.ExitCode -ne 0) {
+$codeCatalog = $res.ExitCode
+$codeSkills = $resSkills.ExitCode
+if ($codeCatalog -ne 0 -or $codeSkills -ne 0) {
     $statusRules = "FAIL"
     $failed = $true
 } else {
@@ -288,33 +311,66 @@ try {
 }
 
 $dimDefinitions = @(
-    @{ num = " 1."; name = "架构一致"; key = "architectureConsistency"; note = "[A+] 分层边界解耦"; labelEn = "架构一致 (Architecture Consistency)" },
-    @{ num = " 2."; name = "语义纯度"; key = "semanticPurity"; note = "[A+] 纯函数数据流"; labelEn = "语义纯度 (Semantic Purity)" },
-    @{ num = " 3."; name = "代码安全"; key = "codeSecurity"; note = "[A+] 输入安全防御"; labelEn = "代码安全 (Code Security)" },
-    @{ num = " 4."; name = "性能预算"; key = "performanceEfficiency"; note = "[A+] 零循环堆分配"; labelEn = "性能预算 (Performance Efficiency)" },
-    @{ num = " 5."; name = "标准化"; key = "standardization"; note = "[B ] 命名契约标准"; labelEn = "标准化 (Standardization)" },
-    @{ num = " 6."; name = "现代化"; key = "modernity"; note = "[A+] 现代语法API"; labelEn = "现代化 (Modernity)" },
-    @{ num = " 7."; name = "可维护性"; key = "maintainability"; note = "[A+] 控制流复杂度"; labelEn = "可维护性 (Maintainability)" },
-    @{ num = " 8."; name = "注释质量"; key = "commentQuality"; note = "[A+] JSDoc契约完备"; labelEn = "注释质量 (Comment Quality)" },
-    @{ num = " 9."; name = "重复率"; key = "duplication"; note = "[A-] DRY原则去重"; labelEn = "重复率 (Duplication)" },
-    @{ num = "10."; name = "技术债风险"; key = "techDebtRisk"; note = "[A+] 零高危债务防线"; labelEn = "技术债风险 (Tech Debt Risk)" }
+    @{ num = " 1."; name = "架构一致"; key = "architectureConsistency"; desc = "分层边界解耦"; labelEn = "架构一致 (Architecture Consistency)" },
+    @{ num = " 2."; name = "语义纯度"; key = "semanticPurity"; desc = "纯函数数据流"; labelEn = "语义纯度 (Semantic Purity)" },
+    @{ num = " 3."; name = "代码安全"; key = "codeSecurity"; desc = "输入安全防御"; labelEn = "代码安全 (Code Security)" },
+    @{ num = " 4."; name = "性能预算"; key = "performanceEfficiency"; desc = "零循环堆分配"; labelEn = "性能预算 (Performance Efficiency)" },
+    @{ num = " 5."; name = "标准化"; key = "standardization"; desc = "命名契约标准"; labelEn = "标准化 (Standardization)" },
+    @{ num = " 6."; name = "现代化"; key = "modernity"; desc = "现代语法API"; labelEn = "现代化 (Modernity)" },
+    @{ num = " 7."; name = "可维护性"; key = "maintainability"; desc = "控制流复杂度"; labelEn = "可维护性 (Maintainability)" },
+    @{ num = " 8."; name = "注释质量"; key = "commentQuality"; desc = "JSDoc契约完备"; labelEn = "注释质量 (Comment Quality)" },
+    @{ num = " 9."; name = "重复率"; key = "duplication"; desc = "DRY原则去重"; labelEn = "重复率 (Duplication)" },
+    @{ num = "10."; name = "技术债风险"; key = "techDebtRisk"; desc = "零高危债务防线"; labelEn = "技术债风险 (Tech Debt Risk)" }
 )
 
-# 计算各子系统归一化得分 [0.0 ~ 100.0]（纯客观连续度量，杜绝硬编码 100.0 与断崖 0.0）
+# 计算各子系统归一化得分 [0.0 ~ 100.0]（纯客观连续度量，杜绝静态硬编码常数与断崖断层）
 $SCORE_FLOOR = 15.0
 
-# 1. 物理卫生基石得分（理论上限 99.8，全合规 99.8，门禁失败扣除 70.0 惩罚分并受 15.0 刚性下界保护）
-$scoreHygiene = if ($statusHygiene -eq "PASS") { 99.8 } else { [math]::Max($SCORE_FLOOR, [math]::Round(99.8 - 70.0, 1)) }
+# 1. 物理卫生基石得分（动态判定：零空文件/跳板与同构脚本对双项全合规 100.0，按违规项比例连续度量）
+$hygienePassedCount = 0
+if ($codeEmpty -eq 0) { $hygienePassedCount += 1 }
+if ($codeIso -eq 0) { $hygienePassedCount += 1 }
+$scoreHygiene = if ($hygienePassedCount -eq 2) {
+    100.0
+} else {
+    [math]::Max($SCORE_FLOOR, [math]::Round(100.0 * ($hygienePassedCount / 2.0), 1))
+}
 
-# 2. 单源规则目录基石得分（理论上限 99.8，410 规则单源一致 99.8，门禁失败扣除 70.0 惩罚分并受 15.0 刚性下界保护）
-$scoreRules   = if ($statusRules -eq "PASS") { 99.8 } else { [math]::Max($SCORE_FLOOR, [math]::Round(99.8 - 70.0, 1)) }
+# 2. 单源规则目录基石得分（基于 410 规则 SSOT 一致性与技能文档字节等价比对动态判定）
+$ruleCatalogPath = Join-Path $repoRoot "scripts\common\rule-catalog.json"
+$catalogRuleCount = 0
+try {
+    if (Test-Path $ruleCatalogPath) {
+        $catalogObj = Get-Content -Path $ruleCatalogPath -Raw -Encoding utf8 | ConvertFrom-Json
+        if ($catalogObj -and $catalogObj.totalRules) {
+            $catalogRuleCount = [int]$catalogObj.totalRules
+        }
+    }
+} catch {
+    $catalogRuleCount = 0
+}
 
-# 3. auto-refactor 质量基线得分（真源自审综合分 98.8，门禁失败扣除 70.0 惩罚分并受 15.0 刚性下界保护）
-$baseAr = if ($null -ne $compositeScore) { [double]$compositeScore } else { 98.8 }
-$scoreAr = if ($statusAr -eq "PASS") { $baseAr } else { [math]::Max($SCORE_FLOOR, [math]::Round($baseAr - 70.0, 1)) }
+$scoreRules = if ($statusRules -eq "PASS" -and $catalogRuleCount -ge 410) {
+    100.0
+} elseif ($statusRules -eq "PASS" -and $catalogRuleCount -gt 0) {
+    [math]::Max($SCORE_FLOOR, [math]::Round(100.0 * ($catalogRuleCount / 410.0), 1))
+} else {
+    $rulesPassedCount = 0
+    if ($codeCatalog -eq 0) { $rulesPassedCount += 1 }
+    if ($codeSkills -eq 0) { $rulesPassedCount += 1 }
+    [math]::Max($SCORE_FLOOR, [math]::Round(100.0 * ($rulesPassedCount / 2.0), 1))
+}
 
-# 4. workspace-timing 审查门禁得分（理论上限 99.6，读取 report-latest.json，按通过率与 142 个 warning 真实衰减至 94.6，门禁失败扣除 70.0 惩罚分）
-$baseWt = 94.6
+# 3. auto-refactor 质量基线得分（基于自审综合基线动态读取，门禁失败动态连续衰减）
+$baseAr = if ($null -ne $compositeScore) { [double]$compositeScore } else { 100.0 }
+$scoreAr = if ($statusAr -eq "PASS") {
+    $baseAr
+} else {
+    [math]::Max($SCORE_FLOOR, [math]::Round($baseAr - 60.0, 1))
+}
+
+# 4. workspace-timing 审查门禁得分（基于 report-latest.json 真实 checks/pass/warn 连续计算，移除硬编码 94.6）
+$baseWt = $null
 $wtReportPath = Join-Path $repoRoot "workspace-timing\reports\review\report-latest.json"
 try {
     if (Test-Path $wtReportPath) {
@@ -326,18 +382,39 @@ try {
             $errCount = if ($wtData.summary.bySeverity -and $wtData.summary.bySeverity.error) { [double]$wtData.summary.bySeverity.error } else { 0.0 }
             if ($totalChecks -gt 0) {
                 $ratio = $passChecks / $totalChecks
-                $rawWt = (99.6 * $ratio) - ($warnCount * 0.035) - ($errCount * 5.0)
+                $rawWt = (100.0 * $ratio) - ($warnCount * 0.035) - ($errCount * 5.0)
                 $baseWt = [math]::Max($SCORE_FLOOR, [math]::Round($rawWt, 1))
             }
         }
     }
 } catch {
-    $baseWt = 94.6
+    $baseWt = $null
 }
-$scoreWt = if ($statusWt -eq "PASS") { $baseWt } else { [math]::Max($SCORE_FLOOR, [math]::Round($baseWt - 70.0, 1)) }
 
-# 5. WebGames 配置架构得分（理论上限 99.7，全合规 99.7，门禁失败扣除 70.0 惩罚分并受 15.0 刚性下界保护）
-$scoreWg = if ($statusWg -eq "PASS") { 99.7 } else { [math]::Max($SCORE_FLOOR, [math]::Round(99.7 - 70.0, 1)) }
+if ($null -eq $baseWt) {
+    $baseWt = if ($statusWt -eq "PASS") { 100.0 } else { $SCORE_FLOOR }
+}
+
+$scoreWt = if ($statusWt -eq "PASS") {
+    $baseWt
+} else {
+    [math]::Max($SCORE_FLOOR, [math]::Round($baseWt - 60.0, 1))
+}
+
+# 5. WebGames 配置架构得分（基于架构护栏执行通过状态动态判定，移除写死 99.7）
+$scoreWg = if ($statusWg -eq "PASS") {
+    100.0
+} else {
+    [math]::Max($SCORE_FLOOR, [math]::Round(100.0 - 60.0, 1))
+}
+
+# 全工作区综合健康分（五大核心子系统基石分平权加权各占 20%：0.2 * (Hygiene + Rules + AR + WT + WG)）
+$workspaceHealthScore = [math]::Round(
+    0.2 * ($scoreHygiene + $scoreRules + $scoreAr + $scoreWt + $scoreWg),
+    2
+)
+$wsHealthStr = if ($workspaceHealthScore % 1 -eq 0) { $workspaceHealthScore.ToString("0.0") } else { $workspaceHealthScore.ToString("0.##") }
+$wsGrade = (Get-GradeFromScore $workspaceHealthScore).Trim()
 
 if ($Json) {
     $qualityVectorObj = if ($null -ne $tenDimensions) {
@@ -374,7 +451,9 @@ if ($Json) {
             workspaceTiming = $scoreWt
             webGames = $scoreWg
         }
-        compositeScore = $compositeScore
+        workspaceHealthScore = $workspaceHealthScore
+        compositeScore = $workspaceHealthScore
+        arCompositeScore = $compositeScore
         tenDimensions = $qualityVectorObj
         qualityVector = $qualityVectorObj
     }
@@ -390,14 +469,10 @@ $titlePad = [math]::Floor(($targetWidth - (Get-DisplayWidth $titleText)) / 2)
 Write-Host (Format-DashboardRow ((" " * $titlePad) + $titleText) $targetWidth) -ForegroundColor Cyan
 Write-Host ("├" + ("─" * $targetWidth) + "┤") -ForegroundColor Cyan
 
-if ($baseline -and $tenDimensions -and $null -ne $compositeScore) {
-    $csStr = if ($compositeScore % 1 -eq 0) { $compositeScore.ToString("0.0") } else { $compositeScore.ToString("0.##") }
-    $summaryText = "综合健康分: {0}" -f $csStr
-    if ($grade) { $summaryText += " ({0})" -f $grade }
-    if ($autonomyRate) { $summaryText += " | 自研率: {0}%" -f $autonomyRate }
-    if ($null -ne $totalDebt) { $summaryText += " | 技术债总量: {0} 项" -f $totalDebt }
-    Write-Host (Format-DashboardRow (" " + $summaryText) $targetWidth) -ForegroundColor White
-}
+$summaryText = "综合健康分: {0} ({1})" -f $wsHealthStr, $wsGrade
+if ($autonomyRate) { $summaryText += " | 自研率: {0}%" -f $autonomyRate }
+if ($null -ne $totalDebt) { $summaryText += " | 技术债总量: {0} 项" -f $totalDebt }
+Write-Host (Format-DashboardRow (" " + $summaryText) $targetWidth) -ForegroundColor White
 
 $sepTitle1 = "─ [全工作区五大核心子系统基石得分] "
 $sep1 = "├" + $sepTitle1 + ("─" * ($targetWidth - (Get-DisplayWidth $sepTitle1))) + "┤"
@@ -426,7 +501,7 @@ foreach ($sys in $sysDefinitions) {
     Write-Host (Format-DashboardRow $rowContent $targetWidth) -ForegroundColor $lineColor
 }
 
-$sepTitle2 = "─ [全工作区十维工程质量全景指数] "
+$sepTitle2 = "─ [auto-refactor 静态引擎十维工程质量全景指数] "
 $sep2 = "├" + $sepTitle2 + ("─" * ($targetWidth - (Get-DisplayWidth $sepTitle2))) + "┤"
 Write-Host $sep2 -ForegroundColor Cyan
 
@@ -450,19 +525,21 @@ if ($baseline -and $tenDimensions -and $null -ne $compositeScore) {
         if ($isNotEvaluated) {
             $bar = " " * 20
             $paddedScore = "   N/A"
+            $gradeTag = "[N/A]"
             $lineColor = "DarkGray"
         } else {
             $score = $parsedScore
             $bar = Get-ProgressBar $score
             $scoreStr = if ($score % 1 -eq 0) { $score.ToString("0.0") } else { $score.ToString("0.##") }
             $paddedScore = $scoreStr.PadLeft(6)
+            $gradeTag = Get-GradeTag $score
             $lineColor = if ($score -ge 90) { "Green" } elseif ($score -ge 75) { "Yellow" } else { "Red" }
         }
         $col1 = $d.num.PadRight(4)
         $col2 = Format-AlignedCell $d.name 17
         $col3 = $bar
         $col4 = $paddedScore
-        $col5 = " " + $d.note
+        $col5 = " " + $gradeTag + " " + $d.desc
         $rowContent = $col1 + $col2 + $col3 + " " + $col4 + $col5
         Write-Host (Format-DashboardRow $rowContent $targetWidth) -ForegroundColor $lineColor
     }
@@ -480,15 +557,11 @@ if ($env:GITHUB_STEP_SUMMARY) {
         $md = New-Object System.Text.StringBuilder
         [void]$md.AppendLine("## 🌐 全工作区跨项目统一审查与十维质量全景看板")
         [void]$md.AppendLine()
-        if ($baseline -and $tenDimensions -and $null -ne $compositeScore) {
-            $csStr = if ($compositeScore % 1 -eq 0) { $compositeScore.ToString("0.0") } else { $compositeScore.ToString("0.##") }
-            $summaryMeta = "> **综合健康分**: **{0}**" -f $csStr
-            if ($grade) { $summaryMeta += " (Grade: **{0}**)" -f $grade }
-            if ($autonomyRate) { $summaryMeta += " &nbsp;|&nbsp; **自研率**: **{0}%**" -f $autonomyRate }
-            if ($null -ne $totalDebt) { $summaryMeta += " &nbsp;|&nbsp; **技术债总量**: **{0} 项**" -f $totalDebt }
-            [void]$md.AppendLine($summaryMeta)
-            [void]$md.AppendLine()
-        }
+        $summaryMeta = "> **综合健康分**: **{0}** (Grade: **{1}**)" -f $wsHealthStr, $wsGrade
+        if ($autonomyRate) { $summaryMeta += " &nbsp;|&nbsp; **自研率**: **{0}%**" -f $autonomyRate }
+        if ($null -ne $totalDebt) { $summaryMeta += " &nbsp;|&nbsp; **技术债总量**: **{0} 项**" -f $totalDebt }
+        [void]$md.AppendLine($summaryMeta)
+        [void]$md.AppendLine()
         [void]$md.AppendLine("### 📊 全工作区五大核心子系统基石得分")
         [void]$md.AppendLine()
         [void]$md.AppendLine("| 序号 | 核心子系统 | 判定结果 | 归一化得分 | 进度可视化 | 覆盖说明 |")
@@ -507,7 +580,7 @@ if ($env:GITHUB_STEP_SUMMARY) {
         [void]$md.AppendLine()
         [void]$md.AppendLine(("> **耗时**: {0}s &nbsp;|&nbsp; **全局状态**: {1}" -f $elapsedSec, $globalStatus))
         [void]$md.AppendLine()
-        [void]$md.AppendLine("### 🎯 全工作区十维工程质量全景指数")
+        [void]$md.AppendLine("### 🎯 auto-refactor 静态引擎十维工程质量全景指数")
         [void]$md.AppendLine()
         if ($baseline -and $tenDimensions -and $null -ne $compositeScore) {
             [void]$md.AppendLine("| 序号 | 质量维度 | 得分 | 进度可视化 |")
