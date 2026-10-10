@@ -25,7 +25,14 @@
  * Patterns are fully configurable; `maxIssuesPerFile` caps flood on vendored content.
  */
 
-import type { Analyzer, AnalyzerContext, Issue, Severity, SecurityLevel, AgentActionType } from '../core/types';
+import type {
+    Analyzer,
+    AnalyzerContext,
+    Issue,
+    Severity,
+    SecurityLevel,
+    AgentActionType,
+} from '../core/types';
 import { SecretMessages } from '../core/messages/secrets';
 import {
     auditRegexSafety,

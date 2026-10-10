@@ -29,7 +29,13 @@
  * Implements both streaming `visit`/`finalize` and standalone `analyze` contracts.
  */
 
-import type { Analyzer, AnalyzerContext, Issue, SecurityLevel, AgentActionType } from '../core/types';
+import type {
+    Analyzer,
+    AnalyzerContext,
+    Issue,
+    SecurityLevel,
+    AgentActionType,
+} from '../core/types';
 import { SEVERITY_WARNING, SEVERITY_ERROR } from '../core/types';
 import { ANALYZER_SECURITY } from '../core/scoring/dimensionLiterals';
 import type { NormalizedNode } from '../core/ast/multilang';
@@ -189,10 +195,7 @@ export class SecurityAnalyzer implements Analyzer {
 
     private shouldSkipByFastFilter(content: string): boolean {
         if (content.length <= 5000) return false;
-        const hits = nativeCore.fastPatternMatch(
-            content,
-            SECURITY_FAST_FILTER_TOKENS as string[],
-        );
+        const hits = nativeCore.fastPatternMatch(content, SECURITY_FAST_FILTER_TOKENS as string[]);
         return hits.length === 0;
     }
 

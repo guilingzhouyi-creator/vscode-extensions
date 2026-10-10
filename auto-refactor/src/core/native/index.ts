@@ -1,7 +1,8 @@
 /**
  * Module: Core Engine — Native Acceleration Substantive Facade
  * File Path: src/core/native/index.ts
- * Architecture Role: Substantive facade for native acceleration kernel, shims, and dataflow operators.
+ * Architecture Role: Substantive facade for native acceleration kernel,
+ *   shims, and dataflow operators.
  * Dependencies & Triggers: Consumed across analyzers, diff pipeline, and performance benchmarks.
  * Responsibilities:
  *   1. Re-export native types, bridge singletons, and pure JS algorithmic shims;

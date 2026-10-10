@@ -136,7 +136,9 @@ pub fn do_work() -> Result<(), String> {
   assert.strictEqual(tryIssue.actionable.action, 'replace_token');
   assert.strictEqual(tryIssue.actionable.code, 'AR:RSM:001');
   assert.strictEqual(tryIssue.actionable.templateSnippet, '$1?');
-  console.log('✔ [PASS] RustModernAnalyzer emits actionable payload and templateSnippet for try! macro');
+  console.log(
+    '✔ [PASS] RustModernAnalyzer emits actionable payload and templateSnippet for try! macro',
+  );
 
   // 6. Test PythonModernAnalyzer outputting actionable and templateSnippet
   const { PythonModernAnalyzer } = require('../dist/analyzers/python-modern');
@@ -157,7 +159,9 @@ def get_path():
   assert.strictEqual(pathIssue.actionable.action, 'replace_token');
   assert.strictEqual(pathIssue.actionable.code, 'AR:PYM:001');
   assert.ok(pathIssue.actionable.templateSnippet, 'Must provide templateSnippet for PYM-PATH-001');
-  console.log('✔ [PASS] PythonModernAnalyzer emits actionable payload and templateSnippet for os.path');
+  console.log(
+    '✔ [PASS] PythonModernAnalyzer emits actionable payload and templateSnippet for os.path',
+  );
 
   // 7. Test ArchitectureAnalyzer outputting actionable and templateSnippet
   const { ArchitectureAnalyzer } = require('../dist/analyzers/architecture');
@@ -171,12 +175,19 @@ export * from './internal-sub';
     options: {},
     config: {},
   });
-  const archFacIssue = archIssues.find((i) => i.rule === 'ARCH-FAC-001' || i.rule === 'facade-without-payload');
+  const archFacIssue = archIssues.find(
+    (i) => i.rule === 'ARCH-FAC-001' || i.rule === 'facade-without-payload',
+  );
   assert.ok(archFacIssue, 'Must find facade issue');
   assert.ok(archFacIssue.actionable, 'Architecture issue must carry actionable payload');
   assert.strictEqual(archFacIssue.actionable.code, 'AR:ARC:001');
-  assert.ok(archFacIssue.actionable.templateSnippet, 'Must provide templateSnippet for ARCH-FAC-001');
-  console.log('✔ [PASS] ArchitectureAnalyzer emits actionable payload and templateSnippet for facade rules');
+  assert.ok(
+    archFacIssue.actionable.templateSnippet,
+    'Must provide templateSnippet for ARCH-FAC-001',
+  );
+  console.log(
+    '✔ [PASS] ArchitectureAnalyzer emits actionable payload and templateSnippet for facade rules',
+  );
 
   // 8. Test PerformanceAnalyzer outputting actionable and templateSnippet
   const { PerformanceAnalyzer } = require('../dist/analyzers/performance');
@@ -193,12 +204,19 @@ function processBatch(items: string[]) {
     content: perfCode,
     options: {},
   });
-  const loopAllocIssue = perfIssues.find((i) => i.rule === 'loop-transient-allocation' || i.rule === 'PRF-MEM-001');
+  const loopAllocIssue = perfIssues.find(
+    (i) => i.rule === 'loop-transient-allocation' || i.rule === 'PRF-MEM-001',
+  );
   assert.ok(loopAllocIssue, 'Must find loop allocation issue');
   assert.ok(loopAllocIssue.actionable, 'Performance issue must carry actionable payload');
   assert.strictEqual(loopAllocIssue.actionable.code, 'AR:PRF:001');
-  assert.ok(loopAllocIssue.actionable.templateSnippet, 'Must provide templateSnippet for loop transient allocation');
-  console.log('✔ [PASS] PerformanceAnalyzer emits actionable payload and templateSnippet for loop allocation');
+  assert.ok(
+    loopAllocIssue.actionable.templateSnippet,
+    'Must provide templateSnippet for loop transient allocation',
+  );
+  console.log(
+    '✔ [PASS] PerformanceAnalyzer emits actionable payload and templateSnippet for loop allocation',
+  );
 
   // 9. Test ShellLintAnalyzer outputting actionable and templateSnippet
   const { ShellLintAnalyzer } = require('../dist/analyzers/shell-lint');
@@ -216,7 +234,9 @@ echo $UNQUOTED_VAR
   assert.ok(quoteIssue.actionable, 'Shell issue must carry actionable payload');
   assert.strictEqual(quoteIssue.actionable.code, 'AR:SHL:002');
   assert.strictEqual(quoteIssue.actionable.templateSnippet, '"$VAR"');
-  console.log('✔ [PASS] ShellLintAnalyzer emits actionable payload and templateSnippet for unquoted variables');
+  console.log(
+    '✔ [PASS] ShellLintAnalyzer emits actionable payload and templateSnippet for unquoted variables',
+  );
 
   console.log('✔ [PASS] All Agent-Actionable diagnostic contracts verified successfully.');
 }
@@ -225,4 +245,3 @@ main().catch((err) => {
   console.error(err);
   process.exit(1);
 });
-
