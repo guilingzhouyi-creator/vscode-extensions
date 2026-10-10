@@ -32,6 +32,7 @@ const REQUIRED_ISOMORPHIC_PAIRS = [
   'package',
   'pre-commit-gate',
   'pre-push-gate',
+  'version-bump',
 ];
 
 /**
@@ -40,6 +41,7 @@ const REQUIRED_ISOMORPHIC_PAIRS = [
 const REQUIRED_FLAG_ALIGNMENTS = {
   'audit-all': ['Fast', 'Json'],
   package: ['HotSync'],
+  'version-bump': ['DryRun'],
 };
 
 /**
