@@ -80,7 +80,7 @@ async function main() {
   assert.strictEqual(vector.E, 90.0); // (85 + 90 + 95) / 3
 
   const score = computeStaticQualityScore(vector);
-  assert.ok(score >= 85.0 && score <= 95.0, `Score out of expected range: ${score}`);
+  assert.strictEqual(score, 89.54);
   console.log(`✔ Static quality vector synthesized: score=${score}, Q_s=${JSON.stringify(vector)}`);
 
   // Vector with explicit overrides

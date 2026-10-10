@@ -224,7 +224,7 @@ async function testSupplyChainAndCredibleIntervals() {
       result.stats.criticalPathFiles === 1,
       'auth_token should be identified as critical path',
     );
-    assert.ok(result.dimensions.criticalPathAutonomy >= 0.0);
+    assert.strictEqual(result.dimensions.criticalPathAutonomy, 0.0);
 
     console.log('   ✓ Supply chain penetration and Bayesian confidence verified.');
   } finally {

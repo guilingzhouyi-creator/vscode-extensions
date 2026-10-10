@@ -46,7 +46,7 @@ async function main() {
     modernity: 80,
   };
   const breakdown = synthesizeEightPillars(baseIndices, 88, 92);
-  assert.ok(breakdown.compositeScore > 80 && breakdown.compositeScore < 95);
+  assert.strictEqual(breakdown.compositeScore, 90.7);
   assert.strictEqual(breakdown.pillars.security, 100);
   // The data pillar averages its override with semanticPurity. It used to fall back to
   // architectureConsistency, which handed that one ten-dimension index an effective 0.25

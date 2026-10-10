@@ -1,7 +1,7 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1791611881240",
-  "timestamp": "2026-10-10T05:58:07.784Z",
-  "cai": 86.8,
+  "snapshotId": "snapshot-v0.4.0-1791632103939",
+  "timestamp": "2026-10-10T11:35:11.978Z",
+  "cai": 86.82,
   "versions": {
     "engineVersion": "0.4.0",
     "ruleVersion": "2026.09-v1",
@@ -14,40 +14,40 @@
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
     "filesScanned": 618,
-    "durationMs": 5548
+    "durationMs": 6536
   },
   "metrics": {
-    "compositeScore": 98.78,
+    "compositeScore": 98.77,
     "grade": "A+",
-    "autonomyRate": 86.8,
+    "autonomyRate": 86.82,
     "effectiveCodeDensity": 0.96,
-    "totalIssues": 11553,
+    "totalIssues": 11712,
     "suppressedIssues": 362,
-    "unsuppressedIssues": 11191,
+    "unsuppressedIssues": 11350,
     "bySeverity": {
-      "info": 1243,
-      "warning": 10310,
+      "info": 1242,
+      "warning": 10470,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
-      "high": 2,
-      "medium": 5269,
-      "low": 6282
+      "high": 4,
+      "medium": 5412,
+      "low": 6296
     }
   },
   "eightPillars": {
     "pillars": {
-      "architecture": 98.67,
-      "maintainability": 97.52,
+      "architecture": 98.63,
+      "maintainability": 97.5,
       "performance": 99.76,
       "data": 99.72,
       "testing": 100,
       "reliability": 99.71,
       "security": 99.89,
-      "extensibility": 94.54
+      "extensibility": 94.5
     },
-    "compositeScore": 98.78,
+    "compositeScore": 98.77,
     "weights": {
       "architecture": 0.15,
       "maintainability": 0.15,
@@ -61,16 +61,16 @@
     "ceilingsApplied": []
   },
   "tenDimensions": {
-    "architectureConsistency": 98.07,
-    "semanticPurity": 99.12,
+    "architectureConsistency": 98,
+    "semanticPurity": 99.11,
     "codeSecurity": 99.85,
     "performanceEfficiency": 99.63,
-    "standardization": 87.68,
+    "standardization": 87.7,
     "modernity": 98.96,
-    "maintainability": 95.99,
+    "maintainability": 95.94,
     "commentQuality": 99.99,
-    "duplication": 90.58,
-    "techDebtRisk": 99.98
+    "duplication": 90.32,
+    "techDebtRisk": 99.97
   },
   "topHotspots": [
     {
@@ -119,6 +119,15 @@
       "effectiveDensity": 0.95
     },
     {
+      "filePath": "src/analyzers/architecture.ts",
+      "domain": "analyzers",
+      "totalIssues": 79,
+      "criticalCount": 0,
+      "highCount": 1,
+      "compositeScore": 94.64,
+      "effectiveDensity": 0.96
+    },
+    {
       "filePath": "src/analyzers/naming-candidate-helper.ts",
       "domain": "analyzers",
       "totalIssues": 79,
@@ -153,26 +162,26 @@
       "highCount": 0,
       "compositeScore": 96.89,
       "effectiveDensity": 0.96
-    },
-    {
-      "filePath": "src/core/diff/histogram-diff.ts",
-      "domain": "diff",
-      "totalIssues": 78,
-      "criticalCount": 0,
-      "highCount": 0,
-      "compositeScore": 97.14,
-      "effectiveDensity": 0.93
     }
   ],
   "technicalDebtLedger": {
     "summary": {
       "critical": 0,
-      "high": 2,
-      "medium": 5269,
-      "low": 6282
+      "high": 4,
+      "medium": 5412,
+      "low": 6296
     },
     "criticalItems": [],
     "highItems": [
+      {
+        "id": "complexity:high-complexity:src/analyzers/architecture.ts:268",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/architecture.ts",
+        "line": 268,
+        "message": "Function \"ArchitectureAnalyzer.analyze\" has cyclomatic complexity 14 (threshold 12)."
+      },
       {
         "id": "complexity:high-complexity:src/analyzers/naming-candidate-helper.ts:705",
         "rule": "high-complexity",
@@ -181,6 +190,15 @@
         "file": "src/analyzers/naming-candidate-helper.ts",
         "line": 705,
         "message": "Function \"buildNamingActionable\" has cyclomatic complexity 12 (threshold 12)."
+      },
+      {
+        "id": "complexity:high-complexity:src/analyzers/security.ts:162",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/security.ts",
+        "line": 162,
+        "message": "Function \"SecurityAnalyzer.analyze\" has cyclomatic complexity 20 (exceeds relaxed threshold 18 for shallow structure)."
       },
       {
         "id": "performance:PRF-ALG-002:src/core/intelligence/code-density-analyzer.ts:117",
@@ -202,9 +220,9 @@
           "architecture": 98.65,
           "maintainability": 98.5,
           "performance": 99.94,
-          "data": 99.86,
+          "data": 99.85,
           "testing": 100,
-          "reliability": 99.85,
+          "reliability": 99.84,
           "security": 99.9,
           "extensibility": 95.76
         },
@@ -212,16 +230,16 @@
       },
       {
         "domainName": "analyzers",
-        "compositeScore": 97.76,
+        "compositeScore": 97.59,
         "pillars": {
-          "architecture": 98.4,
-          "maintainability": 93.14,
+          "architecture": 97.89,
+          "maintainability": 92.87,
           "performance": 99.84,
           "data": 99.22,
           "testing": 100,
-          "reliability": 99.19,
+          "reliability": 99.16,
           "security": 99.84,
-          "extensibility": 92.28
+          "extensibility": 91.78
         },
         "moduleCount": 1
       },
@@ -919,41 +937,41 @@
   },
   "trajectory": {
     "runEloc": {
-      "processed": 134011,
-      "unique": 108370,
-      "changed": 0,
-      "semantic": 0,
+      "processed": 134773,
+      "unique": 108758,
+      "changed": 1388,
+      "semantic": 1110,
       "relocated": 0,
       "cosmetic": 0,
       "boilerplate": 0,
-      "added": 0,
+      "added": 694,
       "deleted": 0,
       "modified": 0
     },
     "lifetime": {
       "weekId": "LIFETIME",
       "startMs": 1791102755050,
-      "endMs": 1791611881238,
+      "endMs": 1791632103937,
       "totalRuns": 150,
       "eloc": {
-        "processedTotal": 19206738,
-        "uniqueTotal": 108370,
-        "changedTotal": 211613,
-        "semanticTotal": 169294
+        "processedTotal": 19220000,
+        "uniqueTotal": 108758,
+        "changedTotal": 213001,
+        "semanticTotal": 170404
       },
       "qed": {
-        "mean": 0.0001,
+        "mean": -0.0001,
         "min": -0.02,
-        "max": 0.03
+        "max": 0.02
       },
       "debt": {
-        "totalAdded": 521,
+        "totalAdded": 670,
         "totalResolved": 303,
         "totalRegressions": 14,
-        "netYield": -0.01
+        "netYield": -0.02
       },
       "meanCompositeScore": 98.91,
-      "gatePassRate": 95.33
+      "gatePassRate": 96
     },
     "isFirstBaseline": false
   }
