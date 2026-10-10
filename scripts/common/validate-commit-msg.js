@@ -13,6 +13,11 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
+const {
+  validateCommitMessageContent,
+  formatDiagnosticReport,
+  runSelfTest: runStyleSelfTest,
+} = require('./validate-commit-msg-style');
 
 const CATALOG_FILE = path.join(__dirname, 'rule-catalog.json');
 const TERMS_FILE = path.join(__dirname, 'commit-msg-forbidden-terms.json');
@@ -54,137 +59,7 @@ function loadTermsConfig() {
   return cachedTermsConfig;
 }
 
-/**
- * Sanitizes line to avoid false positives in code blocks, quotes, and whitelisted terms.
- */
-function sanitizeLineForChecking(line, whitelist) {
-  let sanitized = line;
-  sanitized = sanitized.replace(/`[^`]+`/g, ' __CODE_SPAN__ ');
-  sanitized = sanitized.replace(/\b[A-Z]{2,4}-[A-Z0-9]+-[0-9]{3}\b/g, ' __RULE_ID__ ');
-  sanitized = sanitized.replace(/"[^"]+"/g, ' __QUOTE_SPAN__ ');
-  sanitized = sanitized.replace(/“[^”]+”/g, ' __QUOTE_SPAN__ ');
 
-  for (const term of whitelist) {
-    if (!term) continue;
-    if (/^[a-zA-Z\s-]+$/.test(term)) {
-      const reg = new RegExp(`\\b${term.replace(/\s+/g, '\\s+')}\\b`, 'gi');
-      sanitized = sanitized.replace(reg, ' __WHITELIST_TERM__ ');
-    } else {
-      sanitized = sanitized.split(term).join(' __WHITELIST_TERM__ ');
-    }
-  }
-  return sanitized;
-}
-
-function checkPatternMatch(sanitizedLine, rawLine, lineNum, rule) {
-  const matches = [];
-  if (!Array.isArray(rule.patterns)) return matches;
-
-  for (const pattern of rule.patterns) {
-    if (!pattern || !sanitizedLine.includes(pattern)) continue;
-    matches.push({
-      lineNum,
-      rawLine: rawLine.trim(),
-      ruleId: rule.id,
-      category: rule.category,
-      term: pattern,
-      reason: rule.reason,
-      guidance: rule.guidance,
-    });
-  }
-  return matches;
-}
-
-function checkAsciiMatch(sanitizedLine, rawLine, lineNum, rule) {
-  const matches = [];
-  if (!Array.isArray(rule.asciiPatterns)) return matches;
-
-  for (const asciiPat of rule.asciiPatterns) {
-    if (!asciiPat) continue;
-    const unescaped = asciiPat.replace(/\\[a-zA-Z]/g, '');
-    const isExactCase = Boolean(
-      rule.caseSensitiveAscii || (!/[a-z]/.test(unescaped) && /[A-Z]/.test(unescaped)),
-    );
-    const flags = isExactCase ? '' : 'i';
-    const match = sanitizedLine.match(new RegExp(asciiPat, flags));
-    if (!match) continue;
-    matches.push({
-      lineNum,
-      rawLine: rawLine.trim(),
-      ruleId: rule.id,
-      category: rule.category,
-      term: match[0],
-      reason: rule.reason,
-      guidance: rule.guidance,
-    });
-  }
-  return matches;
-}
-
-function maskLegitimateTechnicalTokens(line) {
-  let masked = line;
-  masked = masked.replace(/https?:\/\/[^\s)]+/g, ' __URL__ ');
-  masked = masked.replace(/\b[A-Z]{2,4}-[A-Z0-9]+-[0-9]{3}\b/g, ' __RULE_ID__ ');
-  masked = masked.replace(/\bL[0-5](?:-[A-Z0-9]+)?\b/g, ' __RULE_ID__ ');
-  masked = masked.replace(/\bL[0-5]~L[0-5]\b/g, ' __RULE_ID__ ');
-  masked = masked.replace(/\b(?:UTF|SHA|RFC|HTTP|TLS|AES)-\d+\b/g, ' __STD_TOKEN__ ');
-  masked = masked.replace(
-    /[a-zA-Z0-9_\-\.\/]+\.(?:ps1|sh|ts|js|json|md|py|gd|rs|toml|yaml|yml|html|css|txt)\b/g,
-    ' __FILE_PATH__ ',
-  );
-  masked = masked.replace(
-    /\bscripts\/(?:ps1|sh|common)\/[a-zA-Z0-9_\-\.\/]+\b/g,
-    ' __FILE_PATH__ ',
-  );
-  masked = masked.replace(
-    /\b(?:python|node|pwsh|powershell|bash|sh|git)\d*(?:\.exe)?\b/gi,
-    ' __BIN__ ',
-  );
-  masked = masked.replace(/--[a-zA-Z0-9_\-]+/g, ' __FLAG__ ');
-  masked = masked.replace(/-[a-zA-Z0-9]\b/g, ' __FLAG__ ');
-  masked = masked.replace(/\b[0-9a-f]{7,40}\b/g, ' __GIT_SHA__ ');
-  return masked;
-}
-
-function checkExecutionSectionNumeric(rawLine, lineNum, rule) {
-  const matches = [];
-  if (!rule) return matches;
-
-  const masked = maskLegitimateTechnicalTokens(rawLine);
-  const foundTerms = [];
-
-  const ratioMatches = masked.match(/\b\d+(\.\d+)?\s*:\s*\d+(\.\d+)?\b/g);
-  if (ratioMatches) foundTerms.push(...ratioMatches);
-
-  const pctMatches = masked.match(/\b\d+(\.\d+)?\s*[%％]/g);
-  if (pctMatches) foundTerms.push(...pctMatches);
-
-  const durationMatches = masked.match(/\b\d+(\.\d+)?\s*(ms|s|sec|seconds|秒|毫秒)\b/gi);
-  if (durationMatches) foundTerms.push(...durationMatches);
-
-  const countMatches = masked.match(
-    /\b\d+\s*(?:passed|failed|skipped|tests|suites|files|cases|checks|套件|用例|项|个|条|处)\b/gi,
-  );
-  if (countMatches) foundTerms.push(...countMatches);
-
-  const standalonePassFailNum = masked.match(
-    /\b(?:PASS|FAIL|PASSED|FAILED)\s*[:=]?\s*\d+\b/g,
-  );
-  if (standalonePassFailNum) foundTerms.push(...standalonePassFailNum);
-
-  if (foundTerms.length > 0) {
-    matches.push({
-      lineNum,
-      rawLine: rawLine.trim(),
-      ruleId: rule.id,
-      category: rule.category,
-      term: foundTerms.join(', '),
-      reason: rule.reason,
-      guidance: rule.guidance,
-    });
-  }
-  return matches;
-}
 
 function validateRuleAntiHallucination(content) {
   const validIds = getValidRuleIds();
@@ -206,67 +81,8 @@ function validateRuleAntiHallucination(content) {
 }
 
 function validateStyleAndTone(content) {
-  const config = loadTermsConfig();
-  const rawLines = content.split(/\r?\n/);
-  const findings = [];
-  const whitelist = config.whitelist || [];
-  const rules = config.forbiddenRules || [];
-
-  const execNumericRule = rules.find((r) => r.id === 'CMG-STY-006');
-  let inExecutionSection = false;
-
-  for (let i = 0; i < rawLines.length; i++) {
-    const rawLine = rawLines[i];
-    const lineNum = i + 1;
-    const trimmed = rawLine.trim();
-
-    if (trimmed.startsWith('#')) continue;
-
-    if (
-      trimmed.startsWith('[Verification') ||
-      trimmed.startsWith('[验证') ||
-      trimmed.startsWith('[测试') ||
-      trimmed.startsWith('[Test')
-    ) {
-      inExecutionSection = true;
-    } else if (trimmed.startsWith('[') && trimmed.includes(']')) {
-      inExecutionSection = false;
-    }
-
-    const sanitizedLine = sanitizeLineForChecking(rawLine, whitelist);
-
-    for (const rule of rules) {
-      if (rule.id === 'CMG-STY-006') continue;
-      findings.push(...checkPatternMatch(sanitizedLine, rawLine, lineNum, rule));
-      findings.push(...checkAsciiMatch(sanitizedLine, rawLine, lineNum, rule));
-    }
-
-    if (inExecutionSection && execNumericRule) {
-      findings.push(...checkExecutionSectionNumeric(rawLine, lineNum, execNumericRule));
-    }
-  }
-
-  return findings;
-}
-
-function formatDiagnosticReport(findings) {
-  const lines = [];
-  lines.push('');
-  lines.push('❌ [FAIL] Rule 8: 提交信息违反技术事实约束或包含违规禁词 (Style & Tone Violation):');
-  lines.push('--------------------------------------------------------------------------------');
-
-  for (const f of findings) {
-    lines.push(
-      ` • [第 ${f.lineNum} 行] 规则 [${f.ruleId}]: 拦截词/模式 '${f.term}'`,
-    );
-    lines.push(`   原始文本: "${f.rawLine}"`);
-    lines.push(`   违规原因: ${f.reason}`);
-    lines.push(`   修改指引: ${f.guidance}`);
-    lines.push('--------------------------------------------------------------------------------');
-  }
-
-  lines.push('提示: 生产级提交必须使用客观中立的技术事实，严禁临时黑话、夸大、贬损或流水账数字。');
-  return lines.join('\n');
+  const result = validateCommitMessageContent(content);
+  return result.findings;
 }
 
 function validateSingleCommitMessage(content) {
@@ -344,8 +160,7 @@ function main() {
   const args = process.argv.slice(2);
 
   if (args.includes('--test')) {
-    const styleValidator = require('./validate-commit-msg-style');
-    styleValidator.runSelfTest();
+    runStyleSelfTest();
     console.log('✔ 单源规则反虚构 (Rule 7) 与风格禁词 (Rule 8) 联合自检通过');
     process.exit(0);
   }

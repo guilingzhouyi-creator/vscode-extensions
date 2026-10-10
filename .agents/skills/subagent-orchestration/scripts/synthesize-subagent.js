@@ -56,13 +56,13 @@ function resolveIntent(intent) {
 
   if (/重构|refactor|消融|解耦|瘦身|优化|降重|平铺|收敛|精简|simplif|跳板/.test(text)) {
     postKey = 'refactor';
-  } else if (/开发|编码|实现|特性|construct|增量|编写|生产|新建|新增|创建|tdd|测试驱动|spec|规格|契约/.test(text)) {
+  } else if (/开发|编码|实现|特性|construct|增量|编写|生产|新建|新增|创建|tdd|测试驱动|spec|规格|契约|cdd|约束驱动/.test(text)) {
     postKey = 'construct';
-  } else if (/守卫|巡检|guardian|门禁裁决|看守|防反弹|防御/.test(text)) {
+  } else if (/守卫|巡检|guardian|门禁裁决|看守|防反弹|防御|约束|constraint|底线|floor|ratchet|棘轮/.test(text)) {
     postKey = 'guardian';
-  } else if (/探索|调研|排查|explore|探针|调查|勘测|拓扑|调用链|排错|debug|质询|interview|缺陷|故障/.test(text)) {
+  } else if (/探索|调研|排查|explore|探针|调查|勘测|拓扑|调用链|排错|debug|质询|interview|缺陷|故障|context|上下文/.test(text)) {
     postKey = 'explore';
-  } else if (/审查|review|检查|合规|诊断|(?:^|[^态])分析/.test(text)) {
+  } else if (/审查|review|检查|合规|诊断|(?:^|[^态])分析|doubt|怀疑|对抗|证伪|挑刺|cross-review/.test(text)) {
     postKey = 'review';
   }
 
@@ -128,8 +128,8 @@ function buildSystemPrompt(archetypeObj, postureObj) {
   const verifySection = isReadOnly
     ? `## 🧪 Layer 4: 本地门禁自检契约 (只读审查姿态)
 只读姿态已物理剥夺写权限，严禁执行产物编译或写入测试；向主 Agent 汇报时必须提供基于 410 规则库与所属领域刚性公理的纯客观文件路径、起始行号与质性技术依据。`
-    : `## 🧪 Layer 4: 本地门禁自检契约
-交割任务前，必须在所属工作目录下依次执行并通过以下本地验证命令：
+    : `## 🧪 Layer 4: 本地门禁自检契约 (构建 + 测试 + 静态规则三重闭环)
+交割任务前，必须在所属工作目录下依次执行并通过以下本地验证命令（测试全绿仅为必要底线，绝不等同于符合审查或通过门禁，必须确保编译、测试与静态规则全部绿色）：
 ${verifyCommands}`;
 
   return `# SubAgent System Contract: [${archetypeObj.displayName}] × [${postureObj.displayName}]
@@ -141,7 +141,8 @@ ${verifyCommands}`;
 2. 复杂度预算：圈复杂度 CC <= 15，控制流深度 Depth <= 4，单行噪声比 Noise <= 4.0；单文件双轨体积 ELOC <= 900 / LOC <= 1400（受 1:3 动态反推包络约束与消除循环内瞬态堆分配 CPX-SPACE-001）；
 3. 门面设计：门面层必须满足 ELOC >= 15 或 Object.freeze 不可变保障，严禁 <= 3 行空包跳板 (ARCH-ABS-001 / ARCH-FAC-001)；
 4. 真实性纪律：单源规则目录 (rule-catalog.json) 权威收录 410 条规则，严禁虚构规则 ID (RCFG-RULE-DRIFT)，禁止敷衍/夸大词汇与施工临时黑话；
-5. 零高危技术债：全工作区 High/Critical 债务历史性归零 (0 项)，严禁引入任何技术债务反弹 (一票否决)。
+5. 零高危技术债：全工作区 High/Critical 债务历史性归零 (0 项)，严禁引入任何技术债务反弹 (一票否决)；
+6. 资深工程规范与防线公理：测试全绿仅为功能底线，绝不等同于符合 Auto 审查或通过门禁系统；编码必须内化资深工程师纪律（卫语句平铺控制流、循环内零瞬态堆分配 CPX-SPACE-001、消融空包跳板 ARCH-ABS-001、六字段 JSDoc 契约）；交割前必须通过本地域三重自检。
 
 ## 🛡️ Layer 1: 物理路径沙箱约束 (Path Jail Guard)
 * 授权操作路径前缀：
@@ -171,7 +172,7 @@ function buildTaskPromptTemplate(taskGoal, archetypeObj, postureObj) {
     ? `[Pre-Delivery Verification]
 纯只读审查姿态，严禁修改任何代码；汇报前请对照 410 规则库与所属领域刚性公理确认包含文件路径、起始行号与质性依据。`
     : `[Pre-Delivery Verification]
-完成改动后，在提交工作前必须自行执行并通过以下本地自检：
+完成改动后，在提交工作前必须自行执行并通过以下本地自检（涵盖构建编译、测试验证及静态分析；确认全量绿色后方可交付主 Agent 交叉复审）：
 ${verifyCommands}`;
 
   return `[Task Scope & Zero-Intersection Path Jail]
@@ -184,10 +185,12 @@ ${goalText}
 
 [Quality & Discipline Checklist]
 1. 严禁创建 0 字节物理空文件或未实现占位符；
-2. 单函数圈复杂度 CC <= 15，嵌套深度 Depth <= 4，单文件双轨体积 ELOC <= 900 / LOC <= 1400；
-3. 提交与汇报严禁使用施工批次代号与非客观黑话，保持纯客观技术事实；
-4. 引用规则 ID 必须在 rule-catalog.json (410 条规则) 中真实登记 (RCFG-RULE-DRIFT)；
-5. 严禁引入任何 High/Critical 技术债务反弹，保持 0 项刚性基线。
+2. 资深工程师控制流：卫语句提前返回，单函数圈复杂度 CC <= 15，嵌套深度 Depth <= 4，单行噪声比 Noise <= 4.0；
+3. 内存与结构防线：循环体与高频调度零瞬态堆分配 (CPX-SPACE-001 / ADV-PRF-002)，消融单行透传跳板 (ARCH-ABS-001)，对外门面实质承载 (ARCH-FAC-001)；
+4. 架构契约与自解释性：核心模块配备标准六字段 JSDoc 头部契约，算法边界显式声明退化保护阈值，严禁假分支幽灵注释与敏捷代号黑话；
+5. 提交与汇报保持纯客观技术事实，严禁施工批次代号，引用规则 ID 必须在 rule-catalog.json 中真实登记 (RCFG-RULE-DRIFT)；
+6. 严禁引入任何 High/Critical 技术债务反弹，保持 0 项刚性基线；
+7. 【四重防线公理】测试通过绝不等同于符合 Auto 审查或通过门禁系统；交割前必须自主闭环本地域三重验证（构建 + 测试 + 静态分析），测试全绿只是最基础的必要条件。
 
 ${preDeliverySection}
 `;

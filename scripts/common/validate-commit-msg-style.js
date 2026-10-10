@@ -187,7 +187,7 @@ function checkExecutionSectionNumeric(rawLine, lineNum, rule) {
  */
 function validateCommitMessageContent(content) {
   const config = loadTermsConfig();
-  const rules = config.rules || [];
+  const rules = config.rules || config.forbiddenRules || [];
   const whitelist = config.whitelist || [];
   const rule6 = rules.find((r) => r.id === 'CMG-STY-006');
 
