@@ -45,3 +45,27 @@ description: >-
 详见：
 - [software-failure-modes.md](references/software-failure-modes.md)
 - [root-cause-analysis-template.md](templates/root-cause-analysis-template.md)
+
+---
+
+## 四、 SSCCE 最小完整可复现哲学 (Short, Self-Contained, Correct Example)
+
+在面对复杂系统缺陷、偶发性崩溃或深层异步竞态时，**严禁在庞大业务代码中直接开刀或盲目试错**。必须严格贯彻 SSCCE 哲学：
+1. **极简代码 (Short)**：编写或剥离出一个 $\le 30$ 行、仅保留触发异常所需最少逻辑的独立脚本；
+2. **自给自足 (Self-Contained)**：剥离一切外部环境依赖，利用内存桩替代真实 I/O，任何人可在任意机器秒级运行；
+3. **精准暴露 (Correct Example)**：该片段必须能 100% 稳定复现目标缺陷（红灯确证）；
+4. **资产沉淀**：缺陷修复后，该复现脚本直接升级为自动化回归测试用例，永久防范故障反弹。
+
+详见：
+- [sscce-reproduction-guide.md](references/sscce-reproduction-guide.md)
+
+---
+
+## 五、 本地事实穷尽前置准则 (Grounded Pre-Investigation)
+
+在向人类工程师提出疑问、请求协助或汇报排错进展前，必须先完成**本地事实穷尽**，严禁低级发问：
+1. **查验真源指针**：是否已阅读相关模块的 SSOT 规范、六字段 JSDoc 头部契约与架构定义；
+2. **查验符号与调用拓扑**：是否已通过 AST 或符号工具追踪过目标函数的完整调用栈与参数传递；
+3. **查验版本变更历史**：是否已查阅 Git 提交历史明确该逻辑的引入初衷与改动背景；
+4. **结构化汇报**：向人类求助时，必须清晰呈现“四元事实组”：精确环境与版本、期望行为、实际现象（含完整错误堆栈）、以及已通过 SSCCE 验证排除的假说。
+
