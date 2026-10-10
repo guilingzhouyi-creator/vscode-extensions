@@ -45,7 +45,7 @@ function renderStatCard(id: string, label: string): string {
     </div>`;
 }
 
-function renderSettingRow(spec: SettingRowSpec): string {
+function renderSettingRow(spec: SettingRowSpec, helpAriaLabel: string = 'Help'): string {
     const labelId = `${spec.id}-label`;
     const descId = `${spec.id}-desc`;
     let controlHtml = '';
@@ -75,7 +75,7 @@ function renderSettingRow(spec: SettingRowSpec): string {
         <div class="setting-label">
           <div class="setting-header-row">
             <span id="${labelId}">${spec.name}</span>
-            <span class="help-icon" tabindex="0" role="button" aria-label="Help">?<span class="tooltip">${spec.tip}</span></span>
+            <span class="help-icon" tabindex="0" role="button" aria-label="${helpAriaLabel}">?<span class="tooltip">${spec.tip}</span></span>
           </div>
           <div class="desc" id="${descId}">${spec.desc}</div>
         </div>${controlHtml}
@@ -83,6 +83,8 @@ function renderSettingRow(spec: SettingRowSpec): string {
 }
 
 export function buildDashboardHtml(args: DashboardTemplateArgs): string {
+    const helpLabel = args.labels['panel.aria.help'] || 'Help';
+    const renderRow = (spec: SettingRowSpec) => renderSettingRow(spec, helpLabel);
     return /* html */ `
 <!DOCTYPE html>
 <html lang="${args.lang}">
@@ -234,7 +236,7 @@ ${DASHBOARD_CHART_STYLES}
   <div class="section">
     <h2>${args.labels['panel.section.basic']}</h2>
     <div class="card-panel">
-      ${renderSettingRow({
+      ${renderRow({
         id: 'chkEnabled',
         dataKey: 'isEnabled',
         type: 'toggle',
@@ -242,7 +244,7 @@ ${DASHBOARD_CHART_STYLES}
         tip: args.labels['panel.set.enabled.tip'],
         desc: args.labels['panel.set.enabled.desc'],
       })}
-      ${renderSettingRow({
+      ${renderRow({
         id: 'chkGlobalDisabled',
         dataKey: 'globalDisabled',
         type: 'toggle',
@@ -250,7 +252,7 @@ ${DASHBOARD_CHART_STYLES}
         tip: args.labels['panel.set.globalDisabled.tip'],
         desc: args.labels['panel.set.globalDisabled.desc'],
       })}
-      ${renderSettingRow({
+      ${renderRow({
         id: 'chkChartDualTrack',
         dataKey: 'chartDualTrackDisplay',
         type: 'toggle',
@@ -258,7 +260,35 @@ ${DASHBOARD_CHART_STYLES}
         tip: args.labels['panel.set.chartDualTrack.tip'],
         desc: args.labels['panel.set.chartDualTrack.desc'],
       })}
-      ${renderSettingRow({
+      ${renderRow({
+        id: 'chkAiDetection',
+        dataKey: 'aiDetectionEnabled',
+        type: 'toggle',
+        name: args.labels['panel.set.aiDetection.name'],
+        tip: args.labels['panel.set.aiDetection.tip'],
+        desc: args.labels['panel.set.aiDetection.desc'],
+      })}
+      ${renderRow({
+        id: 'numIdleTimeout',
+        dataKey: 'idleTimeoutMinutes',
+        type: 'number',
+        min: 0,
+        max: 1440,
+        name: args.labels['panel.set.idleTimeout.name'],
+        tip: args.labels['panel.set.idleTimeout.tip'],
+        desc: args.labels['panel.set.idleTimeout.desc'],
+      })}
+      ${renderRow({
+        id: 'numAiCooldown',
+        dataKey: 'aiCooldownSeconds',
+        type: 'number',
+        min: 0,
+        max: 3600,
+        name: args.labels['panel.set.aiCooldown.name'],
+        tip: args.labels['panel.set.aiCooldown.tip'],
+        desc: args.labels['panel.set.aiCooldown.desc'],
+      })}
+      ${renderRow({
         id: 'chkStatusBar',
         dataKey: 'statusBarEnabled',
         type: 'toggle',
@@ -266,7 +296,7 @@ ${DASHBOARD_CHART_STYLES}
         tip: args.labels['panel.set.statusBar.tip'],
         desc: args.labels['panel.set.statusBar.desc'],
       })}
-      ${renderSettingRow({
+      ${renderRow({
         id: 'selLocale',
         dataKey: 'locale',
         type: 'select',
@@ -279,7 +309,7 @@ ${DASHBOARD_CHART_STYLES}
           { value: 'en', label: args.labels['panel.set.locale.en'] },
         ],
       })}
-      ${renderSettingRow({
+      ${renderRow({
         id: 'chkWeeklyLimit',
         dataKey: 'weeklyLimitEnabled',
         type: 'toggle',
@@ -287,7 +317,7 @@ ${DASHBOARD_CHART_STYLES}
         tip: args.labels['panel.set.weeklyLimit.tip'],
         desc: args.labels['panel.set.weeklyLimit.desc'],
       })}
-      ${renderSettingRow({
+      ${renderRow({
         id: 'numWeeklyLimitHours',
         dataKey: 'weeklyLimitHours',
         type: 'number',
@@ -304,7 +334,7 @@ ${DASHBOARD_CHART_STYLES}
   <div class="section">
     <h2>${args.labels['panel.section.storage']}</h2>
     <div class="card-panel">
-      ${renderSettingRow({
+      ${renderRow({
         id: 'chkJournal',
         dataKey: 'journalEnabled',
         type: 'toggle',
@@ -312,7 +342,7 @@ ${DASHBOARD_CHART_STYLES}
         tip: args.labels['panel.set.journal.tip'],
         desc: args.labels['panel.set.journal.desc'],
       })}
-      ${renderSettingRow({
+      ${renderRow({
         id: 'chkBackup',
         dataKey: 'backupToFile',
         type: 'toggle',
@@ -320,7 +350,7 @@ ${DASHBOARD_CHART_STYLES}
         tip: args.labels['panel.set.backup.tip'],
         desc: args.labels['panel.set.backup.desc'],
       })}
-      ${renderSettingRow({
+      ${renderRow({
         id: 'numRingBuffer',
         dataKey: 'ringBufferCapacity',
         type: 'number',
@@ -330,7 +360,7 @@ ${DASHBOARD_CHART_STYLES}
         tip: args.labels['panel.set.ringBuffer.tip'],
         desc: args.labels['panel.set.ringBuffer.desc'],
       })}
-      ${renderSettingRow({
+      ${renderRow({
         id: 'numJournalInterval',
         dataKey: 'journalFlushIntervalMs',
         type: 'number',
@@ -340,7 +370,7 @@ ${DASHBOARD_CHART_STYLES}
         tip: args.labels['panel.set.journalInterval.tip'],
         desc: args.labels['panel.set.journalInterval.desc'],
       })}
-      ${renderSettingRow({
+      ${renderRow({
         id: 'numFullSaveInterval',
         dataKey: 'fullSaveIntervalMs',
         type: 'number',
@@ -350,7 +380,7 @@ ${DASHBOARD_CHART_STYLES}
         tip: args.labels['panel.set.fullSaveInterval.tip'],
         desc: args.labels['panel.set.fullSaveInterval.desc'],
       })}
-      ${renderSettingRow({
+      ${renderRow({
         id: 'numMaxSessions',
         dataKey: 'maxSessions',
         type: 'number',

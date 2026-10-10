@@ -154,7 +154,7 @@ export class RecoveryService {
         }
 
         let slices = await this.journal.readJournal();
-        const watermark = Number(data.metadata?.lastJournalTs ?? 0);
+        const watermark = data.metadata?.lastJournalTs ?? 0;
         if (watermark > 0) {
             const before = slices.length;
             slices = slices.filter((s) => s.timestamp > watermark);
@@ -174,7 +174,7 @@ export class RecoveryService {
 
         const maxTs = slices.reduce((max, s) => Math.max(max, s.timestamp), 0);
         if (maxTs > 0) {
-            data.metadata = { ...data.metadata, lastJournalTs: String(maxTs) };
+            data.metadata = { ...data.metadata, lastJournalTs: maxTs };
         }
 
         try {

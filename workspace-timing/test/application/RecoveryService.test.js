@@ -111,7 +111,7 @@ describe('RecoveryService（崩溃恢复编排）', () => {
 
   it('水位线去重：metadata.lastJournalTs 之下的旧切片不重复累计', async () => {
     const base = emptyData();
-    base.metadata = { lastJournalTs: '5000' };
+    base.metadata = { lastJournalTs: 5000 };
     const journal = new FakeJournal([
       { timestamp: 4000, deltaMs: 1000 },  // ≤ 水位线 → 跳过
       { timestamp: 6000, deltaMs: 1000 },  // > 水位线 → 回放
@@ -119,7 +119,7 @@ describe('RecoveryService（崩溃恢复编排）', () => {
     const store = new FakeStore(base);
     const data = await makeRecovery(store, journal).recover(45);
     assert.strictEqual(data.totalMs, 1000, '仅回放水位线之上的切片');
-    assert.strictEqual(data.metadata.lastJournalTs, '6000', '水位线推进到最新时间戳');
+    assert.strictEqual(data.metadata.lastJournalTs, 6000, '水位线推进到最新时间戳');
   });
 
   it('truncate 失败降级：不阻塞激活，水位线已推进', async () => {
@@ -128,7 +128,7 @@ describe('RecoveryService（崩溃恢复编排）', () => {
     const store = new FakeStore(base);
     const data = await makeRecovery(store, journal).recover(45);
     assert.strictEqual(data.totalMs, 500, '回放仍应生效');
-    assert.strictEqual(data.metadata.lastJournalTs, '1000', '水位线随写回持久化，供下次去重');
+    assert.strictEqual(data.metadata.lastJournalTs, 1000, '水位线随写回持久化，供下次去重');
   });
 
   it('补偿：journal 无有效回放且存在进行中会话时，按历时兜底补偿', async () => {

@@ -105,6 +105,9 @@ export function buildDashboardScript(labels: Record<string, string>): string {
         setChecked('chkWeeklyLimit', data.weeklyLimitEnabled);
         setValue('numWeeklyLimitHours', data.weeklyLimitHours || 40);
         setChecked('chkChartDualTrack', data.chartDualTrackDisplay !== false);
+        setChecked('chkAiDetection', data.aiDetectionEnabled !== false);
+        setValue('numIdleTimeout', data.idleTimeoutMinutes ?? 15);
+        setValue('numAiCooldown', data.aiCooldownSeconds ?? 60);
 
         // 对比契约：跨工作区对比视图渲染
         renderWorkspaceCompare(data.workspaceList, data.workspaceCount, data.globalTotalMs);
@@ -849,8 +852,8 @@ export function buildDashboardScript(labels: Record<string, string>): string {
           if (dualTrack && ms > 0 && (mMs > 0 || aMs > 0)) {
             const mPct = Math.round((mMs / ms) * 100);
             const aPct = 100 - mPct;
-            dualDetailTag = ' (' + (L['panel.weekly.legendManual'] || 'Manual') + ' ' + formatDuration(mMs) + ' ' + mPct + '% · ' +
-                            (L['panel.weekly.legendAi'] || 'AI') + ' ' + formatDuration(aMs) + ' ' + aPct + '%)';
+            dualDetailTag = ' (' + L['panel.weekly.legendManual'] + ' ' + formatDuration(mMs) + ' ' + mPct + '% · ' +
+                            L['panel.weekly.legendAi'] + ' ' + formatDuration(aMs) + ' ' + aPct + '%)';
           }
 
           const peakTag = (ms > 0 && h === peakHour) ? ' (' + L['panel.today.hourlyPeak'] + ')' : '';

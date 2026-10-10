@@ -329,7 +329,7 @@ export interface WorkspaceTimingData {
 
 /** 扩展元数据结构 */
 export interface TimingMetadata {
-    lastJournalTs?: number | string;
+    lastJournalTs?: number;
     foldedSessionCount?: number;
     journalPlaybackCount?: number;
     [key: string]: unknown;

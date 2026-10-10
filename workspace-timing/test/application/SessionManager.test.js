@@ -152,8 +152,8 @@ describe('SessionManager（跨午夜与休眠管理）', () => {
         assert.strictEqual(timer.data.totalMs, 3600000);
 
         // 验证：journal 水位线推进到今日零点（崩溃恢复时跳过封存段，防双重计数）
-        assert.strictEqual(timer.data.metadata.lastJournalTs, String(todayZero));
-        assert.strictEqual(storage.saved[storage.saved.length - 1].metadata.lastJournalTs, String(todayZero),
+        assert.strictEqual(timer.data.metadata.lastJournalTs, todayZero);
+        assert.strictEqual(storage.saved[storage.saved.length - 1].metadata.lastJournalTs, todayZero,
             '水位线必须随落盘持久化');
 
         // 验证：今日会话新起点为今日零点，昨日 1 小时不计入今日
@@ -182,7 +182,7 @@ describe('SessionManager（跨午夜与休眠管理）', () => {
             assert.strictEqual(timer.data.currentSessionStartMs, resumeMs, '新起点设为唤醒时刻');
 
             // 验证：journal 水位线推进到唤醒时刻（崩溃恢复时跳过休眠前封存段，防双重计数）
-            assert.strictEqual(timer.data.metadata.lastJournalTs, String(resumeMs));
+            assert.strictEqual(timer.data.metadata.lastJournalTs, resumeMs);
         });
     });
 

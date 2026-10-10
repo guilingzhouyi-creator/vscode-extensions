@@ -182,9 +182,11 @@ function sanitizeMetadata(rawMeta: unknown): TimingMetadata | undefined {
     const meta: TimingMetadata = {};
     if (isFiniteNumber(rawMeta.lastJournalTs) && rawMeta.lastJournalTs > 0) {
         meta.lastJournalTs = rawMeta.lastJournalTs;
-    }
-    if (typeof rawMeta.lastJournalTs === 'string' && rawMeta.lastJournalTs.trim() !== '') {
-        meta.lastJournalTs = rawMeta.lastJournalTs;
+    } else if (typeof rawMeta.lastJournalTs === 'string' && rawMeta.lastJournalTs.trim() !== '') {
+        const parsed = Number(rawMeta.lastJournalTs);
+        if (isFiniteNumber(parsed) && parsed > 0) {
+            meta.lastJournalTs = parsed;
+        }
     }
     if (isFiniteNumber(rawMeta.foldedSessionCount) && rawMeta.foldedSessionCount >= 0) {
         meta.foldedSessionCount = Math.floor(rawMeta.foldedSessionCount);

@@ -297,7 +297,7 @@ export class SessionManager {
         this.timer.replaceData({
             ...this.timer.data,
             sessions: [...this.timer.data.sessions],
-            metadata: { ...this.timer.data.metadata, lastJournalTs: String(boundaryMs) },
+            metadata: { ...this.timer.data.metadata, lastJournalTs: boundaryMs },
         });
     }
 
