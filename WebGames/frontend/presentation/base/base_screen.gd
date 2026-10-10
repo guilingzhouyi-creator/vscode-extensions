@@ -8,7 +8,7 @@ extends Control
 
 const UIStateContainerClass = preload("res://frontend/presentation/common/ui_state_container.gd")
 const NavTypes = preload("res://frontend/navigation/nav_types.gd")
-const ViewRouter = preload("res://frontend/navigation/view_router.gd")
+const NavManager = preload("res://frontend/navigation/nav_manager.gd")
 
 var screen_id: String = ""
 var navigation_params: Dictionary = {}
@@ -25,7 +25,7 @@ func on_screen_exit() -> void:
 
 ## 统一返回上一视图（供子类或标题栏组件调用）
 func back(transition_type: int = NavTypes.TransitionType.SLIDE_RIGHT) -> void:
-	ViewRouter.get_instance().pop_view(transition_type)
+	NavManager.get_instance().pop_screen(transition_type)
 
 ## 页面被后置遮盖挂起时调用 (如上面弹出了全屏新页面)
 func on_screen_suspend() -> void:

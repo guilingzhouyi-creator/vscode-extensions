@@ -9,7 +9,7 @@ extends Button
 const DesignTokens = preload("res://frontend/theme/design_tokens.gd")
 const UIAudioBridge = preload("res://frontend/ui_infrastructure/ui_audio_bridge.gd")
 const NavTypes = preload("res://frontend/navigation/nav_types.gd")
-const ViewRouter = preload("res://frontend/navigation/view_router.gd")
+const NavManager = preload("res://frontend/navigation/nav_manager.gd")
 
 signal back_pressed()
 
@@ -48,4 +48,4 @@ func _on_pressed() -> void:
 	back_pressed.emit()
 
 	if auto_pop:
-		ViewRouter.get_instance().pop_view(back_transition)
+		NavManager.get_instance().pop_screen(back_transition)
