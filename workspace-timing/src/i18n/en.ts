@@ -235,6 +235,7 @@ const en: I18nStrings = {
   'panel.weekly.legendAi': 'AI Autonomous Collaboration',
   'panel.weekly.legendRatio': 'AI Ratio',
   'panel.today.hourlyStackedTooltip': '{0} · {1} (Manual {2} {3}% · AI {4} {5}%)',
+  'panel.aria.help': 'Help',
 };
 
 export default en;

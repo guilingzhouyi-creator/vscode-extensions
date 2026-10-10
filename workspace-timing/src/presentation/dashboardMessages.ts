@@ -99,17 +99,11 @@ const MESSAGE_STRATEGIES: {
     },
 };
 
-/** 创建面板消息处理器（每次 activate 构造一次） */
 export function createDashboardMessageHandler(ctx: MessageRouterContext): DashboardMessageHandler {
     return (msg: DashboardMessage) => {
         const handler = MESSAGE_STRATEGIES[msg.type];
         if (handler) {
             void handler(ctx, msg as never);
-        } else if ((msg as { type: string }).type === 'saveSettings') {
-            const payload = (msg as { payload: Partial<any> }).payload;
-            if (payload) {
-                void MESSAGE_STRATEGIES.updateConfig(ctx, { type: 'updateConfig', payload });
-            }
         }
     };
 }

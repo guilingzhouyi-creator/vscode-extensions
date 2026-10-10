@@ -239,4 +239,6 @@ export interface I18nStrings {
     'panel.weekly.legendAi': string;
     'panel.weekly.legendRatio': string;
     'panel.today.hourlyStackedTooltip': string;
+    /** 无障碍帮助图标标签 (Accessibility help label) */
+    'panel.aria.help': string;
 }

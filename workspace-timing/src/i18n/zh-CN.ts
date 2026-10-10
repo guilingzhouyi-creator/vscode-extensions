@@ -235,6 +235,7 @@ const zhCN: I18nStrings = {
   'panel.weekly.legendAi': 'AI 自主协作',
   'panel.weekly.legendRatio': 'AI 占比',
   'panel.today.hourlyStackedTooltip': '{0} · {1} (人工 {2} {3}% · AI {4} {5}%)',
+  'panel.aria.help': '帮助',
 };
 
 export default zhCN;
