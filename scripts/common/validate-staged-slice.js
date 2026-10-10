@@ -17,11 +17,13 @@ const path = require("path");
 const { execSync } = require("child_process");
 
 let ts;
+const REPO_ROOT = path.resolve(__dirname, '../..');
+
 const candidatePaths = [
   "typescript",
-  path.resolve(__dirname, "../../auto-refactor/node_modules/typescript"),
-  path.resolve(__dirname, "../../workspace-timing/node_modules/typescript"),
-  path.resolve(__dirname, "../../node_modules/typescript"),
+  path.resolve(REPO_ROOT, "auto-refactor/node_modules/typescript"),
+  path.resolve(REPO_ROOT, "workspace-timing/node_modules/typescript"),
+  path.resolve(REPO_ROOT, "node_modules/typescript"),
 ];
 
 for (const p of candidatePaths) {
@@ -260,6 +262,7 @@ function getStagedHunkMap(explicitFiles) {
   const map = new Map();
   try {
     const raw = execSync("git diff --cached -U0 --diff-filter=ACM", {
+      cwd: REPO_ROOT,
       encoding: "utf8",
       stdio: ["pipe", "pipe", "ignore"],
       env: getGitEnv(),
@@ -271,7 +274,7 @@ function getStagedHunkMap(explicitFiles) {
 
   if (map.size === 0) {
     for (const file of getStagedFilesFallback()) {
-      map.set(path.resolve(file), { changedLines: null, isNew: false });
+      map.set(path.resolve(REPO_ROOT, file), { changedLines: null, isNew: false });
     }
   }
 
@@ -281,6 +284,7 @@ function getStagedHunkMap(explicitFiles) {
 function getStagedFilesFallback() {
   try {
     const raw = execSync("git diff --cached --name-only --diff-filter=ACM", {
+      cwd: REPO_ROOT,
       encoding: "utf8",
       stdio: ["pipe", "pipe", "ignore"],
       env: getGitEnv(),
@@ -481,9 +485,10 @@ function analyzeFunction(node, sourceFile, cfg) {
 }
 
 function readStagedContentSafe(filePath) {
-  const rel = path.relative(process.cwd(), filePath).replace(/\\/g, "/");
+  const rel = path.relative(REPO_ROOT, filePath).replace(/\\/g, "/");
   try {
     return execSync(`git show :${rel}`, {
+      cwd: REPO_ROOT,
       encoding: "utf8",
       stdio: ["pipe", "pipe", "ignore"],
       env: getGitEnv(),
