@@ -351,12 +351,9 @@ func _connect_signals() -> void:
 # 返回按钮
 # ==============================================================================
 
-## 返回按钮：经 ViewRouter 弹出视图回退上一级
+## 返回按钮：经 BaseScreen.back 弹出视图回退上一级
 func _on_back_pressed() -> void:
-	# 右下角返回按钮：通过 ViewRouter 返回上一视图
-	var router := ViewRouter.get_instance()
-	if router != null:
-		router.pop_view()
+	self.back()
 
 # ==============================================================================
 # 任务列表交互

@@ -3,7 +3,7 @@
 # 文件路径: res://frontend/views/misc_edge/misc_edge_view.gd
 # 职责: 假名面具切换(恶名/声望隔离)、精英突变词条激活与组合预览、
 #       地面拾取邻近提示框与规范命名空间检索；
-#       4 个 Tab 子界面由 MainTabContainer 承载，右下角返回按钮调 ViewRouter.pop_view()。
+#       4 个 Tab 子界面由 MainTabContainer 承载，右下角返回按钮调 BaseScreen.back()。
 # 骨架阶段: 零接线、不接 EventBus，仅本地 Mock 数据驱动 + 按钮点击反馈。
 # ==============================================================================
 class_name MiscEdgeView
@@ -350,9 +350,9 @@ func _connect_signals() -> void:
 # 信号回调
 # ==============================================================================
 
-## 返回按钮：经 ViewRouter 弹出视图回退上一级
+## 返回按钮：经 BaseScreen.back 弹出视图回退上一级
 func _on_back_btn_pressed() -> void:
-	ViewRouter.get_instance().pop_view()
+	self.back()
 
 ## 主 Tab 切换：骨架阶段无额外处理（占位）
 func _on_tab_changed(_tab_idx: int) -> void:

@@ -2,7 +2,7 @@
 # 卡拉尔世界引擎 (Kalar World Engine) - 前端第14卷: 通知与公告系统视图控制器
 # 文件路径: res://frontend/views/notification_bulletin/notification_bulletin_view.gd
 # 职责: 气泡Toast堆叠调度、二次确认Modal弹窗、全服跑马灯与红点树角标同步；
-#       3 个 Tab 子界面由 MainTabContainer 承载，右下角返回按钮调 ViewRouter.pop_view()。
+#       3 个 Tab 子界面由 MainTabContainer 承载，右下角返回按钮调 BaseScreen.back()。
 # 骨架阶段: 零接线、不接 EventBus，仅本地 Mock 数据驱动 + 按钮点击反馈。
 # ==============================================================================
 class_name NotificationBulletinView
@@ -322,9 +322,9 @@ func _connect_signals() -> void:
 # 信号回调
 # ==============================================================================
 
-## 返回按钮：经 ViewRouter 弹出视图回退上一级
+## 返回按钮：经 BaseScreen.back 弹出视图回退上一级
 func _on_back_btn_pressed() -> void:
-	ViewRouter.get_instance().pop_view()
+	self.back()
 
 ## 主 Tab 切换：骨架阶段占位
 func _on_tab_changed(_tab_idx: int) -> void:
@@ -357,13 +357,13 @@ func _on_notif_item_selected(idx: int) -> void:
 			return
 		filtered_idx += 1
 
-## 跳转目标按钮：非空跳转目标经 ViewRouter 推入目标视图
+## 跳转目标按钮：非空跳转目标经 NavManager 推入目标视图
 func _on_jump_target_pressed() -> void:
 	if _selected_notif_idx < 0 or _selected_notif_idx >= _notif_data.size():
 		return
 	var jump: String = _notif_data[_selected_notif_idx].get("jump_target", "")
 	if not jump.is_empty():
-		ViewRouter.get_instance().push_view(jump)
+		NavManager.get_instance().push_screen(jump)
 
 ## 全部已读按钮：批量标记并刷新列表/未读计数与状态文案
 func _on_mark_all_read_pressed() -> void:
