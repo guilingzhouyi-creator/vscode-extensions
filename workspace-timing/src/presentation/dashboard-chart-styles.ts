@@ -23,12 +23,10 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       height: 256px;
       margin: 10px 0 8px 0;
       padding: 12px 16px;
-      background: var(--glass-bg);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      border: 1px solid var(--glass-border);
-      border-radius: var(--radius-md);
-      box-shadow: var(--glass-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-sm);
       position: relative;
       overflow: hidden;
       contain: layout paint;
@@ -65,7 +63,6 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       stroke-width: 2.4;
       stroke-linejoin: round;
       stroke-linecap: round;
-      filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.45));
     }
     /* 视觉契约：自曲线向下衰减至透明底的 SVG LinearGradient Mask */
     .ac-area {
@@ -94,7 +91,6 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       transform: scale(1.4);
       fill: rgba(56, 189, 248, 0.38);
       stroke: #38bdf8;
-      filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.85));
     }
     .ac-dot-group:hover .ac-dot-core {
       transform: scale(1.23);
@@ -103,7 +99,6 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
     .ac-dot-group.is-peak .ac-dot-halo {
       stroke: #34d399;
       fill: rgba(16, 185, 129, 0.28);
-      filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.65));
     }
     /* 交互契约：悬浮胶囊药丸气泡标签，展示工时与日期 */
     .ac-pill-bg {
@@ -117,7 +112,6 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       fill: rgba(15, 23, 42, 0.95);
       stroke: #38bdf8;
       stroke-width: 1.4;
-      filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.45));
     }
     .ac-pill-text {
       font-size: 11px;
@@ -234,10 +228,10 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       cursor: pointer;
     }
     /* 色阶梯度契约：GitHub 风格 4 阶工时强度离散分布映射 */
-    .hm-cell.l1 { background: #0e4429; border: 1px solid rgba(57, 211, 83, 0.2); }
-    .hm-cell.l2 { background: #006d32; border: 1px solid rgba(57, 211, 83, 0.4); }
+    .hm-cell.l1 { background: #0e4429; }
+    .hm-cell.l2 { background: #006d32; }
     .hm-cell.l3 { background: #26a641; }
-    .hm-cell.l4 { background: #39d353; box-shadow: 0 0 4px rgba(57, 211, 83, 0.5); }
+    .hm-cell.l4 { background: #39d353; }
     /* 未来边界契约：尚未到达的未来日期透明度衰减且禁用交互指针 */
     .hm-cell.future { opacity: 0.25; cursor: default; }
     /* 悬停放大契约：非未来日期单元格悬浮展示白光微外边框与层级置顶 */
@@ -316,12 +310,10 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
     .hourly-wrapper {
       position: relative;
       margin: 10px 0 6px 0;
-      background: var(--glass-bg);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      border: 1px solid var(--glass-border);
-      border-radius: var(--radius-md);
-      box-shadow: var(--glass-shadow), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-sm);
       padding: 12px 14px 8px 14px;
       overflow: hidden;
       contain: layout paint;
@@ -398,7 +390,6 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       height: 100%;
       border-radius: 2px 2px 0 0;
       background: linear-gradient(180deg, rgba(56, 189, 248, 0.75), rgba(59, 130, 246, 0.5));
-      box-shadow: 0 0 6px rgba(56, 189, 248, 0.25);
       transform: scaleY(var(/* @scale */--bar-scale, 0));
       transform-origin: bottom;
       transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), filter 0.2s ease;
@@ -409,7 +400,6 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
     /* 峰值柱状契约：全天工作时长最高峰小时立柱渲染青绿高光渐变 */
     .hourly-bar.is-peak {
       background: linear-gradient(180deg, #10b981, #06b6d4);
-      box-shadow: 0 0 10px rgba(16, 185, 129, 0.45);
     }
     /* 底部基线契约：立柱槽位底部基线指示线，有活动时切换高亮青蓝 */
     .hourly-slot-base {
@@ -424,7 +414,6 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
     }
     .hourly-slot.is-peak-slot .hourly-slot-base {
       background: #10b981;
-      box-shadow: 0 0 4px #10b981;
     }
 
     /* 标尺契约：物理标尺刻度线与时间标签 */
@@ -470,7 +459,6 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
     .hourly-notch-group.is-noon .hourly-notch {
       height: 6px;
       background: var(--cyan);
-      box-shadow: 0 0 4px rgba(56, 189, 248, 0.5);
     }
     .hourly-tick-label {
       font-size: 9.5px;
@@ -515,7 +503,6 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       bottom: 0;
       width: 2px;
       background: #f43f5e;
-      box-shadow: 0 0 5px rgba(244, 63, 94, 0.9);
       border-radius: 1px;
       z-index: 3;
       pointer-events: none;
@@ -533,7 +520,7 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       min-width: 2px;
     }
     .trend-fill.is-over {
-      box-shadow: 0 0 8px rgba(239, 68, 68, 0.55);
+      background: #ef4444;
     }
     /* 数值排版契约：右对齐等宽数字排版，超时超限时自适应警示红 */
     .trend-value {
@@ -543,11 +530,10 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       color: var(--success);
       font-weight: 600;
       flex-shrink: 0;
-      transition: color 0.3s ease, text-shadow 0.3s ease;
+      transition: color 0.3s ease;
     }
     .trend-value.is-over {
       color: #ef4444;
-      text-shadow: 0 0 6px rgba(239, 68, 68, 0.35);
     }
 
     /* ==============================================================================
@@ -690,10 +676,9 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       z-index: 100;
       box-shadow: 0 4px 18px rgba(0,0,0,0.35);
       pointer-events: none;
-      backdrop-filter: blur(10px);
     }
-    /* 动画契约：气泡提示入场动画与同名动画隔离保护 */
-    @keyframes fadeInUp {
+    /* 动画契约：气泡提示入场动画与独立动画命名空间 */
+    @keyframes tooltipFadeIn {
       from {
         opacity: 0;
         transform: translate(-50%, 4px);
@@ -704,17 +689,10 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       }
     }
 
-    /* 隔离契约：主要卡片防横移隔离保护，确保居中定位不变量 */
-    .main-header,
-    .section,
-    .settings-card {
-      transform: none !important;
-    }
-
     /* 浮层展示契约：帮助图标悬停时触发淡入上浮动画展示说明气泡 */
     .help-icon:hover .tooltip {
       display: block;
-      animation: fadeInUp 0.15s ease both;
+      animation: tooltipFadeIn 0.15s ease both;
     }
     /* 三角指示契约：CSS Border 纯样式构建底部居中指向三角箭头 */
     .help-icon .tooltip::after {
@@ -748,7 +726,6 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       font-size: 12px;
       font-weight: 500;
       box-shadow: 0 6px 20px rgba(0,0,0,0.3);
-      backdrop-filter: blur(12px);
       opacity: 0;
       transform: translateY(10px);
       transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);

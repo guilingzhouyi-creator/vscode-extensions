@@ -46,6 +46,12 @@ export const DASHBOARD_BASE_STYLES = /* css */ `
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
+    html, body {
+      min-height: 100%;
+      overflow-x: hidden;
+      overflow-y: auto;
+    }
+
     body {
       font-family: var(--vscode-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif);
       font-size: var(--vscode-font-size, 13px);
@@ -127,6 +133,17 @@ export const DASHBOARD_BASE_STYLES = /* css */ `
       to {
         opacity: 1;
         transform: translateY(0);
+      }
+    }
+
+    @keyframes tooltipFadeIn {
+      from {
+        opacity: 0;
+        transform: translate(-50%, 4px);
+      }
+      to {
+        opacity: 1;
+        transform: translate(-50%, 0);
       }
     }
 
@@ -233,6 +250,7 @@ export const DASHBOARD_BASE_STYLES = /* css */ `
       gap: 10px;
       margin-bottom: var(--gap);
       animation: fadeInUp 0.3s ease both;
+      transform: none;
     }
 
     .stat-card {
@@ -242,32 +260,14 @@ export const DASHBOARD_BASE_STYLES = /* css */ `
       padding: 14px 12px;
       text-align: center;
       box-shadow: var(--shadow-sm);
-      backdrop-filter: blur(8px);
-      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      transition: background 0.15s ease, border-color 0.15s ease;
       position: relative;
       overflow: hidden;
     }
 
-    .stat-card::after {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 2px;
-      background: transparent;
-      transition: background 0.25s;
-    }
-
     .stat-card:hover {
-      transform: translateY(-2px);
       background: var(--card-bg-hover);
       border-color: var(--card-border-hover);
-      box-shadow: var(--shadow-md);
-    }
-
-    .stat-card:hover::after {
-      background: linear-gradient(90deg, var(--focus), var(--success));
     }
 
     .stat-card .value {
@@ -291,13 +291,7 @@ export const DASHBOARD_BASE_STYLES = /* css */ `
       letter-spacing: 0.2px;
     }
 
-    /* 状态契约：运行状态呼吸灯 Badge，提供高可见度活跃感知 */
-    @keyframes pulseGlow {
-      0% { box-shadow: 0 0 0 0 var(--success-glow); }
-      70% { box-shadow: 0 0 0 6px rgba(78, 201, 176, 0); }
-      100% { box-shadow: 0 0 0 0 rgba(78, 201, 176, 0); }
-    }
-
+    /* 状态契约：运行状态 Badge，提供高可见度活跃感知 */
     .status-badge {
       display: inline-flex;
       align-items: center;
@@ -322,7 +316,6 @@ export const DASHBOARD_BASE_STYLES = /* css */ `
       height: 6px;
       border-radius: 50%;
       background: var(--success);
-      animation: pulseGlow 1.8s infinite;
     }
 
     .status-disabled {
@@ -340,14 +333,13 @@ export const DASHBOARD_BASE_STYLES = /* css */ `
       background: var(--danger);
     }
 
-    /* 容器契约：毛玻璃卡片容器规范 (Glassmorphism card layout specifications) */
+    /* 容器契约：卡片容器规范 (Card panel layout specifications) */
     .card-panel {
       background: var(--card-bg);
       border: 1px solid var(--card-border);
       border-radius: var(--radius);
       padding: 14px;
       box-shadow: var(--shadow-sm);
-      backdrop-filter: blur(8px);
     }
 
     /* 交互契约：设置列表行与对齐规范 */
@@ -423,13 +415,11 @@ export const DASHBOARD_BASE_STYLES = /* css */ `
       z-index: 100;
       box-shadow: var(--shadow-md);
       pointer-events: none;
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
     }
     .help-icon:hover .tooltip,
     .help-icon:focus-visible .tooltip {
       display: block;
-      animation: fadeInUp 0.15s ease both;
+      animation: tooltipFadeIn 0.15s ease both;
     }
     .help-icon .tooltip::after {
       content: '';
