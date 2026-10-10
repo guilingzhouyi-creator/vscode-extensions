@@ -1,8 +1,3 @@
-import type * as ts from 'typescript';
-import type { NormalizedNode, LanguageAdapter, Position } from './ast/multilang';
-import type { IncrementalFileState } from './diff/incremental-state';
-import type { DefectTaxonomyCategory, StandardActionVerb } from './governance/standard-terminology';
-
 /**
  * Module: Core Engine — Shared Type Contracts and Domain Model
  * File Path: src/core/types.ts
@@ -25,6 +20,11 @@ import type { DefectTaxonomyCategory, StandardActionVerb } from './governance/st
  *   cost. Keeping these declarations centralized prevents producer/consumer drift against
  *   report.schema.json and lets implementation modules stay free of cross-cutting imports.
  */
+
+import type * as ts from 'typescript';
+import type { NormalizedNode, LanguageAdapter, Position } from './ast/multilang';
+import type { IncrementalFileState } from './diff/incremental-state';
+import type { DefectTaxonomyCategory, StandardActionVerb } from './governance/standard-terminology';
 
 // Re-exported for backward compatibility (utils/ast and other modules import Position here).
 export { Position } from './ast/multilang';
