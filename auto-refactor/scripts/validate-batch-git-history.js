@@ -18,6 +18,8 @@ const assert = require('assert');
 const path = require('path');
 const { GitHistoryMiner, CodeEvolutionAnalyzer } = require('../dist/core/evolution');
 
+const EQUIVALENCE_MAX_COMMITS = 2000;
+
 function testMockBatchParsing() {
   console.log('1. Testing In-Memory Multi-File Batch Parsing...');
 
@@ -55,8 +57,8 @@ function testRealRepoBatchEquivalence() {
   ];
 
   const cwd = path.resolve(__dirname, '..');
-  const minerSingle = new GitHistoryMiner({ repoRoot: cwd, maxCommits: 500 });
-  const minerBatch = new GitHistoryMiner({ repoRoot: cwd, maxCommits: 500 });
+  const minerSingle = new GitHistoryMiner({ repoRoot: cwd, maxCommits: EQUIVALENCE_MAX_COMMITS });
+  const minerBatch = new GitHistoryMiner({ repoRoot: cwd, maxCommits: EQUIVALENCE_MAX_COMMITS });
 
   // Measure single file mining time
   const t0 = Date.now();
@@ -65,7 +67,7 @@ function testRealRepoBatchEquivalence() {
 
   // Measure batch preloaded mining time
   const t1 = Date.now();
-  minerBatch.preloadRepository(cwd, 500);
+  minerBatch.preloadRepository(cwd, EQUIVALENCE_MAX_COMMITS);
   const batchProfiles = targetFiles.map((f) => minerBatch.mineFileHistory(f, cwd));
   const batchTime = Math.max(1, Date.now() - t1);
 
@@ -116,11 +118,11 @@ function testCodeEvolutionAnalyzerBatch() {
     'src/core/file-discovery.ts',
   ];
 
-  const minerSeq = new GitHistoryMiner({ repoRoot: cwd, maxCommits: 500 });
-  const minerBatch = new GitHistoryMiner({ repoRoot: cwd, maxCommits: 500 });
+  const minerSeq = new GitHistoryMiner({ repoRoot: cwd, maxCommits: EQUIVALENCE_MAX_COMMITS });
+  const minerBatch = new GitHistoryMiner({ repoRoot: cwd, maxCommits: EQUIVALENCE_MAX_COMMITS });
   const analyzerSequential = new CodeEvolutionAnalyzer(minerSeq);
   const analyzerBatch = new CodeEvolutionAnalyzer(minerBatch);
-  minerBatch.preloadRepository(cwd, 500);
+  minerBatch.preloadRepository(cwd, EQUIVALENCE_MAX_COMMITS);
 
   const seqResults = targetFiles.map((f) => analyzerSequential.analyzeFile(f, cwd));
   const batchMap = analyzerBatch.analyzeFilesBatch(targetFiles, cwd);
