@@ -47,40 +47,8 @@ export interface ImportStatementInfo {
     isWildcard: boolean;
 }
 
-/** Standard library module names for Node.js environments. */
-const NODE_STDLIB: ReadonlySet<string> = new Set([
-    'fs',
-    'path',
-    'os',
-    'child_process',
-    'events',
-    'stream',
-    'util',
-    'crypto',
-    'http',
-    'https',
-    'url',
-    'net',
-    'assert',
-    'buffer',
-]);
-
-/** Standard library module names for Python environments. */
-const PYTHON_STDLIB: ReadonlySet<string> = new Set([
-    'sys',
-    'os',
-    're',
-    'json',
-    'math',
-    'typing',
-    'collections',
-    'itertools',
-    'pathlib',
-    'datetime',
-    'time',
-    'asyncio',
-    'logging',
-]);
+import { GO_CORE_PACKAGES, NODE_CORE_MODULES } from './dependency-provenance';
+import { PYTHON_STDLIB_MODULES } from './python-stdlib';
 
 /** Exemption marker mapping from trigger tokens to canonical exemption reasons. */
 export const EXEMPTION_MARKER_MAP: ReadonlyMap<string, ExemptionReason> = new Map([
@@ -119,8 +87,10 @@ const EXEMPTION_LOOKUP: Record<string, ExemptionReason> = {
  */
 export function categorizeImport(specifier: string, language: string): ImportCategory {
     if (language === 'typescript' || language === 'javascript') {
+        if (specifier.startsWith('node:')) return CATEGORY_STDLIB;
         const clean = specifier.replace(/^node:/, '');
-        if (NODE_STDLIB.has(clean)) return CATEGORY_STDLIB;
+        const base = clean.split('/')[0];
+        if (NODE_CORE_MODULES.has(clean) || NODE_CORE_MODULES.has(base)) return CATEGORY_STDLIB;
         if (specifier.startsWith('./') || specifier.startsWith('../')) return CATEGORY_LOCAL;
         if (specifier.startsWith('@shared/') || specifier.includes('/common/')) {
             return CATEGORY_INTERNAL_SHARED;
@@ -130,15 +100,27 @@ export function categorizeImport(specifier: string, language: string): ImportCat
 
     if (language === 'python') {
         const firstSegment = specifier.split('.')[0];
-        if (PYTHON_STDLIB.has(firstSegment)) return 'stdlib';
+        if (PYTHON_STDLIB_MODULES.has(firstSegment)) return CATEGORY_STDLIB;
         if (specifier.startsWith('.')) return CATEGORY_LOCAL;
         return CATEGORY_THIRD_PARTY;
     }
 
     if (language === 'rust') {
-        if (specifier.startsWith('std::') || specifier.startsWith('core::')) return 'stdlib';
+        if (
+            specifier.startsWith('std::') ||
+            specifier.startsWith('core::') ||
+            specifier.startsWith('alloc::') ||
+            specifier.startsWith('proc_macro::')
+        ) return CATEGORY_STDLIB;
         if (specifier.startsWith('crate::') || specifier.startsWith('super::'))
             return CATEGORY_LOCAL;
+        return CATEGORY_THIRD_PARTY;
+    }
+
+    if (language === 'go') {
+        const firstSegment = specifier.split('/')[0];
+        if (GO_CORE_PACKAGES.has(firstSegment)) return CATEGORY_STDLIB;
+        if (specifier.startsWith('.')) return CATEGORY_LOCAL;
         return CATEGORY_THIRD_PARTY;
     }
 

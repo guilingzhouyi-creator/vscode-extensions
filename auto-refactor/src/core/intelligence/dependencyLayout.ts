@@ -13,8 +13,15 @@
  *   structured issues conforming to the Section VII result model.
  */
 
+import * as fs from 'fs';
+import * as path from 'path';
 import type { Issue, SemanticEvidenceStep, SemanticReviewDetail } from '../types';
 import type { ImportCategory, ImportStatementInfo } from './dependencyLayoutHelpers';
+import {
+    checkKnownPackageVulnerability,
+    parsePackageSpecifier,
+} from './dependency-vulnerabilities';
+import { auditLicenseCompliance } from './license-compliance';
 
 export { categorizeImport, extractExemptionReason } from './dependencyLayoutHelpers';
 export type { ImportCategory, ImportStatementInfo } from './dependencyLayoutHelpers';
@@ -52,6 +59,11 @@ export interface DependencyLayoutOptions {
     flagUnmanagedResources?: boolean;
     flagWildcards?: boolean;
     lazyImportExemptMarkers?: string[];
+    flagPhantomDependencies?: boolean;
+    flagVulnerableDependencies?: boolean;
+    flagLicenseCompliance?: boolean;
+    rootDir?: string;
+    manifestDependencies?: Set<string>;
 }
 
 interface DetailParams {
@@ -327,6 +339,252 @@ function auditExternalResources(
     }
 }
 
+const PKG_LICENSE_CACHE = new Map<string, string | null>();
+const PKG_VERSION_CACHE = new Map<string, string | null>();
+
+/** Known host-provided or ambient modules exempt from phantom dependency flags */
+const KNOWN_AMBIENT_MODULES: ReadonlySet<string> = new Set(['vscode', 'electron']);
+
+function resolvePackageLicense(rootDir: string, packageName: string): string | null {
+    const cacheKey = `${rootDir}::${packageName}`;
+    if (PKG_LICENSE_CACHE.has(cacheKey)) {
+        return PKG_LICENSE_CACHE.get(cacheKey) ?? null;
+    }
+    let cur = rootDir;
+    for (let i = 0; i < 3; i++) {
+        const pkgJsonPath = path.join(cur, 'node_modules', packageName, 'package.json');
+        if (fs.existsSync(pkgJsonPath)) {
+            try {
+                const raw = fs.readFileSync(pkgJsonPath, 'utf8');
+                const data = JSON.parse(raw);
+                let lic: string | null =
+                    typeof data.license === 'string'
+                        ? data.license
+                        : typeof data.license === 'object' && data.license?.type
+                          ? data.license.type
+                          : null;
+                if (!lic && data.licenses && Array.isArray(data.licenses) && data.licenses[0]?.type) {
+                    lic = data.licenses[0].type;
+                }
+                PKG_LICENSE_CACHE.set(cacheKey, lic);
+                return lic;
+            } catch {
+                // best-effort: ignored and falls back to next directory level
+            }
+        }
+        const parent = path.dirname(cur);
+        if (parent === cur) break;
+        cur = parent;
+    }
+    PKG_LICENSE_CACHE.set(cacheKey, null);
+    return null;
+}
+
+function resolvePackageVersion(rootDir: string | undefined, packageName: string): string | null {
+    if (!rootDir) return null;
+    const cacheKey = `${rootDir}::${packageName}`;
+    if (PKG_VERSION_CACHE.has(cacheKey)) {
+        return PKG_VERSION_CACHE.get(cacheKey) ?? null;
+    }
+
+    // 1. Try node_modules/<packageName>/package.json (up to 3 levels)
+    let cur = rootDir;
+    for (let i = 0; i < 3; i++) {
+        const pkgJsonPath = path.join(cur, 'node_modules', packageName, 'package.json');
+        if (fs.existsSync(pkgJsonPath)) {
+            try {
+                const data = JSON.parse(fs.readFileSync(pkgJsonPath, 'utf8'));
+                if (typeof data.version === 'string') {
+                    PKG_VERSION_CACHE.set(cacheKey, data.version);
+                    return data.version;
+                }
+            } catch {
+                // best-effort: ignored and continues search in parent directory
+            }
+        }
+        const parent = path.dirname(cur);
+        if (parent === cur) break;
+        cur = parent;
+    }
+
+    // 2. Try root package.json declared dependencies
+    try {
+        const rootPkg = path.join(rootDir, 'package.json');
+        if (fs.existsSync(rootPkg)) {
+            const data = JSON.parse(fs.readFileSync(rootPkg, 'utf8'));
+            const ver =
+                data.dependencies?.[packageName] ||
+                data.devDependencies?.[packageName] ||
+                data.optionalDependencies?.[packageName];
+            if (typeof ver === 'string') {
+                PKG_VERSION_CACHE.set(cacheKey, ver);
+                return ver;
+            }
+        }
+    } catch {
+        // best-effort: ignored when root manifest is missing or invalid
+    }
+
+    PKG_VERSION_CACHE.set(cacheKey, null);
+    return null;
+}
+
+function extractPackageName(specifier: string): string {
+    const parsed = parsePackageSpecifier(specifier);
+    if (parsed) return parsed.packageName;
+    const clean = specifier.trim().replace(/^node:/, '');
+    if (clean.startsWith('@')) {
+        const parts = clean.split('/');
+        return parts.length >= 2 ? `${parts[0]}/${parts[1]}` : clean;
+    }
+    return clean.split('/')[0];
+}
+
+function isExemptPathOrAlias(specifier: string): boolean {
+    return (
+        specifier.startsWith('.') ||
+        specifier.startsWith('/') ||
+        specifier.startsWith('@/') ||
+        specifier.startsWith('~/') ||
+        specifier.startsWith('#') ||
+        specifier.startsWith('res://')
+    );
+}
+
+function auditVulnerableDependencies(
+    imports: ImportStatementInfo[],
+    rootDir: string | undefined,
+    language: string,
+    issues: Issue[],
+): void {
+    for (const imp of imports) {
+        if (imp.category !== 'third-party') continue;
+        if (isExemptPathOrAlias(imp.moduleSpecifier)) continue;
+
+        const pkgName = extractPackageName(imp.moduleSpecifier);
+        const resolvedVer = resolvePackageVersion(rootDir, pkgName) ?? undefined;
+
+        const vuln = checkKnownPackageVulnerability(imp.moduleSpecifier, resolvedVer, {
+            matchAnyVersionIfUnspecified: true,
+        });
+        if (!vuln) continue;
+
+        reportSingleImportIssue(
+            issues,
+            'DEP-VULN-001',
+            'error',
+            imp,
+            'call',
+            `Compromised package '${vuln.packageName}': ${vuln.title} (${vuln.advisoryId})`,
+            `Import of compromised or backdoored package '${vuln.packageName}'.`,
+            `Known security vulnerability detected: ${vuln.description}`,
+            `Supply chain security threat (${vuln.severity}): potential backdoor or malicious payload.`,
+            vuln.recommendation,
+            'Verify package is removed, replaced, or upgraded to a safe version.',
+            `Supply chain security violation: import of compromised package '${vuln.packageName}' (${vuln.advisoryId}): ${vuln.title}.`,
+            vuln.recommendation,
+            language,
+            'security',
+            1.0,
+        );
+    }
+}
+
+function auditPhantomDependencies(
+    imports: ImportStatementInfo[],
+    manifestDeps: Set<string>,
+    language: string,
+    issues: Issue[],
+): void {
+    if (!manifestDeps || manifestDeps.size === 0) return;
+    const seenPackages = new Set<string>();
+
+    for (const imp of imports) {
+        if (imp.category !== 'third-party') continue;
+        if (isExemptPathOrAlias(imp.moduleSpecifier)) continue;
+
+        const pkgName = extractPackageName(imp.moduleSpecifier);
+        if (!pkgName || seenPackages.has(pkgName)) continue;
+        seenPackages.add(pkgName);
+
+        // Check whether package name is declared in manifest dependencies or is ambient host API
+        const isDeclared =
+            KNOWN_AMBIENT_MODULES.has(pkgName) ||
+            manifestDeps.has(pkgName) ||
+            manifestDeps.has(pkgName.toLowerCase()) ||
+            manifestDeps.has(`@types/${pkgName}`) ||
+            manifestDeps.has(pkgName.replace(/-/g, '_')) ||
+            manifestDeps.has(pkgName.replace(/_/g, '-'));
+
+        if (!isDeclared) {
+            reportSingleImportIssue(
+                issues,
+                'DEP-PHANTOM-001',
+                'warning',
+                imp,
+                'call',
+                `Undeclared external package '${pkgName}' imported without manifest declaration`,
+                `External package '${pkgName}' imported in '${imp.file}' but missing from project manifests.`,
+                'Import of external third-party package not declared in package.json or project manifest',
+                'Phantom dependencies cause non-deterministic builds and CI breakage in clean environments.',
+                `Add '${pkgName}' to dependencies/devDependencies in package.json, or replace with local module.`,
+                `Verify '${pkgName}' is declared in project manifest.`,
+                `Phantom dependency: '${pkgName}' is imported in '${imp.file}' but not declared in project manifest.`,
+                `Add '${pkgName}' to dependencies in package.json or project manifest.`,
+                language,
+                'dependencies',
+                0.95,
+            );
+        }
+    }
+}
+
+function auditDependencyLicenses(
+    imports: ImportStatementInfo[],
+    rootDir: string,
+    language: string,
+    issues: Issue[],
+): void {
+    if (!rootDir) return;
+    const seenPackages = new Set<string>();
+
+    for (const imp of imports) {
+        if (imp.category !== 'third-party') continue;
+        if (isExemptPathOrAlias(imp.moduleSpecifier)) continue;
+
+        const pkgName = extractPackageName(imp.moduleSpecifier);
+        if (!pkgName || seenPackages.has(pkgName)) continue;
+        seenPackages.add(pkgName);
+
+        const lic = resolvePackageLicense(rootDir, pkgName);
+        if (!lic) continue;
+
+        const audit = auditLicenseCompliance(lic);
+        if (audit.isViralCopyleft || !audit.compliant) {
+            reportSingleImportIssue(
+                issues,
+                'DEP-LIC-001',
+                'warning',
+                imp,
+                'condition',
+                `External dependency '${pkgName}' carries restrictive/copyleft license '${lic}'`,
+                `Dependency '${pkgName}' is governed by '${lic}' which imposes copyleft distribution obligations.`,
+                'Proprietary code importing viral copyleft (GPL/AGPL/SSPL) dependency',
+                'Legal and compliance risk: copyleft license requires disclosing proprietary derivative source code.',
+                audit.remediation ||
+                    `Replace '${pkgName}' with a permissively licensed alternative (MIT/Apache-2.0).`,
+                'Verify dependency license is permissive or approved under organizational policy.',
+                `License compliance violation: dependency '${pkgName}' uses restrictive copyleft license '${lic}'.`,
+                audit.remediation ||
+                    `Replace '${pkgName}' with a permissively licensed alternative (MIT/Apache-2.0).`,
+                language,
+                'governance',
+                0.95,
+            );
+        }
+    }
+}
+
 /**
  * Analyze imports and external resource references across a file.
  *
@@ -355,6 +613,15 @@ export function analyzeDependencyLayout(
     }
     if (options.flagUnmanagedResources ?? true) {
         auditExternalResources(resources, language, issues);
+    }
+    if (options.flagVulnerableDependencies ?? true) {
+        auditVulnerableDependencies(imports, options.rootDir, language, issues);
+    }
+    if ((options.flagPhantomDependencies ?? true) && options.manifestDependencies) {
+        auditPhantomDependencies(imports, options.manifestDependencies, language, issues);
+    }
+    if ((options.flagLicenseCompliance ?? true) && options.rootDir) {
+        auditDependencyLicenses(imports, options.rootDir, language, issues);
     }
     return issues;
 }

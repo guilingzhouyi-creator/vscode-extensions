@@ -1,9 +1,9 @@
 {
   "schema": "workspace-rule-catalog/v1",
-  "generatedAt": "2026-10-10T16:44:19.543Z",
-  "totalRules": 414,
+  "generatedAt": "2026-10-11T04:25:14.488Z",
+  "totalRules": 417,
   "counts": {
-    "autoRefactor": 329,
+    "autoRefactor": 332,
     "workspaceTiming": 49,
     "webGames": 53,
     "globalTooling": 7
@@ -98,7 +98,7 @@
       "project": "WebGames",
       "family": "ADV",
       "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/README.md)"
+      "summary": "WebGames domain gate rule (source: WebGames/backend/domains/inventory/item_entity.gd)"
     },
     {
       "id": "ADV-PRF-003",
@@ -738,6 +738,13 @@
       "summary": "Function-scoped lazy import without audit declaration or documented rationale."
     },
     {
+      "id": "DEP-LIC-001",
+      "project": "auto-refactor",
+      "family": "DEP",
+      "severity": "warning",
+      "summary": "High-risk restrictive or viral copyleft license (AGPL/GPL) dependency introduced in proprietary/commercial domain."
+    },
+    {
       "id": "DEP-ORD-001",
       "project": "auto-refactor",
       "family": "DEP",
@@ -745,11 +752,25 @@
       "summary": "File layout and import grouping do not conform to modern polyglot engineering standards."
     },
     {
+      "id": "DEP-PHANTOM-001",
+      "project": "auto-refactor",
+      "family": "DEP",
+      "severity": "warning",
+      "summary": "Import of undeclared external package (phantom dependency) not listed in project manifests (package.json, pyproject.toml, Cargo.toml)."
+    },
+    {
       "id": "DEP-RES-001",
       "project": "auto-refactor",
       "family": "DEP",
       "severity": "warning",
       "summary": "Scattered hardcoded unmanaged external URLs, file paths, or connection strings in business logic."
+    },
+    {
+      "id": "DEP-VULN-001",
+      "project": "auto-refactor",
+      "family": "DEP",
+      "severity": "error",
+      "summary": "Import of known-malicious, compromised, or severely vulnerable third-party package identified in supply chain integrity registry."
     },
     {
       "id": "DEP-WLD-001",

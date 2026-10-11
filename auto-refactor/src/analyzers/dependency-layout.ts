@@ -24,6 +24,7 @@ import {
     categorizeImport,
     extractExemptionReason,
 } from '../core/intelligence/dependencyLayout';
+import { loadProjectManifestDependencies } from '../core/intelligence/dependency-provenance';
 
 /** Pattern detecting remote URLs. */
 const REMOTE_URL_RE = /['"](https?:\/\/[A-Za-z0-9_./?=&%-]+)['"]/g;
@@ -76,7 +77,19 @@ export class DependencyLayoutAnalyzer implements Analyzer {
             this.extractRemoteResources(ctx, resources);
         }
 
-        return analyzeDependencyLayout(imports, resources, language, options);
+        const isExcluded = isExcludedFile(normPath);
+        const rootDir = ctx.config?.root || process.cwd();
+        const manifestDeps = isExcluded
+            ? undefined
+            : options.manifestDependencies || loadProjectManifestDependencies(rootDir);
+        const enrichedOptions: DependencyLayoutOptions = {
+            ...options,
+            rootDir: isExcluded ? undefined : options.rootDir || rootDir,
+            manifestDependencies: manifestDeps,
+            flagLicenseCompliance: isExcluded ? false : options.flagLicenseCompliance,
+        };
+
+        return analyzeDependencyLayout(imports, resources, language, enrichedOptions);
     }
 
     private handleCallImport(

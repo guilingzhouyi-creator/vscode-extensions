@@ -540,6 +540,19 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#dep-laz-001',
     }),
     defineRule({
+        id: 'DEP-LIC-001',
+        family: RULE_FAMILY_DEPENDENCY,
+        analyzer: ANALYZER_DEPENDENCY_LAYOUT,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            'High-risk restrictive or viral copyleft license (AGPL/GPL) dependency introduced in proprietary/commercial domain.',
+        remediation:
+            'Replace copyleft-licensed dependency with permissive alternative (MIT/Apache/BSD) or isolate behind network boundary.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#dep-lic-001',
+    }),
+    defineRule({
         id: 'DEP-ORD-001',
         family: RULE_FAMILY_DEPENDENCY,
         analyzer: ANALYZER_DEPENDENCY_LAYOUT,
@@ -550,6 +563,19 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
             'File layout and import grouping do not conform to modern polyglot engineering standards.',
         remediation: 'Reorder imports to: Stdlib -> ThirdParty -> InternalShared -> Local.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#dep-ord-001',
+    }),
+    defineRule({
+        id: 'DEP-PHANTOM-001',
+        family: RULE_FAMILY_DEPENDENCY,
+        analyzer: ANALYZER_DEPENDENCY_LAYOUT,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            'Import of undeclared external package (phantom dependency) not listed in project manifests (package.json, pyproject.toml, Cargo.toml).',
+        remediation:
+            'Add package to dependencies in project manifest, or use internal/standard library equivalent.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#dep-phantom-001',
     }),
     defineRule({
         id: 'DEP-RES-001',
@@ -563,6 +589,19 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
         remediation:
             'Extract external resource addresses into configuration files or a service discovery registry.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#dep-res-001',
+    }),
+    defineRule({
+        id: 'DEP-VULN-001',
+        family: RULE_FAMILY_DEPENDENCY,
+        analyzer: ANALYZER_DEPENDENCY_LAYOUT,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_ERROR,
+        summary:
+            'Import of known-malicious, compromised, or severely vulnerable third-party package identified in supply chain integrity registry.',
+        remediation:
+            'Immediately remove or replace compromised package dependency with safe verified release.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#dep-vuln-001',
     }),
     defineRule({
         id: 'DEP-WLD-001',

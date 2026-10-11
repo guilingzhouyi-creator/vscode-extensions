@@ -26,16 +26,19 @@ export type ImportProvenanceKind =
 export type FileProvenanceKind = 'proprietary' | 'in_tree_vendor' | 'generated' | 'test_fixture';
 
 /** Node.js core standard library module names */
-const NODE_CORE_MODULES: ReadonlySet<string> = new Set([
+export const NODE_CORE_MODULES: ReadonlySet<string> = new Set([
     'assert',
     'async_hooks',
     'buffer',
     'child_process',
     'cluster',
+    'console',
+    'constants',
     'crypto',
     'dgram',
     'diagnostics_channel',
     'dns',
+    'domain',
     'events',
     'fs',
     'http',
@@ -51,8 +54,10 @@ const NODE_CORE_MODULES: ReadonlySet<string> = new Set([
     'punycode',
     'querystring',
     'readline',
+    'repl',
     'stream',
     'string_decoder',
+    'sys',
     'test',
     'timers',
     'tls',
@@ -68,10 +73,10 @@ const NODE_CORE_MODULES: ReadonlySet<string> = new Set([
 ]);
 
 /** Rust standard and core library roots */
-const RUST_CORE_CRATES: ReadonlySet<string> = new Set(['std', 'core', 'alloc']);
+export const RUST_CORE_CRATES: ReadonlySet<string> = new Set(['std', 'core', 'alloc', 'proc_macro']);
 
 /** Go standard library package root prefixes */
-const GO_CORE_PACKAGES: ReadonlySet<string> = new Set([
+export const GO_CORE_PACKAGES: ReadonlySet<string> = new Set([
     'archive',
     'bufio',
     'bytes',
@@ -140,6 +145,7 @@ function parsePackageJson(manifestPath: string, target: Set<string>): void {
         for (const dep of Object.keys(json.dependencies || {})) target.add(dep);
         for (const dep of Object.keys(json.devDependencies || {})) target.add(dep);
         for (const dep of Object.keys(json.peerDependencies || {})) target.add(dep);
+        for (const dep of Object.keys(json.optionalDependencies || {})) target.add(dep);
     } catch {
         // best-effort fallback: ignored when manifest is corrupt or unreadable
     }

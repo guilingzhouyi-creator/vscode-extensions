@@ -303,8 +303,11 @@
 | `DAT-SER-001` | <a id="dat-ser-001"></a>`data-architecture` | `DAT` | `info` | `all` | 跨层调用链中的重复序列化与反序列化转换。 | 在内部调用链路传递强类型原生对象，仅在网络边界执行序列化。 |
 | `DEP-INV-001` | <a id="dep-inv-001"></a>`dependency-layout` | `DEP` | `error` | `all` | 依赖倒置违规：底层基础设施或公共模块反向依赖高层业务模块。 | 解除反向依赖，通过控制反转或事件总线进行解耦。 |
 | `DEP-LAZ-001` | <a id="dep-laz-001"></a>`dependency-layout` | `DEP` | `warning` | `all` | 未提供审计声明或合规理由的函数内部临时导入。 | 将导入提升至文件顶部，或添加 @lazy/@optional 注释标注意图。 |
+| `DEP-LIC-001` | <a id="dep-lic-001"></a>`dependency-layout` | `DEP` | `warning` | `all` | 商业与专有闭源工程中引入高风险限制性或强传染性开源许可证（AGPL/GPL）依赖。 | 替换为宽松许可证（MIT/Apache/BSD）替代库，或将关联逻辑隔离至独立网络微服务边界之外。 |
 | `DEP-ORD-001` | <a id="dep-ord-001"></a>`dependency-layout` | `DEP` | `info` | `all` | 文件布局与导入分组不符合当前语言现代化工程规范。 | 调整导入顺序为 Stdlib -> ThirdParty -> InternalShared -> Local。 |
+| `DEP-PHANTOM-001` | <a id="dep-phantom-001"></a>`dependency-layout` | `DEP` | `warning` | `all` | 幽灵依赖：源码直接导入未在项目包清单（package.json、pyproject.toml、Cargo.toml）显式声明的外部依赖包。 | 将依赖项显式登记至项目包配置清单中，或改用工程内置实现与官方标准库等价模块。 |
 | `DEP-RES-001` | <a id="dep-res-001"></a>`dependency-layout` | `DEP` | `warning` | `all` | 业务逻辑中散落硬编码的未纳管外部 URL、文件路径或连接串。 | 将外部资源地址统一抽取至配置文件或服务资源注册中心。 |
+| `DEP-VULN-001` | <a id="dep-vuln-001"></a>`dependency-layout` | `DEP` | `error` | `all` | 严重供应链安全漏洞与投毒包导入：直接导入供应链安全完整性注册表通报的恶意篡改或严重漏洞第三方包。 | 立即阻断并剔除受污染包依赖，升级至官方已校验修复安全版本或替换为受信同等功能组件。 |
 | `DEP-WLD-001` | <a id="dep-wld-001"></a>`dependency-layout` | `DEP` | `warning` | `all` | 使用通配符导入破坏显式依赖跟踪与树摇优化。 | 改用显式具名导入 (Named Imports)，明确模块依赖面。 |
 | `GATE-AST-001` | <a id="gate-ast-001"></a>`gate-architecture` | `GATE` | `error` | `all` | 预提交门禁缺少暂存区 AST 局部切片复杂度与嵌套深度刚性预算检查（CC <= 15, Depth <= 4）。 | 在 pre-commit 钩子中配置 validate-staged-slice 切片看守，阻断超标改动。 |
 | `GATE-BUDGET-001` | <a id="gate-budget-001"></a>`gate-architecture` | `GATE` | `warning` | `all` | 预提交门禁运行无界全量回归耗时超标，未实施暂存区分层过滤。 | 实施分层门禁：预提交专注增量暂存切片审查（< 2s），全量回归递延至预推送。 |
