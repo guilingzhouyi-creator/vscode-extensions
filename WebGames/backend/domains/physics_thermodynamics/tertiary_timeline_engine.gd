@@ -45,6 +45,7 @@ class TimelineParams extends RefCounted:
 	var tension_min_ms: int = 4500
 	var tension_max_ms: int = 8500
 	var tension_types: Array = ["PRESSURE_SURGE", "ENVIRONMENT_PULSE", "FORCE_ROUND_ADVANCE"]
+	var tension_payloads: Dictionary = {}
 
 static var _timeline_cache: TimelineParams = null
 static var _timeline_config_version: int = -1
@@ -61,6 +62,9 @@ static func _ensure_timeline_cache() -> void:
 	p.tension_types = GameConfig.get_array("domains.combat", "tertiary_timeline/tension_types", [
 		"PRESSURE_SURGE", "ENVIRONMENT_PULSE", "FORCE_ROUND_ADVANCE"
 	]).duplicate()
+	p.tension_payloads.clear()
+	for t_type in p.tension_types:
+		p.tension_payloads[t_type] = {"tension_type": t_type}
 	_timeline_cache = p
 	_timeline_config_version = GameConfig.config_reload_version()
 
@@ -73,13 +77,27 @@ func initialize(start_ms: int, in_rng: DeterministicRNG) -> void:
 	scheduled_events.append(_build_next_tension_event())
 
 ## 时间推进：驱动虚拟时钟前进 delta_ms，两阶段处理——
+## 零分配快速前置判定：若无任何事件到期，直接跳过 fired/pending 数组分配，零瞬态堆分配返回。
 ## 阶段 A 只收集到期事件；阶段 B 在循环外统一重排期（M8/Inv-TL-2：禁止迭代中修改被迭代容器）。
 ## 新事件 trigger 严格 > now（interval 下限 maxi(1,…)，Inv-TL-1：杜绝 interval=0 同趟再触发死循环）。
 func advance_time(delta_ms: int) -> Array[TimelineEventPointDTO]:
 	if delta_ms <= 0:
 		return []
 
-	current_timeline_ms += delta_ms
+	var target_time := current_timeline_ms + delta_ms
+
+	# 零分配快速短路：检查是否存在到期事件
+	var has_due := false
+	for evt in scheduled_events:
+		if evt.trigger_time_ms <= target_time:
+			has_due = true
+			break
+
+	current_timeline_ms = target_time
+
+	if not has_due:
+		return []
+
 	var fired_events: Array[TimelineEventPointDTO] = []
 	var pending_events: Array[TimelineEventPointDTO] = []
 
@@ -114,7 +132,7 @@ func _build_next_dispatch_event() -> TimelineEventPointDTO:
 	evt.trigger_time_ms = current_timeline_ms + delta
 	return evt
 
-## 生成下一回内紧张点（返回式；空 tension_types 池回退 PRESSURE_SURGE）
+## 生成下一回内紧张点（返回式；空 tension_types 池回退 PRESSURE_SURGE，复用预分配 payload 字典）
 func _build_next_tension_event() -> TimelineEventPointDTO:
 	_ensure_timeline_cache()
 	var p := _timeline_cache
@@ -129,5 +147,8 @@ func _build_next_tension_event() -> TimelineEventPointDTO:
 	evt.event_id = "EVT_TENSION_%d" % event_counter
 	evt.event_type = TimelineEventType.TENSION_PULSE
 	evt.trigger_time_ms = current_timeline_ms + delta
-	evt.payload = {"tension_type": selected_type}
+	if p.tension_payloads.has(selected_type):
+		evt.payload = (p.tension_payloads[selected_type] as Dictionary).duplicate(false)
+	else:
+		evt.payload = {"tension_type": selected_type}
 	return evt

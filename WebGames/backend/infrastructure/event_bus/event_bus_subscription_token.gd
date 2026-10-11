@@ -10,13 +10,22 @@
 class_name EventBusSubscriptionToken
 extends RefCounted
 
-var bus: EventBusCore = null
+var _bus_ref: WeakRef = null
 var channel_id: int = 0
 var category_mask: int = 0
 var callback: Callable = Callable()
 var is_spatial: bool = false
 var token_id: int = 0
 var is_active: bool = false
+
+var bus: Variant:
+	get:
+		return _bus_ref.get_ref() if _bus_ref != null else null
+	set(value):
+		if value == null:
+			_bus_ref = null
+		else:
+			_bus_ref = weakref(value)
 
 func _init(
 	p_bus: EventBusCore,
@@ -26,7 +35,8 @@ func _init(
 	p_spatial: bool,
 	p_tid: int = 0
 ) -> void:
-	bus = p_bus
+	if p_bus != null:
+		_bus_ref = weakref(p_bus)
 	channel_id = p_channel
 	category_mask = p_mask
 	callback = p_cb
@@ -36,8 +46,11 @@ func _init(
 
 ## 幂等注销（首次调用注销成功返回 true，重复调用返回 false）
 func unbind() -> bool:
-	if not is_active or bus == null:
+	if not is_active:
 		return false
-	bus._unregister_token(self)
 	is_active = false
+	if _bus_ref != null:
+		var active_bus: Variant = _bus_ref.get_ref()
+		if active_bus != null and active_bus.has_method("_unregister_token"):
+			active_bus._unregister_token(self)
 	return true

@@ -73,7 +73,9 @@ const CROSS_CUTTING_SUITES: Array[String] = [
 	"res://tests/integration/pipelines/test_dual_domain_storage_pipeline.gd",
 	"res://tests/integration/pipelines/test_resource_catalog_and_async_config_pipeline.gd",
 	"res://tests/unit/infrastructure/test_object_pool_and_batch_pipeline.gd",
-	"res://tests/unit/infrastructure/test_config_subtables.gd"
+	"res://tests/unit/infrastructure/test_config_subtables.gd",
+	"res://tests/unit/infrastructure/test_memory_leak_lifecycle.gd",
+	"res://tests/unit/infrastructure/test_algorithm_optimization_performance.gd"
 ]
 
 const ConfigRouterEngine = preload("res://backend/infrastructure/config_router_engine.gd")

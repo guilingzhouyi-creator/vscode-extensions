@@ -10,44 +10,55 @@
 class_name MultiEntityTriggerRegistry
 extends RefCounted
 
-## 复合状态表: "{trigger_id}::{entity_id}" -> int (TriggerState)
-var _state_table: Dictionary = {}
+## 二维复合状态表: trigger_id (String) -> Dictionary[entity_id (String) -> int (TriggerState)]
+var _matrix: Dictionary = {}
+var _total_count: int = 0
 
 func get_state(trigger_id: String, entity_id: String) -> int:
-	var key := _make_key(trigger_id, entity_id)
-	return _state_table.get(key, SpatialTriggerFSM.TriggerState.OUTSIDE)
+	var sub_dict: Variant = _matrix.get(trigger_id, null)
+	if sub_dict == null or not (sub_dict is Dictionary):
+		return SpatialTriggerFSM.TriggerState.OUTSIDE
+	return (sub_dict as Dictionary).get(entity_id, SpatialTriggerFSM.TriggerState.OUTSIDE)
 
 func update_state(trigger_id: String, entity_id: String, new_state: int) -> int:
-	var key := _make_key(trigger_id, entity_id)
-	var prev: int = _state_table.get(key, SpatialTriggerFSM.TriggerState.OUTSIDE)
-	_state_table[key] = new_state
+	var sub_dict: Dictionary
+	if not _matrix.has(trigger_id):
+		sub_dict = {}
+		_matrix[trigger_id] = sub_dict
+	else:
+		sub_dict = _matrix[trigger_id]
+
+	var prev: int = sub_dict.get(entity_id, SpatialTriggerFSM.TriggerState.OUTSIDE)
+	if not sub_dict.has(entity_id):
+		_total_count += 1
+	sub_dict[entity_id] = new_state
 	return prev
 
 func remove_entity(entity_id: String) -> void:
-	var suffix := "::" + entity_id
-	var to_erase := []
-	for k in _state_table.keys():
-		if str(k).ends_with(suffix):
-			to_erase.append(k)
-	for rk in to_erase:
-		_state_table.erase(rk)
+	var empty_triggers: Array[String] = []
+	for trig_id in _matrix:
+		var sub: Dictionary = _matrix[trig_id]
+		if sub.erase(entity_id):
+			_total_count = maxi(0, _total_count - 1)
+			if sub.is_empty():
+				empty_triggers.append(trig_id)
+	for trig_id in empty_triggers:
+		_matrix.erase(trig_id)
 
 func remove_trigger(trigger_id: String) -> void:
-	var prefix := trigger_id + "::"
-	var to_erase := []
-	for k in _state_table.keys():
-		if str(k).begins_with(prefix):
-			to_erase.append(k)
-	for rk in to_erase:
-		_state_table.erase(rk)
+	if _matrix.has(trigger_id):
+		var sub: Dictionary = _matrix[trigger_id]
+		_total_count = maxi(0, _total_count - sub.size())
+		_matrix.erase(trigger_id)
 
 func clear() -> int:
-	var count := _state_table.size()
-	_state_table.clear()
+	var count := _total_count
+	_matrix.clear()
+	_total_count = 0
 	return count
 
 func get_total_tracked_count() -> int:
-	return max(0, _state_table.size())
+	return maxi(0, _total_count)
 
 static func _make_key(trigger_id: String, entity_id: String) -> String:
 	return "%s::%s" % [trigger_id, entity_id]

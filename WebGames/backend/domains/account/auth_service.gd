@@ -114,6 +114,19 @@ static func register_hook(stage_key: String, callback: Callable) -> void:
 	var hooks_list: Array = _auth_hooks[stage_key]
 	hooks_list.append(callback)
 
+## 注销已注册的鉴权自定义扩展 Hook
+static func unregister_hook(stage_key: String, callback: Callable) -> bool:
+	if stage_key.is_empty() or not _auth_hooks.has(stage_key):
+		return false
+	var hooks_list: Array = _auth_hooks[stage_key]
+	var idx := hooks_list.find(callback)
+	if idx >= 0:
+		hooks_list.remove_at(idx)
+		if hooks_list.is_empty():
+			_auth_hooks.erase(stage_key)
+		return true
+	return false
+
 ## 清空已注册的鉴权自定义扩展 Hook
 static func clear_hooks() -> void:
 	if not _auth_hooks.is_empty():
@@ -281,8 +294,7 @@ static func validate_token(token: String, account_id: String = "", device_finger
 	if now < int(session.get("issued_at", 0)):
 		return {"success": false, "error_code": "TOKEN_FUTURE"}
 	if now > int(session.get("expires_at", 0)):
-		session["revoked"] = true
-		_sessions[token.sha256_text()] = session
+		_sessions.erase(token.sha256_text())
 		return {"success": false, "error_code": "TOKEN_EXPIRED"}
 	if not account_id.is_empty() and account_id != str(session.get("account_id", "")):
 		return {"success": false, "error_code": "TOKEN_ACCOUNT_MISMATCH"}

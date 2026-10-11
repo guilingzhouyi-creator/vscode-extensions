@@ -48,11 +48,16 @@ class AsyncLoadTask extends RefCounted:
 
 static var _instance = null
 
+const DEFAULT_MAX_CACHE_ENTRIES: int = 64
+const DEFAULT_MAX_COMPLETED_TASKS: int = 128
+
 var _task_counter: int = 0
 var _pending_queue: Array[AsyncLoadTask] = []
 var _running_tasks: Dictionary = {}    # task_id -> AsyncLoadTask
 var _completed_tasks: Array[AsyncLoadTask] = []
 var _cached_results: Dictionary = {}   # resource_path -> Variant
+var _cache_keys_fifo: Array[String] = []
+var _max_cache_entries: int = DEFAULT_MAX_CACHE_ENTRIES
 var _active_batches: Dictionary = {}   # batch_id -> BatchLoadRequestDTO
 
 var _deterministic_mode: bool = true
@@ -68,6 +73,7 @@ func _init() -> void:
 	_running_tasks = {}
 	_completed_tasks = []
 	_cached_results = {}
+	_cache_keys_fifo = []
 	_active_batches = {}
 	var force_sync: bool = GameConfig.get_bool("infrastructure.storage", "deterministic/force_sync_in_tests", true)
 	_deterministic_mode = force_sync or OS.has_feature(FEATURE_TEMPLATE) == false
@@ -210,7 +216,7 @@ func _execute_task(task: AsyncLoadTask, sync_mode: bool) -> void:
 			task.status = STATUS_COMPLETED
 			task.result_data = res.get("data", null)
 			task.byte_count = int(res.get("byte_count", 0))
-			_cached_results[task.resource_path] = task.result_data
+			_cache_result(task.resource_path, task.result_data)
 		_notify_task_finished(task)
 	else:
 		_running_tasks[task.task_id] = task
@@ -224,8 +230,21 @@ func _execute_task(task: AsyncLoadTask, sync_mode: bool) -> void:
 				task.status = STATUS_COMPLETED
 				task.result_data = res.get("data", null)
 				task.byte_count = int(res.get("byte_count", 0))
+				_cache_result(task.resource_path, task.result_data)
+			_notify_task_finished(task)
 		var is_high_prio := (task.priority <= StorageContractInterfaces.LoadPriority.HIGH)
 		task.pool_task_id = WorkerThreadPool.add_task(task_fn, is_high_prio, TASK_THREAD_PREFIX + str(task.task_id))
+
+## 插入缓存并执行 FIFO 淘汰，保障缓存字典规模有界
+func _cache_result(path: String, data: Variant) -> void:
+	if _cached_results.has(path):
+		_cached_results[path] = data
+		return
+	while _cache_keys_fifo.size() >= _max_cache_entries:
+		var oldest_key := _cache_keys_fifo.pop_front()
+		_cached_results.erase(oldest_key)
+	_cached_results[path] = data
+	_cache_keys_fifo.append(path)
 
 ## 底层纯 IO 与反序列化算子（可在非主线程安全执行）
 static func _load_resource_payload(path: String) -> Dictionary:
@@ -252,10 +271,14 @@ static func _load_resource_payload(path: String) -> Dictionary:
 func _notify_task_finished(task: AsyncLoadTask) -> void:
 	if _running_tasks.has(task.task_id):
 		_running_tasks.erase(task.task_id)
-	_completed_tasks.append(task)
 	if task.callback.is_valid():
 		var ok := (task.status == STATUS_COMPLETED)
 		task.callback.call(ok, task.result_data, task.error_code)
+		task.callback = Callable() # 立即释放回调闭包，阻断外部大对象与 DTO 连锁强引用常驻
+
+	while _completed_tasks.size() >= DEFAULT_MAX_COMPLETED_TASKS:
+		_completed_tasks.pop_front()
+	_completed_tasks.append(task)
 
 ## 轮询消费完成缓冲区
 func pump_completed_tasks(max_count: int = DEFAULT_PUMP_BATCH_SIZE) -> int:
@@ -273,6 +296,7 @@ func get_cached_resource(resource_path: String) -> Variant:
 func evict_idle_resources() -> int:
 	var count := _cached_results.size()
 	_cached_results.clear()
+	_cache_keys_fifo.clear()
 	return count
 
 ## 获取待处理及正在执行队列总大小
@@ -286,5 +310,6 @@ static func reset_for_tests() -> void:
 		_instance._running_tasks.clear()
 		_instance._completed_tasks.clear()
 		_instance._cached_results.clear()
+		_instance._cache_keys_fifo.clear()
 		_instance._active_batches.clear()
 	_instance = null

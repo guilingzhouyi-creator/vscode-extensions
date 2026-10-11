@@ -162,9 +162,18 @@ func dispatch_now(packet: EventPacket) -> void:
 		_collect_channel_subscribers(0, packet, seen, targets)
 
 	# 派发快照已在独立 targets 中，回调内增删订阅不影响本轮遍历（Inv-EB2-7）
+	var dead_tokens: Array = []
 	for tok in targets:
-		if tok.is_active and tok.callback.is_valid():
+		if not tok.is_active:
+			continue
+		if tok.callback.is_valid():
 			tok.callback.call(packet)
+		else:
+			dead_tokens.append(tok)
+
+	for dead_tok in dead_tokens:
+		dead_tok.is_active = false
+		_unregister_token(dead_tok)
 
 	targets.clear()
 	seen.clear()

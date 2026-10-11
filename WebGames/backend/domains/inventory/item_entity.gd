@@ -28,37 +28,94 @@ const CATEGORY_MANUSCRIPT_GRIMOIRE: String = "MANUSCRIPT_GRIMOIRE"
 const CATEGORY_QUEST_MISC: String = "QUEST_MISC"
 
 # ==============================================================================
-# 二、物品字段（默认值来自 item_defaults 配置段）
+# 二、配置静态缓存与物品字段（默认值来自 item_defaults 配置段）
 # ==============================================================================
 
+class ItemDefaultsCache extends RefCounted:
+	var custom_name: String = "未命名物品"
+	var category: String = CATEGORY_QUEST_MISC
+	var mass_kg: float = 1.0
+	var volume_slots: int = 1
+	var durability: float = 100.0
+	var material_hardness: float = 10.0
+	var combat_metrics: Dictionary = {}
+	var affix_sockets: Dictionary = {}
+	var market_base_price: int = 10
+	var deserialize_name: String = "未知物品"
+
+static var _defaults_cache: ItemDefaultsCache = null
+static var _defaults_config_version: int = -1
+
+static func _ensure_defaults() -> ItemDefaultsCache:
+	if _defaults_cache != null and _defaults_config_version == GameConfig.config_reload_version():
+		return _defaults_cache
+	var c := ItemDefaultsCache.new()
+	c.custom_name = GameConfig.get_string("domains.inventory", "item_defaults/custom_name", "未命名物品")
+	c.category = GameConfig.get_string("domains.inventory", "item_defaults/category", CATEGORY_QUEST_MISC)
+	c.mass_kg = GameConfig.get_float("domains.inventory", "item_defaults/mass_kg", 1.0)
+	c.volume_slots = GameConfig.get_int("domains.inventory", "item_defaults/volume_slots", 1)
+	c.durability = GameConfig.get_float("domains.inventory", "item_defaults/durability", 100.0)
+	c.material_hardness = GameConfig.get_float("domains.inventory", "item_defaults/material_hardness", 10.0)
+	c.combat_metrics = {
+		"edge_sharpness": GameConfig.get_float("domains.inventory", "item_defaults/combat_metrics/edge_sharpness", 1.0),
+		"reach_meters": GameConfig.get_float("domains.inventory", "item_defaults/combat_metrics/reach_meters", 1.0),
+		"effective_armor": GameConfig.get_float("domains.inventory", "item_defaults/combat_metrics/effective_armor", 0.0),
+		"elemental_resistances": {}
+	}
+	c.affix_sockets = {
+		"total_sockets": GameConfig.get_int("domains.inventory", "item_defaults/total_sockets", 2),
+		"imprinted_runes": [],
+		"dynamic_affixes": []
+	}
+	c.market_base_price = GameConfig.get_int("domains.inventory", "item_defaults/market_base_price", 10)
+	c.deserialize_name = GameConfig.get_string("domains.inventory", "item_defaults/deserialize_name", "未知物品")
+	_defaults_cache = c
+	_defaults_config_version = GameConfig.config_reload_version()
+	return c
+
 var item_id: String = ""
-# 实例全局唯一 UID（权威/可追溯/幂等，）：发放来源前缀 + 单调计数 + 校验尾
+# 实例全局唯一 UID（权威/可追溯/幂等）：发放来源前缀 + 单调计数 + 校验尾
 var item_uid: String = ""
 var template_id: String = ""
-var custom_name: String = GameConfig.get_string("domains.inventory", "item_defaults/custom_name", "未命名物品")
+var custom_name: String = ""
 # 合法分类: WEAPON_BLADE / WEAPON_BLUNT / WEAPON_POLE / ARMOR_EQUIPMENT / CONSUMABLE_POTION / CONSUMABLE_RATION / MANA_CRYSTAL / CRAFTING_MATERIAL / MANUSCRIPT_GRIMOIRE / QUEST_MISC
-var category: String = GameConfig.get_string("domains.inventory", "item_defaults/category", CATEGORY_QUEST_MISC)
-var mass_kg: float = GameConfig.get_float("domains.inventory", "item_defaults/mass_kg", 1.0)
-var volume_slots: int = GameConfig.get_int("domains.inventory", "item_defaults/volume_slots", 1)
-var durability_current: float = GameConfig.get_float("domains.inventory", "item_defaults/durability", 100.0)
-var durability_max: float = GameConfig.get_float("domains.inventory", "item_defaults/durability", 100.0)
-var material_hardness: float = GameConfig.get_float("domains.inventory", "item_defaults/material_hardness", 10.0)
-var combat_metrics: Dictionary = {
-	"edge_sharpness": GameConfig.get_float("domains.inventory", "item_defaults/combat_metrics/edge_sharpness", 1.0),
-	"reach_meters": GameConfig.get_float("domains.inventory", "item_defaults/combat_metrics/reach_meters", 1.0),
-	"effective_armor": GameConfig.get_float("domains.inventory", "item_defaults/combat_metrics/effective_armor", 0.0),
-	"elemental_resistances": {}
-}
-var affix_sockets: Dictionary = {
-	"total_sockets": GameConfig.get_int("domains.inventory", "item_defaults/total_sockets", 2),
-	"imprinted_runes": [],
-	"dynamic_affixes": []
-}
-var market_base_price: int = GameConfig.get_int("domains.inventory", "item_defaults/market_base_price", 10)
-var quality_snapshot: Dictionary = {} # 品质等级统一度量快照（：空=未声明，行为不变）
+var category: String = ""
+var mass_kg: float = 0.0
+var volume_slots: int = 0
+var durability_current: float = 0.0
+var durability_max: float = 0.0
+var material_hardness: float = 0.0
+var combat_metrics: Dictionary = {}
+var affix_sockets: Dictionary = {}
+var market_base_price: int = 0
+var quality_snapshot: Dictionary = {} # 品质等级统一度量快照（空=未声明，行为不变）
 var container_state: String = "UNOWNED"
 var owner_account_id: String = ""
-var attribute_mounts: Array = [] # : 物品属性双 UID 挂载条目 (Array[ItemAttributeMountInstance])
+var attribute_mounts: Array = [] # 物品属性双 UID 挂载条目 (Array[ItemAttributeMountInstance])
+
+func _init() -> void:
+	reset_state()
+
+## 状态重置与池化复用契约（ADV-PRF-002）：快速应用静态配置缓存默认值
+func reset_state() -> void:
+	var c := _ensure_defaults()
+	item_id = ""
+	item_uid = ""
+	template_id = ""
+	custom_name = c.custom_name
+	category = c.category
+	mass_kg = c.mass_kg
+	volume_slots = c.volume_slots
+	durability_current = c.durability
+	durability_max = c.durability
+	material_hardness = c.material_hardness
+	combat_metrics = c.combat_metrics.duplicate(true)
+	affix_sockets = c.affix_sockets.duplicate(true)
+	market_base_price = c.market_base_price
+	quality_snapshot.clear()
+	container_state = "UNOWNED"
+	owner_account_id = ""
+	attribute_mounts.clear()
 
 # ==============================================================================
 # 三、序列化 / 反序列化 / 工厂
@@ -115,7 +172,7 @@ static func deserialize(d: Dictionary, legacy_discriminator: String = "") -> Ite
 	# legacy_discriminator 供同模板多实例（item_id 相同）区分，防迁移 UID 碰撞
 	if item.item_uid.is_empty() and not item.template_id.is_empty():
 		item.item_uid = migrate_legacy_uid(item.template_id, item.item_id, legacy_discriminator)
-	item.custom_name = d.get("custom_name", GameConfig.get_string("domains.inventory", "item_defaults/deserialize_name", "未知物品"))
+	item.custom_name = d.get("custom_name", _ensure_defaults().deserialize_name)
 	item.category = d.get("category", item.category)
 	item.mass_kg = maxf(0.0, float(d.get("mass_kg", item.mass_kg)))
 	item.volume_slots = maxi(0, int(d.get("volume_slots", item.volume_slots)))

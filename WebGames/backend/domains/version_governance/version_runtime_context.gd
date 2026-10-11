@@ -51,4 +51,6 @@ func dispose() -> void:
 	magic_registry = null
 	magic_rules = null
 	quality_registry = null
+	config_snapshot.clear()
+	activation_token = null
 	is_active = false
