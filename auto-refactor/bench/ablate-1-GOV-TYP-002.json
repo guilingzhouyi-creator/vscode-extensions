@@ -1,1 +1,0 @@
-{"include":["src/**/*.ts"],"analyzers":{"governance":{"enabled":true,"options":{"rules":{"GOV-TYP-002":{"enabled":false}}}}}}

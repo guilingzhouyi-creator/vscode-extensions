@@ -1,1 +1,0 @@
-{"include":["src/**/*.ts"],"analyzers":{"governance":{"enabled":true,"options":{"rules":{"GOV-PRF-004":{"enabled":false}}}}}}

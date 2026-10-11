@@ -42,6 +42,7 @@ scratch_*.json
 **/.bench-corpus/
 **/.*-corpus/
 **/.corpus/
+auto-refactor/bench/
 **/.corpus-*.actual.json
 **/*.actual.json
 **/.*.actual.json
