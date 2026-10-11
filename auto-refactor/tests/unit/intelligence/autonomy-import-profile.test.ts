@@ -9,8 +9,11 @@
 import { describe, it, expect } from 'vitest';
 import {
     classifyImportProvenance,
+    findNearestManifestInventory,
     isDevOnlyDependency,
+    isUnpinnedVersion,
 } from '../../../src/core/intelligence/dependency-provenance';
+import * as path from 'path';
 import { checkDeprecatedPackage } from '../../../src/core/intelligence/deprecated-dependencies';
 import {
     evaluateProjectAutonomy,
@@ -129,5 +132,51 @@ export async function processData(url: string) {
         expect(sdkNames).toContain('lodash');
         expect(sdkNames).toContain('zod');
         expect(evaluation.compositeAutonomyIndex).toBeLessThan(100);
+    });
+
+    it('objectively penalizes symbolCallAutonomy when external SDKs are imported but symbolIndex is absent', () => {
+        const metrics: FileMetric[] = [
+            { file: 'src/glue.ts', totalLines: 30, effectiveLoc: 20, blankLines: 5, commentLines: 5 },
+        ];
+        const issues: Issue[] = [];
+        const code = `
+import * as aws from 'aws-sdk';
+import * as stripe from 'stripe';
+import * as sentry from '@sentry/node';
+
+export function setup() {
+    return true;
+}
+`;
+        const fileContents = new Map<string, string>([['src/glue.ts', code]]);
+        // Without symbolIndex, previously rCall defaulted falsely to 100%
+        const evaluation = evaluateProjectAutonomy(metrics, issues, mockConfig, fileContents);
+
+        // When code solely imports external SDKs and has zero internal calls, autonomy is objectively 0%
+        expect(evaluation.dimensions.symbolCallAutonomy).toBe(0);
+    });
+});
+
+describe('Unpinned Dependency Version & Monorepo Manifest Intelligence', () => {
+    it('detects unpinned and wildcard version specs reliably', () => {
+        expect(isUnpinnedVersion('*')).toBe(true);
+        expect(isUnpinnedVersion('latest')).toBe(true);
+        expect(isUnpinnedVersion('x')).toBe(true);
+        expect(isUnpinnedVersion('>=1.0.0')).toBe(true);
+        expect(isUnpinnedVersion('>2.0.0')).toBe(true);
+
+        expect(isUnpinnedVersion('^1.2.3')).toBe(false);
+        expect(isUnpinnedVersion('~1.2.3')).toBe(false);
+        expect(isUnpinnedVersion('1.2.3')).toBe(false);
+        expect(isUnpinnedVersion('>=1.0.0 <2.0.0')).toBe(false);
+    });
+
+    it('findNearestManifestInventory merges subproject inventory with root inventory', () => {
+        const repoRoot = path.resolve(__dirname, '../../../../');
+        const subprojectFile = path.join(repoRoot, 'auto-refactor', 'src', 'index.ts');
+
+        const inventory = findNearestManifestInventory(subprojectFile, repoRoot);
+        expect(inventory.allDependencies.size).toBeGreaterThan(0);
+        expect(inventory.versionSpecs.size).toBeGreaterThan(0);
     });
 });

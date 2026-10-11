@@ -1,7 +1,7 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1791697838498",
-  "timestamp": "2026-10-11T05:50:46.860Z",
-  "cai": 85.95,
+  "snapshotId": "snapshot-v0.4.0-1791710364493",
+  "timestamp": "2026-10-11T09:19:33.953Z",
+  "cai": 85.96,
   "versions": {
     "engineVersion": "0.4.0",
     "ruleVersion": "2026.09-v1",
@@ -9,45 +9,45 @@
     "languageAdapterVersion": "adapters-v1.0",
     "scoringVersion": "scoring-v1.0"
   },
-  "rulesDigest": "6fa515774811c1aa3db72da3fbdd21a34c75a8e3cae6c7f9c9645015d92ec3d7",
+  "rulesDigest": "52e38c0caf4cde7a644f1e7f6530c885d02dfa7c1cda30dc1b2474035b81f326",
   "configDigest": "04a1b8446ff3624c6496a9e8c9b405b03d47eda22fb414a869442bfb51978d19",
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
     "filesScanned": 621,
-    "durationMs": 7011
+    "durationMs": 8401
   },
   "metrics": {
-    "compositeScore": 98.74,
+    "compositeScore": 98.72,
     "grade": "A+",
-    "autonomyRate": 85.95,
+    "autonomyRate": 85.96,
     "effectiveCodeDensity": 0.96,
-    "totalIssues": 11926,
+    "totalIssues": 11985,
     "suppressedIssues": 360,
-    "unsuppressedIssues": 11566,
+    "unsuppressedIssues": 11625,
     "bySeverity": {
-      "info": 1337,
-      "warning": 10589,
+      "info": 1343,
+      "warning": 10642,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
-      "high": 103,
-      "medium": 5499,
-      "low": 6324
+      "high": 120,
+      "medium": 5514,
+      "low": 6351
     }
   },
   "eightPillars": {
     "pillars": {
       "architecture": 98.62,
-      "maintainability": 97.45,
-      "performance": 99.69,
-      "data": 99.72,
+      "maintainability": 97.4,
+      "performance": 99.64,
+      "data": 99.71,
       "testing": 100,
-      "reliability": 99.7,
+      "reliability": 99.68,
       "security": 99.89,
       "extensibility": 94.47
     },
-    "compositeScore": 98.74,
+    "compositeScore": 98.72,
     "weights": {
       "architecture": 0.15,
       "maintainability": 0.15,
@@ -62,15 +62,15 @@
   },
   "tenDimensions": {
     "architectureConsistency": 97.97,
-    "semanticPurity": 99.11,
+    "semanticPurity": 99.08,
     "codeSecurity": 99.85,
-    "performanceEfficiency": 99.52,
-    "standardization": 87.7,
-    "modernity": 98.96,
-    "maintainability": 95.82,
+    "performanceEfficiency": 99.44,
+    "standardization": 87.69,
+    "modernity": 98.94,
+    "maintainability": 95.71,
     "commentQuality": 99.99,
-    "duplication": 90.13,
-    "techDebtRisk": 99.94
+    "duplication": 90.07,
+    "techDebtRisk": 99.9
   },
   "topHotspots": [
     {
@@ -119,6 +119,15 @@
       "effectiveDensity": 0.95
     },
     {
+      "filePath": "src/core/scoring/autonomy-scorer.ts",
+      "domain": "scoring",
+      "totalIssues": 80,
+      "criticalCount": 0,
+      "highCount": 1,
+      "compositeScore": 93.21,
+      "effectiveDensity": 0.95
+    },
+    {
       "filePath": "src/analyzers/architecture.ts",
       "domain": "analyzers",
       "totalIssues": 79,
@@ -153,23 +162,14 @@
       "highCount": 0,
       "compositeScore": 97.45,
       "effectiveDensity": 0.91
-    },
-    {
-      "filePath": "src/analyzers/naming-candidate-helper.ts",
-      "domain": "analyzers",
-      "totalIssues": 78,
-      "criticalCount": 0,
-      "highCount": 1,
-      "compositeScore": 94.75,
-      "effectiveDensity": 0.95
     }
   ],
   "technicalDebtLedger": {
     "summary": {
       "critical": 0,
-      "high": 103,
-      "medium": 5499,
-      "low": 6324
+      "high": 120,
+      "medium": 5514,
+      "low": 6351
     },
     "criticalItems": [],
     "highItems": [
@@ -208,6 +208,15 @@
         "file": "src/analyzers/dependency-graph.ts",
         "line": 116,
         "message": "Transient heap allocation in hot loop: Temporary collection or object repeatedly instantiated inside loop body"
+      },
+      {
+        "id": "complexity:high-complexity:src/analyzers/dependency-layout.ts:65",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/dependency-layout.ts",
+        "line": 65,
+        "message": "Function \"DependencyLayoutAnalyzer.analyze\" has cyclomatic complexity 19 (exceeds relaxed threshold 18 for shallow structure)."
       },
       {
         "id": "complexity:high-complexity:src/analyzers/hygiene.ts:206",
@@ -318,12 +327,12 @@
         "message": "Transient heap allocation in hot loop: Temporary collection or object repeatedly instantiated inside loop body"
       },
       {
-        "id": "performance:PRF-MEM-001:src/core/analyzer.ts:177",
+        "id": "performance:PRF-MEM-001:src/core/analyzer.ts:178",
         "rule": "PRF-MEM-001",
         "tier": "high",
         "severity": "info",
         "file": "src/core/analyzer.ts",
-        "line": 177,
+        "line": 178,
         "message": "Transient heap allocation in hot loop: Temporary collection or object repeatedly instantiated inside loop body"
       },
       {
@@ -498,6 +507,15 @@
         "message": "Transient heap allocation in hot loop: Temporary collection or object repeatedly instantiated inside loop body"
       },
       {
+        "id": "performance:PRF-ALG-002:src/core/cfg/cfg-builder.ts:132",
+        "rule": "PRF-ALG-002",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/cfg/cfg-builder.ts",
+        "line": 132,
+        "message": "Array head mutation anti-pattern: Calling 'shift()' inside loop (depth 1) causes O(N) array memory shifts per iteration, degrading to O(N^2)"
+      },
+      {
         "id": "performance:PRF-MEM-001:src/core/comments/project-comment-profiler.ts:265",
         "rule": "PRF-MEM-001",
         "tier": "high",
@@ -604,24 +622,6 @@
         "file": "src/core/dependency-graph.ts",
         "line": 326,
         "message": "Transient heap allocation in hot loop: Temporary collection or object repeatedly instantiated inside loop body"
-      },
-      {
-        "id": "performance:PRF-MEM-001:src/core/dependency-graph.ts:445",
-        "rule": "PRF-MEM-001",
-        "tier": "high",
-        "severity": "info",
-        "file": "src/core/dependency-graph.ts",
-        "line": 445,
-        "message": "Transient heap allocation in hot loop: Temporary collection or object repeatedly instantiated inside loop body"
-      },
-      {
-        "id": "performance:PRF-MEM-001:src/core/diff/histogram-diff.ts:127",
-        "rule": "PRF-MEM-001",
-        "tier": "high",
-        "severity": "info",
-        "file": "src/core/diff/histogram-diff.ts",
-        "line": 127,
-        "message": "Transient heap allocation in hot loop: Temporary collection or object repeatedly instantiated inside loop body"
       }
     ]
   },
@@ -644,16 +644,16 @@
       },
       {
         "domainName": "analyzers",
-        "compositeScore": 97.56,
+        "compositeScore": 97.54,
         "pillars": {
           "architecture": 97.89,
-          "maintainability": 92.76,
+          "maintainability": 92.68,
           "performance": 99.76,
           "data": 99.22,
           "testing": 100,
-          "reliability": 99.13,
+          "reliability": 99.12,
           "security": 99.84,
-          "extensibility": 91.77
+          "extensibility": 91.76
         },
         "moduleCount": 1
       },
@@ -689,11 +689,11 @@
       },
       {
         "domainName": "core",
-        "compositeScore": 98.36,
+        "compositeScore": 98.32,
         "pillars": {
           "architecture": 99.68,
           "maintainability": 96.52,
-          "performance": 98.53,
+          "performance": 98.21,
           "data": 99.59,
           "testing": 100,
           "reliability": 99.59,
@@ -728,17 +728,17 @@
           "testing": 100,
           "reliability": 99.74,
           "security": 99.88,
-          "extensibility": 93.33
+          "extensibility": 93.3
         },
         "moduleCount": 1
       },
       {
         "domainName": "cfg",
-        "compositeScore": 99.07,
+        "compositeScore": 98.98,
         "pillars": {
           "architecture": 100,
           "maintainability": 99.26,
-          "performance": 100,
+          "performance": 99.4,
           "data": 99.28,
           "testing": 100,
           "reliability": 99.28,
@@ -914,26 +914,26 @@
       },
       {
         "domainName": "intelligence",
-        "compositeScore": 98.28,
+        "compositeScore": 98.07,
         "pillars": {
           "architecture": 97.86,
-          "maintainability": 96.81,
-          "performance": 99.83,
-          "data": 99.79,
+          "maintainability": 96.13,
+          "performance": 99.47,
+          "data": 99.63,
           "testing": 100,
-          "reliability": 99.68,
+          "reliability": 99.39,
           "security": 99.88,
-          "extensibility": 91.72
+          "extensibility": 91.65
         },
         "moduleCount": 1
       },
       {
         "domainName": "memory",
-        "compositeScore": 98.58,
+        "compositeScore": 98.49,
         "pillars": {
           "architecture": 99.4,
           "maintainability": 98.7,
-          "performance": 97.27,
+          "performance": 96.67,
           "data": 99.58,
           "testing": 100,
           "reliability": 99.58,
@@ -953,17 +953,17 @@
           "testing": 100,
           "reliability": 100,
           "security": 99.94,
-          "extensibility": 98.84
+          "extensibility": 98.8
         },
         "moduleCount": 1
       },
       {
         "domainName": "native",
-        "compositeScore": 98.58,
+        "compositeScore": 98.49,
         "pillars": {
           "architecture": 100,
           "maintainability": 96,
-          "performance": 100,
+          "performance": 99.4,
           "data": 99.05,
           "testing": 100,
           "reliability": 99.05,
@@ -1214,11 +1214,11 @@
       },
       {
         "domainName": "scheduler",
-        "compositeScore": 98.96,
+        "compositeScore": 98.92,
         "pillars": {
           "architecture": 99.21,
           "maintainability": 98.04,
-          "performance": 99.61,
+          "performance": 99.38,
           "data": 99.88,
           "testing": 100,
           "reliability": 99.88,
@@ -1351,41 +1351,41 @@
   },
   "trajectory": {
     "runEloc": {
-      "processed": 136629,
-      "unique": 110333,
-      "changed": 3190,
-      "semantic": 2552,
+      "processed": 137134,
+      "unique": 110800,
+      "changed": 0,
+      "semantic": 0,
       "relocated": 0,
       "cosmetic": 0,
       "boilerplate": 0,
-      "added": 1595,
+      "added": 0,
       "deleted": 0,
       "modified": 0
     },
     "lifetime": {
       "weekId": "LIFETIME",
       "startMs": 1791102755050,
-      "endMs": 1791697838497,
+      "endMs": 1791710364491,
       "totalRuns": 150,
       "eloc": {
-        "processedTotal": 19348177,
-        "uniqueTotal": 110333,
-        "changedTotal": 238503,
-        "semanticTotal": 190805
+        "processedTotal": 19402172,
+        "uniqueTotal": 110800,
+        "changedTotal": 255191,
+        "semanticTotal": 204156
       },
       "qed": {
-        "mean": -0.0001,
-        "min": -0.02,
+        "mean": -0.0002,
+        "min": -0.01,
         "max": 0.02
       },
       "debt": {
-        "totalAdded": 1122,
-        "totalResolved": 398,
-        "totalRegressions": 14,
+        "totalAdded": 1144,
+        "totalResolved": 356,
+        "totalRegressions": 12,
         "netYield": -0.04
       },
-      "meanCompositeScore": 98.9,
-      "gatePassRate": 94.67
+      "meanCompositeScore": 98.89,
+      "gatePassRate": 95.33
     },
     "isFirstBaseline": false
   }

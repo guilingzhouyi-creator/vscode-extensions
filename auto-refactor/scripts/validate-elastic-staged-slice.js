@@ -203,6 +203,47 @@ function outerHandler(list: number[]): number[] {
   );
 }
 
+// --- Test 7: Low blast radius unexported helper receives elastic bonus (Depth=3, CC=17) ---
+console.log('\n--- 7. Testing Low Blast Radius Elastic Complexity Bonus ---');
+{
+  const privateHelper = `
+function resolveInternalMapping(x: number, y: number, z: number): number {
+    if (x > 0) {
+        if (y > 0) {
+            if (z === 1) return 1;
+            if (z === 2) return 2;
+            if (z === 3) return 3;
+            if (z === 4) return 4;
+            if (z === 5) return 5;
+            if (z === 6) return 6;
+            if (z === 7) return 7;
+            if (z === 8) return 8;
+            if (z === 9) return 9;
+            if (z === 10) return 10;
+            if (z === 11) return 11;
+            if (z === 12) return 12;
+            if (z === 13) return 13;
+            if (z === 14) return 14;
+        }
+    }
+    return 0;
+}
+`;
+  const findings = analyzeSourceText(privateHelper, 'src/internal/mapping.ts');
+  assert(
+    findings.length === 0,
+    'Unexported helper with shallow nesting (Depth=3, CC=17) passes with low-blast bonus',
+  );
+
+  // Exported counterpart must be strictly blocked by standard base limit (15)
+  const exportedCounterpart = 'export ' + privateHelper;
+  const exportedFindings = analyzeSourceText(exportedCounterpart, 'src/internal/mapping.ts');
+  assert(
+    exportedFindings.length === 1 && exportedFindings[0].rule === 'CPX-BUD-001',
+    'Exported counterpart (high blast radius) with CC=17 is strictly blocked by standard limit',
+  );
+}
+
 // --- Summary ---
 console.log('================================================================');
 console.log(`Results: ${passedTests} passed, ${totalTests - passedTests} failed`);
@@ -213,3 +254,4 @@ if (passedTests === totalTests) {
   console.error('❌ SOME TESTS FAILED!');
   process.exit(1);
 }
+

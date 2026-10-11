@@ -226,6 +226,46 @@ function runTests() {
     assert(!gdResult.isExceeded, 'GDScript CC=13 is within relaxed budget when specified as "gd"');
   }
 
+  console.log('--- 8. Testing Blast Radius Multiplier (isExported: false vs true) ---');
+  {
+    const privateHelper = {
+      name: 'internalHelper',
+      filePath: 'src/core/helper.ts',
+      language: 'ts',
+      cc: 17,
+      loc: 40,
+      maxDepth: 2,
+      startLine: 1,
+      startColumn: 1,
+      isExported: false,
+    };
+    const exportedFn = {
+      ...privateHelper,
+      name: 'publicApi',
+      isExported: true,
+    };
+
+    const privateResult = evaluateElasticComplexityBudget(privateHelper, 12, 20);
+    const exportedResult = evaluateElasticComplexityBudget(exportedFn, 12, 20);
+
+    assert(
+      privateResult.multipliers.blastRadius === 1.2,
+      'Private helper with shallow depth receives 1.2x blastRadius multiplier',
+    );
+    assert(
+      exportedResult.multipliers.blastRadius === 1.0,
+      'Exported function receives standard 1.0x blastRadius multiplier',
+    );
+    assert(
+      !privateResult.isExceeded,
+      'Private helper with CC=17 stays within elastic budget due to 1.2x bonus',
+    );
+    assert(
+      exportedResult.isExceeded,
+      'Exported function with CC=17 exceeds standard budget',
+    );
+  }
+
   console.log(`\nElastic Complexity Budget Tests: ${passedCount}/${totalCount} passed.`);
   if (passedCount !== totalCount) {
     process.exit(1);

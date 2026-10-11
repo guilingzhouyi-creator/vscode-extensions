@@ -238,6 +238,30 @@ export class ComplexityAnalyzer implements Analyzer {
         this.fileFunctions = [];
     }
 
+    private resolveIsExported(
+        node: NormalizedNode,
+        parent: NormalizedNode | undefined,
+        fnLines: string[],
+    ): boolean {
+        if (node.exported) {
+            return true;
+        }
+        const firstLine = fnLines[0] || '';
+        if (/\bexport\b/.test(firstLine)) {
+            return true;
+        }
+        const isParentClassExported = Boolean(
+            parent && (parent.exported || (parent.isClassDefining && parent.exported)),
+        );
+        if (isParentClassExported && node.kind === NodeKind.Method) {
+            const isPrivateOrProtected =
+                /\b(private|protected)\b/.test(firstLine) ||
+                Boolean(node.name && node.name.startsWith('#'));
+            return !isPrivateOrProtected;
+        }
+        return false;
+    }
+
     private checkElasticBudget(
         node: NormalizedNode,
         ctx: AnalyzerContext,
@@ -246,6 +270,7 @@ export class ComplexityAnalyzer implements Analyzer {
         loc: number,
         maxDepth: number,
         startLine: number,
+        isExported?: boolean,
     ): void {
         const opts = ctx.options as Record<string, unknown> | undefined;
         const thresh = ctx.config?.thresholds as unknown as Record<string, unknown> | undefined;
@@ -265,6 +290,7 @@ export class ComplexityAnalyzer implements Analyzer {
                 maxDepth,
                 startLine,
                 startColumn: node.start?.column ?? 1,
+                isExported,
             },
             ctx.options.complexityWarn,
             ctx.options.complexityFail,
@@ -277,7 +303,7 @@ export class ComplexityAnalyzer implements Analyzer {
     visit(
         node: NormalizedNode,
         ctx: AnalyzerContext,
-        _parent: NormalizedNode | undefined,
+        parent: NormalizedNode | undefined,
         _grandparent: NormalizedNode | undefined,
         _depth: number,
         className: string | null,
@@ -319,7 +345,17 @@ export class ComplexityAnalyzer implements Analyzer {
         const fnLines = this.cachedLines.slice(startLine - 1, endLine);
         this.fileFunctions.push({ name, startLine, endLine, cc, lines: fnLines });
 
-        this.checkElasticBudget(node, ctx, name, cc, loc, clarity.maxDepth, startLine);
+        const isExported = this.resolveIsExported(node, parent, fnLines);
+        this.checkElasticBudget(
+            node,
+            ctx,
+            name,
+            cc,
+            loc,
+            clarity.maxDepth,
+            startLine,
+            isExported,
+        );
         this.checkControlFlowNestingAndEscapes(
             node,
             ctx,

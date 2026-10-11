@@ -246,7 +246,8 @@ export function updateBraceLoops(trimmed: string, loopStack: LoopScope[]): void 
     }
 }
 
-const LINEAR_LOOKUP_RE = /\.(?:find|filter|indexOf|lastIndexOf|includes|some|every)\s*\(/;
+export const LINEAR_LOOKUP_RE =
+    /\.(?:find|filter|indexOf|lastIndexOf|includes|some|every|shift|unshift)\s*\(/;
 
 /**
  * Extracts linear lookup method name from an expression string if present.

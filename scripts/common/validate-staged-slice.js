@@ -3,7 +3,7 @@
  * File Path: scripts/common/validate-staged-slice.js
  * Architecture Role: High-speed platform-level incremental static analysis gate for pre-commit.
  *   Scans staged TypeScript/JavaScript files to detect architectural complexity anti-patterns:
- *   - Function cyclomatic complexity (> 15 base, elastic bonus up to 25 for flat dispatchers)
+ *   - Function cyclomatic complexity (> 15 base, elastic bonus up to 18 for low blast radius, up to 25 for flat dispatchers)
  *   - Control flow nesting depth (> 4)
  *   - Code dilution / noise index (kappa_noise > 4.0)
  * Dependencies & Triggers: Invoked by pre-commit-gate scripts (sh / ps1) and CI hygiene jobs.
@@ -17,7 +17,7 @@ const path = require("path");
 const { execSync } = require("child_process");
 
 let ts;
-const REPO_ROOT = path.resolve(__dirname, '../..');
+const REPO_ROOT = path.resolve(__dirname, "../..");
 
 const candidatePaths = [
   "typescript",
@@ -50,6 +50,9 @@ const DEFAULT_CONFIG = Object.freeze({
   flatDispatcherBonus: true,
   flatDispatcherMaxComplexity: 25,
   flatDispatcherMaxDepth: 2,
+  lowBlastRadiusBonus: true,
+  lowBlastRadiusMaxComplexity: 18,
+  lowBlastRadiusMaxDepth: 3,
   probeMaxComplexity: 20,
   testMaxComplexity: 20,
 });
@@ -83,28 +86,42 @@ function findProjectConfig(filePath) {
 }
 
 /**
+ * Applies complexity configuration overrides from a given config source.
+ */
+function applyConfigOverrides(cfg, source) {
+  if (!source) return;
+  if (typeof source.maxFunctionComplexity === "number") {
+    cfg.maxFunctionComplexity = source.maxFunctionComplexity;
+  }
+  if (typeof source.maxNestingDepth === "number") {
+    cfg.maxNestingDepth = source.maxNestingDepth;
+  }
+  if (typeof source.maxNoiseRatio === "number") {
+    cfg.maxNoiseRatio = source.maxNoiseRatio;
+  }
+  if (typeof source.flatDispatcherBonus === "boolean") {
+    cfg.flatDispatcherBonus = source.flatDispatcherBonus;
+  }
+  if (typeof source.flatDispatcherMaxComplexity === "number") {
+    cfg.flatDispatcherMaxComplexity = source.flatDispatcherMaxComplexity;
+  }
+  if (typeof source.lowBlastRadiusBonus === "boolean") {
+    cfg.lowBlastRadiusBonus = source.lowBlastRadiusBonus;
+  }
+  if (typeof source.lowBlastRadiusMaxComplexity === "number") {
+    cfg.lowBlastRadiusMaxComplexity = source.lowBlastRadiusMaxComplexity;
+  }
+  if (typeof source.lowBlastRadiusMaxDepth === "number") {
+    cfg.lowBlastRadiusMaxDepth = source.lowBlastRadiusMaxDepth;
+  }
+}
+
+/**
  * Resolves effective complexity configuration for a specific target file.
  */
 function resolveConfig(filePath, overrides = {}) {
   const cfg = { ...DEFAULT_CONFIG };
-  const projectCfg = findProjectConfig(filePath);
-  if (projectCfg) {
-    if (typeof projectCfg.maxFunctionComplexity === "number") {
-      cfg.maxFunctionComplexity = projectCfg.maxFunctionComplexity;
-    }
-    if (typeof projectCfg.maxNestingDepth === "number") {
-      cfg.maxNestingDepth = projectCfg.maxNestingDepth;
-    }
-    if (typeof projectCfg.maxNoiseRatio === "number") {
-      cfg.maxNoiseRatio = projectCfg.maxNoiseRatio;
-    }
-    if (typeof projectCfg.flatDispatcherMaxComplexity === "number") {
-      cfg.flatDispatcherMaxComplexity = projectCfg.flatDispatcherMaxComplexity;
-    }
-    if (typeof projectCfg.flatDispatcherBonus === "boolean") {
-      cfg.flatDispatcherBonus = projectCfg.flatDispatcherBonus;
-    }
-  }
+  applyConfigOverrides(cfg, findProjectConfig(filePath));
 
   const isProbe = /(?:archetype|parser|scanner|detector|lexer|tokenizer)/i.test(
     filePath,
@@ -124,22 +141,7 @@ function resolveConfig(filePath, overrides = {}) {
     );
   }
 
-  if (typeof overrides.maxFunctionComplexity === "number") {
-    cfg.maxFunctionComplexity = overrides.maxFunctionComplexity;
-  }
-  if (typeof overrides.maxNestingDepth === "number") {
-    cfg.maxNestingDepth = overrides.maxNestingDepth;
-  }
-  if (typeof overrides.maxNoiseRatio === "number") {
-    cfg.maxNoiseRatio = overrides.maxNoiseRatio;
-  }
-  if (typeof overrides.flatDispatcherBonus === "boolean") {
-    cfg.flatDispatcherBonus = overrides.flatDispatcherBonus;
-  }
-  if (typeof overrides.flatDispatcherMaxComplexity === "number") {
-    cfg.flatDispatcherMaxComplexity = overrides.flatDispatcherMaxComplexity;
-  }
-
+  applyConfigOverrides(cfg, overrides);
   return cfg;
 }
 
@@ -158,6 +160,10 @@ function parseSingleFlag(arg, flags, explicitFiles) {
   }
   if (arg === "--no-flat-bonus") {
     flags.flatDispatcherBonus = false;
+    return;
+  }
+  if (arg === "--no-blast-bonus") {
+    flags.lowBlastRadiusBonus = false;
     return;
   }
   if (!arg.startsWith("--")) {
@@ -358,6 +364,118 @@ function isFunctionNode(n) {
   );
 }
 
+function getModifiersList(node) {
+  if (!node) return [];
+  if (typeof ts.getModifiers === "function") {
+    const mods = ts.getModifiers(node);
+    if (mods && mods.length) return mods;
+  }
+  return node.modifiers || [];
+}
+
+function hasExportModifier(node) {
+  const mods = getModifiersList(node);
+  for (let i = 0; i < mods.length; i++) {
+    if (mods[i].kind === ts.SyntaxKind.ExportKeyword) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function hasEnclosingFunction(node) {
+  let curr = node ? node.parent : null;
+  while (curr) {
+    if (isFunctionNode(curr)) {
+      return true;
+    }
+    curr = curr.parent;
+  }
+  return false;
+}
+
+function isPublicMethod(node) {
+  if (
+    node.name &&
+    typeof ts.isPrivateIdentifier === "function" &&
+    ts.isPrivateIdentifier(node.name)
+  ) {
+    return false;
+  }
+  const mods = getModifiersList(node);
+  for (let i = 0; i < mods.length; i++) {
+    const k = mods[i].kind;
+    if (
+      k === ts.SyntaxKind.PrivateKeyword ||
+      k === ts.SyntaxKind.ProtectedKeyword
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function isClassMember(node) {
+  if (!node || !node.parent) return false;
+  return (
+    ts.isClassDeclaration(node.parent) ||
+    ts.isClassExpression(node.parent)
+  );
+}
+
+function isEnclosingVariableStatementExported(startNode) {
+  let curr = startNode ? startNode.parent : null;
+  while (curr) {
+    if (isFunctionNode(curr)) {
+      return false;
+    }
+    if (ts.isVariableStatement(curr)) {
+      return hasExportModifier(curr);
+    }
+    curr = curr.parent;
+  }
+  return false;
+}
+
+function isExportedClassMethod(node) {
+  if (!isPublicMethod(node)) {
+    return false;
+  }
+  const parentClass = node.parent;
+  if (ts.isClassDeclaration(parentClass) && hasExportModifier(parentClass)) {
+    return true;
+  }
+  if (
+    ts.isClassExpression(parentClass) &&
+    isEnclosingVariableStatementExported(parentClass)
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Determines whether a function node is exported or public-facing.
+ */
+function isExportedFunction(node) {
+  if (!node || hasEnclosingFunction(node)) {
+    return false;
+  }
+  if (hasExportModifier(node)) {
+    return true;
+  }
+  if (node.parent && ts.isExportAssignment(node.parent)) {
+    return true;
+  }
+  if (isEnclosingVariableStatementExported(node)) {
+    return true;
+  }
+  if (isClassMember(node)) {
+    return isExportedClassMethod(node);
+  }
+  return false;
+}
+
 function calculateComplexity(node) {
   let complexity = 1;
   function walk(n) {
@@ -439,6 +557,23 @@ function calculateElocAndNoise(content) {
   return { totalLines, eloc, noiseRatio };
 }
 
+function resolveComplexityCeiling(cfg, isFlatDispatcher, isLowBlast) {
+  let effectiveMaxCC = cfg.maxFunctionComplexity;
+  let tag = "标准基线上限";
+
+  if (isLowBlast && cfg.lowBlastRadiusMaxComplexity > effectiveMaxCC) {
+    effectiveMaxCC = cfg.lowBlastRadiusMaxComplexity;
+    tag = "私有低爆炸半径上限";
+  }
+
+  if (isFlatDispatcher && cfg.flatDispatcherMaxComplexity > effectiveMaxCC) {
+    effectiveMaxCC = cfg.flatDispatcherMaxComplexity;
+    tag = "平铺分发器上限";
+  }
+
+  return { effectiveMaxCC, tag };
+}
+
 function analyzeFunction(node, sourceFile, cfg) {
   const findings = [];
   const complexity = calculateComplexity(node);
@@ -451,17 +586,26 @@ function analyzeFunction(node, sourceFile, cfg) {
   const maxNesting = { val: 0 };
   checkNesting(node, 0, maxNesting);
 
+  const isExported = isExportedFunction(node);
   const hasLoops = hasLoopConstruct(node);
   const isFlatDispatcher =
     cfg.flatDispatcherBonus &&
     maxNesting.val <= cfg.flatDispatcherMaxDepth &&
     !hasLoops;
-  const effectiveMaxCC = isFlatDispatcher
-    ? cfg.flatDispatcherMaxComplexity
-    : cfg.maxFunctionComplexity;
+  const isLowBlast =
+    !isExported &&
+    cfg.lowBlastRadiusBonus &&
+    !hasLoops &&
+    cfg.flatDispatcherBonus !== false &&
+    maxNesting.val <= cfg.lowBlastRadiusMaxDepth;
+
+  const { effectiveMaxCC, tag } = resolveComplexityCeiling(
+    cfg,
+    isFlatDispatcher,
+    isLowBlast,
+  );
 
   if (complexity > effectiveMaxCC) {
-    const tag = isFlatDispatcher ? "平铺分发器上限" : "标准基线上限";
     findings.push({
       rule: "CPX-BUD-001",
       severity: "error",
@@ -574,7 +718,7 @@ function run() {
   }
 
   console.log(
-    `  ▶ 扫描暂存区 ${hunkMap.size} 个文件的 AST 局部切片 (支持 Hunk 精准切片与分发器弹性包络)...`,
+    `  ▶ 扫描暂存区 ${hunkMap.size} 个文件的 AST 局部切片 (支持 Hunk 精准切片与分发器/低爆炸半径弹性包络)...`,
   );
   let totalErrors = 0;
 
@@ -599,7 +743,7 @@ function run() {
     process.exit(1);
   } else {
     console.log(
-      `  ✔ [PASS] 暂存区 AST 切片审查通过（圈复杂度 <= 15 [分发器 <= 25], 嵌套 <= 4, 噪声比 <= 4.0）`,
+      `  ✔ [PASS] 暂存区 AST 切片审查通过（圈复杂度 <= 15 [私有 <= 18, 分发器 <= 25], 嵌套 <= 4, 噪声比 <= 4.0）`,
     );
     process.exit(0);
   }
@@ -612,6 +756,7 @@ if (require.main === module) {
 module.exports = {
   DEFAULT_CONFIG,
   resolveConfig,
+  isExportedFunction,
   calculateComplexity,
   hasLoopConstruct,
   checkNesting,

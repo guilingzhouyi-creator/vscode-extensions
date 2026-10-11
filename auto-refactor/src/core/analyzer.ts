@@ -52,6 +52,7 @@ import { buildErrorFlowIssues, type ErrorFlowOptions } from './intelligence/erro
 import {
     analyzeCrossFunctionComplexity,
     detectUnboundedRecursion,
+    extractGuardedRecursiveSymbols,
     type LoopSite,
     type SemanticComplexityOptions,
 } from './intelligence/semanticComplexity';
@@ -324,7 +325,8 @@ export class Scanner implements ScannerContext {
             );
         }
 
-        issues.push(...detectUnboundedRecursion(callGraph, new Set()));
+        const guardedSymbols = extractGuardedRecursiveSymbols(this.symbolIndex, callGraph);
+        issues.push(...detectUnboundedRecursion(callGraph, guardedSymbols));
         return issues;
     }
 
@@ -572,3 +574,5 @@ export class Scanner implements ScannerContext {
         );
     }
 }
+
+export { extractGuardedRecursiveSymbols } from './intelligence/semanticComplexity';

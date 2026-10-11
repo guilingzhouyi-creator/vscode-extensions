@@ -137,12 +137,19 @@ export const PerformanceMessages = {
     LINEAR_COLLECTION_LOOKUP_IN_LOOP: (
         methodName: string,
         loopDepth: number,
-    ): DiagnosticDescriptor => ({
-        message: `Nested collection linear lookup anti-pattern: Calling '${methodName}()' inside loop (depth ${loopDepth}) causes O(N*M) polynomial complexity`,
-        suggestion:
-            'Pre-build a Map, Set, or Dictionary index outside the loop to reduce lookup complexity from linear O(M) to constant O(1)',
-        rationale:
-            'Linear collection lookups inside iterative loops degrade algorithm performance from linear O(N+M) to quadratic/polynomial O(N*M).',
-        risk: RISK_MEDIUM,
-    }),
+    ): DiagnosticDescriptor => {
+        const isHeadShift = methodName === 'shift' || methodName === 'unshift';
+        return {
+            message: isHeadShift
+                ? `Array head mutation anti-pattern: Calling '${methodName}()' inside loop (depth ${loopDepth}) causes O(N) array memory shifts per iteration, degrading to O(N^2)`
+                : `Nested collection linear lookup anti-pattern: Calling '${methodName}()' inside loop (depth ${loopDepth}) causes O(N*M) polynomial complexity`,
+            suggestion: isHeadShift
+                ? 'Calling shift()/unshift() inside a loop causes O(N) array memory shifts per iteration, degrading to O(N^2). Use an index cursor or a Deque/RingBuffer.'
+                : 'Pre-build a Map, Set, or Dictionary index outside the loop to reduce lookup complexity from linear O(M) to constant O(1)',
+            rationale: isHeadShift
+                ? 'Calling shift() or unshift() on an array requires re-indexing all subsequent elements in memory on each iteration, causing quadratic O(N^2) total execution time.'
+                : 'Linear collection lookups inside iterative loops degrade algorithm performance from linear O(N+M) to quadratic/polynomial O(N*M).',
+            risk: RISK_MEDIUM,
+        };
+    },
 } as const;

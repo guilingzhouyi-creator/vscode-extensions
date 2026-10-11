@@ -37,7 +37,7 @@
 - **文件命名**：全局遵循 `kebab-case`（*例外*：WebGames 的 `config/**/*.json` 与 `.gd` 脚本保持 `snake_case` 对齐领域惯例）。
 
 ### 2. 代码复杂度、体积与注释契约三轨预算
-- **AST 切片预算（`GATE-AST-001`）**：暂存区生产代码与工具脚本受 AST 局部切片守卫约束：单函数圈复杂度基准 $\text{CC} \le 15$（无循环且 $\text{Depth} \le 2$ 的平铺分发器/状态映射器与探针模块享 $\text{CC} \le 20 \sim 25$ 弹性包络）、控制流嵌套深度 $\text{Depth} \le 4$、单行噪声比 $\text{Noise} \le 4.0$；循环体与调度逻辑须平铺控制流并采用卫语句提前返回；
+- **AST 切片预算（`GATE-AST-001`）**：暂存区生产代码与工具脚本受 AST 局部切片守卫约束：单函数圈复杂度基准 $\text{CC} \le 15$；引入函数爆炸半径感知（Blast Radius），未导出的文件私有局部纯函数（无循环且 $\text{Depth} \le 3$）享 $\text{CC} \le 18 \sim 20$ 低爆炸半径弹性包络，对外导出公共 API 严格执行 $\text{CC} \le 15$ 刚性基线；无循环且 $\text{Depth} \le 2$ 的平铺分发器/状态映射器与探针模块享 $\text{CC} \le 20 \sim 25$ 弹性包络；控制流嵌套深度 $\text{Depth} \le 4$、单行噪声比 $\text{Noise} \le 4.0$；循环体与调度逻辑须平铺控制流并采用卫语句提前返回；
 - **单文件双轨体积与 1:3 动态包络**：全仓源码文件（`.ts`, `.js`, `.gd`, `.py` 等）以**有效代码行（$\text{ELOC} \le 900$）**为第一刚性复杂度红线，以**物理行（$\text{LOC} \le 1400$）**为防膨胀兜底线；在 [evaluate-eloc-budget.js](scripts/common/evaluate-eloc-budget.js) 中执行 1:3 密度比动态反推包络约束与高负荷契约注释密度约束；处于合法包络内的高内聚模块禁止进行破坏内聚性的机械物理碎片化，重构优化必须以**消除循环内瞬态堆分配（`CPX-SPACE-001`）**与平铺控制流为第一优先级；
 - **注释契约与架构自解释性**：
   ① **六字段 JSDoc 模块头部契约**：核心模块、分析器与服务入口必须在首行呈现标准的六字段 JSDoc（`Module`, `File Path`, `Architecture Role`, `Dependencies & Triggers`, `Responsibilities`, `Exit Semantics & Design Rationale`），严禁私有辅助函数或非结构化散文插在模块头之前；

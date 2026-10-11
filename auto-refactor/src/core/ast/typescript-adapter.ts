@@ -170,7 +170,22 @@ export class TypeScriptAdapter implements LanguageAdapter {
             hasFunctionInitializer: isBinding,
             increasesNesting: CONTROL_OR_BLOCK.has(n.kind),
             isConstructor: ts.isConstructorDeclaration(n),
+            parameters: fnLike ? this.extractFnParameters(n, sf) : undefined,
         };
+    }
+
+    private extractFnParameters(n: ts.Node, sf: ts.SourceFile): string[] | undefined {
+        if (
+            !ts.isFunctionDeclaration(n) &&
+            !ts.isMethodDeclaration(n) &&
+            !ts.isFunctionExpression(n) &&
+            !ts.isArrowFunction(n) &&
+            !ts.isConstructorDeclaration(n)
+        ) {
+            return undefined;
+        }
+        if (!n.parameters || n.parameters.length === 0) return undefined;
+        return n.parameters.map((p) => p.name.getText(sf));
     }
 
     private applyNodeHierarchy(

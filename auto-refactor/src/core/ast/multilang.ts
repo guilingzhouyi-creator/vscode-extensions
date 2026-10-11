@@ -87,6 +87,8 @@ export interface NormalizedNode {
     tolerated?: boolean;
     /** Constructor declaration for complexity naming. */
     isConstructor?: boolean;
+    /** Declared formal parameter names when functionLike is true. */
+    parameters?: string[];
 }
 
 /**

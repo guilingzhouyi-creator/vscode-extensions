@@ -5,8 +5,8 @@
  *   budgets instead of brittle fixed dead ends, granting algorithmic exemptions for justified code.
  * Dependencies & Triggers: Consumes NormalizedNode, Issue, and dimensionLiterals; invoked by
  *   ComplexityAnalyzer during traversal and post-scan validation.
- * Responsibilities: Compute language, role, domain, and clarity budget multipliers; enforce
- *   function-level, file-level, and module-level constraints; emit CPX-BUD-001 and CPX-JST-001.
+ * Responsibilities: Compute language, role, domain, clarity, and blast radius budget multipliers;
+ *   enforce function-level, file-level, and module-level constraints; emit CPX-BUD-001 and CPX-JST-001.
  * Exit Semantics & Design Rationale: Deterministic AST inspection without disk I/O.
  *   Prevents harmful forced refactoring of clean state machines and algorithmic kernels.
  */
@@ -36,6 +36,7 @@ export interface FunctionComplexityContext {
     isHotPath?: boolean;
     hasDocContract?: boolean;
     isStateOrAlgorithm?: boolean;
+    isExported?: boolean;
 }
 
 /**
@@ -51,6 +52,7 @@ export interface ElasticBudgetEvaluation {
         role: number;
         domain: number;
         clarity: number;
+        blastRadius: number;
     };
     hasAlgorithmicProof: boolean;
     issues: Issue[];
@@ -99,6 +101,22 @@ function computeClarityMultiplier(maxDepth: number): number {
     return 1.0;
 }
 
+/**
+ * Computes the blast-radius multiplier based on module-boundary visibility.
+ * Private or internal helper functions with shallow control flow have a bounded
+ * blast radius, qualifying for an elastic complexity allowance.
+ *
+ * @param isExported - Whether the function is exposed outside its module or class boundary.
+ * @param maxDepth - Maximum nesting depth within the function body.
+ * @returns Multiplier factor (1.20 for low-blast-radius private helpers, 1.0 otherwise).
+ */
+export function computeBlastRadiusMultiplier(isExported?: boolean, maxDepth?: number): number {
+    if (isExported === false && (maxDepth === undefined || maxDepth <= 3)) {
+        return 1.2;
+    }
+    return 1.0;
+}
+
 const LANGUAGE_CANONICAL_MAP: Readonly<Record<string, string>> = {
     ts: 'typescript',
     tsx: 'typescript',
@@ -139,8 +157,10 @@ function computeBudgetThresholds(
     const isAlgo = isMathOrAlgorithm(fn.name, fn.isStateOrAlgorithm);
     const domainMultiplier = isAlgo ? 1.35 : 1.0;
     const clarityMultiplier = computeClarityMultiplier(fn.maxDepth);
+    const blastRadiusMultiplier = computeBlastRadiusMultiplier(fn.isExported, fn.maxDepth);
 
-    const totalMultiplier = langMultiplier * roleMultiplier * domainMultiplier * clarityMultiplier;
+    const totalMultiplier =
+        langMultiplier * roleMultiplier * domainMultiplier * clarityMultiplier * blastRadiusMultiplier;
     const effectiveWarn = Math.max(8, Math.min(35, Math.round(base.warn * totalMultiplier)));
     const effectiveFail = Math.max(14, Math.min(50, Math.round(base.fail * totalMultiplier)));
     const hasAlgorithmicProof = Boolean((isAlgo || fn.hasDocContract) && fn.maxDepth <= 3);
@@ -151,6 +171,7 @@ function computeBudgetThresholds(
             role: roleMultiplier,
             domain: domainMultiplier,
             clarity: clarityMultiplier,
+            blastRadius: blastRadiusMultiplier,
         },
         totalMultiplier,
         effectiveWarn,

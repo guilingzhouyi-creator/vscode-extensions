@@ -137,7 +137,7 @@ export const CANONICAL_TOPIC_CATALOG: Readonly<Record<string, readonly string[]>
     CONST: ['CLU', 'DRF', 'LAY', 'LIB', 'OWN', 'SCP'],
     CPX: ['AMP', 'BUD', 'HOP', 'JST', 'NEST', 'REC', 'RED', 'SPACE', 'STM', 'TIME'],
     DAT: ['DEF', 'LAY', 'NPL', 'QRY', 'RES', 'SER'],
-    DEP: ['DEV', 'INV', 'LAZ', 'LIC', 'OBS', 'ORD', 'PHANTOM', 'RES', 'VULN', 'WLD'],
+    DEP: ['DEV', 'INV', 'LAZ', 'LIC', 'OBS', 'ORD', 'PHANTOM', 'PIN', 'RES', 'VULN', 'WLD'],
     DOC: ['DUP', 'FEN', 'LNK', 'TRM'],
     ERR: ['FLT', 'MSG', 'PRP'],
     GATE: [

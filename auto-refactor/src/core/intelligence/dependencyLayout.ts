@@ -5,10 +5,14 @@
  *   enforces canonical file structures, audits deferred imports, and governs external URLs.
  * Dependencies & Triggers: Core types (Issue, SemanticReviewDetail, SemanticEvidenceStep);
  *   invoked by DependencyLayoutAnalyzer.
- * Responsibilities: Enforce language-specific file layout matrices (DEP-ORD-001); flag
- *   unjustified in-function imports while allowing audited exemptions (DEP-LAZ-001); detect
- *   unmanaged hardcoded external URLs and endpoints (DEP-RES-001); detect wildcard imports
- *   (DEP-WLD-001); flag inverted dependency references (DEP-INV-001).
+ * Responsibilities:
+ *   1. Enforce language-specific file layout matrices (DEP-ORD-001);
+ *   2. Flag unjustified in-function imports while allowing audited exemptions (DEP-LAZ-001);
+ *   3. Detect unmanaged hardcoded external URLs and endpoints (DEP-RES-001);
+ *   4. Detect wildcard imports (DEP-WLD-001) and inverted dependency references (DEP-INV-001);
+ *   5. Audit development-only dependency leakage into production code (DEP-DEV-001);
+ *   6. Audit deprecated/unmaintained third-party packages (DEP-OBS-001);
+ *   7. Audit unpinned and wildcard dependency versions in project manifests (DEP-PIN-001).
  * Exit Semantics & Design Rationale: Deterministic AST- and line-assisted analysis; returns
  *   structured issues conforming to the Section VII result model.
  */
@@ -24,7 +28,7 @@ import {
 import { auditLicenseCompliance } from './license-compliance';
 import { checkDeprecatedPackage } from './deprecated-dependencies';
 import type { ProjectManifestInventory } from './dependency-provenance';
-import { isDevOnlyDependency } from './dependency-provenance';
+import { isDevOnlyDependency, isUnpinnedVersion } from './dependency-provenance';
 
 export { categorizeImport, extractExemptionReason } from './dependencyLayoutHelpers';
 export type { ImportCategory, ImportStatementInfo } from './dependencyLayoutHelpers';
@@ -67,6 +71,7 @@ export interface DependencyLayoutOptions {
     flagLicenseCompliance?: boolean;
     flagDevOnlyDependencies?: boolean;
     flagDeprecatedDependencies?: boolean;
+    flagUnpinnedDependencies?: boolean;
     rootDir?: string;
     manifestDependencies?: Set<string>;
     manifestInventory?: ProjectManifestInventory;
@@ -695,6 +700,53 @@ function auditDeprecatedDependencies(
     }
 }
 
+function auditUnpinnedDependencies(
+    imports: ImportStatementInfo[],
+    inventory: ProjectManifestInventory | undefined,
+    language: string,
+    issues: Issue[],
+): void {
+    if (!inventory || !inventory.versionSpecs || inventory.versionSpecs.size === 0) {
+        return;
+    }
+
+    const seenPackages = new Set<string>();
+
+    for (const imp of imports) {
+        if (imp.category !== 'third-party') continue;
+        if (isExemptPathOrAlias(imp.moduleSpecifier)) continue;
+
+        const pkgName = extractPackageName(imp.moduleSpecifier);
+        if (!pkgName || seenPackages.has(pkgName)) continue;
+        seenPackages.add(pkgName);
+
+        const normPkg = pkgName.toLowerCase();
+        const ver = inventory.versionSpecs.get(pkgName) || inventory.versionSpecs.get(normPkg);
+        if (!ver) continue;
+
+        if (isUnpinnedVersion(ver)) {
+            reportSingleImportIssue(
+                issues,
+                'DEP-PIN-001',
+                'warning',
+                imp,
+                'call',
+                `Unpinned/wildcard version '${ver}' declared for package '${pkgName}' in manifest`,
+                `Package '${pkgName}' has unpinned version requirement '${ver}' in project manifest.`,
+                'Unpinned or wildcard dependency version declaration',
+                'Floating versions introduce unpredictable breaking changes and supply chain attack vectors.',
+                `Pin '${pkgName}' to an exact or semver-caret range (e.g. ^1.2.3) in project manifest.`,
+                `Verify '${pkgName}' is pinned to a concrete version in manifest.`,
+                `Unpinned dependency version: '${pkgName}' uses '${ver}'. Pin to exact or semver-caret range.`,
+                `Pin '${pkgName}' to an exact or semver-caret range in project manifest.`,
+                language,
+                'dependencies',
+                0.95,
+            );
+        }
+    }
+}
+
 /**
  * Analyze imports and external resource references across a file.
  *
@@ -744,6 +796,9 @@ export function analyzeDependencyLayout(
     }
     if (options.flagDeprecatedDependencies ?? true) {
         auditDeprecatedDependencies(imports, language, issues);
+    }
+    if ((options.flagUnpinnedDependencies ?? true) && options.manifestInventory) {
+        auditUnpinnedDependencies(imports, options.manifestInventory, language, issues);
     }
     return issues;
 }

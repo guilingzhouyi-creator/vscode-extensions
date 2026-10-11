@@ -1,9 +1,9 @@
 {
   "schema": "workspace-rule-catalog/v1",
-  "generatedAt": "2026-10-11T05:49:57.791Z",
-  "totalRules": 419,
+  "generatedAt": "2026-10-11T08:47:51.218Z",
+  "totalRules": 420,
   "counts": {
-    "autoRefactor": 334,
+    "autoRefactor": 335,
     "workspaceTiming": 49,
     "webGames": 53,
     "globalTooling": 7
@@ -84,14 +84,14 @@
       "project": "WebGames",
       "family": "ADV",
       "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/backend/infrastructure/event_bus/event_packet.gd)"
+      "summary": "WebGames domain gate rule (source: WebGames/backend/domains/character_creation/dto/authoritative_character_creation_request_dto.gd)"
     },
     {
       "id": "ADV-PRF-001",
       "project": "WebGames",
       "family": "ADV",
       "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第06期_55到64/Phase_61_脚本库完整性修复与泛化收敛加固/KALAR-DEV-2026-ST57-001_阶段1_注册契约与阈值数据模型设计.md)"
+      "summary": "WebGames domain gate rule (source: WebGames/backend/domains/character_creation/starter_loadout_dispatcher.gd)"
     },
     {
       "id": "ADV-PRF-002",
@@ -771,6 +771,13 @@
       "family": "DEP",
       "severity": "warning",
       "summary": "Import of undeclared external package (phantom dependency) not listed in project manifests (package.json, pyproject.toml, Cargo.toml)."
+    },
+    {
+      "id": "DEP-PIN-001",
+      "project": "auto-refactor",
+      "family": "DEP",
+      "severity": "warning",
+      "summary": "Unpinned or wildcard dependency version: external package declared with floating wildcard (*, latest, open range) in project manifest."
     },
     {
       "id": "DEP-RES-001",

@@ -9,7 +9,10 @@
  *   1. Discover and parse package manifests (package.json, pyproject.toml, requirements.txt,
  *      Cargo.toml, go.mod);
  *   2. Classify import specifiers into stdlib, internal, in-tree vendor, or external SDK;
- *   3. Classify file provenance into proprietary, in-tree vendor, generated, or test fixture.
+ *   3. Classify file provenance into proprietary, in-tree vendor, generated, or test fixture;
+ *   4. Record declared version constraints and identify floating/wildcard versions (isUnpinnedVersion);
+ *   5. Support nearest manifest inventory resolution and composite aggregation for Monorepos;
+ *   6. Recursively resolve compiler path aliases across tsconfig extends inheritance chains.
  * Exit Semantics & Design Rationale: Never throws; deterministic cache-backed lookups with safe
  *   fallbacks for missing or unreadable manifest files.
  */
@@ -149,6 +152,8 @@ export interface ProjectManifestInventory {
     peerDependencies: Set<string>;
     /** Internal path aliases discovered from tsconfig/jsconfig paths */
     pathAliases: Set<string>;
+    /** Declared version constraint strings per package identifier */
+    versionSpecs: Map<string, string>;
 }
 
 /** Manifest inventory cache keyed by absolute root directory path */
@@ -161,22 +166,26 @@ function parsePackageJson(manifestPath: string, inventory: ProjectManifestInvent
     try {
         const raw = fs.readFileSync(manifestPath, 'utf8');
         const json = JSON.parse(raw);
-        for (const dep of Object.keys(json.dependencies || {})) {
+        for (const [dep, ver] of Object.entries(json.dependencies || {})) {
             inventory.prodDependencies.add(dep);
             inventory.allDependencies.add(dep);
+            if (typeof ver === 'string') inventory.versionSpecs.set(dep, ver);
         }
-        for (const dep of Object.keys(json.peerDependencies || {})) {
+        for (const [dep, ver] of Object.entries(json.peerDependencies || {})) {
             inventory.peerDependencies.add(dep);
             inventory.prodDependencies.add(dep);
             inventory.allDependencies.add(dep);
+            if (typeof ver === 'string') inventory.versionSpecs.set(dep, ver);
         }
-        for (const dep of Object.keys(json.optionalDependencies || {})) {
+        for (const [dep, ver] of Object.entries(json.optionalDependencies || {})) {
             inventory.prodDependencies.add(dep);
             inventory.allDependencies.add(dep);
+            if (typeof ver === 'string') inventory.versionSpecs.set(dep, ver);
         }
-        for (const dep of Object.keys(json.devDependencies || {})) {
+        for (const [dep, ver] of Object.entries(json.devDependencies || {})) {
             inventory.devDependencies.add(dep);
             inventory.allDependencies.add(dep);
+            if (typeof ver === 'string') inventory.versionSpecs.set(dep, ver);
         }
     } catch {
         // best-effort fallback: ignored when manifest is corrupt or unreadable
@@ -285,12 +294,29 @@ function parseGoMod(manifestPath: string, target: Set<string>): void {
     }
 }
 
-function extractAliasesFromFile(filePath: string, target: Set<string>): void {
-    if (!fs.existsSync(filePath)) return;
+function extractAliasesFromFile(
+    filePath: string,
+    target: Set<string>,
+    visited = new Set<string>(),
+): void {
+    const absPath = path.resolve(filePath);
+    if (visited.has(absPath) || visited.size > 8 || !fs.existsSync(absPath)) return;
+    visited.add(absPath);
+
     try {
-        const raw = fs.readFileSync(filePath, 'utf8');
+        const raw = fs.readFileSync(absPath, 'utf8');
         const clean = raw.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '');
         const parsed = JSON.parse(clean);
+
+        if (typeof parsed.extends === 'string') {
+            const dir = path.dirname(absPath);
+            let extPath = path.resolve(dir, parsed.extends);
+            if (!extPath.endsWith('.json') && !fs.existsSync(extPath)) {
+                if (fs.existsSync(extPath + '.json')) extPath += '.json';
+            }
+            extractAliasesFromFile(extPath, target, visited);
+        }
+
         const paths = parsed.compilerOptions?.paths;
         if (!paths || typeof paths !== 'object') return;
         for (const key of Object.keys(paths)) {
@@ -314,6 +340,108 @@ function parsePathAliases(rootDir: string, target: Set<string>): void {
 }
 
 /**
+ * Tests whether a dependency version specification is floating or unpinned (wildcard or open range).
+ *
+ * @param spec - Declared version requirement string
+ * @returns True when version is unpinned, wildcard, or open-ended
+ */
+export function isUnpinnedVersion(spec: string): boolean {
+    if (!spec) return false;
+    const trimmed = spec.trim().toLowerCase();
+    if (trimmed === '*' || trimmed === 'latest' || trimmed === 'x' || trimmed === '*.*') {
+        return true;
+    }
+    if (/^[><]=?\s*\d+/.test(trimmed) && !trimmed.includes('<=') && !trimmed.includes('<')) {
+        return true;
+    }
+    if (/\b(?:x|\*)\b/.test(trimmed)) {
+        return true;
+    }
+    return false;
+}
+
+const NEAREST_DIR_CACHE = new Map<string, string | null>();
+
+/**
+ * Locate the nearest directory containing a package manifest (package.json, Cargo.toml, etc.)
+ * searching upwards from the specified file path, bounded by boundaryDir.
+ *
+ * @param startPath - File or folder path to start searching from
+ * @param boundaryDir - Top-level root directory boundary
+ * @returns Directory path containing manifest, or null if none found
+ */
+export function findNearestManifestDir(startPath: string, boundaryDir: string): string | null {
+    const absBoundary = path.resolve(boundaryDir);
+    let current = path.isAbsolute(startPath)
+        ? path.normalize(startPath)
+        : path.resolve(absBoundary, startPath);
+
+    try {
+        if (fs.existsSync(current) && !fs.statSync(current).isDirectory()) {
+            current = path.dirname(current);
+        }
+    } catch {
+        current = path.dirname(current);
+    }
+
+    while (current.length >= absBoundary.length) {
+        if (NEAREST_DIR_CACHE.has(current)) {
+            return NEAREST_DIR_CACHE.get(current)!;
+        }
+
+        const hasManifest =
+            fs.existsSync(path.join(current, 'package.json')) ||
+            fs.existsSync(path.join(current, 'Cargo.toml')) ||
+            fs.existsSync(path.join(current, 'pyproject.toml')) ||
+            fs.existsSync(path.join(current, 'go.mod'));
+
+        if (hasManifest) {
+            NEAREST_DIR_CACHE.set(current, current);
+            return current;
+        }
+
+        if (current === absBoundary) break;
+        const parent = path.dirname(current);
+        if (parent === current) break;
+        current = parent;
+    }
+
+    NEAREST_DIR_CACHE.set(current, null);
+    return null;
+}
+
+/**
+ * Load manifest inventory for the nearest subproject enclosing the file,
+ * automatically merged with the root workspace inventory to prevent Monorepo false positives.
+ *
+ * @param filePath - Path to source file being analyzed
+ * @param rootDir - Scan root directory
+ * @returns Merged ProjectManifestInventory
+ */
+export function findNearestManifestInventory(
+    filePath: string,
+    rootDir: string,
+): ProjectManifestInventory {
+    const absRoot = path.resolve(rootDir);
+    const nearestDir = findNearestManifestDir(filePath, absRoot);
+    if (!nearestDir || nearestDir === absRoot) {
+        return loadProjectManifestInventory(absRoot);
+    }
+
+    const localInv = loadProjectManifestInventory(nearestDir);
+    const rootInv = loadProjectManifestInventory(absRoot);
+
+    return {
+        allDependencies: new Set([...rootInv.allDependencies, ...localInv.allDependencies]),
+        prodDependencies: new Set([...rootInv.prodDependencies, ...localInv.prodDependencies]),
+        devDependencies: new Set([...rootInv.devDependencies, ...localInv.devDependencies]),
+        peerDependencies: new Set([...rootInv.peerDependencies, ...localInv.peerDependencies]),
+        pathAliases: new Set([...rootInv.pathAliases, ...localInv.pathAliases]),
+        versionSpecs: new Map([...rootInv.versionSpecs, ...localInv.versionSpecs]),
+    };
+}
+
+/**
  * Load and cache fine-grained inventory of project dependencies across production
  * and development scopes, alongside internal compiler path aliases.
  *
@@ -331,6 +459,7 @@ export function loadProjectManifestInventory(rootDir: string): ProjectManifestIn
         devDependencies: new Set<string>(),
         peerDependencies: new Set<string>(),
         pathAliases: new Set<string>(),
+        versionSpecs: new Map<string, string>(),
     };
 
     const pkgJson = path.join(absRoot, 'package.json');

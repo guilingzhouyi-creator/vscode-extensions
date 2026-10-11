@@ -188,5 +188,16 @@
     "typescript-eslint": "^8.70.0",
     "vite": "^8.3.1",
     "vitest": "^5.0.1"
+  },
+  "governance": {
+    "complexity": {
+      "maxFunctionComplexity": 15,
+      "maxNestingDepth": 4,
+      "lowBlastRadiusBonus": true,
+      "lowBlastRadiusMaxComplexity": 20,
+      "lowBlastRadiusMaxDepth": 3,
+      "flatDispatcherBonus": true,
+      "flatDispatcherMaxComplexity": 25
+    }
   }
 }

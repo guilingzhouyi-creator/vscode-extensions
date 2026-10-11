@@ -1,9 +1,9 @@
 /**
- * Module: Core Engine — Project In-House Autonomy Scorer (CAI)
+ * Module: Core Engine — Project In-House Autonomy Scorer (CAI 2.0)
  * File Path: src/core/scoring/autonomy-scorer.ts
- * Architecture Role: Evaluates self-development ratio (In-House Autonomy Index) across four
+ * Architecture Role: Evaluates self-development ratio (In-House Autonomy Index) across six
  *   orthogonal dimensions: effective LOC autonomy, symbol call graph autonomy, domain kernel
- *   density, and code originality.
+ *   density, code originality, supply chain resilience, and critical path autonomy.
  * Dependencies & Triggers: Consumes dependency-provenance, file-role-inference, zone-partitioner,
  *   and ScanConfig; invoked by reportBuilder to embed autonomy insights into ScanReport.
  * Responsibilities:
@@ -11,9 +11,14 @@
  *   2. Quantify internal module calls vs external third-party SDK calls;
  *   3. Quantify core algorithm/domain kernel density against glue layers;
  *   4. Quantify code originality by auditing cloned/borrowed token blocks;
- *   5. Produce composite autonomy index (0~100%), qualitative tier (L1~L5), and SDK inventory.
+ *   5. Quantify supply chain dependency depth and lockfile resilience;
+ *   6. Quantify mission-critical security and dispatch path in-house ratio;
+ *   7. Compute Jeffreys conjugate Beta(0.5, 0.5) Bayesian credible interval and confidence;
+ *   8. Produce composite autonomy index (0~100%), qualitative tier (L1~L5), and SDK inventory.
  * Exit Semantics & Design Rationale: Never throws; deterministic mathematical evaluation with
  *   defensive division-by-zero guards and graceful handling for minimal single-file libraries.
+ *   Degradation adaptivity: When symbolIndex is absent, rCall gracefully degrades according to
+ *   file-level external SDK import presence instead of falsely defaulting to 100%.
  */
 
 import * as fs from 'fs';
@@ -22,6 +27,7 @@ import type { FileMetric, Issue, ScanConfig } from '../types';
 import {
     classifyFileProvenance,
     classifyImportProvenance,
+    findNearestManifestInventory,
     loadProjectManifestDependencies,
     loadProjectSupplyChainProfile,
     type SupplyChainProfile,
@@ -661,7 +667,15 @@ function synthesizeAutonomyEvaluation(
     const rLoc = totalTreeEloc > 0 ? (state.proprietaryEffectiveLoc / totalTreeEloc) * 100 : 100;
 
     const totalScopedCalls = state.internalSymbolCalls + state.externalSdkCalls;
-    const rCall = totalScopedCalls > 0 ? (state.internalSymbolCalls / totalScopedCalls) * 100 : 100;
+    let rCall: number;
+    if (totalScopedCalls > 0) {
+        rCall = (state.internalSymbolCalls / totalScopedCalls) * 100;
+    } else if (state.sdkCallCounts.size > 0 || state.externalSdkCalls > 0) {
+        const externalPkgs = Math.max(1, state.sdkCallCounts.size);
+        rCall = Math.max(10, 100 - externalPkgs * 15);
+    } else {
+        rCall = 100;
+    }
 
     const rDomain =
         state.proprietaryEffectiveLoc > 0
@@ -989,11 +1003,15 @@ export function evaluateProjectAutonomy(
         const profile = raw ? extractFileImportProfile(raw, metric.file) : emptyProfile;
         fileToImportProfiles.set(metric.file, profile);
 
-        const extPkgs = collectExtPackages(profile.specifiers, metric.file, manifestDeps);
+        const fileInv = findNearestManifestInventory(metric.file, rootDir);
+        const effectiveDeps =
+            fileInv.allDependencies.size > 0 ? fileInv.allDependencies : manifestDeps;
+
+        const extPkgs = collectExtPackages(profile.specifiers, metric.file, effectiveDeps);
         if (extPkgs) {
             fileToExtPackages.set(metric.file, extPkgs);
         }
-        accumulateFileMetric(metric, config, manifestDeps, state, fileContents, raw);
+        accumulateFileMetric(metric, config, effectiveDeps, state, fileContents, raw);
     }
 
     if (symbolIndex) {

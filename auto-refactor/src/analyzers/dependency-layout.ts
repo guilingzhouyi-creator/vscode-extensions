@@ -8,7 +8,8 @@
  * Responsibilities: Enforce canonical layout order (DEP-ORD-001); audit in-function imports
  *   (DEP-LAZ-001); flag unmanaged hardcoded external URLs (DEP-RES-001); detect wildcard
  *   imports (DEP-WLD-001); flag inverted dependency references (DEP-INV-001); detect dev-only
- *   dependency leakage in production code (DEP-DEV-001) and deprecated libraries (DEP-OBS-001).
+ *   dependency leakage in production code (DEP-DEV-001), deprecated libraries (DEP-OBS-001),
+ *   and unpinned/wildcard dependency versions (DEP-PIN-001).
  * Exit Semantics & Design Rationale: Stateless and synchronous per file; returns Issue[] and
  *   never throws.
  */
@@ -26,6 +27,7 @@ import {
     extractExemptionReason,
 } from '../core/intelligence/dependencyLayout';
 import {
+    findNearestManifestInventory,
     loadProjectManifestDependencies,
     loadProjectManifestInventory,
 } from '../core/intelligence/dependency-provenance';
@@ -83,12 +85,14 @@ export class DependencyLayoutAnalyzer implements Analyzer {
 
         const isExcluded = isExcludedFile(normPath);
         const rootDir = ctx.config?.root || process.cwd();
-        const manifestDeps = isExcluded
-            ? undefined
-            : options.manifestDependencies || loadProjectManifestDependencies(rootDir);
         const manifestInventory = isExcluded
             ? undefined
-            : options.manifestInventory || loadProjectManifestInventory(rootDir);
+            : options.manifestInventory || findNearestManifestInventory(ctx.filePath, rootDir);
+        const manifestDeps = isExcluded
+            ? undefined
+            : options.manifestDependencies ||
+              manifestInventory?.allDependencies ||
+              loadProjectManifestDependencies(rootDir);
         const enrichedOptions: DependencyLayoutOptions = {
             ...options,
             rootDir: isExcluded ? undefined : options.rootDir || rootDir,
@@ -97,6 +101,7 @@ export class DependencyLayoutAnalyzer implements Analyzer {
             flagLicenseCompliance: isExcluded ? false : options.flagLicenseCompliance,
             flagDevOnlyDependencies: isExcluded ? false : options.flagDevOnlyDependencies,
             flagDeprecatedDependencies: isExcluded ? false : options.flagDeprecatedDependencies,
+            flagUnpinnedDependencies: isExcluded ? false : options.flagUnpinnedDependencies,
         };
 
         return analyzeDependencyLayout(imports, resources, language, enrichedOptions);

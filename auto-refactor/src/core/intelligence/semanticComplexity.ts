@@ -21,7 +21,10 @@ export { MAX_COMPLEXITY_TRACE_DEPTH } from './crossFunctionComplexity';
  */
 const MAX_SCORE_CAP = 80;
 
+import * as fs from 'fs';
+import * as path from 'path';
 import type { CallGraph } from './callGraph';
+import type { SymbolIndex, SymbolDefinition } from './symbolIndex';
 import type { Issue, SemanticEvidenceStep, SemanticReviewDetail } from '../types';
 
 /** Threshold of call depth when tracing polynomial cross-function complexity. */
@@ -138,6 +141,235 @@ function recordUnboundedCycleIssue(
             requiresRuntime: false,
         },
     });
+}
+
+/**
+ * Known parameter names that serve as explicit recursion depth or traversal bounds.
+ */
+const GUARD_PARAM_NAMES = new Set<string>([
+    'depth',
+    'maxdepth',
+    'currentdepth',
+    'curdepth',
+    'limit',
+    'maxlimit',
+    'recursionlimit',
+    'level',
+    'maxlevel',
+    'currentlevel',
+    'curlevel',
+    'depthlimit',
+]);
+
+/**
+ * Checks whether an identifier or declaration represents a recursion depth or iteration guard.
+ *
+ * @param param - Parameter declaration or identifier text.
+ * @returns True when the parameter represents a depth, limit, or level bound.
+ */
+export function isGuardParameter(param: string): boolean {
+    const raw = param
+        .trim()
+        .replace(/^(?:public|private|protected|readonly|mut|var|let)\s+/, '')
+        .split(/[:=\s]/)[0]
+        .replace(/^[*&]+/, '')
+        .trim();
+    const clean = raw.toLowerCase().replace(/_/g, '');
+    if (!clean) return false;
+    if (GUARD_PARAM_NAMES.has(clean)) return true;
+    return (
+        (/^depth/.test(clean) && !/^delimiter/.test(clean)) ||
+        /^maxdepth/.test(clean) ||
+        /depth$/.test(clean) ||
+        /limit$/.test(clean) ||
+        /level$/.test(clean)
+    );
+}
+
+/**
+ * Attempts to read file lines safely from disk or in-memory cache.
+ */
+function tryReadSourceLines(file: string, cache: Map<string, string[]>): string[] | null {
+    if (cache.has(file)) return cache.get(file)!;
+    try {
+        const fullPath = path.isAbsolute(file) ? file : path.resolve(process.cwd(), file);
+        if (fs.existsSync(fullPath)) {
+            const content = fs.readFileSync(fullPath, 'utf8');
+            const lines = content.split('\n');
+            cache.set(file, lines);
+            return lines;
+        }
+    } catch {
+        /* Best-effort: unreadable or non-existent file is ignored and falls back to null */
+    }
+    return null;
+}
+
+/**
+ * Extracts the parameter signature enclosed in outer parentheses starting from a line.
+ */
+function extractParamSignature(lines: string[], startLineIdx: number): string | null {
+    let text = '';
+    const end = Math.min(lines.length, startLineIdx + 15);
+    for (let i = startLineIdx; i < end; i++) {
+        text += ' ' + lines[i];
+    }
+    const openIdx = text.indexOf('(');
+    if (openIdx === -1) return null;
+    let depth = 0;
+    let closeIdx = -1;
+    for (let i = openIdx; i < text.length; i++) {
+        const ch = text[i];
+        if (ch === '(') {
+            depth++;
+        } else if (ch === ')') {
+            depth--;
+            if (depth === 0) {
+                closeIdx = i;
+                break;
+            }
+        }
+    }
+    if (closeIdx === -1 || closeIdx <= openIdx + 1) return null;
+    return text.slice(openIdx + 1, closeIdx);
+}
+
+interface ParameterNestingState {
+    paren: number;
+    bracket: number;
+    angle: number;
+}
+
+function updateParameterNesting(ch: string, state: ParameterNestingState): boolean {
+    switch (ch) {
+        case '(': state.paren++; return true;
+        case ')': state.paren = Math.max(0, state.paren - 1); return true;
+        case '[':
+        case '{': state.bracket++; return true;
+        case ']':
+        case '}': state.bracket = Math.max(0, state.bracket - 1); return true;
+        case '<': state.angle++; return true;
+        case '>': state.angle = Math.max(0, state.angle - 1); return true;
+        default: return false;
+    }
+}
+
+/**
+ * Splits parameter list by top-level commas respecting nested brackets and generics.
+ */
+function splitParameters(paramStr: string): string[] {
+    const params: string[] = [];
+    let current = '';
+    const state: ParameterNestingState = { paren: 0, bracket: 0, angle: 0 };
+    for (let i = 0; i < paramStr.length; i++) {
+        const ch = paramStr[i];
+        if (updateParameterNesting(ch, state)) {
+            current += ch;
+            continue;
+        }
+        if (ch === ',' && state.paren === 0 && state.bracket === 0 && state.angle === 0) {
+            const trimmed = current.trim();
+            if (trimmed) params.push(trimmed);
+            current = '';
+            continue;
+        }
+        current += ch;
+    }
+    const tail = current.trim();
+    if (tail) params.push(tail);
+    return params;
+}
+
+/**
+ * Resolves the parameter list for a single symbol definition.
+ */
+function resolveDefinitionParameters(
+    def: SymbolDefinition | Record<string, any>,
+    cache: Map<string, string[]>,
+): string[] {
+    const anyDef = def as Record<string, any>;
+    if (Array.isArray(anyDef.parameters)) return anyDef.parameters;
+    if (Array.isArray(anyDef.params)) return anyDef.params;
+    if (Array.isArray(anyDef.paramNames)) return anyDef.paramNames;
+    if (typeof anyDef.signature === 'string') {
+        return splitParameters(anyDef.signature);
+    }
+    if (typeof def.file === 'string' && typeof def.line === 'number' && def.line > 0) {
+        const lines = tryReadSourceLines(def.file, cache);
+        if (lines && def.line <= lines.length) {
+            const sig = extractParamSignature(lines, def.line - 1);
+            if (sig) return splitParameters(sig);
+        }
+    }
+    return [];
+}
+
+/**
+ * Collects distinct symbol names from call graph and symbol index.
+ */
+function collectCandidateSymbols(callGraph?: CallGraph, symbolIndex?: SymbolIndex): Set<string> {
+    const candidates = new Set<string>();
+    if (callGraph && typeof callGraph.callerNames === 'function') {
+        for (const name of callGraph.callerNames()) candidates.add(name);
+    }
+    if (callGraph && typeof (callGraph as any).edges === 'function') {
+        for (const edge of (callGraph as any).edges()) {
+            if (edge.caller) candidates.add(edge.caller);
+            if (edge.callee) candidates.add(edge.callee);
+        }
+    }
+    if (symbolIndex && typeof symbolIndex.names === 'function') {
+        for (const name of symbolIndex.names()) candidates.add(name);
+    }
+    return candidates;
+}
+
+/**
+ * Extract recursive symbols that carry explicit termination guards (depth/maxDepth/limit/level).
+ *
+ * Inspects symbol parameter lists across definitions and the call graph, whitelisting
+ * functions with termination depth limits to suppress false positive CPX-REC-001 findings.
+ *
+ * @param symbolIndex - Repository cross-file symbol index.
+ * @param callGraph - Cross-file call graph.
+ * @returns Set of guarded recursive symbol names.
+ */
+export function extractGuardedRecursiveSymbols(
+    symbolIndex: SymbolIndex,
+    callGraph: CallGraph,
+): Set<string> {
+    const guarded = new Set<string>();
+    const fileCache = new Map<string, string[]>();
+    const candidateSymbols = collectCandidateSymbols(callGraph, symbolIndex);
+
+    for (const sym of candidateSymbols) {
+        let params: string[] = [];
+        if (typeof (symbolIndex as any)?.getParameters === 'function') {
+            const custom = (symbolIndex as any).getParameters(sym);
+            if (Array.isArray(custom)) params = custom;
+        }
+
+        if (params.length === 0 && symbolIndex && typeof symbolIndex.resolve === 'function') {
+            const resolved = symbolIndex.resolve(sym);
+            const defs = resolved?.definitions || [];
+            for (let i = 0; i < defs.length; i++) {
+                const defParams = resolveDefinitionParameters(defs[i], fileCache);
+                if (defParams.length > 0) {
+                    params = defParams;
+                    break;
+                }
+            }
+        }
+
+        for (let i = 0; i < params.length; i++) {
+            if (isGuardParameter(params[i])) {
+                guarded.add(sym);
+                break;
+            }
+        }
+    }
+
+    return guarded;
 }
 
 /**

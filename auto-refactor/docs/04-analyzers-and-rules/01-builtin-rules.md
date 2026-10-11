@@ -308,6 +308,7 @@
 | `DEP-OBS-001` | <a id="dep-obs-001"></a>`dependency-layout` | `DEP` | `warning` | `all` | 废弃与缺乏维护的第三方库导入：使用了已被官方弃用、停止维护或已被语言/运行期标准库内置能力淘汰的过时依赖。 | 迁移至社区主流受维护的现代替代方案或标准运行期内置能力（如 fetch、crypto.randomUUID、URLSearchParams）。 |
 | `DEP-ORD-001` | <a id="dep-ord-001"></a>`dependency-layout` | `DEP` | `info` | `all` | 文件布局与导入分组不符合当前语言现代化工程规范。 | 调整导入顺序为 Stdlib -> ThirdParty -> InternalShared -> Local。 |
 | `DEP-PHANTOM-001` | <a id="dep-phantom-001"></a>`dependency-layout` | `DEP` | `warning` | `all` | 幽灵依赖：源码直接导入未在项目包清单（package.json、pyproject.toml、Cargo.toml）显式声明的外部依赖包。 | 将依赖项显式登记至项目包配置清单中，或改用工程内置实现与官方标准库等价模块。 |
+| `DEP-PIN-001` | <a id="dep-pin-001"></a>`dependency-layout` | `DEP` | `warning` | `all` | 浮动或未固定版本依赖：外部依赖包在配置清单（package.json、Cargo.toml、pyproject.toml）中使用通配符（*、latest、开放区间）声明版本。 | 在包清单中将依赖项锁定为具体确定版本或标准 semver-caret 区间（如 ^1.2.3），规避供应链漂移与投毒风险。 |
 | `DEP-RES-001` | <a id="dep-res-001"></a>`dependency-layout` | `DEP` | `warning` | `all` | 业务逻辑中散落硬编码的未纳管外部 URL、文件路径或连接串。 | 将外部资源地址统一抽取至配置文件或服务资源注册中心。 |
 | `DEP-VULN-001` | <a id="dep-vuln-001"></a>`dependency-layout` | `DEP` | `error` | `all` | 严重供应链安全漏洞与投毒包导入：直接导入供应链安全完整性注册表通报的恶意篡改或严重漏洞第三方包。 | 立即阻断并剔除受污染包依赖，升级至官方已校验修复安全版本或替换为受信同等功能组件。 |
 | `DEP-WLD-001` | <a id="dep-wld-001"></a>`dependency-layout` | `DEP` | `warning` | `all` | 使用通配符导入破坏显式依赖跟踪与树摇优化。 | 改用显式具名导入 (Named Imports)，明确模块依赖面。 |
@@ -382,7 +383,7 @@
 | `NAM-VAG-001` | <a id="nam-vag-001"></a>`naming` | `NAM` | `warning` | `all` | 严禁使用无业务语义的模糊泛化变量名（如 data、res、ret、tmp、item 等裸词）。 | 结合业务领域语义补齐前缀或后缀（如 `parseResult`、`tokenPayload`、`ruleEntry`）。 |
 | `NUM-PREC-001` | <a id="num-prec-001"></a>`governance` | `NUM` | `warning` | `typescript, javascript` | 数值截断精度失衡：数学计算路径中存在丢精度的四舍五入或比例失配风险。 | 使用标准 0.01 精度舍入（如 * 100 / 100）或显式容差界限以保留有效精度。 |
 | `PRF-ALG-001` | <a id="prf-alg-001"></a>`performance` | `PRF` | `warning` | `all` | 发现 $\ge 3$ 层循环嵌套 (潜在 $O(N^3)$ 多项式计算热点)。 | 将内层查找通过 Map/Set 哈希预索引降维为 $O(1)$。 |
-| `PRF-ALG-002` | <a id="prf-alg-002"></a>`performance` | `PRF` | `warning` | `all` | 循环内集合线性遍历反模式：在循环结构内部对外部集合进行线性检索（find/includes/has/in list 等），导致整体算法复杂度恶化至 O(N*M)。 | 在循环外预先将外部集合构建为 Map 或 Dictionary 哈希索引，将内层查找降至 O(1)，算法总体降至 O(N+M)。 |
+| `PRF-ALG-002` | <a id="prf-alg-002"></a>`performance` | `PRF` | `warning` | `all` | 循环内集合线性检索或数组首部操作反模式：在循环内部进行线性检索（find/includes/has 等）或反复执行首部变异（shift/unshift），导致整体算法复杂度恶化至 O(N*M) 或 O(N^2)。 | 在循环外预先将外部集合构建为 Map/Set 哈希索引，或使用游标索引/双端队列（Deque/RingBuffer）替代首部出入队，将内层开销降至 O(1)。 |
 | `PRF-IO-001` | <a id="prf-io-001"></a>`performance` | `PRF` | `warning` | `all` | 切换为异步非阻塞对应 API，避免锁死 Node.js 事件循环或游戏主线程。 | 事件循环同步阻塞风险：在 `async` 上下文或高频帧循环内调用同步阻塞 I/O (如 `readFileSync`, `time.sleep`)。`thresholds.blockingIoAllowPatterns` 声明的路径 glob（CLI/校验器/基准脚本等进程式工具）豁免；该键同时下发给治理规则 `GOV-PRF-004`，属单一策略源。 |
 | `PRF-LEAK-001` | <a id="prf-leak-001"></a>`performance` | `PRF` | `warning` | `all` | 检测循环或定时器内的集合无界追加，防范 O(t) 或 O(n) 内存泄漏。 | 为集合设置容量上限/LRU淘汰/定期重置，或避免在循环与定时器内无界追加。 |
 | `PRF-MEM-001` | <a id="prf-mem-001"></a>`performance` | `PRF` | `warning` | `all` | 将缓冲区/对象提升至循环外部复用，循环内仅清空重置。 | 高频热路径瞬态堆对象分配 (循环体内 `new Array`, `new Object`, `.duplicate(true)` 等)。 |

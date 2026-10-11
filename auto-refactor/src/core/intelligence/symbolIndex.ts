@@ -42,6 +42,8 @@ export interface SymbolDefinition {
     file: string;
     /** 1-based declaration line, or null when the adapter did not materialize a position. */
     line: number | null;
+    /** Parameter names for function or method declarations. */
+    parameters?: string[];
 }
 
 /** One call site referencing a name. */
@@ -128,7 +130,13 @@ function processSymbolFrame(
 
     const kind = DECLARATION_KIND_MAP.get(node.kind);
     if (kind) {
-        ctx.definitions.push({ name, kind, file: ctx.file, line: node.start?.line ?? null });
+        ctx.definitions.push({
+            name,
+            kind,
+            file: ctx.file,
+            line: node.start?.line ?? null,
+            parameters: node.parameters,
+        });
         pushChildFrames(node.children, name, ctx.stack);
         return;
     }

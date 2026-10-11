@@ -105,6 +105,13 @@ const PRF_ACTIONABLE_MAP: Record<
         safeToAutomate: false,
         templateSnippet: 'const PATTERN = /.../;\nfor (...) { PATTERN.test(...); }',
     },
+    'PRF-ALG-002': {
+        action: 'hoist_declaration',
+        code: 'AR:PRF:004',
+        safeToAutomate: false,
+        templateSnippet:
+            '// Pre-build index or use index cursor instead of linear lookup/shift\nconst indexMap = new Map();',
+    },
 };
 
 /**

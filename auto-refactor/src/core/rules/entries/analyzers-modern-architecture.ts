@@ -604,6 +604,19 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#dep-phantom-001',
     }),
     defineRule({
+        id: 'DEP-PIN-001',
+        family: RULE_FAMILY_DEPENDENCY,
+        analyzer: ANALYZER_DEPENDENCY_LAYOUT,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            'Unpinned or wildcard dependency version: external package declared with floating wildcard (*, latest, open range) in project manifest.',
+        remediation:
+            'Pin package version to an exact or semver-caret range (e.g. ^1.2.3) in project manifest.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#dep-pin-001',
+    }),
+    defineRule({
         id: 'DEP-RES-001',
         family: RULE_FAMILY_DEPENDENCY,
         analyzer: ANALYZER_DEPENDENCY_LAYOUT,

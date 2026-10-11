@@ -201,4 +201,43 @@ describe('DependencyLayoutAnalyzer — Supply Chain & Layout Rules', () => {
         expect(distutilsIssue).toBeDefined();
         expect(impIssue).toBeDefined();
     });
+
+    it('emits DEP-PIN-001 when importing a package declared with wildcard or unpinned version', () => {
+        const code = `import express from 'express';\nexport { express };`;
+        const sf = ts.createSourceFile('src/server.ts', code, ts.ScriptTarget.Latest, true);
+        const inventory: ProjectManifestInventory = {
+            allDependencies: new Set(['express']),
+            prodDependencies: new Set(['express']),
+            devDependencies: new Set(),
+            peerDependencies: new Set(),
+            pathAliases: new Set(),
+            versionSpecs: new Map([['express', '*']]),
+        };
+        const ctx = createMockContext(code, 'src/server.ts', inventory.allDependencies, inventory);
+
+        const issues = analyzer.analyze(sf, ctx);
+        const pin = issues.find((i) => i.rule === 'DEP-PIN-001');
+        expect(pin).toBeDefined();
+        expect(pin?.severity).toBe('warning');
+        expect(pin?.message).toContain("Unpinned dependency version: 'express' uses '*'");
+        expect(pin?.suggestion).toContain('exact or semver-caret range');
+    });
+
+    it('does NOT emit DEP-PIN-001 when package is declared with concrete semver range (^1.2.3)', () => {
+        const code = `import express from 'express';\nexport { express };`;
+        const sf = ts.createSourceFile('src/server.ts', code, ts.ScriptTarget.Latest, true);
+        const inventory: ProjectManifestInventory = {
+            allDependencies: new Set(['express']),
+            prodDependencies: new Set(['express']),
+            devDependencies: new Set(),
+            peerDependencies: new Set(),
+            pathAliases: new Set(),
+            versionSpecs: new Map([['express', '^4.18.2']]),
+        };
+        const ctx = createMockContext(code, 'src/server.ts', inventory.allDependencies, inventory);
+
+        const issues = analyzer.analyze(sf, ctx);
+        const pin = issues.find((i) => i.rule === 'DEP-PIN-001');
+        expect(pin).toBeUndefined();
+    });
 });
