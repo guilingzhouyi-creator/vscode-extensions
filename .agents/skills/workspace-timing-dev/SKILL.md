@@ -144,3 +144,12 @@ npm run review
 # 4. 同步 Webview 静态资源
 npm run sync
 ```
+
+---
+
+## 八、 关联模板与参考指引
+
+- [crash-safety-ringbuffer-journal.md](references/crash-safety-ringbuffer-journal.md)：内存 RingBuffer + Journal 追加写崩溃安全体系分析；
+- [five-layer-architecture-and-i18n.md](references/five-layer-architecture-and-i18n.md)：五层架构解耦与双语/UI 视觉规范指南；
+- [i18n-dictionary-template.json](templates/i18n-dictionary-template.json)：标准双语国际化字典模板；
+- [time-aggregator-test-skeleton.ts](templates/time-aggregator-test-skeleton.ts)：跨自然日工时守恒确定性单测脚手架。

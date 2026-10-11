@@ -11,6 +11,12 @@ description: >-
 
 本技能规范了 `WebGames/` 项目中业务逻辑无头解耦、配置驱动同构化、前端可视化快照单向注入、强类型 Tabs 视图控制器、对象池零堆分配以及原生 Python 极速静态提取规范。
 
+> [!IMPORTANT]
+> **【项目技术栈本质与非 Web 游戏刚性红线】**：
+> 本项目物理目录虽命名为 `WebGames/`（历史命名），但**绝对不是基于浏览器的 Web 游戏、网页游戏或 HTML5 游戏**！
+> 其真实物理本质为**基于 Godot 4.7 引擎的卡拉尔世界纯逻辑解耦与配置驱动系统**，使用 **GDScript** 编写，面向桌面与无头独立架构。
+> **严禁引入任何 DOM、HTML、CSS、Web API、浏览器运行环境或 JavaScript/TypeScript Web 前端技术栈！**
+
 ---
 
 ## 一、 适用场景与触发条件
@@ -126,4 +132,6 @@ pwsh -File WebGames/scripts/ps1/audit-all.ps1
 
 - [four-stage-blueprint-template/](templates/four-stage-blueprint-template/README.md)：四阶段技术规范蓝图模板套件（含阶段 1~4 模板）；
 - [test_case_skeleton.gd](templates/test_case_skeleton.gd)：单元测试标准脚手架；
+- [tab_view_controller_skeleton.gd](templates/tab_view_controller_skeleton.gd)：强类型 Tabs 视图控制器标准样板；
+- [godot-architecture-non-web.md](references/godot-architecture-non-web.md)：Godot 4.7 引擎纯逻辑架构与非 Web 游戏技术栈规范指南；
 - [object-pooling-adv-prf-002.md](references/object-pooling-adv-prf-002.md)：对象池零瞬态分配深度指引。

@@ -27,12 +27,14 @@
     "Rust 原生算子内核与 pure-TS shim 必须保持 100% 字节等价",
     "循环体内严禁动态编译 RegExp 或瞬态堆分配 (CPX-SPACE-001)",
     "门面层必须满足 ELOC >= 15 或 Object.freeze 不可变保障，零空包跳板 (ARCH-ABS-001 / ARCH-FAC-001)",
-    "单分析器扣分遵循 MAX_AXES_PER_FINDING <= 4，并受 validate-project-neutrality.js 项目中立性守卫管束"
+    "单分析器扣分遵循 MAX_AXES_PER_FINDING <= 4，并受 validate-project-neutrality.js 项目中立性守卫管束",
+    "时间戳强制携带 *Ms 物理量纲，质量轨迹紧凑账本遵循 compactStagingPath 暂存与原子落盘",
+    "单文件有效代码行严格受限 ELOC <= 900 / LOC <= 1400 与 1:3 动态包络，杜绝单体巨文件"
   ],
   "localVerification": [
-    "npm run build",
-    "node scripts/validate-facade-governance.js",
-    "node scripts/gate-self.js",
-    "npm test"
+    "cd auto-refactor && npm run build",
+    "cd auto-refactor && node scripts/validate-facade-governance.js",
+    "cd auto-refactor && node scripts/gate-self.js",
+    "cd auto-refactor && npm test"
   ]
 }

@@ -1,3 +1,11 @@
+/**
+ * Module: Static Analyzers — Custom Analyzer Boilerplate
+ * File Path: src/analyzers/example-custom.ts
+ * Architecture Role: Custom static analysis AST visitor and finding emitter
+ * Dependencies: types, NormalizedNode
+ * Responsibilities: Traverse AST to identify anti-patterns and emit structured findings
+ * Exit Semantics & Design Rationale: Pure AST analysis, zero heap allocation in tight loops
+ */
 import { Analyzer, Finding, Severity } from '../types';
 import { NormalizedNode } from '../ast/normalized-node';
 
@@ -7,7 +15,7 @@ export class ExampleCustomAnalyzer implements Analyzer {
     analyze(file: string, ast: NormalizedNode, rawLines: string[]): Finding[] {
         const findings: Finding[] = [];
 
-        // 遍历统一语法树节点并匹配目标特征
+        // 遍历统一语法树节点并匹配目标特征 (单函数圈复杂度 CC <= 15)
         ast.walk((node) => {
             if (node.kind === 'FunctionDeclaration' && node.text.includes('deprecatedOp')) {
                 findings.push({

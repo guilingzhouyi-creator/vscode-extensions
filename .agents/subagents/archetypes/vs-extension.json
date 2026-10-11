@@ -17,19 +17,25 @@
     "doubt-driven-development",
     "context-engineering",
     "constraint-driven-development",
+    "facade-discipline",
     "complexity-budget",
     "product-release-docs",
+    "release-package-workflow",
     "test-benchmark-engineering"
   ],
   "rigidAxioms": [
     "严格遵守五层架构单向依赖：presentation -> application -> domain -> persistence -> integration",
     "UI 文本 100% 接入双语字典 (zh-CN/en)，严禁在 TS/Webview 中硬编码未翻译文案与内部黑话",
     "时间统计核心必须保持 RingBuffer 与日志追加崩溃安全，跨午夜/休眠单测必须注入 withFixedNow 固定时钟 Mock",
-    "tsconfig.json 保持 declaration: false 极速构建"
+    "生产环境严格使用 stagingUri、segmentedSessions 与 [DELTA] 标准命名，严禁模糊临时命名",
+    "tsconfig.json 保持 declaration: false 极速构建",
+    "49 条审查规则单一真源登记于 scripts/config/review-rules.json，严禁发射未登记规则代号",
+    "README 与 CHANGELOG 严格面向真实用户，物理隔离工程重构与门禁内部黑话",
+    "单文件有效代码行严格受限 ELOC <= 900 / LOC <= 1400 与 1:3 动态包络，杜绝单体巨文件"
   ],
   "localVerification": [
-    "npm run compile",
-    "npm run test:fast",
-    "npm run review"
+    "cd workspace-timing && npm run compile",
+    "cd workspace-timing && npm run test:fast",
+    "cd workspace-timing && npm run review"
   ]
 }

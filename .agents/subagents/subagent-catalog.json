@@ -21,28 +21,28 @@
     "wt-construct": {
       "archetype": "vs-extension",
       "posture": "construct",
-      "description": "workspace-timing 业务特性开发与功能增量编写专员",
+      "description": "workspace-timing (VS Code 扩展) 业务特性开发与功能增量编写专员",
       "model": "inherit",
       "workspaceMode": "inherit"
     },
     "wt-review": {
       "archetype": "vs-extension",
       "posture": "review",
-      "description": "workspace-timing 扩展静态审查、分层边界与硬编码分析专员",
+      "description": "workspace-timing (VS Code 扩展) 静态审查、分层边界与硬编码分析专员",
       "model": "inherit",
       "workspaceMode": "inherit"
     },
     "wt-refactor": {
       "archetype": "vs-extension",
       "posture": "refactor",
-      "description": "workspace-timing 结构消融、复杂度平铺与性能加固专员",
+      "description": "workspace-timing (VS Code 扩展) 结构消融、复杂度平铺与性能加固专员",
       "model": "inherit",
       "workspaceMode": "inherit"
     },
     "wt-explore": {
       "archetype": "vs-extension",
       "posture": "explore",
-      "description": "workspace-timing 扩展上下文、五层解耦与设计方案探索调查专员",
+      "description": "workspace-timing (VS Code 扩展) 扩展上下文、五层解耦与设计方案探索调查专员",
       "model": "inherit",
       "workspaceMode": "inherit"
     },
@@ -77,28 +77,28 @@
     "wg-construct": {
       "archetype": "game-engine",
       "posture": "construct",
-      "description": "WebGames 游戏系统设计、四阶段方案落地与 GDScript 增量编码专员",
+      "description": "WebGames (Godot 4.7/非Web游戏) 游戏系统设计、四阶段方案落地与 GDScript 增量编码专员",
       "model": "inherit",
       "workspaceMode": "inherit"
     },
     "wg-review": {
       "archetype": "game-engine",
       "posture": "review",
-      "description": "WebGames 游戏逻辑静态分析、GameConfig 单源与表现层架构审查专员",
+      "description": "WebGames (Godot 4.7/非Web游戏) 游戏逻辑静态分析、GameConfig 单源与表现层架构审查专员",
       "model": "inherit",
       "workspaceMode": "inherit"
     },
     "wg-refactor": {
       "archetype": "game-engine",
       "posture": "refactor",
-      "description": "WebGames 循环瞬态分配消除 (ADV-PRF-002)、超大脚本解耦与视图透传消融专员",
+      "description": "WebGames (Godot 4.7/非Web游戏) 循环瞬态分配消除 (ADV-PRF-002)、超大脚本解耦与视图透传消融专员",
       "model": "inherit",
       "workspaceMode": "inherit"
     },
     "wg-explore": {
       "archetype": "game-engine",
       "posture": "explore",
-      "description": "WebGames 游戏模块、配置图谱与四阶段设计探索调查专员",
+      "description": "WebGames (Godot 4.7/非Web游戏) 游戏模块、配置图谱与四阶段设计探索调查专员",
       "model": "inherit",
       "workspaceMode": "inherit"
     },

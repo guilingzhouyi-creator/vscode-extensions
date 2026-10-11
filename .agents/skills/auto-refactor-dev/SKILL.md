@@ -378,3 +378,13 @@ npm run benchmark
 - **零循环内线性查找**：在循环或频繁触发的热点逻辑中，严禁反复执行 `Array.includes()`、`indexOf()` 或多次简单正则匹配（导致 $O(N \times M)$ 退化）；
 - **标准范式**：必须在循环外通过 `new Set(...)` 预构建快速索引容器并使用 `Set.has()`；多关键词匹配统一使用预编译的单趟复合正则或 ASCII 字符码游标扫描。
 
+---
+
+## 十五、 关联模板与参考指引
+
+- [rust-ts-equivalence-protocol.md](references/rust-ts-equivalence-protocol.md)：Rust 原生算子与纯 TS Shim 100% 字节等价性契约规范；
+- [praxis-client-and-diff-topology.md](references/praxis-client-and-diff-topology.md)：Praxis 客户端 SDK 与一体两面三层拓扑 Diff 规范指南；
+- [concurrency-memory-paradigms.md](references/concurrency-memory-paradigms.md)：高并发调度、图算法降阶与 9 项内存治理工程范式；
+- [analyzer-boilerplate.ts](templates/analyzer-boilerplate.ts)：自定义静态分析器标准化样板；
+- [validate-suite-boilerplate.js](templates/validate-suite-boilerplate.js)：规则专项回归测试套件脚手架。
+
