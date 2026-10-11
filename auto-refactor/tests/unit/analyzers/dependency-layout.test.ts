@@ -9,8 +9,14 @@ import { describe, it, expect } from 'vitest';
 import * as ts from 'typescript';
 import { DependencyLayoutAnalyzer } from '../../../src/analyzers/dependency-layout';
 import type { AnalyzerContext, ScanConfig } from '../../../src/core/types';
+import type { ProjectManifestInventory } from '../../../src/core/intelligence/dependency-provenance';
 
-function createMockContext(content: string, filePath: string, manifestDeps?: Set<string>): AnalyzerContext {
+function createMockContext(
+    content: string,
+    filePath: string,
+    manifestDeps?: Set<string>,
+    manifestInventory?: ProjectManifestInventory,
+): AnalyzerContext {
     const config: Partial<ScanConfig> = {
         root: '/fake-project',
         analyzers: {
@@ -18,6 +24,7 @@ function createMockContext(content: string, filePath: string, manifestDeps?: Set
                 enabled: true,
                 options: {
                     manifestDependencies: manifestDeps,
+                    manifestInventory,
                 },
             },
         } as any,
@@ -108,5 +115,90 @@ describe('DependencyLayoutAnalyzer — Supply Chain & Layout Rules', () => {
         const issues = analyzer.analyze(sf, ctx);
         const wildcard = issues.find((i) => i.rule === 'DEP-WLD-001');
         expect(wildcard).toBeDefined();
+    });
+
+    it('emits DEP-DEV-001 when devDependency is imported in production code without import type', () => {
+        const code = `import { describe } from 'vitest';\nexport function testRun() { describe('demo', () => {}); }`;
+        const sf = ts.createSourceFile('src/core/runner.ts', code, ts.ScriptTarget.Latest, true);
+        const inventory: ProjectManifestInventory = {
+            allDependencies: new Set(['vitest']),
+            prodDependencies: new Set(),
+            devDependencies: new Set(['vitest']),
+            peerDependencies: new Set(),
+            pathAliases: new Map(),
+        };
+        const ctx = createMockContext(code, 'src/core/runner.ts', inventory.allDependencies, inventory);
+
+        const issues = analyzer.analyze(sf, ctx);
+        const devLeak = issues.find((i) => i.rule === 'DEP-DEV-001');
+        expect(devLeak).toBeDefined();
+        expect(devLeak?.severity).toBe('warning');
+        expect(devLeak?.message).toContain('vitest');
+        expect(devLeak?.suggestion).toContain('dependencies');
+    });
+
+    it('does NOT emit DEP-DEV-001 when devDependency is imported via import type in production code', () => {
+        const code = `import type { Suite } from 'vitest';\nexport type MySuite = Suite;`;
+        const sf = ts.createSourceFile('src/core/types.ts', code, ts.ScriptTarget.Latest, true);
+        const inventory: ProjectManifestInventory = {
+            allDependencies: new Set(['vitest']),
+            prodDependencies: new Set(),
+            devDependencies: new Set(['vitest']),
+            peerDependencies: new Set(),
+            pathAliases: new Map(),
+        };
+        const ctx = createMockContext(code, 'src/core/types.ts', inventory.allDependencies, inventory);
+
+        const issues = analyzer.analyze(sf, ctx);
+        const devLeak = issues.find((i) => i.rule === 'DEP-DEV-001');
+        expect(devLeak).toBeUndefined();
+    });
+
+    it('does NOT emit DEP-DEV-001 when devDependency is imported in test or script files', () => {
+        const code = `import { describe } from 'vitest';\ndescribe('test', () => {});`;
+        const sf = ts.createSourceFile('tests/unit/runner.test.ts', code, ts.ScriptTarget.Latest, true);
+        const inventory: ProjectManifestInventory = {
+            allDependencies: new Set(['vitest']),
+            prodDependencies: new Set(),
+            devDependencies: new Set(['vitest']),
+            peerDependencies: new Set(),
+            pathAliases: new Map(),
+        };
+        const ctx = createMockContext(code, 'tests/unit/runner.test.ts', inventory.allDependencies, inventory);
+
+        const issues = analyzer.analyze(sf, ctx);
+        const devLeak = issues.find((i) => i.rule === 'DEP-DEV-001');
+        expect(devLeak).toBeUndefined();
+    });
+
+    it('emits DEP-OBS-001 when importing a deprecated library with migration suggestion', () => {
+        const code = `import request from 'request';\nexport function fetchUrl(url: string) { return request(url); }`;
+        const sf = ts.createSourceFile('src/net/fetcher.ts', code, ts.ScriptTarget.Latest, true);
+        const inventory: ProjectManifestInventory = {
+            allDependencies: new Set(['request']),
+            prodDependencies: new Set(['request']),
+            devDependencies: new Set(),
+            peerDependencies: new Set(),
+            pathAliases: new Map(),
+        };
+        const ctx = createMockContext(code, 'src/net/fetcher.ts', inventory.allDependencies, inventory);
+
+        const issues = analyzer.analyze(sf, ctx);
+        const obs = issues.find((i) => i.rule === 'DEP-OBS-001');
+        expect(obs).toBeDefined();
+        expect(obs?.severity).toBe('warning');
+        expect(obs?.message).toContain('request');
+        expect(obs?.suggestion).toContain('fetch');
+    });
+
+    it('emits DEP-OBS-001 when importing deprecated moment or querystring in line-based mode', () => {
+        const pyCode = `import distutils.core\nfrom imp import load_source`;
+        const pyCtx = createMockContext(pyCode, 'src/legacy.py');
+
+        const pyIssues = analyzer.analyze(null as any, pyCtx);
+        const distutilsIssue = pyIssues.find((i) => i.rule === 'DEP-OBS-001' && i.message.includes('distutils'));
+        const impIssue = pyIssues.find((i) => i.rule === 'DEP-OBS-001' && i.message.includes('imp'));
+        expect(distutilsIssue).toBeDefined();
+        expect(impIssue).toBeDefined();
     });
 });

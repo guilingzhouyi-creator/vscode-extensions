@@ -1,9 +1,9 @@
 {
   "schema": "workspace-rule-catalog/v1",
-  "generatedAt": "2026-10-11T04:25:14.488Z",
-  "totalRules": 417,
+  "generatedAt": "2026-10-11T05:49:57.791Z",
+  "totalRules": 419,
   "counts": {
-    "autoRefactor": 332,
+    "autoRefactor": 334,
     "workspaceTiming": 49,
     "webGames": 53,
     "globalTooling": 7
@@ -724,6 +724,13 @@
       "summary": "Repeated serialization and deserialization cycles across internal call chains."
     },
     {
+      "id": "DEP-DEV-001",
+      "project": "auto-refactor",
+      "family": "DEP",
+      "severity": "warning",
+      "summary": "Development-only dependency imported in production code: devDependencies package imported without type-only qualifier."
+    },
+    {
       "id": "DEP-INV-001",
       "project": "auto-refactor",
       "family": "DEP",
@@ -743,6 +750,13 @@
       "family": "DEP",
       "severity": "warning",
       "summary": "High-risk restrictive or viral copyleft license (AGPL/GPL) dependency introduced in proprietary/commercial domain."
+    },
+    {
+      "id": "DEP-OBS-001",
+      "project": "auto-refactor",
+      "family": "DEP",
+      "severity": "warning",
+      "summary": "Deprecated or unmaintained package imported: third-party library is officially unmaintained or superseded by standard capabilities."
     },
     {
       "id": "DEP-ORD-001",

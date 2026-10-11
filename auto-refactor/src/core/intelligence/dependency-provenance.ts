@@ -73,7 +73,12 @@ export const NODE_CORE_MODULES: ReadonlySet<string> = new Set([
 ]);
 
 /** Rust standard and core library roots */
-export const RUST_CORE_CRATES: ReadonlySet<string> = new Set(['std', 'core', 'alloc', 'proc_macro']);
+export const RUST_CORE_CRATES: ReadonlySet<string> = new Set([
+    'std',
+    'core',
+    'alloc',
+    'proc_macro',
+]);
 
 /** Go standard library package root prefixes */
 export const GO_CORE_PACKAGES: ReadonlySet<string> = new Set([
@@ -132,20 +137,47 @@ const GENERATED_FILE_PATTERN =
 const TEST_FIXTURE_PATTERN =
     /(?:^|[\\/])(?:fixtures?|mocks?|testdata|samples?)[\\/]|[\\/][a-z0-9_.-]+(?:\.mock|\.fixture)\.[a-z0-9]+$/i;
 
-/** Manifest dependencies cache keyed by absolute root directory path */
-const MANIFEST_CACHE = new Map<string, Set<string>>();
+/** Fine-grained inventory of declared project dependencies and path aliases */
+export interface ProjectManifestInventory {
+    /** Union of all declared dependencies across production and development */
+    allDependencies: Set<string>;
+    /** Production runtime dependencies declared in dependencies */
+    prodDependencies: Set<string>;
+    /** Development-only dependencies declared in devDependencies */
+    devDependencies: Set<string>;
+    /** Peer dependencies declared in peerDependencies */
+    peerDependencies: Set<string>;
+    /** Internal path aliases discovered from tsconfig/jsconfig paths */
+    pathAliases: Set<string>;
+}
+
+/** Manifest inventory cache keyed by absolute root directory path */
+const INVENTORY_CACHE = new Map<string, ProjectManifestInventory>();
 
 /**
- * Extract external package dependencies declared in package.json.
+ * Extract external package dependencies declared in package.json with fine-grained scopes.
  */
-function parsePackageJson(manifestPath: string, target: Set<string>): void {
+function parsePackageJson(manifestPath: string, inventory: ProjectManifestInventory): void {
     try {
         const raw = fs.readFileSync(manifestPath, 'utf8');
         const json = JSON.parse(raw);
-        for (const dep of Object.keys(json.dependencies || {})) target.add(dep);
-        for (const dep of Object.keys(json.devDependencies || {})) target.add(dep);
-        for (const dep of Object.keys(json.peerDependencies || {})) target.add(dep);
-        for (const dep of Object.keys(json.optionalDependencies || {})) target.add(dep);
+        for (const dep of Object.keys(json.dependencies || {})) {
+            inventory.prodDependencies.add(dep);
+            inventory.allDependencies.add(dep);
+        }
+        for (const dep of Object.keys(json.peerDependencies || {})) {
+            inventory.peerDependencies.add(dep);
+            inventory.prodDependencies.add(dep);
+            inventory.allDependencies.add(dep);
+        }
+        for (const dep of Object.keys(json.optionalDependencies || {})) {
+            inventory.prodDependencies.add(dep);
+            inventory.allDependencies.add(dep);
+        }
+        for (const dep of Object.keys(json.devDependencies || {})) {
+            inventory.devDependencies.add(dep);
+            inventory.allDependencies.add(dep);
+        }
     } catch {
         // best-effort fallback: ignored when manifest is corrupt or unreadable
     }
@@ -253,6 +285,97 @@ function parseGoMod(manifestPath: string, target: Set<string>): void {
     }
 }
 
+function extractAliasesFromFile(filePath: string, target: Set<string>): void {
+    if (!fs.existsSync(filePath)) return;
+    try {
+        const raw = fs.readFileSync(filePath, 'utf8');
+        const clean = raw.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '');
+        const parsed = JSON.parse(clean);
+        const paths = parsed.compilerOptions?.paths;
+        if (!paths || typeof paths !== 'object') return;
+        for (const key of Object.keys(paths)) {
+            const prefix = key.replace(/\/\*$/, '').replace(/\*$/, '');
+            if (prefix) target.add(prefix);
+        }
+    } catch {
+        // best-effort fallback
+    }
+}
+
+/**
+ * Discover and parse tsconfig/jsconfig compilerOptions.paths to prevent internal
+ * aliases (e.g. '@core/*', '@shared/*') from being misclassified as external SDKs.
+ */
+function parsePathAliases(rootDir: string, target: Set<string>): void {
+    const candidates = ['tsconfig.json', 'jsconfig.json', 'tsconfig.base.json'];
+    for (const fileName of candidates) {
+        extractAliasesFromFile(path.join(rootDir, fileName), target);
+    }
+}
+
+/**
+ * Load and cache fine-grained inventory of project dependencies across production
+ * and development scopes, alongside internal compiler path aliases.
+ *
+ * @param rootDir - Scan root directory
+ * @returns ProjectManifestInventory record
+ */
+export function loadProjectManifestInventory(rootDir: string): ProjectManifestInventory {
+    const absRoot = path.resolve(rootDir);
+    const cached = INVENTORY_CACHE.get(absRoot);
+    if (cached) return cached;
+
+    const inventory: ProjectManifestInventory = {
+        allDependencies: new Set<string>(),
+        prodDependencies: new Set<string>(),
+        devDependencies: new Set<string>(),
+        peerDependencies: new Set<string>(),
+        pathAliases: new Set<string>(),
+    };
+
+    const pkgJson = path.join(absRoot, 'package.json');
+    if (fs.existsSync(pkgJson)) parsePackageJson(pkgJson, inventory);
+
+    const cargoToml = path.join(absRoot, 'Cargo.toml');
+    if (fs.existsSync(cargoToml)) parseCargoToml(cargoToml, inventory.allDependencies);
+
+    parsePythonManifests(absRoot, inventory.allDependencies);
+
+    const goMod = path.join(absRoot, 'go.mod');
+    if (fs.existsSync(goMod)) parseGoMod(goMod, inventory.allDependencies);
+
+    parsePathAliases(absRoot, inventory.pathAliases);
+
+    INVENTORY_CACHE.set(absRoot, inventory);
+    return inventory;
+}
+
+/**
+ * Tests whether a package is strictly a development-only dependency (declared in devDependencies
+ * but absent from production dependencies and peerDependencies).
+ *
+ * @param packageName - Package identifier to test
+ * @param inventory - Declared project manifest inventory
+ * @returns True when package is declared strictly in devDependencies
+ */
+export function isDevOnlyDependency(
+    packageName: string,
+    inventory: ProjectManifestInventory,
+): boolean {
+    const norm = packageName.toLowerCase();
+    const isDeclaredInDev =
+        inventory.devDependencies.has(norm) || inventory.devDependencies.has(packageName);
+    if (!isDeclaredInDev) {
+        return false;
+    }
+    const inProd =
+        inventory.prodDependencies.has(norm) ||
+        inventory.prodDependencies.has(packageName) ||
+        inventory.peerDependencies.has(norm) ||
+        inventory.peerDependencies.has(packageName);
+    return !inProd;
+}
+
 /**
  * Load and cache all declared external package dependencies for a given project root.
  *
@@ -260,25 +383,8 @@ function parseGoMod(manifestPath: string, target: Set<string>): void {
  * @returns Set of lowercase package identifiers
  */
 export function loadProjectManifestDependencies(rootDir: string): Set<string> {
-    const absRoot = path.resolve(rootDir);
-    const cached = MANIFEST_CACHE.get(absRoot);
-    if (cached) return cached;
-
-    const declared = new Set<string>();
-
-    const pkgJson = path.join(absRoot, 'package.json');
-    if (fs.existsSync(pkgJson)) parsePackageJson(pkgJson, declared);
-
-    const cargoToml = path.join(absRoot, 'Cargo.toml');
-    if (fs.existsSync(cargoToml)) parseCargoToml(cargoToml, declared);
-
-    parsePythonManifests(absRoot, declared);
-
-    const goMod = path.join(absRoot, 'go.mod');
-    if (fs.existsSync(goMod)) parseGoMod(goMod, declared);
-
-    MANIFEST_CACHE.set(absRoot, declared);
-    return declared;
+    const inventory = loadProjectManifestInventory(rootDir);
+    return inventory.allDependencies;
 }
 
 /**
@@ -325,23 +431,43 @@ function isDeclaredDependency(firstSegment: string, manifestDeps?: Set<string>):
     return manifestDeps.has(firstSegment) || manifestDeps.has(normalized);
 }
 
+function isRelativeOrInternalPrefix(trimmed: string): boolean {
+    const firstChar = trimmed.charCodeAt(0);
+    if (firstChar === 46 || firstChar === 47 || firstChar === 35) return true; // '.', '/', '#'
+    return trimmed.startsWith('@/') || trimmed.startsWith('~/');
+}
+
+function matchesPathAlias(trimmed: string, pathAliases?: Set<string>): boolean {
+    if (!pathAliases || pathAliases.size === 0) return false;
+    for (const alias of pathAliases) {
+        if (trimmed === alias || trimmed.startsWith(alias + '/')) {
+            return true;
+        }
+    }
+    return false;
+}
+
 /**
  * Classify the provenance of an imported module specifier.
  *
  * @param specifier - Raw module specifier from import statement
  * @param currentFile - Normalized path of current importing file
  * @param manifestDeps - Set of declared external package dependencies
+ * @param pathAliases - Optional set of compiler path aliases (e.g. '@core', '@/')
  * @returns ImportProvenanceKind
  */
 export function classifyImportProvenance(
     specifier: string,
     currentFile: string,
     manifestDeps?: Set<string>,
+    pathAliases?: Set<string>,
 ): ImportProvenanceKind {
     const trimmed = specifier.trim().replace(/^['"]|['"]$/g, '');
     if (!trimmed) return 'unknown';
     if (IN_TREE_VENDOR_PATTERN.test(trimmed)) return 'in_tree_vendor';
-    if (trimmed.startsWith('.') || trimmed.startsWith('/')) return 'internal';
+    if (isRelativeOrInternalPrefix(trimmed) || matchesPathAlias(trimmed, pathAliases)) {
+        return 'internal';
+    }
 
     const firstSegment = trimmed.split('/')[0].split('.')[0].toLowerCase();
     if (isStandardLibraryImport(firstSegment, trimmed)) return 'stdlib';

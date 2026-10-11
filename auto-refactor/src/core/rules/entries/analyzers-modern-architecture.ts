@@ -514,6 +514,19 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#dat-ser-001',
     }),
     defineRule({
+        id: 'DEP-DEV-001',
+        family: RULE_FAMILY_DEPENDENCY,
+        analyzer: ANALYZER_DEPENDENCY_LAYOUT,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            'Development-only dependency imported in production code: devDependencies package imported without type-only qualifier.',
+        remediation:
+            'Move package to dependencies in project manifest, use import type for type references, or replace with production library.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#dep-dev-001',
+    }),
+    defineRule({
         id: 'DEP-INV-001',
         family: RULE_FAMILY_DEPENDENCY,
         analyzer: ANALYZER_DEPENDENCY_LAYOUT,
@@ -551,6 +564,19 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
         remediation:
             'Replace copyleft-licensed dependency with permissive alternative (MIT/Apache/BSD) or isolate behind network boundary.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#dep-lic-001',
+    }),
+    defineRule({
+        id: 'DEP-OBS-001',
+        family: RULE_FAMILY_DEPENDENCY,
+        analyzer: ANALYZER_DEPENDENCY_LAYOUT,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            'Deprecated or unmaintained package imported: third-party library is officially unmaintained or superseded by standard capabilities.',
+        remediation:
+            'Migrate to actively maintained alternatives or standard runtime built-ins (e.g. fetch, crypto.randomUUID, URLSearchParams).',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#dep-obs-001',
     }),
     defineRule({
         id: 'DEP-ORD-001',

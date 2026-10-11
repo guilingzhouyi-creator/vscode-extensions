@@ -7,7 +7,8 @@
  *   intelligence module; triggered when 'dependency-layout' analyzer is enabled.
  * Responsibilities: Enforce canonical layout order (DEP-ORD-001); audit in-function imports
  *   (DEP-LAZ-001); flag unmanaged hardcoded external URLs (DEP-RES-001); detect wildcard
- *   imports (DEP-WLD-001); flag inverted dependency references (DEP-INV-001).
+ *   imports (DEP-WLD-001); flag inverted dependency references (DEP-INV-001); detect dev-only
+ *   dependency leakage in production code (DEP-DEV-001) and deprecated libraries (DEP-OBS-001).
  * Exit Semantics & Design Rationale: Stateless and synchronous per file; returns Issue[] and
  *   never throws.
  */
@@ -24,7 +25,10 @@ import {
     categorizeImport,
     extractExemptionReason,
 } from '../core/intelligence/dependencyLayout';
-import { loadProjectManifestDependencies } from '../core/intelligence/dependency-provenance';
+import {
+    loadProjectManifestDependencies,
+    loadProjectManifestInventory,
+} from '../core/intelligence/dependency-provenance';
 
 /** Pattern detecting remote URLs. */
 const REMOTE_URL_RE = /['"](https?:\/\/[A-Za-z0-9_./?=&%-]+)['"]/g;
@@ -82,11 +86,17 @@ export class DependencyLayoutAnalyzer implements Analyzer {
         const manifestDeps = isExcluded
             ? undefined
             : options.manifestDependencies || loadProjectManifestDependencies(rootDir);
+        const manifestInventory = isExcluded
+            ? undefined
+            : options.manifestInventory || loadProjectManifestInventory(rootDir);
         const enrichedOptions: DependencyLayoutOptions = {
             ...options,
             rootDir: isExcluded ? undefined : options.rootDir || rootDir,
             manifestDependencies: manifestDeps,
+            manifestInventory,
             flagLicenseCompliance: isExcluded ? false : options.flagLicenseCompliance,
+            flagDevOnlyDependencies: isExcluded ? false : options.flagDevOnlyDependencies,
+            flagDeprecatedDependencies: isExcluded ? false : options.flagDeprecatedDependencies,
         };
 
         return analyzeDependencyLayout(imports, resources, language, enrichedOptions);
@@ -357,6 +367,7 @@ function handleStaticImport(
     const isWildcard =
         node.importClause?.namedBindings !== undefined &&
         ts.isNamespaceImport(node.importClause.namedBindings);
+    const isTypeOnly = node.importClause?.isTypeOnly ?? false;
 
     return {
         file: filePath,
@@ -367,6 +378,7 @@ function handleStaticImport(
         isInsideFunction,
         hasAuditExemption: false,
         isWildcard,
+        isTypeOnly,
     };
 }
 
@@ -500,6 +512,7 @@ function parseTsLineImport(
     const specifier = topMatch[1];
     const category = categorizeImport(specifier, 'typescript');
     const isWildcard = TS_WILDCARD_RE.test(trimmed);
+    const isTypeOnly = /^\s*import\s+type\b/.test(trimmed);
     return {
         file: filePath,
         line: lineNum,
@@ -509,5 +522,6 @@ function parseTsLineImport(
         isInsideFunction: false,
         hasAuditExemption: false,
         isWildcard,
+        isTypeOnly,
     };
 }

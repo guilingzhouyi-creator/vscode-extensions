@@ -227,37 +227,230 @@ function resolveAutonomyGrade(score: number): {
 }
 
 /**
- * Extract module specifiers from a source file via lightweight line inspection.
- */
-function extractImportSpecifiersFromContent(content: string): string[] {
-    const specifiers: string[] = [];
-    const lines = content.split('\n');
-    const IMPORT_RE = /(?:import\s+(?:.*?\s+from\s+)?|require\s*\(\s*|from\s+)(['"][^'"]+['"])/g;
+/** File import profile containing extracted specifiers and local symbol bindings */
+export interface FileImportProfile {
+    specifiers: string[];
+    /** Locally bound identifier name -> canonical external package name */
+    symbolToPackageMap: Map<string, string>;
+}
 
+function extractModulePackageName(specifier: string): string {
+    const trimmed = specifier.trim().replace(/^['"]|['"]$/g, '');
+    if (trimmed.startsWith('@')) {
+        const parts = trimmed.split('/');
+        return parts.length >= 2 ? `${parts[0]}/${parts[1]}` : parts[0];
+    }
+    return trimmed.split('/')[0].split('.')[0].toLowerCase();
+}
+
+function parseImportClause(clause: string, pkg: string, symbolToPkg: Map<string, string>): void {
+    if (!clause) return;
+    const nsMatch = /\*\s+as\s+([A-Za-z0-9_$]+)/.exec(clause);
+    if (nsMatch) {
+        symbolToPkg.set(nsMatch[1], pkg);
+        return;
+    }
+    const namedMatch = /\{([\s\S]*?)\}/.exec(clause);
+    if (namedMatch) {
+        const items = namedMatch[1].split(',');
+        for (const item of items) {
+            const parts = item.trim().split(/\s+as\s+/);
+            const local = (parts[1] || parts[0] || '').trim();
+            if (local) symbolToPkg.set(local, pkg);
+        }
+    }
+    const defaultPart = clause
+        .replace(/\{[\s\S]*?\}/, '')
+        .replace(/,/g, '')
+        .trim();
+    if (defaultPart && !defaultPart.startsWith('*')) {
+        symbolToPkg.set(defaultPart, pkg);
+    }
+}
+
+function extractTsJsImportProfile(
+    content: string,
+    specifiers: Set<string>,
+    symbolToPkg: Map<string, string>,
+): void {
+    const lines = content.split('\n');
     for (const line of lines) {
         const trimmed = line.trim();
         if (
             !trimmed ||
             trimmed.startsWith('//') ||
-            trimmed.startsWith('#') ||
+            trimmed.startsWith('/*') ||
             trimmed.startsWith('*')
         ) {
             continue;
         }
-        let match: RegExpExecArray | null;
-        while ((match = IMPORT_RE.exec(trimmed)) !== null) {
-            const spec = match[1].replace(/['"]/g, '').trim();
-            if (spec) specifiers.push(spec);
+        const importFromMatch = /import\s+(?:type\s+)?(.*?)\s+from\s+['"]([^'"]+)['"]/.exec(
+            trimmed,
+        );
+        if (importFromMatch) {
+            const spec = importFromMatch[2].trim();
+            specifiers.add(spec);
+            const pkg = extractModulePackageName(spec);
+            parseImportClause(importFromMatch[1].trim(), pkg, symbolToPkg);
+            continue;
+        }
+        const requireMatch =
+            /(?:const|let|var)\s+(.*?)\s*=\s*require\(\s*['"]([^'"]+)['"]\s*\)/.exec(trimmed);
+        if (requireMatch) {
+            const spec = requireMatch[2].trim();
+            specifiers.add(spec);
+            const pkg = extractModulePackageName(spec);
+            parseImportClause(requireMatch[1].trim(), pkg, symbolToPkg);
+            continue;
+        }
+        const sideEffectMatch = /import\s*\(?\s*['"]([^'"]+)['"]\s*\)?/.exec(trimmed);
+        if (sideEffectMatch) {
+            specifiers.add(sideEffectMatch[1].trim());
+            continue;
+        }
+        const exportFromMatch = /export\s+.*?\s+from\s+['"]([^'"]+)['"]/.exec(trimmed);
+        if (exportFromMatch) {
+            specifiers.add(exportFromMatch[1].trim());
         }
     }
-    return specifiers;
+}
+
+function parsePythonFromClause(
+    spec: string,
+    rawItems: string,
+    specifiers: Set<string>,
+    symbolToPkg: Map<string, string>,
+): void {
+    specifiers.add(spec);
+    const pkg = spec.split('.')[0].toLowerCase();
+    const items = rawItems.split(',');
+    for (const it of items) {
+        const parts = it.trim().split(/\s+as\s+/);
+        const local = (parts[1] || parts[0] || '').trim();
+        if (local) symbolToPkg.set(local, pkg);
+    }
+}
+
+function parsePythonImportClause(
+    rawItems: string,
+    specifiers: Set<string>,
+    symbolToPkg: Map<string, string>,
+): void {
+    const items = rawItems.split(',');
+    for (const it of items) {
+        const parts = it.trim().split(/\s+as\s+/);
+        const mod = parts[0].trim();
+        const local = (parts[1] || parts[0] || '').trim();
+        if (!mod) continue;
+        specifiers.add(mod);
+        const pkg = mod.split('.')[0].toLowerCase();
+        if (local) symbolToPkg.set(local, pkg);
+    }
+}
+
+function extractPythonImportProfile(
+    content: string,
+    specifiers: Set<string>,
+    symbolToPkg: Map<string, string>,
+): void {
+    const lines = content.split('\n');
+    for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('#')) continue;
+        const fromMatch = /^from\s+([A-Za-z0-9_.]+)\s+import\s+(.*)/.exec(trimmed);
+        if (fromMatch) {
+            parsePythonFromClause(fromMatch[1].trim(), fromMatch[2], specifiers, symbolToPkg);
+            continue;
+        }
+        const importMatch = /^import\s+(.*)/.exec(trimmed);
+        if (importMatch) {
+            parsePythonImportClause(importMatch[1], specifiers, symbolToPkg);
+        }
+    }
+}
+
+function extractGoImportProfile(content: string, specifiers: Set<string>): void {
+    const lines = content.split('\n');
+    let inBlock = false;
+    for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('//')) continue;
+        if (trimmed.startsWith('import (')) {
+            inBlock = true;
+            continue;
+        }
+        if (inBlock && trimmed === ')') {
+            inBlock = false;
+            continue;
+        }
+        if (inBlock) {
+            const match = /["']([^'"]+)["']/.exec(trimmed);
+            if (match) specifiers.add(match[1]);
+            continue;
+        }
+        const singleMatch = /^import\s+(?:[A-Za-z0-9_.]+\s+)?["']([^'"]+)["']/.exec(trimmed);
+        if (singleMatch) specifiers.add(singleMatch[1]);
+    }
+}
+
+function extractRustImportProfile(content: string, specifiers: Set<string>): void {
+    const lines = content.split('\n');
+    for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('//')) continue;
+        const useMatch = /^\s*(?:pub\s+)?use\s+([A-Za-z0-9_]+)::/.exec(trimmed);
+        if (useMatch) specifiers.add(useMatch[1]);
+    }
+}
+
+function extractGdScriptImportProfile(content: string, specifiers: Set<string>): void {
+    const lines = content.split('\n');
+    for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith('#')) continue;
+        const match = /(?:preload|load)\s*\(\s*['"]([^'"]+)['"]\s*\)/.exec(trimmed);
+        if (match) specifiers.add(match[1]);
+    }
 }
 
 /**
- * Evaluates the in-house self-development ratio across all scanned files.
+ * Extracts import specifiers and local symbol-to-package bindings across supported languages.
  *
- * @param fileMetrics - Per-file metrics collected during the scan
- * @param issues - Issues reported across all analyzers
+ * @param content - Full source text of the file
+ * @param filePath - Path of the target file for extension inference
+ * @returns FileImportProfile containing discovered specifiers and symbol mappings
+ */
+export function extractFileImportProfile(content: string, filePath: string): FileImportProfile {
+    const specifiers = new Set<string>();
+    const symbolToPackageMap = new Map<string, string>();
+    const ext = path.extname(filePath).toLowerCase();
+
+    if (ext === '.py') {
+        extractPythonImportProfile(content, specifiers, symbolToPackageMap);
+    } else if (ext === '.go') {
+        extractGoImportProfile(content, specifiers);
+    } else if (ext === '.rs') {
+        extractRustImportProfile(content, specifiers);
+    } else if (ext === '.gd') {
+        extractGdScriptImportProfile(content, specifiers);
+    } else {
+        extractTsJsImportProfile(content, specifiers, symbolToPackageMap);
+    }
+
+    return {
+        specifiers: Array.from(specifiers),
+        symbolToPackageMap,
+    };
+}
+
+/**
+ * Extract module specifiers from a source file via multi-language inspection.
+ */
+function extractImportSpecifiersFromContent(content: string, filePath = 'temp.ts'): string[] {
+    const profile = extractFileImportProfile(content, filePath);
+    return profile.specifiers;
+}
+
 /** Pattern to identify mission-critical runtime, security, crypto, and architecture roots */
 const CRITICAL_PATH_PATTERN =
     /(?:auth|crypto|security|cipher|token|signature|hash|tls|ssl|secret|rbac|permission|runtime|kernel|dispatch|protocol|driver|syscall|gateway|bootstrap|main\b)/i;
@@ -283,26 +476,28 @@ interface AutonomyScanState {
     sdkFileSets: Map<string, Set<string>>;
 }
 
+const MAX_AUTONOMY_FILE_READ_BYTES = 512 * 1024;
+
 /**
- * Load raw source content from memory map or disk file.
+ * Load raw source content from memory map or disk file without early 1KB truncation.
  */
-function readFirstChunkFallback(absPath: string): string {
-    let fd = -1;
+function readSourceFileContent(absPath: string): string {
     try {
-        fd = fs.openSync(absPath, 'r');
-        const buf = Buffer.allocUnsafe(1024);
-        const bytesRead = fs.readSync(fd, buf, 0, 1024, 0);
-        return buf.toString('utf8', 0, bytesRead);
+        if (!fs.existsSync(absPath)) return '';
+        const stat = fs.statSync(absPath);
+        if (stat.size <= MAX_AUTONOMY_FILE_READ_BYTES) {
+            return fs.readFileSync(absPath, 'utf8');
+        }
+        const fd = fs.openSync(absPath, 'r');
+        try {
+            const buf = Buffer.allocUnsafe(MAX_AUTONOMY_FILE_READ_BYTES);
+            const bytesRead = fs.readSync(fd, buf, 0, MAX_AUTONOMY_FILE_READ_BYTES, 0);
+            return buf.toString('utf8', 0, bytesRead);
+        } finally {
+            fs.closeSync(fd);
+        }
     } catch {
         return '';
-    } finally {
-        if (fd >= 0) {
-            try {
-                fs.closeSync(fd);
-            } catch {
-                // best-effort close
-            }
-        }
     }
 }
 
@@ -319,7 +514,7 @@ function loadFileRawContent(
         const absPath = path.isAbsolute(metric.file)
             ? metric.file
             : path.join(config.root, metric.file);
-        const chunk = readFirstChunkFallback(absPath);
+        const chunk = readSourceFileContent(absPath);
         if (cache) cache.set(metric.file, chunk);
         return chunk;
     }
@@ -654,17 +849,29 @@ const COMMON_STDLIB_SYMBOLS = new Set([
     'write',
 ]);
 
+function selectBalancedSdk(extPkgs: string[], symbolName: string): string {
+    if (extPkgs.length === 1) return extPkgs[0];
+    let hash = 0;
+    for (let i = 0; i < symbolName.length; i++) {
+        hash = (hash * 31 + symbolName.charCodeAt(i)) >>> 0;
+    }
+    return extPkgs[hash % extPkgs.length];
+}
+
 /**
- * Overwrites call metrics with true AST call references from the indexed symbol graph.
+ * Overwrites call metrics with true AST call references from the indexed symbol graph
+ * and local file import binding profiles.
  *
  * @param symbolIndex - Materialized project symbol index.
  * @param state - Autonomy evaluation state to update.
- * @param fileToExtPackages - Mapping of file paths to external packages.
+ * @param fileToExtPackages - Mapping of file paths to external package lists.
+ * @param fileToImportProfiles - Optional mapping of file paths to local symbol binding profiles.
  */
 function applySymbolIndexReferences(
     symbolIndex: SymbolIndex,
     state: AutonomyScanState,
     fileToExtPackages: Map<string, string[]>,
+    fileToImportProfiles?: Map<string, FileImportProfile>,
 ): void {
     const refs = symbolIndex.getAllReferences();
     if (refs.length === 0) return;
@@ -684,17 +891,50 @@ function applySymbolIndexReferences(
             if (isCritical) state.criticalPathInternalCalls++;
             continue;
         }
+
+        const profile = fileToImportProfiles?.get(ref.file);
+        const boundPkg = profile?.symbolToPackageMap.get(ref.name);
+        if (boundPkg) {
+            recordSdkCall(state, boundPkg, ref.file, isCritical);
+            continue;
+        }
+
         if (COMMON_STDLIB_SYMBOLS.has(ref.name)) {
             state.stdlibCalls++;
             continue;
         }
+
         const extPkgs = fileToExtPackages.get(ref.file);
         if (extPkgs && extPkgs.length > 0) {
-            recordSdkCall(state, extPkgs[0], ref.file, isCritical);
+            const chosen = selectBalancedSdk(extPkgs, ref.name);
+            recordSdkCall(state, chosen, ref.file, isCritical);
         } else {
             state.stdlibCalls++;
         }
     }
+}
+
+function collectExtPackages(
+    specifiers: Iterable<string>,
+    file: string,
+    manifestDeps: Set<string>,
+): string[] | undefined {
+    let hasSdk = false;
+    for (const spec of specifiers) {
+        if (classifyImportProvenance(spec, file, manifestDeps) === 'external_sdk') {
+            hasSdk = true;
+            break;
+        }
+    }
+    if (!hasSdk) return undefined;
+
+    const pkgs: string[] = [];
+    for (const spec of specifiers) {
+        if (classifyImportProvenance(spec, file, manifestDeps) === 'external_sdk') {
+            pkgs.push(extractModulePackageName(spec));
+        }
+    }
+    return pkgs;
 }
 
 /**
@@ -737,26 +977,27 @@ export function evaluateProjectAutonomy(
     };
 
     const fileToExtPackages = new Map<string, string[]>();
+    const fileToImportProfiles = new Map<string, FileImportProfile>();
     const contentCache = new Map<string, string>();
+    const emptyProfile: FileImportProfile = {
+        specifiers: [],
+        symbolToPackageMap: new Map<string, string>(),
+    };
+
     for (const metric of fileMetrics) {
         const raw = loadFileRawContent(metric, config, fileContents, contentCache);
-        const specs = raw ? extractImportSpecifiersFromContent(raw) : [];
-        const extPkgs: string[] = [];
-        for (const spec of specs) {
-            const kind = classifyImportProvenance(spec, metric.file, manifestDeps);
-            if (kind === 'external_sdk') {
-                const pkg = spec.startsWith('@')
-                    ? spec.split('/').slice(0, 2).join('/')
-                    : spec.split('/')[0].split('.')[0].toLowerCase();
-                extPkgs.push(pkg);
-            }
+        const profile = raw ? extractFileImportProfile(raw, metric.file) : emptyProfile;
+        fileToImportProfiles.set(metric.file, profile);
+
+        const extPkgs = collectExtPackages(profile.specifiers, metric.file, manifestDeps);
+        if (extPkgs) {
+            fileToExtPackages.set(metric.file, extPkgs);
         }
-        fileToExtPackages.set(metric.file, extPkgs);
         accumulateFileMetric(metric, config, manifestDeps, state, fileContents, raw);
     }
 
     if (symbolIndex) {
-        applySymbolIndexReferences(symbolIndex, state, fileToExtPackages);
+        applySymbolIndexReferences(symbolIndex, state, fileToExtPackages, fileToImportProfiles);
     }
 
     return synthesizeAutonomyEvaluation(state, fileMetrics.length, issues, supplyChain);

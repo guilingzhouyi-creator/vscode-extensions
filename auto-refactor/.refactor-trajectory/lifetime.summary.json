@@ -1,13 +1,13 @@
 {
   "weekId": "LIFETIME",
   "startMs": 1791102755050,
-  "endMs": 1791692655724,
+  "endMs": 1791697838497,
   "totalRuns": 149,
   "eloc": {
-    "processedTotal": 19196541,
-    "uniqueTotal": 109866,
-    "changedTotal": 225850,
-    "semanticTotal": 180682
+    "processedTotal": 19218690,
+    "uniqueTotal": 110333,
+    "changedTotal": 241652,
+    "semanticTotal": 193324
   },
   "qed": {
     "mean": -0.0001,
@@ -15,8 +15,8 @@
     "max": 0.02
   },
   "debt": {
-    "totalAdded": 1106,
-    "totalResolved": 389,
+    "totalAdded": 1122,
+    "totalResolved": 398,
     "totalRegressions": 14,
     "netYield": -0.04
   },

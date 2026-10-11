@@ -22,6 +22,9 @@ import {
     parsePackageSpecifier,
 } from './dependency-vulnerabilities';
 import { auditLicenseCompliance } from './license-compliance';
+import { checkDeprecatedPackage } from './deprecated-dependencies';
+import type { ProjectManifestInventory } from './dependency-provenance';
+import { isDevOnlyDependency } from './dependency-provenance';
 
 export { categorizeImport, extractExemptionReason } from './dependencyLayoutHelpers';
 export type { ImportCategory, ImportStatementInfo } from './dependencyLayoutHelpers';
@@ -62,8 +65,11 @@ export interface DependencyLayoutOptions {
     flagPhantomDependencies?: boolean;
     flagVulnerableDependencies?: boolean;
     flagLicenseCompliance?: boolean;
+    flagDevOnlyDependencies?: boolean;
+    flagDeprecatedDependencies?: boolean;
     rootDir?: string;
     manifestDependencies?: Set<string>;
+    manifestInventory?: ProjectManifestInventory;
 }
 
 interface DetailParams {
@@ -363,7 +369,12 @@ function resolvePackageLicense(rootDir: string, packageName: string): string | n
                         : typeof data.license === 'object' && data.license?.type
                           ? data.license.type
                           : null;
-                if (!lic && data.licenses && Array.isArray(data.licenses) && data.licenses[0]?.type) {
+                if (
+                    !lic &&
+                    data.licenses &&
+                    Array.isArray(data.licenses) &&
+                    data.licenses[0]?.type
+                ) {
                     lic = data.licenses[0].type;
                 }
                 PKG_LICENSE_CACHE.set(cacheKey, lic);
@@ -585,6 +596,105 @@ function auditDependencyLicenses(
     }
 }
 
+const TEST_OR_TOOLING_PATTERN =
+    /(?:^|[/\\])(?:tests?|fixtures?|mocks?|scripts?|benchmarks?|sample|tooling)(?:[/\\]|$)|(?:\.test|\.spec)\.[a-z0-9]+$/i;
+
+function isTestOrToolingFile(filePath: string): boolean {
+    return TEST_OR_TOOLING_PATTERN.test(filePath.replace(/\\/g, '/'));
+}
+
+function auditDevelopmentDependencies(
+    imports: ImportStatementInfo[],
+    inventory: ProjectManifestInventory | undefined,
+    filePath: string,
+    language: string,
+    issues: Issue[],
+): void {
+    if (!inventory || isTestOrToolingFile(filePath)) {
+        return;
+    }
+
+    const seenPackages = new Set<string>();
+
+    for (const imp of imports) {
+        if (imp.category !== 'third-party') continue;
+        if (isExemptPathOrAlias(imp.moduleSpecifier)) continue;
+
+        // Type-only imports do not emit runtime dependencies and are exempted
+        if (/^\s*import\s+type\b/.test(imp.rawText)) {
+            continue;
+        }
+
+        const pkgName = extractPackageName(imp.moduleSpecifier);
+        if (!pkgName || seenPackages.has(pkgName)) continue;
+        seenPackages.add(pkgName);
+
+        if (isDevOnlyDependency(pkgName, inventory)) {
+            reportSingleImportIssue(
+                issues,
+                'DEP-DEV-001',
+                'warning',
+                imp,
+                'call',
+                `Development-only package '${pkgName}' imported in production code`,
+                `Package '${pkgName}' is declared in devDependencies but imported at runtime in production file '${imp.file}'.`,
+                'Runtime value import of devDependency in production code',
+                'Production builds deployed without devDependencies will crash with missing module errors at runtime.',
+                `Move '${pkgName}' to dependencies in package.json, or switch to 'import type' if used solely for type annotations.`,
+                `Verify '${pkgName}' is in dependencies or converted to 'import type'.`,
+                `Dev-only dependency leakage: '${pkgName}' is declared in devDependencies but imported in production file '${imp.file}'.`,
+                `Move '${pkgName}' to dependencies in package.json, or convert import to 'import type'.`,
+                language,
+                'dependencies',
+                0.95,
+            );
+        }
+    }
+}
+
+function auditDeprecatedDependencies(
+    imports: ImportStatementInfo[],
+    language: string,
+    issues: Issue[],
+): void {
+    const seenPackages = new Set<string>();
+
+    for (const imp of imports) {
+        if (imp.category !== 'third-party' && imp.category !== 'stdlib') continue;
+        if (isExemptPathOrAlias(imp.moduleSpecifier)) continue;
+
+        const pkgName = extractPackageName(imp.moduleSpecifier);
+        if (!pkgName || seenPackages.has(pkgName)) continue;
+        seenPackages.add(pkgName);
+
+        let deprecatedInfo = checkDeprecatedPackage(pkgName);
+        if (!deprecatedInfo && pkgName.includes('.')) {
+            deprecatedInfo = checkDeprecatedPackage(pkgName.split('.')[0]);
+        }
+        if (!deprecatedInfo) continue;
+
+        const targetPkg = deprecatedInfo.packageName;
+        reportSingleImportIssue(
+            issues,
+            'DEP-OBS-001',
+            'warning',
+            imp,
+            'call',
+            `Deprecated package '${targetPkg}' imported: ${deprecatedInfo.reason}`,
+            `Importing deprecated package '${targetPkg}'. Recommended modern replacement: ${deprecatedInfo.replacement}.`,
+            'Deprecated or unmaintained package imported in codebase',
+            'Accumulates technical debt, prevents runtime upgrades, and poses unpatched vulnerability risks.',
+            deprecatedInfo.remediation,
+            `Verify '${targetPkg}' is replaced with ${deprecatedInfo.replacement}.`,
+            `Deprecated dependency: '${targetPkg}' is deprecated (${deprecatedInfo.reason}). Prefer ${deprecatedInfo.replacement}.`,
+            deprecatedInfo.remediation,
+            language,
+            'maintenance',
+            1.0,
+        );
+    }
+}
+
 /**
  * Analyze imports and external resource references across a file.
  *
@@ -622,6 +732,18 @@ export function analyzeDependencyLayout(
     }
     if ((options.flagLicenseCompliance ?? true) && options.rootDir) {
         auditDependencyLicenses(imports, options.rootDir, language, issues);
+    }
+    if ((options.flagDevOnlyDependencies ?? true) && options.manifestInventory) {
+        auditDevelopmentDependencies(
+            imports,
+            options.manifestInventory,
+            firstFile,
+            language,
+            issues,
+        );
+    }
+    if (options.flagDeprecatedDependencies ?? true) {
+        auditDeprecatedDependencies(imports, language, issues);
     }
     return issues;
 }

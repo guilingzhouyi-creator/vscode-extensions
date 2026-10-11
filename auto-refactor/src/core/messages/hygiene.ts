@@ -132,7 +132,11 @@ export const HygieneMessages = {
     /**
      * Build the HYG-EOL-001 descriptor for physical line endings contract violation.
      */
-    LINE_ENDINGS_MISMATCH: (file: string, expected: string, actual: string): DiagnosticDescriptor => ({
+    LINE_ENDINGS_MISMATCH: (
+        file: string,
+        expected: string,
+        actual: string,
+    ): DiagnosticDescriptor => ({
         message: `Line endings contract violation in '${file}': Expected ${expected} but detected ${actual}`,
         suggestion: `Standardize line endings to ${expected} to comply with workspace physical hygiene contract`,
         rationale:
@@ -159,8 +163,7 @@ export const HygieneMessages = {
      */
     FLOATING_PROMISE: (expression: string): DiagnosticDescriptor => ({
         message: `Floating promise detected without handling: '${expression}'. Unhandled promises trigger silent async failures and memory leaks`,
-        suggestion:
-            'Explicitly await, return, void, or attach a .catch() handler to the promise',
+        suggestion: 'Explicitly await, return, void, or attach a .catch() handler to the promise',
         rationale:
             'Floating unhandled promises in asynchronous workflows bypass error handling pipelines and lead to unhandled rejections or silent background hangs.',
         risk: 'High',
@@ -179,4 +182,3 @@ export const HygieneMessages = {
         risk: RISK_MEDIUM,
     }),
 } as const;
-

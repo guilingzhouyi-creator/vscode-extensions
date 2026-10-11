@@ -45,6 +45,7 @@ export interface ImportStatementInfo {
     hasAuditExemption: boolean;
     exemptionReason?: ExemptionReason;
     isWildcard: boolean;
+    isTypeOnly?: boolean;
 }
 
 import { GO_CORE_PACKAGES, NODE_CORE_MODULES } from './dependency-provenance';
@@ -111,7 +112,8 @@ export function categorizeImport(specifier: string, language: string): ImportCat
             specifier.startsWith('core::') ||
             specifier.startsWith('alloc::') ||
             specifier.startsWith('proc_macro::')
-        ) return CATEGORY_STDLIB;
+        )
+            return CATEGORY_STDLIB;
         if (specifier.startsWith('crate::') || specifier.startsWith('super::'))
             return CATEGORY_LOCAL;
         return CATEGORY_THIRD_PARTY;

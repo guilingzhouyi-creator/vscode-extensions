@@ -301,9 +301,11 @@
 | `DAT-QRY-001` | <a id="dat-qry-001"></a>`data-architecture` | `DAT` | `warning` | `all` | 在线请求链路中的无界数据读取或全表内存过滤。 | 增加游标分页或 Limit/Offset 条件，强制限制单次读取上限。 |
 | `DAT-RES-001` | <a id="dat-res-001"></a>`data-architecture` | `DAT` | `warning` | `all` | 资源注册表双向映射不一致或悬空资产：资源登记中心存在空路径、悬空引用或双向映射断裂。 | 确保资源中心双向对称登记，修复或移除悬空资源路径与孤儿资产。 |
 | `DAT-SER-001` | <a id="dat-ser-001"></a>`data-architecture` | `DAT` | `info` | `all` | 跨层调用链中的重复序列化与反序列化转换。 | 在内部调用链路传递强类型原生对象，仅在网络边界执行序列化。 |
+| `DEP-DEV-001` | <a id="dep-dev-001"></a>`dependency-layout` | `DEP` | `warning` | `all` | 开发依赖泄漏至生产代码：生产源文件直接导入仅在 devDependencies 声明的依赖项且未采用纯类型导入。 | 将依赖项提升至 dependencies 生产依赖清单、改用 import type 擦除运行期引用，或替换为生产级轻量实现。 |
 | `DEP-INV-001` | <a id="dep-inv-001"></a>`dependency-layout` | `DEP` | `error` | `all` | 依赖倒置违规：底层基础设施或公共模块反向依赖高层业务模块。 | 解除反向依赖，通过控制反转或事件总线进行解耦。 |
 | `DEP-LAZ-001` | <a id="dep-laz-001"></a>`dependency-layout` | `DEP` | `warning` | `all` | 未提供审计声明或合规理由的函数内部临时导入。 | 将导入提升至文件顶部，或添加 @lazy/@optional 注释标注意图。 |
 | `DEP-LIC-001` | <a id="dep-lic-001"></a>`dependency-layout` | `DEP` | `warning` | `all` | 商业与专有闭源工程中引入高风险限制性或强传染性开源许可证（AGPL/GPL）依赖。 | 替换为宽松许可证（MIT/Apache/BSD）替代库，或将关联逻辑隔离至独立网络微服务边界之外。 |
+| `DEP-OBS-001` | <a id="dep-obs-001"></a>`dependency-layout` | `DEP` | `warning` | `all` | 废弃与缺乏维护的第三方库导入：使用了已被官方弃用、停止维护或已被语言/运行期标准库内置能力淘汰的过时依赖。 | 迁移至社区主流受维护的现代替代方案或标准运行期内置能力（如 fetch、crypto.randomUUID、URLSearchParams）。 |
 | `DEP-ORD-001` | <a id="dep-ord-001"></a>`dependency-layout` | `DEP` | `info` | `all` | 文件布局与导入分组不符合当前语言现代化工程规范。 | 调整导入顺序为 Stdlib -> ThirdParty -> InternalShared -> Local。 |
 | `DEP-PHANTOM-001` | <a id="dep-phantom-001"></a>`dependency-layout` | `DEP` | `warning` | `all` | 幽灵依赖：源码直接导入未在项目包清单（package.json、pyproject.toml、Cargo.toml）显式声明的外部依赖包。 | 将依赖项显式登记至项目包配置清单中，或改用工程内置实现与官方标准库等价模块。 |
 | `DEP-RES-001` | <a id="dep-res-001"></a>`dependency-layout` | `DEP` | `warning` | `all` | 业务逻辑中散落硬编码的未纳管外部 URL、文件路径或连接串。 | 将外部资源地址统一抽取至配置文件或服务资源注册中心。 |

@@ -235,7 +235,7 @@ function parseGitDiffHunks(raw, map) {
     if (line.startsWith("+++ b/")) {
       const rel = line.slice(6).trim();
       if (isEligibleSourcePath(rel)) {
-        currentFile = path.resolve(rel);
+        currentFile = path.resolve(REPO_ROOT, rel);
         if (!map.has(currentFile)) {
           map.set(currentFile, {
             changedLines: new Set(),
