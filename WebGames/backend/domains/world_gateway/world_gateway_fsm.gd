@@ -13,18 +13,24 @@ extends RefCounted
 const AccountSlotBindingSolver = preload("res://backend/domains/account/account_slot_binding_solver.gd")
 
 var context: WorldGatewayContextDTO = null
+var _last_probe_reports: Dictionary = {}
 
 func _init(account_id: String) -> void:
 	context = WorldGatewayContextDTO.new()
 	context.account_id = account_id
 	context.current_phase = WorldGatewayModel.GatewayPhase.AUTHENTICATED
+	_last_probe_reports = {}
 
-## 1. 登录后进入世界栏
+## 1. 登录后进入世界栏（并行收集模式就绪探针报告）
 func enter_gateway() -> Dictionary:
 	if context.current_phase != WorldGatewayModel.GatewayPhase.AUTHENTICATED:
 		return _fail("INVALID_TRANSITION", "当前状态不可重复进入网关: %d" % context.current_phase)
 
 	context.current_phase = WorldGatewayModel.GatewayPhase.GATEWAY_ENTERED
+
+	# 调用 ModeReadinessProbe 收集全域运行模式健康与就绪报告
+	_last_probe_reports = ModeReadinessProbe.probe_all_modes(context.account_id)
+
 	var modes: Array = GameConfig.get_array("domains.world_gateway", "gateway_modes/available_modes", [
 		WorldGatewayModel.GameMode.SINGLE_PLAYER,
 		WorldGatewayModel.GameMode.MULTIPLAYER
@@ -33,11 +39,18 @@ func enter_gateway() -> Dictionary:
 	_notify_event("world_gateway.entered", {
 		"account_id": context.account_id,
 		"available_modes": modes,
-		"configured_hooks": gw_hooks.get("on_gateway_entered", [])
+		"configured_hooks": gw_hooks.get("on_gateway_entered", []),
+		"probe_reports": _last_probe_reports
 	})
-	return {"success": true, "phase": context.current_phase, "context": context.to_dto(), "available_modes": modes}
+	return {
+		"success": true,
+		"phase": context.current_phase,
+		"context": context.to_dto(),
+		"available_modes": modes,
+		"probe_reports": _last_probe_reports
+	}
 
-## 2. 选择游戏模式与解析档位世界（支持显式指定 target_world_id 与 target_slot_id）
+## 2. 选择游戏模式与解析档位世界（前置防越权守卫裁定，支持显式 target_world_id 与 target_slot_id）
 func select_mode(
 	mode: int,
 	canary_flags: Dictionary = {},
@@ -45,8 +58,29 @@ func select_mode(
 	target_world_id: String = "",
 	target_slot_id: String = ""
 ) -> Dictionary:
+	# 气密级防越权守卫裁定：检查模式单向冻结（防热切换）与探针就绪报告
+	var mode_report: Variant = null
+	if mode == WorldGatewayModel.GameMode.SINGLE_PLAYER:
+		mode_report = _last_probe_reports.get("single_player", null)
+	elif mode == WorldGatewayModel.GameMode.MULTIPLAYER:
+		mode_report = _last_probe_reports.get("multiplayer", null)
+
+	var guard_res := AntiBridgeGuard.validate_mode_transition(
+		context.current_phase,
+		WorldGatewayModel.GatewayPhase.MODE_SELECTED,
+		context.selected_mode,
+		mode,
+		mode_report
+	)
+	if not bool(guard_res.get("allowed", false)):
+		return _fail(
+			str(guard_res.get("error_code", "SECURITY_ERR_TRANSITION_BLOCKED")),
+			str(guard_res.get("message", "模式跃迁被安全守卫拦截"))
+		)
+
 	if context.current_phase != WorldGatewayModel.GatewayPhase.GATEWAY_ENTERED:
 		return _fail("INVALID_TRANSITION", "未处于世界栏主界面，当前阶段: %d" % context.current_phase)
+
 	var slot_conversion: Dictionary = _convert_account_slots(account_slots)
 	if not bool(slot_conversion.get("success", false)):
 		return _fail(String(slot_conversion.get("error_code", "INVALID_ACCOUNT_SLOTS")), "账号槽位数据无效")
@@ -165,9 +199,30 @@ func enter_world() -> Dictionary:
 	})
 	return {"success": true, "phase": context.current_phase, "context": context.to_dto()}
 
+## 5. 退回世界栏主界面并实施内存全量洗脱 (Full Memory Scrubbing)
+func exit_to_gateway() -> Dictionary:
+	# 全量洗脱重置运行时所有模式、槽位、世界与角色状态
+	context.selected_mode = WorldGatewayModel.GameMode.UNSELECTED
+	context.selected_slot_id = ""
+	context.selected_world_id = ""
+	context.active_character_id = ""
+	context.is_first_time_creation = false
+	context.current_phase = WorldGatewayModel.GatewayPhase.GATEWAY_ENTERED
+	_last_probe_reports.clear()
+
+	_notify_event("world_gateway.memory_scrubbed", {
+		"account_id": context.account_id,
+		"phase": context.current_phase
+	})
+
+	return {
+		"success": true,
+		"phase": context.current_phase,
+		"context": context.to_dto(),
+		"message": "已完成全量内存洗脱并返回世界网关"
+	}
+
 func _notify_event(channel: String, payload: Dictionary) -> void:
-	# 统一经 EventBus.emit_domain_event 官方唯一入口广播（先发 domain_event 结构化信号，
-	# 再按文案表渲染叙事文案二次广播），禁止裸 emit_signal 绕行。
 	EventBusCore.get_instance().emit_domain_event(channel, payload)
 
 func _fail(code: String, msg: String) -> Dictionary:

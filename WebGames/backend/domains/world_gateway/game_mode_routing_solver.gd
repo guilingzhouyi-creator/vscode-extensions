@@ -69,6 +69,14 @@ static func resolve_mode_entry(
 		res.message = "未选择任何游戏模式"
 		return res
 
+	# 槽位模式亲和性防护：若显式指定目标槽位且尝试进入联机界域，拦截单机槽位跨界渗透
+	if mode == WorldGatewayModel.GameMode.MULTIPLAYER and not target_slot_id.is_empty():
+		var affinity_check := _check_slot_affinity_for_multiplayer(account_slots, target_slot_id, mode)
+		if not bool(affinity_check.get("allowed", true)):
+			res.error_code = str(affinity_check.get("error_code", ""))
+			res.message = str(affinity_check.get("message", ""))
+			return res
+
 	if mode == WorldGatewayModel.GameMode.MULTIPLAYER:
 		return _resolve_multiplayer_entry(account_id, canary_flags, res)
 
@@ -78,6 +86,17 @@ static func resolve_mode_entry(
 	res.error_code = "GATEWAY_ERR_UNKNOWN_MODE"
 	res.message = "未知的游戏模式枚举: %d" % mode
 	return res
+
+
+static func _check_slot_affinity_for_multiplayer(account_slots: Array, target_slot_id: String, target_mode: int) -> Dictionary:
+	for item in account_slots:
+		if item is SaveSlotStateDTO and item.slot_id == target_slot_id:
+			var is_sp_slot: bool = item.slot_id.begins_with("SLOT_SP_") \
+				or item.bound_world_id.begins_with("WORLD_DEFAULT_SP_") \
+				or item.bound_world_id.begins_with("WORLD_SP_")
+			var slot_mode: int = WorldGatewayModel.GameMode.SINGLE_PLAYER if is_sp_slot else WorldGatewayModel.GameMode.MULTIPLAYER
+			return AntiBridgeGuard.validate_slot_mode_affinity(slot_mode, target_mode)
+	return {"allowed": true, "error_code": "", "message": ""}
 
 
 static func _resolve_multiplayer_entry(account_id: String, canary_flags: Dictionary, res: RoutingResultDTO) -> RoutingResultDTO:
@@ -119,6 +138,11 @@ static func _resolve_single_player_entry(
 
 	var effective_world_id := target_world_id if not target_world_id.is_empty() else GameConfig.get_string("domains.world_gateway", "single_player/default_world_id", "WORLD_DEFAULT_SP_01")
 	var world_dto: WorldInstanceDTO = all_worlds.get(effective_world_id, null)
+
+	# 动态持久化世界档案解析：若静态配置表中未显式登记，动态查询 WorldArchiveRepository
+	if world_dto == null:
+		world_dto = _resolve_world_from_repository(effective_world_id)
+
 	if world_dto == null:
 		res.error_code = "GATEWAY_ERR_DEFAULT_WORLD_NOT_FOUND"
 		res.message = "单机目标世界数据缺失: %s" % effective_world_id
@@ -133,6 +157,26 @@ static func _resolve_single_player_entry(
 	res.available_slots = effective_slots
 	res.success = true
 	return res
+
+
+## 从世界档案物理仓储动态解析并构建 WorldInstanceDTO
+static func _resolve_world_from_repository(wid: String) -> WorldInstanceDTO:
+	if wid.is_empty():
+		return null
+	var repo = WorldArchiveRepository.get_instance()
+	if repo == null:
+		return null
+	var summary: WorldArchiveSummaryDTO = repo.get_world_summary(wid)
+	if summary == null:
+		return null
+
+	var dto := WorldInstanceDTO.new()
+	dto.world_id = summary.world_id
+	dto.world_name = summary.world_name
+	dto.mode = summary.mode
+	dto.seed_value = summary.seed_value
+	dto.is_active = summary.is_active
+	return dto
 
 
 static func _resolve_effective_slots(

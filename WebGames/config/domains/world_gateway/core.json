@@ -32,6 +32,18 @@
     "max_slots_baseline": 1,
     "max_worlds_baseline": 1
   },
+  "local_archive": {
+    "root_dir": "user://worlds/sp/",
+    "catalog_file": "world_catalog.json",
+    "max_worlds": 10
+  },
+  "probe_policy": {
+    "sp_disk_check": true,
+    "mp_heartbeat_timeout_ms": 3000,
+    "mp_simulated_ping_ms": 24,
+    "allow_offline_bypass": false,
+    "maintenance_mode": false
+  },
   "canary_features": {
     "FEATURE_MULTI_SLOT": {
       "strategy": "PERCENTAGE_CANARY",
