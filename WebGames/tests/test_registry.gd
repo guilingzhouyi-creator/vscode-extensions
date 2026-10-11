@@ -128,6 +128,10 @@ const TestAccountRegistrationAndPersistence = preload("res://tests/integration/p
 const TestWorldArchiveAndAntiBridgePipeline = preload("res://tests/integration/pipelines/test_world_archive_and_anti_bridge_pipeline.gd")
 # 世界内角色权威创建与时空装配流水线
 const TestAuthoritativeCharacterCreationPipeline = preload("res://tests/integration/pipelines/test_authoritative_character_creation_pipeline.gd")
+# 剧情MOD相对加载与因果扰动流水线
+const TestNarrativeModAndPerturbationPipeline = preload("res://tests/integration/pipelines/test_narrative_mod_and_perturbation_pipeline.gd")
+# MOD开发者SDK与联机安全净化流水线
+const TestModSdkAndRealmSecurityPipeline = preload("res://tests/integration/pipelines/test_mod_sdk_and_realm_security_pipeline.gd")
 
 # 前端 17 大系统白模与表现层测试套件
 const TestFE01AccountEntry = preload("res://tests/unit/frontend/test_fe_01_account_entry.gd")

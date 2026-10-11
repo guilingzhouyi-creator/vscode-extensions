@@ -1,0 +1,57 @@
+{
+  "_meta": {
+    "version": "1.0.0",
+    "schema": "kalar.mod_sdk.capabilities",
+    "generator": "WebGames/scripts/py/sync_mod_sdk.py",
+    "description": "卡拉尔世界引擎 MOD 开发者 SDK 权威能力描述清单（权威真源萃取，禁止手动修改）"
+  },
+  "engine_api_version": "1.0.0",
+  "supported_races": [
+    "HUMAN"
+  ],
+  "valid_node_types": [
+    "START_ENTRY",
+    "STANDARD_STEP",
+    "BRANCH_CHOICE",
+    "TERMINAL_EXIT"
+  ],
+  "available_placeholders": {
+    "{PLAYER_NAME}": "当前玩家角色的自定义名称",
+    "{RACE_ID}": "角色所属种族唯一标识符（如 HUMAN）",
+    "{START_LOCATION}": "角色出生与初始降临的地理场景标识或本地化名称",
+    "{INITIAL_EQUIPMENT}": "角色获得的初始佩剑或基础装备道具名称",
+    "{NPC_TARGET}": "对话交互或剧情引导的目标 NPC 实体名称"
+  },
+  "valid_mutation_events": [
+    "CharacterCreated",
+    "LocationAssigned",
+    "EquipmentGranted",
+    "DialogueReady",
+    "PrologueCompleted"
+  ],
+  "origins": [
+    "DWARVEN_BLACKSMITH",
+    "ELVEN_SCHOLAR",
+    "IMPERIAL_NOBLE",
+    "SHADOW_OUTCAST"
+  ],
+  "birth_regions": [
+    "CENTRAL_CONTINENT",
+    "HOWLING_TUNDRA",
+    "SCORCHED_CANYON",
+    "SILVER_FOREST",
+    "VOID_ARCHIPELAGO"
+  ],
+  "reference_locations": [
+    "CENTRAL_CITY_PLAZA",
+    "ELVEN_SANCTUARY_GROVE",
+    "VALAN_OUTPOST"
+  ],
+  "reference_items": [
+    "KALAR_EQUIP_WEAPON_BLADE_IRON_SWORD",
+    "KALAR_EQUIP_WEAPON_BLADE_MITHRIL_LONGSWORD"
+  ],
+  "reference_npcs": [
+    "FORTRESS_GUARD"
+  ]
+}

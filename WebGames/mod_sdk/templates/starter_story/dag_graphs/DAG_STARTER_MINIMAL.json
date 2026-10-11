@@ -1,0 +1,41 @@
+{
+  "entry_node_id": "NODE_STARTER_AWAKEN",
+  "terminal_node_id": "NODE_STARTER_DEPART",
+  "nodes": {
+    "NODE_STARTER_AWAKEN": {
+      "node_type": "START_ENTRY",
+      "narrative_key": "narrative.starter.awaken",
+      "required_prerequisites": []
+    },
+    "NODE_STARTER_EXPLORE": {
+      "node_type": "STANDARD_STEP",
+      "narrative_key": "narrative.starter.explore",
+      "required_prerequisites": [
+        "NODE_STARTER_AWAKEN"
+      ]
+    },
+    "NODE_STARTER_DEPART": {
+      "node_type": "TERMINAL_EXIT",
+      "narrative_key": "narrative.starter.depart",
+      "required_prerequisites": [
+        "NODE_STARTER_EXPLORE"
+      ],
+      "mutations_on_complete": [
+        {
+          "type": "PrologueCompleted",
+          "dag_id": "DAG_STARTER_MINIMAL"
+        }
+      ]
+    }
+  },
+  "edges": [
+    {
+      "from": "NODE_STARTER_AWAKEN",
+      "to": "NODE_STARTER_EXPLORE"
+    },
+    {
+      "from": "NODE_STARTER_EXPLORE",
+      "to": "NODE_STARTER_DEPART"
+    }
+  ]
+}

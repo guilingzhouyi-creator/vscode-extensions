@@ -1,0 +1,16 @@
+{
+  "pack_id": "starter_story",
+  "pack_name": "官方标准启蒙剧情包",
+  "version": "1.0.0",
+  "author": "Kalar Engine Team",
+  "engine_api_version": "1.0.0",
+  "priority": 100,
+  "dependencies": [],
+  "incompatible_packs": [],
+  "semantic_tags": [
+    "story",
+    "prologue",
+    "starter"
+  ],
+  "is_active": true
+}

@@ -11,15 +11,40 @@ class_name WorldGatewayFSM
 extends RefCounted
 
 const AccountSlotBindingSolver = preload("res://backend/domains/account/account_slot_binding_solver.gd")
+const WorldModAffinityManager = preload("res://backend/domains/narrative_orchestration/world_mod_affinity_manager.gd")
+const ModPackageDiscoverySolver = preload("res://backend/domains/narrative_orchestration/mod_package_discovery_solver.gd")
+const CrossWorldPerturbationBroker = preload("res://backend/domains/narrative_orchestration/cross_world_perturbation_broker.gd")
 
 var context: WorldGatewayContextDTO = null
 var _last_probe_reports: Dictionary = {}
+var active_mods: Array = []
 
 func _init(account_id: String) -> void:
 	context = WorldGatewayContextDTO.new()
 	context.account_id = account_id
 	context.current_phase = WorldGatewayModel.GatewayPhase.AUTHENTICATED
 	_last_probe_reports = {}
+	active_mods = []
+
+## 设置当前网关激活的模组清单
+func set_active_mods(mods: Array) -> void:
+	active_mods = mods.duplicate()
+
+## 获取当前网关激活的模组清单
+func get_active_mods() -> Array:
+	return active_mods
+
+## 强制净化卸载本地第三方模组并回退 Vanilla 原生核心与洗脱内存
+func purge_and_fallback_to_vanilla() -> void:
+	var cleaned_mods: Array = []
+	for m in active_mods:
+		if AntiBridgeGuard.is_vanilla_pack(m):
+			cleaned_mods.append(m)
+	active_mods = cleaned_mods
+	_notify_event("world_gateway.mods_purged", {
+		"account_id": context.account_id,
+		"retained_mods": active_mods
+	})
 
 ## 1. 登录后进入世界栏（并行收集模式就绪探针报告）
 func enter_gateway() -> Dictionary:
@@ -56,8 +81,20 @@ func select_mode(
 	canary_flags: Dictionary = {},
 	account_slots: Array = [],
 	target_world_id: String = "",
-	target_slot_id: String = ""
+	target_slot_id: String = "",
+	custom_mods: Array = []
 ) -> Dictionary:
+	if not custom_mods.is_empty():
+		active_mods = custom_mods.duplicate()
+
+	# 模组界域纪律气密守卫裁定（联机模式严禁加载第三方本地剧情/数值 MOD）
+	var mod_check := AntiBridgeGuard.validate_mod_realm_discipline(mode, active_mods)
+	if not bool(mod_check.get("allowed", false)):
+		return _fail(
+			str(mod_check.get("error_code", AntiBridgeGuard.SECURITY_ERR_MULTIPLAYER_MOD_POISONING)),
+			str(mod_check.get("message", "联机模式严禁加载第三方本地剧情/数值 MOD"))
+		)
+
 	# 气密级防越权守卫裁定：检查模式单向冻结（防热切换）与探针就绪报告
 	var mode_report: Variant = null
 	if mode == WorldGatewayModel.GameMode.SINGLE_PLAYER:
@@ -80,6 +117,10 @@ func select_mode(
 
 	if context.current_phase != WorldGatewayModel.GatewayPhase.GATEWAY_ENTERED:
 		return _fail("INVALID_TRANSITION", "未处于世界栏主界面，当前阶段: %d" % context.current_phase)
+
+	# 若为联机模式，强制卸载本地第三方模组，回退 Vanilla 原生核心并洗脱
+	if mode == WorldGatewayModel.GameMode.MULTIPLAYER:
+		purge_and_fallback_to_vanilla()
 
 	var slot_conversion: Dictionary = _convert_account_slots(account_slots)
 	if not bool(slot_conversion.get("success", false)):
@@ -184,11 +225,38 @@ func attach_ready_character(character_id: String) -> Dictionary:
 	})
 	return {"success": true, "phase": context.current_phase, "context": context.to_dto()}
 
-## 4. 正式进入具体游戏世界
-func enter_world() -> Dictionary:
+## 4. 正式进入具体游戏世界（校验 MOD 锁文件并同化虚空扰动）
+func enter_world(target_world_id: String = "", allow_safe_degrade: bool = false) -> Dictionary:
 	var allow_bypass: bool = GameConfig.get_bool("domains.world_gateway", "gateway_policy/allow_direct_world_bypass", false)
 	if not allow_bypass and context.current_phase != WorldGatewayModel.GatewayPhase.WORLD_ENTRY_PERMITTED:
 		return _fail("DIRECT_WORLD_BYPASS_BLOCKED", "禁止绕过世界网关直接进入世界，当前阶段: %d" % context.current_phase)
+
+	# 联机模式进入前置安全守卫核验与强制净化
+	if context.selected_mode == WorldGatewayModel.GameMode.MULTIPLAYER:
+		var mod_check := AntiBridgeGuard.validate_mod_realm_discipline(context.selected_mode, active_mods)
+		if not bool(mod_check.get("allowed", false)):
+			return _fail(
+				str(mod_check.get("error_code", AntiBridgeGuard.SECURITY_ERR_MULTIPLAYER_MOD_POISONING)),
+				str(mod_check.get("message", "联机模式严禁加载第三方本地剧情/数值 MOD"))
+			)
+		purge_and_fallback_to_vanilla()
+
+	var effective_world_id: String = target_world_id if not target_world_id.is_empty() else context.selected_world_id
+	if not effective_world_id.is_empty():
+		# 1. MOD 锁文件防坏档守卫核验（单机沙盒模式）
+		if context.selected_mode == WorldGatewayModel.GameMode.SINGLE_PLAYER or context.selected_mode == WorldGatewayModel.GameMode.UNSELECTED:
+			var installed_packs: Array = ModPackageDiscoverySolver.scan_installed_packs()
+			var affinity_mgr := WorldModAffinityManager.new()
+			var verify_res := affinity_mgr.verify_and_bind_world_mods(effective_world_id, installed_packs, allow_safe_degrade)
+			if not bool(verify_res.get("success", false)):
+				return _fail(
+					str(verify_res.get("error", "ERR_MISSING_CRITICAL_MOD")),
+					"进入世界时 MOD 锁文件校验失败: %s" % str(verify_res.get("missing_packs", []))
+				)
+
+			# 2. 外部虚空因果扰动同化
+			_assimilate_perturbations(effective_world_id)
+		context.selected_world_id = effective_world_id
 
 	context.current_phase = WorldGatewayModel.GatewayPhase.IN_WORLD
 	_notify_event("world_gateway.world_entered", {
@@ -198,6 +266,38 @@ func enter_world() -> Dictionary:
 		"character_id": context.active_character_id
 	})
 	return {"success": true, "phase": context.current_phase, "context": context.to_dto()}
+
+## 记录单个虚空同化片段至世界历史（独立抽离避免循环内瞬态堆分配）
+func _append_single_perturbation_fragment(world_inst: WorldInstance, p: CrossWorldPerturbationDTO) -> void:
+	var fragment: Dictionary = {
+		"event": "VOID_PERTURBATION_ASSIMILATED",
+		"type": "VOID_PERTURBATION_ASSIMILATED",
+		"perturbation_id": p.perturbation_id,
+		"origin_world_id": p.origin_world_id,
+		"resonance_intensity": p.resonance_intensity,
+		"timestamp_utc": int(Time.get_unix_time_from_system())
+	}
+	world_inst.append_history_fragment(fragment)
+
+## 拉取并同化外部虚空因果扰动至目标单机世界
+func _assimilate_perturbations(effective_world_id: String) -> void:
+	var broker := CrossWorldPerturbationBroker.get_instance()
+	if broker == null:
+		return
+	var perturbations: Array[CrossWorldPerturbationDTO] = broker.poll_perturbations_for_world(effective_world_id)
+	if perturbations.is_empty():
+		return
+	var repo := WorldArchiveRepository.get_instance()
+	if repo == null:
+		return
+	var world_inst: WorldInstance = repo.load_world(effective_world_id)
+	if world_inst == null:
+		return
+
+	for p in perturbations:
+		_append_single_perturbation_fragment(world_inst, p)
+		broker.mark_world_visited(p.perturbation_id, effective_world_id)
+	repo.save_world(world_inst)
 
 ## 5. 退回世界栏主界面并实施内存全量洗脱 (Full Memory Scrubbing)
 func exit_to_gateway() -> Dictionary:
@@ -209,6 +309,7 @@ func exit_to_gateway() -> Dictionary:
 	context.is_first_time_creation = false
 	context.current_phase = WorldGatewayModel.GatewayPhase.GATEWAY_ENTERED
 	_last_probe_reports.clear()
+	active_mods.clear()
 
 	_notify_event("world_gateway.memory_scrubbed", {
 		"account_id": context.account_id,
@@ -226,7 +327,7 @@ func _notify_event(channel: String, payload: Dictionary) -> void:
 	EventBusCore.get_instance().emit_domain_event(channel, payload)
 
 func _fail(code: String, msg: String) -> Dictionary:
-	return {"success": false, "error_code": code, "message": msg, "context": context.to_dto()}
+	return {"success": false, "error_code": code, "error": code, "message": msg, "context": context.to_dto()}
 
 func _load_worlds_catalog() -> Dictionary:
 	var raw_catalog: Dictionary = GameConfig.get_dict("domains.world_gateway", "worlds_catalog", {})

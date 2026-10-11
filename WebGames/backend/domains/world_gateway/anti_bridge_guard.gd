@@ -15,6 +15,7 @@ const SECURITY_ERR_MODE_NOT_READY: String = "SECURITY_ERR_MODE_NOT_READY"
 const SECURITY_ERR_MULTIPLAYER_UNAUTHORIZED: String = "SECURITY_ERR_MULTIPLAYER_UNAUTHORIZED"
 const SECURITY_ERR_SLOT_MODE_POISONING: String = "SECURITY_ERR_SLOT_MODE_POISONING"
 const SECURITY_ERR_NETWORK_MUTE_VIOLATION: String = "SECURITY_ERR_NETWORK_MUTE_VIOLATION"
+const SECURITY_ERR_MULTIPLAYER_MOD_POISONING: String = "SECURITY_ERR_MULTIPLAYER_MOD_POISONING"
 
 ## 校验模式跃迁安全性（模式单向冻结、探针就绪报告、联机白名单资质）
 static func validate_mode_transition(
@@ -99,7 +100,7 @@ static func _check_multiplayer_authorization(probe_report: Variant) -> Dictionar
 	return {"allowed": true, "error_code": "", "message": ""}
 
 ## 校验存档槽位模式亲和性（阻断单机槽位跨界渗透至联机界域）
-static func validate_slot_mode_affinity(slot_mode: int, target_mode: int) -> Dictionary:
+static func validate_slot_mode_affinity(slot_mode: int, target_mode: int, slot_mods: Array = []) -> Dictionary:
 	if slot_mode == WorldGatewayModel.GameMode.SINGLE_PLAYER and target_mode == WorldGatewayModel.GameMode.MULTIPLAYER:
 		return {
 			"allowed": false,
@@ -114,10 +115,91 @@ static func validate_slot_mode_affinity(slot_mode: int, target_mode: int) -> Dic
 			"message": "槽位运行模式与目标模式不匹配: 槽位模式 %d, 目标模式 %d" % [slot_mode, target_mode]
 		}
 
+	if target_mode == WorldGatewayModel.GameMode.MULTIPLAYER and not slot_mods.is_empty():
+		for m in slot_mods:
+			if not _is_vanilla_pack(m):
+				return {
+					"allowed": false,
+					"error_code": SECURITY_ERR_SLOT_MODE_POISONING,
+					"message": "带第三方 MOD 存档槽位严禁渗透至联机界域"
+				}
+
 	return {
 		"allowed": true,
 		"error_code": "",
 		"message": "槽位模式亲和性合规"
+	}
+
+## 判断指定模组项是否属于官方原生 Vanilla 模组
+static func is_vanilla_pack(mod_entry: Variant) -> bool:
+	return _is_vanilla_pack(mod_entry)
+
+## 模组官方 Vanilla 判定底层解算
+static func _is_vanilla_pack(mod_entry: Variant) -> bool:
+	if mod_entry is String:
+		var s := (mod_entry as String).to_lower()
+		return s == "vanilla" or s.begins_with("vanilla_") or s.begins_with("official_") or s == "core_vanilla"
+
+	var pid: String = ""
+	var is_vanilla_flag: bool = false
+	var author: String = ""
+
+	if mod_entry is Dictionary:
+		var d: Dictionary = mod_entry as Dictionary
+		is_vanilla_flag = bool(d.get("is_vanilla", false)) or bool(d.get("is_official", false))
+		pid = str(d.get("pack_id", d.get("id", "")))
+		author = str(d.get("author", ""))
+	elif mod_entry is Object:
+		var obj: Object = mod_entry as Object
+		if "is_vanilla" in obj:
+			is_vanilla_flag = bool(obj.get("is_vanilla"))
+		if not is_vanilla_flag and "is_official" in obj:
+			is_vanilla_flag = bool(obj.get("is_official"))
+		if "pack_id" in obj:
+			pid = str(obj.get("pack_id"))
+		if "author" in obj:
+			author = str(obj.get("author"))
+
+	if is_vanilla_flag:
+		return true
+
+	var pid_lower := pid.to_lower()
+	if pid_lower == "vanilla" or pid_lower.begins_with("vanilla_") or pid_lower.begins_with("official_") or pid_lower == "core_vanilla":
+		return true
+
+	var author_lower := author.to_lower()
+	if author_lower == "vanilla" or author_lower == "official":
+		return true
+
+	return false
+
+## 校验模组界域纪律（联机模式拦截第三方非 Vanilla 模组，单机沙盒放行）
+static func validate_mod_realm_discipline(target_mode: int, active_mods: Array) -> Dictionary:
+	if target_mode == WorldGatewayModel.GameMode.SINGLE_PLAYER:
+		return {
+			"allowed": true,
+			"error_code": "",
+			"message": "单机模组沙盒放行"
+		}
+
+	if target_mode == WorldGatewayModel.GameMode.MULTIPLAYER:
+		for mod_entry in active_mods:
+			if not _is_vanilla_pack(mod_entry):
+				return {
+					"allowed": false,
+					"error_code": SECURITY_ERR_MULTIPLAYER_MOD_POISONING,
+					"message": "联机模式严禁加载第三方本地剧情/数值 MOD"
+				}
+		return {
+			"allowed": true,
+			"error_code": "",
+			"message": "官方 Vanilla 原生包在联机模式下安全放行"
+		}
+
+	return {
+		"allowed": true,
+		"error_code": "",
+		"message": "未选定模式放行"
 	}
 
 ## 校验网络信道通信纪律（单机模式下网络信道静默）

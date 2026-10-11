@@ -1,5 +1,20 @@
 {
   "defaults": {
     "priority_weight": 100
+  },
+  "mod_discovery": {
+    "packages_root": "res://config/narratives/packs/",
+    "mods_install_rel": "mods/narratives/",
+    "mods_user_sandbox": "user://mods/narratives/",
+    "manifest_file": "pack.json",
+    "supported_formats": [
+      ".json"
+    ]
+  },
+  "perturbation_broker": {
+    "cross_world_file": "user://worlds/cross_world_perturbations.json",
+    "default_decay_half_life_seconds": 86400,
+    "max_retained_entries": 1000,
+    "min_resonance_threshold": 0.01
   }
 }
