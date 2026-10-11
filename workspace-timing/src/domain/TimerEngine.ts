@@ -91,8 +91,18 @@ export class TimerEngine {
             return data.idleTotalMs;
         }
         let total = 0;
-        for (const is of (data.idleSessions ?? [])) total += is.durationMs;
-        for (const bucket of Object.values(data.dailyTotals ?? {})) total += (bucket.idleTotalMs ?? 0);
+        const idleSessions = data.idleSessions;
+        if (idleSessions) {
+            for (let i = 0; i < idleSessions.length; i++) total += idleSessions[i].durationMs;
+        }
+        const dailyTotals = data.dailyTotals;
+        if (dailyTotals) {
+            for (const k in dailyTotals) {
+                if (Object.prototype.hasOwnProperty.call(dailyTotals, k)) {
+                    total += (dailyTotals[k].idleTotalMs ?? 0);
+                }
+            }
+        }
         return total;
     }
 
@@ -158,9 +168,13 @@ export class TimerEngine {
 
     private computeRawTodayIdle(): number {
         let idle = 0;
-        for (const is of (this._data.idleSessions ?? [])) {
-            const overlap = this.todayOverlap(is.startMs, is.endMs);
-            if (overlap > 0) idle += overlap;
+        const idleSessions = this._data.idleSessions;
+        if (idleSessions) {
+            for (let i = 0; i < idleSessions.length; i++) {
+                const is = idleSessions[i];
+                const overlap = this.todayOverlap(is.startMs, is.endMs);
+                if (overlap > 0) idle += overlap;
+            }
         }
         return idle;
     }

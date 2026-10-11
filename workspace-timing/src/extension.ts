@@ -220,8 +220,8 @@ export function activate(context: vscode.ExtensionContext): void {
 
         // ─── 无论有无工作区，命令必须注册 ───
         commandRegistrar = new CommandRegistrar();
-        // 注册全局与工作区级命令：注入 orchestrator 与 globalAggregatorRef 支持无工作区降级处理与全局数据重置
-        commandRegistrar.register(context, orchestrator, statusBar, globalAggregatorRef);
+        // 注册全局与工作区级命令：注入 orchestrator、statusBar、globalAggregatorRef 与 activityWatcher 支持模式切换与全局数据重置
+        commandRegistrar.register(context, orchestrator, statusBar, globalAggregatorRef, activityWatcher);
 
         const elapsed = Date.now() - startTime;
         log(LogLevel.Info, `WorkspaceTiming: activated in ${elapsed}ms`);

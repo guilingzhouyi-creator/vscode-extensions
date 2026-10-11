@@ -83,6 +83,13 @@ const zhCN: I18nStrings = {
   'toast.restoreFailed': '还原失败: {0}',
 
   'cmd.modeSwitched': '已切换至「{0}」模式',
+  'cmd.activityModeSwitched': '工作区计时: 活动模式已切换至「{0}」',
+  'cmd.activityModeManual': '工作区计时: 已锁定为人工开发模式',
+  'cmd.activityModeAi': '工作区计时: 已锁定为 AI 自主协作模式',
+  'cmd.activityModeAuto': '工作区计时: 已恢复为自动智能感知模式',
+  'mode.label.manual': '人工开发',
+  'mode.label.ai': 'AI 自主协作',
+  'mode.label.auto': '自动智能感知',
   'cmd.enabled': '工作区计时: 已启用',
   'cmd.disabled': '工作区计时: 已禁用',
   'cmd.globalEnabled': '工作区计时: 已全局启用',

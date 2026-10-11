@@ -11,5 +11,9 @@
   "workspaceTiming.newPeriod": "Workspace Timing: New Counting Period",
   "workspaceTiming.clearHistory": "Workspace Timing: Clear History (Keep Total)",
   "workspaceTiming.restore": "Workspace Timing: Restore from Backup",
-  "workspaceTiming.exportAggregated": "Workspace Timing: Export Aggregated CSV"
+  "workspaceTiming.exportAggregated": "Workspace Timing: Export Aggregated CSV",
+  "workspaceTiming.toggleActivityMode": "Workspace Timing: Toggle Activity Mode (Manual/AI/Auto)",
+  "workspaceTiming.setModeAi": "Workspace Timing: Switch to AI Collaboration Mode",
+  "workspaceTiming.setModeManual": "Workspace Timing: Switch to Manual Dev Mode",
+  "workspaceTiming.setModeAuto": "Workspace Timing: Switch to Auto Sensing Mode"
 }

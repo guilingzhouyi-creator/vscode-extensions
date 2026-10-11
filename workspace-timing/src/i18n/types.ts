@@ -85,6 +85,13 @@ export interface I18nStrings {
 
     /** 命令面板执行反馈契约：响应扩展命令调度与状态切换 (Command execution feedback contracts) */
     'cmd.modeSwitched': string;
+    'cmd.activityModeSwitched': string;
+    'cmd.activityModeManual': string;
+    'cmd.activityModeAi': string;
+    'cmd.activityModeAuto': string;
+    'mode.label.manual': string;
+    'mode.label.ai': string;
+    'mode.label.auto': string;
     'cmd.enabled': string;
     'cmd.disabled': string;
     'cmd.globalEnabled': string;

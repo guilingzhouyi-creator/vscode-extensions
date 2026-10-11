@@ -34,6 +34,8 @@ const MSG_GIT_BIND_FAILED = 'ActivityWatcher: failed to bind git extension';
 const MSG_GIT_READ_API_FAILED = 'ActivityWatcher: failed to read git api';
 const MSG_REPO_BIND_FAILED = 'ActivityWatcher: failed to bind repo';
 const MSG_WATCHER_DISPOSED = 'ActivityWatcher: disposed';
+const MSG_MODE_OVERRIDE_CLEARED = 'ActivityWatcher: mode override cleared, restored to auto sensing';
+const MSG_EXTERNAL_AI_TRIGGERED = 'ActivityWatcher: external AI activity triggered';
 
 /**
  * 架构契约：活动监听观察者回调端口 (ActivityWatcherListener)
@@ -68,14 +70,20 @@ export const DEFAULT_ACTIVITY_OPTIONS: Readonly<ActivityWatcherOptions> = {
     aiCooldownSeconds: DEFAULT_AI_COOLDOWN_SECONDS,
 };
 
-/** 键盘静默观察窗口（2000ms 无手动输入视为静默，此时外部变更转为 AI 模式） */
-const MANUAL_SILENCE_WINDOW_MS = 2 * MS_PER_SECOND;
+/** 排除的文件路径正则（严格忽略依赖、编译产物与测试覆盖率目录，O(M) 单 pass 匹配） */
+const IGNORED_PATH_REGEX = /[/\\](node_modules|\.git|dist|out|build|\.vscode-test|coverage)($|[/\\])/i;
 
-/** 排除的文件路径正则（严格忽略依赖、编译产物与元数据目录，O(M) 单 pass 匹配） */
-const IGNORED_PATH_REGEX = /[/\\](node_modules|\.git|dist|out|build|\.vscode-test|\.gemini|coverage)($|[/\\])/i;
+/** 智能体与自动化工具特征路径正则（命中时属 100% 确认的 AI/Agent 协作信号） */
+const AGENT_PATH_REGEX = /[/\\](\.agents|\.gemini|\.claude|\.cursor|scratch|\.refactor-trajectory)($|[/\\])/i;
 
-/** 判断给定的文件 URI 是否属于被忽略的目录 */
+/** 外部写盘与文件系统重载脉冲保护窗口（1200ms） */
+const EXTERNAL_AI_BURST_WINDOW_MS = 1200;
+
+/** 判断给定的文件 URI 是否属于被忽略的目录（命中 Agent 特征路径优先放行） */
 function isIgnoredUri(uri: vscode.Uri): boolean {
+    if (AGENT_PATH_REGEX.test(uri.fsPath)) {
+        return false;
+    }
     return IGNORED_PATH_REGEX.test(uri.fsPath);
 }
 
@@ -118,6 +126,8 @@ export class ActivityWatcher implements vscode.Disposable {
     private _aiDebounceTimer: NodeJS.Timeout | null = null;
     private _tickInterval: NodeJS.Timeout | null = null;
     private _isStarted: boolean = false;
+    private _modeOverride: ActivityMode | null = null;
+    private _lastExternalSignalMs: number = 0;
 
     constructor(
         options?: Partial<ActivityWatcherOptions>,
@@ -147,6 +157,61 @@ export class ActivityWatcher implements vscode.Disposable {
         return this._lastActivityMs;
     }
 
+    /** 运行时手动指定或清除模式覆盖 */
+    public setModeOverride(mode: ActivityMode | null): void {
+        this._modeOverride = mode;
+        const now = Date.now();
+        if (mode !== null) {
+            this._lastActivityMs = now;
+            if (mode === WATCHER_MODE_AI) {
+                this._lastAiActivityMs = now;
+            } else {
+                this._lastManualActivityMs = now;
+            }
+            this.setMode(mode, now);
+            this.notifyActivity(mode, now);
+            log(LogLevel.Info, `ActivityWatcher: mode override set to ${mode}`);
+        } else {
+            log(LogLevel.Info, MSG_MODE_OVERRIDE_CLEARED);
+        }
+    }
+
+    /** 获取当前模式覆盖状态 */
+    public getModeOverride(): ActivityMode | null {
+        return this._modeOverride;
+    }
+
+    /** 轮转模式覆盖：Auto(null) -> AI -> Manual -> Auto(null) */
+    public toggleModeOverride(): ActivityMode | null {
+        if (this._modeOverride === null) {
+            this.setModeOverride(WATCHER_MODE_AI);
+        } else if (this._modeOverride === WATCHER_MODE_AI) {
+            this.setModeOverride(WATCHER_MODE_MANUAL);
+        } else {
+            this.setModeOverride(null);
+        }
+        return this._modeOverride;
+    }
+
+    /** 主动触发外部 AI 活动心跳（由外部感知源或命令调用） */
+    public triggerAiActivity(_source?: string): void {
+        if (!this._options.aiDetectionEnabled) {
+            return;
+        }
+        if (this._modeOverride === WATCHER_MODE_MANUAL) {
+            return;
+        }
+        const now = Date.now();
+        this._lastAiActivityMs = now;
+        this._lastExternalSignalMs = now;
+        this._lastActivityMs = now;
+        log(LogLevel.Debug, MSG_EXTERNAL_AI_TRIGGERED);
+        if (this._mode !== WATCHER_MODE_AI) {
+            this.setMode(WATCHER_MODE_AI, now);
+        }
+        this.notifyActivity(WATCHER_MODE_AI, now);
+    }
+
     /** 动态更新配置项 */
     public updateConfig(options: Partial<ActivityWatcherOptions>): void {
         this._options = {
@@ -174,33 +239,85 @@ export class ActivityWatcher implements vscode.Disposable {
         log(LogLevel.Info, MSG_WATCHER_STARTED);
     }
 
-    /** 监听编辑器键盘输入与交互（强人工信号） */
+    /** 监听编辑器键盘输入与交互（智能区分主动键入与只读审阅/外部文档刷新） */
     private initEditorListeners(): void {
         this.subscriptions.push(
             vscode.workspace.onDidChangeTextDocument(e => {
-                if (e.contentChanges.length === 0) {
-                    return;
-                }
-                this.recordManualActivity();
+                this.handleDocumentChange(e);
             }),
         );
         this.subscriptions.push(
             vscode.window.onDidChangeTextEditorSelection(() => {
-                this.recordManualActivity();
+                this.handlePassiveInteraction();
             }),
         );
         this.subscriptions.push(
             vscode.window.onDidChangeTextEditorVisibleRanges(() => {
-                this.recordManualActivity();
+                this.handlePassiveInteraction();
             }),
         );
         this.subscriptions.push(
             vscode.window.onDidChangeWindowState(e => {
                 if (e.focused) {
-                    this.recordManualActivity();
+                    this.handlePassiveInteraction();
                 }
             }),
         );
+    }
+
+    /** 处理文档内容变更：区分前台手动输入与后台/重载外部写入 */
+    private handleDocumentChange(e: vscode.TextDocumentChangeEvent): void {
+        if (e.contentChanges.length === 0) {
+            return;
+        }
+        if (e.document.uri.scheme !== 'file' && e.document.uri.scheme !== 'untitled') {
+            return;
+        }
+        if (isIgnoredUri(e.document.uri)) {
+            return;
+        }
+
+        const activeDoc = vscode.window.activeTextEditor?.document;
+        const isForeground = activeDoc !== undefined && activeDoc.uri.toString() === e.document.uri.toString();
+        const now = Date.now();
+
+        // 后台文档发生写入，非当前前台键盘输入，确系外部 Agent/自动化工具写入
+        if (!isForeground) {
+            this.handleExternalSignal(e.document.uri);
+            return;
+        }
+
+        const change = e.contentChanges[0];
+        const isSingleKeyTyping = e.contentChanges.length === 1 && change.text.length <= 3 && !change.text.includes('\n');
+
+        // 前台文档若非单键打字且在外部写入短窗口（1200ms）内发生变动，极大概率是外部写盘后 VS Code 的文件重载
+        if (!isSingleKeyTyping && (now - this._lastExternalSignalMs < EXTERNAL_AI_BURST_WINDOW_MS)) {
+            this.handleExternalSignal(e.document.uri);
+            return;
+        }
+
+        // 否则判定为前台键盘输入，记录人工活动
+        this.recordManualActivity();
+    }
+
+    /** 处理选区、滚动与焦点等只读审阅操作（AI 协作冷却期内不强制切回人工） */
+    private handlePassiveInteraction(): void {
+        const now = Date.now();
+        const cooldownMs = this._options.aiCooldownSeconds * MS_PER_SECOND;
+
+        // 若当前处于 AI 模式且在冷却观察期内：用户移动选区或滚动属于“代码审阅/等待执行”，维持 AI 协作
+        if (this._mode === WATCHER_MODE_AI && (now - this._lastAiActivityMs < cooldownMs)) {
+            this._lastActivityMs = now;
+            return;
+        }
+
+        // 若用户手动锁定了 AI 模式，同样不切回人工
+        if (this._modeOverride === WATCHER_MODE_AI) {
+            this._lastActivityMs = now;
+            return;
+        }
+
+        this.recordManualActivity();
     }
 
     /** 监听文件系统源码变动（AI / Agent 外部写入信号） */
@@ -210,7 +327,7 @@ export class ActivityWatcher implements vscode.Disposable {
             if (isIgnoredUri(uri)) {
                 return;
             }
-            this.handleExternalSignal();
+            this.handleExternalSignal(uri);
         };
 
         this.subscriptions.push(
@@ -281,6 +398,11 @@ export class ActivityWatcher implements vscode.Disposable {
 
     /** 算法契约：记录人工活动并做 1000ms 窗口防抖心跳聚合 (Debounced heartbeat) */
     private recordManualActivity(): void {
+        if (this._modeOverride === WATCHER_MODE_AI) {
+            this._lastActivityMs = Date.now();
+            return;
+        }
+
         const now = Date.now();
         this._lastManualActivityMs = now;
         this._lastActivityMs = now;
@@ -307,16 +429,17 @@ export class ActivityWatcher implements vscode.Disposable {
     }
 
     /** 算法契约：处理外部信号（文件系统写入或 Git 变更，经 1000ms 窗口防抖节流） */
-    private handleExternalSignal(): void {
+    private handleExternalSignal(_uri?: vscode.Uri): void {
         if (!this._options.aiDetectionEnabled) {
             return;
         }
-        const now = Date.now();
-        if (now - this._lastManualActivityMs < MANUAL_SILENCE_WINDOW_MS) {
+        if (this._modeOverride === WATCHER_MODE_MANUAL) {
             return;
         }
 
+        const now = Date.now();
         this._lastAiActivityMs = now;
+        this._lastExternalSignalMs = now;
         this._lastActivityMs = now;
 
         if (this._mode !== WATCHER_MODE_AI) {
@@ -343,6 +466,12 @@ export class ActivityWatcher implements vscode.Disposable {
     /** 算法契约：周期性检测空闲超时阈值与 AI 冷却窗口 */
     private tick(): void {
         const now = Date.now();
+        if (this._modeOverride !== null) {
+            this._lastActivityMs = now;
+            this.notifyActivity(this._modeOverride, now);
+            return;
+        }
+
         if (this._mode === WATCHER_MODE_MANUAL) {
             this.checkManualIdle(now);
         } else if (this._mode === WATCHER_MODE_AI) {

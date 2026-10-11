@@ -1,7 +1,7 @@
 {
   "version": "1.2.0",
   "granularity": "grouped",
-  "timestamp": "2026-10-09T11:48:03.559Z",
+  "timestamp": "2026-10-11T03:34:05.257Z",
   "groups": [
     {
       "key": "governance|GOV-FIL-001|src/application/DashboardDataAssembler.ts",

@@ -83,6 +83,13 @@ const en: I18nStrings = {
   'toast.restoreFailed': 'Restore failed: {0}',
 
   'cmd.modeSwitched': 'Switched to "{0}" mode',
+  'cmd.activityModeSwitched': 'Workspace Timing: Activity mode switched to "{0}"',
+  'cmd.activityModeManual': 'Workspace Timing: Locked to Manual Development mode',
+  'cmd.activityModeAi': 'Workspace Timing: Locked to AI Autonomous Collaboration mode',
+  'cmd.activityModeAuto': 'Workspace Timing: Restored to Auto Smart Sensing mode',
+  'mode.label.manual': 'Manual Dev',
+  'mode.label.ai': 'AI Collaboration',
+  'mode.label.auto': 'Auto Sensing',
   'cmd.enabled': 'Workspace Timing: enabled',
   'cmd.disabled': 'Workspace Timing: disabled',
   'cmd.globalEnabled': 'Workspace Timing: globally enabled',

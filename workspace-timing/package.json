@@ -79,6 +79,22 @@
       {
         "command": "workspaceTiming.exportAggregated",
         "title": "%workspaceTiming.exportAggregated%"
+      },
+      {
+        "command": "workspaceTiming.toggleActivityMode",
+        "title": "%workspaceTiming.toggleActivityMode%"
+      },
+      {
+        "command": "workspaceTiming.setModeAi",
+        "title": "%workspaceTiming.setModeAi%"
+      },
+      {
+        "command": "workspaceTiming.setModeManual",
+        "title": "%workspaceTiming.setModeManual%"
+      },
+      {
+        "command": "workspaceTiming.setModeAuto",
+        "title": "%workspaceTiming.setModeAuto%"
       }
     ],
     "configuration": {

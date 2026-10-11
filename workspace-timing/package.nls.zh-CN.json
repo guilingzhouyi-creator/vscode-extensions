@@ -11,5 +11,9 @@
   "workspaceTiming.newPeriod": "工作区计时: 新建计时周期",
   "workspaceTiming.clearHistory": "工作区计时: 清除历史明细（保留累计）",
   "workspaceTiming.restore": "工作区计时: 从备份还原数据",
-  "workspaceTiming.exportAggregated": "工作区计时: 导出聚合数据 (CSV)"
+  "workspaceTiming.exportAggregated": "工作区计时: 导出聚合数据 (CSV)",
+  "workspaceTiming.toggleActivityMode": "工作区计时: 切换活动模式 (人工/AI/自动)",
+  "workspaceTiming.setModeAi": "工作区计时: 切换为 AI 自主协作模式",
+  "workspaceTiming.setModeManual": "工作区计时: 切换为人工开发模式",
+  "workspaceTiming.setModeAuto": "工作区计时: 切换为自动智能感知模式"
 }

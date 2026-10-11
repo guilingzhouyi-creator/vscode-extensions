@@ -16,6 +16,7 @@ import { LogLevel, log } from '../integration/Logger';
 import { persistTimingConfig } from '../integration/ConfigWatcher';
 import { t, format } from '../i18n/index';
 import { TimeAggregator } from '../domain/TimeAggregator';
+import { ActivityWatcher } from '../integration/ActivityWatcher';
 import { exportTimingToFile, exportAggregatedToFile } from './dashboardMessages';
 
 export class CommandRegistrar {
@@ -26,8 +27,9 @@ export class CommandRegistrar {
         orchestrator: TimerOrchestrator | null,
         statusBar: StatusBarController | null,
         globalAggregator: GlobalAggregator | null,
+        activityWatcher: ActivityWatcher | null = null,
     ): void {
-        this.registerSwitchCommands(orchestrator, statusBar);
+        this.registerSwitchCommands(orchestrator, statusBar, activityWatcher);
         this.registerDataControlCommands(orchestrator, statusBar, globalAggregator);
         this.registerViewAndExportCommands(context, orchestrator, statusBar);
 
@@ -41,6 +43,7 @@ export class CommandRegistrar {
     private registerSwitchCommands(
         orchestrator: TimerOrchestrator | null,
         statusBar: StatusBarController | null,
+        activityWatcher: ActivityWatcher | null = null,
     ): void {
         /** 注册启用计时命令契约：更新工作区配置并驱动状态机恢复就绪态 */
         this.registerCommand('workspaceTiming.enable', async () => {
@@ -88,6 +91,40 @@ export class CommandRegistrar {
             vscode.window.showInformationMessage(
                 format(t()['cmd.modeSwitched'], statusBarModeLabel(nextMode))
             );
+        });
+
+        /** 注册活动模式轮转切换命令契约（自动 -> AI协作 -> 人工开发 -> 自动） */
+        this.registerCommand('workspaceTiming.toggleActivityMode', () => {
+            if (!activityWatcher) { this.noWorkspaceMsg(); return; }
+            const nextOverride = activityWatcher.toggleModeOverride();
+            let label = t()['mode.label.auto'];
+            if (nextOverride === 'ai') {
+                label = t()['mode.label.ai'];
+            } else if (nextOverride === 'manual') {
+                label = t()['mode.label.manual'];
+            }
+            vscode.window.showInformationMessage(format(t()['cmd.activityModeSwitched'], label));
+        });
+
+        /** 注册强制锁定为 AI 协作模式命令 */
+        this.registerCommand('workspaceTiming.setModeAi', () => {
+            if (!activityWatcher) { this.noWorkspaceMsg(); return; }
+            activityWatcher.setModeOverride('ai');
+            vscode.window.showInformationMessage(t()['cmd.activityModeAi']);
+        });
+
+        /** 注册强制锁定为人工开发模式命令 */
+        this.registerCommand('workspaceTiming.setModeManual', () => {
+            if (!activityWatcher) { this.noWorkspaceMsg(); return; }
+            activityWatcher.setModeOverride('manual');
+            vscode.window.showInformationMessage(t()['cmd.activityModeManual']);
+        });
+
+        /** 注册恢复自动智能感知模式命令 */
+        this.registerCommand('workspaceTiming.setModeAuto', () => {
+            if (!activityWatcher) { this.noWorkspaceMsg(); return; }
+            activityWatcher.setModeOverride(null);
+            vscode.window.showInformationMessage(t()['cmd.activityModeAuto']);
         });
     }
 
