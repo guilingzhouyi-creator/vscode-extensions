@@ -258,6 +258,82 @@
       ]
     }
   },
+  "authoritative_reincarnation": {
+    "origins_pool": [
+      {
+        "origin_id": "IMPERIAL_NOBLE",
+        "weight": 30
+      },
+      {
+        "origin_id": "ELVEN_SCHOLAR",
+        "weight": 25
+      },
+      {
+        "origin_id": "DWARVEN_BLACKSMITH",
+        "weight": 25
+      },
+      {
+        "origin_id": "SHADOW_OUTCAST",
+        "weight": 20
+      }
+    ],
+    "origin_race_map": {
+      "IMPERIAL_NOBLE": "HUMAN",
+      "ELVEN_SCHOLAR": "ELF",
+      "DWARVEN_BLACKSMITH": "HUMAN",
+      "SHADOW_OUTCAST": "HUMAN"
+    },
+    "fallback_race": "HUMAN",
+    "fallback_origin": "IMPERIAL_NOBLE",
+    "fallback_region": "CENTRAL_CONTINENT",
+    "fallback_gender": "MALE",
+    "genders_pool": [
+      {
+        "gender": "MALE",
+        "weight": 50
+      },
+      {
+        "gender": "FEMALE",
+        "weight": 50
+      }
+    ],
+    "birth_region_map": {
+      "IMPERIAL_NOBLE": "CENTRAL_CONTINENT",
+      "ELVEN_SCHOLAR": "SILVER_FOREST",
+      "DWARVEN_BLACKSMITH": "SCORCHED_CANYON",
+      "SHADOW_OUTCAST": "VOID_ARCHIPELAGO"
+    },
+    "attribute_generation": {
+      "min_val": 1,
+      "max_val": 6,
+      "baseline": 3,
+      "total_points": 21,
+      "keys": [
+        "STR",
+        "CON",
+        "INT",
+        "AGI",
+        "SPR",
+        "VIT"
+      ]
+    },
+    "traits_allocation": {
+      "paired_presets": [
+        {
+          "positive": "PRIMORDIAL_RESONANCE",
+          "negative": "HEART_CORE_FISSURE",
+          "weight": 60
+        },
+        {
+          "positive": "GIANT_MIGHT",
+          "negative": "MANA_INSULATED",
+          "weight": 40
+        }
+      ],
+      "fallback_positive": "PRIMORDIAL_RESONANCE",
+      "fallback_negative": "HEART_CORE_FISSURE"
+    }
+  },
   "prologue_stages": {
     "1": {
       "narrative_key": "narrative/prologue/awakening",

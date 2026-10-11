@@ -16,6 +16,9 @@ static func run_all_tests() -> Dictionary:
 	# 文字版角色序章执行内核与占位符引擎（专属套件并入本域）
 	var prologue_pipeline_res := TestPrologueCoreAndPlaceholderPipeline.run_all_tests()
 	results.append_array(prologue_pipeline_res.get("results", []))
+	# 世界内角色权威创建与时空装配流水线（专属套件并入本域）
+	var authoritative_res := TestAuthoritativeCharacterCreationPipeline.run_all_tests()
+	results.append_array(authoritative_res.get("results", []))
 
 	var all_passed := true
 	for r in results:

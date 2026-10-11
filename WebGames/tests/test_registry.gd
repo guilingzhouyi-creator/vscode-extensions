@@ -118,10 +118,16 @@ const TestResourceCatalogAndAsyncConfigPipeline = preload("res://tests/integrati
 const TestObjectPoolAndBatchPipeline = preload("res://tests/unit/infrastructure/test_object_pool_and_batch_pipeline.gd")
 # 演进 01: 超大型子域多配置表目录拆分与泛化路由架构
 const TestConfigSubtablesDomain = preload("res://tests/unit/infrastructure/test_config_subtables.gd")
-# Phase 107: 内存泄漏生命周期防御与引用解环
+# 内存泄漏生命周期防御与引用解环流水线
 const TestMemoryLeakLifecycle = preload("res://tests/unit/infrastructure/test_memory_leak_lifecycle.gd")
-# Phase 108: 算法优化与瞬态分配消除
+# 算法优化与瞬态分配消除流水线
 const TestAlgorithmOptimizationPerformance = preload("res://tests/unit/infrastructure/test_algorithm_optimization_performance.gd")
+# 账号注册与物理持久化流水线
+const TestAccountRegistrationAndPersistence = preload("res://tests/integration/pipelines/test_account_registration_and_persistence.gd")
+# 世界档案库与模式探针防越权网关流水线
+const TestWorldArchiveAndAntiBridgePipeline = preload("res://tests/integration/pipelines/test_world_archive_and_anti_bridge_pipeline.gd")
+# 世界内角色权威创建与时空装配流水线
+const TestAuthoritativeCharacterCreationPipeline = preload("res://tests/integration/pipelines/test_authoritative_character_creation_pipeline.gd")
 
 # 前端 17 大系统白模与表现层测试套件
 const TestFE01AccountEntry = preload("res://tests/unit/frontend/test_fe_01_account_entry.gd")
