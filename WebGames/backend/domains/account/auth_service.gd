@@ -12,8 +12,11 @@ class_name AuthService extends RefCounted
 const AccountRegistrationDTO = preload("res://backend/domains/account/dto/account_registration_dto.gd")
 const AccountCompositeAuthDTO = preload("res://backend/domains/account/dto/account_composite_auth_dto.gd")
 const HudEventContract = preload("res://backend/domains/world_state/hud_event_contract.gd")
+const AccountRepository = preload("res://backend/domains/account/account_repository.gd")
 
 const DOMAIN_ACCOUNT_CONFIG: String = "domains.account"
+const DEFAULT_GUEST_NAME_RANGE_MIN: int = 1000
+const DEFAULT_GUEST_NAME_RANGE_MAX: int = 9999
 
 # ==============================================================================
 # 一、会话状态与口令加盐
@@ -41,9 +44,9 @@ static func create_guest_account(device_fingerprint: String = "", rng: Determini
 	acc.account_id = UniqueIdGenerator.next_id(prefix)
 	var name_prefix := GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "auth/guest_name_prefix", "ROGUE_")
 	# 局部变量更名为 name_range，避免遮蔽注入的 rng 参数
-	var name_range: Array = GameConfig.get_array(DOMAIN_ACCOUNT_CONFIG, "auth/guest_name_range", [1000, 9999])
-	var lo := int(name_range[0]) if name_range.size() > 0 else 1000
-	var hi := int(name_range[1]) if name_range.size() > 1 else 9999
+	var name_range: Array = GameConfig.get_array(DOMAIN_ACCOUNT_CONFIG, "auth/guest_name_range", [DEFAULT_GUEST_NAME_RANGE_MIN, DEFAULT_GUEST_NAME_RANGE_MAX])
+	var lo := int(name_range[0]) if name_range.size() > 0 else DEFAULT_GUEST_NAME_RANGE_MIN
+	var hi := int(name_range[1]) if name_range.size() > 1 else DEFAULT_GUEST_NAME_RANGE_MAX
 	acc.username = name_prefix + str(guest_rng.randi_range(lo, hi))
 	var guest_pass := GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "auth/guest_password", "GUEST_NO_PASS")
 	acc.password_hash_sha256 = hash_password(guest_pass)
@@ -67,9 +70,17 @@ static func register_account(request: AccountRegistrationDTO.Request, account_st
 		resp.error_code = GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "auth/errors/invalid_username_length", "ERR_INVALID_USERNAME_LENGTH")
 		return resp
 
-	for acc_id in account_store.keys():
-		var existing: AccountProfileAggregate = account_store[acc_id]
-		if existing != null and existing.username.to_lower() == request.username.to_lower():
+	if not account_store.is_empty():
+		for acc_id in account_store.keys():
+			var existing: AccountProfileAggregate = account_store[acc_id]
+			if existing != null and existing.username.to_lower() == request.username.to_lower():
+				resp.error_code = GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "auth/errors/account_already_exists", "ERR_ACCOUNT_ALREADY_EXISTS")
+				return resp
+	else:
+		var repo := AccountRepository.get_instance()
+		if not repo.is_loaded():
+			repo.load_all()
+		if repo.has_username(request.username):
 			resp.error_code = GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "auth/errors/account_already_exists", "ERR_ACCOUNT_ALREADY_EXISTS")
 			return resp
 
@@ -82,7 +93,16 @@ static func register_account(request: AccountRegistrationDTO.Request, account_st
 	acc.created_timestamp_utc = int(Time.get_unix_time_from_system())
 	acc.last_login_timestamp_utc = 0
 	acc.entitlements = request.initial_entitlements.duplicate()
-	account_store[acc.account_id] = acc
+
+	if not account_store.is_empty():
+		account_store[acc.account_id] = acc
+	else:
+		var repo := AccountRepository.get_instance()
+		var save_res := repo.save_account(acc)
+		if not bool(save_res.get("success", false)):
+			resp.error_code = String(save_res.get("error", "ERR_STORAGE_SAVE_FAILED"))
+			return resp
+		account_store[acc.account_id] = acc
 
 	resp.success = true
 	resp.error_code = GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "auth/errors/ok", "OK")
@@ -181,6 +201,8 @@ static func authenticate_local(username: String, pass_plain: String, account: Ac
 		if needs_rehash:
 			account.password_hash_sha256 = hash_password(pass_plain)
 			account.salt_version = 1
+			if not account.account_id.is_empty():
+				AccountRepository.get_instance().save_account(account)
 		account.last_login_timestamp_utc = int(Time.get_unix_time_from_system())
 		if not device_fingerprint.is_empty():
 			account.local_device_fingerprint = device_fingerprint
@@ -219,6 +241,34 @@ static func authenticate_local(username: String, pass_plain: String, account: Ac
 	var code_inv := GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "auth/errors/invalid_credentials", "ERR_INVALID_CREDENTIALS")
 	return {"success": false, "code": code_inv, "token": ""}
 
+static func _find_target_account_for_auth(username: String, account_store: Dictionary) -> AccountProfileAggregate:
+	if not account_store.is_empty():
+		for acc_id in account_store.keys():
+			var existing: AccountProfileAggregate = account_store[acc_id]
+			if existing != null and existing.username.to_lower() == username.to_lower():
+				return existing
+		return null
+	var repo := AccountRepository.get_instance()
+	if not repo.is_loaded():
+		repo.load_all()
+	return repo.find_by_username(username)
+
+static func _register_composite_target_account(request: AccountCompositeAuthDTO.Request, account_store: Dictionary) -> Dictionary:
+	var reg_req := AccountRegistrationDTO.Request.new()
+	reg_req.username = request.username
+	reg_req.password_plain = request.password_plain
+	reg_req.device_fingerprint = request.device_fingerprint
+	reg_req.initial_entitlements = request.initial_entitlements
+	var reg_resp := register_account(reg_req, account_store)
+	if not reg_resp.success:
+		return {"success": false, "error_code": reg_resp.error_code, "account": null}
+	var target_account: AccountProfileAggregate = null
+	if not account_store.is_empty():
+		target_account = account_store.get(reg_resp.account_id, null)
+	else:
+		target_account = AccountRepository.get_instance().find_by_id(reg_resp.account_id)
+	return {"success": true, "error_code": "", "account": target_account}
+
 ## 复合鉴权接口：支持自动注册/纯登录/纯注册三模流转
 static func composite_authenticate(request: AccountCompositeAuthDTO.Request, account_store: Dictionary = {}) -> AccountCompositeAuthDTO.Response:
 	var resp := AccountCompositeAuthDTO.Response.new()
@@ -226,27 +276,17 @@ static func composite_authenticate(request: AccountCompositeAuthDTO.Request, acc
 		resp.error_code = GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "auth/errors/invalid_credentials", "ERR_INVALID_CREDENTIALS")
 		return resp
 
-	var target_account: AccountProfileAggregate = null
-	for acc_id in account_store.keys():
-		var existing: AccountProfileAggregate = account_store[acc_id]
-		if existing != null and existing.username.to_lower() == request.username.to_lower():
-			target_account = existing
-			break
+	var target_account := _find_target_account_for_auth(request.username, account_store)
 
 	if target_account == null:
 		if request.action_mode == AccountCompositeAuthDTO.MODE_LOGIN_ONLY:
 			resp.error_code = GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "auth/errors/account_not_found", "ERR_ACCOUNT_NOT_FOUND")
 			return resp
-		var reg_req := AccountRegistrationDTO.Request.new()
-		reg_req.username = request.username
-		reg_req.password_plain = request.password_plain
-		reg_req.device_fingerprint = request.device_fingerprint
-		reg_req.initial_entitlements = request.initial_entitlements
-		var reg_resp := register_account(reg_req, account_store)
-		if not reg_resp.success:
-			resp.error_code = reg_resp.error_code
+		var reg_outcome := _register_composite_target_account(request, account_store)
+		if not bool(reg_outcome.get("success", false)):
+			resp.error_code = String(reg_outcome.get("error_code", "ERR_REGISTRATION_FAILED"))
 			return resp
-		target_account = account_store.get(reg_resp.account_id, null)
+		target_account = reg_outcome.get("account", null)
 		resp.is_new_registration = true
 
 	if request.action_mode == AccountCompositeAuthDTO.MODE_REGISTER_ONLY and not resp.is_new_registration:

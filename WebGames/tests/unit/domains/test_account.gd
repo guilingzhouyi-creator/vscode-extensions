@@ -7,6 +7,8 @@ class_name TestAccountDomain extends RefCounted
 const AccountProfileAggregate = preload("res://backend/domains/account/account_profile.gd")
 const AuthService = preload("res://backend/domains/account/auth_service.gd")
 const AccountSlotBindingSolver = preload("res://backend/domains/account/account_slot_binding_solver.gd")
+const AccountRepository = preload("res://backend/domains/account/account_repository.gd")
+const SaveDataAccessLayer = preload("res://backend/domains/persistence_protocol/save_data_access_layer.gd")
 
 static func run_all_tests() -> Dictionary:
 	var results: Array = []
@@ -101,7 +103,7 @@ static func test_entitlements_round_trip() -> Dictionary:
 	return {"test": "TC-ACC-07: entitlements 非空序列化往返（类型化数组兼容）", "passed": passed}
 
 static func test_entitlements_seal_tamper() -> Dictionary:
-	# P39 清单 6：密封密钥经环境供给——测试显式注入受控测试密钥（缺钥即失败关闭）
+	# 密封密钥经环境供给——测试显式注入受控测试密钥（缺钥即失败关闭）
 	OS.set_environment("KALAR_ENTITLEMENT_KEY", "test-seal-key-v1")
 	var acc := AccountProfileAggregate.new()
 	acc.account_id = "ACC_SEAL"
@@ -114,13 +116,41 @@ static func test_entitlements_seal_tamper() -> Dictionary:
 	return {"test": "TC-ACC-08: entitlements 存档密封防篡改（改档即回退空）", "passed": passed}
 
 static func test_character_creation_in_slot() -> Dictionary:
+	var repo := AccountRepository.get_instance()
 	var acc := AccountProfileAggregate.new()
 	acc.account_id = "ACC_003"
+	acc.username = "Artoria"
+	repo.save_account(acc)
+
 	var res := AccountSlotBindingSolver.create_character_in_slot(acc, "SLOT_01", "阿尔托莉雅", "见习冒险者", false)
+	var repo_acc: AccountProfileAggregate = repo.find_by_id("ACC_003")
+	var repo_synced: bool = repo_acc != null and repo_acc.is_slot_occupied("SLOT_01") \
+		and repo_acc.get_summary_by_slot("SLOT_01").character_name == "阿尔托莉雅"
+
 	var quick := AccountSlotBindingSolver.quick_create_in_next_slot(acc, "莫德雷德")
+
+	var prov_res := AccountSlotBindingSolver.create_character_in_slot(acc, "SLOT_03", "高文", "圆桌骑士", false, true, true)
+	var load_prov := SaveDataAccessLayer.load_game("SLOT_03")
+	var prov_ok: bool = bool(prov_res.get("success", false)) \
+		and bool(prov_res.get("provision_result", {}).get("success", false)) \
+		and bool(load_prov.get("success", false)) \
+		and load_prov.get("data", {}).get("character_info", {}).get("name", "") == "高文" \
+		and not acc.get_summary_by_slot("SLOT_03").save_file_sha256.is_empty()
+
 	var clear := AccountSlotBindingSolver.clear_slot(acc, "SLOT_01")
-	var passed: bool = res.success and quick.success and quick.slot_id == "SLOT_02" and clear.success and not acc.is_slot_occupied("SLOT_01")
-	return {"test": "TC-ACC-06: 创建角色第一步槽位落盘与快建/清理", "passed": passed}
+	var clear_synced: bool = repo_acc != null and not repo_acc.is_slot_occupied("SLOT_01")
+
+	var save_path := "user://saves/SLOT_03.json"
+	if FileAccess.file_exists(save_path):
+		DirAccess.remove_absolute(save_path)
+	var save_bak := save_path + ".bak"
+	if FileAccess.file_exists(save_bak):
+		DirAccess.remove_absolute(save_bak)
+	repo.delete_account("ACC_003")
+
+	var passed: bool = res.success and quick.success and quick.slot_id == "SLOT_02" \
+		and repo_synced and prov_ok and clear.success and clear_synced and not acc.is_slot_occupied("SLOT_01")
+	return {"test": "TC-ACC-06: 创建角色第一步槽位落盘与快建/清理（含仓储同步与物理预占）", "passed": passed}
 
 ## 会话有界化：签发超 session/max_entries 会话后
 ## 容器尺寸 ≤ 上限；过期条目先于有效条目被清理（过期优先裁剪语义）。
@@ -150,7 +180,7 @@ static func test_session_cap_pruning() -> Dictionary:
 				and not AuthService._sessions.has(key) \
 				and AuthService._sessions.size() <= max_entries \
 				and AuthService._sessions.size() <= size_before
-	var passed = cap_ok and expired_ok
+	var passed := cap_ok and expired_ok
 	return {
 		"test": "TC-ACC-08: 会话有界化（≤max_entries，过期条目优先清理）",
 		"passed": passed,

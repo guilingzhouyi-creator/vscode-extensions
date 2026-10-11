@@ -18,6 +18,8 @@ const GameLifecycleModel = preload("res://backend/domains/lifecycle/lifecycle_mo
 const GameLifecycleManager = preload("res://backend/domains/lifecycle/game_lifecycle_manager.gd")
 const CharacterPhysiologySheet = preload("res://backend/domains/lifecycle_physiology/physiology_entities.gd")
 const CharacterWalletEntity = preload("res://backend/domains/currency_economy/currency_entities.gd")
+const AccountRepository = preload("res://backend/domains/account/account_repository.gd")
+const AccountProfileAggregate = preload("res://backend/domains/account/account_profile.gd")
 
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
@@ -152,6 +154,15 @@ static func test_snapshot_injection_hydration_and_hud_sync() -> Dictionary:
 	var fsm = GameLifecycleManager.get_instance()
 	assert_eq(fsm.get_current_phase(), GameLifecycleModel.LifecyclePhase.RUNNING, "TC-SEH-05J: 状态机应已激活进入 RUNNING")
 
+	var repo := AccountRepository.get_instance()
+	assert_true(repo.has_account(snap.account_id), "TC-SEH-05K: AccountRepository 应已登记快照账号")
+	var hydrated_acc: AccountProfileAggregate = repo.find_by_id(snap.account_id)
+	assert_not_null(hydrated_acc, "TC-SEH-05L: 快照水化账号聚合不应为空")
+	assert_eq(hydrated_acc.username, snap.username, "TC-SEH-05M: 账号用户名应与快照一致")
+	assert_eq(hydrated_acc.active_slot_id, snap.slot_id, "TC-SEH-05N: 活跃槽位应正确注入")
+	var acc_by_name: AccountProfileAggregate = repo.find_by_username(snap.username)
+	assert_not_null(acc_by_name, "TC-SEH-05O: 用户名大小写不敏感索引应命中")
+
 	SnapshotInjectionSolver.teardown_snapshot(ctx)
 	return {"test": "TC-SEH-05: 全域快照注入水化与 HUD 首帧同步直达", "passed": true}
 
@@ -190,10 +201,17 @@ static func test_teardown_isolation_and_no_residual() -> Dictionary:
 	var res := SnapshotInjectionSolver.inject_and_hydrate(snap)
 	var ctx = res.get("session_context", null)
 
+	var repo_before := AccountRepository.get_instance()
+	assert_true(repo_before.has_account(snap.account_id), "TC-SEH-07A: 清理前账号应在仓储中就绪")
+
 	# 执行清理
 	SnapshotInjectionSolver.teardown_snapshot(ctx)
 
 	var fsm = GameLifecycleManager.get_instance()
-	assert_eq(fsm.get_current_phase(), GameLifecycleModel.LifecyclePhase.UNINITIALIZED, "TC-SEH-07A: 状态机应完全复位为 UNINITIALIZED")
+	assert_eq(fsm.get_current_phase(), GameLifecycleModel.LifecyclePhase.UNINITIALIZED, "TC-SEH-07B: 状态机应完全复位为 UNINITIALIZED")
+
+	var repo_after := AccountRepository.get_instance()
+	assert_false(repo_after.has_account(snap.account_id), "TC-SEH-07C: teardown 后仓储中账号应已被完全清理")
+	assert_eq(repo_after.get_account_count(), 0, "TC-SEH-07D: 仓储重置后账号数应为 0 零残留")
 
 	return {"test": "TC-SEH-07: 测试执行后对称清理与状态机反装配零残留", "passed": true}

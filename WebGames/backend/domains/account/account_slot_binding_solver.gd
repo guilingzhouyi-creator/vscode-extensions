@@ -10,6 +10,8 @@
 class_name AccountSlotBindingSolver extends RefCounted
 
 const DOMAIN_ACCOUNT_CONFIG := "domains.account"
+const AccountRepository = preload("res://backend/domains/account/account_repository.gd")
+const SaveDataAccessLayer = preload("res://backend/domains/persistence_protocol/save_data_access_layer.gd")
 
 # ==============================================================================
 # 一、创建角色与槽位绑定
@@ -18,13 +20,16 @@ const DOMAIN_ACCOUNT_CONFIG := "domains.account"
 ## 创建角色第一步：为指定账号的空槽位创建角色封面并绑定
 ## 边界：fallen 槽位（角色已死亡）可重挂新角色（零继承，slot_id 保持稳定）；
 ##       world_state_ref 经 ensure_account_world_ref 沿用账号当前世界（开关关闭不新建独立世界）。
+##       若 provision_disk 为 true（或配置 auto_provision_disk 开启），则预创建初始物理存档；
+##       若账号已注册于 AccountRepository，则同步持久化槽位摘要。
 static func create_character_in_slot(
 	account: AccountProfileAggregate,
 	slot_id: String,
 	character_name: String,
 	title_prefix: String = "",
 	is_permadeath: bool = false,
-	allow_default_fallback: bool = true
+	allow_default_fallback: bool = true,
+	provision_disk: bool = false
 ) -> Dictionary:
 	if account == null:
 		return {"success": false, "error_code": "INVALID_ACCOUNT"}
@@ -58,25 +63,57 @@ static func create_character_in_slot(
 	var bind_res := account.bind_character_to_slot(slot_id, dto)
 	if not bind_res.success:
 		return bind_res
+
+	var should_provision := provision_disk or GameConfig.get_bool(DOMAIN_ACCOUNT_CONFIG, "save_slot/auto_provision_disk", false)
+	var provision_res: Dictionary = {}
+	if should_provision:
+		var template: Dictionary = GameConfig.get_dict(DOMAIN_ACCOUNT_CONFIG, "save_slot/provision_template", {"level": 1, "gold": 0})
+		var init_payload := {
+			"version": 1,
+			"data": {
+				"character_info": {
+					"name": character_name,
+					"level": int(template.get("level", 1))
+				},
+				"wallet": {
+					"gold": int(template.get("gold", 0))
+				}
+			}
+		}
+		provision_res = SaveDataAccessLayer.save_game(slot_id, init_payload)
+		if bool(provision_res.get("success", false)):
+			dto.save_file_sha256 = str(provision_res.get("sha256", ""))
+
+	var repo := AccountRepository.get_instance()
+	if repo.has_account(account.account_id):
+		repo.save_account(account)
+
 	var world_ref := ensure_account_world_ref(account, allow_default_fallback)
-	return {"success": true, "slot_id": slot_id, "character_name": character_name, "account_id": account.account_id, "world_state_ref": world_ref}
+	return {
+		"success": true,
+		"slot_id": slot_id,
+		"character_name": character_name,
+		"account_id": account.account_id,
+		"world_state_ref": world_ref,
+		"provision_result": provision_res
+	}
 
 # ==============================================================================
 # 二、快捷创建 / 世界引用沿用 / 网关档位状态桥接 / 解绑
 # ==============================================================================
 
 ## 快捷创建：优先重挂 fallen 槽位，无 fallen 再自动选空槽（鼠标点击空槽热区触发）
-static func quick_create_in_next_slot(account: AccountProfileAggregate, character_name: String, allow_default_fallback: bool = true) -> Dictionary:
+static func quick_create_in_next_slot(account: AccountProfileAggregate, character_name: String, allow_default_fallback: bool = true, provision_disk: bool = false) -> Dictionary:
 	if account == null:
 		return {"success": false, "error_code": "INVALID_ACCOUNT"}
 	for slot_id in account.save_slot_summaries:
 		var dto: SaveSlotSummaryDTO = account.save_slot_summaries[slot_id]
 		if dto != null and dto.is_fallen:
-			return create_character_in_slot(account, str(slot_id), character_name, "", false, allow_default_fallback)
+			return create_character_in_slot(account, str(slot_id), character_name, "", false, allow_default_fallback, provision_disk)
 	var next_id := account.get_next_available_slot_id()
 	if next_id.is_empty():
 		return {"success": false, "error_code": "NO_AVAILABLE_SLOT"}
-	return create_character_in_slot(account, next_id, character_name, "", false, allow_default_fallback)
+	return create_character_in_slot(account, next_id, character_name, "", false, allow_default_fallback, provision_disk)
 
 ## 账号世界引用沿用：未接线严格模式下显式保留 UNBOUND 哨兵，不静默绑定默认世界
 static func ensure_account_world_ref(account: AccountProfileAggregate, allow_default_fallback: bool = true) -> String:
@@ -129,5 +166,8 @@ static func clear_slot(account: AccountProfileAggregate, slot_id: String) -> Dic
 	account.save_slot_summaries.erase(slot_id)
 	if account.active_slot_id == slot_id:
 		account.active_slot_id = ""
+	var repo := AccountRepository.get_instance()
+	if repo.has_account(account.account_id):
+		repo.save_account(account)
 	EventBusCore.get_instance().emit_domain_event("account.slot_cleared", {"args": [slot_id], "summary": {"slot_id": slot_id}})
 	return {"success": true, "slot_id": slot_id}

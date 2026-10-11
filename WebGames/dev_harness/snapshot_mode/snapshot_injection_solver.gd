@@ -22,10 +22,16 @@ const CharacterWalletEntity = preload("res://backend/domains/currency_economy/cu
 const AuthService = preload("res://backend/domains/account/auth_service.gd")
 const GameBootstrap = preload("res://backend/infrastructure/game_bootstrap.gd")
 const RuntimeModeGate = preload("res://backend/domains/persistence_protocol/runtime_mode_gate.gd")
+const AccountRepository = preload("res://backend/domains/account/account_repository.gd")
+const AccountProfileAggregate = preload("res://backend/domains/account/account_profile.gd")
+
+const STAGE_INDEX_HUD_SYNC: int = 6
+const STAGE_INDEX_FULL_EXIT: int = 10
 
 static var _active_context: SessionFlowContextDTO = null
 static var _active_wallet: CharacterWalletEntity = null
 static var _active_physiology: CharacterPhysiologySheet = null
+static var _injected_account_id: String = ""
 
 static func get_active_context() -> SessionFlowContextDTO:
 	return _active_context
@@ -35,6 +41,9 @@ static func get_active_wallet() -> CharacterWalletEntity:
 
 static func get_active_physiology() -> CharacterPhysiologySheet:
 	return _active_physiology
+
+static func get_injected_account_id() -> String:
+	return _injected_account_id
 
 ## 全域注入与状态水化入口
 static func inject_and_hydrate(snapshot: TestSnapshotBundleDTO, target_stage_key: String = "") -> Dictionary:
@@ -57,7 +66,13 @@ static func inject_and_hydrate(snapshot: TestSnapshotBundleDTO, target_stage_key
 	# 2. 基础系统装配就绪
 	GameBootstrap.assemble()
 
-	# 3. 构造生理实体与钱包实体
+	# 3. 账号实体组装并注册至 AccountRepository 仓储索引
+	if not _injected_account_id.is_empty():
+		AccountRepository.get_instance().delete_account(_injected_account_id)
+		_injected_account_id = ""
+	_injected_account_id = _hydrate_account_to_repository(snapshot)
+
+	# 4. 构造生理实体与钱包实体
 	var physiology := CharacterPhysiologySheet.new()
 	physiology.race_id = snapshot.race_id
 	var raw_attr = snapshot.attributes
@@ -72,7 +87,7 @@ static func inject_and_hydrate(snapshot: TestSnapshotBundleDTO, target_stage_key
 	wallet.platinum = int(snapshot.wallet_data.get("platinum", 0))
 	wallet.mana_monocrystals = int(snapshot.wallet_data.get("mana_monocrystals", 10))
 
-	# 4. 通过 SaveDataAccessLayer 进行全域数据反装配灌溉
+	# 5. 通过 SaveDataAccessLayer 进行全域数据反装配灌溉
 	var save_payload := {
 		"account": {
 			"account_id": snapshot.account_id,
@@ -126,7 +141,7 @@ static func inject_and_hydrate(snapshot: TestSnapshotBundleDTO, target_stage_key
 	var dal_res := SaveDataAccessLayer.apply_save_data(save_payload)
 	var restored_domains: Array = dal_res.get("restored", {}).keys()
 
-	# 5. 会话上下文 SessionFlowContextDTO 池化获取与全量注入
+	# 6. 会话上下文 SessionFlowContextDTO 池化获取与全量注入
 	var ctx := SessionFlowContextDTO.acquire()
 	ctx.account_id = snapshot.account_id if not snapshot.account_id.is_empty() else "ACC_DEV_INJECTED"
 	ctx.session_token = snapshot.session_token if not snapshot.session_token.is_empty() else "TOK_DEV_INJECTED"
@@ -138,13 +153,13 @@ static func inject_and_hydrate(snapshot: TestSnapshotBundleDTO, target_stage_key
 	ctx.gender = snapshot.gender
 	ctx.current_world_id = snapshot.world_id
 
-	# 6. 生命周期状态机跃迁推进至 RUNNING 态
+	# 7. 生命周期状态机跃迁推进至 RUNNING 态
 	GameLifecycleManager.reset_for_test()
 	var fsm = GameLifecycleManager.get_instance()
 	fsm.transition_to(GameLifecycleModel.LifecyclePhase.BOOT_INITIALIZING)
 	fsm.transition_to(GameLifecycleModel.LifecyclePhase.RUNNING)
 
-	# 7. 主界面 HUD 快照同步汇聚
+	# 8. 主界面 HUD 快照同步汇聚
 	var hud_snapshot: HudStatusSnapshotDTO = HudStateSyncService.trigger_initial_world_sync(
 		ctx.account_id,
 		ctx.character_id,
@@ -161,7 +176,7 @@ static func inject_and_hydrate(snapshot: TestSnapshotBundleDTO, target_stage_key
 	_active_wallet = wallet
 	_active_physiology = physiology
 
-	# 8. 目标阶段定位与桩位标记
+	# 9. 目标阶段定位与桩位标记
 	var effective_stage := target_stage_key if not target_stage_key.is_empty() else snapshot.target_stage_key
 	ctx.stage_results["INJECTED_SNAPSHOT"] = {
 		"snapshot_id": snapshot.snapshot_id,
@@ -179,11 +194,16 @@ static func inject_and_hydrate(snapshot: TestSnapshotBundleDTO, target_stage_key
 		"hydrated_domains": restored_domains,
 		"physiology_sheet": physiology,
 		"wallet_entity": wallet,
-		"snapshot_id": snapshot.snapshot_id
+		"snapshot_id": snapshot.snapshot_id,
+		"injected_account_id": _injected_account_id
 	}
 
 ## 测试结束后的对称清理与状态复位
 static func teardown_snapshot(ctx: SessionFlowContextDTO = null) -> void:
+	if not _injected_account_id.is_empty():
+		AccountRepository.get_instance().delete_account(_injected_account_id)
+		_injected_account_id = ""
+	AccountRepository.reset_for_tests()
 	_active_context = null
 	_active_wallet = null
 	_active_physiology = null
@@ -194,6 +214,23 @@ static func teardown_snapshot(ctx: SessionFlowContextDTO = null) -> void:
 	SaveDataAccessLayer.reset_for_tests()
 	RuntimeModeGate.reset_for_tests()
 	SnapshotEnvironmentGuard.reset_for_test()
+
+## 将快照账号实体水化注入 AccountRepository 仓储索引
+static func _hydrate_account_to_repository(snapshot: TestSnapshotBundleDTO) -> String:
+	if snapshot.account_id.is_empty() and snapshot.username.is_empty():
+		return ""
+	var acc := AccountProfileAggregate.new()
+	acc.account_id = snapshot.account_id if not snapshot.account_id.is_empty() else "ACC_DEV_INJECTED"
+	acc.username = snapshot.username if not snapshot.username.is_empty() else "DevAdventurer"
+	acc.active_slot_id = snapshot.slot_id if not snapshot.slot_id.is_empty() else "SLOT_01"
+	var target_world: String = snapshot.world_id if not snapshot.world_id.is_empty() else "WORLD_DEFAULT_SP_01"
+	acc.world_state_ref = target_world
+	acc.bind_world_slot(target_world, acc.active_slot_id)
+	var now_ts: int = int(Time.get_unix_time_from_system())
+	acc.created_timestamp_utc = now_ts
+	acc.last_login_timestamp_utc = now_ts
+	AccountRepository.get_instance().save_account(acc)
+	return acc.account_id
 
 ## 解析阶段键名对应的阶段序号
 static func _resolve_stage_index(stage_key: String) -> int:
@@ -207,5 +244,5 @@ static func _resolve_stage_index(stage_key: String) -> int:
 		"STAGE_07_ESC_MENU", "STAGE_07", "ESC_MENU": return 7
 		"STAGE_08_EXIT_REQUEST", "STAGE_08", "EXIT_REQUEST": return 8
 		"STAGE_09_SAVE_FLUSH", "STAGE_09", "SAVE_FLUSH": return 9
-		"STAGE_10_FULL_EXIT", "STAGE_10", "FULL_EXIT": return 10
-		_: return 6 # 默认进入主界面 HUD 阶段
+		"STAGE_10_FULL_EXIT", "STAGE_10", "FULL_EXIT": return STAGE_INDEX_FULL_EXIT
+		_: return STAGE_INDEX_HUD_SYNC # 默认进入主界面 HUD 阶段
