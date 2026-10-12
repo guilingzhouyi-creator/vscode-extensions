@@ -34,6 +34,17 @@ const VAR_RE = /^\s*\bvar\s+([a-zA-Z_$][a-zA-Z0-9_$]*)/;
 const RETURN_TRUE_RE = /return\s+[Tt]rue/;
 
 const KEYWORD_PASS = 'pass';
+const KEYWORD_VAR = 'var';
+const KEYWORD_TRUE_LOWER = 'true';
+const KEYWORD_TRUE_UPPER = 'True';
+const TRIGGER_RETURN_TRUE_LOWER = 'return true';
+const TRIGGER_RETURN_TRUE_UPPER = 'return True';
+const REDUNDANT_BOOL_TRIGGERS: readonly string[] = [
+    TRIGGER_RETURN_TRUE_LOWER,
+    TRIGGER_RETURN_TRUE_UPPER,
+];
+const MODERN_CONSTRUCT_TRIGGERS: readonly string[] = [KEYWORD_VAR, KEYWORD_PASS];
+const TOKEN_HYPHEN = '-';
 
 /** Languages supported for modern JavaScript/TypeScript construct checks. */
 const JS_TS_LANGUAGES: ReadonlySet<string> = new Set(['typescript', 'javascript']);
@@ -92,6 +103,7 @@ function checkBooleanRedundancyLine(
     lines: string[],
     violations: GovernanceViolation[],
 ): void {
+    if (!line.includes(KEYWORD_TRUE_LOWER) && !line.includes(KEYWORD_TRUE_UPPER)) return;
     if (!RETURN_TRUE_RE.test(line)) return;
 
     // Single line TS/JS: if (x) return true; else return false;
@@ -139,11 +151,15 @@ export const RedundantBooleanRule: GovernanceRule = {
     category: 'standardization',
     severity: 'warning',
     risk: 'low',
+    textTrigger: REDUNDANT_BOOL_TRIGGERS,
     rationale:
         'Redundant if-then-else returning boolean literals increases cyclomatic complexity and mental overhead.',
     isFixable: true,
     checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
-        if (!ctx.content.includes('return true') && !ctx.content.includes('return True')) {
+        if (
+            !ctx.content.includes(TRIGGER_RETURN_TRUE_LOWER) &&
+            !ctx.content.includes(TRIGGER_RETURN_TRUE_UPPER)
+        ) {
             return null;
         }
 
@@ -166,6 +182,7 @@ function checkModernJsTsLine(
     lineIndex: number,
     violations: GovernanceViolation[],
 ): void {
+    if (!line.includes(KEYWORD_VAR)) return;
     const trimmed = line.trim();
     if (trimmed.startsWith('//') || trimmed.startsWith('*')) return;
     const m = line.match(VAR_RE);
@@ -190,6 +207,7 @@ function checkGdscriptPassLine(
     i: number,
     violations: GovernanceViolation[],
 ): void {
+    if (!lines[i].includes(KEYWORD_PASS)) return;
     const line = lines[i].trim();
     const prevLine = lines[i - 1].trim();
     if (
@@ -217,7 +235,7 @@ function collectModernJsTsViolations(
     ctx: RuleEvaluationContext,
     violations: GovernanceViolation[],
 ): void {
-    if (!/\bvar\s+[a-zA-Z_$]/.test(ctx.content)) return;
+    if (!ctx.content.includes(KEYWORD_VAR) || !/\bvar\s+[a-zA-Z_$]/.test(ctx.content)) return;
     const lines = ctx.masked;
     for (let i = 0; i < lines.length; i++) {
         checkModernJsTsLine(lines[i], i, violations);
@@ -248,6 +266,7 @@ export const ModernConstructRule: GovernanceRule = {
     category: 'standardization',
     severity: 'warning',
     risk: 'low',
+    textTrigger: MODERN_CONSTRUCT_TRIGGERS,
     rationale:
         'Legacy constructs (e.g. `var` in modern TS/JS, dead `pass` in GDScript) violate language idiomatic standards.',
     isFixable: true,
@@ -349,6 +368,8 @@ function isRegisteredOrAliasRule(candidateId: string): boolean {
     return false;
 }
 
+const RULE_SUFFIX_RE = /-\d{3}\b/;
+
 /**
  * Evaluates candidate rule identifiers on a single source line against the rule registry.
  */
@@ -357,6 +378,7 @@ function inspectRuleCatalogLine(
     lineIndex: number,
     violations: GovernanceViolation[],
 ): void {
+    if (!line.includes(TOKEN_HYPHEN) || !RULE_SUFFIX_RE.test(line)) return;
     if (lineContainsIntegritySkipIdentifier(line)) return;
 
     CANDIDATE_RULE_RE.lastIndex = 0;
@@ -388,12 +410,13 @@ export const RuleCatalogIntegrityRule: GovernanceRule = {
     category: 'standardization',
     severity: 'error',
     risk: 'high',
+    textTrigger: TOKEN_HYPHEN,
     rationale:
         'Referencing unregistered or hallucinated rule identifiers causes documentation drift and breaks single-source governance verification.',
     isFixable: false,
     checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
         if (isExemptRuleCatalogPath(ctx.filePath)) return null;
-        if (!/-\d{3}\b/.test(ctx.content)) return null;
+        if (!RULE_SUFFIX_RE.test(ctx.content)) return null;
 
         const violations: GovernanceViolation[] = [];
         const lines = ctx.lines;

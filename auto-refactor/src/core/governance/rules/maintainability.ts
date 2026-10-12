@@ -43,6 +43,11 @@ const FORBIDDEN_IMPORT_PATTERNS = FORBIDDEN_IMPORTS.map((pkg) => ({
 }));
 
 const KEYWORD_EXTENDS = 'extends';
+const TOKEN_OPEN_PAREN = '(';
+const KEYWORD_FUNCTION = 'function';
+const KEYWORD_CONST = 'const';
+const KEYWORD_DEF = 'def';
+const KEYWORD_FUNC = 'func';
 
 const SUBCLASS_HEURISTIC_RE = /(?:Sub|Derived|Child)/;
 const UI_NODES_SET = new Set(['Control', 'Node2D', 'Node3D', 'CanvasItem']);
@@ -201,6 +206,16 @@ function extractParameterText(
     return null;
 }
 
+function hasFunctionStartToken(line: string): boolean {
+    if (!line.includes(TOKEN_OPEN_PAREN)) return false;
+    return (
+        line.includes(KEYWORD_FUNCTION) ||
+        line.includes(KEYWORD_CONST) ||
+        line.includes(KEYWORD_DEF) ||
+        line.includes(KEYWORD_FUNC)
+    );
+}
+
 function inspectFunctionAtLine(
     line: string,
     lines: string[],
@@ -208,6 +223,7 @@ function inspectFunctionAtLine(
     threshold: number,
     violations: GovernanceViolation[],
 ): void {
+    if (!hasFunctionStartToken(line)) return;
     const m = line.match(FUNC_START_RE) || line.match(PY_GD_FUNC_RE);
     if (!m) return;
 
@@ -235,6 +251,15 @@ function inspectFunctionAtLine(
 }
 
 /**
+ * Fast line-level filter for class inheritance statements.
+ */
+function isExtendsCandidateLine(line: string): boolean {
+    if (!line.includes(KEYWORD_EXTENDS) || !EXTENDS_KEYWORD_RE.test(line)) return false;
+    const trimmed = line.trim();
+    return !trimmed.startsWith('//') && !trimmed.startsWith('#');
+}
+
+/**
  * GOV-MNT-001: Excessive Class Inheritance Depth (SIM-INH-001 generalized).
  * Limits class inheritance depth to <= 2 (Composition over Inheritance).
  */
@@ -244,6 +269,7 @@ export const InheritanceDepthRule: GovernanceRule = {
     category: MAINTAINABILITY_CATEGORY,
     severity: SEVERITY_WARN,
     risk: RISK_MEDIUM,
+    textTrigger: KEYWORD_EXTENDS,
     rationale:
         'Deep class inheritance hierarchies (> 2 levels) introduce fragile base class problems; composition is preferred.',
     isFixable: false,
@@ -259,10 +285,9 @@ export const InheritanceDepthRule: GovernanceRule = {
 
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
-            if (!EXTENDS_KEYWORD_RE.test(line)) continue;
-            const trimmed = line.trim();
-            if (trimmed.startsWith('//') || trimmed.startsWith('#')) continue;
-            checkExtendsLine(line, i, isDomainOrBackend, violations);
+            if (isExtendsCandidateLine(line)) {
+                checkExtendsLine(line, i, isDomainOrBackend, violations);
+            }
         }
 
         return violations.length > 0 ? violations : null;
@@ -280,6 +305,7 @@ export const DomainDecouplingRule: GovernanceRule = {
     category: MAINTAINABILITY_CATEGORY,
     severity: SEVERITY_ERR,
     risk: RISK_CRITICAL,
+    textTrigger: FORBIDDEN_IMPORTS,
     rationale:
         'Domain layer must remain clean and portable; importing UI or CLI presentation frameworks introduces severe coupling.',
     isFixable: false,
@@ -308,6 +334,7 @@ export const DataClumpsRule: GovernanceRule = {
     category: MAINTAINABILITY_CATEGORY,
     severity: SEVERITY_INFO_LEVEL,
     risk: RISK_MEDIUM,
+    textTrigger: TOKEN_OPEN_PAREN,
     rationale:
         'Functions with excessive discrete scalar parameters (>= 5) exhibit Data Clumps smell; parameters should be aggregated into a named Context or Options interface.',
     isFixable: false,
@@ -320,6 +347,7 @@ export const DataClumpsRule: GovernanceRule = {
 
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
+            if (!hasFunctionStartToken(line)) continue;
             const trimmed = line.trim();
             if (!trimmed || trimmed.startsWith('//') || trimmed.startsWith('#')) continue;
 

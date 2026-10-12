@@ -29,7 +29,6 @@ import {
 import {
     findNearestManifestInventory,
     loadProjectManifestDependencies,
-    loadProjectManifestInventory,
 } from '../core/intelligence/dependency-provenance';
 
 /** Pattern detecting remote URLs. */

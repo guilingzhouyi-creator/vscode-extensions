@@ -346,16 +346,7 @@ export class ComplexityAnalyzer implements Analyzer {
         this.fileFunctions.push({ name, startLine, endLine, cc, lines: fnLines });
 
         const isExported = this.resolveIsExported(node, parent, fnLines);
-        this.checkElasticBudget(
-            node,
-            ctx,
-            name,
-            cc,
-            loc,
-            clarity.maxDepth,
-            startLine,
-            isExported,
-        );
+        this.checkElasticBudget(node, ctx, name, cc, loc, clarity.maxDepth, startLine, isExported);
         this.checkControlFlowNestingAndEscapes(
             node,
             ctx,

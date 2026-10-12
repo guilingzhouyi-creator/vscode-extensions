@@ -44,7 +44,32 @@ const SYNC_FS_RE =
     /\b(?:readFileSync|writeFileSync|appendFileSync|copyFileSync|readdirSync|accessSync|existsSync|statSync|lstatSync|rmSync|rmdirSync|mkdirSync|openSync|closeSync|renameSync|unlinkSync)\s*\(/;
 /** Substring pre-gate for SYNC_FS_RE — avoids running the long alternation
  *  on non-matching lines. */
-const syncFsPrefixedTest = createPrefixedTest('Sync', SYNC_FS_RE);
+const TRIGGER_SYNC = 'Sync';
+const TRIGGER_GAME_CONFIG = 'GameConfig.get_';
+const TRIGGER_JSON_PARSE = 'JSON.parse(';
+const TRIGGER_READ_FILE_SYNC = 'readFileSync(';
+const TRIGGER_NEW_REGEXP = 'new RegExp(';
+const LOOP_INVARIANT_TRIGGERS: readonly string[] = [
+    TRIGGER_GAME_CONFIG,
+    TRIGGER_JSON_PARSE,
+    TRIGGER_READ_FILE_SYNC,
+    TRIGGER_NEW_REGEXP,
+];
+
+const CALL_FIND = '.find(';
+const CALL_INDEX_OF = '.indexOf(';
+const CALL_INCLUDES = '.includes(';
+const CALL_SOME = '.some(';
+const CALL_FILTER = '.filter(';
+const LINEAR_SEARCH_TRIGGERS: readonly string[] = [
+    CALL_INDEX_OF,
+    CALL_INCLUDES,
+    CALL_FIND,
+    CALL_SOME,
+    CALL_FILTER,
+];
+
+const syncFsPrefixedTest = createPrefixedTest(TRIGGER_SYNC, SYNC_FS_RE);
 
 /**
  * Checks if a line in a loop body executes an expensive loop-invariant operation.
@@ -129,6 +154,7 @@ export const LoopInvariantRule: GovernanceRule = {
     category: PERFORMANCE_CATEGORY,
     severity: SEVERITY_WARN,
     risk: RISK_HIGH,
+    textTrigger: LOOP_INVARIANT_TRIGGERS,
     rationale:
         'Performing invariant I/O, regex construction, or repetitive configuration lookups in loops incurs severe CPU/throughput penalties.',
     isFixable: false,
@@ -165,6 +191,13 @@ const METHOD_INDEXOF = 'indexOf';
  * Evaluates whether a line within a loop body performs an unindexed linear search.
  */
 function checkLinearSearchHit(line: string, lineIndex: number): GovernanceViolation | null {
+    if (
+        !line.includes(CALL_FIND) &&
+        !line.includes(CALL_INDEX_OF) &&
+        !line.includes(CALL_INCLUDES)
+    ) {
+        return null;
+    }
     const m = line.match(LINEAR_SEARCH_RE);
     if (!m) return null;
     // TEXT_VARIABLE_RE has a long alternation chain. It is only tested against
@@ -257,11 +290,11 @@ const LOOP_DETECT_RE = /\b(?:for|while)\s*\(/;
 
 function hasLoopLinearSearchPreCheck(content: string): boolean {
     if (
-        !content.includes('.indexOf(') &&
-        !content.includes('.includes(') &&
-        !content.includes('.find(') &&
-        !content.includes('.some(') &&
-        !content.includes('.filter(')
+        !content.includes(CALL_INDEX_OF) &&
+        !content.includes(CALL_INCLUDES) &&
+        !content.includes(CALL_FIND) &&
+        !content.includes(CALL_SOME) &&
+        !content.includes(CALL_FILTER)
     ) {
         return false;
     }
@@ -287,6 +320,7 @@ export const InLoopLinearSearchRule: GovernanceRule = {
     category: PERFORMANCE_CATEGORY,
     severity: SEVERITY_INFO_LEVEL,
     risk: RISK_MEDIUM,
+    textTrigger: LINEAR_SEARCH_TRIGGERS,
     rationale:
         'Calling linear search (.find / .indexOf / .includes) inside a loop scales at O(N*M); pre-indexing in Map/Set optimizes to O(N).',
     isFixable: false,
@@ -309,6 +343,7 @@ export const InLoopArrayPreHashRule: GovernanceRule = {
     category: PERFORMANCE_CATEGORY,
     severity: SEVERITY_INFO_LEVEL,
     risk: RISK_MEDIUM,
+    textTrigger: LINEAR_SEARCH_TRIGGERS,
     rationale:
         'Calling array linear search (.includes / .indexOf) inside a loop degrades performance to O(N*M); pre-indexing in a Set outside the loop optimizes to O(1).',
     isFixable: false,
@@ -332,6 +367,7 @@ export const TimerLiteralRule: GovernanceRule = {
     severity: SEVERITY_WARN,
     risk: RISK_MEDIUM,
     languages: ['typescript', 'javascript'],
+    textTrigger: [FN_SET_TIMEOUT, FN_SET_INTERVAL],
     rationale:
         'Hardcoded timer delays bypass centralized clamping and platform-specific background throttling.',
     isFixable: false,
@@ -366,7 +402,7 @@ export const SyncIoRule: GovernanceRule = {
     rationale:
         'Synchronous file I/O blocks the host JavaScript event loop, causing severe UI freezes or stalling concurrent request processing.',
     isFixable: false,
-    textTrigger: 'Sync',
+    textTrigger: TRIGGER_SYNC,
     checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
         if (/\.(d\.ts)$/.test(ctx.filePath)) return null;
         if (/(^|\/)(tests?|__tests__)\//.test(ctx.filePath)) return null;

@@ -167,8 +167,13 @@ export class GovernanceRegistry {
     buildTextTrigger(rules: GovernanceRule[]): RegExp | null {
         const triggers: string[] = [];
         for (const rule of rules) {
-            if (rule.textTrigger) {
+            if (!rule.textTrigger) continue;
+            if (typeof rule.textTrigger === 'string') {
                 triggers.push(rule.textTrigger);
+            } else {
+                for (let i = 0; i < rule.textTrigger.length; i++) {
+                    triggers.push(rule.textTrigger[i]);
+                }
             }
         }
         if (triggers.length === 0) return null;

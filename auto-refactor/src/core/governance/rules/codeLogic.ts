@@ -41,7 +41,11 @@ const RETURN_KEYWORDS: ReadonlySet<string> = new Set(['return']);
 const EXEMPT_PRECISION_FILENAMES: ReadonlySet<string> = new Set(['compact-ledger-store.ts']);
 
 /** Keywords and identifiers triggering lossy precision checks. */
-const PRECISION_TRIGGER_TOKENS: ReadonlySet<string> = new Set(['Math', 'toFixed']);
+const TOKEN_MATH = 'Math';
+const TOKEN_MATH_DOT = 'Math.';
+const TOKEN_TO_FIXED = 'toFixed';
+const PRECISION_TRIGGER_TOKENS: ReadonlySet<string> = new Set([TOKEN_MATH, TOKEN_TO_FIXED]);
+const PRECISION_TEXT_TRIGGERS: readonly string[] = [TOKEN_MATH_DOT, TOKEN_TO_FIXED];
 
 const KEYWORD_RETURN = 'return';
 
@@ -146,6 +150,7 @@ export const ExcessiveNestingRule: GovernanceRule = {
  * Checks whether a line contains the return keyword token using library lookup.
  */
 function lineHasReturnKeyword(line: string): boolean {
+    if (!line.includes(KEYWORD_RETURN)) return false;
     const tokens = line.split(/[^a-zA-Z0-9_$]+/);
     for (let i = 0; i < tokens.length; i++) {
         if (RETURN_KEYWORDS.has(tokens[i])) return true;
@@ -200,6 +205,7 @@ export const VacuousWrapperRule: GovernanceRule = {
     rationale:
         'Vacuous wrapper methods that purely forward calls without validation or translation add unnecessary indirection.',
     isFixable: false,
+    textTrigger: KEYWORD_RETURN,
     targetKinds: [NodeKind.Function, NodeKind.Method],
     checkNode(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
         if (!ctx.content.includes(KEYWORD_RETURN)) return null;
@@ -266,6 +272,7 @@ function evaluatePrecisionMatch(
  * Inspects a single masked code line for lossy precision truncation violations.
  */
 function checkPrecisionLine(line: string, lineIndex: number): GovernanceViolation | null {
+    if (!line.includes(TOKEN_MATH) && !line.includes(TOKEN_TO_FIXED)) return null;
     const { hasMath, hasToFixed } = lineHasPrecisionTrigger(line);
     if (!hasMath && !hasToFixed) return null;
 
@@ -311,6 +318,7 @@ export const LossyPrecisionRoundingRule: GovernanceRule = {
     category: 'code_logic',
     severity: 'warning',
     risk: 'medium',
+    textTrigger: PRECISION_TEXT_TRIGGERS,
     rationale:
         'Lossy precision rounding (such as * 10 / 10 or toFixed(1)) introduces truncation errors,' +
         ' IEEE 754 drift, and false equivalence in score arbitration.',
@@ -318,7 +326,8 @@ export const LossyPrecisionRoundingRule: GovernanceRule = {
     checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
         if (isToolOrTestScript(ctx.filePath)) return null;
         if (isExemptPrecisionFilePath(ctx.filePath)) return null;
-        if (!ctx.content.includes('Math.') && !ctx.content.includes('toFixed')) return null;
+        if (!ctx.content.includes(TOKEN_MATH_DOT) && !ctx.content.includes(TOKEN_TO_FIXED))
+            return null;
 
         const violations: GovernanceViolation[] = [];
         const lines = ctx.masked;

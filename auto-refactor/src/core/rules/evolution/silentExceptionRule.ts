@@ -23,6 +23,9 @@ const JS_CATCH_HEAD_RE = /catch\s*(?:\([^)]*\))?\s*\{/;
 /** Regular expression identifying Python except headers. */
 const PY_EXCEPT_HEAD_RE = /^\s*except(?:\s+[^:]*)?:/;
 
+const KEYWORD_CATCH = 'catch';
+const KEYWORD_EXCEPT = 'except';
+
 /**
  * Checks a JS/TS catch block body starting after the opening brace.
  *
@@ -76,6 +79,15 @@ function inspectJsPseudoCatch(
     return { isPseudoCatch, hasRationale, lastIndex: j };
 }
 
+function findJsCatchHeaderColumn(line: string): number {
+    if (!line.includes(KEYWORD_CATCH)) return -1;
+    const trimmed = line.trim();
+    if (trimmed.startsWith('//') || trimmed.startsWith('*') || !JS_CATCH_HEAD_RE.test(trimmed)) {
+        return -1;
+    }
+    return line.indexOf(KEYWORD_CATCH) + 1;
+}
+
 /**
  * Audits JavaScript and TypeScript lines for GOV-EXC-003 violations.
  *
@@ -86,29 +98,24 @@ export function checkJsTsSilentExceptions(lines: readonly string[]): GovernanceV
     const violations: GovernanceViolation[] = [];
 
     for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        const trimmed = line.trim();
-        if (trimmed.startsWith('//') || trimmed.startsWith('*')) {
-            continue;
-        }
+        const catchCol = findJsCatchHeaderColumn(lines[i]);
+        if (catchCol === -1) continue;
 
-        if (JS_CATCH_HEAD_RE.test(trimmed)) {
-            const block = inspectJsPseudoCatch(lines, i + 1);
-            if (block.isPseudoCatch && !block.hasRationale) {
-                violations.push({
-                    ruleId: GOV_EXC_SILENT_RULE_ID,
-                    message:
-                        'Pseudo-catch block silently swallows exceptions with dummy statements ' +
-                        'and no documented rationale.',
-                    line: i + 1,
-                    column: line.indexOf('catch') + 1,
-                    suggestion:
-                        'Add structured error logging, re-throw the error, or document the rationale ' +
-                        'with an explicit keyword (e.g. /* best-effort */ or /* expected */).',
-                    fixable: false,
-                });
-                i = block.lastIndex;
-            }
+        const block = inspectJsPseudoCatch(lines, i + 1);
+        if (block.isPseudoCatch && !block.hasRationale) {
+            violations.push({
+                ruleId: GOV_EXC_SILENT_RULE_ID,
+                message:
+                    'Pseudo-catch block silently swallows exceptions with dummy statements ' +
+                    'and no documented rationale.',
+                line: i + 1,
+                column: catchCol,
+                suggestion:
+                    'Add structured error logging, re-throw the error, or document the rationale ' +
+                    'with an explicit keyword (e.g. /* best-effort */ or /* expected */).',
+                fixable: false,
+            });
+            i = block.lastIndex;
         }
     }
 
@@ -163,6 +170,15 @@ function inspectPythonPseudoCatch(
     return { isPseudoCatch, hasRationale, lastIndex: j };
 }
 
+function findPythonExceptHeaderColumn(line: string): number {
+    if (!line.includes(KEYWORD_EXCEPT)) return -1;
+    const trimmed = line.trim();
+    if (trimmed.startsWith('#') || !PY_EXCEPT_HEAD_RE.test(trimmed) || !trimmed.endsWith(':')) {
+        return -1;
+    }
+    return line.indexOf(KEYWORD_EXCEPT) + 1;
+}
+
 /**
  * Audits Python lines for GOV-EXC-003 violations.
  *
@@ -174,11 +190,10 @@ export function checkPythonSilentExceptions(lines: readonly string[]): Governanc
 
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
-        const trimmed = line.trim();
-        if (trimmed.startsWith('#') || !PY_EXCEPT_HEAD_RE.test(trimmed) || !trimmed.endsWith(':')) {
-            continue;
-        }
+        const exceptCol = findPythonExceptHeaderColumn(line);
+        if (exceptCol === -1) continue;
 
+        const trimmed = line.trim();
         const indent = line.search(/\S/);
         const block = inspectPythonPseudoCatch(lines, i + 1, indent, trimmed);
         if (!block.isPseudoCatch || block.hasRationale) {
@@ -191,7 +206,7 @@ export function checkPythonSilentExceptions(lines: readonly string[]): Governanc
                 'Pseudo-catch except block silently swallows exceptions with dummy ' +
                 'statements and no documented rationale.',
             line: i + 1,
-            column: line.indexOf('except') + 1,
+            column: exceptCol,
             suggestion:
                 'Log the caught exception, re-raise it, or document why silent handling ' +
                 'is intentional (e.g. # best-effort or # expected).',

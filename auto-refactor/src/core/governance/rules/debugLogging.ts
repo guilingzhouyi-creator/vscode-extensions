@@ -60,6 +60,10 @@ function getDbgPatterns(identifiers: string[]): CachedDbgPattern[] {
  * GOV-DBG-001: Diagnostic & Debug Statements in Production Code.
  * Ensures debugging statements do not leak into production paths.
  */
+function matchesDbgPattern(line: string, pat: CachedDbgPattern): boolean {
+    return line.includes(pat.id) && pat.wordRe.test(line) && pat.callRe.test(line);
+}
+
 /**
  * Checks a single masked line against active diagnostic patterns.
  */
@@ -86,21 +90,18 @@ function checkDebugLine(
 
     for (let pIdx = 0; pIdx < patterns.length; pIdx++) {
         const pat = patterns[pIdx];
-        if (!pat.wordRe.test(line)) continue;
+        if (!matchesDbgPattern(line, pat)) continue;
 
-        if (pat.callRe.test(line)) {
-            const m = line.match(pat.wordRe);
-            violations.push({
-                ruleId: 'GOV-DBG-001',
-                message: `Diagnostic call \`${pat.id}\` found in production file.`,
-                line: lineIndex + 1,
-                column: m && m.index != null ? m.index + 1 : line.search(pat.wordRe) + 1,
-                suggestion:
-                    'Remove debug statement or route through a configurable Logger interface.',
-                fixable: false,
-            });
-            break;
-        }
+        const m = line.match(pat.wordRe);
+        violations.push({
+            ruleId: 'GOV-DBG-001',
+            message: `Diagnostic call \`${pat.id}\` found in production file.`,
+            line: lineIndex + 1,
+            column: m && m.index != null ? m.index + 1 : line.search(pat.wordRe) + 1,
+            suggestion: 'Remove debug statement or route through a configurable Logger interface.',
+            fixable: false,
+        });
+        break;
     }
 }
 
@@ -132,9 +133,11 @@ export const DiagnosticLeakRule: GovernanceRule = {
 
         const violations: GovernanceViolation[] = [];
         const lines = ctx.masked;
-        const patterns = getDbgPatterns(ctx.capabilities.debugIdentifiers);
+        const patterns = getDbgPatterns(ctx.capabilities.debugIdentifiers).filter((p) =>
+            ctx.content.includes(p.id),
+        );
 
-        if (!patterns.some((p) => ctx.content.includes(p.id))) {
+        if (patterns.length === 0) {
             return null;
         }
 

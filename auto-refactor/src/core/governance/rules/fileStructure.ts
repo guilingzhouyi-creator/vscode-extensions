@@ -287,6 +287,15 @@ export function classifyArchitecturalTier(filePath: string): string {
     return 'other';
 }
 
+const TOKEN_IMPORT = 'import';
+const TOKEN_REQUIRE = 'require';
+const TOKEN_LOAD = 'load';
+const BLAST_RADIUS_TRIGGERS: readonly string[] = [TOKEN_IMPORT, TOKEN_REQUIRE, TOKEN_LOAD];
+
+function hasImportOrRequireToken(line: string): boolean {
+    return line.includes(TOKEN_IMPORT) || line.includes(TOKEN_REQUIRE) || line.includes(TOKEN_LOAD);
+}
+
 /**
  * Evaluates whether blast radius scan should be skipped for this file.
  */
@@ -294,7 +303,7 @@ function shouldSkipBlastRadiusScan(ctx: RuleEvaluationContext): boolean {
     if (isToolOrTestScript(ctx.filePath)) {
         return true;
     }
-    return !ctx.content.includes('import') && !ctx.content.includes('require');
+    return !ctx.content.includes(TOKEN_IMPORT) && !ctx.content.includes(TOKEN_REQUIRE);
 }
 
 /**
@@ -316,6 +325,9 @@ function collectImportedTiers(filePath: string, lines: readonly string[]): Set<s
 
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
+        if (!hasImportOrRequireToken(line)) {
+            continue;
+        }
         IMPORT_OR_REQUIRE_RE.lastIndex = 0;
         let match: RegExpExecArray | null;
         while ((match = IMPORT_OR_REQUIRE_RE.exec(line)) !== null) {
@@ -359,6 +371,7 @@ export const BlastRadiusGuardRule: GovernanceRule = {
     category: 'file_structure',
     severity: 'warning',
     risk: 'medium',
+    textTrigger: BLAST_RADIUS_TRIGGERS,
     rationale:
         'Monolithic coupling across multiple orthogonal tiers (docs, config, domain, contracts, tooling) increases blast radius and impedes atomic review.',
     isFixable: false,

@@ -260,10 +260,7 @@ function runTests() {
       !privateResult.isExceeded,
       'Private helper with CC=17 stays within elastic budget due to 1.2x bonus',
     );
-    assert(
-      exportedResult.isExceeded,
-      'Exported function with CC=17 exceeds standard budget',
-    );
+    assert(exportedResult.isExceeded, 'Exported function with CC=17 exceeds standard budget');
   }
 
   console.log(`\nElastic Complexity Budget Tests: ${passedCount}/${totalCount} passed.`);

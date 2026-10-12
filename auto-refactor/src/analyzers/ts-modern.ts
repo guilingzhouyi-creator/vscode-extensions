@@ -585,26 +585,25 @@ export class TsModernAnalyzer implements Analyzer {
         const matchingLines = lineIndexByWord?.get(name);
         if (matchingLines && matchingLines.size === 0) return false;
 
-        const escaped = escapeRegExp(name);
-        const word = new RegExp(`\\b${escaped}\\b`, 'g');
-        const fallbackWord = matchingLines ? null : new RegExp(`\\b${escaped}\\b`);
-        const typePatterns = [
-            new RegExp(`:\\s*${escaped}\\b`, 'g'),
-            new RegExp(`\\bas\\s+${escaped}\\b`, 'g'),
-            new RegExp(`<\\s*${escaped}\\s*[,>]`, 'g'),
-            new RegExp(`\\bextends\\s+${escaped}\\b`, 'g'),
-            new RegExp(`\\bimplements\\s+${escaped}\\b`, 'g'),
-            new RegExp(`[|&]\\s*${escaped}\\b`, 'g'),
-            new RegExp(`\\b${escaped}\\s*[|&]`, 'g'),
-            new RegExp(`\\b${escaped}\\s*\\[\\s*\\]`, 'g'),
-        ];
+        const { word, fallbackWord, typePatterns } = getCompiledTypePatterns(name);
         let total = 0;
         let typed = 0;
+
+        if (matchingLines) {
+            for (const index of matchingLines) {
+                if (importLines.has(index)) continue;
+                const code = masked[index];
+                total += countMatches(code, word);
+                for (let p = 0; p < typePatterns.length; p++) {
+                    typed += countMatches(code, typePatterns[p]);
+                }
+            }
+            return total > 0 && typed >= total;
+        }
+
         for (let index = 0; index < masked.length; index += 1) {
             if (importLines.has(index)) continue;
-            if (matchingLines ? !matchingLines.has(index) : !fallbackWord!.test(masked[index])) {
-                continue;
-            }
+            if (!fallbackWord.test(masked[index])) continue;
             const code = masked[index];
             total += countMatches(code, word);
             for (let p = 0; p < typePatterns.length; p++) {
@@ -658,14 +657,51 @@ function collectImportClauses(masked: string[], importLines: Set<number>): Impor
     return records;
 }
 
+interface CompiledTypePatterns {
+    word: RegExp;
+    fallbackWord: RegExp;
+    typePatterns: RegExp[];
+}
+
+const TYPE_PATTERNS_CACHE = new Map<string, CompiledTypePatterns>();
+const WORD_PATTERN_CACHE = new Map<string, RegExp>();
+
+function getCompiledWordPattern(word: string): RegExp {
+    let re = WORD_PATTERN_CACHE.get(word);
+    if (!re) {
+        re = new RegExp(`\\b${escapeRegExp(word)}\\b`);
+        WORD_PATTERN_CACHE.set(word, re);
+    }
+    return re;
+}
+
+function getCompiledTypePatterns(name: string): CompiledTypePatterns {
+    let cached = TYPE_PATTERNS_CACHE.get(name);
+    if (cached) return cached;
+
+    const escaped = escapeRegExp(name);
+    cached = {
+        word: new RegExp(`\\b${escaped}\\b`, 'g'),
+        fallbackWord: new RegExp(`\\b${escaped}\\b`),
+        typePatterns: [
+            new RegExp(`:\\s*${escaped}\\b`, 'g'),
+            new RegExp(`\\bas\\s+${escaped}\\b`, 'g'),
+            new RegExp(`<\\s*${escaped}\\s*[,>]`, 'g'),
+            new RegExp(`\\bextends\\s+${escaped}\\b`, 'g'),
+            new RegExp(`\\bimplements\\s+${escaped}\\b`, 'g'),
+            new RegExp(`[|&]\\s*${escaped}\\b`, 'g'),
+            new RegExp(`\\b${escaped}\\s*[|&]`, 'g'),
+            new RegExp(`\\b${escaped}\\s*\\[\\s*\\]`, 'g'),
+        ],
+    };
+    TYPE_PATTERNS_CACHE.set(name, cached);
+    return cached;
+}
+
 function initializeWordSetEntry(map: Map<string, Set<number>>, word: string): void {
     if (!map.has(word)) {
         map.set(word, new Set<number>());
     }
-}
-
-function compileWordPattern(word: string): RegExp {
-    return new RegExp(`\\b${escapeRegExp(word)}\\b`);
 }
 
 function buildCandidateLineIndex(
@@ -684,14 +720,14 @@ function buildCandidateLineIndex(
 
     const matchers = new Map<string, RegExp>();
     for (const word of lineIndexByWord.keys()) {
-        matchers.set(word, compileWordPattern(word));
+        matchers.set(word, getCompiledWordPattern(word));
     }
 
     for (let index = 0; index < masked.length; index += 1) {
         if (importLines.has(index)) continue;
         const line = masked[index];
         for (const [word, matcher] of matchers) {
-            if (matcher.test(line)) {
+            if (line.includes(word) && matcher.test(line)) {
                 lineIndexByWord.get(word)!.add(index);
             }
         }

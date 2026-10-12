@@ -17,7 +17,6 @@
  *     claim a scope no fixture proves.
  */
 import type { GovernanceRule, GovernanceViolation, RuleEvaluationContext } from '../types';
-import { safeRegexMatch } from '../../../utils/safe-regex';
 
 /** Category shared by every compression lower bounds rule. */
 const MAINTAINABILITY_CATEGORY = 'maintainability';
@@ -60,6 +59,13 @@ const DECLARATION_PREFIX_RE =
     /^\s*(?:type\s+[A-Za-z0-9_$]+\s*=|interface\s+[A-Za-z0-9_$]+|import\s+|export\s+(?:type|interface)\b)/;
 
 const MULTI_TERNARY_RE = /\?[^:]+\?[^:]+:/;
+const OPTIONAL_CHAIN_RE = /\?\./g;
+const NULLISH_COALESCING_RE = /\?\?/g;
+const ELVIS_OPERATOR_RE = /[a-zA-Z0-9_$]+\s*\?\s*:/g;
+const TERNARY_PATTERN_RE = /\?[^:]+:/g;
+const LOGICAL_CHAIN_RE = /&&|\|\|/g;
+const FOR_LOOP_PREFIX_RE = /^for\s*(?:await\s*)?\(/;
+const SWITCH_CLAUSE_PREFIX_RE = /^(?:case\s+|default:)/;
 
 const CALLBACK_KEYWORD_RE = /=>|\bfunction\b/;
 const DECLARED_FUNCTION_RE =
@@ -70,10 +76,28 @@ const CALLBACK_OPEN_RE =
 const CHAR_SEMICOLON = 59;
 const CHAR_OPEN_BRACE = 123;
 const CHAR_CLOSE_BRACE = 125;
-const SEMICOLON_RE = /;/;
+
+const RULE_GIANT_EXP = 'CMP-EXP-001';
+const RULE_SINGLE_LINE = 'CMP-LIN-001';
+const RULE_CALLBACK_DEPTH = 'CMP-CAL-001';
+const RULE_COGNITIVE_DENSITY = 'CMP-DEN-001';
+
+const TOKEN_ARROW = '=>';
+const TOKEN_FUNCTION = 'function';
+const TOKEN_LOGICAL_AND = '&&';
+const TOKEN_LOGICAL_OR = '||';
+const TOKEN_SHL = '<<';
+const TOKEN_SHR = '>>';
+const TOKEN_BIT_XOR = '^';
+const TOKEN_BIT_NOT = '~';
+const TOKEN_QUESTION = '?';
+const TOKEN_COLON = ':';
+const TOKEN_OPEN_BRACE = '{';
+const TOKEN_CLOSE_BRACE = '}';
 
 /** Operator trigger characters for giant expressions. */
-const GIANT_TRIGGER_CHARS: ReadonlySet<string> = new Set(['?', '&', '|']);
+const GIANT_TRIGGER_CHARS: ReadonlySet<string> = new Set([TOKEN_QUESTION, '&', '|']);
+const GIANT_TRIGGER_LIST: readonly string[] = Array.from(GIANT_TRIGGER_CHARS);
 
 /** Reserved executable statement keywords targeting packed single-line statements. */
 const EXECUTABLE_STATEMENT_KEYWORDS: ReadonlySet<string> = new Set([
@@ -89,31 +113,56 @@ const EXECUTABLE_STATEMENT_KEYWORDS: ReadonlySet<string> = new Set([
 ]);
 
 const CALL_EXPRESSION_RE = /[a-zA-Z0-9_$]+\s*\(/;
+const TOKEN_SEMICOLON = ';';
+
+const CHAR_AMPERSAND = 38;
+const CHAR_PIPE = 124;
+const CHAR_SPACE = 32;
 
 /**
- * Evaluates whether a line contains candidate giant expression operators via set lookup.
+ * Checks whether a line has at least two question marks and a colon.
  */
-function hasGiantTriggerChar(line: string): boolean {
+function hasLineTernaryCandidate(line: string): boolean {
+    if (!line.includes(TOKEN_QUESTION) || !line.includes(TOKEN_COLON)) return false;
+    const firstQ = line.indexOf(TOKEN_QUESTION);
+    return line.indexOf(TOKEN_QUESTION, firstQ + 1) > firstQ;
+}
+
+/**
+ * Counts `&` and `|` characters on a line to bound logical operator count.
+ */
+function countLogicalOperatorChars(line: string): number {
+    let count = 0;
     for (let j = 0; j < line.length; j++) {
-        if (GIANT_TRIGGER_CHARS.has(line[j])) return true;
+        const ch = line.charCodeAt(j);
+        if (ch === CHAR_AMPERSAND || ch === CHAR_PIPE) {
+            count++;
+        }
     }
-    return false;
+    return count;
+}
+
+/**
+ * Checks whether a line has enough logical operator characters to reach `MAX_LOGICAL_OPERATORS`.
+ */
+function hasLineLogicalCandidate(line: string, hasAnd: boolean, hasOr: boolean): boolean {
+    const matchesAnd = hasAnd && line.includes(TOKEN_LOGICAL_AND);
+    const matchesOr = hasOr && line.includes(TOKEN_LOGICAL_OR);
+    if (!matchesAnd && !matchesOr) return false;
+    return countLogicalOperatorChars(line) >= MAX_LOGICAL_OPERATORS * 2;
 }
 
 /**
  * Checks whether operator counts on a line cross the minimum heuristic thresholds.
  */
-function hasCandidateOperatorCounts(code: string): boolean {
-    let qCount = 0;
-    let hasColon = false;
-    let logicalOpChars = 0;
-    for (let j = 0; j < code.length; j++) {
-        const ch = code.charCodeAt(j);
-        if (ch === 63) qCount++;
-        else if (ch === 58) hasColon = true;
-        else if (ch === 38 || ch === 124) logicalOpChars++;
-    }
-    return (qCount >= 2 && hasColon) || logicalOpChars >= MAX_LOGICAL_OPERATORS;
+function hasCandidateOperatorCounts(
+    line: string,
+    hasTernary: boolean,
+    hasAnd: boolean,
+    hasOr: boolean,
+): boolean {
+    if (hasTernary && hasLineTernaryCandidate(line)) return true;
+    return (hasAnd || hasOr) && hasLineLogicalCandidate(line, hasAnd, hasOr);
 }
 
 /**
@@ -122,16 +171,32 @@ function hasCandidateOperatorCounts(code: string): boolean {
 function classifyGiantExpression(
     code: string,
 ): { isNestedTernary: boolean; isUnboundedLogical: boolean } | null {
-    const withoutOptional = code.replace(/\?\./g, '  ').replace(/\?\?/g, '  ');
-    const clean = withoutOptional.replace(/[a-zA-Z0-9_$]+\s*\?\s*:/g, '  ');
+    let isNestedTernary = false;
+    let isUnboundedLogical = false;
 
-    const ternaryMatches = clean.match(/\?[^:]+:/g) || [];
-    const logicalMatches = clean.match(/&&|\|\|/g) || [];
+    if (hasLineTernaryCandidate(code)) {
+        const withoutOptional = code
+            .replace(OPTIONAL_CHAIN_RE, '  ')
+            .replace(NULLISH_COALESCING_RE, '  ');
+        const clean = withoutOptional.replace(ELVIS_OPERATOR_RE, '  ');
+        const ternaryMatches = clean.match(TERNARY_PATTERN_RE);
+        const count = ternaryMatches ? ternaryMatches.length : 0;
+        if (count >= MAX_TERNARY_BRANCHES || (count >= 2 && MULTI_TERNARY_RE.test(clean))) {
+            isNestedTernary = true;
+        }
+    }
 
-    const isNestedTernary =
-        ternaryMatches.length >= MAX_TERNARY_BRANCHES ||
-        (ternaryMatches.length >= 2 && MULTI_TERNARY_RE.test(clean));
-    const isUnboundedLogical = logicalMatches.length >= MAX_LOGICAL_OPERATORS;
+    if (countLogicalOperatorChars(code) >= MAX_LOGICAL_OPERATORS * 2) {
+        LOGICAL_CHAIN_RE.lastIndex = 0;
+        let logicalCount = 0;
+        while (LOGICAL_CHAIN_RE.exec(code) !== null) {
+            logicalCount++;
+            if (logicalCount >= MAX_LOGICAL_OPERATORS) {
+                isUnboundedLogical = true;
+                break;
+            }
+        }
+    }
 
     if (!isNestedTernary && !isUnboundedLogical) return null;
     return { isNestedTernary, isUnboundedLogical };
@@ -145,12 +210,11 @@ function evaluateGiantExpressionLine(
     code: string,
     lineIndex: number,
 ): GovernanceViolation | null {
-    if (!hasCandidateOperatorCounts(code)) return null;
     const kind = classifyGiantExpression(code);
     if (!kind) return null;
 
     return {
-        ruleId: 'CMP-EXP-001',
+        ruleId: RULE_GIANT_EXP,
         message: kind.isNestedTernary
             ? 'Giant nested ternary expression exceeds readable lower bounds.'
             : 'Unbounded boolean logical chain with excessive operators exceeds cognitive threshold.',
@@ -172,23 +236,29 @@ function evaluateGiantExpressionLine(
  * Rejects giant expressions packed with deeply nested ternaries or long logical chains.
  */
 export const GiantExpressionRule: GovernanceRule = {
-    id: 'CMP-EXP-001',
+    id: RULE_GIANT_EXP,
     name: 'Giant Unbounded Expression Compression',
     category: MAINTAINABILITY_CATEGORY,
     severity: 'warning',
     risk: 'medium',
     languages: CMP_LANGUAGES,
+    textTrigger: GIANT_TRIGGER_LIST,
     rationale:
         'Giant expressions with deeply nested ternaries or long unparenthesized logical chains create cognitive overload and obscure branching logic.',
     isFixable: false,
     checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
+        const hasTernary = hasLineTernaryCandidate(ctx.content);
+        const hasAnd = ctx.content.includes(TOKEN_LOGICAL_AND);
+        const hasOr = ctx.content.includes(TOKEN_LOGICAL_OR);
+        if (!hasTernary && !hasAnd && !hasOr) return null;
+
         const violations: GovernanceViolation[] = [];
         const masked = ctx.masked;
         const len = ctx.lines.length;
 
         for (let i = 0; i < len; i++) {
             const line = masked[i];
-            if (!line || !hasGiantTriggerChar(line)) continue;
+            if (!line || !hasCandidateOperatorCounts(line, hasTernary, hasAnd, hasOr)) continue;
             const code = line.trim();
             if (!code || DECLARATION_PREFIX_RE.test(code)) continue;
 
@@ -235,7 +305,7 @@ function isExecutableStatementPart(part: string): boolean {
  */
 function areAllSwitchClauses(parts: string[]): boolean {
     for (let i = 0; i < parts.length; i++) {
-        if (!/^(case\s+|default:)/.test(parts[i])) return false;
+        if (!SWITCH_CLAUSE_PREFIX_RE.test(parts[i])) return false;
     }
     return true;
 }
@@ -249,6 +319,8 @@ function evaluateSingleLineStatement(
     lineIndex: number,
 ): GovernanceViolation | null {
     if (!code) return null;
+    if (code.charCodeAt(0) === 102 /* 'f' */ && FOR_LOOP_PREFIX_RE.test(code)) return null;
+    if (DECLARATION_PREFIX_RE.test(code)) return null;
 
     const semi = countSemicolons(code);
     if (semi.count === 0) return null;
@@ -256,14 +328,13 @@ function evaluateSingleLineStatement(
         semi.firstIndex !== semi.lastIndex || code.slice(semi.firstIndex + 1).trim().length > 0;
     if (!hasMultiple) return null;
 
-    if (/^for\s*(?:await\s*)?\(/.test(code)) return null;
-    if (DECLARATION_PREFIX_RE.test(code)) return null;
-
-    const statementCode = (code.indexOf('{') !== -1 ? code.replace(/\{[^}]*\}/g, '{}') : code)
+    const statementCode = (
+        code.includes(TOKEN_OPEN_BRACE) ? code.replace(/\{[^}]*\}/g, '{}') : code
+    )
         .trim()
         .replace(/;$/, '');
     const semiParts = statementCode
-        .split(';')
+        .split(TOKEN_SEMICOLON)
         .map((s) => s.trim())
         .filter(Boolean);
 
@@ -279,7 +350,7 @@ function evaluateSingleLineStatement(
     if (executableCount < 2) return null;
 
     return {
-        ruleId: 'CMP-LIN-001',
+        ruleId: RULE_SINGLE_LINE,
         message: 'Single line packs multiple executable statements or side effects.',
         line: lineIndex + 1,
         column: raw.search(/\S/) + 1,
@@ -294,27 +365,40 @@ function evaluateSingleLineStatement(
 }
 
 /**
+ * Checks whether a line has any non-whitespace character after the first semicolon.
+ */
+function hasPackedSemicolonCandidate(line: string): boolean {
+    if (!line.includes(TOKEN_SEMICOLON)) return false;
+    for (let i = line.indexOf(TOKEN_SEMICOLON) + 1; i < line.length; i++) {
+        if (line.charCodeAt(i) > CHAR_SPACE) return true;
+    }
+    return false;
+}
+
+/**
  * CMP-LIN-001: Single-Line Multi-Semantic Statement Rule.
  * Rejects packing multiple executable statements or mutations onto a single line.
  */
 export const SingleLineMultiSemanticRule: GovernanceRule = {
-    id: 'CMP-LIN-001',
+    id: RULE_SINGLE_LINE,
     name: 'Packed Line Multi-Statement Compression',
     category: MAINTAINABILITY_CATEGORY,
     severity: 'warning',
     risk: 'medium',
     languages: CMP_LANGUAGES,
+    textTrigger: TOKEN_SEMICOLON,
     rationale:
         'Cramming multiple distinct statements or side-effects onto a single line impairs stack traces, debug stepping, and code readability.',
     isFixable: false,
     checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
+        if (!ctx.content.includes(TOKEN_SEMICOLON)) return null;
         const violations: GovernanceViolation[] = [];
         const masked = ctx.masked;
         const len = ctx.lines.length;
 
         for (let i = 0; i < len; i++) {
             const line = masked[i];
-            if (!line || !SEMICOLON_RE.test(line)) continue;
+            if (!line || !hasPackedSemicolonCandidate(line)) continue;
             const code = line.trim();
             if (!code) continue;
 
@@ -330,6 +414,8 @@ export const SingleLineMultiSemanticRule: GovernanceRule = {
  * Determines whether a code line initiates a nested inline callback closure.
  */
 function opensCallbackClosure(code: string): boolean {
+    if (!code.includes(TOKEN_OPEN_BRACE)) return false;
+    if (!code.includes(TOKEN_ARROW) && !code.includes(TOKEN_FUNCTION)) return false;
     if (!CALLBACK_KEYWORD_RE.test(code)) return false;
     if (DECLARED_FUNCTION_RE.test(code)) return false;
     return CALLBACK_OPEN_RE.test(code);
@@ -361,7 +447,7 @@ function createCallbackDepthViolation(
     depth: number,
 ): GovernanceViolation {
     return {
-        ruleId: 'CMP-CAL-001',
+        ruleId: RULE_CALLBACK_DEPTH,
         message: `Callback nesting depth (${depth}) exceeds lower maintainability bounds.`,
         line: lineIndex + 1,
         column: raw.search(/\S/) + 1,
@@ -396,20 +482,45 @@ function evaluateCallbackLine(
 }
 
 /**
+ * Fast line-level pre-filter for callback nesting depth tracking.
+ */
+function shouldSkipCallbackLine(
+    line: string,
+    callbackDepth: number,
+    hasArrow: boolean,
+    hasFn: boolean,
+): boolean {
+    const hasOpenBrace = line.includes(TOKEN_OPEN_BRACE);
+    if (callbackDepth === 0) {
+        if (!hasOpenBrace) return true;
+        return (
+            !(hasArrow && line.includes(TOKEN_ARROW)) && !(hasFn && line.includes(TOKEN_FUNCTION))
+        );
+    }
+    return !hasOpenBrace && !line.includes(TOKEN_CLOSE_BRACE);
+}
+
+/**
  * CMP-CAL-001: Callback Chain Nesting Depth Rule.
  * Rejects deeply nested inline callbacks or promise closures (nesting depth >= 3).
  */
 export const CallbackDepthRule: GovernanceRule = {
-    id: 'CMP-CAL-001',
+    id: RULE_CALLBACK_DEPTH,
     name: 'Deep Callback Chain Nesting',
     category: MAINTAINABILITY_CATEGORY,
     severity: 'warning',
     risk: 'high',
     languages: CMP_LANGUAGES,
+    textTrigger: [TOKEN_ARROW, TOKEN_FUNCTION],
     rationale:
         'Deeply nested inline callback chains create callback hell, complicate exception propagation, and mask race conditions.',
     isFixable: false,
     checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
+        const hasArrow = ctx.content.includes(TOKEN_ARROW);
+        const hasFn = ctx.content.includes(TOKEN_FUNCTION);
+        if (!hasArrow && !hasFn) {
+            return null;
+        }
         const violations: GovernanceViolation[] = [];
         let callbackDepth = 0;
         const masked = ctx.masked;
@@ -417,10 +528,7 @@ export const CallbackDepthRule: GovernanceRule = {
 
         for (let i = 0; i < len; i++) {
             const line = masked[i];
-            if (!line) continue;
-            if (callbackDepth === 0 && !CALLBACK_KEYWORD_RE.test(line)) {
-                continue;
-            }
+            if (!line || shouldSkipCallbackLine(line, callbackDepth, hasArrow, hasFn)) continue;
             const code = line.trim();
             if (!code) continue;
             callbackDepth = evaluateCallbackLine(ctx.lines[i], code, i, callbackDepth, violations);
@@ -429,6 +537,58 @@ export const CallbackDepthRule: GovernanceRule = {
         return violations.length > 0 ? violations : null;
     },
 };
+
+const BIT_XOR = 1;
+const BIT_NOT = 2;
+const BIT_SHL = 4;
+const BIT_SHR = 8;
+
+/**
+ * Computes a bitmask of strong bitwise operators present in the file text.
+ */
+function computeStrongBitwiseMask(content: string): number {
+    return (
+        (content.includes(TOKEN_BIT_XOR) ? BIT_XOR : 0) |
+        (content.includes(TOKEN_BIT_NOT) ? BIT_NOT : 0) |
+        (content.includes(TOKEN_SHL) ? BIT_SHL : 0) |
+        (content.includes(TOKEN_SHR) ? BIT_SHR : 0)
+    );
+}
+
+/**
+ * Checks whether a line contains any strong bitwise operator indicated by `mask`.
+ */
+function hasLineStrongBitwise(line: string, mask: number): boolean {
+    return (
+        ((mask & BIT_XOR) !== 0 && line.includes(TOKEN_BIT_XOR)) ||
+        ((mask & BIT_NOT) !== 0 && line.includes(TOKEN_BIT_NOT)) ||
+        ((mask & BIT_SHL) !== 0 && line.includes(TOKEN_SHL)) ||
+        ((mask & BIT_SHR) !== 0 && line.includes(TOKEN_SHR))
+    );
+}
+
+/**
+ * Counts non-whitespace characters in a string without heap allocations.
+ */
+function countNonWhitespace(str: string): number {
+    let count = 0;
+    for (let i = 0; i < str.length; i++) {
+        if (str.charCodeAt(i) > CHAR_SPACE) count++;
+    }
+    return count;
+}
+
+/**
+ * Counts operators matching OPERATOR_RE in a string without allocating arrays.
+ */
+function countOperators(code: string): number {
+    OPERATOR_RE.lastIndex = 0;
+    let count = 0;
+    while (OPERATOR_RE.exec(code) !== null) {
+        count++;
+    }
+    return count;
+}
 
 /**
  * Evaluates cognitive operator density for a single masked code line.
@@ -442,18 +602,18 @@ function checkDensityLine(
     if (!STRONG_BITWISE_RE.test(code)) return null;
     if (DECLARATION_PREFIX_RE.test(code)) return null;
 
-    const nonWs = code.replace(/\s+/g, '');
-    if (nonWs.length < DENSITY_MIN_LENGTH || nonWs.length > DENSITY_MAX_LENGTH) return null;
+    const nonWsLen = countNonWhitespace(code);
+    if (nonWsLen < DENSITY_MIN_LENGTH || nonWsLen > DENSITY_MAX_LENGTH) return null;
 
-    const opMatches = safeRegexMatch(code, OPERATOR_RE) || [];
-    if (opMatches.length < DENSITY_MIN_OPERATORS) return null;
+    const opCount = countOperators(code);
+    if (opCount < DENSITY_MIN_OPERATORS) return null;
 
-    const density = opMatches.length / nonWs.length;
+    const density = opCount / nonWsLen;
     if (density < DENSITY_THRESHOLD) return null;
 
     const percent = (density * 100).toFixed(0);
     return {
-        ruleId: 'CMP-DEN-001',
+        ruleId: RULE_COGNITIVE_DENSITY,
         message: `High cognitive token density (${percent}% operators) exceeds maintainability lower bounds.`,
         line: lineIndex + 1,
         column: raw.search(/\S/) + 1,
@@ -472,17 +632,19 @@ function checkDensityLine(
  * Rejects excessive operator token density (dense bitwise/math packing without intermediate names).
  */
 export const CognitiveDensityRule: GovernanceRule = {
-    id: 'CMP-DEN-001',
+    id: RULE_COGNITIVE_DENSITY,
     name: 'Cognitive Token Density Compression',
     category: MAINTAINABILITY_CATEGORY,
     severity: 'warning',
     risk: 'medium',
     languages: CMP_LANGUAGES,
+    textTrigger: [TOKEN_SHL, TOKEN_SHR, TOKEN_BIT_XOR, TOKEN_BIT_NOT],
     rationale:
         'Dense syntactic packing of bitwise, arithmetic and conditional operators without naming or spacing exceeds human cognitive chunking capacity.',
     isFixable: false,
     checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
-        if (!STRONG_BITWISE_RE.test(ctx.content)) return null;
+        const mask = computeStrongBitwiseMask(ctx.content);
+        if (mask === 0) return null;
 
         const violations: GovernanceViolation[] = [];
         const masked = ctx.masked;
@@ -491,7 +653,7 @@ export const CognitiveDensityRule: GovernanceRule = {
         for (let i = 0; i < len; i++) {
             const line = masked[i];
             if (!line || line.length < DENSITY_MIN_LENGTH) continue;
-            if (!STRONG_BITWISE_RE.test(line)) continue;
+            if (!hasLineStrongBitwise(line, mask)) continue;
             const code = line.trim();
             const violation = checkDensityLine(ctx.lines[i], code, i);
             if (violation) violations.push(violation);

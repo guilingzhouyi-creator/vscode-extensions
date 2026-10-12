@@ -100,6 +100,7 @@ function checkPythonExceptLine(
     lines: string[],
     violations: GovernanceViolation[],
 ): number {
+    if (!line.includes(TOKEN_EXCEPT)) return lineIndex;
     const trimmed = line.trim();
     if (trimmed.startsWith('#')) return lineIndex;
 
@@ -222,16 +223,23 @@ function checkJsTsCatchLine(
 }
 
 /**
+ * Fast pre-filter for whether a line could contain a JS/TS catch statement.
+ */
+function isJsTsCatchCandidateLine(line: string): boolean {
+    if (!line.includes(TOKEN_CATCH) || !CATCH_KEYWORD_RE.test(line)) return false;
+    const trimmed = line.trim();
+    return !trimmed.startsWith('//') && !trimmed.startsWith('*');
+}
+
+/**
  * Checks JS/TS lines for empty catch blocks lacking documented rationale markers.
  */
 function checkJsTsExceptions(lines: string[]): GovernanceViolation[] {
     const violations: GovernanceViolation[] = [];
     for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
-        if (!CATCH_KEYWORD_RE.test(line)) continue;
-        const trimmed = line.trim();
-        if (trimmed.startsWith('//') || trimmed.startsWith('*')) continue;
-        checkJsTsCatchLine(line, i, lines, violations);
+        if (isJsTsCatchCandidateLine(lines[i])) {
+            checkJsTsCatchLine(lines[i], i, lines, violations);
+        }
     }
     return violations;
 }
@@ -250,6 +258,7 @@ export const SwallowedExceptionRule: GovernanceRule = {
         'Empty catch blocks silently swallow exceptions, causing silent data corruption or masking critical failures. A catch whose body carries an explicit rationale marker (best-effort / ignore / intentional / expected) is treated as a documented decision instead of a silent swallow.',
     isFixable: false,
     languages: ['typescript', 'javascript', 'python'],
+    textTrigger: [TOKEN_CATCH, TOKEN_EXCEPT],
     checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
         // RAW view on purpose: this rule exempts a catch whose handling is DOCUMENTED by a
         // rationale marker in the comment, so the comment is evidence rather than noise. Masking
@@ -268,6 +277,13 @@ export const SwallowedExceptionRule: GovernanceRule = {
         return violations.length > 0 ? violations : null;
     },
 };
+
+const KEYWORD_UNWRAP = 'unwrap';
+
+function isNakedUnwrapCandidate(line: string): boolean {
+    if (!line.includes(KEYWORD_UNWRAP) || !UNWRAP_RE.test(line)) return false;
+    return !line.trim().startsWith('//');
+}
 
 /**
  * GOV-EXC-002: Naked Unwrap in Production Code.
@@ -296,9 +312,7 @@ export const NakedUnwrapRule: GovernanceRule = {
 
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
-            if (!UNWRAP_RE.test(line)) continue;
-            const trimmed = line.trim();
-            if (trimmed.startsWith('//')) continue;
+            if (!isNakedUnwrapCandidate(line)) continue;
             violations.push({
                 ruleId: 'GOV-EXC-002',
                 message:
@@ -330,6 +344,7 @@ export const SilentPseudoCatchRule: GovernanceRule = {
         'assignment) silently swallow exceptions without logging or documented rationale.',
     isFixable: false,
     languages: ['typescript', 'javascript', 'python'],
+    textTrigger: [TOKEN_CATCH, TOKEN_EXCEPT],
     checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
         const lang = ctx.capabilities.languageId;
         if (lang === 'python') {

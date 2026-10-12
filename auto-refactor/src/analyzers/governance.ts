@@ -49,6 +49,15 @@ import {
  * Provides a generalized, cross-language modern quality gate for architecture and script audits.
  * Single-pass multiplexed traversal integration with zero duplicate walks.
  */
+function matchesTextTrigger(rule: GovernanceRule, content: string): boolean {
+    const trigger = rule.textTrigger;
+    if (!trigger) return true;
+    if (typeof trigger === 'string') {
+        return content.includes(trigger);
+    }
+    return trigger.some((token) => content.includes(token));
+}
+
 function isGovernanceCandidate(node: NormalizedNode): boolean {
     return Boolean(
         node.functionLike || node.kind === NodeKind.Function || node.kind === NodeKind.Method,
@@ -145,10 +154,6 @@ export class GovernanceAnalyzer implements Analyzer {
     private nodeRules: GovernanceRule[] = [];
     private fileRules: GovernanceRule[] = [];
     private reusableEvalCtx: RuleEvaluationContext | null = null;
-    /** Combined text trigger regex for fast file-rule pre-scan short-circuit. */
-    private fileTrigger: RegExp | null = null;
-    /** Combined text trigger regex for fast node-rule pre-scan short-circuit. */
-    private nodeTrigger: RegExp | null = null;
     /** Node-level rules grouped by target NodeKind for dispatch optimization. */
     private nodeRulesByKind: Map<string, GovernanceRule[]> = new Map();
 
@@ -173,23 +178,14 @@ export class GovernanceAnalyzer implements Analyzer {
             this.fileRules = rules.filter((r) => typeof r.checkFile === 'function');
 
             // === OPTIMIZATION BLOCK: text trigger pre-scan + kind grouping ===
-            // Build combined text triggers for fast pre-scan short-circuit.
-            // We test against the raw content string (no join allocation) for speed.
+            // Fast path: if a rule has a textTrigger, it only runs when its trigger
+            // substring is present in the raw content. Rules without textTrigger always run.
             // False positives from comments / string literals are acceptable: they only
             // reduce how often we short-circuit, never correctness — the actual rule
             // still runs its own precise checks on the masked view.
-            this.fileTrigger = this.registry.buildTextTrigger(this.fileRules);
-            this.nodeTrigger = this.registry.buildTextTrigger(this.nodeRules);
-
-            // Fast path: if a rule has a textTrigger, it only runs when its trigger
-            // substring is present in the raw content. Rules without textTrigger always run.
             if (ctx.content) {
-                this.fileRules = this.fileRules.filter(
-                    (r) => !r.textTrigger || ctx.content.includes(r.textTrigger),
-                );
-                this.nodeRules = this.nodeRules.filter(
-                    (r) => !r.textTrigger || ctx.content.includes(r.textTrigger),
-                );
+                this.fileRules = this.fileRules.filter((r) => matchesTextTrigger(r, ctx.content));
+                this.nodeRules = this.nodeRules.filter((r) => matchesTextTrigger(r, ctx.content));
             }
 
             // Group node-level rules by target kind for dispatch optimization.
@@ -219,8 +215,6 @@ export class GovernanceAnalyzer implements Analyzer {
         this.nodeRules = [];
         this.fileRules = [];
         this.reusableEvalCtx = null;
-        this.fileTrigger = null;
-        this.nodeTrigger = null;
         this.nodeRulesByKind = new Map();
         // Standalone contract fallback
 

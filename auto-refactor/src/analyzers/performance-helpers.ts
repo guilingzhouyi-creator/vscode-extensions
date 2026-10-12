@@ -246,6 +246,7 @@ export function updateBraceLoops(trimmed: string, loopStack: LoopScope[]): void 
     }
 }
 
+/** Regular expression detecting linear O(N) array or string lookup methods. */
 export const LINEAR_LOOKUP_RE =
     /\.(?:find|filter|indexOf|lastIndexOf|includes|some|every|shift|unshift)\s*\(/;
 
