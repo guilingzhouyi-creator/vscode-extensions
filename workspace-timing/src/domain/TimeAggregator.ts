@@ -104,7 +104,9 @@ export function splitByNaturalDay(
         const last = out[out.length - 1];
         last.manualMs = (last.manualMs ?? 0) + remainingManual;
         last.aiMs = (last.aiMs ?? 0) + remainingAi;
-        last.durationMs = (last.manualMs ?? 0) + (last.aiMs ?? 0);
+        if ((last.manualMs ?? 0) + (last.aiMs ?? 0) > 0) {
+            last.durationMs = (last.manualMs ?? 0) + (last.aiMs ?? 0);
+        }
     }
     return out;
 }

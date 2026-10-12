@@ -462,8 +462,10 @@ export class TimerEngine {
 
         if (elapsed > 0) {
             const segs = this.computeCurrentSegments(boundaryMs);
-            this._data.manualTotalMs = (this._data.manualTotalMs ?? 0) + segs.manual;
-            this._data.aiTotalMs = (this._data.aiTotalMs ?? 0) + segs.ai;
+            const manualSeg = segs.manual === 0 && segs.ai === 0 ? elapsed : segs.manual;
+            const aiSeg = segs.ai;
+            this._data.manualTotalMs = (this._data.manualTotalMs ?? 0) + manualSeg;
+            this._data.aiTotalMs = (this._data.aiTotalMs ?? 0) + aiSeg;
 
             this._data.sessions = TimerEngine.frozenSessions([
                 ...this._data.sessions,
@@ -471,8 +473,8 @@ export class TimerEngine {
                     startMs: this._sessionStartMs,
                     endMs: boundaryMs,
                     durationMs: elapsed,
-                    manualMs: segs.manual,
-                    aiMs: segs.ai,
+                    manualMs: manualSeg,
+                    aiMs: aiSeg,
                 },
             ]);
             this._todayEndedMs += this.todayOverlap(this._sessionStartMs, boundaryMs);

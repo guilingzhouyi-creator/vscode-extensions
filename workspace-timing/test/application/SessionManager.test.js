@@ -130,6 +130,7 @@ describe('SessionManager（跨午夜与休眠管理）', () => {
         // 手动调整引擎会话起点为昨晚 23:00
         timer._sessionStartMs = yesterday23h;
         timer.data.currentSessionStartMs = yesterday23h;
+        timer._modeSwitches = [{ startMs: yesterday23h, mode: 'manual' }];
 
         // 执行跨午夜轮转（通常在 00:00:00 由 Scheduler 触发）
         await sessionManager.rotateSessionAtMidnight();
