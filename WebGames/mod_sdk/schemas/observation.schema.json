@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "kalar.mod_sdk.observation.v1",
+  "title": "ObservationPayload",
+  "description": "卡拉尔世界引擎 MOD SDK 交互式推演观测包标准契约 (kalar.mod_sdk.observation.v1)",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "kalar.mod_sdk.observation.v1",
+      "description": "契约 Schema 版本标识"
+    },
+    "session_id": {
+      "type": "string",
+      "description": "长程交互会话唯一标识符"
+    },
+    "step_index": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "当前推演步进索引（创角就绪后初始为 0，每步决策自增）"
+    },
+    "current_node_id": {
+      "type": ["string", "null"],
+      "description": "当前所处 DAG 剧情节点 ID"
+    },
+    "node_type": {
+      "type": "string",
+      "enum": ["START_ENTRY", "STANDARD_STEP", "BRANCH_CHOICE", "TERMINAL_EXIT", "UNKNOWN"],
+      "description": "当前剧情节点拓扑类型"
+    },
+    "narrative_key": {
+      "type": "string",
+      "description": "当前节点剧情文案键名"
+    },
+    "text_source": {
+      "type": "string",
+      "enum": ["i18n", "inline_text", "missing", "system"],
+      "description": "文本解析来源"
+    },
+    "raw_text": {
+      "type": "string",
+      "description": "未水化插值的原始文案模板"
+    },
+    "hydrated_text": {
+      "type": "string",
+      "description": "已完成占位符插值水化的人类可读文案"
+    },
+    "available_choices": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "当前节点可用的后继决策分支节点 ID 列表"
+    },
+    "character_snapshot": {
+      "type": "object",
+      "description": "当前玩家角色完整面板与属性快照",
+      "properties": {
+        "player_name": { "type": "string" },
+        "character_name": { "type": "string" },
+        "character_id": { "type": "string" },
+        "race": { "type": "string" },
+        "race_id": { "type": "string" },
+        "gender": { "type": "string" },
+        "origin_id": { "type": "string" },
+        "origin_name": { "type": "string" },
+        "birth_region": { "type": "string" },
+        "attributes": { "type": "object" },
+        "hp": { "type": "integer" },
+        "max_hp": { "type": "integer" },
+        "mp": { "type": "integer" },
+        "max_mp": { "type": "integer" },
+        "carry_weight": { "type": "number" },
+        "initial_gold": { "type": "integer" },
+        "gold": { "type": "integer" },
+        "initial_equipment": { "type": "string" },
+        "trait_summary": { "type": "string" },
+        "starter_kit_name": { "type": "string" }
+      },
+      "required": ["player_name", "race", "origin_id", "attributes"]
+    },
+    "applied_mutations": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      },
+      "description": "当前步骤结算触发的状态突变事件列表"
+    },
+    "history_depth": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "交互历史栈当前深度（用于 rollback 判定）"
+    },
+    "is_terminal": {
+      "type": "boolean",
+      "description": "当前节点是否为终结退出节点 (TERMINAL_EXIT)"
+    },
+    "error_code": {
+      "type": ["string", "null"],
+      "description": "若发生非法动作、回滚溢出或分支越界时的错误代码，正常为 null"
+    },
+    "error_message": {
+      "type": ["string", "null"],
+      "description": "错误可读详情，正常为 null"
+    }
+  },
+  "required": [
+    "session_id",
+    "step_index",
+    "current_node_id",
+    "hydrated_text",
+    "available_choices",
+    "character_snapshot",
+    "is_terminal",
+    "error_code"
+  ],
+  "additionalProperties": true
+}
+

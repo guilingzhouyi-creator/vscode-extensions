@@ -1,0 +1,104 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "kalar.mod_sdk.items.v1",
+  "title": "ItemsCatalogDefinition",
+  "description": "卡拉尔世界引擎 物品清单注册表与装备数值覆盖契约规范 (items.json / content/items/*.json)",
+  "type": "object",
+  "properties": {
+    "override_mode": {
+      "type": "string",
+      "enum": ["MERGE", "REPLACE_ENTRY", "TOTAL_PURGE"],
+      "default": "MERGE",
+      "description": "大魔改覆盖策略：MERGE(增量合并新条目并递归补丁现有条目), REPLACE_ENTRY(按 canonical_id 全量替换条目), TOTAL_PURGE(全量清洗原生物品库，仅使用本文件定义的条目)"
+    },
+    "items": {
+      "type": "array",
+      "description": "物品原型定义集合",
+      "items": {
+        "type": "object",
+        "properties": {
+          "canonical_id": {
+            "type": "string",
+            "pattern": "^KALAR:[A-Z0-9_]+:[A-Z0-9_]+:[A-Z0-9_]+$",
+            "description": "权威全局命名空间物品标识符（格式: KALAR:<MAJOR>:<MINOR>:<NAME>）"
+          },
+          "english_name": {
+            "type": "string",
+            "description": "标准英文系统唯一检索代称"
+          },
+          "loc_name_key": {
+            "type": "string",
+            "description": "物品本地化多语言显示名称键"
+          },
+          "loc_desc_key": {
+            "type": "string",
+            "description": "物品本地化详细说明文案键"
+          },
+          "category_major": {
+            "type": "string",
+            "enum": ["EQUIPMENT", "CONSUMABLE", "MATERIAL", "QUEST"],
+            "description": "物品一级大类：EQUIPMENT(穿戴装备), CONSUMABLE(消耗品), MATERIAL(材料/矿石/废料), QUEST(任务专有道具)"
+          },
+          "category_minor": {
+            "type": "string",
+            "description": "物品二级细分类（如 WEAPON_BLADE, ARMOR_PLATE, ALCHEMY, FOOD, ORE, ARTIFACT）"
+          },
+          "tier_rank": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5,
+            "description": "物品品质阶梯品级（1=普通白装, 2=优秀绿装, 3=稀有蓝装, 4=史诗紫装, 5=传说金装）"
+          },
+          "default_mass_kg": {
+            "type": "number",
+            "minimum": 0,
+            "description": "物品物理质量（千克），参与行囊负重与挥砍惯性动量计算"
+          },
+          "default_volume_slots": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "在物品栏中占用的空间格子数"
+          },
+          "base_market_value": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "基准市场交易参考金币价值"
+          },
+          "search_aliases": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "搜索匹配别名别称集合"
+          },
+          "equipment_slot": {
+            "type": "string",
+            "enum": ["MAIN_HAND", "OFF_HAND", "CHEST", "HEAD", "LEGS", "FEET", "ACCESSORY"],
+            "description": "装备允许穿戴的身体槽位（针对 EQUIPMENT 大类）"
+          },
+          "modifiers": {
+            "type": "object",
+            "additionalProperties": { "type": "number" },
+            "description": "穿戴或使用时附加的属性数值加成"
+          },
+          "durability_max": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "最大耐久度上限"
+          },
+          "icon_uri": {
+            "type": "string",
+            "pattern": "^(mod://[a-z0-9_]+/assets/|res://).*$",
+            "description": "物品图标资源路径（支持 mod:// 虚拟寻址）"
+          }
+        },
+        "required": [
+          "canonical_id",
+          "category_major",
+          "tier_rank"
+        ],
+        "additionalProperties": true
+      }
+    }
+  },
+  "required": ["items"],
+  "additionalProperties": false
+}

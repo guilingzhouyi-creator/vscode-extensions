@@ -1,0 +1,32 @@
+{
+  "dag_id": "DAG_TC_PROLOGUE",
+  "entry_node_id": "NODE_TC_START",
+  "terminal_node_id": "NODE_TC_EXIT",
+  "nodes": {
+    "NODE_TC_START": {
+      "node_type": "START_ENTRY",
+      "inline_text": "在被混沌裂隙撕裂的新纪元地表，{player_name} 从废墟残骸中苏醒。",
+      "required_prerequisites": []
+    },
+    "NODE_TC_EXIT": {
+      "node_type": "TERMINAL_EXIT",
+      "inline_text": "拾起残存的武器，{player_name} 踏上了重塑世界秩序的征途。",
+      "required_prerequisites": [
+        "NODE_TC_START"
+      ],
+      "mutations_on_complete": [
+        {
+          "type": "PrologueCompleted",
+          "dag_id": "DAG_TC_PROLOGUE"
+        }
+      ]
+    }
+  },
+  "edges": [
+    {
+      "from": "NODE_TC_START",
+      "to": "NODE_TC_EXIT"
+    }
+  ]
+}
+

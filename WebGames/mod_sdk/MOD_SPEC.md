@@ -1,25 +1,67 @@
-# 卡拉尔世界引擎 · 剧情与命途 MOD 创作者开发契约规范 (MOD Spec v1.1)
+# 卡拉尔世界引擎 · 模组创作者数据契约速查指南 (MOD Quick-Reference Spec v1.2)
 
 > [!NOTE]
-> **【规范定位】**：本规范是面向 MOD 创作者 Agent 与人类开发者的“一页纸极简开发指南”。所有能力清单均由底层单一真源自动化萃取同步，确保 MOD 契约与引擎运行时保持 100% 绝对一致。
+> **【规范定位】**：本手册是面向模组开发者与自主推演 Agent 的根目录官方契约速查指南与真源索引总枢。所有动态能力清单均由底层单一真源自动化静态萃取同步，确保数据契约与引擎运行时保持 100% 绝对一致。
+> 完整深入的架构设计、算法公式与协议明细，请直接查阅 [`docs/`](docs/) 对应权威规范卷。
 > **引擎接口版本**：`1.0.0`
 
 ---
 
-## 一、 扩展包目录结构规范 (Package Layout)
+## 🧭 官方权威规范导航矩阵 (Documentation Index & Navigation Hub)
 
-每个剧情与命途 MOD 扩展包物理上为一个独立目录（支持存放在 `mods/narratives/<mod_dir>/` 或 `user://mods/narratives/<mod_dir>/`），标准布局如下：
+模组工程的核心架构与专题协议已按业务职责解耦至 `docs/` 目录，开发者可依序渐进查阅：
+
+| 专题领域 | 权威规范文档指针 | 核心内容摘要 |
+| :--- | :--- | :--- |
+| **全景架构与装配** | [`docs/SPECIFICATION.md`](docs/SPECIFICATION.md) | 模组核心架构、Kahn 拓扑排序装配算法、多包冲突裁决公理与静态门禁错误码字典 |
+| **视听多媒体准入** | [`docs/ART_AND_ASSETS_GUIDE.md`](docs/ART_AND_ASSETS_GUIDE.md) | Tier 2 视听资产烹饪规范、WebP/OGG/TTF 格式白名单、体积配额与 SHA-256 清单机制 |
+| **规则大魔改覆写** | [`docs/TOTAL_CONVERSION_SPEC.md`](docs/TOTAL_CONVERSION_SPEC.md) | Tier 3 全局大魔改规范、世界地图空间阻抗、物品卡牌、战斗动力学公式与差分覆写语义 |
+| **无头交互推演** | [`docs/AGENT_INTERACTION.md`](docs/AGENT_INTERACTION.md) | Agent 无头交互式推演协议、STDIO NDJSON 双向流式通信契约与 Observation-Action 状态机 |
+| **现场遥测与伴侣** | [`docs/COMPANION_PROTOCOL.md`](docs/COMPANION_PROTOCOL.md) | 非侵入式伴侣观察总线、事件广播协议、会话遥测与现场黑匣子录制归档规范 |
+
+---
+
+## 🏛️ 模组分级架构体系速查 (Tier Hierarchy)
+
+卡拉尔引擎将扩展包划分为三个自底向上兼容的架构级别：
+
+1. **Tier 1: 纯逻辑与剧情命途包 (Logic & Narrative Pack)**
+   - 聚焦叙事分支图元、出身背景、因果天赋守恒与本地化文案；
+   - 纯静态声明式 JSON，体积极小（< 100KB），零多媒体依赖，热重载极速响应。
+2. **Tier 2: 视听与艺术资产增强包 (Audiovisual & Assets Pack)**
+   - 在 Tier 1 逻辑之上注入受控多媒体资产（立绘、场景纹理、UI 音效、背景音乐、字体与纯文本着色器）；
+   - 包含 `assets/` 物理目录与 `assets_manifest.json`，受虚拟协议 `mod://<pack_id>/assets/...` 与严格体积配额保护。
+3. **Tier 3: 全局大魔改规则包 (Total Conversion & Overhaul Pack)**
+   - 包含 Tier 1 & Tier 2 完整能力，深度重构底层游戏世界观、地理空间阻抗、物品装备原型与战斗动力学常数；
+   - 包含 `content/` 模块化目录，支持 `MERGE`、`REPLACE_ENTRY` 与 `TOTAL_PURGE` 声明式差分覆写。
+
+---
+
+## 一、 扩展包目录结构规范 (Package Layout & Topology)
+
+合规模组物理上为一个独立目录（位于 `mods/<pack_id>/` 或 `user://mods/<pack_id>/`），标准布局如下：
 
 ```text
-my_narrative_mod/
-├── pack.json                   # 【必需】MOD 清单元数据描述文件
-├── routing_rules.json          # 【必需】创角种族与出身到序章 DAG 的路由规则
-├── destinies.json              # 【可选/推荐】自定义身世、因果天赋、初始行囊与 UI 解锁策略
+<pack_id>/
+├── pack.json                   # 【必需】MOD 清单元数据与依赖描述文件
+├── routing_rules.json          # 【必需】创角种族与出身到序章 DAG 的路由映射表
+├── destinies.json              # 【推荐/可选】自定义身世、因果天赋、初始行囊与 UI 解锁策略
 ├── dag_graphs/                 # 【必需】剧情有向无环图配置目录
-│   └── DAG_MY_PROLOGUE.json    # DAG 剧情图拓扑结构
-├── i18n/                       # 【必需】剧情本地化文案字典
-│   └── zh-CN.json              # 包含占位符的剧情文本
-└── assets/                     # 【可选】美术与音效资源（如有）
+│   └── DAG_<NAME>.json         # 因果剧情图（单 START_ENTRY，至少 1 个 TERMINAL_EXIT）
+├── i18n/                       # 【必需】剧情多语言本地化文案字典
+│   └── zh-CN.json              # 包含白名单占位符的剧情文本
+├── assets_manifest.json        # 【Tier 2/3 必需】多媒体资产清单与 SHA-256 校验指纹
+├── assets/                     # 【Tier 2/3 可选】受控视听资源存储目录
+│   ├── textures/               # 纹理与插画 (WebP / PNG)
+│   ├── audio/                  # 音频与音效 (OGG / WAV)
+│   ├── fonts/                  # 自定义字体 (TTF / WOFF2)
+│   └── shaders/                # 纯文本着色器 (GDShader)
+└── content/                    # 【Tier 3 专有】大魔改规则模块化数据目录
+    ├── world/                  # 世界地图阻抗与空间拓扑
+    ├── items/                  # 物品原型与装备数值
+    ├── skills/                 # 动作战技与卡牌规则
+    ├── entities/               # 怪物原型与 NPC 模板
+    └── rules/                  # 动力学战斗常数与伤害公式
 ```
 
 ---
@@ -35,6 +77,7 @@ my_narrative_mod/
 | `version` | String | 是 | - | 语义化版本号（如 `1.0.0`） |
 | `author` | String | 否 | `"Unknown"` | 作者或制作组署名 |
 | `engine_api_version` | String | 是 | `"1.0.0"` | 兼容的目标引擎 API 版本 |
+| `tier` | String | 否 | `"TIER_1_LOGIC"` | 模组分级：`TIER_1_LOGIC`, `TIER_2_AUDIOVISUAL`, `TIER_3_OVERHAUL` |
 | `priority` | int | 否 | `100` | 同拓扑层级内的加载优先级（数值越大越优先装配） |
 | `dependencies` | Array[String] | 否 | `[]` | 必须前置加载的 MOD `pack_id` 列表 |
 | `incompatible_packs` | Array[String] | 否 | `[]` | 互斥冲突 MOD 标识符黑名单 |
@@ -70,15 +113,25 @@ MOD 创作者角色与序章节点路由仅允许绑定下列已启用种族：
 
 ### 3. 合法文本占位符字典 (Available Placeholders)
 
-本地化文案模板（i18n）中支持插值的动态占位符全集：
+本地化文案模板（i18n）与节点内联文案（`inline_text`）支持大小写双轨插值（如 `{player_name}` 与 `{PLAYER_NAME}`）：
 
 | 占位符宏 (Placeholder) | 解析源与说明 |
 | :--- | :--- |
-| `{PLAYER_NAME}` | 当前玩家角色的自定义名称 |
-| `{RACE_ID}` | 角色所属种族唯一标识符（如 HUMAN） |
-| `{START_LOCATION}` | 角色出生与初始降临的地理场景标识或本地化名称 |
-| `{INITIAL_EQUIPMENT}` | 角色获得的初始佩剑或基础装备道具名称 |
-| `{NPC_TARGET}` | 对话交互或剧情引导的目标 NPC 实体名称 |
+| `{PLAYER_NAME}` | 当前玩家角色的自定义名称（支持大小写双轨：{player_name} 与 {PLAYER_NAME}） |
+| `{CHARACTER_NAME}` | 当前角色的名称标识，同 {PLAYER_NAME}（支持大小写双轨：{character_name} 与 {CHARACTER_NAME}） |
+| `{CHARACTER_ID}` | 角色实例全局唯一标识符（支持大小写双轨：{character_id} 与 {CHARACTER_ID}） |
+| `{RACE_ID}` | 角色所属种族唯一标识符，如 HUMAN（支持大小写双轨：{race_id} 与 {RACE_ID}） |
+| `{GENDER}` | 角色性别标识，如 FEMALE / MALE（支持大小写双轨：{gender} 与 {GENDER}） |
+| `{START_LOCATION}` | 角色出生与初始降临的地理场景标识或本地化名称（支持大小写双轨：{start_location} 与 {START_LOCATION}） |
+| `{INITIAL_EQUIPMENT}` | 角色获得的初始佩剑或基础装备道具名称（支持大小写双轨：{initial_equipment} 与 {INITIAL_EQUIPMENT}） |
+| `{NPC_TARGET}` | 对话交互或剧情引导的目标 NPC 实体名称（支持大小写双轨：{npc_target} 与 {NPC_TARGET}） |
+| `{EVENT_RESULT}` | 前序节点或剧情事件的判定结果摘要（支持大小写双轨：{event_result} 与 {EVENT_RESULT}） |
+| `{ORIGIN_ID}` | 角色选定或随机抽取的出身背景唯一标识符（支持大小写双轨：{origin_id} 与 {ORIGIN_ID}） |
+| `{ORIGIN_NAME}` | 角色出身背景的人类可读显示名称（支持大小写双轨：{origin_name} 与 {ORIGIN_NAME}） |
+| `{BIRTH_REGION}` | 角色出身关联的降临地域标识符（支持大小写双轨：{birth_region} 与 {BIRTH_REGION}） |
+| `{TRAIT_SUMMARY}` | 角色装配的正负因果天赋组合摘要文本（支持大小写双轨：{trait_summary} 与 {TRAIT_SUMMARY}） |
+| `{STARTER_KIT_NAME}` | 角色装配的初始装备行囊名称（支持大小写双轨：{starter_kit_name} 与 {STARTER_KIT_NAME}） |
+| `{INITIAL_GOLD}` | 角色创角结算后的初始金币数量（支持大小写双轨：{initial_gold} 与 {INITIAL_GOLD}） |
 
 ### 4. 状态突变事件规范 (Valid Mutation Events)
 
@@ -109,7 +162,9 @@ DAG 终结节点或剧情关键节点仅允许发布下列合法状态突变事�
 - **前端 UI 受控解锁策略 (`ui_capability_modes`)**: `origin_selection_mode`: `[INHERIT, ALLOW_MANUAL, FORCE_RANDOM]`；`trait_selection_mode`: `[INHERIT, ALLOW_MANUAL, FORCE_RANDOM]`
 - **内置因果天赋 (`builtin_traits`)**: `GIANT_MIGHT, HEART_CORE_FISSURE, IRON_WILL, MANA_INSULATED, PRIMORDIAL_RESONANCE`
 - **内置初始套件 (`builtin_starter_kits`)**: `KIT_ELF_DEFAULT, KIT_HUMAN_DEFAULT`
+- **内置序章图元 (`builtin_dag_ids`)**: `DAG_PROLOGUE_ELF_SANCTUARY, DAG_PROLOGUE_HUMAN_CAPITAL`
 - **合法物品 ID 清单 (`canonical_item_ids`)**: `KALAR:CONSUM:ALCHEMY:POTION_MANA, KALAR:CONSUM:FOOD:HEARTY_STEW, KALAR:EQUIP:ARMOR:IRON_CHEST, KALAR:EQUIP:ARMOR:RUNIC_SHIELD, KALAR:EQUIP:WEAPON_BLADE:ELVEN_BOW, KALAR:EQUIP:WEAPON_BLADE:IRON_SWORD, KALAR:EQUIP:WEAPON_BLADE:MITHRIL_LONGSWORD, KALAR:MATERIAL:DISPOSAL:MANA_DUST, KALAR:MATERIAL:DISPOSAL:SLAG_ASH, KALAR:MATERIAL:ORE:MITHRIL_ORE, KALAR:QUEST:ARTIFACT:RELIC_FRAGMENT`
+- **静态门禁错误码 (`supported_error_codes`)**: `ERR_MOD_DIR_NOT_FOUND, ERR_FILE_MISSING, ERR_JSON_INVALID, ERR_MANIFEST_NOT_OBJECT, ERR_MANIFEST_FIELD_MISSING, ERR_MANIFEST_FIELD_TYPE, ERR_ROUTING_EMPTY, ERR_ROUTING_TARGET_MISSING, ERR_ROUTING_TARGET_UNKNOWN, ERR_ROUTING_TARGET_NOT_FOUND, ERR_DAG_DIR_MISSING, ERR_DAG_NO_FILES, ERR_DAG_NO_NODES, ERR_DAG_ENTRY_COUNT, ERR_DAG_TERMINAL_COUNT, ERR_DAG_DANGLING_EDGE, ERR_DAG_MISSING_PREREQUISITE, ERR_DAG_CYCLE, ERR_DAG_ORPHAN_NODE, ERR_DAG_UNREACHABLE_TERMINAL, ERR_DAG_NODE_TEXT_MISSING, ERR_I18N_DIR_MISSING, ERR_I18N_EMPTY, ERR_I18N_MISSING_KEY, ERR_UNKNOWN_PLACEHOLDER, ERR_DESTINY_NOT_OBJECT, ERR_DESTINY_INVALID_UI_MODE, ERR_DESTINY_STAT_BUDGET_EXCEEDED, ERR_DESTINY_GOLD_CAP_EXCEEDED, ERR_DESTINY_CAUSALITY_IMBALANCE, ERR_DESTINY_KIT_INVALID, ERR_DESTINY_UNKNOWN_DAG_REF, ERR_DESTINY_UNKNOWN_KIT_REF, ERR_MOD_DUPLICATE_ID_CONFLICT, ERR_MOD_INCOMPATIBLE_CONFLICT, ERR_MOD_UI_POLICY_CONFLICT`
 <!-- AUTOGEN_CAPABILITIES_END -->
 
 ---
@@ -135,7 +190,7 @@ MOD 可通过根目录下的 `destinies.json` 以**列表式结构**扩展创角
 
 ---
 
-## 五、 DAG 剧情拓扑约束 (DAG Graph Invariants)
+## 五、 因果 DAG 剧情拓扑约束 (DAG Graph Invariants)
 
 1. **严格有向无环**：剧情图必须构成有向无环图 (DAG)，解算器将在装配阶段运行 Kahn 算法，检测到环路立即阻断装配；
 2. **单一入口与出口**：每张剧情图必须包含且仅包含 1 个 `START_ENTRY` 与至少 1 个 `TERMINAL_EXIT` 节点；
@@ -144,10 +199,11 @@ MOD 可通过根目录下的 `destinies.json` 以**列表式结构**扩展创角
 
 ---
 
-## 六、 极简实战工程样例 (Minimal Working Example)
+## 六、 极简实战工程样例 (Minimal Working Examples)
 
-### 1. `pack.json` 样例
+### 1. Tier 1 纯逻辑与剧情命途包样例
 
+#### (1) `pack.json`
 ```json
 {
   "pack_id": "mod_frontier_awakening",
@@ -155,6 +211,7 @@ MOD 可通过根目录下的 `destinies.json` 以**列表式结构**扩展创角
   "version": "1.0.0",
   "author": "KalarModders",
   "engine_api_version": "1.0.0",
+  "tier": "TIER_1_LOGIC",
   "priority": 120,
   "dependencies": [],
   "incompatible_packs": [],
@@ -163,8 +220,7 @@ MOD 可通过根目录下的 `destinies.json` 以**列表式结构**扩展创角
 }
 ```
 
-### 2. `destinies.json` 样例
-
+#### (2) `destinies.json`
 ```json
 {
   "ui_capabilities": {
@@ -226,8 +282,7 @@ MOD 可通过根目录下的 `destinies.json` 以**列表式结构**扩展创角
 }
 ```
 
-### 3. `dag_graphs/DAG_FRONTIER_AWAKEN.json` 样例
-
+#### (3) `dag_graphs/DAG_FRONTIER_AWAKEN.json`
 ```json
 {
   "dag_id": "DAG_FRONTIER_AWAKEN",
@@ -263,13 +318,105 @@ MOD 可通过根目录下的 `destinies.json` 以**列表式结构**扩展创角
 }
 ```
 
+### 2. Tier 2 视听资产增强包清单样例 (`assets_manifest.json`)
+
+```json
+{
+  "$schema": "kalar.mod_sdk.assets_manifest.v1",
+  "pack_id": "mod_frontier_audiovisual",
+  "asset_count": 2,
+  "total_size_bytes": 1048576,
+  "assets": [
+    {
+      "path": "textures/characters/scout_portrait.webp",
+      "category": "textures",
+      "size_bytes": 524288,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "mime_type": "image/webp"
+    },
+    {
+      "path": "audio/ambient/wind_whisper.ogg",
+      "category": "audio",
+      "size_bytes": 524288,
+      "sha256": "4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a",
+      "mime_type": "audio/ogg"
+    }
+  ]
+}
+```
+
+### 3. Tier 3 全局大魔改规则配置样例 (`content/rules/game_constants.json`)
+
+```json
+{
+  "$schema": "kalar.mod_sdk.game_rules.v1",
+  "override_mode": "MERGE",
+  "combat_dynamics": {
+    "base_action_point_recovery_rate": 1.25,
+    "critical_damage_multiplier": 2.0,
+    "damage_formula_expression": "max(1, raw_attack * 1.15 - target_defense * 0.85)"
+  }
+}
+```
+
 ---
 
-## 七、 契约防漂移自动化守卫 (Contract Drift Guard)
+## 七、 统一命令行工具速查 (`kalar-mod`)
+
+| 任务目标 | 标准 CLI 命令 | 核心产物与行为说明 |
+| :--- | :--- | :--- |
+| **脚手架创建** | `python mod_sdk/tools/kalar_mod.py init --id <id> --name <name> --tier <tier>` | 基于官方模板生成初始骨架 |
+| **静态诊断** | `python mod_sdk/tools/kalar_mod.py check <mod_dir> [--json]` | 纯静态检测格式、DAG连通性与多包冲突 |
+| **资产烹饪** | `python mod_sdk/tools/kalar_mod.py cook <mod_dir> [--check]` | 校验格式与体积配额并生成 SHA-256 清单 |
+| **剧情演习** | `python mod_sdk/tools/kalar_mod.py preview <mod_dir> [--simulate]` | 打印 DAG 拓扑概览并模拟剧情推进水化 |
+| **无头试玩** | `python mod_sdk/tools/kalar_mod.py play <mod_dir> [--interactive]` | 执行批量验收推演或 Agent STDIO 交互 |
+| **打包归档** | `python mod_sdk/tools/kalar_mod.py pack <mod_dir> [--out-dir <dir>]` | 前置门禁校验并压缩为生产分发包 |
+
+---
+
+## 八、 契约防漂移自动化守卫 (Contract Drift Guard)
 
 本 SDK 规格说明与 `capabilities.json` 由引擎门禁脚本进行强校验。运行以下命令可验证契约是否与底层配置保持一致：
 
 ```bash
+# 验证 MOD SDK 契约是否与引擎底层真源 100% 对齐（0 漂移）
 python WebGames/scripts/py/sync_mod_sdk.py --check-only
+
+# 执行全量 SDK 完整性与门禁审计断言
 python WebGames/scripts/py/audit_sdk_sync.py
+```
+
+---
+
+## 九、 Agent 无头交互式推演协议速查 (Headless Agent Interactive Protocol)
+
+为支持自主推演 Agent 与自动化评测流水线，MOD SDK 提供基于标准输入输出 (`stdio`) 的流式交互通道。详尽通信协议与状态机请参阅 [`docs/AGENT_INTERACTION.md`](docs/AGENT_INTERACTION.md)。
+
+### 1. 通信通道与契约矩阵
+- **启动命令**：`python mod_sdk/tools/kalar_mod.py play <mod_dir> --interactive --json`
+- **通道协议**：双向 `sys.stdin` 与 `sys.stdout`，行定界 JSON (NDJSON)；
+- **强类型 Schema**：
+  * `kalar.mod_sdk.observation.v1` (`schemas/observation.schema.json`)：单步剧情快照；
+  * `kalar.mod_sdk.action.v1` (`schemas/action.schema.json`)：单步决策指令 (`choose`, `rollback`, `quit`)。
+
+### 2. 状态机交互时序简图
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Agent as 外部评测 Agent
+    participant Session as kalar-mod play (Headless Engine)
+
+    Agent->>Session: 启动进程 (kalar-mod play <dir> --interactive --json)
+    Session->>Session: 静态预检 & 创角面板解算 & 路由激活
+    Session-->>Agent: Step 0 观察包 JSON (Observation)
+    loop 单步交互决策推进
+        Agent->>Session: 动作 JSON ({"action": "choose", "choice_id": "NODE_ID"})
+        Session->>Session: 分支校验 & 因果突变结算 & 历史状态压栈
+        Session-->>Agent: Step N 最新观察包 JSON
+    end
+    opt 因果回溯
+        Agent->>Session: 回滚动作 ({"action": "rollback"})
+        Session-->>Agent: 恢复至 Step N-1 观察包 JSON
+    end
+    Session-->>Agent: 抵达终态节点或 quit: 输出完整战报 JSON
 ```

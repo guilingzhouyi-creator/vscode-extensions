@@ -1,0 +1,78 @@
+{
+  "schema_version": "1.0.0",
+  "domain": "world.world_map",
+  "map_id": "WORLD_MAP_ABYSS_ERA",
+  "map_name": "深渊纪元全域拓扑大地图",
+  "default_entry_node": "NODE_CITADEL_RUINS",
+  "nodes": [
+    {
+      "node_id": "NODE_CITADEL_RUINS",
+      "name": "苍白要塞遗址",
+      "region_id": "CENTRAL_CONTINENT",
+      "terrain_type": "RUINS",
+      "coordinates": {
+        "x": 120.5,
+        "y": 45.0
+      },
+      "mana_density": 1.8,
+      "public_order": 70.0,
+      "facilities": [
+        "CAMPFIRE",
+        "ANVIL",
+        "WAYPOINT"
+      ],
+      "icon_asset": "mod://textures/icons/map/citadel_ruins.png"
+    },
+    {
+      "node_id": "NODE_VOID_SWAMP",
+      "name": "蚀星黑沼",
+      "region_id": "VOID_ARCHIPELAGO",
+      "terrain_type": "SWAMP",
+      "coordinates": {
+        "x": 185.0,
+        "y": 92.5
+      },
+      "mana_density": 3.2,
+      "danger_level": 4,
+      "facilities": [
+        "HERBAL_GARDEN"
+      ],
+      "icon_asset": "mod://textures/icons/map/void_swamp.png"
+    },
+    {
+      "node_id": "NODE_ASTRAL_SPIRE",
+      "name": "观星者方尖碑",
+      "region_id": "SILVER_FOREST",
+      "terrain_type": "HIGHLAND",
+      "coordinates": {
+        "x": 80.0,
+        "y": -15.0
+      },
+      "mana_density": 2.5,
+      "danger_level": 2,
+      "facilities": [
+        "OBSERVATORY",
+        "ALCHEMY_LAB"
+      ],
+      "icon_asset": "mod://textures/icons/map/astral_spire.png"
+    }
+  ],
+  "edges": [
+    {
+      "edge_id": "EDGE_CITADEL_TO_SWAMP",
+      "from_node_id": "NODE_CITADEL_RUINS",
+      "to_node_id": "NODE_VOID_SWAMP",
+      "distance_km": 15.0,
+      "impedance": 2.5,
+      "path_type": "MUDDY_TRAIL"
+    },
+    {
+      "edge_id": "EDGE_CITADEL_TO_ASTRAL_SPIRE",
+      "from_node_id": "NODE_CITADEL_RUINS",
+      "to_node_id": "NODE_ASTRAL_SPIRE",
+      "distance_km": 22.0,
+      "impedance": 1.2,
+      "path_type": "STONE_PAVED_ROAD"
+    }
+  ]
+}

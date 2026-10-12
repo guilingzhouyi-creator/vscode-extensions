@@ -1,0 +1,107 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "kalar.mod_sdk.assets_manifest.v1",
+  "title": "AssetsManifestDefinition",
+  "description": "卡拉尔世界引擎 模组美术与音视频资产清单契约规范 (assets_manifest.json)",
+  "type": "object",
+  "properties": {
+    "manifest_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "default": "1.0.0",
+      "description": "资产清单格式版本号"
+    },
+    "pack_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9_]+$",
+      "description": "所属 MOD 的唯一标识符"
+    },
+    "total_size_bytes": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "清单包含的全部资产物理大小总和（字节）"
+    },
+    "assets": {
+      "type": "array",
+      "description": "资产详细条目列表",
+      "items": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "^assets/.*$",
+            "description": "相对于 MOD 根目录的资产相对路径，严禁包含 '..' 路径遍历字符"
+          },
+          "virtual_uri": {
+            "type": "string",
+            "pattern": "^mod://[a-z0-9_]+/assets/.*$",
+            "description": "统一虚拟资产寻址定位符（如 mod://my_mod/assets/textures/hero.webp）"
+          },
+          "asset_type": {
+            "type": "string",
+            "enum": ["TEXTURE", "AUDIO", "FONT", "SHADER"],
+            "description": "资产类别：TEXTURE(图片/贴图), AUDIO(背景乐/音效), FONT(排版字体), SHADER(纯文本着色器)"
+          },
+          "format": {
+            "type": "string",
+            "enum": ["WEBP", "PNG", "OGG", "WAV", "TTF", "WOFF2", "GDSHADER"],
+            "description": "合规媒体容器/编码格式（严禁可执行二进制格式）"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 31457280,
+            "description": "文件物理字节大小（图片上限 15MB，音频上限 30MB）"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "description": "资产文件的 SHA-256 完整性哈希校验值"
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {
+              "width": { "type": "integer", "maximum": 4096 },
+              "height": { "type": "integer", "maximum": 4096 },
+              "duration_seconds": { "type": "number", "minimum": 0 },
+              "sample_rate": { "type": "integer" },
+              "channels": { "type": "integer", "enum": [1, 2] },
+              "font_family": { "type": "string" },
+              "shader_type": { "type": "string", "enum": ["canvas_item", "spatial", "particles"] }
+            },
+            "description": "媒体格式特异性元数据（如分辨率、时长、采样率等）"
+          }
+        },
+        "required": [
+          "path",
+          "virtual_uri",
+          "asset_type",
+          "format",
+          "size_bytes",
+          "sha256"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "security": {
+      "type": "object",
+      "properties": {
+        "sandbox_verified": {
+          "type": "boolean",
+          "description": "是否已通过纯静态沙箱检查，确保零二进制可执行文件"
+        },
+        "scan_timestamp": {
+          "type": "integer",
+          "description": "资产安全校验时间戳"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "manifest_version",
+    "pack_id",
+    "assets"
+  ],
+  "additionalProperties": true
+}

@@ -1,0 +1,43 @@
+{
+  "manifest_version": "1.0.0",
+  "asset_count": 6,
+  "total_size_bytes": 467,
+  "assets": [
+    {
+      "path": "audio/sfx/ui/btn_click.ogg",
+      "type": "audio",
+      "size_bytes": 132,
+      "sha256": "6ec386aad479c061835564f438ac4d857a4071831f62ecf1bf62fbbb38c2c548"
+    },
+    {
+      "path": "ui/hud/bars/health_bar.png",
+      "type": "image",
+      "size_bytes": 67,
+      "sha256": "bf6e855b67618763d38f0cd8c2ab5ea9aed7b28f4475939f040e4e3ac016bedc"
+    },
+    {
+      "path": "ui/hud/bars/mana_bar.png",
+      "type": "image",
+      "size_bytes": 67,
+      "sha256": "bf6e855b67618763d38f0cd8c2ab5ea9aed7b28f4475939f040e4e3ac016bedc"
+    },
+    {
+      "path": "ui/hud/buttons/action_btn_hover.png",
+      "type": "image",
+      "size_bytes": 67,
+      "sha256": "bf6e855b67618763d38f0cd8c2ab5ea9aed7b28f4475939f040e4e3ac016bedc"
+    },
+    {
+      "path": "ui/hud/buttons/action_btn_normal.png",
+      "type": "image",
+      "size_bytes": 67,
+      "sha256": "bf6e855b67618763d38f0cd8c2ab5ea9aed7b28f4475939f040e4e3ac016bedc"
+    },
+    {
+      "path": "ui/hud/frames/main_frame.png",
+      "type": "image",
+      "size_bytes": 67,
+      "sha256": "bf6e855b67618763d38f0cd8c2ab5ea9aed7b28f4475939f040e4e3ac016bedc"
+    }
+  ]
+}

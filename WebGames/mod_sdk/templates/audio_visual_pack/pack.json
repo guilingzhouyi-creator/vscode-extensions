@@ -1,0 +1,18 @@
+{
+  "pack_id": "template_audio_visual_pack",
+  "pack_name": "官方标准视听与美术增强模板",
+  "version": "1.0.0",
+  "author": "Kalar Engine Team",
+  "engine_api_version": "1.0.0",
+  "priority": 200,
+  "mod_tier": "AUDIO_VISUAL",
+  "dependencies": [],
+  "incompatible_packs": [],
+  "semantic_tags": [
+    "audio_visual",
+    "theme",
+    "art_asset",
+    "prologue_cinematic"
+  ],
+  "is_active": true
+}

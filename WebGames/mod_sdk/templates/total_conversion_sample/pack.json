@@ -1,0 +1,19 @@
+{
+  "pack_id": "sample_total_conversion",
+  "pack_name": "官方标准全量规则重构示范包",
+  "version": "1.0.0",
+  "author": "Kalar Engine Team",
+  "engine_api_version": "1.0.0",
+  "priority": 500,
+  "mod_tier": "TOTAL_CONVERSION",
+  "override_mode": "FULL_OVERRIDE",
+  "dependencies": [],
+  "incompatible_packs": [],
+  "semantic_tags": [
+    "total_conversion",
+    "rules_rebalance",
+    "world_overhaul",
+    "equipment_expansion"
+  ],
+  "is_active": true
+}

@@ -5,7 +5,7 @@
 # 架构定位: MOD项目骨架脚手架 (Mod Project Scaffolding CLI)
 # 依赖与触发: 触发方: CLI / 外部 Agent | 上游: 用户/Agent 命令行参数 | 下游: 生成合规 MOD 目录与骨架文件 | 运行时: Python 3.10+
 # 职责说明: 解析 CLI 参数，自动化生成包含清单、路由、DAG 图元与多语言的标准 MOD 项目骨架
-# 退出语义与设计依据: 退出码: 0=生成成功, 1=参数或IO错误, 2=参数解析错误 | 设计依据: Phase 114 DevKit 工具链契约
+# 退出语义与设计依据: 退出码: 0=生成成功, 1=参数或IO错误, 2=参数解析错误 | 设计依据: 《卡拉尔数据契约规范 v1.0》与第一性原理
 # ------------------------------------------------------------------------------
 # 用法示例:
 #   python mod_sdk/tools/scaffold_mod.py --id my_pack --name "我的模组" --race HUMAN --output-dir ./my_pack
@@ -15,12 +15,28 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
 import sys
 from pathlib import Path
 from typing import Any
+
+TOOLS_DIR = Path(__file__).resolve().parent
+if str(TOOLS_DIR) not in sys.path:
+    sys.path.insert(0, str(TOOLS_DIR))
+
+try:
+    from cook_assets import cook_assets
+except ImportError:
+    cook_assets = None
+
+MINIMAL_PNG_BYTES: bytes = (
+    b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
+    b"\x08\x06\x00\x00\x00\x1f\x15c4\x00\x00\x00\rIDATx\x9cc\xf8\xff\xff?"
+    b"\x00\x05\xfe\x02\xfe\xdc\xccY\xe7\x00\x00\x00\x00IEND\xaeB`\x82"
+)
 
 
 def _normalize_dag_id(pack_id: str) -> str:
@@ -67,8 +83,30 @@ def _build_routing_dict(race_id: str, dag_id: str) -> dict[str, Any]:
     }
 
 
-def _build_dag_dict(dag_id: str, pack_id: str) -> dict[str, Any]:
-    """构建标准三节点可达因果 DAG 图元。"""
+def _build_sample_content_dict(pack_id: str, pack_name: str) -> dict[str, Any]:
+    """构建 Tier 3 大魔改实体定义示例。"""
+    clean_stem = pack_id.upper()
+    return {
+        "schema_version": "1.0.0",
+        "custom_entities": [
+            {
+                "entity_id": f"ENTITY_{clean_stem}_RELIC",
+                "name": f"{pack_name}·源初遗物",
+                "category": "ANCIENT_RELIC",
+                "description": f"源自《{pack_name}》的古老造物，散发微弱的法则共鸣。",
+            }
+        ],
+    }
+
+
+def _build_dag_dict(
+    dag_id: str,
+    pack_id: str,
+    inline_text: bool = False,
+    pack_name: str = "",
+    with_assets: bool = False,
+) -> dict[str, Any]:
+    """构建标准三节点可达因果 DAG 图元（顶层携带 dag_id，可选 inline_text 语法糖与资产绑定）。"""
     clean_stem = pack_id.upper()
     entry_nid = f"NODE_{clean_stem}_START"
     step_nid = f"NODE_{clean_stem}_STEP"
@@ -78,32 +116,45 @@ def _build_dag_dict(dag_id: str, pack_id: str) -> dict[str, Any]:
     step_key = f"narrative.{pack_id}.step"
     exit_key = f"narrative.{pack_id}.exit"
 
+    label = pack_name if pack_name else pack_id
+
+    nodes: dict[str, Any] = {
+        entry_nid: {
+            "node_type": "START_ENTRY",
+            "narrative_key": start_key,
+            "required_prerequisites": [],
+        },
+        step_nid: {
+            "node_type": "STANDARD_STEP",
+            "narrative_key": step_key,
+            "required_prerequisites": [entry_nid],
+        },
+        exit_nid: {
+            "node_type": "TERMINAL_EXIT",
+            "narrative_key": exit_key,
+            "required_prerequisites": [step_nid],
+            "mutations_on_complete": [
+                {
+                    "type": "PrologueCompleted",
+                    "dag_id": dag_id,
+                }
+            ],
+        },
+    }
+
+    if with_assets:
+        nodes[entry_nid]["background_asset"] = "mod://assets/textures/background_sample.png"
+
+    if inline_text:
+        nodes[entry_nid]["inline_text"] = f"在《{label}》的初始启蒙点，{{player_name}} 缓缓苏醒。"
+        nodes[step_nid]["inline_text"] = f"四周微光浮动，{{player_name}} 握紧武器迈出坚实步伐。"
+        nodes[exit_nid]["inline_text"] = f"完成试炼，{{player_name}} 准备启程探索卡拉尔广袤天地。"
+
     return {
+        "dag_id": dag_id,
         "entry_node_id": entry_nid,
         "terminal_node_id": exit_nid,
-        "nodes": {
-            entry_nid: {
-                "node_type": "START_ENTRY",
-                "narrative_key": start_key,
-                "required_prerequisites": [],
-            },
-            step_nid: {
-                "node_type": "STANDARD_STEP",
-                "narrative_key": step_key,
-                "required_prerequisites": [entry_nid],
-            },
-            exit_nid: {
-                "node_type": "TERMINAL_EXIT",
-                "narrative_key": exit_key,
-                "required_prerequisites": [step_nid],
-                "mutations_on_complete": [
-                    {
-                        "type": "PrologueCompleted",
-                        "dag_id": dag_id,
-                    }
-                ],
-            },
-        },
+        "nodes": nodes,
         "edges": [
             {"from": entry_nid, "to": step_nid},
             {"from": step_nid, "to": exit_nid},
@@ -130,13 +181,19 @@ def _build_i18n_dict(pack_id: str, pack_name: str) -> dict[str, str]:
     }
 
 
-def _build_destinies_dict(pack_id: str, pack_name: str, race_id: str) -> dict[str, Any]:
-    """构建合规的命途扩展配置 destinies.json 模板。"""
+def _build_destinies_dict(
+    pack_id: str,
+    pack_name: str,
+    race_id: str,
+    dag_id: str | None = None,
+) -> dict[str, Any]:
+    """构建合规的命途扩展配置 destinies.json 模板（注入 prologue_dag_id 与合法行囊）。"""
     clean_stem = re.sub(r"[^A-Za-z0-9_]", "_", pack_id).upper()
     origin_id = f"ORIGIN_{clean_stem}_INITIATE"
     pos_trait_id = f"TRAIT_{clean_stem}_BLESSING"
     neg_trait_id = f"TRAIT_{clean_stem}_BURDEN"
     kit_id = f"KIT_{clean_stem}_STARTER"
+    actual_dag_id = dag_id if dag_id else _normalize_dag_id(pack_id)
 
     return {
         "ui_capabilities": {
@@ -153,6 +210,7 @@ def _build_destinies_dict(pack_id: str, pack_name: str, race_id: str) -> dict[st
                 "weight": 25,
                 "initial_gold": 150,
                 "initial_reputation": 30,
+                "prologue_dag_id": actual_dag_id,
                 "starter_kit_id": kit_id,
                 "attribute_bonus": {
                     "INT": 2,
@@ -226,9 +284,11 @@ def _write_json(file_path: Path, payload: Any) -> None:
 def scaffold_mod(
     pack_id: str,
     pack_name: str,
-    race_id: str,
-    out_dir: Path,
+    race_id: str = "HUMAN",
+    out_dir: Path | None = None,
     with_destiny: bool = True,
+    inline_text: bool = False,
+    tier: int | None = None,
 ) -> int:
     """执行模组脚手架骨架生成。"""
     _ensure_utf8_stdout()
@@ -240,10 +300,30 @@ def scaffold_mod(
         print("❌ 错误: pack_name 不能为空", file=sys.stderr)
         return 1
 
+    if out_dir is None:
+        out_dir = Path(pack_id)
+
+    if tier is not None:
+        effective_tier = tier
+        if tier == 1:
+            with_destiny = False
+            with_assets = False
+            with_content = False
+        elif tier == 3:
+            with_assets = True
+            with_content = True
+        else:
+            with_assets = False
+            with_content = False
+    else:
+        effective_tier = 2 if with_destiny else 1
+        with_assets = False
+        with_content = False
+
     dag_id = _normalize_dag_id(pack_id)
     manifest_data = _build_manifest_dict(pack_id, pack_name)
     routing_data = _build_routing_dict(race_id, dag_id)
-    dag_data = _build_dag_dict(dag_id, pack_id)
+    dag_data = _build_dag_dict(dag_id, pack_id, inline_text=inline_text, pack_name=pack_name, with_assets=with_assets)
     i18n_data = _build_i18n_dict(pack_id, pack_name)
 
     out_dir = out_dir.resolve()
@@ -259,27 +339,57 @@ def scaffold_mod(
         _write_json(manifest_file, manifest_data)
         _write_json(routing_file, routing_data)
         if with_destiny:
-            destinies_data = _build_destinies_dict(pack_id, pack_name, race_id)
+            destinies_data = _build_destinies_dict(pack_id, pack_name, race_id, dag_id)
             _write_json(destinies_file, destinies_data)
         _write_json(dag_file, dag_data)
-        _write_json(i18n_file, i18n_data)
+        if not inline_text:
+            _write_json(i18n_file, i18n_data)
+
+        if with_assets:
+            tex_dir = out_dir / "assets" / "textures"
+            tex_dir.mkdir(parents=True, exist_ok=True)
+            sample_png = tex_dir / "background_sample.png"
+            sample_png.write_bytes(MINIMAL_PNG_BYTES)
+            if cook_assets is not None:
+                cook_assets(out_dir, check_only=False)
+
+        if with_content:
+            content_dir = out_dir / "content"
+            content_dir.mkdir(parents=True, exist_ok=True)
+            content_file = content_dir / "custom_entities.json"
+            _write_json(content_file, _build_sample_content_dict(pack_id, pack_name))
+
     except OSError as io_err:
         print(f"❌ 写入文件失败: {io_err}", file=sys.stderr)
         return 1
+
+    tier_labels = {
+        1: "Tier 1 (极简纯剧情骨架)",
+        2: "Tier 2 (命途系统扩展骨架)",
+        3: "Tier 3 (全量富媒体与大魔改骨架)",
+    }
+    tier_desc = tier_labels.get(effective_tier, f"Tier {effective_tier}")
 
     print("==============================================================================")
     print("✨ MOD 骨架生成成功！")
     print(f"  • MOD 标识符 : {pack_id}")
     print(f"  • MOD 呈现名 : {pack_name}")
+    print(f"  • 架构层级   : {tier_desc}")
     print(f"  • 匹配种族   : {race_id.upper()}")
     print(f"  • 根目录     : {out_dir}")
+    print(f"  • 内联文本   : {'开启 (inline_text)' if inline_text else '关闭 (外部 i18n)'}")
     print("------------------------------------------------------------------------------")
     print(f"  [1] 清单定义 : {manifest_file.name}")
     print(f"  [2] 路由规则 : {routing_file.name}")
     print(f"  [3] 因果图元 : dag_graphs/{dag_file.name}")
-    print(f"  [4] 本地化包 : i18n/{i18n_file.name}")
+    if not inline_text:
+        print(f"  [4] 本地化包 : i18n/{i18n_file.name}")
     if with_destiny:
         print(f"  [5] 命途扩展 : {destinies_file.name}")
+    if with_assets:
+        print("  [6] 富媒体库 : assets/textures/background_sample.png & manifest.json")
+    if with_content:
+        print("  [7] 魔改实体 : content/custom_entities.json")
     print("==============================================================================")
     return 0
 
@@ -296,6 +406,14 @@ def main() -> None:
     parser.add_argument("--race", default="HUMAN", dest="race_id", help="默认绑定的角色种族 (默认: HUMAN)")
     parser.add_argument("--output-dir", required=True, dest="output_dir", help="生成的目标目录路径")
     parser.add_argument(
+        "--tier",
+        type=int,
+        choices=[1, 2, 3],
+        default=None,
+        dest="tier",
+        help="模组复杂度层级 (1=极简纯剧情, 2=命途扩展, 3=全量富媒体与大魔改, 默认: 2)",
+    )
+    parser.add_argument(
         "--with-destiny",
         action="store_true",
         dest="with_destiny",
@@ -308,6 +426,13 @@ def main() -> None:
         dest="with_destiny",
         help="跳过生成 destinies.json",
     )
+    parser.add_argument(
+        "--inline-text",
+        action="store_true",
+        dest="inline_text",
+        default=False,
+        help="在 DAG 节点中直接内联 inline_text 文本，不强制依赖外部 i18n 词条",
+    )
 
     args = parser.parse_args()
     code = scaffold_mod(
@@ -316,6 +441,8 @@ def main() -> None:
         race_id=args.race_id,
         out_dir=Path(args.output_dir),
         with_destiny=args.with_destiny,
+        inline_text=args.inline_text,
+        tier=args.tier,
     )
     sys.exit(code)
 

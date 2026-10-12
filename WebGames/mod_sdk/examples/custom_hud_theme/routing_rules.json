@@ -1,0 +1,8 @@
+{
+  "routing_rules": [
+    {
+      "race": "HUMAN",
+      "target_dag_id": "DAG_HUD_PREVIEW"
+    }
+  ]
+}

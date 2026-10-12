@@ -1,0 +1,89 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "kalar.mod_sdk.skills.v1",
+  "title": "SkillsAndVerbsDefinition",
+  "description": "卡拉尔世界引擎 战斗动作动词、战技卡牌与法术形态覆盖契约规范 (skills.json / content/skills/*.json)",
+  "type": "object",
+  "properties": {
+    "override_mode": {
+      "type": "string",
+      "enum": ["MERGE", "REPLACE_ENTRY", "TOTAL_PURGE"],
+      "default": "MERGE",
+      "description": "动作与战技覆盖模式：MERGE(增量合并与更新), REPLACE_ENTRY(战技条目按 ID 替换), TOTAL_PURGE(清除所有默认原版动词与卡牌)"
+    },
+    "verbs": {
+      "type": "object",
+      "description": "战斗动作动词基础物理属性定义字典（如 STAB, SLASH, UPPER, PARRY, BLOCK, CRUSH）",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "description": "动词单字或简明中文名（如 刺、劈、挂、架）" },
+          "k_mom": { "type": "number", "minimum": 0, "description": "动量系数（参与碰撞与冲击能量换算）" },
+          "k_edge": { "type": "number", "minimum": 0, "description": "刃线压强系数（参与刃锋侵彻度计算）" },
+          "base_ap": { "type": "integer", "description": "基础行动点消耗或回复增量（负数表示消耗，正数表示回复）" },
+          "desc": { "type": "string", "description": "动作机制特点与受力原理解释" }
+        },
+        "required": ["name", "k_mom", "k_edge", "base_ap"]
+      }
+    },
+    "skill_cards": {
+      "type": "array",
+      "description": "战技手牌与法术卡牌原型集合",
+      "items": {
+        "type": "object",
+        "properties": {
+          "card_id": {
+            "type": "string",
+            "pattern": "^CARD_[A-Z0-9_]+$",
+            "description": "战技卡牌唯一标识符（如 CARD_SLASH_HEAVY）"
+          },
+          "name": {
+            "type": "string",
+            "description": "战技显示名称"
+          },
+          "loc_name_key": {
+            "type": "string",
+            "description": "本地化文案键"
+          },
+          "verb_type": {
+            "type": "string",
+            "description": "关联的动作动词类型（必须在 verbs 字典中存在）"
+          },
+          "magic_form": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 5,
+            "default": 0,
+            "description": "法术形态类别：0=纯物理体术, 1=魔素注刃, 2=远程投射, 3=大范围冲击, 4=领域防护, 5=因果律干涉"
+          },
+          "ap_cost": {
+            "type": "integer",
+            "description": "行动点净消耗值"
+          },
+          "base_potency": {
+            "type": "number",
+            "minimum": 0,
+            "description": "基础威力倍率或基底伤害值"
+          },
+          "required_weapon_category": {
+            "type": "string",
+            "description": "释放该卡牌所需佩戴的武器分类（如 WEAPON_BLADE, WEAPON_BLUNT, ANY）"
+          },
+          "desc": {
+            "type": "string",
+            "description": "技能战斗效果与战术意图阐述"
+          }
+        },
+        "required": [
+          "card_id",
+          "name",
+          "verb_type",
+          "ap_cost",
+          "base_potency"
+        ],
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": true
+}

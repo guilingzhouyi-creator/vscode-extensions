@@ -1,0 +1,107 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "kalar.mod_sdk.world.v1",
+  "title": "WorldConfigDefinition",
+  "description": "卡拉尔世界引擎 地理空间、行军阻抗与城镇宏观规则覆盖契约规范 (world.json / content/world/*.json)",
+  "type": "object",
+  "properties": {
+    "override_mode": {
+      "type": "string",
+      "enum": ["MERGE", "REPLACE_ENTRY", "TOTAL_PURGE"],
+      "default": "MERGE",
+      "description": "世界参数覆盖模式：MERGE(增量合并与字段覆写), REPLACE_ENTRY(节点全量替换), TOTAL_PURGE(全量清洗原生大地图配置)"
+    },
+    "terrain_impedance": {
+      "type": "object",
+      "description": "各类型地形对于大地图行军移动与寻路的阻抗摩擦系数",
+      "properties": {
+        "PLAINS": { "type": "number", "minimum": 0.1, "default": 1.0 },
+        "SWAMP": { "type": "number", "minimum": 0.1, "default": 2.5 },
+        "SNOW_MOUNTAIN": { "type": "number", "minimum": 0.1, "default": 3.8 },
+        "VOID_OCEAN": { "type": "number", "minimum": 0.1, "default": 5.0 }
+      },
+      "additionalProperties": { "type": "number", "minimum": 0.1 }
+    },
+    "astar": {
+      "type": "object",
+      "description": "A* 寻路启发式图解算常数",
+      "properties": {
+        "infinity": { "type": "number", "default": 99999999.0 },
+        "default_distance": { "type": "number", "default": 10.0 },
+        "impedance_min": { "type": "number", "default": 0.1 },
+        "impedance_max": { "type": "number", "default": 10.0 }
+      },
+      "additionalProperties": false
+    },
+    "swarm_risk": {
+      "type": "object",
+      "description": "魔潮与虚空灾变威胁风险解算系数",
+      "properties": {
+        "mana_baseline": { "type": "number", "default": 1.0 },
+        "mana_coefficient": { "type": "number", "default": 0.2 },
+        "order_normalize": { "type": "number", "default": 100.0 },
+        "order_coefficient": { "type": "number", "default": 0.3 }
+      },
+      "additionalProperties": false
+    },
+    "marching": {
+      "type": "object",
+      "description": "部队/小队大地图行军与干粮口粮消耗模型",
+      "properties": {
+        "base_speed_kmh": { "type": "number", "minimum": 0.1, "default": 5.0 },
+        "ration_per_person_hour": { "type": "number", "minimum": 0, "default": 0.1 },
+        "default_ration_units": { "type": "number", "minimum": 0, "default": 50.0 },
+        "default_party_size": { "type": "integer", "minimum": 1, "default": 4 },
+        "max_distance_km": { "type": "number", "minimum": 1.0, "default": 500.0 },
+        "empty_party_policy": { "type": "string", "enum": ["reject", "allow"], "default": "reject" }
+      },
+      "additionalProperties": false
+    },
+    "node_defaults": {
+      "type": "object",
+      "description": "空间节点缺省模板参数",
+      "properties": {
+        "continent_id": { "type": "string", "default": "CENTRAL_CONTINENT" },
+        "terrain_type": { "type": "string", "default": "PLAINS" },
+        "regional_mana_density": { "type": "number", "default": 1.0 },
+        "town_id": { "type": "string", "default": "TOWN_VALAN" }
+      },
+      "additionalProperties": true
+    },
+    "town_defaults": {
+      "type": "object",
+      "description": "城镇与聚落节点缺省初始参数",
+      "properties": {
+        "town_name": { "type": "string", "default": "未名要塞" },
+        "governing_nation_id": { "type": "string", "default": "NATION_EMPIRE" },
+        "population_count": { "type": "integer", "minimum": 0, "default": 5000 },
+        "public_order_percent": { "type": "number", "minimum": 0, "maximum": 100, "default": 85.0 },
+        "food_reserve_days": { "type": "number", "minimum": 0, "default": 30.0 },
+        "town_treasury_gold": { "type": "integer", "minimum": 0, "default": 1500 }
+      },
+      "additionalProperties": true
+    },
+    "continuity": {
+      "type": "object",
+      "description": "世界时间时钟连续性配置",
+      "properties": {
+        "enabled": { "type": "boolean", "default": false },
+        "max_history_fragments": { "type": "integer", "default": 64 },
+        "ticks_per_day": { "type": "integer", "default": 20 }
+      },
+      "additionalProperties": false
+    },
+    "default_template": {
+      "type": "object",
+      "description": "世界基础初始模板状态",
+      "properties": {
+        "world_id": { "type": "string", "default": "WORLD_DEFAULT" },
+        "starting_tick": { "type": "integer", "default": 0 },
+        "starting_day": { "type": "integer", "default": 1 },
+        "region_mana_density": { "type": "number", "default": 1.0 }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,264 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "kalar.mod_sdk.destinies.v1",
+  "title": "DestiniesDefinition",
+  "description": "卡拉尔世界引擎 命途身世、因果天赋与初始行囊扩展规范契约 (destinies.json)",
+  "type": "object",
+  "properties": {
+    "ui_capabilities": {
+      "type": "object",
+      "description": "前端 UI 创角受控解锁与因果选择策略模式",
+      "properties": {
+        "origin_selection_mode": {
+          "type": "string",
+          "enum": ["INHERIT", "ALLOW_MANUAL", "FORCE_RANDOM"],
+          "default": "INHERIT",
+          "description": "身世背景选择模式：INHERIT(继承底层引擎策略), ALLOW_MANUAL(开放前端下拉自选), FORCE_RANDOM(强制盲盒随机)"
+        },
+        "trait_selection_mode": {
+          "type": "string",
+          "enum": ["INHERIT", "ALLOW_MANUAL", "FORCE_RANDOM"],
+          "default": "INHERIT",
+          "description": "因果天赋配置模式：INHERIT(继承底层引擎策略), ALLOW_MANUAL(开放前端自选天赋对), FORCE_RANDOM(强制随机配对)"
+        },
+        "allow_attribute_reroll": {
+          "type": "boolean",
+          "default": false,
+          "description": "是否允许在创角界面执行六维核心属性重掷"
+        }
+      },
+      "additionalProperties": false
+    },
+    "custom_origins": {
+      "type": "array",
+      "description": "模组自定义出身背景池列表",
+      "items": {
+        "type": "object",
+        "properties": {
+          "origin_id": {
+            "type": "string",
+            "pattern": "^[A-Z0-9_]+$",
+            "description": "出身背景唯一标识符（大写英文字母与下划线，如 STARTER_ASTRAL_INITIATE）"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32,
+            "description": "出身背景人类可读显示名称"
+          },
+          "race": {
+            "type": "string",
+            "description": "关联角色种族标识符（如 HUMAN, ELF）"
+          },
+          "birth_region": {
+            "type": "string",
+            "description": "角色降临地域标识符（如 CENTRAL_CONTINENT, HOWLING_TUNDRA）"
+          },
+          "weight": {
+            "type": "integer",
+            "minimum": 0,
+            "default": 10,
+            "description": "随机抽取权重"
+          },
+          "initial_gold": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000,
+            "default": 100,
+            "description": "初始金币数量（严禁超过 1000 金币预算上限）"
+          },
+          "starter_kit_id": {
+            "type": "string",
+            "description": "绑定的初始行囊标识符（引用 custom_starter_kits 或内置套件）"
+          },
+          "prologue_dag_id": {
+            "type": "string",
+            "description": "专属序章剧情图标识符（可选，默认由 routing_rules 裁决）"
+          },
+          "attribute_bonus": {
+            "type": "object",
+            "description": "六维核心属性修正（单维范围 [-2, 3]，六维净代数和 [-2, 4]）",
+            "properties": {
+              "STR": { "type": "integer", "minimum": -2, "maximum": 3 },
+              "CON": { "type": "integer", "minimum": -2, "maximum": 3 },
+              "INT": { "type": "integer", "minimum": -2, "maximum": 3 },
+              "AGI": { "type": "integer", "minimum": -2, "maximum": 3 },
+              "SPR": { "type": "integer", "minimum": -2, "maximum": 3 },
+              "VIT": { "type": "integer", "minimum": -2, "maximum": 3 }
+            },
+            "additionalProperties": false
+          },
+          "desc": {
+            "type": "string",
+            "maxLength": 512,
+            "description": "出身背景叙事说明与历史传闻"
+          }
+        },
+        "required": ["origin_id", "name"]
+      }
+    },
+    "custom_traits": {
+      "type": "array",
+      "description": "模组自定义正负因果天赋池列表",
+      "items": {
+        "type": "object",
+        "properties": {
+          "trait_id": {
+            "type": "string",
+            "pattern": "^[A-Z0-9_]+$",
+            "description": "因果天赋唯一标识符（如 TRAIT_STARLIGHT_AFFINITY）"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32,
+            "description": "天赋显示名称"
+          },
+          "cost": {
+            "type": "integer",
+            "not": { "enum": [0] },
+            "description": "因果点数成本（正向天赋必须 > 0，负向天赋必须 < 0，禁止为 0）"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["POSITIVE", "NEGATIVE"],
+            "description": "天赋极性分类：POSITIVE(正面因果益处), NEGATIVE(负面因果枷锁)"
+          },
+          "modifiers": {
+            "type": "object",
+            "description": "天赋赋予的六维属性修正字典",
+            "properties": {
+              "STR": { "type": "integer" },
+              "CON": { "type": "integer" },
+              "INT": { "type": "integer" },
+              "AGI": { "type": "integer" },
+              "SPR": { "type": "integer" },
+              "VIT": { "type": "integer" }
+            },
+            "additionalProperties": false
+          },
+          "desc": {
+            "type": "string",
+            "maxLength": 512,
+            "description": "天赋因果背景与生效效果说明"
+          }
+        },
+        "required": ["trait_id", "name", "cost", "type"]
+      }
+    },
+    "paired_presets": {
+      "type": "array",
+      "description": "正负因果天赋成对守恒预设列表（|pos_cost + neg_cost| <= 1）",
+      "items": {
+        "type": "object",
+        "properties": {
+          "preset_id": {
+            "type": "string",
+            "pattern": "^[A-Z0-9_]+$",
+            "description": "配对预设唯一标识符"
+          },
+          "positive": {
+            "type": "string",
+            "description": "绑定的正向天赋标识符 (cost > 0)"
+          },
+          "negative": {
+            "type": "string",
+            "description": "绑定的负向天赋标识符 (cost < 0)"
+          },
+          "positive_cost": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "显式声明的正向天赋点数（可选，缺省自天赋声明提取）"
+          },
+          "negative_cost": {
+            "type": "integer",
+            "maximum": -1,
+            "description": "显式声明的负向天赋点数（可选，缺省自天赋声明提取）"
+          },
+          "weight": {
+            "type": "integer",
+            "minimum": 0,
+            "default": 50,
+            "description": "抽取该配对组合的权重"
+          }
+        },
+        "required": ["preset_id", "positive", "negative"]
+      }
+    },
+    "custom_starter_kits": {
+      "type": "array",
+      "description": "自定义新兵初始装备行囊配置列表",
+      "items": {
+        "type": "object",
+        "properties": {
+          "kit_id": {
+            "type": "string",
+            "pattern": "^[A-Z0-9_]+$",
+            "description": "初始行囊唯一标识符"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 32,
+            "description": "行囊套件显示名称"
+          },
+          "initial_gold": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000,
+            "default": 50,
+            "description": "行囊附带的金币数量（上限 <= 1000）"
+          },
+          "display_weapon": {
+            "type": "string",
+            "description": "代表性初始佩剑或展示武器的权威物品 ID"
+          },
+          "initial_items": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 10,
+            "description": "行囊初始物品清单（单套套件总件数严格限制 <= 10）",
+            "items": {
+              "type": "object",
+              "properties": {
+                "canonical_id": {
+                  "type": "string",
+                  "pattern": "^KALAR:[A-Z0-9_]+:[A-Z0-9_]+:[A-Z0-9_]+$",
+                  "description": "权威物品标识符（如 KALAR:EQUIP:WEAPON_BLADE:IRON_SWORD）"
+                },
+                "count": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 999,
+                  "default": 1,
+                  "description": "配给物品数量"
+                }
+              },
+              "required": ["canonical_id"]
+            }
+          }
+        },
+        "required": ["kit_id", "name", "initial_items"]
+      }
+    },
+    "custom_routing_rules": {
+      "type": "array",
+      "description": "身世与序章图专用内联路由映射表",
+      "items": {
+        "type": "object",
+        "properties": {
+          "race": { "type": "string" },
+          "origin_id": { "type": "string" },
+          "birth_region": { "type": "string" },
+          "target_dag_id": {
+            "type": "string",
+            "pattern": "^DAG_[A-Z0-9_]+$",
+            "description": "目标因果 DAG 剧情图唯一标识符"
+          }
+        },
+        "required": ["target_dag_id"]
+      }
+    }
+  },
+  "additionalProperties": false
+}

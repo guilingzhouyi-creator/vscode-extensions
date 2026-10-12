@@ -1,0 +1,49 @@
+{
+  "manifest_version": "1.0.0",
+  "asset_count": 7,
+  "total_size_bytes": 502,
+  "assets": [
+    {
+      "path": "models/weapons/abyss_greatsword.gltf",
+      "type": "model",
+      "size_bytes": 78,
+      "sha256": "5f7ebeea11fafa4a6a8fb24d0ac794491fdec639d9d4a10037938ce913b7db17"
+    },
+    {
+      "path": "models/weapons/astral_catalyst.gltf",
+      "type": "model",
+      "size_bytes": 78,
+      "sha256": "5f7ebeea11fafa4a6a8fb24d0ac794491fdec639d9d4a10037938ce913b7db17"
+    },
+    {
+      "path": "models/weapons/void_composite_bow.gltf",
+      "type": "model",
+      "size_bytes": 78,
+      "sha256": "5f7ebeea11fafa4a6a8fb24d0ac794491fdec639d9d4a10037938ce913b7db17"
+    },
+    {
+      "path": "textures/icons/weapons/abyss_greatsword.png",
+      "type": "image",
+      "size_bytes": 67,
+      "sha256": "bf6e855b67618763d38f0cd8c2ab5ea9aed7b28f4475939f040e4e3ac016bedc"
+    },
+    {
+      "path": "textures/icons/weapons/astral_catalyst.png",
+      "type": "image",
+      "size_bytes": 67,
+      "sha256": "bf6e855b67618763d38f0cd8c2ab5ea9aed7b28f4475939f040e4e3ac016bedc"
+    },
+    {
+      "path": "textures/icons/weapons/void_composite_bow.png",
+      "type": "image",
+      "size_bytes": 67,
+      "sha256": "bf6e855b67618763d38f0cd8c2ab5ea9aed7b28f4475939f040e4e3ac016bedc"
+    },
+    {
+      "path": "textures/maps/world_terrain_heightmap.png",
+      "type": "image",
+      "size_bytes": 67,
+      "sha256": "bf6e855b67618763d38f0cd8c2ab5ea9aed7b28f4475939f040e4e3ac016bedc"
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "dag_id": "DAG_HUD_PREVIEW",
+  "entry_node_id": "NODE_HUD_START",
+  "terminal_node_id": "NODE_HUD_EXIT",
+  "nodes": {
+    "NODE_HUD_START": {
+      "node_type": "START_ENTRY",
+      "inline_text": "\u6fc0\u6d3b\u9ed1\u66dc\u77f3\u5b9a\u5236 HUD \u4e3b\u9898\uff0c\u754c\u9762\u53c2\u6570\u521d\u59cb\u5316\u5b8c\u6bd5\u3002",
+      "background_asset": "mod://ui/hud/frames/main_frame.png",
+      "required_prerequisites": []
+    },
+    "NODE_HUD_EXIT": {
+      "node_type": "TERMINAL_EXIT",
+      "inline_text": "\u5168\u5957 HUD \u89c6\u542c\u76ae\u80a4\u751f\u6548\uff0c\u51c6\u5907\u8fdb\u5165\u5b9e\u6218\u3002",
+      "required_prerequisites": [
+        "NODE_HUD_START"
+      ],
+      "mutations_on_complete": [
+        {
+          "type": "PrologueCompleted",
+          "dag_id": "DAG_HUD_PREVIEW"
+        }
+      ]
+    }
+  },
+  "edges": [
+    {
+      "from": "NODE_HUD_START",
+      "to": "NODE_HUD_EXIT"
+    }
+  ]
+}

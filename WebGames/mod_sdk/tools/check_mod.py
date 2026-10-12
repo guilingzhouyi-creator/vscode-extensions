@@ -5,7 +5,7 @@
 # 架构定位: MOD纯静态轻量自愈诊断器 (Pure Static Mod Validator & Diagnostic Tool)
 # 依赖与触发: 触发方: CLI / 外部 Agent | 上游: MOD 目录与文件 | 下游: 控制台输出与结构化 JSON 自愈指引 | 运行时: Python 3.10+
 # 职责说明: 纯静态校验 MOD 清单格式、因果 DAG 拓扑连通性与文案占位符白名单，输出自愈诊断
-# 退出语义与设计依据: 退出码: 0=合规通过, 1=发现违规错误, 2=参数/IO错误 | 设计依据: Phase 114 DevKit 契约与第一性原理
+# 退出语义与设计依据: 退出码: 0=合规通过, 1=发现违规错误, 2=参数/IO错误 | 设计依据: 《卡拉尔数据契约规范 v1.0》与第一性原理
 # ------------------------------------------------------------------------------
 # 用法示例:
 #   python mod_sdk/tools/check_mod.py ./my_mod
@@ -22,87 +22,47 @@ import sys
 from pathlib import Path
 from typing import Any
 
+TOOLS_DIR = Path(__file__).resolve().parent
+if str(TOOLS_DIR) not in sys.path:
+    sys.path.insert(0, str(TOOLS_DIR))
+
+try:
+    from cook_assets import cook_assets
+except ImportError:
+    cook_assets = None
+
 # ==============================================================================
-# 一、全局白名单常量与命途数值边界不变量契约 (Constants & Budget Invariants)
-# - Inv-PLACEHOLDER: 剧情文本仅允许使用预声明的 18 项上下文占位符
-# - Inv-STAT-BUDGET: 自定义身世单维修正 [-2, +3]，六维净代数和 [-2, +4]，金币 [0, 1000]
-# - Inv-CAUSALITY-BALANCE: 正负因果天赋必须配对出现，且 |pos_cost + neg_cost| <= 1
-# - Inv-KIT-CAPACITY: 自定义初始行囊单套物品总件数 <= 10 且 canonical_id 非空
-# ==============================================================================
-WHITELISTED_PLACEHOLDERS: frozenset[str] = frozenset({
-    "player_name", "race", "gender", "level", "world_id", "town",
-    "gold", "cur", "max", "name", "status", "desc",
-    "beast_count", "reward_gold", "loss_soldiers", "loss_gold", "gain_gold",
-})
-PARAM_REGEX: re.Pattern[str] = re.compile(r"\{([a-zA-Z_][a-zA-Z0-9_]*)\}")
-REQUIRED_MANIFEST_FIELDS: tuple[str, ...] = (
-    "pack_id", "pack_name", "version", "author", "engine_api_version",
-    "priority", "dependencies", "incompatible_packs", "semantic_tags", "is_active",
+from check_mod_common import (
+    DiagnosticItem,
+    WHITELISTED_PLACEHOLDERS,
+    PARAM_REGEX,
+    REQUIRED_MANIFEST_FIELDS,
+    VALID_ATTRIBUTE_KEYS,
+    VALID_UI_SELECTION_MODES,
+    BUILTIN_DAG_IDS,
+    BUILTIN_STARTER_KITS,
+    BUILTIN_TRAIT_COSTS,
+    ensure_utf8_stdout as _ensure_utf8_stdout,
+    add_diag as _add_diag,
+    safe_load_json as _safe_load_json,
+    normalize_named_items as _normalize_named_items,
 )
-VALID_ATTRIBUTE_KEYS: frozenset[str] = frozenset({"STR", "CON", "INT", "AGI", "SPR", "VIT"})
-VALID_UI_SELECTION_MODES: frozenset[str] = frozenset({"INHERIT", "ALLOW_MANUAL", "FORCE_RANDOM"})
-BUILTIN_TRAIT_COSTS: dict[str, int] = {
-    "PRIMORDIAL_RESONANCE": 3, "GIANT_MIGHT": 2, "IRON_WILL": 1,
-    "HEART_CORE_FISSURE": -3, "MANA_INSULATED": -2,
-}
+from check_mod_dag import (
+    check_dag_entries_and_terminals as _check_dag_entries_and_terminals,
+    build_dag_graph_structure as _build_dag_graph_structure,
+    detect_dag_cycle_kahn as _detect_dag_cycle_kahn,
+    check_reachability as _check_reachability,
+    flatten_i18n_dict as _flatten_i18n_dict,
+    check_dag_file as _check_dag_file,
+)
+from check_mod_multi import (
+    check_multi_incompatible_packs as _check_multi_incompatible_packs,
+    register_entity_ids as _register_entity_ids,
+    check_multi_duplicate_ids as _check_multi_duplicate_ids,
+    check_multi_ui_policy_conflicts as _check_multi_ui_policy_conflicts,
+    validate_multi_mods,
+)
 
-
-def _ensure_utf8_stdout() -> None:
-    """保障跨平台 UTF-8 控制台输出，防止 Windows GBK 编码崩溃。"""
-    if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
-        try:
-            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-            sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-        except Exception:
-            pass
-
-
-# ==============================================================================
-# 二、结构化诊断模型与 JSON 安全读取底座 (Diagnostic Model & Safe I/O)
-# ==============================================================================
-class DiagnosticItem:
-    """结构化诊断发现项：包含错误码、文件路径、违规详情与面向 Agent 的自愈修复建议。"""
-
-    def __init__(self, code: str, file_path: str, detail: str, fix_suggestion: str) -> None:
-        self.code = code
-        self.file = file_path
-        self.detail = detail
-        self.fix_suggestion = fix_suggestion
-
-    def to_dict(self) -> dict[str, str]:
-        return {"code": self.code, "file": self.file, "detail": self.detail, "fix_suggestion": self.fix_suggestion}
-
-
-def _add_diag(diags: list[DiagnosticItem], code: str, file_path: str, detail: str, fix_suggestion: str) -> None:
-    """向诊断列表追加一条结构化违规记录。"""
-    diags.append(DiagnosticItem(code=code, file_path=file_path, detail=detail, fix_suggestion=fix_suggestion))
-
-
-def _safe_load_json(file_path: Path, rel_name: str, diags: list[DiagnosticItem]) -> Any:
-    """安全读取并解析 JSON 文件，文件缺失或语法损坏时登记自愈诊断。"""
-    if not file_path.is_file():
-        _add_diag(diags, "ERR_FILE_MISSING", rel_name, f"必备文件不存在: {rel_name}", f"请通过 scaffold_mod.py 或手动创建 {rel_name}")
-        return None
-    try:
-        return json.loads(file_path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError) as err:
-        _add_diag(diags, "ERR_JSON_INVALID", rel_name, f"JSON 解析失败: {err}", f"请检查 {rel_name} 的 JSON 语法正确性与逗号/引号匹配")
-        return None
-
-
-def _normalize_named_items(raw_collection: Any, id_field: str) -> list[dict[str, Any]]:
-    """将列表式或字典式条目集合归一化为对象列表。"""
-    if isinstance(raw_collection, list):
-        return [item for item in raw_collection if isinstance(item, dict)]
-    if isinstance(raw_collection, dict):
-        normalized: list[dict[str, Any]] = []
-        for k, v in raw_collection.items():
-            if isinstance(v, dict):
-                entry = dict(v)
-                entry.setdefault(id_field, k)
-                normalized.append(entry)
-        return normalized
-    return []
 
 
 # ==============================================================================
@@ -151,8 +111,15 @@ def _check_origin_stat_bonuses(oid: str, bonuses: dict[str, Any], rel_name: str,
         _add_diag(diags, "ERR_DESTINY_STAT_BUDGET_EXCEEDED", rel_name, f"自定义身世 '{oid}' 六维加成净代数和 {net_sum} 超出 [-2, 4] 预算红线", f"请平衡 '{oid}' 的正负属性加成，使净代数和保持在 [-2, 4] 之间")
 
 
-def _check_single_origin_budget(origin: dict[str, Any], idx: int, rel_name: str, diags: list[DiagnosticItem]) -> None:
-    """校验单个自定义身世的六维加成预算与初始金币上限。"""
+def _check_single_origin_budget(
+    origin: dict[str, Any],
+    idx: int,
+    rel_name: str,
+    diags: list[DiagnosticItem],
+    valid_dags: set[str],
+    valid_kits: set[str],
+) -> None:
+    """校验单个自定义身世的六维加成预算、初始金币上限与序章DAG/套件引用。"""
     oid = str(origin.get("origin_id") or origin.get("id") or f"index_{idx}")
     gold = origin.get("initial_gold", 0)
     if not _is_valid_number(gold) or not (0 <= gold <= 1000):
@@ -161,15 +128,42 @@ def _check_single_origin_budget(origin: dict[str, Any], idx: int, rel_name: str,
     bonuses = origin.get("attribute_bonus", {})
     if not isinstance(bonuses, dict):
         _add_diag(diags, "ERR_DESTINY_STAT_BUDGET_EXCEEDED", rel_name, f"自定义身世 '{oid}' 的 attribute_bonus 必须为对象", "请将 attribute_bonus 声明为六维属性键值对字典")
-        return
+    else:
+        _check_origin_stat_bonuses(oid, bonuses, rel_name, diags)
 
-    _check_origin_stat_bonuses(oid, bonuses, rel_name, diags)
+    prologue_dag_id = origin.get("prologue_dag_id")
+    if prologue_dag_id:
+        if not isinstance(prologue_dag_id, str) or prologue_dag_id.strip() not in valid_dags:
+            _add_diag(
+                diags,
+                "ERR_DESTINY_UNKNOWN_DAG_REF",
+                rel_name,
+                f"自定义身世 '{oid}' 引用的 prologue_dag_id '{prologue_dag_id}' 不存在于 declared_dag_ids 或内置序章图中",
+                "请确保引用的 prologue_dag_id 在 dag_graphs/ 中存在或属于内置序章图",
+            )
+
+    starter_kit_id = origin.get("starter_kit_id")
+    if starter_kit_id:
+        if not isinstance(starter_kit_id, str) or starter_kit_id.strip() not in valid_kits:
+            _add_diag(
+                diags,
+                "ERR_DESTINY_UNKNOWN_KIT_REF",
+                rel_name,
+                f"自定义身世 '{oid}' 引用的 starter_kit_id '{starter_kit_id}' 不存在于 custom_starter_kits 或内置套件中",
+                "请确保 starter_kit_id 引用了合法已声明的套件标识符（如 KIT_HUMAN_DEFAULT）",
+            )
 
 
-def _check_destiny_origins(destiny_data: dict[str, Any], rel_name: str, diags: list[DiagnosticItem]) -> None:
+def _check_destiny_origins(
+    destiny_data: dict[str, Any],
+    rel_name: str,
+    diags: list[DiagnosticItem],
+    valid_dags: set[str],
+    valid_kits: set[str],
+) -> None:
     """校验 custom_origins 列表中的所有自定义身世。"""
     for idx, origin in enumerate(_normalize_named_items(destiny_data.get("custom_origins"), "origin_id")):
-        _check_single_origin_budget(origin, idx, rel_name, diags)
+        _check_single_origin_budget(origin, idx, rel_name, diags, valid_dags, valid_kits)
 
 
 def _extract_trait_cost_map(destiny_data: dict[str, Any], rel_name: str, diags: list[DiagnosticItem]) -> dict[str, int | float]:
@@ -267,7 +261,35 @@ def _check_destiny_starter_kits(destiny_data: dict[str, Any], rel_name: str, dia
         _check_single_starter_kit(kit, idx, rel_name, diags)
 
 
-def _check_destinies_file(mod_dir: Path, diags: list[DiagnosticItem], rel_prefix: str = "") -> dict[str, Any] | None:
+def _check_destiny_custom_routing_rules(
+    destiny_data: dict[str, Any],
+    rel_name: str,
+    valid_dags: set[str],
+    diags: list[DiagnosticItem],
+) -> None:
+    """校验 destinies.json 中的 custom_routing_rules 目标 DAG 是否合法。"""
+    raw_rules = destiny_data.get("custom_routing_rules")
+    if not raw_rules:
+        return
+    rules = _extract_rules_list(raw_rules) if not isinstance(raw_rules, list) else [r for r in raw_rules if isinstance(r, dict)]
+    for idx, rule in enumerate(rules):
+        target = rule.get("target_dag_id")
+        if not target or not isinstance(target, str) or target.strip() not in valid_dags:
+            _add_diag(
+                diags,
+                "ERR_DESTINY_UNKNOWN_DAG_REF",
+                rel_name,
+                f"custom_routing_rules[{idx}] 引用的 target_dag_id '{target}' 不存在于 declared_dag_ids 或内置序章图中",
+                "请指定已存在的有效序章 DAG 图元标识符",
+            )
+
+
+def _check_destinies_file(
+    mod_dir: Path,
+    diags: list[DiagnosticItem],
+    rel_prefix: str = "",
+    declared_dag_ids: set[str] | None = None,
+) -> dict[str, Any] | None:
     """若存在 destinies.json，则校验其 UI 策略、六维预算、正负因果与初始套件。"""
     destiny_path = mod_dir / "destinies.json"
     if not destiny_path.is_file():
@@ -280,10 +302,19 @@ def _check_destinies_file(mod_dir: Path, diags: list[DiagnosticItem], rel_prefix
             _add_diag(diags, "ERR_DESTINY_NOT_OBJECT", rel_name, "destinies.json 顶层必须为 JSON 对象", "请将 destinies.json 根节点调整为 JSON 对象 {}")
         return None
 
+    valid_dags = (declared_dag_ids or set()) | BUILTIN_DAG_IDS
+    declared_kit_ids: set[str] = set()
+    for kit in _normalize_named_items(data.get("custom_starter_kits"), "kit_id"):
+        kid = kit.get("kit_id") or kit.get("id")
+        if isinstance(kid, str) and kid.strip():
+            declared_kit_ids.add(kid.strip())
+    valid_kits = declared_kit_ids | BUILTIN_STARTER_KITS
+
     _check_destiny_ui_capabilities(data, rel_name, diags)
-    _check_destiny_origins(data, rel_name, diags)
+    _check_destiny_origins(data, rel_name, diags, valid_dags, valid_kits)
     _check_destiny_causality_traits(data, rel_name, diags)
     _check_destiny_starter_kits(data, rel_name, diags)
+    _check_destiny_custom_routing_rules(data, rel_name, valid_dags, diags)
     return data
 
 
@@ -350,6 +381,7 @@ def _check_routing_rules(mod_dir: Path, declared_dag_ids: set[str], diags: list[
         ))
         return
 
+    valid_dags = declared_dag_ids | BUILTIN_DAG_IDS
     for idx, rule in enumerate(rules):
         target = rule.get("target_dag_id")
         if not target or not isinstance(target, str):
@@ -361,11 +393,11 @@ def _check_routing_rules(mod_dir: Path, declared_dag_ids: set[str], diags: list[
             ))
             continue
 
-        if declared_dag_ids and target not in declared_dag_ids:
+        if valid_dags and target not in valid_dags:
             diags.append(DiagnosticItem(
                 code="ERR_ROUTING_TARGET_UNKNOWN",
                 file_path="routing_rules.json",
-                detail=f"第 {idx} 条规则引用的 target_dag_id '{target}' 在 dag_graphs/ 中未找到",
+                detail=f"第 {idx} 条规则引用的 target_dag_id '{target}' 在 dag_graphs/ 或内置图中未找到",
                 fix_suggestion=f"请确保 dag_graphs/{target}.json 存在或修改目标 ID",
             ))
 
@@ -376,193 +408,22 @@ def _check_routing_rules(mod_dir: Path, declared_dag_ids: set[str], diags: list[
 # - Inv-DAG-REACHABILITY: 前向全节点可达（零孤儿），反向全路径可达终态（零死胡同）
 # - Inv-MULTI-CONFLICT: 跨包互斥、同名 origin_id/trait_id/kit_id 与 UI 策略互斥静态阻断
 # ==============================================================================
-def _check_dag_entries_and_terminals(nodes: dict[str, Any], rel_name: str, diags: list[DiagnosticItem]) -> tuple[str | None, list[str]]:
-    """校验 DAG 入口与终态节点基数。"""
-    entry_nodes: list[str] = []
-    terminal_nodes: list[str] = []
-
-    for nid, node_data in nodes.items():
-        if not isinstance(node_data, dict):
-            continue
-        ntype = str(node_data.get("node_type", ""))
-        if ntype == "START_ENTRY":
-            entry_nodes.append(nid)
-        elif ntype == "TERMINAL_EXIT":
-            terminal_nodes.append(nid)
-
-    if len(entry_nodes) != 1:
-        diags.append(DiagnosticItem(
-            code="ERR_DAG_ENTRY_COUNT",
-            file_path=rel_name,
-            detail=f"DAG 必须有且仅有一个 START_ENTRY 节点，实际找到: {len(entry_nodes)} 个 ({entry_nodes})",
-            fix_suggestion="请调整节点定义，保留且仅保留一个 node_type 为 'START_ENTRY' 的入口节点",
-        ))
-
-    if not terminal_nodes:
-        diags.append(DiagnosticItem(
-            code="ERR_DAG_TERMINAL_COUNT",
-            file_path=rel_name,
-            detail="DAG 至少需要一个 TERMINAL_EXIT 终态退出节点",
-            fix_suggestion="在 nodes 中添加一个 node_type 为 'TERMINAL_EXIT' 的完成节点",
-        ))
-
-    entry_id = entry_nodes[0] if len(entry_nodes) == 1 else None
-    return entry_id, terminal_nodes
-
-
-def _build_dag_graph_structure(nodes: dict[str, Any], edges: list[Any], rel_name: str, diags: list[DiagnosticItem]) -> tuple[dict[str, list[str]], dict[str, list[str]], dict[str, int]]:
-    """构建邻接表、反向邻接表与入度表，并拦截悬挂边与前置缺失。"""
-    adj: dict[str, list[str]] = {nid: [] for nid in nodes}
-    rev_adj: dict[str, list[str]] = {nid: [] for nid in nodes}
-    in_degree: dict[str, int] = {nid: 0 for nid in nodes}
-
-    for edge in edges:
-        if not isinstance(edge, dict):
-            continue
-        u = edge.get("from") or edge.get("from_node_id")
-        v = edge.get("to") or edge.get("to_node_id")
-        if u not in nodes or v not in nodes:
-            diags.append(DiagnosticItem(
-                code="ERR_DAG_DANGLING_EDGE",
-                file_path=rel_name,
-                detail=f"边连接了不存在的节点: '{u}' -> '{v}'",
-                fix_suggestion="检查边的两端节点 ID 是否均已在 nodes 字典中正确声明",
-            ))
-            continue
-
-        adj[u].append(v)
-        rev_adj[v].append(u)
-        in_degree[v] += 1
-
-    for nid, node_data in nodes.items():
-        if not isinstance(node_data, dict):
-            continue
-        prereqs = node_data.get("required_prerequisites", [])
-        if isinstance(prereqs, list):
-            for pre in prereqs:
-                if pre not in nodes:
-                    diags.append(DiagnosticItem(
-                        code="ERR_DAG_MISSING_PREREQUISITE",
-                        file_path=rel_name,
-                        detail=f"节点 '{nid}' 的前置依赖 '{pre}' 不存在",
-                        fix_suggestion=f"在 nodes 中补充声明 '{pre}' 或从 '{nid}' 的 required_prerequisites 中移除",
-                    ))
-
-    return adj, rev_adj, in_degree
-
-
-def _detect_dag_cycle_kahn(nodes: dict[str, Any], adj: dict[str, list[str]], in_degree: dict[str, int], rel_name: str, diags: list[DiagnosticItem]) -> None:
-    """使用 Kahn 拓扑排序算法检测死锁有向环。"""
-    deg_copy = dict(in_degree)
-    zero_queue = [nid for nid, d in deg_copy.items() if d == 0]
-    visited_count = 0
-
-    while zero_queue:
-        curr = zero_queue.pop(0)
-        visited_count += 1
-        for nbr in adj.get(curr, []):
-            deg_copy[nbr] -= 1
-            if deg_copy[nbr] == 0:
-                zero_queue.append(nbr)
-
-    if visited_count < len(nodes):
-        cyclic_nodes = [nid for nid, d in deg_copy.items() if d > 0]
-        diags.append(DiagnosticItem(
-            code="ERR_DAG_CYCLE",
-            file_path=rel_name,
-            detail=f"DAG 存在死锁循环依赖环 (Cycle)！涉及节点: {cyclic_nodes}",
-            fix_suggestion="断开循环环路中的边（移除导致依赖闭环的边，使拓扑保持严格单向）",
-        ))
-
-
-def _check_reachability(nodes: dict[str, Any], entry_id: str | None, terminals: list[str], adj: dict[str, list[str]], rev_adj: dict[str, list[str]], rel_name: str, diags: list[DiagnosticItem]) -> None:
-    """检查连通性与可达性：所有节点自入口可达，且所有路径均可到达终点。"""
-    if not entry_id:
-        return
-
-    # 1. 前向可达性 (从入口出发)
-    fwd_reachable: set[str] = set()
-    frontier = [entry_id]
-    while frontier:
-        cur = frontier.pop(0)
-        if cur in fwd_reachable:
-            continue
-        fwd_reachable.add(cur)
-        for nxt in adj.get(cur, []):
-            if nxt not in fwd_reachable:
-                frontier.append(nxt)
-
-    unreachable_nodes = set(nodes.keys()) - fwd_reachable
-    if unreachable_nodes:
-        diags.append(DiagnosticItem(
-            code="ERR_DAG_ORPHAN_NODE",
-            file_path=rel_name,
-            detail=f"存在无法从入口 '{entry_id}' 到达的孤儿断链节点: {sorted(unreachable_nodes)}",
-            fix_suggestion="请为孤儿节点添加来自上游节点的边，或者从图元中移除未引用的节点",
-        ))
-
-    # 2. 反向可达性 (能到达任意终态节点)
-    if not terminals:
-        return
-
-    bwd_reachable: set[str] = set()
-    bwd_frontier = list(terminals)
-    while bwd_frontier:
-        cur = bwd_frontier.pop(0)
-        if cur in bwd_reachable:
-            continue
-        bwd_reachable.add(cur)
-        for prev in rev_adj.get(cur, []):
-            if prev not in bwd_reachable:
-                bwd_frontier.append(prev)
-
-    dead_end_nodes = fwd_reachable - bwd_reachable
-    if dead_end_nodes:
-        diags.append(DiagnosticItem(
-            code="ERR_DAG_UNREACHABLE_TERMINAL",
-            file_path=rel_name,
-            detail=f"存在无法沿路径到达任何 TERMINAL_EXIT 的死胡同节点: {sorted(dead_end_nodes)}",
-            fix_suggestion="请为这些节点添加指向终态节点的出边，确保所有分支都能顺利完结",
-        ))
-
-
-def _check_dag_file(dag_path: Path, rel_name: str, required_keys: set[str], diags: list[DiagnosticItem]) -> None:
-    """校验单份 DAG 图元文件。"""
-    data = _safe_load_json(dag_path, rel_name, diags)
-    if not isinstance(data, dict):
-        return
-
-    nodes = data.get("nodes")
-    edges = data.get("edges")
-    if not isinstance(nodes, dict) or not nodes:
-        diags.append(DiagnosticItem(
-            code="ERR_DAG_NO_NODES",
-            file_path=rel_name,
-            detail="DAG 图元 nodes 字段必须为非空字典",
-            fix_suggestion="在 DAG JSON 中声明 'nodes' 对象，并至少包含起始与终态节点",
-        ))
-        return
-
-    if not isinstance(edges, list):
-        edges = []
-
-    # 收集待本地化的叙事键
-    for nid, node_data in nodes.items():
-        if isinstance(node_data, dict):
-            nkey = node_data.get("narrative_key")
-            if nkey and isinstance(nkey, str):
-                required_keys.add(nkey)
-
-    entry_id, terminals = _check_dag_entries_and_terminals(nodes, rel_name, diags)
-    adj, rev_adj, in_deg = _build_dag_graph_structure(nodes, edges, rel_name, diags)
-    _detect_dag_cycle_kahn(nodes, adj, in_deg, rel_name, diags)
-    _check_reachability(nodes, entry_id, terminals, adj, rev_adj, rel_name, diags)
+from check_mod_dag import (
+    check_dag_entries_and_terminals as _check_dag_entries_and_terminals,
+    build_dag_graph_structure as _build_dag_graph_structure,
+    detect_dag_cycle_kahn as _detect_dag_cycle_kahn,
+    check_reachability as _check_reachability,
+    flatten_i18n_dict as _flatten_i18n_dict,
+    check_dag_file as _check_dag_file,
+)
 
 
 def _check_i18n(mod_dir: Path, required_keys: set[str], diags: list[DiagnosticItem]) -> None:
-    """校验 i18n 语言包与占位符白名单。"""
+    """校验 i18n 语言包与占位符白名单（当所有节点采用 inline_text 且 i18n 不存在时免校验放行）。"""
     i18n_dir = mod_dir / "i18n"
     if not i18n_dir.is_dir():
+        if not required_keys:
+            return
         diags.append(DiagnosticItem(
             code="ERR_I18N_DIR_MISSING",
             file_path="i18n",
@@ -573,6 +434,8 @@ def _check_i18n(mod_dir: Path, required_keys: set[str], diags: list[DiagnosticIt
 
     i18n_files = sorted(i18n_dir.glob("*.json"))
     if not i18n_files:
+        if not required_keys:
+            return
         diags.append(DiagnosticItem(
             code="ERR_I18N_EMPTY",
             file_path="i18n",
@@ -583,9 +446,11 @@ def _check_i18n(mod_dir: Path, required_keys: set[str], diags: list[DiagnosticIt
 
     for ifile in i18n_files:
         rel_path = f"i18n/{ifile.name}"
-        data = _safe_load_json(ifile, rel_path, diags)
-        if not isinstance(data, dict):
+        raw_data = _safe_load_json(ifile, rel_path, diags)
+        if not isinstance(raw_data, dict):
             continue
+
+        data = _flatten_i18n_dict(raw_data)
 
         # 1. 检查 DAG 引用的叙事键在语言包中是否存在
         for rkey in sorted(required_keys):
@@ -610,6 +475,133 @@ def _check_i18n(mod_dir: Path, required_keys: set[str], diags: list[DiagnosticIt
                         detail=f"键 '{k}' 包含非法/未知占位符 '{{{param}}}'",
                         fix_suggestion=f"请替换为白名单参数，如: {', '.join(sorted(list(WHITELISTED_PLACEHOLDERS)[:6]))}",
                     ))
+
+
+def _check_asset_safety_and_manifest(mod_dir: Path, diags: list[DiagnosticItem]) -> None:
+    """若存在 assets/ 目录，校验其资源格式白名单、体积预算及 manifest.json。"""
+    assets_dir = mod_dir / "assets"
+    if not assets_dir.is_dir():
+        return
+    if cook_assets is not None:
+        valid_assets, asset_diags, _ = cook_assets(mod_dir, check_only=True)
+        for d in asset_diags:
+            diags.append(DiagnosticItem(d.code, d.file, d.detail, d.fix_suggestion))
+
+
+def _collect_mod_uri_strings(obj: Any) -> list[str]:
+    """递归收集数据对象中所有以 'mod://' 开头的资产 URI 字符串。"""
+    found: list[str] = []
+    if isinstance(obj, str):
+        if obj.startswith("mod://"):
+            found.append(obj)
+    elif isinstance(obj, dict):
+        for v in obj.values():
+            found.extend(_collect_mod_uri_strings(v))
+    elif isinstance(obj, list):
+        for item in obj:
+            found.extend(_collect_mod_uri_strings(item))
+    return found
+
+
+def _resolve_mod_uri_path(mod_dir: Path, uri: str) -> bool:
+    """判断 mod:// 资产 URI 是否在模组内物理存在。"""
+    clean_target = uri[6:].strip("/")
+    if not clean_target:
+        return False
+    if (mod_dir / clean_target).is_file():
+        return True
+    if (mod_dir / "assets" / clean_target).is_file():
+        return True
+    return False
+
+
+def _check_dangling_asset_refs(mod_dir: Path, diags: list[DiagnosticItem]) -> None:
+    """校验 destinies.json 与因果 DAG 图元中引用的 mod:// 资产是否存在于 assets/。"""
+    destiny_path = mod_dir / "destinies.json"
+    if destiny_path.is_file():
+        try:
+            d_data = json.loads(destiny_path.read_text(encoding="utf-8"))
+            for uri in _collect_mod_uri_strings(d_data):
+                if not _resolve_mod_uri_path(mod_dir, uri):
+                    diags.append(DiagnosticItem(
+                        code="ERR_ASSET_DANGLING_REF",
+                        file_path="destinies.json",
+                        detail=f"destinies.json 引用了不存在的资产: '{uri}'",
+                        fix_suggestion=f"请确保资产文件已放置于 assets/ 对应路径，并运行 'kalar-mod cook' 生成清单",
+                    ))
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    dag_dir = mod_dir / "dag_graphs"
+    if dag_dir.is_dir():
+        for df in sorted(dag_dir.glob("*.json")):
+            try:
+                g_data = json.loads(df.read_text(encoding="utf-8"))
+                rel_file = f"dag_graphs/{df.name}"
+                for uri in _collect_mod_uri_strings(g_data):
+                    if not _resolve_mod_uri_path(mod_dir, uri):
+                        diags.append(DiagnosticItem(
+                            code="ERR_ASSET_DANGLING_REF",
+                            file_path=rel_file,
+                            detail=f"{rel_file} 节点中引用了不存在的资产: '{uri}'",
+                            fix_suggestion=f"请确保资产文件已放置于 assets/ 对应路径，或修正节点中的资源 URI",
+                        ))
+            except (json.JSONDecodeError, OSError):
+                pass
+
+
+def _check_content_directory(mod_dir: Path, diags: list[DiagnosticItem]) -> None:
+    """校验 content/ 大魔改数据目录及其 JSON 实体定义的合法性。"""
+    content_dir = mod_dir / "content"
+    if not content_dir.is_dir():
+        return
+
+    content_files = sorted([p for p in content_dir.rglob("*") if p.is_file()])
+    if not content_files:
+        diags.append(DiagnosticItem(
+            code="ERR_CONTENT_EMPTY",
+            file_path="content",
+            detail="content/ 目录已创建但未包含任何数据文件",
+            fix_suggestion="请在 content/ 目录下放置合规的 JSON 数据定义文件，或移除空的 content/ 目录",
+        ))
+        return
+
+    forbidden_exts = frozenset({".exe", ".bat", ".cmd", ".sh", ".py", ".pyc", ".dll", ".so", ".bin", ".ps1"})
+    for cf in content_files:
+        rel_str = f"content/{cf.relative_to(content_dir).as_posix()}"
+        ext = cf.suffix.lower()
+        if ext in forbidden_exts:
+            diags.append(DiagnosticItem(
+                code="ERR_CONTENT_FORBIDDEN_FILE",
+                file_path=rel_str,
+                detail=f"content/ 目录严禁包含可执行或脚本文件: '{cf.name}'",
+                fix_suggestion="请将该文件移出 content/ 目录",
+            ))
+            continue
+        if ext not in (".json", ".json5"):
+            diags.append(DiagnosticItem(
+                code="ERR_CONTENT_INVALID_FORMAT",
+                file_path=rel_str,
+                detail=f"content/ 文件格式非法: '{cf.name}' (仅支持 .json)",
+                fix_suggestion="请将大魔改数据存储为合规的 .json 格式",
+            ))
+            continue
+        try:
+            cdata = json.loads(cf.read_text(encoding="utf-8"))
+            if not isinstance(cdata, (dict, list)):
+                diags.append(DiagnosticItem(
+                    code="ERR_CONTENT_NOT_OBJECT_OR_ARRAY",
+                    file_path=rel_str,
+                    detail=f"{rel_str} 顶层必须为 JSON 对象或列表",
+                    fix_suggestion="请将该文件的根结构调整为 {} 或 []",
+                ))
+        except (json.JSONDecodeError, OSError) as err:
+            diags.append(DiagnosticItem(
+                code="ERR_CONTENT_JSON_INVALID",
+                file_path=rel_str,
+                detail=f"JSON 解析失败: {err}",
+                fix_suggestion=f"请检查 {rel_str} 的语法正确性",
+            ))
 
 
 def validate_mod(mod_dir: Path) -> tuple[bool, list[DiagnosticItem]]:
@@ -649,192 +641,27 @@ def validate_mod(mod_dir: Path) -> tuple[bool, list[DiagnosticItem]]:
         for df in dag_files:
             dag_stem = df.stem
             declared_dag_ids.add(dag_stem)
-            _check_dag_file(df, f"dag_graphs/{df.name}", required_keys, diags)
+            _check_dag_file(df, f"dag_graphs/{df.name}", required_keys, declared_dag_ids, diags)
 
     _check_routing_rules(mod_dir, declared_dag_ids, diags)
     _check_i18n(mod_dir, required_keys, diags)
-    _check_destinies_file(mod_dir, diags)
+    _check_destinies_file(mod_dir, diags, declared_dag_ids=declared_dag_ids)
+    _check_asset_safety_and_manifest(mod_dir, diags)
+    _check_dangling_asset_refs(mod_dir, diags)
+    _check_content_directory(mod_dir, diags)
 
     valid = len(diags) == 0
     return valid, diags
 
 
-def _check_multi_incompatible_packs(
-    pack_records: list[dict[str, Any]],
-    diags: list[DiagnosticItem],
-) -> None:
-    """检测多包联合启用时的 incompatible_packs 互斥冲突。"""
-    active_ids: dict[str, str] = {}
-    for rec in pack_records:
-        pid = rec["pack_id"]
-        dir_name = rec["dir_name"]
-        if pid in active_ids:
-            diags.append(DiagnosticItem(
-                code="ERR_MOD_DUPLICATE_ID_CONFLICT",
-                file_path=f"{dir_name}/pack.json",
-                detail=f"多包联合加载存在重复的 pack_id '{pid}' ({active_ids[pid]} vs {dir_name})",
-                fix_suggestion="请确保每个启用 MOD 的 pack.json 具有全局唯一的 pack_id",
-            ))
-        else:
-            active_ids[pid] = dir_name
+from check_mod_multi import (
+    check_multi_incompatible_packs as _check_multi_incompatible_packs,
+    register_entity_ids as _register_entity_ids,
+    check_multi_duplicate_ids as _check_multi_duplicate_ids,
+    check_multi_ui_policy_conflicts as _check_multi_ui_policy_conflicts,
+    validate_multi_mods,
+)
 
-    seen_pairs: set[tuple[str, str]] = set()
-    for rec in pack_records:
-        pid = rec["pack_id"]
-        dir_name = rec["dir_name"]
-        incompat_list = rec["manifest"].get("incompatible_packs", [])
-        if not isinstance(incompat_list, list):
-            continue
-        for target_id in incompat_list:
-            if not isinstance(target_id, str) or target_id not in active_ids:
-                continue
-            pair_key = (min(pid, target_id), max(pid, target_id))
-            if pair_key in seen_pairs:
-                continue
-            seen_pairs.add(pair_key)
-            diags.append(DiagnosticItem(
-                code="ERR_MOD_INCOMPATIBLE_CONFLICT",
-                file_path=f"{dir_name}/pack.json",
-                detail=f"MOD '{pid}' 与已启用的 MOD '{target_id}' 存在 incompatible_packs 互斥冲突",
-                fix_suggestion=f"请禁用互斥包 '{pid}' 或 '{target_id}' 之一，或解除 incompatible_packs 声明",
-            ))
-
-
-def _register_entity_ids(
-    items: list[dict[str, Any]],
-    id_field: str,
-    category_label: str,
-    pack_id: str,
-    rel_file: str,
-    seen_registry: dict[str, tuple[str, str]],
-    diags: list[DiagnosticItem],
-) -> None:
-    """登记自定义实体 ID 并拦截跨包同名撞车。"""
-    for item in items:
-        entity_id = item.get(id_field) or item.get("id")
-        if not isinstance(entity_id, str) or not entity_id.strip():
-            continue
-        if entity_id in seen_registry:
-            prev_pack, prev_file = seen_registry[entity_id]
-            diags.append(DiagnosticItem(
-                code="ERR_MOD_DUPLICATE_ID_CONFLICT",
-                file_path=rel_file,
-                detail=(
-                    f"跨包同名 {category_label} ID 撞车: '{entity_id}' 同时存在于 "
-                    f"MOD '{prev_pack}' ({prev_file}) 与 MOD '{pack_id}' ({rel_file})"
-                ),
-                fix_suggestion=f"请为 '{entity_id}' 添加模组专属前缀（如 {pack_id.upper()}_{entity_id}）以消除命名冲突",
-            ))
-        else:
-            seen_registry[entity_id] = (pack_id, rel_file)
-
-
-def _check_multi_duplicate_ids(
-    pack_records: list[dict[str, Any]],
-    diags: list[DiagnosticItem],
-) -> None:
-    """检测多包联合启用时的同名 origin_id / trait_id / kit_id 撞车。"""
-    seen_origins: dict[str, tuple[str, str]] = {}
-    seen_traits: dict[str, tuple[str, str]] = {}
-    seen_kits: dict[str, tuple[str, str]] = {}
-
-    for rec in pack_records:
-        destiny = rec.get("destiny")
-        if not isinstance(destiny, dict):
-            continue
-        pid = rec["pack_id"]
-        rel_file = f"{rec['dir_name']}/destinies.json"
-
-        origins = _normalize_named_items(destiny.get("custom_origins"), "origin_id")
-        _register_entity_ids(origins, "origin_id", "origin_id", pid, rel_file, seen_origins, diags)
-
-        traits = _normalize_named_items(destiny.get("custom_traits"), "trait_id")
-        _register_entity_ids(traits, "trait_id", "trait_id", pid, rel_file, seen_traits, diags)
-
-        kits = _normalize_named_items(destiny.get("custom_starter_kits"), "kit_id")
-        _register_entity_ids(kits, "kit_id", "kit_id", pid, rel_file, seen_kits, diags)
-
-
-def _check_multi_ui_policy_conflicts(
-    pack_records: list[dict[str, Any]],
-    diags: list[DiagnosticItem],
-) -> None:
-    """检测多包联合启用时 ui_capabilities 的 ALLOW_MANUAL vs FORCE_RANDOM 策略冲突。"""
-    for mode_key in ("origin_selection_mode", "trait_selection_mode"):
-        mode_sources: dict[str, list[str]] = {}
-        for rec in pack_records:
-            destiny = rec.get("destiny")
-            if not isinstance(destiny, dict):
-                continue
-            ui_cap = destiny.get("ui_capabilities")
-            if not isinstance(ui_cap, dict):
-                continue
-            mode_val = ui_cap.get(mode_key)
-            if isinstance(mode_val, str) and mode_val in ("ALLOW_MANUAL", "FORCE_RANDOM"):
-                mode_sources.setdefault(mode_val, []).append(rec["pack_id"])
-
-        if "ALLOW_MANUAL" in mode_sources and "FORCE_RANDOM" in mode_sources:
-            manual_packs = ", ".join(mode_sources["ALLOW_MANUAL"])
-            random_packs = ", ".join(mode_sources["FORCE_RANDOM"])
-            diags.append(DiagnosticItem(
-                code="ERR_MOD_UI_POLICY_CONFLICT",
-                file_path="destinies.json",
-                detail=(
-                    f"多包 UI 策略冲突 ({mode_key}): MOD [{manual_packs}] 要求 ALLOW_MANUAL，"
-                    f"而 MOD [{random_packs}] 要求 FORCE_RANDOM"
-                ),
-                fix_suggestion=f"请将其中一个 MOD 的 ui_capabilities.{mode_key} 调整为 'INHERIT' 或统一策略模式",
-            ))
-
-
-def validate_multi_mods(mod_dirs: list[Path]) -> tuple[bool, list[DiagnosticItem]]:
-    """执行多包单包合规检查与跨包联合冲突预检。"""
-    all_diags: list[DiagnosticItem] = []
-    pack_records: list[dict[str, Any]] = []
-
-    for mod_dir in mod_dirs:
-        _, single_diags = validate_mod(mod_dir)
-        for d in single_diags:
-            prefixed_file = f"{mod_dir.name}/{d.file}" if not d.file.startswith(str(mod_dir)) else d.file
-            all_diags.append(DiagnosticItem(d.code, prefixed_file, d.detail, d.fix_suggestion))
-
-        if not mod_dir.is_dir():
-            continue
-
-        manifest_path = mod_dir / "pack.json"
-        destiny_path = mod_dir / "destinies.json"
-        manifest: dict[str, Any] = {}
-        if manifest_path.is_file():
-            try:
-                loaded_m = json.loads(manifest_path.read_text(encoding="utf-8"))
-                if isinstance(loaded_m, dict):
-                    manifest = loaded_m
-            except (json.JSONDecodeError, OSError):
-                pass
-
-        destiny: dict[str, Any] | None = None
-        if destiny_path.is_file():
-            try:
-                loaded_d = json.loads(destiny_path.read_text(encoding="utf-8"))
-                if isinstance(loaded_d, dict):
-                    destiny = loaded_d
-            except (json.JSONDecodeError, OSError):
-                pass
-
-        pack_id = str(manifest.get("pack_id") or mod_dir.name)
-        pack_records.append({
-            "pack_id": pack_id,
-            "dir_name": mod_dir.name,
-            "manifest": manifest,
-            "destiny": destiny,
-        })
-
-    if len(pack_records) >= 2:
-        _check_multi_incompatible_packs(pack_records, all_diags)
-        _check_multi_duplicate_ids(pack_records, all_diags)
-        _check_multi_ui_policy_conflicts(pack_records, all_diags)
-
-    return len(all_diags) == 0, all_diags
 
 
 def print_cli_report(valid: bool, diags: list[DiagnosticItem], mod_dir: Path) -> None:
@@ -848,6 +675,8 @@ def print_cli_report(valid: bool, diags: list[DiagnosticItem], mod_dir: Path) ->
         print("  • DAG 拓扑   : 连通性良好，无环，无孤儿，单入口全路径可达")
         print("  • 命途契约   : 六维预算、正负因果守恒与初始套件全部合规")
         print("  • 占位符白名单: 100% 遵从")
+        print("  • 资产与引用 : 格式白名单、体积预算与 mod:// 引用全部合规")
+        print("  • 魔改数据体 : content/ 大魔改数据结构合法")
         print("==============================================================================")
         return
 

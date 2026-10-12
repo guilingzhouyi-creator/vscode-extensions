@@ -1,0 +1,86 @@
+{
+  "ui_capabilities": {
+    "origin_selection_mode": "ALLOW_MANUAL",
+    "trait_selection_mode": "ALLOW_MANUAL",
+    "allow_attribute_reroll": true
+  },
+  "custom_origins": [
+    {
+      "origin_id": "ORIGIN_VALAN_TACTICIAN",
+      "name": "边境战术参谋",
+      "race": "HUMAN",
+      "birth_region": "CENTRAL_CONTINENT",
+      "weight": 30,
+      "initial_gold": 200,
+      "starter_kit_id": "KIT_AV_TACTICIAN",
+      "prologue_dag_id": "DAG_AV_PROLOGUE",
+      "portrait_asset": "mod://textures/portraits/valan_tactician.png",
+      "voice_cue": "mod://audio/voices/tactician_greeting.ogg",
+      "attribute_bonus": {
+        "INT": 2,
+        "STR": 1,
+        "CON": -1
+      },
+      "desc": "边防要塞前沿参谋，通晓战局推演，装配专属立绘形象与登场语音。"
+    }
+  ],
+  "custom_traits": [
+    {
+      "trait_id": "TRAIT_SONIC_RESONANCE",
+      "name": "声律共鸣",
+      "cost": 2,
+      "type": "POSITIVE",
+      "icon_asset": "mod://textures/icons/traits/sonic_resonance.png",
+      "sound_cue": "mod://audio/sfx/trait_activate.ogg",
+      "modifiers": {
+        "INT": 2,
+        "SPR": 1
+      },
+      "desc": "能敏锐捕捉战场声律异动，施法专注与灵觉显著增强。"
+    },
+    {
+      "trait_id": "TRAIT_AUDITORY_OVERLOAD",
+      "name": "听觉过载",
+      "cost": -2,
+      "type": "NEGATIVE",
+      "icon_asset": "mod://textures/icons/traits/auditory_overload.png",
+      "sound_cue": "mod://audio/sfx/trait_overload.ogg",
+      "modifiers": {
+        "CON": -1,
+        "VIT": -1
+      },
+      "desc": "高频音波易引发神经疲惫，体质抗性较常人略显单薄。"
+    }
+  ],
+  "paired_presets": [
+    {
+      "preset_id": "PAIR_AV_RESONANCE",
+      "positive": "TRAIT_SONIC_RESONANCE",
+      "negative": "TRAIT_AUDITORY_OVERLOAD",
+      "weight": 50
+    }
+  ],
+  "custom_starter_kits": [
+    {
+      "kit_id": "KIT_AV_TACTICIAN",
+      "name": "战术参谋行囊",
+      "initial_gold": 120,
+      "icon_asset": "mod://textures/icons/kits/tactician_pack.png",
+      "display_weapon": "KALAR:EQUIP:WEAPON_BLADE:MITHRIL_LONGSWORD",
+      "initial_items": [
+        {
+          "canonical_id": "KALAR:EQUIP:WEAPON_BLADE:MITHRIL_LONGSWORD",
+          "count": 1
+        },
+        {
+          "canonical_id": "KALAR:CONSUM:ALCHEMY:POTION_MANA",
+          "count": 2
+        },
+        {
+          "canonical_id": "KALAR:CONSUM:FOOD:HEARTY_STEW",
+          "count": 1
+        }
+      ]
+    }
+  ]
+}

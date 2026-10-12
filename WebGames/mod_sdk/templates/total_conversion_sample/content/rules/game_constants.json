@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0.0",
+  "domain": "rules.game_constants",
+  "override_mode": "REPLACE_EXISTING",
+  "character_limits": {
+    "min_level": 1,
+    "max_level": 100,
+    "stat_point_budget_baseline": 30,
+    "max_stat_value_cap": 99,
+    "death_penalty_exp_loss_percent": 0.05
+  },
+  "currency_limits": {
+    "max_gold_cap": 99999999,
+    "max_copper_debt_ceiling": 50000000,
+    "base_currency_unit": "copper",
+    "rates": {
+      "copper": 1,
+      "silver": 100,
+      "gold": 10000,
+      "platinum": 1000000,
+      "mana_monocrystals": 15000
+    }
+  },
+  "inventory_limits": {
+    "base_slot_capacity": 80,
+    "max_slot_capacity": 200,
+    "max_mass_capacity_kg": 250.0,
+    "encumbrance_penalty_speed_ratio": 0.5
+  },
+  "world_simulation": {
+    "ticks_per_day": 24,
+    "day_night_cycle_minutes": 48,
+    "resting_recovery_rate_multiplier": 1.5,
+    "weather_change_interval_ticks": 6
+  }
+}

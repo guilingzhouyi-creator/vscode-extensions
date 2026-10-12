@@ -1,0 +1,85 @@
+{
+  "manifest_version": "1.0.0",
+  "asset_count": 13,
+  "total_size_bytes": 1254,
+  "assets": [
+    {
+      "path": "audio/bgm/fortress_dawn_theme.ogg",
+      "type": "audio",
+      "size_bytes": 132,
+      "sha256": "6ec386aad479c061835564f438ac4d857a4071831f62ecf1bf62fbbb38c2c548"
+    },
+    {
+      "path": "audio/bgm/march_to_frontier.ogg",
+      "type": "audio",
+      "size_bytes": 132,
+      "sha256": "6ec386aad479c061835564f438ac4d857a4071831f62ecf1bf62fbbb38c2c548"
+    },
+    {
+      "path": "audio/bgm/tactical_tension.ogg",
+      "type": "audio",
+      "size_bytes": 132,
+      "sha256": "6ec386aad479c061835564f438ac4d857a4071831f62ecf1bf62fbbb38c2c548"
+    },
+    {
+      "path": "audio/sfx/trait_activate.ogg",
+      "type": "audio",
+      "size_bytes": 132,
+      "sha256": "6ec386aad479c061835564f438ac4d857a4071831f62ecf1bf62fbbb38c2c548"
+    },
+    {
+      "path": "audio/sfx/trait_overload.ogg",
+      "type": "audio",
+      "size_bytes": 132,
+      "sha256": "6ec386aad479c061835564f438ac4d857a4071831f62ecf1bf62fbbb38c2c548"
+    },
+    {
+      "path": "audio/voices/tactician_greeting.ogg",
+      "type": "audio",
+      "size_bytes": 132,
+      "sha256": "6ec386aad479c061835564f438ac4d857a4071831f62ecf1bf62fbbb38c2c548"
+    },
+    {
+      "path": "textures/backgrounds/departure_gate.png",
+      "type": "image",
+      "size_bytes": 66,
+      "sha256": "8d119587817d50371922c8e27b4fb42a3d9228ffafd64d0cd08e8922520ee001"
+    },
+    {
+      "path": "textures/backgrounds/fortress_balcony_dawn.png",
+      "type": "image",
+      "size_bytes": 66,
+      "sha256": "8d119587817d50371922c8e27b4fb42a3d9228ffafd64d0cd08e8922520ee001"
+    },
+    {
+      "path": "textures/backgrounds/war_room_tactical.png",
+      "type": "image",
+      "size_bytes": 66,
+      "sha256": "8d119587817d50371922c8e27b4fb42a3d9228ffafd64d0cd08e8922520ee001"
+    },
+    {
+      "path": "textures/icons/kits/tactician_pack.png",
+      "type": "image",
+      "size_bytes": 66,
+      "sha256": "8d119587817d50371922c8e27b4fb42a3d9228ffafd64d0cd08e8922520ee001"
+    },
+    {
+      "path": "textures/icons/traits/auditory_overload.png",
+      "type": "image",
+      "size_bytes": 66,
+      "sha256": "8d119587817d50371922c8e27b4fb42a3d9228ffafd64d0cd08e8922520ee001"
+    },
+    {
+      "path": "textures/icons/traits/sonic_resonance.png",
+      "type": "image",
+      "size_bytes": 66,
+      "sha256": "8d119587817d50371922c8e27b4fb42a3d9228ffafd64d0cd08e8922520ee001"
+    },
+    {
+      "path": "textures/portraits/valan_tactician.png",
+      "type": "image",
+      "size_bytes": 66,
+      "sha256": "8d119587817d50371922c8e27b4fb42a3d9228ffafd64d0cd08e8922520ee001"
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "kalar.mod_sdk.action.v1",
+  "title": "ActionPayload",
+  "description": "卡拉尔世界引擎 MOD SDK 交互式推演动作包标准契约 (kalar.mod_sdk.action.v1)",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "kalar.mod_sdk.action.v1",
+      "description": "契约 Schema 版本标识（可选）"
+    },
+    "session_id": {
+      "type": "string",
+      "description": "所属会话 ID（可选，若提供需与当前推演会话严格对齐）"
+    },
+    "action_type": {
+      "type": "string",
+      "enum": ["choose", "rollback", "quit"],
+      "description": "标准动作指令枚举：choose(分支推进), rollback(历史回溯), quit(主动退出)"
+    },
+    "action": {
+      "type": "string",
+      "enum": ["choose", "rollback", "quit"],
+      "description": "动作指令别名字段，等价于 action_type"
+    },
+    "choice_id": {
+      "type": ["string", "null"],
+      "description": "目标后继分支或节点标识符（在 action_type 为 choose 时有效）"
+    },
+    "params": {
+      "type": "object",
+      "description": "动作附加参数字典",
+      "additionalProperties": true
+    }
+  },
+  "anyOf": [
+    { "required": ["action_type"] },
+    { "required": ["action"] }
+  ],
+  "additionalProperties": true
+}
+

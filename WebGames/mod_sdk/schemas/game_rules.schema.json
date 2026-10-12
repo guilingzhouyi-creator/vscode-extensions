@@ -1,0 +1,113 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "kalar.mod_sdk.game_rules.v1",
+  "title": "GameRulesDefinition",
+  "description": "卡拉尔世界引擎 游戏核心底层机制规则与物理战斗公式覆盖契约规范 (game_rules.json / content/rules/*.json)",
+  "type": "object",
+  "properties": {
+    "override_mode": {
+      "type": "string",
+      "enum": ["MERGE", "REPLACE_ENTRY", "TOTAL_PURGE"],
+      "default": "MERGE",
+      "description": "规则覆盖模式：MERGE(增量字典合并并覆写重合键), REPLACE_ENTRY(顶级规则段全量替换), TOTAL_PURGE(清除所有默认原版规则)"
+    },
+    "combat_constants": {
+      "type": "object",
+      "description": "战斗动力学与法术相变物理常数",
+      "properties": {
+        "kinetic": {
+          "type": "object",
+          "properties": {
+            "energy_coef": { "type": "number", "minimum": 0, "default": 0.5, "description": "动能计算系数 (E = coef * m * v^2)" },
+            "mass_floor": { "type": "number", "minimum": 0.01, "default": 0.1, "description": "计算有效最小质量下限" },
+            "velocity_floor": { "type": "number", "minimum": 0.01, "default": 0.1, "description": "计算有效最小挥砍速度下限" }
+          },
+          "additionalProperties": false
+        },
+        "phase_transition": {
+          "type": "object",
+          "properties": {
+            "primordial_min_loss_floor": { "type": "number", "minimum": 0 },
+            "primordial_step1_loss": { "type": "number", "minimum": 0 },
+            "incantation_step1_base": { "type": "number", "minimum": 0 },
+            "incantation_step1_per_sentence": { "type": "number", "minimum": 0 },
+            "incantation_step1_min": { "type": "number", "minimum": 0 },
+            "incantation_step1_max": { "type": "number", "minimum": 0 },
+            "step2_base": { "type": "number", "minimum": 0 },
+            "step2_per_meter": { "type": "number", "minimum": 0 },
+            "step2_min": { "type": "number", "minimum": 0 },
+            "step2_max": { "type": "number", "minimum": 0 }
+          },
+          "additionalProperties": false
+        },
+        "defense_multipliers": {
+          "type": "object",
+          "properties": {
+            "block": { "type": "number", "minimum": 0, "maximum": 1.0, "default": 0.35, "description": "架挡承伤系数" },
+            "parry": { "type": "number", "minimum": 0, "maximum": 1.0, "default": 0.5, "description": "格挡挂剑承伤系数" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "mechanics": {
+      "type": "object",
+      "description": "回合战斗参与者基准值与卡牌缺省参数",
+      "properties": {
+        "participant_defaults": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "hp": { "type": "number", "minimum": 1.0 },
+            "max_hp": { "type": "number", "minimum": 1.0 },
+            "ap": { "type": "integer" },
+            "weapon_mass_kg": { "type": "number", "minimum": 0.1 },
+            "weapon_velocity": { "type": "number", "minimum": 0.1 },
+            "edge_sharpness": { "type": "number", "minimum": 0.1 },
+            "armor_rating": { "type": "number", "minimum": 0.0 },
+            "is_staggered": { "type": "boolean", "default": false },
+            "is_monster": { "type": "boolean", "default": false }
+          },
+          "additionalProperties": true
+        },
+        "card_defaults": {
+          "type": "object",
+          "properties": {
+            "verb_type": { "type": "string" },
+            "magic_form": { "type": "integer" },
+            "ap_cost": { "type": "integer" },
+            "base_potency": { "type": "number" },
+            "required_weapon_category": { "type": "string" }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "character_rules": {
+      "type": "object",
+      "description": "角色生成边界与属性成长公式",
+      "properties": {
+        "attribute_bounds": {
+          "type": "object",
+          "properties": {
+            "min_per_stat": { "type": "integer", "default": 1 },
+            "max_per_stat": { "type": "integer", "default": 6 },
+            "total_budget": { "type": "integer", "default": 21 },
+            "default_val": { "type": "integer", "default": 3 }
+          },
+          "additionalProperties": false
+        },
+        "carry_weight_multiplier": {
+          "type": "number",
+          "minimum": 1.0,
+          "default": 10.0,
+          "description": "体质力量转换为最大负重的换算乘数"
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

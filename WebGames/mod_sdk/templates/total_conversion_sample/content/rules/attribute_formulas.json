@@ -1,0 +1,59 @@
+{
+  "schema_version": "1.0.0",
+  "domain": "rules.attribute_formulas",
+  "override_mode": "REPLACE_EXISTING",
+  "formulas": {
+    "physical_attack": {
+      "formula_expression": "STR * 2.5 + AGI * 0.8 + BASE_ATK",
+      "coefficients": {
+        "STR": 2.5,
+        "AGI": 0.8,
+        "BASE_ATK": 10.0
+      },
+      "description": "力量为主属性提供高额物理攻击加成，灵巧度(AGI)提供副属性精度补正"
+    },
+    "magical_attack": {
+      "formula_expression": "INT * 3.0 + SPR * 1.2 + BASE_MATK",
+      "coefficients": {
+        "INT": 3.0,
+        "SPR": 1.2,
+        "BASE_MATK": 8.0
+      },
+      "description": "智力决定法术穿透与法术攻击力，精神提供共鸣副属性补正"
+    },
+    "physical_defense": {
+      "formula_expression": "CON * 1.8 + VIT * 0.5",
+      "coefficients": {
+        "CON": 1.8,
+        "VIT": 0.5
+      },
+      "description": "体质决定基础护甲与抗击打能力，活力提供稳态抗性"
+    },
+    "magical_defense": {
+      "formula_expression": "SPR * 2.0 + INT * 0.6",
+      "coefficients": {
+        "SPR": 2.0,
+        "INT": 0.6
+      },
+      "description": "精神构建心灵结界与魔法抗性，智力强化法力护盾结构"
+    },
+    "max_health": {
+      "formula_expression": "VIT * 25.0 + CON * 15.0 + LEVEL * 60.0",
+      "coefficients": {
+        "VIT": 25.0,
+        "CON": 15.0,
+        "LEVEL": 60.0
+      },
+      "description": "生命值上限综合考量活力储备、体质强度及角色等级"
+    },
+    "max_mana": {
+      "formula_expression": "SPR * 20.0 + INT * 10.0 + LEVEL * 40.0",
+      "coefficients": {
+        "SPR": 20.0,
+        "INT": 10.0,
+        "LEVEL": 40.0
+      },
+      "description": "法力值上限由精神沉淀、智力灵能与角色等级决定"
+    }
+  }
+}

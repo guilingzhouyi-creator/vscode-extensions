@@ -1,0 +1,48 @@
+{
+  "dag_id": "DAG_AV_PROLOGUE",
+  "entry_node_id": "NODE_AV_START",
+  "terminal_node_id": "NODE_AV_EXIT",
+  "nodes": {
+    "NODE_AV_START": {
+      "node_type": "START_ENTRY",
+      "inline_text": "在晨曦微光沐浴的要塞露台，{player_name} 俯瞰着整装待发的先遣阵地。",
+      "background_asset": "mod://textures/backgrounds/fortress_balcony_dawn.png",
+      "bgm_asset": "mod://audio/bgm/fortress_dawn_theme.ogg",
+      "required_prerequisites": []
+    },
+    "NODE_AV_STEP_WAR_ROOM": {
+      "node_type": "STANDARD_STEP",
+      "inline_text": "进入要塞作战指挥室，全息战术沙盘在 {player_name} 面前徐徐展开。",
+      "background_asset": "mod://textures/backgrounds/war_room_tactical.png",
+      "bgm_asset": "mod://audio/bgm/tactical_tension.ogg",
+      "required_prerequisites": [
+        "NODE_AV_START"
+      ]
+    },
+    "NODE_AV_EXIT": {
+      "node_type": "TERMINAL_EXIT",
+      "inline_text": "战术部署完毕，{player_name} 佩戴好行囊武器，迈向通往边境的大门。",
+      "background_asset": "mod://textures/backgrounds/departure_gate.png",
+      "bgm_asset": "mod://audio/bgm/march_to_frontier.ogg",
+      "required_prerequisites": [
+        "NODE_AV_STEP_WAR_ROOM"
+      ],
+      "mutations_on_complete": [
+        {
+          "type": "PrologueCompleted",
+          "dag_id": "DAG_AV_PROLOGUE"
+        }
+      ]
+    }
+  },
+  "edges": [
+    {
+      "from": "NODE_AV_START",
+      "to": "NODE_AV_STEP_WAR_ROOM"
+    },
+    {
+      "from": "NODE_AV_STEP_WAR_ROOM",
+      "to": "NODE_AV_EXIT"
+    }
+  ]
+}

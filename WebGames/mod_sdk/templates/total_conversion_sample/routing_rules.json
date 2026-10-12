@@ -1,0 +1,10 @@
+{
+  "routing_rules": [
+    {
+      "race": "HUMAN",
+      "origin": "ORIGIN_VALAN_TACTICIAN",
+      "target_dag_id": "DAG_TC_PROLOGUE"
+    }
+  ]
+}
+

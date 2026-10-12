@@ -1,0 +1,100 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "kalar.mod_sdk.pack.v1",
+  "title": "NarrativePackManifest",
+  "description": "卡拉尔世界引擎 MOD 清单元数据描述契约规范 (pack.json)",
+  "type": "object",
+  "properties": {
+    "pack_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9_]+$",
+      "description": "MOD 全局唯一标识符，严格由全小写英文字母、数字和下划线组成（如 mod_valan_origins）"
+    },
+    "pack_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "description": "MOD 人类可读显示名称（如 瓦兰要塞边境起源扩展包）"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-[a-zA-Z0-9_.]+)?$",
+      "description": "语义化版本号（遵循 SemVer 规范，如 1.0.0）"
+    },
+    "author": {
+      "type": "string",
+      "default": "Unknown",
+      "description": "MOD 创作者或开发团队署名"
+    },
+    "engine_api_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+      "default": "1.0.0",
+      "description": "声明兼容的目标卡拉尔世界引擎 API 接口版本（当前标准为 1.0.0）"
+    },
+    "tier": {
+      "type": "string",
+      "enum": ["TIER_1_LOGIC", "TIER_2_AUDIOVISUAL", "TIER_3_OVERHAUL"],
+      "default": "TIER_1_LOGIC",
+      "description": "MOD 架构分层级别：TIER_1_LOGIC (轻量剧情与命途逻辑包), TIER_2_AUDIOVISUAL (视听与美术增强包), TIER_3_OVERHAUL (全局大魔改规则包)"
+    },
+    "priority": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 10000,
+      "default": 100,
+      "description": "装配拓扑中的加载优先级，同一依赖层级内数值越大越先装配/后覆写"
+    },
+    "dependencies": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9_]+$"
+      },
+      "uniqueItems": true,
+      "default": [],
+      "description": "必须先于本 MOD 加载的前置依赖 MOD pack_id 列表"
+    },
+    "incompatible_packs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9_]+$"
+      },
+      "uniqueItems": true,
+      "default": [],
+      "description": "互斥冲突的 MOD pack_id 黑名单，联合加载时检测到将触发 ERR_MOD_INCOMPATIBLE_CONFLICT"
+    },
+    "semantic_tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true,
+      "default": [],
+      "description": "语义标签集合（如 [\"prologue\", \"dark_fantasy\", \"hardcore\"]），用于检索与分类"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true,
+      "description": "MOD 激活状态开关，若为 false 则加载引擎静态忽略"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1024,
+      "description": "MOD 详尽背景介绍与功能说明文案"
+    },
+    "homepage": {
+      "type": "string",
+      "format": "uri",
+      "description": "MOD 官方主页、开源仓库或讨论发布地址"
+    }
+  },
+  "required": [
+    "pack_id",
+    "pack_name",
+    "version",
+    "engine_api_version"
+  ],
+  "additionalProperties": true
+}

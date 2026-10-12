@@ -1,0 +1,18 @@
+{
+  "pack_id": "example_custom_hud_theme",
+  "pack_name": "黑曜石主题 HUD 界面范例",
+  "version": "1.0.0",
+  "author": "Kalar UI Working Group",
+  "engine_api_version": "1.0.0",
+  "priority": 150,
+  "mod_tier": "AUDIO_VISUAL",
+  "dependencies": [],
+  "incompatible_packs": [],
+  "semantic_tags": [
+    "ui_theme",
+    "hud",
+    "dark_mode",
+    "visual_override"
+  ],
+  "is_active": true
+}
