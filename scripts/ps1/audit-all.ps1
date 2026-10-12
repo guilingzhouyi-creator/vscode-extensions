@@ -337,7 +337,7 @@ $scoreHygiene = if ($hygienePassedCount -eq 2) {
     [math]::Max($SCORE_FLOOR, [math]::Round(100.0 * ($hygienePassedCount / 2.0), 1))
 }
 
-# 2. 单源规则目录基石得分（基于 410 规则 SSOT 一致性与技能文档字节等价比对动态判定）
+# 2. 单源规则目录基石得分（基于 SSOT 规则目录一致性与技能文档字节等价比对动态判定）
 $ruleCatalogPath = Join-Path $repoRoot "scripts\common\rule-catalog.json"
 $catalogRuleCount = 0
 try {
@@ -351,10 +351,11 @@ try {
     $catalogRuleCount = 0
 }
 
-$scoreRules = if ($statusRules -eq "PASS" -and $catalogRuleCount -ge 410) {
+$expectedRuleBaseline = [math]::Max(420, $catalogRuleCount)
+$scoreRules = if ($statusRules -eq "PASS" -and $catalogRuleCount -ge $expectedRuleBaseline) {
     100.0
 } elseif ($statusRules -eq "PASS" -and $catalogRuleCount -gt 0) {
-    [math]::Max($SCORE_FLOOR, [math]::Round(100.0 * ($catalogRuleCount / 410.0), 1))
+    [math]::Max($SCORE_FLOOR, [math]::Round(100.0 * ($catalogRuleCount / [double]$expectedRuleBaseline), 1))
 } else {
     $rulesPassedCount = 0
     if ($codeCatalog -eq 0) { $rulesPassedCount += 1 }
@@ -481,7 +482,7 @@ Write-Host $sep1 -ForegroundColor Cyan
 
 $sysDefinitions = @(
     @{ num = " 1."; name = "工作区物理卫生";   score = $scoreHygiene; note = "(零空文件/同构)" },
-    @{ num = " 2."; name = "单源规则目录";     score = $scoreRules;   note = "(410规则/SSOT)" },
+    @{ num = " 2."; name = "单源规则目录";     score = $scoreRules;   note = "($($catalogRuleCount)规则/SSOT)" },
     @{ num = " 3."; name = "auto-refactor";    score = $scoreAr;      note = "(CLI静态引擎基线)" },
     @{ num = " 4."; name = "workspace-timing"; score = $scoreWt;      note = "(VSCode扩展门禁)" },
     @{ num = " 5."; name = "WebGames配置架构"; score = $scoreWg;      note = "(卡拉尔领域配置)" }
@@ -574,7 +575,7 @@ if ($env:GITHUB_STEP_SUMMARY) {
         $badgeWg      = if ($statusWg -eq "PASS") { "✅ PASS" } else { "❌ FAIL" }
 
         [void]$md.AppendLine(("| 1 | 工作区物理卫生 | {0} | {1:F1} | `[{2}]` | 全仓零空文件/同构契约 |" -f $badgeHygiene, $scoreHygiene, (Get-ProgressBar $scoreHygiene)))
-        [void]$md.AppendLine(("| 2 | 单源规则目录 | {0} | {1:F1} | `[{2}]` | 410规则/SSOT一致性 |" -f $badgeRules, $scoreRules, (Get-ProgressBar $scoreRules)))
+        [void]$md.AppendLine(("| 2 | 单源规则目录 | {0} | {1:F1} | `[{2}]` | {3}规则/SSOT一致性 |" -f $badgeRules, $scoreRules, (Get-ProgressBar $scoreRules), $catalogRuleCount))
         [void]$md.AppendLine(("| 3 | auto-refactor | {0} | {1:F1} | `[{2}]` | CLI静态引擎质量基线 |" -f $badgeAr, $scoreAr, (Get-ProgressBar $scoreAr)))
         [void]$md.AppendLine(("| 4 | workspace-timing | {0} | {1:F1} | `[{2}]` | VSCode扩展审查门禁 |" -f $badgeWt, $scoreWt, (Get-ProgressBar $scoreWt)))
         [void]$md.AppendLine(("| 5 | WebGames配置架构 | {0} | {1:F1} | `[{2}]` | 卡拉尔领域配置审查 |" -f $badgeWg, $scoreWg, (Get-ProgressBar $scoreWg)))

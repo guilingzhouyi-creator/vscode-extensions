@@ -2,9 +2,11 @@
  * Module: Workspace Governance — Subagent Catalog Validator
  * File Path: .agents/skills/subagent-orchestration/scripts/validate-subagent-catalog.js
  * Architecture Role: Verifies the integrity of subagent schemas, archetypes, postures,
- *   associated skills, presets, and detects orphan configs across the workspace.
- * Dependencies: Node.js standard library (fs, path).
- * Exit Semantics: 0 = PASS, 1 = FAIL.
+ *   associated skills, presets, plugin agent definitions, and detects orphan configs across the workspace.
+ * Dependencies & Triggers: Invoked via CLI or audit gates; depends on fs, path, subagent-catalog.json.
+ * Responsibilities: Validates (Archetype x Posture) orthogonal bindings, model inheritance locks,
+ *   read-only tool permissions, and 1:1 parity with .agents/plugins/workspace-governance/agents/*.md.
+ * Exit Semantics & Design Rationale: 0 = PASS, 1 = FAIL; prevents configuration drift between root catalog and plugin agents.
  */
 'use strict';
 
@@ -26,6 +28,7 @@ const REPO_ROOT = findRepoRoot(__dirname);
 const SUBAGENTS_ROOT = path.join(REPO_ROOT, '.agents/subagents');
 const CATALOG_PATH = path.join(SUBAGENTS_ROOT, 'subagent-catalog.json');
 const SKILLS_ROOT = path.join(REPO_ROOT, '.agents/skills');
+const PLUGIN_AGENTS_DIR = path.join(REPO_ROOT, '.agents/plugins/workspace-governance/agents');
 
 function validateDefaultModel(catalog, errors) {
   if (catalog.defaultModel !== 'inherit' && catalog.defaultModel !== 'flash') {
@@ -162,6 +165,32 @@ function validatePresets(catalog, errors) {
   return presets;
 }
 
+function validatePluginAgentsParity(catalog, errors) {
+  if (!fs.existsSync(PLUGIN_AGENTS_DIR)) {
+    errors.push(`插件 agents 目录不存在: ${PLUGIN_AGENTS_DIR}`);
+    return;
+  }
+  const presetKeys = new Set(Object.keys(catalog.presets || {}));
+  const agentFiles = fs.readdirSync(PLUGIN_AGENTS_DIR).filter((f) => f.endsWith('.md'));
+  const fileStems = new Set(agentFiles.map((f) => path.basename(f, '.md')));
+
+  for (const preset of presetKeys) {
+    if (!fileStems.has(preset)) {
+      errors.push(`预置专员 [${preset}] 缺失对应的插件定义文件: .agents/plugins/workspace-governance/agents/${preset}.md`);
+    }
+  }
+  for (const file of agentFiles) {
+    const stem = path.basename(file, '.md');
+    if (!presetKeys.has(stem)) {
+      errors.push(`插件 agents 目录存在未在 subagent-catalog.json 登记的孤儿文件: ${file}`);
+    }
+    const content = fs.readFileSync(path.join(PLUGIN_AGENTS_DIR, file), 'utf8');
+    if (content.includes('\r\n')) {
+      errors.push(`插件专员文件包含非法 CRLF 换行: agents/${file}`);
+    }
+  }
+}
+
 function detectOrphanConfigs(catalog, errors) {
   const archetypesDir = path.join(SUBAGENTS_ROOT, 'archetypes');
   const posturesDir = path.join(SUBAGENTS_ROOT, 'postures');
@@ -202,6 +231,7 @@ function validate() {
   const archKeys = validateArchetypes(catalog, errors);
   const postKeys = validatePostures(catalog, errors);
   const presets = validatePresets(catalog, errors);
+  validatePluginAgentsParity(catalog, errors);
   detectOrphanConfigs(catalog, errors);
 
   if (errors.length > 0) {
@@ -210,7 +240,7 @@ function validate() {
     process.exit(1);
   }
 
-  console.log(`  ✔ [PASS] SubAgent 体系校验通过: ${archKeys.length} 领域原型, ${postKeys.length} 姿态, ${presets.length} 预置全量合规 (模型同构继承 inherit / flash)`);
+  console.log(`  ✔ [PASS] SubAgent 体系校验通过: ${archKeys.length} 领域原型, ${postKeys.length} 姿态, ${presets.length} 预置与插件专员 1:1 全量合规 (模型同构继承 inherit / flash)`);
   process.exit(0);
 }
 

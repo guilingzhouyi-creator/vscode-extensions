@@ -2,9 +2,11 @@
  * Module: Workspace Governance — Subagent JIT Synthesizer Engine
  * File Path: .agents/skills/subagent-orchestration/scripts/synthesize-subagent.js
  * Architecture Role: Single source of truth for synthesizing specialized SubAgent definitions
- *   from orthogonal domain archetypes and action postures, with intent deduction and prompt templating.
- * Dependencies: Node.js standard library (fs, path).
- * Exit Semantics: 0 = PASS, 1 = Config/Arg Error.
+ *   from orthogonal domain archetypes and action postures, with dynamic SSOT binding.
+ * Dependencies & Triggers: Invoked via CLI or Node require; depends on fs, path, subagent-catalog.json, rule-catalog.json.
+ * Responsibilities: Deduces (Archetype x Posture) from natural language intent, binds live rule counts from
+ *   rule-catalog.json, and generates 5-layer system contracts and Zero-Intersection Path Jail task shells.
+ * Exit Semantics & Design Rationale: 0 = PASS, 1 = Config/Arg Error; decouples generic posture invariants from workspace-unified SSOT metrics.
  */
 'use strict';
 
@@ -25,12 +27,30 @@ function findRepoRoot(startDir) {
 const REPO_ROOT = findRepoRoot(__dirname);
 const SUBAGENTS_ROOT = path.join(REPO_ROOT, '.agents/subagents');
 const CATALOG_PATH = path.join(SUBAGENTS_ROOT, 'subagent-catalog.json');
+const RULE_CATALOG_PATH = path.join(REPO_ROOT, 'scripts/common/rule-catalog.json');
 
 function readJson(filePath) {
   if (!fs.existsSync(filePath)) {
     throw new Error(`Config file not found: ${filePath}`);
   }
   return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+}
+
+function getTotalRuleCount() {
+  try {
+    if (fs.existsSync(RULE_CATALOG_PATH)) {
+      const ruleCat = JSON.parse(fs.readFileSync(RULE_CATALOG_PATH, 'utf8'));
+      if (typeof ruleCat?.summary?.totalRules === 'number') {
+        return ruleCat.summary.totalRules;
+      }
+      if (ruleCat?.rules && typeof ruleCat.rules === 'object') {
+        return Object.keys(ruleCat.rules).length;
+      }
+    }
+  } catch (_err) {
+    return 420;
+  }
+  return 420;
 }
 
 function resolveIntent(intent) {
@@ -54,7 +74,7 @@ function resolveIntent(intent) {
     archKey = 'workspace-meta';
   }
 
-  if (/重构|refactor|消融|解耦|瘦身|优化|降重|平铺|收敛|精简|simplif|跳板/.test(text)) {
+  if (/重构|refactor|消融|解耦|瘦身|优化|降重|平铺|收敛|精简|simplif|跳板|算法|算子|lut|swar|位并行|csr|soa|第一性原理/.test(text)) {
     postKey = 'refactor';
   } else if (/开发|编码|实现|特性|construct|增量|编写|生产|新建|新增|创建|tdd|测试驱动|spec|规格|契约|cdd|约束驱动/.test(text)) {
     postKey = 'construct';
@@ -77,6 +97,7 @@ const VALUE_ARG_MAP = {
   '--intent': 'intent',
   '--name': 'name',
   '--task': 'taskGoal',
+  '--files': 'exclusiveFiles',
   '--workspace-mode': 'workspaceMode',
 };
 
@@ -94,6 +115,7 @@ function parseCliArgs(argv) {
     intent: null,
     name: null,
     taskGoal: null,
+    exclusiveFiles: null,
     workspaceMode: 'inherit',
     model: 'inherit',
     dumpAll: false,
@@ -116,7 +138,26 @@ function parseCliArgs(argv) {
   return options;
 }
 
+function formatExclusiveFilesLine(isReadOnly, exclusiveFiles) {
+  if (isReadOnly) {
+    return '- 物理写权限：已剥夺 (只读模式)';
+  }
+  if (!exclusiveFiles || !String(exclusiveFiles).trim()) {
+    return '- 独占文件列表：<请在此列出两两正交的独占文件路径>';
+  }
+  const items = String(exclusiveFiles)
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (items.length === 0) {
+    return '- 独占文件列表：<请在此列出两两正交的独占文件路径>';
+  }
+  const numbered = items.map((f, idx) => `  ${idx + 1}. ${f}`).join('\n');
+  return `- 独占文件列表（Zero-Intersection Path Jail，严禁触碰列表外任何文件）：\n${numbered}`;
+}
+
 function buildSystemPrompt(archetypeObj, postureObj) {
+  const totalRules = getTotalRuleCount();
   const allowedList = archetypeObj.pathJail.allowedPrefixes.map((p) => `  - ${p}`).join('\n');
   const forbiddenList = archetypeObj.pathJail.forbiddenPrefixes.map((p) => `  - ${p}`).join('\n');
   const axiomList = archetypeObj.rigidAxioms.map((a, idx) => `  ${idx + 1}. ${a}`).join('\n');
@@ -127,7 +168,7 @@ function buildSystemPrompt(archetypeObj, postureObj) {
 
   const verifySection = isReadOnly
     ? `## 🧪 Layer 4: 本地门禁自检契约 (只读审查姿态)
-只读姿态已物理剥夺写权限，严禁执行产物编译或写入测试；向主 Agent 汇报时必须提供基于 420 规则库与所属领域刚性公理的纯客观文件路径、起始行号与质性技术依据。`
+只读姿态已物理剥夺写权限，严禁执行产物编译或写入测试；向主 Agent 汇报时必须提供基于 ${totalRules} 规则库与所属领域刚性公理的纯客观文件路径、起始行号与质性技术依据。`
     : `## 🧪 Layer 4: 本地门禁自检契约 (构建 + 测试 + 静态规则三重闭环)
 交割任务前，必须在所属工作目录下依次执行并通过以下本地验证命令（测试全绿仅为必要底线，绝不等同于符合审查或通过门禁，必须确保编译、测试与静态规则全部绿色）：
 ${verifyCommands}`;
@@ -140,7 +181,7 @@ ${verifyCommands}`;
 1. 物理卫生：全仓严禁创建或遗留 0 字节空文件；脚本必须严格保持换行契约（.ps1 CRLF，其他 LF）；
 2. 复杂度预算：圈复杂度 CC <= 15，控制流深度 Depth <= 4，单行噪声比 Noise <= 4.0；单文件双轨体积 ELOC <= 900 / LOC <= 1400（受 1:3 动态反推包络约束与消除循环内瞬态堆分配 CPX-SPACE-001）；
 3. 门面设计：门面层必须满足 ELOC >= 15 或 Object.freeze 不可变保障，严禁 <= 3 行空包跳板 (ARCH-ABS-001 / ARCH-FAC-001)；
-4. 真实性纪律：单源规则目录 (rule-catalog.json) 权威收录 420 条规则，严禁虚构规则 ID (RCFG-RULE-DRIFT)，禁止敷衍/夸大词汇与施工临时黑话；
+4. 真实性纪律：单源规则目录 (rule-catalog.json) 权威收录 ${totalRules} 条规则，严禁虚构规则 ID (RCFG-RULE-DRIFT)，禁止敷衍/夸大词汇与施工临时黑话；
 5. 零高危技术债：全工作区 High/Critical 债务历史性归零 (0 项)，严禁引入任何技术债务反弹 (一票否决)；
 6. 资深工程规范与防线公理：测试全绿仅为功能底线，绝不等同于符合 Auto 审查或通过门禁系统；编码必须内化资深工程师纪律（卫语句平铺控制流、循环内零瞬态堆分配 CPX-SPACE-001、消融空包跳板 ARCH-ABS-001、六字段 JSDoc 契约）；交割前必须通过本地域三重自检。
 
@@ -161,16 +202,18 @@ ${verifySection}
 `;
 }
 
-function buildTaskPromptTemplate(taskGoal, archetypeObj, postureObj) {
+function buildTaskPromptTemplate(taskGoal, archetypeObj, postureObj, exclusiveFiles = null) {
+  const totalRules = getTotalRuleCount();
   const goalText = taskGoal || '<请在此处填写针对性技术任务描述与预期验收条件>';
   const allowed = (archetypeObj.pathJail?.allowedPrefixes || []).join(', ');
   const forbidden = (archetypeObj.pathJail?.forbiddenPrefixes || []).join(', ');
   const isReadOnly = postureObj?.toolPermissions?.enableWriteTools === false;
   const verifyCommands = (archetypeObj.localVerification || []).map((c) => `  $ ${c}`).join('\n');
+  const exclusiveFilesLine = formatExclusiveFilesLine(isReadOnly, exclusiveFiles);
 
   const preDeliverySection = isReadOnly
     ? `[Pre-Delivery Verification]
-纯只读审查姿态，严禁修改任何代码；汇报前请对照 420 规则库与所属领域刚性公理确认包含文件路径、起始行号与质性依据。`
+纯只读审查姿态，严禁修改任何代码；汇报前请对照 ${totalRules} 规则库与所属领域刚性公理确认包含文件路径、起始行号与质性依据。`
     : `[Pre-Delivery Verification]
 完成改动后，在提交工作前必须自行执行并通过以下本地自检（涵盖构建编译、测试验证及静态分析；确认全量绿色后方可交付主 Agent 交叉复审）：
 ${verifyCommands}`;
@@ -178,7 +221,7 @@ ${verifyCommands}`;
   return `[Task Scope & Zero-Intersection Path Jail]
 - 授权操作范围：严格限定在 ${allowed} 内部，严禁越界修改其他目录。
 - 严禁触碰路径前缀（越界操作立即阻断）：${forbidden}
-${isReadOnly ? '- 物理写权限：已剥夺 (只读模式)' : '- 独占文件列表：<请在此列出两两正交的独占文件路径>'}
+${exclusiveFilesLine}
 
 [Objective]
 ${goalText}
@@ -208,7 +251,12 @@ function synthesizeSingle(archKey, postKey, cliOptions, catalog, presetKey = nul
   const subagentName = cliOptions.name || presetKey || `${archKey}-${postKey}`;
   const subagentDesc = defaultDesc || `${archetypeObj.displayName} 的 ${postureObj.displayName}`;
   const systemPrompt = buildSystemPrompt(archetypeObj, postureObj);
-  const taskPrompt = buildTaskPromptTemplate(cliOptions.taskGoal, archetypeObj, postureObj);
+  const taskPrompt = buildTaskPromptTemplate(
+    cliOptions.taskGoal,
+    archetypeObj,
+    postureObj,
+    cliOptions.exclusiveFiles
+  );
 
   const targetModel = cliOptions.model || postureObj.model || catalog.defaultModel || 'inherit';
 

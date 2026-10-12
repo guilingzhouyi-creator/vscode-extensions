@@ -102,20 +102,20 @@ description: >-
 
 ## 四、 标准调度流水线与主 Agent 交叉复审 SOP
 
-### 步骤 1：JIT 合成 SubAgent 契约元数据
-在终端运行工作区装配脚本获取完整的结构化参数：
+### 步骤 1：JIT 合成 SubAgent 契约元数据（动态真源绑定 + 细粒度独占沙箱）
+在终端运行工作区装配脚本（脚本自动从 `scripts/common/rule-catalog.json` 读取实时规则总数，并支持 `--files` 注入细粒度独占文件集）：
 ```bash
-# 模式 A: 自然语言意图自动推导 (推荐)
-node .agents/skills/subagent-orchestration/scripts/synthesize-subagent.js --intent "审查 WebGames 的配置" --task "核查 GameConfig 单源规范" --json
+# 模式 A: 自然语言意图自动推导 + 动态注入独占文件列表 (推荐)
+node .agents/skills/subagent-orchestration/scripts/synthesize-subagent.js --intent "用 256-LUT 与位并行优化 auto-refactor 算子" --files "auto-refactor/src/core/mask-source.ts" --task "消除多趟扫描" --json
 
 # 模式 B: 精确预置别名装配
-node .agents/skills/subagent-orchestration/scripts/synthesize-subagent.js --preset wt-refactor --task "优化时钟调度" --json
+node .agents/skills/subagent-orchestration/scripts/synthesize-subagent.js --preset wt-refactor --files "workspace-timing/src/core/aggregator.ts" --task "优化时钟调度" --json
 
 # 模式 C: 全仓专员批量导出
 node .agents/skills/subagent-orchestration/scripts/synthesize-subagent.js --all
 ```
 
-常用预置别名速查矩阵（23 个预置）：
+常用预置别名速查矩阵（23 个预置，与 `.agents/plugins/workspace-governance/agents/*.md` 保持 1:1 严格同构）：
 * **`vs-extension`**：`wt-construct` / `wt-review` / `wt-refactor` / `wt-explore`
 * **`cli-engine`**：`ar-construct` / `ar-review` / `ar-refactor` / `ar-explore`
 * **`game-engine`**：`wg-construct` / `wg-review` / `wg-refactor` / `wg-explore`

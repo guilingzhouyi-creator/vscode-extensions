@@ -1,6 +1,6 @@
 {
   "schema": "workspace-rule-catalog/v1",
-  "generatedAt": "2026-10-12T04:19:11.068Z",
+  "generatedAt": "2026-10-12T15:19:12.273Z",
   "totalRules": 420,
   "counts": {
     "autoRefactor": 335,
@@ -98,7 +98,7 @@
       "project": "WebGames",
       "family": "ADV",
       "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/backend/domains/character_creation/dto/authoritative_character_creation_request_dto.gd)"
+      "summary": "WebGames domain gate rule (source: WebGames/backend/domains/character_creation/agent_playthrough_session.gd)"
     },
     {
       "id": "ADV-PRF-003",

@@ -4,7 +4,8 @@ description: >-
   auto-refactor 静态分析重构引擎、Rust+TS 双轨内核与 Praxis 客户端 SDK 开发规范。指导 Agent 在
   auto-refactor 项目中维护 30 内置分析器与 335 条规则体系、保证 Rust 算子与纯 TS 桥接 100% 字节等价、
   落实四阶段分析器流水线拓扑 (Stage 0~3) 与有序装配意义、Praxis 表现层语义聚合引擎与 correlatedRules 消费规范、
-  一体两面三层拓扑 Diff 引擎、AgentDirectives 结构化协议、高精度时间戳与暂存分流原子落盘。
+  一体两面三层拓扑 Diff 引擎、AgentDirectives 结构化协议、高精度时间戳与暂存分流原子落盘、
+  以及现代 TypeScript 高级类型学契约（名义量纲烙印、穷尽推导、只读防污染）与全域避免重复开销架构。
 ---
 
 # auto-refactor-dev — 静态重构引擎与双轨算子开发规范
@@ -126,7 +127,24 @@ Rust 原生算子（64-bit SWAR 向量化扫描、Bit-Parallel Myers 差分、Ta
 
 ---
 
-## 八、 专属构建、测试与热路径基准命令
+## 八、 现代 TypeScript 高级类型学契约与避免重复开销架构
+
+> 完整类型学设计原理与零冗余开销基准详见 [type-level-engineering-and-caching.md](references/type-level-engineering-and-caching.md)。
+
+1. **名义类型与量纲烙印 (`Brand<T, B>`)**：核心时间戳（`TimestampMs`）、代码行列（`LineNumber`, `ColumnNumber`）与指纹哈希（`FileHash`）通过 `unique symbol` 名义烙印，零运行时开销，编译期杜绝量纲混用；
+2. **穷尽性推导与不可达断言 (`assertNever`)**：针对 `GateStage`、`DiffSemanticCategory` 等联合类型，分发器末尾必须调用 `assertNever(variant)`，利用 `never` 强制编译期覆盖所有状态分支；
+3. **模板字面量规则代码收窄 (`StandardRuleId`)**：`AR:${Domain}:${Family}-${Number}` 模板字面量类型前置锁定 420 规则命名拓扑，拦截规则漂移（`RCFG-RULE-DRIFT`）；
+4. **精确类型谓词与零盲目强转 (`is`)**：彻底消融 `as any` 与盲目 `as` 强转，所有异构或跨进程数据必须经类型守卫（`hasWorkerSymbols`）校验后安全收窄；
+5. **深度只读与共享 AST 防污染 (`DeepReadonly`)**：单趟磁带流共享的 `ReadonlyAstNode` 声明为深度不可变，杜绝分析器就地变异污染语法树；
+6. **全域避免重复开销四重架构**：
+   - **MoE 稀疏路由 (`sparseRuleRouter.ts`)**：按文件差异分类动态匹配最小充分分析器，跳过 80%~95% 无关计算；
+   - **三级拓扑缓存 (`topology-cache-manager.ts`)**：L1 LRU 内存缓存 + L2 序列化 + L3 DAG 级联最小失效；
+   - **双缓冲流水线与零拷贝 (`worker-scheduler.ts`)**：`inflightRead` 磁盘 I/O 与 Worker 计算并行重叠，Transferable `ArrayBuffer` 转移所有权；
+   - **单趟磁带融合 (`analyzer-runner.ts`)**：30 分析器合并为单次 AST 遍历，循环内零瞬态堆分配（`PRF-MEM-001`）。
+
+---
+
+## 九、 专属构建、测试与热路径基准命令
 
 ```bash
 cd auto-refactor
@@ -138,10 +156,11 @@ node scripts/bench-hot-paths.js  # 4. 热路径微基准（mask-source / governa
 
 ---
 
-## 九、 关联模板与参考指引
+## 十、 关联模板与参考指引
 
 - [rust-ts-equivalence-protocol.md](references/rust-ts-equivalence-protocol.md)：Rust 原生算子与纯 TS Shim 100% 字节等价性契约规范；
 - [praxis-client-and-diff-topology.md](references/praxis-client-and-diff-topology.md)：Praxis 客户端 SDK、表现层语义聚合与一体两面三层拓扑 Diff 规范指南；
 - [concurrency-memory-paradigms.md](references/concurrency-memory-paradigms.md)：高并发调度、热路径字符扫描、图算法降阶与 12 项内存治理工程范式；
+- [type-level-engineering-and-caching.md](references/type-level-engineering-and-caching.md)：现代 TypeScript 高级类型学工程与全域开销规避规范；
 - [analyzer-boilerplate.ts](templates/analyzer-boilerplate.ts)：自定义静态分析器标准化样板；
 - [validate-suite-boilerplate.js](templates/validate-suite-boilerplate.js)：规则专项回归测试套件脚手架。

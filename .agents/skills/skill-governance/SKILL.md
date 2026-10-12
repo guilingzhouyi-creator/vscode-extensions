@@ -23,9 +23,17 @@ description: >-
 
 ---
 
-## 二、 技能标准物理架构（四件套模型）
+## 二、 三层泛化技能拓扑与标准物理架构（Generalization + Unification）
 
-每个技能必须作为一个高内聚的自包含工程单元存在，位于 `.agents/skills/<skill-name>/` 下，目录结构如下：
+为同时实现**跨领域高度泛化复用**与**全工作区刚性契约单源统一**，24 项研发技能按职责解耦为三层正交拓扑（严禁在领域技能中重复抄写通用方法论，彻底杜绝 Token 堆积与多处统计数字硬编码漂移）：
+
+| 拓扑层级 | 技能数量与定位 | 包含技能集 | 泛化与统一机制 |
+| :--- | :--- | :--- | :--- |
+| **Layer 1: 通用工程与算法突破层**<br/>*(Universal Methodology)* | **12 项** — 跨语言、跨项目通用认知与算子原语 | `algorithmic-operator-engineering`, `code-simplification`, `complexity-budget`, `constraint-driven-development`, `context-engineering`, `debugging-and-error-recovery`, `doubt-driven-development`, `facade-discipline`, `interview-me`, `spec-driven-development`, `telemetry-statistical-modeling`, `test-driven-development` | 仅定义恒定不变的工程/数学/算法公理；通过映射表桥接不同语言栈，零项目特定硬编码 |
+| **Layer 2: 工作区统一治理底座层**<br/>*(Workspace Unified Governance)* | **9 项** — 全仓同构门禁、单源目录与多智能体协同 | `batch-commit`, `docs-archive-governance`, `gate-governance`, `product-release-docs`, `release-package-workflow`, `rule-catalog-governance`, `skill-governance`, `subagent-orchestration`, `test-benchmark-engineering` | 唯一绑定 `AGENTS.md`、`rule-catalog.json` 与 `subagent-catalog.json` 动态真源 (SSOT) |
+| **Layer 3: 子项目领域适配器层**<br/>*(Domain Adapters)* | **3 项** — 三大受控项目专属架构红线与适配器 | `auto-refactor-dev` (Node/Rust), `workspace-timing-dev` (VS Code), `webgames-workflow` (Godot 4.7 GDScript) | 仅声明子项目专有拓扑与领域边界，通用复杂度/算子/门面能力一律通过指针委托至 Layer 1/2 |
+
+每个技能必须作为一个高内聚的自包含工程单元存在，位于 `.agents/skills/<skill-name>/` 下，标准“四件套”目录结构如下：
 
 ```text
 .agents/skills/<skill-name>/

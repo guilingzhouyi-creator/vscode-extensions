@@ -195,7 +195,7 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG"
   if (codeIso === 0) hygienePassedCount += 1;
   const scoreHygiene = hygienePassedCount === 2 ? 100.0 : Math.max(SCORE_FLOOR, Number((100.0 * (hygienePassedCount / 2.0)).toFixed(1)));
 
-  // 2. 单源规则目录基石得分（基于 410 规则 SSOT 一致性与技能文档字节等价比对动态判定）
+  // 2. 单源规则目录基石得分（基于 SSOT 规则目录一致性与技能文档字节等价比对动态判定）
   const ruleCatalogPath = path.join(rootDir, "scripts", "common", "rule-catalog.json");
   let catalogRuleCount = 0;
   try {
@@ -209,11 +209,12 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG"
     catalogRuleCount = 0;
   }
 
+  const expectedRuleBaseline = Math.max(420, catalogRuleCount);
   let scoreRules = SCORE_FLOOR;
-  if (statusRules === "PASS" && catalogRuleCount >= 410) {
+  if (statusRules === "PASS" && catalogRuleCount >= expectedRuleBaseline) {
     scoreRules = 100.0;
   } else if (statusRules === "PASS" && catalogRuleCount > 0) {
-    scoreRules = Math.max(SCORE_FLOOR, Number((100.0 * (catalogRuleCount / 410.0)).toFixed(1)));
+    scoreRules = Math.max(SCORE_FLOOR, Number((100.0 * (catalogRuleCount / expectedRuleBaseline)).toFixed(1)));
   } else {
     let rulesPassedCount = 0;
     if (codeCatalog === 0) rulesPassedCount += 1;
@@ -379,7 +380,7 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG"
 
   const sysDefinitions = [
     { num: " 1.", name: "工作区物理卫生",   score: scoreHygiene, note: "(零空文件/同构)" },
-    { num: " 2.", name: "单源规则目录",     score: scoreRules,   note: "(410规则/SSOT)" },
+    { num: " 2.", name: "单源规则目录",     score: scoreRules,   note: `(${catalogRuleCount}规则/SSOT)` },
     { num: " 3.", name: "auto-refactor",    score: scoreAr,      note: "(CLI静态引擎基线)" },
     { num: " 4.", name: "workspace-timing", score: scoreWt,      note: "(VSCode扩展门禁)" },
     { num: " 5.", name: "WebGames配置架构", score: scoreWg,      note: "(卡拉尔领域配置)" }
@@ -455,7 +456,7 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG"
     md += "| 序号 | 核心子系统 | 判定结果 | 归一化得分 | 进度可视化 | 覆盖说明 |\n";
     md += "| :---: | :--- | :---: | :---: | :--- | :--- |\n";
     md += `| 1 | 工作区物理卫生 | ${passBadge(statusHygiene)} | ${scoreHygiene.toFixed(1)} | \`[${makeBar(scoreHygiene, 20)}]\` | 全仓零空文件/同构契约 |\n`;
-    md += `| 2 | 单源规则目录 | ${passBadge(statusRules)} | ${scoreRules.toFixed(1)} | \`[${makeBar(scoreRules, 20)}]\` | 410规则/SSOT一致性 |\n`;
+    md += `| 2 | 单源规则目录 | ${passBadge(statusRules)} | ${scoreRules.toFixed(1)} | \`[${makeBar(scoreRules, 20)}]\` | ${catalogRuleCount}规则/SSOT一致性 |\n`;
     md += `| 3 | auto-refactor | ${passBadge(statusAr)} | ${scoreAr.toFixed(1)} | \`[${makeBar(scoreAr, 20)}]\` | CLI静态引擎质量基线 |\n`;
     md += `| 4 | workspace-timing | ${passBadge(statusWt)} | ${scoreWt.toFixed(1)} | \`[${makeBar(scoreWt, 20)}]\` | VSCode扩展审查门禁 |\n`;
     md += `| 5 | WebGames配置架构 | ${passBadge(statusWg)} | ${scoreWg.toFixed(1)} | \`[${makeBar(scoreWg, 20)}]\` | 卡拉尔领域配置审查 |\n\n`;

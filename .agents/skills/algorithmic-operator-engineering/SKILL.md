@@ -58,7 +58,21 @@ description: >-
 
 ---
 
-## 四、 刚性工程红线与差分神谕验证 (Differential Oracle Verification)
+## 四、 跨语言泛化算子与工作区多栈统一映射矩阵 (Generalized Primitives $\leftrightarrow$ Workspace Unification)
+
+本规范将通用算法第一性原理泛化抽象为语言无关的算子原语，并在工作区三大技术栈与单源规则目录（`rule-catalog.json`）间保持 100% 统一受控：
+
+| 泛化算子原语 (Generalized Primitive) | TypeScript / Node.js V8 (`auto-refactor` / `workspace-timing`) | Rust N-API 原生层 (`auto-refactor/native`) | GDScript 4.7 纯逻辑引擎 (`WebGames`) | 工作区统一门禁与契约映射 (`rule-catalog.json`) |
+| :--- | :--- | :--- | :--- | :--- |
+| **零堆分配平坦竞技场 (Flat Arena / SoA)** | `Int32Array` / `Float64Array` / `Uint32Array` | `Vec<u32>` / `&[u8]` 零拷贝切片 | `PackedInt32Array` / `PackedFloat64Array` | `CPX-SPACE-001` / `ADV-PRF-002` |
+| **无分支查表分发 (Branchless 256-LUT)** | 模块级静态 `Uint8Array(256)` + `charCodeAt` | `static [u8; 256]` + `as usize` 索引 | 预加载常量 `PackedByteArray` 查表 | `GATE-AST-001` ($\text{CC}\le 15, \text{Depth}\le 4$) |
+| **位并行与集合代数 (Bitset / SWAR)** | `Uint32Array` 位集 ($32\text{-bit}$ 步进) | `u64` / `u128` SWAR 寄存器并行 | `int` ($64\text{-bit}$ 有符号位掩码运算) | `ALGORITHMIC_PROOF` 契约注释 |
+| **时代戳 $O(1)$ 状态复位 (Epoch Reset)** | `visitedEpoch: Int32Array` + `epoch++` | `visited_epoch: Vec<u32>` + `wrapping_add` | 成员 `PackedInt32Array` + `_epoch += 1` + `reset_state()` | `ADV-PRF-002` (禁止帧循环 `clear/fill`) |
+| **多模态退化保护包络 (Fallback Envelope)** | 跨度 $>1500$ 行或 $>2\text{M}$ 单元降级线性/直方图 | 双轨阈值同步 (`MAX_MYERS_CELLS`) | 步数/节点超阈值降级启发式近似求解 | `INVARIANT_BOUNDARY` 六字段 JSDoc |
+
+---
+
+## 五、 刚性工程红线与差分神谕验证 (Differential Oracle Verification)
 
 跳出传统的激进算子优化必须置于铁律防线之下，严禁以牺牲正确性或可读性契约为代价：
 1. **差分神谕 100% 等价铁律 (Reference Oracle Parity)**：
@@ -72,7 +86,7 @@ description: >-
 
 ---
 
-## 五、 常用验证与基准测试命令
+## 六、 常用验证与基准测试命令
 
 ```bash
 # 1. 运行 auto-refactor 核心算子热路径微基准 (mask-source / governance-scan / cmp-rules)
@@ -90,7 +104,7 @@ node scripts/common/evaluate-eloc-budget.js
 
 ---
 
-## 六、 关联深水区参考与算子样板
+## 七、 关联深水区参考与算子样板
 
 - [bit-parallel-lut-and-dod-patterns.md](references/bit-parallel-lut-and-dod-patterns.md)：无分支 256-LUT、位并行代数、CSR 扁平图、单趟特征磁带与时代戳 $O(1)$ 复位深度实现图谱（TS / Rust / GDScript）；
 - [branchless-lut-and-epoch-operator.ts](templates/branchless-lut-and-epoch-operator.ts)：集成 256 项 `Uint8Array` LUT、CSR 扁平图与 `Int32Array` 时代戳 $O(1)$ 遍历的标准算子样板。
