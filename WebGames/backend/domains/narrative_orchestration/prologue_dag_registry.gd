@@ -185,7 +185,7 @@ static func _resolve_or_synthesize_mod_graph(
             break
     return _assemble_graph_from_raw(dag_id, template_raw)
 
-static func _assemble_graph_from_raw(dag_id: String, raw: Dictionary) -> NarrativeDAGGraphDTO:
+static func assemble_graph_from_raw(dag_id: String, raw: Dictionary) -> NarrativeDAGGraphDTO:
     var g := NarrativeDAGGraphDTO.new(dag_id)
     g.entry_node_id = str(raw.get("entry_node_id", ""))
     g.terminal_node_id = str(raw.get("terminal_node_id", ""))
@@ -199,6 +199,9 @@ static func _assemble_graph_from_raw(dag_id: String, raw: Dictionary) -> Narrati
         _add_single_raw_edge(g, ed)
 
     return g
+
+static func _assemble_graph_from_raw(dag_id: String, raw: Dictionary) -> NarrativeDAGGraphDTO:
+    return assemble_graph_from_raw(dag_id, raw)
 
 static func _add_single_raw_node(
     g: NarrativeDAGGraphDTO,

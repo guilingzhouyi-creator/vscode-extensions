@@ -83,6 +83,16 @@ func precheck_and_configure_single_player_mods(candidate_packs: Array, enabled_p
     })
     return res
 
+## 扫描并配置单机模式显性 MOD（三级级联全包扫描与预检适配）
+func discover_and_configure_single_player_mods(custom_roots: Array = [], enabled_pack_ids: Array = ["*"]) -> Dictionary:
+    if context.selected_mode == WorldGatewayModel.GameMode.MULTIPLAYER:
+        return _fail(
+            AntiBridgeGuard.SECURITY_ERR_MULTIPLAYER_MOD_POISONING,
+            "联机模式严禁启用自定义命途与UI扩展MOD"
+        )
+    var candidates: Array[Dictionary] = ModPackageDiscoverySolver.scan_installed_full_mod_packages(custom_roots)
+    return precheck_and_configure_single_player_mods(candidates, enabled_pack_ids)
+
 ## 强制净化卸载本地第三方模组并回退 Vanilla 原生核心与洗脱内存
 func purge_and_fallback_to_vanilla() -> void:
     var cleaned_mods: Array = []

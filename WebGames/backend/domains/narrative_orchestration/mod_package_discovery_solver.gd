@@ -201,3 +201,139 @@ static func sort_and_resolve_dependencies(manifests: Array) -> Dictionary:
         "success": true,
         "sorted_packs": sorted_packs
     }
+
+## 安全读取指定 JSON 文件并解析为 Variant
+static func _read_json_file(file_path: String) -> Variant:
+    if not FileAccess.file_exists(file_path):
+        return null
+    var f := FileAccess.open(file_path, FileAccess.READ)
+    if f == null:
+        return null
+    return JSON.parse_string(f.get_as_text())
+
+## 递归展平 i18n 嵌套字典为点分键与斜杠键
+static func _flatten_i18n_dict(dict: Dictionary, prefix: String, target: Dictionary) -> void:
+    for k in dict.keys():
+        var full_key := (prefix + "." + str(k)) if not prefix.is_empty() else str(k)
+        var val: Variant = dict[k]
+        if val is Dictionary:
+            _flatten_i18n_dict(val as Dictionary, full_key, target)
+        else:
+            var str_val := str(val)
+            target[full_key] = str_val
+            target[full_key.replace(".", "/")] = str_val
+            target[full_key.replace("/", ".")] = str_val
+
+## 扫描 mod_dir/dag_graphs 目录下的所有剧情 DAG 图元
+static func _scan_mod_dag_graphs(mod_dir: String, target_graphs: Dictionary) -> void:
+    var dag_dir_path := mod_dir.path_join("dag_graphs")
+    if not DirAccess.dir_exists_absolute(dag_dir_path):
+        return
+    var dir := DirAccess.open(dag_dir_path)
+    if dir == null:
+        return
+    dir.list_dir_begin()
+    var entry_name := dir.get_next()
+    while not entry_name.is_empty():
+        if not dir.current_is_dir() and entry_name.ends_with(".json"):
+            var file_path := dag_dir_path.path_join(entry_name)
+            var raw_json: Variant = _read_json_file(file_path)
+            if raw_json is Dictionary:
+                var stem := entry_name.get_basename()
+                var dag_id := str((raw_json as Dictionary).get("dag_id", (raw_json as Dictionary).get("graph_id", stem)))
+                target_graphs[dag_id] = raw_json
+        entry_name = dir.get_next()
+    dir.list_dir_end()
+
+## 扫描 mod_dir/i18n 目录下的多语言本地化配置
+static func _scan_mod_i18n(mod_dir: String, target_i18n: Dictionary) -> void:
+    var i18n_dir_path := mod_dir.path_join("i18n")
+    if not DirAccess.dir_exists_absolute(i18n_dir_path):
+        return
+    var dir := DirAccess.open(i18n_dir_path)
+    if dir == null:
+        return
+    dir.list_dir_begin()
+    var entry_name := dir.get_next()
+    while not entry_name.is_empty():
+        if not dir.current_is_dir() and entry_name.ends_with(".json"):
+            var file_path := i18n_dir_path.path_join(entry_name)
+            var raw_json: Variant = _read_json_file(file_path)
+            if raw_json is Dictionary:
+                _flatten_i18n_dict(raw_json as Dictionary, "", target_i18n)
+        entry_name = dir.get_next()
+    dir.list_dir_end()
+
+## 加载 destinies.json 与 routing_rules.json 并合并入 MOD 包字典
+static func _load_destinies_and_routing(mod_dir: String, pkg: Dictionary) -> void:
+    var dest_val: Variant = _read_json_file(mod_dir.path_join("destinies.json"))
+    if dest_val is Dictionary:
+        var dest_dict: Dictionary = dest_val
+        var keys_to_merge: Array[String] = [
+            "ui_capabilities", "custom_origins", "custom_traits",
+            "paired_presets", "custom_starter_kits", "custom_routing_rules"
+        ]
+        for k in keys_to_merge:
+            if dest_dict.has(k):
+                pkg[k] = dest_dict[k]
+
+    var rr_val: Variant = _read_json_file(mod_dir.path_join("routing_rules.json"))
+    if rr_val is Dictionary:
+        var rr_dict: Dictionary = rr_val
+        var rules_val: Variant = rr_dict.get("custom_routing_rules", rr_dict.get("routing_rules", []))
+        if rules_val is Array:
+            var existing_rules: Array = pkg.get("custom_routing_rules", [])
+            for r in (rules_val as Array):
+                existing_rules.append(r)
+            pkg["custom_routing_rules"] = existing_rules
+    elif rr_val is Array:
+        var existing_rules: Array = pkg.get("custom_routing_rules", [])
+        for r in (rr_val as Array):
+            existing_rules.append(r)
+        pkg["custom_routing_rules"] = existing_rules
+
+## 从指定目录完整读取并组装单包数据字典
+static func load_full_mod_package_from_dir(mod_dir: String) -> Dictionary:
+    var manifest_path := mod_dir.path_join(MANIFEST_FILENAME)
+    var pack_raw: Variant = _read_json_file(manifest_path)
+    if not (pack_raw is Dictionary):
+        return {}
+
+    var pkg: Dictionary = (pack_raw as Dictionary).duplicate(true)
+    _load_destinies_and_routing(mod_dir, pkg)
+
+    var dag_graphs: Dictionary = pkg.get("dag_graphs", {})
+    _scan_mod_dag_graphs(mod_dir, dag_graphs)
+    pkg["dag_graphs"] = dag_graphs
+
+    var custom_i18n: Dictionary = pkg.get("custom_i18n", {})
+    _scan_mod_i18n(mod_dir, custom_i18n)
+    pkg["custom_i18n"] = custom_i18n
+
+    pkg["root_path"] = mod_dir
+    return pkg
+
+## 扫描三级级联目录并按拓扑排序顺序组装已安装的全量 MOD 包数组
+static func scan_installed_full_mod_packages(custom_roots: Array = []) -> Array[Dictionary]:
+    var installed_packs: Array[NarrativePackManifestDTO] = scan_installed_packs(custom_roots)
+    var sort_res: Dictionary = sort_and_resolve_dependencies(installed_packs)
+
+    var ordered_packs: Array = []
+    if bool(sort_res.get("success", false)):
+        ordered_packs = sort_res.get("sorted_packs", [])
+    else:
+        ordered_packs = installed_packs
+
+    var result: Array[Dictionary] = []
+    for p in ordered_packs:
+        var r_path: String = ""
+        if p is NarrativePackManifestDTO:
+            r_path = (p as NarrativePackManifestDTO).root_path
+        elif p is Dictionary:
+            r_path = str((p as Dictionary).get("root_path", ""))
+        if not r_path.is_empty():
+            var full_pkg := load_full_mod_package_from_dir(r_path)
+            if not full_pkg.is_empty():
+                result.append(full_pkg)
+
+    return result

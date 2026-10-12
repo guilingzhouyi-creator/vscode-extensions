@@ -22,6 +22,8 @@ enum NodeType {
 var node_id: String = ""
 var node_type: int = NodeType.STANDARD_STEP
 var narrative_key: String = ""
+var inline_text: String = ""
+var choices: Array[Dictionary] = []
 var required_prerequisites: Array[String] = []
 ## 预留演进位：节点完成条件的结构化 AST（当前无求值器消费，仅供配置透传与未来
 ## 条件汇聚/动态解锁引擎使用——勿将运行逻辑依赖于此字段的求值结果）
@@ -58,6 +60,8 @@ func to_dto() -> Dictionary:
 		"node_id": node_id,
 		"node_type": node_type,
 		"narrative_key": narrative_key,
+		"inline_text": inline_text,
+		"choices": choices.duplicate(true),
 		"required_prerequisites": required_prerequisites.duplicate(),
 		"completion_condition_ast": completion_condition_ast.duplicate(true),
 		"mutations_on_complete": mutations_on_complete.duplicate(true),
@@ -73,6 +77,21 @@ static func from_dto(d: Dictionary) -> NarrativeDAGNode:
 	var raw_type: Variant = d.get("node_type", NodeType.STANDARD_STEP)
 	node.node_type = parse_node_type(str(raw_type)) if raw_type is String else int(raw_type)
 	node.narrative_key = str(d.get("narrative_key", ""))
+
+	var raw_inline: Variant = d.get("inline_text", "")
+	if raw_inline is Dictionary:
+		var d_inline: Dictionary = raw_inline
+		node.inline_text = str(d_inline.get("zh_CN", d_inline.get("zh-CN", "")))
+		if node.inline_text.is_empty() and not d_inline.is_empty():
+			node.inline_text = str(d_inline.values()[0])
+	else:
+		node.inline_text = str(raw_inline)
+
+	node.choices.clear()
+	for c in (d.get("choices", []) as Array):
+		if c is Dictionary:
+			node.choices.append((c as Dictionary).duplicate(true))
+
 	node.required_prerequisites.clear()
 	for pre in (d.get("required_prerequisites", []) as Array):
 		node.required_prerequisites.append(str(pre))

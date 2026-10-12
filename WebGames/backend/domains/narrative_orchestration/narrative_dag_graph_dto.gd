@@ -11,6 +11,7 @@ class_name NarrativeDAGGraphDTO
 extends RefCounted
 
 var graph_id: String = ""
+var dag_id: String = ""
 var entry_node_id: String = ""
 var terminal_node_id: String = ""
 var nodes: Dictionary = {}  # node_id -> NarrativeDAGNode
@@ -19,6 +20,7 @@ var edges: Array[NarrativeDAGEdge] = []
 ## 图 DTO 构造（图 ID 装配）
 func _init(p_id: String = "") -> void:
 	graph_id = p_id
+	dag_id = p_id
 
 ## 加入节点（非空且 ID 非空时按 ID 索引）
 func add_node(node: NarrativeDAGNode) -> void:
@@ -41,8 +43,10 @@ func to_dto() -> Dictionary:
 	for e in edges:
 		edges_arr.append(e.to_dto())
 
+	var gid := graph_id if not graph_id.is_empty() else dag_id
 	return {
-		"graph_id": graph_id,
+		"graph_id": gid,
+		"dag_id": gid,
 		"entry_node_id": entry_node_id,
 		"terminal_node_id": terminal_node_id,
 		"nodes": nodes_dict,
@@ -51,7 +55,10 @@ func to_dto() -> Dictionary:
 
 ## 从字典重建图（节点/边逐条反序列化）
 static func from_dto(d: Dictionary) -> NarrativeDAGGraphDTO:
-	var graph := NarrativeDAGGraphDTO.new(str(d.get("graph_id", "")))
+	var gid := str(d.get("dag_id", d.get("graph_id", "")))
+	var graph := NarrativeDAGGraphDTO.new(gid)
+	graph.dag_id = gid
+	graph.graph_id = gid
 	graph.entry_node_id = str(d.get("entry_node_id", ""))
 	graph.terminal_node_id = str(d.get("terminal_node_id", ""))
 

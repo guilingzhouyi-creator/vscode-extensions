@@ -62,8 +62,10 @@ static func precheck_single_mod(manifest_input: Variant) -> Dictionary:
 
     _validate_ui_capabilities(dto.ui_capabilities, errors)
     _validate_custom_origins(dto.custom_origins, errors)
+    _validate_origin_references(dto, errors)
     _validate_paired_presets(dto.paired_presets, dto.custom_traits, errors)
     _validate_custom_starter_kits(dto.custom_starter_kits, errors)
+    _validate_dag_graphs(dto.dag_graphs, errors)
 
     var first_code: String = ""
     if not errors.is_empty():
@@ -318,6 +320,28 @@ static func _validate_and_count_kit_item(item_entry: Variant) -> int:
         return -1
     return count
 
+static func _validate_origin_references(dto: DestinyModManifestDTO, errors: Array[Dictionary]) -> void:
+    var builtin_kits: Dictionary = GameConfig.get_dict("domains.starter_loadout", "starter_kits", {})
+    var builtin_dags: Dictionary = GameConfig.get_dict("narratives.prologue_dag_catalog", "dag_graphs", {})
+    for orig in dto.custom_origins:
+        var kid: String = str(orig.get("starter_kit_id", "")).strip_edges()
+        if not kid.is_empty() and not dto.custom_starter_kits.has(kid) and not builtin_kits.has(kid):
+            _append_error(errors, "ERR_DESTINY_UNKNOWN_KIT_REF", "未定义的套件引用: " + kid)
+        var did: String = str(orig.get("prologue_dag_id", "")).strip_edges()
+        if not dto.dag_graphs.is_empty() and not did.is_empty() and not dto.dag_graphs.has(did) and not builtin_dags.has(did):
+            _append_error(errors, "ERR_DESTINY_UNKNOWN_DAG_REF", "未定义的剧情DAG引用: " + did)
+
+static func _validate_dag_graphs(dag_graphs: Dictionary, errors: Array[Dictionary]) -> void:
+    for gid in dag_graphs.keys():
+        var raw_g: Variant = dag_graphs[gid]
+        if not (raw_g is Dictionary):
+            _append_error(errors, "ERR_DESTINY_INVALID_DAG_GRAPH", "非法DAG定义: " + str(gid))
+            continue
+        var g := PrologueDagRegistry.assemble_graph_from_raw(str(gid), raw_g as Dictionary)
+        var val_res := CausalityDagValidator.validate_graph(g)
+        if not bool(val_res.get("is_valid", false)):
+            _append_error(errors, "ERR_DESTINY_INVALID_DAG_GRAPH", "DAG校验失败: %s" % str(gid))
+
 # ==============================================================================
 # 四、多包冲突检测辅助方法 (CC <= 15, Depth <= 3)
 # ==============================================================================
@@ -526,6 +550,8 @@ static func _merge_adapted_manifest(
     var origin_kit_map: Dictionary = {}
     var origin_dag_map: Dictionary = {}
     var custom_routing_rules: Array[Dictionary] = []
+    var dag_graphs: Dictionary = {}
+    var custom_i18n: Dictionary = {}
 
     var allow_manual_origin: bool = false
     var allow_manual_trait: bool = false
@@ -540,17 +566,9 @@ static func _merge_adapted_manifest(
             allow_reroll = true
 
         _merge_single_pack_assets(
-            dto,
-            origins_pool,
-            origins_catalog,
-            origin_race_map,
-            birth_region_map,
-            traits,
-            paired_presets,
-            starter_kits,
-            origin_kit_map,
-            origin_dag_map,
-            custom_routing_rules
+            dto, origins_pool, origins_catalog, origin_race_map, birth_region_map,
+            traits, paired_presets, starter_kits, origin_kit_map, origin_dag_map,
+            custom_routing_rules, dag_graphs, custom_i18n
         )
 
     var ui_controls: Dictionary = {
@@ -576,32 +594,22 @@ static func _merge_adapted_manifest(
         "race_kit_map": race_kit_map,
         "origin_kit_map": origin_kit_map,
         "origin_dag_map": origin_dag_map,
-        "custom_routing_rules": custom_routing_rules
+        "custom_routing_rules": custom_routing_rules,
+        "dag_graphs": dag_graphs,
+        "custom_i18n": custom_i18n
     }
 
 static func _merge_single_pack_assets(
-    dto: DestinyModManifestDTO,
-    origins_pool: Array[Dictionary],
-    origins_catalog: Dictionary,
-    origin_race_map: Dictionary,
-    birth_region_map: Dictionary,
-    traits: Dictionary,
-    paired_presets: Array[Dictionary],
-    starter_kits: Dictionary,
-    origin_kit_map: Dictionary,
-    origin_dag_map: Dictionary,
-    custom_routing_rules: Array[Dictionary]
+    dto: DestinyModManifestDTO, origins_pool: Array[Dictionary], origins_catalog: Dictionary,
+    origin_race_map: Dictionary, birth_region_map: Dictionary, traits: Dictionary,
+    paired_presets: Array[Dictionary], starter_kits: Dictionary, origin_kit_map: Dictionary,
+    origin_dag_map: Dictionary, custom_routing_rules: Array[Dictionary],
+    dag_graphs: Dictionary, custom_i18n: Dictionary
 ) -> void:
     for orig in dto.custom_origins:
         _register_custom_origin(
-            orig,
-            dto.pack_id,
-            origins_pool,
-            origins_catalog,
-            origin_race_map,
-            birth_region_map,
-            origin_kit_map,
-            origin_dag_map
+            orig, dto.pack_id, origins_pool, origins_catalog, origin_race_map,
+            birth_region_map, origin_kit_map, origin_dag_map
         )
 
     for tid in dto.custom_traits.keys():
@@ -619,6 +627,12 @@ static func _merge_single_pack_assets(
 
     for rule in dto.custom_routing_rules:
         custom_routing_rules.append(rule.duplicate(true))
+
+    for gid in dto.dag_graphs.keys():
+        dag_graphs[str(gid)] = dto.dag_graphs[gid]
+
+    for ik in dto.custom_i18n.keys():
+        custom_i18n[str(ik)] = dto.custom_i18n[ik]
 
 static func _register_custom_origin(
     orig: Dictionary,
