@@ -32,217 +32,281 @@ static var _active_context: SessionFlowContextDTO = null
 static var _active_wallet: CharacterWalletEntity = null
 static var _active_physiology: CharacterPhysiologySheet = null
 static var _injected_account_id: String = ""
+static var _injected_mod_adaptation: Dictionary = {}
 
 static func get_active_context() -> SessionFlowContextDTO:
-	return _active_context
+    return _active_context
 
 static func get_active_wallet() -> CharacterWalletEntity:
-	return _active_wallet
+    return _active_wallet
 
 static func get_active_physiology() -> CharacterPhysiologySheet:
-	return _active_physiology
+    return _active_physiology
 
 static func get_injected_account_id() -> String:
-	return _injected_account_id
+    return _injected_account_id
 
-## 全域注入与状态水化入口
-static func inject_and_hydrate(snapshot: TestSnapshotBundleDTO, target_stage_key: String = "") -> Dictionary:
-	# 1. 环境安全守卫判定（生产构建绝对熔断）
-	var env_check := SnapshotEnvironmentGuard.validate_injection_environment()
-	if not bool(env_check.get("permitted", false)):
-		return {
-			"success": false,
-			"error_code": env_check.get("error_code", "ERR_TEST_MODE_DISABLED"),
-			"message": env_check.get("message", "Test mode disabled in production.")
-		}
+static func get_injected_mod_adaptation() -> Dictionary:
+    return _injected_mod_adaptation
 
-	if snapshot == null:
-		return {
-			"success": false,
-			"error_code": "ERR_NULL_SNAPSHOT",
-			"message": "快照对象不可为空"
-		}
+## 全域注入与状态水化入口（支持传入 TestSnapshotBundleDTO 或 Dictionary）
+static func inject_and_hydrate(snapshot: Variant, target_stage_key: String = "") -> Dictionary:
+    # 1. 环境安全守卫判定（生产构建绝对熔断）
+    var env_check := SnapshotEnvironmentGuard.validate_injection_environment()
+    if not bool(env_check.get("permitted", false)):
+        return {
+            "success": false,
+            "error_code": env_check.get("error_code", "ERR_TEST_MODE_DISABLED"),
+            "message": env_check.get("message", "Test mode disabled in production.")
+        }
 
-	# 2. 基础系统装配就绪
-	GameBootstrap.assemble()
+    var bundle: TestSnapshotBundleDTO = _normalize_snapshot_bundle(snapshot)
+    if bundle == null:
+        return {
+            "success": false,
+            "error_code": "ERR_NULL_SNAPSHOT",
+            "message": "快照对象不可为空"
+        }
 
-	# 3. 账号实体组装并注册至 AccountRepository 仓储索引
-	if not _injected_account_id.is_empty():
-		AccountRepository.get_instance().delete_account(_injected_account_id)
-		_injected_account_id = ""
-	_injected_account_id = _hydrate_account_to_repository(snapshot)
+    # 2. 基础系统装配就绪与虚拟命途MOD预检合并水化
+    GameBootstrap.assemble()
+    _hydrate_virtual_destiny_mods(snapshot, bundle)
 
-	# 4. 构造生理实体与钱包实体
-	var physiology := CharacterPhysiologySheet.new()
-	physiology.race_id = snapshot.race_id
-	var raw_attr = snapshot.attributes
-	if raw_attr is Dictionary:
-		for k in (raw_attr as Dictionary).keys():
-			physiology.attribute_levels[String(k).to_upper()] = int(raw_attr[k])
+    # 3. 账号实体组装并注册至 AccountRepository 仓储索引
+    if not _injected_account_id.is_empty():
+        AccountRepository.get_instance().delete_account(_injected_account_id)
+        _injected_account_id = ""
+    _injected_account_id = _hydrate_account_to_repository(bundle)
 
-	var wallet := CharacterWalletEntity.new()
-	wallet.copper = int(snapshot.wallet_data.get("copper", 0))
-	wallet.silver = int(snapshot.wallet_data.get("silver", 0))
-	wallet.gold = int(snapshot.wallet_data.get("gold", 1000))
-	wallet.platinum = int(snapshot.wallet_data.get("platinum", 0))
-	wallet.mana_monocrystals = int(snapshot.wallet_data.get("mana_monocrystals", 10))
+    # 4. 构造生理实体与钱包实体
+    var physiology := _build_physiology_sheet(bundle)
+    var wallet := _build_wallet_entity(bundle)
 
-	# 5. 通过 SaveDataAccessLayer 进行全域数据反装配灌溉
-	var save_payload := {
-		"account": {
-			"account_id": snapshot.account_id,
-			"username": snapshot.username,
-			"active_world_slot": snapshot.world_id,
-			"active_slot_id": snapshot.slot_id
-		},
-		"character_creation": {
-			"character_id": snapshot.character_id,
-			"character_name": snapshot.character_name,
-			"selected_race_id": snapshot.race_id,
-			"selected_gender": snapshot.gender,
-			"level": snapshot.level,
-			"attributes": snapshot.attributes
-		},
-		"currency_economy": {
-			"copper": wallet.copper,
-			"silver": wallet.silver,
-			"gold": wallet.gold,
-			"platinum": wallet.platinum,
-			"mana_monocrystals": wallet.mana_monocrystals
-		},
-		"lifecycle_physiology": {
-			"race_id": snapshot.race_id,
-			"current_hp": snapshot.physiology_data.get("current_hp", 100),
-			"max_hp": snapshot.physiology_data.get("max_hp", 100),
-			"current_mp": snapshot.physiology_data.get("current_mp", 50),
-			"max_mp": snapshot.physiology_data.get("max_mp", 50),
-			"stamina": snapshot.physiology_data.get("stamina", 100),
-			"sanity": snapshot.physiology_data.get("sanity", 100),
-			"hunger": snapshot.physiology_data.get("hunger", 0),
-			"thirst": snapshot.physiology_data.get("thirst", 0),
-			"attribute_levels": snapshot.attributes
-		},
-		"inventory": {
-			"items": snapshot.inventory_items
-		},
-		"world_navigation": {
-			"current_location_id": snapshot.location_name,
-			"current_location_name": snapshot.location_name,
-			"coordinates_x": snapshot.coordinates_x,
-			"coordinates_y": snapshot.coordinates_y
-		},
-		"quest_causality": snapshot.quest_dag_state
-	}
+    # 5. 通过 SaveDataAccessLayer 进行全域数据反装配灌溉
+    var save_payload := _build_save_payload(bundle, wallet)
+    var dal_res := SaveDataAccessLayer.apply_save_data(save_payload)
+    var restored_domains: Array = dal_res.get("restored", {}).keys()
 
-	# 合并自定义领域扩展切片
-	for ext_k in snapshot.domain_extensions.keys():
-		save_payload[ext_k] = snapshot.domain_extensions[ext_k]
+    # 6. 会话上下文 SessionFlowContextDTO 池化获取与全量注入
+    var ctx := _acquire_and_populate_context(bundle)
 
-	var dal_res := SaveDataAccessLayer.apply_save_data(save_payload)
-	var restored_domains: Array = dal_res.get("restored", {}).keys()
+    # 7. 生命周期状态机跃迁推进至 RUNNING 态
+    GameLifecycleManager.reset_for_test()
+    var fsm = GameLifecycleManager.get_instance()
+    fsm.transition_to(GameLifecycleModel.LifecyclePhase.BOOT_INITIALIZING)
+    fsm.transition_to(GameLifecycleModel.LifecyclePhase.RUNNING)
 
-	# 6. 会话上下文 SessionFlowContextDTO 池化获取与全量注入
-	var ctx := SessionFlowContextDTO.acquire()
-	ctx.account_id = snapshot.account_id if not snapshot.account_id.is_empty() else "ACC_DEV_INJECTED"
-	ctx.session_token = snapshot.session_token if not snapshot.session_token.is_empty() else "TOK_DEV_INJECTED"
-	ctx.username = snapshot.username if not snapshot.username.is_empty() else "DevAdventurer"
-	ctx.current_slot_id = snapshot.slot_id if not snapshot.slot_id.is_empty() else "SLOT_01"
-	ctx.character_id = snapshot.character_id if not snapshot.character_id.is_empty() else "CHAR_DEV_INJECTED"
-	ctx.character_name = snapshot.character_name if not snapshot.character_name.is_empty() else "InjectedHero"
-	ctx.race_id = snapshot.race_id
-	ctx.gender = snapshot.gender
-	ctx.current_world_id = snapshot.world_id
+    # 8. 主界面 HUD 快照同步汇聚
+    var hud_snapshot: HudStatusSnapshotDTO = HudStateSyncService.trigger_initial_world_sync(
+        ctx.account_id,
+        ctx.character_id,
+        ctx.character_name,
+        physiology,
+        wallet,
+        bundle.location_name,
+        bundle.race_id
+    )
+    ctx.hud_snapshot = hud_snapshot.to_dto() if hud_snapshot != null else {}
+    ctx.physiology_snapshot = bundle.physiology_data.duplicate(true)
+    ctx.wallet_snapshot = bundle.wallet_data.duplicate(true)
+    _active_context = ctx
+    _active_wallet = wallet
+    _active_physiology = physiology
 
-	# 7. 生命周期状态机跃迁推进至 RUNNING 态
-	GameLifecycleManager.reset_for_test()
-	var fsm = GameLifecycleManager.get_instance()
-	fsm.transition_to(GameLifecycleModel.LifecyclePhase.BOOT_INITIALIZING)
-	fsm.transition_to(GameLifecycleModel.LifecyclePhase.RUNNING)
+    # 9. 目标阶段定位与桩位标记
+    var effective_stage := target_stage_key if not target_stage_key.is_empty() else bundle.target_stage_key
+    ctx.stage_results["INJECTED_SNAPSHOT"] = {
+        "snapshot_id": bundle.snapshot_id,
+        "target_stage_key": effective_stage,
+        "timestamp_utc": int(Time.get_unix_time_from_system())
+    }
+    ctx.current_stage_index = _resolve_stage_index(effective_stage)
 
-	# 8. 主界面 HUD 快照同步汇聚
-	var hud_snapshot: HudStatusSnapshotDTO = HudStateSyncService.trigger_initial_world_sync(
-		ctx.account_id,
-		ctx.character_id,
-		ctx.character_name,
-		physiology,
-		wallet,
-		snapshot.location_name,
-		snapshot.race_id
-	)
-	ctx.hud_snapshot = hud_snapshot.to_dto() if hud_snapshot != null else {}
-	ctx.physiology_snapshot = snapshot.physiology_data.duplicate(true)
-	ctx.wallet_snapshot = snapshot.wallet_data.duplicate(true)
-	_active_context = ctx
-	_active_wallet = wallet
-	_active_physiology = physiology
-
-	# 9. 目标阶段定位与桩位标记
-	var effective_stage := target_stage_key if not target_stage_key.is_empty() else snapshot.target_stage_key
-	ctx.stage_results["INJECTED_SNAPSHOT"] = {
-		"snapshot_id": snapshot.snapshot_id,
-		"target_stage_key": effective_stage,
-		"timestamp_utc": int(Time.get_unix_time_from_system())
-	}
-	ctx.current_stage_index = _resolve_stage_index(effective_stage)
-
-	return {
-		"success": true,
-		"error_code": "OK",
-		"session_context": ctx,
-		"hud_snapshot": hud_snapshot,
-		"target_stage_key": effective_stage,
-		"hydrated_domains": restored_domains,
-		"physiology_sheet": physiology,
-		"wallet_entity": wallet,
-		"snapshot_id": snapshot.snapshot_id,
-		"injected_account_id": _injected_account_id
-	}
+    return {
+        "success": true,
+        "error_code": "OK",
+        "session_context": ctx,
+        "hud_snapshot": hud_snapshot,
+        "target_stage_key": effective_stage,
+        "hydrated_domains": restored_domains,
+        "physiology_sheet": physiology,
+        "wallet_entity": wallet,
+        "snapshot_id": bundle.snapshot_id,
+        "injected_account_id": _injected_account_id,
+        "mod_adaptation": _injected_mod_adaptation
+    }
 
 ## 测试结束后的对称清理与状态复位
 static func teardown_snapshot(ctx: SessionFlowContextDTO = null) -> void:
-	if not _injected_account_id.is_empty():
-		AccountRepository.get_instance().delete_account(_injected_account_id)
-		_injected_account_id = ""
-	AccountRepository.reset_for_tests()
-	_active_context = null
-	_active_wallet = null
-	_active_physiology = null
-	AuthService.clear_sessions()
-	if ctx != null:
-		SessionFlowContextDTO.release(ctx)
-	GameLifecycleManager.reset_for_test()
-	SaveDataAccessLayer.reset_for_tests()
-	RuntimeModeGate.reset_for_tests()
-	SnapshotEnvironmentGuard.reset_for_test()
+    if not _injected_account_id.is_empty():
+        AccountRepository.get_instance().delete_account(_injected_account_id)
+        _injected_account_id = ""
+    AccountRepository.reset_for_tests()
+    _active_context = null
+    _active_wallet = null
+    _active_physiology = null
+    _injected_mod_adaptation.clear()
+    AuthService.clear_sessions()
+    if ctx != null:
+        SessionFlowContextDTO.release(ctx)
+    GameLifecycleManager.reset_for_test()
+    SaveDataAccessLayer.reset_for_tests()
+    RuntimeModeGate.reset_for_tests()
+    SnapshotEnvironmentGuard.reset_for_test()
+
+## 将入参归一化为 TestSnapshotBundleDTO
+static func _normalize_snapshot_bundle(snapshot: Variant) -> TestSnapshotBundleDTO:
+    if snapshot == null:
+        return null
+    if snapshot is TestSnapshotBundleDTO:
+        return snapshot as TestSnapshotBundleDTO
+    if snapshot is Dictionary:
+        return TestSnapshotBundleDTO.from_dict(snapshot as Dictionary) as TestSnapshotBundleDTO
+    return null
+
+## 解析并水化内存虚拟命途 MOD 清单
+static func _hydrate_virtual_destiny_mods(raw_snapshot: Variant, bundle: TestSnapshotBundleDTO) -> void:
+    _injected_mod_adaptation.clear()
+    var virtual_mods: Array = []
+    var enabled_mod_ids: Array = ["*"]
+    var has_virtual_mods: bool = false
+
+    if raw_snapshot is Dictionary:
+        var snap_dict: Dictionary = raw_snapshot as Dictionary
+        if snap_dict.has("virtual_destiny_mods") and snap_dict["virtual_destiny_mods"] is Array:
+            virtual_mods = snap_dict["virtual_destiny_mods"] as Array
+            has_virtual_mods = true
+        if snap_dict.has("enabled_mod_ids") and snap_dict["enabled_mod_ids"] is Array:
+            enabled_mod_ids = snap_dict["enabled_mod_ids"] as Array
+
+    if not has_virtual_mods and bundle.domain_extensions.has("virtual_destiny_mods"):
+        var ext_mods: Variant = bundle.domain_extensions.get("virtual_destiny_mods", [])
+        if ext_mods is Array:
+            virtual_mods = ext_mods as Array
+            has_virtual_mods = true
+        var ext_enabled: Variant = bundle.domain_extensions.get("enabled_mod_ids", ["*"])
+        if ext_enabled is Array:
+            enabled_mod_ids = ext_enabled as Array
+
+    if not has_virtual_mods:
+        return
+
+    var adapt_res: Dictionary = ModPrecheckAndAdaptationSolver.precheck_and_adapt_mod_list(virtual_mods, enabled_mod_ids)
+    _injected_mod_adaptation = adapt_res.duplicate(true)
+
+## 构造生理实体
+static func _build_physiology_sheet(snapshot: TestSnapshotBundleDTO) -> CharacterPhysiologySheet:
+    var physiology := CharacterPhysiologySheet.new()
+    physiology.race_id = snapshot.race_id
+    var raw_attr = snapshot.attributes
+    if raw_attr is Dictionary:
+        for k in (raw_attr as Dictionary).keys():
+            physiology.attribute_levels[String(k).to_upper()] = int(raw_attr[k])
+    return physiology
+
+## 构造钱包实体
+static func _build_wallet_entity(snapshot: TestSnapshotBundleDTO) -> CharacterWalletEntity:
+    var wallet := CharacterWalletEntity.new()
+    wallet.copper = int(snapshot.wallet_data.get("copper", 0))
+    wallet.silver = int(snapshot.wallet_data.get("silver", 0))
+    wallet.gold = int(snapshot.wallet_data.get("gold", 1000))
+    wallet.platinum = int(snapshot.wallet_data.get("platinum", 0))
+    wallet.mana_monocrystals = int(snapshot.wallet_data.get("mana_monocrystals", 10))
+    return wallet
+
+## 构造存档反装配载荷
+static func _build_save_payload(snapshot: TestSnapshotBundleDTO, wallet: CharacterWalletEntity) -> Dictionary:
+    var save_payload := {
+        "account": {
+            "account_id": snapshot.account_id,
+            "username": snapshot.username,
+            "active_world_slot": snapshot.world_id,
+            "active_slot_id": snapshot.slot_id
+        },
+        "character_creation": {
+            "character_id": snapshot.character_id,
+            "character_name": snapshot.character_name,
+            "selected_race_id": snapshot.race_id,
+            "selected_gender": snapshot.gender,
+            "level": snapshot.level,
+            "attributes": snapshot.attributes
+        },
+        "currency_economy": {
+            "copper": wallet.copper,
+            "silver": wallet.silver,
+            "gold": wallet.gold,
+            "platinum": wallet.platinum,
+            "mana_monocrystals": wallet.mana_monocrystals
+        },
+        "lifecycle_physiology": {
+            "race_id": snapshot.race_id,
+            "current_hp": snapshot.physiology_data.get("current_hp", 100),
+            "max_hp": snapshot.physiology_data.get("max_hp", 100),
+            "current_mp": snapshot.physiology_data.get("current_mp", 50),
+            "max_mp": snapshot.physiology_data.get("max_mp", 50),
+            "stamina": snapshot.physiology_data.get("stamina", 100),
+            "sanity": snapshot.physiology_data.get("sanity", 100),
+            "hunger": snapshot.physiology_data.get("hunger", 0),
+            "thirst": snapshot.physiology_data.get("thirst", 0),
+            "attribute_levels": snapshot.attributes
+        },
+        "inventory": {
+            "items": snapshot.inventory_items
+        },
+        "world_navigation": {
+            "current_location_id": snapshot.location_name,
+            "current_location_name": snapshot.location_name,
+            "coordinates_x": snapshot.coordinates_x,
+            "coordinates_y": snapshot.coordinates_y
+        },
+        "quest_causality": snapshot.quest_dag_state
+    }
+    for ext_k in snapshot.domain_extensions.keys():
+        save_payload[ext_k] = snapshot.domain_extensions[ext_k]
+    return save_payload
+
+## 获取并填充会话上下文
+static func _acquire_and_populate_context(snapshot: TestSnapshotBundleDTO) -> SessionFlowContextDTO:
+    var ctx := SessionFlowContextDTO.acquire()
+    ctx.account_id = snapshot.account_id if not snapshot.account_id.is_empty() else "ACC_DEV_INJECTED"
+    ctx.session_token = snapshot.session_token if not snapshot.session_token.is_empty() else "TOK_DEV_INJECTED"
+    ctx.username = snapshot.username if not snapshot.username.is_empty() else "DevAdventurer"
+    ctx.current_slot_id = snapshot.slot_id if not snapshot.slot_id.is_empty() else "SLOT_01"
+    ctx.character_id = snapshot.character_id if not snapshot.character_id.is_empty() else "CHAR_DEV_INJECTED"
+    ctx.character_name = snapshot.character_name if not snapshot.character_name.is_empty() else "InjectedHero"
+    ctx.race_id = snapshot.race_id
+    ctx.gender = snapshot.gender
+    ctx.current_world_id = snapshot.world_id
+    return ctx
 
 ## 将快照账号实体水化注入 AccountRepository 仓储索引
 static func _hydrate_account_to_repository(snapshot: TestSnapshotBundleDTO) -> String:
-	if snapshot.account_id.is_empty() and snapshot.username.is_empty():
-		return ""
-	var acc := AccountProfileAggregate.new()
-	acc.account_id = snapshot.account_id if not snapshot.account_id.is_empty() else "ACC_DEV_INJECTED"
-	acc.username = snapshot.username if not snapshot.username.is_empty() else "DevAdventurer"
-	acc.active_slot_id = snapshot.slot_id if not snapshot.slot_id.is_empty() else "SLOT_01"
-	var target_world: String = snapshot.world_id if not snapshot.world_id.is_empty() else "WORLD_DEFAULT_SP_01"
-	acc.world_state_ref = target_world
-	acc.bind_world_slot(target_world, acc.active_slot_id)
-	var now_ts: int = int(Time.get_unix_time_from_system())
-	acc.created_timestamp_utc = now_ts
-	acc.last_login_timestamp_utc = now_ts
-	AccountRepository.get_instance().save_account(acc)
-	return acc.account_id
+    if snapshot.account_id.is_empty() and snapshot.username.is_empty():
+        return ""
+    var acc := AccountProfileAggregate.new()
+    acc.account_id = snapshot.account_id if not snapshot.account_id.is_empty() else "ACC_DEV_INJECTED"
+    acc.username = snapshot.username if not snapshot.username.is_empty() else "DevAdventurer"
+    acc.active_slot_id = snapshot.slot_id if not snapshot.slot_id.is_empty() else "SLOT_01"
+    var target_world: String = snapshot.world_id if not snapshot.world_id.is_empty() else "WORLD_DEFAULT_SP_01"
+    acc.world_state_ref = target_world
+    acc.bind_world_slot(target_world, acc.active_slot_id)
+    var now_ts: int = int(Time.get_unix_time_from_system())
+    acc.created_timestamp_utc = now_ts
+    acc.last_login_timestamp_utc = now_ts
+    AccountRepository.get_instance().save_account(acc)
+    return acc.account_id
 
 ## 解析阶段键名对应的阶段序号
 static func _resolve_stage_index(stage_key: String) -> int:
-	match stage_key:
-		"STAGE_01_REGISTER", "STAGE_01", "REGISTER": return 1
-		"STAGE_02_INIT_SLOT", "STAGE_02", "INIT_SLOT": return 2
-		"STAGE_03_SELECT_WORLD", "STAGE_03", "SELECT_WORLD": return 3
-		"STAGE_04_CREATE_CHAR", "STAGE_04", "CREATE_CHAR": return 4
-		"STAGE_05_PROLOGUE", "STAGE_05", "PROLOGUE": return 5
-		"STAGE_06_HUD_SYNC", "STAGE_06", "HUD_SYNC": return 6
-		"STAGE_07_ESC_MENU", "STAGE_07", "ESC_MENU": return 7
-		"STAGE_08_EXIT_REQUEST", "STAGE_08", "EXIT_REQUEST": return 8
-		"STAGE_09_SAVE_FLUSH", "STAGE_09", "SAVE_FLUSH": return 9
-		"STAGE_10_FULL_EXIT", "STAGE_10", "FULL_EXIT": return STAGE_INDEX_FULL_EXIT
-		_: return STAGE_INDEX_HUD_SYNC # 默认进入主界面 HUD 阶段
+    match stage_key:
+        "STAGE_01_REGISTER", "STAGE_01", "REGISTER": return 1
+        "STAGE_02_INIT_SLOT", "STAGE_02", "INIT_SLOT": return 2
+        "STAGE_03_SELECT_WORLD", "STAGE_03", "SELECT_WORLD": return 3
+        "STAGE_04_CREATE_CHAR", "STAGE_04", "CREATE_CHAR": return 4
+        "STAGE_05_PROLOGUE", "STAGE_05", "PROLOGUE": return 5
+        "STAGE_06_HUD_SYNC", "STAGE_06", "HUD_SYNC": return 6
+        "STAGE_07_ESC_MENU", "STAGE_07", "ESC_MENU": return 7
+        "STAGE_08_EXIT_REQUEST", "STAGE_08", "EXIT_REQUEST": return 8
+        "STAGE_09_SAVE_FLUSH", "STAGE_09", "SAVE_FLUSH": return 9
+        "STAGE_10_FULL_EXIT", "STAGE_10", "FULL_EXIT": return STAGE_INDEX_FULL_EXIT
+        _: return STAGE_INDEX_HUD_SYNC # 默认进入主界面 HUD 阶段
