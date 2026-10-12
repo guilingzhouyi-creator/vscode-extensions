@@ -178,6 +178,200 @@ def _simulate_dag_branch(
     print("  🏁 分支终态: 剧情顺利达成 TERMINAL_EXIT。")
 
 
+BUILTIN_TRAITS_META: dict[str, tuple[str, int]] = {
+    "PRIMORDIAL_RESONANCE": ("始源魔素共鸣", 3),
+    "GIANT_MIGHT": ("巨人之力", 2),
+    "IRON_WILL": ("钢铁心智", 1),
+    "HEART_CORE_FISSURE": ("心核裂隙", -3),
+    "MANA_INSULATED": ("魔素绝缘体", -2),
+}
+
+BASE_ATTRIBUTES: dict[str, int] = {
+    "STR": 4,
+    "CON": 3,
+    "INT": 4,
+    "AGI": 4,
+    "SPR": 3,
+    "VIT": 3,
+}
+
+
+def _ensure_utf8_stdout() -> None:
+    """保障跨平台 UTF-8 控制台输出，避免 Windows GBK 崩溃。"""
+    if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
+        try:
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+            sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
+
+def _normalize_list_items(raw_val: Any, id_key: str) -> list[dict[str, Any]]:
+    """将列表或字典格式的扩展配置项统一转换为字典列表。"""
+    if isinstance(raw_val, list):
+        return [item for item in raw_val if isinstance(item, dict)]
+    if isinstance(raw_val, dict):
+        result: list[dict[str, Any]] = []
+        for k, v in raw_val.items():
+            if isinstance(v, dict):
+                entry = dict(v)
+                entry.setdefault(id_key, k)
+                result.append(entry)
+        return result
+    return []
+
+
+def _format_ui_mode_desc(mode: str) -> str:
+    """格式化 UI 解锁策略的人类可读状态描述。"""
+    if mode == "ALLOW_MANUAL":
+        return "ALLOW_MANUAL (已解锁前端手动自选控件)"
+    if mode == "FORCE_RANDOM":
+        return "FORCE_RANDOM (强制随机盲盒抽取，锁定自选)"
+    return f"{mode} (继承引擎默认创角策略)"
+
+
+def _resolve_trait_meta(
+    trait_ref: Any,
+    custom_traits: list[dict[str, Any]],
+) -> tuple[str, str, int]:
+    """解析因果天赋的 (ID, 名称, 消耗点数)。"""
+    if isinstance(trait_ref, dict):
+        tid = str(trait_ref.get("trait_id") or trait_ref.get("id") or "CUSTOM_TRAIT")
+        tname = str(trait_ref.get("name") or tid)
+        tcost = int(trait_ref.get("cost", 0))
+        return tid, tname, tcost
+
+    tid_str = str(trait_ref or "UNKNOWN")
+    for ct in custom_traits:
+        cid = ct.get("trait_id") or ct.get("id")
+        if cid == tid_str:
+            return tid_str, str(ct.get("name") or tid_str), int(ct.get("cost", 0))
+
+    if tid_str in BUILTIN_TRAITS_META:
+        b_name, b_cost = BUILTIN_TRAITS_META[tid_str]
+        return tid_str, b_name, b_cost
+    return tid_str, tid_str, 0
+
+
+def _compute_preview_attributes(bonuses: dict[str, Any]) -> tuple[str, int]:
+    """计算叠加身世加成后的六维属性摘要字符串与净加成值。"""
+    parts: list[str] = []
+    net_bonus = 0
+    for key in ("STR", "CON", "INT", "AGI", "SPR", "VIT"):
+        base_val = BASE_ATTRIBUTES.get(key, 3)
+        raw_mod = bonuses.get(key, 0)
+        mod_val = int(raw_mod) if isinstance(raw_mod, (int, float)) else 0
+        net_bonus += mod_val
+        final_val = base_val + mod_val
+        if mod_val != 0:
+            parts.append(f"{key}:{final_val}({mod_val:+d})")
+        else:
+            parts.append(f"{key}:{final_val}")
+    return ", ".join(parts), net_bonus
+
+
+def _find_matching_kit(
+    custom_kits: list[dict[str, Any]],
+    preferred_kit_id: str,
+) -> dict[str, Any] | None:
+    """在自定义套件列表中查找目标套件，未命中时回退至首套自定义套件。"""
+    for kit in custom_kits:
+        kid = kit.get("kit_id") or kit.get("id")
+        if kid == preferred_kit_id:
+            return kit
+    return custom_kits[0] if custom_kits else None
+
+
+def _format_kit_summary(
+    custom_kits: list[dict[str, Any]],
+    preferred_kit_id: str,
+    origin_gold: int,
+) -> tuple[str, int]:
+    """构建初始装备行囊摘要与合并后的初始金币总额。"""
+    selected_kit = _find_matching_kit(custom_kits, preferred_kit_id)
+    if selected_kit is None:
+        total_gold = origin_gold if origin_gold > 0 else 50
+        return f"KIT_HUMAN_DEFAULT (内置标准行囊) | 初始金币: {total_gold}", total_gold
+
+    kid = str(selected_kit.get("kit_id") or "CUSTOM_KIT")
+    kname = str(selected_kit.get("name") or kid)
+    kit_gold = int(selected_kit.get("initial_gold", 0))
+    total_gold = origin_gold + kit_gold if origin_gold > 0 else max(kit_gold, 50)
+    raw_items = selected_kit.get("initial_items", [])
+    item_strs = [
+        f"{it.get('canonical_id')}x{it.get('count', 1)}"
+        for it in (raw_items if isinstance(raw_items, list) else [])
+        if isinstance(it, dict)
+    ]
+    items_joined = ", ".join(item_strs) if item_strs else "无附加物品"
+    return f"{kid} ({kname}) | 初始总金币: {total_gold} | 物品: [{items_joined}]", total_gold
+
+
+def _simulate_destiny_preview(destinies_data: dict[str, Any], context: dict[str, Any]) -> None:
+    """在序章演习前输出命途池合并摘要、UI 解锁状态与确定性抽卡/自选角色预览。"""
+    ui_cap = destinies_data.get("ui_capabilities", {})
+    if not isinstance(ui_cap, dict):
+        ui_cap = {}
+
+    custom_origins = _normalize_list_items(destinies_data.get("custom_origins"), "origin_id")
+    custom_traits = _normalize_list_items(destinies_data.get("custom_traits"), "trait_id")
+    raw_presets = destinies_data.get("paired_presets")
+    paired_presets = [p for p in raw_presets if isinstance(p, dict)] if isinstance(raw_presets, list) else []
+    custom_kits = _normalize_list_items(destinies_data.get("custom_starter_kits"), "kit_id")
+
+    origin_mode = str(ui_cap.get("origin_selection_mode", "INHERIT"))
+    trait_mode = str(ui_cap.get("trait_selection_mode", "INHERIT"))
+    reroll_enabled = bool(ui_cap.get("allow_attribute_reroll", False))
+
+    print("\n🔮 ----------------- [命途扩展与创角演习预览 (destinies.json)] -----------------")
+    print("  [1] 命途池列表合并摘要 (Destiny Pool Merge Summary):")
+    print(f"      • 身世池 (Origins)       : 内置 4 项 + MOD 扩展 {len(custom_origins)} 项 => 合并后共 {4 + len(custom_origins)} 项")
+    print(f"      • 天赋池 (Traits)        : 内置 5 项 + MOD 扩展 {len(custom_traits)} 项 => 合并后共 {5 + len(custom_traits)} 项")
+    print(f"      • 因果配对池 (Presets)   : 内置 2 组 + MOD 扩展 {len(paired_presets)} 组 => 合并后共 {2 + len(paired_presets)} 组")
+    print(f"      • 初始行囊池 (Kits)      : 内置 2 套 + MOD 扩展 {len(custom_kits)} 套 => 合并后共 {2 + len(custom_kits)} 套")
+
+    print("  [2] 前端 UI 控件解锁状态 (Frontend UI Unlock State):")
+    print(f"      • 身世选择策略           : {_format_ui_mode_desc(origin_mode)}")
+    print(f"      • 因果天赋策略           : {_format_ui_mode_desc(trait_mode)}")
+    reroll_desc = "已开放 (允许重掷/自由分配六维)" if reroll_enabled else "已锁定 (仅使用权威随机六维)"
+    print(f"      • 六维重掷开关           : {reroll_enabled} ({reroll_desc})")
+
+    sample_origin = custom_origins[0] if custom_origins else {
+        "origin_id": "IMPERIAL_NOBLE",
+        "name": "帝国贵族后裔",
+        "birth_region": "CENTRAL_CONTINENT",
+        "initial_gold": 500,
+        "starter_kit_id": "KIT_HUMAN_DEFAULT",
+        "attribute_bonus": {"INT": 2, "STR": 1},
+    }
+    oid = str(sample_origin.get("origin_id") or sample_origin.get("id") or "CUSTOM_ORIGIN")
+    oname = str(sample_origin.get("name") or oid)
+    region = str(sample_origin.get("birth_region") or "CENTRAL_CONTINENT")
+    bonuses = sample_origin.get("attribute_bonus", {})
+    attr_summary, net_bonus = _compute_preview_attributes(bonuses if isinstance(bonuses, dict) else {})
+
+    sample_pair = paired_presets[0] if paired_presets else {
+        "positive": "PRIMORDIAL_RESONANCE",
+        "negative": "HEART_CORE_FISSURE",
+    }
+    pos_id, pos_name, pos_cost = _resolve_trait_meta(sample_pair.get("positive"), custom_traits)
+    neg_id, neg_name, neg_cost = _resolve_trait_meta(sample_pair.get("negative"), custom_traits)
+
+    pref_kit_id = str(sample_origin.get("starter_kit_id") or "")
+    origin_gold = int(sample_origin.get("initial_gold", 0))
+    kit_summary, merged_gold = _format_kit_summary(custom_kits, pref_kit_id, origin_gold)
+    context["gold"] = merged_gold
+
+    print("  [3] 确定性抽卡/自选角色预览 (Deterministic Character Preview):")
+    print(f"      • 选定身世 : {oid} ({oname}) [降临地域: {region}]")
+    print(f"      • 六维面板 : {attr_summary} (基准21点, 身世净加成: {net_bonus:+d})")
+    print(
+        f"      • 因果天赋 : 正向[{pos_id}:{pos_name} ({pos_cost:+d})] + "
+        f"负向[{neg_id}:{neg_name} ({neg_cost:+d})] => 净代数和: {pos_cost + neg_cost:+d}"
+    )
+    print(f"      • 初始装备 : {kit_summary}")
+
+
 def _build_simulation_context(race_id: str, player_name: str) -> dict[str, Any]:
     """生成演习用模拟玩家状态上下文。"""
     return {
@@ -229,14 +423,19 @@ def simulate_mod(
     _find_all_paths(entry_id, terminals, adj, [], set(), all_paths)
 
     context = _build_simulation_context(race_id, player_name)
+    destinies_data = _load_json_file(mod_dir / "destinies.json")
 
     print("==============================================================================")
     print("🎭 卡拉尔 MOD 剧情无头演习推演引擎")
     print(f"  • MOD 名称   : {manifest_data.get('pack_name')} ({manifest_data.get('pack_id')})")
     print(f"  • 激活图元   : {target_dag_id}")
     print(f"  • 模拟角色   : {player_name} (种族: {race_id.upper()}, 等级: {context['level']})")
+    print(f"  • 命途扩展   : {'已启用 (destinies.json)' if isinstance(destinies_data, dict) else '未配置 (使用内置默认池)'}")
     print(f"  • 可达分支总数: {len(all_paths)} 条")
     print("==============================================================================")
+
+    if isinstance(destinies_data, dict):
+        _simulate_destiny_preview(destinies_data, context)
 
     nodes = dag_data.get("nodes", {})
     for idx, path_nodes in enumerate(all_paths, start=1):
@@ -258,6 +457,7 @@ def preview_overview(mod_dir: Path) -> int:
     dag_dir = mod_dir / "dag_graphs"
     dag_files = sorted(dag_dir.glob("*.json")) if dag_dir.is_dir() else []
     i18n_catalog = _load_i18n_catalog(mod_dir / "i18n")
+    destinies_data = _load_json_file(mod_dir / "destinies.json")
 
     print("==============================================================================")
     print(f"📖 MOD 静态概览预览: {manifest_data.get('pack_name', '未知模组')}")
@@ -270,6 +470,11 @@ def preview_overview(mod_dir: Path) -> int:
     print(f"  • 语义标签   : {manifest_data.get('semantic_tags')}")
     print(f"  • 包含图元数 : {len(dag_files)} 份 ({', '.join(f.stem for f in dag_files)})")
     print(f"  • 本地化词条 : {len(i18n_catalog)} 条")
+    if isinstance(destinies_data, dict):
+        c_origins = _normalize_list_items(destinies_data.get("custom_origins"), "origin_id")
+        c_traits = _normalize_list_items(destinies_data.get("custom_traits"), "trait_id")
+        c_kits = _normalize_list_items(destinies_data.get("custom_starter_kits"), "kit_id")
+        print(f"  • 命途扩展   : 身世 {len(c_origins)} 项 / 天赋 {len(c_traits)} 项 / 套件 {len(c_kits)} 套")
     print("------------------------------------------------------------------------------")
     print("💡 提示: 传入 '--simulate' 参数可启动无头剧情推演与占位符动态水化。")
     print("==============================================================================")
@@ -278,6 +483,7 @@ def preview_overview(mod_dir: Path) -> int:
 
 def main() -> None:
     """命令行入口。"""
+    _ensure_utf8_stdout()
     parser = argparse.ArgumentParser(
         description="卡拉尔 MOD 剧情演习与预览器 (Mod Narrative Previewer)",
         formatter_class=argparse.RawDescriptionHelpFormatter,

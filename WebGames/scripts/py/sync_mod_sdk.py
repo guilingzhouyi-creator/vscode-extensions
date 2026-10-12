@@ -75,6 +75,59 @@ def collect_placeholders_from_obj(obj: Any, pattern: re.Pattern) -> List[str]:
     return placeholders
 
 
+def extract_destiny_capabilities(config_dir: Path, core_data: Dict[str, Any]) -> Dict[str, Any]:
+    """从角色创建、初始行囊与物品真源提取命途扩展能力契约。"""
+    attr_gen = core_data.get("authoritative_reincarnation", {}).get("attribute_generation", {})
+    attr_keys = attr_gen.get("keys")
+    if not isinstance(attr_keys, list) or not attr_keys:
+        attr_keys = ["STR", "CON", "INT", "AGI", "SPR", "VIT"]
+
+    attribute_bounds = {
+        "min_val": int(attr_gen.get("min_val", 1)),
+        "max_val": int(attr_gen.get("max_val", 6)),
+        "baseline": int(attr_gen.get("baseline", 3)),
+        "total_points": int(attr_gen.get("total_points", 21)),
+    }
+
+    builtin_traits = sorted(list(core_data.get("traits", {}).keys()))
+
+    loadout_path = config_dir / "domains" / "starter_loadout" / "core.json"
+    loadout_data = load_json_file(loadout_path)
+    builtin_starter_kits = sorted(list(loadout_data.get("starter_kits", {}).keys()))
+
+    items_path = config_dir / "items" / "core.json"
+    items_data = load_json_file(items_path)
+    raw_items = items_data.get("items", [])
+    canonical_item_ids = sorted([
+        item["canonical_id"]
+        for item in raw_items
+        if isinstance(item, dict) and isinstance(item.get("canonical_id"), str) and item.get("canonical_id")
+    ])
+
+    return {
+        "attribute_keys": list(attr_keys),
+        "attribute_bounds": attribute_bounds,
+        "origin_bonus_budget": {
+            "per_stat_min": -2,
+            "per_stat_max": 3,
+            "net_sum_min": -2,
+            "net_sum_max": 4,
+            "max_initial_gold": 1000,
+        },
+        "causality_trait_rules": {
+            "require_paired_pos_neg": True,
+            "max_net_cost_delta": 1,
+        },
+        "ui_capability_modes": {
+            "origin_selection_mode": ["INHERIT", "ALLOW_MANUAL", "FORCE_RANDOM"],
+            "trait_selection_mode": ["INHERIT", "ALLOW_MANUAL", "FORCE_RANDOM"],
+        },
+        "builtin_traits": builtin_traits,
+        "builtin_starter_kits": builtin_starter_kits,
+        "canonical_item_ids": canonical_item_ids,
+    }
+
+
 def extract_capabilities(webgames_root: Path) -> Dict[str, Any]:
     """静态提取引擎权威真源配置。"""
     config_dir = webgames_root / "config"
@@ -132,6 +185,9 @@ def extract_capabilities(webgames_root: Path) -> Dict[str, Any]:
         "PrologueCompleted",
     ]
 
+    # 4. 提取命途与创角扩展能力真源
+    destiny_mod_capabilities = extract_destiny_capabilities(config_dir, core_data)
+
     return {
         "_meta": {
             "version": "1.0.0",
@@ -149,12 +205,59 @@ def extract_capabilities(webgames_root: Path) -> Dict[str, Any]:
         "reference_locations": reference_locations,
         "reference_items": reference_items,
         "reference_npcs": reference_npcs,
+        "destiny_mod_capabilities": destiny_mod_capabilities,
     }
 
 
 def format_capabilities_json(capabilities: Dict[str, Any]) -> str:
     """将能力数据序列化为规整的 JSON 字符串（LF 换行，2 空格缩进）。"""
     return json.dumps(capabilities, indent=2, ensure_ascii=False) + "\n"
+
+
+def _build_destiny_autogen_lines(destiny_cap: Dict[str, Any]) -> List[str]:
+    """构建命途扩展能力章节的动态 Markdown 行列表。"""
+    attr_keys = ", ".join(destiny_cap.get("attribute_keys", []))
+    bounds = destiny_cap.get("attribute_bounds", {})
+    budget = destiny_cap.get("origin_bonus_budget", {})
+    trait_rules = destiny_cap.get("causality_trait_rules", {})
+    ui_modes = destiny_cap.get("ui_capability_modes", {})
+    origin_modes = ", ".join(ui_modes.get("origin_selection_mode", []))
+    trait_modes = ", ".join(ui_modes.get("trait_selection_mode", []))
+    builtin_traits = ", ".join(destiny_cap.get("builtin_traits", []))
+    builtin_kits = ", ".join(destiny_cap.get("builtin_starter_kits", []))
+    canonical_items = ", ".join(destiny_cap.get("canonical_item_ids", []))
+
+    return [
+        "",
+        "### 6. 命途与创角扩展能力契约 (`destinies.json` Capabilities)",
+        "",
+        f"- **六维核心属性键 (`attribute_keys`)**: `{attr_keys}`",
+        (
+            f"- **六维基础生成边界 (`attribute_bounds`)**: "
+            f"单维范围 `[{bounds.get('min_val', 1)}, {bounds.get('max_val', 6)}]`，"
+            f"基准值 `{bounds.get('baseline', 3)}`，"
+            f"总点数预算 `{bounds.get('total_points', 21)}`"
+        ),
+        (
+            f"- **自定义身世加成红线 (`origin_bonus_budget`)**: "
+            f"单维加成 `[{budget.get('per_stat_min', -2)}, {budget.get('per_stat_max', 3)}]`，"
+            f"六维净代数和 `[{budget.get('net_sum_min', -2)}, {budget.get('net_sum_max', 4)}]`，"
+            f"初始金币上限 `<={budget.get('max_initial_gold', 1000)}`"
+        ),
+        (
+            f"- **正负因果天赋守恒规则 (`causality_trait_rules`)**: "
+            f"`require_paired_pos_neg={trait_rules.get('require_paired_pos_neg', True)}`（必须一正一负成对配置），"
+            f"`max_net_cost_delta={trait_rules.get('max_net_cost_delta', 1)}`（正负点数净和绝对值 `<= 1`）"
+        ),
+        (
+            f"- **前端 UI 受控解锁策略 (`ui_capability_modes`)**: "
+            f"`origin_selection_mode`: `[{origin_modes}]`；"
+            f"`trait_selection_mode`: `[{trait_modes}]`"
+        ),
+        f"- **内置因果天赋 (`builtin_traits`)**: `{builtin_traits}`",
+        f"- **内置初始套件 (`builtin_starter_kits`)**: `{builtin_kits}`",
+        f"- **合法物品 ID 清单 (`canonical_item_ids`)**: `{canonical_items}`",
+    ]
 
 
 def generate_autogen_spec_section(capabilities: Dict[str, Any]) -> str:
@@ -221,9 +324,13 @@ def generate_autogen_spec_section(capabilities: Dict[str, Any]) -> str:
         f"- **标准初始场景 (Locations)**: `{', '.join(capabilities.get('reference_locations', []))}`",
         f"- **标准初始装备 (Items)**: `{', '.join(capabilities.get('reference_items', []))}`",
         f"- **引导 NPC 实体 (NPCs)**: `{', '.join(capabilities.get('reference_npcs', []))}`",
-        "<!-- AUTOGEN_CAPABILITIES_END -->",
     ])
 
+    destiny_cap = capabilities.get("destiny_mod_capabilities", {})
+    if isinstance(destiny_cap, dict) and destiny_cap:
+        lines.extend(_build_destiny_autogen_lines(destiny_cap))
+
+    lines.append("<!-- AUTOGEN_CAPABILITIES_END -->")
     return "\n".join(lines)
 
 
@@ -231,7 +338,11 @@ def render_full_mod_spec(capabilities: Dict[str, Any], existing_content: Optiona
     """渲染或注入 MOD_SPEC.md 完整内容。"""
     autogen_part = generate_autogen_spec_section(capabilities)
 
-    if existing_content and "<!-- AUTOGEN_CAPABILITIES_START -->" in existing_content:
+    if (
+        existing_content
+        and "<!-- AUTOGEN_CAPABILITIES_START -->" in existing_content
+        and "destinies.json" in existing_content
+    ):
         pattern = re.compile(
             r"<!-- AUTOGEN_CAPABILITIES_START -->.*?<!-- AUTOGEN_CAPABILITIES_END -->",
             re.DOTALL,
@@ -239,7 +350,7 @@ def render_full_mod_spec(capabilities: Dict[str, Any], existing_content: Optiona
         updated = pattern.sub(autogen_part, existing_content)
         return updated.replace("\r\n", "\n")
 
-    template = f"""# 卡拉尔世界引擎 · 剧情 MOD 创作者开发契约规范 (MOD Spec v1.0)
+    template = f"""# 卡拉尔世界引擎 · 剧情与命途 MOD 创作者开发契约规范 (MOD Spec v1.1)
 
 > [!NOTE]
 > **【规范定位】**：本规范是面向 MOD 创作者 Agent 与人类开发者的“一页纸极简开发指南”。所有能力清单均由底层单一真源自动化萃取同步，确保 MOD 契约与引擎运行时保持 100% 绝对一致。
@@ -249,15 +360,17 @@ def render_full_mod_spec(capabilities: Dict[str, Any], existing_content: Optiona
 
 ## 一、 扩展包目录结构规范 (Package Layout)
 
-每个剧情 MOD 扩展包物理上为一个独立目录（支持存放在 `mods/narratives/<mod_dir>/` 或 `user://mods/narratives/<mod_dir>/`），标准布局如下：
+每个剧情与命途 MOD 扩展包物理上为一个独立目录（支持存放在 `mods/narratives/<mod_dir>/` 或 `user://mods/narratives/<mod_dir>/`），标准布局如下：
 
 ```text
 my_narrative_mod/
 ├── pack.json                   # 【必需】MOD 清单元数据描述文件
-├── dags/                       # 【必需】剧情有向无环图配置目录
-│   └── custom_prologue.json    # DAG 剧情图拓扑结构
-├── i18n/                       # 【可选】剧情本地化文案字典
-│   └── custom_prologue.json    # 包含占位符的剧情文本
+├── routing_rules.json          # 【必需】创角种族与出身到序章 DAG 的路由规则
+├── destinies.json              # 【可选/推荐】自定义身世、因果天赋、初始行囊与 UI 解锁策略
+├── dag_graphs/                 # 【必需】剧情有向无环图配置目录
+│   └── DAG_MY_PROLOGUE.json    # DAG 剧情图拓扑结构
+├── i18n/                       # 【必需】剧情本地化文案字典
+│   └── zh-CN.json              # 包含占位符的剧情文本
 └── assets/                     # 【可选】美术与音效资源（如有）
 ```
 
@@ -288,16 +401,37 @@ my_narrative_mod/
 
 ---
 
-## 四、 DAG 剧情拓扑约束 (DAG Graph Invariants)
+## 四、 命途扩展契约规范 (`destinies.json`)
+
+MOD 可通过根目录下的 `destinies.json` 以**列表式结构**扩展创角身世池、正负因果天赋池、初始装备行囊以及前端 UI 交互策略：
+
+1. **前端 UI 受控解锁模式 (`ui_capabilities`)**：
+   - `origin_selection_mode` / `trait_selection_mode` 仅允许取值 `"INHERIT"`（默认继承）、`"ALLOW_MANUAL"`（解锁前端下拉自选）、`"FORCE_RANDOM"`（强制盲盒随机）；
+   - `allow_attribute_reroll`: 布尔值，控制是否开放创角阶段六维属性重掷开关。
+2. **自定义身世数值预算红线 (`custom_origins`)**：
+   - 采用列表项声明（每项含唯一 `origin_id`），`attribute_bonus` 单项属性加成严格限制在 `[-2, 3]`，六维加成净代数和严格限制在 `[-2, 4]`；
+   - `initial_gold` 严禁超过 `1000` 金币上限。
+3. **正负因果天赋配对守恒 (`custom_traits` & `paired_presets`)**：
+   - 正向天赋 `cost > 0`，负向天赋 `cost < 0`；
+   - `paired_presets` 必须将 1 个正向天赋与 1 个负向天赋成对绑定，且正负 `cost` 代数和绝对值必须 `<= 1`（即 `abs(pos_cost + neg_cost) <= 1`）。
+4. **自定义初始行囊契约 (`custom_starter_kits`)**：
+   - 每套行囊（含唯一 `kit_id`）的 `initial_items` 物品总件数必须 `<= 10`，且每项物品的 `canonical_id` 必须非空并对齐 `config/items/core.json`。
+5. **多包非冲突合并规则 (Multi-Pack Merge & Conflict Guard)**：
+   - 多个 MOD 同时启用时，各包的 `custom_origins`、`custom_traits`、`paired_presets`、`custom_starter_kits` 按优先级顺序执行列表追加合并；
+   - 严禁跨包出现同名 `origin_id` / `trait_id` / `kit_id`（报 `ERR_MOD_DUPLICATE_ID_CONFLICT`），严禁同时启用 `incompatible_packs` 互斥包（报 `ERR_MOD_INCOMPATIBLE_CONFLICT`），严禁在 `ui_capabilities` 中同时声明 `"ALLOW_MANUAL"` 与 `"FORCE_RANDOM"` 相反策略（报 `ERR_MOD_UI_POLICY_CONFLICT`）。
+
+---
+
+## 五、 DAG 剧情拓扑约束 (DAG Graph Invariants)
 
 1. **严格有向无环**：剧情图必须构成有向无环图 (DAG)，解算器将在装配阶段运行 Kahn 算法，检测到环路立即阻断装配；
-2. **单一入口与出口**：每张剧情图必须包含且仅包含 1 个 `START_ENTRY` 与 1 个 `TERMINAL_EXIT` 节点；
+2. **单一入口与出口**：每张剧情图必须包含且仅包含 1 个 `START_ENTRY` 与至少 1 个 `TERMINAL_EXIT` 节点；
 3. **前置条件闭包**：每个节点的 `required_prerequisites` 列表引用的父节点必须在该图内可达且真实存在；
 4. **安全状态突变**：节点完成时的 `mutations_on_complete` 必须从上述 `valid_mutation_events` 中选取，禁止发布未声明事件。
 
 ---
 
-## 五、 极简实战工程样例 (Minimal Working Example)
+## 六、 极简实战工程样例 (Minimal Working Example)
 
 ### 1. `pack.json` 样例
 
@@ -316,7 +450,70 @@ my_narrative_mod/
 }}
 ```
 
-### 2. `dags/frontier_dag.json` 样例
+### 2. `destinies.json` 样例
+
+```json
+{{
+  "ui_capabilities": {{
+    "origin_selection_mode": "ALLOW_MANUAL",
+    "trait_selection_mode": "ALLOW_MANUAL",
+    "allow_attribute_reroll": true
+  }},
+  "custom_origins": [
+    {{
+      "origin_id": "STARTER_ASTRAL_INITIATE",
+      "name": "星界巡林学徒",
+      "race": "HUMAN",
+      "birth_region": "CENTRAL_CONTINENT",
+      "weight": 25,
+      "initial_gold": 150,
+      "starter_kit_id": "KIT_STARTER_WANDERER",
+      "attribute_bonus": {{"INT": 2, "AGI": 1, "CON": -1}},
+      "desc": "自幼在边境星象观测所研习古籍与巡林箭术的年轻行者。"
+    }}
+  ],
+  "custom_traits": [
+    {{
+      "trait_id": "TRAIT_STARLIGHT_AFFINITY",
+      "name": "星辉亲和",
+      "cost": 2,
+      "type": "POSITIVE",
+      "modifiers": {{"INT": 2, "SPR": 1}},
+      "desc": "受星界微光眷顾，施法专注与精神韧性显著提升。"
+    }},
+    {{
+      "trait_id": "TRAIT_ASTRAL_FATIGUE",
+      "name": "星蚀倦怠",
+      "cost": -2,
+      "type": "NEGATIVE",
+      "modifiers": {{"CON": -1, "VIT": -1}},
+      "desc": "星力共鸣偶发反噬，肉体耐受力较常人略显单薄。"
+    }}
+  ],
+  "paired_presets": [
+    {{
+      "preset_id": "PAIR_STARTER_ASTRAL",
+      "positive": "TRAIT_STARLIGHT_AFFINITY",
+      "negative": "TRAIT_ASTRAL_FATIGUE",
+      "weight": 50
+    }}
+  ],
+  "custom_starter_kits": [
+    {{
+      "kit_id": "KIT_STARTER_WANDERER",
+      "name": "巡林学徒轻便行囊",
+      "initial_gold": 80,
+      "display_weapon": "KALAR:EQUIP:WEAPON_BLADE:IRON_SWORD",
+      "initial_items": [
+        {{"canonical_id": "KALAR:EQUIP:WEAPON_BLADE:IRON_SWORD", "count": 1}},
+        {{"canonical_id": "KALAR:CONSUM:ALCHEMY:POTION_MANA", "count": 2}}
+      ]
+    }}
+  ]
+}}
+```
+
+### 3. `dag_graphs/DAG_FRONTIER_AWAKEN.json` 样例
 
 ```json
 {{
@@ -355,7 +552,7 @@ my_narrative_mod/
 
 ---
 
-## 六、 契约防漂移自动化守卫 (Contract Drift Guard)
+## 七、 契约防漂移自动化守卫 (Contract Drift Guard)
 
 本 SDK 规格说明与 `capabilities.json` 由引擎门禁脚本进行强校验。运行以下命令可验证契约是否与底层配置保持一致：
 

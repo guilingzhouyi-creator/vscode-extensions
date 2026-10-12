@@ -114,10 +114,14 @@ def rebase_markdown_links(content: str, src_dir: Path, dst_dir: Path, rename_reg
 
         try:
             abs_target.relative_to(root_dir)
+            in_bounds = True
+        except ValueError:
+            in_bounds = (root_dir == ROOT and abs_target.exists() and abs_target.is_relative_to(root_dir.parent))
+
+        if in_bounds:
             new_rel = os.path.relpath(abs_target, dst_dir).replace("\\", "/")
             return f"{prefix}{label}]({new_rel}{anchor_part})"
-        except ValueError:
-            return match.group(0)
+        return match.group(0)
 
     pattern = r"(!?\[)([^\]]*?)\]\(([^)]+)\)"
     return re.sub(pattern, _replace_link, content)

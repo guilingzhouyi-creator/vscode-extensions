@@ -1,0 +1,83 @@
+{
+  "ui_capabilities": {
+    "origin_selection_mode": "ALLOW_MANUAL",
+    "trait_selection_mode": "ALLOW_MANUAL",
+    "allow_attribute_reroll": true
+  },
+  "custom_origins": [
+    {
+      "origin_id": "STARTER_ASTRAL_INITIATE",
+      "name": "星界巡林学徒",
+      "race": "HUMAN",
+      "birth_region": "CENTRAL_CONTINENT",
+      "weight": 25,
+      "initial_gold": 150,
+      "initial_reputation": 30,
+      "starter_kit_id": "KIT_STARTER_WANDERER",
+      "base_factions": {
+        "HOLY_EMPIRE": 20,
+        "FOREST_ENCLAVE": 20
+      },
+      "attribute_bonus": {
+        "INT": 2,
+        "AGI": 1,
+        "CON": -1
+      },
+      "desc": "自幼在边境星象观测所研习古籍与巡林箭术的年轻行者，兼具灵觉与敏捷身手。"
+    }
+  ],
+  "custom_traits": [
+    {
+      "trait_id": "TRAIT_STARLIGHT_AFFINITY",
+      "name": "星辉亲和",
+      "cost": 2,
+      "type": "POSITIVE",
+      "modifiers": {
+        "INT": 2,
+        "SPR": 1
+      },
+      "desc": "受星界微光眷顾，施法专注与精神韧性显著提升。"
+    },
+    {
+      "trait_id": "TRAIT_ASTRAL_FATIGUE",
+      "name": "星蚀倦怠",
+      "cost": -2,
+      "type": "NEGATIVE",
+      "modifiers": {
+        "CON": -1,
+        "VIT": -1
+      },
+      "desc": "星力共鸣偶发反噬，肉体耐受力较常人略显单薄。"
+    }
+  ],
+  "paired_presets": [
+    {
+      "preset_id": "PAIR_STARTER_ASTRAL",
+      "positive": "TRAIT_STARLIGHT_AFFINITY",
+      "negative": "TRAIT_ASTRAL_FATIGUE",
+      "weight": 50
+    }
+  ],
+  "custom_starter_kits": [
+    {
+      "kit_id": "KIT_STARTER_WANDERER",
+      "name": "巡林学徒轻便行囊",
+      "initial_gold": 80,
+      "display_weapon": "KALAR:EQUIP:WEAPON_BLADE:IRON_SWORD",
+      "initial_items": [
+        {
+          "canonical_id": "KALAR:EQUIP:WEAPON_BLADE:IRON_SWORD",
+          "count": 1
+        },
+        {
+          "canonical_id": "KALAR:CONSUM:ALCHEMY:POTION_MANA",
+          "count": 2
+        },
+        {
+          "canonical_id": "KALAR:CONSUM:FOOD:HEARTY_STEW",
+          "count": 1
+        }
+      ]
+    }
+  ]
+}

@@ -244,6 +244,13 @@ AUDIT_TASKS: List[AuditTask] = [
         default_args=[],
         scopes={"scripts"}
     ),
+    AuditTask(
+        task_id="sdk_sync",
+        name="MOD SDK 契约自动萃取与零漂移审查",
+        script_name="audit_sdk_sync.py",
+        default_args=[],
+        scopes={"config", "docs"}
+    ),
 ]
 
 
