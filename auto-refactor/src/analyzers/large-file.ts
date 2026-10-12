@@ -1,236 +1,227 @@
 /**
  * Module: Static Analysis — Large File & Decomposition Analyzer
  * File Path: src/analyzers/large-file.ts
- * Architecture Role: Analyzer adapter serving both the single-pass streaming path
- *   (visit/finalize) and the standalone analyze() contract.
- * Dependencies & Triggers: Core types, NodeKind/NormalizedNode, runStreaming, plus a lazy
- *   require('../core/ast/typescript-adapter') used only by analyze(); triggered by engine passes.
- * Responsibilities: Accumulate lines, non-blank lines, functions, max nesting depth,
- *   top-level declarations and exported symbols; infer module prefixes from the first word of
- *   function names; emit at most one large-file finding with split suggestions when the
- *   configured line/function thresholds are crossed.
- * Exit Semantics & Design Rationale: Returns [] when metrics are within thresholds; severity
- *   is error at lines >= fileLinesFail, otherwise warning at lines >= fileLinesWarn or
- *   functions >= fileFunctionsWarn. Metrics are gathered in one visit pass so streaming stays
- *   O(n) and the same values feed both the gate and the emitted split guidance.
- *
- * Large-file splitting analyzer (language-agnostic).
- *
- * In the single-pass model, `visit` accumulates the structural metrics AND the inferred module
- * prefixes using the adapter-precomputed `node.topLevel` / `node.exported` / `node.functionLike`
- * flags (previously four+ separate `ts.forEachChild` walks). `finalize` consults the
- * (per-analyzer) thresholds and emits at most one issue when the file is too large.
- * `analyze` delegates to `runStreaming` via the TypeScript adapter.
- *
- * Judgment conditions (configurable thresholds):
- *   - lines >= fileLinesFail                        -> error   (must split)
- *   - lines >= fileLinesWarn OR functions >= fileFunctionsWarn -> warning (should split)
+ * Architecture Role: Analyzer adapter serving streaming and standalone analysis contracts.
+ * Dependencies & Triggers: Core types, NodeKind/NormalizedNode, runStreaming, TypeScriptAdapter.
+ * Responsibilities: Accumulate metrics and module prefixes; emit large-file split findings.
+ * Exit Semantics & Design Rationale: Returns [] within thresholds; severity is error at
+ *   lines >= fileLinesFail, warning at lines >= fileLinesWarn or functions >= fileFunctionsWarn.
  */
 
 import * as path from 'path';
 import type * as ts from 'typescript';
-import type { Analyzer, AnalyzerContext, Issue, FileMetric, Severity } from '../core/types';
-import type { NormalizedNode } from '../core/ast/multilang';
-import { NodeKind } from '../core/ast/multilang';
+import {
+    type Analyzer,
+    type AnalyzerContext,
+    type Issue,
+    type FileMetric,
+    type Severity,
+} from '../core/types';
+import { NodeKind, type NormalizedNode } from '../core/ast/multilang';
 import { runStreaming } from '../core/ast/traverse';
-import { analyzeCodeDensity } from '../core/intelligence/code-density-analyzer';
-import { inferFineGrainedFileRole } from '../core/intelligence/file-role-inference';
-import { evaluateRoleElasticBudget } from '../core/intelligence/elastic-budget-matrix';
-import { partitionFileZones } from '../core/intelligence/zone-partitioner';
+import { TypeScriptAdapter } from '../core/ast/typescript-adapter';
+import {
+    analyzeCodeDensity,
+    type CodeDensityMetrics,
+} from '../core/intelligence/code-density-analyzer';
+import {
+    inferFineGrainedFileRole,
+    type FileRoleInferenceResult,
+} from '../core/intelligence/file-role-inference';
+import {
+    evaluateRoleElasticBudget,
+    type ElasticBudgetEvaluation,
+} from '../core/intelligence/elastic-budget-matrix';
+import {
+    partitionFileZones,
+    type IntraFileZoneProfile,
+} from '../core/intelligence/zone-partitioner';
 import { isConstantDefinitionFile } from '../core/intelligence/constant-identity';
 
 /** Architectural token representing benign constant library classification. */
 export const ARCH_BENIGN_CONSTANT_LIBRARY = 'ARCH_BENIGN_CONSTANT_LIBRARY';
 
-function firstWord(name: string): string {
-    const m = name.match(/^[a-z]+|^[A-Z]+/) || ['misc'];
-    return m[0].toLowerCase();
+const ANALYZER_NAME = 'large-file';
+const DEFAULT_MODULE_PREFIX = 'misc';
+const SEVERITY_ERROR: Severity = 'error';
+const SEVERITY_WARNING: Severity = 'warning';
+const EXT_MARKDOWN = '.md',
+    EXT_MARKDOWN_ALT = '.markdown';
+const ARCHETYPE_STDLIB = 'stdlib',
+    ARCHETYPE_SYSTEMS_RUNTIME = 'systems_runtime';
+
+const MAX_BENIGN_CONSTANT_LINES = 3000,
+    MAX_BENIGN_CONSTANT_FUNCTIONS = 2,
+    MAX_BENIGN_CONSTANT_NESTING = 3;
+const MAX_BENIGN_BRANCHES = 2,
+    DENSE_COMPUTATION_LOC_THRESHOLD = 1500,
+    DEFAULT_FILE_LINES_WARN = 400;
+const DECOUPLED_FUNCTION_MULTIPLIER = 4,
+    ROLE_SAMPLE_CHAR_LIMIT = 500,
+    STDLIB_MAX_LINE_LIMIT = 3000;
+
+/** Strongly typed thresholds for the large-file analyzer. */
+export interface LargeFileThresholds {
+    effectiveLocFail?: number;
+    effectiveLocWarn?: number;
+    fileLinesFail?: number;
+    fileLinesWarn?: number;
+    fileFunctionsWarn?: number;
+    enableElasticBudget?: boolean;
+    flagZonePartitioner?: boolean;
+    [key: string]: unknown;
 }
 
-/**
- * Determines whether a file qualifies as a benign large constant library.
- *
- * @param filePath - Source file path.
- * @param content - Source file full content.
- * @param m - Accumulated file metrics.
- * @returns True if file is a pure constant catalog with minimal logic.
- */
-function isBenignConstantLibrary(filePath: string, content: string, m: FileMetric): boolean {
-    if (!isConstantDefinitionFile(filePath, content)) {
-        return false;
-    }
-    if (m.functions > 2 || m.maxNestingDepth > 3) {
-        return false;
-    }
-    const stripped = content.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '');
-    const cfMatches =
-        stripped.match(/\b(?:if\s*\(|for\s*\(|while\s*\(|switch\s*\(|catch\s*\()/g) || [];
-    return cfMatches.length <= 2;
+/** Comprehensive context packaging state required during large-file evaluation. */
+export interface AnalysisEvaluationContext {
+    metrics: FileMetric;
+    thresholds: LargeFileThresholds;
+    density: CodeDensityMetrics;
+    zoneProfile: IntraFileZoneProfile;
+    elasticEvaluation: ElasticBudgetEvaluation;
+    roleInference: FileRoleInferenceResult;
+    isBenignConstant: boolean;
 }
 
-function shouldExemptElastic(
-    t: Record<string, any>,
-    density: any,
-    elasticEvaluation: any,
-    zoneProfile: any,
-    functionsCount: number,
-    isBenignConstant = false,
-    lines = 0,
-): boolean {
-    if (isBenignConstant && lines <= 3000) {
-        return true;
-    }
-    if (!t.enableElasticBudget && !density.isLowDensityDocumented) {
-        return false;
-    }
+function extractFirstWord(identifierName: string): string {
+    const matchedTokens = identifierName.match(/^[a-z]+|^[A-Z]+/) || [DEFAULT_MODULE_PREFIX];
+    return matchedTokens[0].toLowerCase();
+}
+
+function isBenignConstantLibrary(filePath: string, content: string, metrics: FileMetric): boolean {
+    if (!isConstantDefinitionFile(filePath, content)) return false;
     if (
-        density.effectiveCodeLines >= 1500 &&
+        metrics.functions > MAX_BENIGN_CONSTANT_FUNCTIONS ||
+        metrics.maxNestingDepth > MAX_BENIGN_CONSTANT_NESTING
+    ) {
+        return false;
+    }
+    const strippedContent = content.replace(/\/\*[\s\S]*?\*\/|\/\/.*/g, '');
+    const controlFlowMatches =
+        strippedContent.match(/\b(?:if\s*\(|for\s*\(|while\s*\(|switch\s*\(|catch\s*\()/g) || [];
+    return controlFlowMatches.length <= MAX_BENIGN_BRANCHES;
+}
+
+function shouldExemptElastic(evalCtx: AnalysisEvaluationContext): boolean {
+    const { thresholds, density, zoneProfile, elasticEvaluation, metrics, isBenignConstant } =
+        evalCtx;
+    if (isBenignConstant && metrics.lines <= MAX_BENIGN_CONSTANT_LINES) return true;
+    if (!thresholds.enableElasticBudget && !density.isLowDensityDocumented) return false;
+    const functionsWarnLimit = thresholds.fileFunctionsWarn || DEFAULT_FILE_LINES_WARN;
+    if (
+        density.effectiveCodeLines >= DENSE_COMPUTATION_LOC_THRESHOLD &&
         zoneProfile.isDecoupled &&
-        functionsCount < t.fileFunctionsWarn * 4
+        metrics.functions < functionsWarnLimit * DECOUPLED_FUNCTION_MULTIPLIER
     ) {
         return true;
     }
-    return !elasticEvaluation.shouldFlagLargeFile && functionsCount < t.fileFunctionsWarn;
+    return !elasticEvaluation.shouldFlagLargeFile && metrics.functions < functionsWarnLimit;
 }
 
-function getEvaluatedEffectiveLoc(density: any, zoneProfile: any): number {
+function getEvaluatedEffectiveLoc(
+    density: CodeDensityMetrics,
+    zoneProfile?: IntraFileZoneProfile,
+): number {
     if (zoneProfile && typeof zoneProfile.productionEffectiveLoc === 'number') {
         return zoneProfile.productionEffectiveLoc;
     }
     return density ? density.effectiveCodeLines : 0;
 }
 
-function checkFailThreshold(
-    m: FileMetric,
-    t: Record<string, any>,
-    density: any,
-    zoneProfile?: any,
-): string | null {
+function checkFailThreshold(evalCtx: AnalysisEvaluationContext): string | null {
+    const { metrics, thresholds, density, zoneProfile } = evalCtx;
     const effectiveLoc = getEvaluatedEffectiveLoc(density, zoneProfile);
-    if (t.effectiveLocFail && effectiveLoc >= t.effectiveLocFail) {
-        return `effective LOC ${effectiveLoc} >= fail threshold ${t.effectiveLocFail} (lines: ${m.lines})`;
+    if (thresholds.effectiveLocFail && effectiveLoc >= thresholds.effectiveLocFail) {
+        return `effective LOC ${effectiveLoc} >= fail threshold ${thresholds.effectiveLocFail} (lines: ${metrics.lines})`;
     }
-    if (m.lines >= t.fileLinesFail) {
-        const testWarn = t.fileLinesWarn || 400;
+    if (thresholds.fileLinesFail && metrics.lines >= thresholds.fileLinesFail) {
+        const testWarn = thresholds.fileLinesWarn || DEFAULT_FILE_LINES_WARN;
         if (zoneProfile && zoneProfile.embeddedTestLines > 0 && effectiveLoc < testWarn) {
             return null;
         }
-        return `lines ${m.lines} >= fail threshold ${t.fileLinesFail}`;
+        return `lines ${metrics.lines} >= fail threshold ${thresholds.fileLinesFail}`;
     }
     return null;
 }
 
-function evaluateLinesOrLocWarn(
-    m: FileMetric,
-    t: Record<string, any>,
-    density: any,
-    zoneProfile: any,
-): string | null {
+function evaluateLocWarnReason(evalCtx: AnalysisEvaluationContext): string | null {
+    const { metrics, thresholds, density, zoneProfile } = evalCtx;
     const effectiveLoc = getEvaluatedEffectiveLoc(density, zoneProfile);
-    if (t.effectiveLocWarn && effectiveLoc >= t.effectiveLocWarn) {
-        return `effective LOC ${effectiveLoc} >= warn threshold ${t.effectiveLocWarn} (raw lines: ${m.lines})`;
+    if (thresholds.effectiveLocWarn && effectiveLoc >= thresholds.effectiveLocWarn) {
+        return `effective LOC ${effectiveLoc} >= warn threshold ${thresholds.effectiveLocWarn} (raw lines: ${metrics.lines})`;
     }
-    if (m.lines >= t.fileLinesWarn) {
-        const effWarn = t.effectiveLocWarn || 400;
-        const skipWarn = zoneProfile && zoneProfile.embeddedTestLines > 0 && effectiveLoc < effWarn;
-        if (!skipWarn) {
-            return `lines ${m.lines} >= warn threshold ${t.fileLinesWarn}`;
-        }
+    if (thresholds.fileLinesWarn && metrics.lines >= thresholds.fileLinesWarn) {
+        const effWarn = thresholds.effectiveLocWarn || DEFAULT_FILE_LINES_WARN;
+        const skip = zoneProfile && zoneProfile.embeddedTestLines > 0 && effectiveLoc < effWarn;
+        if (!skip) return `lines ${metrics.lines} >= warn threshold ${thresholds.fileLinesWarn}`;
     }
     return null;
 }
 
-function evaluateFunctionsWarn(m: FileMetric, t: Record<string, any>): string | null {
-    if (m.functions >= t.fileFunctionsWarn) {
-        return `functions ${m.functions} >= warn threshold ${t.fileFunctionsWarn}`;
-    }
-    return null;
-}
-
-function evaluateEntanglementWarn(
-    hasReasons: boolean,
-    zoneProfile: any,
-    t: Record<string, any>,
+function evaluateFunctionWarnReason(
+    metrics: FileMetric,
+    thresholds: LargeFileThresholds,
 ): string | null {
-    const elasticActive = t.enableElasticBudget || t.flagZonePartitioner;
-    if (hasReasons && !zoneProfile.isDecoupled && elasticActive) {
-        return `high intra-file entanglement (EI: ${zoneProfile.entanglementIndex})`;
+    if (thresholds.fileFunctionsWarn && metrics.functions >= thresholds.fileFunctionsWarn) {
+        return `functions ${metrics.functions} >= warn threshold ${thresholds.fileFunctionsWarn}`;
     }
     return null;
 }
 
-function collectWarnReasons(
-    m: FileMetric,
-    t: Record<string, any>,
-    density: any,
-    zoneProfile: any,
-): string[] {
+function collectWarnReasons(evalCtx: AnalysisEvaluationContext): string[] {
     const reasons: string[] = [];
-    const locReason = evaluateLinesOrLocWarn(m, t, density, zoneProfile);
-    if (locReason) {
-        reasons.push(locReason);
-    }
-    const fnReason = evaluateFunctionsWarn(m, t);
-    if (fnReason) {
-        reasons.push(fnReason);
-    }
-    const entanglementReason = evaluateEntanglementWarn(reasons.length > 0, zoneProfile, t);
-    if (entanglementReason) {
-        reasons.push(entanglementReason);
+    const locReason = evaluateLocWarnReason(evalCtx);
+    if (locReason) reasons.push(locReason);
+    const fnReason = evaluateFunctionWarnReason(evalCtx.metrics, evalCtx.thresholds);
+    if (fnReason) reasons.push(fnReason);
+    const { zoneProfile, thresholds } = evalCtx;
+    const elasticActive = thresholds.enableElasticBudget || thresholds.flagZonePartitioner;
+    if (reasons.length > 0 && !zoneProfile.isDecoupled && elasticActive) {
+        reasons.push(`high intra-file entanglement (EI: ${zoneProfile.entanglementIndex})`);
     }
     return reasons;
 }
 
-function evaluateThresholdSeverity(
-    m: FileMetric,
-    t: Record<string, any>,
-    density: any,
-    zoneProfile: any,
-    isBenignConstant = false,
-): { severity: Severity | null; reasons: string[] } {
+function evaluateThresholdSeverity(evalCtx: AnalysisEvaluationContext): {
+    severity: Severity | null;
+    reasons: string[];
+} {
+    const { metrics, isBenignConstant } = evalCtx;
     if (isBenignConstant) {
-        if (m.lines <= 3000) {
-            return { severity: null, reasons: [] };
-        }
+        if (metrics.lines <= MAX_BENIGN_CONSTANT_LINES) return { severity: null, reasons: [] };
         return {
-            severity: 'error',
+            severity: SEVERITY_ERROR,
             reasons: [
-                `constant library lines ${m.lines} >= relaxed limit 3000 (${ARCH_BENIGN_CONSTANT_LIBRARY})`,
+                `constant library lines ${metrics.lines} >= relaxed limit ${MAX_BENIGN_CONSTANT_LINES} (${ARCH_BENIGN_CONSTANT_LIBRARY})`,
             ],
         };
     }
-
-    const failReason = checkFailThreshold(m, t, density, zoneProfile);
-    if (failReason) {
-        return { severity: 'error', reasons: [failReason] };
-    }
-
-    const reasons = collectWarnReasons(m, t, density, zoneProfile);
-    if (reasons.length > 0) {
-        return { severity: 'warning', reasons };
-    }
-
+    const failReason = checkFailThreshold(evalCtx);
+    if (failReason) return { severity: SEVERITY_ERROR, reasons: [failReason] };
+    const warnReasons = collectWarnReasons(evalCtx);
+    if (warnReasons.length > 0) return { severity: SEVERITY_WARNING, reasons: warnReasons };
     return { severity: null, reasons: [] };
 }
 
 function buildSplitSuggestions(
-    m: FileMetric,
-    density: any,
-    modules: string[],
-    zoneProfile: any,
-    t: Record<string, any>,
+    evalCtx: AnalysisEvaluationContext,
+    moduleNames: string[],
 ): string[] {
+    const { metrics, density, zoneProfile, thresholds } = evalCtx;
     const suggestions: string[] = [
-        `Split into smaller modules by responsibility (current: ${m.lines} lines, ${density.effectiveCodeLines} effective LOC, ` +
-            `${m.functions} functions, ${m.topLevelDeclarations} top-level declarations, ${m.exportedSymbols} exports, max nesting ${m.maxNestingDepth}).`,
+        `Split into smaller modules by responsibility (current: ${metrics.lines} lines, ${density.effectiveCodeLines} effective LOC, ` +
+            `${metrics.functions} functions, ${metrics.topLevelDeclarations} top-level declarations, ${metrics.exportedSymbols} exports, max nesting ${metrics.maxNestingDepth}).`,
     ];
-    if (modules.length > 1) {
+    if (moduleNames.length > 1) {
         suggestions.push(
-            `Detected potential modules by name prefix: ${modules.join(', ')}. ` +
+            `Detected potential modules by name prefix: ${moduleNames.join(', ')}. ` +
                 `Consider extracting each into its own file under a dedicated directory.`,
         );
     }
-    if (!zoneProfile.isDecoupled && (t.enableElasticBudget || t.flagZonePartitioner)) {
+    if (
+        !zoneProfile.isDecoupled &&
+        (thresholds.enableElasticBudget || thresholds.flagZonePartitioner)
+    ) {
         suggestions.push(
             `Zone partitioner detected ${zoneProfile.segments.length} interleaved transitions between compute and gateway zones. ` +
                 `Extract compute kernels into a dedicated internal submodule to reduce entanglement.`,
@@ -239,11 +230,94 @@ function buildSplitSuggestions(
     return suggestions;
 }
 
+const STDLIB_EXEMPT_ROLES = new Set([
+    'algorithm_computation',
+    'config_constant',
+    'rules_registry',
+    'shared_library',
+]);
+
+function isStdlibExempt(archetype: string | undefined, role: string, lines: number): boolean {
+    const isStdlib = archetype === ARCHETYPE_STDLIB || archetype === ARCHETYPE_SYSTEMS_RUNTIME;
+    return isStdlib && lines <= STDLIB_MAX_LINE_LIMIT && STDLIB_EXEMPT_ROLES.has(role);
+}
+
+function resolveLineCounts(ctx: AnalyzerContext): { lines: number; nonBlankLines: number } {
+    if (ctx.lineStats) return ctx.lineStats;
+    const rawLines = (ctx.content || '').split(/\r\n|\n/);
+    return {
+        lines: rawLines.length,
+        nonBlankLines: rawLines.filter((line) => line.trim().length > 0).length,
+    };
+}
+
+function buildEvaluationContext(
+    ctx: AnalyzerContext,
+    metrics: FileMetric,
+): AnalysisEvaluationContext {
+    const thresholds = (ctx.options || {}) as LargeFileThresholds;
+    const content = ctx.content || '';
+    const density = analyzeCodeDensity(content, ctx.filePath);
+    const roleInference = inferFineGrainedFileRole(
+        ctx.filePath,
+        content.slice(0, ROLE_SAMPLE_CHAR_LIMIT),
+    );
+    const elasticEvaluation = evaluateRoleElasticBudget(
+        roleInference.role,
+        density,
+        path.extname(ctx.filePath),
+        thresholds.effectiveLocWarn,
+    );
+    const zoneProfile = partitionFileZones(content, ctx.filePath, density, ctx.root);
+    const isBenignConstant = isBenignConstantLibrary(ctx.filePath, content, metrics);
+    return {
+        metrics,
+        thresholds,
+        density,
+        zoneProfile,
+        elasticEvaluation,
+        roleInference,
+        isBenignConstant,
+    };
+}
+
+function buildDetailPayload(
+    evalCtx: AnalysisEvaluationContext,
+    reasons: string[],
+    moduleNames: string[],
+): Record<string, unknown> {
+    const {
+        metrics,
+        isBenignConstant,
+        thresholds,
+        density,
+        roleInference,
+        elasticEvaluation,
+        zoneProfile,
+    } = evalCtx;
+    const detailPayload: Record<string, unknown> = {
+        ...metrics,
+        reasons,
+        inferredModules: moduleNames,
+    };
+    if (isBenignConstant) {
+        detailPayload.ARCH_BENIGN_CONSTANT_LIBRARY = true;
+        detailPayload.architecturalCategory = ARCH_BENIGN_CONSTANT_LIBRARY;
+    }
+    if (thresholds.enableElasticBudget === true || thresholds.flagZonePartitioner === true) {
+        detailPayload.densityMetrics = density;
+        detailPayload.fileRole = roleInference.role;
+        detailPayload.elasticEvaluation = elasticEvaluation;
+        detailPayload.zoneProfile = zoneProfile;
+    }
+    return detailPayload;
+}
+
 /**
  * Analyzer checking file size, line counts, function density, and modular breakdown boundaries.
  */
 export class LargeFileAnalyzer implements Analyzer {
-    name = 'large-file' as const;
+    readonly name = ANALYZER_NAME;
 
     private lines = 0;
     private nonBlankLines = 0;
@@ -253,15 +327,14 @@ export class LargeFileAnalyzer implements Analyzer {
     private exportedSymbols = 0;
     private modules = new Set<string>();
 
-    analyze(sf: ts.SourceFile | undefined, ctx: AnalyzerContext): Issue[] {
+    analyze(sourceFile: ts.SourceFile | undefined, ctx: AnalyzerContext): Issue[] {
         this.reset();
-        const content = sf && typeof sf.text === 'string' ? sf.text : ctx.content || '';
-        const { TypeScriptAdapter } =
-            require('../core/ast/typescript-adapter') as typeof import('../core/ast/typescript-adapter');
+        const content =
+            sourceFile && typeof sourceFile.text === 'string' ? sourceFile.text : ctx.content || '';
         const adapter = new TypeScriptAdapter();
         const ast = adapter.parse(content, ctx.filePath);
         return runStreaming(adapter, ast.root, [
-            { analyzer: this, ctx: { ...ctx, sourceFile: sf, root: ast.root, adapter } },
+            { analyzer: this, ctx: { ...ctx, sourceFile, root: ast.root, adapter } },
         ]);
     }
 
@@ -289,9 +362,8 @@ export class LargeFileAnalyzer implements Analyzer {
                 this.topLevelDeclarations++;
                 if (node.exported) this.exportedSymbols++;
             }
-            if (node.functionLike) {
-                const name = node.name;
-                if (name) this.modules.add(firstWord(name));
+            if (node.functionLike && node.name) {
+                this.modules.add(extractFirstWord(node.name));
             }
         }
         if (node.functionLike) this.functions++;
@@ -299,20 +371,11 @@ export class LargeFileAnalyzer implements Analyzer {
     }
 
     finalize(ctx: AnalyzerContext): Issue[] {
-        let lines: number;
-        let nonBlankLines: number;
-        if (ctx.lineStats) {
-            lines = ctx.lineStats.lines;
-            nonBlankLines = ctx.lineStats.nonBlankLines;
-        } else {
-            const content = ctx.content;
-            lines = content.split(/\r\n|\n/).length;
-            nonBlankLines = content.split(/\r\n|\n/).filter((l) => l.trim().length > 0).length;
-        }
+        const { lines, nonBlankLines } = resolveLineCounts(ctx);
         this.lines = lines;
         this.nonBlankLines = nonBlankLines;
 
-        const m: FileMetric = {
+        const metrics: FileMetric = {
             file: ctx.filePath,
             lines: this.lines,
             nonBlankLines: this.nonBlankLines,
@@ -322,69 +385,19 @@ export class LargeFileAnalyzer implements Analyzer {
             exportedSymbols: this.exportedSymbols,
         };
 
-        const t = ctx.options;
-        const density = analyzeCodeDensity(ctx.content, ctx.filePath);
-        const roleInference = inferFineGrainedFileRole(ctx.filePath, ctx.content.slice(0, 500));
-        const ext = path.extname(ctx.filePath);
-        const elasticEvaluation = evaluateRoleElasticBudget(
-            roleInference.role,
-            density,
-            ext,
-            t.effectiveLocWarn,
-        );
-        const zoneProfile = partitionFileZones(ctx.content, ctx.filePath, density, ctx.root);
-        const isBenignConstant = isBenignConstantLibrary(ctx.filePath, ctx.content || '', m);
+        const evalCtx = buildEvaluationContext(ctx, metrics);
+        if (shouldExemptElastic(evalCtx)) return [];
 
-        if (
-            shouldExemptElastic(
-                t,
-                density,
-                elasticEvaluation,
-                zoneProfile,
-                m.functions,
-                isBenignConstant,
-                m.lines,
-            )
-        ) {
+        const fileExt = path.extname(ctx.filePath);
+        if (fileExt === EXT_MARKDOWN || fileExt === EXT_MARKDOWN_ALT) return [];
+        if (isStdlibExempt(ctx.config?.archetype, evalCtx.roleInference.role, metrics.lines)) {
             return [];
         }
 
-        if (ext === '.md' || ext === '.markdown') {
-            return [];
-        }
-
-        if (isStdlibExempt(ctx.config.archetype, roleInference.role, m.lines)) {
-            return [];
-        }
-
-        const { severity, reasons } = evaluateThresholdSeverity(
-            m,
-            t,
-            density,
-            zoneProfile,
-            isBenignConstant,
-        );
+        const { severity, reasons } = evaluateThresholdSeverity(evalCtx);
         if (!severity) return [];
 
-        const modules = [...this.modules];
-        const suggestions = buildSplitSuggestions(m, density, modules, zoneProfile, t);
-
-        const detailPayload: Record<string, unknown> = {
-            ...m,
-            reasons,
-            inferredModules: modules,
-        };
-        if (isBenignConstant) {
-            detailPayload.ARCH_BENIGN_CONSTANT_LIBRARY = true;
-            detailPayload.architecturalCategory = ARCH_BENIGN_CONSTANT_LIBRARY;
-        }
-        if (t.enableElasticBudget === true || t.flagZonePartitioner === true) {
-            detailPayload.densityMetrics = density;
-            detailPayload.fileRole = roleInference.role;
-            detailPayload.elasticEvaluation = elasticEvaluation;
-            detailPayload.zoneProfile = zoneProfile;
-        }
-
+        const moduleNames = [...this.modules];
         return [
             {
                 id: `large-file:large-file:${ctx.filePath}:1`,
@@ -392,7 +405,7 @@ export class LargeFileAnalyzer implements Analyzer {
                 rule: 'large-file',
                 severity,
                 message:
-                    severity === 'error'
+                    severity === SEVERITY_ERROR
                         ? `File is too large and should be split (${reasons.join('; ')}).`
                         : `File is large; consider splitting (${reasons.join('; ')}).`,
                 location: {
@@ -400,21 +413,9 @@ export class LargeFileAnalyzer implements Analyzer {
                     start: { line: 1, column: 1 },
                     end: { line: 1, column: 1 },
                 },
-                detail: detailPayload,
-                suggestion: suggestions.join(' '),
+                detail: buildDetailPayload(evalCtx, reasons, moduleNames),
+                suggestion: buildSplitSuggestions(evalCtx, moduleNames).join(' '),
             },
         ];
     }
-}
-
-const STDLIB_EXEMPT_ROLES = new Set([
-    'algorithm_computation',
-    'config_constant',
-    'rules_registry',
-    'shared_library',
-]);
-
-function isStdlibExempt(archetype: string | undefined, role: string, lines: number): boolean {
-    const isStdlib = archetype === 'stdlib' || archetype === 'systems_runtime';
-    return isStdlib && lines <= 3000 && STDLIB_EXEMPT_ROLES.has(role);
 }

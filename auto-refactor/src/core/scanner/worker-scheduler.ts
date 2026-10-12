@@ -17,7 +17,16 @@ import { Worker } from 'worker_threads';
 import type { ScanConfig, Issue, FileMetric } from '../types';
 import type { WorkerAnalyzerDesc } from '../analyzer-registry';
 import type { Logger } from '../logger';
+import type { SymbolDefinition, SymbolReference } from '../intelligence/symbolIndex';
 import { decodeResults } from '../result-codec';
+
+/**
+ * Extracted AST symbol definitions and references produced by worker threads.
+ */
+export interface WorkerSymbolsPayload {
+    definitions: SymbolDefinition[];
+    references: SymbolReference[];
+}
 
 const DEFAULT_WORKER_FLUSH_TIMEOUT_MS = 3000;
 const TYPEOF_OBJECT = 'object';
@@ -118,8 +127,8 @@ export async function pMap<T, U>(
             out[currentItemIndex] = await fn(items[currentItemIndex]);
         }
     };
-    const n = Math.max(1, Math.min(limit, items.length));
-    await Promise.all(Array.from({ length: n }, () => worker()));
+    const concurrencyLimit = Math.max(1, Math.min(limit, items.length));
+    await Promise.all(Array.from({ length: concurrencyLimit }, () => worker()));
     return out;
 }
 
@@ -179,14 +188,14 @@ export function toTransferable(rawBuffer: Buffer): Buffer {
  *
  * @param config - Scan configuration.
  * @param filesLen - Total file count.
- * @param n - Worker thread count.
+ * @param workerCount - Worker thread count.
  * @returns Number of files to process via hybrid startup.
  */
-export function computeHybridK(config: ScanConfig, filesLen: number, n: number): number {
+export function computeHybridK(config: ScanConfig, filesLen: number, workerCount: number): number {
     const availCores = os.availableParallelism ? os.availableParallelism() : os.cpus().length;
     const baseHybridK = config.parser === 'oxc' ? HYBRID_FILES_OXC : HYBRID_FILES_TS;
-    const fairCap = Math.floor(filesLen / Math.max(2, n + 1));
-    return process.env.AR_HYBRID === '0' || availCores < n * 2
+    const fairCap = Math.floor(filesLen / Math.max(2, workerCount + 1));
+    return process.env.AR_HYBRID === '0' || availCores < workerCount * 2
         ? 0
         : Math.min(Number(process.env.AR_HYBRID_FILES || baseHybridK) | 0, fairCap);
 }
@@ -245,10 +254,10 @@ async function processSingleHybridFile(
         return { result: { issues: [], metric: null } };
     }
     try {
-        const r = await runAnalyzersFn(fileItem.rel, content);
-        return { result: r };
-    } catch (e) {
-        return { result: { issues: [], metric: null }, error: e };
+        const analyzerExecutionResult = await runAnalyzersFn(fileItem.rel, content);
+        return { result: analyzerExecutionResult };
+    } catch (error: unknown) {
+        return { result: { issues: [], metric: null }, error };
     }
 }
 
@@ -341,29 +350,49 @@ interface WorkerTelemetrySnapshot {
 }
 
 function updateArrivalTelemetry(
-    T: WorkerTelemetrySnapshot | null,
-    wk: number,
+    telemetry: WorkerTelemetrySnapshot | null,
+    workerIndex: number,
     workerArrivalTimestampMs: number,
 ): void {
-    if (!T) return;
-    if (T.firstMsgMs[wk] === undefined) {
-        T.firstMsgMs[wk] = workerArrivalTimestampMs - T.poolStart;
-        if (T.hybridDoneAtFirstMsg === -1) {
-            T.hybridDoneAtFirstMsg = T.hybridDone;
+    if (!telemetry) return;
+    if (telemetry.firstMsgMs[workerIndex] === undefined) {
+        telemetry.firstMsgMs[workerIndex] = workerArrivalTimestampMs - telemetry.poolStart;
+        if (telemetry.hybridDoneAtFirstMsg === -1) {
+            telemetry.hybridDoneAtFirstMsg = telemetry.hybridDone;
         }
     }
-    for (let i = T.timeline.length - 1; i >= 0; i--) {
-        const entry = T.timeline[i];
-        if (entry.worker === wk && entry.arrive < 0) {
-            entry.arrive = workerArrivalTimestampMs - T.poolStart;
-            entry.rt = workerArrivalTimestampMs - T.lastDispatch[wk];
+    for (let i = telemetry.timeline.length - 1; i >= 0; i--) {
+        const entry = telemetry.timeline[i];
+        if (entry.worker === workerIndex && entry.arrive < 0) {
+            entry.arrive = workerArrivalTimestampMs - telemetry.poolStart;
+            entry.rt = workerArrivalTimestampMs - telemetry.lastDispatch[workerIndex];
             break;
         }
     }
 }
 
+/** Options for spawning a pool of worker threads. */
+export interface SpawnWorkerPoolOptions {
+    count: number;
+    workerPath: string;
+    config: ScanConfig;
+    descs: WorkerAnalyzerDesc[];
+    trackTelemetry?: boolean;
+}
+
 /**
  * Spawns a pool of worker threads.
+ *
+ * @param options - Parameter object with configuration options.
+ * @returns Spawned workers, spawn start times, and any spawn error encountered.
+ */
+export function spawnWorkerPoolThreads(options: SpawnWorkerPoolOptions): {
+    workers: Worker[];
+    spawnStartTimes: number[];
+    error?: unknown;
+};
+/**
+ * Spawns a pool of worker threads with positional arguments.
  *
  * @param count - Number of worker threads to spawn.
  * @param workerPath - Path to worker script file.
@@ -378,20 +407,178 @@ export function spawnWorkerPoolThreads(
     config: ScanConfig,
     descs: WorkerAnalyzerDesc[],
     trackTelemetry: boolean,
+): { workers: Worker[]; spawnStartTimes: number[]; error?: unknown };
+/**
+ * Implementation dispatching between options object and legacy positional parameters.
+ *
+ * @param optionsOrCount - Configuration options object or thread count.
+ * @param posWorkerPath - Worker path for positional callers.
+ * @param posConfig - Configuration for positional callers.
+ * @param posDescs - Analyzer descriptors for positional callers.
+ * @param posTrackTelemetry - Telemetry flag for positional callers.
+ * @returns Spawned worker threads and metadata.
+ */
+export function spawnWorkerPoolThreads(
+    optionsOrCount: SpawnWorkerPoolOptions | number,
+    posWorkerPath?: string,
+    posConfig?: ScanConfig,
+    posDescs?: WorkerAnalyzerDesc[],
+    posTrackTelemetry?: boolean,
 ): { workers: Worker[]; spawnStartTimes: number[]; error?: unknown } {
+    const isOptionsObject = typeof optionsOrCount === 'object' && optionsOrCount !== null;
+    const count = isOptionsObject ? optionsOrCount.count : optionsOrCount;
+    const workerPath = isOptionsObject ? optionsOrCount.workerPath : posWorkerPath!;
+    const config = isOptionsObject ? optionsOrCount.config : posConfig!;
+    const descs = isOptionsObject ? optionsOrCount.descs : posDescs!;
+    const trackTelemetry = Boolean(
+        isOptionsObject ? optionsOrCount.trackTelemetry : posTrackTelemetry,
+    );
+
     const workers: Worker[] = [];
     const spawnStartTimes: number[] = [];
-    for (let k = 0; k < count; k++) {
+    for (let workerIdxNum = 0; workerIdxNum < count; workerIdxNum++) {
         const workerSpawnStartTimeMs = trackTelemetry ? nowMs() : 0;
         try {
-            const w = new Worker(workerPath, { workerData: { config, analyzerDescs: descs } });
-            workers.push(w);
+            const workerInstance = new Worker(workerPath, {
+                workerData: { config, analyzerDescs: descs },
+            });
+            workers.push(workerInstance);
             spawnStartTimes.push(workerSpawnStartTimeMs);
-        } catch (e) {
-            return { workers, spawnStartTimes, error: e };
+        } catch (spawnError: unknown) {
+            return { workers, spawnStartTimes, error: spawnError };
         }
     }
     return { workers, spawnStartTimes };
+}
+
+function terminateWorkerGroup(workers: Worker[]): void {
+    for (const workerInstance of workers) {
+        try {
+            workerInstance.terminate();
+        } catch {
+            /* ignore worker termination errors */
+        }
+    }
+}
+
+function printMainTelemetryTable(
+    timingTelemetry: WorkerTelemetrySnapshot,
+    workerCount: number,
+): void {
+    const wall = nowMs() - timingTelemetry.poolStart;
+    const spawnTotal = timingTelemetry.spawnMs.reduce(
+        (sumVal, currentVal) => sumVal + currentVal,
+        0,
+    );
+    const busy =
+        spawnTotal +
+        timingTelemetry.readTotal +
+        timingTelemetry.dispatchSyncTotal +
+        timingTelemetry.mergeTotal;
+    const idle = Math.max(0, wall - busy);
+    const formatPercentage = (valueNum: number): string =>
+        ((valueNum / Math.max(1, wall)) * TIMING_PERCENT_SCALE).toFixed(1);
+    console.error(
+        `[AR-TIMING main] poolWall=${wall.toFixed(1)}ms busy=${busy.toFixed(1)}ms(${formatPercentage(busy)}%) ` +
+            `idle=${idle.toFixed(1)}ms(${formatPercentage(idle)}%)`,
+    );
+    console.error(
+        `[AR-TIMING main] spawn=[${timingTelemetry.spawnMs.map((timingVal) => timingVal.toFixed(1)).join(',')}]ms firstMsg=[${timingTelemetry.firstMsgMs
+            .map((timingVal) => timingVal.toFixed(1))
+            .join(
+                ',',
+            )}]ms read=${timingTelemetry.readTotal.toFixed(1)}ms(${timingTelemetry.readCount} batches, avg=${(timingTelemetry.readTotal / Math.max(1, timingTelemetry.readCount)).toFixed(1)}, max=${Math.max(...timingTelemetry.readTimes, 0).toFixed(1)}) ` +
+            `dispatchSync=${timingTelemetry.dispatchSyncTotal.toFixed(1)}ms merge=${timingTelemetry.mergeTotal.toFixed(1)}ms`,
+    );
+    console.error(
+        `[AR-TIMING main] hybrid: k=${timingTelemetry.hybridK} files=${timingTelemetry.hybridFiles} done=${timingTelemetry.hybridDone} ` +
+            `doneBeforeFirstWorkerMsg=${timingTelemetry.hybridDoneAtFirstMsg} ms=${timingTelemetry.hybridMs.toFixed(1)}ms`,
+    );
+    const perWorkerBusy: number[] = new Array(workerCount).fill(0);
+    const perWorkerGaps: number[] = new Array(workerCount).fill(0);
+    const lastArrive: number[] = new Array(workerCount).fill(-1);
+    const rtAll: number[] = [];
+    for (const entry of timingTelemetry.timeline) {
+        if (entry.arrive >= 0) {
+            perWorkerBusy[entry.worker] += entry.rt;
+            rtAll.push(entry.rt);
+            if (lastArrive[entry.worker] >= 0) {
+                perWorkerGaps[entry.worker] += entry.dispatch - lastArrive[entry.worker];
+            }
+            lastArrive[entry.worker] = entry.arrive;
+        }
+    }
+    const rtAvg = rtAll.length
+        ? rtAll.reduce((sumVal, currentVal) => sumVal + currentVal, 0) / rtAll.length
+        : 0;
+    const rtMax = rtAll.length ? Math.max(...rtAll) : 0;
+    console.error(
+        `[AR-TIMING main] roundTrips n=${rtAll.length} avg=${rtAvg.toFixed(1)}ms max=${rtMax.toFixed(1)}ms ` +
+            `perWorkerBusy=[${perWorkerBusy.map((busyVal) => busyVal.toFixed(0)).join(',')}]ms ` +
+            `perWorkerWaitGaps=[${perWorkerGaps.map((gapVal) => gapVal.toFixed(0)).join(',')}]ms`,
+    );
+    const lines: string[] = [];
+    for (const entry of timingTelemetry.timeline) {
+        lines.push(
+            `b${entry.seq} w${entry.worker} +${entry.dispatch.toFixed(0)}ms->+${entry.arrive.toFixed(0)}ms rt=${entry.rt.toFixed(1)}ms`,
+        );
+    }
+    for (let i = 0; i < lines.length; i += TIMING_BATCH_LINES) {
+        console.error(
+            `[AR-TIMING main] batch: ${lines.slice(i, i + TIMING_BATCH_LINES).join(' | ')}`,
+        );
+    }
+}
+
+async function flushWorkerTelemetry(
+    timingTelemetry: WorkerTelemetrySnapshot | null,
+    workers: Worker[],
+): Promise<void> {
+    if (!timingTelemetry || workers.length === 0) return;
+    const acks = workers.map(
+        (activeWorker) =>
+            new Promise<void>((resolvePromise) => {
+                const onMsg = (incomingMessage: unknown): void => {
+                    if (
+                        incomingMessage &&
+                        typeof incomingMessage === 'object' &&
+                        'flushed' in incomingMessage &&
+                        (incomingMessage as { flushed: unknown }).flushed
+                    ) {
+                        activeWorker.off('message', onMsg);
+                        resolvePromise();
+                    }
+                };
+                activeWorker.on('message', onMsg);
+                try {
+                    activeWorker.postMessage({ flush: true });
+                } catch {
+                    resolvePromise();
+                }
+            }),
+    );
+    await Promise.race([
+        Promise.all(acks),
+        new Promise<void>((resolveTimeout) =>
+            setTimeout(resolveTimeout, DEFAULT_WORKER_FLUSH_TIMEOUT_MS),
+        ),
+    ]);
+}
+
+function buildIndexedWorkerResult(
+    resultItem: {
+        file: string;
+        issues: Issue[];
+        metric: FileMetric | null;
+        symbols?: WorkerSymbolsPayload;
+    },
+    fallbackSymbols: WorkerSymbolsPayload | undefined,
+): { issues: Issue[]; metric: FileMetric | null; symbols?: WorkerSymbolsPayload } {
+    return {
+        issues: resultItem.issues || [],
+        metric: resultItem.metric || null,
+        symbols: resultItem.symbols ?? fallbackSymbols,
+    };
 }
 
 /**
@@ -403,19 +590,22 @@ export function spawnWorkerPoolThreads(
  */
 export async function dispatchBatches(
     opts: DispatchOpts,
-): Promise<{ issues: Issue[]; metric: FileMetric | null; symbols?: any }[]> {
+): Promise<{ issues: Issue[]; metric: FileMetric | null; symbols?: WorkerSymbolsPayload }[]> {
     const { files, absRoot, config, descs, numWorkers, runAnalyzersFn, hybridK, keepAlive, fp } =
         opts;
     if (files.length === 0) return [];
     const workerPath = path.resolve(__dirname, '..', 'worker.js');
-    const n = Math.max(1, Math.min(numWorkers, files.length));
+    const workerCount = Math.max(1, Math.min(numWorkers, files.length));
     const idxByFile = new Map<string, number>();
-    files.forEach((f, i) => idxByFile.set(f, i));
-    const results: ({ issues: Issue[]; metric: FileMetric | null; symbols?: any } | null)[] =
-        new Array(files.length);
+    files.forEach((filePath, fileIndex) => idxByFile.set(filePath, fileIndex));
+    const results: ({
+        issues: Issue[];
+        metric: FileMetric | null;
+        symbols?: WorkerSymbolsPayload;
+    } | null)[] = new Array(files.length);
 
     // AR_TIMING state: per-stage / per-batch pipeline instrumentation (no-op when disabled).
-    const T = AR_TIMING
+    const timingTelemetry: WorkerTelemetrySnapshot | null = AR_TIMING
         ? {
               poolStart: nowMs(),
               spawnMs: [] as number[],
@@ -455,8 +645,14 @@ export async function dispatchBatches(
 
         interface WorkerListenerBinding {
             worker: Worker;
-            onMessage: (res: {
-                results: { file: string; issues: Issue[]; metric: FileMetric | null }[];
+            onMessage: (messagePayload: {
+                results: {
+                    file: string;
+                    issues: Issue[];
+                    metric: FileMetric | null;
+                    symbols?: WorkerSymbolsPayload;
+                }[];
+                symbolsMap?: { file: string; symbols?: WorkerSymbolsPayload }[];
             }) => void;
             onError: (err: unknown) => void;
         }
@@ -472,135 +668,43 @@ export async function dispatchBatches(
             listenerBindings.length = 0;
         };
 
-        const fail = (e: unknown) => {
+        const fail = (failureError: unknown) => {
             if (failed) return;
             failed = true;
             cleanupListeners();
-            for (const w of workers)
-                try {
-                    w.terminate();
-                } catch {
-                    /* ignore */
-                }
-            reject(e);
-        };
-
-        /** AR_TIMING: print the main-thread pipeline table. */
-        const printMainTable = (): void => {
-            if (!T) return;
-            const wall = nowMs() - T.poolStart;
-            const spawnTotal = T.spawnMs.reduce((a, b) => a + b, 0);
-            const busy = spawnTotal + T.readTotal + T.dispatchSyncTotal + T.mergeTotal;
-            const idle = Math.max(0, wall - busy);
-            const pct = (v: number): string =>
-                ((v / Math.max(1, wall)) * TIMING_PERCENT_SCALE).toFixed(1);
-            console.error(
-                `[AR-TIMING main] poolWall=${wall.toFixed(1)}ms busy=${busy.toFixed(1)}ms(${pct(busy)}%) ` +
-                    `idle=${idle.toFixed(1)}ms(${pct(idle)}%)`,
-            );
-            console.error(
-                `[AR-TIMING main] spawn=[${T.spawnMs.map((x) => x.toFixed(1)).join(',')}]ms firstMsg=[${T.firstMsgMs
-                    .map((x) => x.toFixed(1))
-                    .join(
-                        ',',
-                    )}]ms read=${T.readTotal.toFixed(1)}ms(${T.readCount} batches, avg=${(T.readTotal / Math.max(1, T.readCount)).toFixed(1)}, max=${Math.max(...T.readTimes, 0).toFixed(1)}) ` +
-                    `dispatchSync=${T.dispatchSyncTotal.toFixed(1)}ms merge=${T.mergeTotal.toFixed(1)}ms`,
-            );
-            console.error(
-                `[AR-TIMING main] hybrid: k=${T.hybridK} files=${T.hybridFiles} done=${T.hybridDone} ` +
-                    `doneBeforeFirstWorkerMsg=${T.hybridDoneAtFirstMsg} ms=${T.hybridMs.toFixed(1)}ms`,
-            );
-            const perWorkerBusy: number[] = new Array(n).fill(0);
-            const perWorkerGaps: number[] = new Array(n).fill(0);
-            const lastArrive: number[] = new Array(n).fill(-1);
-            const rtAll: number[] = [];
-            for (const entry of T.timeline) {
-                if (entry.arrive >= 0) {
-                    perWorkerBusy[entry.worker] += entry.rt;
-                    rtAll.push(entry.rt);
-                    if (lastArrive[entry.worker] >= 0)
-                        perWorkerGaps[entry.worker] += entry.dispatch - lastArrive[entry.worker];
-                    lastArrive[entry.worker] = entry.arrive;
-                }
-            }
-            const rtAvg = rtAll.length ? rtAll.reduce((a, b) => a + b, 0) / rtAll.length : 0;
-            const rtMax = rtAll.length ? Math.max(...rtAll) : 0;
-            console.error(
-                `[AR-TIMING main] roundTrips n=${rtAll.length} avg=${rtAvg.toFixed(1)}ms max=${rtMax.toFixed(1)}ms ` +
-                    `perWorkerBusy=[${perWorkerBusy.map((x) => x.toFixed(0)).join(',')}]ms ` +
-                    `perWorkerWaitGaps=[${perWorkerGaps.map((x) => x.toFixed(0)).join(',')}]ms`,
-            );
-            const lines: string[] = [];
-            for (const entry of T.timeline) {
-                lines.push(
-                    `b${entry.seq} w${entry.worker} +${entry.dispatch.toFixed(0)}ms->+${entry.arrive.toFixed(0)}ms rt=${entry.rt.toFixed(1)}ms`,
-                );
-            }
-            for (let i = 0; i < lines.length; i += TIMING_BATCH_LINES) {
-                console.error(
-                    `[AR-TIMING main] batch: ${lines.slice(i, i + TIMING_BATCH_LINES).join(' | ')}`,
-                );
-            }
-        };
-
-        /** AR_TIMING: ask each worker to flush its table, then let the caller terminate them. */
-        const flushWorkers = async (): Promise<void> => {
-            if (!T || workers.length === 0) return;
-            const acks = workers.map(
-                (w) =>
-                    new Promise<void>((res) => {
-                        const onMsg = (m: unknown): void => {
-                            if (
-                                m &&
-                                typeof m === 'object' &&
-                                'flushed' in m &&
-                                (m as { flushed: unknown }).flushed
-                            ) {
-                                w.off('message', onMsg);
-                                res();
-                            }
-                        };
-                        w.on('message', onMsg);
-                        try {
-                            w.postMessage({ flush: true });
-                        } catch {
-                            res();
-                        }
-                    }),
-            );
-            await Promise.race([
-                Promise.all(acks),
-                new Promise<void>((r) => setTimeout(r, DEFAULT_WORKER_FLUSH_TIMEOUT_MS)),
-            ]);
+            terminateWorkerGroup(workers);
+            reject(failureError);
         };
 
         const finishIfDone = (): boolean => {
             if (completed < files.length) return false;
             cleanupListeners();
-            if (!T) {
-                if (!keepAlive)
-                    for (const x of workers)
-                        try {
-                            x.terminate();
-                        } catch {
-                            /* ignore */
-                        }
-                resolve(results as { issues: Issue[]; metric: FileMetric | null; symbols?: any }[]);
+            if (!timingTelemetry) {
+                if (!keepAlive) {
+                    terminateWorkerGroup(workers);
+                }
+                resolve(
+                    results as {
+                        issues: Issue[];
+                        metric: FileMetric | null;
+                        symbols?: WorkerSymbolsPayload;
+                    }[],
+                );
                 return true;
             }
-            if (!T.flushing) {
-                T.flushing = true;
-                printMainTable();
-                void flushWorkers().then(() => {
-                    if (!keepAlive)
-                        for (const x of workers)
-                            try {
-                                x.terminate();
-                            } catch {
-                                /* ignore */
-                            }
+            if (!timingTelemetry.flushing) {
+                timingTelemetry.flushing = true;
+                printMainTelemetryTable(timingTelemetry, workerCount);
+                void flushWorkerTelemetry(timingTelemetry, workers).then(() => {
+                    if (!keepAlive) {
+                        terminateWorkerGroup(workers);
+                    }
                     resolve(
-                        results as { issues: Issue[]; metric: FileMetric | null; symbols?: any }[],
+                        results as {
+                            issues: Issue[];
+                            metric: FileMetric | null;
+                            symbols?: WorkerSymbolsPayload;
+                        }[],
                     );
                 });
             }
@@ -626,34 +730,34 @@ export async function dispatchBatches(
 
         /** Hybrid startup: process the pre-reserved [0, hybridK) files in-process. */
         const processHybrid = async (batch: { idx: number; rel: string }[]): Promise<void> => {
-            if (T) T.hybridFiles = batch.length;
-            const hybridStartTimeMs = T ? nowMs() : 0;
+            if (timingTelemetry) timingTelemetry.hybridFiles = batch.length;
+            const hybridStartTimeMs = timingTelemetry ? nowMs() : 0;
             await executeHybridPhase({
                 batch,
                 absRoot,
                 preloaded: opts.preloaded,
                 runAnalyzersFn,
                 isAborted: () => failed,
-                onResult: (idx, res) => {
-                    results[idx] = res;
+                onResult: (fileIndex, scanResult) => {
+                    results[fileIndex] = scanResult;
                     completed++;
                 },
                 onError: (err) => fail(err),
-                onProgress: T
+                onProgress: timingTelemetry
                     ? () => {
-                          T.hybridDone++;
+                          timingTelemetry.hybridDone++;
                       }
                     : undefined,
             });
-            if (T) T.hybridMs = nowMs() - hybridStartTimeMs;
+            if (timingTelemetry) timingTelemetry.hybridMs = nowMs() - hybridStartTimeMs;
             finishIfDone();
         };
 
         /** Claim + pre-read one batch of files (index order preserved, guided self-scheduling). */
         const readNextBatch = async (): Promise<ReadyBatch> => {
-            const readBatchStartTimeMs = T ? nowMs() : 0;
+            const readBatchStartTimeMs = timingTelemetry ? nowMs() : 0;
             const remaining = files.length - nextIdx;
-            const guidedSize = Math.ceil(remaining / (2 * n));
+            const guidedSize = Math.ceil(remaining / (2 * workerCount));
             const batchSize = Math.max(1, Math.min(WORKER_BATCH_SIZE, guidedSize));
             const batch: { idx: number; rel: string }[] = [];
             while (batch.length < batchSize && nextIdx < files.length) {
@@ -665,33 +769,37 @@ export async function dispatchBatches(
             );
             const tasks: { file: string; absPath: string; buf: Buffer }[] = [];
             const transfer: ArrayBuffer[] = [];
-            for (const r of reads) {
-                if (r) {
-                    tasks.push({ file: r.file, absPath: r.absPath, buf: r.buf });
-                    transfer.push(r.buf.buffer as ArrayBuffer);
+            for (const readItem of reads) {
+                if (readItem) {
+                    tasks.push({
+                        file: readItem.file,
+                        absPath: readItem.absPath,
+                        buf: readItem.buf,
+                    });
+                    transfer.push(readItem.buf.buffer as ArrayBuffer);
                 }
             }
-            if (T) {
-                const d = nowMs() - readBatchStartTimeMs;
-                T.readTotal += d;
-                T.readCount++;
-                T.readTimes.push(d);
+            if (timingTelemetry) {
+                const durationMs = nowMs() - readBatchStartTimeMs;
+                timingTelemetry.readTotal += durationMs;
+                timingTelemetry.readCount++;
+                timingTelemetry.readTimes.push(durationMs);
             }
             return { tasks, transfer };
         };
 
         let inflightRead: Promise<ReadyBatch> | null = null;
 
-        const acquireReadyBatch = async (w: Worker): Promise<ReadyBatch | null> => {
+        const acquireReadyBatch = async (targetWorker: Worker): Promise<ReadyBatch | null> => {
             if (inflightRead) {
-                const p = inflightRead;
+                const pendingBatchPromise = inflightRead;
                 inflightRead = null;
-                return await p;
+                return await pendingBatchPromise;
             }
             if (nextIdx >= files.length) {
-                if (!T && !keepAlive) {
+                if (!timingTelemetry && !keepAlive) {
                     try {
-                        w.terminate();
+                        targetWorker.terminate();
                     } catch {
                         /* ignore */
                     }
@@ -701,44 +809,44 @@ export async function dispatchBatches(
             return await readNextBatch();
         };
 
-        const postBatchToWorker = (w: Worker, ready: ReadyBatch): void => {
-            const postMessageStartTimeMs = T ? nowMs() : 0;
+        const postBatchToWorker = (targetWorker: Worker, ready: ReadyBatch): void => {
+            const postMessageStartTimeMs = timingTelemetry ? nowMs() : 0;
             const msg: Record<string, unknown> = { tasks: ready.tasks };
             if (fp !== undefined) {
                 msg.fp = fp;
                 msg.config = config;
                 msg.descs = descs;
             }
-            w.postMessage(msg, ready.transfer);
-            if (T) {
+            targetWorker.postMessage(msg, ready.transfer);
+            if (timingTelemetry) {
                 const postMessageEndTimeMs = nowMs();
-                T.dispatchSyncTotal += postMessageEndTimeMs - postMessageStartTimeMs;
-                const k = workerIdx.get(w) ?? 0;
-                const seq = ++T.seqCounter;
-                T.lastDispatch[k] = postMessageEndTimeMs;
-                T.timeline.push({
+                timingTelemetry.dispatchSyncTotal += postMessageEndTimeMs - postMessageStartTimeMs;
+                const workerSequenceId = workerIdx.get(targetWorker) ?? 0;
+                const seq = ++timingTelemetry.seqCounter;
+                timingTelemetry.lastDispatch[workerSequenceId] = postMessageEndTimeMs;
+                timingTelemetry.timeline.push({
                     seq,
-                    worker: k,
-                    dispatch: postMessageEndTimeMs - T.poolStart,
+                    worker: workerSequenceId,
+                    dispatch: postMessageEndTimeMs - timingTelemetry.poolStart,
                     arrive: -1,
                     rt: -1,
                 });
             }
         };
 
-        const dispatch = async (w: Worker) => {
+        const dispatch = async (targetWorker: Worker) => {
             if (failed) return;
-            const ready = await acquireReadyBatch(w);
+            const ready = await acquireReadyBatch(targetWorker);
             if (!ready) return;
             if (ready.tasks.length === 0) {
                 if (finishIfDone()) return;
-                void dispatch(w);
+                void dispatch(targetWorker);
                 return;
             }
             if (nextIdx < files.length && !inflightRead) {
                 inflightRead = readNextBatch();
             }
-            postBatchToWorker(w, ready);
+            postBatchToWorker(targetWorker, ready);
         };
 
         const hybridBatch: { idx: number; rel: string }[] = [];
@@ -748,56 +856,67 @@ export async function dispatchBatches(
         }
         void processHybrid(hybridBatch);
 
-        const wire = (w: Worker, k: number, workerSpawnStartTimeMs: number) => {
-            workerIdx.set(w, k);
+        const wire = (
+            targetWorker: Worker,
+            workerIndex: number,
+            workerSpawnStartTimeMs: number,
+        ) => {
+            workerIdx.set(targetWorker, workerIndex);
             if (!opts.workers) {
-                w.once('online', () => {
-                    if (T) T.spawnMs[k] = nowMs() - workerSpawnStartTimeMs;
+                targetWorker.once('online', () => {
+                    if (timingTelemetry) {
+                        timingTelemetry.spawnMs[workerIndex] = nowMs() - workerSpawnStartTimeMs;
+                    }
                 });
             }
-            const onMessage = (res: {
+            const onMessage = (messagePayload: {
                 results: {
                     file: string;
                     issues: Issue[];
                     metric: FileMetric | null;
-                    symbols?: any;
+                    symbols?: WorkerSymbolsPayload;
                 }[];
-                symbolsMap?: { file: string; symbols?: any }[];
+                symbolsMap?: { file: string; symbols?: WorkerSymbolsPayload }[];
             }) => {
-                const workerArrivalTimestampMs = T ? nowMs() : 0;
-                const wk = workerIdx.get(w) ?? 0;
-                updateArrivalTelemetry(T, wk, workerArrivalTimestampMs);
+                const workerArrivalTimestampMs = timingTelemetry ? nowMs() : 0;
+                const currentWorkerIdx = workerIdx.get(targetWorker) ?? 0;
+                updateArrivalTelemetry(timingTelemetry, currentWorkerIdx, workerArrivalTimestampMs);
 
-                const resArr = normalizeWorkerResults(res.results);
-                for (let k = 0; k < resArr.length; k++) {
-                    const r = resArr[k];
-                    const i = idxByFile.get(r.file);
+                const resArr = normalizeWorkerResults(messagePayload.results);
+                for (let itemIdx = 0; itemIdx < resArr.length; itemIdx++) {
+                    const resultItem = resArr[itemIdx] as {
+                        file: string;
+                        issues: Issue[];
+                        metric: FileMetric | null;
+                        symbols?: WorkerSymbolsPayload;
+                    };
+                    const i = idxByFile.get(resultItem.file);
                     if (i !== undefined) {
-                        const sym = (r as any).symbols ?? res.symbolsMap?.[k]?.symbols;
-                        results[i] = {
-                            issues: r.issues || [],
-                            metric: r.metric || null,
-                            symbols: sym,
-                        };
+                        results[i] = buildIndexedWorkerResult(
+                            resultItem,
+                            messagePayload.symbolsMap?.[itemIdx]?.symbols,
+                        );
                     }
                 }
                 completed += resArr.length;
-                if (T) T.mergeTotal += nowMs() - workerArrivalTimestampMs;
+                if (timingTelemetry) {
+                    timingTelemetry.mergeTotal += nowMs() - workerArrivalTimestampMs;
+                }
                 if (finishIfDone()) return;
-                void dispatch(w);
+                void dispatch(targetWorker);
             };
             const onError = (err: unknown) => {
                 fail(err);
             };
-            w.on('message', onMessage);
-            w.on(EVENT_ERROR, onError);
-            listenerBindings.push({ worker: w, onMessage, onError });
-            void dispatch(w);
+            targetWorker.on('message', onMessage);
+            targetWorker.on(EVENT_ERROR, onError);
+            listenerBindings.push({ worker: targetWorker, onMessage, onError });
+            void dispatch(targetWorker);
         };
 
         if (opts.workers && opts.workers.length > 0) {
-            for (let k = 0; k < opts.workers.length; k++) {
-                wire(opts.workers[k], k, 0);
+            for (let workerIdxNum = 0; workerIdxNum < opts.workers.length; workerIdxNum++) {
+                wire(opts.workers[workerIdxNum], workerIdxNum, 0);
             }
             return;
         }
@@ -806,22 +925,57 @@ export async function dispatchBatches(
             return;
         }
 
-        const spawned = spawnWorkerPoolThreads(n, workerPath, config, descs, Boolean(T));
-        for (const w of spawned.workers) {
-            workers.push(w);
+        const spawned = spawnWorkerPoolThreads({
+            count: workerCount,
+            workerPath,
+            config,
+            descs,
+            trackTelemetry: Boolean(timingTelemetry),
+        });
+        for (const spawnedWorker of spawned.workers) {
+            workers.push(spawnedWorker);
         }
         if (spawned.error) {
             fail(spawned.error);
             return;
         }
-        for (let k = 0; k < spawned.workers.length; k++) {
-            wire(spawned.workers[k], k, spawned.spawnStartTimes[k]);
+        for (let workerIdxNum = 0; workerIdxNum < spawned.workers.length; workerIdxNum++) {
+            wire(
+                spawned.workers[workerIdxNum],
+                workerIdxNum,
+                spawned.spawnStartTimes[workerIdxNum],
+            );
         }
     });
 }
 
+/** Parameter object for cold-path worker pool execution. */
+export interface RunWorkerPoolOptions {
+    files: string[];
+    absRoot: string;
+    config: ScanConfig;
+    descs: WorkerAnalyzerDesc[];
+    numWorkers: number;
+    logger: Logger;
+    runAnalyzersFn: (
+        rel: string,
+        content: string,
+    ) => Promise<{ issues: Issue[]; metric: FileMetric | null }>;
+    preloaded?: Map<string, Buffer>;
+}
+
 /**
  * Cold-path worker pool: spawns fresh worker threads, runs batch dispatcher, and terminates them.
+ *
+ * @param options - Parameter object with pool configuration and callbacks.
+ * @returns One index-aligned `{ issues, metric }` entry per input file.
+ * Concurrency: manages worker threads asynchronously; safe for single-threaded caller.
+ */
+export async function runWorkerPool(
+    options: RunWorkerPoolOptions,
+): Promise<{ issues: Issue[]; metric: FileMetric | null; symbols?: WorkerSymbolsPayload }[]>;
+/**
+ * Cold-path worker pool using legacy positional parameters.
  *
  * @param files - Relative file paths to process.
  * @param absRoot - Absolute root path.
@@ -832,7 +986,6 @@ export async function dispatchBatches(
  * @param runAnalyzersFn - Fallback in-process analyzer callback.
  * @param preloaded - Preloaded buffers for cache reuse.
  * @returns One index-aligned `{ issues, metric }` entry per input file.
- * Concurrency: manages worker threads asynchronously; safe for single-threaded caller.
  */
 export async function runWorkerPool(
     files: string[],
@@ -846,16 +999,52 @@ export async function runWorkerPool(
         content: string,
     ) => Promise<{ issues: Issue[]; metric: FileMetric | null }>,
     preloaded?: Map<string, Buffer>,
-): Promise<{ issues: Issue[]; metric: FileMetric | null; symbols?: any }[]> {
+): Promise<{ issues: Issue[]; metric: FileMetric | null; symbols?: WorkerSymbolsPayload }[]>;
+/**
+ * Implementation dispatching between options object and legacy positional parameters.
+ *
+ * @param optionsOrFiles - Parameter options object or relative file paths.
+ * @param posAbsRoot - Absolute root path for positional callers.
+ * @param posConfig - Configuration for positional callers.
+ * @param posDescs - Analyzer descriptors for positional callers.
+ * @param posNumWorkers - Worker thread count for positional callers.
+ * @param posLogger - Operational logger for positional callers.
+ * @param posRunAnalyzersFn - Fallback analyzer callback for positional callers.
+ * @param posPreloaded - Preloaded buffers for positional callers.
+ * @returns One index-aligned `{ issues, metric }` entry per input file.
+ */
+export async function runWorkerPool(
+    optionsOrFiles: RunWorkerPoolOptions | string[],
+    posAbsRoot?: string,
+    posConfig?: ScanConfig,
+    posDescs?: WorkerAnalyzerDesc[],
+    posNumWorkers?: number,
+    posLogger?: Logger,
+    posRunAnalyzersFn?: (
+        rel: string,
+        content: string,
+    ) => Promise<{ issues: Issue[]; metric: FileMetric | null }>,
+    posPreloaded?: Map<string, Buffer>,
+): Promise<{ issues: Issue[]; metric: FileMetric | null; symbols?: WorkerSymbolsPayload }[]> {
+    const isOptionsObject = !Array.isArray(optionsOrFiles);
+    const files = isOptionsObject ? optionsOrFiles.files : optionsOrFiles;
+    const absRoot = isOptionsObject ? optionsOrFiles.absRoot : posAbsRoot!;
+    const config = isOptionsObject ? optionsOrFiles.config : posConfig!;
+    const descs = isOptionsObject ? optionsOrFiles.descs : posDescs!;
+    const numWorkers = isOptionsObject ? optionsOrFiles.numWorkers : posNumWorkers!;
+    const logger = isOptionsObject ? optionsOrFiles.logger : posLogger!;
+    const runAnalyzersFn = isOptionsObject ? optionsOrFiles.runAnalyzersFn : posRunAnalyzersFn!;
+    const preloaded = isOptionsObject ? optionsOrFiles.preloaded : posPreloaded;
+
     if (files.length === 0) return [];
-    const n = Math.max(1, Math.min(numWorkers, files.length));
-    const hybridK = computeHybridK(config, files.length, n);
+    const workerCount = Math.max(1, Math.min(numWorkers, files.length));
+    const hybridK = computeHybridK(config, files.length, workerCount);
     return dispatchBatches({
         files,
         absRoot,
         config,
         descs,
-        numWorkers: n,
+        numWorkers: workerCount,
         logger,
         runAnalyzersFn,
         hybridK,

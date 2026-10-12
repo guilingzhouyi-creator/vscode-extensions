@@ -127,9 +127,10 @@ export class ControlFlowGraph {
         const visited = new Set<number>();
         const queue: BasicBlock[] = [this.entry];
         const result: BasicBlock[] = [];
+        let head = 0;
 
-        while (queue.length > 0) {
-            const current = queue.shift()!;
+        while (head < queue.length) {
+            const current = queue[head++];
             if (visited.has(current.id)) continue;
             visited.add(current.id);
             result.push(current);

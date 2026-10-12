@@ -3,13 +3,11 @@
  * File Path: src/core/governance/semantic-naming-engine.ts
  * Architecture Role: Generates high-quality, domain-specific, unit-aware, and protocol-standard
  *     constant names, replacing mechanical and naive names like CONST_3000 or EXTRACTED_STRING.
- * Dependencies & Triggers: Consumes classifyLiteral from core/governance/semanticLiterals.ts;
- *     consumed by ConstantsAnalyzer and NearLiteralClusterScanner.
+ * Dependencies & Triggers: Consumes classifyLiteral from core/governance/semanticLiterals.ts and
+ *     tokens from ./semantic-naming-tokens; consumed by ConstantsAnalyzer.
  * Responsibilities:
- *     1. Map RFC and industry protocol codes to canonical names
- *        (HTTP status, port numbers, event names).
- *     2. Recognize unit semantics (milliseconds, seconds, bytes, retries, ratios)
- *        and append appropriate suffixes.
+ *     1. Map RFC and industry protocol codes to canonical names (HTTP status, port numbers).
+ *     2. Recognize unit semantics (milliseconds, seconds, bytes, retries, ratios).
  *     3. Infer contextual roles from parent AST properties, parameter names, or enclosing scopes.
  *     4. Enforce SCREAMING_SNAKE_CASE conventions adhering to target language standards.
  * Exit Semantics & Design Rationale: Deterministic pure function without side effects.
@@ -17,6 +15,45 @@
 
 import { classifyLiteral } from './semanticLiterals';
 import { stripLiteralQuotes } from '../intelligence/constant-identity';
+import {
+    HTTP_STATUS_MAP,
+    KNOWN_PORT_MAP,
+    COMMON_TIME_MS_MAP,
+    KNOWN_EVENTS,
+    STOP_WORDS,
+    STATUS_INDICATORS,
+    DEFAULT_NUMERIC_CONSTANT,
+    DEFAULT_NUMERIC_THRESHOLD,
+    DEFAULT_TEXT_LITERAL,
+    EMPTY_STRING_CONSTANT,
+    EXTERNAL_ENDPOINT_URL,
+    DEFAULT_FILE_TOKEN,
+    PREFIX_DEFAULT,
+    PREFIX_MAX,
+    PREFIX_HEADER,
+    PREFIX_EVENT,
+    PREFIX_ROUTE,
+    PREFIX_PATH,
+    PREFIX_STATUS,
+    PREFIX_PORT,
+    PREFIX_DURATION,
+    PREFIX_DEFAULT_LIMIT,
+    PREFIX_DEFAULT_BATCH,
+    PREFIX_LIMIT_VALUE,
+    SUFFIX_MS,
+    SUFFIX_BASE_URL,
+    SUFFIX_URL,
+    KIND_PORT,
+    KIND_TIME_MS,
+    KIND_URL,
+    KIND_FILE_PATH,
+    MAX_INFERRED_WORDS_COUNT,
+    URL_PATH_MAX_LENGTH,
+    ROUTE_SLUG_MAX_LENGTH,
+    WORD_SLUG_MAX_LENGTH,
+    DEFAULT_LIMIT_THRESHOLD,
+    DEFAULT_BATCH_SIZE_THRESHOLD,
+} from './semantic-naming-tokens';
 
 /** Contextual AST metadata surrounding the literal observation */
 export interface SemanticNamingContext {
@@ -28,126 +65,26 @@ export interface SemanticNamingContext {
     semanticKind?: string;
 }
 
-/** Known RFC HTTP status code semantic mapping */
-const HTTP_STATUS_MAP: Record<number, string> = {
-    200: 'HTTP_STATUS_OK',
-    201: 'HTTP_STATUS_CREATED',
-    202: 'HTTP_STATUS_ACCEPTED',
-    204: 'HTTP_STATUS_NO_CONTENT',
-    301: 'HTTP_STATUS_MOVED_PERMANENTLY',
-    302: 'HTTP_STATUS_FOUND',
-    304: 'HTTP_STATUS_NOT_MODIFIED',
-    400: 'HTTP_STATUS_BAD_REQUEST',
-    401: 'HTTP_STATUS_UNAUTHORIZED',
-    403: 'HTTP_STATUS_FORBIDDEN',
-    404: 'HTTP_STATUS_NOT_FOUND',
-    405: 'HTTP_STATUS_METHOD_NOT_ALLOWED',
-    409: 'HTTP_STATUS_CONFLICT',
-    410: 'HTTP_STATUS_GONE',
-    422: 'HTTP_STATUS_UNPROCESSABLE_ENTITY',
-    429: 'HTTP_STATUS_TOO_MANY_REQUESTS',
-    500: 'HTTP_STATUS_INTERNAL_SERVER_ERROR',
-    502: 'HTTP_STATUS_BAD_GATEWAY',
-    503: 'HTTP_STATUS_SERVICE_UNAVAILABLE',
-    504: 'HTTP_STATUS_GATEWAY_TIMEOUT',
-};
-
-/** Common network port semantic mapping */
-const KNOWN_PORT_MAP: Record<number, string> = {
-    21: 'FTP_PORT',
-    22: 'SSH_PORT',
-    25: 'SMTP_PORT',
-    53: 'DNS_PORT',
-    80: 'DEFAULT_HTTP_PORT',
-    443: 'DEFAULT_HTTPS_PORT',
-    3000: 'DEFAULT_DEV_PORT',
-    3306: 'MYSQL_DEFAULT_PORT',
-    5432: 'POSTGRES_DEFAULT_PORT',
-    6379: 'REDIS_DEFAULT_PORT',
-    8080: 'DEFAULT_HTTP_ALT_PORT',
-    8443: 'DEFAULT_HTTPS_ALT_PORT',
-    9092: 'KAFKA_DEFAULT_PORT',
-    27017: 'MONGODB_DEFAULT_PORT',
-};
-
-/** Common time millisecond semantic mapping */
-const COMMON_TIME_MS_MAP: Record<number, string> = {
-    1000: 'ONE_SECOND_MS',
-    2000: 'TWO_SECONDS_MS',
-    3000: 'THREE_SECONDS_MS',
-    5000: 'DEFAULT_TIMEOUT_MS',
-    10000: 'TEN_SECONDS_MS',
-    15000: 'DEFAULT_HEARTBEAT_INTERVAL_MS',
-    30000: 'THIRTY_SECONDS_MS',
-    60000: 'ONE_MINUTE_MS',
-    300000: 'FIVE_MINUTES_MS',
-    600000: 'TEN_MINUTES_MS',
-    1800000: 'THIRTY_MINUTES_MS',
-    3600000: 'ONE_HOUR_MS',
-    86400000: 'ONE_DAY_MS',
-};
-
-/** Known DOM & framework event names */
-const KNOWN_EVENTS = new Set([
-    'click',
-    'dblclick',
-    'mousedown',
-    'mouseup',
-    'mousemove',
-    'keydown',
-    'keyup',
-    'keypress',
-    'change',
-    'input',
-    'submit',
-    'focus',
-    'blur',
-    'load',
-    'error',
-    'resize',
-    'scroll',
-    'close',
-    'open',
-    'message',
-]);
-
-/** English stopwords to omit from generated constant names */
-const STOP_WORDS = new Set([
-    'the',
-    'a',
-    'an',
-    'is',
-    'are',
-    'was',
-    'were',
-    'of',
-    'in',
-    'on',
-    'at',
-    'by',
-    'for',
-    'to',
-]);
-
-/** Common status indicators to recognize */
-const STATUS_INDICATORS = new Set([
-    'ok',
-    'ready',
-    'success',
-    'failed',
-    'pending',
-    'cancelled',
-    'error',
-    'active',
-    'inactive',
-]);
+const KEYWORD_TIMEOUT = 'TIMEOUT';
+const KEYWORD_INTERVAL = 'INTERVAL';
+const KEYWORD_DELAY = 'DELAY';
+const KEYWORD_DURATION = 'DURATION';
+const KEYWORD_PORT = 'PORT';
+const KEYWORD_RETRY = 'RETRY';
+const KEYWORD_ATTEMPT = 'ATTEMPT';
+const KEYWORD_HEADER = 'HEADER';
+const KEYWORD_EVENT = 'EVENT';
+const KEYWORD_ROUTE = 'ROUTE';
+const KEYWORD_PATH = 'PATH';
+const KEYWORD_URL = 'URL';
+const CAMEL_SPLIT_REPLACEMENT = '$1_$2';
 
 /**
  * Converts camelCase or kebab-case or space-delimited string to UPPER_SNAKE_CASE.
  */
-function toUpperSnakeCase(str: string): string {
-    return str
-        .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+function toUpperSnakeCase(sourceText: string): string {
+    return sourceText
+        .replace(/([a-z0-9])([A-Z])/g, CAMEL_SPLIT_REPLACEMENT)
         .replace(/[^a-zA-Z0-9]+/g, '_')
         .replace(/^_+|_+$/g, '')
         .toUpperCase();
@@ -156,191 +93,232 @@ function toUpperSnakeCase(str: string): string {
 /**
  * Resolves naming for known protocols (HTTP status or known network port).
  *
- * @param num - Numeric literal value.
+ * @param numericValue - Numeric literal value.
  * @returns Protocol constant name or null if unmapped.
  */
-function resolveProtocolNumericName(num: number): string | null {
-    return HTTP_STATUS_MAP[num] ?? KNOWN_PORT_MAP[num] ?? null;
+function resolveProtocolNumericName(numericValue: number): string | null {
+    return HTTP_STATUS_MAP[numericValue] ?? KNOWN_PORT_MAP[numericValue] ?? null;
 }
 
 /**
  * Resolves naming for common time duration in milliseconds with contextual property hint.
  *
- * @param num - Millisecond duration number.
+ * @param numericValue - Millisecond duration number.
  * @param context - Optional AST naming context.
  * @returns Time duration constant name or null if unmapped.
  */
-function resolveTimeMsName(num: number, context?: SemanticNamingContext): string | null {
-    if (!COMMON_TIME_MS_MAP[num]) return null;
+function resolveTimeMsName(numericValue: number, context?: SemanticNamingContext): string | null {
+    if (!COMMON_TIME_MS_MAP[numericValue]) {
+        return null;
+    }
     const hint = context?.parentPropertyName ?? context?.parentParameterName;
     if (hint) {
         const upper = toUpperSnakeCase(hint);
-        if (upper.includes('TIMEOUT') || upper.includes('INTERVAL') || upper.includes('DELAY')) {
-            return upper.endsWith('_MS') ? upper : `${upper}_MS`;
+        if (
+            upper.includes(KEYWORD_TIMEOUT) ||
+            upper.includes(KEYWORD_INTERVAL) ||
+            upper.includes(KEYWORD_DELAY)
+        ) {
+            return upper.endsWith(SUFFIX_MS) ? upper : `${upper}${SUFFIX_MS}`;
         }
     }
-    return COMMON_TIME_MS_MAP[num];
+    return COMMON_TIME_MS_MAP[numericValue];
 }
 
 /**
  * Resolves naming based on surrounding parameter, property, or variable identifier.
  *
- * @param anchor - Surrounding AST identifier name.
+ * @param anchorIdentifier - Surrounding AST identifier name.
  * @returns Inferred constant name.
  */
-function resolveAnchorName(anchor: string): string {
-    const snake = toUpperSnakeCase(anchor);
-    if (snake.includes('PORT')) return `DEFAULT_${snake}`;
+function resolveAnchorName(anchorIdentifier: string): string {
+    const snake = toUpperSnakeCase(anchorIdentifier);
+    if (snake.includes(KEYWORD_PORT)) {
+        return `${PREFIX_DEFAULT}${snake}`;
+    }
     if (
-        snake.includes('TIMEOUT') ||
-        snake.includes('DELAY') ||
-        snake.includes('INTERVAL') ||
-        snake.includes('DURATION')
+        snake.includes(KEYWORD_TIMEOUT) ||
+        snake.includes(KEYWORD_DELAY) ||
+        snake.includes(KEYWORD_INTERVAL) ||
+        snake.includes(KEYWORD_DURATION)
     ) {
-        return snake.endsWith('_MS') ? snake : `${snake}_MS`;
+        return snake.endsWith(SUFFIX_MS) ? snake : `${snake}${SUFFIX_MS}`;
     }
-    if (snake.includes('RETRY') || snake.includes('ATTEMPT')) {
-        return snake.startsWith('MAX_') ? snake : `MAX_${snake}`;
+    if (snake.includes(KEYWORD_RETRY) || snake.includes(KEYWORD_ATTEMPT)) {
+        return snake.startsWith(PREFIX_MAX) ? snake : `${PREFIX_MAX}${snake}`;
     }
-    return `DEFAULT_${snake}`;
+    return `${PREFIX_DEFAULT}${snake}`;
 }
 
 /**
  * Resolves fallback naming based on classification kind or integer magnitude.
  *
- * @param num - Numeric literal value.
- * @param value - Raw literal string text.
+ * @param numericValue - Numeric literal value.
+ * @param rawLiteralText - Raw literal string text.
  * @returns Fallback constant name.
  */
-function resolveFallbackNumericName(num: number, value: string): string {
-    const classification = classifyLiteral(value, true);
-    if (classification.kind === 'port') return `PORT_${num}`;
-    if (classification.kind === 'time-ms') return `DURATION_${num}_MS`;
-    if (Number.isInteger(num)) {
-        if (num > 0 && num <= 10) return `DEFAULT_LIMIT_${num}`;
-        if (num > 10 && num <= 100) return `DEFAULT_BATCH_SIZE_${num}`;
-        return `LIMIT_VALUE_${num}`;
+function resolveFallbackNumericName(numericValue: number, rawLiteralText: string): string {
+    const classification = classifyLiteral(rawLiteralText, true);
+    if (classification.kind === KIND_PORT) {
+        return `${PREFIX_PORT}${numericValue}`;
     }
-    return 'DEFAULT_NUMERIC_THRESHOLD';
+    if (classification.kind === KIND_TIME_MS) {
+        return `${PREFIX_DURATION}${numericValue}${SUFFIX_MS}`;
+    }
+    if (Number.isInteger(numericValue)) {
+        if (numericValue > 0 && numericValue <= DEFAULT_LIMIT_THRESHOLD) {
+            return `${PREFIX_DEFAULT_LIMIT}${numericValue}`;
+        }
+        if (
+            numericValue > DEFAULT_LIMIT_THRESHOLD &&
+            numericValue <= DEFAULT_BATCH_SIZE_THRESHOLD
+        ) {
+            return `${PREFIX_DEFAULT_BATCH}${numericValue}`;
+        }
+        return `${PREFIX_LIMIT_VALUE}${numericValue}`;
+    }
+    return DEFAULT_NUMERIC_THRESHOLD;
 }
 
 /**
  * Suggests a domain-aware constant name for numeric literals.
  *
- * @param value - Raw numeric literal text.
+ * @param literalText - Raw numeric literal text.
  * @param context - Optional AST naming context.
  * @returns Inferred semantic constant name.
  */
-function suggestNumericName(value: string, context?: SemanticNamingContext): string {
-    const num = Number(value);
-    if (!Number.isFinite(num)) {
-        return 'DEFAULT_NUMERIC_CONSTANT';
+function suggestNumericName(literalText: string, context?: SemanticNamingContext): string {
+    const numericValue = Number(literalText);
+    if (!Number.isFinite(numericValue)) {
+        return DEFAULT_NUMERIC_CONSTANT;
     }
-    const protocolName = resolveProtocolNumericName(num);
-    if (protocolName) return protocolName;
+    const protocolName = resolveProtocolNumericName(numericValue);
+    if (protocolName) {
+        return protocolName;
+    }
 
-    const timeName = resolveTimeMsName(num, context);
-    if (timeName) return timeName;
+    const timeName = resolveTimeMsName(numericValue, context);
+    if (timeName) {
+        return timeName;
+    }
 
-    const anchor =
+    const anchorIdentifier =
         context?.parentPropertyName ?? context?.parentParameterName ?? context?.parentLeftHandName;
-    if (anchor) return resolveAnchorName(anchor);
+    if (anchorIdentifier) {
+        return resolveAnchorName(anchorIdentifier);
+    }
 
-    return resolveFallbackNumericName(num, value);
+    return resolveFallbackNumericName(numericValue, literalText);
 }
 
-function inferAnchorStringName(anchor: string, raw: string): string | null {
-    const snake = toUpperSnakeCase(anchor);
-    if (snake.includes('HEADER')) return `HEADER_${toUpperSnakeCase(raw)}`;
-    if (snake.includes('EVENT')) return `EVENT_${toUpperSnakeCase(raw)}`;
-    if (snake.includes('ROUTE') || snake.includes('PATH') || snake.includes('URL')) {
-        return `${snake}_${toUpperSnakeCase(raw).slice(0, 20)}`;
+function inferAnchorStringName(anchorIdentifier: string, rawText: string): string | null {
+    const snake = toUpperSnakeCase(anchorIdentifier);
+    if (snake.includes(KEYWORD_HEADER)) {
+        return `${PREFIX_HEADER}${toUpperSnakeCase(rawText)}`;
+    }
+    if (snake.includes(KEYWORD_EVENT)) {
+        return `${PREFIX_EVENT}${toUpperSnakeCase(rawText)}`;
+    }
+    if (
+        snake.includes(KEYWORD_ROUTE) ||
+        snake.includes(KEYWORD_PATH) ||
+        snake.includes(KEYWORD_URL)
+    ) {
+        return `${snake}_${toUpperSnakeCase(rawText).slice(0, ROUTE_SLUG_MAX_LENGTH)}`;
     }
     return null;
 }
 
-function inferUrlConstantName(raw: string): string {
+function inferUrlConstantName(rawText: string): string {
     try {
-        const u = new URL(raw);
-        const hostSlug = toUpperSnakeCase(u.hostname.replace(/^www\./, ''));
-        const pathSlug = toUpperSnakeCase(u.pathname).slice(0, 16);
-        return pathSlug ? `${hostSlug}_${pathSlug}_URL` : `${hostSlug}_BASE_URL`;
+        const parsedUrl = new URL(rawText);
+        const hostSlug = toUpperSnakeCase(parsedUrl.hostname.replace(/^www\./, ''));
+        const pathSlug = toUpperSnakeCase(parsedUrl.pathname).slice(0, URL_PATH_MAX_LENGTH);
+        return pathSlug ? `${hostSlug}_${pathSlug}${SUFFIX_URL}` : `${hostSlug}${SUFFIX_BASE_URL}`;
     } catch {
-        return 'EXTERNAL_ENDPOINT_URL';
+        return EXTERNAL_ENDPOINT_URL;
     }
 }
 
-function inferFilePathConstantName(raw: string): string {
-    const segments = raw.split(/[\\/]/).filter(Boolean);
-    const last = segments[segments.length - 1] || 'FILE';
+function inferFilePathConstantName(rawText: string): string {
+    const segments = rawText.split(/[\\/]/).filter(Boolean);
+    const last = segments[segments.length - 1] || DEFAULT_FILE_TOKEN;
     const cleaned = toUpperSnakeCase(last.replace(/\.[^.]+$/, ''));
-    return `PATH_${cleaned}`;
+    return `${PREFIX_PATH}${cleaned}`;
 }
 
-function inferWordsConstantName(raw: string): string | null {
-    const words = raw
+function inferWordsConstantName(rawText: string): string | null {
+    const words = rawText
         .replace(/[^A-Za-z0-9]+/g, ' ')
         .trim()
         .split(/\s+/)
-        .filter((w) => !STOP_WORDS.has(w.toLowerCase()))
-        .slice(0, 4);
+        .filter((wordToken) => !STOP_WORDS.has(wordToken.toLowerCase()))
+        .slice(0, MAX_INFERRED_WORDS_COUNT);
 
-    if (words.length === 0) return null;
-    const slug = words.map((w) => w.toUpperCase()).join('_');
-    if (raw.startsWith('/') || raw.includes('/')) {
-        return `ROUTE_${slug}`;
+    if (words.length === 0) {
+        return null;
     }
-    return slug.length > 30 ? slug.slice(0, 30) : slug;
+    const slug = words.map((wordToken) => wordToken.toUpperCase()).join('_');
+    if (rawText.startsWith('/') || rawText.includes('/')) {
+        return `${PREFIX_ROUTE}${slug}`;
+    }
+    return slug.length > WORD_SLUG_MAX_LENGTH ? slug.slice(0, WORD_SLUG_MAX_LENGTH) : slug;
 }
 
 /**
  * Suggests a domain-aware constant name for string literals.
  */
-function suggestStringName(value: string, context?: SemanticNamingContext): string {
-    const raw = stripLiteralQuotes(value).trim();
-    if (!raw) return 'EMPTY_STRING_CONSTANT';
-
-    if (KNOWN_EVENTS.has(raw.toLowerCase())) {
-        return `EVENT_${raw.toUpperCase()}`;
+function suggestStringName(literalText: string, context?: SemanticNamingContext): string {
+    const rawText = stripLiteralQuotes(literalText).trim();
+    if (!rawText) {
+        return EMPTY_STRING_CONSTANT;
     }
 
-    const anchor =
+    if (KNOWN_EVENTS.has(rawText.toLowerCase())) {
+        return `${PREFIX_EVENT}${rawText.toUpperCase()}`;
+    }
+
+    const anchorIdentifier =
         context?.parentPropertyName || context?.parentParameterName || context?.parentLeftHandName;
-    if (anchor) {
-        const anchorName = inferAnchorStringName(anchor, raw);
-        if (anchorName) return anchorName;
+    if (anchorIdentifier) {
+        const anchorName = inferAnchorStringName(anchorIdentifier, rawText);
+        if (anchorName) {
+            return anchorName;
+        }
     }
 
-    const classification = classifyLiteral(raw, false);
-    if (classification.kind === 'url') return inferUrlConstantName(raw);
-    if (classification.kind === 'file-path') return inferFilePathConstantName(raw);
+    const classification = classifyLiteral(rawText, false);
+    if (classification.kind === KIND_URL) {
+        return inferUrlConstantName(rawText);
+    }
+    if (classification.kind === KIND_FILE_PATH) {
+        return inferFilePathConstantName(rawText);
+    }
 
-    const lower = raw.toLowerCase();
+    const lower = rawText.toLowerCase();
     if (STATUS_INDICATORS.has(lower)) {
-        return `STATUS_${lower.toUpperCase()}`;
+        return `${PREFIX_STATUS}${lower.toUpperCase()}`;
     }
 
-    const wordSlug = inferWordsConstantName(raw);
-    if (wordSlug) return wordSlug;
-
-    return 'DEFAULT_TEXT_LITERAL';
+    const wordSlug = inferWordsConstantName(rawText);
+    return wordSlug ? wordSlug : DEFAULT_TEXT_LITERAL;
 }
 
 /**
  * Generates a refined, domain-aware constant name.
  *
- * @param value - Raw or quoted literal string representation.
+ * @param literalText - Raw or quoted literal string representation.
  * @param isNumeric - True if literal represents a numeric value.
  * @param context - Optional AST and scope context.
  * @returns Refined uppercase constant identifier.
  */
 export function generateSemanticConstantName(
-    value: string,
+    literalText: string,
     isNumeric: boolean,
     context?: SemanticNamingContext,
 ): string {
     if (isNumeric) {
-        return suggestNumericName(value, context);
+        return suggestNumericName(literalText, context);
     }
-    return suggestStringName(value, context);
+    return suggestStringName(literalText, context);
 }

@@ -1,7 +1,7 @@
 {
   "version": "1.2.0",
   "granularity": "grouped",
-  "timestamp": "2026-10-07T11:32:30.404Z",
+  "timestamp": "2026-10-12T15:17:50.121Z",
   "groups": [
     {
       "key": "comments|CMT-HDR-001|crates/auto-refactor-core/build.rs",
@@ -348,9 +348,9 @@
     },
     {
       "key": "simplify|SIM-LONG-001|crates/ops-mask/src/lib.rs",
-      "count": 2,
+      "count": 1,
       "severities": {
-        "warning": 2
+        "warning": 1
       }
     },
     {
@@ -390,9 +390,9 @@
     },
     {
       "key": "complexity|CPX-SPACE-001|crates/ops-pattern/src/lib.rs",
-      "count": 2,
+      "count": 1,
       "severities": {
-        "warning": 2
+        "warning": 1
       }
     },
     {
@@ -438,13 +438,6 @@
       }
     },
     {
-      "key": "complexity|high-complexity|scripts/bench-deep-stress.js",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "simplify|SIM-LONG-001|scripts/bench-deep-stress.js",
       "count": 1,
       "severities": {
@@ -474,20 +467,6 @@
     },
     {
       "key": "simplify|SIM-LONG-001|scripts/bench-fastpath.js",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "complexity|high-complexity|scripts/bench-hot-paths.js",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "simplify|SIM-LONG-001|scripts/bench-hot-paths.js",
       "count": 1,
       "severities": {
         "warning": 1
@@ -1103,13 +1082,6 @@
       }
     },
     {
-      "key": "governance|GOV-PRF-005|scripts/validate-mit-corpus.js",
-      "count": 1,
-      "severities": {
-        "info": 1
-      }
-    },
-    {
       "key": "large-file|large-file|scripts/validate-multi-agent.js",
       "count": 1,
       "severities": {
@@ -1128,13 +1100,6 @@
       "count": 3,
       "severities": {
         "warning": 3
-      }
-    },
-    {
-      "key": "governance|GOV-PRF-005|scripts/validate-naming-decoupling-architecture.js",
-      "count": 1,
-      "severities": {
-        "info": 1
       }
     },
     {
@@ -1173,13 +1138,6 @@
       }
     },
     {
-      "key": "complexity|high-complexity|scripts/validate-native-operator.js",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "simplify|SIM-LONG-001|scripts/validate-native-operator.js",
       "count": 1,
       "severities": {
@@ -1202,20 +1160,6 @@
     },
     {
       "key": "simplify|SIM-LONG-001|scripts/validate-native-parity.js",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "complexity|high-complexity|scripts/validate-oxc-keypoints.js",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "simplify|SIM-LONG-001|scripts/validate-oxc-keypoints.js",
       "count": 1,
       "severities": {
         "warning": 1
@@ -1296,13 +1240,6 @@
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "governance|GOV-PRF-005|scripts/validate-python.js",
-      "count": 1,
-      "severities": {
-        "info": 1
       }
     },
     {
@@ -1520,13 +1457,6 @@
       "count": 2,
       "severities": {
         "warning": 2
-      }
-    },
-    {
-      "key": "simplify|SIM-LONG-001|scripts/validate-self-audit.js",
-      "count": 1,
-      "severities": {
-        "warning": 1
       }
     },
     {
@@ -1775,13 +1705,6 @@
       }
     },
     {
-      "key": "simplify|SIM-LONG-001|src/analyzers/architecture.ts",
-      "count": 2,
-      "severities": {
-        "warning": 2
-      }
-    },
-    {
       "key": "large-file|large-file|src/analyzers/comments.ts",
       "count": 1,
       "severities": {
@@ -1818,9 +1741,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/analyzers/complexity-loops.ts",
-      "count": 8,
+      "count": 7,
       "severities": {
-        "warning": 8
+        "warning": 7
       }
     },
     {
@@ -1901,13 +1824,6 @@
       }
     },
     {
-      "key": "complexity|high-complexity|src/analyzers/constants.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "hygiene|HYG-DED-001|src/analyzers/constants.ts",
       "count": 1,
       "severities": {
@@ -1958,9 +1874,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/analyzers/dependency-layout.ts",
-      "count": 8,
+      "count": 4,
       "severities": {
-        "warning": 8
+        "warning": 4
       }
     },
     {
@@ -2014,9 +1930,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/analyzers/gdscript-game.ts",
-      "count": 22,
+      "count": 18,
       "severities": {
-        "warning": 22
+        "warning": 18
       }
     },
     {
@@ -2112,9 +2028,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/analyzers/hygiene.ts",
-      "count": 10,
+      "count": 8,
       "severities": {
-        "warning": 10
+        "warning": 8
       }
     },
     {
@@ -2140,44 +2056,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/analyzers/large-file.ts",
-      "count": 10,
-      "severities": {
-        "warning": 10
-      }
-    },
-    {
-      "key": "governance|GOV-DAT-001|src/analyzers/large-file.ts",
       "count": 2,
       "severities": {
-        "info": 2
-      }
-    },
-    {
-      "key": "governance|GOV-TYP-003|src/analyzers/large-file.ts",
-      "count": 12,
-      "severities": {
-        "warning": 12
-      }
-    },
-    {
-      "key": "constants|magic-number|src/analyzers/large-file.ts",
-      "count": 6,
-      "severities": {
-        "warning": 6
-      }
-    },
-    {
-      "key": "complexity|high-complexity|src/analyzers/large-file.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "simplify|SIM-LONG-001|src/analyzers/large-file.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
+        "warning": 2
       }
     },
     {
@@ -2185,20 +2066,6 @@
       "count": 2,
       "severities": {
         "warning": 2
-      }
-    },
-    {
-      "key": "complexity|high-complexity|src/analyzers/naming-path-helper.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "simplify|SIM-LONG-001|src/analyzers/naming-path-helper.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
       }
     },
     {
@@ -2664,24 +2531,10 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|src/core/architecture/config-driven-architecture.ts",
-      "count": 7,
-      "severities": {
-        "warning": 7
-      }
-    },
-    {
       "key": "constants|magic-number|src/core/architecture/config-driven-architecture.ts",
       "count": 21,
       "severities": {
         "warning": 21
-      }
-    },
-    {
-      "key": "governance|GOV-PRF-005|src/core/architecture/config-driven-architecture.ts",
-      "count": 1,
-      "severities": {
-        "info": 1
       }
     },
     {
@@ -2801,20 +2654,6 @@
       "count": 4,
       "severities": {
         "warning": 4
-      }
-    },
-    {
-      "key": "complexity|high-complexity|src/core/architecture/naming-decoupling-auditor.ts",
-      "count": 2,
-      "severities": {
-        "warning": 2
-      }
-    },
-    {
-      "key": "simplify|SIM-LONG-001|src/core/architecture/naming-decoupling-auditor.ts",
-      "count": 2,
-      "severities": {
-        "warning": 2
       }
     },
     {
@@ -3267,9 +3106,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/cache.ts",
-      "count": 11,
+      "count": 8,
       "severities": {
-        "warning": 11
+        "warning": 8
       }
     },
     {
@@ -3336,34 +3175,6 @@
       }
     },
     {
-      "key": "governance|GOV-PRF-005|src/core/cfg/cfg-builder.ts",
-      "count": 1,
-      "severities": {
-        "info": 1
-      }
-    },
-    {
-      "key": "complexity|CPX-NEST-001|src/core/cfg/cfg-builder.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "complexity|high-complexity|src/core/cfg/cfg-builder.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "performance|PRF-ALG-001|src/core/cfg/def-use-chain.ts",
-      "count": 4,
-      "severities": {
-        "warning": 4
-      }
-    },
-    {
       "key": "constants|hardcoded-string|src/core/cfg/def-use-chain.ts",
       "count": 6,
       "severities": {
@@ -3406,24 +3217,10 @@
       }
     },
     {
-      "key": "performance|PRF-IO-001|src/core/codemod/patch-engine.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "constants|magic-number|src/core/codemod/patch-engine.ts",
       "count": 3,
       "severities": {
         "warning": 3
-      }
-    },
-    {
-      "key": "complexity|CPX-NEST-001|src/core/codemod/transforms/extract-constant.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
       }
     },
     {
@@ -3617,9 +3414,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/config/config.ts",
-      "count": 27,
+      "count": 26,
       "severities": {
-        "warning": 27
+        "warning": 26
       }
     },
     {
@@ -3637,28 +3434,7 @@
       }
     },
     {
-      "key": "complexity|high-complexity|src/core/config/metric-parser.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "simplify|SIM-TRN-001|src/core/config/metric-parser.ts",
-      "count": 1,
-      "severities": {
-        "info": 1
-      }
-    },
-    {
       "key": "large-file|large-file|src/core/dependency-graph.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "complexity|high-complexity|src/core/dependency-graph.ts",
       "count": 1,
       "severities": {
         "warning": 1
@@ -3802,13 +3578,6 @@
       "count": 1,
       "severities": {
         "info": 1
-      }
-    },
-    {
-      "key": "complexity|high-complexity|src/core/diff/myers-algorithm.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
       }
     },
     {
@@ -3994,13 +3763,6 @@
       }
     },
     {
-      "key": "complexity|CPX-NEST-001|src/core/file-discovery.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "governance|GOV-PRF-004|src/core/file-discovery.ts",
       "count": 1,
       "severities": {
@@ -4057,20 +3819,6 @@
       }
     },
     {
-      "key": "complexity|high-complexity|src/core/governance/rules/compressionBounds.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "hygiene|HYG-CLN-001|src/core/governance/rules/compressionBounds.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "governance|GOV-DAT-001|src/core/governance/rules/compressionBounds.ts",
       "count": 1,
       "severities": {
@@ -4114,9 +3862,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/governance/rules/maintainability.ts",
-      "count": 13,
+      "count": 12,
       "severities": {
-        "warning": 13
+        "warning": 12
       }
     },
     {
@@ -4131,13 +3879,6 @@
       "count": 1,
       "severities": {
         "info": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/governance/rules/performance.ts",
-      "count": 2,
-      "severities": {
-        "warning": 2
       }
     },
     {
@@ -4176,13 +3917,6 @@
       }
     },
     {
-      "key": "governance|GOV-PRF-005|src/core/governance/rules/type-system-helpers.ts",
-      "count": 1,
-      "severities": {
-        "info": 1
-      }
-    },
-    {
       "key": "governance|GOV-DAT-001|src/core/governance/rules/type-system-helpers.ts",
       "count": 2,
       "severities": {
@@ -4201,27 +3935,6 @@
       "count": 5,
       "severities": {
         "warning": 5
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/governance/semantic-naming-engine.ts",
-      "count": 72,
-      "severities": {
-        "warning": 72
-      }
-    },
-    {
-      "key": "constants|magic-number|src/core/governance/semantic-naming-engine.ts",
-      "count": 8,
-      "severities": {
-        "warning": 8
-      }
-    },
-    {
-      "key": "simplify|SIM-TRN-001|src/core/governance/semantic-naming-engine.ts",
-      "count": 1,
-      "severities": {
-        "info": 1
       }
     },
     {
@@ -4393,13 +4106,6 @@
       }
     },
     {
-      "key": "hygiene|HYG-CLN-001|src/core/intelligence/code-density-analyzer.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "constants|magic-number|src/core/intelligence/code-density-analyzer.ts",
       "count": 2,
       "severities": {
@@ -4432,20 +4138,6 @@
       "count": 19,
       "severities": {
         "warning": 19
-      }
-    },
-    {
-      "key": "complexity|high-complexity|src/core/intelligence/contextSlice.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "simplify|SIM-LONG-001|src/core/intelligence/contextSlice.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
       }
     },
     {
@@ -4611,9 +4303,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/intelligence/dependencyLayoutHelpers.ts",
-      "count": 11,
+      "count": 9,
       "severities": {
-        "warning": 11
+        "warning": 9
       }
     },
     {
@@ -4628,13 +4320,6 @@
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "governance|GOV-PRF-005|src/core/intelligence/dependencyLayoutHelpers.ts",
-      "count": 1,
-      "severities": {
-        "info": 1
       }
     },
     {
@@ -4855,17 +4540,10 @@
       }
     },
     {
-      "key": "complexity|high-complexity|src/core/intelligence/semanticArchitecture.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "constants|hardcoded-string|src/core/intelligence/semanticArchitecture.ts",
-      "count": 21,
+      "count": 5,
       "severities": {
-        "warning": 21
+        "warning": 5
       }
     },
     {
@@ -4873,13 +4551,6 @@
       "count": 1,
       "severities": {
         "info": 1
-      }
-    },
-    {
-      "key": "simplify|SIM-LONG-001|src/core/intelligence/semanticComplexity.ts",
-      "count": 3,
-      "severities": {
-        "warning": 3
       }
     },
     {
@@ -4925,13 +4596,6 @@
       }
     },
     {
-      "key": "complexity|high-complexity|src/core/intelligence/symbolIndex.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "simplify|SIM-LONG-001|src/core/intelligence/testModernity.ts",
       "count": 1,
       "severities": {
@@ -4971,20 +4635,6 @@
       "count": 24,
       "severities": {
         "warning": 24
-      }
-    },
-    {
-      "key": "complexity|high-complexity|src/core/intelligence/testModernityAuditor.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "simplify|SIM-LONG-001|src/core/intelligence/testModernityAuditor.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
       }
     },
     {
@@ -5073,13 +4723,6 @@
     },
     {
       "key": "governance|GOV-PRF-004|src/core/logger.ts",
-      "count": 2,
-      "severities": {
-        "warning": 2
-      }
-    },
-    {
-      "key": "performance|PRF-IO-001|src/core/logger.ts",
       "count": 1,
       "severities": {
         "warning": 1
@@ -5139,13 +4782,6 @@
       "count": 2,
       "severities": {
         "warning": 2
-      }
-    },
-    {
-      "key": "complexity|high-complexity|src/core/memory/semanticMatcher.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
       }
     },
     {
@@ -5233,13 +4869,6 @@
       }
     },
     {
-      "key": "governance|GOV-PRF-005|src/core/native/native-bridge.ts",
-      "count": 1,
-      "severities": {
-        "info": 1
-      }
-    },
-    {
       "key": "constants|magic-number|src/core/native/native-bridge.ts",
       "count": 3,
       "severities": {
@@ -5265,13 +4894,6 @@
       "count": 1,
       "severities": {
         "info": 1
-      }
-    },
-    {
-      "key": "constants|magic-number|src/core/native/native-clone-shim.ts",
-      "count": 139,
-      "severities": {
-        "warning": 139
       }
     },
     {
@@ -5310,31 +4932,10 @@
       }
     },
     {
-      "key": "constants|magic-number|src/core/native/native-flow-shim.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "constants|hardcoded-string|src/core/native/native-types.ts",
       "count": 2,
       "severities": {
         "warning": 2
-      }
-    },
-    {
-      "key": "complexity|high-complexity|src/core/patterns/pattern-matcher.ts",
-      "count": 2,
-      "severities": {
-        "warning": 2
-      }
-    },
-    {
-      "key": "simplify|SIM-LONG-001|src/core/patterns/pattern-matcher.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
       }
     },
     {
@@ -5349,27 +4950,6 @@
       "count": 3,
       "severities": {
         "warning": 3
-      }
-    },
-    {
-      "key": "hygiene|HYG-CLN-001|src/core/patterns/pattern-matcher.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "complexity|CPX-NEST-001|src/core/patterns/pattern-matcher.ts",
-      "count": 2,
-      "severities": {
-        "warning": 2
-      }
-    },
-    {
-      "key": "governance|GOV-PRF-005|src/core/patterns/pattern-matcher.ts",
-      "count": 1,
-      "severities": {
-        "info": 1
       }
     },
     {
@@ -5394,13 +4974,6 @@
       }
     },
     {
-      "key": "complexity|high-complexity|src/core/pipeline/cycle-detector.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "hygiene|HYG-CLN-001|src/core/pipeline/cycle-detector.ts",
       "count": 1,
       "severities": {
@@ -5409,9 +4982,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/pipeline/dualTrackPipeline.ts",
-      "count": 20,
+      "count": 18,
       "severities": {
-        "warning": 20
+        "warning": 18
       }
     },
     {
@@ -5451,9 +5024,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/policy/gitignore.ts",
-      "count": 2,
+      "count": 1,
       "severities": {
-        "warning": 2
+        "warning": 1
       }
     },
     {
@@ -5472,16 +5045,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/policy/source-mask.ts",
-      "count": 4,
+      "count": 3,
       "severities": {
-        "warning": 4
-      }
-    },
-    {
-      "key": "constants|magic-number|src/core/policy/source-mask.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
+        "warning": 3
       }
     },
     {
@@ -5489,20 +5055,6 @@
       "count": 1,
       "severities": {
         "info": 1
-      }
-    },
-    {
-      "key": "governance|GOV-PRF-005|src/core/policy/source-mask.ts",
-      "count": 1,
-      "severities": {
-        "info": 1
-      }
-    },
-    {
-      "key": "complexity|CPX-NEST-001|src/core/policy/source-mask.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
       }
     },
     {
@@ -5570,16 +5122,9 @@
     },
     {
       "key": "governance|GOV-PRF-004|src/core/praxis/feedback-adaptive-supervisor.ts",
-      "count": 5,
+      "count": 1,
       "severities": {
-        "warning": 5
-      }
-    },
-    {
-      "key": "performance|PRF-IO-001|src/core/praxis/feedback-adaptive-supervisor.ts",
-      "count": 2,
-      "severities": {
-        "warning": 2
+        "warning": 1
       }
     },
     {
@@ -5716,13 +5261,6 @@
       }
     },
     {
-      "key": "complexity|CPX-NEST-001|src/core/profiler/maturityClassifier.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "simplify|SIM-TRN-001|src/core/profiler/maturityClassifier.ts",
       "count": 1,
       "severities": {
@@ -5783,13 +5321,6 @@
       "count": 7,
       "severities": {
         "warning": 7
-      }
-    },
-    {
-      "key": "complexity|high-complexity|src/core/reporters.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
       }
     },
     {
@@ -6010,13 +5541,6 @@
       }
     },
     {
-      "key": "complexity|high-complexity|src/core/router/sparseRuleRouter.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "constants|hardcoded-string|src/core/rules/entries/analyzers.ts",
       "count": 18,
       "severities": {
@@ -6081,9 +5605,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/rules/evolution/dispatchComplexityRule.ts",
-      "count": 8,
+      "count": 5,
       "severities": {
-        "warning": 8
+        "warning": 5
       }
     },
     {
@@ -6136,20 +5660,6 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|src/core/rules/evolution/silentExceptionRule.ts",
-      "count": 2,
-      "severities": {
-        "warning": 2
-      }
-    },
-    {
-      "key": "complexity|high-complexity|src/core/rules/evolution/silentExceptionRule.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "simplify|SIM-TRN-001|src/core/rules/evolution/template-complexity-rule.ts",
       "count": 1,
       "severities": {
@@ -6172,23 +5682,16 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/rules/evolution/wrapperRule.ts",
-      "count": 9,
+      "count": 3,
       "severities": {
-        "warning": 9
+        "warning": 3
       }
     },
     {
       "key": "constants|hardcoded-string|src/core/rules/pyramid/layer1Evaluator.ts",
-      "count": 14,
+      "count": 9,
       "severities": {
-        "warning": 14
-      }
-    },
-    {
-      "key": "complexity|high-complexity|src/core/rules/pyramid/layer1Evaluator.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
+        "warning": 9
       }
     },
     {
@@ -6207,9 +5710,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/rules/pyramid/performanceRules.ts",
-      "count": 41,
+      "count": 37,
       "severities": {
-        "warning": 41
+        "warning": 37
       }
     },
     {
@@ -6416,13 +5919,6 @@
       }
     },
     {
-      "key": "complexity|CPX-NEST-002|src/core/scanner/worker-scheduler.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "governance|GOV-DAT-001|src/core/scanner/worker-scheduler.ts",
       "count": 1,
       "severities": {
@@ -6462,13 +5958,6 @@
       "count": 2,
       "severities": {
         "warning": 2
-      }
-    },
-    {
-      "key": "complexity|high-complexity|src/core/scheduler/dynamic-partitioner.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
       }
     },
     {
@@ -6640,13 +6129,6 @@
       }
     },
     {
-      "key": "constants|magic-number|src/core/scoring/archetype-weight-tuner.ts",
-      "count": 2,
-      "severities": {
-        "warning": 2
-      }
-    },
-    {
       "key": "large-file|large-file|src/core/scoring/autonomy-scorer.ts",
       "count": 1,
       "severities": {
@@ -6787,27 +6269,6 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|src/core/scoring/dimensionDeductions.ts",
-      "count": 8,
-      "severities": {
-        "warning": 8
-      }
-    },
-    {
-      "key": "constants|magic-number|src/core/scoring/dimensionDeductions.ts",
-      "count": 2,
-      "severities": {
-        "warning": 2
-      }
-    },
-    {
-      "key": "complexity|high-complexity|src/core/scoring/dimensionDeductions.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "hygiene|HYG-DED-001|src/core/scoring/dimensionFamilyDeductions.ts",
       "count": 1,
       "severities": {
@@ -6829,13 +6290,6 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|src/core/scoring/dimensionRuleTable.ts",
-      "count": 57,
-      "severities": {
-        "warning": 57
-      }
-    },
-    {
       "key": "constants|hardcoded-string|src/core/scoring/dual-track-test-evaluator.ts",
       "count": 29,
       "severities": {
@@ -6854,20 +6308,6 @@
       "count": 8,
       "severities": {
         "warning": 8
-      }
-    },
-    {
-      "key": "complexity|high-complexity|src/core/scoring/dual-track-test-evaluator.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "simplify|SIM-LONG-001|src/core/scoring/dual-track-test-evaluator.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
       }
     },
     {
@@ -6956,9 +6396,9 @@
     },
     {
       "key": "constants|magic-number|src/core/scoring/hierarchicalScorer.ts",
-      "count": 5,
+      "count": 3,
       "severities": {
-        "warning": 5
+        "warning": 3
       }
     },
     {
@@ -7207,20 +6647,6 @@
       }
     },
     {
-      "key": "complexity|high-complexity|src/core/scoring/topological-churn-evaluator.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "simplify|SIM-LONG-001|src/core/scoring/topological-churn-evaluator.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "constants|hardcoded-string|src/core/semantic-types.ts",
       "count": 5,
       "severities": {
@@ -7243,9 +6669,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/semantic/adapters/python-adapter.ts",
-      "count": 7,
+      "count": 4,
       "severities": {
-        "warning": 7
+        "warning": 4
       }
     },
     {
@@ -7341,9 +6767,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/telemetry/lcov-ingester.ts",
-      "count": 13,
+      "count": 10,
       "severities": {
-        "warning": 13
+        "warning": 10
       }
     },
     {
@@ -7368,13 +6794,6 @@
       }
     },
     {
-      "key": "hygiene|HYG-CLN-001|src/core/telemetry/lcov-ingester.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "constants|duplicate-literal|src/core/trajectory/agentAttribution.ts",
       "count": 1,
       "severities": {
@@ -7390,9 +6809,9 @@
     },
     {
       "key": "governance|GOV-PRF-005|src/core/trajectory/agentCollisionDetector.ts",
-      "count": 2,
+      "count": 1,
       "severities": {
-        "info": 2
+        "info": 1
       }
     },
     {
@@ -7473,31 +6892,10 @@
       }
     },
     {
-      "key": "complexity|high-complexity|src/core/trajectory/patchArbiter.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "constants|hardcoded-string|src/core/trajectory/patchArbiter.ts",
       "count": 2,
       "severities": {
         "warning": 2
-      }
-    },
-    {
-      "key": "constants|magic-number|src/core/trajectory/recipeExtractor.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/trajectory/recipeTypes.ts",
-      "count": 11,
-      "severities": {
-        "warning": 11
       }
     },
     {
@@ -7578,13 +6976,6 @@
       }
     },
     {
-      "key": "complexity|high-complexity|src/core/worker.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "simplify|SIM-LONG-001|src/core/worker.ts",
       "count": 1,
       "severities": {
@@ -7607,20 +6998,13 @@
     },
     {
       "key": "constants|hardcoded-string|src/daemon/client.ts",
-      "count": 10,
+      "count": 9,
       "severities": {
-        "warning": 10
+        "warning": 9
       }
     },
     {
       "key": "hygiene|HYG-CLN-001|src/daemon/client.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "complexity|high-complexity|src/daemon/client.ts",
       "count": 1,
       "severities": {
         "warning": 1
@@ -7655,17 +7039,10 @@
       }
     },
     {
-      "key": "performance|PRF-IO-001|src/daemon/registry.ts",
+      "key": "constants|hardcoded-string|src/daemon/scanHandler.ts",
       "count": 2,
       "severities": {
         "warning": 2
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/daemon/scanHandler.ts",
-      "count": 3,
-      "severities": {
-        "warning": 3
       }
     },
     {
@@ -7712,9 +7089,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/index.ts",
-      "count": 21,
+      "count": 15,
       "severities": {
-        "warning": 21
+        "warning": 15
       }
     },
     {
@@ -7732,13 +7109,6 @@
       }
     },
     {
-      "key": "governance|GOV-TYP-003|src/index.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "governance|GOV-PRF-004|src/index.ts",
       "count": 1,
       "severities": {
@@ -7750,13 +7120,6 @@
       "count": 1,
       "severities": {
         "info": 1
-      }
-    },
-    {
-      "key": "complexity|high-complexity|src/utils/linestats.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
       }
     },
     {

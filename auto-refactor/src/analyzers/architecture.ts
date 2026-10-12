@@ -63,6 +63,23 @@ interface ArchitectureOptions {
     flagTemplateComplexity?: boolean;
 }
 
+interface ArchitectureAuditContext {
+    file: string;
+    currentLayer: ArchitectureLayer;
+    ctx: AnalyzerContext;
+    opts: ArchitectureOptions;
+    forbiddenModules: Set<string>;
+    issues: Issue[];
+    customHeadlessSet?: Set<string>;
+}
+
+interface LayerDependencyAuditTarget {
+    spec: SpecifierInfo;
+    resolvedPath: string;
+    targetLayer: ArchitectureLayer;
+    lineIdx: number;
+}
+
 const DEFAULT_FORBIDDEN_DOMAIN_IMPORTS = (
     'express koa fastify react vue @angular svelte django fastapi flask ' +
     'actix_web actix-web axum tokio godot vscode electron pg mysql mysql2 sqlite3 ' +
@@ -143,6 +160,31 @@ const ARCHITECTURE_LAYER_INFRASTRUCTURE = 'infrastructure';
 
 function isExemptLayer(layer: ArchitectureLayer): boolean {
     return layer === 'test' || layer === 'tooling' || layer === 'shared';
+}
+
+function shouldSkipArchitectureAnalysis(
+    opts: ArchitectureOptions,
+    ctx: AnalyzerContext,
+    currentLayer: ArchitectureLayer,
+): boolean {
+    if (opts.enforceCleanLayers === false) return true;
+    const arch = ctx.config?.archetype;
+    if (arch === 'stdlib' || arch === 'systems_runtime') return true;
+    return isExemptLayer(currentLayer);
+}
+
+function decorateActionableSuggestions(issues: Issue[]): void {
+    for (const iss of issues) {
+        if (!iss.actionable && ARCH_ACTIONABLE_MAP[iss.rule]) {
+            const mapped = ARCH_ACTIONABLE_MAP[iss.rule];
+            iss.actionable = {
+                action: mapped.action,
+                code: mapped.code,
+                safeToAutomate: mapped.safeToAutomate,
+                templateSnippet: mapped.templateSnippet,
+            };
+        }
+    }
 }
 
 function shouldFlagConfigLeakage(opts: ArchitectureOptions, ctx: AnalyzerContext): boolean {
@@ -268,16 +310,9 @@ export class ArchitectureAnalyzer implements Analyzer {
     analyze(sf: import('typescript').SourceFile, ctx: AnalyzerContext): Issue[] {
         void sf;
         const opts = (ctx.options || {}) as ArchitectureOptions;
-        if (opts.enforceCleanLayers === false) {
-            return [];
-        }
-        if (ctx.config?.archetype === 'stdlib' || ctx.config?.archetype === 'systems_runtime') {
-            return [];
-        }
-
         const file = ctx.filePath.replace(/\\/g, '/');
         const currentLayer = this.resolveLayer(file, opts, ctx);
-        if (isExemptLayer(currentLayer)) {
+        if (shouldSkipArchitectureAnalysis(opts, ctx, currentLayer)) {
             return [];
         }
 
@@ -285,17 +320,16 @@ export class ArchitectureAnalyzer implements Analyzer {
         issues.push(...auditEvolutionaryArchitectureRules(ctx.content || '', file, ctx, opts));
 
         const forbiddenList = opts.forbiddenDomainImports || DEFAULT_FORBIDDEN_DOMAIN_IMPORTS;
-        const forbiddenModules = new Set(forbiddenList);
-
-        this.scanSourceLines(
-            ctx.content || '',
+        const auditCtx: ArchitectureAuditContext = {
             file,
             currentLayer,
             ctx,
             opts,
-            forbiddenModules,
+            forbiddenModules: new Set(forbiddenList),
             issues,
-        );
+        };
+
+        this.scanSourceLines(ctx.content || '', auditCtx);
 
         if (shouldFlagConfigLeakage(opts, ctx)) {
             const cfgResult = auditConfigDrivenArchitecture([
@@ -308,34 +342,16 @@ export class ArchitectureAnalyzer implements Analyzer {
             issues.push(...cfgResult.issues);
         }
 
-        for (const iss of issues) {
-            if (!iss.actionable && ARCH_ACTIONABLE_MAP[iss.rule]) {
-                const mapped = ARCH_ACTIONABLE_MAP[iss.rule];
-                iss.actionable = {
-                    action: mapped.action,
-                    code: mapped.code,
-                    safeToAutomate: mapped.safeToAutomate,
-                    templateSnippet: mapped.templateSnippet,
-                };
-            }
-        }
-
+        decorateActionableSuggestions(issues);
         return issues;
     }
 
-    private scanSourceLines(
-        content: string,
-        file: string,
-        currentLayer: ArchitectureLayer,
-        ctx: AnalyzerContext,
-        opts: ArchitectureOptions,
-        forbiddenModules: Set<string>,
-        issues: Issue[],
-    ): void {
-        const thresholdHeadless = (ctx.config?.thresholds as ArchitectureThresholds | undefined)
-            ?.headlessDisallowedImports;
-        const customHeadless = opts.headlessDisallowedImports ?? thresholdHeadless;
-        const customHeadlessSet = customHeadless ? new Set(customHeadless) : undefined;
+    private scanSourceLines(content: string, auditCtx: ArchitectureAuditContext): void {
+        const thresholdHeadless = (
+            auditCtx.ctx.config?.thresholds as ArchitectureThresholds | undefined
+        )?.headlessDisallowedImports;
+        const customHeadless = auditCtx.opts.headlessDisallowedImports ?? thresholdHeadless;
+        auditCtx.customHeadlessSet = customHeadless ? new Set(customHeadless) : undefined;
 
         const len = content.length;
         if (len === 0) return;
@@ -362,29 +378,10 @@ export class ArchitectureAnalyzer implements Analyzer {
             const lineText = content.slice(lineStart, sliceEnd);
             const trimmed = lineText.trim();
 
-            this.checkDtoLeakage(trimmed, file, currentLayer, lineIdx, ctx, opts, issues);
-            const specifiers = extractSpecifiers(lineText, trimmed, file);
-            this.auditSpecifiers(
-                specifiers,
-                file,
-                currentLayer,
-                lineIdx,
-                ctx,
-                opts,
-                forbiddenModules,
-                issues,
-                customHeadlessSet,
-            );
-            this.checkGlobalAndConfigViolations(
-                lineText,
-                trimmed,
-                file,
-                currentLayer,
-                lineIdx,
-                ctx,
-                opts,
-                issues,
-            );
+            this.checkDtoLeakage(trimmed, lineIdx, auditCtx);
+            const specifiers = extractSpecifiers(lineText, trimmed, auditCtx.file);
+            this.auditSpecifiers(specifiers, lineIdx, auditCtx);
+            this.checkGlobalAndConfigViolations(lineText, trimmed, lineIdx, auditCtx);
 
             lineIdx++;
             lineStart = i + 1;
@@ -393,25 +390,22 @@ export class ArchitectureAnalyzer implements Analyzer {
 
     private checkMutableGlobalState(
         lineText: string,
-        file: string,
         lineIdx: number,
-        ctx: AnalyzerContext,
-        opts: ArchitectureOptions,
-        issues: Issue[],
+        auditCtx: ArchitectureAuditContext,
     ): void {
         const flagGlobal =
-            opts.flagMutableGlobalCoupling ??
-            ctx.config.thresholds?.flagMutableGlobalCoupling ??
+            auditCtx.opts.flagMutableGlobalCoupling ??
+            auditCtx.ctx.config.thresholds?.flagMutableGlobalCoupling ??
             false;
         if (flagGlobal && /^\s*export\s+let\s+[A-Za-z0-9_$]+/.test(lineText)) {
-            issues.push(
+            auditCtx.issues.push(
                 this.mkIssue(
-                    ctx,
+                    auditCtx.ctx,
                     lineIdx,
                     'ARCH-GLB-001',
-                    `Implicit shared mutable global state exported in '${file}'.`,
+                    `Implicit shared mutable global state exported in '${auditCtx.file}'.`,
                     SEVERITY_WARNING,
-                    { file, line: lineIdx + 1 },
+                    { file: auditCtx.file, line: lineIdx + 1 },
                     'Encapsulate mutable state in class instances via dependency injection.',
                 ),
             );
@@ -420,32 +414,31 @@ export class ArchitectureAnalyzer implements Analyzer {
 
     private checkDirectConfigAccess(
         trimmed: string,
-        file: string,
-        currentLayer: ArchitectureLayer,
         lineIdx: number,
-        ctx: AnalyzerContext,
-        opts: ArchitectureOptions,
-        issues: Issue[],
+        auditCtx: ArchitectureAuditContext,
     ): void {
         const flagConfig =
-            opts.flagConfigLeakage ?? ctx.config.thresholds?.flagConfigLeakage ?? false;
-        if (!flagConfig || currentLayer !== ARCHITECTURE_LAYER_DOMAIN) return;
+            auditCtx.opts.flagConfigLeakage ??
+            auditCtx.ctx.config.thresholds?.flagConfigLeakage ??
+            false;
+        if (!flagConfig || auditCtx.currentLayer !== ARCHITECTURE_LAYER_DOMAIN) return;
 
         const customConfigKws =
-            opts.protectedConfigKeywords ?? ctx.config.thresholds?.protectedConfigKeywords;
+            auditCtx.opts.protectedConfigKeywords ??
+            auditCtx.ctx.config.thresholds?.protectedConfigKeywords;
         const hasDirectConfigAccess =
             trimmed.includes('process.env') ||
             trimmed.includes('fs.readFileSync') ||
             (customConfigKws && customConfigKws.some((kw: string) => trimmed.includes(kw)));
         if (hasDirectConfigAccess) {
-            issues.push(
+            auditCtx.issues.push(
                 this.mkIssue(
-                    ctx,
+                    auditCtx.ctx,
                     lineIdx,
                     'ARCH-CFG-001',
-                    `Configuration leakage: domain model in '${file}' reads environment directly.`,
+                    `Configuration leakage: domain model in '${auditCtx.file}' reads environment directly.`,
                     'info',
-                    { file, line: lineIdx + 1 },
+                    { file: auditCtx.file, line: lineIdx + 1 },
                     'Inject strongly-typed configuration parameters into domain constructors.',
                 ),
             );
@@ -455,33 +448,26 @@ export class ArchitectureAnalyzer implements Analyzer {
     private checkGlobalAndConfigViolations(
         lineText: string,
         trimmed: string,
-        file: string,
-        currentLayer: ArchitectureLayer,
         lineIdx: number,
-        ctx: AnalyzerContext,
-        opts: ArchitectureOptions,
-        issues: Issue[],
+        auditCtx: ArchitectureAuditContext,
     ): void {
-        this.checkMutableGlobalState(lineText, file, lineIdx, ctx, opts, issues);
-        this.checkDirectConfigAccess(trimmed, file, currentLayer, lineIdx, ctx, opts, issues);
-        this.checkDtoLeakage(trimmed, file, currentLayer, lineIdx, ctx, opts, issues);
+        this.checkMutableGlobalState(lineText, lineIdx, auditCtx);
+        this.checkDirectConfigAccess(trimmed, lineIdx, auditCtx);
+        this.checkDtoLeakage(trimmed, lineIdx, auditCtx);
     }
 
     private checkDtoLeakage(
         trimmed: string,
-        file: string,
-        currentLayer: ArchitectureLayer,
         lineIdx: number,
-        ctx: AnalyzerContext,
-        opts: ArchitectureOptions,
-        issues: Issue[],
+        auditCtx: ArchitectureAuditContext,
     ): void {
-        const secLevel = opts.securityLevel || ctx.config.securityLevel || 'basic';
+        const secLevel =
+            auditCtx.opts.securityLevel || auditCtx.ctx.config.securityLevel || 'basic';
         if (
-            (secLevel === 'full' || opts.checkDtoCredentialLeakage) &&
-            (currentLayer === ARCHITECTURE_LAYER_DOMAIN ||
-                currentLayer === 'application' ||
-                currentLayer === ARCHITECTURE_LAYER_INTERFACE)
+            (secLevel === 'full' || auditCtx.opts.checkDtoCredentialLeakage) &&
+            (auditCtx.currentLayer === ARCHITECTURE_LAYER_DOMAIN ||
+                auditCtx.currentLayer === 'application' ||
+                auditCtx.currentLayer === ARCHITECTURE_LAYER_INTERFACE)
         ) {
             const SENSITIVE_FIELD_RE =
                 /\b(?:passwordHash|passwordSalt|secretKey|clientSecret|privateKey|authToken)\s*[:=]/i;
@@ -489,14 +475,14 @@ export class ArchitectureAnalyzer implements Analyzer {
                 const matched = SENSITIVE_FIELD_RE.exec(trimmed);
                 const field = matched ? matched[0].replace(/[:=]/g, '').trim() : 'credential';
                 const descriptor = ArchitectureMessages.PUBLIC_DTO_CREDENTIAL_LEAK(field);
-                issues.push(
+                auditCtx.issues.push(
                     this.mkIssue(
-                        ctx,
+                        auditCtx.ctx,
                         lineIdx,
                         'ARCH-LEAK-002',
                         descriptor.message,
                         SEVERITY_ERROR,
-                        { file, layer: currentLayer, field },
+                        { file: auditCtx.file, layer: auditCtx.currentLayer, field },
                         descriptor.suggestion,
                     ),
                 );
@@ -506,108 +492,49 @@ export class ArchitectureAnalyzer implements Analyzer {
 
     private auditSpecifiers(
         specifiers: SpecifierInfo[],
-        file: string,
-        currentLayer: ArchitectureLayer,
         lineIdx: number,
-        ctx: AnalyzerContext,
-        opts: ArchitectureOptions,
-        forbiddenModules: Set<string>,
-        issues: Issue[],
-        customHeadlessSet?: Set<string>,
+        auditCtx: ArchitectureAuditContext,
     ): void {
         for (const spec of specifiers) {
-            this.auditDomainImports(
-                spec,
-                file,
-                currentLayer,
-                lineIdx,
-                ctx,
-                opts,
-                forbiddenModules,
-                issues,
-                customHeadlessSet,
-            );
-            this.auditCrossDomainBypass(spec, file, lineIdx, ctx, opts, issues);
-            this.auditPolyglotAdapterDecoupling(spec, file, lineIdx, ctx, issues);
-            if (spec.resolvedPath) {
-                const targetLayer = this.resolveLayer(spec.resolvedPath, opts, ctx);
-                if (
-                    targetLayer === 'test' ||
-                    targetLayer === 'tooling' ||
-                    targetLayer === 'shared'
-                ) {
-                    continue;
-                }
+            this.auditDomainImports(spec, lineIdx, auditCtx);
+            this.auditCrossDomainBypass(spec, lineIdx, auditCtx);
+            this.auditPolyglotAdapterDecoupling(spec, lineIdx, auditCtx);
+            if (!spec.resolvedPath) continue;
 
-                this.auditDomainDependency(
-                    spec,
-                    spec.resolvedPath,
-                    file,
-                    currentLayer,
-                    targetLayer,
-                    lineIdx,
-                    ctx,
-                    opts,
-                    issues,
-                );
-                this.auditApplicationDependency(
-                    spec,
-                    spec.resolvedPath,
-                    file,
-                    currentLayer,
-                    targetLayer,
-                    lineIdx,
-                    ctx,
-                    opts,
-                    issues,
-                );
-                this.auditInterfaceSkipLayer(
-                    spec,
-                    spec.resolvedPath,
-                    file,
-                    currentLayer,
-                    targetLayer,
-                    lineIdx,
-                    ctx,
-                    opts,
-                    issues,
-                );
+            const targetLayer = this.resolveLayer(spec.resolvedPath, auditCtx.opts, auditCtx.ctx);
+            if (targetLayer === 'test' || targetLayer === 'tooling' || targetLayer === 'shared') {
+                continue;
             }
+
+            const depTarget: LayerDependencyAuditTarget = {
+                spec,
+                resolvedPath: spec.resolvedPath,
+                targetLayer,
+                lineIdx,
+            };
+            this.auditDomainDependency(depTarget, auditCtx);
+            this.auditApplicationDependency(depTarget, auditCtx);
+            this.auditInterfaceSkipLayer(depTarget, auditCtx);
         }
     }
 
-    /**
-     * checkFrameworkLeak audit step.
-     *
-     * @param spec - Specifier being audited.
-     * @param basePkg - Base package name extracted from spec.
-     * @param file - Repository-relative path of the importing file.
-     * @param currentLayer - Layer inferred for the importing file.
-     * @param lineIdx - Line index of the import statement.
-     * @param ctx - Analyzer context of the current file.
-     * @param forbiddenModules - Forbidden module set from the options.
-     * @param issues - Issue accumulator the violations are pushed into.
-     */
     private checkFrameworkLeak(
         spec: SpecifierInfo,
         basePkg: string,
-        file: string,
-        currentLayer: ArchitectureLayer,
         lineIdx: number,
-        ctx: AnalyzerContext,
-        forbiddenModules: Set<string>,
-        issues: Issue[],
+        auditCtx: ArchitectureAuditContext,
     ): void {
-        if (!forbiddenModules.has(basePkg) && !forbiddenModules.has(spec.raw)) return;
+        if (!auditCtx.forbiddenModules.has(basePkg) && !auditCtx.forbiddenModules.has(spec.raw))
+            return;
         const descriptor = ArchitectureMessages.DOMAIN_FRAMEWORK_LEAK(spec.raw);
-        issues.push(
+        auditCtx.issues.push(
             this.mkIssue(
-                ctx,
+                auditCtx.ctx,
                 lineIdx,
                 'ARCH-LEAK-001',
                 descriptor.message,
                 SEVERITY_ERROR,
-                { file, layer: currentLayer, specifier: spec.raw },
+                { file: auditCtx.file, layer: auditCtx.currentLayer, specifier: spec.raw },
                 descriptor.suggestion,
             ),
         );
@@ -616,35 +543,33 @@ export class ArchitectureAnalyzer implements Analyzer {
     private checkHeadlessBoundary(
         spec: SpecifierInfo,
         basePkg: string,
-        file: string,
-        currentLayer: ArchitectureLayer,
         lineIdx: number,
-        ctx: AnalyzerContext,
-        opts: ArchitectureOptions,
-        issues: Issue[],
-        customHeadlessSet?: Set<string>,
+        auditCtx: ArchitectureAuditContext,
     ): void {
         const enforceHeadless =
-            opts.enforceHeadless ?? ctx.config.thresholds?.enforceHeadless ?? false;
+            auditCtx.opts.enforceHeadless ??
+            auditCtx.ctx.config.thresholds?.enforceHeadless ??
+            false;
         if (!enforceHeadless) return;
 
         const isForbiddenHeadless =
             FORBIDDEN_HEADLESS_IMPORTS.has(basePkg) ||
             FORBIDDEN_HEADLESS_IMPORTS.has(spec.raw) ||
             Boolean(
-                customHeadlessSet &&
-                (customHeadlessSet.has(basePkg) || customHeadlessSet.has(spec.raw)),
+                auditCtx.customHeadlessSet &&
+                (auditCtx.customHeadlessSet.has(basePkg) ||
+                    auditCtx.customHeadlessSet.has(spec.raw)),
             );
 
         if (isForbiddenHeadless) {
-            issues.push(
+            auditCtx.issues.push(
                 this.mkIssue(
-                    ctx,
+                    auditCtx.ctx,
                     lineIdx,
                     'ARCH-HDL-001',
-                    `Headless architecture violation: domain logic in '${file}' imports presentation framework '${spec.raw}'.`,
+                    `Headless architecture violation: domain logic in '${auditCtx.file}' imports presentation framework '${spec.raw}'.`,
                     SEVERITY_ERROR,
-                    { file, layer: currentLayer, specifier: spec.raw },
+                    { file: auditCtx.file, layer: auditCtx.currentLayer, specifier: spec.raw },
                     'Decouple core domain logic from UI/IDE presentation frameworks.',
                 ),
             );
@@ -653,162 +578,105 @@ export class ArchitectureAnalyzer implements Analyzer {
 
     private auditDomainImports(
         spec: SpecifierInfo,
-        file: string,
-        currentLayer: ArchitectureLayer,
         lineIdx: number,
-        ctx: AnalyzerContext,
-        opts: ArchitectureOptions,
-        forbiddenModules: Set<string>,
-        issues: Issue[],
-        customHeadlessSet?: Set<string>,
+        auditCtx: ArchitectureAuditContext,
     ): void {
-        if (currentLayer !== ARCHITECTURE_LAYER_DOMAIN) return;
+        if (auditCtx.currentLayer !== ARCHITECTURE_LAYER_DOMAIN) return;
         const basePkg = spec.raw.startsWith('@')
             ? spec.raw.split('/').slice(0, 2).join('/')
             : spec.raw.split('/')[0];
 
-        this.checkFrameworkLeak(
-            spec,
-            basePkg,
-            file,
-            currentLayer,
-            lineIdx,
-            ctx,
-            forbiddenModules,
-            issues,
-        );
-        this.checkHeadlessBoundary(
-            spec,
-            basePkg,
-            file,
-            currentLayer,
-            lineIdx,
-            ctx,
-            opts,
-            issues,
-            customHeadlessSet,
-        );
+        this.checkFrameworkLeak(spec, basePkg, lineIdx, auditCtx);
+        this.checkHeadlessBoundary(spec, basePkg, lineIdx, auditCtx);
     }
 
-    /**
-     * auditCrossDomainBypass audit step.
-     *
-     * @param spec - Specifier being audited.
-     * @param file - Repository-relative path of the importing file.
-     * @param lineIdx - Line index of the import statement.
-     * @param ctx - Analyzer context of the current file.
-     * @param opts - Architecture options resolved for this file.
-     * @param issues - Issue accumulator the violations are pushed into.
-     */
     private auditCrossDomainBypass(
         spec: SpecifierInfo,
-        file: string,
         lineIdx: number,
-        ctx: AnalyzerContext,
-        opts: ArchitectureOptions,
-        issues: Issue[],
+        auditCtx: ArchitectureAuditContext,
     ): void {
         const flagBypass =
-            opts.flagCrossDomainBypass ?? ctx.config.thresholds?.flagCrossDomainBypass ?? false;
+            auditCtx.opts.flagCrossDomainBypass ??
+            auditCtx.ctx.config.thresholds?.flagCrossDomainBypass ??
+            false;
         if (
             flagBypass &&
             (spec.raw.includes('/internal/') ||
                 spec.raw.includes('/impl/') ||
                 spec.raw.includes('/private/'))
         ) {
-            issues.push(
+            auditCtx.issues.push(
                 this.mkIssue(
-                    ctx,
+                    auditCtx.ctx,
                     lineIdx,
                     'ARCH-BND-001',
-                    `Cross-domain internal boundary bypass: '${file}' imports private module '${spec.raw}'.`,
+                    `Cross-domain internal boundary bypass: '${auditCtx.file}' imports private module '${spec.raw}'.`,
                     SEVERITY_WARNING,
-                    { file, specifier: spec.raw },
+                    { file: auditCtx.file, specifier: spec.raw },
                     'Import through public module facade rather than private directories.',
                 ),
             );
         }
     }
 
-    /**
-     * auditPolyglotAdapterDecoupling (ARCH-DEC-002).
-     * Disallow direct concrete parser dependencies in analyzer or domain code.
-     */
     private auditPolyglotAdapterDecoupling(
         spec: SpecifierInfo,
-        file: string,
         lineIdx: number,
-        ctx: AnalyzerContext,
-        issues: Issue[],
+        auditCtx: ArchitectureAuditContext,
     ): void {
         const isAnalyzerOrDomain =
-            file.includes('analyzers/') || file.includes('analyzer') || file.includes('domain');
+            auditCtx.file.includes('analyzers/') ||
+            auditCtx.file.includes('analyzer') ||
+            auditCtx.file.includes('domain');
         if (!isAnalyzerOrDomain) return;
 
         const isDisallowed = DISALLOWED_PARSER_PACKAGES.some((pkg) => spec.raw.includes(pkg));
         if (isDisallowed) {
-            const descriptor = ArchitectureMessages.POLYGLOT_PARSER_COUPLING(file, spec.raw);
-            issues.push(
+            const descriptor = ArchitectureMessages.POLYGLOT_PARSER_COUPLING(
+                auditCtx.file,
+                spec.raw,
+            );
+            auditCtx.issues.push(
                 this.mkIssue(
-                    ctx,
+                    auditCtx.ctx,
                     lineIdx,
                     'ARCH-DEC-002',
                     descriptor.message,
                     SEVERITY_WARNING,
-                    { file, specifier: spec.raw },
+                    { file: auditCtx.file, specifier: spec.raw },
                     descriptor.suggestion,
                 ),
             );
         }
     }
 
-    /**
-     * auditDomainDependency audit step.
-     *
-     * @param spec - Specifier being audited.
-     * @param resolvedPath - Resolved target path (narrowed by the caller).
-     * @param file - Repository-relative path of the importing file.
-     * @param currentLayer - Layer inferred for the importing file.
-     * @param targetLayer - Layer inferred for the imported module.
-     * @param lineIdx - Line index of the import statement.
-     * @param ctx - Analyzer context of the current file.
-     * @param opts - Architecture options resolved for this file.
-     * @param issues - Issue accumulator the violations are pushed into.
-     */
     private auditDomainDependency(
-        spec: SpecifierInfo,
-        resolvedPath: string,
-        file: string,
-        currentLayer: ArchitectureLayer,
-        targetLayer: string,
-        lineIdx: number,
-        ctx: AnalyzerContext,
-        opts: ArchitectureOptions,
-        issues: Issue[],
+        target: LayerDependencyAuditTarget,
+        auditCtx: ArchitectureAuditContext,
     ): void {
         // Rule 1: Domain cannot depend on Application, Infrastructure, or Interface
-        if (currentLayer === ARCHITECTURE_LAYER_DOMAIN) {
+        if (auditCtx.currentLayer === ARCHITECTURE_LAYER_DOMAIN) {
             if (
-                targetLayer === ARCHITECTURE_LAYER_APPLICATION ||
-                targetLayer === ARCHITECTURE_LAYER_INFRASTRUCTURE ||
-                targetLayer === ARCHITECTURE_LAYER_INTERFACE
+                target.targetLayer === ARCHITECTURE_LAYER_APPLICATION ||
+                target.targetLayer === ARCHITECTURE_LAYER_INFRASTRUCTURE ||
+                target.targetLayer === ARCHITECTURE_LAYER_INTERFACE
             ) {
                 const descriptor = ArchitectureMessages.DOMAIN_INVERSION_BREACH(
-                    currentLayer,
-                    targetLayer,
-                    resolvedPath,
+                    auditCtx.currentLayer,
+                    target.targetLayer,
+                    target.resolvedPath,
                 );
-                issues.push(
+                auditCtx.issues.push(
                     this.mkIssue(
-                        ctx,
-                        lineIdx,
+                        auditCtx.ctx,
+                        target.lineIdx,
                         'ARCH-DIR-001',
                         descriptor.message,
                         SEVERITY_ERROR,
                         {
-                            fromLayer: currentLayer,
-                            toLayer: targetLayer,
-                            targetPath: resolvedPath,
+                            fromLayer: auditCtx.currentLayer,
+                            toLayer: target.targetLayer,
+                            targetPath: target.resolvedPath,
                         },
                         descriptor.suggestion,
                     ),
@@ -816,21 +684,21 @@ export class ArchitectureAnalyzer implements Analyzer {
 
                 // Structural layering illusion (ARCH-DIR-003)
                 const flagIllusions =
-                    opts.flagLayeringIllusions ??
-                    ctx.config.thresholds?.flagLayeringIllusions ??
+                    auditCtx.opts.flagLayeringIllusions ??
+                    auditCtx.ctx.config.thresholds?.flagLayeringIllusions ??
                     false;
-                if (flagIllusions && targetLayer === ARCHITECTURE_LAYER_INFRASTRUCTURE) {
-                    issues.push(
+                if (flagIllusions && target.targetLayer === ARCHITECTURE_LAYER_INFRASTRUCTURE) {
+                    auditCtx.issues.push(
                         this.mkIssue(
-                            ctx,
-                            lineIdx,
+                            auditCtx.ctx,
+                            target.lineIdx,
                             'ARCH-DIR-003',
-                            `Structural layering illusion: domain entity '${file}' directly imports infrastructure '${resolvedPath}'.`,
+                            `Structural layering illusion: domain entity '${auditCtx.file}' directly imports infrastructure '${target.resolvedPath}'.`,
                             SEVERITY_ERROR,
                             {
-                                fromLayer: currentLayer,
-                                toLayer: targetLayer,
-                                targetPath: resolvedPath,
+                                fromLayer: auditCtx.currentLayer,
+                                toLayer: target.targetLayer,
+                                targetPath: target.resolvedPath,
                             },
                             'Invert dependency using interfaces defined in the domain.',
                         ),
@@ -840,70 +708,64 @@ export class ArchitectureAnalyzer implements Analyzer {
         }
     }
 
-    /**
-     * auditApplicationDependency audit step.
-     */
     private auditApplicationDependency(
-        spec: SpecifierInfo,
-        resolvedPath: string,
-        file: string,
-        currentLayer: ArchitectureLayer,
-        targetLayer: string,
-        lineIdx: number,
-        ctx: AnalyzerContext,
-        opts: ArchitectureOptions,
-        issues: Issue[],
+        target: LayerDependencyAuditTarget,
+        auditCtx: ArchitectureAuditContext,
     ): void {
         // Rule 2: Application cannot depend on Interface
         if (
-            currentLayer === ARCHITECTURE_LAYER_APPLICATION &&
-            targetLayer === ARCHITECTURE_LAYER_INTERFACE
+            auditCtx.currentLayer === ARCHITECTURE_LAYER_APPLICATION &&
+            target.targetLayer === ARCHITECTURE_LAYER_INTERFACE
         ) {
-            const d = ArchitectureMessages.APPLICATION_LAYER_BREACH(targetLayer, resolvedPath);
-            issues.push(
+            const descriptor = ArchitectureMessages.APPLICATION_LAYER_BREACH(
+                target.targetLayer,
+                target.resolvedPath,
+            );
+            auditCtx.issues.push(
                 this.mkIssue(
-                    ctx,
-                    lineIdx,
+                    auditCtx.ctx,
+                    target.lineIdx,
                     'ARCH-DIR-001',
-                    d.message,
+                    descriptor.message,
                     SEVERITY_ERROR,
-                    { fromLayer: currentLayer, toLayer: targetLayer, targetPath: resolvedPath },
-                    d.suggestion,
+                    {
+                        fromLayer: auditCtx.currentLayer,
+                        toLayer: target.targetLayer,
+                        targetPath: target.resolvedPath,
+                    },
+                    descriptor.suggestion,
                 ),
             );
         }
     }
 
-    /**
-     * auditInterfaceSkipLayer audit step.
-     */
     private auditInterfaceSkipLayer(
-        spec: SpecifierInfo,
-        resolvedPath: string,
-        file: string,
-        currentLayer: ArchitectureLayer,
-        targetLayer: string,
-        lineIdx: number,
-        ctx: AnalyzerContext,
-        opts: ArchitectureOptions,
-        issues: Issue[],
+        target: LayerDependencyAuditTarget,
+        auditCtx: ArchitectureAuditContext,
     ): void {
         // Rule 3: Interface should not directly bypass Application to Infrastructure (Skip-Layer)
         if (
-            currentLayer === ARCHITECTURE_LAYER_INTERFACE &&
-            targetLayer === ARCHITECTURE_LAYER_INFRASTRUCTURE &&
-            !opts.allowSkipLayers
+            auditCtx.currentLayer === ARCHITECTURE_LAYER_INTERFACE &&
+            target.targetLayer === ARCHITECTURE_LAYER_INFRASTRUCTURE &&
+            !auditCtx.opts.allowSkipLayers
         ) {
-            const d = ArchitectureMessages.SKIP_LAYER_PENETRATION(targetLayer, resolvedPath);
-            issues.push(
+            const descriptor = ArchitectureMessages.SKIP_LAYER_PENETRATION(
+                target.targetLayer,
+                target.resolvedPath,
+            );
+            auditCtx.issues.push(
                 this.mkIssue(
-                    ctx,
-                    lineIdx,
+                    auditCtx.ctx,
+                    target.lineIdx,
                     'ARCH-DIR-002',
-                    d.message,
+                    descriptor.message,
                     SEVERITY_WARNING,
-                    { fromLayer: currentLayer, toLayer: targetLayer, targetPath: resolvedPath },
-                    d.suggestion,
+                    {
+                        fromLayer: auditCtx.currentLayer,
+                        toLayer: target.targetLayer,
+                        targetPath: target.resolvedPath,
+                    },
+                    descriptor.suggestion,
                 ),
             );
         }

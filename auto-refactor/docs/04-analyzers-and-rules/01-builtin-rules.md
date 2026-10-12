@@ -1,4 +1,4 @@
-# 01. 四层规则金字塔、30 个内置分析器与 325 条全量规则字典
+# 01. 四层规则金字塔、30 个内置分析器与 335 条全量规则字典
 
 > **所属层级**：L4 规则引擎与内置分析器 (`docs/04-analyzers-and-rules/`)  
 > **对应代码真源**：`src/core/rules/registry.ts`、`src/core/rules/entries/*.ts`、`src/core/analyzer-registry.ts`、`src/analyzers/*.ts`
@@ -7,7 +7,7 @@
 
 ## 1. 四层规则金字塔与双轨文案架构
 
-`auto-refactor` 将全部 **325 条内置规则**（含 **310 条规范化 `FAMILY-TOPIC-NNN` 规则**与 **15 条向后兼容别名规则**）统一收拢于 `src/core/rules/registry.ts` 单一真源注册表中，并由 `npm run validate-rules-registry` 门禁在每次构建时强制校验「发射集 = 注册集 = 文档覆盖集（325/325）」。在工作区全域单源规则目录快照（`scripts/common/rule-catalog.json`）中，活跃规则规模保持 **410 条全仓 SSOT 活跃规则**。
+`auto-refactor` 将全部 **335 条内置规则**（含 **320 条规范化 `FAMILY-TOPIC-NNN` 规则**与 **15 条向后兼容别名规则**）统一收拢于 `src/core/rules/registry.ts` 单一真源注册表中，并由 `npm run validate-rules-registry` 门禁在每次构建时强制校验「发射集 = 注册集 = 文档覆盖集（335/335）」。在工作区全域单源规则目录快照（`scripts/common/rule-catalog.json`）中，活跃规则规模保持 **420 条全仓 SSOT 活跃规则**。
 
 ### 1.1 四层规则金字塔拓扑
 
@@ -20,7 +20,7 @@
 
 ### 1.2 双轨文案分层契约（Dual-Track Wording Architecture）
 
-- **机读/执行轨（Machine & Agent Track）**：位于 `src/core/messages/`、`src/core/rules/entries/` 与 `src/core/guidance/`，底层规则注册表（`RULE_REGISTRY`）与内核诊断统一为 **100% 国际工业英文标准**（涵盖所有 `summary` 与 `remediation` 规范元数据），输出高 Token 密度、确定性的 SARIF 2.1.0 诊断载荷与 CAPP 智能体修复提示词，并作为工作区单源规则目录（`scripts/common/rule-catalog.json`，410 条全仓 SSOT）的唯一真源底座。
+- **机读/执行轨（Machine & Agent Track）**：位于 `src/core/messages/`、`src/core/rules/entries/` 与 `src/core/guidance/`，底层规则注册表（`RULE_REGISTRY`）与内核诊断统一为 **100% 国际工业英文标准**（涵盖所有 `summary` 与 `remediation` 规范元数据），输出高 Token 密度、确定性的 SARIF 2.1.0 诊断载荷与 CAPP 智能体修复提示词，并作为工作区单源规则目录（`scripts/common/rule-catalog.json`，420 条全仓 SSOT）的唯一真源底座。
 - **人读/呈现轨（Human & Presentation Track）**：由 **Praxis 表现层**（`src/core/praxis/presentation/`）与 `PraxisI18nProvider` 独占承载，采用模块化领域分包双语字典（`zh-cn/` 与 `en/`），面向人类工程师与 IDE 富文本诊断卡片（`PraxisDiagnosticCard`）提供完整、专业、细粒度的人机可读本地化转译与交互式修复指引。
 
 ### 1.3 标准 3-3-3 命名拓扑公理、权威三字母映射与三阶双轨别名等价网络
@@ -78,7 +78,7 @@
 
 ---
 
-## 3. 全量 325 条内置规则权威字典（由门禁自动核验）
+## 3. 全量 335 条内置规则权威字典（由门禁自动核验）
 
 ### Layer 1 — 全域安全、密钥与卫生底线层 (Universal Safety & Hygiene)
 

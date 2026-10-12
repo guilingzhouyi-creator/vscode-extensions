@@ -568,6 +568,61 @@ export class TsModernAnalyzer implements Analyzer {
     }
 
     /**
+     * Accumulate type usage occurrences within a pre-indexed line set.
+     *
+     * @param indices - Set of line numbers containing identifier candidate occurrences.
+     * @param masked - Masked lines of the file.
+     * @param importLines - Line indexes holding import clauses.
+     * @param patterns - Compiled regular expressions for the identifier.
+     * @returns Total matches and type-position matches across the indexed lines.
+     */
+    private tallyIndexedUsage(
+        indices: Set<number>,
+        masked: string[],
+        importLines: Set<number>,
+        patterns: CompiledTypePatterns,
+    ): { total: number; typed: number } {
+        let total = 0;
+        let typed = 0;
+        for (const index of indices) {
+            if (importLines.has(index)) continue;
+            const code = masked[index];
+            total += countMatches(code, patterns.word);
+            for (let p = 0; p < patterns.typePatterns.length; p++) {
+                typed += countMatches(code, patterns.typePatterns[p]);
+            }
+        }
+        return { total, typed };
+    }
+
+    /**
+     * Accumulate type usage occurrences by scanning all source lines with fallback filtering.
+     *
+     * @param masked - Masked lines of the file.
+     * @param importLines - Line indexes holding import clauses.
+     * @param patterns - Compiled regular expressions for the identifier.
+     * @returns Total matches and type-position matches across the whole file.
+     */
+    private tallyFullUsage(
+        masked: string[],
+        importLines: Set<number>,
+        patterns: CompiledTypePatterns,
+    ): { total: number; typed: number } {
+        let total = 0;
+        let typed = 0;
+        for (let index = 0; index < masked.length; index += 1) {
+            if (importLines.has(index)) continue;
+            if (!patterns.fallbackWord.test(masked[index])) continue;
+            const code = masked[index];
+            total += countMatches(code, patterns.word);
+            for (let p = 0; p < patterns.typePatterns.length; p++) {
+                typed += countMatches(code, patterns.typePatterns[p]);
+            }
+        }
+        return { total, typed };
+    }
+
+    /**
      * Decide whether one imported identifier is used exclusively in type positions.
      *
      * @param name - Imported local identifier.
@@ -585,31 +640,11 @@ export class TsModernAnalyzer implements Analyzer {
         const matchingLines = lineIndexByWord?.get(name);
         if (matchingLines && matchingLines.size === 0) return false;
 
-        const { word, fallbackWord, typePatterns } = getCompiledTypePatterns(name);
-        let total = 0;
-        let typed = 0;
+        const patterns = getCompiledTypePatterns(name);
+        const { total, typed } = matchingLines
+            ? this.tallyIndexedUsage(matchingLines, masked, importLines, patterns)
+            : this.tallyFullUsage(masked, importLines, patterns);
 
-        if (matchingLines) {
-            for (const index of matchingLines) {
-                if (importLines.has(index)) continue;
-                const code = masked[index];
-                total += countMatches(code, word);
-                for (let p = 0; p < typePatterns.length; p++) {
-                    typed += countMatches(code, typePatterns[p]);
-                }
-            }
-            return total > 0 && typed >= total;
-        }
-
-        for (let index = 0; index < masked.length; index += 1) {
-            if (importLines.has(index)) continue;
-            if (!fallbackWord.test(masked[index])) continue;
-            const code = masked[index];
-            total += countMatches(code, word);
-            for (let p = 0; p < typePatterns.length; p++) {
-                typed += countMatches(code, typePatterns[p]);
-            }
-        }
         return total > 0 && typed >= total;
     }
 }
@@ -727,7 +762,7 @@ function buildCandidateLineIndex(
         if (importLines.has(index)) continue;
         const line = masked[index];
         for (const [word, matcher] of matchers) {
-            if (line.includes(word) && matcher.test(line)) {
+            if (matcher.test(line)) {
                 lineIndexByWord.get(word)!.add(index);
             }
         }
@@ -735,11 +770,13 @@ function buildCandidateLineIndex(
     return lineIndexByWord;
 }
 
+const PREV_LINE_ARG_TERMINATOR_RE = /[(=,[]$/;
+
 function isPassedAsArgPreviousLine(masked: string[], start: number): boolean {
     for (let prev = start - 1; prev >= 0; prev--) {
         const prevTrim = masked[prev].trim();
         if (prevTrim.length === 0) continue;
-        return /[(=,[]$/.test(prevTrim);
+        return PREV_LINE_ARG_TERMINATOR_RE.test(prevTrim);
     }
     return false;
 }

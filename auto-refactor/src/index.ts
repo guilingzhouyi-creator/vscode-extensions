@@ -14,20 +14,43 @@
  *     exits 2. Compile-cache setup is best-effort so an unwritable cache never breaks a scan.
  */
 // Enable Node's V8 bytecode compile cache for the CLI process. MUST run before any
-// other require so the CLI's own module graph gets cached on disk (30-50% faster
+// other code so the CLI's own module graph gets cached on disk (30-50% faster
 // cold-start module compilation on Node >= 22.8). CLI-only by design — library consumers
 // (api.ts / analyzer.ts) are intentionally NOT affected. Best-effort: any failure (old
 // Node, unwritable cache dir, already enabled, ...) must never break the scan.
+import * as nodeModule from 'node:module';
 try {
-    const { enableCompileCache } = require('node:module');
-    enableCompileCache?.();
+    const maybeEnable = (nodeModule as { enableCompileCache?: () => void }).enableCompileCache;
+    maybeEnable?.();
 } catch {
     /* compile cache is best-effort — ignore */
 }
 
-import { scanAndRender } from './api';
+import * as fs from 'fs';
+import * as path from 'path';
+
+import {
+    scanAndRender,
+    querySymbols,
+    queryAgentConstraints,
+    getChangeTrajectory,
+    getReviewMemory,
+    scan,
+    type ScanReport,
+} from './api';
 import { resolveConfig } from './core/config/config';
-import { DAEMON_SUBCOMMAND, DAEMON_MODE_OFF, parseArgs, printUsage } from './cli/cli-parser';
+import { DAEMON_SUBCOMMAND, parseArgs, printUsage, type CliOptions } from './cli/cli-parser';
+import { defaultPatchEngine, PatchEngine, type FixDescriptor } from './core/codemod';
+import {
+    TrajectoryAccumulator,
+    readLifetimeSummary,
+    recordToVector,
+    computeTrajectoryQualityMetrics,
+} from './core/trajectory';
+import { evaluateCompositeGate, type GateStage } from './core/praxis/composite-quality-gate';
+import { CacheStore } from './core/cache';
+import { daemonCommand } from './cli/daemonCmd';
+import { selfTestCommand } from './cli/selfTestCmd';
 
 /** Decimal radix used when parsing numeric CLI arguments such as `--line`. */
 const DECIMAL_RADIX = 10;
@@ -35,44 +58,63 @@ const DECIMAL_RADIX = 10;
 /** Number of leading revision-id characters shown by the `trajectory` CLI subcommand. */
 const REVISION_ID_DISPLAY_LENGTH = 8;
 
+/** CLI subcommand identifiers */
+const CMD_SYMBOLS = 'symbols';
+const CMD_GUIDE = 'guide';
+const CMD_TRAJECTORY = 'trajectory';
+const CMD_MEMORY = 'memory';
+const CMD_STATS = 'stats';
+const CMD_GATE = 'gate';
+const CMD_SCAN = 'scan';
+const CMD_SELF_TEST = 'self-test';
+
+/** Common CLI option flags */
+const FLAG_ROOT = '--root';
+const FLAG_DOMAIN = '--domain';
+const FLAG_LINE = '--line';
+const FLAG_STAGE = '--stage';
+const FLAG_SUMMARY = '--summary';
+const FLAG_SUMMARY_SHORT = '-s';
+
+/** Scoring, threshold and weight constants */
+const SCORE_MAX = 100.0;
+const SCORE_GATE_FAIL = 80.0;
+const SCORE_INITIAL_FIX_BASELINE = 98.0;
+const SCORE_FIX_INCREMENT_PER_APPLIED = 0.1;
+const RECENT_RUNS_WINDOW = 3;
+const RESOLVED_POINTS_PER_APPLIED = 2;
+const RESOLVED_POINTS_STATIC_PASS = 10;
+const ADDED_POINTS_PER_REGRESSION = 5;
+const LOC_TO_EQUIV_RATIO = 1.37;
+const MILLION_DIVISOR = 1000000;
+
 async function handleSymbolsCommand(args: string[]): Promise<void> {
-    const { querySymbols } = require('./api');
-    const target = args[args.indexOf('symbols') + 1];
+    const target = args[args.indexOf(CMD_SYMBOLS) + 1];
     if (!target) {
         process.stderr.write('Usage: auto-refactor symbols <name> [--root <dir>]\n');
         process.exit(2);
     }
-    const rootIdx = args.indexOf('--root');
+    const rootIdx = args.indexOf(FLAG_ROOT);
     const root = rootIdx !== -1 ? args[rootIdx + 1] : process.cwd();
     try {
-        const result: {
-            definitions: Array<{ kind: string; file: string; line?: number }>;
-            references: Array<{ file: string; line?: number }>;
-            stats: {
-                definitions: number;
-                references: number;
-                crossFileReferences: number;
-                builtFrom: string;
-            };
-        } = await querySymbols(target, {
+        const symbolQueryResult = await querySymbols(target, {
             root,
             logLevel: 'silent',
-            daemon: DAEMON_MODE_OFF,
             cache: false,
         });
 
         process.stdout.write(`\n=== Symbol: ${target} ===\n`);
-        for (const definition of result.definitions) {
+        for (const definition of symbolQueryResult.definitions) {
             process.stdout.write(
                 `  defined  ${definition.kind.padEnd(9)} ${definition.file}:${definition.line ?? '?'}\n`,
             );
         }
-        for (const reference of result.references) {
+        for (const reference of symbolQueryResult.references) {
             process.stdout.write(`  called   ${reference.file}:${reference.line ?? '?'}\n`);
         }
         process.stdout.write(
-            `  coverage defs=${result.stats.definitions} refs=${result.stats.references} ` +
-                `crossFile=${result.stats.crossFileReferences} (${result.stats.builtFrom})\n`,
+            `  coverage defs=${symbolQueryResult.stats.definitions} refs=${symbolQueryResult.stats.references} ` +
+                `crossFile=${symbolQueryResult.stats.crossFileReferences} (${symbolQueryResult.stats.builtFrom})\n`,
         );
         process.exit(0);
     } catch (error: unknown) {
@@ -82,17 +124,16 @@ async function handleSymbolsCommand(args: string[]): Promise<void> {
 }
 
 function handleGuideCommand(args: string[]): void {
-    const { queryAgentConstraints } = require('./api');
-    const targetFile = args[args.indexOf('guide') + 1];
+    const targetFile = args[args.indexOf(CMD_GUIDE) + 1];
     if (!targetFile) {
         process.stderr.write(
             'Usage: auto-refactor guide <file> [--domain <name>] [--line <num>]\n',
         );
         process.exit(2);
     }
-    const domainIdx = args.indexOf('--domain');
+    const domainIdx = args.indexOf(FLAG_DOMAIN);
     const domainName = domainIdx !== -1 ? args[domainIdx + 1] : undefined;
-    const lineIdx = args.indexOf('--line');
+    const lineIdx = args.indexOf(FLAG_LINE);
     const line = lineIdx !== -1 ? parseInt(args[lineIdx + 1], DECIMAL_RADIX) : undefined;
     const prompt = queryAgentConstraints({ filePath: targetFile, domainName, line });
     process.stdout.write(prompt.renderedMarkdown + '\n');
@@ -100,11 +141,10 @@ function handleGuideCommand(args: string[]): void {
 }
 
 async function printRecentActiveRuns(activeRunsFile: string): Promise<void> {
-    const fs = require('fs');
     if (!fs.existsSync(activeRunsFile)) return;
     const rawContent = await fs.promises.readFile(activeRunsFile, 'utf8');
     const raw = rawContent.trim().split('\n').filter(Boolean);
-    const recent = raw.slice(-3);
+    const recent = raw.slice(-RECENT_RUNS_WINDOW);
     if (recent.length === 0) return;
     process.stdout.write(`\nRecent Active Runs (last ${recent.length}):\n`);
     for (const line of recent) {
@@ -121,8 +161,6 @@ async function printRecentActiveRuns(activeRunsFile: string): Promise<void> {
 }
 
 async function printLedgerSummary(customRoot?: string): Promise<void> {
-    const fs = require('fs');
-    const path = require('path');
     const baseDir = customRoot ? path.resolve(customRoot) : process.cwd();
     let ledgerDir = path.join(baseDir, '.refactor-trajectory');
     if (!fs.existsSync(ledgerDir)) {
@@ -142,7 +180,10 @@ async function printLedgerSummary(customRoot?: string): Promise<void> {
     try {
         const lifetimeContent = await fs.promises.readFile(lifetimeFile, 'utf8');
         const lifetime = JSON.parse(lifetimeContent);
-        const equivLoc = ((lifetime.eloc.processedTotal * 1.37) / 1000000).toFixed(2);
+        const equivLoc = (
+            (lifetime.eloc.processedTotal * LOC_TO_EQUIV_RATIO) /
+            MILLION_DIVISOR
+        ).toFixed(2);
         process.stdout.write(`\n=== Workspace Refactoring Trajectory & Review Ledger ===\n`);
         process.stdout.write(`Total Audit Runs       : ${lifetime.totalRuns}\n`);
         process.stdout.write(
@@ -174,7 +215,6 @@ async function printLedgerSummary(customRoot?: string): Promise<void> {
 }
 
 function printFileTrajectory(targetFile: string): void {
-    const { getChangeTrajectory } = require('./api');
     const traj = getChangeTrajectory(targetFile);
     if (!traj || traj.revisions.length === 0) {
         process.stdout.write(`No historical trajectory recorded for ${targetFile}\n`);
@@ -202,11 +242,14 @@ function printFileTrajectory(targetFile: string): void {
 }
 
 async function handleTrajectoryCommand(args: string[]): Promise<void> {
-    const rawTarget = args[args.indexOf('trajectory') + 1];
+    const rawTarget = args[args.indexOf(CMD_TRAJECTORY) + 1];
     const isSummary =
-        !rawTarget || rawTarget === '--summary' || rawTarget === '-s' || rawTarget.startsWith('--');
+        !rawTarget ||
+        rawTarget === FLAG_SUMMARY ||
+        rawTarget === FLAG_SUMMARY_SHORT ||
+        rawTarget.startsWith('--');
     if (isSummary) {
-        const rootIdx = args.indexOf('--root');
+        const rootIdx = args.indexOf(FLAG_ROOT);
         const customRoot = rootIdx !== -1 && args[rootIdx + 1] ? args[rootIdx + 1] : undefined;
         await printLedgerSummary(customRoot);
         return;
@@ -233,13 +276,11 @@ function countLinesEloc(content: string): { loc: number; eloc: number } {
 
 async function processDirectoryEntries(
     curr: string,
-    entries: import('fs').Dirent[],
+    entries: fs.Dirent[],
     queue: string[],
     supportedExts: Set<string>,
     ignoredDirs: Set<string>,
 ): Promise<{ files: number; loc: number; eloc: number }> {
-    const path = require('path');
-    const fs = require('fs');
     let files = 0;
     let loc = 0;
     let eloc = 0;
@@ -269,7 +310,6 @@ async function processDirectoryEntries(
 async function collectDirectoryStats(
     targetRoot: string,
 ): Promise<{ totalFiles: number; totalLoc: number; totalEloc: number }> {
-    const fs = require('fs');
     const SUPPORTED_EXTS = new Set(['.ts', '.js', '.mjs', '.cjs', '.gd', '.py', '.sh', '.ps1']);
     const IGNORED_DIRS = new Set([
         'node_modules',
@@ -289,7 +329,7 @@ async function collectDirectoryStats(
     const queue = [targetRoot];
     while (queue.length > 0) {
         const curr = queue.pop()!;
-        let entries: import('fs').Dirent[] = [];
+        let entries: fs.Dirent[] = [];
         try {
             entries = await fs.promises.readdir(curr, { withFileTypes: true });
         } catch {
@@ -311,7 +351,7 @@ async function collectDirectoryStats(
 }
 
 async function handleStatsCommand(args: string[]): Promise<void> {
-    const rootIdx = args.indexOf('--root');
+    const rootIdx = args.indexOf(FLAG_ROOT);
     const targetRoot = rootIdx !== -1 && args[rootIdx + 1] ? args[rootIdx + 1] : process.cwd();
 
     const { totalFiles, totalLoc, totalEloc } = await collectDirectoryStats(targetRoot);
@@ -331,7 +371,6 @@ async function handleStatsCommand(args: string[]): Promise<void> {
 }
 
 function handleMemoryCommand(): void {
-    const { getReviewMemory } = require('./api');
     const mem = getReviewMemory();
     const stats = mem.getStats();
     process.stdout.write(`\n=== Review Memory Status ===\n`);
@@ -348,14 +387,9 @@ function handleMemoryCommand(): void {
  * @param cli - Parsed command-line options including fix flags.
  * @returns Exit code 0 on successful repair completion.
  */
-async function handleFixWorkflow(cli: any): Promise<number> {
-    const { scan } = require('./api');
-    const { defaultPatchEngine, PatchEngine } = require('./core/codemod');
-    const fs = require('fs');
-    const path = require('path');
-
+async function handleFixWorkflow(cli: CliOptions): Promise<number> {
     const report = await scan(cli);
-    const fixesByFile = new Map<string, any[]>();
+    const fixesByFile = new Map<string, FixDescriptor[]>();
 
     for (const issue of report.issues) {
         const fix = PatchEngine.issueToFix(issue);
@@ -387,16 +421,16 @@ async function handleFixWorkflow(cli: any): Promise<number> {
         if (!fs.existsSync(fullPath)) continue;
 
         const content = await fs.promises.readFile(fullPath, 'utf8');
-        const result = defaultPatchEngine.applyFixes(fullPath, content, fixes, {
+        const patchApplyResult = defaultPatchEngine.applyFixes(fullPath, content, fixes, {
             dryRun: cli.fixDryRun,
             rules: cli.fixRules,
         });
 
-        if (result.appliedFixCount > 0) {
-            totalApplied += result.appliedFixCount;
-            totalSkipped += result.skippedConflictCount;
-            if (result.unifiedDiff) {
-                process.stdout.write(result.unifiedDiff + '\n');
+        if (patchApplyResult.appliedFixCount > 0) {
+            totalApplied += patchApplyResult.appliedFixCount;
+            totalSkipped += patchApplyResult.skippedConflictCount;
+            if (patchApplyResult.unifiedDiff) {
+                process.stdout.write(patchApplyResult.unifiedDiff + '\n');
             }
         }
     }
@@ -415,18 +449,15 @@ async function handleFixWorkflow(cli: any): Promise<number> {
  */
 async function recordCodemodTrajectory(
     rootDir: string,
-    fixesByFile: Map<string, any[]>,
+    fixesByFile: Map<string, FixDescriptor[]>,
     totalApplied: number,
-    cli: any,
+    cli: CliOptions,
 ): Promise<void> {
     if (cli.fixDryRun || totalApplied === 0) return;
     try {
-        const fs = require('fs');
-        const path = require('path');
         const trajectoryDir = path.join(rootDir, '.refactor-trajectory');
         if (!fs.existsSync(trajectoryDir)) return;
 
-        const { TrajectoryAccumulator } = require('./core/trajectory');
         const accumulator = new TrajectoryAccumulator(trajectoryDir);
         const modifiedFilesList = [];
         for (const relPath of fixesByFile.keys()) {
@@ -438,16 +469,22 @@ async function recordCodemodTrajectory(
                 });
             }
         }
-        const resolvedPoints = totalApplied * 2;
+        const resolvedPoints = totalApplied * RESOLVED_POINTS_PER_APPLIED;
+        const maybeRevision = (cli as Record<string, unknown>).revision;
         await accumulator.recordAuditRun({
             runId: `fix-${Date.now()}`,
-            revision: cli.revision ? String(cli.revision).slice(0, 8) : 'codemod',
+            revision: maybeRevision
+                ? String(maybeRevision).slice(0, REVISION_ID_DISPLAY_LENGTH)
+                : 'codemod',
             module: path.basename(rootDir),
             agent: 'codemod-fix',
             timestamp: Date.now(),
             scannedFiles: modifiedFilesList,
-            beforeScore: 98.0,
-            afterScore: Math.min(100.0, 98.0 + totalApplied * 0.1),
+            beforeScore: SCORE_INITIAL_FIX_BASELINE,
+            afterScore: Math.min(
+                SCORE_MAX,
+                SCORE_INITIAL_FIX_BASELINE + totalApplied * SCORE_FIX_INCREMENT_PER_APPLIED,
+            ),
             resolvedDebtPoints: resolvedPoints,
             addedDebtPoints: 0,
             regressionFindingsCount: 0,
@@ -467,7 +504,6 @@ async function handleScanCommand(args: string[]): Promise<number> {
 
     // --cache-clear: wipe the cache dir up-front (a fresh scan rebuilds it).
     if (cli.cacheClear) {
-        const { CacheStore } = require('./core/cache');
         const cfg = resolveConfig(cli);
         const cache = new CacheStore(cli.cacheDir, cfg.root);
         const ok = cache.clear();
@@ -484,16 +520,16 @@ async function handleScanCommand(args: string[]): Promise<number> {
 }
 
 function parseGateOptions(args: string[]): {
-    stage: import('./core/praxis/composite-quality-gate').GateStage;
+    stage: GateStage;
     root: string;
 } {
-    const stageIdx = args.indexOf('--stage');
-    let stage: import('./core/praxis/composite-quality-gate').GateStage = 'pre-commit';
+    const stageIdx = args.indexOf(FLAG_STAGE);
+    let stage: GateStage = 'pre-commit';
     if (stageIdx !== -1 && args[stageIdx + 1]) {
-        stage = args[stageIdx + 1] as any;
+        stage = args[stageIdx + 1] as GateStage;
     }
 
-    const rootIdx = args.indexOf('--root');
+    const rootIdx = args.indexOf(FLAG_ROOT);
     let root = process.cwd();
     if (rootIdx !== -1 && args[rootIdx + 1]) {
         root = args[rootIdx + 1];
@@ -503,7 +539,7 @@ function parseGateOptions(args: string[]): {
 }
 
 function computeProcessedDensityAndRatio(
-    fileMetrics: any[],
+    fileMetrics: Array<{ nonBlankLines?: number; lines?: number }>,
     totalFiles: number,
 ): { processedEloc: number; density: number; ratio: number } {
     let totalProcessedEloc = 0;
@@ -528,15 +564,12 @@ function computeProcessedDensityAndRatio(
 }
 
 async function readHistoricalMeanScore(root: string): Promise<number | undefined> {
-    const fs = require('fs');
-    const path = require('path');
     const trajectoryDir = path.join(root, '.refactor-trajectory');
     if (!fs.existsSync(trajectoryDir)) {
         return undefined;
     }
 
     try {
-        const { readLifetimeSummary } = require('./core/trajectory');
         const lifetime = await readLifetimeSummary(trajectoryDir);
         if (
             lifetime &&
@@ -573,13 +606,12 @@ function buildGateMetrics(
     beforeScore: number,
     currentScore: number,
     scoreVector: number[],
-    counters: any,
+    counters: ReturnType<typeof buildTrajectoryCounters>,
     resolvedDebtPoints: number,
     addedDebtPoints: number,
     regressionCount: number,
-    unsuppressedErrors: any[],
+    unsuppressedErrors: Array<{ id?: string; rule?: string }>,
 ) {
-    const { computeTrajectoryQualityMetrics } = require('./core/trajectory');
     const netDebtPointsDelta = resolvedDebtPoints - addedDebtPoints;
     return computeTrajectoryQualityMetrics({
         beforeScore,
@@ -592,30 +624,27 @@ function buildGateMetrics(
             netDebtCleared: netDebtPointsDelta,
             regressionFindingsCount: regressionCount,
             regressionFindingIds: unsuppressedErrors.map(
-                (issue: any) => issue.id || issue.rule || 'STATIC_ERROR',
+                (issue) => issue.id || issue.rule || 'STATIC_ERROR',
             ),
         },
     });
 }
 
 function resolveGateConfigFile(root: string): string | undefined {
-    const fs = require('fs');
-    const path = require('path');
     const configPath = path.join(root, 'auto-refactor.config.json');
     return fs.existsSync(configPath) ? configPath : undefined;
 }
 
-function extractUnsuppressedErrors(issues: any[]): any[] {
-    return (issues || []).filter((issue: any) => issue.severity === 'error' && !issue.suppression);
+function extractUnsuppressedErrors(issues: ScanReport['issues']): ScanReport['issues'] {
+    return (issues || []).filter((issue) => issue.severity === 'error' && !issue.suppression);
 }
 
 function resolveGateScores(
-    scanResult: any,
+    scanResult: ScanReport,
     staticPass: boolean,
     historicalBeforeScore: number | undefined,
 ): { currentScore: number; beforeScore: number; scoreVector: number[] } {
-    const { recordToVector } = require('./core/trajectory');
-    let currentScore = staticPass ? 100.0 : 80.0;
+    let currentScore = staticPass ? SCORE_MAX : SCORE_GATE_FAIL;
     if (
         typeof scanResult.qualityScore?.compositeScore === 'number' &&
         Number.isFinite(scanResult.qualityScore.compositeScore)
@@ -631,11 +660,10 @@ function resolveGateScores(
 }
 
 async function executeGateScan(root: string): Promise<{
-    scanResult: any;
-    unsuppressedErrors: any[];
+    scanResult: ScanReport;
+    unsuppressedErrors: ScanReport['issues'];
     staticPass: boolean;
 }> {
-    const { scan } = require('./api');
     const configFile = resolveGateConfigFile(root);
     const scanResult = await scan({ root, configFile, logLevel: 'warn' });
     const unsuppressedErrors = extractUnsuppressedErrors(scanResult.issues);
@@ -645,11 +673,15 @@ async function executeGateScan(root: string): Promise<{
 
 async function prepareGateEvaluation(
     root: string,
-    scanData: { scanResult: any; unsuppressedErrors: any[]; staticPass: boolean },
+    scanData: {
+        scanResult: ScanReport;
+        unsuppressedErrors: ScanReport['issues'];
+        staticPass: boolean;
+    },
 ): Promise<{
     staticPass: boolean;
-    counters: any;
-    metrics: any;
+    counters: ReturnType<typeof buildTrajectoryCounters>;
+    metrics: ReturnType<typeof buildGateMetrics>;
 }> {
     const { scanResult, unsuppressedErrors, staticPass } = scanData;
     const regressionCount = unsuppressedErrors.length;
@@ -666,8 +698,8 @@ async function prepareGateEvaluation(
         staticPass,
         historicalBeforeScore,
     );
-    const resolvedDebtPoints = staticPass ? 10 : 0;
-    const addedDebtPoints = regressionCount * 5;
+    const resolvedDebtPoints = staticPass ? RESOLVED_POINTS_STATIC_PASS : 0;
+    const addedDebtPoints = regressionCount * ADDED_POINTS_PER_REGRESSION;
 
     const counters = buildTrajectoryCounters(processedEloc, density, ratio);
     const metrics = buildGateMetrics(
@@ -684,10 +716,13 @@ async function prepareGateEvaluation(
 }
 
 function evaluateGateStatus(
-    stage: import('./core/praxis/composite-quality-gate').GateStage,
-    evalData: { staticPass: boolean; counters: any; metrics: any },
+    stage: GateStage,
+    evalData: {
+        staticPass: boolean;
+        counters: ReturnType<typeof buildTrajectoryCounters>;
+        metrics: ReturnType<typeof buildGateMetrics>;
+    },
 ): { summaryText: string; passed: boolean } {
-    const { evaluateCompositeGate } = require('./core/praxis/composite-quality-gate');
     return evaluateCompositeGate({
         stage,
         staticPass: evalData.staticPass,
@@ -701,9 +736,9 @@ async function handleGateCommand(args: string[]): Promise<void> {
     const { stage, root } = parseGateOptions(args);
     const scanData = await executeGateScan(root);
     const evalData = await prepareGateEvaluation(root, scanData);
-    const result = evaluateGateStatus(stage, evalData);
-    process.stdout.write(result.summaryText + '\n');
-    process.exit(result.passed ? 0 : 1);
+    const compositeGateResult = evaluateGateStatus(stage, evalData);
+    process.stdout.write(compositeGateResult.summaryText + '\n');
+    process.exit(compositeGateResult.passed ? 0 : 1);
 }
 
 /**
@@ -712,47 +747,45 @@ async function handleGateCommand(args: string[]): Promise<void> {
  */
 async function main(): Promise<void> {
     const args = process.argv.slice(2);
-    const subcommand = args.find((argument) => !argument.startsWith('--')) || 'scan';
+    const subcommand = args.find((argument) => !argument.startsWith('--')) || CMD_SCAN;
 
-    if (subcommand === 'symbols') {
+    if (subcommand === CMD_SYMBOLS) {
         await handleSymbolsCommand(args);
         return;
     }
     if (subcommand === DAEMON_SUBCOMMAND) {
-        const { daemonCommand } = require('./cli/daemonCmd');
         const restArgs = args.slice(args.indexOf(DAEMON_SUBCOMMAND) + 1);
         const daemonResult = await daemonCommand(restArgs);
         if (daemonResult.text) process.stdout.write(daemonResult.text + '\n');
         process.exit(daemonResult.code);
     }
-    if (subcommand === 'self-test') {
-        const { selfTestCommand } = require('./cli/selfTestCmd');
-        const testArgs = args.slice(args.indexOf('self-test') + 1);
+    if (subcommand === CMD_SELF_TEST) {
+        const testArgs = args.slice(args.indexOf(CMD_SELF_TEST) + 1);
         const selfTestResult = await selfTestCommand(testArgs);
         process.stderr.write(selfTestResult.text + '\n');
         process.exit(selfTestResult.code);
     }
-    if (subcommand === 'guide') {
+    if (subcommand === CMD_GUIDE) {
         handleGuideCommand(args);
         return;
     }
-    if (subcommand === 'trajectory') {
+    if (subcommand === CMD_TRAJECTORY) {
         await handleTrajectoryCommand(args);
         return;
     }
-    if (subcommand === 'memory') {
+    if (subcommand === CMD_MEMORY) {
         handleMemoryCommand();
         return;
     }
-    if (subcommand === 'stats') {
+    if (subcommand === CMD_STATS) {
         await handleStatsCommand(args);
         return;
     }
-    if (subcommand === 'gate') {
+    if (subcommand === CMD_GATE) {
         await handleGateCommand(args);
         return;
     }
-    if (subcommand !== 'scan') {
+    if (subcommand !== CMD_SCAN) {
         printUsage();
         process.exit(2);
     }
