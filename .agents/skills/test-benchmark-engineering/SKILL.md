@@ -3,7 +3,7 @@ name: test-benchmark-engineering
 description: >-
   测试工程化、确定性隔离与性能基准回归守卫规范。指导 Agent 落实跨项目防孤儿用例管理、
   固定时钟与伪随机数确定性环境隔离、基准套件耗时回归棘轮 (TB-REGRESSION)、
-  以及 auto-refactor 325 规则全量自测与 workspace-timing 145 用例防护。
+  以及 auto-refactor 335 规则全量自测与 workspace-timing 156 用例防护。
 ---
 
 # test-benchmark-engineering — 测试工程化、确定性隔离与基准回归工作流
@@ -40,14 +40,14 @@ description: >-
 
 工作区对测试用例实行严格的**全量纳管、零孤儿用例**原则：
 
-1. **`auto-refactor` (325 规则自测全纳管)**：
+1. **`auto-refactor` (335 规则自测全纳管)**：
    - 规则自测用例位于 `auto-refactor/tests/rules/`；
    - 必须在 `auto-refactor/scripts/test-parallel.js` 或并行自测清单中注册；
-   - 保证 153/153 套测试套件并发绿色通过，0 挂起，纯 TS shim 与 Rust 算子 100% 字节等价。
-2. **`workspace-timing` (145 单元测试全纳管)**：
+   - 保证 155/155 套测试套件并发/串行绿色通过，0 挂起，纯 TS shim 与 Rust 算子 100% 字节等价。
+2. **`workspace-timing` (156 单元测试全纳管)**：
    - 单元测试位于 `workspace-timing/src/test/`；
    - 必须通过 `npm run test:fast` 极速套件与 `npm run review` 全量覆盖；
-   - 必须覆盖跨午夜、RingBuffer 满载清退与 StorageCoordinator 级联兜底边界。
+   - 必须覆盖跨午夜/跨周双轨守恒、RingBuffer 满载清退与 StorageCoordinator 级联兜底边界。
 3. **`WebGames` (全域测试清单纳管)**：
    - 所有测试套件继承 `TestCase`，并在 `config/infrastructure/domains.json` 与 `test_registry.gd` 中双向注册；
    - 严禁在 `tests/unit/` 根目录平铺散落未注册脚本。
@@ -58,9 +58,10 @@ description: >-
 
 为了保护极速开发体验与自动化门禁性能，测试耗时受到单调棘轮机制看守：
 
-### 1. 单用例耗时上限
+### 1. 单用例耗时上限与热路径微基准
 - 纯逻辑单元测试单项耗时应严格控制在 $10\text{ms}$ 以内；
-- 内存流式预审门禁全量判定耗时控制在 $100\text{ms}$ 级（如 `gate-fast-staged.js < 90ms`）。
+- 内存流式预审门禁全量判定耗时控制在 $100\text{ms}$ 级（如 `gate-fast-staged.js < 90ms`）；
+- `auto-refactor` 热路径微基准（`node auto-refactor/scripts/bench-hot-paths.js`）专门看守 `mask-source`、`governance-scan` 与 `cmp-rules` 吞吐表现。
 
 ### 2. 基准耗时棘轮与阻断 (`TB-REGRESSION`)
 - 子项目测试基线记录历史测试耗时快照；
@@ -72,10 +73,10 @@ description: >-
 ## 五、 常用测试运行与验证命令矩阵
 
 ```bash
-# 1. auto-refactor 全量测试套件 (153/153 并发通过)
-cd auto-refactor && npm test
+# 1. auto-refactor 全量测试套件 (155/155 通过) 与热路径基准
+cd auto-refactor && npm test && node scripts/bench-hot-paths.js
 
-# 2. workspace-timing 极速单元测试 (145 项用例通过)
+# 2. workspace-timing 极速单元测试 (156 项用例通过)
 cd workspace-timing && npm run test:fast
 
 # 3. auto-refactor 规则自审棘轮基线看守
@@ -86,8 +87,8 @@ pwsh -File scripts/ps1/audit-all.ps1 -Fast
 ```
 
 **质性断言标准**：
-- auto-refactor 153/153 套测试绿色通过，0 孤儿用例；
-- workspace-timing 145 项单元测试 100% 通过；
+- auto-refactor 155/155 套测试绿色通过，0 孤儿用例；
+- workspace-timing 156 项单元测试 100% 通过；
 - 测试过程零未决异步句柄挂起，环境沙箱自动清理干净；
 - 全工作区 High/Critical 技术债务保持 0 项基线，严禁引入技术债务反弹。
 

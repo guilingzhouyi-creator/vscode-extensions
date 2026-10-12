@@ -74,9 +74,10 @@ description: >-
 - **`segmentedSessions`**：跨自然日切分或滚动折叠后的标准会话片段序列，替代歧义的 `sessions` 或 `splitSessions`；
 - **`[DELTA]`**：日志追加与事件广播中的增量数据行前缀标记，供 Journal 日志回放器精确识别增量数据行。
 
-### 2. 跨自然日会话切分与休眠恢复
-- 系统挂起、休眠唤醒（`resumeFromSleep`）或意外恢复时，若运行区间跨越自然日边界，严禁将多日时长作为单段长会话直接封存；
+### 2. 跨自然日会话切分、双轨守恒与休眠恢复
+- 系统挂起、休眠唤醒（`resumeFromSleep`）或意外恢复时，若运行区间跨越自然日或跨周（如周日跨周一）边界，严禁将多日时长作为单段长会话直接封存；
 - 必须通过 `TimeAggregator.splitByNaturalDay(startMs, endMs)` 将跨日会话原子拆分为各自然日的 `segmentedSessions` 片段，分别封存并保证时长守恒；
+- **双轨未记录正向守恒回退不变式**：当输入会话未显式记录人工/AI 双轨细分（`rawManual === 0 && rawAi === 0 && durationMs > 0`）时，切分后的各自然日片段必须将全部 `segDuration` 正向回退计入 `manualMs`，严禁因比例乘零导致跨午夜切分后 `durationMs` 被归零吞没；
 - 会话封存时，仅将归属于当前自然日的片段累加至今日计数器，非本日片段不得污染今日活跃统计。
 
 ---
@@ -106,7 +107,7 @@ description: >-
 ### 1. 门禁分流调度与对应指令
 当修改触及 `workspace-timing/**` 路径时，门禁系统触发三阶递进校验：
 1. **增量极速编译**：`npm run compile`（严格基于 `tsconfig.json` 的 `isolatedModules` 与无 `declaration` 快速发射）；
-2. **单元测试与回归套件**：`npm run test:fast`（执行 145 项单元测试，重点看守会话折叠、跨日切分、时长守恒与崩溃回放）；
+2. **单元测试与回归套件**：`npm run test:fast`（执行 156 项单元测试，重点看守会话折叠、跨日/跨周切分、双轨时长守恒与崩溃回放）；
 3. **专有规则审查门禁**：`npm run review`（执行 `scripts/dist/review/run-review.js` 检查 L0~L5 六层共 49 条规则）。
 
 ### 2. 49 条审查规则单一真源对齐 (SSOT)
@@ -135,7 +136,7 @@ cd workspace-timing
 # 1. 极速增量编译 TypeScript
 npm run compile
 
-# 2. 运行快速单元测试套件（145 项用例，包含折叠/聚合/i18n/双轨工时契约）
+# 2. 运行快速单元测试套件（156 项用例，包含折叠/聚合/i18n/双轨工时契约）
 npm run test:fast
 
 # 3. 运行扩展 L0~L5 六层权重审查门禁（49 规则看守）

@@ -1,0 +1,20 @@
+{
+  "schema": "workspace-floor-guard-contract/v1",
+  "project": "auto-refactor",
+  "ratchetPolicy": "monotonic-non-decreasing",
+  "budgets": {
+    "maxCyclomaticComplexity": 15,
+    "maxControlFlowDepth": 4,
+    "maxLineNoiseRatio": 4.0,
+    "maxEffectiveLoc": 900,
+    "maxPhysicalLoc": 1400,
+    "maxHighCriticalDebt": 0
+  },
+  "forbiddenRegressions": [
+    "threshold_relaxation",
+    "inline_suppression_injection",
+    "test_assertion_deletion",
+    "stub_or_empty_catch",
+    "unregistered_rule_id"
+  ]
+}

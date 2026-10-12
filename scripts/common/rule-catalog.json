@@ -1,6 +1,6 @@
 {
   "schema": "workspace-rule-catalog/v1",
-  "generatedAt": "2026-10-11T15:21:31.377Z",
+  "generatedAt": "2026-10-12T04:19:11.068Z",
   "totalRules": 420,
   "counts": {
     "autoRefactor": 335,
@@ -84,7 +84,7 @@
       "project": "WebGames",
       "family": "ADV",
       "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/backend/domains/character_creation/dto/authoritative_character_creation_request_dto.gd)"
+      "summary": "WebGames domain gate rule (source: WebGames/backend/domains/character_creation/dto/destiny_mod_manifest_dto.gd)"
     },
     {
       "id": "ADV-PRF-001",
@@ -98,7 +98,7 @@
       "project": "WebGames",
       "family": "ADV",
       "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/backend/domains/inventory/item_entity.gd)"
+      "summary": "WebGames domain gate rule (source: WebGames/backend/domains/character_creation/dto/authoritative_character_creation_request_dto.gd)"
     },
     {
       "id": "ADV-PRF-003",

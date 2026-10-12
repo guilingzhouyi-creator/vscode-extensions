@@ -2,13 +2,13 @@
 name: skill-governance
 description: >-
   工作区技能集工程化结构、生命周期与同构分发治理规范。指导 Agent 遵循 JIT 渐进式披露原则，
-  规范维护 15 项研发技能的四件套物理布局（SKILL.md、references、templates、scripts）、
+  规范维护 24 项研发技能的四件套物理布局（SKILL.md、references、templates、scripts）、
   YAML Frontmatter 语法契约、双目录（.agents/skills 与插件包）100% 字节等价性同步与自动化门禁验证。
 ---
 
 # skill-governance — 技能集工程化结构与生命周期治理规范
 
-本技能确立了全工作区技能集（Skills）的标准物理架构、YAML 元数据契约、JIT 渐进式披露（Progressive Disclosure）原则、根目录与插件包双副本 100% 字节等价同步机制以及自动化校验门禁标准。
+本技能确立了全工作区 24 项研发技能集（Skills）的标准物理架构、YAML 元数据契约、JIT 渐进式披露（Progressive Disclosure）与防 Token 膨胀原则、根目录与插件包双副本 100% 字节等价同步机制以及自动化校验门禁标准。
 
 ---
 
@@ -29,7 +29,7 @@ description: >-
 
 ```text
 .agents/skills/<skill-name>/
-├── SKILL.md                 # [必选] 技能唯一顶层入口与快速决策中枢 (100~300 行)
+├── SKILL.md                 # [必选] 技能唯一顶层入口与快速决策中枢 (建议 50~250 行，上限 <= 300 行)
 ├── references/              # [推荐] 深水区技术实现指南、数学模型与详细背景 (按需查阅)
 │   └── *.md
 ├── templates/               # [推荐] 开箱即用的标准化样板代码、配置文件或测试骨架
@@ -40,17 +40,17 @@ description: >-
 
 ---
 
-## 三、 JIT 渐进式披露设计原则 (JIT Progressive Disclosure)
+## 三、 JIT 渐进式披露与防 Token 堆积原则 (JIT Progressive Disclosure)
 
-为避免单文件上下文膨胀并提升 Agent 的决策速度，技能编写必须遵守渐进式披露原则：
+为严防上下文填充过度（Context Bloat）并提升 Agent 的决策信噪比，技能编写必须遵守以下纪律：
 
-1. **`SKILL.md` 保持高内聚精炼**：
-   - 目标长度控制在 **100 ~ 300 行**；
-   - 聚焦：适用场景、核心公理矩阵、关键架构约束、常用验证命令及关联文件指针；
-   - 避免在 `SKILL.md` 中平铺展示数百行的大段背景叙述或完整代码实现。
+1. **`SKILL.md` 紧凑高信噪比与反注水铁律**：
+   - 推荐长度控制在 **50 ~ 250 行**（硬上限 $\le 300$ 行）；
+   - **严禁为凑行数注水**：简明方法论技能保持 60~100 行高密度表达即可，严禁堆积冗余形容词、重复示例或大段背景散文消耗上下文 Token；
+   - 聚焦：适用场景、核心公理矩阵、关键架构约束、常用验证命令及关联文件指针。
 2. **深水区下沉至 `references/`**：
-   - 将复杂数学证明、算法边界、历史演进或深度协议规范抽离为独立的 Markdown 文档；
-   - 在 `SKILL.md` 尾部通过相对链接形式提供“按需查阅”指针。
+   - 将复杂数学证明、接口完整定义、算法边界或深度协议规范下沉为 `references/` 下的独立 Markdown 文档；
+   - 在 `SKILL.md` 尾部通过相对链接提供“按需加载（JIT）”指针，未触及深水区子任务时无需加载。
 3. **实操脚手架收口至 `templates/`**：
    - 将标准类定义、测试用例骨架、JSON 配置样板独立放置在 `templates/` 中；
    - 模板代码本身必须严格遵守圈复杂度 $\text{CC} \le 15$、嵌套深度 $\text{Depth} \le 4$ 及模块头六字段 JSDoc 规范。

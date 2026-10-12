@@ -68,4 +68,5 @@ description: >-
 ## 三、 对抗性审查参考模板
 
 详见：
+- [adversarial-falsification-heuristics.md](references/adversarial-falsification-heuristics.md)
 - [doubt-cycle-template.md](templates/doubt-cycle-template.md)

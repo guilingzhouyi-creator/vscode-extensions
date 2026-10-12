@@ -66,3 +66,4 @@ description: >-
 
 详见：
 - [floor-guard.md](references/floor-guard.md)
+- [floor-guard-contract.json](templates/floor-guard-contract.json)

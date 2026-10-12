@@ -55,11 +55,16 @@ description: >-
 
 ---
 
-## 三、 全域配置驱动与同构目录化标准
+## 三、 全域配置驱动、核心领域闭环与 MOD SDK 契约
 
-1. **统一读取入口**：所有领域数值与静态资源统一经 `GameConfig.get_*` 从 `config/domains/<域>/core.json` 及其子表读取；
-2. **严禁根目录平铺配置表**：配置表必须按领域归入 `config/domains/<domain>/`；
-3. **泛化路由与热重载**：支持以点分路径形式（如 `GameConfig.get_value("economy.rates.tax")`）访问配置，底层支持细粒度热重载与合法性 Schema 校验。
+1. **统一读取入口与同构目录**：所有领域数值与静态资源统一经 `GameConfig.get_*` 从 `config/domains/<domain>/core.json` 及其子表读取（严禁根目录平铺配置表），支持点分路径访问（如 `GameConfig.get_value("economy.rates.tax")`）、细粒度热重载与 Schema 校验；
+2. **账号物理仓储与权威会话核心 (`account/`)**：
+   - `AccountDiskRepository` 负责账号本地物理持久化与临时快照原子落盘；
+   - `AccountSessionStore` 与快照水化恢复器保障登录态、角色槽位及跨世界切换的幂等恢复；
+   - `WorldGateway` 执行世界准入防越权校验，角色创建统一走权威创角与出生锚点分配管线，严禁前端伪造角色初始属性；
+3. **MOD DAG 拓扑加载与 `mod_sdk` 工具链**：
+   - MOD 加载器基于有向无环图（DAG）执行依赖拓扑排序、版本兼容校验与配置增量覆写，遇循环依赖或越界修改立即熔断隔离；
+   - 配套 Python 工具链：`sync_mod_sdk.py`（同步 SDK 契约）、`scaffold_mod.py`（生成标准 MOD 脚手架）、`check_mod.py`（静态合规审查）、`preview_mod.py`（覆写差异预览）。
 
 ---
 

@@ -76,3 +76,4 @@ description: >-
 
 详见：
 - [context-hierarchy-guide.md](references/context-hierarchy-guide.md)
+- [session-handoff-checkpoint.md](templates/session-handoff-checkpoint.md)

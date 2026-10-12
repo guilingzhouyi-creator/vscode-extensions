@@ -127,7 +127,7 @@ function buildSystemPrompt(archetypeObj, postureObj) {
 
   const verifySection = isReadOnly
     ? `## 🧪 Layer 4: 本地门禁自检契约 (只读审查姿态)
-只读姿态已物理剥夺写权限，严禁执行产物编译或写入测试；向主 Agent 汇报时必须提供基于 410 规则库与所属领域刚性公理的纯客观文件路径、起始行号与质性技术依据。`
+只读姿态已物理剥夺写权限，严禁执行产物编译或写入测试；向主 Agent 汇报时必须提供基于 420 规则库与所属领域刚性公理的纯客观文件路径、起始行号与质性技术依据。`
     : `## 🧪 Layer 4: 本地门禁自检契约 (构建 + 测试 + 静态规则三重闭环)
 交割任务前，必须在所属工作目录下依次执行并通过以下本地验证命令（测试全绿仅为必要底线，绝不等同于符合审查或通过门禁，必须确保编译、测试与静态规则全部绿色）：
 ${verifyCommands}`;
@@ -140,7 +140,7 @@ ${verifyCommands}`;
 1. 物理卫生：全仓严禁创建或遗留 0 字节空文件；脚本必须严格保持换行契约（.ps1 CRLF，其他 LF）；
 2. 复杂度预算：圈复杂度 CC <= 15，控制流深度 Depth <= 4，单行噪声比 Noise <= 4.0；单文件双轨体积 ELOC <= 900 / LOC <= 1400（受 1:3 动态反推包络约束与消除循环内瞬态堆分配 CPX-SPACE-001）；
 3. 门面设计：门面层必须满足 ELOC >= 15 或 Object.freeze 不可变保障，严禁 <= 3 行空包跳板 (ARCH-ABS-001 / ARCH-FAC-001)；
-4. 真实性纪律：单源规则目录 (rule-catalog.json) 权威收录 410 条规则，严禁虚构规则 ID (RCFG-RULE-DRIFT)，禁止敷衍/夸大词汇与施工临时黑话；
+4. 真实性纪律：单源规则目录 (rule-catalog.json) 权威收录 420 条规则，严禁虚构规则 ID (RCFG-RULE-DRIFT)，禁止敷衍/夸大词汇与施工临时黑话；
 5. 零高危技术债：全工作区 High/Critical 债务历史性归零 (0 项)，严禁引入任何技术债务反弹 (一票否决)；
 6. 资深工程规范与防线公理：测试全绿仅为功能底线，绝不等同于符合 Auto 审查或通过门禁系统；编码必须内化资深工程师纪律（卫语句平铺控制流、循环内零瞬态堆分配 CPX-SPACE-001、消融空包跳板 ARCH-ABS-001、六字段 JSDoc 契约）；交割前必须通过本地域三重自检。
 
@@ -170,7 +170,7 @@ function buildTaskPromptTemplate(taskGoal, archetypeObj, postureObj) {
 
   const preDeliverySection = isReadOnly
     ? `[Pre-Delivery Verification]
-纯只读审查姿态，严禁修改任何代码；汇报前请对照 410 规则库与所属领域刚性公理确认包含文件路径、起始行号与质性依据。`
+纯只读审查姿态，严禁修改任何代码；汇报前请对照 420 规则库与所属领域刚性公理确认包含文件路径、起始行号与质性依据。`
     : `[Pre-Delivery Verification]
 完成改动后，在提交工作前必须自行执行并通过以下本地自检（涵盖构建编译、测试验证及静态分析；确认全量绿色后方可交付主 Agent 交叉复审）：
 ${verifyCommands}`;
