@@ -71,12 +71,17 @@ interface RuleConstraints {
     allowExternalPrefixes: string[];
 }
 
+function compileGroupRegexes(globs?: string[]): RegExp[] {
+    if (!globs || globs.length === 0) return [];
+    return globs.map(globToRegex);
+}
+
 function compileGroups(groups: Record<string, string[]>): CompiledGroup[] {
     const compiled: CompiledGroup[] = [];
     for (const [group, globs] of Object.entries(groups)) {
         compiled.push({
             group,
-            regexes: (globs ?? []).map(globToRegex),
+            regexes: compileGroupRegexes(globs),
         });
     }
     return compiled;
@@ -113,8 +118,10 @@ function compileRuleConstraints(fromGroup: string, rule: GroupRules): RuleConstr
     });
 
     const target = { allowAll: false, exact: new Set<string>(), prefixes: [] as string[] };
-    for (const a of rule.allowExternal ?? []) {
-        classifyAllowedExternal(a, target);
+    if (rule.allowExternal) {
+        for (const a of rule.allowExternal) {
+            classifyAllowedExternal(a, target);
+        }
     }
 
     return {

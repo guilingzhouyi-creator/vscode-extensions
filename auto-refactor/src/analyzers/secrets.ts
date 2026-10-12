@@ -175,15 +175,17 @@ function compileSecretPatterns(opts: SecretsOptions): CompiledSecretPattern[] {
         compiled.push({ name: p.name, re: new RegExp(p.source) });
     }
 
-    for (const source of opts.extraPatterns ?? []) {
-        if (!isRegexSafe(source)) {
-            const warnings = auditRegexSafety(source);
-            console.warn(
-                `[secrets] Skipping unsafe extraPattern "${source.slice(0, 40)}": ${warnings.join('; ')}`,
-            );
-            continue;
+    if (opts.extraPatterns) {
+        for (const source of opts.extraPatterns) {
+            if (!isRegexSafe(source)) {
+                const warnings = auditRegexSafety(source);
+                console.warn(
+                    `[secrets] Skipping unsafe extraPattern "${source.slice(0, 40)}": ${warnings.join('; ')}`,
+                );
+                continue;
+            }
+            compiled.push({ name: 'custom-extra', re: new RegExp(source) });
         }
-        compiled.push({ name: 'custom-extra', re: new RegExp(source) });
     }
 
     return compiled;

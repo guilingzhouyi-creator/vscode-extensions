@@ -72,12 +72,14 @@ function findMatchingBrace(lines: string[], startIndex: number): number {
     return -1;
 }
 
+const BRACE_ONLY_LINE_RE = /^[{}]+$/;
+
 /** Find the last non-blank, non-comment, non-brace-only line index in [start, end]. */
 function findLastMeaningfulLine(lines: string[], start: number, end: number): number {
     for (let i = end; i >= start; i--) {
         const trimmed = lines[i].trim();
         if (isCommentOrBlankLine(trimmed)) continue;
-        if (/^[{}]+$/.test(trimmed)) continue;
+        if (BRACE_ONLY_LINE_RE.test(trimmed)) continue;
         return i;
     }
     return -1;
@@ -89,7 +91,7 @@ function countMeaningfulStmts(lines: string[], start: number, end: number): numb
     for (let i = start; i < end; i++) {
         const trimmed = lines[i].trim();
         if (isCommentOrBlankLine(trimmed)) continue;
-        if (/^[{}]+$/.test(trimmed)) continue;
+        if (BRACE_ONLY_LINE_RE.test(trimmed)) continue;
         count++;
     }
     return count;

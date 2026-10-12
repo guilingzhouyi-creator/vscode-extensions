@@ -77,6 +77,8 @@ const SHELL_ACTIONABLE_MAP: Record<
     },
 };
 
+const FOREACH_STATEMENT_RE = /(?:^|[\s;{}])foreach\s*\(/i;
+
 /**
  * Shell / PowerShell lint analyzer.
  */
@@ -483,8 +485,7 @@ export class ShellLintAnalyzer implements Analyzer {
             const alias = match[1].toLowerCase();
             // In PowerShell, `foreach ($var in $col)` is a language statement keyword,
             // not a pipeline alias for `ForEach-Object`.
-            const isForeachStatement =
-                alias === 'foreach' && /(?:^|[\s;{}])foreach\s*\(/i.test(trimmed);
+            const isForeachStatement = alias === 'foreach' && FOREACH_STATEMENT_RE.test(trimmed);
             if (isForeachStatement) {
                 continue;
             }

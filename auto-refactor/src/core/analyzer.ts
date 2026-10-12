@@ -174,10 +174,12 @@ export class Scanner implements ScannerContext {
                 analyzers: { ...config.analyzers },
             };
             for (const name of ALL_BUILTIN_ANALYZERS) {
-                sparseConfig.analyzers[name] = {
-                    ...(sparseConfig.analyzers[name] || {}),
-                    enabled: activeSet.has(name),
-                };
+                const existing = sparseConfig.analyzers[name];
+                if (existing) {
+                    existing.enabled = activeSet.has(name);
+                } else {
+                    sparseConfig.analyzers[name] = { enabled: activeSet.has(name) };
+                }
             }
             this.plan = resolveAnalyzers(sparseConfig, config.baseDir || process.cwd());
             this.logger.info(

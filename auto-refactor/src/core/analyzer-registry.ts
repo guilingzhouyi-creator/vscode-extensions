@@ -214,9 +214,12 @@ function topoSort(plan: ResolvedAnalyzer[]): ResolvedAnalyzer[] {
             return;
         }
         inProgress.add(p.name);
-        for (const dep of p.instance.dependsOn || []) {
-            const d = byName.get(dep);
-            if (d) visit(d);
+        const dependsOn = p.instance.dependsOn;
+        if (dependsOn) {
+            for (const dep of dependsOn) {
+                const d = byName.get(dep);
+                if (d) visit(d);
+            }
         }
         inProgress.delete(p.name);
         visited.add(p.name);
@@ -254,7 +257,9 @@ function resolveCustomAnalyzers(
     plan: ResolvedAnalyzer[],
     seen: Set<string>,
 ): void {
-    for (const c of config.customAnalyzers || []) {
+    const customAnalyzers = config.customAnalyzers;
+    if (!customAnalyzers) return;
+    for (const c of customAnalyzers) {
         if (c.enabled === false || seen.has(c.name)) continue;
         if (!c.signals || !Array.isArray(c.signals) || c.signals.length === 0 || !c.track) {
             throw new Error(

@@ -675,7 +675,7 @@ export class CommentAnalyzer implements Analyzer {
 
             const isCode = this.collectRecentComments(trimmed, lineIdx, recentCommentLines, state);
 
-            const backticks = (line.match(/(?<!\\)`/g) || []).length;
+            const backticks = countUnescapedBackticks(line);
             const wasInTemplate = inTemplateLiteral;
             if (backticks % 2 === 1) {
                 inTemplateLiteral = !inTemplateLiteral;
@@ -925,4 +925,23 @@ export class CommentAnalyzer implements Analyzer {
             ...(evidence ? { evidence } : {}),
         };
     }
+}
+
+/**
+ * Count unescaped backtick characters in a source line without heap allocation.
+ *
+ * @param line - Line text to inspect.
+ * @returns Number of unescaped backtick characters found.
+ */
+function countUnescapedBackticks(line: string): number {
+    let count = 0;
+    const len = line.length;
+    for (let i = 0; i < len; i++) {
+        if (line.charCodeAt(i) === 96 /* '`' */) {
+            if (i === 0 || line.charCodeAt(i - 1) !== 92 /* '\\' */) {
+                count++;
+            }
+        }
+    }
+    return count;
 }
