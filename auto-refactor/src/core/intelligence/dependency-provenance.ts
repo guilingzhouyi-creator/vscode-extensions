@@ -10,7 +10,8 @@
  *      Cargo.toml, go.mod);
  *   2. Classify import specifiers into stdlib, internal, in-tree vendor, or external SDK;
  *   3. Classify file provenance into proprietary, in-tree vendor, generated, or test fixture;
- *   4. Record declared version constraints and identify floating/wildcard versions (isUnpinnedVersion);
+ *   4. Record declared version constraints and identify floating/wildcard
+ *      versions (isUnpinnedVersion);
  *   5. Support nearest manifest inventory resolution and composite aggregation for Monorepos;
  *   6. Recursively resolve compiler path aliases across tsconfig extends inheritance chains.
  * Exit Semantics & Design Rationale: Never throws; deterministic cache-backed lookups with safe
@@ -340,7 +341,8 @@ function parsePathAliases(rootDir: string, target: Set<string>): void {
 }
 
 /**
- * Tests whether a dependency version specification is floating or unpinned (wildcard or open range).
+ * Tests whether a dependency version specification is floating or unpinned
+ * (wildcard or open range).
  *
  * @param spec - Declared version requirement string
  * @returns True when version is unpinned, wildcard, or open-ended
@@ -360,7 +362,38 @@ export function isUnpinnedVersion(spec: string): boolean {
     return false;
 }
 
-const NEAREST_DIR_CACHE = new Map<string, string | null>();
+const PATH_TO_NEAREST_DIR_MAP = new Map<string, string | null>();
+const DIR_TO_MERGED_INVENTORY_MAP = new Map<string, ProjectManifestInventory>();
+const KNOWN_FILE_EXT_PATTERN =
+    /\.(?:[cm]?[jt]sx?|py|rs|go|gd|json|ya?ml|toml|md|sh|ps1|c|h|cpp|hpp|java|cs|rb|php|swift|kt|lock|sum|txt)$/i;
+const CACHE_KEY_SEP = '\0';
+const MANIFEST_PKG_JSON = 'package.json';
+const MANIFEST_CARGO_TOML = 'Cargo.toml';
+const MANIFEST_PYPROJECT_TOML = 'pyproject.toml';
+const MANIFEST_GO_MOD = 'go.mod';
+
+function resolveStartDirectory(startPath: string, absBoundary: string): string {
+    const resolved = path.isAbsolute(startPath)
+        ? path.normalize(startPath)
+        : path.resolve(absBoundary, startPath);
+    if (KNOWN_FILE_EXT_PATTERN.test(resolved)) {
+        return path.dirname(resolved);
+    }
+    try {
+        return fs.statSync(resolved).isDirectory() ? resolved : path.dirname(resolved);
+    } catch {
+        return path.dirname(resolved);
+    }
+}
+
+function directoryHasManifest(dirPath: string): boolean {
+    return (
+        fs.existsSync(path.join(dirPath, MANIFEST_PKG_JSON)) ||
+        fs.existsSync(path.join(dirPath, MANIFEST_CARGO_TOML)) ||
+        fs.existsSync(path.join(dirPath, MANIFEST_PYPROJECT_TOML)) ||
+        fs.existsSync(path.join(dirPath, MANIFEST_GO_MOD))
+    );
+}
 
 /**
  * Locate the nearest directory containing a package manifest (package.json, Cargo.toml, etc.)
@@ -372,32 +405,22 @@ const NEAREST_DIR_CACHE = new Map<string, string | null>();
  */
 export function findNearestManifestDir(startPath: string, boundaryDir: string): string | null {
     const absBoundary = path.resolve(boundaryDir);
-    let current = path.isAbsolute(startPath)
-        ? path.normalize(startPath)
-        : path.resolve(absBoundary, startPath);
-
-    try {
-        if (fs.existsSync(current) && !fs.statSync(current).isDirectory()) {
-            current = path.dirname(current);
-        }
-    } catch {
-        current = path.dirname(current);
-    }
+    let current = resolveStartDirectory(startPath, absBoundary);
+    const visitedKeys: string[] = [];
+    let foundDir: string | null = null;
 
     while (current.length >= absBoundary.length) {
-        if (NEAREST_DIR_CACHE.has(current)) {
-            return NEAREST_DIR_CACHE.get(current)!;
+        const cacheKey = absBoundary + CACHE_KEY_SEP + current;
+        const cachedDir = PATH_TO_NEAREST_DIR_MAP.get(cacheKey);
+        if (cachedDir !== undefined) {
+            foundDir = cachedDir;
+            break;
         }
+        visitedKeys.push(cacheKey);
 
-        const hasManifest =
-            fs.existsSync(path.join(current, 'package.json')) ||
-            fs.existsSync(path.join(current, 'Cargo.toml')) ||
-            fs.existsSync(path.join(current, 'pyproject.toml')) ||
-            fs.existsSync(path.join(current, 'go.mod'));
-
-        if (hasManifest) {
-            NEAREST_DIR_CACHE.set(current, current);
-            return current;
+        if (directoryHasManifest(current)) {
+            foundDir = current;
+            break;
         }
 
         if (current === absBoundary) break;
@@ -406,8 +429,10 @@ export function findNearestManifestDir(startPath: string, boundaryDir: string): 
         current = parent;
     }
 
-    NEAREST_DIR_CACHE.set(current, null);
-    return null;
+    for (const key of visitedKeys) {
+        PATH_TO_NEAREST_DIR_MAP.set(key, foundDir);
+    }
+    return foundDir;
 }
 
 /**
@@ -428,10 +453,14 @@ export function findNearestManifestInventory(
         return loadProjectManifestInventory(absRoot);
     }
 
+    const mergeKey = absRoot + CACHE_KEY_SEP + nearestDir;
+    const cachedMerged = DIR_TO_MERGED_INVENTORY_MAP.get(mergeKey);
+    if (cachedMerged) return cachedMerged;
+
     const localInv = loadProjectManifestInventory(nearestDir);
     const rootInv = loadProjectManifestInventory(absRoot);
 
-    return {
+    const merged: ProjectManifestInventory = {
         allDependencies: new Set([...rootInv.allDependencies, ...localInv.allDependencies]),
         prodDependencies: new Set([...rootInv.prodDependencies, ...localInv.prodDependencies]),
         devDependencies: new Set([...rootInv.devDependencies, ...localInv.devDependencies]),
@@ -439,6 +468,8 @@ export function findNearestManifestInventory(
         pathAliases: new Set([...rootInv.pathAliases, ...localInv.pathAliases]),
         versionSpecs: new Map([...rootInv.versionSpecs, ...localInv.versionSpecs]),
     };
+    DIR_TO_MERGED_INVENTORY_MAP.set(mergeKey, merged);
+    return merged;
 }
 
 /**

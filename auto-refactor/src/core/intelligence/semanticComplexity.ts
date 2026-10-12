@@ -242,15 +242,28 @@ interface ParameterNestingState {
 
 function updateParameterNesting(ch: string, state: ParameterNestingState): boolean {
     switch (ch) {
-        case '(': state.paren++; return true;
-        case ')': state.paren = Math.max(0, state.paren - 1); return true;
+        case '(':
+            state.paren++;
+            return true;
+        case ')':
+            state.paren = Math.max(0, state.paren - 1);
+            return true;
         case '[':
-        case '{': state.bracket++; return true;
+        case '{':
+            state.bracket++;
+            return true;
         case ']':
-        case '}': state.bracket = Math.max(0, state.bracket - 1); return true;
-        case '<': state.angle++; return true;
-        case '>': state.angle = Math.max(0, state.angle - 1); return true;
-        default: return false;
+        case '}':
+            state.bracket = Math.max(0, state.bracket - 1);
+            return true;
+        case '<':
+            state.angle++;
+            return true;
+        case '>':
+            state.angle = Math.max(0, state.angle - 1);
+            return true;
+        default:
+            return false;
     }
 }
 

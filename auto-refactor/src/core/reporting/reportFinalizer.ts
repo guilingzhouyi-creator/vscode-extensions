@@ -422,6 +422,28 @@ function refreshQualityScores(
 }
 
 /**
+ * Determines whether quality scores and composite metrics should be recomputed.
+ *
+ * @param report - Current scan report
+ * @param initialIssueCount - Count of issues before post-scan suppression
+ * @param suppressedCount - Count of suppressed issues
+ * @returns True if quality metrics require recalculation
+ */
+function shouldRefreshQualityScores(
+    report: ScanReport,
+    initialIssueCount: number,
+    suppressedCount: number,
+): boolean {
+    if (report.issues.length !== initialIssueCount || suppressedCount > 0) return true;
+    return (
+        !report.qualityScore ||
+        !report.fileQualityScores ||
+        !report.triPlaneQuality ||
+        !report.autonomy
+    );
+}
+
+/**
  * Post-scan pipeline enriching and finalizing a raw ScanReport.
  *
  * @param report - Raw report to finalize in-place.
@@ -454,6 +476,7 @@ export async function finalizeReport(
     if ((report as unknown as Record<symbol, boolean>)[FINALIZED]) return;
     (report as unknown as Record<symbol, boolean>)[FINALIZED] = true;
     const postScanPasses: string[] = [];
+    const initialIssueCount = report.issues.length;
 
     const warnings: string[] = [...(report.summary.warnings ?? [])];
     checkEmptyIncludeGlobs(report, warnings);
@@ -494,7 +517,9 @@ export async function finalizeReport(
     report.summary.postScanPasses = postScanPasses;
     if (warnings.length > 0) report.summary.warnings = warnings;
 
-    refreshQualityScores(report, config, reportScanner);
+    if (shouldRefreshQualityScores(report, initialIssueCount, suppressedCount)) {
+        refreshQualityScores(report, config, reportScanner);
+    }
 
     await finalizeBaseline(report, config, options, logger, postScanPasses);
 }

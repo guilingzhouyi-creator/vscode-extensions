@@ -84,9 +84,14 @@ function resolveChildScopeBinding(node: NormalizedNode, binding: string | null):
 type NodeHookFn = NonNullable<StreamingEntry['analyzer']['visit']>;
 type ErrorReporter = (analyzerName: string, err: unknown, ctx: AnalyzerContext) => void;
 
-function dispatchNodeVisits(
-    visits: (NodeHookFn | null | undefined)[],
-    entries: StreamingEntry[],
+interface ActiveHook {
+    fn: NodeHookFn;
+    ctx: AnalyzerContext;
+    name: string;
+}
+
+function dispatchActiveVisits(
+    active: ActiveHook[],
     node: NormalizedNode,
     parent: NormalizedNode | undefined,
     grandparent: NormalizedNode | undefined,
@@ -95,20 +100,18 @@ function dispatchNodeVisits(
     binding: string | null,
     pushError: ErrorReporter,
 ): void {
-    for (let i = 0; i < visits.length; i++) {
-        const v = visits[i];
-        if (!v) continue;
+    for (let i = 0; i < active.length; i++) {
+        const h = active[i];
         try {
-            v(node, entries[i].ctx, parent, grandparent, depth, className, binding);
+            h.fn(node, h.ctx, parent, grandparent, depth, className, binding);
         } catch (e) {
-            pushError(entries[i].analyzer.name, e, entries[i].ctx);
+            pushError(h.name, e, h.ctx);
         }
     }
 }
 
-function dispatchNodeLeaves(
-    leaves: (NodeHookFn | null | undefined)[],
-    entries: StreamingEntry[],
+function dispatchActiveLeaves(
+    active: ActiveHook[],
     node: NormalizedNode,
     parent: NormalizedNode | undefined,
     grandparent: NormalizedNode | undefined,
@@ -117,13 +120,12 @@ function dispatchNodeLeaves(
     binding: string | null,
     pushError: ErrorReporter,
 ): void {
-    for (let i = leaves.length - 1; i >= 0; i--) {
-        const l = leaves[i];
-        if (!l) continue;
+    for (let i = 0; i < active.length; i++) {
+        const h = active[i];
         try {
-            l(node, entries[i].ctx, parent, grandparent, depth, className, binding);
+            h.fn(node, h.ctx, parent, grandparent, depth, className, binding);
         } catch (e) {
-            pushError(entries[i].analyzer.name, e, entries[i].ctx);
+            pushError(h.name, e, h.ctx);
         }
     }
 }
@@ -150,17 +152,30 @@ export function runStreaming(
     const errored = new Set<string>();
 
     // Pre-bind visit/finalize once per file: saves the per-node `typeof` check and property
-    // lookups on the hot path (significant for many-tiny-files workloads).
-    const visits = entries.map((a) =>
-        isCallable(a.analyzer.visit) ? a.analyzer.visit.bind(a.analyzer) : null,
-    );
+    const activeVisits: ActiveHook[] = [];
+    for (let i = 0; i < entries.length; i++) {
+        const a = entries[i];
+        if (isCallable(a.analyzer.visit)) {
+            activeVisits.push({
+                fn: a.analyzer.visit.bind(a.analyzer),
+                ctx: a.ctx,
+                name: a.analyzer.name,
+            });
+        }
+    }
 
-    // Pre-bind leave hooks (post-order). null when the analyzer has no leave method —
-    // the per-node leave loop is skipped entirely when all entries are null.
-    const leaves = entries.map((a) =>
-        isCallable(a.analyzer.leave) ? a.analyzer.leave.bind(a.analyzer) : null,
-    );
-    const hasAnyLeave = leaves.some((l) => l !== null);
+    const activeLeaves: ActiveHook[] = [];
+    for (let i = entries.length - 1; i >= 0; i--) {
+        const a = entries[i];
+        if (isCallable(a.analyzer.leave)) {
+            activeLeaves.push({
+                fn: a.analyzer.leave.bind(a.analyzer),
+                ctx: a.ctx,
+                name: a.analyzer.name,
+            });
+        }
+    }
+    const hasAnyLeave = activeLeaves.length > 0;
 
     const pushError = (name: string, e: unknown, ctx: AnalyzerContext) => {
         if (errored.has(name)) return; // one error issue per analyzer per file
@@ -189,17 +204,18 @@ export function runStreaming(
         className: string | null,
         binding: string | null,
     ): void => {
-        dispatchNodeVisits(
-            visits,
-            entries,
-            node,
-            parent,
-            grandparent,
-            depth,
-            className,
-            binding,
-            pushError,
-        );
+        if (activeVisits.length > 0) {
+            dispatchActiveVisits(
+                activeVisits,
+                node,
+                parent,
+                grandparent,
+                depth,
+                className,
+                binding,
+                pushError,
+            );
+        }
 
         const childDepth = depth + (node.increasesNesting ? 1 : 0);
         const cName = resolveChildScopeName(node, className);
@@ -210,9 +226,8 @@ export function runStreaming(
         }
 
         if (hasAnyLeave) {
-            dispatchNodeLeaves(
-                leaves,
-                entries,
+            dispatchActiveLeaves(
+                activeLeaves,
                 node,
                 parent,
                 grandparent,
@@ -344,16 +359,30 @@ export function runStreamingProjected(
     const issues: Issue[] = [];
     const errored = new Set<string>();
 
-    // Pre-bind visit/finalize once per file (same hot-path savings as runStreaming).
-    const visits = entries.map((a) =>
-        isCallable(a.analyzer.visit) ? a.analyzer.visit.bind(a.analyzer) : null,
-    );
+    const activeVisits: ActiveHook[] = [];
+    for (let i = 0; i < entries.length; i++) {
+        const a = entries[i];
+        if (isCallable(a.analyzer.visit)) {
+            activeVisits.push({
+                fn: a.analyzer.visit.bind(a.analyzer),
+                ctx: a.ctx,
+                name: a.analyzer.name,
+            });
+        }
+    }
 
-    // Pre-bind leave hooks (post-order) — same zero-overhead pattern as runStreaming.
-    const leaves = entries.map((a) =>
-        isCallable(a.analyzer.leave) ? a.analyzer.leave.bind(a.analyzer) : null,
-    );
-    const hasAnyLeave = leaves.some((l) => l !== null);
+    const activeLeaves: ActiveHook[] = [];
+    for (let i = entries.length - 1; i >= 0; i--) {
+        const a = entries[i];
+        if (isCallable(a.analyzer.leave)) {
+            activeLeaves.push({
+                fn: a.analyzer.leave.bind(a.analyzer),
+                ctx: a.ctx,
+                name: a.analyzer.name,
+            });
+        }
+    }
+    const hasAnyLeave = activeLeaves.length > 0;
 
     const pushError = (name: string, e: unknown, ctx: AnalyzerContext) => {
         if (errored.has(name)) return; // one error issue per analyzer per file
@@ -394,17 +423,18 @@ export function runStreamingProjected(
         // Scan-wide consumers (the cross-file symbol index) observe the SAME projected nodes the
         // analyzers see; this is the only point where the lazy path has a NormalizedNode in hand.
         if (onNode) onNode(node, caller);
-        dispatchNodeVisits(
-            visits,
-            entries,
-            node,
-            parentProj,
-            grandparentProj,
-            depth,
-            className,
-            binding,
-            pushError,
-        );
+        if (activeVisits.length > 0) {
+            dispatchActiveVisits(
+                activeVisits,
+                node,
+                parentProj,
+                grandparentProj,
+                depth,
+                className,
+                binding,
+                pushError,
+            );
+        }
 
         const childDepth = depth + (node.increasesNesting ? 1 : 0);
         const cName = resolveChildScopeName(node, className);
@@ -416,9 +446,8 @@ export function runStreamingProjected(
         }
 
         if (hasAnyLeave) {
-            dispatchNodeLeaves(
-                leaves,
-                entries,
+            dispatchActiveLeaves(
+                activeLeaves,
                 node,
                 parentProj,
                 grandparentProj,

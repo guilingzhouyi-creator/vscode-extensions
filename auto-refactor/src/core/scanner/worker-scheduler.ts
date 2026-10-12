@@ -31,8 +31,8 @@ const TIMING_PERCENT_SCALE = 100;
  * with available hardware cores.
  */
 export const AUTO_WORKER_MAX = Math.min(
-    16,
-    Math.max(8, (os.availableParallelism ? os.availableParallelism() : os.cpus().length || 8) - 1),
+    8,
+    Math.max(4, (os.availableParallelism ? os.availableParallelism() : os.cpus().length || 8) - 1),
 );
 
 /**
@@ -42,7 +42,7 @@ export const AUTO_WORKER_MAX = Math.min(
  * faster on eight. Scaling by file count instead of jumping straight to the core count keeps both
  * shapes fast.
  */
-export const AUTO_WORKER_FILES_PER_THREAD = 24;
+export const AUTO_WORKER_FILES_PER_THREAD = 64;
 
 /** Timeline lines per AR-TIMING console batch, keeping each debug line readable. */
 const TIMING_BATCH_LINES = 8;
@@ -52,23 +52,15 @@ export const WORKER_BATCH_SIZE = 32;
 
 /**
  * Hybrid startup: the first K files are parsed in-process on the main thread while the workers
- * import `typescript` (~223ms dead time per fresh isolate). K is parser-aware because the
- * optimal offload volume depends on the WORKER-side per-file cost:
- *   - parser='typescript': worker parse+materialize ~1.10-1.38ms/file (slow) -> K=500 is best
- *     (~-9% on 1500-file corpus, 4 workers); larger K regresses (main thread saturates, starves
- *     worker dispatch/read-ahead).
- *   - parser='oxc': worker parse+materialize ~0.90ms/file (fast) -> less offloading needed;
- *     K=200-300 is best, K=500 measured ~zero benefit (oxc worker speedup is inside the worker
- *     isolate; the main-thread in-process rate stays ~1.1ms/file for both parsers).
- * Only applies to the n>1 pool path. Debug knobs: AR_HYBRID=0 disables (A/B baseline),
- * AR_HYBRID_FILES=<n> overrides the parser-selected default.
+ * import `typescript` (~223ms dead time per fresh isolate). K is parser-aware and capped by each
+ * thread's fair share (`filesLen / (n + 1)`) so the main thread never starves booted workers.
  *
  * WARM-SCAN: hybrid exists only to mask the worker cold-import dead time (~300ms ts).
  * A WARM pool (already imported + JIT'ed) gets K=0 — otherwise the main thread would steal
  * files from workers and slow the hot path.
  */
-const HYBRID_FILES_TS = 500;
-const HYBRID_FILES_OXC = 200;
+const HYBRID_FILES_TS = 64;
+const HYBRID_FILES_OXC = 48;
 
 /** Bounded concurrency for the hybrid in-process phase (overlaps readFile on the libuv pool). */
 const HYBRID_CONCURRENCY = 16;
@@ -193,9 +185,10 @@ export function toTransferable(rawBuffer: Buffer): Buffer {
 export function computeHybridK(config: ScanConfig, filesLen: number, n: number): number {
     const availCores = os.availableParallelism ? os.availableParallelism() : os.cpus().length;
     const baseHybridK = config.parser === 'oxc' ? HYBRID_FILES_OXC : HYBRID_FILES_TS;
+    const fairCap = Math.floor(filesLen / Math.max(2, n + 1));
     return process.env.AR_HYBRID === '0' || availCores < n * 2
         ? 0
-        : Math.min(Number(process.env.AR_HYBRID_FILES || baseHybridK) | 0, filesLen);
+        : Math.min(Number(process.env.AR_HYBRID_FILES || baseHybridK) | 0, fairCap);
 }
 
 /** Configuration and runtime parameters for worker thread batch dispatching. */
@@ -806,6 +799,10 @@ export async function dispatchBatches(
             for (let k = 0; k < opts.workers.length; k++) {
                 wire(opts.workers[k], k, 0);
             }
+            return;
+        }
+
+        if (nextIdx >= files.length) {
             return;
         }
 

@@ -152,11 +152,46 @@ const EXTENSION_LANGUAGE: Record<string, string> = {
     '.svelte': MASK_LANGUAGE_TYPESCRIPT,
 };
 
-/** Characters that, immediately before a `/`, mean the slash opens a regex literal. */
-const REGEX_PREFIX_CHARS = new Set('([{,=:!&|?;+-*%<>');
+const ASCII_TABLE_SIZE = 128;
+const CHAR_TAB = 9;
+const CHAR_CR = 13;
+const CHAR_SPACE = 32;
+const CHAR_DOUBLE_QUOTE = 34;
+const CHAR_HASH = 35;
+const CHAR_SINGLE_QUOTE = 39;
+const CHAR_ASTERISK = 42;
+const CHAR_SLASH = 47;
+const CHAR_DIGIT_0 = 48;
+const CHAR_DIGIT_9 = 57;
+const CHAR_LESS_THAN = 60;
+const CHAR_UPPER_A = 65;
+const CHAR_UPPER_Z = 90;
+const CHAR_OPEN_BRACKET = 91;
+const CHAR_BACKSLASH = 92;
+const CHAR_CLOSE_BRACKET = 93;
+const CHAR_UNDERSCORE = 95;
+const CHAR_BACKTICK = 96;
+const CHAR_LOWER_A = 97;
+const CHAR_LOWER_B = 98;
+const CHAR_LOWER_C = 99;
+const CHAR_LOWER_R = 114;
+const CHAR_LOWER_Z = 122;
+const TRIGGER_DIRECT = 1;
+const TRIGGER_RAW_PREFIX = 2;
+const NATIVE_DISPATCH_MIN_LEN = 50000;
+const HTML_COMMENT_OPEN = '<!--';
+const HTML_COMMENT_CLOSE = '-->';
+const DOUBLE_QUOTE_STR = '"';
 
-/** Flag characters consumed after a regex literal's closing slash. */
-const REGEX_FLAG_RE = /[a-z]/i;
+/** Characters that, immediately before a `/`, mean the slash opens a regex literal. */
+const REGEX_PREFIX_TABLE = (() => {
+    const table = new Uint8Array(ASCII_TABLE_SIZE);
+    const chars = '([{,=:!&|?;+-*%<>';
+    for (let i = 0; i < chars.length; i++) {
+        table[chars.charCodeAt(i)] = TRIGGER_DIRECT;
+    }
+    return table;
+})();
 
 /**
  * Pure JavaScript implementation of source masking.
@@ -170,12 +205,22 @@ const REGEX_FLAG_RE = /[a-z]/i;
 export function maskSourceTextJs(content: string, config: SourceMaskConfig): MaskedSource {
     const lines = content.split('\n');
     const len = lines.length;
-    const raw: string[] = new Array(len);
-    const masked: string[] = new Array(len);
-    const state: MaskState = { inBlockComment: false, quote: null, rawString: null };
+    const raw: string[] = [];
+    raw.length = len;
+    const masked: string[] = [];
+    masked.length = len;
+    const state: MaskState = {
+        inBlockComment: false,
+        quote: null,
+        rawString: null,
+        triggerTable: getTriggerTable(config),
+        close: config.blockComment?.close ?? '',
+    };
     for (let i = 0; i < len; i++) {
         let line = lines[i];
-        if (line.endsWith('\r')) line = line.slice(0, -1);
+        if (line.length > 0 && line.charCodeAt(line.length - 1) === CHAR_CR) {
+            line = line.slice(0, -1);
+        }
         raw[i] = line;
         masked[i] = maskLine(line, state, config);
     }
@@ -193,7 +238,7 @@ export function maskSourceTextJs(content: string, config: SourceMaskConfig): Mas
  * @returns Both views; `raw` feeds evidence text, `masked` feeds the rule patterns.
  */
 export function maskSourceText(content: string, config: SourceMaskConfig): MaskedSource {
-    if (content.length > 50000) {
+    if (content.length > NATIVE_DISPATCH_MIN_LEN) {
         try {
             return nativeCore.maskSourceCode(content, {
                 lineComment: config.lineComment,
@@ -231,8 +276,7 @@ export function languageIdFromPath(filePath: string): string | null {
  * @returns The preset for that language, or the C-family default.
  */
 export function maskPresetForLanguage(languageId: string | null | undefined): SourceMaskConfig {
-    if (!languageId) return DEFAULT_MASK;
-    return SOURCE_MASK_PRESETS[languageId] ?? DEFAULT_MASK;
+    return languageId ? (SOURCE_MASK_PRESETS[languageId] ?? DEFAULT_MASK) : DEFAULT_MASK;
 }
 
 /**
@@ -273,46 +317,64 @@ interface MaskState {
     quote: string | null;
     /** Active raw string hash count, or null when scanning ordinary code. */
     rawString?: number | null;
+    /** Precomputed 128-entry ASCII trigger table for the active config. */
+    triggerTable: Uint8Array;
+    /** Block-comment closing delimiter, or empty string if none. */
+    close: string;
 }
 
-/** Trigger-character matcher per config, built once because presets are module constants. */
-const TRIGGER_CACHE = new WeakMap<SourceMaskConfig, RegExp>();
+/** Trigger-character lookup table per config, built once per config instance. */
+const TRIGGER_TABLE_CACHE = new WeakMap<SourceMaskConfig, Uint8Array>();
 
 /**
- * Build the matcher for every character that could OPEN a comment, a literal or a regex.
+ * Populate quote and raw-string trigger entries in the lookup table.
+ */
+function populateQuoteTriggers(table: Uint8Array, config: SourceMaskConfig): void {
+    if (config.quoteChars.includes(DOUBLE_QUOTE_STR) || config.rawStrings) {
+        table[CHAR_DOUBLE_QUOTE] = TRIGGER_DIRECT;
+        table[CHAR_LOWER_B] = TRIGGER_RAW_PREFIX;
+        table[CHAR_LOWER_C] = TRIGGER_RAW_PREFIX;
+        table[CHAR_LOWER_R] = TRIGGER_RAW_PREFIX;
+    }
+    for (let i = 0; i < config.quoteChars.length; i++) {
+        const code = config.quoteChars.charCodeAt(i);
+        if (code < ASCII_TABLE_SIZE) table[code] = TRIGGER_DIRECT;
+    }
+}
+
+/**
+ * Build the 128-entry ASCII lookup table for characters that can open a comment, literal or regex.
  *
- * The set is derived from the config rather than hardcoded: a `#` line comment must count for
- * Python and GDScript, and `<#` for PowerShell, or those languages would take the fast path on a
- * line whose comment was never blanked.
+ * Entry value `1` marks direct trigger characters; `2` marks raw-string
+ * prefix letters (`r`, `b`, `c`) that require an immediately following
+ * `"` or `#` (or `r"`/`r#`).
  *
  * @param config - Comment and quote syntax of the language.
- * @returns A single-character-class matcher, tested once per line.
+ * @returns A 128-byte lookup table cached by config identity.
  */
-function triggerRegex(config: SourceMaskConfig): RegExp {
-    const cached = TRIGGER_CACHE.get(config);
+function getTriggerTable(config: SourceMaskConfig): Uint8Array {
+    const cached = TRIGGER_TABLE_CACHE.get(config);
     if (cached) return cached;
 
-    // A degenerate config with no line-comment prefix would blank whole lines, so it must never
-    // take the fast path: an always-matching pattern keeps it on the general path.
+    const table = new Uint8Array(ASCII_TABLE_SIZE);
     if (!config.lineComment) {
-        const never = /(?:)/;
-        TRIGGER_CACHE.set(config, never);
-        return never;
+        table.fill(TRIGGER_DIRECT);
+        TRIGGER_TABLE_CACHE.set(config, table);
+        return table;
     }
 
-    const chars = new Set<string>();
-    for (const char of config.quoteChars) chars.add(char);
-    chars.add(config.lineComment[0]);
-    if (config.blockComment) chars.add(config.blockComment.open[0]);
-    if (config.regexLiterals) chars.add('/');
-    if (config.htmlComment) chars.add('<');
+    populateQuoteTriggers(table, config);
+    const lineChar = config.lineComment.charCodeAt(0);
+    if (lineChar < ASCII_TABLE_SIZE) table[lineChar] = TRIGGER_DIRECT;
+    if (config.blockComment && config.blockComment.open.length > 0) {
+        const blockChar = config.blockComment.open.charCodeAt(0);
+        if (blockChar < ASCII_TABLE_SIZE) table[blockChar] = TRIGGER_DIRECT;
+    }
+    if (config.regexLiterals) table[CHAR_SLASH] = TRIGGER_DIRECT;
+    if (config.htmlComment) table[CHAR_LESS_THAN] = TRIGGER_DIRECT;
 
-    const escaped = [...chars]
-        .map((char) => char.replace(/[.*+?^${}()|[\]\\/-]/g, '\\$&'))
-        .join('');
-    const built = new RegExp(`[${escaped}]`);
-    TRIGGER_CACHE.set(config, built);
-    return built;
+    TRIGGER_TABLE_CACHE.set(config, table);
+    return table;
 }
 
 /**
@@ -320,9 +382,9 @@ function triggerRegex(config: SourceMaskConfig): RegExp {
  */
 function opensRegexLiteral(line: string, index: number): boolean {
     for (let back = index - 1; back >= 0; back -= 1) {
-        const char = line[back];
-        if (char === ' ' || char === '\t') continue;
-        return REGEX_PREFIX_CHARS.has(char);
+        const code = line.charCodeAt(back);
+        if (code === CHAR_SPACE || code === CHAR_TAB) continue;
+        return code < ASCII_TABLE_SIZE && REGEX_PREFIX_TABLE[code] === TRIGGER_DIRECT;
     }
     return true;
 }
@@ -336,17 +398,18 @@ function scanQuotedSpan(
     quoteChar: string,
     state: MaskState,
 ): number {
+    const quoteCode = quoteChar.charCodeAt(0);
+    const len = line.length;
     let index = startIndex;
-    while (index < line.length) {
-        const char = line[index];
-        if (char === '\\') {
+    while (index < len) {
+        const code = line.charCodeAt(index);
+        if (code === CHAR_BACKSLASH) {
             index += 2;
             continue;
         }
-        if (char === quoteChar) {
+        if (code === quoteCode) {
             state.quote = null;
-            index++;
-            break;
+            return index + 1;
         }
         index++;
     }
@@ -358,7 +421,10 @@ function scanQuotedSpan(
  */
 function consumeRegexFlags(line: string, startIndex: number): number {
     let cursor = startIndex;
-    while (cursor < line.length && REGEX_FLAG_RE.test(line[cursor])) {
+    const len = line.length;
+    while (cursor < len) {
+        const lowerCode = line.charCodeAt(cursor) | CHAR_SPACE;
+        if (lowerCode < CHAR_LOWER_A || lowerCode > CHAR_LOWER_Z) break;
         cursor++;
     }
     return cursor;
@@ -370,23 +436,18 @@ function consumeRegexFlags(line: string, startIndex: number): number {
 function scanRegexSpan(line: string, startIndex: number): number {
     let cursor = startIndex + 1;
     let inClass = false;
-    while (cursor < line.length) {
-        const rc = line[cursor];
-        if (rc === '\\') {
+    const len = line.length;
+    while (cursor < len) {
+        const regexChar = line.charCodeAt(cursor);
+        if (regexChar === CHAR_BACKSLASH) {
             cursor += 2;
             continue;
         }
-        if (rc === '[') {
+        if (regexChar === CHAR_OPEN_BRACKET) {
             inClass = true;
-            cursor++;
-            continue;
-        }
-        if (rc === ']') {
+        } else if (regexChar === CHAR_CLOSE_BRACKET) {
             inClass = false;
-            cursor++;
-            continue;
-        }
-        if (rc === '/' && !inClass) {
+        } else if (regexChar === CHAR_SLASH && !inClass) {
             return consumeRegexFlags(line, cursor + 1);
         }
         cursor++;
@@ -397,12 +458,8 @@ function scanRegexSpan(line: string, startIndex: number): number {
 /**
  * Advance past continuing block comment content.
  */
-function scanBlockCommentContinuation(
-    line: string,
-    index: number,
-    close: string,
-    state: MaskState,
-): number {
+function scanBlockCommentContinuation(line: string, index: number, state: MaskState): number {
+    const close = state.close;
     const cIdx = close ? line.indexOf(close, index) : -1;
     if (cIdx !== -1) {
         state.inBlockComment = false;
@@ -461,7 +518,7 @@ function scanQuoteOrRegex(
 function matchesClosingHashes(line: string, start: number, count: number): boolean {
     if (start + count > line.length) return false;
     for (let k = 0; k < count; k++) {
-        if (line[start + k] !== '#') return false;
+        if (line.charCodeAt(start + k) !== CHAR_HASH) return false;
     }
     return true;
 }
@@ -478,7 +535,10 @@ function scanRawStringBody(
     let cursor = startIndex;
     const len = line.length;
     while (cursor < len) {
-        if (line[cursor] === '"' && matchesClosingHashes(line, cursor + 1, hashes)) {
+        if (
+            line.charCodeAt(cursor) === CHAR_DOUBLE_QUOTE &&
+            matchesClosingHashes(line, cursor + 1, hashes)
+        ) {
             state.rawString = null;
             return cursor + 1 + hashes;
         }
@@ -495,10 +555,10 @@ function isPrecededByIdentChar(line: string, index: number): boolean {
     if (index === 0) return false;
     const prev = line.charCodeAt(index - 1);
     return (
-        (prev >= 48 && prev <= 57) || // 0-9
-        (prev >= 65 && prev <= 90) || // A-Z
-        (prev >= 97 && prev <= 122) || // a-z
-        prev === 95 // _
+        (prev >= CHAR_DIGIT_0 && prev <= CHAR_DIGIT_9) ||
+        (prev >= CHAR_UPPER_A && prev <= CHAR_UPPER_Z) ||
+        (prev >= CHAR_LOWER_A && prev <= CHAR_LOWER_Z) ||
+        prev === CHAR_UNDERSCORE
     );
 }
 
@@ -511,15 +571,18 @@ function scanOpeningRawString(
     config: SourceMaskConfig,
     state: MaskState,
 ): number {
-    if (!config.quoteChars.includes('"') && !config.rawStrings) {
+    if (!config.quoteChars.includes(DOUBLE_QUOTE_STR) && !config.rawStrings) {
         return -1;
     }
 
-    const char = line[index];
+    const code = line.charCodeAt(index);
     let rPos = index;
-    if ((char === 'b' || char === 'c') && index + 1 < line.length && line[index + 1] === 'r') {
+    if (
+        (code === CHAR_LOWER_B || code === CHAR_LOWER_C) &&
+        line.charCodeAt(index + 1) === CHAR_LOWER_R
+    ) {
         rPos = index + 1;
-    } else if (char !== 'r') {
+    } else if (code !== CHAR_LOWER_R) {
         return -1;
     }
 
@@ -529,16 +592,148 @@ function scanOpeningRawString(
 
     let pos = rPos + 1;
     let hashes = 0;
-    while (pos < line.length && line[pos] === '#') {
+    while (pos < line.length && line.charCodeAt(pos) === CHAR_HASH) {
         hashes++;
         pos++;
     }
 
-    if (pos >= line.length || line[pos] !== '"') {
+    if (pos >= line.length || line.charCodeAt(pos) !== CHAR_DOUBLE_QUOTE) {
         return -1;
     }
 
     return scanRawStringBody(line, pos + 1, hashes, state);
+}
+
+/**
+ * Scans continuing multi-line construct (quote, raw string, block comment, or HTML comment).
+ */
+function scanMultiLineState(
+    line: string,
+    index: number,
+    state: MaskState,
+    config: SourceMaskConfig,
+): number {
+    if (state.quote) {
+        return scanQuotedSpan(line, index, state.quote, state);
+    }
+    if (state.rawString != null) {
+        return scanRawStringBody(line, index, state.rawString, state);
+    }
+    if (state.inBlockComment) {
+        return scanBlockCommentContinuation(line, index, state);
+    }
+    if (config.htmlComment && state.inHtmlComment) {
+        const cIdx = line.indexOf(HTML_COMMENT_CLOSE, index);
+        if (cIdx !== -1) {
+            state.inHtmlComment = false;
+            return cIdx + HTML_COMMENT_CLOSE.length;
+        }
+        return line.length;
+    }
+    return -1;
+}
+
+/**
+ * Fast-path check and scan for quote tokens (', ", `).
+ */
+function scanQuoteFast(
+    line: string,
+    index: number,
+    code: number,
+    state: MaskState,
+    config: SourceMaskConfig,
+): number {
+    if (code !== CHAR_SINGLE_QUOTE && code !== CHAR_DOUBLE_QUOTE && code !== CHAR_BACKTICK) {
+        return -1;
+    }
+    const char = line[index];
+    if (!config.quoteChars.includes(char)) {
+        return -1;
+    }
+    if (code === CHAR_BACKTICK && !config.multilineTemplates) {
+        return index + 1;
+    }
+    state.quote = char;
+    return scanQuotedSpan(line, index + 1, char, state);
+}
+
+/**
+ * Fast-path check and scan for slash tokens (line comment, block comment, or regex literal).
+ */
+function scanSlashFast(
+    line: string,
+    index: number,
+    state: MaskState,
+    config: SourceMaskConfig,
+): number {
+    const nextCode = line.charCodeAt(index + 1);
+    if (nextCode === CHAR_SLASH && config.lineComment === '//') {
+        return line.length;
+    }
+    if (nextCode === CHAR_ASTERISK && config.blockComment?.open === '/*') {
+        state.inBlockComment = true;
+        const close = state.close || '*/';
+        const cIdx = line.indexOf(close, index + 2);
+        if (cIdx !== -1) {
+            state.inBlockComment = false;
+            return cIdx + close.length;
+        }
+        return line.length;
+    }
+    if (config.regexLiterals && opensRegexLiteral(line, index)) {
+        return scanRegexSpan(line, index);
+    }
+    return -1;
+}
+
+/**
+ * Fast-path check and scan for hash comments, HTML comments, or raw strings.
+ */
+function scanOtherPrefixFast(
+    line: string,
+    index: number,
+    code: number,
+    state: MaskState,
+    config: SourceMaskConfig,
+): number {
+    if (code === CHAR_HASH && config.lineComment === '#') {
+        return line.length;
+    }
+    if (code === CHAR_LESS_THAN) {
+        if (config.htmlComment && line.startsWith(HTML_COMMENT_OPEN, index)) {
+            state.inHtmlComment = true;
+            const cIdx = line.indexOf(HTML_COMMENT_CLOSE, index + HTML_COMMENT_OPEN.length);
+            if (cIdx !== -1) {
+                state.inHtmlComment = false;
+                return cIdx + HTML_COMMENT_CLOSE.length;
+            }
+            return line.length;
+        }
+        return -1;
+    }
+    if (code === CHAR_LOWER_R || code === CHAR_LOWER_B || code === CHAR_LOWER_C) {
+        return scanOpeningRawString(line, index, config, state);
+    }
+    return -1;
+}
+
+/**
+ * Fallback scanner for custom language syntax configurations.
+ */
+function scanFallback(
+    line: string,
+    index: number,
+    state: MaskState,
+    config: SourceMaskConfig,
+): number {
+    if (line.startsWith(config.lineComment, index)) {
+        return line.length;
+    }
+    const bcEnd = scanOpeningBlockComment(line, index, config, state);
+    if (bcEnd !== -1) {
+        return bcEnd;
+    }
+    return scanQuoteOrRegex(line, index, config, state);
 }
 
 /**
@@ -550,70 +745,149 @@ function scanNextMaskSpan(
     index: number,
     state: MaskState,
     config: SourceMaskConfig,
-    close: string,
 ): number {
-    if (state.quote) {
-        return scanQuotedSpan(line, index, state.quote, state);
+    if (!isNormalMaskState(state)) {
+        return scanMultiLineState(line, index, state, config);
     }
-    if (state.rawString != null) {
-        return scanRawStringBody(line, index, state.rawString, state);
+
+    const code = line.charCodeAt(index);
+    const qEnd = scanQuoteFast(line, index, code, state, config);
+    if (qEnd !== -1) return qEnd;
+
+    if (code === CHAR_SLASH) {
+        return scanSlashFast(line, index, state, config);
     }
-    if (state.inBlockComment) {
-        return scanBlockCommentContinuation(line, index, close, state);
-    }
-    if (config.htmlComment && state.inHtmlComment) {
-        const cIdx = line.indexOf('-->', index);
-        if (cIdx !== -1) {
-            state.inHtmlComment = false;
-            return cIdx + 3;
-        }
-        return line.length;
-    }
-    if (line.startsWith(config.lineComment, index)) {
-        return line.length;
-    }
-    const bcEnd = scanOpeningBlockComment(line, index, config, state);
-    if (bcEnd !== -1) {
-        return bcEnd;
-    }
-    if (config.htmlComment && line.startsWith('<!--', index)) {
-        state.inHtmlComment = true;
-        const cIdx = line.indexOf('-->', index + 4);
-        if (cIdx !== -1) {
-            state.inHtmlComment = false;
-            return cIdx + 3;
-        }
-        return line.length;
-    }
-    const rawEnd = scanOpeningRawString(line, index, config, state);
-    if (rawEnd !== -1) {
-        return rawEnd;
-    }
-    return scanQuoteOrRegex(line, index, config, state);
+
+    const pEnd = scanOtherPrefixFast(line, index, code, state, config);
+    if (pEnd !== -1) return pEnd;
+
+    return scanFallback(line, index, state, config);
 }
 
 /**
- * Decides whether line masking can be skipped entirely.
+ * Checks whether the masker is in normal top-level code state (no open multi-line construct).
  */
-function shouldSkipMasking(line: string, state: MaskState, config: SourceMaskConfig): boolean {
-    if (state.quote || state.inBlockComment || state.inHtmlComment || state.rawString != null) {
-        return false;
+function isNormalMaskState(state: MaskState): boolean {
+    return (
+        state.quote === null &&
+        !state.inBlockComment &&
+        !state.inHtmlComment &&
+        state.rawString == null
+    );
+}
+
+/**
+ * Fast pre-check for whether `'r'`, `'b'`, or `'c'` is immediately followed by `"` or `#`.
+ */
+function isRawStringCandidate(line: string, index: number, code: number): boolean {
+    const rIdx =
+        code === CHAR_LOWER_R
+            ? index
+            : line.charCodeAt(index + 1) === CHAR_LOWER_R
+              ? index + 1
+              : -1;
+    if (rIdx === -1) return false;
+    const next = line.charCodeAt(rIdx + 1);
+    return next === CHAR_DOUBLE_QUOTE || next === CHAR_HASH;
+}
+
+/**
+ * Advance `startIndex` to the next character that can trigger a comment, quote, or regex span.
+ */
+function advanceToNextTrigger(line: string, startIndex: number, triggerTable: Uint8Array): number {
+    const len = line.length;
+    let index = startIndex;
+    while (index < len) {
+        const code = line.charCodeAt(index);
+        if (code < ASCII_TABLE_SIZE) {
+            const trig = triggerTable[code];
+            if (
+                trig === TRIGGER_DIRECT ||
+                (trig === TRIGGER_RAW_PREFIX && isRawStringCandidate(line, index, code))
+            ) {
+                break;
+            }
+        }
+        index++;
     }
-    return !triggerRegex(config).test(line);
+    return index;
+}
+
+/**
+ * Advance cursor position to next trigger when in normal code state, or to `nextPos` otherwise.
+ */
+function advanceMaskIndex(line: string, nextPos: number, state: MaskState): number {
+    if (!isNormalMaskState(state)) return nextPos;
+    return advanceToNextTrigger(line, nextPos, state.triggerTable);
 }
 
 /**
  * Checks if a line is completely enclosed inside a multi-line comment block.
  */
-function isFullyCommentedLine(line: string, state: MaskState, close: string): boolean {
+function isFullyCommentedLine(line: string, state: MaskState): boolean {
     if (state.quote) return false;
+    const close = state.close;
     if (state.inBlockComment && close.length > 0 && !line.includes(close)) {
         return true;
     }
-    if (state.rawString != null && !line.includes('"')) {
+    if (state.rawString != null && !line.includes(DOUBLE_QUOTE_STR)) {
         return true;
     }
-    return Boolean(state.inHtmlComment && !line.includes('-->'));
+    return Boolean(state.inHtmlComment && !line.includes(HTML_COMMENT_CLOSE));
+}
+
+const PREALLOC_SPACES_LEN = 512;
+const PREALLOC_SPACES = ' '.repeat(PREALLOC_SPACES_LEN);
+
+/**
+ * Returns a string of spaces of the requested length using a pre-allocated slice when possible.
+ */
+function getSpaces(len: number): string {
+    if (len <= 0) return '';
+    if (len <= PREALLOC_SPACES_LEN) return PREALLOC_SPACES.slice(0, len);
+    return ' '.repeat(len);
+}
+
+/**
+ * Execute span masking starting from `startIndex` on `line`.
+ */
+function maskLineFromIndex(
+    line: string,
+    startIndex: number,
+    state: MaskState,
+    config: SourceMaskConfig,
+): string {
+    const len = line.length;
+    let pieces: string[] | null = null;
+    let lastCopied = 0;
+    let index = startIndex;
+
+    while (index < len) {
+        const nextIdx = scanNextMaskSpan(line, index, state, config);
+        if (nextIdx === -1) {
+            index = advanceMaskIndex(line, index + 1, state);
+            continue;
+        }
+        if (index < nextIdx) {
+            if (pieces === null && nextIdx === len) {
+                const prefix = index === 0 ? '' : line.slice(0, index);
+                return prefix + getSpaces(len - index);
+            }
+            if (pieces === null) pieces = [];
+            if (index > lastCopied) {
+                pieces.push(line.slice(lastCopied, index));
+            }
+            pieces.push(getSpaces(nextIdx - index));
+            lastCopied = nextIdx;
+        }
+        index = advanceMaskIndex(line, nextIdx, state);
+    }
+
+    if (pieces === null) return line;
+    if (lastCopied < len) {
+        pieces.push(line.slice(lastCopied));
+    }
+    return pieces.join('');
 }
 
 /**
@@ -625,41 +899,15 @@ function isFullyCommentedLine(line: string, state: MaskState, close: string): bo
  * @returns A same-length copy whose comment and literal characters are spaces.
  */
 function maskLine(line: string, state: MaskState, config: SourceMaskConfig): string {
-    if (shouldSkipMasking(line, state, config)) return line;
-
-    const close = config.blockComment?.close ?? '';
-    if (isFullyCommentedLine(line, state, close)) {
-        return ' '.repeat(line.length);
+    const len = line.length;
+    if (len === 0) return line;
+    if (isNormalMaskState(state)) {
+        const firstTrigger = advanceToNextTrigger(line, 0, state.triggerTable);
+        if (firstTrigger >= len) return line;
+        return maskLineFromIndex(line, firstTrigger, state, config);
     }
-
-    const pieces: string[] = [];
-    let lastCopied = 0;
-    let hasBlanked = false;
-
-    const blankSpan = (start: number, end: number): void => {
-        if (start >= end) return;
-        hasBlanked = true;
-        if (start > lastCopied) {
-            pieces.push(line.slice(lastCopied, start));
-        }
-        pieces.push(' '.repeat(end - start));
-        lastCopied = end;
-    };
-
-    let index = 0;
-    while (index < line.length) {
-        const nextIdx = scanNextMaskSpan(line, index, state, config, close);
-        if (nextIdx !== -1) {
-            blankSpan(index, nextIdx);
-            index = nextIdx;
-        } else {
-            index++;
-        }
+    if (isFullyCommentedLine(line, state)) {
+        return getSpaces(len);
     }
-
-    if (!hasBlanked) return line;
-    if (lastCopied < line.length) {
-        pieces.push(line.slice(lastCopied));
-    }
-    return pieces.join('');
+    return maskLineFromIndex(line, 0, state, config);
 }

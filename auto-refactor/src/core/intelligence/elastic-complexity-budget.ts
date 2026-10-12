@@ -6,7 +6,8 @@
  * Dependencies & Triggers: Consumes NormalizedNode, Issue, and dimensionLiterals; invoked by
  *   ComplexityAnalyzer during traversal and post-scan validation.
  * Responsibilities: Compute language, role, domain, clarity, and blast radius budget multipliers;
- *   enforce function-level, file-level, and module-level constraints; emit CPX-BUD-001 and CPX-JST-001.
+ *   enforce function-level, file-level, and module-level constraints;
+ *   emit CPX-BUD-001 and CPX-JST-001.
  * Exit Semantics & Design Rationale: Deterministic AST inspection without disk I/O.
  *   Prevents harmful forced refactoring of clean state machines and algorithmic kernels.
  */
@@ -160,7 +161,11 @@ function computeBudgetThresholds(
     const blastRadiusMultiplier = computeBlastRadiusMultiplier(fn.isExported, fn.maxDepth);
 
     const totalMultiplier =
-        langMultiplier * roleMultiplier * domainMultiplier * clarityMultiplier * blastRadiusMultiplier;
+        langMultiplier *
+        roleMultiplier *
+        domainMultiplier *
+        clarityMultiplier *
+        blastRadiusMultiplier;
     const effectiveWarn = Math.max(8, Math.min(35, Math.round(base.warn * totalMultiplier)));
     const effectiveFail = Math.max(14, Math.min(50, Math.round(base.fail * totalMultiplier)));
     const hasAlgorithmicProof = Boolean((isAlgo || fn.hasDocContract) && fn.maxDepth <= 3);

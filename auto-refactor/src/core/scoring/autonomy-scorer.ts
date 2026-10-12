@@ -274,6 +274,52 @@ function parseImportClause(clause: string, pkg: string, symbolToPkg: Map<string,
     }
 }
 
+const KEYWORD_IMPORT = 'import';
+const KEYWORD_REQUIRE = 'require';
+const KEYWORD_EXPORT = 'export';
+
+function hasTsJsImportKeyword(line: string): boolean {
+    return (
+        line.includes(KEYWORD_IMPORT) ||
+        line.includes(KEYWORD_REQUIRE) ||
+        line.includes(KEYWORD_EXPORT)
+    );
+}
+
+function extractTsJsImportLine(
+    trimmed: string,
+    specifiers: Set<string>,
+    symbolToPkg: Map<string, string>,
+): void {
+    const importFromMatch = /import\s+(?:type\s+)?(.*?)\s+from\s+['"]([^'"]+)['"]/.exec(trimmed);
+    if (importFromMatch) {
+        const spec = importFromMatch[2].trim();
+        specifiers.add(spec);
+        const pkg = extractModulePackageName(spec);
+        parseImportClause(importFromMatch[1].trim(), pkg, symbolToPkg);
+        return;
+    }
+    const requireMatch = /(?:const|let|var)\s+(.*?)\s*=\s*require\(\s*['"]([^'"]+)['"]\s*\)/.exec(
+        trimmed,
+    );
+    if (requireMatch) {
+        const spec = requireMatch[2].trim();
+        specifiers.add(spec);
+        const pkg = extractModulePackageName(spec);
+        parseImportClause(requireMatch[1].trim(), pkg, symbolToPkg);
+        return;
+    }
+    const sideEffectMatch = /import\s*\(?\s*['"]([^'"]+)['"]\s*\)?/.exec(trimmed);
+    if (sideEffectMatch) {
+        specifiers.add(sideEffectMatch[1].trim());
+        return;
+    }
+    const exportFromMatch = /export\s+.*?\s+from\s+['"]([^'"]+)['"]/.exec(trimmed);
+    if (exportFromMatch) {
+        specifiers.add(exportFromMatch[1].trim());
+    }
+}
+
 function extractTsJsImportProfile(
     content: string,
     specifiers: Set<string>,
@@ -281,6 +327,7 @@ function extractTsJsImportProfile(
 ): void {
     const lines = content.split('\n');
     for (const line of lines) {
+        if (!hasTsJsImportKeyword(line)) continue;
         const trimmed = line.trim();
         if (
             !trimmed ||
@@ -290,34 +337,7 @@ function extractTsJsImportProfile(
         ) {
             continue;
         }
-        const importFromMatch = /import\s+(?:type\s+)?(.*?)\s+from\s+['"]([^'"]+)['"]/.exec(
-            trimmed,
-        );
-        if (importFromMatch) {
-            const spec = importFromMatch[2].trim();
-            specifiers.add(spec);
-            const pkg = extractModulePackageName(spec);
-            parseImportClause(importFromMatch[1].trim(), pkg, symbolToPkg);
-            continue;
-        }
-        const requireMatch =
-            /(?:const|let|var)\s+(.*?)\s*=\s*require\(\s*['"]([^'"]+)['"]\s*\)/.exec(trimmed);
-        if (requireMatch) {
-            const spec = requireMatch[2].trim();
-            specifiers.add(spec);
-            const pkg = extractModulePackageName(spec);
-            parseImportClause(requireMatch[1].trim(), pkg, symbolToPkg);
-            continue;
-        }
-        const sideEffectMatch = /import\s*\(?\s*['"]([^'"]+)['"]\s*\)?/.exec(trimmed);
-        if (sideEffectMatch) {
-            specifiers.add(sideEffectMatch[1].trim());
-            continue;
-        }
-        const exportFromMatch = /export\s+.*?\s+from\s+['"]([^'"]+)['"]/.exec(trimmed);
-        if (exportFromMatch) {
-            specifiers.add(exportFromMatch[1].trim());
-        }
+        extractTsJsImportLine(trimmed, specifiers, symbolToPkg);
     }
 }
 
@@ -449,14 +469,6 @@ export function extractFileImportProfile(content: string, filePath: string): Fil
     };
 }
 
-/**
- * Extract module specifiers from a source file via multi-language inspection.
- */
-function extractImportSpecifiersFromContent(content: string, filePath = 'temp.ts'): string[] {
-    const profile = extractFileImportProfile(content, filePath);
-    return profile.specifiers;
-}
-
 /** Pattern to identify mission-critical runtime, security, crypto, and architecture roots */
 const CRITICAL_PATH_PATTERN =
     /(?:auth|crypto|security|cipher|token|signature|hash|tls|ssl|secret|rbac|permission|runtime|kernel|dispatch|protocol|driver|syscall|gateway|bootstrap|main\b)/i;
@@ -480,6 +492,7 @@ interface AutonomyScanState {
     criticalPathExternalCalls: number;
     sdkCallCounts: Map<string, number>;
     sdkFileSets: Map<string, Set<string>>;
+    currentSpecifiers?: string[];
 }
 
 const MAX_AUTONOMY_FILE_READ_BYTES = 512 * 1024;
@@ -489,7 +502,6 @@ const MAX_AUTONOMY_FILE_READ_BYTES = 512 * 1024;
  */
 function readSourceFileContent(absPath: string): string {
     try {
-        if (!fs.existsSync(absPath)) return '';
         const stat = fs.statSync(absPath);
         if (stat.size <= MAX_AUTONOMY_FILE_READ_BYTES) {
             return fs.readFileSync(absPath, 'utf8');
@@ -592,18 +604,13 @@ function processImportSpecifiers(
  */
 function accumulateFileMetric(
     metric: FileMetric,
-    config: ScanConfig,
     manifestDeps: Set<string>,
     state: AutonomyScanState,
-    fileContents?: Map<string, string>,
-    prefetchedContent?: string,
+    rawContent: string,
 ): void {
-    const rawContent =
-        prefetchedContent !== undefined
-            ? prefetchedContent
-            : loadFileRawContent(metric, config, fileContents);
-    const provenance = classifyFileProvenance(metric.file, rawContent.slice(0, 500));
-    const eloc = (metric as any).nonBlankLines || metric.lines || 1;
+    const headerSlice = rawContent.slice(0, 500);
+    const provenance = classifyFileProvenance(metric.file, headerSlice);
+    const eloc = (metric as { nonBlankLines?: number }).nonBlankLines || metric.lines || 1;
 
     if (provenance === 'in_tree_vendor') {
         state.vendorFiles++;
@@ -624,7 +631,7 @@ function accumulateFileMetric(
         state.criticalPathFiles++;
     }
 
-    const roleResult = inferFineGrainedFileRole(metric.file, rawContent.slice(0, 500));
+    const roleResult = inferFineGrainedFileRole(metric.file, headerSlice);
     if (
         roleResult.role === 'algorithm_computation' ||
         roleResult.role === 'core_trunk' ||
@@ -633,8 +640,10 @@ function accumulateFileMetric(
         state.domainKernelEffectiveLoc += eloc;
     }
 
-    const specifiers = rawContent ? extractImportSpecifiersFromContent(rawContent) : [];
-    processImportSpecifiers(specifiers, metric.file, manifestDeps, state, isCritical);
+    const specifiers = state.currentSpecifiers;
+    if (specifiers && specifiers.length > 0) {
+        processImportSpecifiers(specifiers, metric.file, manifestDeps, state, isCritical);
+    }
 }
 
 /**
@@ -898,8 +907,13 @@ function applySymbolIndexReferences(
     state.sdkCallCounts.clear();
     state.sdkFileSets.clear();
 
+    const criticalByFile = new Map<string, boolean>();
     for (const ref of refs) {
-        const isCritical = CRITICAL_PATH_PATTERN.test(ref.file);
+        let isCritical = criticalByFile.get(ref.file);
+        if (isCritical === undefined) {
+            isCritical = CRITICAL_PATH_PATTERN.test(ref.file);
+            criticalByFile.set(ref.file, isCritical);
+        }
         if (symbolIndex.hasDefinition(ref.name)) {
             state.internalSymbolCalls++;
             if (isCritical) state.criticalPathInternalCalls++;
@@ -933,18 +947,10 @@ function collectExtPackages(
     file: string,
     manifestDeps: Set<string>,
 ): string[] | undefined {
-    let hasSdk = false;
+    let pkgs: string[] | undefined;
     for (const spec of specifiers) {
         if (classifyImportProvenance(spec, file, manifestDeps) === 'external_sdk') {
-            hasSdk = true;
-            break;
-        }
-    }
-    if (!hasSdk) return undefined;
-
-    const pkgs: string[] = [];
-    for (const spec of specifiers) {
-        if (classifyImportProvenance(spec, file, manifestDeps) === 'external_sdk') {
+            if (!pkgs) pkgs = [];
             pkgs.push(extractModulePackageName(spec));
         }
     }
@@ -1011,7 +1017,8 @@ export function evaluateProjectAutonomy(
         if (extPkgs) {
             fileToExtPackages.set(metric.file, extPkgs);
         }
-        accumulateFileMetric(metric, config, effectiveDeps, state, fileContents, raw);
+        state.currentSpecifiers = profile.specifiers;
+        accumulateFileMetric(metric, effectiveDeps, state, raw);
     }
 
     if (symbolIndex) {

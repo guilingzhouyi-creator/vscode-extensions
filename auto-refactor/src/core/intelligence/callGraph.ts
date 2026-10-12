@@ -77,6 +77,10 @@ function enqueueUnseenCallees(
     }
 }
 
+function compareStrings(a: string, b: string): number {
+    return a < b ? -1 : a > b ? 1 : 0;
+}
+
 /**
  * Cross-file call graph derived from a symbol index.
  *
@@ -99,8 +103,7 @@ export class CallGraph {
      */
     constructor(index: SymbolIndex) {
         const called = index.calledNames();
-        const names = [...new Set([...index.names(), ...called])].sort();
-        for (const name of names) {
+        for (const name of called) {
             const { definitions, references } = index.resolve(name);
             const calleeFile = definitions.length > 0 ? definitions[0].file : null;
             for (const reference of references) {
@@ -118,10 +121,10 @@ export class CallGraph {
         }
         this.allEdges.sort(
             (a, b) =>
-                (a.caller ?? '').localeCompare(b.caller ?? '') ||
-                a.callerFile.localeCompare(b.callerFile) ||
+                compareStrings(a.caller ?? '', b.caller ?? '') ||
+                compareStrings(a.callerFile, b.callerFile) ||
                 (a.line ?? 0) - (b.line ?? 0) ||
-                a.callee.localeCompare(b.callee),
+                compareStrings(a.callee, b.callee),
         );
         for (const edge of this.allEdges) {
             if (edge.caller !== null) {
