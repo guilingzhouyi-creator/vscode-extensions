@@ -134,6 +134,24 @@ export interface FingerprintAnalyzerDesc {
  * @param descs - Target output array to collect analyzer descriptors into.
  * @param seen - Set tracking already seen analyzer names for deduplication.
  */
+function mergeAnalyzerOptions(
+    thresholds: ScanConfig['thresholds'],
+    options?: Record<string, unknown>,
+): Record<string, unknown> {
+    if (!options) {
+        return thresholds ? { ...thresholds } : {};
+    }
+    return { ...thresholds, ...options };
+}
+
+/**
+ * Collects fingerprints of built-in registered analyzers.
+ *
+ * @param analyzers - Configured analyzers record.
+ * @param thresholds - Global threshold settings.
+ * @param descs - Output array of analyzer descriptors.
+ * @param seen - Set tracking already seen analyzer names for deduplication.
+ */
 function collectBuiltinDescs(
     analyzers:
         | Record<string, { enabled?: boolean; options?: Record<string, unknown> } | undefined>
@@ -142,7 +160,10 @@ function collectBuiltinDescs(
     descs: FingerprintAnalyzerDesc[],
     seen: Set<string>,
 ): void {
-    for (const [name, decl] of Object.entries(analyzers || {})) {
+    if (!analyzers) {
+        return;
+    }
+    for (const [name, decl] of Object.entries(analyzers)) {
         if (!decl || decl.enabled === false) continue;
         const version = ANALYZER_VERSIONS[name];
         if (version === undefined) continue;
@@ -150,7 +171,7 @@ function collectBuiltinDescs(
             name,
             version,
             modulePath: BUILTIN_MODULE_PATHS[name] || `../analyzers/${name}`,
-            options: { ...thresholds, ...(decl.options || {}) },
+            options: mergeAnalyzerOptions(thresholds, decl.options),
             legacy: false,
         });
         seen.add(name);
@@ -171,7 +192,10 @@ function collectCustomDescs(
     descs: FingerprintAnalyzerDesc[],
     seen: Set<string>,
 ): void {
-    for (const c of customAnalyzers || []) {
+    if (!customAnalyzers || customAnalyzers.length === 0) {
+        return;
+    }
+    for (const c of customAnalyzers) {
         if (c.enabled === false || seen.has(c.name)) continue;
         const modPath = path.isAbsolute(c.module)
             ? c.module
@@ -180,7 +204,7 @@ function collectCustomDescs(
             name: c.name,
             version: 1,
             modulePath: modPath,
-            options: { ...thresholds, ...(c.options || {}) },
+            options: mergeAnalyzerOptions(thresholds, c.options),
             legacy: true,
         });
         seen.add(c.name);

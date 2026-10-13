@@ -69,13 +69,16 @@ export function findImportCycles(edges: Map<string, Set<string>>): string[][] {
         return cached;
     };
 
+    const pathArr: string[] = [];
+    const stack: Array<{ node: string; nexts: string[]; idx: number }> = [];
+
     for (const start of [...edges.keys()].sort()) {
         if ((color.get(start) ?? WHITE) !== WHITE) continue;
         color.set(start, GRAY);
-        const pathArr: string[] = [start];
-        const stack: Array<{ node: string; nexts: string[]; idx: number }> = [
-            { node: start, nexts: sortedNexts(start), idx: 0 },
-        ];
+        pathArr.length = 0;
+        pathArr.push(start);
+        stack.length = 0;
+        stack.push({ node: start, nexts: sortedNexts(start), idx: 0 });
         while (stack.length > 0) {
             const top = stack[stack.length - 1];
             if (top.idx >= top.nexts.length) {
@@ -206,14 +209,14 @@ function getImporterTokens(
 
 function auditModuleSymbols(
     mod: { file: string; exportedSymbols: string[] },
-    importerFiles: string[],
+    importerSet: ReadonlySet<string>,
     contents: Map<string, string>,
     importerTokenSets: Map<string, Set<string>>,
     severity: Severity,
     issues: Issue[],
 ): number {
     const combinedTokens = new Set<string>();
-    for (const f of importerFiles) {
+    for (const f of importerSet) {
         const tokens = getImporterTokens(f, contents, importerTokenSets);
         if (tokens === undefined) {
             return 0;
@@ -227,6 +230,7 @@ function auditModuleSymbols(
     for (const sym of mod.exportedSymbols) {
         if (flagged >= MAX_UNUSED_EXPORTS_PER_MODULE) break;
         if (!combinedTokens.has(sym)) {
+            const sampleImporters = Array.from(importerSet).slice(0, IMPORTER_DETAIL_LIMIT);
             issues.push({
                 id: `dependency-graph:unused-export:${mod.file}:${sym}`,
                 analyzer: DEPENDENCY_GRAPH_ANALYZER_ID,
@@ -238,7 +242,7 @@ function auditModuleSymbols(
                     start: { line: 1, column: 1 },
                     end: { line: 1, column: 1 },
                 },
-                detail: { symbol: sym, importers: importerFiles.slice(0, IMPORTER_DETAIL_LIMIT) },
+                detail: { symbol: sym, importers: sampleImporters },
                 suggestion:
                     'Remove this export or add it to entryGlobs if it is an external entry point.',
             });
@@ -267,9 +271,9 @@ function auditUnusedExports(
     for (const mod of graph.getModules()) {
         if (mod.exportedSymbols.length === 0) continue;
         if (isEntry(mod.file) || mod.file.endsWith('.d.ts')) continue;
-        const importerFiles = [...(importers.get(mod.file) ?? [])];
+        const importerSet = importers.get(mod.file);
 
-        if (importerFiles.length === 0) {
+        if (!importerSet || importerSet.size === 0) {
             issues.push({
                 id: `dependency-graph:unused-module:${mod.file}:1`,
                 analyzer: DEPENDENCY_GRAPH_ANALYZER_ID,
@@ -293,7 +297,7 @@ function auditUnusedExports(
 
         unusedFlagged += auditModuleSymbols(
             mod,
-            importerFiles,
+            importerSet,
             contents,
             importerTokenSets,
             unusedSeverity,

@@ -332,40 +332,102 @@ export function assembleGlobalThresholds(
  * @param globalThresholds - Global threshold overlays.
  * @returns Fully resolved dictionary of analyzer declarations.
  */
+const EMPTY_RECORD: Readonly<Record<string, unknown>> = Object.freeze({});
+
+function extractGlobalThresholdLayer(
+    name: string,
+    analyzerDefaults: Record<string, Record<string, unknown>>,
+    globalThresholds: Record<string, unknown>,
+): Record<string, unknown> {
+    const defaults = analyzerDefaults[name];
+    if (!defaults) {
+        return EMPTY_RECORD;
+    }
+    const layer: Record<string, unknown> = {};
+    for (const key of Object.keys(defaults)) {
+        if (key in globalThresholds) {
+            layer[key] = globalThresholds[key];
+        }
+    }
+    return layer;
+}
+
+function mergeAnalyzerOptionsHierarchy(
+    defaults: Record<string, unknown> | undefined,
+    globalLayer: Record<string, unknown>,
+    baseOptions: Record<string, unknown> | undefined,
+    declOptions: Record<string, unknown> | undefined,
+): Record<string, unknown> {
+    const res: Record<string, unknown> = {};
+    if (defaults) Object.assign(res, defaults);
+    Object.assign(res, globalLayer);
+    if (baseOptions) Object.assign(res, baseOptions);
+    if (declOptions) Object.assign(res, declOptions);
+    return res;
+}
+
+function buildDefaultAnalyzerOptions(
+    name: string,
+    analyzerDefaults: Record<string, Record<string, unknown>>,
+    globalThresholds: Record<string, unknown>,
+): Record<string, unknown> {
+    const defaults = analyzerDefaults[name];
+    const globalLayer = extractGlobalThresholdLayer(
+        name,
+        analyzerDefaults,
+        globalThresholds,
+    );
+    const opts: Record<string, unknown> = {};
+    if (defaults) Object.assign(opts, defaults);
+    Object.assign(opts, globalLayer);
+    return opts;
+}
+
+/**
+ * Merges analyzer declarations from baseline configurations with file-level overrides.
+ *
+ * @param baseAnalyzers - Default analyzer settings.
+ * @param fileCfgAnalyzers - File-level analyzer configuration overrides.
+ * @param analyzerDefaults - Default configuration options per analyzer.
+ * @param globalThresholds - Global threshold overlays.
+ * @returns Fully resolved dictionary of analyzer declarations.
+ */
 export function mergeAnalyzerDeclarations(
     baseAnalyzers: Record<string, AnalyzerDeclaration>,
     fileCfgAnalyzers: Record<string, Partial<AnalyzerDeclaration>> | undefined,
     analyzerDefaults: Record<string, Record<string, unknown>>,
     globalThresholds: Record<string, unknown>,
 ): Record<string, AnalyzerDeclaration> {
-    const globalThresholdLayer = (name: string): Record<string, unknown> => {
-        const layer: Record<string, unknown> = {};
-        for (const key of Object.keys(analyzerDefaults[name] || {})) {
-            if (key in globalThresholds) layer[key] = globalThresholds[key];
-        }
-        return layer;
-    };
-
     const analyzers: Record<string, AnalyzerDeclaration> = { ...baseAnalyzers };
     if (fileCfgAnalyzers) {
         for (const [name, decl] of Object.entries(fileCfgAnalyzers)) {
-            const defaults = analyzerDefaults[name] || {};
+            const defaults = analyzerDefaults[name];
+            const globalLayer = extractGlobalThresholdLayer(
+                name,
+                analyzerDefaults,
+                globalThresholds,
+            );
             analyzers[name] = {
                 enabled: decl?.enabled !== false,
-                options: {
-                    ...defaults,
-                    ...globalThresholdLayer(name),
-                    ...(analyzers[name]?.options || {}),
-                    ...(decl?.options || {}),
-                },
+                options: mergeAnalyzerOptionsHierarchy(
+                    defaults,
+                    globalLayer,
+                    analyzers[name]?.options,
+                    decl?.options,
+                ),
             };
         }
     }
     for (const name of Object.keys(analyzers)) {
-        if (!analyzers[name].options || Object.keys(analyzers[name].options).length === 0) {
+        const currentDecl = analyzers[name];
+        if (!currentDecl.options || Object.keys(currentDecl.options).length === 0) {
             analyzers[name] = {
-                ...analyzers[name],
-                options: { ...(analyzerDefaults[name] || {}), ...globalThresholdLayer(name) },
+                ...currentDecl,
+                options: buildDefaultAnalyzerOptions(
+                    name,
+                    analyzerDefaults,
+                    globalThresholds,
+                ),
             };
         }
     }
