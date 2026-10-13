@@ -104,8 +104,10 @@ function renderReportHeader(report: ScanReport): string[] {
             `  skipped (disabled) analyzers: ${report.summary.disabledAnalyzers.join(', ')}`,
         );
     }
-    for (const warning of report.summary.warnings ?? []) {
-        lines.push(`  note: ${warning}`);
+    if (report.summary.warnings) {
+        for (const warning of report.summary.warnings) {
+            lines.push(`  note: ${warning}`);
+        }
     }
     lines.push('');
     return lines;
@@ -120,9 +122,12 @@ function renderReportHeader(report: ScanReport): string[] {
 function groupIssuesByFile(issues: readonly Issue[]): Map<string, Issue[]> {
     const byFile = new Map<string, Issue[]>();
     for (const it of issues) {
-        const arr = byFile.get(it.location.file) || [];
+        let arr = byFile.get(it.location.file);
+        if (!arr) {
+            arr = [];
+            byFile.set(it.location.file, arr);
+        }
         arr.push(it);
-        byFile.set(it.location.file, arr);
     }
     return byFile;
 }

@@ -71,6 +71,24 @@ function isAnalyzerActive(id: string, config?: ScanConfig): boolean {
     return declaration !== undefined && declaration.enabled !== false;
 }
 
+function filterActiveAnalyzers(declared: readonly string[], config?: ScanConfig): string[] {
+    const active: string[] = [];
+    for (const id of declared) {
+        if (isAnalyzerActive(id, config)) {
+            active.push(id);
+        }
+    }
+    return active;
+}
+
+function createDimensionBucket(): {
+    points: number;
+    effectivePoints: number;
+    entries: { rule: string; points: number; reason: string }[];
+} {
+    return { points: 0, effectivePoints: 0, entries: [] };
+}
+
 /**
  * Determine which quality dimensions were evaluated under the given scan configuration.
  *
@@ -88,12 +106,7 @@ export function calculateEvaluatedDimensions(config?: ScanConfig): {
 
     for (const dim of ALL_QUALITY_DIMENSIONS) {
         const declared = DIMENSION_ANALYZERS[dim];
-        const active: string[] = [];
-        for (const id of declared) {
-            if (isAnalyzerActive(id, config)) {
-                active.push(id);
-            }
-        }
+        const active = filterActiveAnalyzers(declared, config);
         evaluatedBy[dim] = active;
         if (active.length === 0) {
             notEvaluated.push(dim);
@@ -141,7 +154,7 @@ export function groupDeductionsByDimension(
         }
     >;
     for (const dim of ALL_QUALITY_DIMENSIONS) {
-        deductionsByDimension[dim] = { points: 0, effectivePoints: 0, entries: [] };
+        deductionsByDimension[dim] = createDimensionBucket();
     }
     for (const entry of rationales) {
         const bucket = deductionsByDimension[entry.dimension];

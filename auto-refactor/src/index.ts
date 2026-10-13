@@ -329,7 +329,7 @@ async function collectDirectoryStats(
     const queue = [targetRoot];
     while (queue.length > 0) {
         const curr = queue.pop()!;
-        let entries: fs.Dirent[] = [];
+        let entries: fs.Dirent[];
         try {
             entries = await fs.promises.readdir(curr, { withFileTypes: true });
         } catch {
@@ -395,9 +395,12 @@ async function handleFixWorkflow(cli: CliOptions): Promise<number> {
         const fix = PatchEngine.issueToFix(issue);
         if (fix) {
             const relFile = issue.location.file;
-            const existing = fixesByFile.get(relFile) || [];
+            let existing = fixesByFile.get(relFile);
+            if (!existing) {
+                existing = [];
+                fixesByFile.set(relFile, existing);
+            }
             existing.push(fix);
-            fixesByFile.set(relFile, existing);
         }
     }
 
