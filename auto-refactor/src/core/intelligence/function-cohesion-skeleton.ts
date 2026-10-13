@@ -171,12 +171,12 @@ function longestCommonSuffix(stmtsA: string[], stmtsB: string[]): string[] {
         const a = stmtsA[stmtsA.length - 1 - i];
         const b = stmtsB[stmtsB.length - 1 - i];
         if (a === b && a.length > 0) {
-            common.unshift(a);
+            common.push(a);
         } else {
             break;
         }
     }
-    return common;
+    return common.reverse();
 }
 
 function checkDisjointPair(

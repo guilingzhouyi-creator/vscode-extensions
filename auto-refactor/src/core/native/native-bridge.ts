@@ -171,12 +171,12 @@ function computeTopologicalOrder(
             queue.push(node);
         }
     }
-    queue.sort();
+    queue.sort((a, b) => b.localeCompare(a));
 
     const topologicalOrder: string[] = [];
     const orderedSet = new Set<string>();
     while (queue.length > 0) {
-        const current = queue.shift()!;
+        const current = queue.pop()!;
         topologicalOrder.push(current);
         orderedSet.add(current);
 
@@ -186,7 +186,7 @@ function computeTopologicalOrder(
             inDegreeCopy.set(next, remainingIn);
             if (remainingIn === 0) {
                 queue.push(next);
-                queue.sort();
+                queue.sort((a, b) => b.localeCompare(a));
             }
         }
     }

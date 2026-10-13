@@ -605,9 +605,10 @@ function findIndirectStorageQueryIssue(
 ): Issue | null {
     const visited = new Set<string>();
     const queue: Array<{ id: string; path: string[] }> = [{ id: node.id, path: [node.name] }];
+    let queueHead = 0;
 
-    while (queue.length > 0) {
-        const current = queue.shift()!;
+    while (queueHead < queue.length) {
+        const current = queue[queueHead++]!;
         if (current.path.length > MAX_INTER_PROCEDURAL_QUERY_DEPTH) continue;
 
         const targets = callsMap.get(current.id) || [];

@@ -102,9 +102,10 @@ export class WorkerPoolManager {
 
     /** LRU prune: terminate least-recently-used pools beyond maxPools. */
     prune(): void {
-        while (this.order.length > this.maxPools) {
-            const victim = this.order.shift();
-            if (!victim) break;
+        if (this.order.length <= this.maxPools) return;
+        const excess = this.order.length - this.maxPools;
+        const victims = this.order.splice(0, excess);
+        for (const victim of victims) {
             this.destroy(victim);
         }
     }

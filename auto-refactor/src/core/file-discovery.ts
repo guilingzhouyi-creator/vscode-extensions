@@ -204,9 +204,10 @@ export function collectFiles(
 ): string[] {
     const results: string[] = [];
     const dirQueue: string[] = [absRoot];
+    let queueHead = 0;
 
-    while (dirQueue.length > 0) {
-        const dir = dirQueue.shift()!;
+    while (queueHead < dirQueue.length) {
+        const dir = dirQueue[queueHead++]!;
         const entries = readDirectoryEntries(dir);
 
         for (const e of entries) {

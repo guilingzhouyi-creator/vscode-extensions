@@ -75,9 +75,10 @@ export class CallChainImpactTracer {
                 { callee: targetSymbol, depth: 1 },
             ];
             const visitedCallers = new Set<string>([targetSymbol]);
+            let queueHead = 0;
 
-            while (queue.length > 0) {
-                const current = queue.shift()!;
+            while (queueHead < queue.length) {
+                const current = queue[queueHead++]!;
                 const incomingEdges: CallGraphEdge[] = callGraph.callersOf(current.callee);
 
                 for (const edge of incomingEdges) {

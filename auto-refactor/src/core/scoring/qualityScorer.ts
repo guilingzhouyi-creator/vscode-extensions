@@ -327,7 +327,7 @@ export class QualityScorer {
     ): PolyglotGeneralizationMetrics | undefined {
         const langTotals: Record<string, { sum: number; count: number }> = {};
         for (const [filePath, scoreBreakdown] of Object.entries(fileQualityScores)) {
-            const ext = filePath.slice(filePath.lastIndexOf('.')).toLowerCase();
+            const ext = extractFileExtension(filePath);
             const lang = resolveFileLanguage(ext);
             if (!lang) continue;
             if (!langTotals[lang]) langTotals[lang] = { sum: 0, count: 0 };
@@ -363,4 +363,9 @@ export class QualityScorer {
             languageCount: activeLangKeys.length,
         };
     }
+}
+
+function extractFileExtension(filePath: string): string {
+    const dotIndex = filePath.lastIndexOf('.');
+    return dotIndex !== -1 ? filePath.slice(dotIndex).toLowerCase() : '';
 }

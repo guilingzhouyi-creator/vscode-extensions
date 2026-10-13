@@ -92,6 +92,22 @@ const BLOCK_COMMENT_DELIMITERS: readonly BlockCommentDelimiter[] = [
     { open: '<!--', close: '-->' },
 ];
 
+function tryMatchBlockCommentDelimiter(
+    trimmed: string,
+    delimiter: BlockCommentDelimiter,
+): { kind: LineClassificationKind; nextCloseToken: string | null } | null {
+    if (!trimmed.startsWith(delimiter.open)) return null;
+    const commentEndIndex = trimmed.indexOf(delimiter.close, delimiter.open.length);
+    if (commentEndIndex !== -1) {
+        const rest = trimmed.slice(commentEndIndex + delimiter.close.length).trim();
+        return {
+            kind: rest.length > 0 ? 'EFFECTIVE_CODE' : 'COMMENT_LINE',
+            nextCloseToken: null,
+        };
+    }
+    return { kind: 'COMMENT_LINE', nextCloseToken: delimiter.close };
+}
+
 /**
  * Classifies block comment continuation or opening across languages
  * (C-style, PowerShell, Python/GDScript docstrings, HTML/XML).
@@ -113,17 +129,8 @@ function classifyBlockComment(
     }
 
     for (const delimiter of BLOCK_COMMENT_DELIMITERS) {
-        if (trimmed.startsWith(delimiter.open)) {
-            const commentEndIndex = trimmed.indexOf(delimiter.close, delimiter.open.length);
-            if (commentEndIndex !== -1) {
-                const rest = trimmed.slice(commentEndIndex + delimiter.close.length).trim();
-                return {
-                    kind: rest.length > 0 ? 'EFFECTIVE_CODE' : 'COMMENT_LINE',
-                    nextCloseToken: null,
-                };
-            }
-            return { kind: 'COMMENT_LINE', nextCloseToken: delimiter.close };
-        }
+        const matched = tryMatchBlockCommentDelimiter(trimmed, delimiter);
+        if (matched) return matched;
     }
 
     return null;

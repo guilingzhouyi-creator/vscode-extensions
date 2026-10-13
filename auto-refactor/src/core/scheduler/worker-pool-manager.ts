@@ -223,15 +223,18 @@ export class WorkerPoolManager implements IExecutionScheduler {
         // Apply priority aging once per dispatch cycle to prevent starvation
         this.boostStarvedTasks();
 
-        while (this.activeWorkersCount < this.maxConcurrency && this.queue.length > 0) {
-            const next = this.queue.shift();
-            if (!next) {
-                break;
-            }
-            if (this.queue.length === 0) {
-                this.oldestStarvableEnqueuedAt = 0;
-            }
+        const availableSlots = this.maxConcurrency - this.activeWorkersCount;
+        const dispatchCount = Math.min(availableSlots, this.queue.length);
+        if (dispatchCount <= 0) {
+            return;
+        }
 
+        const tasksToDispatch = this.queue.splice(0, dispatchCount);
+        if (this.queue.length === 0) {
+            this.oldestStarvableEnqueuedAt = 0;
+        }
+
+        for (const next of tasksToDispatch) {
             this.activeWorkersCount++;
             const startMs = Date.now();
 

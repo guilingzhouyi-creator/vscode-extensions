@@ -298,12 +298,18 @@ export class ReviewMemoryManager {
 
     /** Evict least-recently-used records until the in-memory file cap is satisfied. */
     private enforceLimits(): void {
-        while (this.records.size > this.policy.maxFilesInMemory && this.lruOrder.length > 0) {
-            const oldest = this.lruOrder.shift();
+        if (this.records.size <= this.policy.maxFilesInMemory) return;
+        const excess = this.records.size - this.policy.maxFilesInMemory;
+        const evictCount = Math.min(excess, this.lruOrder.length);
+        if (evictCount <= 0) return;
+
+        for (let i = 0; i < evictCount; i++) {
+            const oldest = this.lruOrder[i];
             if (oldest) {
                 this.records.delete(oldest);
             }
         }
+        this.lruOrder.splice(0, evictCount);
     }
 
     /**

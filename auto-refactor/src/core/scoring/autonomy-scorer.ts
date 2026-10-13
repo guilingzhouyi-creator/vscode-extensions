@@ -503,13 +503,12 @@ const MAX_AUTONOMY_FILE_READ_BYTES = 512 * 1024;
 function readSourceFileContent(absPath: string): string {
     try {
         const stat = fs.statSync(absPath);
-        if (stat.size <= MAX_AUTONOMY_FILE_READ_BYTES) {
-            return fs.readFileSync(absPath, 'utf8');
-        }
+        const readLength = Math.min(stat.size, MAX_AUTONOMY_FILE_READ_BYTES);
+        if (readLength <= 0) return '';
         const fd = fs.openSync(absPath, 'r');
         try {
-            const buf = Buffer.allocUnsafe(MAX_AUTONOMY_FILE_READ_BYTES);
-            const bytesRead = fs.readSync(fd, buf, 0, MAX_AUTONOMY_FILE_READ_BYTES, 0);
+            const buf = Buffer.allocUnsafe(readLength);
+            const bytesRead = fs.readSync(fd, buf, 0, readLength, 0);
             return buf.toString('utf8', 0, bytesRead);
         } finally {
             fs.closeSync(fd);

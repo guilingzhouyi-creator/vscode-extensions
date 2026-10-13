@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1791892613094",
-  "timestamp": "2026-10-13T11:57:06.487Z",
+  "snapshotId": "snapshot-v0.4.0-1791893657479",
+  "timestamp": "2026-10-13T12:14:25.401Z",
   "cai": 86,
   "versions": {
     "engineVersion": "0.4.0",
@@ -14,40 +14,40 @@
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
     "filesScanned": 623,
-    "durationMs": 8346
+    "durationMs": 6438
   },
   "metrics": {
-    "compositeScore": 98.81,
+    "compositeScore": 98.82,
     "grade": "A+",
     "autonomyRate": 86,
     "effectiveCodeDensity": 0.96,
-    "totalIssues": 9795,
+    "totalIssues": 9783,
     "suppressedIssues": 268,
-    "unsuppressedIssues": 9527,
+    "unsuppressedIssues": 9515,
     "bySeverity": {
       "info": 1318,
-      "warning": 8477,
+      "warning": 8465,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
-      "high": 83,
+      "high": 72,
       "medium": 4573,
-      "low": 5139
+      "low": 5138
     }
   },
   "eightPillars": {
     "pillars": {
       "architecture": 98.62,
       "maintainability": 97.44,
-      "performance": 99.67,
+      "performance": 99.73,
       "data": 99.74,
       "testing": 100,
       "reliability": 99.72,
       "security": 99.89,
       "extensibility": 95.12
     },
-    "compositeScore": 98.81,
+    "compositeScore": 98.82,
     "weights": {
       "architecture": 0.15,
       "maintainability": 0.15,
@@ -64,7 +64,7 @@
     "architectureConsistency": 97.95,
     "semanticPurity": 99.21,
     "codeSecurity": 99.85,
-    "performanceEfficiency": 99.5,
+    "performanceEfficiency": 99.58,
     "standardization": 89.01,
     "modernity": 99.16,
     "maintainability": 95.74,
@@ -103,20 +103,11 @@
     {
       "filePath": "src/core/intelligence/dataArchitecture.ts",
       "domain": "intelligence",
-      "totalIssues": 71,
+      "totalIssues": 70,
       "criticalCount": 0,
-      "highCount": 1,
-      "compositeScore": 95.19,
+      "highCount": 0,
+      "compositeScore": 95.64,
       "effectiveDensity": 0.95
-    },
-    {
-      "filePath": "src/core/native/native-bridge.ts",
-      "domain": "native",
-      "totalIssues": 69,
-      "criticalCount": 0,
-      "highCount": 1,
-      "compositeScore": 96.04,
-      "effectiveDensity": 0.92
     },
     {
       "filePath": "src/cli/cli-parser.ts",
@@ -146,6 +137,15 @@
       "effectiveDensity": 0.93
     },
     {
+      "filePath": "src/core/native/native-bridge.ts",
+      "domain": "native",
+      "totalIssues": 68,
+      "criticalCount": 0,
+      "highCount": 0,
+      "compositeScore": 96.49,
+      "effectiveDensity": 0.92
+    },
+    {
       "filePath": "src/core/result-codec.ts",
       "domain": "core",
       "totalIssues": 67,
@@ -167,9 +167,9 @@
   "technicalDebtLedger": {
     "summary": {
       "critical": 0,
-      "high": 83,
+      "high": 72,
       "medium": 4573,
-      "low": 5139
+      "low": 5138
     },
     "criticalItems": [],
     "highItems": [
@@ -453,15 +453,6 @@
         "message": "Transient heap allocation in hot loop: Temporary collection or object repeatedly instantiated inside loop body"
       },
       {
-        "id": "performance:PRF-ALG-002:src/core/file-discovery.ts:209",
-        "rule": "PRF-ALG-002",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/file-discovery.ts",
-        "line": 209,
-        "message": "Array head mutation anti-pattern: Calling 'shift()' inside loop (depth 1) causes O(N) array memory shifts per iteration, degrading to O(N^2)"
-      },
-      {
         "id": "performance:PRF-MEM-001:src/core/governance/registry.ts:195",
         "rule": "PRF-MEM-001",
         "tier": "high",
@@ -469,33 +460,6 @@
         "file": "src/core/governance/registry.ts",
         "line": 195,
         "message": "Transient heap allocation in hot loop: Temporary collection or object repeatedly instantiated inside loop body"
-      },
-      {
-        "id": "performance:PRF-ALG-002:src/core/intelligence/callChainImpactTracer.ts:80",
-        "rule": "PRF-ALG-002",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/intelligence/callChainImpactTracer.ts",
-        "line": 80,
-        "message": "Array head mutation anti-pattern: Calling 'shift()' inside loop (depth 1) causes O(N) array memory shifts per iteration, degrading to O(N^2)"
-      },
-      {
-        "id": "performance:PRF-ALG-002:src/core/intelligence/code-density-analyzer.ts:117",
-        "rule": "PRF-ALG-002",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/intelligence/code-density-analyzer.ts",
-        "line": 117,
-        "message": "Nested collection linear lookup anti-pattern: Calling 'indexOf()' inside loop (depth 1) causes O(N*M) polynomial complexity"
-      },
-      {
-        "id": "performance:PRF-ALG-002:src/core/intelligence/dataArchitecture.ts:610",
-        "rule": "PRF-ALG-002",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/intelligence/dataArchitecture.ts",
-        "line": 610,
-        "message": "Array head mutation anti-pattern: Calling 'shift()' inside loop (depth 1) causes O(N) array memory shifts per iteration, degrading to O(N^2)"
       },
       {
         "id": "complexity:high-complexity:src/core/intelligence/dependency-provenance.ts:166",
@@ -534,15 +498,6 @@
         "message": "Function \"categorizeImport\" has cyclomatic complexity 24 (exceeds relaxed threshold 18 for shallow structure)."
       },
       {
-        "id": "performance:PRF-ALG-002:src/core/intelligence/function-cohesion-skeleton.ts:174",
-        "rule": "PRF-ALG-002",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/intelligence/function-cohesion-skeleton.ts",
-        "line": 174,
-        "message": "Array head mutation anti-pattern: Calling 'unshift()' inside loop (depth 1) causes O(N) array memory shifts per iteration, degrading to O(N^2)"
-      },
-      {
         "id": "complexity:high-complexity:src/core/intelligence/license-compliance.ts:353",
         "rule": "high-complexity",
         "tier": "high",
@@ -579,24 +534,6 @@
         "message": "Function \"extractGuardedRecursiveSymbols\" has cyclomatic complexity 12 (threshold 12)."
       },
       {
-        "id": "performance:PRF-ALG-002:src/core/memory/reviewMemory.ts:302",
-        "rule": "PRF-ALG-002",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/memory/reviewMemory.ts",
-        "line": 302,
-        "message": "Array head mutation anti-pattern: Calling 'shift()' inside loop (depth 1) causes O(N) array memory shifts per iteration, degrading to O(N^2)"
-      },
-      {
-        "id": "performance:PRF-ALG-002:src/core/native/native-bridge.ts:179",
-        "rule": "PRF-ALG-002",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/native/native-bridge.ts",
-        "line": 179,
-        "message": "Array head mutation anti-pattern: Calling 'shift()' inside loop (depth 1) causes O(N) array memory shifts per iteration, degrading to O(N^2)"
-      },
-      {
         "id": "performance:PRF-MEM-001:src/core/praxis/presentation/i18n-provider.ts:141",
         "rule": "PRF-MEM-001",
         "tier": "high",
@@ -621,6 +558,69 @@
         "severity": "info",
         "file": "src/core/preflight/slice-partitioner.ts",
         "line": 186,
+        "message": "Transient heap allocation in hot loop: Temporary collection or object repeatedly instantiated inside loop body"
+      },
+      {
+        "id": "performance:PRF-MEM-001:src/core/preflight/sparse-activator.ts:207",
+        "rule": "PRF-MEM-001",
+        "tier": "high",
+        "severity": "info",
+        "file": "src/core/preflight/sparse-activator.ts",
+        "line": 207,
+        "message": "Transient heap allocation in hot loop: Temporary collection or object repeatedly instantiated inside loop body"
+      },
+      {
+        "id": "performance:PRF-MEM-001:src/core/reporters.ts:107",
+        "rule": "PRF-MEM-001",
+        "tier": "high",
+        "severity": "info",
+        "file": "src/core/reporters.ts",
+        "line": 107,
+        "message": "Transient heap allocation in hot loop: Temporary collection or object repeatedly instantiated inside loop body"
+      },
+      {
+        "id": "performance:PRF-MEM-001:src/core/reporters.ts:123",
+        "rule": "PRF-MEM-001",
+        "tier": "high",
+        "severity": "info",
+        "file": "src/core/reporters.ts",
+        "line": 123,
+        "message": "Transient heap allocation in hot loop: Temporary collection or object repeatedly instantiated inside loop body"
+      },
+      {
+        "id": "performance:PRF-MEM-001:src/core/reporting/baselineManager.ts:109",
+        "rule": "PRF-MEM-001",
+        "tier": "high",
+        "severity": "info",
+        "file": "src/core/reporting/baselineManager.ts",
+        "line": 109,
+        "message": "Transient heap allocation in hot loop: Temporary collection or object repeatedly instantiated inside loop body"
+      },
+      {
+        "id": "performance:PRF-MEM-001:src/core/reporting/baselineManager.ts:126",
+        "rule": "PRF-MEM-001",
+        "tier": "high",
+        "severity": "info",
+        "file": "src/core/reporting/baselineManager.ts",
+        "line": 126,
+        "message": "Transient heap allocation in hot loop: Temporary collection or object repeatedly instantiated inside loop body"
+      },
+      {
+        "id": "performance:PRF-MEM-001:src/core/reporting/baselineManager.ts:229",
+        "rule": "PRF-MEM-001",
+        "tier": "high",
+        "severity": "info",
+        "file": "src/core/reporting/baselineManager.ts",
+        "line": 229,
+        "message": "Transient heap allocation in hot loop: Temporary collection or object repeatedly instantiated inside loop body"
+      },
+      {
+        "id": "performance:PRF-MEM-001:src/core/reporting/reportBuilder.ts:205",
+        "rule": "PRF-MEM-001",
+        "tier": "high",
+        "severity": "info",
+        "file": "src/core/reporting/reportBuilder.ts",
+        "line": 205,
         "message": "Transient heap allocation in hot loop: Temporary collection or object repeatedly instantiated inside loop body"
       }
     ]
@@ -689,11 +689,11 @@
       },
       {
         "domainName": "core",
-        "compositeScore": 98.44,
+        "compositeScore": 98.48,
         "pillars": {
           "architecture": 99.68,
           "maintainability": 96.79,
-          "performance": 98.4,
+          "performance": 98.71,
           "data": 99.59,
           "testing": 100,
           "reliability": 99.59,
@@ -914,11 +914,11 @@
       },
       {
         "domainName": "intelligence",
-        "compositeScore": 98.23,
+        "compositeScore": 98.28,
         "pillars": {
           "architecture": 97.86,
           "maintainability": 96.44,
-          "performance": 99.68,
+          "performance": 99.99,
           "data": 99.63,
           "testing": 100,
           "reliability": 99.49,
@@ -929,11 +929,11 @@
       },
       {
         "domainName": "memory",
-        "compositeScore": 98.51,
+        "compositeScore": 98.6,
         "pillars": {
           "architecture": 99.4,
           "maintainability": 98.7,
-          "performance": 96.67,
+          "performance": 97.27,
           "data": 99.58,
           "testing": 100,
           "reliability": 99.58,
@@ -959,11 +959,11 @@
       },
       {
         "domainName": "native",
-        "compositeScore": 98.53,
+        "compositeScore": 98.62,
         "pillars": {
           "architecture": 100,
           "maintainability": 96,
-          "performance": 99.4,
+          "performance": 100,
           "data": 99.05,
           "testing": 100,
           "reliability": 99.05,
@@ -1214,11 +1214,11 @@
       },
       {
         "domainName": "scheduler",
-        "compositeScore": 98.89,
+        "compositeScore": 98.93,
         "pillars": {
           "architecture": 99.21,
           "maintainability": 98.04,
-          "performance": 99.38,
+          "performance": 99.61,
           "data": 99.88,
           "testing": 100,
           "reliability": 99.88,
@@ -1229,11 +1229,11 @@
       },
       {
         "domainName": "scoring",
-        "compositeScore": 98.32,
+        "compositeScore": 98.36,
         "pillars": {
           "architecture": 96.94,
           "maintainability": 97.21,
-          "performance": 99.49,
+          "performance": 99.73,
           "data": 99.84,
           "testing": 100,
           "reliability": 99.84,
@@ -1351,8 +1351,8 @@
   },
   "trajectory": {
     "runEloc": {
-      "processed": 139626,
-      "unique": 112876,
+      "processed": 139646,
+      "unique": 112896,
       "changed": 0,
       "semantic": 0,
       "relocated": 0,
@@ -1365,27 +1365,27 @@
     "lifetime": {
       "weekId": "LIFETIME",
       "startMs": 1791102755050,
-      "endMs": 1791892613092,
-      "totalRuns": 246,
+      "endMs": 1791893657477,
+      "totalRuns": 248,
       "eloc": {
-        "processedTotal": 32767657,
-        "uniqueTotal": 112876,
+        "processedTotal": 33046929,
+        "uniqueTotal": 112896,
         "changedTotal": 369910,
         "semanticTotal": 295925
       },
       "qed": {
-        "mean": 0.0001,
+        "mean": 0.0002,
         "min": -0.13,
         "max": 0.18
       },
       "debt": {
         "totalAdded": 1592,
-        "totalResolved": 1861,
+        "totalResolved": 1894,
         "totalRegressions": 0,
         "netYield": 0.01
       },
       "meanCompositeScore": 98.82,
-      "gatePassRate": 94.31
+      "gatePassRate": 94.35
     },
     "isFirstBaseline": false
   }
