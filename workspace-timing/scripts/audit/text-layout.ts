@@ -12,6 +12,13 @@ import { loadJson, ReviewRules } from '../common/config.js';
 import { readFileSafe, collectFiles } from '../common/scan.js';
 import { finding, envelope, printEnvelope, STATUS, verdict, Finding } from '../common/result.js';
 
+interface PackageJsonManifest {
+  version?: string;
+  contributes?: {
+    configuration?: Array<{ properties?: Record<string, unknown> }> | { properties?: Record<string, unknown> };
+  };
+}
+
 const args = parseArgs(process.argv.slice(2));
 if (args.help) { await helpFromHeader(import.meta.url); process.exit(0); }
 const log = createLogger({ quiet: args.json });
@@ -74,7 +81,7 @@ if (clText === null) {
   }
 
   // DOC-CL-003：最新版本节与 package.json 版本同步（"打包了却没写日志"的机器化）
-  const pkgRes = await loadJson<{ version?: string }>(path.join(root, 'package.json'));
+  const pkgRes = await loadJson<PackageJsonManifest>(path.join(root, 'package.json'));
   const pkgVersion = pkgRes.ok ? pkgRes.data?.version : undefined;
   if (pkgVersion && versions.length > 0 && versions[0].ver !== pkgVersion) {
     findings.push(finding({
@@ -143,8 +150,8 @@ if (clText === null) {
     const latestLines = clLines.slice(latestVer.line - 1, nextVerLine - 1);
 
     const configKeys = new Set<string>();
-    if (pkgRes.ok && (pkgRes.data as any)?.contributes?.configuration) {
-      const configs = (pkgRes.data as any).contributes.configuration;
+    if (pkgRes.ok && pkgRes.data?.contributes?.configuration) {
+      const configs = pkgRes.data.contributes.configuration;
       const configList = Array.isArray(configs) ? configs : [configs];
       for (const c of configList) {
         if (c?.properties) {
@@ -280,7 +287,7 @@ if (rdText === null) {
 
   // DOC-RD-002：若存在路线图节，package.json 版本必须在路线图行中登记，且不得仍标 🚧 规划中
   // （纯产品发布页模式下不设内部施工路线图，无需版本行硬比）
-  const pkgRes = await loadJson<{ version?: string }>(path.join(root, 'package.json'));
+  const pkgRes = await loadJson<PackageJsonManifest>(path.join(root, 'package.json'));
   const pkgVersion = pkgRes.ok ? pkgRes.data?.version : undefined;
   const hasRoadmapSection = rdLines.some((l) => l.startsWith('## 🗺️ 路线图'));
   if (hasRoadmapSection && pkgVersion) {
@@ -312,8 +319,8 @@ if (rdText === null) {
       // DOC-RD-003：路线图已发布版本成果摘要真实性与反虚构核验
       if (shipped) {
         const configKeys = new Set<string>();
-        if (pkgRes.ok && (pkgRes.data as any)?.contributes?.configuration) {
-          const configs = (pkgRes.data as any).contributes.configuration;
+        if (pkgRes.ok && pkgRes.data?.contributes?.configuration) {
+          const configs = pkgRes.data.contributes.configuration;
           const configList = Array.isArray(configs) ? configs : [configs];
           for (const c of configList) {
             if (c?.properties) {

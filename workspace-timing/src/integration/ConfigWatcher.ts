@@ -28,7 +28,7 @@ import {
 } from '../domain/models';
 import { DashboardData } from '../domain/dashboard-types';
 import { LogLevel, log } from './Logger';
-import { t, setLocale, resolveLocale } from '../i18n/index';
+import { setLocale, resolveLocale } from '../i18n/index';
 
 const CONFIG_SECTION = 'workspaceTiming';
 const CONFIG_KEY_ENABLED = 'enabled';
