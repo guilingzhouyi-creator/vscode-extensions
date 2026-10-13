@@ -74,7 +74,7 @@
 
 ```bash
 # scripts/sh/audit-all.sh 规范骨架
-#!/usr/bin/env bash
+# !/usr/bin/env bash
 set -euo pipefail
 
 # 统一参数解析

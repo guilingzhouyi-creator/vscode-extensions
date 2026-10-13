@@ -85,7 +85,7 @@ class ObjectPoolStatsDTO extends RefCounted:
 class_name SoAEntityBuffer extends RefCounted:
 	var capacity: int = 0
 	var active_count: int = 0
-	
+
 	# 平铺连续紧凑数组 (Struct of Arrays)
 	var entity_ids: PackedInt32Array = PackedInt32Array()
 	var pos_x: PackedFloat32Array = PackedFloat32Array()

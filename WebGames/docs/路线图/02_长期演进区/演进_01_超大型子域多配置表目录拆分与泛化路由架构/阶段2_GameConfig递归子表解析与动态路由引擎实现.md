@@ -20,7 +20,7 @@
 ## 一、 动态路由引擎实现：ConfigRouterEngine
 
 ### 1. 模块定位与职责
-模块路径：`res://backend/infrastructure/config_router_engine.gd`  
+模块路径：`res://backend/infrastructure/config_router_engine.gd`
 定位：纯静态配置路由解算器，管理主表别名、领域子表清单与基于前缀的智能路由派发。
 
 ### 2. 代码实现契约
@@ -128,12 +128,12 @@ static func get_value(table_name: String, path: String, default: Variant = null)
 	var target_table := route.resolved_table
 	if not _tables.has(target_table):
 		_ensure_table_loaded_jit(target_table)
-	
+
 	# 优先从解析后的目标表取值
 	var val = _lookup_in_table(target_table, path)
 	if val != null:
 		return val
-		
+
 	# 若为多表领域且未命中，执行域内全子表保底寻址
 	if ConfigRouterEngine.get_subtables_for_domain(table_name).size() > 0:
 		for sub in ConfigRouterEngine.get_subtables_for_domain(table_name):
@@ -142,7 +142,7 @@ static func get_value(table_name: String, path: String, default: Variant = null)
 			var fallback_val = _lookup_in_table(sub, path)
 			if fallback_val != null:
 				return fallback_val
-				
+
 	return default
 ```
 

@@ -90,14 +90,14 @@ static func run_all_tests() -> Dictionary:
 
 | 用例 ID | 测试目标与执行步骤 | 预期断言结果 | 对应不变量 |
 | :--- | :--- | :--- | :--- |
-| **`TC-HDS-01`** | **标准账号注册校验与重名拦截**<br>1. 空密码/越界用户名；2. 合规注册；3. 同名二次注册。 | 1. 返回配置化错误码拒绝；2. 注册成功唯一 ID；3. `ERR_ACCOUNT_ALREADY_EXISTS` 拦截。 | `Inv-HDS2-1`<br>`Inv-HDS3-1` |
-| **`TC-HDS-02`** | **鉴权 EventBus 全周期广播（契约完备）**<br>1. 监听 `account.*`；2. 注册/登录/注销。 | 依次捕获三事件；载荷含 `category_key/auth` + `args`；登录载荷 token 前缀 ≤8、无明文密码/哈希。 | `Inv-HDS-4`<br>`Inv-HDS2-5` |
-| **`TC-HDS-03`** | **快照 DTO 序列化与除数守卫**<br>构造 `hp_max=0.0/-10.0`、`ap_max=0` 异常字典。 | `from_dto` 钳制 `hp_max/ap_max >= 1.0`；往返序列化深度一致。 | `Inv-HDS-3`<br>`Inv-HDS4-3` |
-| **`TC-HDS-04`** | **快照真实溯源与防臆造白名单**<br>构造真实 `CharacterPhysiologySheet`/`CharacterWalletEntity` 调 `get_hud_status_snapshot()`。 | `attribute_values` 与 `get_actual_values()` 深度一致；`wallet_gold/mana_monocrystals` 与实体一致；快照无 mp/level/exp 字段。 | `Inv-HDS-1`<br>`Inv-HDS4-4` |
-| **`TC-HDS-05`** | **无头推轨事件流广播**<br>监听 `world_state.*`；调全量快照与增量方法。 | `world_state.snapshot_published` 收到完整载荷；`stat_mutated`/`wallet_mutated` 收到 delta 与 args；监听方改动不反污染实体（深拷贝隔离）。 | `Inv-HDS-2`<br>`Inv-HDS2-3` |
-| **`TC-HDS-06`** | **全生命周期无头闭环贯穿集成测试**<br>注册 ➔ 加盐登录 ➔ 选角输入昵称 ➔ 序章四阶段 ➔ 进世界（`world_entered` 触发首帧快照）➔ 优雅停机 11 域存档 ➔ 单例反装配。 | 全链路成功跃迁，耗时 < 500ms；首帧快照派发一次；存档落盘；反装配零残留。 | `Inv-HDS4-1` |
-| **`TC-HDS-07`** | **前端零入侵安全审计**<br>Git diff 与前端目录文件哈希。 | `frontend/` 改动数 == 0。 | `Inv-HDS-5`<br>`Inv-HDS4-2` |
-| **`TC-HDS-08`** | **全域回归与内存泄漏守卫**<br>全量测试套件 + 对象池/RID 检测。 | 既有 93+ 套全 PASS；0 ObjectDB 泄漏、0 CanvasItem RID 悬挂；新增套件经 registry 与 arch guard 登记校验。 | `Inv-HDS2-2` |
+| **`TC-HDS-01`** | **标准账号注册校验与重名拦截**<br/>1. 空密码/越界用户名；2. 合规注册；3. 同名二次注册。 | 1. 返回配置化错误码拒绝；2. 注册成功唯一 ID；3. `ERR_ACCOUNT_ALREADY_EXISTS` 拦截。 | `Inv-HDS2-1`<br/>`Inv-HDS3-1` |
+| **`TC-HDS-02`** | **鉴权 EventBus 全周期广播（契约完备）**<br/>1. 监听 `account.*`；2. 注册/登录/注销。 | 依次捕获三事件；载荷含 `category_key/auth` + `args`；登录载荷 token 前缀 ≤8、无明文密码/哈希。 | `Inv-HDS-4`<br/>`Inv-HDS2-5` |
+| **`TC-HDS-03`** | **快照 DTO 序列化与除数守卫**<br/>构造 `hp_max=0.0/-10.0`、`ap_max=0` 异常字典。 | `from_dto` 钳制 `hp_max/ap_max >= 1.0`；往返序列化深度一致。 | `Inv-HDS-3`<br/>`Inv-HDS4-3` |
+| **`TC-HDS-04`** | **快照真实溯源与防臆造白名单**<br/>构造真实 `CharacterPhysiologySheet`/`CharacterWalletEntity` 调 `get_hud_status_snapshot()`。 | `attribute_values` 与 `get_actual_values()` 深度一致；`wallet_gold/mana_monocrystals` 与实体一致；快照无 mp/level/exp 字段。 | `Inv-HDS-1`<br/>`Inv-HDS4-4` |
+| **`TC-HDS-05`** | **无头推轨事件流广播**<br/>监听 `world_state.*`；调全量快照与增量方法。 | `world_state.snapshot_published` 收到完整载荷；`stat_mutated`/`wallet_mutated` 收到 delta 与 args；监听方改动不反污染实体（深拷贝隔离）。 | `Inv-HDS-2`<br/>`Inv-HDS2-3` |
+| **`TC-HDS-06`** | **全生命周期无头闭环贯穿集成测试**<br/>注册 ➔ 加盐登录 ➔ 选角输入昵称 ➔ 序章四阶段 ➔ 进世界（`world_entered` 触发首帧快照）➔ 优雅停机 11 域存档 ➔ 单例反装配。 | 全链路成功跃迁，耗时 < 500ms；首帧快照派发一次；存档落盘；反装配零残留。 | `Inv-HDS4-1` |
+| **`TC-HDS-07`** | **前端零入侵安全审计**<br/>Git diff 与前端目录文件哈希。 | `frontend/` 改动数 == 0。 | `Inv-HDS-5`<br/>`Inv-HDS4-2` |
+| **`TC-HDS-08`** | **全域回归与内存泄漏守卫**<br/>全量测试套件 + 对象池/RID 检测。 | 既有 93+ 套全 PASS；0 ObjectDB 泄漏、0 CanvasItem RID 悬挂；新增套件经 registry 与 arch guard 登记校验。 | `Inv-HDS2-2` |
 
 ---
 

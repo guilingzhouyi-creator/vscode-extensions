@@ -60,7 +60,7 @@ static func _encode_composite_key(parts: Array) -> String:
         key += "%d:%s" % [s.length(), s]
     return key
 # 使用点收敛：98 行唯一构造点改经本函数；KEY_SEP 若失去全部使用点即删除
-#（以 grep 实况为准——不留死常量，对齐死配置门禁）
+# （以 grep 实况为准——不留死常量，对齐死配置门禁）
 ```
 
 ### 3. 零硬编码与依赖核对

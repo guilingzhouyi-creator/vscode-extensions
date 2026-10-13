@@ -1,7 +1,7 @@
 # 游戏退出流程实现审查报告 (AUDIT_REPORT_退出流程审查)
 
-> **审查基准版本**：WebGames (Godot 4.7) / Phase 57 契约收口完成后  
-> **审查目标链路**：`前端退出页面 → 用户触发退出 → 前端退出请求/状态切换 → 后端接收退出指令 → 游戏运行实例停止 → 相关运行资源释放 → 状态最终确认 → 前端完成退出流程`  
+> **审查基准版本**：WebGames (Godot 4.7) / Phase 57 契约收口完成后
+> **审查目标链路**：`前端退出页面 → 用户触发退出 → 前端退出请求/状态切换 → 后端接收退出指令 → 游戏运行实例停止 → 相关运行资源释放 → 状态最终确认 → 前端完成退出流程`
 > **审查原则**：事实求是、零臆测、按真实代码逐行核查，明确职责边界与依赖，仅做审查，不越权编码。
 
 ---
@@ -80,16 +80,16 @@ Resource Manager (SaveManager落盘 ➔ EventBus注销 ➔ AuthService会话清�
 
 | 模块 / 角色 | 依赖谁 | 被谁依赖 | 是否合理 | 是否需要调整 | 调整建议 / 目标接口 |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **MainHUDView**<br>(`frontend/views/main_hud/`) | `UIIntermediary`<br>`ThemeManager` | `ViewRouter` (场景切换)<br>用户点击事件 | **不合理** (当前仅本地假日志) | **需要调整** | 剥离退出交互至独立确认模态框，接入标准退出指令分发。 |
-| **UIIntermediary**<br>(`frontend/i18n/`) | `UITextResolver`<br>`PlaceholderFiller` | `MainHUDView`<br>各前端视图 | **合理** (仅文本编排) | 保持现状 | 仅用于退出弹窗文案解析。 |
-| **Exit API / 契约层**<br>(*待建*) | `ContractRegistry`<br>`DTO 校验器` | 前端页面 / 退出控制器 | **尚未实现** | **必须新建** | 建立 `CMD_STOP_GAME` 契约端点，规范请求/响应结构。 |
-| **GameLifecycleService**<br>(*待建*) | `GameLifecycleFSM`<br>`SaveManager`<br>`AuthService` | API 契约层 | **尚未实现** | **必须新建** | 退出用例门面服务，编排保存、清理、停机次序。 |
-| **GameLoopStateStack**<br>(`backend/infrastructure/`) | `EventBus` | 仅单元测试 / 局部孤立调用 | **不合理** (脱离主循环，缺退出态) | **需要调整** | 扩展 `STOPPING`、`STOPPED` 枚举，或与全局生命周期体系合流。 |
-| **WorldGatewayFSM**<br>(`backend/domains/world_gateway/`) | `EventBus`<br>`GameModeRoutingSolver` | 进世界调用方 | **不合理** (单向无逆向退网关) | **需要调整** | 增加 `exit_world()` 跃迁，允许退回 `AUTHENTICATED` 状态。 |
-| **SaveManager**<br>(`backend/infrastructure/`) | `DirAccess`<br>`FileAccess`<br>`GameConfig` | `test_persistence_protocol.gd`<br>(生产退出未挂接) | **合理** (纯粹持久化原子工具) | **需要挂接** | 由生命周期停机链在进入 `STOPPING` 态时显式调用。 |
-| **AuthService**<br>(`backend/domains/account/`) | `GameConfig`<br>`DeterministicRNG` | 鉴权各方<br>(退出未挂接) | **合理** (会话管理独立) | **需要挂接** | 停机时由生命周期管理器调用 `revoke_token()` 销毁当前会话。 |
-| **GameBootstrap**<br>(`backend/infrastructure/`) | `ItemLoaderPipeline`<br>`MagicTierRegistry` | 引擎入口 / 测试套件 | **不合理** (只进不出，静态单例永驻) | **需要调整** | 补充 `teardown()`，重置静态单例，解绑全局常驻监听器。 |
-| **MainDashboard**<br>(`frontend/views/`) | `WorldClockMaster`<br>`WearableInventoryAggregate` 等 | 场景宿主 | **严重不合理** (直接 new 领域实体) | **建议重构** | 历史技术债务，在后续重构中解耦为只读 DTO 表现宿主。 |
+| **MainHUDView**<br/>(`frontend/views/main_hud/`) | `UIIntermediary`<br/>`ThemeManager` | `ViewRouter` (场景切换)<br/>用户点击事件 | **不合理** (当前仅本地假日志) | **需要调整** | 剥离退出交互至独立确认模态框，接入标准退出指令分发。 |
+| **UIIntermediary**<br/>(`frontend/i18n/`) | `UITextResolver`<br/>`PlaceholderFiller` | `MainHUDView`<br/>各前端视图 | **合理** (仅文本编排) | 保持现状 | 仅用于退出弹窗文案解析。 |
+| **Exit API / 契约层**<br/>(*待建*) | `ContractRegistry`<br/>`DTO 校验器` | 前端页面 / 退出控制器 | **尚未实现** | **必须新建** | 建立 `CMD_STOP_GAME` 契约端点，规范请求/响应结构。 |
+| **GameLifecycleService**<br/>(*待建*) | `GameLifecycleFSM`<br/>`SaveManager`<br/>`AuthService` | API 契约层 | **尚未实现** | **必须新建** | 退出用例门面服务，编排保存、清理、停机次序。 |
+| **GameLoopStateStack**<br/>(`backend/infrastructure/`) | `EventBus` | 仅单元测试 / 局部孤立调用 | **不合理** (脱离主循环，缺退出态) | **需要调整** | 扩展 `STOPPING`、`STOPPED` 枚举，或与全局生命周期体系合流。 |
+| **WorldGatewayFSM**<br/>(`backend/domains/world_gateway/`) | `EventBus`<br/>`GameModeRoutingSolver` | 进世界调用方 | **不合理** (单向无逆向退网关) | **需要调整** | 增加 `exit_world()` 跃迁，允许退回 `AUTHENTICATED` 状态。 |
+| **SaveManager**<br/>(`backend/infrastructure/`) | `DirAccess`<br/>`FileAccess`<br/>`GameConfig` | `test_persistence_protocol.gd`<br/>(生产退出未挂接) | **合理** (纯粹持久化原子工具) | **需要挂接** | 由生命周期停机链在进入 `STOPPING` 态时显式调用。 |
+| **AuthService**<br/>(`backend/domains/account/`) | `GameConfig`<br/>`DeterministicRNG` | 鉴权各方<br/>(退出未挂接) | **合理** (会话管理独立) | **需要挂接** | 停机时由生命周期管理器调用 `revoke_token()` 销毁当前会话。 |
+| **GameBootstrap**<br/>(`backend/infrastructure/`) | `ItemLoaderPipeline`<br/>`MagicTierRegistry` | 引擎入口 / 测试套件 | **不合理** (只进不出，静态单例永驻) | **需要调整** | 补充 `teardown()`，重置静态单例，解绑全局常驻监听器。 |
+| **MainDashboard**<br/>(`frontend/views/`) | `WorldClockMaster`<br/>`WearableInventoryAggregate` 等 | 场景宿主 | **严重不合理** (直接 new 领域实体) | **建议重构** | 历史技术债务，在后续重构中解耦为只读 DTO 表现宿主。 |
 
 ---
 
@@ -165,7 +165,7 @@ Resource Manager (SaveManager落盘 ➔ EventBus注销 ➔ AuthService会话清�
 1. **接入 OS 窗口关闭拦截**：
    - 在应用入口根节点监听 `Node.NOTIFICATION_WM_CLOSE_REQUEST`，捕获操作系统的关闭信号，执行拦截、唤起退出流程并安全存盘，完成后再显式调用 `get_tree().quit()`。
 2. **建立生命周期状态机与服务**：
-   - 新建 `GameLifecycleFSM`，确立权威状态迁移：  
+   - 新建 `GameLifecycleFSM`，确立权威状态迁移：
      `RUNNING → STOPPING → [SAVE_FLUSHING] → STOPPED`；定义非法跃迁防护与单向写权限。
 3. **编排资源释放与存盘链路**：
    - 建立停机编排器，顺序执行：阻止新输入 ➔ 触发全域数据持久化落盘（`SaveManager`） ➔ 会话凭证销毁（`AuthService.revoke_token`） ➔ 单例与事件解绑（`GameBootstrap.teardown`）。
