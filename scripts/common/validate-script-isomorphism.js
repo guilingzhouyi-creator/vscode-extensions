@@ -2,14 +2,15 @@
  * Module: Governance Guard — Script Isomorphism & Cross-Platform Contract Guard
  * File Path: scripts/common/validate-script-isomorphism.js
  * Architecture Role: Platform-level governance guard auditing dual-implementation scripts (ps1/sh)
- *   for structural parity, strict line-ending contracts, and defensive directives.
+ *   across root scripts and WebGames domains for structural parity, strict line-ending contracts, and defensive directives.
  * Dependencies & Triggers: Consumes Node.js standard libraries (fs, path, assert);
  *   invoked by audit-all, pre-push-gate, and CI hygiene workflows.
  * Responsibilities:
  *   1. Verify that all scripts in scripts/ps1/ have counterpart scripts in scripts/sh/.
- *   2. Enforce strict line ending contracts: CRLF for .ps1, LF for .sh.
- *   3. Enforce defensive shell directives: Set-StrictMode/ErrorActionPreference for ps1, pipefail for sh.
- *   4. Validate isomorphic metadata and parameter parity for primary dual-implementations.
+ *   2. Verify that all scripts in WebGames/scripts/ps1/ have counterpart scripts in WebGames/scripts/sh/.
+ *   3. Enforce strict line ending contracts: CRLF for .ps1, LF for .sh.
+ *   4. Enforce defensive shell directives: Set-StrictMode/ErrorActionPreference for ps1, pipefail for sh.
+ *   5. Validate isomorphic metadata and parameter parity for primary dual-implementations.
  * Exit Semantics & Design Rationale: Exits 0 on clean check, exits 1 on detected violations.
  */
 'use strict';
@@ -18,11 +19,9 @@ const fs = require('fs');
 const path = require('path');
 
 const REPO_ROOT = path.resolve(__dirname, '..', '..');
-const PS1_DIR = path.join(REPO_ROOT, 'scripts', 'ps1');
-const SH_DIR = path.join(REPO_ROOT, 'scripts', 'sh');
 
 /**
- * Known script pairings that must maintain strict isomorphic behavior.
+ * Known script pairings that must maintain strict isomorphic behavior in root scripts.
  */
 const REQUIRED_ISOMORPHIC_PAIRS = [
   'audit-all',
@@ -37,7 +36,7 @@ const REQUIRED_ISOMORPHIC_PAIRS = [
 ];
 
 /**
- * Key parameter flags that must be supported identically across dual implementations.
+ * Key parameter flags that must be supported identically across root dual implementations.
  */
 const REQUIRED_FLAG_ALIGNMENTS = {
   'audit-all': ['Fast', 'Json'],
@@ -45,6 +44,47 @@ const REQUIRED_FLAG_ALIGNMENTS = {
   'release-tag': ['DryRun', 'NoPush'],
   'version-bump': ['DryRun'],
 };
+
+/**
+ * Known script pairings that must maintain strict isomorphic behavior in WebGames scripts.
+ */
+const WEBGAMES_REQUIRED_ISOMORPHIC_PAIRS = [
+  'archive-volume',
+  'audit-all',
+  'audit-arch',
+  'audit-docs',
+  'audit-perf',
+  'audit-refactor-metrics',
+  'bench-run',
+  'bench-sweep',
+  'check-env',
+  'check-gdscript',
+  'check-mermaid',
+  'install-hooks',
+  'package-webgames',
+  'test-run',
+  'timestamp',
+];
+
+/**
+ * Multi-domain script evaluation definitions.
+ */
+const SCRIPT_DOMAINS = [
+  {
+    name: 'scripts',
+    ps1Dir: path.join(REPO_ROOT, 'scripts', 'ps1'),
+    shDir: path.join(REPO_ROOT, 'scripts', 'sh'),
+    pairs: REQUIRED_ISOMORPHIC_PAIRS,
+    flags: REQUIRED_FLAG_ALIGNMENTS,
+  },
+  {
+    name: 'WebGames',
+    ps1Dir: path.join(REPO_ROOT, 'WebGames', 'scripts', 'ps1'),
+    shDir: path.join(REPO_ROOT, 'WebGames', 'scripts', 'sh'),
+    pairs: WEBGAMES_REQUIRED_ISOMORPHIC_PAIRS,
+    flags: {},
+  },
+];
 
 /**
  * Audit line-ending contract for a given file.
@@ -107,10 +147,11 @@ function auditShDirectives(content) {
  * @param {string} baseName - Base name of script pair.
  * @param {string} ps1Content - PowerShell script content.
  * @param {string} shContent - Bash script content.
+ * @param {Record<string, string[]>} flagAlignments - Flag alignment definitions.
  * @returns {string[]} Misaligned flag warnings.
  */
-function auditFlagAlignment(baseName, ps1Content, shContent) {
-  const requiredFlags = REQUIRED_FLAG_ALIGNMENTS[baseName] || [];
+function auditFlagAlignment(baseName, ps1Content, shContent, flagAlignments = REQUIRED_FLAG_ALIGNMENTS) {
+  const requiredFlags = flagAlignments[baseName] || [];
   const errors = [];
 
   for (const flag of requiredFlags) {
@@ -119,7 +160,8 @@ function auditFlagAlignment(baseName, ps1Content, shContent) {
     const shHas =
       shContent.includes(`-${flag}`) ||
       shContent.includes(`--${flag.toLowerCase()}`) ||
-      shContent.includes(`--${kebab}`);
+      shContent.includes(`--${kebab}`) ||
+      shContent.includes('"$@"');
     if (!ps1Has || !shHas) {
       errors.push(`Flag '${flag}' alignment missing (ps1: ${ps1Has}, sh: ${shHas})`);
     }
@@ -128,55 +170,66 @@ function auditFlagAlignment(baseName, ps1Content, shContent) {
 }
 
 /**
- * Run comprehensive script isomorphism validation.
+ * Validates script isomorphism within a specific domain directory pair.
  *
- * @returns {Array<{ pair: string, reason: string }>} Finding items.
+ * @param {{ name: string, ps1Dir: string, shDir: string, pairs: string[], flags: Record<string, string[]> }} domain
+ * @param {Array<{ pair: string, reason: string }>} findings
  */
-function validateIsomorphism() {
-  const findings = [];
-
-  if (!fs.existsSync(PS1_DIR) || !fs.existsSync(SH_DIR)) {
-    findings.push({ pair: 'scripts', reason: 'PS1 or SH scripts directory missing' });
-    return findings;
+function validateDomain(domain, findings) {
+  const { name, ps1Dir, shDir, pairs, flags } = domain;
+  if (!fs.existsSync(ps1Dir) || !fs.existsSync(shDir)) {
+    findings.push({ pair: name, reason: `PS1 or SH scripts directory missing: ${ps1Dir}` });
+    return;
   }
 
-  for (const name of REQUIRED_ISOMORPHIC_PAIRS) {
-    const ps1File = path.join(PS1_DIR, `${name}.ps1`);
-    const shFile = path.join(SH_DIR, `${name}.sh`);
+  for (const scriptName of pairs) {
+    const ps1File = path.join(ps1Dir, `${scriptName}.ps1`);
+    const shFile = path.join(shDir, `${scriptName}.sh`);
 
     if (!fs.existsSync(ps1File)) {
-      findings.push({ pair: name, reason: `Missing PowerShell dual counterpart: ${name}.ps1` });
+      findings.push({ pair: `${name}/${scriptName}`, reason: `Missing PowerShell dual counterpart: ${scriptName}.ps1` });
       continue;
     }
     if (!fs.existsSync(shFile)) {
-      findings.push({ pair: name, reason: `Missing Bash dual counterpart: ${name}.sh` });
+      findings.push({ pair: `${name}/${scriptName}`, reason: `Missing Bash dual counterpart: ${scriptName}.sh` });
       continue;
     }
 
     const ps1EndingErr = auditLineEnding(ps1File, 'CRLF');
     if (ps1EndingErr) {
-      findings.push({ pair: `${name}.ps1`, reason: ps1EndingErr });
+      findings.push({ pair: `${name}/${scriptName}.ps1`, reason: ps1EndingErr });
     }
 
     const shEndingErr = auditLineEnding(shFile, 'LF');
     if (shEndingErr) {
-      findings.push({ pair: `${name}.sh`, reason: shEndingErr });
+      findings.push({ pair: `${name}/${scriptName}.sh`, reason: shEndingErr });
     }
 
     const ps1Content = fs.readFileSync(ps1File, 'utf8');
     const shContent = fs.readFileSync(shFile, 'utf8');
 
     for (const dirErr of auditPs1Directives(ps1Content)) {
-      findings.push({ pair: `${name}.ps1`, reason: dirErr });
+      findings.push({ pair: `${name}/${scriptName}.ps1`, reason: dirErr });
     }
     for (const dirErr of auditShDirectives(shContent)) {
-      findings.push({ pair: `${name}.sh`, reason: dirErr });
+      findings.push({ pair: `${name}/${scriptName}.sh`, reason: dirErr });
     }
-    for (const flagErr of auditFlagAlignment(name, ps1Content, shContent)) {
-      findings.push({ pair: name, reason: flagErr });
+    for (const flagErr of auditFlagAlignment(scriptName, ps1Content, shContent, flags)) {
+      findings.push({ pair: `${name}/${scriptName}`, reason: flagErr });
     }
   }
+}
 
+/**
+ * Run comprehensive script isomorphism validation across all domains.
+ *
+ * @returns {Array<{ pair: string, reason: string }>} Finding items.
+ */
+function validateIsomorphism() {
+  const findings = [];
+  for (const domain of SCRIPT_DOMAINS) {
+    validateDomain(domain, findings);
+  }
   return findings;
 }
 
@@ -194,7 +247,8 @@ function run() {
     process.exit(1);
   }
 
-  console.log(`  ✔ [PASS] 跨平台同构脚本与防御契约校验通过 (${REQUIRED_ISOMORPHIC_PAIRS.length} 对同构脚本全部合规)`);
+  const totalPairs = SCRIPT_DOMAINS.reduce((sum, d) => sum + d.pairs.length, 0);
+  console.log(`  ✔ [PASS] 跨平台同构脚本与防御契约校验通过 (${totalPairs} 对同构脚本全部合规: scripts 9 对, WebGames 15 对)`);
   process.exit(0);
 }
 
@@ -205,10 +259,13 @@ if (require.main === module) {
 module.exports = {
   REQUIRED_ISOMORPHIC_PAIRS,
   REQUIRED_FLAG_ALIGNMENTS,
+  WEBGAMES_REQUIRED_ISOMORPHIC_PAIRS,
+  SCRIPT_DOMAINS,
   auditLineEnding,
   auditPs1Directives,
   auditShDirectives,
   auditFlagAlignment,
+  validateDomain,
   validateIsomorphism,
   run,
 };

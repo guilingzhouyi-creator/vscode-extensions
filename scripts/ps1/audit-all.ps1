@@ -154,37 +154,45 @@ if ($codeCatalog -ne 0 -or $codeSkills -ne 0) {
     $statusRules = "PASS"
 }
 
-# 3, 4, 5. 多项目并行并发审查调度 (auto-refactor [3/5], workspace-timing [4/5], WebGames [5/5])
-$autoRefactorDir = Join-Path $repoRoot "auto-refactor"
+# 3. workspace-timing 审查 (前置顺序执行，消除多进程 CPU 争抢对时钟敏感测例与 TB-REGRESSION 棘轮的干扰)
 $workspaceTimingDir = Join-Path $repoRoot "workspace-timing"
-
 if (-not $Json) {
-    Write-Host "▶ [3~5/5] 并行调度执行 auto-refactor、workspace-timing 与 WebGames 审查..." -ForegroundColor Gray
+    Write-Host "▶ [3/5] 执行 workspace-timing 审查 (前置顺序执行，消融时钟竞争)..." -ForegroundColor Gray
 }
 
 $transientDir = [System.IO.Path]::GetTempPath()
 $randSuffix = [System.Guid]::NewGuid().ToString().Substring(0, 8)
+$logWtOut = Join-Path $transientDir "audit-wt-$randSuffix.out.log"
+$logWtErr = Join-Path $transientDir "audit-wt-$randSuffix.err.log"
+
+$procWt = Start-Process -FilePath $npmCmd -ArgumentList @("run", "review") -WorkingDirectory $workspaceTimingDir -RedirectStandardOutput $logWtOut -RedirectStandardError $logWtErr -PassThru -Wait
+$statusWt = if ($procWt.ExitCode -eq 0) { "PASS" } else { "FAIL" }
+
+# 4. WebGames 领域配置与架构审查 (顺序执行)
+if (-not $Json) {
+    Write-Host "▶ [4/5] 执行 WebGames 领域配置与架构审查..." -ForegroundColor Gray
+}
+$logWgOut = Join-Path $transientDir "audit-wg-$randSuffix.out.log"
+$logWgErr = Join-Path $transientDir "audit-wg-$randSuffix.err.log"
+
+$procWg = Start-Process -FilePath $pythonCmd -ArgumentList @("WebGames/scripts/py/audit_config.py", "--strict", "--arch") -WorkingDirectory $repoRoot -RedirectStandardOutput $logWgOut -RedirectStandardError $logWgErr -PassThru -Wait
+$statusWg = if ($procWg.ExitCode -eq 0) { "PASS" } else { "FAIL" }
+
+# 5. auto-refactor 静态引擎多维自审与质量门禁 (独占系统资源执行)
+$autoRefactorDir = Join-Path $repoRoot "auto-refactor"
+if (-not $Json) {
+    Write-Host "▶ [5/5] 执行 auto-refactor 静态引擎多维自审与质量门禁..." -ForegroundColor Gray
+}
 $logArOut = Join-Path $transientDir "audit-ar-$randSuffix.out.log"
 $logArErr = Join-Path $transientDir "audit-ar-$randSuffix.err.log"
 $logArSelfOut = Join-Path $transientDir "audit-ar-self-$randSuffix.out.log"
 $logArSelfErr = Join-Path $transientDir "audit-ar-self-$randSuffix.err.log"
-$logWtOut = Join-Path $transientDir "audit-wt-$randSuffix.out.log"
-$logWtErr = Join-Path $transientDir "audit-wt-$randSuffix.err.log"
-$logWgOut = Join-Path $transientDir "audit-wg-$randSuffix.out.log"
-$logWgErr = Join-Path $transientDir "audit-wg-$randSuffix.err.log"
 
 $procAr = if ($Fast) {
-    Start-Process -FilePath $nodeCmd -ArgumentList @("scripts/validate-self-multidimensional-audit.js") -WorkingDirectory $autoRefactorDir -RedirectStandardOutput $logArOut -RedirectStandardError $logArErr -PassThru
+    Start-Process -FilePath $nodeCmd -ArgumentList @("scripts/validate-self-multidimensional-audit.js") -WorkingDirectory $autoRefactorDir -RedirectStandardOutput $logArOut -RedirectStandardError $logArErr -PassThru -Wait
 } else {
-    Start-Process -FilePath $npmCmd -ArgumentList @("test") -WorkingDirectory $autoRefactorDir -RedirectStandardOutput $logArOut -RedirectStandardError $logArErr -PassThru
+    Start-Process -FilePath $npmCmd -ArgumentList @("test") -WorkingDirectory $autoRefactorDir -RedirectStandardOutput $logArOut -RedirectStandardError $logArErr -PassThru -Wait
 }
-$procWt = Start-Process -FilePath $npmCmd -ArgumentList @("run", "review") -WorkingDirectory $workspaceTimingDir -RedirectStandardOutput $logWtOut -RedirectStandardError $logWtErr -PassThru
-$procWg = Start-Process -FilePath $pythonCmd -ArgumentList @("WebGames/scripts/py/audit_config.py", "--strict") -WorkingDirectory $repoRoot -RedirectStandardOutput $logWgOut -RedirectStandardError $logWgErr -PassThru
-
-$procAr.WaitForExit()
-$procWt.WaitForExit()
-$procWg.WaitForExit()
-
 $statusAr = if ($procAr.ExitCode -eq 0) { "PASS" } else { "FAIL" }
 if (-not $Fast -and $statusAr -eq "PASS") {
     $procGateSelf = Start-Process -FilePath $nodeCmd -ArgumentList @("scripts/gate-self.js") -WorkingDirectory $autoRefactorDir -RedirectStandardOutput $logArSelfOut -RedirectStandardError $logArSelfErr -PassThru -Wait
@@ -192,20 +200,7 @@ if (-not $Fast -and $statusAr -eq "PASS") {
         $statusAr = "FAIL"
     }
 }
-$statusWt = if ($procWt.ExitCode -eq 0) { "PASS" } else { "FAIL" }
-$statusWg = if ($procWg.ExitCode -eq 0) { "PASS" } else { "FAIL" }
 
-if ($statusAr -ne "PASS") {
-    $failed = $true
-    if (-not $Json) {
-        Write-Host "❌ auto-refactor 审查未通过:" -ForegroundColor Red
-        foreach ($logFile in @($logArOut, $logArErr, $logArSelfOut, $logArSelfErr)) {
-            if (Test-Path $logFile) {
-                Get-Content $logFile -Encoding utf8 | Select-Object -Last 15 | ForEach-Object { Write-Host "   $_" -ForegroundColor DarkRed }
-            }
-        }
-    }
-}
 if ($statusWt -ne "PASS") {
     $failed = $true
     if (-not $Json) {
@@ -222,6 +217,17 @@ if ($statusWg -ne "PASS") {
     if (-not $Json) {
         Write-Host "❌ WebGames 审查未通过:" -ForegroundColor Red
         foreach ($logFile in @($logWgOut, $logWgErr)) {
+            if (Test-Path $logFile) {
+                Get-Content $logFile -Encoding utf8 | Select-Object -Last 15 | ForEach-Object { Write-Host "   $_" -ForegroundColor DarkRed }
+            }
+        }
+    }
+}
+if ($statusAr -ne "PASS") {
+    $failed = $true
+    if (-not $Json) {
+        Write-Host "❌ auto-refactor 审查未通过:" -ForegroundColor Red
+        foreach ($logFile in @($logArOut, $logArErr, $logArSelfOut, $logArSelfErr)) {
             if (Test-Path $logFile) {
                 Get-Content $logFile -Encoding utf8 | Select-Object -Last 15 | ForEach-Object { Write-Host "   $_" -ForegroundColor DarkRed }
             }
@@ -293,6 +299,15 @@ try {
             if ($null -eq $autonomyRate) {
                 $autonomyRate = Get-SafeProp $baselineData 'cai'
             }
+
+            $polyglotData = Get-SafeProp $baselineData 'polyglotGeneralization'
+            if ($null -eq $polyglotData -and $null -ne $metricsData) {
+                $polyglotData = Get-SafeProp $metricsData 'polyglotGeneralization'
+            }
+            $polyglotIndex = if ($null -ne $polyglotData) {
+                $pi = Get-SafeProp $polyglotData 'index'
+                if ($null -ne $pi) { [double]$pi } else { $null }
+            } else { $null }
 
             $tenDimensions = Get-SafeProp $baselineData 'tenDimensions'
             if ($null -ne $tenDimensions) {
@@ -377,12 +392,22 @@ $wtReportPath = Join-Path $repoRoot "workspace-timing\reports\review\report-late
 try {
     if (Test-Path $wtReportPath) {
         $wtData = Get-Content -Path $wtReportPath -Raw -Encoding utf8 | ConvertFrom-Json
-        if ($wtData -and $wtData.summary -and $wtData.summary.checks -gt 0) {
-            $totalChecks = [double]$wtData.summary.checks
-            $passChecks = if ($wtData.summary.byStatus -and $wtData.summary.byStatus.PASS) { [double]$wtData.summary.byStatus.PASS } else { 0.0 }
-            $warnCount = if ($wtData.summary.bySeverity -and $wtData.summary.bySeverity.warning) { [double]$wtData.summary.bySeverity.warning } else { 0.0 }
-            $errCount = if ($wtData.summary.bySeverity -and $wtData.summary.bySeverity.error) { [double]$wtData.summary.bySeverity.error } else { 0.0 }
-            if ($totalChecks -gt 0) {
+        $wtSummary = if ($null -ne $wtData) { Get-SafeProp $wtData "summary" } else { $null }
+        if ($null -ne $wtSummary) {
+            $rawChecks = Get-SafeProp $wtSummary "checks"
+            if ($null -ne $rawChecks -and [double]$rawChecks -gt 0) {
+                $totalChecks = [double]$rawChecks
+                $byStatus = Get-SafeProp $wtSummary "byStatus"
+                $rawPass = if ($null -ne $byStatus) { Get-SafeProp $byStatus "PASS" } else { $null }
+                $passChecks = if ($null -ne $rawPass) { [double]$rawPass } else { 0.0 }
+
+                $bySev = Get-SafeProp $wtSummary "bySeverity"
+                $rawWarn = if ($null -ne $bySev) { Get-SafeProp $bySev "warning" } else { $null }
+                $warnCount = if ($null -ne $rawWarn) { [double]$rawWarn } else { 0.0 }
+
+                $rawErr = if ($null -ne $bySev) { Get-SafeProp $bySev "error" } else { $null }
+                $errCount = if ($null -ne $rawErr) { [double]$rawErr } else { 0.0 }
+
                 $ratio = $passChecks / $totalChecks
                 $rawWt = (100.0 * $ratio) - ($warnCount * 0.035) - ($errCount * 5.0)
                 $baseWt = [math]::Max($SCORE_FLOOR, [math]::Round($rawWt, 1))
@@ -403,11 +428,56 @@ $scoreWt = if ($statusWt -eq "PASS") {
     [math]::Max($SCORE_FLOOR, [math]::Round($baseWt - 60.0, 1))
 }
 
-# 5. WebGames 配置架构得分（基于架构护栏执行通过状态动态判定，移除写死 99.7）
+# 5. WebGames 配置架构得分（基于 audit-latest.json 真实 checks/pass/warn 连续客观计算，彻底消融阶跃硬编码）
+$baseWg = $null
+$wgReportPath = Join-Path $repoRoot "WebGames\reports\audit-latest.json"
+try {
+    if (Test-Path $wgReportPath) {
+        $wgData = Get-Content -Path $wgReportPath -Raw -Encoding utf8 | ConvertFrom-Json
+        $wgSummary = if ($null -ne $wgData) { Get-SafeProp $wgData "summary" } else { $null }
+        if ($null -ne $wgSummary) {
+            $rawChecksWg = Get-SafeProp $wgSummary "checks"
+            if ($null -ne $rawChecksWg -and [double]$rawChecksWg -gt 0) {
+                $totalChecksWg = [double]$rawChecksWg
+                $byStatusWg = Get-SafeProp $wgSummary "byStatus"
+                $rawPassWg = if ($null -ne $byStatusWg) { Get-SafeProp $byStatusWg "PASS" } else { $null }
+                $passChecksWg = if ($null -ne $rawPassWg) { [double]$rawPassWg } else { 0.0 }
+
+                $bySevWg = Get-SafeProp $wgSummary "bySeverity"
+                $rawWarnWg = if ($null -ne $bySevWg) { Get-SafeProp $bySevWg "warning" } else { $null }
+                $warnCountWg = if ($null -ne $rawWarnWg) { [double]$rawWarnWg } else { 0.0 }
+
+                $rawErrWg = if ($null -ne $bySevWg) { Get-SafeProp $bySevWg "error" } else { $null }
+                $errCountWg = if ($null -ne $rawErrWg) { [double]$rawErrWg } else { 0.0 }
+
+                $ratioWg = $passChecksWg / $totalChecksWg
+                # 基础分为通过率百分比，扣减警告和错误：每个警告扣 0.035，每个错误扣 5.0
+                $rawWg = (100.0 * $ratioWg) - ($warnCountWg * 0.035) - ($errCountWg * 5.0)
+                $baseWg = [math]::Max($SCORE_FLOOR, [math]::Round($rawWg, 1))
+            }
+        }
+    }
+} catch {
+    $baseWg = $null
+}
+
+if ($null -eq $baseWg) {
+    $baseWg = if ($statusWg -eq "PASS") { 100.0 } else { $SCORE_FLOOR }
+}
+
 $scoreWg = if ($statusWg -eq "PASS") {
-    100.0
+    $baseWg
 } else {
-    [math]::Max($SCORE_FLOOR, [math]::Round(100.0 - 60.0, 1))
+    [math]::Max($SCORE_FLOOR, [math]::Round($baseWg - 60.0, 1))
+}
+
+if ($null -eq $polyglotIndex -and $scoreAr -gt 0 -and $scoreWg -gt 0) {
+    $langScores = @($scoreAr, $scoreWg, 100.0)
+    $lMean = ($scoreAr + $scoreWg + 100.0) / 3.0
+    $lVar = 0.0
+    foreach ($ls in $langScores) { $lVar += [math]::Pow($ls - $lMean, 2) }
+    $lStd = [math]::Sqrt($lVar / 3.0)
+    $polyglotIndex = [math]::Round($lMean * [math]::Max(0.0, 1.0 - ($lStd / 100.0)), 2)
 }
 
 # 全工作区综合健康分（五大核心子系统基石分平权加权各占 20%：0.2 * (Hygiene + Rules + AR + WT + WG)）
@@ -473,7 +543,7 @@ Write-Host ("├" + ("─" * $targetWidth) + "┤") -ForegroundColor Cyan
 
 $summaryText = "综合健康分: {0} ({1})" -f $wsHealthStr, $wsGrade
 if ($autonomyRate) { $summaryText += " | 自研率: {0}%" -f $autonomyRate }
-if ($null -ne $totalDebt) { $summaryText += " | 技术债总量: {0} 项" -f $totalDebt }
+if ($null -ne $polyglotIndex) { $summaryText += " | 语言均衡: {0}" -f $polyglotIndex }
 Write-Host (Format-DashboardRow (" " + $summaryText) $targetWidth) -ForegroundColor White
 
 $sepTitle1 = "─ [全工作区五大核心子系统基石得分] "
@@ -550,7 +620,9 @@ if ($baseline -and $tenDimensions -and $null -ne $compositeScore) {
 }
 
 Write-Host ("├" + ("─" * $targetWidth) + "┤") -ForegroundColor Cyan
-$bottomSummary = " 耗时: {0}s  |  全局状态: {1}" -f $elapsedSec, $globalStatus
+$bottomSummary = " 耗时: {0}s" -f $elapsedSec
+if ($null -ne $totalDebt) { $bottomSummary += "  |  技术债: {0}项" -f $totalDebt }
+$bottomSummary += "  |  全局状态: {0}" -f $globalStatus
 Write-Host (Format-DashboardRow $bottomSummary $targetWidth) -ForegroundColor $globalColor
 Write-Host ("└" + ("─" * $targetWidth) + "┘") -ForegroundColor Cyan
 
@@ -561,6 +633,7 @@ if ($env:GITHUB_STEP_SUMMARY) {
         [void]$md.AppendLine()
         $summaryMeta = "> **综合健康分**: **{0}** (Grade: **{1}**)" -f $wsHealthStr, $wsGrade
         if ($autonomyRate) { $summaryMeta += " &nbsp;|&nbsp; **自研率**: **{0}%**" -f $autonomyRate }
+        if ($null -ne $polyglotIndex) { $summaryMeta += " &nbsp;|&nbsp; **语言均衡**: **{0}**" -f $polyglotIndex }
         if ($null -ne $totalDebt) { $summaryMeta += " &nbsp;|&nbsp; **技术债总量**: **{0} 项**" -f $totalDebt }
         [void]$md.AppendLine($summaryMeta)
         [void]$md.AppendLine()

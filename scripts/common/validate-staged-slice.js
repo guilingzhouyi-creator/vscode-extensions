@@ -47,6 +47,8 @@ const DEFAULT_CONFIG = Object.freeze({
   maxFunctionComplexity: 15,
   maxNestingDepth: 4,
   maxNoiseRatio: 4.0,
+  minFunctionNameLength: 3,
+  maxFunctionNameLength: 50,
   flatDispatcherBonus: true,
   flatDispatcherMaxComplexity: 25,
   flatDispatcherMaxDepth: 2,
@@ -99,6 +101,12 @@ function applyConfigOverrides(cfg, source) {
   if (typeof source.maxNoiseRatio === "number") {
     cfg.maxNoiseRatio = source.maxNoiseRatio;
   }
+  if (typeof source.minFunctionNameLength === "number") {
+    cfg.minFunctionNameLength = source.minFunctionNameLength;
+  }
+  if (typeof source.maxFunctionNameLength === "number") {
+    cfg.maxFunctionNameLength = source.maxFunctionNameLength;
+  }
   if (typeof source.flatDispatcherBonus === "boolean") {
     cfg.flatDispatcherBonus = source.flatDispatcherBonus;
   }
@@ -145,6 +153,13 @@ function resolveConfig(filePath, overrides = {}) {
   return cfg;
 }
 
+/**
+ * Parses a single CLI argument token into flags or explicit target files.
+ *
+ * @param {string} arg - CLI token
+ * @param {Record<string, any>} flags - Parsed flag collection
+ * @param {string[]} explicitFiles - Target file list accumulator
+ */
 function parseSingleFlag(arg, flags, explicitFiles) {
   if (arg.startsWith("--max-cc=")) {
     flags.maxFunctionComplexity = parseInt(arg.slice(9), 10);
@@ -171,6 +186,12 @@ function parseSingleFlag(arg, flags, explicitFiles) {
   }
 }
 
+/**
+ * Parses raw CLI arguments array into structured option flags and explicit targets.
+ *
+ * @param {string[]} args - CLI arguments array
+ * @returns {{ flags: Record<string, any>, explicitFiles: string[] }}
+ */
 function parseCliFlags(args) {
   const flags = {};
   const explicitFiles = [];
@@ -180,6 +201,11 @@ function parseCliFlags(args) {
   return { flags, explicitFiles };
 }
 
+/**
+ * Constructs an isolated Git environment preventing global config permissions errors.
+ *
+ * @returns {Record<string, string>}
+ */
 function getGitEnv() {
   return {
     ...process.env,
@@ -189,6 +215,14 @@ function getGitEnv() {
   };
 }
 
+/**
+ * State Machine Helper: Parses a unified diff hunk header and populates changed line index.
+ * Matches syntax: @@ -from,len +to,len @@
+ *
+ * @param {string} line - Unified diff hunk header line
+ * @param {string} currentFile - Absolute path of the file currently parsed
+ * @param {Map<string, { changedLines: Set<number>, isNew: boolean }>} map - Result accumulator map
+ */
 function parseHunkLine(line, currentFile, map) {
   const match = line.match(
     /@@\s+-[0-9]+(?:,[0-9]+)?\s+\+([0-9]+)(?:,([0-9]+))?\s+@@/,
@@ -220,6 +254,12 @@ function isEligibleSourcePath(rel) {
   return true;
 }
 
+/**
+ * Creates hunk map from explicitly passed target file paths.
+ *
+ * @param {string[]} explicitFiles - Target file list
+ * @returns {Map<string, { changedLines: Set<number>|null, isNew: boolean }>}
+ */
 function mapFromExplicitFiles(explicitFiles) {
   const map = new Map();
   for (const f of explicitFiles) {
@@ -234,6 +274,12 @@ function mapFromExplicitFiles(explicitFiles) {
   return map;
 }
 
+/**
+ * State Machine: Parses raw git diff text into per-file changed line intervals.
+ *
+ * @param {string} raw - Raw unified diff output
+ * @param {Map<string, { changedLines: Set<number>, isNew: boolean }>} map - Map populated with changed lines
+ */
 function parseGitDiffHunks(raw, map) {
   let currentFile = null;
   let isCurrentNew = false;
@@ -260,6 +306,12 @@ function parseGitDiffHunks(raw, map) {
   }
 }
 
+/**
+ * Obtains mapped staged hunks and changed line intervals from git index.
+ *
+ * @param {string[]} explicitFiles - Explicit CLI target files
+ * @returns {Map<string, { changedLines: Set<number>|null, isNew: boolean }>}
+ */
 function getStagedHunkMap(explicitFiles) {
   if (explicitFiles && explicitFiles.length > 0) {
     return mapFromExplicitFiles(explicitFiles);
@@ -287,6 +339,11 @@ function getStagedHunkMap(explicitFiles) {
   return map;
 }
 
+/**
+ * Fallback: Reads staged filenames without fine-grained hunk diff line mapping.
+ *
+ * @returns {string[]}
+ */
 function getStagedFilesFallback() {
   try {
     const raw = execSync("git diff --cached --name-only --diff-filter=ACM", {
@@ -313,6 +370,12 @@ function getStagedFilesFallback() {
   }
 }
 
+/**
+ * Retrieves list of staged source file paths.
+ *
+ * @param {string[]} explicitFiles - Explicit CLI targets
+ * @returns {string[]}
+ */
 function getStagedFiles(explicitFiles) {
   const map = getStagedHunkMap(explicitFiles);
   return Array.from(map.keys());
@@ -355,6 +418,12 @@ const NESTING_BLOCK_KINDS = new Set([
   ts.SyntaxKind.SwitchStatement,
 ]);
 
+/**
+ * Identifies whether an AST node defines a callable function scope.
+ *
+ * @param {ts.Node} n - AST node
+ * @returns {boolean}
+ */
 function isFunctionNode(n) {
   return (
     ts.isFunctionDeclaration(n) ||
@@ -364,6 +433,12 @@ function isFunctionNode(n) {
   );
 }
 
+/**
+ * Retrieves the modifier list of an AST node across TS compiler versions.
+ *
+ * @param {ts.Node} node - Target node
+ * @returns {readonly ts.Modifier[]}
+ */
 function getModifiersList(node) {
   if (!node) return [];
   if (typeof ts.getModifiers === "function") {
@@ -373,6 +448,12 @@ function getModifiersList(node) {
   return node.modifiers || [];
 }
 
+/**
+ * Checks if node has an explicit export modifier.
+ *
+ * @param {ts.Node} node - Target node
+ * @returns {boolean}
+ */
 function hasExportModifier(node) {
   const mods = getModifiersList(node);
   for (let i = 0; i < mods.length; i++) {
@@ -383,6 +464,12 @@ function hasExportModifier(node) {
   return false;
 }
 
+/**
+ * Determines whether a node is nested inside an enclosing function closure.
+ *
+ * @param {ts.Node} node - Target node
+ * @returns {boolean}
+ */
 function hasEnclosingFunction(node) {
   let curr = node ? node.parent : null;
   while (curr) {
@@ -394,6 +481,12 @@ function hasEnclosingFunction(node) {
   return false;
 }
 
+/**
+ * Checks whether a class method is public-facing.
+ *
+ * @param {ts.Node} node - Class member node
+ * @returns {boolean}
+ */
 function isPublicMethod(node) {
   if (
     node.name &&
@@ -415,6 +508,12 @@ function isPublicMethod(node) {
   return true;
 }
 
+/**
+ * Checks if node is an immediate member of a class declaration or expression.
+ *
+ * @param {ts.Node} node - Target node
+ * @returns {boolean}
+ */
 function isClassMember(node) {
   if (!node || !node.parent) return false;
   return (
@@ -423,6 +522,12 @@ function isClassMember(node) {
   );
 }
 
+/**
+ * Walks upward to verify if enclosing variable statement is exported.
+ *
+ * @param {ts.Node} startNode - Target variable declaration
+ * @returns {boolean}
+ */
 function isEnclosingVariableStatementExported(startNode) {
   let curr = startNode ? startNode.parent : null;
   while (curr) {
@@ -437,6 +542,12 @@ function isEnclosingVariableStatementExported(startNode) {
   return false;
 }
 
+/**
+ * Verifies if class method belongs to an exported class.
+ *
+ * @param {ts.Node} node - Class method node
+ * @returns {boolean}
+ */
 function isExportedClassMethod(node) {
   if (!isPublicMethod(node)) {
     return false;
@@ -456,6 +567,10 @@ function isExportedClassMethod(node) {
 
 /**
  * Determines whether a function node is exported or public-facing.
+ * Public functions adhere strictly to base CC <= 15 without blast radius relaxation.
+ *
+ * @param {ts.Node} node - Target function node
+ * @returns {boolean}
  */
 function isExportedFunction(node) {
   if (!node || hasEnclosingFunction(node)) {
@@ -476,6 +591,14 @@ function isExportedFunction(node) {
   return false;
 }
 
+/**
+ * State Machine Invariant: Calculates McCabe Cyclomatic Complexity for a single function scope.
+ * Complexity starts at 1, incrementing on each decision branch (if, loop, case, catch, logical operators).
+ * Nested child functions are ignored to isolate complexity to the target function boundary.
+ *
+ * @param {ts.Node} node - Function AST node
+ * @returns {number} Computed cyclomatic complexity
+ */
 function calculateComplexity(node) {
   let complexity = 1;
   function walk(n) {
@@ -496,6 +619,13 @@ function calculateComplexity(node) {
   return complexity;
 }
 
+/**
+ * Scans a function AST node to check for presence of loop constructs (for, while, do).
+ * Functions containing loops are ineligible for flat dispatcher or low blast radius bonuses.
+ *
+ * @param {ts.Node} node - Function AST node
+ * @returns {boolean}
+ */
 function hasLoopConstruct(node) {
   let found = false;
   function walk(n) {
@@ -513,6 +643,14 @@ function hasLoopConstruct(node) {
   return found;
 }
 
+/**
+ * State Machine Invariant: Recursively traverses AST control flow blocks to calculate maximum nesting depth.
+ * Guard clause awareness: Chained else-if statements do not increment nesting depth.
+ *
+ * @param {ts.Node} node - AST node
+ * @param {number} currentDepth - Current block nesting level
+ * @param {{ val: number }} maxObserved - Container tracking peak nesting depth
+ */
 function checkNesting(node, currentDepth, maxObserved) {
   let depth = currentDepth;
   const isBlock = NESTING_BLOCK_KINDS.has(node.kind);
@@ -537,6 +675,12 @@ function checkNesting(node, currentDepth, maxObserved) {
   });
 }
 
+/**
+ * Computes Effective Lines of Code (ELOC) and noise ratio (kappa_noise).
+ *
+ * @param {string} content - Raw source file content
+ * @returns {{ totalLines: number, eloc: number, noiseRatio: number }}
+ */
 function calculateElocAndNoise(content) {
   const lines = content.split("\n");
   const totalLines = lines.length;
@@ -557,6 +701,18 @@ function calculateElocAndNoise(content) {
   return { totalLines, eloc, noiseRatio };
 }
 
+/**
+ * Resolves effective cyclomatic complexity ceiling based on function blast radius and role.
+ * Elastic envelopes:
+ * - Public API: strictly CC <= 15
+ * - Low Blast Radius (private, unexported, no loops, depth <= 3): CC <= 18
+ * - Flat Dispatcher (no loops, depth <= 2): CC <= 25
+ *
+ * @param {Record<string, any>} cfg - Configuration rules
+ * @param {boolean} isFlatDispatcher - True if function qualifies as flat dispatcher
+ * @param {boolean} isLowBlast - True if function qualifies for low blast radius envelope
+ * @returns {{ effectiveMaxCC: number, tag: string }}
+ */
 function resolveComplexityCeiling(cfg, isFlatDispatcher, isLowBlast) {
   let effectiveMaxCC = cfg.maxFunctionComplexity;
   let tag = "标准基线上限";
@@ -574,14 +730,102 @@ function resolveComplexityCeiling(cfg, isFlatDispatcher, isLowBlast) {
   return { effectiveMaxCC, tag };
 }
 
+/**
+ * Whitelist of permitted short/single-letter function identifiers.
+ * Includes coordinates, math operators, and canonical AST visitor accessors.
+ */
+const EXEMPT_FUNCTION_NAMES = new Set([
+  "x", "y", "z", "w", "h", "r", "g", "b", "a",
+  "dx", "dy", "dz",
+  "sin", "cos", "tan", "min", "max", "abs", "gcd", "pow",
+  "at", "on", "by", "up", "to", "op", "is", "as", "in", "id", "fn", "go",
+]);
+
+/**
+ * Denylist of generic, unsemantic, or temporary placeholder function identifiers.
+ */
+const UNSEMANTIC_FUNCTION_NAMES = new Set([
+  "foo", "bar", "baz", "qux", "temp", "tmp",
+  "dummy", "stub", "asdf", "qwerty", "dosomething",
+  "func", "func1", "func2", "fn1", "fn2", "test1", "test2",
+]);
+
+/**
+ * Evaluates function/method identifier length and semantic expressiveness.
+ * Enforces length in [3, 50], blocking single-letter or placeholder identifiers.
+ *
+ * @param {ts.Node} node - Target function AST node
+ * @param {ts.SourceFile} sourceFile - TypeScript source file
+ * @param {Record<string, any>} cfg - Complexity & naming thresholds
+ * @param {number} lineNum - 1-based source line number
+ * @returns {{ rule: string, severity: string, message: string, line: number, suggestedFix: string } | null}
+ */
+function validateFunctionName(node, sourceFile, cfg, lineNum) {
+  if (!node.name) return null;
+
+  const rawName = node.name.getText(sourceFile);
+  const name = rawName.startsWith("#") ? rawName.slice(1) : rawName;
+  if (!/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(name)) return null;
+
+  const lower = name.toLowerCase();
+  if (UNSEMANTIC_FUNCTION_NAMES.has(lower)) {
+    return {
+      rule: "NAM-VAG-001",
+      severity: "error",
+      message: `函数/方法 '${name}' 为无语义或临时占位命名`,
+      line: lineNum,
+      suggestedFix: "替换为具有明确领域语义与操作意图的命名",
+    };
+  }
+
+  const minLen = cfg.minFunctionNameLength || 3;
+  const maxLen = cfg.maxFunctionNameLength || 50;
+
+  if (name.length < minLen && !EXEMPT_FUNCTION_NAMES.has(lower)) {
+    return {
+      rule: "NAM-LEN-002",
+      severity: "error",
+      message: `函数/方法 '${name}' 命名过短 (${name.length} < ${minLen} 字符，缺乏语义描述)`,
+      line: lineNum,
+      suggestedFix: "采用表意清晰的动宾结构短语命名函数/方法",
+    };
+  }
+
+  if (name.length > maxLen) {
+    return {
+      rule: "NAM-LEN-002",
+      severity: "error",
+      message: `函数/方法 '${name}' 命名过长 (${name.length} > ${maxLen} 字符，建议精简)`,
+      line: lineNum,
+      suggestedFix: "精简冗余限定词或通过所属类/模块上下文消除命名膨胀",
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Evaluates an individual function AST node for CC and nesting depth violations.
+ *
+ * @param {ts.Node} node - Target function AST node
+ * @param {ts.SourceFile} sourceFile - TypeScript source file container
+ * @param {Record<string, any>} cfg - Effective complexity threshold configuration
+ * @returns {Array<{ rule: string, severity: string, message: string, line: number, suggestedFix: string }>}
+ */
 function analyzeFunction(node, sourceFile, cfg) {
   const findings = [];
-  const complexity = calculateComplexity(node);
-  const funcName = node.name ? node.name.getText(sourceFile) : "<anonymous>";
   const pos = sourceFile.getLineAndCharacterOfPosition(
     node.getStart(sourceFile),
   );
   const lineNum = pos.line + 1;
+  const funcName = node.name ? node.name.getText(sourceFile) : "<anonymous>";
+
+  const nameFinding = validateFunctionName(node, sourceFile, cfg, lineNum);
+  if (nameFinding) {
+    findings.push(nameFinding);
+  }
+
+  const complexity = calculateComplexity(node);
 
   const maxNesting = { val: 0 };
   checkNesting(node, 0, maxNesting);
@@ -760,6 +1004,8 @@ module.exports = {
   calculateComplexity,
   hasLoopConstruct,
   checkNesting,
+  validateFunctionName,
+  analyzeFunction,
   analyzeSourceText,
   analyzeFile,
   run,

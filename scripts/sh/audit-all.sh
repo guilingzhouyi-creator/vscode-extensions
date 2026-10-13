@@ -79,53 +79,52 @@ else
     STATUS_RULES="PASS"
 fi
 
-# 3, 4, 5. 多项目并行并发审查调度 (auto-refactor [3/5], workspace-timing [4/5], WebGames [5/5])
-if [[ "$JSON_MODE" -eq 0 ]]; then
-    echo "▶ [3~5/5] 并行调度执行 auto-refactor、workspace-timing 与 WebGames 审查..."
-fi
-
-LOG_AR=$(mktemp)
 LOG_WT=$(mktemp)
 LOG_WG=$(mktemp)
-trap 'rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG"' EXIT
+LOG_AR=$(mktemp)
+trap 'rm -f "$LOG_WT" "$LOG_WG" "$LOG_AR"' EXIT
 
-if [[ "$FAST_MODE" -eq 1 ]]; then
-    (cd auto-refactor && "$NODE_BIN" scripts/validate-self-multidimensional-audit.js) >"$LOG_AR" 2>&1 & PID_AR=$!
-else
-    (cd auto-refactor && "$NPM_BIN" test && "$NODE_BIN" scripts/gate-self.js) >"$LOG_AR" 2>&1 & PID_AR=$!
+# 3. workspace-timing 审查 (前置顺序执行，消除多进程 CPU 争抢对时钟敏感测例与 TB-REGRESSION 棘轮的干扰)
+if [[ "$JSON_MODE" -eq 0 ]]; then
+    echo "▶ [3/5] 执行 workspace-timing 审查 (前置顺序执行，消融时钟竞争)..."
 fi
 
-(cd workspace-timing && "$NPM_BIN" run review) >"$LOG_WT" 2>&1 & PID_WT=$!
-
-("$PYTHON_BIN" WebGames/scripts/py/audit_config.py --strict) >"$LOG_WG" 2>&1 & PID_WG=$!
-
-STATUS_AR="PASS"
 STATUS_WT="PASS"
-STATUS_WG="PASS"
-
-if ! wait "$PID_AR"; then
-    STATUS_AR="FAIL"
-    FAILED=1
-fi
-
-if ! wait "$PID_WT"; then
+if ! (cd workspace-timing && "$NPM_BIN" run review) >"$LOG_WT" 2>&1; then
     STATUS_WT="FAIL"
     FAILED=1
 fi
 
-if ! wait "$PID_WG"; then
+# 4. WebGames 领域配置与架构审查 (顺序执行)
+if [[ "$JSON_MODE" -eq 0 ]]; then
+    echo "▶ [4/5] 执行 WebGames 领域配置与架构审查..."
+fi
+
+STATUS_WG="PASS"
+if ! ("$PYTHON_BIN" WebGames/scripts/py/audit_config.py --strict --arch) >"$LOG_WG" 2>&1; then
     STATUS_WG="FAIL"
     FAILED=1
 fi
 
-# 日志输出与清理：子进程失败后回显末尾 15 行日志
-if [[ "$STATUS_AR" != "PASS" ]]; then
-    if [[ "$JSON_MODE" -eq 0 && -s "$LOG_AR" ]]; then
-        echo "❌ auto-refactor 审查未通过:"
-        tail -n 15 "$LOG_AR" | sed 's/^/   /'
+# 5. auto-refactor 静态引擎多维自审与质量门禁 (独占系统资源执行)
+if [[ "$JSON_MODE" -eq 0 ]]; then
+    echo "▶ [5/5] 执行 auto-refactor 静态引擎多维自审与质量门禁..."
+fi
+
+STATUS_AR="PASS"
+if [[ "$FAST_MODE" -eq 1 ]]; then
+    if ! (cd auto-refactor && "$NODE_BIN" scripts/validate-self-multidimensional-audit.js) >"$LOG_AR" 2>&1; then
+        STATUS_AR="FAIL"
+        FAILED=1
+    fi
+else
+    if ! (cd auto-refactor && "$NPM_BIN" test && "$NODE_BIN" scripts/gate-self.js) >"$LOG_AR" 2>&1; then
+        STATUS_AR="FAIL"
+        FAILED=1
     fi
 fi
 
+# 日志输出与清理：子进程失败后回显末尾 15 行日志
 if [[ "$STATUS_WT" != "PASS" ]]; then
     if [[ "$JSON_MODE" -eq 0 && -s "$LOG_WT" ]]; then
         echo "❌ workspace-timing 审查未通过:"
@@ -137,6 +136,13 @@ if [[ "$STATUS_WG" != "PASS" ]]; then
     if [[ "$JSON_MODE" -eq 0 && -s "$LOG_WG" ]]; then
         echo "❌ WebGames 审查未通过:"
         tail -n 15 "$LOG_WG" | sed 's/^/   /'
+    fi
+fi
+
+if [[ "$STATUS_AR" != "PASS" ]]; then
+    if [[ "$JSON_MODE" -eq 0 && -s "$LOG_AR" ]]; then
+        echo "❌ auto-refactor 审查未通过:"
+        tail -n 15 "$LOG_AR" | sed 's/^/   /'
     fi
 fi
 
@@ -252,8 +258,32 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG"
   }
   const scoreWt = statusWt === "PASS" ? baseWt : Math.max(SCORE_FLOOR, Number((baseWt - 60.0).toFixed(1)));
 
-  // 5. WebGames 配置架构得分（基于架构护栏执行通过状态动态判定，移除写死 99.7）
-  const scoreWg = statusWg === "PASS" ? 100.0 : Math.max(SCORE_FLOOR, Number((100.0 - 60.0).toFixed(1)));
+  // 5. WebGames 配置架构得分（基于 audit-latest.json 真实 checks/pass/warn 连续客观计算，彻底消融阶跃硬编码）
+  let baseWg = null;
+  try {
+    const wgReportPath = path.join(repoRoot, "WebGames", "reports", "audit-latest.json");
+    if (fs.existsSync(wgReportPath)) {
+      const wgData = JSON.parse(fs.readFileSync(wgReportPath, "utf8"));
+      if (wgData && wgData.summary && wgData.summary.checks > 0) {
+        const totalChecksWg = Number(wgData.summary.checks);
+        const passChecksWg = wgData.summary.byStatus && wgData.summary.byStatus.PASS ? Number(wgData.summary.byStatus.PASS) : 0;
+        const warnCountWg = wgData.summary.bySeverity && wgData.summary.bySeverity.warning ? Number(wgData.summary.bySeverity.warning) : 0;
+        const errCountWg = wgData.summary.bySeverity && wgData.summary.bySeverity.error ? Number(wgData.summary.bySeverity.error) : 0;
+        if (totalChecksWg > 0) {
+          const ratioWg = passChecksWg / totalChecksWg;
+          const rawWg = (100.0 * ratioWg) - (warnCountWg * 0.035) - (errCountWg * 5.0);
+          baseWg = Math.max(SCORE_FLOOR, Number(rawWg.toFixed(1)));
+        }
+      }
+    }
+  } catch (_) {
+    baseWg = null;
+  }
+
+  if (baseWg === null) {
+    baseWg = statusWg === "PASS" ? 100.0 : SCORE_FLOOR;
+  }
+  const scoreWg = statusWg === "PASS" ? baseWg : Math.max(SCORE_FLOOR, Number((baseWg - 60.0).toFixed(1)));
 
   // 全工作区综合健康分（五大核心子系统基石分平权加权各占 20%：0.2 * (Hygiene + Rules + AR + WT + WG)）
   const workspaceHealthScore = Number((0.2 * (scoreHygiene + scoreRules + scoreAr + scoreWt + scoreWg)).toFixed(2));
@@ -371,9 +401,26 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG"
   console.log(formatDashboardRow(" ".repeat(titlePad) + titleText, targetWidth));
   console.log(borderMid);
 
+  let polyglotIndex = null;
+  try {
+    if (fs.existsSync(baselineFile)) {
+      const b = JSON.parse(fs.readFileSync(baselineFile, "utf8"));
+      const m = b.metrics || {};
+      const polyData = b.polyglotGeneralization || m.polyglotGeneralization || null;
+      if (polyData && polyData.index != null) polyglotIndex = Number(polyData.index);
+    }
+  } catch (_) {}
+  if (polyglotIndex === null && scoreAr > 0 && scoreWg > 0) {
+    const lScores = [scoreAr, scoreWg, 100.0];
+    const lMean = (scoreAr + scoreWg + 100.0) / 3.0;
+    const lVar = lScores.reduce((acc, s) => acc + Math.pow(s - lMean, 2), 0) / 3.0;
+    const lStd = Math.sqrt(lVar);
+    polyglotIndex = Math.round(lMean * Math.max(0.0, 1.0 - (lStd / 100.0)) * 100) / 100;
+  }
+
   let summaryText = `综合健康分: ${wsHealthStr} (${wsGrade})`;
   if (autonomyRate != null) summaryText += ` | 自研率: ${Number(autonomyRate).toFixed(2)}%`;
-  if (totalDebt != null) summaryText += ` | 技术债总量: ${totalDebt} 项`;
+  if (polyglotIndex != null) summaryText += ` | 语言均衡: ${Number(polyglotIndex).toFixed(2)}`;
   console.log(formatDashboardRow(" " + summaryText, targetWidth));
 
   console.log(sep1);
@@ -441,7 +488,7 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG"
   console.log(borderMid);
 
   const globalStatus = failed ? "❌ 存在违规异常" : "✅ 全域健康达标";
-  const bottomSummary = ` 耗时: ${elapsedSec}s  |  全局状态: ${globalStatus}`;
+  const bottomSummary = ` 耗时: ${elapsedSec}s${totalDebt !== null ? `  |  技术债: ${totalDebt}项` : ""}  |  全局状态: ${globalStatus}`;
   console.log(formatDashboardRow(bottomSummary, targetWidth));
   console.log(borderBot);
 
@@ -450,8 +497,9 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG"
     let md = "## 🌐 全工作区跨项目统一审查与十维质量全景看板\n\n";
     const gStr = ` (Grade: **${wsGrade}**)`;
     const aStr = autonomyRate ? ` &nbsp;|&nbsp; **自研率**: **${autonomyRate}%**` : "";
+    const pStr = polyglotIndex !== null ? ` &nbsp;|&nbsp; **语言均衡**: **${polyglotIndex}**` : "";
     const dStr = totalDebt !== null ? ` &nbsp;|&nbsp; **技术债总量**: **${totalDebt} 项**` : "";
-    md += `> **综合健康分**: **${wsHealthStr}**${gStr}${aStr}${dStr}\n\n`;
+    md += `> **综合健康分**: **${wsHealthStr}**${gStr}${aStr}${pStr}${dStr}\n\n`;
     md += "### 📊 全工作区五大核心子系统基石得分\n\n";
     md += "| 序号 | 核心子系统 | 判定结果 | 归一化得分 | 进度可视化 | 覆盖说明 |\n";
     md += "| :---: | :--- | :---: | :---: | :--- | :--- |\n";

@@ -152,16 +152,94 @@ function collectCommitMsgRules() {
   }
 }
 
+function collectPlatformGovernanceRules() {
+  return [
+    {
+      id: 'VOL-DOC-001',
+      project: 'global-tooling',
+      family: 'VOL',
+      severity: 'error',
+      summary: 'High-load logic architecture contract guard: modules with ELOC >= 600 must maintain comment ratio >= 8%',
+    },
+    {
+      id: 'VOL-ELOC-001',
+      project: 'global-tooling',
+      family: 'VOL',
+      severity: 'error',
+      summary: 'Effective code volume budget guard: single file ELOC must not exceed 900',
+    },
+    {
+      id: 'VOL-LOC-001',
+      project: 'global-tooling',
+      family: 'VOL',
+      severity: 'error',
+      summary: 'Physical line count budget guard: single file raw LOC must not exceed 1400',
+    },
+    {
+      id: 'VOL-RATIO-001',
+      project: 'global-tooling',
+      family: 'VOL',
+      severity: 'warning',
+      summary: 'Dynamic dilution envelope guard: physical line count must not exceed dynamic ratio 1:3 envelope',
+    },
+    {
+      id: 'VOL-DIL-001',
+      project: 'global-tooling',
+      family: 'VOL',
+      severity: 'warning',
+      summary: 'Logic density floor guard: effective code density must not fall below 33% of total file lines',
+    },
+    {
+      id: 'GATE-AST-001',
+      project: 'global-tooling',
+      family: 'GATE',
+      severity: 'error',
+      summary: 'Pre-commit gate staged AST slice complexity (CC <= 15), nesting depth (Depth <= 4), and noise ratio guard',
+    },
+    {
+      id: 'GATE-ISO-001',
+      project: 'global-tooling',
+      family: 'GATE',
+      severity: 'error',
+      summary: 'Cross-platform script isomorphism guard: dual ps1/sh parity, strict CRLF/LF line endings, and defensive directives',
+    },
+    {
+      id: 'ARCH-ABS-001',
+      project: 'global-tooling',
+      family: 'ARCH',
+      severity: 'error',
+      summary: 'Vacuous forwarding trampoline elimination guard: empty forwarding modules with ELOC <= 3 are strictly blocked',
+    },
+    {
+      id: 'ARCH-FAC-001',
+      project: 'global-tooling',
+      family: 'ARCH',
+      severity: 'error',
+      summary: 'Substantive facade payload guard: facade module must satisfy ELOC >= 15 or aggregate >= 3 subdomains with immutability',
+    },
+  ];
+}
+
+function collectGlobalToolingRules() {
+  const commitRules = collectCommitMsgRules();
+  const platformRules = collectPlatformGovernanceRules();
+  const dedup = new Map();
+  for (const r of [...commitRules, ...platformRules]) {
+    dedup.set(r.id, r);
+  }
+  return Array.from(dedup.values());
+}
+
 function generate() {
   console.log('🔄 Consolidating workspace rule catalog...');
   const arRules = collectAutoRefactorRules();
   const wtRules = collectWorkspaceTimingRules();
   const wgRules = collectWebGamesRules();
-  const cmgRules = collectCommitMsgRules();
+  const globalRules = collectGlobalToolingRules();
 
   const ruleMap = new Map();
 
-  for (const r of [...arRules, ...wtRules, ...wgRules, ...cmgRules]) {
+  for (const r of [...arRules, ...wtRules, ...wgRules, ...globalRules]) {
     if (!ruleMap.has(r.id)) {
       ruleMap.set(r.id, r);
     }
@@ -175,7 +253,7 @@ function generate() {
       autoRefactor: arRules.length,
       workspaceTiming: wtRules.length,
       webGames: wgRules.length,
-      globalTooling: cmgRules.length,
+      globalTooling: globalRules.length,
     },
     rules: Array.from(ruleMap.values()).sort((a, b) => a.id.localeCompare(b.id)),
   };
@@ -189,4 +267,9 @@ if (require.main === module) {
   generate();
 }
 
-module.exports = { generate, OUTPUT_FILE };
+module.exports = {
+  generate,
+  OUTPUT_FILE,
+  collectPlatformGovernanceRules,
+  collectGlobalToolingRules,
+};

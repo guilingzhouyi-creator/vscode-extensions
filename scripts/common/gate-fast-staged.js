@@ -27,6 +27,24 @@ const ABS_PATH_WHITELIST_PATTERN = /(?:node_modules|\.gemini|file:\/\/)/;
 
 const SLANG_FILENAME_PATTERN = /(?:^|[-_.])(?:temp|wip|new|st\d+|p\d+)(?:[-_.]|$)/i;
 
+const ALLOWED_SHORT_STEMS = new Set([
+  'ui', 'en', 'zh', 'db', 'io', 'ci', 'os', 'vm', 'fs', 're', 'id', 'ip',
+]);
+
+const STANDARD_TECH_ABBREVIATIONS = new Set([
+  'ui', 'db', 'io', 'os', 'vm', 'fs', 'id', 'ip', 'ci', 'cd',
+  'sdk', 'api', 'cli', 'ast', 'cfg', 'lut', 'doc', 'req', 'res',
+  'msg', 'btn', 'pkg', 'src', 'ctx', 'fmt', 'cmd', 'ptr', 'str',
+  'std', 'fps', 'rng', 'pr', 'sh', 'ps', 'md', 'ts', 'js', 'py',
+  'gd', 'rs', '2d', '3d', '4k', 'ssl', 'ssh', 'tcp', 'udp', 'dns',
+  'rpc', 'ipc', 'csr', 'soa', 'swar', 'simd', 'cc', 'eloc', 'loc',
+  'diff', 'rgb', 'hex', 'fn', 'cb', 'rx', 'tx', 'env', 'app', 'dev',
+]);
+
+const IGNORED_BASENAMES = new Set([
+  'index', 'main', 'lib', 'mod', 'api', 'types', 'cli', 'readme', 'changelog', 'license',
+]);
+
 function getSafeGitEnv() {
   const root = path.resolve(__dirname, '../..');
   return {
@@ -191,6 +209,48 @@ function validateFilenameSlang(file, gate4Violations) {
   }
 }
 
+function isMorphemeValid(seg) {
+  if (seg.length < 2) return true;
+  if (/^\d+$/.test(seg)) return true;
+  if (seg.toLowerCase() === 'xyz') return false;
+  if (/[aeiouy]/i.test(seg)) return true;
+  return STANDARD_TECH_ABBREVIATIONS.has(seg.toLowerCase());
+}
+
+function validateFilenameSegments(file, stem, gate4Violations) {
+  const cleanStem = stem.replace(/\.(?:test|spec)$/i, '');
+  const segments = cleanStem.split(/[-_]+/).filter(Boolean);
+  if (segments.length > 5) {
+    gate4Violations.push(`文件名单词段数过多 (> 5 段，过度堆叠): ${file}`);
+  }
+  for (const seg of segments) {
+    if (!isMorphemeValid(seg)) {
+      gate4Violations.push(
+        `文件名单词段 '${seg}' 缺乏元音语素且非标准技术缩写: ${file}`,
+      );
+    }
+  }
+}
+
+function validateFilenameLength(file, gate4Violations) {
+  const norm = file.replace(/\\/g, '/');
+  if (/(?:fixtures\/|testdata\/|\.bench|__mocks__\/|docs\/)/i.test(norm)) return;
+  const baseName = path.basename(file);
+  const ext = path.extname(baseName);
+  if (!/\.(?:ts|js|py|gd|rs|sh|ps1)$/i.test(ext)) return;
+  const stem = baseName.slice(0, baseName.length - ext.length);
+  const lower = stem.toLowerCase();
+  if (IGNORED_BASENAMES.has(lower)) return;
+  if (stem.length < 3 && !ALLOWED_SHORT_STEMS.has(lower)) {
+    gate4Violations.push(`文件名过短 (< 3 字符，缺乏语义描述): ${file}`);
+    return;
+  }
+  if (stem.length > 55) {
+    gate4Violations.push(`文件名过长 (> 55 字符，建议按子目录解耦): ${file}`);
+  }
+  validateFilenameSegments(file, stem, gate4Violations);
+}
+
 function validateFileEol(file, buffer, gate2Violations) {
   const hasCR = buffer.includes(0x0d);
   if (file.endsWith('.ps1')) {
@@ -224,6 +284,7 @@ function validateFileVolume(file, content, gate5Violations) {
 
 function inspectStagedFile(repoRoot, file, collectors) {
   validateFilenameSlang(file, collectors.gate4);
+  validateFilenameLength(file, collectors.gate4);
 
   const fullPath = path.resolve(repoRoot, file);
   if (!fs.existsSync(fullPath)) return;
@@ -388,4 +449,7 @@ module.exports = {
   checkDiffStream,
   calculateEloc,
   runFastStaged,
+  isMorphemeValid,
+  validateFilenameSegments,
+  validateFilenameLength,
 };

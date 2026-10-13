@@ -28,6 +28,9 @@ $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 $PSDefaultParameterValues['Get-Content:Encoding'] = 'utf8'
 $PSDefaultParameterValues['Set-Content:Encoding'] = 'utf8'
 
+if (-not $env:GIT_CONFIG_GLOBAL) { $env:GIT_CONFIG_GLOBAL = 'NUL' }
+if (-not $env:GIT_CONFIG_SYSTEM) { $env:GIT_CONFIG_SYSTEM = 'NUL' }
+
 if ([string]::IsNullOrWhiteSpace($Root)) {
     $Root = (Resolve-Path (Join-Path $PSScriptRoot "../..")).Path
 }
