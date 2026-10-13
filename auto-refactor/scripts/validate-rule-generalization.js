@@ -21,6 +21,7 @@ const path = require('path');
 const {
   defaultGeneralizationPipeline,
   RuleGeneralizationPipeline,
+  WRAPPER_FIXTURES,
   auditVacuousWrappers,
   HYG_WRAP_RULE_ID,
   HYG_WRAP_REDUNDANT_RULE_ID,
@@ -90,6 +91,11 @@ function testCandidateStateAndScrutiny() {
   assert.ok(promotion.verifiedLanguages.includes('typescript'));
   assert.ok(promotion.verifiedLanguages.includes('python'));
   assert.ok(promotion.verifiedLanguages.includes('rust'));
+  assert.ok(promotion.verifiedLanguages.includes('go'));
+  assert.ok(
+    WRAPPER_FIXTURES.some((f) => f.language === 'go'),
+    'WRAPPER_FIXTURES must include Go language fixture',
+  );
 
   console.log('  [PASS] Candidate state machine & 4-tier scrutiny validated');
 }
@@ -112,6 +118,11 @@ function testPatternNormalizer() {
     normalizeParameterNames('&mut self, id: u64, code: usize'),
     ['id', 'code'],
     'Rust parameters normalized (&mut self stripped)',
+  );
+  assert.deepStrictEqual(
+    normalizeParameterNames('id string, count int'),
+    ['id', 'count'],
+    'Go parameters normalized without colon',
   );
 
   // Transparent forwarding
@@ -224,7 +235,30 @@ fn dispatch(id: u64, code: u32) -> Result {
   const rsGoodIssues = auditVacuousWrappers(rsGood, 'src/lib.rs', fakeCtx(rsGood, 'src/lib.rs'));
   assert.strictEqual(rsGoodIssues.length, 0, 'Rust documented wrapper must pass');
 
-  console.log('  [PASS] HYG-WRAP-001 verified on TypeScript, Python, Rust');
+  // Go validation
+  const goBad = `
+func forwardQuery(id string, count int) Result {
+    return target.fetchData(id, count)
+}
+`;
+  const goGood = `
+// adapter delegation pattern
+func forwardQuery(id string, count int) Result {
+    return target.fetchData(id, count)
+}
+`;
+  const goBadIssues = auditVacuousWrappers(goBad, 'pkg/query.go', fakeCtx(goBad, 'pkg/query.go'));
+  assert.strictEqual(goBadIssues.length, 1, 'Go bad wrapper must be detected');
+  assert.strictEqual(goBadIssues[0].rule, HYG_WRAP_RULE_ID);
+
+  const goGoodIssues = auditVacuousWrappers(
+    goGood,
+    'pkg/query.go',
+    fakeCtx(goGood, 'pkg/query.go'),
+  );
+  assert.strictEqual(goGoodIssues.length, 0, 'Go exempt wrapper must pass');
+
+  console.log('  [PASS] HYG-WRAP-001 verified on TypeScript, Python, Rust, Go');
 }
 
 function testHygWrapRedundantDelegation() {
@@ -427,7 +461,8 @@ function testArchTmpMonolithicTemplate() {
   templateLines.push('    let html = \'<div class="dashboard-container">\';');
   for (let i = 1; i <= 140; i++) {
     templateLines.push(
-      `    html += '<section class=\"card-${i}\"><span>Metric ${i}</span><table><tr><td>${i}</td></tr></table></section>';`,
+      `    html += '<section class=\"card-${i}\"><span>Metric ${i}</span>` +
+        `<table><tr><td>${i}</td></tr></table></section>';`,
     );
   }
   templateLines.push("    html += '</div>';");

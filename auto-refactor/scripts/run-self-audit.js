@@ -389,7 +389,8 @@ async function runSelfAudit(options = {}) {
   // 3. Classify Technical Debt Ledger
   const { debtByTier, criticalItems, highItems, fileIssuesMap } = buildDebtLedger(issues);
 
-  // 补全无缺陷文件：遍历 scanReport.fileMetrics，使 0 缺陷文件全部参与 computeFileScores，根除平均分幸存者偏差
+  // Supplement zero-defect files: populate fileIssuesMap from fileMetrics
+  // to avoid survivorship bias in scores.
   if (Array.isArray(scanReport.fileMetrics)) {
     for (const m of scanReport.fileMetrics) {
       const file = m.file || m.filePath;

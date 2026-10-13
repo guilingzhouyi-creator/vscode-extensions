@@ -216,6 +216,12 @@ function recordPairCoOccurrences(
     }
 }
 
+/**
+ * Construct an inverted symbol caller index and sparse co-occurrence graph edges.
+ *
+ * @param callerImports - Readonly array of caller paths and their imported symbols.
+ * @returns Inverted symbol index map and sparse co-occurrence edges.
+ */
 export function buildSparseCallerGraph(
     callerImports: readonly {
         readonly callerPath: string;

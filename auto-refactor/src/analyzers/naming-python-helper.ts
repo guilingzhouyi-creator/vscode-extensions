@@ -16,6 +16,7 @@ import type {
     NamingDecouplingAuditor,
     SymbolEntry,
 } from '../core/architecture/naming-decoupling-auditor';
+import { validateFunctionTokensAndSemantics } from './naming-path-helper';
 
 /** Callback factory for instantiating canonical Issue records. */
 export type IssueFactory = (
@@ -43,6 +44,13 @@ export interface PythonNamingOptions {
     checkSingleLetters?: boolean;
     checkJargon?: boolean;
     checkDecoupling?: boolean;
+    checkLengths?: boolean;
+    minFunctionWords?: number;
+    maxFunctionWords?: number;
+    minFunctionLength?: number;
+    maxFunctionLength?: number;
+    enforceVerbNounContract?: boolean;
+    enforceMorphemeCheck?: boolean;
     vagueBlacklist?: string[];
 }
 
@@ -166,6 +174,101 @@ export function auditPythonAssignment(
 }
 
 /**
+ * Audits a Python function declaration line for length constraints and process jargon.
+ *
+ * @param line - Line text containing function definition.
+ * @param lineIdx - 0-indexed line number.
+ * @param opts - Python naming options.
+ * @param hasTransientJargon - Jargon predicate callback.
+ * @param mkIssue - Issue factory callback.
+ * @param checkDecouplingSymbol - Decoupling symbol checker callback.
+ * @param issues - Output issue accumulator.
+ * @param symbols - Optional symbol entry accumulator.
+ */
+export function auditPythonFunction(
+    line: string,
+    lineIdx: number,
+    opts: PythonNamingOptions,
+    hasTransientJargon: (name: string) => boolean,
+    mkIssue: IssueFactory,
+    checkDecouplingSymbol: DecouplingChecker,
+    issues: Issue[],
+    symbols?: SymbolEntry[],
+): void {
+    const fnMatch = /^def\s+([A-Za-z0-9_]+)\s*\(/.exec(line);
+    if (!fnMatch) return;
+    const fnName = fnMatch[1];
+
+    const isSpecialMethod = /^__[a-zA-Z0-9_]+__$/.test(fnName);
+    if (opts.checkLengths !== false && !isSpecialMethod) {
+        const minLen = opts.minFunctionLength ?? 3;
+        const maxLen = opts.maxFunctionLength ?? 50;
+        if (fnName.length < minLen) {
+            const msg =
+                `Python function or method name '${fnName}' is too short ` +
+                `(< ${minLen} characters); lacks semantic description.`;
+            const sugg =
+                `Rename '${fnName}' to a descriptive snake_case verb-noun ` +
+                `phrase with at least ${minLen} characters.`;
+            issues.push(
+                mkIssue(
+                    lineIdx + 1,
+                    'NAM-LEN-002',
+                    msg,
+                    { name: fnName, length: fnName.length, minLen },
+                    sugg,
+                ),
+            );
+        } else if (fnName.length >= maxLen) {
+            const msg =
+                `Python function or method name '${fnName}' is excessively long ` +
+                `(>= ${maxLen} characters); consider simplifying or decomposing.`;
+            const sugg =
+                `Refactor '${fnName}' to reduce verbosity or decompose ` +
+                `responsibilities into smaller procedures.`;
+            issues.push(
+                mkIssue(
+                    lineIdx + 1,
+                    'NAM-LEN-002',
+                    msg,
+                    { name: fnName, length: fnName.length, maxLen },
+                    sugg,
+                ),
+            );
+        }
+    }
+
+    const cleanName = fnName.replace(/^_+|_+$/g, '');
+    const segments = cleanName.split('_').filter((s) => s.length > 0);
+    const finding = validateFunctionTokensAndSemantics(fnName, segments, opts);
+    if (finding) {
+        issues.push(
+            mkIssue(
+                lineIdx + 1,
+                'NAM-LEN-002',
+                finding.message,
+                { name: fnName, findingType: finding.type, token: finding.token },
+                `Refactor Python function '${fnName}' according to engineering naming standards.`,
+            ),
+        );
+    }
+
+    if (opts.checkJargon !== false && hasTransientJargon(fnName)) {
+        issues.push(
+            mkIssue(
+                lineIdx + 1,
+                'NAM-JRG-002',
+                `Python function '${fnName}' contains transient construction jargon.`,
+                { name: fnName },
+                'Replace transient process markers with semantic domain naming.',
+            ),
+        );
+    }
+
+    checkDecouplingSymbol(fnName, 'function', { line: lineIdx, character: 0 }, symbols);
+}
+
+/**
  * Main helper driving Python line-by-line lexical and naming audits.
  *
  * @param content - Full file text content.
@@ -193,6 +296,16 @@ export function auditPythonSourceHelper(
         const line = lines[i].trim();
         if (line.startsWith('#') || !line) continue;
         auditPythonClass(
+            line,
+            i,
+            opts,
+            hasTransientJargon,
+            mkIssue,
+            checkDecouplingSymbol,
+            issues,
+            symbols,
+        );
+        auditPythonFunction(
             line,
             i,
             opts,

@@ -12,6 +12,7 @@
  *   4. Quantify hook decoupling, data-flow purity, pool conservation, and CAS reentrancy safety.
  *   5. Measure compatibility layer debt decay, directness purity, and deprecation containment.
  *   6. Assess Pareto zero-cost modern utility and modern construct adoption rate.
+ *   7. Compute polyglot generalization and modernization equilibrium index.
  * Exit Semantics & Design Rationale: Pure deterministic math helpers; zero I/O.
  */
 
@@ -567,4 +568,5 @@ export {
     calculateProfileCompositeScore,
     calculateShannonEntropy,
     calculateAstLocDensityIndex,
+    calculatePolyglotGeneralizationIndex,
 } from './modernization-metrics';

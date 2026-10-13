@@ -239,6 +239,9 @@ export class MyersScratchPool {
     }
 }
 
+/**
+ * Shared pre-allocated scratch pool for Myers difference computation buffers.
+ */
 export const myersScratchPool = new MyersScratchPool();
 
 /**

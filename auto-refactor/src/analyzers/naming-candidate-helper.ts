@@ -18,6 +18,7 @@ import * as ts from 'typescript';
 import type { AgentActionablePayload, AnalyzerContext, Severity } from '../core/types';
 import { SEVERITY_WARNING } from '../core/types';
 import type { DiagnosticDescriptor } from '../core/messages/types';
+import { validateFunctionTokensAndSemantics } from './naming-path-helper';
 
 /** Candidate naming proposal derived by the inference pipeline. */
 export interface NamingCandidate {
@@ -85,41 +86,12 @@ export const MAX_VARIABLE_NAME_LENGTH = 42;
 export const MAX_FUNCTION_NAME_LENGTH = 50;
 
 /** Allowed short identifier names commonly accepted across domains. */
-export const ALLOWED_SHORT_NAMES: ReadonlySet<string> = new Set([
-    'x',
-    'y',
-    'z',
-    'dx',
-    'dy',
-    'w',
-    'h',
-    'id',
-    'ip',
-    'i',
-    'j',
-    'k',
-    '_',
-    'ts',
-    'fs',
-    'cp',
-    'vm',
-    'db',
-    'fd',
-    'fn',
-    'cb',
-    'el',
-    'sf',
-    'ns',
-    'op',
-    're',
-    'ex',
-    'ev',
-    'ok',
-    'no',
-    'ch',
-    'tx',
-    'rx',
-]);
+export const ALLOWED_SHORT_NAMES: ReadonlySet<string> = new Set(
+    (
+        'x y z dx dy w h id ip i j k l m n p r s t v a b c d e f _ ' +
+        'ts fs cp vm db fd fn cb el sf ns op re ex ev ok no ch tx rx io os ui ci cd eq ne gt lt'
+    ).split(' '),
+);
 
 /**
  * Common truncated abbreviations dictionary with standard English expansions.
@@ -172,20 +144,9 @@ export const UNAPPROVED_ABBREVIATION_SET = new Set([
  */
 export const POLYSEMIC_ABBREVIATIONS = new Set(['cur', 'res', 'sec', 'auth', 'doc', 'cnt']);
 
-const PRIMITIVE_TYPE_NAMES = new Set([
-    'string',
-    'number',
-    'boolean',
-    'any',
-    'unknown',
-    'void',
-    'never',
-    'symbol',
-    'bigint',
-    'object',
-    'undefined',
-    'null',
-]);
+const PRIMITIVE_TYPE_NAMES = new Set(
+    'string number boolean any unknown void never symbol bigint object undefined null'.split(' '),
+);
 
 /**
  * Diagnostic message catalog for length and abbreviation rules.
@@ -808,9 +769,31 @@ export type NamingIssueEmitter = (
  * @param pos.line - 0-based line number.
  * @param pos.character - 0-based character offset.
  * @param ctx - Analyzer execution context.
+/**
+ * Options configuring function identifier naming checks.
+ */
+export interface FunctionNamingAuditOptions {
+    checkLengths?: boolean;
+    checkAbbreviations?: boolean;
+    minFunctionWords?: number;
+    maxFunctionWords?: number;
+    minFunctionLength?: number;
+    maxFunctionLength?: number;
+    enforceVerbNounContract?: boolean;
+    enforceMorphemeCheck?: boolean;
+}
+
+/**
+ * Audits a function or method name for minimum/maximum length constraints
+ * and unapproved abbreviation patterns.
+ *
+ * @param name - Function or method identifier name.
+ * @param node - AST declaration node.
+ * @param pos - Position coordinates of the identifier.
+ * @param pos.line - 0-based line number.
+ * @param pos.character - 0-based character offset.
+ * @param ctx - Analyzer execution context.
  * @param opts - Naming audit options.
- * @param opts.checkLengths - Flag whether length bounds are enabled.
- * @param opts.checkAbbreviations - Flag whether abbreviation checks are enabled.
  * @param symbolIndex - Optional symbol index service.
  * @param emitIssue - Callback to emit diagnostic issues.
  */
@@ -819,12 +802,14 @@ export function auditFunctionNameLengthsAndAbbreviations(
     node: ts.Node,
     pos: { line: number; character: number },
     ctx: AnalyzerContext,
-    opts: { checkLengths?: boolean; checkAbbreviations?: boolean },
+    opts: FunctionNamingAuditOptions,
     symbolIndex: SymbolIndexLike | undefined,
     emitIssue: NamingIssueEmitter,
 ): void {
     if (opts.checkLengths !== false) {
-        if (name.length < 3) {
+        const minLen = opts.minFunctionLength ?? 3;
+        const maxLen = opts.maxFunctionLength ?? MAX_FUNCTION_NAME_LENGTH;
+        if (name.length < minLen) {
             const desc = NamingMessages.FUNCTION_NAME_TOO_SHORT(name);
             const actionable = buildNamingActionable(
                 name,
@@ -840,11 +825,11 @@ export function auditFunctionNameLengthsAndAbbreviations(
                 RULE_NAM_LEN_002,
                 desc.message,
                 SEVERITY_WARNING,
-                { name, length: name.length, actionable },
+                { name, length: name.length, minLen, actionable },
                 desc.suggestion,
                 actionable,
             );
-        } else if (name.length >= MAX_FUNCTION_NAME_LENGTH) {
+        } else if (name.length >= maxLen) {
             const desc = NamingMessages.FUNCTION_NAME_TOO_LONG(name);
             const actionable = buildNamingActionable(
                 name,
@@ -860,11 +845,36 @@ export function auditFunctionNameLengthsAndAbbreviations(
                 RULE_NAM_LEN_002,
                 desc.message,
                 SEVERITY_WARNING,
-                { name, length: name.length, actionable },
+                { name, length: name.length, maxLen, actionable },
                 desc.suggestion,
                 actionable,
             );
         }
+    }
+
+    const cleanName = name.replace(/^[_#]+/, '');
+    const tokens = tokenizeIdentifier(cleanName);
+    const isAccessor = ts.isGetAccessor(node) || ts.isSetAccessor(node);
+    const finding = validateFunctionTokensAndSemantics(name, tokens, opts, isAccessor);
+    if (finding) {
+        const actionable = buildNamingActionable(
+            name,
+            node,
+            RULE_NAM_LEN_002,
+            ctx,
+            pos,
+            symbolIndex,
+        );
+        emitIssue(
+            pos.line + 1,
+            pos.character + 1,
+            RULE_NAM_LEN_002,
+            finding.message,
+            SEVERITY_WARNING,
+            { name, findingType: finding.type, token: finding.token, actionable },
+            `Refactor function name '${name}' according to engineering naming standards.`,
+            actionable,
+        );
     }
 
     if (opts.checkAbbreviations !== false) {
@@ -925,7 +935,7 @@ export function auditVariableNameLengthsAndAbbreviations(
     emitIssue: NamingIssueEmitter,
 ): void {
     if (opts.checkLengths !== false) {
-        if (!isTopLevel && name.length <= 2 && !ALLOWED_SHORT_NAMES.has(name)) {
+        if (!isTopLevel && name.length === 2 && !ALLOWED_SHORT_NAMES.has(name)) {
             const desc = NamingMessages.VARIABLE_NAME_TOO_SHORT(name);
             const actionable = buildNamingActionable(
                 name,

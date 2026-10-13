@@ -330,6 +330,7 @@ function isToleratedString(
     sf: ts.SourceFile,
     grandparent?: ts.Node,
 ): boolean {
+    if (ts.isTypeNode(p) || (grandparent && ts.isTypeNode(grandparent))) return true;
     if (TOLERATED_STRING_PARENT_KINDS.has(p.kind)) return true;
     if (ts.isPropertyAssignment(p) || ts.isJsxAttribute(p)) return p.name === node;
     if (ts.isElementAccessExpression(p)) return p.argumentExpression === node;

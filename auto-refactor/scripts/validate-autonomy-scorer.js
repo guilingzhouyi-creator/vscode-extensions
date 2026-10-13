@@ -13,7 +13,8 @@
  *   3. Assert evaluateProjectAutonomy calculates R_loc, R_call, R_domain, R_pure,
  *      and composite index;
  *   4. Assert 5-tier classification boundaries (L1 through L5) strictly hold;
- *   5. Assert full scan integration reports autonomy evaluation in scan results.
+ *   5. Assert full scan integration reports autonomy evaluation in scan results;
+ *   6. Assert polyglot generalization index adheres to mathematical bounds and dispersion penalty.
  * Exit Semantics & Design Rationale: Exits 0 on success, throws AssertionError on failure.
  */
 
@@ -30,6 +31,9 @@ const {
   classifyImportProvenance,
 } = require('../dist/core/intelligence/dependency-provenance');
 const { evaluateProjectAutonomy } = require('../dist/core/scoring/autonomy-scorer');
+const {
+  calculatePolyglotGeneralizationIndex,
+} = require('../dist/core/scoring/modernization-formulas');
 const { scan } = require('../dist/api');
 
 async function testProvenanceManifestDetection() {
@@ -354,6 +358,77 @@ async function testEndToEndScanIntegration() {
   }
 }
 
+async function testPolyglotGeneralizationModel() {
+  console.log('6. Testing polyglot generalization and modernization equilibrium index (Step 4)...');
+
+  // Case A: Empty language set returns 100
+  assert.strictEqual(
+    calculatePolyglotGeneralizationIndex({}),
+    100,
+    'Empty language record should yield default perfect equilibrium 100',
+  );
+
+  // Case B: Single language returns normalized score directly
+  assert.strictEqual(
+    calculatePolyglotGeneralizationIndex({ typescript: 88.5 }),
+    88.5,
+    'Single language should return its normalized score directly',
+  );
+  assert.strictEqual(
+    calculatePolyglotGeneralizationIndex({ python: 120 }),
+    100,
+    'Single language score should be clamped to 100 upper bound',
+  );
+  assert.strictEqual(
+    calculatePolyglotGeneralizationIndex({ rust: -15 }),
+    0,
+    'Single language score should be clamped to 0 lower bound',
+  );
+
+  // Case C: Multi-language homogeneous high scores yield high score (zero dispersion penalty)
+  const homogeneousScore = calculatePolyglotGeneralizationIndex({
+    typescript: 90,
+    python: 90,
+    rust: 90,
+    go: 90,
+  });
+  assert.strictEqual(
+    homogeneousScore,
+    90,
+    'Homogeneous scores should produce zero dispersion penalty and retain mean',
+  );
+
+  const perfectScore = calculatePolyglotGeneralizationIndex({
+    typescript: 100,
+    rust: 100,
+  });
+  assert.strictEqual(perfectScore, 100, 'All-100 scores should produce 100');
+
+  // Case D: Multi-language imbalanced scores incur rational dispersion dampening
+  const imbalancedScore = calculatePolyglotGeneralizationIndex({
+    typescript: 95,
+    python: 35,
+  });
+  assert.strictEqual(
+    imbalancedScore,
+    45.5,
+    'Imbalanced scores (95 vs 35) should penalize composite to 45.5 via dispersion factor',
+  );
+  assert.ok(imbalancedScore < 65, 'Imbalanced score must be lower than arithmetic mean (65)');
+
+  // Case E: Custom weights influence weighted mean and standard deviation
+  const weightedScore = calculatePolyglotGeneralizationIndex(
+    { typescript: 90, python: 60 },
+    { typescript: 3, python: 1 },
+  );
+  assert.ok(
+    weightedScore > 60 && weightedScore < 82.5,
+    `Weighted score ${weightedScore} should be rationally dampened below weighted mean 82.5`,
+  );
+
+  console.log('   ✓ Polyglot generalization mathematical properties verified.');
+}
+
 async function main() {
   console.log('Starting autonomy scorer verification harness...');
   await testProvenanceManifestDetection();
@@ -361,6 +436,7 @@ async function main() {
   await testSupplyChainAndCredibleIntervals();
   await testFiveTierBoundaryHold();
   await testEndToEndScanIntegration();
+  await testPolyglotGeneralizationModel();
   console.log('\n[PASS] All autonomy scorer tests passed successfully.\n');
 }
 

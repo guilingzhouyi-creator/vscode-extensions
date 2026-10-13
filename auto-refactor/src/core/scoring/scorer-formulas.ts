@@ -480,6 +480,15 @@ function resolveDimensionScore(
     return computeStandardDimensionScore(dim, rawPoints, effectiveScale);
 }
 
+/**
+ * Compute dimension quality scores from raw deduction points applying
+ * scale-damping and security ceilings.
+ *
+ * @param deductionPoints - Map of quality dimensions to accumulated raw deduction points.
+ * @param scaleFactor - Codebase or file scale factor damping factor.
+ * @param metric - Optional file metric for computing security dimension ceilings.
+ * @returns Record of quality dimension scores mapped to their scale-damped scores.
+ */
 export function applyScaleDampedScores(
     deductionPoints: Record<QualityDimension, number>,
     scaleFactor: number,

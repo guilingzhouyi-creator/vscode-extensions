@@ -2,10 +2,12 @@
  * Module: Core Engine — Modernization & Structural Metric Formulas
  * File Path: src/core/scoring/modernization-metrics.ts
  * Architecture Role: Mathematical formulas evaluating frontend and structural quality,
- *   including zero-cost modern utilities, FSM determinism, layout nesting, and Shannon entropy.
+ *   including zero-cost modern utilities, FSM determinism, layout nesting, Shannon entropy,
+ *   and polyglot multi-language generalization.
  * Dependencies & Triggers: Consumes scorer-formulas and scoringTypes; consumed by
  *   modernization-formulas.
- * Responsibilities: Compute structural, frontend, entropy, and AST density quality indices.
+ * Responsibilities: Compute structural, frontend, entropy, AST density, and polyglot
+ *   generalization modernization equilibrium indices.
  * Exit Semantics & Design Rationale: Pure deterministic math helpers; strictly zero I/O.
  */
 
@@ -428,4 +430,134 @@ export function calculateAstLocDensityIndex(astNodeCount: number, nonBlankLines:
     const nodes = Math.max(0, astNodeCount);
     const lines = Math.max(1, nonBlankLines);
     return Math.round((nodes / lines) * SCORE_ROUNDING) / SCORE_ROUNDING;
+}
+
+/**
+ * Safely extract a clamped score in [0, 100].
+ */
+function extractSafeScore(raw: unknown): number {
+    if (typeof raw !== 'number' || !Number.isFinite(raw)) {
+        return 0;
+    }
+    return Math.min(100, Math.max(0, raw));
+}
+
+/**
+ * Safely extract a positive weighting value.
+ */
+function extractSafeWeight(raw: unknown): number {
+    if (typeof raw !== 'number' || !Number.isFinite(raw) || raw <= 0) {
+        return 0;
+    }
+    return raw;
+}
+
+/**
+ * Compute the sum of valid custom weights for the given language keys.
+ */
+function computeTotalCustomWeight(
+    keys: readonly string[],
+    weights?: Readonly<Record<string, number>>,
+): number {
+    if (!weights) {
+        return 0;
+    }
+    let total = 0;
+    for (let i = 0; i < keys.length; i += 1) {
+        total += extractSafeWeight(weights[keys[i]]);
+    }
+    return total;
+}
+
+/**
+ * Compute weighted mean score across active languages.
+ */
+function computeWeightedMean(
+    keys: readonly string[],
+    scores: Readonly<Record<string, number>>,
+    weights: Readonly<Record<string, number>> | undefined,
+    totalWeight: number,
+): number {
+    let sum = 0;
+    for (let i = 0; i < keys.length; i += 1) {
+        const key = keys[i];
+        const s = extractSafeScore(scores[key]);
+        const w = weights ? extractSafeWeight(weights[key]) : 1.0;
+        sum += s * w;
+    }
+    return sum / totalWeight;
+}
+
+/**
+ * Compute weighted variance across active languages.
+ */
+function computeWeightedVariance(
+    keys: readonly string[],
+    scores: Readonly<Record<string, number>>,
+    weights: Readonly<Record<string, number>> | undefined,
+    mean: number,
+    totalWeight: number,
+): number {
+    let sum = 0;
+    for (let i = 0; i < keys.length; i += 1) {
+        const key = keys[i];
+        const s = extractSafeScore(scores[key]);
+        const w = weights ? extractSafeWeight(weights[key]) : 1.0;
+        const diff = s - mean;
+        sum += w * diff * diff;
+    }
+    return sum / totalWeight;
+}
+
+/**
+ * Compute Polyglot Generalization and Modernization Equilibrium Index.
+ *
+ * Mathematical formulation:
+ * S_{\text{mean}} = \frac{\sum w_i \cdot s_i}{\sum w_i}
+ * \sigma_S = \sqrt{\frac{\sum w_i \cdot (s_i - S_{\text{mean}})^2}{\sum w_i}}
+ * D = \max\left(0, 1.0 - \frac{\sigma_S}{100}\right)
+ * P_{\text{polyglot}} = S_{\text{mean}} \cdot D
+ *
+ * Evaluates modernization and standardization equilibrium across multi-language stacks.
+ * Homogeneous advancement yields zero dispersion penalty; severe single-language
+ * lag incurs rational dampening to prevent isolated high-score masking.
+ *
+ * @param languageScores - Map of language identifiers to modernization scores in [0, 100].
+ * @param languageWeights - Optional weighting map for languages (defaults to equal weight 1.0).
+ * @returns Balanced polyglot generalization index in [0, 100].
+ */
+export function calculatePolyglotGeneralizationIndex(
+    languageScores: Readonly<Record<string, number>>,
+    languageWeights?: Readonly<Record<string, number>>,
+): number {
+    if (!languageScores || typeof languageScores !== 'object') {
+        return 100.0;
+    }
+    const keys = Object.keys(languageScores);
+    if (keys.length === 0) {
+        return 100.0;
+    }
+    if (keys.length === 1) {
+        const raw = languageScores[keys[0]];
+        return Math.round(extractSafeScore(raw) * SCORE_ROUNDING) / SCORE_ROUNDING;
+    }
+
+    const customWeightSum = computeTotalCustomWeight(keys, languageWeights);
+    const activeWeights = customWeightSum > 0 ? languageWeights : undefined;
+    const totalWeight = customWeightSum > 0 ? customWeightSum : keys.length;
+
+    const sMean = computeWeightedMean(keys, languageScores, activeWeights, totalWeight);
+    const variance = computeWeightedVariance(
+        keys,
+        languageScores,
+        activeWeights,
+        sMean,
+        totalWeight,
+    );
+    const sigmaS = Math.sqrt(Math.max(0, variance));
+
+    const dispersionPenalty = Math.max(0, 1.0 - sigmaS / 100.0);
+    const polyglotScore = sMean * dispersionPenalty;
+    const clampedScore = Math.max(0, Math.min(100, polyglotScore));
+    return Math.round(clampedScore * SCORE_ROUNDING) / SCORE_ROUNDING;
 }

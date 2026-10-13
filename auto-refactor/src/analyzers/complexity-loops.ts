@@ -22,15 +22,39 @@ const MAX_LOOP_INSPECTION_WINDOW_LINES = 30;
 const DEFAULT_SCALE_VAR = 'dynamicCollection';
 
 /**
- * Loop headers the engine treats as iteration sites.
+ * Loop headers the engine treats as iteration sites across TS/JS, Python, Rust, Go, GDScript.
  */
-const LOOP_HEADER_RE = /\b(?:for\s*\(|for\s+[a-zA-Z0-9_$]+\s+in|while\s*\(|do\s*\{)\b/;
+const LOOP_HEADER_RE =
+    /\b(?:for\s*\(|for\s+[a-zA-Z0-9_$]+(?:\s*,\s*[a-zA-Z0-9_$]+)?\s*(?:in|range|:=)|for\s*\{|while\s*\(|while\s+[^{:\n]+|loop\s*\{|do\s*\{)\b/;
 
 /**
- * Per-iteration allocation the hoist advice actually applies to.
+ * Transient heap allocation patterns per language runtime.
  */
-const TRANSIENT_CONTAINER_RE =
-    /\b(?:new\s+(?:Array|Object|Map|Set|WeakMap|WeakSet|Int8Array|Uint8Array|Int16Array|Uint16Array|Int32Array|Uint32Array|Float32Array|Float64Array)|\/duplicate\(true\)|\.clone\()/;
+const TRANSIENT_TS_CONTAINER_RE =
+    /\b(?:new\s+(?:Array|Object|Map|Set|WeakMap|WeakSet|Int[0-9]+Array|Uint[0-9]+Array|Float[0-9]+Array)|\/duplicate\(true\)|\.clone\()/;
+
+const TRANSIENT_GO_RE = /\b(?:make\s*\(\s*(?:\[\]|map\[|chan\b)|&[A-Z][a-zA-Z0-9_]*\{|\.clone\()/;
+
+const TRANSIENT_RUST_RE =
+    /\b(?:(?:Vec|Box|String|HashMap|BTreeMap|HashSet|BTreeSet)::(?:new|with_capacity)\s*\(|\.clone\()/;
+
+const TRANSIENT_PYTHON_RE = /(?:(?<![.\w])(?:list|dict|set)\s*\(|\.copy\()/;
+
+const TRANSIENT_GDSCRIPT_RE = /\b(?:\/duplicate\(true\)|\.duplicate\()/;
+
+/**
+ * Select the appropriate transient allocation regex based on file path extension.
+ *
+ * @param filePath - Path of the file being inspected.
+ * @returns Pre-compiled regex matching transient container allocations in that runtime.
+ */
+function resolveTransientRegex(filePath: string): RegExp {
+    if (filePath.endsWith('.py')) return TRANSIENT_PYTHON_RE;
+    if (filePath.endsWith('.go')) return TRANSIENT_GO_RE;
+    if (filePath.endsWith('.rs')) return TRANSIENT_RUST_RE;
+    if (filePath.endsWith('.gd')) return TRANSIENT_GDSCRIPT_RE;
+    return TRANSIENT_TS_CONTAINER_RE;
+}
 
 /** Synchronous I/O calls that amplify its cost when run once per iteration. */
 const BLOCKING_IO_RE =
@@ -44,7 +68,7 @@ const BLOCKING_IO_RE =
  */
 function resolveLoopScaleVariable(lineText: string): string {
     const ofInMatch = lineText.match(
-        /\bfor\s*(?:\([^;]+?(?:of|in)\s+([^);{]+)|[A-Za-z0-9_$,\s]+\s+in\s+([^:#\n]+))/,
+        /\bfor\s*(?:\([^;]+?(?:of|in)\s+([^);{]+)|[A-Za-z0-9_$,\s]+\s+(?:in|range)\s+([^:#{\n]+))/,
     );
     if (ofInMatch) return (ofInMatch[1] || ofInMatch[2] || DEFAULT_SCALE_VAR).trim();
     const cStyleMatch = lineText.match(/;\s*[^<>=!]+[<>=!]+\s*([^;]+);/);
@@ -111,18 +135,20 @@ function loopBodyRange(
  * @param lines - Raw file lines.
  * @param from - First body line (inclusive, 1-based).
  * @param to - Last body line (inclusive, 1-based).
+ * @param transientRegex - Pre-compiled regex matching transient container allocations.
  * @returns Flags the complexity rules report on.
  */
 function inspectLoopBody(
     lines: string[],
     from: number,
     to: number,
+    transientRegex: RegExp = TRANSIENT_TS_CONTAINER_RE,
 ): { hasTransientAllocation: boolean; hasBlockingIo: boolean } {
     let hasTransientAllocation = false;
     let hasBlockingIo = false;
     for (let l = from; l <= to && l <= lines.length; l++) {
         const txt = lines[l - 1] ?? '';
-        if (!hasTransientAllocation && TRANSIENT_CONTAINER_RE.test(txt)) {
+        if (!hasTransientAllocation && transientRegex.test(txt)) {
             hasTransientAllocation = true;
         }
         if (!hasBlockingIo && BLOCKING_IO_RE.test(txt)) hasBlockingIo = true;
@@ -156,6 +182,7 @@ export function findLoopSitesInFunction(
     const sites: LoopSite[] = [];
     const startLine = fnNode.start?.line ?? 1;
     const endLine = fnNode.end?.line ?? lines.length;
+    const transientRegex = resolveTransientRegex(filePath);
 
     for (let l = startLine; l <= endLine && l <= lines.length; l++) {
         const lineText = lines[l - 1] ?? '';
@@ -171,7 +198,7 @@ export function findLoopSitesInFunction(
             symbol: fnSymbol,
             isBounded: isBoundedCollection(scaleVariable),
             scaleVariable,
-            ...inspectLoopBody(lines, body.from, body.to),
+            ...inspectLoopBody(lines, body.from, body.to, transientRegex),
         });
     }
 

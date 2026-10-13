@@ -20,7 +20,9 @@ import type {
     QualityScoreRationale,
     QualityWeights,
     QualityReviewProfile,
+    PolyglotGeneralizationMetrics,
 } from './scoringTypes';
+import { calculatePolyglotGeneralizationIndex } from './modernization-formulas';
 import {
     ALL_QUALITY_DIMENSIONS,
     DEFAULT_QUALITY_WEIGHTS,
@@ -55,6 +57,24 @@ import {
 
 /** Files named in the skipped-file warning before the list is truncated. */
 const SKIPPED_FILE_DETAIL_LIMIT = 5;
+
+function resolveFileLanguage(ext: string): string | null {
+    if (
+        ext === '.ts' ||
+        ext === '.tsx' ||
+        ext === '.js' ||
+        ext === '.jsx' ||
+        ext === '.mjs' ||
+        ext === '.cjs'
+    ) {
+        return 'typescript';
+    }
+    if (ext === '.py') return 'python';
+    if (ext === '.rs') return 'rust';
+    if (ext === '.go') return 'go';
+    if (ext === '.gd') return 'gdscript';
+    return null;
+}
 
 /**
  * Transparent Multi-Dimensional Quality Scorer.
@@ -262,6 +282,7 @@ export class QualityScorer {
         // through the file-scoped helper capped it at 300 lines, so baseConfidence was always
         // 1.0 and the published confidence collapsed to exactly coverage.
         const confidence = calculateConfidenceFromVolume(totalWeight, coverage, 'project');
+        const polyglotGeneralization = this.computePolyglotMetrics(fileQualityScores);
 
         return {
             indices: rawScores,
@@ -294,9 +315,52 @@ export class QualityScorer {
             coverage,
             deductionsByDimension,
             evaluatedBy,
+            polyglotGeneralization,
             rationales: allRationales.slice(0, 10),
             evaluatedAt: Date.now(),
             skippedFileWarning,
+        };
+    }
+
+    private computePolyglotMetrics(
+        fileQualityScores: Record<string, QualityScoreBreakdown>,
+    ): PolyglotGeneralizationMetrics | undefined {
+        const langTotals: Record<string, { sum: number; count: number }> = {};
+        for (const [filePath, scoreBreakdown] of Object.entries(fileQualityScores)) {
+            const ext = filePath.slice(filePath.lastIndexOf('.')).toLowerCase();
+            const lang = resolveFileLanguage(ext);
+            if (!lang) continue;
+            if (!langTotals[lang]) langTotals[lang] = { sum: 0, count: 0 };
+            langTotals[lang].sum += scoreBreakdown.compositeScore;
+            langTotals[lang].count += 1;
+        }
+
+        const langScores: Record<string, number> = {};
+        for (const [lang, { sum, count }] of Object.entries(langTotals)) {
+            langScores[lang] = Math.round((sum / count) * SCORE_ROUNDING) / SCORE_ROUNDING;
+        }
+
+        const activeLangKeys = Object.keys(langScores);
+        if (activeLangKeys.length === 0) return undefined;
+
+        const index = calculatePolyglotGeneralizationIndex(langScores);
+        const total = Object.values(langScores).reduce((a, b) => a + b, 0);
+        const meanScore =
+            Math.round((total / activeLangKeys.length) * SCORE_ROUNDING) / SCORE_ROUNDING;
+        const variance =
+            activeLangKeys.reduce((acc, k) => acc + Math.pow(langScores[k] - meanScore, 2), 0) /
+            activeLangKeys.length;
+        const standardDeviation = Math.round(Math.sqrt(variance) * SCORE_ROUNDING) / SCORE_ROUNDING;
+        const dispersionPenalty =
+            Math.round(Math.max(0, 1.0 - standardDeviation / 100) * SCORE_ROUNDING) /
+            SCORE_ROUNDING;
+
+        return {
+            index,
+            meanScore,
+            dispersionPenalty,
+            standardDeviation,
+            languageCount: activeLangKeys.length,
         };
     }
 }

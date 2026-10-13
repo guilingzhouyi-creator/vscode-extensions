@@ -241,7 +241,7 @@ function aggregateLocationCards(cardsAtLoc: PraxisDiagnosticCard[]): PraxisDiagn
 }
 
 /**
- * Pure function aggregating semantically overlapping diagnostic cards at identical locations.
+ * Aggregate semantically overlapping diagnostic cards at identical locations.
  * Uncorrelated cards and locations with single cards remain strictly unmodified.
  *
  * @param cards - Input diagnostic cards array

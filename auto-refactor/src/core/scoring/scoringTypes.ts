@@ -236,6 +236,10 @@ export interface QualityScoreBreakdown {
      */
     evaluatedBy?: Partial<Record<QualityDimension, string[]>>;
     /**
+     * Optional polyglot multi-language generalization and modernization balance metrics.
+     */
+    polyglotGeneralization?: PolyglotGeneralizationMetrics;
+    /**
      * Machine-readable definition of the quantified standard this score was produced under:
      * the composite/coverage/confidence formulas, the per-dimension weights and the grade
      * cut-offs, so a consumer can re-derive the grade instead of trusting the label.
@@ -276,4 +280,20 @@ export interface QualityScoreBreakdown {
         dimensionWeights: Record<string, number>;
         familyDimensions: Record<string, string>;
     };
+}
+
+/**
+ * Metrics tracking polyglot multi-language generalization balance.
+ */
+export interface PolyglotGeneralizationMetrics {
+    /** Balanced polyglot index in [0, 100]. */
+    index: number;
+    /** Weighted mean modernization score across measured languages. */
+    meanScore: number;
+    /** Dispersion penalty factor in [0, 1]. */
+    dispersionPenalty: number;
+    /** Standard deviation of language modernization scores. */
+    standardDeviation: number;
+    /** Evaluated language count. */
+    languageCount: number;
 }

@@ -88,19 +88,19 @@ export interface WorkerAnalyzerDesc {
  * Adding a built-in analyzer = adding one entry here; user config stays declarative.
  */
 export const BUILTIN_FACTORIES: Record<string, () => Analyzer> = {
-    // Stage 0: 物理底线与紧急安全
+    // Stage 0: Physical Hygiene & Critical Security
     hygiene: () => new HygieneAnalyzer(),
     'shell-lint': () => new ShellLintAnalyzer(),
     'large-file': () => new LargeFileAnalyzer(),
     secrets: () => new SecretsAnalyzer(),
     security: () => new SecurityAnalyzer(),
-    // Stage 1: 文本规范、词法符号与文档
+    // Stage 1: Text Governance, Lexical Symbols & Documentation
     comments: () => new CommentAnalyzer(),
     naming: () => new NamingAnalyzer(),
     constants: () => new ConstantsAnalyzer(),
     docs: () => new DocsAnalyzer(),
     'production-hygiene': () => new ProductionHygieneAnalyzer(),
-    // Stage 2: 单文件语法 AST、控制流与语言现代化
+    // Stage 2: Single-file AST, Control Flow & Language Modernity
     simplify: () => new SimplifyAnalyzer(),
     complexity: () => new ComplexityAnalyzer(),
     stdlib: () => new StdlibAnalyzer(),
@@ -110,7 +110,7 @@ export const BUILTIN_FACTORIES: Record<string, () => Analyzer> = {
     'gdscript-modern': () => new GdscriptModernAnalyzer(),
     'go-modern': () => new GoModernAnalyzer(),
     frontend: () => new FrontendAnalyzer(),
-    // Stage 3: 领域架构契约、数据流与全工程拓扑
+    // Stage 3: Domain Architecture Contracts, Data Flow & Global Topology
     performance: () => new PerformanceAnalyzer(),
     architecture: () => new ArchitectureAnalyzer(),
     'data-architecture': () => new DataArchitectureAnalyzer(),
@@ -136,19 +136,19 @@ export const BUILTIN_FACTORIES: Record<string, () => Analyzer> = {
  * `src/core/` → `src/analyzers/`.
  */
 export const BUILTIN_MODULE_PATHS: Record<string, string> = {
-    // Stage 0: 物理底线与紧急安全
+    // Stage 0: Physical Hygiene & Critical Security
     hygiene: '../analyzers/hygiene',
     'shell-lint': '../analyzers/shell-lint',
     'large-file': '../analyzers/large-file',
     secrets: '../analyzers/secrets',
     security: '../analyzers/security',
-    // Stage 1: 文本规范、词法符号与文档
+    // Stage 1: Text Governance, Lexical Symbols & Documentation
     comments: '../analyzers/comments',
     naming: '../analyzers/naming',
     constants: '../analyzers/constants',
     docs: '../analyzers/docs',
     'production-hygiene': '../analyzers/production-hygiene',
-    // Stage 2: 单文件语法 AST、控制流与语言现代化
+    // Stage 2: Single-file AST, Control Flow & Language Modernity
     simplify: '../analyzers/simplify',
     complexity: '../analyzers/complexity',
     stdlib: '../analyzers/stdlib',
@@ -158,7 +158,7 @@ export const BUILTIN_MODULE_PATHS: Record<string, string> = {
     'gdscript-modern': '../analyzers/gdscript-modern',
     'go-modern': '../analyzers/go-modern',
     frontend: '../analyzers/frontend',
-    // Stage 3: 领域架构契约、数据流与全工程拓扑
+    // Stage 3: Domain Architecture Contracts, Data Flow & Global Topology
     performance: '../analyzers/performance',
     architecture: '../analyzers/architecture',
     'data-architecture': '../analyzers/data-architecture',

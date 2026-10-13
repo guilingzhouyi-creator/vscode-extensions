@@ -594,6 +594,17 @@ function buildAmplificationAllocIssue(symbol: string, site: LoopSite): Issue {
     };
 }
 
+/**
+ * Detect complexity amplification issues across loop sites, such as blocking I/O
+ * and transient allocations.
+ *
+ * @param loopSites - Map of symbol names to their analyzed loop sites.
+ * @param ioAllowPatterns - Optional list of RegExp patterns exempting files from
+ *   blocking I/O warnings.
+ * @param allocationAllowPatterns - Optional list of RegExp patterns exempting files
+ *   from transient allocation warnings.
+ * @returns Array of detected complexity amplification issues.
+ */
 export function detectComplexityAmplification(
     loopSites: Map<string, LoopSite[]>,
     ioAllowPatterns: RegExp[] = [],

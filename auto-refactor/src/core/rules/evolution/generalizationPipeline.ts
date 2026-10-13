@@ -28,7 +28,7 @@ import {
 import { ARCH_DISP_RULE_ID, auditDispatchComplexity } from './dispatchComplexityRule';
 
 /** Pre-packaged multi-language fixtures for HYG-WRAP-001 */
-const WRAPPER_FIXTURES: readonly MultiLangFixture[] = [
+export const WRAPPER_FIXTURES: readonly MultiLangFixture[] = [
     {
         language: 'typescript',
         negativeSample: `
@@ -72,6 +72,21 @@ fn dispatch_event(id: u64, code: u32) -> Result {
 }
 `,
         description: 'Rust transparent delegation without documentation exemption.',
+    },
+    {
+        language: 'go',
+        negativeSample: `
+func forwardQuery(id string, count int) Result {
+    return target.fetchData(id, count)
+}
+`,
+        positiveSample: `
+// adapter delegation pattern
+func forwardQuery(id string, count int) Result {
+    return target.fetchData(id, count)
+}
+`,
+        description: 'Go transparent parameter forwarding without exemption rationale.',
     },
 ];
 
@@ -169,7 +184,7 @@ const FOUNDATIONAL_CANDIDATES: readonly RuleCandidate[] = [
             justification:
                 'Redundant forwarding functions artificially inflate codebase volume ' +
                 'and reduce effective code density across all languages.',
-            universalAcrossLanguages: ['typescript', 'javascript', 'python', 'rust'],
+            universalAcrossLanguages: ['typescript', 'javascript', 'python', 'rust', 'go'],
             reviewedAt: '2026-09-19',
         },
     },
@@ -325,7 +340,13 @@ export class RuleGeneralizationPipeline {
     private verifyFixtures(candidate: RuleCandidate): boolean {
         for (const fixture of candidate.fixtures) {
             const ext =
-                fixture.language === 'python' ? '.py' : fixture.language === 'rust' ? '.rs' : '.ts';
+                fixture.language === 'python'
+                    ? '.py'
+                    : fixture.language === 'rust'
+                      ? '.rs'
+                      : fixture.language === 'go'
+                        ? '.go'
+                        : '.ts';
             const fixturePath = `test/fixture${ext}`;
             const fakeCtx: Partial<AnalyzerContext> = {
                 filePath: fixturePath,

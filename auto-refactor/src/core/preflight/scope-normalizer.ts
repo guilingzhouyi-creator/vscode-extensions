@@ -270,6 +270,12 @@ export function synthesizeDomainScope(ctx: ScopeSynthesisContext): ModeSynthesis
     };
 }
 
+/**
+ * Function signature for synthesizing quality metrics under a specific audit scope mode.
+ *
+ * @param ctx - Scope synthesis context containing priors and observations.
+ * @returns Mode synthesis result with adjusted project mean, standard error, and explanation.
+ */
 export type ScopeSynthesizer = (ctx: ScopeSynthesisContext) => ModeSynthesisResult;
 
 /** Dispatch table mapping audit scope modes to synthesis strategies */

@@ -76,19 +76,19 @@ const PERCENT_SCALE = 100;
  * union; custom analyzers loaded from config stay outside it and are handled separately.
  */
 export const ALL_BUILTIN_ANALYZERS = [
-    // Stage 0: 物理底线与紧急安全
+    // Stage 0: Physical Hygiene & Critical Security
     ANALYZER_HYGIENE,
     ANALYZER_SHELL_LINT,
     ANALYZER_LARGE_FILE,
     ANALYZER_SECRETS,
     ANALYZER_SECURITY,
-    // Stage 1: 文本规范、词法符号与文档
+    // Stage 1: Text Governance, Lexical Symbols & Documentation
     ANALYZER_COMMENTS,
     ANALYZER_NAMING,
     ANALYZER_CONSTANTS,
     ANALYZER_DOCS,
     ANALYZER_PRODUCTION_HYGIENE,
-    // Stage 2: 单文件语法 AST、控制流与语言现代化
+    // Stage 2: Single-file AST, Control Flow & Language Modernity
     ANALYZER_SIMPLIFY,
     ANALYZER_COMPLEXITY,
     ANALYZER_STDLIB,
@@ -98,7 +98,7 @@ export const ALL_BUILTIN_ANALYZERS = [
     ANALYZER_GDSCRIPT_MODERN,
     ANALYZER_GO_MODERN,
     ANALYZER_FRONTEND,
-    // Stage 3: 领域架构契约、数据流与全工程拓扑
+    // Stage 3: Domain Architecture Contracts, Data Flow & Global Topology
     ANALYZER_PERFORMANCE,
     ANALYZER_ARCHITECTURE,
     ANALYZER_DATA_ARCHITECTURE,

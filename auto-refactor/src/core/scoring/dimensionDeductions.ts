@@ -389,6 +389,14 @@ const TIER1_KEYWORD_RE = /LEAK|CIRCULAR/;
 const TIER2_PREFIX_RE = /^(?:CPX|CMP|DAT|TST-DBT)/;
 const TIER2_ANALYZER_RE = /complexity|maintainability/;
 
+/**
+ * Determine whether a rule finding qualifies as Tier 1 critical structural debt.
+ *
+ * @param rule - Rule identifier.
+ * @param analyzer - Originating analyzer name.
+ * @param severity - Severity string of the finding.
+ * @returns True if the finding represents critical structural debt.
+ */
 export function isTier1CriticalDebt(rule: string, analyzer: string, severity: string): boolean {
     if (severity === FRAGMENT_ERROR) {
         return true;
@@ -401,6 +409,13 @@ export function isTier1CriticalDebt(rule: string, analyzer: string, severity: st
     return TIER1_PREFIX_RE.test(r) || TIER1_KEYWORD_RE.test(r);
 }
 
+/**
+ * Determine whether a rule finding qualifies as Tier 2 evolutionary maintenance debt.
+ *
+ * @param rule - Rule identifier.
+ * @param analyzer - Originating analyzer name.
+ * @returns True if the finding represents evolutionary maintenance debt.
+ */
 export function isTier2EvolutionaryDebt(rule: string, analyzer: string): boolean {
     const a = (analyzer ?? '').toLowerCase();
     if (TIER2_ANALYZER_RE.test(a)) {

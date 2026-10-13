@@ -79,6 +79,16 @@ const MATRIX = [
     agnostic: true,
   },
   {
+    language: 'go',
+    file: 'src/probe.go',
+    pack: 'go-modern',
+    packRule: 'GOM-ERR-001',
+    fixture: (marker) =>
+      `package main\n\nimport "os"\n\n// ${marker}\n` +
+      `func probe() {\n\tf, _ := os.Open("test.txt")\n\t_ = f\n}\n`,
+    agnostic: true,
+  },
+  {
     language: 'markdown',
     file: 'docs/probe.md',
     pack: null,

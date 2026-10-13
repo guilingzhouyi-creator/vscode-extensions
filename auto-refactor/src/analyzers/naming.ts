@@ -25,7 +25,12 @@ import {
     type SymbolEntry,
 } from '../core/architecture/naming-decoupling-auditor';
 import { auditPythonSourceHelper } from './naming-python-helper';
-import { auditFileAndDirectoryPaths, hasTransientJargon } from './naming-path-helper';
+import { auditPolyglotSource } from './naming-polyglot-helper';
+import {
+    auditFileAndDirectoryPaths,
+    hasTransientJargon,
+    APPROVED_ACTION_VERBS,
+} from './naming-path-helper';
 import {
     NamingMessages,
     ALLOWED_SHORT_NAMES,
@@ -40,7 +45,13 @@ import {
     type NamingActionablePayload,
 } from './naming-candidate-helper';
 
-export { NamingMessages, ALLOWED_SHORT_NAMES, MAX_VARIABLE_NAME_LENGTH, MAX_FUNCTION_NAME_LENGTH };
+export {
+    NamingMessages,
+    ALLOWED_SHORT_NAMES,
+    MAX_VARIABLE_NAME_LENGTH,
+    MAX_FUNCTION_NAME_LENGTH,
+    APPROVED_ACTION_VERBS,
+};
 
 /**
  * Tunable options for NamingAnalyzer.
@@ -58,6 +69,17 @@ export interface NamingOptions {
     checkDecoupling?: boolean;
     checkLengths?: boolean;
     checkAbbreviations?: boolean;
+    minFileLength?: number;
+    maxFileLength?: number;
+    minFileWords?: number;
+    maxFileWords?: number;
+    minFunctionLength?: number;
+    maxFunctionLength?: number;
+    minFunctionWords?: number;
+    maxFunctionWords?: number;
+    enforceVerbNounContract?: boolean;
+    enforceMorphemeCheck?: boolean;
+    allowedShortFiles?: string[];
     vagueBlacklist?: string[];
     singleLetterAllowed?: string[];
 }
@@ -68,7 +90,30 @@ const DEFAULT_VAGUE_WORDS =
 
 const DEFAULT_VAGUE_BLACKLIST = new Set(DEFAULT_VAGUE_WORDS.split(' '));
 
-const DEFAULT_SINGLE_LETTER_ALLOWED = new Set(['i', 'j', 'k', '_']);
+const DEFAULT_SINGLE_LETTER_ALLOWED = new Set([
+    'i',
+    'j',
+    'k',
+    '_',
+    'a',
+    'b',
+    'c',
+    'd',
+    'e',
+    'f',
+    'l',
+    'm',
+    'n',
+    'p',
+    'r',
+    's',
+    't',
+    'v',
+    'w',
+    'x',
+    'y',
+    'z',
+]);
 
 const CAMEL_TO_SNAKE_PATTERN = '$1_$2';
 
@@ -116,6 +161,16 @@ export class NamingAnalyzer implements Analyzer {
             }
         } else if (ext === '.py') {
             this.auditPythonSource(ctx.content || '', opts, ctx, issues);
+        } else if (ext === '.go' || ext === '.rs' || ext === '.gd') {
+            auditPolyglotSource(
+                ctx.content || '',
+                ext,
+                opts,
+                ctx,
+                (c, line, col, rule, msg, sev, detail, sugg) =>
+                    this.mkIssue(c, line, col, rule, msg, sev, detail, sugg),
+                issues,
+            );
         }
 
         issues.sort(
@@ -608,8 +663,8 @@ export class NamingAnalyzer implements Analyzer {
                 this.checkVariableName(paramName, param, false, pos, ctx, issues, opts);
                 if (!isExemptVague) {
                     this.checkIdentifierVagueness(paramName, pos, vagueSet, ctx, issues, opts);
+                    this.checkSingleLetter(paramName, pos, false, singleAllowed, ctx, issues, opts);
                 }
-                this.checkSingleLetter(paramName, pos, false, singleAllowed, ctx, issues, opts);
                 if (opts.checkJargon !== false) {
                     this.checkSymbolJargon(paramName, pos, ctx, issues);
                 }
@@ -755,6 +810,14 @@ export class NamingAnalyzer implements Analyzer {
         }
     }
 
+    /**
+     * Audits call expressions (e.g. describe / it / test) for transient process milestone jargon.
+     *
+     * @param node - Call expression AST node.
+     * @param sf - Source file providing position offsets.
+     * @param ctx - Execution context.
+     * @param issues - Output issues accumulator.
+     */
     private checkCallExpressionJargon(
         node: ts.CallExpression,
         sf: ts.SourceFile,
@@ -785,9 +848,17 @@ export class NamingAnalyzer implements Analyzer {
         }
     }
 
+    /**
+     * Audits an identifier symbol for transient sprint or milestone process jargon.
+     *
+     * @param name - Identifier string to inspect.
+     * @param pos - Source position line and character coordinates.
+     * @param ctx - Execution context.
+     * @param issues - Output issues accumulator.
+     */
     private checkSymbolJargon(
         name: string,
-        pos: { line: number; character: number },
+        pos: ts.LineAndCharacter,
         ctx: AnalyzerContext,
         issues: Issue[],
     ): void {
@@ -807,9 +878,19 @@ export class NamingAnalyzer implements Analyzer {
         }
     }
 
+    /**
+     * Checks if identifier matches blacklisted vague or uninformative terms.
+     *
+     * @param name - Identifier name to audit.
+     * @param pos - Source position line and character coordinates.
+     * @param vagueSet - Set of uninformative identifier terms.
+     * @param ctx - Execution context.
+     * @param issues - Output issues accumulator.
+     * @param opts - Naming analyzer configuration options.
+     */
     private checkIdentifierVagueness(
         name: string,
-        pos: { line: number; character: number },
+        pos: ts.LineAndCharacter,
         vagueSet: Set<string>,
         ctx: AnalyzerContext,
         issues: Issue[],
@@ -832,9 +913,20 @@ export class NamingAnalyzer implements Analyzer {
         }
     }
 
+    /**
+     * Enforces single-letter variable restriction, exempting loop index coordinates.
+     *
+     * @param name - Variable identifier name.
+     * @param pos - Source position line and character coordinates.
+     * @param inLoop - True if variable is declared inside loop scope.
+     * @param singleAllowed - Whitelisted single-letter loop variable identifiers.
+     * @param ctx - Execution context.
+     * @param issues - Output issues accumulator.
+     * @param opts - Naming analyzer configuration options.
+     */
     private checkSingleLetter(
         name: string,
-        pos: { line: number; character: number },
+        pos: ts.LineAndCharacter,
         inLoop: boolean,
         singleAllowed: Set<string>,
         ctx: AnalyzerContext,
@@ -860,10 +952,20 @@ export class NamingAnalyzer implements Analyzer {
         }
     }
 
+    /**
+     * Verifies Map collection variable declarations describe key-value relationship.
+     *
+     * @param name - Identifier name of collection variable.
+     * @param init - Optional initializer expression node.
+     * @param pos - Source position line and character coordinates.
+     * @param ctx - Execution context.
+     * @param issues - Output issues accumulator.
+     * @param opts - Naming analyzer configuration options.
+     */
     private checkCollectionNaming(
         name: string,
         init: ts.Expression | undefined,
-        pos: { line: number; character: number },
+        pos: ts.LineAndCharacter,
         ctx: AnalyzerContext,
         issues: Issue[],
         opts: NamingOptions,
@@ -894,6 +996,14 @@ export class NamingAnalyzer implements Analyzer {
         );
     }
 
+    /**
+     * Audits Python source content for function names, length, and anti-jargon conventions.
+     *
+     * @param content - Raw python source code content string.
+     * @param opts - Analyzer naming configuration options.
+     * @param ctx - Execution context.
+     * @param issues - Output issues accumulator.
+     */
     private auditPythonSource(
         content: string,
         opts: NamingOptions,

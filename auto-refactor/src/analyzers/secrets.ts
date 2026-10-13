@@ -207,6 +207,10 @@ function resolveEntropyConfig(opts: SecretsOptions, level: SecurityLevel): Resol
     };
 }
 
+/**
+ * Secrets and credentials leak analyzer.
+ * Detects hardcoded passwords, tokens, API keys, private keys, and high-entropy strings.
+ */
 export class SecretsAnalyzer implements Analyzer {
     name = 'secrets' as const;
 

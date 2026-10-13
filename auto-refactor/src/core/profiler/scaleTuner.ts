@@ -49,6 +49,8 @@ const ANALYZER_COMMENTS = 'comments';
 const ANALYZER_GOVERNANCE = 'governance';
 /** Analyzer id for simplify option tuning. */
 const ANALYZER_SIMPLIFY = 'simplify';
+/** Analyzer id for naming option tuning. */
+const ANALYZER_NAMING = 'naming';
 
 /** Scale grade identifier for medium projects. */
 const SCALE_GRADE_MEDIUM = 'medium';
@@ -93,6 +95,34 @@ const MICRO_MAX_TERNARY_LENGTH = 100;
 const ENTERPRISE_MAX_TERNARY_LENGTH = 80;
 const MICRO_MAX_GUARD_NESTING = 4;
 const ENTERPRISE_MAX_GUARD_NESTING = 3;
+
+// ── Naming limits per scale grade ──
+const MICRO_MIN_FILE_WORDS = 1;
+const MICRO_MAX_FILE_WORDS = 3;
+const MICRO_MIN_FILE_LENGTH = 3;
+const MICRO_MAX_FILE_LENGTH = 35;
+const MICRO_MIN_FUNCTION_WORDS = 1;
+const MICRO_MAX_FUNCTION_WORDS = 3;
+const MICRO_MIN_FUNCTION_LENGTH = 3;
+const MICRO_MAX_FUNCTION_LENGTH = 35;
+
+const MEDIUM_MIN_FILE_WORDS = 2;
+const MEDIUM_MAX_FILE_WORDS = 4;
+const MEDIUM_MIN_FILE_LENGTH = 4;
+const MEDIUM_MAX_FILE_LENGTH = 48;
+const MEDIUM_MIN_FUNCTION_WORDS = 2;
+const MEDIUM_MAX_FUNCTION_WORDS = 4;
+const MEDIUM_MIN_FUNCTION_LENGTH = 4;
+const MEDIUM_MAX_FUNCTION_LENGTH = 45;
+
+const LARGE_MIN_FILE_WORDS = 2;
+const LARGE_MAX_FILE_WORDS = 5;
+const LARGE_MIN_FILE_LENGTH = 4;
+const LARGE_MAX_FILE_LENGTH = 55;
+const LARGE_MIN_FUNCTION_WORDS = 2;
+const LARGE_MAX_FUNCTION_WORDS = 5;
+const LARGE_MIN_FUNCTION_LENGTH = 4;
+const LARGE_MAX_FUNCTION_LENGTH = 50;
 
 /**
  * Classify a project into a scale grade from its file count and source lines of code.
@@ -217,6 +247,51 @@ function tuneSimplifyByGrade(grade: ScaleGrade, tuned: Record<string, any>): voi
 }
 
 /**
+ * Tune naming analyzer options by scale grade.
+ *
+ * @param grade - Scale grade.
+ * @param tuned - Tuned options bag to mutate.
+ */
+function tuneNamingByGrade(grade: ScaleGrade, tuned: Record<string, any>): void {
+    tuned.enforceVerbNounContract = true;
+    tuned.enforceMorphemeCheck = true;
+    switch (grade) {
+        case SCALE_GRADE_MICRO:
+        case SCALE_GRADE_SMALL:
+            tuned.minFileWords = MICRO_MIN_FILE_WORDS;
+            tuned.maxFileWords = MICRO_MAX_FILE_WORDS;
+            tuned.minFileLength = MICRO_MIN_FILE_LENGTH;
+            tuned.maxFileLength = MICRO_MAX_FILE_LENGTH;
+            tuned.minFunctionWords = MICRO_MIN_FUNCTION_WORDS;
+            tuned.maxFunctionWords = MICRO_MAX_FUNCTION_WORDS;
+            tuned.minFunctionLength = MICRO_MIN_FUNCTION_LENGTH;
+            tuned.maxFunctionLength = MICRO_MAX_FUNCTION_LENGTH;
+            break;
+        case SCALE_GRADE_MEDIUM:
+            tuned.minFileWords = MEDIUM_MIN_FILE_WORDS;
+            tuned.maxFileWords = MEDIUM_MAX_FILE_WORDS;
+            tuned.minFileLength = MEDIUM_MIN_FILE_LENGTH;
+            tuned.maxFileLength = MEDIUM_MAX_FILE_LENGTH;
+            tuned.minFunctionWords = MEDIUM_MIN_FUNCTION_WORDS;
+            tuned.maxFunctionWords = MEDIUM_MAX_FUNCTION_WORDS;
+            tuned.minFunctionLength = MEDIUM_MIN_FUNCTION_LENGTH;
+            tuned.maxFunctionLength = MEDIUM_MAX_FUNCTION_LENGTH;
+            break;
+        case SCALE_GRADE_LARGE:
+        case SCALE_GRADE_ENTERPRISE:
+            tuned.minFileWords = LARGE_MIN_FILE_WORDS;
+            tuned.maxFileWords = LARGE_MAX_FILE_WORDS;
+            tuned.minFileLength = LARGE_MIN_FILE_LENGTH;
+            tuned.maxFileLength = LARGE_MAX_FILE_LENGTH;
+            tuned.minFunctionWords = LARGE_MIN_FUNCTION_WORDS;
+            tuned.maxFunctionWords = LARGE_MAX_FUNCTION_WORDS;
+            tuned.minFunctionLength = LARGE_MIN_FUNCTION_LENGTH;
+            tuned.maxFunctionLength = LARGE_MAX_FUNCTION_LENGTH;
+            break;
+    }
+}
+
+/**
  * Tune analyzer options by scale grade.
  *
  * @param grade - Scale grade.
@@ -241,6 +316,8 @@ export function getTunedAnalyzerOptions(
         }
     } else if (analyzerName === ANALYZER_SIMPLIFY) {
         tuneSimplifyByGrade(grade, tuned);
+    } else if (analyzerName === ANALYZER_NAMING) {
+        tuneNamingByGrade(grade, tuned);
     }
 
     return tuned;

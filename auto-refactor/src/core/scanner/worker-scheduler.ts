@@ -277,10 +277,12 @@ export interface HybridPhaseContext {
 }
 
 /**
- * Top-level pure execution of the hybrid startup phase.
+ * Top-level orchestration of the hybrid startup phase.
  * Processes initial files concurrently without deeply nested closures (Depth <= 2).
  *
+ * Concurrency note: asynchronous file processing bounded by HYBRID_CONCURRENCY.
  * @param ctx - Context object configuring the hybrid execution phase.
+ * @returns Promise resolving when all batch files finish processing.
  */
 export async function executeHybridPhase(ctx: HybridPhaseContext): Promise<void> {
     const { batch, absRoot, preloaded, runAnalyzersFn, isAborted, onResult, onError, onProgress } =

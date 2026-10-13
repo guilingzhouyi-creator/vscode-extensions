@@ -15,8 +15,20 @@ const DOCUMENTED_RATIONALE_RE =
     /\b(?:best-?effort|ignore[sd]?|intentional(?:ly)?|deliberate(?:ly)?|expected|by-?design)\b/i;
 
 /** Regular expression identifying pseudo-catch or dummy no-op statements. */
-const PSEUDO_CATCH_RE =
-    /^(?:void\s*\(?0\)?|pass|\.\.\.|const\s+_\w*\s*=\s*\w+|let\s+_\w*\s*=\s*\w+|_\w*\s*=\s*\w+|null|undefined)\s*;?$/;
+const PSEUDO_CATCH_RE = new RegExp(
+    '^(?:void\\s*\\(?0\\)?|pass|\\.\\.\\.|' +
+        'const\\s+_\\w*\\s*=\\s*\\w+|let\\s+_\\w*\\s*=\\s*\\w+|' +
+        '_\\w*\\s*=\\s*\\w+|null|undefined)\\s*;?$',
+);
+
+/** Set of self reference tokens to ignore across languages (Python, Rust). */
+const IGNORABLE_SELF_TOKENS = new Set(['self', '&self', '&mut self']);
+
+/** Regular expression identifying access and mutability modifiers. */
+const MODIFIER_PREFIX_RE = /^(?:public|private|protected|readonly)\s+/;
+
+/** Regular expression splitting whitespace-delimited tokens. */
+const WHITESPACE_SPLIT_RE = /\s+/;
 
 /**
  * Normalizes a function parameter list by stripping types and default values.
@@ -35,7 +47,7 @@ export function normalizeParameterNames(paramStr: string): string[] {
 
     for (const rawToken of rawTokens) {
         let token = rawToken.trim();
-        if (!token || token === 'self' || token === '&self' || token === '&mut self') {
+        if (!token || IGNORABLE_SELF_TOKENS.has(token)) {
             continue;
         }
         // Strip default values (e.g. `foo = 10`)
@@ -45,12 +57,15 @@ export function normalizeParameterNames(paramStr: string): string[] {
         // Strip type annotations (e.g. `foo: string`, `mut foo: usize`)
         if (token.includes(':')) {
             token = token.split(':')[0].trim();
+        } else if (WHITESPACE_SPLIT_RE.test(token)) {
+            // Go-style parameter signatures without colon (e.g. `id string`, `count int`)
+            token = token.slice(0, token.search(WHITESPACE_SPLIT_RE));
         }
         if (token.startsWith('mut ')) {
             token = token.slice(4).trim();
         }
         // Strip modifiers like readonly or public
-        token = token.replace(/^(?:public|private|protected|readonly)\s+/, '');
+        token = token.replace(MODIFIER_PREFIX_RE, '');
         if (token) {
             results.push(token);
         }

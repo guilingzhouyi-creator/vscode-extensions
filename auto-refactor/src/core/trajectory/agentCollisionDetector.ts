@@ -18,6 +18,8 @@ import { inferSystemTopologyRole } from '../architecture/roleInference';
 import type { SystemTopologyRole } from '../architecture/types';
 import { DEFAULT_ALLOWED_DEPENDENCIES } from '../architecture/types';
 
+const EMPTY_IMPORTS: string[] = Object.freeze([]) as unknown as string[];
+
 interface DependencyEdge {
     from: string;
     to: string;
@@ -38,8 +40,11 @@ function normalizePath(p: string): string {
 function buildCompositeEdges(patches: AgentPatchSlice[]): DependencyEdge[] {
     const edges: DependencyEdge[] = [];
     for (const patch of patches) {
+        const deps = patch.dependenciesAdded;
+        if (!deps || deps.length === 0) {
+            continue;
+        }
         const from = normalizePath(patch.filePath);
-        const deps = patch.dependenciesAdded || [];
         for (const dep of deps) {
             edges.push({
                 from,
@@ -50,6 +55,24 @@ function buildCompositeEdges(patches: AgentPatchSlice[]): DependencyEdge[] {
         }
     }
     return edges;
+}
+
+/**
+ * Slices the DFS traversal stack into an active circular dependency cycle.
+ */
+function extractDetectedCycle(
+    toNode: string,
+    stack: string[],
+    edgeStack: DependencyEdge[],
+): { cycle: string[]; edges: DependencyEdge[] } | null {
+    const cycleIndex = stack.indexOf(toNode);
+    if (cycleIndex === -1) {
+        return null;
+    }
+    const cycle = stack.slice(cycleIndex);
+    cycle.push(toNode);
+    const relevantEdges = edgeStack.slice(cycleIndex);
+    return { cycle, edges: relevantEdges };
 }
 
 /**
@@ -65,20 +88,24 @@ function findCycleInGraph(
     visited.add(node);
     stack.push(node);
 
-    const neighbors = adj.get(node) || [];
+    const neighbors = adj.get(node);
+    if (!neighbors || neighbors.length === 0) {
+        stack.pop();
+        return null;
+    }
+
     for (const edge of neighbors) {
         edgeStack.push(edge);
         if (!visited.has(edge.to)) {
             const res = findCycleInGraph(edge.to, adj, visited, stack, edgeStack);
             if (res) return res;
-        } else {
-            const cycleIndex = stack.indexOf(edge.to);
-            if (cycleIndex !== -1) {
-                const cycle = stack.slice(cycleIndex);
-                cycle.push(edge.to);
-                const relevantEdges = edgeStack.slice(cycleIndex);
-                return { cycle, edges: relevantEdges };
-            }
+            edgeStack.pop();
+            continue;
+        }
+
+        const cycleResult = extractDetectedCycle(edge.to, stack, edgeStack);
+        if (cycleResult) {
+            return cycleResult;
         }
         edgeStack.pop();
     }
@@ -162,7 +189,7 @@ function checkDependencyLayerInversion(
     fromRole: SystemTopologyRole,
     dep: string,
 ): AgentCollision | null {
-    const toRole = inferSystemTopologyRole(dep, []).role;
+    const toRole = inferSystemTopologyRole(dep, EMPTY_IMPORTS).role;
     if (fromRole === toRole) {
         return null;
     }
@@ -221,6 +248,33 @@ function checkImportContractBreakage(
 }
 
 /**
+ * Creates a synthetic dependency edge representing an existing base repository edge.
+ */
+function createBaseEdge(from: string, to: string): DependencyEdge {
+    return {
+        from,
+        to,
+        agentUid: '__base__',
+        patchId: '__base__',
+    };
+}
+
+/**
+ * Retrieves or initializes an edge list in the directed adjacency index.
+ */
+function getOrCreateEdgeList(
+    adj: Map<string, DependencyEdge[]>,
+    key: string,
+): DependencyEdge[] {
+    let list = adj.get(key);
+    if (!list) {
+        list = [];
+        adj.set(key, list);
+    }
+    return list;
+}
+
+/**
  * Detects architectural collisions and dependency conflicts across concurrent agent patches.
  */
 export class AgentCollisionDetector {
@@ -259,28 +313,25 @@ export class AgentCollisionDetector {
 
         for (const e of baseEdges) {
             const fromPath = normalizePath(e.from);
-            const list = adj.get(fromPath) || [];
-            list.push({
-                from: fromPath,
-                to: normalizePath(e.to),
-                agentUid: '__base__',
-                patchId: '__base__',
-            });
-            adj.set(fromPath, list);
+            getOrCreateEdgeList(adj, fromPath).push(
+                createBaseEdge(fromPath, normalizePath(e.to)),
+            );
         }
 
         for (const e of patchEdges) {
-            const list = adj.get(e.from) || [];
-            list.push(e);
-            adj.set(e.from, list);
+            getOrCreateEdgeList(adj, e.from).push(e);
         }
 
         const visited = new Set<string>();
+        const dfsStack: string[] = [];
+        const dfsEdgeStack: DependencyEdge[] = [];
         for (const node of adj.keys()) {
             if (visited.has(node)) {
                 continue;
             }
-            const result = findCycleInGraph(node, adj, visited, [], []);
+            dfsStack.length = 0;
+            dfsEdgeStack.length = 0;
+            const result = findCycleInGraph(node, adj, visited, dfsStack, dfsEdgeStack);
             if (!result) {
                 continue;
             }
@@ -298,8 +349,11 @@ export class AgentCollisionDetector {
     private detectLayerInversions(patches: AgentPatchSlice[]): AgentCollision[] {
         const collisions: AgentCollision[] = [];
         for (const patch of patches) {
-            const fromRole = inferSystemTopologyRole(patch.filePath, []).role;
-            const deps = patch.dependenciesAdded || [];
+            const deps = patch.dependenciesAdded;
+            if (!deps || deps.length === 0) {
+                continue;
+            }
+            const fromRole = inferSystemTopologyRole(patch.filePath, EMPTY_IMPORTS).role;
             for (const dep of deps) {
                 const collision = checkDependencyLayerInversion(patch, fromRole, dep);
                 if (collision) {
@@ -318,13 +372,21 @@ export class AgentCollisionDetector {
         const exportedMap = new Map<string, { agentUid: string; file: string }>();
 
         for (const p of patches) {
-            for (const sym of p.exportedSymbols || []) {
+            const exported = p.exportedSymbols;
+            if (!exported || exported.length === 0) {
+                continue;
+            }
+            for (const sym of exported) {
                 exportedMap.set(sym, { agentUid: p.agentUid, file: p.filePath });
             }
         }
 
         for (const p of patches) {
-            for (const sym of p.importedSymbols || []) {
+            const imported = p.importedSymbols;
+            if (!imported || imported.length === 0) {
+                continue;
+            }
+            for (const sym of imported) {
                 const collision = checkImportContractBreakage(p, sym, exportedMap);
                 if (collision) {
                     collisions.push(collision);

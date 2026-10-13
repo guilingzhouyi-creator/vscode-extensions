@@ -120,6 +120,9 @@ function intentTokens(intent: string, stopWords: readonly string[]): string[] {
     return tokens;
 }
 
+/**
+ * Collector for context slice regions, dependencies, and impact references with budget limits.
+ */
 class SliceRegionCollector {
     readonly regions: ContextSliceRegion[] = [];
     readonly dependencies: string[] = [];
