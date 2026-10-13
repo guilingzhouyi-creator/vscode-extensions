@@ -1,10 +1,10 @@
 {
   "weekId": "2026-W42",
   "startMs": 1791772968234,
-  "endMs": 1791893657477,
-  "totalRuns": 100,
+  "endMs": 1791893710311,
+  "totalRuns": 101,
   "eloc": {
-    "processedTotal": 13843993,
+    "processedTotal": 13983639,
     "uniqueTotal": 112896,
     "changedTotal": 117275,
     "semanticTotal": 93817
@@ -20,6 +20,6 @@
     "totalRegressions": 0,
     "netYield": 0.08
   },
-  "meanCompositeScore": 98.72,
-  "gatePassRate": 95
+  "meanCompositeScore": 98.73,
+  "gatePassRate": 95.05
 }

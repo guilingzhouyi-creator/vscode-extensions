@@ -106,10 +106,13 @@ export function groupCounts(issues: Issue[]): GroupedBaselineRow[] {
     const rows = new Map<string, { count: number; severities: SeverityHistogram }>();
     for (const issue of issues) {
         const key = issueGroupKey(issue);
-        const row = rows.get(key) ?? { count: 0, severities: {} };
+        let row = rows.get(key);
+        if (!row) {
+            row = { count: 0, severities: {} };
+            rows.set(key, row);
+        }
         row.count += 1;
         row.severities[issue.severity] = (row.severities[issue.severity] ?? 0) + 1;
-        rows.set(key, row);
     }
     return [...rows].map(([key, row]) => ({ key, count: row.count, severities: row.severities }));
 }
@@ -123,9 +126,12 @@ export function groupCounts(issues: Issue[]): GroupedBaselineRow[] {
 export function idSeverityHistograms(issues: Issue[]): Record<string, SeverityHistogram> {
     const histograms: Record<string, SeverityHistogram> = {};
     for (const issue of issues) {
-        const histogram = histograms[issue.id] ?? {};
+        let histogram = histograms[issue.id];
+        if (!histogram) {
+            histogram = {};
+            histograms[issue.id] = histogram;
+        }
         histogram[issue.severity] = (histogram[issue.severity] ?? 0) + 1;
-        histograms[issue.id] = histogram;
     }
     return histograms;
 }
@@ -226,8 +232,10 @@ export function readIdCredits(
     }
     // Union with the histogram keys: an id carrying a credit only in `severities` keeps it, so a
     // hand-trimmed id list can never turn a baselined finding into a false new one.
-    for (const id of Object.keys(severities ?? {})) {
-        if (!occurrences.has(id)) occurrences.set(id, 0);
+    if (severities) {
+        for (const id of Object.keys(severities)) {
+            if (!occurrences.has(id)) occurrences.set(id, 0);
+        }
     }
     const credits = new Map<string, BaselineCredits>();
     for (const id of occurrences.keys()) {

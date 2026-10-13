@@ -48,6 +48,10 @@ export const POST_SCAN_SCOPE_INCREMENTAL = 'incremental';
 /** Post-scan scope: a full scan may use cross-file facts; an incremental one may not. */
 export type PostScanScope = typeof POST_SCAN_SCOPE_FULL | typeof POST_SCAN_SCOPE_INCREMENTAL;
 
+/** Immutable empty array singletons for zero-allocation fallbacks in hot loops. */
+const EMPTY_ISSUES: readonly Issue[] = Object.freeze([]);
+const EMPTY_SUPPRESSIONS: readonly SuppressionRule[] = Object.freeze([]);
+
 const FINALIZED = Symbol('auto-refactor:finalized');
 
 /**
@@ -263,7 +267,7 @@ function buildSuppressionIndex(suppressions: SuppressionRule[]): SuppressionInde
     for (const analyzer of byAnalyzer.keys()) {
         analyzerCandidates.set(
             analyzer,
-            [...(byAnalyzer.get(analyzer) ?? []), ...general].sort(
+            [...(byAnalyzer.get(analyzer) ?? EMPTY_SUPPRESSIONS), ...general].sort(
                 (a, b) => (orderIdx.get(a) ?? 0) - (orderIdx.get(b) ?? 0),
             ),
         );
@@ -387,7 +391,7 @@ function refreshQualityScores(
     const fileQualityScores: Record<string, QualityScoreBreakdown> = {};
     const fileMetrics = report.fileMetrics ?? [];
     for (const m of fileMetrics) {
-        const fileIssues = issuesByFile.get(m.file) || [];
+        const fileIssues = issuesByFile.get(m.file) ?? (EMPTY_ISSUES as Issue[]);
         fileQualityScores[m.file] = scorer.evaluateFile(m.file, fileIssues, m, config);
     }
     report.fileQualityScores = fileQualityScores;

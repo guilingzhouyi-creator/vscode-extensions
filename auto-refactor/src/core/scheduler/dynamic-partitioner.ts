@@ -69,6 +69,19 @@ function extractModuleGroupKey(filePath: string): string {
     return `${parts[0]}/${parts[1]}`;
 }
 
+function getOrCreateBucket<K, V>(map: Map<K, V[]>, key: K): V[] {
+    let bucket = map.get(key);
+    if (!bucket) {
+        bucket = [];
+        map.set(key, bucket);
+    }
+    return bucket;
+}
+
+function resetPartitionBucket(): string[] {
+    return [];
+}
+
 /**
  * Clusters files into groups by module affinity.
  */
@@ -76,9 +89,7 @@ function clusterFilesByModule(files: string[]): Map<string, string[]> {
     const clusters = new Map<string, string[]>();
     for (const file of files) {
         const key = extractModuleGroupKey(file);
-        const group = clusters.get(key) ?? [];
-        group.push(file);
-        clusters.set(key, group);
+        getOrCreateBucket(clusters, key).push(file);
     }
     return clusters;
 }
@@ -146,7 +157,7 @@ function packClusterFiles(
                     activeDomains,
                 ),
             );
-            currentFiles = [];
+            currentFiles = resetPartitionBucket();
             currentWorkload = 0;
         }
     }

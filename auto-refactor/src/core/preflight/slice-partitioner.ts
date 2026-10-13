@@ -18,6 +18,9 @@
 import type { AuditIndexEntry } from './audit-index';
 import type { SparseActivationResult } from './sparse-activator';
 
+/** Immutable empty string array singleton for zero-allocation fallbacks. */
+const EMPTY_STRING_LIST: readonly string[] = Object.freeze([]);
+
 /** Canonical domain slice categories */
 export type SliceCategory =
     | 'lexical_hygiene'
@@ -130,6 +133,28 @@ function hasAnyCategoryAnalyzer(
     return needed.some((a) => analyzerSet.has(a));
 }
 
+function collectCategoryRelevantFiles(
+    files: readonly string[],
+    fileAnalyzerMap: Readonly<Record<string, readonly string[]>>,
+    analyzerSet: Set<string>,
+    entryMap: Map<string, AuditIndexEntry>,
+    analyzersCount: number,
+): { relevantFiles: string[]; sliceWorkload: number } {
+    const relevantFiles: string[] = [];
+    let sliceWorkload = 0;
+
+    for (const f of files) {
+        const needed = fileAnalyzerMap[f] ?? (EMPTY_STRING_LIST as string[]);
+        if (hasAnyCategoryAnalyzer(needed, analyzerSet)) {
+            relevantFiles.push(f);
+            const eloc = entryMap.get(f)?.eloc.estimatedEloc || 50;
+            sliceWorkload += eloc * analyzersCount;
+        }
+    }
+
+    return { relevantFiles, sliceWorkload };
+}
+
 /**
  * Partitions activated analyzers and files into mutually disjoint review slices.
  *
@@ -177,19 +202,13 @@ export function partitionReviewSlices(
     for (const [cat, analyzers] of categoryEntries) {
         if (analyzers.length === 0) continue;
 
-        // Find all selected files that need at least one analyzer from this category
-        const relevantFiles: string[] = [];
-        let sliceWorkload = 0;
-        const analyzerSet = categorySets[cat];
-
-        for (const f of activation.selectedFiles) {
-            const needed = activation.fileAnalyzerMap[f] || [];
-            if (hasAnyCategoryAnalyzer(needed, analyzerSet)) {
-                relevantFiles.push(f);
-                const eloc = entryMap.get(f)?.eloc.estimatedEloc || 50;
-                sliceWorkload += eloc * analyzers.length;
-            }
-        }
+        const { relevantFiles, sliceWorkload } = collectCategoryRelevantFiles(
+            activation.selectedFiles,
+            activation.fileAnalyzerMap,
+            categorySets[cat],
+            entryMap,
+            analyzers.length,
+        );
 
         if (relevantFiles.length > 0) {
             slices.push(

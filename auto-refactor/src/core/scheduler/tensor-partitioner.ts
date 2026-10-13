@@ -104,6 +104,18 @@ function partitionDepthFiles(
 }
 
 /**
+ * Retrieves an existing bucket array from a Map, or allocates and registers a new one.
+ */
+function getOrCreateBucket<K, V>(map: Map<K, V[]>, key: K): V[] {
+    let bucket = map.get(key);
+    if (!bucket) {
+        bucket = [];
+        map.set(key, bucket);
+    }
+    return bucket;
+}
+
+/**
  * Groups files of a single cluster by their dependency depth.
  */
 function groupFilesByDepth(
@@ -113,12 +125,7 @@ function groupFilesByDepth(
     const depthGroups = new Map<number, string[]>();
     for (const file of clusterFiles) {
         const depth = depthMap.get(file) ?? 0;
-        let grp = depthGroups.get(depth);
-        if (!grp) {
-            grp = [];
-            depthGroups.set(depth, grp);
-        }
-        grp.push(file);
+        getOrCreateBucket(depthGroups, depth).push(file);
     }
     return depthGroups;
 }
@@ -129,12 +136,7 @@ function groupFilesByDepth(
 function buildImportsGraph(edges: [string, string][]): Map<string, string[]> {
     const imports = new Map<string, string[]>();
     for (const [from, to] of edges) {
-        let list = imports.get(from);
-        if (!list) {
-            list = [];
-            imports.set(from, list);
-        }
-        list.push(to);
+        getOrCreateBucket(imports, from).push(to);
     }
     return imports;
 }
@@ -356,12 +358,7 @@ export class TensorPartitioner {
 
         for (const file of files) {
             const key = extractModuleGroupKeyFast(file);
-            let group = clusters.get(key);
-            if (!group) {
-                group = [];
-                clusters.set(key, group);
-            }
-            group.push(file);
+            getOrCreateBucket(clusters, key).push(file);
         }
 
         return clusters;

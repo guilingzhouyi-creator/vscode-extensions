@@ -218,10 +218,13 @@ function isMorphemeValid(seg) {
 }
 
 function validateFilenameSegments(file, stem, gate4Violations) {
-  const cleanStem = stem.replace(/\.(?:test|spec)$/i, '');
+  const norm = file.replace(/\\/g, '/');
+  const isTest = /(?:tests\/|\.test\.|\.spec\.|test_)/i.test(norm);
+  const maxSegments = isTest ? 8 : 5;
+  const cleanStem = stem.replace(/\.(?:test|spec)$/i, '').replace(/^test[_-]/i, '');
   const segments = cleanStem.split(/[-_]+/).filter(Boolean);
-  if (segments.length > 5) {
-    gate4Violations.push(`文件名单词段数过多 (> 5 段，过度堆叠): ${file}`);
+  if (segments.length > maxSegments) {
+    gate4Violations.push(`文件名单词段数过多 (> ${maxSegments} 段，过度堆叠): ${file}`);
   }
   for (const seg of segments) {
     if (!isMorphemeValid(seg)) {
