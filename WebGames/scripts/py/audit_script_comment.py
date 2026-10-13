@@ -78,45 +78,32 @@ def iter_targets() -> Generator[Path, None, None]:
                     yield p
 
 
-def audit_file(path: Path, fix: bool = False) -> list[dict[str, Any]]:
-    """解析单文件头注释与严格工程化规则，返回违规 dict 列表。"""
+def _check_header_must_fields(head_lines: list[str], head: str, path_str: str) -> list[dict[str, Any]]:
+    """检查必填六字段要素及其非空约束。"""
     violations: list[dict[str, Any]] = []
-    path = path.resolve()
-    try:
-        raw_bytes = path.read_bytes()
-        text = raw_bytes.decode("utf-8", errors="ignore")
-    except Exception as e:
-        return [{
-            "file": str(path),
-            "rule": "HEADER-UNREADABLE",
-            "detail": f"无法读取文件（编码/IO: {e}）"
-        }]
-
-    lines = text.splitlines()
-    head_lines = lines[:35]
-    head = "\n".join(head_lines)
-
-    # 1. 必填六字段及非空校验
     for marker in HEADER_MUST:
         if marker not in head:
             violations.append({
-                "file": str(path),
+                "file": path_str,
                 "rule": "HEADER-MISSING-MUST",
                 "detail": f"缺少必填六字段要素「{marker}」"
             })
-        else:
-            for line in head_lines:
-                if marker in line:
-                    val = line.split(marker, 1)[1].strip()
-                    if not val:
-                        violations.append({
-                            "file": str(path),
-                            "rule": "HEADER-EMPTY-FIELD",
-                            "detail": f"要素「{marker}」内容为空"
-                        })
-                    break
+            continue
+        for line in head_lines:
+            if marker in line:
+                val = line.split(marker, 1)[1].strip()
+                if not val:
+                    violations.append({
+                        "file": path_str,
+                        "rule": "HEADER-EMPTY-FIELD",
+                        "detail": f"要素「{marker}」内容为空"
+                    })
+                break
+    return violations
 
-    # 1b. 文件路径真实性对齐
+
+def _check_declared_path_match(head_lines: list[str], path: Path, path_str: str) -> list[dict[str, Any]]:
+    """校验声明文件路径与物理磁盘相对路径对齐。"""
     for line in head_lines:
         if "文件路径:" in line:
             decl_path = line.split("文件路径:", 1)[1].strip().replace("\\", "/")
@@ -128,23 +115,25 @@ def audit_file(path: Path, fix: bool = False) -> list[dict[str, Any]]:
                 valid_paths.add(rel_wg)
                 valid_paths.add(f"WebGames/{rel_wg}")
             if decl_path not in valid_paths:
-                violations.append({
-                    "file": str(path),
+                return [{
+                    "file": path_str,
                     "rule": "HEADER-PATH-MISMATCH",
                     "detail": f"声明路径「{decl_path}」与物理路径「{rel_repo}」不符"
-                })
+                }]
             break
+    return []
 
-    # 2. 78 字符等宽分隔线检查（去 # 或 // 后，符号数量必须恰好为 78）
+
+def _check_separator_lines(
+    head_lines: list[str], is_js: bool, path_str: str, fix: bool, new_lines: list[str]
+) -> tuple[list[dict[str, Any]], bool]:
+    """检查 78 字符等宽分隔线。"""
+    violations: list[dict[str, Any]] = []
     fixed = False
-    new_lines = list(lines)
-    is_js = path.suffix == ".mjs"
-
     for i, line in enumerate(head_lines):
         sep_matched = False
         prefix = "# "
         sym = "="
-
         if is_js:
             m = JS_SEP_RE.match(line)
             if m:
@@ -162,52 +151,85 @@ def audit_file(path: Path, fix: bool = False) -> list[dict[str, Any]]:
             width = len(m.group(1))
             if width != 78:
                 violations.append({
-                    "file": str(path),
+                    "file": path_str,
                     "rule": "HEADER-SEPARATOR-WIDTH",
                     "detail": f"L{i+1} 分隔线宽度 {width} ≠ 78"
                 })
                 if fix:
                     new_lines[i] = prefix + (sym * 78)
                     fixed = True
+    return violations, fixed
 
-    if fix and fixed:
-        new_text = "\n".join(new_lines)
-        if path.suffix == ".ps1":
-            new_text = new_text.replace("\r\n", "\n").replace("\n", "\r\n")
-        else:
-            new_text = new_text.replace("\r\n", "\n").replace("\r", "\n")
-        path.write_text(new_text, encoding="utf-8")
 
-    # 3. 未决标记与批次黑话检测（仅针对 # 或 // 注释行，杜绝规则定义误报）
+def _check_comment_markers(head_lines: list[str], path_str: str) -> list[dict[str, Any]]:
+    """检测未决标记与批次黑话禁止词。"""
+    violations: list[dict[str, Any]] = []
     for i, line in enumerate(head_lines):
         stripped = line.strip()
         if not (stripped.startswith("#") or stripped.startswith("//")):
             continue
-        if "PENDING_RE" in line or "JARGON_RE" in line or "COMMENT-" in line or "RULE" in line:
+        if any(ignore in line for ignore in ("PENDING_RE", "JARGON_RE", "COMMENT-", "RULE")):
             continue
         if PENDING_RE.search(line):
             violations.append({
-                "file": str(path),
+                "file": path_str,
                 "rule": "COMMENT-PENDING-MARKER",
                 "detail": f"L{i+1} 注释含未决标记：{line.strip()[:60]}"
             })
         if JARGON_RE.search(line):
             violations.append({
-                "file": str(path),
+                "file": path_str,
                 "rule": "COMMENT-JARGON",
                 "detail": f"L{i+1} 注释含批次黑话禁止词：{line.strip()[:60]}"
             })
+    return violations
 
-    # 4. PowerShell 标头三件套硬约束
+
+def _save_fixed_header(path: Path, new_lines: list[str]) -> None:
+    """持久化保存修复后的头注释（保持对应平台的换行契约）。"""
+    new_text = "\n".join(new_lines)
+    if path.suffix == ".ps1":
+        new_text = new_text.replace("\r\n", "\n").replace("\n", "\r\n")
+    else:
+        new_text = new_text.replace("\r\n", "\n").replace("\r", "\n")
+    path.write_text(new_text, encoding="utf-8")
+
+
+def audit_file(path: Path, fix: bool = False) -> list[dict[str, Any]]:
+    """解析单文件头注释与严格工程化规则，返回违规 dict 列表。"""
+    path = path.resolve()
+    path_str = str(path)
+    try:
+        raw_bytes = path.read_bytes()
+        text = raw_bytes.decode("utf-8", errors="ignore")
+    except Exception as e:
+        return [{
+            "file": path_str,
+            "rule": "HEADER-UNREADABLE",
+            "detail": f"无法读取文件（编码/IO: {e}）"
+        }]
+
+    lines = text.splitlines()
+    head_lines = lines[:35]
+    head = "\n".join(head_lines)
+    new_lines = list(lines)
+
+    violations: list[dict[str, Any]] = []
+    violations.extend(_check_header_must_fields(head_lines, head, path_str))
+    violations.extend(_check_declared_path_match(head_lines, path, path_str))
+
+    sep_violations, fixed = _check_separator_lines(head_lines, path.suffix == ".mjs", path_str, fix, new_lines)
+    violations.extend(sep_violations)
+    if fix and fixed:
+        _save_fixed_header(path, new_lines)
+
+    violations.extend(_check_comment_markers(head_lines, path_str))
+
     if path.suffix == ".ps1":
         violations.extend(_check_ps1_triad(text, path))
-
-    # 5. Bash 安全 Shebang 与安全选项
-    if path.suffix == ".sh":
+    elif path.suffix == ".sh":
         violations.extend(_check_bash_safety(lines, text, path))
-
-    # 6. Python 模块级 docstring、强类型与注解绑定
-    if path.suffix == ".py":
+    elif path.suffix == ".py":
         violations.extend(_check_py_docstring(text, path))
         violations.extend(_check_py_strict_typing(text, path))
         violations.extend(_check_py_annotation_bindings(text, path))
@@ -264,45 +286,51 @@ def _check_bash_safety(lines: list[str], text: str, path: Path) -> list[dict[str
     return violations
 
 
+def _check_func_typing(node: Any, path_str: str) -> list[dict[str, Any]]:
+    """检查单个函数的参数与返回值类型注解完备性。"""
+    violations: list[dict[str, Any]] = []
+    missing_args = [
+        a.arg for a in node.args.args
+        if a.annotation is None and a.arg not in ("self", "cls")
+    ]
+    if missing_args:
+        violations.append({
+            "file": path_str,
+            "rule": "PY-UNTYPED-ARG",
+            "detail": f"函数「{node.name}」参数缺少类型标注：{', '.join(missing_args)} (L{node.lineno})"
+        })
+    if node.returns is None:
+        violations.append({
+            "file": path_str,
+            "rule": "PY-UNTYPED-RETURN",
+            "detail": f"函数「{node.name}」缺少明确返回值类型注解（如 -> None）(L{node.lineno})"
+        })
+    return violations
+
+
 def _check_py_strict_typing(text: str, path: Path) -> list[dict[str, Any]]:
     """Python 100% 强类型注解与零裸 except 治理契约。"""
-    violations = []
+    violations: list[dict[str, Any]] = []
+    path_str = str(path)
     try:
         tree = ast.parse(text)
     except SyntaxError:
-        return []  # 语法错误由后续专门规则报告
+        return []
 
     for node in ast.walk(tree):
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            missing_args = [
-                a.arg for a in node.args.args
-                if a.annotation is None and a.arg not in ("self", "cls")
-            ]
-            if missing_args:
-                violations.append({
-                    "file": str(path),
-                    "rule": "PY-UNTYPED-ARG",
-                    "detail": f"函数「{node.name}」参数缺少类型标注：{', '.join(missing_args)} (L{node.lineno})"
-                })
-            if node.returns is None:
-                violations.append({
-                    "file": str(path),
-                    "rule": "PY-UNTYPED-RETURN",
-                    "detail": f"函数「{node.name}」缺少明确返回值类型注解（如 -> None）(L{node.lineno})"
-                })
-        elif isinstance(node, ast.ExceptHandler):
-            if node.type is None:
-                violations.append({
-                    "file": str(path),
-                    "rule": "PY-BARE-EXCEPT",
-                    "detail": f"L{node.lineno} 存在裸 except: 违规，必须显式捕获具体异常元组"
-                })
+            violations.extend(_check_func_typing(node, path_str))
+        elif isinstance(node, ast.ExceptHandler) and node.type is None:
+            violations.append({
+                "file": path_str,
+                "rule": "PY-BARE-EXCEPT",
+                "detail": f"L{node.lineno} 存在裸 except: 违规，必须显式捕获具体异常元组"
+            })
     return violations
 
 
 def _check_py_docstring(text: str, path: Path) -> list[dict[str, Any]]:
     """py 模块级 docstring：存在且首行为一句话职责说明。"""
-    # 允许在 shebang 与头注释后紧随 docstring
     m = re.search(r'"""([\s\S]+?)"""', text)
     if not m or len(m.group(1).strip()) < 8:
         return [{
@@ -322,6 +350,65 @@ ANNOTATION_NAMES = frozenset({
 })
 
 
+def _has_future_annotations(tree: ast.Module) -> bool:
+    """检查是否声明了 from __future__ import annotations。"""
+    for node in tree.body:
+        if isinstance(node, ast.ImportFrom) and node.module == "__future__":
+            if any(alias.name == "annotations" for alias in node.names):
+                return True
+    return False
+
+
+def _extract_body_bound_symbol(node: ast.AST, bound: set[str]) -> None:
+    """提取模块顶层节点中的定义标识符。"""
+    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+        bound.add(node.name)
+        return
+    if isinstance(node, ast.Assign):
+        for target in node.targets:
+            if isinstance(target, ast.Name):
+                bound.add(target.id)
+        return
+    if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+        bound.add(node.target.id)
+
+
+def _collect_bound_symbols(tree: ast.Module) -> set[str]:
+    """收集 AST 模块内所有的导入与显式定义符号。"""
+    bound: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Import, ast.ImportFrom)):
+            for alias in node.names:
+                bound.add(alias.asname or alias.name.split(".")[0])
+    for node in tree.body:
+        _extract_body_bound_symbol(node, bound)
+    return bound
+
+
+def _extract_node_annotation(node: ast.AST) -> Any:
+    """提取参数、函数返回值或类型化赋值的注解 AST。"""
+    if isinstance(node, ast.arg):
+        return node.annotation
+    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        return node.returns
+    if isinstance(node, ast.AnnAssign):
+        return node.annotation
+    return None
+
+
+def _collect_missing_annotations(tree: ast.Module, bound: set[str]) -> set[str]:
+    """在 AST 中收集使用了 ANNOTATION_NAMES 但未在作用域内绑定的名字。"""
+    missing: set[str] = set()
+    for node in ast.walk(tree):
+        annotation = _extract_node_annotation(node)
+        if annotation is None:
+            continue
+        for sub in ast.walk(annotation):
+            if isinstance(sub, ast.Name) and sub.id in ANNOTATION_NAMES and sub.id not in bound:
+                missing.add(sub.id)
+    return missing
+
+
 def _check_py_annotation_bindings(text: str, path: Path) -> list[dict[str, Any]]:
     """Python 注解名字绑定完备性校验。"""
     try:
@@ -333,45 +420,14 @@ def _check_py_annotation_bindings(text: str, path: Path) -> list[dict[str, Any]]
             "detail": f"AST 解析失败：{exc}",
         }]
 
-    for node in tree.body:
-        if isinstance(node, ast.ImportFrom) and node.module == "__future__":
-            if any(alias.name == "annotations" for alias in node.names):
-                return []
+    if _has_future_annotations(tree):
+        return []
 
-    bound: set[str] = set()
-    # 导入绑定：全树收集（含函数内局部导入），消除「局部导入 → 误报」噪声
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.Import, ast.ImportFrom)):
-            for alias in node.names:
-                bound.add(alias.asname or alias.name.split(".")[0])
-    # 模块级定义绑定：函数/类/变量
-    for node in tree.body:
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
-            bound.add(node.name)
-        elif isinstance(node, ast.Assign):
-            for target in node.targets:
-                if isinstance(target, ast.Name):
-                    bound.add(target.id)
-        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
-            bound.add(node.target.id)
-
-    missing: set[str] = set()
-    for node in ast.walk(tree):
-        annotation: Any = None
-        if isinstance(node, ast.arg):
-            annotation = node.annotation
-        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            annotation = node.returns
-        elif isinstance(node, ast.AnnAssign):
-            annotation = node.annotation
-        if annotation is None:
-            continue
-        for sub in ast.walk(annotation):
-            if isinstance(sub, ast.Name) and sub.id in ANNOTATION_NAMES and sub.id not in bound:
-                missing.add(sub.id)
-
+    bound = _collect_bound_symbols(tree)
+    missing = _collect_missing_annotations(tree, bound)
     if not missing:
         return []
+
     return [{
         "file": str(path),
         "rule": "PY-ANNOTATION-IMPORT",

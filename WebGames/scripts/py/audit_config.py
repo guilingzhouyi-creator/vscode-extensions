@@ -13,6 +13,7 @@
 # ==============================================================================
 """审查 config/ 目录与 game_config.gd 必需表清单的一致性。"""
 import argparse
+from datetime import datetime, timezone
 import json
 import re
 import sys
@@ -336,14 +337,17 @@ class DeclarativeRuleEvaluator:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser()
+    ap = argparse.ArgumentParser(description="WebGames 配置表与架构护栏一致性审查引擎")
     ap.add_argument("--strict", action="store_true", help="必需表缺失也视为失败")
     ap.add_argument("--fix", action="store_true", help="自动修复 JSON 格式（无 BOM / LF / 2 空格规范序列化 / 末行换行）")
+    ap.add_argument("--arch", action="store_true", help="同时执行原生静态架构护栏断言并纳入聚合报告")
+    ap.add_argument("--report", type=str, default="", help="保存结构化审查报告路径 (JSON)")
     args = ap.parse_args()
 
     violations: list[str] = []
     warnings: list[str] = []
     found_tables: set[str] = set()
+    invalid_tables: set[str] = set()
     files = sorted(CONFIG_DIR.rglob("*.json"))
     if not files:
         print("【audit-config】未找到任何 config/*.json")
@@ -369,6 +373,7 @@ def main() -> int:
         layer = rel.parts[0] if len(rel.parts) > 1 else ""
         if layer not in LAYERS:
             violations.append(f"配置文件层级非法: {rel_posix}（应为 {sorted(LAYERS)} 之一）")
+            invalid_tables.add(rel_posix)
         table = ".".join(rel.with_suffix("").parts)
         found_tables.add(table)
         try:
@@ -377,12 +382,17 @@ def main() -> int:
             data = json.loads(raw_text)
         except (json.JSONDecodeError, UnicodeDecodeError, OSError) as e:
             violations.append(f"JSON 解析失败: {rel_posix} ({e})")
+            invalid_tables.add(table)
             continue
         if not isinstance(data, dict):
             violations.append(f"顶层必须为 JSON 对象: {rel_posix}")
+            invalid_tables.add(table)
+        v_before = len(violations)
         check_keys(data, "", violations, table)
         check_format(f, raw, raw_text, data, rel, violations, fix=args.fix)
         evaluator.evaluate_file(data, rel_posix, violations)
+        if len(violations) > v_before:
+            invalid_tables.add(table)
 
     required = parse_required_tables()
     if not required:
@@ -391,12 +401,83 @@ def main() -> int:
         if t not in found_tables:
             warnings.append(f"必需表缺失（game_config.gd 声明但无对应文件）: {t}")
 
-    print(f"【audit-config】配置表: {len(found_tables)} 张 / 必需表: {len(required)} 张")
+    arch_results: list[dict] = []
+    arch_violations: list[str] = []
+    if args.arch:
+        try:
+            from audit_arch_static import run_all_checks
+            arch_ok, arch_results, domain_title, arch_elapsed = run_all_checks()
+            for r in arch_results:
+                if not r.get("passed"):
+                    for v in r.get("violations", []):
+                        arch_violations.append(f"架构护栏违规 [{r.get('test', '')}]: {v}")
+        except Exception as ex:
+            arch_violations.append(f"架构护栏执行异常: {ex}")
+
+    total_tables = len(found_tables)
+    required_count = len(required)
+    arch_checks_count = len(arch_results) if args.arch else 0
+    total_checks = total_tables + required_count + arch_checks_count
+    all_violations = violations + arch_violations
+    err_count = len(all_violations)
+    warn_count = len(warnings)
+    pass_checks = max(0, total_checks - err_count - (warn_count if args.strict else 0))
+    is_passed = (err_count == 0) and not (args.strict and warn_count > 0)
+
+    bayesian_ratio = (pass_checks + 0.5) / (total_checks + 1.0)
+    credible_contract_score = max(0.0, round((100.0 * bayesian_ratio) - (warn_count * 0.035) - (err_count * 5.0), 2))
+
+    report_data = {
+        "schema": "webgames-audit-report/v1",
+        "project": "WebGames",
+        "generatedAt": datetime.now(timezone.utc).isoformat(),
+        "status": "PASS" if is_passed else "FAIL",
+        "summary": {
+            "checks": total_checks,
+            "byStatus": {
+                "PASS": pass_checks,
+                "FAIL": err_count,
+            },
+            "bySeverity": {
+                "warning": warn_count,
+                "error": err_count,
+            },
+            "tables": {
+                "total": total_tables,
+                "required": required_count,
+                "passed": total_tables - len(invalid_tables),
+            },
+            "architecture": {
+                "evaluated": bool(args.arch),
+                "totalChecks": arch_checks_count,
+                "passChecks": sum(1 for r in arch_results if r.get("passed")) if args.arch else 0,
+            },
+            "bayesianConfidence": {
+                "prior": "Jeffreys Beta(0.5, 0.5)",
+                "posteriorMean": round(bayesian_ratio, 6),
+                "credibleScore": credible_contract_score,
+            },
+        },
+        "violations": all_violations,
+        "warnings": warnings,
+    }
+
+    report_dest = Path(args.report) if args.report else (ROOT / "reports" / "audit-latest.json")
+    try:
+        report_dest.parent.mkdir(parents=True, exist_ok=True)
+        report_dest.write_text(json.dumps(report_data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    except OSError as oe:
+        print(f"  ⚠ 报告落盘失败 ({report_dest}): {oe}")
+
+    summary_tag = f"【audit-config】配置表: {total_tables} 张 / 必需表: {required_count} 张"
+    if args.arch:
+        summary_tag += f" / 架构断言: {arch_checks_count} 项"
+    print(summary_tag)
     for w in warnings:
         print(f"  ⚠ {w}")
-    if violations or (args.strict and warnings):
+    if all_violations or (args.strict and warnings):
         print("【audit-config】违规项:")
-        for v in violations:
+        for v in all_violations:
             print(f"  ✗ {v}")
         print("【审查结论】未通过")
         return 1

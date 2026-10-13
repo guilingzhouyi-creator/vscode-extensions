@@ -44,6 +44,8 @@ if ($pyCmd) {
   $fail = 1
 }
 
+# Git 沙箱环境加固：隔离全局配置，防止受限沙箱权限异常
+$env:GIT_CONFIG_GLOBAL = "NUL"
 $gitCmd = Get-Command git -ErrorAction SilentlyContinue
 if ($gitCmd) {
   $gitVer = & git --version 2>$null

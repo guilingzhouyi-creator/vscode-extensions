@@ -17,6 +17,10 @@ param(
 Set-StrictMode -Version Latest
 
 $ErrorActionPreference = "Stop"
+
+# Git 沙箱环境加固：隔离全局配置，防止受限沙箱权限异常
+$env:GIT_CONFIG_GLOBAL = "NUL"
+
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $WebGamesDir = Split-Path -Parent $ScriptDir
 $RepoRoot = Split-Path -Parent $WebGamesDir

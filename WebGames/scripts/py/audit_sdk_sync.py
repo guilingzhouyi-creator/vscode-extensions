@@ -33,6 +33,11 @@ from sync_mod_sdk import (
 )
 
 
+SEVERITY_ERROR = "error"
+RULE_STAT_ERROR = "SDK-STAT-ERROR"
+UTF8 = "utf-8"
+
+
 @dataclass
 class AuditFinding:
     rule_id: str
@@ -240,6 +245,58 @@ class ModSdkAuditor:
                     suggestion="确保文件内容为标准 JSON 格式",
                 ))
 
+    def _check_single_tool_file(self, tools_dir: Path, t_name: str, t_desc: str) -> None:
+        """审计单个核心开发工具脚本的存在性与非空断言。"""
+        t_path = tools_dir / t_name
+        rel_path = f"WebGames/mod_sdk/tools/{t_name}"
+
+        if not t_path.is_file():
+            self.findings.append(AuditFinding(
+                rule_id="SDK-TOOL-FILE-MISSING",
+                file_path=rel_path,
+                line=1,
+                severity=SEVERITY_ERROR,
+                message=f"缺少核心开发工具脚本: {t_name} ({t_desc})",
+                suggestion=f"请补齐 {rel_path} 工具脚本",
+            ))
+            return
+
+        try:
+            if t_path.stat().st_size == 0:
+                self.findings.append(AuditFinding(
+                    rule_id="SDK-TOOL-FILE-ZERO-BYTE",
+                    file_path=rel_path,
+                    line=1,
+                    severity=SEVERITY_ERROR,
+                    message=f"工具脚本体积为 0 字节空文件: {t_name}",
+                ))
+        except OSError as exc:
+            self.findings.append(AuditFinding(
+                rule_id=RULE_STAT_ERROR,
+                file_path=rel_path,
+                line=1,
+                severity=SEVERITY_ERROR,
+                message=f"无法读取工具脚本状态: {t_name} ({exc})",
+            ))
+
+    def _check_cli_subcommands(self, tools_dir: Path) -> None:
+        """针对统一 CLI 入口 kalar_mod.py 进行子命令完整性静态断言。"""
+        kalar_cli_path = tools_dir / "kalar_mod.py"
+        if not kalar_cli_path.is_file():
+            return
+        cli_text = kalar_cli_path.read_text(encoding=UTF8)
+        required_subcommands = ["init", "check", "cook", "preview", "play", "pack"]
+        for subcmd in required_subcommands:
+            if f'"{subcmd}"' not in cli_text and f"'{subcmd}'" not in cli_text:
+                self.findings.append(AuditFinding(
+                    rule_id="SDK-CLI-SUBCMD-MISSING",
+                    file_path="WebGames/mod_sdk/tools/kalar_mod.py",
+                    line=1,
+                    severity=SEVERITY_ERROR,
+                    message=f"统一 CLI 门面缺少必须的子命令支持: {subcmd}",
+                    suggestion=f"确保 kalar_mod.py 支持 {required_subcommands} 全部六大核心子命令",
+                ))
+
     def _check_tools_integrity(self) -> None:
         """审计 tools/ 目录及其统一 CLI 核心工具链的物理存在性与功能完备性。"""
         tools_dir = self.mod_sdk_dir / "tools"
@@ -250,7 +307,7 @@ class ModSdkAuditor:
                 rule_id="SDK-TOOLS-DIR-MISSING",
                 file_path=rel_dir,
                 line=1,
-                severity="error",
+                severity=SEVERITY_ERROR,
                 message="缺少开发工具目录 tools/",
                 suggestion="确保 mod_sdk/tools/ 目录存在",
             ))
@@ -266,53 +323,8 @@ class ModSdkAuditor:
         ]
 
         for t_name, t_desc in expected_tools:
-            t_path = tools_dir / t_name
-            rel_path = f"WebGames/mod_sdk/tools/{t_name}"
-
-            if not t_path.is_file():
-                self.findings.append(AuditFinding(
-                    rule_id="SDK-TOOL-FILE-MISSING",
-                    file_path=rel_path,
-                    line=1,
-                    severity="error",
-                    message=f"缺少核心开发工具脚本: {t_name} ({t_desc})",
-                    suggestion=f"请补齐 {rel_path} 工具脚本",
-                ))
-                continue
-
-            try:
-                if t_path.stat().st_size == 0:
-                    self.findings.append(AuditFinding(
-                        rule_id="SDK-TOOL-FILE-ZERO-BYTE",
-                        file_path=rel_path,
-                        line=1,
-                        severity="error",
-                        message=f"工具脚本体积为 0 字节空文件: {t_name}",
-                    ))
-            except OSError as exc:
-                self.findings.append(AuditFinding(
-                    rule_id="SDK-STAT-ERROR",
-                    file_path=rel_path,
-                    line=1,
-                    severity="error",
-                    message=f"无法读取工具脚本状态: {t_name} ({exc})",
-                ))
-
-        # 针对统一 CLI 入口 kalar_mod.py 进行子命令完整性静态断言
-        kalar_cli_path = tools_dir / "kalar_mod.py"
-        if kalar_cli_path.is_file():
-            cli_text = kalar_cli_path.read_text(encoding="utf-8")
-            required_subcommands = ["init", "check", "cook", "preview", "play", "pack"]
-            for subcmd in required_subcommands:
-                if f'"{subcmd}"' not in cli_text and f"'{subcmd}'" not in cli_text:
-                    self.findings.append(AuditFinding(
-                        rule_id="SDK-CLI-SUBCMD-MISSING",
-                        file_path="WebGames/mod_sdk/tools/kalar_mod.py",
-                        line=1,
-                        severity="error",
-                        message=f"统一 CLI 门面缺少必须的子命令支持: {subcmd}",
-                        suggestion=f"确保 kalar_mod.py 支持 {required_subcommands} 全部六大核心子命令",
-                    ))
+            self._check_single_tool_file(tools_dir, t_name, t_desc)
+        self._check_cli_subcommands(tools_dir)
 
     def _check_templates_and_examples(self) -> None:
         """审计 templates/ 与 examples/ 官方脚手架与实战样例目录完整性。"""
@@ -372,28 +384,31 @@ class ModSdkAuditor:
             ))
             return
 
-        # 1. supported_races
+    def _check_cap_races(self, data: Dict[str, Any], rel_path: str) -> None:
+        """校验 supported_races 列表与基础种族。"""
         races = data.get("supported_races")
         if not isinstance(races, list) or len(races) == 0:
             self.findings.append(AuditFinding(
                 rule_id="SDK-RACES-EMPTY",
                 file_path=rel_path,
                 line=1,
-                severity="error",
+                severity=SEVERITY_ERROR,
                 message="capabilities.json 缺少有效的 supported_races 列表",
                 suggestion="supported_races 必须为包含至少 1 个已启用种族的列表",
             ))
-        elif "HUMAN" not in races:
+            return
+        if "HUMAN" not in races:
             self.findings.append(AuditFinding(
                 rule_id="SDK-RACES-HUMAN-MISSING",
                 file_path=rel_path,
                 line=1,
-                severity="error",
+                severity=SEVERITY_ERROR,
                 message="supported_races 中缺少基础种族 HUMAN",
                 suggestion="确保 core.json 中的 HUMAN 处于启用状态",
             ))
 
-        # 2. valid_node_types
+    def _check_cap_node_types(self, data: Dict[str, Any], rel_path: str) -> None:
+        """校验 valid_node_types 是否包含四大标准拓扑节点。"""
         expected_node_types = {"START_ENTRY", "STANDARD_STEP", "BRANCH_CHOICE", "TERMINAL_EXIT"}
         node_types = set(data.get("valid_node_types", []))
         missing_nodes = expected_node_types - node_types
@@ -402,12 +417,13 @@ class ModSdkAuditor:
                 rule_id="SDK-NODE-TYPES-INCOMPLETE",
                 file_path=rel_path,
                 line=1,
-                severity="error",
+                severity=SEVERITY_ERROR,
                 message=f"valid_node_types 缺少必需节点类型: {sorted(list(missing_nodes))}",
                 suggestion="DAG 节点类型必须包含四类标准拓扑节点",
             ))
 
-        # 3. available_placeholders
+    def _check_cap_placeholders(self, data: Dict[str, Any], rel_path: str) -> None:
+        """校验 available_placeholders 核心占位符。"""
         expected_placeholders = {
             "{PLAYER_NAME}",
             "{RACE_ID}",
@@ -422,12 +438,13 @@ class ModSdkAuditor:
                 rule_id="SDK-PLACEHOLDER-MISSING",
                 file_path=rel_path,
                 line=1,
-                severity="error",
+                severity=SEVERITY_ERROR,
                 message=f"available_placeholders 缺少核心占位符: {sorted(list(missing_ph))}",
                 suggestion="必须补齐剧情与创角核心占位符字典",
             ))
 
-        # 4. valid_mutation_events
+    def _check_cap_mutations(self, data: Dict[str, Any], rel_path: str) -> None:
+        """校验 valid_mutation_events 状态突变事件。"""
         expected_mutations = {
             "CharacterCreated",
             "LocationAssigned",
@@ -442,21 +459,48 @@ class ModSdkAuditor:
                 rule_id="SDK-MUTATION-MISSING",
                 file_path=rel_path,
                 line=1,
-                severity="error",
+                severity=SEVERITY_ERROR,
                 message=f"valid_mutation_events 缺少核心状态突变事件: {sorted(list(missing_mut))}",
                 suggestion="确保包含 CharacterCreated, LocationAssigned 等五项标准突变事件",
             ))
 
-        # 5. destiny_mod_capabilities
+    def _check_cap_destiny(self, data: Dict[str, Any], rel_path: str) -> None:
+        """校验 destiny_mod_capabilities 命途契约能力描述。"""
         destiny_caps = data.get("destiny_mod_capabilities", {})
         if not isinstance(destiny_caps, dict) or not destiny_caps.get("attribute_keys"):
             self.findings.append(AuditFinding(
                 rule_id="SDK-DESTINY-CAPS-MISSING",
                 file_path=rel_path,
                 line=1,
-                severity="error",
+                severity=SEVERITY_ERROR,
                 message="capabilities.json 缺少有效的 destiny_mod_capabilities 命途契约能力描述",
             ))
+
+    def _check_capabilities_schema(self) -> None:
+        """审计 capabilities.json 的结构字段完整性与必要枚举语义。"""
+        cap_path = self.mod_sdk_dir / "capabilities.json"
+        rel_path = "WebGames/mod_sdk/capabilities.json"
+        if not cap_path.is_file():
+            return
+
+        try:
+            data = json.loads(cap_path.read_text(encoding=UTF8))
+        except Exception as exc:
+            self.findings.append(AuditFinding(
+                rule_id="SDK-JSON-INVALID",
+                file_path=rel_path,
+                line=1,
+                severity=SEVERITY_ERROR,
+                message=f"capabilities.json 解析 JSON 语法失败: {exc}",
+                suggestion="确保文件内容为合法 JSON 且无乱码",
+            ))
+            return
+
+        self._check_cap_races(data, rel_path)
+        self._check_cap_node_types(data, rel_path)
+        self._check_cap_placeholders(data, rel_path)
+        self._check_cap_mutations(data, rel_path)
+        self._check_cap_destiny(data, rel_path)
 
     def _check_spec_guidance_structure(self) -> None:
         """审计 MOD_SPEC.md 核心章节、动态标记与 Tier 分级指引完整度。"""

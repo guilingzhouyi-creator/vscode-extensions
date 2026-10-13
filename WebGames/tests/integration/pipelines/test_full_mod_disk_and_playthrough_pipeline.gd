@@ -4,7 +4,7 @@
 # 架构定位: Integration Test Suite / End-to-End Pipeline Harness
 # 跨域依赖: 上游: TestRegistry | 下游: ModPackageDiscoverySolver, WorldGatewayFSM, PrologueExecutionKernel, ModPrecheckAndAdaptationSolver, ProloguePlaceholderResolver | 配置: config/domains/*.json | 信号: 无直接监听
 # 职责说明: 全链路验证磁盘五件套模板聚合与双态Schema归一化、网关单机一键磁盘发现与挂载、悬空序章与套件跨表拦截、内联文本语法糖与双轨占位符水化、后端无头试玩推演与因果突变结算闭环、以及Python工具链同构等价性。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约 (Phase 116 阶段4)
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约 (全目录MOD磁盘发现与推演内核架构规范)
 # ==============================================================================
 
 class_name TestFullModDiskAndPlaythroughPipeline

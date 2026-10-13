@@ -11,6 +11,7 @@
 #   python scripts/py/audit_bounds.py
 #   python scripts/py/audit_bounds.py --json
 # ==============================================================================
+import argparse
 import re
 import sys
 from pathlib import Path
@@ -23,6 +24,18 @@ BACKEND = ROOT / "backend"
 
 DIV_RE = re.compile(r'(?<![/\w])/\s*([a-zA-Z0-9_]+(?:\.[a-zA-Z0-9_]+)?)')
 
+SAFE_CONSTS = ("2.0", "2", "10.0", "100.0", "60.0", "1000.0", "3600.0", "PI", "TAU", "1", "1.0", "3", "4", "5")
+DIV_GUARDS = ("max(", "maxi(", "maxf(", "clamp(", "clampf(")
+CURRENCY_KEYS = ("wallet.", "treasury_", "gold -=", "copper -=", "silver -=", "crystals -=", "points -=")
+VITAL_DOWN_KEYS = ("hp -=", "shield_hp -=", "durability_current -=", "stamina -=", "mana -=")
+VITAL_UP_KEYS = ("hp +=", "shield_hp +=", "durability_current +=", "stamina +=", "mana +=")
+CLAMP_DOWN_GUARDS = ("clamp(", "clampf(", "max(", "maxi(", "maxf(", "if ")
+CLAMP_UP_GUARDS = ("clamp(", "clampf(", "min(", "mini(", "minf(", "if ")
+PROBABILITY_KEYS = ("rate", "probability", "chance")
+BREAKTHROUGH_KEYS = ("berserk", "penetration", "breakthrough", "arbitrage", "overclock", "loss_ratio", "unassigned_potential")
+HEADER_SEPARATOR = "=" * 80
+
+
 def clean_line(line: str) -> str:
     """去除注释与字符串字面量，保留纯代码逻辑"""
     s = line.strip()
@@ -33,68 +46,101 @@ def clean_line(line: str) -> str:
     s = re.sub(r'\'[^\']*\'', '\'\'', s)
     return s
 
-import argparse
 
-def run_bounds_audit() -> int:
-    ap = argparse.ArgumentParser(description="上下界溢出与下界穿透全域深度审查与分析工具")
-    ap.add_argument("--strict", action="store_true", help="当存在高危上下界穿透风险时阻断退出")
-    args = ap.parse_args()
+def _check_div_zero(s: str, raw: str, rel: str, idx: int) -> list:
+    """检查真实除法分母安全。"""
+    cases = []
+    for m in DIV_RE.finditer(s):
+        denom = m.group(1)
+        if denom in SAFE_CONSTS:
+            continue
+        guards = (*DIV_GUARDS, f"if {denom}", f"{denom} > 0", f"{denom} != 0")
+        if not any(g in s for g in guards):
+            cases.append((rel, idx, denom, raw.strip()))
+    return cases
 
-    print("=" * 80)
-    print("🛡️ 卡拉尔世界引擎：全域上下界溢出、下界穿透与有意突破机制深度审查报告")
-    print("=" * 80)
 
-    div_zero_cases = []
-    currency_underflows = []
-    unclamped_vitals = []
-    probability_risks = []
-    intentional_breakthroughs = []
+def _check_currency_underflow(s: str, raw: str, rel: str, idx: int) -> list:
+    """检查货币与资产下界扣减。"""
+    if "-=" in s and any(k in s for k in CURRENCY_KEYS):
+        return [(rel, idx, raw.strip())]
+    return []
 
-    for gd_file in sorted(BACKEND.rglob("*.gd")):
-        rel = str(gd_file.relative_to(ROOT)).replace("\\", "/")
-        raw_lines = gd_file.read_text(encoding="utf-8").splitlines()
-        
-        for idx, raw in enumerate(raw_lines, 1):
-            s = clean_line(raw)
-            if not s:
-                continue
 
-            # 1. 真实除法分母安全检查
-            for m in DIV_RE.finditer(s):
-                denom = m.group(1)
-                # 排除标准常量或已受 max/clamp/if 保护的分母
-                safe_consts = ("2.0", "2", "10.0", "100.0", "60.0", "1000.0", "3600.0", "PI", "TAU", "1", "1.0", "3", "4", "5")
-                if denom not in safe_consts:
-                    if not any(g in s for g in ("max(", "maxi(", "maxf(", "clamp(", "clampf(", f"if {denom}", f"{denom} > 0", f"{denom} != 0")):
-                        div_zero_cases.append((rel, idx, denom, raw.strip()))
+def _check_unclamped_vitals(s: str, raw: str, rel: str, idx: int) -> list:
+    """检查生命、护盾、耐久、体力未做上下界钳制。"""
+    vitals = []
+    if any(k in s for k in VITAL_DOWN_KEYS) and not any(g in s for g in CLAMP_DOWN_GUARDS):
+        vitals.append((rel, idx, "下界穿透风险", raw.strip()))
+    if any(k in s for k in VITAL_UP_KEYS) and not any(g in s for g in CLAMP_UP_GUARDS):
+        vitals.append((rel, idx, "超上限溢出风险", raw.strip()))
+    return vitals
 
-            # 2. 货币与资产下界扣减检查
-            if any(k in s for k in ("wallet.", "treasury_", "gold -=", "copper -=", "silver -=", "crystals -=", "points -=")):
-                if "-=" in s:
-                    # 检查是否有前置余额断言或扣减守卫
-                    currency_underflows.append((rel, idx, raw.strip()))
 
-            # 3. 生命、护盾、耐久、体力未做下界 max(0) 或上界 min(max) 钳制
-            if any(k in s for k in ("hp -=", "shield_hp -=", "durability_current -=", "stamina -=", "mana -=")):
-                if not any(g in s for g in ("clamp(", "clampf(", "max(", "maxi(", "maxf(", "if ")):
-                    unclamped_vitals.append((rel, idx, "下界穿透风险", raw.strip()))
-                    
-            if any(k in s for k in ("hp +=", "shield_hp +=", "durability_current +=", "stamina +=", "mana +=")):
-                if not any(g in s for g in ("clamp(", "clampf(", "min(", "mini(", "minf(", "if ")):
-                    unclamped_vitals.append((rel, idx, "超上限溢出风险", raw.strip()))
+def _is_unclamped_prob_calc(s: str) -> bool:
+    """判断是否为未受保护的概率赋值计算。"""
+    if "=" not in s or s.startswith("const") or "get_float" in s or "return" in s:
+        return False
+    return not any(g in s for g in ("clamp(", "clampf(", "min(", "max("))
 
-            # 4. 概率计算未做 clamp [0.0, 1.0]
-            if any(k in s for k in ("rate", "probability", "chance")) and any(op in s for op in ("*", "+", "-")):
-                if "=" in s and not s.startswith("const") and "get_float" not in s and "return" not in s:
-                    if not any(g in s for g in ("clamp(", "clampf(", "min(", "max(")):
-                        probability_risks.append((rel, idx, raw.strip()))
 
-            # 5. 有意而为之的突破/破阶机制 (Intentional Breakthrough Mechanics)
-            if any(k in raw.lower() for k in ("berserk", "penetration", "breakthrough", "arbitrage", "overclock", "loss_ratio", "unassigned_potential")):
-                if any(k in raw for k in ("func ", "class_name ", "enum ", "const ")) or "is_berserk" in raw or "arbitrage" in raw:
-                    intentional_breakthroughs.append((rel, idx, raw.strip()))
+def _check_probability_risks(s: str, raw: str, rel: str, idx: int) -> list:
+    """检查概率计算未做 clamp [0.0, 1.0]。"""
+    if not any(k in s for k in PROBABILITY_KEYS):
+        return []
+    if not any(op in s for op in ("*", "+", "-")):
+        return []
+    if _is_unclamped_prob_calc(s):
+        return [(rel, idx, raw.strip())]
+    return []
 
-    # 输出结构化审查结果
+
+def _check_intentional_breakthroughs(raw: str, rel: str, idx: int) -> list:
+    """识别有意而为之的突破/破阶机制。"""
+    if any(k in raw.lower() for k in BREAKTHROUGH_KEYS):
+        if any(k in raw for k in ("func ", "class_name ", "enum ", "const ")) or "is_berserk" in raw or "arbitrage" in raw:
+            return [(rel, idx, raw.strip())]
+    return []
+
+
+def _scan_file_bounds(gd_file: Path) -> dict:
+    """扫描单个 GDScript 文件中的各类数值边界情况。"""
+    rel = str(gd_file.relative_to(ROOT)).replace("\\", "/")
+    raw_lines = gd_file.read_text(encoding="utf-8").splitlines()
+
+    file_div_zero = []
+    file_currency = []
+    file_vitals = []
+    file_prob = []
+    file_breakthrough = []
+
+    for idx, raw in enumerate(raw_lines, 1):
+        s = clean_line(raw)
+        if not s:
+            continue
+        file_div_zero.extend(_check_div_zero(s, raw, rel, idx))
+        file_currency.extend(_check_currency_underflow(s, raw, rel, idx))
+        file_vitals.extend(_check_unclamped_vitals(s, raw, rel, idx))
+        file_prob.extend(_check_probability_risks(s, raw, rel, idx))
+        file_breakthrough.extend(_check_intentional_breakthroughs(raw, rel, idx))
+
+    return {
+        "div_zero": file_div_zero,
+        "currency": file_currency,
+        "vitals": file_vitals,
+        "prob": file_prob,
+        "breakthrough": file_breakthrough,
+    }
+
+
+def _print_bounds_report(results: dict) -> None:
+    """打印边界审查结构化报告。"""
+    currency_underflows = results["currency"]
+    unclamped_vitals = results["vitals"]
+    div_zero_cases = results["div_zero"]
+    probability_risks = results["prob"]
+    intentional_breakthroughs = results["breakthrough"]
+
     print(f"\n【一、 资产与数值扣减下界穿透检查】 (共 {len(currency_underflows)} 处):")
     for r, l, code in currency_underflows:
         print(f"  · [{r}:L{l}] ➔ `{code}`")
@@ -115,13 +161,37 @@ def run_bounds_audit() -> int:
     for r, l, code in intentional_breakthroughs[:12]:
         print(f"  · [{r}:L{l}] ➔ `{code}`")
 
-    print("\n" + "=" * 80)
-    total_risks = len(currency_underflows) + len(unclamped_vitals) + len(div_zero_cases) + len(probability_risks)
+
+def run_bounds_audit() -> int:
+    ap = argparse.ArgumentParser(description="上下界溢出与下界穿透全域深度审查与分析工具")
+    ap.add_argument("--strict", action="store_true", help="当存在高危上下界穿透风险时阻断退出")
+    args = ap.parse_args()
+
+    print(HEADER_SEPARATOR)
+    print("🛡️ 卡拉尔世界引擎：全域上下界溢出、下界穿透与有意突破机制深度审查报告")
+    print(HEADER_SEPARATOR)
+
+    aggregated = {"div_zero": [], "currency": [], "vitals": [], "prob": [], "breakthrough": []}
+    for gd_file in sorted(BACKEND.rglob("*.gd")):
+        res = _scan_file_bounds(gd_file)
+        for k in aggregated:
+            aggregated[k].extend(res[k])
+
+    _print_bounds_report(aggregated)
+
+    print("\n" + HEADER_SEPARATOR)
+    total_risks = (
+        len(aggregated["currency"])
+        + len(aggregated["vitals"])
+        + len(aggregated["div_zero"])
+        + len(aggregated["prob"])
+    )
     if args.strict and total_risks > 0:
         print("【审查结论】--strict 模式未通过（存在数值上下界穿透或除零风险）")
         return 1
     print("【审查结论】通过（数值边界合规）")
     return 0
+
 
 if __name__ == "__main__":
     sys.exit(run_bounds_audit())

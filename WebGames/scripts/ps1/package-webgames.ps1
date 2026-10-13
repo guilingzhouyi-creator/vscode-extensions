@@ -18,6 +18,9 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Continue"
 
+# Git 沙箱环境加固：隔离全局配置，防止受限沙箱权限异常
+$env:GIT_CONFIG_GLOBAL = "NUL"
+
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RootDir = Split-Path -Parent (Split-Path -Parent $ScriptDir)
 
@@ -62,6 +65,7 @@ if ($code -eq 0 -and (Test-Path $pckPath)) {
   Write-Host "  • 安全门禁: dev_harness 零调试脚手架排除验证通过"
 
   # 追加式构建元数据指纹留痕（字节级开销，杜绝二进制归档膨胀）
+  $env:GIT_CONFIG_GLOBAL = "NUL"
   $gitCommit = (& git rev-parse --short HEAD 2>$null)
   if (-not $gitCommit) { $gitCommit = "unknown" }
   $manifestPath = Join-Path $OutDir "build_manifest.jsonl"

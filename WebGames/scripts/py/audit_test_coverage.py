@@ -30,14 +30,20 @@ IDENT_RE = re.compile(r"\b[A-Z][A-Za-z0-9_]{2,}\b")
 PRELOAD_DOMAIN_RE = re.compile(r"res://backend/domains/([a-zA-Z0-9_]+)/")
 
 
+UTF8 = "utf-8"
+GD_GLOB = "*.gd"
+TEST_GD_GLOB = "test_*.gd"
+ROOT_DOMAIN = "(root)"
+
+
 def build_class_index() -> dict[str, str]:
     """class_name → 所属域目录名（相对 domains/ 的第一层目录）。"""
     index: dict[str, str] = {}
-    for f in DOMAINS_DIR.rglob("*.gd"):
+    for f in DOMAINS_DIR.rglob(GD_GLOB):
         rel = f.relative_to(DOMAINS_DIR)
-        domain = rel.parts[0] if len(rel.parts) > 1 else "(root)"
+        domain = rel.parts[0] if len(rel.parts) > 1 else ROOT_DOMAIN
         try:
-            text = f.read_text(encoding="utf-8")
+            text = f.read_text(encoding=UTF8)
         except UnicodeDecodeError:
             continue
         for m in CLASS_NAME_RE.finditer(text):
@@ -45,30 +51,63 @@ def build_class_index() -> dict[str, str]:
     return index
 
 
-def main() -> int:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--strict", action="store_true", help="存在未覆盖域即返回 1")
-    args = ap.parse_args()
+def _scan_single_test_file(
+    tf: Path,
+    class_index: dict[str, str],
+    domain_set: set[str],
+    coverage: dict[str, set[str]],
+    seen_idents: set[str],
+    seen_domains: set[str],
+) -> None:
+    """扫描单个测试文件引用的 class 与 preload 领域。"""
+    try:
+        text = tf.read_text(encoding=UTF8)
+    except UnicodeDecodeError:
+        return
 
-    domains = sorted(d.name for d in DOMAINS_DIR.iterdir() if d.is_dir())
-    test_files = sorted(TESTS_DIR.rglob("test_*.gd"))
-    class_index = build_class_index()
-
-    coverage: dict[str, set[str]] = {}
-    for tf in test_files:
-        try:
-            text = tf.read_text(encoding="utf-8")
-        except UnicodeDecodeError:
+    seen_idents.clear()
+    for m in IDENT_RE.finditer(text):
+        ident = m.group(0)
+        if ident in seen_idents:
             continue
-        for ident in set(IDENT_RE.findall(text)):
-            domain = class_index.get(ident)
-            if domain:
-                coverage.setdefault(domain, set()).add(tf.name)
-        for dom in set(PRELOAD_DOMAIN_RE.findall(text)):
-            if dom in domains:
-                coverage.setdefault(dom, set()).add(tf.name)
+        seen_idents.add(ident)
+        domain = class_index.get(ident)
+        if domain:
+            coverage.setdefault(domain, set()).add(tf.name)
 
-    uncovered = [d for d in domains if d not in coverage]
+    seen_domains.clear()
+    for m in PRELOAD_DOMAIN_RE.finditer(text):
+        dom = m.group(1)
+        if dom in seen_domains:
+            continue
+        seen_domains.add(dom)
+        if dom in domain_set:
+            coverage.setdefault(dom, set()).add(tf.name)
+
+
+def calculate_domain_coverage(
+    test_files: list[Path],
+    class_index: dict[str, str],
+    domains: list[str],
+) -> dict[str, set[str]]:
+    """统计测试文件对领域目录的覆盖映射。"""
+    coverage: dict[str, set[str]] = {}
+    domain_set = set(domains)
+    seen_idents: set[str] = set()
+    seen_domains: set[str] = set()
+    for tf in test_files:
+        _scan_single_test_file(tf, class_index, domain_set, coverage, seen_idents, seen_domains)
+    return coverage
+
+
+def print_coverage_report(
+    domains: list[str],
+    test_files: list[Path],
+    class_index: dict[str, str],
+    coverage: dict[str, set[str]],
+    uncovered: list[str],
+) -> None:
+    """打印领域覆盖率统计与映射清单。"""
     print(f"【audit-test-coverage】域总数 {len(domains)} / 测试文件 {len(test_files)} / "
           f"class 索引 {len(class_index)} / 已覆盖域 {len(coverage)}")
     print("【audit-test-coverage】覆盖映射（域 → 测试文件）:")
@@ -79,6 +118,21 @@ def main() -> int:
     print(f"【audit-test-coverage】未覆盖域: {len(uncovered)} 个")
     for d in uncovered:
         print(f"  · {d}")
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--strict", action="store_true", help="存在未覆盖域即返回 1")
+    args = ap.parse_args()
+
+    domains = sorted(d.name for d in DOMAINS_DIR.iterdir() if d.is_dir())
+    test_files = sorted(TESTS_DIR.rglob(TEST_GD_GLOB))
+    class_index = build_class_index()
+
+    coverage = calculate_domain_coverage(test_files, class_index, domains)
+    uncovered = [d for d in domains if d not in coverage]
+
+    print_coverage_report(domains, test_files, class_index, coverage, uncovered)
     if args.strict and uncovered:
         print("【审查结论】--strict 模式未通过")
         return 1

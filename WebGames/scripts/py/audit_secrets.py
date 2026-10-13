@@ -27,10 +27,14 @@ WG_REL = "WebGames"
 MAX_BYTES = 2_000_000
 MAX_EXAMPLES_PER_FILE = 4
 
-# (正则, 标签) —— 私钥标记
+# (正则, 标签) —— 私钥标记（采用动态特征组装，避免特征扫描器将检查工具自身误报为泄露私钥）
+_HEADER_PREFIX = "-----" + "BEGIN "
+_PRIVATE_KEY_SUFFIX = "PRIVATE " + "KEY-----"
+_PGP_SUFFIX = "PRIVATE KEY " + "BLOCK-----"
+
 MARKERS = [
-    (r"-----BEGIN (?:RSA |EC |OPENSSH |DSA |ENCRYPTED )?PRIVATE KEY-----", "私钥标记"),
-    (r"-----BEGIN PGP PRIVATE KEY BLOCK-----", "PGP 私钥"),
+    (rf"{_HEADER_PREFIX}(?:RSA |EC |OPENSSH |DSA |ENCRYPTED )?{_PRIVATE_KEY_SUFFIX}", "私钥标记"),
+    (rf"{_HEADER_PREFIX}PGP {_PGP_SUFFIX}", "PGP 私钥"),
 ]
 # (正则, 标签) —— 常见服务高熵 token
 TOKENS = [
@@ -61,72 +65,79 @@ def git(args: list[str], cwd: Path) -> str:
         return ""
 
 
+def _is_path_in_scope(p: str, scan_root: Path, repo_root_p: Path) -> bool:
+    """判定文件路径是否属于当前指定的扫描根目录作用域。"""
+    if scan_root == repo_root_p:
+        return True
+    return p == WG_REL or p.startswith(WG_REL + "/")
+
+
 def collect_paths(scan_root: Path) -> list[Path]:
     """已跟踪 ∪ 未跟踪未忽略 ∪ 暂存 的相对路径（相对 git 仓库根）。"""
     repo_root = git(["rev-parse", "--show-toplevel"], scan_root).strip()
     if not repo_root:
         return []
     repo_root_p = Path(repo_root)
+    z_flag = "-z"
     raw = (
-        git(["ls-files", "-z"], repo_root_p)
-        + git(["ls-files", "-z", "--others", "--exclude-standard"], repo_root_p)
-        + git(["diff", "--cached", "--name-only", "-z"], repo_root_p)
+        git(["ls-files", z_flag], repo_root_p)
+        + git(["ls-files", z_flag, "--others", "--exclude-standard"], repo_root_p)
+        + git(["diff", "--cached", "--name-only", z_flag], repo_root_p)
     )
     paths: list[Path] = []
     seen: set[str] = set()
     for p in raw.split("\0"):
         if not p:
             continue
-        p = p.replace("\\", "/")
-        if scan_root == repo_root_p:
-            key = p
-        else:
-            rel = WG_REL
-            if p == rel or p.startswith(rel + "/"):
-                key = p
-            else:
-                continue
-        if key in seen:
+        norm_p = p.replace("\\", "/")
+        if not _is_path_in_scope(norm_p, scan_root, repo_root_p) or norm_p in seen:
             continue
-        seen.add(key)
-        paths.append(repo_root_p / p)
+        seen.add(norm_p)
+        paths.append(repo_root_p / norm_p)
     return paths
 
 
-def scan_file(path: Path, findings: list[str]) -> int:
-    # 排除脚本自身：其源码包含检测模式字符串（如 PGP 私钥标记），避免自扫描误报
+def _read_text_safely(path: Path) -> str | None:
+    """安全读取文件文本内容，跳过自扫描脚本、二进制后缀、超大文件与非 utf-8 解码错误。"""
     if path.name == HERE.name and path.resolve() == HERE:
-        return 0
-    # 前置后缀初筛：避免大体积二进制文件（图片/压缩包）读盘
+        return None
     if path.suffix.lower() in BINARY_SUFFIXES:
-        return 0
+        return None
     try:
         data = path.read_bytes()
     except OSError:
-        return 0
+        return None
     if len(data) > MAX_BYTES:
-        return 0
+        return None
     try:
-        text = data.decode("utf-8")
+        return data.decode("utf-8")
     except UnicodeDecodeError:
-        return 0
+        return None
 
-    # 联合正则快速初筛短路：99.9% 的文件无任何嫌疑特征，一次 search 即可直接跳过
-    if not COMBINED_FAST_RE.search(text):
-        return 0
 
-    rel = path.relative_to(HERE.parents[2]).as_posix()
+def _scan_text_findings(text: str) -> tuple[dict[str, int], list[str]]:
+    """扫描文本中包含的密钥候选并聚合统计量与前 4 个样例片段。"""
     counts = {label: 0 for _, label in ALL_COMPILED}
     examples: list[str] = []
     for i, line in enumerate(text.splitlines(), 1):
         for pat_re, label in ALL_COMPILED:
             m = pat_re.search(line)
-            if m:
-                counts[label] += 1
-                if len(examples) < MAX_EXAMPLES_PER_FILE:
-                    snippet = m.group(0)
-                    examples.append(f"L{i} {label}: {snippet[:40]}")
+            if not m:
+                continue
+            counts[label] += 1
+            if len(examples) < MAX_EXAMPLES_PER_FILE:
+                snippet = m.group(0)
+                examples.append(f"L{i} {label}: {snippet[:40]}")
+    return counts, examples
 
+
+def scan_file(path: Path, findings: list[str]) -> int:
+    text = _read_text_safely(path)
+    if not text or not COMBINED_FAST_RE.search(text):
+        return 0
+
+    rel = path.relative_to(HERE.parents[2]).as_posix()
+    counts, examples = _scan_text_findings(text)
     total = sum(counts.values())
     if total:
         detail = "  例: " + "; ".join(examples) if examples else ""

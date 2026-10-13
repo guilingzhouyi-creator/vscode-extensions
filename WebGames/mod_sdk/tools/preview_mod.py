@@ -234,7 +234,14 @@ def _resolve_target_dag(
 
 
 def _build_simulation_graph(dag_data: dict[str, Any]) -> tuple[str | None, set[str], dict[str, list[str]]]:
-    """构建用于演习路径遍历的图结构。"""
+    """构建用于演习路径遍历的因果有向无环图 (DAG) 拓扑结构。
+
+    Args:
+        dag_data: 包含 nodes 与 edges 的字典数据结构。
+
+    Returns:
+        三元组: (起点节点ID, 终态退出节点集合, 邻接表映射)。
+    """
     nodes: dict[str, Any] = dag_data.get("nodes", {})
     edges: list[Any] = dag_data.get("edges", [])
 
@@ -269,7 +276,16 @@ def _find_all_paths(
     visited: set[str],
     all_paths: list[list[str]],
 ) -> None:
-    """深度优先搜索枚举所有从入口到终态的合规无环路径。"""
+    """深度优先搜索枚举所有从入口到终态的合规无环分支路径。
+
+    Args:
+        current: 当前遍历游标节点 ID。
+        terminals: 目标终态节点集合 (TERMINAL_EXIT)。
+        adj: 节点邻接表关系图。
+        path: 当前遍历路径栈帧。
+        visited: 已访问节点防成环集合。
+        all_paths: 完整导出路径归集容器。
+    """
     path.append(current)
     visited.add(current)
 
@@ -431,7 +447,19 @@ def _build_simulation_context(
     initial_gold: int,
     trait_summary: str,
 ) -> dict[str, Any]:
-    """生成演习用大小写双轨模拟角色上下文。"""
+    """生成演习用大小写双轨模拟角色上下文环境。
+
+    Args:
+        race_id: 玩家种族标识符 (如 ELF, HUMAN)。
+        player_name: 玩家角色命名。
+        selected_origin: 选定出身配置字典。
+        selected_kit: 选定行囊配置字典。
+        initial_gold: 初始金币量。
+        trait_summary: 特质组合摘要文本。
+
+    Returns:
+        包含全套双轨 (小写+大写) 占位符变量的水化上下文字典。
+    """
     oid = str(selected_origin.get("origin_id") or "IMPERIAL_NOBLE")
     oname = str(selected_origin.get("name") or oid)
     region = str(selected_origin.get("birth_region") or "CENTRAL_CONTINENT")
@@ -483,7 +511,18 @@ def simulate_mod(
     origin_id: str | None = None,
     as_json: bool = False,
 ) -> int:
-    """执行剧情模组无头分支演习。"""
+    """执行 MOD 全链路剧情与分支选项无头演习推演。
+
+    Args:
+        mod_dir: 模组工程根目录。
+        race_id: 参演角色种族。
+        player_name: 参演角色名称。
+        origin_id: 可选指定出身 ID。
+        as_json: 是否以结构化 JSON 格式输出结果。
+
+    Returns:
+        退出状态码: 0=推演成功, 1=推演失败或数据异常。
+    """
     manifest_data = _load_json_file(mod_dir / "pack.json")
     if not isinstance(manifest_data, dict):
         if as_json:
@@ -638,7 +677,17 @@ def preview_overview(
     origin_id: str | None = None,
     as_json: bool = False,
 ) -> int:
-    """输出 MOD 结构静态预览概览。"""
+    """提取并展示 MOD 资产、清单配置与四级路由概览。
+
+    Args:
+        mod_dir: 模组工程根目录。
+        race_id: 角色种族标识符 (默认 HUMAN)。
+        origin_id: 可选出身标识符。
+        as_json: 是否以结构化 JSON 格式导出摘要。
+
+    Returns:
+        退出状态码: 0=概览成功, 1=加载失败。
+    """
     manifest_data = _load_json_file(mod_dir / "pack.json")
     if not isinstance(manifest_data, dict):
         if as_json:

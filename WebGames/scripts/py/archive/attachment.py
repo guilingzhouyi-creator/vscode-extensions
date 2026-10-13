@@ -16,16 +16,37 @@
 import re
 from pathlib import Path
 
-from archive.constants import ANCHOR_CONVENTIONS, KALAR_DEV_PREFIX, build_att_header_template, resolve_responsible
+from archive.constants import ANCHOR_CONVENTIONS, AnchorConventions, KALAR_DEV_PREFIX, build_att_header_template, resolve_responsible
 from archive.keywords import extract_att_keywords
 from archive.metadata import minify_markdown_text, resolve_file_formation_date
+
+
+# 常量声明
+UTF8_ENCODING = "utf-8"
+NEWLINE_LF = "\n"
+
+
+def _extract_volume_goal_summary(stages: list[Path], clean_title: str) -> str:
+    """从案卷各阶段正文提取施工目标。"""
+    if not stages:
+        return f"完成 {clean_title} 四阶段架构施工与表现层闭环"
+    all_text = NEWLINE_LF.join([s.read_text(encoding=UTF8_ENCODING) for s in stages])
+    goals = re.findall(r"(?:【施工目标】|【核心职责】)[：:]\s*(.+?)(?:\n|>|$)", all_text)
+    if goals:
+        return "；".join(list(dict.fromkeys(goals))[:3])
+    return f"完成 {clean_title} 四阶段架构施工与表现层闭环"
+
+
+def _extract_volume_formation_date(stages: list[Path], today: str) -> str:
+    """解析案卷的最早形成日期。"""
+    stage_dates = [resolve_file_formation_date(s) for s in stages] if stages else []
+    return min(stage_dates) if stage_dates else today
 
 
 def generate_volume_attachment(dst_vol_dir: Path, st_id: str, vol_name: str, today: str, annual_year: str = "") -> Path:
     """生成案卷级第 5 份共享契约与全局上下文附件 (ATT)。annual_year 由归档日期推导注入。"""
     att_filename = f"{KALAR_DEV_PREFIX}-{st_id}-ATT_附件_案卷共享契约与上下文.md"
     att_path = dst_vol_dir / att_filename
-
     if att_path.exists():
         return att_path
 
@@ -33,20 +54,13 @@ def generate_volume_attachment(dst_vol_dir: Path, st_id: str, vol_name: str, tod
     clean_title = re.sub(r"^Phase_\d+_", "", vol_name).replace("_", " ")
     responsible = resolve_responsible(vol_name)
 
-    # 扫描本卷所有阶段正文提取施工目标与最早落盘形成日期
     stages = sorted([s for s in dst_vol_dir.glob("*.md") if "ATT" not in s.name and "阶段" in s.name])
-    all_text = "\n".join([s.read_text(encoding="utf-8") for s in stages]) if stages else ""
-    goals = re.findall(r"(?:【施工目标】|【核心职责】)[：:]\s*(.+?)(?:\n|>|$)", all_text)
-    goal_summary = "；".join(list(dict.fromkeys(goals))[:3]) if goals else f"完成 {clean_title} 四阶段架构施工与表现层闭环"
+    goal_summary = _extract_volume_goal_summary(stages, clean_title)
+    formation_date = _extract_volume_formation_date(stages, today)
 
-    stage_dates = [resolve_file_formation_date(s) for s in stages] if stages else []
-    formation_date = min(stage_dates) if stage_dates else today
-
-    # 动态根据本卷实际内容归纳特化主题词
     att_kws = extract_att_keywords(dst_vol_dir, vol_name, st_id)
     att_keywords_str = "; ".join(att_kws)
 
-    # 头块模板经 constants 配置单源构建（年度槽位动态注入，严禁字面年份）
     att_header = build_att_header_template(annual_year).format(
         archive_code=f"{KALAR_DEV_PREFIX}-{st_id}-ATT",
         st_id=st_id,
@@ -103,7 +117,7 @@ flowchart LR
 2. **零硬编码契约**：所有数值、枚举、文本、阈值全部收敛至 `config/` 对应数据表；
 3. **数据隔离边界**：状态聚合根由专属领域服务托管，跨域交互经 EventBus 广播解耦。
 """
-    att_path.write_text(minify_markdown_text(att_header + att_body), encoding="utf-8", newline="\n")
+    att_path.write_text(minify_markdown_text(att_header + att_body), encoding=UTF8_ENCODING, newline="\n")
     return att_path
 
 
@@ -123,6 +137,55 @@ def inject_att_pointer(content: str, att_name: str) -> tuple[str, bool]:
     return content, False
 
 
+def _build_nav_items(current_name: str, att_name: str, stages: list[Path]) -> list[str]:
+    """构建当前文档对应的导航项列表。"""
+    nav_items: list[str] = []
+    if att_name:
+        if current_name == att_name:
+            nav_items.append("**ATT 共享附件 (当前)**")
+        else:
+            nav_items.append(f"[ATT 共享附件]({att_name})")
+
+    for sf in stages:
+        m = re.search(r"阶段(\d)", sf.name)
+        s_num = m.group(1) if m else "?"
+        if current_name == sf.name:
+            nav_items.append(f"**阶段{s_num} (当前)**")
+        else:
+            nav_items.append(f"[阶段{s_num}]({sf.name})")
+    return nav_items
+
+
+def _insert_navbar_after_note(content: str, note_anchor: str, navbar_line: str) -> str:
+    """在 Note 块结束位置插入导航条。"""
+    lines = content.split("\n")
+    new_lines = []
+    in_note = False
+    inserted = False
+    for ln in lines:
+        new_lines.append(ln)
+        if ln.startswith(note_anchor):
+            in_note = True
+        elif in_note and not ln.startswith(">"):
+            in_note = False
+            if not inserted:
+                new_lines.insert(len(new_lines) - 1, navbar_line)
+                inserted = True
+    if not inserted:
+        new_lines.append(navbar_line)
+    return "\n".join(new_lines)
+
+
+def _apply_navbar_to_content(content: str, conv: AnchorConventions, navbar_line: str) -> str:
+    """将导航条注入或替换到内容中。"""
+    navbar_re = re.compile(r"(?m)^\s*" + re.escape(conv.navbar_marker) + r"[^\r\n]*")
+    if navbar_re.search(content):
+        return navbar_re.sub(navbar_line, content)
+    if conv.navbar_note_anchor in content:
+        return _insert_navbar_after_note(content, conv.navbar_note_anchor, navbar_line)
+    return re.sub(conv.navbar_fallback_h1, r"\1\n" + navbar_line + "\n", content, count=1)
+
+
 def inject_volume_navbars(vol_dir: Path, st_id: str) -> None:
     """自动为案卷内的 5 份文档（ATT + 4阶段）注入卷内直达导航浮标（锚点经 AnchorConventions 单源声明）"""
     conv = ANCHOR_CONVENTIONS
@@ -132,45 +195,8 @@ def inject_volume_navbars(vol_dir: Path, st_id: str) -> None:
     all_files = (att_files if att_files else []) + stages
 
     for f in all_files:
-        content = f.read_text(encoding="utf-8")
-        nav_items = []
-        if att_name:
-            if f.name == att_name:
-                nav_items.append("**ATT 共享附件 (当前)**")
-            else:
-                nav_items.append(f"[ATT 共享附件]({att_name})")
-
-        for sf in stages:
-            m = re.search(r"阶段(\d)", sf.name)
-            s_num = m.group(1) if m else "?"
-            if f.name == sf.name:
-                nav_items.append(f"**阶段{s_num} (当前)**")
-            else:
-                nav_items.append(f"[阶段{s_num}]({sf.name})")
-
+        content = f.read_text(encoding=UTF8_ENCODING)
+        nav_items = _build_nav_items(f.name, att_name, stages)
         navbar_line = conv.navbar_marker + " ｜ ".join(nav_items)
-
-        navbar_re = re.compile(r"(?m)^\s*" + re.escape(conv.navbar_marker) + r"[^\r\n]*")
-        if navbar_re.search(content):
-            content = navbar_re.sub(navbar_line, content)
-        elif conv.navbar_note_anchor in content:
-            lines = content.split("\n")
-            new_lines = []
-            in_note = False
-            inserted = False
-            for ln in lines:
-                new_lines.append(ln)
-                if ln.startswith(conv.navbar_note_anchor):
-                    in_note = True
-                elif in_note and not ln.startswith(">"):
-                    in_note = False
-                    if not inserted:
-                        new_lines.insert(len(new_lines) - 1, navbar_line)
-                        inserted = True
-            if not inserted:
-                new_lines.append(navbar_line)
-            content = "\n".join(new_lines)
-        else:
-            content = re.sub(conv.navbar_fallback_h1, r"\1\n" + navbar_line + "\n", content, count=1)
-
-        f.write_text(minify_markdown_text(content), encoding="utf-8", newline="\n")
+        new_content = _apply_navbar_to_content(content, conv, navbar_line)
+        f.write_text(minify_markdown_text(new_content), encoding=UTF8_ENCODING, newline="\n")

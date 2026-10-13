@@ -4,7 +4,7 @@
 # 架构定位: Integration Test Suite / End-to-End Pipeline Harness
 # 跨域依赖: 上游: TestRegistry | 下游: AgentPlaythroughSession, CompanionObserverBus, CompanionBlackboxRecorder, ModWorkbenchView | 配置: config/domains/*.json | 信号: CompanionObserverBus
 # 职责说明: 全链路验证长程交互式Agent推演会话生命周期、单步分支选择与突变结算、决策快照回滚与状态恢复、非侵入式伴侣观察总线广播与有界队列、现场黑匣子诊断转储及前端工坊轻量占位契约。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约 (Phase 117 阶段4)
+# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约 (智能体试玩会话与伴侣观察总线架构规范)
 # ==============================================================================
 
 class_name TestAgentInteractiveSessionAndCompanionPipeline

@@ -14,8 +14,23 @@
 # ==============================================================================
 """MOD SDK 权威真源静态萃取与契约同步引擎。
 
-从引擎配置单一真源提取受支持种族、DAG 节点类型、文本占位符及状态突变事件，
-并同步生成 mod_sdk/capabilities.json 与更新 mod_sdk/MOD_SPEC.md。
+架构定位与职责说明：
+- 从引擎配置单一真源 (config/domains/ 及 config/narratives/) 自动化静态萃取能力清单；
+- 同步生成 mod_sdk/capabilities.json 与更新 mod_sdk/MOD_SPEC.md 动态能力章节；
+- 提供 --check-only 命令行门禁守卫，拦截任何数据契约漂移；
+- 遵循零瞬态堆分配与单源收口公理，保证引擎运行时与模组开发契约 100% 绝对一致。
+
+五阶段同步状态机 (Synchronization Pipeline State Machine):
+  Phase 1 [Discovery]: 定位 WebGames 根目录并加载核心领域配置 JSON；
+  Phase 2 [Extraction]: AST/JSON 符号深度遍历提取受支持种族、DAG 标识符、占位符及状态突变事件；
+  Phase 3 [Compilation]: 汇总命途扩展能力契约、数值边界与 UI 受控策略；
+  Phase 4 [Generation]: 渲染规整能力清单 capabilities.json 与 MOD_SPEC.md Markdown 文档；
+  Phase 5 [Verification/Sync]: 对比磁盘文件判定契约漂移，或原子回写磁盘并保持 LF 换行。
+
+设计依据与不变式契约：
+- 单一事实源 (SSOT)：capabilities.json 必须完全由源码与配置导出，禁止人工维护分叉副本；
+- 零破坏性原则：MOD_SPEC.md 的静态规范手工撰写区段必须严格保持不变，仅动态标记区受控刷新；
+- 双向等价断言：capabilities.json 格式化缩进使用 2 空格，末尾保留单个标准 LF 换行。
 """
 
 import argparse
@@ -133,6 +148,27 @@ SUPPORTED_ERROR_CODES: List[str] = [
 ]
 
 
+def _collect_dag_id_from_list(items: List[Any], found_ids: set[str]) -> None:
+    """从字典列表中提取包含 DAG_ 前缀的节点标识符。"""
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        did = item.get("dag_id") or item.get("id")
+        if isinstance(did, str) and did.startswith("DAG_"):
+            found_ids.add(did)
+
+
+def _collect_dag_id_from_value(value: Any, found_ids: set[str]) -> None:
+    """从字典或列表值中提取 DAG 标识符。"""
+    if isinstance(value, dict):
+        for sub_k in value.keys():
+            if isinstance(sub_k, str) and sub_k.startswith("DAG_"):
+                found_ids.add(sub_k)
+        return
+    if isinstance(value, list):
+        _collect_dag_id_from_list(value, found_ids)
+
+
 def _extract_builtin_dag_ids(config_dir: Path) -> List[str]:
     """从 config/narratives/prologue_dag_catalog.json 提取内置序章 DAG 标识符列表。"""
     dag_catalog_path = config_dir / "narratives" / "prologue_dag_catalog.json"
@@ -142,16 +178,8 @@ def _extract_builtin_dag_ids(config_dir: Path) -> List[str]:
         for k, v in dag_catalog_data.items():
             if isinstance(k, str) and k.startswith("DAG_"):
                 found_ids.add(k)
-            elif isinstance(v, dict):
-                for sub_k in v.keys():
-                    if isinstance(sub_k, str) and sub_k.startswith("DAG_"):
-                        found_ids.add(sub_k)
-            elif isinstance(v, list):
-                for item in v:
-                    if isinstance(item, dict):
-                        did = item.get("dag_id") or item.get("id")
-                        if isinstance(did, str) and did.startswith("DAG_"):
-                            found_ids.add(did)
+            else:
+                _collect_dag_id_from_value(v, found_ids)
     if not found_ids:
         return ["DAG_PROLOGUE_ELF_SANCTUARY", "DAG_PROLOGUE_HUMAN_CAPITAL"]
     return sorted(found_ids)
@@ -230,7 +258,16 @@ def extract_destiny_capabilities(config_dir: Path, core_data: Dict[str, Any]) ->
 
 
 def extract_capabilities(webgames_root: Path) -> Dict[str, Any]:
-    """静态提取引擎权威真源配置。"""
+    """执行核心能力静态萃取流水线。
+
+    业务逻辑与状态机时序：
+    1. 创角核心领域真源 (character_creation/core.json)：解析受支持种族枚举与六维属性初值；
+    2. 叙事与本地化配置 (narratives/prologue_i18n.json)：DFS 遍历占位符 token 并构建大小写双轨词典；
+    3. DAG 流程图元真源 (narratives/prologue_dag_catalog.json)：萃取合法节点类型与状态突变事件列表；
+    4. 命途扩展能力 (destiny/): 聚合身世背景、因果天赋等数值守恒预算与边界契约。
+
+    返回规整后的能力全集字典，保证字段命名与 mod_sdk/capabilities.json 架构契约 100% 对齐。
+    """
     config_dir = webgames_root / "config"
 
     # 1. 提取 character_creation core.json
@@ -823,7 +860,14 @@ def check_contract_drift(
     webgames_root: Path,
     capabilities: Dict[str, Any],
 ) -> Tuple[bool, List[str]]:
-    """比对磁盘既有文件与内存萃取结果，返回是否存在漂移及差异说明。"""
+    """比对磁盘既有文件与内存萃取结果，检测契约漂移。
+
+    判定规则与差分输出：
+    - 分别对 capabilities.json 与 MOD_SPEC.md 动态区间进行内存渲染；
+    - 使用 difflib 生成统一上下文 Diff 补丁（前 30 行明细）；
+    - 若两份文件均无漂移，返回 (True, [])；否则返回 (False, diff_messages)；
+    - 本函数供 --check-only 命令行门禁与 CI/预提交钩子直接消费。
+    """
     mod_sdk_dir = webgames_root / "mod_sdk"
     cap_path = mod_sdk_dir / "capabilities.json"
     spec_path = mod_sdk_dir / "MOD_SPEC.md"
@@ -869,7 +913,13 @@ def check_contract_drift(
 
 
 def sync_to_disk(webgames_root: Path, capabilities: Dict[str, Any]) -> None:
-    """将萃取的能力清单与文档写入磁盘（保证 LF 换行与 UTF-8 编码）。"""
+    """将萃取的能力清单与文档原子写入磁盘。
+
+    落盘规范与格式保证：
+    - capabilities.json：按键排序、2 空格缩进、末尾单个 LF、UTF-8 编码；
+    - MOD_SPEC.md：定位标记区间进行局部切片替换，保留手工撰写章节无损；
+    - 保证跨平台（Windows/Linux）一致的 LF 换行契约。
+    """
     mod_sdk_dir = webgames_root / "mod_sdk"
     mod_sdk_dir.mkdir(parents=True, exist_ok=True)
 

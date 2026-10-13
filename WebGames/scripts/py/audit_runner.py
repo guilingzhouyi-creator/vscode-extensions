@@ -52,6 +52,11 @@ C_BLUE = "\033[34m"
 C_CYAN = "\033[36m"
 C_GRAY = "\033[90m"
 
+# 常量定义
+SCOPE_DOCS = "docs"
+SCOPE_ALL = "all"
+ENCODING_UTF8 = "utf-8"
+
 
 @dataclass
 class AuditTask:
@@ -254,6 +259,57 @@ AUDIT_TASKS: List[AuditTask] = [
 ]
 
 
+def _classify_scripts_path(
+    base: str,
+    registered_by_name: dict[str, str],
+    engine_hits: set[str],
+) -> bool:
+    """分类 scripts 目录下的脚本变更，返回是否需回退全量门禁。"""
+    if base.endswith(".sh") or base.endswith(".ps1"):
+        engine_hits.add("pair_parity")
+        return False
+    if base.endswith(".py"):
+        tid = registered_by_name.get(base)
+        if tid:
+            engine_hits.add(tid)
+            return False
+        return True
+    return False
+
+
+def _classify_git_path_item(
+    path_str: str,
+    registered_by_name: dict[str, str],
+    scopes: set[str],
+    engine_hits: set[str],
+) -> bool:
+    """分析单个 git 路径并归类到 scopes/engine_hits，返回是否触发全量 scripts 回退。"""
+    if "WebGames/" in path_str:
+        path_str = path_str.split("WebGames/", 1)[1]
+
+    if path_str.endswith(".gd"):
+        scopes.add("gd")
+        if "tests/" in path_str:
+            scopes.add("test")
+        return False
+
+    if path_str.startswith("config/") or path_str.endswith(".json"):
+        scopes.add("config")
+        return False
+
+    if path_str.startswith("docs/") or path_str.endswith(".md"):
+        scopes.add("docs")
+        return False
+
+    if path_str.startswith("scripts/"):
+        scopes.add("scripts")
+        base = path_str.rsplit("/", 1)[-1]
+        return _classify_scripts_path(base, registered_by_name, engine_hits)
+
+    scopes.add("all")
+    return False
+
+
 def detect_git_changed_scope_tasks(root: Path) -> set[str]:
     """通过 git 状态分析返回 (scopes, engine_hits, scripts_need_full) 三要素。
 
@@ -272,48 +328,38 @@ def detect_git_changed_scope_tasks(root: Path) -> set[str]:
         )
         if r.returncode != 0:
             return {"all"}, set(), False
-        
+
         lines = r.stdout.strip().splitlines()
         if not lines:
-            # 无任何修改，默认跑轻量检查
             return {"gd", "config", "docs"}, set(), False
 
         for line in lines:
             parts = line.strip().split(maxsplit=1)
-            if len(parts) < 2:
-                continue
-            path_str = parts[1].replace("\\", "/")
-            if "WebGames/" in path_str:
-                path_str = path_str.split("WebGames/", 1)[1]
-
-            if path_str.endswith(".gd"):
-                scopes.add("gd")
-                if "tests/" in path_str:
-                    scopes.add("test")
-            elif path_str.startswith("config/") or path_str.endswith(".json"):
-                scopes.add("config")
-            elif path_str.startswith("docs/") or path_str.endswith(".md"):
-                scopes.add("docs")
-            elif path_str.startswith("scripts/"):
-                # scripts 域定向映射（替代全量回退）
-                scopes.add("scripts")
-                base = path_str.rsplit("/", 1)[-1]
-                if base.endswith(".sh") or base.endswith(".ps1"):
-                    engine_hits.add("pair_parity")
-                elif base.endswith(".py"):
-                    tid = registered_by_name.get(base)
-                    if tid:
-                        engine_hits.add(tid)
-                    else:
-                        # driver/共享底座/新增未注册引擎：核心变更 → 回退全量
-                        scripts_need_full = True
-                # scripts/js（.mjs）与 scripts/README.md（.md 已走上一分支）无引擎映射
-            else:
-                scopes.add("all")
+            if len(parts) >= 2:
+                path_str = parts[1].replace("\\", "/")
+                if _classify_git_path_item(path_str, registered_by_name, scopes, engine_hits):
+                    scripts_need_full = True
     except Exception:
         return {"all"}, set(), True
 
-    return (scopes if scopes else {"all"}), engine_hits, scripts_need_full
+    return (scopes if scopes else {SCOPE_ALL}), engine_hits, scripts_need_full
+
+
+def _find_orphan_engine_files(engine_files: set, registered: set) -> List[str]:
+    """检查未注册到 AUDIT_TASKS 的孤儿引擎文件。"""
+    return [
+        f"孤儿引擎文件未注册进 AUDIT_TASKS: scripts/py/{f}（新增门禁须先登记 task_id）"
+        for f in sorted(engine_files - registered)
+    ]
+
+
+def _find_missing_registered_files(registered: set) -> List[str]:
+    """检查 AUDIT_TASKS 中注册但在磁盘上缺失的文件。"""
+    return [
+        f"注册任务脚本文件缺失: {name}"
+        for name in sorted(registered)
+        if not (PY_SCRIPTS_DIR / name).exists()
+    ]
 
 
 def check_registry_completeness() -> List[str]:
@@ -328,17 +374,13 @@ def check_registry_completeness() -> List[str]:
         files = {f for f in os.listdir(PY_SCRIPTS_DIR) if f.endswith(".py")}
     except OSError as ex:
         return [f"无法扫描 scripts/py 目录: {ex}"]
+
     engine_files = {
         f for f in files
-        if f not in REGISTRY_EXEMPT
-        and f.startswith(ENGINE_PREFIXES)
+        if f not in REGISTRY_EXEMPT and f.startswith(ENGINE_PREFIXES)
     }
-    issues: List[str] = []
-    for f in sorted(engine_files - registered):
-        issues.append(f"孤儿引擎文件未注册进 AUDIT_TASKS: scripts/py/{f}（新增门禁须先登记 task_id）")
-    for name in sorted(registered):
-        if not (PY_SCRIPTS_DIR / name).exists():
-            issues.append(f"注册任务脚本文件缺失: {name}")
+    issues = _find_orphan_engine_files(engine_files, registered)
+    issues.extend(_find_missing_registered_files(registered))
     return issues
 
 
@@ -435,6 +477,29 @@ def _stable_fingerprint(content: str) -> str:
     return hashlib.sha256(content.encode("utf-8")).hexdigest()[:12]
 
 
+def _build_sarif_finding(task: AuditTask, level: str, text: str) -> dict:
+    """构建单个 SARIF finding 字典项。"""
+    region = _extract_region(text)
+    loc = {
+        "physicalLocation": {
+            "artifactLocation": {
+                "uri": region.get("artifactLocation", {}).get("uri", f"scripts/py/{task.script_name}")
+            }
+        }
+    }
+    if "startLine" in region:
+        loc["physicalLocation"]["region"] = {"startLine": region["startLine"]}
+    return {
+        "ruleId": task.task_id,
+        "level": level,
+        "message": {"text": text[:4000]},
+        "locations": [loc],
+        "partialFingerprints": {
+            "primaryLocationLineHash": _stable_fingerprint(f"{task.task_id}:{text[:200]}")
+        }
+    }
+
+
 def _generate_sarif(results: List[TaskResult]) -> dict:
     """将任务结果聚合为 OASIS SARIF 2.1.0 工业标准静态分析结果格式（含 region/指纹/调用元数据）。"""
     sarif_rules = []
@@ -455,49 +520,14 @@ def _generate_sarif(results: List[TaskResult]) -> dict:
     sarif_results = []
     for r in results:
         if r.returncode != 0:
-            msg = r.stderr.strip() if r.stderr.strip() else (r.stdout.strip() if r.stdout.strip() else f"Task {r.task.name} failed with returncode {r.returncode}")
-            region = _extract_region(msg)
-            loc = {
-                "physicalLocation": {
-                    "artifactLocation": {
-                        "uri": region.get("artifactLocation", {}).get("uri", f"scripts/py/{r.task.script_name}")
-                    }
-                }
-            }
-            if "startLine" in region:
-                loc["physicalLocation"]["region"] = {"startLine": region["startLine"]}
-            sarif_results.append({
-                "ruleId": r.task.task_id,
-                "level": "error",
-                "message": {"text": msg[:4000]},
-                "locations": [loc],
-                # 稳定指纹：按规则+脚本+首行定位跨 run 去重（GitHub code scanning 增量展示依赖）
-                "partialFingerprints": {
-                    "primaryLocationLineHash": _stable_fingerprint(f"{r.task.task_id}:{msg[:200]}")
-                }
-            })
+            err = r.stderr.strip()
+            out = r.stdout.strip()
+            msg = err if err else (out if out else f"Task {r.task.name} failed with returncode {r.returncode}")
+            sarif_results.append(_build_sarif_finding(r.task, "error", msg))
         else:
             w = _warning_slice(r.stderr)
             if w:
-                region = _extract_region(w)
-                loc = {
-                    "physicalLocation": {
-                        "artifactLocation": {
-                            "uri": region.get("artifactLocation", {}).get("uri", f"scripts/py/{r.task.script_name}")
-                        }
-                    }
-                }
-                if "startLine" in region:
-                    loc["physicalLocation"]["region"] = {"startLine": region["startLine"]}
-                sarif_results.append({
-                    "ruleId": r.task.task_id,
-                    "level": "warning",
-                    "message": {"text": w[:4000]},
-                    "locations": [loc],
-                    "partialFingerprints": {
-                        "primaryLocationLineHash": _stable_fingerprint(f"{r.task.task_id}:{w[:200]}")
-                    }
-                })
+                sarif_results.append(_build_sarif_finding(r.task, "warning", w))
 
     return {
         "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
@@ -521,7 +551,8 @@ def _generate_sarif(results: List[TaskResult]) -> dict:
     }
 
 
-def main() -> int:
+def _parse_and_validate_cli_args() -> tuple[argparse.Namespace, bool]:
+    """解析并校验命令行参数，支持输出格式简写与静默模式判定。"""
     parser = argparse.ArgumentParser(description="WebGames 全脚本库统一调度入口（audit/bench/archive 异步并行）")
     parser.add_argument("--version", action="version", version=f"%(prog)s {AUDIT_RUNNER_VERSION}")
     parser.add_argument("--diff", action="store_true", help="增量切片模式：仅扫描当前 Git 变更相关域")
@@ -539,192 +570,272 @@ def main() -> int:
     if args.json:
         args.format = "json"
     is_quiet_mode = args.format in ("json", "sarif")
+    return args, is_quiet_mode
 
-    # 确定 Python 解释器
-    py_exec = sys.executable or "python"
 
-    # 计算目标任务切片（优先级：--task > --group > --diff > --slice > 全量）
+def _resolve_task_combination(task_arg: str) -> tuple[List[AuditTask], int]:
+    """解析指定 task_id 组合列表。"""
+    wanted = [s.strip() for s in task_arg.split(",") if s.strip()]
+    by_id = {t.task_id: t for t in AUDIT_TASKS}
+    unknown = [w for w in wanted if w not in by_id]
+    if unknown:
+        print(f"未知任务 id: {unknown}\n可选任务: {', '.join(sorted(by_id))}")
+        return [], 2
+    return [by_id[w] for w in wanted], 0
+
+
+def _resolve_group_combination(group_arg: str) -> tuple[List[AuditTask], int]:
+    """解析指定 group 分组任务列表。"""
+    groups = {s.strip() for s in group_arg.split(",") if s.strip()}
+    valid = {"audit", "bench", "archive"}
+    bad = groups - valid
+    if bad:
+        print(f"未知分组: {sorted(bad)}（可选: audit/bench/archive）")
+        return [], 2
+    return [t for t in AUDIT_TASKS if t.group in groups], 0
+
+
+def _is_task_hit_by_diff(
+    t: AuditTask,
+    changed_scopes: set[str],
+    script_engine_hits: set[str],
+    scripts_need_full: bool,
+) -> bool:
+    """判定单个门禁任务是否被当前 git diff 变更命中。"""
+    if t.group != "audit":
+        return False
+    if scripts_need_full:
+        return True
+    if "all" in changed_scopes or "all" in t.scopes:
+        return True
+    if bool(t.scopes & changed_scopes):
+        return True
+    return t.task_id in script_engine_hits
+
+
+def _resolve_diff_combination() -> List[AuditTask]:
+    """基于当前 Git 变更范围解析命中的任务集合。"""
+    changed_scopes, script_engine_hits, scripts_need_full = detect_git_changed_scope_tasks(ROOT_DIR)
+    return [
+        t for t in AUDIT_TASKS
+        if _is_task_hit_by_diff(t, changed_scopes, script_engine_hits, scripts_need_full)
+    ]
+
+
+def _resolve_slice_combination(slice_arg: str) -> tuple[List[AuditTask], int]:
+    """基于子串大小写不敏感匹配切片任务。"""
+    needle = slice_arg.strip().lower()
+    if not needle:
+        print("--slice 不可为空字符串")
+        return [], 2
     tasks_to_run: List[AuditTask] = []
+    for t in AUDIT_TASKS:
+        if t.group != "audit":
+            continue
+        hay = " ".join([t.task_id.lower(), t.script_name.lower(), *[s.lower() for s in t.scopes]])
+        if needle in hay:
+            tasks_to_run.append(t)
+    if not tasks_to_run:
+        by_id = sorted(t.task_id for t in AUDIT_TASKS)
+        print(f"--slice 无命中: {slice_arg!r}\n可选任务: {', '.join(by_id)}")
+        return [], 2
+    return tasks_to_run, 0
+
+
+def _dispatch_target_task_resolution(args: argparse.Namespace) -> tuple[List[AuditTask], int]:
+    """分发解析特定参数维度的任务集合。"""
+    if args.task:
+        return _resolve_task_combination(args.task)
+    if args.group:
+        return _resolve_group_combination(args.group)
+    if args.diff:
+        return _resolve_diff_combination(), 0
+    if args.slice:
+        return _resolve_slice_combination(args.slice)
+    return [t for t in AUDIT_TASKS if t.group == "audit"], 0
+
+
+def _resolve_target_tasks(args: argparse.Namespace) -> tuple[List[AuditTask], int]:
+    """多策略解析目标任务列表并支持 baseline 动态覆盖。"""
     if args.slice and (args.task or args.group or args.diff):
         print("--slice 不可与 --task/--group/--diff 混用（切片只做减法，请单用）")
-        return 2
-    if args.task:
-        wanted = [s.strip() for s in args.task.split(",") if s.strip()]
-        by_id = {t.task_id: t for t in AUDIT_TASKS}
-        unknown = [w for w in wanted if w not in by_id]
-        if unknown:
-            print(f"未知任务 id: {unknown}\n可选任务: {', '.join(sorted(by_id))}")
-            return 2
-        tasks_to_run = [by_id[w] for w in wanted]
-    elif args.group:
-        groups = {s.strip() for s in args.group.split(",") if s.strip()}
-        valid = {"audit", "bench", "archive"}
-        bad = groups - valid
-        if bad:
-            print(f"未知分组: {sorted(bad)}（可选: audit/bench/archive）")
-            return 2
-        tasks_to_run = [t for t in AUDIT_TASKS if t.group in groups]
-    elif args.diff:
-        changed_scopes, script_engine_hits, scripts_need_full = detect_git_changed_scope_tasks(ROOT_DIR)
-        for t in AUDIT_TASKS:
-            if t.group == "audit" and ("all" in changed_scopes or "all" in t.scopes or bool(t.scopes & changed_scopes)):
-                tasks_to_run.append(t)
-        if scripts_need_full:
-            # 核心底座变更（driver/common/未知引擎）→ 全量 audit 保守兜底
-            for t in AUDIT_TASKS:
-                if t.group == "audit" and t not in tasks_to_run:
-                    tasks_to_run.append(t)
-        else:
-            # scripts 域引擎定向命中（sh/ps1→pair_parity、引擎 py→对应任务）
-            for t in AUDIT_TASKS:
-                if t.task_id in script_engine_hits and t not in tasks_to_run:
-                    tasks_to_run.append(t)
-    elif args.slice:
-        # Phase 58（切片减法语义）：子串大小写不敏感匹配 task_id / script_name / scopes
-        needle = args.slice.strip().lower()
-        if not needle:
-            print("--slice 不可为空字符串")
-            return 2
-        for t in AUDIT_TASKS:
-            if t.group != "audit":
-                continue
-            hay = " ".join([t.task_id.lower(), t.script_name.lower(), *[s.lower() for s in t.scopes]])
-            if needle in hay:
-                tasks_to_run.append(t)
-        if not tasks_to_run:
-            by_id = sorted(t.task_id for t in AUDIT_TASKS)
-            print(f"--slice 无命中: {args.slice!r}\n可选任务: {', '.join(by_id)}")
-            return 2
-    else:
-        # 无参默认 = audit 组全量（bench/archive 需显式 --group/--task——保持既有调用面零破坏）
-        tasks_to_run = [t for t in AUDIT_TASKS if t.group == "audit"]
+        return [], 2
 
-    # 基准规范（脚本库治理）：引擎↔注册表完备性自检（孤儿/悬空即阻断，防目录漂移静默累积）
-    registry_issues: List[str] = check_registry_completeness()
-    if not args.json and registry_issues:
+    tasks, code = _dispatch_target_task_resolution(args)
+    if code != 0:
+        return [], code
+
+    if args.baseline:
+        tasks = [
+            replace(t, default_args=["--baseline", args.baseline])
+            if t.task_id == "docs" else t
+            for t in tasks
+        ]
+    return tasks, 0
+
+
+def _compute_worker_count(args: argparse.Namespace, task_count: int) -> int:
+    """计算线程池最大并发工作进程数。"""
+    if args.serial:
+        return 1
+    cpu_count = os.cpu_count() or 4
+    return args.jobs if args.jobs > 0 else min(cpu_count, task_count)
+
+
+def _handle_registry_warnings(registry_issues: List[str], is_json: bool) -> None:
+    """非静默 JSON 模式下输出注册表自检告警。"""
+    if not is_json and registry_issues:
         print(f"{C_RED}【registry】❌ 脚本库注册表完备性自检未通过:{C_RESET}")
         for issue in registry_issues:
             print(f"  - {issue}")
 
-    # 处理 baseline 参数覆盖（复制替换，避免突变全局 AUDIT_TASKS 共享对象）
-    if args.baseline:
-        tasks_to_run = [
-            replace(t, default_args=["--baseline", args.baseline])
-            if t.task_id == "docs" else t
-            for t in tasks_to_run
-        ]
 
-    # 并发数设置
-    cpu_count = os.cpu_count() or 4
-    workers = args.jobs if args.jobs > 0 else min(cpu_count, len(tasks_to_run))
-    if args.serial:
-        workers = 1
+def _print_runner_header(args: argparse.Namespace, workers: int, task_count: int) -> None:
+    """输出调度器启动时的模式与参数看板。"""
+    mode_desc = f"定向切片 (--slice {args.slice})" if args.slice else ("Git 差异定向增量" if args.diff else f"全量并行 ({args.group} 组)")
+    print("=" * 75)
+    print(f"🚀 {C_BOLD}启动卡拉尔世界引擎全域质量门禁调度流水线 (v{AUDIT_RUNNER_VERSION}){C_RESET}")
+    print("=" * 75)
+    print(f"  • 运行模式: {C_YELLOW}{mode_desc}{C_RESET} | 并发工作池: {C_GREEN}{workers} Workers{C_RESET} | 目标任务数: {task_count}/{len(AUDIT_TASKS)}")
+    print(f"  • 工作根目录: {C_GRAY}{ROOT_DIR}{C_RESET}\n")
 
-    if not is_quiet_mode:
-        print(f"{C_BOLD}{C_CYAN}╔═══════════════════════════════════════════════════════════════════════╗{C_RESET}")
-        print(f"{C_BOLD}{C_CYAN}║     🛡️  WebGames 门禁异步并行调度引擎 (Parallel Quality Gates)       ║{C_RESET}")
-        print(f"{C_BOLD}{C_CYAN}╚═══════════════════════════════════════════════════════════════════════╝{C_RESET}")
-        mode_desc = f"增量切片 (--diff)" if args.diff else (f"指定任务 (--task {args.task})" if args.task else (f"分组 ({args.group})" if args.group else ("单域切片 (" + args.slice + ")" if args.slice else "全量全域")))
-        print(f"  • 运行模式: {C_YELLOW}{mode_desc}{C_RESET} | 并发工作池: {C_GREEN}{workers} Workers{C_RESET} | 目标任务数: {len(tasks_to_run)}/{len(AUDIT_TASKS)}")
-        print(f"  • 工作根目录: {C_GRAY}{ROOT_DIR}{C_RESET}\n")
 
-    results: List[TaskResult] = []
+def _log_task_result(res: TaskResult, is_quiet_mode: bool, extra_tag: str = "") -> None:
+    """打印单任务执行结果徽标与耗时。"""
+    if is_quiet_mode:
+        return
+    badge = f"{C_GREEN}✅ PASS{C_RESET}" if res.returncode == 0 else f"{C_RED}❌ FAIL({res.returncode}){C_RESET}"
+    tag_str = f" [{extra_tag}]" if extra_tag else ""
+    print(f"  [{badge}] {C_BOLD}{res.task.name:<30s}{C_RESET} ({res.task.script_name}) — {res.elapsed_sec:5.2f}s{tag_str}")
+
+
+def _run_exclusive_tasks(tasks: List[AuditTask], py_exec: str, is_quiet_mode: bool) -> List[TaskResult]:
+    """串行执行 exclusive 独占任务。"""
+    results = []
+    for t in tasks:
+        res = run_single_task(t, [], py_exec)
+        results.append(res)
+        _log_task_result(res, is_quiet_mode, "串行 exclusive")
+    return results
+
+
+def _run_parallel_task_pool(tasks: List[AuditTask], workers: int, py_exec: str, is_quiet_mode: bool) -> List[TaskResult]:
+    """通过线程池并发执行独立只读任务。"""
+    results = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
+        future_to_task = {
+            executor.submit(run_single_task, t, [], py_exec): t
+            for t in tasks
+        }
+        for future in concurrent.futures.as_completed(future_to_task):
+            res = future.result()
+            results.append(res)
+            _log_task_result(res, is_quiet_mode)
+    return results
+
+
+def _run_serial_task_list(tasks: List[AuditTask], py_exec: str, is_quiet_mode: bool) -> List[TaskResult]:
+    """单线程串行执行任务列表。"""
+    results = []
+    for t in tasks:
+        res = run_single_task(t, [], py_exec)
+        results.append(res)
+        _log_task_result(res, is_quiet_mode)
+    return results
+
+
+def _execute_audit_pipeline(
+    tasks_to_run: List[AuditTask],
+    workers: int,
+    py_exec: str,
+    is_quiet_mode: bool,
+) -> tuple[List[TaskResult], float, float, float]:
+    """执行完整的门禁流水线调度，返回 (结果列表, 实际墙钟耗时, 串行累计耗时, 加速比)。"""
     wall_start = time.perf_counter()
-
-    # exclusive（写操作）任务先行串行，其余并行（防并行写冲突）
     exclusive_tasks = [t for t in tasks_to_run if t.exclusive]
     parallel_tasks = [t for t in tasks_to_run if not t.exclusive]
 
-    for t in exclusive_tasks:
-        res = run_single_task(t, [], py_exec)
-        results.append(res)
-        if not is_quiet_mode:
-            status_badge = f"{C_GREEN}✅ PASS{C_RESET}" if res.returncode == 0 else f"{C_RED}❌ FAIL({res.returncode}){C_RESET}"
-            print(f"  [{status_badge}] {C_BOLD}{res.task.name:<30s}{C_RESET} ({res.task.script_name}) — {res.elapsed_sec:5.2f}s [串行 exclusive]")
-
+    results = _run_exclusive_tasks(exclusive_tasks, py_exec, is_quiet_mode)
     if workers > 1 and len(parallel_tasks) > 1:
-        # 多任务异步并行调度（ThreadPoolExecutor：I/O-bound subprocess 纯等待释放 GIL，零进程派生与 IPC 序列化开销）
-        with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
-            future_to_task = {
-                executor.submit(run_single_task, t, [], py_exec): t
-                for t in parallel_tasks
-            }
-            for future in concurrent.futures.as_completed(future_to_task):
-                res = future.result()
-                results.append(res)
-                if not is_quiet_mode:
-                    status_badge = f"{C_GREEN}✅ PASS{C_RESET}" if res.returncode == 0 else f"{C_RED}❌ FAIL({res.returncode}){C_RESET}"
-                    print(f"  [{status_badge}] {C_BOLD}{res.task.name:<30s}{C_RESET} ({res.task.script_name}) — {res.elapsed_sec:5.2f}s")
+        results.extend(_run_parallel_task_pool(parallel_tasks, workers, py_exec, is_quiet_mode))
     else:
-        # 串行执行
-        for t in parallel_tasks:
-            res = run_single_task(t, [], py_exec)
-            results.append(res)
-            if not is_quiet_mode:
-                status_badge = f"{C_GREEN}✅ PASS{C_RESET}" if res.returncode == 0 else f"{C_RED}❌ FAIL({res.returncode}){C_RESET}"
-                print(f"  [{status_badge}] {C_BOLD}{res.task.name:<30s}{C_RESET} ({res.task.script_name}) — {res.elapsed_sec:5.2f}s")
+        results.extend(_run_serial_task_list(parallel_tasks, py_exec, is_quiet_mode))
 
     wall_elapsed = time.perf_counter() - wall_start
     sum_elapsed = sum(r.elapsed_sec for r in results)
     speedup = (sum_elapsed / wall_elapsed) if wall_elapsed > 0 else 1.0
 
-    # 排序使输出稳定（预构建 task_id → 注册序 索引映射，避免逐条线性查找 O(n²)）
     order_index = {t.task_id: i for i, t in enumerate(AUDIT_TASKS)}
     results.sort(key=lambda r: order_index.get(r.task.task_id, len(order_index)))
+    return results, wall_elapsed, sum_elapsed, speedup
 
-    all_passed = all(r.returncode == 0 for r in results)
-    failed_tasks = [r for r in results if r.returncode != 0]
-    if registry_issues:
-        all_passed = False
+
+def _export_sarif_report(args: argparse.Namespace, results: List[TaskResult], all_passed: bool, is_quiet_mode: bool) -> None:
+    """生成并导出 SARIF 报告。"""
+    sarif_doc = _generate_sarif(results)
+    if args.sarif_out:
+        out_p = Path(args.sarif_out)
+        out_p.parent.mkdir(parents=True, exist_ok=True)
+        out_p.write_text(json.dumps(sarif_doc, ensure_ascii=False, indent=2), encoding="utf-8")
         if not is_quiet_mode:
-            print(f"\n{C_RED}❌ 脚本库注册表完备性自检未通过（孤儿引擎/悬空注册需先登记或修复）:{C_RESET}")
-            for issue in registry_issues:
-                print(f"  - {issue}")
-
-    # SARIF 报告生成与导出
-    if args.sarif_out or args.format == "sarif":
-        sarif_doc = _generate_sarif(results)
-        if args.sarif_out:
-            out_p = Path(args.sarif_out)
-            out_p.parent.mkdir(parents=True, exist_ok=True)
-            out_p.write_text(json.dumps(sarif_doc, ensure_ascii=False, indent=2), encoding="utf-8")
-            if not is_quiet_mode:
-                print(f"【SARIF】已成功导出行业标准分析报告至: {out_p}")
-        if args.format == "sarif":
-            print(json.dumps(sarif_doc, ensure_ascii=False, indent=2))
-            sys.exit(0 if all_passed else 1)
-
-    if args.format == "json":
-        report = {
-            "all_passed": all_passed,
-            "wall_elapsed_sec": round(wall_elapsed, 3),
-            "sum_cpu_sec": round(sum_elapsed, 3),
-            "speedup_ratio": round(speedup, 2),
-            "workers": workers,
-            "registry_issues": registry_issues,
-            "tasks": [
-                {
-                    "task_id": r.task.task_id,
-                    "group": r.task.group,
-                    "name": r.task.name,
-                    "script": r.task.script_name,
-                    "passed": r.returncode == 0,
-                    "returncode": r.returncode,
-                    "elapsed_sec": round(r.elapsed_sec, 3),
-                    "stderr": r.stderr if r.returncode != 0 else _warning_slice(r.stderr)
-                }
-                for r in results
-            ]
-        }
-        print(json.dumps(report, ensure_ascii=False, indent=2))
+            print(f"【SARIF】已成功导出行业标准分析报告至: {out_p}")
+    if args.format == "sarif":
+        print(json.dumps(sarif_doc, ensure_ascii=False, indent=2))
         sys.exit(0 if all_passed else 1)
 
+
+def _export_json_report(
+    results: List[TaskResult],
+    all_passed: bool,
+    wall_elapsed: float,
+    sum_elapsed: float,
+    speedup: float,
+    workers: int,
+    registry_issues: List[str],
+) -> None:
+    """输出 JSON 格式聚合报告。"""
+    report = {
+        "all_passed": all_passed,
+        "wall_elapsed_sec": round(wall_elapsed, 3),
+        "sum_cpu_sec": round(sum_elapsed, 3),
+        "speedup_ratio": round(speedup, 2),
+        "workers": workers,
+        "registry_issues": registry_issues,
+        "tasks": [
+            {
+                "task_id": r.task.task_id,
+                "group": r.task.group,
+                "name": r.task.name,
+                "script": r.task.script_name,
+                "passed": r.returncode == 0,
+                "returncode": r.returncode,
+                "elapsed_sec": round(r.elapsed_sec, 3),
+                "stderr": r.stderr if r.returncode != 0 else _warning_slice(r.stderr),
+            }
+            for r in results
+        ],
+    }
+    print(json.dumps(report, ensure_ascii=False, indent=2))
+    sys.exit(0 if all_passed else 1)
+
+
+def _render_console_summary(
+    results: List[TaskResult],
+    failed_tasks: List[TaskResult],
+    all_passed: bool,
+    wall_elapsed: float,
+    sum_elapsed: float,
+    speedup: float,
+    registry_issues: List[str],
+) -> int:
+    """渲染控制台汇总看板并返回退出码。"""
     print("\n" + "=" * 75)
     print(f"📊 {C_BOLD}门禁调度汇总报告 (Quality Gates Aggregation){C_RESET}")
     print("=" * 75)
-    print(f"  • 任务通过率: {C_GREEN if all_passed else C_RED}{len(results) - len(failed_tasks)} / {len(results)} PASS{C_RESET}")
+    pass_cnt = len(results) - len(failed_tasks)
+    print(f"  • 任务通过率: {C_GREEN if all_passed else C_RED}{pass_cnt} / {len(results)} PASS{C_RESET}")
     print(f"  • 并行实际耗时 (Wall Clock): {C_GREEN}{wall_elapsed:5.2f}s{C_RESET} (串行等效累计: {sum_elapsed:5.2f}s | 加速比: {C_CYAN}{speedup:.2f}x{C_RESET})")
-    
+
     if failed_tasks or registry_issues:
         if failed_tasks:
             print(f"\n{C_RED}{C_BOLD}❌ 未通过任务诊断详情:{C_RESET}")
@@ -735,11 +846,54 @@ def main() -> int:
                 if ft.stderr.strip():
                     print(f"{C_RED}{ft.stderr.strip()}{C_RESET}")
         print(f"\n{C_RED}【门禁结论】审查未通过，已阻断！{C_RESET}")
-        sys.exit(1)
-    else:
-        print(f"\n{C_GREEN}{C_BOLD}🎉 恭喜！全域门禁审查 100% 全部通过 (0 Error / 0 Warn)！{C_RESET}")
-        sys.exit(0)
+        return 1
+
+    print(f"\n{C_GREEN}{C_BOLD}🎉 恭喜！全域门禁审查 100% 全部通过 (0 Error / 0 Warn)！{C_RESET}")
+    return 0
+
+
+def _finalize_audit_outputs(
+    args: argparse.Namespace,
+    results: List[TaskResult],
+    all_passed: bool,
+    wall_elapsed: float,
+    sum_elapsed: float,
+    speedup: float,
+    workers: int,
+    registry_issues: List[str],
+    is_quiet_mode: bool,
+) -> int:
+    """统一输出 SARIF、JSON 报告或终端汇总面板。"""
+    failed_tasks = [r for r in results if r.returncode != 0]
+    if args.sarif_out or args.format == "sarif":
+        _export_sarif_report(args, results, all_passed, is_quiet_mode)
+    if args.format == "json":
+        _export_json_report(results, all_passed, wall_elapsed, sum_elapsed, speedup, workers, registry_issues)
+    return _render_console_summary(results, failed_tasks, all_passed, wall_elapsed, sum_elapsed, speedup, registry_issues)
+
+
+def main() -> int:
+    args, is_quiet_mode = _parse_and_validate_cli_args()
+    tasks_to_run, err_code = _resolve_target_tasks(args)
+    if err_code != 0:
+        return err_code
+
+    registry_issues = check_registry_completeness()
+    _handle_registry_warnings(registry_issues, args.json)
+
+    workers = _compute_worker_count(args, len(tasks_to_run))
+    if not is_quiet_mode:
+        _print_runner_header(args, workers, len(tasks_to_run))
+
+    py_exec = sys.executable or "python"
+    results, wall_elapsed, sum_elapsed, speedup = _execute_audit_pipeline(tasks_to_run, workers, py_exec, is_quiet_mode)
+
+    all_passed = all(r.returncode == 0 for r in results) and not registry_issues
+    return _finalize_audit_outputs(
+        args, results, all_passed, wall_elapsed, sum_elapsed, speedup, workers, registry_issues, is_quiet_mode
+    )
 
 
 if __name__ == "__main__":
     sys.exit(main())
+
