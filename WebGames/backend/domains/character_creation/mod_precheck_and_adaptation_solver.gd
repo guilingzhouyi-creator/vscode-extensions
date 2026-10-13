@@ -530,9 +530,7 @@ static func _merge_adapted_manifest(
 ) -> Dictionary:
     var origins_pool: Array[Dictionary] = []
     var raw_base_pool: Array = GameConfig.get_array("domains.character_creation", "authoritative_reincarnation/origins_pool", [])
-    for entry in raw_base_pool:
-        if entry is Dictionary:
-            origins_pool.append((entry as Dictionary).duplicate(true))
+    origins_pool.assign(raw_base_pool.duplicate(true))
 
     var origins_catalog: Dictionary = GameConfig.get_dict("domains.character_creation", "origins", {}).duplicate(true)
     var origin_race_map: Dictionary = GameConfig.get_dict("domains.character_creation", "authoritative_reincarnation/origin_race_map", {}).duplicate(true)
@@ -541,9 +539,7 @@ static func _merge_adapted_manifest(
 
     var paired_presets: Array[Dictionary] = []
     var raw_base_pairs: Array = GameConfig.get_array("domains.character_creation", "authoritative_reincarnation/traits_allocation/paired_presets", [])
-    for pair_entry in raw_base_pairs:
-        if pair_entry is Dictionary:
-            paired_presets.append((pair_entry as Dictionary).duplicate(true))
+    paired_presets.assign(raw_base_pairs.duplicate(true))
 
     var starter_kits: Dictionary = GameConfig.get_dict("domains.starter_loadout", "starter_kits", {}).duplicate(true)
     var race_kit_map: Dictionary = GameConfig.get_dict("domains.starter_loadout", "race_kit_map", {}).duplicate(true)
@@ -612,27 +608,23 @@ static func _merge_single_pack_assets(
             birth_region_map, origin_kit_map, origin_dag_map
         )
 
-    for tid in dto.custom_traits.keys():
-        var t_entry: Variant = dto.custom_traits[tid]
-        if t_entry is Dictionary:
-            traits[str(tid)] = (t_entry as Dictionary).duplicate(true)
+    if not dto.custom_traits.is_empty():
+        traits.merge(dto.custom_traits.duplicate(true), true)
 
-    for preset in dto.paired_presets:
-        paired_presets.append(preset.duplicate(true))
+    if not dto.paired_presets.is_empty():
+        paired_presets.append_array(dto.paired_presets.duplicate(true))
 
-    for kid in dto.custom_starter_kits.keys():
-        var k_entry: Variant = dto.custom_starter_kits[kid]
-        if k_entry is Dictionary:
-            starter_kits[str(kid)] = (k_entry as Dictionary).duplicate(true)
+    if not dto.custom_starter_kits.is_empty():
+        starter_kits.merge(dto.custom_starter_kits.duplicate(true), true)
 
-    for rule in dto.custom_routing_rules:
-        custom_routing_rules.append(rule.duplicate(true))
+    if not dto.custom_routing_rules.is_empty():
+        custom_routing_rules.append_array(dto.custom_routing_rules.duplicate(true))
 
-    for gid in dto.dag_graphs.keys():
-        dag_graphs[str(gid)] = dto.dag_graphs[gid]
+    if not dto.dag_graphs.is_empty():
+        dag_graphs.merge(dto.dag_graphs, true)
 
-    for ik in dto.custom_i18n.keys():
-        custom_i18n[str(ik)] = dto.custom_i18n[ik]
+    if not dto.custom_i18n.is_empty():
+        custom_i18n.merge(dto.custom_i18n, true)
 
 static func _register_custom_origin(
     orig: Dictionary,

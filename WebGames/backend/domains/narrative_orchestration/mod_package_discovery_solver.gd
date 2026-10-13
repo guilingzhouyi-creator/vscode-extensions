@@ -138,6 +138,25 @@ static func _sort_tier_by_priority(tier: Array[NarrativePackManifestDTO]) -> voi
         return a.pack_id < b.pack_id
     )
 
+## 单层 Kahn 依赖缩减解算，平铺控制流并消除循环内深层嵌套
+static func _process_kahn_tier(
+    current_tier: Array[NarrativePackManifestDTO],
+    adj_list: Dictionary,
+    in_degree: Dictionary,
+    pack_map: Dictionary,
+    sorted_packs: Array[NarrativePackManifestDTO]
+) -> Array[NarrativePackManifestDTO]:
+    var next_tier: Array[NarrativePackManifestDTO] = []
+    for pack_obj in current_tier:
+        sorted_packs.append(pack_obj)
+        var successors: Array = adj_list.get(pack_obj.pack_id, [])
+        for succ_id in successors:
+            var new_deg: int = int(in_degree.get(succ_id, 0)) - 1
+            in_degree[succ_id] = new_deg
+            if new_deg == 0:
+                next_tier.append(pack_map[succ_id])
+    return next_tier
+
 ## 执行基于 Kahn 算法的 DAG 依赖拓扑排序
 static func sort_and_resolve_dependencies(manifests: Array) -> Dictionary:
     if manifests.is_empty():
@@ -175,15 +194,7 @@ static func sort_and_resolve_dependencies(manifests: Array) -> Dictionary:
     var sorted_packs: Array[NarrativePackManifestDTO] = []
     while not current_tier.is_empty():
         _sort_tier_by_priority(current_tier)
-        var next_tier: Array[NarrativePackManifestDTO] = []
-        for pack_obj in current_tier:
-            sorted_packs.append(pack_obj)
-            var successors: Array = adj_list[pack_obj.pack_id]
-            for succ_id in successors:
-                in_degree[succ_id] = int(in_degree[succ_id]) - 1
-                if int(in_degree[succ_id]) == 0:
-                    next_tier.append(pack_map[succ_id])
-        current_tier = next_tier
+        current_tier = _process_kahn_tier(current_tier, adj_list, in_degree, pack_map, sorted_packs)
 
     if sorted_packs.size() < pack_map.size():
         var cycles: Array[String] = []

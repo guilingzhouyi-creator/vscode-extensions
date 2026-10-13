@@ -47,7 +47,8 @@ func register_observer(cb: Callable) -> void:
 
 ## 注销指定观察回调
 func unregister_observer(cb: Callable) -> void:
-	_observers.erase(cb)
+	if _observers.has(cb):
+		_observers.erase(cb)
 
 # ==============================================================================
 # 三、非侵入式只读事件广播与历史追溯
@@ -65,20 +66,21 @@ func broadcast_event(event_type: String, payload: Dictionary) -> void:
 		_ring_buffer.pop_front()
 	_ring_buffer.append(entry)
 
+	var read_only_payload: Dictionary = payload.duplicate(true)
 	for obs in _observers:
 		if obs.is_valid():
-			obs.call(event_type, payload.duplicate(true))
+			obs.call(event_type, read_only_payload)
 
 ## 获取最近事件尾部切片（默认截取最近 8 条）
 func get_recent_events(limit: int = 8) -> Array[Dictionary]:
-	var out: Array[Dictionary] = []
 	var total: int = _ring_buffer.size()
 	var effective_limit: int = mini(limit, total)
 	var start_idx: int = total - effective_limit
-	for i in range(start_idx, total):
-		out.append((_ring_buffer[i] as Dictionary).duplicate(true))
+	var out: Array[Dictionary] = []
+	out.assign(_ring_buffer.slice(start_idx, total))
 	return out
 
 ## 清空环形队列历史记录
 func clear_history() -> void:
-	_ring_buffer.clear()
+	if not _ring_buffer.is_empty():
+		_ring_buffer.clear()
