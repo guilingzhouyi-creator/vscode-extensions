@@ -64,6 +64,8 @@ export interface SymbolImpactAnalysis {
     suggestedRefactorPlan: string[];
 }
 
+const EMPTY_IMPORT_NAMES: string[] = Object.freeze([]) as unknown as string[];
+
 function parsePythonImportStatement(
     line: string,
     out: Array<{ module: string; names: string[] }>,
@@ -76,7 +78,7 @@ function parsePythonImportStatement(
             .split(/\s+as\s+/)[0]
             .trim();
         if (/^[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*$/.test(name)) {
-            out.push({ module: name, names: [] });
+            out.push({ module: name, names: EMPTY_IMPORT_NAMES });
         }
     }
     return true;
@@ -302,6 +304,18 @@ export class ModuleDependencyGraph {
         return revSet;
     }
 
+    private getOrCreateTargetRefs(
+        targetMap: Map<string, ImportedSymbolRef[]>,
+        resolved: string,
+    ): ImportedSymbolRef[] {
+        let refs = targetMap.get(resolved);
+        if (!refs) {
+            refs = [];
+            targetMap.set(resolved, refs);
+        }
+        return refs;
+    }
+
     private extractAndRecordNamedImports(filePath: string, content: string): void {
         const namedImportRegex = /import\s+(?:type\s+)?\{([^}]+)\}\s+from\s+['"]([^'"]+)['"]/g;
         const normFile = this.norm(filePath);
@@ -321,11 +335,7 @@ export class ModuleDependencyGraph {
                     specifier.startsWith('@/'))
             ) {
                 const resolved = this.resolveImportPath(normFile, specifier);
-                let refs = targetMap.get(resolved);
-                if (!refs) {
-                    refs = [];
-                    targetMap.set(resolved, refs);
-                }
+                const refs = this.getOrCreateTargetRefs(targetMap, resolved);
                 const parsed = parseNamedImportParts(rawSymbols, resolved);
                 for (let i = 0; i < parsed.length; i++) {
                     refs.push(parsed[i]);
@@ -439,19 +449,22 @@ export class ModuleDependencyGraph {
         const affectedFilesSet = new Set<string>();
         const impactedImportSites: SymbolImpactAnalysis['impactedImportSites'] = [];
 
-        const directDependents = this.reverseDeps.get(normTarget) || new Set<string>();
-        for (const importer of directDependents) {
-            const targetMap = this.importedSymbolsMap.get(importer);
-            const refs = targetMap?.get(normTarget) || [];
-            for (const ref of refs) {
-                if (symbolSet.has(ref.symbol)) {
-                    affectedFilesSet.add(importer);
-                    impactedImportSites.push({
-                        importerFile: importer,
-                        importedSymbol: ref.symbol,
-                        alias: ref.alias,
-                        line: ref.line,
-                    });
+        const directDependents = this.reverseDeps.get(normTarget);
+        if (directDependents && directDependents.size > 0) {
+            for (const importer of directDependents) {
+                const targetMap = this.importedSymbolsMap.get(importer);
+                const refs = targetMap?.get(normTarget);
+                if (!refs || refs.length === 0) continue;
+                for (const ref of refs) {
+                    if (symbolSet.has(ref.symbol)) {
+                        affectedFilesSet.add(importer);
+                        impactedImportSites.push({
+                            importerFile: importer,
+                            importedSymbol: ref.symbol,
+                            alias: ref.alias,
+                            line: ref.line,
+                        });
+                    }
                 }
             }
         }

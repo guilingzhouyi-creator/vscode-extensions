@@ -879,7 +879,10 @@ export interface FunctionSemanticsFinding {
  * @param isAccessor - Optional flag indicating getter or setter accessor.
  * @returns Finding if a rule is violated, or null if compliant.
  */
-function validateFunctionVerbNoun(name: string, firstToken: string): FunctionSemanticsFinding | null {
+function validateFunctionVerbNoun(
+    name: string,
+    firstToken: string,
+): FunctionSemanticsFinding | null {
     const firstWord = firstToken.toLowerCase();
     if (APPROVED_ACTION_VERBS.has(firstWord)) return null;
     return {
@@ -921,7 +924,10 @@ function validateFunctionWordCount(
     return null;
 }
 
-function validateFunctionMorphemes(name: string, tokens: string[]): FunctionSemanticsFinding | null {
+function validateFunctionMorphemes(
+    name: string,
+    tokens: string[],
+): FunctionSemanticsFinding | null {
     for (const token of tokens) {
         const tokenLower = token.toLowerCase();
         if (token.length >= 2) {

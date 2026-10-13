@@ -372,11 +372,7 @@ function buildDefaultAnalyzerOptions(
     globalThresholds: Record<string, unknown>,
 ): Record<string, unknown> {
     const defaults = analyzerDefaults[name];
-    const globalLayer = extractGlobalThresholdLayer(
-        name,
-        analyzerDefaults,
-        globalThresholds,
-    );
+    const globalLayer = extractGlobalThresholdLayer(name, analyzerDefaults, globalThresholds);
     const opts: Record<string, unknown> = {};
     if (defaults) Object.assign(opts, defaults);
     Object.assign(opts, globalLayer);
@@ -423,11 +419,7 @@ export function mergeAnalyzerDeclarations(
         if (!currentDecl.options || Object.keys(currentDecl.options).length === 0) {
             analyzers[name] = {
                 ...currentDecl,
-                options: buildDefaultAnalyzerOptions(
-                    name,
-                    analyzerDefaults,
-                    globalThresholds,
-                ),
+                options: buildDefaultAnalyzerOptions(name, analyzerDefaults, globalThresholds),
             };
         }
     }

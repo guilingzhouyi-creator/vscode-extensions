@@ -262,10 +262,7 @@ function createBaseEdge(from: string, to: string): DependencyEdge {
 /**
  * Retrieves or initializes an edge list in the directed adjacency index.
  */
-function getOrCreateEdgeList(
-    adj: Map<string, DependencyEdge[]>,
-    key: string,
-): DependencyEdge[] {
+function getOrCreateEdgeList(adj: Map<string, DependencyEdge[]>, key: string): DependencyEdge[] {
     let list = adj.get(key);
     if (!list) {
         list = [];
@@ -313,9 +310,7 @@ export class AgentCollisionDetector {
 
         for (const e of baseEdges) {
             const fromPath = normalizePath(e.from);
-            getOrCreateEdgeList(adj, fromPath).push(
-                createBaseEdge(fromPath, normalizePath(e.to)),
-            );
+            getOrCreateEdgeList(adj, fromPath).push(createBaseEdge(fromPath, normalizePath(e.to)));
         }
 
         for (const e of patchEdges) {
