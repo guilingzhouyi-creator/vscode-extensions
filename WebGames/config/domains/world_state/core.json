@@ -1,19 +1,72 @@
 {
   "_meta": {
     "domain": "world_state",
-    "extensions_note": "MP、等级经验、ap_max 实值等无权威源的展示项，本卷不入快照，留待演进02 前端契约 / 等级域 / 法力域闭环扩展"
+    "extensions_note": "Phase 118 六大业务支柱聚合、网关模式自适应与四大领域通信存储分流配置单源"
   },
   "hud": {
     "channels": {
       "snapshot": "world_state.snapshot_published",
       "stat_mutated": "world_state.stat_mutated",
-      "wallet_mutated": "world_state.wallet_mutated"
+      "wallet_mutated": "world_state.wallet_mutated",
+      "clock_ticked": "world_state.clock_phase_ticked",
+      "mode_adapted": "world_state.mode_features_adapted"
     }
   },
   "hud_defaults": {
     "ap_max": 10.0,
+    "mp_max_fallback": 50.0,
+    "max_hotbar_slots": 8,
+    "light_asset_max_payload_bytes": 4096,
     "snapshot_of": {
       "hp_max": "domains.combat/participant_defaults/max_hp"
     }
+  },
+  "storage_isolation": {
+    "offline_vault_prefix": "user://offline_vault/",
+    "online_cache_prefix": "user://online_cache/"
+  },
+  "domain_channel_bindings": {
+    "action": {
+      "protocol_mp": "WEBSOCKET_GRPC",
+      "protocol_sp": "IN_MEMORY_EVENT_BUS"
+    },
+    "asset": {
+      "protocol_mp": "REST_RPC_IDEMPOTENT",
+      "protocol_sp": "ATOMIC_LOCAL_SEGMENT"
+    },
+    "retention": {
+      "protocol_mp": "CDN_LIGHT_POLL",
+      "protocol_sp": "GAME_CONFIG_DIRECT"
+    },
+    "meta": {
+      "protocol_mp": "ASYNC_POLL_CACHE_SHIELD",
+      "protocol_sp": "PAGED_DISK_LAZY_SLICE"
+    }
+  },
+  "mode_feature_profiles": {
+    "single_player": {
+      "show_matchmaking": false,
+      "show_online_chat": false,
+      "show_real_money_shop": false,
+      "show_cross_server_guild": false,
+      "enable_offline_cdkey": true,
+      "enable_offline_gacha": true,
+      "enable_local_story_mail": true
+    },
+    "multiplayer": {
+      "show_matchmaking": true,
+      "show_online_chat": true,
+      "show_real_money_shop": true,
+      "show_cross_server_guild": true,
+      "enable_offline_cdkey": false,
+      "enable_offline_gacha": false,
+      "enable_local_story_mail": true
+    }
+  },
+  "calendar_phases": {
+    "dawn_hour": 5,
+    "noon_hour": 11,
+    "dusk_hour": 17,
+    "midnight_hour": 21
   }
 }
