@@ -93,7 +93,7 @@ wait_with_timeout() {
     local log_file="${4:-}"
     local count=0
     while kill -0 "$pid" 2>/dev/null; do
-        if [ "$count" -ge "$timeout" ]; then
+        if [[ "$count" -ge "$timeout" ]]; then
             echo "⚠️ $name 审查执行超时 (${timeout}s，PID: $pid)，强制终止进程..." >&2
             kill -TERM "$pid" 2>/dev/null || true
             sleep 1
@@ -157,9 +157,9 @@ else
 fi
 
 # 看门狗超时守卫：防止子进程挂起导致审查无限阻塞
-TIMEOUT_WT=$([ "$FAST_MODE" -eq 1 ] && echo 60 || echo 120)
-TIMEOUT_WG=$([ "$FAST_MODE" -eq 1 ] && echo 60 || echo 120)
-TIMEOUT_AR=$([ "$FAST_MODE" -eq 1 ] && echo 90 || echo 240)
+TIMEOUT_WT=$([[ "$FAST_MODE" -eq 1 ]] && echo 60 || echo 120)
+TIMEOUT_WG=$([[ "$FAST_MODE" -eq 1 ]] && echo 60 || echo 120)
+TIMEOUT_AR=$([[ "$FAST_MODE" -eq 1 ]] && echo 90 || echo 240)
 
 STATUS_WT="PASS"
 CODE_WT=0

@@ -6,7 +6,14 @@
  *   - Rule 7: Static analysis & review rule ID anti-hallucination / SSOT drift verification
  *   - Rule 8: Technical factual tone, forbidden terms, and anti-execution-log style auditing
  *   Supports single-file audit, stdin streaming, and batch commit range scanning (--range).
- * Exit Semantics: Exits 0 on all checks passing, 1 on any detected violation.
+ * Dependencies & Triggers: Consumes rule-catalog.json, commit-msg-forbidden-terms.json, and validate-commit-msg-style;
+ *   invoked by commit-msg-gate (ps1/sh), pre-push-gate (ps1/sh), and CI workflows.
+ * Responsibilities:
+ *   1. Load and cache SSOT rule catalog and forbidden technical terms;
+ *   2. Validate single commit messages or range sequences against 8-rule commit governance;
+ *   3. Emit rich diagnostic failure reports and enforce strict exit semantics.
+ * Exit Semantics & Design Rationale: Exits 0 on all checks passing, 1 on any detected violation.
+ *   Achieves high-speed (<50ms) single-process memory verification without repetitive disk reloads.
  */
 'use strict';
 

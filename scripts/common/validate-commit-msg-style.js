@@ -4,8 +4,15 @@
  * Architecture Role: Validates that Git commit messages strictly convey objective technical facts
  *   and do not contain temporary/casual phrasing, hyperbolic/absolute claims, derogatory negativity,
  *   or meta-narrative slogans (bilingual enforcement: Chinese and English).
- * Dependencies & Triggers: Invoked by commit-msg-gate.sh, commit-msg-gate.ps1, pre-push gates, and CI.
- * Exit Semantics: Exits 0 on compliance, 1 on prohibited terms.
+ * Dependencies & Triggers: Consumes commit-msg-forbidden-terms.json;
+ *   invoked by commit-msg-gate.sh, commit-msg-gate.ps1, pre-push gates, and validate-commit-msg.
+ * Responsibilities:
+ *   1. Tokenize commit header and body sections, stripping code blocks and whitelisted symbols;
+ *   2. Scan text against forbidden patterns (temporary, hyperbolic, derogatory, meta-slogans, execution logs);
+ *   3. Enforce technical factual assertions in verification blocks without execution counters;
+ *   4. Render detailed diagnostic reports with violation guidance and suggested remediation.
+ * Exit Semantics & Design Rationale: Exits 0 on compliance, 1 on prohibited terms.
+ *   Maintains immutable, professional, high-density engineering archives without marketing or emotional noise.
  */
 'use strict';
 

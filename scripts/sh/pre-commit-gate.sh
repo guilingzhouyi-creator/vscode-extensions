@@ -26,6 +26,10 @@ echo "================================================================="
 
 NODE_BIN=$(command -v node 2>/dev/null || command -v node.exe 2>/dev/null || echo "node")
 NPM_BIN=$(command -v npm 2>/dev/null || command -v npm.cmd 2>/dev/null || echo "npm")
+PYTHON_BIN=$(command -v python3.12 2>/dev/null || command -v python3 2>/dev/null || command -v python 2>/dev/null || command -v py 2>/dev/null || echo "python3")
+
+STEP_LOG=$(mktemp)
+trap 'rm -f "$STEP_LOG"' EXIT
 
 # 获取当前暂存区中的文件列表（新增、修改、重命名）
 STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null || true)
@@ -47,8 +51,9 @@ fi
 # --- Gate 7: 单源规则漂移熔断 ---
 echo "[7/9] 校验单源规则元数据一致性..."
 if echo "$STAGED_FILES" | grep -qE "auto-refactor/src/core/rules/|auto-refactor/src/analyzers/"; then
-    if ! (cd auto-refactor && "$NPM_BIN" run validate-rules-registry >/dev/null 2>&1); then
+    if ! (cd auto-refactor && "$NPM_BIN" run validate-rules-registry) >"$STEP_LOG" 2>&1; then
         echo "❌ [FAIL] Gate 7: 规则注册表元数据发生漂移 (RCFG-RULE-DRIFT)！"
+        tail -n 15 "$STEP_LOG" | sed 's/^/   /'
         FAILED=1
     else
         echo "  ✔ [PASS] 规则元数据单源一致性校验通过"
@@ -74,8 +79,9 @@ TOUCHED_WG_AUDIT=$(echo "$STAGED_FILES" | grep -E '^WebGames/(config/|scripts/py
 
 if [[ -n "$TOUCHED_WT_COMPILE" ]]; then
     echo "  ▶ 触发 workspace-timing 增量编译校验..."
-    if ! (cd workspace-timing && "$NPM_BIN" run compile >/dev/null 2>&1); then
+    if ! (cd workspace-timing && "$NPM_BIN" run compile) >"$STEP_LOG" 2>&1; then
         echo "❌ [FAIL] Gate 8: workspace-timing 编译失败！"
+        tail -n 15 "$STEP_LOG" | sed 's/^/   /'
         FAILED=1
     fi
 elif echo "$STAGED_FILES" | grep -q '^workspace-timing/'; then
@@ -85,8 +91,9 @@ fi
 TOUCHED_WT_DOC=$(echo "$STAGED_FILES" | grep -E '^workspace-timing/(CHANGELOG\.md|README\.md|package\.json)' || true)
 if [[ -n "$TOUCHED_WT_DOC" ]]; then
     echo "  ▶ 触发 workspace-timing 文档布局与变更日志真实性门禁 (L3-DOC-LAYOUT)..."
-    if ! (cd workspace-timing && "$NODE_BIN" scripts/dist/audit/text-layout.js >/dev/null 2>&1); then
+    if ! (cd workspace-timing && "$NODE_BIN" scripts/dist/audit/text-layout.js) >"$STEP_LOG" 2>&1; then
         echo "❌ [FAIL] Gate 8: workspace-timing 文档文本布局或变更日志真实性核验未通过！"
+        tail -n 15 "$STEP_LOG" | sed 's/^/   /'
         FAILED=1
     else
         echo "  ✔ [PASS] workspace-timing 文档布局与变更日志真实性校验通过"
@@ -95,8 +102,9 @@ fi
 
 if [[ -n "$TOUCHED_AR_COMPILE" ]]; then
     echo "  ▶ 触发 auto-refactor 增量编译校验..."
-    if ! (cd auto-refactor && "$NPM_BIN" run build >/dev/null 2>&1); then
+    if ! (cd auto-refactor && "$NPM_BIN" run build) >"$STEP_LOG" 2>&1; then
         echo "❌ [FAIL] Gate 8: auto-refactor 编译失败！"
+        tail -n 15 "$STEP_LOG" | sed 's/^/   /'
         FAILED=1
     fi
 elif echo "$STAGED_FILES" | grep -q '^auto-refactor/'; then
@@ -105,9 +113,9 @@ fi
 
 if [[ -n "$TOUCHED_WG_AUDIT" ]]; then
     echo "  ▶ 触发 WebGames 增量配置架构审查..."
-    PYTHON_BIN=$(command -v python3 2>/dev/null || command -v python 2>/dev/null || command -v py 2>/dev/null || echo "python3")
-    if ! "$PYTHON_BIN" WebGames/scripts/py/audit_config.py --strict >/dev/null 2>&1; then
+    if ! "$PYTHON_BIN" WebGames/scripts/py/audit_config.py --strict >"$STEP_LOG" 2>&1; then
         echo "❌ [FAIL] Gate 8: WebGames 配置架构审查未通过！"
+        tail -n 15 "$STEP_LOG" | sed 's/^/   /'
         FAILED=1
     fi
 fi

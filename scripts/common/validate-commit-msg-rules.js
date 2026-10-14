@@ -3,8 +3,13 @@
  * File Path: scripts/common/validate-commit-msg-rules.js
  * Architecture Role: Ensures that any static analysis or review rule IDs mentioned in Git commit messages
  *   exist in the workspace Single-Source-of-Truth rule catalog.
- * Dependencies & Triggers: Invoked by commit-msg-gate.sh and commit-msg-gate.ps1.
- * Exit Semantics: Exits 0 if all mentioned rule IDs are valid or no rule IDs mentioned; exits 1 on hallucinated IDs.
+ * Dependencies & Triggers: Consumes rule-catalog.json; invoked by commit-msg-gate.sh, commit-msg-gate.ps1, and validate-commit-msg.
+ * Responsibilities:
+ *   1. Extract potential static analysis and lint rule IDs from commit messages;
+ *   2. Validate extracted rule tokens against registered SSOT catalog entries;
+ *   3. Flag and reject any fabricated or hallucinated rule identifiers (RCFG-RULE-DRIFT).
+ * Exit Semantics & Design Rationale: Exits 0 if all mentioned rule IDs are valid or no rule IDs mentioned; exits 1 on hallucinated IDs.
+ *   Prevents ghost rules and phantom debt references from polluting long-term Git history.
  */
 'use strict';
 

@@ -39,6 +39,7 @@ if (-not $stagedFiles -or $stagedFiles.Count -eq 0 -or ($stagedFiles.Count -eq 1
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "../..")).Path
 $nodeCmd = if ($IsWindows -or $env:OS -match "Windows") { "node.exe" } else { "node" }
 $npmCmd = if ($IsWindows -or $env:OS -match "Windows") { "npm.cmd" } else { "npm" }
+$pythonCmd = if (Get-Command python3.12 -ErrorAction SilentlyContinue) { "python3.12" } elseif (Get-Command python -ErrorAction SilentlyContinue) { "python" } elseif (Get-Command python3 -ErrorAction SilentlyContinue) { "python3" } else { "py" }
 $failed = $false
 
 # --- Gate 1~6: 快速暂存区统一流式审查 ([1/9] 零空文件, [2/9] 换行契约, [3/9] 绝对路径, [4/9] 零黑话, [5/9] 双轨体积, [6/9] 密钥防泄漏) ---
@@ -116,7 +117,6 @@ if ($hasArCompile) {
 
 if ($hasWgAudit) {
     Write-Host "  ▶ 触发 WebGames 增量配置架构审查..." -ForegroundColor Cyan
-    $pythonCmd = if (Get-Command python3 -ErrorAction SilentlyContinue) { "python3" } elseif (Get-Command python -ErrorAction SilentlyContinue) { "python" } else { "py" }
     $process = Start-Process -FilePath $pythonCmd -ArgumentList "WebGames/scripts/py/audit_config.py", "--strict" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
     if ($process.ExitCode -ne 0) {
         Write-Host "❌ [FAIL] Gate 8: WebGames 配置架构审查未通过！" -ForegroundColor Red

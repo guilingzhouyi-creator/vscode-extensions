@@ -26,9 +26,75 @@ echo "================================================================="
 
 NODE_BIN=$(command -v node 2>/dev/null || command -v node.exe 2>/dev/null || echo "node")
 NPM_BIN=$(command -v npm 2>/dev/null || command -v npm.cmd 2>/dev/null || echo "npm")
-PYTHON_BIN=$(command -v python3 2>/dev/null || command -v python 2>/dev/null || command -v py 2>/dev/null || echo "python3")
+PYTHON_BIN=$(command -v python3.12 2>/dev/null || command -v python3 2>/dev/null || command -v python 2>/dev/null || command -v py 2>/dev/null || echo "python3")
 
 FAILED=0
+
+AUDIT_LOG_DIR="$ROOT_DIR/.audit-logs"
+mkdir -p "$AUDIT_LOG_DIR"
+STEP_LOG="$AUDIT_LOG_DIR/pre-push-step.log"
+
+run_gate_step() {
+    local timeout_sec="$1"
+    local step_name="$2"
+    local work_dir="$3"
+    shift 3
+
+    rm -f "$STEP_LOG"
+
+    (cd "$work_dir" && "$@") > "$STEP_LOG" 2>&1 &
+    local pid=$!
+
+    local count=0
+    while kill -0 "$pid" 2>/dev/null; do
+        if [[ "$count" -ge "$timeout_sec" ]]; then
+            echo "⚠️ $step_name 审查执行超时 (${timeout_sec}s，PID: $pid)，强制终止进程树..." >&2
+            kill -9 "$pid" 2>/dev/null || true
+
+            local timestamp
+            timestamp=$(date +"%Y%m%d-%H%M%S")
+            local safe_name
+            safe_name=$(echo "$step_name" | tr ' /' '__' | tr '[:upper:]' '[:lower:]')
+            local diag_file="$AUDIT_LOG_DIR/timeout-prepush-${safe_name}-${timestamp}.log"
+
+            {
+                echo "================================================================================"
+                echo "⚠️ WATCHDOG TIMEOUT 诊断快照 (Pre-Push Gate Bash)"
+                echo "================================================================================"
+                echo "目标模块: $step_name"
+                echo "工作目录: $work_dir"
+                echo "进程 PID: $pid"
+                echo "超时阈值: ${timeout_sec} 秒"
+                echo "触发时间: $(date)"
+                echo "处置措施: 看门狗已触发 kill -9 终止进程"
+                echo "--------------------------------------------------------------------------------"
+                echo "【最后捕获的标准输出与错误日志】:"
+                if [[ -f "$STEP_LOG" ]]; then
+                    tail -n 100 "$STEP_LOG"
+                else
+                    echo "(日志文件不存在或未捕获到输出)"
+                fi
+                echo "================================================================================"
+            } > "$diag_file"
+            echo "💡 超时诊断快照已落盘至: $diag_file" >&2
+            return 124
+        fi
+        sleep 1
+        count=$((count + 1))
+    done
+
+    local status=0
+    wait "$pid" || status=$?
+    if [[ "$status" -ne 0 ]]; then
+        echo "❌ $step_name 失败 (退出码: $status)" >&2
+        if [[ -f "$STEP_LOG" ]]; then
+            echo "   --- 错误日志摘要 ---" >&2
+            tail -n 20 "$STEP_LOG" | sed 's/^/   /' >&2
+        fi
+        return "$status"
+    fi
+    return 0
+}
 
 # --- 影响域智能分析 (Impact-driven Routing) ---
 RANGE=""
@@ -85,8 +151,7 @@ fi
 
 # --- Gate 1: 全工作区零空文件与物理卫生守卫 ---
 echo "[1/9] 校验全工作区零物理空文件与空白脚本守卫..."
-if ! "$NODE_BIN" scripts/common/validate-no-empty-files.js >/dev/null 2>&1; then
-    echo "❌ Gate 1: 发现物理 0 字节或语义虚空文件"
+if ! run_gate_step 30 "Gate 1 (零物理空文件)" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-no-empty-files.js; then
     FAILED=1
 else
     echo "  ✔ 全工作区零空文件校验通过"
@@ -94,8 +159,7 @@ fi
 
 # --- Gate 2: 规则单源目录一致性同步 ---
 echo "[2/9] 校验全工作区单源规则目录同步..."
-if ! "$NODE_BIN" scripts/common/generate-rule-catalog.js >/dev/null 2>&1; then
-    echo "❌ Gate 2: 单源规则目录生成失败"
+if ! run_gate_step 30 "Gate 2 (单源规则目录)" "$ROOT_DIR" "$NODE_BIN" scripts/common/generate-rule-catalog.js; then
     FAILED=1
 else
     echo "  ✔ 全工作区单源规则目录同步通过"
@@ -104,7 +168,21 @@ fi
 # --- Gate 3: auto-refactor 引擎全量门禁与回归套件 ---
 if [[ "$RUN_AR" -eq 1 ]]; then
     echo "[3/9] 执行 auto-refactor 全量门禁与回归套件 (Rust/Build/Self/Tests)..."
-    if ! (cd auto-refactor && "$NODE_BIN" scripts/gate-rust.js && "$NPM_BIN" run build && "$NODE_BIN" scripts/gate-self.js && "$NPM_BIN" test >/dev/null 2>&1); then
+    AR_GATE_FAIL=0
+    if ! run_gate_step 60 "auto-refactor Rust Gate" "auto-refactor" "$NODE_BIN" scripts/gate-rust.js; then
+        AR_GATE_FAIL=1
+    fi
+    if ! run_gate_step 90 "auto-refactor Build" "auto-refactor" "$NPM_BIN" run build; then
+        AR_GATE_FAIL=1
+    fi
+    if ! run_gate_step 60 "auto-refactor Self Gate" "auto-refactor" "$NODE_BIN" scripts/gate-self.js; then
+        AR_GATE_FAIL=1
+    fi
+    if ! run_gate_step 180 "auto-refactor Tests" "auto-refactor" "$NODE_BIN" scripts/test-parallel.js; then
+        AR_GATE_FAIL=1
+    fi
+
+    if [[ "$AR_GATE_FAIL" -ne 0 ]]; then
         echo "❌ Gate 3: auto-refactor 门禁或测试套件未通过"
         FAILED=1
     else
@@ -117,8 +195,7 @@ fi
 # --- Gate 4: auto-refactor 多维自审与质量基线 ---
 if [[ "$RUN_AR" -eq 1 ]]; then
     echo "[4/9] 执行 auto-refactor 质量基线与多维自审 (LOC预算/熵/密度/BIF)..."
-    if ! (cd auto-refactor && "$NODE_BIN" scripts/validate-self-multidimensional-audit.js >/dev/null 2>&1); then
-        echo "❌ Gate 4: auto-refactor 多维自审或质量基线未达标"
+    if ! run_gate_step 60 "Gate 4 (auto-refactor 质量基线)" "auto-refactor" "$NODE_BIN" scripts/validate-self-multidimensional-audit.js; then
         FAILED=1
     else
         echo "  ✔ auto-refactor 质量基线与自审达标"
@@ -130,8 +207,7 @@ fi
 # --- Gate 5: workspace-timing 快速单元测试套件 ---
 if [[ "$RUN_WT" -eq 1 ]]; then
     echo "[5/9] 执行 workspace-timing 快速单元测试套件..."
-    if ! (cd workspace-timing && "$NPM_BIN" run test:fast >/dev/null 2>&1); then
-        echo "❌ Gate 5: workspace-timing 单元测试未通过"
+    if ! run_gate_step 60 "Gate 5 (workspace-timing 快速单元测试)" "workspace-timing" "$NPM_BIN" run test:fast; then
         FAILED=1
     else
         echo "  ✔ workspace-timing 快速单元测试通过"
@@ -143,8 +219,7 @@ fi
 # --- Gate 6: workspace-timing L0~L5 六层审查门禁 ---
 if [[ "$RUN_WT" -eq 1 ]]; then
     echo "[6/9] 执行 workspace-timing L0~L5 六层审查门禁..."
-    if ! (cd workspace-timing && "$NPM_BIN" run review >/dev/null 2>&1); then
-        echo "❌ Gate 6: workspace-timing L0~L5 审查门禁未通过"
+    if ! run_gate_step 60 "Gate 6 (workspace-timing 审查门禁)" "workspace-timing" "$NPM_BIN" run review; then
         FAILED=1
     else
         echo "  ✔ workspace-timing 审查门禁通过"
@@ -156,8 +231,7 @@ fi
 # --- Gate 7: auto-refactor 长期轨迹账本物理约束守卫 ---
 if [[ "$RUN_AR" -eq 1 ]]; then
     echo "[7/9] 校验 auto-refactor 长期轨迹账本物理约束 (<350B/条, <=2MB)..."
-    if ! "$NODE_BIN" scripts/common/validate-trajectory-ledger.js >/dev/null 2>&1; then
-        echo "❌ Gate 7: auto-refactor 轨迹账本物理约束未达标"
+    if ! run_gate_step 30 "Gate 7 (长期轨迹账本约束)" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-trajectory-ledger.js; then
         FAILED=1
     else
         echo "  ✔ auto-refactor 长期轨迹账本物理约束通过"
@@ -169,8 +243,7 @@ fi
 # --- Gate 8: WebGames 配置架构与必需表一致性审查 ---
 if [[ "$RUN_WG" -eq 1 ]]; then
     echo "[8/9] 执行 WebGames 配置架构与必需表一致性审查..."
-    if ! "$PYTHON_BIN" WebGames/scripts/py/audit_config.py --strict >/dev/null 2>&1; then
-        echo "❌ Gate 8: WebGames 配置架构审查未通过"
+    if ! run_gate_step 30 "Gate 8 (WebGames 配置架构审查)" "$ROOT_DIR" "$PYTHON_BIN" WebGames/scripts/py/audit_config.py --strict; then
         FAILED=1
     else
         echo "  ✔ WebGames 配置架构审查通过"
@@ -182,9 +255,10 @@ fi
 # --- Gate 9: 待推送提交历史风格与禁词审查 (validate-commit-msg-style / validate-commit-msg) ---
 if [[ -n "$RANGE" ]]; then
     echo "[9/9] 审查待推送提交历史风格与文本约束 (流式扫描: $RANGE)..."
-    if ! "$NODE_BIN" scripts/common/validate-commit-msg.js --range "$RANGE"; then
-        echo "❌ Gate 9: 待推送分支提交历史存在风格与文本约束违规"
+    if ! run_gate_step 30 "Gate 9 (待推送提交历史风格与禁词审查)" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-commit-msg.js --range "$RANGE"; then
         FAILED=1
+    else
+        echo "  ✔ 待推送分支提交历史风格与文本约束校验通过"
     fi
 else
     echo "  ✔ [Gate 9] 首次推送或无上游对比基准，跳过历史扫描"

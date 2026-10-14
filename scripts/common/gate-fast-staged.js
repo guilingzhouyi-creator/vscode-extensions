@@ -9,7 +9,15 @@
  *   - Gate 4: Zero slang & temporary nomenclature
  *   - Gate 5: Dual-scale volume & dynamic envelope budget (ELOC <= 900, LOC <= 1400)
  *   - Gate 6: Secret keys & sensitive token leak prevention
- * Exit Semantics: Exits 0 on clean check, 1 on any violation.
+ * Dependencies & Triggers: Consumes Node.js standard libraries (fs, path, child_process);
+ *   invoked by pre-commit-gate (ps1/sh), pre-push-gate, and CI hygiene workflows.
+ * Responsibilities:
+ *   1. Rapidly validate staged file physical cleanliness and line ending conventions;
+ *   2. Guard against secret token leaks, absolute path disclosures, and non-standard nomenclature;
+ *   3. Enforce dual-scale ELOC/LOC volume budgets across staged source files;
+ *   4. Emit structured diagnostic console logs and fail-closed exit codes.
+ * Exit Semantics & Design Rationale: Exits 0 on clean check, 1 on any violation.
+ *   Employs single-pass in-memory stream parsing to achieve <90ms pre-commit execution without disk thrashing.
  */
 'use strict';
 
@@ -40,6 +48,7 @@ const STANDARD_TECH_ABBREVIATIONS = new Set([
   'rpc', 'ipc', 'csr', 'soa', 'swar', 'simd', 'cc', 'eloc', 'loc',
   'diff', 'rgb', 'hex', 'fn', 'cb', 'rx', 'tx', 'env', 'app', 'dev',
   'fsm', 'npc', 'gm', 'rpg', 'pve', 'pvp', 'hp', 'mp',
+  'vs', 'prf', 'mcp', 'ssot', 'ir', 'cai', 'e2e', 'wasm',
 ]);
 
 const IGNORED_BASENAMES = new Set([

@@ -3,8 +3,14 @@
  * File Path: scripts/common/record-workspace-trajectory.js
  * Architecture Role: Records multi-project audit-all quality results into the unified
  *   long-term .refactor-trajectory ledger, ensuring cross-project trajectory continuity.
- * Dependencies & Triggers: Invoked by audit-all.ps1 and audit-all.sh at conclusion of review.
- * Exit Semantics: Exits 0 on successful ledger append, 1 on severe failure.
+ * Dependencies & Triggers: Consumes baseline reports, Git commit HEAD, and active runs;
+ *   invoked by audit-all.ps1 and audit-all.sh at conclusion of review.
+ * Responsibilities:
+ *   1. Assemble compact trajectory run entry adhering to <350B byte envelope;
+ *   2. Append atomically to active-runs.ndjson ledger;
+ *   3. Enforce rotating archive window and update lifetime summary statistics.
+ * Exit Semantics & Design Rationale: Exits 0 on successful ledger append, 1 on severe failure.
+ *   Guarantees long-term immutable record of workspace quality trajectory without unbounded storage growth.
  */
 'use strict';
 

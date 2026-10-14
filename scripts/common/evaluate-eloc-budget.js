@@ -10,7 +10,7 @@
  *      to compute true semantic complexity (ELOC);
  *   2. Guard against cognitive overload (ELOC <= 800) and editor bloat (LOC <= 1200);
  *   3. Emit structured findings and exit non-zero on threshold breaches.
- * Exit Semantics: 0 = PASS, 1 = FAIL on budget violation or file access error.
+ * Exit Semantics & Design Rationale: 0 = PASS, 1 = FAIL on budget violation or file access error.
  */
 'use strict';
 

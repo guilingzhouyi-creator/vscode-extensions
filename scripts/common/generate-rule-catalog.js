@@ -2,9 +2,15 @@
  * Module: Workspace Rule Catalog Generator & SSOT Consolidator
  * File Path: scripts/common/generate-rule-catalog.js
  * Architecture Role: Single source of truth consolidator for all active static analysis and review rules
- *   across auto-refactor, workspace-timing, and WebGames.
- * Dependencies & Triggers: Invoked by build scripts, CI, and local gate verification.
- * Exit Semantics: Exits 0 on success, 1 on error.
+ *   across auto-refactor, workspace-timing, WebGames, and global tooling.
+ * Dependencies & Triggers: Consumes registry.js, review-rules.json, and audit_config.py;
+ *   invoked by audit-all, pre-commit-gate, pre-push-gate, CI, and local verification.
+ * Responsibilities:
+ *   1. Discover and aggregate rule metadata across all sub-projects;
+ *   2. Validate standard 3-3-3 topology, severity mappings, and non-empty summaries;
+ *   3. Generate canonical rule-catalog.json (SSOT) or assert zero drift in check-only mode.
+ * Exit Semantics & Design Rationale: Exits 0 on clean catalog generation or parity check, 1 on schema/drift error.
+ *   Provides immutable baseline reference preventing rule ID hallucinations across commits and PRs.
  */
 'use strict';
 
