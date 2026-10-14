@@ -82,45 +82,116 @@ fi
 LOG_WT=$(mktemp)
 LOG_WG=$(mktemp)
 LOG_AR=$(mktemp)
-trap 'rm -f "$LOG_WT" "$LOG_WG" "$LOG_AR"' EXIT
+LOG_AR_SELF=$(mktemp)
+trap 'rm -f "$LOG_WT" "$LOG_WG" "$LOG_AR" "$LOG_AR_SELF"' EXIT
 
-# 3. workspace-timing 审查 (前置顺序执行，消除多进程 CPU 争抢对时钟敏感测例与 TB-REGRESSION 棘轮的干扰)
+# 辅助函数: 带看门狗超时的后台进程等待机制
+wait_with_timeout() {
+    local pid="$1"
+    local timeout="$2"
+    local name="$3"
+    local log_file="${4:-}"
+    local count=0
+    while kill -0 "$pid" 2>/dev/null; do
+        if [ "$count" -ge "$timeout" ]; then
+            echo "⚠️ $name 审查执行超时 (${timeout}s，PID: $pid)，强制终止进程..." >&2
+            kill -TERM "$pid" 2>/dev/null || true
+            sleep 1
+            kill -KILL "$pid" 2>/dev/null || true
+
+            local diag_dir="$ROOT_DIR/.audit-logs"
+            mkdir -p "$diag_dir" 2>/dev/null || true
+            local timestamp
+            timestamp=$(date +"%Y%m%d-%H%M%S" 2>/dev/null || echo "unknown")
+            local safe_name
+            safe_name=$(echo "$name" | tr ' ' '_' | tr '[:upper:]' '[:lower:]')
+            local diag_file="$diag_dir/timeout-${safe_name}-${timestamp}.log"
+            {
+                echo "================================================================================"
+                echo "⚠️ WATCHDOG TIMEOUT 诊断快照"
+                echo "================================================================================"
+                echo "目标模块: $name"
+                echo "进程 PID: $pid"
+                echo "超时阈值: ${timeout} 秒"
+                echo "触发时间: $(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || date)"
+                echo "处置措施: 看门狗已触发 SIGTERM/SIGKILL 级联终止进程"
+                echo "--------------------------------------------------------------------------------"
+                echo "【最后捕获的标准输出与错误日志】:"
+                if [[ -n "$log_file" && -f "$log_file" ]]; then
+                    tail -n 100 "$log_file"
+                else
+                    echo "(日志内容为空或未指定日志文件)"
+                fi
+                echo "================================================================================"
+            } > "$diag_file" 2>/dev/null || true
+            echo "💡 超时诊断快照已落盘至: $diag_file" >&2
+            return 124
+        fi
+        sleep 1
+        count=$((count + 1))
+    done
+    wait "$pid" 2>/dev/null || return $?
+    return 0
+}
+
+# 3~5. 并行并发调度 workspace-timing、WebGames 与 auto-refactor 三大项目审查
 if [[ "$JSON_MODE" -eq 0 ]]; then
-    echo "▶ [3/5] 执行 workspace-timing 审查 (前置顺序执行，消融时钟竞争)..."
+    echo "▶ [3/5] 并行调度 workspace-timing 审查 (VS Code 扩展)..."
+    echo "▶ [4/5] 并行调度 WebGames 领域配置与架构审查..."
+    echo "▶ [5/5] 并行调度 auto-refactor 静态引擎多维自审与质量门禁..."
 fi
 
+# 并发拉起三大项目审查任务 (后台异步派发)
+(cd workspace-timing && "$NPM_BIN" run review) >"$LOG_WT" 2>&1 &
+PID_WT=$!
+
+("$PYTHON_BIN" WebGames/scripts/py/audit_config.py --strict --arch) >"$LOG_WG" 2>&1 &
+PID_WG=$!
+
+if [[ "$FAST_MODE" -eq 1 ]]; then
+    (cd auto-refactor && "$NODE_BIN" scripts/validate-self-multidimensional-audit.js) >"$LOG_AR" 2>&1 &
+    PID_AR=$!
+else
+    (cd auto-refactor && "$NODE_BIN" scripts/test-parallel.js) >"$LOG_AR" 2>&1 &
+    PID_AR=$!
+fi
+
+# 看门狗超时守卫：防止子进程挂起导致审查无限阻塞
+TIMEOUT_WT=$([ "$FAST_MODE" -eq 1 ] && echo 60 || echo 120)
+TIMEOUT_WG=$([ "$FAST_MODE" -eq 1 ] && echo 60 || echo 120)
+TIMEOUT_AR=$([ "$FAST_MODE" -eq 1 ] && echo 90 || echo 240)
+
 STATUS_WT="PASS"
-if ! (cd workspace-timing && "$NPM_BIN" run review) >"$LOG_WT" 2>&1; then
+CODE_WT=0
+wait_with_timeout "$PID_WT" "$TIMEOUT_WT" "workspace-timing" "$LOG_WT" || CODE_WT=$?
+if [[ "$CODE_WT" -ne 0 ]]; then
     STATUS_WT="FAIL"
     FAILED=1
 fi
 
-# 4. WebGames 领域配置与架构审查 (顺序执行)
-if [[ "$JSON_MODE" -eq 0 ]]; then
-    echo "▶ [4/5] 执行 WebGames 领域配置与架构审查..."
-fi
-
 STATUS_WG="PASS"
-if ! ("$PYTHON_BIN" WebGames/scripts/py/audit_config.py --strict --arch) >"$LOG_WG" 2>&1; then
+CODE_WG=0
+wait_with_timeout "$PID_WG" "$TIMEOUT_WG" "WebGames" "$LOG_WG" || CODE_WG=$?
+if [[ "$CODE_WG" -ne 0 ]]; then
     STATUS_WG="FAIL"
     FAILED=1
 fi
 
-# 5. auto-refactor 静态引擎多维自审与质量门禁 (独占系统资源执行)
-if [[ "$JSON_MODE" -eq 0 ]]; then
-    echo "▶ [5/5] 执行 auto-refactor 静态引擎多维自审与质量门禁..."
+STATUS_AR="PASS"
+CODE_AR=0
+wait_with_timeout "$PID_AR" "$TIMEOUT_AR" "auto-refactor" "$LOG_AR" || CODE_AR=$?
+if [[ "$CODE_AR" -ne 0 ]]; then
+    STATUS_AR="FAIL"
+    FAILED=1
 fi
 
-STATUS_AR="PASS"
-if [[ "$FAST_MODE" -eq 1 ]]; then
-    if ! (cd auto-refactor && "$NODE_BIN" scripts/validate-self-multidimensional-audit.js) >"$LOG_AR" 2>&1; then
+if [[ "$FAST_MODE" -eq 0 && "$STATUS_AR" == "PASS" ]]; then
+    CODE_GATE_SELF=0
+    (cd auto-refactor && "$NODE_BIN" scripts/gate-self.js) >"$LOG_AR_SELF" 2>&1 || CODE_GATE_SELF=$?
+    if [[ "$CODE_GATE_SELF" -ne 0 ]]; then
         STATUS_AR="FAIL"
         FAILED=1
-    fi
-else
-    if ! (cd auto-refactor && "$NPM_BIN" test && "$NODE_BIN" scripts/gate-self.js) >"$LOG_AR" 2>&1; then
-        STATUS_AR="FAIL"
-        FAILED=1
+        cat "$LOG_AR_SELF" >> "$LOG_AR"
     fi
 fi
 
@@ -146,7 +217,17 @@ if [[ "$STATUS_AR" != "PASS" ]]; then
     fi
 fi
 
-rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG"
+if [[ "$FAILED" -ne 0 ]]; then
+    DIAG_DIR="$ROOT_DIR/.audit-logs"
+    mkdir -p "$DIAG_DIR" 2>/dev/null || true
+    TIMESTAMP=$(date +"%Y%m%d-%H%M%S" 2>/dev/null || echo "unknown")
+    [[ "$STATUS_WT" != "PASS" && -s "$LOG_WT" ]] && cp "$LOG_WT" "$DIAG_DIR/fail-workspace-timing-$TIMESTAMP.log" 2>/dev/null || true
+    [[ "$STATUS_WG" != "PASS" && -s "$LOG_WG" ]] && cp "$LOG_WG" "$DIAG_DIR/fail-webgames-$TIMESTAMP.log" 2>/dev/null || true
+    [[ "$STATUS_AR" != "PASS" && -s "$LOG_AR" ]] && cp "$LOG_AR" "$DIAG_DIR/fail-auto-refactor-$TIMESTAMP.log" 2>/dev/null || true
+    echo "💡 失败审查完整日志已保留至: .audit-logs/" >&2
+fi
+
+rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF"
 
 # 统一合并执行报告、十维质量看板与步骤摘要生成（消除多进程重复启动）
 "$NODE_BIN" -e '

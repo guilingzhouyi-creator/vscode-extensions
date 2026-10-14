@@ -108,6 +108,74 @@ function Get-GradeFromScore {
     return (Get-GradeTag $Score).Replace("[", "").Replace("]", "").Trim()
 }
 
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+
+function Wait-ProcessWithTimeout {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [System.Diagnostics.Process]$Process,
+        [Parameter(Mandatory = $true)]
+        [int]$TimeoutSeconds,
+        [Parameter(Mandatory = $false)]
+        [string]$ProcessName = "Process",
+        [Parameter(Mandatory = $false)]
+        [string[]]$LogFiles = @()
+    )
+    $hasExited = $Process.WaitForExit($TimeoutSeconds * 1000)
+    if (-not $hasExited) {
+        $pidNum = $Process.Id
+        try {
+            Write-Warning "⚠️ $ProcessName 审查执行超时 (${TimeoutSeconds}s，PID: $pidNum)，强制终止进程树..."
+            $Process.Kill($true)
+        } catch {
+            # 容错处理：进程若在捕获瞬间已退出
+        }
+
+        try {
+            $diagDir = Join-Path $repoRoot ".audit-logs"
+            if (-not (Test-Path $diagDir)) {
+                [void](New-Item -ItemType Directory -Path $diagDir -Force)
+            }
+            $safeName = $ProcessName.Replace(" ", "_").ToLower()
+            $timestamp = (Get-Date).ToString("yyyyMMdd-HHmmss")
+            $diagFile = Join-Path $diagDir "timeout-$safeName-$timestamp.log"
+
+            $diagLines = [System.Collections.Generic.List[string]]::new()
+            $diagLines.Add("================================================================================")
+            $diagLines.Add("⚠️ WATCHDOG TIMEOUT 诊断快照")
+            $diagLines.Add("================================================================================")
+            $diagLines.Add("目标模块: $ProcessName")
+            $diagLines.Add("进程 PID: $pidNum")
+            $diagLines.Add("超时阈值: ${TimeoutSeconds} 秒")
+            $diagLines.Add("触发时间: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff zzz')")
+            $diagLines.Add("处置措施: 看门狗已触发 Process.Kill(`$true) 级联终止进程树")
+            $diagLines.Add("--------------------------------------------------------------------------------")
+            $diagLines.Add("【最后捕获的标准输出与错误日志】:")
+            foreach ($lf in $LogFiles) {
+                if (Test-Path $lf) {
+                    $diagLines.Add("--- 来源日志: $lf ---")
+                    $tailContent = Get-Content -Path $lf -Encoding utf8 -Tail 100 -ErrorAction SilentlyContinue
+                    if ($tailContent) {
+                        $diagLines.AddRange($tailContent)
+                    } else {
+                        $diagLines.Add("(日志内容为空或未捕获到输出)")
+                    }
+                }
+            }
+            $diagLines.Add("================================================================================")
+            [System.IO.File]::WriteAllLines($diagFile, $diagLines, [System.Text.UTF8Encoding]::new($false))
+            Write-Host "💡 超时诊断快照已落盘至: $diagFile" -ForegroundColor Yellow
+        } catch {
+            # 诊断快照落盘失败不阻断异常主流程
+        }
+
+        return $false
+    }
+    $Process.WaitForExit()
+    return $true
+}
+
 if (-not $env:GIT_CONFIG_GLOBAL) { $env:GIT_CONFIG_GLOBAL = 'NUL' }
 if (-not $env:GIT_CONFIG_SYSTEM) { $env:GIT_CONFIG_SYSTEM = 'NUL' }
 if (-not $env:GIT_CONFIG_NOSYSTEM) { $env:GIT_CONFIG_NOSYSTEM = '1' }
@@ -122,8 +190,6 @@ if (-not $Json) {
     Write-Host "🌐 全工作区跨项目统一审查中枢 (Unified Workspace Review Engine)" -ForegroundColor Cyan
     Write-Host "=================================================================" -ForegroundColor Cyan
 }
-
-$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 
 $startTime = [System.Diagnostics.Stopwatch]::StartNew()
 $failed = $false
@@ -154,49 +220,51 @@ if ($codeCatalog -ne 0 -or $codeSkills -ne 0) {
     $statusRules = "PASS"
 }
 
-# 3. workspace-timing 审查 (前置顺序执行，消除多进程 CPU 争抢对时钟敏感测例与 TB-REGRESSION 棘轮的干扰)
+# 3~5. 并行并发调度 workspace-timing、WebGames 与 auto-refactor 三大项目审查
 $workspaceTimingDir = Join-Path $repoRoot "workspace-timing"
+$autoRefactorDir = Join-Path $repoRoot "auto-refactor"
+
 if (-not $Json) {
-    Write-Host "▶ [3/5] 执行 workspace-timing 审查 (前置顺序执行，消融时钟竞争)..." -ForegroundColor Gray
+    Write-Host "▶ [3/5] 并行调度 workspace-timing 审查 (VS Code 扩展)..." -ForegroundColor Gray
+    Write-Host "▶ [4/5] 并行调度 WebGames 领域配置与架构审查..." -ForegroundColor Gray
+    Write-Host "▶ [5/5] 并行调度 auto-refactor 静态引擎多维自审与质量门禁..." -ForegroundColor Gray
 }
 
 $transientDir = [System.IO.Path]::GetTempPath()
 $randSuffix = [System.Guid]::NewGuid().ToString().Substring(0, 8)
 $logWtOut = Join-Path $transientDir "audit-wt-$randSuffix.out.log"
 $logWtErr = Join-Path $transientDir "audit-wt-$randSuffix.err.log"
-
-$procWt = Start-Process -FilePath $npmCmd -ArgumentList @("run", "review") -WorkingDirectory $workspaceTimingDir -RedirectStandardOutput $logWtOut -RedirectStandardError $logWtErr -PassThru -Wait
-$statusWt = if ($procWt.ExitCode -eq 0) { "PASS" } else { "FAIL" }
-
-# 4. WebGames 领域配置与架构审查 (顺序执行)
-if (-not $Json) {
-    Write-Host "▶ [4/5] 执行 WebGames 领域配置与架构审查..." -ForegroundColor Gray
-}
 $logWgOut = Join-Path $transientDir "audit-wg-$randSuffix.out.log"
 $logWgErr = Join-Path $transientDir "audit-wg-$randSuffix.err.log"
-
-$procWg = Start-Process -FilePath $pythonCmd -ArgumentList @("WebGames/scripts/py/audit_config.py", "--strict", "--arch") -WorkingDirectory $repoRoot -RedirectStandardOutput $logWgOut -RedirectStandardError $logWgErr -PassThru -Wait
-$statusWg = if ($procWg.ExitCode -eq 0) { "PASS" } else { "FAIL" }
-
-# 5. auto-refactor 静态引擎多维自审与质量门禁 (独占系统资源执行)
-$autoRefactorDir = Join-Path $repoRoot "auto-refactor"
-if (-not $Json) {
-    Write-Host "▶ [5/5] 执行 auto-refactor 静态引擎多维自审与质量门禁..." -ForegroundColor Gray
-}
 $logArOut = Join-Path $transientDir "audit-ar-$randSuffix.out.log"
 $logArErr = Join-Path $transientDir "audit-ar-$randSuffix.err.log"
 $logArSelfOut = Join-Path $transientDir "audit-ar-self-$randSuffix.out.log"
 $logArSelfErr = Join-Path $transientDir "audit-ar-self-$randSuffix.err.log"
 
+$procWt = Start-Process -FilePath $npmCmd -ArgumentList @("run", "review") -WorkingDirectory $workspaceTimingDir -RedirectStandardOutput $logWtOut -RedirectStandardError $logWtErr -PassThru
+$procWg = Start-Process -FilePath $pythonCmd -ArgumentList @("WebGames/scripts/py/audit_config.py", "--strict", "--arch") -WorkingDirectory $repoRoot -RedirectStandardOutput $logWgOut -RedirectStandardError $logWgErr -PassThru
 $procAr = if ($Fast) {
-    Start-Process -FilePath $nodeCmd -ArgumentList @("scripts/validate-self-multidimensional-audit.js") -WorkingDirectory $autoRefactorDir -RedirectStandardOutput $logArOut -RedirectStandardError $logArErr -PassThru -Wait
+    Start-Process -FilePath $nodeCmd -ArgumentList @("scripts/validate-self-multidimensional-audit.js") -WorkingDirectory $autoRefactorDir -RedirectStandardOutput $logArOut -RedirectStandardError $logArErr -PassThru
 } else {
-    Start-Process -FilePath $npmCmd -ArgumentList @("test") -WorkingDirectory $autoRefactorDir -RedirectStandardOutput $logArOut -RedirectStandardError $logArErr -PassThru -Wait
+    Start-Process -FilePath $nodeCmd -ArgumentList @("scripts/test-parallel.js") -WorkingDirectory $autoRefactorDir -RedirectStandardOutput $logArOut -RedirectStandardError $logArErr -PassThru
 }
-$statusAr = if ($procAr.ExitCode -eq 0) { "PASS" } else { "FAIL" }
+
+$timeoutWt = if ($Fast) { 60 } else { 120 }
+$timeoutWg = if ($Fast) { 60 } else { 120 }
+$timeoutAr = if ($Fast) { 90 } else { 240 }
+
+$wtClean = Wait-ProcessWithTimeout -Process $procWt -TimeoutSeconds $timeoutWt -ProcessName "workspace-timing" -LogFiles @($logWtOut, $logWtErr)
+$wgClean = Wait-ProcessWithTimeout -Process $procWg -TimeoutSeconds $timeoutWg -ProcessName "WebGames" -LogFiles @($logWgOut, $logWgErr)
+$arClean = Wait-ProcessWithTimeout -Process $procAr -TimeoutSeconds $timeoutAr -ProcessName "auto-refactor" -LogFiles @($logArOut, $logArErr)
+
+$statusWt = if ($wtClean -and $procWt.ExitCode -eq 0) { "PASS" } else { "FAIL" }
+$statusWg = if ($wgClean -and $procWg.ExitCode -eq 0) { "PASS" } else { "FAIL" }
+$statusAr = if ($arClean -and $procAr.ExitCode -eq 0) { "PASS" } else { "FAIL" }
+
 if (-not $Fast -and $statusAr -eq "PASS") {
-    $procGateSelf = Start-Process -FilePath $nodeCmd -ArgumentList @("scripts/gate-self.js") -WorkingDirectory $autoRefactorDir -RedirectStandardOutput $logArSelfOut -RedirectStandardError $logArSelfErr -PassThru -Wait
-    if ($procGateSelf.ExitCode -ne 0) {
+    $procGateSelf = Start-Process -FilePath $nodeCmd -ArgumentList @("scripts/gate-self.js") -WorkingDirectory $autoRefactorDir -RedirectStandardOutput $logArSelfOut -RedirectStandardError $logArSelfErr -PassThru
+    $gateSelfClean = Wait-ProcessWithTimeout -Process $procGateSelf -TimeoutSeconds 60 -ProcessName "auto-refactor gate-self" -LogFiles @($logArSelfOut, $logArSelfErr)
+    if (-not $gateSelfClean -or $procGateSelf.ExitCode -ne 0) {
         $statusAr = "FAIL"
     }
 }
@@ -232,6 +300,31 @@ if ($statusAr -ne "PASS") {
                 Get-Content $logFile -Encoding utf8 | Select-Object -Last 15 | ForEach-Object { Write-Host "   $_" -ForegroundColor DarkRed }
             }
         }
+    }
+}
+
+if ($failed) {
+    try {
+        $diagDir = Join-Path $repoRoot ".audit-logs"
+        if (-not (Test-Path $diagDir)) {
+            [void](New-Item -ItemType Directory -Path $diagDir -Force)
+        }
+        $timestamp = (Get-Date).ToString("yyyyMMdd-HHmmss")
+        if ($statusWt -ne "PASS") {
+            if (Test-Path $logWtOut) { Copy-Item -Path $logWtOut -Destination (Join-Path $diagDir "fail-workspace-timing-$timestamp.out.log") -Force -ErrorAction SilentlyContinue }
+            if (Test-Path $logWtErr) { Copy-Item -Path $logWtErr -Destination (Join-Path $diagDir "fail-workspace-timing-$timestamp.err.log") -Force -ErrorAction SilentlyContinue }
+        }
+        if ($statusWg -ne "PASS") {
+            if (Test-Path $logWgOut) { Copy-Item -Path $logWgOut -Destination (Join-Path $diagDir "fail-webgames-$timestamp.out.log") -Force -ErrorAction SilentlyContinue }
+            if (Test-Path $logWgErr) { Copy-Item -Path $logWgErr -Destination (Join-Path $diagDir "fail-webgames-$timestamp.err.log") -Force -ErrorAction SilentlyContinue }
+        }
+        if ($statusAr -ne "PASS") {
+            if (Test-Path $logArOut) { Copy-Item -Path $logArOut -Destination (Join-Path $diagDir "fail-auto-refactor-$timestamp.out.log") -Force -ErrorAction SilentlyContinue }
+            if (Test-Path $logArErr) { Copy-Item -Path $logArErr -Destination (Join-Path $diagDir "fail-auto-refactor-$timestamp.err.log") -Force -ErrorAction SilentlyContinue }
+        }
+        Write-Host "💡 失败审查完整日志已保留至: .audit-logs/" -ForegroundColor Yellow
+    } catch {
+        # 归档日志失败不阻断异常主流程
     }
 }
 
