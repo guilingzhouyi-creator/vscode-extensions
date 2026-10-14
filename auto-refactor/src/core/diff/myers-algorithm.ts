@@ -93,7 +93,10 @@ function computeCommonPrefixLength(
     const minLen = Math.min(oldLines.length, newLines.length);
     let prefixIndex = 0;
     while (prefixIndex < minLen) {
-        if (oldHashes[prefixIndex] !== newHashes[prefixIndex] || oldLines[prefixIndex] !== newLines[prefixIndex]) {
+        if (
+            oldHashes[prefixIndex] !== newHashes[prefixIndex] ||
+            oldLines[prefixIndex] !== newLines[prefixIndex]
+        ) {
             break;
         }
         prefixIndex++;
@@ -101,10 +104,7 @@ function computeCommonPrefixLength(
     return prefixIndex;
 }
 
-function computeCommonSuffixLength(
-    span: CommonLineSpan,
-    prefixLength: number,
-): number {
+function computeCommonSuffixLength(span: CommonLineSpan, prefixLength: number): number {
     const { oldLines, newLines, oldHashes, newHashes } = span;
     const maxSuffix = Math.min(oldLines.length - prefixLength, newLines.length - prefixLength);
     let suffixIndex = 0;
@@ -138,7 +138,9 @@ function extractUint32Middle(
     midLength: number,
 ): Uint32Array {
     if (prefixLength === 0 && suffixLength === 0) return hashes;
-    return midLength === 0 ? new Uint32Array(0) : hashes.subarray(prefixLength, hashes.length - suffixLength);
+    return midLength === 0
+        ? new Uint32Array(0)
+        : hashes.subarray(prefixLength, hashes.length - suffixLength);
 }
 
 /**
@@ -157,10 +159,7 @@ export function trimPrefixSuffix(
     newHashes: Uint32Array,
 ): TrimmedSpans {
     const prefix = computeCommonPrefixLength(oldLines, newLines, oldHashes, newHashes);
-    const suffix = computeCommonSuffixLength(
-        { oldLines, newLines, oldHashes, newHashes },
-        prefix,
-    );
+    const suffix = computeCommonSuffixLength({ oldLines, newLines, oldHashes, newHashes }, prefix);
     const midN = oldLines.length - prefix - suffix;
     const midM = newLines.length - prefix - suffix;
 
@@ -197,15 +196,16 @@ interface MyersContext {
 /**
  * Advance diagonal snake along matched lines.
  */
-function advanceSnake(
-    ctx: MyersContext,
-    startX: number,
-    startY: number,
-): number {
+function advanceSnake(ctx: MyersContext, startX: number, startY: number): number {
     const { midA, midB, midHA, midHB, midN, midM } = ctx;
     let currX = startX;
     let currY = startY;
-    while (currX < midN && currY < midM && midHA[currX] === midHB[currY] && midA[currX] === midB[currY]) {
+    while (
+        currX < midN &&
+        currY < midM &&
+        midHA[currX] === midHB[currY] &&
+        midA[currX] === midB[currY]
+    ) {
         currX++;
         currY++;
     }
@@ -341,7 +341,12 @@ function computeReconstructedMyersTrace(
     for (let depthIndex = diffDepth; depthIndex >= 0; depthIndex--) {
         if (depthIndex === 0) {
             const zeroTarget = { currX: 0, currY: 0 };
-            const finalPos = computeRewoundEqualSnake(midOps, prefixLength, { currX, currY }, zeroTarget);
+            const finalPos = computeRewoundEqualSnake(
+                midOps,
+                prefixLength,
+                { currX, currY },
+                zeroTarget,
+            );
             currX = finalPos.currX;
             currY = finalPos.currY;
             break;
@@ -351,7 +356,8 @@ function computeReconstructedMyersTrace(
         const diagonalK = currX - currY;
         const insertMove =
             diagonalK === -depthIndex ||
-            (diagonalK !== depthIndex && flatTrace[base + diagonalK - 1] < flatTrace[base + diagonalK + 1]);
+            (diagonalK !== depthIndex &&
+                flatTrace[base + diagonalK - 1] < flatTrace[base + diagonalK + 1]);
         const prevK = insertMove ? diagonalK + 1 : diagonalK - 1;
         const prevX = flatTrace[base + prevK];
         const prevY = prevX - prevK;
@@ -385,18 +391,6 @@ function computeReconstructedMyersTrace(
     return midOps;
 }
 
-const backtrackMyersTrace = computeReconstructedMyersTrace;
-
-/**
- * Assemble prefix, middle operations, and suffix into unified edit script.
- *
- * @param prefix - Length of matching common prefix lines.
- * @param suffix - Length of matching common suffix lines.
- * @param n - Total lines in old content.
- * @param m - Total lines in new content.
- * @param midOps - Diff operations for the middle modified section.
- * @returns Complete list of diff operations for the full file.
- */
 const COMPACT_DIFF_ENABLED = process.env.AR_COMPACT_DIFF !== '0';
 const CONTEXT_MARGIN = 3;
 
@@ -477,17 +471,11 @@ export interface AssembleSpanConfig {
 /**
  * Assemble prefix, middle operations, and suffix into unified edit script.
  *
- * @param configOrPrefix - Length of matching common prefix lines or AssembleSpanConfig.
- * @param suffixOrMidOps - Length of matching common suffix lines or middle DiffOp array.
- * @param oldLineCount - Total lines in old content.
- * @param newLineCount - Total lines in new content.
- * @param midOpsParam - Diff operations for the middle modified section.
+ * @param config - Options defining prefix, suffix, and line count boundaries.
+ * @param midOps - Diff operations for the middle modified section.
  * @returns Complete list of diff operations for the full file.
  */
-export function assembleDiffOps(
-    config: AssembleSpanConfig,
-    midOps: DiffOp[],
-): DiffOp[] {
+export function assembleDiffOps(config: AssembleSpanConfig, midOps: DiffOp[]): DiffOp[] {
     const { prefix, suffix, oldLineCount, newLineCount } = config;
     const ops: DiffOp[] = [];
     emitPrefixOps(ops, prefix);
@@ -508,8 +496,6 @@ function computeFnv1a32Hash(str: string): number {
     }
     return hash;
 }
-
-const fnv1a = computeFnv1a32Hash;
 
 function computeLineHashes(lines: string[]): Uint32Array {
     const hashes = new Uint32Array(lines.length);
@@ -534,8 +520,6 @@ function evaluateTrivialDiff(oldLines: string[], newLines: string[]): DiffOp[] |
     }
     return null;
 }
-
-const checkTrivialDiff = evaluateTrivialDiff;
 
 /**
  * Computes an optimal line-level edit script using the standard Myers O(ND) greedy
@@ -565,7 +549,7 @@ const checkTrivialDiff = evaluateTrivialDiff;
  *   Precondition: must equal `oldLines.length`.
  * @param hashB - Optional precomputed 32-bit FNV-1a hashes for lines in `newLines`.
  *   Precondition: must equal `newLines.length`.
- * @returns Ordered edit script (`DiffOp[]`) describing minimal edits to transform `oldLines` into `newLines`.
+ * @returns Ordered edit script (`DiffOp[]`) describing minimal edits transforming old to new.
  */
 export function computeMyersDiff(
     oldLines: string[],
@@ -583,7 +567,16 @@ export function computeMyersDiff(
     const trimmed = trimPrefixSuffix(oldLines, newLines, effectiveHashA, effectiveHashB);
     const { prefix, suffix, midA, midB, midHA, midHB } = trimmed;
 
-    return executeMyersDiffCore({ prefix, suffix, oldLineCount, newLineCount, midA, midB, midHA, midHB });
+    return executeMyersDiffCore({
+        prefix,
+        suffix,
+        oldLineCount,
+        newLineCount,
+        midA,
+        midB,
+        midHA,
+        midHB,
+    });
 }
 
 /**
@@ -638,7 +631,10 @@ export function executeMyersDiffCore(plan: MyersDiffPlan): DiffOp[] {
 
     // Guard against excessive iterations on large unpruned matrices (>1500 lines or >2M cells).
     // Degradation cleanly preserves trimmed prefix/suffix slices.
-    if (maxDistance > MYERS_MAX_MID_LINES || (maxDistance + 1) * (2 * maxDistance + 1) > MYERS_MAX_TRACE_CELLS) {
+    if (
+        maxDistance > MYERS_MAX_MID_LINES ||
+        (maxDistance + 1) * (2 * maxDistance + 1) > MYERS_MAX_TRACE_CELLS
+    ) {
         const midOps = histogramDiff(midA, midB, midHA, midHB);
         return assembleDiffOps(spanConfig, midOps);
     }

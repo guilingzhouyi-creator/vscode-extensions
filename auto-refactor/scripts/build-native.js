@@ -39,8 +39,8 @@ const BUILD_COMMAND_DEFAULT = 'cargo build --release';
 /**
  * Generates search candidate paths for compiled native artifacts across targets.
  *
- * @param {string} crateDir - Root directory of the Rust crate.
- * @returns {string[]} Array of resolved candidate file paths.
+ * @param crateDir - Root directory of the Rust crate.
+ * @returns Array of resolved candidate file paths.
  */
 function resolveCandidatePaths(crateDir) {
   const rootTarget = path.join(crateDir, DIR_PARENT, DIR_TARGET);

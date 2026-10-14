@@ -16,7 +16,6 @@ import {
     RULE_FAMILY_TYPESCRIPT_MODERN,
     RULE_FAMILY_RUST_MODERN,
     RULE_FAMILY_VSCODE_EXTENSION,
-    RULE_FAMILY_MODERNITY,
     LANGUAGE_TYPESCRIPT,
     LANGUAGE_JAVASCRIPT,
     LANGUAGE_RUST,
@@ -749,5 +748,3 @@ export const ANALYZER_MODERN_LANGUAGE_RULES: readonly RuleDefinition[] = [
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#vsc-ui-003',
     }),
 ];
-
-

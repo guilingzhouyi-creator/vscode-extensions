@@ -4,15 +4,16 @@
  * Architecture Role: Detects redundant backward compatibility shim functions and methods,
  *   auditing short forwarding bodies or explicit deprecation/shim tags and scoring them
  *   against the 4D Elastic Compatibility Arbiter to emit MOD-BWD-001 issues.
- * Dependencies & Triggers: Consumes typescript AST (ts.SourceFile) and elastic-compatibility-arbiter;
- *   invoked by scan pipeline and rule generalization orchestrators.
+ * Dependencies & Triggers: Consumes typescript AST (ts.SourceFile) and
+ *   elastic-compatibility-arbiter; invoked by scan pipeline and rule generalization orchestrators.
  * Responsibilities:
- *   1. Traverse ts.SourceFile AST for function declarations, method declarations, and arrow bindings;
+ *   1. Traverse ts.SourceFile AST for function, method, and arrow binding declarations;
  *   2. Detect short bodies (<= 4 lines / statements) performing transparent parameter forwarding;
  *   3. Parse JSDoc and comments for @deprecated, shim, or backward compat markers;
  *   4. Query ElasticCompatibilityArbiter with fanIn, isPerimeter, isHotPath, and sunset versions;
  *   5. Emit canonical MOD-BWD-001 issues with structured detail and actionable suggestions.
- * Exit Semantics & Design Rationale: Pure, deterministic function; returns Issue[] array with zero side effects.
+ * Exit Semantics & Design Rationale: Pure, deterministic function; returns Issue[] array
+ *   with zero side effects.
  */
 
 import * as ts from 'typescript';
@@ -38,7 +39,6 @@ const SUNSET_VERSION_RE = /sunset:?\s*v?([0-9]+\.[0-9]+(?:\.[0-9]+)?)/i;
 function inferProjectVersion(filePath: string): string | undefined {
     return resolveProjectVersion(filePath);
 }
-
 
 /**
  * Options for configuring backward compatibility shim audit.
@@ -121,6 +121,7 @@ function hasShimMarker(sourceFile: ts.SourceFile, node: ts.Node): boolean {
  *
  * @param node - Declaration AST node.
  * @param symbolName - Identifier text.
+ * @param parent - Optional parent declaration AST node.
  * @param options - Audit configuration options.
  * @returns Derived or configured fan-in integer.
  */
@@ -155,7 +156,9 @@ function resolveFanIn(
         const parentModifiers = ts.canHaveModifiers(parent) ? ts.getModifiers(parent) : undefined;
         const parentExported = parentModifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
         const isExplicitPublic = modifiers?.some((m) => m.kind === ts.SyntaxKind.PublicKeyword);
-        const isExplicitProtected = modifiers?.some((m) => m.kind === ts.SyntaxKind.ProtectedKeyword);
+        const isExplicitProtected = modifiers?.some(
+            (m) => m.kind === ts.SyntaxKind.ProtectedKeyword,
+        );
         if (parentExported && (isExplicitPublic || !isExplicitProtected)) {
             isExported = true;
         }
@@ -183,7 +186,10 @@ function resolveFanIn(
  * @param body - Function body block or expression.
  * @returns Struct with target call name and statement count.
  */
-function extractBodyTargetCall(body: ts.Block | ts.Expression): { targetCall: string | null; count: number } {
+function extractBodyTargetCall(body: ts.Block | ts.Expression): {
+    targetCall: string | null;
+    count: number;
+} {
     if (ts.isBlock(body)) {
         const count = body.statements.length;
         if (count === 0 || count > MAX_SHIM_BODY_STATEMENTS) return { targetCall: null, count };

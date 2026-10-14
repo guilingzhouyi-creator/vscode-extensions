@@ -31,16 +31,9 @@ import {
     FRAGMENT_ERROR,
     FRAGMENT_WARNING,
     RULE_MOD_BWD_001,
-    RULE_MOD_FLB_001,
-    RULE_MOD_DEP_001,
     DEDUCTION_BACKWARD_SHIM,
-    DEDUCTION_FALLBACK_CHAIN,
-    DEDUCTION_DEPRECATED_ACCESS,
 } from './dimensionLiterals';
-import {
-    calculateArchitectureDirectnessIndex,
-    calculateShimDebtDecayPenalty,
-} from './modernization-formulas';
+import { calculateShimDebtDecayPenalty } from './modernization-formulas';
 export {
     calculateArchitectureDirectnessIndex,
     calculateShimDebtDecayPenalty,
@@ -577,8 +570,7 @@ export function applyModernityDecayDeductions(issue: Issue, apply: DeductionAppl
         typeof detail.penaltyMultiplier === 'number' ? detail.penaltyMultiplier : 1.0;
     const versionsUntilSunset =
         typeof detail.versionsUntilSunset === 'number' ? detail.versionsUntilSunset : 0;
-    const ageDays =
-        versionsUntilSunset <= 0 ? 60 : Math.max(1, (3 - versionsUntilSunset) * 30);
+    const ageDays = versionsUntilSunset <= 0 ? 60 : Math.max(1, (3 - versionsUntilSunset) * 30);
     const dynamicPenalty = calculateShimDebtDecayPenalty(
         DEDUCTION_BACKWARD_SHIM * penaltyMul,
         ageDays,

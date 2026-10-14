@@ -28,6 +28,9 @@ export interface WorkerSymbolsPayload {
     references: SymbolReference[];
 }
 
+/**
+ * Raw scanning results emitted by an isolated worker thread for a single processed file.
+ */
 export type WorkerRawResultItem = {
     file: string;
     issues: Issue[];

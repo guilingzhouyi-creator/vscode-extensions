@@ -717,7 +717,9 @@ function synthesizeAutonomyEvaluation(
     const totalTreeEloc =
         state.proprietaryEffectiveLoc + state.vendorEffectiveLoc + state.generatedEffectiveLoc;
     const rLoc =
-        totalTreeEloc > 0 ? (state.proprietaryEffectiveLoc / totalTreeEloc) * PERCENT_FACTOR : PERCENT_FACTOR;
+        totalTreeEloc > 0
+            ? (state.proprietaryEffectiveLoc / totalTreeEloc) * PERCENT_FACTOR
+            : PERCENT_FACTOR;
 
     const totalScopedCalls = state.internalSymbolCalls + state.externalSdkCalls;
     let rCall: number;
@@ -725,14 +727,20 @@ function synthesizeAutonomyEvaluation(
         rCall = (state.internalSymbolCalls / totalScopedCalls) * PERCENT_FACTOR;
     } else if (state.sdkCallCounts.size > 0 || state.externalSdkCalls > 0) {
         const externalPkgs = Math.max(1, state.sdkCallCounts.size);
-        rCall = Math.max(MIN_RCALL_SCORE, PERCENT_FACTOR - externalPkgs * EXTERNAL_PKG_PENALTY_WEIGHT);
+        rCall = Math.max(
+            MIN_RCALL_SCORE,
+            PERCENT_FACTOR - externalPkgs * EXTERNAL_PKG_PENALTY_WEIGHT,
+        );
     } else {
         rCall = PERCENT_FACTOR;
     }
 
     const rDomain =
         state.proprietaryEffectiveLoc > 0
-            ? Math.min(PERCENT_FACTOR, (state.domainKernelEffectiveLoc / state.proprietaryEffectiveLoc) * PERCENT_FACTOR)
+            ? Math.min(
+                  PERCENT_FACTOR,
+                  (state.domainKernelEffectiveLoc / state.proprietaryEffectiveLoc) * PERCENT_FACTOR,
+              )
             : PERCENT_FACTOR;
 
     const cloneIssues = issues.filter(
@@ -906,10 +914,7 @@ function applySymbolIndexReferences(
     }
 }
 
-function appendExtPackage(
-    pkgs: string[] | undefined,
-    spec: string,
-): string[] {
+function appendExtPackage(pkgs: string[] | undefined, spec: string): string[] {
     const pkg = extractModulePackageName(spec);
     if (pkgs !== undefined) {
         pkgs.push(pkg);

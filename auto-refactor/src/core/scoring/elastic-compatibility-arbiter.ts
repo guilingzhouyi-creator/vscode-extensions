@@ -7,12 +7,13 @@
  * Dependencies & Triggers: Consumes Severity from ../types; invoked by backwardShimRule,
  *   fallback-chain-matcher, and deprecated-usage-visitor during AST analysis.
  * Responsibilities:
- *   1. Evaluate Fan-In elasticity (private leaf <=1: error 1.0; internal 2..4: warning 0.6; public >=5: dynamic);
- *   2. Enforce sunset retirement deadlines (unspecified or expired >= sunset: error 2.0; transition: info/warning 0.2~0.5);
- *   3. Enforce physical location invariants (perimeter allows compatibility relaxation; hotpath strictly vetoes as error 2.0);
+ *   1. Evaluate Fan-In elasticity (leaf <=1: error 1.0; internal 2..4: warn 0.6; public >=5);
+ *   2. Enforce sunset retirement deadlines (expired: error 2.0; transition: info/warn 0.2~0.5);
+ *   3. Enforce physical location invariants (perimeter relaxed; hotpath vetoes as error 2.0);
  *   4. Zero transient heap allocation in high-frequency scoring paths with flat control flow.
- * Exit Semantics & Design Rationale: Pure, deterministic function; returns structured ElasticEvaluationResult
- *   with quantified severity, penalty multiplier, envelope category, and technical rationale.
+ * Exit Semantics & Design Rationale: Pure, deterministic function; returns
+ *   structured ElasticEvaluationResult with quantified severity, penalty multiplier,
+ *   envelope category, and technical rationale.
  */
 
 import type { Severity } from '../types';
@@ -24,7 +25,9 @@ import { SEVERITY_INFO, SEVERITY_WARNING, SEVERITY_ERROR } from '../types';
 export interface ElasticContext {
     /** Fan-in invocation count or dependent callers count */
     fanIn: number;
-    /** Whether symbol is located at the architectural perimeter (API entrypoint, adapter, gateway) */
+    /**
+     * Whether symbol is located at the architectural perimeter (API entrypoint, adapter, gateway)
+     */
     isPerimeter?: boolean;
     /** Whether symbol is located in core business domain or performance hotpath */
     isHotPath?: boolean;
@@ -42,11 +45,7 @@ export interface ElasticContext {
  * Category envelope classification for compatibility lifecycle.
  */
 export type ElasticEnvelopeType =
-    | 'private_leaf'
-    | 'internal_shared'
-    | 'public_api'
-    | 'hotpath_violation'
-    | 'perimeter_relaxed';
+    'private_leaf' | 'internal_shared' | 'public_api' | 'hotpath_violation' | 'perimeter_relaxed';
 
 /**
  * Quantified arbitration verdict returned by the elastic arbiter.
@@ -107,15 +106,23 @@ function calculateVersionDistance(
  * @returns Structured arbitration verdict with severity, multiplier, envelope, and rationale.
  */
 export function evaluateElasticEnvelope(context: ElasticContext): ElasticEvaluationResult {
-    const { fanIn, isPerimeter = false, isHotPath = false, currentVersion, sunsetVersion } = context;
+    const {
+        fanIn,
+        isPerimeter = false,
+        isHotPath = false,
+        currentVersion,
+        sunsetVersion,
+    } = context;
 
-    // 1. Hotpath one-vote veto: any compatibility shim or fallback cascade on hotpath is strictly error
+    // 1. Hotpath one-vote veto: any compatibility shim or fallback cascade
+    // on hotpath is strictly error
     if (isHotPath) {
         return {
             severity: SEVERITY_ERROR,
             penaltyMultiplier: 2.0,
             envelope: 'hotpath_violation',
-            rationale: 'Hotpath performance barrier: backward compatibility shim or fallback cascade on critical execution path is vetoed as error.',
+            rationale:
+                'Hotpath performance barrier: backward compatibility shim or fallback cascade on critical execution path is vetoed as error.',
             versionsUntilSunset: null,
         };
     }
@@ -127,7 +134,8 @@ export function evaluateElasticEnvelope(context: ElasticContext): ElasticEvaluat
                 severity: SEVERITY_WARNING,
                 penaltyMultiplier: 0.5,
                 envelope: 'perimeter_relaxed',
-                rationale: 'Perimeter private leaf allows transitional accommodation with softened penalty.',
+                rationale:
+                    'Perimeter private leaf allows transitional accommodation with softened penalty.',
                 versionsUntilSunset: null,
             };
         }
@@ -180,7 +188,8 @@ export function evaluateElasticEnvelope(context: ElasticContext): ElasticEvaluat
             severity: SEVERITY_WARNING,
             penaltyMultiplier: 0.5,
             envelope: 'public_api',
-            rationale: 'Public API symbol has sunset schedule but current system version is unverified.',
+            rationale:
+                'Public API symbol has sunset schedule but current system version is unverified.',
             versionsUntilSunset: 1,
         };
     }

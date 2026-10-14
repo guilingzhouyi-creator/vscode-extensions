@@ -20,6 +20,105 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { FusionWeights } from '../scoring/fusion-scorer';
 
+/** File encoding standard */
+const ENCODING_UTF8 = 'utf-8';
+
+/** Default profile for governance snapshot */
+const DEFAULT_PROJECT_PROFILE = 'standard';
+
+/** Schema version for governance ledger snapshots */
+const GOVERNANCE_SNAPSHOT_VERSION = '1.0';
+
+/** Prefix for unique incident identifier keys */
+const INCIDENT_ID_PREFIX = 'INC-';
+
+/** Default description for stability milestone achievement */
+const DEFAULT_MILESTONE_DESC = 'Module completed production release cycle with zero regressions';
+
+/** Feedback incident type classifications */
+const INCIDENT_TYPE_ROLLBACK: FeedbackIncidentType = 'rollback';
+const INCIDENT_TYPE_STABLE_MILESTONE: FeedbackIncidentType = 'stable_milestone';
+
+/** Feedback incident severity classifications */
+const SEVERITY_LOW: FeedbackIncidentSeverity = 'low';
+const SEVERITY_HIGH: FeedbackIncidentSeverity = 'high';
+
+/** Incident attribution plane literals */
+const PLANE_STATIC: IncidentAttributionPlane = 'static';
+const PLANE_DYNAMIC: IncidentAttributionPlane = 'dynamic';
+const PLANE_FEEDBACK: IncidentAttributionPlane = 'feedback';
+const PLANE_UNSPECIFIED: IncidentAttributionPlane = 'unspecified';
+
+/** Scaling factor for two-decimal rounding operations */
+const ROUND_PERCENT_FACTOR = 100;
+
+/** Precision multiplier for three-decimal weight normalization */
+const WEIGHT_ROUND_FACTOR = 1000;
+
+/** Default predicted quality score for rollbacks */
+const DEFAULT_ROLLBACK_SCORE = 85.0;
+
+/** Realized defect score for rollbacks */
+const DEFAULT_ROLLBACK_ACTUAL_SCORE = 20.0;
+
+/** Baseline predicted quality score for milestone verification */
+const DEFAULT_MILESTONE_SCORE = 90.0;
+
+/** Realized quality score for zero-regression milestones */
+const DEFAULT_MILESTONE_ACTUAL_SCORE = 100.0;
+
+/** Maximum quality score boundary */
+const MAX_QUALITY_SCORE = 100.0;
+
+/** Minimum quality score boundary */
+const MIN_QUALITY_SCORE = 0.0;
+
+/** Adoption threshold qualifying a rule for reliability boost */
+const PROVEN_ADOPTION_THRESHOLD = 5;
+
+/** Penalization decrement per recorded rollback */
+const ROLLBACK_PENALTY_STEP = 0.25;
+
+/** Adoption reward increment per successful adoption */
+const ADOPTION_BONUS_STEP = 0.05;
+
+/** Reliability multiplier boost for proven adoption record */
+const PROVEN_RULE_BONUS = 0.1;
+
+/** Absolute minimum floor for rule confidence multiplier */
+const MIN_RULE_CONFIDENCE = 0.2;
+
+/** Absolute maximum ceiling for rule confidence multiplier */
+const MAX_RULE_CONFIDENCE = 1.2;
+
+/** Absolute minimum floor for supervisor rule confidence adjustment */
+const CONFIDENCE_FLOOR = 0.1;
+
+/** Absolute maximum ceiling for supervisor rule confidence adjustment */
+const CONFIDENCE_CEILING = 1.0;
+
+/** Maximum stability boost multiplier increment for patterns */
+const MAX_PATTERN_BOOST = 0.25;
+
+/** Stability boost increment per recorded milestone */
+const PATTERN_MILESTONE_STEP = 0.05;
+
+/** Default smooth learning rate eta */
+const DEFAULT_LEARNING_RATE = 0.02;
+
+/** Minimum permitted learning rate eta */
+const MIN_LEARNING_RATE = 0.01;
+
+/** Maximum permitted learning rate eta */
+const MAX_LEARNING_RATE = 0.05;
+
+/** Formatting indentation spaces for JSON snapshot persistence */
+const JSON_INDENT_SPACES = 2;
+
+const PROP_WS = 'Ws';
+const PROP_WD = 'Wd';
+const PROP_WF = 'Wf';
+
 /**
  * Persistent snapshot schema for governance ledger and learned tri-plane weights.
  */
@@ -100,6 +199,22 @@ export interface PatternStabilityStats {
 }
 
 /**
+ * Tri-plane gradient vector representation avoiding capitalized member identifiers.
+ */
+export type TriPlaneGradient = FusionWeights;
+
+/**
+ * Context object for recording rule rollback occurrences.
+ */
+export interface RuleRollbackContext {
+    ruleId: string;
+    modulePath: string;
+    description: string;
+    predictedScore?: number;
+    actualOutcomeScore?: number;
+}
+
+/**
  * Single step of weight evolution.
  */
 export interface AdaptiveEvolutionStep {
@@ -109,7 +224,7 @@ export interface AdaptiveEvolutionStep {
     updatedWeights: FusionWeights;
     error: number;
     learningRate: number;
-    gradient: { Ws: number; Wd: number; Wf: number };
+    gradient: TriPlaneGradient;
     reason: string;
 }
 
@@ -128,13 +243,104 @@ export interface FeedbackGovernanceSummary {
 
 /** Default minimum and maximum bounds for tri-plane weights */
 const WEIGHT_BOUNDS = {
-    Ws: { min: 0.2, max: 0.8 },
-    Wd: { min: 0.1, max: 0.7 },
-    Wf: { min: 0.05, max: 0.4 },
+    [PROP_WS]: { min: 0.2, max: 0.8 },
+    [PROP_WD]: { min: 0.1, max: 0.7 },
+    [PROP_WF]: { min: 0.05, max: 0.4 },
 };
 
-/** Default smooth learning rate eta */
-const DEFAULT_LEARNING_RATE = 0.02;
+/** Default initial weights for tri-plane supervisor */
+const DEFAULT_INITIAL_WEIGHTS: FusionWeights = {
+    [PROP_WS]: 0.5,
+    [PROP_WD]: 0.35,
+    [PROP_WF]: 0.15,
+};
+
+/**
+ * Derives the feature gradient vector according to attributed plane discrepancy.
+ *
+ * @param plane - Attributed defect plane.
+ * @returns Three-dimensional gradient vector.
+ */
+function deriveOutcomeGradient(plane: IncidentAttributionPlane): TriPlaneGradient {
+    switch (plane) {
+        case PLANE_DYNAMIC:
+            return { [PROP_WS]: 0.005, [PROP_WD]: -0.008, [PROP_WF]: 0.003 };
+        case PLANE_STATIC:
+            return { [PROP_WS]: -0.008, [PROP_WD]: 0.005, [PROP_WF]: 0.003 };
+        case PLANE_FEEDBACK:
+            return { [PROP_WS]: 0.004, [PROP_WD]: 0.004, [PROP_WF]: -0.008 };
+        default:
+            return { [PROP_WS]: -0.004, [PROP_WD]: -0.004, [PROP_WF]: 0.008 };
+    }
+}
+
+/**
+ * Computes updated and normalized weights using gradient descent and bounding constraints.
+ *
+ * @param prev - Previous weights vector.
+ * @param error - Outcome discrepancy error.
+ * @param learningRate - Adaptive learning rate eta.
+ * @param gradient - Directional gradient vector.
+ * @returns Normalized convex fusion weights.
+ */
+function computeNormalizedWeights(
+    prev: FusionWeights,
+    error: number,
+    learningRate: number,
+    gradient: TriPlaneGradient,
+): FusionWeights {
+    let rawStatic = prev.Ws + learningRate * error * gradient.Ws;
+    let rawDynamic = prev.Wd + learningRate * error * gradient.Wd;
+    let rawFeedback = prev.Wf + learningRate * error * gradient.Wf;
+
+    const bounds = WEIGHT_BOUNDS;
+    rawStatic = Math.max(bounds.Ws.min, Math.min(bounds.Ws.max, rawStatic));
+    rawDynamic = Math.max(bounds.Wd.min, Math.min(bounds.Wd.max, rawDynamic));
+    rawFeedback = Math.max(bounds.Wf.min, Math.min(bounds.Wf.max, rawFeedback));
+
+    const totalWeightSum = rawStatic + rawDynamic + rawFeedback;
+    const weightStatic =
+        Math.round((rawStatic / totalWeightSum) * WEIGHT_ROUND_FACTOR) / WEIGHT_ROUND_FACTOR;
+    const weightDynamic =
+        Math.round((rawDynamic / totalWeightSum) * WEIGHT_ROUND_FACTOR) / WEIGHT_ROUND_FACTOR;
+    const weightFeedback =
+        Math.round((rawFeedback / totalWeightSum) * WEIGHT_ROUND_FACTOR) / WEIGHT_ROUND_FACTOR;
+
+    const updatedWeights: FusionWeights = {
+        [PROP_WS]: weightStatic,
+        [PROP_WD]: weightDynamic,
+        [PROP_WF]: weightFeedback,
+    };
+
+    const roundSum = updatedWeights.Ws + updatedWeights.Wd + updatedWeights.Wf;
+    if (roundSum !== 1.0) {
+        const remainder = 1.0 - updatedWeights.Wd - updatedWeights.Wf;
+        updatedWeights.Ws = Math.round(remainder * WEIGHT_ROUND_FACTOR) / WEIGHT_ROUND_FACTOR;
+    }
+
+    return updatedWeights;
+}
+
+/**
+ * Formats diagnostic reason string for weight evolution steps.
+ *
+ * @param error - Discrepancy error value.
+ * @param plane - Attribution plane.
+ * @param prev - Previous weights.
+ * @param updated - Newly calculated weights.
+ * @returns Human-readable explanation.
+ */
+function formatEvolutionReason(
+    error: number,
+    plane: IncidentAttributionPlane,
+    prev: FusionWeights,
+    updated: FusionWeights,
+): string {
+    return (
+        `Adaptive weight shift on Error=${error.toFixed(1)} attributed to ${plane} plane ` +
+        `[Ws: ${prev.Ws} -> ${updated.Ws}, Wd: ${prev.Wd} -> ${updated.Wd}, Wf: ${prev.Wf} -> ${updated.Wf}]`
+    );
+}
 
 /**
  * Ledger maintaining software governance incident history, rule rollbacks,
@@ -157,10 +363,12 @@ export class FeedbackIncidentLedger {
     public recordIncident(
         input: Omit<FeedbackIncidentRecord, 'id' | 'timestamp' | 'error'>,
     ): FeedbackIncidentRecord {
-        const error = Math.round((input.actualOutcomeScore - input.predictedScore) * 100) / 100;
+        const error =
+            Math.round((input.actualOutcomeScore - input.predictedScore) * ROUND_PERCENT_FACTOR) /
+            ROUND_PERCENT_FACTOR;
         const record: FeedbackIncidentRecord = {
             ...input,
-            id: `INC-${Date.now()}-${this.nextIdCounter++}`,
+            id: `${INCIDENT_ID_PREFIX}${Date.now()}-${this.nextIdCounter++}`,
             timestamp: Date.now(),
             error,
         };
@@ -168,13 +376,13 @@ export class FeedbackIncidentLedger {
         this.incidents.push(record);
 
         if (input.ruleId) {
-            if (input.type === 'rollback') {
+            if (input.type === INCIDENT_TYPE_ROLLBACK) {
                 const current = this.ruleRollbacks.get(input.ruleId) ?? 0;
                 this.ruleRollbacks.set(input.ruleId, current + 1);
             }
         }
 
-        if (input.patternId && input.type === 'stable_milestone') {
+        if (input.patternId && input.type === INCIDENT_TYPE_STABLE_MILESTONE) {
             const current = this.patternMilestones.get(input.patternId) ?? 0;
             this.patternMilestones.set(input.patternId, current + 1);
         }
@@ -194,17 +402,35 @@ export class FeedbackIncidentLedger {
      * Records that an automated rule change was rolled back due to defect or developer revert.
      */
     public recordRuleRollback(
-        ruleId: string,
-        modulePath: string,
-        description: string,
-        predictedScore = 85.0,
-        actualOutcomeScore = 20.0,
+        contextOrRuleId: RuleRollbackContext | string,
+        modulePath = '',
+        description = '',
+        ...scores: [number?, number?]
     ): FeedbackIncidentRecord {
+        if (typeof contextOrRuleId === 'object' && contextOrRuleId !== null) {
+            return this.recordIncident({
+                type: INCIDENT_TYPE_ROLLBACK,
+                severity: SEVERITY_HIGH,
+                attributionPlane: PLANE_STATIC,
+                ruleId: contextOrRuleId.ruleId,
+                modulePath: contextOrRuleId.modulePath,
+                predictedScore: contextOrRuleId.predictedScore ?? DEFAULT_ROLLBACK_SCORE,
+                actualOutcomeScore:
+                    contextOrRuleId.actualOutcomeScore ?? DEFAULT_ROLLBACK_ACTUAL_SCORE,
+                description: contextOrRuleId.description,
+            });
+        }
+
+        const [
+            predictedScore = DEFAULT_ROLLBACK_SCORE,
+            actualOutcomeScore = DEFAULT_ROLLBACK_ACTUAL_SCORE,
+        ] = scores;
+
         return this.recordIncident({
-            type: 'rollback',
-            severity: 'high',
-            attributionPlane: 'static',
-            ruleId,
+            type: INCIDENT_TYPE_ROLLBACK,
+            severity: SEVERITY_HIGH,
+            attributionPlane: PLANE_STATIC,
+            ruleId: contextOrRuleId,
             modulePath,
             predictedScore,
             actualOutcomeScore,
@@ -218,16 +444,16 @@ export class FeedbackIncidentLedger {
     public recordStabilityMilestone(
         patternId: string,
         modulePath: string,
-        description = 'Module completed production release cycle with zero regressions',
+        description = DEFAULT_MILESTONE_DESC,
     ): FeedbackIncidentRecord {
         return this.recordIncident({
-            type: 'stable_milestone',
-            severity: 'low',
-            attributionPlane: 'feedback',
+            type: INCIDENT_TYPE_STABLE_MILESTONE,
+            severity: SEVERITY_LOW,
+            attributionPlane: PLANE_FEEDBACK,
             patternId,
             modulePath,
-            predictedScore: 90.0,
-            actualOutcomeScore: 100.0,
+            predictedScore: DEFAULT_MILESTONE_SCORE,
+            actualOutcomeScore: DEFAULT_MILESTONE_ACTUAL_SCORE,
             description,
         });
     }
@@ -242,15 +468,18 @@ export class FeedbackIncidentLedger {
 
         let multiplier = 1.0;
         if (rollbacks > 0) {
-            multiplier -= rollbacks * 0.25;
-            multiplier += adoptions * 0.05;
-        } else if (adoptions >= 5) {
-            multiplier += 0.1;
+            multiplier -= rollbacks * ROLLBACK_PENALTY_STEP;
+            multiplier += adoptions * ADOPTION_BONUS_STEP;
+        } else if (adoptions >= PROVEN_ADOPTION_THRESHOLD) {
+            multiplier += PROVEN_RULE_BONUS;
         }
 
         const confidenceMultiplier = Math.max(
-            0.2,
-            Math.min(1.2, Math.round(multiplier * 100) / 100),
+            MIN_RULE_CONFIDENCE,
+            Math.min(
+                MAX_RULE_CONFIDENCE,
+                Math.round(multiplier * ROUND_PERCENT_FACTOR) / ROUND_PERCENT_FACTOR,
+            ),
         );
 
         return {
@@ -267,8 +496,9 @@ export class FeedbackIncidentLedger {
      */
     public getPatternStability(patternId: string): PatternStabilityStats {
         const milestoneCount = this.patternMilestones.get(patternId) ?? 0;
-        const boost = 1.0 + Math.min(0.25, milestoneCount * 0.05);
-        const stabilityBoostFactor = Math.round(boost * 100) / 100;
+        const boost = 1.0 + Math.min(MAX_PATTERN_BOOST, milestoneCount * PATTERN_MILESTONE_STEP);
+        const stabilityBoostFactor =
+            Math.round(boost * ROUND_PERCENT_FACTOR) / ROUND_PERCENT_FACTOR;
 
         return {
             patternId,
@@ -287,7 +517,7 @@ export class FeedbackIncidentLedger {
     /**
      * Exports ledger state to plain JSON-serializable object.
      */
-    public exportState(): {
+    public getExportedState(): {
         incidents: FeedbackIncidentRecord[];
         ruleAdoptions: Record<string, number>;
         ruleRollbacks: Record<string, number>;
@@ -302,37 +532,61 @@ export class FeedbackIncidentLedger {
     }
 
     /**
+     * Backward-compatible delegation for ledger state export.
+     */
+    public exportState = (): {
+        incidents: FeedbackIncidentRecord[];
+        ruleAdoptions: Record<string, number>;
+        ruleRollbacks: Record<string, number>;
+        patternMilestones: Record<string, number>;
+    } => {
+        return this.getExportedState();
+    };
+
+    /**
      * Imports ledger state from serialized object.
      */
-    public importState(data: {
+    public applyImportedState(snapshotPayload: {
         incidents?: FeedbackIncidentRecord[];
         ruleAdoptions?: Record<string, number>;
         ruleRollbacks?: Record<string, number>;
         patternMilestones?: Record<string, number>;
     }): void {
-        if (Array.isArray(data.incidents)) {
+        if (Array.isArray(snapshotPayload.incidents)) {
             this.incidents.length = 0;
-            this.incidents.push(...data.incidents);
+            this.incidents.push(...snapshotPayload.incidents);
         }
-        if (data.ruleAdoptions) {
+        if (snapshotPayload.ruleAdoptions) {
             this.ruleAdoptions.clear();
-            for (const [k, v] of Object.entries(data.ruleAdoptions)) {
-                this.ruleAdoptions.set(k, v);
+            for (const [ruleId, count] of Object.entries(snapshotPayload.ruleAdoptions)) {
+                this.ruleAdoptions.set(ruleId, count);
             }
         }
-        if (data.ruleRollbacks) {
+        if (snapshotPayload.ruleRollbacks) {
             this.ruleRollbacks.clear();
-            for (const [k, v] of Object.entries(data.ruleRollbacks)) {
-                this.ruleRollbacks.set(k, v);
+            for (const [ruleId, count] of Object.entries(snapshotPayload.ruleRollbacks)) {
+                this.ruleRollbacks.set(ruleId, count);
             }
         }
-        if (data.patternMilestones) {
+        if (snapshotPayload.patternMilestones) {
             this.patternMilestones.clear();
-            for (const [k, v] of Object.entries(data.patternMilestones)) {
-                this.patternMilestones.set(k, v);
+            for (const [patternId, count] of Object.entries(snapshotPayload.patternMilestones)) {
+                this.patternMilestones.set(patternId, count);
             }
         }
     }
+
+    /**
+     * Backward-compatible delegation for ledger state import.
+     */
+    public importState = (snapshotPayload: {
+        incidents?: FeedbackIncidentRecord[];
+        ruleAdoptions?: Record<string, number>;
+        ruleRollbacks?: Record<string, number>;
+        patternMilestones?: Record<string, number>;
+    }): void => {
+        this.applyImportedState(snapshotPayload);
+    };
 }
 
 const syncFsWriteText = fs.writeFileSync.bind(fs);
@@ -353,7 +607,7 @@ export const PraxisIoBarrier = {
     writeSync(destinationPath: string, payload: string): void {
         const parentDirectory = path.dirname(destinationPath);
         fs.mkdirSync(parentDirectory, { recursive: true });
-        syncFsWriteText(destinationPath, payload, 'utf-8');
+        syncFsWriteText(destinationPath, payload, ENCODING_UTF8);
     },
 
     /**
@@ -363,7 +617,7 @@ export const PraxisIoBarrier = {
      * @returns File content string.
      */
     readSync(sourcePath: string): string {
-        return syncFsReadText(sourcePath, 'utf-8');
+        return syncFsReadText(sourcePath, ENCODING_UTF8);
     },
 };
 
@@ -384,12 +638,12 @@ export class FeedbackAdaptiveSupervisor {
 
     constructor(
         ledger: FeedbackIncidentLedger = new FeedbackIncidentLedger(),
-        initialWeights: FusionWeights = { Ws: 0.5, Wd: 0.35, Wf: 0.15 },
+        initialWeights: FusionWeights = DEFAULT_INITIAL_WEIGHTS,
         learningRate = DEFAULT_LEARNING_RATE,
     ) {
         this.ledger = ledger;
         this.currentWeights = { ...initialWeights };
-        this.learningRate = Math.max(0.01, Math.min(0.05, learningRate));
+        this.learningRate = Math.max(MIN_LEARNING_RATE, Math.min(MAX_LEARNING_RATE, learningRate));
     }
 
     /**
@@ -414,14 +668,27 @@ export class FeedbackAdaptiveSupervisor {
     }
 
     /**
-     * Adjusts a rule's base confidence using historical rollback tracking.
+     * Updates a rule's base confidence using historical rollback tracking.
      * High rollbacks discount confidence; stable adoptions preserve or slightly boost confidence.
      */
-    public adjustRuleConfidence(ruleId: string, baseConfidence = 1.0): number {
+    public updateRuleConfidence(ruleId: string, baseConfidence = 1.0): number {
         const stats = this.ledger.getRuleReliability(ruleId);
         const adjusted = baseConfidence * stats.confidenceMultiplier;
-        return Math.max(0.1, Math.min(1.0, Math.round(adjusted * 100) / 100));
+        return Math.max(
+            CONFIDENCE_FLOOR,
+            Math.min(
+                CONFIDENCE_CEILING,
+                Math.round(adjusted * ROUND_PERCENT_FACTOR) / ROUND_PERCENT_FACTOR,
+            ),
+        );
     }
+
+    /**
+     * Backward-compatible delegation for confidence adjustment.
+     */
+    public adjustRuleConfidence = (ruleId: string, baseConfidence = 1.0): number => {
+        return this.updateRuleConfidence(ruleId, baseConfidence);
+    };
 
     /**
      * Applies architectural pattern stability boost factor to a base score.
@@ -429,85 +696,34 @@ export class FeedbackAdaptiveSupervisor {
     public applyArchitectureBoost(patternId: string, baseScore: number): number {
         const stats = this.ledger.getPatternStability(patternId);
         const boosted = baseScore * stats.stabilityBoostFactor;
-        return Math.max(0.0, Math.min(100.0, Math.round(boosted * 100) / 100));
+        return Math.max(
+            MIN_QUALITY_SCORE,
+            Math.min(
+                MAX_QUALITY_SCORE,
+                Math.round(boosted * ROUND_PERCENT_FACTOR) / ROUND_PERCENT_FACTOR,
+            ),
+        );
     }
 
     /**
      * Evolves tri-plane weights based on discrepancy between predicted score and actual outcome:
      * W_{t+1} = W_t + eta * Error * Gradient.
      */
-    public evolveFromOutcome(params: {
+    public runOutcomeEvolution(params: {
         predictedScore: number;
         actualOutcomeScore: number;
         attributionPlane?: IncidentAttributionPlane;
-        customGradient?: { Ws: number; Wd: number; Wf: number };
+        customGradient?: TriPlaneGradient;
         reason?: string;
     }): AdaptiveEvolutionStep {
         const error = params.actualOutcomeScore - params.predictedScore;
-        const plane = params.attributionPlane ?? 'unspecified';
-
-        // Derive feature gradient vector based on attributed plane
-        let gradient: { Ws: number; Wd: number; Wf: number };
-
-        if (params.customGradient) {
-            gradient = params.customGradient;
-        } else {
-            // When error < 0 (over-optimistic prediction):
-            // - Runtime failure (dynamic): Wd underweighted -> pull Wd up, Ws down.
-            // - Structural regression (static): Ws underweighted -> pull Ws up, Wd down.
-            // - Historical issue (feedback): Wf underweighted -> pull Wf up.
-            switch (plane) {
-                case 'dynamic':
-                    gradient = { Ws: 0.005, Wd: -0.008, Wf: 0.003 };
-                    break;
-                case 'static':
-                    gradient = { Ws: -0.008, Wd: 0.005, Wf: 0.003 };
-                    break;
-                case 'feedback':
-                    gradient = { Ws: 0.004, Wd: 0.004, Wf: -0.008 };
-                    break;
-                default:
-                    // Symmetrical balance
-                    gradient = { Ws: -0.004, Wd: -0.004, Wf: 0.008 };
-                    break;
-            }
-        }
-
+        const plane = params.attributionPlane ?? PLANE_UNSPECIFIED;
+        const gradient = params.customGradient ?? deriveOutcomeGradient(plane);
         const prev = { ...this.currentWeights };
-
-        // Delta = eta * Error * Gradient
-        // When error < 0 and gradient is negative for the underweighted plane,
-        // delta = eta * (-|error|) * (-|grad|) > 0, correctly increasing weight.
-        let rawWs = prev.Ws + this.learningRate * error * gradient.Ws;
-        let rawWd = prev.Wd + this.learningRate * error * gradient.Wd;
-        let rawWf = prev.Wf + this.learningRate * error * gradient.Wf;
-
-        // Clamp to allowed intervals
-        rawWs = Math.max(WEIGHT_BOUNDS.Ws.min, Math.min(WEIGHT_BOUNDS.Ws.max, rawWs));
-        rawWd = Math.max(WEIGHT_BOUNDS.Wd.min, Math.min(WEIGHT_BOUNDS.Wd.max, rawWd));
-        rawWf = Math.max(WEIGHT_BOUNDS.Wf.min, Math.min(WEIGHT_BOUNDS.Wf.max, rawWf));
-
-        // L1 Normalization: sum must equal 1.0
-        const sum = rawWs + rawWd + rawWf;
-        const updatedWeights: FusionWeights = {
-            Ws: Math.round((rawWs / sum) * 1000) / 1000,
-            Wd: Math.round((rawWd / sum) * 1000) / 1000,
-            Wf: Math.round((rawWf / sum) * 1000) / 1000,
-        };
-
-        // Fix any residual roundoff to ensure exact 1.000 sum
-        const roundSum = updatedWeights.Ws + updatedWeights.Wd + updatedWeights.Wf;
-        if (roundSum !== 1.0) {
-            const remainder = 1.0 - updatedWeights.Wd - updatedWeights.Wf;
-            updatedWeights.Ws = Math.round(remainder * 1000) / 1000;
-        }
+        const updatedWeights = computeNormalizedWeights(prev, error, this.learningRate, gradient);
 
         this.currentWeights = updatedWeights;
-
-        const reason =
-            params.reason ??
-            `Adaptive weight shift on Error=${error.toFixed(1)} attributed to ${plane} plane ` +
-                `[Ws: ${prev.Ws} -> ${updatedWeights.Ws}, Wd: ${prev.Wd} -> ${updatedWeights.Wd}, Wf: ${prev.Wf} -> ${updatedWeights.Wf}]`;
+        const reason = params.reason ?? formatEvolutionReason(error, plane, prev, updatedWeights);
 
         const step: AdaptiveEvolutionStep = {
             stepIndex: this.evolutionHistory.length + 1,
@@ -525,10 +741,19 @@ export class FeedbackAdaptiveSupervisor {
     }
 
     /**
+     * Backward-compatible delegation for outcome evolution.
+     */
+    public evolveFromOutcome = (
+        params: Parameters<FeedbackAdaptiveSupervisor['runOutcomeEvolution']>[0],
+    ): AdaptiveEvolutionStep => {
+        return this.runOutcomeEvolution(params);
+    };
+
+    /**
      * Convenience method to evolve weights directly from a recorded incident.
      */
-    public evolveFromIncident(incident: FeedbackIncidentRecord): AdaptiveEvolutionStep {
-        return this.evolveFromOutcome({
+    public runIncidentEvolution(incident: FeedbackIncidentRecord): AdaptiveEvolutionStep {
+        return this.runOutcomeEvolution({
             predictedScore: incident.predictedScore,
             actualOutcomeScore: incident.actualOutcomeScore,
             attributionPlane: incident.attributionPlane,
@@ -537,11 +762,18 @@ export class FeedbackAdaptiveSupervisor {
     }
 
     /**
+     * Backward-compatible delegation for incident evolution.
+     */
+    public evolveFromIncident = (incident: FeedbackIncidentRecord): AdaptiveEvolutionStep => {
+        return this.runIncidentEvolution(incident);
+    };
+
+    /**
      * Generates a governance summary of all incidents, adaptive adjustments, and rule tracking.
      */
     public generateGovernanceSummary(): FeedbackGovernanceSummary {
         const incidents = this.ledger.getAllIncidents();
-        const rollbacks = incidents.filter((incident) => incident.type === 'rollback');
+        const rollbacks = incidents.filter((incident) => incident.type === INCIDENT_TYPE_ROLLBACK);
 
         const rulesSet = new Set<string>();
         let dampenedCount = 0;
@@ -584,7 +816,9 @@ export class FeedbackAdaptiveSupervisor {
      * @param projectProfile - Project profile identifier (default: 'standard').
      * @returns Portable GovernanceLedgerSnapshot.
      */
-    public exportLedgerSnapshot(projectProfile = 'standard'): GovernanceLedgerSnapshot {
+    public getExportedLedgerSnapshot(
+        projectProfile = DEFAULT_PROJECT_PROFILE,
+    ): GovernanceLedgerSnapshot {
         const summary = this.generateGovernanceSummary();
         const incidents = this.ledger.getAllIncidents();
 
@@ -609,7 +843,7 @@ export class FeedbackAdaptiveSupervisor {
         const boostedPatterns = Array.from(boostedPatternsSet);
 
         return {
-            version: '1.0',
+            version: GOVERNANCE_SNAPSHOT_VERSION,
             lastUpdated: new Date().toISOString(),
             projectProfile,
             learnedWeights: { ...this.currentWeights },
@@ -621,18 +855,38 @@ export class FeedbackAdaptiveSupervisor {
     }
 
     /**
+     * Backward-compatible delegation for snapshot export.
+     */
+    public exportLedgerSnapshot = (
+        projectProfile = DEFAULT_PROJECT_PROFILE,
+    ): GovernanceLedgerSnapshot => {
+        return this.getExportedLedgerSnapshot(projectProfile);
+    };
+
+    /**
      * Imports a governance snapshot to restore learned weights and evolutionary state.
      *
      * @param snapshot - GovernanceLedgerSnapshot to load.
      */
-    public importLedgerSnapshot(snapshot: GovernanceLedgerSnapshot): void {
+    public applyImportedLedgerSnapshot(snapshot: GovernanceLedgerSnapshot): void {
         if (snapshot.learnedWeights) {
             const { Ws, Wd, Wf } = snapshot.learnedWeights;
             if (typeof Ws === 'number' && typeof Wd === 'number' && typeof Wf === 'number') {
-                this.currentWeights = { Ws, Wd, Wf };
+                this.currentWeights = {
+                    [PROP_WS]: Ws,
+                    [PROP_WD]: Wd,
+                    [PROP_WF]: Wf,
+                };
             }
         }
     }
+
+    /**
+     * Backward-compatible delegation for snapshot import.
+     */
+    public importLedgerSnapshot = (snapshot: GovernanceLedgerSnapshot): void => {
+        this.applyImportedLedgerSnapshot(snapshot);
+    };
 
     /**
      * Serializes and writes the governance snapshot to a JSON file.
@@ -641,29 +895,29 @@ export class FeedbackAdaptiveSupervisor {
      * @param filePath - Destination JSON file path.
      * @param projectProfile - Project profile identifier.
      */
-    public saveLedgerSnapshot(filePath: string, projectProfile = 'standard'): void {
-        const snapshot = this.exportLedgerSnapshot(projectProfile);
-        const resolvedPath = path.resolve(filePath);
-        this.snapshotMemoryCache.set(resolvedPath, snapshot);
+    public saveLedgerSnapshot(filePath: string, projectProfile = DEFAULT_PROJECT_PROFILE): void {
+        const snapshot = this.getExportedLedgerSnapshot(projectProfile);
+        const diskPath = path.resolve(filePath);
+        this.snapshotMemoryCache.set(diskPath, snapshot);
         try {
-            PraxisIoBarrier.writeSync(filePath, JSON.stringify(snapshot, null, 2));
+            PraxisIoBarrier.writeSync(filePath, JSON.stringify(snapshot, null, JSON_INDENT_SPACES));
         } catch {
             // Best-effort disk persistence: memory snapshot remains valid when disk write fails
         }
     }
 
     public loadLedgerSnapshot(filePath: string): boolean {
-        const resolvedPath = path.resolve(filePath);
-        const cachedSnapshot = this.snapshotMemoryCache.get(resolvedPath);
+        const diskPath = path.resolve(filePath);
+        const cachedSnapshot = this.snapshotMemoryCache.get(diskPath);
         if (cachedSnapshot) {
-            this.importLedgerSnapshot(cachedSnapshot);
+            this.applyImportedLedgerSnapshot(cachedSnapshot);
             return true;
         }
         try {
             const rawContent = PraxisIoBarrier.readSync(filePath);
             const parsedSnapshot = JSON.parse(rawContent) as GovernanceLedgerSnapshot;
-            this.snapshotMemoryCache.set(resolvedPath, parsedSnapshot);
-            this.importLedgerSnapshot(parsedSnapshot);
+            this.snapshotMemoryCache.set(diskPath, parsedSnapshot);
+            this.applyImportedLedgerSnapshot(parsedSnapshot);
             return true;
         } catch {
             return false;
@@ -679,14 +933,18 @@ export class FeedbackAdaptiveSupervisor {
      */
     public async saveLedgerSnapshotAsync(
         filePath: string,
-        projectProfile = 'standard',
+        projectProfile = DEFAULT_PROJECT_PROFILE,
     ): Promise<void> {
-        const snapshot = this.exportLedgerSnapshot(projectProfile);
-        const resolvedPath = path.resolve(filePath);
-        this.snapshotMemoryCache.set(resolvedPath, snapshot);
-        const dir = path.dirname(filePath);
-        await fs.promises.mkdir(dir, { recursive: true });
-        await fs.promises.writeFile(filePath, JSON.stringify(snapshot, null, 2), 'utf-8');
+        const snapshot = this.getExportedLedgerSnapshot(projectProfile);
+        const diskPath = path.resolve(filePath);
+        this.snapshotMemoryCache.set(diskPath, snapshot);
+        const parentDirectory = path.dirname(filePath);
+        await fs.promises.mkdir(parentDirectory, { recursive: true });
+        await fs.promises.writeFile(
+            filePath,
+            JSON.stringify(snapshot, null, JSON_INDENT_SPACES),
+            ENCODING_UTF8,
+        );
     }
 
     /**
@@ -697,17 +955,17 @@ export class FeedbackAdaptiveSupervisor {
      * @returns True if successfully loaded, false if file does not exist or invalid.
      */
     public async loadLedgerSnapshotAsync(filePath: string): Promise<boolean> {
-        const resolvedPath = path.resolve(filePath);
-        const cached = this.snapshotMemoryCache.get(resolvedPath);
+        const diskPath = path.resolve(filePath);
+        const cached = this.snapshotMemoryCache.get(diskPath);
         if (cached) {
-            this.importLedgerSnapshot(cached);
+            this.applyImportedLedgerSnapshot(cached);
             return true;
         }
         try {
-            const content = await fs.promises.readFile(filePath, 'utf-8');
+            const content = await fs.promises.readFile(filePath, ENCODING_UTF8);
             const parsed = JSON.parse(content) as GovernanceLedgerSnapshot;
-            this.snapshotMemoryCache.set(resolvedPath, parsed);
-            this.importLedgerSnapshot(parsed);
+            this.snapshotMemoryCache.set(diskPath, parsed);
+            this.applyImportedLedgerSnapshot(parsed);
             return true;
         } catch {
             return false;
@@ -716,4 +974,4 @@ export class FeedbackAdaptiveSupervisor {
 }
 
 /** Default global instance of supervisor */
-export const defaultFeedbackAdaptiveSupervisor = new FeedbackAdaptiveSupervisor();
+export const defaultAdaptiveSupervisor = new FeedbackAdaptiveSupervisor();

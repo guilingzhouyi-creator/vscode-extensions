@@ -14,8 +14,8 @@
 import type { CodeDensityMetrics } from './code-density-analyzer';
 import type { FineGrainedFileRole } from './file-role-inference';
 
-const SEVERITY_BUDGET_ERROR: 'error' = 'error';
-const SEVERITY_BUDGET_WARN: 'warning' = 'warning';
+const SEVERITY_BUDGET_ERROR = 'error' as const;
+const SEVERITY_BUDGET_WARN = 'warning' as const;
 
 /** Role budget threshold contract */
 export interface RoleBudgetThresholds {
@@ -353,10 +353,16 @@ export function evaluateRoleElasticBudget(
     let violationSeverity: 'warning' | 'error' | null = null;
     let rationale = 'File size is within elastic complexity budget';
 
-    if (isEclFail || (isPhysicalFail && metrics.effectiveDensity > HIGH_DENSITY_VIOLATION_THRESHOLD)) {
+    if (
+        isEclFail ||
+        (isPhysicalFail && metrics.effectiveDensity > HIGH_DENSITY_VIOLATION_THRESHOLD)
+    ) {
         violationSeverity = SEVERITY_BUDGET_ERROR;
         rationale = `Effective code lines (${metrics.effectiveCodeLines}) or physical lines (${metrics.physicalLines}) exceeds error threshold for role [${role}]`;
-    } else if (isEclWarn || (isPhysicalWarn && metrics.effectiveDensity > HIGH_DENSITY_VIOLATION_THRESHOLD)) {
+    } else if (
+        isEclWarn ||
+        (isPhysicalWarn && metrics.effectiveDensity > HIGH_DENSITY_VIOLATION_THRESHOLD)
+    ) {
         violationSeverity = SEVERITY_BUDGET_WARN;
         rationale = `Effective code lines (${metrics.effectiveCodeLines}) or physical lines (${metrics.physicalLines}) exceeds warning threshold for role [${role}]`;
     }

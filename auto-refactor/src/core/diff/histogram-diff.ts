@@ -83,10 +83,7 @@ function isBetterAnchorCandidate(
 /**
  * Emits trivial diff operations when one or both sub-problem spans are empty.
  */
-function handleEmptySpan(
-    context: HistogramDiffContext,
-    span: Span,
-): boolean {
+function handleEmptySpan(context: HistogramDiffContext, span: Span): boolean {
     const sourceSpanLength = span.endA - span.startA;
     const targetSpanLength = span.endB - span.startB;
 
@@ -151,10 +148,7 @@ function buildTargetHashPositionMap(
     return targetMap;
 }
 
-function findBucketStart(
-    positionBucket: readonly number[],
-    startTargetIndex: number,
-): number {
+function findBucketStart(positionBucket: readonly number[], startTargetIndex: number): number {
     const listLength = positionBucket.length;
     if (listLength <= BINARY_SEARCH_MIN_BUCKET_SIZE || positionBucket[0] >= startTargetIndex) {
         return 0;
@@ -198,10 +192,7 @@ function countValidOccurrences(
     return { countTarget, matchedTargetIndex };
 }
 
-function findBestAnchor(
-    context: HistogramDiffContext,
-    activeSpan: Span,
-): AnchorMatch {
+function findBestAnchor(context: HistogramDiffContext, activeSpan: Span): AnchorMatch {
     let anchorSourceIndex = -1;
     let anchorTargetIndex = -1;
     let minOccurrences = Number.POSITIVE_INFINITY;
@@ -243,20 +234,12 @@ function findBestAnchor(
     return { anchorSourceIndex, anchorTargetIndex };
 }
 
-function handleMyersFallback(
-    context: HistogramDiffContext,
-    activeSpan: Span,
-): void {
+function handleMyersFallback(context: HistogramDiffContext, activeSpan: Span): void {
     const sliceSource = context.sourceLines.slice(activeSpan.startA, activeSpan.endA);
     const sliceTarget = context.targetLines.slice(activeSpan.startB, activeSpan.endB);
     const sliceHashesSource = context.sourceHashes.subarray(activeSpan.startA, activeSpan.endA);
     const sliceHashesTarget = context.targetHashes.subarray(activeSpan.startB, activeSpan.endB);
-    const subOperations = myersDiff(
-        sliceSource,
-        sliceTarget,
-        sliceHashesSource,
-        sliceHashesTarget,
-    );
+    const subOperations = myersDiff(sliceSource, sliceTarget, sliceHashesSource, sliceHashesTarget);
 
     for (const operation of subOperations) {
         context.operations.push({
@@ -267,10 +250,7 @@ function handleMyersFallback(
     }
 }
 
-function emitDisjointOperations(
-    context: HistogramDiffContext,
-    activeSpan: Span,
-): void {
+function emitDisjointOperations(context: HistogramDiffContext, activeSpan: Span): void {
     for (let sourceIndex = activeSpan.startA; sourceIndex < activeSpan.endA; sourceIndex++) {
         context.operations.push({
             type: DIFF_OP_DELETE,
@@ -302,10 +282,7 @@ function appendSuffixEquals(
     }
 }
 
-function trimCommonPrefix(
-    context: HistogramDiffContext,
-    span: Span,
-): number {
+function trimCommonPrefix(context: HistogramDiffContext, span: Span): number {
     let prefixCount = 0;
     while (
         span.startA + prefixCount < span.endA &&
@@ -325,11 +302,7 @@ function trimCommonPrefix(
     return prefixCount;
 }
 
-function trimCommonSuffix(
-    context: HistogramDiffContext,
-    span: Span,
-    prefixCount: number,
-): number {
+function trimCommonSuffix(context: HistogramDiffContext, span: Span, prefixCount: number): number {
     const minSourceIndex = span.startA + prefixCount;
     const minTargetIndex = span.startB + prefixCount;
     let suffixCount = 0;

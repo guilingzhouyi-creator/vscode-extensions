@@ -33,11 +33,11 @@ export const ANALYZER_GATE_ARCHITECTURE = 'gate-architecture';
 const RISK_CRITICAL = 'critical';
 const RISK_HIGH = 'high';
 const RISK_MEDIUM = 'medium';
-const RISK_LOW = 'low';
+const _RISK_LOW = 'low';
 
 const CATEGORY_ARCHITECTURE = 'architecture';
 const CATEGORY_RELIABILITY = 'reliability';
-const CATEGORY_SECURITY = 'security';
+const _CATEGORY_SECURITY = 'security';
 const CATEGORY_MAINTAINABILITY = 'maintainability';
 const CATEGORY_STANDARDIZATION = 'standardization';
 const CATEGORY_HYGIENE = 'hygiene';

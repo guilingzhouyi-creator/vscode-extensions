@@ -284,11 +284,9 @@ export class OxcAdapter implements LanguageAdapter {
         return undefined;
     }
 
-    private buildNormalizedNode(
-        classification: NodeClassification,
-        ctx: Ctx,
-    ): NormalizedNode {
-        const { rawNode, kind, isFunctionLike, isLiteral, isClassDefining, introducesBinding } = classification;
+    private buildNormalizedNode(classification: NodeClassification, ctx: Ctx): NormalizedNode {
+        const { rawNode, kind, isFunctionLike, isLiteral, isClassDefining, introducesBinding } =
+            classification;
         const rawType = rawNode.type;
         const pos = this.resolveNodePositions(rawNode, classification, ctx);
         const node: NormalizedNode = {
@@ -307,7 +305,8 @@ export class OxcAdapter implements LanguageAdapter {
             bindingName: introducesBinding ? oxcBindingNameOf(rawNode, ctx) : null,
             hasFunctionInitializer: introducesBinding,
             increasesNesting: CONTROL_OR_BLOCK.has(rawType) || rawType === KIND_STATIC_BLOCK,
-            isConstructor: rawType === NODE_KIND_METHOD_DEFINITION && rawNode.kind === KIND_CONSTRUCTOR,
+            isConstructor:
+                rawType === NODE_KIND_METHOD_DEFINITION && rawNode.kind === KIND_CONSTRUCTOR,
             children: [],
         };
         return node;
@@ -318,7 +317,9 @@ export class OxcAdapter implements LanguageAdapter {
         const isTopLevel =
             Boolean(parent) && parent!.type === KIND_PROGRAM && TOP_LEVEL_DECL.has(rawNode.type);
         targetNode.topLevel = isTopLevel;
-        targetNode.exported = isTopLevel && (Boolean(rawNode[PROP_EXPORTED]) || rawNode.type === KIND_TS_EXPORT_ASSIGNMENT);
+        targetNode.exported =
+            isTopLevel &&
+            (Boolean(rawNode[PROP_EXPORTED]) || rawNode.type === KIND_TS_EXPORT_ASSIGNMENT);
         if (isLiteral) {
             targetNode.isConstBound = oxcIsConstBoundOf(rawNode, parent, grandparent);
             targetNode.tolerated = oxcIsToleratedOf(rawNode, parent, ctx, grandparent);
@@ -367,10 +368,7 @@ export class OxcAdapter implements LanguageAdapter {
         seed.cacheSubtree(span, children);
     }
 
-    private traverseOxcChildren(
-        options: ChildTraversalOptions,
-        parseContext: ParseContext,
-    ): void {
+    private traverseOxcChildren(options: ChildTraversalOptions, parseContext: ParseContext): void {
         const { targetNode, rawNode, oxcParent, isMethodSource } = options;
         for (const propKey of Object.keys(rawNode)) {
             if (OXC_META_KEYS.has(propKey) || propKey === PROP_EXPORTED) continue;
@@ -385,7 +383,10 @@ export class OxcAdapter implements LanguageAdapter {
                 for (const childNode of propertyValue) {
                     this.pushChild(targetNode, childNode, dispatchConfig, parseContext);
                 }
-            } else if (typeof propertyValue === TYPEOF_OBJECT && typeof (propertyValue as OxcNode).type === TYPEOF_STRING) {
+            } else if (
+                typeof propertyValue === TYPEOF_OBJECT &&
+                typeof (propertyValue as OxcNode).type === TYPEOF_STRING
+            ) {
                 this.pushChild(targetNode, propertyValue as OxcNode, dispatchConfig, parseContext);
             }
         }
@@ -398,7 +399,8 @@ export class OxcAdapter implements LanguageAdapter {
     ): NormalizedNode {
         const rawType = rawNode.type;
         const isMethodSource =
-            rawType === NODE_KIND_METHOD_DEFINITION || (rawType === NODE_KIND_PROPERTY && rawNode.method === true);
+            rawType === NODE_KIND_METHOD_DEFINITION ||
+            (rawType === NODE_KIND_PROPERTY && rawNode.method === true);
         const kind = oxcKindOf(rawNode);
         const isFunctionLike = kind === NodeKind.Function || kind === NodeKind.Method;
         const isLiteral = kind === NodeKind.NumericLiteral || kind === NodeKind.StringLiteral;
@@ -406,7 +408,12 @@ export class OxcAdapter implements LanguageAdapter {
             rawType === NODE_KIND_CLASS_DECLARATION || rawType === NODE_KIND_CLASS_EXPRESSION;
         const introducesBinding = oxcIntroducesBinding(rawNode);
 
-        const startOffset = this.resolveStartOffset(rawNode, isFunctionLike, isClassDefining, hierarchy.exportWrapper);
+        const startOffset = this.resolveStartOffset(
+            rawNode,
+            isFunctionLike,
+            isClassDefining,
+            hierarchy.exportWrapper,
+        );
         const classification: NodeClassification = {
             rawNode,
             kind,
@@ -462,7 +469,10 @@ export class OxcAdapter implements LanguageAdapter {
                 for (const subChildNode of propertyValue) {
                     this.pushChild(targetNode, subChildNode, dispatchConfig, parseContext);
                 }
-            } else if (typeof propertyValue === TYPEOF_OBJECT && typeof (propertyValue as OxcNode).type === TYPEOF_STRING) {
+            } else if (
+                typeof propertyValue === TYPEOF_OBJECT &&
+                typeof (propertyValue as OxcNode).type === TYPEOF_STRING
+            ) {
                 this.pushChild(targetNode, propertyValue as OxcNode, dispatchConfig, parseContext);
             }
         }
@@ -492,10 +502,16 @@ export class OxcAdapter implements LanguageAdapter {
         config: ChildDispatchConfig,
         parseContext: ParseContext,
     ): boolean {
-        const hierarchy = { parent: config.oxcParent, grandparent: config.oxcGrandparent, exportWrapper: oxcChildNode };
+        const hierarchy = {
+            parent: config.oxcParent,
+            grandparent: config.oxcGrandparent,
+            exportWrapper: oxcChildNode,
+        };
         if (oxcChildNode.type === KIND_EXPORT_ALL_DECLARATION) {
             if (oxcChildNode.source) {
-                targetNode.children!.push(this.mapNode(oxcChildNode.source, hierarchy, parseContext));
+                targetNode.children!.push(
+                    this.mapNode(oxcChildNode.source, hierarchy, parseContext),
+                );
             }
             return true;
         }
@@ -505,7 +521,9 @@ export class OxcAdapter implements LanguageAdapter {
         ) {
             if (oxcChildNode.declaration) {
                 oxcChildNode.declaration[PROP_EXPORTED] = true;
-                targetNode.children!.push(this.mapNode(oxcChildNode.declaration, hierarchy, parseContext));
+                targetNode.children!.push(
+                    this.mapNode(oxcChildNode.declaration, hierarchy, parseContext),
+                );
             }
             return true;
         }
@@ -541,7 +559,11 @@ export class OxcAdapter implements LanguageAdapter {
         return false;
     }
 
-    private tryCollectLiteralInType(rawNode: OxcNode, container: NormalizedNode, ctx: Ctx): boolean {
+    private tryCollectLiteralInType(
+        rawNode: OxcNode,
+        container: NormalizedNode,
+        ctx: Ctx,
+    ): boolean {
         if (rawNode.type !== KIND_LITERAL) return false;
         const kind =
             typeof rawNode.value === TYPEOF_STRING

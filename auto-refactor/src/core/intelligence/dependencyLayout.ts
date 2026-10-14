@@ -198,7 +198,14 @@ function reportSingleImportIssue(issues: Issue[], config: SingleImportIssueConfi
         module: config.moduleName ?? MODULE_IMPORTS,
         symbol: config.imp.moduleSpecifier,
         currentBehavior: config.currentBehavior,
-        evidence: [{ kind: config.evidenceKind, description: config.evidenceDesc, file: config.imp.file, line: config.imp.line }],
+        evidence: [
+            {
+                kind: config.evidenceKind,
+                description: config.evidenceDesc,
+                file: config.imp.file,
+                line: config.imp.line,
+            },
+        ],
         triggerCondition: config.triggerCondition,
         risk: config.risk,
         suggestedFix: config.suggestedFix,
@@ -295,7 +302,8 @@ const RULE_DESCRIPTOR_MAP: Readonly<Record<string, StaticRuleDescriptor>> = Obje
         severity: SEVERITY_WARNING,
         moduleName: MODULE_DEPENDENCIES,
         evidenceKind: KIND_CALL,
-        triggerCondition: 'Import of external third-party package not declared in package.json or project manifest',
+        triggerCondition:
+            'Import of external third-party package not declared in package.json or project manifest',
         risk: 'Phantom dependencies cause non-deterministic builds and CI breakage in clean environments.',
         verificationMethod: 'Verify package is declared in project manifest.',
         confidence: CONFIDENCE_DEFAULT,
@@ -307,7 +315,8 @@ const RULE_DESCRIPTOR_MAP: Readonly<Record<string, StaticRuleDescriptor>> = Obje
         evidenceKind: KIND_CONDITION,
         triggerCondition: 'Proprietary code importing viral copyleft (GPL/AGPL/SSPL) dependency',
         risk: 'Legal and compliance risk: copyleft license requires disclosing proprietary derivative source code.',
-        verificationMethod: 'Verify dependency license is permissive or approved under organizational policy.',
+        verificationMethod:
+            'Verify dependency license is permissive or approved under organizational policy.',
         confidence: CONFIDENCE_DEFAULT,
     },
     'DEP-DEV-001': {
@@ -428,18 +437,21 @@ function auditFileLayoutOrder(
     for (let i = 0; i < topLevel.length - 1; i++) {
         const currentImport = topLevel[i];
         const nextImport = topLevel[i + 1];
-        if (CATEGORY_PRIORITY[currentImport.category] <= CATEGORY_PRIORITY[nextImport.category]) continue;
+        if (CATEGORY_PRIORITY[currentImport.category] <= CATEGORY_PRIORITY[nextImport.category])
+            continue;
         const detail = createDetail({
             language,
             module: MODULE_LAYOUT,
             symbol: nextImport.moduleSpecifier,
             currentBehavior: `Import ordering inversion: '${currentImport.category}' placed before '${nextImport.category}'.`,
-            evidence: [{
-                kind: KIND_CONDITION,
-                description: `'${currentImport.moduleSpecifier}' (${currentImport.category}) precedes '${nextImport.moduleSpecifier}' (${nextImport.category})`,
-                file: currentImport.file,
-                line: nextImport.line,
-            }],
+            evidence: [
+                {
+                    kind: KIND_CONDITION,
+                    description: `'${currentImport.moduleSpecifier}' (${currentImport.category}) precedes '${nextImport.moduleSpecifier}' (${nextImport.category})`,
+                    file: currentImport.file,
+                    line: nextImport.line,
+                },
+            ],
             triggerCondition: 'Import group order does not follow canonical sequence',
             risk: 'Violates repository layout conventions.',
             suggestedFix: 'Reorder imports: standard library first, third-party, then local.',
@@ -472,13 +484,15 @@ function auditExternalResources(
             module: MODULE_RESOURCES,
             symbol: res.symbol,
             currentBehavior: `Raw unmanaged remote endpoint '${res.urlOrPath}' hardcoded.`,
-            evidence: [{
-                kind: KIND_VARIABLE,
-                description: `Raw external URL '${res.urlOrPath}' embedded directly in code`,
-                file: res.file,
-                line: res.line,
-                symbol: res.symbol,
-            }],
+            evidence: [
+                {
+                    kind: KIND_VARIABLE,
+                    description: `Raw external URL '${res.urlOrPath}' embedded directly in code`,
+                    file: res.file,
+                    line: res.line,
+                    symbol: res.symbol,
+                },
+            ],
             triggerCondition: 'Hardcoded HTTP/WebSocket URL string detected in business code',
             risk: 'Prevents environment-specific routing and rotation.',
             suggestedFix: 'Move remote URLs into configuration or service registry.',
@@ -516,7 +530,9 @@ function readJsonSafely(filePath: string): any | null {
 function findAncestorPackageManifest(rootDir: string, packageName: string): any | null {
     let currentDir = rootDir;
     for (let i = 0; i < MAX_ANCESTOR_SEARCH_DEPTH; i++) {
-        const manifest = readJsonSafely(path.join(currentDir, 'node_modules', packageName, 'package.json'));
+        const manifest = readJsonSafely(
+            path.join(currentDir, 'node_modules', packageName, 'package.json'),
+        );
         if (manifest) {
             return manifest;
         }
@@ -533,7 +549,8 @@ function extractLicenseFromManifest(manifest: any): string | null {
     if (!manifest) return null;
     if (typeof manifest.license === 'string') return manifest.license;
     if (typeof manifest.license?.type === 'string') return manifest.license.type;
-    if (Array.isArray(manifest.licenses) && manifest.licenses[0]?.type) return manifest.licenses[0].type;
+    if (Array.isArray(manifest.licenses) && manifest.licenses[0]?.type)
+        return manifest.licenses[0].type;
     return null;
 }
 
@@ -637,7 +654,8 @@ function auditVulnerableDependencies(
     issues: Issue[],
 ): void {
     for (const imp of imports) {
-        if (imp.category !== CATEGORY_THIRD_PARTY || isExemptPathOrAlias(imp.moduleSpecifier)) continue;
+        if (imp.category !== CATEGORY_THIRD_PARTY || isExemptPathOrAlias(imp.moduleSpecifier))
+            continue;
 
         const pkgName = extractPackageName(imp.moduleSpecifier);
         const resolvedVer = resolvePackageVersion(rootDir, pkgName) ?? undefined;
@@ -686,7 +704,8 @@ function auditPhantomDependencies(
     const seenPhantomPackages = new Set<string>();
 
     for (const imp of imports) {
-        if (imp.category !== CATEGORY_THIRD_PARTY || isExemptPathOrAlias(imp.moduleSpecifier)) continue;
+        if (imp.category !== CATEGORY_THIRD_PARTY || isExemptPathOrAlias(imp.moduleSpecifier))
+            continue;
 
         const pkgName = extractPackageName(imp.moduleSpecifier);
         if (!pkgName || seenPhantomPackages.has(pkgName)) continue;
@@ -716,10 +735,7 @@ interface LicenseAuditContext {
 /**
  * Audits a single import against legal license compliance and copyleft propagation risks.
  */
-function checkSingleLicenseViolation(
-    imp: ImportStatementInfo,
-    ctx: LicenseAuditContext,
-): void {
+function checkSingleLicenseViolation(imp: ImportStatementInfo, ctx: LicenseAuditContext): void {
     const pkgName = extractUniqueThirdPartyPackage(imp, ctx.seenPackages);
     if (!pkgName) {
         return;
@@ -756,7 +772,12 @@ function auditDependencyLicenses(
 ): void {
     if (!rootDir) return;
     const seenLicensePackages = new Set<string>();
-    const ctx: LicenseAuditContext = { rootDir, language, seenPackages: seenLicensePackages, issues };
+    const ctx: LicenseAuditContext = {
+        rootDir,
+        language,
+        seenPackages: seenLicensePackages,
+        issues,
+    };
 
     for (const imp of imports) {
         checkSingleLicenseViolation(imp, ctx);
@@ -878,17 +899,15 @@ interface UnpinnedAuditContext {
 /**
  * Audits a single import statement for unpinned or wildcard version constraints in manifests.
  */
-function auditSingleUnpinnedImport(
-    imp: ImportStatementInfo,
-    ctx: UnpinnedAuditContext,
-): void {
+function auditSingleUnpinnedImport(imp: ImportStatementInfo, ctx: UnpinnedAuditContext): void {
     const pkgName = extractUniqueThirdPartyPackage(imp, ctx.seenPackages);
     if (!pkgName) {
         return;
     }
 
     const normPkg = pkgName.toLowerCase();
-    const ver = ctx.inventory.versionSpecs?.get(pkgName) || ctx.inventory.versionSpecs?.get(normPkg);
+    const ver =
+        ctx.inventory.versionSpecs?.get(pkgName) || ctx.inventory.versionSpecs?.get(normPkg);
     if (!ver || !isUnpinnedVersion(ver)) {
         return;
     }
@@ -914,7 +933,12 @@ function auditUnpinnedDependencies(
     }
 
     const seenUnpinnedPackages = new Set<string>();
-    const ctx: UnpinnedAuditContext = { inventory, language, seenPackages: seenUnpinnedPackages, issues };
+    const ctx: UnpinnedAuditContext = {
+        inventory,
+        language,
+        seenPackages: seenUnpinnedPackages,
+        issues,
+    };
     for (const imp of imports) {
         auditSingleUnpinnedImport(imp, ctx);
     }
@@ -930,10 +954,7 @@ interface SyntaxLayoutContext {
 /**
  * Executes syntactic and topological file layout audit passes.
  */
-function auditSyntaxLayoutPasses(
-    ctx: SyntaxLayoutContext,
-    issues: Issue[],
-): void {
+function auditSyntaxLayoutPasses(ctx: SyntaxLayoutContext, issues: Issue[]): void {
     auditInFunctionImports(ctx.imports, ctx.language, issues);
     if (ctx.options.flagWildcards ?? true) {
         auditWildcardImports(ctx.imports, ctx.language, issues);
@@ -959,15 +980,17 @@ interface SemanticLayoutContext {
 /**
  * Executes supply chain, licensing, and package manifest semantic audit passes.
  */
-function auditSemanticLayoutPasses(
-    ctx: SemanticLayoutContext,
-    issues: Issue[],
-): void {
+function auditSemanticLayoutPasses(ctx: SemanticLayoutContext, issues: Issue[]): void {
     if (ctx.options.flagVulnerableDependencies ?? true) {
         auditVulnerableDependencies(ctx.imports, ctx.options.rootDir, ctx.language, issues);
     }
     if ((ctx.options.flagPhantomDependencies ?? true) && ctx.options.manifestDependencies) {
-        auditPhantomDependencies(ctx.imports, ctx.options.manifestDependencies, ctx.language, issues);
+        auditPhantomDependencies(
+            ctx.imports,
+            ctx.options.manifestDependencies,
+            ctx.language,
+            issues,
+        );
     }
     if ((ctx.options.flagLicenseCompliance ?? true) && ctx.options.rootDir) {
         auditDependencyLicenses(ctx.imports, ctx.options.rootDir, ctx.language, issues);

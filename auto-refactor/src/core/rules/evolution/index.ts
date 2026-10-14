@@ -16,4 +16,3 @@ export * from './dispatchComplexityRule';
 export * from './template-complexity-rule';
 export * from './backward-shim-rule';
 export * from './generalizationPipeline';
-

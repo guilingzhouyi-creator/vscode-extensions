@@ -402,7 +402,12 @@ function extractAliasesFromFile(
     visited = new Set<string>(),
 ): void {
     const absPath = path.resolve(filePath);
-    if (visited.has(absPath) || visited.size > MAX_TSCONFIG_EXTENDS_DEPTH || !fs.existsSync(absPath)) return;
+    if (
+        visited.has(absPath) ||
+        visited.size > MAX_TSCONFIG_EXTENDS_DEPTH ||
+        !fs.existsSync(absPath)
+    )
+        return;
     visited.add(absPath);
 
     try {
@@ -722,7 +727,12 @@ function isDeclaredDependency(firstSegment: string, manifestDeps?: Set<string>):
 
 function isRelativeOrInternalPrefix(trimmed: string): boolean {
     const firstChar = trimmed.charCodeAt(0);
-    if (firstChar === CHAR_CODE_DOT || firstChar === CHAR_CODE_SLASH || firstChar === CHAR_CODE_HASH) return true;
+    if (
+        firstChar === CHAR_CODE_DOT ||
+        firstChar === CHAR_CODE_SLASH ||
+        firstChar === CHAR_CODE_HASH
+    )
+        return true;
     return trimmed.startsWith('@/') || trimmed.startsWith('~/');
 }
 
@@ -790,7 +800,10 @@ function tryLoadNpmLock(absRoot: string, direct: number): SupplyChainProfile | n
         const parsedLock = JSON.parse(raw);
         let totalPackages = 0;
         if (parsedLock.packages && typeof parsedLock.packages === 'object') {
-            totalPackages = Math.max(0, Object.keys(parsedLock.packages).filter((k) => k !== '').length);
+            totalPackages = Math.max(
+                0,
+                Object.keys(parsedLock.packages).filter((k) => k !== '').length,
+            );
         } else if (parsedLock.dependencies && typeof parsedLock.dependencies === 'object') {
             totalPackages = Object.keys(parsedLock.dependencies).length;
         }

@@ -83,10 +83,7 @@ export interface FileCoverageProfile {
 
 /** Qualitative evaluation status of test coverage health for an inspected location. */
 export type CoverageStatus =
-    | 'well_covered'
-    | 'moderate_coverage'
-    | 'uncovered_high_risk'
-    | 'unmonitored';
+    'well_covered' | 'moderate_coverage' | 'uncovered_high_risk' | 'unmonitored';
 
 /**
  * Result of coverage risk damping computation indicating multiplier and rationale.
@@ -210,10 +207,7 @@ function handleBranchRecord(
 /**
  * Compute ratios and insert coverage profile into destination map.
  */
-function recordProfile(
-    state: LcovParserState,
-    resultMap: Map<string, FileCoverageProfile>,
-): void {
+function recordProfile(state: LcovParserState, resultMap: Map<string, FileCoverageProfile>): void {
     if (!state.currentPath) return;
     const normalizedPath = state.currentPath.replace(/\\/g, '/');
     let activeHits = 0;
@@ -223,8 +217,12 @@ function recordProfile(
 
     const effectiveFound = Math.max(state.linesFound, state.lineHits.size);
     const effectiveHit = state.linesHit > 0 ? state.linesHit : activeHits;
-    const lineRatio = effectiveFound > 0 ? +(effectiveHit / effectiveFound).toFixed(RATIO_PRECISION_DIGITS) : 0.0;
-    const branchRatio = state.branchesFound > 0 ? +(state.branchesHit / state.branchesFound).toFixed(RATIO_PRECISION_DIGITS) : 1.0;
+    const lineRatio =
+        effectiveFound > 0 ? +(effectiveHit / effectiveFound).toFixed(RATIO_PRECISION_DIGITS) : 0.0;
+    const branchRatio =
+        state.branchesFound > 0
+            ? +(state.branchesHit / state.branchesFound).toFixed(RATIO_PRECISION_DIGITS)
+            : 1.0;
 
     resultMap.set(normalizedPath, {
         filePath: normalizedPath,
@@ -459,7 +457,7 @@ export class LcovIngester {
             return {
                 filePath: '',
                 line: targetLine,
-                'dampingMultiplier': MULTIPLIER_NEUTRAL,
+                dampingMultiplier: MULTIPLIER_NEUTRAL,
                 status: STATUS_UNMONITORED,
                 rationale:
                     'No CI coverage telemetry available for this file. Neutral multiplier 1.0x applied.',
@@ -469,11 +467,14 @@ export class LcovIngester {
         const lineHit = targetLine !== undefined ? profile.lineHits.get(targetLine) : undefined;
 
         // Condition 1: Naked Uncovered Line or Critical Low Coverage (<20%)
-        if ((targetLine !== undefined && lineHit === 0) || profile.lineCoverageRatio < COVERAGE_LOW_THRESHOLD) {
+        if (
+            (targetLine !== undefined && lineHit === 0) ||
+            profile.lineCoverageRatio < COVERAGE_LOW_THRESHOLD
+        ) {
             return {
                 filePath: profile.filePath,
                 line: targetLine,
-                'dampingMultiplier': MULTIPLIER_HIGH_RISK,
+                dampingMultiplier: MULTIPLIER_HIGH_RISK,
                 status: STATUS_UNCOVERED_HIGH_RISK,
                 lineHitCount: lineHit,
                 rationale:
@@ -492,7 +493,7 @@ export class LcovIngester {
             return {
                 filePath: profile.filePath,
                 line: targetLine,
-                'dampingMultiplier': MULTIPLIER_WELL_COVERED,
+                dampingMultiplier: MULTIPLIER_WELL_COVERED,
                 status: STATUS_WELL_COVERED,
                 lineHitCount: lineHit,
                 rationale:
@@ -505,7 +506,7 @@ export class LcovIngester {
         return {
             filePath: profile.filePath,
             line: targetLine,
-            'dampingMultiplier': MULTIPLIER_NEUTRAL,
+            dampingMultiplier: MULTIPLIER_NEUTRAL,
             status: STATUS_MODERATE_COVERAGE,
             lineHitCount: lineHit,
             rationale:

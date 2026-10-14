@@ -26,7 +26,8 @@ import { ANALYZER_GOVERNANCE } from '../scoring/dimensionLiterals';
 /** Canonical rule identifier for cross-generational fallback chains. */
 export const MOD_FLB_RULE_ID = 'MOD-FLB-001';
 
-const GENERATIONAL_STRIP_RE = /^(?:legacy|old|compat|deprecated|raw|prev|prior)_?|_?(?:v1|v2|old|legacy|fallback|prior|ms|sec)$/gi;
+const GENERATIONAL_STRIP_RE =
+    /^(?:legacy|old|compat|deprecated|raw|prev|prior)_?|_?(?:v1|v2|old|legacy|fallback|prior|ms|sec)$/gi;
 
 /**
  * Checks whether file path belongs to architectural perimeter (adapters, compat shims, gateways).
@@ -56,7 +57,11 @@ export function isPerimeterPath(filePath: string): boolean {
  * @returns True if expression is a literal default value.
  */
 function isConstantLiteral(expr: ts.Expression): boolean {
-    if (ts.isNumericLiteral(expr) || ts.isStringLiteral(expr) || ts.isNoSubstitutionTemplateLiteral(expr)) {
+    if (
+        ts.isNumericLiteral(expr) ||
+        ts.isStringLiteral(expr) ||
+        ts.isNoSubstitutionTemplateLiteral(expr)
+    ) {
         return true;
     }
     const k = expr.kind;
@@ -173,10 +178,7 @@ function inspectBinaryFallbackChain(
     filePath: string,
 ): Issue | null {
     const opKind = rootNode.operatorToken.kind;
-    if (
-        opKind !== ts.SyntaxKind.QuestionQuestionToken &&
-        opKind !== ts.SyntaxKind.BarBarToken
-    ) {
+    if (opKind !== ts.SyntaxKind.QuestionQuestionToken && opKind !== ts.SyntaxKind.BarBarToken) {
         return null;
     }
 
@@ -222,10 +224,7 @@ function inspectBinaryFallbackChain(
  * @param filePath - Repository relative file path.
  * @returns Array of emitted MOD-FLB-001 issues.
  */
-export function auditFallbackChains(
-    sourceFile: ts.SourceFile,
-    filePath: string,
-): Issue[] {
+export function auditFallbackChains(sourceFile: ts.SourceFile, filePath: string): Issue[] {
     // Non-perimeter invariant: perimeter files are exempted
     if (isPerimeterPath(filePath)) {
         return [];

@@ -68,7 +68,7 @@ const DIR_LIB_TITLE = 'Lib';
 const DIR_LIBRARY = 'library';
 const DIR_CORE = 'core';
 const DIR_STD = 'std';
-const DIR_ALLOC = 'alloc';
+const _DIR_ALLOC = 'alloc';
 const DIR_KERNEL = 'kernel';
 
 const PATH_FRAGMENT_KERNEL = '/kernel';

@@ -22,7 +22,6 @@ import {
     SEVERITY_WARNING,
     SEVERITY_ERROR,
     LANGUAGE_TYPESCRIPT,
-    COMMENT_LEVEL_OFF,
 } from '../core/types';
 
 import { parseHumanMetric } from '../core/config/metric-parser';
@@ -45,27 +44,142 @@ const STR_INCLUDE = 'include';
 const STR_EXCLUDE = 'exclude';
 const STR_ID = 'id';
 const STR_GROUPED = 'grouped';
-const STR_JSON = 'json';
-const STR_SARIF = 'sarif';
-const STR_TEXT = 'text';
-const STR_BASIC = 'basic';
-const STR_STANDARD = 'standard';
-const STR_STRICT = 'strict';
-const STR_FULL = 'full';
 const STR_OXC = 'oxc';
 const MODE_AUTO = 'auto';
 const MODE_ON = 'on';
 
+const FLAG_PARSER = 'parser';
+const FLAG_LOG_LEVEL = 'log-level';
+const FLAG_COMMENT_LEVEL = 'comment-level';
+const FLAG_SECURITY_LEVEL = 'security-level';
+const FLAG_FAIL_ON_SEVERITY = 'fail-on-severity';
+const FLAG_BASELINE_GRANULARITY = 'baseline-granularity';
+const FLAG_FORMAT = 'format';
+const FLAG_HELP = 'help';
+const FLAG_HELP_SHORT = 'h';
+const FLAG_NO_DAEMON = 'no-daemon';
+const FLAG_ANALYZERS = 'analyzers';
+const FLAG_FIX_RULES = 'fix-rules';
+const FLAG_PROFILE = 'profile';
+const FLAG_REVIEW_PROFILE = 'review-profile';
+
+const PREFIX_DOUBLE_DASH = '--';
+const PREFIX_SINGLE_DASH = '-';
+const CHAR_COMMA = ',';
+const CHAR_COLON = ':';
+const CHAR_NEWLINE = '\n';
+const CHAR_EQUALS = '=';
+const CHAR_SPACE = ' ';
+const EMPTY_STRING = '';
+
+/** Compact definition table for boolean toggle flags and their CliOptions property names. */
+const BOOLEAN_FLAG_MAP_DEF = `fail-on-issue:failOnIssue
+fail-on-analyzer-error:failOnAnalyzerError
+respect-gitignore:respectGitignore
+cache:cache
+diff:diff
+auto-tune:autoTuneScale
+profile:showProfile
+score:showScore
+memory:memory
+record-trajectory:recordTrajectory`;
+
+/** Compact definition table for standalone flags mapping to [property, booleanValue]. */
+const STANDALONE_FLAG_MAP_DEF = `no-cache:cache:false
+cache-clear:cacheClear:true
+cache-custom:cacheCustom:true
+no-memory:memory:false
+baseline-ratchet-down:baselineRatchetDown:true
+force-baseline-expand:forceBaselineExpand:true
+fix:fix:true
+fix-dry-run:fixDryRun:true`;
+
+/** Compact definition table for string value flags. */
+const STRING_VALUE_MAP_DEF = `out:out
+output:out
+root:root
+config:configFile
+baseline:baseline
+update-baseline:updateBaseline
+cache-dir:cacheDir
+agent-uid:agentUid
+telemetry:telemetry
+log-file:logFile`;
+
+/** Compact definition table for human metric flags. */
+const METRIC_VALUE_MAP_DEF = `effective-loc:effectiveLoc
+max-sloc:effectiveLoc
+file-lines-warn:fileLinesWarn
+file-lines-fail:fileLinesFail`;
+
+/** Compact definition table for numeric flags. */
+const NUMBER_VALUE_MAP_DEF = `concurrency:concurrency
+workers:workers`;
+
+const VALID_PROFILES_DEF = 'frontend backend composite';
+const VALID_FORMATS_DEF = 'json sarif text agent capp praxis';
+const VALID_COMMENT_LEVELS_DEF = 'off basic standard strict';
+const VALID_SECURITY_LEVELS_DEF = 'off basic full';
+const KNOWN_CLI_SUBCOMMANDS_DEF = 'scan daemon self-test symbols guide trajectory memory stats';
+
+function parseMappingTable<T extends Record<string, string>>(tableDefinition: string): Readonly<T> {
+    const tableResult: Record<string, string> = {};
+    const definitionLines = tableDefinition.split(CHAR_NEWLINE);
+    for (let lineIndex = 0; lineIndex < definitionLines.length; lineIndex++) {
+        const rawLine = definitionLines[lineIndex].trim();
+        if (!rawLine) {
+            continue;
+        }
+        const separatorIndex = rawLine.indexOf(CHAR_COLON);
+        if (separatorIndex === -1) {
+            continue;
+        }
+        const flagKey = rawLine.slice(0, separatorIndex).trim();
+        const propertyValue = rawLine.slice(separatorIndex + 1).trim();
+        tableResult[flagKey] = propertyValue;
+    }
+    return Object.freeze(tableResult) as Readonly<T>;
+}
+
+const TOKEN_PART_COUNT = 3;
+
+function parseStandaloneFlagTable(
+    tableDefinition: string,
+): Readonly<Record<string, [keyof CliOptions, boolean]>> {
+    const tableResult: Record<string, [keyof CliOptions, boolean]> = {};
+    const definitionLines = tableDefinition.split(CHAR_NEWLINE);
+    for (let lineIndex = 0; lineIndex < definitionLines.length; lineIndex++) {
+        const rawLine = definitionLines[lineIndex].trim();
+        if (!rawLine) {
+            continue;
+        }
+        const tokenParts = rawLine.split(CHAR_COLON);
+        if (tokenParts.length === TOKEN_PART_COUNT) {
+            const flagKey = tokenParts[0].trim();
+            const propertyName = tokenParts[1].trim() as keyof CliOptions;
+            const flagState = tokenParts[2].trim() === VAL_TRUE;
+            tableResult[flagKey] = [propertyName, flagState];
+        }
+    }
+    return Object.freeze(tableResult);
+}
+
 const VALID_SEVERITIES = new Set<string>([SEVERITY_INFO, SEVERITY_WARNING, SEVERITY_ERROR]);
-const VALID_FORMATS = new Set<string>([STR_JSON, STR_SARIF, STR_TEXT, 'agent', 'capp', 'praxis']);
-const VALID_COMMENT_LEVELS = new Set<string>([
-    COMMENT_LEVEL_OFF,
-    STR_BASIC,
-    STR_STANDARD,
-    STR_STRICT,
-]);
-const VALID_SECURITY_LEVELS = new Set<string>([SECURITY_LEVEL_OFF, STR_BASIC, STR_FULL]);
-const VALID_PROFILES = new Set<string>(['frontend', 'backend', 'composite']);
+const VALID_PROFILES = new Set<string>(VALID_PROFILES_DEF.split(CHAR_SPACE));
+const VALID_FORMATS = new Set<string>(VALID_FORMATS_DEF.split(CHAR_SPACE));
+const VALID_COMMENT_LEVELS = new Set<string>(VALID_COMMENT_LEVELS_DEF.split(CHAR_SPACE));
+const VALID_SECURITY_LEVELS = new Set<string>(VALID_SECURITY_LEVELS_DEF.split(CHAR_SPACE));
+const KNOWN_CLI_SUBCOMMANDS = new Set<string>(KNOWN_CLI_SUBCOMMANDS_DEF.split(CHAR_SPACE));
+
+const BOOLEAN_FLAG_PROPS =
+    parseMappingTable<Record<string, keyof CliOptions>>(BOOLEAN_FLAG_MAP_DEF);
+const STANDALONE_BOOLEAN_PROPS = parseStandaloneFlagTable(STANDALONE_FLAG_MAP_DEF);
+const STRING_VALUE_PROPS =
+    parseMappingTable<Record<string, keyof CliOptions>>(STRING_VALUE_MAP_DEF);
+const METRIC_VALUE_PROPS =
+    parseMappingTable<Record<string, keyof CliOptions>>(METRIC_VALUE_MAP_DEF);
+const NUMBER_VALUE_PROPS =
+    parseMappingTable<Record<string, keyof CliOptions>>(NUMBER_VALUE_MAP_DEF);
 
 /**
  * Options accepted by the CLI layer, extending scan options with out and cache-clear flags.
@@ -87,261 +201,257 @@ export interface CliOptions extends ScanOptions {
  * Appends comma-separated values to a list flag on CliOptions.
  */
 function applyListFlag(
-    opt: CliOptions,
-    arg: typeof STR_INCLUDE | typeof STR_EXCLUDE,
-    val: string,
+    cliOptions: CliOptions,
+    targetFlag: typeof STR_INCLUDE | typeof STR_EXCLUDE,
+    flagValue: string,
 ): void {
-    const items = val
-        .split(',')
-        .map((s) => s.trim())
+    const parsedTokens = flagValue
+        .split(CHAR_COMMA)
+        .map((tokenSegment) => tokenSegment.trim())
         .filter(Boolean);
-    opt[arg] = opt[arg] ? [...opt[arg], ...items] : items;
+    const existingList = cliOptions[targetFlag];
+    cliOptions[targetFlag] = existingList ? [...existingList, ...parsedTokens] : parsedTokens;
 }
 
-const BOOLEAN_FLAG_PROPS: Record<string, keyof CliOptions> = {
-    'fail-on-issue': 'failOnIssue',
-    'fail-on-analyzer-error': 'failOnAnalyzerError',
-    'respect-gitignore': 'respectGitignore',
-    cache: 'cache',
-    diff: 'diff',
-    'auto-tune': 'autoTuneScale',
-    profile: 'showProfile',
-    score: 'showScore',
-    memory: 'memory',
-    'record-trajectory': 'recordTrajectory',
-};
-
-function isBooleanFlag(arg: string): boolean {
-    return arg === DAEMON_FLAG || Object.prototype.hasOwnProperty.call(BOOLEAN_FLAG_PROPS, arg);
+function isBooleanFlag(flagName: string): boolean {
+    return (
+        flagName === DAEMON_FLAG ||
+        Object.prototype.hasOwnProperty.call(BOOLEAN_FLAG_PROPS, flagName)
+    );
 }
 
-function applyBooleanFlag(opt: CliOptions, arg: string, enabled: boolean): boolean {
-    if (arg === DAEMON_FLAG) {
-        opt.daemon = enabled ? MODE_ON : DAEMON_MODE_OFF;
+function applyBooleanFlag(cliOptions: CliOptions, flagName: string, flagEnabled: boolean): boolean {
+    if (flagName === DAEMON_FLAG) {
+        cliOptions.daemon = flagEnabled ? MODE_ON : DAEMON_MODE_OFF;
         return true;
     }
-    const prop = BOOLEAN_FLAG_PROPS[arg];
-    if (prop) {
-        (opt as Record<string, unknown>)[prop] = enabled;
+    const propKey = BOOLEAN_FLAG_PROPS[flagName];
+    if (propKey) {
+        (cliOptions as Record<string, unknown>)[propKey] = flagEnabled;
         return true;
     }
     return false;
 }
 
-const STANDALONE_BOOLEAN_PROPS: Record<string, [keyof CliOptions, boolean]> = {
-    'no-cache': ['cache', false],
-    'cache-clear': ['cacheClear', true],
-    'cache-custom': ['cacheCustom', true],
-    'no-memory': ['memory', false],
-    'baseline-ratchet-down': ['baselineRatchetDown', true],
-    'force-baseline-expand': ['forceBaselineExpand', true],
-    fix: ['fix', true],
-    'fix-dry-run': ['fixDryRun', true],
-};
-
-function applyStandaloneFlag(opt: CliOptions, arg: string): boolean {
-    if (arg === 'help' || arg === 'h') {
+function applyStandaloneFlag(cliOptions: CliOptions, flagName: string): boolean {
+    if (flagName === FLAG_HELP || flagName === FLAG_HELP_SHORT) {
         printUsage();
         process.exit(0);
     }
-    if (arg === 'no-daemon') {
-        opt.daemon = DAEMON_MODE_OFF;
+    if (flagName === FLAG_NO_DAEMON) {
+        cliOptions.daemon = DAEMON_MODE_OFF;
         return true;
     }
-    const entry = STANDALONE_BOOLEAN_PROPS[arg];
-    if (entry) {
-        (opt as Record<string, unknown>)[entry[0]] = entry[1];
+    const mappingEntry = STANDALONE_BOOLEAN_PROPS[flagName];
+    if (mappingEntry) {
+        const [targetProperty, flagState] = mappingEntry;
+        (cliOptions as Record<string, unknown>)[targetProperty] = flagState;
         return true;
     }
     return false;
 }
 
-const STRING_VALUE_PROPS: Record<string, keyof CliOptions> = {
-    out: 'out',
-    output: 'out',
-    root: 'root',
-    config: 'configFile',
-    baseline: 'baseline',
-    'update-baseline': 'updateBaseline',
-    'cache-dir': 'cacheDir',
-    'agent-uid': 'agentUid',
-    telemetry: 'telemetry',
-    'log-file': 'logFile',
-};
-
-const METRIC_VALUE_PROPS: Record<string, keyof CliOptions> = {
-    'effective-loc': 'effectiveLoc',
-    'max-sloc': 'effectiveLoc',
-    'file-lines-warn': 'fileLinesWarn',
-    'file-lines-fail': 'fileLinesFail',
-};
-
-const NUMBER_VALUE_PROPS: Record<string, keyof CliOptions> = {
-    concurrency: 'concurrency',
-    workers: 'workers',
-};
-
-function applyListValueFlag(opt: CliOptions, arg: string, val: string): boolean {
-    if (arg === STR_INCLUDE || arg === STR_EXCLUDE) {
-        applyListFlag(opt, arg, val);
+function applyListValueFlag(cliOptions: CliOptions, flagName: string, flagValue: string): boolean {
+    if (flagName === STR_INCLUDE || flagName === STR_EXCLUDE) {
+        applyListFlag(cliOptions, flagName, flagValue);
         return true;
     }
-    if (arg === 'analyzers' || arg === 'fix-rules') {
-        const items = val
-            .split(',')
-            .map((s) => s.trim())
+    if (flagName === FLAG_ANALYZERS || flagName === FLAG_FIX_RULES) {
+        const parsedTokens = flagValue
+            .split(CHAR_COMMA)
+            .map((tokenSegment) => tokenSegment.trim())
             .filter(Boolean);
-        if (arg === 'analyzers') opt.analyzers = items;
-        else opt.fixRules = items;
+        if (flagName === FLAG_ANALYZERS) {
+            cliOptions.analyzers = parsedTokens;
+        } else {
+            cliOptions.fixRules = parsedTokens;
+        }
         return true;
     }
     return false;
 }
 
-type SpecialValueHandler = (opt: CliOptions, val: string) => void;
+type SpecialValueHandler = (cliOptions: CliOptions, flagValue: string) => void;
 
-const SPECIAL_VALUE_HANDLERS: Record<string, SpecialValueHandler> = {
-    parser: (opt, val) => {
-        opt.parser = val === STR_OXC ? STR_OXC : LANGUAGE_TYPESCRIPT;
+const SPECIAL_VALUE_HANDLERS: Readonly<Record<string, SpecialValueHandler>> = Object.freeze({
+    [FLAG_PARSER]: (cliOptions: CliOptions, flagValue: string): void => {
+        cliOptions.parser = flagValue === STR_OXC ? STR_OXC : LANGUAGE_TYPESCRIPT;
     },
-    'log-level': (opt, val) => {
-        opt.logLevel = val as LogLevel;
+    [FLAG_LOG_LEVEL]: (cliOptions: CliOptions, flagValue: string): void => {
+        cliOptions.logLevel = flagValue as LogLevel;
     },
-    'comment-level': (opt, val) => {
-        if (VALID_COMMENT_LEVELS.has(val)) {
-            opt.commentLevel = val as CommentLevel;
+    [FLAG_COMMENT_LEVEL]: (cliOptions: CliOptions, flagValue: string): void => {
+        if (VALID_COMMENT_LEVELS.has(flagValue)) {
+            cliOptions.commentLevel = flagValue as CommentLevel;
         }
     },
-    'security-level': (opt, val) => {
-        if (VALID_SECURITY_LEVELS.has(val)) {
-            opt.securityLevel = val as SecurityLevel;
+    [FLAG_SECURITY_LEVEL]: (cliOptions: CliOptions, flagValue: string): void => {
+        if (VALID_SECURITY_LEVELS.has(flagValue)) {
+            cliOptions.securityLevel = flagValue as SecurityLevel;
         }
     },
-    'fail-on-severity': (opt, val) => {
-        if (VALID_SEVERITIES.has(val)) {
-            opt.failOnSeverity = val as Severity;
+    [FLAG_FAIL_ON_SEVERITY]: (cliOptions: CliOptions, flagValue: string): void => {
+        if (VALID_SEVERITIES.has(flagValue)) {
+            cliOptions.failOnSeverity = flagValue as Severity;
         }
     },
-    'baseline-granularity': (opt, val) => {
-        if (val === STR_ID || val === STR_GROUPED) {
-            opt.baselineGranularity = val;
+    [FLAG_BASELINE_GRANULARITY]: (cliOptions: CliOptions, flagValue: string): void => {
+        if (flagValue === STR_ID || flagValue === STR_GROUPED) {
+            cliOptions.baselineGranularity = flagValue;
         }
     },
-    format: (opt, val) => {
-        if (VALID_FORMATS.has(val)) {
-            opt.format = val as OutputFormat;
+    [FLAG_FORMAT]: (cliOptions: CliOptions, flagValue: string): void => {
+        if (VALID_FORMATS.has(flagValue)) {
+            cliOptions.format = flagValue as OutputFormat;
         }
     },
-};
+});
 
-function applySpecialValueFlag(opt: CliOptions, arg: string, val: string): boolean {
-    const handler = SPECIAL_VALUE_HANDLERS[arg];
-    if (!handler) {
+function applySpecialValueFlag(
+    cliOptions: CliOptions,
+    flagName: string,
+    flagValue: string,
+): boolean {
+    const flagHandler = SPECIAL_VALUE_HANDLERS[flagName];
+    if (!flagHandler) {
         return false;
     }
-    handler(opt, val);
+    flagHandler(cliOptions, flagValue);
     return true;
 }
 
-function applyValueFlag(opt: CliOptions, arg: string, val: string): void {
-    const strProp = STRING_VALUE_PROPS[arg];
-    if (strProp) {
-        (opt as Record<string, unknown>)[strProp] = val;
+function applyValueFlag(cliOptions: CliOptions, flagName: string, flagValue: string): void {
+    const stringProperty = STRING_VALUE_PROPS[flagName];
+    if (stringProperty) {
+        (cliOptions as Record<string, unknown>)[stringProperty] = flagValue;
         return;
     }
-    const metricProp = METRIC_VALUE_PROPS[arg];
-    if (metricProp) {
-        (opt as Record<string, unknown>)[metricProp] = parseHumanMetric(val);
+    const metricProperty = METRIC_VALUE_PROPS[flagName];
+    if (metricProperty) {
+        (cliOptions as Record<string, unknown>)[metricProperty] = parseHumanMetric(flagValue);
         return;
     }
-    const numProp = NUMBER_VALUE_PROPS[arg];
-    if (numProp) {
-        (opt as Record<string, unknown>)[numProp] = Number(val);
+    const numericProperty = NUMBER_VALUE_PROPS[flagName];
+    if (numericProperty) {
+        (cliOptions as Record<string, unknown>)[numericProperty] = Number(flagValue);
         return;
     }
-    if (applyListValueFlag(opt, arg, val)) return;
-    applySpecialValueFlag(opt, arg, val);
+    if (applyListValueFlag(cliOptions, flagName, flagValue)) {
+        return;
+    }
+    applySpecialValueFlag(cliOptions, flagName, flagValue);
 }
 
 /**
  * Resolves boolean flag value considering inline '=false' and explicit next token.
  */
-function resolveBooleanFlagValue(
-    hasInline: boolean,
-    value: string,
-    nextToken: string | undefined,
-): { enabled: boolean; consumedNext: boolean } {
-    if (hasInline) {
-        return { enabled: value !== VAL_FALSE, consumedNext: false };
+function resolveBoolFlag(
+    hasInlineValue: boolean,
+    inlineValue: string,
+    nextArgumentToken: string | undefined,
+): [boolean, number] {
+    if (hasInlineValue) {
+        return [inlineValue !== VAL_FALSE, 0];
     }
-    if (nextToken === VAL_TRUE || nextToken === VAL_FALSE) {
-        return { enabled: nextToken !== VAL_FALSE, consumedNext: true };
+    if (nextArgumentToken === VAL_TRUE || nextArgumentToken === VAL_FALSE) {
+        return [nextArgumentToken !== VAL_FALSE, 1];
     }
-    return { enabled: true, consumedNext: false };
+    return [true, 0];
 }
 
-function handleProfileArgument(
-    opt: CliOptions,
-    arg: string,
-    hasInline: boolean,
-    value: string,
-    nextArg: string | undefined,
-): { handled: boolean; consumedNext: boolean } {
-    if (arg === 'profile') {
-        const candidate = hasInline ? value : nextArg;
-        if (candidate && VALID_PROFILES.has(candidate)) {
-            opt.reviewProfile = candidate as QualityReviewProfile;
-            opt.showProfile = true;
-            return { handled: true, consumedNext: !hasInline };
-        }
-        return { handled: true, consumedNext: false };
-    }
-    if (arg === 'review-profile') {
-        const candidate = hasInline ? value : nextArg;
-        if (candidate && VALID_PROFILES.has(candidate)) {
-            opt.reviewProfile = candidate as QualityReviewProfile;
-            return { handled: true, consumedNext: !hasInline };
-        }
-        return { handled: true, consumedNext: false };
-    }
-    return { handled: false, consumedNext: false };
+interface FlagTokenContext {
+    readonly flagName: string;
+    readonly hasInlineValue: boolean;
+    readonly inlineValue: string;
+    readonly nextArgumentToken?: string;
 }
 
-/** Known CLI subcommands that should not be treated as target scan paths. */
-const KNOWN_CLI_SUBCOMMANDS = new Set([
-    'scan',
-    'daemon',
-    'self-test',
-    'symbols',
-    'guide',
-    'trajectory',
-    'memory',
-    'stats',
-]);
+function handleProfileFlag(
+    flagContext: FlagTokenContext,
+    cliOptions: CliOptions,
+): [boolean, number] {
+    const isProfile = flagContext.flagName === FLAG_PROFILE;
+    const isReviewProfile = flagContext.flagName === FLAG_REVIEW_PROFILE;
+    if (!isProfile && !isReviewProfile) {
+        return [false, 0];
+    }
+    if (isProfile) {
+        cliOptions.showProfile = true;
+    }
+    const candidateProfile = flagContext.hasInlineValue
+        ? flagContext.inlineValue
+        : flagContext.nextArgumentToken;
+    if (candidateProfile && VALID_PROFILES.has(candidateProfile)) {
+        cliOptions.reviewProfile = candidateProfile as QualityReviewProfile;
+        return [true, flagContext.hasInlineValue ? 0 : 1];
+    }
+    return [true, 0];
+}
 
-function tryCollectPositional(arg: string, positionalPaths: string[]): boolean {
-    if (arg.startsWith('--')) return false;
-    if (!KNOWN_CLI_SUBCOMMANDS.has(arg) && !arg.startsWith('-')) {
-        positionalPaths.push(arg);
+function tryCollectPositional(argumentToken: string, positionalPaths: string[]): boolean {
+    if (argumentToken.startsWith(PREFIX_DOUBLE_DASH)) {
+        return false;
+    }
+    if (
+        !KNOWN_CLI_SUBCOMMANDS.has(argumentToken) &&
+        !argumentToken.startsWith(PREFIX_SINGLE_DASH)
+    ) {
+        positionalPaths.push(argumentToken);
     }
     return true;
 }
 
-function resolveNextValue(
-    hasInline: boolean,
-    value: string,
-    nextToken: string | undefined,
-): { val: string; consumedNext: boolean } {
-    if (hasInline) return { val: value, consumedNext: false };
-    if (nextToken === undefined || nextToken.startsWith('--'))
-        return { val: '', consumedNext: false };
-    return { val: nextToken, consumedNext: true };
+function resolveTokenValue(
+    hasInlineValue: boolean,
+    inlineValue: string,
+    nextArgumentToken: string | undefined,
+): [string, number] {
+    if (hasInlineValue) {
+        return [inlineValue, 0];
+    }
+    if (!nextArgumentToken || nextArgumentToken.startsWith(PREFIX_DOUBLE_DASH)) {
+        return [EMPTY_STRING, 0];
+    }
+    return [nextArgumentToken, 1];
 }
 
-function finalizeRootPath(opt: CliOptions, positionalPaths: string[]): void {
-    if (!opt.root && positionalPaths.length > 0) {
-        opt.root = positionalPaths[0];
+function finalizeRootPath(cliOptions: CliOptions, positionalPaths: string[]): void {
+    if (!cliOptions.root && positionalPaths.length > 0) {
+        cliOptions.root = positionalPaths[0];
     }
+}
+
+function extractFlagTokenParts(rawToken: string): [string, boolean, string] {
+    const normalized = rawToken.slice(2);
+    const eqIdx = normalized.indexOf(CHAR_EQUALS);
+    if (eqIdx === -1) {
+        return [normalized, false, EMPTY_STRING];
+    }
+    return [normalized.slice(0, eqIdx), true, normalized.slice(eqIdx + 1)];
+}
+
+function dispatchGenericFlag(cliOptions: CliOptions, flagContext: FlagTokenContext): number {
+    if (isBooleanFlag(flagContext.flagName)) {
+        const [flagEnabled, stepOffset] = resolveBoolFlag(
+            flagContext.hasInlineValue,
+            flagContext.inlineValue,
+            flagContext.nextArgumentToken,
+        );
+        applyBooleanFlag(cliOptions, flagContext.flagName, flagEnabled);
+        return stepOffset;
+    }
+
+    if (applyStandaloneFlag(cliOptions, flagContext.flagName)) {
+        return 0;
+    }
+
+    const [flagValue, stepOffset] = resolveTokenValue(
+        flagContext.hasInlineValue,
+        flagContext.inlineValue,
+        flagContext.nextArgumentToken,
+    );
+    applyValueFlag(cliOptions, flagContext.flagName, flagValue);
+    return stepOffset;
 }
 
 /**
@@ -352,57 +462,39 @@ function finalizeRootPath(opt: CliOptions, positionalPaths: string[]): void {
  * @returns Fully populated CLI options object.
  */
 export function parseArgs(argv: string[]): CliOptions {
-    const opt: CliOptions = { cache: true, daemon: MODE_AUTO };
+    const cliOptions: CliOptions = { cache: true, daemon: MODE_AUTO };
     const positionalPaths: string[] = [];
 
-    for (let i = 0; i < argv.length; i++) {
-        let arg = argv[i];
-        if (tryCollectPositional(arg, positionalPaths)) {
-            continue;
-        }
-        arg = arg.slice(2);
-
-        let value = '';
-        let hasInline = false;
-        if (arg.includes('=')) {
-            [arg, value] = arg.split('=', 2);
-            hasInline = true;
-        }
-
-        const profileRes = handleProfileArgument(opt, arg, hasInline, value, argv[i + 1]);
-        if (profileRes.handled) {
-            if (profileRes.consumedNext) i++;
+    for (let tokenIndex = 0; tokenIndex < argv.length; tokenIndex++) {
+        const rawToken = argv[tokenIndex];
+        if (tryCollectPositional(rawToken, positionalPaths)) {
             continue;
         }
 
-        if (isBooleanFlag(arg)) {
-            const { enabled, consumedNext } = resolveBooleanFlagValue(
-                hasInline,
-                value,
-                argv[i + 1],
-            );
-            if (consumedNext) i++;
-            applyBooleanFlag(opt, arg, enabled);
+        const [flagName, hasInlineValue, inlineValue] = extractFlagTokenParts(rawToken);
+        const nextArgumentToken = argv[tokenIndex + 1];
+        const flagContext: FlagTokenContext = {
+            flagName,
+            hasInlineValue,
+            inlineValue,
+            nextArgumentToken,
+        };
+
+        const [handledProfile, profileOffset] = handleProfileFlag(flagContext, cliOptions);
+        if (handledProfile) {
+            tokenIndex += profileOffset;
             continue;
         }
 
-        if (applyStandaloneFlag(opt, arg)) {
-            continue;
-        }
-
-        const { val, consumedNext } = resolveNextValue(hasInline, value, argv[i + 1]);
-        if (consumedNext) i++;
-        applyValueFlag(opt, arg, val);
+        tokenIndex += dispatchGenericFlag(cliOptions, flagContext);
     }
 
-    finalizeRootPath(opt, positionalPaths);
-    return opt;
+    finalizeRootPath(cliOptions, positionalPaths);
+    return cliOptions;
 }
 
-/** Print the CLI usage banner and available flags to stdout. */
-export function printUsage(): void {
-    process.stdout
-        .write(`auto-refactor — automated code-refactoring analyzer (declarative, pluggable)
+/** CLI usage banner text displayed to users requesting help. */
+const CLI_USAGE_HELP_TEXT = `auto-refactor — automated code-refactoring analyzer (declarative, pluggable)
 
 Usage:
   auto-refactor scan [options]       Run static analysis and quality review on source files
@@ -457,5 +549,9 @@ Options:
   --fix-dry-run               Compute and display unified diffs without modifying files
   --fix-rules <rules>         Comma-separated list of rule IDs to restrict auto-fixing
   --help, -h                  Show this help
-`);
+`;
+
+/** Print the CLI usage banner and available flags to stdout. */
+export function printUsage(): void {
+    process.stdout.write(CLI_USAGE_HELP_TEXT);
 }

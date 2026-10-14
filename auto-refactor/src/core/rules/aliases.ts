@@ -42,8 +42,8 @@ export interface LegacyRuleAliasMetadata {
  *
  * Families follow the owning analyzer's existing canonical family (`ARCH`, `DEP`, `SEC`, …) so a
  * renamed rule stays grouped with its siblings in reports and documentation.
- *
- * @deprecated All aliases mapped here are scheduled for retirement at {@link LEGACY_RULE_SUNSET_VERSION}.
+ * @deprecated All aliases mapped here are scheduled for retirement
+ *   at {@link LEGACY_RULE_SUNSET_VERSION}.
  */
 export const LEGACY_RULE_ALIASES: Readonly<Record<string, string>> = Object.freeze({
     'analyzer-error': 'ENG-RUN-001',

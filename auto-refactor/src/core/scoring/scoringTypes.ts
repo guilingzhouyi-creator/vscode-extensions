@@ -120,7 +120,12 @@ export const DIMENSION_ANALYZERS: Record<QualityDimension, readonly string[]> = 
         ANALYZER_VSCODE_EXTENSION,
         ANALYZER_GATE_ARCHITECTURE,
     ],
-    semanticPurity: [ANALYZER_GOVERNANCE, ANALYZER_HYGIENE, ANALYZER_DEPENDENCY_GRAPH, ANALYZER_STDLIB],
+    semanticPurity: [
+        ANALYZER_GOVERNANCE,
+        ANALYZER_HYGIENE,
+        ANALYZER_DEPENDENCY_GRAPH,
+        ANALYZER_STDLIB,
+    ],
     codeSecurity: [
         ANALYZER_ARCHITECTURE,
         ANALYZER_SECURITY,

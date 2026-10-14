@@ -70,4 +70,3 @@ export function rulesForAnalyzer(analyzer: string): RuleDefinition[] {
 export function canonicalRuleIds(): string[] {
     return RULE_REGISTRY.filter((rule) => rule.canonical).map((rule) => rule.id);
 }
-

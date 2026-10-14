@@ -97,7 +97,11 @@ export class RegressionTrajectoryDetector {
     /**
      * Formats the cyclic regression description message.
      */
-    private formatCycleDescription(candidate: FileRevision, current: FileRevision, step: number): string {
+    private formatCycleDescription(
+        candidate: FileRevision,
+        current: FileRevision,
+        step: number,
+    ): string {
         const cyclePrefix =
             step === 2
                 ? `Cyclic flip-flop detected between revision ${candidate.revisionId} and ${current.revisionId}.`

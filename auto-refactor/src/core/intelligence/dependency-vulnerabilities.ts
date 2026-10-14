@@ -20,17 +20,27 @@ export type VulnerabilitySeverity = 'critical' | 'high' | 'medium' | 'low';
 export type VulnerabilityCategory =
     'backdoor' | 'poisoning' | 'protestware' | 'malicious_payload' | 'account_takeover';
 
+/** Critical severity indicator for supply-chain vulnerability findings */
 export const VULN_SEV_CRITICAL: VulnerabilitySeverity = 'critical';
+/** High severity indicator for supply-chain vulnerability findings */
 export const VULN_SEV_HIGH: VulnerabilitySeverity = 'high';
+/** Medium severity indicator for supply-chain vulnerability findings */
 export const VULN_SEV_MEDIUM: VulnerabilitySeverity = 'medium';
+/** Low severity indicator for supply-chain vulnerability findings */
 export const VULN_SEV_LOW: VulnerabilitySeverity = 'low';
 
+/** Category constant representing backdoor insertion */
 export const VULN_CAT_BACKDOOR: VulnerabilityCategory = 'backdoor';
+/** Category constant representing repository or package poisoning */
 export const VULN_CAT_POISONING: VulnerabilityCategory = 'poisoning';
+/** Category constant representing protestware supply-chain alteration */
 export const VULN_CAT_PROTESTWARE: VulnerabilityCategory = 'protestware';
+/** Category constant representing malicious payload delivery */
 export const VULN_CAT_MALICIOUS: VulnerabilityCategory = 'malicious_payload';
+/** Category constant representing account takeover compromise */
 export const VULN_CAT_TAKEOVER: VulnerabilityCategory = 'account_takeover';
 
+/** Wildcard token matching all package versions for universal supply-chain embargoes */
 export const AFFECTED_ALL_VERSIONS = '*';
 
 const PROTOCOL_FILE = 'file:';

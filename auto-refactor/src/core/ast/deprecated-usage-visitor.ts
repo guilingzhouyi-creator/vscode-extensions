@@ -135,7 +135,10 @@ function resolveTargetIdentifier(node: ts.Node, parent?: ts.Node): ts.Identifier
         if (ts.isIdentifier(node.expression)) {
             return node.expression;
         }
-        if (ts.isPropertyAccessExpression(node.expression) && ts.isIdentifier(node.expression.name)) {
+        if (
+            ts.isPropertyAccessExpression(node.expression) &&
+            ts.isIdentifier(node.expression.name)
+        ) {
             return node.expression.name;
         }
         return null;
@@ -155,7 +158,11 @@ function resolveTargetIdentifier(node: ts.Node, parent?: ts.Node): ts.Identifier
  */
 function isDeclarationSite(parent: ts.Node | undefined, identifier: ts.Identifier): boolean {
     if (!parent) return false;
-    if (ts.isFunctionDeclaration(parent) || ts.isMethodDeclaration(parent) || ts.isVariableDeclaration(parent)) {
+    if (
+        ts.isFunctionDeclaration(parent) ||
+        ts.isMethodDeclaration(parent) ||
+        ts.isVariableDeclaration(parent)
+    ) {
         return parent.name === identifier;
     }
     return false;
@@ -234,7 +241,8 @@ export function auditDeprecatedUsages(
     filePath: string,
     checker?: ts.TypeChecker,
 ): Issue[] {
-    // Exclusion: tests are legitimate consumers of deprecated APIs for backward-compatibility verification
+    // Exclusion: tests legitimately consume deprecated APIs
+    // for backward-compatibility verification
     if (isTestFile(filePath)) {
         return [];
     }

@@ -218,7 +218,11 @@ function applyScaleTuning(
         ? tunedThresholds
         : getTunedThresholds(scaleGrade, tunedThresholds);
     for (const [name, decl] of Object.entries(analyzers)) {
-        decl.options = getTunedAnalyzerOptions(scaleGrade, name, decl.options || EMPTY_ANALYZER_OPTIONS);
+        decl.options = getTunedAnalyzerOptions(
+            scaleGrade,
+            name,
+            decl.options || EMPTY_ANALYZER_OPTIONS,
+        );
     }
     return next;
 }
@@ -242,7 +246,11 @@ function applyMaturityTuning(
         ? tunedThresholds
         : getMaturityTunedThresholds(maturityTier, tunedThresholds);
     for (const [name, decl] of Object.entries(analyzers)) {
-        decl.options = getMaturityTunedAnalyzerOptions(maturityTier, name, decl.options || EMPTY_ANALYZER_OPTIONS);
+        decl.options = getMaturityTunedAnalyzerOptions(
+            maturityTier,
+            name,
+            decl.options || EMPTY_ANALYZER_OPTIONS,
+        );
     }
     return next;
 }

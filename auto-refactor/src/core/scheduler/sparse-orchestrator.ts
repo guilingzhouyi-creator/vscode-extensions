@@ -205,7 +205,9 @@ export class SparseOrchestrator {
             const partitionFindings = await this.collectPartitionIssues(
                 partition,
                 fileContents,
-                () => { cacheHits++; },
+                () => {
+                    cacheHits++;
+                },
                 async () => {
                     processedUnits++;
                     if (processedUnits % 15 === 0) {

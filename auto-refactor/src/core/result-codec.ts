@@ -158,7 +158,12 @@ class Writer {
                     this.flushCurrentChunk();
                     continue;
                 }
-                overflowBuffer.copy(this.currentChunk, this.position, offset, offset + chunkSliceLen);
+                overflowBuffer.copy(
+                    this.currentChunk,
+                    this.position,
+                    offset,
+                    offset + chunkSliceLen,
+                );
                 this.position += chunkSliceLen;
                 offset += chunkSliceLen;
             }
@@ -354,11 +359,7 @@ export function encodeResults(results: FileResult[]): Buffer {
             writer.writeString(issue.analyzer);
             writer.writeString(issue.rule);
             const severityCode =
-                issue.severity === SEVERITY_INFO
-                    ? 0
-                    : issue.severity === SEVERITY_WARNING
-                      ? 1
-                      : 2;
+                issue.severity === SEVERITY_INFO ? 0 : issue.severity === SEVERITY_WARNING ? 1 : 2;
             writer.writeU8(severityCode);
             writer.writeString(issue.message);
             writer.writeString(issue.location.file);

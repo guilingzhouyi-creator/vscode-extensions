@@ -315,6 +315,15 @@ function appendWeekRecord(
     groups.set(weekId, [record]);
 }
 
+/**
+ * Compacts trajectory execution records into weekly summarized checkpoints,
+ * pruning older rolling runs beyond the retention limit.
+ * Concurrency: Thread-safe across disjoint ledger targets; write operations perform atomic swaps.
+ *
+ * @param ledgerDir Directory path hosting execution ledger ndjson files
+ * @param maxRollingRuns Maximum number of rolling runs retained in active ledger
+ * @returns Array of weekly trajectory summary reports generated
+ */
 export async function compactLedger(
     ledgerDir: string,
     maxRollingRuns = DEFAULT_MAX_ROLLING_RUNS,

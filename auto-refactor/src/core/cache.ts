@@ -219,7 +219,9 @@ export class CacheStore {
     private isHotEntry(entry: L2Entry, cutoffMs: number): boolean {
         if (entry.ts && entry.ts >= cutoffMs) return true;
         if (entry.issues && Array.isArray(entry.issues)) {
-            return entry.issues.some((issueItem: Issue) => issueItem.severity === SEVERITY_STR_ERROR);
+            return entry.issues.some(
+                (issueItem: Issue) => issueItem.severity === SEVERITY_STR_ERROR,
+            );
         }
         return false;
     }
@@ -269,7 +271,7 @@ export class CacheStore {
                 k: rawObject.k,
                 p: rawObject.p,
                 issues: metadataOnly ? EMPTY_METADATA_ISSUES : rawObject.issues,
-                metric: metadataOnly ? null : (rawObject.metric || null),
+                metric: metadataOnly ? null : rawObject.metric || null,
                 ts: typeof rawObject.ts === TYPEOF_NUMBER ? (rawObject.ts as number) : 0,
                 fm: typeof rawObject.fm === TYPEOF_NUMBER ? (rawObject.fm as number) : undefined,
                 fs: typeof rawObject.fs === TYPEOF_NUMBER ? (rawObject.fs as number) : undefined,
@@ -500,8 +502,7 @@ export class CacheStore {
     executeCleanupIfNeeded(): void {
         if (!this.enabled || this.l2.size <= this.maxEntries) return;
         if (this.maxAgeDays > 0) {
-            const maxAgeMs =
-                this.maxAgeDays * HOURS_PER_DAY * SECONDS_PER_HOUR * MILLIS_PER_SECOND;
+            const maxAgeMs = this.maxAgeDays * HOURS_PER_DAY * SECONDS_PER_HOUR * MILLIS_PER_SECOND;
             this.trimExpiredEntries(Date.now(), maxAgeMs);
         }
         this.trimLruExcess();

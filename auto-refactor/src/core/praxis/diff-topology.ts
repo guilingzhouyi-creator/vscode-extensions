@@ -702,7 +702,9 @@ function buildLayer3(
     const destructiveModifications = detectDestructiveModifications(input.hunks, layer1);
     const crossLayerRisks = detectCrossLayerRisks(input.filePath, input.issues);
 
-    const blockingIssues = (input.issues || []).filter((i) => i.severity === SEVERITY_LITERAL_ERROR);
+    const blockingIssues = (input.issues || []).filter(
+        (i) => i.severity === SEVERITY_LITERAL_ERROR,
+    );
     const escalationReasons: string[] = [];
 
     if (conflictMarkers.length > 0) {

@@ -190,12 +190,11 @@ function recordFileMemory(
 const EMPTY_FILE_ISSUES: readonly Issue[] = Object.freeze([]);
 
 /**
- * Score every scanned file and persist its review-memory/trajectory record.
+ * Resolves the issue array for a given file from the grouped issues map.
  *
- * @param host - Report host carrying the scorer and the memory/trajectory managers.
- * @param fileMetrics - Per-file metric records of this scan.
  * @param issuesByFile - Issues grouped by file path.
- * @returns Per-file quality breakdowns keyed by file path.
+ * @param file - File path to look up.
+ * @returns Array of issues found for the file.
  */
 function resolveFileIssues(issuesByFile: Map<string, Issue[]>, file: string): Issue[] {
     const list = issuesByFile.get(file);
@@ -205,6 +204,14 @@ function resolveFileIssues(issuesByFile: Map<string, Issue[]>, file: string): Is
     return EMPTY_FILE_ISSUES as unknown as Issue[];
 }
 
+/**
+ * Score every scanned file and persist its review-memory/trajectory record.
+ *
+ * @param host - Report host carrying the scorer and the memory/trajectory managers.
+ * @param fileMetrics - Per-file metric records of this scan.
+ * @param issuesByFile - Issues grouped by file path.
+ * @returns Per-file quality breakdowns keyed by file path.
+ */
 function collectFileQuality(
     host: ReportHost,
     fileMetrics: FileMetric[],

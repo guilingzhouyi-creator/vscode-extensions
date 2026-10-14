@@ -106,33 +106,33 @@ export function extractDomainName(filePath: string): string {
 }
 
 const ANNOTATED_ROLE_MAP: Readonly<Record<string, SystemTopologyRole>> = Object.freeze({
-    'core': ROLE_HEADLESS_DOMAIN_CORE,
-    'domain': ROLE_HEADLESS_DOMAIN_CORE,
-    'headless': ROLE_HEADLESS_DOMAIN_CORE,
-    'headless_domain_core': ROLE_HEADLESS_DOMAIN_CORE,
-    'data': ROLE_DATA_LAYER,
-    'persistence': ROLE_DATA_LAYER,
-    'data_layer': ROLE_DATA_LAYER,
-    'infra': ROLE_INFRASTRUCTURE,
-    'infrastructure': ROLE_INFRASTRUCTURE,
-    'adapter': ROLE_ADAPTER,
-    'app': ROLE_APPLICATION_CLI,
-    'application': ROLE_APPLICATION_CLI,
-    'cli': ROLE_APPLICATION_CLI,
-    'application_cli': ROLE_APPLICATION_CLI,
-    'shared': ROLE_SHARED,
-    'util': ROLE_SHARED,
-    'config': ROLE_CONFIGURATION,
-    'configuration': ROLE_CONFIGURATION,
-    'tool': ROLE_TOOL_SCRIPT,
-    'tooling': ROLE_TOOL_SCRIPT,
-    'script': ROLE_TOOL_SCRIPT,
-    'scripts': ROLE_TOOL_SCRIPT,
-    'tool_script': ROLE_TOOL_SCRIPT,
-    'test': ROLE_TEST_SUITE,
-    'tests': ROLE_TEST_SUITE,
-    'spec': ROLE_TEST_SUITE,
-    'test_suite': ROLE_TEST_SUITE,
+    core: ROLE_HEADLESS_DOMAIN_CORE,
+    domain: ROLE_HEADLESS_DOMAIN_CORE,
+    headless: ROLE_HEADLESS_DOMAIN_CORE,
+    headless_domain_core: ROLE_HEADLESS_DOMAIN_CORE,
+    data: ROLE_DATA_LAYER,
+    persistence: ROLE_DATA_LAYER,
+    data_layer: ROLE_DATA_LAYER,
+    infra: ROLE_INFRASTRUCTURE,
+    infrastructure: ROLE_INFRASTRUCTURE,
+    adapter: ROLE_ADAPTER,
+    app: ROLE_APPLICATION_CLI,
+    application: ROLE_APPLICATION_CLI,
+    cli: ROLE_APPLICATION_CLI,
+    application_cli: ROLE_APPLICATION_CLI,
+    shared: ROLE_SHARED,
+    util: ROLE_SHARED,
+    config: ROLE_CONFIGURATION,
+    configuration: ROLE_CONFIGURATION,
+    tool: ROLE_TOOL_SCRIPT,
+    tooling: ROLE_TOOL_SCRIPT,
+    script: ROLE_TOOL_SCRIPT,
+    scripts: ROLE_TOOL_SCRIPT,
+    tool_script: ROLE_TOOL_SCRIPT,
+    test: ROLE_TEST_SUITE,
+    tests: ROLE_TEST_SUITE,
+    spec: ROLE_TEST_SUITE,
+    test_suite: ROLE_TEST_SUITE,
 });
 
 const TEST_DIR_PATTERN = /(?:^|\/)(?:tests?|testdata|benchmarks?|fixtures?|specs?)\//;
@@ -180,7 +180,10 @@ function matchRoleFromImports(
     imports: string[],
 ): { role: SystemTopologyRole; reason: string } | undefined {
     if (imports.some((imp) => CLI_FRAMEWORK_IMPORTS.has(imp))) {
-        return { role: ROLE_APPLICATION_CLI, reason: 'Imports CLI framework or interactive prompt' };
+        return {
+            role: ROLE_APPLICATION_CLI,
+            reason: 'Imports CLI framework or interactive prompt',
+        };
     }
     if (imports.some((imp) => DATA_LAYER_IMPORTS.has(imp))) {
         return { role: ROLE_DATA_LAYER, reason: 'Imports database driver or ORM framework' };
@@ -245,7 +248,8 @@ function resolveExplicitRole(
         return {
             role: customRole,
             reasons: ['Explicit override from customRoleMappings'],
-            isHeadless: customRole !== ROLE_APPLICATION_CLI && !containsPresentationImports(imports),
+            isHeadless:
+                customRole !== ROLE_APPLICATION_CLI && !containsPresentationImports(imports),
         };
     }
 

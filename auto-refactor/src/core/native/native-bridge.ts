@@ -18,6 +18,7 @@ import type {
     INativeCore,
     NativeCloneBlock,
     NativeClonePair,
+    NativeCoreEngineType,
     NativeCoreStatus,
     NativeDataflowParams,
     NativeDataflowResult,
@@ -50,6 +51,48 @@ import { computeDominatorTreeShim, solveDataflowShim } from './native-flow-shim'
 
 export { HASH_COEFFS };
 
+const DEFAULT_CONTEXT_LINES = 3;
+const DEFAULT_MINHASH_PERMUTATIONS = 64;
+const LARGE_GRAPH_EDGES_THRESHOLD = 1500;
+const NATIVE_BINDING_PATH = '../../../crates/auto-refactor-core/index.node';
+const ENGINE_PURE_JS: NativeCoreEngineType = 'pure-js-shim';
+const ENGINE_RUST_NATIVE: NativeCoreEngineType = 'rust-native';
+const VERSION_SHIM = '0.4.0-shim';
+const VERSION_NATIVE_FALLBACK = '0.4.0-native';
+
+const CAPABILITY_HISTOGRAM_DIFF = 'histogram-diff';
+const CAPABILITY_TARJAN_SCC = 'tarjan-scc';
+const CAPABILITY_TOPOLOGICAL_SORT = 'topological-sort';
+const CAPABILITY_FAST_PATTERN_MATCH = 'fast-pattern-match';
+const CAPABILITY_SIMD_SOURCE_MASK = 'simd-source-mask';
+const CAPABILITY_CLONE_DETECTION = 'clone-detection';
+const CAPABILITY_MINHASH_LSH = 'minhash-lsh';
+const CAPABILITY_DOMINATOR_TREE = 'dominator-tree';
+const CAPABILITY_DATAFLOW_SOLVER = 'dataflow-solver';
+
+const CAPABILITY_SIMD_HISTOGRAM_DIFF = 'simd-histogram-diff';
+const CAPABILITY_PARALLEL_TARJAN_SCC = 'parallel-tarjan-scc';
+const CAPABILITY_ZERO_COPY_BUFFER = 'zero-copy-buffer';
+
+const SHIM_CAPABILITIES: readonly string[] = Object.freeze([
+    CAPABILITY_HISTOGRAM_DIFF,
+    CAPABILITY_TARJAN_SCC,
+    CAPABILITY_TOPOLOGICAL_SORT,
+    CAPABILITY_FAST_PATTERN_MATCH,
+    CAPABILITY_SIMD_SOURCE_MASK,
+    CAPABILITY_CLONE_DETECTION,
+    CAPABILITY_MINHASH_LSH,
+    CAPABILITY_DOMINATOR_TREE,
+    CAPABILITY_DATAFLOW_SOLVER,
+]);
+
+const NATIVE_CORE_CAPABILITIES: readonly string[] = Object.freeze([
+    ...SHIM_CAPABILITIES,
+    CAPABILITY_SIMD_HISTOGRAM_DIFF,
+    CAPABILITY_PARALLEL_TARJAN_SCC,
+    CAPABILITY_ZERO_COPY_BUFFER,
+]);
+
 const EMPTY_NEIGHBOR_SET: ReadonlySet<string> = Object.freeze(new Set<string>());
 const MICRO_SOURCE_MASK_THRESHOLD = 256;
 
@@ -61,40 +104,40 @@ interface TarjanState {
     stack: string[];
     sccs: string[][];
     cycles: string[][];
-    adjacency: Map<string, Set<string>>;
+    nodeToNeighborsMap: Map<string, Set<string>>;
 }
 
 function addDirectedEdge(
-    from: string,
-    to: string,
-    adjacency: Map<string, Set<string>>,
-    inDegree: Map<string, number>,
+    sourceNode: string,
+    targetNode: string,
+    nodeToNeighborsMap: Map<string, Set<string>>,
+    nodeToInDegreeMap: Map<string, number>,
 ): void {
-    let neighbors = adjacency.get(from);
+    let neighbors = nodeToNeighborsMap.get(sourceNode);
     if (!neighbors) {
         neighbors = new Set();
-        adjacency.set(from, neighbors);
+        nodeToNeighborsMap.set(sourceNode, neighbors);
     }
-    if (!neighbors.has(to)) {
-        neighbors.add(to);
-        inDegree.set(to, (inDegree.get(to) || 0) + 1);
+    if (!neighbors.has(targetNode)) {
+        neighbors.add(targetNode);
+        nodeToInDegreeMap.set(targetNode, (nodeToInDegreeMap.get(targetNode) || 0) + 1);
     }
-    if (!inDegree.has(from)) {
-        inDegree.set(from, 0);
+    if (!nodeToInDegreeMap.has(sourceNode)) {
+        nodeToInDegreeMap.set(sourceNode, 0);
     }
 }
 
-function strongConnect(node: string, state: TarjanState): void {
+function traverseStrongConnect(node: string, state: TarjanState): void {
     state.indices.set(node, state.indexCounter);
     state.lowlinks.set(node, state.indexCounter);
     state.indexCounter++;
     state.stack.push(node);
     state.onStack.add(node);
 
-    const neighbors = state.adjacency.get(node) || EMPTY_NEIGHBOR_SET;
+    const neighbors = state.nodeToNeighborsMap.get(node) || EMPTY_NEIGHBOR_SET;
     for (const neighbor of neighbors) {
         if (!state.indices.has(neighbor)) {
-            strongConnect(neighbor, state);
+            traverseStrongConnect(neighbor, state);
             state.lowlinks.set(
                 node,
                 Math.min(state.lowlinks.get(node)!, state.lowlinks.get(neighbor)!),
@@ -110,11 +153,11 @@ function strongConnect(node: string, state: TarjanState): void {
     }
 
     if (state.lowlinks.get(node) === state.indices.get(node)) {
-        popScc(node, state);
+        extractConnectedComponent(node, state);
     }
 }
 
-function popScc(node: string, state: TarjanState): void {
+function extractConnectedComponent(node: string, state: TarjanState): void {
     const scc: string[] = [];
     let popped: string;
     do {
@@ -128,14 +171,14 @@ function popScc(node: string, state: TarjanState): void {
         state.cycles.push([...scc].reverse());
         return;
     }
-    if (scc.length === 1 && state.adjacency.get(node)?.has(node)) {
+    if (scc.length === 1 && state.nodeToNeighborsMap.get(node)?.has(node)) {
         state.cycles.push([node, node]);
     }
 }
 
-function computeSccsAndCycles(
+function computeTarjanCycles(
     allNodes: Set<string>,
-    adjacency: Map<string, Set<string>>,
+    nodeToNeighborsMap: Map<string, Set<string>>,
 ): { sccs: string[][]; cycles: string[][] } {
     const state: TarjanState = {
         indexCounter: 0,
@@ -145,11 +188,11 @@ function computeSccsAndCycles(
         stack: [],
         sccs: [],
         cycles: [],
-        adjacency,
+        nodeToNeighborsMap,
     };
     for (const node of allNodes) {
         if (!state.indices.has(node)) {
-            strongConnect(node, state);
+            traverseStrongConnect(node, state);
         }
     }
     return { sccs: state.sccs, cycles: state.cycles };
@@ -157,17 +200,17 @@ function computeSccsAndCycles(
 
 function computeTopologicalOrder(
     allNodes: Set<string>,
-    adjacency: Map<string, Set<string>>,
-    inDegree: Map<string, number>,
+    nodeToNeighborsMap: Map<string, Set<string>>,
+    nodeToInDegreeMap: Map<string, number>,
 ): string[] {
-    const inDegreeCopy = new Map<string, number>();
+    const nodeToInDegreeCopyMap = new Map<string, number>();
     for (const node of allNodes) {
-        inDegreeCopy.set(node, inDegree.get(node) || 0);
+        nodeToInDegreeCopyMap.set(node, nodeToInDegreeMap.get(node) || 0);
     }
 
     const queue: string[] = [];
     for (const node of allNodes) {
-        if (inDegreeCopy.get(node) === 0) {
+        if (nodeToInDegreeCopyMap.get(node) === 0) {
             queue.push(node);
         }
     }
@@ -180,10 +223,10 @@ function computeTopologicalOrder(
         topologicalOrder.push(current);
         orderedSet.add(current);
 
-        const neighbors = adjacency.get(current) || EMPTY_NEIGHBOR_SET;
+        const neighbors = nodeToNeighborsMap.get(current) || EMPTY_NEIGHBOR_SET;
         for (const next of neighbors) {
-            const remainingIn = inDegreeCopy.get(next)! - 1;
-            inDegreeCopy.set(next, remainingIn);
+            const remainingIn = nodeToInDegreeCopyMap.get(next)! - 1;
+            nodeToInDegreeCopyMap.set(next, remainingIn);
             if (remainingIn === 0) {
                 queue.push(next);
                 queue.sort((a, b) => b.localeCompare(a));
@@ -347,7 +390,7 @@ function trimTrailingHash(index: LineIndex, lineCount: number): Uint32Array {
 export class PureJsNativeShim implements INativeCore {
     private readonly defaultContextLines: number;
 
-    public constructor(defaultContextLines = 3) {
+    public constructor(defaultContextLines = DEFAULT_CONTEXT_LINES) {
         this.defaultContextLines = defaultContextLines;
     }
 
@@ -357,19 +400,9 @@ export class PureJsNativeShim implements INativeCore {
     public getStatus(): NativeCoreStatus {
         return {
             isNativeAvailable: false,
-            activeEngine: 'pure-js-shim',
-            version: '0.4.0-shim',
-            capabilities: [
-                'histogram-diff',
-                'tarjan-scc',
-                'topological-sort',
-                'fast-pattern-match',
-                'simd-source-mask',
-                'clone-detection',
-                'minhash-lsh',
-                'dominator-tree',
-                'dataflow-solver',
-            ],
+            activeEngine: ENGINE_PURE_JS,
+            version: VERSION_SHIM,
+            capabilities: [...SHIM_CAPABILITIES],
         };
     }
 
@@ -409,18 +442,22 @@ export class PureJsNativeShim implements INativeCore {
      * Implements Tarjan's SCC algorithm and topological sort.
      */
     public analyzeDependencyGraph(edges: [string, string][]): NativeGraphAnalysis {
-        const adjacency = new Map<string, Set<string>>();
-        const inDegree = new Map<string, number>();
+        const nodeToNeighborsMap = new Map<string, Set<string>>();
+        const nodeToInDegreeMap = new Map<string, number>();
         const allNodes = new Set<string>();
 
-        for (const [from, to] of edges) {
-            allNodes.add(from);
-            allNodes.add(to);
-            addDirectedEdge(from, to, adjacency, inDegree);
+        for (const [sourceNode, targetNode] of edges) {
+            allNodes.add(sourceNode);
+            allNodes.add(targetNode);
+            addDirectedEdge(sourceNode, targetNode, nodeToNeighborsMap, nodeToInDegreeMap);
         }
 
-        const { sccs, cycles } = computeSccsAndCycles(allNodes, adjacency);
-        const topologicalOrder = computeTopologicalOrder(allNodes, adjacency, inDegree);
+        const { sccs, cycles } = computeTarjanCycles(allNodes, nodeToNeighborsMap);
+        const topologicalOrder = computeTopologicalOrder(
+            allNodes,
+            nodeToNeighborsMap,
+            nodeToInDegreeMap,
+        );
 
         return {
             cycles,
@@ -459,7 +496,7 @@ export class PureJsNativeShim implements INativeCore {
      * Pure JS fallback implementation of the native operator library.
      */
     public maskSourceCode(content: string, config: NativeMaskConfig): NativeMaskedSource {
-        const res = maskSourceTextJs(content, {
+        const maskedResult = maskSourceTextJs(content, {
             lineComment: config.lineComment,
             blockComment:
                 config.blockCommentOpen && config.blockCommentClose
@@ -471,8 +508,8 @@ export class PureJsNativeShim implements INativeCore {
         });
         const stats = countLineStats(content);
         return {
-            raw: res.raw,
-            masked: res.masked,
+            raw: maskedResult.raw,
+            masked: maskedResult.masked,
             lines: stats.lines,
             nonBlankLines: stats.nonBlankLines,
         };
@@ -482,27 +519,32 @@ export class PureJsNativeShim implements INativeCore {
      * Counts duplicated non-blank lines using 32-bit line hashes.
      */
     public countDuplicateLines(content: string): number {
-        return countDuplicateLinesShim(content);
+        return !content ? 0 : countDuplicateLinesShim(content);
     }
 
     /**
      * Detects repeated code blocks within a single file.
      */
     public detectCloneBlocks(content: string, minCloneLines: number): NativeCloneBlock[] {
+        if (!content || minCloneLines <= 0) return [];
         return detectCloneBlocksShim(content, minCloneLines);
     }
 
     /**
      * Computes a MinHash signature vector for a source file.
      */
-    public computeMinHash(content: string, numPermutations = 64): number[] {
-        return computeMinHashShim(content, numPermutations);
+    public computeMinHash(
+        content: string,
+        numPermutations = DEFAULT_MINHASH_PERMUTATIONS,
+    ): number[] {
+        return !content ? [] : computeMinHashShim(content, numPermutations);
     }
 
     /**
      * Discovers similar file pairs using Locality Sensitive Hashing (LSH).
      */
     public findClonePairs(signatures: number[][], threshold: number): NativeClonePair[] {
+        if (!signatures || signatures.length === 0) return [];
         return findClonePairsShim(signatures, threshold);
     }
 
@@ -514,13 +556,26 @@ export class PureJsNativeShim implements INativeCore {
         nodes: string[],
         edges: Array<[string, string]>,
     ): NativeDominatorTreeResult {
-        return computeDominatorTreeShim(entry, nodes, edges);
+        if ((!nodes || nodes.length === 0) && (!edges || edges.length === 0)) {
+            return {
+                entry,
+                reachableNodes: [entry],
+                idom: {},
+                dominanceFrontiers: {},
+                loopHeaders: [],
+                backEdges: [],
+            };
+        }
+        return computeDominatorTreeShim(entry, nodes || [], edges);
     }
 
     /**
      * Solves forward or backward dataflow equations to a fixed point.
      */
     public solveDataflow(params: NativeDataflowParams): NativeDataflowResult {
+        if (!params || !params.entry) {
+            return { inSets: {}, outSets: {}, iterations: 0 };
+        }
         return solveDataflowShim(params);
     }
 
@@ -596,13 +651,13 @@ export class PureJsNativeShim implements INativeCore {
     /**
      * Builds a single NativeDiffHunk from DiffOp operations within the specified range.
      */
-    private buildHunk(
-        ops: DiffOp[],
-        startIdx: number,
-        endIdx: number,
-        oldLines: string[],
-        newLines: string[],
-    ): NativeDiffHunk {
+    private buildHunk(context: {
+        readonly ops: DiffOp[];
+        readonly startIdx: number;
+        readonly endIdx: number;
+        readonly oldLines: string[];
+        readonly newLines: string[];
+    }): NativeDiffHunk {
         const state: HunkBuilderState = {
             oldStart: 0,
             newStart: 0,
@@ -613,18 +668,18 @@ export class PureJsNativeShim implements INativeCore {
             firstNewAssigned: false,
         };
 
-        for (let opIdx = startIdx; opIdx < endIdx; opIdx++) {
-            const op = ops[opIdx];
+        for (let opIdx = context.startIdx; opIdx < context.endIdx; opIdx++) {
+            const op = context.ops[opIdx];
             if (op.type === DIFF_OP_EQUAL) {
-                applyDiffOpEqual(op, oldLines, state);
+                applyDiffOpEqual(op, context.oldLines, state);
                 continue;
             }
             if (op.type === DIFF_OP_DELETE) {
-                applyDiffOpDelete(op, oldLines, state);
+                applyDiffOpDelete(op, context.oldLines, state);
                 continue;
             }
             if (op.type === DIFF_OP_INSERT) {
-                applyDiffOpInsert(op, newLines, state);
+                applyDiffOpInsert(op, context.newLines, state);
             }
         }
 
@@ -647,16 +702,16 @@ export class PureJsNativeShim implements INativeCore {
         contextLines: number,
     ): NativeDiffHunk[] {
         const hunks: NativeDiffHunk[] = [];
-        let i = 0;
+        let opIndex = 0;
 
-        while (i < ops.length) {
+        while (opIndex < ops.length) {
             // Skip leading unchanged lines
-            if (ops[i].type === DIFF_OP_EQUAL || ops[i].type === DIFF_OP_EQUAL_SPAN) {
-                i++;
+            if (ops[opIndex].type === DIFF_OP_EQUAL || ops[opIndex].type === DIFF_OP_EQUAL_SPAN) {
+                opIndex++;
                 continue;
             }
 
-            const clusterStart = i;
+            const clusterStart = opIndex;
             const contextBefore = this.findPrecedingContextCount(ops, clusterStart, contextLines);
             const hunkOpsStart = clusterStart - contextBefore;
 
@@ -664,82 +719,114 @@ export class PureJsNativeShim implements INativeCore {
             const contextAfter = this.findTrailingContextCount(ops, clusterEnd, contextLines);
             const hunkOpsEnd = clusterEnd + contextAfter;
 
-            hunks.push(this.buildHunk(ops, hunkOpsStart, hunkOpsEnd, oldLines, newLines));
-            i = hunkOpsEnd;
+            hunks.push(
+                this.buildHunk({
+                    ops,
+                    startIdx: hunkOpsStart,
+                    endIdx: hunkOpsEnd,
+                    oldLines,
+                    newLines,
+                }),
+            );
+            opIndex = hunkOpsEnd;
         }
 
         return hunks;
     }
 }
 
-/**
- * Attempts to load native binary bindings if available.
- */
-function probeNativeBinding(): INativeCore | null {
+interface RawNativeBinding {
+    readonly computeHistogramDiff: (oldContent: string, newContent: string) => NativeDiffHunk[];
+    readonly analyzeDependencyGraph: (edges: [string, string][]) => NativeGraphAnalysis;
+    readonly fastPatternMatch: (sourceText: string, patterns: string[]) => NativePatternMatch[];
+    readonly maskSourceCode: (content: string, config: NativeMaskConfig) => NativeMaskedSource;
+    readonly countDuplicateLines: (content: string) => number;
+    readonly detectCloneBlocks: (content: string, minCloneLines: number) => NativeCloneBlock[];
+    readonly computeMinHash?: (content: string, numPermutations?: number) => number[];
+    readonly computeMinhash?: (content: string, numPermutations?: number) => number[];
+    readonly findClonePairs: (signatures: number[][], threshold: number) => NativeClonePair[];
+    readonly computeDominatorTree: (
+        entry: string,
+        nodes: string[],
+        edges: Array<[string, string]>,
+    ) => NativeDominatorTreeResult;
+    readonly solveDataflow: (
+        entry: string,
+        nodes: string[],
+        edges: Array<[string, string]>,
+        forward: boolean,
+        gen: Record<string, string[]>,
+        kill: Record<string, string[]>,
+    ) => NativeDataflowResult;
+    readonly version?: string;
+    readonly VERSION?: string;
+}
+
+function assembleNativeBindingCore(
+    binding: RawNativeBinding,
+    jsShim: PureJsNativeShim,
+): INativeCore {
+    return {
+        computeHistogramDiff: binding.computeHistogramDiff,
+        analyzeDependencyGraph: (edges: [string, string][]) => {
+            if (edges.length < LARGE_GRAPH_EDGES_THRESHOLD) {
+                return jsShim.analyzeDependencyGraph(edges);
+            }
+            return binding.analyzeDependencyGraph(edges);
+        },
+        fastPatternMatch: binding.fastPatternMatch,
+        maskSourceCode: (content: string, config: NativeMaskConfig) => {
+            if (content.length < MICRO_SOURCE_MASK_THRESHOLD) {
+                return jsShim.maskSourceCode(content, config);
+            }
+            return binding.maskSourceCode(content, config);
+        },
+        countDuplicateLines: binding.countDuplicateLines,
+        detectCloneBlocks: binding.detectCloneBlocks,
+        computeMinHash:
+            binding.computeMinHash ||
+            binding.computeMinhash ||
+            ((content, permutations) => jsShim.computeMinHash(content, permutations)),
+        findClonePairs: binding.findClonePairs,
+        computeDominatorTree: binding.computeDominatorTree,
+        solveDataflow: (params: NativeDataflowParams) =>
+            binding.solveDataflow(
+                params.entry,
+                params.nodes ?? [],
+                params.edges,
+                params.forward ?? true,
+                params.gen ?? {},
+                params.kill ?? {},
+            ),
+        getStatus: () => ({
+            isNativeAvailable: true,
+            activeEngine: ENGINE_RUST_NATIVE,
+            version: binding.version || binding.VERSION || VERSION_NATIVE_FALLBACK,
+            capabilities: [...NATIVE_CORE_CAPABILITIES],
+        }),
+    };
+}
+
+function loadNativeBindingModule(): RawNativeBinding | null {
     try {
-        // Probe relative prebuilt N-API binary location
-        const binding = require('../../../crates/auto-refactor-core/index.node');
+        const modulePath = NATIVE_BINDING_PATH;
+        const dynamicLoader = typeof require === 'function' ? require : undefined;
+        if (!dynamicLoader) return null;
+        const binding = dynamicLoader(modulePath) as RawNativeBinding;
         if (binding && typeof binding.computeHistogramDiff === 'function') {
-            const jsShim = new PureJsNativeShim();
-            return {
-                computeHistogramDiff: binding.computeHistogramDiff,
-                analyzeDependencyGraph: (edges: [string, string][]) => {
-                    if (edges.length < 1500) {
-                        return jsShim.analyzeDependencyGraph(edges);
-                    }
-                    return binding.analyzeDependencyGraph(edges);
-                },
-                fastPatternMatch: binding.fastPatternMatch,
-                // Adaptive micro-threshold dispatch: delegate tiny inputs to pure JS shim
-                // to avoid cross-boundary N-API serialization overhead; route normal/large files
-                // to Rust SIMD acceleration kernel.
-                maskSourceCode: (content: string, config: NativeMaskConfig) => {
-                    if (content.length < MICRO_SOURCE_MASK_THRESHOLD) {
-                        return jsShim.maskSourceCode(content, config);
-                    }
-                    return binding.maskSourceCode(content, config);
-                },
-                countDuplicateLines: binding.countDuplicateLines,
-                detectCloneBlocks: binding.detectCloneBlocks,
-                computeMinHash: binding.computeMinHash || binding.computeMinhash,
-                findClonePairs: binding.findClonePairs,
-                computeDominatorTree: binding.computeDominatorTree,
-                solveDataflow: (params: NativeDataflowParams) => {
-                    return binding.solveDataflow(
-                        params.entry,
-                        params.nodes ?? [],
-                        params.edges,
-                        params.forward ?? true,
-                        params.gen ?? {},
-                        params.kill ?? {},
-                    );
-                },
-                getStatus: () => ({
-                    isNativeAvailable: true,
-                    activeEngine: 'rust-native',
-                    version: binding.version || binding.VERSION || '0.4.0-native',
-                    capabilities: [
-                        'histogram-diff',
-                        'tarjan-scc',
-                        'topological-sort',
-                        'fast-pattern-match',
-                        'simd-histogram-diff',
-                        'parallel-tarjan-scc',
-                        'zero-copy-buffer',
-                        'simd-source-mask',
-                        'clone-detection',
-                        'minhash-lsh',
-                        'dominator-tree',
-                        'dataflow-solver',
-                    ],
-                }),
-            };
+            return binding;
         }
     } catch (_err) {
-        // Expected: native binary missing or unsupported platform; fallback to pure JS shim
         void _err;
     }
     return null;
+}
+
+function probeNativeBinding(): INativeCore | null {
+    const binding = loadNativeBindingModule();
+    if (!binding) return null;
+    const jsShim = new PureJsNativeShim();
+    return assembleNativeBindingCore(binding, jsShim);
 }
 
 /**
@@ -749,131 +836,200 @@ function probeNativeBinding(): INativeCore | null {
 export const nativeCore: INativeCore = probeNativeBinding() || new PureJsNativeShim();
 
 /**
- * Retrieves the status and capabilities of the active acceleration engine.
+ * Retrieves the status and capabilities of the active acceleration engine with immutable defense.
  *
  * @returns Active native core engine status descriptor.
  */
 export function getNativeCoreStatus(): NativeCoreStatus {
-    return nativeCore.getStatus();
+    const status = nativeCore.getStatus();
+    return Object.freeze({
+        isNativeAvailable: status.isNativeAvailable,
+        activeEngine: status.activeEngine,
+        version: status.version,
+        capabilities: Object.freeze([...status.capabilities]) as unknown as string[],
+    });
 }
 
 /**
- * Convenience helper to compute histogram diffs.
+ * Computes line-level histogram diffs with identical-content short-circuit optimization.
  *
  * @param oldContent - Original text content.
  * @param newContent - Updated text content.
  * @returns Array of computed NativeDiffHunk elements.
  */
-export function nativeHistogramDiff(oldContent: string, newContent: string): NativeDiffHunk[] {
-    return nativeCore.computeHistogramDiff(oldContent, newContent);
+export function computeNativeHistogramDiff(
+    oldContent: string,
+    newContent: string,
+): NativeDiffHunk[] {
+    return oldContent === newContent ? [] : nativeCore.computeHistogramDiff(oldContent, newContent);
 }
 
 /**
- * Convenience helper to analyze dependency graph topology and detect cycles.
+ * Analyzes dependency graph topology with empty edge defensive bypass.
  *
  * @param edges - Array of directed [from, to] dependency edges.
  * @returns Graph analysis result with cycles, topological order, and SCCs.
  */
-export function nativeAnalyzeDependencyGraph(edges: [string, string][]): NativeGraphAnalysis {
+export function analyzeNativeDependencyGraph(edges: [string, string][]): NativeGraphAnalysis {
+    if (!edges || edges.length === 0) {
+        return {
+            cycles: [],
+            topologicalOrder: [],
+            stronglyConnectedComponents: [],
+            isAcyclic: true,
+        };
+    }
     return nativeCore.analyzeDependencyGraph(edges);
 }
 
 /**
- * Convenience helper to perform fast pattern matching.
+ * Performs fast pattern matching across source text.
  *
  * @param sourceText - Target text to search.
  * @param patterns - Pattern strings to match against source.
  * @returns Array of pattern matches with offsets and line numbers.
  */
-export function nativeFastPatternMatch(
+export function matchNativeFastPatterns(
     sourceText: string,
     patterns: string[],
 ): NativePatternMatch[] {
+    if (!sourceText || !patterns || patterns.length === 0) return [];
     return nativeCore.fastPatternMatch(sourceText, patterns);
 }
 
 /**
- * Convenience helper to mask source code comments and literals.
+ * Masks source code comments and literals with blank text guard.
  *
  * @param content - Target source code content.
  * @param config - Lexical masking configuration.
  * @returns Masked source text structure with line metrics.
  */
-export function nativeMaskSourceCode(
+export function maskNativeSourceCode(
     content: string,
     config: NativeMaskConfig,
 ): NativeMaskedSource {
+    if (!content) {
+        return { raw: [], masked: [], lines: 0, nonBlankLines: 0 };
+    }
     return nativeCore.maskSourceCode(content, config);
 }
 
 /**
- * Convenience helper to count duplicated non-blank lines.
+ * Counts duplicated non-blank lines with empty content guard.
  *
  * @param content - Target source code content.
  * @returns Number of duplicated occurrences beyond the first.
  */
-export function nativeCountDuplicateLines(content: string): number {
-    return nativeCore.countDuplicateLines(content);
+export function countNativeDuplicateLines(content: string): number {
+    return !content ? 0 : nativeCore.countDuplicateLines(content);
 }
 
 /**
- * Convenience helper to detect code clone blocks within a file.
+ * Detects code clone blocks within a file with bounds checks.
  *
  * @param content - Target source code content.
  * @param minCloneLines - Minimum consecutive lines to constitute a clone.
  * @returns Detected clone block descriptors.
  */
-export function nativeDetectCloneBlocks(
+export function detectNativeCloneBlocks(
     content: string,
     minCloneLines: number,
 ): NativeCloneBlock[] {
+    if (!content || minCloneLines <= 0) return [];
     return nativeCore.detectCloneBlocks(content, minCloneLines);
 }
 
 /**
- * Convenience helper to compute MinHash signature of a file.
+ * Computes MinHash signature of a file with content presence check.
  *
  * @param content - Target source code content.
- * @param numPermutations - Number of permutations (default 64).
+ * @param numPermutations - Number of permutations.
  * @returns MinHash signature vector.
  */
-export function nativeComputeMinHash(content: string, numPermutations?: number): number[] {
-    return nativeCore.computeMinHash(content, numPermutations);
+export function computeNativeMinHash(content: string, numPermutations?: number): number[] {
+    return !content ? [] : nativeCore.computeMinHash(content, numPermutations);
 }
 
 /**
- * Convenience helper to discover similar file pairs using LSH.
+ * Discovers similar file pairs using LSH with signature validation.
  *
  * @param signatures - Array of file MinHash signatures.
  * @param threshold - Similarity threshold between 0.0 and 1.0.
  * @returns Array of detected similar file pairs with similarity scores.
  */
-export function nativeFindClonePairs(signatures: number[][], threshold: number): NativeClonePair[] {
-    return nativeCore.findClonePairs(signatures, threshold);
+export function findNativeClonePairs(signatures: number[][], threshold: number): NativeClonePair[] {
+    return !signatures || signatures.length === 0
+        ? []
+        : nativeCore.findClonePairs(signatures, threshold);
 }
 
 /**
- * Convenience helper to compute immediate dominators and dominance frontiers.
+ * Computes immediate dominators and dominance frontiers with node list defense.
  *
  * @param entry - Entry node identifier.
  * @param nodes - Node identifiers list.
  * @param edges - Directed edges list.
  * @returns Computed dominator tree result.
  */
-export function nativeComputeDominatorTree(
+export function computeNativeDominatorTree(
     entry: string,
     nodes: string[],
     edges: Array<[string, string]>,
 ): NativeDominatorTreeResult {
+    if (!nodes || nodes.length === 0) {
+        return {
+            entry,
+            reachableNodes: [],
+            idom: {},
+            dominanceFrontiers: {},
+            loopHeaders: [],
+            backEdges: [],
+        };
+    }
     return nativeCore.computeDominatorTree(entry, nodes, edges);
 }
 
 /**
- * Convenience helper to solve forward or backward dataflow equations to a fixed point.
+ * Solves forward or backward dataflow equations to a fixed point.
  *
  * @param params - Dataflow configuration parameters.
  * @returns In and Out sets at fixed-point convergence.
  */
-export function nativeSolveDataflow(params: NativeDataflowParams): NativeDataflowResult {
+export function solveNativeDataflow(params: NativeDataflowParams): NativeDataflowResult {
+    if (!params || !params.entry) {
+        return { inSets: {}, outSets: {}, iterations: 0 };
+    }
     return nativeCore.solveDataflow(params);
 }
+
+// ─── Substantive Backwards-Compatibility Aliases ────────────────────────────
+
+/** Backward compatibility alias for computeNativeHistogramDiff. */
+export const nativeHistogramDiff = computeNativeHistogramDiff;
+
+/** Backward compatibility alias for analyzeNativeDependencyGraph. */
+export const nativeAnalyzeDependencyGraph = analyzeNativeDependencyGraph;
+
+/** Backward compatibility alias for matchNativeFastPatterns. */
+export const nativeFastPatternMatch = matchNativeFastPatterns;
+
+/** Backward compatibility alias for maskNativeSourceCode. */
+export const nativeMaskSourceCode = maskNativeSourceCode;
+
+/** Backward compatibility alias for countNativeDuplicateLines. */
+export const nativeCountDuplicateLines = countNativeDuplicateLines;
+
+/** Backward compatibility alias for detectNativeCloneBlocks. */
+export const nativeDetectCloneBlocks = detectNativeCloneBlocks;
+
+/** Backward compatibility alias for computeNativeMinHash. */
+export const nativeComputeMinHash = computeNativeMinHash;
+
+/** Backward compatibility alias for findNativeClonePairs. */
+export const nativeFindClonePairs = findNativeClonePairs;
+
+/** Backward compatibility alias for computeNativeDominatorTree. */
+export const nativeComputeDominatorTree = computeNativeDominatorTree;
+
+/** Backward compatibility alias for solveNativeDataflow. */
+export const nativeSolveDataflow = solveNativeDataflow;

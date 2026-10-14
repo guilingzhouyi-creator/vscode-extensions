@@ -272,7 +272,6 @@ export function calculateCasReentrancySafetyIndex(
     return Math.round(safety * PERCENT_SCALE) / PERCENT_SCALE;
 }
 
-
 /**
  * Measure Architecture Indirection-to-Cohesion Utility Metric.
  *
@@ -348,7 +347,6 @@ export function calculateConfigCacheFreshnessScore(
     return Math.round(freshness * PERCENT_SCALE) / PERCENT_SCALE;
 }
 
-
 /**
  * Calculate DTO Backward-Compatibility Bridge Index.
  *
@@ -372,7 +370,6 @@ export function calculateDtoCompatibilityBridgeIndex(
     const index = modernBridgeOps / total;
     return Math.round(index * PERCENT_SCALE) / PERCENT_SCALE;
 }
-
 
 /**
  * Measure Schema Grounding Rate for Dynamic Domain Literals.

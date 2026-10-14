@@ -176,21 +176,13 @@ function computeAffinityScore(
 }
 
 /**
- * Executes sparse activation filtering over candidate files and available analyzers.
+ * Appends matched analyzer identifier to the accumulated array.
  *
- * @param availableAnalyzers - List of candidate analyzer identifiers.
- * @param fileEntries - Indexed metadata for candidate files.
- * @param scopeDecision - Decided audit scope.
- * @param changedFiles - Set of files physically changed.
- * @param neighborFiles - Set of files in 1st-order neighborhood.
- * @param threshold - Minimum affinity score required for activation (default 0.35).
- * @param weights - Optional custom weights.
- * @returns Frozen SparseActivationResult.
+ * @param matched - Existing array of matched analyzer IDs, if any.
+ * @param aId - Analyzer ID to append.
+ * @returns Array with appended analyzer identifier.
  */
-function appendMatchedAnalyzer(
-    matched: string[] | undefined,
-    aId: string,
-): string[] {
+function appendMatchedAnalyzer(matched: string[] | undefined, aId: string): string[] {
     if (matched !== undefined) {
         matched.push(aId);
         return matched;
@@ -231,6 +223,19 @@ function matchFileAnalyzers(
     return matched;
 }
 
+/**
+ * Computes sparse analyzer activation mapping across indexed files based on scope decisions,
+ * change sets, and domain affinity weights.
+ *
+ * @param availableAnalyzers List of registered analyzer identifiers
+ * @param fileEntries Index entries for candidate files in scope
+ * @param scopeDecision Preflight scope determination result
+ * @param changedFiles Directly modified file path set
+ * @param neighborFiles Topological neighbors of modified files
+ * @param threshold Minimum score threshold required for analyzer activation
+ * @param weights Dynamic weighting configuration for activation scoring
+ * @returns Sparse activation mapping per file, unique activated analyzers, and decision rationales
+ */
 export function activateSparseAnalyzers(
     availableAnalyzers: readonly string[],
     fileEntries: readonly AuditIndexEntry[],
