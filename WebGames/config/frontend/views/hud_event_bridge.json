@@ -1,0 +1,36 @@
+{
+  "_meta": {
+    "version": "1.0.0",
+    "description": "主页HUD事件桥接器通道白名单与策略路由配置"
+  },
+  "subscribed_channels": [
+    {
+      "channel": "world_state.hud_snapshot_published",
+      "handler": "on_authoritative_snapshot_received",
+      "priority": 100,
+      "payload_schema": "authoritative_hud_snapshot"
+    },
+    {
+      "channel": "currency.wallet.mutated",
+      "handler": "on_wallet_mutated",
+      "priority": 90,
+      "payload_schema": "wallet_mutation"
+    },
+    {
+      "channel": "prologue.step_advanced",
+      "handler": "on_prologue_advanced",
+      "priority": 80,
+      "payload_schema": "prologue_event"
+    },
+    {
+      "channel": "world_gateway.world_entered",
+      "handler": "on_world_entered",
+      "priority": 70,
+      "payload_schema": "world_entry"
+    }
+  ],
+  "fallback_policy": {
+    "unregistered_channel_action": "IGNORE_OR_SYSTEM_LOG",
+    "missing_field_fallback": "RETAIN_LAST_SNAPSHOT"
+  }
+}

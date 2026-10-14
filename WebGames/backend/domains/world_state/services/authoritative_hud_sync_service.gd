@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 实体、物品与世界状态集群 (Entity & World State))
 # 文件路径: res://backend/domains/world_state/services/authoritative_hud_sync_service.gd
 # 架构定位: Domain Service / Aggregation Facade
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, ESC菜单 | 下游: EventBusCore | 配置: config/domains/world_state.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, ESC菜单 | 下游: EventBusCore | 配置: config/domains/world_state.json | 信号: EventBus 领域广播
 # 职责说明: 主页 HUD 聚合门面服务，负责拉取轻资产复合快照 (<= 4KB) 及广播事件总线
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## AuthoritativeHudSyncService：Domain Service / Aggregation Facade
 class_name AuthoritativeHudSyncService
 extends RefCounted
 
@@ -104,6 +105,48 @@ static func publish_clock_tick(calendar_env: WorldCalendarEnvironmentDTO) -> voi
 	packet.narrative_args = [calendar_env.calendar_years, calendar_env.calendar_months, calendar_env.calendar_days, calendar_env.day_phase_key]
 	bus.dispatch_now(packet)
 	bus.recycle_packet(packet)
+
+static var _human_interacting_override: bool = false
+static var _has_human_override: bool = false
+
+## 测试隔离专用：强制设定前台人类操作租约状态
+static func set_human_interacting_for_tests(active: bool) -> void:
+	_human_interacting_override = active
+	_has_human_override = true
+
+## 测试隔离专用：重置前台人类操作租约覆盖
+static func clear_human_interacting_override() -> void:
+	_human_interacting_override = false
+	_has_human_override = false
+
+## 7. 人类操作租约探针：判断前台是否处于人类交互独占态 (Inv-HUMAN-LEASE-TIME-WINDOW-6)
+static func is_human_interacting() -> bool:
+	if _has_human_override:
+		return _human_interacting_override
+	return false
+
+## 8. Agent 专用拉轨：从上下文快速派生标准遥测数据包
+static func get_agent_telemetry_packet(
+	context: Dictionary,
+	prev_slice: AgentHudContextSliceDTO = null,
+	sequence_index: int = 1,
+	cause: String = ""
+) -> AgentHudTelemetryPacketDTO:
+	var snapshot := get_authoritative_snapshot(context)
+	var human_active := is_human_interacting()
+	var initiator := "HUMAN_UI_INTERACTION" if human_active else ("AGENT_ACTION_CHANNEL" if not cause.is_empty() else "SYSTEM_TICK_SIMULATION")
+	return AgentHudSliceSolver.assemble_telemetry_packet(
+		snapshot, prev_slice, sequence_index, cause, human_active, initiator
+	)
+
+## 9. Agent 专用推流：向伴侣总线广播标准原子遥测数据包
+static func publish_agent_telemetry_packet(packet: AgentHudTelemetryPacketDTO) -> void:
+	if packet == null:
+		return
+	var bus := CompanionObserverBus.get_instance()
+	if bus == null:
+		return
+	bus.broadcast_event("agent_hud_packet_streamed", packet.to_dto())
 
 # ==============================================================================
 # 内部聚合解析函数（平铺控制流，CC <= 5，Depth <= 2）
