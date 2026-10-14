@@ -11,7 +11,7 @@
 #   ./bin/kalar-mod.sh --version
 #   ./bin/kalar-mod.sh check ../templates/starter_story
 # ==============================================================================
-set -e
+set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TOOLS_PY="$SCRIPT_DIR/../tools/kalar_mod.py"
 
