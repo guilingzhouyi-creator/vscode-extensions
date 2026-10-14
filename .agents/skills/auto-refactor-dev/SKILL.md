@@ -37,8 +37,11 @@ description: >-
 - **L5 质量度量平面**：静态（10 支柱）+ 动态证据 + 演化（CAI 指数）；
 - **L6 Praxis 交付层**：统一客户端 SDK、多 Agent 冲突仲裁、轨迹配方学习与级联回滚。
 
-### 刚性等价性铁律：
-Rust 原生算子（64-bit SWAR 向量化扫描、Bit-Parallel Myers 差分、Tarjan SCC / 支配树、词法脱敏状态机、MinHash+LSH）与纯 TypeScript 回退实现（`src/core/native/*-shim.ts`）在输出数据结构、行号平移、哈希值以及错误边界上必须保持 **100% 语义与字节等价**，受 `scripts/validate-native-parity.js` 与 `scripts/validate-equivalence.js` 持续看守（详见 [rust-ts-equivalence-protocol.md](references/rust-ts-equivalence-protocol.md)）。
+### 刚性铁律与架构公理：
+1. **Rust+TS 双轨内核等价性铁律**：
+   Rust 原生算子（64-bit SWAR 向量化扫描、Bit-Parallel Myers 差分、Tarjan SCC / 支配树、词法脱敏状态机、MinHash+LSH）与纯 TypeScript 回退实现（`src/core/native/*-shim.ts`）在输出数据结构、行号平移、哈希值以及错误边界上必须保持 **100% 语义与字节等价**，受 `scripts/validate-native-parity.js` 与 `scripts/validate-equivalence.js` 持续看守（详见 [rust-ts-equivalence-protocol.md](references/rust-ts-equivalence-protocol.md)）。
+2. **项目中立性刚性公理 (Project Neutrality Axiom)**：
+   `auto-refactor` 是纯粹跨语言中立、项目中立的通用静态代码重构与治理引擎，**绝对严禁绑定任何特定外部项目**。核心分析器、规则体系与原生算子严禁硬编码外部特定业务项目的私有路径（如 `WebGames/` 或 `workspace-timing/` 的具体业务模块名）或特定业务常量。所有特定技术栈规则必须且仅能通过探测行业标准配置指纹（如 `project.godot`、`package.json` 中的标准依赖、`go.mod`）推断泛化原型环境（`Archetype Context`），并由 `validate-project-neutrality.js` 门禁执行一票否决。
 
 ---
 
@@ -100,10 +103,11 @@ Rust 原生算子（64-bit SWAR 向量化扫描、Bit-Parallel Myers 差分、Ta
    - 当 `src/core/rules/`、`src/analyzers/` 或 `crates/` 发生变更（或显式传 `--force-audit`）时自动触发全量重建。
 2. **项目中立性守卫 (`validate-project-neutrality.js`)**：分析器严禁硬编码特定业务仓库路径；框架专属规则必须通过探测标准配置特征（如 `project.godot` 或 `vscode` 依赖）推断 `Archetype Context`。
 3. **防孤儿单测契约 (`validate-suite-manifest.js`)**：所有 `scripts/validate-*.js` 必须在 `scripts/test-parallel.js`（149 个并行套件 + 5 个串行套件 + 1 个 vitest 套件 = 155 套测试）显式纳管。
-4. **三平面质量模型与贝叶斯统计**：
+4. **三平面质量模型、贝叶斯统计与长程轨迹检测**：
    - 从 0 纯客观累加符号调用，外部 SDK 调用基于全局 `symbolIndex` 精确追踪；
    - 采用无信息 Jeffreys 先验 $\text{Beta}(0.5, 0.5)$ 共轭后验（$\alpha = 0.5 + k, \beta = 0.5 + n - k$）动态计算后验均值与 95% 置信区间；
-   - 质量轨迹以紧凑 NDJSON（$<350\text{B}$/条，总预算 $\le 2\text{MB}$）滚动持久化至 `.refactor-trajectory/`；全工作区 High/Critical Debt 严格保持 0 项。
+   - 质量轨迹以紧凑 NDJSON（$<350\text{B}$/条，总预算 $\le 2\text{MB}$）滚动持久化至 `.refactor-trajectory/`；全工作区 High/Critical Debt 严格保持 0 项；
+   - **长程滑动窗口多步死循环振荡检测 (`regressionTrajectoryDetector.ts`)**：维护深度至多 16 步（$k \le 16$）滑动历史窗口，突破单步振荡局限，精准识别 $A \to B \to C \to A$ 等长程死循环拓扑，精确计算 `cycleLength` 并触发自适应反思指令与熔断。
 5. **上下文感知假告警抑制**：测试套件（`test_suite`）豁免魔法字面量抽取；国际化字典（`i18n`）与日志/异常入参豁免硬编码字符串提取。
 
 ---
@@ -133,7 +137,7 @@ Rust 原生算子（64-bit SWAR 向量化扫描、Bit-Parallel Myers 差分、Ta
 
 1. **名义类型与量纲烙印 (`Brand<T, B>`)**：核心时间戳（`TimestampMs`）、代码行列（`LineNumber`, `ColumnNumber`）与指纹哈希（`FileHash`）通过 `unique symbol` 名义烙印，零运行时开销，编译期杜绝量纲混用；
 2. **穷尽性推导与不可达断言 (`assertNever`)**：针对 `GateStage`、`DiffSemanticCategory` 等联合类型，分发器末尾必须调用 `assertNever(variant)`，利用 `never` 强制编译期覆盖所有状态分支；
-3. **模板字面量规则代码收窄 (`StandardRuleId`)**：`AR:${Domain}:${Family}-${Number}` 模板字面量类型前置锁定 420 规则命名拓扑，拦截规则漂移（`RCFG-RULE-DRIFT`）；
+3. **模板字面量规则代码收窄 (`StandardRuleId`)**：`AR:${Domain}:${Family}-${Number}` 模板字面量类型前置锁定 425 规则命名拓扑，拦截规则漂移（`RCFG-RULE-DRIFT`）；
 4. **精确类型谓词与零盲目强转 (`is`)**：彻底消融 `as any` 与盲目 `as` 强转，所有异构或跨进程数据必须经类型守卫（`hasWorkerSymbols`）校验后安全收窄；
 5. **深度只读与共享 AST 防污染 (`DeepReadonly`)**：单趟磁带流共享的 `ReadonlyAstNode` 声明为深度不可变，杜绝分析器就地变异污染语法树；
 6. **全域避免重复开销四重架构**：

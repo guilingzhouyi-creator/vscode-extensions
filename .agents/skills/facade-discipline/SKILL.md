@@ -122,7 +122,18 @@ installDaemonRejectionGuard();
 - **严格遵循复杂度与嵌套预算**：
   门面内部所有方法严控在 $\text{CC} \le 15$ 与 $\text{Depth} \le 4$ 预算之内，全量应用卫语句与防御性参数校验。
 
-### 3. 消除跳板反模式前后对比
+### 3. 内核-扩展契约隔离与 AST 静态萃取 SDK 门面实践 (Kernel-Extension Separation & AST-Extracted SDK Facade)
+在插件化、MOD 系统或外部微内核扩展架构中，门面承担着**物理防腐隔离层与契约防护屏障**的决定性职责：
+- **核心内核与外部生态单向解耦**：
+  外部扩展（Plugins / MODs / SDK Consumers）严禁直读或侵入内部求解器、运行时私有类或可变内存状态；
+- **声明式 AST 静态萃取管线**：
+  不依赖不可控的动态反射，由离线 AST 解析器遍历核心层公共契约与数据模型，自动化萃取并生成深度只读、不可变的对外 SDK 门面；
+- **双向零漂移门禁看守 (Bi-directional Zero-Drift Gate)**：
+  门禁系统持续断言核心暴露符号与 SDK 门面导出符号的 100% 差分等价：
+  $$\text{Diff}(\text{Core}_{\text{public}}, \text{SDK}_{\text{exported}}) \equiv \emptyset$$
+  任何一方擅自增删字段或类型漂移均在 CI 阶段直接阻断，保障外部扩展生态的持久向后兼容性。
+
+### 4. 消除跳板反模式前后对比
 ```typescript
 // ❌ 错误示范：跳板文件 internal/bridge.ts (ELOC = 1, ARCH-ABS-001 违规)
 export * from './real-service';

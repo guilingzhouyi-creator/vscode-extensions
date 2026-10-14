@@ -3,7 +3,7 @@ name: telemetry-statistical-modeling
 description: >-
   度量评估、经典贝叶斯统计建模与反刷分熔断规范。指导 Agent 在 auto-refactor 等分析系统中
   落实从 0 纯客观统计、Jeffreys Beta(0.5, 0.5) 共轭后验均值与方差置信区间估计、
-  基于 AST symbolIndex 的 CAI 符号追踪、以及 BLOCK_GAMING_DETECTED 虚假重构熔断。
+  异构系统多语言均衡指数与离散度惩罚模型、基于 AST symbolIndex 的 CAI 符号追踪、以及 BLOCK_GAMING_DETECTED 虚假重构熔断。
 ---
 
 # telemetry-statistical-modeling — 度量评估、贝叶斯统计建模与反刷分工作流
@@ -53,7 +53,30 @@ description: >-
 
 ---
 
-## 四、 反刷分熔断防御机制 (`BLOCK_GAMING_DETECTED`)
+## 四、 异构多系统/多语言均衡指数数学模型 (Polyglot / Multi-System Balanced Generalization Index)
+
+针对跨多语言、多微服务或多组件架构中“单一模块刷高分掩盖弱势模块短板”的单点偏倚风险，度量系统引入加权均衡指数数学模型（`calculatePolyglotGeneralizationIndex`）：
+
+### 1. 加权均值与样本标准差
+设系统由 $M$ 个子领域/语言组成，各模块规范化得分为 $S_i \in [0, 100]$，权重为 $w_i > 0$：
+- **加权均值**：
+  $$\mu = \frac{\sum_{i=1}^M w_i S_i}{\sum_{i=1}^M w_i}$$
+- **加权样本标准差（离散度）**：
+  $$\sigma = \sqrt{\frac{\sum_{i=1}^M w_i (S_i - \mu)^2}{\sum_{i=1}^M w_i}}$$
+
+### 2. 离散度惩罚与均衡综合得分
+- **均衡性惩罚因子 $D$**：
+  $$D = \max\left(0.0, \; 1.0 - \frac{\sigma}{100}\right)$$
+- **均衡综合得分**：
+  $$S_{\text{balanced}} = \mu \times D$$
+- **数学性质与治理导向**：
+  - 当 $M \le 1$ 时，返回单模块原始截断得分，无离散度惩罚；
+  - 当各技术栈/子系统协同并进时（$\sigma \to 0$），$D \to 1.0$，综合得分保持高位；
+  - 当某技术栈严重掉队（如 TS=95, Py=35）时，标准差 $\sigma$ 增大导致 $D$ 折损，压低综合得分，坚决杜绝“单点过度工程掩盖全局缺陷”的伪现代化。
+
+---
+
+## 五、 反刷分熔断防御机制 (`BLOCK_GAMING_DETECTED`)
 
 为防范在自动化重构中通过轻微编辑虚增活跃度或骗取自治评分，系统设置反刷分熔断防线：
 
@@ -71,7 +94,7 @@ description: >-
 
 ---
 
-## 五、 本地验证指令与断言标准
+## 六、 本地验证指令与断言标准
 
 在提交度量评估相关代码前，执行本地验证：
 
@@ -91,7 +114,7 @@ node auto-refactor/scripts/validate-project-neutrality.js
 
 ---
 
-## 六、 关联模板与参考指引
+## 七、 关联模板与参考指引
 
 - [jeffreys-beta-credible-interval.md](references/jeffreys-beta-credible-interval.md)：无信息 Jeffreys 先验共轭后验详细数学推导指南；
 - [anti-gaming-detection-mechanics.md](references/anti-gaming-detection-mechanics.md)：反刷分熔断判定机制与作弊特征指南；

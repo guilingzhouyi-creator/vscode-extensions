@@ -39,7 +39,7 @@ description: >-
 [Step 4: 单趟磁带融合] 能否将 N 个分析器/规则的多遍文本扫描融合为 1 次线性扫描 + 结构化特征磁带查询？
       │
       ▼
-[Step 5: 时代戳与增量] 能否用 Epoch 版本号自增实现 O(1) 状态重置，或用滑动差分消灭重复全窗口重算？
+[Step 5: 时代戳与增量] 能否用 Epoch 版本号自增实现 O(1) 状态重置，或用滑动差分/长程窗口拓扑检测消灭重复计算与死循环？
 ```
 
 ---
@@ -68,6 +68,9 @@ description: >-
 | **无分支查表分发 (Branchless 256-LUT)** | 模块级静态 `Uint8Array(256)` + `charCodeAt` | `static [u8; 256]` + `as usize` 索引 | 预加载常量 `PackedByteArray` 查表 | `GATE-AST-001` ($\text{CC}\le 15, \text{Depth}\le 4$) |
 | **位并行与集合代数 (Bitset / SWAR)** | `Uint32Array` 位集 ($32\text{-bit}$ 步进) | `u64` / `u128` SWAR 寄存器并行 | `int` ($64\text{-bit}$ 有符号位掩码运算) | `ALGORITHMIC_PROOF` 契约注释 |
 | **时代戳 $O(1)$ 状态复位 (Epoch Reset)** | `visitedEpoch: Int32Array` + `epoch++` | `visited_epoch: Vec<u32>` + `wrapping_add` | 成员 `PackedInt32Array` + `_epoch += 1` + `reset_state()` | `ADV-PRF-002` (禁止帧循环 `clear/fill`) |
+| **定长环形缓冲轨迹记忆 (RingBuffer Trajectory)** | 预分配固定容量数组 + 双指针位回环游标 | `VecDeque` 预分配或定长数组轮询 | 定长 32 槽位数组 + `cursor = (cursor + 1) % N` 覆盖 | `PRF-MEM-001` / `ADV-PRF-002` |
+| **容器原位注入 (In-Place Injection)** | 调用方传入预分配上下文 `out: Context` 就地覆写 | `&mut Context` 就地借用，零生命周期逃逸 | 传入预分配 `Dictionary` / `Array`，严禁返回新实例 | `CPX-SPACE-001` / `ADV-PRF-002` |
+| **长程拓扑振荡检测 (Multi-step Cycle Detection)** | 滑动窗口定长哈希匹配 ($k \le 16$) 计算环长 | 状态指纹环形滑动窗口与拓扑剪枝 | 状态机历史指纹比对与自适应阻断 | `PRF-ALG-002` / `ALGORITHMIC_PROOF` |
 | **多模态退化保护包络 (Fallback Envelope)** | 跨度 $>1500$ 行或 $>2\text{M}$ 单元降级线性/直方图 | 双轨阈值同步 (`MAX_MYERS_CELLS`) | 步数/节点超阈值降级启发式近似求解 | `INVARIANT_BOUNDARY` 六字段 JSDoc |
 
 ---

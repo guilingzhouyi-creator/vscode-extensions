@@ -2,14 +2,14 @@
 name: rule-catalog-governance
 description: >-
   全工作区单源规则目录（SSOT）、元数据一致性与规则反虚构治理规范。指导 Agent 聚合
-  420 条跨项目静态分析与审查规则（autoRefactor: 335, workspaceTiming: 49, webGames: 53, globalTooling: 7）、
+  425 条跨项目静态分析与审查规则（autoRefactor: 335, workspaceTiming: 49, webGames: 55, globalTooling: 16）、
   落实标准 3-3-3 命名拓扑与 104 项权威词典、三阶双轨别名等价网络、底层完备诊断与表现层语义去重双层解耦公理、
   跨项目规则族前缀命名空间边界及防范规则 ID 虚构（RCFG-RULE-DRIFT）。
 ---
 
 # rule-catalog-governance — 全仓单源规则目录与元数据一致性治理
 
-本技能规范了工作区 420 条静态分析与审查规则的单源聚合机制（Single Source of Truth, SSOT）、标准 3-3-3 命名拓扑公理、权威 104 项三字母映射词典、三阶双轨别名等价网络、底层完备诊断与表现层语义去重双层解耦公理、跨项目规则族命名空间边界、三大项目规范注册流程、规则防虚构门禁（`RCFG-RULE-DRIFT`）以及客观度量求真数学公理。
+本技能规范了工作区 425 条静态分析与审查规则的单源聚合机制（Single Source of Truth, SSOT）、标准 3-3-3 命名拓扑公理、权威 104 项三字母映射词典、三阶双轨别名等价网络、底层完备诊断与表现层语义去重双层解耦公理、跨项目规则族命名空间边界、三大项目规范注册流程、规则防虚构门禁（`RCFG-RULE-DRIFT`）以及客观度量求真数学公理。
 
 ---
 
@@ -29,17 +29,17 @@ description: >-
 工作区维护全局唯一的规则真源注册表，任何规则必须在注册表中登记后方可在代码、配置、分析报告或提交说明中生效：
 - **SSOT 文件路径**：`scripts/common/rule-catalog.json`
 - **生成与聚合脚本**：`scripts/common/generate-rule-catalog.js`
-- **纳管规模与形态**：跨三大项目聚合 420 条活跃规则，结构元数据定义如下：
+- **纳管规模与形态**：跨三大项目聚合 425 条活跃规则，结构元数据定义如下：
   ```json
   {
     "schema": "workspace-rule-catalog/v1",
-    "generatedAt": "2026-10-09T12:55:00.000Z",
-    "totalRules": 420,
+    "generatedAt": "2026-10-13T15:54:07.325Z",
+    "totalRules": 425,
     "counts": {
       "autoRefactor": 335,
       "workspaceTiming": 49,
-      "webGames": 53,
-      "globalTooling": 7
+      "webGames": 55,
+      "globalTooling": 16
     },
     "rules": [
       {
@@ -55,11 +55,11 @@ description: >-
   }
   ```
 
-### 规则分布矩阵 (420 条活跃规则)：
+### 规则分布矩阵 (425 条活跃规则)：
 1. **`autoRefactor` (335 条)**：涵盖 30 个内置分析器（architecture, data-architecture, test-modernity, dependency-layout, naming, gate-architecture 等）与四层金字塔体系；
 2. **`workspaceTiming` (49 条)**：涵盖 VS Code 扩展审查体系的 L0~L5 六层刚性防线（编译、存储崩溃安全、聚合守恒、i18n、性能与 UI 对比度）及进阶门禁与测试预算规则；
-3. **`webGames` (53 条)**：涵盖 Godot 游戏工程的文档治理（`DOC-`、`LINK-`）、高性能脚本契约（`ADV-`）与配置架构审查规则；
-4. **`globalTooling` (7 条)**：涵盖提交规范与禁词风格拦截（`CMG-STY-001`~`006`）及四大受控项目归属声明守卫（`CMG-PRJ-001`）。
+3. **`webGames` (55 条)**：涵盖 Godot 游戏工程的文档治理（`DOC-`、`LINK-`）、高性能脚本契约（`ADV-`）与配置架构审查规则；
+4. **`globalTooling` (16 条)**：涵盖提交规范与禁词风格拦截（`CMG-STY-001`~`006`，`CMG-PRJ-001`）以及平台脚本工程化、AST 切片隔离与门面实质承载守卫（`VOL-DOC-001`, `GATE-AST-001`, `GATE-ISO-001`, `ARCH-ABS-001`, `ARCH-FAC-001` 等）。
 
 ---
 
@@ -171,14 +171,14 @@ flowchart TD
 
 ## 六、 跨项目规则族前缀命名空间规范
 
-为避免全仓 420 条规则在跨项目静态分析、预提交门禁（Gate 7）或 CI 流程中发生命名空间踩踏与误杀，工作区严格划分四大项目域的规则族前缀边界：
+为避免全仓 425 条规则在跨项目静态分析、预提交门禁（Gate 7）或 CI 流程中发生命名空间踩踏与误杀，工作区严格划分四大项目域的规则族前缀边界：
 
 | 项目领域 (`Project`) | 规则规模 | 权威合法规则族前缀 / 命名空间 | 治理范围与职责边界 |
 | :--- | :--- | :--- | :--- |
 | **`auto-refactor`** | 335 条 | 30 个分析器内置家族：`ARCH`, `BIG`, `CMP`, `CMT`, `CONST`, `CPX`, `DAT`, `DEP`, `DOC`, `ERR`, `GATE`, `GDM`, `GOM`, `GOV`, `HYG`, `NAM`, `NUM`, `PRF`, `PROD`, `PS`, `PYM`, `RSM`, `SEC`, `SH`, `SIM`, `STDLIB`, `TSM`, `TST`, `UI`, `VSC` 及 15 条 Legacy 别名 | 通用多语言代码重构、AST 语法树、Rust 双轨算子、复杂度与架构质量模型 |
 | **`workspace-timing`** | 49 条 | L0~L5 六层审查体系：`L0-`, `L1-`, `L2-`, `L3-`, `L4-`, `L5-`；扩展专属族：`ARF-`, `DOC-`, `HC-`, `LAY-`, `RCFG-`, `RES-`, `SCR-`, `TB-` | VS Code 扩展生命周期、分层存储安全、i18n 对齐、时间守恒与状态栏治理 |
-| **`WebGames`** | 53 条 | Godot 专属契约：`ADV-`（高性能脚本与引擎约束）、`DOC-`、`LINK-`（文档与跨卷链接）、`PRF-`、`RES-`、`UUID-`、`SIM-` | Godot 4 游戏逻辑、节点树信号契约、文档双语归档与配置单源治理 |
-| **`global-tooling`** | 7 条 | 通用门禁族：`CMG-`（提交说明规范 `CMG-STY-001`~`006`, `CMG-PRJ-001`）、`GATE-`（平台脚本与 AST 隔离守卫） | 跨平台工作区门禁、提交说明防虚构、沙箱隔离与环境一致性 |
+| **`WebGames`** | 55 条 | Godot 专属契约：`ADV-`（高性能脚本与引擎约束）、`DOC-`、`LINK-`（文档与跨卷链接）、`PRF-`、`RES-`、`UUID-`、`SIM-` | Godot 4 游戏逻辑、节点树信号契约、文档双语归档与配置单源治理 |
+| **`global-tooling`** | 16 条 | 通用门禁与治理族：`CMG-`（提交说明规范 `CMG-STY-001`~`006`, `CMG-PRJ-001`）、`GATE-`（平台脚本与 AST 隔离守卫 `GATE-AST-001`, `GATE-ISO-001`）、`VOL-`（`VOL-DOC-001`）、`ARCH-`（`ARCH-ABS-001`, `ARCH-FAC-001`） | 跨平台工作区门禁、提交说明防虚构、沙箱隔离、代码行预算与门面实质承载 |
 
 ### 跨项目防误杀与隔离铁律：
 1. **命名空间互斥隔离**：各项目的规则校验脚本与门禁工具在执行规则一致性检查时，必须依据规则 ID 前缀精准分流至所属工程域，严禁跨项目判定规则漂移；
@@ -200,16 +200,21 @@ flowchart TD
 - **单源配置文件**：在 `workspace-timing/scripts/config/review-rules.json` 中统一登记；
 - **规则层级代号**：使用严格的 `L0~L5` 六层体系前缀（如 `L0-COMPILE`、`L1-STORAGE-CRASH`、`L2-TIMING-CONSERVATION`、`L3-I18N-COVERAGE`），并附带对应触发审查命令与阻断级别。
 
-### 3. `WebGames` 文档与代码规范注册工作流 (53 规则体系)
+### 3. `WebGames` 文档与代码规范注册工作流 (55 规则体系)
 - **配置与门禁脚本**：在 `WebGames/scripts/config/docs_governance_rules.json` 或 `WebGames/scripts/py/audit_docs.py` 中登记规则元数据；
 - **前缀体系**：对齐文档治理规范（`DOC-`、`LINK-`）与引擎高性能契约（`ADV-`）。
 
-### 4. 全仓同步触发与自动化核查
-在任何子项目中新增或修改规则后，必须运行：
+### 4. 全仓同步触发与 `--check-only` 零漂移断言
+在任何子项目中新增或修改规则后，必须运行全仓生成脚本完成同步：
 ```powershell
 node scripts/common/generate-rule-catalog.js
 ```
-确保全仓 SSOT 目录 `scripts/common/rule-catalog.json` 自动完成增量聚合与计数同步。若规则数发生漂移，门禁将即时拒绝提交。
+确保全仓 SSOT 目录 `scripts/common/rule-catalog.json` 自动完成增量聚合与计数同步。
+在本地预审与 CI 门禁中，统一通过只读断言模式验证：
+```powershell
+node scripts/common/generate-rule-catalog.js --check-only
+```
+- **工作机制**：动态扫描内存注册表集合 $R_{\text{memory}}$ 与磁盘 JSON 快照集合 $R_{\text{disk}}$，只要存在缺失或孤儿规则，立即打印 `❌ [RCFG-RULE-DRIFT]` 并以退出码 1 阻断，杜绝未更新落盘的盲目提交。
 
 ---
 
@@ -259,12 +264,15 @@ node scripts/common/generate-rule-catalog.js
 # 1. 重新扫描三大项目并全量生成单源规则目录 (SSOT)
 node scripts/common/generate-rule-catalog.js
 
-# 2. 本地验证提交说明中的规则 ID 是否真实存在
+# 2. 校验规则注册表与磁盘快照 100% 零漂移（CI 与门禁预审断言）
+node scripts/common/generate-rule-catalog.js --check-only
+
+# 3. 本地验证提交说明中的规则 ID 是否真实存在
 node scripts/common/validate-commit-msg-rules.js <path-to-commit-msg-file>
 
-# 3. 运行 pre-commit 门禁中的规则一致性校验 (Gate 7)
+# 4. 运行 pre-commit 门禁中的规则一致性校验 (Gate 7)
 pwsh -File scripts/ps1/pre-commit-gate.ps1
 
-# 4. 执行全工作区快速审查中枢核验
+# 5. 执行全工作区快速审查中枢核验
 pwsh -File scripts/ps1/audit-all.ps1 -Fast
 ```

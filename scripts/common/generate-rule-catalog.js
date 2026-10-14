@@ -230,7 +230,7 @@ function collectGlobalToolingRules() {
   return Array.from(dedup.values());
 }
 
-function generate() {
+function generate(checkOnly = false) {
   console.log('🔄 Consolidating workspace rule catalog...');
   const arRules = collectAutoRefactorRules();
   const wtRules = collectWorkspaceTimingRules();
@@ -245,6 +245,30 @@ function generate() {
     }
   }
 
+  const generatedRules = Array.from(ruleMap.values()).sort((a, b) => a.id.localeCompare(b.id));
+
+  if (checkOnly) {
+    if (!fs.existsSync(OUTPUT_FILE)) {
+      console.error(`❌ [DRIFT] Rule catalog file missing on disk: ${OUTPUT_FILE}`);
+      process.exit(1);
+    }
+    const existing = JSON.parse(fs.readFileSync(OUTPUT_FILE, 'utf8'));
+    const existingMap = new Map((existing.rules || []).map((r) => [r.id, r]));
+
+    const missingOnDisk = generatedRules.filter((r) => !existingMap.has(r.id)).map((r) => r.id);
+    const orphanOnDisk = (existing.rules || []).filter((r) => !ruleMap.has(r.id)).map((r) => r.id);
+
+    if (missingOnDisk.length > 0 || orphanOnDisk.length > 0) {
+      console.error(`❌ [RCFG-RULE-DRIFT] Detected rule catalog drift between registry and disk!`);
+      if (missingOnDisk.length > 0) console.error(`   Missing on disk: ${missingOnDisk.join(', ')}`);
+      if (orphanOnDisk.length > 0) console.error(`   Orphan on disk: ${orphanOnDisk.join(', ')}`);
+      process.exit(1);
+    }
+
+    console.log(`✅ [PASS] Rule catalog is in 100% zero-drift parity with registry (${generatedRules.length} rules).`);
+    return;
+  }
+
   const catalog = {
     schema: 'workspace-rule-catalog/v1',
     generatedAt: new Date().toISOString(),
@@ -255,7 +279,7 @@ function generate() {
       webGames: wgRules.length,
       globalTooling: globalRules.length,
     },
-    rules: Array.from(ruleMap.values()).sort((a, b) => a.id.localeCompare(b.id)),
+    rules: generatedRules,
   };
 
   fs.mkdirSync(path.dirname(OUTPUT_FILE), { recursive: true });
@@ -264,7 +288,8 @@ function generate() {
 }
 
 if (require.main === module) {
-  generate();
+  const isCheckOnly = process.argv.includes('--check-only');
+  generate(isCheckOnly);
 }
 
 module.exports = {

@@ -101,5 +101,8 @@ description: >-
 2. **常用本地预审命令矩阵**：
    - 暂存区极速体检：`pwsh -File scripts/ps1/pre-commit-gate.ps1`
    - 提交信息预审：`pwsh -File scripts/ps1/commit-msg-gate.ps1 <msg-file>`
+   - 单源规则零漂移断言：`node scripts/common/generate-rule-catalog.js --check-only`
+   - 技能集规范与同构核验：`node scripts/common/validate-skills.js`
    - 双轨体积评估：`node scripts/common/evaluate-eloc-budget.js`
+   - MOD SDK 双向同步核验：`python WebGames/scripts/py/audit_sdk_sync.py`
    - 全工作区快速统一审查：`pwsh -File scripts/ps1/audit-all.ps1 -Fast`

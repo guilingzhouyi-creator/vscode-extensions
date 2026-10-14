@@ -27,6 +27,28 @@ const MIN_CONTRACT_COMMENT_RATIO = 0.08;
 const MIN_REPRESENTATIVE_LOC = 250;
 
 /**
+ * Multi-language syntactic verbosity coefficients.
+ * Aligned with auto-refactor elastic budget matrix to normalize cognitive footprint.
+ */
+const LANGUAGE_VERBOSITY_FACTORS = {
+  '.py': 0.7,
+  '.gd': 0.75,
+  '.ts': 1.0,
+  '.js': 1.0,
+  '.rs': 1.25,
+  '.go': 1.4,
+  '.ps1': 1.1,
+  '.sh': 1.0,
+  '.bash': 1.0,
+};
+
+function getLanguageVerbosityFactor(filePath) {
+  if (!filePath) return 1.0;
+  const ext = path.extname(filePath).toLowerCase();
+  return LANGUAGE_VERBOSITY_FACTORS[ext] || 1.0;
+}
+
+/**
  * Checks whether a line in a C-style language (TS, JS) is a comment or blank,
  * updating the block comment state accordingly.
  *
@@ -273,12 +295,15 @@ function isBenignConstantCatalog(filePath, content) {
 function evaluateDynamicEnvelope(metrics, options, filePath = '', content = '') {
   const { eloc, totalLoc, commentLines } = metrics;
   const isConstantCatalog = isBenignConstantCatalog(filePath, content);
+  const langFactor = getLanguageVerbosityFactor(filePath);
+  const baseMaxEloc = options.maxEloc || DEFAULT_MAX_ELOC;
+  const baseMaxLoc = options.maxLoc || DEFAULT_MAX_LOC;
   const maxEloc = isConstantCatalog
-    ? Math.max(options.maxEloc || DEFAULT_MAX_ELOC, 1800)
-    : options.maxEloc || DEFAULT_MAX_ELOC;
+    ? Math.max(baseMaxEloc, 1800)
+    : Math.round(baseMaxEloc * langFactor);
   const maxLoc = isConstantCatalog
-    ? Math.max(options.maxLoc || DEFAULT_MAX_LOC, 2500)
-    : options.maxLoc || DEFAULT_MAX_LOC;
+    ? Math.max(baseMaxLoc, 2500)
+    : Math.round(baseMaxLoc * langFactor);
   const densityRatioTarget = options.densityRatio || DEFAULT_TARGET_DENSITY_RATIO;
 
   // 1. Absolute volume bounds

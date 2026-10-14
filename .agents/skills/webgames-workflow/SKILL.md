@@ -62,13 +62,14 @@ description: >-
    - `AccountDiskRepository` 负责账号本地物理持久化与临时快照原子落盘；
    - `AccountSessionStore` 与快照水化恢复器保障登录态、角色槽位及跨世界切换的幂等恢复；
    - `WorldGateway` 执行世界准入防越权校验，角色创建统一走权威创角与出生锚点分配管线，严禁前端伪造角色初始属性；
-3. **MOD DAG 拓扑加载与 `mod_sdk` 工具链**：
+3. **MOD DAG 拓扑加载、SDK 静态萃取与双向零漂移工作流**：
    - MOD 加载器基于有向无环图（DAG）执行依赖拓扑排序、版本兼容校验与配置增量覆写，遇循环依赖或越界修改立即熔断隔离；
-   - 配套 Python 工具链：`sync_mod_sdk.py`（同步 SDK 契约）、`scaffold_mod.py`（生成标准 MOD 脚手架）、`check_mod.py`（静态合规审查）、`preview_mod.py`（覆写差异预览）。
+   - **单向静态 AST 萃取管线**：`sync_mod_sdk.py` 基于 AST 静态分析，从核心数据实体与求解器中自动化提取纯净公共契约，生成并同步至 `WebGames/mods/core_sdk/`；
+   - **双向零漂移门禁看守**：`audit_sdk_sync.py` 严格校验 Core 与 `mods/core_sdk/` 保持 100% 差分等价；MOD 开发者严格且仅面向 `core_sdk` 编程，严禁直连或穿透调用底层求解器私有状态。
 
 ---
 
-## 四、 前端可视化表现层边界（视图零业务计算与强类型 Tabs 控制器）
+## 四、 前端可视化表现层边界（HUD 结构化切片流与强类型 Tabs 控制器）
 
 `frontend/views/**` 必须保持纯粹的表现层定位，严守四大红线：
 1. **视图零业务计算**：视图内严禁调用 `randf()`/`randi()` 伪造随机数、严禁内嵌汇率换算/概率判定/战斗数值公式、严禁自维护业务状态机与伪持久化状态；
@@ -76,7 +77,7 @@ description: >-
    - 彻底消除 `var v = _view` 等弱类型缩写；
    - 视图控制器必须显式声明强类型子视图引用（如 `var _overview_view: OverviewView`），保障编译期静态类型检查与完整代码提示；
    - 严禁任何动态弱类型穿透与动态反射调用；
-3. **唯一数据入口**：业务数据一律通过强类型快照经由 `apply_snapshot(snapshot: Dictionary) -> void` 方法单向注入；视图严禁直读业务 Mock 或私自穿透读取未暴露的后端单例；
+3. **HUD 结构化切片流单向注入**：业务数据一律通过强类型快照经由 `apply_snapshot(snapshot: Dictionary) -> void` 方法单向注入；视图严禁直读业务 Mock 或私自穿透读取未暴露的后端单例，消除前端状态滞留；
 4. **单向依赖解耦与资源复用**：视图层仅允许依赖 UI 基础设施、展示组件与 i18n/主题模块，严禁直接依赖后端求解器或私有类；浮层、确认弹窗与通用面板优先复用全局管理器，避免节点泄漏。
 
 ---
@@ -86,8 +87,9 @@ description: >-
 在每帧更新（`_process` / `_physics_process`）或高频事件循环中，严格落实零瞬态内存分配：
 1. **严禁循环内裸调 `.new()` (`ADV-PRF-002`)**：频繁创建的对象（特效、弹道、伤害跳字、事件载荷）必须通过对象池进行借还；
 2. **必须实现 `reset_state()` 契约**：归还对象池前或重新借出时，必须显式调用 `reset_state()` 彻底重置所有内部状态、数值与集合引用，杜绝脏数据残留；
-3. **预分配容器容量**：数组与字典预先设定容量避免运行时动态扩容导致的内存碎片；
-4. **借还生命周期对称性**：获取时初始化并标记活跃，归还时执行 `reset_state()` 并重新入池，析构时统一释放。
+3. **定长环形轨迹记忆 (Fixed 32-Slot RingBuffer)**：状态历史与轨迹记忆采用定长 32 槽位环形缓冲，双指针回环 $O(1)$ 覆盖写入与快照重现，严禁动态 `push/pop` 导致堆内存碎片；
+4. **容器原位注入 (In-Place Injection)**：函数间传递或组装数据时，调用方传入预分配的 `Dictionary` 或 `Array`，由被调用方就地写入覆写，严禁在帧循环中分配并返回全新的临时容器；
+5. **预分配容器容量与借还对称性**：容器预分配固定容量；获取时初始化并标记活跃，归还时执行 `reset_state()` 并重新入池，析构时统一释放。
 
 ---
 
@@ -117,17 +119,20 @@ description: >-
 # 1. 运行原生 Python 静态提取门禁（极速剥离引擎冷启动，提速 87.5%）
 python WebGames/scripts/py/audit_arch_static.py
 
-# 2. 语法与静态规范检查
+# 2. 校验 MOD SDK 契约双向零漂移
+python WebGames/scripts/py/audit_sdk_sync.py
+
+# 3. 语法与静态规范检查
 bash WebGames/scripts/sh/check-gdscript.sh
 # 或在 Windows PowerShell:
 pwsh -File WebGames/scripts/ps1/check-gdscript.ps1
 
-# 3. 无头运行全量单元测试套件
+# 4. 无头运行全量单元测试套件
 bash WebGames/scripts/sh/test-run.sh
 # 或在 Windows PowerShell:
 pwsh -File WebGames/scripts/ps1/test-run.ps1
 
-# 4. 执行 WebGames 专属全量门禁与配置审查
+# 5. 执行 WebGames 专属全量门禁与配置审查
 pwsh -File WebGames/scripts/ps1/audit-all.ps1
 ```
 

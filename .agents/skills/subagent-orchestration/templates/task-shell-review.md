@@ -8,7 +8,7 @@
 [Quality & Discipline Checklist]
 1. 纯只读姿态：严禁创建或修改任何生产代码、测试或配置文件；
 2. 质性事实断言：审查意见必须给出具体文件路径、起始行号与客观违规事实；
-3. 规则单源引用：涉及的规则代码必须在 rule-catalog.json (420 条规则) 中真实登记 (RCFG-RULE-DRIFT)；
+3. 规则单源引用：涉及的规则代码必须在 rule-catalog.json (425 条规则) 中真实登记 (RCFG-RULE-DRIFT)；
 4. 语言纪律：纯技术事实，严禁敏捷工期代号、敷衍词汇或主观夸大表达。
 
 [Pre-Delivery Verification]

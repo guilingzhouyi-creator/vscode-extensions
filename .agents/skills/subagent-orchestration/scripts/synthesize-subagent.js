@@ -48,9 +48,9 @@ function getTotalRuleCount() {
       }
     }
   } catch (_err) {
-    return 420;
+    return 425;
   }
-  return 420;
+  return 425;
 }
 
 function resolveIntent(intent) {

@@ -1,11 +1,11 @@
 {
   "schema": "workspace-rule-catalog/v1",
-  "generatedAt": "2026-10-13T12:15:57.008Z",
-  "totalRules": 425,
+  "generatedAt": "2026-10-14T05:50:57.711Z",
+  "totalRules": 428,
   "counts": {
-    "autoRefactor": 335,
+    "autoRefactor": 338,
     "workspaceTiming": 49,
-    "webGames": 53,
+    "webGames": 55,
     "globalTooling": 16
   },
   "rules": [
@@ -1793,6 +1793,27 @@
       "family": "PRF",
       "severity": "warning",
       "summary": "Transient heap allocation inside a loop (ADV-PRF-002), violating the zero-transient-allocation contract."
+    },
+    {
+      "id": "MOD-BWD-001",
+      "project": "auto-refactor",
+      "family": "MOD",
+      "severity": "warning",
+      "summary": "Backward compatibility shim, redundant legacy alias, or outdated parameter forwarding detected."
+    },
+    {
+      "id": "MOD-DEP-001",
+      "project": "auto-refactor",
+      "family": "MOD",
+      "severity": "warning",
+      "summary": "Invocation or access of deprecated symbol detected in internal production source code."
+    },
+    {
+      "id": "MOD-FLB-001",
+      "project": "auto-refactor",
+      "family": "MOD",
+      "severity": "warning",
+      "summary": "Cross-generational fallback chain or redundant fallback cascade detected in non-perimeter source code."
     },
     {
       "id": "NAM-ABR-001",
