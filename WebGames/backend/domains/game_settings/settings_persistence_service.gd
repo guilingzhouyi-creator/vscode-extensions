@@ -2,19 +2,22 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/game_settings/settings_persistence_service.gd
 # 架构定位: Domain Service / State Orchestrator
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/game_settings.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/game_settings.json | 信号: EventBus 领域广播
 # 职责说明: 独立于游戏角色存档的 settings.kalar_cfg 序列化与反序列化落盘
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## SettingsPersistenceService：Domain Service / State Orchestrator
 class_name SettingsPersistenceService
 extends RefCounted
 
 const DEFAULT_SETTINGS_PATH: String = "user://settings.kalar_cfg"
 
+## 将设置数据序列化为内存 JSON 字符串
 static func save_to_memory_string(settings: GameSettingsAggregate) -> String:
 	return JSON.stringify(settings.serialize(), "\t")
 
+## 从内存 JSON 字符串反序列化加载设置配置
 static func load_from_memory_string(settings: GameSettingsAggregate, json_str: String) -> bool:
 	var parsed = JSON.parse_string(json_str)
 	if typeof(parsed) == TYPE_DICTIONARY:

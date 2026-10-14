@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 治理、权限与持久化集群 (Governance & Persistence))
 # 文件路径: res://backend/domains/telemetry_account_lifecycle/telemetry_event_dto.gd
 # 架构定位: Value Object DTO / Data Transport Model
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/telemetry_account_lifecycle.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/telemetry_account_lifecycle.json | 信号: EventBus 领域广播
 # 职责说明: 封装遥测埋点事件 UUID、生命周期阶段、会话时长与自定义多维属性
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## TelemetryEventDTO：Value Object DTO / Data Transport Model
 class_name TelemetryEventDTO
 extends RefCounted
 

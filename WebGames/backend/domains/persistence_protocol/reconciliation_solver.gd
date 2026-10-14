@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 治理、权限与持久化集群 (Governance & Persistence))
 # 文件路径: res://backend/domains/persistence_protocol/reconciliation_solver.gd
 # 架构定位: Headless Discrete Solver / Numerical Calculator
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: infrastructure.persistence.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: infrastructure.persistence.json | 信号: EventBus 领域广播
 # 职责说明: 权威帧与未确认客户端输入队列预测调和算法 (Reconciliation)。 默认状态/默认动作由 config/persistence.json 的 reconciliation 段驱动。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## PersistenceAndReconciliationSolver：Headless Discrete Solver / Numerical Calculator
 class_name PersistenceAndReconciliationSolver extends RefCounted
 
 ## 帧同步预测调和求解器 (Client Prediction Reconciliation)

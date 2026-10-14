@@ -2,13 +2,14 @@
 # 模块归属: 业务领域层 (Domains · 治理、权限与持久化集群 (Governance & Persistence))
 # 文件路径: res://backend/domains/persistence_protocol/resource_dependency_dag.gd
 # 架构定位: Resource Dependency Directed Acyclic Graph (DAG)
-# 跨域依赖: 上游: TargetedHotReloader, GameConfig | 下游: EventBusCore, BoundedResourceCache
+# 依赖与触发: 上游: TargetedHotReloader, GameConfig | 下游: EventBusCore, BoundedResourceCache
 # 职责说明: 资源依赖有向无环图：管理配置、文案、场景与数据模型之间的双向依赖关系，
 #           提供环路检测与局部失效子图计算（Invalidation Subgraph），支持热重载时
 #           仅精准重算并刷新受影响分支，杜绝粗暴全量重载。
-# 设计依据: 双域储存架构局部失效与定向热更规范
+# 退出语义与设计依据: 双域储存架构局部失效与定向热更规范
 # ==============================================================================
 
+## ResourceDependencyDAG：Resource Dependency Directed Acyclic Graph (DAG)
 class_name ResourceDependencyDAG extends RefCounted
 
 ## 邻接表：源节点 -> 其直接下游依赖它的节点集合（Array[String]）

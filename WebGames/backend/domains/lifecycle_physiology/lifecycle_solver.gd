@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/lifecycle_physiology/lifecycle_solver.gd
 # 架构定位: Headless Discrete Solver / Numerical Calculator
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/lifecycle.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/lifecycle.json | 信号: EventBus 领域广播
 # 职责说明: 跨种族寿命等效换算引擎、肉身机能 SF 衰退方程与魔法资质反噬判定。 SF 公式与反噬阈值由 config/lifecycle.json 驱动。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## LifeCycleAndPhysiologySolver：Headless Discrete Solver / Numerical Calculator
 class_name LifeCycleAndPhysiologySolver extends RefCounted
 
 ## 0-100岁绝对标准原器寿命等效与机能衰减求解器

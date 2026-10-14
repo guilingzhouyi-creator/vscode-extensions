@@ -2,11 +2,12 @@
 # 模块归属: 基础设施层 (Infrastructure · Logging & Telemetry)
 # 文件路径: res://backend/infrastructure/log_export_config_dto.gd
 # 架构定位: Log Collector & Stream Processor
-# 跨域依赖: 上游: 全域业务模块与异常拦截器 | 下游: RingBuffer, FileAccess | 配置: config/infrastructure/logging.json | 信号: FATAL/ERROR 级别告警信号
+# 依赖与触发: 上游: 全域业务模块与异常拦截器 | 下游: RingBuffer, FileAccess | 配置: config/infrastructure/logging.json | 信号: FATAL/ERROR 级别告警信号
 # 职责说明: 映射 config/infrastructure/log.json 中 export 段配置，驱动文件落盘、 轮转与过滤策略，支持热重载自愈（Inv-LG-4）。
-# 设计依据: 统一结构化日志规范 / 性能基准审计
+# 退出语义与设计依据: 统一结构化日志规范 / 性能基准审计
 # ==============================================================================
 
+## LogExportConfigDTO：Log Collector & Stream Processor
 class_name LogExportConfigDTO extends RefCounted
 
 # ==============================================================================

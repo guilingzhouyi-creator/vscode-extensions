@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 实体、物品与世界状态集群 (Entity & World State))
 # 文件路径: res://backend/domains/inventory/multi_profession_engine.gd
 # 架构定位: Domain Logic Component
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/inventory.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/inventory.json | 信号: EventBus 领域广播
 # 职责说明: 掌握技能图云特征聚类、动态授予 Sword Master / Holy Archmage / Spellblade 位格。 阈值/符号表/职业称号与叙述文案由 config/domains/inventory.json、 config/narratives/inventory.json 驱动。
-# 设计依据: 业务域第一性原理 / 多职业引擎规范
+# 退出语义与设计依据: 业务域第一性原理 / 多职业引擎规范
 # ==============================================================================
 
+## MultiProfessionEngine：Domain Logic Component
 class_name MultiProfessionEngine extends RefCounted
 
 # ==============================================================================

@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 实体、物品与世界状态集群 (Entity & World State))
 # 文件路径: res://backend/domains/spatial_movement/movement_vector_bridge_solver.gd
 # 架构定位: Headless Discrete Solver / Numerical Calculator
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/spatial_movement.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/spatial_movement.json | 信号: EventBus 领域广播
 # 职责说明: 将文字方位动词解析为连续物理速度向量，计算地形阻抗与负重衰减 优化: 引入 DirectionAliasIndex 静态倒排映射缓存与结构化参数，消除热路径高频配置读与循环比对
-# 设计依据: 业务域第一性原理 / 架构设计规范
+# 退出语义与设计依据: 业务域第一性原理 / 架构设计规范
 # ==============================================================================
 
+## MovementVectorBridgeSolver：Headless Discrete Solver / Numerical Calculator
 class_name MovementVectorBridgeSolver
 extends RefCounted
 

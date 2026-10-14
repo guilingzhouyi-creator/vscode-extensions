@@ -2,13 +2,14 @@
 # 模块归属: 业务领域层 (Domains · 治理、权限与持久化集群 (Governance & Persistence))
 # 文件路径: res://backend/domains/persistence_protocol/frame_budget_dispatcher.gd
 # 架构定位: Main Thread Slicing & Budget Dispatcher
-# 跨域依赖: 上游: AuxiliaryWorkerPool, StorageMediator | 下游: GameConfig, EventBusCore
+# 依赖与触发: 上游: AuxiliaryWorkerPool, StorageMediator | 下游: GameConfig, EventBusCore
 # 职责说明: 主线程切片预算调度器：严格按照配置的时间预算（默认 2.0ms/帧）向主线程
 #           提交 GPU 资源创建、PackedScene 实例化与对象注册任务。当单帧耗时触达
 #           预算阈值时，自动推迟剩余任务至后续循环，杜绝突发卡顿与丢帧。
-# 设计依据: 双域储存架构单帧切片预算提交规范
+# 退出语义与设计依据: 双域储存架构单帧切片预算提交规范
 # ==============================================================================
 
+## FrameBudgetDispatcher：Main Thread Slicing & Budget Dispatcher
 class_name FrameBudgetDispatcher extends RefCounted
 
 const MS_TO_USEC: float = 1000.0
@@ -18,6 +19,7 @@ static var _instance = null
 
 var _submission_queue: Array[Dictionary] = []
 
+## 获取单例全局静态唯一实例
 static func get_instance() -> RefCounted:
 	if _instance == null:
 		_instance = new()
@@ -26,7 +28,7 @@ static func get_instance() -> RefCounted:
 func _init() -> void:
 	_submission_queue = []
 
-## 压入主线程待处理切片任务
+## 压入主线程切片执行任务
 func enqueue_submission(action: Callable, priority: int = 1) -> void:
 	if not action.is_valid():
 		return
@@ -41,7 +43,7 @@ func enqueue_submission(action: Callable, priority: int = 1) -> void:
 		idx += 1
 	_submission_queue.insert(idx, item)
 
-## 获取当前待处理任务总数
+## 获取当前待执行任务总数
 func get_pending_count() -> int:
 	if _submission_queue.is_empty():
 		return 0

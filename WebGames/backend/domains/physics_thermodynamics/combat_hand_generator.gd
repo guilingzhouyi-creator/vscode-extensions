@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 核心战斗与魔法集群 (Combat & Magic))
 # 文件路径: res://backend/domains/physics_thermodynamics/combat_hand_generator.gd
 # 架构定位: Domain Logic Component
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/combat.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/combat.json | 信号: EventBus 领域广播
 # 职责说明: 严格分离手牌数量随机与牌型抽取，支持首次遇敌与后续回合规则分流，支持合法 0 手牌
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## CombatHandGenerator：Domain Logic Component
 class_name CombatHandGenerator
 extends RefCounted
 

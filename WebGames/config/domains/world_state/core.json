@@ -68,5 +68,33 @@
     "noon_hour": 11,
     "dusk_hour": 17,
     "midnight_hour": 21
+  },
+  "agent_telemetry_stream": {
+    "enabled": true,
+    "max_payload_bytes": 2048,
+    "ring_buffer_capacity": 32,
+    "async_queue_capacity": 128,
+    "backpressure_strategy": "DROP_OLDEST",
+    "binary_compression_enabled": true,
+    "protocol_version": "1.0.0",
+    "domain_name": "HOME_HUD",
+    "supported_directives": [
+      "ALLOCATE_POTENTIAL_STAT",
+      "REST_AND_ADVANCE_TIME",
+      "CLAIM_QUEST_OBJECTIVE",
+      "INSPECT_INVENTORY_SLOT",
+      "TOGGLE_MODE_ADAPTATION",
+      "MARK_MAIL_READ",
+      "DISMISS_UI_NOTICE"
+    ],
+    "auto_publish_on_hud_sync": true
+  },
+  "agent_action_channel": {
+    "enabled": true,
+    "max_actions_per_second": 30,
+    "reject_on_stale_sequence": true,
+    "zero_hardware_input_bypass": true,
+    "human_preemption_lease_ms": 3000,
+    "auto_preempt_on_modal_open": true
   }
 }

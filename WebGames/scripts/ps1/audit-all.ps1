@@ -26,11 +26,7 @@ $ErrorActionPreference = "Stop"
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RootDir = Split-Path -Parent (Split-Path -Parent $ScriptDir)
 
-$pyCmd = Get-Command python -ErrorAction SilentlyContinue
-if (-not $pyCmd) {
-  Write-Host "【audit-all】python 缺失"
-  exit 1
-}
+$pyCmd = if (Get-Command python3.12 -ErrorAction SilentlyContinue) { "python3.12" } elseif (Get-Command python3 -ErrorAction SilentlyContinue) { "python3" } elseif (Get-Command py -ErrorAction SilentlyContinue) { "py" } else { "python" }
 
 $argsList = @()
 if ($diff) { $argsList += "--diff" }
@@ -42,7 +38,7 @@ if ($baseline) { $argsList += "--baseline", $baseline }
 
 Push-Location $RootDir
 try {
-  & python -X utf8 "scripts\py\audit_runner.py" @argsList
+  & $pyCmd -X utf8 "scripts\py\audit_runner.py" @argsList
   $code = $LASTEXITCODE
   exit $code
 } finally {

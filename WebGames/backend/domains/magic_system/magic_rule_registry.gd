@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 核心战斗与魔法集群 (Combat & Magic))
 # 文件路径: res://backend/domains/magic_system/magic_rule_registry.gd
 # 架构定位: Domain Registry / Specification Catalog
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/magic_rules.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/magic_rules.json | 信号: EventBus 领域广播
 # 职责说明: 加载 config/domains/magic_rules.json 唯一事实源，启动校验结构不变量 （属性大类成员闭合 / 变体源体系闭合 / 条件树结构 / 位阶形态合法 / 组合语义枚举 / 数值域），为魔法规则引擎提供统一配置查询。 位阶维度复用 MagicTierRegistry（不复制阶位表），禁止把示例数值或 固定属性组合固化为系统唯一规则。
-# 设计依据: 业务域第一性原理 / 架构设计规范
+# 退出语义与设计依据: 业务域第一性原理 / 架构设计规范
 # ==============================================================================
 
+## MagicRuleRegistry：Domain Registry / Specification Catalog
 class_name MagicRuleRegistry
 extends RefCounted
 

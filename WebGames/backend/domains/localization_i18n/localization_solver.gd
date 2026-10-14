@@ -2,17 +2,19 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/localization_i18n/localization_solver.gd
 # 架构定位: Headless Discrete Solver / Numerical Calculator
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/localization_i18n.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/localization_i18n.json | 信号: EventBus 领域广播
 # 职责说明: 执行多语言文本查找、多层级安全回退链与参数化占位符动态插值
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## LocalizationSolver：Headless Discrete Solver / Numerical Calculator
 class_name LocalizationSolver
 extends RefCounted
 
 ## 未登记名称键告警计数（遥测/审计只读查询，禁写业务判断分支）
 static var missing_name_keys: int = 0
 
+## 根据语言包与键路径检索多语言本地化翻译文本
 static func translate(
 	catalog: LocalizationRegistryCatalog,
 	loc_key: String,

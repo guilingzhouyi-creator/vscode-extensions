@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/account/dto/account_composite_auth_dto.gd
 # 架构定位: Value Object DTO / Data Transport Model
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: account | 配置: config/domains/account.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: account | 配置: config/domains/account.json | 信号: EventBus 领域广播
 # 职责说明: 规范注册与登录复合鉴权请求与响应数据载荷，支持自动注册与登录双模流转。
-# 设计依据: 业务领域第一性原理 / 复合鉴权与分流契约规范
+# 退出语义与设计依据: 业务领域第一性原理 / 复合鉴权与分流契约规范
 # ==============================================================================
 
+## AccountCompositeAuthDTO：Value Object DTO / Data Transport Model
 class_name AccountCompositeAuthDTO
 extends RefCounted
 
@@ -35,6 +36,7 @@ class Request extends RefCounted:
 		action_mode = p_action_mode
 		device_fingerprint = p_device_fingerprint
 
+	## 重置内部数据状态，供对象池无堆分配复用
 	func reset_state() -> void:
 		username = ""
 		password_plain = ""
@@ -42,6 +44,7 @@ class Request extends RefCounted:
 		device_fingerprint = ""
 		initial_entitlements.clear()
 
+	## 序列化当前对象为通用字典传输结构
 	func to_dto() -> Dictionary:
 		return {
 			"username": username,
@@ -50,6 +53,7 @@ class Request extends RefCounted:
 			"initial_entitlements": initial_entitlements.duplicate()
 		}
 
+	## 从输入字典反序列化还原传输对象
 	static func from_dto(data: Dictionary) -> Request:
 		var req := Request.new()
 		req.username = String(data.get("username", "")).strip_edges()
@@ -75,6 +79,7 @@ class Response extends RefCounted:
 	var save_slot_summaries: Dictionary = {}
 	var world_state_ref: String = ""
 
+	## 重置内部数据状态，供对象池无堆分配复用
 	func reset_state() -> void:
 		success = false
 		error_code = "OK"
@@ -87,6 +92,7 @@ class Response extends RefCounted:
 		save_slot_summaries.clear()
 		world_state_ref = ""
 
+	## 序列化当前对象为通用字典传输结构
 	func to_dto() -> Dictionary:
 		var slot_dicts: Dictionary = {}
 		for k in save_slot_summaries.keys():
@@ -108,6 +114,7 @@ class Response extends RefCounted:
 			"world_state_ref": world_state_ref
 		}
 
+	## 从输入字典反序列化还原传输对象
 	static func from_dto(data: Dictionary) -> Response:
 		var resp := Response.new()
 		resp.success = bool(data.get("success", false))

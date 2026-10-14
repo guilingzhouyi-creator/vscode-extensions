@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 核心战斗与魔法集群 (Combat & Magic))
 # 文件路径: res://backend/domains/potential_growth/respec_pipeline.gd
 # 架构定位: Business Pipeline / Transaction Safe Orchestrator
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/potential.json | 信号: EventBus 领域广播
-# 职责说明: 扣除金币与魔单晶因果代价，全额返还已加潜能点；洗点洗的是中间系数结构层： - L1 等级回退至基础（min_level、进度归零）； - L2 阅历重塑层重置为 1.0（先天基础系数不重置）； - L3 随机动态加点实际值保留（永久性，洗点不逆转）。 代价公式由 config/domains/potential.json 驱动，文案由 narratives/potential.json 驱动。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/potential.json | 信号: EventBus 领域广播
+# 职责说明: 扣除金币与魔单晶因果代价，全额返还已加潜能点；洗点洗的是中间系数结构层： - L1 等级回退至基础（min_level、进度归零）； - L2 阅历修饰层重置为 1.0（先天基础系数不重置）； - L3 随机动态加点实际值保留（永久性，洗点不逆转）。 代价公式由 config/domains/potential.json 驱动，文案由 narratives/potential.json 驱动。
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## AttributeRespecPipeline：Business Pipeline / Transaction Safe Orchestrator
 class_name AttributeRespecPipeline extends RefCounted
 
 ## 洗点成本：金币指数曲线（历史次数封顶）+ 魔单晶按已分配点折算（M9 分子钳 0 Inv-TX-2）
@@ -48,7 +49,7 @@ static func execute_heart_core_respec(
 		sheet.set_level(k, AttributeConversionEngine.min_level())
 		sheet.set_progress(k, 0.0)
 
-	# L2 阅历重塑层重置（洗点洗的是中间系数结构层；先天基础系数 base_coefficients 不重置）
+	# L2 阅历修饰层重置（洗点洗的是中间系数结构层；先天基础系数 base_coefficients 不重置）
 	sheet.experience_reshape = {}
 
 	# L3 随机动态加点实际值保留（永久性，洗点不逆转）——dynamic_adjustments 不动

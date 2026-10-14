@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 实体、物品与世界状态集群 (Entity & World State))
 # 文件路径: res://backend/domains/item_namespace_registry/magic_ability_tier_resolver.gd
 # 架构定位: Headless Discrete Solver / Numerical Calculator
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/item_namespace_registry.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/item_namespace_registry.json | 信号: EventBus 领域广播
 # 职责说明: 能力分级（异能/英雄/神圣/真神 + 超位）与阶位梯度（1~11）之间的 **弱映射关联**——仅经参考区间/权重/参考标签/越级容忍表达经验性关系， **严禁 Tier↔Rank 一对一枚举映射作为核心判定逻辑**；允许区间重叠与越级。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## MagicAbilityTierResolver：Headless Discrete Solver / Numerical Calculator
 class_name MagicAbilityTierResolver
 extends RefCounted
 

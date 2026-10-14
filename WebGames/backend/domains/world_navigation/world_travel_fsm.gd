@@ -2,13 +2,15 @@
 # 模块归属: 业务领域层 (Domains · 实体、物品与世界状态集群 (Entity & World State))
 # 文件路径: res://backend/domains/world_navigation/world_travel_fsm.gd
 # 架构定位: Domain FSM / Lifecycle Session Engine
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/world.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/world.json | 信号: EventBus 领域广播
 # 职责说明: 队伍行军时间推进、地质阻抗口粮消耗与城镇抵达状态跃迁。 行军速度/口粮消耗与叙事文案由 config/world.json、 config/narratives/world.json 驱动。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## WorldTravelAndSettlementFSM：Domain FSM / Lifecycle Session Engine
 class_name WorldTravelAndSettlementFSM extends RefCounted
 
+## MarchingParty：行军编队实体数据模型
 class MarchingParty extends RefCounted:
 	var party_id: String = ""
 	var current_node_id: String = ""

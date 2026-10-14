@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 核心战斗与魔法集群 (Combat & Magic))
 # 文件路径: res://backend/domains/world_boss/universal_contribution_solver.gd
 # 架构定位: Headless Discrete Solver / Numerical Calculator
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/world_boss.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/world_boss.json | 信号: EventBus 领域广播
 # 职责说明: 伤害量/承伤量/治疗量综合贡献度权重加权计算、MVP 评定与掉落拍卖分配 权重由 config/domains/world_boss.json 驱动，文案由 narratives/world_boss.json 驱动。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## UniversalContributionSolver：Headless Discrete Solver / Numerical Calculator
 class_name UniversalContributionSolver extends RefCounted
 
 ## 贡献榜计算：伤害/承伤/治疗加权得分并降序排序（权重配置驱动）

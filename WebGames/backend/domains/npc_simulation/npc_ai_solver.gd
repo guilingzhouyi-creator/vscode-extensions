@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 剧情、任务与社交集群 (Narrative & Social))
 # 文件路径: res://backend/domains/npc_simulation/npc_ai_solver.gd
 # 架构定位: Headless Discrete Solver / Numerical Calculator
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/npc.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/npc.json | 信号: EventBus 领域广播
 # 职责说明: 基于五维性格矩阵与等效寿命的目标导向行动规划 (GOAP)。 阈值/权重/目标标识由 config/npc.json 的 goap 段驱动。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## NPCAIAndEvolutionSolver：Headless Discrete Solver / Numerical Calculator
 class_name NPCAIAndEvolutionSolver extends RefCounted
 
 ## 目标导向行动规划器 (GOAP Action Planner)

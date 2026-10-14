@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/mail_system/mailbox_manager.gd
 # 架构定位: Domain Service / State Orchestrator
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: inventory | 配置: config/domains/mail_system.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: inventory | 配置: config/domains/mail_system.json | 信号: EventBus 领域广播
 # 职责说明: 维护信箱 100 封容量上限、已读无附件旧邮件自动 GC 清理、过期邮件失效
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## MailboxManager：Domain Service / State Orchestrator
 class_name MailboxManager
 extends RefCounted
 

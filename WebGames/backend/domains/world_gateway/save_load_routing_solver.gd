@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 实体、物品与世界状态集群 (Entity & World State))
 # 文件路径: res://backend/domains/world_gateway/save_load_routing_solver.gd
 # 架构定位: Headless Discrete Solver / Numerical Calculator
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: account, persistence_protocol, character_creation, world_state, lifecycle | 配置: config/domains/world_gateway.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: account, persistence_protocol, character_creation, world_state, lifecycle | 配置: config/domains/world_gateway.json | 信号: EventBus 领域广播
 # 职责说明: 求解二次载入双轨流向（边界 A 序章重放重初始化 vs 边界 B 成熟存档直载），提供占位符世界槽位校验与 ESC 停机串联。
-# 设计依据: 业务域第一性原理 / 二次载入与双轨路由契约规范
+# 退出语义与设计依据: 业务域第一性原理 / 二次载入与双轨路由契约规范
 # ==============================================================================
 
+## SaveLoadRoutingSolver：Headless Discrete Solver / Numerical Calculator
 class_name SaveLoadRoutingSolver
 extends RefCounted
 

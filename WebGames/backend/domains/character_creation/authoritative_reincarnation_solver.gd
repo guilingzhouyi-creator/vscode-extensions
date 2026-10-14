@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 角色创建集群 (Character Creation))
 # 文件路径: res://backend/domains/character_creation/authoritative_reincarnation_solver.gd
 # 架构定位: Domain Logic Component / Authoritative Solver
-# 跨域依赖: 上游: Gateway / WorldGateway / Orchestrator | 下游: DeterministicRNG, GameConfig | 配置: config/domains/character_creation/core.json | 信号: 无
+# 依赖与触发: 上游: Gateway / WorldGateway / Orchestrator | 下游: DeterministicRNG, GameConfig | 配置: config/domains/character_creation/core.json | 信号: 无
 # 职责说明: 纯后端角色身世权威解算器；零信任清洗客户端伪造入参，依托伪随机种子、单源配置及已通过预检适配的单机命途 MOD 清单，加权或受控自选解算身世轮盘、种族、因果天赋对与 [1,6] 严格六维属性。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## AuthoritativeReincarnationSolver：Domain Logic Component / Authoritative Solver
 class_name AuthoritativeReincarnationSolver
 extends RefCounted
 

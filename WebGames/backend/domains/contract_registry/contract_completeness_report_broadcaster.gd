@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/contract_registry/contract_completeness_report_broadcaster.gd
 # 架构定位: Domain Logic Component
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/contract_registry.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/contract_registry.json | 信号: EventBus 领域广播
 # 职责说明: 经 EventBus 唯一官方入口广播契约完整性快照报告与破坏性变更告警
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## ContractCompletenessReportBroadcaster：Domain Logic Component
 class_name ContractCompletenessReportBroadcaster
 extends RefCounted
 
@@ -25,7 +26,7 @@ static func broadcast_completeness_report(report: Variant) -> void:
 	EventBusCore.get_instance().emit_domain_event("contract_registry.completeness_report", payload)
 
 
-## 广播契约层待处理破坏性变更告警
+## 广播契约层未决破坏性变更告警
 static func alert_breaking_change_pending(contracts: Array) -> void:
 	if EventBusCore.get_instance() == null:
 		return

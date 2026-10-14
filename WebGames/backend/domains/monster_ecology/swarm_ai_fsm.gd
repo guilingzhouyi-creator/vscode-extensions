@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/monster_ecology/swarm_ai_fsm.gd
 # 架构定位: Domain FSM / Lifecycle Session Engine
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/monster.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/monster.json | 信号: EventBus 领域广播
 # 职责说明: 兽潮共鸣天灾调度、怪物基于正负 AP 势能博弈的发卡池 AI。 AI 阈值/verb 字面量/共鸣增量与叙事文案由 config/domains/monster.json、 config/narratives/monster.json 驱动。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## SwarmResonanceAndAIFSM：Domain FSM / Lifecycle Session Engine
 class_name SwarmResonanceAndAIFSM extends RefCounted
 
 ## 怪物 AI 发卡决策：按 AP 势能区间（防御/调整/暴怒重击/斩击）选择动词

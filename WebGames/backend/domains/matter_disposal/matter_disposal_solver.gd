@@ -2,14 +2,16 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/matter_disposal/matter_disposal_solver.gd
 # 架构定位: Headless Discrete Solver / Numerical Calculator
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/matter_disposal.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/matter_disposal.json | 信号: EventBus 领域广播
 # 职责说明: 严格遵循物质守恒，拒绝背包凭空删除；计算熔炉焚化产出炉渣与魔素尘埃
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## MatterDisposalSolver：Headless Discrete Solver / Numerical Calculator
 class_name MatterDisposalSolver
 extends RefCounted
 
+## 执行物品物理销毁并更新背包与掉落
 static func execute_disposal(
 	player_pos: Vector2,
 	facility: ItemDisposalFacilityDTO,

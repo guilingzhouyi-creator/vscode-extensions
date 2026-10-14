@@ -2,11 +2,12 @@
 # 模块归属: 基础设施层 (Infrastructure · Deterministic Randomness)
 # 文件路径: res://backend/infrastructure/deterministic_rng.gd
 # 架构定位: Deterministic PRNG Engine
-# 跨域依赖: 上游: CombatCore, LootTable, DropResolver | 下游: 无 | 配置: 无 | 信号: 无
+# 依赖与触发: 上游: CombatCore, LootTable, DropResolver | 下游: 无 | 配置: 无 | 信号: 无
 # 职责说明: 以配置驱动的 LCG 提供可复现随机源，取代 Godot 全局 randf()/randi()。  为什么不能用全局 randf()/randi(): 全局随机依赖引擎内部状态，未显式 seed 时每次进程启动序列都不同， 导致抽卡、属性掷骰、强化成败等结果不可复现、不可回放， 与本项目「全域确定性」的核心契约直接冲突。  用法: var rng := DeterministicRNG.from_seed(12345)   # 独立实例，完全隔离 rng.randf(); rng.randi_range(1, 6); rng.pick(arr)  DeterministicRNG.global().randf()              # 共享实例（业务默认入口） DeterministicRNG.reseed_global(seed)           # 整局复现开关  LCG 常数（multiplier / increment / mask / 默认种子）由 config/domains/deterministic.json 的 lcg.* 驱动。
-# 设计依据: 确定性离散随机数规范
+# 退出语义与设计依据: 确定性离散随机数规范
 # ==============================================================================
 
+## DeterministicRNG：Deterministic PRNG Engine
 class_name DeterministicRNG extends RefCounted
 
 # ==============================================================================
@@ -72,6 +73,7 @@ func set_seed(seed_value: int) -> void:
 	if _state == 0:
 		_state = 1
 
+## 获取当前状态机或实体的当前状态值
 func get_state() -> int:
 	return _state
 

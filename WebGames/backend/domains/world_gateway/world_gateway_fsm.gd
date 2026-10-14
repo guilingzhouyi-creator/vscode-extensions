@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 实体、物品与世界状态集群 (Entity & World State))
 # 文件路径: res://backend/domains/world_gateway/world_gateway_fsm.gd
 # 架构定位: Domain FSM / Lifecycle Session Engine
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: account, feature_toggle_canary | 配置: config/domains/world_gateway.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: account, feature_toggle_canary | 配置: config/domains/world_gateway.json | 信号: EventBus 领域广播
 # 职责说明: 编排世界栏生命周期跃迁、单机/联机模式路由、拦截直接跳界与全域事件发布
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## WorldGatewayFSM：Domain FSM / Lifecycle Session Engine
 class_name WorldGatewayFSM
 extends RefCounted
 
@@ -225,6 +226,7 @@ func select_mode(
 
     return {"success": true, "context": context.to_dto(), "route_result": route_res}
 
+## 根据账户属性与配置决策适配的游戏入口模式
 func select_mode_for_account(
     mode: int,
     account: AccountProfileAggregate,

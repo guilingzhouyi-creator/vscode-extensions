@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 实体、物品与世界状态集群 (Entity & World State))
 # 文件路径: res://backend/domains/item_namespace_registry/item_loader_pipeline.gd
 # 架构定位: Business Pipeline / Transaction Safe Orchestrator
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/item_namespace_registry.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/item_namespace_registry.json | 信号: EventBus 领域广播
 # 职责说明: 从配置字典/JSON 批量加载并实例化物品注册表；提供 config/items/*.json 自动发现装配入口（build_catalog_from_config）与配置热重载回收 （reload_from_config：配置删除的物品自动注销、回收数字 ID 与名称键）
-# 设计依据: 业务域第一性原理 / 架构设计规范
+# 退出语义与设计依据: 业务域第一性原理 / 架构设计规范
 # ==============================================================================
 
+## ItemLoaderPipeline：Business Pipeline / Transaction Safe Orchestrator
 class_name ItemLoaderPipeline
 extends RefCounted
 

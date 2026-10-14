@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 核心战斗与魔法集群 (Combat & Magic))
 # 文件路径: res://backend/domains/physics_thermodynamics/timeline_schedule_generator.gd
 # 架构定位: Domain Logic Component
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/combat.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/combat.json | 信号: EventBus 领域广播
 # 职责说明: 回合开局一次性生成本回合离散时间轴事件，集成最小间距约束与加发牌点/紧张点排期
-# 设计依据: 业务域第一性原理 / 架构设计规范
+# 退出语义与设计依据: 业务域第一性原理 / 架构设计规范
 # ==============================================================================
 
+## TimelineScheduleGenerator：Domain Logic Component
 class_name TimelineScheduleGenerator
 extends RefCounted
 

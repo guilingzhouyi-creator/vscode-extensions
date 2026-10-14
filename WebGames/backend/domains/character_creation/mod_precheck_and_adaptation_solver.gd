@@ -2,9 +2,9 @@
 # 模块归属: 业务领域层 (Domains · 角色创建集群 (Character Creation))
 # 文件路径: res://backend/domains/character_creation/mod_precheck_and_adaptation_solver.gd
 # 架构定位: Domain Logic Component / Precheck & List Adaptation Solver
-# 跨域依赖: 上游: WorldGateway / Orchestrator / UI | 下游: DestinyModManifestDTO, GameConfig | 配置: config/domains/character_creation/core.json, config/domains/starter_loadout/core.json | 信号: 无
+# 依赖与触发: 上游: WorldGateway / Orchestrator / UI | 下游: DestinyModManifestDTO, GameConfig | 配置: config/domains/character_creation/core.json, config/domains/starter_loadout/core.json | 信号: 无
 # 职责说明: 单机显性命途 MOD 合规预检与多包列表冲突适配引擎；执行单包数值预算与因果天平静态预检、多包互斥/同名ID/UI策略冲突裁决，以及基础池与多包清单式动态合并适配。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 # 核心算法与架构不变量契约 (Architecture Invariants & Complexity Contracts):
 # 1. Inv-DESTINY-PRECHECK-1 (单包数值与因果天平边界):
@@ -32,6 +32,7 @@
 #      conflicts, adapted_manifest, creation_ui_snapshot}，确保前端视图与网关状态机零空指针安全消费。
 # ==============================================================================
 
+## ModPrecheckAndAdaptationSolver：Domain Logic Component / Precheck & List Adaptation Solver
 class_name ModPrecheckAndAdaptationSolver
 extends RefCounted
 
@@ -154,7 +155,17 @@ static func precheck_and_adapt_mod_list(
             ui_conflicts
         )
 
-    var adapted_manifest: Dictionary = _merge_adapted_manifest(enabled_manifests, enabled_ids_out)
+    var topo_conflicts: Array[Dictionary] = []
+    var sorted_manifests: Array[DestinyModManifestDTO] = _topological_sort_manifests(enabled_manifests, topo_conflicts)
+    if not topo_conflicts.is_empty():
+        return _build_adaptation_failure(
+            "ERR_MOD_INCOMPATIBLE_CONFLICT",
+            enabled_ids_out,
+            precheck_checklist,
+            topo_conflicts
+        )
+
+    var adapted_manifest: Dictionary = _merge_adapted_manifest(sorted_manifests, enabled_ids_out)
     var creation_ui_snapshot: Dictionary = _build_creation_ui_snapshot(
         adapted_manifest,
         precheck_checklist,
@@ -408,6 +419,64 @@ static func _check_pack_incompatibilities(
                 inc_id,
                 "启用包存在显式互斥声明: %s <-> %s" % [dto.pack_id, inc_id]
             )
+    for dep_id in dto.dependencies:
+        if not active_lookup.has(dep_id):
+            _append_conflict(
+                conflicts,
+                "ERR_MOD_INCOMPATIBLE_CONFLICT",
+                dto.pack_id,
+                dep_id,
+                "启用包缺少前置依赖包: %s 需要 %s" % [dto.pack_id, dep_id]
+            )
+
+static func _topological_sort_manifests(
+    manifests: Array[DestinyModManifestDTO],
+    conflicts: Array[Dictionary]
+) -> Array[DestinyModManifestDTO]:
+    if manifests.size() <= 1:
+        return manifests
+
+    var in_degree: Dictionary = {}
+    var adj: Dictionary = {}
+    var dto_map: Dictionary = {}
+
+    for dto in manifests:
+        dto_map[dto.pack_id] = dto
+        in_degree[dto.pack_id] = 0
+        adj[dto.pack_id] = []
+
+    for dto in manifests:
+        for dep_id in dto.dependencies:
+            if dto_map.has(dep_id):
+                adj[dep_id].append(dto.pack_id)
+                in_degree[dto.pack_id] = in_degree[dto.pack_id] + 1
+
+    var queue: Array[String] = []
+    for pid in in_degree.keys():
+        if in_degree[pid] == 0:
+            queue.append(pid)
+
+    var sorted_out: Array[DestinyModManifestDTO] = []
+    while not queue.is_empty():
+        var u_pid: String = queue.pop_front()
+        sorted_out.append(dto_map[u_pid])
+        var dependents: Array = adj[u_pid]
+        for v_pid in dependents:
+            in_degree[v_pid] = in_degree[v_pid] - 1
+            if in_degree[v_pid] == 0:
+                queue.append(v_pid)
+
+    if sorted_out.size() < manifests.size():
+        _append_conflict(
+            conflicts,
+            "ERR_MOD_INCOMPATIBLE_CONFLICT",
+            manifests[0].pack_id,
+            "",
+            "已启用的 MOD 包集合中存在循环依赖死锁环"
+        )
+        return manifests
+
+    return sorted_out
 
 static func _detect_duplicate_id_conflicts(
     enabled_manifests: Array[DestinyModManifestDTO]

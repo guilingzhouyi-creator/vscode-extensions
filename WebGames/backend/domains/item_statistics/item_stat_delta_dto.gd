@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/item_statistics/item_stat_delta_dto.gd
 # 架构定位: Value Object DTO / Data Transport Model
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/item_statistics.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/item_statistics.json | 信号: EventBus 领域广播
 # 职责说明: 承载单个物品事件的统计量增量，用于自底向上常数时间 O(1) 路径累加
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## ItemStatDeltaDTO：Value Object DTO / Data Transport Model
 class_name ItemStatDeltaDTO
 extends RefCounted
 
@@ -35,6 +36,7 @@ func _init(
 	actual_applied = p_actual
 	current_leaf_quantity = p_leaf_qty
 
+## 序列化当前对象为通用字典传输结构
 func to_dto() -> Dictionary:
 	return {
 		"canonical_id": canonical_id,
@@ -46,6 +48,7 @@ func to_dto() -> Dictionary:
 		"current_leaf_quantity": current_leaf_quantity
 	}
 
+## 从输入字典反序列化还原传输对象
 static func from_dto(data: Dictionary) -> RefCounted:
 	var dto: ItemStatDeltaDTO = load("res://backend/domains/item_statistics/item_stat_delta_dto.gd").new()
 	if data.is_empty():

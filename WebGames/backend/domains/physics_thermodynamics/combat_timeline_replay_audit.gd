@@ -2,14 +2,16 @@
 # 模块归属: 业务领域层 (Domains · 核心战斗与魔法集群 (Combat & Magic))
 # 文件路径: res://backend/domains/physics_thermodynamics/combat_timeline_replay_audit.gd
 # 架构定位: Domain Logic Component
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/combat.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/combat.json | 信号: EventBus 领域广播
 # 职责说明: 记录并审计战斗全生命周期中的每一步时间戳、先手判定、发牌时序、出牌校验与 小回合切换动作，输出标准化的确定性重放 Payload，支持服务端无状态回放检验。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## CombatTimelineReplayAudit：Domain Logic Component
 class_name CombatTimelineReplayAudit
 extends RefCounted
 
+## StepRecordDTO：回放步骤记录数据传输模型
 class StepRecordDTO extends RefCounted:
 	var step_index: int = 0
 	var timeline_ms: int = 0

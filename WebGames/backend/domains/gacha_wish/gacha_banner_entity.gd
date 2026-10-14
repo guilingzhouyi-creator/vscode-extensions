@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/gacha_wish/gacha_banner_entity.gd
 # 架构定位: Domain Entity / Aggregate Root
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: currency_economy, inventory | 配置: config/domains/gacha.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: currency_economy, inventory | 配置: config/domains/gacha.json | 信号: EventBus 领域广播
 # 职责说明: 祈愿卡池元数据、UP 角色/神器物品池、保底计数器状态契约 默认值由 config/domains/gacha.json 的 banner_defaults 驱动。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## GachaBannerAggregate：Domain Entity / Aggregate Root
 class_name GachaBannerAggregate extends RefCounted
 
 var banner_id: String = GameConfig.get_string("domains.gacha", "banner_defaults/banner_id", "BANNER_LEGENDARY_HERO")
@@ -23,6 +24,7 @@ var standard_5star_item_ids: Array = GameConfig.get_array("domains.gacha", "bann
 var standard_4star_item_ids: Array = GameConfig.get_array("domains.gacha", "banner_defaults/standard_4star_item_ids", ["ITEM_ELVEN_BOW", "ITEM_RUNIC_SHIELD", "ITEM_ELIXIR_HIGH"])
 var standard_3star_item_ids: Array = GameConfig.get_array("domains.gacha", "banner_defaults/standard_3star_item_ids", ["ITEM_IRON_SWORD", "ITEM_HEALTH_POTION", "ITEM_TRAVEL_RATION"])
 
+## 序列化当前实体或对象状态为字典结构
 func serialize() -> Dictionary:
 	return {
 		"banner_id": banner_id,

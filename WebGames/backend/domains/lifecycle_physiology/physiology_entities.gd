@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/lifecycle_physiology/physiology_entities.gd
 # 架构定位: Domain Logic Component
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/lifecycle.json | 信号: EventBus 领域广播
-# 职责说明: 统一六维属性底座（三层模型）+ 三大综合生理指标 + 寿命年轮 + 体质/资质。 - L1 等级层：attribute_levels（统一 1~6 级）+ attribute_progress（区间内连续值）； - L2 中间系数结构层（阅历重塑层）：experience_reshape，心核洗点重置，预留阅历联动； - L3 底层实际值域：dynamic_adjustments（随机动态加点永久实际值偏移，洗点不逆转）； - 实际值统一经 AttributeConversionEngine 换算（等级/系数/规则全配置驱动）。 生理初值由 config/lifecycle.json 的 physiology_defaults 段驱动。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/lifecycle.json | 信号: EventBus 领域广播
+# 职责说明: 统一六维属性底座（三层模型）+ 三大综合生理指标 + 寿命年轮 + 体质/资质。 - L1 等级层：attribute_levels（统一 1~6 级）+ attribute_progress（区间内连续值）； - L2 中间系数结构层（阅历修饰层）：experience_reshape，心核洗点重置，预留阅历联动； - L3 底层实际值域：dynamic_adjustments（随机动态加点永久实际值偏移，洗点不逆转）； - 实际值统一经 AttributeConversionEngine 换算（等级/系数/规则全配置驱动）。 生理初值由 config/lifecycle.json 的 physiology_defaults 段驱动。
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## CharacterPhysiologySheet：Domain Logic Component
 class_name CharacterPhysiologySheet extends RefCounted
 
 enum PhysicalConstitution {
@@ -30,12 +31,12 @@ var attribute_levels: Dictionary = {}   # attr(STR/CON/INT/AGI/SPR/VIT) -> int 1
 var attribute_progress: Dictionary = {} # attr -> float [0,1)（等级区间内连续）
 var race_id: String = "HUMAN"           # 种族系数查找键（身世/天赋 = 系数修正）
 
-## L2 中间系数结构层（阅历重塑层）：心核洗点重置此层；预留阅历系统联动
-## （阅历突破可重塑该系数，见需求表16 双轨加点；默认 1.0 由 attribute.json 驱动）
+## L2 中间系数结构层（阅历修饰层）：心核洗点重置此层；预留阅历系统联动
+## （阅历突破可更新该系数，见需求表16 双轨加点；默认 1.0 由 attribute.json 驱动）
 var experience_reshape: Dictionary = {}
 
 ## L2 先天基础系数层（身世/天赋 = 系数修正的载体）：创角时由种族系数 × 天赋修正
-## 组合而成，先天固定、心核洗点不重置；实际系数 = 基础系数 × 阅历重塑系数
+## 组合而成，先天固定、心核洗点不重置；实际系数 = 基础系数 × 阅历修饰系数
 var base_coefficients: Dictionary = {}
 
 ## L3 底层实际值域：随机动态加点直加/直减的永久实际值偏移（洗点不逆转）
@@ -55,7 +56,6 @@ var mana_aptitude: int = GameConfig.get_int("domains.lifecycle", "physiology_def
 # ==============================================================================
 # 统一属性访问器（等级域 + 实际值域，唯一合法入口）
 # ==============================================================================
-
 func get_level(attr: String) -> int:
 	return int(attribute_levels.get(attr, AttributeConversionEngine.min_level()))
 
@@ -66,9 +66,11 @@ func set_level(attr: String, level: int) -> bool:
 	attribute_levels[attr] = level
 	return true
 
+## 获取指定属性在当前等级内的连续进度值
 func get_progress(attr: String) -> float:
 	return float(attribute_progress.get(attr, 0.0))
 
+## 更新指定属性在当前等级内的连续进度值
 func set_progress(attr: String, progress: float) -> void:
 	attribute_progress[attr] = clamp(progress, 0.0, 1.0)
 
@@ -78,7 +80,7 @@ func get_base_coefficient(attr: String) -> float:
 		return float(base_coefficients[attr])
 	return AttributeConversionEngine.race_coefficient(race_id, attr)
 
-## 阅历重塑系数（默认 1.0）
+## 阅历修饰系数（默认 1.0）
 func get_experience_reshape(attr: String) -> float:
 	return float(experience_reshape.get(attr, AttributeConversionEngine.experience_reshape_default()))
 
@@ -86,12 +88,14 @@ func get_experience_reshape(attr: String) -> float:
 func get_actual_value(attr: String) -> float:
 	return AttributeConversionEngine.sheet_actual_value(self, attr)
 
+## 获取全部六维属性底层实际能力值字典
 func get_actual_values() -> Dictionary:
 	var out := {}
 	for k in AttributeConversionEngine.DEFAULT_STAT_LIST:
 		out[k] = get_actual_value(k)
 	return out
 
+## 获取全部六维属性当前离散等级字典
 func get_all_levels() -> Dictionary:
 	var out := {}
 	for k in AttributeConversionEngine.DEFAULT_STAT_LIST:
@@ -116,6 +120,7 @@ func duplicate_physiology() -> CharacterPhysiologySheet:
 	clone.mental_stress_factor = mental_stress_factor
 	return clone
 
+## 序列化当前角色生理表状态为持久化字典结构
 func serialize() -> Dictionary:
 	return {
 		"attribute_levels": attribute_levels,

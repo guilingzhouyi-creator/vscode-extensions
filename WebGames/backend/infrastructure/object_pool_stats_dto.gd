@@ -2,11 +2,12 @@
 # 模块归属: 基础设施层 (Infrastructure · High Pressure Pooling)
 # 文件路径: res://backend/infrastructure/object_pool_stats_dto.gd
 # 架构定位: Object Pool Telemetry Snapshot Data Transfer Object
-# 跨域依赖: 上游: ObjectPool, ObjectPoolManager | 下游: EventBusCore | 配置: config/infrastructure/object_pool.json | 信号: 无
+# 依赖与触发: 上游: ObjectPool, ObjectPoolManager | 下游: EventBusCore | 配置: config/infrastructure/object_pool.json | 信号: 无
 # 职责说明: 对象池运行指标快照模型：记录累计分配数、活跃在用数、池内空闲数、峰值占用与溢出计数。
-# 设计依据: 演进 03 高承压对象池与数据导向无头处理器架构规范
+# 退出语义与设计依据: 演进 03 高承压对象池与数据导向无头处理器架构规范
 # ==============================================================================
 
+## ObjectPoolStatsDTO：Object Pool Telemetry Snapshot Data Transfer Object
 class_name ObjectPoolStatsDTO extends RefCounted
 
 var pool_name: String = ""
@@ -18,6 +19,7 @@ var total_acquires: int = 0
 var total_releases: int = 0
 var total_overflows: int = 0
 
+## 序列化当前对象为通用字典传输结构
 func to_dto() -> Dictionary:
 	return {
 		"pool_name": pool_name,
@@ -30,6 +32,7 @@ func to_dto() -> Dictionary:
 		"total_overflows": total_overflows
 	}
 
+## 从输入字典反序列化还原传输对象
 static func from_dto(data: Dictionary) -> RefCounted:
 	var dto: RefCounted = new()
 	dto.pool_name = str(data.get("pool_name", ""))

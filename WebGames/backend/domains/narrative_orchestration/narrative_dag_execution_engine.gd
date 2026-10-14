@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 剧情、任务与社交集群 (Narrative & Social))
 # 文件路径: res://backend/domains/narrative_orchestration/narrative_dag_execution_engine.gd
 # 架构定位: Domain Logic Component
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/narrative_orchestration.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/narrative_orchestration.json | 信号: EventBus 领域广播
 # 职责说明: 运行时编排 DAG 节点流转，管理条件分支选择、并行激活与汇聚等待 优化: 预编译出边邻接表索引与前置依赖哈希集合，消除全图全边线性遍历；支持会话 DTO 存盘恢复
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## NarrativeDagExecutionEngine：Domain Logic Component
 class_name NarrativeDagExecutionEngine
 extends RefCounted
 

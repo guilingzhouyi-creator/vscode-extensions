@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/commission_quest/commission_settlement_solver.gd
 # 架构定位: Headless Discrete Solver / Numerical Calculator
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/commission_quest.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/commission_quest.json | 信号: EventBus 领域广播
 # 职责说明: 判定冒险者资质阶位准入、计算组织手续费抽成并划拨双方钱包与公会金库
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## CommissionSettlementSolver：Headless Discrete Solver / Numerical Calculator
 class_name CommissionSettlementSolver
 extends RefCounted
 

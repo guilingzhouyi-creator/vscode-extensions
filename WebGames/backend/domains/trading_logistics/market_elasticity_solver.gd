@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 经济、交易与物流集群 (Economy & Trade))
 # 文件路径: res://backend/domains/trading_logistics/market_elasticity_solver.gd
 # 架构定位: Headless Discrete Solver / Numerical Calculator
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/trading.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/trading.json | 信号: EventBus 领域广播
 # 职责说明: 局部集市供需价格弹性方程、大宗倾销砸盘与平抑物价冲击求解。 定价 clamp 边界与保底价由 config/trading.json 的 market 段驱动。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## MarketElasticityAndTradingSolver：Headless Discrete Solver / Numerical Calculator
 class_name MarketElasticityAndTradingSolver extends RefCounted
 
 ## 城镇集市局部供需弹性定价求解器。

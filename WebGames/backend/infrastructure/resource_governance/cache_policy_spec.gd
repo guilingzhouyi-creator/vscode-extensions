@@ -2,11 +2,12 @@
 # 模块归属: 基础设施层 (Infrastructure · Resource Governance)
 # 文件路径: res://backend/infrastructure/resource_governance/cache_policy_spec.gd
 # 架构定位: Memory Governor / Bounded Cache
-# 跨域依赖: 上游: GameBootstrap, ViewRouter, 资源消费方 | 下游: BoundedResourceCache, CachePolicySpec | 配置: config/infrastructure/resource.json | 信号: 缓存淘汰 / 内存预警事件
+# 依赖与触发: 上游: GameBootstrap, ViewRouter, 资源消费方 | 下游: BoundedResourceCache, CachePolicySpec | 配置: config/infrastructure/resource.json | 信号: 缓存淘汰 / 内存预警事件
 # 职责说明: 缓存淘汰策略与配额参数规格实体：声明最大驻留条目数、空闲生存时间（TTL）、弱引用保持模式与紧急驱逐水位。
-# 设计依据: 有界资源与内存生命周期治理标准
+# 退出语义与设计依据: 有界资源与内存生命周期治理标准
 # ==============================================================================
 
+## CachePolicySpec：Memory Governor / Bounded Cache
 class_name CachePolicySpec extends RefCounted
 
 # ==============================================================================

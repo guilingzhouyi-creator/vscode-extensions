@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/item_statistics/item_statistics_solver.gd
 # 架构定位: Headless Discrete Solver / Numerical Calculator
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/item_statistics.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/item_statistics.json | 信号: EventBus 领域广播
 # 职责说明: 物品全生命周期事件契约（获得/消耗/销毁/交易/锻造/追缴）： - 事件接入 record_item_event：更新账号 UID 物品 ID 库（递归挂载/落账）+ 旁路遥测 TelemetrySidecarEngine 落点； - 查询按账号 UID 隔离（直接操作该账号的库）；跨账号全局聚合需 RBAC 门禁； - 事件名约定 "<域>.<事件>"（与 EventBus 领域事件约定一致）。
-# 设计依据: 业务域第一性原理 / 架构设计规范
+# 退出语义与设计依据: 业务域第一性原理 / 架构设计规范
 # ==============================================================================
 
+## ItemStatisticsSolver：Headless Discrete Solver / Numerical Calculator
 class_name ItemStatisticsSolver
 extends RefCounted
 
@@ -76,13 +77,13 @@ static func record_item_event(
 # ==============================================================================
 # 查询（按账号 UID 隔离：仅操作该账号自己的库）
 # ==============================================================================
-
 static func query_account_item_stats(library: AccountItemLibraryAggregate, canonical_id: String) -> Dictionary:
 	var found := library.find_item_node(canonical_id)
 	if found.is_empty():
 		return {"found": false, "canonical_id": canonical_id}
 	return {"found": true, "canonical_id": canonical_id, "stats": found["node"]["stats"].duplicate()}
 
+## 查询指定账户特定子树层级的物品统计
 static func query_account_subtree(
 	library: AccountItemLibraryAggregate,
 	category_major: String = "",
@@ -90,6 +91,7 @@ static func query_account_subtree(
 ) -> Dictionary:
 	return library.query_subtree(category_major, category_minor)
 
+## 查询指定账户全量子树的物品统计数据
 static func query_account_all(library: AccountItemLibraryAggregate) -> Array:
 	return library.query_all_items()
 
@@ -101,6 +103,7 @@ static func _accumulate_library_stats(agg: Dictionary, stats: Dictionary) -> voi
 	for k in AccountItemLibraryAggregate.STAT_KEYS:
 		agg[k] = int(agg[k]) + int(stats.get(k, 0))
 
+## 跨账户查询全局物品聚合统计数据
 static func query_global_item_stats(
 	libraries: Array,
 	canonical_id: String,

@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 实体、物品与世界状态集群 (Entity & World State))
 # 文件路径: res://backend/domains/item_namespace_registry/magic_baseline_resolver.gd
 # 架构定位: Headless Discrete Solver / Numerical Calculator
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/item_namespace_registry.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/item_namespace_registry.json | 信号: EventBus 领域广播
 # 职责说明: 将法术/施法者声明（形态 + 位阶 + 资质 + 实力称号）确定性解析为统一 魔法基线快照；强制规范化约束——真神从属超位形态、未登记拒绝、 魔术师档（非魔法范畴）不进入魔法位阶体系、禁绕过注册表
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## MagicBaselineResolver：Headless Discrete Solver / Numerical Calculator
 class_name MagicBaselineResolver
 extends RefCounted
 

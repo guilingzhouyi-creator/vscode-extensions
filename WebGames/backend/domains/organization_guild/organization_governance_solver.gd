@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 剧情、任务与社交集群 (Narrative & Social))
 # 文件路径: res://backend/domains/organization_guild/organization_governance_solver.gd
 # 架构定位: Headless Discrete Solver / Numerical Calculator
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/organization_guild.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/organization_guild.json | 信号: EventBus 领域广播
 # 职责说明: 判定职位 RBAC 操作许可、金库出纳审计与外交宣战状态机迁移
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## OrganizationGovernanceSolver：Headless Discrete Solver / Numerical Calculator
 class_name OrganizationGovernanceSolver
 extends RefCounted
 

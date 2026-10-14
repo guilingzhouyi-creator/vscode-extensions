@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 角色创建集群 (Character Creation))
 # 文件路径: res://backend/domains/character_creation/dto/authoritative_character_creation_request_dto.gd
 # 架构定位: Data Transfer Object (DTO)
-# 跨域依赖: 上游: Gateway / Client / UI | 下游: AuthoritativeReincarnationSolver | 配置: config/domains/character_creation/core.json | 信号: 无
+# 依赖与触发: 上游: Gateway / Client / UI | 下游: AuthoritativeReincarnationSolver | 配置: config/domains/character_creation/core.json | 信号: 无
 # 职责说明: 客户端向世界网关发起的权威角色创建请求传输对象；承载基础意图入参及请求种子，严格由后端权威解算器执行零信任清洗。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## AuthoritativeCharacterCreationRequestDTO：Data Transfer Object (DTO)
 class_name AuthoritativeCharacterCreationRequestDTO
 extends RefCounted
 
@@ -24,7 +25,6 @@ var extra_custom_fields: Dictionary = {}
 # ==============================================================================
 # 二、对象池与重置契约 (ADV-PRF-002)
 # ==============================================================================
-
 func reset_state() -> void:
 	account_id = ""
 	slot_id = 0
@@ -36,7 +36,6 @@ func reset_state() -> void:
 # ==============================================================================
 # 三、序列化与工厂方法
 # ==============================================================================
-
 func to_dto() -> Dictionary:
 	return {
 		"account_id": account_id,
@@ -47,6 +46,7 @@ func to_dto() -> Dictionary:
 		"extra_custom_fields": extra_custom_fields.duplicate(true)
 	}
 
+## 从输入字典反序列化还原传输对象
 static func from_dto(d: Dictionary) -> AuthoritativeCharacterCreationRequestDTO:
 	var dto := AuthoritativeCharacterCreationRequestDTO.new()
 	if d.is_empty():

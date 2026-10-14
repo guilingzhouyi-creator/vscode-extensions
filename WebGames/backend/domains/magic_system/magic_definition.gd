@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 核心战斗与魔法集群 (Combat & Magic))
 # 文件路径: res://backend/domains/magic_system/magic_definition.gd
 # 架构定位: Domain Logic Component
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/magic_rules.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/magic_rules.json | 信号: EventBus 领域广播
 # 职责说明: 描述魔法本体：canonical 标识、施法形态（引用 MagicTierSnapshot.MagicForm）、 属性归属（引用 magic_rules 属性体系）、基础位阶（独立维度，引用阶位梯度）、 效果参数键。位阶是独立数据维度，升格/降格不复制本实体。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## MagicDefinition：Domain Logic Component
 class_name MagicDefinition
 extends RefCounted
 

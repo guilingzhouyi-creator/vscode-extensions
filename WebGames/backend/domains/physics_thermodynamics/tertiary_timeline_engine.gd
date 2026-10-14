@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 核心战斗与魔法集群 (Combat & Magic))
 # 文件路径: res://backend/domains/physics_thermodynamics/tertiary_timeline_engine.gd
 # 架构定位: Domain Logic Component
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/combat.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/combat.json | 信号: EventBus 领域广播
 # 职责说明: 独立于玩家操作轴与小回合轴的第三时间轴，负责持续推演战斗虚拟时钟， 按离散随机分布排期并触发「随机发放点」与「回内紧张点」两大离散时间事件。 配置由 config/domains/combat.json tertiary_timeline 驱动，代码零硬编码。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## TertiaryTimelineEngine：Domain Logic Component
 class_name TertiaryTimelineEngine
 extends RefCounted
 
@@ -15,6 +16,7 @@ enum TimelineEventType {
 	TENSION_PULSE, # 回内紧张点 (触发战场压力突变、环境脉冲、强行转回合等)
 }
 
+## TimelineEventPointDTO：时间线事件节点数据传输模型
 class TimelineEventPointDTO extends RefCounted:
 	var event_id: String = ""
 	var event_type: TimelineEventType = TimelineEventType.RANDOM_DISPATCH
@@ -22,6 +24,7 @@ class TimelineEventPointDTO extends RefCounted:
 	var payload: Dictionary = {} # 附带参数 (抽卡策略/紧张事件类型)
 	var is_processed: bool = false
 
+	## 序列化当前对象为通用字典传输结构
 	func to_dto() -> Dictionary:
 		return {
 			"event_id": event_id,
@@ -68,6 +71,7 @@ static func _ensure_timeline_cache() -> void:
 	_timeline_cache = p
 	_timeline_config_version = GameConfig.config_reload_version()
 
+## 初始化组件或实体的内部运行状态
 func initialize(start_ms: int, in_rng: DeterministicRNG) -> void:
 	current_timeline_ms = start_ms
 	scheduled_events.clear()

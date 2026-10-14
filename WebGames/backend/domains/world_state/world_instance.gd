@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 实体、物品与世界状态集群 (Entity & World State))
 # 文件路径: res://backend/domains/world_state/world_instance.gd
 # 架构定位: Domain Logic Component
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/world_state.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/world_state.json | 信号: EventBus 领域广播
 # 职责说明: 世界数据与角色数据隔离容器：世界时间单调推进、世界持续状态保留、 历史影响片段只增不改。角色死亡不得回退本实例；新角色重新进入 已被影响的同一世界。配置由 config/domains/world.json 驱动。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## WorldInstance：Domain Logic Component
 class_name WorldInstance extends RefCounted
 
 var world_id: String = ""
@@ -50,9 +51,11 @@ func append_history_fragment(fragment: Dictionary) -> void:
 	while history_fragments.size() > max_fragments:
 		history_fragments.pop_front()
 
+## 序列化当前实体或对象状态为字典结构
 func serialize() -> Dictionary:
 	return {"world_id": world_id, "world_time": world_time.duplicate(), "world_state": world_state.duplicate(), "history_fragments": history_fragments.duplicate()}
 
+## 从字典结构反序列化恢复实体或对象状态
 static func deserialize(d: Dictionary) -> WorldInstance:
 	var inst := WorldInstance.new(String(d.get("world_id", "")))
 	inst.world_time = d.get("world_time", inst.world_time)

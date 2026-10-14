@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 剧情、任务与社交集群 (Narrative & Social))
 # 文件路径: res://backend/domains/narrative_orchestration/dto/narrative_pack_manifest_dto.gd
 # 架构定位: Value Object DTO / Data Transport Model
-# 跨域依赖: 上游: ModPackageDiscoverySolver, WorldModAffinityManager | 下游: GameConfig | 配置: config/domains/narrative_orchestration/core.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: ModPackageDiscoverySolver, WorldModAffinityManager | 下游: GameConfig | 配置: config/domains/narrative_orchestration/core.json | 信号: EventBus 领域广播
 # 职责说明: 封装剧情 MOD 扩展包清单元数据契约（标识、版本、依赖拓扑、优先级与语义标签）
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## NarrativePackManifestDTO：Value Object DTO / Data Transport Model
 class_name NarrativePackManifestDTO
 extends RefCounted
 

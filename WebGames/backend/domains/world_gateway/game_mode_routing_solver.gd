@@ -2,14 +2,16 @@
 # 模块归属: 业务领域层 (Domains · 实体、物品与世界状态集群 (Entity & World State))
 # 文件路径: res://backend/domains/world_gateway/game_mode_routing_solver.gd
 # 架构定位: Headless Discrete Solver / Numerical Calculator
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: account, feature_toggle_canary | 配置: config/domains/world_gateway.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: account, feature_toggle_canary | 配置: config/domains/world_gateway.json | 信号: EventBus 领域广播
 # 职责说明: 根据用户选择的运行模式、档位现状与灰度特性解析可用世界与档位
-# 设计依据: 业务域第一性原理 / 架构设计规范
+# 退出语义与设计依据: 业务域第一性原理 / 架构设计规范
 # ==============================================================================
 
+## GameModeRoutingSolver：Headless Discrete Solver / Numerical Calculator
 class_name GameModeRoutingSolver
 extends RefCounted
 
+## RoutingResultDTO：游戏模式路由决策结果传输模型
 class RoutingResultDTO extends RefCounted:
 	var success: bool = false
 	var error_code: String = ""
@@ -84,7 +86,7 @@ static func resolve_mode_entry(
 		return _resolve_single_player_entry(account_id, all_worlds, account_slots, canary_flags, target_world_id, target_slot_id, res)
 
 	res.error_code = "GATEWAY_ERR_UNKNOWN_MODE"
-	res.message = "未知的游戏模式枚举: %d" % mode
+	res.message = GameConfig.msg_fmt("world_gateway", "unknown_game_mode", {"mode": mode})
 	return res
 
 
@@ -145,7 +147,7 @@ static func _resolve_single_player_entry(
 
 	if world_dto == null:
 		res.error_code = "GATEWAY_ERR_DEFAULT_WORLD_NOT_FOUND"
-		res.message = "单机目标世界数据缺失: %s" % effective_world_id
+		res.message = GameConfig.msg_fmt("world_gateway", "world_data_missing", {"world_id": effective_world_id})
 		return res
 
 	res.resolved_world = world_dto
@@ -190,7 +192,7 @@ static func _resolve_effective_slots(
 	if account_slots.is_empty():
 		if not target_slot_id.is_empty():
 			res.error_code = "GATEWAY_ERR_SLOT_NOT_FOUND"
-			res.message = "指定档位不存在: %s" % target_slot_id
+			res.message = GameConfig.msg_fmt("world_gateway", "slot_not_found", {"slot_id": target_slot_id})
 			return []
 		var slot_id := target_slot_id if not target_slot_id.is_empty() else GameConfig.get_string("domains.world_gateway", "single_player/default_slot_id", "SLOT_SP_01")
 		var default_slot := SaveSlotStateDTO.new()
@@ -213,7 +215,7 @@ static func _resolve_effective_slots(
 			if item is SaveSlotStateDTO and item.slot_id == target_slot_id:
 				return [item]
 		res.error_code = "GATEWAY_ERR_SLOT_NOT_FOUND"
-		res.message = "指定档位不存在: %s" % target_slot_id
+		res.message = GameConfig.msg_fmt("world_gateway", "slot_not_found", {"slot_id": target_slot_id})
 		return []
 
 	if can_multislot:

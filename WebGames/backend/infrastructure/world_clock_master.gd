@@ -2,11 +2,12 @@
 # 模块归属: 基础设施层 (Infrastructure · Clock & Timing)
 # 文件路径: res://backend/infrastructure/world_clock_master.gd
 # 架构定位: Deterministic Clock Master
-# 跨域依赖: 上游: CombatCore, QuestCausality, WorldNavigation | 下游: 无 | 配置: config/infrastructure/clock.json | 信号: 游戏虚拟时钟心跳与昼夜更迭信号
+# 依赖与触发: 上游: CombatCore, QuestCausality, WorldNavigation | 下游: 无 | 配置: config/infrastructure/clock.json | 信号: 游戏虚拟时钟心跳与昼夜更迭信号
 # 职责说明: 统一调度微观战斗时钟 (Δt=20ms)、行军探索时钟 (1h) 与生理年轮时钟 (1mo)。 历法常数与事件文案由 config/infrastructure/clock.json、config/narratives/clock.json 驱动。
-# 设计依据: 确定性虚拟时钟驱动协议
+# 退出语义与设计依据: 确定性虚拟时钟驱动协议
 # ==============================================================================
 
+## WorldClockMaster：Deterministic Clock Master
 class_name WorldClockMaster extends RefCounted
 
 # ==============================================================================

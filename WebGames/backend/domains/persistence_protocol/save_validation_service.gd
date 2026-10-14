@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 治理、权限与持久化集群 (Governance & Persistence))
 # 文件路径: res://backend/domains/persistence_protocol/save_validation_service.gd
 # 架构定位: Domain Service / State Orchestrator
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: infrastructure.persistence.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: infrastructure.persistence.json | 信号: EventBus 领域广播
 # 职责说明: 依据 persistence.json 校验规则执行缺失字段回退、类型强转与未知域治理。 支持迁移后校验与领域级恢复保障（Inv-SV-2/7/11）。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## SaveValidationService：Domain Service / State Orchestrator
 class_name SaveValidationService extends RefCounted
 
 ## 验证工作区字典：依据 persistence.json 规则进行数据清洗与校验

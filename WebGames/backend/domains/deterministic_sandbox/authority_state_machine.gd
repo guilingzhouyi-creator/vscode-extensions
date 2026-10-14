@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/deterministic_sandbox/authority_state_machine.gd
 # 架构定位: Domain FSM / Lifecycle Session Engine
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/deterministic.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/deterministic.json | 信号: EventBus 领域广播
 # 职责说明: 单机/预测/权威三态解耦流转、时序攻击与 AP 透支作弊防御； 脱同步阈值/透支阈值/状态与原因文案由 config/deterministic.json、 config/narratives/deterministic.json 驱动（代码零硬编码）。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## AuthorityTriStateMachine：Domain FSM / Lifecycle Session Engine
 class_name AuthorityTriStateMachine extends RefCounted
 
 # ==============================================================================

@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 治理、权限与持久化集群 (Governance & Persistence))
 # 文件路径: res://backend/domains/persistence_protocol/editor_hot_reload_manager.gd
 # 架构定位: Domain Service / State Orchestrator
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: infrastructure.persistence.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: infrastructure.persistence.json | 信号: EventBus 领域广播
 # 职责说明: 监听并检测单机编辑器配置变更，按领域白名单精确重载并广播业务刷新。 严格仅单机模式生效，联机模式物理阻断（Inv-SV-8/9/14）。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## EditorHotReloadManager：Domain Service / State Orchestrator
 class_name EditorHotReloadManager extends RefCounted
 
 const RuntimeModeGate = preload("res://backend/domains/persistence_protocol/runtime_mode_gate.gd")

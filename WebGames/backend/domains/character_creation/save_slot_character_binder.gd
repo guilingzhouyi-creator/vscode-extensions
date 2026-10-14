@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/character_creation/save_slot_character_binder.gd
 # 架构定位: Domain Logic Component
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/character_creation.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/character_creation.json | 信号: EventBus 领域广播
 # 职责说明: 完成「后端派生属性 → 构造角色档案 → 绑定目标档位 → 生成开局事件包」 的原子落档。档位状态以 Dictionary 数据契约传入/回写，键集与 `SaveSlotStateDTO.to_dto()` 对齐（slot_id/account_id/bound_world_id/ bound_character_id/is_occupied/is_first_creation/last_played_timestamp_utc）， 规避对 world_gateway 域（在途未 import）的跨文件类引用。 关联细则: 阶段2 §2.3（档位绑定与开局事件触发器）
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## SaveSlotCharacterBinder：Domain Logic Component
 class_name SaveSlotCharacterBinder
 extends RefCounted
 
@@ -77,7 +78,7 @@ static func commit_creation_and_bind_slot(
 	opening.opening_quest_line_id = GameConfig.get_string("domains.character_creation", "defaults/initial_quest_line", "QUEST_PROLOGUE_01")
 	opening.timestamp_utc = int(Time.get_unix_time_from_system())
 	opening.narrative_context = {
-		"welcome_message": "欢迎来到卡拉尔世界，冒险者 %s！" % request.character_name
+		"welcome_message": GameConfig.msg_fmt("character_creation", "welcome_message", {"character_name": request.character_name})
 	}
 
 	res["success"] = true

@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 角色创建集群 (Character Creation))
 # 文件路径: res://backend/domains/character_creation/dto/destiny_mod_manifest_dto.gd
 # 架构定位: Data Transfer Object (DTO)
-# 跨域依赖: 上游: WorldGateway / ModPrecheckAndAdaptationSolver | 下游: AuthoritativeReincarnationSolver, StarterLoadoutDispatcher | 配置: config/domains/character_creation/core.json | 信号: 无
+# 依赖与触发: 上游: WorldGateway / ModPrecheckAndAdaptationSolver | 下游: AuthoritativeReincarnationSolver, StarterLoadoutDispatcher | 配置: config/domains/character_creation/core.json | 信号: 无
 # 职责说明: 单机命途显性 MOD 声明清单数据传输对象；承载单包元数据、前端 UI 策略能力声明、自定义身世池、因果天赋、配对预设、初始套件与专属序章路由规则。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## DestinyModManifestDTO：Data Transfer Object (DTO)
 class_name DestinyModManifestDTO
 extends RefCounted
 
@@ -33,7 +34,6 @@ var custom_i18n: Dictionary = {}
 # ==============================================================================
 # 二、对象池与状态重置契约 (ADV-POOL-001)
 # ==============================================================================
-
 func reset_state() -> void:
     pack_id = ""
     pack_name = ""
@@ -54,7 +54,6 @@ func reset_state() -> void:
 # ==============================================================================
 # 三、序列化与工厂反序列化契约
 # ==============================================================================
-
 func to_dto() -> Dictionary:
     return {
         "pack_id": pack_id,
@@ -74,6 +73,7 @@ func to_dto() -> Dictionary:
         "custom_i18n": custom_i18n.duplicate(true)
     }
 
+## 从输入字典反序列化还原传输对象
 static func from_dto(d: Dictionary, fallback_pack_id: String = "") -> DestinyModManifestDTO:
     var dto := DestinyModManifestDTO.new()
     if d.is_empty():

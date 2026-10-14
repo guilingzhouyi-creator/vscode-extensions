@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/character_creation/prologue_placeholder_resolver.gd
 # 架构定位: Headless Discrete Solver / Numerical Calculator
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/character_creation.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/character_creation.json | 信号: EventBus 领域广播
 # 职责说明: 统一占位符格式 {VARIABLE_NAME} 的高可靠运行时解析与安全替换： - 从 CharacterPrologueContext 动态收集事实来源（严禁写死角色名/出生点/道具名） - 遇缺失占位符平稳降级为 [UNKNOWN:KEY] 并返回 missing_placeholders 清单 - 文案/地理名/道具名/NPC 名全部经后端剧情 i18n 表解析 关联细则: 阶段2 §二（占位符解析引擎算法实现）
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## ProloguePlaceholderResolver：Headless Discrete Solver / Numerical Calculator
 class_name ProloguePlaceholderResolver
 extends RefCounted
 

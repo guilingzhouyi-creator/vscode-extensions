@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 治理、权限与持久化集群 (Governance & Persistence))
 # 文件路径: res://backend/domains/admin_sandbox/gm_command_catalog.gd
 # 架构定位: Domain Registry / Specification Catalog
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: currency_economy | 配置: infrastructure.admin.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: currency_economy | 配置: infrastructure.admin.json | 信号: EventBus 领域广播
 # 职责说明: 将 GM 沙盒作弊能力注册为聊天斜杠命令（min_admin_level = LEVEL_GAME_MASTER）， 具名静态 handler 桥接 SandboxCheatSolver；context 契约： { admin, inventory, wallet, sheet, clock, catalog(物品注册表，必填) }
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## GmCommandCatalog：Domain Registry / Specification Catalog
 class_name GmCommandCatalog
 extends RefCounted
 

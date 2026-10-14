@@ -2,12 +2,13 @@
 # 模块归属: 业务领域层 (Domains · 治理、权限与持久化集群 (Governance & Persistence))
 # 文件路径: res://backend/domains/persistence_protocol/dto/resource_index_entry_dto.gd
 # 架构定位: Value Object DTO / Resource Index Descriptor Model
-# 跨域依赖: 上游: StorageResourceCatalog, AuxiliaryWorkerPool | 下游: GameConfig, ResourceDecoderRegistry
+# 依赖与触发: 上游: StorageResourceCatalog, AuxiliaryWorkerPool | 下游: GameConfig, ResourceDecoderRegistry
 # 职责说明: 资源索引描述符数据传输对象：承载资源的逻辑标识、底层物理路径、资源分类、
 #           加载优先级、依赖图列表与尺寸预估，彻底隔离业务代码对磁盘物理路径的直接依赖。
-# 设计依据: 双域储存架构资源索引与寻址规范
+# 退出语义与设计依据: 双域储存架构资源索引与寻址规范
 # ==============================================================================
 
+## ResourceIndexEntryDTO：Value Object DTO / Resource Index Descriptor Model
 class_name ResourceIndexEntryDTO extends RefCounted
 
 const DEFAULT_CATEGORY: String = "config"

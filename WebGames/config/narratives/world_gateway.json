@@ -10,5 +10,14 @@
   "world_entry_permitted": "角色身份已核验通过，准许进入世界。",
   "invalid_transition": "状态机流转非法: {detail}",
   "cross_mode_blocked": "跨模式状态写入被拦截，会话模式与目标模式不匹配。",
-  "multiplayer_canary_restricted": "联机模式当前处于灰度封测阶段，未向当前账号开放。"
+  "multiplayer_canary_restricted": "联机模式当前处于灰度封测阶段，未向当前账号开放。",
+  "mode_hot_switch_blocked": "跨模式热切换被拦截: 模式已选定({current_mode})，变更至({target_mode})必须经退网关全量洗脱",
+  "slot_mode_mismatch": "槽位运行模式与目标模式不匹配: 槽位模式 {slot_mode}, 目标模式 {target_mode}",
+  "silent_channel_violation": "单机模式网络信道静默违规，禁止广播远程通道: {channel_name}",
+  "unknown_game_mode": "未知的游戏模式枚举: {mode}",
+  "world_data_missing": "单机目标世界数据缺失: {world_id}",
+  "slot_not_found": "指定档位不存在: {slot_id}",
+  "save_dir_create_failed": "本地存档目录创建失败: {dir}",
+  "save_dir_permission_denied": "本地存档目录不可写或权限不足: {dir}",
+  "state_mutation_blocked": "跨模式状态写入被拦截: 会话模式 {current_mode}, 目标模式 {target_mode}"
 }

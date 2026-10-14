@@ -2,13 +2,14 @@
 # 模块归属: 业务领域层 (Domains · 治理、权限与持久化集群 (Governance & Persistence))
 # 文件路径: res://backend/domains/persistence_protocol/auxiliary_worker_pool.gd
 # 架构定位: Auxiliary Domain Async Worker Pool
-# 跨域依赖: 上游: StorageMediator, ViewRouter | 下游: WorkerThreadPool, FileAccess, JSON, GameConfig
+# 依赖与触发: 上游: StorageMediator, ViewRouter | 下游: WorkerThreadPool, FileAccess, JSON, GameConfig
 # 职责说明: 辅助数据储存并发工作池：管理大体量地图、文案、音频与预制体等可重建数据的
 #           异步流式读取。严格将磁盘 IO、数据解压与 JSON 反序列化剥离出主线程，
 #           提供基于优先级的多级队列、背压流控、取消令牌与无头确定性测试驱动模式。
-# 设计依据: 双域储存架构线程与任务边界治理规范
+# 退出语义与设计依据: 双域储存架构线程与任务边界治理规范
 # ==============================================================================
 
+## AuxiliaryWorkerPool：Auxiliary Domain Async Worker Pool
 class_name AuxiliaryWorkerPool extends RefCounted
 
 const StorageContractInterfaces = preload("res://backend/domains/persistence_protocol/storage_contract_interfaces.gd")
@@ -62,6 +63,7 @@ var _active_batches: Dictionary = {}   # batch_id -> BatchLoadRequestDTO
 
 var _deterministic_mode: bool = true
 
+## 获取单例全局静态唯一实例
 static func get_instance() -> RefCounted:
 	if _instance == null:
 		_instance = new()
@@ -299,7 +301,7 @@ func evict_idle_resources() -> int:
 	_cache_keys_fifo.clear()
 	return count
 
-## 获取待处理及正在执行队列总大小
+## 获取待执行及正在执行队列总大小
 func get_queue_size() -> int:
 	return _pending_queue.size() + _running_tasks.size()
 

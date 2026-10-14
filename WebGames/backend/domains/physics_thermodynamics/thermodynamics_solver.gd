@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 核心战斗与魔法集群 (Combat & Magic))
 # 文件路径: res://backend/domains/physics_thermodynamics/thermodynamics_solver.gd
 # 架构定位: Headless Discrete Solver / Numerical Calculator
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/combat.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/combat.json | 信号: EventBus 领域广播
 # 职责说明: 动量守恒与刃口侵彻伤害方程、始源直驱 vs 咒术两步相变能损方程。 动能系数与相变损耗参数由 config/domains/combat.json 驱动。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## PhysicsAndThermodynamicsSolver：Headless Discrete Solver / Numerical Calculator
 class_name PhysicsAndThermodynamicsSolver extends RefCounted
 
 ## 侵彻求解静态参数缓存（模式：配置热重载版本推进自动失效重建）。

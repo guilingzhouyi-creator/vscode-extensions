@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 核心战斗与魔法集群 (Combat & Magic))
 # 文件路径: res://backend/domains/world_boss/phase_transition_fsm.gd
 # 架构定位: Domain FSM / Lifecycle Session Engine
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/world_boss.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/world_boss.json | 信号: EventBus 领域广播
 # 职责说明: 判定首领血量归零切阶段、触发全屏转相清场机制与狂暴激怒 倍率与文案由 config/domains/world_boss.json、narratives/world_boss.json 驱动。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## ConfigurablePhaseTransitionFSM：Domain FSM / Lifecycle Session Engine
 class_name ConfigurablePhaseTransitionFSM extends RefCounted
 
 ## 首领受击结算：击败锁存 → 护盾吸收/无敌归零 → 血量扣减 → 血尽切阶段（L2 乘性强化+机制护盾+转相清场）或终态锁存+动态加点联动

@@ -2,11 +2,12 @@
 # 模块归属: 基础设施层 (Infrastructure · EventBus)
 # 文件路径: res://backend/infrastructure/event_bus/event_bus_subscription_token.gd
 # 架构定位: Event Broker / Decoupling Foundation
-# 跨域依赖: 上游: 全域 47 业务域服务、GM追缴、网络层 | 下游: EventChannel, EventSubscriberToken | 配置: config/infrastructure/event_bus.json | 信号: 全域领域事件中心分发
+# 依赖与触发: 上游: 全域 47 业务域服务、GM追缴、网络层 | 下游: EventChannel, EventSubscriberToken | 配置: config/infrastructure/event_bus.json | 信号: 全域领域事件中心分发
 # 职责说明: 订阅生命周期托管令牌。支持幂等解绑 (unbind)， 与旧版信号式令牌区分，防止全局类名命名冲突。
-# 设计依据: 事件总线解耦规范 / 前后端通信隔离契约
+# 退出语义与设计依据: 事件总线解耦规范 / 前后端通信隔离契约
 # ==============================================================================
 
+## EventBusSubscriptionToken：Event Broker / Decoupling Foundation
 class_name EventBusSubscriptionToken
 extends RefCounted
 

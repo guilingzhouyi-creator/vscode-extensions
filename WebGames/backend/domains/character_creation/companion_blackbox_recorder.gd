@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 角色创建集群 (Character Creation))
 # 文件路径: res://backend/domains/character_creation/companion_blackbox_recorder.gd
 # 架构定位: Domain Diagnostics / Blackbox Dump Provider
-# 跨域依赖: 上游: AgentPlaythroughSession, WorldGateway | 下游: CompanionObserverBus | 配置: 无 | 信号: 无
+# 依赖与触发: 上游: AgentPlaythroughSession, WorldGateway | 下游: CompanionObserverBus | 配置: 无 | 信号: 无
 # 职责说明: 伴侣推演黑匣子现场转储器；在推演发生异常、死路挂起或规则冲突时，即时抽取伴侣观察总线事件尾部轨迹与当前角色快照，组装标准诊断转储字典 (Diagnostic Dump)，供现场复盘与自动化审计。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## CompanionBlackboxRecorder：Domain Diagnostics / Blackbox Dump Provider
 class_name CompanionBlackboxRecorder
 extends RefCounted
 

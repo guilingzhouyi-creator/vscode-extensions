@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 剧情、任务与社交集群 (Narrative & Social))
 # 文件路径: res://backend/domains/organization_guild/organization_tech_fsm.gd
 # 架构定位: Domain FSM / Lifecycle Session Engine
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/organization_guild.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/organization_guild.json | 信号: EventBus 领域广播
 # 职责说明: 管理公会驻地科技升级、消耗金库资源并为全体成员计算被动光环增益
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## OrganizationTechFSM：Domain FSM / Lifecycle Session Engine
 class_name OrganizationTechFSM
 extends RefCounted
 

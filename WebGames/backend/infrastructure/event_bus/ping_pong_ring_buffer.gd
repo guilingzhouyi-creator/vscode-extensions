@@ -2,11 +2,12 @@
 # 模块归属: 基础设施层 (Infrastructure · EventBus)
 # 文件路径: res://backend/infrastructure/event_bus/ping_pong_ring_buffer.gd
 # 架构定位: Event Broker / Decoupling Foundation
-# 跨域依赖: 上游: 全域 47 业务域服务、GM追缴、网络层 | 下游: EventChannel, EventSubscriberToken | 配置: config/infrastructure/event_bus.json | 信号: 全域领域事件中心分发
+# 依赖与触发: 上游: 全域 47 业务域服务、GM追缴、网络层 | 下游: EventChannel, EventSubscriberToken | 配置: config/infrastructure/event_bus.json | 信号: 全域领域事件中心分发
 # 职责说明: 事件总线专用双缓冲环形队列：隔离事件发布线程与分发消费循环，保证事件批量派发期间新发布的事件写入后台缓冲零冲突。
-# 设计依据: 事件总线解耦规范 / 前后端通信隔离契约
+# 退出语义与设计依据: 事件总线解耦规范 / 前后端通信隔离契约
 # ==============================================================================
 
+## PingPongRingBuffer：Event Broker / Decoupling Foundation
 class_name PingPongRingBuffer
 extends RefCounted
 
@@ -43,8 +44,10 @@ func flush_frame(callback: Callable) -> int:
 	read_array.clear()
 	return count
 
+## 获取当前缓冲区内存储的有效元素数量
 func size() -> int:
 	return _buffer_a.size() + _buffer_b.size()
 
+## 获取当前环形缓冲区的物理最大容量
 func capacity() -> int:
 	return _capacity

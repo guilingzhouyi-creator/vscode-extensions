@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/item_statistics/account_item_library.gd
 # 架构定位: Domain Logic Component
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/item_statistics.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/item_statistics.json | 信号: EventBus 领域广播
 # 职责说明: 每个账号 UID 下挂载一棵物品 ID 库树： 根(account_id) → category_major → category_minor → canonical_id 叶节点； 分类节点沿路径递归聚合子树统计（current_quantity 与各事件累计量）； 递归操作：mount_item 递归建路径 / apply_item_delta 递归定位并自底向上重算 / query_subtree 递归遍历聚合 / query_all_items 递归收集叶节点。
-# 设计依据: 业务域第一性原理 / 架构设计规范
+# 退出语义与设计依据: 业务域第一性原理 / 架构设计规范
 # ==============================================================================
 
+## AccountItemLibraryAggregate：Domain Logic Component
 class_name AccountItemLibraryAggregate
 extends RefCounted
 
@@ -143,6 +144,7 @@ func query_all_items() -> Array:
 	_collect_items_recursive(root_node, out)
 	return out
 
+## 序列化当前实体或对象状态为字典结构
 func serialize() -> Dictionary:
 	return {"account_id": account_id, "root_node": root_node}
 

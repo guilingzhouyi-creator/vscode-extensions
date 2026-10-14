@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 角色创建集群 (Character Creation))
 # 文件路径: res://backend/domains/character_creation/dto/agent_observation_packet_dto.gd
 # 架构定位: Data Transfer Object (DTO)
-# 跨域依赖: 上游: AgentPlaythroughSession, ModWorkbenchView | 下游: NarrativeDagExecutionEngine | 配置: config/domains/character_creation/core.json | 信号: 无
+# 依赖与触发: 上游: AgentPlaythroughSession, ModWorkbenchView | 下游: NarrativeDagExecutionEngine | 配置: config/domains/character_creation/core.json | 信号: 无
 # 职责说明: 长程交互式推演会话观测包与动作包数据传输契约；承载推演会话标识、步骤索引、当前活跃节点、双轨水化文本、可选动作分支集、角色快照及终态/错误码标志，支持双向无损序列化与对象重置。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## AgentObservationPacketDTO：Data Transfer Object (DTO)
 class_name AgentObservationPacketDTO
 extends RefCounted
 
@@ -26,7 +27,6 @@ var error_code: String = ""
 # ==============================================================================
 # 二、对象池与重置契约 (ADV-PRF-002)
 # ==============================================================================
-
 func reset_state() -> void:
 	session_id = ""
 	step_index = 0
@@ -40,7 +40,6 @@ func reset_state() -> void:
 # ==============================================================================
 # 三、序列化与工厂方法
 # ==============================================================================
-
 func to_dto() -> Dictionary:
 	var choices_copy: Array[Dictionary] = []
 	for c in available_choices:
@@ -56,6 +55,7 @@ func to_dto() -> Dictionary:
 		"error_code": error_code
 	}
 
+## 从输入字典反序列化还原传输对象
 static func from_dto(raw: Dictionary) -> AgentObservationPacketDTO:
 	var dto := AgentObservationPacketDTO.new()
 	if raw.is_empty():
@@ -79,19 +79,20 @@ static func from_dto(raw: Dictionary) -> AgentObservationPacketDTO:
 # ==============================================================================
 # 四、动作包契约类 (AgentActionPacketDTO)
 # ==============================================================================
-
 class AgentActionPacketDTO extends RefCounted:
 	var session_id: String = ""
 	var action_type: String = "" # "CHOOSE", "ROLLBACK", "QUIT"
 	var choice_id: String = ""
 	var params: Dictionary = {}
 
+	## 重置内部数据状态，供对象池无堆分配复用
 	func reset_state() -> void:
 		session_id = ""
 		action_type = ""
 		choice_id = ""
 		params.clear()
 
+	## 序列化当前对象为通用字典传输结构
 	func to_dto() -> Dictionary:
 		return {
 			"session_id": session_id,
@@ -100,6 +101,7 @@ class AgentActionPacketDTO extends RefCounted:
 			"params": params.duplicate(true)
 		}
 
+	## 从输入字典反序列化还原传输对象
 	static func from_dto(raw: Dictionary) -> AgentActionPacketDTO:
 		var dto := AgentActionPacketDTO.new()
 		if raw.is_empty():

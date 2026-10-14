@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 核心战斗与魔法集群 (Combat & Magic))
 # 文件路径: res://backend/domains/potential_growth/targeted_attribute_solver.gd
 # 架构定位: Headless Discrete Solver / Numerical Calculator
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/potential.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/potential.json | 信号: EventBus 领域广播
 # 职责说明: 玩家定向加点：潜能点 → 统一等级提升（1~6 级，经 AttributeConversionEngine 规则校验），成本曲线按等级破阶递减 C(L) = base + floor((L-base)/tier_size)。 加点只动 L1 等级层（显示等级），底层实际值由换算引擎统一得出。 公式参数由 config/domains/potential.json 驱动。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## TargetedAttributeSolver：Headless Discrete Solver / Numerical Calculator
 class_name TargetedAttributeSolver extends RefCounted
 
 const STAT_STR: String = "STR"

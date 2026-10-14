@@ -2,12 +2,13 @@
 # 模块归属: 业务领域层 (Domains · 治理、权限与持久化集群 (Governance & Persistence))
 # 文件路径: res://backend/domains/persistence_protocol/dto/storage_metrics_dto.gd
 # 架构定位: Value Object DTO / Dual-Domain Storage Telemetry Metrics Model
-# 跨域依赖: 上游: PrimaryStorageEngine, AuxiliaryWorkerPool, FrameBudgetDispatcher | 下游: TelemetryEngine, AuditDashboard
+# 依赖与触发: 上游: PrimaryStorageEngine, AuxiliaryWorkerPool, FrameBudgetDispatcher | 下游: TelemetryEngine, AuditDashboard
 # 职责说明: 双域储存观测指标传输对象：承载九维核心运行时监控度量，
 #           用于量化分析启动耗时、IO 等待、流控吞吐与内存压力。
-# 设计依据: 双域储存架构观测指标看板规范
+# 退出语义与设计依据: 双域储存架构观测指标看板规范
 # ==============================================================================
 
+## StorageMetricsDTO：Value Object DTO / Dual-Domain Storage Telemetry Metrics Model
 class_name StorageMetricsDTO extends RefCounted
 
 const DEFAULT_FRAME_BUDGET_MS: float = 2.0
@@ -20,7 +21,7 @@ var time_to_first_interactive_ms: float = 0.0
 var auxiliary_throughput_mb_per_sec: float = 0.0
 ## 4. 主线程 IO 等待时间 (ms)
 var main_thread_io_wait_ms: float = 0.0
-## 5. 待处理任务队列长度
+## 5. 待执行任务队列长度
 var queue_length: int = 0
 ## 6. 辅助资源缓存命中率 (0.0 - 1.0)
 var cache_hit_rate: float = 0.0

@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 实体、物品与世界状态集群 (Entity & World State))
 # 文件路径: res://backend/domains/spatial_movement/direction_alias_index.gd
 # 架构定位: Domain Logic Component
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/spatial_movement.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/spatial_movement.json | 信号: EventBus 领域广播
 # 职责说明: 维护文字方位别名到归一化物理向量的 O(1) 散列映射缓存
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## DirectionAliasIndex：Domain Logic Component
 class_name DirectionAliasIndex
 extends RefCounted
 
@@ -19,12 +20,15 @@ func _init() -> void:
 	is_initialized = false
 	last_updated_utc = 0
 
+## 获取当前空间实体的二维或三维位置向量
 func get_vector(key: String) -> Vector2:
 	return alias_to_vector_map.get(key.strip_edges().to_upper(), Vector2.ZERO)
 
+## 查询当前空间实体是否存在指定的备用别名
 func has_alias(key: String) -> bool:
 	return alias_to_vector_map.has(key.strip_edges().to_upper())
 
+## 序列化当前对象为通用字典传输结构
 func to_dto() -> Dictionary:
 	var serialized_map := {}
 	for k in alias_to_vector_map.keys():

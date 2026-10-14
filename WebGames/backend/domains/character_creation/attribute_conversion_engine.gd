@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/character_creation/attribute_conversion_engine.gd
 # 架构定位: Domain Logic Component
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/character_creation.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/character_creation.json | 信号: EventBus 领域广播
 # 职责说明: 卡拉尔统一属性底座三层模型的唯一换算入口（L1 等级层 → L2 系数层 → L3 实际值域）； 人类基准/成长曲线/系数/死区等参数全部由 config/domains/attribute.json 驱动（零硬编码）， 与相邻模块以「后端权威派生、前端不注入」为边界约定。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## AttributeConversionEngine：Domain Logic Component
 class_name AttributeConversionEngine
 extends RefCounted
 
@@ -59,7 +60,7 @@ static func race_coefficient(race: String, attr: String) -> float:
 	var entry: Dictionary = table.get(race, table.get("DEFAULT", {}))
 	return float(entry.get(attr, 1.0))
 
-## 阅历重塑系数默认值（config/domains/attribute.json experience_reshape_default，默认 1.0）
+## 阅历修饰系数默认值（config/domains/attribute.json experience_reshape_default，默认 1.0）
 static func experience_reshape_default() -> float:
 	return GameConfig.get_float("domains.attribute", "experience_reshape_default", 1.0)
 
@@ -116,7 +117,7 @@ static func convert_to_actual(
 	return human_base(attr) * growth_units(q) * coef + dynamic_adjustment
 
 ## 从生理表聚合换算（消费方统一入口）：等级 → 底层实际能力值。
-## 系数 = 先天基础系数（种族×天赋，缺省回退配置表）× 阅历重塑系数（L2）。
+## 系数 = 先天基础系数（种族×天赋，缺省回退配置表）× 阅历调节系数（L2）。
 static func sheet_actual_value(sheet: CharacterPhysiologySheet, attr: String) -> float:
 	return convert_to_actual(
 		sheet.race_id,

@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/account/account_profile.gd
 # 架构定位: Domain Logic Component
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/account.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/account.json | 信号: EventBus 领域广播
 # 职责说明: 离线自洽账户、设备指纹绑定、多角色冒险插槽映射与天命传承点。 默认值/槽位上限由 config/domains/account.json 驱动；权限经 EntitlementService 密封鉴权（存档反序列化 fail-safe 校验）。
-# 设计依据: 业务域第一性原理 / 账号与槽位生命周期契约
+# 退出语义与设计依据: 业务域第一性原理 / 账号与槽位生命周期契约
 # ==============================================================================
 
+## AccountProfileAggregate：Domain Logic Component
 class_name AccountProfileAggregate extends RefCounted
 
 const DOMAIN_ACCOUNT_CONFIG: String = "domains.account"
@@ -21,7 +22,7 @@ const RESERVED_PLACEHOLDER: String = "RESERVED_PLACEHOLDER"
 var account_id: String = ""
 var username: String = GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "auth/default_username", "Adventurer")
 var password_hash_sha256: String = ""
-## 口令盐版本：1=按配置盐哈希（新档默认）；0=空盐历史档（login-time 重铸标记）
+## 口令盐版本：1=按配置盐哈希（标准单轨）
 var salt_version: int = 1
 var created_timestamp_utc: int = 0
 var last_login_timestamp_utc: int = 0
@@ -158,7 +159,7 @@ static func deserialize(d: Dictionary) -> AccountProfileAggregate:
 	acc.account_id = d.get("account_id", "")
 	acc.username = d.get("username", GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "auth/default_username", "Adventurer"))
 	acc.password_hash_sha256 = d.get("password_hash_sha256", "")
-	acc.salt_version = int(d.get("salt_version", 0))  # 旧档缺省 0 = 空盐历史档
+	acc.salt_version = int(d.get("salt_version", 1))
 	acc.created_timestamp_utc = d.get("created_timestamp_utc", 0)
 	acc.last_login_timestamp_utc = d.get("last_login_timestamp_utc", 0)
 	acc.local_device_fingerprint = d.get("local_device_fingerprint", "")

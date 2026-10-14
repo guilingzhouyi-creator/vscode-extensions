@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 实体、物品与世界状态集群 (Entity & World State))
 # 文件路径: res://backend/domains/world_gateway/anti_bridge_guard.gd
 # 架构定位: Domain Security Guard / Anti-Privilege Escalation
-# 跨域依赖: 上游: WorldGatewayFSM, GameModeRoutingSolver | 下游: EventBus | 配置: config/domains/world_gateway/core.json
+# 依赖与触发: 上游: WorldGatewayFSM, GameModeRoutingSolver | 下游: EventBus | 配置: config/domains/world_gateway/core.json
 # 职责说明: 拦截跨模式热切换、单机槽位跨界渗透联机与单机网络广播越权
-# 设计依据: 业务领域第一性原理与气密级防越权安全规范
+# 退出语义与设计依据: 业务领域第一性原理与气密级防越权安全规范
 # ==============================================================================
 
+## AntiBridgeGuard：Domain Security Guard / Anti-Privilege Escalation
 class_name AntiBridgeGuard
 extends RefCounted
 
@@ -30,7 +31,7 @@ static func validate_mode_transition(
 		return {
 			"allowed": false,
 			"error_code": SECURITY_ERR_CROSS_MODE_HOT_SWAP,
-			"message": "跨模式热切换被拦截: 模式已选定(%d)，变更至(%d)必须经退网关全量洗脱" % [current_mode, target_mode]
+			"message": GameConfig.msg_fmt("world_gateway", "mode_hot_switch_blocked", {"current_mode": current_mode, "target_mode": target_mode})
 		}
 
 	# 2. 检查探针报告就绪性
@@ -112,7 +113,7 @@ static func validate_slot_mode_affinity(slot_mode: int, target_mode: int, slot_m
 		return {
 			"allowed": false,
 			"error_code": SECURITY_ERR_SLOT_MODE_POISONING,
-			"message": "槽位运行模式与目标模式不匹配: 槽位模式 %d, 目标模式 %d" % [slot_mode, target_mode]
+			"message": GameConfig.msg_fmt("world_gateway", "slot_mode_mismatch", {"slot_mode": slot_mode, "target_mode": target_mode})
 		}
 
 	if target_mode == WorldGatewayModel.GameMode.MULTIPLAYER and not slot_mods.is_empty():
@@ -214,7 +215,7 @@ static func validate_network_channel_discipline(current_mode: int, channel_name:
 			return {
 				"allowed": false,
 				"error_code": SECURITY_ERR_NETWORK_MUTE_VIOLATION,
-				"message": "单机模式网络信道静默违规，禁止广播远程通道: %s" % channel_name
+				"message": GameConfig.msg_fmt("world_gateway", "silent_channel_violation", {"channel_name": channel_name})
 			}
 
 	return {

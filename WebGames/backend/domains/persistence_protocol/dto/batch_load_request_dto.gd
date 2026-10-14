@@ -2,12 +2,13 @@
 # 模块归属: 业务领域层 (Domains · 治理、权限与持久化集群 (Governance & Persistence))
 # 文件路径: res://backend/domains/persistence_protocol/dto/batch_load_request_dto.gd
 # 架构定位: Value Object DTO / Batch Resource Loading Request Model
-# 跨域依赖: 上游: GameConfig, ViewRouter, SceneManager | 下游: AuxiliaryWorkerPool, FrameBudgetDispatcher
+# 依赖与触发: 上游: GameConfig, ViewRouter, SceneManager | 下游: AuxiliaryWorkerPool, FrameBudgetDispatcher
 # 职责说明: 批量资源装载请求数据传输对象：组织多项关联资源的批量并行异步调度，
 #           维护整批资源加载进度状态计数与原子完成屏障（Barrier），支持统一取消令牌。
-# 设计依据: 双域储存架构并发流控与屏障设计规范
+# 退出语义与设计依据: 双域储存架构并发流控与屏障设计规范
 # ==============================================================================
 
+## BatchLoadRequestDTO：Value Object DTO / Batch Resource Loading Request Model
 class_name BatchLoadRequestDTO extends RefCounted
 
 const ResourceIndexEntryDTO = preload("res://backend/domains/persistence_protocol/dto/resource_index_entry_dto.gd")

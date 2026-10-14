@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 经济、交易与物流集群 (Economy & Trade))
 # 文件路径: res://backend/domains/workshop_forge/equipment_enhancement_solver.gd
 # 架构定位: Headless Discrete Solver / Numerical Calculator
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: currency_economy | 配置: config/domains/workshop.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: currency_economy | 配置: config/domains/workshop.json | 信号: EventBus 领域广播
 # 职责说明: +1 ~ +15 装备强化概率衰减、保护符防降级与属性阶梯倍率提升 概率表/成本公式/倍率由 config/domains/workshop.json 驱动，文案由 narratives/workshop.json 驱动。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## EquipmentEnhancementSolver：Headless Discrete Solver / Numerical Calculator
 class_name EquipmentEnhancementSolver extends RefCounted
 
 static var _completed_transactions: Dictionary = {}

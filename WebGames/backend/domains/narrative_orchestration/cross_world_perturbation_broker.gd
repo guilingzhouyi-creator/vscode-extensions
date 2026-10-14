@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 剧情、任务与社交集群 (Narrative & Social))
 # 文件路径: res://backend/domains/narrative_orchestration/cross_world_perturbation_broker.gd
 # 架构定位: Domain Service / Cross-World Perturbation Broker
-# 跨域依赖: 上游: WorldGateway, NarrativeCausalityOrchestrator | 下游: GameConfig | 配置: config/domains/narrative_orchestration/core.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: WorldGateway, NarrativeCausalityOrchestrator | 下游: GameConfig | 配置: config/domains/narrative_orchestration/core.json | 信号: EventBus 领域广播
 # 职责说明: 管理跨世界因果虚空共鸣扰动的发布、过滤轮询、访问登记、物理原子落盘与半衰期衰减修剪
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## CrossWorldPerturbationBroker：Domain Service / Cross-World Perturbation Broker
 class_name CrossWorldPerturbationBroker
 extends RefCounted
 

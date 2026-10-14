@@ -2,11 +2,12 @@
 # 模块归属: 基础设施层 (Infrastructure · Error Governance)
 # 文件路径: res://backend/infrastructure/error_code_registry.gd
 # 架构定位: Error Code Registry / Reporter
-# 跨域依赖: 上游: 全域后端与前端边界 | 下游: UnifiedLoggerService | 配置: config/infrastructure/errors.json | 信号: 严重错误上报信号
+# 依赖与触发: 上游: 全域后端与前端边界 | 下游: UnifiedLoggerService | 配置: config/infrastructure/errors.json | 信号: 严重错误上报信号
 # 职责说明: 维护由 config/infrastructure/errors_catalog.json 驱动的全域英文协议错误码， 提供错误码校验、严重度映射、i18n 键定位与未登记遥测断点（Inv-LG-2）。
-# 设计依据: 错误码统一与可证伪契约
+# 退出语义与设计依据: 错误码统一与可证伪契约
 # ==============================================================================
 
+## ErrorCodeRegistry：Error Code Registry / Reporter
 class_name ErrorCodeRegistry extends RefCounted
 
 # ==============================================================================

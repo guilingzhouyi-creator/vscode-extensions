@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 核心战斗与魔法集群 (Combat & Magic))
 # 文件路径: res://backend/domains/physics_thermodynamics/physical_verb_registry.gd
 # 架构定位: Domain Registry / Specification Catalog
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/combat.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/combat.json | 信号: EventBus 领域广播
 # 职责说明: 八大物理动词侵彻常数、四大魔法形态枚举与动作卡牌实体。 动词常数与卡牌默认值由 config/domains/combat.json 驱动，代码零硬编码。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## PhysicalVerbRegistry：Domain Registry / Specification Catalog
 class_name PhysicalVerbRegistry extends RefCounted
 
 static var verbs: Dictionary:
@@ -62,6 +63,7 @@ enum MagicForm {
 	SUPERTIER    # 超位禁咒 (天灾级战略法术)
 }
 
+## CombatActionCardEntity：战斗动作卡牌实体模型
 class CombatActionCardEntity extends RefCounted:
 	var card_id: String = ""
 	var card_name: String = ""
@@ -105,6 +107,7 @@ class CombatActionCardEntity extends RefCounted:
 			"card_pool": card_pool,
 		}
 
+## CombatNarrativeEventPacket：战斗叙事事件数据包模型
 class CombatNarrativeEventPacket extends RefCounted:
 	var actor_id: String = ""
 	var target_id: String = ""

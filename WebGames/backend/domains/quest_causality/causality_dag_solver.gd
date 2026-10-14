@@ -2,13 +2,15 @@
 # 模块归属: 业务领域层 (Domains · 剧情、任务与社交集群 (Narrative & Social))
 # 文件路径: res://backend/domains/quest_causality/causality_dag_solver.gd
 # 架构定位: Headless Discrete Solver / Numerical Calculator
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: inventory | 配置: config/domains/quest.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: inventory | 配置: config/domains/quest.json | 信号: EventBus 领域广播
 # 职责说明: 状态事实评估、因果 DAG 路径判定 (强攻/隐匿/外交/黑市)
-# 设计依据: 业务域第一性原理 / 架构设计规范
+# 退出语义与设计依据: 业务域第一性原理 / 架构设计规范
 # ==============================================================================
 
+## CausalityDAGSolver：Headless Discrete Solver / Numerical Calculator
 class_name CausalityDAGSolver extends RefCounted
 
+## 评估任务完成条件与阶段性因果状态
 static func evaluate_quest_completion(
 	quest: QuestObjectiveNode.QuestCausalityAggregate,
 	world_state_facts: Dictionary

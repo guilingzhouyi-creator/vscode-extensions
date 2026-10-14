@@ -2,11 +2,12 @@
 # 模块归属: 基础设施层 (Infrastructure · Resource Governance)
 # 文件路径: res://backend/infrastructure/resource_governance/resource_lifecycle_descriptor.gd
 # 架构定位: Memory Governor / Bounded Cache
-# 跨域依赖: 上游: GameBootstrap, ViewRouter, 资源消费方 | 下游: BoundedResourceCache, CachePolicySpec | 配置: config/infrastructure/resource.json | 信号: 缓存淘汰 / 内存预警事件
+# 依赖与触发: 上游: GameBootstrap, ViewRouter, 资源消费方 | 下游: BoundedResourceCache, CachePolicySpec | 配置: config/infrastructure/resource.json | 信号: 缓存淘汰 / 内存预警事件
 # 职责说明: 资源生命周期状态描述符：记录资源的加载阶段（UNLOADED/LOADING/READY/DIRTY/EVICTED）、引用计数与最后访问时间戳。
-# 设计依据: 有界资源与内存生命周期治理标准
+# 退出语义与设计依据: 有界资源与内存生命周期治理标准
 # ==============================================================================
 
+## ResourceLifecycleDescriptor：Memory Governor / Bounded Cache
 class_name ResourceLifecycleDescriptor extends RefCounted
 
 ## 资源生命周期六阶段标准

@@ -22,7 +22,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(_test_uid_uniqueness_across_prefixes())
 	results.append(_test_uid_counter_monotonic())
 	results.append(_test_uid_checksum_anti_tamper())
-	results.append(_test_uid_legacy_migration())
+	results.append(_test_uid_missing_default_generation())
 	results.append(_test_server_grant_idempotent())
 	results.append(_test_factory_build_with_uid())
 
@@ -350,18 +350,14 @@ static func _test_uid_checksum_anti_tamper() -> Dictionary:
 	var passed: bool = ItemUIDGenerator.validate_uid(uid) and not ItemUIDGenerator.validate_uid(tampered) and ItemUIDGenerator.prefix_of(uid) == "MAIL_"
 	return {"test": "TC-ITEM-UID-03: UID 校验尾防篡改与来源追溯", "passed": passed}
 
-static func _test_uid_legacy_migration() -> Dictionary:
-	var mig1 := ItemEntity.migrate_legacy_uid("KALAR:EQUIP:WEAPON_BLADE:MITHRIL_LONGSWORD", "GM_ITEM_172")
-	var mig2 := ItemEntity.migrate_legacy_uid("KALAR:EQUIP:WEAPON_BLADE:MITHRIL_LONGSWORD", "GM_ITEM_172")
-	var item := ItemEntity.deserialize({"item_id": "GM_ITEM_172", "template_id": "KALAR:EQUIP:WEAPON_BLADE:MITHRIL_LONGSWORD"})
-	# 碰撞守卫：同模板同 item_id 的两件旧档实例，经不同判别子（槽位键/序号）迁移得到互异 UID
-	var dup_a := ItemEntity.migrate_legacy_uid("KALAR:CONSUM:ALCHEMY:POTION_MANA", "KALAR:CONSUM:ALCHEMY:POTION_MANA", "BACKPACK_0")
-	var dup_b := ItemEntity.migrate_legacy_uid("KALAR:CONSUM:ALCHEMY:POTION_MANA", "KALAR:CONSUM:ALCHEMY:POTION_MANA", "BACKPACK_1")
-	# legacy 感知：迁移 UID 通过系统自校验（validate_uid）且来源可溯（prefix_of = LGC_）
-	var legacy_valid := ItemUIDGenerator.validate_uid(mig1) and ItemUIDGenerator.prefix_of(mig1) == "LGC_"
-	var passed: bool = mig1 == mig2 and mig1.begins_with("LGC_") and item.item_uid == mig1 \
-		and dup_a != dup_b and legacy_valid
-	return {"test": "TC-ITEM-UID-04: 旧档无 uid 确定性迁移可复现且同模板多实例判别子防碰撞", "passed": passed}
+static func _test_uid_missing_default_generation() -> Dictionary:
+	var item1 := ItemEntity.deserialize({"item_id": "GM_ITEM_172", "template_id": "KALAR:EQUIP:WEAPON_BLADE:MITHRIL_LONGSWORD"})
+	var item2 := ItemEntity.deserialize({"item_id": "GM_ITEM_172", "template_id": "KALAR:EQUIP:WEAPON_BLADE:MITHRIL_LONGSWORD"})
+	# 缺省重设：缺失 item_uid 时由 ItemUIDGenerator 分配标准 SRV_ 前缀合法 UID，且多次生成各实例全局互异
+	var valid1 := ItemUIDGenerator.validate_uid(item1.item_uid) and ItemUIDGenerator.prefix_of(item1.item_uid) == "SRV_"
+	var valid2 := ItemUIDGenerator.validate_uid(item2.item_uid) and ItemUIDGenerator.prefix_of(item2.item_uid) == "SRV_"
+	var passed: bool = not item1.item_uid.is_empty() and not item2.item_uid.is_empty() and item1.item_uid != item2.item_uid and valid1 and valid2
+	return {"test": "TC-ITEM-UID-04: 物品缺失 uid 反序列化自动重设标准合规默认 UID", "passed": passed}
 
 static func _test_server_grant_idempotent() -> Dictionary:
 	var registry := ServerGrantRegistry.new()

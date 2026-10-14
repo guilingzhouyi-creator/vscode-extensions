@@ -16,9 +16,6 @@
       "DRP_",
       "QST_"
     ],
-    "legacy_prefixes": [
-      "LGC_"
-    ],
     "count_width": 8,
     "start_count": 0
   },

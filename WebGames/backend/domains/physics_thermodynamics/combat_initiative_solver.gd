@@ -2,14 +2,16 @@
 # 模块归属: 业务领域层 (Domains · 核心战斗与魔法集群 (Combat & Magic))
 # 文件路径: res://backend/domains/physics_thermodynamics/combat_initiative_solver.gd
 # 架构定位: Headless Discrete Solver / Numerical Calculator
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/combat.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/combat.json | 信号: EventBus 领域广播
 # 职责说明: 依据双方角色综合属性（敏捷/感知/等级加权 + 装备修正 + 状态增益 + 确定性抖动） 计算先手权与初始 AP 势能差值，并提供三级平局决胜（Tie-breaker）算法。 配置由 config/domains/combat.json initiative_model 驱动，代码零硬编码。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## CombatInitiativeSolver：Headless Discrete Solver / Numerical Calculator
 class_name CombatInitiativeSolver
 extends RefCounted
 
+## ParticipantInitiativeSpec：参战者先攻规格参数模型
 class ParticipantInitiativeSpec extends RefCounted:
 	var participant_id: String = ""
 	var name: String = ""
@@ -55,6 +57,7 @@ class ParticipantInitiativeSpec extends RefCounted:
 		spec.is_first_mover = bool(data.get("is_first_mover", false))
 		return spec
 
+## BattleInitiativeResultDTO：战斗先攻求解结果传输模型
 class BattleInitiativeResultDTO extends RefCounted:
 	var first_mover_id: String = ""
 	var tie_broken_by: String = "NONE"          # "SCORE" / "AGI_FALLBACK" / "RNG_TIEBREAKER"

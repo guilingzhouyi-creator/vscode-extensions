@@ -2,11 +2,12 @@
 # 模块归属: 基础设施层 (Infrastructure · Configuration Core)
 # 文件路径: res://backend/infrastructure/game_config.gd
 # 架构定位: Central Configuration Center
-# 跨域依赖: 上游: 全域业务域、UI表现层快照提供者 | 下游: JSON 文件系统 | 配置: config/**/*.json (66 张配置表) | 信号: 配置重载广播
+# 依赖与触发: 上游: 全域业务域、UI表现层快照提供者 | 下游: JSON 文件系统 | 配置: config/**/*.json (66 张配置表) | 信号: 配置重载广播
 # 职责说明: 全域配置文件的泛用加载与读取层。上层业务（42 领域 / 基础设施 / 前端） 通过本底座以「表名 + 多级路径 + 默认值回退」的方式获取一切数值、文案、 标识与分类定义，实现「零硬编码、全配置驱动」，并支持运行时热重载。  配置表布局（res://config/）: config/<name>.json            -> 表名 "<name>"           （顶层） config/<sub>/<name>.json      -> 表名 "<sub>.<name>"     （嵌套目录，递归加载）  路径语法: 以 "/" 分隔多级键，如 "rates/silver"；支持数组下标 "list/0"。 用法示例: GameConfig.get_int("domains.currency", "rates/silver", 100) GameConfig.get_float("domains.combat", "participant_defaults/hp", 100.0) GameConfig.get_string("narratives.currency", "sink_transaction", "") GameConfig.get_dict("infrastructure.event_categories", "combat", {}) GameConfig.reload_config()   # 热重载：先构建新快照并校验，成功后原子交换（勿命名 reload——被 GDScript 内建遮蔽）
-# 设计依据: WebGames 零硬编码配置驱动总则
+# 退出语义与设计依据: WebGames 零硬编码配置驱动总则
 # ==============================================================================
 
+## GameConfig：Central Configuration Center
 class_name GameConfig extends RefCounted
 
 # ==============================================================================
@@ -395,7 +396,6 @@ static func reload_subtable(subtable_name: String) -> Dictionary:
 # ==============================================================================
 # 四、泛用取值与类型化取值
 # ==============================================================================
-
 static func is_loaded() -> bool:
 	return _loaded
 
@@ -463,6 +463,7 @@ static func get_string(table_name: String, path: String, default: String = "") -
 		return str(v)
 	return default
 
+## 读取配置表指定路径的整型数值
 static func get_int(table_name: String, path: String, default: int = 0) -> int:
 	var v: Variant = get_value(table_name, path, default)
 	if v is int:
@@ -473,6 +474,7 @@ static func get_int(table_name: String, path: String, default: int = 0) -> int:
 		return (v as String).to_int()
 	return default
 
+## 读取配置表指定路径的浮点数值
 static func get_float(table_name: String, path: String, default: float = 0.0) -> float:
 	var v: Variant = get_value(table_name, path, default)
 	if v is float or v is int:
@@ -481,14 +483,17 @@ static func get_float(table_name: String, path: String, default: float = 0.0) ->
 		return (v as String).to_float()
 	return default
 
+## 读取配置表指定路径的布尔值
 static func get_bool(table_name: String, path: String, default: bool = false) -> bool:
 	var v: Variant = get_value(table_name, path, default)
 	return v if v is bool else default
 
+## 读取配置表指定路径的字典结构
 static func get_dict(table_name: String, path: String, default: Dictionary = {}) -> Dictionary:
 	var v: Variant = get_value(table_name, path, default)
 	return v if v is Dictionary else default
 
+## 读取配置表指定路径的数组列表
 static func get_array(table_name: String, path: String, default: Array = []) -> Array:
 	var v: Variant = get_value(table_name, path, default)
 	return v if v is Array else default
@@ -527,6 +532,13 @@ static func _lookup_path_in_table(table: Variant, path: String) -> Variant:
 ## 键名为运行期变量，属动态键，不参与 TC-ARCH-06 的静态键校验（键清单由文案表维护）。
 static func msg(domain_id: String, key: String) -> String:
 	return get_string("narratives." + domain_id, key, key)
+
+## 领域文案统一格式化读取：表 = narratives.<domain_id>，获取模板后经 TemplateFormatter 执行 {param} 填充。
+## 支持大小写键名自适应容错，未命中配置键回退 fallback 或 key 本身。
+static func msg_fmt(domain_id: String, key: String, params: Dictionary = {}, fallback: String = "") -> String:
+	var default_text := fallback if not fallback.is_empty() else key
+	var tpl := get_string("narratives." + domain_id, key, default_text)
+	return TemplateFormatter.format(tpl, params)
 
 # ==============================================================================
 # 五、内部实现（路径解析 / 目录扫描 / 表加载）

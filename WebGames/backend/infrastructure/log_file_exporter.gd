@@ -2,11 +2,12 @@
 # 模块归属: 基础设施层 (Infrastructure · Logging & Telemetry)
 # 文件路径: res://backend/infrastructure/log_file_exporter.gd
 # 架构定位: Log Collector & Stream Processor
-# 跨域依赖: 上游: 全域业务模块与异常拦截器 | 下游: RingBuffer, FileAccess | 配置: config/infrastructure/logging.json | 信号: FATAL/ERROR 级别告警信号
+# 依赖与触发: 上游: 全域业务模块与异常拦截器 | 下游: RingBuffer, FileAccess | 配置: config/infrastructure/logging.json | 信号: FATAL/ERROR 级别告警信号
 # 职责说明: 作为 EventBus 旁路流式消费者，依据 log.json export 配置执行日志落盘、 级别/通道过滤、容量轮转归档与全局序号对账（Inv-LG-3, Inv-LG-4）。
-# 设计依据: 统一结构化日志规范 / 性能基准审计
+# 退出语义与设计依据: 统一结构化日志规范 / 性能基准审计
 # ==============================================================================
 
+## LogFileExporter：Log Collector & Stream Processor
 class_name LogFileExporter extends RefCounted
 
 # ==============================================================================

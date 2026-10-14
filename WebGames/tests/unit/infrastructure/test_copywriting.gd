@@ -18,6 +18,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(_test_missing_params())
 	results.append(_test_domain_resolver_regression())
 	results.append(_test_hot_reload_and_key_registration())
+	results.append(_test_template_formatter_and_msg_fmt())
 
 	var passed_cnt := 0
 	for r in results:
@@ -114,5 +115,27 @@ static func _test_hot_reload_and_key_registration() -> Dictionary:
 	var passed = res.get("success", false) and owner == "item"
 	return {
 		"test": "TC-COPY-06: 键登记与热重载（四域文案键名称注册表登记可查 + 实时读取）",
+		"passed": passed
+	}
+
+## TC-COPY-07: 通用命名占位符与 GameConfig.msg_fmt（大小写容错 + 单源文案取值）
+static func _test_template_formatter_and_msg_fmt() -> Dictionary:
+	var tpl := "测试：{player_name} 在 [{location}]，等级 {LV}！"
+	var formatted := TemplateFormatter.format(tpl, {
+		"PLAYER_NAME": "亚瑟",
+		"location": "卡拉尔圣城",
+		"lv": 10
+	})
+	var check1 := formatted == "测试：亚瑟 在 [卡拉尔圣城]，等级 10！"
+
+	var msg1 := GameConfig.msg_fmt("character_creation", "name_length_invalid", {"min": 2, "max": 16})
+	var check2 := msg1 == "角色名长度须在 2 至 16 字符之间"
+
+	var msg2 := GameConfig.msg_fmt("world_gateway", "slot_not_found", {"slot_id": "SLOT_SP_01"})
+	var check3 := msg2 == "指定档位不存在: SLOT_SP_01"
+
+	var passed: bool = check1 and check2 and check3
+	return {
+		"test": "TC-COPY-07: 命名占位符引擎与 GameConfig.msg_fmt（自适应容错 + 单源读取）",
 		"passed": passed
 	}

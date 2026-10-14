@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/lattice_skill_book/grimoire_authoring_pipeline.gd
 # 架构定位: Business Pipeline / Transaction Safe Orchestrator
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/lattice.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/lattice.json | 信号: EventBus 领域广播
 # 职责说明: 招式手稿物品实例化、藏经阁流通与作者版税分润结算。 ID/名称前缀、默认价格版税与叙事文案由 config/lattice.json、 config/narratives/lattice.json 驱动。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## GrimoireAuthoringPipeline：Business Pipeline / Transaction Safe Orchestrator
 class_name GrimoireAuthoringPipeline extends RefCounted
 
 ## base_market_price / royalty_rate 传 -1 时取配置默认值（GDScript 默认参数须为常量表达式）
@@ -51,6 +52,7 @@ static func publish_manuscript_book(
 
 	return manuscript
 
+## 结算技能书手稿按销量计算的版税收益
 static func settle_book_royalties(manuscript: SkillSubgraphAST.ManuscriptItemEntity, copies_sold: int) -> int:
 	var total_gross := copies_sold * manuscript.market_base_price
 	var author_payout := int(floor(float(total_gross) * manuscript.royalty_percent))

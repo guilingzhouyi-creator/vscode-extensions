@@ -1,6 +1,11 @@
 {
-  "birth_narrative": "【天道轮回·降世新生】冒险者 [%s] 降生于【%s】，身具【%s】血脉！",
-  "karma_exceed": "Karma cost %d exceeds allowance %d",
-  "point_buy_out_of_range": "Attribute %s out of range [%d, %d]: %d",
-  "point_buy_exceed": "Total points spent %d exceeds limit %d"
+  "birth_narrative": "【天道轮回·降世新生】冒险者 [{character_name}] 降生于【{location}】，身具【{bloodline}】血脉！",
+  "karma_exceed": "Karma cost {cost} exceeds allowance {allowance}",
+  "point_buy_out_of_range": "Attribute {attr} out of range [{min}, {max}]: {val}",
+  "point_buy_exceed": "Total points spent {spent} exceeds limit {limit}",
+  "name_length_invalid": "角色名长度须在 {min} 至 {max} 字符之间",
+  "race_not_found": "目标种族不存在: {race_id}",
+  "welcome_message": "欢迎来到卡拉尔世界，冒险者 {character_name}！",
+  "world_not_found": "目标单机世界档案不存在: {world_id}",
+  "world_instance_load_failed": "无法加载目标世界时空实例: {world_id}"
 }

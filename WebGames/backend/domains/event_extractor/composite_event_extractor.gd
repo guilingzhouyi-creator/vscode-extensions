@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/event_extractor/composite_event_extractor.gd
 # 架构定位: Value Object DTO / Data Transport Model
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: item_statistics, telemetry_account_lifecycle | 配置: config/domains/event_extractor.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: item_statistics, telemetry_account_lifecycle | 配置: config/domains/event_extractor.json | 信号: EventBus 领域广播
 # 职责说明: 配置驱动的通用提取管线「分组 → 组合 → 物化 → 投影」： - 分组：以 (account_id, transaction_id) 为组合键分组原始事件批次； - 组合：每组折叠为一个 CompositeEventDTO（物品流 + 货币增量 + 元数据）； - 物化：批量落账号 UID 递归树（复用 ItemStatisticsSolver 既有路径，减量下限 0）； - 投影：配置驱动派生视图（按账号/按物品汇总）。 规则表由 config/domains/event_extractor.json 驱动（零硬编码）； 空键守卫：transaction_id 缺失的原始事件不组合、保持逐条落账（不吞没）； 幂等：processed_keys 字典跨批次共享，已处理组键跳过。
-# 设计依据: 业务域第一性原理 / 架构设计规范
+# 退出语义与设计依据: 业务域第一性原理 / 架构设计规范
 # ==============================================================================
 
+## CompositeEventExtractor：Value Object DTO / Data Transport Model
 class_name CompositeEventExtractor
 extends RefCounted
 

@@ -2,11 +2,12 @@
 # 模块归属: 基础设施层 (Infrastructure · Logging & Telemetry)
 # 文件路径: res://backend/infrastructure/log_retention_cleaner.gd
 # 架构定位: Log Collector & Stream Processor
-# 跨域依赖: 上游: 全域业务模块与异常拦截器 | 下游: RingBuffer, FileAccess | 配置: config/infrastructure/logging.json | 信号: FATAL/ERROR 级别告警信号
+# 依赖与触发: 上游: 全域业务模块与异常拦截器 | 下游: RingBuffer, FileAccess | 配置: config/infrastructure/logging.json | 信号: FATAL/ERROR 级别告警信号
 # 职责说明: 依据 log.json retention 段配置安全扫描并清理超出 max_days 的历史轮转归档文件， 主日志文件永久受保护，带清理间隔节流与磁盘有界收敛保证（有界收敛惯例）。
-# 设计依据: 统一结构化日志留存规范 / 性能基准有界收敛契约
+# 退出语义与设计依据: 统一结构化日志留存规范 / 性能基准有界收敛契约
 # ==============================================================================
 
+## LogRetentionCleaner：Log Collector & Stream Processor
 class_name LogRetentionCleaner extends RefCounted
 
 # ==============================================================================

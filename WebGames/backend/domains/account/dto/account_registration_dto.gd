@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/account/dto/account_registration_dto.gd
 # 架构定位: Value Object DTO / Data Transport Model
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/account.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/account.json | 信号: EventBus 领域广播
 # 职责说明: 规范非游客正常注册的输入与输出数据载荷，屏蔽底层哈希细节。 安全红线：password_plain 仅存在于内存态 Request，严禁入广播/日志/存档。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## AccountRegistrationDTO：Value Object DTO / Data Transport Model
 class_name AccountRegistrationDTO
 extends RefCounted
 
@@ -17,6 +18,7 @@ class Request extends RefCounted:
 	var device_fingerprint: String = ""
 	var initial_entitlements: Array[String] = []
 
+	## 序列化当前对象为通用字典传输结构
 	func to_dto() -> Dictionary:
 		return {
 			"username": username,
@@ -24,6 +26,7 @@ class Request extends RefCounted:
 			"initial_entitlements": initial_entitlements.duplicate()
 		}
 
+	## 从输入字典反序列化还原传输对象
 	static func from_dto(data: Dictionary) -> Request:
 		var req := Request.new()
 		req.username = String(data.get("username", "")).strip_edges()
@@ -43,6 +46,7 @@ class Response extends RefCounted:
 	var username: String = ""
 	var created_timestamp_utc: int = 0
 
+	## 序列化当前对象为通用字典传输结构
 	func to_dto() -> Dictionary:
 		return {
 			"success": success,
@@ -52,6 +56,7 @@ class Response extends RefCounted:
 			"created_timestamp_utc": created_timestamp_utc
 		}
 
+	## 从输入字典反序列化还原传输对象
 	static func from_dto(data: Dictionary) -> Response:
 		var resp := Response.new()
 		resp.success = bool(data.get("success", false))

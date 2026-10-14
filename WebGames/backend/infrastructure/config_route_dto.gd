@@ -2,10 +2,12 @@
 # 模块归属: 基础设施层 (Infrastructure · Configuration Core)
 # 文件路径: res://backend/infrastructure/config_route_dto.gd
 # 架构定位: Configuration Routing DTO
+# 依赖与触发: 触发方: ConfigRouterEngine 路由解析 | 上游: 领域请求键 | 下游: 目标子表路径
 # 职责说明: 封装多配置表点分命名空间解析、别名重定向与路由模式元数据。
-# 设计依据: 演进 01 超大型子域多配置表目录拆分与泛化路由架构
+# 退出语义与设计依据: 演进 01 超大型子域多配置表目录拆分与泛化路由架构
 # ==============================================================================
 
+## ConfigRouteDTO：Configuration Routing DTO
 class_name ConfigRouteDTO extends RefCounted
 
 ## 路由解析模式枚举

@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 实体、物品与世界状态集群 (Entity & World State))
 # 文件路径: res://backend/domains/item_namespace_registry/magic_tier_snapshot.gd
 # 架构定位: Value Object DTO / Data Transport Model
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/item_namespace_registry.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/item_namespace_registry.json | 信号: EventBus 领域广播
 # 职责说明: 魔法体系统一基线数据契约——施法形态（4）、魔法资质（4 档，魔适者为 修炼门槛）、**阶位梯度（连续 1~11 阶，纯强度/规模/技术层级梯度， 无能力分级前缀）、能力分级（异能/英雄/神圣/真神 + 超位，独立平行维度）**、 施法者战斗实力称号（13 级，前三档魔术师 = 非魔法范畴） + 用户纠正（双维度平行体系：阶位梯度 × 能力分级）
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## MagicTierSnapshot：Value Object DTO / Data Transport Model
 class_name MagicTierSnapshot
 extends RefCounted
 

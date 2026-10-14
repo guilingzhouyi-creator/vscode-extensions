@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 实体、物品与世界状态集群 (Entity & World State))
 # 文件路径: res://backend/domains/inventory/wearable_inventory.gd
 # 架构定位: Domain Logic Component
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/inventory.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/inventory.json | 信号: EventBus 领域广播
 # 职责说明: 随身穿戴暗格动态聚合、裸身容量 0 约束、负重超标拦截。 槽位清单/负重上限/分类判定由 config/domains/inventory.json 的 wearable 段驱动。
-# 设计依据: 业务域第一性原理 / 穿戴背包聚合根架构规范
+# 退出语义与设计依据: 业务域第一性原理 / 穿戴背包聚合根架构规范
 # ==============================================================================
 
+## WearableInventoryAggregate：Domain Logic Component
 class_name WearableInventoryAggregate extends RefCounted
 
 const InventoryMetricSnapshotClass = preload("res://backend/domains/inventory/inventory_metric_snapshot.gd")

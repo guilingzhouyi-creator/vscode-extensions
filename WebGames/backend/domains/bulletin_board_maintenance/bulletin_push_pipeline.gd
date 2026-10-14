@@ -2,14 +2,16 @@
 # 模块归属: 业务领域层 (Domains · 治理、权限与持久化集群 (Governance & Persistence))
 # 文件路径: res://backend/domains/bulletin_board_maintenance/bulletin_push_pipeline.gd
 # 架构定位: Business Pipeline / Transaction Safe Orchestrator
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/bulletin_board_maintenance.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/bulletin_board_maintenance.json | 信号: EventBus 领域广播
 # 职责说明: 响应 GM 指令动态修改维护模式或发布紧急停机公告卡片
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## BulletinPushPipeline：Business Pipeline / Transaction Safe Orchestrator
 class_name BulletinPushPipeline
 extends RefCounted
 
+## 切换系统维护状态并向全局广播维护公告
 static func set_maintenance(
 	board: BulletinBoardAggregate,
 	enable_maintenance: bool,

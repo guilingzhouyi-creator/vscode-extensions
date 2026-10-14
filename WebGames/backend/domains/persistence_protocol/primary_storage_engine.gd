@@ -2,13 +2,14 @@
 # 模块归属: 业务领域层 (Domains · 治理、权限与持久化集群 (Governance & Persistence))
 # 文件路径: res://backend/domains/persistence_protocol/primary_storage_engine.gd
 # 架构定位: Primary Domain Storage Engine
-# 跨域依赖: 上游: WorldGateway, AuthService | 下游: SaveManager, GameConfig, EventBusCore
+# 依赖与触发: 上游: WorldGateway, AuthService | 下游: SaveManager, GameConfig, EventBusCore
 # 职责说明: 主要数据储存引擎：负责影响游戏世界状态、用户身份与长期一致性的核心数据持久化，
 #           提供基于毫秒级时限的“最小可运行世界状态”快速恢复（TTFI 优化），
 #           严格落实三段式原子写、SHA-256 签名完整性与损坏自动回滚自愈。
-# 设计依据: 双域储存架构主要数据域规范
+# 退出语义与设计依据: 双域储存架构主要数据域规范
 # ==============================================================================
 
+## PrimaryStorageEngine：Primary Domain Storage Engine
 class_name PrimaryStorageEngine extends RefCounted
 
 const StorageContractInterfaces = preload("res://backend/domains/persistence_protocol/storage_contract_interfaces.gd")
@@ -32,6 +33,7 @@ const DEFAULT_MAX_HP: float = 100.0
 
 static var _instance = null
 
+## 获取单例全局静态唯一实例
 static func get_instance() -> RefCounted:
 	if _instance == null:
 		_instance = new()

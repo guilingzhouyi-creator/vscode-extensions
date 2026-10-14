@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 治理、权限与持久化集群 (Governance & Persistence))
 # 文件路径: res://backend/domains/version_governance/version_state_machine.gd
 # 架构定位: Domain FSM / Lifecycle Session Engine
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/version_governance.json | 信号: EventBus 领域广播
-# 职责说明: 严格管控版本从发现、分群、推送、授权、下载、校验、暂存、激活到运行的 9 大单向状态及 4 大异常状态跃迁
-# 设计依据: 业务域第一性原理 / 架构设计规范
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/version_governance.json | 信号: EventBus 领域广播
+# 职责说明: 严格管控版本从发现、分群、推送、授权、下载、校验、本地存储、激活到运行的 9 大单向状态及 4 大异常状态跃迁
+# 退出语义与设计依据: 业务域第一性原理 / 架构设计规范
 # ==============================================================================
 
+## VersionStateMachine：Domain FSM / Lifecycle Session Engine
 class_name VersionStateMachine
 extends RefCounted
 

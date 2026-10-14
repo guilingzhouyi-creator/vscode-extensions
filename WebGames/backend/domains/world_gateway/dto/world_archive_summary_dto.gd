@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 实体、物品与世界状态集群 (Entity & World State))
 # 文件路径: res://backend/domains/world_gateway/dto/world_archive_summary_dto.gd
 # 架构定位: Value Object DTO / Data Transport Model
-# 跨域依赖: 上游: WorldArchiveRepository, WorldGateway | 下游: 无 | 配置: config/domains/world_gateway/core.json | 信号: 无
+# 依赖与触发: 上游: WorldArchiveRepository, WorldGateway | 下游: 无 | 配置: config/domains/world_gateway/core.json | 信号: 无
 # 职责说明: 承载单机与联机世界档案的轻量级摘要元数据，支持网关目录检索与选界展示。
-# 设计依据: 业务域第一性原理 / 架构解耦契约与世界状态隔离规范
+# 退出语义与设计依据: 业务域第一性原理 / 架构解耦契约与世界状态隔离规范
 # ==============================================================================
 
+## WorldArchiveSummaryDTO：Value Object DTO / Data Transport Model
 class_name WorldArchiveSummaryDTO
 extends RefCounted
 

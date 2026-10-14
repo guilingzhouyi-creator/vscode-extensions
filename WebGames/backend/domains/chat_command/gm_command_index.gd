@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/chat_command/gm_command_index.gd
 # 架构定位: Domain Logic Component
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/chat_command.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/chat_command.json | 信号: EventBus 领域广播
 # 职责说明: 维护 GM 命令最近使用索引（MRU 窗口，默认仅最近 20 条）、分页滚动 （页缓冲池回收复用，内存有界）与「最近适配补全」解析 参数由 config/domains/chat_command.json 的 gm_index 段驱动。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## GmCommandIndexSolver：Domain Logic Component
 class_name GmCommandIndexSolver
 extends RefCounted
 

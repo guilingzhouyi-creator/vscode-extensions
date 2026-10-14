@@ -2,17 +2,19 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/localization_i18n/localization_registry_catalog.gd
 # 架构定位: Domain Registry / Specification Catalog
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/localization_i18n.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/localization_i18n.json | 信号: EventBus 领域广播
 # 职责说明: 注册多语言词条字典、多层级回退策略与当前语言环境管理
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## LocalizationRegistryCatalog：Domain Registry / Specification Catalog
 class_name LocalizationRegistryCatalog
 extends RefCounted
 
 ## 全局共享词库实例（懒加载）：启动即灌入 config/i18n 双词典（英文唯一底座 + 中文展示层）
 static var _shared: LocalizationRegistryCatalog = null
 
+## 获取共享的通用单例或数据引用
 static func get_shared() -> LocalizationRegistryCatalog:
 	if _shared == null:
 		_shared = LocalizationRegistryCatalog.new()

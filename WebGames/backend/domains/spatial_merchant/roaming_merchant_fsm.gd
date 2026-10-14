@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 经济、交易与物流集群 (Economy & Trade))
 # 文件路径: res://backend/domains/spatial_merchant/roaming_merchant_fsm.gd
 # 架构定位: Domain FSM / Lifecycle Session Engine
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/spatial_merchant.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/spatial_merchant.json | 信号: EventBus 领域广播
 # 职责说明: 管理游荡商人定居点停靠刷新、停留时限耗尽自动拔营与交易阻断
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## RoamingMerchantFSM：Domain FSM / Lifecycle Session Engine
 class_name RoamingMerchantFSM
 extends RefCounted
 

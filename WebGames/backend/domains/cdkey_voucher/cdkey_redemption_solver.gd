@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 经济、交易与物流集群 (Economy & Trade))
 # 文件路径: res://backend/domains/cdkey_voucher/cdkey_redemption_solver.gd
 # 架构定位: Headless Discrete Solver / Numerical Calculator
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/cdkey_voucher.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/cdkey_voucher.json | 信号: EventBus 领域广播
 # 职责说明: 兑换码检定、复合门槛规则引擎、防枚举、频控/时效/全服上限与邮件发放； 全部运营 CDKey 兑换必须经此域，禁止绕过（chat_command 路径仅为开发/测试通道）。 频控防爆破、时效门槛检定、原子核销记录与防并发重放  配置驱动: 频控阈值与锁定时长 -> config/domains/cdkey_voucher.json 的 rate_limit.* 全部错误/成功文案   -> config/narratives/cdkey_voucher.json 代码零硬编码，改文案与调阈值无需重新编译。
-# 设计依据: 业务域第一性原理 / 经济交易兑换码架构规范
+# 退出语义与设计依据: 业务域第一性原理 / 经济交易兑换码架构规范
 # ==============================================================================
 
+## CDKeyRedemptionSolver：Headless Discrete Solver / Numerical Calculator
 class_name CDKeyRedemptionSolver
 extends RefCounted
 

@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/gacha_wish/gacha_execution_service.gd
 # 架构定位: Domain Service / State Orchestrator
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: currency_economy, inventory | 配置: config/domains/gacha.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: currency_economy, inventory | 配置: config/domains/gacha.json | 信号: EventBus 领域广播
 # 职责说明: 货币扣款结算、十连祈愿批处理与掉落物品实例化入包； 掉落物品走物品注册表三元组（掉落表 item_ids 为已登记 canonical_id， 原型属性为单一事实源，未登记/容量不足严格计入失败，不造临时物件）。 汇率与文案由 config/domains/currency.json、config/domains/gacha.json、 config/narratives/gacha.json 驱动。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## GachaExecutionService：Domain Service / State Orchestrator
 class_name GachaExecutionService extends RefCounted
 
 static var _completed_transactions: Dictionary = {}

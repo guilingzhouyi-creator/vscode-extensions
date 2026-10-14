@@ -2,13 +2,15 @@
 # 模块归属: 业务领域层 (Domains · 治理、权限与持久化集群 (Governance & Persistence))
 # 文件路径: res://backend/domains/admin_sandbox/sandbox_cheat_solver.gd
 # 架构定位: Headless Discrete Solver / Numerical Calculator
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: currency_economy | 配置: infrastructure.admin.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: currency_economy | 配置: infrastructure.admin.json | 信号: EventBus 领域广播
 # 职责说明: 无敌模式、任意金币道具生成、属性强行修改、世界时钟快进与穿墙瞬移 数值与文案由 config/infrastructure/admin.json、narratives/admin.json 驱动。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## SandboxCheatSolver：Headless Discrete Solver / Numerical Calculator
 class_name SandboxCheatSolver extends RefCounted
 
+## 解析并执行沙盒作弊控制台指令
 static func execute_cheat_command(
 	admin: AdminPermissionAggregate,
 	command_name: String,

@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 角色创建集群 (Character Creation))
 # 文件路径: res://backend/domains/character_creation/agent_playthrough_session.gd
 # 架构定位: Domain Workflow Controller / Playthrough Session
-# 跨域依赖: 上游: Gateway, ModWorkbenchView | 下游: NarrativeDagExecutionEngine, PrologueExecutionKernel, CompanionObserverBus, CompanionBlackboxRecorder | 配置: config/domains/character_creation/core.json | 信号: CompanionObserverBus
+# 依赖与触发: 上游: Gateway, ModWorkbenchView | 下游: NarrativeDagExecutionEngine, PrologueExecutionKernel, CompanionObserverBus, CompanionBlackboxRecorder | 配置: config/domains/character_creation/core.json | 信号: CompanionObserverBus
 # 职责说明: 长程交互式推演会话控制器；编排模组预检适配、身世权威解算、装备物理水化与因果 DAG 逐步推演，维护历史快照调用栈（支持确定性无损回滚与分支跳转），向伴侣总线广播生命周期事件并输出标准观测包。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## AgentPlaythroughSession：Domain Workflow Controller / Playthrough Session
 class_name AgentPlaythroughSession
 extends RefCounted
 

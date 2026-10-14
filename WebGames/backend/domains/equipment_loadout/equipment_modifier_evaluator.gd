@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/equipment_loadout/equipment_modifier_evaluator.gd
 # 架构定位: Domain Resolver / Policy Evaluator
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/equipment.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/equipment.json | 信号: EventBus 领域广播
 # 职责说明: 遍历战备槽位装备，聚合前缀/后缀/符文词条，输出综合六维属性与抗性修正， 并基于生理副本叠加（不污染存档）重算体魄； 符文加成由 config/domains/equipment.json 的 rune_modifiers 段驱动。
-# 设计依据: 业务域第一性原理 / 战备词缀聚合与生理属性叠加规范
+# 退出语义与设计依据: 业务域第一性原理 / 战备词缀聚合与生理属性叠加规范
 # ==============================================================================
 
+## EquipmentModifierEvaluator：Domain Resolver / Policy Evaluator
 class_name EquipmentModifierEvaluator extends RefCounted
 
 # ==============================================================================

@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/character_creation/character_creation_service.gd
 # 架构定位: Domain Service / State Orchestrator
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/character_creation.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/character_creation.json | 信号: EventBus 领域广播
 # 职责说明: 整合种族身世、六维属性、先天天赋与地缘出生点，实例化 CharacterPhysiologySheet （统一六维属性底座三层模型）： - L1 等级层：创角分配为统一 1~6 级（购点/骰点产出，经统一规则校验）； - L2 先天基础系数层：种族系数 × 天赋系数修正（身世/天赋 = 系数修正，不占等级空间）； 寿命尺度与文案由 config/domains/character_creation.json、narratives/character_creation.json 驱动。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## CharacterCreationService：Domain Service / State Orchestrator
 class_name CharacterCreationService extends RefCounted
 
 # ==============================================================================
@@ -135,7 +136,7 @@ static func process_character_creation(
 	var races_dict: Dictionary = GameConfig.get_dict("domains.character_creation", "races_catalog", {})
 	var race_data: Dictionary = races_dict.get(request.selected_race_id, {})
 	if race_data.is_empty():
-		return {"success": false, "error_code": "RACE_NOT_FOUND", "message": "目标种族不存在: %s" % request.selected_race_id}
+		return {"success": false, "error_code": "RACE_NOT_FOUND", "message": GameConfig.msg_fmt("character_creation", "race_not_found", {"race_id": request.selected_race_id})}
 
 	var race_def := RaceDefinitionDTO.from_dto(race_data)
 	if not race_def.is_enabled:

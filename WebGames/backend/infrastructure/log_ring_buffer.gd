@@ -2,11 +2,12 @@
 # 模块归属: 基础设施层 (Infrastructure · Logging & Telemetry)
 # 文件路径: res://backend/infrastructure/log_ring_buffer.gd
 # 架构定位: Log Collector & Stream Processor
-# 跨域依赖: 上游: 全域业务模块与异常拦截器 | 下游: RingBuffer, FileAccess | 配置: config/infrastructure/logging.json | 信号: FATAL/ERROR 级别告警信号
+# 依赖与触发: 上游: 全域业务模块与异常拦截器 | 下游: RingBuffer, FileAccess | 配置: config/infrastructure/logging.json | 信号: FATAL/ERROR 级别告警信号
 # 职责说明: 维持内存中最近 N 条结构化日志（有界收敛），支撑实时检索与运维查询， 容量由 log.json structured/ring_buffer_capacity 配置驱动（有界收敛惯例）。
-# 设计依据: 统一结构化日志规范 / 性能基准审计
+# 退出语义与设计依据: 统一结构化日志规范 / 性能基准审计
 # ==============================================================================
 
+## LogRingBuffer：Log Collector & Stream Processor
 class_name LogRingBuffer extends RefCounted
 
 # ==============================================================================

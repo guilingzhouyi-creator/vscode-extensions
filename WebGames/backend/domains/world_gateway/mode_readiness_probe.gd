@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 实体、物品与世界状态集群 (Entity & World State))
 # 文件路径: res://backend/domains/world_gateway/mode_readiness_probe.gd
 # 架构定位: Domain Probe / Environment Validator
-# 跨域依赖: 上游: WorldGatewayFSM, GameBootstrap | 下游: CanaryRolloutSolver, GameModeRoutingSolver | 配置: config/domains/world_gateway/core.json | 信号: 无
+# 依赖与触发: 上游: WorldGatewayFSM, GameBootstrap | 下游: CanaryRolloutSolver, GameModeRoutingSolver | 配置: config/domains/world_gateway/core.json | 信号: 无
 # 职责说明: 提供单机与联机运行模式环境就绪态探测，执行存储可写性诊断、灰度白名单校验与防越权阻断。
-# 设计依据: 业务域第一性原理 / 模式就绪探测与防越权隔离拓扑规范
+# 退出语义与设计依据: 业务域第一性原理 / 模式就绪探测与防越权隔离拓扑规范
 # ==============================================================================
 
+## ModeReadinessProbe：Domain Probe / Environment Validator
 class_name ModeReadinessProbe
 extends RefCounted
 

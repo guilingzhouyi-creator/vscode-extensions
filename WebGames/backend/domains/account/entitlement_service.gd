@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/account/entitlement_service.gd
 # 架构定位: Domain Service / State Orchestrator
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/account.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/account.json | 信号: EventBus 领域广播
 # 职责说明: 可扩展账号权限/等级字段体系的统一鉴权入口（安全分责）： - 权限字段仅描述账号资格，不直担具体游戏逻辑； - 业务模块一律经 has_entitlement 判断，禁止直读 account.entitlements； - 本地存档为明文（entitlements/encrypted=false）：完整性靠存档密封 （seal 重算比对，防意外损坏/简单篡改），资格合法性靠 allowed 白名单 （空列表=放行全部）与消费端鉴权共同约束，配置由 config/domains/account.json 驱动。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## EntitlementService：Domain Service / State Orchestrator
 class_name EntitlementService extends RefCounted
 
 # ==============================================================================

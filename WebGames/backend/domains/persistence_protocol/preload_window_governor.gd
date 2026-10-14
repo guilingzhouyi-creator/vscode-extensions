@@ -2,13 +2,14 @@
 # 模块归属: 业务领域层 (Domains · 治理、权限与持久化集群 (Governance & Persistence))
 # 文件路径: res://backend/domains/persistence_protocol/preload_window_governor.gd
 # 架构定位: Spatial & Scene Preload Window Governor
-# 跨域依赖: 上游: SpatialMovement, ViewRouter | 下游: GameConfig, BoundedResourceCache
+# 依赖与触发: 上游: SpatialMovement, ViewRouter | 下游: GameConfig, BoundedResourceCache
 # 职责说明: 动态预加载滑动窗口管理器：基于玩家所在场景与空间坐标计算有限预加载范围，
 #           禁止一次性无界全量读取整个世界，配合 BoundedResourceCache 实现内存与 IO
 #           有界控制。
-# 设计依据: 双域储存架构有限预加载窗口与流式拉取规范
+# 退出语义与设计依据: 双域储存架构有限预加载窗口与流式拉取规范
 # ==============================================================================
 
+## PreloadWindowGovernor：Spatial & Scene Preload Window Governor
 class_name PreloadWindowGovernor extends RefCounted
 
 const DEFAULT_WINDOW_RADIUS: float = 100.0
@@ -19,6 +20,7 @@ var _current_position: Vector2 = Vector2.ZERO
 var _current_scene_id: String = ""
 var _window_radius: float = DEFAULT_WINDOW_RADIUS
 
+## 获取单例全局静态唯一实例
 static func get_instance() -> RefCounted:
 	if _instance == null:
 		_instance = new()

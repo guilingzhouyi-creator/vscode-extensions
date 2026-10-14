@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/ground_loot/ground_dropped_item_aggregate.gd
 # 架构定位: Domain Entity / Aggregate Root
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/ground_loot.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/ground_loot.json | 信号: EventBus 领域广播
 # 职责说明: 物品物理落地实例化、挂载微观空间坐标、专属保护期与材质衰变半衰期。 空间位置/拾取半径/保护期/衰变寿命默认值全部由 config/domains/ground_loot.json 驱动（代码零硬编码）；item 实例经 ItemInstanceFactory 生成权威 UID。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## GroundDroppedItemAggregate：Domain Entity / Aggregate Root
 class_name GroundDroppedItemAggregate
 extends RefCounted
 

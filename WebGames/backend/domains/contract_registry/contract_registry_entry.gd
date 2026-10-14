@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/contract_registry/contract_registry_entry.gd
 # 架构定位: Domain Registry / Specification Catalog
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/contract_registry.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/contract_registry.json | 信号: EventBus 领域广播
 # 职责说明: 单一契约端点条目，承载 46 后端域 ↔ 17 前端视图之间的单一事实来源映射定义
-# 设计依据: 业务域第一性原理 / 单一事实源契约条目规范
+# 退出语义与设计依据: 业务域第一性原理 / 单一事实源契约条目规范
 # ==============================================================================
 
+## ContractRegistryEntry：Domain Registry / Specification Catalog
 class_name ContractRegistryEntry
 extends Resource
 

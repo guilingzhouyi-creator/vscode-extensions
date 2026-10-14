@@ -2,11 +2,12 @@
 # 模块归属: 基础设施层 (Infrastructure · Logging & Telemetry)
 # 文件路径: res://backend/infrastructure/logging/unified_logger_service.gd
 # 架构定位: Log Collector & Stream Processor
-# 跨域依赖: 上游: 全域业务模块与异常拦截器 | 下游: RingBuffer, FileAccess | 配置: config/infrastructure/logging.json | 信号: FATAL/ERROR 级别告警信号
+# 依赖与触发: 上游: 全域业务模块与异常拦截器 | 下游: RingBuffer, FileAccess | 配置: config/infrastructure/logging.json | 信号: FATAL/ERROR 级别告警信号
 # 职责说明: 全域统一结构化日志服务：支持按模块分级过滤（DEBUG/INFO/WARN/ERROR/FATAL）、上下文标签绑定、异步缓冲写入与防日志泛滥限流。
-# 设计依据: 统一结构化日志规范 / 性能基准审计
+# 退出语义与设计依据: 统一结构化日志规范 / 性能基准审计
 # ==============================================================================
 
+## UnifiedLoggerService：Log Collector & Stream Processor
 class_name UnifiedLoggerService extends RefCounted
 
 # ==============================================================================
@@ -67,21 +68,27 @@ func _init(p_catalog: Dictionary = {}, p_min_level: Severity = Severity.INFO) ->
 	_message_catalog = p_catalog.duplicate(true)
 	_min_severity = p_min_level
 
+## 设置控制台与日志链路的最低输出日志级别
 func set_min_severity(p_sev: Severity) -> void:
 	_min_severity = p_sev
 
+## 设置是否静音屏蔽控制台的标准输出
 func set_mute_console(p_mute: bool) -> void:
 	_mute_console = p_mute
 
+## 设置是否以独立单机模式运行日志管道
 func set_standalone_mode(p_sp: bool) -> void:
 	_is_standalone_mode = p_sp
 
+## 挂载外部高吞吐环形缓冲区
 func set_ring_buffer(p_buf: Object) -> void:
 	_ring_buffer = p_buf
 
+## 挂载遥测度量指标收集接收器
 func set_metric_sink(p_sink: Object) -> void:
 	_metric_sink = p_sink
 
+## 获取日志服务已注册的事件目录字典
 func get_catalog() -> Dictionary:
 	return _message_catalog
 

@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/contract_registry/contract_registry_index.gd
 # 架构定位: Domain Registry / Specification Catalog
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/contract_registry.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/contract_registry.json | 信号: EventBus 领域广播
 # 职责说明: 集中加载、持有并提供全域 46 域 ↔ 17 视图契约条目的只读检索与审计接口
-# 设计依据: 业务域第一性原理 / 契约注册表架构规范
+# 退出语义与设计依据: 业务域第一性原理 / 契约注册表架构规范
 # ==============================================================================
 
+## ContractRegistryIndex：Domain Registry / Specification Catalog
 class_name ContractRegistryIndex
 extends RefCounted
 
@@ -266,7 +267,7 @@ static func has_contract(contract_id: String) -> bool:
 	return get_contract(contract_id) != null
 
 
-## 完整性审计：对 coverage_marker=MISSING 的占位域返回缺失 DTO/事件/命令 三清单
+## 完整性审计：对 coverage_marker=MISSING 的未覆盖域返回缺失 DTO/事件/命令 三清单
 ## （数据驱动推导，不再硬编码目标域列表）
 static func audit_completeness() -> Dictionary:
 	ensure_loaded()

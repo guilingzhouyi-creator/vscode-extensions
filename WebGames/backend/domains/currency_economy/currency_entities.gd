@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/currency_economy/currency_entities.gd
 # 架构定位: Domain Logic Component
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/currency.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/currency.json | 信号: EventBus 领域广播
 # 职责说明: 铜/银/金/白金换算比率、物理负重约束与战略能源魔单晶本位。 换算比率与单币质量由 config/currency.json 驱动，代码零硬编码。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## CharacterWalletEntity：Domain Logic Component
 class_name CharacterWalletEntity extends RefCounted
 
 const COIN_COPPER: String = "copper"
@@ -25,6 +26,7 @@ var gold: int = 0
 var platinum: int = 0
 var mana_monocrystals: int = 0 # 战略能源高阶本位货币
 
+## 计算当前持有各类货币折算的铜币基准总价值
 func get_total_copper_value() -> int:
 	return (
 		copper * _rate(COIN_COPPER) +
@@ -33,6 +35,7 @@ func get_total_copper_value() -> int:
 		platinum * _rate(COIN_PLATINUM)
 	)
 
+## 计算当前持有货币所产生的物理负重总千克数
 func calculate_total_currency_mass_kg() -> float:
 	return (
 		float(copper) * _mass_kg(COIN_COPPER) +
@@ -139,9 +142,11 @@ func _validate_debt_limit(values: Dictionary) -> bool:
 	var copper_total := int(values.copper) * _rate(COIN_COPPER) + int(values.silver) * _rate(COIN_SILVER) + int(values.gold) * _rate(COIN_GOLD) + int(values.platinum) * _rate(COIN_PLATINUM)
 	return -copper_total <= max_debt
 
+## 转换当前对象为基础字典数据结构
 func to_dictionary() -> Dictionary:
 	return {"copper": copper, "silver": silver, "gold": gold, "platinum": platinum, "mana_monocrystals": mana_monocrystals}
 
+## 从基础字典数据恢复对象状态
 func from_dictionary(values: Dictionary) -> void:
 	for field in CURRENCY_FIELDS:
 		if values.has(field):

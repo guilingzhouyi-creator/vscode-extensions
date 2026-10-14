@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/feature_toggle_canary/canary_rollout_solver.gd
 # 架构定位: Headless Discrete Solver / Numerical Calculator
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/feature_toggle_canary.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/feature_toggle_canary.json | 信号: EventBus 领域广播
 # 职责说明: 确定性哈希散列分流计算 (0~99 Bucket)、白名单优先判定与崩溃自动熔断
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## CanaryRolloutSolver：Headless Discrete Solver / Numerical Calculator
 class_name CanaryRolloutSolver
 extends RefCounted
 

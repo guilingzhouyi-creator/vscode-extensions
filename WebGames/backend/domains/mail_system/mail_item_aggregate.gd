@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/mail_system/mail_item_aggregate.gd
 # 架构定位: Domain Entity / Aggregate Root
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: inventory | 配置: config/domains/mail_system.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: inventory | 配置: config/domains/mail_system.json | 信号: EventBus 领域广播
 # 职责说明: 邮件领域实体定义，包含未读/已读/已领/过期生命周期与附件载荷 DTO
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## MailItemAggregate：Domain Entity / Aggregate Root
 class_name MailItemAggregate
 extends RefCounted
 

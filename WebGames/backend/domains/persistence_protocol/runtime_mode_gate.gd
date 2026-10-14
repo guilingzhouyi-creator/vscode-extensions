@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 治理、权限与持久化集群 (Governance & Persistence))
 # 文件路径: res://backend/domains/persistence_protocol/runtime_mode_gate.gd
 # 架构定位: Domain Logic Component
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: infrastructure.persistence.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: infrastructure.persistence.json | 信号: EventBus 领域广播
 # 职责说明: 维护游戏运行模式，并在运行模式、数据源、生命周期与服务入口四层实施 严格物理隔离，杜绝本地编辑器热更新与非权威数据污染联机体系（Inv-SV-8）。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## RuntimeModeGate：Domain Logic Component
 class_name RuntimeModeGate extends RefCounted
 
 enum Mode {
@@ -14,6 +15,7 @@ enum Mode {
 	ONLINE
 }
 
+## OnlineAuthoritativeSource：在线权威数据源契约模型
 class OnlineAuthoritativeSource extends RefCounted:
 	pass
 

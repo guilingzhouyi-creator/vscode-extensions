@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/character_creation/starter_loadout_dispatcher.gd
 # 架构定位: Domain Logic Component
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/starter_loadout/core.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/starter_loadout/core.json | 信号: EventBus 领域广播
 # 职责说明: 配置与单机命途 MOD 联动驱动的新手初始物资发放与物理水化，含绝对幂等保护：优先按 origin_id 匹配 adapted_mod_manifest 自定义套件，未命中则回退按 race_id 从 starter_loadout 发放并水化注入 CharacterProfile。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## StarterLoadoutDispatcher：Domain Logic Component
 class_name StarterLoadoutDispatcher
 extends RefCounted
 

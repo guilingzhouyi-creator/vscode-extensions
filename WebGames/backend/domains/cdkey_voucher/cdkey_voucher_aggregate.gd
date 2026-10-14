@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 经济、交易与物流集群 (Economy & Trade))
 # 文件路径: res://backend/domains/cdkey_voucher/cdkey_voucher_aggregate.gd
 # 架构定位: Domain Entity / Aggregate Root
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/cdkey_voucher.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/cdkey_voucher.json | 信号: EventBus 领域广播
 # 职责说明: 兑换码批次与凭证领域聚合根，定义通用广播码与一次性唯一码、时效与门槛
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## CDKeyVoucherAggregate：Domain Entity / Aggregate Root
 class_name CDKeyVoucherAggregate
 extends RefCounted
 

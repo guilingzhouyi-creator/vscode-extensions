@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 经济、交易与物流集群 (Economy & Trade))
 # 文件路径: res://backend/domains/cdkey_voucher/redemption_flow_orchestrator.gd
 # 架构定位: Domain Logic Component
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/cdkey_voucher.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/cdkey_voucher.json | 信号: EventBus 领域广播
 # 职责说明: 统一兑换生命周期编排：事务键去重 -> 资格判定/原子核销 -> 成功记录 -> 邮件投递 -> DISPATCH_PENDING 恢复重发。流程一致性契约（）： - 门槛未达标/判定失败：可重试失败态，零核销写入（对齐 ） - 核销成功即写记录（transaction_id 唯一）；投递失败标记 DISPATCH_PENDING， 恢复后按记录重发，不重复核销 - 审计：判定原因/状态跃迁/投递操作结构化留痕（供日志/审计，不暴露客户端）
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## RedemptionFlowOrchestrator：Domain Logic Component
 class_name RedemptionFlowOrchestrator
 extends RefCounted
 

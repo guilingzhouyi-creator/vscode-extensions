@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/hardware_input/input_device_state_aggregate.gd
 # 架构定位: Domain Entity / Aggregate Root
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/hardware_input.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/hardware_input.json | 信号: EventBus 领域广播
 # 职责说明: 监听键盘/鼠标/手柄/触屏输入状态、死区滤波配置与动作重映射表
-# 设计依据: 业务域第一性原理 / 架构设计规范
+# 退出语义与设计依据: 业务域第一性原理 / 架构设计规范
 # ==============================================================================
 
+## InputDeviceStateAggregate：Domain Entity / Aggregate Root
 class_name InputDeviceStateAggregate
 extends RefCounted
 
@@ -66,7 +67,7 @@ static func resolve_escape_menu_action(action_key: String) -> Dictionary:
 	out["action_key"] = action_key
 	return out
 
-## 按当前设备输出 UI 按键提示（手柄/键鼠各自首选绑定，空映射占位）
+## 按当前设备输出 UI 按键提示（手柄/键鼠各自首选绑定，空映射返回问号标识）
 func get_ui_button_prompt(action_name: String) -> String:
 	var bindings: Array = action_mappings.get(action_name, [])
 	if bindings.is_empty():

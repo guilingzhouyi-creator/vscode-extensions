@@ -17,6 +17,34 @@
     "soa_batch": {
       "default_buffer_capacity": 2048,
       "damping_factor": 0.95
+    },
+    "agent_hud_telemetry_packet": {
+      "enabled": true,
+      "preallocate_size": 8,
+      "max_capacity": 64,
+      "allow_overflow_alloc": true,
+      "overflow_warning_threshold": 32
+    },
+    "agent_hud_context_slice": {
+      "enabled": true,
+      "preallocate_size": 16,
+      "max_capacity": 128,
+      "allow_overflow_alloc": true,
+      "overflow_warning_threshold": 64
+    },
+    "agent_action_directive": {
+      "enabled": true,
+      "preallocate_size": 32,
+      "max_capacity": 256,
+      "allow_overflow_alloc": true,
+      "overflow_warning_threshold": 128
+    },
+    "hud_causal_delta": {
+      "enabled": true,
+      "preallocate_size": 32,
+      "max_capacity": 256,
+      "allow_overflow_alloc": true,
+      "overflow_warning_threshold": 128
     }
   },
   "telemetry": {

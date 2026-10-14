@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 治理、权限与持久化集群 (Governance & Persistence))
 # 文件路径: res://backend/domains/telemetry_account_lifecycle/account_lifecycle_pipeline.gd
 # 架构定位: Business Pipeline / Transaction Safe Orchestrator
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/telemetry_account_lifecycle.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/telemetry_account_lifecycle.json | 信号: EventBus 领域广播
 # 职责说明: 追踪注册/登录/创角/进世界/心跳完整生命周期阶段，计算会话留存指标
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## AccountLifecyclePipeline：Business Pipeline / Transaction Safe Orchestrator
 class_name AccountLifecyclePipeline
 extends RefCounted
 

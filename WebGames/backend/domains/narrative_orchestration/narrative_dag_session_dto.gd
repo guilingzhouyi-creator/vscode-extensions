@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 剧情、任务与社交集群 (Narrative & Social))
 # 文件路径: res://backend/domains/narrative_orchestration/narrative_dag_session_dto.gd
 # 架构定位: Domain FSM / Lifecycle Session Engine
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/narrative_orchestration.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/narrative_orchestration.json | 信号: EventBus 领域广播
 # 职责说明: 序列化并承载 DAG 执行引擎的运行时活跃状态、已完成集合与上下文，支持存盘恢复
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## NarrativeDagSessionDTO：Domain FSM / Lifecycle Session Engine
 class_name NarrativeDagSessionDTO
 extends RefCounted
 
@@ -25,6 +26,7 @@ func _init(p_graph_id: String = "") -> void:
 	is_terminated = false
 	snapshot_timestamp_utc = 0
 
+## 序列化当前对象为通用字典传输结构
 func to_dto() -> Dictionary:
 	return {
 		"graph_id": graph_id,
@@ -35,6 +37,7 @@ func to_dto() -> Dictionary:
 		"snapshot_timestamp_utc": snapshot_timestamp_utc
 	}
 
+## 从输入字典反序列化还原传输对象
 static func from_dto(data: Dictionary) -> RefCounted:
 	var dto: NarrativeDagSessionDTO = NarrativeDagSessionDTO.new()
 	if data.is_empty():

@@ -2,11 +2,12 @@
 # 模块归属: 基础设施层 (Infrastructure · Resource Governance)
 # 文件路径: res://backend/infrastructure/resource_governance/bounded_resource_cache.gd
 # 架构定位: Memory Governor / Bounded Cache
-# 跨域依赖: 上游: GameBootstrap, ViewRouter, 资源消费方 | 下游: BoundedResourceCache, CachePolicySpec | 配置: config/infrastructure/resource.json | 信号: 缓存淘汰 / 内存预警事件
+# 依赖与触发: 上游: GameBootstrap, ViewRouter, 资源消费方 | 下游: BoundedResourceCache, CachePolicySpec | 配置: config/infrastructure/resource.json | 信号: 缓存淘汰 / 内存预警事件
 # 职责说明: 有界资源缓存容器：基于 LRU 权重算法管理已载入的只读静态配置与纹理/音效资源，强制受控于内存配额上限，防无界内存泄漏。
-# 设计依据: 有界资源与内存生命周期治理标准
+# 退出语义与设计依据: 有界资源与内存生命周期治理标准
 # ==============================================================================
 
+## BoundedResourceCache：Memory Governor / Bounded Cache
 class_name BoundedResourceCache extends RefCounted
 
 const CachePolicySpec = preload("res://backend/infrastructure/resource_governance/cache_policy_spec.gd")
@@ -113,6 +114,7 @@ func clear_on_hot_reload() -> void:
 	if _spec.allow_hot_reload_clear:
 		clear()
 
+## 清空当前容器或管理器内的所有记录与缓存
 func clear() -> int:
 	var count := _store.size()
 	_store.clear()
@@ -120,9 +122,11 @@ func clear() -> int:
 	_access_order_dict.clear()
 	return count
 
+## 获取当前缓冲区内存储的有效元素数量
 func size() -> int:
 	return maxi(0, _store.size())
 
+## 获取缓存中当前所有活跃条目的键名列表
 func keys() -> Array[String]:
 	var res: Array[String] = []
 	for k in _store:

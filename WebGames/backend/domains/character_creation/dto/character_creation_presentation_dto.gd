@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 角色创建集群 (Character Creation))
 # 文件路径: res://backend/domains/character_creation/dto/character_creation_presentation_dto.gd
 # 架构定位: Data Transfer Object (DTO)
-# 跨域依赖: 上游: AuthoritativeReincarnationSolver / Orchestrator | 下游: Gateway / Client / UI | 配置: config/domains/character_creation/core.json | 信号: 无
+# 依赖与触发: 上游: AuthoritativeReincarnationSolver / Orchestrator | 下游: Gateway / Client / UI | 配置: config/domains/character_creation/core.json | 信号: 无
 # 职责说明: 角色创建完成与权威解算后的表现层传输对象；汇聚六维雷达、身世描述、种族名称、生理概况、钱包与新手装备展示数据。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## CharacterCreationPresentationDTO：Data Transfer Object (DTO)
 class_name CharacterCreationPresentationDTO
 extends RefCounted
 
@@ -32,7 +33,6 @@ var prologue_preview: Dictionary = {}
 # ==============================================================================
 # 二、对象池与重置契约 (ADV-PRF-002)
 # ==============================================================================
-
 func reset_state() -> void:
 	character_id = ""
 	character_name = ""
@@ -52,7 +52,6 @@ func reset_state() -> void:
 # ==============================================================================
 # 三、序列化与工厂方法
 # ==============================================================================
-
 func to_dto() -> Dictionary:
 	return {
 		"character_id": character_id,
@@ -71,6 +70,7 @@ func to_dto() -> Dictionary:
 		"prologue_preview": prologue_preview.duplicate(true)
 	}
 
+## 从输入字典反序列化还原传输对象
 static func from_dto(d: Dictionary) -> CharacterCreationPresentationDTO:
 	var dto := CharacterCreationPresentationDTO.new()
 	if d.is_empty():

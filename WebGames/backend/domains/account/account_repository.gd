@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/account/account_repository.gd
 # 架构定位: Domain Repository / Persistence Engine
-# 跨域依赖: 上游: AuthService, GameBootstrap | 下游: FileAccess, DirAccess, AccountProfileAggregate | 配置: config/domains/account.json | 信号: 无
+# 依赖与触发: 上游: AuthService, GameBootstrap | 下游: FileAccess, DirAccess, AccountProfileAggregate | 配置: config/domains/account.json | 信号: 无
 # 职责说明: 负责全域账号的物理仓储、双层缓存索引（ID与用户名）与原子持久化落盘。
-# 设计依据: 业务域第一性原理 / 账号与槽位生命周期契约 / 事务型存档原子写入规范
+# 退出语义与设计依据: 业务域第一性原理 / 账号与槽位生命周期契约 / 事务型存档原子写入规范
 # ==============================================================================
 
+## AccountRepository：Domain Repository / Persistence Engine
 class_name AccountRepository
 extends RefCounted
 

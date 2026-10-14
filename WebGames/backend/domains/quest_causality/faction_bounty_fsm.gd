@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 剧情、任务与社交集群 (Narrative & Social))
 # 文件路径: res://backend/domains/quest_causality/faction_bounty_fsm.gd
 # 架构定位: Domain FSM / Lifecycle Session Engine
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: inventory | 配置: config/domains/quest.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: inventory | 配置: config/domains/quest.json | 信号: EventBus 领域广播
 # 职责说明: 任务结算阵营声望奖惩、恶名通缉诛杀令跃迁。 通缉阈值与叙事文案由 config/quest.json、config/narratives/quest.json 驱动。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## FactionBountyAndCausalityFSM：Domain FSM / Lifecycle Session Engine
 class_name FactionBountyAndCausalityFSM extends RefCounted
 
 ## 任务结算：阵营声望奖惩叠加 → 恶名通缉阈值判定并广播（诛杀令跃迁）

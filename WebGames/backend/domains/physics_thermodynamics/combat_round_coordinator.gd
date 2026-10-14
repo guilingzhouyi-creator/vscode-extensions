@@ -2,14 +2,16 @@
 # 模块归属: 业务领域层 (Domains · 核心战斗与魔法集群 (Combat & Magic))
 # 文件路径: res://backend/domains/physics_thermodynamics/combat_round_coordinator.gd
 # 架构定位: Domain Logic Component
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/combat.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/combat.json | 信号: EventBus 领域广播
 # 职责说明: 协调玩家操作轴、小回合轴与第三时间轴的三轴联动，判定小回合终点， 支持回合开局预排期离散事件与 0 手牌持续推演保活，防止时间轴中断。 配置由 config/domains/combat.json round_lifecycle 驱动，代码零硬编码。
-# 设计依据: 业务域第一性原理 / 架构设计规范
+# 退出语义与设计依据: 业务域第一性原理 / 架构设计规范
 # ==============================================================================
 
+## CombatRoundCoordinator：Domain Logic Component
 class_name CombatRoundCoordinator
 extends RefCounted
 
+## CombatRoundCoordinatorSnapshotDTO：战斗回合协调快照传输模型
 class CombatRoundCoordinatorSnapshotDTO extends RefCounted:
 	var round_number: int = 1
 	var round_start_timeline_ms: int = 0

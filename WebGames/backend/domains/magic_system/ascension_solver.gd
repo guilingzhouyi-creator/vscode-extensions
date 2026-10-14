@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 核心战斗与魔法集群 (Combat & Magic))
 # 文件路径: res://backend/domains/magic_system/ascension_solver.gd
 # 架构定位: Headless Discrete Solver / Numerical Calculator
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/magic_rules.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/magic_rules.json | 信号: EventBus 领域广播
 # 职责说明: 魔法升格化——消耗指定条件后使目标魔法的现有位阶提升一阶。位阶为独立 数据维度（复用 MagicTierRegistry 阶位梯度 1~11），升格后按新位阶计算 后续效果，**不把升格后的每一级制作为独立技能/新卡**。 最大位阶 / 条件 / 连续升格 / 永久性 / 最高位阶处理由 magic_rules.json 的 ascension 段驱动；与高阶级位形态不变量（god-form 须 SUPERTIER） 冲突时受控拒绝。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## AscensionSolver：Headless Discrete Solver / Numerical Calculator
 class_name AscensionSolver
 extends RefCounted
 

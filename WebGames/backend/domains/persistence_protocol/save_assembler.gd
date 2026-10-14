@@ -2,25 +2,29 @@
 # 模块归属: 业务领域层 (Domains · 治理、权限与持久化集群 (Governance & Persistence))
 # 文件路径: res://backend/domains/persistence_protocol/save_assembler.gd
 # 架构定位: Domain Logic Component
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: infrastructure.persistence.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: infrastructure.persistence.json | 信号: EventBus 领域广播
 # 职责说明: 以 config/infrastructure/domains.json 领域清单为唯一事实来源，把各领域 聚合的 serialize() 产物按清单顺序组装成 SaveManager 的 payload.data， 读取时校验 format_version、经迁移链后回灌各领域静态 deserialize。 清单顺序输出保证 data 键序稳定——这是存档 SHA-256 字节稳定的前提。  扩展约定（新增可存档领域 = 三步，零改动扩散到本文件）: 1. 领域聚合实现实例方法 serialize() -> Dictionary； 2. 领域类实现静态方法 deserialize(d: Dictionary)； 3. 调用方把聚合实例注册进 providers、把 Callable(ItemEntity, "deserialize") 形态的静态反序列化器注册进 consumers。 未注册的领域自然不参与存档；providers 中注册但聚合缺 serialize 的记入 skipped。
-# 设计依据: 业务域第一性原理 / 存档清单组装与链式迁移规范
+# 退出语义与设计依据: 业务域第一性原理 / 存档清单组装与链式迁移规范
 # ==============================================================================
 
+## GameSaveAssembler：Domain Logic Component
 class_name GameSaveAssembler extends RefCounted
 
 ## 逐版本迁移注册表：键 = 来源版本号，值 = { "to": 目标版本, "fn": Callable }。
 ## v1 全域同版为空表；未来升版在此登记迁移函数即可，读取路径无需改动。
 static var _migrations: Dictionary = {}
 
+## 注册从源版本到目标版本的存档迁移变换器
 static func register_migration(from_version: String, to_version: String, migrate: Callable) -> void:
 	_migrations[from_version] = {"to": to_version, "fn": migrate}
 
+## 检查是否存在从源版本到目标版本的迁移规则
 static func has_migration(from_version: String) -> bool:
 	if from_version.is_empty():
 		return false
 	return _migrations.has(from_version)
 
+## 获取指定版本间迁移变换的处理函数
 static func get_migration(from_version: String) -> Dictionary:
 	return _migrations.get(from_version, {})
 
@@ -119,10 +123,9 @@ static func _manifest_entries() -> Array:
 
 
 ## UID 单轨迁移判定器：只读递归扫描存档 payload 中实例物品 item_uid 的
-## 旧档前缀（LGC_，读 domains.item_namespace_registry uid/legacy_prefixes）计数。
-static func audit_legacy_uid(payload_data: Dictionary) -> Dictionary:
-	var prefixes: Array = GameConfig.get_array(
-		"domains.item_namespace_registry", "uid/legacy_prefixes", ["LGC_"])
+## 旧档前缀（LGC_ 等自定义或历史判定，脱离配置真源）计数。
+static func audit_legacy_uid(payload_data: Dictionary, custom_prefixes: Array = ["LGC_"]) -> Dictionary:
+	var prefixes: Array = custom_prefixes
 	var report: Dictionary = {"total_instances": 0, "legacy_uid_count": 0, "legacy_prefixes": prefixes, "legacy_samples": []}
 	_scan_uid_node(payload_data, prefixes, report)
 	report["migration_complete"] = int(report["legacy_uid_count"]) == 0

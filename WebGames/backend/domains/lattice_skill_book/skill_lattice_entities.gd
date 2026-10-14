@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/lattice_skill_book/skill_lattice_entities.gd
 # 架构定位: Domain Logic Component
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/lattice.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/lattice.json | 信号: EventBus 领域广播
 # 职责说明: 技能子图 AST 拓扑结构、SHA-256 签名、典籍手稿实体与藏经阁版税。 默认技能名/手稿名/分类/版税由 config/lattice.json 驱动。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## SkillSubgraphAST：Domain Logic Component
 class_name SkillSubgraphAST
 extends RefCounted
 
@@ -39,6 +40,7 @@ static func deserialize(d: Dictionary) -> SkillSubgraphAST:
 	ast.edges = d.get("edges", [])
 	return ast
 
+## ManuscriptItemEntity：技能书手稿物品实体模型
 class ManuscriptItemEntity extends RefCounted:
 	var item_id: String = ""
 	var custom_name: String = GameConfig.get_string("domains.lattice", "manuscript_defaults/custom_name", "古老剑谱残卷")

@@ -2,11 +2,12 @@
 # 模块归属: 基础设施层 (Infrastructure · Core Engine)
 # 文件路径: res://backend/infrastructure/authority_sync_stub.gd
 # 架构定位: Infrastructure Service
-# 跨域依赖: 上游: 全域业务域 (Domains) | 下游: GameConfig, EventBusCore | 配置: config/infrastructure/*.json | 信号: 无直接信号 (由子系统广播)
+# 依赖与触发: 上游: 全域业务域 (Domains) | 下游: GameConfig, EventBusCore | 配置: config/infrastructure/*.json | 信号: 无直接信号 (由子系统广播)
 # 职责说明: 文字版完备版不落地 WebSocket/ENet，仅定义服务器权威校验与快照差分契约； 客户端预测与插值补偿预留接口，全部配置驱动，零硬编码。
-# 设计依据: WebGames 基础设施分层架构规范
+# 退出语义与设计依据: WebGames 基础设施分层架构规范
 # ==============================================================================
 
+## AuthoritySyncStub：Infrastructure Service
 class_name AuthoritySyncStub extends RefCounted
 
 # ==============================================================================

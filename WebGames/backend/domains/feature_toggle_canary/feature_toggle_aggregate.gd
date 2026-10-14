@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/feature_toggle_canary/feature_toggle_aggregate.gd
 # 架构定位: Domain Entity / Aggregate Root
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/feature_toggle_canary.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/feature_toggle_canary.json | 信号: EventBus 领域广播
 # 职责说明: 特性开关矩阵聚合根、策略分级定义与熔断故障状态追踪
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## FeatureToggleAggregate：Domain Entity / Aggregate Root
 class_name FeatureToggleAggregate
 extends RefCounted
 
@@ -17,6 +18,7 @@ enum RolloutStrategy {
 	GLOBAL_ENABLED      # 全量开放 (100%)
 }
 
+## FeatureFlagEntry：特性标志条目数据模型
 class FeatureFlagEntry extends RefCounted:
 	var feature_key: String = ""            # 如 "FEATURE_2D_CONTINUOUS_MOVEMENT"
 	var strategy: RolloutStrategy = RolloutStrategy.GLOBAL_DISABLED

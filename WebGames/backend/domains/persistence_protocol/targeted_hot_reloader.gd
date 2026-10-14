@@ -2,13 +2,14 @@
 # 模块归属: 业务领域层 (Domains · 治理、权限与持久化集群 (Governance & Persistence))
 # 文件路径: res://backend/domains/persistence_protocol/targeted_hot_reloader.gd
 # 架构定位: Targeted Incremental Hot Reloader
-# 跨域依赖: 上游: GameConfig, VersionGovernance | 下游: ResourceDependencyDAG, AuxiliaryWorkerPool, EventBusCore
+# 依赖与触发: 上游: GameConfig, VersionGovernance | 下游: ResourceDependencyDAG, AuxiliaryWorkerPool, EventBusCore
 # 职责说明: 定向增量热重载器：当某项配置、文案或资源发生变更时，依据资源依赖 DAG
 #           精准计算受影响的失效子图，仅定向重载相关节点；加载失败时安全回退旧缓存，
 #           杜绝因局部更新而粗暴重启整个存储或配置系统。
-# 设计依据: 双域储存架构定向热更与容错回滚规范
+# 退出语义与设计依据: 双域储存架构定向热更与容错回滚规范
 # ==============================================================================
 
+## TargetedHotReloader：Targeted Incremental Hot Reloader
 class_name TargetedHotReloader extends RefCounted
 
 const ResourceDependencyDAG = preload("res://backend/domains/persistence_protocol/resource_dependency_dag.gd")
@@ -24,6 +25,7 @@ static var _instance = null
 var _dag: ResourceDependencyDAG = null
 var _cache_store: Dictionary = {} # node_id -> Variant (最新有效缓存备份)
 
+## 获取单例全局静态唯一实例
 static func get_instance() -> RefCounted:
 	if _instance == null:
 		_instance = new()

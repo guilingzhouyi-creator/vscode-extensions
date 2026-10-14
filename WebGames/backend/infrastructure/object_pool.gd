@@ -2,12 +2,13 @@
 # 模块归属: 基础设施层 (Infrastructure · High Pressure Pooling)
 # 文件路径: res://backend/infrastructure/object_pool.gd
 # 架构定位: Generic RefCounted Object Pool
-# 跨域依赖: 上游: ObjectPoolManager, 业务系统 | 下游: ObjectPoolConfigDTO, ObjectPoolStatsDTO | 配置: config/infrastructure/object_pool.json | 信号: 溢出告警
+# 依赖与触发: 上游: ObjectPoolManager, 业务系统 | 下游: ObjectPoolConfigDTO, ObjectPoolStatsDTO | 配置: config/infrastructure/object_pool.json | 信号: 溢出告警
 # 职责说明: 泛化引用计数对象池核心实现：提供 O(1) LIFO 借还管理、借出彻底重置（reset_state）、
 #           防双重释放安全拦截与基于容量上限的自动丢弃策略，阻断瞬态堆内存碎片。
-# 设计依据: 演进 03 高承压对象池与数据导向无头处理器架构规范
+# 退出语义与设计依据: 演进 03 高承压对象池与数据导向无头处理器架构规范
 # ==============================================================================
 
+## ObjectPool：Generic RefCounted Object Pool
 class_name ObjectPool extends RefCounted
 
 const ObjectPoolConfigDTO = preload("res://backend/infrastructure/object_pool_config_dto.gd")
@@ -92,6 +93,7 @@ func release(obj: RefCounted) -> bool:
 		_stats.idle_in_pool = _idle_stack.size()
 		return true
 
+## 清空当前容器或管理器内的所有记录与缓存
 func clear() -> void:
 	_idle_stack.clear()
 	_acquired_set.clear()
@@ -99,8 +101,10 @@ func clear() -> void:
 	_stats.active_in_use = 0
 	_stats.total_allocated = 0
 
+## 获取当前对象池的运行统计数据快照
 func get_stats() -> ObjectPoolStatsDTO:
 	return _stats
 
+## 获取当前组件配置参数数据传输对象
 func get_config() -> ObjectPoolConfigDTO:
 	return _config

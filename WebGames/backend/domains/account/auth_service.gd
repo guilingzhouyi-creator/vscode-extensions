@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/account/auth_service.gd
 # 架构定位: Domain Service / State Orchestrator
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/account.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/account.json | 信号: EventBus 领域广播
 # 职责说明: 离线游客速通创建、加盐哈希密码鉴权与会话 Token 签发。 盐/默认值/错误码/会话 TTL 由 config/domains/account.json 与 config/infrastructure/admin.json（session.*）驱动，代码零硬编码。
-# 设计依据: 业务域第一性原理 / 账号与槽位生命周期契约
+# 退出语义与设计依据: 业务域第一性原理 / 账号与槽位生命周期契约
 # ==============================================================================
 
+## AuthService：Domain Service / State Orchestrator
 class_name AuthService extends RefCounted
 
 const AccountRegistrationDTO = preload("res://backend/domains/account/dto/account_registration_dto.gd")
@@ -189,20 +190,10 @@ static func authenticate_local(username: String, pass_plain: String, account: Ac
 	if not device_fingerprint.is_empty() and not account.local_device_fingerprint.is_empty() and device_fingerprint != account.local_device_fingerprint:
 		var code_fp := GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "auth/errors/device_mismatch", "ERR_DEVICE_MISMATCH")
 		return {"success": false, "code": code_fp, "token": ""}
-	# 口令双态校验（盐重铸链）：salt_version==0 空盐历史档先按空盐比对，通过即重哈希落盘并升级 salt_version=1（login-time 重铸，不强制重置口令）
+	# 口令单轨校验：统一按配置盐哈希（向前兼容，无向后历史包袱）
 	var input_hash := hash_password(pass_plain)
-	var legacy_hash := pass_plain.sha256_text()
 	var matched := account.username == username and (account.is_guest_mode or account.password_hash_sha256 == input_hash)
-	var needs_rehash := false
-	if not matched and not account.is_guest_mode and account.salt_version == 0 and account.password_hash_sha256 == legacy_hash:
-		matched = true
-		needs_rehash = true
 	if matched:
-		if needs_rehash:
-			account.password_hash_sha256 = hash_password(pass_plain)
-			account.salt_version = 1
-			if not account.account_id.is_empty():
-				AccountRepository.get_instance().save_account(account)
 		account.last_login_timestamp_utc = int(Time.get_unix_time_from_system())
 		if not device_fingerprint.is_empty():
 			account.local_device_fingerprint = device_fingerprint
@@ -237,7 +228,7 @@ static func authenticate_local(username: String, pass_plain: String, account: Ac
 		})
 		_dispatch_auth_hooks("post_login", {"account_id": account.account_id, "username": account.username, "token": token, "auto_enter_gateway": auto_enter})
 
-		return {"success": true, "code": code_ok, "token": token, "account_id": account.account_id, "username": account.username, "issued_at": issued_at, "expires_at": issued_at + ttl, "rehashed": needs_rehash, "auto_enter_gateway": auto_enter}
+		return {"success": true, "code": code_ok, "token": token, "account_id": account.account_id, "username": account.username, "issued_at": issued_at, "expires_at": issued_at + ttl, "rehashed": false, "auto_enter_gateway": auto_enter}
 	var code_inv := GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "auth/errors/invalid_credentials", "ERR_INVALID_CREDENTIALS")
 	return {"success": false, "code": code_inv, "token": ""}
 

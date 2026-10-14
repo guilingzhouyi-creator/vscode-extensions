@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 经济、交易与物流集群 (Economy & Trade))
 # 文件路径: res://backend/domains/trading_logistics/caravan_logistics_fsm.gd
 # 架构定位: Domain FSM / Lifecycle Session Engine
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/trading.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/trading.json | 信号: EventBus 领域广播
 # 职责说明: 商队运输进度推进、沿途遇袭劫掠风险计算与货物运抵结算。 风险系数与叙事文案由 config/trading.json、config/narratives/trading.json 驱动。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## CaravanLogisticsFSM：Domain FSM / Lifecycle Session Engine
 class_name CaravanLogisticsFSM extends RefCounted
 
 ## 商队进度推进：进度封顶 + 劫镖风险判定（危险度×系数 − 护卫×保护）→ 遇袭/运抵叙事广播

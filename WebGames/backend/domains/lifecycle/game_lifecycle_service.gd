@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/lifecycle/game_lifecycle_service.gd
 # 架构定位: Domain Service / State Orchestrator
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/lifecycle.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/lifecycle.json | 信号: EventBus 领域广播
 # 职责说明: 编排多阶段安全停机管线（输入冻结 ➔ 持久化刷盘 ➔ 凭证注销 ➔ 引擎反装配）与统一 EventBus 广播
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## GameLifecycleService：Domain Service / State Orchestrator
 class_name GameLifecycleService
 extends RefCounted
 
@@ -184,6 +185,7 @@ static func _execute_registered_shutdown_resources(resp: GameShutdownDTO.Respons
 		return {"success": false, "error_code": critical_error_code}
 	return {"success": true, "error_code": ""}
 
+## ShutdownStageContext：关机阶段上下文传输模型
 class ShutdownStageContext extends RefCounted:
 	var stage: String = ""
 	var request: GameShutdownDTO.Request

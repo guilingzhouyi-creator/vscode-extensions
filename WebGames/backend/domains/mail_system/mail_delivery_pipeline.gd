@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/mail_system/mail_delivery_pipeline.gd
 # 架构定位: Business Pipeline / Transaction Safe Orchestrator
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: inventory | 配置: config/domains/mail_system.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: inventory | 配置: config/domains/mail_system.json | 信号: EventBus 领域广播
 # 职责说明: 一键提取邮件附件、随身背包满仓安全保护（未提取附件安全留存）； 附件物品发放走物品注册表三元组（template_id 必填为已登记 canonical_id， 未登记附件不可提取，安全留存于邮件等待修复后重试）。
-# 设计依据: 业务域第一性原理 / 架构设计规范
+# 退出语义与设计依据: 业务域第一性原理 / 架构设计规范
 # ==============================================================================
 
+## MailDeliveryPipeline：Business Pipeline / Transaction Safe Orchestrator
 class_name MailDeliveryPipeline
 extends RefCounted
 
@@ -17,6 +18,7 @@ static var _claimed_results: Dictionary = {}
 static func _claim_cache_key(mail: MailItemAggregate) -> String:
 	return "%s::%s" % [mail.recipient_account_id, mail.mail_id]
 
+## 领取指定单个邮件的附件奖励
 static func claim_single_mail(
 	mail: MailItemAggregate,
 	wallet: CharacterWalletEntity,
@@ -108,6 +110,7 @@ static func claim_single_mail(
 		FifoBudget.trim_oldest(_claimed_results, GameConfig.get_int("infrastructure.admin", "idempotency/max_records", 1000))
 	return result
 
+## 一键领取所有未领邮件的附件奖励
 static func claim_all_mails(
 	mailbox: MailboxManager,
 	wallet: CharacterWalletEntity,

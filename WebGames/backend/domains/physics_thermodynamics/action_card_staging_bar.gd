@@ -2,14 +2,16 @@
 # 模块归属: 业务领域层 (Domains · 核心战斗与魔法集群 (Combat & Magic))
 # 文件路径: res://backend/domains/physics_thermodynamics/action_card_staging_bar.gd
 # 架构定位: Domain Logic Component
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/combat.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/combat.json | 信号: EventBus 领域广播
 # 职责说明: 维护参与者手牌待发栏（Staging Bar）队列、容量上限与满载溢出缓冲机制。 待发栏满载时第三时间轴绝不阻塞，依配置执行 DISCARD_OLDEST 或 CONVERT_AP。 配置由 config/domains/combat.json staging_bar 驱动，代码零硬编码。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## ActionCardStagingBar：Domain Logic Component
 class_name ActionCardStagingBar
 extends RefCounted
 
+## StagingBarSnapshotDTO：待发栏快照数据传输模型
 class StagingBarSnapshotDTO extends RefCounted:
 	var owner_id: String = ""
 	var max_capacity: int = 5

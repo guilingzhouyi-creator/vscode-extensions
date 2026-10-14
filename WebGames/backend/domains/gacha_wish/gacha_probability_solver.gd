@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/gacha_wish/gacha_probability_solver.gd
 # 架构定位: Headless Discrete Solver / Numerical Calculator
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: currency_economy, inventory | 配置: config/domains/gacha.json | 信号: EventBus 领域广播
-# 职责说明: 工业级 PRNG 动态概率算法：小保底 70 抽软保底递增、90 抽硬保底、50/50 歪率与大保底机制 概率常数与保底阈值由 config/domains/gacha.json 驱动，代码零硬编码。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: currency_economy, inventory | 配置: config/domains/gacha.json | 信号: EventBus 领域广播
+# 职责说明: 伪随机数生成器 (PRNG) 动态概率算法：小保底 70 抽软保底递增、90 抽硬保底、50/50 歪率与大保底机制 概率常数与保底阈值由 config/domains/gacha.json 驱动，代码零硬编码。
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## GachaProbabilitySolver：Headless Discrete Solver / Numerical Calculator
 class_name GachaProbabilitySolver extends RefCounted
 
 ## 5 星基础概率（domains.gacha rates/base_5star 配置，默认 0.006）

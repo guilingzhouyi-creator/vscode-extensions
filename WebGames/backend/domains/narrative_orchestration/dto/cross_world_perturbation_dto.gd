@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 剧情、任务与社交集群 (Narrative & Social))
 # 文件路径: res://backend/domains/narrative_orchestration/dto/cross_world_perturbation_dto.gd
 # 架构定位: Value Object DTO / Data Transport Model
-# 跨域依赖: 上游: CrossWorldPerturbationBroker, WorldGateway | 下游: GameConfig | 配置: config/domains/narrative_orchestration/core.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: CrossWorldPerturbationBroker, WorldGateway | 下游: GameConfig | 配置: config/domains/narrative_orchestration/core.json | 信号: EventBus 领域广播
 # 职责说明: 封装跨世界因果虚空共鸣扰动载荷（源世界、半衰期、共鸣强度、语义标签及已访问世界索引）
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## CrossWorldPerturbationDTO：Value Object DTO / Data Transport Model
 class_name CrossWorldPerturbationDTO
 extends RefCounted
 

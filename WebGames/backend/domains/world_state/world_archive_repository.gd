@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 实体、物品与世界状态集群 (Entity & World State))
 # 文件路径: res://backend/domains/world_state/world_archive_repository.gd
 # 架构定位: Domain Repository / Persistence Engine
-# 跨域依赖: 上游: GameBootstrap, WorldGateway | 下游: FileAccess, DirAccess, WorldInstance | 配置: config/domains/world_gateway/core.json | 信号: 无
+# 依赖与触发: 上游: GameBootstrap, WorldGateway | 下游: FileAccess, DirAccess, WorldInstance | 配置: config/domains/world_gateway/core.json | 信号: 无
 # 职责说明: 负责单机世界档案的物理仓储、目录索引维护、世界子目录管理与状态原子落盘。
-# 设计依据: 业务域第一性原理 / 单机世界隔离拓扑与事务型原子落盘规范
+# 退出语义与设计依据: 业务域第一性原理 / 单机世界隔离拓扑与事务型原子落盘规范
 # ==============================================================================
 
+## WorldArchiveRepository：Domain Repository / Persistence Engine
 class_name WorldArchiveRepository
 extends RefCounted
 

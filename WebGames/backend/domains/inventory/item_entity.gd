@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 实体、物品与世界状态集群 (Entity & World State))
 # 文件路径: res://backend/domains/inventory/item_entity.gd
 # 架构定位: Domain Entity / Aggregate Root
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/inventory.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/inventory.json | 信号: EventBus 领域广播
 # 职责说明: 万物物品聚合根、物理材质硬度、刃口常数与裸身容量 0 约束。 物品默认属性由 config/domains/inventory.json 的 item_defaults 段驱动。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## ItemEntity：Domain Entity / Aggregate Root
 class_name ItemEntity extends RefCounted
 
 # ==============================================================================
@@ -30,7 +31,6 @@ const CATEGORY_QUEST_MISC: String = "QUEST_MISC"
 # ==============================================================================
 # 二、配置静态缓存与物品字段（默认值来自 item_defaults 配置段）
 # ==============================================================================
-
 class ItemDefaultsCache extends RefCounted:
 	var custom_name: String = "未命名物品"
 	var category: String = CATEGORY_QUEST_MISC
@@ -161,17 +161,19 @@ func mount_attribute(mount: ItemAttributeMountInstance) -> void:
 ## 两处刻意保留的差异兜底：custom_name 走独立的 deserialize_name 键（损坏存档回落
 ## 「未知物品」而非「未命名物品」）；combat_metrics / affix_sockets 缺键回落空字典
 ## （非配置富缺省，与既有存档兼容语义一致）。
-static func deserialize(d: Dictionary, legacy_discriminator: String = "") -> ItemEntity:
+static func deserialize(d: Dictionary) -> ItemEntity:
 	var item := ItemEntity.new()
 	if d == null:
 		return item
 	item.item_id = str(d.get("item_id", item.item_id))
 	item.item_uid = d.get("item_uid", "")
 	item.template_id = str(d.get("template_id", item.template_id))
-	# 旧档无 uid：确定性迁移派生（可复现，不改变原型语义）；
-	# legacy_discriminator 供同模板多实例（item_id 相同）区分，防迁移 UID 碰撞
-	if item.item_uid.is_empty() and not item.template_id.is_empty():
-		item.item_uid = migrate_legacy_uid(item.template_id, item.item_id, legacy_discriminator)
+	# 缺省 UID 重设默认值：自动分配新架构标准服务端发放 UID（权威/可追溯/合规）
+	if item.item_uid.is_empty():
+		var gen_uid := ItemUIDGenerator.generate_uid("SRV_")
+		if gen_uid.is_empty():
+			gen_uid = "SRV_00000001" + "SRV_1".sha256_text().substr(0, 2)
+		item.item_uid = gen_uid
 	item.custom_name = d.get("custom_name", _ensure_defaults().deserialize_name)
 	item.category = d.get("category", item.category)
 	item.mass_kg = maxf(0.0, float(d.get("mass_kg", item.mass_kg)))
@@ -242,12 +244,3 @@ static func from_payload(
 	if payload.has("item_uid"):
 		item.item_uid = str(payload["item_uid"])
 	return item
-
-## 旧档 UID 确定性迁移：template_id + item_id（+ 可选实例判别子）→ 固定派生（可复现、零随机）。
-## 判别子用于同模板多实例（item_id 相同）区分：传入槽位键/序号等每实例唯一值，
-## 缺省空串保持原行为（唯一 item_id 场景向后兼容）。
-static func migrate_legacy_uid(template_id: String, legacy_item_id: String, instance_discriminator: String = "") -> String:
-	var raw := template_id + ":" + legacy_item_id
-	if not instance_discriminator.is_empty():
-		raw += ":" + instance_discriminator
-	return "LGC_" + raw.sha256_text().substr(0, 20)

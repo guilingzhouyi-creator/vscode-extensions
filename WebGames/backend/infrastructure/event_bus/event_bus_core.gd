@@ -2,11 +2,12 @@
 # 模块归属: 基础设施层 (Infrastructure · EventBus)
 # 文件路径: res://backend/infrastructure/event_bus/event_bus_core.gd
 # 架构定位: Event Broker / Decoupling Foundation
-# 跨域依赖: 上游: 全域 47 业务域服务、GM追缴、网络层 | 下游: EventChannel, EventSubscriberToken | 配置: config/infrastructure/event_bus.json | 信号: 全域领域事件中心分发
+# 依赖与触发: 上游: 全域 47 业务域服务、GM追缴、网络层 | 下游: EventChannel, EventSubscriberToken | 配置: config/infrastructure/event_bus.json | 信号: 全域领域事件中心分发
 # 职责说明: 全域解耦事件中枢核心单例：提供强类型事件订阅、通道路由、同步即时派发与异步队列缓冲支持；包含强弱引用生命周期管理，彻底防范观察者内存泄漏与悬挂指针双重广播。
-# 设计依据: 事件总线解耦规范 / 前后端通信隔离契约
+# 退出语义与设计依据: 事件总线解耦规范 / 前后端通信隔离契约
 # ==============================================================================
 
+## EventBusCore：Event Broker / Decoupling Foundation
 class_name EventBusCore
 extends RefCounted
 
@@ -67,6 +68,7 @@ func borrow_packet(channel_id: int, category_mask: int, payload: Variant = null)
 	packet.payload_data = payload
 	return packet
 
+## 回收事件包至对象池，杜绝堆碎片产生
 func recycle_packet(packet: EventPacket) -> void:
 	if packet == null:
 		return
@@ -98,6 +100,7 @@ func on_spatial(pos: Vector3, radius: float, callback: Callable) -> EventBusSubs
 	_spatial_grid.register_listener(token_id, pos, radius, callback)
 	return EventBusSubscriptionToken.new(self, 0, 0, callback, true, token_id)
 
+## 订阅二维空间局部范围事件通知
 func on_spatial_2d(pos_2d: Vector2, radius: float, callback: Callable, is_isometric_xz: bool = false) -> EventBusSubscriptionToken:
 	_seq_counter += 1
 	var token_id: int = _seq_counter
@@ -118,7 +121,7 @@ func _unregister_token(token: EventBusSubscriptionToken) -> void:
 # 原语 ①：dispatch_now（即时同步因果 + 递归熔断）
 # ==============================================================================
 
-## 深度索引化暂存准备（复用不重建，零热路径堆分配）
+## 深度索引化临时工作区准备（复用不重建，零热路径堆分配）
 func _prepare_dispatch_scratch(depth: int) -> void:
 	if depth >= _target_scratch.size():
 		_target_scratch.resize(depth + 1)
@@ -141,6 +144,7 @@ func _collect_channel_subscribers(channel_id: int, packet: EventPacket, seen: Di
 			seen[tok] = true
 			targets.append(tok)
 
+## 即时同步分发因果事件，执行递归熔断与死循环拦截
 func dispatch_now(packet: EventPacket) -> void:
 	if packet == null:
 		return
@@ -182,7 +186,6 @@ func dispatch_now(packet: EventPacket) -> void:
 # ==============================================================================
 # 原语 ②：enqueue_frame + flush_frame_events（帧级双缓冲合批）
 # ==============================================================================
-
 func enqueue_frame(packet: EventPacket) -> bool:
 	if packet == null:
 		return false
@@ -198,6 +201,7 @@ func enqueue_frame(packet: EventPacket) -> bool:
 		recycle_packet(packet)
 	return ok
 
+## 刷新并分发当前帧所有缓冲队列事件包
 func flush_frame_events() -> int:
 	return _ring_buffer.flush_frame(func(packet: EventPacket) -> void:
 		dispatch_now(packet)
@@ -207,7 +211,6 @@ func flush_frame_events() -> int:
 # ==============================================================================
 # 原语 ③：dispatch_spatial / dispatch_spatial_2d（空间AoI定向裁剪）
 # ==============================================================================
-
 func dispatch_spatial(packet: EventPacket, origin: Vector3, radius: float) -> int:
 	if packet == null:
 		return 0
@@ -216,6 +219,7 @@ func dispatch_spatial(packet: EventPacket, origin: Vector3, radius: float) -> in
 	packet.set_spatial_header(origin, radius)
 	return _spatial_grid.dispatch_packet(packet)
 
+## 按二维平面圆形范围向局部侦听器广播事件
 func dispatch_spatial_2d(packet: EventPacket, origin_2d: Vector2, radius: float, is_isometric_xz: bool = false) -> int:
 	if packet == null:
 		return 0
@@ -236,9 +240,11 @@ func get_spatial_cell_size() -> float:
 func get_frame_buffer_capacity() -> int:
 	return _ring_buffer.capacity()
 
+## 获取事件总线允许的最大递归嵌套分发深度
 func get_max_dispatch_depth() -> int:
 	return _max_depth
 
+## 获取指定事件或对象的专用缓存池
 func get_pool() -> EventPool:
 	return _pool
 

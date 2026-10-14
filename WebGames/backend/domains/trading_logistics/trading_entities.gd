@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 经济、交易与物流集群 (Economy & Trade))
 # 文件路径: res://backend/domains/trading_logistics/trading_entities.gd
 # 架构定位: Domain Logic Component
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/trading.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/trading.json | 信号: EventBus 领域广播
 # 职责说明: 城镇局部集市商品库存供需弹性参数、跨国商队货单与护卫编队。 默认商品/商队参数由 config/trading.json 驱动。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## TownMarketCommodity：Domain Logic Component
 class_name TownMarketCommodity extends RefCounted
 
 var item_id: String = ""
@@ -21,6 +22,7 @@ var last_price: int = -1              # 上次成交价（变化率上限比较�
 var accumulated_volume: float = 0.0   # 累计成交量（成交量反馈输入）
 var last_price_tick: int = 0          # 上次定价的世界刻度（时间演化相位基准）
 
+## TradeCaravanEntity：商队货运行动实体模型
 class TradeCaravanEntity extends RefCounted:
 	var caravan_id: String = ""
 	var origin_town_id: String = GameConfig.get_string("domains.trading", "caravan_defaults/origin_town_id", "TOWN_A")

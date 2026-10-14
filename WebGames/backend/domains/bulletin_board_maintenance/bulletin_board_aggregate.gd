@@ -2,14 +2,16 @@
 # 模块归属: 业务领域层 (Domains · 治理、权限与持久化集群 (Governance & Persistence))
 # 文件路径: res://backend/domains/bulletin_board_maintenance/bulletin_board_aggregate.gd
 # 架构定位: Domain Entity / Aggregate Root
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/bulletin_board_maintenance.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/bulletin_board_maintenance.json | 信号: EventBus 领域广播
 # 职责说明: 维护公告卡片列表、维护倒计时模式与准入白名单状态
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## BulletinBoardAggregate：Domain Entity / Aggregate Root
 class_name BulletinBoardAggregate
 extends RefCounted
 
+## BulletinCardDTO：公告卡片数据传输模型
 class BulletinCardDTO extends RefCounted:
 	var card_id: String = ""
 	var priority: int = GameConfig.get_int("domains.bulletin_board_maintenance", "defaults/priority", 100)                 # 权重 (数字越大越靠前)

@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 经济、交易与物流集群 (Economy & Trade))
 # 文件路径: res://backend/domains/workshop_forge/socket_inscription_service.gd
 # 架构定位: Domain Service / State Orchestrator
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: currency_economy | 配置: config/domains/workshop.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: currency_economy | 配置: config/domains/workshop.json | 信号: EventBus 领域广播
 # 职责说明: 装备孔位打孔开槽、符文铭刻与神圣附魔矩阵共鸣 孔位默认与上限由 config/domains/workshop.json 驱动，文案由 narratives/workshop.json 驱动。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## SocketInscriptionService：Domain Service / State Orchestrator
 class_name SocketInscriptionService extends RefCounted
 
 ## 符文铭刻：孔位占满拦截 → 追加符文并广播铭刻叙事

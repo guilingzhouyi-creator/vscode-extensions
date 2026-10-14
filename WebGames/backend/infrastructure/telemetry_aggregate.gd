@@ -2,11 +2,12 @@
 # 模块归属: 基础设施层 (Infrastructure · Profiling & Telemetry)
 # 文件路径: res://backend/infrastructure/telemetry_aggregate.gd
 # 架构定位: Telemetry Probe / Metric Collector
-# 跨域依赖: 上游: GameBootstrap, CombatSessionManager | 下游: UnifiedLoggerService | 配置: config/infrastructure/profiling.json | 信号: 性能超限告警
+# 依赖与触发: 上游: GameBootstrap, CombatSessionManager | 下游: UnifiedLoggerService | 配置: config/infrastructure/profiling.json | 信号: 性能超限告警
 # 职责说明: 单向只读消费结构化日志，按域与事件分类聚合计数与耗时分位 (p50/p95)， 滑动窗口重置，支撑热路径承压可观测性（Inv-LS-4 遥测单向不变量）。
-# 设计依据: 性能治理与基准审计架构
+# 退出语义与设计依据: 性能治理与基准审计架构
 # ==============================================================================
 
+## TelemetryAggregate：Telemetry Probe / Metric Collector
 class_name TelemetryAggregate extends RefCounted
 
 # ==============================================================================

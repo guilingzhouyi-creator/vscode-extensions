@@ -2,14 +2,16 @@
 # 模块归属: 业务领域层 (Domains · 剧情、任务与社交集群 (Narrative & Social))
 # 文件路径: res://backend/domains/narrative_orchestration/chronicle_logger_pipeline.gd
 # 架构定位: Business Pipeline / Transaction Safe Orchestrator
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/narrative_orchestration.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/narrative_orchestration.json | 信号: EventBus 领域广播
 # 职责说明: 记录重大因果大事件、生成确定性事件指纹哈希并构建不可逆世界编年史
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## ChronicleLoggerPipeline：Business Pipeline / Transaction Safe Orchestrator
 class_name ChronicleLoggerPipeline
 extends RefCounted
 
+## ChronicleEntryDTO：编年史条目数据传输模型
 class ChronicleEntryDTO extends RefCounted:
 	var entry_hash: String
 	var event_id: String

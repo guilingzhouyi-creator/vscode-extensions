@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/account/account_slot_binding_solver.gd
 # 架构定位: Headless Discrete Solver / Numerical Calculator
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/account.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/account.json | 信号: EventBus 领域广播
 # 职责说明: 账号→槽位→角色的首步落盘：校验槽位可用性、创建 SaveSlot 封面、绑定至账号；全部配置驱动，文字版鼠标/快捷键触发。
-# 设计依据: 业务领域第一性原理 / 账号与槽位生命周期契约
+# 退出语义与设计依据: 业务领域第一性原理 / 账号与槽位生命周期契约
 # ==============================================================================
 
+## AccountSlotBindingSolver：Headless Discrete Solver / Numerical Calculator
 class_name AccountSlotBindingSolver extends RefCounted
 
 const DOMAIN_ACCOUNT_CONFIG := "domains.account"

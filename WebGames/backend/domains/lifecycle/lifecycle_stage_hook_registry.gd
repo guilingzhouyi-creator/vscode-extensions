@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/lifecycle/lifecycle_stage_hook_registry.gd
 # 架构定位: Generic Pipeline & Hook Registry Engine
-# 跨域依赖: 上游: 领域业务流 | 下游: GameConfig, UnwiredSlotGuardSolver, SessionFlowContextDTO | 配置: config/infrastructure/lifecycle.json
+# 依赖与触发: 上游: 领域业务流 | 下游: GameConfig, UnwiredSlotGuardSolver, SessionFlowContextDTO | 配置: config/infrastructure/lifecycle.json
 # 职责说明: 纯配置驱动的生命周期十阶段调度与扩展 Hook 注册执行引擎，解耦跨域强依赖
-# 设计依据: 业务域第一性原理 / 分层解耦无头架构
+# 退出语义与设计依据: 业务域第一性原理 / 分层解耦无头架构
 # ==============================================================================
 
+## LifecycleStageHookRegistry：Generic Pipeline & Hook Registry Engine
 class_name LifecycleStageHookRegistry
 extends RefCounted
 
@@ -17,13 +18,16 @@ static var _stage_configs: Dictionary = {}
 static var _stage_aliases: Dictionary = {}
 static var _config_error: String = ""
 
+## 使当前生命周期注册表缓存失效
 static func invalidate_cache() -> void:
 	_config_version = -1
 
+## 清空当前生命周期注册的全部阶段钩子
 static func clear_hooks() -> void:
 	_pre_hooks.clear()
 	_post_hooks.clear()
 
+## 向指定生命周期阶段注册前置或后置回调钩子
 static func register_hook(stage_identifier: String, callable: Callable, hook_type: String = "post") -> void:
 	var norm_id := _normalize_stage_key(stage_identifier)
 	if norm_id.is_empty():
@@ -39,6 +43,7 @@ static func _register_to_table(table: Dictionary, norm_id: String, callable: Cal
 	var list: Array = table[norm_id]
 	list.append(callable)
 
+## 获取指定阶段注册的所有可执行回调钩子
 static func get_hooks(stage_identifier: String, hook_type: String = "post") -> Array:
 	var norm_id := _normalize_stage_key(stage_identifier)
 	if norm_id.is_empty():
@@ -48,6 +53,7 @@ static func get_hooks(stage_identifier: String, hook_type: String = "post") -> A
 		return []
 	return table[norm_id]
 
+## 执行指定阶段注册的全部钩子函数
 static func execute_stage(stage_identifier: String, ctx: SessionFlowContextDTO, payload: Dictionary = {}) -> Dictionary:
 	if not _ensure_config_index():
 		return {"success": false, "error_code": "INVALID_STAGE_CONFIG", "details": _config_error}

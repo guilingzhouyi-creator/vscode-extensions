@@ -2,17 +2,20 @@
 # 模块归属: 业务领域层 (Domains · 实体、物品与世界状态集群 (Entity & World State))
 # 文件路径: res://backend/domains/inventory/inventory_metric_snapshot.gd
 # 架构定位: Value Object DTO / Data Transport Model
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/inventory.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/inventory.json | 信号: EventBus 领域广播
 # 职责说明: 承载随身仓储的容积、负重、超载与满格度量快照。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## InventoryMetricSnapshot：Value Object DTO / Data Transport Model
 class_name InventoryMetricSnapshot
 extends RefCounted
 
 # ==============================================================================
 # 一、度量字段
 # ==============================================================================
+static func get_default_max_carry_weight_kg() -> float:
+	return GameConfig.get_float("domains.inventory.core", "wearable/max_carry_weight_kg", 50.0)
 
 var total_capacity_slots: int = 0
 var used_volume_slots: int = 0
@@ -62,7 +65,7 @@ static func from_dto(data: Dictionary) -> RefCounted:
 	snap.total_capacity_slots = int(data.get("total_capacity_slots", 0))
 	snap.used_volume_slots = int(data.get("used_volume_slots", 0))
 	snap.total_mass_kg = float(data.get("total_mass_kg", 0.0))
-	snap.max_carry_weight_kg = float(data.get("max_carry_weight_kg", 50.0))
+	snap.max_carry_weight_kg = float(data.get("max_carry_weight_kg", get_default_max_carry_weight_kg()))
 	snap.item_count = int(data.get("item_count", 0))
 	snap.is_overweight = bool(data.get("is_overweight", false))
 	snap.is_full = bool(data.get("is_full", false))

@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 实体、物品与世界状态集群 (Entity & World State))
 # 文件路径: res://backend/domains/world_gateway/remote_realm_directory_provider.gd
 # 架构定位: Domain Provider / Remote Realm Stub
-# 跨域依赖: 上游: WorldGatewayFSM, GameModeRoutingSolver | 下游: 无 | 配置: config/domains/world_gateway/core.json
+# 依赖与触发: 上游: WorldGatewayFSM, GameModeRoutingSolver | 下游: 无 | 配置: config/domains/world_gateway/core.json
 # 职责说明: 提供联机界域只读目录卡片查询扩展桩，包含延迟、状态与灰度标识。
-# 设计依据: 业务领域第一性原理 / 联机界域只读扩展与无状态查询契约
+# 退出语义与设计依据: 业务领域第一性原理 / 联机界域只读扩展与无状态查询契约
 # ==============================================================================
 
+## RemoteRealmDirectoryProvider：Domain Provider / Remote Realm Stub
 class_name RemoteRealmDirectoryProvider
 extends RefCounted
 

@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 剧情、任务与社交集群 (Narrative & Social))
 # 文件路径: res://backend/domains/notification_red_dot/red_dot_tree_node.gd
 # 架构定位: Domain Logic Component
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/notification_red_dot.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/notification_red_dot.json | 信号: EventBus 领域广播
 # 职责说明: 维护有向无环红点树状拓扑、直接计数与聚合计数，封装四级通知 DTO
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## RedDotTreeNode：Domain Logic Component
 class_name RedDotTreeNode
 extends RefCounted
 
@@ -29,6 +30,7 @@ func _init(
 	total_aggregated_count = p_count
 	children_paths = p_children
 
+## NotificationDTO：系统通知数据传输模型
 class NotificationDTO extends RefCounted:
 	const DEFAULT_AUTO_DISMISS_SECONDS: float = 3.0
 

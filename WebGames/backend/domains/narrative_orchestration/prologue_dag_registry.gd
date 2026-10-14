@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 剧情、任务与社交集群 (Narrative & Social))
 # 文件路径: res://backend/domains/narrative_orchestration/prologue_dag_registry.gd
 # 架构定位: Domain Registry / Specification Catalog
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/narrative_orchestration.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/narrative_orchestration.json | 信号: EventBus 领域广播
 # 职责说明: 依据角色种族、身世标识及已适配的单机命途 MOD 路由规则，从配置或 MOD 清单加载并装配专属序章剧情 DAG。
-# 设计依据: 业务域第一性原理 / 架构设计规范
+# 退出语义与设计依据: 业务域第一性原理 / 架构设计规范
 # ==============================================================================
 
+## PrologueDagRegistry：Domain Registry / Specification Catalog
 class_name PrologueDagRegistry
 extends RefCounted
 
@@ -185,6 +186,7 @@ static func _resolve_or_synthesize_mod_graph(
             break
     return _assemble_graph_from_raw(dag_id, template_raw)
 
+## 从原始叙事配置装配编排事件因果图谱
 static func assemble_graph_from_raw(dag_id: String, raw: Dictionary) -> NarrativeDAGGraphDTO:
     var g := NarrativeDAGGraphDTO.new(dag_id)
     g.entry_node_id = str(raw.get("entry_node_id", ""))

@@ -2,11 +2,12 @@
 # 模块归属: 基础设施层 (Infrastructure · Lifecycle FSM)
 # 文件路径: res://backend/infrastructure/game_loop_fsm.gd
 # 架构定位: Deterministic Game Loop FSM
-# 跨域依赖: 上游: GameBootstrap, WorldGateway | 下游: EventBusCore | 配置: config/infrastructure/fsm.json | 信号: 主循环状态跃迁广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway | 下游: EventBusCore | 配置: config/infrastructure/fsm.json | 信号: 主循环状态跃迁广播
 # 职责说明: 顶层生命周期主循环状态机：冷启动 → 登录 → 创角 → 大地图 → 战斗 → 结算 状态栈保证栈顶单活、幂等切换与全局上下文不丢失；场景切入切出 DTO 契约 全部经枚举强类型，零硬编码字符串。
-# 设计依据: 全局游戏主循环状态机规范
+# 退出语义与设计依据: 全局游戏主循环状态机规范
 # ==============================================================================
 
+## GameLoopStateStack：Deterministic Game Loop FSM
 class_name GameLoopStateStack extends RefCounted
 
 # ==============================================================================

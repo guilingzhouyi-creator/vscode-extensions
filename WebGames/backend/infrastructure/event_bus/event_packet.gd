@@ -2,11 +2,12 @@
 # 模块归属: 基础设施层 (Infrastructure · EventBus)
 # 文件路径: res://backend/infrastructure/event_bus/event_packet.gd
 # 架构定位: Event Broker / Decoupling Foundation
-# 跨域依赖: 上游: 全域 47 业务域服务、GM追缴、网络层 | 下游: EventChannel, EventSubscriberToken | 配置: config/infrastructure/event_bus.json | 信号: 全域领域事件中心分发
+# 依赖与触发: 上游: 全域 47 业务域服务、GM追缴、网络层 | 下游: EventChannel, EventSubscriberToken | 配置: config/infrastructure/event_bus.json | 信号: 全域领域事件中心分发
 # 职责说明: 紧凑型强类型事件数据载体。原生承载 2D/3D 空间标头、多态业务载荷与池化生命周期 （遵循 ADV-POOL-001 规范，零循环内堆分配），彻底告别裸 Dictionary 历史包袱。
-# 设计依据: 事件总线解耦规范 / 前后端通信隔离契约
+# 退出语义与设计依据: 事件总线解耦规范 / 前后端通信隔离契约
 # ==============================================================================
 
+## EventPacket：Event Broker / Decoupling Foundation
 class_name EventPacket
 extends RefCounted
 

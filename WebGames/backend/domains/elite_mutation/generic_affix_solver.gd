@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/elite_mutation/generic_affix_solver.gd
 # 架构定位: Headless Discrete Solver / Numerical Calculator
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/elite.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/elite.json | 信号: EventBus 领域广播
 # 职责说明: 吸血/熔火/迅捷/荆棘/虚化等通用变异词缀的定义读取与后端概率滚动（纯函数）； 词缀定义与词缀池权重由 config/domains/elite.json 的 affixes / affix_pool 段驱动。 角色归位：原 apply_elite_affixes（原地改写入参状态）已迁入 EliteMonsterAggregate.apply_affixes，本文件收敛为纯求解器。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## GenericAffixSolver：Headless Discrete Solver / Numerical Calculator
 class_name GenericAffixSolver extends RefCounted
 
 # ==============================================================================

@@ -2,11 +2,12 @@
 # 模块归属: 基础设施层 (Infrastructure · Bootstrap Orchestration)
 # 文件路径: res://backend/infrastructure/game_bootstrap.gd
 # 架构定位: Lifecycle Orchestrator / Assembly Engine
-# 跨域依赖: 上游: Main Scene, Headless Test Runner | 下游: GameConfig, ItemRegistryCatalog, VersionGovernance | 配置: config/infrastructure/admin.json, config/infrastructure/domains.json | 信号: 全域启动装配完成事件
+# 依赖与触发: 上游: Main Scene, Headless Test Runner | 下游: GameConfig, ItemRegistryCatalog, VersionGovernance | 配置: config/infrastructure/admin.json, config/infrastructure/domains.json | 信号: 全域启动装配完成事件
 # 职责说明: 引擎全域生命周期唯一启动装配入口（幂等安全）：执行配置就绪核验 → 物品与魔法注册表装配 → 内置 GM 审计命令加载 → 版本化上下文激活。
-# 设计依据: 版本化上下文 / 启动幂等性装配契约
+# 退出语义与设计依据: 版本化上下文 / 启动幂等性装配契约
 # ==============================================================================
 
+## GameBootstrap：Lifecycle Orchestrator / Assembly Engine
 class_name GameBootstrap
 extends RefCounted
 
@@ -155,6 +156,7 @@ static func quality_tier_registry() -> QualityTierRegistry:
 	_quality_registry.reload_configuration()
 	return _quality_registry
 
+## 查询全域引导装配流水线是否已全部就绪
 static func is_assembled() -> bool:
 	return _assembled
 

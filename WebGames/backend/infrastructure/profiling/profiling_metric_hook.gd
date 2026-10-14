@@ -2,11 +2,12 @@
 # 模块归属: 基础设施层 (Infrastructure · Profiling & Telemetry)
 # 文件路径: res://backend/infrastructure/profiling/profiling_metric_hook.gd
 # 架构定位: Telemetry Probe / Metric Collector
-# 跨域依赖: 上游: GameBootstrap, CombatSessionManager | 下游: UnifiedLoggerService | 配置: config/infrastructure/profiling.json | 信号: 性能超限告警
+# 依赖与触发: 上游: GameBootstrap, CombatSessionManager | 下游: UnifiedLoggerService | 配置: config/infrastructure/profiling.json | 信号: 性能超限告警
 # 职责说明: 低开销性能探针与遥测采集钩子：监控关键核心路径耗时（微秒级）、内存堆分配量、对象池复用率，输出可供门禁比对的基准快照。
-# 设计依据: 性能治理与基准审计架构
+# 退出语义与设计依据: 性能治理与基准审计架构
 # ==============================================================================
 
+## ProfilingMetricHook：Telemetry Probe / Metric Collector
 class_name ProfilingMetricHook extends RefCounted
 
 # ==============================================================================

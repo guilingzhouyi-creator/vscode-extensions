@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/lattice_skill_book/lattice_decompiler_service.gd
 # 架构定位: Domain Service / State Orchestrator
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/lattice.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/lattice.json | 信号: EventBus 领域广播
 # 职责说明: 空间测地线拓扑剪枝降能损、DAG 环路检测与拓扑哈希生成。 剪枝率/能损系数/签名格式由 config/lattice.json 驱动（签名格式 变化会破坏跨版本指纹兼容，改配置需谨慎）。
-# 设计依据: 业务域第一性原理 / 架构设计规范
+# 退出语义与设计依据: 业务域第一性原理 / 架构设计规范
 # ==============================================================================
 
+## LatticeDecompilerService：Domain Service / State Orchestrator
 class_name LatticeDecompilerService extends RefCounted
 
 ## 三维点阵空间拉线反编译优化求解器
@@ -66,6 +67,7 @@ static func _process_topological_neighbors(curr: String, adj: Dictionary, in_deg
 		if in_degree[nxt] == 0:
 			queue.append(nxt)
 
+## 为技能子图 AST 生成唯一拓扑签名
 static func generate_ast_signature(ast: SkillSubgraphAST) -> String:
 	var prefix := GameConfig.get_string("domains.lattice", "decompiler/signature_prefix", "AST:")
 	var title_sep := GameConfig.get_string("domains.lattice", "decompiler/signature_title_sep", ":")

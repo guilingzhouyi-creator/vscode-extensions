@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/event_driven_audio/audio_bus_pipeline.gd
 # 架构定位: Business Pipeline / Transaction Safe Orchestrator
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/event_driven_audio.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/event_driven_audio.json | 信号: EventBus 领域广播
 # 职责说明: 监听全域战斗/剧情事件，限制同类音频并发播放路数（Polyphony Limiter）， 按总线轨映射音量并委托 SpatialAudioSolver 做空间声学求值； 并发上限/总线轨映射/默认音量由 config/domains/event_driven_audio.json 驱动。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## AudioBusPipeline：Business Pipeline / Transaction Safe Orchestrator
 class_name AudioBusPipeline
 extends RefCounted
 

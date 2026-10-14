@@ -2,11 +2,12 @@
 # 模块归属: 基础设施层 (Infrastructure · Persistence & Save)
 # 文件路径: res://backend/infrastructure/save_manager.gd
 # 架构定位: Persistence Facade / Save Engine
-# 跨域依赖: 上游: WorldState, CharacterProgression, Inventory | 下游: FileAccess, VersionedRuntimeContext | 配置: config/infrastructure/save.json | 信号: 存档开始 / 成功 / 失败事件
+# 依赖与触发: 上游: WorldState, CharacterProgression, Inventory | 下游: FileAccess, VersionedRuntimeContext | 配置: config/infrastructure/save.json | 信号: 存档开始 / 成功 / 失败事件
 # 职责说明: 负责 .kalar_save 自洽存档文件的原子读写与 SHA-256 数据完整性校验。 存档目录/扩展名/信封版本/引擎标识/日志文案全部由 config/infrastructure/persistence.json 驱动。  完整性契约（重要）: 信封中【只存 data_json 一个数据字段】，不存在与之平行的 "data" 对象。 校验与消费必须指向同一字节序列：校验 data_json 的 SHA-256，并从 该字符串反序列化返回。若同时存在可写的 "data" 字段，攻击者只需改写 data 而不动 data_json 即可绕过校验，校验将形同虚设。  原子写契约: 写入 .tmp -> flush/close -> 备份旧档为 .bak -> rename 原子替换。 任一步失败都不会破坏已存在的正档（rename 是文件系统级原子操作）。  旧档兼容: 仅含 "data" 而无 "data_json" 的历史存档按 legacy 降级读取， 无法校验（缺少被签名的原始字节序列），返回 verified=false 并告警。
-# 设计依据: 事务型存档原子写入规范
+# 退出语义与设计依据: 事务型存档原子写入规范
 # ==============================================================================
 
+## SaveManager：Persistence Facade / Save Engine
 class_name SaveManager extends RefCounted
 
 const OP_RESTORE: String = "restore"
@@ -159,12 +160,7 @@ static func load_game(save_name: String) -> Dictionary:
 	var recorded_hash: String = env.get("signature_sha256", "")
 
 	if raw_data_str.is_empty():
-		# legacy 存档：无 data_json，缺少被签名的原始字节，无法校验
-		if env.has("data"):
-			push_warning("SaveManager: %s (%s)" % [_msg("legacy_unverified"), file_path])
-			EventBusCore.get_instance().emit_log("warn", _msg("legacy_unverified"))
-			return {"success": true, "data": env.get("data", {}), "meta": env, "verified": false, "stage": "LOAD", "error_code": "LEGACY_UNVERIFIED"}
-		return _fail("load", "INVALID_ENVELOPE", _msg("invalid_envelope"))
+		return _fail_or_recover("load", "INVALID_ENVELOPE", _msg("invalid_envelope"), save_name)
 
 	var calculated_hash := compute_sha256(raw_data_str)
 	if calculated_hash != recorded_hash:

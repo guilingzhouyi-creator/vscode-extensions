@@ -2,12 +2,13 @@
 # 模块归属: 业务领域层 (Domains · 治理、权限与持久化集群 (Governance & Persistence))
 # 文件路径: res://backend/domains/persistence_protocol/resource_decoder_registry.gd
 # 架构定位: Polymorphic Resource Decoder Registry Center
-# 跨域依赖: 上游: AuxiliaryWorkerPool, StorageResourceCatalog | 下游: JSON, FileAccess
+# 依赖与触发: 上游: AuxiliaryWorkerPool, StorageResourceCatalog | 下游: JSON, FileAccess
 # 职责说明: 多态资源解码注册中心：管理针对 JSON 配置、纯文本、Godot 资源、网格与音频等
 #           多类型资源在后台工作线程中的纯函数反序列化解码器，支持插件式注册与自适应分发。
-# 设计依据: 双域储存架构多态解码规范
+# 退出语义与设计依据: 双域储存架构多态解码规范
 # ==============================================================================
 
+## ResourceDecoderRegistry：Polymorphic Resource Decoder Registry Center
 class_name ResourceDecoderRegistry extends RefCounted
 
 const StorageContractInterfaces = preload("res://backend/domains/persistence_protocol/storage_contract_interfaces.gd")
@@ -22,12 +23,14 @@ const ERR_NO_DECODER: String = "ERR_NO_DECODER"
 
 ## 内置 JSON 资源解码器
 class JSONResourceDecoder extends StorageContractInterfaces.ResourceDecoderContract:
+	## 判定输入资源条目是否支持当前格式解码
 	func can_decode(entry: RefCounted) -> bool:
 		var e := entry as ResourceIndexEntryDTO
 		if e == null:
 			return false
 		return e.category == CAT_CONFIG or e.physical_path.ends_with(EXT_JSON)
 
+	## 对二进制或文本输入载荷执行反序列化解码
 	func decode_payload(_raw_bytes: PackedByteArray, text: String, _entry: RefCounted) -> Dictionary:
 		var json := JSON.new()
 		if json.parse(text) != OK:
@@ -36,12 +39,14 @@ class JSONResourceDecoder extends StorageContractInterfaces.ResourceDecoderContr
 
 ## 内置通用文本资源解码器
 class TextResourceDecoder extends StorageContractInterfaces.ResourceDecoderContract:
+	## 判定输入资源条目是否支持当前格式解码
 	func can_decode(entry: RefCounted) -> bool:
 		var e := entry as ResourceIndexEntryDTO
 		if e == null:
 			return false
 		return e.category == CAT_TEXT or not e.physical_path.ends_with(EXT_JSON)
 
+	## 对二进制或文本输入载荷执行反序列化解码
 	func decode_payload(_raw_bytes: PackedByteArray, text: String, _entry: RefCounted) -> Dictionary:
 		return {"data": text, "error": ERR_NONE}
 
@@ -49,6 +54,7 @@ static var _instance = null
 var _decoders: Array = []
 var _default_decoder: StorageContractInterfaces.ResourceDecoderContract = null
 
+## 获取单例全局静态唯一实例
 static func get_instance() -> RefCounted:
 	if _instance == null:
 		_instance = new()

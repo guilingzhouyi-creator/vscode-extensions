@@ -2,13 +2,15 @@
 # 模块归属: 业务领域层 (Domains · 实体、物品与世界状态集群 (Entity & World State))
 # 文件路径: res://backend/domains/world_navigation/map_ecology_solver.gd
 # 架构定位: Headless Discrete Solver / Numerical Calculator
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/world.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/world.json | 信号: EventBus 领域广播
 # 职责说明: 多介质阻抗 A* 最短路径求解、魔素畸变与兽潮爆发概率自平衡模型。 地形阻抗/A* 哨兵值/兽潮系数由 config/world.json 驱动。
-# 设计依据: 业务域第一性原理 / 架构设计规范
+# 退出语义与设计依据: 业务域第一性原理 / 架构设计规范
 # ==============================================================================
 
+## MapAndEcologySolver：Headless Discrete Solver / Numerical Calculator
 class_name MapAndEcologySolver extends RefCounted
 
+## 获取两聚落节点间路径的地形移动阻抗系数
 static func get_terrain_impedance(terrain: String) -> float:
 	return GameConfig.get_float("domains.world", "terrain_impedance/" + terrain, 1.0)
 

@@ -2,11 +2,12 @@
 # 模块归属: 基础设施层 (Infrastructure · Logging & Telemetry)
 # 文件路径: res://backend/infrastructure/log_query_service.gd
 # 架构定位: Log Collector & Stream Processor
-# 跨域依赖: 上游: 全域业务模块与异常拦截器 | 下游: RingBuffer, FileAccess | 配置: config/infrastructure/logging.json | 信号: FATAL/ERROR 级别告警信号
+# 依赖与触发: 上游: 全域业务模块与异常拦截器 | 下游: RingBuffer, FileAccess | 配置: config/infrastructure/logging.json | 信号: FATAL/ERROR 级别告警信号
 # 职责说明: 跨介质合并内存环形缓冲实时数据与磁盘 NDJSON 导出历史数据， 执行六维过滤、分页切片与截断保护（Inv-LS-5 检索只读不变量）。
-# 设计依据: 统一结构化日志规范 / 性能基准审计
+# 退出语义与设计依据: 统一结构化日志规范 / 性能基准审计
 # ==============================================================================
 
+## LogQueryService：Log Collector & Stream Processor
 class_name LogQueryService extends RefCounted
 
 # ==============================================================================

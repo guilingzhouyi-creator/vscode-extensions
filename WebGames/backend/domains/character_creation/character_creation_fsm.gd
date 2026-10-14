@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/character_creation/character_creation_fsm.gd
 # 架构定位: Domain FSM / Lifecycle Session Engine
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/character_creation.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/character_creation.json | 信号: EventBus 领域广播
 # 职责说明: 以顺序状态机约束创角流程：角色名录入 → 性别选定 → 扩展参数确认 → 提交校验 → 持久化完成 → 开局事件激活。前序未完成禁止跃迁后续状态 （创角顺序不可逆不变量）；角色名长度/非法字符由 GameConfig 驱动。 关联细则: 阶段2 §2.1（创角流程状态机）
-# 设计依据: 业务域第一性原理 / 创角状态机规范
+# 退出语义与设计依据: 业务域第一性原理 / 创角状态机规范
 # ==============================================================================
 
+## CharacterCreationFSM：Domain FSM / Lifecycle Session Engine
 class_name CharacterCreationFSM
 extends RefCounted
 
@@ -68,7 +69,7 @@ func set_character_name(c_name: String) -> Dictionary:
 		return {
 			"success": false,
 			"error_code": "INVALID_NAME_LENGTH",
-			"message": "角色名长度须在 %d 至 %d 字符之间" % [min_len, max_len]
+			"message": GameConfig.msg_fmt("character_creation", "name_length_invalid", {"min": min_len, "max": max_len})
 		}
 	for ch in banned:
 		if trimmed.contains(str(ch)):

@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 剧情、任务与社交集群 (Narrative & Social))
 # 文件路径: res://backend/domains/narrative_orchestration/world_mod_affinity_manager.gd
 # 架构定位: Domain Service / World Mod Binding Manager
-# 跨域依赖: 上游: WorldGatewayFSM | 下游: WorldArchiveRepository, WorldInstance | 配置: config/domains/narrative_orchestration/core.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: WorldGatewayFSM | 下游: WorldArchiveRepository, WorldInstance | 配置: config/domains/narrative_orchestration/core.json | 信号: EventBus 领域广播
 # 职责说明: 管理单机世界专属的 MOD 锁文件，执行初次绑定固化、一致性校验与安全降级防坏档守卫
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## WorldModAffinityManager：Domain Service / World Mod Binding Manager
 class_name WorldModAffinityManager
 extends RefCounted
 

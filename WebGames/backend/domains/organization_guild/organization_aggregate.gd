@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 剧情、任务与社交集群 (Narrative & Social))
 # 文件路径: res://backend/domains/organization_guild/organization_aggregate.gd
 # 架构定位: Domain Entity / Aggregate Root
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/organization_guild.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/organization_guild.json | 信号: EventBus 领域广播
 # 职责说明: 原生公会与玩家自建组织实体，管理职位 RBAC、公共金库、驻地科技树与外交状态
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## OrganizationAggregate：Domain Entity / Aggregate Root
 class_name OrganizationAggregate
 extends RefCounted
 
@@ -33,6 +34,7 @@ enum GuildRole {
 	NOVICE = 1        # 见习新人
 }
 
+## OrgMemberDTO：组织公会成员数据传输模型
 class OrgMemberDTO extends RefCounted:
 	var account_id: String
 	var character_name: String

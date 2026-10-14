@@ -22,8 +22,8 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_entitlements_seal_tamper())
 	# 会话有界化：过期优先清理（TC-ACC-SESSION-01）
 	results.append(test_session_cap_pruning())
-	# R-02（TC-ACC-09）：盐重铸三态
-	results.append(test_salt_rehash_migration())
+	# R-02（TC-ACC-09）：单轨加盐口令鉴权与反序列化默认值重设
+	results.append(test_salt_single_track_authentication())
 
 	var all_passed: bool = true
 	for r in results:
@@ -189,27 +189,36 @@ static func test_session_cap_pruning() -> Dictionary:
 	}
 
 
-## 盐重铸三态：空盐档登录重铸/重铸后新盐校验/错口令拒绝
-static func test_salt_rehash_migration() -> Dictionary:
+## 单轨盐鉴权契约：标准盐鉴权/错口令拒绝/未加盐旧口令严格拦截/反序列化缺失默认值重设
+static func test_salt_single_track_authentication() -> Dictionary:
+	var pass_plain := "StandardPass123"
 	var acc := AccountProfileAggregate.new()
-	acc.account_id = "ACC_REHASH"
-	acc.username = "RehashUser"
-	acc.salt_version = 0
-	acc.password_hash_sha256 = "RehashPass123".sha256_text()
-	var r1 := AuthService.authenticate_local("RehashUser", "RehashPass123", acc)
-	var rehashed_ok: bool = r1.get("success", false) 		and r1.get("rehashed", false) == true 		and acc.salt_version == 1 		and acc.password_hash_sha256 == AuthService.hash_password("RehashPass123")
-	var r2 := AuthService.authenticate_local("RehashUser", "RehashPass123", acc)
-	var new_salt_ok: bool = r2.get("success", false) and r2.get("rehashed", true) == false
-	var wrong_pass_rejected: bool = not AuthService.authenticate_local("RehashUser", "WrongPass", acc).get("success", true)
-	var legacy_acc := AccountProfileAggregate.new()
-	legacy_acc.account_id = "ACC_REHASH_B"
-	legacy_acc.username = "RehashUserB"
-	legacy_acc.salt_version = 0
-	legacy_acc.password_hash_sha256 = "RightPass".sha256_text()
-	var bad_legacy: bool = not AuthService.authenticate_local("RehashUserB", "WrongPass", legacy_acc).get("success", true)
-	var passed: bool = rehashed_ok and new_salt_ok and wrong_pass_rejected and bad_legacy
+	acc.account_id = "ACC_SINGLE_SALT"
+	acc.username = "StandardUser"
+	acc.salt_version = 1
+	acc.password_hash_sha256 = AuthService.hash_password(pass_plain)
+
+	# 1. 标准凭证通过鉴权，rehashed 恒为 false
+	var r1 := AuthService.authenticate_local("StandardUser", pass_plain, acc)
+	var standard_ok: bool = r1.get("success", false) and r1.get("rehashed", true) == false and acc.salt_version == 1
+
+	# 2. 错误口令严格拒绝
+	var wrong_pass_rejected: bool = not AuthService.authenticate_local("StandardUser", "WrongPass", acc).get("success", true)
+
+	# 3. 历史未加盐裸哈希账户在单轨加盐体系下严格拦截拒绝
+	var raw_hash_acc := AccountProfileAggregate.new()
+	raw_hash_acc.account_id = "ACC_RAW_HASH"
+	raw_hash_acc.username = "RawUser"
+	raw_hash_acc.password_hash_sha256 = pass_plain.sha256_text()
+	var raw_rejected: bool = not AuthService.authenticate_local("RawUser", pass_plain, raw_hash_acc).get("success", true)
+
+	# 4. 反序列化缺省 salt_version 自动重设默认值 1
+	var deserialized := AccountProfileAggregate.deserialize({"account_id": "ACC_DESER", "username": "DeserUser"})
+	var default_salt_ok: bool = deserialized.salt_version == 1
+
+	var passed: bool = standard_ok and wrong_pass_rejected and raw_rejected and default_salt_ok
 	return {
-		"test": "TC-ACC-09: 盐重铸三态（空盐档重铸/新盐校验/错口令拒绝）",
+		"test": "TC-ACC-09: 单轨加盐口令鉴权与反序列化默认值重设断言",
 		"passed": passed,
-		"salt_version_after": acc.salt_version
+		"salt_version": acc.salt_version
 	}

@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/character_creation/opening_event_stream_dto.gd
 # 架构定位: Value Object DTO / Data Transport Model
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/character_creation.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/character_creation.json | 信号: EventBus 领域广播
 # 职责说明: 首次角色创建成功后向后端 EventBus 发布的结构化开局事件包： 账号/档位/世界/角色/首次标记/起始地点/开局主线引导 + 开局文案上下文。 前端仅订阅事件驱动开局剧情，禁止反向写入剧情执行标志。 关联细则: 阶段1 §1.3（开局事件流数据契约）
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## OpeningEventStreamDTO：Value Object DTO / Data Transport Model
 class_name OpeningEventStreamDTO
 extends RefCounted
 

@@ -15,6 +15,7 @@ const MainHUDSubpanelsClass = preload("res://frontend/views/main_hud/main_hud_su
 const FrontendHudSnapshot = preload("res://frontend/domain_boundary/contracts/frontend_hud_snapshot.gd")
 const KBadgeClass = preload("res://frontend/components/k_badge.gd")
 const KTabBar = preload("res://frontend/components/k_tab_bar.gd")
+const HudEventBridge = preload("res://frontend/systems/hud_event_bridge.gd")
 
 # ==============================================================================
 # 节点引用（场景树中以 unique_name_in_owner 标记）
@@ -158,10 +159,12 @@ func _ready() -> void:
 	main_menu_visible = false; _main_menu_panel.visible = false
 	_connect_signals()
 	_attach_mail_red_dot_badge()
+	HudEventBridge.get_instance().attach_hud(self)
 	UIIntermediary.adapt_view(self)
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE:
+		HudEventBridge.get_instance().detach_hud()
 		UIIntermediary.clear_view_bindings(self)
 
 # ==============================================================================

@@ -2,12 +2,13 @@
 # 模块归属: 业务领域层 (Domains · 治理、权限与持久化集群 (Governance & Persistence))
 # 文件路径: res://backend/domains/persistence_protocol/dto/minimum_world_state_dto.gd
 # 架构定位: Value Object DTO / Minimum Viable World State Model
-# 跨域依赖: 上游: PrimaryStorageEngine, WorldGateway | 下游: SessionFlowContext
+# 依赖与触发: 上游: PrimaryStorageEngine, WorldGateway | 下游: SessionFlowContext
 # 职责说明: 最小可运行世界状态传输对象：承载账号身份、角色基础、生命体征与进度摘要，
 #           用于在极短毫秒预算内恢复基础世界状态，达成首个可交互时间（TTFI）极速就绪。
-# 设计依据: 双域储存架构主要数据域规范
+# 退出语义与设计依据: 双域储存架构主要数据域规范
 # ==============================================================================
 
+## MinimumWorldStateDTO：Value Object DTO / Minimum Viable World State Model
 class_name MinimumWorldStateDTO extends RefCounted
 
 const DEFAULT_MAX_HP: float = 100.0

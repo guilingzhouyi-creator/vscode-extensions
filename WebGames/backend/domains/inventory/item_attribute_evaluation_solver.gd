@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 实体、物品与世界状态集群 (Entity & World State))
 # 文件路径: res://backend/domains/inventory/item_attribute_evaluation_solver.gd
 # 架构定位: Headless Discrete Solver / Numerical Calculator
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/inventory.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/inventory.json | 信号: EventBus 领域广播
 # 职责说明: 融合 A类增量、B类减量与已鉴定的 C类特殊词缀，实施互斥过滤与严格非负截断 (max(0.0, ...))。 三阶段流水：词缀收集与互斥 → 数值累加与单条上下界钳制 → 合并与非负硬截断。
-# 设计依据: 业务域第一性原理 / 架构设计规范
+# 退出语义与设计依据: 业务域第一性原理 / 架构设计规范
 # ==============================================================================
 
+## ItemAttributeEvaluationSolver：Headless Discrete Solver / Numerical Calculator
 class_name ItemAttributeEvaluationSolver
 extends RefCounted
 

@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/elite_mutation/generic_berserk_fsm.gd
 # 架构定位: Domain FSM / Lifecycle Session Engine
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/elite.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/elite.json | 信号: EventBus 领域广播
 # 职责说明: 基于血线阈值与战斗超时的通用狂暴触发判定、免疫控制与爆发伤害加成 （L2 系数乘性修正）；阈值与倍率由 config/domains/elite.json 的 berserk_fsm 段驱动，叙事文案由 config/narratives/elite.json 驱动。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## GenericBerserkFSM：Domain FSM / Lifecycle Session Engine
 class_name GenericBerserkFSM extends RefCounted
 
 # ==============================================================================

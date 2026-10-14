@@ -2,20 +2,23 @@
 # 模块归属: 业务领域层 (Domains · 核心战斗与魔法集群 (Combat & Magic))
 # 文件路径: res://backend/domains/magic_system/delay_scheduler.gd
 # 架构定位: Domain Logic Component
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/magic_rules.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/magic_rules.json | 信号: EventBus 领域广播
 # 职责说明: 延时魔法（设置延时 N 步 → 经过 N 步强制打出）的独立待触发调度状态。 非阻塞设计：调度器只维护到期队列，到期项在行动系统可用时机消费， 任何情况下不得阻塞玩家正常行动卡继续打出。释放时间以步数为主要单位， 边界事件（持有者死亡/战斗结束/回合结束）与释放失败策略由配置驱动。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## DelayScheduler：Domain Logic Component
 class_name DelayScheduler
 extends RefCounted
 
 var _pending: Array = []          # Array[MagicRuleTrigger]（待触发行动队列）
 var _config: Dictionary = {}
 
+## 依据传入的配置参数初始化延迟调度器
 func setup(delay_config: Dictionary) -> void:
 	_config = delay_config.duplicate(true)
 
+## 配置并绑定调度器的生命周期与触发参数
 func config() -> Dictionary:
 	return _config
 
@@ -59,6 +62,7 @@ func drain_due(holder_id: String = "") -> Array:
 	_pending = rest
 	return due
 
+## 获取调度器中当前处于挂起状态的延迟任务数量
 func pending_count(holder_id: String = "") -> int:
 	if holder_id.is_empty():
 		return _pending.size()

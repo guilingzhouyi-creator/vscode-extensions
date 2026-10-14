@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 剧情、任务与社交集群 (Narrative & Social))
 # 文件路径: res://backend/domains/quest_causality/quest_reward_dispatch.gd
 # 架构定位: Domain Logic Component
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: inventory | 配置: config/domains/quest.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: inventory | 配置: config/domains/quest.json | 信号: EventBus 领域广播
 # 职责说明: 任务物品奖励统一事实源（quest.json:reward_items 引用 canonical_id）， 发放经注册库校验 + ItemInstanceFactory 权威 UID（前缀 QST_）， 背包满原子中断、未登记拒绝入账、统计 uid 旁路。
-# 设计依据: 业务域第一性原理 / 任务物品奖励发放与幂等事务规范
+# 退出语义与设计依据: 业务域第一性原理 / 任务物品奖励发放与幂等事务规范
 # ==============================================================================
 
+## QuestRewardDispatch：Domain Logic Component
 class_name QuestRewardDispatch extends RefCounted
 
 static var _completed_transactions: Dictionary = {}

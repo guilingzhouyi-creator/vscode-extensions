@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/lifecycle_physiology/lifecycle_fsm.gd
 # 架构定位: Domain FSM / Lifecycle Session Engine
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/lifecycle.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/lifecycle.json | 信号: EventBus 领域广播
 # 职责说明: 历法年轮推进机能衰退、寿元大限判定、生机逆龄与丹药调和。 大限阈值/恢复量与叙事文案由 config/lifecycle.json、 config/narratives/lifecycle.json 驱动。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## LifeCycleEvolutionFSM：Domain FSM / Lifecycle Session Engine
 class_name LifeCycleEvolutionFSM extends RefCounted
 
 ## 历法年轮推进：机能衰退计算（体魄求解）+ 寿元大限/死亡判定并广播年轮叙事

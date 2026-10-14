@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 治理、权限与持久化集群 (Governance & Persistence))
 # 文件路径: res://backend/domains/sovereignty_realm/feoffment_solver.gd
 # 架构定位: Headless Discrete Solver / Numerical Calculator
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/sovereignty.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/sovereignty.json | 信号: EventBus 领域广播
 # 职责说明: 经历声望 ⊗ 战功驱动的动态爵位评定与领地封赏。 爵位阈值与头衔名由 config/sovereignty.json 驱动。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## SovereigntyAndFeoffmentSolver：Headless Discrete Solver / Numerical Calculator
 class_name SovereigntyAndFeoffmentSolver extends RefCounted
 
 ## 经历声望 ⊗ 战功驱动的动态封爵求解器
@@ -31,6 +32,7 @@ static func evaluate_knighthood_promotion(reputation: float, battle_merits: floa
 	else:
 		return KnighthoodTitle.TitleRank.COMMONER
 
+## 获取爵位等级对应的显示称号多语言名称
 static func get_title_name(rank: int) -> String:
 	match rank:
 		KnighthoodTitle.TitleRank.MONARCH: return GameConfig.get_string("domains.sovereignty", "title_names/monarch", "帝王")

@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 剧情、任务与社交集群 (Narrative & Social))
 # 文件路径: res://backend/domains/quest_causality/quest_entities.gd
 # 架构定位: Domain Logic Component
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: inventory | 配置: config/domains/quest.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: inventory | 配置: config/domains/quest.json | 信号: EventBus 领域广播
 # 职责说明: 世界状态因果有向无环图 (Causality DAG) 目标状态判定契约。 默认方案类型/任务标题/奖励由 config/quest.json 驱动。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## QuestObjectiveNode：Domain Logic Component
 class_name QuestObjectiveNode extends RefCounted
 
 var node_id: String = ""
@@ -16,6 +17,7 @@ var required_value: Variant = null
 var is_completed: bool = false
 var prerequisite_nodes: Array = []
 
+## QuestCausalityAggregate：任务因果聚合根实体模型
 class QuestCausalityAggregate extends RefCounted:
 	var quest_id: String = ""
 	var quest_title: String = GameConfig.get_string("domains.quest", "quest_defaults/quest_title", "净化古老遗迹")

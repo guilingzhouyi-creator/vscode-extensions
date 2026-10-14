@@ -2,11 +2,12 @@
 # 模块归属: 基础设施层 (Infrastructure · Robustness & Idempotency)
 # 文件路径: res://backend/infrastructure/robustness/idempotency_controller.gd
 # 架构定位: Fault-Tolerance Guard / Circuit Breaker
-# 跨域依赖: 上游: 全域后端高危调用点 | 下游: UnifiedLoggerService | 配置: config/infrastructure/robustness.json | 信号: 熔断触发与拦截日志
+# 依赖与触发: 上游: 全域后端高危调用点 | 下游: UnifiedLoggerService | 配置: config/infrastructure/robustness.json | 信号: 熔断触发与拦截日志
 # 职责说明: 全域事务操作幂等控制器：基于请求哈希或业务流水号对并发双发、重试风暴进行布隆式/滑动窗口去重，确保高危写操作严格仅执行一次。
-# 设计依据: 防御健壮性工程标准
+# 退出语义与设计依据: 防御健壮性工程标准
 # ==============================================================================
 
+## IdempotencyController：Fault-Tolerance Guard / Circuit Breaker
 class_name IdempotencyController extends RefCounted
 
 ## 执行操作记录字典: operation_token -> { "executed_at": float, "result": Variant }
@@ -58,11 +59,13 @@ func _evict_excess_tokens() -> void:
 		_token_order_dict.erase(victim)
 		_executed_tokens.erase(victim)
 
+## 检查控制器中是否存在指定请求令牌
 func has_token(p_token: String) -> bool:
 	if p_token.is_empty():
 		return false
 	return _executed_tokens.has(p_token)
 
+## 获取指定令牌对应的缓存执行结果
 func get_result(p_token: String, p_default: Variant = null) -> Variant:
 	if p_token.is_empty():
 		return p_default
@@ -71,12 +74,14 @@ func get_result(p_token: String, p_default: Variant = null) -> Variant:
 		return entry.get("result", p_default)
 	return p_default
 
+## 重置控制器历史记录与内部哈希表
 func reset() -> int:
 	var count := _executed_tokens.size()
 	_executed_tokens.clear()
 	_token_order_dict.clear()
 	return count
 
+## 获取控制器历史记录队列长度
 func history_size() -> int:
 	return maxi(0, _executed_tokens.size())
 

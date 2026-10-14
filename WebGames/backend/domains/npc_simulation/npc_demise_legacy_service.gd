@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 剧情、任务与社交集群 (Narrative & Social))
 # 文件路径: res://backend/domains/npc_simulation/npc_demise_legacy_service.gd
 # 架构定位: Domain Service / Lifecycle Session Engine
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/npc.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/npc.json | 信号: EventBus 领域广播
 # 职责说明: 寿元大限著书立说、自然坐化与遗产门徒交接。 著书参数与叙事文案由 config/npc.json、config/narratives/npc.json 驱动。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## NPCDemiseLegacyService：Domain Service / Lifecycle Session Engine
 class_name NPCDemiseLegacyService extends RefCounted
 
 ## 幂等提交索引：来源 NPC 仅能成功提交一次传承（防重复发书/转账）。

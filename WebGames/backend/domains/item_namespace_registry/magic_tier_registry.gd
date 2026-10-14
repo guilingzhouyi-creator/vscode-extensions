@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 实体、物品与世界状态集群 (Entity & World State))
 # 文件路径: res://backend/domains/item_namespace_registry/magic_tier_registry.gd
 # 架构定位: Domain Registry / Specification Catalog
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/item_namespace_registry.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/item_namespace_registry.json | 信号: EventBus 领域广播
 # 职责说明: 加载 config/domains/magic_tiers.json 唯一事实源，启动校验多项硬性 不变量（阶位梯度 11 阶单调 / 能力分级区间自洽可重叠 / 资质阈值递增 / 实力称号 13 级单调 / 魔术非魔法边界），为技能/装备/角色/敌人提供 统一魔法基线查询（双维度：阶位梯度 × 能力分级）
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## MagicTierRegistry：Domain Registry / Specification Catalog
 class_name MagicTierRegistry
 extends RefCounted
 

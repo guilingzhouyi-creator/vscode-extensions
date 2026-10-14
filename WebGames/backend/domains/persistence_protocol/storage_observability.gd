@@ -2,13 +2,14 @@
 # 模块归属: 业务领域层 (Domains · 治理、权限与持久化集群 (Governance & Persistence))
 # 文件路径: res://backend/domains/persistence_protocol/storage_observability.gd
 # 架构定位: Dual-Domain Storage Observability & Telemetry Collector
-# 跨域依赖: 上游: PrimaryStorageEngine, AuxiliaryWorkerPool, FrameBudgetDispatcher | 下游: StorageMetricsDTO, EventBusCore
+# 依赖与触发: 上游: PrimaryStorageEngine, AuxiliaryWorkerPool, FrameBudgetDispatcher | 下游: StorageMetricsDTO, EventBusCore
 # 职责说明: 双域储存观测指标收集器：聚合主要数据恢复、TTFI、辅助资源吞吐、
 #           主线程 IO 等待、队列长度、缓存命中率、内存峰值、单帧提交预算与重试失败率
 #           九维核心度量，向监控系统与质量看板输出快照。
-# 设计依据: 双域储存架构观测指标看板规范
+# 退出语义与设计依据: 双域储存架构观测指标看板规范
 # ==============================================================================
 
+## StorageObservability：Dual-Domain Storage Observability & Telemetry Collector
 class_name StorageObservability extends RefCounted
 
 const StorageMetricsDTO = preload("res://backend/domains/persistence_protocol/dto/storage_metrics_dto.gd")
@@ -31,6 +32,7 @@ var _cache_hits: int = 0
 var _failed_requests: int = 0
 var _peak_memory_bytes: int = 0
 
+## 获取单例全局静态唯一实例
 static func get_instance() -> RefCounted:
 	if _instance == null:
 		_instance = new()

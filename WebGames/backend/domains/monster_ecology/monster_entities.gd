@@ -2,13 +2,15 @@
 # 模块归属: 业务领域层 (Domains · 通用业务集群 (General Domain))
 # 文件路径: res://backend/domains/monster_ecology/monster_entities.gd
 # 架构定位: Domain Logic Component
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/monster.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/monster.json | 信号: EventBus 领域广播
 # 职责说明: 怪物微观生理与玩家 100% 同构模型、多部位碰撞破坏体与基因吞噬池。 部位默认属性与物种生理初值由 config/domains/monster.json 驱动。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## MonsterAggregateEntity：Domain Logic Component
 class_name MonsterAggregateEntity extends RefCounted
 
+## MonsterBodyPart：怪物身体部位实体结构
 class MonsterBodyPart extends RefCounted:
 	var part_id: String = GameConfig.get_string("domains.monster", "body_part_defaults/part_id", "HEAD") # HEAD / TORSO / LIMB_LEFT / LIMB_RIGHT / WING / HEART_CORE
 	var part_name: String = GameConfig.get_string("domains.monster", "body_part_defaults/part_name", "头颅")

@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 实体、物品与世界状态集群 (Entity & World State))
 # 文件路径: res://backend/domains/spatial_movement/spatial_location_entity.gd
 # 架构定位: Domain Entity / Aggregate Root
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/spatial_movement.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/spatial_movement.json | 信号: EventBus 领域广播
 # 职责说明: 宏观离散图论索引与微观实数连续欧氏坐标并存，支持文字向 2D/3D 平滑演化
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## SpatialLocationEntity：Domain Entity / Aggregate Root
 class_name SpatialLocationEntity
 extends RefCounted
 
@@ -39,5 +40,6 @@ func _init(
 		interior_subgraph_id = p_subgraph
 	local_coordinates = p_coords
 
+## 计算全域空间实体坐标哈希指纹
 func get_global_spatial_fingerprint() -> String:
 	return "%s:%s:%s:(%.2f,%.2f)" % [continent_id, region_node_id, interior_subgraph_id, local_coordinates.x, local_coordinates.y]

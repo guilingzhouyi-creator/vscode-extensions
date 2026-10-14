@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 经济、交易与物流集群 (Economy & Trade))
 # 文件路径: res://backend/domains/workshop_forge/reforge_salvage_pipeline.gd
 # 架构定位: Business Pipeline / Transaction Safe Orchestrator
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: currency_economy | 配置: config/domains/workshop.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: currency_economy | 配置: config/domains/workshop.json | 信号: EventBus 领域广播
 # 职责说明: 词条洗练随机重掷与装备分解返还强化材料与金币 词条池/返还率由 config/domains/workshop.json 驱动，文案由 narratives/workshop.json 驱动。
-# 设计依据: 业务域第一性原理 / 架构设计规范
+# 退出语义与设计依据: 业务域第一性原理 / 架构设计规范
 # ==============================================================================
 
+## ReforgingAndSalvagePipeline：Business Pipeline / Transaction Safe Orchestrator
 class_name ReforgingAndSalvagePipeline extends RefCounted
 
 ## 洗练词缀池（domains.workshop reforge/pool 配置驱动）

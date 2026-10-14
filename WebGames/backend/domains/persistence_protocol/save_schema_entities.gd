@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 治理、权限与持久化集群 (Governance & Persistence))
 # 文件路径: res://backend/domains/persistence_protocol/save_schema_entities.gd
 # 架构定位: Domain Logic Component
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: infrastructure.persistence.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: infrastructure.persistence.json | 信号: EventBus 领域广播
 # 职责说明: .kalar_save 数据架构、前后端命令与事件包契约。 版本号/命令类型/事件类型默认值由 config/persistence.json 驱动。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## KalarSaveSchema：Domain Logic Component
 class_name KalarSaveSchema extends RefCounted
 
 var save_format_version: String = GameConfig.get_string("infrastructure.persistence", "format_version", "1.0.0")
@@ -29,6 +30,7 @@ func serialize() -> Dictionary:
 		"authored_books": authored_books
 	}
 
+## ClientCommandPacket：客户端指令数据包模型
 class ClientCommandPacket extends RefCounted:
 	var command_id: String = ""
 	var sequence_number: int = 0
@@ -36,6 +38,7 @@ class ClientCommandPacket extends RefCounted:
 	var payload: Dictionary = {}
 	var client_timestamp: int = 0
 
+## ServerEventPacket：服务端事件数据包模型
 class ServerEventPacket extends RefCounted:
 	var server_frame_tick: int = 0
 	var acknowledged_sequence_number: int = 0

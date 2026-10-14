@@ -2,13 +2,14 @@
 # 模块归属: 业务领域层 (Domains · 治理、权限与持久化集群 (Governance & Persistence))
 # 文件路径: res://backend/domains/persistence_protocol/storage_resource_catalog.gd
 # 架构定位: Unified Storage Resource Catalog & Index Orchestrator
-# 跨域依赖: 上游: GameConfig, PrimaryStorageEngine, AuxiliaryWorkerPool | 下游: FileAccess, JSON
+# 依赖与触发: 上游: GameConfig, PrimaryStorageEngine, AuxiliaryWorkerPool | 下游: FileAccess, JSON
 # 职责说明: 统一储存资源目录中心：管理全域配置表、美术网格、贴图、文案与预制体的逻辑键
 #           到物理路径的映射索引，为双域存储提供 O(1) 复杂度资源检索与分级启动清单编排，
 #           彻底消灭磁盘递归扫盘。
-# 设计依据: 双域储存架构资源索引与寻址规范
+# 退出语义与设计依据: 双域储存架构资源索引与寻址规范
 # ==============================================================================
 
+## StorageResourceCatalog：Unified Storage Resource Catalog & Index Orchestrator
 class_name StorageResourceCatalog extends StorageContractInterfaces.ResourceIndexProviderContract
 
 const StorageContractInterfaces = preload("res://backend/domains/persistence_protocol/storage_contract_interfaces.gd")
@@ -33,6 +34,7 @@ var _entries_by_priority: Dictionary = {}    # priority -> Array[ResourceIndexEn
 var _critical_tables: Dictionary = {}        # table_name -> true
 var _loaded: bool = false
 
+## 获取单例全局静态唯一实例
 static func get_instance() -> RefCounted:
 	if _instance == null:
 		_instance = new()

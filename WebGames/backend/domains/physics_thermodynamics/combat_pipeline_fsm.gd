@@ -2,13 +2,15 @@
 # 模块归属: 业务领域层 (Domains · 核心战斗与魔法集群 (Combat & Magic))
 # 文件路径: res://backend/domains/physics_thermodynamics/combat_pipeline_fsm.gd
 # 架构定位: Business Pipeline / Transaction Safe Orchestrator
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/combat.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/combat.json | 信号: EventBus 领域广播
 # 职责说明: 正负 AP 动态势能博弈、防反架招打断/僵直状态机与战报文字流生成。 参与者默认属性、打断惩罚、减伤系数与叙事文案由 config/domains/combat.json、 config/narratives/combat.json 驱动。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## CombatPipelineFSM：Business Pipeline / Transaction Safe Orchestrator
 class_name CombatPipelineFSM extends RefCounted
 
+## CombatParticipant：战斗参战单位实体模型
 class CombatParticipant extends RefCounted:
 	var participant_id: String = ""
 	var name: String = GameConfig.get_string("domains.combat", "participant_defaults/name", "战士")
@@ -46,6 +48,7 @@ static func _ensure_settlement_cache() -> void:
 	_settlement_cache = p
 	_settlement_config_version = GameConfig.config_reload_version()
 
+## 推进并结算当前动作轮次的所有参战行为
 static func execute_action_round(
 	attacker: CombatParticipant,
 	attacker_verb: String,

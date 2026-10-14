@@ -35,7 +35,7 @@ static func run_all_tests() -> Dictionary:
 		"results": results
 	}
 
-## TC-SV-06: legacy 旧档降级兼容（Inv-SV-4）
+## TC-SV-06: 历史无签名 legacy 存档严格拦截（向前兼容无向后包袱）
 static func test_legacy_save_fallback_compatibility() -> Dictionary:
 	var legacy_slot := "test_legacy_save"
 	var save_dir: String = SaveManager._save_dir()
@@ -52,23 +52,21 @@ static func test_legacy_save_fallback_compatibility() -> Dictionary:
 	}
 	var f := FileAccess.open(file_path, FileAccess.WRITE)
 	if f == null:
-		return { "test": "TC-SV-06: legacy 旧档降级兼容", "passed": false, "reason": "write_fail" }
+		return { "test": "TC-SV-06: 历史无签名 legacy 存档严格拦截", "passed": false, "reason": "write_fail" }
 	f.store_string(JSON.stringify(legacy_envelope))
 	f.close()
 
 	var load_res := SaveDataAccessLayer.load_game(legacy_slot)
 	var success := bool(load_res.get("success", false))
-	var verified := bool(load_res.get("verified", true))
-	var data_dict: Dictionary = load_res.get("data", {})
-	var gold_ok := (int(data_dict.get("gold", 0)) == 500)
+	var error_code: String = str(load_res.get("error_code", ""))
 
-	# 预期：读取成功，但 verified=false（降级告警），数据无损读出
-	var passed := success and not verified and gold_ok
+	# 预期：严格阻断（success=false），错误码为 INVALID_ENVELOPE
+	var passed := (not success) and (error_code == "INVALID_ENVELOPE")
 	return {
-		"test": "TC-SV-06: 历史无签名 legacy 存档降级读取与数据兼容断言",
+		"test": "TC-SV-06: 历史无签名 legacy 存档严格拦截断言",
 		"passed": passed,
 		"success": success,
-		"verified": verified
+		"error_code": error_code
 	}
 
 ## TC-SV-07: 整档迁移链逐级演进（Inv-SV-4/7）

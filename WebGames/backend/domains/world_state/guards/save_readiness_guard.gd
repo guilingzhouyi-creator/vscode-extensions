@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 实体、物品与世界状态集群 (Entity & World State))
 # 文件路径: res://backend/domains/world_state/guards/save_readiness_guard.gd
 # 架构定位: Domain Guard / Security Validator
-# 跨域依赖: 上游: WorldGateway, WorldInstance, ESC 菜单 | 下游: 无 | 配置: 无 | 信号: 无
+# 依赖与触发: 上游: WorldGateway, WorldInstance, ESC 菜单 | 下游: 无 | 配置: 无 | 信号: 无
 # 职责说明: 提供保存就绪性校验与存储目录气密隔离性校验纯函数守卫
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## SaveReadinessGuard：Domain Guard / Security Validator
 class_name SaveReadinessGuard
 extends RefCounted
 

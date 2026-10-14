@@ -2,11 +2,12 @@
 # 模块归属: 基础设施层 (Infrastructure · EventBus)
 # 文件路径: res://backend/infrastructure/event_bus/headless_spatial_hash_grid_3d.gd
 # 架构定位: Event Broker / Decoupling Foundation
-# 跨域依赖: 上游: 全域 47 业务域服务、GM追缴、网络层 | 下游: EventChannel, EventSubscriberToken | 配置: config/infrastructure/event_bus.json | 信号: 全域领域事件中心分发
+# 依赖与触发: 上游: 全域 47 业务域服务、GM追缴、网络层 | 下游: EventChannel, EventSubscriberToken | 配置: config/infrastructure/event_bus.json | 信号: 全域领域事件中心分发
 # 职责说明: 事件总线专用三维空间格网：专门为视觉线索空间裁剪与视锥体过滤提供极速碰撞与距离测算，杜绝高频事件遍历全场景。
-# 设计依据: 事件总线空间裁剪解耦规范 / 前后端通信隔离契约
+# 退出语义与设计依据: 事件总线空间裁剪解耦规范 / 前后端通信隔离契约
 # ==============================================================================
 
+## HeadlessSpatialHashGrid3D：Event Broker / Decoupling Foundation
 class_name HeadlessSpatialHashGrid3D
 extends RefCounted
 
@@ -50,10 +51,20 @@ func _insert_entry_z_column(cx: int, cy: int, min_cz: int, max_cz: int, entry: D
 		_grid[h].append(entry)
 
 func _insert_entry_xy_plane(min_cell: Vector3i, max_cell: Vector3i, entry: Dictionary) -> void:
+	if min_cell.z == max_cell.z:
+		var cz: int = min_cell.z
+		for cx in range(min_cell.x, max_cell.x + 1):
+			for cy in range(min_cell.y, max_cell.y + 1):
+				var h: int = _hash_cell_indices(cx, cy, cz)
+				if not _grid.has(h):
+					_grid[h] = []
+				_grid[h].append(entry)
+		return
 	for cx in range(min_cell.x, max_cell.x + 1):
 		for cy in range(min_cell.y, max_cell.y + 1):
 			_insert_entry_z_column(cx, cy, min_cell.z, max_cell.z, entry)
 
+## 在空间哈希网格中注册三维局部侦听器
 func register_listener(token_id: int, center: Vector3, radius: float, callback: Callable) -> void:
 	# 幂等：同 token_id 重复注册时先注销旧挂载，杜绝网格残留重复条目
 	if _listeners.has(token_id):
@@ -65,10 +76,12 @@ func register_listener(token_id: int, center: Vector3, radius: float, callback: 
 	var entry: Dictionary = {"token_id": token_id, "callback": callback}
 	_insert_entry_xy_plane(min_cell, max_cell, entry)
 
+## 在空间哈希网格中注册二维局部侦听器
 func register_listener_2d(token_id: int, center_2d: Vector2, radius: float, callback: Callable, is_isometric_xz: bool = false) -> void:
 	var pos_3d: Vector3 = Vector3(center_2d.x, 0.0, center_2d.y) if is_isometric_xz else Vector3(center_2d.x, center_2d.y, 0.0)
 	register_listener(token_id, pos_3d, radius, callback)
 
+## 更新侦听器在空间网格中的空间坐标位置
 func update_listener_position(token_id: int, new_center: Vector3, radius: float, callback: Callable) -> void:
 	unregister_listener(token_id)
 	register_listener(token_id, new_center, radius, callback)
@@ -88,10 +101,17 @@ func _remove_token_z_column(cx: int, cy: int, min_cz: int, max_cz: int, token_id
 		_remove_token_from_cell(_hash_cell_indices(cx, cy, cz), token_id)
 
 func _remove_token_xy_plane(min_cell: Vector3i, max_cell: Vector3i, token_id: int) -> void:
+	if min_cell.z == max_cell.z:
+		var cz: int = min_cell.z
+		for cx in range(min_cell.x, max_cell.x + 1):
+			for cy in range(min_cell.y, max_cell.y + 1):
+				_remove_token_from_cell(_hash_cell_indices(cx, cy, cz), token_id)
+		return
 	for cx in range(min_cell.x, max_cell.x + 1):
 		for cy in range(min_cell.y, max_cell.y + 1):
 			_remove_token_z_column(cx, cy, min_cell.z, max_cell.z, token_id)
 
+## 从空间网格中注销指定令牌的侦听器
 func unregister_listener(token_id: int) -> void:
 	if not _listeners.has(token_id):
 		return
@@ -123,6 +143,12 @@ func _collect_z_column_targets(cx: int, cy: int, min_cz: int, max_cz: int, pos: 
 		_collect_cell_targets(_hash_cell_indices(cx, cy, cz), pos, r, called_tokens, targets)
 
 func _collect_targets_xy_plane(min_cell: Vector3i, max_cell: Vector3i, pos: Vector3, r: float, called_tokens: Dictionary, targets: Array) -> void:
+	if min_cell.z == max_cell.z:
+		var cz: int = min_cell.z
+		for cx in range(min_cell.x, max_cell.x + 1):
+			for cy in range(min_cell.y, max_cell.y + 1):
+				_collect_cell_targets(_hash_cell_indices(cx, cy, cz), pos, r, called_tokens, targets)
+		return
 	for cx in range(min_cell.x, max_cell.x + 1):
 		for cy in range(min_cell.y, max_cell.y + 1):
 			_collect_z_column_targets(cx, cy, min_cell.z, max_cell.z, pos, r, called_tokens, targets)

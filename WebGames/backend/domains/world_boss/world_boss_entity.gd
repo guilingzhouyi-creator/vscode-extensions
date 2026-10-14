@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 核心战斗与魔法集群 (Combat & Magic))
 # 文件路径: res://backend/domains/world_boss/world_boss_entity.gd
 # 架构定位: Domain Entity / Aggregate Root
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/world_boss.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/world_boss.json | 信号: EventBus 领域广播
 # 职责说明: 单机游荡天灾与联机大型 Raid 首领 100% 同构模型、多段血槽与机制护盾契约 默认值由 config/domains/world_boss.json 驱动。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## WorldBossAggregate：Domain Entity / Aggregate Root
 class_name WorldBossAggregate extends MonsterAggregateEntity
 
 var boss_uid: String = GameConfig.get_string("domains.world_boss", "entity_defaults/boss_uid", "BOSS_WORLD_LEVIATHAN_01")

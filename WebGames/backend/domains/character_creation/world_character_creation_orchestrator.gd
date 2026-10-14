@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 角色创建领域)
 # 文件路径: res://backend/domains/character_creation/world_character_creation_orchestrator.gd
 # 架构定位: Domain Orchestrator / Service Facade
-# 跨域依赖: 上游: WorldGatewayFSM, UI/API | 下游: WorldArchiveRepository, SaveDataAccessLayer, AccountRepository, EventBusCore | 配置: config/domains/character_creation.json | 信号: character_creation.authoritative_completed
+# 依赖与触发: 上游: WorldGatewayFSM, UI/API | 下游: WorldArchiveRepository, SaveDataAccessLayer, AccountRepository, EventBusCore | 配置: config/domains/character_creation.json | 信号: character_creation.authoritative_completed
 # 职责说明: 世界内角色权威创建与时空装配事务门面。执行零信任输入防伪校验、后端权威命途解算、角色实体装配、初始装备物理入包水化、世界时钟因果锚定与历史片段只增追加、存储物理落盘与账号封面同步、网关状态自动回挂跃迁以及全景只读呈现信封组装。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## WorldCharacterCreationOrchestrator：Domain Orchestrator / Service Facade
 class_name WorldCharacterCreationOrchestrator
 extends RefCounted
 
@@ -42,7 +43,7 @@ static func create_character_authoritative(
         return {
             "success": false,
             "error_code": "WORLD_NOT_FOUND",
-            "message": "目标单机世界档案不存在: %s" % req.world_id
+            "message": GameConfig.msg_fmt("character_creation", "world_not_found", {"world_id": req.world_id})
         }
 
     # 3. 权威命途解算（零信任剥离客户端伪造参数，支持单机已预检MOD合并清单）
@@ -209,7 +210,7 @@ static func _anchor_world_continuity(
 ) -> Dictionary:
     var world_inst: WorldInstance = world_repo.load_world(world_id)
     if world_inst == null:
-        return {"success": false, "error_code": "WORLD_INSTANCE_LOAD_FAILED", "message": "无法加载目标世界时空实例: %s" % world_id}
+        return {"success": false, "error_code": "WORLD_INSTANCE_LOAD_FAILED", "message": GameConfig.msg_fmt("character_creation", "world_instance_load_failed", {"world_id": world_id})}
 
     var birth_fragment: Dictionary = {
         "type": "CHARACTER_BORN",

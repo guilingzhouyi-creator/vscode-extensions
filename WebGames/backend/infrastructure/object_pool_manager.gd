@@ -2,12 +2,13 @@
 # 模块归属: 基础设施层 (Infrastructure · Pool Management Orchestration)
 # 文件路径: res://backend/infrastructure/object_pool_manager.gd
 # 架构定位: Object Pool Central Orchestrator & Registry
-# 跨域依赖: 上游: GameBootstrap, 各业务域工厂 | 下游: ObjectPool, GameConfig, EventBusCore | 配置: config/infrastructure/object_pool.json | 信号: 对象池装配/清空事件
+# 依赖与触发: 上游: GameBootstrap, 各业务域工厂 | 下游: ObjectPool, GameConfig, EventBusCore | 配置: config/infrastructure/object_pool.json | 信号: 对象池装配/清空事件
 # 职责说明: 全域对象池集中管理中枢：提供单例池注册、配置装配驱动、对称反装配
 #           与集中生命周期追踪，消除散落无序的对象池实例化与内存泄漏。
-# 设计依据: 演进 03 高承压对象池与数据导向无头处理器架构规范
+# 退出语义与设计依据: 演进 03 高承压对象池与数据导向无头处理器架构规范
 # ==============================================================================
 
+## ObjectPoolManager：Object Pool Central Orchestrator & Registry
 class_name ObjectPoolManager extends RefCounted
 
 const ObjectPoolConfigDTO = preload("res://backend/infrastructure/object_pool_config_dto.gd")
@@ -26,12 +27,14 @@ const DEFAULT_OVERFLOW_THRESHOLD: int = 256
 static var _pools: Dictionary = {}
 static var _initialized: bool = false
 
+## 初始化组件或实体的内部运行状态
 static func initialize() -> void:
 	if _initialized:
 		return
 	_pools.clear()
 	_initialized = true
 
+## 注册指定名称的对象池与生成工厂
 static func register_pool(pool_name: String, factory: Callable, config_override: ObjectPoolConfigDTO = null) -> ObjectPool:
 	initialize()
 	var cfg := config_override if config_override != null else _load_pool_config(pool_name)
@@ -39,9 +42,11 @@ static func register_pool(pool_name: String, factory: Callable, config_override:
 	_pools[pool_name] = pool
 	return pool
 
+## 获取指定事件或对象的专用缓存池
 static func get_pool(pool_name: String) -> ObjectPool:
 	return _pools.get(pool_name, null)
 
+## 销毁清理所有对象池与静态资源
 static func teardown() -> void:
 	for pool in _pools.values():
 		if pool != null:
@@ -59,9 +64,11 @@ static func _load_pool_config(pool_name: String) -> ObjectPoolConfigDTO:
 	dto.overflow_warning_threshold = maxi(1, GameConfig.get_int(CONFIG_TABLE_OBJECT_POOL, prefix + PATH_OVERFLOW_THRESHOLD, DEFAULT_OVERFLOW_THRESHOLD))
 	return dto
 
+## 获取当前已注册对象池总数
 static func get_pool_count() -> int:
 	return _pools.size()
 
+## 获取所有已注册对象池的名称清单
 static func get_all_pool_names() -> Array[String]:
 	var names: Array[String] = []
 	for k in _pools.keys():

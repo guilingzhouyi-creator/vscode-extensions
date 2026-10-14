@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 治理、权限与持久化集群 (Governance & Persistence))
 # 文件路径: res://backend/domains/sovereignty_realm/nation_sovereignty_fsm.gd
 # 架构定位: Domain FSM / Lifecycle Session Engine
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/sovereignty.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/sovereignty.json | 信号: EventBus 领域广播
 # 职责说明: 荒原拓荒建国、领土自治、宫廷政变刺杀弑君与全域超级蝴蝶效应震荡。 建国/政变数值与叙事文案由 config/sovereignty.json、 config/narratives/sovereignty.json 驱动。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## NationSovereigntyAndCoupFSM：Domain FSM / Lifecycle Session Engine
 class_name NationSovereigntyAndCoupFSM extends RefCounted
 
 ## 玩家荒原拓荒独立建国状态机

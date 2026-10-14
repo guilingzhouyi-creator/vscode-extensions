@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 治理、权限与持久化集群 (Governance & Persistence))
 # 文件路径: res://backend/domains/persistence_protocol/save_data_access_layer.gd
 # 架构定位: Domain Entity / Aggregate Root
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: infrastructure.persistence.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: infrastructure.persistence.json | 信号: EventBus 领域广播
 # 职责说明: 作为全域数据持久化唯一访问门面，提供统一序列化装配、反序列化分发、 脏标记增量持久化、空壳档阻断与运行模式闸门控制（Inv-SV-2/6/10）。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## SaveDataAccessLayer：Domain Entity / Aggregate Root
 class_name SaveDataAccessLayer extends RefCounted
 
 const SaveDomainContract = preload("res://backend/domains/persistence_protocol/save_domain_contract.gd")

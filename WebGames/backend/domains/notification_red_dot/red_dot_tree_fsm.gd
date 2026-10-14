@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 剧情、任务与社交集群 (Narrative & Social))
 # 文件路径: res://backend/domains/notification_red_dot/red_dot_tree_fsm.gd
 # 架构定位: Domain FSM / State Advancer (角色归位：对注入 registry 原地推进计数聚合)
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/notification_red_dot.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/notification_red_dot.json | 信号: EventBus 领域广播
 # 职责说明: 递归更新叶子节点计数、自发向上冒泡汇总父级计数与清空同步。 六角色归位（）：本文件对调用方注入的 registry 原地推进节点计数（含环检测守卫），属 fsm 语义（《后端逻辑处理标准 v1》存量渐进归位），不再声明为纯求解器。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## RedDotTreeFsm：Domain FSM / State Advancer (角色归位：对注入 registry 原地推进计数聚合)
 class_name RedDotTreeFsm
 extends RefCounted
 

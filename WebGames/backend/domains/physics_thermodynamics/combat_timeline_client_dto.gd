@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 核心战斗与魔法集群 (Combat & Magic))
 # 文件路径: res://backend/domains/physics_thermodynamics/combat_timeline_client_dto.gd
 # 架构定位: Value Object DTO / Data Transport Model
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/combat.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/combat.json | 信号: EventBus 领域广播
 # 职责说明: 专门面向表现层/客户端暴露的只读安全视图，消除未决事件绝对时间戳与倒计时泄漏
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## CombatTimelineClientDTO：Value Object DTO / Data Transport Model
 class_name CombatTimelineClientDTO
 extends RefCounted
 
@@ -20,6 +21,7 @@ class PresenterSnapshotDTO extends RefCounted:
 	var resolved_events: Array[Dictionary] = [] # 仅包含已发生的事件通知 (如 {"kind": "NORMAL_DRAW", "drawn": 1})
 	var is_zero_hand_active: bool = false      # 当前是否因特殊状态处于无牌可打姿态
 
+	## 序列化生成面向前端客户端的只读展示数据视图
 	func to_client_view() -> Dictionary:
 		return {
 			"round_number": round_number,

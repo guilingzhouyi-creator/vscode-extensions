@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 核心战斗与魔法集群 (Combat & Magic))
 # 文件路径: res://backend/domains/magic_system/magic_rule_condition.gd
 # 架构定位: Domain Logic Component
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/magic_rules.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: GameConfig, EventBusCore | 配置: config/domains/magic_rules.json | 信号: EventBus 领域广播
 # 职责说明: 求值可配置组合条件树（AND/OR/NOT/LEAF），用于升格资格、融会贯通、 延时释放校验等场景。条件结构与参数全部来自配置（magic_rules.json / 运行时输入），引擎不把具体条件组合写死。未识别条件种类返回 false （受控失败），不产生隐含规则。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## MagicRuleCondition：Domain Logic Component
 class_name MagicRuleCondition
 extends RefCounted
 
