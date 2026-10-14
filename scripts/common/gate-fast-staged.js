@@ -28,7 +28,7 @@ const ABS_PATH_WHITELIST_PATTERN = /(?:node_modules|\.gemini|file:\/\/)/;
 const SLANG_FILENAME_PATTERN = /(?:^|[-_.])(?:temp|wip|new|st\d+|p\d+)(?:[-_.]|$)/i;
 
 const ALLOWED_SHORT_STEMS = new Set([
-  'ui', 'en', 'zh', 'db', 'io', 'ci', 'os', 'vm', 'fs', 're', 'id', 'ip',
+  'ui', 'en', 'zh', 'db', 'io', 'ci', 'os', 'vm', 'fs', 're', 'id', 'ip', 'gm',
 ]);
 
 const STANDARD_TECH_ABBREVIATIONS = new Set([
@@ -39,6 +39,7 @@ const STANDARD_TECH_ABBREVIATIONS = new Set([
   'gd', 'rs', '2d', '3d', '4k', 'ssl', 'ssh', 'tcp', 'udp', 'dns',
   'rpc', 'ipc', 'csr', 'soa', 'swar', 'simd', 'cc', 'eloc', 'loc',
   'diff', 'rgb', 'hex', 'fn', 'cb', 'rx', 'tx', 'env', 'app', 'dev',
+  'fsm', 'npc', 'gm', 'rpg', 'pve', 'pvp', 'hp', 'mp',
 ]);
 
 const IGNORED_BASENAMES = new Set([
