@@ -208,32 +208,29 @@ export class RustAdapter implements LanguageAdapter {
             isConstructor: false,
         };
 
-        const topLevel = Boolean(
-            parent && parent.type === 'source_file' && TOP_LEVEL_TYPES.has(sn.type),
-        );
-        node.topLevel = topLevel;
-        node.exported =
-            topLevel &&
-            Boolean(
-                sn.namedChildren?.some(
-                    (c) => c.type === 'visibility_modifier' && Boolean(c.text?.startsWith('pub')),
-                ),
-            );
+        const exportStatus = checkRustExported(sn, parent);
+        node.topLevel = exportStatus.topLevel;
+        node.exported = exportStatus.exported;
 
         if (isLiteral) {
             node.isConstBound = this.isConstBoundOf(sn, parent);
             node.tolerated = this.isToleratedOf(sn, parent);
         }
 
-        // Only allocate a children array when the node has named children (leaves —
-        // identifiers, literals, punctuation — keep `children` undefined), because the
-        // engine and analyzers already consume via `node.children || []`.
-        let kids: NormalizedNode[] | undefined;
-        for (const c of sn.namedChildren || []) {
-            (kids ??= []).push(this.mapNode(c, sn));
-        }
-        node.children = kids;
+        node.children = this.mapChildren(sn);
         return node;
+    }
+
+    private mapChildren(sn: TreeSitterNode): NormalizedNode[] | undefined {
+        const namedChildren = sn.namedChildren;
+        if (!namedChildren || namedChildren.length === 0) {
+            return undefined;
+        }
+        const kids: NormalizedNode[] = [];
+        for (let i = 0; i < namedChildren.length; i++) {
+            kids.push(this.mapNode(namedChildren[i], sn));
+        }
+        return kids;
     }
 
     /**
@@ -350,4 +347,19 @@ export class RustAdapter implements LanguageAdapter {
         }
         return STRING_TOLERATED_PARENTS.has(parent.type);
     }
+}
+
+function checkRustExported(
+    sn: TreeSitterNode,
+    parent: TreeSitterNode | undefined,
+): { topLevel: boolean; exported: boolean } {
+    if (!parent || parent.type !== 'source_file' || !TOP_LEVEL_TYPES.has(sn.type)) {
+        return { topLevel: false, exported: false };
+    }
+    const hasPub = Boolean(
+        sn.namedChildren?.some(
+            (c) => c.type === 'visibility_modifier' && Boolean(c.text?.startsWith('pub')),
+        ),
+    );
+    return { topLevel: true, exported: hasPub };
 }

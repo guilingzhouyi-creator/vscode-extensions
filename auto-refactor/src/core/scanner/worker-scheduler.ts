@@ -28,6 +28,13 @@ export interface WorkerSymbolsPayload {
     references: SymbolReference[];
 }
 
+export type WorkerRawResultItem = {
+    file: string;
+    issues: Issue[];
+    metric: FileMetric | null;
+    symbols?: WorkerSymbolsPayload;
+};
+
 const DEFAULT_WORKER_FLUSH_TIMEOUT_MS = 3000;
 const TYPEOF_OBJECT = 'object';
 const EVENT_ERROR = 'error';
@@ -886,12 +893,7 @@ export async function dispatchBatches(
 
                 const resArr = normalizeWorkerResults(messagePayload.results);
                 for (let itemIdx = 0; itemIdx < resArr.length; itemIdx++) {
-                    const resultItem = resArr[itemIdx] as {
-                        file: string;
-                        issues: Issue[];
-                        metric: FileMetric | null;
-                        symbols?: WorkerSymbolsPayload;
-                    };
+                    const resultItem = resArr[itemIdx] as WorkerRawResultItem;
                     const i = idxByFile.get(resultItem.file);
                     if (i !== undefined) {
                         results[i] = buildIndexedWorkerResult(

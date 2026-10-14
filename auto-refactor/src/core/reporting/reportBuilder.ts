@@ -187,6 +187,8 @@ function recordFileMemory(
     });
 }
 
+const EMPTY_FILE_ISSUES: readonly Issue[] = Object.freeze([]);
+
 /**
  * Score every scanned file and persist its review-memory/trajectory record.
  *
@@ -195,6 +197,14 @@ function recordFileMemory(
  * @param issuesByFile - Issues grouped by file path.
  * @returns Per-file quality breakdowns keyed by file path.
  */
+function resolveFileIssues(issuesByFile: Map<string, Issue[]>, file: string): Issue[] {
+    const list = issuesByFile.get(file);
+    if (list !== undefined) {
+        return list;
+    }
+    return EMPTY_FILE_ISSUES as unknown as Issue[];
+}
+
 function collectFileQuality(
     host: ReportHost,
     fileMetrics: FileMetric[],
@@ -202,7 +212,7 @@ function collectFileQuality(
 ): Record<string, QualityScoreBreakdown> {
     const fileQualityScores: Record<string, QualityScoreBreakdown> = {};
     for (const m of fileMetrics) {
-        const fileIssues = issuesByFile.get(m.file) || [];
+        const fileIssues = resolveFileIssues(issuesByFile, m.file);
         const score = host.scorer.evaluateFile(m.file, fileIssues, m, host.config);
         fileQualityScores[m.file] = score;
         recordFileMemory(host, m, fileIssues, score);

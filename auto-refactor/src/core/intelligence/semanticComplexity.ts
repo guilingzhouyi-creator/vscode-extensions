@@ -317,24 +317,64 @@ function resolveDefinitionParameters(
     return [];
 }
 
-/**
- * Collects distinct symbol names from call graph and symbol index.
- */
-function collectCandidateSymbols(callGraph?: CallGraph, symbolIndex?: SymbolIndex): Set<string> {
-    const candidates = new Set<string>();
-    if (callGraph && typeof callGraph.callerNames === 'function') {
+function ingestCallGraphSymbols(callGraph: CallGraph | undefined, candidates: Set<string>): void {
+    if (!callGraph) return;
+    if (typeof callGraph.callerNames === 'function') {
         for (const name of callGraph.callerNames()) candidates.add(name);
     }
-    if (callGraph && typeof (callGraph as any).edges === 'function') {
+    if (typeof (callGraph as any).edges === 'function') {
         for (const edge of (callGraph as any).edges()) {
             if (edge.caller) candidates.add(edge.caller);
             if (edge.callee) candidates.add(edge.callee);
         }
     }
-    if (symbolIndex && typeof symbolIndex.names === 'function') {
-        for (const name of symbolIndex.names()) candidates.add(name);
-    }
+}
+
+function ingestSymbolIndexSymbols(
+    symbolIndex: SymbolIndex | undefined,
+    candidates: Set<string>,
+): void {
+    if (!symbolIndex || typeof symbolIndex.names !== 'function') return;
+    for (const name of symbolIndex.names()) candidates.add(name);
+}
+
+/**
+ * Collects distinct symbol names from call graph and symbol index.
+ */
+function collectCandidateSymbols(callGraph?: CallGraph, symbolIndex?: SymbolIndex): Set<string> {
+    const candidates = new Set<string>();
+    ingestCallGraphSymbols(callGraph, candidates);
+    ingestSymbolIndexSymbols(symbolIndex, candidates);
     return candidates;
+}
+
+function resolveSymbolParameters(
+    sym: string,
+    symbolIndex: SymbolIndex,
+    fileCache: Map<string, string[]>,
+): readonly string[] {
+    if (typeof (symbolIndex as any)?.getParameters === 'function') {
+        const custom = (symbolIndex as any).getParameters(sym);
+        if (Array.isArray(custom)) return custom;
+    }
+
+    if (symbolIndex && typeof symbolIndex.resolve === 'function') {
+        const resolved = symbolIndex.resolve(sym);
+        const defs = resolved?.definitions || [];
+        for (let i = 0; i < defs.length; i++) {
+            const defParams = resolveDefinitionParameters(defs[i], fileCache);
+            if (defParams.length > 0) return defParams;
+        }
+    }
+
+    return [];
+}
+
+function hasGuardParameter(params: readonly string[]): boolean {
+    for (let i = 0; i < params.length; i++) {
+        if (isGuardParameter(params[i])) return true;
+    }
+    return false;
 }
 
 /**
@@ -356,29 +396,9 @@ export function extractGuardedRecursiveSymbols(
     const candidateSymbols = collectCandidateSymbols(callGraph, symbolIndex);
 
     for (const sym of candidateSymbols) {
-        let params: string[] = [];
-        if (typeof (symbolIndex as any)?.getParameters === 'function') {
-            const custom = (symbolIndex as any).getParameters(sym);
-            if (Array.isArray(custom)) params = custom;
-        }
-
-        if (params.length === 0 && symbolIndex && typeof symbolIndex.resolve === 'function') {
-            const resolved = symbolIndex.resolve(sym);
-            const defs = resolved?.definitions || [];
-            for (let i = 0; i < defs.length; i++) {
-                const defParams = resolveDefinitionParameters(defs[i], fileCache);
-                if (defParams.length > 0) {
-                    params = defParams;
-                    break;
-                }
-            }
-        }
-
-        for (let i = 0; i < params.length; i++) {
-            if (isGuardParameter(params[i])) {
-                guarded.add(sym);
-                break;
-            }
+        const params = resolveSymbolParameters(sym, symbolIndex, fileCache);
+        if (hasGuardParameter(params)) {
+            guarded.add(sym);
         }
     }
 

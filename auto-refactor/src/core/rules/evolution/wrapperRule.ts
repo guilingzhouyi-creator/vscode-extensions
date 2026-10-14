@@ -26,9 +26,8 @@ const INIT_METHOD_PREFIX = '_init';
 /** Maximum line count for a function to be considered a candidate trivial wrapper. */
 const MAX_WRAPPER_LINE_COUNT = 4;
 
-/** Exemption keywords in comments or decorators indicating legitimate delegation. */
-const EXEMPTION_MARKERS_RE =
-    /@deprecated|@override|adapter|facade|shim|backward compat|forward compat|interface implementation|delegate/i;
+/** Exemption keywords in comments or decorators indicating legitimate system-level proxying. */
+const EXEMPTION_MARKERS_RE = /@override|interface implementation|vtable proxy/i;
 
 const RESERVED_CONTROL_KEYWORDS = new Set([
     'catch',

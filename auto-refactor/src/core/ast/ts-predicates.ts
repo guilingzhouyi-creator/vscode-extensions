@@ -254,22 +254,43 @@ function isAsConst(node: ts.Node | undefined): boolean {
     return false;
 }
 
+function isFreezeCall(n: ts.Node | undefined): boolean {
+    if (!n || !ts.isCallExpression(n)) return false;
+    const expr = n.expression;
+    if (ts.isIdentifier(expr) && (expr.text === 'deepFreeze' || expr.text === 'freeze')) {
+        return true;
+    }
+    if (
+        ts.isPropertyAccessExpression(expr) &&
+        ts.isIdentifier(expr.expression) &&
+        expr.expression.text === 'Object' &&
+        expr.name.text === 'freeze'
+    ) {
+        return true;
+    }
+    return false;
+}
+
 /**
  * Test whether a node resides inside an `as const` expression or a const collection constructor.
  *
  * @param parent - Immediate parent node.
  * @param grandparent - Grandparent node.
+ * @param greatGrandparent - Great-grandparent node.
  * @returns True when the literal is enclosed within a declared const structure.
  */
 function isEnclosedInConstDeclaration(
     parent: ts.Node | undefined,
     grandparent?: ts.Node | undefined,
+    greatGrandparent?: ts.Node | undefined,
 ): boolean {
-    if (isAsConst(parent) || isAsConst(grandparent)) return true;
-    for (const n of [parent, grandparent]) {
-        if (n && ts.isNewExpression(n) && ts.isIdentifier(n.expression)) {
+    if (isAsConst(parent) || isAsConst(grandparent) || isAsConst(greatGrandparent)) return true;
+    for (const n of [parent, grandparent, greatGrandparent]) {
+        if (!n) continue;
+        if (ts.isNewExpression(n) && ts.isIdentifier(n.expression)) {
             if (n.expression.text === 'Set' || n.expression.text === 'Map') return true;
         }
+        if (isFreezeCall(n)) return true;
     }
     return false;
 }
@@ -280,12 +301,14 @@ function isEnclosedInConstDeclaration(
  * @param node - Literal node whose const-bound status is being resolved.
  * @param parent - Raw parent node.
  * @param grandparent - Raw grandparent node.
+ * @param greatGrandparent - Optional raw great-grandparent node.
  * @returns True when the literal is the initializer of a const declaration or enum member.
  */
 export function isConstBoundOf(
     node: ts.Node,
     parent: ts.Node | undefined,
     grandparent: ts.Node | undefined,
+    greatGrandparent?: ts.Node | undefined,
 ): boolean {
     const isConstVar =
         parent &&
@@ -295,7 +318,7 @@ export function isConstBoundOf(
         ts.isVariableDeclarationList(grandparent) &&
         (grandparent.flags & ts.NodeFlags.Const) !== 0;
     if (isConstVar || (parent && ts.isEnumMember(parent))) return true;
-    return isEnclosedInConstDeclaration(parent, grandparent);
+    return isEnclosedInConstDeclaration(parent, grandparent, greatGrandparent);
 }
 
 function tsIsCallTolerated(caller: ts.Node, arg: ts.Node, sf: ts.SourceFile): boolean {
@@ -324,26 +347,38 @@ const JSX_ELEMENT_KINDS = new Set<ts.SyntaxKind>([
     ts.SyntaxKind.JsxSelfClosingElement,
 ]);
 
+function isTypeContext(p: ts.Node, grandparent?: ts.Node): boolean {
+    if (ts.isTypeNode(p)) return true;
+    if (grandparent && ts.isTypeNode(grandparent)) return true;
+    return false;
+}
+
+function isNamedPropertyContext(p: ts.Node, node: ts.Node): boolean {
+    if (ts.isPropertyAssignment(p)) return p.name === node;
+    if (ts.isJsxAttribute(p)) return p.name === node;
+    return false;
+}
+
+function isStringConcatTolerated(p: ts.Node, sf: ts.SourceFile, grandparent?: ts.Node): boolean {
+    if (!grandparent) return false;
+    if (!ts.isBinaryExpression(p)) return false;
+    if (p.operatorToken.kind !== ts.SyntaxKind.PlusToken) return false;
+    return tsIsCallTolerated(grandparent, p, sf);
+}
+
 function isToleratedString(
     node: ts.Node,
     p: ts.Node,
     sf: ts.SourceFile,
     grandparent?: ts.Node,
 ): boolean {
-    if (ts.isTypeNode(p) || (grandparent && ts.isTypeNode(grandparent))) return true;
+    if (isTypeContext(p, grandparent)) return true;
     if (TOLERATED_STRING_PARENT_KINDS.has(p.kind)) return true;
-    if (ts.isPropertyAssignment(p) || ts.isJsxAttribute(p)) return p.name === node;
+    if (isNamedPropertyContext(p, node)) return true;
     if (ts.isElementAccessExpression(p)) return p.argumentExpression === node;
     if (JSX_ELEMENT_KINDS.has(p.kind)) return false;
     if (tsIsCallTolerated(p, node, sf)) return true;
-    if (
-        grandparent &&
-        ts.isBinaryExpression(p) &&
-        p.operatorToken.kind === ts.SyntaxKind.PlusToken
-    ) {
-        return tsIsCallTolerated(grandparent, p, sf);
-    }
-    return false;
+    return isStringConcatTolerated(p, sf, grandparent);
 }
 
 function isToleratedCallArg(node: ts.Node, p: ts.Node, sf?: ts.SourceFile): boolean {

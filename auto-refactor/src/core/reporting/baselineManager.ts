@@ -97,20 +97,47 @@ export function issueGroupKey(issue: Issue): string {
 }
 
 /**
- * Aggregate issue occurrences by analyzer, rule, and repository-relative file path.
+ * Retrieves existing baseline row or initializes a zero-count entry for key.
  *
- * @param issues - Issues to group.
- * @returns Grouped rows carrying occurrence counts and per-severity histograms.
+ * @param rows - Aggregated baseline rows map.
+ * @param key - Grouping key for analyzer, rule, and file.
+ * @returns Baseline row carrying occurrence counts and per-severity histograms.
+ */
+function getOrCreateBaselineRow(
+    rows: Map<string, { count: number; severities: SeverityHistogram }>,
+    key: string,
+): { count: number; severities: SeverityHistogram } {
+    let row = rows.get(key);
+    if (!row) {
+        row = { count: 0, severities: {} };
+        rows.set(key, row);
+    }
+    return row;
+}
+
+function getOrCreateSeverityHistogram(
+    histograms: Record<string, SeverityHistogram>,
+    id: string,
+): SeverityHistogram {
+    let histogram = histograms[id];
+    if (!histogram) {
+        histogram = {};
+        histograms[id] = histogram;
+    }
+    return histogram;
+}
+
+/**
+ * Groups issue occurrence counts and per-severity histograms by group key.
+ *
+ * @param issues - Collection of issues to group into baseline rows.
+ * @returns Array of grouped baseline rows.
  */
 export function groupCounts(issues: Issue[]): GroupedBaselineRow[] {
     const rows = new Map<string, { count: number; severities: SeverityHistogram }>();
     for (const issue of issues) {
         const key = issueGroupKey(issue);
-        let row = rows.get(key);
-        if (!row) {
-            row = { count: 0, severities: {} };
-            rows.set(key, row);
-        }
+        const row = getOrCreateBaselineRow(rows, key);
         row.count += 1;
         row.severities[issue.severity] = (row.severities[issue.severity] ?? 0) + 1;
     }
@@ -126,11 +153,7 @@ export function groupCounts(issues: Issue[]): GroupedBaselineRow[] {
 export function idSeverityHistograms(issues: Issue[]): Record<string, SeverityHistogram> {
     const histograms: Record<string, SeverityHistogram> = {};
     for (const issue of issues) {
-        let histogram = histograms[issue.id];
-        if (!histogram) {
-            histogram = {};
-            histograms[issue.id] = histogram;
-        }
+        const histogram = getOrCreateSeverityHistogram(histograms, issue.id);
         histogram[issue.severity] = (histogram[issue.severity] ?? 0) + 1;
     }
     return histograms;

@@ -127,12 +127,11 @@ export interface FingerprintAnalyzerDesc {
 }
 
 /**
- * Derive deterministic analyzer descriptors WITHOUT loading any module.
+ * Merges configured thresholds with analyzer options.
  *
- * @param analyzers - Configured analyzer declarations map.
  * @param thresholds - Configured thresholds map.
- * @param descs - Target output array to collect analyzer descriptors into.
- * @param seen - Set tracking already seen analyzer names for deduplication.
+ * @param options - Optional analyzer options map.
+ * @returns Combined options record.
  */
 function mergeAnalyzerOptions(
     thresholds: ScanConfig['thresholds'],

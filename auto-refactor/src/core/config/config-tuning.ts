@@ -114,6 +114,8 @@ export const AUTO_TUNE_SECRET_MIN_LENGTH = 24;
 /** Auto-tune secret entropy floor used when `securityLevel` is `full`. */
 export const AUTO_TUNE_SECRET_ENTROPY_THRESHOLD = 4.2;
 
+const EMPTY_ANALYZER_OPTIONS: Record<string, unknown> = Object.freeze({});
+
 /** Effective scale grade resolved by the tuning stage. */
 type ScaleGrade = NonNullable<ScanConfig['scaleGrade']>;
 
@@ -216,7 +218,7 @@ function applyScaleTuning(
         ? tunedThresholds
         : getTunedThresholds(scaleGrade, tunedThresholds);
     for (const [name, decl] of Object.entries(analyzers)) {
-        decl.options = getTunedAnalyzerOptions(scaleGrade, name, decl.options || {});
+        decl.options = getTunedAnalyzerOptions(scaleGrade, name, decl.options || EMPTY_ANALYZER_OPTIONS);
     }
     return next;
 }
@@ -240,7 +242,7 @@ function applyMaturityTuning(
         ? tunedThresholds
         : getMaturityTunedThresholds(maturityTier, tunedThresholds);
     for (const [name, decl] of Object.entries(analyzers)) {
-        decl.options = getMaturityTunedAnalyzerOptions(maturityTier, name, decl.options || {});
+        decl.options = getMaturityTunedAnalyzerOptions(maturityTier, name, decl.options || EMPTY_ANALYZER_OPTIONS);
     }
     return next;
 }

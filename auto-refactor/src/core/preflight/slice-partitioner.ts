@@ -144,7 +144,7 @@ function collectCategoryRelevantFiles(
     let sliceWorkload = 0;
 
     for (const f of files) {
-        const needed = fileAnalyzerMap[f] ?? (EMPTY_STRING_LIST as string[]);
+        const needed = fileAnalyzerMap[f] || EMPTY_STRING_LIST;
         if (hasAnyCategoryAnalyzer(needed, analyzerSet)) {
             relevantFiles.push(f);
             const eloc = entryMap.get(f)?.eloc.estimatedEloc || 50;

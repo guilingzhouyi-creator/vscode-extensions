@@ -52,6 +52,41 @@ const TS_IMPORT_RE =
     /^\s*(?:import\s+(?:type\s+)?(?:[\s\S]*?from\s+)?|const\s+.*=\s*require\()['"]([^'"]+)['"]/;
 const TS_WILDCARD_RE = /\b(?:import\s+\*\s+as|import\s+\*)/;
 
+function buildEnrichedOptions(
+    normPath: string,
+    filePath: string,
+    options: DependencyLayoutOptions,
+    configRoot?: string,
+): DependencyLayoutOptions {
+    if (isExcludedFile(normPath)) {
+        return {
+            ...options,
+            rootDir: undefined,
+            manifestDependencies: undefined,
+            manifestInventory: undefined,
+            flagLicenseCompliance: false,
+            flagDevOnlyDependencies: false,
+            flagDeprecatedDependencies: false,
+            flagUnpinnedDependencies: false,
+        };
+    }
+
+    const rootDir = configRoot || process.cwd();
+    const manifestInventory =
+        options.manifestInventory || findNearestManifestInventory(filePath, rootDir);
+    const manifestDeps =
+        options.manifestDependencies ||
+        manifestInventory?.allDependencies ||
+        loadProjectManifestDependencies(rootDir);
+
+    return {
+        ...options,
+        rootDir: options.rootDir || rootDir,
+        manifestDependencies: manifestDeps,
+        manifestInventory,
+    };
+}
+
 /**
  * Analyzer enforcing file layout, import discipline, and external resource management.
  */
@@ -82,26 +117,12 @@ export class DependencyLayoutAnalyzer implements Analyzer {
             this.extractRemoteResources(ctx, resources);
         }
 
-        const isExcluded = isExcludedFile(normPath);
-        const rootDir = ctx.config?.root || process.cwd();
-        const manifestInventory = isExcluded
-            ? undefined
-            : options.manifestInventory || findNearestManifestInventory(ctx.filePath, rootDir);
-        const manifestDeps = isExcluded
-            ? undefined
-            : options.manifestDependencies ||
-              manifestInventory?.allDependencies ||
-              loadProjectManifestDependencies(rootDir);
-        const enrichedOptions: DependencyLayoutOptions = {
-            ...options,
-            rootDir: isExcluded ? undefined : options.rootDir || rootDir,
-            manifestDependencies: manifestDeps,
-            manifestInventory,
-            flagLicenseCompliance: isExcluded ? false : options.flagLicenseCompliance,
-            flagDevOnlyDependencies: isExcluded ? false : options.flagDevOnlyDependencies,
-            flagDeprecatedDependencies: isExcluded ? false : options.flagDeprecatedDependencies,
-            flagUnpinnedDependencies: isExcluded ? false : options.flagUnpinnedDependencies,
-        };
+        const enrichedOptions = buildEnrichedOptions(
+            normPath,
+            ctx.filePath,
+            options,
+            ctx.config?.root,
+        );
 
         return analyzeDependencyLayout(imports, resources, language, enrichedOptions);
     }

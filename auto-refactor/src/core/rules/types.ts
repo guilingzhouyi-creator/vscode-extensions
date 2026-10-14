@@ -58,6 +58,7 @@ export type RuleFamily =
     | 'RSM'
     | 'GDM'
     | 'NAM'
+    | 'MOD'
     | 'GOM'
     | 'SH'
     | 'PS'
@@ -70,6 +71,9 @@ export type RuleFamily =
     | 'PROD'
     | 'ENG'
     | 'CST';
+
+/** Canonical rule-family prefix for forward evolution and modernization governance rules. */
+export const RULE_FAMILY_MODERNITY = 'MOD';
 
 /** Canonical rule-family prefix for engine execution and runtime error rules. */
 export const RULE_FAMILY_ENGINE = 'ENG';

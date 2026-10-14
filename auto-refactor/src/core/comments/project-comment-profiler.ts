@@ -239,6 +239,19 @@ export class ProjectCommentProfiler {
         return computeLanguageDistribution(comments);
     }
 
+    private appendCommentText(
+        domainBuffers: Map<string, string[]>,
+        domainKey: string,
+        commentText: string,
+    ): void {
+        let buf = domainBuffers.get(domainKey);
+        if (!buf) {
+            buf = [];
+            domainBuffers.set(domainKey, buf);
+        }
+        buf.push(commentText);
+    }
+
     /**
      * Aggregates multiple source files into a repository-wide comment ecosystem profile.
      *
@@ -262,9 +275,7 @@ export class ProjectCommentProfiler {
             const parts = normalized.split('/');
             const domainKey = parts.length > 1 ? parts[0] : 'root';
 
-            const buf = domainBuffers.get(domainKey) ?? [];
-            buf.push(commentText);
-            domainBuffers.set(domainKey, buf);
+            this.appendCommentText(domainBuffers, domainKey, commentText);
         }
 
         // Calculate domain-specific profiles

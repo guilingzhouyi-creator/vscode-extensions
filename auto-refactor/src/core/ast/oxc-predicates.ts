@@ -59,9 +59,9 @@ const DECL_KIND_MAP: Record<string, NodeKind> = {
 };
 
 /** Determine NodeKind for declaration-like oxc AST nodes. */
-function oxcDeclarationKindOf(n: OxcNode): NodeKind | undefined {
-    if (n.type === NODE_KIND_PROPERTY) return n.method ? NodeKind.Method : NodeKind.Other;
-    return DECL_KIND_MAP[n.type];
+function oxcDeclarationKindOf(node: OxcNode): NodeKind | undefined {
+    if (node.type === NODE_KIND_PROPERTY) return node.method ? NodeKind.Method : NodeKind.Other;
+    return DECL_KIND_MAP[node.type];
 }
 
 const EXPRESSION_KIND_MAP: Record<string, NodeKind> = {
@@ -73,16 +73,16 @@ const EXPRESSION_KIND_MAP: Record<string, NodeKind> = {
 };
 
 /** Determine NodeKind for literal and expression oxc AST nodes. */
-function oxcLiteralOrExpressionKindOf(n: OxcNode): NodeKind | undefined {
-    if (n.type === 'Literal') {
-        if (typeof n.value === TYPEOF_NUMBER) return NodeKind.NumericLiteral;
-        if (typeof n.value === TYPEOF_STRING) return NodeKind.StringLiteral;
+function oxcLiteralOrExpressionKindOf(node: OxcNode): NodeKind | undefined {
+    if (node.type === 'Literal') {
+        if (typeof node.value === TYPEOF_NUMBER) return NodeKind.NumericLiteral;
+        if (typeof node.value === TYPEOF_STRING) return NodeKind.StringLiteral;
         return NodeKind.Other;
     }
-    if (n.type === 'TemplateLiteral') {
-        return (n.expressions || []).length === 0 ? NodeKind.StringLiteral : NodeKind.Other;
+    if (node.type === 'TemplateLiteral') {
+        return (node.expressions || []).length === 0 ? NodeKind.StringLiteral : NodeKind.Other;
     }
-    return EXPRESSION_KIND_MAP[n.type];
+    return EXPRESSION_KIND_MAP[node.type];
 }
 
 const COMMON_CONTROL_FLOW_TYPES = [
@@ -103,22 +103,22 @@ const STATEMENT_CONTROL_FLOW_TYPES = new Set([
 ]);
 
 /** Determine NodeKind for control-flow and block oxc AST nodes. */
-function oxcStatementKindOf(n: OxcNode): NodeKind | undefined {
-    if (STATEMENT_CONTROL_FLOW_TYPES.has(n.type)) return NodeKind.ControlFlow;
-    return n.type === 'BlockStatement' ? NodeKind.Block : undefined;
+function oxcStatementKindOf(node: OxcNode): NodeKind | undefined {
+    if (STATEMENT_CONTROL_FLOW_TYPES.has(node.type)) return NodeKind.ControlFlow;
+    return node.type === 'BlockStatement' ? NodeKind.Block : undefined;
 }
 
 /**
  * Map an oxc ESTree AST node to the unified engine NodeKind.
  *
- * @param n - Raw oxc AST node to classify.
+ * @param node - Raw oxc AST node to classify.
  * @returns Mapped NodeKind classification enum value.
  */
-export function oxcKindOf(n: OxcNode): NodeKind {
+export function oxcKindOf(node: OxcNode): NodeKind {
     return (
-        oxcDeclarationKindOf(n) ??
-        oxcLiteralOrExpressionKindOf(n) ??
-        oxcStatementKindOf(n) ??
+        oxcDeclarationKindOf(node) ??
+        oxcLiteralOrExpressionKindOf(node) ??
+        oxcStatementKindOf(node) ??
         NodeKind.Other
     );
 }
@@ -130,28 +130,28 @@ const OXC_LOGICAL_OPS = new Set(['&&', '||', '??']);
 /**
  * Calculate cyclomatic decision-point weight for an oxc node (SwitchCase default -> 0).
  *
- * @param n - Raw oxc AST node to evaluate.
+ * @param node - Raw oxc AST node to evaluate.
  * @returns Decision point branch weight (0 or 1).
  */
-export function oxcBranchWeightOf(n: OxcNode): number {
-    if (OXC_BRANCH_WEIGHT_TYPES.has(n.type)) return 1;
-    if (n.type === 'SwitchCase') return n.test ? 1 : 0;
-    if (n.type === 'BinaryExpression' || n.type === 'LogicalExpression') {
-        return OXC_LOGICAL_OPS.has(n.operator as string) ? 1 : 0;
+export function oxcBranchWeightOf(node: OxcNode): number {
+    if (OXC_BRANCH_WEIGHT_TYPES.has(node.type)) return 1;
+    if (node.type === 'SwitchCase') return node.test ? 1 : 0;
+    if (node.type === 'BinaryExpression' || node.type === 'LogicalExpression') {
+        return OXC_LOGICAL_OPS.has(node.operator as string) ? 1 : 0;
     }
     return 0;
 }
 
-function oxcTargetFnNode(n: OxcNode): OxcNode | undefined {
-    switch (n.type) {
+function oxcTargetFnNode(node: OxcNode): OxcNode | undefined {
+    switch (node.type) {
         case 'VariableDeclarator':
-            return n.init;
+            return node.init;
         case NODE_KIND_PROPERTY:
-            return n.method ? undefined : n.value;
+            return node.method ? undefined : node.value;
         case 'PropertyDefinition':
-            return n.value;
+            return node.value;
         case NODE_KIND_ASSIGNMENT_EXPRESSION:
-            return n.operator === '=' ? n.right : undefined;
+            return node.operator === '=' ? node.right : undefined;
         default:
             return undefined;
     }
@@ -160,11 +160,11 @@ function oxcTargetFnNode(n: OxcNode): OxcNode | undefined {
 /**
  * Determine if an oxc node introduces a variable or member binding with a function initializer.
  *
- * @param n - Raw oxc AST node to evaluate.
+ * @param node - Raw oxc AST node to evaluate.
  * @returns True when node introduces a function-like binding.
  */
-export function oxcIntroducesBinding(n: OxcNode): boolean {
-    const target = oxcTargetFnNode(n);
+export function oxcIntroducesBinding(node: OxcNode): boolean {
+    const target = oxcTargetFnNode(node);
     return target && target.type ? FN_TYPES.has(target.type) : false;
 }
 
@@ -177,23 +177,23 @@ function oxcKeyText(key: OxcNode, ctx: Ctx): string {
 /**
  * Resolve the binding name for an assignment or declarator node.
  *
- * @param n - Raw oxc AST node.
+ * @param node - Raw oxc AST node.
  * @param ctx - Parser context containing source text.
  * @returns Extracted binding name, or null if not applicable.
  */
-export function oxcBindingNameOf(n: OxcNode, ctx: Ctx): string | null {
-    if (n.type === 'VariableDeclarator') {
-        return n.id && typeof n.id.name === TYPEOF_STRING ? n.id.name : null;
+export function oxcBindingNameOf(node: OxcNode, ctx: Ctx): string | null {
+    if (node.type === 'VariableDeclarator') {
+        return node.id && typeof node.id.name === TYPEOF_STRING ? node.id.name : null;
     }
-    if (n.type === NODE_KIND_PROPERTY || n.type === 'PropertyDefinition') {
-        return n.key ? oxcKeyText(n.key, ctx) : null;
+    if (node.type === NODE_KIND_PROPERTY || node.type === 'PropertyDefinition') {
+        return node.key ? oxcKeyText(node.key, ctx) : null;
     }
-    if (n.type === NODE_KIND_ASSIGNMENT_EXPRESSION) {
+    if (node.type === NODE_KIND_ASSIGNMENT_EXPRESSION) {
         if (
-            n.left &&
-            (n.left.type === NODE_KIND_MEMBER_EXPRESSION || n.left.type === 'Identifier')
+            node.left &&
+            (node.left.type === NODE_KIND_MEMBER_EXPRESSION || node.left.type === 'Identifier')
         ) {
-            return ctx.src.slice(n.left.start, n.left.end);
+            return ctx.src.slice(node.left.start, node.left.end);
         }
         return null;
     }
@@ -211,20 +211,20 @@ const NAMED_DECL_TYPES = new Set([
 /**
  * Resolve display name for functions, methods, classes, and interfaces.
  *
- * @param n - Raw oxc AST node.
+ * @param node - Raw oxc AST node.
  * @param ctx - Parser context containing source text.
  * @returns Extracted display name, or null if anonymous/unnamed.
  */
-export function oxcNameOf(n: OxcNode, ctx: Ctx): string | null {
-    if (NAMED_DECL_TYPES.has(n.type)) {
-        return n.id && typeof n.id.name === TYPEOF_STRING ? n.id.name : null;
+export function oxcNameOf(node: OxcNode, ctx: Ctx): string | null {
+    if (NAMED_DECL_TYPES.has(node.type)) {
+        return node.id && typeof node.id.name === TYPEOF_STRING ? node.id.name : null;
     }
-    if (n.type === 'ArrowFunctionExpression') return null;
+    if (node.type === 'ArrowFunctionExpression') return null;
     if (
-        n.type === NODE_KIND_METHOD_DEFINITION ||
-        (n.type === NODE_KIND_PROPERTY && n.method === true)
+        node.type === NODE_KIND_METHOD_DEFINITION ||
+        (node.type === NODE_KIND_PROPERTY && node.method === true)
     ) {
-        return n.key ? oxcKeyText(n.key, ctx) : null;
+        return node.key ? oxcKeyText(node.key, ctx) : null;
     }
     return null;
 }
@@ -277,30 +277,32 @@ export function oxcIsConstBoundOf(
 
 const OXC_TYPE_EXTRA = new Set(['TSLiteralType', 'TSTypeReference', 'TSTypeAnnotation']);
 
-function oxcIsToleratedCallArg(node: OxcNode, p: OxcNode, ctx?: Ctx): boolean {
-    if (p.type !== NODE_KIND_CALL_EXPRESSION || !ctx) return false;
-    const args = p.arguments;
-    if (!Array.isArray(args)) return false;
-    const argIdx = args.indexOf(node);
+function oxcIsToleratedCallArg(node: OxcNode, parentNode: OxcNode, ctx?: Ctx): boolean {
+    if (parentNode.type !== NODE_KIND_CALL_EXPRESSION || !ctx) return false;
+    const callArgs = parentNode.arguments;
+    if (!Array.isArray(callArgs)) return false;
+    const argIdx = callArgs.indexOf(node);
     if (argIdx < 0) return false;
-    const callee = p.callee ? ctx.src.slice(p.callee.start, p.callee.end) : '';
+    const callee = parentNode.callee
+        ? ctx.src.slice(parentNode.callee.start, parentNode.callee.end)
+        : '';
     const numVal = Number(node.value ?? 0);
     return isCallArgumentToleratedByPolicy(callee, argIdx, numVal);
 }
 
 /** Check whether a numeric literal appears in a tolerated AST context. */
-function oxcIsNumericTolerated(node: OxcNode, p: OxcNode, ctx?: Ctx): boolean {
-    if (p.type === NODE_KIND_MEMBER_EXPRESSION) return true;
-    if (p.type === NODE_KIND_PROPERTY && p.key === node) return true;
-    if (p.type === NODE_TS_ENUM_MEMBER) return true;
-    if (TYPE_SKIP_TYPES.has(p.type) || OXC_TYPE_EXTRA.has(p.type)) return true;
-    if (p.type === NODE_SWITCH_CASE && p.test === node) return true;
-    return oxcIsToleratedCallArg(node, p, ctx);
+function oxcIsNumericTolerated(node: OxcNode, parentNode: OxcNode, ctx?: Ctx): boolean {
+    if (parentNode.type === NODE_KIND_MEMBER_EXPRESSION) return true;
+    if (parentNode.type === NODE_KIND_PROPERTY && parentNode.key === node) return true;
+    if (parentNode.type === NODE_TS_ENUM_MEMBER) return true;
+    if (TYPE_SKIP_TYPES.has(parentNode.type) || OXC_TYPE_EXTRA.has(parentNode.type)) return true;
+    if (parentNode.type === NODE_SWITCH_CASE && parentNode.test === node) return true;
+    return oxcIsToleratedCallArg(node, parentNode, ctx);
 }
 
-function oxcIsCallTolerated(caller: OxcNode, arg: OxcNode, ctx: Ctx): boolean {
+function oxcIsCallTolerated(caller: OxcNode, argumentNode: OxcNode, ctx: Ctx): boolean {
     if (caller.type !== NODE_KIND_CALL_EXPRESSION && caller.type !== NODE_NEW_EXPR) return false;
-    if (!Array.isArray(caller.arguments) || !caller.arguments.includes(arg)) return false;
+    if (!Array.isArray(caller.arguments) || !caller.arguments.includes(argumentNode)) return false;
     const callee = caller.callee ? ctx.src.slice(caller.callee.start, caller.callee.end) : '';
     return (
         /\b(t|i18n\.\w*|translate|fmt|formatMessage)\s*$/.test(callee) ||
@@ -311,17 +313,23 @@ function oxcIsCallTolerated(caller: OxcNode, arg: OxcNode, ctx: Ctx): boolean {
 }
 
 /** Check whether a string literal appears in a tolerated AST context. */
-function oxcIsStringTolerated(node: OxcNode, p: OxcNode, ctx: Ctx, grandparent?: OxcNode): boolean {
-    if (p.type === NODE_IMPORT_DECL || p.type === NODE_TS_IMPORT_EQUALS) return true;
-    if (p.type === NODE_THROW_STMT) return true;
-    if (p.type === NODE_KIND_PROPERTY && p.key === node) return true;
-    if (p.type === NODE_KIND_MEMBER_EXPRESSION) return true;
-    if (p.type === NODE_JSX_ATTRIBUTE && p.name === node) return true;
-    if (p.type === NODE_SWITCH_CASE && p.test === node) return true;
-    if (p.type === NODE_JSX_ELEMENT || p.type === NODE_JSX_OPENING_ELEMENT) return false;
-    if (oxcIsCallTolerated(p, node, ctx)) return true;
-    if (grandparent && p.type === NODE_BINARY_EXPR && p.operator === OP_PLUS) {
-        return oxcIsCallTolerated(grandparent, p, ctx);
+function oxcIsStringTolerated(
+    node: OxcNode,
+    parentNode: OxcNode,
+    ctx: Ctx,
+    grandparent?: OxcNode,
+): boolean {
+    const parentType = parentNode.type;
+    if (parentType === NODE_IMPORT_DECL || parentType === NODE_TS_IMPORT_EQUALS) return true;
+    if (parentType === NODE_THROW_STMT) return true;
+    if (parentType === NODE_KIND_PROPERTY && parentNode.key === node) return true;
+    if (parentType === NODE_KIND_MEMBER_EXPRESSION) return true;
+    if (parentType === NODE_JSX_ATTRIBUTE && parentNode.name === node) return true;
+    if (parentType === NODE_SWITCH_CASE && parentNode.test === node) return true;
+    if (parentType === NODE_JSX_ELEMENT || parentType === NODE_JSX_OPENING_ELEMENT) return false;
+    if (oxcIsCallTolerated(parentNode, node, ctx)) return true;
+    if (grandparent && parentType === NODE_BINARY_EXPR && parentNode.operator === OP_PLUS) {
+        return oxcIsCallTolerated(grandparent, parentNode, ctx);
     }
     return false;
 }
@@ -330,62 +338,62 @@ function oxcIsStringTolerated(node: OxcNode, p: OxcNode, ctx: Ctx, grandparent?:
  * Test whether a literal node resides in a tolerated context (e.g. enum member, imports, i18n).
  *
  * @param node - Raw literal oxc node.
- * @param p - Raw parent oxc node.
+ * @param parentNode - Raw parent oxc node.
  * @param ctx - Parser context containing source text.
  * @param grandparent - Optional raw grandparent oxc node.
  * @returns True if literal should be tolerated by analyzers.
  */
 export function oxcIsToleratedOf(
     node: OxcNode,
-    p: OxcNode | undefined,
+    parentNode: OxcNode | undefined,
     ctx: Ctx,
     grandparent?: OxcNode,
 ): boolean {
-    if (!p) return false;
+    if (!parentNode) return false;
     if (typeof node.value === TYPEOF_NUMBER) {
-        return oxcIsNumericTolerated(node, p, ctx);
+        return oxcIsNumericTolerated(node, parentNode, ctx);
     }
-    return oxcIsStringTolerated(node, p, ctx, grandparent);
+    return oxcIsStringTolerated(node, parentNode, ctx, grandparent);
 }
 
 /**
  * Test if an oxc node represents a function or method boundary.
  *
- * @param n - Raw oxc AST node.
+ * @param node - Raw oxc AST node.
  * @returns True if node is a function or method kind.
  */
-export function oxcIsFnLikeNode(n: OxcNode): boolean {
-    const kind = oxcKindOf(n);
+export function oxcIsFnLikeNode(node: OxcNode): boolean {
+    const kind = oxcKindOf(node);
     return kind === NodeKind.Function || kind === NodeKind.Method;
 }
 
 /**
  * Compute 1-based line/column position from UTF-16 offset via binary search over line starts.
  *
- * @param off - UTF-16 character offset in source text.
+ * @param offset - UTF-16 character offset in source text.
  * @param ctx - Parser context with lineStarts table.
  * @returns 1-based line and column Position.
  */
-export function oxcPosOf(off: number, ctx: Ctx): Position {
-    const ls = ctx.lineStarts;
-    let lo = -1;
-    let hi = ls.length - 1;
-    while (lo < hi) {
-        const mid = (lo + hi + 1) >> 1;
-        if (ls[mid] <= off) lo = mid;
-        else hi = mid - 1;
+export function oxcPosOf(offset: number, ctx: Ctx): Position {
+    const lineStarts = ctx.lineStarts;
+    let lowIndex = -1;
+    let highIndex = lineStarts.length - 1;
+    while (lowIndex < highIndex) {
+        const midIndex = (lowIndex + highIndex + 1) >> 1;
+        if (lineStarts[midIndex] <= offset) lowIndex = midIndex;
+        else highIndex = midIndex - 1;
     }
-    return { line: lo + 2, column: off - (lo >= 0 ? ls[lo] : 0) + 1 };
+    return { line: lowIndex + 2, column: offset - (lowIndex >= 0 ? lineStarts[lowIndex] : 0) + 1 };
 }
 
 /**
  * Retrieve raw literal text from an oxc node.
  *
- * @param n - Raw literal oxc node.
+ * @param node - Raw literal oxc node.
  * @param ctx - Parser context with source text.
  * @returns Literal string representation.
  */
-export function oxcLiteralText(n: OxcNode, ctx: Ctx): string {
-    if (n.type === NODE_TYPE_TEMPLATE_LITERAL) return ctx.src.slice(n.start, n.end);
-    return n.raw != null ? String(n.raw) : ctx.src.slice(n.start, n.end);
+export function oxcLiteralText(node: OxcNode, ctx: Ctx): string {
+    if (node.type === NODE_TYPE_TEMPLATE_LITERAL) return ctx.src.slice(node.start, node.end);
+    return node.raw != null ? String(node.raw) : ctx.src.slice(node.start, node.end);
 }

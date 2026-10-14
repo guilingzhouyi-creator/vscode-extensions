@@ -27,6 +27,12 @@ import {
     DEDUCTION_UNUSED_BINDING,
     DEDUCTION_NAMING_VIOLATION,
     DEDUCTION_SUBSTANDARD_COMMENT,
+    RULE_MOD_BWD_001,
+    RULE_MOD_FLB_001,
+    RULE_MOD_DEP_001,
+    DEDUCTION_BACKWARD_SHIM,
+    DEDUCTION_FALLBACK_CHAIN,
+    DEDUCTION_DEPRECATED_ACCESS,
     ANALYZER_GOVERNANCE,
     ANALYZER_LARGE_FILE,
     ANALYZER_COMPLEXITY,
@@ -264,6 +270,49 @@ export const DIMENSION_RULES: DimensionRule[] = [
         covers: ruleMatches([RULE_GOV_DEPRECATED], ['legacy', 'deprecated']),
         dimension: DIMENSION_MODERNITY,
         points: DEDUCTION_DEPRECATED_FEATURE,
+        rationale: ScoringRationales.DEPRECATED_LANGUAGE_FEATURE,
+    },
+    // Modernity — backward compatibility shims, fallback chains, and deprecated accesses
+    {
+        analyzer: 'ts-modern',
+        covers: ruleMatches([RULE_MOD_BWD_001], ['backward', 'shim', 'BWD']),
+        dimension: DIMENSION_MODERNITY,
+        points: DEDUCTION_BACKWARD_SHIM,
+        rationale: ScoringRationales.DEPRECATED_LANGUAGE_FEATURE,
+    },
+    {
+        analyzer: 'ts-modern',
+        covers: ruleMatches([RULE_MOD_FLB_001], ['fallback', 'chain', 'FLB']),
+        dimension: DIMENSION_MODERNITY,
+        points: DEDUCTION_FALLBACK_CHAIN,
+        rationale: ScoringRationales.DEPRECATED_LANGUAGE_FEATURE,
+    },
+    {
+        analyzer: 'ts-modern',
+        covers: ruleMatches([RULE_MOD_DEP_001], ['deprecated', 'access', 'DEP']),
+        dimension: DIMENSION_MODERNITY,
+        points: DEDUCTION_DEPRECATED_ACCESS,
+        rationale: ScoringRationales.DEPRECATED_LANGUAGE_FEATURE,
+    },
+    {
+        analyzer: ANALYZER_GOVERNANCE,
+        covers: ruleMatches([RULE_MOD_BWD_001], ['backward', 'shim', 'BWD']),
+        dimension: DIMENSION_MODERNITY,
+        points: DEDUCTION_BACKWARD_SHIM,
+        rationale: ScoringRationales.DEPRECATED_LANGUAGE_FEATURE,
+    },
+    {
+        analyzer: ANALYZER_GOVERNANCE,
+        covers: ruleMatches([RULE_MOD_FLB_001], ['fallback', 'chain', 'FLB']),
+        dimension: DIMENSION_MODERNITY,
+        points: DEDUCTION_FALLBACK_CHAIN,
+        rationale: ScoringRationales.DEPRECATED_LANGUAGE_FEATURE,
+    },
+    {
+        analyzer: ANALYZER_GOVERNANCE,
+        covers: ruleMatches([RULE_MOD_DEP_001], ['deprecated', 'access', 'DEP']),
+        dimension: DIMENSION_MODERNITY,
+        points: DEDUCTION_DEPRECATED_ACCESS,
         rationale: ScoringRationales.DEPRECATED_LANGUAGE_FEATURE,
     },
     ...MODERNITY_ANALYZERS.map((analyzer): DimensionRule => ({
@@ -788,17 +837,24 @@ export const DIMENSION_RULES: DimensionRule[] = [
     ...FRONTEND_DIMENSION_RULES,
 ];
 
+function ensureAnalyzerBucket(
+    map: Map<string, DimensionRule[]>,
+    analyzer: string,
+): DimensionRule[] {
+    let list = map.get(analyzer);
+    if (!list) {
+        list = [];
+        map.set(analyzer, list);
+    }
+    return list;
+}
+
 /**
  * Fast analyzer-indexed lookup table partitioning DIMENSION_RULES to avoid O(N) full-table scans.
  */
 const RULES_BY_ANALYZER = new Map<string, DimensionRule[]>();
 for (const rule of DIMENSION_RULES) {
-    let list = RULES_BY_ANALYZER.get(rule.analyzer);
-    if (!list) {
-        list = [];
-        RULES_BY_ANALYZER.set(rule.analyzer, list);
-    }
-    list.push(rule);
+    ensureAnalyzerBucket(RULES_BY_ANALYZER, rule.analyzer).push(rule);
 }
 
 /**

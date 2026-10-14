@@ -66,7 +66,7 @@ export class TypeScriptAdapter implements LanguageAdapter {
      */
     parse(content: string, filePath: string, seed?: ProjectionSeed): NormalizedAst {
         const sf = createSourceFile(filePath, content);
-        const root = this.mapNode(sf, undefined, undefined, sf, seed);
+        const root = this.mapNode(sf, undefined, undefined, undefined, sf, seed);
         return { root, sourceFile: sf };
     }
 
@@ -193,6 +193,7 @@ export class TypeScriptAdapter implements LanguageAdapter {
         n: ts.Node,
         parentTs: ts.Node | undefined,
         grandparentTs: ts.Node | undefined,
+        greatGrandparentTs: ts.Node | undefined,
         isLiteral: boolean,
         sf: ts.SourceFile,
     ): void {
@@ -202,7 +203,7 @@ export class TypeScriptAdapter implements LanguageAdapter {
             topLevel &&
             (hasExportModifier(n) || ts.isExportAssignment(n) || ts.isExportDeclaration(n));
         if (isLiteral) {
-            node.isConstBound = isConstBoundOf(n, parentTs, grandparentTs);
+            node.isConstBound = isConstBoundOf(n, parentTs, grandparentTs, greatGrandparentTs);
             node.tolerated = isToleratedOf(n, parentTs, sf, grandparentTs);
         }
     }
@@ -255,13 +256,14 @@ export class TypeScriptAdapter implements LanguageAdapter {
     private traverseChildren(
         n: ts.Node,
         parentTs: ts.Node | undefined,
+        grandparentTs: ts.Node | undefined,
         sf: ts.SourceFile,
         seed?: ProjectionSeed,
     ): NormalizedNode[] | undefined {
         let kids: NormalizedNode[] | undefined;
         ts.forEachChild(n, (c) => {
             if (isSkippableToken(c)) return;
-            (kids ??= []).push(this.mapNode(c, n, parentTs, sf, seed));
+            (kids ??= []).push(this.mapNode(c, n, parentTs, grandparentTs, sf, seed));
         });
         return kids;
     }
@@ -270,6 +272,7 @@ export class TypeScriptAdapter implements LanguageAdapter {
         n: ts.Node,
         parentTs: ts.Node | undefined,
         grandparentTs: ts.Node | undefined,
+        greatGrandparentTs: ts.Node | undefined,
         sf: ts.SourceFile,
         seed?: ProjectionSeed,
     ): NormalizedNode {
@@ -290,13 +293,21 @@ export class TypeScriptAdapter implements LanguageAdapter {
             isCall,
             sf,
         );
-        this.applyNodeHierarchy(node, n, parentTs, grandparentTs, isLiteral, sf);
+        this.applyNodeHierarchy(
+            node,
+            n,
+            parentTs,
+            grandparentTs,
+            greatGrandparentTs,
+            isLiteral,
+            sf,
+        );
 
         if (this.tryReuseSubtree(node, n, fnLike, sf, seed)) {
             return node;
         }
 
-        const kids = this.traverseChildren(n, parentTs, sf, seed);
+        const kids = this.traverseChildren(n, parentTs, grandparentTs, sf, seed);
         node.children = kids;
         this.recordSpanCache(seed, fnLike, n, sf, kids);
         return node;

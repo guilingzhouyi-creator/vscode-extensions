@@ -63,6 +63,40 @@ export const ALL_QUALITY_DIMENSIONS: readonly QualityDimension[] = [
     'techDebtRisk',
 ] as const;
 
+const ANALYZER_ARCHITECTURE = 'architecture';
+const ANALYZER_DEPENDENCY_GRAPH = 'dependency-graph';
+const ANALYZER_DEPENDENCY_LAYOUT = 'dependency-layout';
+const ANALYZER_DATA_ARCHITECTURE = 'data-architecture';
+const ANALYZER_STDLIB = 'stdlib';
+const ANALYZER_NAMING = 'naming';
+const ANALYZER_GDSCRIPT_GAME = 'gdscript-game';
+const ANALYZER_VSCODE_EXTENSION = 'vscode-extension';
+const ANALYZER_GATE_ARCHITECTURE = 'gate-architecture';
+const ANALYZER_GOVERNANCE = 'governance';
+const ANALYZER_HYGIENE = 'hygiene';
+const ANALYZER_SECURITY = 'security';
+const ANALYZER_SECRETS = 'secrets';
+const ANALYZER_PRODUCTION_HYGIENE = 'production-hygiene';
+const ANALYZER_CLIENT_EXPOSURE = 'client-exposure';
+const ANALYZER_PERFORMANCE = 'performance';
+const ANALYZER_COMPLEXITY = 'complexity';
+const ANALYZER_FRONTEND = 'frontend';
+const ANALYZER_LARGE_FILE = 'large-file';
+const ANALYZER_DOCS = 'docs';
+const ANALYZER_SHELL_LINT = 'shell-lint';
+const ANALYZER_SIMPLIFY = 'simplify';
+const ANALYZER_TS_MODERN = 'ts-modern';
+const ANALYZER_PYTHON_MODERN = 'python-modern';
+const ANALYZER_RUST_MODERN = 'rust-modern';
+const ANALYZER_GDSCRIPT_MODERN = 'gdscript-modern';
+const ANALYZER_TEST_MODERNITY = 'test-modernity';
+const ANALYZER_GO_MODERN = 'go-modern';
+const ANALYZER_COMMENTS = 'comments';
+const ANALYZER_CONSTANTS = 'constants';
+
+const SCALE_MODE_DENSITY = 'density';
+const SCALE_MODE_ABSOLUTE = 'absolute';
+
 /**
  * Analyzers whose evidence feeds each quality dimension. A dimension is *not evaluated* when none
  * of its analyzers is enabled in the scan configuration, so the model never scores an axis that
@@ -76,63 +110,69 @@ export const ALL_QUALITY_DIMENSIONS: readonly QualityDimension[] = [
  */
 export const DIMENSION_ANALYZERS: Record<QualityDimension, readonly string[]> = {
     architectureConsistency: [
-        'architecture',
-        'dependency-graph',
-        'dependency-layout',
-        'data-architecture',
-        'stdlib',
-        'naming',
-        'gdscript-game',
-        'vscode-extension',
-        'gate-architecture',
+        ANALYZER_ARCHITECTURE,
+        ANALYZER_DEPENDENCY_GRAPH,
+        ANALYZER_DEPENDENCY_LAYOUT,
+        ANALYZER_DATA_ARCHITECTURE,
+        ANALYZER_STDLIB,
+        ANALYZER_NAMING,
+        ANALYZER_GDSCRIPT_GAME,
+        ANALYZER_VSCODE_EXTENSION,
+        ANALYZER_GATE_ARCHITECTURE,
     ],
-    semanticPurity: ['governance', 'hygiene', 'dependency-graph', 'stdlib'],
-    codeSecurity: ['architecture', 'security', 'secrets', 'production-hygiene', 'client-exposure'],
+    semanticPurity: [ANALYZER_GOVERNANCE, ANALYZER_HYGIENE, ANALYZER_DEPENDENCY_GRAPH, ANALYZER_STDLIB],
+    codeSecurity: [
+        ANALYZER_ARCHITECTURE,
+        ANALYZER_SECURITY,
+        ANALYZER_SECRETS,
+        ANALYZER_PRODUCTION_HYGIENE,
+        ANALYZER_CLIENT_EXPOSURE,
+    ],
     performanceEfficiency: [
-        'performance',
-        'data-architecture',
-        'complexity',
-        'gdscript-game',
-        'vscode-extension',
-        'frontend',
+        ANALYZER_PERFORMANCE,
+        ANALYZER_DATA_ARCHITECTURE,
+        ANALYZER_COMPLEXITY,
+        ANALYZER_GDSCRIPT_GAME,
+        ANALYZER_VSCODE_EXTENSION,
+        ANALYZER_FRONTEND,
     ],
     standardization: [
-        'hygiene',
-        'large-file',
-        'dependency-layout',
-        'stdlib',
-        'naming',
-        'docs',
-        'gate-architecture',
-        'shell-lint',
-        'simplify',
-        'frontend',
+        ANALYZER_HYGIENE,
+        ANALYZER_LARGE_FILE,
+        ANALYZER_DEPENDENCY_LAYOUT,
+        ANALYZER_STDLIB,
+        ANALYZER_NAMING,
+        ANALYZER_DOCS,
+        ANALYZER_GATE_ARCHITECTURE,
+        ANALYZER_SHELL_LINT,
+        ANALYZER_SIMPLIFY,
+        ANALYZER_FRONTEND,
     ],
     modernity: [
-        'governance',
-        'ts-modern',
-        'python-modern',
-        'rust-modern',
-        'gdscript-modern',
-        'gdscript-game',
-        'test-modernity',
-        'go-modern',
+        ANALYZER_GOVERNANCE,
+        ANALYZER_TS_MODERN,
+        ANALYZER_PYTHON_MODERN,
+        ANALYZER_RUST_MODERN,
+        ANALYZER_GDSCRIPT_MODERN,
+        ANALYZER_GDSCRIPT_GAME,
+        ANALYZER_TEST_MODERNITY,
+        ANALYZER_GO_MODERN,
     ],
     maintainability: [
-        'complexity',
-        'large-file',
-        'test-modernity',
-        'stdlib',
-        'gdscript-game',
-        'gate-architecture',
-        'shell-lint',
-        'simplify',
-        'frontend',
-        'production-hygiene',
+        ANALYZER_COMPLEXITY,
+        ANALYZER_LARGE_FILE,
+        ANALYZER_TEST_MODERNITY,
+        ANALYZER_STDLIB,
+        ANALYZER_GDSCRIPT_GAME,
+        ANALYZER_GATE_ARCHITECTURE,
+        ANALYZER_SHELL_LINT,
+        ANALYZER_SIMPLIFY,
+        ANALYZER_FRONTEND,
+        ANALYZER_PRODUCTION_HYGIENE,
     ],
-    commentQuality: ['comments', 'vscode-extension', 'simplify'],
-    duplication: ['constants', 'hygiene'],
-    techDebtRisk: ['governance'],
+    commentQuality: [ANALYZER_COMMENTS, ANALYZER_VSCODE_EXTENSION, ANALYZER_SIMPLIFY],
+    duplication: [ANALYZER_CONSTANTS, ANALYZER_HYGIENE],
+    techDebtRisk: [ANALYZER_GOVERNANCE],
 };
 
 /**
@@ -144,16 +184,16 @@ export const DIMENSION_ANALYZERS: Record<QualityDimension, readonly string[]> = 
  * Declaring this here keeps the curve reading configuration rather than a hardcoded rule id.
  */
 export const DIMENSION_SCALE_MODE: Record<QualityDimension, 'absolute' | 'density'> = {
-    architectureConsistency: 'density',
-    semanticPurity: 'density',
-    codeSecurity: 'absolute',
-    performanceEfficiency: 'density',
-    standardization: 'density',
-    modernity: 'density',
-    maintainability: 'density',
-    commentQuality: 'density',
-    duplication: 'density',
-    techDebtRisk: 'density',
+    architectureConsistency: SCALE_MODE_DENSITY,
+    semanticPurity: SCALE_MODE_DENSITY,
+    codeSecurity: SCALE_MODE_ABSOLUTE,
+    performanceEfficiency: SCALE_MODE_DENSITY,
+    standardization: SCALE_MODE_DENSITY,
+    modernity: SCALE_MODE_DENSITY,
+    maintainability: SCALE_MODE_DENSITY,
+    commentQuality: SCALE_MODE_DENSITY,
+    duplication: SCALE_MODE_DENSITY,
+    techDebtRisk: SCALE_MODE_DENSITY,
 };
 
 /** Dimension weights for the composite Quality Index (default balanced) */

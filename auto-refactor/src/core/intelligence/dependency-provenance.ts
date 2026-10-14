@@ -129,6 +129,94 @@ export const GO_CORE_PACKAGES: ReadonlySet<string> = new Set([
     'unsafe',
 ]);
 
+// ---------------------------------------------------------------------------
+// Manifest and Configuration File Names
+// ---------------------------------------------------------------------------
+
+const MANIFEST_PKG_JSON = 'package.json';
+const MANIFEST_CARGO_TOML = 'Cargo.toml';
+const MANIFEST_PYPROJECT_TOML = 'pyproject.toml';
+const MANIFEST_REQUIREMENTS_TXT = 'requirements.txt';
+const MANIFEST_GO_MOD = 'go.mod';
+
+const CONFIG_TSCONFIG_JSON = 'tsconfig.json';
+const CONFIG_JSCONFIG_JSON = 'jsconfig.json';
+const CONFIG_TSCONFIG_BASE_JSON = 'tsconfig.base.json';
+const TSCONFIG_CANDIDATE_NAMES: readonly string[] = [
+    CONFIG_TSCONFIG_JSON,
+    CONFIG_JSCONFIG_JSON,
+    CONFIG_TSCONFIG_BASE_JSON,
+];
+
+// ---------------------------------------------------------------------------
+// Lockfile Names and Types
+// ---------------------------------------------------------------------------
+
+const LOCKFILE_PKG_LOCK_JSON = 'package-lock.json';
+const LOCKFILE_CARGO_LOCK = 'Cargo.lock';
+const LOCKFILE_GO_SUM = 'go.sum';
+const LOCKFILE_POETRY_LOCK = 'poetry.lock';
+
+const LOCKFILE_TYPE_NPM = 'npm';
+const LOCKFILE_TYPE_CARGO = 'cargo';
+const LOCKFILE_TYPE_GO = 'go';
+const LOCKFILE_TYPE_POETRY = 'poetry';
+const LOCKFILE_TYPE_NONE = 'none';
+
+// ---------------------------------------------------------------------------
+// Provenance Classification Tokens
+// ---------------------------------------------------------------------------
+
+const FILE_PROVENANCE_IN_TREE_VENDOR: FileProvenanceKind = 'in_tree_vendor';
+const FILE_PROVENANCE_GENERATED: FileProvenanceKind = 'generated';
+const FILE_PROVENANCE_TEST_FIXTURE: FileProvenanceKind = 'test_fixture';
+const FILE_PROVENANCE_PROPRIETARY: FileProvenanceKind = 'proprietary';
+
+const IMPORT_PROVENANCE_STDLIB: ImportProvenanceKind = 'stdlib';
+const IMPORT_PROVENANCE_INTERNAL: ImportProvenanceKind = 'internal';
+const IMPORT_PROVENANCE_IN_TREE_VENDOR: ImportProvenanceKind = 'in_tree_vendor';
+const IMPORT_PROVENANCE_EXTERNAL_SDK: ImportProvenanceKind = 'external_sdk';
+const IMPORT_PROVENANCE_UNKNOWN: ImportProvenanceKind = 'unknown';
+
+// ---------------------------------------------------------------------------
+// Protocol, Runtime, and Engine Tokens
+// ---------------------------------------------------------------------------
+
+const NODE_CORE_PREFIX = 'node:';
+const GODOT_GLOBAL_SCOPE_PREFIX = '@GlobalScope';
+const GODOT_ENGINE_IDENTIFIER = 'Engine';
+const GODOT_RESOURCE_LOADER_IDENTIFIER = 'ResourceLoader';
+
+const UNPINNED_WILDCARD = '*';
+const UNPINNED_LATEST = 'latest';
+const UNPINNED_X = 'x';
+const UNPINNED_STAR_STAR = '*.*';
+
+const GO_REQUIRE_PREFIX = 'require ';
+const GO_REQUIRE_GROUP_START = 'require (';
+
+// ---------------------------------------------------------------------------
+// Numerical & Depth Boundaries
+// ---------------------------------------------------------------------------
+
+const MAX_TSCONFIG_EXTENDS_DEPTH = 8;
+const CHAR_CODE_DOT = 46;
+const CHAR_CODE_SLASH = 47;
+const CHAR_CODE_HASH = 35;
+
+const ESTIMATED_DEPTH_SHALLOW = 1;
+const ESTIMATED_DEPTH_MODERATE = 2;
+const ESTIMATED_DEPTH_DEEP = 3;
+const ESTIMATED_DEPTH_VERY_DEEP = 4;
+
+const DEPTH_THRESHOLD_FACTOR_LOW = 4;
+const DEPTH_THRESHOLD_FACTOR_MEDIUM = 5;
+const DEPTH_THRESHOLD_FACTOR_CARGO_HIGH = 15;
+const DEPTH_THRESHOLD_FACTOR_NPM_HIGH = 20;
+
+const DEFAULT_TRANSITIVE_MULTIPLIER = 3;
+const DEFAULT_TOTAL_MULTIPLIER = 4;
+
 /** In-tree vendor directory path patterns */
 const IN_TREE_VENDOR_PATTERN =
     /(?:^|[\\/])(?:vendor|third_party|third-party|extern|external|submodules|embedded)[\\/]/i;
@@ -160,6 +248,21 @@ export interface ProjectManifestInventory {
 /** Manifest inventory cache keyed by absolute root directory path */
 const INVENTORY_CACHE = new Map<string, ProjectManifestInventory>();
 
+function ingestDependencyMap(
+    rawRecord: unknown,
+    primarySet: Set<string>,
+    inventory: ProjectManifestInventory,
+    isProd = false,
+): void {
+    if (!rawRecord || typeof rawRecord !== 'object') return;
+    for (const [dep, ver] of Object.entries(rawRecord as Record<string, unknown>)) {
+        primarySet.add(dep);
+        inventory.allDependencies.add(dep);
+        if (isProd) inventory.prodDependencies.add(dep);
+        if (typeof ver === 'string') inventory.versionSpecs.set(dep, ver);
+    }
+}
+
 /**
  * Extract external package dependencies declared in package.json with fine-grained scopes.
  */
@@ -167,27 +270,10 @@ function parsePackageJson(manifestPath: string, inventory: ProjectManifestInvent
     try {
         const raw = fs.readFileSync(manifestPath, 'utf8');
         const json = JSON.parse(raw);
-        for (const [dep, ver] of Object.entries(json.dependencies || {})) {
-            inventory.prodDependencies.add(dep);
-            inventory.allDependencies.add(dep);
-            if (typeof ver === 'string') inventory.versionSpecs.set(dep, ver);
-        }
-        for (const [dep, ver] of Object.entries(json.peerDependencies || {})) {
-            inventory.peerDependencies.add(dep);
-            inventory.prodDependencies.add(dep);
-            inventory.allDependencies.add(dep);
-            if (typeof ver === 'string') inventory.versionSpecs.set(dep, ver);
-        }
-        for (const [dep, ver] of Object.entries(json.optionalDependencies || {})) {
-            inventory.prodDependencies.add(dep);
-            inventory.allDependencies.add(dep);
-            if (typeof ver === 'string') inventory.versionSpecs.set(dep, ver);
-        }
-        for (const [dep, ver] of Object.entries(json.devDependencies || {})) {
-            inventory.devDependencies.add(dep);
-            inventory.allDependencies.add(dep);
-            if (typeof ver === 'string') inventory.versionSpecs.set(dep, ver);
-        }
+        ingestDependencyMap(json.dependencies, inventory.prodDependencies, inventory, true);
+        ingestDependencyMap(json.peerDependencies, inventory.peerDependencies, inventory, true);
+        ingestDependencyMap(json.optionalDependencies, inventory.prodDependencies, inventory, true);
+        ingestDependencyMap(json.devDependencies, inventory.devDependencies, inventory, false);
     } catch {
         // best-effort fallback: ignored when manifest is corrupt or unreadable
     }
@@ -221,8 +307,7 @@ function parseCargoToml(manifestPath: string, target: Set<string>): void {
 /** Safely read UTF-8 text from disk, returning null on error or non-existence. */
 function tryReadUtf8Text(filePath: string): string | null {
     try {
-        if (!fs.existsSync(filePath)) return null;
-        return fs.readFileSync(filePath, 'utf8');
+        return fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf8') : null;
     } catch {
         return null;
     }
@@ -258,11 +343,11 @@ function parseRequirementsDeps(raw: string, target: Set<string>): void {
  * Extract external package dependencies declared in pyproject.toml and requirements.txt.
  */
 function parsePythonManifests(rootDir: string, target: Set<string>): void {
-    const pyproject = tryReadUtf8Text(path.join(rootDir, 'pyproject.toml'));
+    const pyproject = tryReadUtf8Text(path.join(rootDir, MANIFEST_PYPROJECT_TOML));
     if (pyproject) {
         parsePyprojectDeps(pyproject, target);
     }
-    const reqTxt = tryReadUtf8Text(path.join(rootDir, 'requirements.txt'));
+    const reqTxt = tryReadUtf8Text(path.join(rootDir, MANIFEST_REQUIREMENTS_TXT));
     if (reqTxt) {
         parseRequirementsDeps(reqTxt, target);
     }
@@ -277,7 +362,7 @@ function parseGoMod(manifestPath: string, target: Set<string>): void {
         let inRequire = false;
         for (const line of raw.split('\n')) {
             const trimmed = line.trim();
-            if (trimmed.startsWith('require (')) {
+            if (trimmed.startsWith(GO_REQUIRE_GROUP_START)) {
                 inRequire = true;
                 continue;
             }
@@ -285,7 +370,7 @@ function parseGoMod(manifestPath: string, target: Set<string>): void {
                 inRequire = false;
                 continue;
             }
-            if ((inRequire || trimmed.startsWith('require ')) && trimmed) {
+            if ((inRequire || trimmed.startsWith(GO_REQUIRE_PREFIX)) && trimmed) {
                 const parts = trimmed.replace(/^require\s+/, '').split(/\s+/);
                 if (parts[0]) target.add(parts[0]);
             }
@@ -295,13 +380,29 @@ function parseGoMod(manifestPath: string, target: Set<string>): void {
     }
 }
 
+function resolveExtendsPath(dir: string, extendsTarget: string): string {
+    let extPath = path.resolve(dir, extendsTarget);
+    if (!extPath.endsWith('.json') && !fs.existsSync(extPath) && fs.existsSync(extPath + '.json')) {
+        extPath += '.json';
+    }
+    return extPath;
+}
+
+function ingestCompilerPaths(pathsRecord: unknown, target: Set<string>): void {
+    if (!pathsRecord || typeof pathsRecord !== 'object') return;
+    for (const key of Object.keys(pathsRecord as Record<string, unknown>)) {
+        const prefix = key.replace(/\/\*$/, '').replace(/\*$/, '');
+        if (prefix) target.add(prefix);
+    }
+}
+
 function extractAliasesFromFile(
     filePath: string,
     target: Set<string>,
     visited = new Set<string>(),
 ): void {
     const absPath = path.resolve(filePath);
-    if (visited.has(absPath) || visited.size > 8 || !fs.existsSync(absPath)) return;
+    if (visited.has(absPath) || visited.size > MAX_TSCONFIG_EXTENDS_DEPTH || !fs.existsSync(absPath)) return;
     visited.add(absPath);
 
     try {
@@ -310,20 +411,11 @@ function extractAliasesFromFile(
         const parsed = JSON.parse(clean);
 
         if (typeof parsed.extends === 'string') {
-            const dir = path.dirname(absPath);
-            let extPath = path.resolve(dir, parsed.extends);
-            if (!extPath.endsWith('.json') && !fs.existsSync(extPath)) {
-                if (fs.existsSync(extPath + '.json')) extPath += '.json';
-            }
+            const extPath = resolveExtendsPath(path.dirname(absPath), parsed.extends);
             extractAliasesFromFile(extPath, target, visited);
         }
 
-        const paths = parsed.compilerOptions?.paths;
-        if (!paths || typeof paths !== 'object') return;
-        for (const key of Object.keys(paths)) {
-            const prefix = key.replace(/\/\*$/, '').replace(/\*$/, '');
-            if (prefix) target.add(prefix);
-        }
+        ingestCompilerPaths(parsed.compilerOptions?.paths, target);
     } catch {
         // best-effort fallback
     }
@@ -334,8 +426,7 @@ function extractAliasesFromFile(
  * aliases (e.g. '@core/*', '@shared/*') from being misclassified as external SDKs.
  */
 function parsePathAliases(rootDir: string, target: Set<string>): void {
-    const candidates = ['tsconfig.json', 'jsconfig.json', 'tsconfig.base.json'];
-    for (const fileName of candidates) {
+    for (const fileName of TSCONFIG_CANDIDATE_NAMES) {
         extractAliasesFromFile(path.join(rootDir, fileName), target);
     }
 }
@@ -350,16 +441,18 @@ function parsePathAliases(rootDir: string, target: Set<string>): void {
 export function isUnpinnedVersion(spec: string): boolean {
     if (!spec) return false;
     const trimmed = spec.trim().toLowerCase();
-    if (trimmed === '*' || trimmed === 'latest' || trimmed === 'x' || trimmed === '*.*') {
+    if (
+        trimmed === UNPINNED_WILDCARD ||
+        trimmed === UNPINNED_LATEST ||
+        trimmed === UNPINNED_X ||
+        trimmed === UNPINNED_STAR_STAR
+    ) {
         return true;
     }
     if (/^[><]=?\s*\d+/.test(trimmed) && !trimmed.includes('<=') && !trimmed.includes('<')) {
         return true;
     }
-    if (/\b(?:x|\*)\b/.test(trimmed)) {
-        return true;
-    }
-    return false;
+    return /\b(?:x|\*)\b/.test(trimmed);
 }
 
 const PATH_TO_NEAREST_DIR_MAP = new Map<string, string | null>();
@@ -367,10 +460,6 @@ const DIR_TO_MERGED_INVENTORY_MAP = new Map<string, ProjectManifestInventory>();
 const KNOWN_FILE_EXT_PATTERN =
     /\.(?:[cm]?[jt]sx?|py|rs|go|gd|json|ya?ml|toml|md|sh|ps1|c|h|cpp|hpp|java|cs|rb|php|swift|kt|lock|sum|txt)$/i;
 const CACHE_KEY_SEP = '\0';
-const MANIFEST_PKG_JSON = 'package.json';
-const MANIFEST_CARGO_TOML = 'Cargo.toml';
-const MANIFEST_PYPROJECT_TOML = 'pyproject.toml';
-const MANIFEST_GO_MOD = 'go.mod';
 
 function resolveStartDirectory(startPath: string, absBoundary: string): string {
     const resolved = path.isAbsolute(startPath)
@@ -435,6 +524,44 @@ export function findNearestManifestDir(startPath: string, boundaryDir: string): 
     return foundDir;
 }
 
+const PROJECT_VERSION_CACHE = new Map<string, string | undefined>();
+
+/**
+ * Discovers and caches declared semver version from nearest package.json manifest.
+ *
+ * @param filePath - Source file path being analyzed.
+ * @param boundaryDir - Optional root boundary directory (defaults to process.cwd()).
+ * @returns Discovered semver string or undefined.
+ */
+export function resolveProjectVersion(
+    filePath: string,
+    boundaryDir = process.cwd(),
+): string | undefined {
+    const nearestDir = findNearestManifestDir(filePath, boundaryDir);
+    if (!nearestDir) return undefined;
+    if (PROJECT_VERSION_CACHE.has(nearestDir)) {
+        return PROJECT_VERSION_CACHE.get(nearestDir);
+    }
+
+    const pkgPath = path.join(nearestDir, MANIFEST_PKG_JSON);
+    let version: string | undefined;
+    try {
+        if (fs.existsSync(pkgPath)) {
+            const raw = fs.readFileSync(pkgPath, 'utf8');
+            const parsed = JSON.parse(raw);
+            if (typeof parsed.version === 'string') {
+                version = parsed.version;
+            }
+        }
+    } catch (err) {
+        // Safe fallback on read or JSON parse failure
+        void err;
+    }
+
+    PROJECT_VERSION_CACHE.set(nearestDir, version);
+    return version;
+}
+
 /**
  * Load manifest inventory for the nearest subproject enclosing the file,
  * automatically merged with the root workspace inventory to prevent Monorepo false positives.
@@ -493,15 +620,15 @@ export function loadProjectManifestInventory(rootDir: string): ProjectManifestIn
         versionSpecs: new Map<string, string>(),
     };
 
-    const pkgJson = path.join(absRoot, 'package.json');
+    const pkgJson = path.join(absRoot, MANIFEST_PKG_JSON);
     if (fs.existsSync(pkgJson)) parsePackageJson(pkgJson, inventory);
 
-    const cargoToml = path.join(absRoot, 'Cargo.toml');
+    const cargoToml = path.join(absRoot, MANIFEST_CARGO_TOML);
     if (fs.existsSync(cargoToml)) parseCargoToml(cargoToml, inventory.allDependencies);
 
     parsePythonManifests(absRoot, inventory.allDependencies);
 
-    const goMod = path.join(absRoot, 'go.mod');
+    const goMod = path.join(absRoot, MANIFEST_GO_MOD);
     if (fs.existsSync(goMod)) parseGoMod(goMod, inventory.allDependencies);
 
     parsePathAliases(absRoot, inventory.pathAliases);
@@ -558,30 +685,32 @@ export function classifyFileProvenance(filePath: string, headerClues?: string): 
     const norm = filePath.replace(/\\/g, '/');
 
     if (IN_TREE_VENDOR_PATTERN.test(norm)) {
-        return 'in_tree_vendor';
+        return FILE_PROVENANCE_IN_TREE_VENDOR;
     }
 
     if (
         GENERATED_FILE_PATTERN.test(norm) ||
         (headerClues && /(?:@generated|Code generated by|DO NOT EDIT)/i.test(headerClues))
     ) {
-        return 'generated';
+        return FILE_PROVENANCE_GENERATED;
     }
 
     if (TEST_FIXTURE_PATTERN.test(norm)) {
-        return 'test_fixture';
+        return FILE_PROVENANCE_TEST_FIXTURE;
     }
 
-    return 'proprietary';
+    return FILE_PROVENANCE_PROPRIETARY;
 }
 
 function isStandardLibraryImport(firstSegment: string, trimmed: string): boolean {
-    if (trimmed.startsWith('node:')) return true;
+    if (trimmed.startsWith(NODE_CORE_PREFIX)) return true;
     if (NODE_CORE_MODULES.has(firstSegment) || NODE_CORE_MODULES.has(trimmed)) return true;
     if (PYTHON_STDLIB_MODULES.has(firstSegment) || PYTHON_STDLIB_MODULES.has(trimmed)) return true;
     if (RUST_CORE_CRATES.has(firstSegment) || GO_CORE_PACKAGES.has(firstSegment)) return true;
     return (
-        trimmed.startsWith('@GlobalScope') || trimmed === 'Engine' || trimmed === 'ResourceLoader'
+        trimmed.startsWith(GODOT_GLOBAL_SCOPE_PREFIX) ||
+        trimmed === GODOT_ENGINE_IDENTIFIER ||
+        trimmed === GODOT_RESOURCE_LOADER_IDENTIFIER
     );
 }
 
@@ -593,7 +722,7 @@ function isDeclaredDependency(firstSegment: string, manifestDeps?: Set<string>):
 
 function isRelativeOrInternalPrefix(trimmed: string): boolean {
     const firstChar = trimmed.charCodeAt(0);
-    if (firstChar === 46 || firstChar === 47 || firstChar === 35) return true; // '.', '/', '#'
+    if (firstChar === CHAR_CODE_DOT || firstChar === CHAR_CODE_SLASH || firstChar === CHAR_CODE_HASH) return true;
     return trimmed.startsWith('@/') || trimmed.startsWith('~/');
 }
 
@@ -623,23 +752,23 @@ export function classifyImportProvenance(
     pathAliases?: Set<string>,
 ): ImportProvenanceKind {
     const trimmed = specifier.trim().replace(/^['"]|['"]$/g, '');
-    if (!trimmed) return 'unknown';
-    if (IN_TREE_VENDOR_PATTERN.test(trimmed)) return 'in_tree_vendor';
+    if (!trimmed) return IMPORT_PROVENANCE_UNKNOWN;
+    if (IN_TREE_VENDOR_PATTERN.test(trimmed)) return IMPORT_PROVENANCE_IN_TREE_VENDOR;
     if (isRelativeOrInternalPrefix(trimmed) || matchesPathAlias(trimmed, pathAliases)) {
-        return 'internal';
+        return IMPORT_PROVENANCE_INTERNAL;
     }
 
     const firstSegment = trimmed.split('/')[0].split('.')[0].toLowerCase();
-    if (isStandardLibraryImport(firstSegment, trimmed)) return 'stdlib';
-    if (isDeclaredDependency(firstSegment, manifestDeps)) return 'external_sdk';
-    if (trimmed.startsWith('@')) return 'external_sdk';
+    if (isStandardLibraryImport(firstSegment, trimmed)) return IMPORT_PROVENANCE_STDLIB;
+    if (isDeclaredDependency(firstSegment, manifestDeps)) return IMPORT_PROVENANCE_EXTERNAL_SDK;
+    if (trimmed.startsWith('@')) return IMPORT_PROVENANCE_EXTERNAL_SDK;
 
     const currentSegments = currentFile.replace(/\\/g, '/').split('/');
     if (currentSegments.length > 1 && currentSegments[0] === firstSegment) {
-        return 'internal';
+        return IMPORT_PROVENANCE_INTERNAL;
     }
 
-    return 'external_sdk';
+    return IMPORT_PROVENANCE_EXTERNAL_SDK;
 }
 
 /** Supply chain dependency profile derived from manifest and lockfile analysis */
@@ -653,30 +782,30 @@ export interface SupplyChainProfile {
 }
 
 function tryLoadNpmLock(absRoot: string, direct: number): SupplyChainProfile | null {
-    const pkgLock = path.join(absRoot, 'package-lock.json');
+    const pkgLock = path.join(absRoot, LOCKFILE_PKG_LOCK_JSON);
     if (!fs.existsSync(pkgLock)) return null;
 
     try {
         const raw = fs.readFileSync(pkgLock, 'utf8');
-        const data = JSON.parse(raw);
+        const parsedLock = JSON.parse(raw);
         let totalPackages = 0;
-        if (data.packages && typeof data.packages === 'object') {
-            totalPackages = Math.max(0, Object.keys(data.packages).filter((k) => k !== '').length);
-        } else if (data.dependencies && typeof data.dependencies === 'object') {
-            totalPackages = Object.keys(data.dependencies).length;
+        if (parsedLock.packages && typeof parsedLock.packages === 'object') {
+            totalPackages = Math.max(0, Object.keys(parsedLock.packages).filter((k) => k !== '').length);
+        } else if (parsedLock.dependencies && typeof parsedLock.dependencies === 'object') {
+            totalPackages = Object.keys(parsedLock.dependencies).length;
         }
         const transitive = Math.max(0, totalPackages - direct);
         const depth =
             totalPackages <= direct
-                ? 1
-                : totalPackages <= direct * 5
-                  ? 2
-                  : totalPackages <= direct * 20
-                    ? 3
-                    : 4;
+                ? ESTIMATED_DEPTH_SHALLOW
+                : totalPackages <= direct * DEPTH_THRESHOLD_FACTOR_MEDIUM
+                  ? ESTIMATED_DEPTH_MODERATE
+                  : totalPackages <= direct * DEPTH_THRESHOLD_FACTOR_NPM_HIGH
+                    ? ESTIMATED_DEPTH_DEEP
+                    : ESTIMATED_DEPTH_VERY_DEEP;
         return {
             hasLockfile: true,
-            lockfileType: 'npm',
+            lockfileType: LOCKFILE_TYPE_NPM,
             directDependencyCount: direct,
             transitiveDependencyCount: transitive,
             totalLockfilePackages: totalPackages,
@@ -689,7 +818,7 @@ function tryLoadNpmLock(absRoot: string, direct: number): SupplyChainProfile | n
 }
 
 function tryLoadCargoLock(absRoot: string, direct: number): SupplyChainProfile | null {
-    const cargoLock = path.join(absRoot, 'Cargo.lock');
+    const cargoLock = path.join(absRoot, LOCKFILE_CARGO_LOCK);
     if (!fs.existsSync(cargoLock)) return null;
 
     try {
@@ -699,15 +828,15 @@ function tryLoadCargoLock(absRoot: string, direct: number): SupplyChainProfile |
         const transitive = Math.max(0, totalPackages - direct);
         const depth =
             totalPackages <= direct
-                ? 1
-                : totalPackages <= direct * 4
-                  ? 2
-                  : totalPackages <= direct * 15
-                    ? 3
-                    : 4;
+                ? ESTIMATED_DEPTH_SHALLOW
+                : totalPackages <= direct * DEPTH_THRESHOLD_FACTOR_LOW
+                  ? ESTIMATED_DEPTH_MODERATE
+                  : totalPackages <= direct * DEPTH_THRESHOLD_FACTOR_CARGO_HIGH
+                    ? ESTIMATED_DEPTH_DEEP
+                    : ESTIMATED_DEPTH_VERY_DEEP;
         return {
             hasLockfile: true,
-            lockfileType: 'cargo',
+            lockfileType: LOCKFILE_TYPE_CARGO,
             directDependencyCount: direct,
             transitiveDependencyCount: transitive,
             totalLockfilePackages: totalPackages,
@@ -720,7 +849,7 @@ function tryLoadCargoLock(absRoot: string, direct: number): SupplyChainProfile |
 }
 
 function tryLoadGoSum(absRoot: string, direct: number): SupplyChainProfile | null {
-    const goSum = path.join(absRoot, 'go.sum');
+    const goSum = path.join(absRoot, LOCKFILE_GO_SUM);
     if (!fs.existsSync(goSum)) return null;
 
     try {
@@ -734,10 +863,15 @@ function tryLoadGoSum(absRoot: string, direct: number): SupplyChainProfile | nul
         }
         const totalPackages = modules.size;
         const transitive = Math.max(0, totalPackages - direct);
-        const depth = totalPackages <= direct ? 1 : totalPackages <= direct * 4 ? 2 : 3;
+        const depth =
+            totalPackages <= direct
+                ? ESTIMATED_DEPTH_SHALLOW
+                : totalPackages <= direct * DEPTH_THRESHOLD_FACTOR_LOW
+                  ? ESTIMATED_DEPTH_MODERATE
+                  : ESTIMATED_DEPTH_DEEP;
         return {
             hasLockfile: true,
-            lockfileType: 'go',
+            lockfileType: LOCKFILE_TYPE_GO,
             directDependencyCount: direct,
             transitiveDependencyCount: transitive,
             totalLockfilePackages: totalPackages,
@@ -750,7 +884,7 @@ function tryLoadGoSum(absRoot: string, direct: number): SupplyChainProfile | nul
 }
 
 function tryLoadPoetryLock(absRoot: string, direct: number): SupplyChainProfile | null {
-    const poetryLock = path.join(absRoot, 'poetry.lock');
+    const poetryLock = path.join(absRoot, LOCKFILE_POETRY_LOCK);
     if (!fs.existsSync(poetryLock)) return null;
 
     try {
@@ -758,10 +892,15 @@ function tryLoadPoetryLock(absRoot: string, direct: number): SupplyChainProfile 
         const matches = raw.match(/\[\[package\]\]/g);
         const totalPackages = matches ? matches.length : 0;
         const transitive = Math.max(0, totalPackages - direct);
-        const depth = totalPackages <= direct ? 1 : totalPackages <= direct * 4 ? 2 : 3;
+        const depth =
+            totalPackages <= direct
+                ? ESTIMATED_DEPTH_SHALLOW
+                : totalPackages <= direct * DEPTH_THRESHOLD_FACTOR_LOW
+                  ? ESTIMATED_DEPTH_MODERATE
+                  : ESTIMATED_DEPTH_DEEP;
         return {
             hasLockfile: true,
-            lockfileType: 'poetry',
+            lockfileType: LOCKFILE_TYPE_POETRY,
             directDependencyCount: direct,
             transitiveDependencyCount: transitive,
             totalLockfilePackages: totalPackages,
@@ -794,11 +933,11 @@ export function loadProjectSupplyChainProfile(
         tryLoadGoSum(absRoot, direct) ??
         tryLoadPoetryLock(absRoot, direct) ?? {
             hasLockfile: false,
-            lockfileType: 'none',
+            lockfileType: LOCKFILE_TYPE_NONE,
             directDependencyCount: direct,
-            transitiveDependencyCount: direct > 0 ? direct * 3 : 0,
-            totalLockfilePackages: direct > 0 ? direct * 4 : 0,
-            estimatedDepth: direct > 0 ? 3 : 1,
+            transitiveDependencyCount: direct > 0 ? direct * DEFAULT_TRANSITIVE_MULTIPLIER : 0,
+            totalLockfilePackages: direct > 0 ? direct * DEFAULT_TOTAL_MULTIPLIER : 0,
+            estimatedDepth: direct > 0 ? ESTIMATED_DEPTH_DEEP : ESTIMATED_DEPTH_SHALLOW,
         }
     );
 }

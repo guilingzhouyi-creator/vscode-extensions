@@ -17,6 +17,7 @@ import {
     RULE_FAMILY_GOVERNANCE,
     RULE_FAMILY_CMP,
     RULE_FAMILY_NUMERIC,
+    RULE_FAMILY_MODERNITY,
     SEVERITY_INFO,
     SEVERITY_WARNING,
     SEVERITY_ERROR,
@@ -465,5 +466,44 @@ export const GOVERNANCE_RULES: readonly RuleDefinition[] = [
             'Use standard 0.01 precision rounding (e.g. * 100 / 100) or explicit tolerance bounds' +
             'to preserve precision.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#num-prec-001',
+    }),
+    defineRule({
+        id: 'MOD-BWD-001',
+        family: RULE_FAMILY_MODERNITY,
+        analyzer: ANALYZER_GOVERNANCE,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            'Backward compatibility shim, redundant legacy alias, or outdated parameter forwarding detected.',
+        remediation:
+            'Forward evolve the architecture: migrate callers to modern canonical APIs and remove redundant shim layers.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#mod-bwd-001',
+    }),
+    defineRule({
+        id: 'MOD-DEP-001',
+        family: RULE_FAMILY_MODERNITY,
+        analyzer: ANALYZER_GOVERNANCE,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            'Invocation or access of deprecated symbol detected in internal production source code.',
+        remediation:
+            'Migrate callers to non-deprecated alternatives or update references to current APIs.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#mod-dep-001',
+    }),
+    defineRule({
+        id: 'MOD-FLB-001',
+        family: RULE_FAMILY_MODERNITY,
+        analyzer: ANALYZER_GOVERNANCE,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            'Cross-generational fallback chain or redundant fallback cascade detected in non-perimeter source code.',
+        remediation:
+            'Consolidate fallback cascades to modern canonical values or isolate transition logic to architectural perimeters.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#mod-flb-001',
     }),
 ];

@@ -14,6 +14,9 @@
 import type { CodeDensityMetrics } from './code-density-analyzer';
 import type { FineGrainedFileRole } from './file-role-inference';
 
+const SEVERITY_BUDGET_ERROR: 'error' = 'error';
+const SEVERITY_BUDGET_WARN: 'warning' = 'warning';
+
 /** Role budget threshold contract */
 export interface RoleBudgetThresholds {
     /** Physical line warning threshold */
@@ -46,63 +49,162 @@ export interface ElasticBudgetEvaluation {
     rationale: string;
 }
 
+// ---------------------------------------------------------------------------
+// Architectural Role Baseline Budgets
+// ---------------------------------------------------------------------------
+
+const CORE_TRUNK_PHYSICAL_WARN = 500;
+const CORE_TRUNK_PHYSICAL_FAIL = 900;
+const CORE_TRUNK_ELOC_WARN = 350;
+const CORE_TRUNK_ELOC_FAIL = 650;
+const CORE_TRUNK_COMPLEXITY = 12;
+const CORE_TRUNK_DEPTH = 4;
+
+const BUSINESS_PHYSICAL_WARN = 400;
+const BUSINESS_PHYSICAL_FAIL = 800;
+const BUSINESS_ELOC_WARN = 280;
+const BUSINESS_ELOC_FAIL = 550;
+const BUSINESS_COMPLEXITY = 10;
+const BUSINESS_DEPTH = 4;
+
+const SHARED_LIB_PHYSICAL_WARN = 350;
+const SHARED_LIB_PHYSICAL_FAIL = 600;
+const SHARED_LIB_ELOC_WARN = 220;
+const SHARED_LIB_ELOC_FAIL = 450;
+const SHARED_LIB_COMPLEXITY = 8;
+const SHARED_LIB_DEPTH = 3;
+
+const ALGO_PHYSICAL_WARN = 800;
+const ALGO_PHYSICAL_FAIL = 1500;
+const ALGO_ELOC_WARN = 600;
+const ALGO_ELOC_FAIL = 1100;
+const ALGO_COMPLEXITY = 20;
+const ALGO_DEPTH = 5;
+
+const RULES_PHYSICAL_WARN = 1200;
+const RULES_PHYSICAL_FAIL = 3000;
+const RULES_ELOC_WARN = 800;
+const RULES_ELOC_FAIL = 2000;
+const RULES_COMPLEXITY = 6;
+const RULES_DEPTH = 3;
+
+const CONFIG_PHYSICAL_WARN = 1000;
+const CONFIG_PHYSICAL_FAIL = 2500;
+const CONFIG_ELOC_WARN = 600;
+const CONFIG_ELOC_FAIL = 1500;
+const CONFIG_COMPLEXITY = 4;
+const CONFIG_DEPTH = 3;
+
+const TEST_PHYSICAL_WARN = 1000;
+const TEST_PHYSICAL_FAIL = 2000;
+const TEST_ELOC_WARN = 700;
+const TEST_ELOC_FAIL = 1400;
+const TEST_COMPLEXITY = 15;
+const TEST_DEPTH = 4;
+
+const GATE_INFRA_PHYSICAL_WARN = 500;
+const GATE_INFRA_PHYSICAL_FAIL = 800;
+const GATE_INFRA_ELOC_WARN = 350;
+const GATE_INFRA_ELOC_FAIL = 600;
+const GATE_INFRA_COMPLEXITY = 15;
+const GATE_INFRA_DEPTH = 4;
+
+// ---------------------------------------------------------------------------
+// Dynamic Scaling & Density Constants
+// ---------------------------------------------------------------------------
+
+const DYNAMIC_BASELINE_LOC = 400;
+const DYNAMIC_FAIL_RATIO = 2.0;
+const DYNAMIC_PHYSICAL_RATIO = 1.4;
+const LOW_DENSITY_DAMPING_FACTOR = 1.5;
+const NEUTRAL_DENSITY_FACTOR = 1.0;
+const HIGH_DENSITY_VIOLATION_THRESHOLD = 0.35;
+
+const ROLE_AUTO_GENERATED = 'auto_generated';
+
+// ---------------------------------------------------------------------------
+// Language Normalization Factors
+// ---------------------------------------------------------------------------
+
+const VERBOSITY_PYTHON = 0.7;
+const VERBOSITY_GDSCRIPT = 0.75;
+const VERBOSITY_STANDARD = 1.0;
+const VERBOSITY_RUST = 1.25;
+const VERBOSITY_C_CPP = 1.35;
+const VERBOSITY_GO = 1.4;
+
+const LANG_PYTHON = 'python';
+const LANG_PY = 'py';
+const LANG_GDSCRIPT = 'gdscript';
+const LANG_GD = 'gd';
+const LANG_TYPESCRIPT = 'typescript';
+const LANG_TS = 'ts';
+const LANG_JAVASCRIPT = 'javascript';
+const LANG_JS = 'js';
+const LANG_RUST = 'rust';
+const LANG_RS = 'rs';
+const LANG_GO = 'go';
+const LANG_C = 'c';
+const LANG_CPP = 'cpp';
+const LANG_CPP_ALT = 'c++';
+
 /** Base role budget configuration table */
 const BASE_ROLE_BUDGETS: Record<FineGrainedFileRole, RoleBudgetThresholds> = {
     core_trunk: {
-        physicalLinesWarn: 500,
-        physicalLinesFail: 900,
-        effectiveLocWarn: 350,
-        effectiveLocFail: 650,
-        complexityBudget: 12,
-        nestingDepthBudget: 4,
+        physicalLinesWarn: CORE_TRUNK_PHYSICAL_WARN,
+        physicalLinesFail: CORE_TRUNK_PHYSICAL_FAIL,
+        effectiveLocWarn: CORE_TRUNK_ELOC_WARN,
+        effectiveLocFail: CORE_TRUNK_ELOC_FAIL,
+        complexityBudget: CORE_TRUNK_COMPLEXITY,
+        nestingDepthBudget: CORE_TRUNK_DEPTH,
     },
     business_module: {
-        physicalLinesWarn: 400,
-        physicalLinesFail: 800,
-        effectiveLocWarn: 280,
-        effectiveLocFail: 550,
-        complexityBudget: 10,
-        nestingDepthBudget: 4,
+        physicalLinesWarn: BUSINESS_PHYSICAL_WARN,
+        physicalLinesFail: BUSINESS_PHYSICAL_FAIL,
+        effectiveLocWarn: BUSINESS_ELOC_WARN,
+        effectiveLocFail: BUSINESS_ELOC_FAIL,
+        complexityBudget: BUSINESS_COMPLEXITY,
+        nestingDepthBudget: BUSINESS_DEPTH,
     },
     shared_library: {
-        physicalLinesWarn: 350,
-        physicalLinesFail: 600,
-        effectiveLocWarn: 220,
-        effectiveLocFail: 450,
-        complexityBudget: 8,
-        nestingDepthBudget: 3,
+        physicalLinesWarn: SHARED_LIB_PHYSICAL_WARN,
+        physicalLinesFail: SHARED_LIB_PHYSICAL_FAIL,
+        effectiveLocWarn: SHARED_LIB_ELOC_WARN,
+        effectiveLocFail: SHARED_LIB_ELOC_FAIL,
+        complexityBudget: SHARED_LIB_COMPLEXITY,
+        nestingDepthBudget: SHARED_LIB_DEPTH,
     },
     algorithm_computation: {
-        physicalLinesWarn: 800,
-        physicalLinesFail: 1500,
-        effectiveLocWarn: 600,
-        effectiveLocFail: 1100,
-        complexityBudget: 20,
-        nestingDepthBudget: 5,
+        physicalLinesWarn: ALGO_PHYSICAL_WARN,
+        physicalLinesFail: ALGO_PHYSICAL_FAIL,
+        effectiveLocWarn: ALGO_ELOC_WARN,
+        effectiveLocFail: ALGO_ELOC_FAIL,
+        complexityBudget: ALGO_COMPLEXITY,
+        nestingDepthBudget: ALGO_DEPTH,
     },
     rules_registry: {
-        physicalLinesWarn: 1200,
-        physicalLinesFail: 3000,
-        effectiveLocWarn: 800,
-        effectiveLocFail: 2000,
-        complexityBudget: 6,
-        nestingDepthBudget: 3,
+        physicalLinesWarn: RULES_PHYSICAL_WARN,
+        physicalLinesFail: RULES_PHYSICAL_FAIL,
+        effectiveLocWarn: RULES_ELOC_WARN,
+        effectiveLocFail: RULES_ELOC_FAIL,
+        complexityBudget: RULES_COMPLEXITY,
+        nestingDepthBudget: RULES_DEPTH,
     },
     config_constant: {
-        physicalLinesWarn: 1000,
-        physicalLinesFail: 2500,
-        effectiveLocWarn: 600,
-        effectiveLocFail: 1500,
-        complexityBudget: 4,
-        nestingDepthBudget: 3,
+        physicalLinesWarn: CONFIG_PHYSICAL_WARN,
+        physicalLinesFail: CONFIG_PHYSICAL_FAIL,
+        effectiveLocWarn: CONFIG_ELOC_WARN,
+        effectiveLocFail: CONFIG_ELOC_FAIL,
+        complexityBudget: CONFIG_COMPLEXITY,
+        nestingDepthBudget: CONFIG_DEPTH,
     },
     test_suite: {
-        physicalLinesWarn: 1000,
-        physicalLinesFail: 2000,
-        effectiveLocWarn: 700,
-        effectiveLocFail: 1400,
-        complexityBudget: 15,
-        nestingDepthBudget: 4,
+        physicalLinesWarn: TEST_PHYSICAL_WARN,
+        physicalLinesFail: TEST_PHYSICAL_FAIL,
+        effectiveLocWarn: TEST_ELOC_WARN,
+        effectiveLocFail: TEST_ELOC_FAIL,
+        complexityBudget: TEST_COMPLEXITY,
+        nestingDepthBudget: TEST_DEPTH,
     },
     auto_generated: {
         physicalLinesWarn: Number.MAX_SAFE_INTEGER,
@@ -113,37 +215,34 @@ const BASE_ROLE_BUDGETS: Record<FineGrainedFileRole, RoleBudgetThresholds> = {
         nestingDepthBudget: Number.MAX_SAFE_INTEGER,
     },
     gate_infrastructure: {
-        physicalLinesWarn: 500,
-        physicalLinesFail: 800,
-        effectiveLocWarn: 350,
-        effectiveLocFail: 600,
-        complexityBudget: 15,
-        nestingDepthBudget: 4,
+        physicalLinesWarn: GATE_INFRA_PHYSICAL_WARN,
+        physicalLinesFail: GATE_INFRA_PHYSICAL_FAIL,
+        effectiveLocWarn: GATE_INFRA_ELOC_WARN,
+        effectiveLocFail: GATE_INFRA_ELOC_FAIL,
+        complexityBudget: GATE_INFRA_COMPLEXITY,
+        nestingDepthBudget: GATE_INFRA_DEPTH,
     },
 };
 
-/**
- * Retrieves baseline budget thresholds for given role.
- *
 /**
  * Multi-language syntactic verbosity coefficients.
  * Normalizes syntactic footprint differences relative to TypeScript/JavaScript (1.0).
  */
 export const LANGUAGE_VERBOSITY_FACTORS: Readonly<Record<string, number>> = {
-    python: 0.7,
-    py: 0.7,
-    gdscript: 0.75,
-    gd: 0.75,
-    typescript: 1.0,
-    ts: 1.0,
-    javascript: 1.0,
-    js: 1.0,
-    rust: 1.25,
-    rs: 1.25,
-    go: 1.4,
-    c: 1.35,
-    cpp: 1.35,
-    'c++': 1.35,
+    [LANG_PYTHON]: VERBOSITY_PYTHON,
+    [LANG_PY]: VERBOSITY_PYTHON,
+    [LANG_GDSCRIPT]: VERBOSITY_GDSCRIPT,
+    [LANG_GD]: VERBOSITY_GDSCRIPT,
+    [LANG_TYPESCRIPT]: VERBOSITY_STANDARD,
+    [LANG_TS]: VERBOSITY_STANDARD,
+    [LANG_JAVASCRIPT]: VERBOSITY_STANDARD,
+    [LANG_JS]: VERBOSITY_STANDARD,
+    [LANG_RUST]: VERBOSITY_RUST,
+    [LANG_RS]: VERBOSITY_RUST,
+    [LANG_GO]: VERBOSITY_GO,
+    [LANG_C]: VERBOSITY_C_CPP,
+    [LANG_CPP]: VERBOSITY_C_CPP,
+    [LANG_CPP_ALT]: VERBOSITY_C_CPP,
 };
 
 /**
@@ -153,9 +252,9 @@ export const LANGUAGE_VERBOSITY_FACTORS: Readonly<Record<string, number>> = {
  * @returns Verbosity factor (defaulting to 1.0 for unspecified languages)
  */
 export function getLanguageVerbosityFactor(language?: string): number {
-    if (!language) return 1.0;
+    if (!language) return VERBOSITY_STANDARD;
     const key = language.toLowerCase().replace(/^\./, '');
-    return LANGUAGE_VERBOSITY_FACTORS[key] ?? 1.0;
+    return LANGUAGE_VERBOSITY_FACTORS[key] ?? VERBOSITY_STANDARD;
 }
 
 /**
@@ -180,11 +279,11 @@ export function getRoleBudget(
         baseEffectiveLocWarn > 0
     ) {
         // Compute dynamically based on parameterized base budget
-        const roleScale = base.effectiveLocWarn / 400; // Normalized to 400 default baseline
+        const roleScale = base.effectiveLocWarn / DYNAMIC_BASELINE_LOC;
         const dynamicWarn = Math.round(baseEffectiveLocWarn * vFactor * roleScale);
-        const dynamicFail = Math.round(dynamicWarn * 2.0);
-        const physicalWarn = Math.round(dynamicWarn * 1.4);
-        const physicalFail = Math.round(dynamicFail * 1.4);
+        const dynamicFail = Math.round(dynamicWarn * DYNAMIC_FAIL_RATIO);
+        const physicalWarn = Math.round(dynamicWarn * DYNAMIC_PHYSICAL_RATIO);
+        const physicalFail = Math.round(dynamicFail * DYNAMIC_PHYSICAL_RATIO);
 
         return {
             ...base,
@@ -195,7 +294,7 @@ export function getRoleBudget(
         };
     }
 
-    if (vFactor === 1.0) {
+    if (vFactor === VERBOSITY_STANDARD) {
         return base;
     }
 
@@ -226,7 +325,7 @@ export function evaluateRoleElasticBudget(
     const base = getRoleBudget(role, language, baseEffectiveLocWarn);
 
     // Auto-generated code is fully exempt
-    if (role === 'auto_generated') {
+    if (role === ROLE_AUTO_GENERATED) {
         return {
             effectivePhysicalWarn: Number.MAX_SAFE_INTEGER,
             effectivePhysicalFail: Number.MAX_SAFE_INTEGER,
@@ -238,7 +337,9 @@ export function evaluateRoleElasticBudget(
     }
 
     // Well-documented or data-heavy files receive 1.5x physical line headroom damping
-    const densityDampingFactor = metrics.isLowDensityDocumented ? 1.5 : 1.0;
+    const densityDampingFactor = metrics.isLowDensityDocumented
+        ? LOW_DENSITY_DAMPING_FACTOR
+        : NEUTRAL_DENSITY_FACTOR;
     const effectivePhysicalWarn = Math.round(base.physicalLinesWarn * densityDampingFactor);
     const effectivePhysicalFail = Math.round(base.physicalLinesFail * densityDampingFactor);
 
@@ -252,11 +353,11 @@ export function evaluateRoleElasticBudget(
     let violationSeverity: 'warning' | 'error' | null = null;
     let rationale = 'File size is within elastic complexity budget';
 
-    if (isEclFail || (isPhysicalFail && metrics.effectiveDensity > 0.35)) {
-        violationSeverity = 'error';
+    if (isEclFail || (isPhysicalFail && metrics.effectiveDensity > HIGH_DENSITY_VIOLATION_THRESHOLD)) {
+        violationSeverity = SEVERITY_BUDGET_ERROR;
         rationale = `Effective code lines (${metrics.effectiveCodeLines}) or physical lines (${metrics.physicalLines}) exceeds error threshold for role [${role}]`;
-    } else if (isEclWarn || (isPhysicalWarn && metrics.effectiveDensity > 0.35)) {
-        violationSeverity = 'warning';
+    } else if (isEclWarn || (isPhysicalWarn && metrics.effectiveDensity > HIGH_DENSITY_VIOLATION_THRESHOLD)) {
+        violationSeverity = SEVERITY_BUDGET_WARN;
         rationale = `Effective code lines (${metrics.effectiveCodeLines}) or physical lines (${metrics.physicalLines}) exceeds warning threshold for role [${role}]`;
     }
 

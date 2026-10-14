@@ -25,11 +25,28 @@ import type {
     TestDebtTicket,
     TestModernityMetricSummary,
 } from '../types';
+import { SEVERITY_WARNING, SEVERITY_INFO } from '../types';
 import {
     CODE_TST_SKIPPED,
     CODE_TST_TAUTOLOGICAL,
     CODE_TST_FRAGILE_FLOAT,
 } from '../constants/rule-codes';
+
+const KIND_CONDITION = 'condition';
+const KIND_CALL = 'call';
+const MODULE_TEST_SUITE = 'test-suite';
+const MODULE_GOVERNANCE = 'governance';
+const CODE_DOMAIN_TEST_MODERNITY = 'test-modernity';
+const CODE_DOMAIN_TEST_DEBT = 'test-debt';
+const DEFAULT_RULE_VERSION = '1.0.0';
+const DEFAULT_CONFIG_VERSION = '0.3.0';
+const DEFAULT_END_COLUMN = 80;
+const ANALYZER_TEST_MODERNITY = 'test-modernity';
+const RULE_TST_ILS_001 = 'TST-ILS-001';
+const RULE_TST_SKP_001 = 'TST-SKP-001';
+const RULE_TST_TAU_001 = 'TST-TAU-001';
+const RULE_TST_FLT_001 = 'TST-FLT-001';
+const RULE_TST_DBT_001 = 'TST-DBT-001';
 
 /**
  * Descriptor of a test case or suite site.
@@ -89,14 +106,14 @@ export interface BusinessTestMappingResult {
 function createDeprecatedContractIssue(site: TestSite): Issue {
     const evidence: SemanticEvidenceStep[] = [
         {
-            kind: 'call',
+            kind: KIND_CALL,
             description: `Test '${site.testName}' verifies obsolete contract version ${site.contractVersion}`,
             file: site.file,
             line: site.line,
             symbol: site.testName,
         },
         {
-            kind: 'condition',
+            kind: KIND_CONDITION,
             description: `Active production contract version is ${site.activeContractVersion}`,
             file: site.file,
             line: site.line,
@@ -106,9 +123,9 @@ function createDeprecatedContractIssue(site: TestSite): Issue {
 
     const detail: SemanticReviewDetail = {
         language: 'typescript',
-        module: 'test-suite',
+        module: MODULE_TEST_SUITE,
         symbol: site.testName,
-        codeDomain: 'test-modernity',
+        codeDomain: CODE_DOMAIN_TEST_MODERNITY,
         currentBehavior: `Test suite verifies deprecated contract ${site.contractVersion} while production code is on ${site.activeContractVersion}.`,
         semanticEvidenceChain: evidence,
         triggerCondition:
@@ -122,21 +139,21 @@ function createDeprecatedContractIssue(site: TestSite): Issue {
         impactedTests: [site.file],
         verificationMethod:
             'Execute test runner and assert test verifies active business schema fields.',
-        ruleVersion: '1.0.0',
-        configVersion: '0.3.0',
+        ruleVersion: DEFAULT_RULE_VERSION,
+        configVersion: DEFAULT_CONFIG_VERSION,
         canAutofix: false,
     };
 
     return {
-        id: `test-modernity:TST-ILS-001:${site.file}:${site.line}`,
-        analyzer: 'test-modernity',
-        rule: 'TST-ILS-001',
-        severity: 'warning',
+        id: `${ANALYZER_TEST_MODERNITY}:${RULE_TST_ILS_001}:${site.file}:${site.line}`,
+        analyzer: ANALYZER_TEST_MODERNITY,
+        rule: RULE_TST_ILS_001,
+        severity: SEVERITY_WARNING,
         message: `Test integrity illusion: '${site.testName}' asserts deprecated contract (${site.contractVersion} vs active ${site.activeContractVersion}).`,
         location: {
             file: site.file,
             start: { line: site.line, column: 1 },
-            end: { line: site.line, column: 80 },
+            end: { line: site.line, column: DEFAULT_END_COLUMN },
         },
         detail,
         suggestion: `Migrate test assertions to verify current contract ${site.activeContractVersion}.`,
@@ -150,7 +167,7 @@ function createDeprecatedContractIssue(site: TestSite): Issue {
 function createMockOnlyIssue(site: TestSite): Issue {
     const evidence: SemanticEvidenceStep[] = [
         {
-            kind: 'call',
+            kind: KIND_CALL,
             description: `Test '${site.testName}' configures mock and asserts only mock configuration`,
             file: site.file,
             line: site.line,
@@ -160,9 +177,9 @@ function createMockOnlyIssue(site: TestSite): Issue {
 
     const detail: SemanticReviewDetail = {
         language: 'typescript',
-        module: 'test-suite',
+        module: MODULE_TEST_SUITE,
         symbol: site.testName,
-        codeDomain: 'test-modernity',
+        codeDomain: CODE_DOMAIN_TEST_MODERNITY,
         currentBehavior: `Test '${site.testName}' asserts only the mock stub's own return value without exercising business state transitions.`,
         semanticEvidenceChain: evidence,
         triggerCondition:
@@ -177,21 +194,21 @@ function createMockOnlyIssue(site: TestSite): Issue {
         impactedTests: [site.file],
         verificationMethod:
             'Introduce an intentional bug in domain logic and verify the test catches it.',
-        ruleVersion: '1.0.0',
-        configVersion: '0.3.0',
+        ruleVersion: DEFAULT_RULE_VERSION,
+        configVersion: DEFAULT_CONFIG_VERSION,
         canAutofix: false,
     };
 
     return {
-        id: `test-modernity:TST-ILS-001:${site.file}:${site.line}`,
-        analyzer: 'test-modernity',
-        rule: 'TST-ILS-001',
-        severity: 'warning',
+        id: `${ANALYZER_TEST_MODERNITY}:${RULE_TST_ILS_001}:${site.file}:${site.line}`,
+        analyzer: ANALYZER_TEST_MODERNITY,
+        rule: RULE_TST_ILS_001,
+        severity: SEVERITY_WARNING,
         message: `Test integrity illusion: '${site.testName}' verifies mock stubs only without real domain assertions.`,
         location: {
             file: site.file,
             start: { line: site.line, column: 1 },
-            end: { line: site.line, column: 80 },
+            end: { line: site.line, column: DEFAULT_END_COLUMN },
         },
         detail,
         suggestion:
@@ -206,7 +223,7 @@ function createMockOnlyIssue(site: TestSite): Issue {
 function createSkippedTestIssue(site: TestSite): Issue {
     const evidence: SemanticEvidenceStep[] = [
         {
-            kind: 'condition',
+            kind: KIND_CONDITION,
             description: `Test '${site.testName}' explicitly skipped or disabled`,
             file: site.file,
             line: site.line,
@@ -216,9 +233,9 @@ function createSkippedTestIssue(site: TestSite): Issue {
 
     const detail: SemanticReviewDetail = {
         language: 'typescript',
-        module: 'test-suite',
+        module: MODULE_TEST_SUITE,
         symbol: site.testName,
-        codeDomain: 'test-modernity',
+        codeDomain: CODE_DOMAIN_TEST_MODERNITY,
         currentBehavior: `Permanently skipped or disabled test case in '${site.file}'.`,
         semanticEvidenceChain: evidence,
         triggerCondition: 'Test suite contains skipped tests (.skip, xit, @pytest.mark.skip)',
@@ -231,21 +248,21 @@ function createSkippedTestIssue(site: TestSite): Issue {
         impactedCallers: [],
         impactedTests: [site.file],
         verificationMethod: 'Execute test suite and confirm test runs to completion.',
-        ruleVersion: '1.0.0',
-        configVersion: '0.3.0',
+        ruleVersion: DEFAULT_RULE_VERSION,
+        configVersion: DEFAULT_CONFIG_VERSION,
         canAutofix: false,
     };
 
     return {
-        id: `test-modernity:TST-SKP-001:${site.file}:${site.line}`,
-        analyzer: 'test-modernity',
-        rule: 'TST-SKP-001',
-        severity: 'warning',
+        id: `${ANALYZER_TEST_MODERNITY}:${RULE_TST_SKP_001}:${site.file}:${site.line}`,
+        analyzer: ANALYZER_TEST_MODERNITY,
+        rule: RULE_TST_SKP_001,
+        severity: SEVERITY_WARNING,
         message: `Orphaned skipped test case '${site.testName}' in active test suite.`,
         location: {
             file: site.file,
             start: { line: site.line, column: 1 },
-            end: { line: site.line, column: 80 },
+            end: { line: site.line, column: DEFAULT_END_COLUMN },
         },
         detail,
         suggestion:
@@ -267,7 +284,7 @@ function createSkippedTestIssue(site: TestSite): Issue {
 function createTautologicalIssue(site: TestSite): Issue {
     const evidence: SemanticEvidenceStep[] = [
         {
-            kind: 'condition',
+            kind: KIND_CONDITION,
             description: `Tautological assertion in test '${site.testName}'`,
             file: site.file,
             line: site.line,
@@ -277,9 +294,9 @@ function createTautologicalIssue(site: TestSite): Issue {
 
     const detail: SemanticReviewDetail = {
         language: 'typescript',
-        module: 'test-suite',
+        module: MODULE_TEST_SUITE,
         symbol: site.testName,
-        codeDomain: 'test-modernity',
+        codeDomain: CODE_DOMAIN_TEST_MODERNITY,
         currentBehavior: `Test contains non-verifying or tautological assertion (e.g. expect(true).toBe(true)).`,
         semanticEvidenceChain: evidence,
         triggerCondition:
@@ -293,21 +310,21 @@ function createTautologicalIssue(site: TestSite): Issue {
         impactedCallers: [],
         impactedTests: [site.file],
         verificationMethod: 'Run test with fault injection to verify failure capability.',
-        ruleVersion: '1.0.0',
-        configVersion: '0.3.0',
+        ruleVersion: DEFAULT_RULE_VERSION,
+        configVersion: DEFAULT_CONFIG_VERSION,
         canAutofix: false,
     };
 
     return {
-        id: `test-modernity:TST-TAU-001:${site.file}:${site.line}`,
-        analyzer: 'test-modernity',
-        rule: 'TST-TAU-001',
-        severity: 'warning',
+        id: `${ANALYZER_TEST_MODERNITY}:${RULE_TST_TAU_001}:${site.file}:${site.line}`,
+        analyzer: ANALYZER_TEST_MODERNITY,
+        rule: RULE_TST_TAU_001,
+        severity: SEVERITY_WARNING,
         message: `Tautological or non-verifying assertion in '${site.testName}'.`,
         location: {
             file: site.file,
             start: { line: site.line, column: 1 },
-            end: { line: site.line, column: 80 },
+            end: { line: site.line, column: DEFAULT_END_COLUMN },
         },
         detail,
         suggestion: 'Assert specific business values and invariants rather than constant truth.',
@@ -329,7 +346,7 @@ function createFragileFloatIssue(site: TestSite): Issue {
     const floatLit = site.fragileFloatLiteral ?? 'float';
     const evidence: SemanticEvidenceStep[] = [
         {
-            kind: 'condition',
+            kind: KIND_CONDITION,
             description: `Fragile floating-point assertion against naked literal '${floatLit}' in test '${site.testName}'`,
             file: site.file,
             line: site.line,
@@ -339,9 +356,9 @@ function createFragileFloatIssue(site: TestSite): Issue {
 
     const detail: SemanticReviewDetail = {
         language: 'typescript',
-        module: 'test-suite',
+        module: MODULE_TEST_SUITE,
         symbol: site.testName,
-        codeDomain: 'test-modernity',
+        codeDomain: CODE_DOMAIN_TEST_MODERNITY,
         currentBehavior: `Test asserts calculated floating-point result against naked magic literal '${floatLit}' without formula derivation or tolerance.`,
         semanticEvidenceChain: evidence,
         triggerCondition:
@@ -356,21 +373,21 @@ function createFragileFloatIssue(site: TestSite): Issue {
         impactedTests: [site.file],
         verificationMethod:
             'Assert test failure with epsilon perturbation or replace with toBeCloseTo matcher.',
-        ruleVersion: '1.0.0',
-        configVersion: '0.3.0',
+        ruleVersion: DEFAULT_RULE_VERSION,
+        configVersion: DEFAULT_CONFIG_VERSION,
         canAutofix: false,
     };
 
     return {
-        id: `test-modernity:TST-FLT-001:${site.file}:${site.line}`,
-        analyzer: 'test-modernity',
-        rule: 'TST-FLT-001',
-        severity: 'warning',
+        id: `${ANALYZER_TEST_MODERNITY}:${RULE_TST_FLT_001}:${site.file}:${site.line}`,
+        analyzer: ANALYZER_TEST_MODERNITY,
+        rule: RULE_TST_FLT_001,
+        severity: SEVERITY_WARNING,
         message: `Fragile floating-point assertion: '${site.testName}' asserts naked float literal '${floatLit}' without epsilon tolerance.`,
         location: {
             file: site.file,
             start: { line: site.line, column: 1 },
-            end: { line: site.line, column: 80 },
+            end: { line: site.line, column: DEFAULT_END_COLUMN },
         },
         detail,
         suggestion: `Derive expected value via mathematical formula (e.g. Math.round(formula * 100) / 100) or use tolerance assertion.`,
@@ -395,9 +412,9 @@ function createFragileFloatIssue(site: TestSite): Issue {
 function createTestDebtIssue(debt: TestDebtTicket): Issue {
     const detail: SemanticReviewDetail = {
         language: 'typescript',
-        module: 'governance',
+        module: MODULE_GOVERNANCE,
         symbol: debt.domain,
-        codeDomain: 'test-debt',
+        codeDomain: CODE_DOMAIN_TEST_DEBT,
         currentBehavior: `Deferred test coverage for domain '${debt.domain}' lacks owner or milestone convergence target.`,
         semanticEvidenceChain: [],
         triggerCondition:
@@ -411,21 +428,21 @@ function createTestDebtIssue(debt: TestDebtTicket): Issue {
         impactedCallers: [],
         impactedTests: [],
         verificationMethod: 'Audit test debt registry for milestone completeness.',
-        ruleVersion: '1.0.0',
-        configVersion: '0.3.0',
+        ruleVersion: DEFAULT_RULE_VERSION,
+        configVersion: DEFAULT_CONFIG_VERSION,
         canAutofix: false,
     };
 
     return {
-        id: `test-modernity:TST-DBT-001:${debt.domain}:1`,
-        analyzer: 'test-modernity',
-        rule: 'TST-DBT-001',
-        severity: 'info',
+        id: `${ANALYZER_TEST_MODERNITY}:${RULE_TST_DBT_001}:${debt.domain}:1`,
+        analyzer: ANALYZER_TEST_MODERNITY,
+        rule: RULE_TST_DBT_001,
+        severity: SEVERITY_INFO,
         message: `Unindexed test debt: domain '${debt.domain}' deferred test coverage lacks milestone target.`,
         location: {
             file: `docs/test-debt/${debt.domain}.md`,
             start: { line: 1, column: 1 },
-            end: { line: 1, column: 80 },
+            end: { line: 1, column: DEFAULT_END_COLUMN },
         },
         detail,
         suggestion: 'Specify target milestone and responsible owner for test debt convergence.',

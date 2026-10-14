@@ -296,7 +296,7 @@ export function fastDiff(
         hashB,
     );
 
-    return myersDiffCore(prefix, suffix, n, m, midA, midB, midHA, midHB);
+    return myersDiffCore({ prefix, suffix, oldLineCount: n, newLineCount: m, midA, midB, midHA, midHB });
 }
 
 function hasInvalidCoordinates(editRange: EditRange): boolean {

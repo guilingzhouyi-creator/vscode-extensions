@@ -66,7 +66,7 @@ fn dispatch_event(id: u64, code: u32) -> Result {
 }
 `,
         positiveSample: `
-/// @deprecated use inner.dispatch directly
+/// @override inner.dispatch delegation
 fn dispatch_event(id: u64, code: u32) -> Result {
     self.inner.dispatch(id, code)
 }
@@ -81,7 +81,7 @@ func forwardQuery(id string, count int) Result {
 }
 `,
         positiveSample: `
-// adapter delegation pattern
+// interface implementation proxy
 func forwardQuery(id string, count int) Result {
     return target.fetchData(id, count)
 }

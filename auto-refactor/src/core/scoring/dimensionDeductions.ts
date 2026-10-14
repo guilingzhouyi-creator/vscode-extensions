@@ -30,7 +30,21 @@ import {
     DIMENSION_DUPLICATION,
     FRAGMENT_ERROR,
     FRAGMENT_WARNING,
+    RULE_MOD_BWD_001,
+    RULE_MOD_FLB_001,
+    RULE_MOD_DEP_001,
+    DEDUCTION_BACKWARD_SHIM,
+    DEDUCTION_FALLBACK_CHAIN,
+    DEDUCTION_DEPRECATED_ACCESS,
 } from './dimensionLiterals';
+import {
+    calculateArchitectureDirectnessIndex,
+    calculateShimDebtDecayPenalty,
+} from './modernization-formulas';
+export {
+    calculateArchitectureDirectnessIndex,
+    calculateShimDebtDecayPenalty,
+} from './modernization-formulas';
 import { DIMENSION_RULES, getDimensionRulesForAnalyzer } from './dimensionRuleTable';
 import {
     applyArchitectureDeductions,
@@ -203,6 +217,11 @@ export const FAMILY_DIMENSIONS: Record<string, QualityDimension> = {
     // Governance Rules
     'GOV-DAT': DIMENSION_MAINTAINABILITY,
     'GOV-STD': DIMENSION_MODERNITY,
+    // Modernity & Forward Evolution Governance Rules
+    'MOD-BWD': DIMENSION_MODERNITY,
+    'MOD-FLB': DIMENSION_MODERNITY,
+    'MOD-DEP': DIMENSION_MODERNITY,
+    MOD: DIMENSION_MODERNITY,
     // File Dimension Governance
     'large-file': DIMENSION_MAINTAINABILITY,
 };
@@ -338,10 +357,8 @@ export function buildDimensionDeductionSources(): Record<QualityDimension, strin
     }
 
     const result = {} as Record<QualityDimension, string[]>;
-    for (const [dimensionKey, analyzerSet] of Object.entries(buckets) as [
-        QualityDimension,
-        Set<string>,
-    ][]) {
+    const bucketEntries = Object.entries(buckets) as [QualityDimension, Set<string>][];
+    for (const [dimensionKey, analyzerSet] of bucketEntries) {
         if (analyzerSet.size > 0) {
             result[dimensionKey] = Array.from(analyzerSet).sort();
         }
@@ -545,6 +562,41 @@ export function calculateCompoundedDeduction(
 }
 
 /**
+ * Apply dynamic modernity decay deductions for backward compatibility shims.
+ * Integrates calculateShimDebtDecayPenalty and calculateArchitectureDirectnessIndex.
+ *
+ * @param issue - Analyzed issue finding.
+ * @param apply - Deduction callback function.
+ */
+export function applyModernityDecayDeductions(issue: Issue, apply: DeductionApplier): void {
+    if (!issue.rule || issue.rule !== RULE_MOD_BWD_001) return;
+    const line = issue.location?.start?.line;
+    const detail = (issue.detail as Record<string, any>) || {};
+    const fanIn = typeof detail.fanIn === 'number' ? detail.fanIn : 1;
+    const penaltyMul =
+        typeof detail.penaltyMultiplier === 'number' ? detail.penaltyMultiplier : 1.0;
+    const versionsUntilSunset =
+        typeof detail.versionsUntilSunset === 'number' ? detail.versionsUntilSunset : 0;
+    const ageDays =
+        versionsUntilSunset <= 0 ? 60 : Math.max(1, (3 - versionsUntilSunset) * 30);
+    const dynamicPenalty = calculateShimDebtDecayPenalty(
+        DEDUCTION_BACKWARD_SHIM * penaltyMul,
+        ageDays,
+        fanIn,
+        fanIn + 5,
+    );
+    if (dynamicPenalty > 0) {
+        apply(
+            DIMENSION_MODERNITY,
+            Math.round(dynamicPenalty),
+            `Modernity decay penalty for unpruned backward compatibility shim [Fan-in: ${fanIn}, AgeDays: ${ageDays}]`,
+            RULE_MOD_BWD_001,
+            line,
+        );
+    }
+}
+
+/**
  * Apply all issue-based deductions across quality dimensions.
  *
  * @param issue - Analyzed issue finding.
@@ -595,6 +647,7 @@ export function applyIssueDeductions(
     applyArchitectureDeductions(issue, recordFamilyClaim);
     applySecurityDeductions(issue, recordFamilyClaim);
     applyPerformanceDeductions(issue, recordFamilyClaim);
+    applyModernityDecayDeductions(issue, recordFamilyClaim);
     applyQualityDimensionDeductions(issue, effectiveApply, claimedByFamilyMask);
 }
 

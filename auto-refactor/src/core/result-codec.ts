@@ -39,7 +39,8 @@
  *       u8 hasActionable; if 1: <actionable value>
  *     u8 hasSymbols; if 1: <symbols value>
  */
-import type { Issue, FileMetric } from './types';
+import type { Issue, FileMetric, Severity } from './types';
+import { SEVERITY_INFO, SEVERITY_WARNING, SEVERITY_ERROR } from './types';
 
 /**
  * Whether binary result transport is armed for the current process.
@@ -64,7 +65,7 @@ type FileResult = {
     file: string;
     issues: Issue[];
     metric: FileMetric | null;
-    symbols?: any;
+    symbols?: unknown;
 };
 
 // ── Binary protocol constants (little-endian PR50 transport) ──
@@ -93,139 +94,142 @@ const HEX_RADIX = 16;
  * Growable little-endian binary writer backing the PR50 result transport.
  *
  * Scalars, unsigned varints, UTF-8 strings, and tagged JSON values are appended into 64 KiB
- * chunks; `result()` flushes the tail and concatenates the chunks into one Buffer. The writer is
- * single-use and not thread-safe: one instance belongs to exactly one encodeResults call.
+ * chunks; `buildResultBuffer()` flushes the tail and concatenates the chunks into one Buffer.
+ * The writer is single-use and not thread-safe: one instance belongs to one encodeResults call.
  */
 class Writer {
     private chunks: Buffer[] = [];
-    private cur = Buffer.allocUnsafe(CHUNK_BYTES);
-    private pos = 0;
+    private currentChunk = Buffer.allocUnsafe(CHUNK_BYTES);
+    private position = 0;
 
-    private flush(): void {
-        this.chunks.push(this.cur.subarray(0, this.pos));
-        this.cur = Buffer.allocUnsafe(CHUNK_BYTES);
-        this.pos = 0;
+    private flushCurrentChunk(): void {
+        this.chunks.push(this.currentChunk.subarray(0, this.position));
+        this.currentChunk = Buffer.allocUnsafe(CHUNK_BYTES);
+        this.position = 0;
     }
 
-    u8(v: number): void {
-        if (this.pos + 1 > this.cur.length) this.flush();
-        this.cur[this.pos++] = v & U8_MASK;
+    writeU8(byteValue: number): void {
+        if (this.position + 1 > this.currentChunk.length) this.flushCurrentChunk();
+        this.currentChunk[this.position++] = byteValue & U8_MASK;
     }
 
-    u32(v: number): void {
-        if (this.pos + U32_BYTES > this.cur.length) this.flush();
-        this.cur.writeUInt32LE(v >>> 0, this.pos);
-        this.pos += U32_BYTES;
+    writeU32(uint32Value: number): void {
+        if (this.position + U32_BYTES > this.currentChunk.length) this.flushCurrentChunk();
+        this.currentChunk.writeUInt32LE(uint32Value >>> 0, this.position);
+        this.position += U32_BYTES;
     }
 
-    f64(v: number): void {
-        if (this.pos + F64_BYTES > this.cur.length) this.flush();
-        this.cur.writeDoubleLE(v, this.pos);
-        this.pos += F64_BYTES;
+    writeFloat64(floatValue: number): void {
+        if (this.position + F64_BYTES > this.currentChunk.length) this.flushCurrentChunk();
+        this.currentChunk.writeDoubleLE(floatValue, this.position);
+        this.position += F64_BYTES;
     }
 
     /** unsigned varint (up to 2^53-1 → ≤ 8 bytes). */
-    varint(n: number): void {
-        let v = Math.floor(n);
-        if (v < 0) v = 0;
-        while (v >= VARINT_CONTINUATION_BIT) {
-            this.u8((v & VARINT_PAYLOAD_MASK) | VARINT_CONTINUATION_BIT);
-            v = Math.floor(v / VARINT_RADIX);
+    writeVarint(numericValue: number): void {
+        let numericPayload = Math.floor(numericValue);
+        if (numericPayload < 0) numericPayload = 0;
+        while (numericPayload >= VARINT_CONTINUATION_BIT) {
+            this.writeU8((numericPayload & VARINT_PAYLOAD_MASK) | VARINT_CONTINUATION_BIT);
+            numericPayload = Math.floor(numericPayload / VARINT_RADIX);
         }
-        this.u8(v);
+        this.writeU8(numericPayload);
     }
 
-    str(s: string): void {
-        const byteLen = Buffer.byteLength(s, 'utf8');
-        this.varint(byteLen);
+    writeString(strValue: string): void {
+        const byteLen = Buffer.byteLength(strValue, 'utf8');
+        this.writeVarint(byteLen);
         if (byteLen === 0) return;
 
-        if (this.pos + byteLen <= this.cur.length) {
+        if (this.position + byteLen <= this.currentChunk.length) {
             // Fast path: direct write into chunk with 0 intermediate Buffer allocation
-            this.cur.write(s, this.pos, byteLen, 'utf8');
-            this.pos += byteLen;
+            this.currentChunk.write(strValue, this.position, byteLen, 'utf8');
+            this.position += byteLen;
         } else {
             // Chunk boundary overflow fallback
-            const b = Buffer.from(s, 'utf8');
-            let off = 0;
-            while (off < b.length) {
-                const n = Math.min(b.length - off, this.cur.length - this.pos);
-                if (n === 0) {
-                    this.flush();
+            const overflowBuffer = Buffer.from(strValue, 'utf8');
+            let offset = 0;
+            while (offset < overflowBuffer.length) {
+                const chunkSliceLen = Math.min(
+                    overflowBuffer.length - offset,
+                    this.currentChunk.length - this.position,
+                );
+                if (chunkSliceLen === 0) {
+                    this.flushCurrentChunk();
                     continue;
                 }
-                b.copy(this.cur, this.pos, off, off + n);
-                this.pos += n;
-                off += n;
+                overflowBuffer.copy(this.currentChunk, this.position, offset, offset + chunkSliceLen);
+                this.position += chunkSliceLen;
+                offset += chunkSliceLen;
             }
         }
     }
 
-    writeNumber(v: number): void {
-        if (Number.isInteger(v) && Math.abs(v) < VARINT_SAFE_LIMIT) {
-            this.u8(T_INT);
+    writeNumber(numericTarget: number): void {
+        if (Number.isInteger(numericTarget) && Math.abs(numericTarget) < VARINT_SAFE_LIMIT) {
+            this.writeU8(T_INT);
             // zigzag
-            this.varint(v >= 0 ? v * 2 : -v * 2 - 1);
+            this.writeVarint(numericTarget >= 0 ? numericTarget * 2 : -numericTarget * 2 - 1);
             return;
         }
-        this.u8(T_FLOAT);
-        this.f64(v);
+        this.writeU8(T_FLOAT);
+        this.writeFloat64(numericTarget);
     }
 
-    writeArray(v: unknown[]): void {
-        this.u8(T_ARRAY);
-        this.varint(v.length);
-        for (const item of v) this.value(item);
+    writeArray(arrayValue: unknown[]): void {
+        this.writeU8(T_ARRAY);
+        this.writeVarint(arrayValue.length);
+        for (const item of arrayValue) this.writeValue(item);
     }
 
-    writeObject(v: Record<string, unknown>): void {
-        this.u8(T_OBJECT);
-        const keys = Object.keys(v);
-        this.varint(keys.length);
-        for (const k of keys) {
-            this.str(k);
-            this.value(v[k]);
+    writeObject(objectValue: Record<string, unknown>): void {
+        this.writeU8(T_OBJECT);
+        const keys = Object.keys(objectValue);
+        this.writeVarint(keys.length);
+        for (const key of keys) {
+            this.writeString(key);
+            this.writeValue(objectValue[key]);
         }
     }
 
     /** tagged JSON value — preserves key insertion order, arrays, ints/floats, non-ASCII. */
-    value(v: unknown): void {
-        if (v === null || v === undefined) {
-            this.u8(T_NULL);
+    writeValue(payloadItem: unknown): void {
+        if (payloadItem === null || payloadItem === undefined) {
+            this.writeU8(T_NULL);
             return;
         }
-        if (v === true) {
-            this.u8(T_TRUE);
+        if (payloadItem === true) {
+            this.writeU8(T_TRUE);
             return;
         }
-        if (v === false) {
-            this.u8(T_FALSE);
+        if (payloadItem === false) {
+            this.writeU8(T_FALSE);
             return;
         }
-        if (typeof v === 'number') {
-            this.writeNumber(v);
+        if (typeof payloadItem === 'number') {
+            this.writeNumber(payloadItem);
             return;
         }
-        if (typeof v === 'string') {
-            this.u8(T_STRING);
-            this.str(v);
+        if (typeof payloadItem === 'string') {
+            this.writeU8(T_STRING);
+            this.writeString(payloadItem);
             return;
         }
-        if (Array.isArray(v)) {
-            this.writeArray(v);
+        if (Array.isArray(payloadItem)) {
+            this.writeArray(payloadItem);
             return;
         }
-        if (typeof v === 'object') {
-            this.writeObject(v as Record<string, unknown>);
+        if (typeof payloadItem === 'object') {
+            this.writeObject(payloadItem as Record<string, unknown>);
             return;
         }
         // function / symbol / bigint — never produced by built-in analyzers; safest fallback.
-        this.u8(T_STRING);
-        this.str(String(v));
+        this.writeU8(T_STRING);
+        this.writeString(String(payloadItem));
     }
 
-    result(): Buffer {
-        this.flush();
+    buildResultBuffer(): Buffer {
+        this.flushCurrentChunk();
         return Buffer.concat(this.chunks);
     }
 }
@@ -239,77 +243,79 @@ class Writer {
  * tag, or an over-long varint.
  */
 class Reader {
-    private pos = 0;
-    constructor(private buf: Buffer) {}
+    private position = 0;
+    constructor(private readonly buffer: Buffer) {}
 
-    u8(): number {
-        return this.buf[this.pos++];
+    readU8(): number {
+        return this.buffer[this.position++];
     }
-    u32(): number {
-        const v = this.buf.readUInt32LE(this.pos);
-        this.pos += U32_BYTES;
-        return v;
+    readU32(): number {
+        const uint32Result = this.buffer.readUInt32LE(this.position);
+        this.position += U32_BYTES;
+        return uint32Result;
     }
-    f64(): number {
-        const v = this.buf.readDoubleLE(this.pos);
-        this.pos += F64_BYTES;
-        return v;
+    readFloat64(): number {
+        const floatResult = this.buffer.readDoubleLE(this.position);
+        this.position += F64_BYTES;
+        return floatResult;
     }
-    varint(): number {
-        let v = 0;
+    readVarint(): number {
+        let accumulatedValue = 0;
         let shift = 0;
         for (;;) {
-            const b = this.buf[this.pos++];
+            const byteValue = this.buffer[this.position++];
             if (shift < VARINT_FAST_PATH_SHIFT) {
-                v += (b & VARINT_PAYLOAD_MASK) << shift;
+                accumulatedValue += (byteValue & VARINT_PAYLOAD_MASK) << shift;
             } else {
-                v += (b & VARINT_PAYLOAD_MASK) * Math.pow(2, shift);
+                accumulatedValue += (byteValue & VARINT_PAYLOAD_MASK) * Math.pow(2, shift);
             }
-            if ((b & VARINT_CONTINUATION_BIT) === 0) break;
+            if ((byteValue & VARINT_CONTINUATION_BIT) === 0) break;
             shift += VARINT_SHIFT_STEP;
             if (shift > VARINT_MAX_SHIFT) throw new Error('resultCodec: varint overflow');
         }
-        return v;
+        return accumulatedValue;
     }
-    str(): string {
-        const len = this.varint();
-        const s = this.buf.toString('utf8', this.pos, this.pos + len);
-        this.pos += len;
-        return s;
+    readString(): string {
+        const len = this.readVarint();
+        const stringValue = this.buffer.toString('utf8', this.position, this.position + len);
+        this.position += len;
+        return stringValue;
     }
     private readInt(): number {
-        const z = this.varint();
-        return z % 2 === 0 ? z / 2 : -(z + 1) / 2;
+        const encodedInt = this.readVarint();
+        return encodedInt % 2 === 0 ? encodedInt / 2 : -(encodedInt + 1) / 2;
     }
 
     private readArray(): unknown[] {
-        const n = this.varint();
-        const arr: unknown[] = new Array(n);
-        for (let i = 0; i < n; i++) arr[i] = this.value();
+        const itemCount = this.readVarint();
+        const arr: unknown[] = [];
+        for (let index = 0; index < itemCount; index++) {
+            arr.push(this.readValue());
+        }
         return arr;
     }
 
     private readObject(): Record<string, unknown> {
-        const n = this.varint();
-        const o: Record<string, unknown> = {};
-        for (let i = 0; i < n; i++) {
-            const k = this.str();
-            o[k] = this.value();
+        const entryCount = this.readVarint();
+        const resultObject: Record<string, unknown> = {};
+        for (let index = 0; index < entryCount; index++) {
+            const key = this.readString();
+            resultObject[key] = this.readValue();
         }
-        return o;
+        return resultObject;
     }
 
-    value(): unknown {
-        const t = this.u8();
-        if (t === T_NULL) return null;
-        if (t === T_TRUE) return true;
-        if (t === T_FALSE) return false;
-        if (t === T_INT) return this.readInt();
-        if (t === T_FLOAT) return this.f64();
-        if (t === T_STRING) return this.str();
-        if (t === T_ARRAY) return this.readArray();
-        if (t === T_OBJECT) return this.readObject();
-        throw new Error(`resultCodec: bad type tag 0x${t.toString(HEX_RADIX)}`);
+    readValue(): unknown {
+        const typeTag = this.readU8();
+        if (typeTag === T_NULL) return null;
+        if (typeTag === T_TRUE) return true;
+        if (typeTag === T_FALSE) return false;
+        if (typeTag === T_INT) return this.readInt();
+        if (typeTag === T_FLOAT) return this.readFloat64();
+        if (typeTag === T_STRING) return this.readString();
+        if (typeTag === T_ARRAY) return this.readArray();
+        if (typeTag === T_OBJECT) return this.readObject();
+        throw new Error(`resultCodec: bad type tag 0x${typeTag.toString(HEX_RADIX)}`);
     }
 }
 
@@ -325,94 +331,106 @@ class Reader {
  * @returns One Buffer containing the magic header followed by every file entry.
  */
 export function encodeResults(results: FileResult[]): Buffer {
-    const w = new Writer();
-    w.u32(MAGIC);
-    w.u32(results.length);
-    for (const r of results) {
-        w.str(r.file);
-        const m = r.metric;
-        if (m) {
-            w.u8(1);
-            w.varint(m.lines);
-            w.varint(m.nonBlankLines);
-            w.varint(m.functions);
-            w.varint(m.maxNestingDepth);
-            w.varint(m.topLevelDeclarations);
-            w.varint(m.exportedSymbols);
+    const writer = new Writer();
+    writer.writeU32(MAGIC);
+    writer.writeU32(results.length);
+    for (const fileResult of results) {
+        writer.writeString(fileResult.file);
+        const metric = fileResult.metric;
+        if (metric) {
+            writer.writeU8(1);
+            writer.writeVarint(metric.lines);
+            writer.writeVarint(metric.nonBlankLines);
+            writer.writeVarint(metric.functions);
+            writer.writeVarint(metric.maxNestingDepth);
+            writer.writeVarint(metric.topLevelDeclarations);
+            writer.writeVarint(metric.exportedSymbols);
         } else {
-            w.u8(0);
+            writer.writeU8(0);
         }
-        w.varint(r.issues.length);
-        for (const i of r.issues) {
-            w.str(i.id);
-            w.str(i.analyzer);
-            w.str(i.rule);
-            w.u8(i.severity === 'info' ? 0 : i.severity === 'warning' ? 1 : 2);
-            w.str(i.message);
-            w.str(i.location.file);
-            w.varint(i.location.start.line);
-            w.varint(i.location.start.column);
-            w.varint(i.location.end.line);
-            w.varint(i.location.end.column);
-            w.value(i.detail);
-            if (i.suggestion !== undefined) {
-                w.u8(1);
-                w.str(i.suggestion);
+        writer.writeVarint(fileResult.issues.length);
+        for (const issue of fileResult.issues) {
+            writer.writeString(issue.id);
+            writer.writeString(issue.analyzer);
+            writer.writeString(issue.rule);
+            const severityCode =
+                issue.severity === SEVERITY_INFO
+                    ? 0
+                    : issue.severity === SEVERITY_WARNING
+                      ? 1
+                      : 2;
+            writer.writeU8(severityCode);
+            writer.writeString(issue.message);
+            writer.writeString(issue.location.file);
+            writer.writeVarint(issue.location.start.line);
+            writer.writeVarint(issue.location.start.column);
+            writer.writeVarint(issue.location.end.line);
+            writer.writeVarint(issue.location.end.column);
+            writer.writeValue(issue.detail);
+            if (issue.suggestion !== undefined) {
+                writer.writeU8(1);
+                writer.writeString(issue.suggestion);
             } else {
-                w.u8(0);
+                writer.writeU8(0);
             }
-            if (i.actionable !== undefined) {
-                w.u8(1);
-                w.value(i.actionable);
+            if (issue.actionable !== undefined) {
+                writer.writeU8(1);
+                writer.writeValue(issue.actionable);
             } else {
-                w.u8(0);
+                writer.writeU8(0);
             }
         }
-        if (r.symbols) {
-            w.u8(1);
-            w.value(r.symbols);
+        if (fileResult.symbols) {
+            writer.writeU8(1);
+            writer.writeValue(fileResult.symbols);
         } else {
-            w.u8(0);
+            writer.writeU8(0);
         }
     }
-    return w.result();
+    return writer.buildResultBuffer();
 }
 
-function decodeMetric(r: Reader, file: string): FileMetric | null {
-    const hasMetric = r.u8();
+function decodeMetric(reader: Reader, file: string): FileMetric | null {
+    const hasMetric = reader.readU8();
     if (!hasMetric) return null;
     return {
         file,
-        lines: r.varint(),
-        nonBlankLines: r.varint(),
-        functions: r.varint(),
-        maxNestingDepth: r.varint(),
-        topLevelDeclarations: r.varint(),
-        exportedSymbols: r.varint(),
+        lines: reader.readVarint(),
+        nonBlankLines: reader.readVarint(),
+        functions: reader.readVarint(),
+        maxNestingDepth: reader.readVarint(),
+        topLevelDeclarations: reader.readVarint(),
+        exportedSymbols: reader.readVarint(),
     };
 }
 
-function decodeSingleIssue(r: Reader): Issue {
-    const id = r.str();
-    const analyzer = r.str();
-    const rule = r.str();
-    const sev = r.u8();
-    const message = r.str();
-    const locFile = r.str();
-    const startLine = r.varint();
-    const startCol = r.varint();
-    const endLine = r.varint();
-    const endCol = r.varint();
-    const detail = r.value() as Record<string, unknown>;
-    const hasSug = r.u8();
-    const suggestion = hasSug ? r.str() : undefined;
-    const hasAct = r.u8();
-    const actionable = hasAct ? (r.value() as any) : undefined;
+const SEVERITY_BY_CODE = [SEVERITY_INFO, SEVERITY_WARNING, SEVERITY_ERROR] as const;
+
+function decodeSeverity(severityCode: number): Severity {
+    return SEVERITY_BY_CODE[severityCode] ?? SEVERITY_ERROR;
+}
+
+function decodeSingleIssue(reader: Reader): Issue {
+    const id = reader.readString();
+    const analyzer = reader.readString();
+    const rule = reader.readString();
+    const severityCode = reader.readU8();
+    const message = reader.readString();
+    const locFile = reader.readString();
+    const startLine = reader.readVarint();
+    const startCol = reader.readVarint();
+    const endLine = reader.readVarint();
+    const endCol = reader.readVarint();
+    const detail = reader.readValue() as Record<string, unknown>;
+    const hasSuggestion = reader.readU8();
+    const suggestion = hasSuggestion ? reader.readString() : undefined;
+    const hasActionable = reader.readU8();
+    const actionable = hasActionable ? (reader.readValue() as Issue['actionable']) : undefined;
     return {
         id,
         analyzer,
         rule,
-        severity: sev === 0 ? 'info' : sev === 1 ? 'warning' : 'error',
+        severity: decodeSeverity(severityCode),
         message,
         location: {
             file: locFile,
@@ -425,21 +443,21 @@ function decodeSingleIssue(r: Reader): Issue {
     };
 }
 
-function decodeFileIssues(r: Reader): Issue[] {
-    const issueCount = r.varint();
-    const issues: Issue[] = new Array(issueCount);
-    for (let k = 0; k < issueCount; k++) {
-        issues[k] = decodeSingleIssue(r);
+function decodeFileIssues(reader: Reader): Issue[] {
+    const issueCount = reader.readVarint();
+    const issues: Issue[] = [];
+    for (let index = 0; index < issueCount; index++) {
+        issues.push(decodeSingleIssue(reader));
     }
     return issues;
 }
 
-function decodeSingleFileResult(r: Reader): FileResult {
-    const file = r.str();
-    const metric = decodeMetric(r, file);
-    const issues = decodeFileIssues(r);
-    const hasSym = r.u8();
-    const symbols = hasSym ? (r.value() as any) : undefined;
+function decodeSingleFileResult(reader: Reader): FileResult {
+    const file = reader.readString();
+    const metric = decodeMetric(reader, file);
+    const issues = decodeFileIssues(reader);
+    const hasSymbols = reader.readU8();
+    const symbols = hasSymbols ? reader.readValue() : undefined;
     return {
         file,
         issues,
@@ -460,14 +478,16 @@ function decodeSingleFileResult(r: Reader): FileResult {
  * @throws Error when the magic header is wrong, a type tag is unknown, or a varint overflows.
  */
 export function decodeResults(buf: Buffer | Uint8Array): FileResult[] {
-    const b = Buffer.isBuffer(buf) ? buf : Buffer.from(buf.buffer, buf.byteOffset, buf.byteLength);
-    const r = new Reader(b);
-    const magic = r.u32();
+    const sourceBuffer = Buffer.isBuffer(buf)
+        ? buf
+        : Buffer.from(buf.buffer, buf.byteOffset, buf.byteLength);
+    const reader = new Reader(sourceBuffer);
+    const magic = reader.readU32();
     if (magic !== MAGIC) throw new Error('resultCodec: bad magic');
-    const n = r.u32();
-    const out: FileResult[] = new Array(n);
-    for (let f = 0; f < n; f++) {
-        out[f] = decodeSingleFileResult(r);
+    const fileCount = reader.readU32();
+    const out: FileResult[] = [];
+    for (let index = 0; index < fileCount; index++) {
+        out.push(decodeSingleFileResult(reader));
     }
     return out;
 }

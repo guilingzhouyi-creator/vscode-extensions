@@ -67,7 +67,7 @@ const REPLACE_CALL_RE = /\.replace\(/;
 const ANY_TYPE_RE = /(?::\s*any\b)|(?:\bas\s+any\b)|(?:<\s*any\s*>)|(?:\bany\s*\[\s*\])/;
 
 /** Named import clause without the `type` modifier; the specifier is masked out beforehand. */
-const NAMED_IMPORT_RE = /^\s*import\s+(?:type\s+)?\{([^}]*)\}\s+from\s/;
+const NAMED_IMPORT_RE = /^\s*import\s+\{([^}]*)\}\s+from\s/;
 
 /** Comment/literal syntax of the TS/JS family, handed to the shared source masker. */
 const TS_MASK: SourceMaskConfig = {

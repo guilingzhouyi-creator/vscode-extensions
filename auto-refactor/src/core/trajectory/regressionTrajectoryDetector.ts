@@ -77,41 +77,95 @@ export class RegressionTrajectoryDetector {
     }
 
     /**
-     * Check for flip-flop modifications where code reverts to an older hash or content.
+     * Default maximum lookback window depth for sliding-window cyclic oscillation detection.
      */
-    private checkFlipFlop(filePath: string, revisions: FileRevision[]): Issue | undefined {
+    public static readonly DEFAULT_LOOKBACK_WINDOW = 16;
+
+    /**
+     * Checks whether two revisions are identical in content or AST representation.
+     */
+    private isStateMatch(a: FileRevision, b: FileRevision): boolean {
+        if (a.fileHash && b.fileHash && a.fileHash === b.fileHash) {
+            return true;
+        }
+        if (a.astDigest && b.astDigest && a.astDigest === b.astDigest) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Formats the cyclic regression description message.
+     */
+    private formatCycleDescription(candidate: FileRevision, current: FileRevision, step: number): string {
+        const cyclePrefix =
+            step === 2
+                ? `Cyclic flip-flop detected between revision ${candidate.revisionId} and ${current.revisionId}.`
+                : `Multi-step cyclic oscillation (cycle length: ${step}) detected between revision ${candidate.revisionId} and ${current.revisionId}.`;
+        return `${cyclePrefix} Code modifications reverted to an earlier state after ${step} mutation steps without forward progress.`;
+    }
+
+    /**
+     * Check for cyclic oscillation or flip-flop mutations where code reverts to an older state.
+     *
+     * @param filePath - Target file path being tracked.
+     * @param revisions - Chronological list of revisions.
+     * @param maxLookback - Maximum past steps to inspect in sliding window.
+     * @returns Emitted Issue instance or undefined if no cycle exists.
+     */
+    public checkFlipFlop(
+        filePath: string,
+        revisions: FileRevision[],
+        maxLookback: number = RegressionTrajectoryDetector.DEFAULT_LOOKBACK_WINDOW,
+    ): Issue | undefined {
         const len = revisions.length;
         if (len < 3) {
             return undefined;
         }
 
         const current = revisions[len - 1];
-        const previous = revisions[len - 2];
-        const prior = revisions[len - 3];
+        if (!current.fileHash && !current.astDigest) {
+            return undefined;
+        }
 
-        // Direct flip-flop: prior == current && previous != current
-        const isHashFlipFlop =
-            prior.fileHash &&
-            current.fileHash &&
-            prior.fileHash === current.fileHash &&
-            previous.fileHash !== current.fileHash;
+        const lookbackDepth = Math.min(len - 1, Math.max(2, maxLookback));
 
-        const isDigestFlipFlop =
-            prior.astDigest &&
-            current.astDigest &&
-            prior.astDigest === current.astDigest &&
-            previous.astDigest !== current.astDigest;
+        // Scan backward from the latest revision to detect returns to prior states
+        for (let step = 2; step <= lookbackDepth; step++) {
+            const candidate = revisions[len - 1 - step];
+            if (!candidate) continue;
 
-        if (isHashFlipFlop || isDigestFlipFlop) {
-            return this.createRegressionIssue(
-                filePath,
-                1,
-                `Cyclic flip-flop detected between revision ${prior.revisionId} and ${current.revisionId}. ` +
-                    `Code modifications reverted to an earlier state without forward progress.`,
-            );
+            if (!this.isStateMatch(candidate, current)) continue;
+            if (!this.hasIntermediateMutation(revisions, len - 1 - step, len - 1)) continue;
+
+            const message = this.formatCycleDescription(candidate, current, step);
+            return this.createRegressionIssue(filePath, 1, message);
         }
 
         return undefined;
+    }
+
+    /**
+     * Asserts whether intermediate revisions differed from the terminal state.
+     */
+    private hasIntermediateMutation(
+        revisions: FileRevision[],
+        startIdx: number,
+        endIdx: number,
+    ): boolean {
+        const targetHash = revisions[endIdx].fileHash;
+        const targetDigest = revisions[endIdx].astDigest;
+
+        for (let i = startIdx + 1; i < endIdx; i++) {
+            const rev = revisions[i];
+            if (rev.fileHash && rev.fileHash !== targetHash) {
+                return true;
+            }
+            if (rev.astDigest && rev.astDigest !== targetDigest) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

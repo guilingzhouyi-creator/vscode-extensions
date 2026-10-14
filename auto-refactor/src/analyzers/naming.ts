@@ -17,7 +17,7 @@
 import * as path from 'path';
 import * as ts from 'typescript';
 import type { Analyzer, AnalyzerContext, Issue, Severity } from '../core/types';
-import { SEVERITY_WARNING, SEVERITY_INFO } from '../core/types';
+import { SEVERITY_WARNING } from '../core/types';
 import { ANALYZER_NAMING } from '../core/scoring/dimensionLiterals';
 import {
     NamingDecouplingAuditor,
@@ -39,11 +39,20 @@ import {
     auditFunctionNameLengthsAndAbbreviations,
     auditVariableNameLengthsAndAbbreviations,
     auditMemberAbbreviation,
-    isCompositeLiteral,
-    isScalarLiteral,
     isSimpleArrowFunction,
     type NamingActionablePayload,
 } from './naming-candidate-helper';
+import {
+    DEFAULT_VAGUE_BLACKLIST,
+    DEFAULT_SINGLE_LETTER_ALLOWED,
+    checkTopLevelConstantHelper,
+    checkCallExpressionJargonHelper,
+    checkSymbolJargonHelper,
+    checkIdentifierVaguenessHelper,
+    checkSingleLetterHelper,
+    checkCollectionNamingHelper,
+    auditDecouplingClustersHelper,
+} from './naming-ast-helper';
 
 export {
     NamingMessages,
@@ -84,46 +93,6 @@ export interface NamingOptions {
     singleLetterAllowed?: string[];
 }
 
-/** Default blacklist of vague and uninformative variable names lacking context. */
-const DEFAULT_VAGUE_WORDS =
-    'data temp tmp val value res result ret obj item info param arg foo bar baz thing';
-
-const DEFAULT_VAGUE_BLACKLIST = new Set(DEFAULT_VAGUE_WORDS.split(' '));
-
-const DEFAULT_SINGLE_LETTER_ALLOWED = new Set([
-    'i',
-    'j',
-    'k',
-    '_',
-    'a',
-    'b',
-    'c',
-    'd',
-    'e',
-    'f',
-    'l',
-    'm',
-    'n',
-    'p',
-    'r',
-    's',
-    't',
-    'v',
-    'w',
-    'x',
-    'y',
-    'z',
-]);
-
-const CAMEL_TO_SNAKE_PATTERN = '$1_$2';
-
-const TEST_TITLE_JARGON_RE = new RegExp(
-    '\\b(p[0-9]+|phase[\\s_-]*[0-9]+|st[\\s_-]*[0-9]+|temp|tmp|w' + 'ip)\\b',
-    'i',
-);
-
-const TEST_RUNNER_FUNCTIONS = new Set(['describe', 'it', 'test', 'suite']);
-
 const JS_TS_EXTS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs']);
 
 /**
@@ -150,28 +119,7 @@ export class NamingAnalyzer implements Analyzer {
         }
 
         const ext = path.extname(filePath).toLowerCase();
-        if (JS_TS_EXTS.has(ext)) {
-            const sourceFile =
-                sf ||
-                (ctx.content
-                    ? ts.createSourceFile(filePath, ctx.content, ts.ScriptTarget.Latest, true)
-                    : undefined);
-            if (sourceFile) {
-                this.auditTypeScriptAst(sourceFile, opts, ctx, issues);
-            }
-        } else if (ext === '.py') {
-            this.auditPythonSource(ctx.content || '', opts, ctx, issues);
-        } else if (ext === '.go' || ext === '.rs' || ext === '.gd') {
-            auditPolyglotSource(
-                ctx.content || '',
-                ext,
-                opts,
-                ctx,
-                (c, line, col, rule, msg, sev, detail, sugg) =>
-                    this.mkIssue(c, line, col, rule, msg, sev, detail, sugg),
-                issues,
-            );
-        }
+        this.dispatchLanguageAudit(ext, sf, ctx, opts, issues);
 
         issues.sort(
             (a, b) =>
@@ -183,10 +131,76 @@ export class NamingAnalyzer implements Analyzer {
         return issues;
     }
 
+    /**
+     * Dispatches naming analysis to language-specific auditors based on file extension.
+     *
+     * @param ext - Normalized lowercase file extension.
+     * @param sf - Optional parsed TypeScript SourceFile.
+     * @param ctx - Execution analysis context.
+     * @param opts - Naming analyzer configuration options.
+     * @param issues - Output issues collection.
+     */
+    private dispatchLanguageAudit(
+        ext: string,
+        sf: ts.SourceFile | undefined,
+        ctx: AnalyzerContext,
+        opts: NamingOptions,
+        issues: Issue[],
+    ): void {
+        if (JS_TS_EXTS.has(ext)) {
+            const sourceFile =
+                sf ||
+                (ctx.content
+                    ? ts.createSourceFile(ctx.filePath, ctx.content, ts.ScriptTarget.Latest, true)
+                    : undefined);
+            if (sourceFile) {
+                this.auditTypeScriptAst(sourceFile, opts, ctx, issues);
+            }
+            return;
+        }
+
+        if (ext === '.py') {
+            this.auditPythonSource(ctx.content || '', opts, ctx, issues);
+            return;
+        }
+
+        if (ext === '.go' || ext === '.rs' || ext === '.gd') {
+            auditPolyglotSource(
+                ctx.content || '',
+                ext,
+                opts,
+                ctx,
+                (c, line, col, rule, msg, sev, detail, sugg) =>
+                    this.mkIssue(c, line, col, rule, msg, sev, detail, sugg),
+                issues,
+            );
+        }
+    }
+
+    /**
+     * Finalizes analysis pass across source file.
+     *
+     * @param ctx - Execution analysis context.
+     * @returns Array of issues identified in the source file.
+     */
     finalize(ctx: AnalyzerContext): Issue[] {
         return this.analyze(ctx.sourceFile, ctx);
     }
 
+    /**
+     * Constructs a standardized naming Issue object.
+     *
+     * @param ctx - Execution analysis context.
+     * @param line - 1-based source line index.
+     * @param column - 1-based source column offset.
+     * @param rule - SSOT rule identifier string.
+     * @param message - Diagnostic message text.
+     * @param severity - Issue severity classification.
+     * @param detail - Structured diagnostic payload dictionary.
+     * @param suggestion - Optional actionable resolution guidance.
+     * @param actionable - Optional machine-executable fix payload.
+     * @returns Formatted issue descriptor.
+     */
     private mkIssue(
         ctx: AnalyzerContext,
         line: number,
@@ -215,14 +229,30 @@ export class NamingAnalyzer implements Analyzer {
         };
     }
 
+    /**
+     * Resolves symbol index from analysis context or runtime options.
+     *
+     * @param ctx - Execution analysis context.
+     * @returns Symbol index instance or undefined.
+     */
     private getSymbolIndex(ctx: AnalyzerContext): any {
         return (ctx as any).symbolIndex || (ctx.options as any)?.symbolIndex;
     }
 
+    /**
+     * Audits function name lengths, abbreviations, and verb-noun contract.
+     *
+     * @param name - Identifier string of the function.
+     * @param node - AST node representation.
+     * @param pos - Source position line and character offsets.
+     * @param ctx - Execution analysis context.
+     * @param issues - Output issues collection.
+     * @param opts - Naming analyzer configuration options.
+     */
     private checkFunctionName(
         name: string,
         node: ts.Node,
-        pos: { line: number; character: number },
+        pos: ts.LineAndCharacter,
         ctx: AnalyzerContext,
         issues: Issue[],
         opts: NamingOptions,
@@ -252,11 +282,22 @@ export class NamingAnalyzer implements Analyzer {
         );
     }
 
+    /**
+     * Audits variable naming lengths, abbreviations, and scope contracts.
+     *
+     * @param name - Identifier string of the variable.
+     * @param decl - AST variable declaration node.
+     * @param isTopLevel - True if declared at module root scope.
+     * @param pos - Source position line and character offsets.
+     * @param ctx - Execution analysis context.
+     * @param issues - Output issues collection.
+     * @param opts - Naming analyzer configuration options.
+     */
     private checkVariableName(
         name: string,
         decl: ts.Node,
         isTopLevel: boolean,
-        pos: { line: number; character: number },
+        pos: ts.LineAndCharacter,
         ctx: AnalyzerContext,
         issues: Issue[],
         opts: NamingOptions,
@@ -287,10 +328,21 @@ export class NamingAnalyzer implements Analyzer {
         );
     }
 
+    /**
+     * Records discovered symbol and evaluates architectural decoupling boundaries.
+     *
+     * @param name - Symbol identifier string.
+     * @param kind - Semantic classification kind of declaration.
+     * @param pos - Source position coordinates.
+     * @param opts - Naming analyzer configuration options.
+     * @param ctx - Execution analysis context.
+     * @param issues - Output issues collection.
+     * @param symbols - Optional symbol index accumulator.
+     */
     private checkDecouplingSymbol(
         name: string,
         kind: SymbolDeclarationKind,
-        pos: { line: number; character: number },
+        pos: ts.LineAndCharacter,
         opts: NamingOptions,
         ctx: AnalyzerContext,
         issues: Issue[],
@@ -334,6 +386,7 @@ export class NamingAnalyzer implements Analyzer {
         }
     }
 
+    /** Predicate determining whether an AST node represents a type declaration. */
     private isTypeDecl(node: ts.Node): boolean {
         return (
             ts.isClassDeclaration(node) ||
@@ -343,6 +396,7 @@ export class NamingAnalyzer implements Analyzer {
         );
     }
 
+    /** Predicate determining whether an AST node represents an object or class member. */
     private isMemberDecl(node: ts.Node): boolean {
         return (
             ts.isMethodDeclaration(node) ||
@@ -351,6 +405,7 @@ export class NamingAnalyzer implements Analyzer {
         );
     }
 
+    /** Predicate determining whether an AST node represents a function structure. */
     private isFunctionDecl(node: ts.Node): boolean {
         return (
             ts.isFunctionDeclaration(node) ||
@@ -359,6 +414,7 @@ export class NamingAnalyzer implements Analyzer {
         );
     }
 
+    /** Verifies top-level scalar constants follow UPPER_SNAKE_CASE. */
     private checkTopLevelConstant(
         decl: ts.VariableDeclaration,
         name: string,
@@ -366,37 +422,18 @@ export class NamingAnalyzer implements Analyzer {
         ctx: AnalyzerContext,
         issues: Issue[],
     ): void {
-        if (!decl.initializer) return;
-        const init = decl.initializer;
-        const isFn = ts.isArrowFunction(init) || ts.isFunctionExpression(init);
-        const isClass = ts.isClassExpression(init);
-        if (isFn || isClass) return;
-
-        // Composite object dictionaries (ObjectLiteralExpression,
-        // ArrayLiteralExpression, or with as const)
-        // are permitted to use camelCase (or UPPER_SNAKE_CASE).
-        if (isCompositeLiteral(init)) {
-            return;
-        }
-
-        // Only scalar constants enforce UPPER_SNAKE_CASE
-        const isScalar = isScalarLiteral(init);
-        if (isScalar && !/^[A-Z][A-Z0-9_]*$/.test(name)) {
-            issues.push(
-                this.mkIssue(
-                    ctx,
-                    pos.line + 1,
-                    pos.character + 1,
-                    'NAM-GLB-001',
-                    `Top-level constant '${name}' should follow UPPER_SNAKE_CASE naming convention.`,
-                    SEVERITY_WARNING,
-                    { name },
-                    `Rename '${name}' to an uppercase snake_case constant (e.g. '${name.replace(/([a-z0-9])([A-Z])/g, CAMEL_TO_SNAKE_PATTERN).toUpperCase()}').`,
-                ),
-            );
-        }
+        checkTopLevelConstantHelper(
+            decl,
+            name,
+            pos,
+            ctx,
+            (c, line, col, rule, msg, sev, detail, sugg) =>
+                this.mkIssue(c, line, col, rule, msg, sev, detail, sugg),
+            issues,
+        );
     }
 
+    /** Audits destructuring patterns for vague identifiers and single letters. */
     private checkBindingPattern(
         pattern: ts.BindingPattern,
         sf: ts.SourceFile,
@@ -655,6 +692,7 @@ export class NamingAnalyzer implements Analyzer {
             }
             this.checkDecouplingSymbol(node.name.text, 'function', pos, opts, ctx, issues, symbols);
         }
+        const isArrow = ts.isArrowFunction(node) || ts.isFunctionExpression(node);
         const isExemptVague = isSimpleArrowFunction(node, sf);
         for (const param of fn.parameters) {
             if (ts.isIdentifier(param.name)) {
@@ -663,7 +701,7 @@ export class NamingAnalyzer implements Analyzer {
                 this.checkVariableName(paramName, param, false, pos, ctx, issues, opts);
                 if (!isExemptVague) {
                     this.checkIdentifierVagueness(paramName, pos, vagueSet, ctx, issues, opts);
-                    this.checkSingleLetter(paramName, pos, false, singleAllowed, ctx, issues, opts);
+                    this.checkSingleLetter(paramName, pos, isArrow, singleAllowed, ctx, issues, opts);
                 }
                 if (opts.checkJargon !== false) {
                     this.checkSymbolJargon(paramName, pos, ctx, issues);
@@ -720,42 +758,23 @@ export class NamingAnalyzer implements Analyzer {
         ts.forEachChild(sf, visit);
 
         if (opts.checkDecoupling !== false && discoveredSymbols.length >= 4) {
-            const clusterFindings = this.decouplingAuditor.auditClusters(discoveredSymbols);
-            const flaggedDecouplingSymbols = new Set<string>();
-            for (const issue of issues) {
-                if (issue.rule === 'NAM-DEC-001') {
-                    const sym = (issue.detail as Record<string, unknown>)?.symbol;
-                    if (typeof sym === 'string') {
-                        flaggedDecouplingSymbols.add(sym);
-                    }
-                }
-            }
-
-            for (const finding of clusterFindings) {
-                if (!flaggedDecouplingSymbols.has(finding.symbol)) {
-                    flaggedDecouplingSymbols.add(finding.symbol);
-                    issues.push(
-                        this.mkIssue(
-                            ctx,
-                            finding.line,
-                            finding.column,
-                            'NAM-DEC-001',
-                            finding.message,
-                            SEVERITY_WARNING,
-                            {
-                                symbol: finding.symbol,
-                                length: finding.length,
-                                segments: finding.segments,
-                                suggestedDomainDirectory: finding.suggestedDomainDirectory,
-                                suggestedSymbol: finding.suggestedSymbol,
-                                actionableProposal: finding.actionableProposal,
-                            },
-                            finding.actionableProposal.rationale,
-                        ),
-                    );
-                }
-            }
+            this.auditDecouplingClusters(discoveredSymbols, ctx, issues);
         }
+    }
+
+    private auditDecouplingClusters(
+        discoveredSymbols: SymbolEntry[],
+        ctx: AnalyzerContext,
+        issues: Issue[],
+    ): void {
+        auditDecouplingClustersHelper(
+            discoveredSymbols,
+            this.decouplingAuditor,
+            ctx,
+            (c, line, col, rule, msg, sev, detail, sugg) =>
+                this.mkIssue(c, line, col, rule, msg, sev, detail, sugg),
+            issues,
+        );
     }
 
     private dispatchAstNode(
@@ -810,84 +829,38 @@ export class NamingAnalyzer implements Analyzer {
         }
     }
 
-    /**
-     * Audits call expressions (e.g. describe / it / test) for transient process milestone jargon.
-     *
-     * @param node - Call expression AST node.
-     * @param sf - Source file providing position offsets.
-     * @param ctx - Execution context.
-     * @param issues - Output issues accumulator.
-     */
     private checkCallExpressionJargon(
         node: ts.CallExpression,
         sf: ts.SourceFile,
         ctx: AnalyzerContext,
         issues: Issue[],
     ): void {
-        if (!ts.isIdentifier(node.expression) || !TEST_RUNNER_FUNCTIONS.has(node.expression.text)) {
-            return;
-        }
-        const arg0 = node.arguments[0];
-        if (!arg0 || (!ts.isStringLiteral(arg0) && !ts.isNoSubstitutionTemplateLiteral(arg0))) {
-            return;
-        }
-        if (TEST_TITLE_JARGON_RE.test(arg0.text)) {
-            const pos = sf.getLineAndCharacterOfPosition(arg0.getStart(sf));
-            issues.push(
-                this.mkIssue(
-                    ctx,
-                    pos.line + 1,
-                    pos.character + 1,
-                    'NAM-JRG-002',
-                    `Test title '${arg0.text}' contains transient construction jargon or milestone marker.`,
-                    SEVERITY_WARNING,
-                    { title: arg0.text },
-                    'Remove transient process markers from test description.',
-                ),
-            );
-        }
+        checkCallExpressionJargonHelper(
+            node,
+            sf,
+            ctx,
+            (c, line, col, rule, msg, sev, detail, sugg) =>
+                this.mkIssue(c, line, col, rule, msg, sev, detail, sugg),
+            issues,
+        );
     }
 
-    /**
-     * Audits an identifier symbol for transient sprint or milestone process jargon.
-     *
-     * @param name - Identifier string to inspect.
-     * @param pos - Source position line and character coordinates.
-     * @param ctx - Execution context.
-     * @param issues - Output issues accumulator.
-     */
     private checkSymbolJargon(
         name: string,
         pos: ts.LineAndCharacter,
         ctx: AnalyzerContext,
         issues: Issue[],
     ): void {
-        if (hasTransientJargon(name)) {
-            issues.push(
-                this.mkIssue(
-                    ctx,
-                    pos.line + 1,
-                    pos.character + 1,
-                    'NAM-JRG-002',
-                    `Symbol or test identifier '${name}' contains transient construction jargon or milestone marker.`,
-                    SEVERITY_WARNING,
-                    { name },
-                    'Replace transient process markers with semantic domain naming.',
-                ),
-            );
-        }
+        checkSymbolJargonHelper(
+            name,
+            pos,
+            ctx,
+            (c, line, col, rule, msg, sev, detail, sugg) =>
+                this.mkIssue(c, line, col, rule, msg, sev, detail, sugg),
+            issues,
+        );
     }
 
-    /**
-     * Checks if identifier matches blacklisted vague or uninformative terms.
-     *
-     * @param name - Identifier name to audit.
-     * @param pos - Source position line and character coordinates.
-     * @param vagueSet - Set of uninformative identifier terms.
-     * @param ctx - Execution context.
-     * @param issues - Output issues accumulator.
-     * @param opts - Naming analyzer configuration options.
-     */
     private checkIdentifierVagueness(
         name: string,
         pos: ts.LineAndCharacter,
@@ -896,34 +869,18 @@ export class NamingAnalyzer implements Analyzer {
         issues: Issue[],
         opts: NamingOptions,
     ): void {
-        if (opts.checkVagueNames === false) return;
-        if (vagueSet.has(name.toLowerCase())) {
-            issues.push(
-                this.mkIssue(
-                    ctx,
-                    pos.line + 1,
-                    pos.character + 1,
-                    'NAM-VAG-001',
-                    `Identifier '${name}' is vague and uninformative; lacks domain context.`,
-                    SEVERITY_WARNING,
-                    { name },
-                    `Replace '${name}' with a domain-qualified identifier (e.g. 'parseResult', 'userData', 'tokenPayload').`,
-                ),
-            );
-        }
+        checkIdentifierVaguenessHelper(
+            name,
+            pos,
+            vagueSet,
+            ctx,
+            opts,
+            (c, line, col, rule, msg, sev, detail, sugg) =>
+                this.mkIssue(c, line, col, rule, msg, sev, detail, sugg),
+            issues,
+        );
     }
 
-    /**
-     * Enforces single-letter variable restriction, exempting loop index coordinates.
-     *
-     * @param name - Variable identifier name.
-     * @param pos - Source position line and character coordinates.
-     * @param inLoop - True if variable is declared inside loop scope.
-     * @param singleAllowed - Whitelisted single-letter loop variable identifiers.
-     * @param ctx - Execution context.
-     * @param issues - Output issues accumulator.
-     * @param opts - Naming analyzer configuration options.
-     */
     private checkSingleLetter(
         name: string,
         pos: ts.LineAndCharacter,
@@ -933,35 +890,19 @@ export class NamingAnalyzer implements Analyzer {
         issues: Issue[],
         opts: NamingOptions,
     ): void {
-        if (opts.checkSingleLetters === false) return;
-        if (name.length === 1 && /^[a-zA-Z]$/.test(name)) {
-            if (inLoop && singleAllowed.has(name)) return;
-            if (name === '_') return;
-            issues.push(
-                this.mkIssue(
-                    ctx,
-                    pos.line + 1,
-                    pos.character + 1,
-                    'NAM-SGL-001',
-                    `Single-letter variable name '${name}' hurts code readability.`,
-                    SEVERITY_WARNING,
-                    { name, inLoop },
-                    `Replace '${name}' with a meaningful descriptive name; only loop indices ('i','j','k') and '_' are tolerated.`,
-                ),
-            );
-        }
+        checkSingleLetterHelper(
+            name,
+            pos,
+            inLoop,
+            singleAllowed,
+            ctx,
+            opts,
+            (c, line, col, rule, msg, sev, detail, sugg) =>
+                this.mkIssue(c, line, col, rule, msg, sev, detail, sugg),
+            issues,
+        );
     }
 
-    /**
-     * Verifies Map collection variable declarations describe key-value relationship.
-     *
-     * @param name - Identifier name of collection variable.
-     * @param init - Optional initializer expression node.
-     * @param pos - Source position line and character coordinates.
-     * @param ctx - Execution context.
-     * @param issues - Output issues accumulator.
-     * @param opts - Naming analyzer configuration options.
-     */
     private checkCollectionNaming(
         name: string,
         init: ts.Expression | undefined,
@@ -970,29 +911,15 @@ export class NamingAnalyzer implements Analyzer {
         issues: Issue[],
         opts: NamingOptions,
     ): void {
-        if (opts.checkCollections === false || !init) return;
-        if (!ts.isNewExpression(init) || !init.expression || !ts.isIdentifier(init.expression)) {
-            return;
-        }
-        if (init.expression.text !== 'Map') return;
-        if (
-            /(By[A-Z0-9]|To[A-Z0-9]|Map|Dict|Mapping)/.test(name) ||
-            /(To|By|Map|Dict)$/i.test(name)
-        ) {
-            return;
-        }
-
-        issues.push(
-            this.mkIssue(
-                ctx,
-                pos.line + 1,
-                pos.character + 1,
-                'NAM-COL-001',
-                `Map '${name}' should describe key-value relation in its name.`,
-                SEVERITY_INFO,
-                { name },
-                `Rename Map to express relationship (e.g. '${name}ById', '${name}ToTarget', or '${name}Map').`,
-            ),
+        checkCollectionNamingHelper(
+            name,
+            init,
+            pos,
+            ctx,
+            opts,
+            (c, line, col, rule, msg, sev, detail, sugg) =>
+                this.mkIssue(c, line, col, rule, msg, sev, detail, sugg),
+            issues,
         );
     }
 

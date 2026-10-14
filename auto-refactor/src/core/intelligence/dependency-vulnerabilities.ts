@@ -20,6 +20,24 @@ export type VulnerabilitySeverity = 'critical' | 'high' | 'medium' | 'low';
 export type VulnerabilityCategory =
     'backdoor' | 'poisoning' | 'protestware' | 'malicious_payload' | 'account_takeover';
 
+export const VULN_SEV_CRITICAL: VulnerabilitySeverity = 'critical';
+export const VULN_SEV_HIGH: VulnerabilitySeverity = 'high';
+export const VULN_SEV_MEDIUM: VulnerabilitySeverity = 'medium';
+export const VULN_SEV_LOW: VulnerabilitySeverity = 'low';
+
+export const VULN_CAT_BACKDOOR: VulnerabilityCategory = 'backdoor';
+export const VULN_CAT_POISONING: VulnerabilityCategory = 'poisoning';
+export const VULN_CAT_PROTESTWARE: VulnerabilityCategory = 'protestware';
+export const VULN_CAT_MALICIOUS: VulnerabilityCategory = 'malicious_payload';
+export const VULN_CAT_TAKEOVER: VulnerabilityCategory = 'account_takeover';
+
+export const AFFECTED_ALL_VERSIONS = '*';
+
+const PROTOCOL_FILE = 'file:';
+const PROTOCOL_HTTP = 'http:';
+const PROTOCOL_HTTPS = 'https:';
+const PROTOCOL_NODE = 'node:';
+
 /** Internal dictionary record definition for known vulnerable packages */
 export interface VulnerabilityRecord {
     /** Target npm package name including scope if applicable */
@@ -90,9 +108,9 @@ export interface VulnerabilityCheckOptions {
 export const KNOWN_VULNERABILITY_DICTIONARY: readonly VulnerabilityRecord[] = Object.freeze([
     {
         packageName: 'flatmap-stream',
-        affectedVersions: '*',
-        severity: 'critical',
-        category: 'backdoor',
+        affectedVersions: AFFECTED_ALL_VERSIONS,
+        severity: VULN_SEV_CRITICAL,
+        category: VULN_CAT_BACKDOOR,
         advisoryId: 'GHSA-5545-2q6w-2gh6',
         title: 'Malicious supply-chain backdoor stealing Bitcoin credentials',
         description:
@@ -104,8 +122,8 @@ export const KNOWN_VULNERABILITY_DICTIONARY: readonly VulnerabilityRecord[] = Ob
     {
         packageName: 'event-stream',
         affectedVersions: Object.freeze(['3.3.6']),
-        severity: 'critical',
-        category: 'backdoor',
+        severity: VULN_SEV_CRITICAL,
+        category: VULN_CAT_BACKDOOR,
         advisoryId: 'CVE-2018-20834',
         title: 'Supply chain compromise introducing flatmap-stream backdoor',
         description:
@@ -117,8 +135,8 @@ export const KNOWN_VULNERABILITY_DICTIONARY: readonly VulnerabilityRecord[] = Ob
     {
         packageName: 'colors',
         affectedVersions: Object.freeze(['1.4.1', '1.4.2']),
-        severity: 'high',
-        category: 'protestware',
+        severity: VULN_SEV_HIGH,
+        category: VULN_CAT_PROTESTWARE,
         advisoryId: 'GHSA-5wpq-43j2-6qwc',
         title: 'Protestware / denial of service via infinite loop and corrupted terminal output',
         description:
@@ -128,8 +146,8 @@ export const KNOWN_VULNERABILITY_DICTIONARY: readonly VulnerabilityRecord[] = Ob
     {
         packageName: 'faker',
         affectedVersions: Object.freeze(['6.6.6']),
-        severity: 'high',
-        category: 'protestware',
+        severity: VULN_SEV_HIGH,
+        category: VULN_CAT_PROTESTWARE,
         advisoryId: 'GHSA-48p4-6565-553x',
         title: 'Protestware / intentional repository sabotage',
         description: 'faker 6.6.6 was intentionally sabotaged by its author with an infinite loop.',
@@ -138,8 +156,8 @@ export const KNOWN_VULNERABILITY_DICTIONARY: readonly VulnerabilityRecord[] = Ob
     {
         packageName: 'node-ipc',
         affectedVersions: Object.freeze(['9.2.2', '10.1.1', '10.1.2']),
-        severity: 'critical',
-        category: 'malicious_payload',
+        severity: VULN_SEV_CRITICAL,
+        category: VULN_CAT_MALICIOUS,
         advisoryId: 'CVE-2022-23812',
         title: 'Protestware wiper payload targeting geolocation (peacenotwar)',
         description:
@@ -150,8 +168,8 @@ export const KNOWN_VULNERABILITY_DICTIONARY: readonly VulnerabilityRecord[] = Ob
     {
         packageName: 'coa',
         affectedVersions: Object.freeze(['2.0.3', '2.0.4']),
-        severity: 'critical',
-        category: 'account_takeover',
+        severity: VULN_SEV_CRITICAL,
+        category: VULN_CAT_TAKEOVER,
         advisoryId: 'CVE-2021-43788',
         title: 'Account takeover delivering password-stealing malware (Danabot)',
         description:
@@ -162,8 +180,8 @@ export const KNOWN_VULNERABILITY_DICTIONARY: readonly VulnerabilityRecord[] = Ob
     {
         packageName: 'rc',
         affectedVersions: Object.freeze(['1.2.9', '1.3.9']),
-        severity: 'critical',
-        category: 'account_takeover',
+        severity: VULN_SEV_CRITICAL,
+        category: VULN_CAT_TAKEOVER,
         advisoryId: 'CVE-2021-43787',
         title: 'Compromised npm release executing credential stealer malware',
         description:
@@ -174,8 +192,8 @@ export const KNOWN_VULNERABILITY_DICTIONARY: readonly VulnerabilityRecord[] = Ob
     {
         packageName: 'ua-parser-js',
         affectedVersions: Object.freeze(['0.7.29', '0.8.0', '1.0.0']),
-        severity: 'critical',
-        category: 'account_takeover',
+        severity: VULN_SEV_CRITICAL,
+        category: VULN_CAT_TAKEOVER,
         advisoryId: 'CVE-2021-43616',
         title: 'Compromised npm releases deploying cryptominer and password stealer',
         description:
@@ -185,9 +203,9 @@ export const KNOWN_VULNERABILITY_DICTIONARY: readonly VulnerabilityRecord[] = Ob
     },
     {
         packageName: 'peacenotwar',
-        affectedVersions: '*',
-        severity: 'high',
-        category: 'protestware',
+        affectedVersions: AFFECTED_ALL_VERSIONS,
+        severity: VULN_SEV_HIGH,
+        category: VULN_CAT_PROTESTWARE,
         advisoryId: 'GHSA-c2qf-rxjj-qqgw',
         title: 'Protestware dropping unexpected political files onto desktop',
         description:
@@ -196,9 +214,9 @@ export const KNOWN_VULNERABILITY_DICTIONARY: readonly VulnerabilityRecord[] = Ob
     },
     {
         packageName: 'crossenv',
-        affectedVersions: '*',
-        severity: 'critical',
-        category: 'poisoning',
+        affectedVersions: AFFECTED_ALL_VERSIONS,
+        severity: VULN_SEV_CRITICAL,
+        category: VULN_CAT_POISONING,
         advisoryId: 'GHSA-394v-5264-9w4j',
         title: 'Typosquatting malicious package for cross-env',
         description: 'crossenv was a typosquatting malware package stealing environment variables.',
@@ -206,9 +224,9 @@ export const KNOWN_VULNERABILITY_DICTIONARY: readonly VulnerabilityRecord[] = Ob
     },
     {
         packageName: 'electron-native-notify',
-        affectedVersions: '*',
-        severity: 'critical',
-        category: 'malicious_payload',
+        affectedVersions: AFFECTED_ALL_VERSIONS,
+        severity: VULN_SEV_CRITICAL,
+        category: VULN_CAT_MALICIOUS,
         advisoryId: 'GHSA-4hvw-g378-5777',
         title: 'Malicious package executing unauthorized shell commands',
         description:
@@ -217,9 +235,9 @@ export const KNOWN_VULNERABILITY_DICTIONARY: readonly VulnerabilityRecord[] = Ob
     },
     {
         packageName: '@malicious/test-package',
-        affectedVersions: '*',
-        severity: 'critical',
-        category: 'poisoning',
+        affectedVersions: AFFECTED_ALL_VERSIONS,
+        severity: VULN_SEV_CRITICAL,
+        category: VULN_CAT_POISONING,
         advisoryId: 'ADV-TEST-MAL-01',
         title: 'Test fixture for scoped malicious package detection',
         description: 'Synthetic malicious scoped package fixture for intelligence testing.',
@@ -250,10 +268,10 @@ function isLocalOrProtocolPath(trimmed: string): boolean {
         trimmed.startsWith('.') ||
         trimmed.startsWith('/') ||
         trimmed.startsWith('\\') ||
-        trimmed.startsWith('file:') ||
-        trimmed.startsWith('http:') ||
-        trimmed.startsWith('https:') ||
-        trimmed.startsWith('node:')
+        trimmed.startsWith(PROTOCOL_FILE) ||
+        trimmed.startsWith(PROTOCOL_HTTP) ||
+        trimmed.startsWith(PROTOCOL_HTTPS) ||
+        trimmed.startsWith(PROTOCOL_NODE)
     );
 }
 
@@ -415,7 +433,7 @@ export function checkKnownPackageVulnerability(
         : undefined;
 
     // Case 1: Entire package is backdoored/poisoned in all versions
-    if (record.affectedVersions === '*') {
+    if (record.affectedVersions === AFFECTED_ALL_VERSIONS) {
         return {
             packageName: record.packageName,
             specifier,

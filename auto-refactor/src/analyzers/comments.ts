@@ -152,6 +152,11 @@ const CHAR_CODE_LF = 10;
 const CHAR_CODE_CR = 13;
 const COMMENT_URL_OR_INLINE_CODE_RE = /https?:\/\/\S+|`[^`]{20,}`/;
 const HEADER_COMMENT_PREFIX_RE = /^\s*(\/\/|\/\*|\*|#|##|""")/;
+const SIX_FIELD_ALIASES_ZH: Readonly<Record<string, readonly string[]>> = Object.freeze({
+    '依赖与触发': Object.freeze(['依赖与触发', '跨域依赖', '依赖和触发']),
+    '退出语义与设计依据': Object.freeze(['退出语义与设计依据', '设计依据', '退出语义与设计权衡', '退出语义与架构依据']),
+});
+
 const SIX_FIELD_PATTERNS: ReadonlyArray<{
     readonly en: string;
     readonly zh: string;
@@ -160,7 +165,9 @@ const SIX_FIELD_PATTERNS: ReadonlyArray<{
     SIX_FIELD_HEADERS_EN.map((en, i) => {
         const zh = SIX_FIELD_HEADERS_ZH[i];
         const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        return Object.freeze({ en, zh, regex: new RegExp(`${esc(en)}|${esc(zh)}`) });
+        const aliases = SIX_FIELD_ALIASES_ZH[zh] || [zh];
+        const allZh = aliases.map(esc).join('|');
+        return Object.freeze({ en, zh, regex: new RegExp(`${esc(en)}|${allZh}`) });
     }),
 );
 
@@ -639,7 +646,17 @@ export class CommentAnalyzer implements Analyzer {
         if (!pathMatch) return;
 
         const declaredPath = pathMatch[1].trim().replace(/\\/g, '/');
-        if (file.endsWith(declaredPath) || declaredPath.endsWith(file)) return;
+        const normalizedDeclared = declaredPath.startsWith('res://')
+            ? declaredPath.slice('res://'.length)
+            : declaredPath;
+        if (
+            file.endsWith(declaredPath) ||
+            declaredPath.endsWith(file) ||
+            file.endsWith(normalizedDeclared) ||
+            normalizedDeclared.endsWith(file)
+        ) {
+            return;
+        }
 
         const desc = CommentMessages.HEADER_PATH_MISMATCH(declaredPath, file);
         issues.push(

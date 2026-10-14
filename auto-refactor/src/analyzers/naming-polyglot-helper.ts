@@ -182,6 +182,42 @@ function auditExtractedFunction(
     );
 }
 
+type PolyglotLineAuditor = (line: string, lineIndex: number) => void;
+
+function createPolyglotLineAuditor(
+    ext: string,
+    opts: NamingOptions,
+    ctx: AnalyzerContext,
+    mkIssue: IssueFactory,
+    issues: Issue[],
+): PolyglotLineAuditor | null {
+    if (ext === '.go') {
+        return (line, i) => {
+            const match = GO_FUNC_RE.exec(line);
+            if (match && !isGoFunctionExempt(match[1])) {
+                auditExtractedFunction(match[1], i, false, opts, ctx, mkIssue, issues);
+            }
+        };
+    }
+    if (ext === '.rs') {
+        return (line, i) => {
+            const match = RUST_FN_RE.exec(line);
+            if (match && !isRustFunctionExempt(match[1])) {
+                auditExtractedFunction(match[1], i, true, opts, ctx, mkIssue, issues);
+            }
+        };
+    }
+    if (ext === '.gd') {
+        return (line, i) => {
+            const match = GDSCRIPT_FUNC_RE.exec(line);
+            if (match && !isGDScriptFunctionExempt(match[1])) {
+                auditExtractedFunction(match[1], i, true, opts, ctx, mkIssue, issues);
+            }
+        };
+    }
+    return null;
+}
+
 /**
  * Audit Go, Rust, or GDScript source lines for naming conventions and semantic contracts.
  *
@@ -200,30 +236,14 @@ export function auditPolyglotSource(
     mkIssue: IssueFactory,
     issues: Issue[],
 ): void {
-    const lines = content.split(/\r?\n/);
-    const isGo = ext === '.go';
-    const isRust = ext === '.rs';
-    const isGD = ext === '.gd';
+    const auditor = createPolyglotLineAuditor(ext, opts, ctx, mkIssue, issues);
+    if (!auditor) return;
 
+    const lines = content.split(/\r?\n/);
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
-        if (!line) continue;
-
-        if (isGo) {
-            const match = GO_FUNC_RE.exec(line);
-            if (match && !isGoFunctionExempt(match[1])) {
-                auditExtractedFunction(match[1], i, false, opts, ctx, mkIssue, issues);
-            }
-        } else if (isRust) {
-            const match = RUST_FN_RE.exec(line);
-            if (match && !isRustFunctionExempt(match[1])) {
-                auditExtractedFunction(match[1], i, true, opts, ctx, mkIssue, issues);
-            }
-        } else if (isGD) {
-            const match = GDSCRIPT_FUNC_RE.exec(line);
-            if (match && !isGDScriptFunctionExempt(match[1])) {
-                auditExtractedFunction(match[1], i, true, opts, ctx, mkIssue, issues);
-            }
+        if (line) {
+            auditor(line, i);
         }
     }
 }

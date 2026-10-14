@@ -329,7 +329,7 @@ async function collectDirectoryStats(
     const queue = [targetRoot];
     while (queue.length > 0) {
         const curr = queue.pop()!;
-        let entries: fs.Dirent[];
+        let entries: Array<fs.Dirent>;
         try {
             entries = await fs.promises.readdir(curr, { withFileTypes: true });
         } catch {
@@ -381,6 +381,18 @@ function handleMemoryCommand(): void {
     process.exit(0);
 }
 
+function getOrCreateFixList(
+    fixesByFile: Map<string, FixDescriptor[]>,
+    file: string,
+): FixDescriptor[] {
+    let existing = fixesByFile.get(file);
+    if (!existing) {
+        existing = [];
+        fixesByFile.set(file, existing);
+    }
+    return existing;
+}
+
 /**
  * Executes automated AST codemod repairs for actionable scan findings.
  *
@@ -394,13 +406,7 @@ async function handleFixWorkflow(cli: CliOptions): Promise<number> {
     for (const issue of report.issues) {
         const fix = PatchEngine.issueToFix(issue);
         if (fix) {
-            const relFile = issue.location.file;
-            let existing = fixesByFile.get(relFile);
-            if (!existing) {
-                existing = [];
-                fixesByFile.set(relFile, existing);
-            }
-            existing.push(fix);
+            getOrCreateFixList(fixesByFile, issue.location.file).push(fix);
         }
     }
 

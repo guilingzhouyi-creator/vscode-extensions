@@ -420,8 +420,9 @@ function evictMatchingStates(
     predicate: (st: IncrementalFileState) => boolean,
 ): number {
     let evicted = 0;
+    const toRemove: string[] = [];
     for (const bucket of incremental.values()) {
-        const toRemove: string[] = [];
+        toRemove.length = 0;
         for (const [path, st] of bucket) {
             if (predicate(st)) {
                 toRemove.push(path);

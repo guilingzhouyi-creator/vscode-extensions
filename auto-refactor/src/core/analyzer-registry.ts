@@ -235,14 +235,19 @@ function resolveBuiltinAnalyzers(
     plan: ResolvedAnalyzer[],
     seen: Set<string>,
 ): void {
-    for (const [name, decl] of Object.entries(config.analyzers || {})) {
+    const analyzers = config.analyzers;
+    if (!analyzers) return;
+    const baseThresholds = config.thresholds || {};
+
+    for (const name of Object.keys(analyzers)) {
+        const decl = analyzers[name];
         if (!decl || decl.enabled === false) continue;
         const factory = BUILTIN_FACTORIES[name];
         if (factory) {
             plan.push({
                 name,
                 instance: factory(),
-                options: { ...config.thresholds, ...(decl.options || {}) },
+                options: decl.options ? { ...baseThresholds, ...decl.options } : baseThresholds,
                 modulePath: BUILTIN_MODULE_PATHS[name],
                 factory,
             });

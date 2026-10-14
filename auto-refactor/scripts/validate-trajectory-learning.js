@@ -584,6 +584,50 @@ function evaluateContext(rawInput: TypedContextView): any {
   assert(regIssues.length >= 1 && regIssues[0].rule === 'GOV-TRJ-001');
   console.log(`  ✔ Emitted blocking issue: ${regIssues[0].rule} -> ${regIssues[0].message}`);
 
+  // Multi-step cyclic oscillation test (A -> B -> C -> A, 3 steps)
+  const multiStepRevisions = [
+    {
+      revisionId: 'rev-01',
+      fileHash: 'state-alpha',
+      astDigest: 'ast-alpha',
+      timestamp: 1000,
+      agentUid: 'agent-1',
+      qualityScore: { compositeScore: 75, dimensions: {} },
+      ruleHitIds: [],
+    },
+    {
+      revisionId: 'rev-02',
+      fileHash: 'state-beta',
+      astDigest: 'ast-beta',
+      timestamp: 2000,
+      agentUid: 'agent-2',
+      qualityScore: { compositeScore: 78, dimensions: {} },
+      ruleHitIds: [],
+    },
+    {
+      revisionId: 'rev-03',
+      fileHash: 'state-gamma',
+      astDigest: 'ast-gamma',
+      timestamp: 3000,
+      agentUid: 'agent-3',
+      qualityScore: { compositeScore: 76, dimensions: {} },
+      ruleHitIds: [],
+    },
+    {
+      revisionId: 'rev-04',
+      fileHash: 'state-alpha',
+      astDigest: 'ast-alpha',
+      timestamp: 4000,
+      agentUid: 'agent-4',
+      qualityScore: { compositeScore: 74, dimensions: {} },
+      ruleHitIds: [],
+    },
+  ];
+  const multiStepIssues = detector.detectRegressions('src/core/dispatch.ts', multiStepRevisions);
+  assert(multiStepIssues.length >= 1 && multiStepIssues[0].rule === 'GOV-TRJ-001');
+  assert(multiStepIssues[0].message.includes('Multi-step cyclic oscillation (cycle length: 3)'));
+  console.log(`  ✔ Multi-step 3-cycle oscillation intercepted: ${multiStepIssues[0].message}`);
+
   // Gate 16: Praxis Facade SPI & Performance Benchmark
   console.log('\n[Gate 16] Verifying Praxis trajectory learning facade & latency benchmark...');
   const verdict = await service.learnFromTrajectory({ ...poolInput, churnRatio: 0.4 });

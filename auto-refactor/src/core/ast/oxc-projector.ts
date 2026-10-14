@@ -274,17 +274,19 @@ export class OxcProjector implements NodeProjector {
 
     private flattenTopLevelExports(n: OxcNode): OxcNode[] {
         const out: OxcNode[] = [];
-        for (const stmt of n.body || []) {
-            if (
-                (stmt.type === NODE_KIND_EXPORT_NAMED_DECLARATION ||
-                    stmt.type === NODE_KIND_EXPORT_DEFAULT_DECLARATION) &&
-                stmt.declaration
-            ) {
-                stmt.declaration.__exported = true;
-                stmt.declaration.__exportStart = stmt.start;
-                out.push(stmt.declaration);
-            } else {
-                out.push(stmt);
+        if (Array.isArray(n.body)) {
+            for (const stmt of n.body) {
+                if (
+                    (stmt.type === NODE_KIND_EXPORT_NAMED_DECLARATION ||
+                        stmt.type === NODE_KIND_EXPORT_DEFAULT_DECLARATION) &&
+                    stmt.declaration
+                ) {
+                    stmt.declaration.__exported = true;
+                    stmt.declaration.__exportStart = stmt.start;
+                    out.push(stmt.declaration);
+                } else {
+                    out.push(stmt);
+                }
             }
         }
         return out;
@@ -380,7 +382,9 @@ export class OxcProjector implements NodeProjector {
         if (SKIP_TYPES.has(item.type)) return true;
         if (this.tryHandleRawExport(out, item)) return true;
         if (item.type === 'TSEnumBody') {
-            for (const m of item.members || []) this.pushRaw(out, m, false);
+            if (Array.isArray(item.members)) {
+                for (const m of item.members) this.pushRaw(out, m, false);
+            }
             return true;
         }
         return false;

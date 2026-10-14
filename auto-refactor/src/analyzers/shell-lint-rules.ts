@@ -10,6 +10,30 @@
 import type { SEVERITY_INFO } from '../core/types';
 import { SEVERITY_WARNING, SEVERITY_ERROR } from '../core/types';
 
+/* ---- Rule ID constants ---- */
+
+export const RULE_SH_DEPR_001 = 'SH-DEPR-001';
+export const RULE_SH_COND_001 = 'SH-COND-001';
+export const RULE_SH_QUOTE_001 = 'SH-QUOTE-001';
+export const RULE_SH_DOC_001 = 'SH-DOC-001';
+export const RULE_PS_DOC_001 = 'PS-DOC-001';
+export const RULE_SH_EOL_001 = 'SH-EOL-001';
+export const RULE_SH_EXIT_001 = 'SH-EXIT-001';
+export const RULE_SH_TRAP_001 = 'SH-TRAP-001';
+export const RULE_PS_TRAP_001 = 'PS-TRAP-001';
+export const RULE_SH_SEC_001 = 'SH-SEC-001';
+export const RULE_PS_SEC_001 = 'PS-SEC-001';
+export const RULE_PS_SAFE_001 = 'PS-SAFE-001';
+export const RULE_SH_SAFE_001 = 'SH-SAFE-001';
+
+const SCRIPTS_DIR_FRAGMENT = '/scripts/';
+const SCRIPTS_DIR_PREFIX = 'scripts/';
+
+function isScriptDirectory(filePath: string): boolean {
+    const norm = filePath.replace(/\\/g, '/');
+    return norm.includes(SCRIPTS_DIR_FRAGMENT) || norm.startsWith(SCRIPTS_DIR_PREFIX);
+}
+
 /* ---- Shell extension detection ---- */
 
 /** Set of standard Unix shell script extensions. */
@@ -30,10 +54,7 @@ export function isShellFile(filePath: string, content: string): boolean {
     const slash = lower.lastIndexOf('/');
     const dot = lower.lastIndexOf('.');
     if (dot > slash) {
-        const ext = lower.slice(dot);
-        if (SHELL_EXTS.has(ext)) return true;
-        if (POWERSHELL_EXTS.has(ext)) return false;
-        return false;
+        return SHELL_EXTS.has(lower.slice(dot));
     }
     // Extensionless — check shebang
     return /^#!\s*\/.*(?:bash|sh|zsh|ksh)\b/.test(content.split('\n')[0] || '');
@@ -49,10 +70,7 @@ export function isPowerShellFile(filePath: string): boolean {
     const lower = filePath.toLowerCase();
     const slash = lower.lastIndexOf('/');
     const dot = lower.lastIndexOf('.');
-    if (dot > slash) {
-        return POWERSHELL_EXTS.has(lower.slice(dot));
-    }
-    return false;
+    return dot > slash ? POWERSHELL_EXTS.has(lower.slice(dot)) : false;
 }
 
 /* ---- Shell patterns ---- */
@@ -87,169 +105,63 @@ export const SHELL_DOC_HEADER_RE =
 
 /* ---- PowerShell patterns & tables ---- */
 
-export const POWERSHELL_ALIASES: Record<string, string> = {
-    ls: 'Get-ChildItem',
-    dir: 'Get-ChildItem',
-    gci: 'Get-ChildItem',
-    cd: 'Set-Location',
-    sl: 'Set-Location',
-    chdir: 'Set-Location',
-    pwd: 'Get-Location',
-    gl: 'Get-Location',
-    cp: 'Copy-Item',
-    cpi: 'Copy-Item',
-    copy: 'Copy-Item',
-    mv: 'Move-Item',
-    mi: 'Move-Item',
-    move: 'Move-Item',
-    rm: 'Remove-Item',
-    ri: 'Remove-Item',
-    del: 'Remove-Item',
-    erase: 'Remove-Item',
-    rd: 'Remove-Item',
-    rmdir: 'Remove-Item',
-    ni: 'New-Item',
-    mkdir: 'New-Item',
-    md: 'New-Item',
-    cat: 'Get-Content',
-    gc: 'Get-Content',
-    type: 'Get-Content',
-    echo: 'Write-Output',
-    write: 'Write-Output',
-    kill: 'Stop-Process',
-    spps: 'Stop-Process',
-    ps: 'Get-Process',
-    gps: 'Get-Process',
-    sort: 'Sort-Object',
-    select: 'Select-Object',
-    where: 'Where-Object',
-    '?': 'Where-Object',
-    '%': 'ForEach-Object',
-    foreach: 'ForEach-Object',
-    fl: 'Format-List',
-    ft: 'Format-Table',
-    fw: 'Format-Wide',
-    fc: 'Format-Custom',
-    tee: 'Tee-Object',
-    sleep: 'Start-Sleep',
-    start: 'Start-Process',
-    saps: 'Start-Process',
-    iex: 'Invoke-Expression',
-    ii: 'Invoke-Item',
-    gp: 'Get-ItemProperty',
-    sp: 'Set-ItemProperty',
-    gi: 'Get-Item',
-    si: 'Set-Item',
-    cls: 'Clear-Host',
-    clear: 'Clear-Host',
-    h: 'Get-History',
-    history: 'Get-History',
-    r: 'Invoke-History',
-    ihy: 'Invoke-History',
-    get: 'Get-Content',
-};
+const ALIAS_GROUPS: ReadonlyArray<[string, string]> = [
+    ['Get-ChildItem', 'ls dir gci'],
+    ['Set-Location', 'cd sl chdir'],
+    ['Get-Location', 'pwd gl'],
+    ['Copy-Item', 'cp cpi copy'],
+    ['Move-Item', 'mv mi move'],
+    ['Remove-Item', 'rm ri del erase rd rmdir'],
+    ['New-Item', 'ni mkdir md'],
+    ['Get-Content', 'cat gc type get'],
+    ['Write-Output', 'echo write'],
+    ['Stop-Process', 'kill spps'],
+    ['Get-Process', 'ps gps'],
+    ['Sort-Object', 'sort'],
+    ['Select-Object', 'select'],
+    ['Where-Object', 'where ?'],
+    ['ForEach-Object', '% foreach'],
+    ['Format-List', 'fl'],
+    ['Format-Table', 'ft'],
+    ['Format-Wide', 'fw'],
+    ['Format-Custom', 'fc'],
+    ['Tee-Object', 'tee'],
+    ['Start-Sleep', 'sleep'],
+    ['Start-Process', 'start saps'],
+    ['Invoke-Expression', 'iex'],
+    ['Invoke-Item', 'ii'],
+    ['Get-ItemProperty', 'gp'],
+    ['Set-ItemProperty', 'sp'],
+    ['Get-Item', 'gi'],
+    ['Set-Item', 'si'],
+    ['Clear-Host', 'cls clear'],
+    ['Get-History', 'h history'],
+    ['Invoke-History', 'r ihy'],
+];
 
-export const PS_APPROVED_VERBS = new Set([
-    'Add',
-    'Approve',
-    'Assert',
-    'Backup',
-    'Block',
-    'Build',
-    'Checkpoint',
-    'Clear',
-    'Close',
-    'Compare',
-    'Complete',
-    'Compress',
-    'Confirm',
-    'Connect',
-    'Convert',
-    'ConvertFrom',
-    'ConvertTo',
-    'Copy',
-    'Debug',
-    'Deny',
-    'Disable',
-    'Disconnect',
-    'Dismount',
-    'Edit',
-    'Enable',
-    'Enter',
-    'Exit',
-    'Expand',
-    'Export',
-    'Find',
-    'Format',
-    'Get',
-    'Grant',
-    'Group',
-    'Hide',
-    'Import',
-    'Initialize',
-    'Install',
-    'Invoke',
-    'Join',
-    'Limit',
-    'Lock',
-    'Measure',
-    'Merge',
-    'Mount',
-    'Move',
-    'New',
-    'Open',
-    'Optimize',
-    'Out',
-    'Ping',
-    'Pop',
-    'Protect',
-    'Publish',
-    'Push',
-    'Put',
-    'Read',
-    'Receive',
-    'Redo',
-    'Register',
-    'Remove',
-    'Rename',
-    'Repair',
-    'Request',
-    'Reset',
-    'Resize',
-    'Resolve',
-    'Restart',
-    'Restore',
-    'Resume',
-    'Revoke',
-    'Save',
-    'Search',
-    'Select',
-    'Send',
-    'Set',
-    'Show',
-    'Skip',
-    'Split',
-    'Start',
-    'Step',
-    'Stop',
-    'Submit',
-    'Suspend',
-    'Switch',
-    'Sync',
-    'Test',
-    'Trace',
-    'Undo',
-    'Uninstall',
-    'Unlock',
-    'Unprotect',
-    'Unpublish',
-    'Unregister',
-    'Update',
-    'Use',
-    'Wait',
-    'Watch',
-    'Write',
-]);
+function buildAliasMap(): Record<string, string> {
+    const map: Record<string, string> = {};
+    for (const [cmdlet, aliases] of ALIAS_GROUPS) {
+        for (const alias of aliases.split(' ')) {
+            map[alias] = cmdlet;
+        }
+    }
+    return Object.freeze(map);
+}
+
+export const POWERSHELL_ALIASES: Record<string, string> = buildAliasMap();
+
+const PS_VERB_TOKENS =
+    'Add Approve Assert Backup Block Build Checkpoint Clear Close Compare Complete Compress ' +
+    'Confirm Connect Convert ConvertFrom ConvertTo Copy Debug Deny Disable Disconnect Dismount ' +
+    'Edit Enable Enter Exit Expand Export Find Format Get Grant Group Hide Import Initialize ' +
+    'Install Invoke Join Limit Lock Measure Merge Mount Move New Open Optimize Out Ping Pop ' +
+    'Protect Publish Push Put Read Receive Redo Register Remove Rename Repair Request Reset ' +
+    'Resize Resolve Restart Restore Resume Revoke Save Search Select Send Set Show Skip Split ' +
+    'Start Step Stop Submit Suspend Switch Sync Test Trace Undo Uninstall Unlock Unprotect ' +
+    'Unpublish Unregister Update Use Wait Watch Write';
+
+export const PS_APPROVED_VERBS = new Set(PS_VERB_TOKENS.split(' '));
 
 export const PS_FUNCTION_RE = /^\s*function\s+([A-Za-z][A-Za-z0-9_-]*)\s*(?:\(\))?\s*\{?/;
 export const PS_CMDLET_BINDING_RE = /\[CmdletBinding\s*\(\s*\)\]/;
@@ -289,6 +201,13 @@ export interface PowerShellScanState {
     hasUntypedParam: boolean;
 }
 
+export interface ShellLineScanContext {
+    raw: string;
+    trimmed: string;
+    maskedTrimmed: string;
+    lineIndex: number;
+}
+
 /* ---- Scan Helper Functions ---- */
 
 /**
@@ -321,24 +240,44 @@ export function scanStrictErrorFlags(maskedLines: string[]): {
 /**
  * Checks for deprecated shell syntax (`...` backticks and single bracket tests).
  *
- * @param line - Raw line text.
- * @param trimmed - Trimmed line text.
+ * @param lineOrCtx - Raw line text or structured ShellLineScanContext.
+ * @param trimmedOrEmit - Trimmed line text or issue callback when context is passed.
  * @param maskedTrimmed - Masked trimmed line text.
- * @param i - 0-based line index.
- * @param emit - Issue emission callback.
+ * @param lineIndex - 0-based line index.
+ * @param emitter - Issue emission callback.
  */
 export function checkDeprecatedSyntax(
-    line: string,
-    trimmed: string,
-    maskedTrimmed: string,
-    i: number,
-    emit: ShellEmitter,
+    lineOrCtx: string | ShellLineScanContext,
+    trimmedOrEmit?: string | ShellEmitter,
+    maskedTrimmed?: string,
+    lineIndex?: number,
+    emitter?: ShellEmitter,
 ): void {
-    if (BACKTICK_CMD_RE.test(line) && !/^['"]/.test(trimmed)) {
-        if (maskedTrimmed.includes('`')) {
+    let raw: string;
+    let trimmed: string;
+    let masked: string;
+    let idx: number;
+    let emit: ShellEmitter;
+
+    if (typeof lineOrCtx === 'object' && lineOrCtx !== null) {
+        raw = lineOrCtx.raw;
+        trimmed = lineOrCtx.trimmed;
+        masked = lineOrCtx.maskedTrimmed;
+        idx = lineOrCtx.lineIndex;
+        emit = trimmedOrEmit as ShellEmitter;
+    } else {
+        raw = lineOrCtx;
+        trimmed = trimmedOrEmit as string;
+        masked = maskedTrimmed || '';
+        idx = lineIndex || 0;
+        emit = emitter!;
+    }
+
+    if (BACKTICK_CMD_RE.test(raw) && !/^['"]/.test(trimmed)) {
+        if (masked.includes('`')) {
             emit(
-                i,
-                'SH-DEPR-001',
+                idx,
+                RULE_SH_DEPR_001,
                 'Backtick command substitution is deprecated: use $(...) instead.',
                 SEVERITY_WARNING,
                 'Replace `` `cmd` `` with `$(cmd)` — it nests cleanly and is easier to read.',
@@ -347,11 +286,11 @@ export function checkDeprecatedSyntax(
         }
     }
 
-    if (DEPRECATED_TEST_RE.test(maskedTrimmed) && !MODERN_TEST_RE.test(maskedTrimmed)) {
-        if (/\[[^\]]*\]/.test(maskedTrimmed)) {
+    if (DEPRECATED_TEST_RE.test(masked) && !MODERN_TEST_RE.test(masked)) {
+        if (/\[[^\]]*\]/.test(masked)) {
             emit(
-                i,
-                'SH-DEPR-001',
+                idx,
+                RULE_SH_DEPR_001,
                 'The `[` test command is fragile; use `[[` for safer string/number tests.',
                 SEVERITY_WARNING,
                 'Use `[[ ... ]]` instead of `[ ... ]` — it handles empty variables safely and supports pattern matching.',
@@ -370,13 +309,13 @@ export function checkDeprecatedSyntax(
  *
  * @param trimmed - Trimmed line text.
  * @param _maskedTrimmed - Masked trimmed line text.
- * @param i - 0-based line index.
+ * @param lineIndex - 0-based line index.
  * @param emit - Issue emission callback.
  */
 export function checkShellConditionSyntax(
     trimmed: string,
     _maskedTrimmed: string,
-    i: number,
+    lineIndex: number,
     emit: ShellEmitter,
 ): void {
     if (!/\[\s+.+\s+\]/.test(trimmed) || /\[\[/.test(trimmed)) {
@@ -390,8 +329,8 @@ export function checkShellConditionSyntax(
 
     if (/=~/.test(inner)) {
         emit(
-            i,
-            'SH-COND-001',
+            lineIndex,
+            RULE_SH_COND_001,
             'Regex operator `=~` is invalid inside single brackets `[ ... ]`; use `[[ ... ]]`.',
             SEVERITY_ERROR,
             'Upgrade condition to `[[ ... =~ ... ]]` to enable regex pattern matching.',
@@ -399,8 +338,8 @@ export function checkShellConditionSyntax(
         );
     } else if (/(?:&&|\|\|)/.test(inner)) {
         emit(
-            i,
-            'SH-COND-001',
+            lineIndex,
+            RULE_SH_COND_001,
             'Logical `&&` / `||` inside single brackets `[ ... ]` causes syntax errors; use `[[ ... ]]`.',
             SEVERITY_ERROR,
             'Upgrade condition to `[[ ... && ... ]]` or use separate test invocations.',
@@ -408,8 +347,8 @@ export function checkShellConditionSyntax(
         );
     } else if (/(?:^|\s)==(?:\s|$)/.test(inner)) {
         emit(
-            i,
-            'SH-COND-001',
+            lineIndex,
+            RULE_SH_COND_001,
             'Equality operator `==` inside single brackets `[ ... ]` violates POSIX portability.',
             SEVERITY_WARNING,
             'Use single `=` inside `[ ... ]` for portability, or upgrade to `[[ ... == ... ]]`.',
@@ -423,13 +362,13 @@ export function checkShellConditionSyntax(
  *
  * @param _line - Raw line text.
  * @param maskedTrimmed - Masked trimmed line text.
- * @param i - 0-based line index.
+ * @param lineIndex - 0-based line index.
  * @param emit - Issue emission callback.
  */
 export function checkUnquotedVariables(
     _line: string,
     maskedTrimmed: string,
-    i: number,
+    lineIndex: number,
     emit: ShellEmitter,
 ): void {
     if (/^\s*[A-Za-z_][A-Za-z0-9_]*=/.test(maskedTrimmed)) return;
@@ -446,17 +385,15 @@ export function checkUnquotedVariables(
         const filtered = matches.filter((m) => {
             const inner = m.match(/\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?/);
             if (!inner) return false;
-            const name = inner[1];
-            if (name.length === 1) return false;
-            return true;
+            return inner[1].length !== 1;
         });
 
         if (filtered.length > 0) {
             const varMatch = filtered[0].match(/\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?/);
             const varName = varMatch ? varMatch[1] : 'var';
             emit(
-                i,
-                'SH-QUOTE-001',
+                lineIndex,
+                RULE_SH_QUOTE_001,
                 `Variable \`$${varName}\` may be unquoted: word-splitting will break values with spaces.`,
                 SEVERITY_WARNING,
                 `Wrap the reference in double quotes: \`"$${varName}"\` to preserve spaces and special characters.`,
@@ -474,9 +411,7 @@ export function checkUnquotedVariables(
  * @param emit - Issue emission callback.
  */
 export function checkShellDocContract(lines: string[], filePath: string, emit: ShellEmitter): void {
-    const norm = filePath.replace(/\\/g, '/');
-    const isScriptDir = norm.includes('/scripts/') || norm.startsWith('scripts/');
-    if (lines.length < 30 && !isScriptDir) return;
+    if (lines.length < 30 && !isScriptDirectory(filePath)) return;
 
     const maxScan = Math.min(lines.length, 30);
     for (let i = 0; i < maxScan; i++) {
@@ -485,7 +420,7 @@ export function checkShellDocContract(lines: string[], filePath: string, emit: S
 
     emit(
         0,
-        'SH-DOC-001',
+        RULE_SH_DOC_001,
         'Shell script lacks standard module documentation contract header.',
         SEVERITY_WARNING,
         'Add a standard module header (# Module:, # Description:, # Usage:) near the top.',
@@ -505,9 +440,7 @@ export function checkPowerShellDocContract(
     filePath: string,
     emit: ShellEmitter,
 ): void {
-    const norm = filePath.replace(/\\/g, '/');
-    const isScriptDir = norm.includes('/scripts/') || norm.startsWith('scripts/');
-    if (lines.length < 30 && !isScriptDir) return;
+    if (lines.length < 30 && !isScriptDirectory(filePath)) return;
 
     const maxScan = Math.min(lines.length, 30);
     for (let i = 0; i < maxScan; i++) {
@@ -516,7 +449,7 @@ export function checkPowerShellDocContract(
 
     emit(
         0,
-        'PS-DOC-001',
+        RULE_PS_DOC_001,
         'PowerShell script lacks standard documentation header (.SYNOPSIS/.DESCRIPTION or Module header).',
         SEVERITY_WARNING,
         'Add standard comment help (<# .SYNOPSIS ... .DESCRIPTION ... #>) or module metadata at script start.',
@@ -534,7 +467,7 @@ export function checkShellLineEndings(content: string, emit: ShellEmitter): void
     if (content.includes('\r')) {
         emit(
             0,
-            'SH-EOL-001',
+            RULE_SH_EOL_001,
             'Shell script contains CRLF (\\r\\n) line endings; execution will fail on POSIX/containers.',
             SEVERITY_ERROR,
             'Convert line endings from CRLF to LF using dos2unix or your editor line-ending setting.',
@@ -561,7 +494,7 @@ export function checkShellStrictExitCapture(
     if (SH_PREDICATE_COMMANDS_RE.test(trimmed) && !SH_EXIT_GUARD_RE.test(trimmed)) {
         emit(
             lineIdx,
-            'SH-EXIT-001',
+            RULE_SH_EXIT_001,
             'Command expected to return non-zero exit codes executed bare under `set -e`, risking early abort.',
             SEVERITY_WARNING,
             'Capture exit status explicitly: `STATUS=0; cmd || STATUS=$?` or wrap in `if cmd; then`.',
@@ -601,7 +534,7 @@ export function checkShellResourceCleanup(
     if (hasResource && !hasTrap) {
         emit(
             resourceLine,
-            'SH-TRAP-001',
+            RULE_SH_TRAP_001,
             'Temporary file/directory created without registering EXIT cleanup trap.',
             SEVERITY_ERROR,
             'Register a cleanup trap immediately after creating temporary resources: `trap \'rm -rf "$TMP"\' EXIT`.',
@@ -639,7 +572,7 @@ export function checkPowerShellResourceDisposal(
     if (handleLine !== -1 && !hasFinally) {
         emit(
             handleLine,
-            'PS-TRAP-001',
+            RULE_PS_TRAP_001,
             'Critical system handle created without try-finally resource disposal.',
             SEVERITY_WARNING,
             'Wrap handle usage in `try { ... } finally { $handle.Dispose() }` to guarantee release.',
@@ -663,7 +596,7 @@ export function checkShellDynamicSecurity(
     if (SH_EVAL_DYNAMIC_RE.test(trimmed)) {
         emit(
             lineIdx,
-            'SH-SEC-001',
+            RULE_SH_SEC_001,
             'Dynamic `eval` with variable expansion risks arbitrary command injection.',
             SEVERITY_ERROR,
             'Use an array invocation (`"${CMD[@]}"`) or direct function dispatch instead of dynamic eval.',
@@ -687,7 +620,7 @@ export function checkPowerShellDynamicSecurity(
     if (PS_IEX_DYNAMIC_RE.test(trimmed)) {
         emit(
             lineIdx,
-            'PS-SEC-001',
+            RULE_PS_SEC_001,
             'Dynamic `Invoke-Expression` (iex) with variable input risks arbitrary code injection.',
             SEVERITY_ERROR,
             'Use the call operator (`& $cmd @params`) or script block invocation instead of Invoke-Expression.',
@@ -699,24 +632,44 @@ export function checkPowerShellDynamicSecurity(
 /**
  * Checks for interactive input without guard in PowerShell (PS-SAFE-001).
  *
- * @param trimmed - Trimmed raw line.
- * @param maskedTrimmed - Masked trimmed line text.
- * @param lineIdx - 0-based line index.
- * @param hasInteractiveGuard - Whether the script contains an interactive environment check.
- * @param emit - Issue emission callback.
+ * @param trimmedOrCtx - Trimmed raw line or structured line scan context.
+ * @param maskedOrGuard - Masked line text or guard status when context is passed.
+ * @param lineIdxOrEmit - Line index or emitter when context is passed.
+ * @param hasGuard - Guard status when discrete parameters are passed.
+ * @param emit - Issue emission callback when discrete parameters are passed.
  */
-export function checkPowerShellInteractiveSafety(
-    trimmed: string,
-    maskedTrimmed: string,
-    lineIdx: number,
-    hasInteractiveGuard: boolean,
-    emit: ShellEmitter,
+export function checkPsInteractiveSafety(
+    trimmedOrCtx: string | ShellLineScanContext,
+    maskedOrGuard: string | boolean,
+    lineIdxOrEmit?: number | ShellEmitter,
+    hasGuard?: boolean,
+    emit?: ShellEmitter,
 ): void {
+    let trimmed: string;
+    let maskedTrimmed: string;
+    let lineIdx: number;
+    let hasInteractiveGuard: boolean;
+    let emitter: ShellEmitter;
+
+    if (typeof trimmedOrCtx === 'object' && trimmedOrCtx !== null) {
+        trimmed = trimmedOrCtx.trimmed;
+        maskedTrimmed = trimmedOrCtx.maskedTrimmed;
+        lineIdx = trimmedOrCtx.lineIndex;
+        hasInteractiveGuard = Boolean(maskedOrGuard);
+        emitter = lineIdxOrEmit as ShellEmitter;
+    } else {
+        trimmed = trimmedOrCtx;
+        maskedTrimmed = maskedOrGuard as string;
+        lineIdx = lineIdxOrEmit as number;
+        hasInteractiveGuard = Boolean(hasGuard);
+        emitter = emit!;
+    }
+
     if (hasInteractiveGuard) return;
     if (PS_INTERACTIVE_RE.test(maskedTrimmed)) {
-        emit(
+        emitter(
             lineIdx,
-            'PS-SAFE-001',
+            RULE_PS_SAFE_001,
             'Interactive input cmdlet used without non-interactive terminal guard.',
             SEVERITY_ERROR,
             'Guard interactive input with `if ([Environment]::UserInteractive -and -not [Console]::IsOutputRedirected)` or support `-Force`.',
@@ -725,29 +678,52 @@ export function checkPowerShellInteractiveSafety(
     }
 }
 
+/** Backward-compatible alias for checkPsInteractiveSafety. */
+export const checkPowerShellInteractiveSafety = checkPsInteractiveSafety;
+
 /**
  * Checks for interactive read without timeout or TTY guard in Shell (SH-SAFE-001).
  *
- * @param trimmed - Trimmed raw line.
- * @param maskedTrimmed - Masked trimmed line text.
- * @param lineIdx - 0-based line index.
- * @param hasTtyGuard - Whether script checks for a tty.
- * @param emit - Issue emission callback.
+ * @param trimmedOrCtx - Trimmed raw line or structured line scan context.
+ * @param maskedOrGuard - Masked line text or guard status when context is passed.
+ * @param lineIdxOrEmit - Line index or emitter when context is passed.
+ * @param hasGuard - TTY guard status when discrete parameters are passed.
+ * @param emit - Issue emission callback when discrete parameters are passed.
  */
 export function checkShellInteractiveSafety(
-    trimmed: string,
-    maskedTrimmed: string,
-    lineIdx: number,
-    hasTtyGuard: boolean,
-    emit: ShellEmitter,
+    trimmedOrCtx: string | ShellLineScanContext,
+    maskedOrGuard: string | boolean,
+    lineIdxOrEmit?: number | ShellEmitter,
+    hasGuard?: boolean,
+    emit?: ShellEmitter,
 ): void {
+    let trimmed: string;
+    let maskedTrimmed: string;
+    let lineIdx: number;
+    let hasTtyGuard: boolean;
+    let emitter: ShellEmitter;
+
+    if (typeof trimmedOrCtx === 'object' && trimmedOrCtx !== null) {
+        trimmed = trimmedOrCtx.trimmed;
+        maskedTrimmed = trimmedOrCtx.maskedTrimmed;
+        lineIdx = trimmedOrCtx.lineIndex;
+        hasTtyGuard = Boolean(maskedOrGuard);
+        emitter = lineIdxOrEmit as ShellEmitter;
+    } else {
+        trimmed = trimmedOrCtx;
+        maskedTrimmed = maskedOrGuard as string;
+        lineIdx = lineIdxOrEmit as number;
+        hasTtyGuard = Boolean(hasGuard);
+        emitter = emit!;
+    }
+
     if (hasTtyGuard) return;
     if (/^\s*while\b.*?\bread\b/.test(maskedTrimmed)) return;
     if (/<<<|<<|<[a-zA-Z0-9_\/"'$]/.test(maskedTrimmed)) return;
     if (SH_READ_INTERACTIVE_RE.test(maskedTrimmed) && !/\s-t\s+\d+/.test(maskedTrimmed)) {
-        emit(
+        emitter(
             lineIdx,
-            'SH-SAFE-001',
+            RULE_SH_SAFE_001,
             'Interactive `read` without timeout risks hanging unattended CI/Agent subprocesses.',
             SEVERITY_ERROR,
             'Add a timeout flag (`read -t 10`) or verify terminal interactivity with `[[ -t 0 ]]` before prompting.',

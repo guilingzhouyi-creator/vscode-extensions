@@ -187,6 +187,50 @@ function computeAffinityScore(
  * @param weights - Optional custom weights.
  * @returns Frozen SparseActivationResult.
  */
+function appendMatchedAnalyzer(
+    matched: string[] | undefined,
+    aId: string,
+): string[] {
+    if (matched !== undefined) {
+        matched.push(aId);
+        return matched;
+    }
+    return [aId];
+}
+
+function matchFileAnalyzers(
+    entry: AuditIndexEntry,
+    availableAnalyzers: readonly string[],
+    isChanged: boolean,
+    isNeighbor: boolean,
+    scopeDecision: AuditScopeDecision,
+    threshold: number,
+    weights: typeof DEFAULT_ACTIVATION_WEIGHTS,
+    activatedSet: Set<string>,
+    rationaleMap: Record<string, string>,
+): string[] | undefined {
+    let matched: string[] | undefined;
+    for (const aId of availableAnalyzers) {
+        const score = computeAffinityScore(
+            aId,
+            entry,
+            isChanged,
+            isNeighbor,
+            scopeDecision,
+            weights,
+        );
+        if (score >= threshold) {
+            matched = appendMatchedAnalyzer(matched, aId);
+            activatedSet.add(aId);
+            if (!rationaleMap[aId]) {
+                rationaleMap[aId] =
+                    `Activated with affinity ${score} on ${entry.role} (${entry.lang})`;
+            }
+        }
+    }
+    return matched;
+}
+
 export function activateSparseAnalyzers(
     availableAnalyzers: readonly string[],
     fileEntries: readonly AuditIndexEntry[],
@@ -202,31 +246,18 @@ export function activateSparseAnalyzers(
 
     for (const entry of fileEntries) {
         const fPath = entry.filePath;
-        const isChanged = changedFiles.has(fPath);
-        const isNeighbor = neighborFiles.has(fPath);
-        const matchedAnalyzers: string[] = [];
-
-        for (const aId of availableAnalyzers) {
-            const score = computeAffinityScore(
-                aId,
-                entry,
-                isChanged,
-                isNeighbor,
-                scopeDecision,
-                weights,
-            );
-
-            if (score >= threshold) {
-                matchedAnalyzers.push(aId);
-                activatedSet.add(aId);
-                if (!rationaleMap[aId]) {
-                    rationaleMap[aId] =
-                        `Activated with affinity ${score} on ${entry.role} (${entry.lang})`;
-                }
-            }
-        }
-
-        if (matchedAnalyzers.length > 0) {
+        const matchedAnalyzers = matchFileAnalyzers(
+            entry,
+            availableAnalyzers,
+            changedFiles.has(fPath),
+            neighborFiles.has(fPath),
+            scopeDecision,
+            threshold,
+            weights,
+            activatedSet,
+            rationaleMap,
+        );
+        if (matchedAnalyzers) {
             fileAnalyzerMap[fPath] = matchedAnalyzers;
         }
     }

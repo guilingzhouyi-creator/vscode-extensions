@@ -20,6 +20,8 @@ import type {
 } from './types';
 import { DEFAULT_ALLOWED_DEPENDENCIES } from './types';
 
+const EMPTY_EXPORTS: readonly string[] = Object.freeze([]);
+
 /**
  * File descriptor used for building the architecture graph.
  */
@@ -48,6 +50,13 @@ function isPrivateInternalPath(importPath: string): boolean {
         importPath.includes('/impl/') ||
         importPath.includes('/private/')
     );
+}
+
+function resolveFileExports(file: SourceArchitectureFile): string[] {
+    if (file.exports && file.exports.length > 0) {
+        return file.exports;
+    }
+    return EMPTY_EXPORTS as unknown as string[];
 }
 
 /**
@@ -208,13 +217,12 @@ export class SemanticArchitectureGraph {
         // 1. Create nodes
         for (const file of files) {
             const filePath = normalizePath(file.filePath);
-            const inference = inferSystemTopologyRole(
-                filePath,
-                file.imports,
-                file.exports || [],
-                file.content,
-                options,
-            );
+            const exportsList = resolveFileExports(file);
+            const inference = inferSystemTopologyRole(filePath, file.imports, {
+                exports: exportsList,
+                content: file.content,
+                ...options,
+            });
             const domainName = extractDomainName(filePath);
 
             archGraph.addNode({
@@ -225,7 +233,7 @@ export class SemanticArchitectureGraph {
                 domainName,
                 inferredReasons: inference.reasons,
                 imports: file.imports,
-                exports: file.exports || [],
+                exports: exportsList,
                 hasDirectConfigAccess: file.hasDirectConfigAccess ?? false,
                 hasGlobalMutableState: file.hasGlobalMutableState ?? false,
             });
@@ -324,7 +332,11 @@ function populateArchitectureNodes(
     for (const [filePath, { imports, exports }] of fileMap.entries()) {
         const importList = Array.from(imports);
         const exportList = Array.from(exports);
-        const inference = inferSystemTopologyRole(filePath, importList, exportList, '', options);
+        const inference = inferSystemTopologyRole(filePath, importList, {
+            exports: exportList,
+            content: '',
+            ...options,
+        });
         const domainName = extractDomainName(filePath);
 
         archGraph.addNode({

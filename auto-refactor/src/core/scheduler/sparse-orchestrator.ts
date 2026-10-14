@@ -167,6 +167,25 @@ export class SparseOrchestrator {
         return { findings: findingsForFile, cacheHit: false };
     }
 
+    private async collectPartitionIssues(
+        partition: ReviewPartition,
+        fileContents: Map<string, string>,
+        onCacheHit: () => void,
+        onProcessedUnit: () => Promise<void>,
+    ): Promise<Issue[]> {
+        const partitionFindings: Issue[] = [];
+        for (const file of partition.primaryFiles) {
+            const content = fileContents.get(file) ?? '';
+            const fileResult = await this.analyzeFileInPartition(file, content, partition);
+            if (fileResult.cacheHit) {
+                onCacheHit();
+            }
+            partitionFindings.push(...fileResult.findings);
+            await onProcessedUnit();
+        }
+        return partitionFindings;
+    }
+
     private async executeLocalAnalysis(
         partitions: ReviewPartition[],
         fileContents: Map<string, string>,
@@ -182,22 +201,18 @@ export class SparseOrchestrator {
         let processedUnits = 0;
 
         for (const partition of partitions) {
-            const partitionFindings: Issue[] = [];
             const partitionStart = Date.now();
-
-            for (const file of partition.primaryFiles) {
-                const content = fileContents.get(file) ?? '';
-                const fileResult = await this.analyzeFileInPartition(file, content, partition);
-                if (fileResult.cacheHit) {
-                    cacheHits++;
-                }
-                partitionFindings.push(...fileResult.findings);
-
-                processedUnits++;
-                if (processedUnits % 15 === 0) {
-                    await cooperativeYield();
-                }
-            }
+            const partitionFindings = await this.collectPartitionIssues(
+                partition,
+                fileContents,
+                () => { cacheHits++; },
+                async () => {
+                    processedUnits++;
+                    if (processedUnits % 15 === 0) {
+                        await cooperativeYield();
+                    }
+                },
+            );
 
             resultBus.push({
                 partitionId: partition.id,

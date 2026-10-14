@@ -23,10 +23,27 @@ import { toCanonicalRuleId as normalizeToCanonicalRuleId } from './topic-catalog
 import { RULE_ID_PATTERN } from './types';
 
 /**
+ * Sunset target version for legacy rule aliases under 4D-ECE lifecycle governance.
+ * In accordance with forward-evolution axioms, all legacy forms are scheduled for retirement.
+ */
+export const LEGACY_RULE_SUNSET_VERSION = 'v0.5.0';
+
+/**
+ * Metadata descriptor for retired and transitioning legacy rule aliases.
+ */
+export interface LegacyRuleAliasMetadata {
+    readonly canonicalId: string;
+    readonly sunsetVersion: string;
+    readonly isDeprecated: boolean;
+}
+
+/**
  * Canonical replacement for each legacy id.
  *
  * Families follow the owning analyzer's existing canonical family (`ARCH`, `DEP`, `SEC`, …) so a
  * renamed rule stays grouped with its siblings in reports and documentation.
+ *
+ * @deprecated All aliases mapped here are scheduled for retirement at {@link LEGACY_RULE_SUNSET_VERSION}.
  */
 export const LEGACY_RULE_ALIASES: Readonly<Record<string, string>> = Object.freeze({
     'analyzer-error': 'ENG-RUN-001',
@@ -45,6 +62,24 @@ export const LEGACY_RULE_ALIASES: Readonly<Record<string, string>> = Object.free
     'unused-export': 'DEP-UNX-001',
     'unused-module': 'DEP-UNM-001',
 });
+
+/**
+ * Query lifecycle metadata for a given rule alias candidate under 4D-ECE governance.
+ *
+ * @param id - Potential legacy alias identifier.
+ * @returns Metadata descriptor or undefined if id is not a legacy alias.
+ */
+export function getLegacyRuleMetadata(id: string): LegacyRuleAliasMetadata | undefined {
+    const canonicalId = LEGACY_RULE_ALIASES[id];
+    if (!canonicalId) {
+        return undefined;
+    }
+    return {
+        canonicalId,
+        sunsetVersion: LEGACY_RULE_SUNSET_VERSION,
+        isDeprecated: true,
+    };
+}
 
 /**
  * Resolve any rule id to the canonical id that decides its identity.

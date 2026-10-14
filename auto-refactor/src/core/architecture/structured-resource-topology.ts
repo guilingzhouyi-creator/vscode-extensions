@@ -217,6 +217,26 @@ function recordPairCoOccurrences(
 }
 
 /**
+ * Appends a caller path to the inverted symbol index, allocating a bucket only on first encounter.
+ *
+ * @param inverted - Inverted symbol index map.
+ * @param sym - Symbol identifier.
+ * @param callerPath - Caller path importing the symbol.
+ */
+function appendInvertedCaller(
+    inverted: Map<string, string[]>,
+    sym: string,
+    callerPath: string,
+): void {
+    const list = inverted.get(sym);
+    if (list !== undefined) {
+        list.push(callerPath);
+        return;
+    }
+    inverted.set(sym, [callerPath]);
+}
+
+/**
  * Construct an inverted symbol caller index and sparse co-occurrence graph edges.
  *
  * @param callerImports - Readonly array of caller paths and their imported symbols.
@@ -234,9 +254,7 @@ export function buildSparseCallerGraph(
     const inverted = new Map<string, string[]>();
     for (const entry of callerImports) {
         for (const sym of entry.importedSymbols) {
-            const list = inverted.get(sym) ?? [];
-            list.push(entry.callerPath);
-            inverted.set(sym, list);
+            appendInvertedCaller(inverted, sym, entry.callerPath);
         }
     }
 

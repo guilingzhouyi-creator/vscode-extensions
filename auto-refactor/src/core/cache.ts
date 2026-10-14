@@ -80,6 +80,22 @@ const PROJECT_HASH_HEX_CHARS = 24;
 const HOURS_PER_DAY = 24;
 const SECONDS_PER_HOUR = 3600;
 const MILLIS_PER_SECOND = 1000;
+const EMPTY_METADATA_ISSUES: Issue[] = Object.freeze([]) as unknown as Issue[];
+
+const FILE_MANIFEST_JSON = 'manifest.json';
+const FILE_FINGERPRINTS_JSONL = 'fingerprints.jsonl';
+const FILE_RESULTS_JSONL = 'results.jsonl';
+const FILE_PATHS_JSONL = 'paths.jsonl';
+const DEFAULT_CACHE_DIR_NAME = '.auto-refactor-cache';
+
+const CACHE_LOAD_LEVEL_FULL = 'full';
+const CACHE_LOAD_LEVEL_HOT = 'hot';
+const CACHE_LOAD_LEVEL_METADATA = 'metadata';
+const CACHE_LOAD_LEVEL_DISABLED = 'disabled';
+
+const SEVERITY_STR_ERROR = 'error';
+const RETENTION_HOT_DAYS = 7;
+const REFRESH_TIMESTAMP_INTERVAL_MS = 60_000;
 
 /**
  * Computes a deterministic truncated SHA-256 hash identifying a project root.
@@ -111,13 +127,13 @@ export class CacheStore {
     private readonly resultsPath: string;
     private readonly pathsPath: string;
     private loaded = false;
-    private l2LoadLevel: 'full' | 'hot' | 'metadata' | 'disabled' = 'full';
+    private l2LoadLevel: 'full' | 'hot' | 'metadata' | 'disabled' = CACHE_LOAD_LEVEL_FULL;
     private readonly logger?: Logger;
 
     constructor(dir?: string, root?: string, opts: CacheStoreOptions = {}) {
         const projectRoot = root || process.cwd();
-        const explicit = dir || path.join(projectRoot, '.auto-refactor-cache');
-        const isDefaultLayout = path.basename(path.resolve(explicit)) === '.auto-refactor-cache';
+        const explicit = dir || path.join(projectRoot, DEFAULT_CACHE_DIR_NAME);
+        const isDefaultLayout = path.basename(path.resolve(explicit)) === DEFAULT_CACHE_DIR_NAME;
         this.dir = isDefaultLayout
             ? path.resolve(explicit)
             : path.join(path.resolve(explicit), projectHashFor(projectRoot));
@@ -125,53 +141,54 @@ export class CacheStore {
         this.maxAgeDays = opts.maxAgeDays ?? DEFAULT_MAX_AGE_DAYS;
         this.maxL2LoadBytes = opts.maxL2LoadBytes ?? DEFAULT_MAX_L2_LOAD_BYTES;
         this.logger = opts.logger;
-        this.manifestPath = path.join(this.dir, 'manifest.json');
-        this.fingerprintsPath = path.join(this.dir, 'fingerprints.jsonl');
-        this.resultsPath = path.join(this.dir, 'results.jsonl');
-        this.pathsPath = path.join(this.dir, 'paths.jsonl');
+        this.manifestPath = path.join(this.dir, FILE_MANIFEST_JSON);
+        this.fingerprintsPath = path.join(this.dir, FILE_FINGERPRINTS_JSONL);
+        this.resultsPath = path.join(this.dir, FILE_RESULTS_JSONL);
+        this.pathsPath = path.join(this.dir, FILE_PATHS_JSONL);
         if (opts.disabled === true) {
             this.enabled = false;
             return;
         }
-        this.enabled = this.init();
-        if (this.enabled) this.load();
+        this.enabled = this.initializeCache();
+        if (this.enabled) this.loadCacheFromDisk();
     }
 
-    private init(): boolean {
+    private initializeCache(): boolean {
         try {
             fs.mkdirSync(this.dir, { recursive: true });
         } catch {
             return false;
         }
         if (!probeWritable(this.dir)) return false;
-        return this.rebuildOrAdoptManifest();
+        return this.adoptOrRebuildManifest();
     }
 
-    private rebuildOrAdoptManifest(): boolean {
+    private adoptOrRebuildManifest(): boolean {
         try {
             const raw = readTextFileSync(this.manifestPath);
-            const m = JSON.parse(raw);
+            const parsedManifest = JSON.parse(raw);
             if (
-                m &&
-                m.formatVersion === CACHE_FORMAT_VERSION &&
-                typeof m.toolVersion === TYPEOF_STRING &&
-                typeof m.maxEntries === TYPEOF_NUMBER &&
-                typeof m.maxAgeDays === TYPEOF_NUMBER
+                parsedManifest &&
+                parsedManifest.formatVersion === CACHE_FORMAT_VERSION &&
+                typeof parsedManifest.toolVersion === TYPEOF_STRING &&
+                typeof parsedManifest.maxEntries === TYPEOF_NUMBER &&
+                typeof parsedManifest.maxAgeDays === TYPEOF_NUMBER
             ) {
                 return true;
             }
-            this.rebuildManifest();
+            this.rebuildCacheManifest();
             return true;
         } catch {
-            this.rebuildManifest();
+            this.rebuildCacheManifest();
             return true;
         }
     }
 
-    private rebuildManifest(): void {
+    private rebuildCacheManifest(): void {
+        const currentToolVersion = TOOL_VERSION;
         const manifest = {
             formatVersion: CACHE_FORMAT_VERSION,
-            toolVersion: TOOL_VERSION,
+            toolVersion: currentToolVersion,
             createdAt: new Date().toISOString(),
             maxEntries: this.maxEntries,
             maxAgeDays: this.maxAgeDays,
@@ -179,7 +196,11 @@ export class CacheStore {
         writeFileAtomic(this.manifestPath, JSON.stringify(manifest, null, 2) + '\n');
     }
 
-    private load(): void {
+    private rebuildManifest(): void {
+        this.rebuildCacheManifest();
+    }
+
+    private loadCacheFromDisk(): void {
         if (this.loaded) return;
         this.loaded = true;
         this.loadFingerprints();
@@ -195,10 +216,10 @@ export class CacheStore {
         }
     }
 
-    private isHotEntry(entry: L2Entry, cutoff: number): boolean {
-        if (entry.ts && entry.ts >= cutoff) return true;
+    private isHotEntry(entry: L2Entry, cutoffMs: number): boolean {
+        if (entry.ts && entry.ts >= cutoffMs) return true;
         if (entry.issues && Array.isArray(entry.issues)) {
-            return entry.issues.some((i: Issue) => i.severity === 'error');
+            return entry.issues.some((issueItem: Issue) => issueItem.severity === SEVERITY_STR_ERROR);
         }
         return false;
     }
@@ -206,8 +227,8 @@ export class CacheStore {
     private loadResults(): void {
         let fileSize: number;
         try {
-            const st = fs.statSync(this.resultsPath);
-            fileSize = st.size;
+            const statInfo = fs.statSync(this.resultsPath);
+            fileSize = statInfo.size;
         } catch {
             return;
         }
@@ -216,21 +237,23 @@ export class CacheStore {
 
         if (ratio <= 0.7) {
             this.loadResultsFull();
-            this.l2LoadLevel = 'full';
+            this.l2LoadLevel = CACHE_LOAD_LEVEL_FULL;
             return;
         }
         if (ratio <= 1.0) {
-            const cutoff = Date.now() - 7 * HOURS_PER_DAY * SECONDS_PER_HOUR * MILLIS_PER_SECOND;
-            this.loadResultsFiltered((entry: L2Entry) => this.isHotEntry(entry, cutoff));
-            this.l2LoadLevel = 'hot';
+            const cutoffMs =
+                Date.now() -
+                RETENTION_HOT_DAYS * HOURS_PER_DAY * SECONDS_PER_HOUR * MILLIS_PER_SECOND;
+            this.loadResultsFiltered((entry: L2Entry) => this.isHotEntry(entry, cutoffMs));
+            this.l2LoadLevel = CACHE_LOAD_LEVEL_HOT;
             return;
         }
         if (ratio <= 2.0) {
             this.loadResultsMetadataOnly();
-            this.l2LoadLevel = 'metadata';
+            this.l2LoadLevel = CACHE_LOAD_LEVEL_METADATA;
             return;
         }
-        this.l2LoadLevel = 'disabled';
+        this.l2LoadLevel = CACHE_LOAD_LEVEL_DISABLED;
         if (this.logger) {
             this.logger.warn(
                 `L2 cache too large (${(fileSize / BYTES_PER_KIB / KIB_PER_MIB).toFixed(1)} MiB), skipping load`,
@@ -238,11 +261,32 @@ export class CacheStore {
         }
     }
 
+    private parseL2Record(line: string, metadataOnly = false): L2Entry | null {
+        try {
+            const rawObject = JSON.parse(line);
+            if (!isValidL2(rawObject)) return null;
+            return {
+                k: rawObject.k,
+                p: rawObject.p,
+                issues: metadataOnly ? EMPTY_METADATA_ISSUES : rawObject.issues,
+                metric: metadataOnly ? null : (rawObject.metric || null),
+                ts: typeof rawObject.ts === TYPEOF_NUMBER ? (rawObject.ts as number) : 0,
+                fm: typeof rawObject.fm === TYPEOF_NUMBER ? (rawObject.fm as number) : undefined,
+                fs: typeof rawObject.fs === TYPEOF_NUMBER ? (rawObject.fs as number) : undefined,
+            };
+        } catch {
+            return null;
+        }
+    }
+
     private loadResultsFull(): void {
         const lines = readLinesSafe(this.resultsPath);
         for (const line of lines) {
             if (!line.trim()) continue;
-            this.parseL2Line(line);
+            const entryRecord = this.parseL2Record(line, false);
+            if (!entryRecord) continue;
+            this.l2.set(entryRecord.k, entryRecord);
+            this.indexSecondaryCacheByPath(entryRecord);
         }
     }
 
@@ -250,25 +294,10 @@ export class CacheStore {
         const lines = readLinesSafe(this.resultsPath);
         for (const line of lines) {
             if (!line.trim()) continue;
-            try {
-                const o = JSON.parse(line);
-                if (!isValidL2(o)) continue;
-                const entry: L2Entry = {
-                    k: o.k,
-                    p: o.p,
-                    issues: o.issues,
-                    metric: o.metric || null,
-                    ts: typeof o.ts === TYPEOF_NUMBER ? (o.ts as number) : 0,
-                    fm: typeof o.fm === TYPEOF_NUMBER ? (o.fm as number) : undefined,
-                    fs: typeof o.fs === TYPEOF_NUMBER ? (o.fs as number) : undefined,
-                };
-                if (predicate(entry)) {
-                    this.l2.set(o.k, entry);
-                    this.indexL2ByPath(entry);
-                }
-            } catch {
-                /* Best-effort: skip corrupt line */
-            }
+            const entryRecord = this.parseL2Record(line, false);
+            if (!entryRecord || !predicate(entryRecord)) continue;
+            this.l2.set(entryRecord.k, entryRecord);
+            this.indexSecondaryCacheByPath(entryRecord);
         }
     }
 
@@ -276,42 +305,18 @@ export class CacheStore {
         const lines = readLinesSafe(this.resultsPath);
         for (const line of lines) {
             if (!line.trim()) continue;
-            try {
-                const o = JSON.parse(line);
-                if (!isValidL2(o)) continue;
-                const entry: L2Entry = {
-                    k: o.k,
-                    p: o.p,
-                    issues: [],
-                    metric: null,
-                    ts: typeof o.ts === TYPEOF_NUMBER ? (o.ts as number) : 0,
-                };
-                this.l2.set(o.k, entry);
-                this.indexL2ByPath(entry);
-            } catch {
-                /* Best-effort: skip corrupt line */
-            }
+            const entryRecord = this.parseL2Record(line, true);
+            if (!entryRecord) continue;
+            this.l2.set(entryRecord.k, entryRecord);
+            this.indexSecondaryCacheByPath(entryRecord);
         }
     }
 
     private parseL2Line(line: string): void {
-        try {
-            const o = JSON.parse(line);
-            if (!isValidL2(o)) return;
-            const entry: L2Entry = {
-                k: o.k,
-                p: o.p,
-                issues: o.issues,
-                metric: o.metric || null,
-                ts: typeof o.ts === TYPEOF_NUMBER ? (o.ts as number) : 0,
-                fm: typeof o.fm === TYPEOF_NUMBER ? (o.fm as number) : undefined,
-                fs: typeof o.fs === TYPEOF_NUMBER ? (o.fs as number) : undefined,
-            };
-            this.l2.set(o.k, entry);
-            this.indexL2ByPath(entry);
-        } catch {
-            /* Best-effort: skip corrupt line */
-        }
+        const entryRecord = this.parseL2Record(line, false);
+        if (!entryRecord) return;
+        this.l2.set(entryRecord.k, entryRecord);
+        this.indexSecondaryCacheByPath(entryRecord);
     }
 
     private loadPaths(): void {
@@ -324,80 +329,139 @@ export class CacheStore {
 
     private parsePathLine(line: string): void {
         try {
-            const o = JSON.parse(line);
-            if (!isValidPathEntry(o)) return;
-            const e = this.l2.get(o.k);
-            if (e) this.l2ByPath.set(o.pk, e);
+            const rawObject = JSON.parse(line);
+            if (!isValidPathEntry(rawObject)) return;
+            const entryRecord = this.l2.get(rawObject.k);
+            if (entryRecord) this.l2ByPath.set(rawObject.pk, entryRecord);
         } catch {
             /* Best-effort: skip corrupt line */
         }
     }
 
-    lookupL1(relPath: string): Fingerprint | null {
+    lookupPrimaryCache(relPath: string): Fingerprint | null {
         if (!this.enabled) return null;
         return this.l1.get(relPath) || null;
     }
 
-    lookupL2(fpHashValue: string, contentHash: string): (CachedResult & { p: string }) | null {
-        if (!this.enabled) return null;
-        const key = l2Key(fpHashValue, contentHash);
-        const e = this.l2.get(key);
-        if (!e) return null;
-        if (e.issues.length === 0 && e.metric === null && this.l2LoadLevel === 'metadata') {
-            return null;
-        }
-        const now = Date.now();
-        if (now - e.ts > 60_000) {
-            e.ts = now;
-            this.dirtyL2.set(key, e);
-        }
-        return { issues: e.issues, metric: e.metric, p: e.p };
+    lookupL1(relPath: string): Fingerprint | null {
+        return this.lookupPrimaryCache(relPath);
     }
 
-    writeL1(relPath: string, fp: Fingerprint): void {
+    lookupSecondaryCache(
+        fpHashValue: string,
+        contentHash: string,
+    ): (CachedResult & { p: string }) | null {
+        if (!this.enabled) return null;
+        const keyString = l2Key(fpHashValue, contentHash);
+        const entryRecord = this.l2.get(keyString);
+        if (!entryRecord) return null;
+        if (
+            entryRecord.issues.length === 0 &&
+            entryRecord.metric === null &&
+            this.l2LoadLevel === CACHE_LOAD_LEVEL_METADATA
+        ) {
+            return null;
+        }
+        const nowMs = Date.now();
+        if (nowMs - entryRecord.ts > REFRESH_TIMESTAMP_INTERVAL_MS) {
+            entryRecord.ts = nowMs;
+            this.dirtyL2.set(keyString, entryRecord);
+        }
+        return { issues: entryRecord.issues, metric: entryRecord.metric, p: entryRecord.p };
+    }
+
+    lookupL2(fpHashValue: string, contentHash: string): (CachedResult & { p: string }) | null {
+        return this.lookupSecondaryCache(fpHashValue, contentHash);
+    }
+
+    writePrimaryCache(relPath: string, fileFingerprint: Fingerprint): void {
         if (!this.enabled) return;
-        this.l1.set(relPath, fp);
-        this.dirtyL1.set(relPath, fp);
+        this.l1.set(relPath, fileFingerprint);
+        this.dirtyL1.set(relPath, fileFingerprint);
+    }
+
+    writeL1(relPath: string, fileFingerprint: Fingerprint): void {
+        this.writePrimaryCache(relPath, fileFingerprint);
+    }
+
+    writeSecondaryCache(
+        fpHashValue: string,
+        contentHash: string,
+        relPath: string,
+        scanResult: CachedResult,
+        fileFingerprint?: Fingerprint,
+    ): void {
+        if (!this.enabled) return;
+        const keyString = l2Key(fpHashValue, contentHash);
+        const entryRecord: L2Entry = {
+            k: keyString,
+            p: relPath,
+            issues: scanResult.issues,
+            metric: scanResult.metric,
+            ts: Date.now(),
+            fm: fileFingerprint ? fileFingerprint.mtimeMs : undefined,
+            fs: fileFingerprint ? fileFingerprint.size : undefined,
+        };
+        this.l2.set(keyString, entryRecord);
+        this.dirtyL2.set(keyString, entryRecord);
+        this.indexSecondaryCacheByPath(entryRecord);
     }
 
     writeL2(
         fpHashValue: string,
         contentHash: string,
         relPath: string,
-        result: CachedResult,
-        fp?: Fingerprint,
+        scanResult: CachedResult,
+        fileFingerprint?: Fingerprint,
     ): void {
-        if (!this.enabled) return;
-        const key = l2Key(fpHashValue, contentHash);
-        const entry: L2Entry = {
-            k: key,
-            p: relPath,
-            issues: result.issues,
-            metric: result.metric,
-            ts: Date.now(),
-            fm: fp ? fp.mtimeMs : undefined,
-            fs: fp ? fp.size : undefined,
-        };
-        this.l2.set(key, entry);
-        this.dirtyL2.set(key, entry);
-        this.indexL2ByPath(entry);
+        this.writeSecondaryCache(fpHashValue, contentHash, relPath, scanResult, fileFingerprint);
     }
 
-    private indexL2ByPath(entry: L2Entry): void {
-        const pathKey = this.pathKeyFor(entry.k, entry.p, entry.fm, entry.fs);
+    private indexSecondaryCacheByPath(entryRecord: L2Entry): void {
+        const pathKey = this.computePathKey(
+            entryRecord.k,
+            entryRecord.p,
+            entryRecord.fm,
+            entryRecord.fs,
+        );
         const existing = this.l2ByPath.get(pathKey);
-        if (!existing || entry.ts >= existing.ts) this.l2ByPath.set(pathKey, entry);
+        if (!existing || entryRecord.ts >= existing.ts) this.l2ByPath.set(pathKey, entryRecord);
     }
 
-    private fpHashOfL2Key(k: string): string {
-        const m = /^v1:([0-9a-f]+):[0-9a-f]+$/.exec(k);
-        return m ? m[1] : '';
+    private extractFingerprintHash(keyString: string): string {
+        const matchResult = /^v1:([0-9a-f]+):[0-9a-f]+$/.exec(keyString);
+        return matchResult ? matchResult[1] : '';
     }
 
-    private pathKeyFor(l2key: string, relPath: string, mtimeMs?: number, size?: number): string {
-        const fm = typeof mtimeMs === TYPEOF_NUMBER ? String(mtimeMs) : '*';
-        const fs = typeof size === TYPEOF_NUMBER ? String(size) : '*';
-        return `${this.fpHashOfL2Key(l2key)}\u0000${relPath}\u0000${fm}\u0000${fs}`;
+    private computePathKey(
+        l2key: string,
+        relPath: string,
+        mtimeMs?: number,
+        size?: number,
+    ): string {
+        const fingerprintMtimeMs = typeof mtimeMs === TYPEOF_NUMBER ? String(mtimeMs) : '*';
+        const fingerprintSizeBytes = typeof size === TYPEOF_NUMBER ? String(size) : '*';
+        return `${this.extractFingerprintHash(l2key)}\u0000${relPath}\u0000${fingerprintMtimeMs}\u0000${fingerprintSizeBytes}`;
+    }
+
+    lookupSecondaryCacheByPath(
+        fpHashValue: string,
+        relPath: string,
+        mtimeMs: number,
+        size: number,
+    ): (CachedResult & { p: string }) | null {
+        if (!this.enabled) return null;
+        const lookupPathKey = `${fpHashValue}\u0000${relPath}\u0000${mtimeMs}\u0000${size}`;
+        const entryRecord = this.l2ByPath.get(lookupPathKey);
+        if (!entryRecord) return null;
+        if (
+            entryRecord.issues.length === 0 &&
+            entryRecord.metric === null &&
+            this.l2LoadLevel === CACHE_LOAD_LEVEL_METADATA
+        ) {
+            return null;
+        }
+        return { issues: entryRecord.issues, metric: entryRecord.metric, p: entryRecord.p };
     }
 
     lookupL2ByPath(
@@ -406,20 +470,14 @@ export class CacheStore {
         mtimeMs: number,
         size: number,
     ): (CachedResult & { p: string }) | null {
-        if (!this.enabled) return null;
-        const e = this.l2ByPath.get(`${fpHashValue}\u0000${relPath}\u0000${mtimeMs}\u0000${size}`);
-        if (!e) return null;
-        if (e.issues.length === 0 && e.metric === null && this.l2LoadLevel === 'metadata') {
-            return null;
-        }
-        return { issues: e.issues, metric: e.metric, p: e.p };
+        return this.lookupSecondaryCacheByPath(fpHashValue, relPath, mtimeMs, size);
     }
 
-    flush(): void {
+    flushCacheToDisk(): void {
         if (!this.enabled) return;
         try {
             if (this.dirtyL1.size > 0 || this.dirtyL2.size > 0) {
-                this.cleanupIfNeeded();
+                this.executeCleanupIfNeeded();
             }
             if (this.dirtyL1.size > 0) {
                 writeFileAtomic(this.fingerprintsPath, serializeL1(this.l1));
@@ -435,27 +493,41 @@ export class CacheStore {
         }
     }
 
-    cleanupIfNeeded(): void {
+    flush(): void {
+        this.flushCacheToDisk();
+    }
+
+    executeCleanupIfNeeded(): void {
         if (!this.enabled || this.l2.size <= this.maxEntries) return;
         if (this.maxAgeDays > 0) {
-            const maxAgeMs = this.maxAgeDays * HOURS_PER_DAY * SECONDS_PER_HOUR * MILLIS_PER_SECOND;
-            this.trimTtlEntries(Date.now(), maxAgeMs);
+            const maxAgeMs =
+                this.maxAgeDays * HOURS_PER_DAY * SECONDS_PER_HOUR * MILLIS_PER_SECOND;
+            this.trimExpiredEntries(Date.now(), maxAgeMs);
         }
         this.trimLruExcess();
     }
 
-    private removeL2Entry(e: L2Entry): void {
-        this.l2.delete(e.k);
-        const pathKey = this.pathKeyFor(e.k, e.p, e.fm, e.fs);
-        if (this.l2ByPath.get(pathKey) === e) {
+    cleanupIfNeeded(): void {
+        this.executeCleanupIfNeeded();
+    }
+
+    private removeSecondaryCacheEntry(entryRecord: L2Entry): void {
+        this.l2.delete(entryRecord.k);
+        const pathKey = this.computePathKey(
+            entryRecord.k,
+            entryRecord.p,
+            entryRecord.fm,
+            entryRecord.fs,
+        );
+        if (this.l2ByPath.get(pathKey) === entryRecord) {
             this.l2ByPath.delete(pathKey);
         }
     }
 
-    private trimTtlEntries(now: number, maxAgeMs: number): void {
-        for (const e of this.l2.values()) {
-            if (now - e.ts > maxAgeMs) {
-                this.removeL2Entry(e);
+    private trimExpiredEntries(nowMs: number, maxAgeMs: number): void {
+        for (const entryRecord of this.l2.values()) {
+            if (nowMs - entryRecord.ts > maxAgeMs) {
+                this.removeSecondaryCacheEntry(entryRecord);
             }
         }
     }
@@ -465,9 +537,9 @@ export class CacheStore {
         if (excess <= 0) return;
 
         const sorted = [...this.l2.values()].sort((a, b) => a.ts - b.ts);
-        for (const e of sorted) {
+        for (const entryRecord of sorted) {
             if (excess <= 0) break;
-            this.removeL2Entry(e);
+            this.removeSecondaryCacheEntry(entryRecord);
             excess--;
         }
     }
@@ -476,8 +548,8 @@ export class CacheStore {
         try {
             if (!removeCacheDir(this.dir)) return false;
             this.resetMemoryMaps();
-            this.enabled = this.init();
-            if (this.enabled) this.rebuildManifest();
+            this.enabled = this.initializeCache();
+            if (this.enabled) this.rebuildCacheManifest();
             return this.enabled;
         } catch {
             return false;
@@ -492,16 +564,24 @@ export class CacheStore {
         this.dirtyL2.clear();
     }
 
-    size(): { l1: number; l2: number; l2LoadLevel: string } {
+    getCacheMetrics(): { l1: number; l2: number; l2LoadLevel: string } {
         return { l1: this.l1.size, l2: this.l2.size, l2LoadLevel: this.l2LoadLevel };
+    }
+
+    size(): { l1: number; l2: number; l2LoadLevel: string } {
+        return this.getCacheMetrics();
     }
 
     getLoadLevel(): 'full' | 'hot' | 'metadata' | 'disabled' {
         return this.l2LoadLevel;
     }
 
-    dump(): string {
+    dumpCacheState(): string {
         return canonicalJson({ l1: [...this.l1.entries()], l2: [...this.l2.values()] });
+    }
+
+    dump(): string {
+        return this.dumpCacheState();
     }
 }
 
@@ -513,5 +593,5 @@ export class CacheStore {
  * @returns Resolved cache directory path.
  */
 export function resolveCacheDir(cacheDir: string | undefined, root: string): string {
-    return cacheDir || path.join(root, '.auto-refactor-cache');
+    return cacheDir || path.join(root, DEFAULT_CACHE_DIR_NAME);
 }

@@ -190,12 +190,14 @@ export class PythonAdapter implements LanguageAdapter {
         }
 
         const childCtx = resolveChildMapContext(ctx, sn);
-        let kids: NormalizedNode[] | undefined;
-        for (const c of sn.namedChildren || []) {
-            const kid = this.mapNode(c, sn, childCtx);
-            (kids ??= []).push(kid);
+        const namedChildren = sn.namedChildren;
+        if (namedChildren && namedChildren.length > 0) {
+            const kids: NormalizedNode[] = [];
+            for (let i = 0; i < namedChildren.length; i++) {
+                kids.push(this.mapNode(namedChildren[i], sn, childCtx));
+            }
+            node.children = kids;
         }
-        node.children = kids;
         return node;
     }
 }

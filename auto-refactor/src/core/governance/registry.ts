@@ -108,6 +108,8 @@ export const BUILTIN_GOVERNANCE_RULES: GovernanceRule[] = [
     CognitiveDensityRule,
 ];
 
+const DEFAULT_TARGET_KINDS: readonly string[] = Object.freeze(['*']);
+
 /**
  * In-memory registry of governance rules keyed by `rule.id`.
  *
@@ -182,6 +184,19 @@ export class GovernanceRegistry {
         return new RegExp(escaped.join('|'));
     }
 
+    private appendRuleToKindGroup(
+        groups: Map<string, GovernanceRule[]>,
+        kind: string,
+        rule: GovernanceRule,
+    ): void {
+        let list = groups.get(kind);
+        if (!list) {
+            list = [];
+            groups.set(kind, list);
+        }
+        list.push(rule);
+    }
+
     /**
      * Group node-level rules by the NodeKind they target.
      * Rules with no specific target go under the '*' key.
@@ -190,10 +205,9 @@ export class GovernanceRegistry {
         const groups = new Map<string, GovernanceRule[]>();
         for (const rule of rules) {
             if (typeof rule.checkNode !== 'function') continue;
-            const kinds = rule.targetKinds || ['*'];
+            const kinds = rule.targetKinds ?? DEFAULT_TARGET_KINDS;
             for (const kind of kinds) {
-                if (!groups.has(kind)) groups.set(kind, []);
-                groups.get(kind)!.push(rule);
+                this.appendRuleToKindGroup(groups, kind, rule);
             }
         }
         return groups;

@@ -14,6 +14,15 @@ import { histogramDiff } from './histogram-diff';
 /** Largest diff span in lines still handled by Myers; larger spans fall back to histogram. */
 export const MYERS_MAX_MID_LINES = 1500;
 
+/** Maximum cells allowed in the Myers diagonal trace matrix before degrading. */
+export const MYERS_MAX_TRACE_CELLS = 2_000_000;
+
+/** Default capacity for Myers diagonal working vector vBuffer. */
+export const DEFAULT_V_CAPACITY = 4096;
+
+/** Default capacity for Myers trace buffer. */
+export const DEFAULT_TRACE_CAPACITY = 65536;
+
 /** DiffOp tag for a matched/unchanged line pair. */
 export const DIFF_OP_EQUAL = 'equal';
 
@@ -57,102 +66,111 @@ export interface TrimmedSpans {
 }
 
 /**
+ * Context container for common prefix/suffix comparisons across line spans.
+ */
+interface CommonLineSpan {
+    readonly oldLines: string[];
+    readonly newLines: string[];
+    readonly oldHashes: Uint32Array;
+    readonly newHashes: Uint32Array;
+}
+
+/**
  * Computes length of identical common prefix between two hashed line arrays.
  *
- * @param a - Old lines.
- * @param b - New lines.
- * @param hashA - Hashes of old lines.
- * @param hashB - Hashes of new lines.
+ * @param oldLines - Old lines.
+ * @param newLines - New lines.
+ * @param oldHashes - Hashes of old lines.
+ * @param newHashes - Hashes of new lines.
  * @returns Matching prefix length in lines.
  */
 function computeCommonPrefixLength(
-    a: string[],
-    b: string[],
-    hashA: Uint32Array,
-    hashB: Uint32Array,
+    oldLines: string[],
+    newLines: string[],
+    oldHashes: Uint32Array,
+    newHashes: Uint32Array,
 ): number {
-    const minLen = Math.min(a.length, b.length);
-    let prefix = 0;
-    while (prefix < minLen) {
-        if (hashA[prefix] !== hashB[prefix] || a[prefix] !== b[prefix]) {
+    const minLen = Math.min(oldLines.length, newLines.length);
+    let prefixIndex = 0;
+    while (prefixIndex < minLen) {
+        if (oldHashes[prefixIndex] !== newHashes[prefixIndex] || oldLines[prefixIndex] !== newLines[prefixIndex]) {
             break;
         }
-        prefix++;
+        prefixIndex++;
     }
-    return prefix;
+    return prefixIndex;
 }
 
 function computeCommonSuffixLength(
-    a: string[],
-    b: string[],
-    hashA: Uint32Array,
-    hashB: Uint32Array,
-    prefix: number,
+    span: CommonLineSpan,
+    prefixLength: number,
 ): number {
-    const maxSuffix = Math.min(a.length - prefix, b.length - prefix);
-    let suffix = 0;
-    const n = a.length;
-    const m = b.length;
-    while (suffix < maxSuffix) {
-        const idxA = n - 1 - suffix;
-        const idxB = m - 1 - suffix;
-        if (hashA[idxA] !== hashB[idxB] || a[idxA] !== b[idxB]) {
+    const { oldLines, newLines, oldHashes, newHashes } = span;
+    const maxSuffix = Math.min(oldLines.length - prefixLength, newLines.length - prefixLength);
+    let suffixIndex = 0;
+    const oldLineCount = oldLines.length;
+    const newLineCount = newLines.length;
+    while (suffixIndex < maxSuffix) {
+        const idxA = oldLineCount - 1 - suffixIndex;
+        const idxB = newLineCount - 1 - suffixIndex;
+        if (oldHashes[idxA] !== newHashes[idxB] || oldLines[idxA] !== newLines[idxB]) {
             break;
         }
-        suffix++;
+        suffixIndex++;
     }
-    return suffix;
+    return suffixIndex;
 }
 
-function sliceStringMiddle(
-    arr: string[],
-    prefix: number,
-    suffix: number,
-    midLen: number,
+function extractStringMiddle(
+    lines: string[],
+    prefixLength: number,
+    suffixLength: number,
+    midLength: number,
 ): string[] {
-    if (prefix === 0 && suffix === 0) return arr;
-    if (midLen === 0) return [];
-    return arr.slice(prefix, arr.length - suffix);
+    if (prefixLength === 0 && suffixLength === 0) return lines;
+    return midLength === 0 ? [] : lines.slice(prefixLength, lines.length - suffixLength);
 }
 
-function sliceUint32Middle(
-    arr: Uint32Array,
-    prefix: number,
-    suffix: number,
-    midLen: number,
+function extractUint32Middle(
+    hashes: Uint32Array,
+    prefixLength: number,
+    suffixLength: number,
+    midLength: number,
 ): Uint32Array {
-    if (prefix === 0 && suffix === 0) return arr;
-    if (midLen === 0) return new Uint32Array(0);
-    return arr.subarray(prefix, arr.length - suffix);
+    if (prefixLength === 0 && suffixLength === 0) return hashes;
+    return midLength === 0 ? new Uint32Array(0) : hashes.subarray(prefixLength, hashes.length - suffixLength);
 }
 
 /**
  * Trim common prefix and suffix between two line arrays using fast uint32 hashes.
  *
- * @param a - Old lines.
- * @param b - New lines.
- * @param hashA - Hashes of old lines.
- * @param hashB - Hashes of new lines.
+ * @param oldLines - Old lines.
+ * @param newLines - New lines.
+ * @param oldHashes - Hashes of old lines.
+ * @param newHashes - Hashes of new lines.
  * @returns Trimmed spans and middle slices.
  */
 export function trimPrefixSuffix(
-    a: string[],
-    b: string[],
-    hashA: Uint32Array,
-    hashB: Uint32Array,
+    oldLines: string[],
+    newLines: string[],
+    oldHashes: Uint32Array,
+    newHashes: Uint32Array,
 ): TrimmedSpans {
-    const prefix = computeCommonPrefixLength(a, b, hashA, hashB);
-    const suffix = computeCommonSuffixLength(a, b, hashA, hashB, prefix);
-    const midN = a.length - prefix - suffix;
-    const midM = b.length - prefix - suffix;
+    const prefix = computeCommonPrefixLength(oldLines, newLines, oldHashes, newHashes);
+    const suffix = computeCommonSuffixLength(
+        { oldLines, newLines, oldHashes, newHashes },
+        prefix,
+    );
+    const midN = oldLines.length - prefix - suffix;
+    const midM = newLines.length - prefix - suffix;
 
     return {
         prefix,
         suffix,
-        midA: sliceStringMiddle(a, prefix, suffix, midN),
-        midB: sliceStringMiddle(b, prefix, suffix, midM),
-        midHA: sliceUint32Middle(hashA, prefix, suffix, midN),
-        midHB: sliceUint32Middle(hashB, prefix, suffix, midM),
+        midA: extractStringMiddle(oldLines, prefix, suffix, midN),
+        midB: extractStringMiddle(newLines, prefix, suffix, midM),
+        midHA: extractUint32Middle(oldHashes, prefix, suffix, midN),
+        midHB: extractUint32Middle(newHashes, prefix, suffix, midM),
     };
 }
 
@@ -180,22 +198,18 @@ interface MyersContext {
  * Advance diagonal snake along matched lines.
  */
 function advanceSnake(
-    midA: string[],
-    midB: string[],
-    midHA: Uint32Array,
-    midHB: Uint32Array,
-    midN: number,
-    midM: number,
+    ctx: MyersContext,
     startX: number,
     startY: number,
 ): number {
-    let x = startX;
-    let y = startY;
-    while (x < midN && y < midM && midHA[x] === midHB[y] && midA[x] === midB[y]) {
-        x++;
-        y++;
+    const { midA, midB, midHA, midHB, midN, midM } = ctx;
+    let currX = startX;
+    let currY = startY;
+    while (currX < midN && currY < midM && midHA[currX] === midHB[currY] && midA[currX] === midB[currY]) {
+        currX++;
+        currY++;
     }
-    return x;
+    return currX;
 }
 
 /**
@@ -203,39 +217,29 @@ function advanceSnake(
  * Eliminates transient typed array allocations in hot search loops (CPX-SPACE-001).
  */
 export class MyersScratchPool {
-    private vBuffer: Int32Array = new Int32Array(4096);
-    private traceBuffer: Int32Array = new Int32Array(65536);
+    private diagonalVectorBuffer: Int32Array = new Int32Array(DEFAULT_V_CAPACITY);
+    private searchTraceBuffer: Int32Array = new Int32Array(DEFAULT_TRACE_CAPACITY);
 
-    /**
-     * Acquire or expand the working diagonal vector v with size rowSize (2 * max + 1).
-     * Automatically zeroes out the active region [0, minCapacity).
-     */
-    acquireV(minCapacity: number): Int32Array {
-        if (this.vBuffer.length < minCapacity) {
-            const nextCap = Math.max(minCapacity, this.vBuffer.length * 2);
-            this.vBuffer = new Int32Array(nextCap);
+    getOrExpandDiagonalVector(minCapacity: number): Int32Array {
+        if (this.diagonalVectorBuffer.length < minCapacity) {
+            const nextCap = Math.max(minCapacity, this.diagonalVectorBuffer.length * 2);
+            this.diagonalVectorBuffer = new Int32Array(nextCap);
         }
-        this.vBuffer.fill(0, 0, minCapacity);
-        return this.vBuffer;
+        this.diagonalVectorBuffer.fill(0, 0, minCapacity);
+        return this.diagonalVectorBuffer;
     }
 
-    /**
-     * Acquire or expand the contiguous flatTrace buffer with capacity (max + 1)^2.
-     */
-    acquireTrace(minCapacity: number): Int32Array {
-        if (this.traceBuffer.length < minCapacity) {
-            const nextCap = Math.max(minCapacity, this.traceBuffer.length * 2);
-            this.traceBuffer = new Int32Array(nextCap);
+    getOrExpandTraceBuffer(minCapacity: number): Int32Array {
+        if (this.searchTraceBuffer.length < minCapacity) {
+            const nextCap = Math.max(minCapacity, this.searchTraceBuffer.length * 2);
+            this.searchTraceBuffer = new Int32Array(nextCap);
         }
-        return this.traceBuffer;
+        return this.searchTraceBuffer;
     }
 
-    /**
-     * Reset the pool buffers to default sizes.
-     */
-    reset(): void {
-        this.vBuffer = new Int32Array(4096);
-        this.traceBuffer = new Int32Array(65536);
+    resetPoolBuffers(): void {
+        this.diagonalVectorBuffer = new Int32Array(DEFAULT_V_CAPACITY);
+        this.searchTraceBuffer = new Int32Array(DEFAULT_TRACE_CAPACITY);
     }
 }
 
@@ -248,32 +252,34 @@ export const myersScratchPool = new MyersScratchPool();
  * Execute forward diagonal trace for Myers greedy search with inlined diagonal
  * snake advancement. Employs MyersScratchPool to eliminate loop-body allocations (CPX-SPACE-001).
  */
-function computeMyersTrace(ctx: MyersContext, max: number): MyersSearchResult {
-    const { midA, midB, midHA, midHB, midN, midM } = ctx;
-    const offset = max;
-    const rowSize = 2 * max + 1;
-    const requiredTraceCapacity = (max + 1) * (max + 1);
+function computeMyersTrace(ctx: MyersContext, maxDistance: number): MyersSearchResult {
+    const { midN, midM } = ctx;
+    const offset = maxDistance;
+    const rowSize = 2 * maxDistance + 1;
+    const requiredTraceCapacity = (maxDistance + 1) * (maxDistance + 1);
 
-    const v = myersScratchPool.acquireV(rowSize);
-    const flatTrace = myersScratchPool.acquireTrace(requiredTraceCapacity);
-    let d = 0;
+    const diagonalVector = myersScratchPool.getOrExpandDiagonalVector(rowSize);
+    const flatTrace = myersScratchPool.getOrExpandTraceBuffer(requiredTraceCapacity);
+    let diffDepth = 0;
 
-    for (d = 0; d <= max; d++) {
-        const base = d * d + d;
-        for (let k = -d; k <= d; k++) {
-            flatTrace[base + k] = v[offset + k];
+    for (diffDepth = 0; diffDepth <= maxDistance; diffDepth++) {
+        const base = diffDepth * diffDepth + diffDepth;
+        for (let diagonalK = -diffDepth; diagonalK <= diffDepth; diagonalK++) {
+            flatTrace[base + diagonalK] = diagonalVector[offset + diagonalK];
         }
 
         let reached = false;
-        for (let k = -d; k <= d; k += 2) {
+        for (let diagonalK = -diffDepth; diagonalK <= diffDepth; diagonalK += 2) {
             const initialX =
-                k === -d || (k !== d && v[k - 1 + offset] < v[k + 1 + offset])
-                    ? v[k + 1 + offset]
-                    : v[k - 1 + offset] + 1;
-            const x = advanceSnake(midA, midB, midHA, midHB, midN, midM, initialX, initialX - k);
-            const y = x - k;
-            v[k + offset] = x;
-            if (x >= midN && y >= midM) {
+                diagonalK === -diffDepth ||
+                (diagonalK !== diffDepth &&
+                    diagonalVector[diagonalK - 1 + offset] < diagonalVector[diagonalK + 1 + offset])
+                    ? diagonalVector[diagonalK + 1 + offset]
+                    : diagonalVector[diagonalK - 1 + offset] + 1;
+            const xCoord = advanceSnake(ctx, initialX, initialX - diagonalK);
+            const yCoord = xCoord - diagonalK;
+            diagonalVector[diagonalK + offset] = xCoord;
+            if (xCoord >= midN && yCoord >= midM) {
                 reached = true;
                 break;
             }
@@ -282,59 +288,104 @@ function computeMyersTrace(ctx: MyersContext, max: number): MyersSearchResult {
             break;
         }
     }
-    return { flatTrace, d };
+    return { flatTrace, d: diffDepth };
+}
+
+/**
+ * Internal 2D coordinate position for trace backtracking.
+ */
+interface RewindSnakePosition {
+    readonly currX: number;
+    readonly currY: number;
+}
+
+/**
+ * Helper to rewind diagonal snake along matched lines during trace reconstruction,
+ * eliminating duplicated while loop blocks (HYG-CLN-001).
+ */
+function computeRewoundEqualSnake(
+    midOps: DiffOp[],
+    prefixLength: number,
+    startPos: RewindSnakePosition,
+    targetPos: RewindSnakePosition,
+): RewindSnakePosition {
+    let currX = startPos.currX;
+    let currY = startPos.currY;
+    while (currX > targetPos.currX && currY > targetPos.currY) {
+        midOps.push({
+            type: DIFF_OP_EQUAL,
+            aIdx: prefixLength + currX - 1,
+            bIdx: prefixLength + currY - 1,
+        });
+        currX--;
+        currY--;
+    }
+    return { currX, currY };
 }
 
 /**
  * Backtrack trace to reconstruct the optimal edit script for the middle block.
  * Eliminates transient object allocations by inlining diagonal snake reversal.
  */
-function backtrackMyersTrace(
+function computeReconstructedMyersTrace(
     search: MyersSearchResult,
     midN: number,
     midM: number,
-    prefix: number,
+    prefixLength: number,
 ): DiffOp[] {
-    const { flatTrace, d } = search;
+    const { flatTrace, d: diffDepth } = search;
     const midOps: DiffOp[] = [];
-    let x = midN;
-    let y = midM;
+    let currX = midN;
+    let currY = midM;
 
-    for (let di = d; di >= 0; di--) {
-        if (di === 0) {
-            while (x > 0 && y > 0) {
-                midOps.push({ type: DIFF_OP_EQUAL, aIdx: prefix + x - 1, bIdx: prefix + y - 1 });
-                x--;
-                y--;
-            }
+    for (let depthIndex = diffDepth; depthIndex >= 0; depthIndex--) {
+        if (depthIndex === 0) {
+            const zeroTarget = { currX: 0, currY: 0 };
+            const finalPos = computeRewoundEqualSnake(midOps, prefixLength, { currX, currY }, zeroTarget);
+            currX = finalPos.currX;
+            currY = finalPos.currY;
             break;
         }
 
-        const base = di * di + di;
-        const k = x - y;
+        const base = depthIndex * depthIndex + depthIndex;
+        const diagonalK = currX - currY;
         const insertMove =
-            k === -di || (k !== di && flatTrace[base + k - 1] < flatTrace[base + k + 1]);
-        const prevK = insertMove ? k + 1 : k - 1;
+            diagonalK === -depthIndex ||
+            (diagonalK !== depthIndex && flatTrace[base + diagonalK - 1] < flatTrace[base + diagonalK + 1]);
+        const prevK = insertMove ? diagonalK + 1 : diagonalK - 1;
         const prevX = flatTrace[base + prevK];
         const prevY = prevX - prevK;
 
-        while (x > prevX && y > prevY) {
-            midOps.push({ type: DIFF_OP_EQUAL, aIdx: prefix + x - 1, bIdx: prefix + y - 1 });
-            x--;
-            y--;
-        }
+        const intermediatePos = computeRewoundEqualSnake(
+            midOps,
+            prefixLength,
+            { currX, currY },
+            { currX: prevX, currY: prevY },
+        );
+        currX = intermediatePos.currX;
+        currY = intermediatePos.currY;
 
         if (insertMove) {
-            midOps.push({ type: DIFF_OP_INSERT, aIdx: prefix + x, bIdx: prefix + y - 1 });
-            y--;
+            midOps.push({
+                type: DIFF_OP_INSERT,
+                aIdx: prefixLength + currX,
+                bIdx: prefixLength + currY - 1,
+            });
+            currY--;
         } else {
-            midOps.push({ type: DIFF_OP_DELETE, aIdx: prefix + x - 1, bIdx: prefix + y });
-            x--;
+            midOps.push({
+                type: DIFF_OP_DELETE,
+                aIdx: prefixLength + currX - 1,
+                bIdx: prefixLength + currY,
+            });
+            currX--;
         }
     }
     midOps.reverse();
     return midOps;
 }
+
+const backtrackMyersTrace = computeReconstructedMyersTrace;
 
 /**
  * Assemble prefix, middle operations, and suffix into unified edit script.
@@ -363,10 +414,15 @@ export function emitEqualRun(
     startB: number,
     count: number,
 ): void {
-    for (let i = 0; i < count; i++) {
-        target.push({ type: DIFF_OP_EQUAL, aIdx: startA + i, bIdx: startB + i });
+    for (let lineIndex = 0; lineIndex < count; lineIndex++) {
+        target.push({ type: DIFF_OP_EQUAL, aIdx: startA + lineIndex, bIdx: startB + lineIndex });
     }
 }
+
+/**
+ * Emits a contiguous run of equal diff operations. Alias of emitEqualRun.
+ */
+export const emitEqualSpanRun = emitEqualRun;
 
 /**
  * Emits prefix diff operations with optional span compaction.
@@ -385,17 +441,22 @@ function emitPrefixOps(target: DiffOp[], prefix: number): void {
 /**
  * Emits suffix diff operations with optional span compaction.
  */
-function emitSuffixOps(target: DiffOp[], suffix: number, n: number, m: number): void {
+function emitSuffixOps(
+    target: DiffOp[],
+    suffix: number,
+    oldLineCount: number,
+    newLineCount: number,
+): void {
     const compactThreshold = CONTEXT_MARGIN * 2;
-    const baseA = n - suffix;
-    const baseB = m - suffix;
+    const baseA = oldLineCount - suffix;
+    const baseB = newLineCount - suffix;
     if (COMPACT_DIFF_ENABLED && suffix > compactThreshold) {
         emitEqualRun(target, baseA, baseB, CONTEXT_MARGIN);
         const spanLen = suffix - CONTEXT_MARGIN;
         target.push({
             type: DIFF_OP_EQUAL_SPAN,
-            aIdx: n - spanLen,
-            bIdx: m - spanLen,
+            aIdx: oldLineCount - spanLen,
+            bIdx: newLineCount - spanLen,
             length: spanLen,
         });
         return;
@@ -404,46 +465,56 @@ function emitSuffixOps(target: DiffOp[], suffix: number, n: number, m: number): 
 }
 
 /**
+ * Configuration options for assembling diff operations from trimmed common prefix and suffix.
+ */
+export interface AssembleSpanConfig {
+    readonly prefix: number;
+    readonly suffix: number;
+    readonly oldLineCount: number;
+    readonly newLineCount: number;
+}
+
+/**
  * Assemble prefix, middle operations, and suffix into unified edit script.
  *
- * @param prefix - Length of matching common prefix lines.
- * @param suffix - Length of matching common suffix lines.
- * @param n - Total lines in old content.
- * @param m - Total lines in new content.
- * @param midOps - Diff operations for the middle modified section.
+ * @param configOrPrefix - Length of matching common prefix lines or AssembleSpanConfig.
+ * @param suffixOrMidOps - Length of matching common suffix lines or middle DiffOp array.
+ * @param oldLineCount - Total lines in old content.
+ * @param newLineCount - Total lines in new content.
+ * @param midOpsParam - Diff operations for the middle modified section.
  * @returns Complete list of diff operations for the full file.
  */
 export function assembleDiffOps(
-    prefix: number,
-    suffix: number,
-    n: number,
-    m: number,
+    config: AssembleSpanConfig,
     midOps: DiffOp[],
 ): DiffOp[] {
+    const { prefix, suffix, oldLineCount, newLineCount } = config;
     const ops: DiffOp[] = [];
     emitPrefixOps(ops, prefix);
-    for (let i = 0; i < midOps.length; i++) {
-        ops.push(midOps[i]);
+    for (let opIndex = 0; opIndex < midOps.length; opIndex++) {
+        ops.push(midOps[opIndex]);
     }
-    emitSuffixOps(ops, suffix, n, m);
+    emitSuffixOps(ops, suffix, oldLineCount, newLineCount);
     return ops;
 }
 
 const FNV1A_32_PRIME = 0x01000193;
 const FNV1A_32_OFFSET_BASIS = 0x811c9dc5;
 
-function fnv1a(str: string): number {
+function computeFnv1a32Hash(str: string): number {
     let hash = FNV1A_32_OFFSET_BASIS;
-    for (let i = 0; i < str.length; i++) {
-        hash = Math.imul(hash ^ str.charCodeAt(i), FNV1A_32_PRIME) >>> 0;
+    for (let charIndex = 0; charIndex < str.length; charIndex++) {
+        hash = Math.imul(hash ^ str.charCodeAt(charIndex), FNV1A_32_PRIME) >>> 0;
     }
     return hash;
 }
 
+const fnv1a = computeFnv1a32Hash;
+
 function computeLineHashes(lines: string[]): Uint32Array {
     const hashes = new Uint32Array(lines.length);
-    for (let i = 0; i < lines.length; i++) {
-        hashes[i] = fnv1a(lines[i]);
+    for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+        hashes[lineIndex] = computeFnv1a32Hash(lines[lineIndex]);
     }
     return hashes;
 }
@@ -451,16 +522,20 @@ function computeLineHashes(lines: string[]): Uint32Array {
 /**
  * Return trivial diff ops when one or both input line arrays are empty.
  */
-function checkTrivialDiff(a: string[], b: string[]): DiffOp[] | null {
-    if (a.length === 0 && b.length === 0) return [];
-    if (a.length === 0) {
-        return b.map((_, bIdx) => ({ type: DIFF_OP_INSERT, aIdx: 0, bIdx }));
+function evaluateTrivialDiff(oldLines: string[], newLines: string[]): DiffOp[] | null {
+    const isOldEmpty = oldLines.length === 0;
+    const isNewEmpty = newLines.length === 0;
+    if (isOldEmpty && isNewEmpty) return [];
+    if (isOldEmpty) {
+        return newLines.map((_, bIdx) => ({ type: DIFF_OP_INSERT, aIdx: 0, bIdx }));
     }
-    if (b.length === 0) {
-        return a.map((_, aIdx) => ({ type: DIFF_OP_DELETE, aIdx, bIdx: 0 }));
+    if (isNewEmpty) {
+        return oldLines.map((_, aIdx) => ({ type: DIFF_OP_DELETE, aIdx, bIdx: 0 }));
     }
     return null;
 }
+
+const checkTrivialDiff = evaluateTrivialDiff;
 
 /**
  * Computes an optimal line-level edit script using the standard Myers O(ND) greedy
@@ -469,7 +544,7 @@ function checkTrivialDiff(a: string[], b: string[]): DiffOp[] | null {
  * Preconditions:
  *   - When precomputed line hash buffers (`hashA`, `hashB`) are provided, they MUST
  *     be strictly equal in length to their corresponding line arrays
- *     (`hashA.length === a.length` and `hashB.length === b.length`).
+ *     (`hashA.length === oldLines.length` and `hashB.length === newLines.length`).
  *     Providing mismatched hash buffers violates buffer alignment and causes
  *     out-of-bounds indexing or erroneous line identity matches during prefix/suffix
  *     stripping and snake advancement.
@@ -480,35 +555,55 @@ function checkTrivialDiff(a: string[], b: string[]): DiffOp[] | null {
  *     consumption on large or disjoint differences.
  *   - If the trimmed middle section exceeds `MYERS_MAX_MID_LINES` (1500 lines total
  *     across middle spans: `max = midN + midM > 1500`) or if the diagonal trace matrix
- *     exceeds 2,000,000 cells (`(max + 1) * (2 * max + 1) > 2_000_000`), the
+ *     exceeds 2,000,000 cells (`(max + 1) * (2 * max + 1) > MYERS_MAX_TRACE_CELLS`), the
  *     algorithm automatically degrades and falls back to `histogramDiff`
  *     to prevent out-of-memory (OOM) failures and latency spikes on disjoint content.
  *
- * @param a - Array of lines from the original/old content.
- * @param b - Array of lines from the modified/new content.
- * @param hashA - Optional precomputed 32-bit FNV-1a hashes for lines in `a`.
- *   Precondition: must equal `a.length`.
- * @param hashB - Optional precomputed 32-bit FNV-1a hashes for lines in `b`.
- *   Precondition: must equal `b.length`.
- * @returns Ordered edit script (`DiffOp[]`) describing minimal edits to transform `a` into `b`.
+ * @param oldLines - Array of lines from the original/old content.
+ * @param newLines - Array of lines from the modified/new content.
+ * @param hashA - Optional precomputed 32-bit FNV-1a hashes for lines in `oldLines`.
+ *   Precondition: must equal `oldLines.length`.
+ * @param hashB - Optional precomputed 32-bit FNV-1a hashes for lines in `newLines`.
+ *   Precondition: must equal `newLines.length`.
+ * @returns Ordered edit script (`DiffOp[]`) describing minimal edits to transform `oldLines` into `newLines`.
  */
-export function myersDiff(
-    a: string[],
-    b: string[],
+export function computeMyersDiff(
+    oldLines: string[],
+    newLines: string[],
     hashA?: Uint32Array,
     hashB?: Uint32Array,
 ): DiffOp[] {
-    const trivial = checkTrivialDiff(a, b);
+    const trivial = evaluateTrivialDiff(oldLines, newLines);
     if (trivial !== null) return trivial;
 
-    const n = a.length;
-    const m = b.length;
-    const effectiveHashA = hashA ?? computeLineHashes(a);
-    const effectiveHashB = hashB ?? computeLineHashes(b);
-    const trimmed = trimPrefixSuffix(a, b, effectiveHashA, effectiveHashB);
+    const oldLineCount = oldLines.length;
+    const newLineCount = newLines.length;
+    const effectiveHashA = hashA ?? computeLineHashes(oldLines);
+    const effectiveHashB = hashB ?? computeLineHashes(newLines);
+    const trimmed = trimPrefixSuffix(oldLines, newLines, effectiveHashA, effectiveHashB);
     const { prefix, suffix, midA, midB, midHA, midHB } = trimmed;
 
-    return myersDiffCore(prefix, suffix, n, m, midA, midB, midHA, midHB);
+    return executeMyersDiffCore({ prefix, suffix, oldLineCount, newLineCount, midA, midB, midHA, midHB });
+}
+
+/**
+ * Computes an optimal line-level edit script using standard Myers diff algorithm.
+ * Backward-compatible alias of computeMyersDiff.
+ */
+export const myersDiff = computeMyersDiff;
+
+/**
+ * Structured parameter object for Myers core diff algorithm execution.
+ */
+export interface MyersDiffPlan {
+    readonly prefix: number;
+    readonly suffix: number;
+    readonly oldLineCount: number;
+    readonly newLineCount: number;
+    readonly midA: string[];
+    readonly midB: string[];
+    readonly midHA: Uint32Array;
+    readonly midHB: Uint32Array;
 }
 
 /**
@@ -523,46 +618,38 @@ export function myersDiff(
  *     automatically degrades and falls back to `histogramDiff` to guarantee O(ND) bounds and
  *     eliminate OOM risks.
  *
- * @param prefix - Length of identical common prefix.
- * @param suffix - Length of identical common suffix.
- * @param n - Original length of line array a.
- * @param m - Original length of line array b.
- * @param midA - Middle slice of line array a without prefix and suffix.
- * @param midB - Middle slice of line array b without prefix and suffix.
- * @param midHA - Hashes corresponding to midA lines.
- * @param midHB - Hashes corresponding to midB lines.
+ * @param plan - Structured Myers diff parameters including trimmed slices and line counts.
  * @returns Complete sequence of DiffOp operations reconstructing b from a.
  */
-export function myersDiffCore(
-    prefix: number,
-    suffix: number,
-    n: number,
-    m: number,
-    midA: string[],
-    midB: string[],
-    midHA: Uint32Array,
-    midHB: Uint32Array,
-): DiffOp[] {
-    if (prefix + suffix === n && prefix + suffix === m) {
-        const fullOps: DiffOp[] = new Array(n);
-        for (let i = 0; i < n; i++) {
-            fullOps[i] = { type: DIFF_OP_EQUAL, aIdx: i, bIdx: i };
+export function executeMyersDiffCore(plan: MyersDiffPlan): DiffOp[] {
+    const { prefix, suffix, oldLineCount, newLineCount, midA, midB, midHA, midHB } = plan;
+    if (prefix + suffix === oldLineCount && prefix + suffix === newLineCount) {
+        const fullOps: DiffOp[] = [];
+        for (let lineIndex = 0; lineIndex < oldLineCount; lineIndex++) {
+            fullOps.push({ type: DIFF_OP_EQUAL, aIdx: lineIndex, bIdx: lineIndex });
         }
         return fullOps;
     }
 
     const midN = midA.length;
     const midM = midB.length;
-    const max = midN + midM;
+    const maxDistance = midN + midM;
+    const spanConfig: AssembleSpanConfig = { prefix, suffix, oldLineCount, newLineCount };
 
     // Guard against excessive iterations on large unpruned matrices (>1500 lines or >2M cells).
     // Degradation cleanly preserves trimmed prefix/suffix slices.
-    if (max > MYERS_MAX_MID_LINES || (max + 1) * (2 * max + 1) > 2_000_000) {
+    if (maxDistance > MYERS_MAX_MID_LINES || (maxDistance + 1) * (2 * maxDistance + 1) > MYERS_MAX_TRACE_CELLS) {
         const midOps = histogramDiff(midA, midB, midHA, midHB);
-        return assembleDiffOps(prefix, suffix, n, m, midOps);
+        return assembleDiffOps(spanConfig, midOps);
     }
 
-    const search = computeMyersTrace({ midA, midB, midHA, midHB, midN, midM }, max);
-    const midOps = backtrackMyersTrace(search, midN, midM, prefix);
-    return assembleDiffOps(prefix, suffix, n, m, midOps);
+    const search = computeMyersTrace({ midA, midB, midHA, midHB, midN, midM }, maxDistance);
+    const midOps = computeReconstructedMyersTrace(search, midN, midM, prefix);
+    return assembleDiffOps(spanConfig, midOps);
 }
+
+/**
+ * Core engine for Myers line diff operating on pre-trimmed middle slices.
+ * Backward-compatible alias of executeMyersDiffCore.
+ */
+export const myersDiffCore = executeMyersDiffCore;

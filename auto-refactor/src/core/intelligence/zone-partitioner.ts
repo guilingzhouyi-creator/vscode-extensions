@@ -76,6 +76,26 @@ const STATE_PATTERN =
 /** Pattern heuristics for static data and lookup tables. */
 const TABLE_PATTERN = /(?:table|matrix|lookup|dict|mapping|mask|constants|registry|catalog)/i;
 
+const TEST_EXACT_NAMES = new Set(['tests', 'test']);
+
+const STATE_NODE_KINDS = new Set<NodeKind>([NodeKind.Class, NodeKind.Struct, NodeKind.Impl]);
+
+function isTestNodeName(name: string): boolean {
+    if (TEST_EXACT_NAMES.has(name)) return true;
+    if (name.startsWith('test_') || name.endsWith('_test')) return true;
+    return false;
+}
+
+function isLookupTableNode(node: NormalizedNode, name: string): boolean {
+    const isDataField = node.kind === NodeKind.Constant || node.kind === NodeKind.Field;
+    return isDataField && TABLE_PATTERN.test(name);
+}
+
+function isStateLifecycleNode(node: NormalizedNode, name: string): boolean {
+    if (STATE_NODE_KINDS.has(node.kind)) return true;
+    return STATE_PATTERN.test(name);
+}
+
 /**
  * Classifies an individual normalized AST declaration node into a candidate semantic zone.
  */
@@ -83,26 +103,17 @@ function classifyNodeZone(node: NormalizedNode): SemanticZoneType {
     const name = (node.name || '').toLowerCase();
 
     // 0. Embedded test zone: Rust #[cfg(test)], test modules, or test functions
-    if (name === 'tests' || name === 'test' || name.startsWith('test_') || name.endsWith('_test')) {
+    if (isTestNodeName(name)) {
         return ZONE_EMBEDDED_TEST;
     }
 
     // 1. Data and lookup tables: constants or variables with high literal density
-    if (node.kind === NodeKind.Constant || node.kind === NodeKind.Field) {
-        if (TABLE_PATTERN.test(name)) {
-            return ZONE_LOOKUP_TABLE;
-        }
+    if (isLookupTableNode(node, name)) {
+        return ZONE_LOOKUP_TABLE;
     }
 
     // 2. State & Lifecycle: classes, structs, impl blocks, or stateful coordinators
-    if (
-        node.kind === NodeKind.Class ||
-        node.kind === NodeKind.Struct ||
-        node.kind === NodeKind.Impl
-    ) {
-        return ZONE_STATE_LIFECYCLE;
-    }
-    if (STATE_PATTERN.test(name)) {
+    if (isStateLifecycleNode(node, name)) {
         return ZONE_STATE_LIFECYCLE;
     }
 

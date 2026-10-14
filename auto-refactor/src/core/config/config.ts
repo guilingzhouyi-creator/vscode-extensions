@@ -340,6 +340,8 @@ export function defaultAnalyzerOptions(): Record<AnalyzerId, Record<string, any>
     };
 }
 
+const EMPTY_ANALYZER_OPTIONS: Readonly<Record<string, unknown>> = Object.freeze({});
+
 /**
  * Default declarative registry: built-in core registered.
  * Specialized tiers (governance, architecture, performance, comments, hygiene, security)
@@ -350,7 +352,7 @@ export function defaultAnalyzerOptions(): Record<AnalyzerId, Record<string, any>
 export function defaultAnalyzers(): Record<string, AnalyzerDeclaration> {
     const map: Record<string, AnalyzerDeclaration> = {};
     for (const name of BUILTIN_ANALYZERS) {
-        map[name] = { enabled: !SPECIALIZED_ANALYZERS.has(name), options: {} };
+        map[name] = { enabled: !SPECIALIZED_ANALYZERS.has(name), options: EMPTY_ANALYZER_OPTIONS };
     }
     return map;
 }

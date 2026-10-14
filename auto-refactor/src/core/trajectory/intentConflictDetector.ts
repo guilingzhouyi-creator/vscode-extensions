@@ -95,6 +95,19 @@ export class IntentConflictDetector {
         return conflicts;
     }
 
+    private appendPatchToFileMap(
+        fileMap: Map<string, AgentPatchSlice[]>,
+        norm: string,
+        p: AgentPatchSlice,
+    ): void {
+        let list = fileMap.get(norm);
+        if (!list) {
+            list = [];
+            fileMap.set(norm, list);
+        }
+        list.push(p);
+    }
+
     /**
      * Inspects concurrent patches for eroded guards and opposing modifications.
      */
@@ -104,9 +117,7 @@ export class IntentConflictDetector {
 
         for (const p of patches) {
             const norm = normalizePath(p.filePath);
-            const list = fileMap.get(norm) || [];
-            list.push(p);
-            fileMap.set(norm, list);
+            this.appendPatchToFileMap(fileMap, norm, p);
         }
 
         for (const [norm, group] of fileMap.entries()) {

@@ -190,6 +190,28 @@ const TAG_RULES: Readonly<Record<string, TagPredicate>> = {
 };
 
 /**
+ * Builds a RecipePrecondition without transient object spreading.
+ *
+ * @param language - Target language identifier.
+ * @param descriptor - Matched pattern descriptor.
+ * @returns Concrete RecipePrecondition object.
+ */
+function buildRecipePrecondition(
+    language: string | undefined,
+    descriptor: PatternDescriptor,
+): RecipePrecondition {
+    const precondition: RecipePrecondition = {
+        targetLanguage: language,
+        minLines: descriptor.minLines,
+        antiPatternTags: descriptor.antiPatternTags,
+    };
+    if (descriptor.minComplexity !== undefined) {
+        precondition.minComplexity = descriptor.minComplexity;
+    }
+    return precondition;
+}
+
+/**
  * Extractor engine that derives reusable refactoring recipes from code evolution history.
  */
 export class TrajectoryRecipeExtractor {
@@ -320,14 +342,7 @@ export class TrajectoryRecipeExtractor {
                     name: descriptor.name,
                     category: descriptor.category,
                     description: descriptor.description,
-                    precondition: {
-                        targetLanguage: language,
-                        minLines: descriptor.minLines,
-                        ...(descriptor.minComplexity === undefined
-                            ? {}
-                            : { minComplexity: descriptor.minComplexity }),
-                        antiPatternTags: descriptor.antiPatternTags,
-                    },
+                    precondition: buildRecipePrecondition(language, descriptor),
                     operations: descriptor.operations,
                 };
             }

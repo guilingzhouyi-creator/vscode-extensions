@@ -79,6 +79,47 @@ const EXEMPTION_LOOKUP: Record<string, ExemptionReason> = {
     cycle: 'cycle-breaker',
 };
 
+function categorizeTsJsImport(specifier: string): ImportCategory {
+    if (specifier.startsWith('node:')) return CATEGORY_STDLIB;
+    const clean = specifier.replace(/^node:/, '');
+    const base = clean.split('/')[0];
+    if (NODE_CORE_MODULES.has(clean) || NODE_CORE_MODULES.has(base)) return CATEGORY_STDLIB;
+    if (specifier.startsWith('./') || specifier.startsWith('../')) return CATEGORY_LOCAL;
+    if (specifier.startsWith('@shared/') || specifier.includes('/common/')) {
+        return CATEGORY_INTERNAL_SHARED;
+    }
+    return CATEGORY_THIRD_PARTY;
+}
+
+function categorizePythonImport(specifier: string): ImportCategory {
+    const firstSegment = specifier.split('.')[0];
+    if (PYTHON_STDLIB_MODULES.has(firstSegment)) return CATEGORY_STDLIB;
+    if (specifier.startsWith('.')) return CATEGORY_LOCAL;
+    return CATEGORY_THIRD_PARTY;
+}
+
+function categorizeRustImport(specifier: string): ImportCategory {
+    if (
+        specifier.startsWith('std::') ||
+        specifier.startsWith('core::') ||
+        specifier.startsWith('alloc::') ||
+        specifier.startsWith('proc_macro::')
+    ) {
+        return CATEGORY_STDLIB;
+    }
+    if (specifier.startsWith('crate::') || specifier.startsWith('super::')) {
+        return CATEGORY_LOCAL;
+    }
+    return CATEGORY_THIRD_PARTY;
+}
+
+function categorizeGoImport(specifier: string): ImportCategory {
+    const firstSegment = specifier.split('/')[0];
+    if (GO_CORE_PACKAGES.has(firstSegment)) return CATEGORY_STDLIB;
+    if (specifier.startsWith('.')) return CATEGORY_LOCAL;
+    return CATEGORY_THIRD_PARTY;
+}
+
 /**
  * Determine import category based on language and module specifier.
  *
@@ -87,50 +128,21 @@ const EXEMPTION_LOOKUP: Record<string, ExemptionReason> = {
  * @returns Categorized import classification.
  */
 export function categorizeImport(specifier: string, language: string): ImportCategory {
-    if (language === 'typescript' || language === 'javascript') {
-        if (specifier.startsWith('node:')) return CATEGORY_STDLIB;
-        const clean = specifier.replace(/^node:/, '');
-        const base = clean.split('/')[0];
-        if (NODE_CORE_MODULES.has(clean) || NODE_CORE_MODULES.has(base)) return CATEGORY_STDLIB;
-        if (specifier.startsWith('./') || specifier.startsWith('../')) return CATEGORY_LOCAL;
-        if (specifier.startsWith('@shared/') || specifier.includes('/common/')) {
-            return CATEGORY_INTERNAL_SHARED;
-        }
-        return CATEGORY_THIRD_PARTY;
-    }
-
-    if (language === 'python') {
-        const firstSegment = specifier.split('.')[0];
-        if (PYTHON_STDLIB_MODULES.has(firstSegment)) return CATEGORY_STDLIB;
-        if (specifier.startsWith('.')) return CATEGORY_LOCAL;
-        return CATEGORY_THIRD_PARTY;
-    }
-
-    if (language === 'rust') {
-        if (
-            specifier.startsWith('std::') ||
-            specifier.startsWith('core::') ||
-            specifier.startsWith('alloc::') ||
-            specifier.startsWith('proc_macro::')
-        )
-            return CATEGORY_STDLIB;
-        if (specifier.startsWith('crate::') || specifier.startsWith('super::'))
+    switch (language) {
+        case 'typescript':
+        case 'javascript':
+            return categorizeTsJsImport(specifier);
+        case 'python':
+            return categorizePythonImport(specifier);
+        case 'rust':
+            return categorizeRustImport(specifier);
+        case 'go':
+            return categorizeGoImport(specifier);
+        case 'gdscript':
             return CATEGORY_LOCAL;
-        return CATEGORY_THIRD_PARTY;
+        default:
+            return CATEGORY_THIRD_PARTY;
     }
-
-    if (language === 'go') {
-        const firstSegment = specifier.split('/')[0];
-        if (GO_CORE_PACKAGES.has(firstSegment)) return CATEGORY_STDLIB;
-        if (specifier.startsWith('.')) return CATEGORY_LOCAL;
-        return CATEGORY_THIRD_PARTY;
-    }
-
-    if (language === 'gdscript') {
-        return CATEGORY_LOCAL;
-    }
-
-    return CATEGORY_THIRD_PARTY;
 }
 
 /** Maximum capacity of precompiled custom exemption regex cache (bounded LRU). */

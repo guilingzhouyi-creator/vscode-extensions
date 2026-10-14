@@ -54,9 +54,27 @@ import {
     oxcPosOf,
     oxcLiteralText,
 } from './oxc-predicates';
+import { createRequire } from 'node:module';
 import { OxcProjector } from './oxc-projector';
 
 export { OxcProjector } from './oxc-projector';
+
+const dynamicRequire = createRequire(__filename);
+
+const MODULE_OXC_PARSER = 'oxc-parser';
+const EXT_DTS = '.d.ts';
+const LANG_TSX = 'tsx';
+const LANG_JSX = 'jsx';
+const LANG_DTS = 'dts';
+const SOURCE_TYPE_UNAMBIGUOUS = 'unambiguous';
+const KIND_STATIC_BLOCK = 'StaticBlock';
+const KIND_CONSTRUCTOR = 'constructor';
+const KIND_PROGRAM = 'Program';
+const KIND_TS_EXPORT_ASSIGNMENT = 'TSExportAssignment';
+const KIND_EXPORT_ALL_DECLARATION = 'ExportAllDeclaration';
+const KIND_TS_ENUM_BODY = 'TSEnumBody';
+const KIND_LITERAL = 'Literal';
+const PROP_EXPORTED = '__exported';
 
 // oxc-parser is ESM-only; load lazily so the default TypeScript path never requires it.
 let _parseSync: ParseSyncFn | null = null;
@@ -67,18 +85,63 @@ function parseSyncSafe(
     options: Parameters<ParseSyncFn>[2],
 ): OxcParseResult {
     if (!_parseSync) {
-        const mod = require('oxc-parser') as { parseSync: ParseSyncFn };
-        _parseSync = mod.parseSync;
+        const oxcModule = dynamicRequire(MODULE_OXC_PARSER) as { parseSync: ParseSyncFn };
+        _parseSync = oxcModule.parseSync;
     }
     return _parseSync(filename, sourceText, options);
 }
 
 function resolveOxcLang(filePath: string): 'dts' | 'tsx' | 'jsx' | 'ts' | 'js' {
-    if (filePath.endsWith('.d.ts')) return 'dts';
-    if (/\.tsx$/i.test(filePath)) return 'tsx';
+    if (filePath.endsWith(EXT_DTS)) return LANG_DTS;
+    if (/\.tsx$/i.test(filePath)) return LANG_TSX;
     if (/\.ts$/i.test(filePath)) return OXC_LANGUAGE_TS;
-    if (/\.jsx$/i.test(filePath)) return 'jsx';
-    return OXC_LANGUAGE_JS;
+    return /\.jsx$/i.test(filePath) ? LANG_JSX : OXC_LANGUAGE_JS;
+}
+
+function executeOxcParse(filePath: string, content: string): OxcParseResult {
+    const lang = resolveOxcLang(filePath);
+    return parseSyncSafe(filePath, content, {
+        lang,
+        sourceType: SOURCE_TYPE_UNAMBIGUOUS,
+        preserveParens: true,
+    });
+}
+
+interface ParseContext {
+    readonly ctx: Ctx;
+    readonly seed?: ProjectionSeed;
+}
+
+interface NodeClassification {
+    readonly rawNode: OxcNode;
+    readonly kind: NodeKind;
+    readonly isFunctionLike: boolean;
+    readonly isLiteral: boolean;
+    readonly isClassDefining: boolean;
+    readonly introducesBinding: boolean;
+    readonly startOffset: number;
+}
+
+interface NodeHierarchyContext {
+    readonly targetNode: NormalizedNode;
+    readonly rawNode: OxcNode;
+    readonly parent?: OxcNode;
+    readonly grandparent?: OxcNode;
+    readonly isLiteral: boolean;
+    readonly ctx: Ctx;
+}
+
+interface ChildDispatchConfig {
+    readonly oxcParent: OxcNode;
+    readonly oxcGrandparent?: OxcNode;
+    readonly inlineFnValue: boolean;
+}
+
+interface ChildTraversalOptions {
+    readonly targetNode: NormalizedNode;
+    readonly rawNode: OxcNode;
+    readonly oxcParent?: OxcNode;
+    readonly isMethodSource: boolean;
 }
 
 /**
@@ -108,19 +171,17 @@ export class OxcAdapter implements LanguageAdapter {
      * @returns Normalized AST whose root is the source-file node.
      */
     parse(content: string, filePath: string, seed?: ProjectionSeed): NormalizedAst {
-        const lang = resolveOxcLang(filePath);
-        const res = parseSyncSafe(filePath, content, {
-            lang,
-            sourceType: 'unambiguous',
-            preserveParens: true,
-        });
+        const parseResult = executeOxcParse(filePath, content);
         const ctx: Ctx = { src: content, lineStarts: computeLineStarts(content) };
-        const program = res.program;
-        const root = this.mapNode(program, undefined, undefined, undefined, ctx, seed);
+        const program = parseResult.program;
+        const parseContext: ParseContext = { ctx, seed };
+        const root = this.mapNode(program, {}, parseContext);
         const children: NormalizedNode[] = [];
-        for (const stmt of program.body || []) {
-            const mapped = this.mapTopStatement(stmt, program, ctx, seed);
-            if (mapped) children.push(mapped);
+        if (Array.isArray(program.body)) {
+            for (const stmt of program.body) {
+                const mapped = this.mapTopStatement(stmt, program, parseContext);
+                if (mapped) children.push(mapped);
+            }
         }
         root.children = children;
         return { root };
@@ -137,13 +198,8 @@ export class OxcAdapter implements LanguageAdapter {
      * @returns An `OxcProjector` over the raw program; never `null` for supported extensions.
      */
     project(content: string, filePath: string, policy: ProjectionPolicy): NodeProjector | null {
-        const lang = resolveOxcLang(filePath);
-        const res = parseSyncSafe(filePath, content, {
-            lang,
-            sourceType: 'unambiguous',
-            preserveParens: true,
-        });
-        return new OxcProjector(res.program, content, policy);
+        const parseResult = executeOxcParse(filePath, content);
+        return new OxcProjector(parseResult.program, content, policy);
     }
 
     /**
@@ -169,298 +225,287 @@ export class OxcAdapter implements LanguageAdapter {
     private mapTopStatement(
         stmt: OxcNode,
         program: OxcNode,
-        ctx: Ctx,
-        seed?: ProjectionSeed,
+        parseContext: ParseContext,
     ): NormalizedNode | null {
         if (
             (stmt.type === NODE_KIND_EXPORT_NAMED_DECLARATION ||
                 stmt.type === NODE_KIND_EXPORT_DEFAULT_DECLARATION) &&
             stmt.declaration
         ) {
-            stmt.declaration.__exported = true;
-            return this.mapNode(stmt.declaration, program, undefined, stmt, ctx, seed);
+            stmt.declaration[PROP_EXPORTED] = true;
+            return this.mapNode(
+                stmt.declaration,
+                { parent: program, exportWrapper: stmt },
+                parseContext,
+            );
         }
-        return this.mapNode(stmt, program, undefined, undefined, ctx, seed);
+        return this.mapNode(stmt, { parent: program }, parseContext);
     }
 
     private resolveStartOffset(
-        n: OxcNode,
-        fnLike: boolean,
+        rawNode: OxcNode,
+        isFunctionLike: boolean,
         isClassDefining: boolean,
-        exportWrapper: OxcNode | undefined,
+        exportWrapper?: OxcNode,
     ): number {
-        if ((fnLike || isClassDefining) && n.__exported && exportWrapper) {
+        if ((isFunctionLike || isClassDefining) && rawNode[PROP_EXPORTED] && exportWrapper) {
             return exportWrapper.start;
         }
-        return n.start;
+        return rawNode.start;
     }
 
     private resolveNodePositions(
-        n: OxcNode,
-        kind: NodeKind,
-        startOff: number,
-        isLiteral: boolean,
-        fnLike: boolean,
+        rawNode: OxcNode,
+        classification: NodeClassification,
         ctx: Ctx,
     ): { start?: Position; end?: Position } {
+        const { kind, isLiteral, isFunctionLike, startOffset } = classification;
         const needsPos =
-            isLiteral || fnLike || kind === NodeKind.SourceFile || kind === NodeKind.Class;
+            isLiteral || isFunctionLike || kind === NodeKind.SourceFile || kind === NodeKind.Class;
         if (!needsPos) return {};
         return {
-            start: oxcPosOf(startOff, ctx),
-            end: oxcPosOf(n.end, ctx),
+            start: oxcPosOf(startOffset, ctx),
+            end: oxcPosOf(rawNode.end, ctx),
         };
     }
 
     private resolveNodeName(
-        n: OxcNode,
-        kind: NodeKind,
-        fnLike: boolean,
-        isClassDefining: boolean,
-        isBinding: boolean,
+        rawNode: OxcNode,
+        classification: NodeClassification,
         ctx: Ctx,
     ): string | undefined {
-        if (fnLike || isClassDefining || isBinding) {
-            return oxcNameOf(n, ctx) ?? undefined;
+        const { kind, isFunctionLike, isClassDefining, introducesBinding } = classification;
+        if (isFunctionLike || isClassDefining || introducesBinding) {
+            return oxcNameOf(rawNode, ctx) ?? undefined;
         }
         if (kind === NodeKind.Variable || kind === NodeKind.Constant) {
-            return oxcNameOf(n, ctx) ?? undefined;
+            return oxcNameOf(rawNode, ctx) ?? undefined;
         }
         return undefined;
     }
 
     private buildNormalizedNode(
-        n: OxcNode,
-        kind: NodeKind,
-        fnLike: boolean,
-        isLiteral: boolean,
-        isClassDefining: boolean,
-        isBinding: boolean,
-        startOff: number,
+        classification: NodeClassification,
         ctx: Ctx,
     ): NormalizedNode {
-        const t = n.type;
-        const pos = this.resolveNodePositions(n, kind, startOff, isLiteral, fnLike, ctx);
+        const { rawNode, kind, isFunctionLike, isLiteral, isClassDefining, introducesBinding } = classification;
+        const rawType = rawNode.type;
+        const pos = this.resolveNodePositions(rawNode, classification, ctx);
         const node: NormalizedNode = {
             kind,
-            rawKind: t,
-            text: isLiteral ? oxcLiteralText(n, ctx) : undefined,
+            rawKind: rawType,
+            text: isLiteral ? oxcLiteralText(rawNode, ctx) : undefined,
             start: pos.start,
             end: pos.end,
-            name: this.resolveNodeName(n, kind, fnLike, isClassDefining, isBinding, ctx),
+            name: this.resolveNodeName(rawNode, classification, ctx),
             isNumeric: kind === NodeKind.NumericLiteral,
             isString: kind === NodeKind.StringLiteral,
-            branchWeight: oxcBranchWeightOf(n),
-            functionLike: fnLike,
+            branchWeight: oxcBranchWeightOf(rawNode),
+            functionLike: isFunctionLike,
             isClassDefining,
-            introducesBinding: isBinding,
-            bindingName: isBinding ? oxcBindingNameOf(n, ctx) : null,
-            hasFunctionInitializer: isBinding,
-            increasesNesting: CONTROL_OR_BLOCK.has(t) || t === 'StaticBlock',
-            isConstructor: t === NODE_KIND_METHOD_DEFINITION && n.kind === 'constructor',
+            introducesBinding,
+            bindingName: introducesBinding ? oxcBindingNameOf(rawNode, ctx) : null,
+            hasFunctionInitializer: introducesBinding,
+            increasesNesting: CONTROL_OR_BLOCK.has(rawType) || rawType === KIND_STATIC_BLOCK,
+            isConstructor: rawType === NODE_KIND_METHOD_DEFINITION && rawNode.kind === KIND_CONSTRUCTOR,
             children: [],
         };
         return node;
     }
 
-    private applyNodeHierarchy(
-        node: NormalizedNode,
-        n: OxcNode,
-        parent: OxcNode | undefined,
-        grandparent: OxcNode | undefined,
-        isLiteral: boolean,
-        ctx: Ctx,
-    ): void {
-        const topLevel =
-            Boolean(parent) && parent!.type === 'Program' && TOP_LEVEL_DECL.has(n.type);
-        node.topLevel = topLevel;
-        node.exported = topLevel && (Boolean(n.__exported) || n.type === 'TSExportAssignment');
+    private applyNodeHierarchy(context: NodeHierarchyContext): void {
+        const { targetNode, rawNode, parent, grandparent, isLiteral, ctx } = context;
+        const isTopLevel =
+            Boolean(parent) && parent!.type === KIND_PROGRAM && TOP_LEVEL_DECL.has(rawNode.type);
+        targetNode.topLevel = isTopLevel;
+        targetNode.exported = isTopLevel && (Boolean(rawNode[PROP_EXPORTED]) || rawNode.type === KIND_TS_EXPORT_ASSIGNMENT);
         if (isLiteral) {
-            node.isConstBound = oxcIsConstBoundOf(n, parent, grandparent);
-            node.tolerated = oxcIsToleratedOf(n, parent, ctx, grandparent);
+            targetNode.isConstBound = oxcIsConstBoundOf(rawNode, parent, grandparent);
+            targetNode.tolerated = oxcIsToleratedOf(rawNode, parent, ctx, grandparent);
         }
     }
 
-    private tryReuseSubtree(
-        node: NormalizedNode,
-        n: OxcNode,
-        fnLike: boolean,
-        ctx: Ctx,
-        seed?: ProjectionSeed,
-    ): boolean {
-        if (!seed || !fnLike) return false;
-        const startPos = oxcPosOf(n.start, ctx);
-        const span: ReusedSpan = {
+    private computeReusedSpan(rawNode: OxcNode, ctx: Ctx): ReusedSpan {
+        const startPos = oxcPosOf(rawNode.start, ctx);
+        return {
             startLine: startPos.line,
             startColumn: startPos.column,
-            startByte: n.start,
-            endByte: n.end,
-            sourceText: ctx.src.slice(n.start, n.end),
+            startByte: rawNode.start,
+            endByte: rawNode.end,
+            sourceText: ctx.src.slice(rawNode.start, rawNode.end),
         };
+    }
+
+    private tryReuseSubtree(
+        targetNode: NormalizedNode,
+        rawNode: OxcNode,
+        isFunctionLike: boolean,
+        parseContext: ParseContext,
+    ): boolean {
+        const { ctx, seed } = parseContext;
+        if (!seed || !isFunctionLike) return false;
+        const span = this.computeReusedSpan(rawNode, ctx);
         const reused = seed.reuseSubtree(span);
         if (reused) {
-            node.children = reused;
+            targetNode.children = reused;
             seed.cacheSubtree(span, reused);
-            if (seed.markReused) seed.markReused(node, span);
+            if (seed.markReused) seed.markReused(targetNode, span);
             return true;
         }
         return false;
     }
 
     private recordSpanCache(
-        seed: ProjectionSeed | undefined,
-        fnLike: boolean,
-        n: OxcNode,
-        ctx: Ctx,
+        parseContext: ParseContext,
+        isFunctionLike: boolean,
+        rawNode: OxcNode,
         children: NormalizedNode[],
     ): void {
-        if (!seed || !fnLike) return;
-        const startPos = oxcPosOf(n.start, ctx);
-        const span: ReusedSpan = {
-            startLine: startPos.line,
-            startColumn: startPos.column,
-            startByte: n.start,
-            endByte: n.end,
-            sourceText: ctx.src.slice(n.start, n.end),
-        };
+        const { ctx, seed } = parseContext;
+        if (!seed || !isFunctionLike) return;
+        const span = this.computeReusedSpan(rawNode, ctx);
         seed.cacheSubtree(span, children);
     }
 
     private traverseOxcChildren(
-        node: NormalizedNode,
-        n: OxcNode,
-        parent: OxcNode | undefined,
-        isMethodSource: boolean,
-        ctx: Ctx,
-        seed?: ProjectionSeed,
+        options: ChildTraversalOptions,
+        parseContext: ParseContext,
     ): void {
-        for (const key of Object.keys(n)) {
-            if (OXC_META_KEYS.has(key) || key === '__exported') continue;
-            const v = n[key];
-            if (v == null) continue;
-            if (Array.isArray(v)) {
-                for (const item of v) {
-                    this.pushChild(node, item, n, parent, isMethodSource, ctx, seed);
+        const { targetNode, rawNode, oxcParent, isMethodSource } = options;
+        for (const propKey of Object.keys(rawNode)) {
+            if (OXC_META_KEYS.has(propKey) || propKey === PROP_EXPORTED) continue;
+            const propertyValue = rawNode[propKey];
+            if (propertyValue == null) continue;
+            const dispatchConfig: ChildDispatchConfig = {
+                oxcParent: rawNode,
+                oxcGrandparent: oxcParent,
+                inlineFnValue: isMethodSource,
+            };
+            if (Array.isArray(propertyValue)) {
+                for (const childNode of propertyValue) {
+                    this.pushChild(targetNode, childNode, dispatchConfig, parseContext);
                 }
-            } else if (typeof v === TYPEOF_OBJECT && typeof (v as OxcNode).type === TYPEOF_STRING) {
-                this.pushChild(node, v as OxcNode, n, parent, isMethodSource, ctx, seed);
+            } else if (typeof propertyValue === TYPEOF_OBJECT && typeof (propertyValue as OxcNode).type === TYPEOF_STRING) {
+                this.pushChild(targetNode, propertyValue as OxcNode, dispatchConfig, parseContext);
             }
         }
     }
 
     private mapNode(
-        n: OxcNode,
-        parent: OxcNode | undefined,
-        grandparent: OxcNode | undefined,
-        exportWrapper: OxcNode | undefined,
-        ctx: Ctx,
-        seed?: ProjectionSeed,
+        rawNode: OxcNode,
+        hierarchy: { parent?: OxcNode; grandparent?: OxcNode; exportWrapper?: OxcNode },
+        parseContext: ParseContext,
     ): NormalizedNode {
-        const t = n.type;
+        const rawType = rawNode.type;
         const isMethodSource =
-            t === NODE_KIND_METHOD_DEFINITION || (t === NODE_KIND_PROPERTY && n.method === true);
-        const kind = oxcKindOf(n);
-        const fnLike = kind === NodeKind.Function || kind === NodeKind.Method;
+            rawType === NODE_KIND_METHOD_DEFINITION || (rawType === NODE_KIND_PROPERTY && rawNode.method === true);
+        const kind = oxcKindOf(rawNode);
+        const isFunctionLike = kind === NodeKind.Function || kind === NodeKind.Method;
         const isLiteral = kind === NodeKind.NumericLiteral || kind === NodeKind.StringLiteral;
         const isClassDefining =
-            t === NODE_KIND_CLASS_DECLARATION || t === NODE_KIND_CLASS_EXPRESSION;
-        const isBinding = oxcIntroducesBinding(n);
+            rawType === NODE_KIND_CLASS_DECLARATION || rawType === NODE_KIND_CLASS_EXPRESSION;
+        const introducesBinding = oxcIntroducesBinding(rawNode);
 
-        const startOff = this.resolveStartOffset(n, fnLike, isClassDefining, exportWrapper);
-        const node = this.buildNormalizedNode(
-            n,
+        const startOffset = this.resolveStartOffset(rawNode, isFunctionLike, isClassDefining, hierarchy.exportWrapper);
+        const classification: NodeClassification = {
+            rawNode,
             kind,
-            fnLike,
+            isFunctionLike,
             isLiteral,
             isClassDefining,
-            isBinding,
-            startOff,
-            ctx,
-        );
-        this.applyNodeHierarchy(node, n, parent, grandparent, isLiteral, ctx);
+            introducesBinding,
+            startOffset,
+        };
 
-        if (this.tryReuseSubtree(node, n, fnLike, ctx, seed)) {
-            return node;
+        const targetNode = this.buildNormalizedNode(classification, parseContext.ctx);
+        const hierarchyContext: NodeHierarchyContext = {
+            targetNode,
+            rawNode,
+            parent: hierarchy.parent,
+            grandparent: hierarchy.grandparent,
+            isLiteral,
+            ctx: parseContext.ctx,
+        };
+        this.applyNodeHierarchy(hierarchyContext);
+
+        if (this.tryReuseSubtree(targetNode, rawNode, isFunctionLike, parseContext)) {
+            return targetNode;
         }
 
-        this.traverseOxcChildren(node, n, parent, isMethodSource, ctx, seed);
-        this.recordSpanCache(seed, fnLike, n, ctx, node.children || []);
-        return node;
+        const traversalOptions: ChildTraversalOptions = {
+            targetNode,
+            rawNode,
+            oxcParent: hierarchy.parent,
+            isMethodSource,
+        };
+        this.traverseOxcChildren(traversalOptions, parseContext);
+        this.recordSpanCache(parseContext, isFunctionLike, rawNode, targetNode.children || []);
+        return targetNode;
     }
 
     pushMethodFunctionValue(
-        node: NormalizedNode,
-        item: OxcNode,
+        targetNode: NormalizedNode,
+        oxcChildNode: OxcNode,
         oxcParent: OxcNode,
-        ctx: Ctx,
-        seed?: ProjectionSeed,
+        parseContext: ParseContext,
     ): void {
-        for (const key of Object.keys(item)) {
-            if (OXC_META_KEYS.has(key)) continue;
-            const v = item[key];
-            if (v == null) continue;
-            if (Array.isArray(v)) {
-                for (const sub of v) {
-                    this.pushChild(node, sub, item, oxcParent, false, ctx, seed);
+        const dispatchConfig: ChildDispatchConfig = {
+            oxcParent: oxcChildNode,
+            oxcGrandparent: oxcParent,
+            inlineFnValue: false,
+        };
+        for (const propKey of Object.keys(oxcChildNode)) {
+            if (OXC_META_KEYS.has(propKey)) continue;
+            const propertyValue = oxcChildNode[propKey];
+            if (propertyValue == null) continue;
+            if (Array.isArray(propertyValue)) {
+                for (const subChildNode of propertyValue) {
+                    this.pushChild(targetNode, subChildNode, dispatchConfig, parseContext);
                 }
-            } else if (typeof v === TYPEOF_OBJECT && typeof (v as OxcNode).type === TYPEOF_STRING) {
-                this.pushChild(node, v as OxcNode, item, oxcParent, false, ctx, seed);
+            } else if (typeof propertyValue === TYPEOF_OBJECT && typeof (propertyValue as OxcNode).type === TYPEOF_STRING) {
+                this.pushChild(targetNode, propertyValue as OxcNode, dispatchConfig, parseContext);
             }
         }
     }
 
     pushChild(
-        node: NormalizedNode,
-        item: OxcNode | null | undefined,
-        oxcParent: OxcNode,
-        oxcGrandparent: OxcNode | undefined,
-        inlineFnValue: boolean,
-        ctx: Ctx,
-        seed?: ProjectionSeed,
+        targetNode: NormalizedNode,
+        oxcChildNode: OxcNode | null | undefined,
+        config: ChildDispatchConfig,
+        parseContext: ParseContext,
     ): void {
-        if (item == null) return;
-        if (
-            this.tryHandleSpecialChild(
-                node,
-                item,
-                oxcParent,
-                oxcGrandparent,
-                inlineFnValue,
-                ctx,
-                seed,
-            )
-        ) {
+        if (oxcChildNode == null) return;
+        if (this.tryHandleSpecialChild(targetNode, oxcChildNode, config, parseContext)) {
             return;
         }
-        const child = this.mapNode(item, oxcParent, oxcGrandparent, undefined, ctx, seed);
-        node.children!.push(child);
+        const child = this.mapNode(
+            oxcChildNode,
+            { parent: config.oxcParent, grandparent: config.oxcGrandparent },
+            parseContext,
+        );
+        targetNode.children!.push(child);
     }
 
     private tryHandleExportChild(
-        node: NormalizedNode,
-        item: OxcNode,
-        oxcParent: OxcNode,
-        oxcGrandparent: OxcNode | undefined,
-        ctx: Ctx,
-        seed?: ProjectionSeed,
+        targetNode: NormalizedNode,
+        oxcChildNode: OxcNode,
+        config: ChildDispatchConfig,
+        parseContext: ParseContext,
     ): boolean {
-        if (item.type === 'ExportAllDeclaration') {
-            if (item.source) {
-                node.children!.push(
-                    this.mapNode(item.source, oxcParent, oxcGrandparent, item, ctx, seed),
-                );
+        const hierarchy = { parent: config.oxcParent, grandparent: config.oxcGrandparent, exportWrapper: oxcChildNode };
+        if (oxcChildNode.type === KIND_EXPORT_ALL_DECLARATION) {
+            if (oxcChildNode.source) {
+                targetNode.children!.push(this.mapNode(oxcChildNode.source, hierarchy, parseContext));
             }
             return true;
         }
         if (
-            item.type === NODE_KIND_EXPORT_NAMED_DECLARATION ||
-            item.type === NODE_KIND_EXPORT_DEFAULT_DECLARATION
+            oxcChildNode.type === NODE_KIND_EXPORT_NAMED_DECLARATION ||
+            oxcChildNode.type === NODE_KIND_EXPORT_DEFAULT_DECLARATION
         ) {
-            if (item.declaration) {
-                item.declaration.__exported = true;
-                node.children!.push(
-                    this.mapNode(item.declaration, oxcParent, oxcGrandparent, item, ctx, seed),
-                );
+            if (oxcChildNode.declaration) {
+                oxcChildNode.declaration[PROP_EXPORTED] = true;
+                targetNode.children!.push(this.mapNode(oxcChildNode.declaration, hierarchy, parseContext));
             }
             return true;
         }
@@ -468,50 +513,49 @@ export class OxcAdapter implements LanguageAdapter {
     }
 
     private tryHandleSpecialChild(
-        node: NormalizedNode,
-        item: OxcNode,
-        oxcParent: OxcNode,
-        oxcGrandparent: OxcNode | undefined,
-        inlineFnValue: boolean,
-        ctx: Ctx,
-        seed?: ProjectionSeed,
+        targetNode: NormalizedNode,
+        oxcChildNode: OxcNode,
+        config: ChildDispatchConfig,
+        parseContext: ParseContext,
     ): boolean {
-        if (inlineFnValue && item.type === NODE_KIND_FUNCTION_EXPRESSION) {
-            this.pushMethodFunctionValue(node, item, oxcParent, ctx, seed);
+        if (config.inlineFnValue && oxcChildNode.type === NODE_KIND_FUNCTION_EXPRESSION) {
+            this.pushMethodFunctionValue(targetNode, oxcChildNode, config.oxcParent, parseContext);
             return true;
         }
-        if (TYPE_SKIP_TYPES.has(item.type)) {
-            this.collectLiteralsInType(item, node, ctx);
+        if (TYPE_SKIP_TYPES.has(oxcChildNode.type)) {
+            this.collectLiteralsInType(oxcChildNode, targetNode, parseContext.ctx);
             return true;
         }
-        if (SKIP_TYPES.has(item.type)) return true;
-        if (this.tryHandleExportChild(node, item, oxcParent, oxcGrandparent, ctx, seed)) {
+        if (SKIP_TYPES.has(oxcChildNode.type)) return true;
+        if (this.tryHandleExportChild(targetNode, oxcChildNode, config, parseContext)) {
             return true;
         }
-        if (item.type === 'TSEnumBody') {
-            for (const m of item.members || []) {
-                this.pushChild(node, m, oxcParent, oxcGrandparent, false, ctx, seed);
+        if (oxcChildNode.type === KIND_TS_ENUM_BODY) {
+            if (Array.isArray(oxcChildNode.members)) {
+                for (const enumMember of oxcChildNode.members) {
+                    this.pushChild(targetNode, enumMember, config, parseContext);
+                }
             }
             return true;
         }
         return false;
     }
 
-    private tryCollectLiteralInType(cur: OxcNode, container: NormalizedNode, ctx: Ctx): boolean {
-        if (cur.type !== 'Literal') return false;
+    private tryCollectLiteralInType(rawNode: OxcNode, container: NormalizedNode, ctx: Ctx): boolean {
+        if (rawNode.type !== KIND_LITERAL) return false;
         const kind =
-            typeof cur.value === TYPEOF_STRING
+            typeof rawNode.value === TYPEOF_STRING
                 ? NodeKind.StringLiteral
-                : typeof cur.value === TYPEOF_NUMBER
+                : typeof rawNode.value === TYPEOF_NUMBER
                   ? NodeKind.NumericLiteral
                   : NodeKind.Other;
         if (kind !== NodeKind.Other) {
             container.children!.push({
                 kind,
-                rawKind: 'Literal',
-                text: oxcLiteralText(cur, ctx),
-                start: oxcPosOf(cur.start, ctx),
-                end: oxcPosOf(cur.end, ctx),
+                rawKind: KIND_LITERAL,
+                text: oxcLiteralText(rawNode, ctx),
+                start: oxcPosOf(rawNode.start, ctx),
+                end: oxcPosOf(rawNode.end, ctx),
                 isNumeric: kind === NodeKind.NumericLiteral,
                 isString: kind === NodeKind.StringLiteral,
                 branchWeight: 0,
@@ -523,30 +567,34 @@ export class OxcAdapter implements LanguageAdapter {
         return true;
     }
 
-    private pushOxcChildrenToStack(cur: OxcNode, stack: OxcNode[]): void {
+    private pushOxcChildrenToStack(rawNode: OxcNode, stack: OxcNode[]): void {
         const children: OxcNode[] = [];
-        for (const k of Object.keys(cur)) {
-            if (OXC_META_KEYS.has(k)) continue;
-            const v = cur[k];
-            if (v == null) continue;
-            if (Array.isArray(v)) {
-                for (const x of v) {
-                    if (x && typeof x === TYPEOF_OBJECT) children.push(x as OxcNode);
+        for (const propKey of Object.keys(rawNode)) {
+            if (OXC_META_KEYS.has(propKey)) continue;
+            const propertyValue = rawNode[propKey];
+            if (propertyValue == null) continue;
+            if (Array.isArray(propertyValue)) {
+                for (const arrayElement of propertyValue) {
+                    if (arrayElement && typeof arrayElement === TYPEOF_OBJECT) {
+                        children.push(arrayElement as OxcNode);
+                    }
                 }
-            } else if (typeof v === TYPEOF_OBJECT) {
-                children.push(v as OxcNode);
+            } else if (typeof propertyValue === TYPEOF_OBJECT) {
+                children.push(propertyValue as OxcNode);
             }
         }
-        for (let i = children.length - 1; i >= 0; i--) stack.push(children[i]);
+        for (let index = children.length - 1; index >= 0; index--) {
+            stack.push(children[index]);
+        }
     }
 
     collectLiteralsInType(typeNode: OxcNode, container: NormalizedNode, ctx: Ctx): void {
         const stack: OxcNode[] = [typeNode];
         while (stack.length) {
-            const cur = stack.pop();
-            if (cur == null) continue;
-            if (this.tryCollectLiteralInType(cur, container, ctx)) continue;
-            this.pushOxcChildrenToStack(cur, stack);
+            const currentItem = stack.pop();
+            if (currentItem == null) continue;
+            if (this.tryCollectLiteralInType(currentItem, container, ctx)) continue;
+            this.pushOxcChildrenToStack(currentItem, stack);
         }
     }
 }

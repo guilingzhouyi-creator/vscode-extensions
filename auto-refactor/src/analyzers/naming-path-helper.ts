@@ -64,7 +64,7 @@ export const ALLOWED_ACRONYMS: ReadonlySet<string> = new Set(
         'pos req res str sync async grpc http https html json yaml toml xml css dom ' +
         'url uri urn uuid guid jwt sql cli api sdk dto dao rpc ssl tls tcp udp ' +
         'dns ftp ssh cpu gpu ram rom png jpg svg gif csv tsv pdf ast loc eloc ' +
-        'sloc dfa nfa lut swar csr soa aos simd fps rng crc md5 sha ssot pr cd ' +
+        'sloc dfa nfa fsm lut swar csr soa aos simd fps rng crc md5 sha ssot pr cd ' +
         'qa env dev prod std fmt log tmp pkg bin lib ref opt arg cmd sys cwd ' +
         'pid gid uid tty zh en'
     ).split(' '),
@@ -597,182 +597,29 @@ function auditDirectoryName(
 }
 
 /** Standard engineering action verbs initiating descriptive function identifiers. */
-export const APPROVED_ACTION_VERBS: ReadonlySet<string> = new Set([
-    'get',
-    'fetch',
-    'read',
-    'scan',
-    'load',
-    'query',
-    'retrieve',
-    'extract',
-    'find',
-    'search',
-    'select',
-    'lookup',
-    'obtain',
-    'pull',
-    'peek',
-    'check',
-    'audit',
-    'validate',
-    'verify',
-    'detect',
-    'assert',
-    'ensure',
-    'test',
-    'inspect',
-    'examine',
-    'analyze',
-    'finalize',
-    'visit',
-    'match',
-    'guard',
-    'probe',
-    'lint',
-    'is',
-    'has',
-    'should',
-    'can',
-    'must',
-    'will',
-    'does',
-    'was',
-    'were',
-    'contains',
-    'exists',
-    'allows',
-    'supports',
-    'needs',
-    'compute',
-    'calculate',
-    'parse',
-    'resolve',
-    'evaluate',
-    'estimate',
-    'count',
-    'measure',
-    'compile',
-    'transpile',
-    'deduce',
-    'infer',
-    'aggregate',
-    'sum',
-    'diff',
-    'score',
-    'build',
-    'create',
-    'generate',
-    'make',
-    'construct',
-    'init',
-    'initialize',
-    'instantiate',
-    'produce',
-    'spawn',
-    'setup',
-    'clone',
-    'copy',
-    'assemble',
-    'compose',
-    'synthesize',
-    'handle',
-    'apply',
-    'format',
-    'normalize',
-    'transform',
-    'convert',
-    'map',
-    'filter',
-    'reduce',
-    'serialize',
-    'deserialize',
-    'encode',
-    'decode',
-    'escape',
-    'unescape',
-    'sanitize',
-    'wrap',
-    'unwrap',
-    'flatten',
-    'merge',
-    'split',
-    'patch',
-    'replace',
-    'to',
-    'from',
-    'as',
-    'strip',
-    'classify',
-    'run',
-    'start',
-    'stop',
-    'reset',
-    'dispatch',
-    'emit',
-    'update',
-    'clear',
-    'execute',
-    'invoke',
-    'trigger',
-    'process',
-    'flush',
-    'drain',
-    'sync',
-    'refresh',
-    'reload',
-    'retry',
-    'resume',
-    'pause',
-    'cancel',
-    'abort',
-    'dispose',
-    'destroy',
-    'close',
-    'open',
-    'send',
-    'receive',
-    'broadcast',
-    'publish',
-    'subscribe',
-    'notify',
-    'bind',
-    'unbind',
-    'register',
-    'unregister',
-    'install',
-    'uninstall',
-    'attach',
-    'detach',
-    'push',
-    'pop',
-    'shift',
-    'unshift',
-    'add',
-    'remove',
-    'delete',
-    'set',
-    'put',
-    'drop',
-    'prune',
-    'evict',
-    'track',
-    'record',
-    'log',
-    'print',
-    'dump',
-    'write',
-    'save',
-    'store',
-    'persist',
-    'walk',
-    'traverse',
-    'iterate',
-    'loop',
-    'do',
-    'perform',
-    'try',
-]);
+export const APPROVED_ACTION_VERBS: ReadonlySet<string> = new Set(
+    (
+        'abort accumulate add advance aggregate allocate allows analyze append apply arbitrate as ' +
+        'assemble assert attach audit benchmark bind broadcast build calculate can cancel categorize ' +
+        'check clamp classify clear clone close collect compile compose compress compute construct ' +
+        'contains convert copy count create debounce decode decompress deduce define delete dequeue ' +
+        'derive deserialize destroy detach detect diff dispatch dispose do does drain drop ' +
+        'dump emit encode enqueue ensure escape estimate evaluate evict examine execute exists ' +
+        'extract fast fetch filter finalize find flatten flush format forward freeze from ' +
+        'generate get group guard handle has index infer ingest init initialize inspect ' +
+        'install instantiate intercept invoke is isolate iterate lint load log lookup loop ' +
+        'make map mask match matches measure merge mk mock must needs normalize ' +
+        'notify obtain open parse partition patch pause peek perform persist pipe poll ' +
+        'pop populate print probe process produce project propagate prune publish pull push ' +
+        'put query queue read receive reclaim record redirect reduce refresh register reload ' +
+        'remove render replace report reset resolve resume retrieve retry review route run ' +
+        'safe sanitize save scan schedule score search seed select send serialize set ' +
+        'setup shift should sort spawn split start stop store strip subscribe sum ' +
+        'supports sync synthesize tag test throttle to track transform transpile traverse trigger ' +
+        'trim truncate try tune unbind unescape uninstall unregister unshift unwrap update validate ' +
+        'verify visit walk was were will wrap write'
+    ).split(' '),
+);
 
 /** Standard test framework runner functions exempt from verb-noun naming checks. */
 export const TEST_FRAMEWORK_FUNCTIONS: ReadonlySet<string> = new Set([
@@ -870,13 +717,7 @@ export interface FunctionSemanticsFinding {
  * Validates token composition and semantic naming contracts for a function identifier.
  *
  * @param name - Function or method name.
- * @param tokens - Parsed word tokens decomposed from the identifier.
- * @param opts - Validation configuration options.
- * @param opts.enforceVerbNounContract - Whether to check initial token action verb whitelist.
- * @param opts.enforceMorphemeCheck - Whether to verify valid morphemes.
- * @param opts.minFunctionWords - Minimum allowed word count.
- * @param opts.maxFunctionWords - Maximum allowed word count.
- * @param isAccessor - Optional flag indicating getter or setter accessor.
+ * @param firstToken - First parsed word token decomposed from the identifier.
  * @returns Finding if a rule is violated, or null if compliant.
  */
 function validateFunctionVerbNoun(
@@ -952,6 +793,19 @@ function validateFunctionMorphemes(
     return null;
 }
 
+/**
+ * Validates function tokens and naming semantics against length, morpheme, and verb contracts.
+ *
+ * @param name - Function or method name.
+ * @param tokens - Parsed word tokens decomposed from identifier.
+ * @param opts - Semantic validation options.
+ * @param opts.enforceVerbNounContract - Whether to check initial token action verb whitelist.
+ * @param opts.enforceMorphemeCheck - Whether to verify valid morphemes.
+ * @param opts.minFunctionWords - Minimum allowed word count.
+ * @param opts.maxFunctionWords - Maximum allowed word count.
+ * @param isAccessor - Optional flag indicating getter or setter accessor.
+ * @returns Semantic finding if violated, or null if compliant.
+ */
 export function validateFunctionTokensAndSemantics(
     name: string,
     tokens: string[],

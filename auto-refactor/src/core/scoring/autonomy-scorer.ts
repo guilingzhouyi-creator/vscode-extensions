@@ -35,6 +35,50 @@ import {
 import { inferFineGrainedFileRole } from '../intelligence/file-role-inference';
 import type { SymbolIndex } from '../intelligence/symbolIndex';
 
+const SCALE_LOC_EXPONENT = 4000;
+const SCALE_FILE_EXPONENT = 8;
+const PRECISION_THREE = 3;
+const PRECISION_TWO = 2;
+const PERCENT_MAX = 100.0;
+const PERCENT_FACTOR = 100;
+const MIN_EFFECTIVE_SAMPLE_SIZE = 2;
+const CONFIDENCE_LOW_THRESHOLD = 0.45;
+const PRIOR_JEFFREYS_ALPHA = 0.5;
+const PRIOR_JEFFREYS_BETA = 0.5;
+const NORMAL_Z95_CRITICAL_VALUE = 1.95996;
+
+const GRADE_L5_THRESHOLD = 95.0;
+const GRADE_L4_THRESHOLD = 85.0;
+const GRADE_L3_THRESHOLD = 70.0;
+const GRADE_L2_THRESHOLD = 50.0;
+
+const GRADE_L5 = 'L5_INDEPENDENT';
+const GRADE_L4 = 'L4_HIGH_AUTONOMY';
+const GRADE_L3 = 'L3_BALANCED';
+const GRADE_L2 = 'L2_FRAMEWORK_DEPENDENT';
+const GRADE_L1 = 'L1_SHALLOW_WRAPPER';
+
+const MAX_AUTONOMY_FILE_READ_BYTES = 524288;
+const HEADER_PREVIEW_SLICE_500 = 500;
+
+const KIND_INTERNAL = 'internal';
+const KIND_STDLIB = 'stdlib';
+const KIND_EXTERNAL_SDK = 'external_sdk';
+const PROVENANCE_IN_TREE_VENDOR = 'in_tree_vendor';
+const PROVENANCE_GENERATED = 'generated';
+const ROLE_ALGORITHM_COMPUTATION = 'algorithm_computation';
+const ROLE_CORE_TRUNK = 'core_trunk';
+const ROLE_BUSINESS_MODULE = 'business_module';
+
+const MIN_RESILIENCE_SCORE = 15.0;
+const MIN_RCALL_SCORE = 10;
+const EXTERNAL_PKG_PENALTY_WEIGHT = 15;
+const MAX_CLONE_PENALTY = 30;
+const CLONE_PENALTY_MULTIPLIER = 1.5;
+const RULE_HYG_CLN_001 = 'HYG-CLN-001';
+const RULE_DUPLICATE_LITERAL = 'duplicate-literal';
+const HASH_PRIME_MULTIPLIER = 31;
+
 /**
  * Computes rigorous Bayesian Credible Interval for autonomy index using
  * Beta conjugate prior (Jeffreys prior Beta(0.5, 0.5)) and normal posterior approximation.
@@ -45,17 +89,20 @@ function computeBayesianAutonomyConfidence(
     totalFiles: number,
     totalScopedCalls: number,
 ): AutonomyConfidence {
-    const locSufficiency = 1.0 - Math.exp(-effectiveLoc / 4000);
-    const fileSufficiency = 1.0 - Math.exp(-totalFiles / 8);
-    const sampleSufficiency = +(locSufficiency * fileSufficiency).toFixed(3);
-    const isLowConfidence = sampleSufficiency < 0.45;
+    const locSufficiency = 1.0 - Math.exp(-effectiveLoc / SCALE_LOC_EXPONENT);
+    const fileSufficiency = 1.0 - Math.exp(-totalFiles / SCALE_FILE_EXPONENT);
+    const sampleSufficiency = +(locSufficiency * fileSufficiency).toFixed(PRECISION_THREE);
+    const isLowConfidence = sampleSufficiency < CONFIDENCE_LOW_THRESHOLD;
 
     // Beta conjugate Jeffreys prior: Alpha_0 = 0.5, Beta_0 = 0.5
-    const alpha0 = 0.5;
-    const beta0 = 0.5;
+    const alpha0 = PRIOR_JEFFREYS_ALPHA;
+    const beta0 = PRIOR_JEFFREYS_BETA;
 
-    const effectiveSampleSize = Math.max(2, Math.round(effectiveLoc / 100 + totalScopedCalls));
-    const pObserved = Math.max(0.0, Math.min(1.0, compositeScore / 100));
+    const effectiveSampleSize = Math.max(
+        MIN_EFFECTIVE_SAMPLE_SIZE,
+        Math.round(effectiveLoc / PERCENT_FACTOR + totalScopedCalls),
+    );
+    const pObserved = Math.max(0.0, Math.min(1.0, compositeScore / PERCENT_FACTOR));
 
     const kSuccess = pObserved * effectiveSampleSize;
     const alpha = kSuccess + alpha0;
@@ -63,17 +110,17 @@ function computeBayesianAutonomyConfidence(
     const posteriorTotal = alpha + beta;
 
     const posteriorMean = alpha / posteriorTotal;
-    const credibleScore = +(posteriorMean * 100).toFixed(2);
+    const credibleScore = +(posteriorMean * PERCENT_FACTOR).toFixed(PRECISION_TWO);
 
     const posteriorVariance =
         (alpha * beta) / (posteriorTotal * posteriorTotal * (posteriorTotal + 1));
     const standardError = Math.sqrt(posteriorVariance);
 
-    const z95 = 1.95996;
-    const margin = +(z95 * standardError * 100).toFixed(2);
+    const z95 = NORMAL_Z95_CRITICAL_VALUE;
+    const margin = +(z95 * standardError * PERCENT_FACTOR).toFixed(PRECISION_TWO);
 
-    const lowerBound = +Math.max(0.0, credibleScore - margin).toFixed(2);
-    const upperBound = +Math.min(100.0, credibleScore + margin).toFixed(2);
+    const lowerBound = +Math.max(0.0, credibleScore - margin).toFixed(PRECISION_TWO);
+    const upperBound = +Math.min(PERCENT_MAX, credibleScore + margin).toFixed(PRECISION_TWO);
 
     return {
         sampleSufficiency,
@@ -197,42 +244,41 @@ function resolveAutonomyGrade(score: number): {
     grade: AutonomyGrade;
     description: string;
 } {
-    if (score >= 95.0) {
+    if (score >= GRADE_L5_THRESHOLD) {
         return {
-            grade: 'L5_INDEPENDENT',
+            grade: GRADE_L5,
             description:
                 'Extremely high autonomy: Core architecture and algorithms are entirely proprietary with minimal external SDK coupling',
         };
     }
-    if (score >= 85.0) {
+    if (score >= GRADE_L4_THRESHOLD) {
         return {
-            grade: 'L4_HIGH_AUTONOMY',
+            grade: GRADE_L4,
             description:
                 'High autonomy: Business logic and domain kernel are fully proprietary, integrating standard open-source ecosystems reasonably',
         };
     }
-    if (score >= 70.0) {
+    if (score >= GRADE_L3_THRESHOLD) {
         return {
-            grade: 'L3_BALANCED',
+            grade: GRADE_L3,
             description:
                 'Balanced autonomy: Core business is proprietary with moderate collaboration with mainstream frameworks and cloud ecosystems',
         };
     }
-    if (score >= 50.0) {
+    if (score >= GRADE_L2_THRESHOLD) {
         return {
-            grade: 'L2_FRAMEWORK_DEPENDENT',
+            grade: GRADE_L2,
             description:
                 'Framework dependent: Substantial business logic is composed as glue code around third-party external SDKs',
         };
     }
     return {
-        grade: 'L1_SHALLOW_WRAPPER',
+        grade: GRADE_L1,
         description:
             'Shallow wrapper: Primarily interface passthrough and third-party implementation references with low proprietary ratio',
     };
 }
 
-/**
 /** File import profile containing extracted specifiers and local symbol bindings */
 export interface FileImportProfile {
     specifiers: string[];
@@ -495,8 +541,6 @@ interface AutonomyScanState {
     currentSpecifiers?: string[];
 }
 
-const MAX_AUTONOMY_FILE_READ_BYTES = 512 * 1024;
-
 /**
  * Load raw source content from memory map or disk file without early 1KB truncation.
  */
@@ -566,16 +610,16 @@ function recordSingleSpecifier(
     isCritical: boolean,
 ): void {
     const kind = classifyImportProvenance(spec, currentFile, manifestDeps);
-    if (kind === 'internal') {
+    if (kind === KIND_INTERNAL) {
         state.internalSymbolCalls++;
         if (isCritical) state.criticalPathInternalCalls++;
         return;
     }
-    if (kind === 'stdlib') {
+    if (kind === KIND_STDLIB) {
         state.stdlibCalls++;
         return;
     }
-    if (kind === 'external_sdk') {
+    if (kind === KIND_EXTERNAL_SDK) {
         const pkg = spec.startsWith('@')
             ? spec.split('/').slice(0, 2).join('/')
             : spec.split('/')[0].split('.')[0].toLowerCase();
@@ -607,16 +651,16 @@ function accumulateFileMetric(
     state: AutonomyScanState,
     rawContent: string,
 ): void {
-    const headerSlice = rawContent.slice(0, 500);
+    const headerSlice = rawContent.slice(0, HEADER_PREVIEW_SLICE_500);
     const provenance = classifyFileProvenance(metric.file, headerSlice);
     const eloc = (metric as { nonBlankLines?: number }).nonBlankLines || metric.lines || 1;
 
-    if (provenance === 'in_tree_vendor') {
+    if (provenance === PROVENANCE_IN_TREE_VENDOR) {
         state.vendorFiles++;
         state.vendorEffectiveLoc += eloc;
         return;
     }
-    if (provenance === 'generated') {
+    if (provenance === PROVENANCE_GENERATED) {
         state.generatedFiles++;
         state.generatedEffectiveLoc += eloc;
         return;
@@ -632,9 +676,9 @@ function accumulateFileMetric(
 
     const roleResult = inferFineGrainedFileRole(metric.file, headerSlice);
     if (
-        roleResult.role === 'algorithm_computation' ||
-        roleResult.role === 'core_trunk' ||
-        roleResult.role === 'business_module'
+        roleResult.role === ROLE_ALGORITHM_COMPUTATION ||
+        roleResult.role === ROLE_CORE_TRUNK ||
+        roleResult.role === ROLE_BUSINESS_MODULE
     ) {
         state.domainKernelEffectiveLoc += eloc;
     }
@@ -650,15 +694,15 @@ function accumulateFileMetric(
  */
 function calculateSupplyChainResilience(supplyChain: SupplyChainProfile): number {
     if (supplyChain.directDependencyCount === 0 && supplyChain.totalLockfilePackages === 0) {
-        return 100.0;
+        return PERCENT_MAX;
     }
     const d = supplyChain.directDependencyCount;
     const t = supplyChain.transitiveDependencyCount;
     const depth = supplyChain.estimatedDepth;
 
     const penalty = d * 0.5 + Math.sqrt(t) * 0.8 + Math.max(0, depth - 1) * 2.0;
-    const resilience = Math.max(15.0, Math.min(100.0, 100.0 - penalty));
-    return +resilience.toFixed(1);
+    const resilience = Math.max(MIN_RESILIENCE_SCORE, Math.min(PERCENT_MAX, PERCENT_MAX - penalty));
+    return Math.round(resilience * 10) / 10;
 }
 
 /**
@@ -672,38 +716,39 @@ function synthesizeAutonomyEvaluation(
 ): AutonomyEvaluation {
     const totalTreeEloc =
         state.proprietaryEffectiveLoc + state.vendorEffectiveLoc + state.generatedEffectiveLoc;
-    const rLoc = totalTreeEloc > 0 ? (state.proprietaryEffectiveLoc / totalTreeEloc) * 100 : 100;
+    const rLoc =
+        totalTreeEloc > 0 ? (state.proprietaryEffectiveLoc / totalTreeEloc) * PERCENT_FACTOR : PERCENT_FACTOR;
 
     const totalScopedCalls = state.internalSymbolCalls + state.externalSdkCalls;
     let rCall: number;
     if (totalScopedCalls > 0) {
-        rCall = (state.internalSymbolCalls / totalScopedCalls) * 100;
+        rCall = (state.internalSymbolCalls / totalScopedCalls) * PERCENT_FACTOR;
     } else if (state.sdkCallCounts.size > 0 || state.externalSdkCalls > 0) {
         const externalPkgs = Math.max(1, state.sdkCallCounts.size);
-        rCall = Math.max(10, 100 - externalPkgs * 15);
+        rCall = Math.max(MIN_RCALL_SCORE, PERCENT_FACTOR - externalPkgs * EXTERNAL_PKG_PENALTY_WEIGHT);
     } else {
-        rCall = 100;
+        rCall = PERCENT_FACTOR;
     }
 
     const rDomain =
         state.proprietaryEffectiveLoc > 0
-            ? Math.min(100, (state.domainKernelEffectiveLoc / state.proprietaryEffectiveLoc) * 100)
-            : 100;
+            ? Math.min(PERCENT_FACTOR, (state.domainKernelEffectiveLoc / state.proprietaryEffectiveLoc) * PERCENT_FACTOR)
+            : PERCENT_FACTOR;
 
     const cloneIssues = issues.filter(
-        (i) => i.rule === 'HYG-CLN-001' || i.rule === 'duplicate-literal',
+        (i) => i.rule === RULE_HYG_CLN_001 || i.rule === RULE_DUPLICATE_LITERAL,
     );
-    const clonePenalty = Math.min(30, cloneIssues.length * 1.5);
-    const rPure = Math.max(0, 100 - clonePenalty);
+    const clonePenalty = Math.min(MAX_CLONE_PENALTY, cloneIssues.length * CLONE_PENALTY_MULTIPLIER);
+    const rPure = Math.max(0, PERCENT_FACTOR - clonePenalty);
 
     const rSupply = calculateSupplyChainResilience(supplyChain);
 
     const totalCriticalCalls = state.criticalPathInternalCalls + state.criticalPathExternalCalls;
     let rCritical: number;
     if (state.criticalPathFiles > 0 && totalCriticalCalls > 0) {
-        rCritical = (state.criticalPathInternalCalls / totalCriticalCalls) * 100;
+        rCritical = (state.criticalPathInternalCalls / totalCriticalCalls) * PERCENT_FACTOR;
     } else if (state.criticalPathFiles > 0) {
-        rCritical = state.externalSdkCalls === 0 ? 100.0 : rCall;
+        rCritical = state.externalSdkCalls === 0 ? PERCENT_MAX : rCall;
     } else {
         rCritical = rCall;
     }
@@ -779,103 +824,23 @@ function synthesizeAutonomyEvaluation(
     };
 }
 
-const COMMON_STDLIB_SYMBOLS = new Set([
-    'push',
-    'pop',
-    'shift',
-    'unshift',
-    'slice',
-    'splice',
-    'join',
-    'map',
-    'filter',
-    'reduce',
-    'find',
-    'includes',
-    'forEach',
-    'indexOf',
-    'lastIndexOf',
-    'some',
-    'every',
-    'concat',
-    'reverse',
-    'sort',
-    'keys',
-    'values',
-    'entries',
-    'assign',
-    'freeze',
-    'seal',
-    'create',
-    'defineProperty',
-    'hasOwnProperty',
-    'toString',
-    'valueOf',
-    'trim',
-    'split',
-    'replace',
-    'replaceAll',
-    'toLowerCase',
-    'toUpperCase',
-    'startsWith',
-    'endsWith',
-    'substring',
-    'charAt',
-    'charCodeAt',
-    'match',
-    'test',
-    'exec',
-    'now',
-    'parse',
-    'stringify',
-    'log',
-    'info',
-    'warn',
-    'error',
-    'debug',
-    'trace',
-    'floor',
-    'ceil',
-    'round',
-    'abs',
-    'min',
-    'max',
-    'sqrt',
-    'pow',
-    'random',
-    'setTimeout',
-    'clearTimeout',
-    'setInterval',
-    'clearInterval',
-    'resolve',
-    'reject',
-    'then',
-    'catch',
-    'finally',
-    'all',
-    'race',
-    'has',
-    'get',
-    'set',
-    'add',
-    'delete',
-    'clear',
-    'size',
-    'length',
-    'bind',
-    'call',
-    'apply',
-    'close',
-    'open',
-    'read',
-    'write',
-]);
+const COMMON_STDLIB_SYMBOLS: ReadonlySet<string> = new Set(
+    (
+        'push pop shift unshift slice splice join map filter reduce find includes forEach indexOf ' +
+        'lastIndexOf some every concat reverse sort keys values entries assign freeze seal create ' +
+        'defineProperty hasOwnProperty toString valueOf trim split replace replaceAll toLowerCase ' +
+        'toUpperCase startsWith endsWith substring charAt charCodeAt match test exec now parse ' +
+        'stringify log info warn error debug trace floor ceil round abs min max sqrt pow random ' +
+        'setTimeout clearTimeout setInterval clearInterval resolve reject then catch finally all race ' +
+        'has get set add delete clear size length bind call apply close open read write'
+    ).split(' '),
+);
 
 function selectBalancedSdk(extPkgs: string[], symbolName: string): string {
     if (extPkgs.length === 1) return extPkgs[0];
     let hash = 0;
     for (let i = 0; i < symbolName.length; i++) {
-        hash = (hash * 31 + symbolName.charCodeAt(i)) >>> 0;
+        hash = (hash * HASH_PRIME_MULTIPLIER + symbolName.charCodeAt(i)) >>> 0;
     }
     return extPkgs[hash % extPkgs.length];
 }
@@ -941,6 +906,18 @@ function applySymbolIndexReferences(
     }
 }
 
+function appendExtPackage(
+    pkgs: string[] | undefined,
+    spec: string,
+): string[] {
+    const pkg = extractModulePackageName(spec);
+    if (pkgs !== undefined) {
+        pkgs.push(pkg);
+        return pkgs;
+    }
+    return [pkg];
+}
+
 function collectExtPackages(
     specifiers: Iterable<string>,
     file: string,
@@ -948,9 +925,8 @@ function collectExtPackages(
 ): string[] | undefined {
     let pkgs: string[] | undefined;
     for (const spec of specifiers) {
-        if (classifyImportProvenance(spec, file, manifestDeps) === 'external_sdk') {
-            if (!pkgs) pkgs = [];
-            pkgs.push(extractModulePackageName(spec));
+        if (classifyImportProvenance(spec, file, manifestDeps) === KIND_EXTERNAL_SDK) {
+            pkgs = appendExtPackage(pkgs, spec);
         }
     }
     return pkgs;

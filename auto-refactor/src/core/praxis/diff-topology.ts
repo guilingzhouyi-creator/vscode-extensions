@@ -70,6 +70,73 @@ const MASS_DELETION_LINE_THRESHOLD = 50;
 /** Threshold ratio of deletions to additions for mass deletion */
 const MASS_DELETION_RATIO_THRESHOLD = 2.0;
 
+// ---------------------------------------------------------------------------
+// Diff Attributes, Line Types, and Symbol Kinds
+// ---------------------------------------------------------------------------
+
+const DIFF_LINE_TYPE_CONTEXT = 'context';
+const DIFF_LINE_TYPE_INSERT = 'insert';
+const DIFF_LINE_TYPE_DELETE = 'delete';
+const DEFAULT_SYMBOL_KIND = 'symbol';
+
+// ---------------------------------------------------------------------------
+// Conflict Signatures and Markers
+// ---------------------------------------------------------------------------
+
+const CONFLICT_MARKER_START = 'start';
+const CONFLICT_MARKER_SEPARATOR = 'separator';
+const CONFLICT_MARKER_END = 'end';
+
+const CONFLICT_SIGNATURE_START = '<<<<<<<';
+const CONFLICT_SIGNATURE_MID = '=======';
+const CONFLICT_SIGNATURE_END = '>>>>>>>';
+
+const MIN_CONFLICT_MARKER_LENGTH = 7;
+const CHAR_CODE_LESS_THAN = 60;
+const CHAR_CODE_EQUALS = 61;
+const CHAR_CODE_GREATER_THAN = 62;
+const CHAR_CODE_LINE_FEED = 10;
+const CHAR_CODE_CARRIAGE_RETURN = 13;
+
+// ---------------------------------------------------------------------------
+// Topological Risk Severities and Scope Levels
+// ---------------------------------------------------------------------------
+
+const RISK_SEVERITY_BLOCK: DiffRiskSeverity = 'block';
+const RISK_SEVERITY_WARN: DiffRiskSeverity = 'warn';
+const RISK_SEVERITY_PASS: DiffRiskSeverity = 'pass';
+
+const IMPACT_SCOPE_ISOLATED = 'isolated';
+const IMPACT_SCOPE_LOCAL = 'local';
+const IMPACT_SCOPE_WIDE = 'wide';
+const IMPACT_SCOPE_CRITICAL = 'critical';
+
+const RISK_LEVEL_CLEAN = 'clean';
+const RISK_LEVEL_GUARDED = 'guarded';
+const RISK_LEVEL_HAZARDOUS = 'hazardous';
+const RISK_LEVEL_BLOCKING = 'blocking';
+
+const LAYER1_STATUS_READY = 'ready';
+const LAYER1_STATUS_EMPTY = 'empty';
+
+const RISK_KIND_OBJECT_LITERAL = 'object_literal';
+const DESTRUCTIVE_KIND_MASS_DELETION = 'mass_deletion';
+const DESTRUCTIVE_KIND_API_REMOVAL = 'public_api_removal';
+const TARGET_MODULE_EXTERNAL = 'external';
+
+const SEVERITY_LITERAL_ERROR = 'error';
+
+// ---------------------------------------------------------------------------
+// Topological Thresholds
+// ---------------------------------------------------------------------------
+
+const IMPACT_FILES_FOCUS_THRESHOLD = 3;
+const HIGH_MODIFICATIONS_FOCUS_THRESHOLD = 30;
+const IMPACT_FILES_CRITICAL_THRESHOLD = 10;
+const IMPACT_FILES_WIDE_THRESHOLD = 3;
+const GRAPH_SLICE_DEPTH = 2;
+const GRAPH_SLICE_DIRECTION_BACKWARD = 'backward';
+
 // ============================================================================
 // Layer 1 Evaluation: Build Execution Unit Diff
 // ============================================================================
@@ -81,7 +148,7 @@ interface MutableAstMapping extends DiffAstNodeMapping {
 function countChangedLinesInHunk(hunk: ReviewDiffHunk): number {
     let count = 0;
     for (const l of hunk.lines) {
-        if (l.type !== 'context') {
+        if (l.type !== DIFF_LINE_TYPE_CONTEXT) {
             count++;
         }
     }
@@ -93,7 +160,7 @@ function recordHunkMapping(
     hunk: ReviewDiffHunk,
     symbol: string,
 ): void {
-    const kind = hunk.astContext?.symbolKind || 'symbol';
+    const kind = hunk.astContext?.symbolKind || DEFAULT_SYMBOL_KIND;
     const start = hunk.astContext?.scopeRange?.startLine || hunk.newSpan.startLine;
     const end =
         hunk.astContext?.scopeRange?.endLine || hunk.newSpan.startLine + hunk.newSpan.lineCount;
@@ -144,12 +211,12 @@ function processHunkLine(
     line: AttributedDiffLine,
     stats: { additions: number; deletions: number; changedLineNumbers: number[] },
 ): void {
-    if (line.type === 'insert') {
+    if (line.type === DIFF_LINE_TYPE_INSERT) {
         stats.additions++;
         if (line.lineNoNew !== undefined) {
             stats.changedLineNumbers.push(line.lineNoNew);
         }
-    } else if (line.type === 'delete') {
+    } else if (line.type === DIFF_LINE_TYPE_DELETE) {
         stats.deletions++;
         if (line.lineNoOld !== undefined) {
             stats.changedLineNumbers.push(line.lineNoOld);
@@ -283,7 +350,7 @@ function extractPropagationPaths(
         if (!seedId) {
             continue;
         }
-        const slice = graph.getSlice(seedId, 2, 'backward');
+        const slice = graph.getSlice(seedId, GRAPH_SLICE_DEPTH, GRAPH_SLICE_DIRECTION_BACKWARD);
         for (const edge of slice.edges) {
             const key = `${edge.fromNodeId}->${edge.toNodeId}`;
             if (visited.has(key)) {
@@ -332,10 +399,10 @@ function buildLayer2(
     if (contractConflicts.length > 0) {
         recommendedFocus.push('Audit architectural contract violations against SSOT catalog');
     }
-    if (impactFiles.length > 3) {
+    if (impactFiles.length > IMPACT_FILES_FOCUS_THRESHOLD) {
         recommendedFocus.push('Perform cross-file reverse dependency regression checks');
     }
-    if (layer1.modifications > 30) {
+    if (layer1.modifications > HIGH_MODIFICATIONS_FOCUS_THRESHOLD) {
         recommendedFocus.push('Validate semantic behavior invariants on modified AST scopes');
     }
     if (recommendedFocus.length === 0) {
@@ -366,7 +433,7 @@ function checkConflictLine(line: string, lineNumber: number): DiffConflictMarker
     if (startMatch) {
         return {
             line: lineNumber,
-            markerType: 'start',
+            markerType: CONFLICT_MARKER_START,
             branchLabel: startMatch[1],
         };
     }
@@ -374,7 +441,7 @@ function checkConflictLine(line: string, lineNumber: number): DiffConflictMarker
     if (CONFLICT_MID_REGEX.test(line)) {
         return {
             line: lineNumber,
-            markerType: 'separator',
+            markerType: CONFLICT_MARKER_SEPARATOR,
         };
     }
 
@@ -382,7 +449,7 @@ function checkConflictLine(line: string, lineNumber: number): DiffConflictMarker
     if (endMatch) {
         return {
             line: lineNumber,
-            markerType: 'end',
+            markerType: CONFLICT_MARKER_END,
             branchLabel: endMatch[1],
         };
     }
@@ -391,11 +458,11 @@ function checkConflictLine(line: string, lineNumber: number): DiffConflictMarker
 }
 
 function isConflictCandidate(content: string, start: number, len: number): boolean {
-    if (len < 7) {
+    if (len < MIN_CONFLICT_MARKER_LENGTH) {
         return false;
     }
     const c = content.charCodeAt(start);
-    return c === 60 /* '<' */ || c === 61 /* '=' */ || c === 62; /* '>' */
+    return c === CHAR_CODE_LESS_THAN || c === CHAR_CODE_EQUALS || c === CHAR_CODE_GREATER_THAN;
 }
 
 /**
@@ -403,7 +470,9 @@ function isConflictCandidate(content: string, start: number, len: number): boole
  */
 function hasConflictSignature(content: string): boolean {
     return (
-        content.includes('<<<<<<<') || content.includes('=======') || content.includes('>>>>>>>')
+        content.includes(CONFLICT_SIGNATURE_START) ||
+        content.includes(CONFLICT_SIGNATURE_MID) ||
+        content.includes(CONFLICT_SIGNATURE_END)
     );
 }
 
@@ -429,7 +498,7 @@ function detectConflictMarkersFromHunks(hunks: ReviewDiffHunk[]): DiffConflictMa
  */
 function findNextLineBreak(text: string, pos: number, len: number): number {
     for (let i = pos; i < len; i++) {
-        if (text.charCodeAt(i) === 10 /* \n */) {
+        if (text.charCodeAt(i) === CHAR_CODE_LINE_FEED) {
             return i;
         }
     }
@@ -437,7 +506,7 @@ function findNextLineBreak(text: string, pos: number, len: number): number {
 }
 
 function getEffectiveLineEnd(text: string, start: number, end: number): number {
-    return end > start && text.charCodeAt(end - 1) === 13 /* \r */ ? end - 1 : end;
+    return end > start && text.charCodeAt(end - 1) === CHAR_CODE_CARRIAGE_RETURN ? end - 1 : end;
 }
 
 /**
@@ -495,7 +564,7 @@ function detectLoopAllocFromIssues(issues?: Issue[]): DiffLoopAllocationRisk[] {
             risks.push({
                 line: issue.location.start.line,
                 codeSnippet: issue.message,
-                riskKind: 'object_literal',
+                riskKind: RISK_KIND_OBJECT_LITERAL,
                 remediationAdvice:
                     issue.suggestion || 'Eliminate transient heap allocation inside loop',
             });
@@ -509,14 +578,14 @@ function detectLoopAllocFromHunks(hunks: ReviewDiffHunk[]): DiffLoopAllocationRi
     for (const hunk of hunks) {
         let insideLoop = false;
         for (const line of hunk.lines) {
-            if (line.type !== 'insert') continue;
+            if (line.type !== DIFF_LINE_TYPE_INSERT) continue;
             if (LOOP_KEYWORD_REGEX.test(line.content)) insideLoop = true;
             if (insideLoop && TRANSIENT_ALLOC_REGEX.test(line.content)) {
                 const lineNo = line.lineNoNew || hunk.newSpan.startLine;
                 risks.push({
                     line: lineNo,
                     codeSnippet: line.content.trim(),
-                    riskKind: 'object_literal',
+                    riskKind: RISK_KIND_OBJECT_LITERAL,
                     remediationAdvice:
                         'Pre-allocate and reuse scratch buffers or object pools outside loop',
                 });
@@ -550,9 +619,9 @@ function collectExportDeclarations(hunks: ReviewDiffHunk[]): {
         for (const line of hunk.lines) {
             const match = line.content.match(EXPORT_DECLARATION_REGEX);
             if (!match) continue;
-            if (line.type === 'delete') {
+            if (line.type === DIFF_LINE_TYPE_DELETE) {
                 deletedExports.add(match[1]);
-            } else if (line.type === 'insert') {
+            } else if (line.type === DIFF_LINE_TYPE_INSERT) {
                 addedExports.add(match[1]);
             }
         }
@@ -574,7 +643,7 @@ function detectDestructiveModifications(
         layer1.deletions > layer1.additions * MASS_DELETION_RATIO_THRESHOLD
     ) {
         destructive.push({
-            kind: 'mass_deletion',
+            kind: DESTRUCTIVE_KIND_MASS_DELETION,
             description: `Detected mass deletion: ${layer1.deletions} lines deleted with only ${layer1.additions} additions`,
             affectedSymbols: [],
             deletedLinesCount: layer1.deletions,
@@ -585,7 +654,7 @@ function detectDestructiveModifications(
     for (const deletedSymbol of deletedExports) {
         if (!addedExports.has(deletedSymbol)) {
             destructive.push({
-                kind: 'public_api_removal',
+                kind: DESTRUCTIVE_KIND_API_REMOVAL,
                 description: `Public API export '${deletedSymbol}' was removed without equivalent replacement`,
                 affectedSymbols: [deletedSymbol],
                 deletedLinesCount: 1,
@@ -611,7 +680,7 @@ function detectCrossLayerRisks(filePath: string, issues?: Issue[]): DiffCrossLay
         if (CROSS_LAYER_RULE_RE.test(issue.rule)) {
             risks.push({
                 sourceFile: filePath,
-                targetModule: 'external',
+                targetModule: TARGET_MODULE_EXTERNAL,
                 riskDescription: issue.message,
                 ruleId: issue.rule,
             });
@@ -633,7 +702,7 @@ function buildLayer3(
     const destructiveModifications = detectDestructiveModifications(input.hunks, layer1);
     const crossLayerRisks = detectCrossLayerRisks(input.filePath, input.issues);
 
-    const blockingIssues = (input.issues || []).filter((i) => i.severity === 'error');
+    const blockingIssues = (input.issues || []).filter((i) => i.severity === SEVERITY_LITERAL_ERROR);
     const escalationReasons: string[] = [];
 
     if (conflictMarkers.length > 0) {
@@ -691,19 +760,19 @@ function resolveOverallRisk(
     layer3: DiffLayer3ConflictRisk,
 ): DiffRiskSeverity {
     if (layer3.shouldEscalateToL3A || layer3.blockingIssues.length > 0) {
-        return 'block';
+        return RISK_SEVERITY_BLOCK;
     }
     if (
         layer3.loopAllocations.length > 0 ||
         layer3.destructiveModifications.length > 0 ||
         layer2.contractConflicts.length > 0
     ) {
-        return 'warn';
+        return RISK_SEVERITY_WARN;
     }
     if (layer1.totalChangedLines === 0) {
-        return 'pass';
+        return RISK_SEVERITY_PASS;
     }
-    return 'pass';
+    return RISK_SEVERITY_PASS;
 }
 
 /**
@@ -717,22 +786,22 @@ function buildTopologicalSummary(
 ): TopologicalDiffSummary {
     const overallRisk = resolveOverallRisk(layer1, layer2, layer3);
 
-    let layer2ImpactScope: TopologicalDiffSummary['layer2ImpactScope'] = 'isolated';
-    if (layer2.impactFiles.length > 10) {
-        layer2ImpactScope = 'critical';
-    } else if (layer2.impactFiles.length > 3) {
-        layer2ImpactScope = 'wide';
+    let layer2ImpactScope: TopologicalDiffSummary['layer2ImpactScope'] = IMPACT_SCOPE_ISOLATED;
+    if (layer2.impactFiles.length > IMPACT_FILES_CRITICAL_THRESHOLD) {
+        layer2ImpactScope = IMPACT_SCOPE_CRITICAL;
+    } else if (layer2.impactFiles.length > IMPACT_FILES_WIDE_THRESHOLD) {
+        layer2ImpactScope = IMPACT_SCOPE_WIDE;
     } else if (layer2.impactFiles.length > 0) {
-        layer2ImpactScope = 'local';
+        layer2ImpactScope = IMPACT_SCOPE_LOCAL;
     }
 
-    let layer3RiskLevel: TopologicalDiffSummary['layer3RiskLevel'] = 'clean';
+    let layer3RiskLevel: TopologicalDiffSummary['layer3RiskLevel'] = RISK_LEVEL_CLEAN;
     if (layer3.blockingIssues.length > 0 || layer3.conflictMarkers.length > 0) {
-        layer3RiskLevel = 'blocking';
+        layer3RiskLevel = RISK_LEVEL_BLOCKING;
     } else if (layer3.destructiveModifications.length > 0 || layer3.loopAllocations.length > 0) {
-        layer3RiskLevel = 'hazardous';
+        layer3RiskLevel = RISK_LEVEL_HAZARDOUS;
     } else if (layer3.crossLayerRisks.length > 0) {
-        layer3RiskLevel = 'guarded';
+        layer3RiskLevel = RISK_LEVEL_GUARDED;
     }
 
     return {
@@ -743,7 +812,7 @@ function buildTopologicalSummary(
         deletions: layer1.deletions,
         overallRisk,
         shouldEscalateToL3A: layer3.shouldEscalateToL3A,
-        layer1Status: layer1.totalChangedLines > 0 ? 'ready' : 'empty',
+        layer1Status: layer1.totalChangedLines > 0 ? LAYER1_STATUS_READY : LAYER1_STATUS_EMPTY,
         layer2ImpactScope,
         layer3RiskLevel,
     };

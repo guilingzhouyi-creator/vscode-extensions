@@ -48,11 +48,15 @@ function collectAgentBlastRadii(patches: AgentPatchSlice[]): Map<string, AgentBl
     for (const patch of patches) {
         const radius = getOrCreateAgentBlastRadius(map, patch.agentUid);
         radius.files.add(normalizePath(patch.filePath));
-        for (const sym of patch.importedSymbols || []) {
-            radius.symbols.add(sym);
+        if (patch.importedSymbols) {
+            for (const sym of patch.importedSymbols) {
+                radius.symbols.add(sym);
+            }
         }
-        for (const sym of patch.exportedSymbols || []) {
-            radius.symbols.add(sym);
+        if (patch.exportedSymbols) {
+            for (const sym of patch.exportedSymbols) {
+                radius.symbols.add(sym);
+            }
         }
     }
 

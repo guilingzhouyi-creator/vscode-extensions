@@ -195,7 +195,12 @@ function forwardQuery(id: string, count: number): Result {
     'src/service.ts',
     fakeCtx(tsExempt, 'src/service.ts'),
   );
-  assert.strictEqual(tsExemptIssues.length, 0, 'TS @deprecated wrapper must be exempt');
+  assert.strictEqual(
+    tsExemptIssues.length,
+    1,
+    'TS @deprecated wrapper must NOT be exempt and report violation',
+  );
+  assert.strictEqual(tsExemptIssues[0].rule, HYG_WRAP_RULE_ID);
 
   // Python validation
   const pyBad = `
@@ -224,7 +229,7 @@ fn dispatch(id: u64, code: u32) -> Result {
 }
 `;
   const rsGood = `
-/// @deprecated use inner.dispatch
+/// @override inner.dispatch delegation
 fn dispatch(id: u64, code: u32) -> Result {
     self.inner.dispatch(id, code)
 }
@@ -242,7 +247,7 @@ func forwardQuery(id string, count int) Result {
 }
 `;
   const goGood = `
-// adapter delegation pattern
+// interface implementation proxy
 func forwardQuery(id string, count int) Result {
     return target.fetchData(id, count)
 }

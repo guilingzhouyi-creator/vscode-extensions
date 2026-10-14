@@ -214,6 +214,15 @@ function partitionScanFiles(
     return { configFiles, sourceFiles };
 }
 
+function appendMapStringList(map: Map<string, string[]>, key: string, item: string): void {
+    let list = map.get(key);
+    if (!list) {
+        list = [];
+        map.set(key, list);
+    }
+    list.push(item);
+}
+
 function collectDeclaredConfigKeys(configFiles: ConfigScanFile[]): {
     declaredKeys: Set<string>;
     keyOrigins: Map<string, string[]>;
@@ -224,9 +233,7 @@ function collectDeclaredConfigKeys(configFiles: ConfigScanFile[]): {
         const keys = extractDeclaredKeys(cfg.content);
         for (const k of keys) {
             declaredKeys.add(k);
-            const list = keyOrigins.get(k) ?? [];
-            list.push(cfg.filePath);
-            keyOrigins.set(k, list);
+            appendMapStringList(keyOrigins, k, cfg.filePath);
         }
     }
     return { declaredKeys, keyOrigins };
@@ -503,9 +510,7 @@ function detectFlatConfigSprawl(
     for (const f of configFiles) {
         const norm = f.filePath.replace(/\\/g, '/');
         const dir = extractFileDirectory(norm);
-        const list = dirMap.get(dir) ?? [];
-        list.push(norm);
-        dirMap.set(dir, list);
+        appendMapStringList(dirMap, dir, norm);
     }
 
     let flatSprawlCount = 0;

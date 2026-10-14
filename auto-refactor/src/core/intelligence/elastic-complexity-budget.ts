@@ -59,22 +59,69 @@ export interface ElasticBudgetEvaluation {
     issues: Issue[];
 }
 
+const DEFAULT_WARN_THRESHOLD = 12;
+const DEFAULT_FAIL_THRESHOLD = 20;
+const RUST_WARN_THRESHOLD = 16;
+const RUST_FAIL_THRESHOLD = 26;
+const GDSCRIPT_WARN_THRESHOLD = 14;
+const GDSCRIPT_FAIL_THRESHOLD = 22;
+
+const ROLE_TOOL_SCRIPT = 'tool_script';
+const ROLE_TEST_SUITE = 'test_suite';
+const ROLE_INFRASTRUCTURE = 'infrastructure';
+const ROLE_APPLICATION_CLI = 'application_cli';
+const ROLE_ADAPTER = 'adapter';
+
+const MULTIPLIER_TOOL_TEST = 1.4;
+const MULTIPLIER_INFRA = 1.25;
+const MULTIPLIER_CLI_ADAPTER = 0.8;
+const MULTIPLIER_DEFAULT = 1.0;
+
+const CLARITY_SHALLOW_DEPTH_LIMIT = 2;
+const CLARITY_SHALLOW_MULTIPLIER = 1.3;
+const CLARITY_DEEP_DEPTH_LIMIT = 5;
+const CLARITY_DEEP_MULTIPLIER = 0.7;
+
+const BLAST_RADIUS_MAX_DEPTH = 3;
+const BLAST_RADIUS_LOW_MULTIPLIER = 1.2;
+
+const DOMAIN_ALGO_MULTIPLIER = 1.35;
+
+const EFFECTIVE_WARN_MIN = 8;
+const EFFECTIVE_WARN_MAX = 35;
+const EFFECTIVE_FAIL_MIN = 14;
+const EFFECTIVE_FAIL_MAX = 50;
+
+const UNJUSTIFIED_CC_THRESHOLD = 14;
+const UNJUSTIFIED_DEPTH_THRESHOLD = 4;
+
+const FILE_BUDGET_MIN = 60;
+const FILE_BUDGET_LOC_UNIT = 500;
+const FILE_BUDGET_CC_PER_UNIT = 80;
+const FILE_BUDGET_MIN_FUNCTIONS = 4;
+
+const LANG_TYPESCRIPT = 'typescript';
+const LANG_JAVASCRIPT = 'javascript';
+const LANG_PYTHON = 'python';
+const LANG_RUST = 'rust';
+const LANG_GDSCRIPT = 'gdscript';
+
 /**
  * Language-specific base thresholds.
  */
 const LANGUAGE_BASE_THRESHOLDS: Record<string, { warn: number; fail: number }> = {
-    typescript: { warn: 12, fail: 20 },
-    javascript: { warn: 12, fail: 20 },
-    python: { warn: 12, fail: 20 },
-    rust: { warn: 16, fail: 26 },
-    gdscript: { warn: 14, fail: 22 },
+    [LANG_TYPESCRIPT]: { warn: DEFAULT_WARN_THRESHOLD, fail: DEFAULT_FAIL_THRESHOLD },
+    [LANG_JAVASCRIPT]: { warn: DEFAULT_WARN_THRESHOLD, fail: DEFAULT_FAIL_THRESHOLD },
+    [LANG_PYTHON]: { warn: DEFAULT_WARN_THRESHOLD, fail: DEFAULT_FAIL_THRESHOLD },
+    [LANG_RUST]: { warn: RUST_WARN_THRESHOLD, fail: RUST_FAIL_THRESHOLD },
+    [LANG_GDSCRIPT]: { warn: GDSCRIPT_WARN_THRESHOLD, fail: GDSCRIPT_FAIL_THRESHOLD },
 };
 
 function computeRoleMultiplier(role?: string): number {
-    if (role === 'tool_script' || role === 'test_suite') return 1.4;
-    if (role === 'infrastructure') return 1.25;
-    if (role === 'application_cli' || role === 'adapter') return 0.8;
-    return 1.0;
+    if (role === ROLE_TOOL_SCRIPT || role === ROLE_TEST_SUITE) return MULTIPLIER_TOOL_TEST;
+    if (role === ROLE_INFRASTRUCTURE) return MULTIPLIER_INFRA;
+    if (role === ROLE_APPLICATION_CLI || role === ROLE_ADAPTER) return MULTIPLIER_CLI_ADAPTER;
+    return MULTIPLIER_DEFAULT;
 }
 
 const ALGO_KEYWORDS = [
@@ -97,9 +144,9 @@ function isMathOrAlgorithm(name: string, isStateOrAlgorithm?: boolean): boolean 
 }
 
 function computeClarityMultiplier(maxDepth: number): number {
-    if (maxDepth <= 2) return 1.3;
-    if (maxDepth >= 5) return 0.7;
-    return 1.0;
+    if (maxDepth <= CLARITY_SHALLOW_DEPTH_LIMIT) return CLARITY_SHALLOW_MULTIPLIER;
+    if (maxDepth >= CLARITY_DEEP_DEPTH_LIMIT) return CLARITY_DEEP_MULTIPLIER;
+    return MULTIPLIER_DEFAULT;
 }
 
 /**
@@ -112,27 +159,27 @@ function computeClarityMultiplier(maxDepth: number): number {
  * @returns Multiplier factor (1.20 for low-blast-radius private helpers, 1.0 otherwise).
  */
 export function computeBlastRadiusMultiplier(isExported?: boolean, maxDepth?: number): number {
-    if (isExported === false && (maxDepth === undefined || maxDepth <= 3)) {
-        return 1.2;
+    if (isExported === false && (maxDepth === undefined || maxDepth <= BLAST_RADIUS_MAX_DEPTH)) {
+        return BLAST_RADIUS_LOW_MULTIPLIER;
     }
-    return 1.0;
+    return MULTIPLIER_DEFAULT;
 }
 
 const LANGUAGE_CANONICAL_MAP: Readonly<Record<string, string>> = {
-    ts: 'typescript',
-    tsx: 'typescript',
-    typescript: 'typescript',
-    js: 'javascript',
-    jsx: 'javascript',
-    mjs: 'javascript',
-    cjs: 'javascript',
-    javascript: 'javascript',
-    py: 'python',
-    python: 'python',
-    rs: 'rust',
-    rust: 'rust',
-    gd: 'gdscript',
-    gdscript: 'gdscript',
+    ts: LANG_TYPESCRIPT,
+    tsx: LANG_TYPESCRIPT,
+    typescript: LANG_TYPESCRIPT,
+    js: LANG_JAVASCRIPT,
+    jsx: LANG_JAVASCRIPT,
+    mjs: LANG_JAVASCRIPT,
+    cjs: LANG_JAVASCRIPT,
+    javascript: LANG_JAVASCRIPT,
+    py: LANG_PYTHON,
+    python: LANG_PYTHON,
+    rs: LANG_RUST,
+    rust: LANG_RUST,
+    gd: LANG_GDSCRIPT,
+    gdscript: LANG_GDSCRIPT,
 };
 
 /**
@@ -153,10 +200,10 @@ function computeBudgetThresholds(
 ) {
     const langKey = normalizeLanguageTag(fn.language);
     const base = LANGUAGE_BASE_THRESHOLDS[langKey] ?? { warn: defaultWarn, fail: defaultFail };
-    const langMultiplier = base.warn / 12;
+    const langMultiplier = base.warn / DEFAULT_WARN_THRESHOLD;
     const roleMultiplier = computeRoleMultiplier(fn.role);
     const isAlgo = isMathOrAlgorithm(fn.name, fn.isStateOrAlgorithm);
-    const domainMultiplier = isAlgo ? 1.35 : 1.0;
+    const domainMultiplier = isAlgo ? DOMAIN_ALGO_MULTIPLIER : MULTIPLIER_DEFAULT;
     const clarityMultiplier = computeClarityMultiplier(fn.maxDepth);
     const blastRadiusMultiplier = computeBlastRadiusMultiplier(fn.isExported, fn.maxDepth);
 
@@ -166,9 +213,17 @@ function computeBudgetThresholds(
         domainMultiplier *
         clarityMultiplier *
         blastRadiusMultiplier;
-    const effectiveWarn = Math.max(8, Math.min(35, Math.round(base.warn * totalMultiplier)));
-    const effectiveFail = Math.max(14, Math.min(50, Math.round(base.fail * totalMultiplier)));
-    const hasAlgorithmicProof = Boolean((isAlgo || fn.hasDocContract) && fn.maxDepth <= 3);
+    const effectiveWarn = Math.max(
+        EFFECTIVE_WARN_MIN,
+        Math.min(EFFECTIVE_WARN_MAX, Math.round(base.warn * totalMultiplier)),
+    );
+    const effectiveFail = Math.max(
+        EFFECTIVE_FAIL_MIN,
+        Math.min(EFFECTIVE_FAIL_MAX, Math.round(base.fail * totalMultiplier)),
+    );
+    const hasAlgorithmicProof = Boolean(
+        (isAlgo || fn.hasDocContract) && fn.maxDepth <= BLAST_RADIUS_MAX_DEPTH,
+    );
 
     return {
         multipliers: {
@@ -257,8 +312,8 @@ function createUnjustifiedNestingIssue(fn: FunctionComplexityContext): Issue {
  */
 export function evaluateElasticComplexityBudget(
     fn: FunctionComplexityContext,
-    defaultWarn = 12,
-    defaultFail = 20,
+    defaultWarn = DEFAULT_WARN_THRESHOLD,
+    defaultFail = DEFAULT_FAIL_THRESHOLD,
 ): ElasticBudgetEvaluation {
     const issues: Issue[] = [];
     const thresholds = computeBudgetThresholds(fn, defaultWarn, defaultFail);
@@ -279,7 +334,10 @@ export function evaluateElasticComplexityBudget(
         );
     }
 
-    const isUnjustified = fn.cc >= 14 && fn.maxDepth >= 4 && !hasAlgorithmicProof;
+    const isUnjustified =
+        fn.cc >= UNJUSTIFIED_CC_THRESHOLD &&
+        fn.maxDepth >= UNJUSTIFIED_DEPTH_THRESHOLD &&
+        !hasAlgorithmicProof;
     if (isUnjustified) {
         issues.push(createUnjustifiedNestingIssue(fn));
     }
@@ -311,9 +369,12 @@ export function evaluateFileCumulativeBudget(
     if (functionCCs.length === 0) return null;
     const totalCC = functionCCs.reduce((sum, c) => sum + c, 0);
     // Dynamic file budget: base 80 CC per 500 LOC
-    const baseBudget = Math.max(60, Math.round((lineCount / 500) * 80));
+    const baseBudget = Math.max(
+        FILE_BUDGET_MIN,
+        Math.round((lineCount / FILE_BUDGET_LOC_UNIT) * FILE_BUDGET_CC_PER_UNIT),
+    );
 
-    if (totalCC > baseBudget && functionCCs.length >= 4) {
+    if (totalCC > baseBudget && functionCCs.length >= FILE_BUDGET_MIN_FUNCTIONS) {
         return {
             id: `complexity:${RULE_CPX_BUD_001}:${filePath}:file-budget`,
             analyzer: ANALYZER_COMPLEXITY,

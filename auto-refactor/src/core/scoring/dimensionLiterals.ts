@@ -753,3 +753,17 @@ export const DEDUCTION_SEC_CSS_AUTH_BYPASS = 30;
 export const DEDUCTION_SEC_DISABLED_FLAG = 15;
 /** Points deducted for unreleased test routes in production. */
 export const DEDUCTION_SEC_UNRELEASED_ROUTE = 25;
+
+/** Rule id for backward-compatibility shim and transitional wrapper debt. */
+export const RULE_MOD_BWD_001 = 'MOD-BWD-001';
+/** Rule id for defensive fallback cascade chain and obsolete compatibility shims. */
+export const RULE_MOD_FLB_001 = 'MOD-FLB-001';
+/** Rule id for inward contamination of deprecated symbol access in modern modules. */
+export const RULE_MOD_DEP_001 = 'MOD-DEP-001';
+
+/** Points deducted for backward-compatibility shims maintaining obsolete APIs. */
+export const DEDUCTION_BACKWARD_SHIM = 15;
+/** Points deducted for defensive fallback chains and multi-tier degradation shims. */
+export const DEDUCTION_FALLBACK_CHAIN = 12;
+/** Points deducted for deprecated symbol access and uncontained legacy API calls. */
+export const DEDUCTION_DEPRECATED_ACCESS = 20;

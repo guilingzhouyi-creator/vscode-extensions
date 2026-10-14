@@ -204,6 +204,7 @@ export const CANONICAL_TOPIC_CATALOG: Readonly<Record<string, readonly string[]>
         'TYP',
     ],
     HYG: ['BLT', 'CLN', 'DED', 'EMP', 'EOL', 'EXC', 'NAM', 'SGL', 'STB', 'SUP', 'WRAP'],
+    MOD: ['BWD', 'DEP', 'FLB'],
     NAM: [
         'ABR',
         'COL',

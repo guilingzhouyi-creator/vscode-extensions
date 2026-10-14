@@ -188,8 +188,9 @@ export class ShellLintAnalyzer implements Analyzer {
 
             const maskedLine = maskedLines[i];
             const maskedTrimmed = maskedLine.trim();
+            const lineCtx = { raw: line, trimmed, maskedTrimmed, lineIndex: i };
 
-            checkDeprecatedSyntax(line, trimmed, maskedTrimmed, i, emit);
+            checkDeprecatedSyntax(lineCtx, emit);
             checkShellConditionSyntax(trimmed, maskedTrimmed, i, emit);
             this.checkCdWithoutCheck(trimmed, i, emit);
             this.checkReadWithoutR(trimmed, i, emit);
@@ -197,7 +198,7 @@ export class ShellLintAnalyzer implements Analyzer {
             this.checkEchoVsPrintf(trimmed, i, emit);
             checkUnquotedVariables(line, maskedTrimmed, i, emit);
             checkShellDynamicSecurity(trimmed, i, emit);
-            checkShellInteractiveSafety(trimmed, maskedTrimmed, i, hasTtyGuard, emit);
+            checkShellInteractiveSafety(lineCtx, hasTtyGuard, emit);
             checkShellStrictExitCapture(trimmed, i, hasE, emit);
         }
     }
@@ -330,10 +331,11 @@ export class ShellLintAnalyzer implements Analyzer {
 
             if (trimmed === '' || trimmed.startsWith('#')) continue;
 
+            const lineCtx = { raw: line, trimmed, maskedTrimmed, lineIndex: i };
             this.updatePowerShellFunctionState(state, line, trimmed, maskedTrimmed, i, emit);
             this.checkPowerShellAliases(trimmed, maskedTrimmed, i, emit);
             checkPowerShellDynamicSecurity(trimmed, i, emit);
-            checkPowerShellInteractiveSafety(trimmed, maskedTrimmed, i, hasInteractiveGuard, emit);
+            checkPowerShellInteractiveSafety(lineCtx, hasInteractiveGuard, emit);
         }
     }
 

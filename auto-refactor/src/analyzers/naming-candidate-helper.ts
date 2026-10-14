@@ -97,30 +97,30 @@ export const ALLOWED_SHORT_NAMES: ReadonlySet<string> = new Set(
  * Common truncated abbreviations dictionary with standard English expansions.
  */
 export const COMMON_ABBREVIATIONS: Readonly<Record<string, string>> = Object.freeze({
-    usr: 'user',
-    mgr: 'manager',
-    btn: 'button',
-    cnt: 'count',
-    ptr: 'pointer',
-    cur: 'current',
-    auth_mgr: 'authManager',
-    tbl: 'table',
-    chk: 'check',
-    cb: 'callback',
-    cfg: 'config',
-    ctx: 'context',
-    doc: 'document',
-    err: 'error',
-    idx: 'index',
-    len: 'length',
-    msg: 'message',
-    num: 'number',
-    pos: 'position',
-    prev: 'previous',
-    req: 'request',
-    res: 'response',
-    src: 'source',
-    str: 'string',
+    'usr': 'user',
+    'mgr': 'manager',
+    'btn': 'button',
+    'cnt': 'count',
+    'ptr': 'pointer',
+    'cur': 'current',
+    'auth_mgr': 'authManager',
+    'tbl': 'table',
+    'chk': 'check',
+    'cb': 'callback',
+    'cfg': 'config',
+    'ctx': 'context',
+    'doc': 'document',
+    'err': 'error',
+    'idx': 'index',
+    'len': 'length',
+    'msg': 'message',
+    'num': 'number',
+    'pos': 'position',
+    'prev': 'previous',
+    'req': 'request',
+    'res': 'response',
+    'src': 'source',
+    'str': 'string',
 });
 
 /**
@@ -650,6 +650,104 @@ export function isNodeExported(node?: ts.Node): boolean {
     return false;
 }
 
+function createStandardizationActionable(
+    name: string,
+    ruleCode: string,
+    topCandidate: NamingCandidate,
+    candidates: NamingCandidate[],
+    pos: { line: number; character: number },
+): NamingActionablePayload {
+    const standardizationProposal: StandardizationProposal = {
+        originalName: name,
+        suggestedName: topCandidate.name,
+        confidence: topCandidate.confidence,
+        candidates,
+        rationale: topCandidate.rationale,
+        safeToAutomate: true,
+    };
+
+    return {
+        action: 'replace_token',
+        code: ruleCode,
+        taxonomy: 'GOV_NORM',
+        safeToAutomate: true,
+        targetSymbol: topCandidate.name,
+        patch: {
+            range: {
+                startLine: pos.line + 1,
+                startCol: pos.character + 1,
+                endLine: pos.line + 1,
+                endCol: pos.character + 1 + name.length,
+            },
+            replacementText: topCandidate.name,
+        },
+        templateSnippet: topCandidate.name,
+        targetArguments: {
+            originalName: name,
+            standardizationProposal,
+        },
+        standardizationProposal,
+    };
+}
+
+function resolveClarificationReasons(
+    isCrossFileExported: boolean,
+    isExported: boolean,
+    crossCtx: CrossFileUsageContext,
+    ambiguity: { hasAmbiguity: boolean; reasons: string[] },
+): string[] {
+    const reasons = [...ambiguity.reasons];
+    if (isCrossFileExported) {
+        reasons.unshift(
+            `Exported symbol has ${crossCtx.crossFileReferenceCount} cross-file reference(s)`,
+        );
+    } else if (isExported && reasons.length === 0) {
+        reasons.unshift('Exported symbol boundary requires external consumer verification');
+    }
+    return reasons;
+}
+
+function createClarificationActionable(
+    name: string,
+    ruleCode: string,
+    filePath: string,
+    crossCtx: CrossFileUsageContext,
+    ambiguity: { hasAmbiguity: boolean; reasons: string[] },
+    candidates: NamingCandidate[],
+    isExported: boolean,
+    isCrossFileExported: boolean,
+    topCandidate?: NamingCandidate,
+): NamingActionablePayload {
+    const reasons = resolveClarificationReasons(
+        isCrossFileExported,
+        isExported,
+        crossCtx,
+        ambiguity,
+    );
+    const clarificationRequest: ClarificationRequest = {
+        symbolName: name,
+        filePath,
+        crossFileContext: crossCtx,
+        ambiguityReasons: reasons,
+        candidates,
+        requiresHumanReview: true,
+    };
+
+    return {
+        action: 'replace_token',
+        code: ruleCode,
+        taxonomy: 'GOV_NORM',
+        safeToAutomate: false,
+        targetSymbol: topCandidate?.name ?? name,
+        templateSnippet: topCandidate ? topCandidate.name : undefined,
+        targetArguments: {
+            symbolName: name,
+            clarificationRequest,
+        },
+        clarificationRequest,
+    };
+}
+
 /**
  * Build machine-actionable payload with standardization proposal or clarification request.
  *
@@ -681,70 +779,20 @@ export function buildNamingActionable(
     const shouldClarify = isCrossFileExported || ambiguity.hasAmbiguity || isExported;
 
     if (!shouldClarify && topCandidate && topCandidate.confidence >= 0.85) {
-        const standardizationProposal: StandardizationProposal = {
-            originalName: name,
-            suggestedName: topCandidate.name,
-            confidence: topCandidate.confidence,
-            candidates,
-            rationale: topCandidate.rationale,
-            safeToAutomate: true,
-        };
-
-        return {
-            action: 'replace_token',
-            code: ruleCode,
-            taxonomy: 'GOV_NORM',
-            safeToAutomate: true,
-            targetSymbol: topCandidate.name,
-            patch: {
-                range: {
-                    startLine: pos.line + 1,
-                    startCol: pos.character + 1,
-                    endLine: pos.line + 1,
-                    endCol: pos.character + 1 + name.length,
-                },
-                replacementText: topCandidate.name,
-            },
-            templateSnippet: topCandidate.name,
-            targetArguments: {
-                originalName: name,
-                standardizationProposal,
-            },
-            standardizationProposal,
-        };
+        return createStandardizationActionable(name, ruleCode, topCandidate, candidates, pos);
     }
 
-    const reasons = [...ambiguity.reasons];
-    if (isCrossFileExported) {
-        reasons.unshift(
-            `Exported symbol has ${crossCtx.crossFileReferenceCount} cross-file reference(s)`,
-        );
-    } else if (isExported && reasons.length === 0) {
-        reasons.unshift('Exported symbol boundary requires external consumer verification');
-    }
-
-    const clarificationRequest: ClarificationRequest = {
-        symbolName: name,
-        filePath: ctx.filePath,
-        crossFileContext: crossCtx,
-        ambiguityReasons: reasons,
+    return createClarificationActionable(
+        name,
+        ruleCode,
+        ctx.filePath,
+        crossCtx,
+        ambiguity,
         candidates,
-        requiresHumanReview: true,
-    };
-
-    return {
-        action: 'replace_token',
-        code: ruleCode,
-        taxonomy: 'GOV_NORM',
-        safeToAutomate: false,
-        targetSymbol: topCandidate?.name ?? name,
-        templateSnippet: topCandidate ? topCandidate.name : undefined,
-        targetArguments: {
-            symbolName: name,
-            clarificationRequest,
-        },
-        clarificationRequest,
-    };
+        isExported,
+        isCrossFileExported,
+        topCandidate,
+    );
 }
 
 /** Callback signature for issuing naming diagnostics. */
@@ -1130,9 +1178,8 @@ export function isScalarLiteral(expr: ts.Expression): boolean {
  */
 export function isSimpleArrowFunction(node: ts.Node, sf: ts.SourceFile): boolean {
     if (!ts.isArrowFunction(node)) return false;
+    if (!ts.isBlock(node.body) || node.body.statements.length <= 1) return true;
     const startLine = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line;
     const endLine = sf.getLineAndCharacterOfPosition(node.getEnd()).line;
-    if (startLine !== endLine) return false;
-    if (!ts.isBlock(node.body)) return true;
-    return node.body.statements.length <= 1;
+    return endLine - startLine <= 4;
 }

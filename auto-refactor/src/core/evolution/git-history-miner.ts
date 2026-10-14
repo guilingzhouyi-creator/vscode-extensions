@@ -73,6 +73,19 @@ function parseCommitChunk(
     return { record, fileLines };
 }
 
+function appendCommitRecord(
+    commitsByFile: Map<string, GitCommitRecord[]>,
+    normFile: string,
+    record: GitCommitRecord,
+): void {
+    const list = commitsByFile.get(normFile);
+    if (list !== undefined) {
+        list.push(record);
+        return;
+    }
+    commitsByFile.set(normFile, [record]);
+}
+
 function recordCommitFiles(
     commitsByFile: Map<string, GitCommitRecord[]>,
     record: GitCommitRecord,
@@ -81,12 +94,7 @@ function recordCommitFiles(
     for (const rawFile of fileLines) {
         const normFile = rawFile.trim().replace(/\\/g, '/');
         if (!normFile) continue;
-        let list = commitsByFile.get(normFile);
-        if (!list) {
-            list = [];
-            commitsByFile.set(normFile, list);
-        }
-        list.push(record);
+        appendCommitRecord(commitsByFile, normFile, record);
     }
 }
 

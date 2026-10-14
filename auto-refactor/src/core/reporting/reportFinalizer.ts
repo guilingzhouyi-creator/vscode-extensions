@@ -390,8 +390,12 @@ function refreshQualityScores(
     const issuesByFile = groupIssuesByFile(report.issues);
     const fileQualityScores: Record<string, QualityScoreBreakdown> = {};
     const fileMetrics = report.fileMetrics ?? [];
+    function getIssuesForFile(issuesByFile: Map<string, Issue[]>, file: string): Issue[] {
+        return issuesByFile.get(file) ?? (EMPTY_ISSUES as Issue[]);
+    }
+
     for (const m of fileMetrics) {
-        const fileIssues = issuesByFile.get(m.file) ?? (EMPTY_ISSUES as Issue[]);
+        const fileIssues = getIssuesForFile(issuesByFile, m.file);
         fileQualityScores[m.file] = scorer.evaluateFile(m.file, fileIssues, m, config);
     }
     report.fileQualityScores = fileQualityScores;

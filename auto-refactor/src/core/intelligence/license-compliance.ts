@@ -341,6 +341,146 @@ export function isPermissive(licenseSpdx: string): boolean {
     return classifySpdxLicense(licenseSpdx) === 'permissive';
 }
 
+function evaluateExplicitLists(
+    trimmed: string,
+    normalized: string,
+    category: LicenseCategory,
+    viral: boolean,
+    allowedLicenses: readonly string[],
+    blockedLicenses: readonly string[],
+): LicenseAuditResult | null {
+    if (blockedLicenses.includes(normalized)) {
+        return {
+            spdxExpression: trimmed,
+            normalizedSpdx: normalized,
+            category,
+            compliant: false,
+            isViralCopyleft: viral,
+            riskLevel: 'critical',
+            reason: `License "${trimmed}" is on the prohibited license blacklist.`,
+            violations: [`License "${trimmed}" is explicitly blocked by policy.`],
+            remediation: 'Remove dependency or replace with an approved alternative.',
+        };
+    }
+    if (allowedLicenses.includes(normalized)) {
+        return {
+            spdxExpression: trimmed,
+            normalizedSpdx: normalized,
+            category,
+            compliant: true,
+            isViralCopyleft: viral,
+            riskLevel: viral ? 'medium' : 'none',
+            reason: `License "${trimmed}" is explicitly approved by policy whitelist.`,
+            violations: [],
+        };
+    }
+    return null;
+}
+
+function evaluateViralCopyleft(
+    trimmed: string,
+    normalized: string,
+    category: LicenseCategory,
+    viral: boolean,
+    blockViralCopyleft: boolean,
+): LicenseAuditResult | null {
+    if (!viral || !blockViralCopyleft) return null;
+    return {
+        spdxExpression: trimmed,
+        normalizedSpdx: normalized,
+        category,
+        compliant: false,
+        isViralCopyleft: true,
+        riskLevel: 'critical',
+        reason:
+            `Viral copyleft license "${trimmed}" poses severe intellectual property ` +
+            'and closed-source enclosure risks.',
+        violations: [
+            `Viral copyleft license "${trimmed}" imposes reciprocal distribution requirements.`,
+        ],
+        remediation:
+            'Replace dependency with a permissively licensed alternative (MIT/Apache-2.0) ' +
+            'or negotiate commercial terms.',
+    };
+}
+
+function evaluateCategoryCompliance(
+    trimmed: string,
+    normalized: string,
+    category: LicenseCategory,
+    allowWeakCopyleft: boolean,
+    allowedCategories: readonly string[],
+): LicenseAuditResult {
+    if (category === 'weak_copyleft') {
+        if (allowWeakCopyleft || allowedCategories.includes('weak_copyleft')) {
+            return {
+                spdxExpression: trimmed,
+                normalizedSpdx: normalized,
+                category,
+                compliant: true,
+                isViralCopyleft: false,
+                riskLevel: 'low',
+                reason:
+                    `Weak copyleft license "${trimmed}" is permitted; isolate via dynamic linking ` +
+                    'and preserve library modifications.',
+                violations: [],
+            };
+        }
+        return {
+            spdxExpression: trimmed,
+            normalizedSpdx: normalized,
+            category,
+            compliant: false,
+            isViralCopyleft: false,
+            riskLevel: 'medium',
+            reason: `Weak copyleft license "${trimmed}" requires policy exception or dynamic linking review.`,
+            violations: [
+                `Weak copyleft license "${trimmed}" is not approved under standard permissive policy.`,
+            ],
+            remediation:
+                'Ensure module is linked dynamically without modifications, or request policy exception.',
+        };
+    }
+
+    if (category === 'permissive') {
+        if (allowedCategories.includes('permissive')) {
+            return {
+                spdxExpression: trimmed,
+                normalizedSpdx: normalized,
+                category,
+                compliant: true,
+                isViralCopyleft: false,
+                riskLevel: 'none',
+                reason: `Permissive license "${trimmed}" complies with corporate policy.`,
+                violations: [],
+            };
+        }
+        return {
+            spdxExpression: trimmed,
+            normalizedSpdx: normalized,
+            category,
+            compliant: false,
+            isViralCopyleft: false,
+            riskLevel: 'medium',
+            reason: `License category "permissive" is not in allowed categories list.`,
+            violations: [`Permissive license "${trimmed}" is excluded by category policy.`],
+            remediation: 'Add permissive category to allowed policy categories.',
+        };
+    }
+
+    return {
+        spdxExpression: trimmed,
+        normalizedSpdx: normalized,
+        category: 'unapproved',
+        compliant: false,
+        isViralCopyleft: false,
+        riskLevel: 'high',
+        reason: `Unrecognized or proprietary license "${trimmed}" lacks commercial clearance.`,
+        violations: [`License "${trimmed}" is unrecognized or unapproved for commercial use.`],
+        remediation: 'Clarify licensing terms with package authors or seek legal review.',
+    };
+}
+
 /**
  * Audits an SPDX license string against an organizational compliance policy.
  *
@@ -382,135 +522,30 @@ export function auditLicenseCompliance(
     const allowWeakCopyleft = policy.allowWeakCopyleft ?? false;
     const blockViralCopyleft = policy.blockViralCopyleft ?? true;
 
-    const violations: string[] = [];
+    const explicitResult = evaluateExplicitLists(
+        trimmed,
+        normalized,
+        category,
+        viral,
+        allowedLicenses,
+        blockedLicenses,
+    );
+    if (explicitResult) return explicitResult;
 
-    // 1. Explicit blacklist takes absolute precedence
-    if (blockedLicenses.includes(normalized)) {
-        violations.push(`License "${trimmed}" is explicitly blocked by policy.`);
-        return {
-            spdxExpression: trimmed,
-            normalizedSpdx: normalized,
-            category,
-            compliant: false,
-            isViralCopyleft: viral,
-            riskLevel: 'critical',
-            reason: `License "${trimmed}" is on the prohibited license blacklist.`,
-            violations,
-            remediation: 'Remove dependency or replace with an approved alternative.',
-        };
-    }
+    const viralResult = evaluateViralCopyleft(
+        trimmed,
+        normalized,
+        category,
+        viral,
+        blockViralCopyleft,
+    );
+    if (viralResult) return viralResult;
 
-    // 2. Explicit whitelist approval
-    if (allowedLicenses.includes(normalized)) {
-        return {
-            spdxExpression: trimmed,
-            normalizedSpdx: normalized,
-            category,
-            compliant: true,
-            isViralCopyleft: viral,
-            riskLevel: viral ? 'medium' : 'none',
-            reason: `License "${trimmed}" is explicitly approved by policy whitelist.`,
-            violations: [],
-        };
-    }
-
-    // 3. Viral copyleft strict rejection
-    if (viral && blockViralCopyleft) {
-        violations.push(
-            `Viral copyleft license "${trimmed}" imposes reciprocal distribution requirements.`,
-        );
-        return {
-            spdxExpression: trimmed,
-            normalizedSpdx: normalized,
-            category,
-            compliant: false,
-            isViralCopyleft: true,
-            riskLevel: 'critical',
-            reason:
-                `Viral copyleft license "${trimmed}" poses severe intellectual property ` +
-                'and closed-source enclosure risks.',
-            violations,
-            remediation:
-                'Replace dependency with a permissively licensed alternative (MIT/Apache-2.0) ' +
-                'or negotiate commercial terms.',
-        };
-    }
-
-    // 4. Weak copyleft evaluation
-    if (category === 'weak_copyleft') {
-        const isAllowed = allowWeakCopyleft || allowedCategories.includes('weak_copyleft');
-        if (isAllowed) {
-            return {
-                spdxExpression: trimmed,
-                normalizedSpdx: normalized,
-                category,
-                compliant: true,
-                isViralCopyleft: false,
-                riskLevel: 'low',
-                reason:
-                    `Weak copyleft license "${trimmed}" is permitted; isolate via dynamic linking ` +
-                    'and preserve library modifications.',
-                violations: [],
-            };
-        }
-
-        violations.push(
-            `Weak copyleft license "${trimmed}" is not approved under standard permissive policy.`,
-        );
-        return {
-            spdxExpression: trimmed,
-            normalizedSpdx: normalized,
-            category,
-            compliant: false,
-            isViralCopyleft: false,
-            riskLevel: 'medium',
-            reason: `Weak copyleft license "${trimmed}" requires policy exception or dynamic linking review.`,
-            violations,
-            remediation:
-                'Ensure module is linked dynamically without modifications, or request policy exception.',
-        };
-    }
-
-    // 5. Permissive category evaluation
-    if (category === 'permissive') {
-        if (allowedCategories.includes('permissive')) {
-            return {
-                spdxExpression: trimmed,
-                normalizedSpdx: normalized,
-                category,
-                compliant: true,
-                isViralCopyleft: false,
-                riskLevel: 'none',
-                reason: `Permissive license "${trimmed}" complies with corporate policy.`,
-                violations: [],
-            };
-        }
-
-        violations.push(`Permissive license "${trimmed}" is excluded by category policy.`);
-        return {
-            spdxExpression: trimmed,
-            normalizedSpdx: normalized,
-            category,
-            compliant: false,
-            isViralCopyleft: false,
-            riskLevel: 'medium',
-            reason: `License category "permissive" is not in allowed categories list.`,
-            violations,
-            remediation: 'Add permissive category to allowed policy categories.',
-        };
-    }
-
-    // 6. Unapproved or unrecognized license
-    violations.push(`License "${trimmed}" is unrecognized or unapproved for commercial use.`);
-    return {
-        spdxExpression: trimmed,
-        normalizedSpdx: normalized,
-        category: 'unapproved',
-        compliant: false,
-        isViralCopyleft: false,
-        riskLevel: 'high',
-        reason: `Unrecognized or proprietary license "${trimmed}" lacks commercial clearance.`,
-        violations,
-        remediation: 'Clarify licensing terms with package authors or seek legal review.',
-    };
+    return evaluateCategoryCompliance(
+        trimmed,
+        normalized,
+        category,
+        allowWeakCopyleft,
+        allowedCategories,
+    );
 }

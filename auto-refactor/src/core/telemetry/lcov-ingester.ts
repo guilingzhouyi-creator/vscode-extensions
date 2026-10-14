@@ -18,6 +18,55 @@
 
 import type { DynamicIssueRisk } from '../dynamic/dynamic-types';
 
+const ASCII_LF = 10;
+const ASCII_CR = 13;
+const ASCII_SPACE = 32;
+const ASCII_COMMA = 44;
+const ASCII_SLASH = 47;
+const ASCII_ZERO = 48;
+const ASCII_NINE = 57;
+const ASCII_UPPER_B = 66;
+const ASCII_UPPER_D = 68;
+const ASCII_UPPER_F = 70;
+const ASCII_UPPER_H = 72;
+const ASCII_UPPER_L = 76;
+const ASCII_UPPER_S = 83;
+const ASCII_BACKSLASH = 92;
+const ASCII_LOWER_E = 101;
+
+const DECIMAL_BASE = 10;
+const PERCENT_FACTOR = 100;
+const RATIO_PRECISION_DIGITS = 3;
+
+const LCOV_PREFIX_LEN_DA = 3;
+const LCOV_PREFIX_LEN_SF = 3;
+const LCOV_PREFIX_LEN_LINE = 3;
+const LCOV_PREFIX_LEN_BRANCH = 4;
+
+const MULTIPLIER_NEUTRAL = 1.0;
+const MULTIPLIER_HIGH_RISK = 1.8;
+const MULTIPLIER_WELL_COVERED = 0.5;
+
+const COVERAGE_LOW_THRESHOLD = 0.2;
+const COVERAGE_LINE_HIGH_THRESHOLD = 0.9;
+const COVERAGE_BRANCH_HIGH_THRESHOLD = 0.8;
+
+const STATUS_WELL_COVERED: CoverageStatus = 'well_covered';
+const STATUS_MODERATE_COVERAGE: CoverageStatus = 'moderate_coverage';
+const STATUS_UNCOVERED_HIGH_RISK: CoverageStatus = 'uncovered_high_risk';
+const STATUS_UNMONITORED: CoverageStatus = 'unmonitored';
+
+const RISK_RAW_HIGH = 7.5;
+const RISK_NORMALIZED_HIGH = 6.5;
+const RISK_RAW_LOW = 0.5;
+const RISK_NORMALIZED_LOW = 0.3;
+const RISK_RAW_NEUTRAL = 1.0;
+const RISK_NORMALIZED_NEUTRAL = 1.0;
+
+const CONFIDENCE_HIGH_RISK = 0.9;
+const CONFIDENCE_WELL_COVERED = 0.95;
+const CONFIDENCE_NEUTRAL = 0.5;
+
 /**
  * Normalized line and branch test coverage profile for an individual source file.
  */
@@ -34,7 +83,10 @@ export interface FileCoverageProfile {
 
 /** Qualitative evaluation status of test coverage health for an inspected location. */
 export type CoverageStatus =
-    'well_covered' | 'moderate_coverage' | 'uncovered_high_risk' | 'unmonitored';
+    | 'well_covered'
+    | 'moderate_coverage'
+    | 'uncovered_high_risk'
+    | 'unmonitored';
 
 /**
  * Result of coverage risk damping computation indicating multiplier and rationale.
@@ -68,29 +120,29 @@ function parseDaCursor(
     end: number,
     lineHits: Map<number, number>,
 ): void {
-    let p = start + 3;
+    let cursor = start + LCOV_PREFIX_LEN_DA;
     let lineNo = 0;
-    while (p < end) {
-        const c = text.charCodeAt(p);
-        if (c === 44) {
+    while (cursor < end) {
+        const charCode = text.charCodeAt(cursor);
+        if (charCode === ASCII_COMMA) {
             break;
         }
-        if (c >= 48 && c <= 57) {
-            lineNo = lineNo * 10 + (c - 48);
+        if (charCode >= ASCII_ZERO && charCode <= ASCII_NINE) {
+            lineNo = lineNo * DECIMAL_BASE + (charCode - ASCII_ZERO);
         }
-        p++;
+        cursor++;
     }
-    if (p >= end || text.charCodeAt(p) !== 44) {
+    if (cursor >= end || text.charCodeAt(cursor) !== ASCII_COMMA) {
         return;
     }
-    p++;
+    cursor++;
     let hitCount = 0;
-    while (p < end) {
-        const c = text.charCodeAt(p);
-        if (c >= 48 && c <= 57) {
-            hitCount = hitCount * 10 + (c - 48);
+    while (cursor < end) {
+        const charCode = text.charCodeAt(cursor);
+        if (charCode >= ASCII_ZERO && charCode <= ASCII_NINE) {
+            hitCount = hitCount * DECIMAL_BASE + (charCode - ASCII_ZERO);
         }
-        p++;
+        cursor++;
     }
     lineHits.set(lineNo, hitCount);
 }
@@ -99,14 +151,14 @@ function parseDaCursor(
  * Fast zero-allocation integer parser from an integer cursor slice [start, end).
  */
 function parseIntegerCursor(text: string, start: number, end: number): number {
-    let val = 0;
-    for (let p = start; p < end; p++) {
-        const c = text.charCodeAt(p);
-        if (c >= 48 && c <= 57) {
-            val = val * 10 + (c - 48);
+    let parsedValue = 0;
+    for (let cursor = start; cursor < end; cursor++) {
+        const charCode = text.charCodeAt(cursor);
+        if (charCode >= ASCII_ZERO && charCode <= ASCII_NINE) {
+            parsedValue = parsedValue * DECIMAL_BASE + (charCode - ASCII_ZERO);
         }
     }
-    return val;
+    return parsedValue;
 }
 
 function handleSfRecord(
@@ -115,8 +167,8 @@ function handleSfRecord(
     end: number,
     state: LcovParserState,
 ): void {
-    let sfStart = start + 3;
-    while (sfStart < end && lcovText.charCodeAt(sfStart) <= 32) {
+    let sfStart = start + LCOV_PREFIX_LEN_SF;
+    while (sfStart < end && lcovText.charCodeAt(sfStart) <= ASCII_SPACE) {
         sfStart++;
     }
     state.currentPath = lcovText.slice(sfStart, end);
@@ -127,27 +179,63 @@ function handleSfRecord(
     state.lineHits = new Map<number, number>();
 }
 
-function handleLRecord(lcovText: string, start: number, end: number, state: LcovParserState): void {
-    const c1 = lcovText.charCodeAt(start + 1);
-    if (c1 === 70 /* 'F' */) {
-        state.linesFound = parseIntegerCursor(lcovText, start + 3, end);
-    } else if (c1 === 72 /* 'H' */) {
-        state.linesHit = parseIntegerCursor(lcovText, start + 3, end);
-    }
-}
-
-function handleBrRecord(
+function handleLineRecord(
     lcovText: string,
     start: number,
     end: number,
     state: LcovParserState,
 ): void {
-    const c2 = lcovText.charCodeAt(start + 2);
-    if (c2 === 70 /* 'F' */) {
-        state.branchesFound = parseIntegerCursor(lcovText, start + 4, end);
-    } else if (c2 === 72 /* 'H' */) {
-        state.branchesHit = parseIntegerCursor(lcovText, start + 4, end);
+    const subTypeChar = lcovText.charCodeAt(start + 1);
+    if (subTypeChar === ASCII_UPPER_F) {
+        state.linesFound = parseIntegerCursor(lcovText, start + LCOV_PREFIX_LEN_LINE, end);
+    } else if (subTypeChar === ASCII_UPPER_H) {
+        state.linesHit = parseIntegerCursor(lcovText, start + LCOV_PREFIX_LEN_LINE, end);
     }
+}
+
+function handleBranchRecord(
+    lcovText: string,
+    start: number,
+    end: number,
+    state: LcovParserState,
+): void {
+    const branchSubTypeChar = lcovText.charCodeAt(start + 2);
+    if (branchSubTypeChar === ASCII_UPPER_F) {
+        state.branchesFound = parseIntegerCursor(lcovText, start + LCOV_PREFIX_LEN_BRANCH, end);
+    } else if (branchSubTypeChar === ASCII_UPPER_H) {
+        state.branchesHit = parseIntegerCursor(lcovText, start + LCOV_PREFIX_LEN_BRANCH, end);
+    }
+}
+
+/**
+ * Compute ratios and insert coverage profile into destination map.
+ */
+function recordProfile(
+    state: LcovParserState,
+    resultMap: Map<string, FileCoverageProfile>,
+): void {
+    if (!state.currentPath) return;
+    const normalizedPath = state.currentPath.replace(/\\/g, '/');
+    let activeHits = 0;
+    for (const count of state.lineHits.values()) {
+        if (count > 0) activeHits++;
+    }
+
+    const effectiveFound = Math.max(state.linesFound, state.lineHits.size);
+    const effectiveHit = state.linesHit > 0 ? state.linesHit : activeHits;
+    const lineRatio = effectiveFound > 0 ? +(effectiveHit / effectiveFound).toFixed(RATIO_PRECISION_DIGITS) : 0.0;
+    const branchRatio = state.branchesFound > 0 ? +(state.branchesHit / state.branchesFound).toFixed(RATIO_PRECISION_DIGITS) : 1.0;
+
+    resultMap.set(normalizedPath, {
+        filePath: normalizedPath,
+        linesFound: effectiveFound,
+        linesHit: effectiveHit,
+        lineCoverageRatio: lineRatio,
+        branchesFound: state.branchesFound,
+        branchesHit: state.branchesHit,
+        branchCoverageRatio: branchRatio,
+        lineHits: state.lineHits,
+    });
 }
 
 function handleEndOfRecord(
@@ -155,15 +243,7 @@ function handleEndOfRecord(
     resultMap: Map<string, FileCoverageProfile>,
 ): void {
     if (state.currentPath) {
-        recordProfile(
-            state.currentPath,
-            state.linesFound,
-            state.linesHit,
-            state.branchesFound,
-            state.branchesHit,
-            state.lineHits,
-            resultMap,
-        );
+        recordProfile(state, resultMap);
     }
     state.currentPath = null;
 }
@@ -173,7 +253,7 @@ function handleEndOfRecord(
  */
 function findNextLineBreak(text: string, pos: number, textLen: number): number {
     for (let i = pos; i < textLen; i++) {
-        if (text.charCodeAt(i) === 10 /* '\n' */) {
+        if (text.charCodeAt(i) === ASCII_LF) {
             return i;
         }
     }
@@ -185,12 +265,17 @@ function findNextLineBreak(text: string, pos: number, textLen: number): number {
  */
 function fastBasename(filePath: string): string {
     for (let i = filePath.length - 1; i >= 0; i--) {
-        const c = filePath.charCodeAt(i);
-        if (c === 47 /* '/' */ || c === 92 /* '\\' */) {
+        const charCode = filePath.charCodeAt(i);
+        if (charCode === ASCII_SLASH || charCode === ASCII_BACKSLASH) {
             return filePath.slice(i + 1);
         }
     }
     return filePath;
+}
+
+interface RecordProcessingContext {
+    state: LcovParserState;
+    resultMap: Map<string, FileCoverageProfile>;
 }
 
 /**
@@ -200,61 +285,25 @@ function processRecordCursor(
     lcovText: string,
     start: number,
     end: number,
-    state: LcovParserState,
-    resultMap: Map<string, FileCoverageProfile>,
+    ctx: RecordProcessingContext,
 ): void {
     switch (lcovText.charCodeAt(start)) {
-        case 68 /* 'D' */:
-            parseDaCursor(lcovText, start, end, state.lineHits);
+        case ASCII_UPPER_D:
+            parseDaCursor(lcovText, start, end, ctx.state.lineHits);
             break;
-        case 83 /* 'S' */:
-            handleSfRecord(lcovText, start, end, state);
+        case ASCII_UPPER_S:
+            handleSfRecord(lcovText, start, end, ctx.state);
             break;
-        case 76 /* 'L' */:
-            handleLRecord(lcovText, start, end, state);
+        case ASCII_UPPER_L:
+            handleLineRecord(lcovText, start, end, ctx.state);
             break;
-        case 66 /* 'B' */:
-            handleBrRecord(lcovText, start, end, state);
+        case ASCII_UPPER_B:
+            handleBranchRecord(lcovText, start, end, ctx.state);
             break;
-        case 101 /* 'e' */:
-            handleEndOfRecord(state, resultMap);
+        case ASCII_LOWER_E:
+            handleEndOfRecord(ctx.state, ctx.resultMap);
             break;
     }
-}
-
-/**
- * Compute ratios and insert coverage profile into destination map.
- */
-function recordProfile(
-    currentPath: string,
-    linesFound: number,
-    linesHit: number,
-    branchesFound: number,
-    branchesHit: number,
-    lineHits: Map<number, number>,
-    resultMap: Map<string, FileCoverageProfile>,
-): void {
-    const normalizedPath = currentPath.replace(/\\/g, '/');
-    let activeHits = 0;
-    for (const count of lineHits.values()) {
-        if (count > 0) activeHits++;
-    }
-
-    const effectiveFound = Math.max(linesFound, lineHits.size);
-    const effectiveHit = linesHit > 0 ? linesHit : activeHits;
-    const lineRatio = effectiveFound > 0 ? +(effectiveHit / effectiveFound).toFixed(3) : 0.0;
-    const branchRatio = branchesFound > 0 ? +(branchesHit / branchesFound).toFixed(3) : 1.0;
-
-    resultMap.set(normalizedPath, {
-        filePath: normalizedPath,
-        linesFound: effectiveFound,
-        linesHit: effectiveHit,
-        lineCoverageRatio: lineRatio,
-        branchesFound,
-        branchesHit,
-        branchCoverageRatio: branchRatio,
-        lineHits,
-    });
 }
 
 /**
@@ -274,6 +323,10 @@ export class LcovIngester {
      * @returns Map of normalized file paths to their FileCoverageProfile.
      */
     public parse(lcovText: string): Map<string, FileCoverageProfile> {
+        return this.parseLcov(lcovText);
+    }
+
+    public parseLcov(lcovText: string): Map<string, FileCoverageProfile> {
         const resultMap = new Map<string, FileCoverageProfile>();
         if (!lcovText || typeof lcovText !== 'string') {
             return resultMap;
@@ -288,22 +341,23 @@ export class LcovIngester {
             lineHits: new Map<number, number>(),
         };
 
+        const processingCtx: RecordProcessingContext = { state, resultMap };
         let pos = 0;
         const textLen = lcovText.length;
 
         while (pos < textLen) {
             const nextNewline = findNextLineBreak(lcovText, pos, textLen);
             let endPos = nextNewline;
-            if (endPos > pos && lcovText.charCodeAt(endPos - 1) === 13) {
+            if (endPos > pos && lcovText.charCodeAt(endPos - 1) === ASCII_CR) {
                 endPos--;
             }
 
             let start = pos;
-            while (start < endPos && lcovText.charCodeAt(start) <= 32) {
+            while (start < endPos && lcovText.charCodeAt(start) <= ASCII_SPACE) {
                 start++;
             }
             let end = endPos;
-            while (end > start && lcovText.charCodeAt(end - 1) <= 32) {
+            while (end > start && lcovText.charCodeAt(end - 1) <= ASCII_SPACE) {
                 end--;
             }
 
@@ -312,7 +366,7 @@ export class LcovIngester {
                 continue;
             }
 
-            processRecordCursor(lcovText, start, end, state, resultMap);
+            processRecordCursor(lcovText, start, end, processingCtx);
         }
 
         return resultMap;
@@ -324,22 +378,22 @@ export class LcovIngester {
     public buildBasenameIndex(
         profiles: Map<string, FileCoverageProfile>,
     ): Map<string, FileCoverageProfile> {
-        const index = new Map<string, FileCoverageProfile>();
+        const basenameMap = new Map<string, FileCoverageProfile>();
         for (const [key, profile] of profiles) {
-            index.set(fastBasename(key), profile);
+            basenameMap.set(fastBasename(key), profile);
         }
-        return index;
+        return basenameMap;
     }
 
     private getOrBuildBasenameIndex(
         profiles: Map<string, FileCoverageProfile>,
     ): Map<string, FileCoverageProfile> {
-        let index = this.basenameCache.get(profiles);
-        if (!index) {
-            index = this.buildBasenameIndex(profiles);
-            this.basenameCache.set(profiles, index);
+        let cachedIndex = this.basenameCache.get(profiles);
+        if (!cachedIndex) {
+            cachedIndex = this.buildBasenameIndex(profiles);
+            this.basenameCache.set(profiles, cachedIndex);
         }
-        return index;
+        return cachedIndex;
     }
 
     /**
@@ -405,8 +459,8 @@ export class LcovIngester {
             return {
                 filePath: '',
                 line: targetLine,
-                dampingMultiplier: 1.0,
-                status: 'unmonitored',
+                'dampingMultiplier': MULTIPLIER_NEUTRAL,
+                status: STATUS_UNMONITORED,
                 rationale:
                     'No CI coverage telemetry available for this file. Neutral multiplier 1.0x applied.',
             };
@@ -415,16 +469,16 @@ export class LcovIngester {
         const lineHit = targetLine !== undefined ? profile.lineHits.get(targetLine) : undefined;
 
         // Condition 1: Naked Uncovered Line or Critical Low Coverage (<20%)
-        if ((targetLine !== undefined && lineHit === 0) || profile.lineCoverageRatio < 0.2) {
+        if ((targetLine !== undefined && lineHit === 0) || profile.lineCoverageRatio < COVERAGE_LOW_THRESHOLD) {
             return {
                 filePath: profile.filePath,
                 line: targetLine,
-                dampingMultiplier: 1.8,
-                status: 'uncovered_high_risk',
+                'dampingMultiplier': MULTIPLIER_HIGH_RISK,
+                status: STATUS_UNCOVERED_HIGH_RISK,
                 lineHitCount: lineHit,
                 rationale:
                     `Uncovered high-risk code region detected by CI telemetry ` +
-                    `(line hit: ${lineHit ?? 0}, file coverage: ${(profile.lineCoverageRatio * 100).toFixed(0)}%). ` +
+                    `(line hit: ${lineHit ?? 0}, file coverage: ${(profile.lineCoverageRatio * PERCENT_FACTOR).toFixed(0)}%). ` +
                     `Complexity penalty amplified 1.8x.`,
             };
         }
@@ -432,18 +486,18 @@ export class LcovIngester {
         // Condition 2: Thoroughly Tested Module (line >= 90% and branch >= 80%)
         if (
             (lineHit === undefined || lineHit > 0) &&
-            profile.lineCoverageRatio >= 0.9 &&
-            profile.branchCoverageRatio >= 0.8
+            profile.lineCoverageRatio >= COVERAGE_LINE_HIGH_THRESHOLD &&
+            profile.branchCoverageRatio >= COVERAGE_BRANCH_HIGH_THRESHOLD
         ) {
             return {
                 filePath: profile.filePath,
                 line: targetLine,
-                dampingMultiplier: 0.5,
-                status: 'well_covered',
+                'dampingMultiplier': MULTIPLIER_WELL_COVERED,
+                status: STATUS_WELL_COVERED,
                 lineHitCount: lineHit,
                 rationale:
-                    `Comprehensive CI test coverage verified (line: ${(profile.lineCoverageRatio * 100).toFixed(0)}%, ` +
-                    `branch: ${(profile.branchCoverageRatio * 100).toFixed(0)}%). Complexity risk halved to 0.5x.`,
+                    `Comprehensive CI test coverage verified (line: ${(profile.lineCoverageRatio * PERCENT_FACTOR).toFixed(0)}%, ` +
+                    `branch: ${(profile.branchCoverageRatio * PERCENT_FACTOR).toFixed(0)}%). Complexity risk halved to 0.5x.`,
             };
         }
 
@@ -451,11 +505,11 @@ export class LcovIngester {
         return {
             filePath: profile.filePath,
             line: targetLine,
-            dampingMultiplier: 1.0,
-            status: 'moderate_coverage',
+            'dampingMultiplier': MULTIPLIER_NEUTRAL,
+            status: STATUS_MODERATE_COVERAGE,
             lineHitCount: lineHit,
             rationale:
-                `Moderate coverage telemetry (line: ${(profile.lineCoverageRatio * 100).toFixed(0)}%). ` +
+                `Moderate coverage telemetry (line: ${(profile.lineCoverageRatio * PERCENT_FACTOR).toFixed(0)}%). ` +
                 `Standard baseline multiplier applied.`,
         };
     }
@@ -470,7 +524,7 @@ export class LcovIngester {
     ): DynamicIssueRisk {
         const evalResult = this.evaluateCoverageDamping(profile, line);
 
-        if (evalResult.status === 'uncovered_high_risk') {
+        if (evalResult.status === STATUS_UNCOVERED_HIGH_RISK) {
             return {
                 hotspotId: `${rule}:${profile?.filePath ?? 'unknown'}:${line}`,
                 filePath: profile?.filePath,
@@ -479,13 +533,13 @@ export class LcovIngester {
                 F: 2.0,
                 R: 1.5,
                 V: 1.0,
-                rawRisk: 7.5,
-                normalizedRisk: 6.5,
-                evidenceConfidence: 0.9,
+                rawRisk: RISK_RAW_HIGH,
+                normalizedRisk: RISK_NORMALIZED_HIGH,
+                evidenceConfidence: CONFIDENCE_HIGH_RISK,
             };
         }
 
-        if (evalResult.status === 'well_covered') {
+        if (evalResult.status === STATUS_WELL_COVERED) {
             return {
                 hotspotId: `${rule}:${profile?.filePath ?? 'unknown'}:${line}`,
                 filePath: profile?.filePath,
@@ -494,9 +548,9 @@ export class LcovIngester {
                 F: 0.5,
                 R: 1.0,
                 V: 1.0,
-                rawRisk: 0.5,
-                normalizedRisk: 0.3,
-                evidenceConfidence: 0.95,
+                rawRisk: RISK_RAW_LOW,
+                normalizedRisk: RISK_NORMALIZED_LOW,
+                evidenceConfidence: CONFIDENCE_WELL_COVERED,
             };
         }
 
@@ -508,9 +562,9 @@ export class LcovIngester {
             F: 1.0,
             R: 1.0,
             V: 1.0,
-            rawRisk: 1.0,
-            normalizedRisk: 1.0,
-            evidenceConfidence: 0.5,
+            rawRisk: RISK_RAW_NEUTRAL,
+            normalizedRisk: RISK_NORMALIZED_NEUTRAL,
+            evidenceConfidence: CONFIDENCE_NEUTRAL,
         };
     }
 }

@@ -29,6 +29,58 @@ const TYPESCRIPT_LANGUAGE_ID = 'typescript';
 
 /** Language id reported for JavaScript files in the extension-to-language map. */
 const JAVASCRIPT_LANGUAGE_ID = 'javascript';
+const GDSCRIPT_LANGUAGE_ID = 'gdscript';
+const RUST_LANGUAGE_ID = 'rust';
+const PYTHON_LANGUAGE_ID = 'python';
+const SHELL_LANGUAGE_ID = 'shell';
+const POWERSHELL_LANGUAGE_ID = 'powershell';
+const GO_LANGUAGE_ID = 'go';
+const C_LANGUAGE_ID = 'c';
+const CPP_LANGUAGE_ID = 'cpp';
+const JAVA_LANGUAGE_ID = 'java';
+const KOTLIN_LANGUAGE_ID = 'kotlin';
+const CSHARP_LANGUAGE_ID = 'csharp';
+const DART_LANGUAGE_ID = 'dart';
+const SWIFT_LANGUAGE_ID = 'swift';
+const LUA_LANGUAGE_ID = 'lua';
+const RUBY_LANGUAGE_ID = 'ruby';
+
+const FILE_PACKAGE_JSON = 'package.json';
+const FILE_PROJECT_GODOT = 'project.godot';
+const FILE_CARGO_TOML = 'Cargo.toml';
+const FILE_LIB_RS = 'lib.rs';
+const FILE_MAIN_RS = 'main.rs';
+const FILE_PYTHON_H = 'Python.h';
+const FILE_OS_PY = 'os.py';
+const FILE_SYS_PY = 'sys.py';
+const FILE_NODE_H = 'node.h';
+const FILE_FS_JS = 'fs.js';
+
+const DIR_SRC = 'src';
+const DIR_LIB = 'lib';
+const DIR_INTERNAL = 'internal';
+const DIR_RUNTIME = 'runtime';
+const DIR_SYNC = 'sync';
+const DIR_CMD = 'cmd';
+const DIR_NET = 'net';
+const DIR_INCLUDE = 'Include';
+const DIR_LIB_TITLE = 'Lib';
+const DIR_LIBRARY = 'library';
+const DIR_CORE = 'core';
+const DIR_STD = 'std';
+const DIR_ALLOC = 'alloc';
+const DIR_KERNEL = 'kernel';
+
+const PATH_FRAGMENT_KERNEL = '/kernel';
+const PATH_FRAGMENT_RUNTIME = '/runtime';
+const PATH_FRAGMENT_BARE_METAL = '/bare-metal';
+const PATH_FRAGMENT_FREESTANDING = '/freestanding';
+const PATH_FRAGMENT_LIBRARY_CORE = '/library/core';
+const PATH_FRAGMENT_LIBRARY_STD = '/library/std';
+const PATH_FRAGMENT_LIBRARY_ALLOC = '/library/alloc';
+
+const HEADER_PREVIEW_SLICE_LIMIT = 1000;
+const VERSION_ZERO = '0.0.0';
 
 /**
  * File extension to language id mapping.
@@ -42,25 +94,25 @@ const EXT_TO_LANG: Record<string, string> = {
     '.jsx': JAVASCRIPT_LANGUAGE_ID,
     '.mjs': JAVASCRIPT_LANGUAGE_ID,
     '.cjs': JAVASCRIPT_LANGUAGE_ID,
-    '.gd': 'gdscript',
-    '.rs': 'rust',
-    '.py': 'python',
-    '.sh': 'shell',
-    '.bash': 'shell',
-    '.ps1': 'powershell',
-    '.go': 'go',
-    '.c': 'c',
-    '.cpp': 'cpp',
-    '.h': 'c',
-    '.hpp': 'cpp',
-    '.java': 'java',
-    '.kt': 'kotlin',
-    '.kts': 'kotlin',
-    '.cs': 'csharp',
-    '.dart': 'dart',
-    '.swift': 'swift',
-    '.lua': 'lua',
-    '.rb': 'ruby',
+    '.gd': GDSCRIPT_LANGUAGE_ID,
+    '.rs': RUST_LANGUAGE_ID,
+    '.py': PYTHON_LANGUAGE_ID,
+    '.sh': SHELL_LANGUAGE_ID,
+    '.bash': SHELL_LANGUAGE_ID,
+    '.ps1': POWERSHELL_LANGUAGE_ID,
+    '.go': GO_LANGUAGE_ID,
+    '.c': C_LANGUAGE_ID,
+    '.cpp': CPP_LANGUAGE_ID,
+    '.h': C_LANGUAGE_ID,
+    '.hpp': CPP_LANGUAGE_ID,
+    '.java': JAVA_LANGUAGE_ID,
+    '.kt': KOTLIN_LANGUAGE_ID,
+    '.kts': KOTLIN_LANGUAGE_ID,
+    '.cs': CSHARP_LANGUAGE_ID,
+    '.dart': DART_LANGUAGE_ID,
+    '.swift': SWIFT_LANGUAGE_ID,
+    '.lua': LUA_LANGUAGE_ID,
+    '.rb': RUBY_LANGUAGE_ID,
 };
 
 const IGNORED_DIRS = new Set([
@@ -384,10 +436,7 @@ function processSampledItem(
         );
         return 0;
     }
-    if (item.isFile()) {
-        return recordSampledFile(item.name, languages);
-    }
-    return 0;
+    return item.isFile() ? recordSampledFile(item.name, languages) : 0;
 }
 
 /**
@@ -542,7 +591,7 @@ const WEB_FRAMEWORKS = new Set([
 
 function readPackageData(root: string, pkg?: Record<string, any>): Record<string, any> | null {
     if (pkg) return pkg;
-    const pkgPath = path.join(root, 'package.json');
+    const pkgPath = path.join(root, FILE_PACKAGE_JSON);
     if (!fs.existsSync(pkgPath)) return null;
     try {
         return JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
@@ -559,13 +608,13 @@ function isDemoArchetype(root: string, packageData: Record<string, any> | null):
     if (!packageData) return false;
     const name = String(packageData.name || '');
     const version = String(packageData.version || '');
-    return /(?:demo|samples?|examples?|tutorial)/i.test(name) || version === '0.0.0';
+    return /(?:demo|samples?|examples?|tutorial)/i.test(name) || version === VERSION_ZERO;
 }
 
 function isGameArchetype(root: string, profile?: Partial<ProjectProfile>): boolean {
-    if (profile?.primaryLanguage === 'gdscript') return true;
-    if ((profile?.languages?.['gdscript'] ?? 0) > 0) return true;
-    if (fs.existsSync(path.join(root, 'project.godot'))) return true;
+    if (profile?.primaryLanguage === GDSCRIPT_LANGUAGE_ID) return true;
+    if ((profile?.languages?.[GDSCRIPT_LANGUAGE_ID] ?? 0) > 0) return true;
+    if (fs.existsSync(path.join(root, FILE_PROJECT_GODOT))) return true;
     for (const f of profile?.frameworks ?? []) {
         if (GAME_FRAMEWORKS.has(f.toLowerCase())) return true;
     }
@@ -594,7 +643,7 @@ function isWebArchetype(
 }
 
 function isRustStdlib(root: string, normRoot: string): boolean {
-    const cargoToml = path.join(root, 'Cargo.toml');
+    const cargoToml = path.join(root, FILE_CARGO_TOML);
     if (fs.existsSync(cargoToml)) {
         try {
             const raw = fs.readFileSync(cargoToml, 'utf8');
@@ -604,38 +653,38 @@ function isRustStdlib(root: string, normRoot: string): boolean {
         }
     }
     return (
-        normRoot.includes('/library/core') ||
-        normRoot.includes('/library/std') ||
-        normRoot.includes('/library/alloc') ||
-        fs.existsSync(path.join(root, 'library', 'core')) ||
-        fs.existsSync(path.join(root, 'library', 'std'))
+        normRoot.includes(PATH_FRAGMENT_LIBRARY_CORE) ||
+        normRoot.includes(PATH_FRAGMENT_LIBRARY_STD) ||
+        normRoot.includes(PATH_FRAGMENT_LIBRARY_ALLOC) ||
+        fs.existsSync(path.join(root, DIR_LIBRARY, DIR_CORE)) ||
+        fs.existsSync(path.join(root, DIR_LIBRARY, DIR_STD))
     );
 }
 
 function isPythonStdlib(root: string, profile?: Partial<ProjectProfile>): boolean {
-    const isPythonTree = Boolean(profile?.languages?.['python']);
+    const isPythonTree = Boolean(profile?.languages?.[PYTHON_LANGUAGE_ID]);
     return (
-        (isPythonTree || fs.existsSync(path.join(root, 'Lib'))) &&
-        (fs.existsSync(path.join(root, 'Include', 'Python.h')) ||
-            (fs.existsSync(path.join(root, 'Lib', 'os.py')) &&
-                fs.existsSync(path.join(root, 'Lib', 'sys.py'))))
+        (isPythonTree || fs.existsSync(path.join(root, DIR_LIB_TITLE))) &&
+        (fs.existsSync(path.join(root, DIR_INCLUDE, FILE_PYTHON_H)) ||
+            (fs.existsSync(path.join(root, DIR_LIB_TITLE, FILE_OS_PY)) &&
+                fs.existsSync(path.join(root, DIR_LIB_TITLE, FILE_SYS_PY))))
     );
 }
 
 function isGoStdlib(root: string): boolean {
     return (
-        fs.existsSync(path.join(root, 'src', 'runtime')) &&
-        fs.existsSync(path.join(root, 'src', 'sync')) &&
-        (fs.existsSync(path.join(root, 'src', 'cmd', 'go')) ||
-            fs.existsSync(path.join(root, 'src', 'net')))
+        fs.existsSync(path.join(root, DIR_SRC, DIR_RUNTIME)) &&
+        fs.existsSync(path.join(root, DIR_SRC, DIR_SYNC)) &&
+        (fs.existsSync(path.join(root, DIR_SRC, DIR_CMD, 'go')) ||
+            fs.existsSync(path.join(root, DIR_SRC, DIR_NET)))
     );
 }
 
 function isNodeRuntime(root: string): boolean {
     return (
-        fs.existsSync(path.join(root, 'lib', 'internal')) &&
-        (fs.existsSync(path.join(root, 'src', 'node.h')) ||
-            fs.existsSync(path.join(root, 'lib', 'fs.js')))
+        fs.existsSync(path.join(root, DIR_LIB, DIR_INTERNAL)) &&
+        (fs.existsSync(path.join(root, DIR_SRC, FILE_NODE_H)) ||
+            fs.existsSync(path.join(root, DIR_LIB, FILE_FS_JS)))
     );
 }
 
@@ -652,7 +701,7 @@ function isStdlibArchetype(root: string, profile?: Partial<ProjectProfile>): boo
 function hasNoStdHeader(filePath: string): boolean {
     if (!fs.existsSync(filePath)) return false;
     try {
-        const header = fs.readFileSync(filePath, 'utf8').slice(0, 1000);
+        const header = fs.readFileSync(filePath, 'utf8').slice(0, HEADER_PREVIEW_SLICE_LIMIT);
         return header.includes('#![no_std]') || header.includes('#![no_core]');
     } catch {
         return false;
@@ -660,7 +709,7 @@ function hasNoStdHeader(filePath: string): boolean {
 }
 
 function hasSystemsCargoName(root: string): boolean {
-    const cargoToml = path.join(root, 'Cargo.toml');
+    const cargoToml = path.join(root, FILE_CARGO_TOML);
     if (!fs.existsSync(cargoToml)) return false;
     try {
         const raw = fs.readFileSync(cargoToml, 'utf8');
@@ -673,11 +722,11 @@ function hasSystemsCargoName(root: string): boolean {
 }
 
 const SYSTEMS_CANDIDATE_PATHS = [
-    ['src', 'lib.rs'],
-    ['src', 'main.rs'],
-    ['core', 'src', 'lib.rs'],
-    ['kernel', 'src', 'lib.rs'],
-    ['runtime', 'src', 'lib.rs'],
+    [DIR_SRC, FILE_LIB_RS],
+    [DIR_SRC, FILE_MAIN_RS],
+    [DIR_CORE, DIR_SRC, FILE_LIB_RS],
+    [DIR_KERNEL, DIR_SRC, FILE_LIB_RS],
+    [DIR_RUNTIME, DIR_SRC, FILE_LIB_RS],
 ];
 
 function isSystemsRuntimeArchetype(root: string, profile?: Partial<ProjectProfile>): boolean {
@@ -688,10 +737,10 @@ function isSystemsRuntimeArchetype(root: string, profile?: Partial<ProjectProfil
     }
     if (hasSystemsCargoName(root)) return true;
     return (
-        normRoot.includes('/kernel') ||
-        normRoot.includes('/runtime') ||
-        normRoot.includes('/bare-metal') ||
-        normRoot.includes('/freestanding')
+        normRoot.includes(PATH_FRAGMENT_KERNEL) ||
+        normRoot.includes(PATH_FRAGMENT_RUNTIME) ||
+        normRoot.includes(PATH_FRAGMENT_BARE_METAL) ||
+        normRoot.includes(PATH_FRAGMENT_FREESTANDING)
     );
 }
 
@@ -714,6 +763,5 @@ export function detectProjectArchetype(
     if (isSystemsRuntimeArchetype(root, profile)) return ARCHETYPE_SYSTEMS_RUNTIME;
     if (isDemoArchetype(root, packageData)) return ARCHETYPE_DEMO;
     if (isGameArchetype(root, profile)) return ARCHETYPE_GAME;
-    if (isWebArchetype(profile, packageData)) return ARCHETYPE_WEB;
-    return ARCHETYPE_LIBRARY;
+    return isWebArchetype(profile, packageData) ? ARCHETYPE_WEB : ARCHETYPE_LIBRARY;
 }

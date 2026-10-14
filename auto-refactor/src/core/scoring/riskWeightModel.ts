@@ -375,7 +375,8 @@ export function computeRiskWeightedPenalties(issues: Issue[]): RiskPenaltyResult
         totalPenalty += p;
     }
 
-    for (const d of Object.keys(dimensionPenalties) as QualityDimension[]) {
+    const dimKeys = Object.keys(dimensionPenalties) as QualityDimension[];
+    for (const d of dimKeys) {
         dimensionPenalties[d] =
             Math.round(dimensionPenalties[d] * DAMPENING_SCALE) / DAMPENING_SCALE;
     }

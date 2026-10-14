@@ -32,14 +32,24 @@ export interface ObservedConstantDeclaration {
 /**
  * Inspects a grouped list of same-name declarations for value divergence.
  */
+function obtainDeclarationList<K>(
+    map: Map<K, ObservedConstantDeclaration[]>,
+    key: K,
+): ObservedConstantDeclaration[] {
+    let list = map.get(key);
+    if (!list) {
+        list = [];
+        map.set(key, list);
+    }
+    return list;
+}
+
 function inspectConstantGroupDrift(name: string, list: ObservedConstantDeclaration[]): Issue[] {
     if (list.length <= 1) return [];
 
     const distinctValues = new Map<string, ObservedConstantDeclaration[]>();
     for (const item of list) {
-        const vList = distinctValues.get(item.normalizedValue) || [];
-        vList.push(item);
-        distinctValues.set(item.normalizedValue, vList);
+        obtainDeclarationList(distinctValues, item.normalizedValue).push(item);
     }
 
     if (distinctValues.size <= 1) return [];
@@ -85,9 +95,7 @@ export function detectConstantDrift(declarations: ObservedConstantDeclaration[])
     const byName = new Map<string, ObservedConstantDeclaration[]>();
 
     for (const decl of declarations) {
-        const list = byName.get(decl.name) || [];
-        list.push(decl);
-        byName.set(decl.name, list);
+        obtainDeclarationList(byName, decl.name).push(decl);
     }
 
     for (const [name, list] of byName) {

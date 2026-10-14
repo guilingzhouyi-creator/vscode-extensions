@@ -7,14 +7,14 @@
 
 ## 1. 四层规则金字塔与双轨文案架构
 
-`auto-refactor` 将全部 **335 条内置规则**（含 **320 条规范化 `FAMILY-TOPIC-NNN` 规则**与 **15 条向后兼容别名规则**）统一收拢于 `src/core/rules/registry.ts` 单一真源注册表中，并由 `npm run validate-rules-registry` 门禁在每次构建时强制校验「发射集 = 注册集 = 文档覆盖集（335/335）」。在工作区全域单源规则目录快照（`scripts/common/rule-catalog.json`）中，活跃规则规模保持 **420 条全仓 SSOT 活跃规则**。
+`auto-refactor` 将全部 **338 条内置规则**（含 **323 条规范化 `FAMILY-TOPIC-NNN` 规则**与 **15 条向后兼容别名规则**）统一收拢于 `src/core/rules/registry.ts` 单一真源注册表中，并由 `npm run validate-rules-registry` 门禁在每次构建时强制校验「发射集 = 注册集 = 文档覆盖集（338/338）」。在工作区全域单源规则目录快照（`scripts/common/rule-catalog.json`）中，活跃规则规模保持 **423 条全仓 SSOT 活跃规则**。
 
 ### 1.1 四层规则金字塔拓扑
 
 | 金字塔层级 | 规则数量 | 包含规则族前缀 | 核心守护边界 |
 | :--- | :---: | :--- | :--- |
 | **Layer 1：全域安全与卫生底线** | 49 条 | `SEC` / `HYG` / `ERR` / `CMT` / `DOC` / `SIM` | 凭证防泄露、注入防御、错误吞没拦截、代码物理卫生、注释质量 (ECD-C) 与文档结构完整性 |
-| **Layer 2：语言族现代化与标准库** | 98 条 | `TSM` / `PYM` / `RSM` / `GOM` / `GDM` / `SH` / `PS` (`SHL`) / `STDLIB` (`STD`) / `UI` / `PROD` | TypeScript、Python、Rust、Go、GDScript、Shell、PowerShell 现代语法惯用法、标准库手写轮子替换与前端工程现代化 |
+| **Layer 2：语言族现代化与标准库** | 101 条 | `TSM` / `MOD` / `PYM` / `RSM` / `GOM` / `GDM` / `SH` / `PS` (`SHL`) / `STDLIB` (`STD`) / `UI` / `PROD` | TypeScript、Python、Rust、Go、GDScript、Shell、PowerShell 现代语法惯用法、标准库手写轮子替换与前端工程现代化 |
 | **Layer 3：架构拓扑、治理、数据与性能** | 141 条 | `ARCH` / `GOV` / `DAT` / `PRF` / `DEP` / `NAM` / `CONST` / `CPX` / `GATE` / `CMP` / `NUM` | 分层单向依赖、架构防腐、多 Agent 协作防冲突 (`GOV-AGN-001`)、切片破坏防范 (`GOV-SLC-001`)、轨迹回归检验 (`GOV-TRJ-001`)、N+1 数据库查询阻断与热循环零分配 |
 | **Layer 4：领域专精、测试现代性与历史兼容** | 37 条 | `GDM` (`gdscript-game`) / `VSC` / `TST` / `SEC` (`client-exposure`) + 15 条 Legacy Aliases | Godot 4 游戏引擎运行态契约、VS Code 扩展清单与事件规范、测试有效覆盖深度与历史规则平滑迁移过渡窗口 |
 
@@ -168,6 +168,9 @@
 | `GOM-STYLE-001` | <a id="gom-style-001"></a>`go-modern` | `GOM` | `info` | `go` | 方法接收器命名不符合 Go 惯例。 | 使用 1-2 字母短名且与类型保持一致。 |
 | `GOM-STYLE-002` | <a id="gom-style-002"></a>`go-modern` | `GOM` | `info` | `go` | 错误变量未以 err 开头。 | 将变量重命名为以 err 开头。 |
 | `GOM-STYLE-003` | <a id="gom-style-003"></a>`go-modern` | `GOM` | `info` | `go` | 导出包注释或包命名不符合规范。 | 添加规范包注释或修正包名。 |
+| `MOD-BWD-001` | <a id="mod-bwd-001"></a>`ts-modern` | `MOD` | `warning` | `typescript, javascript` | 向后兼容垫片维持过时签名但未执行平替剪除。 | 将调用方直接迁移至标准规范 API 并剪除过渡期垫片包装函数。 |
+| `MOD-DEP-001` | <a id="mod-dep-001"></a>`ts-modern` | `MOD` | `warning` | `typescript, javascript` | 内部生产代码直接调用或访问带有 @deprecated 标记的符号。 | 在 API 正式日落退役前，将废弃符号访问全量替换为现代标准接口。 |
+| `MOD-FLB-001` | <a id="mod-flb-001"></a>`ts-modern` | `MOD` | `warning` | `typescript, javascript` | 防御性跨代级联回退链（?? 或 \|\| 级联跨版本字段）。 | 在周界适配层完成入参归一化并注入默认值，核心域实行直接访问。 |
 | `PROD-HYG-001` | <a id="prod-hyg-001"></a>`production-hygiene` | `PROD` | `error` | `all` | 生产构建产物包含调试输出、未决标记或绝对路径。 | 配置打包构建工具移除 console、注释与源码绝对路径。 |
 | `PROD-HYG-002` | <a id="prod-hyg-002"></a>`production-hygiene` | `PROD` | `error` | `all` | 生产环境暴露 Source Map 或 sourceMappingURL 指令。 | 关闭公共 Source Map 或仅上传至内部私有崩溃追踪服务。 |
 | `PROD-HYG-003` | <a id="prod-hyg-003"></a>`production-hygiene` | `PROD` | `error` | `all` | 敏感后端环境变量泄露至客户端代码包。 | 确保密钥留在服务端，前端仅使用公开环境变量前缀。 |

@@ -113,6 +113,15 @@ function renderReportHeader(report: ScanReport): string[] {
     return lines;
 }
 
+function getOrCreateFileIssues(byFile: Map<string, Issue[]>, file: string): Issue[] {
+    let arr = byFile.get(file);
+    if (!arr) {
+        arr = [];
+        byFile.set(file, arr);
+    }
+    return arr;
+}
+
 /**
  * Groups issue findings by their target file path.
  *
@@ -122,12 +131,7 @@ function renderReportHeader(report: ScanReport): string[] {
 function groupIssuesByFile(issues: readonly Issue[]): Map<string, Issue[]> {
     const byFile = new Map<string, Issue[]>();
     for (const it of issues) {
-        let arr = byFile.get(it.location.file);
-        if (!arr) {
-            arr = [];
-            byFile.set(it.location.file, arr);
-        }
-        arr.push(it);
+        getOrCreateFileIssues(byFile, it.location.file).push(it);
     }
     return byFile;
 }

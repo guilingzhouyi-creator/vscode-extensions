@@ -45,43 +45,69 @@ const DIFF_OP_EQUAL = 'equal';
 /** DiffOp tag for a line added in the new content. */
 const DIFF_OP_INSERT = 'insert';
 
+/** DiffOp tag for a line deleted in the new content. */
+const DIFF_OP_DELETE = 'delete';
+
+/**
+ * Execution context carrying immutable arrays and operation sink for histogram diff.
+ */
+interface HistogramDiffContext {
+    readonly sourceLines: readonly string[];
+    readonly targetLines: readonly string[];
+    readonly sourceHashes: Uint32Array;
+    readonly targetHashes: Uint32Array;
+    readonly targetHashToPositionsMap: ReadonlyMap<number, number[]>;
+    readonly operations: DiffOp[];
+}
+
+interface AnchorMatch {
+    anchorSourceIndex: number;
+    anchorTargetIndex: number;
+}
+
 /**
  * Checks if a candidate anchor has fewer occurrences or is closer to the midpoint.
  */
 function isBetterAnchorCandidate(
-    countB: number,
-    dist: number,
+    countTarget: number,
+    distanceFromMid: number,
     minOccurrences: number,
     bestDistFromMid: number,
 ): boolean {
-    if (countB < minOccurrences) {
+    if (countTarget < minOccurrences) {
         return true;
     }
-    return countB === minOccurrences && dist < bestDistFromMid;
+    return countTarget === minOccurrences && distanceFromMid < bestDistFromMid;
 }
 
 /**
  * Emits trivial diff operations when one or both sub-problem spans are empty.
  */
 function handleEmptySpan(
-    lenA: number,
-    lenB: number,
-    startA: number,
-    endA: number,
-    startB: number,
-    endB: number,
-    ops: DiffOp[],
+    context: HistogramDiffContext,
+    span: Span,
 ): boolean {
-    if (lenA === 0 && lenB === 0) return true;
-    if (lenA === 0) {
-        for (let i = startB; i < endB; i++) {
-            ops.push({ type: DIFF_OP_INSERT, aIdx: startA, bIdx: i });
+    const sourceSpanLength = span.endA - span.startA;
+    const targetSpanLength = span.endB - span.startB;
+
+    if (sourceSpanLength === 0 && targetSpanLength === 0) return true;
+    if (sourceSpanLength === 0) {
+        for (let targetIndex = span.startB; targetIndex < span.endB; targetIndex++) {
+            context.operations.push({
+                type: DIFF_OP_INSERT,
+                aIdx: span.startA,
+                bIdx: targetIndex,
+            });
         }
         return true;
     }
-    if (lenB === 0) {
-        for (let i = startA; i < endA; i++) {
-            ops.push({ type: 'delete', aIdx: i, bIdx: startB });
+    if (targetSpanLength === 0) {
+        for (let sourceIndex = span.startA; sourceIndex < span.endA; sourceIndex++) {
+            context.operations.push({
+                type: DIFF_OP_DELETE,
+                aIdx: sourceIndex,
+                bIdx: span.startB,
+            });
         }
         return true;
     }
@@ -96,277 +122,346 @@ function isFallbackCondition(remA: number, remB: number, depth: number): boolean
 }
 
 /**
- * Diff two line arrays with the histogram algorithm over caller-supplied 32-bit line hashes.
- *
- * Trims the common prefix/suffix, picks the rarest shared line nearest the midpoint as a split
- * anchor and recurses on both sides; sub-problems below FALLBACK_THRESHOLD or the recursion cap
- * fall back to Myers. The result is a total, ordered DiffOp[] covering both inputs, and inputs
- * with no shared line degrade to a delete-then-insert script in linear time. This function is
- * pure and never throws; hA/hB must be aligned index-for-index with a/b.
- *
- * @param a - Original line array; emitted `aIdx` values index into it.
- * @param b - Revised line array; emitted `bIdx` values index into it.
- * @param hA - 32-bit hash for each line of `a`, aligned with `a` by index.
- * @param hB - 32-bit hash for each line of `b`, aligned with `b` by index.
- * @returns Edit script of equal/delete/insert operations that reconstructs `b` from `a`.
+ * Appends a line index to the hash position bucket, creating the bucket on first encounter.
  */
-export function histogramDiff(
-    a: string[],
-    b: string[],
-    hA: Uint32Array,
-    hB: Uint32Array,
-): DiffOp[] {
-    const ops: DiffOp[] = [];
-
-    // Build the global hash index once at the top level so every recursion reuses it.
-    const bHashPositions = new Map<number, number[]>();
-    for (let j = 0; j < b.length; j++) {
-        const hash = hB[j];
-        let list = bHashPositions.get(hash);
-        if (!list) {
-            list = [];
-            bHashPositions.set(hash, list);
-        }
-        list.push(j);
+function appendHashPosition(
+    targetMap: Map<number, number[]>,
+    hashValue: number,
+    positionIndex: number,
+): void {
+    const positionList = targetMap.get(hashValue);
+    if (positionList !== undefined) {
+        positionList.push(positionIndex);
+        return;
     }
-
-    interface AnchorMatch {
-        anchorA: number;
-        anchorB: number;
-    }
-
-    function findBucketStart(bList: number[], curStartB: number): number {
-        const listLen = bList.length;
-        if (listLen <= BINARY_SEARCH_MIN_BUCKET_SIZE || bList[0] >= curStartB) {
-            return 0;
-        }
-        let low = 0;
-        let high = listLen - 1;
-        while (low < high) {
-            const mid = (low + high) >>> 1;
-            if (bList[mid] < curStartB) {
-                low = mid + 1;
-            } else {
-                high = mid;
-            }
-        }
-        return low;
-    }
-
-    function countValidOccurrences(
-        bList: number[],
-        startK: number,
-        curEndB: number,
-        targetLine: string,
-        b: string[],
-    ): { countB: number; matchedB: number } {
-        let countB = 0;
-        let matchedB = -1;
-        const listLen = bList.length;
-        for (let k = startK; k < listLen; k++) {
-            const pos = bList[k];
-            if (pos >= curEndB) break;
-            countB++;
-            if (matchedB === -1 && targetLine === b[pos]) matchedB = pos;
-        }
-        return { countB, matchedB };
-    }
-
-    function findBestAnchor(
-        curStartA: number,
-        curEndA: number,
-        curStartB: number,
-        curEndB: number,
-        remA: number,
-        a: string[],
-        b: string[],
-        hA: Uint32Array,
-        bHashPositions: Map<number, number[]>,
-    ): AnchorMatch {
-        let anchorA = -1;
-        let anchorB = -1;
-        let minOccurrences = Number.POSITIVE_INFINITY;
-        let bestDistFromMid = Number.POSITIVE_INFINITY;
-        const midPointA = curStartA + Math.floor(remA / 2);
-
-        for (let i = curStartA; i < curEndA; i++) {
-            const hash = hA[i];
-            const bList = bHashPositions.get(hash);
-            if (!bList) continue;
-
-            const listLen = bList.length;
-            if (bList[0] >= curEndB || bList[listLen - 1] < curStartB) continue;
-
-            const startK = findBucketStart(bList, curStartB);
-            const { countB, matchedB } = countValidOccurrences(bList, startK, curEndB, a[i], b);
-            if (countB === 0 || matchedB === -1) continue;
-
-            const dist = Math.abs(i - midPointA);
-            if (isBetterAnchorCandidate(countB, dist, minOccurrences, bestDistFromMid)) {
-                minOccurrences = countB;
-                bestDistFromMid = dist;
-                anchorA = i;
-                anchorB = matchedB;
-                if (countB === 1 && dist === 0) break;
-            }
-        }
-        return { anchorA, anchorB };
-    }
-
-    function handleMyersFallback(
-        curStartA: number,
-        curEndA: number,
-        curStartB: number,
-        curEndB: number,
-        a: string[],
-        b: string[],
-        hA: Uint32Array,
-        hB: Uint32Array,
-        ops: DiffOp[],
-    ): void {
-        const sliceA = a.slice(curStartA, curEndA);
-        const sliceB = b.slice(curStartB, curEndB);
-        const sliceHA = hA.subarray(curStartA, curEndA);
-        const sliceHB = hB.subarray(curStartB, curEndB);
-        const subOps = myersDiff(sliceA, sliceB, sliceHA, sliceHB);
-
-        for (const op of subOps) {
-            ops.push({
-                type: op.type,
-                aIdx: curStartA + op.aIdx,
-                bIdx: curStartB + op.bIdx,
-            });
-        }
-    }
-
-    function emitDisjointOps(
-        curStartA: number,
-        curEndA: number,
-        curStartB: number,
-        curEndB: number,
-        ops: DiffOp[],
-    ): void {
-        for (let i = curStartA; i < curEndA; i++) {
-            ops.push({ type: 'delete', aIdx: i, bIdx: curStartB });
-        }
-        for (let j = curStartB; j < curEndB; j++) {
-            ops.push({ type: DIFF_OP_INSERT, aIdx: curEndA, bIdx: j });
-        }
-    }
-
-    function appendSuffixEquals(curEndA: number, curEndB: number, s: number, ops: DiffOp[]): void {
-        for (let i = 0; i < s; i++) {
-            ops.push({ type: DIFF_OP_EQUAL, aIdx: curEndA + i, bIdx: curEndB + i });
-        }
-    }
-
-    function trimCommonPrefix(
-        startA: number,
-        endA: number,
-        startB: number,
-        endB: number,
-        a: string[],
-        b: string[],
-        hA: Uint32Array,
-        hB: Uint32Array,
-        ops: DiffOp[],
-    ): number {
-        let p = 0;
-        while (
-            startA + p < endA &&
-            startB + p < endB &&
-            hA[startA + p] === hB[startB + p] &&
-            a[startA + p] === b[startB + p]
-        ) {
-            ops.push({ type: DIFF_OP_EQUAL, aIdx: startA + p, bIdx: startB + p });
-            p++;
-        }
-        return p;
-    }
-
-    function trimCommonSuffix(
-        minA: number,
-        endA: number,
-        minB: number,
-        endB: number,
-        a: string[],
-        b: string[],
-        hA: Uint32Array,
-        hB: Uint32Array,
-    ): number {
-        let s = 0;
-        while (
-            endA - 1 - s >= minA &&
-            endB - 1 - s >= minB &&
-            hA[endA - 1 - s] === hB[endB - 1 - s] &&
-            a[endA - 1 - s] === b[endB - 1 - s]
-        ) {
-            s++;
-        }
-        return s;
-    }
-
-    function solve(span: Span, depth: number): void {
-        const { startA, endA, startB, endB } = span;
-        const lenA = endA - startA;
-        const lenB = endB - startB;
-
-        if (handleEmptySpan(lenA, lenB, startA, endA, startB, endB, ops)) {
-            return;
-        }
-
-        const p = trimCommonPrefix(startA, endA, startB, endB, a, b, hA, hB, ops);
-        const s = trimCommonSuffix(startA + p, endA, startB + p, endB, a, b, hA, hB);
-
-        const curStartA = startA + p;
-        const curEndA = endA - s;
-        const curStartB = startB + p;
-        const curEndB = endB - s;
-        const remA = curEndA - curStartA;
-        const remB = curEndB - curStartB;
-
-        if (remA === 0 && remB === 0) {
-            appendSuffixEquals(curEndA, curEndB, s, ops);
-            return;
-        }
-
-        if (isFallbackCondition(remA, remB, depth)) {
-            handleMyersFallback(curStartA, curEndA, curStartB, curEndB, a, b, hA, hB, ops);
-            appendSuffixEquals(curEndA, curEndB, s, ops);
-            return;
-        }
-
-        const { anchorA, anchorB } = findBestAnchor(
-            curStartA,
-            curEndA,
-            curStartB,
-            curEndB,
-            remA,
-            a,
-            b,
-            hA,
-            bHashPositions,
-        );
-
-        if (anchorA === -1 || anchorB === -1) {
-            emitDisjointOps(curStartA, curEndA, curStartB, curEndB, ops);
-            appendSuffixEquals(curEndA, curEndB, s, ops);
-            return;
-        }
-
-        // Divide left
-        solve({ startA: curStartA, endA: anchorA, startB: curStartB, endB: anchorB }, depth + 1);
-        // Anchor
-        ops.push({ type: DIFF_OP_EQUAL, aIdx: anchorA, bIdx: anchorB });
-        // Divide right
-        solve(
-            { startA: anchorA + 1, endA: curEndA, startB: anchorB + 1, endB: curEndB },
-            depth + 1,
-        );
-
-        appendSuffixEquals(curEndA, curEndB, s, ops);
-    }
-
-    solve({ startA: 0, endA: a.length, startB: 0, endB: b.length }, 0);
-    return ops;
+    targetMap.set(hashValue, [positionIndex]);
 }
+
+/**
+ * Builds the top-level lookup map from line hash to target position indices.
+ */
+function buildTargetHashPositionMap(
+    targetLines: readonly string[],
+    targetHashes: Uint32Array,
+): Map<number, number[]> {
+    const targetMap = new Map<number, number[]>();
+    for (let targetIndex = 0; targetIndex < targetLines.length; targetIndex++) {
+        appendHashPosition(targetMap, targetHashes[targetIndex], targetIndex);
+    }
+    return targetMap;
+}
+
+function findBucketStart(
+    positionBucket: readonly number[],
+    startTargetIndex: number,
+): number {
+    const listLength = positionBucket.length;
+    if (listLength <= BINARY_SEARCH_MIN_BUCKET_SIZE || positionBucket[0] >= startTargetIndex) {
+        return 0;
+    }
+    let low = 0;
+    let high = listLength - 1;
+    while (low < high) {
+        const mid = (low + high) >>> 1;
+        if (positionBucket[mid] < startTargetIndex) {
+            low = mid + 1;
+        } else {
+            high = mid;
+        }
+    }
+    return low;
+}
+
+interface BucketScanConfig {
+    readonly positionBucket: readonly number[];
+    readonly startBucketIndex: number;
+    readonly endTargetIndex: number;
+    readonly targetLineContent: string;
+}
+
+function countValidOccurrences(
+    context: HistogramDiffContext,
+    config: BucketScanConfig,
+): { countTarget: number; matchedTargetIndex: number } {
+    let countTarget = 0;
+    let matchedTargetIndex = -1;
+    const { positionBucket, startBucketIndex, endTargetIndex, targetLineContent } = config;
+    const listLength = positionBucket.length;
+    for (let bucketIndex = startBucketIndex; bucketIndex < listLength; bucketIndex++) {
+        const positionIndex = positionBucket[bucketIndex];
+        if (positionIndex >= endTargetIndex) break;
+        countTarget++;
+        if (matchedTargetIndex === -1 && targetLineContent === context.targetLines[positionIndex]) {
+            matchedTargetIndex = positionIndex;
+        }
+    }
+    return { countTarget, matchedTargetIndex };
+}
+
+function findBestAnchor(
+    context: HistogramDiffContext,
+    activeSpan: Span,
+): AnchorMatch {
+    let anchorSourceIndex = -1;
+    let anchorTargetIndex = -1;
+    let minOccurrences = Number.POSITIVE_INFINITY;
+    let bestDistFromMid = Number.POSITIVE_INFINITY;
+    const remainderSource = activeSpan.endA - activeSpan.startA;
+    const midPointSource = activeSpan.startA + Math.floor(remainderSource / 2);
+
+    for (let sourceIndex = activeSpan.startA; sourceIndex < activeSpan.endA; sourceIndex++) {
+        const hashValue = context.sourceHashes[sourceIndex];
+        const positionBucket = context.targetHashToPositionsMap.get(hashValue);
+        if (!positionBucket) continue;
+
+        const listLength = positionBucket.length;
+        if (
+            positionBucket[0] >= activeSpan.endB ||
+            positionBucket[listLength - 1] < activeSpan.startB
+        ) {
+            continue;
+        }
+
+        const startBucketIndex = findBucketStart(positionBucket, activeSpan.startB);
+        const { countTarget, matchedTargetIndex } = countValidOccurrences(context, {
+            positionBucket,
+            startBucketIndex,
+            endTargetIndex: activeSpan.endB,
+            targetLineContent: context.sourceLines[sourceIndex],
+        });
+        if (countTarget === 0 || matchedTargetIndex === -1) continue;
+
+        const distance = Math.abs(sourceIndex - midPointSource);
+        if (isBetterAnchorCandidate(countTarget, distance, minOccurrences, bestDistFromMid)) {
+            minOccurrences = countTarget;
+            bestDistFromMid = distance;
+            anchorSourceIndex = sourceIndex;
+            anchorTargetIndex = matchedTargetIndex;
+            if (countTarget === 1 && distance === 0) break;
+        }
+    }
+    return { anchorSourceIndex, anchorTargetIndex };
+}
+
+function handleMyersFallback(
+    context: HistogramDiffContext,
+    activeSpan: Span,
+): void {
+    const sliceSource = context.sourceLines.slice(activeSpan.startA, activeSpan.endA);
+    const sliceTarget = context.targetLines.slice(activeSpan.startB, activeSpan.endB);
+    const sliceHashesSource = context.sourceHashes.subarray(activeSpan.startA, activeSpan.endA);
+    const sliceHashesTarget = context.targetHashes.subarray(activeSpan.startB, activeSpan.endB);
+    const subOperations = myersDiff(
+        sliceSource,
+        sliceTarget,
+        sliceHashesSource,
+        sliceHashesTarget,
+    );
+
+    for (const operation of subOperations) {
+        context.operations.push({
+            type: operation.type,
+            aIdx: activeSpan.startA + operation.aIdx,
+            bIdx: activeSpan.startB + operation.bIdx,
+        });
+    }
+}
+
+function emitDisjointOperations(
+    context: HistogramDiffContext,
+    activeSpan: Span,
+): void {
+    for (let sourceIndex = activeSpan.startA; sourceIndex < activeSpan.endA; sourceIndex++) {
+        context.operations.push({
+            type: DIFF_OP_DELETE,
+            aIdx: sourceIndex,
+            bIdx: activeSpan.startB,
+        });
+    }
+    for (let targetIndex = activeSpan.startB; targetIndex < activeSpan.endB; targetIndex++) {
+        context.operations.push({
+            type: DIFF_OP_INSERT,
+            aIdx: activeSpan.endA,
+            bIdx: targetIndex,
+        });
+    }
+}
+
+function appendSuffixEquals(
+    context: HistogramDiffContext,
+    endSourceIndex: number,
+    endTargetIndex: number,
+    suffixCount: number,
+): void {
+    for (let offset = 0; offset < suffixCount; offset++) {
+        context.operations.push({
+            type: DIFF_OP_EQUAL,
+            aIdx: endSourceIndex + offset,
+            bIdx: endTargetIndex + offset,
+        });
+    }
+}
+
+function trimCommonPrefix(
+    context: HistogramDiffContext,
+    span: Span,
+): number {
+    let prefixCount = 0;
+    while (
+        span.startA + prefixCount < span.endA &&
+        span.startB + prefixCount < span.endB &&
+        context.sourceHashes[span.startA + prefixCount] ===
+            context.targetHashes[span.startB + prefixCount] &&
+        context.sourceLines[span.startA + prefixCount] ===
+            context.targetLines[span.startB + prefixCount]
+    ) {
+        context.operations.push({
+            type: DIFF_OP_EQUAL,
+            aIdx: span.startA + prefixCount,
+            bIdx: span.startB + prefixCount,
+        });
+        prefixCount++;
+    }
+    return prefixCount;
+}
+
+function trimCommonSuffix(
+    context: HistogramDiffContext,
+    span: Span,
+    prefixCount: number,
+): number {
+    const minSourceIndex = span.startA + prefixCount;
+    const minTargetIndex = span.startB + prefixCount;
+    let suffixCount = 0;
+    while (
+        span.endA - 1 - suffixCount >= minSourceIndex &&
+        span.endB - 1 - suffixCount >= minTargetIndex &&
+        context.sourceHashes[span.endA - 1 - suffixCount] ===
+            context.targetHashes[span.endB - 1 - suffixCount] &&
+        context.sourceLines[span.endA - 1 - suffixCount] ===
+            context.targetLines[span.endB - 1 - suffixCount]
+    ) {
+        suffixCount++;
+    }
+    return suffixCount;
+}
+
+function executeDiffRecursion(
+    context: HistogramDiffContext,
+    span: Span,
+    recursionDepth: number,
+): void {
+    if (handleEmptySpan(context, span)) {
+        return;
+    }
+
+    const prefixCount = trimCommonPrefix(context, span);
+    const suffixCount = trimCommonSuffix(context, span, prefixCount);
+
+    const activeSpan: Span = {
+        startA: span.startA + prefixCount,
+        endA: span.endA - suffixCount,
+        startB: span.startB + prefixCount,
+        endB: span.endB - suffixCount,
+    };
+
+    const remainingSource = activeSpan.endA - activeSpan.startA;
+    const remainingTarget = activeSpan.endB - activeSpan.startB;
+
+    if (remainingSource === 0 && remainingTarget === 0) {
+        appendSuffixEquals(context, activeSpan.endA, activeSpan.endB, suffixCount);
+        return;
+    }
+
+    if (isFallbackCondition(remainingSource, remainingTarget, recursionDepth)) {
+        handleMyersFallback(context, activeSpan);
+        appendSuffixEquals(context, activeSpan.endA, activeSpan.endB, suffixCount);
+        return;
+    }
+
+    const { anchorSourceIndex, anchorTargetIndex } = findBestAnchor(context, activeSpan);
+
+    if (anchorSourceIndex === -1 || anchorTargetIndex === -1) {
+        emitDisjointOperations(context, activeSpan);
+        appendSuffixEquals(context, activeSpan.endA, activeSpan.endB, suffixCount);
+        return;
+    }
+
+    // Divide left
+    executeDiffRecursion(
+        context,
+        {
+            startA: activeSpan.startA,
+            endA: anchorSourceIndex,
+            startB: activeSpan.startB,
+            endB: anchorTargetIndex,
+        },
+        recursionDepth + 1,
+    );
+
+    // Anchor
+    context.operations.push({
+        type: DIFF_OP_EQUAL,
+        aIdx: anchorSourceIndex,
+        bIdx: anchorTargetIndex,
+    });
+
+    // Divide right
+    executeDiffRecursion(
+        context,
+        {
+            startA: anchorSourceIndex + 1,
+            endA: activeSpan.endA,
+            startB: anchorTargetIndex + 1,
+            endB: activeSpan.endB,
+        },
+        recursionDepth + 1,
+    );
+
+    appendSuffixEquals(context, activeSpan.endA, activeSpan.endB, suffixCount);
+}
+
+/**
+ * Compute line-level edit script using the Git/Libgit2 histogram diff algorithm.
+ *
+ * @param sourceLines - Original line array; emitted `aIdx` values index into it.
+ * @param targetLines - Revised line array; emitted `bIdx` values index into it.
+ * @param sourceHashes - 32-bit hash for each line of `sourceLines`, aligned by index.
+ * @param targetHashes - 32-bit hash for each line of `targetLines`, aligned by index.
+ * @returns Edit script of equal/delete/insert operations that reconstructs `targetLines` from
+ *          `sourceLines`.
+ */
+export function computeHistogramDiff(
+    sourceLines: string[],
+    targetLines: string[],
+    sourceHashes: Uint32Array,
+    targetHashes: Uint32Array,
+): DiffOp[] {
+    const operations: DiffOp[] = [];
+    const targetHashToPositionsMap = buildTargetHashPositionMap(targetLines, targetHashes);
+
+    const context: HistogramDiffContext = {
+        sourceLines,
+        targetLines,
+        sourceHashes,
+        targetHashes,
+        targetHashToPositionsMap,
+        operations,
+    };
+
+    executeDiffRecursion(
+        context,
+        {
+            startA: 0,
+            endA: sourceLines.length,
+            startB: 0,
+            endB: targetLines.length,
+        },
+        0,
+    );
+
+    return operations;
+}
+
+/** Backward-compatible export alias for histogram diff. */
+export const histogramDiff = computeHistogramDiff;

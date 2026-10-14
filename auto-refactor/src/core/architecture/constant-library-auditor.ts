@@ -60,35 +60,41 @@ export interface ConstantLibraryTopologyVerdict {
     suggestedModules: SuggestedConstantModule[];
 }
 
+interface PrefixModuleMapping {
+    readonly prefixes: readonly string[];
+    readonly module: string;
+}
+
+const CONSTANT_MODULE_MAPPINGS: readonly PrefixModuleMapping[] = Object.freeze([
+    { prefixes: ['AST_', 'NODE_'], module: 'ast-tokens.ts' },
+    { prefixes: ['RULE_', 'CODE_'], module: 'rule-codes.ts' },
+    { prefixes: ['SYS_', 'PATH_', 'EXT_', 'DIR_'], module: 'system-tokens.ts' },
+    { prefixes: ['SEVERITY_', 'STATUS_', 'DIAG_'], module: 'diagnostic-tokens.ts' },
+    { prefixes: ['CFG_', 'CONFIG_', 'DEFAULT_', 'LIMIT_'], module: 'config-tokens.ts' },
+]);
+
+/** Directory segment markers identifying an existing constant library structure. */
+const CONSTANT_LIB_DIR_PATTERN = /\/(?:constants|tokens|dictionary|dictionaries)\//;
+
+/** File suffix patterns identifying an existing constant library module. */
+const CONSTANT_LIB_FILE_PATTERN = /(?:constants|tokens|dictionary)\.[tj]s$/;
+
+function matchesAnyPrefix(target: string, prefixes: readonly string[]): boolean {
+    for (const prefix of prefixes) {
+        if (target.startsWith(prefix)) return true;
+    }
+    return false;
+}
+
 /**
  * Categorize a constant symbol into a canonical domain module name.
  */
 function categorizeSymbolToModule(name: string): string {
     const upper = name.toUpperCase();
-    if (upper.startsWith('AST_') || upper.startsWith('NODE_')) {
-        return 'ast-tokens.ts';
-    }
-    if (upper.startsWith('RULE_') || upper.startsWith('CODE_')) {
-        return 'rule-codes.ts';
-    }
-    if (
-        upper.startsWith('SYS_') ||
-        upper.startsWith('PATH_') ||
-        upper.startsWith('EXT_') ||
-        upper.startsWith('DIR_')
-    ) {
-        return 'system-tokens.ts';
-    }
-    if (upper.startsWith('SEVERITY_') || upper.startsWith('STATUS_') || upper.startsWith('DIAG_')) {
-        return 'diagnostic-tokens.ts';
-    }
-    if (
-        upper.startsWith('CFG_') ||
-        upper.startsWith('CONFIG_') ||
-        upper.startsWith('DEFAULT_') ||
-        upper.startsWith('LIMIT_')
-    ) {
-        return 'config-tokens.ts';
+    for (const mapping of CONSTANT_MODULE_MAPPINGS) {
+        if (matchesAnyPrefix(upper, mapping.prefixes)) {
+            return mapping.module;
+        }
     }
     return 'domain-tokens.ts';
 }
@@ -103,18 +109,10 @@ function categorizeSymbolToModule(name: string): string {
  */
 export function isAlreadyInConstantLibrary(filePath: string): boolean {
     const posix = filePath.replace(/\\/g, '/').toLowerCase();
-    return (
-        posix.includes('/constants/') ||
-        posix.includes('/tokens/') ||
-        posix.includes('/dictionary/') ||
-        posix.includes('/dictionaries/') ||
-        posix.endsWith('constants.ts') ||
-        posix.endsWith('constants.js') ||
-        posix.endsWith('tokens.ts') ||
-        posix.endsWith('tokens.js') ||
-        posix.endsWith('dictionary.ts') ||
-        posix.endsWith('dictionary.js')
-    );
+    if (CONSTANT_LIB_DIR_PATTERN.test(posix)) {
+        return true;
+    }
+    return CONSTANT_LIB_FILE_PATTERN.test(posix);
 }
 
 /** Canonical domain module filenames for constant library topology. */

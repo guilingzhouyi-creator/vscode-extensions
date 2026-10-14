@@ -272,25 +272,6 @@ export function calculateCasReentrancySafetyIndex(
     return Math.round(safety * PERCENT_SCALE) / PERCENT_SCALE;
 }
 
-/**
- * Compatibility alias for reentrancy safety index.
- *
- * @param guardedTransitions - Guarded transitions count.
- * @param totalTransitions - Total transitions count.
- * @param reentrancyExposureRatio - Reentrancy exposure ratio.
- * @returns Safety index value.
- */
-export function calculateReentrancySafetyIndex(
-    guardedTransitions: number,
-    totalTransitions: number,
-    reentrancyExposureRatio: number = 0,
-): number {
-    return calculateCasReentrancySafetyIndex(
-        guardedTransitions,
-        totalTransitions,
-        reentrancyExposureRatio,
-    );
-}
 
 /**
  * Measure Architecture Indirection-to-Cohesion Utility Metric.
@@ -367,25 +348,6 @@ export function calculateConfigCacheFreshnessScore(
     return Math.round(freshness * PERCENT_SCALE) / PERCENT_SCALE;
 }
 
-/**
- * Compatibility alias for cache freshness safety.
- *
- * @param invalidatedTablesCount - Invalidated tables count.
- * @param totalCachedTablesCount - Total cached tables count.
- * @param staleWindowRatio - Stale window ratio.
- * @returns Freshness index value.
- */
-export function calculateCacheFreshnessSafety(
-    invalidatedTablesCount: number,
-    totalCachedTablesCount: number,
-    staleWindowRatio: number = 0,
-): number {
-    return calculateConfigCacheFreshnessScore(
-        invalidatedTablesCount,
-        totalCachedTablesCount,
-        staleWindowRatio,
-    );
-}
 
 /**
  * Calculate DTO Backward-Compatibility Bridge Index.
@@ -411,21 +373,6 @@ export function calculateDtoCompatibilityBridgeIndex(
     return Math.round(index * PERCENT_SCALE) / PERCENT_SCALE;
 }
 
-/**
- * Compatibility alias for DTO compatibility index.
- *
- * @param bridgedCallCount - Bridged call count.
- * @param totalCallCount - Total call count.
- * @returns Compatibility index value.
- */
-export function calculateDtoCompatibilityIndex(
-    bridgedCallCount: number,
-    totalCallCount: number,
-): number {
-    if (totalCallCount <= 0) return 1.0;
-    const ratio = Math.min(1.0, Math.max(0, bridgedCallCount) / totalCallCount);
-    return Math.round(ratio * PERCENT_SCALE) / PERCENT_SCALE;
-}
 
 /**
  * Measure Schema Grounding Rate for Dynamic Domain Literals.

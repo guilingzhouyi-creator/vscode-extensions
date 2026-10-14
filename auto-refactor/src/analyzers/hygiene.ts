@@ -46,6 +46,12 @@ interface HygieneOptions {
 
 const TERMINAL_STMT_RE = /^\s*(?:return\b|throw\s+|break;|continue;|raise\s+|exit\b)/;
 const TEMP_STUB_RE = /\b(TODO|FIXME|XXX|HACK|unimplemented)\b/i;
+const SUPPRESSION_DIRECTIVE_RE =
+    /^\s*(?:\/\/|\/\*|#|\*)\s*(?:@ts-(?:ignore|expect-error|nocheck)|eslint-disable|biome-ignore|#\s*noqa)\b/i;
+const VAGUE_THROW_RE =
+    /^\s*(?:throw\s+new\s+[A-Za-z0-9_$]*(?:Error|Exception)\s*\(\s*(?:['"]\s*['"]|['"](?:error|failed|err|invalid|unknown|bad|bug|oops|exception)['"]\s*)?\)|throw\s+['"][a-zA-Z0-9_\-\s]{0,8}['"]\s*;?|raise\s+[A-Za-z0-9_$]*(?:Exception|Error)\s*\(\s*(?:['"]\s*['"]|['"](?:error|failed|err)['"]\s*)?\))/i;
+const FLOATING_PROMISE_RE =
+    /^\s*(?:Promise\.(?:all|allSettled|race|resolve|reject)|new\s+Promise)\s*\(/;
 /** Default number of consecutive meaningful lines that counts as a duplicate block. */
 const DEFAULT_MIN_CLONE_LINES = 6;
 /** 32-bit FNV-1a offset basis used to seed the line hasher. */
@@ -200,79 +206,113 @@ function computeLineHashesFallback(content: string): {
  * match whole words, so identifiers such as `wipCount` do not false-positive.
  * Failure semantics: always returns an issue array and never throws on unusual input.
  */
+type IssueFactory = (
+    ctx: AnalyzerContext,
+    lineIdx: number,
+    rule: string,
+    message: string,
+    severity: 'info' | typeof SEVERITY_WARNING | 'error',
+    detail: Record<string, any>,
+    suggestion?: string,
+) => Issue;
+
+function auditFileBasics(
+    content: string,
+    file: string,
+    ctx: AnalyzerContext,
+    mkIssue: IssueFactory,
+    issues: Issue[],
+): boolean {
+    const len = content.length;
+    const trimmed = content.trim();
+    if (len === 0 || trimmed.length === 0) {
+        issues.push(
+            mkIssue(
+                ctx,
+                0,
+                'HYG-EMP-001',
+                `Source file '${file}' is empty (0 bytes or whitespace only) and contains no valid executable code.`,
+                'error',
+                { file, length: len },
+            ),
+        );
+        return true;
+    }
+
+    if (file.endsWith('.ps1')) {
+        if (!content.includes('\r\n') && content.includes('\n')) {
+            const desc = HygieneMessages.LINE_ENDINGS_MISMATCH(file, 'CRLF', 'LF');
+            issues.push(
+                mkIssue(
+                    ctx,
+                    0,
+                    'HYG-EOL-001',
+                    desc.message,
+                    'error',
+                    { file, expected: 'CRLF', actual: 'LF' },
+                    desc.suggestion,
+                ),
+            );
+        }
+    } else if (/\.(?:ts|js|json|md|sh|rs|py|gd)$/.test(file)) {
+        if (content.includes('\r\n')) {
+            const desc = HygieneMessages.LINE_ENDINGS_MISMATCH(file, 'LF', 'CRLF');
+            issues.push(
+                mkIssue(
+                    ctx,
+                    0,
+                    'HYG-EOL-001',
+                    desc.message,
+                    'error',
+                    { file, expected: 'LF', actual: 'CRLF' },
+                    desc.suggestion,
+                ),
+            );
+        }
+    }
+
+    return false;
+}
+
+/**
+ * Hygiene Analyzer auditing stubs, phantom branches, empty scripts, and transient process jargon.
+ */
 export class HygieneAnalyzer implements Analyzer {
     name = 'hygiene' as const;
 
     analyze(sf: import('typescript').SourceFile | undefined, ctx: AnalyzerContext): Issue[] {
         void sf;
         const opts = (ctx.options || {}) as HygieneOptions;
-        const checkDead = opts.checkDeadCode !== false;
-        const checkNaming = opts.checkNaming !== false;
-        const checkStubs = opts.checkTemporaryStubs !== false;
-        const checkClones = opts.checkDuplicateBlocks !== false;
-        const minCloneLines = opts.minCloneLines ?? DEFAULT_MIN_CLONE_LINES;
-
         const issues: Issue[] = [];
         const content = ctx.content || '';
-        const len = content.length;
         const file = ctx.filePath.replace(/\\/g, '/');
 
-        const trimmed = content.trim();
-        if (len === 0 || trimmed.length === 0) {
-            issues.push(
-                this.mkIssue(
-                    ctx,
-                    0,
-                    'HYG-EMP-001',
-                    `Source file '${file}' is empty (0 bytes or whitespace only) and contains no valid executable code.`,
-                    'error',
-                    { file, length: len },
-                ),
-            );
+        if (auditFileBasics(content, file, ctx, this.mkIssue.bind(this), issues)) {
             return issues;
         }
 
-        if (file.endsWith('.ps1')) {
-            if (!content.includes('\r\n') && content.includes('\n')) {
-                const desc = HygieneMessages.LINE_ENDINGS_MISMATCH(file, 'CRLF', 'LF');
-                issues.push(
-                    this.mkIssue(
-                        ctx,
-                        0,
-                        'HYG-EOL-001',
-                        desc.message,
-                        'error',
-                        { file, expected: 'CRLF', actual: 'LF' },
-                        desc.suggestion,
-                    ),
-                );
-            }
-        } else if (/\.(?:ts|js|json|md|sh|rs|py|gd)$/.test(file)) {
-            if (content.includes('\r\n')) {
-                const desc = HygieneMessages.LINE_ENDINGS_MISMATCH(file, 'LF', 'CRLF');
-                issues.push(
-                    this.mkIssue(
-                        ctx,
-                        0,
-                        'HYG-EOL-001',
-                        desc.message,
-                        'error',
-                        { file, expected: 'LF', actual: 'CRLF' },
-                        desc.suggestion,
-                    ),
-                );
-            }
-        }
-
-        if (checkNaming) {
+        if (opts.checkNaming !== false) {
             this.auditFileNaming(file, ctx, issues);
             if (file.endsWith('.py')) this.auditPythonNaming(content, file, ctx, issues);
         }
 
-        this.auditLineHygiene(content, len, file, checkDead, checkStubs, ctx, issues);
+        this.auditLineHygiene(
+            content,
+            content.length,
+            file,
+            opts.checkDeadCode !== false,
+            opts.checkTemporaryStubs !== false,
+            ctx,
+            issues,
+        );
 
-        if (checkClones) {
-            this.auditCloneBlocks(content, minCloneLines, ctx, issues);
+        if (opts.checkDuplicateBlocks !== false) {
+            this.auditCloneBlocks(
+                content,
+                opts.minCloneLines ?? DEFAULT_MIN_CLONE_LINES,
+                ctx,
+                issues,
+            );
         }
 
         if (opts.checkWrappers !== false) {
@@ -511,101 +551,130 @@ export class HygieneAnalyzer implements Analyzer {
         ctx: AnalyzerContext,
         issues: Issue[],
     ): void {
-        if (TEMP_STUB_RE.test(trimmed)) {
-            const match = trimmed.match(TEMP_STUB_RE);
-            const marker = match ? match[0] : 'TODO';
-            const desc = HygieneMessages.TEMPORARY_STUB(marker);
-            issues.push(
-                this.mkIssue(
-                    ctx,
-                    lineIdx,
-                    'HYG-STB-001',
-                    desc.message,
-                    'info',
-                    { line: lineIdx + 1, marker },
-                    desc.suggestion,
-                ),
-            );
-        }
+        this.auditStubMarkers(trimmed, lineIdx, ctx, issues);
+        this.auditTransientJargon(trimmed, lineIdx, jargonRe, ctx, issues);
+        this.auditSuppressionDirectives(trimmed, lineIdx, ctx, issues);
+        this.auditNonCommentExpressions(trimmed, lineIdx, ctx, issues);
+    }
 
+    private auditStubMarkers(
+        trimmed: string,
+        lineIdx: number,
+        ctx: AnalyzerContext,
+        issues: Issue[],
+    ): void {
+        if (!TEMP_STUB_RE.test(trimmed)) return;
+        const match = trimmed.match(TEMP_STUB_RE);
+        const marker = match ? match[0] : 'TODO';
+        const desc = HygieneMessages.TEMPORARY_STUB(marker);
+        issues.push(
+            this.mkIssue(
+                ctx,
+                lineIdx,
+                'HYG-STB-001',
+                desc.message,
+                'info',
+                { line: lineIdx + 1, marker },
+                desc.suggestion,
+            ),
+        );
+    }
+
+    private auditTransientJargon(
+        trimmed: string,
+        lineIdx: number,
+        jargonRe: RegExp,
+        ctx: AnalyzerContext,
+        issues: Issue[],
+    ): void {
         const jargonMatch = trimmed.match(jargonRe);
         if (
-            jargonMatch &&
-            !isVocabularyEnumeration(trimmed, jargonMatch.index ?? 0, jargonMatch[0])
+            !jargonMatch ||
+            isVocabularyEnumeration(trimmed, jargonMatch.index ?? 0, jargonMatch[0])
         ) {
-            const jargon = jargonMatch[0];
-            const desc = HygieneMessages.TRANSIENT_JARGON(jargon);
+            return;
+        }
+        const jargon = jargonMatch[0];
+        const desc = HygieneMessages.TRANSIENT_JARGON(jargon);
+        issues.push(
+            this.mkIssue(
+                ctx,
+                lineIdx,
+                'HYG-STB-002',
+                desc.message,
+                SEVERITY_WARNING,
+                { line: lineIdx + 1, jargon },
+                desc.suggestion,
+            ),
+        );
+    }
+
+    private auditSuppressionDirectives(
+        trimmed: string,
+        lineIdx: number,
+        ctx: AnalyzerContext,
+        issues: Issue[],
+    ): void {
+        if (!SUPPRESSION_DIRECTIVE_RE.test(trimmed)) return;
+        const match = trimmed.match(SUPPRESSION_DIRECTIVE_RE);
+        const directive = match ? match[0].trim() : trimmed;
+        const desc = HygieneMessages.SUPPRESSION_DIRECTIVE(directive);
+        issues.push(
+            this.mkIssue(
+                ctx,
+                lineIdx,
+                'HYG-SUP-001',
+                desc.message,
+                'error',
+                { line: lineIdx + 1, directive },
+                desc.suggestion,
+            ),
+        );
+    }
+
+    private auditNonCommentExpressions(
+        trimmed: string,
+        lineIdx: number,
+        ctx: AnalyzerContext,
+        issues: Issue[],
+    ): void {
+        if (
+            trimmed.startsWith('//') ||
+            trimmed.startsWith('*') ||
+            trimmed.startsWith('/*') ||
+            trimmed.startsWith('#')
+        ) {
+            return;
+        }
+
+        if (VAGUE_THROW_RE.test(trimmed)) {
+            const desc = HygieneMessages.VAGUE_ERROR_MESSAGE(trimmed);
             issues.push(
                 this.mkIssue(
                     ctx,
                     lineIdx,
-                    'HYG-STB-002',
+                    'ERR-MSG-001',
                     desc.message,
                     SEVERITY_WARNING,
-                    { line: lineIdx + 1, jargon },
+                    { line: lineIdx + 1, expression: trimmed },
                     desc.suggestion,
                 ),
             );
         }
 
-        const SUPPRESSION_DIRECTIVE_RE =
-            /^\s*(?:\/\/|\/\*|#|\*)\s*(?:@ts-(?:ignore|expect-error|nocheck)|eslint-disable|biome-ignore|#\s*noqa)\b/i;
-        if (SUPPRESSION_DIRECTIVE_RE.test(trimmed)) {
-            const match = trimmed.match(SUPPRESSION_DIRECTIVE_RE);
-            const directive = match ? match[0].trim() : trimmed;
-            const desc = HygieneMessages.SUPPRESSION_DIRECTIVE(directive);
+        if (FLOATING_PROMISE_RE.test(trimmed)) {
+            const desc = HygieneMessages.FLOATING_PROMISE(trimmed);
             issues.push(
                 this.mkIssue(
                     ctx,
                     lineIdx,
-                    'HYG-SUP-001',
+                    'ERR-FLT-001',
                     desc.message,
-                    'error',
-                    { line: lineIdx + 1, directive },
+                    SEVERITY_WARNING,
+                    { line: lineIdx + 1, expression: trimmed },
                     desc.suggestion,
                 ),
             );
-        }
-
-        if (
-            !trimmed.startsWith('//') &&
-            !trimmed.startsWith('*') &&
-            !trimmed.startsWith('/*') &&
-            !trimmed.startsWith('#')
-        ) {
-            const VAGUE_THROW_RE =
-                /^\s*(?:throw\s+new\s+[A-Za-z0-9_$]*(?:Error|Exception)\s*\(\s*(?:['"]\s*['"]|['"](?:error|failed|err|invalid|unknown|bad|bug|oops|exception)['"]\s*)?\)|throw\s+['"][a-zA-Z0-9_\-\s]{0,8}['"]\s*;?|raise\s+[A-Za-z0-9_$]*(?:Exception|Error)\s*\(\s*(?:['"]\s*['"]|['"](?:error|failed|err)['"]\s*)?\))/i;
-            if (VAGUE_THROW_RE.test(trimmed)) {
-                const desc = HygieneMessages.VAGUE_ERROR_MESSAGE(trimmed);
-                issues.push(
-                    this.mkIssue(
-                        ctx,
-                        lineIdx,
-                        'ERR-MSG-001',
-                        desc.message,
-                        SEVERITY_WARNING,
-                        { line: lineIdx + 1, expression: trimmed },
-                        desc.suggestion,
-                    ),
-                );
-            }
-
-            const FLOATING_PROMISE_RE =
-                /^\s*(?:Promise\.(?:all|allSettled|race|resolve|reject)|new\s+Promise)\s*\(/;
-            if (FLOATING_PROMISE_RE.test(trimmed)) {
-                const desc = HygieneMessages.FLOATING_PROMISE(trimmed);
-                issues.push(
-                    this.mkIssue(
-                        ctx,
-                        lineIdx,
-                        'ERR-FLT-001',
-                        desc.message,
-                        SEVERITY_WARNING,
-                        { line: lineIdx + 1, expression: trimmed },
-                        desc.suggestion,
-                    ),
-                );
-            }
         }
     }
 

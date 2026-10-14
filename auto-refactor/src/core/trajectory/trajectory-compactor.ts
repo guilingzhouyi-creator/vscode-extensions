@@ -295,6 +295,26 @@ async function readWeeklySummaries(weeklyDir: string): Promise<WeeklyTrajectoryS
  * @param maxRollingRuns - Maximum number of active runs to keep in active-runs.ndjson.
  * @returns Array of generated weekly summaries.
  */
+/**
+ * Appends a trajectory record into its ISO-week group, allocating on first encounter.
+ *
+ * @param groups - Map of week IDs to trajectory records.
+ * @param weekId - ISO week identifier.
+ * @param record - Compact trajectory record.
+ */
+function appendWeekRecord(
+    groups: Map<string, CompactTrajectoryRecord[]>,
+    weekId: string,
+    record: CompactTrajectoryRecord,
+): void {
+    const group = groups.get(weekId);
+    if (group !== undefined) {
+        group.push(record);
+        return;
+    }
+    groups.set(weekId, [record]);
+}
+
 export async function compactLedger(
     ledgerDir: string,
     maxRollingRuns = DEFAULT_MAX_ROLLING_RUNS,
@@ -308,13 +328,7 @@ export async function compactLedger(
     // Group records by ISO Week
     const weekGroups = new Map<string, CompactTrajectoryRecord[]>();
     for (const r of records) {
-        const weekId = getIsoWeekId(r.t);
-        let group = weekGroups.get(weekId);
-        if (!group) {
-            group = [];
-            weekGroups.set(weekId, group);
-        }
-        group.push(r);
+        appendWeekRecord(weekGroups, getIsoWeekId(r.t), r);
     }
 
     const summaries: WeeklyTrajectorySummary[] = [];

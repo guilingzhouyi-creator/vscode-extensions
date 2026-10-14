@@ -306,6 +306,26 @@ export const ACTION_VERB_SPECS: Readonly<Record<StandardActionVerb, ActionVerbSp
 /** Canonical diagnostic verdict enumeration */
 export type StandardDiagnosticVerdict = 'BLOCK' | 'WARN' | 'INFO' | 'PASS';
 
+interface TaxonomyPrefixMapping {
+    readonly prefixes: readonly string[];
+    readonly category: DefectTaxonomyCategory;
+}
+
+const TAXONOMY_PREFIX_MAPPINGS: readonly TaxonomyPrefixMapping[] = Object.freeze([
+    { prefixes: ['ADV-CMP', 'ADV-NST', 'SIM-'], category: 'CTRL_FLOW' },
+    { prefixes: ['NUM-', 'PREC-'], category: 'NUM_PREC' },
+    { prefixes: ['TST-', 'TEST-'], category: 'TEST_MODERN' },
+    { prefixes: ['SEC-', 'SECRET-'], category: 'SEC_GUARD' },
+    { prefixes: ['ARCH-', 'LAYER-', 'DEP-', 'FAC-'], category: 'ARCH_LAYER' },
+]);
+
+function matchesTaxonomyPrefix(upper: string, prefixes: readonly string[]): boolean {
+    for (const prefix of prefixes) {
+        if (upper.startsWith(prefix)) return true;
+    }
+    return false;
+}
+
 /**
  * Resolves the defect taxonomy category for a canonical rule ID.
  *
@@ -317,25 +337,10 @@ export function resolveRuleTaxonomy(ruleId: string): DefectTaxonomyCategory {
         return 'GOV_NORM';
     }
     const upper = ruleId.toUpperCase();
-    if (upper.startsWith('ADV-CMP') || upper.startsWith('ADV-NST') || upper.startsWith('SIM-')) {
-        return 'CTRL_FLOW';
-    }
-    if (upper.startsWith('NUM-') || upper.startsWith('PREC-')) {
-        return 'NUM_PREC';
-    }
-    if (upper.startsWith('TST-') || upper.startsWith('TEST-')) {
-        return 'TEST_MODERN';
-    }
-    if (upper.startsWith('SEC-') || upper.startsWith('SECRET-')) {
-        return 'SEC_GUARD';
-    }
-    if (
-        upper.startsWith('ARCH-') ||
-        upper.startsWith('LAYER-') ||
-        upper.startsWith('DEP-') ||
-        upper.startsWith('FAC-')
-    ) {
-        return 'ARCH_LAYER';
+    for (const mapping of TAXONOMY_PREFIX_MAPPINGS) {
+        if (matchesTaxonomyPrefix(upper, mapping.prefixes)) {
+            return mapping.category;
+        }
     }
     return 'GOV_NORM';
 }
