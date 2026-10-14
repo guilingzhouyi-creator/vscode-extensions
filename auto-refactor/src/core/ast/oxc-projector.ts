@@ -46,6 +46,75 @@ import {
     oxcLiteralText,
 } from './oxc-predicates';
 
+/** AST node type representing the root file program. */
+const AST_NODE_PROGRAM = 'Program';
+
+/** AST node type for static class initialization blocks. */
+const AST_NODE_STATIC_BLOCK = 'StaticBlock';
+
+/** AST node type representing binary expression operations. */
+const AST_NODE_BINARY_EXPRESSION = 'BinaryExpression';
+
+/** AST node type representing logical short-circuiting expressions. */
+const AST_NODE_LOGICAL_EXPRESSION = 'LogicalExpression';
+
+/** AST node type representing TypeScript export assignment syntax. */
+const AST_NODE_TS_EXPORT_ASSIGNMENT = 'TSExportAssignment';
+
+/** AST node type representing wildcard export declarations. */
+const AST_NODE_EXPORT_ALL_DECLARATION = 'ExportAllDeclaration';
+
+/** AST node type representing TypeScript enum body collections. */
+const AST_NODE_TS_ENUM_BODY = 'TSEnumBody';
+
+/** Special method kind identifier designating class constructors. */
+const METHOD_KIND_CONSTRUCTOR = 'constructor';
+
+/** Assignment operator symbol for standard value assignment. */
+const ASSIGNMENT_OPERATOR_EQUAL = '=';
+
+/** Internal metadata property tagging hoisted export status. */
+const PROP_EXPORTED = '__exported';
+
+/** Internal metadata property storing hoisted export start offset. */
+const PROP_EXPORT_START = '__exportStart';
+
+/** Structured parameter package for projecting normalized nodes. */
+interface NodeProjectionContext {
+    readonly rawNode: OxcNode;
+    readonly kind: NodeKind;
+    readonly fnLike: boolean;
+    readonly isClassDefining: boolean;
+    readonly isBinding: boolean;
+    readonly isScope: boolean;
+    readonly startOffset: number;
+    readonly topLevel: boolean;
+}
+
+/** Structured context holding parent ancestry and classification flags for metadata projection. */
+interface ProjectedMetadataOptions {
+    readonly parentRaw?: OxcNode;
+    readonly grandparentRaw?: OxcNode;
+    readonly isLiteral: boolean;
+    readonly fnLike: boolean;
+}
+
+/** Lineage context for cheap non-function node property assignment. */
+interface NonFunctionLineage {
+    readonly parentRaw?: OxcNode;
+    readonly grandparentRaw?: OxcNode;
+    readonly isLiteral: boolean;
+}
+
+/** Evaluation parameters for observable syntax detection. */
+interface ObservableSyntaxFlags {
+    readonly fnLike: boolean;
+    readonly isClassDefining: boolean;
+    readonly isBinding: boolean;
+    readonly isScope: boolean;
+    readonly topLevel: boolean;
+}
+
 /**
  * Lazy `NodeProjector` for oxc-backed files: projects raw ESTree nodes on demand and serves
  * raw child sequences to the engine, including Mode B subtree sharing with complexity.
@@ -63,8 +132,7 @@ export class OxcProjector implements NodeProjector {
     private readonly rawChildrenCache = new Map<OxcNode, OxcNode[]>();
 
     /**
-     * Wrap one raw oxc program in a lazy projector; no normalized tree is built here.
-     *
+     * Wrap one raw oxc program in a lazy projector; no normalized tree is built here.\n     *
      * @param program - Raw oxc Program node produced by `parseSync`.
      * @param content - Source text used for line-start lookup and raw text slices.
      * @param policy - Projection policy that gates which normalized fields are constructed.
@@ -78,11 +146,11 @@ export class OxcProjector implements NodeProjector {
     /**
      * Test whether a raw node is this projector's program root.
      *
-     * @param raw - Raw parser node to test.
+     * @param rawNode - Raw parser node to test.
      * @returns `true` only for the root Program node, `false` for nested nodes or `null`.
      */
-    isSourceFile(raw: unknown): boolean {
-        return Boolean(raw) && (raw as OxcNode).type === 'Program';
+    isSourceFile(rawNode: unknown): boolean {
+        return Boolean(rawNode) && (rawNode as OxcNode).type === AST_NODE_PROGRAM;
     }
 
     /**
@@ -100,205 +168,214 @@ export class OxcProjector implements NodeProjector {
         parentRaw: unknown | undefined,
         grandparentRaw: unknown | undefined,
     ): NormalizedNode {
-        const n = raw as OxcNode;
-        const cached = this.subtreeCache.get(n);
+        const rawNode = raw as OxcNode;
+        const cached = this.subtreeCache.get(rawNode);
         if (cached) return cached;
-        if (this.isSourceFile(n)) return { kind: NodeKind.SourceFile };
+        if (this.isSourceFile(rawNode)) return { kind: NodeKind.SourceFile };
 
-        const t = n.type;
-        const kind = oxcKindOf(n);
+        const nodeType = rawNode.type;
+        const kind = oxcKindOf(rawNode);
         const fnLike = kind === NodeKind.Function || kind === NodeKind.Method;
         const isLiteral = kind === NodeKind.NumericLiteral || kind === NodeKind.StringLiteral;
         const isClassDefining =
-            t === NODE_KIND_CLASS_DECLARATION || t === NODE_KIND_CLASS_EXPRESSION;
-        const isBinding = oxcIntroducesBinding(n);
-        const isScope = CONTROL_OR_BLOCK.has(t) || t === 'StaticBlock';
+            nodeType === NODE_KIND_CLASS_DECLARATION || nodeType === NODE_KIND_CLASS_EXPRESSION;
+        const isBinding = oxcIntroducesBinding(rawNode);
+        const isScope = CONTROL_OR_BLOCK.has(nodeType) || nodeType === AST_NODE_STATIC_BLOCK;
         const topLevel =
-            Boolean(parentRaw) && this.isSourceFile(parentRaw) && TOP_LEVEL_DECL.has(t);
-        const isObservable = this.isObservableSyntax(
+            Boolean(parentRaw) && this.isSourceFile(parentRaw) && TOP_LEVEL_DECL.has(nodeType);
+        const isObservable = this.isObservableSyntax({
             fnLike,
             isClassDefining,
             isBinding,
             isScope,
             topLevel,
-        );
+        });
 
-        if (this.shouldCollapseToPlaceholder(t, isLiteral, isObservable, n)) {
+        if (this.shouldCollapseToPlaceholder(nodeType, isLiteral, isObservable, rawNode)) {
             return OTHER_PLACEHOLDER;
         }
 
-        const startOff = this.resolveProjectorStartOffset(n, fnLike, isClassDefining);
-        const node = this.buildProjectedNode(
-            n,
+        const startOffset = this.resolveProjectorStartOffset(rawNode, fnLike, isClassDefining);
+        const normalizedTarget = this.buildProjectedNode({
+            rawNode,
             kind,
             fnLike,
             isClassDefining,
             isBinding,
             isScope,
-            startOff,
+            startOffset,
             topLevel,
-        );
-        this.applyProjectedMetadata(
-            node,
-            n,
-            parentRaw as OxcNode | undefined,
-            grandparentRaw as OxcNode | undefined,
+        });
+        this.applyProjectedMetadata(normalizedTarget, rawNode, {
+            parentRaw: parentRaw as OxcNode | undefined,
+            grandparentRaw: grandparentRaw as OxcNode | undefined,
             isLiteral,
             fnLike,
-        );
-        return node;
+        });
+        return normalizedTarget;
     }
 
-    private isObservableSyntax(
-        fnLike: boolean,
-        isClassDefining: boolean,
-        isBinding: boolean,
-        isScope: boolean,
-        topLevel: boolean,
-    ): boolean {
-        if (fnLike || isClassDefining || isBinding) return true;
-        return isScope || topLevel;
+    private isObservableSyntax(flags: ObservableSyntaxFlags): boolean {
+        const { fnLike, isClassDefining, isBinding, isScope, topLevel } = flags;
+        return fnLike || isClassDefining || isBinding ? true : isScope || topLevel;
     }
 
     private shouldCollapseToPlaceholder(
-        t: string,
+        nodeType: string,
         isLiteral: boolean,
         isObservable: boolean,
-        n: OxcNode,
+        rawNode: OxcNode,
     ): boolean {
         if (isLiteral) return !this.policy.needLiterals;
-        if (t === 'BinaryExpression' || t === 'LogicalExpression') return true;
-        if (t === NODE_KIND_ASSIGNMENT_EXPRESSION) return n.operator !== '=';
+        if (nodeType === AST_NODE_BINARY_EXPRESSION || nodeType === AST_NODE_LOGICAL_EXPRESSION) {
+            return true;
+        }
+        if (nodeType === NODE_KIND_ASSIGNMENT_EXPRESSION) {
+            return rawNode.operator !== ASSIGNMENT_OPERATOR_EQUAL;
+        }
         return !isObservable;
     }
 
     private resolveProjectorStartOffset(
-        n: OxcNode,
+        rawNode: OxcNode,
         fnLike: boolean,
         isClassDefining: boolean,
     ): number {
-        if (!fnLike && !isClassDefining) return n.start;
-        if (n.__exported && typeof n.__exportStart === TYPEOF_NUMBER) {
-            return n.__exportStart;
-        }
-        return n.start;
+        if (!fnLike && !isClassDefining) return rawNode.start;
+        const hasExportedOffset =
+            Boolean(rawNode[PROP_EXPORTED]) && typeof rawNode[PROP_EXPORT_START] === TYPEOF_NUMBER;
+        return hasExportedOffset ? (rawNode[PROP_EXPORT_START] as number) : rawNode.start;
     }
 
     private resolveProjectedName(
-        n: OxcNode,
+        rawNode: OxcNode,
         fnLike: boolean,
         isClassDefining: boolean,
         isBinding: boolean,
     ): string | undefined {
         if (!this.policy.needNames) return undefined;
         if (fnLike || isClassDefining || isBinding) {
-            return oxcNameOf(n, this.ctx) ?? undefined;
+            return oxcNameOf(rawNode, this.ctx) ?? undefined;
         }
         return undefined;
     }
 
-    private resolveProjectedBindingName(n: OxcNode, isBinding: boolean): string | undefined {
+    private resolveProjectedBindingName(rawNode: OxcNode, isBinding: boolean): string | undefined {
         if (!this.policy.needNames || !isBinding) return undefined;
-        return oxcBindingNameOf(n, this.ctx) ?? undefined;
+        return oxcBindingNameOf(rawNode, this.ctx) ?? undefined;
     }
 
     private resolveProjectedPositions(
-        n: OxcNode,
-        startOff: number,
+        rawNode: OxcNode,
+        startOffset: number,
         isLiteral: boolean,
         fnLike: boolean,
     ): { start?: Position; end?: Position } {
         if (!this.policy.needPositions) return {};
         if (!isLiteral && !fnLike) return {};
         return {
-            start: oxcPosOf(startOff, this.ctx),
-            end: oxcPosOf(n.end, this.ctx),
+            start: oxcPosOf(startOffset, this.ctx),
+            end: oxcPosOf(rawNode.end, this.ctx),
         };
     }
 
-    private isConstructorMethod(n: OxcNode): boolean {
+    private isConstructorMethod(rawNode: OxcNode): boolean {
         return (
             this.policy.needComplexity &&
-            n.type === NODE_KIND_METHOD_DEFINITION &&
-            n.kind === 'constructor'
+            rawNode.type === NODE_KIND_METHOD_DEFINITION &&
+            rawNode.kind === METHOD_KIND_CONSTRUCTOR
         );
     }
 
-    private buildProjectedNode(
-        n: OxcNode,
-        kind: NodeKind,
-        fnLike: boolean,
-        isClassDefining: boolean,
-        isBinding: boolean,
-        isScope: boolean,
-        startOff: number,
-        topLevel: boolean,
-    ): NormalizedNode {
-        const isLiteral = kind === NodeKind.NumericLiteral || kind === NodeKind.StringLiteral;
-        const pos = this.resolveProjectedPositions(n, startOff, isLiteral, fnLike);
-        const node: NormalizedNode = {
-            kind,
-            text: isLiteral && this.policy.needLiterals ? oxcLiteralText(n, this.ctx) : undefined,
+    private buildProjectedNode(ctx: NodeProjectionContext): NormalizedNode {
+        const isLiteral =
+            ctx.kind === NodeKind.NumericLiteral || ctx.kind === NodeKind.StringLiteral;
+        const pos = this.resolveProjectedPositions(
+            ctx.rawNode,
+            ctx.startOffset,
+            isLiteral,
+            ctx.fnLike,
+        );
+        return {
+            kind: ctx.kind,
+            text:
+                isLiteral && this.policy.needLiterals
+                    ? oxcLiteralText(ctx.rawNode, this.ctx)
+                    : undefined,
             start: pos.start,
             end: pos.end,
-            name: this.resolveProjectedName(n, fnLike, isClassDefining, isBinding),
-            branchWeight: oxcBranchWeightOf(n),
-            functionLike: fnLike,
-            isClassDefining,
-            introducesBinding: isBinding,
-            bindingName: this.resolveProjectedBindingName(n, isBinding),
-            increasesNesting: isScope,
-            isConstructor: this.isConstructorMethod(n),
-            topLevel,
-            exported: topLevel && (Boolean(n.__exported) || n.type === 'TSExportAssignment'),
+            name: this.resolveProjectedName(
+                ctx.rawNode,
+                ctx.fnLike,
+                ctx.isClassDefining,
+                ctx.isBinding,
+            ),
+            branchWeight: oxcBranchWeightOf(ctx.rawNode),
+            functionLike: ctx.fnLike,
+            isClassDefining: ctx.isClassDefining,
+            introducesBinding: ctx.isBinding,
+            bindingName: this.resolveProjectedBindingName(ctx.rawNode, ctx.isBinding),
+            increasesNesting: ctx.isScope,
+            isConstructor: this.isConstructorMethod(ctx.rawNode),
+            topLevel: ctx.topLevel,
+            exported:
+                ctx.topLevel &&
+                (Boolean(ctx.rawNode[PROP_EXPORTED]) ||
+                    ctx.rawNode.type === AST_NODE_TS_EXPORT_ASSIGNMENT),
         };
-        return node;
+    }
+
+    private applyConstBoundAndTolerated(
+        targetNode: NormalizedNode,
+        rawNode: OxcNode,
+        parentRaw?: OxcNode,
+        grandparentRaw?: OxcNode,
+    ): void {
+        targetNode.isConstBound = oxcIsConstBoundOf(rawNode, parentRaw, grandparentRaw);
+        targetNode.tolerated = oxcIsToleratedOf(rawNode, parentRaw, this.ctx, grandparentRaw);
     }
 
     private applyProjectedMetadata(
-        node: NormalizedNode,
-        n: OxcNode,
-        parentRaw: OxcNode | undefined,
-        grandparentRaw: OxcNode | undefined,
-        isLiteral: boolean,
-        fnLike: boolean,
+        projectedNode: NormalizedNode,
+        rawNode: OxcNode,
+        metaOpts: ProjectedMetadataOptions,
     ): void {
+        const { parentRaw, grandparentRaw, isLiteral, fnLike } = metaOpts;
         if (isLiteral && this.policy.needLiterals) {
-            node.isConstBound = oxcIsConstBoundOf(n, parentRaw, grandparentRaw);
-            node.tolerated = oxcIsToleratedOf(n, parentRaw, this.ctx, grandparentRaw);
+            this.applyConstBoundAndTolerated(projectedNode, rawNode, parentRaw, grandparentRaw);
         }
         if (this.policy.needComplexity && fnLike) {
-            node.children = this.projectSubtree(n, parentRaw, grandparentRaw);
+            projectedNode.children = this.projectSubtree(rawNode, parentRaw, grandparentRaw);
         }
     }
 
-    private flattenTopLevelExports(n: OxcNode): OxcNode[] {
-        const out: OxcNode[] = [];
-        if (Array.isArray(n.body)) {
-            for (const stmt of n.body) {
+    private flattenTopLevelExports(rawProgramNode: OxcNode): OxcNode[] {
+        const outStatements: OxcNode[] = [];
+        if (Array.isArray(rawProgramNode.body)) {
+            for (const stmt of rawProgramNode.body) {
                 if (
                     (stmt.type === NODE_KIND_EXPORT_NAMED_DECLARATION ||
                         stmt.type === NODE_KIND_EXPORT_DEFAULT_DECLARATION) &&
                     stmt.declaration
                 ) {
-                    stmt.declaration.__exported = true;
-                    stmt.declaration.__exportStart = stmt.start;
-                    out.push(stmt.declaration);
+                    stmt.declaration[PROP_EXPORTED] = true;
+                    stmt.declaration[PROP_EXPORT_START] = stmt.start;
+                    outStatements.push(stmt.declaration);
                 } else {
-                    out.push(stmt);
+                    outStatements.push(stmt);
                 }
             }
         }
-        return out;
+        return outStatements;
     }
 
-    private resolveFunctionSubtreeKids(n: OxcNode): OxcNode[] {
-        let kids = this.functionSubtrees.get(n);
-        if (!kids) {
-            kids = this.rawChildrenOf(n);
-            this.functionSubtrees.set(n, kids);
+    private resolveFunctionChildren(fnNode: OxcNode): OxcNode[] {
+        let childNodes = this.functionSubtrees.get(fnNode);
+        if (!childNodes) {
+            childNodes = this.collectRawChildrenOf(fnNode);
+            this.functionSubtrees.set(fnNode, childNodes);
         }
-        return kids;
+        return childNodes;
     }
 
     /**
@@ -308,82 +385,105 @@ export class OxcProjector implements NodeProjector {
      * @returns Raw children in materialized source order.
      */
     forEachChild(raw: unknown): Iterable<unknown> {
-        const n = raw as OxcNode;
-        if (this.isSourceFile(n)) {
-            return this.flattenTopLevelExports(n);
+        const rawNode = raw as OxcNode;
+        if (this.isSourceFile(rawNode)) {
+            return this.flattenTopLevelExports(rawNode);
         }
-        if (this.policy.needComplexity && oxcIsFnLikeNode(n)) {
-            return this.resolveFunctionSubtreeKids(n);
+        if (this.policy.needComplexity && oxcIsFnLikeNode(rawNode)) {
+            return this.resolveFunctionChildren(rawNode);
         }
         if (this.policy.needComplexity) {
-            const cached = this.rawChildrenCache.get(n);
+            const cached = this.rawChildrenCache.get(rawNode);
             if (cached) return cached;
         }
-        const kids = this.rawChildrenOf(n);
-        if (this.policy.needComplexity && kids.length > 0) this.rawChildrenCache.set(n, kids);
-        return kids;
+        const childNodes = this.collectRawChildrenOf(rawNode);
+        if (this.policy.needComplexity && childNodes.length > 0) {
+            this.rawChildrenCache.set(rawNode, childNodes);
+        }
+        return childNodes;
     }
 
-    private rawChildrenOf(n: OxcNode): OxcNode[] {
-        const out: OxcNode[] = [];
-        this.collectInto(n, out);
-        return out;
+    private collectRawChildrenOf(rawNode: OxcNode): OxcNode[] {
+        const childNodes: OxcNode[] = [];
+        this.collectInto(rawNode, childNodes);
+        return childNodes;
     }
 
-    private collectNodeValue(out: OxcNode[], v: unknown, isMethodSource: boolean): void {
-        if (Array.isArray(v)) {
-            for (const item of v) this.pushRaw(out, item, isMethodSource);
-        } else if (typeof v === TYPEOF_OBJECT && typeof (v as OxcNode).type === TYPEOF_STRING) {
-            this.pushRaw(out, v as OxcNode, isMethodSource);
+    private collectNodeValue(
+        outNodes: OxcNode[],
+        childValue: unknown,
+        isMethodSource: boolean,
+    ): void {
+        if (Array.isArray(childValue)) {
+            for (const rawChildNode of childValue) {
+                this.pushRaw(outNodes, rawChildNode, isMethodSource);
+            }
+        } else if (
+            typeof childValue === TYPEOF_OBJECT &&
+            typeof (childValue as OxcNode).type === TYPEOF_STRING
+        ) {
+            this.pushRaw(outNodes, childValue as OxcNode, isMethodSource);
         }
     }
 
-    private collectInto(n: OxcNode, out: OxcNode[]): void {
+    private collectInto(rawNode: OxcNode, outNodes: OxcNode[]): void {
         const isMethodSource =
-            n.type === NODE_KIND_METHOD_DEFINITION ||
-            (n.type === NODE_KIND_PROPERTY && n.method === true);
-        for (const key of Object.keys(n)) {
-            if (OXC_META_KEYS.has(key) || key === '__exported' || key === '__exportStart') continue;
-            const v = n[key];
-            if (v != null) {
-                this.collectNodeValue(out, v, isMethodSource);
+            rawNode.type === NODE_KIND_METHOD_DEFINITION ||
+            (rawNode.type === NODE_KIND_PROPERTY && rawNode.method === true);
+        for (const metaKey of Object.keys(rawNode)) {
+            if (
+                OXC_META_KEYS.has(metaKey) ||
+                metaKey === PROP_EXPORTED ||
+                metaKey === PROP_EXPORT_START
+            ) {
+                continue;
+            }
+            const propValue = rawNode[metaKey];
+            if (propValue != null) {
+                this.collectNodeValue(outNodes, propValue, isMethodSource);
             }
         }
     }
 
-    private tryHandleRawExport(out: OxcNode[], item: OxcNode): boolean {
-        if (item.type === 'ExportAllDeclaration') {
-            if (item.source) out.push(item.source);
+    private tryHandleRawExport(outNodes: OxcNode[], rawExportNode: OxcNode): boolean {
+        if (rawExportNode.type === AST_NODE_EXPORT_ALL_DECLARATION) {
+            if (rawExportNode.source) outNodes.push(rawExportNode.source);
             return true;
         }
         if (
-            item.type === NODE_KIND_EXPORT_NAMED_DECLARATION ||
-            item.type === NODE_KIND_EXPORT_DEFAULT_DECLARATION
+            rawExportNode.type === NODE_KIND_EXPORT_NAMED_DECLARATION ||
+            rawExportNode.type === NODE_KIND_EXPORT_DEFAULT_DECLARATION
         ) {
-            if (item.declaration) {
-                item.declaration.__exported = true;
-                item.declaration.__exportStart = item.start;
-                out.push(item.declaration);
+            if (rawExportNode.declaration) {
+                rawExportNode.declaration[PROP_EXPORTED] = true;
+                rawExportNode.declaration[PROP_EXPORT_START] = rawExportNode.start;
+                outNodes.push(rawExportNode.declaration);
             }
             return true;
         }
         return false;
     }
 
-    private tryHandleRawSpecial(out: OxcNode[], item: OxcNode, inlineFnValue: boolean): boolean {
-        if (inlineFnValue && item.type === NODE_KIND_FUNCTION_EXPRESSION) {
-            this.collectInto(item, out);
+    private tryHandleRawSpecial(
+        outNodes: OxcNode[],
+        rawCandidateNode: OxcNode,
+        inlineFnValue: boolean,
+    ): boolean {
+        if (inlineFnValue && rawCandidateNode.type === NODE_KIND_FUNCTION_EXPRESSION) {
+            this.collectInto(rawCandidateNode, outNodes);
             return true;
         }
-        if (TYPE_SKIP_TYPES.has(item.type)) {
-            out.push(item);
+        if (TYPE_SKIP_TYPES.has(rawCandidateNode.type)) {
+            outNodes.push(rawCandidateNode);
             return true;
         }
-        if (SKIP_TYPES.has(item.type)) return true;
-        if (this.tryHandleRawExport(out, item)) return true;
-        if (item.type === 'TSEnumBody') {
-            if (Array.isArray(item.members)) {
-                for (const m of item.members) this.pushRaw(out, m, false);
+        if (SKIP_TYPES.has(rawCandidateNode.type)) return true;
+        if (this.tryHandleRawExport(outNodes, rawCandidateNode)) return true;
+        if (rawCandidateNode.type === AST_NODE_TS_ENUM_BODY) {
+            if (Array.isArray(rawCandidateNode.members)) {
+                for (const enumMember of rawCandidateNode.members) {
+                    this.pushRaw(outNodes, enumMember, false);
+                }
             }
             return true;
         }
@@ -391,107 +491,114 @@ export class OxcProjector implements NodeProjector {
     }
 
     private pushRaw(
-        out: OxcNode[],
-        item: OxcNode | null | undefined,
+        outNodes: OxcNode[],
+        rawCandidateNode: OxcNode | null | undefined,
         inlineFnValue: boolean,
     ): void {
-        if (item == null) return;
-        if (this.tryHandleRawSpecial(out, item, inlineFnValue)) return;
-        out.push(item);
+        if (rawCandidateNode == null) return;
+        if (this.tryHandleRawSpecial(outNodes, rawCandidateNode, inlineFnValue)) return;
+        outNodes.push(rawCandidateNode);
     }
 
     private projectSubtree(
-        fn: OxcNode,
+        fnNode: OxcNode,
         parentRaw: OxcNode | undefined,
         _grandparentRaw: OxcNode | undefined,
     ): NormalizedNode[] {
         const rawChildren: OxcNode[] = [];
-        const children = this.buildSubtree(fn, parentRaw, rawChildren);
-        this.functionSubtrees.set(fn, rawChildren);
+        const children = this.buildSubtree(fnNode, parentRaw, rawChildren);
+        this.functionSubtrees.set(fnNode, rawChildren);
         return children;
     }
 
     private buildSubtree(
-        fn: OxcNode,
+        fnNode: OxcNode,
         parentRaw: OxcNode | undefined,
         rawOut: OxcNode[] | null,
     ): NormalizedNode[] {
-        const children: NormalizedNode[] = [];
+        const projectedChildren: NormalizedNode[] = [];
         const rawChildren: OxcNode[] = [];
-        for (const c of this.rawChildrenOf(fn)) {
-            rawChildren.push(c);
-            if (rawOut) rawOut.push(c);
-            const proj = this.cheapProject(c, fn, parentRaw);
-            children.push(proj);
-            if (!oxcIsFnLikeNode(c)) {
-                proj.children = this.buildSubtree(c, fn, null);
+        for (const rawChild of this.collectRawChildrenOf(fnNode)) {
+            rawChildren.push(rawChild);
+            if (rawOut) rawOut.push(rawChild);
+            const projectedChild = this.buildCheapProjectedNode(rawChild, fnNode, parentRaw);
+            projectedChildren.push(projectedChild);
+            if (!oxcIsFnLikeNode(rawChild)) {
+                projectedChild.children = this.buildSubtree(rawChild, fnNode, null);
             }
         }
-        if (rawChildren.length > 0) this.rawChildrenCache.set(fn, rawChildren);
-        return children;
+        if (rawChildren.length > 0) this.rawChildrenCache.set(fnNode, rawChildren);
+        return projectedChildren;
     }
 
-    private applyCheapFunctionProps(node: NormalizedNode, n: OxcNode): void {
-        if (this.policy.needNames) node.name = oxcNameOf(n, this.ctx) ?? undefined;
+    private applyCheapFunctionProps(projectedNode: NormalizedNode, fnNode: OxcNode): void {
+        if (this.policy.needNames) projectedNode.name = oxcNameOf(fnNode, this.ctx) ?? undefined;
         if (this.policy.needPositions) {
-            node.start = oxcPosOf(n.start, this.ctx);
-            node.end = oxcPosOf(n.end, this.ctx);
+            projectedNode.start = oxcPosOf(fnNode.start, this.ctx);
+            projectedNode.end = oxcPosOf(fnNode.end, this.ctx);
         }
         if (this.policy.needComplexity) {
-            node.isConstructor = n.type === NODE_KIND_METHOD_DEFINITION && n.kind === 'constructor';
+            projectedNode.isConstructor =
+                fnNode.type === NODE_KIND_METHOD_DEFINITION &&
+                fnNode.kind === METHOD_KIND_CONSTRUCTOR;
         }
     }
 
-    private applyCheapNonFunctionProps(
-        node: NormalizedNode,
-        n: OxcNode,
-        parentRaw: OxcNode | undefined,
-        grandparentRaw: OxcNode | undefined,
-        isLiteral: boolean,
+    private applyNonFunctionProps(
+        projectedNode: NormalizedNode,
+        rawNode: OxcNode,
+        lineage: NonFunctionLineage,
     ): void {
-        const t = n.type;
-        if (t === NODE_KIND_CLASS_DECLARATION || t === NODE_KIND_CLASS_EXPRESSION) {
-            node.isClassDefining = true;
-            if (this.policy.needNames) node.name = oxcNameOf(n, this.ctx) ?? undefined;
-        } else if (oxcIntroducesBinding(n)) {
-            node.introducesBinding = true;
-            if (this.policy.needNames)
-                node.bindingName = oxcBindingNameOf(n, this.ctx) ?? undefined;
+        const { parentRaw, grandparentRaw, isLiteral } = lineage;
+        const nodeType = rawNode.type;
+        if (nodeType === NODE_KIND_CLASS_DECLARATION || nodeType === NODE_KIND_CLASS_EXPRESSION) {
+            projectedNode.isClassDefining = true;
+            if (this.policy.needNames) {
+                projectedNode.name = oxcNameOf(rawNode, this.ctx) ?? undefined;
+            }
+        } else if (oxcIntroducesBinding(rawNode)) {
+            projectedNode.introducesBinding = true;
+            if (this.policy.needNames) {
+                projectedNode.bindingName = oxcBindingNameOf(rawNode, this.ctx) ?? undefined;
+            }
         }
         if (isLiteral && this.policy.needLiterals) {
-            node.text = oxcLiteralText(n, this.ctx);
-            node.start = oxcPosOf(n.start, this.ctx);
-            node.end = oxcPosOf(n.end, this.ctx);
-            node.isConstBound = oxcIsConstBoundOf(n, parentRaw, grandparentRaw);
-            node.tolerated = oxcIsToleratedOf(n, parentRaw, this.ctx, grandparentRaw);
+            projectedNode.text = oxcLiteralText(rawNode, this.ctx);
+            projectedNode.start = oxcPosOf(rawNode.start, this.ctx);
+            projectedNode.end = oxcPosOf(rawNode.end, this.ctx);
+            this.applyConstBoundAndTolerated(projectedNode, rawNode, parentRaw, grandparentRaw);
         }
     }
 
-    private cheapProject(
-        n: OxcNode,
+    private buildCheapProjectedNode(
+        rawNode: OxcNode,
         parentRaw: OxcNode | undefined,
         grandparentRaw: OxcNode | undefined,
     ): NormalizedNode {
-        const t = n.type;
-        const kind = oxcKindOf(n);
+        const nodeType = rawNode.type;
+        const kind = oxcKindOf(rawNode);
         const fnLike = kind === NodeKind.Function || kind === NodeKind.Method;
         const isLiteral = kind === NodeKind.NumericLiteral || kind === NodeKind.StringLiteral;
 
-        const node: NormalizedNode = {
+        const cheapTarget: NormalizedNode = {
             kind,
             functionLike: fnLike,
-            branchWeight: oxcBranchWeightOf(n),
-            increasesNesting: CONTROL_OR_BLOCK.has(t) || t === 'StaticBlock',
+            branchWeight: oxcBranchWeightOf(rawNode),
+            increasesNesting: CONTROL_OR_BLOCK.has(nodeType) || nodeType === AST_NODE_STATIC_BLOCK,
             children: undefined,
         };
 
         if (fnLike) {
-            this.applyCheapFunctionProps(node, n);
+            this.applyCheapFunctionProps(cheapTarget, rawNode);
         } else {
-            this.applyCheapNonFunctionProps(node, n, parentRaw, grandparentRaw, isLiteral);
+            this.applyNonFunctionProps(cheapTarget, rawNode, {
+                parentRaw,
+                grandparentRaw,
+                isLiteral,
+            });
         }
 
-        if (!fnLike) this.subtreeCache.set(n, node);
-        return node;
+        if (!fnLike) this.subtreeCache.set(rawNode, cheapTarget);
+        return cheapTarget;
     }
 }
