@@ -140,6 +140,14 @@ const TestFullModDiskAndPlaythroughPipeline = preload("res://tests/integration/p
 const TestAgentInteractiveSessionAndCompanionPipeline = preload("res://tests/integration/pipelines/test_agent_interactive_session_and_companion_pipeline.gd")
 # 主页HUD六大支柱与网关模式自适应全链路流水线
 const TestAuthoritativeHudAndModeAdaptationPipeline = preload("res://tests/integration/pipelines/test_authoritative_hud_and_mode_adaptation_pipeline.gd")
+# 主页HUD面向Agent标准数据包与动态行动空间流水线
+const TestAgentHudSliceAndActionSpacePipeline = preload("res://tests/integration/pipelines/test_agent_hud_slice_and_action_space_pipeline.gd")
+# Agent遥测高频推演基准与深度对象池流水线
+const TestAgentTelemetryHighThroughputPipeline = preload("res://tests/integration/pipelines/test_agent_telemetry_high_throughput_pipeline.gd")
+# 统一协议工厂与双轨信封及ESC系统菜单后端联动流水线
+const TestUnifiedProtocolAndEscPipeline = preload("res://tests/integration/pipelines/test_unified_protocol_and_esc_pipeline.gd")
+# MOD开发者SDK便利协议同步与推演流水线
+const TestModSdkDeveloperErgonomicsPipeline = preload("res://tests/integration/pipelines/test_mod_sdk_developer_ergonomics_pipeline.gd")
 
 # 前端 17 大系统白模与表现层测试套件
 const TestFE01AccountEntry = preload("res://tests/unit/frontend/test_fe_01_account_entry.gd")
@@ -231,10 +239,14 @@ static func get_all_test_classes() -> Array:
 		TestDestinyModPrecheckAndUiAdaptationPipeline,
 		TestFullModDiskAndPlaythroughPipeline,
 		TestAgentInteractiveSessionAndCompanionPipeline,
-		TestAuthoritativeHudAndModeAdaptationPipeline
+		TestAuthoritativeHudAndModeAdaptationPipeline,
+		TestAgentHudSliceAndActionSpacePipeline,
+		TestAgentTelemetryHighThroughputPipeline,
+		TestUnifiedProtocolAndEscPipeline,
+		TestModSdkDeveloperErgonomicsPipeline
 	]
 
-## 前端测试套件（17 大系统 + 6 前端基建与边界套件 = 23；全域 103 后端与横切 + 23 前端 = 126 套件）
+## 前端测试套件（17 大系统 + 6 前端基建与边界套件 = 23；全域 107 后端与横切 + 23 前端 = 130 套件）
 static func get_frontend_test_classes() -> Array:
 	return [
 		TestFE01AccountEntry, TestFE02MainHUD, TestFE03CharacterProgression,
@@ -248,7 +260,7 @@ static func get_frontend_test_classes() -> Array:
 		TestFrontendRobustness, TestFrontendErrorDomain
 	]
 
-## 全域测试套件（后端业务域 + 横切基础设施 + 前端 23 = 全域共 124 套件）
+## 全域测试套件（后端业务域 + 横切基础设施 + 前端 23 = 全域共 129 套件）
 static func get_all_engine_test_classes() -> Array:
 	var list := get_all_test_classes()
 	list.append_array(get_frontend_test_classes())
