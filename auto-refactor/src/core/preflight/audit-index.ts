@@ -340,8 +340,8 @@ function computeShallowEloc(content: string): ShallowElocResult {
         nonBlankLines++;
         const firstChar = trimmed.charCodeAt(0);
         if (
-            firstChar === 35 ||
-            firstChar === 42 ||
+            firstChar === CHAR_CODE_HASH ||
+            firstChar === CHAR_CODE_STAR ||
             trimmed.startsWith('//') ||
             trimmed.startsWith('/*')
         ) {

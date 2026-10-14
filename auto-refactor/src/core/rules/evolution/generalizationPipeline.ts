@@ -252,19 +252,21 @@ const FOUNDATIONAL_CANDIDATES: readonly RuleCandidate[] = [
     }),
 ];
 
-function buildScrutinyOutcome(
-    candidateId: string,
-    passed: boolean,
-    level: GeneralizationLevel,
-    eligible: boolean,
-    rejectionReason?: string,
-): ScrutinyEvaluationResult {
+interface ScrutinyOutcomeParams {
+    readonly candidateId: string;
+    readonly passed: boolean;
+    readonly level: GeneralizationLevel;
+    readonly eligible: boolean;
+    readonly reason?: string;
+}
+
+function buildScrutinyOutcome(params: ScrutinyOutcomeParams): ScrutinyEvaluationResult {
     return Object.freeze({
-        candidateId,
-        passed,
-        determinedLevel: level,
-        eligibleForPromotion: eligible,
-        rejectionReason,
+        candidateId: params.candidateId,
+        passed: params.passed,
+        determinedLevel: params.level,
+        eligibleForPromotion: params.eligible,
+        rejectionReason: params.reason,
     });
 }
 
@@ -304,38 +306,43 @@ export class RuleGeneralizationPipeline {
     public evaluateScrutiny(candidateId: string): ScrutinyEvaluationResult {
         const candidate = this.candidates.get(candidateId);
         if (!candidate) {
-            return buildScrutinyOutcome(
+            return buildScrutinyOutcome({
                 candidateId,
-                false,
-                LEVEL_PROJ,
-                false,
-                `Candidate '${candidateId}' not found`,
-            );
+                passed: false,
+                level: LEVEL_PROJ,
+                eligible: false,
+                reason: `Candidate '${candidateId}' not found`,
+            });
         }
 
         // Tier 0 Check: Project-specific patterns cannot be promoted globally
         if (candidate.level === LEVEL_PROJ) {
-            return buildScrutinyOutcome(
+            return buildScrutinyOutcome({
                 candidateId,
-                false,
-                LEVEL_PROJ,
-                false,
-                REJECT_PROJECT_SPECIFIC,
-            );
+                passed: false,
+                level: LEVEL_PROJ,
+                eligible: false,
+                reason: REJECT_PROJECT_SPECIFIC,
+            });
         }
 
         // Multi-language verification check
         if (!this.verifyFixtures(candidate)) {
-            return buildScrutinyOutcome(
+            return buildScrutinyOutcome({
                 candidateId,
-                false,
-                candidate.level,
-                false,
-                REJECT_FIXTURES_FAILED,
-            );
+                passed: false,
+                level: candidate.level,
+                eligible: false,
+                reason: REJECT_FIXTURES_FAILED,
+            });
         }
 
-        return buildScrutinyOutcome(candidateId, true, candidate.level, true);
+        return buildScrutinyOutcome({
+            candidateId,
+            passed: true,
+            level: candidate.level,
+            eligible: true,
+        });
     }
 
     /** Promotes an eligible candidate to canonical production status. */
