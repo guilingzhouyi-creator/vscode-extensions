@@ -97,30 +97,30 @@ export const ALLOWED_SHORT_NAMES: ReadonlySet<string> = new Set(
  * Common truncated abbreviations dictionary with standard English expansions.
  */
 export const COMMON_ABBREVIATIONS: Readonly<Record<string, string>> = Object.freeze({
-    'usr': 'user',
-    'mgr': 'manager',
-    'btn': 'button',
-    'cnt': 'count',
-    'ptr': 'pointer',
-    'cur': 'current',
-    'auth_mgr': 'authManager',
-    'tbl': 'table',
-    'chk': 'check',
-    'cb': 'callback',
-    'cfg': 'config',
-    'ctx': 'context',
-    'doc': 'document',
-    'err': 'error',
-    'idx': 'index',
-    'len': 'length',
-    'msg': 'message',
-    'num': 'number',
-    'pos': 'position',
-    'prev': 'previous',
-    'req': 'request',
-    'res': 'response',
-    'src': 'source',
-    'str': 'string',
+    usr: 'user',
+    mgr: 'manager',
+    btn: 'button',
+    cnt: 'count',
+    ptr: 'pointer',
+    cur: 'current',
+    auth_mgr: 'authManager',
+    tbl: 'table',
+    chk: 'check',
+    cb: 'callback',
+    cfg: 'config',
+    ctx: 'context',
+    doc: 'document',
+    err: 'error',
+    idx: 'index',
+    len: 'length',
+    msg: 'message',
+    num: 'number',
+    pos: 'position',
+    prev: 'previous',
+    req: 'request',
+    res: 'response',
+    src: 'source',
+    str: 'string',
 });
 
 /**
@@ -832,17 +832,15 @@ export interface FunctionNamingAuditOptions {
 }
 
 /**
- * Audits a function or method name for minimum/maximum length constraints
- * and unapproved abbreviation patterns.
+ * Emits a structured naming diagnostic issue at the target identifier coordinates.
  *
- * @param name - Function or method identifier name.
- * @param node - AST declaration node.
  * @param pos - Position coordinates of the identifier.
  * @param pos.line - 0-based line number.
  * @param pos.character - 0-based character offset.
- * @param ctx - Analyzer execution context.
- * @param opts - Naming audit options.
- * @param symbolIndex - Optional symbol index service.
+ * @param rule - Rule identifier string.
+ * @param desc - Diagnostic descriptor containing message and suggestion.
+ * @param detail - Diagnostic payload map.
+ * @param actionable - Actionable remediation directives.
  * @param emitIssue - Callback to emit diagnostic issues.
  */
 function emitNamingDiagnostic(
@@ -918,12 +916,21 @@ export function auditFunctionNameLengthsAndAbbreviations(
             const desc = isShort
                 ? NamingMessages.FUNCTION_NAME_TOO_SHORT(name)
                 : NamingMessages.FUNCTION_NAME_TOO_LONG(name);
-            const actionable = buildNamingActionable(name, node, RULE_NAM_LEN_002, ctx, pos, symbolIndex);
+            const actionable = buildNamingActionable(
+                name,
+                node,
+                RULE_NAM_LEN_002,
+                ctx,
+                pos,
+                symbolIndex,
+            );
             emitNamingDiagnostic(
                 pos,
                 RULE_NAM_LEN_002,
                 desc,
-                isShort ? { name, length: name.length, minLen } : { name, length: name.length, maxLen },
+                isShort
+                    ? { name, length: name.length, minLen }
+                    : { name, length: name.length, maxLen },
                 actionable,
                 emitIssue,
             );
@@ -935,11 +942,23 @@ export function auditFunctionNameLengthsAndAbbreviations(
     const isAccessor = ts.isGetAccessor(node) || ts.isSetAccessor(node);
     const finding = validateFunctionTokensAndSemantics(name, tokens, opts, isAccessor);
     if (finding) {
-        const actionable = buildNamingActionable(name, node, RULE_NAM_LEN_002, ctx, pos, symbolIndex);
+        const actionable = buildNamingActionable(
+            name,
+            node,
+            RULE_NAM_LEN_002,
+            ctx,
+            pos,
+            symbolIndex,
+        );
         emitNamingDiagnostic(
             pos,
             RULE_NAM_LEN_002,
-            { message: finding.message, suggestion: `Refactor function name '${name}' according to engineering naming standards.`, rationale: '', risk: 'Low' },
+            {
+                message: finding.message,
+                suggestion: `Refactor function name '${name}' according to engineering naming standards.`,
+                rationale: '',
+                risk: 'Low',
+            },
             { name, findingType: finding.type, token: finding.token },
             actionable,
             emitIssue,
@@ -987,7 +1006,14 @@ export function auditVariableNameLengthsAndAbbreviations(
             const desc = isShort
                 ? NamingMessages.VARIABLE_NAME_TOO_SHORT(name)
                 : NamingMessages.VARIABLE_NAME_TOO_LONG(name);
-            const actionable = buildNamingActionable(name, decl, RULE_NAM_LEN_001, ctx, pos, symbolIndex);
+            const actionable = buildNamingActionable(
+                name,
+                decl,
+                RULE_NAM_LEN_001,
+                ctx,
+                pos,
+                symbolIndex,
+            );
             emitNamingDiagnostic(
                 pos,
                 RULE_NAM_LEN_001,
@@ -1037,4 +1063,3 @@ export {
     isScalarLiteral,
     isSimpleArrowFunction,
 } from './naming-ast-helper';
-

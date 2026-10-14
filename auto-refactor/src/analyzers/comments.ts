@@ -153,8 +153,13 @@ const CHAR_CODE_CR = 13;
 const COMMENT_URL_OR_INLINE_CODE_RE = /https?:\/\/\S+|`[^`]{20,}`/;
 const HEADER_COMMENT_PREFIX_RE = /^\s*(\/\/|\/\*|\*|#|##|""")/;
 const SIX_FIELD_ALIASES_ZH: Readonly<Record<string, readonly string[]>> = Object.freeze({
-    '依赖与触发': Object.freeze(['依赖与触发', '跨域依赖', '依赖和触发']),
-    '退出语义与设计依据': Object.freeze(['退出语义与设计依据', '设计依据', '退出语义与设计权衡', '退出语义与架构依据']),
+    ['依赖与触发']: Object.freeze(['依赖与触发', '跨域依赖', '依赖和触发']),
+    ['退出语义与设计依据']: Object.freeze([
+        '退出语义与设计依据',
+        '设计依据',
+        '退出语义与设计权衡',
+        '退出语义与架构依据',
+    ]),
 });
 
 const SIX_FIELD_PATTERNS: ReadonlyArray<{

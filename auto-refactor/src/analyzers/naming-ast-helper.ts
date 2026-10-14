@@ -449,4 +449,3 @@ export function isSimpleArrowFunction(node: ts.Node, sf: ts.SourceFile): boolean
     const endLine = sf.getLineAndCharacterOfPosition(node.getEnd()).line;
     return endLine - startLine <= 4;
 }
-

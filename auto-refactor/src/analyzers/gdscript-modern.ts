@@ -18,30 +18,53 @@
  *     masked text proves the call is real code, the raw text proves the Godot 3 signature.
  */
 import type { Analyzer, AnalyzerContext, Issue, Severity, AgentActionType } from '../core/types';
-import { SEVERITY_WARNING, SEVERITY_INFO } from '../core/types';
 import { ANALYZER_GDSCRIPT_MODERN } from '../core/scoring/dimensionLiterals';
 import { maskSourceText, type SourceMaskConfig } from '../core/policy/source-mask';
 
+const SEV_WARN: Severity = 'warning';
+const SEV_INFO: Severity = 'info';
+
+/** Rule identifier for deprecated Godot 3 yield() syntax. */
 export const RULE_GDM_YIELD_001 = 'GDM-YIELD-001';
+/** Rule identifier for Godot 3 export syntax needing migration to @export. */
 export const RULE_GDM_EXPORT_001 = 'GDM-EXPORT-001';
+/** Rule identifier for Godot 3 onready keyword needing migration to @onready. */
 export const RULE_GDM_ONREADY_001 = 'GDM-ONREADY-001';
+/** Rule identifier for Godot 3 tool keyword needing migration to @tool. */
 export const RULE_GDM_TOOL_001 = 'GDM-TOOL-001';
+/** Rule identifier for legacy Pool*Array types needing migration to Packed*Array. */
 export const RULE_GDM_POOL_001 = 'GDM-POOL-001';
+/** Rule identifier for legacy RPC modifiers needing migration to @rpc. */
 export const RULE_GDM_RPC_001 = 'GDM-RPC-001';
+/** Rule identifier for legacy string-based connect() needing migration to Callables. */
 export const RULE_GDM_CONNECT_001 = 'GDM-CONNECT-001';
+/** Rule identifier for object pool items missing super.reset_state() invocation. */
 export const RULE_GDM_POOL_002 = 'GDM-POOL-002';
+/** Rule identifier for UI button press events lacking debounce protection. */
 export const RULE_GDM_DEB_001 = 'GDM-DEB-001';
+/** Rule identifier for state transitions bypassing the finite state machine. */
 export const RULE_GDM_FSM_001 = 'GDM-FSM-001';
+/** Rule identifier for observer callbacks retaining strong references without weakref. */
 export const RULE_GDM_WEAK_001 = 'GDM-WEAK-001';
+/** Rule identifier for view layouts missing responsive container anchoring. */
 export const RULE_GDM_RES_001 = 'GDM-RES-001';
+/** Rule identifier for views performing direct store mutations without actions. */
 export const RULE_GDM_UNI_001 = 'GDM-UNI-001';
+/** Rule identifier for massive view scripts exceeding effective line budget. */
 export const RULE_GDM_LOC_001 = 'GDM-LOC-001';
+/** Rule identifier for screen scripts not inheriting from standard BaseScreen. */
 export const RULE_GDM_EXT_001 = 'GDM-EXT-001';
+/** Rule identifier for hardcoded style constants bypassing design tokens. */
 export const RULE_GDM_TOK_001 = 'GDM-TOK-001';
+/** Rule identifier for screen components missing status bar integration. */
 export const RULE_GDM_BAR_001 = 'GDM-BAR-001';
+/** Rule identifier for unbounded list rendering without virtualized recycling. */
 export const RULE_GDM_VRT_001 = 'GDM-VRT-001';
+/** Rule identifier for user-visible UI text lacking internationalization tr(). */
 export const RULE_GDM_I18N_001 = 'GDM-I18N-001';
+/** Rule identifier for brittle relative node paths bypassing unique names (%). */
 export const RULE_GDM_NOD_001 = 'GDM-NOD-001';
+/** Rule identifier for view components coupling directly with presentation models. */
 export const RULE_GDM_BND_001 = 'GDM-BND-001';
 
 const ACT_REPLACE_TOKEN: AgentActionType = 'replace_token';
@@ -63,10 +86,12 @@ const MAX_VIEW_LOC_BUDGET = 450;
 /** Extension the pack accepts; the content-only path sees every language. */
 const SOURCE_EXTENSION = '.gd';
 
+const GDSCRIPT_QUOTE_CHARS = '"\'`';
+
 /** Masking syntax for GDScript: `#` line comments and the three quote characters. */
 const GDSCRIPT_MASK: SourceMaskConfig = {
     lineComment: '#',
-    quoteChars: '"\'`',
+    quoteChars: GDSCRIPT_QUOTE_CHARS,
 };
 
 /** `yield(...)`, replaced by `await`. */
@@ -109,46 +134,54 @@ interface LineRule extends IssueSpec {
     readonly pattern: RegExp;
 }
 
+/** Context bundle targeting presentation view line scanning. */
+interface ViewScanTarget {
+    readonly masked: string[];
+    readonly raw: string[];
+    readonly file: string;
+    readonly out: Issue[];
+}
+
 /** Keyword rules, all of which fit on one physical line. */
 const LINE_RULES: LineRule[] = [
     {
         rule: RULE_GDM_YIELD_001,
-        severity: SEVERITY_WARNING,
+        severity: SEV_WARN,
         pattern: YIELD_RE,
         message: '`yield` was removed in Godot 4: coroutines are plain `await` expressions.',
         suggestion: 'Rewrite `yield(obj, "signal")` as `await obj.signal`.',
     },
     {
         rule: RULE_GDM_EXPORT_001,
-        severity: SEVERITY_WARNING,
+        severity: SEV_WARN,
         pattern: EXPORT_RE,
         message: 'The `export` statement syntax is gone; Godot 4 uses annotations.',
         suggestion: 'Write `@export var x: int`, keeping the type in the declaration itself.',
     },
     {
         rule: RULE_GDM_ONREADY_001,
-        severity: SEVERITY_WARNING,
+        severity: SEV_WARN,
         pattern: ONREADY_RE,
         message: '`onready` became the `@onready` annotation in Godot 4.',
         suggestion: 'Write `@onready var node = $Path`.',
     },
     {
         rule: RULE_GDM_TOOL_001,
-        severity: SEVERITY_WARNING,
+        severity: SEV_WARN,
         pattern: TOOL_RE,
         message: 'The `tool` keyword became the `@tool` annotation in Godot 4.',
         suggestion: 'Put `@tool` on the first line of the script.',
     },
     {
         rule: RULE_GDM_POOL_001,
-        severity: SEVERITY_WARNING,
+        severity: SEV_WARN,
         pattern: POOL_ARRAY_RE,
         message: '`Pool*Array` types were renamed to `Packed*Array` in Godot 4.',
         suggestion: 'Use the `PackedByteArray` / `PackedVector2Array` family of names.',
     },
     {
         rule: RULE_GDM_RPC_001,
-        severity: SEVERITY_WARNING,
+        severity: SEV_WARN,
         pattern: RPC_MODIFIER_RE,
         message: 'RPC keywords before `func` were replaced by the `@rpc` annotation.',
         suggestion:
@@ -163,76 +196,125 @@ interface ActionableSpec {
     readonly templateSnippet: string;
 }
 
-const ACTIONABLE_SPECS: Readonly<Record<string, ActionableSpec>> = Object.freeze({
-    [RULE_GDM_YIELD_001]: { code: 'AR:GDM:001', templateSnippet: 'await $1.$2' },
-    [RULE_GDM_EXPORT_001]: { code: 'AR:GDM:002', templateSnippet: '@export var $1: $2' },
-    [RULE_GDM_ONREADY_001]: {
-        code: 'AR:GDM:003',
-        safeToAutomate: true,
-        templateSnippet: '@onready var $1 = $2',
-    },
-    [RULE_GDM_TOOL_001]: { code: 'AR:GDM:004', safeToAutomate: true, templateSnippet: '@tool' },
-    [RULE_GDM_POOL_001]: {
-        code: 'AR:GDM:005',
-        safeToAutomate: true,
-        templateSnippet: 'Packed$1Array',
-    },
-    [RULE_GDM_RPC_001]: { code: 'AR:GDM:006', templateSnippet: '@rpc func $1()' },
-    [RULE_GDM_CONNECT_001]: { code: 'AR:GDM:007', templateSnippet: '$1.connect($2.$3)' },
-    [RULE_GDM_POOL_002]: {
+interface ActionableConfigEntry {
+    readonly rule: string;
+    readonly codeId: string;
+    readonly snippet: string;
+    readonly action?: AgentActionType;
+    readonly autoSafe?: boolean;
+}
+
+const SNIPPET_AWAIT = 'await $1.$2';
+const SNIPPET_EXPORT = '@export var $1: $2';
+const SNIPPET_ONREADY = '@onready var $1 = $2';
+const SNIPPET_TOOL = '@tool';
+const SNIPPET_PACKED_ARRAY = 'Packed$1Array';
+const SNIPPET_RPC = '@rpc func $1()';
+const SNIPPET_CONNECT = '$1.connect($2.$3)';
+const SNIPPET_SUPER_RESET = 'super.reset_state()';
+const SNIPPET_DEBOUNCE_CONNECT = 'btn.pressed_debounced.connect($1)';
+const SNIPPET_FSM_TRANSITION = 'fsm.transition_to($1)';
+const SNIPPET_WEAKREF = 'weakref($1)';
+const SNIPPET_RESPONSIVE_LAYOUT = 'apply_responsive_layout()';
+const SNIPPET_STORE_DISPATCH = 'store.dispatch($1)';
+const SNIPPET_SPLIT_SUBVIEWS = '# Split into sub-views';
+const SNIPPET_EXTENDS_BASE_SCREEN = 'extends BaseScreen';
+const SNIPPET_THEME_CONSTANTS = 'ThemeConstants.$1';
+const SNIPPET_STATUS_BAR = 'StatusBar.new()';
+const SNIPPET_VIRTUAL_LIST = 'VirtualList.new()';
+const SNIPPET_TR = 'tr("$1")';
+const SNIPPET_UNIQUE_NODE = '@onready var $1 = %$1';
+const SNIPPET_PRESENTER_BIND = 'presenter.bind($1)';
+
+const ACTIONABLE_SPECS_TABLE: readonly ActionableConfigEntry[] = [
+    { rule: RULE_GDM_YIELD_001, codeId: '001', snippet: SNIPPET_AWAIT },
+    { rule: RULE_GDM_EXPORT_001, codeId: '002', snippet: SNIPPET_EXPORT },
+    { rule: RULE_GDM_ONREADY_001, codeId: '003', snippet: SNIPPET_ONREADY, autoSafe: true },
+    { rule: RULE_GDM_TOOL_001, codeId: '004', snippet: SNIPPET_TOOL, autoSafe: true },
+    { rule: RULE_GDM_POOL_001, codeId: '005', snippet: SNIPPET_PACKED_ARRAY, autoSafe: true },
+    { rule: RULE_GDM_RPC_001, codeId: '006', snippet: SNIPPET_RPC },
+    { rule: RULE_GDM_CONNECT_001, codeId: '007', snippet: SNIPPET_CONNECT },
+    {
+        rule: RULE_GDM_POOL_002,
+        codeId: '008',
+        snippet: SNIPPET_SUPER_RESET,
         action: ACT_GUARD_CLAUSE,
-        code: 'AR:GDM:008',
-        templateSnippet: 'super.reset_state()',
     },
-    [RULE_GDM_DEB_001]: {
+    {
+        rule: RULE_GDM_DEB_001,
+        codeId: '009',
+        snippet: SNIPPET_DEBOUNCE_CONNECT,
         action: ACT_GUARD_CLAUSE,
-        code: 'AR:GDM:009',
-        templateSnippet: 'btn.pressed_debounced.connect($1)',
     },
-    [RULE_GDM_FSM_001]: {
+    {
+        rule: RULE_GDM_FSM_001,
+        codeId: '010',
+        snippet: SNIPPET_FSM_TRANSITION,
         action: ACT_GUARD_CLAUSE,
-        code: 'AR:GDM:010',
-        templateSnippet: 'fsm.transition_to($1)',
     },
-    [RULE_GDM_WEAK_001]: { code: 'AR:GDM:011', templateSnippet: 'weakref($1)' },
-    [RULE_GDM_RES_001]: {
+    { rule: RULE_GDM_WEAK_001, codeId: '011', snippet: SNIPPET_WEAKREF },
+    {
+        rule: RULE_GDM_RES_001,
+        codeId: '012',
+        snippet: SNIPPET_RESPONSIVE_LAYOUT,
         action: ACT_SIMPLIFY_CONTROL,
-        code: 'AR:GDM:012',
-        templateSnippet: 'apply_responsive_layout()',
     },
-    [RULE_GDM_UNI_001]: {
+    {
+        rule: RULE_GDM_UNI_001,
+        codeId: '013',
+        snippet: SNIPPET_STORE_DISPATCH,
         action: ACT_SIMPLIFY_CONTROL,
-        code: 'AR:GDM:013',
-        templateSnippet: 'store.dispatch($1)',
     },
-    [RULE_GDM_LOC_001]: {
+    {
+        rule: RULE_GDM_LOC_001,
+        codeId: '014',
+        snippet: SNIPPET_SPLIT_SUBVIEWS,
         action: ACT_DECOMPOSE_MODULE,
-        code: 'AR:GDM:014',
-        templateSnippet: '# Split into sub-views',
     },
-    [RULE_GDM_EXT_001]: { code: 'AR:GDM:015', templateSnippet: 'extends BaseScreen' },
-    [RULE_GDM_TOK_001]: { code: 'AR:GDM:016', templateSnippet: 'ThemeConstants.$1' },
-    [RULE_GDM_BAR_001]: { code: 'AR:GDM:017', templateSnippet: 'StatusBar.new()' },
-    [RULE_GDM_VRT_001]: { code: 'AR:GDM:018', templateSnippet: 'VirtualList.new()' },
-    [RULE_GDM_I18N_001]: { code: 'AR:GDM:019', templateSnippet: 'tr("$1")' },
-    [RULE_GDM_NOD_001]: { code: 'AR:GDM:020', templateSnippet: '@onready var $1 = %$1' },
-    [RULE_GDM_BND_001]: {
+    { rule: RULE_GDM_EXT_001, codeId: '015', snippet: SNIPPET_EXTENDS_BASE_SCREEN },
+    { rule: RULE_GDM_TOK_001, codeId: '016', snippet: SNIPPET_THEME_CONSTANTS },
+    { rule: RULE_GDM_BAR_001, codeId: '017', snippet: SNIPPET_STATUS_BAR },
+    { rule: RULE_GDM_VRT_001, codeId: '018', snippet: SNIPPET_VIRTUAL_LIST },
+    { rule: RULE_GDM_I18N_001, codeId: '019', snippet: SNIPPET_TR },
+    { rule: RULE_GDM_NOD_001, codeId: '020', snippet: SNIPPET_UNIQUE_NODE },
+    {
+        rule: RULE_GDM_BND_001,
+        codeId: '021',
+        snippet: SNIPPET_PRESENTER_BIND,
         action: ACT_DECOUPLE_FACADE,
-        code: 'AR:GDM:021',
-        templateSnippet: 'presenter.bind($1)',
     },
-});
+];
+
+function buildActionableSpecMap(
+    entries: readonly ActionableConfigEntry[],
+): Record<string, ActionableSpec> {
+    const map: Record<string, ActionableSpec> = {};
+    for (let i = 0; i < entries.length; i++) {
+        const configEntry = entries[i];
+        map[configEntry.rule] = {
+            code: `AR:GDM:${configEntry.codeId}`,
+            templateSnippet: configEntry.snippet,
+            ...(configEntry.action ? { action: configEntry.action } : {}),
+            ...(configEntry.autoSafe ? { safeToAutomate: configEntry.autoSafe } : {}),
+        };
+    }
+    return map;
+}
+
+const ACTIONABLE_SPECS: Readonly<Record<string, ActionableSpec>> = Object.freeze(
+    buildActionableSpecMap(ACTIONABLE_SPECS_TABLE),
+);
 
 const SPEC_CONNECT: IssueSpec = Object.freeze({
     rule: RULE_GDM_CONNECT_001,
-    severity: SEVERITY_INFO,
+    severity: SEV_INFO,
     message: 'Godot 3 `connect` passes the method as a string, which no checker validates.',
     suggestion: 'Use `signal.connect(method.callable())` or `signal.connect(_on_signal)`.',
 });
 
 const SPEC_POOL_RESET: IssueSpec = Object.freeze({
     rule: RULE_GDM_POOL_002,
-    severity: SEVERITY_WARNING,
+    severity: SEV_WARN,
     message:
         'Object pool `reset_state()` method should invoke `super.reset_state()` to maintain parent state cleanup contract.',
     suggestion:
@@ -241,7 +323,7 @@ const SPEC_POOL_RESET: IssueSpec = Object.freeze({
 
 const SPEC_DEBOUNCE: IssueSpec = Object.freeze({
     rule: RULE_GDM_DEB_001,
-    severity: SEVERITY_WARNING,
+    severity: SEV_WARN,
     message:
         'Critical business action button connects bare `pressed` signal without debounce or loading fencing.',
     suggestion:
@@ -250,25 +332,22 @@ const SPEC_DEBOUNCE: IssueSpec = Object.freeze({
 
 const SPEC_FSM: IssueSpec = Object.freeze({
     rule: RULE_GDM_FSM_001,
-    severity: SEVERITY_WARNING,
-    message:
-        'Direct mutation of private FSM state variable bypasses lifecycle transition guards.',
+    severity: SEV_WARN,
+    message: 'Direct mutation of private FSM state variable bypasses lifecycle transition guards.',
     suggestion:
         'Invoke `fsm.transition_to(target_state, payload)` to ensure entry/exit guards execute.',
 });
 
 const SPEC_WEAKREF: IssueSpec = Object.freeze({
     rule: RULE_GDM_WEAK_001,
-    severity: SEVERITY_WARNING,
-    message:
-        'Dynamic observer registry holds strong reference to Node instance without `weakref`.',
-    suggestion:
-        'Store `weakref(node)` and verify `.get_ref() != null` before dispatching updates.',
+    severity: SEV_WARN,
+    message: 'Dynamic observer registry holds strong reference to Node instance without `weakref`.',
+    suggestion: 'Store `weakref(node)` and verify `.get_ref() != null` before dispatching updates.',
 });
 
 const SPEC_RESPONSIVE: IssueSpec = Object.freeze({
     rule: RULE_GDM_RES_001,
-    severity: SEVERITY_WARNING,
+    severity: SEV_WARN,
     message:
         'Hardcoded absolute screen resolution in view layout breaks responsive multi-aspect scaling.',
     suggestion:
@@ -277,16 +356,15 @@ const SPEC_RESPONSIVE: IssueSpec = Object.freeze({
 
 const SPEC_UNIDIRECTIONAL: IssueSpec = Object.freeze({
     rule: RULE_GDM_UNI_001,
-    severity: SEVERITY_WARNING,
-    message:
-        'In-place mutation of immutable Snapshot DTO field violates unidirectional data flow.',
+    severity: SEV_WARN,
+    message: 'In-place mutation of immutable Snapshot DTO field violates unidirectional data flow.',
     suggestion:
         'Dispatch an intention Command or call domain boundary service instead of modifying snapshot directly.',
 });
 
 const SPEC_VIEW_LOC: IssueSpec = Object.freeze({
     rule: RULE_GDM_LOC_001,
-    severity: SEVERITY_WARNING,
+    severity: SEV_WARN,
     message: 'Presentation view script exceeds physical line budget limit of 450 LOC.',
     suggestion:
         'Decompose complex subpanels, item renderers, or companion controllers into separate modules.',
@@ -294,7 +372,7 @@ const SPEC_VIEW_LOC: IssueSpec = Object.freeze({
 
 const SPEC_SCREEN_EXTENDS: IssueSpec = Object.freeze({
     rule: RULE_GDM_EXT_001,
-    severity: SEVERITY_WARNING,
+    severity: SEV_WARN,
     message:
         'Presentation view controller directly extends Control instead of BaseScreen or BaseModal.',
     suggestion:
@@ -303,16 +381,15 @@ const SPEC_SCREEN_EXTENDS: IssueSpec = Object.freeze({
 
 const SPEC_DESIGN_TOKEN: IssueSpec = Object.freeze({
     rule: RULE_GDM_TOK_001,
-    severity: SEVERITY_WARNING,
+    severity: SEV_WARN,
     message:
         'Hardcoded Color(...) literal in presentation view violates DesignTokens single source of truth.',
-    suggestion:
-        'Use semantic color constants from DesignTokens (e.g., DesignTokens.COLOR_*).',
+    suggestion: 'Use semantic color constants from DesignTokens (e.g., DesignTokens.COLOR_*).',
 });
 
 const SPEC_STATUS_BAR: IssueSpec = Object.freeze({
     rule: RULE_GDM_BAR_001,
-    severity: SEVERITY_WARNING,
+    severity: SEV_WARN,
     message:
         'Direct instantiation of bare ProgressBar violates KStatusBar standardized component contract.',
     suggestion:
@@ -321,25 +398,23 @@ const SPEC_STATUS_BAR: IssueSpec = Object.freeze({
 
 const SPEC_VIRTUAL_LIST: IssueSpec = Object.freeze({
     rule: RULE_GDM_VRT_001,
-    severity: SEVERITY_WARNING,
+    severity: SEV_WARN,
     message:
         'Unbounded dynamic node instantiation in list container without KVirtualList recycling.',
-    suggestion:
-        'Use KVirtualList with object pooling to recycle list item nodes efficiently.',
+    suggestion: 'Use KVirtualList with object pooling to recycle list item nodes efficiently.',
 });
 
 const SPEC_I18N: IssueSpec = Object.freeze({
     rule: RULE_GDM_I18N_001,
-    severity: SEVERITY_WARNING,
-    message:
-        'Hardcoded user-facing string assigned directly without i18n localization wrapper.',
+    severity: SEV_WARN,
+    message: 'Hardcoded user-facing string assigned directly without i18n localization wrapper.',
     suggestion:
         'Wrap UI text with tr("KEY") or bind through UIIntermediary for reactive locale switching.',
 });
 
 const SPEC_NODE_PATH: IssueSpec = Object.freeze({
     rule: RULE_GDM_NOD_001,
-    severity: SEVERITY_WARNING,
+    severity: SEV_WARN,
     message:
         'Fragile relative node traversal (get_parent/find_child) breaks presentation encapsulation.',
     suggestion:
@@ -348,9 +423,8 @@ const SPEC_NODE_PATH: IssueSpec = Object.freeze({
 
 const SPEC_PRESENTATION_BIND: IssueSpec = Object.freeze({
     rule: RULE_GDM_BND_001,
-    severity: SEVERITY_WARNING,
-    message:
-        'Presentation view directly couples to backend GameState singleton.',
+    severity: SEV_WARN,
+    message: 'Presentation view directly couples to backend GameState singleton.',
     suggestion:
         'Consume data via BaseScreen.apply_snapshot() and emit UI intentions instead of mutating backend state.',
 });
@@ -412,7 +486,7 @@ const RESPONSIVE_LAYOUT_RE =
     /\b(?:size|custom_minimum_size)\s*=\s*Vector2\s*\(\s*(?:1920|2560|3840|1280)\s*,\s*(?:1080|1440|2160|720)\s*\)/;
 const UNIDIRECTIONAL_FLOW_RE =
     /\b(?:snapshot|dto|_snapshot|_dto)\s*\.\s*(?:hp|mp|gold|score|level|exp|status|currency)\s*(?:=|\+=|-=|\*=)/;
-const DEBOUNCE_ACTION_BTN_RE =
+const DEBOUNCE_ACTION_BUTTON_RE =
     /\b(?:submit|buy|purchase|login|register|transfer|confirm|delete)_btn\b.*\.pressed\.connect\s*\(/;
 const DEBOUNCE_HANDLER_RE =
     /\.pressed\.connect\s*\(\s*(?:_on_submit|_on_buy|_on_purchase|_on_confirm|_on_transfer|_on_login)\b/;
@@ -473,14 +547,10 @@ export class GdscriptModernAnalyzer implements Analyzer {
             if (code.trim().length === 0) continue;
             for (const rule of LINE_RULES) {
                 if (!rule.pattern.test(code)) continue;
-                out.push(
-                    makeIssue(file, index, rule, { line: raw[index].trim() }),
-                );
+                out.push(makeIssue(file, index, rule, { line: raw[index].trim() }));
             }
             if (masked[index].includes(TOKEN_DOT_CONNECT) && LEGACY_CONNECT_RE.test(raw[index])) {
-                out.push(
-                    makeIssue(file, index, SPEC_CONNECT, { line: raw[index].trim() }),
-                );
+                out.push(makeIssue(file, index, SPEC_CONNECT, { line: raw[index].trim() }));
             }
         }
 
@@ -518,9 +588,7 @@ export class GdscriptModernAnalyzer implements Analyzer {
             const funcIndent = code.search(/\S/);
             const hasSuperCall = this.hasSuperInResetState(masked, index + 1, funcIndent);
             if (!hasSuperCall) {
-                out.push(
-                    makeIssue(file, index, SPEC_POOL_RESET, { line: raw[index].trim() }),
-                );
+                out.push(makeIssue(file, index, SPEC_POOL_RESET, { line: raw[index].trim() }));
             }
         }
     }
@@ -554,10 +622,8 @@ export class GdscriptModernAnalyzer implements Analyzer {
         if (!norm.includes(PATH_VIEWS) && !norm.includes(PATH_FRONTEND)) return;
         for (let index = 0; index < masked.length; index += 1) {
             const line = masked[index];
-            if (DEBOUNCE_ACTION_BTN_RE.test(line) || DEBOUNCE_HANDLER_RE.test(line)) {
-                out.push(
-                    makeIssue(file, index, SPEC_DEBOUNCE, { line: raw[index].trim() }),
-                );
+            if (DEBOUNCE_ACTION_BUTTON_RE.test(line) || DEBOUNCE_HANDLER_RE.test(line)) {
+                out.push(makeIssue(file, index, SPEC_DEBOUNCE, { line: raw[index].trim() }));
             }
         }
     }
@@ -572,9 +638,7 @@ export class GdscriptModernAnalyzer implements Analyzer {
         for (let index = 0; index < masked.length; index += 1) {
             const line = masked[index];
             if (FSM_STATE_MUTATION_RE.test(line)) {
-                out.push(
-                    makeIssue(file, index, SPEC_FSM, { line: raw[index].trim() }),
-                );
+                out.push(makeIssue(file, index, SPEC_FSM, { line: raw[index].trim() }));
             }
         }
     }
@@ -585,15 +649,17 @@ export class GdscriptModernAnalyzer implements Analyzer {
         file: string,
         out: Issue[],
     ): void {
-        if (!file.includes(TOKEN_REGISTRY) && !file.includes(TOKEN_MANAGER) && !file.includes(TOKEN_BUS)) {
+        if (
+            !file.includes(TOKEN_REGISTRY) &&
+            !file.includes(TOKEN_MANAGER) &&
+            !file.includes(TOKEN_BUS)
+        ) {
             return;
         }
         for (let index = 0; index < masked.length; index += 1) {
             const line = masked[index];
             if (OBSERVER_APPEND_RE.test(line) && !hasWeakRefCall(line)) {
-                out.push(
-                    makeIssue(file, index, SPEC_WEAKREF, { line: raw[index].trim() }),
-                );
+                out.push(makeIssue(file, index, SPEC_WEAKREF, { line: raw[index].trim() }));
             }
         }
     }
@@ -604,19 +670,18 @@ export class GdscriptModernAnalyzer implements Analyzer {
     }
 
     private scanViewPattern(
-        masked: string[],
-        raw: string[],
-        file: string,
-        out: Issue[],
+        target: ViewScanTarget,
         pattern: RegExp,
         spec: IssueSpec,
         useRaw = false,
     ): void {
-        if (!this.isViewFile(file)) return;
-        const source = useRaw ? raw : masked;
+        if (!this.isViewFile(target.file)) return;
+        const source = useRaw ? target.raw : target.masked;
         for (let index = 0; index < source.length; index += 1) {
             if (pattern.test(source[index])) {
-                out.push(makeIssue(file, index, spec, { line: raw[index].trim() }));
+                target.out.push(
+                    makeIssue(target.file, index, spec, { line: target.raw[index].trim() }),
+                );
             }
         }
     }
@@ -627,7 +692,7 @@ export class GdscriptModernAnalyzer implements Analyzer {
         file: string,
         out: Issue[],
     ): void {
-        this.scanViewPattern(masked, raw, file, out, RESPONSIVE_LAYOUT_RE, SPEC_RESPONSIVE);
+        this.scanViewPattern({ masked, raw, file, out }, RESPONSIVE_LAYOUT_RE, SPEC_RESPONSIVE);
     }
 
     private checkUnidirectionalFlow(
@@ -636,15 +701,17 @@ export class GdscriptModernAnalyzer implements Analyzer {
         file: string,
         out: Issue[],
     ): void {
-        this.scanViewPattern(masked, raw, file, out, UNIDIRECTIONAL_FLOW_RE, SPEC_UNIDIRECTIONAL);
+        this.scanViewPattern(
+            { masked, raw, file, out },
+            UNIDIRECTIONAL_FLOW_RE,
+            SPEC_UNIDIRECTIONAL,
+        );
     }
 
     private checkViewLocBudget(_masked: string[], raw: string[], file: string, out: Issue[]): void {
         if (!this.isViewFile(file)) return;
         if (raw.length > MAX_VIEW_LOC_BUDGET) {
-            out.push(
-                makeIssue(file, 0, SPEC_VIEW_LOC, { lineCount: raw.length }),
-            );
+            out.push(makeIssue(file, 0, SPEC_VIEW_LOC, { lineCount: raw.length }));
         }
     }
 
@@ -654,7 +721,7 @@ export class GdscriptModernAnalyzer implements Analyzer {
         file: string,
         out: Issue[],
     ): void {
-        this.scanViewPattern(masked, raw, file, out, SCREEN_EXTENDS_RE, SPEC_SCREEN_EXTENDS);
+        this.scanViewPattern({ masked, raw, file, out }, SCREEN_EXTENDS_RE, SPEC_SCREEN_EXTENDS);
     }
 
     private checkDesignTokenCompliance(
@@ -663,7 +730,7 @@ export class GdscriptModernAnalyzer implements Analyzer {
         file: string,
         out: Issue[],
     ): void {
-        this.scanViewPattern(masked, raw, file, out, DESIGN_TOKEN_RE, SPEC_DESIGN_TOKEN);
+        this.scanViewPattern({ masked, raw, file, out }, DESIGN_TOKEN_RE, SPEC_DESIGN_TOKEN);
     }
 
     private checkStatusBarComponentAdoption(
@@ -672,7 +739,7 @@ export class GdscriptModernAnalyzer implements Analyzer {
         file: string,
         out: Issue[],
     ): void {
-        this.scanViewPattern(masked, raw, file, out, STATUS_BAR_RE, SPEC_STATUS_BAR);
+        this.scanViewPattern({ masked, raw, file, out }, STATUS_BAR_RE, SPEC_STATUS_BAR);
     }
 
     private checkVirtualListAdoption(
@@ -681,7 +748,7 @@ export class GdscriptModernAnalyzer implements Analyzer {
         file: string,
         out: Issue[],
     ): void {
-        this.scanViewPattern(masked, raw, file, out, VIRTUAL_LIST_RE, SPEC_VIRTUAL_LIST);
+        this.scanViewPattern({ masked, raw, file, out }, VIRTUAL_LIST_RE, SPEC_VIRTUAL_LIST);
     }
 
     private checkI18nBindingDiscipline(
@@ -690,7 +757,7 @@ export class GdscriptModernAnalyzer implements Analyzer {
         file: string,
         out: Issue[],
     ): void {
-        this.scanViewPattern(masked, raw, file, out, I18N_BINDING_RE, SPEC_I18N, true);
+        this.scanViewPattern({ masked, raw, file, out }, I18N_BINDING_RE, SPEC_I18N, true);
     }
 
     private checkExplicitNodePathDiscipline(
@@ -699,7 +766,7 @@ export class GdscriptModernAnalyzer implements Analyzer {
         file: string,
         out: Issue[],
     ): void {
-        this.scanViewPattern(masked, raw, file, out, EXPLICIT_NODE_PATH_RE, SPEC_NODE_PATH);
+        this.scanViewPattern({ masked, raw, file, out }, EXPLICIT_NODE_PATH_RE, SPEC_NODE_PATH);
     }
 
     private checkPresentationDecoupling(
@@ -708,6 +775,7 @@ export class GdscriptModernAnalyzer implements Analyzer {
         file: string,
         out: Issue[],
     ): void {
-        this.scanViewPattern(masked, raw, file, out, GAME_STATE_COUPLE_RE, SPEC_PRESENTATION_BIND);
+        const scanTarget: ViewScanTarget = { masked, raw, file, out };
+        this.scanViewPattern(scanTarget, GAME_STATE_COUPLE_RE, SPEC_PRESENTATION_BIND);
     }
 }

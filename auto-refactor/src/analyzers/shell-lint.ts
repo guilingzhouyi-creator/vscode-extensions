@@ -55,8 +55,8 @@ import {
     checkPowerShellResourceDisposal,
     checkShellDynamicSecurity,
     checkPowerShellDynamicSecurity,
-    checkPowerShellInteractiveSafety,
-    checkShellInteractiveSafety,
+    checkPowerShellSafety,
+    checkShellSafety,
 } from './shell-lint-rules';
 
 const SHELL_ACTIONABLE_MAP: Record<
@@ -198,7 +198,7 @@ export class ShellLintAnalyzer implements Analyzer {
             this.checkEchoVsPrintf(trimmed, i, emit);
             checkUnquotedVariables(line, maskedTrimmed, i, emit);
             checkShellDynamicSecurity(trimmed, i, emit);
-            checkShellInteractiveSafety(lineCtx, hasTtyGuard, emit);
+            checkShellSafety(lineCtx, hasTtyGuard, emit);
             checkShellStrictExitCapture(trimmed, i, hasE, emit);
         }
     }
@@ -335,7 +335,7 @@ export class ShellLintAnalyzer implements Analyzer {
             this.updatePowerShellFunctionState(state, line, trimmed, maskedTrimmed, i, emit);
             this.checkPowerShellAliases(trimmed, maskedTrimmed, i, emit);
             checkPowerShellDynamicSecurity(trimmed, i, emit);
-            checkPowerShellInteractiveSafety(lineCtx, hasInteractiveGuard, emit);
+            checkPowerShellSafety(lineCtx, hasInteractiveGuard, emit);
         }
     }
 
@@ -385,20 +385,14 @@ export class ShellLintAnalyzer implements Analyzer {
             state.inParamBlock = true;
             state.paramBraceDepth = 0;
         }
+        if (!state.inParamBlock) return;
 
-        if (state.inParamBlock) {
-            for (const ch of trimmed) {
-                if (ch === '(') state.paramBraceDepth++;
-                else if (ch === ')') state.paramBraceDepth--;
-            }
-            if (!PS_PARAM_WITH_TYPE_RE.test(trimmed) && PS_PARAM_SIMPLE_RE.test(trimmed)) {
-                if (/\$[A-Za-z]/.test(maskedTrimmed)) {
-                    state.hasUntypedParam = true;
-                }
-            }
-            if (state.paramBraceDepth <= 0) {
-                state.inParamBlock = false;
-            }
+        state.paramBraceDepth = updateParamParenDepth(trimmed, state.paramBraceDepth);
+        if (isUntypedParamCandidate(trimmed, maskedTrimmed)) {
+            state.hasUntypedParam = true;
+        }
+        if (state.paramBraceDepth <= 0) {
+            state.inParamBlock = false;
         }
     }
 
@@ -505,4 +499,41 @@ export class ShellLintAnalyzer implements Analyzer {
             }
         }
     }
+}
+
+/**
+ * Determines whether a PowerShell parameter declaration line represents an untyped parameter.
+ * Excludes attributes, typed parameters, and PowerShell built-in literals.
+ *
+ * @param trimmed - Line text trimmed of outer whitespace.
+ * @param maskedTrimmed - Masked line content to safely test variable presence.
+ * @returns True if the candidate is an untyped variable parameter.
+ */
+function isUntypedParamCandidate(trimmed: string, maskedTrimmed: string): boolean {
+    if (trimmed.startsWith('[Parameter') || PS_PARAM_WITH_TYPE_RE.test(trimmed)) {
+        return false;
+    }
+    const match = PS_PARAM_SIMPLE_RE.exec(trimmed);
+    if (!match) return false;
+    const varName = match[1].toLowerCase();
+    if (varName === 'true' || varName === 'false' || varName === 'null') {
+        return false;
+    }
+    return /\$[A-Za-z]/.test(maskedTrimmed);
+}
+
+/**
+ * Updates parenthesis nesting depth across a trimmed line of PowerShell parameter block.
+ *
+ * @param trimmed - Line content to inspect for parentheses.
+ * @param currentDepth - Existing depth before processing the line.
+ * @returns Updated parenthesis depth.
+ */
+function updateParamParenDepth(trimmed: string, currentDepth: number): number {
+    let depth = currentDepth;
+    for (const ch of trimmed) {
+        if (ch === '(') depth++;
+        else if (ch === ')') depth--;
+    }
+    return depth;
 }

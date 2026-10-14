@@ -39,12 +39,13 @@ import { maskedLinesOfPath } from '../core/policy/source-mask';
 import { globToRegExp } from '../core/file-discovery';
 import type { LoopSite } from '../core/intelligence/semanticComplexity';
 import { detectComplexityAmplification } from '../core/intelligence/semanticComplexity';
+import type { StructuredClarityResult } from './structured-clarity';
 import { evaluateStructuredClarity, formatOptimizationHint } from './structured-clarity';
 import {
     findLoopSitesInFunction,
     collectLoopAllocSites,
     createRoutineDescriptors,
-    cyclomaticComplexity,
+    cyclomaticComplexity as computeCyclomaticComplexity,
 } from './complexity-loops';
 import {
     evaluateElasticComplexityBudget,
@@ -55,6 +56,8 @@ import { evaluateDistributedRedundancy } from '../core/intelligence/semantic-dom
 import { evaluateResourcePooling } from '../core/intelligence/resource-pooling-auditor';
 
 /** Regular expression matching parser/AST related file path components. */
+const MODULE_TYPESCRIPT_ADAPTER = '../core/ast/typescript-adapter';
+
 const RE_PARSER_FILE_CONTEXT =
     /(?:adapter|parser|lexer|walker|codec|deserializer|ast|analyzer|audit|evaluator|graph|rule)/i;
 
@@ -77,89 +80,230 @@ const RE_CONTROL_FLOW_ESCAPE = /^(?:return\b|throw\b|break\b|continue\b)/;
 /** Regular expression detecting case or default labels in switch statements. */
 const RE_STATE_MACHINE_BRANCH = /^(?:case\b|default:)/;
 
+/** Canonical analyzer rule identifier for cyclomatic complexity. */
+const _RULE_HIGH_COMPLEXITY = 'high-complexity';
+
+/** Syntactic keyword name for function declarations. */
+const KIND_FUNCTION_KEYWORD = 'FunctionKeyword';
+
+/** Default placeholder name for anonymous functions. */
+const ANONYMOUS_FUNCTION_NAME = 'anonymous';
+
+/** Canonical constructor method name. */
+const CONSTRUCTOR_NAME = 'constructor';
+
+/** Agent actionable action tag for pure predicate extraction. */
+const ACTION_EXTRACT_PURE_PREDICATE = 'extract_pure_predicate';
+
+/** Agent actionable action tag for guard clause refactoring. */
+const ACTION_APPLY_GUARD_CLAUSE = 'apply_guard_clause';
+
+/** Defect taxonomy category for control flow anomalies. */
+const TAXONOMY_CTRL_FLOW = 'CTRL_FLOW';
+
+/** Code template snippet for lookup strategy pattern. */
+const SNIPPET_STRATEGY_MAP = 'const strategyMap: Record<string, () => Result> = { ... };';
+
+/** Code template snippet for guard clause early return. */
+const SNIPPET_GUARD_CLAUSE = 'if (!condition) return defaultValue;';
+
+/** Context category for AST and parser traversal functions. */
+const CONTEXT_AST_PARSER = 'ast-parser';
+
+/** Context category for explicit state machines. */
+const CONTEXT_STATE_MACHINE = 'state-machine';
+
+/** Context category for event loop and daemon workers. */
+const CONTEXT_EVENT_LOOP = 'event-loop';
+
+/** Context category for general business domain logic. */
+const CONTEXT_GENERAL_BUSINESS = 'general-business';
+
+/** Refactoring suggestion for flat functions with high branching complexity. */
+const SUGGESTION_FLAT_HIGH_BRANCHING =
+    'Function has flat control flow but high branching. ' +
+    'Consider a lookup table (map/strategy pattern) to eliminate branches.';
+
+/** Refactoring suggestion for unbounded control-flow nesting depth. */
+const SUGGESTION_UNBOUNDED_NESTING =
+    'Flatten control flow using early returns (guard clauses) or extract nested blocks.';
+
+/** Refactoring suggestion for deep control-flow jump over a long line span. */
+const SUGGESTION_DEEP_ESCAPE =
+    'Extract deeply nested block into a localized helper method to reduce jump distance.';
+
+/** Refactoring suggestion for oversized state machine branch cases. */
+const SUGGESTION_STATE_MACHINE =
+    'Extract branch body into a dedicated action to keep dispatch lean.';
+
+/** Minimum physical line count to classify a dispatch construct as a state machine. */
+const MIN_STATE_MACHINE_LINES = 15;
+
+/** Relaxed nesting depth budget for parsers, state machines, and event loops. */
+const DEPTH_BUDGET_COMPLEX = 5;
+
+/** Strict baseline nesting depth budget for general business logic. */
+const DEPTH_BUDGET_GENERAL = 3;
+
+/** Maximum LOC for a short-span guard exempt from unbounded nesting warnings. */
+const SHORT_SPAN_GUARD_LOC = 25;
+
+/** Maximum nesting depth for a short-span guard exemption. */
+const SHORT_SPAN_GUARD_DEPTH = 4;
+
+/** Minimum function line span required to evaluate deep control escapes. */
+const HIGH_SPAN_WARN_LINES = 60;
+
+/** Minimum nesting depth required to evaluate deep control escapes. */
+const ESCAPE_EVALUATION_MIN_DEPTH = 4;
+
+/** Indentation threshold (spaces) for escape evaluation under complex budgets. */
+const INDENT_SPACES_COMPLEX_BUDGET = 20;
+
+/** Indentation threshold (spaces) for escape evaluation under standard budgets. */
+const INDENT_SPACES_STANDARD_BUDGET = 16;
+
+/** Line index offset within function body before deep escape scanning begins. */
+const ESCAPE_SCAN_START_INDEX = 40;
+
+/** Maximum function LOC tolerated before deep escapes are flagged under complex budgets. */
+const ESCAPE_SPAN_EXTENDED_LIMIT = 120;
+
+/** Maximum allowed physical lines within a single state machine case branch. */
+const MAX_CASE_BRANCH_LINES = 35;
+
+/** Minimum number of file functions required to trigger cohesion or redundancy audits. */
+const MIN_FUNCTIONS_FOR_COHESION = 2;
+
+/** Fallback line count for redundancy evaluation when source content is absent. */
+const DEFAULT_CONTENT_LINE_COUNT = 100;
+
+/**
+ * Context payload for constructing structured complexity issue details.
+ */
+interface ComplexityDetailContext {
+    name: string;
+    cyclomaticComplexity: number;
+    warn: number;
+    fail: number;
+    clarity: StructuredClarityResult;
+}
+
+/**
+ * Parameter payload for constructing a high-complexity Issue record.
+ */
+interface ComplexityIssueContext {
+    node: NormalizedNode;
+    ctx: AnalyzerContext;
+    name: string;
+    cyclomaticComplexity: number;
+    clarity: StructuredClarityResult;
+}
+
+/**
+ * Encapsulated metric profile of an analyzed function node.
+ */
+interface FunctionMetricContext {
+    name: string;
+    cyclomaticComplexity: number;
+    loc: number;
+    maxDepth: number;
+    startLine: number;
+    isExported?: boolean;
+}
+
+/**
+ * Context payload for evaluating control-flow nesting and deep jump escapes.
+ */
+interface ComplexityNestingContext {
+    ctx: AnalyzerContext;
+    name: string;
+    loc: number;
+    maxDepth: number;
+    depthBudget: number;
+    contextKind: string;
+    startLine: number;
+}
+
 function formatAnonymous(className: string | null, binding: string | null): string {
     if (binding) return binding;
-    return className ? `${className}.<anonymous>` : 'anonymous';
+    return className ? `${className}.<${ANONYMOUS_FUNCTION_NAME}>` : ANONYMOUS_FUNCTION_NAME;
 }
 
 /** Resolve a human-readable name for a function-like node using the threaded scope. */
-function nameFor(node: NormalizedNode, className: string | null, binding: string | null): string {
+function getFunctionName(
+    node: NormalizedNode,
+    className: string | null,
+    binding: string | null,
+): string {
     if (node.isConstructor) {
-        return className ? `${className}.constructor` : 'constructor';
+        return className ? `${className}.${CONSTRUCTOR_NAME}` : CONSTRUCTOR_NAME;
     }
     if (node.kind === NodeKind.Method) {
-        const m = node.name || 'anonymous';
-        return className ? `${className}.${m}` : m;
+        const methodName = node.name || ANONYMOUS_FUNCTION_NAME;
+        return className ? `${className}.${methodName}` : methodName;
     }
-    if (node.name) {
-        return node.name;
-    }
-    return formatAnonymous(className, binding);
+    return node.name ? node.name : formatAnonymous(className, binding);
 }
 
 function resolveStartNode(node: NormalizedNode): NormalizedNode {
     const first = node.children?.[0];
-    if (first && first.rawKind === 'FunctionKeyword') {
-        return first;
-    }
-    return node;
+    return first && first.rawKind === KIND_FUNCTION_KEYWORD ? first : node;
 }
 
-function buildComplexityDetail(
-    name: string,
-    cc: number,
-    warn: number,
-    fail: number,
-    clarity: ReturnType<typeof evaluateStructuredClarity>,
-): Record<string, unknown> {
+function buildComplexityDetail(context: ComplexityDetailContext): Record<string, unknown> {
     const detail: Record<string, unknown> = {
-        function: name,
-        cyclomaticComplexity: cc,
-        warn,
-        fail,
+        function: context.name,
+        cyclomaticComplexity: context.cyclomaticComplexity,
+        warn: context.warn,
+        fail: context.fail,
     };
-    if (clarity.isStructurallyClear) {
-        detail.effectiveWarn = clarity.effectiveWarn;
-        detail.effectiveFail = clarity.effectiveFail;
-        detail.maxBranchDepth = clarity.maxDepth;
+    if (context.clarity.isStructurallyClear) {
+        detail.effectiveWarn = context.clarity.effectiveWarn;
+        detail.effectiveFail = context.clarity.effectiveFail;
+        detail.maxBranchDepth = context.clarity.maxDepth;
         detail.structuredClarity = true;
     }
     return detail;
 }
 
-function buildComplexityIssue(
-    node: NormalizedNode,
-    ctx: AnalyzerContext,
-    name: string,
-    cc: number,
-    clarity: ReturnType<typeof evaluateStructuredClarity>,
-): Issue {
-    const t = ctx.options;
-    const severity: Severity = cc >= clarity.effectiveFail ? SEVERITY_ERROR : SEVERITY_WARNING;
+function buildComplexityIssue(context: ComplexityIssueContext): Issue {
+    const { node, ctx, name, cyclomaticComplexity, clarity } = context;
+    const options = ctx.options;
+    const severity: Severity =
+        cyclomaticComplexity >= clarity.effectiveFail ? SEVERITY_ERROR : SEVERITY_WARNING;
     const startNode = resolveStartNode(node);
 
     const message = clarity.isStructurallyClear
-        ? `Function "${name}" has cyclomatic complexity ${cc} (exceeds relaxed threshold ` +
+        ? `Function "${name}" has cyclomatic complexity ${cyclomaticComplexity} (exceeds relaxed threshold ` +
           `${clarity.effectiveWarn} for shallow structure).`
-        : `Function "${name}" has cyclomatic complexity ${cc} (threshold ${t.complexityWarn}).`;
+        : `Function "${name}" has cyclomatic complexity ${cyclomaticComplexity} (threshold ${options.complexityWarn}).`;
 
     const suggestion = clarity.isStructurallyClear
-        ? 'Function has flat control flow but high branching. ' +
-          'Consider a lookup table (map/strategy pattern) to eliminate branches.'
-        : formatOptimizationHint(cc);
+        ? SUGGESTION_FLAT_HIGH_BRANCHING
+        : formatOptimizationHint(cyclomaticComplexity);
+
     const actionable: AgentActionablePayload = {
-        action: clarity.isStructurallyClear ? 'extract_pure_predicate' : 'apply_guard_clause',
+        action: clarity.isStructurallyClear
+            ? ACTION_EXTRACT_PURE_PREDICATE
+            : ACTION_APPLY_GUARD_CLAUSE,
         code: CODE_CPX_HIGH_COMPLEXITY,
-        taxonomy: 'CTRL_FLOW',
+        taxonomy: TAXONOMY_CTRL_FLOW,
         safeToAutomate: false,
-        templateSnippet: clarity.isStructurallyClear
-            ? 'const strategyMap: Record<string, () => Result> = { ... };'
-            : 'if (!condition) return defaultValue;',
+        templateSnippet: clarity.isStructurallyClear ? SNIPPET_STRATEGY_MAP : SNIPPET_GUARD_CLAUSE,
         targetArguments: {
-            cyclomaticComplexity: cc,
-            threshold: t.complexityWarn,
+            cyclomaticComplexity,
+            threshold: options.complexityWarn,
             functionName: name,
         },
+    };
+
+    const detailContext: ComplexityDetailContext = {
+        name,
+        cyclomaticComplexity,
+        warn: options.complexityWarn,
+        fail: options.complexityFail,
+        clarity,
     };
 
     return {
@@ -169,7 +313,7 @@ function buildComplexityIssue(
         severity,
         message,
         location: locN(startNode, ctx.filePath),
-        detail: buildComplexityDetail(name, cc, t.complexityWarn, t.complexityFail, clarity),
+        detail: buildComplexityDetail(detailContext),
         suggestion,
         actionable,
     };
@@ -207,8 +351,9 @@ export class ComplexityAnalyzer implements Analyzer {
         this.cachedLines = ctx.content ? ctx.content.split('\n') : [];
         this.maskedFor = ctx.filePath;
 
-        const { TypeScriptAdapter } =
-            require('../core/ast/typescript-adapter') as typeof import('../core/ast/typescript-adapter');
+        const { TypeScriptAdapter } = require(
+            MODULE_TYPESCRIPT_ADAPTER,
+        ) as typeof import('../core/ast/typescript-adapter');
         const adapter = new TypeScriptAdapter();
         const ast = adapter.parse(sf.text, ctx.filePath);
         return runStreaming(adapter, ast.root, [
@@ -222,11 +367,11 @@ export class ComplexityAnalyzer implements Analyzer {
             const cached = state.getComplexity(fnKey);
             if (cached !== undefined) return cached;
         }
-        const cc = cyclomaticComplexity(node);
+        const cyclomaticComplexity = computeCyclomaticComplexity(node);
         if (state) {
-            state.setComplexity(fnKey, cc);
+            state.setComplexity(fnKey, cyclomaticComplexity);
         }
-        return cc;
+        return cyclomaticComplexity;
     }
 
     private ensureFileState(filePath: string, content?: string): void {
@@ -265,12 +410,7 @@ export class ComplexityAnalyzer implements Analyzer {
     private checkElasticBudget(
         node: NormalizedNode,
         ctx: AnalyzerContext,
-        name: string,
-        cc: number,
-        loc: number,
-        maxDepth: number,
-        startLine: number,
-        isExported?: boolean,
+        metrics: FunctionMetricContext,
     ): void {
         const opts = ctx.options as Record<string, unknown> | undefined;
         const thresh = ctx.config?.thresholds as unknown as Record<string, unknown> | undefined;
@@ -282,15 +422,15 @@ export class ComplexityAnalyzer implements Analyzer {
         const lang = ctx.filePath.split('.').pop() || 'ts';
         const budgetResult = evaluateElasticComplexityBudget(
             {
-                name,
+                name: metrics.name,
                 filePath: ctx.filePath,
                 language: lang,
-                cc,
-                loc,
-                maxDepth,
-                startLine,
+                cc: metrics.cyclomaticComplexity,
+                loc: metrics.loc,
+                maxDepth: metrics.maxDepth,
+                startLine: metrics.startLine,
                 startColumn: node.start?.column ?? 1,
-                isExported,
+                isExported: metrics.isExported,
             },
             ctx.options.complexityWarn,
             ctx.options.complexityFail,
@@ -303,14 +443,18 @@ export class ComplexityAnalyzer implements Analyzer {
     visit(
         node: NormalizedNode,
         ctx: AnalyzerContext,
-        parent: NormalizedNode | undefined,
-        _grandparent: NormalizedNode | undefined,
-        _depth: number,
-        className: string | null,
-        binding: string | null,
+        parent?: NormalizedNode,
+        ...scope: [
+            grandparent?: NormalizedNode,
+            depth?: number,
+            className?: string | null,
+            binding?: string | null,
+        ]
     ): void {
         if (!node.functionLike) return;
-        const name = nameFor(node, className, binding);
+        const className = scope[2] ?? null;
+        const binding = scope[3] ?? null;
+        const name = getFunctionName(node, className, binding);
 
         // The engine drives visit/finalize directly (only the standalone contract calls
         // analyze), so the masked view is built here on first use per file.
@@ -328,8 +472,8 @@ export class ComplexityAnalyzer implements Analyzer {
             this.loopSites.set(name, fnSites);
         }
 
-        const cc = this.computeComplexity(node, ctx.incremental);
-        this.functionCCs.push(cc);
+        const cyclomaticComplexity = this.computeComplexity(node, ctx.incremental);
+        this.functionCCs.push(cyclomaticComplexity);
 
         const startLine = node.start?.line ?? 1;
         const endLine = node.end?.line ?? startLine;
@@ -343,22 +487,37 @@ export class ComplexityAnalyzer implements Analyzer {
         );
 
         const fnLines = this.cachedLines.slice(startLine - 1, endLine);
-        this.fileFunctions.push({ name, startLine, endLine, cc, lines: fnLines });
+        this.fileFunctions.push({
+            name,
+            startLine,
+            endLine,
+            cc: cyclomaticComplexity,
+            lines: fnLines,
+        });
 
         const isExported = this.resolveIsExported(node, parent, fnLines);
-        this.checkElasticBudget(node, ctx, name, cc, loc, clarity.maxDepth, startLine, isExported);
-        this.checkControlFlowNestingAndEscapes(
-            node,
-            ctx,
+        const metrics: FunctionMetricContext = {
             name,
+            cyclomaticComplexity,
             loc,
-            clarity.maxDepth,
+            maxDepth: clarity.maxDepth,
             startLine,
-            fnLines,
-        );
+            isExported,
+        };
 
-        if (cc >= clarity.effectiveWarn) {
-            this.issues.push(buildComplexityIssue(node, ctx, name, cc, clarity));
+        this.checkElasticBudget(node, ctx, metrics);
+        this.checkNestingEscapes(ctx, metrics, fnLines);
+
+        if (cyclomaticComplexity >= clarity.effectiveWarn) {
+            this.issues.push(
+                buildComplexityIssue({
+                    node,
+                    ctx,
+                    name,
+                    cyclomaticComplexity,
+                    clarity,
+                }),
+            );
         }
     }
 
@@ -367,34 +526,31 @@ export class ComplexityAnalyzer implements Analyzer {
      * Differentiates legitimate state machines, AST parsers, and short-span guards from
      * unbounded business logic nesting.
      */
-    private checkControlFlowNestingAndEscapes(
-        _node: NormalizedNode,
+    private checkNestingEscapes(
         ctx: AnalyzerContext,
-        name: string,
-        loc: number,
-        maxDepth: number,
-        startLine: number,
+        metrics: FunctionMetricContext,
         fnLines: string[],
     ): void {
         const { depthBudget, contextKind, isStateMachine } = this.resolveNestingBudget(
             ctx,
-            name,
+            metrics.name,
             fnLines,
         );
 
-        this.checkUnboundedNesting(ctx, name, loc, maxDepth, depthBudget, contextKind, startLine);
-        this.checkDeepLongSpanEscapes(
+        const nestingContext: ComplexityNestingContext = {
             ctx,
-            name,
-            loc,
-            maxDepth,
+            name: metrics.name,
+            loc: metrics.loc,
+            maxDepth: metrics.maxDepth,
             depthBudget,
             contextKind,
-            startLine,
-            fnLines,
-        );
+            startLine: metrics.startLine,
+        };
+
+        this.checkUnboundedNesting(nestingContext);
+        this.checkDeepLongSpanEscapes(nestingContext, fnLines);
         if (isStateMachine) {
-            this.checkStateMachineDiscipline(ctx, name, startLine, fnLines);
+            this.checkStateMachineDiscipline(ctx, metrics.name, metrics.startLine, fnLines);
         }
     }
 
@@ -407,33 +563,42 @@ export class ComplexityAnalyzer implements Analyzer {
             RE_PARSER_FILE_CONTEXT.test(ctx.filePath) || RE_PARSER_FUNCTION_NAME.test(name);
 
         const hasSwitchOrDispatch = fnLines.some((l) => RE_SWITCH_OR_DISPATCH_LINE.test(l));
-        const isStateMachine = hasSwitchOrDispatch && fnLines.length >= 15;
+        const isStateMachine = hasSwitchOrDispatch && fnLines.length >= MIN_STATE_MACHINE_LINES;
         const isEventLoop =
             RE_EVENT_LOOP_FILE_CONTEXT.test(ctx.filePath) || RE_EVENT_LOOP_FUNCTION_NAME.test(name);
 
         if (isParserContext) {
-            return { depthBudget: 5, contextKind: 'ast-parser', isStateMachine };
+            return {
+                depthBudget: DEPTH_BUDGET_COMPLEX,
+                contextKind: CONTEXT_AST_PARSER,
+                isStateMachine,
+            };
         }
         if (isStateMachine) {
-            return { depthBudget: 5, contextKind: 'state-machine', isStateMachine };
+            return {
+                depthBudget: DEPTH_BUDGET_COMPLEX,
+                contextKind: CONTEXT_STATE_MACHINE,
+                isStateMachine,
+            };
         }
         if (isEventLoop) {
-            return { depthBudget: 5, contextKind: 'event-loop', isStateMachine };
+            return {
+                depthBudget: DEPTH_BUDGET_COMPLEX,
+                contextKind: CONTEXT_EVENT_LOOP,
+                isStateMachine,
+            };
         }
-        return { depthBudget: 3, contextKind: 'general-business', isStateMachine };
+        return {
+            depthBudget: DEPTH_BUDGET_GENERAL,
+            contextKind: CONTEXT_GENERAL_BUSINESS,
+            isStateMachine,
+        };
     }
 
-    private checkUnboundedNesting(
-        ctx: AnalyzerContext,
-        name: string,
-        loc: number,
-        maxDepth: number,
-        depthBudget: number,
-        contextKind: string,
-        startLine: number,
-    ): void {
+    private checkUnboundedNesting(context: ComplexityNestingContext): void {
+        const { ctx, name, loc, maxDepth, depthBudget, contextKind, startLine } = context;
         if (maxDepth <= depthBudget) return;
-        const isShortSpanGuard = loc <= 25 && maxDepth <= 4;
+        const isShortSpanGuard = loc <= SHORT_SPAN_GUARD_LOC && maxDepth <= SHORT_SPAN_GUARD_DEPTH;
         if (isShortSpanGuard) return;
 
         this.issues.push({
@@ -456,14 +621,13 @@ export class ComplexityAnalyzer implements Analyzer {
                 contextKind,
                 loc,
             },
-            suggestion:
-                'Flatten control flow using early returns (guard clauses) or extract nested blocks.',
+            suggestion: SUGGESTION_UNBOUNDED_NESTING,
             actionable: {
-                action: 'apply_guard_clause',
+                action: ACTION_APPLY_GUARD_CLAUSE,
                 code: CODE_CPX_DEEP_NESTING,
-                taxonomy: 'CTRL_FLOW',
+                taxonomy: TAXONOMY_CTRL_FLOW,
                 safeToAutomate: false,
-                templateSnippet: 'if (!condition) return defaultValue;',
+                templateSnippet: SNIPPET_GUARD_CLAUSE,
                 targetArguments: {
                     maxDepth,
                     depthBudget,
@@ -473,29 +637,24 @@ export class ComplexityAnalyzer implements Analyzer {
         });
     }
 
-    private checkDeepLongSpanEscapes(
-        ctx: AnalyzerContext,
-        name: string,
-        loc: number,
-        maxDepth: number,
-        depthBudget: number,
-        contextKind: string,
-        startLine: number,
-        fnLines: string[],
-    ): void {
-        if (loc < 60 || maxDepth < 4) return;
+    private checkDeepLongSpanEscapes(context: ComplexityNestingContext, fnLines: string[]): void {
+        const { ctx, name, loc, maxDepth, depthBudget, contextKind, startLine } = context;
+        if (loc < HIGH_SPAN_WARN_LINES || maxDepth < ESCAPE_EVALUATION_MIN_DEPTH) return;
 
-        const thresholdIndent = depthBudget >= 5 ? 20 : 16;
+        const thresholdIndent =
+            depthBudget >= DEPTH_BUDGET_COMPLEX
+                ? INDENT_SPACES_COMPLEX_BUDGET
+                : INDENT_SPACES_STANDARD_BUDGET;
         let deepJumpLine = -1;
 
         for (let i = 0; i < fnLines.length; i++) {
-            if (i < 40) continue;
+            if (i < ESCAPE_SCAN_START_INDEX) continue;
             const line = fnLines[i];
             const trimmed = line.trimStart();
             const indentSpaces = line.length - trimmed.length;
             if (indentSpaces < thresholdIndent) continue;
             if (!RE_CONTROL_FLOW_ESCAPE.test(trimmed)) continue;
-            if (depthBudget >= 5 && loc <= 120) continue;
+            if (depthBudget >= DEPTH_BUDGET_COMPLEX && loc <= ESCAPE_SPAN_EXTENDED_LIMIT) continue;
 
             deepJumpLine = startLine + i;
             break;
@@ -523,8 +682,7 @@ export class ComplexityAnalyzer implements Analyzer {
                 jumpLine: deepJumpLine,
                 contextKind,
             },
-            suggestion:
-                'Extract deeply nested block into a localized helper method to reduce jump distance.',
+            suggestion: SUGGESTION_DEEP_ESCAPE,
         });
     }
 
@@ -540,7 +698,7 @@ export class ComplexityAnalyzer implements Analyzer {
         for (let i = 0; i < fnLines.length; i++) {
             const trimmed = fnLines[i].trim();
             if (RE_STATE_MACHINE_BRANCH.test(trimmed)) {
-                if (currentCaseLength > 35 && currentCaseLine > 0) {
+                if (currentCaseLength > MAX_CASE_BRANCH_LINES && currentCaseLine > 0) {
                     this.pushStateMachineCaseIssue(ctx, name, currentCaseLine, currentCaseLength);
                 }
                 currentCaseLine = startLine + i;
@@ -564,7 +722,7 @@ export class ComplexityAnalyzer implements Analyzer {
             severity: SEVERITY_INFO,
             message:
                 `State machine branch discipline: case branch at line ${caseLine} in ` +
-                `function '${name}' has length ${caseLength} LOC (threshold: 35).`,
+                `function '${name}' has length ${caseLength} LOC (threshold: ${MAX_CASE_BRANCH_LINES}).`,
             location: {
                 file: ctx.filePath,
                 start: { line: caseLine, column: 1 },
@@ -575,7 +733,7 @@ export class ComplexityAnalyzer implements Analyzer {
                 branchLine: caseLine,
                 branchLength: caseLength,
             },
-            suggestion: 'Extract branch body into a dedicated action to keep dispatch lean.',
+            suggestion: SUGGESTION_STATE_MACHINE,
         });
     }
 
@@ -617,11 +775,10 @@ export class ComplexityAnalyzer implements Analyzer {
             );
             if (fileBudgetIssue) {
                 this.issues.push(fileBudgetIssue);
-                void 0;
             }
         }
 
-        if (flagCohesion && this.fileFunctions.length >= 2) {
+        if (flagCohesion && this.fileFunctions.length >= MIN_FUNCTIONS_FOR_COHESION) {
             const cohesionResult = analyzeFunctionCohesionAndSkeleton(
                 ctx.filePath,
                 this.fileFunctions,
@@ -638,7 +795,7 @@ export class ComplexityAnalyzer implements Analyzer {
         const flagRedundancy = Boolean(
             opts?.flagDistributedRedundancy ?? thresh?.flagDistributedRedundancy ?? false,
         );
-        if (!flagRedundancy || this.fileFunctions.length < 2) return;
+        if (!flagRedundancy || this.fileFunctions.length < MIN_FUNCTIONS_FOR_COHESION) return;
 
         const descriptors = createRoutineDescriptors(this.fileFunctions, ctx.filePath);
         const lineCount =
@@ -646,7 +803,7 @@ export class ComplexityAnalyzer implements Analyzer {
                 ? this.cachedLines.length
                 : ctx.content
                   ? ctx.content.split('\n').length
-                  : 100;
+                  : DEFAULT_CONTENT_LINE_COUNT;
         const redundancyResult = evaluateDistributedRedundancy(descriptors, lineCount);
         this.issues.push(...redundancyResult.issues);
     }

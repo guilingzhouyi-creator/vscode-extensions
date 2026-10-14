@@ -614,7 +614,7 @@ export const APPROVED_ACTION_VERBS: ReadonlySet<string> = new Set(
         'put query queue read receive reclaim record redirect reduce refresh register reload ' +
         'remove render replace report reset resolve resume retrieve retry review route run ' +
         'safe sanitize save scan schedule score search seed select send serialize set ' +
-        'setup shift should sort spawn split start stop store strip subscribe sum ' +
+        'setup shift should solve sort spawn split start stop store strip subscribe sum ' +
         'supports sync synthesize tag test throttle to track transform transpile traverse trigger ' +
         'trim truncate try tune unbind unescape uninstall unregister unshift unwrap update validate ' +
         'verify visit walk was were will wrap write'

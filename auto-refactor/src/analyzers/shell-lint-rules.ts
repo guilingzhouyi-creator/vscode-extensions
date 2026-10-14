@@ -12,18 +12,31 @@ import { SEVERITY_WARNING, SEVERITY_ERROR } from '../core/types';
 
 /* ---- Rule ID constants ---- */
 
+/** Rule identifier for deprecated shell syntax detection. */
 export const RULE_SH_DEPR_001 = 'SH-DEPR-001';
+/** Rule identifier for fragile conditional test detection. */
 export const RULE_SH_COND_001 = 'SH-COND-001';
+/** Rule identifier for unquoted variable usage detection. */
 export const RULE_SH_QUOTE_001 = 'SH-QUOTE-001';
+/** Rule identifier for missing shell script documentation header. */
 export const RULE_SH_DOC_001 = 'SH-DOC-001';
+/** Rule identifier for missing PowerShell script documentation header. */
 export const RULE_PS_DOC_001 = 'PS-DOC-001';
+/** Rule identifier for non-compliant line endings in shell scripts. */
 export const RULE_SH_EOL_001 = 'SH-EOL-001';
+/** Rule identifier for shell commands lacking explicit error exit checking. */
 export const RULE_SH_EXIT_001 = 'SH-EXIT-001';
+/** Rule identifier for missing error trap handler in shell scripts. */
 export const RULE_SH_TRAP_001 = 'SH-TRAP-001';
+/** Rule identifier for missing error handling trap in PowerShell scripts. */
 export const RULE_PS_TRAP_001 = 'PS-TRAP-001';
+/** Rule identifier for insecure dynamic command execution in shell. */
 export const RULE_SH_SEC_001 = 'SH-SEC-001';
+/** Rule identifier for insecure dynamic evaluation in PowerShell. */
 export const RULE_PS_SEC_001 = 'PS-SEC-001';
+/** Rule identifier for missing non-interactive safety guards in PowerShell. */
 export const RULE_PS_SAFE_001 = 'PS-SAFE-001';
+/** Rule identifier for missing non-interactive safety guards in shell. */
 export const RULE_SH_SAFE_001 = 'SH-SAFE-001';
 
 const SCRIPTS_DIR_FRAGMENT = '/scripts/';
@@ -105,45 +118,48 @@ export const SHELL_DOC_HEADER_RE =
 
 /* ---- PowerShell patterns & tables ---- */
 
-const ALIAS_GROUPS: ReadonlyArray<[string, string]> = [
-    ['Get-ChildItem', 'ls dir gci'],
-    ['Set-Location', 'cd sl chdir'],
-    ['Get-Location', 'pwd gl'],
-    ['Copy-Item', 'cp cpi copy'],
-    ['Move-Item', 'mv mi move'],
-    ['Remove-Item', 'rm ri del erase rd rmdir'],
-    ['New-Item', 'ni mkdir md'],
-    ['Get-Content', 'cat gc type get'],
-    ['Write-Output', 'echo write'],
-    ['Stop-Process', 'kill spps'],
-    ['Get-Process', 'ps gps'],
-    ['Sort-Object', 'sort'],
-    ['Select-Object', 'select'],
-    ['Where-Object', 'where ?'],
-    ['ForEach-Object', '% foreach'],
-    ['Format-List', 'fl'],
-    ['Format-Table', 'ft'],
-    ['Format-Wide', 'fw'],
-    ['Format-Custom', 'fc'],
-    ['Tee-Object', 'tee'],
-    ['Start-Sleep', 'sleep'],
-    ['Start-Process', 'start saps'],
-    ['Invoke-Expression', 'iex'],
-    ['Invoke-Item', 'ii'],
-    ['Get-ItemProperty', 'gp'],
-    ['Set-ItemProperty', 'sp'],
-    ['Get-Item', 'gi'],
-    ['Set-Item', 'si'],
-    ['Clear-Host', 'cls clear'],
-    ['Get-History', 'h history'],
-    ['Invoke-History', 'r ihy'],
-];
+const POWERSHELL_ALIAS_MAPPING_TEXT = `Get-ChildItem:ls dir gci
+Set-Location:cd sl chdir
+Get-Location:pwd gl
+Copy-Item:cp cpi copy
+Move-Item:mv mi move
+Remove-Item:rm ri del erase rd rmdir
+New-Item:ni mkdir md
+Get-Content:cat gc type get
+Write-Output:echo write
+Stop-Process:kill spps
+Get-Process:ps gps
+Sort-Object:sort
+Select-Object:select
+Where-Object:where ?
+ForEach-Object:% foreach
+Format-List:fl
+Format-Table:ft
+Format-Wide:fw
+Format-Custom:fc
+Tee-Object:tee
+Start-Sleep:sleep
+Start-Process:start saps
+Invoke-Expression:iex
+Invoke-Item:ii
+Get-ItemProperty:gp
+Set-ItemProperty:sp
+Get-Item:gi
+Set-Item:si
+Clear-Host:cls clear
+Get-History:h history
+Invoke-History:r ihy`;
 
 function buildAliasMap(): Record<string, string> {
     const map: Record<string, string> = {};
-    for (const [cmdlet, aliases] of ALIAS_GROUPS) {
-        for (const alias of aliases.split(' ')) {
-            map[alias] = cmdlet;
+    const lines = POWERSHELL_ALIAS_MAPPING_TEXT.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        const [cmdlet, aliases] = line.split(':');
+        const aliasList = aliases.split(' ');
+        for (let j = 0; j < aliasList.length; j++) {
+            map[aliasList[j]] = cmdlet;
         }
     }
     return Object.freeze(map);
@@ -166,7 +182,7 @@ export const PS_APPROVED_VERBS = new Set(PS_VERB_TOKENS.split(' '));
 export const PS_FUNCTION_RE = /^\s*function\s+([A-Za-z][A-Za-z0-9_-]*)\s*(?:\(\))?\s*\{?/;
 export const PS_CMDLET_BINDING_RE = /\[CmdletBinding\s*\(\s*\)\]/;
 export const PS_PARAM_BLOCK_RE = /^\s*param\s*\(/i;
-export const PS_PARAM_WITH_TYPE_RE = /\[[A-Za-z][A-Za-z0-9_.]*\]\s*\$/;
+export const PS_PARAM_WITH_TYPE_RE = /\[[A-Za-z][A-Za-z0-9_.]*(?:\[\s*\])?\]\s*\$/;
 export const PS_PARAM_SIMPLE_RE = /(?:^|[\s,])\$([A-Za-z][A-Za-z0-9_]*)\s*(?:=|,|\))/;
 export const PS_ERROR_ACTION_RE = /\$ErrorActionPreference\s*=\s*['"]Stop['"]/i;
 export const PS_RESOURCE_DISPOSAL_RE =
@@ -240,38 +256,14 @@ export function scanStrictErrorFlags(maskedLines: string[]): {
 /**
  * Checks for deprecated shell syntax (`...` backticks and single bracket tests).
  *
- * @param lineOrCtx - Raw line text or structured ShellLineScanContext.
- * @param trimmedOrEmit - Trimmed line text or issue callback when context is passed.
- * @param maskedTrimmed - Masked trimmed line text.
- * @param lineIndex - 0-based line index.
- * @param emitter - Issue emission callback.
+ * @param lineCtx - Structured ShellLineScanContext.
+ * @param emit - Issue emission callback.
  */
-export function checkDeprecatedSyntax(
-    lineOrCtx: string | ShellLineScanContext,
-    trimmedOrEmit?: string | ShellEmitter,
-    maskedTrimmed?: string,
-    lineIndex?: number,
-    emitter?: ShellEmitter,
-): void {
-    let raw: string;
-    let trimmed: string;
-    let masked: string;
-    let idx: number;
-    let emit: ShellEmitter;
-
-    if (typeof lineOrCtx === 'object' && lineOrCtx !== null) {
-        raw = lineOrCtx.raw;
-        trimmed = lineOrCtx.trimmed;
-        masked = lineOrCtx.maskedTrimmed;
-        idx = lineOrCtx.lineIndex;
-        emit = trimmedOrEmit as ShellEmitter;
-    } else {
-        raw = lineOrCtx;
-        trimmed = trimmedOrEmit as string;
-        masked = maskedTrimmed || '';
-        idx = lineIndex || 0;
-        emit = emitter!;
-    }
+export function checkDeprecatedSyntax(lineCtx: ShellLineScanContext, emit: ShellEmitter): void {
+    const raw = lineCtx.raw;
+    const trimmed = lineCtx.trimmed;
+    const masked = lineCtx.maskedTrimmed;
+    const idx = lineCtx.lineIndex;
 
     if (BACKTICK_CMD_RE.test(raw) && !/^['"]/.test(trimmed)) {
         if (masked.includes('`')) {
@@ -384,8 +376,7 @@ export function checkUnquotedVariables(
     if (matches && matches.length > 0) {
         const filtered = matches.filter((m) => {
             const inner = m.match(/\$\{?([A-Za-z_][A-Za-z0-9_]*)\}?/);
-            if (!inner) return false;
-            return inner[1].length !== 1;
+            return inner ? inner[1].length !== 1 : false;
         });
 
         if (filtered.length > 0) {
@@ -632,102 +623,55 @@ export function checkPowerShellDynamicSecurity(
 /**
  * Checks for interactive input without guard in PowerShell (PS-SAFE-001).
  *
- * @param trimmedOrCtx - Trimmed raw line or structured line scan context.
- * @param maskedOrGuard - Masked line text or guard status when context is passed.
- * @param lineIdxOrEmit - Line index or emitter when context is passed.
- * @param hasGuard - Guard status when discrete parameters are passed.
- * @param emit - Issue emission callback when discrete parameters are passed.
+/**
+ * Checks for interactive input without guard in PowerShell (PS-SAFE-001).
+ *
+ * @param lineCtx - Structured line scan context.
+ * @param hasGuard - Guard status indicating whether the script runs non-interactively.
+ * @param emit - Issue emission callback.
  */
-export function checkPsInteractiveSafety(
-    trimmedOrCtx: string | ShellLineScanContext,
-    maskedOrGuard: string | boolean,
-    lineIdxOrEmit?: number | ShellEmitter,
-    hasGuard?: boolean,
-    emit?: ShellEmitter,
+export function checkPowerShellSafety(
+    lineCtx: ShellLineScanContext,
+    hasGuard: boolean,
+    emit: ShellEmitter,
 ): void {
-    let trimmed: string;
-    let maskedTrimmed: string;
-    let lineIdx: number;
-    let hasInteractiveGuard: boolean;
-    let emitter: ShellEmitter;
-
-    if (typeof trimmedOrCtx === 'object' && trimmedOrCtx !== null) {
-        trimmed = trimmedOrCtx.trimmed;
-        maskedTrimmed = trimmedOrCtx.maskedTrimmed;
-        lineIdx = trimmedOrCtx.lineIndex;
-        hasInteractiveGuard = Boolean(maskedOrGuard);
-        emitter = lineIdxOrEmit as ShellEmitter;
-    } else {
-        trimmed = trimmedOrCtx;
-        maskedTrimmed = maskedOrGuard as string;
-        lineIdx = lineIdxOrEmit as number;
-        hasInteractiveGuard = Boolean(hasGuard);
-        emitter = emit!;
-    }
-
-    if (hasInteractiveGuard) return;
-    if (PS_INTERACTIVE_RE.test(maskedTrimmed)) {
-        emitter(
-            lineIdx,
+    if (hasGuard) return;
+    if (PS_INTERACTIVE_RE.test(lineCtx.maskedTrimmed)) {
+        emit(
+            lineCtx.lineIndex,
             RULE_PS_SAFE_001,
             'Interactive input cmdlet used without non-interactive terminal guard.',
             SEVERITY_ERROR,
             'Guard interactive input with `if ([Environment]::UserInteractive -and -not [Console]::IsOutputRedirected)` or support `-Force`.',
-            { line: trimmed },
+            { line: lineCtx.trimmed },
         );
     }
 }
 
-/** Backward-compatible alias for checkPsInteractiveSafety. */
-export const checkPowerShellInteractiveSafety = checkPsInteractiveSafety;
-
 /**
  * Checks for interactive read without timeout or TTY guard in Shell (SH-SAFE-001).
  *
- * @param trimmedOrCtx - Trimmed raw line or structured line scan context.
- * @param maskedOrGuard - Masked line text or guard status when context is passed.
- * @param lineIdxOrEmit - Line index or emitter when context is passed.
- * @param hasGuard - TTY guard status when discrete parameters are passed.
- * @param emit - Issue emission callback when discrete parameters are passed.
+ * @param lineCtx - Structured line scan context.
+ * @param hasGuard - TTY guard status.
+ * @param emit - Issue emission callback.
  */
-export function checkShellInteractiveSafety(
-    trimmedOrCtx: string | ShellLineScanContext,
-    maskedOrGuard: string | boolean,
-    lineIdxOrEmit?: number | ShellEmitter,
-    hasGuard?: boolean,
-    emit?: ShellEmitter,
+export function checkShellSafety(
+    lineCtx: ShellLineScanContext,
+    hasGuard: boolean,
+    emit: ShellEmitter,
 ): void {
-    let trimmed: string;
-    let maskedTrimmed: string;
-    let lineIdx: number;
-    let hasTtyGuard: boolean;
-    let emitter: ShellEmitter;
-
-    if (typeof trimmedOrCtx === 'object' && trimmedOrCtx !== null) {
-        trimmed = trimmedOrCtx.trimmed;
-        maskedTrimmed = trimmedOrCtx.maskedTrimmed;
-        lineIdx = trimmedOrCtx.lineIndex;
-        hasTtyGuard = Boolean(maskedOrGuard);
-        emitter = lineIdxOrEmit as ShellEmitter;
-    } else {
-        trimmed = trimmedOrCtx;
-        maskedTrimmed = maskedOrGuard as string;
-        lineIdx = lineIdxOrEmit as number;
-        hasTtyGuard = Boolean(hasGuard);
-        emitter = emit!;
-    }
-
-    if (hasTtyGuard) return;
-    if (/^\s*while\b.*?\bread\b/.test(maskedTrimmed)) return;
-    if (/<<<|<<|<[a-zA-Z0-9_\/"'$]/.test(maskedTrimmed)) return;
-    if (SH_READ_INTERACTIVE_RE.test(maskedTrimmed) && !/\s-t\s+\d+/.test(maskedTrimmed)) {
-        emitter(
-            lineIdx,
+    if (hasGuard) return;
+    const masked = lineCtx.maskedTrimmed;
+    if (/^\s*while\b.*?\bread\b/.test(masked)) return;
+    if (/<<<|<<|<[a-zA-Z0-9_\/"'$]/.test(masked)) return;
+    if (SH_READ_INTERACTIVE_RE.test(masked) && !/\s-t\s+\d+/.test(masked)) {
+        emit(
+            lineCtx.lineIndex,
             RULE_SH_SAFE_001,
             'Interactive `read` without timeout risks hanging unattended CI/Agent subprocesses.',
             SEVERITY_ERROR,
             'Add a timeout flag (`read -t 10`) or verify terminal interactivity with `[[ -t 0 ]]` before prompting.',
-            { line: trimmed },
+            { line: lineCtx.trimmed },
         );
     }
 }

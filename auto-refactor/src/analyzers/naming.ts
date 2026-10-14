@@ -701,7 +701,15 @@ export class NamingAnalyzer implements Analyzer {
                 this.checkVariableName(paramName, param, false, pos, ctx, issues, opts);
                 if (!isExemptVague) {
                     this.checkIdentifierVagueness(paramName, pos, vagueSet, ctx, issues, opts);
-                    this.checkSingleLetter(paramName, pos, isArrow, singleAllowed, ctx, issues, opts);
+                    this.checkSingleLetter(
+                        paramName,
+                        pos,
+                        isArrow,
+                        singleAllowed,
+                        ctx,
+                        issues,
+                        opts,
+                    );
                 }
                 if (opts.checkJargon !== false) {
                     this.checkSymbolJargon(paramName, pos, ctx, issues);

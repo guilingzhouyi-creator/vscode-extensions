@@ -15,8 +15,43 @@
  *     content-oriented; the heuristics are keyword-anchored so a missed modernization is
  *     preferred over a wrong rewrite suggestion.
  */
-import type { Analyzer, AnalyzerContext, Issue, AgentActionType } from '../core/types';
+import type { Analyzer, AnalyzerContext, Issue, AgentActionType, Severity } from '../core/types';
 import { SEVERITY_WARNING, SEVERITY_ERROR } from '../core/types';
+import {
+    PY_STDLIB_NAMES,
+    PY_LOCAL_ROOTS,
+    PY_ABC_TYPING_NAMES,
+    SHADOW_IGNORE_NAMES,
+} from './python-modern-tables';
+
+const RULE_PYM_PATH_001 = 'PYM-PATH-001';
+const RULE_PYM_RAISE_001 = 'PYM-RAISE-001';
+const RULE_PYM_DEFAULT_001 = 'PYM-DEFAULT-001';
+const RULE_PYM_DATETIME_001 = 'PYM-DATETIME-001';
+const RULE_PYM_UNION_001 = 'PYM-UNION-001';
+const RULE_PYM_SLOTS_001 = 'PYM-SLOTS-001';
+const RULE_PYM_ASYNC_001 = 'PYM-ASYNC-001';
+const RULE_PYM_OPEN_001 = 'PYM-OPEN-001';
+const RULE_PYM_SHADOW_001 = 'PYM-SHADOW-001';
+const RULE_PYM_FSTRING_001 = 'PYM-FSTRING-001';
+const RULE_PYM_GENERIC_001 = 'PYM-GENERIC-001';
+const RULE_PYM_ABC_001 = 'PYM-ABC-001';
+const RULE_PYM_IMPORT_001 = 'PYM-IMPORT-001';
+
+const ACTION_APPLY_GUARD = 'apply_guard_clause';
+const ACTION_RENAME_SYMBOL = 'rename_symbol';
+const ACTION_SIMPLIFY_CONTROL = 'simplify_control_flow';
+const ACTION_REPLACE_TOKEN = 'replace_token';
+
+const SCOPE_KIND_MODULE = 'module';
+const SCOPE_KIND_FUNCTION = 'function';
+const SCOPE_KIND_CLASS = 'class';
+const BLOCK_KIND_DEF = 'def';
+const BLOCK_KIND_CLASS = 'class';
+const BLOCK_KIND_EXCEPT = 'except';
+const BLOCK_KIND_WITH = 'with';
+const BLOCK_KIND_OTHER = 'other';
+const PREFIX_OS_PATH = 'os.path.';
 
 const BLOCK_OPEN_RE = /:\s*(?:#.*)?$/;
 const ASYNC_DEF_RE = /^\s*async\s+def\b/;
@@ -41,13 +76,6 @@ const EXCEPT_AS_RE = /^\s*except\b.*\bas\s+([A-Za-z_]\w*)\s*:/;
 const IMPORT_SIMPLE_RE = /^\s*import\s+([A-Za-z_]\w*)/;
 const IMPORT_FROM_RE = /^\s*from\s+[A-Za-z_.\w]+\s+import\s+(.+)$/;
 
-import {
-    PY_STDLIB_NAMES,
-    PY_LOCAL_ROOTS,
-    PY_ABC_TYPING_NAMES,
-    SHADOW_IGNORE_NAMES,
-} from './python-modern-tables';
-
 const BLOCKING_CALL_RE =
     /\b(?:time\.sleep|requests\.(?:get|post|put|patch|delete|request)|urllib\.request\.urlopen)\s*\(/;
 const SYNC_ORM_CALL_RE = /(?<![\w.])(?:[A-Za-z_]\w*\.)*(?:session|Session)\.(?:query|execute)\s*\(/;
@@ -68,20 +96,220 @@ const PY_PEP604_ANN_ASSIGN_RE =
     /^\s*[A-Za-z_]\w*\s*:\s*(?:typing\.)?(?:Optional|Union)\s*\[[^\]]*\]\s*=/;
 const PY_PEP604_ALIAS_RE = /^\s*[A-Za-z_]\w*\s*=\s*(?:typing\.)?(?:Optional|Union)\s*\[/;
 const PY_DATACLASS_RE = /^@(?:dataclasses\.)?dataclass\b/;
-const SECTION_LABELS = ['stdlib', 'third-party', 'local'];
+
+const SECTION_LABEL_STDLIB = 'stdlib';
+const SECTION_LABEL_THIRD_PARTY = 'third-party';
+const SECTION_LABEL_LOCAL = 'local';
+const SECTION_LABELS: readonly string[] = Object.freeze([
+    SECTION_LABEL_STDLIB,
+    SECTION_LABEL_THIRD_PARTY,
+    SECTION_LABEL_LOCAL,
+]);
+
+const SECTION_STDLIB_INDEX = 0;
+const SECTION_THIRD_PARTY_INDEX = 1;
+const SECTION_LOCAL_INDEX = 2;
+
+const SNIPPET_PATH = 'Path($1) / $2';
+const SNIPPET_RAISE = 'raise $1 from $2';
+const SNIPPET_DEFAULT = '$1: $2 = None';
+const SNIPPET_DATETIME = 'datetime.UTC';
+const SNIPPET_UNION = '$1 | None';
+const SNIPPET_SLOTS = '@dataclass(slots=True)';
+const SNIPPET_ASYNC = 'await asyncio.to_thread($1)';
+const SNIPPET_OPEN = 'with open($1) as $2:';
+const SNIPPET_SHADOW = '$1_renamed';
+const SNIPPET_FSTRING = 'f"{$1}"';
+const SNIPPET_GENERIC = '$1[$2]';
+const SNIPPET_ABC = 'from collections.abc import $1';
+const SNIPPET_IMPORT = 'import $1';
+
+/** Issue metadata specification for constructing structured findings. */
+interface IssueSpec {
+    readonly rule: string;
+    readonly severity: Severity;
+    readonly message: string;
+    readonly suggestion: string;
+}
+
+const SPEC_PATH: IssueSpec = Object.freeze({
+    rule: RULE_PYM_PATH_001,
+    severity: SEVERITY_WARNING,
+    message: 'os.path usage: prefer pathlib.Path for path manipulation.',
+    suggestion:
+        'Build paths with pathlib.Path (`Path(...) / name`), which is OS-neutral and self-documenting.',
+});
+
+const SPEC_FSTRING: IssueSpec = Object.freeze({
+    rule: RULE_PYM_FSTRING_001,
+    severity: SEVERITY_WARNING,
+    message: 'Percent-formatting is legacy: f-strings are faster and harder to misalign.',
+    suggestion: 'Rewrite as an f-string (`f"...{value}"`).',
+});
+
+const SPEC_DATETIME: IssueSpec = Object.freeze({
+    rule: RULE_PYM_DATETIME_001,
+    severity: SEVERITY_ERROR,
+    message: 'timezone.utc is superseded by the datetime.UTC singleton.',
+    suggestion: 'Use `datetime.UTC` (PEP 615 / ruff UP017).',
+});
+
+const SPEC_UNION: IssueSpec = Object.freeze({
+    rule: RULE_PYM_UNION_001,
+    severity: SEVERITY_ERROR,
+    message: 'Optional/Union in an annotation or alias: PEP 604 unions read better.',
+    suggestion: 'Write `X | None` / `X | Y` instead of Optional/Union.',
+});
+
+const SPEC_RAISE: IssueSpec = Object.freeze({
+    rule: RULE_PYM_RAISE_001,
+    severity: SEVERITY_WARNING,
+    message: '`raise` inside an except block without `from` drops the original exception chain.',
+    suggestion:
+        'Re-raise with `raise NewError(...) from exc` (or a bare `raise` to propagate unchanged).',
+});
+
+const SPEC_DEFAULT: IssueSpec = Object.freeze({
+    rule: RULE_PYM_DEFAULT_001,
+    severity: SEVERITY_WARNING,
+    message:
+        'Mutable default argument detected: the default is created once and shared by every call.',
+    suggestion: 'Use a `None` sentinel and build the list/dict/set inside the body.',
+});
+
+const SPEC_OPEN: IssueSpec = Object.freeze({
+    rule: RULE_PYM_OPEN_001,
+    severity: SEVERITY_WARNING,
+    message: '`open()` without a `with` block leaks the file handle on error paths.',
+    suggestion:
+        'Wrap the call in `with open(...) as handle:` so the handle closes deterministically.',
+});
+
+const SPEC_ASYNC_BLOCKING: IssueSpec = Object.freeze({
+    rule: RULE_PYM_ASYNC_001,
+    severity: SEVERITY_ERROR,
+    message: 'Blocking call inside an async function blocks the event loop.',
+    suggestion:
+        'Use the async equivalent (asyncio.sleep, httpx, async repository) or run the blocking call in a thread.',
+});
+
+const SPEC_ASYNC_ORM: IssueSpec = Object.freeze({
+    rule: RULE_PYM_ASYNC_001,
+    severity: SEVERITY_ERROR,
+    message: 'Synchronous ORM call inside an async function is not awaited.',
+    suggestion:
+        'Await the async session (`await session.execute(...)`) or use the async repository API.',
+});
+
+const SPEC_SLOTS: IssueSpec = Object.freeze({
+    rule: RULE_PYM_SLOTS_001,
+    severity: SEVERITY_WARNING,
+    message:
+        'Dataclass without slots=True: instances carry a __dict__ and typos create silent attributes.',
+    suggestion:
+        'Add `slots=True` (or an explicit `slots=False` when __dict__ is genuinely required).',
+});
+
+const SPEC_IMPORT_ORDER: IssueSpec = Object.freeze({
+    rule: RULE_PYM_IMPORT_001,
+    severity: SEVERITY_WARNING,
+    message: 'Import section order violated.',
+    suggestion: 'Group imports as stdlib → third-party → local (PEP 8), separated by blank lines.',
+});
+
+interface ActionableSpec {
+    readonly action?: AgentActionType;
+    readonly code: string;
+    readonly safeToAutomate?: boolean;
+    readonly templateSnippet: string;
+}
+
+interface ActionableConfigEntry {
+    readonly rule: string;
+    readonly codeId: string;
+    readonly snippet: string;
+    readonly action?: AgentActionType;
+    readonly autoSafe?: boolean;
+}
+
+const ACTIONABLE_SPECS_TABLE: readonly ActionableConfigEntry[] = [
+    { rule: RULE_PYM_PATH_001, codeId: '001', snippet: SNIPPET_PATH },
+    {
+        rule: RULE_PYM_RAISE_001,
+        codeId: '002',
+        snippet: SNIPPET_RAISE,
+        action: ACTION_APPLY_GUARD,
+    },
+    {
+        rule: RULE_PYM_DEFAULT_001,
+        codeId: '003',
+        snippet: SNIPPET_DEFAULT,
+        action: ACTION_APPLY_GUARD,
+    },
+    { rule: RULE_PYM_DATETIME_001, codeId: '004', snippet: SNIPPET_DATETIME, autoSafe: true },
+    { rule: RULE_PYM_UNION_001, codeId: '005', snippet: SNIPPET_UNION, autoSafe: true },
+    { rule: RULE_PYM_SLOTS_001, codeId: '006', snippet: SNIPPET_SLOTS },
+    {
+        rule: RULE_PYM_ASYNC_001,
+        codeId: '007',
+        snippet: SNIPPET_ASYNC,
+        action: ACTION_APPLY_GUARD,
+    },
+    {
+        rule: RULE_PYM_OPEN_001,
+        codeId: '008',
+        snippet: SNIPPET_OPEN,
+        action: ACTION_APPLY_GUARD,
+    },
+    {
+        rule: RULE_PYM_SHADOW_001,
+        codeId: '009',
+        snippet: SNIPPET_SHADOW,
+        action: ACTION_RENAME_SYMBOL,
+    },
+    { rule: RULE_PYM_FSTRING_001, codeId: '010', snippet: SNIPPET_FSTRING },
+    { rule: RULE_PYM_GENERIC_001, codeId: '011', snippet: SNIPPET_GENERIC, autoSafe: true },
+    { rule: RULE_PYM_ABC_001, codeId: '012', snippet: SNIPPET_ABC, autoSafe: true },
+    {
+        rule: RULE_PYM_IMPORT_001,
+        codeId: '013',
+        snippet: SNIPPET_IMPORT,
+        action: ACTION_SIMPLIFY_CONTROL,
+    },
+];
+
+function buildActionableSpecMap(
+    entries: readonly ActionableConfigEntry[],
+): Record<string, ActionableSpec> {
+    const map: Record<string, ActionableSpec> = {};
+    for (let entryIndex = 0; entryIndex < entries.length; entryIndex++) {
+        const configEntry = entries[entryIndex];
+        map[configEntry.rule] = {
+            action: configEntry.action ?? ACTION_REPLACE_TOKEN,
+            code: `AR:PYM:${configEntry.codeId}`,
+            safeToAutomate: configEntry.autoSafe ?? false,
+            templateSnippet: configEntry.snippet,
+        };
+    }
+    return map;
+}
+
+const ACTIONABLE_SPECS: Readonly<Record<string, ActionableSpec>> = Object.freeze(
+    buildActionableSpecMap(ACTIONABLE_SPECS_TABLE),
+);
 
 /** One module-level import statement captured for the ordering rule (PYM-IMPORT-001). */
 interface ImportRecord {
-    line: number;
-    text: string;
-    section: number;
+    readonly line: number;
+    readonly text: string;
+    readonly section: number;
 }
 
 type BlockKind = typeof PYTHON_ASYNC_KEYWORD | 'def' | 'class' | 'except' | 'with' | 'other';
 
 interface Block {
-    indent: number;
-    kind: BlockKind;
+    readonly indent: number;
+    readonly kind: BlockKind;
 }
 
 /**
@@ -92,109 +320,47 @@ interface Block {
  * assigned inside them leak into the enclosing function / class / module scope.
  */
 interface VarScope {
-    indent: number;
-    kind: 'module' | 'function' | 'class';
-    names: Map<string, number>; // name -> 1-based line number of first declaration
+    readonly indent: number;
+    readonly kind: 'module' | 'function' | 'class';
+    readonly names: Map<string, number>; // name -> 1-based line number of first declaration
 }
 
 /** Options shape for the shadowing rule, resolved from `ctx.options.shadowing`. */
 interface ShadowingOptions {
-    enabled: boolean;
-    ignoreNames: Set<string>;
+    readonly enabled: boolean;
+    readonly ignoreNames: Set<string>;
 }
 
-const PYM_ACTIONABLE_MAP: Record<
-    string,
-    { action: AgentActionType; code: string; safeToAutomate: boolean; templateSnippet: string }
-> = {
-    'PYM-PATH-001': {
-        action: 'replace_token',
-        code: 'AR:PYM:001',
-        safeToAutomate: false,
-        templateSnippet: 'Path($1) / $2',
-    },
-    'PYM-RAISE-001': {
-        action: 'apply_guard_clause',
-        code: 'AR:PYM:002',
-        safeToAutomate: false,
-        templateSnippet: 'raise $1 from $2',
-    },
-    'PYM-DEFAULT-001': {
-        action: 'apply_guard_clause',
-        code: 'AR:PYM:003',
-        safeToAutomate: false,
-        templateSnippet: '$1: $2 = None',
-    },
-    'PYM-DATETIME-001': {
-        action: 'replace_token',
-        code: 'AR:PYM:004',
-        safeToAutomate: true,
-        templateSnippet: 'datetime.UTC',
-    },
-    'PYM-UNION-001': {
-        action: 'replace_token',
-        code: 'AR:PYM:005',
-        safeToAutomate: true,
-        templateSnippet: '$1 | None',
-    },
-    'PYM-SLOTS-001': {
-        action: 'replace_token',
-        code: 'AR:PYM:006',
-        safeToAutomate: false,
-        templateSnippet: '@dataclass(slots=True)',
-    },
-    'PYM-ASYNC-001': {
-        action: 'apply_guard_clause',
-        code: 'AR:PYM:007',
-        safeToAutomate: false,
-        templateSnippet: 'await asyncio.to_thread($1)',
-    },
-    'PYM-OPEN-001': {
-        action: 'apply_guard_clause',
-        code: 'AR:PYM:008',
-        safeToAutomate: false,
-        templateSnippet: 'with open($1) as $2:',
-    },
-    'PYM-SHADOW-001': {
-        action: 'rename_symbol',
-        code: 'AR:PYM:009',
-        safeToAutomate: false,
-        templateSnippet: '$1_renamed',
-    },
-    'PYM-FSTRING-001': {
-        action: 'replace_token',
-        code: 'AR:PYM:010',
-        safeToAutomate: false,
-        templateSnippet: 'f"{$1}"',
-    },
-    'PYM-GENERIC-001': {
-        action: 'replace_token',
-        code: 'AR:PYM:011',
-        safeToAutomate: true,
-        templateSnippet: '$1[$2]',
-    },
-    'PYM-ABC-001': {
-        action: 'replace_token',
-        code: 'AR:PYM:012',
-        safeToAutomate: true,
-        templateSnippet: 'from collections.abc import $1',
-    },
-    'PYM-IMPORT-001': {
-        action: 'simplify_control_flow',
-        code: 'AR:PYM:013',
-        safeToAutomate: false,
-        templateSnippet: 'import $1',
-    },
-};
-
 type PyEmitter = (
-    lineIdx: number,
-    rule: string,
-    message: string,
-    severity: typeof SEVERITY_WARNING | typeof SEVERITY_ERROR,
-    suggestion: string,
+    targetLineIndex: number,
+    spec: IssueSpec,
     detail: Record<string, unknown>,
 ) => void;
+
+interface PyLineScanContext {
+    readonly line: string;
+    readonly trimmed: string;
+    readonly lineIndex: number;
+    readonly emit: PyEmitter;
+}
+
+interface PyBlockContext {
+    readonly inExcept: boolean;
+    readonly inWith: boolean;
+    readonly inAsync: boolean;
+}
+
+interface PyShadowContext {
+    readonly indent: number;
+    readonly varScopes: VarScope[];
+    readonly opts: ShadowingOptions;
+    readonly emit: PyEmitter;
+}
+
+interface PyImportAccumulator {
+    readonly file: string;
+    readonly records: ImportRecord[];
+}
 
 /**
  * Python modernization analyzer.
@@ -207,13 +373,6 @@ export class PythonModernAnalyzer implements Analyzer {
     name = 'python-modern' as const;
 
     /**
-     * Scan one Python file for modernization findings.
-     *
-     * @param _sf - Unused TypeScript source file (kept for the analyzer contract).
-     * @param ctx - Analyzer context carrying the file content and path.
-     * @returns All findings for the file.
-     */
-    /**
      * Streaming-path entry point: the engine invokes this once per file. A content-only analyzer
      * must expose it, because the legacy `analyze` path is TypeScript-only (the engine
      * materializes a `ts.SourceFile` solely for TS-family adapters).
@@ -225,6 +384,13 @@ export class PythonModernAnalyzer implements Analyzer {
         return this.analyze(undefined, ctx);
     }
 
+    /**
+     * Scan one Python file for modernization findings.
+     *
+     * @param _sf - Unused TypeScript source file (kept for the analyzer contract).
+     * @param ctx - Analyzer context carrying the file content and path.
+     * @returns All findings for the file.
+     */
     analyze(_sf: unknown, ctx: AnalyzerContext): Issue[] {
         const content = ctx.content || '';
         const file = ctx.filePath.replace(/\\/g, '/');
@@ -237,12 +403,13 @@ export class PythonModernAnalyzer implements Analyzer {
 
         // Shadowing: initialize with a module-level scope (indent -1 so it is never popped).
         const varScopes: VarScope[] = [
-            { indent: -1, kind: 'module', names: new Map<string, number>() },
+            { indent: -1, kind: SCOPE_KIND_MODULE, names: new Map<string, number>() },
         ];
         const shadowOpts = this.resolveShadowingOptions(ctx.options);
+        const importAcc: PyImportAccumulator = { file, records: importRecords };
 
-        for (let i = 0; i < lines.length; i++) {
-            let line = lines[i];
+        for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+            let line = lines[lineIndex];
             if (line.endsWith('\r')) line = line.slice(0, -1);
             const trimmed = line.trim();
             if (trimmed === '' || trimmed.startsWith('#')) continue;
@@ -250,19 +417,28 @@ export class PythonModernAnalyzer implements Analyzer {
             const indent = line.length - line.trimStart().length;
             this.popScopesForIndent(indent, blocks, varScopes);
 
-            const inAsync = this.hasKind(blocks, PYTHON_ASYNC_KEYWORD);
-            const inExcept = this.hasKind(blocks, 'except');
-            const inWith = this.hasKind(blocks, 'with');
+            const scanCtx: PyLineScanContext = { line, trimmed, lineIndex, emit };
+            const blockCtx: PyBlockContext = {
+                inExcept: this.hasKind(blocks, BLOCK_KIND_EXCEPT),
+                inWith: this.hasKind(blocks, BLOCK_KIND_WITH),
+                inAsync: this.hasKind(blocks, PYTHON_ASYNC_KEYWORD),
+            };
+            const shadowCtx: PyShadowContext = {
+                indent,
+                varScopes,
+                opts: shadowOpts,
+                emit,
+            };
 
-            this.auditModernSyntax(line, trimmed, i, emit);
-            this.auditModernTyping(line, trimmed, i, emit);
-            this.auditControlFlow(line, trimmed, i, lines, inExcept, inWith, inAsync, emit);
-            this.auditDataclassSlots(trimmed, i, lines, emit);
-            this.recordModuleImports(trimmed, indent, blocks, file, i, importRecords);
-            this.auditVariableShadowing(line, trimmed, i, indent, varScopes, shadowOpts, emit);
+            this.auditModernSyntax(scanCtx);
+            this.auditModernTyping(scanCtx);
+            this.auditControlFlow(scanCtx, lines, blockCtx);
+            this.auditDataclassSlots(scanCtx, lines);
+            this.recordModuleImports(scanCtx, indent, blocks, importAcc);
+            this.auditVariableShadowing(scanCtx, shadowCtx);
 
             if (BLOCK_OPEN_RE.test(trimmed)) {
-                blocks.push({ indent, kind: this.kindOf(trimmed) });
+                blocks.push({ indent, kind: this.resolveBlockKind(trimmed) });
             }
         }
 
@@ -281,98 +457,78 @@ export class PythonModernAnalyzer implements Analyzer {
 
     private createIssueEmitter(file: string, issues: Issue[]): PyEmitter {
         return (
-            lineIdx: number,
-            rule: string,
-            message: string,
-            severity: typeof SEVERITY_WARNING | typeof SEVERITY_ERROR,
-            suggestion: string,
+            targetLineIndex: number,
+            spec: IssueSpec,
             detail: Record<string, unknown>,
         ): void => {
-            const mapped = PYM_ACTIONABLE_MAP[rule];
-            const actionable = mapped
-                ? {
-                      action: mapped.action,
-                      code: mapped.code,
-                      safeToAutomate: mapped.safeToAutomate,
-                      templateSnippet: mapped.templateSnippet,
-                  }
-                : undefined;
-
-            issues.push({
-                id: `python-modern:${rule}:${file}:${lineIdx + 1}`,
+            const mappedAction = ACTIONABLE_SPECS[spec.rule];
+            const lineNumber = targetLineIndex + 1;
+            const issuePayload: Issue = {
+                id: `python-modern:${spec.rule}:${file}:${lineNumber}`,
                 analyzer: this.name,
-                rule,
-                severity,
-                message,
+                rule: spec.rule,
+                severity: spec.severity,
+                message: spec.message,
                 location: {
                     file,
-                    start: { line: lineIdx + 1, column: 1 },
-                    end: { line: lineIdx + 1, column: 1 },
+                    start: { line: lineNumber, column: 1 },
+                    end: { line: lineNumber, column: 1 },
                 },
                 detail,
-                suggestion,
-                ...(actionable ? { actionable } : {}),
-            });
+                suggestion: spec.suggestion,
+            };
+
+            if (mappedAction) {
+                issuePayload.actionable = {
+                    action: mappedAction.action ?? ACTION_REPLACE_TOKEN,
+                    code: mappedAction.code,
+                    safeToAutomate: mappedAction.safeToAutomate ?? false,
+                    templateSnippet: mappedAction.templateSnippet,
+                };
+            }
+
+            issues.push(issuePayload);
         };
     }
 
-    private auditModernSyntax(line: string, trimmed: string, i: number, emit: PyEmitter): void {
-        if (line.includes('os.path.')) {
-            emit(
-                i,
-                'PYM-PATH-001',
-                'os.path usage: prefer pathlib.Path for path manipulation.',
-                SEVERITY_WARNING,
-                'Build paths with pathlib.Path (`Path(...) / name`), which is OS-neutral and self-documenting.',
-                { line: trimmed },
-            );
+    private auditModernSyntax(scanCtx: PyLineScanContext): void {
+        const line = scanCtx.line;
+        const lineIndex = scanCtx.lineIndex;
+        const trimmed = scanCtx.trimmed;
+        const emit = scanCtx.emit;
+
+        if (line.includes(PREFIX_OS_PATH)) {
+            emit(lineIndex, SPEC_PATH, { line: trimmed });
         }
 
         if (PERCENT_FORMAT_RE.test(line)) {
-            emit(
-                i,
-                'PYM-FSTRING-001',
-                'Percent-formatting is legacy: f-strings are faster and harder to misalign.',
-                SEVERITY_WARNING,
-                'Rewrite as an f-string (`f"...{value}"`).',
-                { line: trimmed },
-            );
+            emit(lineIndex, SPEC_FSTRING, { line: trimmed });
         }
 
         if (/\btimezone\.utc\b/.test(line)) {
-            emit(
-                i,
-                'PYM-DATETIME-001',
-                'timezone.utc is superseded by the datetime.UTC singleton.',
-                SEVERITY_ERROR,
-                'Use `datetime.UTC` (PEP 615 / ruff UP017).',
-                { line: trimmed },
-            );
+            emit(lineIndex, SPEC_DATETIME, { line: trimmed });
         }
 
         if (PY_PEP604_ANN_ASSIGN_RE.test(line) || PY_PEP604_ALIAS_RE.test(line)) {
-            emit(
-                i,
-                'PYM-UNION-001',
-                'Optional/Union in an annotation or alias: PEP 604 unions read better.',
-                SEVERITY_ERROR,
-                'Write `X | None` / `X | Y` instead of Optional/Union.',
-                { line: trimmed },
-            );
+            emit(lineIndex, SPEC_UNION, { line: trimmed });
         }
     }
 
-    private auditModernTyping(line: string, trimmed: string, i: number, emit: PyEmitter): void {
+    private auditModernTyping(scanCtx: PyLineScanContext): void {
+        const line = scanCtx.line;
+        const lineIndex = scanCtx.lineIndex;
+        const trimmed = scanCtx.trimmed;
+        const emit = scanCtx.emit;
+
         if (PY_PEP585_RE.test(line)) {
             const hit = PY_PEP585_RE.exec(line)?.[1] ?? '';
-            emit(
-                i,
-                'PYM-GENERIC-001',
-                `typing.${hit}[...] is legacy: PEP 585 parameterizes the builtin instead.`,
-                SEVERITY_ERROR,
-                `Use \`${hit.toLowerCase()}[...]\` rather than typing.${hit}.`,
-                { line: trimmed, name: hit },
-            );
+            const spec: IssueSpec = {
+                rule: RULE_PYM_GENERIC_001,
+                severity: SEVERITY_ERROR,
+                message: `typing.${hit}[...] is legacy: PEP 585 parameterizes the builtin instead.`,
+                suggestion: `Use \`${hit.toLowerCase()}[...]\` rather than typing.${hit}.`,
+            };
+            emit(lineIndex, spec, { line: trimmed, name: hit });
         }
 
         const abcImport = ABC_IMPORT_RE.exec(trimmed);
@@ -388,175 +544,121 @@ export class PythonModernAnalyzer implements Analyzer {
                 )
                 .filter((name) => PY_ABC_TYPING_NAMES.has(name));
             if (offenders.length > 0) {
-                emit(
-                    i,
-                    'PYM-ABC-001',
-                    `Abstract type(s) ${offenders.join(', ')} belong to collections.abc, not typing.`,
-                    SEVERITY_ERROR,
-                    'Import these names from collections.abc (the typing aliases are deprecated).',
-                    { names: offenders },
-                );
+                const spec: IssueSpec = {
+                    rule: RULE_PYM_ABC_001,
+                    severity: SEVERITY_ERROR,
+                    message: `Abstract type(s) ${offenders.join(', ')} belong to collections.abc, not typing.`,
+                    suggestion:
+                        'Import these names from collections.abc (the typing aliases are deprecated).',
+                };
+                emit(lineIndex, spec, { names: offenders });
             }
         }
     }
 
     private auditRaiseFrom(
         codeOnly: string,
-        trimmed: string,
-        i: number,
-        lines: string[],
-        emit: PyEmitter,
+        scanCtx: PyLineScanContext,
+        lines: readonly string[],
     ): void {
         if (!RAISE_RE.test(codeOnly)) return;
         const hasCauseAhead =
             RAISE_FROM_RE.test(codeOnly) ||
-            this.followingLinesContain(i, lines, /\bfrom\b/, RAISE_CAUSE_LOOKAHEAD_LINES);
-        if (!hasCauseAhead) {
-            emit(
-                i,
-                'PYM-RAISE-001',
-                '`raise` inside an except block without `from` drops the original exception chain.',
-                SEVERITY_WARNING,
-                'Re-raise with `raise NewError(...) from exc` (or a bare `raise` to propagate unchanged).',
-                { line: trimmed },
+            this.checkFollowingLinesContain(
+                scanCtx.lineIndex,
+                lines,
+                /\bfrom\b/,
+                RAISE_CAUSE_LOOKAHEAD_LINES,
             );
+        if (!hasCauseAhead) {
+            scanCtx.emit(scanCtx.lineIndex, SPEC_RAISE, { line: scanCtx.trimmed });
         }
     }
 
-    private auditMutableDefaults(line: string, trimmed: string, i: number, emit: PyEmitter): void {
+    private auditMutableDefaults(scanCtx: PyLineScanContext): void {
+        const line = scanCtx.line;
         const isDef = ASYNC_DEF_RE.test(line) || DEF_RE.test(line) || CLASS_RE.test(line);
         if (!isDef) return;
         const parenIdx = line.indexOf('(');
         if (parenIdx === -1) return;
         const signature = line.slice(parenIdx + 1);
         if (signature !== '' && MUTABLE_DEFAULT_RE.test(signature)) {
-            emit(
-                i,
-                'PYM-DEFAULT-001',
-                'Mutable default argument detected: the default is created once and shared by every call.',
-                SEVERITY_WARNING,
-                'Use a `None` sentinel and build the list/dict/set inside the body.',
-                { line: trimmed },
-            );
+            scanCtx.emit(scanCtx.lineIndex, SPEC_DEFAULT, { line: scanCtx.trimmed });
         }
     }
 
-    private auditUnmanagedOpen(
-        line: string,
-        trimmed: string,
-        i: number,
-        inWith: boolean,
-        emit: PyEmitter,
-    ): void {
-        if (!inWith && /\bopen\s*\(/.test(line) && !WITH_RE.test(line)) {
-            emit(
-                i,
-                'PYM-OPEN-001',
-                '`open()` without a `with` block leaks the file handle on error paths.',
-                SEVERITY_WARNING,
-                'Wrap the call in `with open(...) as handle:` so the handle closes deterministically.',
-                { line: trimmed },
-            );
+    private auditUnmanagedOpen(scanCtx: PyLineScanContext, inWith: boolean): void {
+        if (!inWith && /\bopen\s*\(/.test(scanCtx.line) && !WITH_RE.test(scanCtx.line)) {
+            scanCtx.emit(scanCtx.lineIndex, SPEC_OPEN, { line: scanCtx.trimmed });
         }
     }
 
     private auditControlFlow(
-        line: string,
-        trimmed: string,
-        i: number,
-        lines: string[],
-        inExcept: boolean,
-        inWith: boolean,
-        inAsync: boolean,
-        emit: PyEmitter,
+        scanCtx: PyLineScanContext,
+        lines: readonly string[],
+        blockCtx: PyBlockContext,
     ): void {
-        const codeOnly = trimmed.split('#')[0].trim();
-        if (inExcept) {
-            this.auditRaiseFrom(codeOnly, trimmed, i, lines, emit);
+        const codeOnly = scanCtx.trimmed.split('#')[0].trim();
+        if (blockCtx.inExcept) {
+            this.auditRaiseFrom(codeOnly, scanCtx, lines);
         }
-        this.auditMutableDefaults(line, trimmed, i, emit);
+        this.auditMutableDefaults(scanCtx);
 
-        if (inAsync && !ASYNC_DEF_RE.test(line)) {
-            this.auditAsyncCalls(line, trimmed, i, emit);
+        if (blockCtx.inAsync && !ASYNC_DEF_RE.test(scanCtx.line)) {
+            this.auditAsyncCalls(scanCtx);
         }
 
-        this.auditUnmanagedOpen(line, trimmed, i, inWith, emit);
+        this.auditUnmanagedOpen(scanCtx, blockCtx.inWith);
     }
 
-    private auditAsyncCalls(line: string, trimmed: string, i: number, emit: PyEmitter): void {
+    private auditAsyncCalls(scanCtx: PyLineScanContext): void {
+        const line = scanCtx.line;
+        const lineIndex = scanCtx.lineIndex;
+        const trimmed = scanCtx.trimmed;
+        const emit = scanCtx.emit;
+
         if (BLOCKING_CALL_RE.test(line)) {
-            emit(
-                i,
-                'PYM-ASYNC-001',
-                'Blocking call inside an async function blocks the event loop.',
-                SEVERITY_ERROR,
-                'Use the async equivalent (asyncio.sleep, httpx, async repository) or run the blocking call in a thread.',
-                { line: trimmed },
-            );
+            emit(lineIndex, SPEC_ASYNC_BLOCKING, { line: trimmed });
         } else if (!AWAITED_ORM_CALL_RE.test(line) && SYNC_ORM_CALL_RE.test(line)) {
-            emit(
-                i,
-                'PYM-ASYNC-001',
-                'Synchronous ORM call inside an async function is not awaited.',
-                SEVERITY_ERROR,
-                'Await the async session (`await session.execute(...)`) or use the async repository API.',
-                { line: trimmed },
-            );
+            emit(lineIndex, SPEC_ASYNC_ORM, { line: trimmed });
         }
     }
 
-    private auditDataclassSlots(
-        trimmed: string,
-        i: number,
-        lines: string[],
-        emit: PyEmitter,
-    ): void {
-        if (!PY_DATACLASS_RE.test(trimmed)) return;
-        let j = i + 1;
-        while (j < lines.length && (lines[j].trim().startsWith('@') || lines[j].trim() === '')) {
-            j++;
+    private auditDataclassSlots(scanCtx: PyLineScanContext, lines: readonly string[]): void {
+        if (!PY_DATACLASS_RE.test(scanCtx.trimmed)) return;
+        let probeLineIndex = scanCtx.lineIndex + 1;
+        while (
+            probeLineIndex < lines.length &&
+            (lines[probeLineIndex].trim().startsWith('@') || lines[probeLineIndex].trim() === '')
+        ) {
+            probeLineIndex++;
         }
-        const next = j < lines.length ? lines[j].trim() : '';
-        if (/^class\s+[A-Za-z_]\w*\s*:/.test(next) && !/\bslots\s*=/.test(trimmed)) {
-            emit(
-                i,
-                'PYM-SLOTS-001',
-                'Dataclass without slots=True: instances carry a __dict__ and typos create silent attributes.',
-                SEVERITY_WARNING,
-                'Add `slots=True` (or an explicit `slots=False` when __dict__ is genuinely required).',
-                { line: trimmed },
-            );
+        const next = probeLineIndex < lines.length ? lines[probeLineIndex].trim() : '';
+        if (/^class\s+[A-Za-z_]\w*\s*:/.test(next) && !/\bslots\s*=/.test(scanCtx.trimmed)) {
+            scanCtx.emit(scanCtx.lineIndex, SPEC_SLOTS, { line: scanCtx.trimmed });
         }
     }
 
     private recordModuleImports(
-        trimmed: string,
+        scanCtx: PyLineScanContext,
         indent: number,
-        blocks: Block[],
-        file: string,
-        i: number,
-        importRecords: ImportRecord[],
+        blocks: readonly Block[],
+        acc: PyImportAccumulator,
     ): void {
         const moduleLevel =
             indent === 0 &&
-            !this.hasKind(blocks, 'def') &&
+            !this.hasKind(blocks, BLOCK_KIND_DEF) &&
             !this.hasKind(blocks, PYTHON_ASYNC_KEYWORD) &&
-            !this.hasKind(blocks, 'class');
-        if (moduleLevel && /^(?:import|from)\s+/.test(trimmed)) {
-            importRecords.push({
-                line: i + 1,
-                text: trimmed,
-                section: this.importSection(trimmed, file),
+            !this.hasKind(blocks, BLOCK_KIND_CLASS);
+        if (moduleLevel && /^(?:import|from)\s+/.test(scanCtx.trimmed)) {
+            acc.records.push({
+                line: scanCtx.lineIndex + 1,
+                text: scanCtx.trimmed,
+                section: this.classifyImportSection(scanCtx.trimmed, acc.file),
             });
         }
     }
 
-    /**
-     * Classify the block introduced by a line that ends with a colon.
-     *
-     * @param trimmed - Line content with surrounding whitespace removed.
-     * @returns The block kind consumed by the context checks.
-     */
     /**
      * Classify one module-level import statement into the PEP 8 three-section model.
      *
@@ -564,15 +666,19 @@ export class PythonModernAnalyzer implements Analyzer {
      * @param file - Normalized file path (its first segment counts as a local root).
      * @returns 0 for stdlib, 1 for third-party, 2 for first-party/local.
      */
-    private importSection(text: string, file: string): number {
+    private classifyImportSection(text: string, file: string): number {
         const fromMatch = /^from\s+([A-Za-z_][\w.]*)\s+import\b/.exec(text);
         const importMatch = /^import\s+([A-Za-z_][\w.]*)/.exec(text);
         const module = fromMatch?.[1] ?? importMatch?.[1] ?? '';
-        if (module === '' || module.startsWith('.')) return 2;
+        if (module === '' || module.startsWith('.')) {
+            return SECTION_LOCAL_INDEX;
+        }
         const root = module.split('.')[0];
-        if (PY_STDLIB_NAMES.has(root)) return 0;
-        if (PY_LOCAL_ROOTS.has(root) || root === file.split('/')[0]) return 2;
-        return 1;
+        if (PY_STDLIB_NAMES.has(root)) {
+            return SECTION_STDLIB_INDEX;
+        }
+        const isLocalRoot = PY_LOCAL_ROOTS.has(root) || root === file.split('/')[0];
+        return isLocalRoot ? SECTION_LOCAL_INDEX : SECTION_THIRD_PARTY_INDEX;
     }
 
     /**
@@ -581,64 +687,51 @@ export class PythonModernAnalyzer implements Analyzer {
      * @param records - Module-level imports in source order.
      * @param emit - Issue factory shared with the line scanner.
      */
-    private checkImportOrder(
-        records: ImportRecord[],
-        emit: (
-            lineIdx: number,
-            rule: string,
-            message: string,
-            severity: typeof SEVERITY_WARNING | typeof SEVERITY_ERROR,
-            suggestion: string,
-            detail: Record<string, unknown>,
-        ) => void,
-    ): void {
+    private checkImportOrder(records: readonly ImportRecord[], emit: PyEmitter): void {
         if (records.length === 0) return;
         let seenSection = 0;
         for (const record of records) {
             if (record.section < seenSection) {
-                emit(
-                    record.line - 1,
-                    'PYM-IMPORT-001',
-                    `Import section order violated: a ${SECTION_LABELS[record.section]} import follows a ${SECTION_LABELS[seenSection]} import.`,
-                    SEVERITY_WARNING,
-                    'Group imports as stdlib → third-party → local (PEP 8), separated by blank lines.',
-                    { line: record.text, section: record.section },
-                );
+                const spec: IssueSpec = {
+                    rule: RULE_PYM_IMPORT_001,
+                    severity: SEVERITY_WARNING,
+                    message: `Import section order violated: a ${SECTION_LABELS[record.section]} import follows a ${SECTION_LABELS[seenSection]} import.`,
+                    suggestion: SPEC_IMPORT_ORDER.suggestion,
+                };
+                emit(record.line - 1, spec, {
+                    line: record.text,
+                    section: record.section,
+                });
                 break;
             }
             seenSection = Math.max(seenSection, record.section);
         }
         const sections: ImportRecord[][] = [[], [], []];
         for (const record of records) sections[record.section].push(record);
-        for (let index = 0; index < sections.length; index++) {
-            this.checkSectionAlphabetical(sections[index], index, emit);
+        for (let sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
+            this.checkSectionAlphabetical(sections[sectionIndex], sectionIndex, emit);
         }
     }
 
     private checkSectionAlphabetical(
-        group: ImportRecord[],
-        index: number,
-        emit: (
-            lineIdx: number,
-            rule: string,
-            message: string,
-            severity: typeof SEVERITY_WARNING | typeof SEVERITY_ERROR,
-            suggestion: string,
-            detail: Record<string, unknown>,
-        ) => void,
+        group: readonly ImportRecord[],
+        sectionIndex: number,
+        emit: PyEmitter,
     ): void {
-        const texts = group.map((r) => r.text);
+        const texts = group.map((record) => record.text);
         const ordered = [...texts].sort();
-        for (let pos = 0; pos < texts.length; pos++) {
-            if (texts[pos] !== ordered[pos]) {
-                emit(
-                    group[pos].line - 1,
-                    'PYM-IMPORT-001',
-                    `${SECTION_LABELS[index]} imports are not alphabetically ordered (expected \`${ordered[pos]}\` at this position).`,
-                    SEVERITY_WARNING,
-                    'Sort each import section alphabetically by whole line.',
-                    { line: texts[pos], expected: ordered[pos] },
-                );
+        for (let recordPos = 0; recordPos < texts.length; recordPos++) {
+            if (texts[recordPos] !== ordered[recordPos]) {
+                const spec: IssueSpec = {
+                    rule: RULE_PYM_IMPORT_001,
+                    severity: SEVERITY_WARNING,
+                    message: `${SECTION_LABELS[sectionIndex]} imports are not alphabetically ordered (expected \`${ordered[recordPos]}\` at this position).`,
+                    suggestion: 'Sort each import section alphabetically by whole line.',
+                };
+                emit(group[recordPos].line - 1, spec, {
+                    line: texts[recordPos],
+                    expected: ordered[recordPos],
+                });
                 break;
             }
         }
@@ -656,15 +749,15 @@ export class PythonModernAnalyzer implements Analyzer {
      * @param lookahead - Maximum number of following lines to inspect.
      * @returns True when the pattern appears within the window.
      */
-    private followingLinesContain(
+    private checkFollowingLinesContain(
         index: number,
-        lines: string[],
+        lines: readonly string[],
         pattern: RegExp,
         lookahead: number,
     ): boolean {
         const end = Math.min(index + lookahead + 1, lines.length);
-        for (let i = index + 1; i < end; i++) {
-            if (pattern.test(lines[i])) return true;
+        for (let scanLineIndex = index + 1; scanLineIndex < end; scanLineIndex++) {
+            if (pattern.test(lines[scanLineIndex])) return true;
         }
         return false;
     }
@@ -696,67 +789,55 @@ export class PythonModernAnalyzer implements Analyzer {
      * Control-flow blocks (if/for/while/with/try) do NOT create new scopes — matching
      * Python's actual LEGB rule.
      *
-     * @param line - Raw current line (with leading whitespace).
-     * @param trimmed - Current line with surrounding whitespace removed.
-     * @param lineIdx - Zero-based line index.
-     * @param indent - Indentation width of the current line.
-     * @param varScopes - Variable scope stack (mutated in place).
-     * @param opts - Shadowing rule options (enabled flag, ignore-names set).
-     * @param emit - Issue factory shared with the rest of the analyzer.
+     * @param scanCtx - Current line scan context.
+     * @param shadowCtx - Active lexical scoping and shadowing context.
      */
-    private auditVariableShadowing(
-        line: string,
-        trimmed: string,
-        lineIdx: number,
-        indent: number,
-        varScopes: VarScope[],
-        opts: ShadowingOptions,
-        emit: PyEmitter,
-    ): void {
-        if (!opts.enabled) return;
+    private auditVariableShadowing(scanCtx: PyLineScanContext, shadowCtx: PyShadowContext): void {
+        if (!shadowCtx.opts.enabled) return;
 
-        const codeOnly = trimmed.split('#')[0].trim();
-        const currentScope = varScopes[varScopes.length - 1];
-        const line1 = lineIdx + 1;
+        const codeOnly = scanCtx.trimmed.split('#')[0].trim();
+        const targetLine = scanCtx.lineIndex + 1;
 
-        if (
-            this.auditDefAndClassShadowing(line, line1, indent, currentScope, varScopes, opts, emit)
-        ) {
+        if (this.auditDefAndClassShadowing(scanCtx.line, targetLine, shadowCtx)) {
             return;
         }
-        if (this.auditImportShadowing(line, codeOnly, line1, currentScope, varScopes, opts, emit)) {
+        if (this.auditImportShadowing(scanCtx.line, codeOnly, targetLine, shadowCtx)) {
             return;
         }
-        if (this.auditContextBindingShadowing(line, line1, currentScope, varScopes, opts, emit)) {
+        if (this.auditContextBindingShadowing(scanCtx.line, targetLine, shadowCtx)) {
             return;
         }
-        this.auditAssignShadowing(line, line1, currentScope, varScopes, opts, emit);
+        this.auditAssignShadowing(scanCtx.line, targetLine, shadowCtx);
+    }
+
+    private getTopScope(shadowCtx: PyShadowContext): VarScope {
+        return shadowCtx.varScopes[shadowCtx.varScopes.length - 1];
     }
 
     private auditDefAndClassShadowing(
         line: string,
-        line1: number,
-        indent: number,
-        currentScope: VarScope,
-        varScopes: VarScope[],
-        opts: ShadowingOptions,
-        emit: PyEmitter,
+        targetLine: number,
+        shadowCtx: PyShadowContext,
     ): boolean {
+        const enclosingScope = this.getTopScope(shadowCtx);
         const defMatch = DEF_PARAMS_RE.exec(line);
         if (defMatch) {
             const funcName = defMatch[1];
             const paramsStr = defMatch[2];
-            this.registerBinding(funcName, line1, currentScope, varScopes, opts, emit);
+            this.registerBinding(funcName, targetLine, enclosingScope, shadowCtx);
             const isAsync = ASYNC_DEF_RE.test(line);
-            const newKind: 'function' | 'class' =
-                isAsync || DEF_RE.test(line) ? 'function' : 'class';
-            const newScope: VarScope = { indent, kind: newKind, names: new Map() };
-            varScopes.push(newScope);
+            const newKind = isAsync || DEF_RE.test(line) ? SCOPE_KIND_FUNCTION : SCOPE_KIND_CLASS;
+            const newScope: VarScope = {
+                indent: shadowCtx.indent,
+                kind: newKind,
+                names: new Map(),
+            };
+            shadowCtx.varScopes.push(newScope);
 
-            if (newKind === 'function') {
+            if (newKind === SCOPE_KIND_FUNCTION) {
                 const paramNames = this.extractParamNames(paramsStr);
-                for (const pName of paramNames) {
-                    this.registerBinding(pName, line1, newScope, varScopes, opts, emit);
+                for (const paramName of paramNames) {
+                    this.registerBinding(paramName, targetLine, newScope, shadowCtx);
                 }
             }
             return true;
@@ -765,10 +846,14 @@ export class PythonModernAnalyzer implements Analyzer {
         if (CLASS_RE.test(line)) {
             const clsMatch = /^\s*class\s+([A-Za-z_]\w*)/.exec(line);
             if (clsMatch) {
-                this.registerBinding(clsMatch[1], line1, currentScope, varScopes, opts, emit);
+                this.registerBinding(clsMatch[1], targetLine, enclosingScope, shadowCtx);
             }
-            const newScope: VarScope = { indent, kind: 'class', names: new Map() };
-            varScopes.push(newScope);
+            const newScope: VarScope = {
+                indent: shadowCtx.indent,
+                kind: SCOPE_KIND_CLASS,
+                names: new Map(),
+            };
+            shadowCtx.varScopes.push(newScope);
             return true;
         }
 
@@ -778,17 +863,15 @@ export class PythonModernAnalyzer implements Analyzer {
     private auditImportShadowing(
         line: string,
         codeOnly: string,
-        line1: number,
-        currentScope: VarScope,
-        varScopes: VarScope[],
-        opts: ShadowingOptions,
-        emit: PyEmitter,
+        targetLine: number,
+        shadowCtx: PyShadowContext,
     ): boolean {
         if (!/^(?:import|from)\s+/.test(codeOnly)) return false;
+        const moduleScope = this.getTopScope(shadowCtx);
 
         const simpleImp = IMPORT_SIMPLE_RE.exec(line);
         if (simpleImp) {
-            this.registerBinding(simpleImp[1], line1, currentScope, varScopes, opts, emit);
+            this.registerBinding(simpleImp[1], targetLine, moduleScope, shadowCtx);
         }
         const fromImp = IMPORT_FROM_RE.exec(codeOnly);
         if (fromImp) {
@@ -802,7 +885,7 @@ export class PythonModernAnalyzer implements Analyzer {
                 const asMatch = /^(.+?)\s+as\s+([A-Za-z_]\w*)$/.exec(clean);
                 const name = asMatch ? asMatch[2] : clean.split(/\s+/)[0];
                 if (/^[A-Za-z_]\w*$/.test(name)) {
-                    this.registerBinding(name, line1, currentScope, varScopes, opts, emit);
+                    this.registerBinding(name, targetLine, moduleScope, shadowCtx);
                 }
             }
         }
@@ -811,27 +894,25 @@ export class PythonModernAnalyzer implements Analyzer {
 
     private auditContextBindingShadowing(
         line: string,
-        line1: number,
-        currentScope: VarScope,
-        varScopes: VarScope[],
-        opts: ShadowingOptions,
-        emit: PyEmitter,
+        targetLine: number,
+        shadowCtx: PyShadowContext,
     ): boolean {
+        const activeScope = this.getTopScope(shadowCtx);
         const forMatch = FOR_VAR_RE.exec(line);
         if (forMatch) {
-            this.registerBinding(forMatch[1], line1, currentScope, varScopes, opts, emit);
+            this.registerBinding(forMatch[1], targetLine, activeScope, shadowCtx);
             return true;
         }
 
         const withMatch = WITH_AS_RE.exec(line);
         if (withMatch) {
-            this.registerBinding(withMatch[1], line1, currentScope, varScopes, opts, emit);
+            this.registerBinding(withMatch[1], targetLine, activeScope, shadowCtx);
             return true;
         }
 
         const exceptMatch = EXCEPT_AS_RE.exec(line);
         if (exceptMatch) {
-            this.registerBinding(exceptMatch[1], line1, currentScope, varScopes, opts, emit);
+            this.registerBinding(exceptMatch[1], targetLine, activeScope, shadowCtx);
             return true;
         }
 
@@ -840,17 +921,15 @@ export class PythonModernAnalyzer implements Analyzer {
 
     private auditAssignShadowing(
         line: string,
-        line1: number,
-        currentScope: VarScope,
-        varScopes: VarScope[],
-        opts: ShadowingOptions,
-        emit: PyEmitter,
+        targetLine: number,
+        shadowCtx: PyShadowContext,
     ): void {
         const assignMatch = ASSIGN_RE.exec(line);
         if (assignMatch) {
             const afterEq = line.slice(assignMatch[0].length);
             if (afterEq.startsWith('=')) return;
-            this.registerBinding(assignMatch[1], line1, currentScope, varScopes, opts, emit);
+            const targetScope = this.getTopScope(shadowCtx);
+            this.registerBinding(assignMatch[1], targetLine, targetScope, shadowCtx);
         }
     }
 
@@ -859,29 +938,26 @@ export class PythonModernAnalyzer implements Analyzer {
      * already exists in any enclosing scope.
      *
      * @param name - The variable/parameter/function name to register.
-     * @param line1 - 1-based line number of the declaration.
-     * @param currentScope - The scope the name belongs to (varScopes top).
-     * @param varScopes - Full scope stack (used for outer-scope lookup).
-     * @param opts - Shadowing options (ignore-names set).
-     * @param emit - Issue factory.
+     * @param targetLine - 1-based line number of the declaration.
+     * @param targetScope - The scope the name belongs to.
+     * @param shadowCtx - Full shadowing options and scope stack.
      */
     private registerBinding(
         name: string,
-        line1: number,
-        currentScope: VarScope,
-        varScopes: VarScope[],
-        opts: ShadowingOptions,
-        emit: PyEmitter,
+        targetLine: number,
+        targetScope: VarScope,
+        shadowCtx: PyShadowContext,
     ): void {
-        if (opts.ignoreNames.has(name)) return;
+        if (shadowCtx.opts.ignoreNames.has(name)) return;
 
         // If the name already exists in the SAME scope, this is a reassignment, not shadowing.
-        if (currentScope.names.has(name)) return;
+        if (targetScope.names.has(name)) return;
 
         // Walk outer scopes (skip the current one) looking for a prior declaration.
         let outerLine = -1;
-        for (let i = varScopes.length - 2; i >= 0; i--) {
-            const found = varScopes[i].names.get(name);
+        const scopes = shadowCtx.varScopes;
+        for (let scopeIndex = scopes.length - 2; scopeIndex >= 0; scopeIndex--) {
+            const found = scopes[scopeIndex].names.get(name);
             if (found !== undefined) {
                 outerLine = found;
                 break;
@@ -889,24 +965,28 @@ export class PythonModernAnalyzer implements Analyzer {
         }
 
         if (outerLine > 0) {
-            emit(
-                line1 - 1,
-                'PYM-SHADOW-001',
-                `Variable \`${name}\` may shadow an outer-scope declaration (line ${outerLine}).`,
-                SEVERITY_WARNING,
-                'Rename the variable or use a different name to avoid shadowing the outer binding.',
-                { name, outerLine, scope: currentScope.kind },
-            );
+            const spec: IssueSpec = {
+                rule: RULE_PYM_SHADOW_001,
+                severity: SEVERITY_WARNING,
+                message: `Variable \`${name}\` may shadow an outer-scope declaration (line ${outerLine}).`,
+                suggestion:
+                    'Rename the variable or use a different name to avoid shadowing the outer binding.',
+            };
+            shadowCtx.emit(targetLine - 1, spec, {
+                name,
+                outerLine,
+                scope: targetScope.kind,
+            });
         }
 
-        currentScope.names.set(name, line1);
+        targetScope.names.set(name, targetLine);
     }
 
     /**
      * Parse a Python function parameter string and return the parameter names.
      *
      * Handles simple names, defaults (`x=1`), type annotations (`x: int`), *args, **kwargs,
-     * and `/` / `*` positional-only / keyword-only markers.  Multi-line signatures are not
+     * and `/` / `*` positional-only / keyword-only markers. Multi-line signatures are not
      * supported — this is a heuristic, line-level parser.
      *
      * @param paramsStr - The raw text inside the parentheses of a `def` line.
@@ -916,7 +996,7 @@ export class PythonModernAnalyzer implements Analyzer {
         const parts = this.splitParamParts(paramsStr);
         const names: string[] = [];
         for (const part of parts) {
-            const name = this.cleanParamName(part);
+            const name = this.sanitizeParamName(part);
             if (name) {
                 names.push(name);
             }
@@ -942,7 +1022,7 @@ export class PythonModernAnalyzer implements Analyzer {
         return parts;
     }
 
-    private cleanParamName(part: string): string | null {
+    private sanitizeParamName(part: string): string | null {
         const trimmed = part.trim();
         if (trimmed === '' || trimmed === '/' || trimmed === '*') return null;
         let cleaned = trimmed.replace(/^\*{1,2}/, '').trim();
@@ -957,13 +1037,12 @@ export class PythonModernAnalyzer implements Analyzer {
         return /^[A-Za-z_]\w*$/.test(cleaned) ? cleaned : null;
     }
 
-    private kindOf(trimmed: string): BlockKind {
+    private resolveBlockKind(trimmed: string): BlockKind {
         if (ASYNC_DEF_RE.test(trimmed)) return PYTHON_ASYNC_KEYWORD;
-        if (DEF_RE.test(trimmed)) return 'def';
-        if (CLASS_RE.test(trimmed)) return 'class';
-        if (EXCEPT_RE.test(trimmed)) return 'except';
-        if (WITH_RE.test(trimmed)) return 'with';
-        return 'other';
+        if (DEF_RE.test(trimmed)) return BLOCK_KIND_DEF;
+        if (CLASS_RE.test(trimmed)) return BLOCK_KIND_CLASS;
+        if (EXCEPT_RE.test(trimmed)) return BLOCK_KIND_EXCEPT;
+        return WITH_RE.test(trimmed) ? BLOCK_KIND_WITH : BLOCK_KIND_OTHER;
     }
 
     /**
@@ -973,7 +1052,7 @@ export class PythonModernAnalyzer implements Analyzer {
      * @param kind - Block kind to look for.
      * @returns True when the kind is present in the stack.
      */
-    private hasKind(blocks: Block[], kind: BlockKind): boolean {
-        return blocks.some((b) => b.kind === kind);
+    private hasKind(blocks: readonly Block[], kind: BlockKind): boolean {
+        return blocks.some((block) => block.kind === kind);
     }
 }

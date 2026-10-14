@@ -352,7 +352,11 @@ export class SimplifyAnalyzer implements Analyzer {
             }
         } else if (ts.isConstructorDeclaration(node)) {
             name = 'constructor';
-        } else if (ts.isVariableDeclaration(node.parent) && ts.isIdentifier(node.parent.name)) {
+        } else if (
+            node.parent &&
+            ts.isVariableDeclaration(node.parent) &&
+            ts.isIdentifier(node.parent.name)
+        ) {
             name = node.parent.name.text;
         }
 
