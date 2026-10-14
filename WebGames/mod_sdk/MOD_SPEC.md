@@ -164,7 +164,25 @@ DAG 终结节点或剧情关键节点仅允许发布下列合法状态突变事�
 - **内置初始套件 (`builtin_starter_kits`)**: `KIT_ELF_DEFAULT, KIT_HUMAN_DEFAULT`
 - **内置序章图元 (`builtin_dag_ids`)**: `DAG_PROLOGUE_ELF_SANCTUARY, DAG_PROLOGUE_HUMAN_CAPITAL`
 - **合法物品 ID 清单 (`canonical_item_ids`)**: `KALAR:CONSUM:ALCHEMY:POTION_MANA, KALAR:CONSUM:FOOD:HEARTY_STEW, KALAR:EQUIP:ARMOR:IRON_CHEST, KALAR:EQUIP:ARMOR:RUNIC_SHIELD, KALAR:EQUIP:WEAPON_BLADE:ELVEN_BOW, KALAR:EQUIP:WEAPON_BLADE:IRON_SWORD, KALAR:EQUIP:WEAPON_BLADE:MITHRIL_LONGSWORD, KALAR:MATERIAL:DISPOSAL:MANA_DUST, KALAR:MATERIAL:DISPOSAL:SLAG_ASH, KALAR:MATERIAL:ORE:MITHRIL_ORE, KALAR:QUEST:ARTIFACT:RELIC_FRAGMENT`
-- **静态门禁错误码 (`supported_error_codes`)**: `ERR_MOD_DIR_NOT_FOUND, ERR_FILE_MISSING, ERR_JSON_INVALID, ERR_MANIFEST_NOT_OBJECT, ERR_MANIFEST_FIELD_MISSING, ERR_MANIFEST_FIELD_TYPE, ERR_ROUTING_EMPTY, ERR_ROUTING_TARGET_MISSING, ERR_ROUTING_TARGET_UNKNOWN, ERR_ROUTING_TARGET_NOT_FOUND, ERR_DAG_DIR_MISSING, ERR_DAG_NO_FILES, ERR_DAG_NO_NODES, ERR_DAG_ENTRY_COUNT, ERR_DAG_TERMINAL_COUNT, ERR_DAG_DANGLING_EDGE, ERR_DAG_MISSING_PREREQUISITE, ERR_DAG_CYCLE, ERR_DAG_ORPHAN_NODE, ERR_DAG_UNREACHABLE_TERMINAL, ERR_DAG_NODE_TEXT_MISSING, ERR_I18N_DIR_MISSING, ERR_I18N_EMPTY, ERR_I18N_MISSING_KEY, ERR_UNKNOWN_PLACEHOLDER, ERR_DESTINY_NOT_OBJECT, ERR_DESTINY_INVALID_UI_MODE, ERR_DESTINY_STAT_BUDGET_EXCEEDED, ERR_DESTINY_GOLD_CAP_EXCEEDED, ERR_DESTINY_CAUSALITY_IMBALANCE, ERR_DESTINY_KIT_INVALID, ERR_DESTINY_UNKNOWN_DAG_REF, ERR_DESTINY_UNKNOWN_KIT_REF, ERR_MOD_DUPLICATE_ID_CONFLICT, ERR_MOD_INCOMPATIBLE_CONFLICT, ERR_MOD_UI_POLICY_CONFLICT`
+- **静态门禁错误码 (`supported_error_codes`)**: `ERR_MOD_DIR_NOT_FOUND, ERR_FILE_MISSING, ERR_JSON_INVALID, ERR_MANIFEST_NOT_OBJECT, ERR_MANIFEST_FIELD_MISSING, ERR_MANIFEST_FIELD_TYPE, ERR_ROUTING_EMPTY, ERR_ROUTING_TARGET_MISSING, ERR_ROUTING_TARGET_UNKNOWN, ERR_ROUTING_TARGET_NOT_FOUND, ERR_DAG_DIR_MISSING, ERR_DAG_NO_FILES, ERR_DAG_NO_NODES, ERR_DAG_ENTRY_COUNT, ERR_DAG_TERMINAL_COUNT, ERR_DAG_DANGLING_EDGE, ERR_DAG_MISSING_PREREQUISITE, ERR_DAG_CYCLE, ERR_DAG_ORPHAN_NODE, ERR_DAG_UNREACHABLE_TERMINAL, ERR_DAG_NODE_TEXT_MISSING, ERR_I18N_DIR_MISSING, ERR_I18N_EMPTY, ERR_I18N_MISSING_KEY, ERR_UNKNOWN_PLACEHOLDER, ERR_DESTINY_NOT_OBJECT, ERR_DESTINY_INVALID_UI_MODE, ERR_DESTINY_STAT_BUDGET_EXCEEDED, ERR_DESTINY_GOLD_CAP_EXCEEDED, ERR_DESTINY_CAUSALITY_IMBALANCE, ERR_DESTINY_KIT_INVALID, ERR_DESTINY_UNKNOWN_DAG_REF, ERR_DESTINY_UNKNOWN_KIT_REF, ERR_MOD_DUPLICATE_ID_CONFLICT, ERR_MOD_INCOMPATIBLE_CONFLICT, ERR_MOD_UI_POLICY_CONFLICT, ERR_PREEMPTED_BY_HUMAN, ERR_INVALID_ESC_ACTION, ERR_GATEWAY_NOT_BOUND, ERR_SAVE_GUARD_BLOCKED, ERR_INVALID_ENVELOPE`
+
+### 7. 主页 HUD 面向 Agent 动态行动空间与遥测流能力契约 (Home HUD Telemetry)
+
+- **遥测协议版本 (`protocol_version`)**: `1.0.0`
+- **遥测业务域 (`domain_name`)**: `HOME_HUD`
+- **定长轨迹与流控队列 (`ring_buffer_capacity` / `async_queue_capacity`)**: 定长环形缓冲 `32` 槽位，异步队列容量 `128`，背压流控策略 `DROP_OLDEST`
+- **受支持动态行动空间指令集 (`supported_directives`)**: `ALLOCATE_POTENTIAL_STAT, CLAIM_QUEST_OBJECTIVE, DISMISS_UI_NOTICE, INSPECT_INVENTORY_SLOT, MARK_MAIL_READ, REST_AND_ADVANCE_TIME, TOGGLE_MODE_ADAPTATION`
+- **人类控制权优先租约 (`control_lease`)**: 人类抢占窗口 `3000ms`，模态独占抢占 `True`，控制模式 `[READ_WRITE, READ_ONLY_OBSERVER]`，操作者状态 `[IDLE, ACTIVE, EXCLUSIVE_MODAL_OPEN]`
+- **紧凑二进制流编解码 (`binary_telemetry_codec`)**: 魔数标识 `0x4B414C52` (KALR)，协议版本 `1`，目标压缩体积预算 `<=256` 字节
+
+### 8. 全域统一请求响应信封与 ESC 协议契约 (Unified Protocol Envelope)
+
+- **统一协议版本 (`protocol_version`)**: `1.0.0`
+- **受支持参与者身份 (`supported_actors`)**: `HUMAN_UI, AGENT`
+- **人类独占抢占租约窗口 (`human_preemption_lease_ms`)**: `3000ms`（模态打开自动抢占: `True`）
+- **协议路由业务域 (`supported_domains`)**: `HOME_HUD, ESC_MENU, PROLOGUE, CHARACTER_CREATION`
+- **受支持系统菜单指令 (`esc_menu_actions`)**: `RESUME_GAME, OPEN_SETTINGS, SAVE_AND_QUIT_TO_ARCHIVE, FORCE_QUIT_TO_ARCHIVE, SAVE_AND_QUIT_TO_GATEWAY, SAVE_AND_QUIT_DESKTOP`
+- **信封强类型 Schema 版本 (`envelope_schema_versions`)**: 请求信封 `kalar.mod_sdk.client_request_envelope.v1`，响应信封 `kalar.mod_sdk.unified_response_envelope.v1`，ESC 载荷 `kalar.mod_sdk.esc_menu_action_payload.v1`
 <!-- AUTOGEN_CAPABILITIES_END -->
 
 ---
@@ -369,7 +387,8 @@ MOD 可通过根目录下的 `destinies.json` 以**列表式结构**扩展创角
 | **静态诊断** | `python mod_sdk/tools/kalar_mod.py check <mod_dir> [--json]` | 纯静态检测格式、DAG连通性与多包冲突 |
 | **资产烹饪** | `python mod_sdk/tools/kalar_mod.py cook <mod_dir> [--check]` | 校验格式与体积配额并生成 SHA-256 清单 |
 | **剧情演习** | `python mod_sdk/tools/kalar_mod.py preview <mod_dir> [--simulate]` | 打印 DAG 拓扑概览并模拟剧情推进水化 |
-| **无头试玩** | `python mod_sdk/tools/kalar_mod.py play <mod_dir> [--interactive]` | 执行批量验收推演或 Agent STDIO 交互 |
+| **无头试玩** | `python mod_sdk/tools/kalar_mod.py play <mod_dir> [--interactive] [--with-hud]` | 执行批量验收推演、Agent STDIO 交互或主页 HUD 贯通 |
+| **协议派发** | `python mod_sdk/tools/kalar_mod.py dispatch <mod_dir> [--action <type>] [--json]` | 离线派发统一协议请求并执行强类型信封校验 |
 | **打包归档** | `python mod_sdk/tools/kalar_mod.py pack <mod_dir> [--out-dir <dir>]` | 前置门禁校验并压缩为生产分发包 |
 
 ---

@@ -227,6 +227,7 @@ def play_mod_suite(
     seed: str,
     choices_param: str | None,
     choice_strategy: str,
+    with_hud: bool = False,
 ) -> tuple[dict[str, Any], bool]:
     """执行完整的预检、面板解算、路由装配与批处理推演闭环（100% 向后兼容）。"""
     bundle, fail_transcript = prepare_session(
@@ -253,7 +254,7 @@ def play_mod_suite(
     )
 
     is_success = reached_term and bundle["is_valid"]
-    transcript = {
+    transcript: dict[str, Any] = {
         "schema_version": SCHEMA_VERSION,
         "is_success": is_success,
         "precheck_report": bundle["precheck_report"],
@@ -263,6 +264,23 @@ def play_mod_suite(
         "transcript_steps": steps,
         "final_state": final_state,
     }
+    if with_hud:
+        char_sheet = bundle.get("char_sheet") or {}
+        transcript["initial_hud_snapshot"] = {
+            "hp": char_sheet.get("hp", 100.0),
+            "hp_max": char_sheet.get("max_hp", 100.0),
+            "mp": char_sheet.get("mp", 50.0),
+            "mp_max": char_sheet.get("max_mp", 50.0),
+            "ap": 10.0,
+            "ap_max": 10.0,
+            "gold": char_sheet.get("initial_gold", 0),
+            "potential_stat_points": 0,
+            "current_location": bundle.get("context", {}).get("start_location", "CENTRAL_CONTINENT"),
+            "active_mode": "single_player",
+            "active_modals": [],
+            "unread_mail_count": 0,
+            "tracked_quest": "QUEST_PROLOGUE_WAKE",
+        }
     return transcript, is_success
 
 
@@ -330,6 +348,7 @@ def main() -> None:
         help="启动长程交互式单步推演会话 (Agent stdio 流式推演)",
     )
     parser.add_argument("--simulate", action="store_true", dest="simulate", help="启动推演模式（保留与 preview_mod 的参数对称性）")
+    parser.add_argument("--with-hud", action="store_true", dest="with_hud", help="在推演战报中附带初始主页 HUD 快照切片")
 
     args = parser.parse_args()
     paths = [Path(p).resolve() for p in args.mod_dirs]
@@ -370,6 +389,7 @@ def main() -> None:
             seed=args.seed,
             choices_param=args.choices,
             choice_strategy=args.choice_strategy,
+            with_hud=args.with_hud,
         )
         if args.as_json:
             print(json.dumps(transcript, ensure_ascii=False, indent=2))

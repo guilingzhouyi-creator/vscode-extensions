@@ -4,7 +4,7 @@
 # 文件路径: WebGames/mod_sdk/tools/kalar_mod.py
 # 架构定位: MOD开发工具链统一入口门面 (Unified Mod CLI Interface)
 # 依赖与触发: 触发方: CLI / 用户 / CI / 自动化管道 | 上游: scaffold_mod / check_mod / cook_assets / preview_mod / play_mod | 下游: 终端交互 / 校验报告 / 模组包 | 运行时: Python 3.10+
-# 职责说明: 聚合 init、check、cook、preview、play、pack 六大核心子命令，提供一致的开发者交互界面与工件打包
+# 职责说明: 聚合 init、check、cook、preview、play、pack、dispatch 七大核心子命令，提供一致的开发者交互界面与工件打包
 # 退出语义与设计依据: 退出码: 0=操作成功, 1=业务校验失败, 2=参数错误/IO异常 | 设计依据: 《卡拉尔数据契约规范 v1.0》与第一性原理
 # ------------------------------------------------------------------------------
 # 用法示例:
@@ -13,7 +13,8 @@
 #   python mod_sdk/tools/kalar_mod.py check ./my_mod
 #   python mod_sdk/tools/kalar_mod.py cook ./my_mod --check
 #   python mod_sdk/tools/kalar_mod.py preview ./my_mod --simulate
-#   python mod_sdk/tools/kalar_mod.py play ./my_mod
+#   python mod_sdk/tools/kalar_mod.py play ./my_mod --with-hud
+#   python mod_sdk/tools/kalar_mod.py dispatch --action ESC_QUERY_READINESS
 #   python mod_sdk/tools/kalar_mod.py pack ./my_mod
 # ==============================================================================
 """卡拉尔世界引擎 MOD 统一开发套件 CLI 门面。"""
@@ -232,12 +233,53 @@ def _handle_play(args: argparse.Namespace) -> int:
         seed=args.seed,
         choices_param=args.choices,
         choice_strategy=args.choice_strategy,
+        with_hud=getattr(args, "with_hud", False),
     )
     if args.as_json:
         print(json.dumps(transcript, ensure_ascii=False, indent=2))
     else:
         print_transcript_text(transcript)
     return 0 if is_success else 1
+
+
+def _handle_dispatch(args: argparse.Namespace) -> int:
+    """分发 dispatch 子命令：离线派发统一协议请求并执行强类型信封校验。"""
+    from kalar_protocol_client import KalarProtocolClient
+    try:
+        payload_dict = json.loads(args.payload) if args.payload else {}
+    except Exception as exc:
+        err_msg = f"无法解析 payload JSON: {exc}"
+        if args.as_json:
+            print(json.dumps({"is_success": False, "error": err_msg}, ensure_ascii=False))
+        else:
+            print(f"{Style.RED}❌ 错误: {err_msg}{Style.RESET}", file=sys.stderr)
+        return 2
+
+    client = KalarProtocolClient()
+    req = client.build_request(
+        actor_type=args.actor,
+        domain=args.domain,
+        action_type=args.action,
+        payload=payload_dict,
+    )
+    resp = client.send(req)
+
+    if args.as_json:
+        print(json.dumps(resp, ensure_ascii=False, indent=2))
+    else:
+        if resp.get("is_success"):
+            print(f"{Style.GREEN}✔ 协议派发成功{Style.RESET} [ReqID={resp.get('request_id')}]")
+            print(f"  • 响应动作   : {resp.get('payload', {}).get('action', args.action)}")
+            print(f"  • 服务端时间 : {resp.get('server_timestamp_ms')}ms")
+            print(f"  • 载荷摘要   : {json.dumps(resp.get('payload', {}), ensure_ascii=False)}")
+        else:
+            print(f"{Style.RED}❌ 协议派发受阻{Style.RESET} [ReqID={resp.get('request_id')}]")
+            print(f"  • 错误代码   : {resp.get('error_code', 'UNKNOWN')}")
+            print(f"  • 提示信息   : {resp.get('message', 'None')}")
+            if resp.get("payload"):
+                print(f"  • 详细信息   : {json.dumps(resp.get('payload', {}), ensure_ascii=False)}")
+
+    return 0 if resp.get("is_success") else 1
 
 
 # ==============================================================================
@@ -490,6 +532,7 @@ def _build_parser() -> argparse.ArgumentParser:
         help="启动长程交互式单步推演会话 (Agent stdio 流式推演)",
     )
     p_play.add_argument("--simulate", action="store_true", dest="simulate", help="启动推演模式（兼容参数）")
+    p_play.add_argument("--with-hud", action="store_true", dest="with_hud", help="在推演战报中附带初始主页 HUD 快照切片")
 
     # 6. pack
     p_pack = subparsers.add_parser("pack", help="验证并打包 MOD 为 .zip 分发包")
@@ -502,6 +545,14 @@ def _build_parser() -> argparse.ArgumentParser:
         help="跳过打包前的静态自愈诊断与资产审计门禁",
     )
     p_pack.add_argument("--json", action="store_true", dest="as_json", help="输出机器可读的结构化 JSON 打包结果")
+
+    # 7. dispatch
+    p_disp = subparsers.add_parser("dispatch", help="离线派发全域统一协议请求并执行双轨信封校验")
+    p_disp.add_argument("--actor", choices=["HUMAN_UI", "AGENT"], default="HUMAN_UI", help="操作发起方主体类型 (默认: HUMAN_UI)")
+    p_disp.add_argument("--domain", default="ESC_MENU", help="目标业务领域名称 (默认: ESC_MENU)")
+    p_disp.add_argument("--action", default="ESC_QUERY_READINESS", help="具体指令动作类型 (默认: ESC_QUERY_READINESS)")
+    p_disp.add_argument("--payload", default="{}", help="业务载荷 JSON 字符串 (默认: {})")
+    p_disp.add_argument("--json", action="store_true", dest="as_json", help="输出机器可读的结构化响应 JSON 信封")
 
     return parser
 
@@ -527,6 +578,7 @@ def main() -> None:
         "preview": _handle_preview,
         "play": _handle_play,
         "pack": _handle_pack,
+        "dispatch": _handle_dispatch,
     }
 
     handler = handlers.get(args.subcommand)

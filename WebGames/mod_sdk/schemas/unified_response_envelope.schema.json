@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "kalar.mod_sdk.unified_response_envelope.v1",
+  "title": "UnifiedResponseEnvelope",
+  "description": "卡拉尔世界引擎全域统一服务端响应信封契约 (kalar.mod_sdk.unified_response_envelope.v1)",
+  "type": "object",
+  "properties": {
+    "request_id": {
+      "type": "string",
+      "description": "响应所对应的原始客户端请求 ID"
+    },
+    "is_success": {
+      "type": "boolean",
+      "description": "指令执行是否成功标志"
+    },
+    "payload": {
+      "type": "object",
+      "description": "领域服务返回的业务响应载荷字典",
+      "additionalProperties": true
+    },
+    "error_code": {
+      "type": "string",
+      "description": "错误码标识符（执行成功时为空串）"
+    },
+    "message": {
+      "type": "string",
+      "description": "人类可读提示文本或错误详情信息"
+    },
+    "server_timestamp_ms": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "服务端执行完毕并封包时的物理毫秒时间戳"
+    }
+  },
+  "required": [
+    "request_id",
+    "is_success",
+    "payload",
+    "server_timestamp_ms"
+  ],
+  "additionalProperties": false
+}
+

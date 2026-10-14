@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 实体、物品与世界状态集群 (Entity & World State))
 # 文件路径: res://backend/domains/world_state/dto/paged_result_dto.gd
 # 架构定位: Value Object DTO / Data Transport Model
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/world_state.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/world_state.json | 信号: EventBus 领域广播
 # 职责说明: 分页查询响应结果传输对象，携带切片数据与翻页元数据。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## PagedResultDTO：Value Object DTO / Data Transport Model
 class_name PagedResultDTO
 extends RefCounted
 
@@ -19,6 +20,7 @@ var has_prev: bool = false
 var next_cursor: String = ""
 var items: Array = []
 
+## 序列化当前对象为通用字典传输结构
 func to_dto() -> Dictionary:
 	return {
 		"page_index": page_index,
@@ -31,6 +33,7 @@ func to_dto() -> Dictionary:
 		"items": items.duplicate()
 	}
 
+## 从输入字典反序列化还原传输对象
 static func from_dto(data: Dictionary) -> PagedResultDTO:
 	var dto := PagedResultDTO.new()
 	dto.page_index = maxi(0, int(data.get("page_index", 0)))

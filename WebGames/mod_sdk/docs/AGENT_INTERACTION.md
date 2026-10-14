@@ -213,3 +213,141 @@ Agent 经由 `stdin` 下发的决策包，支持三种核心指令：
 - **`status` 必须为 `"COMPLETED"`**：验证剧情图无悬空死胡同；
 - **`unresolved_placeholders_count` 必须为 `0`**：验证文本中没有任何遗漏插值的未决花括号占位符；
 - **`reached_terminal_cleanly` 必须为 `true`**：验证因果突变结算链条完整发布。
+
+---
+
+## 六、 主页 HUD 结构化遥测交互与动态行动空间协议 (Home HUD Telemetry & Action Space)
+
+从引擎 Phase 118~120 演进起，外部评测 Agent 与自主推演模型不仅支持序章 DAG 推进，更全面接入**主页 HUD 去表现化结构化切片流与专属逻辑输入通道**。
+
+### 1. 交互流转时序与双轨通信架构
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Agent as 外部决策 Agent / LLM
+    participant Channel as AgentActionChannel (专属输入通道)
+    participant Engine as 主页 HUD 运行时内核 (AuthoritativeHudSyncService)
+    participant Bus as CompanionObserverBus (伴侣观察总线)
+
+    Engine->>Engine: 聚合主页 HUD 权威快照并求解因果差分
+    Engine->>Bus: 广播 agent_hud_packet_streamed 事件
+    Engine-->>Agent: 下发标准原子遥测包 (kalar.mod_sdk.hud_telemetry.v1)
+
+    alt 人类前台正在交互 (is_writable=false)
+        Agent->>Agent: 识别 control_lease.agent_control_mode="READ_ONLY_OBSERVER"
+        Agent->>Agent: 挂起动作发射，保持纯观测态 (零硬件争抢)
+    else 处于空闲决策窗口 (is_writable=true)
+        Agent->>Channel: 发射动作指令 (kalar.mod_sdk.agent_action.v1)
+        Channel->>Channel: 校验 sequence_index 与前置条件
+        Channel->>Engine: 零硬件输入争抢，直投领域用例执行
+        Engine->>Engine: 结算业务逻辑与状态突变
+        Engine-->>Agent: 下发下一帧递增 sequence_index 的遥测包
+    end
+```
+
+### 2. 标准原子遥测数据包结构 (`kalar.mod_sdk.hud_telemetry.v1`)
+
+主页 HUD 遥测包由信封元数据、控制权租约、纯净上下文观测、单步因果差分流及动态行动空间五大板块组成，详见 `mod_sdk/schemas/agent_hud_telemetry_packet.schema.json`：
+
+```json
+{
+  "envelope": {
+    "protocol_version": "1.0.0",
+    "packet_id": "pkt_1791806400120_1",
+    "sequence_index": 1,
+    "timestamp_ms": 1791806400120,
+    "domain": "HOME_HUD",
+    "is_terminal": false,
+    "control_lease": {
+      "human_interaction_state": "IDLE",
+      "agent_control_mode": "READ_WRITE",
+      "active_operator": "IDLE",
+      "is_writable": true,
+      "preempted_by_human": false
+    }
+  },
+  "observation": {
+    "character_identity": { "character_id": "char_001", "character_name": "瓦兰之剑" },
+    "physiology_status": { "hp_current": 100.0, "hp_max": 100.0, "ap_current": 10.0, "ap_max": 10.0 },
+    "wallet_asset": { "wallet_gold": 500, "unallocated_potential_points": 2 },
+    "calendar_environment": { "calendar_days": 1, "day_phase_key": "DAY" },
+    "feature_access": { "game_mode": 0, "show_matchmaking": false },
+    "active_quests": [],
+    "ui_notices": []
+  },
+  "causal_deltas": [
+    {
+      "delta_type": "STAT_MUTATION",
+      "field_key": "wallet_gold",
+      "previous_value": 450,
+      "current_value": 500,
+      "numeric_delta": 50.0,
+      "cause_event": "QUEST_REWARD",
+      "initiator": "SYSTEM_TICK_SIMULATION"
+    }
+  ],
+  "action_space": [
+    {
+      "directive_id": "ALLOCATE_POTENTIAL_STAT",
+      "domain": "ASSET",
+      "description": "分配未分配潜能点至基础属性",
+      "cost_payload": { "potential_points": 1 },
+      "preconditions": { "unallocated_points_min": 1 },
+      "allowed_parameters": { "stat_target": ["STR", "AGI", "INT", "STA"] },
+      "is_executable": true,
+      "blocked_reason": ""
+    }
+  ]
+}
+```
+
+### 3. 专属逻辑动作通道指令包 (`kalar.mod_sdk.agent_action.v1`)
+
+Agent 经由专属逻辑动作通道（`AgentActionChannel`）提交上行决策，彻底杜绝与人类键鼠发生硬件争抢。详见 `mod_sdk/schemas/agent_action_packet.schema.json`：
+
+```json
+{
+  "session_id": "sess_8f3a9e21",
+  "sequence_index": 1,
+  "directive_id": "ALLOCATE_POTENTIAL_STAT",
+  "params": {
+    "stat_target": "STR",
+    "points": 1
+  },
+  "origin_packet_id": "pkt_1791806400120_1",
+  "agent_signature": "model_gemini_pro",
+  "client_timestamp_ms": 1791806400125
+}
+```
+
+#### 7 大动态行动空间指令规格表：
+
+| 指令 ID (`directive_id`) | 所属域 | 核心语义 | 代价载荷 (`cost_payload`) | 前置条件 (`preconditions`) | 参数值域 (`params`) |
+| :--- | :---: | :--- | :--- | :--- | :--- |
+| `ALLOCATE_POTENTIAL_STAT` | `ASSET` | 分配未分配潜能点至基础属性 | `{"potential_points": 1}` | `unallocated_points_min >= 1` | `stat_target`: `STR/AGI/INT/STA` |
+| `REST_AND_ADVANCE_TIME` | `RETENTION` | 在安全宿屋休息推进时相并恢复体能 | `{"ap": 2.0}` | `ap_min >= 2.0` | 无 |
+| `CLAIM_QUEST_OBJECTIVE` | `ACTION` | 交付当前达标的任务目标并领取报酬 | 无 | `quest_completable == true` | 无 |
+| `INSPECT_INVENTORY_SLOT` | `ASSET` | 查验背包轻量道具槽位与耐久 | 无 | 无 | 可选 `slot_index` |
+| `TOGGLE_MODE_ADAPTATION` | `META` | 探测并调整单机/联机自适应特性 | 无 | 无 | 可选 `target_mode` |
+| `MARK_MAIL_READ` | `RETENTION` | 读取未读信件并收取附件奖励 | 无 | `unread_mail_min >= 1` | 可选 `mail_id` |
+| `DISMISS_UI_NOTICE` | `META` | 确认并关闭前台去表现化弹窗通知 | 无 | 无 | 可选 `notice_id` |
+
+### 4. 人类操作独占租约与只读退化机制
+
+1. **抢占时限窗口**：人类前台操作触发时，引擎激活优先抢占租约（`human_preemption_lease_ms = 2000`）；
+2. **只读模式自动降级**：
+   - 遥测包信封中的 `control_lease.is_writable` 置为 `false`；
+   - `control_lease.agent_control_mode` 切换为 `"READ_ONLY_OBSERVER"`；
+   - 动态行动空间中所有指令的 `is_executable` 被置为 `false`，`blocked_reason` 标记为 `"ERR_PREEMPTED_BY_HUMAN"`；
+3. **安全上行守卫**：若 Agent 在只读窗口强行提交动作包，`AgentActionChannel` 立即拦截并返回阻断状态，杜绝打断玩家交互。
+
+### 5. 定长环形轨迹记忆与紧凑二进制流
+
+1. **时序轨迹反思窗口**：
+   - 引擎内置 `AgentTrajectoryRingBuffer`（默认容量 32 槽位），支持 $O(1)$ 常数时间滚动覆盖；
+   - 提供 `get_trajectory_window(k)` 接口，允许 Agent 提取最近 $k$ 步历史切片，支持多步因果反思与长程归因；
+2. **紧凑二进制编解码 (`BinaryTelemetryCodec`)**：
+   - 针对高频通信场景，支持通过 Godot 原生 `PackedByteArray` 序列化；
+   - 包含 `0x4B414C52` (`KALR`) 魔数校验与单字节紧凑字段映射，单包体积压缩至 ~85 字节（压缩率达 95.7%）。
+

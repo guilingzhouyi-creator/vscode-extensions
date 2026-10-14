@@ -1,0 +1,154 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "kalar.mod_sdk.hud_telemetry.v1",
+  "title": "AgentHudTelemetryPacket",
+  "description": "卡拉尔世界引擎主页 HUD 标准原子遥测数据包外壳契约 (kalar.mod_sdk.hud_telemetry.v1)",
+  "type": "object",
+  "properties": {
+    "envelope": {
+      "type": "object",
+      "description": "信封元数据与控制权租约状态",
+      "properties": {
+        "protocol_version": {
+          "type": "string",
+          "const": "1.0.0",
+          "description": "协议规范版本"
+        },
+        "packet_id": {
+          "type": "string",
+          "description": "当前遥测包全局唯一 ID"
+        },
+        "sequence_index": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "递增时序序列号"
+        },
+        "timestamp_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "数据包产出物理时间戳 (毫秒)"
+        },
+        "domain": {
+          "type": "string",
+          "const": "HOME_HUD",
+          "description": "所属业务领域名"
+        },
+        "is_terminal": {
+          "type": "boolean",
+          "description": "是否为会话终结包"
+        },
+        "control_lease": {
+          "type": "object",
+          "description": "操作权租约与人类交互抢占状态",
+          "properties": {
+            "human_interaction_state": {
+              "type": "string",
+              "enum": ["IDLE", "ACTIVE", "EXCLUSIVE_MODAL_OPEN"],
+              "description": "前台人类交互活跃状态"
+            },
+            "agent_control_mode": {
+              "type": "string",
+              "enum": ["READ_WRITE", "READ_ONLY_OBSERVER"],
+              "description": "智能体当前控制模式"
+            },
+            "active_operator": {
+              "type": "string",
+              "enum": ["IDLE", "HUMAN_PLAYER", "AGENT", "SYSTEM"],
+              "description": "当前操作发起者"
+            },
+            "is_writable": {
+              "type": "boolean",
+              "description": "当前帧是否允许智能体上行提交动作"
+            },
+            "preempted_by_human": {
+              "type": "boolean",
+              "description": "是否被人类前台操作锁定抢占"
+            }
+          },
+          "required": [
+            "human_interaction_state",
+            "agent_control_mode",
+            "active_operator",
+            "is_writable",
+            "preempted_by_human"
+          ]
+        }
+      },
+      "required": [
+        "protocol_version",
+        "packet_id",
+        "sequence_index",
+        "timestamp_ms",
+        "domain",
+        "is_terminal",
+        "control_lease"
+      ]
+    },
+    "observation": {
+      "type": "object",
+      "description": "主页 HUD 去表现化纯净状态上下文切片",
+      "properties": {
+        "character_identity": { "type": "object" },
+        "physiology_status": { "type": "object" },
+        "wallet_asset": { "type": "object" },
+        "calendar_environment": { "type": "object" },
+        "feature_access": { "type": "object" },
+        "active_quests": { "type": "array" },
+        "ui_notices": { "type": "array" }
+      }
+    },
+    "causal_deltas": {
+      "type": "array",
+      "description": "当前步骤结算触发的因果差分流",
+      "items": {
+        "type": "object",
+        "properties": {
+          "delta_type": { "type": "string" },
+          "field_key": { "type": "string" },
+          "previous_value": {},
+          "current_value": {},
+          "numeric_delta": { "type": "number" },
+          "cause_event": { "type": "string" },
+          "initiator": { "type": "string" }
+        },
+        "required": ["delta_type", "field_key", "initiator"]
+      }
+    },
+    "action_space": {
+      "type": "array",
+      "description": "动态行动空间受剪枝可用指令集",
+      "items": {
+        "type": "object",
+        "properties": {
+          "directive_id": {
+            "type": "string",
+            "enum": [
+              "ALLOCATE_POTENTIAL_STAT",
+              "REST_AND_ADVANCE_TIME",
+              "CLAIM_QUEST_OBJECTIVE",
+              "INSPECT_INVENTORY_SLOT",
+              "TOGGLE_MODE_ADAPTATION",
+              "MARK_MAIL_READ",
+              "DISMISS_UI_NOTICE"
+            ]
+          },
+          "domain": { "type": "string" },
+          "description": { "type": "string" },
+          "cost_payload": { "type": "object" },
+          "preconditions": { "type": "object" },
+          "allowed_parameters": { "type": "object" },
+          "is_executable": { "type": "boolean" },
+          "blocked_reason": { "type": "string" }
+        },
+        "required": ["directive_id", "domain", "is_executable"]
+      }
+    }
+  },
+  "required": [
+    "envelope",
+    "observation",
+    "causal_deltas",
+    "action_space"
+  ]
+}
+

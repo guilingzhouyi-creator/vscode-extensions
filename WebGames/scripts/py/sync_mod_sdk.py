@@ -56,9 +56,18 @@ def resolve_webgames_root() -> Path:
     """定位 WebGames 项目根目录。"""
     curr = Path(__file__).resolve()
     for candidate in [curr] + list(curr.parents):
-        if (candidate / "config" / "domains" / "character_creation" / "core.json").is_file():
+        if (
+            candidate / "config" / "domains" / "character_creation" / "core.json"
+        ).is_file():
             return candidate
-        if (candidate / "WebGames" / "config" / "domains" / "character_creation" / "core.json").is_file():
+        if (
+            candidate
+            / "WebGames"
+            / "config"
+            / "domains"
+            / "character_creation"
+            / "core.json"
+        ).is_file():
             return candidate / "WebGames"
     return Path(__file__).resolve().parents[2]
 
@@ -145,6 +154,11 @@ SUPPORTED_ERROR_CODES: List[str] = [
     "ERR_MOD_DUPLICATE_ID_CONFLICT",
     "ERR_MOD_INCOMPATIBLE_CONFLICT",
     "ERR_MOD_UI_POLICY_CONFLICT",
+    "ERR_PREEMPTED_BY_HUMAN",
+    "ERR_INVALID_ESC_ACTION",
+    "ERR_GATEWAY_NOT_BOUND",
+    "ERR_SAVE_GUARD_BLOCKED",
+    "ERR_INVALID_ENVELOPE",
 ]
 
 
@@ -197,9 +211,13 @@ def _build_dual_track_placeholder_list(upper_keys: List[str]) -> List[str]:
     return result
 
 
-def extract_destiny_capabilities(config_dir: Path, core_data: Dict[str, Any]) -> Dict[str, Any]:
+def extract_destiny_capabilities(
+    config_dir: Path, core_data: Dict[str, Any]
+) -> Dict[str, Any]:
     """从角色创建、初始行囊与物品真源提取命途扩展能力契约。"""
-    attr_gen = core_data.get("authoritative_reincarnation", {}).get("attribute_generation", {})
+    attr_gen = core_data.get("authoritative_reincarnation", {}).get(
+        "attribute_generation", {}
+    )
     attr_keys = attr_gen.get("keys")
     if not isinstance(attr_keys, list) or not attr_keys:
         attr_keys = ["STR", "CON", "INT", "AGI", "SPR", "VIT"]
@@ -221,11 +239,15 @@ def extract_destiny_capabilities(config_dir: Path, core_data: Dict[str, Any]) ->
     items_path = config_dir / "items" / "core.json"
     items_data = load_json_file(items_path)
     raw_items = items_data.get("items", [])
-    canonical_item_ids = sorted([
-        item["canonical_id"]
-        for item in raw_items
-        if isinstance(item, dict) and isinstance(item.get("canonical_id"), str) and item.get("canonical_id")
-    ])
+    canonical_item_ids = sorted(
+        [
+            item["canonical_id"]
+            for item in raw_items
+            if isinstance(item, dict)
+            and isinstance(item.get("canonical_id"), str)
+            and item.get("canonical_id")
+        ]
+    )
 
     upper_placeholders = list(STANDARD_PLACEHOLDER_DOCS.keys())
     dual_placeholders = _build_dual_track_placeholder_list(upper_placeholders)
@@ -257,6 +279,102 @@ def extract_destiny_capabilities(config_dir: Path, core_data: Dict[str, Any]) ->
     }
 
 
+def extract_agent_hud_telemetry_capabilities(config_dir: Path) -> Dict[str, Any]:
+    """从 config/domains/world_state/core.json 静态萃取 Agent 遥测与动态动作通道能力。"""
+    ws_core_path = config_dir / "domains" / "world_state" / "core.json"
+    ws_data = load_json_file(ws_core_path)
+
+    stream_cfg = ws_data.get("agent_telemetry_stream", {})
+    channel_cfg = ws_data.get("agent_action_channel", {})
+
+    raw_directives = stream_cfg.get("supported_directives", [])
+    supported_directives = (
+        sorted(list(raw_directives))
+        if raw_directives
+        else [
+            "ALLOCATE_POTENTIAL_STAT",
+            "CLAIM_QUEST_OBJECTIVE",
+            "DISMISS_UI_NOTICE",
+            "INSPECT_INVENTORY_SLOT",
+            "MARK_MAIL_READ",
+            "REST_AND_ADVANCE_TIME",
+            "TOGGLE_MODE_ADAPTATION",
+        ]
+    )
+
+    return {
+        "protocol_version": str(stream_cfg.get("protocol_version", "1.0.0")),
+        "domain_name": str(stream_cfg.get("domain_name", "HOME_HUD")),
+        "ring_buffer_capacity": int(stream_cfg.get("ring_buffer_capacity", 32)),
+        "async_queue_capacity": int(stream_cfg.get("async_queue_capacity", 128)),
+        "backpressure_strategy": str(
+            stream_cfg.get("backpressure_strategy", "DROP_OLDEST")
+        ),
+        "binary_compression_enabled": bool(
+            stream_cfg.get("binary_compression_enabled", True)
+        ),
+        "supported_directives": supported_directives,
+        "control_lease": {
+            "human_preemption_lease_ms": int(
+                channel_cfg.get("human_preemption_lease_ms", 3000)
+            ),
+            "auto_preempt_on_modal_open": bool(
+                channel_cfg.get("auto_preempt_on_modal_open", True)
+            ),
+            "modes": [
+                "READ_WRITE",
+                "READ_ONLY_OBSERVER",
+            ],
+            "operator_states": [
+                "IDLE",
+                "ACTIVE",
+                "EXCLUSIVE_MODAL_OPEN",
+            ],
+        },
+        "binary_telemetry_codec": {
+            "magic_header": "0x4B414C52",
+            "protocol_version": 1,
+            "target_byte_budget": 256,
+        },
+    }
+
+
+def extract_unified_protocol_capabilities(config_dir: Path) -> Dict[str, Any]:
+    """从 config/domains/ 与引擎全局常数静态萃取全域统一协议契约。"""
+    ws_core_path = config_dir / "domains" / "world_state" / "core.json"
+    ws_data = load_json_file(ws_core_path)
+    channel_cfg = ws_data.get("agent_action_channel", {})
+
+    lease_ms = int(channel_cfg.get("human_preemption_lease_ms", 3000))
+    auto_preempt = bool(channel_cfg.get("auto_preempt_on_modal_open", True))
+
+    return {
+        "protocol_version": "1.0.0",
+        "supported_actors": ["HUMAN_UI", "AGENT"],
+        "human_preemption_lease_ms": lease_ms,
+        "auto_preempt_on_modal_open": auto_preempt,
+        "supported_domains": [
+            "HOME_HUD",
+            "ESC_MENU",
+            "PROLOGUE",
+            "CHARACTER_CREATION",
+        ],
+        "esc_menu_actions": [
+            "RESUME_GAME",
+            "OPEN_SETTINGS",
+            "SAVE_AND_QUIT_TO_ARCHIVE",
+            "FORCE_QUIT_TO_ARCHIVE",
+            "SAVE_AND_QUIT_TO_GATEWAY",
+            "SAVE_AND_QUIT_DESKTOP",
+        ],
+        "envelope_schema_versions": {
+            "client_request": "kalar.mod_sdk.client_request_envelope.v1",
+            "unified_response": "kalar.mod_sdk.unified_response_envelope.v1",
+            "esc_payload": "kalar.mod_sdk.esc_menu_action_payload.v1",
+        },
+    }
+
+
 def extract_capabilities(webgames_root: Path) -> Dict[str, Any]:
     """执行核心能力静态萃取流水线。
 
@@ -264,7 +382,8 @@ def extract_capabilities(webgames_root: Path) -> Dict[str, Any]:
     1. 创角核心领域真源 (character_creation/core.json)：解析受支持种族枚举与六维属性初值；
     2. 叙事与本地化配置 (narratives/prologue_i18n.json)：DFS 遍历占位符 token 并构建大小写双轨词典；
     3. DAG 流程图元真源 (narratives/prologue_dag_catalog.json)：萃取合法节点类型与状态突变事件列表；
-    4. 命途扩展能力 (destiny/): 聚合身世背景、因果天赋等数值守恒预算与边界契约。
+    4. 命途扩展能力 (destiny/): 聚合身世背景、因果天赋等数值守恒预算与边界契约；
+    5. 主页 HUD 遥测与动作通道能力 (world_state/core.json): 聚合切片流、7 大指令与人类独占租约。
 
     返回规整后的能力全集字典，保证字段命名与 mod_sdk/capabilities.json 架构契约 100% 对齐。
     """
@@ -275,10 +394,13 @@ def extract_capabilities(webgames_root: Path) -> Dict[str, Any]:
     core_data = load_json_file(core_path)
 
     races_catalog = core_data.get("races_catalog", {})
-    supported_races = sorted([
-        r_id for r_id, r_info in races_catalog.items()
-        if isinstance(r_info, dict) and r_info.get("is_enabled", False)
-    ])
+    supported_races = sorted(
+        [
+            r_id
+            for r_id, r_info in races_catalog.items()
+            if isinstance(r_info, dict) and r_info.get("is_enabled", False)
+        ]
+    )
     if not supported_races:
         supported_races = ["HUMAN"]
 
@@ -300,17 +422,23 @@ def extract_capabilities(webgames_root: Path) -> Dict[str, Any]:
                 f"剧情本地化占位符: {clean_name}（支持大小写双轨：{{{clean_name.lower()}}} 与 {ph}）"
             )
 
-    supported_placeholders = _build_dual_track_placeholder_list(list(available_placeholders.keys()))
+    supported_placeholders = _build_dual_track_placeholder_list(
+        list(available_placeholders.keys())
+    )
 
     reference_locations = sorted(list(i18n_data.get("locations", {}).keys()))
     reference_items = sorted(list(i18n_data.get("items", {}).keys()))
-    reference_npcs = sorted([
-        k for k in i18n_data.get("npcs", {}).keys()
-        if k != "default_guide"
-    ])
+    reference_npcs = sorted(
+        [k for k in i18n_data.get("npcs", {}).keys() if k != "default_guide"]
+    )
 
     # 3. 提取 prologue_dag_catalog.json
-    valid_node_types = ["START_ENTRY", "STANDARD_STEP", "BRANCH_CHOICE", "TERMINAL_EXIT"]
+    valid_node_types = [
+        "START_ENTRY",
+        "STANDARD_STEP",
+        "BRANCH_CHOICE",
+        "TERMINAL_EXIT",
+    ]
     valid_mutation_events = [
         "CharacterCreated",
         "LocationAssigned",
@@ -321,6 +449,14 @@ def extract_capabilities(webgames_root: Path) -> Dict[str, Any]:
 
     # 4. 提取命途与创角扩展能力真源
     destiny_mod_capabilities = extract_destiny_capabilities(config_dir, core_data)
+
+    # 5. 提取主页 HUD 遥测与动态动作通道能力真源
+    agent_hud_telemetry_capabilities = extract_agent_hud_telemetry_capabilities(
+        config_dir
+    )
+
+    # 6. 提取全域统一协议与跨端信封契约真源
+    unified_protocol_capabilities = extract_unified_protocol_capabilities(config_dir)
 
     return {
         "_meta": {
@@ -342,6 +478,8 @@ def extract_capabilities(webgames_root: Path) -> Dict[str, Any]:
         "reference_items": reference_items,
         "reference_npcs": reference_npcs,
         "destiny_mod_capabilities": destiny_mod_capabilities,
+        "agent_hud_telemetry_capabilities": agent_hud_telemetry_capabilities,
+        "unified_protocol_capabilities": unified_protocol_capabilities,
         "interactive_session_capabilities": {
             "supported_modes": [
                 "BATCH_SIMULATION",
@@ -417,6 +555,85 @@ def _build_destiny_autogen_lines(destiny_cap: Dict[str, Any]) -> List[str]:
     ]
 
 
+def _build_agent_hud_telemetry_autogen_lines(
+    telemetry_cap: Dict[str, Any],
+) -> List[str]:
+    """构建主页 HUD Agent 遥测与动态行动空间章节的动态 Markdown 行列表。"""
+    protocol_ver = telemetry_cap.get("protocol_version", "1.0.0")
+    domain_name = telemetry_cap.get("domain_name", "HOME_HUD")
+    ring_cap = telemetry_cap.get("ring_buffer_capacity", 32)
+    async_cap = telemetry_cap.get("async_queue_capacity", 128)
+    backpressure = telemetry_cap.get("backpressure_strategy", "DROP_OLDEST")
+    directives = ", ".join(telemetry_cap.get("supported_directives", []))
+    lease = telemetry_cap.get("control_lease", {})
+    lease_ms = lease.get("human_preemption_lease_ms", 2000)
+    auto_preempt = lease.get("auto_preempt_on_modal_open", True)
+    modes = ", ".join(lease.get("modes", []))
+    op_states = ", ".join(lease.get("operator_states", []))
+    codec = telemetry_cap.get("binary_telemetry_codec", {})
+    magic = codec.get("magic_header", "0x4B414C52")
+    budget = codec.get("target_byte_budget", 256)
+
+    return [
+        "",
+        "### 7. 主页 HUD 面向 Agent 动态行动空间与遥测流能力契约 (Home HUD Telemetry)",
+        "",
+        f"- **遥测协议版本 (`protocol_version`)**: `{protocol_ver}`",
+        f"- **遥测业务域 (`domain_name`)**: `{domain_name}`",
+        (
+            f"- **定长轨迹与流控队列 (`ring_buffer_capacity` / `async_queue_capacity`)**: "
+            f"定长环形缓冲 `{ring_cap}` 槽位，异步队列容量 `{async_cap}`，背压流控策略 `{backpressure}`"
+        ),
+        f"- **受支持动态行动空间指令集 (`supported_directives`)**: `{directives}`",
+        (
+            f"- **人类控制权优先租约 (`control_lease`)**: "
+            f"人类抢占窗口 `{lease_ms}ms`，模态独占抢占 `{auto_preempt}`，"
+            f"控制模式 `[{modes}]`，操作者状态 `[{op_states}]`"
+        ),
+        (
+            f"- **紧凑二进制流编解码 (`binary_telemetry_codec`)**: "
+            f"魔数标识 `{magic}` (KALR)，协议版本 `{codec.get('protocol_version', 1)}`，"
+            f"目标压缩体积预算 `<={budget}` 字节"
+        ),
+    ]
+
+
+def _build_unified_protocol_autogen_lines(proto_cap: Dict[str, Any]) -> List[str]:
+    """构建全域统一协议与跨端信封契约章节的动态 Markdown 行列表。"""
+    protocol_ver = proto_cap.get("protocol_version", "1.0.0")
+    actors = ", ".join(proto_cap.get("supported_actors", []))
+    lease_ms = proto_cap.get("human_preemption_lease_ms", 3000)
+    auto_preempt = proto_cap.get("auto_preempt_on_modal_open", True)
+    domains = ", ".join(proto_cap.get("supported_domains", []))
+    esc_actions = ", ".join(proto_cap.get("esc_menu_actions", []))
+    schemas = proto_cap.get("envelope_schema_versions", {})
+    req_schema = schemas.get(
+        "client_request", "kalar.mod_sdk.client_request_envelope.v1"
+    )
+    resp_schema = schemas.get(
+        "unified_response", "kalar.mod_sdk.unified_response_envelope.v1"
+    )
+    esc_schema = schemas.get("esc_payload", "kalar.mod_sdk.esc_menu_action_payload.v1")
+
+    return [
+        "",
+        "### 8. 全域统一请求响应信封与 ESC 协议契约 (Unified Protocol Envelope)",
+        "",
+        f"- **统一协议版本 (`protocol_version`)**: `{protocol_ver}`",
+        f"- **受支持参与者身份 (`supported_actors`)**: `{actors}`",
+        (
+            f"- **人类独占抢占租约窗口 (`human_preemption_lease_ms`)**: "
+            f"`{lease_ms}ms`（模态打开自动抢占: `{auto_preempt}`）"
+        ),
+        f"- **协议路由业务域 (`supported_domains`)**: `{domains}`",
+        f"- **受支持系统菜单指令 (`esc_menu_actions`)**: `{esc_actions}`",
+        (
+            f"- **信封强类型 Schema 版本 (`envelope_schema_versions`)**: "
+            f"请求信封 `{req_schema}`，响应信封 `{resp_schema}`，ESC 载荷 `{esc_schema}`"
+        ),
+    ]
+
+
 def generate_autogen_spec_section(capabilities: Dict[str, Any]) -> str:
     """生成 MOD_SPEC.md 动态能力章节的 Markdown 文本。"""
     lines: List[str] = [
@@ -435,63 +652,77 @@ def generate_autogen_spec_section(capabilities: Dict[str, Any]) -> str:
     for race in capabilities.get("supported_races", []):
         lines.append(f"| `{race}` | 启用 (Active) | 卡拉尔世界核心创角与剧情支持种族 |")
 
-    lines.extend([
-        "",
-        "### 2. 合法 DAG 节点类型 (Valid DAG Node Types)",
-        "",
-        "剧情图由下列四类节点拓扑连接，严禁使用非声明节点类型：",
-        "",
-        "| 节点类型枚举 | 拓扑约束 | 语义与职责 |",
-        "| :--- | :--- | :--- |",
-        "| `START_ENTRY` | 入度必须为 0，单图仅允许 1 个 | 序章剧情唯一的起始入口节点 |",
-        "| `STANDARD_STEP` | 入度 >= 1，出度 >= 1 | 标准顺序执行剧情推进步骤 |",
-        "| `BRANCH_CHOICE` | 入度 >= 1，出度 >= 2 | 具有多分支交互选择或因果分流节点 |",
-        "| `TERMINAL_EXIT` | 出度必须为 0，允许触发完成突变 | 剧情图唯一的终结退出节点 |",
-        "",
-        "### 3. 合法文本占位符字典 (Available Placeholders)",
-        "",
-        "本地化文案模板（i18n）与节点内联文案（`inline_text`）支持大小写双轨插值（如 `{player_name}` 与 `{PLAYER_NAME}`）：",
-        "",
-        "| 占位符宏 (Placeholder) | 解析源与说明 |",
-        "| :--- | :--- |",
-    ])
+    lines.extend(
+        [
+            "",
+            "### 2. 合法 DAG 节点类型 (Valid DAG Node Types)",
+            "",
+            "剧情图由下列四类节点拓扑连接，严禁使用非声明节点类型：",
+            "",
+            "| 节点类型枚举 | 拓扑约束 | 语义与职责 |",
+            "| :--- | :--- | :--- |",
+            "| `START_ENTRY` | 入度必须为 0，单图仅允许 1 个 | 序章剧情唯一的起始入口节点 |",
+            "| `STANDARD_STEP` | 入度 >= 1，出度 >= 1 | 标准顺序执行剧情推进步骤 |",
+            "| `BRANCH_CHOICE` | 入度 >= 1，出度 >= 2 | 具有多分支交互选择或因果分流节点 |",
+            "| `TERMINAL_EXIT` | 出度必须为 0，允许触发完成突变 | 剧情图唯一的终结退出节点 |",
+            "",
+            "### 3. 合法文本占位符字典 (Available Placeholders)",
+            "",
+            "本地化文案模板（i18n）与节点内联文案（`inline_text`）支持大小写双轨插值（如 `{player_name}` 与 `{PLAYER_NAME}`）：",
+            "",
+            "| 占位符宏 (Placeholder) | 解析源与说明 |",
+            "| :--- | :--- |",
+        ]
+    )
 
     placeholders = capabilities.get("available_placeholders", {})
     for ph, desc in placeholders.items():
         lines.append(f"| `{ph}` | {desc} |")
 
-    lines.extend([
-        "",
-        "### 4. 状态突变事件规范 (Valid Mutation Events)",
-        "",
-        "DAG 终结节点或剧情关键节点仅允许发布下列合法状态突变事件：",
-        "",
-        "| 突变事件类型 (Mutation Type) | 触发阶段与语义 |",
-        "| :--- | :--- |",
-        "| `CharacterCreated` | 角色基础档案初始化完成并装配属性 |",
-        "| `LocationAssigned` | 角色出生地与初始空间坐标指派完毕 |",
-        "| `EquipmentGranted` | 角色初始新兵行囊与佩剑装备入包 |",
-        "| `DialogueReady` | 对话总线就绪并激活引导 NPC 交互 |",
-        "| `PrologueCompleted` | 序章历程完结，世界大门敞开，流转至主舞台 |",
-        "",
-        "### 5. 参考预设枚举库 (Reference Constants)",
-        "",
-        f"- **可选出身预设 (Origins)**: `{', '.join(capabilities.get('origins', []))}`",
-        f"- **可选出生地域 (Birth Regions)**: `{', '.join(capabilities.get('birth_regions', []))}`",
-        f"- **标准初始场景 (Locations)**: `{', '.join(capabilities.get('reference_locations', []))}`",
-        f"- **标准初始装备 (Items)**: `{', '.join(capabilities.get('reference_items', []))}`",
-        f"- **引导 NPC 实体 (NPCs)**: `{', '.join(capabilities.get('reference_npcs', []))}`",
-    ])
+    lines.extend(
+        [
+            "",
+            "### 4. 状态突变事件规范 (Valid Mutation Events)",
+            "",
+            "DAG 终结节点或剧情关键节点仅允许发布下列合法状态突变事件：",
+            "",
+            "| 突变事件类型 (Mutation Type) | 触发阶段与语义 |",
+            "| :--- | :--- |",
+            "| `CharacterCreated` | 角色基础档案初始化完成并装配属性 |",
+            "| `LocationAssigned` | 角色出生地与初始空间坐标指派完毕 |",
+            "| `EquipmentGranted` | 角色初始新兵行囊与佩剑装备入包 |",
+            "| `DialogueReady` | 对话总线就绪并激活引导 NPC 交互 |",
+            "| `PrologueCompleted` | 序章历程完结，世界大门敞开，流转至主舞台 |",
+            "",
+            "### 5. 参考预设枚举库 (Reference Constants)",
+            "",
+            f"- **可选出身预设 (Origins)**: `{', '.join(capabilities.get('origins', []))}`",
+            f"- **可选出生地域 (Birth Regions)**: `{', '.join(capabilities.get('birth_regions', []))}`",
+            f"- **标准初始场景 (Locations)**: `{', '.join(capabilities.get('reference_locations', []))}`",
+            f"- **标准初始装备 (Items)**: `{', '.join(capabilities.get('reference_items', []))}`",
+            f"- **引导 NPC 实体 (NPCs)**: `{', '.join(capabilities.get('reference_npcs', []))}`",
+        ]
+    )
 
     destiny_cap = capabilities.get("destiny_mod_capabilities", {})
     if isinstance(destiny_cap, dict) and destiny_cap:
         lines.extend(_build_destiny_autogen_lines(destiny_cap))
 
+    telemetry_cap = capabilities.get("agent_hud_telemetry_capabilities", {})
+    if isinstance(telemetry_cap, dict) and telemetry_cap:
+        lines.extend(_build_agent_hud_telemetry_autogen_lines(telemetry_cap))
+
+    proto_cap = capabilities.get("unified_protocol_capabilities", {})
+    if isinstance(proto_cap, dict) and proto_cap:
+        lines.extend(_build_unified_protocol_autogen_lines(proto_cap))
+
     lines.append("<!-- AUTOGEN_CAPABILITIES_END -->")
     return "\n".join(lines)
 
 
-def render_full_mod_spec(capabilities: Dict[str, Any], existing_content: Optional[str] = None) -> str:
+def render_full_mod_spec(
+    capabilities: Dict[str, Any], existing_content: Optional[str] = None
+) -> str:
     """渲染或注入 MOD_SPEC.md 完整内容。"""
     autogen_part = generate_autogen_spec_section(capabilities)
 
@@ -510,15 +741,13 @@ def render_full_mod_spec(capabilities: Dict[str, Any], existing_content: Optiona
     template = f"""# 卡拉尔世界引擎 · 模组创作者数据契约速查指南 (MOD Quick-Reference Spec v1.2)
 
 > [!NOTE]
-> **【规范定位】**：本手册是面向模组开发者与自主推演 Agent 的根目录官方契约速查指南与真源索引总枢。所有动态能力清单均由底层单一真源自动化静态萃取同步，确保数据契约与引擎运行时保持 100% 绝对一致。
+> **【规范定位】**：本手册是面向模组开发者与自主推演 Agent 的根目录官方契约速查指南与真源索引总枢。所有动态能力清单均由底层单一真源自动化静态萃取同步，确保数据契约与引擎运行时保持一致。
 > 完整深入的架构设计、算法公式与协议明细，请直接查阅 [`docs/`](docs/) 对应权威规范卷。
-> **引擎接口版本**：`{capabilities.get('engine_api_version', '1.0.0')}`
+> **引擎接口版本**：`{capabilities.get("engine_api_version", "1.0.0")}`
 
 ---
 
 ## 🧭 官方权威规范导航矩阵 (Documentation Index & Navigation Hub)
-
-模组工程的核心架构与专题协议已按业务职责解耦至 `docs/` 目录，开发者可依序渐进查阅：
 
 | 专题领域 | 权威规范文档指针 | 核心内容摘要 |
 | :--- | :--- | :--- |
@@ -530,331 +759,23 @@ def render_full_mod_spec(capabilities: Dict[str, Any], existing_content: Optiona
 
 ---
 
-## 🏛️ 模组分级架构体系速查 (Tier Hierarchy)
-
-卡拉尔引擎将扩展包划分为三个自底向上兼容的架构级别：
-
-1. **Tier 1: 纯逻辑与剧情命途包 (Logic & Narrative Pack)**
-   - 聚焦叙事分支图元、出身背景、因果天赋守恒与本地化文案；
-   - 纯静态声明式 JSON，体积极小（< 100KB），零多媒体依赖，热重载极速响应。
-2. **Tier 2: 视听与艺术资产增强包 (Audiovisual & Assets Pack)**
-   - 在 Tier 1 逻辑之上注入受控多媒体资产（立绘、场景纹理、UI 音效、背景音乐、字体与纯文本着色器）；
-   - 包含 `assets/` 物理目录与 `assets_manifest.json`，受虚拟协议 `mod://<pack_id>/assets/...` 与严格体积配额保护。
-3. **Tier 3: 全局大魔改规则包 (Total Conversion & Overhaul Pack)**
-   - 包含 Tier 1 & Tier 2 完整能力，深度重构底层游戏世界观、地理空间阻抗、物品装备原型与战斗动力学常数；
-   - 包含 `content/` 模块化目录，支持 `MERGE`、`REPLACE_ENTRY` 与 `TOTAL_PURGE` 声明式差分覆写。
-
----
-
-## 一、 扩展包目录结构规范 (Package Layout & Topology)
-
-合规模组物理上为一个独立目录（位于 `mods/<pack_id>/` 或 `user://mods/<pack_id>/`），标准布局如下：
-
-```text
-<pack_id>/
-├── pack.json                   # 【必需】MOD 清单元数据与依赖描述文件
-├── routing_rules.json          # 【必需】创角种族与出身到序章 DAG 的路由映射表
-├── destinies.json              # 【推荐/可选】自定义身世、因果天赋、初始行囊与 UI 解锁策略
-├── dag_graphs/                 # 【必需】剧情有向无环图配置目录
-│   └── DAG_<NAME>.json         # 因果剧情图（单 START_ENTRY，至少 1 个 TERMINAL_EXIT）
-├── i18n/                       # 【必需】剧情多语言本地化文案字典
-│   └── zh-CN.json              # 包含白名单占位符的剧情文本
-├── assets_manifest.json        # 【Tier 2/3 必需】多媒体资产清单与 SHA-256 校验指纹
-├── assets/                     # 【Tier 2/3 可选】受控视听资源存储目录
-│   ├── textures/               # 纹理与插画 (WebP / PNG)
-│   ├── audio/                  # 音频与音效 (OGG / WAV)
-│   ├── fonts/                  # 自定义字体 (TTF / WOFF2)
-│   └── shaders/                # 纯文本着色器 (GDShader)
-└── content/                    # 【Tier 3 专有】大魔改规则模块化数据目录
-    ├── world/                  # 世界地图阻抗与空间拓扑
-    ├── items/                  # 物品原型与装备数值
-    ├── skills/                 # 动作战技与卡牌规则
-    ├── entities/               # 怪物原型与 NPC 模板
-    └── rules/                  # 动力学战斗常数与伤害公式
-```
-
----
-
-## 二、 MOD 清单元数据契约 (`pack.json`)
-
-`pack.json` 描述 MOD 的基础身份与依赖拓扑，反序列化严格对齐 `NarrativePackManifestDTO`：
-
-| 字段名称 | 类型 | 必需 | 默认值 | 约束说明与语义 |
-| :--- | :---: | :---: | :--- | :--- |
-| `pack_id` | String | 是 | - | 唯一标识符，全小写字母、数字与下划线（如 `mod_valan_origins`） |
-| `pack_name` | String | 是 | - | 人类可读显示名称（如 `瓦兰边境起源包`） |
-| `version` | String | 是 | - | 语义化版本号（如 `1.0.0`） |
-| `author` | String | 否 | `"Unknown"` | 作者或制作组署名 |
-| `engine_api_version` | String | 是 | `"1.0.0"` | 兼容的目标引擎 API 版本 |
-| `tier` | String | 否 | `"TIER_1_LOGIC"` | 模组分级：`TIER_1_LOGIC`, `TIER_2_AUDIOVISUAL`, `TIER_3_OVERHAUL` |
-| `priority` | int | 否 | `100` | 同拓扑层级内的加载优先级（数值越大越优先装配） |
-| `dependencies` | Array[String] | 否 | `[]` | 必须前置加载的 MOD `pack_id` 列表 |
-| `incompatible_packs` | Array[String] | 否 | `[]` | 互斥冲突 MOD 标识符黑名单 |
-| `semantic_tags` | Array[String] | 否 | `[]` | 语义标签（如 `["prologue", "dark_fantasy"]`） |
-| `is_active` | bool | 否 | `true` | 是否激活启用状态 |
-
----
-
-## 三、 引擎能力真源契约 (Engine Capabilities)
+## 一、 引擎能力真源契约 (Engine Capabilities)
 
 {autogen_part}
 
 ---
 
-## 四、 命途扩展契约规范 (`destinies.json`)
-
-MOD 可通过根目录下的 `destinies.json` 以**列表式结构**扩展创角身世池、正负因果天赋池、初始装备行囊以及前端 UI 交互策略：
-
-1. **前端 UI 受控解锁模式 (`ui_capabilities`)**：
-   - `origin_selection_mode` / `trait_selection_mode` 仅允许取值 `"INHERIT"`（默认继承）、`"ALLOW_MANUAL"`（解锁前端下拉自选）、`"FORCE_RANDOM"`（强制盲盒随机）；
-   - `allow_attribute_reroll`: 布尔值，控制是否开放创角阶段六维属性重掷开关。
-2. **自定义身世数值预算红线 (`custom_origins`)**：
-   - 采用列表项声明（每项含唯一 `origin_id`），`attribute_bonus` 单项属性加成严格限制在 `[-2, 3]`，六维加成净代数和严格限制在 `[-2, 4]`；
-   - `initial_gold` 严禁超过 `1000` 金币上限。
-3. **正负因果天赋配对守恒 (`custom_traits` & `paired_presets`)**：
-   - 正向天赋 `cost > 0`，负向天赋 `cost < 0`；
-   - `paired_presets` 必须将 1 个正向天赋与 1 个负向天赋成对绑定，且正负 `cost` 代数和绝对值必须 `<= 1`（即 `abs(pos_cost + neg_cost) <= 1`）。
-4. **自定义初始行囊契约 (`custom_starter_kits`)**：
-   - 每套行囊（含唯一 `kit_id`）的 `initial_items` 物品总件数必须 `<= 10`，且每项物品的 `canonical_id` 必须非空并对齐 `config/items/core.json`。
-5. **多包非冲突合并规则 (Multi-Pack Merge & Conflict Guard)**：
-   - 多个 MOD 同时启用时，各包的 `custom_origins`、`custom_traits`、`paired_presets`、`custom_starter_kits` 按优先级顺序执行列表追加合并；
-   - 严禁跨包出现同名 `origin_id` / `trait_id` / `kit_id`（报 `ERR_MOD_DUPLICATE_ID_CONFLICT`），严禁同时启用 `incompatible_packs` 互斥包（报 `ERR_MOD_INCOMPATIBLE_CONFLICT`），严禁在 `ui_capabilities` 中同时声明 `"ALLOW_MANUAL"` 与 `"FORCE_RANDOM"` 相反策略（报 `ERR_MOD_UI_POLICY_CONFLICT`）。
-
----
-
-## 五、 因果 DAG 剧情拓扑约束 (DAG Graph Invariants)
-
-1. **严格有向无环**：剧情图必须构成有向无环图 (DAG)，解算器将在装配阶段运行 Kahn 算法，检测到环路立即阻断装配；
-2. **单一入口与出口**：每张剧情图必须包含且仅包含 1 个 `START_ENTRY` 与至少 1 个 `TERMINAL_EXIT` 节点；
-3. **前置条件闭包**：每个节点的 `required_prerequisites` 列表引用的父节点必须在该图内可达且真实存在；
-4. **安全状态突变**：节点完成时的 `mutations_on_complete` 必须从上述 `valid_mutation_events` 中选取，禁止发布未声明事件。
-
----
-
-## 六、 极简实战工程样例 (Minimal Working Examples)
-
-### 1. Tier 1 纯逻辑与剧情命途包样例
-
-#### (1) `pack.json`
-```json
-{{
-  "pack_id": "mod_frontier_awakening",
-  "pack_name": "边境要塞苏醒包",
-  "version": "1.0.0",
-  "author": "KalarModders",
-  "engine_api_version": "1.0.0",
-  "tier": "TIER_1_LOGIC",
-  "priority": 120,
-  "dependencies": [],
-  "incompatible_packs": [],
-  "semantic_tags": ["prologue", "frontier"],
-  "is_active": true
-}}
-```
-
-#### (2) `destinies.json`
-```json
-{{
-  "ui_capabilities": {{
-    "origin_selection_mode": "ALLOW_MANUAL",
-    "trait_selection_mode": "ALLOW_MANUAL",
-    "allow_attribute_reroll": true
-  }},
-  "custom_origins": [
-    {{
-      "origin_id": "STARTER_ASTRAL_INITIATE",
-      "name": "星界巡林学徒",
-      "race": "HUMAN",
-      "birth_region": "CENTRAL_CONTINENT",
-      "weight": 25,
-      "initial_gold": 150,
-      "starter_kit_id": "KIT_STARTER_WANDERER",
-      "attribute_bonus": {{"INT": 2, "AGI": 1, "CON": -1}},
-      "desc": "自幼在边境星象观测所研习古籍与巡林箭术的年轻行者。"
-    }}
-  ],
-  "custom_traits": [
-    {{
-      "trait_id": "TRAIT_STARLIGHT_AFFINITY",
-      "name": "星辉亲和",
-      "cost": 2,
-      "type": "POSITIVE",
-      "modifiers": {{"INT": 2, "SPR": 1}},
-      "desc": "受星界微光眷顾，施法专注与精神韧性显著提升。"
-    }},
-    {{
-      "trait_id": "TRAIT_ASTRAL_FATIGUE",
-      "name": "星蚀倦怠",
-      "cost": -2,
-      "type": "NEGATIVE",
-      "modifiers": {{"CON": -1, "VIT": -1}},
-      "desc": "星力共鸣偶发反噬，肉体耐受力较常人略显单薄。"
-    }}
-  ],
-  "paired_presets": [
-    {{
-      "preset_id": "PAIR_STARTER_ASTRAL",
-      "positive": "TRAIT_STARLIGHT_AFFINITY",
-      "negative": "TRAIT_ASTRAL_FATIGUE",
-      "weight": 50
-    }}
-  ],
-  "custom_starter_kits": [
-    {{
-      "kit_id": "KIT_STARTER_WANDERER",
-      "name": "巡林学徒轻便行囊",
-      "initial_gold": 80,
-      "display_weapon": "KALAR:EQUIP:WEAPON_BLADE:IRON_SWORD",
-      "initial_items": [
-        {{"canonical_id": "KALAR:EQUIP:WEAPON_BLADE:IRON_SWORD", "count": 1}},
-        {{"canonical_id": "KALAR:CONSUM:ALCHEMY:POTION_MANA", "count": 2}}
-      ]
-    }}
-  ]
-}}
-```
-
-#### (3) `dag_graphs/DAG_FRONTIER_AWAKEN.json`
-```json
-{{
-  "dag_id": "DAG_FRONTIER_AWAKEN",
-  "entry_node_id": "NODE_ENTRY",
-  "terminal_node_id": "NODE_EXIT",
-  "nodes": {{
-    "NODE_ENTRY": {{
-      "node_type": "START_ENTRY",
-      "narrative_key": "frontier.awakening",
-      "required_prerequisites": []
-    }},
-    "NODE_STEP_EXPLORE": {{
-      "node_type": "STANDARD_STEP",
-      "narrative_key": "frontier.explore",
-      "required_prerequisites": ["NODE_ENTRY"]
-    }},
-    "NODE_EXIT": {{
-      "node_type": "TERMINAL_EXIT",
-      "narrative_key": "frontier.completed",
-      "required_prerequisites": ["NODE_STEP_EXPLORE"],
-      "mutations_on_complete": [
-        {{
-          "type": "PrologueCompleted",
-          "dag_id": "DAG_FRONTIER_AWAKEN"
-        }}
-      ]
-    }}
-  }},
-  "edges": [
-    {{"from": "NODE_ENTRY", "to": "NODE_STEP_EXPLORE"}},
-    {{"from": "NODE_STEP_EXPLORE", "to": "NODE_EXIT"}}
-  ]
-}}
-```
-
-### 2. Tier 2 视听资产增强包清单样例 (`assets_manifest.json`)
-
-```json
-{{
-  "$schema": "kalar.mod_sdk.assets_manifest.v1",
-  "pack_id": "mod_frontier_audiovisual",
-  "asset_count": 2,
-  "total_size_bytes": 1048576,
-  "assets": [
-    {{
-      "path": "textures/characters/scout_portrait.webp",
-      "category": "textures",
-      "size_bytes": 524288,
-      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-      "mime_type": "image/webp"
-    }},
-    {{
-      "path": "audio/ambient/wind_whisper.ogg",
-      "category": "audio",
-      "size_bytes": 524288,
-      "sha256": "4b227777d4dd1fc61c6f884f48641d02b4d121d3fd328cb08b5531fcacdabf8a",
-      "mime_type": "audio/ogg"
-    }}
-  ]
-}}
-```
-
-### 3. Tier 3 全局大魔改规则配置样例 (`content/rules/game_constants.json`)
-
-```json
-{{
-  "$schema": "kalar.mod_sdk.game_rules.v1",
-  "override_mode": "MERGE",
-  "combat_dynamics": {{
-    "base_action_point_recovery_rate": 1.25,
-    "critical_damage_multiplier": 2.0,
-    "damage_formula_expression": "max(1, raw_attack * 1.15 - target_defense * 0.85)"
-  }}
-}}
-```
-
----
-
-## 七、 统一命令行工具速查 (`kalar-mod`)
-
-| 任务目标 | 标准 CLI 命令 | 核心产物与行为说明 |
-| :--- | :--- | :--- |
-| **脚手架创建** | `python mod_sdk/tools/kalar_mod.py init --id <id> --name <name> --tier <tier>` | 基于官方模板生成初始骨架 |
-| **静态诊断** | `python mod_sdk/tools/kalar_mod.py check <mod_dir> [--json]` | 纯静态检测格式、DAG连通性与多包冲突 |
-| **资产烹饪** | `python mod_sdk/tools/kalar_mod.py cook <mod_dir> [--check]` | 校验格式与体积配额并生成 SHA-256 清单 |
-| **剧情演习** | `python mod_sdk/tools/kalar_mod.py preview <mod_dir> [--simulate]` | 打印 DAG 拓扑概览并模拟剧情推进水化 |
-| **无头试玩** | `python mod_sdk/tools/kalar_mod.py play <mod_dir> [--interactive]` | 执行批量验收推演或 Agent STDIO 交互 |
-| **打包归档** | `python mod_sdk/tools/kalar_mod.py pack <mod_dir> [--out-dir <dir>]` | 前置门禁校验并压缩为生产分发包 |
-
----
-
-## 八、 契约防漂移自动化守卫 (Contract Drift Guard)
-
-本 SDK 规格说明与 `capabilities.json` 由引擎门禁脚本进行强校验。运行以下命令可验证契约是否与底层配置保持一致：
+## 二、 自动化验证与守卫命令
 
 ```bash
-# 验证 MOD SDK 契约是否与引擎底层真源 100% 对齐（0 漂移）
+# 验证 MOD SDK 契约是否与引擎底层真源保持一致（零漂移）
 python WebGames/scripts/py/sync_mod_sdk.py --check-only
 
 # 执行全量 SDK 完整性与门禁审计断言
 python WebGames/scripts/py/audit_sdk_sync.py
 ```
-
----
-
-## 九、 Agent 无头交互式推演协议速查 (Headless Agent Interactive Protocol)
-
-为支持自主推演 Agent 与自动化评测流水线，MOD SDK 提供基于标准输入输出 (`stdio`) 的流式交互通道。详尽通信协议与状态机请参阅 [`docs/AGENT_INTERACTION.md`](docs/AGENT_INTERACTION.md)。
-
-### 1. 通信通道与契约矩阵
-- **启动命令**：`python mod_sdk/tools/kalar_mod.py play <mod_dir> --interactive --json`
-- **通道协议**：双向 `sys.stdin` 与 `sys.stdout`，行定界 JSON (NDJSON)；
-- **强类型 Schema**：
-  * `kalar.mod_sdk.observation.v1` (`schemas/observation.schema.json`)：单步剧情快照；
-  * `kalar.mod_sdk.action.v1` (`schemas/action.schema.json`)：单步决策指令 (`choose`, `rollback`, `quit`)。
-
-### 2. 状态机交互时序简图
-```mermaid
-sequenceDiagram
-    autonumber
-    participant Agent as 外部评测 Agent
-    participant Session as kalar-mod play (Headless Engine)
-
-    Agent->>Session: 启动进程 (kalar-mod play <dir> --interactive --json)
-    Session->>Session: 静态预检 & 创角面板解算 & 路由激活
-    Session-->>Agent: Step 0 观察包 JSON (Observation)
-    loop 单步交互决策推进
-        Agent->>Session: 动作 JSON ({{"action": "choose", "choice_id": "NODE_ID"}})
-        Session->>Session: 分支校验 & 因果突变结算 & 历史状态压栈
-        Session-->>Agent: Step N 最新观察包 JSON
-    end
-    opt 因果回溯
-        Agent->>Session: 回滚动作 ({{"action": "rollback"}})
-        Session-->>Agent: 恢复至 Step N-1 观察包 JSON
-    end
-    Session-->>Agent: 抵达终态节点或 quit: 输出完整战报 JSON
-```
 """
     return template.replace("\r\n", "\n")
-
 
 def check_contract_drift(
     webgames_root: Path,
@@ -879,14 +800,18 @@ def check_contract_drift(
     if not cap_path.is_file():
         diff_messages.append(f"磁盘缺失文件: {cap_path}")
     else:
-        existing_cap_content = cap_path.read_text(encoding="utf-8").replace("\r\n", "\n")
+        existing_cap_content = cap_path.read_text(encoding="utf-8").replace(
+            "\r\n", "\n"
+        )
         if existing_cap_content != expected_cap_content:
-            diff_lines = list(difflib.unified_diff(
-                existing_cap_content.splitlines(keepends=True),
-                expected_cap_content.splitlines(keepends=True),
-                fromfile="disk/capabilities.json",
-                tofile="memory/capabilities.json",
-            ))
+            diff_lines = list(
+                difflib.unified_diff(
+                    existing_cap_content.splitlines(keepends=True),
+                    expected_cap_content.splitlines(keepends=True),
+                    fromfile="disk/capabilities.json",
+                    tofile="memory/capabilities.json",
+                )
+            )
             diff_messages.append(
                 f"capabilities.json 契约漂移:\n" + "".join(diff_lines[:30])
             )
@@ -895,18 +820,22 @@ def check_contract_drift(
     if not spec_path.is_file():
         diff_messages.append(f"磁盘缺失文件: {spec_path}")
     else:
-        existing_spec_content = spec_path.read_text(encoding="utf-8").replace("\r\n", "\n")
-        expected_spec_content = render_full_mod_spec(capabilities, existing_spec_content)
+        existing_spec_content = spec_path.read_text(encoding="utf-8").replace(
+            "\r\n", "\n"
+        )
+        expected_spec_content = render_full_mod_spec(
+            capabilities, existing_spec_content
+        )
         if existing_spec_content != expected_spec_content:
-            diff_lines = list(difflib.unified_diff(
-                existing_spec_content.splitlines(keepends=True),
-                expected_spec_content.splitlines(keepends=True),
-                fromfile="disk/MOD_SPEC.md",
-                tofile="memory/MOD_SPEC.md",
-            ))
-            diff_messages.append(
-                f"MOD_SPEC.md 契约漂移:\n" + "".join(diff_lines[:30])
+            diff_lines = list(
+                difflib.unified_diff(
+                    existing_spec_content.splitlines(keepends=True),
+                    expected_spec_content.splitlines(keepends=True),
+                    fromfile="disk/MOD_SPEC.md",
+                    tofile="memory/MOD_SPEC.md",
+                )
             )
+            diff_messages.append(f"MOD_SPEC.md 契约漂移:\n" + "".join(diff_lines[:30]))
 
     is_clean = len(diff_messages) == 0
     return is_clean, diff_messages
@@ -932,7 +861,9 @@ def sync_to_disk(webgames_root: Path, capabilities: Dict[str, Any]) -> None:
     print(f"[OK] 已同步能力清单: {cap_path}")
 
     # 2. 写入或注入 MOD_SPEC.md
-    existing_spec = spec_path.read_text(encoding="utf-8") if spec_path.is_file() else None
+    existing_spec = (
+        spec_path.read_text(encoding="utf-8") if spec_path.is_file() else None
+    )
     spec_content = render_full_mod_spec(capabilities, existing_spec)
     spec_path.write_text(spec_content, encoding="utf-8", newline="\n")
     print(f"[OK] 已同步开发契约规范: {spec_path}")
@@ -941,7 +872,9 @@ def sync_to_disk(webgames_root: Path, capabilities: Dict[str, Any]) -> None:
 def main() -> int:
     """CLI 入口主函数。"""
     ensure_utf8_stdout()
-    parser = argparse.ArgumentParser(description="卡拉尔引擎 MOD 开发者 SDK 权威真源静态萃取与防漂移同步引擎")
+    parser = argparse.ArgumentParser(
+        description="卡拉尔引擎 MOD 开发者 SDK 权威真源静态萃取与防漂移同步引擎"
+    )
     parser.add_argument(
         "--check-only",
         action="store_true",
@@ -969,7 +902,10 @@ def main() -> int:
         print("[FAIL] 检测到 MOD SDK 契约发生漂移！", file=sys.stderr)
         for diff in diffs:
             print(diff, file=sys.stderr)
-        print("\n请运行 python WebGames/scripts/py/sync_mod_sdk.py 重新同步最新权威契约。", file=sys.stderr)
+        print(
+            "\n请运行 python WebGames/scripts/py/sync_mod_sdk.py 重新同步最新权威契约。",
+            file=sys.stderr,
+        )
         return 1
 
     sync_to_disk(root, capabilities)

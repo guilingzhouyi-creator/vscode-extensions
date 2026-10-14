@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 实体、物品与世界状态集群 (Entity & World State))
 # 文件路径: res://backend/domains/world_state/dto/hud_status_snapshot_dto.gd
 # 架构定位: Value Object DTO / Data Transport Model
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/world_state.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/world_state.json | 信号: EventBus 领域广播
 # 职责说明: 聚合角色身份、六维 L3 实值、生理层级、展示型生命/行动力与资产钱包， 作为双轨（主动拉取 / 事件推送）的标准快照载荷。 事实溯源（审查整改版，零臆造）： - attribute_values/attribute_levels -> CharacterPhysiologySheet 真实 API - hp_max -> domains.combat participant_defaults/max_hp（配置真源 + 下限守卫） - ap_max -> domains.world_state hud_defaults/ap_max（配置真源 + 下限守卫） - wallet_*  -> CharacterWalletEntity 真实字段（gold/mana_monocrystals） - MP / 等级经验等无权威源展示项不入快照，留待后续域闭环扩展
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## HudStatusSnapshotDTO：Value Object DTO / Data Transport Model
 class_name HudStatusSnapshotDTO
 extends RefCounted
 
@@ -33,6 +34,7 @@ var wallet_mana_monocrystals: int = 0
 # 时钟与时间戳
 var timestamp_utc: int = 0
 
+## 序列化当前对象为通用字典传输结构
 func to_dto() -> Dictionary:
 	return {
 		"account_id": account_id,
@@ -51,6 +53,7 @@ func to_dto() -> Dictionary:
 		"timestamp_utc": timestamp_utc
 	}
 
+## 从输入字典反序列化还原传输对象
 static func from_dto(data: Dictionary) -> HudStatusSnapshotDTO:
 	var dto := HudStatusSnapshotDTO.new()
 	dto.account_id = String(data.get("account_id", ""))

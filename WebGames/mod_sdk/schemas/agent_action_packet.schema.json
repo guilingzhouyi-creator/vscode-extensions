@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "kalar.mod_sdk.agent_action.v1",
+  "title": "AgentActionPacket",
+  "description": "卡拉尔世界引擎面向专属逻辑动作通道的上行标准动作包契约 (kalar.mod_sdk.agent_action.v1)",
+  "type": "object",
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "description": "对应交互推演会话唯一 ID"
+    },
+    "sequence_index": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "响应的目标遥测包序号（保障保序执行防乱序）"
+    },
+    "directive_id": {
+      "type": "string",
+      "enum": [
+        "ALLOCATE_POTENTIAL_STAT",
+        "REST_AND_ADVANCE_TIME",
+        "CLAIM_QUEST_OBJECTIVE",
+        "INSPECT_INVENTORY_SLOT",
+        "TOGGLE_MODE_ADAPTATION",
+        "MARK_MAIL_READ",
+        "DISMISS_UI_NOTICE"
+      ],
+      "description": "选定的合法指令 ID"
+    },
+    "action_id": {
+      "type": "string",
+      "enum": [
+        "ALLOCATE_POTENTIAL_STAT",
+        "REST_AND_ADVANCE_TIME",
+        "CLAIM_QUEST_OBJECTIVE",
+        "INSPECT_INVENTORY_SLOT",
+        "TOGGLE_MODE_ADAPTATION",
+        "MARK_MAIL_READ",
+        "DISMISS_UI_NOTICE"
+      ],
+      "description": "指令别名字段，等价于 directive_id"
+    },
+    "params": {
+      "type": "object",
+      "description": "指令执行所需参数字典（如分配潜能点的目标属性与点数）",
+      "additionalProperties": true
+    },
+    "parameters": {
+      "type": "object",
+      "description": "参数字典别名，等价于 params",
+      "additionalProperties": true
+    },
+    "origin_packet_id": {
+      "type": "string",
+      "description": "响应来源的遥测数据包唯一 ID"
+    },
+    "agent_signature": {
+      "type": "string",
+      "description": "决策智能体签名或标识字符串"
+    },
+    "client_timestamp_ms": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "智能体决策产出时的客户端物理时间戳 (毫秒)"
+    }
+  },
+  "anyOf": [
+    { "required": ["directive_id"] },
+    { "required": ["action_id"] }
+  ],
+  "required": [
+    "session_id",
+    "sequence_index"
+  ],
+  "additionalProperties": true
+}
+

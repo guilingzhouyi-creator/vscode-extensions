@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "kalar.mod_sdk.client_request_envelope.v1",
+  "title": "ClientRequestEnvelope",
+  "description": "卡拉尔世界引擎全域通用客户端请求信封契约 (kalar.mod_sdk.client_request_envelope.v1)",
+  "type": "object",
+  "properties": {
+    "request_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "请求唯一序号（UUID 或基于客户端时间戳与哈希派生）"
+    },
+    "session_token": {
+      "type": "string",
+      "description": "当前客户端会话认证令牌（无登录态时可为空串）"
+    },
+    "account_id": {
+      "type": "string",
+      "description": "操作发起方绑定的账号唯一标识符"
+    },
+    "character_id": {
+      "type": "string",
+      "description": "当前世界内绑定的目标角色唯一标识符"
+    },
+    "actor_type": {
+      "type": "string",
+      "enum": [
+        "HUMAN_UI",
+        "AGENT"
+      ],
+      "description": "操作主体类型：HUMAN_UI（人类前台UI请求）或 AGENT（自主推演Agent动作）"
+    },
+    "domain": {
+      "type": "string",
+      "minLength": 1,
+      "description": "目标处理领域名称，如 world_state, world_gateway, lifecycle, game_settings"
+    },
+    "action_type": {
+      "type": "string",
+      "minLength": 1,
+      "description": "具体指令动作标识符，如 ESC_SAVE_GAME, ALLOCATE_POTENTIAL_STAT 等"
+    },
+    "payload": {
+      "type": "object",
+      "description": "业务专属参数载荷字典",
+      "additionalProperties": true
+    },
+    "lease_nonce": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "人类控制租约流水号（人类前台请求单调自增 > 0，Agent 请求恒为 0）"
+    },
+    "client_timestamp_ms": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "客户端发射请求时的物理毫秒时间戳"
+    }
+  },
+  "required": [
+    "request_id",
+    "actor_type",
+    "domain",
+    "action_type",
+    "payload",
+    "client_timestamp_ms"
+  ],
+  "additionalProperties": false
+}
+

@@ -75,16 +75,18 @@ flowchart TD
 | `companion.choice_committed` | 玩家或推演器做出分支选择 | `step_index`, `choice_id`, `choice_label` | 伴侣对玩家的决策行为发表个性化感想 |
 | `companion.mutation_applied` | 结算状态突变事件 | `mutation_type`, `delta_summary` | 伴侣提醒属性增长、金币变化或新装备入包 |
 | `companion.session_completed`| 抵达终态节点或序章完结 | `transcript_summary`, `final_character` | 伴侣总结历程表现，展望后续开放世界征程 |
+| `agent_hud_packet_streamed` | 主页 HUD 单步切片组装完成 | `envelope`, `observation`, `causal_deltas`, `action_space` | 伴侣 Agent 实时感知主页生理、资产、时钟与任务变动，评估当前可用操作 |
 
 ---
 
 ## 三、 有界环形缓冲队列规范 (`RingBuffer`)
 
-为了在故障突发时能够回溯导致崩溃的前序前驱动作，同时保持内存占用严格恒定，伴侣记录器内置定长环形缓冲区（`BoundedRingBuffer`）：
+为了在故障突发时能够回溯导致崩溃的前序前驱动作，同时保持内存占用严格恒定，伴侣记录器与时序轨迹器内置定长环形缓冲区（`BoundedRingBuffer` / `AgentTrajectoryRingBuffer`）：
 
-1. **容量限制**：默认定长容量设为 **32 条事件记录**（可在配置文件中调整，最大不超过 64）；
-2. **覆写策略 (FIFO Eviction)**：当缓冲区写满时，新事件无缝覆盖最老槽位，读写操作均为严格的 $\mathcal{O}(1)$ 常数时间复杂度；
-3. **零瞬态堆膨胀**：预分配固定数组槽位，严禁在主循环中频繁触发数组扩容（Resize）与动态重分配。
+1. **容量限制**：默认定长容量设为 **32 条事件记录**（可在配置文件 `world_state/core.json` 中调整，最大不超过 64）；
+2. **覆写策略 (FIFO Eviction)**：当缓冲区写满时，新事件无缝覆盖最老槽位，读写操作均为严格的 $\mathcal{O}(1)$ 常数时间复杂度，彻底消除 `pop_front()` 内存搬移；
+3. **多步因果反思窗口**：支持 `get_trajectory_window(k)`，允许在 $\mathcal{O}(k)$ 时间内按时间序提取最近 $k$ 步事件切片，支持长程因果归因；
+4. **零瞬态堆膨胀**：预分配固定数组槽位，严禁在主循环中频繁触发数组扩容（Resize）与动态重分配。
 
 ---
 

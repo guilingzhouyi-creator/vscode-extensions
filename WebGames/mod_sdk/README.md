@@ -62,8 +62,10 @@ WebGames/mod_sdk/
 │   ├── items.schema.json       # 物品道具原型契约
 │   ├── skills.schema.json      # 动作战技卡牌契约
 │   ├── world.schema.json       # 世界地图空间阻抗契约
-│   ├── observation.schema.json # Agent 观察快照契约
-│   └── action.schema.json      # Agent 决策动作契约
+│   ├── observation.schema.json # Agent 观察快照契约 (序章)
+│   ├── action.schema.json      # Agent 决策动作契约 (序章)
+│   ├── agent_hud_telemetry_packet.schema.json # 主页 HUD 原子遥测包契约
+│   └── agent_action_packet.schema.json # 专属动作通道上行指令包契约
 ├── templates/                  # 【官方脚手架模板】分级合规初始工程骨架
 │   ├── starter_story/          # Tier 1 纯逻辑与剧情命途初始工程骨架
 │   ├── audio_visual_pack/      # Tier 2 视听与艺术资产增强模板工程

@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 实体、物品与世界状态集群 (Entity & World State))
 # 文件路径: res://backend/domains/world_state/dto/authoritative_hud_snapshot_dto.gd
 # 架构定位: Value Object DTO / Data Transport Model
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/world_state.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/world_state.json | 信号: EventBus 领域广播
 # 职责说明: 权威 HUD 聚合快照载荷传输对象，整合身份、生理、资产钱包、历法天候、任务追踪与模式特性等轻量核心数据。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## AuthoritativeHudSnapshotDTO：Value Object DTO / Data Transport Model
 class_name AuthoritativeHudSnapshotDTO
 extends RefCounted
 
@@ -46,6 +47,7 @@ var active_red_dot_paths: Array[String] = []
 var quest_tracker: ActiveQuestTrackerDTO = null
 var mode_features: ModeFeatureManifestDTO = null
 
+## 序列化当前对象为通用字典传输结构
 func to_dto() -> Dictionary:
 	return {
 		"account_id": account_id,
@@ -76,6 +78,7 @@ func to_dto() -> Dictionary:
 		"mode_features": mode_features.to_dto() if mode_features != null else {}
 	}
 
+## 从输入字典反序列化还原传输对象
 static func from_dto(data: Dictionary) -> AuthoritativeHudSnapshotDTO:
 	var dto := AuthoritativeHudSnapshotDTO.new()
 	_hydrate_identity(data, dto)

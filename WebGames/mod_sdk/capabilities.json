@@ -100,7 +100,12 @@
     "ERR_DESTINY_UNKNOWN_KIT_REF",
     "ERR_MOD_DUPLICATE_ID_CONFLICT",
     "ERR_MOD_INCOMPATIBLE_CONFLICT",
-    "ERR_MOD_UI_POLICY_CONFLICT"
+    "ERR_MOD_UI_POLICY_CONFLICT",
+    "ERR_PREEMPTED_BY_HUMAN",
+    "ERR_INVALID_ESC_ACTION",
+    "ERR_GATEWAY_NOT_BOUND",
+    "ERR_SAVE_GUARD_BLOCKED",
+    "ERR_INVALID_ENVELOPE"
   ],
   "valid_mutation_events": [
     "CharacterCreated",
@@ -268,8 +273,76 @@
       "ERR_DESTINY_UNKNOWN_KIT_REF",
       "ERR_MOD_DUPLICATE_ID_CONFLICT",
       "ERR_MOD_INCOMPATIBLE_CONFLICT",
-      "ERR_MOD_UI_POLICY_CONFLICT"
+      "ERR_MOD_UI_POLICY_CONFLICT",
+      "ERR_PREEMPTED_BY_HUMAN",
+      "ERR_INVALID_ESC_ACTION",
+      "ERR_GATEWAY_NOT_BOUND",
+      "ERR_SAVE_GUARD_BLOCKED",
+      "ERR_INVALID_ENVELOPE"
     ]
+  },
+  "agent_hud_telemetry_capabilities": {
+    "protocol_version": "1.0.0",
+    "domain_name": "HOME_HUD",
+    "ring_buffer_capacity": 32,
+    "async_queue_capacity": 128,
+    "backpressure_strategy": "DROP_OLDEST",
+    "binary_compression_enabled": true,
+    "supported_directives": [
+      "ALLOCATE_POTENTIAL_STAT",
+      "CLAIM_QUEST_OBJECTIVE",
+      "DISMISS_UI_NOTICE",
+      "INSPECT_INVENTORY_SLOT",
+      "MARK_MAIL_READ",
+      "REST_AND_ADVANCE_TIME",
+      "TOGGLE_MODE_ADAPTATION"
+    ],
+    "control_lease": {
+      "human_preemption_lease_ms": 3000,
+      "auto_preempt_on_modal_open": true,
+      "modes": [
+        "READ_WRITE",
+        "READ_ONLY_OBSERVER"
+      ],
+      "operator_states": [
+        "IDLE",
+        "ACTIVE",
+        "EXCLUSIVE_MODAL_OPEN"
+      ]
+    },
+    "binary_telemetry_codec": {
+      "magic_header": "0x4B414C52",
+      "protocol_version": 1,
+      "target_byte_budget": 256
+    }
+  },
+  "unified_protocol_capabilities": {
+    "protocol_version": "1.0.0",
+    "supported_actors": [
+      "HUMAN_UI",
+      "AGENT"
+    ],
+    "human_preemption_lease_ms": 3000,
+    "auto_preempt_on_modal_open": true,
+    "supported_domains": [
+      "HOME_HUD",
+      "ESC_MENU",
+      "PROLOGUE",
+      "CHARACTER_CREATION"
+    ],
+    "esc_menu_actions": [
+      "RESUME_GAME",
+      "OPEN_SETTINGS",
+      "SAVE_AND_QUIT_TO_ARCHIVE",
+      "FORCE_QUIT_TO_ARCHIVE",
+      "SAVE_AND_QUIT_TO_GATEWAY",
+      "SAVE_AND_QUIT_DESKTOP"
+    ],
+    "envelope_schema_versions": {
+      "client_request": "kalar.mod_sdk.client_request_envelope.v1",
+      "unified_response": "kalar.mod_sdk.unified_response_envelope.v1",
+      "esc_payload": "kalar.mod_sdk.esc_menu_action_payload.v1"
+    }
   },
   "interactive_session_capabilities": {
     "supported_modes": [

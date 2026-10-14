@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 实体、物品与世界状态集群 (Entity & World State))
 # 文件路径: res://backend/domains/world_state/dto/world_calendar_environment_dto.gd
 # 架构定位: Value Object DTO / Data Transport Model
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/world_state.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/world_state.json | 信号: EventBus 领域广播
 # 职责说明: 世界历法与环境天候状态传输对象，承载年月历、时辰相位与以太浓度。
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## WorldCalendarEnvironmentDTO：Value Object DTO / Data Transport Model
 class_name WorldCalendarEnvironmentDTO
 extends RefCounted
 
@@ -17,6 +18,7 @@ var travel_hours: int = 0
 var day_phase_key: String = "MIDNIGHT"
 var mana_density_tier: int = 1
 
+## 序列化当前对象为通用字典传输结构
 func to_dto() -> Dictionary:
 	return {
 		"calendar_years": calendar_years,
@@ -27,6 +29,7 @@ func to_dto() -> Dictionary:
 		"mana_density_tier": mana_density_tier
 	}
 
+## 从输入字典反序列化还原传输对象
 static func from_dto(data: Dictionary) -> WorldCalendarEnvironmentDTO:
 	var dto := WorldCalendarEnvironmentDTO.new()
 	dto.calendar_years = maxi(0, int(data.get("calendar_years", 0)))

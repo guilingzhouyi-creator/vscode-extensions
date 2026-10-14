@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "kalar.mod_sdk.esc_menu_action_payload.v1",
+  "title": "EscMenuActionPayload",
+  "description": "卡拉尔世界引擎 ESC 系统菜单指令载荷强类型契约 (kalar.mod_sdk.esc_menu_action_payload.v1)",
+  "type": "object",
+  "properties": {
+    "action_type": {
+      "type": "string",
+      "enum": [
+        "ESC_QUERY_READINESS",
+        "ESC_SAVE_GAME",
+        "ESC_EXIT_TO_GATEWAY",
+        "ESC_QUIT_GAME",
+        "ESC_APPLY_SETTINGS"
+      ],
+      "description": "ESC 菜单核心操作指令"
+    },
+    "payload": {
+      "type": "object",
+      "properties": {
+        "slot_id": {
+          "type": "string",
+          "description": "存档槽位 ID，如 SLOT_01 ~ SLOT_10"
+        },
+        "auto_save": {
+          "type": "boolean",
+          "description": "退出前是否自动执行快速刷盘"
+        },
+        "exit_reason": {
+          "type": "string",
+          "description": "停机退出原因描述"
+        },
+        "volume_master": {
+          "type": "number",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "主音量调节 [0.0, 1.0]"
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "required": [
+    "action_type",
+    "payload"
+  ],
+  "additionalProperties": false
+}
+

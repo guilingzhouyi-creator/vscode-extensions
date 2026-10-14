@@ -2,11 +2,12 @@
 # 模块归属: 业务领域层 (Domains · 实体、物品与世界状态集群 (Entity & World State))
 # 文件路径: res://backend/domains/world_state/dto/hud_mutation_events_dto.gd
 # 架构定位: Value Object DTO / Data Transport Model
-# 跨域依赖: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/world_state.json | 信号: EventBus 领域广播
+# 依赖与触发: 上游: GameBootstrap, WorldGateway, 业务调度器 | 下游: world_navigation | 配置: config/domains/world_state.json | 信号: EventBus 领域广播
 # 职责说明: 当角色仅发生单项属性或钱包变动时，避免高频广播完整大快照， 提供精准增量事件流。 取值域契约： - StatMutation.stat_name   -> CharacterPhysiologySheet 六维 attribute 键 - WalletMutation.currency_type -> CharacterWalletEntity.CURRENCY_FIELDS
-# 设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
+# 退出语义与设计依据: 业务领域第一性原理与卡拉尔架构解耦契约
 # ==============================================================================
 
+## HudMutationEventsDTO：Value Object DTO / Data Transport Model
 class_name HudMutationEventsDTO
 extends RefCounted
 
@@ -20,6 +21,7 @@ class StatMutation extends RefCounted:
 	var cause_event: String = ""
 	var timestamp_utc: int = 0
 
+	## 序列化当前对象为通用字典传输结构
 	func to_dto() -> Dictionary:
 		return {
 			"character_id": character_id,
@@ -41,6 +43,7 @@ class WalletMutation extends RefCounted:
 	var reason_key: String = ""
 	var timestamp_utc: int = 0
 
+	## 序列化当前对象为通用字典传输结构
 	func to_dto() -> Dictionary:
 		return {
 			"account_id": account_id,
