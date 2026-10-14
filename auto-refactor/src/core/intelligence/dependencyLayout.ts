@@ -145,18 +145,6 @@ function createDetail(params: DetailParams): SemanticReviewDetail {
     };
 }
 
-interface StepContext {
-    kind: SemanticEvidenceStep['kind'];
-    description: string;
-    file: string;
-    line: number;
-    symbol?: string;
-}
-
-function buildSingleStep(ctx: StepContext): SemanticEvidenceStep[] {
-    return [{ kind: ctx.kind, description: ctx.description, file: ctx.file, line: ctx.line, symbol: ctx.symbol }];
-}
-
 interface LayoutIssuePayload {
     rule: string;
     severity: 'info' | 'warning' | 'error';
@@ -205,18 +193,12 @@ interface SingleImportIssueConfig {
 }
 
 function reportSingleImportIssue(issues: Issue[], config: SingleImportIssueConfig): void {
-    const evidence = buildSingleStep({
-        kind: config.evidenceKind,
-        description: config.evidenceDesc,
-        file: config.imp.file,
-        line: config.imp.line,
-    });
     const detail = createDetail({
         language: config.language,
         module: config.moduleName ?? MODULE_IMPORTS,
         symbol: config.imp.moduleSpecifier,
         currentBehavior: config.currentBehavior,
-        evidence,
+        evidence: [{ kind: config.evidenceKind, description: config.evidenceDesc, file: config.imp.file, line: config.imp.line }],
         triggerCondition: config.triggerCondition,
         risk: config.risk,
         suggestedFix: config.suggestedFix,
@@ -234,6 +216,173 @@ function reportSingleImportIssue(issues: Issue[], config: SingleImportIssueConfi
     });
 }
 
+interface RuleFormatPayload {
+    evidenceDesc: string;
+    currentBehavior: string;
+    message: string;
+    suggestion: string;
+    suggestedFix?: string;
+    verificationMethod?: string;
+    risk?: string;
+    triggerCondition?: string;
+}
+
+interface StaticRuleDescriptor {
+    readonly rule: string;
+    readonly severity: 'info' | 'warning' | 'error';
+    readonly moduleName: string;
+    readonly evidenceKind: SemanticEvidenceStep['kind'];
+    readonly triggerCondition: string;
+    readonly risk: string;
+    readonly verificationMethod: string;
+    readonly suggestedFix?: string;
+    readonly confidence?: number;
+    readonly defaultFormat?: (imp: ImportStatementInfo) => RuleFormatPayload;
+}
+
+const RULE_DESCRIPTOR_MAP: Readonly<Record<string, StaticRuleDescriptor>> = Object.freeze({
+    'DEP-LAZ-001': {
+        rule: 'DEP-LAZ-001',
+        severity: SEVERITY_WARNING,
+        moduleName: MODULE_IMPORTS,
+        evidenceKind: KIND_CALL,
+        triggerCondition: 'Import inside function lacking @lazy/@optional tag',
+        risk: 'Hides module coupling and risks hidden circular dependencies.',
+        verificationMethod: 'Verify import lives in top-level header or carries exemption tag.',
+        suggestedFix: 'Hoist import to top-level, or annotate with exemption.',
+        defaultFormat: (imp: ImportStatementInfo) => ({
+            evidenceDesc: `In-function import '${imp.rawText}' without audit tag`,
+            currentBehavior: `Ad-hoc in-function import '${imp.rawText}' executed at runtime.`,
+            message: `Unjustified in-function import '${imp.moduleSpecifier}': hoist or declare exemption.`,
+            suggestion: 'Move import to top-level or annotate with @lazy/@optional justification.',
+        }),
+    },
+    'DEP-WLD-001': {
+        rule: 'DEP-WLD-001',
+        severity: SEVERITY_WARNING,
+        moduleName: MODULE_IMPORTS,
+        evidenceKind: KIND_CALL,
+        triggerCondition: 'Wildcard import used in production source code',
+        risk: 'Pollutes local namespace and obscures dependency tracking.',
+        verificationMethod: 'Verify named imports replace wildcard.',
+        suggestedFix: 'Import only explicitly required named symbols.',
+        confidence: CONFIDENCE_HIGH,
+        defaultFormat: (imp: ImportStatementInfo) => ({
+            evidenceDesc: `Wildcard import: '${imp.rawText}'`,
+            currentBehavior: `Importing all symbols from '${imp.moduleSpecifier}' via wildcard.`,
+            message: `Wildcard import from '${imp.moduleSpecifier}': prefer explicit named imports.`,
+            suggestion: 'Replace wildcard with explicit named symbol imports.',
+        }),
+    },
+    'DEP-INV-001': {
+        rule: 'DEP-INV-001',
+        severity: SEVERITY_ERROR,
+        moduleName: MODULE_DEPENDENCIES,
+        evidenceKind: KIND_CONDITION,
+        triggerCondition: 'Shared component imports higher-level domain/app module',
+        risk: 'Creates inverted dependency cycles, preventing utility reuse.',
+        verificationMethod: 'Verify low-level utilities have zero upper-layer dependencies.',
+        suggestedFix: 'Invert dependency via dependency injection or relocate logic.',
+        defaultFormat: (imp: ImportStatementInfo) => ({
+            evidenceDesc: `Low-level file '${imp.file}' imports high-level '${imp.moduleSpecifier}'`,
+            currentBehavior: `Low-level component '${imp.file}' inverts dependency by importing '${imp.moduleSpecifier}'.`,
+            message: `Inverted dependency: low-level module '${imp.file}' imports high-level '${imp.moduleSpecifier}'.`,
+            suggestion: 'Extract shared contract or inject domain dependency from higher level.',
+        }),
+    },
+    'DEP-PHANTOM-001': {
+        rule: 'DEP-PHANTOM-001',
+        severity: SEVERITY_WARNING,
+        moduleName: MODULE_DEPENDENCIES,
+        evidenceKind: KIND_CALL,
+        triggerCondition: 'Import of external third-party package not declared in package.json or project manifest',
+        risk: 'Phantom dependencies cause non-deterministic builds and CI breakage in clean environments.',
+        verificationMethod: 'Verify package is declared in project manifest.',
+        confidence: CONFIDENCE_DEFAULT,
+    },
+    'DEP-LIC-001': {
+        rule: 'DEP-LIC-001',
+        severity: SEVERITY_WARNING,
+        moduleName: MODULE_GOVERNANCE,
+        evidenceKind: KIND_CONDITION,
+        triggerCondition: 'Proprietary code importing viral copyleft (GPL/AGPL/SSPL) dependency',
+        risk: 'Legal and compliance risk: copyleft license requires disclosing proprietary derivative source code.',
+        verificationMethod: 'Verify dependency license is permissive or approved under organizational policy.',
+        confidence: CONFIDENCE_DEFAULT,
+    },
+    'DEP-DEV-001': {
+        rule: 'DEP-DEV-001',
+        severity: SEVERITY_WARNING,
+        moduleName: MODULE_DEPENDENCIES,
+        evidenceKind: KIND_CALL,
+        triggerCondition: 'Runtime value import of devDependency in production code',
+        risk: 'Production builds deployed without devDependencies will crash with missing module errors at runtime.',
+        verificationMethod: "Verify package is in dependencies or converted to 'import type'.",
+        confidence: CONFIDENCE_DEFAULT,
+    },
+    'DEP-OBS-001': {
+        rule: 'DEP-OBS-001',
+        severity: SEVERITY_WARNING,
+        moduleName: MODULE_MAINTENANCE,
+        evidenceKind: KIND_CALL,
+        triggerCondition: 'Deprecated or unmaintained package imported in codebase',
+        risk: 'Accumulates technical debt, prevents runtime upgrades, and poses unpatched vulnerability risks.',
+        verificationMethod: 'Verify deprecated package is replaced with active alternative.',
+        confidence: CONFIDENCE_HIGH,
+    },
+    'DEP-PIN-001': {
+        rule: 'DEP-PIN-001',
+        severity: SEVERITY_WARNING,
+        moduleName: MODULE_MAINTENANCE,
+        evidenceKind: KIND_CALL,
+        triggerCondition: 'Unpinned or wildcard dependency version declaration',
+        risk: 'Floating versions introduce unpredictable breaking changes and supply chain attack vectors.',
+        verificationMethod: 'Verify package in package.json has a pinned exact or caret version.',
+        confidence: CONFIDENCE_DEFAULT,
+    },
+    'DEP-VULN-001': {
+        rule: 'DEP-VULN-001',
+        severity: SEVERITY_ERROR,
+        moduleName: MODULE_SECURITY,
+        evidenceKind: KIND_CALL,
+        triggerCondition: 'Known security vulnerability detected',
+        risk: 'Supply chain security threat: potential backdoor or malicious payload.',
+        verificationMethod: 'Verify package is removed, replaced, or upgraded to a safe version.',
+        confidence: CONFIDENCE_HIGH,
+    },
+});
+
+function emitDescribedImportIssue(
+    issues: Issue[],
+    ruleId: string,
+    imp: ImportStatementInfo,
+    language: string,
+    customPayload?: RuleFormatPayload,
+): void {
+    const desc = RULE_DESCRIPTOR_MAP[ruleId];
+    if (!desc) return;
+    const formatted = customPayload || (desc.defaultFormat ? desc.defaultFormat(imp) : null);
+    if (!formatted) return;
+
+    reportSingleImportIssue(issues, {
+        rule: desc.rule,
+        severity: desc.severity,
+        imp,
+        evidenceKind: desc.evidenceKind,
+        evidenceDesc: formatted.evidenceDesc,
+        currentBehavior: formatted.currentBehavior,
+        triggerCondition: formatted.triggerCondition ?? desc.triggerCondition,
+        risk: formatted.risk ?? desc.risk,
+        suggestedFix: formatted.suggestedFix ?? desc.suggestedFix ?? '',
+        verificationMethod: formatted.verificationMethod ?? desc.verificationMethod,
+        message: formatted.message,
+        suggestion: formatted.suggestion,
+        language,
+        moduleName: desc.moduleName,
+        confidence: desc.confidence,
+    });
+}
+
 function auditInFunctionImports(
     imports: ImportStatementInfo[],
     language: string,
@@ -241,21 +390,7 @@ function auditInFunctionImports(
 ): void {
     for (const imp of imports) {
         if (!imp.isInsideFunction || imp.hasAuditExemption) continue;
-        reportSingleImportIssue(issues, {
-            rule: 'DEP-LAZ-001',
-            severity: SEVERITY_WARNING,
-            imp,
-            evidenceKind: KIND_CALL,
-            evidenceDesc: `In-function import '${imp.rawText}' without audit tag`,
-            currentBehavior: `Ad-hoc in-function import '${imp.rawText}' executed at runtime.`,
-            triggerCondition: 'Import inside function lacking @lazy/@optional tag',
-            risk: 'Hides module coupling and risks hidden circular dependencies.',
-            suggestedFix: 'Hoist import to top-level, or annotate with exemption.',
-            verificationMethod: 'Verify import lives in top-level header or carries exemption tag.',
-            message: `Unjustified in-function import '${imp.moduleSpecifier}': hoist or declare exemption.`,
-            suggestion: 'Move import to top-level or annotate with @lazy/@optional justification.',
-            language,
-        });
+        emitDescribedImportIssue(issues, 'DEP-LAZ-001', imp, language);
     }
 }
 
@@ -266,23 +401,7 @@ function auditWildcardImports(
 ): void {
     for (const imp of imports) {
         if (!imp.isWildcard) continue;
-        reportSingleImportIssue(issues, {
-            rule: 'DEP-WLD-001',
-            severity: SEVERITY_WARNING,
-            imp,
-            evidenceKind: KIND_CALL,
-            evidenceDesc: `Wildcard import: '${imp.rawText}'`,
-            currentBehavior: `Importing all symbols from '${imp.moduleSpecifier}' via wildcard.`,
-            triggerCondition: 'Wildcard import used in production source code',
-            risk: 'Pollutes local namespace and obscures dependency tracking.',
-            suggestedFix: 'Import only explicitly required named symbols.',
-            verificationMethod: 'Verify named imports replace wildcard.',
-            message: `Wildcard import from '${imp.moduleSpecifier}': prefer explicit named imports.`,
-            suggestion: 'Replace wildcard with explicit named symbol imports.',
-            language,
-            moduleName: MODULE_IMPORTS,
-            confidence: CONFIDENCE_HIGH,
-        });
+        emitDescribedImportIssue(issues, 'DEP-WLD-001', imp, language);
     }
 }
 
@@ -295,22 +414,7 @@ function auditInvertedDependencies(
     if (!isLowLevelFile) return;
     for (const imp of imports) {
         if (!HIGH_LEVEL_IMPORT_RE.test(imp.moduleSpecifier)) continue;
-        reportSingleImportIssue(issues, {
-            rule: 'DEP-INV-001',
-            severity: SEVERITY_ERROR,
-            imp,
-            evidenceKind: KIND_CONDITION,
-            evidenceDesc: `Low-level file '${imp.file}' imports high-level '${imp.moduleSpecifier}'`,
-            currentBehavior: `Low-level component '${imp.file}' inverts dependency by importing '${imp.moduleSpecifier}'.`,
-            triggerCondition: 'Shared component imports higher-level domain/app module',
-            risk: 'Creates inverted dependency cycles, preventing utility reuse.',
-            suggestedFix: 'Invert dependency via dependency injection or relocate logic.',
-            verificationMethod: 'Verify low-level utilities have zero upper-layer dependencies.',
-            message: `Inverted dependency: low-level module '${imp.file}' imports high-level '${imp.moduleSpecifier}'.`,
-            suggestion: 'Extract shared contract or inject domain dependency from higher level.',
-            language,
-            moduleName: MODULE_DEPENDENCIES,
-        });
+        emitDescribedImportIssue(issues, 'DEP-INV-001', imp, language);
     }
 }
 
@@ -325,18 +429,17 @@ function auditFileLayoutOrder(
         const currentImport = topLevel[i];
         const nextImport = topLevel[i + 1];
         if (CATEGORY_PRIORITY[currentImport.category] <= CATEGORY_PRIORITY[nextImport.category]) continue;
-        const evidence = buildSingleStep({
-            kind: KIND_CONDITION,
-            description: `'${currentImport.moduleSpecifier}' (${currentImport.category}) precedes '${nextImport.moduleSpecifier}' (${nextImport.category})`,
-            file: currentImport.file,
-            line: nextImport.line,
-        });
         const detail = createDetail({
             language,
             module: MODULE_LAYOUT,
             symbol: nextImport.moduleSpecifier,
             currentBehavior: `Import ordering inversion: '${currentImport.category}' placed before '${nextImport.category}'.`,
-            evidence,
+            evidence: [{
+                kind: KIND_CONDITION,
+                description: `'${currentImport.moduleSpecifier}' (${currentImport.category}) precedes '${nextImport.moduleSpecifier}' (${nextImport.category})`,
+                file: currentImport.file,
+                line: nextImport.line,
+            }],
             triggerCondition: 'Import group order does not follow canonical sequence',
             risk: 'Violates repository layout conventions.',
             suggestedFix: 'Reorder imports: standard library first, third-party, then local.',
@@ -364,19 +467,18 @@ function auditExternalResources(
 ): void {
     for (const res of resources) {
         if (res.isManagedInRegistry || !EXTERNAL_URL_RE.test(res.urlOrPath)) continue;
-        const evidence = buildSingleStep({
-            kind: KIND_VARIABLE,
-            description: `Raw external URL '${res.urlOrPath}' embedded directly in code`,
-            file: res.file,
-            line: res.line,
-            symbol: res.symbol,
-        });
         const detail = createDetail({
             language,
             module: MODULE_RESOURCES,
             symbol: res.symbol,
             currentBehavior: `Raw unmanaged remote endpoint '${res.urlOrPath}' hardcoded.`,
-            evidence,
+            evidence: [{
+                kind: KIND_VARIABLE,
+                description: `Raw external URL '${res.urlOrPath}' embedded directly in code`,
+                file: res.file,
+                line: res.line,
+                symbol: res.symbol,
+            }],
             triggerCondition: 'Hardcoded HTTP/WebSocket URL string detected in business code',
             risk: 'Prevents environment-specific routing and rotation.',
             suggestedFix: 'Move remote URLs into configuration or service registry.',
@@ -400,26 +502,39 @@ const PKG_KEY_TO_VERSION_MAP = new Map<string, string | null>();
 /** Known host-provided or ambient modules exempt from phantom dependency flags */
 const KNOWN_AMBIENT_MODULES: ReadonlySet<string> = new Set(['vscode', 'electron']);
 
-function extractLicenseFromPackageJson(pkgJsonPath: string): string | null {
-    if (!fs.existsSync(pkgJsonPath)) {
+function readJsonSafely(filePath: string): any | null {
+    if (!fs.existsSync(filePath)) {
         return null;
     }
     try {
-        const raw = fs.readFileSync(pkgJsonPath, 'utf8');
-        const parsedPkgJson = JSON.parse(raw);
-        if (typeof parsedPkgJson.license === 'string') {
-            return parsedPkgJson.license;
-        }
-        if (typeof parsedPkgJson.license === 'object' && parsedPkgJson.license?.type) {
-            return parsedPkgJson.license.type;
-        }
-        if (Array.isArray(parsedPkgJson.licenses) && parsedPkgJson.licenses[0]?.type) {
-            return parsedPkgJson.licenses[0].type;
-        }
-        return null;
+        return JSON.parse(fs.readFileSync(filePath, 'utf8'));
     } catch {
         return null;
     }
+}
+
+function findAncestorPackageManifest(rootDir: string, packageName: string): any | null {
+    let currentDir = rootDir;
+    for (let i = 0; i < MAX_ANCESTOR_SEARCH_DEPTH; i++) {
+        const manifest = readJsonSafely(path.join(currentDir, 'node_modules', packageName, 'package.json'));
+        if (manifest) {
+            return manifest;
+        }
+        const parent = path.dirname(currentDir);
+        if (parent === currentDir) {
+            break;
+        }
+        currentDir = parent;
+    }
+    return null;
+}
+
+function extractLicenseFromManifest(manifest: any): string | null {
+    if (!manifest) return null;
+    if (typeof manifest.license === 'string') return manifest.license;
+    if (typeof manifest.license?.type === 'string') return manifest.license.type;
+    if (Array.isArray(manifest.licenses) && manifest.licenses[0]?.type) return manifest.licenses[0].type;
+    return null;
 }
 
 /**
@@ -430,57 +545,9 @@ function resolvePackageLicense(rootDir: string, packageName: string): string | n
     if (PKG_KEY_TO_LICENSE_MAP.has(cacheKey)) {
         return PKG_KEY_TO_LICENSE_MAP.get(cacheKey) ?? null;
     }
-    let currentDir = rootDir;
-    for (let i = 0; i < MAX_ANCESTOR_SEARCH_DEPTH; i++) {
-        const pkgJsonPath = path.join(currentDir, 'node_modules', packageName, 'package.json');
-        const lic = extractLicenseFromPackageJson(pkgJsonPath);
-        if (lic) {
-            PKG_KEY_TO_LICENSE_MAP.set(cacheKey, lic);
-            return lic;
-        }
-        const parent = path.dirname(currentDir);
-        if (parent === currentDir) {
-            break;
-        }
-        currentDir = parent;
-    }
-    PKG_KEY_TO_LICENSE_MAP.set(cacheKey, null);
-    return null;
-}
-
-/**
- * Safely extracts package version string from a package.json file.
- */
-function extractVersionFromPackageJson(pkgJsonPath: string): string | null {
-    if (!fs.existsSync(pkgJsonPath)) {
-        return null;
-    }
-    try {
-        const parsedVersionJson = JSON.parse(fs.readFileSync(pkgJsonPath, 'utf8'));
-        return typeof parsedVersionJson.version === 'string' ? parsedVersionJson.version : null;
-    } catch {
-        return null;
-    }
-}
-
-/**
- * Resolves package version declaration from root package.json manifests.
- */
-function resolveVersionFromRootManifest(rootDir: string, packageName: string): string | null {
-    const rootPkg = path.join(rootDir, 'package.json');
-    if (!fs.existsSync(rootPkg)) {
-        return null;
-    }
-    try {
-        const manifestData = JSON.parse(fs.readFileSync(rootPkg, 'utf8'));
-        const ver =
-            manifestData.dependencies?.[packageName] ||
-            manifestData.devDependencies?.[packageName] ||
-            manifestData.optionalDependencies?.[packageName];
-        return typeof ver === 'string' ? ver : null;
-    } catch {
-        return null;
-    }
+    const lic = extractLicenseFromManifest(findAncestorPackageManifest(rootDir, packageName));
+    PKG_KEY_TO_LICENSE_MAP.set(cacheKey, lic);
+    return lic;
 }
 
 /**
@@ -495,31 +562,19 @@ function resolvePackageVersion(rootDir: string | undefined, packageName: string)
         return PKG_KEY_TO_VERSION_MAP.get(cacheKey) ?? null;
     }
 
-    // 1. Try node_modules/<packageName>/package.json (up to 3 levels)
-    let currentDir = rootDir;
-    for (let i = 0; i < MAX_ANCESTOR_SEARCH_DEPTH; i++) {
-        const pkgJsonPath = path.join(currentDir, 'node_modules', packageName, 'package.json');
-        const ver = extractVersionFromPackageJson(pkgJsonPath);
-        if (ver) {
-            PKG_KEY_TO_VERSION_MAP.set(cacheKey, ver);
-            return ver;
-        }
-        const parent = path.dirname(currentDir);
-        if (parent === currentDir) {
-            break;
-        }
-        currentDir = parent;
+    const manifest = findAncestorPackageManifest(rootDir, packageName);
+    let ver = typeof manifest?.version === 'string' ? manifest.version : null;
+    if (!ver) {
+        const rootManifest = readJsonSafely(path.join(rootDir, 'package.json'));
+        const declared =
+            rootManifest?.dependencies?.[packageName] ||
+            rootManifest?.devDependencies?.[packageName] ||
+            rootManifest?.optionalDependencies?.[packageName];
+        ver = typeof declared === 'string' ? declared : null;
     }
 
-    // 2. Try root package.json declared dependencies
-    const manifestVer = resolveVersionFromRootManifest(rootDir, packageName);
-    if (manifestVer) {
-        PKG_KEY_TO_VERSION_MAP.set(cacheKey, manifestVer);
-        return manifestVer;
-    }
-
-    PKG_KEY_TO_VERSION_MAP.set(cacheKey, null);
-    return null;
+    PKG_KEY_TO_VERSION_MAP.set(cacheKey, ver);
+    return ver;
 }
 
 /**
@@ -582,8 +637,7 @@ function auditVulnerableDependencies(
     issues: Issue[],
 ): void {
     for (const imp of imports) {
-        if (imp.category !== CATEGORY_THIRD_PARTY) continue;
-        if (isExemptPathOrAlias(imp.moduleSpecifier)) continue;
+        if (imp.category !== CATEGORY_THIRD_PARTY || isExemptPathOrAlias(imp.moduleSpecifier)) continue;
 
         const pkgName = extractPackageName(imp.moduleSpecifier);
         const resolvedVer = resolvePackageVersion(rootDir, pkgName) ?? undefined;
@@ -593,22 +647,14 @@ function auditVulnerableDependencies(
         });
         if (!vuln) continue;
 
-        reportSingleImportIssue(issues, {
-            rule: 'DEP-VULN-001',
-            severity: SEVERITY_ERROR,
-            imp,
-            evidenceKind: KIND_CALL,
+        emitDescribedImportIssue(issues, 'DEP-VULN-001', imp, language, {
             evidenceDesc: `Compromised package '${vuln.packageName}': ${vuln.title} (${vuln.advisoryId})`,
             currentBehavior: `Import of compromised or backdoored package '${vuln.packageName}'.`,
             triggerCondition: `Known security vulnerability detected: ${vuln.description}`,
             risk: `Supply chain security threat (${vuln.severity}): potential backdoor or malicious payload.`,
             suggestedFix: vuln.recommendation,
-            verificationMethod: 'Verify package is removed, replaced, or upgraded to a safe version.',
             message: `Supply chain security violation: import of compromised package '${vuln.packageName}' (${vuln.advisoryId}): ${vuln.title}.`,
             suggestion: vuln.recommendation,
-            language,
-            moduleName: MODULE_SECURITY,
-            confidence: CONFIDENCE_HIGH,
         });
     }
 }
@@ -640,8 +686,7 @@ function auditPhantomDependencies(
     const seenPhantomPackages = new Set<string>();
 
     for (const imp of imports) {
-        if (imp.category !== CATEGORY_THIRD_PARTY) continue;
-        if (isExemptPathOrAlias(imp.moduleSpecifier)) continue;
+        if (imp.category !== CATEGORY_THIRD_PARTY || isExemptPathOrAlias(imp.moduleSpecifier)) continue;
 
         const pkgName = extractPackageName(imp.moduleSpecifier);
         if (!pkgName || seenPhantomPackages.has(pkgName)) continue;
@@ -651,22 +696,12 @@ function auditPhantomDependencies(
             continue;
         }
 
-        reportSingleImportIssue(issues, {
-            rule: 'DEP-PHANTOM-001',
-            severity: SEVERITY_WARNING,
-            imp,
-            evidenceKind: KIND_CALL,
+        emitDescribedImportIssue(issues, 'DEP-PHANTOM-001', imp, language, {
             evidenceDesc: `Undeclared external package '${pkgName}' imported without manifest declaration`,
             currentBehavior: `External package '${pkgName}' imported in '${imp.file}' but missing from project manifests.`,
-            triggerCondition: 'Import of external third-party package not declared in package.json or project manifest',
-            risk: 'Phantom dependencies cause non-deterministic builds and CI breakage in clean environments.',
             suggestedFix: `Add '${pkgName}' to dependencies/devDependencies in package.json, or replace with local module.`,
-            verificationMethod: `Verify '${pkgName}' is declared in project manifest.`,
             message: `Phantom dependency: '${pkgName}' is imported in '${imp.file}' but not declared in project manifest.`,
             suggestion: `Add '${pkgName}' to dependencies in package.json or project manifest.`,
-            language,
-            moduleName: MODULE_DEPENDENCIES,
-            confidence: CONFIDENCE_DEFAULT,
         });
     }
 }
@@ -700,26 +735,16 @@ function checkSingleLicenseViolation(
         return;
     }
 
-    reportSingleImportIssue(ctx.issues, {
-        rule: 'DEP-LIC-001',
-        severity: SEVERITY_WARNING,
-        imp,
-        evidenceKind: KIND_CONDITION,
+    const remediation =
+        audit.remediation ||
+        `Replace '${pkgName}' with a permissively licensed alternative (MIT/Apache-2.0).`;
+
+    emitDescribedImportIssue(ctx.issues, 'DEP-LIC-001', imp, ctx.language, {
         evidenceDesc: `External dependency '${pkgName}' carries restrictive/copyleft license '${lic}'`,
         currentBehavior: `Dependency '${pkgName}' is governed by '${lic}' which imposes copyleft distribution obligations.`,
-        triggerCondition: 'Proprietary code importing viral copyleft (GPL/AGPL/SSPL) dependency',
-        risk: 'Legal and compliance risk: copyleft license requires disclosing proprietary derivative source code.',
-        suggestedFix:
-            audit.remediation ||
-            `Replace '${pkgName}' with a permissively licensed alternative (MIT/Apache-2.0).`,
-        verificationMethod: 'Verify dependency license is permissive or approved under organizational policy.',
+        suggestedFix: remediation,
         message: `License compliance violation: dependency '${pkgName}' uses restrictive copyleft license '${lic}'.`,
-        suggestion:
-            audit.remediation ||
-            `Replace '${pkgName}' with a permissively licensed alternative (MIT/Apache-2.0).`,
-        language: ctx.language,
-        moduleName: MODULE_GOVERNANCE,
-        confidence: CONFIDENCE_DEFAULT,
+        suggestion: remediation,
     });
 }
 
@@ -780,22 +805,12 @@ function auditDevelopmentDependencies(
         if (!pkgName) continue;
 
         if (isDevOnlyDependency(pkgName, ctx.inventory)) {
-            reportSingleImportIssue(ctx.issues, {
-                rule: 'DEP-DEV-001',
-                severity: SEVERITY_WARNING,
-                imp,
-                evidenceKind: KIND_CALL,
+            emitDescribedImportIssue(ctx.issues, 'DEP-DEV-001', imp, ctx.language, {
                 evidenceDesc: `Development-only package '${pkgName}' imported in production code`,
                 currentBehavior: `Package '${pkgName}' is declared in devDependencies but imported at runtime in production file '${imp.file}'.`,
-                triggerCondition: 'Runtime value import of devDependency in production code',
-                risk: 'Production builds deployed without devDependencies will crash with missing module errors at runtime.',
                 suggestedFix: `Move '${pkgName}' to dependencies in package.json, or switch to 'import type' if used solely for type annotations.`,
-                verificationMethod: `Verify '${pkgName}' is in dependencies or converted to 'import type'.`,
                 message: `Dev-only dependency leakage: '${pkgName}' is declared in devDependencies but imported in production file '${imp.file}'.`,
                 suggestion: `Move '${pkgName}' to dependencies in package.json, or convert import to 'import type'.`,
-                language: ctx.language,
-                moduleName: MODULE_DEPENDENCIES,
-                confidence: CONFIDENCE_DEFAULT,
             });
         }
     }
@@ -833,22 +848,12 @@ function auditSingleDeprecatedImport(
     }
 
     const targetPkg = deprecatedInfo.packageName;
-    reportSingleImportIssue(issues, {
-        rule: 'DEP-OBS-001',
-        severity: SEVERITY_WARNING,
-        imp,
-        evidenceKind: KIND_CALL,
+    emitDescribedImportIssue(issues, 'DEP-OBS-001', imp, language, {
         evidenceDesc: `Deprecated package '${targetPkg}' imported: ${deprecatedInfo.reason}`,
         currentBehavior: `Importing deprecated package '${targetPkg}'. Recommended modern replacement: ${deprecatedInfo.replacement}.`,
-        triggerCondition: 'Deprecated or unmaintained package imported in codebase',
-        risk: 'Accumulates technical debt, prevents runtime upgrades, and poses unpatched vulnerability risks.',
         suggestedFix: deprecatedInfo.remediation,
-        verificationMethod: `Verify '${targetPkg}' is replaced with ${deprecatedInfo.replacement}.`,
         message: `Deprecated dependency: '${targetPkg}' is deprecated (${deprecatedInfo.reason}). Prefer ${deprecatedInfo.replacement}.`,
         suggestion: deprecatedInfo.remediation,
-        language,
-        moduleName: MODULE_MAINTENANCE,
-        confidence: CONFIDENCE_HIGH,
     });
 }
 
@@ -888,22 +893,13 @@ function auditSingleUnpinnedImport(
         return;
     }
 
-    reportSingleImportIssue(ctx.issues, {
-        rule: 'DEP-PIN-001',
-        severity: SEVERITY_WARNING,
-        imp,
-        evidenceKind: KIND_CALL,
+    emitDescribedImportIssue(ctx.issues, 'DEP-PIN-001', imp, ctx.language, {
         evidenceDesc: `Unpinned/wildcard version '${ver}' declared for package '${pkgName}' in manifest`,
         currentBehavior: `Package '${pkgName}' has unpinned version requirement '${ver}' in project manifest.`,
-        triggerCondition: 'Unpinned or wildcard dependency version declaration',
-        risk: 'Floating versions introduce unpredictable breaking changes and supply chain attack vectors.',
         suggestedFix: `Pin '${pkgName}' to an exact or semver-caret range (e.g. ^1.2.3) in project manifest.`,
         verificationMethod: `Verify '${pkgName}' is pinned to a concrete version in manifest.`,
         message: `Unpinned dependency version: '${pkgName}' uses '${ver}'. Pin to exact or semver-caret range.`,
         suggestion: `Pin '${pkgName}' to an exact or semver-caret range in project manifest.`,
-        language: ctx.language,
-        moduleName: MODULE_DEPENDENCIES,
-        confidence: CONFIDENCE_DEFAULT,
     });
 }
 

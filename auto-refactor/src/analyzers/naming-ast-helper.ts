@@ -23,7 +23,6 @@ import type {
     SymbolEntry,
 } from '../core/architecture/naming-decoupling-auditor';
 import { hasTransientJargon } from './naming-path-helper';
-import { isCompositeLiteral, isScalarLiteral } from './naming-candidate-helper';
 import type { NamingOptions } from './naming';
 
 /**
@@ -377,3 +376,77 @@ export function auditDecouplingClustersHelper(
         }
     }
 }
+
+const SCALAR_SYNTAX_KINDS = new Set<ts.SyntaxKind>([
+    ts.SyntaxKind.NumericLiteral,
+    ts.SyntaxKind.StringLiteral,
+    ts.SyntaxKind.NoSubstitutionTemplateLiteral,
+    ts.SyntaxKind.TrueKeyword,
+    ts.SyntaxKind.FalseKeyword,
+    ts.SyntaxKind.BigIntLiteral,
+    ts.SyntaxKind.RegularExpressionLiteral,
+]);
+
+/**
+ * Strips type assertions and parenthesization from a constant initializer.
+ *
+ * @param expr - Expression AST node to unwrap.
+ * @returns Deeply unwrapped inner expression node.
+ */
+export function unwrapConstantInitializer(expr: ts.Expression): ts.Expression {
+    let current = expr;
+    while (
+        ts.isAsExpression(current) ||
+        ts.isTypeAssertionExpression(current) ||
+        ts.isParenthesizedExpression(current) ||
+        ts.isNonNullExpression(current)
+    ) {
+        current = current.expression;
+    }
+    return current;
+}
+
+/**
+ * Checks whether an expression represents a composite collection/object literal.
+ *
+ * @param expr - Expression AST node to inspect.
+ * @returns True if expression is an object or array literal.
+ */
+export function isCompositeLiteral(expr: ts.Expression): boolean {
+    const unwrapped = unwrapConstantInitializer(expr);
+    return ts.isObjectLiteralExpression(unwrapped) || ts.isArrayLiteralExpression(unwrapped);
+}
+
+/**
+ * Checks whether an expression is a scalar primitive literal.
+ *
+ * @param expr - Expression AST node to inspect.
+ * @returns True if expression is a scalar primitive literal.
+ */
+export function isScalarLiteral(expr: ts.Expression): boolean {
+    let unwrapped = unwrapConstantInitializer(expr);
+    const isUnaryPlusOrMinus =
+        ts.isPrefixUnaryExpression(unwrapped) &&
+        (unwrapped.operator === ts.SyntaxKind.PlusToken ||
+            unwrapped.operator === ts.SyntaxKind.MinusToken);
+    if (isUnaryPlusOrMinus) {
+        unwrapped = (unwrapped as ts.PrefixUnaryExpression).operand;
+    }
+    return SCALAR_SYNTAX_KINDS.has(unwrapped.kind);
+}
+
+/**
+ * Checks whether an AST node is a single-line or single-expression arrow function.
+ *
+ * @param node - AST node to test.
+ * @param sf - Source file providing position offsets.
+ * @returns True if node is a single-line or concise-body arrow function.
+ */
+export function isSimpleArrowFunction(node: ts.Node, sf: ts.SourceFile): boolean {
+    if (!ts.isArrowFunction(node)) return false;
+    if (!ts.isBlock(node.body) || node.body.statements.length <= 1) return true;
+    const startLine = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line;
+    const endLine = sf.getLineAndCharacterOfPosition(node.getEnd()).line;
+    return endLine - startLine <= 4;
+}
+

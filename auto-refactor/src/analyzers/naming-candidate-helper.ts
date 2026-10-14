@@ -845,6 +845,62 @@ export interface FunctionNamingAuditOptions {
  * @param symbolIndex - Optional symbol index service.
  * @param emitIssue - Callback to emit diagnostic issues.
  */
+function emitNamingDiagnostic(
+    pos: { line: number; character: number },
+    rule: string,
+    desc: DiagnosticDescriptor,
+    detail: Record<string, unknown>,
+    actionable: NamingActionablePayload,
+    emitIssue: NamingIssueEmitter,
+): void {
+    emitIssue(
+        pos.line + 1,
+        pos.character + 1,
+        rule,
+        desc.message,
+        SEVERITY_WARNING,
+        { ...detail, actionable },
+        desc.suggestion,
+        actionable,
+    );
+}
+
+function checkAndEmitAbbreviation(
+    name: string,
+    node: ts.Node,
+    pos: { line: number; character: number },
+    ctx: AnalyzerContext,
+    symbolIndex: SymbolIndexLike | undefined,
+    emitIssue: NamingIssueEmitter,
+): void {
+    const abbr = findUnapprovedAbbreviation(name);
+    if (!abbr) return;
+    const desc = NamingMessages.UNAPPROVED_ABBREVIATION(name, abbr.unapproved, abbr.expanded);
+    const actionable = buildNamingActionable(name, node, RULE_NAM_ABR_001, ctx, pos, symbolIndex);
+    emitNamingDiagnostic(
+        pos,
+        RULE_NAM_ABR_001,
+        desc,
+        { name, unapproved: abbr.unapproved, expanded: abbr.expanded },
+        actionable,
+        emitIssue,
+    );
+}
+
+/**
+ * Audits a function or method name for minimum/maximum length constraints
+ * and unapproved abbreviation patterns.
+ *
+ * @param name - Function or method identifier name.
+ * @param node - AST declaration node.
+ * @param pos - Position coordinates of the identifier.
+ * @param pos.line - 0-based line number.
+ * @param pos.character - 0-based character offset.
+ * @param ctx - Analyzer execution context.
+ * @param opts - Naming audit options.
+ * @param symbolIndex - Optional symbol index service.
+ * @param emitIssue - Callback to emit diagnostic issues.
+ */
 export function auditFunctionNameLengthsAndAbbreviations(
     name: string,
     node: ts.Node,
@@ -857,45 +913,19 @@ export function auditFunctionNameLengthsAndAbbreviations(
     if (opts.checkLengths !== false) {
         const minLen = opts.minFunctionLength ?? 3;
         const maxLen = opts.maxFunctionLength ?? MAX_FUNCTION_NAME_LENGTH;
-        if (name.length < minLen) {
-            const desc = NamingMessages.FUNCTION_NAME_TOO_SHORT(name);
-            const actionable = buildNamingActionable(
-                name,
-                node,
-                RULE_NAM_LEN_002,
-                ctx,
+        if (name.length < minLen || name.length >= maxLen) {
+            const isShort = name.length < minLen;
+            const desc = isShort
+                ? NamingMessages.FUNCTION_NAME_TOO_SHORT(name)
+                : NamingMessages.FUNCTION_NAME_TOO_LONG(name);
+            const actionable = buildNamingActionable(name, node, RULE_NAM_LEN_002, ctx, pos, symbolIndex);
+            emitNamingDiagnostic(
                 pos,
-                symbolIndex,
-            );
-            emitIssue(
-                pos.line + 1,
-                pos.character + 1,
                 RULE_NAM_LEN_002,
-                desc.message,
-                SEVERITY_WARNING,
-                { name, length: name.length, minLen, actionable },
-                desc.suggestion,
+                desc,
+                isShort ? { name, length: name.length, minLen } : { name, length: name.length, maxLen },
                 actionable,
-            );
-        } else if (name.length >= maxLen) {
-            const desc = NamingMessages.FUNCTION_NAME_TOO_LONG(name);
-            const actionable = buildNamingActionable(
-                name,
-                node,
-                RULE_NAM_LEN_002,
-                ctx,
-                pos,
-                symbolIndex,
-            );
-            emitIssue(
-                pos.line + 1,
-                pos.character + 1,
-                RULE_NAM_LEN_002,
-                desc.message,
-                SEVERITY_WARNING,
-                { name, length: name.length, maxLen, actionable },
-                desc.suggestion,
-                actionable,
+                emitIssue,
             );
         }
     }
@@ -905,53 +935,19 @@ export function auditFunctionNameLengthsAndAbbreviations(
     const isAccessor = ts.isGetAccessor(node) || ts.isSetAccessor(node);
     const finding = validateFunctionTokensAndSemantics(name, tokens, opts, isAccessor);
     if (finding) {
-        const actionable = buildNamingActionable(
-            name,
-            node,
-            RULE_NAM_LEN_002,
-            ctx,
+        const actionable = buildNamingActionable(name, node, RULE_NAM_LEN_002, ctx, pos, symbolIndex);
+        emitNamingDiagnostic(
             pos,
-            symbolIndex,
-        );
-        emitIssue(
-            pos.line + 1,
-            pos.character + 1,
             RULE_NAM_LEN_002,
-            finding.message,
-            SEVERITY_WARNING,
-            { name, findingType: finding.type, token: finding.token, actionable },
-            `Refactor function name '${name}' according to engineering naming standards.`,
+            { message: finding.message, suggestion: `Refactor function name '${name}' according to engineering naming standards.`, rationale: '', risk: 'Low' },
+            { name, findingType: finding.type, token: finding.token },
             actionable,
+            emitIssue,
         );
     }
 
     if (opts.checkAbbreviations !== false) {
-        const abbr = findUnapprovedAbbreviation(name);
-        if (abbr) {
-            const desc = NamingMessages.UNAPPROVED_ABBREVIATION(
-                name,
-                abbr.unapproved,
-                abbr.expanded,
-            );
-            const actionable = buildNamingActionable(
-                name,
-                node,
-                RULE_NAM_ABR_001,
-                ctx,
-                pos,
-                symbolIndex,
-            );
-            emitIssue(
-                pos.line + 1,
-                pos.character + 1,
-                RULE_NAM_ABR_001,
-                desc.message,
-                SEVERITY_WARNING,
-                { name, unapproved: abbr.unapproved, expanded: abbr.expanded, actionable },
-                desc.suggestion,
-                actionable,
-            );
-        }
+        checkAndEmitAbbreviation(name, node, pos, ctx, symbolIndex, emitIssue);
     }
 }
 
@@ -983,79 +979,28 @@ export function auditVariableNameLengthsAndAbbreviations(
     emitIssue: NamingIssueEmitter,
 ): void {
     if (opts.checkLengths !== false) {
-        if (!isTopLevel && name.length === 2 && !ALLOWED_SHORT_NAMES.has(name)) {
-            const desc = NamingMessages.VARIABLE_NAME_TOO_SHORT(name);
-            const actionable = buildNamingActionable(
-                name,
-                decl,
-                RULE_NAM_LEN_001,
-                ctx,
-                pos,
-                symbolIndex,
-            );
-            emitIssue(
-                pos.line + 1,
-                pos.character + 1,
-                RULE_NAM_LEN_001,
-                desc.message,
-                SEVERITY_WARNING,
-                { name, length: name.length, isTopLevel, actionable },
-                desc.suggestion,
-                actionable,
-            );
-        } else if (
+        const isShort = !isTopLevel && name.length === 2 && !ALLOWED_SHORT_NAMES.has(name);
+        const isLong =
             name.length >= MAX_VARIABLE_NAME_LENGTH &&
-            (!isTopLevel || !/^[A-Z][A-Z0-9_]*$/.test(name))
-        ) {
-            const desc = NamingMessages.VARIABLE_NAME_TOO_LONG(name);
-            const actionable = buildNamingActionable(
-                name,
-                decl,
-                RULE_NAM_LEN_001,
-                ctx,
+            (!isTopLevel || !/^[A-Z][A-Z0-9_]*$/.test(name));
+        if (isShort || isLong) {
+            const desc = isShort
+                ? NamingMessages.VARIABLE_NAME_TOO_SHORT(name)
+                : NamingMessages.VARIABLE_NAME_TOO_LONG(name);
+            const actionable = buildNamingActionable(name, decl, RULE_NAM_LEN_001, ctx, pos, symbolIndex);
+            emitNamingDiagnostic(
                 pos,
-                symbolIndex,
-            );
-            emitIssue(
-                pos.line + 1,
-                pos.character + 1,
                 RULE_NAM_LEN_001,
-                desc.message,
-                SEVERITY_WARNING,
-                { name, length: name.length, isTopLevel, actionable },
-                desc.suggestion,
+                desc,
+                { name, length: name.length, isTopLevel },
                 actionable,
+                emitIssue,
             );
         }
     }
 
     if (opts.checkAbbreviations !== false) {
-        const abbr = findUnapprovedAbbreviation(name);
-        if (abbr) {
-            const desc = NamingMessages.UNAPPROVED_ABBREVIATION(
-                name,
-                abbr.unapproved,
-                abbr.expanded,
-            );
-            const actionable = buildNamingActionable(
-                name,
-                decl,
-                RULE_NAM_ABR_001,
-                ctx,
-                pos,
-                symbolIndex,
-            );
-            emitIssue(
-                pos.line + 1,
-                pos.character + 1,
-                RULE_NAM_ABR_001,
-                desc.message,
-                SEVERITY_WARNING,
-                { name, unapproved: abbr.unapproved, expanded: abbr.expanded, actionable },
-                desc.suggestion,
-                actionable,
-            );
-        }
+        checkAndEmitAbbreviation(name, decl, pos, ctx, symbolIndex, emitIssue);
     }
 }
 
@@ -1083,103 +1028,13 @@ export function auditMemberAbbreviation(
     emitIssue: NamingIssueEmitter,
 ): void {
     if (opts.checkAbbreviations === false) return;
-    const abbr = findUnapprovedAbbreviation(memberName);
-    if (abbr) {
-        const desc = NamingMessages.UNAPPROVED_ABBREVIATION(
-            memberName,
-            abbr.unapproved,
-            abbr.expanded,
-        );
-        const actionable = buildNamingActionable(
-            memberName,
-            member,
-            RULE_NAM_ABR_001,
-            ctx,
-            pos,
-            symbolIndex,
-        );
-        emitIssue(
-            pos.line + 1,
-            pos.character + 1,
-            RULE_NAM_ABR_001,
-            desc.message,
-            SEVERITY_WARNING,
-            { name: memberName, unapproved: abbr.unapproved, expanded: abbr.expanded, actionable },
-            desc.suggestion,
-            actionable,
-        );
-    }
+    checkAndEmitAbbreviation(memberName, member, pos, ctx, symbolIndex, emitIssue);
 }
 
-const SCALAR_SYNTAX_KINDS = new Set<ts.SyntaxKind>([
-    ts.SyntaxKind.NumericLiteral,
-    ts.SyntaxKind.StringLiteral,
-    ts.SyntaxKind.NoSubstitutionTemplateLiteral,
-    ts.SyntaxKind.TrueKeyword,
-    ts.SyntaxKind.FalseKeyword,
-    ts.SyntaxKind.BigIntLiteral,
-    ts.SyntaxKind.RegularExpressionLiteral,
-]);
+export {
+    unwrapConstantInitializer,
+    isCompositeLiteral,
+    isScalarLiteral,
+    isSimpleArrowFunction,
+} from './naming-ast-helper';
 
-/**
- * Strips type assertions and parenthesization from a constant initializer.
- *
- * @param expr - Expression AST node to unwrap.
- * @returns Deeply unwrapped inner expression node.
- */
-export function unwrapConstantInitializer(expr: ts.Expression): ts.Expression {
-    let current = expr;
-    while (
-        ts.isAsExpression(current) ||
-        ts.isTypeAssertionExpression(current) ||
-        ts.isParenthesizedExpression(current) ||
-        ts.isNonNullExpression(current)
-    ) {
-        current = current.expression;
-    }
-    return current;
-}
-
-/**
- * Checks whether an expression represents a composite collection/object literal.
- *
- * @param expr - Expression AST node to inspect.
- * @returns True if expression is an object or array literal.
- */
-export function isCompositeLiteral(expr: ts.Expression): boolean {
-    const unwrapped = unwrapConstantInitializer(expr);
-    return ts.isObjectLiteralExpression(unwrapped) || ts.isArrayLiteralExpression(unwrapped);
-}
-
-/**
- * Checks whether an expression is a scalar primitive literal.
- *
- * @param expr - Expression AST node to inspect.
- * @returns True if expression is a scalar primitive literal.
- */
-export function isScalarLiteral(expr: ts.Expression): boolean {
-    let unwrapped = unwrapConstantInitializer(expr);
-    const isUnaryPlusOrMinus =
-        ts.isPrefixUnaryExpression(unwrapped) &&
-        (unwrapped.operator === ts.SyntaxKind.PlusToken ||
-            unwrapped.operator === ts.SyntaxKind.MinusToken);
-    if (isUnaryPlusOrMinus) {
-        unwrapped = (unwrapped as ts.PrefixUnaryExpression).operand;
-    }
-    return SCALAR_SYNTAX_KINDS.has(unwrapped.kind);
-}
-
-/**
- * Checks whether an AST node is a single-line or single-expression arrow function.
- *
- * @param node - AST node to test.
- * @param sf - Source file providing position offsets.
- * @returns True if node is a single-line or concise-body arrow function.
- */
-export function isSimpleArrowFunction(node: ts.Node, sf: ts.SourceFile): boolean {
-    if (!ts.isArrowFunction(node)) return false;
-    if (!ts.isBlock(node.body) || node.body.statements.length <= 1) return true;
-    const startLine = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line;
-    const endLine = sf.getLineAndCharacterOfPosition(node.getEnd()).line;
-    return endLine - startLine <= 4;
-}
