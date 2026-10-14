@@ -12,7 +12,7 @@
 
 const assert = require('assert');
 const { RecoveryService } = require('../../out/application/RecoveryService.js');
-const { setLogLevel, LogLevel } = require('../../out/integration/Logger.js');
+const { setLogLevel, LogLevel } = require('../../out/integration/logger.js');
 
 setLogLevel(LogLevel.None);
 

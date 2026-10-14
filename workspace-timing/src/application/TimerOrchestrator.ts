@@ -25,16 +25,16 @@ import {
     OrchestratorState,
     ActivityMode,
 } from '../domain/models';
-import { validateTimingData } from '../persistence/DataValidator';
-import { migrateToFolded } from '../domain/HistoryFolder';
+import { validateTimingData } from '../persistence/data-validator';
+import { migrateToFolded } from '../domain/history-folder';
 import { TimeAggregator } from '../domain/TimeAggregator';
 import { DashboardData } from '../domain/dashboard-types';
 import { GlobalAggregator } from './GlobalAggregator';
 import { DisableManager, DisableState } from './DisableManager';
 import { Scheduler, StatusBarDisplayData } from './Scheduler';
 import { exportCSV, exportAggregatedCSV, exportReport, ReportKind } from './exporters/index';
-import { buildDashboardData } from './DashboardDataAssembler';
-import { LogLevel, log } from '../integration/Logger';
+import { buildDashboardData } from './dashboard-data-assembler';
+import { LogLevel, log } from '../integration/logger';
 import { t, format } from '../i18n/index';
 
 export type { OrchestratorState };

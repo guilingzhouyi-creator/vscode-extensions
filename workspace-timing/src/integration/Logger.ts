@@ -1,6 +1,6 @@
 /**
  * Module: Logger — 跨层无依赖统一日志工具
- * File Path: src/integration/Logger.ts
+ * File Path: src/integration/logger.ts
  * Architecture Role: Integration layer foundational logging utility with zero external runtime dependencies
  * Dependencies & Triggers: domain/models.ts; used across all layers (Domain, Cache, Persistence, Application, Presentation)
  * Responsibilities: Filter and format structured log entries by LogLevel severity; extract Error object stack traces; provide immutable frozen logger facade

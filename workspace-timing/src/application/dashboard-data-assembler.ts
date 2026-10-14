@@ -1,6 +1,6 @@
 /**
  * Module: DashboardDataAssembler — 面板数据传输对象组装器
- * File Path: src/application/DashboardDataAssembler.ts
+ * File Path: src/application/dashboard-data-assembler.ts
  * Architecture Role: Application layer pure projection engine and view model assembler
  * Dependencies & Triggers: domain/models.ts, domain/TimeAggregator.ts, domain/dashboard-types.ts, GlobalAggregator; invoked by TimerOrchestrator and exporters
  * Responsibilities: Assemble ReadonlyTimingData, configuration options, and GlobalSnapshot into unified DashboardData; project 7-day stats, heatmaps, and weekly trends

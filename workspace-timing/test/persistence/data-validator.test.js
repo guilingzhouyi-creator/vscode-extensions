@@ -5,7 +5,7 @@
 'use strict';
 
 const assert = require('assert');
-const { validateTimingData } = require('../../out/persistence/DataValidator.js');
+const { validateTimingData } = require('../../out/persistence/data-validator.js');
 const { LATEST_VERSION } = require('../../out/domain/models.js');
 
 function validFile(overrides = {}) {

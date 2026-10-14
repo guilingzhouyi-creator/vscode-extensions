@@ -12,6 +12,7 @@ import {
     TimingConfig,
     StatusBarMode,
     DEFAULT_CONFIG,
+    TIMING_CONFIG_KEYS,
     sanitizeWeeklyLimitHours,
     sanitizeWeeklyLimitEnabled,
     sanitizeRingBufferCapacity,
@@ -27,45 +28,42 @@ import {
     sanitizeChartDualTrackDisplay,
 } from '../domain/models';
 import { DashboardData } from '../domain/dashboard-types';
-import { LogLevel, log } from './Logger';
+import { LogLevel, log } from './logger';
 import { setLocale, resolveLocale } from '../i18n/index';
-
-const CONFIG_SECTION = 'workspaceTiming';
-const CONFIG_KEY_ENABLED = 'enabled';
 
 /**
  * 读取当前用户配置（唯一入口，避免多处重复实现导致配置漂移）。
  * 供 ConfigWatcher 与 extension.ts 初始化共用，保证初始化/运行期配置同源。
  */
 export function readTimingConfig(): TimingConfig {
-    const cfg = vscode.workspace.getConfiguration(CONFIG_SECTION);
+    const cfg = vscode.workspace.getConfiguration(TIMING_CONFIG_KEYS.SECTION);
 
     return {
-        enabled: cfg.get<boolean>(CONFIG_KEY_ENABLED, DEFAULT_CONFIG.enabled),
-        globalDisabled: cfg.get<boolean>('globalDisabled', DEFAULT_CONFIG.globalDisabled),
-        locale: sanitizeLocale(cfg.get('locale', DEFAULT_CONFIG.locale)),
-        statusBarEnabled: cfg.get<boolean>('statusBar.enabled', DEFAULT_CONFIG.statusBarEnabled),
-        backupToFile: cfg.get<boolean>('storage.backupToFile', DEFAULT_CONFIG.backupToFile),
-        journalEnabled: cfg.get<boolean>('storage.journalEnabled', DEFAULT_CONFIG.journalEnabled),
+        enabled: cfg.get<boolean>(TIMING_CONFIG_KEYS.ENABLED, DEFAULT_CONFIG.enabled),
+        globalDisabled: cfg.get<boolean>(TIMING_CONFIG_KEYS.GLOBAL_DISABLED, DEFAULT_CONFIG.globalDisabled),
+        locale: sanitizeLocale(cfg.get(TIMING_CONFIG_KEYS.LOCALE, DEFAULT_CONFIG.locale)),
+        statusBarEnabled: cfg.get<boolean>(TIMING_CONFIG_KEYS.STATUS_BAR_ENABLED, DEFAULT_CONFIG.statusBarEnabled),
+        backupToFile: cfg.get<boolean>(TIMING_CONFIG_KEYS.STORAGE_BACKUP_TO_FILE, DEFAULT_CONFIG.backupToFile),
+        journalEnabled: cfg.get<boolean>(TIMING_CONFIG_KEYS.STORAGE_JOURNAL_ENABLED, DEFAULT_CONFIG.journalEnabled),
         ringBufferCapacity: sanitizeRingBufferCapacity(
-            cfg.get<number>('storage.ringBufferCapacity', DEFAULT_CONFIG.ringBufferCapacity)),
+            cfg.get<number>(TIMING_CONFIG_KEYS.STORAGE_RING_BUFFER_CAPACITY, DEFAULT_CONFIG.ringBufferCapacity)),
         journalFlushIntervalMs: sanitizeJournalFlushIntervalMs(
-            cfg.get<number>('storage.journalFlushInterval', DEFAULT_CONFIG.journalFlushIntervalMs)),
+            cfg.get<number>(TIMING_CONFIG_KEYS.STORAGE_JOURNAL_FLUSH_INTERVAL, DEFAULT_CONFIG.journalFlushIntervalMs)),
         fullSaveIntervalMs: sanitizeFullSaveIntervalMs(
-            cfg.get<number>('storage.fullSaveInterval', DEFAULT_CONFIG.fullSaveIntervalMs)),
-        statusBarMode: sanitizeStatusBarMode(cfg.get('statusBar.mode', DEFAULT_CONFIG.statusBarMode)),
+            cfg.get<number>(TIMING_CONFIG_KEYS.STORAGE_FULL_SAVE_INTERVAL, DEFAULT_CONFIG.fullSaveIntervalMs)),
+        statusBarMode: sanitizeStatusBarMode(cfg.get(TIMING_CONFIG_KEYS.STATUS_BAR_MODE, DEFAULT_CONFIG.statusBarMode)),
         maxSessions: sanitizeMaxSessions(
-            cfg.get<number>('storage.maxSessions', DEFAULT_CONFIG.maxSessions)),
+            cfg.get<number>(TIMING_CONFIG_KEYS.STORAGE_MAX_SESSIONS, DEFAULT_CONFIG.maxSessions)),
         historyRawRetentionDays: sanitizeHistoryRawRetentionDays(
-            cfg.get<number>('storage.historyRawRetentionDays', DEFAULT_CONFIG.historyRawRetentionDays)),
-        safetySnapshot: cfg.get<boolean>('storage.safetySnapshot', DEFAULT_CONFIG.safetySnapshot),
-        weeklyLimitEnabled: sanitizeWeeklyLimitEnabled(cfg.get('weeklyLimit.enabled', DEFAULT_CONFIG.weeklyLimitEnabled)),
-        weeklyLimitHours: sanitizeWeeklyLimitHours(cfg.get('weeklyLimit.hours', DEFAULT_CONFIG.weeklyLimitHours)),
-        idleTimeoutMinutes: sanitizeIdleTimeoutMinutes(cfg.get('idleTimeoutMinutes', DEFAULT_CONFIG.idleTimeoutMinutes)),
-        aiDetectionEnabled: sanitizeAiDetectionEnabled(cfg.get('aiDetectionEnabled', DEFAULT_CONFIG.aiDetectionEnabled)),
-        aiCooldownSeconds: sanitizeAiCooldownSeconds(cfg.get('aiCooldownSeconds', DEFAULT_CONFIG.aiCooldownSeconds)),
+            cfg.get<number>(TIMING_CONFIG_KEYS.STORAGE_HISTORY_RAW_RETENTION_DAYS, DEFAULT_CONFIG.historyRawRetentionDays)),
+        safetySnapshot: cfg.get<boolean>(TIMING_CONFIG_KEYS.STORAGE_SAFETY_SNAPSHOT, DEFAULT_CONFIG.safetySnapshot),
+        weeklyLimitEnabled: sanitizeWeeklyLimitEnabled(cfg.get(TIMING_CONFIG_KEYS.WEEKLY_LIMIT_ENABLED, DEFAULT_CONFIG.weeklyLimitEnabled)),
+        weeklyLimitHours: sanitizeWeeklyLimitHours(cfg.get(TIMING_CONFIG_KEYS.WEEKLY_LIMIT_HOURS, DEFAULT_CONFIG.weeklyLimitHours)),
+        idleTimeoutMinutes: sanitizeIdleTimeoutMinutes(cfg.get(TIMING_CONFIG_KEYS.IDLE_TIMEOUT_MINUTES, DEFAULT_CONFIG.idleTimeoutMinutes)),
+        aiDetectionEnabled: sanitizeAiDetectionEnabled(cfg.get(TIMING_CONFIG_KEYS.AI_DETECTION_ENABLED, DEFAULT_CONFIG.aiDetectionEnabled)),
+        aiCooldownSeconds: sanitizeAiCooldownSeconds(cfg.get(TIMING_CONFIG_KEYS.AI_COOLDOWN_SECONDS, DEFAULT_CONFIG.aiCooldownSeconds)),
         chartDualTrackDisplay: sanitizeChartDualTrackDisplay(
-            cfg.get<boolean>('chartDualTrackDisplay', DEFAULT_CONFIG.chartDualTrackDisplay)),
+            cfg.get<boolean>(TIMING_CONFIG_KEYS.CHART_DUAL_TRACK_DISPLAY, DEFAULT_CONFIG.chartDualTrackDisplay)),
     };
 }
 
@@ -77,25 +75,25 @@ const PERSIST_FIELDS: ReadonlyArray<{
     key: string;
     sanitize?: (v: unknown) => unknown;
 }> = [
-    { field: CONFIG_KEY_ENABLED, key: CONFIG_KEY_ENABLED },
-    { field: 'globalDisabled', key: 'globalDisabled' },
-    { field: 'locale', key: 'locale' },
-    { field: 'statusBarEnabled', key: 'statusBar.enabled' },
-    { field: 'statusBarMode', key: 'statusBar.mode' },
-    { field: 'journalEnabled', key: 'storage.journalEnabled' },
-    { field: 'backupToFile', key: 'storage.backupToFile' },
-    { field: 'ringBufferCapacity', key: 'storage.ringBufferCapacity' },
-    { field: 'journalFlushIntervalMs', key: 'storage.journalFlushInterval' },
-    { field: 'fullSaveIntervalMs', key: 'storage.fullSaveInterval' },
-    { field: 'maxSessions', key: 'storage.maxSessions' },
-    { field: 'historyRawRetentionDays', key: 'storage.historyRawRetentionDays' },
-    { field: 'safetySnapshot', key: 'storage.safetySnapshot' },
-    { field: 'weeklyLimitEnabled', key: 'weeklyLimit.enabled', sanitize: sanitizeWeeklyLimitEnabled },
-    { field: 'weeklyLimitHours', key: 'weeklyLimit.hours', sanitize: sanitizeWeeklyLimitHours },
-    { field: 'idleTimeoutMinutes', key: 'idleTimeoutMinutes', sanitize: sanitizeIdleTimeoutMinutes },
-    { field: 'aiDetectionEnabled', key: 'aiDetectionEnabled', sanitize: sanitizeAiDetectionEnabled },
-    { field: 'aiCooldownSeconds', key: 'aiCooldownSeconds', sanitize: sanitizeAiCooldownSeconds },
-    { field: 'chartDualTrackDisplay', key: 'chartDualTrackDisplay', sanitize: sanitizeChartDualTrackDisplay },
+    { field: TIMING_CONFIG_KEYS.ENABLED, key: TIMING_CONFIG_KEYS.ENABLED },
+    { field: 'globalDisabled', key: TIMING_CONFIG_KEYS.GLOBAL_DISABLED },
+    { field: 'locale', key: TIMING_CONFIG_KEYS.LOCALE },
+    { field: 'statusBarEnabled', key: TIMING_CONFIG_KEYS.STATUS_BAR_ENABLED },
+    { field: 'statusBarMode', key: TIMING_CONFIG_KEYS.STATUS_BAR_MODE },
+    { field: 'journalEnabled', key: TIMING_CONFIG_KEYS.STORAGE_JOURNAL_ENABLED },
+    { field: 'backupToFile', key: TIMING_CONFIG_KEYS.STORAGE_BACKUP_TO_FILE },
+    { field: 'ringBufferCapacity', key: TIMING_CONFIG_KEYS.STORAGE_RING_BUFFER_CAPACITY },
+    { field: 'journalFlushIntervalMs', key: TIMING_CONFIG_KEYS.STORAGE_JOURNAL_FLUSH_INTERVAL },
+    { field: 'fullSaveIntervalMs', key: TIMING_CONFIG_KEYS.STORAGE_FULL_SAVE_INTERVAL },
+    { field: 'maxSessions', key: TIMING_CONFIG_KEYS.STORAGE_MAX_SESSIONS },
+    { field: 'historyRawRetentionDays', key: TIMING_CONFIG_KEYS.STORAGE_HISTORY_RAW_RETENTION_DAYS },
+    { field: 'safetySnapshot', key: TIMING_CONFIG_KEYS.STORAGE_SAFETY_SNAPSHOT },
+    { field: 'weeklyLimitEnabled', key: TIMING_CONFIG_KEYS.WEEKLY_LIMIT_ENABLED, sanitize: sanitizeWeeklyLimitEnabled },
+    { field: 'weeklyLimitHours', key: TIMING_CONFIG_KEYS.WEEKLY_LIMIT_HOURS, sanitize: sanitizeWeeklyLimitHours },
+    { field: 'idleTimeoutMinutes', key: TIMING_CONFIG_KEYS.IDLE_TIMEOUT_MINUTES, sanitize: sanitizeIdleTimeoutMinutes },
+    { field: 'aiDetectionEnabled', key: TIMING_CONFIG_KEYS.AI_DETECTION_ENABLED, sanitize: sanitizeAiDetectionEnabled },
+    { field: 'aiCooldownSeconds', key: TIMING_CONFIG_KEYS.AI_COOLDOWN_SECONDS, sanitize: sanitizeAiCooldownSeconds },
+    { field: 'chartDualTrackDisplay', key: TIMING_CONFIG_KEYS.CHART_DUAL_TRACK_DISPLAY, sanitize: sanitizeChartDualTrackDisplay },
 ];
 
 /**
@@ -105,7 +103,7 @@ export async function persistTimingConfig(
     partial: Partial<DashboardData> | Partial<TimingConfig>,
     target: vscode.ConfigurationTarget = vscode.ConfigurationTarget.Global,
 ): Promise<void> {
-    const config = vscode.workspace.getConfiguration(CONFIG_SECTION);
+    const config = vscode.workspace.getConfiguration(TIMING_CONFIG_KEYS.SECTION);
     const rawRecord = partial as Record<string, unknown>;
     const record: Record<string, unknown> = {
         ...rawRecord,
@@ -178,7 +176,7 @@ export class ConfigWatcher implements vscode.Disposable {
     start(): void {
         this.subscriptions.push(
             vscode.workspace.onDidChangeConfiguration(e => {
-                if (!e.affectsConfiguration(CONFIG_SECTION)) return;
+                if (!e.affectsConfiguration(TIMING_CONFIG_KEYS.SECTION)) return;
 
                 try {
                     const config = this.readConfig();

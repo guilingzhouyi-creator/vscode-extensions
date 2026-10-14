@@ -9,7 +9,7 @@
 
 import { GlobalTimingData, WorkspaceRecord } from '../domain/global-types';
 import { GLOBAL_STALE_TTL_MS, MS_PER_HOUR } from '../domain/models';
-import { LogLevel, log } from '../integration/Logger';
+import { LogLevel, log } from '../integration/logger';
 
 /** 当前工作区标识（由组合根注入，替代直读 vscode.workspace） */
 export interface WorkspaceInfo {

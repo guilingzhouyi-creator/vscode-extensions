@@ -12,8 +12,8 @@ import { TimeAggregator } from '../../domain/TimeAggregator';
 import { CsvExporter } from './CsvExporter';
 import { AggregatedCsvExporter } from './AggregatedCsvExporter';
 import { ReportExporter, ReportKind } from './ReportExporter';
-import { buildWeeklyTrendEntries } from '../DashboardDataAssembler';
-import { log, LogLevel } from '../../integration/Logger';
+import { buildWeeklyTrendEntries } from '../dashboard-data-assembler';
+import { log, LogLevel } from '../../integration/logger';
 
 export { CsvExporter } from './CsvExporter';
 export { AggregatedCsvExporter } from './AggregatedCsvExporter';

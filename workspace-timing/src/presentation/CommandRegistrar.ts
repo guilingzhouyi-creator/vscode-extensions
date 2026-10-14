@@ -12,12 +12,13 @@ import { TimerOrchestrator } from '../application/TimerOrchestrator';
 import { GlobalAggregator } from '../application/GlobalAggregator';
 import { StatusBarController, statusBarModeLabel } from './StatusBarController';
 import { DashboardPanel } from './DashboardPanel';
-import { LogLevel, log } from '../integration/Logger';
+import { LogLevel, log } from '../integration/logger';
 import { persistTimingConfig } from '../integration/ConfigWatcher';
 import { t, format } from '../i18n/index';
 import { TimeAggregator } from '../domain/TimeAggregator';
 import { ActivityWatcher } from '../integration/ActivityWatcher';
 import { exportTimingToFile, exportAggregatedToFile } from './dashboardMessages';
+import { TIMING_COMMAND_IDS } from '../domain/models';
 
 export class CommandRegistrar {
     private readonly subscriptions: vscode.Disposable[] = [];
@@ -46,7 +47,7 @@ export class CommandRegistrar {
         activityWatcher: ActivityWatcher | null = null,
     ): void {
         /** 注册启用计时命令契约：更新工作区配置并驱动状态机恢复就绪态 */
-        this.registerCommand('workspaceTiming.enable', async () => {
+        this.registerCommand(TIMING_COMMAND_IDS.ENABLE, async () => {
             if (!orchestrator) { this.noWorkspaceMsg(); return; }
             orchestrator.disable.updateConfig({ enabled: true, globalDisabled: false });
             await orchestrator.onDisableStateChanged(orchestrator.disable.resolveState());
@@ -57,7 +58,7 @@ export class CommandRegistrar {
         });
 
         /** 注册工作区禁用计时命令契约：暂挂活动采集并持久化停用状态 */
-        this.registerCommand('workspaceTiming.disable', async () => {
+        this.registerCommand(TIMING_COMMAND_IDS.DISABLE, async () => {
             if (!orchestrator) { this.noWorkspaceMsg(); return; }
             orchestrator.disable.updateConfig({ enabled: false });
             await orchestrator.onDisableStateChanged(orchestrator.disable.resolveState());
@@ -68,7 +69,7 @@ export class CommandRegistrar {
         });
 
         /** 注册跨工作区全局禁用开关契约：在所有打开的窗口中全局屏蔽计时采集 */
-        this.registerCommand('workspaceTiming.toggleGlobal', async () => {
+        this.registerCommand(TIMING_COMMAND_IDS.TOGGLE_GLOBAL, async () => {
             if (!orchestrator) { this.noWorkspaceMsg(); return; }
             const current = orchestrator.disable.config.globalDisabled;
             orchestrator.disable.updateConfig({ globalDisabled: !current });
@@ -82,7 +83,7 @@ export class CommandRegistrar {
         });
 
         /** 注册状态栏显示模式循环切换契约：轮转显示今日/总计/紧凑样式并落盘配置 */
-        this.registerCommand('workspaceTiming.showStatus', () => {
+        this.registerCommand(TIMING_COMMAND_IDS.SHOW_STATUS, () => {
             if (!statusBar) { this.noWorkspaceMsg(); return; }
             const nextMode = statusBar.cycleMode();
             persistTimingConfig({ statusBarMode: nextMode }).catch(err =>
@@ -94,7 +95,7 @@ export class CommandRegistrar {
         });
 
         /** 注册活动模式轮转切换命令契约（自动 -> AI协作 -> 人工开发 -> 自动） */
-        this.registerCommand('workspaceTiming.toggleActivityMode', () => {
+        this.registerCommand(TIMING_COMMAND_IDS.TOGGLE_ACTIVITY_MODE, () => {
             if (!activityWatcher) { this.noWorkspaceMsg(); return; }
             const nextOverride = activityWatcher.toggleModeOverride();
             let label = t()['mode.label.auto'];
@@ -107,21 +108,21 @@ export class CommandRegistrar {
         });
 
         /** 注册强制锁定为 AI 协作模式命令 */
-        this.registerCommand('workspaceTiming.setModeAi', () => {
+        this.registerCommand(TIMING_COMMAND_IDS.SET_MODE_AI, () => {
             if (!activityWatcher) { this.noWorkspaceMsg(); return; }
             activityWatcher.setModeOverride('ai');
             vscode.window.showInformationMessage(t()['cmd.activityModeAi']);
         });
 
         /** 注册强制锁定为人工开发模式命令 */
-        this.registerCommand('workspaceTiming.setModeManual', () => {
+        this.registerCommand(TIMING_COMMAND_IDS.SET_MODE_MANUAL, () => {
             if (!activityWatcher) { this.noWorkspaceMsg(); return; }
             activityWatcher.setModeOverride('manual');
             vscode.window.showInformationMessage(t()['cmd.activityModeManual']);
         });
 
         /** 注册恢复自动智能感知模式命令 */
-        this.registerCommand('workspaceTiming.setModeAuto', () => {
+        this.registerCommand(TIMING_COMMAND_IDS.SET_MODE_AUTO, () => {
             if (!activityWatcher) { this.noWorkspaceMsg(); return; }
             activityWatcher.setModeOverride(null);
             vscode.window.showInformationMessage(t()['cmd.activityModeAuto']);
@@ -134,14 +135,14 @@ export class CommandRegistrar {
         globalAggregator: GlobalAggregator | null,
     ): void {
         /** 注册立即强制存盘调试契约：绕过定时降频窗口，触发全量同步落盘 */
-        this.registerCommand('workspaceTiming.debugSave', async () => {
+        this.registerCommand(TIMING_COMMAND_IDS.DEBUG_SAVE, async () => {
             if (!orchestrator) { this.noWorkspaceMsg(); return; }
             await orchestrator.saveNow();
             vscode.window.showInformationMessage(format(t()['cmd.debugSaved'], 'OK'));
         });
 
         /** 注册新建周期命令契约：弹出破坏性模态确认框后重置累计工时并保留历史切片 */
-        this.registerCommand('workspaceTiming.newPeriod', async () => {
+        this.registerCommand(TIMING_COMMAND_IDS.NEW_PERIOD, async () => {
             if (!orchestrator || !statusBar) { this.noWorkspaceMsg(); return; }
             const msg = t()['confirm.newPeriod'];
             const title = t()['confirm.newPeriod.title'];
@@ -153,7 +154,7 @@ export class CommandRegistrar {
         });
 
         /** 注册全量数据重置命令契约：业务编排委托 orchestrator.resetAllData 清空并重启计时 */
-        this.registerCommand('workspaceTiming.reset', async () => {
+        this.registerCommand(TIMING_COMMAND_IDS.RESET, async () => {
             if (!orchestrator || !statusBar) { this.noWorkspaceMsg(); return; }
             const msg = t()['confirm.reset'];
             const title = t()['confirm.reset.title'];
@@ -167,7 +168,7 @@ export class CommandRegistrar {
         });
 
         /** 注册清除跨工作区累计契约：仅清理全局聚合存储，严格隔离各本地工作区数据 */
-        this.registerCommand('workspaceTiming.clearGlobal', async () => {
+        this.registerCommand(TIMING_COMMAND_IDS.CLEAR_GLOBAL, async () => {
             if (!globalAggregator) { this.noWorkspaceMsg(); return; }
             const msg = t()['confirm.clearGlobal'];
             const title = t()['confirm.clearGlobal.title'];
@@ -179,7 +180,7 @@ export class CommandRegistrar {
         });
 
         /** 注册清除历史明细契约：保留累计汇总指标，安全裁剪细粒度历史会话切片 */
-        this.registerCommand('workspaceTiming.clearHistory', async () => {
+        this.registerCommand(TIMING_COMMAND_IDS.CLEAR_HISTORY, async () => {
             if (!orchestrator || !statusBar) { this.noWorkspaceMsg(); return; }
             const msg = t()['confirm.clearHistory'];
             const title = t()['confirm.clearHistory.title'];
@@ -192,7 +193,7 @@ export class CommandRegistrar {
         });
 
         /** 注册从备份文件还原契约：引导用户选择历史快照并在比对后安全覆盖恢复 */
-        this.registerCommand('workspaceTiming.restore', async () => {
+        this.registerCommand(TIMING_COMMAND_IDS.RESTORE, async () => {
             if (!orchestrator || !statusBar) { this.noWorkspaceMsg(); return; }
             await this.handleRestoreCommand(orchestrator, statusBar);
         });
@@ -204,12 +205,12 @@ export class CommandRegistrar {
         statusBar: StatusBarController | null,
     ): void {
         /** 注册打开可视化配置与统计仪表盘 Webview 命令契约 */
-        this.registerCommand('workspaceTiming.openDashboard', () => {
+        this.registerCommand(TIMING_COMMAND_IDS.OPEN_DASHBOARD, () => {
             DashboardPanel.createOrShow(context.extensionUri);
         });
 
         /** 注册导出原始会话流水 CSV 报表命令契约：复用 Dashboard 管道实现异步落盘 */
-        this.registerCommand('workspaceTiming.export', () => {
+        this.registerCommand(TIMING_COMMAND_IDS.EXPORT, () => {
             void exportTimingToFile({
                 getOrchestrator: () => orchestrator,
                 getStatusBar: () => statusBar,
@@ -218,7 +219,7 @@ export class CommandRegistrar {
         });
 
         /** 注册导出多维聚合日报 CSV 报表命令契约：按天对工时及 AI 辅助时长汇总导出 */
-        this.registerCommand('workspaceTiming.exportAggregated', () => {
+        this.registerCommand(TIMING_COMMAND_IDS.EXPORT_AGGREGATED, () => {
             void exportAggregatedToFile({
                 getOrchestrator: () => orchestrator,
                 getStatusBar: () => statusBar,

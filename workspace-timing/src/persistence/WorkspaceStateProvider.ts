@@ -10,7 +10,7 @@
 import * as vscode from 'vscode';
 import { WorkspaceTimingData } from '../domain/models';
 import { IStorageProvider } from './IStorageProvider';
-import { LogLevel, log } from '../integration/Logger';
+import { LogLevel, log } from '../integration/logger';
 
 const STORAGE_KEY = 'workspaceTiming:data';
 

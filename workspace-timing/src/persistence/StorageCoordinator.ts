@@ -10,7 +10,7 @@
 import { WorkspaceTimingData } from '../domain/models';
 import { IStorageProvider } from './IStorageProvider';
 import { IJournalStore } from '../cache/IJournalStore';
-import { LogLevel, log } from '../integration/Logger';
+import { LogLevel, log } from '../integration/logger';
 
 /** 可生成命名快照的文件存储提供者接口 */
 export interface ISnapshotStorageProvider extends IStorageProvider {

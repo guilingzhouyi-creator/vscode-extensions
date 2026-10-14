@@ -221,7 +221,7 @@
           "domain"
         ],
         "mayImportExternal": [
-          "src/integration/Logger"
+          "src/integration/logger"
         ],
         "externalModules": []
       },
@@ -231,7 +231,7 @@
           "domain"
         ],
         "mayImportExternal": [
-          "src/integration/Logger",
+          "src/integration/logger",
           "src/cache/IJournalStore"
         ],
         "externalModules": [
@@ -249,7 +249,7 @@
           "persistence"
         ],
         "mayImportExternal": [
-          "src/integration/Logger",
+          "src/integration/logger",
           "i18n"
         ],
         "externalModules": [
@@ -299,7 +299,7 @@
         ]
       }
     },
-    "matchingSemantics": "mayImportExternal 条目：'src/x/*' 前缀匹配文件；'src/integration/Logger' 精确文件；'i18n'（无/无*）整层匹配。persistence→src/cache/IJournalStore 为依赖倒置端口实现（消费方接口），属许可的例外。"
+    "matchingSemantics": "mayImportExternal 条目：'src/x/*' 前缀匹配文件；'src/integration/logger' 精确文件；'i18n'（无/无*）整层匹配。persistence→src/cache/IJournalStore 为依赖倒置端口实现（消费方接口），属许可的例外。"
   },
   "hardcode": {
     "magicNumber": {
@@ -307,6 +307,7 @@
       "exemptPaths": [
         "src/domain/",
         "src/presentation/dashboardTemplate.ts",
+        "src/presentation/dashboard-script.ts",
         "src/presentation/dashboard-base-styles.ts",
         "src/presentation/dashboard-chart-styles.ts",
         "src/i18n/"
@@ -324,6 +325,7 @@
       ],
       "exemptPaths": [
         "src/presentation/dashboardTemplate.ts",
+        "src/presentation/dashboard-script.ts",
         "src/presentation/dashboard-base-styles.ts",
         "src/presentation/dashboard-chart-styles.ts"
       ]

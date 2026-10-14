@@ -15,9 +15,9 @@ const {
   pruneDailyOverflowSessions,
   recycleSessions,
   recycleIdleSessions,
-} = require('../../out/domain/HistoryFolder.js');
+} = require('../../out/domain/history-folder.js');
 const { TimeAggregator } = require('../../out/domain/TimeAggregator.js');
-const { setLogLevel, LogLevel } = require('../../out/integration/Logger.js');
+const { setLogLevel, LogLevel } = require('../../out/integration/logger.js');
 
 setLogLevel(LogLevel.None);
 

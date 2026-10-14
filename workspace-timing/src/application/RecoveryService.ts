@@ -19,9 +19,9 @@ import {
     TimeSlice,
 } from '../domain/models';
 import { TimeAggregator } from '../domain/TimeAggregator';
-import { migrateToFolded } from '../domain/HistoryFolder';
+import { migrateToFolded } from '../domain/history-folder';
 import { IJournalStore } from '../cache/IJournalStore';
-import { LogLevel, log } from '../integration/Logger';
+import { LogLevel, log } from '../integration/logger';
 
 /** 切片连续性判定容差：3 秒（心跳间隔 1s 的 3 倍） */
 const SLICE_CONTINUITY_GAP_MS = 3 * MS_PER_SECOND;

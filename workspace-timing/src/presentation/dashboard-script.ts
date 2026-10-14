@@ -725,12 +725,17 @@ export function buildDashboardScript(labels: Record<string, string>): string {
           let listHtml = '';
           const runningText = (typeof window !== 'undefined' && window.__I18N__ && window.__I18N__.panelTodayRunning) ||
             L['panel.today.running'] ||
-            ((typeof window !== 'undefined' && window.__LOCALE__ === 'zh-CN') ? '进行中' : 'Running');
+            'Running';
 
           for (let i = 0; i < detail.sessions.length; i++) {
             const s = detail.sessions[i];
             const extraCls = i >= 5 ? ' session-extra' : '';
-            const isRunning = Boolean(s.isRunningTail || s.endLabel === '进行中' || s.endLabel === 'Running');
+            const isRunning = Boolean(
+              s.isRunningTail ||
+              s.endLabel === runningText ||
+              s.endLabel === 'Running' ||
+              (L['panel.today.running'] && s.endLabel === L['panel.today.running'])
+            );
             const endText = isRunning ? runningText : escapeHtml(s.endLabel);
             listHtml +=
               '<div class="session-row' + extraCls + '">' +

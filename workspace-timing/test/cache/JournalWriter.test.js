@@ -9,7 +9,7 @@
 const assert = require('assert');
 const { JournalWriter } = require('../../out/cache/JournalWriter.js');
 const { TimeBasedCacheStrategy } = require('../../out/cache/ICacheStrategy.js');
-const { setLogLevel, LogLevel } = require('../../out/integration/Logger.js');
+const { setLogLevel, LogLevel } = require('../../out/integration/logger.js');
 
 setLogLevel(LogLevel.None);
 

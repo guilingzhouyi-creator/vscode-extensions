@@ -18,11 +18,11 @@ import {
     FOLD_CHECKPOINT_MOD,
 } from '../domain/models';
 import { TimeAggregator, parseLocalDate } from '../domain/TimeAggregator';
-import { migrateToFolded } from '../domain/HistoryFolder';
+import { migrateToFolded } from '../domain/history-folder';
 import { StorageCoordinator } from '../persistence/StorageCoordinator';
 import { JournalWriter } from '../cache/JournalWriter';
 import { RecoveryService } from './RecoveryService';
-import { LogLevel, log } from '../integration/Logger';
+import { LogLevel, log } from '../integration/logger';
 
 /**
  * 契约模型：会话结束落盘计算结果 (SessionResult)

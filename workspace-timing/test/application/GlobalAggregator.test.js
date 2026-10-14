@@ -8,7 +8,7 @@
 
 const assert = require('assert');
 const { GlobalAggregator } = require('../../out/application/GlobalAggregator.js');
-const { setLogLevel, LogLevel } = require('../../out/integration/Logger.js');
+const { setLogLevel, LogLevel } = require('../../out/integration/logger.js');
 
 setLogLevel(LogLevel.None);
 

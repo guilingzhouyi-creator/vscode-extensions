@@ -11,7 +11,7 @@ import * as vscode from 'vscode';
 
 // Domain
 import { TimerEngine } from './domain/TimerEngine';
-import { LogLevel, setLogLevel, log } from './integration/Logger';
+import { LogLevel, setLogLevel, log } from './integration/logger';
 
 // Cache
 import { JournalWriter } from './cache/JournalWriter';

@@ -16,8 +16,9 @@ import {
     DEFAULT_IDLE_TIMEOUT_MINUTES,
     DEFAULT_AI_COOLDOWN_SECONDS,
     DEFAULT_AI_DETECTION_ENABLED,
+    DEFAULT_AI_BURST_WINDOW_MS,
 } from '../domain/models';
-import { LogLevel, log } from './Logger';
+import { LogLevel, log } from './logger';
 
 /** 监测器状态枚举（包含工作模式与内部空闲态） */
 export type WatcherMode = ActivityMode | 'idle';
@@ -76,8 +77,6 @@ const IGNORED_PATH_REGEX = /[/\\](node_modules|\.git|dist|out|build|\.vscode-tes
 /** 智能体与自动化工具特征路径正则（命中时属 100% 确认的 AI/Agent 协作信号） */
 const AGENT_PATH_REGEX = /[/\\](\.agents|\.gemini|\.claude|\.cursor|scratch|\.refactor-trajectory)($|[/\\])/i;
 
-/** 外部写盘与文件系统重载脉冲保护窗口（1200ms） */
-const EXTERNAL_AI_BURST_WINDOW_MS = 1200;
 
 /** 判断给定的文件 URI 是否属于被忽略的目录（命中 Agent 特征路径优先放行） */
 function isIgnoredUri(uri: vscode.Uri): boolean {
@@ -291,7 +290,7 @@ export class ActivityWatcher implements vscode.Disposable {
         const isSingleKeyTyping = e.contentChanges.length === 1 && change.text.length <= 3 && !change.text.includes('\n');
 
         // 前台文档若非单键打字且在外部写入短窗口（1200ms）内发生变动，极大概率是外部写盘后 VS Code 的文件重载
-        if (!isSingleKeyTyping && (now - this._lastExternalSignalMs < EXTERNAL_AI_BURST_WINDOW_MS)) {
+        if (!isSingleKeyTyping && (now - this._lastExternalSignalMs < DEFAULT_AI_BURST_WINDOW_MS)) {
             this.handleExternalSignal(e.document.uri);
             return;
         }

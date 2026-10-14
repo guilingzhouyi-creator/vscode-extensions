@@ -77,6 +77,8 @@ export const ISO_TIME_END = 23;
 export const CSP_NONCE_LENGTH = 32;
 /** 状态栏右侧停靠优先级 */
 export const STATUS_BAR_PRIORITY = 100;
+/** 外部写盘与文件系统重载脉冲保护窗口 (1200ms) */
+export const DEFAULT_AI_BURST_WINDOW_MS = 1200;
 
 // ─── 配置边界单一真源 ────────────────────────────────
 // 以下上下界是配置合法域的【唯一权威】，与 package.json contributes 的
@@ -430,3 +432,6 @@ export const DEFAULT_CONFIG: TimingConfig = {
     aiCooldownSeconds: DEFAULT_AI_COOLDOWN_SECONDS,
     chartDualTrackDisplay: DEFAULT_CHART_DUAL_TRACK_DISPLAY,
 };
+
+export * from './constants';
+

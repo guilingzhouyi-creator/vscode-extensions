@@ -1,6 +1,6 @@
 /**
  * Module: Data Validator (持久化数据深度校验与净化器)
- * File Path: src/persistence/DataValidator.ts
+ * File Path: src/persistence/data-validator.ts
  * Architecture Role: 持久化层输入防护与反腐化层（ACL），在备份还原与外部导入时实施严格类型与数值守卫。
  * Dependencies & Triggers: 依赖 domain/models 核心模型与版本常量；在从外部文件或备份恢复计时数据时触发执行。
  * Responsibilities: 顶层结构完整性检查；会话条目时长守恒约束修复与排序；历史折叠日桶规范化；双轨时长配比合规性裁决。
@@ -18,7 +18,7 @@ import {
     MS_PER_DAY,
     TimingMetadata,
 } from '../domain/models';
-import { sanitizeOverlappingDailyTotals } from '../domain/HistoryFolder';
+import { sanitizeOverlappingDailyTotals } from '../domain/history-folder';
 
 export interface ValidationResult {
     ok: boolean;
@@ -176,24 +176,39 @@ function sanitizeDailyTotals(rawTotals: unknown): DailyTotalsMap | undefined {
     return dailyTotals;
 }
 
+function parsePositiveTimestamp(val: unknown): number | undefined {
+    if (isFiniteNumber(val) && val > 0) {
+        return val;
+    }
+    if (typeof val === 'string' && val.trim() !== '') {
+        const parsed = Number(val);
+        if (isFiniteNumber(parsed) && parsed > 0) {
+            return parsed;
+        }
+    }
+    return undefined;
+}
+
+function parseNonNegativeInt(val: unknown): number | undefined {
+    return isFiniteNumber(val) && val >= 0 ? Math.floor(val) : undefined;
+}
+
 function sanitizeMetadata(rawMeta: unknown): TimingMetadata | undefined {
     if (!isRecord(rawMeta)) {
         return undefined;
     }
     const meta: TimingMetadata = {};
-    if (isFiniteNumber(rawMeta.lastJournalTs) && rawMeta.lastJournalTs > 0) {
-        meta.lastJournalTs = rawMeta.lastJournalTs;
-    } else if (typeof rawMeta.lastJournalTs === 'string' && rawMeta.lastJournalTs.trim() !== '') {
-        const parsed = Number(rawMeta.lastJournalTs);
-        if (isFiniteNumber(parsed) && parsed > 0) {
-            meta.lastJournalTs = parsed;
-        }
+    const lastJournalTs = parsePositiveTimestamp(rawMeta.lastJournalTs);
+    if (lastJournalTs !== undefined) {
+        meta.lastJournalTs = lastJournalTs;
     }
-    if (isFiniteNumber(rawMeta.foldedSessionCount) && rawMeta.foldedSessionCount >= 0) {
-        meta.foldedSessionCount = Math.floor(rawMeta.foldedSessionCount);
+    const foldedSessionCount = parseNonNegativeInt(rawMeta.foldedSessionCount);
+    if (foldedSessionCount !== undefined) {
+        meta.foldedSessionCount = foldedSessionCount;
     }
-    if (isFiniteNumber(rawMeta.journalPlaybackCount) && rawMeta.journalPlaybackCount >= 0) {
-        meta.journalPlaybackCount = Math.floor(rawMeta.journalPlaybackCount);
+    const journalPlaybackCount = parseNonNegativeInt(rawMeta.journalPlaybackCount);
+    if (journalPlaybackCount !== undefined) {
+        meta.journalPlaybackCount = journalPlaybackCount;
     }
     return Object.keys(meta).length > 0 ? meta : undefined;
 }

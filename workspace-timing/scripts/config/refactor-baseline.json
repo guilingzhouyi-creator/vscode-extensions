@@ -4,15 +4,15 @@
   "timestamp": "2026-09-05T08:34:47.427Z",
   "groups": [
     {
-      "key": "governance|GOV-FIL-001|src/application/DashboardDataAssembler.ts",
+      "key": "governance|GOV-FIL-001|src/application/dashboard-data-assembler.ts",
       "count": 1
     },
     {
-      "key": "constants|magic-number|src/application/DashboardDataAssembler.ts",
+      "key": "constants|magic-number|src/application/dashboard-data-assembler.ts",
       "count": 5
     },
     {
-      "key": "complexity|high-complexity|src/application/DashboardDataAssembler.ts",
+      "key": "complexity|high-complexity|src/application/dashboard-data-assembler.ts",
       "count": 1
     },
     {
@@ -172,19 +172,19 @@
       "count": 1
     },
     {
-      "key": "governance|GOV-FIL-001|src/domain/HistoryFolder.ts",
+      "key": "governance|GOV-FIL-001|src/domain/history-folder.ts",
       "count": 1
     },
     {
-      "key": "constants|magic-number|src/domain/HistoryFolder.ts",
+      "key": "constants|magic-number|src/domain/history-folder.ts",
       "count": 1
     },
     {
-      "key": "governance|GOV-LOG-001|src/domain/HistoryFolder.ts",
+      "key": "governance|GOV-LOG-001|src/domain/history-folder.ts",
       "count": 2
     },
     {
-      "key": "complexity|high-complexity|src/domain/HistoryFolder.ts",
+      "key": "complexity|high-complexity|src/domain/history-folder.ts",
       "count": 1
     },
     {
@@ -240,39 +240,39 @@
       "count": 1
     },
     {
-      "key": "governance|GOV-FIL-001|src/integration/Logger.ts",
+      "key": "governance|GOV-FIL-001|src/integration/logger.ts",
       "count": 1
     },
     {
-      "key": "governance|GOV-LOG-001|src/integration/Logger.ts",
+      "key": "governance|GOV-LOG-001|src/integration/logger.ts",
       "count": 1
     },
     {
-      "key": "constants|magic-number|src/integration/Logger.ts",
+      "key": "constants|magic-number|src/integration/logger.ts",
       "count": 2
     },
     {
-      "key": "governance|GOV-DBG-001|src/integration/Logger.ts",
+      "key": "governance|GOV-DBG-001|src/integration/logger.ts",
       "count": 2
     },
     {
-      "key": "governance|GOV-FIL-001|src/persistence/DataValidator.ts",
+      "key": "governance|GOV-FIL-001|src/persistence/data-validator.ts",
       "count": 1
     },
     {
-      "key": "complexity|high-complexity|src/persistence/DataValidator.ts",
+      "key": "complexity|high-complexity|src/persistence/data-validator.ts",
       "count": 1
     },
     {
-      "key": "governance|GOV-LOG-001|src/persistence/DataValidator.ts",
+      "key": "governance|GOV-LOG-001|src/persistence/data-validator.ts",
       "count": 1
     },
     {
-      "key": "constants|duplicate-literal|src/persistence/DataValidator.ts",
+      "key": "constants|duplicate-literal|src/persistence/data-validator.ts",
       "count": 1
     },
     {
-      "key": "constants|hardcoded-string|src/persistence/DataValidator.ts",
+      "key": "constants|hardcoded-string|src/persistence/data-validator.ts",
       "count": 1
     },
     {

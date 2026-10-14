@@ -10,7 +10,7 @@
 import { JournalWriter } from '../cache/JournalWriter';
 import { SessionManager } from './SessionManager';
 import { TimeAggregator } from '../domain/TimeAggregator';
-import { LogLevel, log } from '../integration/Logger';
+import { LogLevel, log } from '../integration/logger';
 import {
     DEFAULT_JOURNAL_FLUSH_MS,
     MS_PER_MINUTE,

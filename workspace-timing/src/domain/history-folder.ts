@@ -1,6 +1,6 @@
 /**
  * Module: HistoryFolder — History Folding Engine (Pure Function)
- * File Path: src/domain/HistoryFolder.ts
+ * File Path: src/domain/history-folder.ts
  * Architecture Role: Domain layer stateless folding and memory-bounded recycling engine
  * Dependencies & Triggers: domain/models.ts, domain/TimeAggregator.ts; triggered by SessionManager
  * Responsibilities: Fold expired and overflow work/idle sessions into dailyTotals buckets, recycle old week data, enforce bounded memory
@@ -69,11 +69,26 @@ export function foldCutoffStartMs(retentionDays: number, now = Date.now()): numb
     return todayStart - retentionDays * MS_PER_DAY;
 }
 
+/** 单条日桶条目防御性拷贝，防止原地突变 */
+function cloneDailyEntry(entry: DailyTotalsMap[string]): DailyTotalsMap[string] {
+    return {
+        totalMs: entry.totalMs,
+        sessionCount: entry.sessionCount,
+        manualMs: entry.manualMs,
+        aiMs: entry.aiMs,
+        idleTotalMs: entry.idleTotalMs,
+        idleSessionCount: entry.idleSessionCount,
+    };
+}
+
 /** 深度拷贝既有日桶，防止原地突变与键注入污染 */
 function cloneTotals(existingTotals?: DailyTotalsMap): DailyTotalsMap {
+    if (!existingTotals) {
+        return {};
+    }
     const totals: DailyTotalsMap = {};
-    for (const [k, v] of Object.entries(existingTotals ?? {})) {
-        totals[k] = { ...v };
+    for (const [k, v] of Object.entries(existingTotals)) {
+        totals[k] = cloneDailyEntry(v);
     }
     return totals;
 }
@@ -114,6 +129,16 @@ function filterByWeekStart<T extends { startMs: number; endMs: number }>(
     return { kept, toFold };
 }
 
+function getOrCreateBucket<T>(groups: Map<string, T[]>, key: string): T[] {
+    const existing = groups.get(key);
+    if (existing) {
+        return existing;
+    }
+    const created: T[] = [];
+    groups.set(key, created);
+    return created;
+}
+
 /** 按自然日分组并对超出 maxPerDay 的最旧条目执行截断拆分 */
 function partitionByDailyLimit<T extends { startMs: number; endMs: number }>(
     items: readonly T[],
@@ -126,12 +151,7 @@ function partitionByDailyLimit<T extends { startMs: number; endMs: number }>(
     for (const item of items) {
         if (!(item.endMs > item.startMs) || item.startMs <= 0) continue;
         const key = localDateStr(item.startMs);
-        let list = dayGroups.get(key);
-        if (!list) {
-            list = [];
-            dayGroups.set(key, list);
-        }
-        list.push(item);
+        getOrCreateBucket(dayGroups, key).push(item);
     }
     const kept: T[] = [];
     const toFold: T[] = [];

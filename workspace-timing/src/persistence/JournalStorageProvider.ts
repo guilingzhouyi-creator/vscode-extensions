@@ -12,7 +12,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { TimeSlice } from '../domain/models';
 import { IJournalStore } from '../cache/IJournalStore';
-import { LogLevel, log } from '../integration/Logger';
+import { LogLevel, log } from '../integration/logger';
 
 const JOURNAL_FILE = 'workspace-timing.journal';
 

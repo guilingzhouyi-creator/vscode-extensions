@@ -10,7 +10,7 @@
 import * as vscode from 'vscode';
 import { StatusBarMode, STATUS_BAR_PRIORITY } from '../domain/models';
 import { TimeAggregator } from '../domain/TimeAggregator';
-import { LogLevel, log } from '../integration/Logger';
+import { LogLevel, log } from '../integration/logger';
 import { t, format } from '../i18n/index';
 
 export type { StatusBarMode };

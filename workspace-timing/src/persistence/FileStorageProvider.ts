@@ -11,7 +11,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { WorkspaceTimingData } from '../domain/models';
 import { IStorageProvider } from './IStorageProvider';
-import { LogLevel, log } from '../integration/Logger';
+import { LogLevel, log } from '../integration/logger';
 
 const FILE_NAME = 'workspace-timing.json';
 

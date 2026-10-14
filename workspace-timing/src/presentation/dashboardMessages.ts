@@ -12,7 +12,7 @@ import { TimerOrchestrator } from '../application/TimerOrchestrator';
 import { StatusBarController } from './StatusBarController';
 import { DashboardMessage } from '../domain/dashboard-types';
 import { TimeAggregator } from '../domain/TimeAggregator';
-import { LogLevel, log } from '../integration/Logger';
+import { LogLevel, log } from '../integration/logger';
 import { persistTimingConfig } from '../integration/ConfigWatcher';
 import { t, format, setLocale, resolveLocale } from '../i18n/index';
 import { DashboardPanel } from './DashboardPanel';

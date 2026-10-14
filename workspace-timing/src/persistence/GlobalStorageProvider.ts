@@ -9,7 +9,7 @@
 
 import * as vscode from 'vscode';
 import { GlobalTimingData, createEmptyGlobalData } from '../domain/global-types';
-import { LogLevel, log } from '../integration/Logger';
+import { LogLevel, log } from '../integration/logger';
 
 const STORAGE_KEY = 'workspaceTiming:global';
 

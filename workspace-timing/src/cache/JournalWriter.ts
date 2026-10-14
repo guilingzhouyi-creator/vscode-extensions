@@ -17,7 +17,7 @@ import {
 import { RingBuffer } from './RingBuffer';
 import { ICacheStrategy, TimeBasedCacheStrategy } from './ICacheStrategy';
 import { IJournalStore } from './IJournalStore';
-import { LogLevel, log } from '../integration/Logger';
+import { LogLevel, log } from '../integration/logger';
 
 export class JournalWriter {
     private readonly ringBuffer: RingBuffer<TimeSlice>;
