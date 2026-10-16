@@ -20,7 +20,7 @@
     "单文件双轨体积 (ELOC <= 900 / LOC <= 1400) 与 AST 切片预算 (CC <= 15, Depth <= 4)"
   ],
   "localVerification": [
-    "node scripts/common/validate-no-empty-files.js",
+    "node scripts/common/validate-physical-hygiene.js",
     "node scripts/common/generate-rule-catalog.js",
     "node scripts/common/evaluate-eloc-budget.js"
   ]
