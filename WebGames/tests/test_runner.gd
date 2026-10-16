@@ -15,11 +15,11 @@ func _initialize() -> void:
 	# 全域启动装配（幂等）：GameConfig 就绪 + 物品注册表 + 内置 GM 命令，
 	# 测试运行器作为 CLI 运行时入口覆盖真实装配路径
 	GameBootstrap.assemble()
-	if TestRegistryClass == null or not TestRegistryClass.has_method("get_all_engine_test_classes"):
-		printerr("❌ 致命错误：TestRegistryClass 编译失败或未暴露 get_all_engine_test_classes()")
+	var test_classes: Array = TestRegistryClass.get_all_engine_test_classes()
+	if test_classes == null or test_classes.is_empty():
+		printerr("❌ 致命错误：TestRegistry 未返回任何有效测试套件")
 		quit(1)
 		return
-	var test_classes = TestRegistryClass.get_all_engine_test_classes()
 
 	# 领域总数取自注册表，避免新增领域后标题数字与实际执行数失同步
 	print("\n==============================================================================")
