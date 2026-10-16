@@ -31,4 +31,4 @@ dist/
 *.pck
 
 # 静态分析与度量审查临时报告（不入库）
-reports/
+/reports/

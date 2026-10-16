@@ -16,6 +16,7 @@
 | `docs/归档库/` | 国家标准技术档案库（01后端42卷 + 02前端17卷 + 03短期施工周期归档卷） | [卡拉尔全宗档案总目录与元数据库.md](归档库/卡拉尔全宗档案总目录与元数据库.md) |
 | `docs/模板/` | 标准工程化四阶段与编码老练风格模板库（必须定向区间切片阅读） | [README.md](模板/README.md) |
 | `docs/玩法汇总/` | 玩法设计稿（需求源头，只读参考） | 目录内按序号命名 |
+| `docs/艺术工单需求表/` | 视觉/UI/音频艺术生产工单库（面向美术团队与外包交付的工业级生产契约） | [README.md](艺术工单需求表/README.md) |
 | `docs/audit/` | 专项审查与审计报告（契约层/UI/质量审计） | [AUDIT_REPORT_UI缺失.md](audit/AUDIT_REPORT_UI缺失.md) ｜ [前端可视化.md](audit/AUDIT_REPORT_前端可视化.md) ｜ [注释覆盖度.md](audit/AUDIT_REPORT_注释覆盖度.md) ｜ [退出流程审查.md](audit/AUDIT_REPORT_退出流程审查.md) |
 | `docs/` 根 | 稳定命名族（`README.md`、`卡拉尔世界引擎开发路线图.md`、`后端代码注释规范.md`，已登记 `NAMING_RULES` scope `.`） | — |
 

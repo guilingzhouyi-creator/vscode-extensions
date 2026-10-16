@@ -30,7 +30,8 @@
     "PHASE-CODE-SANITY": { "severity": "error", "fixable": false, "desc": "短期施工区细则代码块违规散落（示例代码中严禁出现 push_error/push_warning 散落或 randf/randi 等非确定性调用）" }
   },
   "naming_rules": [
-    { "scope": ".", "dirs": ["后端架构", "前端架构", "归档库", "路线图", "玩法汇总", "模板", "audit"], "files": ["卡拉尔世界引擎开发路线图\\.md", "README\\.md", "后端代码注释规范\\.md"] },
+    { "scope": ".", "dirs": ["后端架构", "前端架构", "归档库", "路线图", "玩法汇总", "模板", "audit", "艺术工单需求表"], "files": ["卡拉尔世界引擎开发路线图\\.md", "README\\.md", "后端代码注释规范\\.md"] },
+    { "scope": "艺术工单需求表", "dirs": [], "files": ["README\\.md", ".+\\.md"] },
     { "scope": "audit", "dirs": [], "files": ["AUDIT_REPORT_.+\\.md"] },
     { "scope": "后端架构", "files": ["后端架构需求表\\d+\\.md", "后端架构需求表索引\\.md"] },
     { "scope": "前端架构", "files": ["前端架构需求表\\d+\\.md", "前端架构需求表索引\\.md", "前端UI骨架建设路线图\\.md", "前端文本内容体系改造路线图\\.md"] },
