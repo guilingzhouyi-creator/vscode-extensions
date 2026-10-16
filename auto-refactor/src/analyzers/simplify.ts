@@ -868,9 +868,12 @@ export class SimplifyAnalyzer implements Analyzer {
      */
     private checkPythonBodyEmpty(lines: string[], defIndex: number, defIndent: number): boolean {
         const bodyLineIndex = this.advancePastPythonDocstrings(lines, defIndex + 1);
-        if (bodyLineIndex >= lines.length || !PY_EMPTY_BODY_RE.test(lines[bodyLineIndex].trim()))
+        if (bodyLineIndex >= lines.length || !PY_EMPTY_BODY_RE.test(lines[bodyLineIndex].trim())) {
             return false;
-        if (this.getIndentWidth(lines[bodyLineIndex]) <= defIndent) return false;
+        }
+        if (this.getIndentWidth(lines[bodyLineIndex]) <= defIndent) {
+            return false;
+        }
         let nextLineIndex = bodyLineIndex + 1;
         while (
             nextLineIndex < lines.length &&

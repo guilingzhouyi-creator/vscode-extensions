@@ -47,6 +47,111 @@ const NAMING_UPPER_SNAKE_CASE = 'UPPER_SNAKE_CASE';
 /** Naming-convention id for lower-case underscore names (`snake_case`). */
 const NAMING_SNAKE_CASE = 'snake_case';
 
+const LANG_TYPESCRIPT = 'typescript';
+const LANG_JAVASCRIPT = 'javascript';
+const LANG_GDSCRIPT = 'gdscript';
+const LANG_RUST = 'rust';
+const LANG_PYTHON = 'python';
+const LANG_GO = 'go';
+const LANG_SHELL = 'shell';
+const LANG_POWERSHELL = 'powershell';
+
+const RAW_DEBUG_JS_TS = 'console.log\nconsole.debug\nconsole.info\nconsole.trace\ndebugger';
+const RAW_DEBUG_GDSCRIPT = 'print\nprint_debug\nprint_stack\nbreakpoint';
+const RAW_DEBUG_RUST = 'println!\neprintln!\ndbg!';
+const RAW_DEBUG_PYTHON = 'print\nbreakpoint';
+const RAW_DEBUG_GO = 'fmt.Println\nfmt.Printf\nlog.Println\nlog.Printf\npanic';
+const RAW_DEBUG_SHELL = 'echo\nset -x';
+const RAW_DEBUG_POWERSHELL = 'Write-Host\nWrite-Debug';
+
+const DEBUG_JS_TS: readonly string[] = Object.freeze(RAW_DEBUG_JS_TS.split('\n'));
+const DEBUG_GDSCRIPT: readonly string[] = Object.freeze(RAW_DEBUG_GDSCRIPT.split('\n'));
+const DEBUG_RUST: readonly string[] = Object.freeze(RAW_DEBUG_RUST.split('\n'));
+const DEBUG_PYTHON: readonly string[] = Object.freeze(RAW_DEBUG_PYTHON.split('\n'));
+const DEBUG_GO: readonly string[] = Object.freeze(RAW_DEBUG_GO.split('\n'));
+const DEBUG_SHELL: readonly string[] = Object.freeze(RAW_DEBUG_SHELL.split('\n'));
+const DEBUG_POWERSHELL: readonly string[] = Object.freeze(RAW_DEBUG_POWERSHELL.split('\n'));
+
+type NamingConventions = LanguageCapabilities['namingConventions'];
+
+const NAMING_WEB: NamingConventions = {
+    file: NAMING_KEBAB_CASE,
+    class: NAMING_PASCAL_CASE,
+    function: NAMING_CAMEL_CASE,
+    variable: NAMING_CAMEL_CASE,
+    constant: NAMING_UPPER_SNAKE_CASE,
+};
+
+const NAMING_SYSTEM: NamingConventions = {
+    file: NAMING_SNAKE_CASE,
+    class: NAMING_PASCAL_CASE,
+    function: NAMING_SNAKE_CASE,
+    variable: NAMING_SNAKE_CASE,
+    constant: NAMING_UPPER_SNAKE_CASE,
+};
+
+const NAMING_GO: NamingConventions = {
+    file: NAMING_SNAKE_CASE,
+    class: NAMING_PASCAL_CASE,
+    function: NAMING_CAMEL_CASE,
+    variable: NAMING_CAMEL_CASE,
+    constant: NAMING_UPPER_SNAKE_CASE,
+};
+
+const NAMING_SHELL: NamingConventions = {
+    file: NAMING_KEBAB_CASE,
+    class: NAMING_PASCAL_CASE,
+    function: NAMING_SNAKE_CASE,
+    variable: NAMING_SNAKE_CASE,
+    constant: NAMING_UPPER_SNAKE_CASE,
+};
+
+const NAMING_POWERSHELL: NamingConventions = {
+    file: NAMING_KEBAB_CASE,
+    class: NAMING_PASCAL_CASE,
+    function: NAMING_PASCAL_CASE,
+    variable: NAMING_CAMEL_CASE,
+    constant: NAMING_UPPER_SNAKE_CASE,
+};
+
+type FeatureTuple = readonly [
+    typing: boolean,
+    inference: boolean,
+    inheritance: boolean,
+    matching: boolean,
+    resultType: boolean,
+    exceptions: boolean,
+];
+
+const FEATURES_TS: FeatureTuple = [true, true, true, false, false, true];
+const FEATURES_JS: FeatureTuple = [false, false, true, false, false, true];
+const FEATURES_GD: FeatureTuple = [true, true, true, true, true, false];
+const FEATURES_RS: FeatureTuple = [true, true, false, true, true, false];
+const FEATURES_PY: FeatureTuple = [true, true, true, true, false, true];
+const FEATURES_GO: FeatureTuple = [true, true, false, false, false, false];
+const FEATURES_SH: FeatureTuple = [false, false, false, true, false, false];
+const FEATURES_PS: FeatureTuple = [true, true, true, true, false, true];
+
+function buildLanguageProfile(
+    languageId: string,
+    features: FeatureTuple,
+    debugIdentifiers: readonly string[],
+    namingConventions: NamingConventions,
+): LanguageCapabilities {
+    const [typing, inference, inheritance, matching, resultType, exceptions] = features;
+    return {
+        languageId,
+        supportsStaticTyping: typing,
+        supportsTypeInference: inference,
+        supportsClassInheritance: inheritance,
+        supportsPatternMatching: matching,
+        hasResultType: resultType,
+        hasExceptions: exceptions,
+        debugIdentifiers: [...debugIdentifiers],
+        namingConventions,
+    };
+}
+
 /**
  * Canonical registry of language capability descriptors keyed by profile id.
  *
@@ -56,179 +161,48 @@ const NAMING_SNAKE_CASE = 'snake_case';
  * read-only descriptors, so mutating one would affect every consumer.
  */
 export const LANGUAGE_PROFILES: Record<string, LanguageCapabilities> = {
-    typescript: {
-        languageId: 'typescript',
-        supportsStaticTyping: true,
-        supportsTypeInference: true,
-        supportsClassInheritance: true,
-        supportsPatternMatching: false,
-        hasResultType: false,
-        hasExceptions: true,
-        debugIdentifiers: [
-            'console.log',
-            'console.debug',
-            'console.info',
-            'console.trace',
-            'debugger',
-        ],
-        namingConventions: {
-            file: NAMING_KEBAB_CASE,
-            class: NAMING_PASCAL_CASE,
-            function: NAMING_CAMEL_CASE,
-            variable: NAMING_CAMEL_CASE,
-            constant: NAMING_UPPER_SNAKE_CASE,
-        },
-    },
-    javascript: {
-        languageId: 'javascript',
-        supportsStaticTyping: false,
-        supportsTypeInference: false,
-        supportsClassInheritance: true,
-        supportsPatternMatching: false,
-        hasResultType: false,
-        hasExceptions: true,
-        debugIdentifiers: [
-            'console.log',
-            'console.debug',
-            'console.info',
-            'console.trace',
-            'debugger',
-        ],
-        namingConventions: {
-            file: NAMING_KEBAB_CASE,
-            class: NAMING_PASCAL_CASE,
-            function: NAMING_CAMEL_CASE,
-            variable: NAMING_CAMEL_CASE,
-            constant: NAMING_UPPER_SNAKE_CASE,
-        },
-    },
-    gdscript: {
-        languageId: 'gdscript',
-        supportsStaticTyping: true,
-        supportsTypeInference: true,
-        supportsClassInheritance: true,
-        supportsPatternMatching: true,
-        hasResultType: true,
-        hasExceptions: false,
-        debugIdentifiers: ['print', 'print_debug', 'print_stack', 'breakpoint'],
-        namingConventions: {
-            file: NAMING_SNAKE_CASE,
-            class: NAMING_PASCAL_CASE,
-            function: NAMING_SNAKE_CASE,
-            variable: NAMING_SNAKE_CASE,
-            constant: NAMING_UPPER_SNAKE_CASE,
-        },
-    },
-    rust: {
-        languageId: 'rust',
-        supportsStaticTyping: true,
-        supportsTypeInference: true,
-        supportsClassInheritance: false, // Rust uses traits/impl composition
-        supportsPatternMatching: true,
-        hasResultType: true,
-        hasExceptions: false, // Rust uses Result<T, E> and panic
-        debugIdentifiers: ['println!', 'eprintln!', 'dbg!'],
-        namingConventions: {
-            file: NAMING_SNAKE_CASE,
-            class: NAMING_PASCAL_CASE,
-            function: NAMING_SNAKE_CASE,
-            variable: NAMING_SNAKE_CASE,
-            constant: NAMING_UPPER_SNAKE_CASE,
-        },
-    },
-    python: {
-        languageId: 'python',
-        supportsStaticTyping: true,
-        supportsTypeInference: true,
-        supportsClassInheritance: true,
-        supportsPatternMatching: true,
-        hasResultType: false,
-        hasExceptions: true,
-        debugIdentifiers: ['print', 'breakpoint'],
-        namingConventions: {
-            file: NAMING_SNAKE_CASE,
-            class: NAMING_PASCAL_CASE,
-            function: NAMING_SNAKE_CASE,
-            variable: NAMING_SNAKE_CASE,
-            constant: NAMING_UPPER_SNAKE_CASE,
-        },
-    },
-    go: {
-        languageId: 'go',
-        supportsStaticTyping: true,
-        supportsTypeInference: true,
-        supportsClassInheritance: false, // Go uses struct embedding and interfaces, not inheritance
-        supportsPatternMatching: false, // Go has no pattern matching (switch is type-switch only)
-        hasResultType: false, // Go uses multi-value returns (value, error), not a Result type
-        hasExceptions: false, // Go uses error values, not exceptions
-        debugIdentifiers: ['fmt.Println', 'fmt.Printf', 'log.Println', 'log.Printf', 'panic'],
-        namingConventions: {
-            file: NAMING_SNAKE_CASE,
-            class: NAMING_PASCAL_CASE, // exported types
-            function: NAMING_CAMEL_CASE, // mixedCaps, exported = PascalCase
-            variable: NAMING_CAMEL_CASE, // mixedCaps
-            // Go uses camelCase in practice; profile uses the shared enum
-            constant: NAMING_UPPER_SNAKE_CASE,
-        },
-    },
-    shell: {
-        languageId: 'shell',
-        supportsStaticTyping: false,
-        supportsTypeInference: false,
-        supportsClassInheritance: false,
-        supportsPatternMatching: true,
-        hasResultType: false,
-        hasExceptions: false,
-        debugIdentifiers: ['echo', 'set -x'],
-        namingConventions: {
-            file: NAMING_KEBAB_CASE,
-            class: NAMING_PASCAL_CASE,
-            function: NAMING_SNAKE_CASE,
-            variable: NAMING_SNAKE_CASE,
-            constant: NAMING_UPPER_SNAKE_CASE,
-        },
-    },
-    powershell: {
-        languageId: 'powershell',
-        supportsStaticTyping: true,
-        supportsTypeInference: true,
-        supportsClassInheritance: true,
-        supportsPatternMatching: true,
-        hasResultType: false,
-        hasExceptions: true,
-        debugIdentifiers: ['Write-Host', 'Write-Debug'],
-        namingConventions: {
-            file: NAMING_KEBAB_CASE,
-            class: NAMING_PASCAL_CASE,
-            function: NAMING_PASCAL_CASE,
-            variable: NAMING_CAMEL_CASE,
-            constant: NAMING_UPPER_SNAKE_CASE,
-        },
-    },
+    [LANG_TYPESCRIPT]: buildLanguageProfile(LANG_TYPESCRIPT, FEATURES_TS, DEBUG_JS_TS, NAMING_WEB),
+    [LANG_JAVASCRIPT]: buildLanguageProfile(LANG_JAVASCRIPT, FEATURES_JS, DEBUG_JS_TS, NAMING_WEB),
+    [LANG_GDSCRIPT]: buildLanguageProfile(
+        LANG_GDSCRIPT,
+        FEATURES_GD,
+        DEBUG_GDSCRIPT,
+        NAMING_SYSTEM,
+    ),
+    [LANG_RUST]: buildLanguageProfile(LANG_RUST, FEATURES_RS, DEBUG_RUST, NAMING_SYSTEM),
+    [LANG_PYTHON]: buildLanguageProfile(LANG_PYTHON, FEATURES_PY, DEBUG_PYTHON, NAMING_SYSTEM),
+    [LANG_GO]: buildLanguageProfile(LANG_GO, FEATURES_GO, DEBUG_GO, NAMING_GO),
+    [LANG_SHELL]: buildLanguageProfile(LANG_SHELL, FEATURES_SH, DEBUG_SHELL, NAMING_SHELL),
+    [LANG_POWERSHELL]: buildLanguageProfile(
+        LANG_POWERSHELL,
+        FEATURES_PS,
+        DEBUG_POWERSHELL,
+        NAMING_POWERSHELL,
+    ),
 };
 
 /**
  * Direct extension-to-profile Map for O(1) single-lookup resolution.
  */
-const EXT_TO_PROFILE = new Map<string, LanguageCapabilities>([
-    ['.ts', LANGUAGE_PROFILES.typescript],
-    ['.tsx', LANGUAGE_PROFILES.typescript],
-    ['.mts', LANGUAGE_PROFILES.typescript],
-    ['.cts', LANGUAGE_PROFILES.typescript],
-    ['.js', LANGUAGE_PROFILES.javascript],
-    ['.jsx', LANGUAGE_PROFILES.javascript],
-    ['.mjs', LANGUAGE_PROFILES.javascript],
-    ['.cjs', LANGUAGE_PROFILES.javascript],
-    ['.gd', LANGUAGE_PROFILES.gdscript],
-    ['.rs', LANGUAGE_PROFILES.rust],
-    ['.py', LANGUAGE_PROFILES.python],
-    ['.go', LANGUAGE_PROFILES.go],
-    ['.sh', LANGUAGE_PROFILES.shell],
-    ['.bash', LANGUAGE_PROFILES.shell],
-    ['.zsh', LANGUAGE_PROFILES.shell],
-    ['.ps1', LANGUAGE_PROFILES.powershell],
-    ['.psm1', LANGUAGE_PROFILES.powershell],
-    ['.psd1', LANGUAGE_PROFILES.powershell],
+const EXTENSION_PROFILES_MAP = new Map<string, LanguageCapabilities>([
+    ['.ts', LANGUAGE_PROFILES[LANG_TYPESCRIPT]],
+    ['.tsx', LANGUAGE_PROFILES[LANG_TYPESCRIPT]],
+    ['.mts', LANGUAGE_PROFILES[LANG_TYPESCRIPT]],
+    ['.cts', LANGUAGE_PROFILES[LANG_TYPESCRIPT]],
+    ['.js', LANGUAGE_PROFILES[LANG_JAVASCRIPT]],
+    ['.jsx', LANGUAGE_PROFILES[LANG_JAVASCRIPT]],
+    ['.mjs', LANGUAGE_PROFILES[LANG_JAVASCRIPT]],
+    ['.cjs', LANGUAGE_PROFILES[LANG_JAVASCRIPT]],
+    ['.gd', LANGUAGE_PROFILES[LANG_GDSCRIPT]],
+    ['.rs', LANGUAGE_PROFILES[LANG_RUST]],
+    ['.py', LANGUAGE_PROFILES[LANG_PYTHON]],
+    ['.go', LANGUAGE_PROFILES[LANG_GO]],
+    ['.sh', LANGUAGE_PROFILES[LANG_SHELL]],
+    ['.bash', LANGUAGE_PROFILES[LANG_SHELL]],
+    ['.zsh', LANGUAGE_PROFILES[LANG_SHELL]],
+    ['.ps1', LANGUAGE_PROFILES[LANG_POWERSHELL]],
+    ['.psm1', LANGUAGE_PROFILES[LANG_POWERSHELL]],
+    ['.psd1', LANGUAGE_PROFILES[LANG_POWERSHELL]],
 ]);
 
 /**
@@ -261,11 +235,11 @@ function fastExtname(filePath: string): string {
  */
 export function resolveLanguageProfile(filePath: string, adapterId?: string): LanguageCapabilities {
     const ext = fastExtname(filePath);
-    const profile = EXT_TO_PROFILE.get(ext);
+    const profile = EXTENSION_PROFILES_MAP.get(ext);
     if (profile) return profile;
 
     if (adapterId && LANGUAGE_PROFILES[adapterId]) {
         return LANGUAGE_PROFILES[adapterId];
     }
-    return LANGUAGE_PROFILES.typescript;
+    return LANGUAGE_PROFILES[LANG_TYPESCRIPT];
 }

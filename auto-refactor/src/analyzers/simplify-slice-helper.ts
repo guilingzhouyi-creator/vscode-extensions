@@ -86,9 +86,20 @@ const JS_GLOBALS = new Set([
     'module',
 ]);
 
-function capitalize(text: string): string {
-    if (!text) return 'Helper';
-    return text.charAt(0).toUpperCase() + text.slice(1);
+const DEFAULT_HELPER_SUFFIX = 'Helper';
+const RETURN_TYPE_VOID = 'void';
+const COMMENT_EXTRACTED_HELPER = '// Extracted helper:';
+const COMMENT_SLICE_BODY = '    // ... extracted slice statements';
+const COMMENT_CALL_SITE = '// Call site:';
+const DEFAULT_EMPTY_RETURN = 'return;';
+const DEFAULT_TARGET_FUNCTION = 'targetFunction';
+const COMMENT_FUNCTION_BODY = '    // ... function body';
+const MAX_SLICE_STATEMENT_WINDOW = 15;
+const PREFIX_EXTRACT = 'extract';
+const DEFAULT_FUNCTION_NAME = 'Helper';
+
+function formatCapitalizedText(text: string): string {
+    return text ? text.charAt(0).toUpperCase() + text.slice(1) : DEFAULT_HELPER_SUFFIX;
 }
 
 function collectBindingIdentifiers(binding: ts.BindingName, target: Set<string>): void {
@@ -132,9 +143,7 @@ function isIdentifierRead(id: ts.Identifier): boolean {
     const parent = id.parent;
     if (!parent) return true;
     if (ts.isTypeNode(parent) || ts.isTypeReferenceNode(parent)) return false;
-    if (isDeclarationName(parent, id)) return false;
-    if (isAssignmentTarget(parent, id)) return false;
-    return true;
+    return !isDeclarationName(parent, id) && !isAssignmentTarget(parent, id);
 }
 
 function isAssignmentOperator(kind: ts.SyntaxKind): boolean {
@@ -159,23 +168,26 @@ function collectVariablesInStatement(stmt: ts.Statement): StatementVariableInfo 
     const reads = new Set<string>();
     const writes = new Set<string>();
 
-    function visit(n: ts.Node): void {
-        if (ts.isTypeNode(n)) return;
-        if (ts.isVariableDeclaration(n)) {
-            collectBindingIdentifiers(n.name, writes);
-        } else if (ts.isBinaryExpression(n) && isAssignmentOperator(n.operatorToken.kind)) {
-            if (ts.isIdentifier(n.left)) {
-                writes.add(n.left.text);
-                if (n.operatorToken.kind !== ts.SyntaxKind.EqualsToken) {
-                    reads.add(n.left.text);
+    function visit(astNode: ts.Node): void {
+        if (ts.isTypeNode(astNode)) return;
+        if (ts.isVariableDeclaration(astNode)) {
+            collectBindingIdentifiers(astNode.name, writes);
+        } else if (
+            ts.isBinaryExpression(astNode) &&
+            isAssignmentOperator(astNode.operatorToken.kind)
+        ) {
+            if (ts.isIdentifier(astNode.left)) {
+                writes.add(astNode.left.text);
+                if (astNode.operatorToken.kind !== ts.SyntaxKind.EqualsToken) {
+                    reads.add(astNode.left.text);
                 }
             }
-        } else if (ts.isPrefixUnaryExpression(n) || ts.isPostfixUnaryExpression(n)) {
-            collectUnaryWrites(n, writes, reads);
-        } else if (ts.isIdentifier(n) && isIdentifierRead(n)) {
-            reads.add(n.text);
+        } else if (ts.isPrefixUnaryExpression(astNode) || ts.isPostfixUnaryExpression(astNode)) {
+            collectUnaryWrites(astNode, writes, reads);
+        } else if (ts.isIdentifier(astNode) && isIdentifierRead(astNode)) {
+            reads.add(astNode.text);
         }
-        ts.forEachChild(n, visit);
+        ts.forEachChild(astNode, visit);
     }
 
     ts.forEachChild(stmt, visit);
@@ -197,30 +209,30 @@ function buildExtractSignature(
     inputs: string[],
     outputs: string[],
 ): { signature: string; template: string } {
-    const paramList = inputs.map((v) => `${v}: any`).join(', ');
-    let returnType = 'void';
+    const paramList = inputs.map((v) => `${v}: unknown`).join(', ');
+    let returnType = RETURN_TYPE_VOID;
     let returnStmt = '';
     let callSite = `${helperName}(${inputs.join(', ')});`;
 
     if (outputs.length === 1) {
-        returnType = 'any';
+        returnType = 'unknown';
         returnStmt = `    return ${outputs[0]};`;
         callSite = `const ${outputs[0]} = ${helperName}(${inputs.join(', ')});`;
     } else if (outputs.length > 1) {
-        returnType = `{ ${outputs.map((v) => `${v}: any`).join(', ')} }`;
+        returnType = `{ ${outputs.map((v) => `${v}: unknown`).join(', ')} }`;
         returnStmt = `    return { ${outputs.join(', ')} };`;
         callSite = `const { ${outputs.join(', ')} } = ${helperName}(${inputs.join(', ')});`;
     }
 
     const signature = `function ${helperName}(${paramList}): ${returnType}`;
     const template = [
-        `// Extracted helper:`,
+        COMMENT_EXTRACTED_HELPER,
         `${signature} {`,
-        `    // ... extracted slice statements`,
+        COMMENT_SLICE_BODY,
         returnStmt,
         `}`,
         ``,
-        `// Call site:`,
+        COMMENT_CALL_SITE,
         callSite,
     ]
         .filter(Boolean)
@@ -237,7 +249,7 @@ function resolveWritesBefore(
     if (prefixWrites) return prefixWrites[startIndex];
     const writesBefore = new Set<string>();
     for (let k = 0; k < startIndex; k++) {
-        for (const writtenVar of stmtInfos[k].writes) writesBefore.add(writtenVar);
+        stmtInfos[k].writes.forEach((writtenVar) => writesBefore.add(writtenVar));
     }
     return writesBefore;
 }
@@ -251,24 +263,30 @@ function resolveReadsAfter(
     if (suffixReads) return suffixReads[endIndex + 1];
     const readsAfter = new Set<string>();
     for (let k = endIndex + 1; k < statementsLen; k++) {
-        for (const readVar of stmtInfos[k].reads) readsAfter.add(readVar);
+        stmtInfos[k].reads.forEach((readVar) => readsAfter.add(readVar));
     }
     return readsAfter;
 }
 
+interface LineSpanRangeIndices {
+    readonly startIndex: number;
+    readonly endIndex: number;
+}
+
 function resolveLineSpan(
-    startIndex: number,
-    endIndex: number,
+    range: LineSpanRangeIndices,
     statements: readonly ts.Statement[],
     sf: ts.SourceFile,
-    stmtStartLines?: Int32Array,
-    stmtEndLines?: Int32Array,
+    cachedLines?: { starts?: Int32Array; ends?: Int32Array },
 ): FunctionSliceRange {
-    if (stmtStartLines && stmtEndLines) {
-        return { startLine: stmtStartLines[startIndex], endLine: stmtEndLines[endIndex] };
+    if (cachedLines?.starts && cachedLines?.ends) {
+        return {
+            startLine: cachedLines.starts[range.startIndex],
+            endLine: cachedLines.ends[range.endIndex],
+        };
     }
-    const startPos = sf.getLineAndCharacterOfPosition(statements[startIndex].getStart(sf));
-    const endPos = sf.getLineAndCharacterOfPosition(statements[endIndex].getEnd());
+    const startPos = sf.getLineAndCharacterOfPosition(statements[range.startIndex].getStart(sf));
+    const endPos = sf.getLineAndCharacterOfPosition(statements[range.endIndex].getEnd());
     return { startLine: startPos.line + 1, endLine: endPos.line + 1 };
 }
 
@@ -279,9 +297,7 @@ function isSliceInputVariable(
     sliceWrites: ReadonlySet<string>,
 ): boolean {
     if (JS_GLOBALS.has(variable)) return false;
-    if (paramNames.has(variable)) return true;
-    if (writesBefore.has(variable)) return true;
-    return !sliceWrites.has(variable);
+    return paramNames.has(variable) || writesBefore.has(variable) || !sliceWrites.has(variable);
 }
 
 function collectInputVariables(
@@ -317,55 +333,62 @@ function computeDependencyScore(inputCount: number, outputCount: number): number
 }
 
 function populateSliceVariables(
-    startIndex: number,
-    endIndex: number,
+    range: LineSpanRangeIndices,
     stmtInfos: StatementVariableInfo[],
-    outReads: Set<string>,
-    outWrites: Set<string>,
+    buffers: { reads: Set<string>; writes: Set<string> },
 ): void {
-    for (let k = startIndex; k <= endIndex; k++) {
-        for (const readVar of stmtInfos[k].reads) outReads.add(readVar);
-        for (const writtenVar of stmtInfos[k].writes) outWrites.add(writtenVar);
+    for (let k = range.startIndex; k <= range.endIndex; k++) {
+        stmtInfos[k].reads.forEach((r) => buffers.reads.add(r));
+        stmtInfos[k].writes.forEach((w) => buffers.writes.add(w));
     }
 }
 
+interface SliceEvaluationContext {
+    readonly statements: readonly ts.Statement[];
+    readonly sf: ts.SourceFile;
+    readonly paramNames: ReadonlySet<string>;
+    readonly stmtInfos: StatementVariableInfo[];
+    readonly helperName: string;
+    readonly prefixWrites?: Set<string>[];
+    readonly suffixReads?: Set<string>[];
+    readonly cachedLines?: { starts?: Int32Array; ends?: Int32Array };
+    readonly buffers?: { reads: Set<string>; writes: Set<string> };
+}
+
 function evaluateSliceRange(
-    statements: readonly ts.Statement[],
-    startIndex: number,
-    endIndex: number,
-    sf: ts.SourceFile,
-    paramNames: Set<string>,
-    stmtInfos: StatementVariableInfo[],
-    helperName: string,
-    prefixWrites?: Set<string>[],
-    suffixReads?: Set<string>[],
-    stmtStartLines?: Int32Array,
-    stmtEndLines?: Int32Array,
-    scratchReads?: Set<string>,
-    scratchWrites?: Set<string>,
+    range: LineSpanRangeIndices,
+    context: SliceEvaluationContext,
 ): FunctionSliceCandidate {
-    const sliceReads = scratchReads ?? new Set<string>();
-    const sliceWrites = scratchWrites ?? new Set<string>();
+    const { startIndex, endIndex } = range;
+    const sliceReads = context.buffers?.reads ?? new Set<string>();
+    const sliceWrites = context.buffers?.writes ?? new Set<string>();
     sliceReads.clear();
     sliceWrites.clear();
 
-    populateSliceVariables(startIndex, endIndex, stmtInfos, sliceReads, sliceWrites);
+    populateSliceVariables(range, context.stmtInfos, { reads: sliceReads, writes: sliceWrites });
 
-    const writesBefore = resolveWritesBefore(startIndex, stmtInfos, prefixWrites);
-    const readsAfter = resolveReadsAfter(endIndex, statements.length, stmtInfos, suffixReads);
+    const writesBefore = resolveWritesBefore(startIndex, context.stmtInfos, context.prefixWrites);
+    const readsAfter = resolveReadsAfter(
+        endIndex,
+        context.statements.length,
+        context.stmtInfos,
+        context.suffixReads,
+    );
 
-    const inputVars = collectInputVariables(sliceReads, paramNames, writesBefore, sliceWrites);
+    const inputVars = collectInputVariables(
+        sliceReads,
+        context.paramNames,
+        writesBefore,
+        sliceWrites,
+    );
     const outputVars = collectOutputVariables(sliceWrites, readsAfter);
     const dependencyCount = computeDependencyScore(inputVars.length, outputVars.length);
-    const sliceRange = resolveLineSpan(
-        startIndex,
-        endIndex,
-        statements,
-        sf,
-        stmtStartLines,
-        stmtEndLines,
+    const sliceRange = resolveLineSpan(range, context.statements, context.sf, context.cachedLines);
+    const { signature, template } = buildExtractSignature(
+        context.helperName,
+        inputVars,
+        outputVars,
     );
-    const { signature, template } = buildExtractSignature(helperName, inputVars, outputVars);
 
     return {
         sliceRange,
@@ -383,14 +406,17 @@ function evaluateSliceRange(
 
 function copyAndExtendSet(base: ReadonlySet<string>, additions: ReadonlySet<string>): Set<string> {
     const next = new Set<string>(base);
-    for (const item of additions) next.add(item);
+    additions.forEach((item) => next.add(item));
     return next;
 }
 
-function precomputePrefixWrites(n: number, stmtInfos: StatementVariableInfo[]): Set<string>[] {
-    const prefixWrites: Set<string>[] = new Array(n + 1);
+function precomputePrefixWrites(
+    statementCount: number,
+    stmtInfos: StatementVariableInfo[],
+): Set<string>[] {
+    const prefixWrites: Set<string>[] = Array.from({ length: statementCount + 1 });
     prefixWrites[0] = new Set<string>();
-    for (let k = 0; k < n; k++) {
+    for (let k = 0; k < statementCount; k++) {
         if (stmtInfos[k].writes.size === 0) {
             prefixWrites[k + 1] = prefixWrites[k];
         } else {
@@ -400,10 +426,13 @@ function precomputePrefixWrites(n: number, stmtInfos: StatementVariableInfo[]): 
     return prefixWrites;
 }
 
-function precomputeSuffixReads(n: number, stmtInfos: StatementVariableInfo[]): Set<string>[] {
-    const suffixReads: Set<string>[] = new Array(n + 1);
-    suffixReads[n] = new Set<string>();
-    for (let k = n - 1; k >= 0; k--) {
+function precomputeSuffixReads(
+    statementCount: number,
+    stmtInfos: StatementVariableInfo[],
+): Set<string>[] {
+    const suffixReads: Set<string>[] = Array.from({ length: statementCount + 1 });
+    suffixReads[statementCount] = new Set<string>();
+    for (let k = statementCount - 1; k >= 0; k--) {
         if (stmtInfos[k].reads.size === 0) {
             suffixReads[k] = suffixReads[k + 1];
         } else {
@@ -415,7 +444,7 @@ function precomputeSuffixReads(n: number, stmtInfos: StatementVariableInfo[]): S
 
 function createSliceAnalysis(candidates: FunctionSliceCandidate[]): FunctionSliceAnalysis {
     const recommended = candidates[0];
-    const result = Object.assign([...candidates], {
+    const analysisPayload = Object.assign([...candidates], {
         sliceRange: recommended ? recommended.sliceRange : undefined,
         extractSignature: recommended ? recommended.extractSignature : undefined,
         readVariables: recommended ? recommended.readVariables : undefined,
@@ -423,7 +452,7 @@ function createSliceAnalysis(candidates: FunctionSliceCandidate[]): FunctionSlic
         candidates,
         recommendedSlice: recommended,
     }) as FunctionSliceAnalysis;
-    return result;
+    return analysisPayload;
 }
 
 /**
@@ -441,89 +470,54 @@ export function computeFunctionSlices(
     const statements = node.body.statements;
     if (statements.length === 0) return null;
 
-    const fnName = node.name && ts.isIdentifier(node.name) ? node.name.text : 'Helper';
-    const helperName = 'extract' + capitalize(fnName);
+    const fnName = node.name && ts.isIdentifier(node.name) ? node.name.text : DEFAULT_FUNCTION_NAME;
+    const helperName = PREFIX_EXTRACT + formatCapitalizedText(fnName);
     const paramNames = collectFunctionParameterNames(node);
     const stmtInfos = statements.map((s) => collectVariablesInStatement(s));
 
     const candidates: FunctionSliceCandidate[] = [];
-    const n = statements.length;
+    const statementCount = statements.length;
 
     // Precompute statement line spans ONCE to eliminate redundant AST position queries in loops
-    const stmtStartLines = new Int32Array(n);
-    const stmtEndLines = new Int32Array(n);
-    for (let k = 0; k < n; k++) {
+    const stmtStartLines = new Int32Array(statementCount);
+    const stmtEndLines = new Int32Array(statementCount);
+    for (let k = 0; k < statementCount; k++) {
         stmtStartLines[k] = sf.getLineAndCharacterOfPosition(statements[k].getStart(sf)).line + 1;
         stmtEndLines[k] = sf.getLineAndCharacterOfPosition(statements[k].getEnd()).line + 1;
     }
 
-    const prefixWrites = precomputePrefixWrites(n, stmtInfos);
-    const suffixReads = precomputeSuffixReads(n, stmtInfos);
+    const prefixWrites = precomputePrefixWrites(statementCount, stmtInfos);
+    const suffixReads = precomputeSuffixReads(statementCount, stmtInfos);
     const scratchReads = new Set<string>();
     const scratchWrites = new Set<string>();
+    const sliceContext: SliceEvaluationContext = {
+        statements,
+        sf,
+        paramNames,
+        stmtInfos,
+        helperName,
+        prefixWrites,
+        suffixReads,
+        cachedLines: { starts: stmtStartLines, ends: stmtEndLines },
+        buffers: { reads: scratchReads, writes: scratchWrites },
+    };
 
-    if (n === 1) {
-        candidates.push(
-            evaluateSliceRange(
-                statements,
-                0,
-                0,
-                sf,
-                paramNames,
-                stmtInfos,
-                helperName,
-                prefixWrites,
-                suffixReads,
-                stmtStartLines,
-                stmtEndLines,
-                scratchReads,
-                scratchWrites,
-            ),
-        );
+    if (statementCount === 1) {
+        candidates.push(evaluateSliceRange({ startIndex: 0, endIndex: 0 }, sliceContext));
         return createSliceAnalysis(candidates);
     }
 
-    const maxLen = Math.min(n - 1, 15);
+    const maxLen = Math.min(statementCount - 1, MAX_SLICE_STATEMENT_WINDOW);
     for (let len = 2; len <= maxLen; len++) {
-        for (let i = 0; i <= n - len; i++) {
+        for (let i = 0; i <= statementCount - len; i++) {
             const j = i + len - 1;
-            candidates.push(
-                evaluateSliceRange(
-                    statements,
-                    i,
-                    j,
-                    sf,
-                    paramNames,
-                    stmtInfos,
-                    helperName,
-                    prefixWrites,
-                    suffixReads,
-                    stmtStartLines,
-                    stmtEndLines,
-                    scratchReads,
-                    scratchWrites,
-                ),
-            );
+            candidates.push(evaluateSliceRange({ startIndex: i, endIndex: j }, sliceContext));
         }
     }
 
     if (candidates.length === 0) {
         candidates.push(
-            evaluateSliceRange(
-                statements,
-                0,
-                n - 1,
-                sf,
-                paramNames,
-                stmtInfos,
-                helperName,
-                prefixWrites,
-                suffixReads,
-                stmtStartLines,
-                stmtEndLines,
-                scratchReads,
-                scratchWrites,
-            ),
+            evaluateSliceRange({ startIndex: 0, endIndex: statementCount - 1 }, sliceContext),
         );
     }
 
@@ -593,15 +587,15 @@ function findFallbackReturn(
     node: ts.FunctionDeclaration | ts.MethodDeclaration | ts.ArrowFunction | ts.FunctionExpression,
     sf: ts.SourceFile,
 ): string {
-    if (!node.body || !ts.isBlock(node.body)) return 'return;';
+    if (!node.body || !ts.isBlock(node.body)) return DEFAULT_EMPTY_RETURN;
     const stmts = node.body.statements;
     for (let i = stmts.length - 1; i >= 0; i--) {
         const s = stmts[i];
         if (ts.isReturnStatement(s)) {
-            return s.expression ? `return ${s.expression.getText(sf)};` : 'return;';
+            return s.expression ? `return ${s.expression.getText(sf)};` : DEFAULT_EMPTY_RETURN;
         }
     }
-    return 'return;';
+    return DEFAULT_EMPTY_RETURN;
 }
 
 function collectNestedIfConditions(
@@ -633,7 +627,7 @@ function collectNestedIfConditions(
  * @param sf - Source file providing syntax text.
  * @returns Flattened early-return guard clause string, or null if not applicable.
  */
-export function generateInvertedConditionSnippet(
+export function getInvertedGuardSnippet(
     node: ts.FunctionDeclaration | ts.MethodDeclaration | ts.ArrowFunction | ts.FunctionExpression,
     sf: ts.SourceFile,
 ): string | null {
@@ -665,6 +659,9 @@ export function generateInvertedConditionSnippet(
     return clauses.join('\n');
 }
 
+/** Backward compatibility alias */
+export const generateInvertedConditionSnippet = getInvertedGuardSnippet;
+
 /**
  * Generate a refactoring template encapsulating multiple parameters into a typed options object.
  *
@@ -676,7 +673,7 @@ export function generateParameterObjectSnippet(
     functionName: string,
     params: Array<{ name: string; type?: string }>,
 ): string {
-    const typeName = `${capitalize(functionName)}Options`;
+    const typeName = `${formatCapitalizedText(functionName)}Options`;
     const propLines = params.map((p) => `    ${p.name}: ${p.type || 'unknown'};`).join('\n');
     const paramNames = params.map((p) => p.name).join(', ');
 
@@ -685,9 +682,9 @@ export function generateParameterObjectSnippet(
         propLines,
         `}`,
         ``,
-        `function ${functionName || 'targetFunction'}(options: ${typeName}) {`,
+        `function ${functionName || DEFAULT_TARGET_FUNCTION}(options: ${typeName}) {`,
         `    const { ${paramNames} } = options;`,
-        `    // ... function body`,
+        COMMENT_FUNCTION_BODY,
         `}`,
     ].join('\n');
 }
@@ -737,30 +734,30 @@ export function findTsFunctionAtLine(
     const maxLineIdx = targetLine + 2;
     const maxPos = maxLineIdx < lineStarts.length ? lineStarts[maxLineIdx] : sf.end;
 
-    function walk(n: ts.Node): boolean | void {
-        if (n.end < minPos || n.pos > maxPos) {
+    function walk(astNode: ts.Node): boolean | void {
+        if (astNode.end < minPos || astNode.pos > maxPos) {
             return;
         }
 
         if (
-            ts.isFunctionDeclaration(n) ||
-            ts.isMethodDeclaration(n) ||
-            ts.isArrowFunction(n) ||
-            ts.isFunctionExpression(n)
+            ts.isFunctionDeclaration(astNode) ||
+            ts.isMethodDeclaration(astNode) ||
+            ts.isArrowFunction(astNode) ||
+            ts.isFunctionExpression(astNode)
         ) {
-            const pos = sf.getLineAndCharacterOfPosition(n.getStart(sf));
+            const pos = sf.getLineAndCharacterOfPosition(astNode.getStart(sf));
             const line = pos.line + 1;
             const distance = Math.abs(line - targetLine);
             if (distance < minDistance && distance <= 2) {
                 minDistance = distance;
-                bestMatch = n;
+                bestMatch = astNode;
                 if (minDistance === 0) {
                     return true;
                 }
             }
         }
 
-        return ts.forEachChild(n, walk);
+        return ts.forEachChild(astNode, walk);
     }
 
     walk(sf);

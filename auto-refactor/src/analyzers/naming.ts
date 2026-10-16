@@ -36,9 +36,9 @@ import {
     ALLOWED_SHORT_NAMES,
     MAX_VARIABLE_NAME_LENGTH,
     MAX_FUNCTION_NAME_LENGTH,
-    auditFunctionNameLengthsAndAbbreviations,
-    auditVariableNameLengthsAndAbbreviations,
-    auditMemberAbbreviation,
+    auditFunctionName,
+    auditVariableName,
+    auditMemberName,
     type NamingActionablePayload,
     type NamingDiagnosticRecord,
     type SymbolIndexLike,
@@ -287,7 +287,10 @@ export class NamingAnalyzer implements Analyzer {
         aCtx: AstNamingContext,
     ): void {
         const { index, emit } = this.resolveSymbolIndexAndEmitter(aCtx);
-        auditFunctionNameLengthsAndAbbreviations(name, node, pos, aCtx.ctx, aCtx.opts, index, emit);
+        auditFunctionName(
+            { name, node, pos },
+            { ctx: aCtx.ctx, opts: aCtx.opts, symbolIndex: index, emitIssue: emit },
+        );
     }
 
     /**
@@ -295,15 +298,14 @@ export class NamingAnalyzer implements Analyzer {
      */
     private checkVariableName(target: VariableTarget, aCtx: AstNamingContext): void {
         const { index, emit } = this.resolveSymbolIndexAndEmitter(aCtx);
-        auditVariableNameLengthsAndAbbreviations(
-            target.name,
-            target.decl,
-            target.isTopLevel ?? false,
-            target.pos,
-            aCtx.ctx,
-            aCtx.opts,
-            index,
-            emit,
+        auditVariableName(
+            {
+                name: target.name,
+                node: target.decl,
+                pos: target.pos,
+                isTopLevel: target.isTopLevel ?? false,
+            },
+            { ctx: aCtx.ctx, opts: aCtx.opts, symbolIndex: index, emitIssue: emit },
         );
     }
 
@@ -324,8 +326,9 @@ export class NamingAnalyzer implements Analyzer {
                 column: pos.character + 1,
             });
         }
-        if (aCtx.opts.checkDecoupling === false || isCatalogOrLiteralsPath(aCtx.ctx.filePath))
+        if (aCtx.opts.checkDecoupling === false || isCatalogOrLiteralsPath(aCtx.ctx.filePath)) {
             return;
+        }
         const finding = this.decouplingAuditor.auditIdentifier(
             name,
             kind,
@@ -551,7 +554,10 @@ export class NamingAnalyzer implements Analyzer {
             this.checkFunctionParameters(member, aCtx);
         } else {
             const { index, emit } = this.resolveSymbolIndexAndEmitter(aCtx);
-            auditMemberAbbreviation(memberName, member, pos, aCtx.ctx, aCtx.opts, index, emit);
+            auditMemberName(
+                { name: memberName, node: member, pos },
+                { ctx: aCtx.ctx, opts: aCtx.opts, symbolIndex: index, emitIssue: emit },
+            );
         }
 
         if (aCtx.opts.checkJargon !== false) {

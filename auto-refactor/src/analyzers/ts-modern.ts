@@ -70,11 +70,13 @@ const ANY_TYPE_RE = /(?::\s*any\b)|(?:\bas\s+any\b)|(?:<\s*any\s*>)|(?:\bany\s*\
 /** Named import clause without the `type` modifier; the specifier is masked out beforehand. */
 const NAMED_IMPORT_RE = /^\s*import\s+\{([^}]*)\}\s+from\s/;
 
+const TS_QUOTE_CHARS = '"\'`';
+
 /** Comment/literal syntax of the TS/JS family, handed to the shared source masker. */
 const TS_MASK: SourceMaskConfig = {
     lineComment: '//',
     blockComment: { open: '/*', close: '*/' },
-    quoteChars: '"\'`',
+    quoteChars: TS_QUOTE_CHARS,
     multilineTemplates: true,
 };
 
@@ -91,6 +93,12 @@ interface LineRule {
     /** One-line rewrite guidance. */
     suggestion: string;
 }
+
+const RULE_TSM_INCLUDES = 'TSM-INCLUDES-001';
+const RULE_TSM_REQUIRE = 'TSM-REQUIRE-001';
+const RULE_TSM_REPLACE = 'TSM-REPLACE-001';
+const LABEL_IMPORTS = 'imports';
+const LABEL_IMPORT = 'import';
 
 /** Keyword rules shared by every supported extension. */
 const LINE_RULES: LineRule[] = [
@@ -125,7 +133,7 @@ const LINE_RULES: LineRule[] = [
             'Merge with `{ ...source }`, which is typed and avoids the empty-object argument.',
     },
     {
-        rule: 'TSM-INCLUDES-001',
+        rule: RULE_TSM_INCLUDES,
         severity: SEVERITY_WARNING,
         pattern: INDEX_OF_BOUNDARY_RE,
         message: '`indexOf` compared against -1/0 is less direct than the boolean the check wants.',
@@ -154,88 +162,73 @@ const LINE_RULES: LineRule[] = [
  * @param column - 1-based column of the evidence on that line.
  * @returns The finding, ready to be pushed onto the result list.
  */
+const ACTION_REPLACE_TOKEN: AgentActionType = 'replace_token';
+const ACTION_SPLIT_FUNCTION: AgentActionType = 'split_function';
+const ACTION_APPLY_GUARD: AgentActionType = 'apply_guard_clause';
+
+const SNIPPET_VAR = 'const $1 = $2;';
+const SNIPPET_CTOR = '[]';
+const SNIPPET_ARGS = '(...args: unknown[]) => { ... }';
+const SNIPPET_SPREAD = '{ ...target, ...source }';
+const SNIPPET_INCLUDES = '$1.includes($2)';
+const SNIPPET_SUBSTR = '$1.slice($2, $2 + $3)';
+const SNIPPET_REPLACE = '$1.replaceAll($2, $3)';
+const SNIPPET_ANY = 'unknown';
+const SNIPPET_TYPE = 'import type { $1 } from $2;';
+const SNIPPET_REQUIRE = 'import $1 from $2;';
+const SNIPPET_DISP = 'context.subscriptions.push($1);';
+
+const CODE_TSM_001 = 'AR:TSM:001';
+const CODE_TSM_002 = 'AR:TSM:002';
+const CODE_TSM_003 = 'AR:TSM:003';
+const CODE_TSM_004 = 'AR:TSM:004';
+const CODE_TSM_005 = 'AR:TSM:005';
+const CODE_TSM_006 = 'AR:TSM:006';
+const CODE_TSM_007 = 'AR:TSM:007';
+const CODE_TSM_008 = 'AR:TSM:008';
+const CODE_TSM_009 = 'AR:TSM:009';
+const CODE_TSM_010 = 'AR:TSM:010';
+const CODE_TSM_011 = 'AR:TSM:011';
+
+type TsmActionTuple = readonly [action: AgentActionType, code: string, snippet: string];
+
+const TSM_ACTION_TUPLES: Record<string, TsmActionTuple> = {
+    'TSM-VAR-001': [ACTION_REPLACE_TOKEN, CODE_TSM_001, SNIPPET_VAR],
+    'TSM-CTOR-001': [ACTION_REPLACE_TOKEN, CODE_TSM_002, SNIPPET_CTOR],
+    'TSM-ARGS-001': [ACTION_SPLIT_FUNCTION, CODE_TSM_003, SNIPPET_ARGS],
+    'TSM-SPREAD-001': [ACTION_REPLACE_TOKEN, CODE_TSM_004, SNIPPET_SPREAD],
+    'TSM-INCLUDES-001': [ACTION_REPLACE_TOKEN, CODE_TSM_005, SNIPPET_INCLUDES],
+    'TSM-SUBSTR-001': [ACTION_REPLACE_TOKEN, CODE_TSM_006, SNIPPET_SUBSTR],
+    'TSM-REPLACE-001': [ACTION_REPLACE_TOKEN, CODE_TSM_007, SNIPPET_REPLACE],
+    'TSM-ANY-001': [ACTION_REPLACE_TOKEN, CODE_TSM_008, SNIPPET_ANY],
+    'TSM-TYPE-001': [ACTION_REPLACE_TOKEN, CODE_TSM_009, SNIPPET_TYPE],
+    'TSM-REQUIRE-001': [ACTION_REPLACE_TOKEN, CODE_TSM_010, SNIPPET_REQUIRE],
+    'TSM-DISP-001': [ACTION_APPLY_GUARD, CODE_TSM_011, SNIPPET_DISP],
+};
+
 const TSM_ACTIONABLE_MAP: Record<
     string,
     { action: AgentActionType; code: string; safeToAutomate: boolean; templateSnippet: string }
-> = {
-    'TSM-VAR-001': {
-        action: 'replace_token',
-        code: 'AR:TSM:001',
-        safeToAutomate: false,
-        templateSnippet: 'const $1 = $2;',
-    },
-    'TSM-CTOR-001': {
-        action: 'replace_token',
-        code: 'AR:TSM:002',
-        safeToAutomate: false,
-        templateSnippet: '[]',
-    },
-    'TSM-ARGS-001': {
-        action: 'split_function',
-        code: 'AR:TSM:003',
-        safeToAutomate: false,
-        templateSnippet: '(...args: unknown[]) => { ... }',
-    },
-    'TSM-SPREAD-001': {
-        action: 'replace_token',
-        code: 'AR:TSM:004',
-        safeToAutomate: false,
-        templateSnippet: '{ ...target, ...source }',
-    },
-    'TSM-INCLUDES-001': {
-        action: 'replace_token',
-        code: 'AR:TSM:005',
-        safeToAutomate: false,
-        templateSnippet: '$1.includes($2)',
-    },
-    'TSM-SUBSTR-001': {
-        action: 'replace_token',
-        code: 'AR:TSM:006',
-        safeToAutomate: false,
-        templateSnippet: '$1.slice($2, $2 + $3)',
-    },
-    'TSM-REPLACE-001': {
-        action: 'replace_token',
-        code: 'AR:TSM:007',
-        safeToAutomate: false,
-        templateSnippet: '$1.replaceAll($2, $3)',
-    },
-    'TSM-ANY-001': {
-        action: 'replace_token',
-        code: 'AR:TSM:008',
-        safeToAutomate: false,
-        templateSnippet: 'unknown',
-    },
-    'TSM-TYPE-001': {
-        action: 'replace_token',
-        code: 'AR:TSM:009',
-        safeToAutomate: false,
-        templateSnippet: 'import type { $1 } from $2;',
-    },
-    'TSM-REQUIRE-001': {
-        action: 'replace_token',
-        code: 'AR:TSM:010',
-        safeToAutomate: false,
-        templateSnippet: 'import $1 from $2;',
-    },
-    'TSM-DISP-001': {
-        action: 'apply_guard_clause',
-        code: 'AR:TSM:011',
-        safeToAutomate: false,
-        templateSnippet: 'context.subscriptions.push($1);',
-    },
-};
+> = Object.fromEntries(
+    Object.entries(TSM_ACTION_TUPLES).map(([rule, [action, code, templateSnippet]]) => [
+        rule,
+        { action, code, safeToAutomate: false, templateSnippet },
+    ]),
+);
 
-function makeIssue(
-    file: string,
-    lineIndex: number,
-    rule: string,
-    severity: Severity,
-    message: string,
-    suggestion: string,
-    detail: Record<string, unknown>,
-    column: number,
-): Issue {
+interface TsModernIssueOptions {
+    readonly file: string;
+    readonly lineIndex: number;
+    readonly rule: string;
+    readonly severity: Severity;
+    readonly message: string;
+    readonly suggestion: string;
+    readonly detail: Record<string, unknown>;
+    readonly column: number;
+}
+
+function makeIssue(options: TsModernIssueOptions): Issue {
+    const { file, lineIndex, rule, severity, message, suggestion, detail, column } = options;
     const line = lineIndex + 1;
     const mapped = TSM_ACTIONABLE_MAP[rule];
     const actionable = mapped
@@ -273,6 +266,9 @@ function countMatches(code: string, pattern: RegExp): number {
     return code.match(pattern)?.length ?? 0;
 }
 
+const REGEX_ESCAPE_RE = /[.*+?^${}()|[\]\\]/g;
+const REGEX_MATCH_SUBSTITUTION = '\\$&';
+
 /**
  * Escape the characters that are special to a regular expression.
  *
@@ -280,7 +276,7 @@ function countMatches(code: string, pattern: RegExp): number {
  * @returns Text safe to interpolate into a pattern.
  */
 function escapeRegExp(text: string): string {
-    return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return text.replace(REGEX_ESCAPE_RE, REGEX_MATCH_SUBSTITUTION);
 }
 
 /** TypeScript/JavaScript modernization pack: ten rules over a masked view of the file. */
@@ -307,7 +303,7 @@ export class TsModernAnalyzer implements Analyzer {
      */
     analyze(_sf: unknown, ctx: AnalyzerContext): Issue[] {
         const file = ctx.filePath.replace(/\\/g, '/');
-        if (!this.accepts(file)) return [];
+        if (!this.checkAcceptance(file)) return [];
         const content = ctx.content || '';
         if (content.length === 0) return [];
         const { raw, masked } = maskSourceText(content, TS_MASK);
@@ -339,21 +335,23 @@ export class TsModernAnalyzer implements Analyzer {
             if (trimmed.length === 0) continue;
 
             const isStartOfDisposable = ISOLATED_DISPOSABLE_RE.test(line);
-            const notPassedAsArg = !isPassedAsArgPreviousLine(masked, i);
+            const notPassedAsArg = !isArgOnPreviousLine(masked, i);
             if (isStartOfDisposable && openParenDepth === 0 && notPassedAsArg) {
                 const m = line.match(ISOLATED_DISPOSABLE_RE)!;
                 const col = findFirstNonWhitespaceColumn(line);
                 out.push(
-                    makeIssue(
+                    makeIssue({
                         file,
-                        i,
-                        'TSM-DISP-001',
-                        SEVERITY_WARNING,
-                        'Disposable resource/listener created in isolated statement without tracking in subscriptions.',
-                        'Pass to `context.subscriptions.push(...)` or store in a Disposable collection to prevent memory leaks.',
-                        { matched: m[0].trim() },
-                        col,
-                    ),
+                        lineIndex: i,
+                        rule: 'TSM-DISP-001',
+                        severity: SEVERITY_WARNING,
+                        message:
+                            'Disposable resource/listener created in isolated statement without tracking in subscriptions.',
+                        suggestion:
+                            'Pass to `context.subscriptions.push(...)` or store in a Disposable collection to prevent memory leaks.',
+                        detail: { matched: m[0].trim() },
+                        column: col,
+                    }),
                 );
             }
 
@@ -367,7 +365,7 @@ export class TsModernAnalyzer implements Analyzer {
      * @param file - Normalized repository-relative path.
      * @returns True for a supported extension that is not a declaration file.
      */
-    private accepts(file: string): boolean {
+    private checkAcceptance(file: string): boolean {
         if (file.endsWith(DECLARATION_SUFFIX)) return false;
         return SUPPORTED_EXTENSIONS.some((extension) => file.endsWith(extension));
     }
@@ -386,18 +384,16 @@ export class TsModernAnalyzer implements Analyzer {
         for (const rule of LINE_RULES) {
             if (!rule.pattern.test(code)) continue;
             out.push(
-                makeIssue(
+                makeIssue({
                     file,
-                    index,
-                    rule.rule,
-                    rule.severity,
-                    rule.message,
-                    rule.suggestion,
-                    {
-                        line: code.trim(),
-                    },
-                    1,
-                ),
+                    lineIndex: index,
+                    rule: rule.rule,
+                    severity: rule.severity,
+                    message: rule.message,
+                    suggestion: rule.suggestion,
+                    detail: { line: code.trim() },
+                    column: 1,
+                }),
             );
         }
     }
@@ -433,16 +429,17 @@ export class TsModernAnalyzer implements Analyzer {
             const code = masked[index];
             if (!REQUIRE_CALL_RE.test(code)) continue;
             out.push(
-                makeIssue(
+                makeIssue({
                     file,
-                    index,
-                    'TSM-REQUIRE-001',
-                    SEVERITY_WARNING,
-                    'CommonJS `require` in a module that already uses ESM syntax.',
-                    'Import the binding (`import x from "m"` / `import { y } from "m"`) instead.',
-                    { line: code.trim() },
-                    1,
-                ),
+                    lineIndex: index,
+                    rule: RULE_TSM_REQUIRE,
+                    severity: SEVERITY_WARNING,
+                    message: 'CommonJS `require` in a module that already uses ESM syntax.',
+                    suggestion:
+                        'Import the binding (`import x from "m"` / `import { y } from "m"`) instead.',
+                    detail: { line: code.trim() },
+                    column: 1,
+                }),
             );
         }
     }
@@ -470,16 +467,17 @@ export class TsModernAnalyzer implements Analyzer {
             const match = REPLACE_LITERAL_RE.exec(raw[index]);
             if (!match) continue;
             out.push(
-                makeIssue(
+                makeIssue({
                     file,
-                    index,
-                    'TSM-REPLACE-001',
-                    SEVERITY_INFO,
-                    '`replace` with a string pattern rewrites only the first occurrence.',
-                    'Use `replaceAll(pattern, value)` when every occurrence should change.',
-                    { line: masked[index].trim(), quote: match[1] },
-                    match.index + 1,
-                ),
+                    lineIndex: index,
+                    rule: RULE_TSM_REPLACE,
+                    severity: SEVERITY_INFO,
+                    message: '`replace` with a string pattern rewrites only the first occurrence.',
+                    suggestion:
+                        'Use `replaceAll(pattern, value)` when every occurrence should change.',
+                    detail: { line: masked[index].trim(), quote: match[1] },
+                    column: match.index + 1,
+                }),
             );
         }
     }
@@ -496,16 +494,17 @@ export class TsModernAnalyzer implements Analyzer {
             const code = masked[index];
             if (code.trim().length === 0 || !ANY_TYPE_RE.test(code)) continue;
             out.push(
-                makeIssue(
+                makeIssue({
                     file,
-                    index,
-                    'TSM-ANY-001',
-                    SEVERITY_WARNING,
-                    'Explicit `any` disables checking for every value it touches.',
-                    'Prefer `unknown` plus a narrowing check, or a precise generic/union type.',
-                    { line: code.trim() },
-                    1,
-                ),
+                    lineIndex: index,
+                    rule: 'TSM-ANY-001',
+                    severity: SEVERITY_WARNING,
+                    message: 'Explicit `any` disables checking for every value it touches.',
+                    suggestion:
+                        'Prefer `unknown` plus a narrowing check, or a precise generic/union type.',
+                    detail: { line: code.trim() },
+                    column: 1,
+                }),
             );
         }
     }
@@ -536,90 +535,74 @@ export class TsModernAnalyzer implements Analyzer {
 
         const clauses = collectImportClauses(masked, importLines);
         const lineIndexByWord = buildCandidateLineIndex(masked, importLines, clauses);
-        const typeOnlyCache = new Map<string, boolean>();
+        const isTypeByNameMap = new Map<string, boolean>();
 
         for (let c = 0; c < clauses.length; c++) {
             const { lineIndex, names } = clauses[c];
             const typeOnly: string[] = [];
             for (let n = 0; n < names.length; n++) {
                 const name = names[n];
-                let isType = typeOnlyCache.get(name);
+                let isType = isTypeByNameMap.get(name);
                 if (isType === undefined) {
                     isType = this.isTypeOnlyName(name, masked, importLines, lineIndexByWord);
-                    typeOnlyCache.set(name, isType);
+                    isTypeByNameMap.set(name, isType);
                 }
                 if (isType) {
                     typeOnly.push(name);
                 }
             }
             if (typeOnly.length === 0) continue;
-            const label = typeOnly.length > 1 ? 'imports' : 'import';
+            const label = typeOnly.length > 1 ? LABEL_IMPORTS : LABEL_IMPORT;
             out.push(
-                makeIssue(
+                makeIssue({
                     file,
                     lineIndex,
-                    'TSM-TYPE-001',
-                    SEVERITY_INFO,
-                    `Named ${label} used only as a type: ${typeOnly.join(', ')}.`,
-                    'Mark the clause `import type { … }` so the binding is erased at compile time.',
-                    { line: raw[lineIndex].trim(), names: typeOnly },
-                    1,
-                ),
+                    rule: 'TSM-TYPE-001',
+                    severity: SEVERITY_INFO,
+                    message: `Named ${label} used only as a type: ${typeOnly.join(', ')}.`,
+                    suggestion:
+                        'Mark the clause `import type { … }` so the binding is erased at compile time.',
+                    detail: { line: raw[lineIndex].trim(), names: typeOnly },
+                    column: 1,
+                }),
             );
         }
     }
 
-    /**
-     * Accumulate type usage occurrences within a pre-indexed line set.
-     *
-     * @param indices - Set of line numbers containing identifier candidate occurrences.
-     * @param masked - Masked lines of the file.
-     * @param importLines - Line indexes holding import clauses.
-     * @param patterns - Compiled regular expressions for the identifier.
-     * @returns Total matches and type-position matches across the indexed lines.
-     */
-    private tallyIndexedUsage(
-        indices: Set<number>,
-        masked: string[],
-        importLines: Set<number>,
+    private countLineUsage(
+        code: string,
         patterns: CompiledTypePatterns,
-    ): { total: number; typed: number } {
-        let total = 0;
-        let typed = 0;
-        for (const index of indices) {
-            if (importLines.has(index)) continue;
-            const code = masked[index];
-            total += countMatches(code, patterns.word);
-            for (let p = 0; p < patterns.typePatterns.length; p++) {
-                typed += countMatches(code, patterns.typePatterns[p]);
-            }
+    ): { lineTotal: number; lineTyped: number } {
+        let lineTyped = 0;
+        const lineTotal = countMatches(code, patterns.word);
+        for (let p = 0; p < patterns.typePatterns.length; p++) {
+            lineTyped += countMatches(code, patterns.typePatterns[p]);
         }
-        return { total, typed };
+        return { lineTotal, lineTyped };
     }
 
     /**
-     * Accumulate type usage occurrences by scanning all source lines with fallback filtering.
+     * Accumulate type usage occurrences across candidate lines.
      *
-     * @param masked - Masked lines of the file.
-     * @param importLines - Line indexes holding import clauses.
-     * @param patterns - Compiled regular expressions for the identifier.
-     * @returns Total matches and type-position matches across the whole file.
+     * @param candidateIndices - Iterable of line indexes to scan.
+     * @param scope - Bundled file masking, import index, and compiled pattern scope.
+     * @param mustTestFallbackWord - Whether to pre-test fallback word before full pattern matching.
+     * @returns Total matches and type-position matches across the candidate lines.
      */
-    private tallyFullUsage(
-        masked: string[],
-        importLines: Set<number>,
-        patterns: CompiledTypePatterns,
+    private computeUsageAcrossLines(
+        candidateIndices: Iterable<number>,
+        scope: UsageScanScope,
+        mustTestFallbackWord: boolean,
     ): { total: number; typed: number } {
         let total = 0;
         let typed = 0;
-        for (let index = 0; index < masked.length; index += 1) {
+        const { masked, importLines, patterns } = scope;
+        for (const index of candidateIndices) {
             if (importLines.has(index)) continue;
-            if (!patterns.fallbackWord.test(masked[index])) continue;
-            const code = masked[index];
-            total += countMatches(code, patterns.word);
-            for (let p = 0; p < patterns.typePatterns.length; p++) {
-                typed += countMatches(code, patterns.typePatterns[p]);
-            }
+            if (mustTestFallbackWord && !patterns.fallbackWord.test(masked[index])) continue;
+            const { lineTotal, lineTyped } = this.countLineUsage(masked[index], patterns);
+            total += lineTotal;
+            typed += lineTyped;
         }
         return { total, typed };
     }
@@ -643,18 +626,32 @@ export class TsModernAnalyzer implements Analyzer {
         if (matchingLines && matchingLines.size === 0) return false;
 
         const patterns = getCompiledTypePatterns(name);
-        const { total, typed } = matchingLines
-            ? this.tallyIndexedUsage(matchingLines, masked, importLines, patterns)
-            : this.tallyFullUsage(masked, importLines, patterns);
+        const candidateIndices = matchingLines ?? masked.keys();
+        const scope: UsageScanScope = { masked, importLines, patterns };
+        const { total, typed } = this.computeUsageAcrossLines(
+            candidateIndices,
+            scope,
+            !matchingLines,
+        );
 
         return total > 0 && typed >= total;
     }
 }
 
+const CHAR_CODE_SPACE = 32;
+const CHAR_CODE_TAB = 9;
+const CHAR_CODE_CR = 13;
+const CHAR_CODE_LF = 10;
+
 function findFirstNonWhitespaceColumn(line: string): number {
     for (let c = 0; c < line.length; c++) {
         const code = line.charCodeAt(c);
-        if (code !== 32 && code !== 9 && code !== 13 && code !== 10) {
+        if (
+            code !== CHAR_CODE_SPACE &&
+            code !== CHAR_CODE_TAB &&
+            code !== CHAR_CODE_CR &&
+            code !== CHAR_CODE_LF
+        ) {
             return c + 1;
         }
     }
@@ -694,44 +691,57 @@ function collectImportClauses(masked: string[], importLines: Set<number>): Impor
     return records;
 }
 
+interface UsageScanScope {
+    readonly masked: string[];
+    readonly importLines: Set<number>;
+    readonly patterns: CompiledTypePatterns;
+}
+
 interface CompiledTypePatterns {
     word: RegExp;
     fallbackWord: RegExp;
     typePatterns: RegExp[];
 }
 
-const TYPE_PATTERNS_CACHE = new Map<string, CompiledTypePatterns>();
-const WORD_PATTERN_CACHE = new Map<string, RegExp>();
+interface UsageScanScope {
+    readonly masked: string[];
+    readonly importLines: Set<number>;
+    readonly patterns: CompiledTypePatterns;
+}
+
+const typePatternsByNameMap = new Map<string, CompiledTypePatterns>();
+const wordPatternByWordMap = new Map<string, RegExp>();
+const REGEXP_GLOBAL_FLAG = 'g';
 
 function getCompiledWordPattern(word: string): RegExp {
-    let re = WORD_PATTERN_CACHE.get(word);
+    let re = wordPatternByWordMap.get(word);
     if (!re) {
         re = new RegExp(`\\b${escapeRegExp(word)}\\b`);
-        WORD_PATTERN_CACHE.set(word, re);
+        wordPatternByWordMap.set(word, re);
     }
     return re;
 }
 
 function getCompiledTypePatterns(name: string): CompiledTypePatterns {
-    let cached = TYPE_PATTERNS_CACHE.get(name);
+    let cached = typePatternsByNameMap.get(name);
     if (cached) return cached;
 
     const escaped = escapeRegExp(name);
     cached = {
-        word: new RegExp(`\\b${escaped}\\b`, 'g'),
+        word: new RegExp(`\\b${escaped}\\b`, REGEXP_GLOBAL_FLAG),
         fallbackWord: new RegExp(`\\b${escaped}\\b`),
         typePatterns: [
-            new RegExp(`:\\s*${escaped}\\b`, 'g'),
-            new RegExp(`\\bas\\s+${escaped}\\b`, 'g'),
-            new RegExp(`<\\s*${escaped}\\s*[,>]`, 'g'),
-            new RegExp(`\\bextends\\s+${escaped}\\b`, 'g'),
-            new RegExp(`\\bimplements\\s+${escaped}\\b`, 'g'),
-            new RegExp(`[|&]\\s*${escaped}\\b`, 'g'),
-            new RegExp(`\\b${escaped}\\s*[|&]`, 'g'),
-            new RegExp(`\\b${escaped}\\s*\\[\\s*\\]`, 'g'),
+            new RegExp(`:\\s*${escaped}\\b`, REGEXP_GLOBAL_FLAG),
+            new RegExp(`\\bas\\s+${escaped}\\b`, REGEXP_GLOBAL_FLAG),
+            new RegExp(`<\\s*${escaped}\\s*[,>]`, REGEXP_GLOBAL_FLAG),
+            new RegExp(`\\bextends\\s+${escaped}\\b`, REGEXP_GLOBAL_FLAG),
+            new RegExp(`\\bimplements\\s+${escaped}\\b`, REGEXP_GLOBAL_FLAG),
+            new RegExp(`(?<![|&])[|&](?![|&])\\s*${escaped}\\b`, REGEXP_GLOBAL_FLAG),
+            new RegExp(`\\b${escaped}\\s*(?<![|&])[|&](?![|&])`, REGEXP_GLOBAL_FLAG),
+            new RegExp(`\\b${escaped}\\s*\\[\\s*\\]`, REGEXP_GLOBAL_FLAG),
         ],
     };
-    TYPE_PATTERNS_CACHE.set(name, cached);
+    typePatternsByNameMap.set(name, cached);
     return cached;
 }
 
@@ -755,15 +765,15 @@ function buildCandidateLineIndex(
     }
     if (lineIndexByWord.size === 0) return lineIndexByWord;
 
-    const matchers = new Map<string, RegExp>();
+    const matcherByWordMap = new Map<string, RegExp>();
     for (const word of lineIndexByWord.keys()) {
-        matchers.set(word, getCompiledWordPattern(word));
+        matcherByWordMap.set(word, getCompiledWordPattern(word));
     }
 
     for (let index = 0; index < masked.length; index += 1) {
         if (importLines.has(index)) continue;
         const line = masked[index];
-        for (const [word, matcher] of matchers) {
+        for (const [word, matcher] of matcherByWordMap) {
             if (matcher.test(line)) {
                 lineIndexByWord.get(word)!.add(index);
             }
@@ -774,7 +784,7 @@ function buildCandidateLineIndex(
 
 const PREV_LINE_ARG_TERMINATOR_RE = /[(=,[]$/;
 
-function isPassedAsArgPreviousLine(masked: string[], start: number): boolean {
+function isArgOnPreviousLine(masked: string[], start: number): boolean {
     for (let prev = start - 1; prev >= 0; prev--) {
         const prevTrim = masked[prev].trim();
         if (prevTrim.length === 0) continue;

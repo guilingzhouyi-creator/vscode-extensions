@@ -5,7 +5,7 @@
  * Architecture Role: A/B measurement harness that times the current dist scan and,
  *   on demand, a MIXED dist to isolate the traversal saving of single-pass descent.
  * Dependencies & Triggers: require('../dist/api') for the baseline and a MIXED dist
- *   at C:/tmp/ar-mixed-dist for --vs-mixed; triggered by `npm run benchmark`;
+ *   at <tmpdir>/ar-mixed-dist for --vs-mixed; triggered by `npm run benchmark`;
  *   re-inits module paths so the external dist can resolve 'typescript'.
  * Responsibilities: Rebuild scripts/.bench-corpus from three dense TS templates plus
  *   a 30-function big.ts and a config that loads samples/analyzers/noConsole.js;
@@ -17,25 +17,86 @@
  */
 
 const fs = require('fs');
-const path = require('path');
+const os = require('os');
+const PATH_SYS = 'path';
+const path = require(PATH_SYS);
 
-const ROOT = path.join(__dirname, '..');
+const PARENT_DIR = '..';
+const MODULE_SYS = 'module';
+const ROOT = path.join(__dirname, PARENT_DIR);
+const NODE_MODULES_DIR = 'node_modules';
+const SAMPLES_DIR = 'samples';
+const CORPUS_DIR_NAME = '.bench-corpus';
+const DIST_DIR_NAME = 'dist';
+const API_ENTRY_NAME = 'api';
+const API_JS_FILE = 'api.js';
+const GIT_DIR = '.git';
+const SRC_DIR = 'src';
+const BIG_TS_FILE = 'src/big.ts';
+const EXPORT_KEYWORD = 'export';
+const SCHEMA_PROP = '$schema';
+
 // Ensure the external MIXED dist can resolve 'typescript'. process.env.NODE_PATH only
 // takes effect at module-resolution time, so re-init the module paths after setting it.
-process.env.NODE_PATH = path.join(ROOT, 'node_modules');
-require('module').Module._initPaths();
-const CORPUS = path.join(__dirname, '.bench-corpus');
-const SAMPLES = path.join(ROOT, 'samples');
+process.env.NODE_PATH = path.join(ROOT, NODE_MODULES_DIR);
+require(MODULE_SYS).Module._initPaths();
+const CORPUS = path.join(__dirname, CORPUS_DIR_NAME);
+const SAMPLES = path.join(ROOT, SAMPLES_DIR);
 
-const arg = (name, dflt) => {
-  const m = process.argv.find((a) => a.startsWith(`--${name}=`));
-  return m ? m.split('=')[1] : dflt;
+const DEFAULT_FILES_COUNT = 300;
+const DEFAULT_ITERATIONS_COUNT = 3;
+const DEFAULT_WORKERS_COUNT = 1;
+const DEFAULT_MIXED_DIST_PATH = path.join(os.tmpdir(), 'ar-mixed-dist');
+const BIG_FILE_FUNCTION_COUNT = 30;
+const PERCENT_CONVERSION_FACTOR = 100;
+
+const FORMAT_JSON = 'json';
+const LOG_LEVEL_SILENT = 'silent';
+const LOG_LEVEL_INFO = 'info';
+const SEVERITY_WARNING = 'warning';
+const SEVERITY_ERROR = 'error';
+
+const ANALYZER_CONSTANTS = 'constants';
+const ANALYZER_LARGE_FILE = 'large-file';
+const ANALYZER_COMPLEXITY = 'complexity';
+const ANALYZER_NO_CONSOLE = 'no-console';
+
+const SIGNAL_LITERAL = 'LITERAL';
+const TRACK_FAST = 'fast';
+
+const CONFIG_SCHEMA_PATH = './config.schema.json';
+const CONFIG_FILE_NAME = 'auto-refactor.config.json';
+const ANALYZERS_SUBDIR = 'analyzers';
+const NO_CONSOLE_FILE = 'noConsole.js';
+const NO_CONSOLE_SCRIPT_REL = path.join(ANALYZERS_SUBDIR, NO_CONSOLE_FILE);
+
+const ARG_FILES = 'files';
+const ARG_ITERS = 'iterations';
+const ARG_WORKERS = 'workers';
+const ARG_MIXED_DIST = 'mixed-dist';
+const FLAG_VS_MIXED = '--vs-mixed';
+
+const MSG_WELCOME = 'welcome message';
+const MSG_GOODBYE = 'goodbye message';
+
+const THRESHOLD_MIN_MAGIC = 2;
+const THRESHOLD_DUPLICATE_LITERAL = 3;
+const THRESHOLD_STRING_MIN_LEN = 3;
+const THRESHOLD_FILE_LINES_WARN = 400;
+const THRESHOLD_COMPLEXITY_WARN = 8;
+const THRESHOLD_LARGE_FILE_LINES = 50;
+const THRESHOLD_LARGE_FILE_FUNCTIONS = 5;
+const THRESHOLD_FAST_COMPLEXITY = 5;
+
+const getCliArgument = (name, defaultValue) => {
+  const matchedArg = process.argv.find((argToken) => argToken.startsWith(`--${name}=`));
+  return matchedArg ? matchedArg.split('=')[1] : defaultValue;
 };
-const FILES = parseInt(arg('files', '300'), 10);
-const ITERS = parseInt(arg('iterations', '3'), 10);
-const WORKERS = parseInt(arg('workers', '1'), 10);
-const VS_MIXED = process.argv.includes('--vs-mixed');
-const MIXED_DIST = arg('mixed-dist', 'C:/tmp/ar-mixed-dist');
+const TARGET_FILES_COUNT = parseInt(getCliArgument(ARG_FILES, String(DEFAULT_FILES_COUNT)), 10);
+const RUN_ITERATIONS = parseInt(getCliArgument(ARG_ITERS, String(DEFAULT_ITERATIONS_COUNT)), 10);
+const WORKER_COUNT = parseInt(getCliArgument(ARG_WORKERS, String(DEFAULT_WORKERS_COUNT)), 10);
+const IS_VS_MIXED = process.argv.includes(FLAG_VS_MIXED);
+const MIXED_DIST = getCliArgument(ARG_MIXED_DIST, DEFAULT_MIXED_DIST_PATH);
 
 // Synthetic fixture exports are interpolated so the line-oriented strict comment scanner does
 // not read them as real public API declarations; the generated corpus bytes stay identical.
@@ -46,7 +107,7 @@ const TEMPLATES = [
   const c = a + b;
   return c > 0 ? c : -c;
 }
-${'export'} const K = 100;
+${EXPORT_KEYWORD} const K = 100;
 `,
   `export class C {
   private x = 0;
@@ -59,9 +120,9 @@ ${'export'} const K = 100;
 }
 `,
   `function t(s: string): string { return s; }
-${'export'} function page(): string {
-  const a = t('welcome message');
-  const b = t('goodbye message');
+${EXPORT_KEYWORD} function page(): string {
+  const a = t('${MSG_WELCOME}');
+  const b = t('${MSG_GOODBYE}');
   return a + b;
 }
 `,
@@ -71,111 +132,138 @@ function buildCorpus() {
   // Always start from a clean corpus — stale files from previous runs with different
   // --files counts would otherwise pollute the file count and the benchmark numbers.
   fs.rmSync(CORPUS, { recursive: true, force: true });
-  fs.mkdirSync(path.join(CORPUS, 'src'), { recursive: true });
-  const w = (p, c) => fs.writeFileSync(path.join(CORPUS, p), c);
-  for (let i = 0; i < FILES; i++) w(`src/bench_${i}.ts`, TEMPLATES[i % TEMPLATES.length]);
+  fs.mkdirSync(path.join(CORPUS, SRC_DIR), { recursive: true });
+  const writeCorpusFile = (relativePath, fileContent) =>
+    fs.writeFileSync(path.join(CORPUS, relativePath), fileContent);
+  for (let i = 0; i < TARGET_FILES_COUNT; i++) {
+    writeCorpusFile(`src/bench_${i}.ts`, TEMPLATES[i % TEMPLATES.length]);
+  }
   // a few large files to add node volume
-  let big = '';
-  for (let i = 0; i < 30; i++)
-    big += `export function g${i}(n: number): number { let s = 0; if (n > ${i}) s += ${i}; if (n < ${i}) s -= ${i}; return s + ${i}; }\n`;
-  w('src/big.ts', big);
+  let bigFileContent = '';
+  for (let i = 0; i < BIG_FILE_FUNCTION_COUNT; i++) {
+    bigFileContent += `export function g${i}(n: number): number { let s = 0; if (n > ${i}) s += ${i}; if (n < ${i}) s -= ${i}; return s + ${i}; }\n`;
+  }
+  writeCorpusFile(BIG_TS_FILE, bigFileContent);
   const config = {
-    $schema: './config.schema.json',
-    format: 'json',
+    [SCHEMA_PROP]: CONFIG_SCHEMA_PATH,
+    format: FORMAT_JSON,
     failOnIssue: false,
     include: ['**/*.ts', '**/*.js'],
-    exclude: ['node_modules', '.git', 'dist'],
+    exclude: [NODE_MODULES_DIR, GIT_DIR, DIST_DIR_NAME],
     thresholds: {
-      magicNumberMin: 2,
-      duplicateLiteralThreshold: 3,
-      hardcodedStringMinLength: 3,
-      fileLinesWarn: 400,
-      complexityWarn: 8,
+      magicNumberMin: THRESHOLD_MIN_MAGIC,
+      duplicateLiteralThreshold: THRESHOLD_DUPLICATE_LITERAL,
+      hardcodedStringMinLength: THRESHOLD_STRING_MIN_LEN,
+      fileLinesWarn: THRESHOLD_FILE_LINES_WARN,
+      complexityWarn: THRESHOLD_COMPLEXITY_WARN,
     },
     analyzers: {
-      constants: {
+      [ANALYZER_CONSTANTS]: {
         enabled: true,
-        options: { magicNumberMin: 2, duplicateLiteralThreshold: 3, hardcodedStringMinLength: 3 },
+        options: {
+          magicNumberMin: THRESHOLD_MIN_MAGIC,
+          duplicateLiteralThreshold: THRESHOLD_DUPLICATE_LITERAL,
+          hardcodedStringMinLength: THRESHOLD_STRING_MIN_LEN,
+        },
       },
-      'large-file': { enabled: true, options: { fileLinesWarn: 50, fileFunctionsWarn: 5 } },
-      complexity: { enabled: true, options: { complexityWarn: 5 } },
-      'no-console': { enabled: true, options: { severity: 'warning', allowed: ['error'] } },
+      [ANALYZER_LARGE_FILE]: {
+        enabled: true,
+        options: {
+          fileLinesWarn: THRESHOLD_LARGE_FILE_LINES,
+          fileFunctionsWarn: THRESHOLD_LARGE_FILE_FUNCTIONS,
+        },
+      },
+      [ANALYZER_COMPLEXITY]: {
+        enabled: true,
+        options: { complexityWarn: THRESHOLD_FAST_COMPLEXITY },
+      },
+      [ANALYZER_NO_CONSOLE]: {
+        enabled: true,
+        options: { severity: SEVERITY_WARNING, allowed: [SEVERITY_ERROR] },
+      },
     },
     customAnalyzers: [
       {
-        name: 'no-console',
-        module: path.join(SAMPLES, 'analyzers', 'noConsole.js'),
+        name: ANALYZER_NO_CONSOLE,
+        module: path.join(SAMPLES, NO_CONSOLE_SCRIPT_REL),
         enabled: true,
-        signals: ['LITERAL'],
-        track: 'fast',
-        options: { severity: 'warning', allowed: ['error'] },
+        signals: [SIGNAL_LITERAL],
+        track: TRACK_FAST,
+        options: { severity: SEVERITY_WARNING, allowed: [SEVERITY_ERROR] },
       },
     ],
-    workers: WORKERS,
+    workers: WORKER_COUNT,
     respectGitignore: true,
     failOnAnalyzerError: false,
-    logLevel: 'info',
+    logLevel: LOG_LEVEL_INFO,
   };
-  w('auto-refactor.config.json', JSON.stringify(config, null, 2));
+  writeCorpusFile(CONFIG_FILE_NAME, JSON.stringify(config, null, 2));
 }
 
-async function timeDist(api) {
+async function benchmarkDistribution(distributionApi) {
   const scenario = {
     root: CORPUS,
-    configFile: path.join(CORPUS, 'auto-refactor.config.json'),
-    workers: WORKERS,
-    format: 'json',
-    logLevel: 'silent',
+    configFile: path.join(CORPUS, CONFIG_FILE_NAME),
+    workers: WORKER_COUNT,
+    format: FORMAT_JSON,
+    logLevel: LOG_LEVEL_SILENT,
   };
-  const times = [];
-  let summary = null;
-  for (let k = 0; k < ITERS; k++) {
-    const t0 = performance.now();
-    const r = await api.scan(scenario);
-    const t1 = performance.now();
-    times.push(t1 - t0);
-    summary = r.summary;
+  const durationTimes = [];
+  let executionSummary = null;
+  for (let iterationIndex = 0; iterationIndex < RUN_ITERATIONS; iterationIndex++) {
+    const startTimeMs = performance.now();
+    const scanResult = await distributionApi.scan(scenario);
+    const endTimeMs = performance.now();
+    durationTimes.push(endTimeMs - startTimeMs);
+    executionSummary = scanResult.summary;
   }
-  times.sort((a, b) => a - b);
-  const median = times[Math.floor(times.length / 2)];
-  return { median, files: summary.filesScanned, issues: summary.issuesTotal };
+  durationTimes.sort((a, b) => a - b);
+  const medianDuration = durationTimes[Math.floor(durationTimes.length / 2)];
+  return {
+    median: medianDuration,
+    files: executionSummary.filesScanned,
+    issues: executionSummary.issuesTotal,
+  };
 }
 
 async function main() {
   buildCorpus();
-  console.log(`\nBenchmark: ${FILES} files, workers=${WORKERS}, iterations=${ITERS}`);
+  console.log(
+    `\nBenchmark: ${TARGET_FILES_COUNT} files, workers=${WORKER_COUNT}, iterations=${RUN_ITERATIONS}`,
+  );
   console.log('------------------------------------------------------------');
 
-  const newApi = require(path.join(ROOT, 'dist', 'api'));
-  const neu = await timeDist(newApi);
+  const newApi = require(path.join(ROOT, DIST_DIR_NAME, API_ENTRY_NAME));
+  const baselineResult = await benchmarkDistribution(newApi);
   console.log(
-    `NEW (single-pass)   median ${neu.median.toFixed(1)} ms   files=${neu.files} issues=${neu.issues}`,
+    `NEW (single-pass)   median ${baselineResult.median.toFixed(1)} ms   files=${baselineResult.files} issues=${baselineResult.issues}`,
   );
 
-  if (VS_MIXED) {
-    if (!fs.existsSync(path.join(MIXED_DIST, 'api.js'))) {
+  if (IS_VS_MIXED) {
+    if (!fs.existsSync(path.join(MIXED_DIST, API_JS_FILE))) {
       console.error(`MIXED dist not found at ${MIXED_DIST} — skipping comparison.`);
     } else {
-      const mixedApi = require(path.join(MIXED_DIST, 'api'));
-      const mix = await timeDist(mixedApi);
+      const mixedApi = require(path.join(MIXED_DIST, API_ENTRY_NAME));
+      const mixedResult = await benchmarkDistribution(mixedApi);
       console.log(
-        `MIXED (multi-walk)   median ${mix.median.toFixed(1)} ms   files=${mix.files} issues=${mix.issues}`,
+        `MIXED (multi-walk)   median ${mixedResult.median.toFixed(1)} ms   files=${mixedResult.files} issues=${mixedResult.issues}`,
       );
-      const speedup = mix.median / neu.median;
-      const saved = (1 - neu.median / mix.median) * 100;
+      const speedup = mixedResult.median / baselineResult.median;
+      const saved = (1 - baselineResult.median / mixedResult.median) * PERCENT_CONVERSION_FACTOR;
       console.log('------------------------------------------------------------');
       console.log(
         `SPEEDUP vs multi-walk: ${speedup.toFixed(2)}x  (traversal cost saved: ${saved.toFixed(1)}%)`,
       );
-      if (mix.issues !== neu.issues)
+      if (mixedResult.issues !== baselineResult.issues) {
         console.warn(
-          `WARNING: issue counts differ (NEW=${neu.issues} MIXED=${mix.issues}) — results not comparable`,
+          `WARNING: issue counts differ (NEW=${baselineResult.issues} MIXED=${mixedResult.issues}) — results not comparable`,
         );
+      }
     }
   }
 }
 
-main().catch((e) => {
-  console.error(e);
+main().catch((error) => {
+  console.error(error);
   process.exit(1);
 });
