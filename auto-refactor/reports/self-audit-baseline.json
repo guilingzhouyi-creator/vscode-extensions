@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1792082196446",
-  "timestamp": "2026-10-15T16:36:43.901Z",
+  "snapshotId": "snapshot-v0.4.0-1792137548170",
+  "timestamp": "2026-10-16T07:59:17.089Z",
   "cai": 86.04,
   "versions": {
     "engineVersion": "0.4.0",
@@ -14,26 +14,26 @@
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
     "filesScanned": 637,
-    "durationMs": 5828
+    "durationMs": 7082
   },
   "metrics": {
     "compositeScore": 98.86,
     "grade": "A+",
     "autonomyRate": 86.04,
     "effectiveCodeDensity": 0.95,
-    "totalIssues": 6713,
+    "totalIssues": 6711,
     "suppressedIssues": 167,
-    "unsuppressedIssues": 6546,
+    "unsuppressedIssues": 6544,
     "bySeverity": {
-      "info": 766,
-      "warning": 5947,
+      "info": 767,
+      "warning": 5944,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
-      "high": 4,
-      "medium": 3385,
-      "low": 3324
+      "high": 3,
+      "medium": 3383,
+      "low": 3325
     }
   },
   "eightPillars": {
@@ -65,9 +65,9 @@
     "semanticPurity": 99.31,
     "codeSecurity": 99.85,
     "performanceEfficiency": 97.6,
-    "standardization": 93.63,
+    "standardization": 93.64,
     "modernity": 99.59,
-    "maintainability": 97.14,
+    "maintainability": 97.15,
     "commentQuality": 99.99,
     "duplication": 94.19,
     "techDebtRisk": 98.93
@@ -167,20 +167,20 @@
   "technicalDebtLedger": {
     "summary": {
       "critical": 0,
-      "high": 4,
-      "medium": 3385,
-      "low": 3324
+      "high": 3,
+      "medium": 3383,
+      "low": 3325
     },
     "criticalItems": [],
     "highItems": [
       {
-        "id": "complexity:high-complexity:src/analyzers/complexity-loops.ts:147",
+        "id": "complexity:high-complexity:src/analyzers/complexity-loops.ts:175",
         "rule": "high-complexity",
         "tier": "high",
         "severity": "warning",
         "file": "src/analyzers/complexity-loops.ts",
-        "line": 147,
-        "message": "Function \"inspectLoopBody\" has cyclomatic complexity 22 (threshold 12)."
+        "line": 175,
+        "message": "Function \"inspectLoopBody\" has cyclomatic complexity 14 (threshold 12)."
       },
       {
         "id": "complexity:high-complexity:src/analyzers/complexity.ts:746",
@@ -199,15 +199,6 @@
         "file": "src/analyzers/simplify-inlining.ts",
         "line": 122,
         "message": "Function \"walk\" has cyclomatic complexity 12 (threshold 12)."
-      },
-      {
-        "id": "complexity:high-complexity:src/analyzers/simplify-inlining.ts:184",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/analyzers/simplify-inlining.ts",
-        "line": 184,
-        "message": "Function \"auditOrphanInlining\" has cyclomatic complexity 18 (exceeds relaxed threshold 18 for shallow structure)."
       }
     ]
   },
@@ -230,16 +221,16 @@
       },
       {
         "domainName": "analyzers",
-        "compositeScore": 98.31,
+        "compositeScore": 98.32,
         "pillars": {
           "architecture": 98.95,
-          "maintainability": 96.45,
+          "maintainability": 96.53,
           "performance": 97.25,
           "data": 99.53,
           "testing": 100,
-          "reliability": 98.81,
+          "reliability": 98.82,
           "security": 99.84,
-          "extensibility": 95.88
+          "extensibility": 95.9
         },
         "moduleCount": 1
       },
@@ -967,27 +958,27 @@
   },
   "trajectory": {
     "runEloc": {
-      "processed": 145896,
-      "unique": 117621,
-      "changed": 16407,
-      "semantic": 13126,
+      "processed": 145902,
+      "unique": 117627,
+      "changed": 15753,
+      "semantic": 12602,
       "relocated": 0,
       "cosmetic": 0,
       "boilerplate": 0,
-      "added": 8204,
+      "added": 7877,
       "deleted": 0,
       "modified": 0
     },
     "lifetime": {
       "weekId": "LIFETIME",
       "startMs": 1791102755050,
-      "endMs": 1792082196445,
+      "endMs": 1792137548168,
       "totalRuns": 252,
       "eloc": {
-        "processedTotal": 33687509,
-        "uniqueTotal": 117621,
-        "changedTotal": 292483,
-        "semanticTotal": 233985
+        "processedTotal": 33687515,
+        "uniqueTotal": 117627,
+        "changedTotal": 291829,
+        "semanticTotal": 233461
       },
       "qed": {
         "mean": 0.0001,
@@ -996,7 +987,7 @@
       },
       "debt": {
         "totalAdded": 1569,
-        "totalResolved": 1739,
+        "totalResolved": 1744,
         "totalRegressions": 0,
         "netYield": 0.01
       },
