@@ -461,7 +461,7 @@ async function runSelfAudit(options = {}) {
   });
 
   // 8. Write to reports/self-audit-baseline.json
-  fs.writeFileSync(BASELINE_OUTPUT, JSON.stringify(baselineReport, null, 2), 'utf8');
+  fs.writeFileSync(BASELINE_OUTPUT, JSON.stringify(baselineReport, null, 2) + '\n', 'utf8');
 
   return baselineReport;
 }

@@ -308,7 +308,7 @@ export async function writeLifetimeSummary(
     ensureLedgerDirectory(ledgerDir);
     const lifetimeFile = path.join(ledgerDir, 'lifetime.summary.json');
     const compactStagingPath = `${lifetimeFile}.compact-tmp-${process.pid}-${Date.now()}`;
-    const payload = JSON.stringify(summary, null, 2);
+    const payload = JSON.stringify(summary, null, 2) + '\n';
     try {
         await fs.promises.writeFile(compactStagingPath, payload, 'utf8');
         await fs.promises.rename(compactStagingPath, lifetimeFile);

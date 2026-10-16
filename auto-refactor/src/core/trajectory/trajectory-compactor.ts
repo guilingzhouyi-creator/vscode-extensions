@@ -262,7 +262,7 @@ async function saveWeeklyPartitionSummary(
             // Best-effort: ignore corrupt existing file and proceed to overwrite
         }
     }
-    await fs.promises.writeFile(weekFilePath, JSON.stringify(summary, null, 2), 'utf8');
+    await fs.promises.writeFile(weekFilePath, JSON.stringify(summary, null, 2) + '\n', 'utf8');
     return summary;
 }
 
