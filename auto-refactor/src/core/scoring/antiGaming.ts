@@ -2,8 +2,10 @@
  * Module: Core Scoring — Anti-Gaming Detector
  * File Path: src/core/scoring/antiGaming.ts
  * Architecture Role: Detects score-gaming behaviors including artificial function splitting,
- *   empty forwarding wrappers, tautological test padding, and spurious interfaces.
+ *   empty forwarding wrappers, tautological test padding, spurious interfaces, tautological
+ *   traversal loop padding, and low-entropy token water-logging.
  * Dependencies & Triggers: Consumes computeEffectiveCodeDensity from ./effectiveDensity,
+ *   tokenizeCode and calculateTokenShannonEntropy from ../intelligence/token-entropy,
  *   and Issue from core/types.
  * Responsibilities: Emit canonical GOV-GAM-001 issues and calculate gaming deductions.
  * Exit Semantics & Design Rationale: Deterministic pattern matching with explainable evidence.
@@ -19,6 +21,7 @@ import {
 
 import { evaluateEffectiveCommentDensity } from '../comments/comment-density-model';
 import { calculateShannonEntropy } from './modernization-formulas';
+import { tokenizeCode, calculateTokenShannonEntropy } from '../intelligence/token-entropy';
 
 /**
  * Rule identifier for anti-gaming detection.
@@ -50,6 +53,10 @@ const RE_VAR_KEYWORD_PREFIX = /\b(?:var|let|const)\s+/;
 /** Regular expression testing single letter plus digit sequenced identifier. */
 const RE_DEGENERATE_IDENTIFIER = /^[a-zA-Z]\d+$/;
 
+/** Regular expression matching empty or tautological traversal loops. */
+const RE_TAUTOLOGICAL_LOOPS =
+    /(?:for\s*\([^)]*\)|while\s*\([^)]*\))\s*\{\s*(?:continue;|void\s*0;|\/\/[^\r\n]*|\/\*[\s\S]*?\*\/|[\r\n\s])*\}|for\s+[a-zA-Z_$][a-zA-Z0-9_$]*\s+in\s+[^:\r\n]+:\s*(?:pass|\.\.\.)(?:\s|$)/g;
+
 /**
  * Kinds of score gaming recognized.
  */
@@ -59,7 +66,9 @@ export type GamingPatternKind =
     | 'spurious_empty_interface'
     | 'artificial_relocation_padding'
     | 'tautological_comment_padding'
-    | 'naming_entropy_anomaly';
+    | 'naming_entropy_anomaly'
+    | 'tautological_traversal_padding'
+    | 'low_entropy_token_padding';
 
 /**
  * Result of anti-gaming detection.
@@ -114,6 +123,7 @@ function checkArtificialSplitting(
             },
             detail: {
                 gamingType: 'artificial_function_splitting',
+                gamingKind: 'artificial_function_splitting',
                 forwardingCount: density.forwardingCount,
                 effectiveDensity: density.effectiveDensity,
                 totalLoc: density.totalLoc,
@@ -160,6 +170,7 @@ function checkTautologicalTestPadding(
             },
             detail: {
                 gamingType: 'tautological_test_padding',
+                gamingKind: 'tautological_test_padding',
                 tautologyCount: count,
             },
             suggestion:
@@ -205,6 +216,7 @@ function checkRelocationPadding(
             },
             detail: {
                 gamingType: GAMING_KIND_RELOCATION_PADDING,
+                gamingKind: GAMING_KIND_RELOCATION_PADDING,
                 relocatedCount: analysis.relocatedCount,
             },
             suggestion:
@@ -239,6 +251,7 @@ function checkTautologicalCommentPadding(
             },
             detail: {
                 gamingKind: 'tautological_comment_padding',
+                gamingType: 'tautological_comment_padding',
                 effectiveCommentRatio: metrics.effectiveCommentRatio,
                 totalCommentLines: metrics.totalCommentLines,
             },
@@ -280,6 +293,7 @@ function checkNamingEntropyAnomaly(
             },
             detail: {
                 gamingKind: 'naming_entropy_anomaly',
+                gamingType: 'naming_entropy_anomaly',
                 entropy,
                 identifierCount: names.length,
             },
@@ -288,6 +302,108 @@ function checkNamingEntropyAnomaly(
         });
         gamingKinds.push('naming_entropy_anomaly');
         return 10.0;
+    }
+    return 0.0;
+}
+
+/**
+ * Detects tautological traversal padding (consecutive formal empty loops).
+ *
+ * @param filePath - Physical path to source file under evaluation.
+ * @param content - Source file text content.
+ * @param issues - Output issues collection.
+ * @param gamingKinds - Detected gaming pattern collection.
+ * @returns Quality penalty points (20.0 if triggered, else 0.0).
+ */
+function checkTautologicalTraversalPadding(
+    filePath: string,
+    content: string,
+    issues: Issue[],
+    gamingKinds: GamingPatternKind[],
+): number {
+    const matches = content.match(RE_TAUTOLOGICAL_LOOPS);
+    const count = matches ? matches.length : 0;
+    if (count >= 2) {
+        gamingKinds.push('tautological_traversal_padding');
+        issues.push({
+            id: `${ANALYZER_GOVERNANCE}:${RULE_GOV_GAM_001}:${filePath}:tautological-loop`,
+            analyzer: ANALYZER_GOVERNANCE,
+            rule: RULE_GOV_GAM_001,
+            severity: SEVERITY_WARNING,
+            message:
+                `Anti-gaming violation: detected ${count} tautological empty traversal loops ` +
+                `inflating iteration volume without state change.`,
+            location: {
+                file: filePath,
+                start: { line: 1, column: 1 },
+                end: { line: 1, column: DEFAULT_LINE_END_COLUMN },
+            },
+            detail: {
+                gamingKind: 'tautological_traversal_padding',
+                gamingType: 'tautological_traversal_padding',
+                tautologicalLoopCount: count,
+            },
+            suggestion:
+                'Remove vacuous empty traversal loops; loops must mutate domain state or execute purposeful side-effects.',
+        });
+        return 20.0;
+    }
+    return 0.0;
+}
+
+/**
+ * Detects low-entropy token padding in oversized files
+ * (lines >= 300 with Shannon entropy H(T) < 2.5).
+ *
+ * @param filePath - Physical path to source file under evaluation.
+ * @param content - Source file text content.
+ * @param issues - Output issues collection.
+ * @param gamingKinds - Detected gaming pattern collection.
+ * @returns Quality penalty points (25.0 if triggered, else 0.0).
+ */
+function checkLowEntropyTokenPadding(
+    filePath: string,
+    content: string,
+    issues: Issue[],
+    gamingKinds: GamingPatternKind[],
+): number {
+    const totalLines = content.split(/\r?\n/).length;
+    if (totalLines < 300) {
+        return 0.0;
+    }
+
+    const tokenStream = tokenizeCode(content);
+    if (tokenStream.rawTokens.length === 0) {
+        return 0.0;
+    }
+
+    const entropyResult = calculateTokenShannonEntropy(tokenStream.rawTokens);
+    if (entropyResult.entropy < 2.5) {
+        gamingKinds.push('low_entropy_token_padding');
+        issues.push({
+            id: `${ANALYZER_GOVERNANCE}:${RULE_GOV_GAM_001}:${filePath}:low-entropy-tokens`,
+            analyzer: ANALYZER_GOVERNANCE,
+            rule: RULE_GOV_GAM_001,
+            severity: SEVERITY_WARNING,
+            message:
+                `Anti-gaming violation: detected low-entropy token padding in large file ` +
+                `(${totalLines} lines, H(T) = ${entropyResult.entropy} < 2.5 bits).`,
+            location: {
+                file: filePath,
+                start: { line: 1, column: 1 },
+                end: { line: 1, column: DEFAULT_LINE_END_COLUMN },
+            },
+            detail: {
+                gamingKind: 'low_entropy_token_padding',
+                gamingType: 'low_entropy_token_padding',
+                totalLines,
+                entropy: entropyResult.entropy,
+                vocabularySize: entropyResult.vocabularySize,
+            },
+            suggestion:
+                'Avoid inflating file volume with low-entropy repetitive tokens or repetitive dictionary definitions.',
+        });
+        return 25.0;
     }
     return 0.0;
 }
@@ -307,7 +423,26 @@ export function detectScoreGaming(filePath: string, content: string): AntiGaming
     const testPenalty = checkTautologicalTestPadding(filePath, content, issues, gamingKinds);
     const commentPenalty = checkTautologicalCommentPadding(filePath, content, issues, gamingKinds);
     const entropyPenalty = checkNamingEntropyAnomaly(filePath, content, issues, gamingKinds);
-    const gamingPenalty = splitPenalty + testPenalty + commentPenalty + entropyPenalty;
+    const traversalPenalty = checkTautologicalTraversalPadding(
+        filePath,
+        content,
+        issues,
+        gamingKinds,
+    );
+    const lowEntropyTokenPenalty = checkLowEntropyTokenPadding(
+        filePath,
+        content,
+        issues,
+        gamingKinds,
+    );
+
+    const gamingPenalty =
+        splitPenalty +
+        testPenalty +
+        commentPenalty +
+        entropyPenalty +
+        traversalPenalty +
+        lowEntropyTokenPenalty;
 
     return {
         hasGaming: issues.length > 0,

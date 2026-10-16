@@ -507,10 +507,36 @@
         "exportedSymbols": {
           "type": "integer",
           "minimum": 0
+        },
+        "effectiveDensity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "tspr": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "por": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "columnDensity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "compositeDensity": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
         }
       },
       "additionalProperties": false
     },
+
     "ConfigRef": {
       "type": "object",
       "description": "Subset echo of ScanConfig (structure mirrors config.schema.json).",

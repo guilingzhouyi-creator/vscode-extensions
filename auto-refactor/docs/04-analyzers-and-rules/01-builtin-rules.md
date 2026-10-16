@@ -134,6 +134,7 @@
 | `SIM-FLAT-002` | <a id="sim-flat-002"></a>`simplify` | `SIM` | `warning` | `all` | 深层嵌套的条件分支与 AST 访问流应使用卫语句（Guard Clause）提前返回或短路扁平化，控制嵌套深度 ≤ 3。 | 将深层嵌套的 if/else 重构为反向条件的前置卫语句（提前 return/continue/break），保持主逻辑扁平清晰。 |
 | `SIM-GUARD-001` | <a id="sim-guard-001"></a>`simplify` | `SIM` | `info` | `typescript, javascript` | 倒置的前置守卫条件导致深层嵌套。 | 反转条件提取提前返回的 Guard Clause。 |
 | `SIM-IMM-001` | <a id="sim-imm-001"></a>`simplify` | `SIM` | `info` | `all` | 通过三元表达式折叠消除未初始化的局部可变绑定，提纯为不可变 const | 将 let x; if (c) { x = a; } else { x = b; } 提纯为 const x = c ? a : b;，消除可变状态生命周期。 |
+| `SIM-INL-001` | <a id="sim-inl-001"></a>`simplify` | `SIM` | `info` | `all` | 单次调用孤儿微函数就地内联候选：私有局部微函数（ELOC ≤ 6 且 Fan-in = 1）与调用方词法特征高度重合，内联收益显著（U_inline ≥ 0.70）。 | 将单次调用的私有微函数就地内联至调用点，增强局部性并消除跨函数参数泥团与调用跳跃。 |
 | `SIM-LONG-001` | <a id="sim-long-001"></a>`simplify` | `SIM` | `warning` | `all` | 抽取内聚步骤为具名 helper，让顶层流程只剩意图序列 | 函数物理跨度超过 `thresholds.maxFunctionLines`（默认 60）。跨度取适配器物化的起止行，覆盖 TS/JS/Python/Rust/GDScript。 |
 | `SIM-PRNT-001` | <a id="sim-prnt-001"></a>`simplify` | `SIM` | `warning` | `all` | 改用结构化 logger 或删除；调试输出绕过日志级别并泄漏到生产 stdout | 非豁免路径出现调试输出（`print`/`pprint`/`breakpoint`/`console.log`/`println!`/`dbg!` 等）。默认豁免 `**/cli/**`、`**/scripts/**`、`**/tests/**`、`**/bench/**`、`*.test.*`、`*.spec.*`，可用 `printAllowPatterns` 覆盖。 |
 | `SIM-TRN-001` | <a id="sim-trn-001"></a>`simplify` | `SIM` | `info` | `all` | 冗长且无副作用的 if-else 分支可折叠为浅层单行三元表达式 | 双分支为同变量单一赋值或纯返回值时，在无副作用、单层深度且行长 ≤ 80 字符的前提下折叠为三元表达式，降低控制流复杂度。 |
@@ -243,6 +244,9 @@
 | `UI-ENG-002` | <a id="ui-eng-002"></a>`frontend` | `UI` | `warning` | `all` | DOM 层级深度超过 12 或 CSS 动画使用了重排属性。 | 扁平化 DOM 层次，动效改用 transform 与 opacity 合成属性。 |
 | `UI-ENG-003` | <a id="ui-eng-003"></a>`frontend` | `UI` | `warning` | `all` | 组件 Props 超过 10 个或存在复杂重复 DOM 模板。 | 拆分为单一职责微组件，提升组件复用率。 |
 | `UI-ENG-004` | <a id="ui-eng-004"></a>`frontend` | `UI` | `info` | `all` | 前端 Hook 或事件回调函数命名不符合规范。 | 自定义 Hook 以 use 开头，事件回调以 on 或 handle 开头。 |
+| `UI-ENG-005` | <a id="ui-eng-005"></a>`frontend` | `UI` | `warning` | `all` | 输入框或文本域的回车事件处理未做 CJK 拼音输入法合成状态守卫（isComposing / 229）。 | 在 Enter 处理前增加 e.nativeEvent.isComposing === false 与 e.keyCode !== 229 拦截。 |
+| `UI-ENG-006` | <a id="ui-eng-006"></a>`frontend` | `UI` | `warning` | `all` | 动态计数器、计时时间戳或度量数值展示未开启等宽对齐数字（tabular-nums）。 | 声明 font-variant-numeric: tabular-nums 或添加 tnum 工具类以消除宽度跳动。 |
+| `UI-ENG-007` | <a id="ui-eng-007"></a>`frontend` | `UI` | `warning` | `all` | 边框容器内部交互控件嵌套双重边框（单闭合线框律冲突）。 | 消除子元素多余边框，改用明度差底色或 box-shadow 内发光微凸显。 |
 
 ### Layer 3 — 架构拓扑、工程治理、数据与性能层 (Architecture, Governance, Data & Performance)
 
@@ -271,6 +275,7 @@
 | `ARCH-HDL-001` | <a id="arch-hdl-001"></a>`architecture` | `ARCH` | `error` | `all` | 无头架构违规：核心业务逻辑或计算模块直接绑定 UI/IDE 视图框架。 | 解除核心计算与展示框架依赖，保持无头独立执行与测试能力。 |
 | `ARCH-LEAK-001` | <a id="arch-leak-001"></a>`architecture` | `ARCH` | `warning` | `all` | 领域模型使用 POJO/原生实体，隔离外部框架专有类型。 | 职责泄漏：纯领域模型直接引用或泄漏外部框架库 (Express/Vue/Godot/ORM)。 |
 | `ARCH-LEAK-002` | <a id="arch-leak-002"></a>`architecture` | `ARCH` | `warning` | `all` | 分层越界：外层实现被内层直接反向引用（Clean/DDD 层序反转）。 | 把依赖改回单向（内层定义接口、外层实现），或把该文件移入正确层。 |
+| `ARCH-PLM-001` | <a id="arch-plm-001"></a>`architecture` | `ARCH` | `warning` | `all` | 接线代码与中转开销占比超标：模块内导入导出、转发中转与接口胶水占比超标（POR > 0.60 且 TSPR < 0.35），缺乏实质业务承载。 | 消除无实质承载的空心透传跳板，或为门面注入实质性编排、不可变冻结与模式自验逻辑。 |
 | `ARCH-ROL-001` | <a id="arch-rol-001"></a>`architecture` | `ARCH` | `warning` | `all` | 文件本体角色失衡与伪共享库：文件承担过多易变状态或高耦合业务逻辑，却被跨域频繁引用作为共享库。 | 剥离核心领域状态，明确稳定输入输出边界，构建真正低耦合的共享库。 |
 | `ARCH-ROL-002` | <a id="arch-rol-002"></a>`architecture` | `ARCH` | `warning` | `all` | 业务模块承载无界公共能力：领域业务模块内部私自承载与导出通用基础设施或公共计算能力。 | 将通用能力下沉至对应共享层或基础设施层，确保领域模块职责专注单一。 |
 | `ARCH-SKL-001` | <a id="arch-skl-001"></a>`architecture` | `ARCH` | `info` | `all` | 策略骨架复用候选：检测到具有同构前置校验与收尾步骤的复杂流程。 | 提取公共执行骨架（模板方法/高阶函数编排），将差异步骤作为策略注入。 |
@@ -298,6 +303,7 @@
 | `CPX-SPACE-001` | <a id="cpx-space-001"></a>`complexity` | `CPX` | `warning` | `all` | 热点循环内无界瞬态内存分配与重复全量物化。 | 将对象/缓冲区分配提升到循环外，循环内执行就地重置与复用。 |
 | `CPX-STM-001` | <a id="cpx-stm-001"></a>`complexity` | `CPX` | `info` | `all` | 状态机分派结构规范：状态机多层分支内存在过长单分支逻辑（>30 LOC），降低了分派骨架的清晰度。 | 将状态机单分支过长逻辑提取为独立动作处理器，保留纯粹的状态转移分派骨架。 |
 | `CPX-TIME-001` | <a id="cpx-time-001"></a>`complexity` | `CPX` | `warning` | `all` | 跨函数/跨文件无界多项式时间复杂度：嵌套迭代调用链引发高开销。 | 将内层数据预先构建为 Map/Set 索引，降低复合复杂度至 O(N)。 |
+| `CPX-TRV-001` | <a id="cpx-trv-001"></a>`complexity` | `CPX` | `warning` | `all` | 形式主义空循环反模式：循环体缺乏实质状态转移、累加聚合或副作用（代数条件熵增 deltaEntropy ≤ 0.05）。 | 消除纯形式遍历，替换为直接属性提取、数组切片或声明式高阶过滤操作。 |
 | `DAT-DEF-001` | <a id="dat-def-001"></a>`data-architecture` | `DAT` | `info` | `all` | 受信内部领域边界内的冗余重复防御性校验。 | 在信任边界执行一次性完整校验，内部领域对象依托不可变类型保证。 |
 | `DAT-LAY-001` | <a id="dat-lay-001"></a>`data-architecture` | `DAT` | `warning` | `all` | 数据访问抽象泄漏：业务核心直接操纵持久化驱动或底层存储细节。 | 将存储驱动调用封装在仓储接口实现内，领域层仅依赖仓储契约。 |
 | `DAT-NPL-001` | <a id="dat-npl-001"></a>`data-architecture` | `DAT` | `error` | `all` | 迭代与映射上下文中的 N+1 查询与重复存储调用。 | 将循环内查询提升至外层使用批量 IN 查询或 DataLoader 批量加载。 |
@@ -422,6 +428,7 @@
 | `VSC-UI-001` | <a id="vsc-ui-001"></a>`vscode-extension` | `VSC` | `warning` | `typescript, javascript` | Webview 集合列表渲染缺少有界密度控制或折叠收起能力（超过 5 项列表缺乏折叠与导出旁置布局）。 | 为 Webview 动态集合列表实现阈值折叠控件与紧凑密度布局，保障大数据集下信息层次清晰。 |
 | `VSC-UI-002` | <a id="vsc-ui-002"></a>`vscode-extension` | `VSC` | `error` | `typescript, javascript` | Webview 视图样式包含硬编码单色颜色值，破坏 VS Code 主题动态自适应契约。 | 将硬编码颜色替换为 VS Code CSS 主题变量（如 var(--vscode-editor-foreground) 等）。 |
 | `VSC-UI-003` | <a id="vsc-ui-003"></a>`vscode-extension` | `VSC` | `warning` | `typescript, javascript` | Webview 表单交互输入控件缺少无障碍名称或标签绑定（WCAG 4.1.2）。 | 为表单控件补充 aria-label、aria-labelledby 或显式绑定 <label for="...">。 |
+| `VSC-UI-004` | <a id="vsc-ui-004"></a>`vscode-extension` | `VSC` | `warning` | `typescript, javascript` | Webview 交互状态样式变更动态改变 border 粗细导致布局抖动。 | 使用 box-shadow: inset 或预置静态透明边框承载高亮状态。 |
 | `analyzer-error` | <a id="analyzer-error"></a>`engine` | `LANG` | `info` | `all` | 分析器在单文件上抛异常（failOnAnalyzerError 可升为 error）。（计划迁移至 `ENG-RUN-001`） | 修复分析器缺陷；已知外部数据问题可保持 info 留痕。 |
 | `clean-layer-violation` | <a id="clean-layer-violation"></a>`architecture` | `ARCH` | `error` | `all` | 增量管线中的分层越界（clean-layer 口径）。（计划迁移至 `ARCH-CLN-001`） | 按层序调整依赖方向或把实现下沉/上提到正确层。 |
 | `disallowed-import` | <a id="disallowed-import"></a>`dependency-graph` | `DEP` | `error` | `all` | 声明式导入边界违规：跨组依赖或未授权外部包。（计划迁移至 `DEP-IMP-001`） | 按配置的 allowGroups/allowExternal 调整导入，或显式登记豁免。 |

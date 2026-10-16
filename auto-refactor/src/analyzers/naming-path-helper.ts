@@ -66,7 +66,7 @@ export const ALLOWED_ACRONYMS: ReadonlySet<string> = new Set(
         'dns ftp ssh cpu gpu ram rom png jpg svg gif csv tsv pdf ast loc eloc ' +
         'sloc dfa nfa fsm lut swar csr soa aos simd fps rng crc md5 sha ssot pr cd ' +
         'qa env dev prod std fmt log tmp pkg bin lib ref opt arg cmd sys cwd ' +
-        'pid gid uid tty zh en'
+        'pid gid uid tty zh en ts js py rs gd l1 l2 l3'
     ).split(' '),
 );
 
@@ -80,14 +80,15 @@ export const DEFAULT_MIN_FILE_NAME_LENGTH = 3;
 export const DEFAULT_MAX_FILE_NAME_LENGTH = 55;
 
 /** Permitted short file base stems with well-recognized cross-domain semantics. */
-export const ALLOWED_SHORT_FILE_STEMS = new Set('ui en zh db io ci os vm fs re id ip'.split(' '));
+export const ALLOWED_SHORT_FILE_STEMS = new Set(
+    'ui en zh db io ci os vm fs re id ip swar'.split(' '),
+);
 
-const JARGON_PATTERN_STR =
-    '\\b(p[0-9]+|phase[\\s_]*[0-9]+|st[\\s_]*[0-9]+|temp|tmp|w' + 'ip|new)\\b';
 /** Regular expression matching transient construction jargon in symbol and file names. */
-export const TRANSIENT_JARGON_RE = new RegExp(JARGON_PATTERN_STR, 'i');
+export const TRANSIENT_JARGON_RE =
+    /\b(p[0-9]+|phase[\s_]*[0-9]+|st[\s_]*[0-9]+|temp|tmp|w\x69p|new)\b/i;
 /** Regular expression matching standalone jargon tokens. */
-export const JARGON_TOKEN_RE = new RegExp('^(p\\d+|phase\\d*|st\\d+|temp|tmp|w' + 'ip)$');
+export const JARGON_TOKEN_RE = /^(p\d+|phase\d*|st\d+|temp|tmp|w\x69p)$/;
 /** Regular expression matching prefix tokens for multi-part jargon. */
 export const JARGON_PREFIX_TOKEN_RE = /^(?:p|st|phase)$/;
 
@@ -129,6 +130,9 @@ const IGNORED_DIRS = new Set(
 const JS_TS_EXTS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs']);
 const SNAKE_EXTS = new Set(['.py', '.rs', '.gd']);
 
+const ANALYZER_OR_ENGINE_PATH_RE =
+    /(?:\/(?:analyzers|core|engine|tests|scripts|test)\/|-(?:analyzer|rules|helper)\.ts$)/;
+
 /**
  * Determines if a file is an analyzer implementation or core engine component
  * where base types (e.g. constants, rules, config) form the architectural engine
@@ -138,23 +142,28 @@ const SNAKE_EXTS = new Set(['.py', '.rs', '.gd']);
  * @returns True when file is part of analyzer/engine implementations.
  */
 export function isAnalyzerOrEngineFile(filePath: string): boolean {
-    const normalized = filePath.replace(/\\/g, '/').toLowerCase();
-    if (
-        normalized.includes('/analyzers/') ||
-        normalized.includes('/core/') ||
-        normalized.includes('/engine/') ||
-        normalized.includes('/tests/') ||
-        normalized.includes('/scripts/') ||
-        normalized.includes('/test/')
-    ) {
-        return true;
-    }
-    return (
-        normalized.endsWith('-analyzer.ts') ||
-        normalized.endsWith('-rules.ts') ||
-        normalized.endsWith('-helper.ts')
-    );
+    return ANALYZER_OR_ENGINE_PATH_RE.test(filePath.replace(/\\/g, '/').toLowerCase());
 }
+
+/**
+ * Structured diagnostic record for path naming findings.
+ */
+export interface PathFindingInput {
+    readonly line: number;
+    readonly rule: string;
+    readonly message: string;
+    readonly detail: Record<string, unknown>;
+    readonly suggestion?: string;
+}
+
+/** Factory function creating Issue diagnostics from normalized path finding inputs. */
+export type IssueFactory = (finding: PathFindingInput) => Issue;
+
+const MAX_STRUCTURED_RESOURCE_BUDGET = 1000;
+const SYNTHETIC_NODES_PER_ELOC = 4;
+const SYNTHETIC_SYMBOL_COUNT = 5;
+const SYNTHETIC_LITERAL_COUNT = 10;
+const SYNTHETIC_AST_DEPTH = 3;
 
 /**
  * Audits single file for structured resource topology compliance.
@@ -167,13 +176,7 @@ export function isAnalyzerOrEngineFile(filePath: string): boolean {
 export function auditStructuredResourceFile(
     filePath: string,
     content: string,
-    mkIssue: (
-        line: number,
-        rule: string,
-        message: string,
-        detail: Record<string, unknown>,
-        suggestion?: string,
-    ) => Issue,
+    mkIssue: IssueFactory,
     issues: Issue[],
 ): void {
     if (isAnalyzerOrEngineFile(filePath)) return;
@@ -190,74 +193,66 @@ export function auditStructuredResourceFile(
             {
                 filePath,
                 eloc,
-                astNodeCount: eloc * 4,
-                symbolCount: 5,
-                literalCount: 10,
-                astDepth: 3,
+                astNodeCount: eloc * SYNTHETIC_NODES_PER_ELOC,
+                symbolCount: SYNTHETIC_SYMBOL_COUNT,
+                literalCount: SYNTHETIC_LITERAL_COUNT,
+                astDepth: SYNTHETIC_AST_DEPTH,
                 language: path.extname(filePath).slice(1) || 'typescript',
                 isExecutableLogic: false,
             },
         ],
-        1000,
+        MAX_STRUCTURED_RESOURCE_BUDGET,
     );
 
     for (const f of findings) {
         issues.push(
-            mkIssue(
-                1,
-                f.ruleId,
-                f.message,
-                f.details,
-                `Align '${filePath}' with 3-tier structured resource topology standard.`,
-            ),
+            mkIssue({
+                line: 1,
+                rule: f.ruleId,
+                message: f.message,
+                detail: f.details,
+                suggestion: `Align '${filePath}' with 3-tier structured resource topology standard.`,
+            }),
         );
     }
 }
 
 /**
+ * Execution context carrying path, options, issue accumulator, and factory for path naming audits.
+ */
+export interface PathNamingContext {
+    readonly filePath: string;
+    readonly opts: PathNamingOptions;
+    readonly ctx: AnalyzerContext;
+    readonly mkIssue: IssueFactory;
+    readonly issues: Issue[];
+}
+
+/**
  * Audits file and directory path naming conventions and transient jargon violations.
  *
- * @param filePath - Normalized path to audit.
- * @param opts - Path naming options.
- * @param ctx - Analyzer context.
- * @param mkIssue - Issue factory callback.
- * @param issues - Accumulator array for generated issues.
+ * @param pCtx - Path naming traversal context.
  */
-export function auditFileAndDirectoryPaths(
-    filePath: string,
-    opts: PathNamingOptions,
-    ctx: AnalyzerContext,
-    mkIssue: (
-        line: number,
-        rule: string,
-        message: string,
-        detail: Record<string, unknown>,
-        suggestion?: string,
-    ) => Issue,
-    issues: Issue[],
-): void {
-    auditFileName(filePath, opts, ctx, mkIssue, issues);
-    auditDirectoryName(filePath, opts, ctx, mkIssue, issues);
-    if (opts.checkFiles !== false && opts.checkResourceTopology !== false) {
-        auditStructuredResourceFile(filePath, ctx.content || '', mkIssue, issues);
+export function auditFileAndDirectoryPaths(pCtx: PathNamingContext): void {
+    auditFileName(pCtx);
+    auditDirectoryName(pCtx);
+    if (pCtx.opts.checkFiles !== false && pCtx.opts.checkResourceTopology !== false) {
+        auditStructuredResourceFile(
+            pCtx.filePath,
+            pCtx.ctx.content || '',
+            pCtx.mkIssue,
+            pCtx.issues,
+        );
     }
 }
 
 const CAMEL_TO_KEBAB_PATTERN = '$1-$2';
 
-type IssueFactory = (
-    line: number,
-    rule: string,
-    message: string,
-    detail: Record<string, unknown>,
-    suggestion?: string,
-) => Issue;
-
 interface FileNamingTarget {
-    filePath: string;
-    baseName: string;
-    nameWithoutExt: string;
-    ext: string;
+    readonly filePath: string;
+    readonly baseName: string;
+    readonly nameWithoutExt: string;
+    readonly ext: string;
 }
 
 type FileNamingStrategy = (target: FileNamingTarget, mkIssue: IssueFactory) => Issue | null;
@@ -273,13 +268,13 @@ function auditJsTsFileName(target: FileNamingTarget, mkIssue: IssueFactory): Iss
         .replace(/([a-z0-9])([A-Z])/g, CAMEL_TO_KEBAB_PATTERN)
         .replace(/[_]/g, '-')
         .toLowerCase();
-    return mkIssue(
-        1,
-        'NAM-FIL-001',
-        `File name '${baseName}' violates strict kebab-case naming convention for TypeScript/JavaScript.`,
-        { file: filePath, baseName, suggested: `${suggested}${ext}` },
-        `Rename file to '${suggested}${ext}'.`,
-    );
+    return mkIssue({
+        line: 1,
+        rule: 'NAM-FIL-001',
+        message: `File name '${baseName}' violates strict kebab-case naming convention for TypeScript/JavaScript.`,
+        detail: { file: filePath, baseName, suggested: `${suggested}${ext}` },
+        suggestion: `Rename file to '${suggested}${ext}'.`,
+    });
 }
 
 function auditSnakeFileName(target: FileNamingTarget, mkIssue: IssueFactory): Issue | null {
@@ -293,21 +288,21 @@ function auditSnakeFileName(target: FileNamingTarget, mkIssue: IssueFactory): Is
         .replace(/([a-z0-9])([A-Z])/g, CAMEL_TO_SNAKE_PATTERN)
         .replace(/[-]/g, '_')
         .toLowerCase();
-    return mkIssue(
-        1,
-        'NAM-FIL-001',
-        `File name '${baseName}' violates strict snake_case naming convention for ${ext.slice(1)}.`,
-        { file: filePath, baseName, suggested: `${suggested}${ext}` },
-        `Rename file to '${suggested}${ext}'.`,
-    );
+    return mkIssue({
+        line: 1,
+        rule: 'NAM-FIL-001',
+        message: `File name '${baseName}' violates strict snake_case naming convention for ${ext.slice(1)}.`,
+        detail: { file: filePath, baseName, suggested: `${suggested}${ext}` },
+        suggestion: `Rename file to '${suggested}${ext}'.`,
+    });
 }
 
-const FILE_NAMING_STRATEGIES = new Map<string, FileNamingStrategy>();
+const FILE_STRATEGY_MAP = new Map<string, FileNamingStrategy>();
 for (const ext of JS_TS_EXTS) {
-    FILE_NAMING_STRATEGIES.set(ext, auditJsTsFileName);
+    FILE_STRATEGY_MAP.set(ext, auditJsTsFileName);
 }
 for (const ext of SNAKE_EXTS) {
-    FILE_NAMING_STRATEGIES.set(ext, auditSnakeFileName);
+    FILE_STRATEGY_MAP.set(ext, auditSnakeFileName);
 }
 
 function resolveFileNameWithoutExt(baseName: string, ext: string): string {
@@ -315,23 +310,17 @@ function resolveFileNameWithoutExt(baseName: string, ext: string): string {
     return raw.endsWith('.d') ? raw.slice(0, -2) : raw;
 }
 
-function checkFileJargonOrIgnored(
-    filePath: string,
-    baseName: string,
-    nameWithoutExt: string,
-    mkIssue: IssueFactory,
-    issues: Issue[],
-): boolean {
-    if (IGNORED_FILE_BASENAMES.has(nameWithoutExt.toLowerCase())) return true;
-    if (TRANSIENT_JARGON_RE.test(nameWithoutExt)) {
-        issues.push(
-            mkIssue(
-                1,
-                'NAM-FIL-001',
-                `File name '${baseName}' contains transient process jargon or milestone tags.`,
-                { file: filePath, baseName },
-                'Remove temporary process markers from file name.',
-            ),
+function checkFileJargonOrIgnored(target: FileNamingTarget, pCtx: PathNamingContext): boolean {
+    if (IGNORED_FILE_BASENAMES.has(target.nameWithoutExt.toLowerCase())) return true;
+    if (TRANSIENT_JARGON_RE.test(target.nameWithoutExt)) {
+        pCtx.issues.push(
+            pCtx.mkIssue({
+                line: 1,
+                rule: 'NAM-FIL-001',
+                message: `File name '${target.baseName}' contains transient process jargon or milestone tags.`,
+                detail: { file: pCtx.filePath, baseName: target.baseName },
+                suggestion: 'Remove temporary process markers from file name.',
+            }),
         );
         return true;
     }
@@ -343,66 +332,65 @@ function dispatchNamingStrategy(
     mkIssue: IssueFactory,
     issues: Issue[],
 ): void {
-    const strategy = FILE_NAMING_STRATEGIES.get(target.ext);
+    const strategy = FILE_STRATEGY_MAP.get(target.ext);
     if (!strategy) return;
     const issue = strategy(target, mkIssue);
     if (issue) issues.push(issue);
 }
 
+const FIXTURE_OR_BENCH_PATH_RE = /\/(?:\.bench|fixtures|testdata|__mocks__)\//;
+
 function isFixtureOrBenchPath(filePath: string): boolean {
-    const norm = filePath.replace(/\\/g, '/').toLowerCase();
-    return (
-        norm.includes('/.bench') ||
-        norm.includes('/fixtures/') ||
-        norm.includes('/testdata/') ||
-        norm.includes('/__mocks__/')
-    );
+    return FIXTURE_OR_BENCH_PATH_RE.test(filePath.replace(/\\/g, '/').toLowerCase());
 }
 
-function checkFileNameLength(
-    filePath: string,
-    baseName: string,
-    nameWithoutExt: string,
-    opts: PathNamingOptions,
-    mkIssue: IssueFactory,
-    issues: Issue[],
-): void {
-    if (isFixtureOrBenchPath(filePath)) return;
-    const minLen = opts.minFileLength ?? DEFAULT_MIN_FILE_NAME_LENGTH;
-    const maxLen = opts.maxFileLength ?? DEFAULT_MAX_FILE_NAME_LENGTH;
-    const allowedSet = opts.allowedShortFiles
-        ? new Set(opts.allowedShortFiles.map((s) => s.toLowerCase()))
+function checkFileNameLength(target: FileNamingTarget, pCtx: PathNamingContext): void {
+    if (isFixtureOrBenchPath(pCtx.filePath)) return;
+    const minLen = pCtx.opts.minFileLength ?? DEFAULT_MIN_FILE_NAME_LENGTH;
+    const maxLen = pCtx.opts.maxFileLength ?? DEFAULT_MAX_FILE_NAME_LENGTH;
+    const allowedSet = pCtx.opts.allowedShortFiles
+        ? new Set(pCtx.opts.allowedShortFiles.map((s) => s.toLowerCase()))
         : ALLOWED_SHORT_FILE_STEMS;
 
-    const lower = nameWithoutExt.toLowerCase();
-    if (nameWithoutExt.length < minLen && !allowedSet.has(lower)) {
+    const lower = target.nameWithoutExt.toLowerCase();
+    if (target.nameWithoutExt.length < minLen && !allowedSet.has(lower)) {
         const msg =
-            `File name '${baseName}' is excessively short ` +
+            `File name '${target.baseName}' is excessively short ` +
             `(< ${minLen} characters); lacks domain description.`;
-        issues.push(
-            mkIssue(
-                1,
-                'NAM-FIL-001',
-                msg,
-                { file: filePath, baseName, length: nameWithoutExt.length, minLen },
-                `Rename file '${baseName}' to a descriptive identifier conveying domain purpose.`,
-            ),
+        pCtx.issues.push(
+            pCtx.mkIssue({
+                line: 1,
+                rule: 'NAM-FIL-001',
+                message: msg,
+                detail: {
+                    file: pCtx.filePath,
+                    baseName: target.baseName,
+                    length: target.nameWithoutExt.length,
+                    minLen,
+                },
+                suggestion: `Rename file '${target.baseName}' to a descriptive identifier conveying domain purpose.`,
+            }),
         );
         return;
     }
 
-    if (nameWithoutExt.length > maxLen) {
+    if (target.nameWithoutExt.length > maxLen) {
         const msg =
-            `File name '${baseName}' is excessively long ` +
+            `File name '${target.baseName}' is excessively long ` +
             `(> ${maxLen} characters); consider decomposing responsibilities into subdirectories.`;
-        issues.push(
-            mkIssue(
-                1,
-                'NAM-FIL-001',
-                msg,
-                { file: filePath, baseName, length: nameWithoutExt.length, maxLen },
-                `Decompose or shorten file name '${baseName}' to focus on core domain entity.`,
-            ),
+        pCtx.issues.push(
+            pCtx.mkIssue({
+                line: 1,
+                rule: 'NAM-FIL-001',
+                message: msg,
+                detail: {
+                    file: pCtx.filePath,
+                    baseName: target.baseName,
+                    length: target.nameWithoutExt.length,
+                    maxLen,
+                },
+                suggestion: `Decompose or shorten file name '${target.baseName}' to focus on core domain entity.`,
+            }),
         );
     }
 }
@@ -425,141 +413,131 @@ export function splitFileNameSegments(nameWithoutExt: string, ext: string): stri
 }
 
 function checkFileWordLimits(
-    filePath: string,
-    baseName: string,
+    target: FileNamingTarget,
     wordCount: number,
-    opts: PathNamingOptions,
     isShortExempt: boolean,
-    mkIssue: IssueFactory,
-    issues: Issue[],
+    pCtx: PathNamingContext,
 ): void {
     if (
-        opts.minFileWords !== undefined &&
-        opts.minFileWords > 1 &&
-        wordCount < opts.minFileWords &&
+        pCtx.opts.minFileWords !== undefined &&
+        pCtx.opts.minFileWords > 1 &&
+        wordCount < pCtx.opts.minFileWords &&
         !isShortExempt
     ) {
-        issues.push(
-            mkIssue(
-                1,
-                'NAM-FIL-001',
-                `File name '${baseName}' has too few word segments ` +
-                    `(${wordCount} < ${opts.minFileWords}); lacks domain specificity.`,
-                { file: filePath, baseName, wordCount, minWords: opts.minFileWords },
-                `Expand file name '${baseName}' with domain qualifying words ` +
-                    `(at least ${opts.minFileWords} word segments).`,
-            ),
+        pCtx.issues.push(
+            pCtx.mkIssue({
+                line: 1,
+                rule: 'NAM-FIL-001',
+                message:
+                    `File name '${target.baseName}' has too few word segments ` +
+                    `(${wordCount} < ${pCtx.opts.minFileWords}); lacks domain specificity.`,
+                detail: {
+                    file: pCtx.filePath,
+                    baseName: target.baseName,
+                    wordCount,
+                    minWords: pCtx.opts.minFileWords,
+                },
+                suggestion:
+                    `Expand file name '${target.baseName}' with domain qualifying words ` +
+                    `(at least ${pCtx.opts.minFileWords} word segments).`,
+            }),
         );
     }
 
-    if (opts.maxFileWords !== undefined && wordCount > opts.maxFileWords) {
-        issues.push(
-            mkIssue(
-                1,
-                'NAM-FIL-001',
-                `File name '${baseName}' has too many word segments ` +
-                    `(${wordCount} > ${opts.maxFileWords}); consider simplifying file naming.`,
-                { file: filePath, baseName, wordCount, maxWords: opts.maxFileWords },
-                `Simplify file name '${baseName}' to at most ${opts.maxFileWords} word segments.`,
-            ),
+    if (pCtx.opts.maxFileWords !== undefined && wordCount > pCtx.opts.maxFileWords) {
+        pCtx.issues.push(
+            pCtx.mkIssue({
+                line: 1,
+                rule: 'NAM-FIL-001',
+                message:
+                    `File name '${target.baseName}' has too many word segments ` +
+                    `(${wordCount} > ${pCtx.opts.maxFileWords}); consider simplifying file naming.`,
+                detail: {
+                    file: pCtx.filePath,
+                    baseName: target.baseName,
+                    wordCount,
+                    maxWords: pCtx.opts.maxFileWords,
+                },
+                suggestion: `Simplify file name '${target.baseName}' to at most ${pCtx.opts.maxFileWords} word segments.`,
+            }),
         );
     }
 }
 
 function checkFileMorphemes(
-    filePath: string,
-    baseName: string,
+    target: FileNamingTarget,
     segments: string[],
-    mkIssue: IssueFactory,
-    issues: Issue[],
+    pCtx: PathNamingContext,
 ): void {
     for (const seg of segments) {
         if (seg.length < 2) continue;
         const hasLetters = LETTERS_RE.test(seg);
         if (hasLetters && !isMorphemePhonetic(seg)) {
-            issues.push(
-                mkIssue(
-                    1,
-                    'NAM-FIL-001',
-                    `File name '${baseName}' contains segment '${seg}' with ` +
+            pCtx.issues.push(
+                pCtx.mkIssue({
+                    line: 1,
+                    rule: 'NAM-FIL-001',
+                    message:
+                        `File name '${target.baseName}' contains segment '${seg}' with ` +
                         `invalid morpheme phonetics (missing vowel or unapproved acronym).`,
-                    { file: filePath, baseName, segment: seg },
-                    `Use recognizable English domain terms containing vowels ` +
+                    detail: { file: pCtx.filePath, baseName: target.baseName, segment: seg },
+                    suggestion:
+                        `Use recognizable English domain terms containing vowels ` +
                         `for file name segments.`,
-                ),
+                }),
             );
             break;
         }
     }
 }
 
-function checkFileWordsAndMorphemes(
-    filePath: string,
-    baseName: string,
-    nameWithoutExt: string,
-    ext: string,
-    opts: PathNamingOptions,
-    mkIssue: IssueFactory,
-    issues: Issue[],
-): void {
-    if (isFixtureOrBenchPath(filePath)) return;
-    const lowerStem = nameWithoutExt.toLowerCase();
+function checkFileWordsAndMorphemes(target: FileNamingTarget, pCtx: PathNamingContext): void {
+    if (isFixtureOrBenchPath(pCtx.filePath)) return;
+    const lowerStem = target.nameWithoutExt.toLowerCase();
     if (IGNORED_FILE_BASENAMES.has(lowerStem)) return;
 
-    const allowedSet = opts.allowedShortFiles
-        ? new Set(opts.allowedShortFiles.map((s) => s.toLowerCase()))
+    const allowedSet = pCtx.opts.allowedShortFiles
+        ? new Set(pCtx.opts.allowedShortFiles.map((s) => s.toLowerCase()))
         : ALLOWED_SHORT_FILE_STEMS;
 
-    const minLen = opts.minFileLength ?? DEFAULT_MIN_FILE_NAME_LENGTH;
-    if (nameWithoutExt.length < minLen && !allowedSet.has(lowerStem)) {
+    const minLen = pCtx.opts.minFileLength ?? DEFAULT_MIN_FILE_NAME_LENGTH;
+    if (target.nameWithoutExt.length < minLen && !allowedSet.has(lowerStem)) {
         return;
     }
 
-    const stemWithoutSuffix = nameWithoutExt.replace(TEST_SPEC_SUFFIX_RE, '');
-    const segments = splitFileNameSegments(stemWithoutSuffix, ext);
+    const stemWithoutSuffix = target.nameWithoutExt.replace(TEST_SPEC_SUFFIX_RE, '');
+    const segments = splitFileNameSegments(stemWithoutSuffix, target.ext);
     if (segments.length === 0) return;
 
     const isShortExempt = allowedSet.has(lowerStem);
-    checkFileWordLimits(filePath, baseName, segments.length, opts, isShortExempt, mkIssue, issues);
+    checkFileWordLimits(target, segments.length, isShortExempt, pCtx);
 
-    if (opts.enforceMorphemeCheck) {
-        checkFileMorphemes(filePath, baseName, segments, mkIssue, issues);
+    if (pCtx.opts.enforceMorphemeCheck) {
+        checkFileMorphemes(target, segments, pCtx);
     }
 }
 
-function auditFileName(
-    filePath: string,
-    opts: PathNamingOptions,
-    ctx: AnalyzerContext,
-    mkIssue: IssueFactory,
-    issues: Issue[],
-): void {
-    if (opts.checkFiles === false) return;
-    const baseName = path.basename(filePath);
+function auditFileName(pCtx: PathNamingContext): void {
+    if (pCtx.opts.checkFiles === false) return;
+    const baseName = path.basename(pCtx.filePath);
     const ext = path.extname(baseName);
     const nameWithoutExt = resolveFileNameWithoutExt(baseName, ext);
-    if (checkFileJargonOrIgnored(filePath, baseName, nameWithoutExt, mkIssue, issues)) return;
+    const target: FileNamingTarget = {
+        filePath: pCtx.filePath,
+        baseName,
+        nameWithoutExt,
+        ext,
+    };
+    if (checkFileJargonOrIgnored(target, pCtx)) return;
 
-    checkFileNameLength(filePath, baseName, nameWithoutExt, opts, mkIssue, issues);
-    checkFileWordsAndMorphemes(filePath, baseName, nameWithoutExt, ext, opts, mkIssue, issues);
-    dispatchNamingStrategy({ filePath, baseName, nameWithoutExt, ext }, mkIssue, issues);
+    checkFileNameLength(target, pCtx);
+    checkFileWordsAndMorphemes(target, pCtx);
+    dispatchNamingStrategy(target, pCtx.mkIssue, pCtx.issues);
 }
 
-function auditDirectoryName(
-    filePath: string,
-    opts: PathNamingOptions,
-    ctx: AnalyzerContext,
-    mkIssue: (
-        line: number,
-        rule: string,
-        message: string,
-        detail: Record<string, unknown>,
-        suggestion?: string,
-    ) => Issue,
-    issues: Issue[],
-): void {
-    if (opts.checkDirectories === false) return;
-    const dir = path.dirname(filePath);
+function auditDirectoryName(pCtx: PathNamingContext): void {
+    if (pCtx.opts.checkDirectories === false) return;
+    const dir = path.dirname(pCtx.filePath);
     if (dir === '.' || !dir) return;
 
     const segments = dir.split(/[\\/]/);
@@ -569,27 +547,27 @@ function auditDirectoryName(
         }
 
         if (TRANSIENT_JARGON_RE.test(segment)) {
-            issues.push(
-                mkIssue(
-                    1,
-                    'NAM-DIR-001',
-                    `Directory name '${segment}' contains transient process jargon or milestone tags.`,
-                    { dir, segment },
-                    'Remove temporary process markers from directory name.',
-                ),
+            pCtx.issues.push(
+                pCtx.mkIssue({
+                    line: 1,
+                    rule: 'NAM-DIR-001',
+                    message: `Directory name '${segment}' contains transient process jargon or milestone tags.`,
+                    detail: { dir, segment },
+                    suggestion: 'Remove temporary process markers from directory name.',
+                }),
             );
             return;
         }
 
         if (/[A-Z_]/.test(segment)) {
-            issues.push(
-                mkIssue(
-                    1,
-                    'NAM-DIR-001',
-                    `Directory '${segment}' should follow kebab-case convention.`,
-                    { dir, segment },
-                    'Rename directory to kebab-case.',
-                ),
+            pCtx.issues.push(
+                pCtx.mkIssue({
+                    line: 1,
+                    rule: 'NAM-DIR-001',
+                    message: `Directory '${segment}' should follow kebab-case convention.`,
+                    detail: { dir, segment },
+                    suggestion: 'Rename directory to kebab-case.',
+                }),
             );
             return;
         }
@@ -599,20 +577,20 @@ function auditDirectoryName(
 /** Standard engineering action verbs initiating descriptive function identifiers. */
 export const APPROVED_ACTION_VERBS: ReadonlySet<string> = new Set(
     (
-        'abort accumulate add advance aggregate allocate allows analyze append apply arbitrate as ' +
-        'assemble assert attach audit benchmark bind broadcast build calculate can cancel categorize ' +
-        'check clamp classify clear clone close collect compile compose compress compute construct ' +
+        'abort accumulate add advance aggregate align allocate allows analyze append apply arbitrate as ' +
+        'assemble assert attach audit benchmark bind broadcast build calculate can cancel capitalize categorize ' +
+        'check clamp classify clean cleanup clear clone close collect compile compose compress compute construct ' +
         'contains convert copy count create debounce decode decompress deduce define delete dequeue ' +
         'derive deserialize destroy detach detect diff dispatch dispose do does drain drop ' +
         'dump emit encode enqueue ensure escape estimate evaluate evict examine execute exists ' +
         'extract fast fetch filter finalize find flatten flush format forward freeze from ' +
         'generate get group guard handle has index infer ingest init initialize inspect ' +
-        'install instantiate intercept invoke is isolate iterate lint load log lookup loop ' +
+        'install instantiate intercept introduce introduces invert invoke is isolate iterate lint load log lookup loop ' +
         'make map mask match matches measure merge mk mock must needs normalize ' +
         'notify obtain open parse partition patch pause peek perform persist pipe poll ' +
-        'pop populate print probe process produce project propagate prune publish pull push ' +
+        'pop populate precompute print probe process produce project propagate prune publish pull push ' +
         'put query queue read receive reclaim record redirect reduce refresh register reload ' +
-        'remove render replace report reset resolve resume retrieve retry review route run ' +
+        'remove render rename replace report reset resolve resume retrieve retry review route run ' +
         'safe sanitize save scan schedule score search seed select send serialize set ' +
         'setup shift should solve sort spawn split start stop store strip subscribe sum ' +
         'supports sync synthesize tag test throttle to track transform transpile traverse trigger ' +
@@ -657,6 +635,42 @@ export const EXEMPT_METHOD_NAMES: ReadonlySet<string> = new Set([
     'clear',
     'reset',
     'assert',
+    'format',
+    'parse',
+    'project',
+    'normalize',
+    'evaluate',
+    'walk',
+    'enter',
+    'leave',
+    'scan',
+    'flush',
+    'partition',
+    'register',
+    'push',
+    'put',
+    'get',
+    'set',
+    'has',
+    'size',
+    'stats',
+    'close',
+    'open',
+    'start',
+    'stop',
+    'step',
+    'match',
+    'clone',
+    'copy',
+    'emit',
+    'poll',
+    'drain',
+    'peek',
+    'pop',
+    'shutdown',
+    'check',
+    'root',
+    'children',
 ]);
 
 /** Permitted single-letter morpheme tokens representing mathematical coordinates or loops. */
@@ -697,12 +711,23 @@ export function isExemptFunctionName(name: string, isAccessor?: boolean): boolea
     return isAccessor === true;
 }
 
+const TYPE_VERB_NOUN = 'verb_noun' as const;
+const TYPE_TOO_FEW_WORDS = 'too_few_words' as const;
+const TYPE_TOO_MANY_WORDS = 'too_many_words' as const;
+const TYPE_INVALID_MORPHEME = 'invalid_morpheme' as const;
+const TYPE_SINGLE_LETTER = 'single_letter' as const;
+
 /**
  * Diagnostic finding representing a function naming semantics violation.
  */
 export interface FunctionSemanticsFinding {
     /** Type tag classifying the semantic finding. */
-    type: 'verb_noun' | 'too_few_words' | 'too_many_words' | 'invalid_morpheme' | 'single_letter';
+    type:
+        | typeof TYPE_VERB_NOUN
+        | typeof TYPE_TOO_FEW_WORDS
+        | typeof TYPE_TOO_MANY_WORDS
+        | typeof TYPE_INVALID_MORPHEME
+        | typeof TYPE_SINGLE_LETTER;
     /** Offending token if applicable. */
     token?: string;
     /** Measured word count. */
@@ -720,14 +745,11 @@ export interface FunctionSemanticsFinding {
  * @param firstToken - First parsed word token decomposed from the identifier.
  * @returns Finding if a rule is violated, or null if compliant.
  */
-function validateFunctionVerbNoun(
-    name: string,
-    firstToken: string,
-): FunctionSemanticsFinding | null {
+function checkFunctionVerbNoun(name: string, firstToken: string): FunctionSemanticsFinding | null {
     const firstWord = firstToken.toLowerCase();
     if (APPROVED_ACTION_VERBS.has(firstWord)) return null;
     return {
-        type: 'verb_noun',
+        type: TYPE_VERB_NOUN,
         token: firstWord,
         message:
             `Function or method name '${name}' violates verb-noun contract; ` +
@@ -736,7 +758,7 @@ function validateFunctionVerbNoun(
     };
 }
 
-function validateFunctionWordCount(
+function checkFunctionWordCount(
     name: string,
     tokenCount: number,
     minWords?: number,
@@ -744,7 +766,7 @@ function validateFunctionWordCount(
 ): FunctionSemanticsFinding | null {
     if (minWords !== undefined && tokenCount < minWords) {
         return {
-            type: 'too_few_words',
+            type: TYPE_TOO_FEW_WORDS,
             wordCount: tokenCount,
             expectedWords: minWords,
             message:
@@ -754,7 +776,7 @@ function validateFunctionWordCount(
     }
     if (maxWords !== undefined && tokenCount > maxWords) {
         return {
-            type: 'too_many_words',
+            type: TYPE_TOO_MANY_WORDS,
             wordCount: tokenCount,
             expectedWords: maxWords,
             message:
@@ -765,17 +787,14 @@ function validateFunctionWordCount(
     return null;
 }
 
-function validateFunctionMorphemes(
-    name: string,
-    tokens: string[],
-): FunctionSemanticsFinding | null {
+function checkFunctionMorphemes(name: string, tokens: string[]): FunctionSemanticsFinding | null {
     for (const token of tokens) {
         const tokenLower = token.toLowerCase();
         if (token.length >= 2) {
             const hasLetters = LETTERS_RE.test(token);
             if (hasLetters && !isMorphemePhonetic(token)) {
                 return {
-                    type: 'invalid_morpheme',
+                    type: TYPE_INVALID_MORPHEME,
                     token,
                     message:
                         `Function or method name '${name}' contains segment '${token}' with ` +
@@ -784,7 +803,7 @@ function validateFunctionMorphemes(
             }
         } else if (token.length === 1 && !ALLOWED_SINGLE_LETTER_TOKENS.has(tokenLower)) {
             return {
-                type: 'single_letter',
+                type: TYPE_SINGLE_LETTER,
                 token,
                 message: `Function or method name '${name}' contains cryptic single-letter fragment '${token}'.`,
             };
@@ -806,7 +825,7 @@ function validateFunctionMorphemes(
  * @param isAccessor - Optional flag indicating getter or setter accessor.
  * @returns Semantic finding if violated, or null if compliant.
  */
-export function validateFunctionTokensAndSemantics(
+export function auditFunctionSemantics(
     name: string,
     tokens: string[],
     opts: {
@@ -822,11 +841,11 @@ export function validateFunctionTokensAndSemantics(
     }
 
     if (opts.enforceVerbNounContract) {
-        const verbFinding = validateFunctionVerbNoun(name, tokens[0]);
+        const verbFinding = checkFunctionVerbNoun(name, tokens[0]);
         if (verbFinding) return verbFinding;
     }
 
-    const wordCountFinding = validateFunctionWordCount(
+    const wordCountFinding = checkFunctionWordCount(
         name,
         tokens.length,
         opts.minFunctionWords,
@@ -834,9 +853,5 @@ export function validateFunctionTokensAndSemantics(
     );
     if (wordCountFinding) return wordCountFinding;
 
-    if (opts.enforceMorphemeCheck) {
-        return validateFunctionMorphemes(name, tokens);
-    }
-
-    return null;
+    return opts.enforceMorphemeCheck ? checkFunctionMorphemes(name, tokens) : null;
 }

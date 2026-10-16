@@ -17,6 +17,37 @@ import * as ts from 'typescript';
 import type { Issue } from '../../types';
 import type { SemanticGraph } from '../../semantic/semanticGraph';
 import type { RuleLayer, UniversalEvaluationContext, UniversalSemanticRule } from './types';
+import { ANALYZER_PERFORMANCE, SEVERITY_WARNING, SEVERITY_ERROR } from '../../constants';
+
+const LAYER_UNIVERSAL: RuleLayer = 'layer1_universal';
+
+// Static rule signatures for rule registry discovery:
+// rule: 'loop-transient-allocation'
+const RULE_LOOP_TRANSIENT = 'loop-transient-allocation';
+// rule: 'high-algorithmic-complexity'
+const RULE_HIGH_COMPLEXITY = 'high-algorithmic-complexity';
+// rule: 'expensive-loop-operation'
+const RULE_EXPENSIVE_LOOP = 'expensive-loop-operation';
+
+const CALL_DUPLICATE_TRUE = '.duplicate(true)';
+const CALL_DEEPCOPY_PREFIX = 'copy.deepcopy(';
+const CALL_DEEPCOPY_METHOD = '.deepcopy(';
+const CALL_DEEPCOPY_IDENTIFIER = 'copy.deepcopy()';
+const CALL_JSON_PARSE = 'JSON.parse';
+const CALL_CLONE = '.clone()';
+const CALL_BOX_NEW = 'Box::new(';
+const CALL_DUPLICATE_SUFFIX = '.duplicate';
+const CALL_CLONE_DEEP_SUFFIX = '.cloneDeep';
+const CALL_INDEX_OF_SUFFIX = '.indexOf';
+const CALL_INCLUDES_SUFFIX = '.includes';
+const CALL_FIND_SUFFIX = '.find';
+
+const DESC_LOOP_TRANSIENT =
+    'Detects transient heap allocations, closures, or instantiations inside loops.';
+const DESC_HIGH_COMPLEXITY =
+    'Detects nested loop iterations causing potential O(N^2) or O(N^3) performance hotspots.';
+const DESC_EXPENSIVE_LOOP =
+    'Detects expensive operations like deep copies or blocking I/O within loops.';
 
 /**
  * Performance inspection options.
@@ -58,24 +89,21 @@ function runSourceRule(ruleId: string, context: UniversalEvaluationContext): Iss
 }
 
 /**
- * Universal Rule: Loop Transient Allocation (ADV-PRF-002).
- *
- * Delegates to {@link PerformanceRuleEvaluator}, which implements the detection for real.
- * This class previously returned an empty array unconditionally while still being registered
- * with {@link UniversalPyramidEvaluator}, so the rule reported itself as active but never
- * produced a finding. The SemanticGraph passed to a Layer 1 rule carries no loop annotations
- * to inspect, so the evaluation is driven from source text via the context instead.
+ * Abstract base for universal performance semantic rules.
  */
-export class LoopTransientAllocationRule implements UniversalSemanticRule {
-    public readonly id = 'loop-transient-allocation';
-    public readonly name = 'Loop Transient Heap Allocation';
-    public readonly layer: RuleLayer = 'layer1_universal';
-    public readonly defaultSeverity = 'warning' as const;
-    public readonly description =
-        'Detects transient heap allocations, closures, or instantiations inside loops.';
+abstract class BasePerformanceSemanticRule implements UniversalSemanticRule {
+    public abstract readonly id: string;
+    public abstract readonly name: string;
+    public readonly defaultSeverity: typeof SEVERITY_WARNING | typeof SEVERITY_ERROR;
+    public abstract readonly description: string;
+    public readonly layer: RuleLayer = LAYER_UNIVERSAL;
+
+    protected constructor(severity: typeof SEVERITY_WARNING | typeof SEVERITY_ERROR) {
+        this.defaultSeverity = severity;
+    }
 
     /**
-     * Evaluates the source under review for transient allocations.
+     * Evaluates the source under review for performance bottlenecks.
      *
      * @param _graph - SemanticGraph instance.
      * @param context - Evaluation context, used to resolve the file under review.
@@ -83,59 +111,113 @@ export class LoopTransientAllocationRule implements UniversalSemanticRule {
      */
     public evaluate(_graph: SemanticGraph, context: UniversalEvaluationContext): Issue[] {
         return runSourceRule(this.id, context);
+    }
+}
+
+/**
+ * Universal Rule: Loop Transient Allocation (ADV-PRF-002).
+ */
+export class LoopTransientAllocationRule extends BasePerformanceSemanticRule {
+    public readonly id = RULE_LOOP_TRANSIENT;
+    public readonly name = 'Loop Transient Heap Allocation';
+    public readonly description = DESC_LOOP_TRANSIENT;
+
+    public constructor() {
+        super(SEVERITY_WARNING);
     }
 }
 
 /**
  * Universal Rule: High Algorithmic Complexity Hotspot.
- *
- * Delegates to {@link PerformanceRuleEvaluator}; see {@link LoopTransientAllocationRule}
- * for why the previous unconditional empty return was a defect.
  */
-export class HighAlgorithmicComplexityRule implements UniversalSemanticRule {
-    public readonly id = 'high-algorithmic-complexity';
+export class HighAlgorithmicComplexityRule extends BasePerformanceSemanticRule {
+    public readonly id = RULE_HIGH_COMPLEXITY;
     public readonly name = 'High Algorithmic Complexity Hotspot';
-    public readonly layer: RuleLayer = 'layer1_universal';
-    public readonly defaultSeverity = 'warning' as const;
-    public readonly description =
-        'Detects nested loop iterations causing potential O(N^2) or O(N^3) performance hotspots.';
+    public readonly description = DESC_HIGH_COMPLEXITY;
 
-    /**
-     * Evaluates the source under review for complexity hotspots.
-     *
-     * @param _graph - SemanticGraph instance.
-     * @param context - Evaluation context, used to resolve the file under review.
-     * @returns List of detected issues.
-     */
-    public evaluate(_graph: SemanticGraph, context: UniversalEvaluationContext): Issue[] {
-        return runSourceRule(this.id, context);
+    public constructor() {
+        super(SEVERITY_WARNING);
     }
 }
 
 /**
  * Universal Rule: Expensive Operation in Loop.
- *
- * Delegates to {@link PerformanceRuleEvaluator}; see {@link LoopTransientAllocationRule}
- * for why the previous unconditional empty return was a defect.
  */
-export class ExpensiveLoopOperationRule implements UniversalSemanticRule {
-    public readonly id = 'expensive-loop-operation';
+export class ExpensiveLoopOperationRule extends BasePerformanceSemanticRule {
+    public readonly id = RULE_EXPENSIVE_LOOP;
     public readonly name = 'Expensive Operation Inside Loop';
-    public readonly layer: RuleLayer = 'layer1_universal';
-    public readonly defaultSeverity = 'error' as const;
-    public readonly description =
-        'Detects expensive operations like deep copies or blocking I/O within loops.';
+    public readonly description = DESC_EXPENSIVE_LOOP;
 
-    /**
-     * Evaluates the source under review for expensive in-loop operations.
-     *
-     * @param _graph - SemanticGraph instance.
-     * @param context - Evaluation context, used to resolve the file under review.
-     * @returns List of detected issues.
-     */
-    public evaluate(_graph: SemanticGraph, context: UniversalEvaluationContext): Issue[] {
-        return runSourceRule(this.id, context);
+    public constructor() {
+        super(SEVERITY_ERROR);
     }
+}
+
+interface CallExpressionAuditParams {
+    node: ts.Node;
+    callText: string;
+    filePath: string;
+    sourceFile: ts.SourceFile;
+    issues: Issue[];
+}
+
+interface IndentedLineAuditParams {
+    filePath: string;
+    trimmed: string;
+    lineNo: number;
+    ext: string;
+    issues: Issue[];
+}
+
+interface PerformanceIssueParams {
+    filePath: string;
+    rule: string;
+    severity: typeof SEVERITY_WARNING | typeof SEVERITY_ERROR;
+    line: number;
+    column: number;
+    message: string;
+    detail: Record<string, unknown>;
+}
+
+function buildPerformanceIssue(params: PerformanceIssueParams): Issue {
+    return {
+        id: `${ANALYZER_PERFORMANCE}:${params.rule}:${params.line}:${params.column}`,
+        analyzer: ANALYZER_PERFORMANCE,
+        rule: params.rule,
+        severity: params.severity,
+        message: params.message,
+        location: {
+            file: params.filePath,
+            start: { line: params.line, column: params.column },
+            end: { line: params.line, column: params.column },
+        },
+        detail: params.detail,
+    };
+}
+
+interface NodeIssueParams {
+    filePath: string;
+    sourceFile: ts.SourceFile;
+    node: ts.Node;
+    rule: string;
+    severity: typeof SEVERITY_WARNING | typeof SEVERITY_ERROR;
+    message: string;
+    detail: Record<string, unknown>;
+}
+
+function createNodeIssue(params: NodeIssueParams): Issue {
+    const { line, character } = params.sourceFile.getLineAndCharacterOfPosition(
+        params.node.getStart(),
+    );
+    return buildPerformanceIssue({
+        filePath: params.filePath,
+        rule: params.rule,
+        severity: params.severity,
+        line: line + 1,
+        column: character + 1,
+        message: params.message,
+        detail: params.detail,
+    });
 }
 
 /**
@@ -191,7 +273,7 @@ export class PerformanceRuleEvaluator {
         );
 
         const walkNode = (node: ts.Node, loopDepth: number) => {
-            const isLoop = this.isTsLoopNode(node);
+            const isLoop = this.isAstLoopNode(node);
             const currentLoopDepth = isLoop ? loopDepth + 1 : loopDepth;
 
             if (isLoop && currentLoopDepth > this.maxLoopDepth) {
@@ -201,7 +283,7 @@ export class PerformanceRuleEvaluator {
             }
 
             if (currentLoopDepth > 0 && !isLoop) {
-                this.checkTsLoopBodyNode(node, filePath, sourceFile, issues);
+                this.checkAstLoopBodyNode(node, filePath, sourceFile, issues);
             }
 
             ts.forEachChild(node, (child) => walkNode(child, currentLoopDepth));
@@ -217,7 +299,7 @@ export class PerformanceRuleEvaluator {
      * @param node - AST node to check.
      * @returns True if the node is a loop.
      */
-    private isTsLoopNode(node: ts.Node): boolean {
+    private isAstLoopNode(node: ts.Node): boolean {
         return (
             ts.isForStatement(node) ||
             ts.isForOfStatement(node) ||
@@ -235,7 +317,7 @@ export class PerformanceRuleEvaluator {
      * @param sourceFile - Source file AST representation.
      * @param issues - Mutable issue collection.
      */
-    private checkTsLoopBodyNode(
+    private checkAstLoopBodyNode(
         node: ts.Node,
         filePath: string,
         sourceFile: ts.SourceFile,
@@ -247,7 +329,7 @@ export class PerformanceRuleEvaluator {
             );
         } else if (ts.isCallExpression(node)) {
             const callText = node.expression.getText();
-            this.checkTsCallExpression(node, callText, filePath, sourceFile, issues);
+            this.checkAstCallExpression({ node, callText, filePath, sourceFile, issues });
         } else if (ts.isArrayLiteralExpression(node) && node.elements.length > 0) {
             const hasSpread = node.elements.some((el) => ts.isSpreadElement(el));
             if (hasSpread) {
@@ -266,32 +348,44 @@ export class PerformanceRuleEvaluator {
     /**
      * Checks a call expression inside a loop for expensive operations or quadratic lookups.
      *
-     * @param node - CallExpression node.
-     * @param callText - Callee text.
-     * @param filePath - File path.
-     * @param sourceFile - Source file AST.
-     * @param issues - Mutable issue accumulator.
+     * @param params - Call expression analysis parameter bundle.
      */
-    private checkTsCallExpression(
-        node: ts.Node,
-        callText: string,
-        filePath: string,
-        sourceFile: ts.SourceFile,
-        issues: Issue[],
-    ): void {
-        if (
-            callText.endsWith('.duplicate') ||
-            callText.includes('JSON.parse') ||
-            callText.endsWith('.cloneDeep')
-        ) {
-            issues.push(this.createExpensiveIssue(filePath, sourceFile, node, callText));
-        } else if (
-            callText.endsWith('.indexOf') ||
-            callText.endsWith('.includes') ||
-            callText.endsWith('.find')
-        ) {
-            issues.push(this.createLinearScanIssue(filePath, sourceFile, node, callText));
+    private checkAstCallExpression(params: CallExpressionAuditParams): void {
+        const { node, callText, filePath, sourceFile, issues } = params;
+        const isExpensive =
+            callText.endsWith(CALL_DUPLICATE_SUFFIX) ||
+            callText.includes(CALL_JSON_PARSE) ||
+            callText.endsWith(CALL_CLONE_DEEP_SUFFIX);
+
+        const isLinearScan =
+            !isExpensive &&
+            (callText.endsWith(CALL_INDEX_OF_SUFFIX) ||
+                callText.endsWith(CALL_INCLUDES_SUFFIX) ||
+                callText.endsWith(CALL_FIND_SUFFIX));
+
+        if (!isExpensive && !isLinearScan) {
+            return;
         }
+
+        const rule = isExpensive ? RULE_EXPENSIVE_LOOP : RULE_HIGH_COMPLEXITY;
+        const severity = isExpensive ? SEVERITY_ERROR : SEVERITY_WARNING;
+        const message = isExpensive
+            ? `Expensive operation '${callText}' inside loop body. ` +
+              'Eliminate redundant deep copying or serialization in hot paths.'
+            : `Linear scan method '${callText}' called inside loop body, leading to implicit O(N^2) complexity. ` +
+              'Index data into a Map or Set before iterating.';
+
+        issues.push(
+            createNodeIssue({
+                filePath,
+                sourceFile,
+                node,
+                rule,
+                severity,
+                message,
+                detail: { operation: callText },
+            }),
+        );
     }
 
     /**
@@ -325,7 +419,13 @@ export class PerformanceRuleEvaluator {
                     issues.push(this.createLineComplexityIssue(filePath, i + 1, depth));
                 }
             } else if (loopStack.length > 0) {
-                this.checkIndentedLineIssues(filePath, trimmed, i + 1, ext, issues);
+                this.checkIndentedLineIssues({
+                    filePath,
+                    trimmed,
+                    lineNo: i + 1,
+                    ext,
+                    issues,
+                });
             }
         }
         return issues;
@@ -334,30 +434,21 @@ export class PerformanceRuleEvaluator {
     /**
      * Checks an individual line inside a loop for Python or GDScript violations.
      *
-     * @param filePath - File path.
-     * @param trimmed - Line text.
-     * @param lineNo - 1-based line number.
-     * @param ext - File extension.
-     * @param issues - Mutable issue list.
+     * @param params - Indented line analysis parameter bundle.
      */
-    private checkIndentedLineIssues(
-        filePath: string,
-        trimmed: string,
-        lineNo: number,
-        ext: string,
-        issues: Issue[],
-    ): void {
-        if (ext === '.gd' && trimmed.includes('.duplicate(true)')) {
-            issues.push(this.createLineExpensiveIssue(filePath, lineNo, '.duplicate(true)'));
+    private checkIndentedLineIssues(params: IndentedLineAuditParams): void {
+        const { filePath, trimmed, lineNo, ext, issues } = params;
+        if (ext === '.gd' && trimmed.includes(CALL_DUPLICATE_TRUE)) {
+            issues.push(this.createLineExpensiveIssue(filePath, lineNo, CALL_DUPLICATE_TRUE));
         } else if (ext === '.gd' && /\.new\s*\(/.test(trimmed)) {
             issues.push(
                 this.createLineAllocationIssue(filePath, lineNo, 'class.new() instantiation'),
             );
         } else if (
             ext === '.py' &&
-            (trimmed.includes('copy.deepcopy(') || trimmed.includes('.deepcopy('))
+            (trimmed.includes(CALL_DEEPCOPY_PREFIX) || trimmed.includes(CALL_DEEPCOPY_METHOD))
         ) {
-            issues.push(this.createLineExpensiveIssue(filePath, lineNo, 'copy.deepcopy()'));
+            issues.push(this.createLineExpensiveIssue(filePath, lineNo, CALL_DEEPCOPY_IDENTIFIER));
         } else if (ext === '.py' && /re\.compile\s*\(/.test(trimmed)) {
             issues.push(
                 this.createLineAllocationIssue(filePath, lineNo, 're.compile() compilation'),
@@ -386,7 +477,7 @@ export class PerformanceRuleEvaluator {
                 }
             }
             if (loopLevel > 0) {
-                if (trimmed.includes('.clone()') || trimmed.includes('Box::new(')) {
+                if (trimmed.includes(CALL_CLONE) || trimmed.includes(CALL_BOX_NEW)) {
                     issues.push(
                         this.createLineAllocationIssue(filePath, i + 1, 'clone/Box allocation'),
                     );
@@ -408,22 +499,17 @@ export class PerformanceRuleEvaluator {
         node: ts.Node,
         target: string,
     ): Issue {
-        const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart());
-        return {
-            id: `performance:loop-transient-allocation:${line + 1}:${character + 1}`,
-            analyzer: 'performance',
-            rule: 'loop-transient-allocation',
-            severity: 'warning',
+        return createNodeIssue({
+            filePath,
+            sourceFile,
+            node,
+            rule: RULE_LOOP_TRANSIENT,
+            severity: SEVERITY_WARNING,
             message:
                 `Transient heap allocation (${target}) inside loop body. ` +
                 'Hoist instantiation out of loop or adopt an object pool pattern.',
-            location: {
-                file: filePath,
-                start: { line: line + 1, column: character + 1 },
-                end: { line: line + 1, column: character + 1 },
-            },
             detail: { target },
-        };
+        });
     }
 
     /**
@@ -435,141 +521,70 @@ export class PerformanceRuleEvaluator {
         node: ts.Node,
         depth: number,
     ): Issue {
-        const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart());
-        const severity = depth >= 3 && this.tripleNestingFatal ? 'error' : 'warning';
-        return {
-            id: `performance:high-algorithmic-complexity:${line + 1}:${character + 1}`,
-            analyzer: 'performance',
-            rule: 'high-algorithmic-complexity',
+        const severity = depth >= 3 && this.tripleNestingFatal ? SEVERITY_ERROR : SEVERITY_WARNING;
+        return createNodeIssue({
+            filePath,
+            sourceFile,
+            node,
+            rule: RULE_HIGH_COMPLEXITY,
             severity,
             message:
                 `Nested loop depth ${depth} detected, resulting in potential O(N^${depth}) complexity. ` +
                 'Refactor with indexed data structures (e.g. Map/Set) to lower algorithmic order.',
-            location: {
-                file: filePath,
-                start: { line: line + 1, column: character + 1 },
-                end: { line: line + 1, column: character + 1 },
-            },
             detail: { depth },
-        };
-    }
-
-    /**
-     * Creates an issue for expensive operations from AST node.
-     */
-    private createExpensiveIssue(
-        filePath: string,
-        sourceFile: ts.SourceFile,
-        node: ts.Node,
-        operation: string,
-    ): Issue {
-        const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart());
-        return {
-            id: `performance:expensive-loop-operation:${line + 1}:${character + 1}`,
-            analyzer: 'performance',
-            rule: 'expensive-loop-operation',
-            severity: 'error',
-            message:
-                `Expensive operation '${operation}' inside loop body. ` +
-                'Eliminate redundant deep copying or serialization in hot paths.',
-            location: {
-                file: filePath,
-                start: { line: line + 1, column: character + 1 },
-                end: { line: line + 1, column: character + 1 },
-            },
-            detail: { operation },
-        };
-    }
-
-    /**
-     * Creates an issue for linear scan in loop from AST node.
-     */
-    private createLinearScanIssue(
-        filePath: string,
-        sourceFile: ts.SourceFile,
-        node: ts.Node,
-        operation: string,
-    ): Issue {
-        const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart());
-        return {
-            id: `performance:high-algorithmic-complexity:${line + 1}:${character + 1}`,
-            analyzer: 'performance',
-            rule: 'high-algorithmic-complexity',
-            severity: 'warning',
-            message:
-                `Linear scan method '${operation}' called inside loop body, leading to implicit O(N^2) complexity. ` +
-                'Index data into a Map or Set before iterating.',
-            location: {
-                file: filePath,
-                start: { line: line + 1, column: character + 1 },
-                end: { line: line + 1, column: character + 1 },
-            },
-            detail: { operation },
-        };
+        });
     }
 
     /**
      * Creates a line-based complexity issue.
      */
     private createLineComplexityIssue(filePath: string, line: number, depth: number): Issue {
-        const severity = depth >= 3 && this.tripleNestingFatal ? 'error' : 'warning';
-        return {
-            id: `performance:high-algorithmic-complexity:${line}:1`,
-            analyzer: 'performance',
-            rule: 'high-algorithmic-complexity',
+        const severity = depth >= 3 && this.tripleNestingFatal ? SEVERITY_ERROR : SEVERITY_WARNING;
+        return buildPerformanceIssue({
+            filePath,
+            rule: RULE_HIGH_COMPLEXITY,
             severity,
+            line,
+            column: 1,
             message:
                 `Nested loop depth ${depth} detected. ` +
                 `Potential O(N^${depth}) complexity hotspot.`,
-            location: {
-                file: filePath,
-                start: { line, column: 1 },
-                end: { line, column: 1 },
-            },
             detail: { depth },
-        };
+        });
     }
 
     /**
      * Creates a line-based transient allocation issue.
      */
     private createLineAllocationIssue(filePath: string, line: number, target: string): Issue {
-        return {
-            id: `performance:loop-transient-allocation:${line}:1`,
-            analyzer: 'performance',
-            rule: 'loop-transient-allocation',
-            severity: 'warning',
+        return buildPerformanceIssue({
+            filePath,
+            rule: RULE_LOOP_TRANSIENT,
+            severity: SEVERITY_WARNING,
+            line,
+            column: 1,
             message:
                 `Transient heap allocation (${target}) inside loop body. ` +
                 'Violates zero transient allocation contract in hot paths.',
-            location: {
-                file: filePath,
-                start: { line, column: 1 },
-                end: { line, column: 1 },
-            },
             detail: { target },
-        };
+        });
     }
 
     /**
      * Creates a line-based expensive operation issue.
      */
     private createLineExpensiveIssue(filePath: string, line: number, operation: string): Issue {
-        return {
-            id: `performance:expensive-loop-operation:${line}:1`,
-            analyzer: 'performance',
-            rule: 'expensive-loop-operation',
-            severity: 'error',
+        return buildPerformanceIssue({
+            filePath,
+            rule: RULE_EXPENSIVE_LOOP,
+            severity: SEVERITY_ERROR,
+            line,
+            column: 1,
             message:
                 `Prohibited expensive operation '${operation}' in loop. ` +
                 'Deep duplication or heavy cloning inside loops is forbidden.',
-            location: {
-                file: filePath,
-                start: { line, column: 1 },
-                end: { line, column: 1 },
-            },
             detail: { operation },
-        };
+        });
     }
 }
 

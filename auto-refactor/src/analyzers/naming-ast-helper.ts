@@ -22,22 +22,58 @@ import type {
     NamingDecouplingAuditor,
     SymbolEntry,
 } from '../core/architecture/naming-decoupling-auditor';
+import { ANALYZER_NAMING } from '../core/scoring/dimensionLiterals';
 import { hasTransientJargon } from './naming-path-helper';
 import type { NamingOptions } from './naming';
 
 /**
- * Factory callback signature to construct normalized issue findings.
+ * Context object carrying state for TypeScript AST naming audits.
  */
-export type IssueFactory = (
-    ctx: AnalyzerContext,
-    line: number,
-    column: number,
-    rule: string,
-    message: string,
-    severity: Severity,
-    detail: Record<string, unknown>,
-    suggestion?: string,
-) => Issue;
+export interface AstNamingContext {
+    readonly ctx: AnalyzerContext;
+    readonly opts: NamingOptions;
+    readonly issues: Issue[];
+    readonly sf: ts.SourceFile;
+    readonly vagueSet?: Set<string>;
+    readonly singleAllowed?: Set<string>;
+    readonly symbols?: SymbolEntry[];
+}
+
+/**
+ * Structured diagnostic payload for AST naming findings.
+ */
+export interface AstFindingInput {
+    readonly line: number;
+    readonly column: number;
+    readonly rule: string;
+    readonly message: string;
+    readonly severity?: Severity;
+    readonly detail?: Record<string, unknown>;
+    readonly suggestion?: string;
+}
+
+/**
+ * Emits a structured diagnostic issue directly to the issue accumulator.
+ */
+function pushAstFinding(aCtx: AstNamingContext, finding: AstFindingInput): void {
+    const col = finding.column ?? 1;
+    const sev = finding.severity ?? SEVERITY_WARNING;
+    const det = finding.detail ?? {};
+    aCtx.issues.push({
+        id: `naming:${finding.rule}:${aCtx.ctx.filePath}:${finding.line}`,
+        analyzer: ANALYZER_NAMING,
+        rule: finding.rule,
+        severity: sev,
+        message: finding.message,
+        location: {
+            file: aCtx.ctx.filePath,
+            start: { line: Math.max(1, finding.line), column: Math.max(1, col) },
+            end: { line: Math.max(1, finding.line), column: Math.max(1, col) },
+        },
+        detail: det,
+        suggestion: finding.suggestion,
+    });
+}
 
 const DEFAULT_VAGUE_WORDS =
     'data temp tmp val value res result ret obj item info param arg foo bar baz thing';
@@ -76,11 +112,10 @@ export const DEFAULT_SINGLE_LETTER_ALLOWED = new Set([
 ]);
 
 const CAMEL_TO_SNAKE_PATTERN = '$1_$2';
+const JARGON_PATTERN = '\\b(p[0-9]+|phase[\\s_-]*[0-9]+|st[\\s_-]*[0-9]+|temp|tmp|w' + 'ip)\\b';
+const REGEX_IGNORE_CASE = 'i';
 
-const TEST_TITLE_JARGON_RE = new RegExp(
-    '\\b(p[0-9]+|phase[\\s_-]*[0-9]+|st[\\s_-]*[0-9]+|temp|tmp|w' + 'ip)\\b',
-    'i',
-);
+const TEST_TITLE_JARGON_RE = new RegExp(JARGON_PATTERN, REGEX_IGNORE_CASE);
 
 const TEST_RUNNER_FUNCTIONS = new Set(['describe', 'it', 'test', 'suite']);
 
@@ -90,17 +125,13 @@ const TEST_RUNNER_FUNCTIONS = new Set(['describe', 'it', 'test', 'suite']);
  * @param decl - AST variable declaration node.
  * @param name - Variable identifier name.
  * @param pos - Source position line and character coordinates.
- * @param ctx - Execution analysis context.
- * @param issueFactory - Factory callback to construct normalized issues.
- * @param issues - Output issues collection.
+ * @param aCtx - AST naming traversal context.
  */
 export function checkTopLevelConstantHelper(
     decl: ts.VariableDeclaration,
     name: string,
     pos: ts.LineAndCharacter,
-    ctx: AnalyzerContext,
-    issueFactory: IssueFactory,
-    issues: Issue[],
+    aCtx: AstNamingContext,
 ): void {
     if (!decl.initializer) return;
     const init = decl.initializer;
@@ -116,18 +147,15 @@ export function checkTopLevelConstantHelper(
     }
 
     const suggestionName = name.replace(/([a-z0-9])([A-Z])/g, CAMEL_TO_SNAKE_PATTERN).toUpperCase();
-    issues.push(
-        issueFactory(
-            ctx,
-            pos.line + 1,
-            pos.character + 1,
-            'NAM-GLB-001',
-            `Top-level constant '${name}' should follow UPPER_SNAKE_CASE naming convention.`,
-            SEVERITY_WARNING,
-            { name },
-            `Rename '${name}' to an uppercase snake_case constant (e.g. '${suggestionName}').`,
-        ),
-    );
+    pushAstFinding(aCtx, {
+        line: pos.line + 1,
+        column: pos.character + 1,
+        rule: 'NAM-GLB-001',
+        message: `Top-level constant '${name}' should follow UPPER_SNAKE_CASE naming convention.`,
+        severity: SEVERITY_WARNING,
+        detail: { name },
+        suggestion: `Rename '${name}' to an uppercase snake_case constant (e.g. '${suggestionName}').`,
+    });
 }
 
 /**
@@ -135,21 +163,17 @@ export function checkTopLevelConstantHelper(
  *
  * @param node - AST call expression node.
  * @param sf - Source file representation.
- * @param ctx - Execution analysis context.
- * @param issueFactory - Factory callback to construct normalized issues.
- * @param issues - Output issues collection.
+ * @param aCtx - AST naming traversal context.
  */
 export function checkCallExpressionJargonHelper(
     node: ts.CallExpression,
     sf: ts.SourceFile,
-    ctx: AnalyzerContext,
-    issueFactory: IssueFactory,
-    issues: Issue[],
+    aCtx: AstNamingContext,
 ): void {
     if (!ts.isIdentifier(node.expression) || !TEST_RUNNER_FUNCTIONS.has(node.expression.text)) {
         return;
     }
-    const arg0 = node.arguments[0];
+    const [arg0] = node.arguments;
     if (!arg0 || (!ts.isStringLiteral(arg0) && !ts.isNoSubstitutionTemplateLiteral(arg0))) {
         return;
     }
@@ -157,18 +181,15 @@ export function checkCallExpressionJargonHelper(
         return;
     }
     const pos = sf.getLineAndCharacterOfPosition(arg0.getStart(sf));
-    issues.push(
-        issueFactory(
-            ctx,
-            pos.line + 1,
-            pos.character + 1,
-            'NAM-JRG-002',
-            `Test title '${arg0.text}' contains transient construction jargon or milestone marker.`,
-            SEVERITY_WARNING,
-            { title: arg0.text },
-            'Remove transient process markers from test description.',
-        ),
-    );
+    pushAstFinding(aCtx, {
+        line: pos.line + 1,
+        column: pos.character + 1,
+        rule: 'NAM-JRG-002',
+        message: `Test title '${arg0.text}' contains transient construction jargon or milestone marker.`,
+        severity: SEVERITY_WARNING,
+        detail: { title: arg0.text },
+        suggestion: 'Remove transient process markers from test description.',
+    });
 }
 
 /**
@@ -176,32 +197,25 @@ export function checkCallExpressionJargonHelper(
  *
  * @param name - Identifier string to inspect.
  * @param pos - Source position line and character coordinates.
- * @param ctx - Execution analysis context.
- * @param issueFactory - Factory callback to construct normalized issues.
- * @param issues - Output issues collection.
+ * @param aCtx - AST naming traversal context.
  */
 export function checkSymbolJargonHelper(
     name: string,
     pos: ts.LineAndCharacter,
-    ctx: AnalyzerContext,
-    issueFactory: IssueFactory,
-    issues: Issue[],
+    aCtx: AstNamingContext,
 ): void {
     if (!hasTransientJargon(name)) {
         return;
     }
-    issues.push(
-        issueFactory(
-            ctx,
-            pos.line + 1,
-            pos.character + 1,
-            'NAM-JRG-002',
-            `Symbol or test identifier '${name}' contains transient construction jargon or milestone marker.`,
-            SEVERITY_WARNING,
-            { name },
-            'Replace transient process markers with semantic domain naming.',
-        ),
-    );
+    pushAstFinding(aCtx, {
+        line: pos.line + 1,
+        column: pos.character + 1,
+        rule: 'NAM-JRG-002',
+        message: `Symbol or test identifier '${name}' contains transient construction jargon or milestone marker.`,
+        severity: SEVERITY_WARNING,
+        detail: { name },
+        suggestion: 'Replace transient process markers with semantic domain naming.',
+    });
 }
 
 /**
@@ -209,36 +223,26 @@ export function checkSymbolJargonHelper(
  *
  * @param name - Identifier name to audit.
  * @param pos - Source position line and character coordinates.
- * @param vagueSet - Set of uninformative identifier terms.
- * @param ctx - Execution analysis context.
- * @param opts - Naming analyzer configuration options.
- * @param issueFactory - Factory callback to construct normalized issues.
- * @param issues - Output issues collection.
+ * @param aCtx - AST naming traversal context.
  */
 export function checkIdentifierVaguenessHelper(
     name: string,
     pos: ts.LineAndCharacter,
-    vagueSet: Set<string>,
-    ctx: AnalyzerContext,
-    opts: NamingOptions,
-    issueFactory: IssueFactory,
-    issues: Issue[],
+    aCtx: AstNamingContext,
 ): void {
-    if (opts.checkVagueNames === false || !vagueSet.has(name.toLowerCase())) {
+    const vagueSet = aCtx.vagueSet ?? DEFAULT_VAGUE_BLACKLIST;
+    if (aCtx.opts.checkVagueNames === false || !vagueSet.has(name.toLowerCase())) {
         return;
     }
-    issues.push(
-        issueFactory(
-            ctx,
-            pos.line + 1,
-            pos.character + 1,
-            'NAM-VAG-001',
-            `Identifier '${name}' is vague and uninformative; lacks domain context.`,
-            SEVERITY_WARNING,
-            { name },
-            `Replace '${name}' with a domain-qualified identifier (e.g. 'parseResult', 'userData', 'tokenPayload').`,
-        ),
-    );
+    pushAstFinding(aCtx, {
+        line: pos.line + 1,
+        column: pos.character + 1,
+        rule: 'NAM-VAG-001',
+        message: `Identifier '${name}' is vague and uninformative; lacks domain context.`,
+        severity: SEVERITY_WARNING,
+        detail: { name },
+        suggestion: `Replace '${name}' with a domain-qualified identifier (e.g. 'parseResult', 'userData', 'tokenPayload').`,
+    });
 }
 
 /**
@@ -247,38 +251,28 @@ export function checkIdentifierVaguenessHelper(
  * @param name - Variable identifier name.
  * @param pos - Source position line and character coordinates.
  * @param inLoop - True if variable is declared inside loop scope.
- * @param singleAllowed - Whitelisted single-letter loop variable identifiers.
- * @param ctx - Execution analysis context.
- * @param opts - Naming analyzer configuration options.
- * @param issueFactory - Factory callback to construct normalized issues.
- * @param issues - Output issues collection.
+ * @param aCtx - AST naming traversal context.
  */
 export function checkSingleLetterHelper(
     name: string,
     pos: ts.LineAndCharacter,
     inLoop: boolean,
-    singleAllowed: Set<string>,
-    ctx: AnalyzerContext,
-    opts: NamingOptions,
-    issueFactory: IssueFactory,
-    issues: Issue[],
+    aCtx: AstNamingContext,
 ): void {
-    if (opts.checkSingleLetters === false) return;
+    if (aCtx.opts.checkSingleLetters === false) return;
     if (name.length !== 1 || !/^[a-zA-Z]$/.test(name)) return;
+    const singleAllowed = aCtx.singleAllowed ?? DEFAULT_SINGLE_LETTER_ALLOWED;
     if (name === '_' || (inLoop && singleAllowed.has(name))) return;
 
-    issues.push(
-        issueFactory(
-            ctx,
-            pos.line + 1,
-            pos.character + 1,
-            'NAM-SGL-001',
-            `Single-letter variable name '${name}' hurts code readability.`,
-            SEVERITY_WARNING,
-            { name, inLoop },
-            `Replace '${name}' with a meaningful descriptive name; only loop indices ('i','j','k') and '_' are tolerated.`,
-        ),
-    );
+    pushAstFinding(aCtx, {
+        line: pos.line + 1,
+        column: pos.character + 1,
+        rule: 'NAM-SGL-001',
+        message: `Single-letter variable name '${name}' hurts code readability.`,
+        severity: SEVERITY_WARNING,
+        detail: { name, inLoop },
+        suggestion: `Replace '${name}' with a meaningful descriptive name; only loop indices ('i','j','k') and '_' are tolerated.`,
+    });
 }
 
 /**
@@ -287,21 +281,15 @@ export function checkSingleLetterHelper(
  * @param name - Identifier name of collection variable.
  * @param init - Optional initializer expression node.
  * @param pos - Source position line and character coordinates.
- * @param ctx - Execution analysis context.
- * @param opts - Naming analyzer configuration options.
- * @param issueFactory - Factory callback to construct normalized issues.
- * @param issues - Output issues collection.
+ * @param aCtx - AST naming traversal context.
  */
 export function checkCollectionNamingHelper(
     name: string,
     init: ts.Expression | undefined,
     pos: ts.LineAndCharacter,
-    ctx: AnalyzerContext,
-    opts: NamingOptions,
-    issueFactory: IssueFactory,
-    issues: Issue[],
+    aCtx: AstNamingContext,
 ): void {
-    if (opts.checkCollections === false || !init) return;
+    if (aCtx.opts.checkCollections === false || !init) return;
     if (!ts.isNewExpression(init) || !init.expression || !ts.isIdentifier(init.expression)) {
         return;
     }
@@ -310,18 +298,15 @@ export function checkCollectionNamingHelper(
         return;
     }
 
-    issues.push(
-        issueFactory(
-            ctx,
-            pos.line + 1,
-            pos.character + 1,
-            'NAM-COL-001',
-            `Map '${name}' should describe key-value relation in its name.`,
-            SEVERITY_INFO,
-            { name },
-            `Rename Map to express relationship (e.g. '${name}ById', '${name}ToTarget', or '${name}Map').`,
-        ),
-    );
+    pushAstFinding(aCtx, {
+        line: pos.line + 1,
+        column: pos.character + 1,
+        rule: 'NAM-COL-001',
+        message: `Map '${name}' should describe key-value relation in its name.`,
+        severity: SEVERITY_INFO,
+        detail: { name },
+        suggestion: `Rename '${name}' to describe key-value relationship (e.g. '${name}ByKey', '${name}ToValue').`,
+    });
 }
 
 /**
@@ -329,20 +314,16 @@ export function checkCollectionNamingHelper(
  *
  * @param discoveredSymbols - Collection of discovered symbols in file.
  * @param decouplingAuditor - Auditor instance evaluating decoupling clusters.
- * @param ctx - Execution analysis context.
- * @param issueFactory - Factory callback to construct normalized issues.
- * @param issues - Output issues collection.
+ * @param aCtx - AST naming traversal context.
  */
 export function auditDecouplingClustersHelper(
     discoveredSymbols: SymbolEntry[],
     decouplingAuditor: NamingDecouplingAuditor,
-    ctx: AnalyzerContext,
-    issueFactory: IssueFactory,
-    issues: Issue[],
+    aCtx: AstNamingContext,
 ): void {
     const clusterFindings = decouplingAuditor.auditClusters(discoveredSymbols);
     const flaggedDecouplingSymbols = new Set<string>();
-    for (const issue of issues) {
+    for (const issue of aCtx.issues) {
         if (issue.rule === 'NAM-DEC-001') {
             const sym = (issue.detail as Record<string, unknown>)?.symbol;
             if (typeof sym === 'string') {
@@ -354,25 +335,22 @@ export function auditDecouplingClustersHelper(
     for (const finding of clusterFindings) {
         if (!flaggedDecouplingSymbols.has(finding.symbol)) {
             flaggedDecouplingSymbols.add(finding.symbol);
-            issues.push(
-                issueFactory(
-                    ctx,
-                    finding.line,
-                    finding.column,
-                    'NAM-DEC-001',
-                    finding.message,
-                    SEVERITY_WARNING,
-                    {
-                        symbol: finding.symbol,
-                        length: finding.length,
-                        segments: finding.segments,
-                        suggestedDomainDirectory: finding.suggestedDomainDirectory,
-                        suggestedSymbol: finding.suggestedSymbol,
-                        actionableProposal: finding.actionableProposal,
-                    },
-                    finding.actionableProposal.rationale,
-                ),
-            );
+            pushAstFinding(aCtx, {
+                line: finding.line,
+                column: finding.column,
+                rule: 'NAM-DEC-001',
+                message: finding.message,
+                severity: SEVERITY_WARNING,
+                detail: {
+                    symbol: finding.symbol,
+                    length: finding.length,
+                    segments: finding.segments,
+                    suggestedDomainDirectory: finding.suggestedDomainDirectory,
+                    suggestedSymbol: finding.suggestedSymbol,
+                    actionableProposal: finding.actionableProposal,
+                },
+                suggestion: finding.actionableProposal.rationale,
+            });
         }
     }
 }
@@ -435,6 +413,8 @@ export function isScalarLiteral(expr: ts.Expression): boolean {
     return SCALAR_SYNTAX_KINDS.has(unwrapped.kind);
 }
 
+const MAX_SIMPLE_ARROW_LINES = 4;
+
 /**
  * Checks whether an AST node is a single-line or single-expression arrow function.
  *
@@ -447,5 +427,5 @@ export function isSimpleArrowFunction(node: ts.Node, sf: ts.SourceFile): boolean
     if (!ts.isBlock(node.body) || node.body.statements.length <= 1) return true;
     const startLine = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line;
     const endLine = sf.getLineAndCharacterOfPosition(node.getEnd()).line;
-    return endLine - startLine <= 4;
+    return endLine - startLine <= MAX_SIMPLE_ARROW_LINES;
 }

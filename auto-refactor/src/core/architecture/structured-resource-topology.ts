@@ -3,11 +3,72 @@
  * File Path: src/core/architecture/structured-resource-topology.ts
  * Architecture Role: Evaluates naming hierarchy, dynamic scale thresholds, semantic volume,
  *   caller inverted index, multi-modal cohesion, Tarjan SCC decomposition, and risk.
- * Dependencies & Triggers: Consumes internal typing and utility functions.
+ * Dependencies & Triggers: Consumes internal typing and utility functions;
+ *   consumed by NamingAnalyzer.
  * Responsibilities: Enforce architectural resource topology and scale-adaptive rules.
  * Exit Semantics & Design Rationale: Pure architectural analysis engine. Cyclomatic complexity
  *   is strictly bounded (CC <= 10 per function) with full mathematical invariances.
  */
+
+/** Maximum allowed token depth before hierarchy is flagged. */
+export const MAX_HIERARCHY_DEPTH = 3;
+
+/** Maximum length of a resource basename before being flagged as over-descriptive. */
+export const MAX_DESCRIPTIVE_NAME_LENGTH = 45;
+
+/** Minimum core ELOC floor for log10 scaling. */
+export const CORE_ELOC_MIN_FLOOR = 10;
+
+/** Base omnibus capacity scaling multiplier. */
+export const OMNIBUS_BASE_CAPACITY = 120;
+
+/** Lower bound for omnibus capacity threshold in lines. */
+export const OMNIBUS_MIN_CAPACITY = 60;
+
+/** Scaling factor for percentage rounding. */
+export const PERCENT_ROUNDING_SCALE = 100;
+
+/** Scaling factor for three-decimal rounding. */
+export const COHESION_ROUNDING_SCALE = 1000;
+
+/** Severity constant for warning findings. */
+export const SEVERITY_WARNING = 'warning' as const;
+
+/** Severity constant for info findings. */
+export const SEVERITY_INFO = 'info' as const;
+
+/** Minimum ELOC threshold for fragmented resources. */
+export const MIN_FRAGMENT_ELOC = 15;
+
+/** Minimum Semantic Volume threshold for fragmented resources. */
+export const MIN_FRAGMENT_SV = 30;
+
+/** Scale factor multiplier for semantic volume over-capacity. */
+export const SV_OVER_CAPACITY_FACTOR = 1.5;
+
+/** Node archetype string constants. */
+const TYPE_PURE = 'pure-type';
+const TYPE_HIGH_LAYER = 'high-layer';
+const TYPE_RUNTIME_INSTANCE = 'runtime-instance';
+const TYPE_EVENT = 'event';
+const TYPE_STRATEGY = 'strategy';
+const TYPE_SMALL_LEAF = 'small-leaf';
+
+/** Architectural strategy recommended to break a strongly connected cycle. */
+export type SccResolutionStrategy =
+    | 'TYPE_SINKING'
+    | 'INTERFACE_INVERSION'
+    | 'DEPENDENCY_INJECTION'
+    | 'EVENT_DECOUPLING'
+    | 'REGISTRY_EXTRACTION'
+    | 'RE_MERGING';
+
+const STRATEGY_TYPE_SINKING: SccResolutionStrategy = 'TYPE_SINKING';
+const STRATEGY_INTERFACE_INVERSION: SccResolutionStrategy = 'INTERFACE_INVERSION';
+const STRATEGY_DEPENDENCY_INJECTION: SccResolutionStrategy = 'DEPENDENCY_INJECTION';
+const STRATEGY_EVENT_DECOUPLING: SccResolutionStrategy = 'EVENT_DECOUPLING';
+const STRATEGY_REGISTRY_EXTRACTION: SccResolutionStrategy = 'REGISTRY_EXTRACTION';
+const STRATEGY_RE_MERGING: SccResolutionStrategy = 'RE_MERGING';
 
 /** Structured breakdown of a resource file path and name. */
 export interface StructuredResourceNamingParts {
@@ -98,9 +159,10 @@ export function parseStructuredResourceNaming(fileName: string): StructuredResou
     const baseType = isRecognized ? firstLower : tokens[0];
     const domain = tokens.length > 1 ? tokens[1] : null;
     const subdomain = tokens.length > 2 ? tokens[2] : null;
-    const extraParts = tokens.length > 3 ? tokens.slice(3) : [];
-    const depth = isRecognized ? Math.min(tokens.length, 3) : 1;
-    const isOverDescriptive = tokens.length > 3 || baseName.length > 45;
+    const extraParts = tokens.length > MAX_HIERARCHY_DEPTH ? tokens.slice(MAX_HIERARCHY_DEPTH) : [];
+    const depth = isRecognized ? Math.min(tokens.length, MAX_HIERARCHY_DEPTH) : 1;
+    const isOverDescriptive =
+        tokens.length > MAX_HIERARCHY_DEPTH || baseName.length > MAX_DESCRIPTIVE_NAME_LENGTH;
 
     return {
         baseType,
@@ -146,52 +208,74 @@ export function calculateSnapshotCoreELOC(
  * @param densityPrior - Language density prior.
  * @returns Omnibus capacity threshold in ELOC.
  */
-export function calculateOmnibusCapacityThreshold(
+export function computeOmnibusCapacity(
     language: string,
     coreELOC: number,
     densityPrior: number = 1.0,
 ): number {
+    void language;
     const effectiveDensity = Math.max(0.5, densityPrior);
-    const scaleFactor = Math.log10(Math.max(10, coreELOC));
-    const baseCapacity = 120 * effectiveDensity * scaleFactor;
-    return Math.max(60, Math.round(baseCapacity));
+    const scaleFactor = Math.log10(Math.max(CORE_ELOC_MIN_FLOOR, coreELOC));
+    const baseCapacity = OMNIBUS_BASE_CAPACITY * effectiveDensity * scaleFactor;
+    return Math.max(OMNIBUS_MIN_CAPACITY, Math.round(baseCapacity));
+}
+
+/** Backward compatible alias for computeOmnibusCapacity. */
+export const calculateOmnibusCapacityThreshold = computeOmnibusCapacity;
+
+/** Input metrics bundle for semantic volume calculation. */
+export interface SemanticVolumeMetrics {
+    readonly eloc: number;
+    readonly astNodeCount: number;
+    readonly symbolCount: number;
+    readonly literalCount: number;
+    readonly astDepth: number;
 }
 
 /**
  * Calculates Semantic Volume (SV) against line-packing/minification evasion.
+ * Supports both object bundle and legacy positional scalar signatures.
  *
- * @param eloc - Effective logic lines.
- * @param astNodeCount - Total AST node count.
- * @param symbolCount - Declared symbol count.
- * @param literalCount - Total literal count.
- * @param astDepth - Maximum AST depth.
- * @param weights - Semantic volume weights.
+ * @param args - Either [metrics, weights] or positional scalar parameters.
  * @returns Semantic volume score.
  */
 export function calculateSemanticVolume(
-    eloc: number,
-    astNodeCount: number,
-    symbolCount: number,
-    literalCount: number,
-    astDepth: number,
-    weights: SemanticVolumeWeights = DEFAULT_SV_WEIGHTS,
+    ...args:
+        | [metrics: SemanticVolumeMetrics, weights?: SemanticVolumeWeights]
+        | [
+              eloc: number,
+              astNodeCount: number,
+              symbolCount: number,
+              literalCount: number,
+              astDepth: number,
+              weights?: SemanticVolumeWeights,
+          ]
 ): number {
+    if (typeof args[0] === 'object') {
+        const [first, maybeWeights] = args as [SemanticVolumeMetrics, SemanticVolumeWeights?];
+        const weights = maybeWeights ?? DEFAULT_SV_WEIGHTS;
+        const rawSV =
+            weights.we * first.eloc +
+            weights.wa * first.astNodeCount +
+            weights.ws * first.symbolCount +
+            weights.wl * first.literalCount +
+            weights.wd * first.astDepth;
+        return Math.round(rawSV * PERCENT_ROUNDING_SCALE) / PERCENT_ROUNDING_SCALE;
+    }
+    const [eloc, astNodeCount, symbolCount, literalCount, astDepth, weights = DEFAULT_SV_WEIGHTS] =
+        args as [number, number, number, number, number, SemanticVolumeWeights?];
     const rawSV =
         weights.we * eloc +
         weights.wa * astNodeCount +
         weights.ws * symbolCount +
         weights.wl * literalCount +
         weights.wd * astDepth;
-    return Math.round(rawSV * 100) / 100;
+    return Math.round(rawSV * PERCENT_ROUNDING_SCALE) / PERCENT_ROUNDING_SCALE;
 }
 
-/**
- * Inverted caller index builder and sparse candidate graph generator.
- * Time Complexity: O(|E_s|) where |E_s| = sum(|I(c)|^2) << |S|^2.
- *
- * @param callerImports - File import dependency entries.
- * @returns Sparse caller graph with inverted index.
- */
+/** Backward compatible alias for calculateSemanticVolume. */
+export const computeSemanticVolume = calculateSemanticVolume;
+
 /**
  * Records pairwise co-occurrence counts into an accumulator index.
  * Encapsulates the O(|I(c)|^2) local matrix traversal to reduce loop depth to 2.
@@ -208,9 +292,9 @@ function recordPairCoOccurrences(
         const firstSymbol = importedSymbols[i];
         for (let j = i + 1; j < symbolCount; j++) {
             const secondSymbol = importedSymbols[j];
-            const u = firstSymbol < secondSymbol ? firstSymbol : secondSymbol;
-            const v = firstSymbol < secondSymbol ? secondSymbol : firstSymbol;
-            const pairKey = `${u}::${v}`;
+            const smallerSymbol = firstSymbol < secondSymbol ? firstSymbol : secondSymbol;
+            const largerSymbol = firstSymbol < secondSymbol ? secondSymbol : firstSymbol;
+            const pairKey = `${smallerSymbol}::${largerSymbol}`;
             coOccurrenceMap.set(pairKey, (coOccurrenceMap.get(pairKey) ?? 0) + 1);
         }
     }
@@ -219,21 +303,21 @@ function recordPairCoOccurrences(
 /**
  * Appends a caller path to the inverted symbol index, allocating a bucket only on first encounter.
  *
- * @param inverted - Inverted symbol index map.
- * @param sym - Symbol identifier.
+ * @param invertedCallersMap - Inverted symbol index map.
+ * @param symbolName - Symbol identifier.
  * @param callerPath - Caller path importing the symbol.
  */
-function appendInvertedCaller(
-    inverted: Map<string, string[]>,
-    sym: string,
+function addInvertedCaller(
+    invertedCallersMap: Map<string, string[]>,
+    symbolName: string,
     callerPath: string,
 ): void {
-    const list = inverted.get(sym);
-    if (list !== undefined) {
-        list.push(callerPath);
+    const callers = invertedCallersMap.get(symbolName);
+    if (callers !== undefined) {
+        callers.push(callerPath);
         return;
     }
-    inverted.set(sym, [callerPath]);
+    invertedCallersMap.set(symbolName, [callerPath]);
 }
 
 /**
@@ -251,63 +335,85 @@ export function buildSparseCallerGraph(
     readonly invertedIndex: ReadonlyMap<string, readonly string[]>;
     readonly sparseEdges: readonly [string, string, number][];
 } {
-    const inverted = new Map<string, string[]>();
+    const invertedCallersMap = new Map<string, string[]>();
     for (const entry of callerImports) {
         for (const sym of entry.importedSymbols) {
-            appendInvertedCaller(inverted, sym, entry.callerPath);
+            addInvertedCaller(invertedCallersMap, sym, entry.callerPath);
         }
     }
 
-    const coOccurrence = new Map<string, number>();
+    const coOccurrenceMap = new Map<string, number>();
     for (const entry of callerImports) {
-        recordPairCoOccurrences(entry.importedSymbols, coOccurrence);
+        recordPairCoOccurrences(entry.importedSymbols, coOccurrenceMap);
     }
 
     const sparseEdges: [string, string, number][] = [];
-    for (const [key, weight] of coOccurrence.entries()) {
-        const [u, v] = key.split('::');
-        sparseEdges.push([u, v, weight]);
+    for (const [key, weight] of coOccurrenceMap.entries()) {
+        const [firstSym, secondSym] = key.split('::');
+        sparseEdges.push([firstSym, secondSym, weight]);
     }
 
-    return { invertedIndex: inverted, sparseEdges };
+    return { invertedIndex: invertedCallersMap, sparseEdges };
+}
+
+/** Multi-modal cohesion factors input bundle. */
+export interface MultiModalCohesionFactors {
+    readonly nameJaccard: number;
+    readonly typeAffinity: number;
+    readonly callerOverlap: number;
+    readonly domainPurity: number;
+    readonly historyCovariance: number;
 }
 
 /**
  * Multi-modal semantic cohesion calculator.
+ * Supports both object bundle and legacy positional scalar signatures.
  *
- * @param nameJaccard - Identifier Jaccard similarity.
- * @param typeAffinity - Type graph affinity score.
- * @param callerOverlap - Inverted caller overlap ratio.
- * @param domainPurity - Domain co-location purity.
- * @param historyCovariance - Commit co-change history covariance.
- * @param weights - Multi-modal cohesion weights.
+ * @param args - Either [factors, weights] or positional scalar parameters.
  * @returns Composite cohesion score.
  */
 export function calculateMultiModalCohesion(
-    nameJaccard: number,
-    typeAffinity: number,
-    callerOverlap: number,
-    domainPurity: number,
-    historyCovariance: number,
-    weights: CohesionWeights = DEFAULT_COHESION_WEIGHTS,
+    ...args:
+        | [factors: MultiModalCohesionFactors, weights?: CohesionWeights]
+        | [
+              nameJaccard: number,
+              typeAffinity: number,
+              callerOverlap: number,
+              domainPurity: number,
+              historyCovariance: number,
+              weights?: CohesionWeights,
+          ]
 ): number {
+    if (typeof args[0] === 'object') {
+        const [first, maybeWeights] = args as [MultiModalCohesionFactors, CohesionWeights?];
+        const weights = maybeWeights ?? DEFAULT_COHESION_WEIGHTS;
+        const score =
+            weights.wn * Math.max(0, Math.min(1, first.nameJaccard)) +
+            weights.wt * Math.max(0, Math.min(1, first.typeAffinity)) +
+            weights.wc * Math.max(0, Math.min(1, first.callerOverlap)) +
+            weights.wd * Math.max(0, Math.min(1, first.domainPurity)) +
+            weights.wh * Math.max(0, Math.min(1, first.historyCovariance));
+        return Math.round(score * COHESION_ROUNDING_SCALE) / COHESION_ROUNDING_SCALE;
+    }
+    const [
+        nameJaccard,
+        typeAffinity,
+        callerOverlap,
+        domainPurity,
+        historyCovariance,
+        weights = DEFAULT_COHESION_WEIGHTS,
+    ] = args as [number, number, number, number, number, CohesionWeights?];
     const score =
         weights.wn * Math.max(0, Math.min(1, nameJaccard)) +
         weights.wt * Math.max(0, Math.min(1, typeAffinity)) +
         weights.wc * Math.max(0, Math.min(1, callerOverlap)) +
         weights.wd * Math.max(0, Math.min(1, domainPurity)) +
         weights.wh * Math.max(0, Math.min(1, historyCovariance));
-    return Math.round(score * 1000) / 1000;
+    return Math.round(score * COHESION_ROUNDING_SCALE) / COHESION_ROUNDING_SCALE;
 }
 
-/** Architectural strategy recommended to break a strongly connected cycle. */
-export type SccResolutionStrategy =
-    | 'TYPE_SINKING'
-    | 'INTERFACE_INVERSION'
-    | 'DEPENDENCY_INJECTION'
-    | 'EVENT_DECOUPLING'
-    | 'REGISTRY_EXTRACTION'
-    | 'RE_MERGING';
+/** Backward compatible alias for calculateMultiModalCohesion. */
+export const computeMultiModalCohesion = calculateMultiModalCohesion;
 
 /** Diagnostic report containing discovered SCC cycle components and remedies. */
 export interface SccCycleDiagnosis {
@@ -330,45 +436,51 @@ class TarjanSccComputer {
 
     constructor(private readonly adjList: ReadonlyMap<string, readonly string[]>) {}
 
-    compute(): string[][] {
+    computeCycleComponents(): string[][] {
         for (const node of this.adjList.keys()) {
             if (!this.indices.has(node)) {
-                this.strongConnect(node);
+                this.computeStrongConnect(node);
             }
         }
         return this.sccs;
     }
 
-    private strongConnect(v: string): void {
-        this.indices.set(v, this.index);
-        this.lowlink.set(v, this.index);
+    private computeStrongConnect(nodeId: string): void {
+        this.indices.set(nodeId, this.index);
+        this.lowlink.set(nodeId, this.index);
         this.index++;
-        this.stack.push(v);
-        this.onStack.add(v);
+        this.stack.push(nodeId);
+        this.onStack.add(nodeId);
 
-        const neighbors = this.adjList.get(v) ?? [];
-        for (const w of neighbors) {
-            if (!this.indices.has(w)) {
-                this.strongConnect(w);
-                this.lowlink.set(v, Math.min(this.lowlink.get(v)!, this.lowlink.get(w)!));
-            } else if (this.onStack.has(w)) {
-                this.lowlink.set(v, Math.min(this.lowlink.get(v)!, this.indices.get(w)!));
+        const neighbors = this.adjList.get(nodeId) ?? [];
+        for (const neighborNode of neighbors) {
+            if (!this.indices.has(neighborNode)) {
+                this.computeStrongConnect(neighborNode);
+                this.lowlink.set(
+                    nodeId,
+                    Math.min(this.lowlink.get(nodeId)!, this.lowlink.get(neighborNode)!),
+                );
+            } else if (this.onStack.has(neighborNode)) {
+                this.lowlink.set(
+                    nodeId,
+                    Math.min(this.lowlink.get(nodeId)!, this.indices.get(neighborNode)!),
+                );
             }
         }
 
-        if (this.lowlink.get(v) === this.indices.get(v)) {
-            this.popComponent(v);
+        if (this.lowlink.get(nodeId) === this.indices.get(nodeId)) {
+            this.popComponent(nodeId);
         }
     }
 
-    private popComponent(root: string): void {
+    private popComponent(rootNode: string): void {
         const component: string[] = [];
-        let w: string;
+        let poppedNode: string;
         do {
-            w = this.stack.pop()!;
-            this.onStack.delete(w);
-            component.push(w);
-        } while (w !== root);
+            poppedNode = this.stack.pop()!;
+            this.onStack.delete(poppedNode);
+            component.push(poppedNode);
+        } while (poppedNode !== rootNode);
         this.sccs.push(component);
     }
 }
@@ -380,52 +492,52 @@ function resolveCycleStrategy(
         'pure-type' | 'high-layer' | 'runtime-instance' | 'event' | 'strategy' | 'small-leaf'
     >,
 ): { nodes: string[]; strategy: SccResolutionStrategy; rationale: string } {
-    const types = nodes.map((n) => nodeTypes?.get(n) ?? 'pure-type');
-    if (types.every((t) => t === 'pure-type')) {
+    const types = nodes.map((n) => nodeTypes?.get(n) ?? TYPE_PURE);
+    if (types.every((t) => t === TYPE_PURE)) {
         return {
             nodes: [...nodes],
-            strategy: 'TYPE_SINKING',
+            strategy: STRATEGY_TYPE_SINKING,
             rationale: 'Extract common interfaces/types into types-base module',
         };
     }
-    if (types.includes('high-layer')) {
+    if (types.includes(TYPE_HIGH_LAYER)) {
         return {
             nodes: [...nodes],
-            strategy: 'INTERFACE_INVERSION',
+            strategy: STRATEGY_INTERFACE_INVERSION,
             rationale: 'Apply Dependency Inversion Principle (DIP) to decouple layers',
         };
     }
-    if (types.includes('runtime-instance')) {
+    if (types.includes(TYPE_RUNTIME_INSTANCE)) {
         return {
             nodes: [...nodes],
-            strategy: 'DEPENDENCY_INJECTION',
+            strategy: STRATEGY_DEPENDENCY_INJECTION,
             rationale: 'Pass instances via dependency injection rather than direct imports',
         };
     }
-    if (types.includes('event')) {
+    if (types.includes(TYPE_EVENT)) {
         return {
             nodes: [...nodes],
-            strategy: 'EVENT_DECOUPLING',
+            strategy: STRATEGY_EVENT_DECOUPLING,
             rationale: 'Decouple state changes using event emitter pub/sub',
         };
     }
-    if (types.includes('strategy')) {
+    if (types.includes(TYPE_STRATEGY)) {
         return {
             nodes: [...nodes],
-            strategy: 'REGISTRY_EXTRACTION',
+            strategy: STRATEGY_REGISTRY_EXTRACTION,
             rationale: 'Extract dynamic strategies into centralized registry',
         };
     }
-    if (types.every((t) => t === 'small-leaf')) {
+    if (types.every((t) => t === TYPE_SMALL_LEAF)) {
         return {
             nodes: [...nodes],
-            strategy: 'RE_MERGING',
+            strategy: STRATEGY_RE_MERGING,
             rationale: 'Micro sub-libraries are highly cohesive; re-merge into parent domain',
         };
     }
     return {
         nodes: [...nodes],
-        strategy: 'TYPE_SINKING',
+        strategy: STRATEGY_TYPE_SINKING,
         rationale: 'Extract common types into base type definition file',
     };
 }
@@ -437,7 +549,7 @@ function resolveCycleStrategy(
  * @param nodeTypes - Optional node archetype classification map.
  * @returns Strongly connected components and cycle resolution strategies.
  */
-export function diagnoseSccDependencyCycles(
+export function auditDependencyCycles(
     adjList: ReadonlyMap<string, readonly string[]>,
     nodeTypes?: ReadonlyMap<
         string,
@@ -445,7 +557,7 @@ export function diagnoseSccDependencyCycles(
     >,
 ): SccCycleDiagnosis {
     const computer = new TarjanSccComputer(adjList);
-    const sccs = computer.compute();
+    const sccs = computer.computeCycleComponents();
     const cyclicComponents = sccs
         .filter((comp) => comp.length > 1)
         .map((nodes) => resolveCycleStrategy(nodes, nodeTypes));
@@ -455,6 +567,9 @@ export function diagnoseSccDependencyCycles(
         cyclicComponents,
     };
 }
+
+/** Backward compatible alias for auditDependencyCycles. */
+export const diagnoseSccDependencyCycles = auditDependencyCycles;
 
 /**
  * Bayesian prior update for language density coefficient.
@@ -471,45 +586,89 @@ export function updateLanguageDensityPrior(
 ): number {
     const lambda = Math.max(0.01, Math.min(0.5, learningRate));
     const updated = (1 - lambda) * prior + lambda * sampleDensity;
-    return Math.round(updated * 1000) / 1000;
+    return Math.round(updated * COHESION_ROUNDING_SCALE) / COHESION_ROUNDING_SCALE;
 }
+
+/** Dimensions input bundle for tripartite orthogonal risk. */
+export interface TripartiteRiskDimensions {
+    readonly confidence: number;
+    readonly severity: number;
+    readonly impact: number;
+}
+
+/** Exponents input bundle for tripartite orthogonal risk. */
+export interface TripartiteRiskExponents {
+    readonly alpha?: number;
+    readonly beta?: number;
+    readonly gamma?: number;
+}
+
+const DEFAULT_ALPHA = 1.0;
+const DEFAULT_BETA = 1.2;
+const DEFAULT_GAMMA = 0.8;
 
 /**
  * Tripartite orthogonal risk calculator.
- * Risk = Confidence^alpha * Severity^beta * Impact^gamma
+ * Risk = Confidence^alpha * Severity^beta * Impact^gamma.
+ * Supports both object bundle and legacy positional scalar signatures.
  *
- * @param confidence - Finding confidence in [0, 1].
- * @param severity - Normalized severity in [0, 1].
- * @param impact - Structural impact in [0, 1].
- * @param alpha - Confidence exponent.
- * @param beta - Severity exponent.
- * @param gamma - Impact exponent.
+ * @param args - Either [dimensions, exponents] or positional scalar parameters.
  * @returns Tripartite risk breakdown.
  */
 export function calculateTripartiteRisk(
-    confidence: number,
-    severity: number,
-    impact: number,
-    alpha: number = 1.0,
-    beta: number = 1.2,
-    gamma: number = 0.8,
+    ...args:
+        | [dimensions: TripartiteRiskDimensions, exponents?: TripartiteRiskExponents]
+        | [
+              confidence: number,
+              severity: number,
+              impact: number,
+              alpha?: number,
+              beta?: number,
+              gamma?: number,
+          ]
 ): {
     readonly confidence: number;
     readonly severity: number;
     readonly impact: number;
     readonly risk: number;
 } {
-    const c = Math.max(0, Math.min(1, confidence));
-    const s = Math.max(0, Math.min(1, severity));
-    const i = Math.max(0, Math.min(1, impact));
-    const rawRisk = Math.pow(c, alpha) * Math.pow(s, beta) * Math.pow(i, gamma);
+    const isObjectForm = typeof args[0] === 'object';
+    const dims: TripartiteRiskDimensions = isObjectForm
+        ? (args[0] as TripartiteRiskDimensions)
+        : {
+              confidence: args[0] as number,
+              severity: args[1] as number,
+              impact: args[2] as number,
+          };
+    const exponents: TripartiteRiskExponents | undefined = isObjectForm
+        ? (args[1] as TripartiteRiskExponents | undefined)
+        : {
+              alpha: args[3] as number | undefined,
+              beta: args[4] as number | undefined,
+              gamma: args[5] as number | undefined,
+          };
+
+    const alpha = exponents?.alpha ?? DEFAULT_ALPHA;
+    const beta = exponents?.beta ?? DEFAULT_BETA;
+    const gamma = exponents?.gamma ?? DEFAULT_GAMMA;
+    const clampedConfidence = Math.max(0, Math.min(1, dims.confidence));
+    const clampedSeverity = Math.max(0, Math.min(1, dims.severity));
+    const clampedImpact = Math.max(0, Math.min(1, dims.impact));
+    const rawRisk =
+        Math.pow(clampedConfidence, alpha) *
+        Math.pow(clampedSeverity, beta) *
+        Math.pow(clampedImpact, gamma);
+
     return {
-        confidence: c,
-        severity: s,
-        impact: i,
-        risk: Math.round(rawRisk * 1000) / 1000,
+        confidence: clampedConfidence,
+        severity: clampedSeverity,
+        impact: clampedImpact,
+        risk: Math.round(rawRisk * COHESION_ROUNDING_SCALE) / COHESION_ROUNDING_SCALE,
     };
 }
+
+/** Backward compatible alias for calculateTripartiteRisk. */
+export const computeTripartiteRisk = calculateTripartiteRisk;
 
 /** Diagnostic finding emitted by resource topology validation. */
 export interface ResourceTopologyFinding {
@@ -520,6 +679,108 @@ export interface ResourceTopologyFinding {
     readonly details: Record<string, unknown>;
 }
 
+/** Candidate resource file metric shape. */
+export interface CandidateResourceFile {
+    readonly filePath: string;
+    readonly eloc: number;
+    readonly astNodeCount: number;
+    readonly symbolCount: number;
+    readonly literalCount: number;
+    readonly astDepth: number;
+    readonly language: string;
+    readonly isExecutableLogic: boolean;
+}
+
+function auditResourceScaleFindings(
+    candidateFile: CandidateResourceFile,
+    parts: StructuredResourceNamingParts,
+    coreELOC: number,
+    findings: ResourceTopologyFinding[],
+): void {
+    const semanticVolume = computeSemanticVolume(candidateFile);
+    const capacityLimit = computeOmnibusCapacity(candidateFile.language, coreELOC);
+
+    if (
+        parts.depth === 1 &&
+        (candidateFile.eloc > capacityLimit ||
+            semanticVolume > capacityLimit * SV_OVER_CAPACITY_FACTOR)
+    ) {
+        findings.push({
+            ruleId: 'NAM-RES-001',
+            filePath: candidateFile.filePath,
+            message: `Structured resource file '${candidateFile.filePath}' is overly generic with high capacity (ELOC=${candidateFile.eloc}, SV=${semanticVolume}, Limit=${capacityLimit}). Recommend splitting by domain.`,
+            severity: SEVERITY_WARNING,
+            details: { eloc: candidateFile.eloc, sv: semanticVolume, threshold: capacityLimit },
+        });
+    }
+
+    if (
+        parts.depth === MAX_HIERARCHY_DEPTH &&
+        candidateFile.eloc < MIN_FRAGMENT_ELOC &&
+        semanticVolume < MIN_FRAGMENT_SV
+    ) {
+        findings.push({
+            ruleId: 'NAM-RES-002',
+            filePath: candidateFile.filePath,
+            message: `Structured resource file '${candidateFile.filePath}' is over-specialized and fragmented (ELOC=${candidateFile.eloc}, SV=${semanticVolume}). Recommend merging into parent domain.`,
+            severity: SEVERITY_INFO,
+            details: { eloc: candidateFile.eloc, sv: semanticVolume },
+        });
+    }
+}
+
+function auditNamingHierarchy(
+    candidateFile: CandidateResourceFile,
+    parts: StructuredResourceNamingParts,
+    isRecognized: boolean,
+    findings: ResourceTopologyFinding[],
+): void {
+    if (parts.extraParts.length > 0) {
+        findings.push({
+            ruleId: 'NAM-RES-003',
+            filePath: candidateFile.filePath,
+            message: `Structured resource file '${candidateFile.filePath}' exceeds 3-tier naming hierarchy (depth=${parts.depth + parts.extraParts.length}).`,
+            severity: SEVERITY_WARNING,
+            details: { extraParts: parts.extraParts },
+        });
+    }
+
+    if (parts.isOverDescriptive) {
+        findings.push({
+            ruleId: 'NAM-RES-004',
+            filePath: candidateFile.filePath,
+            message: `Structured resource file '${candidateFile.filePath}' has overly descriptive naming tokens.`,
+            severity: SEVERITY_WARNING,
+            details: { baseName: parts.rawBaseName },
+        });
+    }
+
+    if (candidateFile.isExecutableLogic && isRecognized) {
+        findings.push({
+            ruleId: 'NAM-RES-005',
+            filePath: candidateFile.filePath,
+            message: `Structured resource file '${candidateFile.filePath}' declares a resource type but contains heavy executable business logic.`,
+            severity: SEVERITY_WARNING,
+            details: { symbolCount: candidateFile.symbolCount },
+        });
+    }
+}
+
+function auditSingleResourceFile(
+    candidateFile: CandidateResourceFile,
+    coreELOC: number,
+    findings: ResourceTopologyFinding[],
+): void {
+    const parts = parseStructuredResourceNaming(candidateFile.filePath);
+    const isRecognized = RECOGNIZED_RESOURCE_BASE_TYPES.has(parts.baseType.toLowerCase());
+    if (!isRecognized) {
+        return;
+    }
+
+    auditResourceScaleFindings(candidateFile, parts, coreELOC, findings);
+    auditNamingHierarchy(candidateFile, parts, isRecognized, findings);
+}
+
 /**
  * Full audit executor for structured resource topology.
  *
@@ -528,87 +789,12 @@ export interface ResourceTopologyFinding {
  * @returns Detected resource topology findings.
  */
 export function auditStructuredResourceTopology(
-    files: readonly {
-        readonly filePath: string;
-        readonly eloc: number;
-        readonly astNodeCount: number;
-        readonly symbolCount: number;
-        readonly literalCount: number;
-        readonly astDepth: number;
-        readonly language: string;
-        readonly isExecutableLogic: boolean;
-    }[],
+    files: readonly CandidateResourceFile[],
     coreELOC: number,
 ): readonly ResourceTopologyFinding[] {
     const findings: ResourceTopologyFinding[] = [];
-
-    for (const f of files) {
-        const parts = parseStructuredResourceNaming(f.filePath);
-        const isRecognized = RECOGNIZED_RESOURCE_BASE_TYPES.has(parts.baseType.toLowerCase());
-
-        if (!isRecognized) {
-            continue;
-        }
-
-        const sv = calculateSemanticVolume(
-            f.eloc,
-            f.astNodeCount,
-            f.symbolCount,
-            f.literalCount,
-            f.astDepth,
-        );
-        const threshold = calculateOmnibusCapacityThreshold(f.language, coreELOC);
-
-        if (parts.depth === 1 && (f.eloc > threshold || sv > threshold * 1.5)) {
-            findings.push({
-                ruleId: 'NAM-RES-001',
-                filePath: f.filePath,
-                message: `Structured resource file '${f.filePath}' is overly generic with high capacity (ELOC=${f.eloc}, SV=${sv}, Limit=${threshold}). Recommend splitting by domain.`,
-                severity: 'warning',
-                details: { eloc: f.eloc, sv, threshold },
-            });
-        }
-
-        if (parts.depth === 3 && f.eloc < 15 && sv < 30) {
-            findings.push({
-                ruleId: 'NAM-RES-002',
-                filePath: f.filePath,
-                message: `Structured resource file '${f.filePath}' is over-specialized and fragmented (ELOC=${f.eloc}, SV=${sv}). Recommend merging into parent domain.`,
-                severity: 'info',
-                details: { eloc: f.eloc, sv },
-            });
-        }
-
-        if (parts.extraParts.length > 0) {
-            findings.push({
-                ruleId: 'NAM-RES-003',
-                filePath: f.filePath,
-                message: `Structured resource file '${f.filePath}' exceeds 3-tier naming hierarchy (depth=${parts.depth + parts.extraParts.length}).`,
-                severity: 'warning',
-                details: { extraParts: parts.extraParts },
-            });
-        }
-
-        if (parts.isOverDescriptive) {
-            findings.push({
-                ruleId: 'NAM-RES-004',
-                filePath: f.filePath,
-                message: `Structured resource file '${f.filePath}' has overly descriptive naming tokens.`,
-                severity: 'warning',
-                details: { baseName: parts.rawBaseName },
-            });
-        }
-
-        if (f.isExecutableLogic && isRecognized) {
-            findings.push({
-                ruleId: 'NAM-RES-005',
-                filePath: f.filePath,
-                message: `Structured resource file '${f.filePath}' declares a resource type but contains heavy executable business logic.`,
-                severity: 'warning',
-                details: { symbolCount: f.symbolCount },
-            });
-        }
+    for (const file of files) {
+        auditSingleResourceFile(file, coreELOC, findings);
     }
-
     return findings;
 }

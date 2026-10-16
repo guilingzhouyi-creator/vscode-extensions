@@ -34,8 +34,8 @@ export class RecipePatternDetectors {
      */
     public static isFunctionSplit(before: string[], after: string[]): boolean {
         const countFn = (lines: string[]): number =>
-            lines.filter((l) => {
-                const trimmed = l.trim();
+            lines.filter((line) => {
+                const trimmed = line.trim();
                 if (/^(?:if|for|while|switch|catch)\b/.test(trimmed)) {
                     return false;
                 }
@@ -61,15 +61,15 @@ export class RecipePatternDetectors {
         beforeText?: string,
         afterText?: string,
     ): boolean {
-        const b = resolveText(before, beforeText);
-        const a = resolveText(after, afterText);
+        const beforeSrc = resolveText(before, beforeText);
+        const afterSrc = resolveText(after, afterText);
         const hasManyArgsBefore =
             /\(\s*\w+\s*(?::\s*[^,)]+)?,\s*\w+\s*(?::\s*[^,)]+)?,\s*\w+\s*(?::\s*[^,)]+)?,\s*\w+/.test(
-                b,
+                beforeSrc,
             );
         const hasOptionsInterfaceAfter =
             /interface\s+\w+Options|type\s+\w+Config\s*=|interface\s+\w+Config|\w+Options\b/.test(
-                a,
+                afterSrc,
             );
         return hasManyArgsBefore && hasOptionsInterfaceAfter;
     }
@@ -83,12 +83,12 @@ export class RecipePatternDetectors {
         beforeText?: string,
         afterText?: string,
     ): boolean {
-        const b = resolveText(before, beforeText);
-        const a = resolveText(after, afterText);
-        const beforeBranches = countBranchMatches(b, 3);
+        const beforeSrc = resolveText(before, beforeText);
+        const afterSrc = resolveText(after, afterText);
+        const beforeBranches = countBranchMatches(beforeSrc, 3);
         const afterHasMapOrRecord =
             /const\s+\w*(?:Handlers|_HANDLERS|Strategy|_STRATEGY|Dispatch)\s*:\s*Record|new\s+Map|\bMap<\w+,\s*\w+>|\w+_HANDLERS\b/i.test(
-                a,
+                afterSrc,
             );
         return beforeBranches >= 3 && afterHasMapOrRecord;
     }
@@ -102,10 +102,10 @@ export class RecipePatternDetectors {
         beforeText?: string,
         afterText?: string,
     ): boolean {
-        const b = resolveText(before, beforeText);
-        const a = resolveText(after, afterText);
-        const beforeHasGuards = /if\s*\(!\w+\)\s*return|try\s*\{/.test(b);
-        const afterHasGuards = /if\s*\(!\w+\)\s*return|try\s*\{/.test(a);
+        const beforeSrc = resolveText(before, beforeText);
+        const afterSrc = resolveText(after, afterText);
+        const beforeHasGuards = /if\s*\(!\w+\)\s*return|try\s*\{/.test(beforeSrc);
+        const afterHasGuards = /if\s*\(!\w+\)\s*return|try\s*\{/.test(afterSrc);
         return !beforeHasGuards && afterHasGuards;
     }
 
@@ -118,12 +118,12 @@ export class RecipePatternDetectors {
         beforeText?: string,
         afterText?: string,
     ): boolean {
-        const b = resolveText(before, beforeText);
-        const a = resolveText(after, afterText);
-        const beforeHasPool = /\b(acquire|release|_pool|reset_state)\b/.test(b);
+        const beforeSrc = resolveText(before, beforeText);
+        const afterSrc = resolveText(after, afterText);
+        const beforeHasPool = /\b(acquire|release|_pool|reset_state)\b/.test(beforeSrc);
         const afterHasPool =
-            /\b(reset_state|acquire\s*\(|release\s*\(|_pool\b)/.test(a) &&
-            (/\breset_state\b/.test(a) || /\b_pool\b/.test(a));
+            /\b(reset_state|acquire\s*\(|release\s*\(|_pool\b)/.test(afterSrc) &&
+            (/\breset_state\b/.test(afterSrc) || /\b_pool\b/.test(afterSrc));
         return !beforeHasPool && afterHasPool;
     }
 
@@ -136,13 +136,15 @@ export class RecipePatternDetectors {
         beforeText?: string,
         afterText?: string,
     ): boolean {
-        const b = resolveText(before, beforeText);
-        const a = resolveText(after, afterText);
+        const beforeSrc = resolveText(before, beforeText);
+        const afterSrc = resolveText(after, afterText);
 
-        const beforeHasCas = /(_is_executing|_is_stopping|is_reentrant|_cas_lock)\b/.test(b);
+        const beforeHasCas = /(_is_executing|_is_stopping|is_reentrant|_cas_lock)\b/.test(
+            beforeSrc,
+        );
         const afterHasCas =
-            /(_is_executing|_is_stopping|is_reentrant|_cas_lock)\s*[:=]/.test(a) &&
-            /if\s+.*(_is_executing|_is_stopping|is_reentrant|_cas_lock)/.test(a);
+            /(_is_executing|_is_stopping|is_reentrant|_cas_lock)\s*[:=]/.test(afterSrc) &&
+            /if\s+.*(_is_executing|_is_stopping|is_reentrant|_cas_lock)/.test(afterSrc);
 
         return !beforeHasCas && afterHasCas;
     }
@@ -156,13 +158,13 @@ export class RecipePatternDetectors {
         beforeText?: string,
         afterText?: string,
     ): boolean {
-        const b = resolveText(before, beforeText);
-        const a = resolveText(after, afterText);
+        const beforeSrc = resolveText(before, beforeText);
+        const afterSrc = resolveText(after, afterText);
 
         const beforeHasInvalidate =
-            /\b(invalidate_cache|_ensure_\w+_cache|config_reload_version)\b/.test(b);
+            /\b(invalidate_cache|_ensure_\w+_cache|config_reload_version)\b/.test(beforeSrc);
         const afterHasInvalidate =
-            /\b(invalidate_cache|_ensure_\w+_cache|config_reload_version)\b/.test(a);
+            /\b(invalidate_cache|_ensure_\w+_cache|config_reload_version)\b/.test(afterSrc);
 
         return !beforeHasInvalidate && afterHasInvalidate;
     }
@@ -176,12 +178,14 @@ export class RecipePatternDetectors {
         beforeText?: string,
         afterText?: string,
     ): boolean {
-        const b = resolveText(before, beforeText);
-        const a = resolveText(after, afterText);
+        const beforeSrc = resolveText(before, beforeText);
+        const afterSrc = resolveText(after, afterText);
         return (
-            /\b(func|function)\s+\w+\s*\(\s*\w+[^,)]+,\s*\w+[^,)]+,\s*\w+[^,)]+,\s*\w+/.test(b) &&
-            /\b(func|function)\s+\w+_context\b|\b\w+ContextDTO\b/.test(a) &&
-            /\b(from_stat_mutation|from_wallet_mutation|create\s*\(|_context\s*\()/.test(a)
+            /\b(func|function)\s+\w+\s*\(\s*\w+[^,)]+,\s*\w+[^,)]+,\s*\w+[^,)]+,\s*\w+/.test(
+                beforeSrc,
+            ) &&
+            /\b(func|function)\s+\w+_context\b|\b\w+ContextDTO\b/.test(afterSrc) &&
+            /\b(from_stat_mutation|from_wallet_mutation|create\s*\(|_context\s*\()/.test(afterSrc)
         );
     }
 
@@ -194,11 +198,13 @@ export class RecipePatternDetectors {
         beforeText?: string,
         afterText?: string,
     ): boolean {
-        const b = resolveText(before, beforeText);
-        const a = resolveText(after, afterText);
+        const beforeSrc = resolveText(before, beforeText);
+        const afterSrc = resolveText(after, afterText);
         return (
-            /\b(if\s+step\s*==|match\s+phase|switch\s*\(stage\))/.test(b) &&
-            /\b(dispatch_hook|invoke_hook|HookRegistry|_hook_bus|execute_pipeline_hook)\b/.test(a)
+            /\b(if\s+step\s*==|match\s+phase|switch\s*\(stage\))/.test(beforeSrc) &&
+            /\b(dispatch_hook|invoke_hook|HookRegistry|_hook_bus|execute_pipeline_hook)\b/.test(
+                afterSrc,
+            )
         );
     }
 
@@ -211,14 +217,16 @@ export class RecipePatternDetectors {
         beforeText?: string,
         afterText?: string,
     ): boolean {
-        const b = resolveText(before, beforeText);
-        const a = resolveText(after, afterText);
+        const beforeSrc = resolveText(before, beforeText);
+        const afterSrc = resolveText(after, afterText);
         return (
-            /\b(from_stat_mutation|from_wallet_mutation|apply_mutation_legacy|bridge_)\b/.test(b) &&
-            !/\b(from_stat_mutation|from_wallet_mutation|apply_mutation_legacy|bridge_)\b/.test(
-                a,
+            /\b(from_stat_mutation|from_wallet_mutation|apply_mutation_legacy|bridge_)\b/.test(
+                beforeSrc,
             ) &&
-            /\bapply_mutation_context\b/.test(a)
+            !/\b(from_stat_mutation|from_wallet_mutation|apply_mutation_legacy|bridge_)\b/.test(
+                afterSrc,
+            ) &&
+            /\bapply_mutation_context\b/.test(afterSrc)
         );
     }
 
@@ -231,12 +239,12 @@ export class RecipePatternDetectors {
         beforeText?: string,
         afterText?: string,
     ): boolean {
-        const b = resolveText(before, beforeText);
-        const a = resolveText(after, afterText);
+        const beforeSrc = resolveText(before, beforeText);
+        const afterSrc = resolveText(after, afterText);
         return (
-            /\.apply_mutation\(\s*[^,)]+,\s*[^,)]+,\s*[^,)]+,\s*[^,)]+/.test(b) &&
+            /\.apply_mutation\(\s*[^,)]+,\s*[^,)]+,\s*[^,)]+,\s*[^,)]+/.test(beforeSrc) &&
             /\.apply_mutation_context\(\s*(?:new\s+\w+ContextDTO|\w+ContextDTO\.create|ctx\b)/.test(
-                a,
+                afterSrc,
             )
         );
     }
@@ -250,11 +258,11 @@ export class RecipePatternDetectors {
         beforeText?: string,
         afterText?: string,
     ): boolean {
-        const b = resolveText(before, beforeText);
-        const a = resolveText(after, afterText);
+        const beforeSrc = resolveText(before, beforeText);
+        const afterSrc = resolveText(after, afterText);
         return (
-            !/@deprecated\b/.test(b) &&
-            /@deprecated\s+\[Since\s+v[^\]]+,\s*Sunset\s+v[^\]]+\]|@deprecated\b/.test(a)
+            !/@deprecated\b/.test(beforeSrc) &&
+            /@deprecated\s+\[Since\s+v[^\]]+,\s*Sunset\s+v[^\]]+\]|@deprecated\b/.test(afterSrc)
         );
     }
 
@@ -267,14 +275,14 @@ export class RecipePatternDetectors {
         beforeText?: string,
         afterText?: string,
     ): boolean {
-        const b = resolveText(before, beforeText);
-        const a = resolveText(after, afterText);
+        const beforeSrc = resolveText(before, beforeText);
+        const afterSrc = resolveText(after, afterText);
         const beforeHasBoxing =
-            /\bvar\s+\w+\s*=\s*\{\s*["']\w+["']\s*:/.test(b) ||
-            /new\s+Object\(\)|\.duplicate\(true\)/.test(b);
+            /\bvar\s+\w+\s*=\s*\{\s*["']\w+["']\s*:/.test(beforeSrc) ||
+            /new\s+Object\(\)|\.duplicate\(true\)/.test(beforeSrc);
         const afterHasZeroCost =
-            /\b(ReadOnlyContext|TypedContextView|solve_direct)\b/.test(a) &&
-            !/\bvar\s+\w+\s*=\s*\{\s*["']\w+["']\s*:/.test(a);
+            /\b(ReadOnlyContext|TypedContextView|solve_direct)\b/.test(afterSrc) &&
+            !/\bvar\s+\w+\s*=\s*\{\s*["']\w+["']\s*:/.test(afterSrc);
         return beforeHasBoxing && afterHasZeroCost;
     }
 
@@ -287,12 +295,12 @@ export class RecipePatternDetectors {
         beforeText?: string,
         afterText?: string,
     ): boolean {
-        const b = resolveText(before, beforeText);
-        const a = resolveText(after, afterText);
+        const beforeSrc = resolveText(before, beforeText);
+        const afterSrc = resolveText(after, afterText);
         return (
-            /\.pressed\.connect\s*\(/.test(b) &&
-            !/\bdebounced_pressed\b/.test(b) &&
-            /\b(debounced_pressed|KButtonClass|is_loading|_debounce_timer)\b/.test(a)
+            /\.pressed\.connect\s*\(/.test(beforeSrc) &&
+            !/\bdebounced_pressed\b/.test(beforeSrc) &&
+            /\b(debounced_pressed|KButtonClass|is_loading|_debounce_timer)\b/.test(afterSrc)
         );
     }
 
@@ -305,12 +313,12 @@ export class RecipePatternDetectors {
         beforeText?: string,
         afterText?: string,
     ): boolean {
-        const b = resolveText(before, beforeText);
-        const a = resolveText(after, afterText);
+        const beforeSrc = resolveText(before, beforeText);
+        const afterSrc = resolveText(after, afterText);
         return (
-            /_current_state\s*=\s*(?:State\.|STATE_|\w+)/.test(b) &&
-            !/transition_to\s*\(/.test(b) &&
-            /transition_to\s*\(\s*(?:State\.|STATE_|\w+)/.test(a)
+            /_current_state\s*=\s*(?:State\.|STATE_|\w+)/.test(beforeSrc) &&
+            !/transition_to\s*\(/.test(beforeSrc) &&
+            /transition_to\s*\(\s*(?:State\.|STATE_|\w+)/.test(afterSrc)
         );
     }
 
@@ -323,12 +331,12 @@ export class RecipePatternDetectors {
         beforeText?: string,
         afterText?: string,
     ): boolean {
-        const b = resolveText(before, beforeText);
-        const a = resolveText(after, afterText);
+        const beforeSrc = resolveText(before, beforeText);
+        const afterSrc = resolveText(after, afterText);
         return (
-            /\b(?:_observers|_listeners|_bindings)\.append\s*\(\s*\w+\s*\)/.test(b) &&
-            !/weakref\s*\(/.test(b) &&
-            /weakref\s*\(\s*\w+\s*\)/.test(a)
+            /\b(?:_observers|_listeners|_bindings)\.append\s*\(\s*\w+\s*\)/.test(beforeSrc) &&
+            !/weakref\s*\(/.test(beforeSrc) &&
+            /weakref\s*\(\s*\w+\s*\)/.test(afterSrc)
         );
     }
 
@@ -341,12 +349,12 @@ export class RecipePatternDetectors {
         beforeText?: string,
         afterText?: string,
     ): boolean {
-        const b = resolveText(before, beforeText);
-        const a = resolveText(after, afterText);
+        const beforeSrc = resolveText(before, beforeText);
+        const afterSrc = resolveText(after, afterText);
         return (
-            /\b(?:snapshot|dto|_snapshot|_dto)\s*\.\s*\w+\s*(?:=|\+=|-=|\*=)/.test(b) &&
-            /\b(?:dispatch_intent|send_command|request_\w+|call_domain)\b/.test(a) &&
-            !/\b(?:snapshot|dto|_snapshot|_dto)\s*\.\s*\w+\s*(?:=|\+=|-=|\*=)/.test(a)
+            /\b(?:snapshot|dto|_snapshot|_dto)\s*\.\s*\w+\s*(?:=|\+=|-=|\*=)/.test(beforeSrc) &&
+            /\b(?:dispatch_intent|send_command|request_\w+|call_domain)\b/.test(afterSrc) &&
+            !/\b(?:snapshot|dto|_snapshot|_dto)\s*\.\s*\w+\s*(?:=|\+=|-=|\*=)/.test(afterSrc)
         );
     }
 }

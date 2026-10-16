@@ -136,6 +136,12 @@ const SUGGESTION_DEEP_ESCAPE =
 const SUGGESTION_STATE_MACHINE =
     'Extract branch body into a dedicated action to keep dispatch lean.';
 
+/** Refactoring suggestion for tautological empty traversal loops. */
+const SUGGESTION_TAUTOLOGICAL_LOOP =
+    'Eliminate vacuous iteration loop or replace with direct expression / slice lookup.';
+
+const RULE_CPX_TRV_001 = 'CPX-TRV-001';
+
 /** Minimum physical line count to classify a dispatch construct as a state machine. */
 const MIN_STATE_MACHINE_LINES = 15;
 
@@ -739,14 +745,55 @@ export class ComplexityAnalyzer implements Analyzer {
 
     private finalizeAmplification(ctx: AnalyzerContext): void {
         if (this.loopSites.size === 0) return;
+        const thresh = ctx.config?.thresholds as unknown as Record<string, unknown> | undefined;
+        const ioPatterns = ctx.options?.blockingIoAllowPatterns ?? thresh?.blockingIoAllowPatterns;
+        const allocPatterns =
+            ctx.options?.allocationAllowPatterns ?? thresh?.allocationAllowPatterns;
         const toRegExps = (globs: unknown): RegExp[] =>
             ((globs ?? []) as string[]).map((glob) => globToRegExp(glob));
         const ampIssues = detectComplexityAmplification(
             this.loopSites,
-            toRegExps(ctx.options?.blockingIoAllowPatterns),
-            toRegExps(ctx.options?.allocationAllowPatterns),
+            toRegExps(ioPatterns),
+            toRegExps(allocPatterns),
         );
         this.issues.push(...ampIssues);
+
+        const normFile = ctx.filePath.replace(/\\/g, '/');
+        const isExempt =
+            normFile.includes('/test/') ||
+            normFile.includes('/tests/') ||
+            normFile.includes('/fixtures/') ||
+            normFile.includes('/bench') ||
+            normFile.endsWith('.test.ts') ||
+            normFile.endsWith('.spec.ts');
+
+        if (!isExempt) {
+            for (const [fnSymbol, loops] of this.loopSites.entries()) {
+                for (let i = 0; i < loops.length; i++) {
+                    const loop = loops[i];
+                    if (loop.isTautological) {
+                        this.issues.push({
+                            id: `${ANALYZER_COMPLEXITY}:${RULE_CPX_TRV_001}:${normFile}:${loop.line}`,
+                            analyzer: ANALYZER_COMPLEXITY,
+                            rule: RULE_CPX_TRV_001,
+                            severity: SEVERITY_WARNING,
+                            message: `Tautological loop traversal detected in '${fnSymbol}': iteration exhibits zero or negligible state mutation entropy delta (deltaEntropy: ${loop.deltaEntropy ?? 0} <= 0.05).`,
+                            location: {
+                                file: normFile,
+                                start: { line: loop.line, column: 1 },
+                                end: { line: loop.line, column: 1 },
+                            },
+                            detail: {
+                                symbol: fnSymbol,
+                                scaleVariable: loop.scaleVariable,
+                                deltaEntropy: loop.deltaEntropy ?? 0,
+                            },
+                            suggestion: SUGGESTION_TAUTOLOGICAL_LOOP,
+                        });
+                    }
+                }
+            }
+        }
     }
 
     private finalizeElasticAndCohesion(

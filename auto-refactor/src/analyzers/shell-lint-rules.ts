@@ -279,7 +279,12 @@ export function checkDeprecatedSyntax(lineCtx: ShellLineScanContext, emit: Shell
     }
 
     if (DEPRECATED_TEST_RE.test(masked) && !MODERN_TEST_RE.test(masked)) {
-        if (/\[[^\]]*\]/.test(masked)) {
+        if (
+            !/:\s*\[/.test(trimmed) &&
+            !/\]\s*,/.test(trimmed) &&
+            !/^\s*["'][A-Za-z0-9_-]+["']\s*:/.test(trimmed) &&
+            /\[[^\]]*\]/.test(masked)
+        ) {
             emit(
                 idx,
                 RULE_SH_DEPR_001,

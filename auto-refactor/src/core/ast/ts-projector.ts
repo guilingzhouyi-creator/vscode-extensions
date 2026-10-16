@@ -134,16 +134,16 @@ const TS_KIND_INFO: TsKindInfo[] = (() => {
     return table;
 })();
 
-function kindInfoFor(n: ts.Node): TsKindInfo {
-    const info = TS_KIND_INFO[n.kind];
-    if (info) return info;
-    const kindNum = n.kind;
+function kindInfoFor(astNode: ts.Node): TsKindInfo {
+    const kindMeta = TS_KIND_INFO[astNode.kind];
+    if (kindMeta) return kindMeta;
+    const kindNum = astNode.kind;
     return {
-        kind: kindOf(n),
-        fnLike: isFunctionLike(n),
-        branch: kindNum === ts.SyntaxKind.BinaryExpression ? 0 : branchWeightOf(n),
+        kind: kindOf(astNode),
+        fnLike: isFunctionLike(astNode),
+        branch: kindNum === ts.SyntaxKind.BinaryExpression ? 0 : branchWeightOf(astNode),
         increasesNesting: CONTROL_OR_BLOCK.has(kindNum),
-        isClassDefining: ts.isClassDeclaration(n) || ts.isClassExpression(n),
+        isClassDefining: ts.isClassDeclaration(astNode) || ts.isClassExpression(astNode),
         literal:
             kindNum === ts.SyntaxKind.NumericLiteral
                 ? 1
@@ -201,20 +201,20 @@ export class TsNodeProjector implements NodeProjector {
         parentRaw: unknown | undefined,
         grandparentRaw: unknown | undefined,
     ): NormalizedNode {
-        const n = raw as ts.Node;
-        const cached = this.subtreeCache.get(n);
+        const rawNode = raw as ts.Node;
+        const cached = this.subtreeCache.get(rawNode);
         if (cached) return cached;
-        if (this.isSourceFile(n)) return { kind: NodeKind.SourceFile };
+        if (this.isSourceFile(rawNode)) return { kind: NodeKind.SourceFile };
 
-        const info = kindInfoFor(n);
-        const fnLike = info.fnLike;
-        const isLiteral = info.literal !== 0;
-        const isScope = info.increasesNesting;
-        const isFuncKw = n.kind === ts.SyntaxKind.FunctionKeyword;
-        const isClassDefining = info.isClassDefining;
-        const isBinding = introducesBinding(n);
-        const topLevel = !!parentRaw && this.isSourceFile(parentRaw) && isTopLevelDecl(n);
-        const symbolCall = this.policy.needSymbols === true && info.kind === NodeKind.Call;
+        const kindMeta = kindInfoFor(rawNode);
+        const fnLike = kindMeta.fnLike;
+        const isLiteral = kindMeta.literal !== 0;
+        const isScope = kindMeta.increasesNesting;
+        const isFuncKw = rawNode.kind === ts.SyntaxKind.FunctionKeyword;
+        const isClassDefining = kindMeta.isClassDefining;
+        const isBinding = introducesBinding(rawNode);
+        const topLevel = !!parentRaw && this.isSourceFile(parentRaw) && isTopLevelDecl(rawNode);
+        const symbolCall = this.policy.needSymbols === true && kindMeta.kind === NodeKind.Call;
         const isObservable = this.isObservableSyntax(
             fnLike,
             isClassDefining,
@@ -225,13 +225,15 @@ export class TsNodeProjector implements NodeProjector {
             topLevel,
         );
 
-        if (this.shouldCollapseToPlaceholder(info, isLiteral, isFuncKw, n, isObservable)) {
+        if (
+            this.shouldCollapseToPlaceholder(kindMeta, isLiteral, isFuncKw, rawNode, isObservable)
+        ) {
             return OTHER_PLACEHOLDER;
         }
 
         const node = this.buildProjectedNode(
-            n,
-            info,
+            rawNode,
+            kindMeta,
             fnLike,
             isLiteral,
             isScope,
@@ -242,7 +244,7 @@ export class TsNodeProjector implements NodeProjector {
         );
         this.applyProjectedMetadata(
             node,
-            n,
+            rawNode,
             parentRaw as ts.Node | undefined,
             grandparentRaw as ts.Node | undefined,
             isLiteral,
@@ -266,17 +268,17 @@ export class TsNodeProjector implements NodeProjector {
     }
 
     private isPlaceholderFastPath(
-        info: TsKindInfo,
+        kindMeta: TsKindInfo,
         isLiteral: boolean,
         isFuncKw: boolean,
-        n: ts.Node,
+        astNode: ts.Node,
     ): boolean {
-        if (!info.special) return true;
+        if (!kindMeta.special) return true;
         if (isLiteral && !this.policy.needLiterals) return true;
         if (isFuncKw && !this.policy.needComplexity) return true;
         if (
-            n.kind === ts.SyntaxKind.BinaryExpression &&
-            (n as ts.BinaryExpression).operatorToken.kind !== ts.SyntaxKind.EqualsToken
+            astNode.kind === ts.SyntaxKind.BinaryExpression &&
+            (astNode as ts.BinaryExpression).operatorToken.kind !== ts.SyntaxKind.EqualsToken
         ) {
             return true;
         }
@@ -284,19 +286,19 @@ export class TsNodeProjector implements NodeProjector {
     }
 
     private shouldCollapseToPlaceholder(
-        info: TsKindInfo,
+        kindMeta: TsKindInfo,
         isLiteral: boolean,
         isFuncKw: boolean,
-        n: ts.Node,
+        astNode: ts.Node,
         isObservable: boolean,
     ): boolean {
-        if (this.isPlaceholderFastPath(info, isLiteral, isFuncKw, n)) return true;
+        if (this.isPlaceholderFastPath(kindMeta, isLiteral, isFuncKw, astNode)) return true;
         if (isLiteral) return false;
         return !isObservable;
     }
 
     private resolveProjectedPositions(
-        n: ts.Node,
+        astNode: ts.Node,
         isCall: boolean,
         isLiteral: boolean,
         fnLike: boolean,
@@ -310,38 +312,38 @@ export class TsNodeProjector implements NodeProjector {
             (wantsSymbols && declaration);
         if (!needsPos) return {};
         return {
-            start: posOf(n.getStart(this.sf), this.sf),
-            end: posOf(n.getEnd(), this.sf),
+            start: posOf(astNode.getStart(this.sf), this.sf),
+            end: posOf(astNode.getEnd(), this.sf),
         };
     }
 
     private resolveProjectedName(
-        n: ts.Node,
+        astNode: ts.Node,
         isCall: boolean,
         wantsSymbols: boolean,
         declaration: boolean,
     ): string | undefined {
-        if (isCall) return calleeNameOf(n, this.sf) ?? undefined;
+        if (isCall) return calleeNameOf(astNode, this.sf) ?? undefined;
         const needsName = (this.policy.needNames || wantsSymbols) && declaration;
-        if (needsName) return nameOf(n, this.sf) ?? undefined;
+        if (needsName) return nameOf(astNode, this.sf) ?? undefined;
         return undefined;
     }
 
     private resolveProjectedBindingName(
-        n: ts.Node,
+        astNode: ts.Node,
         isBinding: boolean,
         wantsSymbols: boolean,
         declaration: boolean,
     ): string | undefined {
         if (!isBinding) return undefined;
         const needsName = (this.policy.needNames || wantsSymbols) && declaration;
-        if (needsName) return bindingName(n, this.sf) ?? undefined;
+        if (needsName) return bindingName(astNode, this.sf) ?? undefined;
         return undefined;
     }
 
     private buildProjectedNode(
-        n: ts.Node,
-        info: TsKindInfo,
+        astNode: ts.Node,
+        kindMeta: TsKindInfo,
         fnLike: boolean,
         isLiteral: boolean,
         isScope: boolean,
@@ -350,11 +352,11 @@ export class TsNodeProjector implements NodeProjector {
         isBinding: boolean,
         topLevel: boolean,
     ): NormalizedNode {
-        const isCall = info.kind === NodeKind.Call;
+        const isCall = kindMeta.kind === NodeKind.Call;
         const wantsSymbols = this.policy.needSymbols === true;
         const declaration = fnLike || isClassDefining || isBinding;
         const pos = this.resolveProjectedPositions(
-            n,
+            astNode,
             isCall,
             isLiteral,
             fnLike,
@@ -364,40 +366,48 @@ export class TsNodeProjector implements NodeProjector {
         );
 
         const node: NormalizedNode = {
-            kind: info.kind,
+            kind: kindMeta.kind,
             rawKind: isFuncKw && this.policy.needComplexity ? 'FunctionKeyword' : undefined,
-            text: isLiteral && this.policy.needLiterals ? n.getText(this.sf) : undefined,
+            text: isLiteral && this.policy.needLiterals ? astNode.getText(this.sf) : undefined,
             start: pos.start,
             end: pos.end,
-            name: this.resolveProjectedName(n, isCall, wantsSymbols, declaration),
+            name: this.resolveProjectedName(astNode, isCall, wantsSymbols, declaration),
             functionLike: fnLike,
             isClassDefining,
             introducesBinding: isBinding,
-            bindingName: this.resolveProjectedBindingName(n, isBinding, wantsSymbols, declaration),
+            bindingName: this.resolveProjectedBindingName(
+                astNode,
+                isBinding,
+                wantsSymbols,
+                declaration,
+            ),
             increasesNesting: isScope,
-            isConstructor: Boolean(this.policy.needComplexity) && ts.isConstructorDeclaration(n),
+            isConstructor:
+                Boolean(this.policy.needComplexity) && ts.isConstructorDeclaration(astNode),
             topLevel,
             exported:
                 topLevel &&
-                (hasExportModifier(n) || ts.isExportAssignment(n) || ts.isExportDeclaration(n)),
+                (hasExportModifier(astNode) ||
+                    ts.isExportAssignment(astNode) ||
+                    ts.isExportDeclaration(astNode)),
         };
         return node;
     }
 
     private applyProjectedMetadata(
         node: NormalizedNode,
-        n: ts.Node,
+        astNode: ts.Node,
         parentRaw: ts.Node | undefined,
         grandparentRaw: ts.Node | undefined,
         isLiteral: boolean,
         fnLike: boolean,
     ): void {
         if (isLiteral && this.policy.needLiterals) {
-            node.isConstBound = isConstBoundOf(n, parentRaw, grandparentRaw);
-            node.tolerated = isToleratedOf(n, parentRaw, this.sf, grandparentRaw);
+            node.isConstBound = isConstBoundOf(astNode, parentRaw, grandparentRaw);
+            node.tolerated = isToleratedOf(astNode, parentRaw, this.sf, grandparentRaw);
         }
         if (this.policy.needComplexity && fnLike) {
-            node.children = this.projectSubtree(n, parentRaw, grandparentRaw);
+            node.children = this.projectSubtree(astNode, parentRaw, grandparentRaw);
         }
     }
 
@@ -408,25 +418,25 @@ export class TsNodeProjector implements NodeProjector {
      * @returns An iterable of non-skippable raw children in materialized order.
      */
     forEachChild(raw: unknown): Iterable<unknown> {
-        const n = raw as ts.Node;
-        if (this.policy.needComplexity && isFunctionLike(n)) {
-            let kids = this.functionSubtrees.get(n);
+        const targetNode = raw as ts.Node;
+        if (this.policy.needComplexity && isFunctionLike(targetNode)) {
+            let kids = this.functionSubtrees.get(targetNode);
             if (!kids) {
                 kids = [];
-                ts.forEachChild(n, (c) => {
-                    if (!isSkippableToken(c)) kids!.push(c);
+                ts.forEachChild(targetNode, (childNode) => {
+                    if (!isSkippableToken(childNode)) kids!.push(childNode);
                 });
-                this.functionSubtrees.set(n, kids);
+                this.functionSubtrees.set(targetNode, kids);
             }
             return kids;
         }
         if (this.policy.needComplexity) {
-            const cached = this.rawChildrenCache.get(n);
+            const cached = this.rawChildrenCache.get(targetNode);
             if (cached) return cached;
         }
         const kids: ts.Node[] = [];
-        ts.forEachChild(n, (c) => {
-            if (!isSkippableToken(c)) kids.push(c);
+        ts.forEachChild(targetNode, (childNode) => {
+            if (!isSkippableToken(childNode)) kids.push(childNode);
         });
         return kids;
     }
@@ -449,100 +459,107 @@ export class TsNodeProjector implements NodeProjector {
     ): NormalizedNode[] {
         const children: NormalizedNode[] = [];
         const rawChildren: ts.Node[] = [];
-        ts.forEachChild(fn, (c) => {
-            if (isSkippableToken(c)) return;
-            rawChildren.push(c);
-            if (rawOut) rawOut.push(c);
-            const proj = this.cheapProject(c, fn, parentRaw);
+        ts.forEachChild(fn, (childNode) => {
+            if (isSkippableToken(childNode)) return;
+            rawChildren.push(childNode);
+            if (rawOut) rawOut.push(childNode);
+            const proj = this.cheapProject(childNode, fn, parentRaw);
             children.push(proj);
-            if (!isFunctionLike(c)) {
-                proj.children = this.buildSubtree(c, fn, null);
+            if (!isFunctionLike(childNode)) {
+                proj.children = this.buildSubtree(childNode, fn, null);
             }
         });
         if (rawChildren.length > 0) this.rawChildrenCache.set(fn, rawChildren);
         return children;
     }
 
-    private applyCheapFunctionProps(node: NormalizedNode, n: ts.Node): void {
-        if (this.policy.needNames) node.name = nameOf(n, this.sf);
+    private applyCheapFunctionProps(node: NormalizedNode, astNode: ts.Node): void {
+        if (this.policy.needNames) node.name = nameOf(astNode, this.sf);
         if (this.policy.needPositions) {
-            node.start = posOf(n.getStart(this.sf), this.sf);
-            node.end = posOf(n.getEnd(), this.sf);
+            node.start = posOf(astNode.getStart(this.sf), this.sf);
+            node.end = posOf(astNode.getEnd(), this.sf);
         }
-        if (this.policy.needComplexity) node.isConstructor = ts.isConstructorDeclaration(n);
+        if (this.policy.needComplexity) node.isConstructor = ts.isConstructorDeclaration(astNode);
     }
 
     private applyCheapLiteralProps(
         node: NormalizedNode,
-        n: ts.Node,
+        astNode: ts.Node,
         parentRaw: ts.Node | undefined,
         grandparentRaw: ts.Node | undefined,
     ): void {
         if (!this.policy.needLiterals) return;
-        node.text = n.getText(this.sf);
-        node.start = posOf(n.getStart(this.sf), this.sf);
-        node.end = posOf(n.getEnd(), this.sf);
-        node.isConstBound = isConstBoundOf(n, parentRaw, grandparentRaw);
-        node.tolerated = isToleratedOf(n, parentRaw, this.sf, grandparentRaw);
+        node.text = astNode.getText(this.sf);
+        node.start = posOf(astNode.getStart(this.sf), this.sf);
+        node.end = posOf(astNode.getEnd(), this.sf);
+        node.isConstBound = isConstBoundOf(astNode, parentRaw, grandparentRaw);
+        node.tolerated = isToleratedOf(astNode, parentRaw, this.sf, grandparentRaw);
     }
 
     private applyCheapNonFunctionProps(
         node: NormalizedNode,
-        n: ts.Node,
-        info: TsKindInfo,
+        astNode: ts.Node,
+        kindMeta: TsKindInfo,
         parentRaw: ts.Node | undefined,
         grandparentRaw: ts.Node | undefined,
         isLiteral: boolean,
     ): void {
-        if (info.isClassDefining) {
+        if (kindMeta.isClassDefining) {
             node.isClassDefining = true;
-            if (this.policy.needNames) node.name = nameOf(n, this.sf);
-        } else if (introducesBinding(n)) {
+            if (this.policy.needNames) node.name = nameOf(astNode, this.sf);
+        } else if (introducesBinding(astNode)) {
             node.introducesBinding = true;
-            if (this.policy.needNames) node.bindingName = bindingName(n, this.sf);
-        } else if (info.kind === NodeKind.Call) {
-            node.name = calleeNameOf(n, this.sf) ?? undefined;
-            node.start = posOf(n.getStart(this.sf), this.sf);
-            node.end = posOf(n.getEnd(), this.sf);
+            if (this.policy.needNames) node.bindingName = bindingName(astNode, this.sf);
+        } else if (kindMeta.kind === NodeKind.Call) {
+            node.name = calleeNameOf(astNode, this.sf) ?? undefined;
+            node.start = posOf(astNode.getStart(this.sf), this.sf);
+            node.end = posOf(astNode.getEnd(), this.sf);
         }
         if (isLiteral) {
-            this.applyCheapLiteralProps(node, n, parentRaw, grandparentRaw);
-        } else if (n.kind === ts.SyntaxKind.FunctionKeyword) {
+            this.applyCheapLiteralProps(node, astNode, parentRaw, grandparentRaw);
+        } else if (astNode.kind === ts.SyntaxKind.FunctionKeyword) {
             if (this.policy.needComplexity) node.rawKind = 'FunctionKeyword';
             if (this.policy.needPositions) {
-                node.start = posOf(n.getStart(this.sf), this.sf);
-                node.end = posOf(n.getEnd(), this.sf);
+                node.start = posOf(astNode.getStart(this.sf), this.sf);
+                node.end = posOf(astNode.getEnd(), this.sf);
             }
         }
     }
 
     private cheapProject(
-        n: ts.Node,
+        astNode: ts.Node,
         parentRaw: ts.Node | undefined,
         grandparentRaw: ts.Node | undefined,
     ): NormalizedNode {
-        const info = kindInfoFor(n);
-        const kind = info.kind;
-        const fnLike = info.fnLike;
-        const isLiteral = info.literal !== 0;
-        const branchWeight =
-            n.kind === ts.SyntaxKind.BinaryExpression ? branchWeightOf(n) : info.branch;
+        const kindMeta = kindInfoFor(astNode);
+        const kind = kindMeta.kind;
+        const fnLike = kindMeta.fnLike;
+        const isLiteral = kindMeta.literal !== 0;
+        const isBinary = astNode.kind === ts.SyntaxKind.BinaryExpression;
+        const branchWeight = isBinary ? branchWeightOf(astNode) : kindMeta.branch;
 
         const node: NormalizedNode = {
             kind,
             functionLike: fnLike,
             branchWeight,
-            increasesNesting: info.increasesNesting,
+            increasesNesting: kindMeta.increasesNesting,
             children: undefined,
         };
 
         if (fnLike) {
-            this.applyCheapFunctionProps(node, n);
+            this.applyCheapFunctionProps(node, astNode);
         } else {
-            this.applyCheapNonFunctionProps(node, n, info, parentRaw, grandparentRaw, isLiteral);
+            this.applyCheapNonFunctionProps(
+                node,
+                astNode,
+                kindMeta,
+                parentRaw,
+                grandparentRaw,
+                isLiteral,
+            );
         }
 
-        if (!fnLike) this.subtreeCache.set(n, node);
+        if (!fnLike) this.subtreeCache.set(astNode, node);
         return node;
     }
 }

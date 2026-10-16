@@ -234,6 +234,11 @@ export interface FileMetric {
     maxNestingDepth: number;
     topLevelDeclarations: number;
     exportedSymbols: number;
+    effectiveDensity?: number;
+    tspr?: number;
+    por?: number;
+    columnDensity?: number;
+    compositeDensity?: number;
 }
 
 /**

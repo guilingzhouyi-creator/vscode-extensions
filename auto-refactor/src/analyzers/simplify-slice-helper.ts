@@ -86,9 +86,9 @@ const JS_GLOBALS = new Set([
     'module',
 ]);
 
-function capitalize(s: string): string {
-    if (!s) return 'Helper';
-    return s.charAt(0).toUpperCase() + s.slice(1);
+function capitalize(text: string): string {
+    if (!text) return 'Helper';
+    return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 function collectBindingIdentifiers(binding: ts.BindingName, target: Set<string>): void {
@@ -230,45 +230,45 @@ function buildExtractSignature(
 }
 
 function resolveWritesBefore(
-    i: number,
+    startIndex: number,
     stmtInfos: StatementVariableInfo[],
     prefixWrites?: Set<string>[],
 ): Set<string> {
-    if (prefixWrites) return prefixWrites[i];
+    if (prefixWrites) return prefixWrites[startIndex];
     const writesBefore = new Set<string>();
-    for (let k = 0; k < i; k++) {
-        for (const w of stmtInfos[k].writes) writesBefore.add(w);
+    for (let k = 0; k < startIndex; k++) {
+        for (const writtenVar of stmtInfos[k].writes) writesBefore.add(writtenVar);
     }
     return writesBefore;
 }
 
 function resolveReadsAfter(
-    j: number,
+    endIndex: number,
     statementsLen: number,
     stmtInfos: StatementVariableInfo[],
     suffixReads?: Set<string>[],
 ): Set<string> {
-    if (suffixReads) return suffixReads[j + 1];
+    if (suffixReads) return suffixReads[endIndex + 1];
     const readsAfter = new Set<string>();
-    for (let k = j + 1; k < statementsLen; k++) {
-        for (const r of stmtInfos[k].reads) readsAfter.add(r);
+    for (let k = endIndex + 1; k < statementsLen; k++) {
+        for (const readVar of stmtInfos[k].reads) readsAfter.add(readVar);
     }
     return readsAfter;
 }
 
 function resolveLineSpan(
-    i: number,
-    j: number,
+    startIndex: number,
+    endIndex: number,
     statements: readonly ts.Statement[],
     sf: ts.SourceFile,
     stmtStartLines?: Int32Array,
     stmtEndLines?: Int32Array,
 ): FunctionSliceRange {
     if (stmtStartLines && stmtEndLines) {
-        return { startLine: stmtStartLines[i], endLine: stmtEndLines[j] };
+        return { startLine: stmtStartLines[startIndex], endLine: stmtEndLines[endIndex] };
     }
-    const startPos = sf.getLineAndCharacterOfPosition(statements[i].getStart(sf));
-    const endPos = sf.getLineAndCharacterOfPosition(statements[j].getEnd());
+    const startPos = sf.getLineAndCharacterOfPosition(statements[startIndex].getStart(sf));
+    const endPos = sf.getLineAndCharacterOfPosition(statements[endIndex].getEnd());
     return { startLine: startPos.line + 1, endLine: endPos.line + 1 };
 }
 
@@ -317,22 +317,22 @@ function computeDependencyScore(inputCount: number, outputCount: number): number
 }
 
 function populateSliceVariables(
-    i: number,
-    j: number,
+    startIndex: number,
+    endIndex: number,
     stmtInfos: StatementVariableInfo[],
     outReads: Set<string>,
     outWrites: Set<string>,
 ): void {
-    for (let k = i; k <= j; k++) {
-        for (const r of stmtInfos[k].reads) outReads.add(r);
-        for (const w of stmtInfos[k].writes) outWrites.add(w);
+    for (let k = startIndex; k <= endIndex; k++) {
+        for (const readVar of stmtInfos[k].reads) outReads.add(readVar);
+        for (const writtenVar of stmtInfos[k].writes) outWrites.add(writtenVar);
     }
 }
 
 function evaluateSliceRange(
     statements: readonly ts.Statement[],
-    i: number,
-    j: number,
+    startIndex: number,
+    endIndex: number,
     sf: ts.SourceFile,
     paramNames: Set<string>,
     stmtInfos: StatementVariableInfo[],
@@ -349,15 +349,22 @@ function evaluateSliceRange(
     sliceReads.clear();
     sliceWrites.clear();
 
-    populateSliceVariables(i, j, stmtInfos, sliceReads, sliceWrites);
+    populateSliceVariables(startIndex, endIndex, stmtInfos, sliceReads, sliceWrites);
 
-    const writesBefore = resolveWritesBefore(i, stmtInfos, prefixWrites);
-    const readsAfter = resolveReadsAfter(j, statements.length, stmtInfos, suffixReads);
+    const writesBefore = resolveWritesBefore(startIndex, stmtInfos, prefixWrites);
+    const readsAfter = resolveReadsAfter(endIndex, statements.length, stmtInfos, suffixReads);
 
     const inputVars = collectInputVariables(sliceReads, paramNames, writesBefore, sliceWrites);
     const outputVars = collectOutputVariables(sliceWrites, readsAfter);
     const dependencyCount = computeDependencyScore(inputVars.length, outputVars.length);
-    const sliceRange = resolveLineSpan(i, j, statements, sf, stmtStartLines, stmtEndLines);
+    const sliceRange = resolveLineSpan(
+        startIndex,
+        endIndex,
+        statements,
+        sf,
+        stmtStartLines,
+        stmtEndLines,
+    );
     const { signature, template } = buildExtractSignature(helperName, inputVars, outputVars);
 
     return {
@@ -369,8 +376,8 @@ function evaluateSliceRange(
         inputVariables: inputVars,
         outputVariables: outputVars,
         templateSnippet: template,
-        startIndex: i,
-        endIndex: j,
+        startIndex,
+        endIndex,
     };
 }
 

@@ -325,6 +325,31 @@ class Reader {
 }
 
 /**
+ * Write an optional floating-point metric field.
+ *
+ * @param writer - Target binary buffer writer.
+ * @param value - Optional numeric value to encode.
+ */
+function writeOptionalMetricField(writer: Writer, value: number | undefined): void {
+    if (value !== undefined) {
+        writer.writeU8(1);
+        writer.writeFloat64(value);
+    } else {
+        writer.writeU8(0);
+    }
+}
+
+/**
+ * Decode an optional floating-point metric field.
+ *
+ * @param reader - Sequential binary buffer reader.
+ * @returns Decoded numeric value or undefined if absent.
+ */
+function decodeOptionalMetricField(reader: Reader): number | undefined {
+    return reader.readU8() ? reader.readFloat64() : undefined;
+}
+
+/**
  * Encode a batch of per-file results into the PR50 binary transport buffer.
  *
  * Writes the magic header and file count, then per file its path, optional metric, and every
@@ -350,6 +375,11 @@ export function encodeResults(results: FileResult[]): Buffer {
             writer.writeVarint(metric.maxNestingDepth);
             writer.writeVarint(metric.topLevelDeclarations);
             writer.writeVarint(metric.exportedSymbols);
+            writeOptionalMetricField(writer, metric.effectiveDensity);
+            writeOptionalMetricField(writer, metric.tspr);
+            writeOptionalMetricField(writer, metric.por);
+            writeOptionalMetricField(writer, metric.columnDensity);
+            writeOptionalMetricField(writer, metric.compositeDensity);
         } else {
             writer.writeU8(0);
         }
@@ -394,14 +424,30 @@ export function encodeResults(results: FileResult[]): Buffer {
 function decodeMetric(reader: Reader, file: string): FileMetric | null {
     const hasMetric = reader.readU8();
     if (!hasMetric) return null;
+    const lines = reader.readVarint();
+    const nonBlankLines = reader.readVarint();
+    const functions = reader.readVarint();
+    const maxNestingDepth = reader.readVarint();
+    const topLevelDeclarations = reader.readVarint();
+    const exportedSymbols = reader.readVarint();
+    const effectiveDensity = decodeOptionalMetricField(reader);
+    const tspr = decodeOptionalMetricField(reader);
+    const por = decodeOptionalMetricField(reader);
+    const columnDensity = decodeOptionalMetricField(reader);
+    const compositeDensity = decodeOptionalMetricField(reader);
     return {
         file,
-        lines: reader.readVarint(),
-        nonBlankLines: reader.readVarint(),
-        functions: reader.readVarint(),
-        maxNestingDepth: reader.readVarint(),
-        topLevelDeclarations: reader.readVarint(),
-        exportedSymbols: reader.readVarint(),
+        lines,
+        nonBlankLines,
+        functions,
+        maxNestingDepth,
+        topLevelDeclarations,
+        exportedSymbols,
+        ...(effectiveDensity !== undefined ? { effectiveDensity } : {}),
+        ...(tspr !== undefined ? { tspr } : {}),
+        ...(por !== undefined ? { por } : {}),
+        ...(columnDensity !== undefined ? { columnDensity } : {}),
+        ...(compositeDensity !== undefined ? { compositeDensity } : {}),
     };
 }
 

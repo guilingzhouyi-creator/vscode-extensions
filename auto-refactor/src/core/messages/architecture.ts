@@ -189,4 +189,30 @@ export const ArchitectureMessages = {
             'pass-through wrappers inflate cognitive complexity without adding resilience.',
         risk: RISK_MEDIUM,
     }),
+
+    // ARCH-PLM-001: Plumbing and wiring overhead ratio
+    /**
+     * Build the ARCH-PLM-001 descriptor for excessive wiring/plumbing code.
+     *
+     * @param file - File path containing excessive wiring.
+     * @param por - Measured plumbing overhead ratio.
+     * @param tspr - Measured token semantic payload ratio.
+     * @param threshold - Maximum allowable plumbing ratio.
+     * @returns Fresh descriptor with Medium risk and wiring reduction guidance.
+     */
+    PLUMBING_OVERHEAD_RATIO: (
+        file: string,
+        por: number,
+        tspr: number,
+        threshold: number,
+    ): DiagnosticDescriptor => ({
+        message:
+            `Plumbing overhead ratio (${(por * 100).toFixed(1)}%) in '${file}' exceeds threshold ` +
+            `(${(threshold * 100).toFixed(1)}%); wiring code dominates logic payload (TSPR: ${(tspr * 100).toFixed(1)}%).`,
+        suggestion:
+            'De-escalate empty forwarding trampolines, inline one-line adapters, or enrich facade with domain validation.',
+        rationale:
+            'Modules dominated by import/export wiring and superficial forwarding wrappers obscure real domain logic and dilute codebase density.',
+        risk: RISK_MEDIUM,
+    }),
 } as const;

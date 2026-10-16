@@ -12,6 +12,7 @@
 import type { NormalizedNode } from '../core/ast/multilang';
 import type { LoopSite } from '../core/intelligence/semanticComplexity';
 import { isBoundedCollection } from '../core/intelligence/semanticComplexity';
+import { calculateLoopStateEntropy } from '../core/intelligence/payload-density';
 
 /**
  * Maximum window of lines inside a loop body inspected for allocations and blocking I/O.
@@ -103,30 +104,63 @@ function braceMatchedEnd(masked: string[], headerLine: number, cap: number): num
  * @param masked - Masked lines of the file, so braces inside strings never unbalance the match.
  * @param headerLine - 1-based line of the loop header.
  * @param endLine - Last line that may belong to the body (function end).
+ * @param rawLines - Raw file lines to fall back on when the masked line is completely blanked.
  * @returns Inclusive 1-based line range of the body.
  */
 function loopBodyRange(
     masked: string[],
     headerLine: number,
     endLine: number,
+    rawLines: string[] = [],
 ): { from: number; to: number } {
+    const cap = Math.min(endLine, headerLine + MAX_LOOP_INSPECTION_WINDOW_LINES);
     if (masked.length === 0) {
-        return {
-            from: headerLine,
-            to: Math.min(endLine, headerLine + MAX_LOOP_INSPECTION_WINDOW_LINES),
-        };
+        return { from: headerLine, to: cap };
     }
-    const header = masked[headerLine - 1] ?? '';
+    let targetLines = masked;
+    let header = masked[headerLine - 1] ?? '';
+    if (header.trim().length === 0 && rawLines.length >= headerLine) {
+        targetLines = rawLines;
+        header = rawLines[headerLine - 1] ?? '';
+    }
+
     const afterParen = header.slice(header.lastIndexOf(')') + 1);
     if (header.indexOf('{', header.lastIndexOf(')') + 1) >= 0) {
-        const cap = Math.min(endLine, headerLine + MAX_LOOP_INSPECTION_WINDOW_LINES);
-        return { from: headerLine, to: braceMatchedEnd(masked, headerLine, cap) };
+        return { from: headerLine, to: braceMatchedEnd(targetLines, headerLine, cap) };
     }
     if (afterParen.trim().length > 0) return { from: headerLine, to: headerLine };
-    for (let l = headerLine + 1; l <= endLine; l++) {
-        if ((masked[l - 1] ?? '').trim().length > 0) return { from: headerLine, to: l };
+    for (let l = headerLine + 1; l <= cap; l++) {
+        if ((targetLines[l - 1] ?? '').trim().length > 0) return { from: headerLine, to: l };
     }
     return { from: headerLine, to: headerLine };
+}
+
+const MUTATION_RE =
+    /(?:[=+\-*/%&|^]|\b(?:push|pop|shift|unshift|set|add|delete|clear|splice)\s*\()/;
+const SIDE_EFFECT_RE =
+    /(?:console\.|fs\.|print\s*\(|write\s*\(|send\s*\(|emit\s*\(|emit_signal\s*\(|\b(?:dispose|close|destroy|cleanup|release|cancel|unsubscribe|flush)\s*\()/;
+
+function isCommentLine(trimmed: string): boolean {
+    return (
+        trimmed.startsWith('//') ||
+        trimmed.startsWith('#') ||
+        trimmed.startsWith('/*') ||
+        trimmed.startsWith('*')
+    );
+}
+
+function extractLoopStatementText(trimmed: string): string | null {
+    if (!LOOP_HEADER_RE.test(trimmed)) {
+        return trimmed;
+    }
+    const lastClose = trimmed.lastIndexOf(')');
+    if (lastClose < 0) return null;
+    const afterParen = trimmed.slice(lastClose + 1).replace(/[{}]/g, '').trim();
+    return afterParen.length > 0 ? afterParen : null;
+}
+
+function isPunctuationOrPass(text: string): boolean {
+    return text.length === 0 || text === '{' || text === '}' || text === 'pass';
 }
 
 /**
@@ -143,18 +177,49 @@ function inspectLoopBody(
     from: number,
     to: number,
     transientRegex: RegExp = TRANSIENT_TS_CONTAINER_RE,
-): { hasTransientAllocation: boolean; hasBlockingIo: boolean } {
+): {
+    hasTransientAllocation: boolean;
+    hasBlockingIo: boolean;
+    isTautological: boolean;
+    deltaEntropy: number;
+} {
     let hasTransientAllocation = false;
     let hasBlockingIo = false;
+    let stateMutationsCount = 0;
+    let hasSideEffects = false;
+    let effectiveStatements = 0;
+
     for (let l = from; l <= to && l <= lines.length; l++) {
         const txt = lines[l - 1] ?? '';
+        const trimmed = txt.trim();
+        if (isCommentLine(trimmed)) {
+            continue;
+        }
+        const statementText = extractLoopStatementText(trimmed);
+        if (statementText && !isPunctuationOrPass(statementText)) {
+            effectiveStatements++;
+            if (MUTATION_RE.test(statementText)) {
+                stateMutationsCount++;
+            }
+            if (SIDE_EFFECT_RE.test(statementText)) {
+                hasSideEffects = true;
+            }
+        }
         if (!hasTransientAllocation && transientRegex.test(txt)) {
             hasTransientAllocation = true;
         }
-        if (!hasBlockingIo && BLOCKING_IO_RE.test(txt)) hasBlockingIo = true;
-        if (hasTransientAllocation && hasBlockingIo) break;
+        if (!hasBlockingIo && BLOCKING_IO_RE.test(txt)) {
+            hasBlockingIo = true;
+        }
     }
-    return { hasTransientAllocation, hasBlockingIo };
+
+    const { deltaEntropy, isTautological } = calculateLoopStateEntropy(
+        Math.max(1, effectiveStatements + 5),
+        stateMutationsCount,
+        hasSideEffects || hasBlockingIo,
+    );
+
+    return { hasTransientAllocation, hasBlockingIo, isTautological, deltaEntropy };
 }
 
 /**
@@ -191,7 +256,7 @@ export function findLoopSitesInFunction(
         if (!LOOP_HEADER_RE.test(lineText)) continue;
 
         const scaleVariable = resolveLoopScaleVariable(lineText);
-        const body = loopBodyRange(masked, l, endLine);
+        const body = loopBodyRange(masked, l, endLine, lines);
         sites.push({
             file: filePath,
             line: l,

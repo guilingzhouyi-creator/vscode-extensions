@@ -129,12 +129,14 @@ const RULE_DTO_CREDENTIAL_LEAK = 'ARCH-LEAK-002';
 const RULE_HEADLESS_BREACH = 'ARCH-HDL-001';
 const RULE_BOUNDARY_BYPASS = 'ARCH-BND-001';
 const RULE_PARSER_COUPLING = 'ARCH-DEC-002';
+const RULE_PLUMBING = 'ARCH-PLM-001';
 
 /** Actionable code and action constants */
 const CODE_ACTION_FACADE = 'AR:ARC:001';
 const CODE_ACTION_TRAMPOLINE = 'AR:ARC:002';
 const CODE_ACTION_INVERT = 'AR:ARC:003';
 const CODE_ACTION_DECOMPOSE = 'AR:ARC:004';
+const CODE_ACTION_PLUMBING = 'AR:ARC:005';
 
 const ACTION_DECOUPLE: AgentActionType = 'decouple_facade';
 const ACTION_REPLACE: AgentActionType = 'replace_token';
@@ -146,6 +148,8 @@ const SNIPPET_FACADE = 'export const ModuleFacade = Object.freeze({ ... });';
 const SNIPPET_TRAMPOLINE = '// Melt single-target trampoline; import directly from source';
 const SNIPPET_INVERT = '// Invert dependency via interface or port/adapter';
 const SNIPPET_DECOMPOSE = '// Extract shared contracts to domain-level shared module';
+const SNIPPET_PLUMBING =
+    '// De-escalate empty wiring; enrich with domain logic or consolidate adapters';
 
 const createActionSpec = (
     action: AgentActionType,
@@ -170,6 +174,11 @@ const ACTION_SPEC_DECOMPOSE = createActionSpec(
     CODE_ACTION_DECOMPOSE,
     SNIPPET_DECOMPOSE,
 );
+const ACTION_SPEC_PLUMBING = createActionSpec(
+    ACTION_DECOUPLE,
+    CODE_ACTION_PLUMBING,
+    SNIPPET_PLUMBING,
+);
 
 const ARCH_ACTIONABLE_MAP: Record<string, ActionableSpec> = {
     [RULE_FACADE]: ACTION_SPEC_FACADE,
@@ -180,6 +189,7 @@ const ARCH_ACTIONABLE_MAP: Record<string, ActionableSpec> = {
     [RULE_DOMAIN_LEAK_LEGACY]: ACTION_SPEC_INVERT,
     [RULE_DIRECTION_BREACH]: ACTION_SPEC_DECOMPOSE,
     [RULE_DIRECTION_BREACH_LEGACY]: ACTION_SPEC_DECOMPOSE,
+    [RULE_PLUMBING]: ACTION_SPEC_PLUMBING,
 };
 
 /** Diagnostic suggestion prose constants */

@@ -4,12 +4,30 @@
  * Architecture Role: Quantifies true semantic contribution versus maintained boilerplate,
  *   penalizing artificial function splitting, empty forwarding wrappers, and trivial getters.
  *   Calculates effective code density ratio, non-ELOC noise index, and Gaussian health score.
- * Dependencies & Triggers: Pure function over source code string and language tag.
+ * Dependencies & Triggers: Pure function over source code string and language tag. Consumes
+ *   tokenizeCode, calculateTokenShannonEntropy, calculateGoldilocksEntropyFactor,
+ *   calculateColumnDensity from ../intelligence/token-entropy, and calculateWeightedTokenPayload,
+ *   calculateFunctionReuseMetrics, calculateCompositeEffectiveDensity
+ *   from ../intelligence/payload-density.
  * Responsibilities: Count total LOC, detect forwarding methods and trivial boilerplate,
  *   compute effective code density ratio (rho_eff), noise index (kappa_noise),
- *   and continuous Gaussian density health (eta_health).
- * Exit Semantics & Design Rationale: Bounded 0.0-1.0 ratios, deterministic line analysis.
+ *   continuous Gaussian density health (eta_health), token semantic payload ratio (TSPR),
+ *   plumbing overhead ratio (POR), single-use function rate (SUFR), and composite density tensor.
+ * Exit Semantics & Design Rationale: Bounded 0.0-1.0 ratios, deterministic line analysis,
+ *   and zero transient heap allocation in high-frequency calculation loops.
  */
+
+import {
+    tokenizeCode,
+    calculateTokenShannonEntropy,
+    calculateGoldilocksEntropyFactor,
+    calculateColumnDensity,
+} from '../intelligence/token-entropy';
+import {
+    calculateWeightedTokenPayload,
+    calculateFunctionReuseMetrics,
+    calculateCompositeEffectiveDensity,
+} from '../intelligence/payload-density';
 
 /**
  * Result of effective code density evaluation.
@@ -23,6 +41,13 @@ export interface EffectiveDensityResult {
     noiseIndex: number;
     gaussianHealth: number;
     isLowDensity: boolean;
+    tokenCount?: number;
+    tokensPerEloc?: number;
+    columnDensity?: number;
+    tspr?: number;
+    por?: number;
+    sufr?: number;
+    compositeDensity?: number;
 }
 
 /**
@@ -102,16 +127,83 @@ export function calculateGaussianDensityHealth(
     return Math.round(health * 1000) / 1000;
 }
 
+const FUNCTION_KEYWORD_SET = new Set(['function', 'def', 'func', 'fn']);
+const IDENTIFIER_PATTERN = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/;
+const STANDALONE_BOILERPLATE = new Set(['{', '}', 'return;', 'pass']);
+
+function collectDeclaredFunctionNames(rawTokens: readonly string[]): Set<string> {
+    const declaredNames = new Set<string>();
+    const maxIdx = rawTokens.length - 1;
+    for (let i = 0; i < maxIdx; i++) {
+        if (!FUNCTION_KEYWORD_SET.has(rawTokens[i])) continue;
+        const next = rawTokens[i + 1];
+        if (next && IDENTIFIER_PATTERN.test(next)) {
+            declaredNames.add(next);
+        }
+    }
+    return declaredNames;
+}
+
+function countTokenFrequencies(
+    tokens: readonly string[],
+    targets: Set<string>,
+): Map<string, number> {
+    const freqMap = new Map<string, number>();
+    for (let i = 0; i < tokens.length; i++) {
+        const token = tokens[i];
+        if (targets.has(token)) {
+            const cur = freqMap.get(token) || 0;
+            freqMap.set(token, cur + 1);
+        }
+    }
+    return freqMap;
+}
+
+/**
+ * Extracts fan-in invocation count approximation for declared functions from token stream.
+ *
+ * @param rawTokens - Flat array of code tokens.
+ * @returns Array of invocation counts per declared function symbol.
+ */
+function extractDeclaredFunctionFanIns(rawTokens: readonly string[]): number[] {
+    if (rawTokens.length < 2) return [];
+
+    const declaredNames = collectDeclaredFunctionNames(rawTokens);
+    if (declaredNames.size === 0) return [];
+
+    const freqMap = countTokenFrequencies(rawTokens, declaredNames);
+    const fanIns: number[] = [];
+    for (const name of declaredNames) {
+        const count = freqMap.get(name) || 0;
+        fanIns.push(Math.max(0, count - 1));
+    }
+    return fanIns;
+}
+
+function evaluateLineBoilerplateWeight(trimmed: string): { weight: number; isForwarding: boolean } {
+    if (isTrivialForwarder(trimmed)) {
+        return { weight: 1.0, isForwarding: true };
+    }
+    if (
+        STANDALONE_BOILERPLATE.has(trimmed) ||
+        trimmed.includes('throw new Error("Not implemented")')
+    ) {
+        return { weight: 0.5, isForwarding: false };
+    }
+    return { weight: 0.0, isForwarding: false };
+}
+
 /**
  * Calculates effective code density and noise metrics across source content.
  *
  * @param content - Source code text to analyze.
- * @param _language - Optional programming language tag.
- * @returns Breakdown of useful LOC, boilerplate LOC, density ratio, noise index, and health.
+ * @param language - Optional programming language tag.
+ * @returns Breakdown of useful LOC, boilerplate LOC, density ratio,
+ *   noise index, and tensor metrics.
  */
 export function computeEffectiveCodeDensity(
     content: string,
-    _language: string = 'typescript',
+    language: string = 'typescript',
 ): EffectiveDensityResult {
     const lines = content.split(/\r?\n/);
     let totalLoc = 0;
@@ -124,19 +216,10 @@ export function computeEffectiveCodeDensity(
         }
         totalLoc++;
 
-        const trimmed = line.trim();
-        // Check single-line stubs or forwarding calls
-        if (isTrivialForwarder(trimmed)) {
-            boilerplateLoc += 1;
+        const evalResult = evaluateLineBoilerplateWeight(line.trim());
+        boilerplateLoc += evalResult.weight;
+        if (evalResult.isForwarding) {
             forwardingCount++;
-        } else if (
-            trimmed === '{' ||
-            trimmed === '}' ||
-            trimmed === 'return;' ||
-            trimmed === 'pass' ||
-            trimmed.includes('throw new Error("Not implemented")')
-        ) {
-            boilerplateLoc += 0.5;
         }
     }
 
@@ -144,6 +227,45 @@ export function computeEffectiveCodeDensity(
     const effectiveDensity = totalLoc > 0 ? Math.round((usefulLoc / totalLoc) * 100) / 100 : 1.0;
     const noiseIndex = calculateNoiseIndex(totalLoc, usefulLoc);
     const gaussianHealth = calculateGaussianDensityHealth(noiseIndex);
+    const isLowDensity = totalLoc >= 15 && effectiveDensity < 0.55;
+
+    // Advanced token density and payload tensor integration
+    const tokenStream = tokenizeCode(content, language);
+    const tokenCount = tokenStream.tokens.length;
+
+    let tokensPerEloc = 0;
+    let columnDensity = 0;
+    let tspr = 0;
+    let por = 0;
+    let sufr = 0;
+    let compositeDensity = 0;
+
+    if (tokenCount > 0) {
+        const eloc = Math.max(1, usefulLoc);
+        const colMetrics = calculateColumnDensity(tokenCount, eloc);
+        tokensPerEloc = colMetrics.tokensPerEloc;
+        columnDensity = colMetrics.columnDensity;
+
+        const payloadMetrics = calculateWeightedTokenPayload(tokenStream.tokens);
+        tspr = payloadMetrics.tspr;
+        por = payloadMetrics.por;
+
+        const fanIns = extractDeclaredFunctionFanIns(tokenStream.rawTokens);
+        const reuseMetrics = calculateFunctionReuseMetrics(fanIns);
+        sufr = reuseMetrics.sufr;
+
+        const entropyResult = calculateTokenShannonEntropy(tokenStream.rawTokens);
+        const entropyFactor = calculateGoldilocksEntropyFactor(entropyResult.entropy);
+
+        compositeDensity = calculateCompositeEffectiveDensity({
+            lineDensity: effectiveDensity,
+            columnDensity,
+            reuseDensity: fanIns.length > 0 ? reuseMetrics.reuseDensity : effectiveDensity,
+            sharedDensity: effectiveDensity,
+            payloadDensity: tspr,
+            entropyFactor,
+        });
+    }
 
     return {
         totalLoc,
@@ -153,6 +275,13 @@ export function computeEffectiveCodeDensity(
         effectiveDensity,
         noiseIndex,
         gaussianHealth,
-        isLowDensity: totalLoc >= 15 && effectiveDensity < 0.55,
+        isLowDensity,
+        tokenCount,
+        tokensPerEloc,
+        columnDensity,
+        tspr,
+        por,
+        sufr,
+        compositeDensity,
     };
 }

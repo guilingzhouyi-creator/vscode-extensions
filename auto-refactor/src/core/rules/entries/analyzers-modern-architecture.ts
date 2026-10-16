@@ -240,6 +240,12 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
         'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-fac-001',
     ),
     defineArchitectureRule(
+        'ARCH-PLM-001',
+        'Plumbing overhead ratio (POR) exceeds threshold; wiring code dominates logic payload.',
+        'De-escalate empty forwarding trampolines, inline one-line adapters, or enrich facade with domain validation.',
+        'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-plm-001',
+    ),
+    defineArchitectureRule(
         'ARCH-ROL-001',
         'File entity role imbalance and pseudo-shared library: file carries excessive mutable' +
             'state or coupled logic but is heavily imported as a shared library.',
@@ -431,6 +437,19 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
         remediation:
             'Pre-build inner dataset into Map/Set indices to reduce composite complexity to O(N).',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#cpx-time-001',
+    }),
+    defineRule({
+        id: 'CPX-TRV-001',
+        family: RULE_FAMILY_COMPLEXITY,
+        analyzer: ANALYZER_COMPLEXITY,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            'Tautological loop traversal detected with zero or negligible state mutation entropy delta.',
+        remediation:
+            'Eliminate vacuous iteration loop or replace with direct expression / slice lookup.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#cpx-trv-001',
     }),
     defineRule({
         id: 'DAT-DEF-001',

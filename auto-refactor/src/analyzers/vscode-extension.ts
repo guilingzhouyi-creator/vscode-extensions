@@ -11,6 +11,7 @@
  *   5. VSC-UI-002: Guard against hardcoded colors without VS Code theme variables.
  *   6. VSC-PERF-002: Guard against CSS transitions on geometry layout properties causing reflow.
  *   7. VSC-UI-003: Guard against interactive form controls lacking accessible labels (A11y).
+ *   8. VSC-UI-004: Guard against dynamic border jitter in interactive states.
  * Exit Semantics & Design Rationale: Pure, fail-safe scanner returning Issue[]. Zero throw.
  */
 
@@ -251,6 +252,22 @@ export class VscodeExtensionAnalyzer implements Analyzer {
             );
         }
 
+        // 8. VSC-UI-004: Webview interactive dynamic border jitter guard
+        const borderJitterViolations = this.detectDynamicBorderJitter(raw);
+        for (const b of borderJitterViolations) {
+            issues.push(
+                makeVscIssue(
+                    file,
+                    b.line,
+                    'VSC-UI-004',
+                    SEVERITY_WARNING,
+                    'Webview interactive state style changes must not dynamically modify border width triggering layout jitter.',
+                    'Use box-shadow: inset 0 0 0 <width> <color> or static transparent borders for hover/active states.',
+                    { line: b.line, text: b.text },
+                ),
+            );
+        }
+
         return issues;
     }
 
@@ -346,6 +363,19 @@ export class VscodeExtensionAnalyzer implements Analyzer {
                         violations.push({ line: i + 1, text: line.trim(), tag });
                     }
                 }
+            }
+        }
+        return violations;
+    }
+
+    private detectDynamicBorderJitter(rawLines: string[]): Array<{ line: number; text: string }> {
+        const violations: Array<{ line: number; text: string }> = [];
+        const jitterRe =
+            /:(?:hover|focus|focus-visible|active)\b[^{]*\{[^}]*?\bborder(?:-width)?\s*:\s*[1-9]\d*px/i;
+        for (let i = 0; i < rawLines.length; i++) {
+            const line = rawLines[i];
+            if (jitterRe.test(line)) {
+                violations.push({ line: i + 1, text: line.trim() });
             }
         }
         return violations;

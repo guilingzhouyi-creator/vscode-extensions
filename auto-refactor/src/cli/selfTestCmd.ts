@@ -169,20 +169,36 @@ export const EXPECTED_PAIRS: Array<{ pair: string; why: string }> = [
  * @returns Result with exit code 0 when every expected pair fired, 1 when any pair is missing,
  *          or 2 when fixture setup or the underlying scan fails, plus the rendered report text.
  */
+const UTF8 = 'utf8';
+
+function materializeFixtureFiles(
+    fixtureRoot: string,
+    fixtureFiles: ReadonlyArray<{ rel: string; content: string }>,
+): void {
+    const FIXTURE_ITEMS = fixtureFiles;
+    for (const item of FIXTURE_ITEMS) {
+        const abs = path.join(fixtureRoot, item.rel);
+        fs.mkdirSync(path.dirname(abs), { recursive: true });
+        fs.writeFileSync(abs, item.content, UTF8);
+    }
+}
+
+/**
+ * Executes built-in end-to-end self-test suite on synthetic fixtures.
+ *
+ * @param _args - Command-line arguments.
+ * @returns Resulting exit code and text output report.
+ */
 export async function selfTestCommand(_args: string[]): Promise<{ code: number; text: string }> {
     const lines: string[] = [];
     const fixtureRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'auto-refactor-selftest-'));
     try {
         const { files, config } = buildFixtures();
-        for (const f of files) {
-            const abs = path.join(fixtureRoot, f.rel);
-            fs.mkdirSync(path.dirname(abs), { recursive: true });
-            fs.writeFileSync(abs, f.content, 'utf8');
-        }
+        materializeFixtureFiles(fixtureRoot, files);
         fs.writeFileSync(
             path.join(fixtureRoot, 'auto-refactor.config.json'),
             JSON.stringify(config, null, 2),
-            'utf8',
+            UTF8,
         );
 
         // Use the real scanAndRender pipeline (exemption, dependency-graph and baseline phases);

@@ -156,7 +156,57 @@ export function getWebviewHtml(): string {
   console.log('  [PASS] 4. VSC-UI-002 passes with proper VS Code theme CSS variables');
 })();
 
-// ── Test 5: Scoring Dimension Deduction Integration ──
+// ── Test 5: VSC-UI-004 Dynamic Border Jitter Guard ──
+(function testDynamicBorderJitter() {
+  const jitterSource = `
+export function getStyles(): string {
+    return \`
+        <style>
+            .button:hover { border: 1px solid var(--vscode-focusBorder); }
+            .input:focus { border-width: 2px; }
+        </style>
+    \`;
+}
+`;
+  const jitterIssues = analyzer.analyze(null, {
+    filePath: 'src/ui/button.ts',
+    content: jitterSource,
+  });
+  const vscUi004Violations = jitterIssues.filter((i) => i.rule === 'VSC-UI-004');
+  assert.strictEqual(
+    vscUi004Violations.length,
+    2,
+    'Must detect dynamic border mutation on hover/focus',
+  );
+  assert.strictEqual(vscUi004Violations[0].severity, 'warning');
+  assert.ok(vscUi004Violations[0].message.includes('border width triggering layout jitter'));
+
+  // Compliant version using box-shadow inset or border-color transition
+  const nonJitterSource = `
+export function getStyles(): string {
+    return \`
+        <style>
+            .button:hover { box-shadow: inset 0 0 0 1px var(--vscode-focusBorder); }
+            .input:focus { border-color: var(--vscode-focusBorder); }
+        </style>
+    \`;
+}
+`;
+  const nonJitterIssues = analyzer.analyze(null, {
+    filePath: 'src/ui/button.ts',
+    content: nonJitterSource,
+  });
+  assert.strictEqual(
+    nonJitterIssues.filter((i) => i.rule === 'VSC-UI-004').length,
+    0,
+    'box-shadow inset and border-color transitions must not trigger VSC-UI-004',
+  );
+  console.log(
+    '  [PASS] 5. VSC-UI-004 flags dynamic border jitter and passes with box-shadow inset',
+  );
+})();
+
+// ── Test 6: Scoring Dimension Deduction Integration ──
 (function testDimensionScoringIntegration() {
   const vscUi001Issue = {
     id: 'vscode-extension:VSC-UI-001:file.ts:1',
@@ -174,6 +224,15 @@ export function getWebviewHtml(): string {
     message: 'Webview UI contains hardcoded color #000000 instead of theme CSS variables.',
   };
 
+  const vscUi004Issue = {
+    id: 'vscode-extension:VSC-UI-004:file.ts:1',
+    analyzer: 'vscode-extension',
+    rule: 'VSC-UI-004',
+    severity: 'warning',
+    message:
+      'Webview interactive state style changes must not dynamically modify border width triggering layout jitter.',
+  };
+
   const rule001 = DIMENSION_RULES.find(
     (r) => r.analyzer === vscUi001Issue.analyzer && r.covers(vscUi001Issue),
   );
@@ -186,7 +245,15 @@ export function getWebviewHtml(): string {
   assert.notStrictEqual(rule002, undefined, 'VSC-UI-002 must be mapped in DIMENSION_RULES');
   assert.strictEqual(rule002.dimension, DIMENSION_ARCHITECTURE_CONSISTENCY);
 
-  console.log('  [PASS] 5. VSC-UI-001 and VSC-UI-002 map to correct scoring quality dimensions');
+  const rule004 = DIMENSION_RULES.find(
+    (r) => r.analyzer === vscUi004Issue.analyzer && r.covers(vscUi004Issue),
+  );
+  assert.notStrictEqual(rule004, undefined, 'VSC-UI-004 must be mapped in DIMENSION_RULES');
+  assert.strictEqual(rule004.dimension, DIMENSION_PERFORMANCE_EFFICIENCY);
+
+  console.log(
+    '  [PASS] 6. VSC-UI-001, VSC-UI-002, and VSC-UI-004 map to correct scoring quality dimensions',
+  );
 })();
 
 console.log('\nAll VS Code Extension UI Folding & Theme Hygiene Tests Passed successfully.');

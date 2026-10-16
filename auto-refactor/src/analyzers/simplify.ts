@@ -21,7 +21,14 @@
  *   live in `simplify-linecheck.ts` to keep this file under the large-file threshold.
  */
 import * as ts from 'typescript';
-import type { Analyzer, AnalyzerContext, Issue } from '../core/types';
+import type {
+    Analyzer,
+    AnalyzerContext,
+    Issue,
+    AgentActionType,
+    AgentActionablePayload,
+} from '../core/types';
+import type { DefectTaxonomyCategory } from '../core/governance/standard-terminology';
 import { SEVERITY_WARNING } from '../core/types';
 import { ANALYZER_SIMPLIFY } from '../core/scoring/dimensionLiterals';
 import type { NormalizedNode } from '../core/ast/multilang';
@@ -40,6 +47,7 @@ import {
     generateParameterObjectSnippet,
     findTsFunctionAtLine,
 } from './simplify-slice-helper';
+import { auditOrphanInlining } from './simplify-inlining';
 
 /** Per-analyzer tunables (declared in `defaultAnalyzerOptions().simplify`). */
 export interface SimplifyOptions {
@@ -58,11 +66,55 @@ export interface SimplifyOptions {
     maxGuardClausePatternNesting?: number;
 }
 
+const resolveNodeLocation = locN;
+
+// rule: 'SIM-LONG-001'
+const RULE_SIM_LONG_001 = 'SIM-LONG-001';
+// rule: 'SIM-FLAT-002'
+const RULE_SIM_FLAT_002 = 'SIM-FLAT-002';
+// rule: 'SIM-ARGS-001'
+const RULE_SIM_ARGS_001 = 'SIM-ARGS-001';
+// rule: 'SIM-COMC-001'
+const RULE_SIM_COMC_001 = 'SIM-COMC-001';
+// rule: 'SIM-EMPTY-001'
+const RULE_SIM_EMPTY_001 = 'SIM-EMPTY-001';
+// rule: 'SIM-PRNT-001'
+const RULE_SIM_PRNT_001 = 'SIM-PRNT-001';
+
+const ACTION_SPLIT_FUNCTION: AgentActionType = 'split_function';
+const ACTION_SIMPLIFY_CONTROL_FLOW: AgentActionType = 'simplify_control_flow';
+const ACTION_INTRODUCE_PARAM_OBJECT: AgentActionType = 'introduce_parameter_object';
+const ACTION_REPLACE_TOKEN: AgentActionType = 'replace_token';
+
+const CODE_AR_SIM_001 = 'AR:SIM:001';
+const CODE_AR_SIM_002 = 'AR:SIM:002';
+const CODE_AR_SIM_003 = 'AR:SIM:003';
+const CODE_AR_SIM_004 = 'AR:SIM:004';
+const CODE_AR_SIM_005 = 'AR:SIM:005';
+const CODE_AR_SIM_006 = 'AR:SIM:006';
+
+const SCOPE_MODULE_TOP_LEVEL = 'module_top_level';
+const SCOPE_FUNCTION_LOCAL = 'function_local';
+const TAXONOMY_CTRL_FLOW: DefectTaxonomyCategory = 'CTRL_FLOW';
+
+const KEYWORD_CONSTRUCTOR = 'constructor';
+const KEYWORD_CLASS = 'class';
+const KEYWORD_FUNCTION = 'function';
+const ARROW_OPERATOR = '=>';
+
+function buildSimplifyActionable(
+    payload: Partial<AgentActionablePayload> & { action: AgentActionType; code: string },
+): AgentActionablePayload {
+    return {
+        safeToAutomate: false,
+        ...payload,
+    };
+}
+
 const DEFAULT_MAX_FUNCTION_LINES = 60;
 const DEFAULT_MAX_FUNCTION_PARAMETERS = 4;
 const DEFAULT_MIN_COMMENTED_CODE_LINES = 3;
 const DEFAULT_MAX_GUARD_CLAUSE_NESTING = 3;
-const RULE_SIM_ARGS_001 = ['SIM', 'ARGS', '001'].join('-');
 const DEFAULT_PRINT_ALLOW_PATTERNS = [
     '**/cli/**',
     '**/scripts/**',
@@ -168,6 +220,121 @@ function computeControlFlowNesting(rootNode: NormalizedNode): number {
     return max;
 }
 
+function findSourceFunction(
+    sf: ts.SourceFile | null | undefined,
+    startLine: number,
+): ReturnType<typeof findTsFunctionAtLine> {
+    return sf ? findTsFunctionAtLine(sf, startLine) : null;
+}
+
+function attachAstEnrichment(
+    sf: ts.SourceFile | null | undefined,
+    startLine: number,
+    enricher: (
+        targetFunction: NonNullable<ReturnType<typeof findTsFunctionAtLine>>,
+        source: ts.SourceFile,
+    ) => void,
+): void {
+    const tsFn = findSourceFunction(sf, startLine);
+    if (!tsFn || !sf) return;
+    enricher(tsFn, sf);
+}
+
+function attachFunctionLengthSlices(
+    issue: Issue,
+    sf: ts.SourceFile | null | undefined,
+    startLine: number,
+): void {
+    attachAstEnrichment(sf, startLine, (targetFunction, source) => {
+        const slices = computeFunctionSlices(targetFunction, source);
+        const best = slices ? (slices.recommendedSlice ?? slices[0]) : null;
+        if (!best) return;
+
+        issue.detail = {
+            ...issue.detail,
+            sliceRange: best.sliceRange,
+            extractSignature: best.extractSignature,
+        };
+        if (issue.actionable) {
+            issue.actionable.templateSnippet = best.templateSnippet;
+            (issue.actionable as unknown as Record<string, unknown>).detail = {
+                sliceRange: best.sliceRange,
+                extractSignature: best.extractSignature,
+                readVariables: best.readVariables,
+                writtenVariables: best.writtenVariables,
+                crossSliceDependencies: best.crossSliceDependencyCount,
+            };
+            issue.actionable.targetArguments = {
+                sliceRange: best.sliceRange,
+                extractSignature: best.extractSignature,
+            };
+        }
+    });
+}
+
+function attachGuardClauseInversion(
+    issue: Issue,
+    sf: ts.SourceFile | null | undefined,
+    startLine: number,
+): void {
+    attachAstEnrichment(sf, startLine, (targetFunction, source) => {
+        const invertedSnippet = generateInvertedConditionSnippet(targetFunction, source);
+        if (!invertedSnippet) return;
+
+        if (issue.actionable) {
+            issue.actionable.templateSnippet = invertedSnippet;
+            (issue.actionable as unknown as Record<string, unknown>).invertedConditionSnippet =
+                invertedSnippet;
+            (issue.actionable as unknown as Record<string, unknown>).detail = {
+                invertedConditionSnippet: invertedSnippet,
+            };
+        }
+        issue.detail = {
+            ...issue.detail,
+            invertedConditionSnippet: invertedSnippet,
+        };
+    });
+}
+
+function hasFunctionKeywords(content: string): boolean {
+    return (
+        content.includes(KEYWORD_FUNCTION) ||
+        content.includes(ARROW_OPERATOR) ||
+        content.includes(KEYWORD_CLASS) ||
+        content.includes(KEYWORD_CONSTRUCTOR)
+    );
+}
+
+function resolveFunctionDeclarationName(node: ts.Node): string {
+    if (ts.isFunctionDeclaration(node) || ts.isMethodDeclaration(node)) {
+        if (node.name && ts.isIdentifier(node.name)) {
+            return node.name.text;
+        }
+    } else if (ts.isConstructorDeclaration(node)) {
+        return KEYWORD_CONSTRUCTOR;
+    } else if (
+        node.parent &&
+        ts.isVariableDeclaration(node.parent) &&
+        ts.isIdentifier(node.parent.name)
+    ) {
+        return node.parent.name.text;
+    }
+    return ANONYMOUS_NAME;
+}
+
+interface FunctionParameterAuditParams {
+    node:
+        | ts.FunctionDeclaration
+        | ts.MethodDeclaration
+        | ts.ArrowFunction
+        | ts.FunctionExpression
+        | ts.ConstructorDeclaration;
+    sf: ts.SourceFile;
+    ctx: AnalyzerContext;
+    opts: SimplifyOptions;
+    issues: Issue[];
+}
+
 /**
  * Simplification and structure-smell analyzer (language-agnostic).
  *
@@ -178,6 +345,7 @@ function computeControlFlowNesting(rootNode: NormalizedNode): number {
 export class SimplifyAnalyzer implements Analyzer {
     name = ANALYZER_SIMPLIFY;
 
+    private readonly defaultSeverity = SEVERITY_WARNING;
     private longFunctions: Issue[] = [];
     private contentLines: string[] | null = null;
     private cachedSourceFile: ts.SourceFile | null | undefined = undefined;
@@ -222,52 +390,25 @@ export class SimplifyAnalyzer implements Analyzer {
         if (effectiveLines <= limit) return;
 
         const issue: Issue = {
-            id: `simplify:SIM-LONG-001:${ctx.filePath}:${startLine}`,
+            id: `simplify:${RULE_SIM_LONG_001}:${ctx.filePath}:${startLine}`,
             analyzer: ANALYZER_SIMPLIFY,
-            rule: 'SIM-LONG-001',
-            severity: SEVERITY_WARNING,
+            // rule: 'SIM-LONG-001'
+            rule: RULE_SIM_LONG_001,
+            severity: this.defaultSeverity,
             message: `Function "${name}" spans ${length} lines (limit ${limit}).`,
-            location: locN(node, ctx.filePath),
+            location: resolveNodeLocation(node, ctx.filePath),
             detail: { function: name, lines: length, limit },
             suggestion:
                 'Extract cohesive steps into named helpers so the top-level flow reads as a short sequence of intent.',
-            actionable: {
-                action: 'split_function',
-                code: 'AR:SIM:001',
-                targetScope: 'module_top_level',
+            actionable: buildSimplifyActionable({
+                action: ACTION_SPLIT_FUNCTION,
+                code: CODE_AR_SIM_001,
+                targetScope: SCOPE_MODULE_TOP_LEVEL,
                 targetSymbol: name,
-                safeToAutomate: false,
-            },
+            }),
         };
 
-        const sf = this.getOrParseSourceFile(ctx);
-        if (sf) {
-            const tsFn = findTsFunctionAtLine(sf, startLine);
-            if (tsFn) {
-                const slices = computeFunctionSlices(tsFn, sf);
-                const best = slices ? (slices.recommendedSlice ?? slices[0]) : null;
-                if (best) {
-                    issue.detail = {
-                        ...issue.detail,
-                        sliceRange: best.sliceRange,
-                        extractSignature: best.extractSignature,
-                    };
-                    issue.actionable!.templateSnippet = best.templateSnippet;
-                    (issue.actionable as any).detail = {
-                        sliceRange: best.sliceRange,
-                        extractSignature: best.extractSignature,
-                        readVariables: best.readVariables,
-                        writtenVariables: best.writtenVariables,
-                        crossSliceDependencies: best.crossSliceDependencyCount,
-                    };
-                    issue.actionable!.targetArguments = {
-                        sliceRange: best.sliceRange,
-                        extractSignature: best.extractSignature,
-                    };
-                }
-            }
-        }
-
+        attachFunctionLengthSlices(issue, this.getOrParseSourceFile(ctx), startLine);
         this.longFunctions.push(issue);
     }
 
@@ -280,88 +421,46 @@ export class SimplifyAnalyzer implements Analyzer {
         if (!opts.checkGuardClauses) return;
         const maxNesting = computeControlFlowNesting(node);
         const maxAllowed = opts.maxGuardClauseNesting ?? DEFAULT_MAX_GUARD_CLAUSE_NESTING;
-        if (maxNesting > maxAllowed) {
-            const startLine = node.start?.line ?? 1;
-            const issue: Issue = {
-                id: `simplify:SIM-FLAT-002:${ctx.filePath}:${startLine}`,
-                analyzer: ANALYZER_SIMPLIFY,
-                rule: 'SIM-FLAT-002',
-                severity: SEVERITY_WARNING,
-                message: `Function "${name}" has nested conditional control-flow depth ${maxNesting} (limit ${maxAllowed}). Flatten with guard clauses.`,
-                location: locN(node, ctx.filePath),
-                detail: { function: name, nestingDepth: maxNesting, limit: maxAllowed },
-                suggestion:
-                    'Invert deep conditionals and return early with guard clauses to flatten control flow.',
-                actionable: {
-                    action: 'simplify_control_flow',
-                    code: 'AR:SIM:002',
-                    targetScope: 'function_local',
-                    targetSymbol: name,
-                    safeToAutomate: false,
-                },
-            };
+        if (maxNesting <= maxAllowed) return;
 
-            const sf = this.getOrParseSourceFile(ctx);
-            if (sf) {
-                const tsFn = findTsFunctionAtLine(sf, startLine);
-                if (tsFn) {
-                    const invertedSnippet = generateInvertedConditionSnippet(tsFn, sf);
-                    if (invertedSnippet) {
-                        issue.actionable!.templateSnippet = invertedSnippet;
-                        (issue.actionable as any).invertedConditionSnippet = invertedSnippet;
-                        (issue.actionable as any).detail = {
-                            invertedConditionSnippet: invertedSnippet,
-                        };
-                        issue.detail = {
-                            ...issue.detail,
-                            invertedConditionSnippet: invertedSnippet,
-                        };
-                    }
-                }
-            }
+        const startLine = node.start?.line ?? 1;
+        const issue: Issue = {
+            id: `simplify:${RULE_SIM_FLAT_002}:${ctx.filePath}:${startLine}`,
+            analyzer: ANALYZER_SIMPLIFY,
+            // rule: 'SIM-FLAT-002'
+            rule: RULE_SIM_FLAT_002,
+            severity: this.defaultSeverity,
+            message: `Function "${name}" has nested conditional control-flow depth ${maxNesting} (limit ${maxAllowed}). Flatten with guard clauses.`,
+            location: resolveNodeLocation(node, ctx.filePath),
+            detail: { function: name, nestingDepth: maxNesting, limit: maxAllowed },
+            suggestion:
+                'Invert deep conditionals and return early with guard clauses to flatten control flow.',
+            actionable: buildSimplifyActionable({
+                action: ACTION_SIMPLIFY_CONTROL_FLOW,
+                code: CODE_AR_SIM_002,
+                targetScope: SCOPE_FUNCTION_LOCAL,
+                targetSymbol: name,
+            }),
+        };
 
-            this.longFunctions.push(issue);
-        }
+        attachGuardClauseInversion(issue, this.getOrParseSourceFile(ctx), startLine);
+        this.longFunctions.push(issue);
     }
 
-    private auditFunctionParameters(
-        node:
-            | ts.FunctionDeclaration
-            | ts.MethodDeclaration
-            | ts.ArrowFunction
-            | ts.FunctionExpression
-            | ts.ConstructorDeclaration,
-        sf: ts.SourceFile,
-        ctx: AnalyzerContext,
-        opts: SimplifyOptions,
-        issues: Issue[],
-    ): void {
+    private auditFunctionParameters(params: FunctionParameterAuditParams): void {
+        const { node, sf, ctx, opts, issues } = params;
         const limit = opts.maxFunctionParameters ?? DEFAULT_MAX_FUNCTION_PARAMETERS;
-        const params = node.parameters;
-        if (params.length <= limit) return;
+        const nodeParams = node.parameters;
+        if (nodeParams.length <= limit) return;
 
         const startPos = sf.getLineAndCharacterOfPosition(node.getStart(sf));
         const endPos = sf.getLineAndCharacterOfPosition(node.getEnd());
         const startLine = startPos.line + 1;
         const startCol = startPos.character + 1;
 
-        let name = 'anonymous';
-        if (ts.isFunctionDeclaration(node) || ts.isMethodDeclaration(node)) {
-            if (node.name && ts.isIdentifier(node.name)) {
-                name = node.name.text;
-            }
-        } else if (ts.isConstructorDeclaration(node)) {
-            name = 'constructor';
-        } else if (
-            node.parent &&
-            ts.isVariableDeclaration(node.parent) &&
-            ts.isIdentifier(node.parent.name)
-        ) {
-            name = node.parent.name.text;
-        }
-
-        const paramNames = params.map((p) => p.name.getText(sf));
-        const paramInfo = params.map((p) => ({
+        const name = resolveFunctionDeclarationName(node);
+        const paramNames = nodeParams.map((p) => p.name.getText(sf));
+        const paramInfo = nodeParams.map((p) => ({
             name: p.name.getText(sf),
             type: p.type ? p.type.getText(sf) : undefined,
         }));
@@ -372,9 +471,10 @@ export class SimplifyAnalyzer implements Analyzer {
         issues.push({
             id: `simplify:${RULE_SIM_ARGS_001}:${file}:${startLine}`,
             analyzer: ANALYZER_SIMPLIFY,
+            // rule: 'SIM-ARGS-001'
             rule: RULE_SIM_ARGS_001,
-            severity: SEVERITY_WARNING,
-            message: `Function "${name}" has ${params.length} parameters (limit ${limit}). Introduce a parameter object.`,
+            severity: this.defaultSeverity,
+            message: `Function "${name}" has ${nodeParams.length} parameters (limit ${limit}). Introduce a parameter object.`,
             location: {
                 file,
                 start: { line: startLine, column: startCol },
@@ -383,25 +483,24 @@ export class SimplifyAnalyzer implements Analyzer {
             detail: {
                 function: name,
                 parameters: paramNames,
-                parameterCount: params.length,
+                parameterCount: nodeParams.length,
                 limit,
             },
             suggestion:
                 'Encapsulate parameter list into a single options/parameter object using introduce_parameter_object.',
-            actionable: {
-                action: 'introduce_parameter_object' as any,
-                code: 'AR:SIM:006',
-                taxonomy: 'CTRL_FLOW',
-                targetScope: 'function_local',
+            actionable: buildSimplifyActionable({
+                action: ACTION_INTRODUCE_PARAM_OBJECT,
+                code: CODE_AR_SIM_006,
+                taxonomy: TAXONOMY_CTRL_FLOW,
+                targetScope: SCOPE_FUNCTION_LOCAL,
                 targetSymbol: name,
-                safeToAutomate: false,
                 templateSnippet: template,
                 targetArguments: {
                     functionName: name,
-                    parameterCount: params.length,
+                    parameterCount: nodeParams.length,
                     parameters: paramNames,
                 },
-            },
+            }),
         });
     }
 
@@ -419,7 +518,7 @@ export class SimplifyAnalyzer implements Analyzer {
                 ts.isFunctionExpression(node) ||
                 ts.isConstructorDeclaration(node)
             ) {
-                this.auditFunctionParameters(node, sf, ctx, opts, issues);
+                this.auditFunctionParameters({ node, sf, ctx, opts, issues });
             }
             ts.forEachChild(node, walk);
         };
@@ -429,17 +528,32 @@ export class SimplifyAnalyzer implements Analyzer {
     visit(
         node: NormalizedNode,
         ctx: AnalyzerContext,
-        _parent?: NormalizedNode,
-        _grandparent?: NormalizedNode,
-        _depth?: number,
-        className?: string | null,
-        binding?: string | null,
+        ...frame: [NormalizedNode?, NormalizedNode?, number?, (string | null)?, (string | null)?]
     ): void {
         if (!node.functionLike || !node.start || !node.end) return;
         const opts = (ctx.options || {}) as SimplifyOptions;
-        const name = this.nameFor(node, className ?? null, binding ?? null);
+        const className = frame[3] ?? null;
+        const binding = frame[4] ?? null;
+        const name = this.resolveNameFor(node, className, binding);
         this.checkFunctionLength(node, ctx, opts, name);
         this.checkGuardClauseNesting(node, ctx, opts, name);
+    }
+
+    private dispatchSourceAudits(
+        sourceFile: ts.SourceFile | null,
+        ctx: AnalyzerContext,
+        opts: SimplifyOptions,
+        issues: Issue[],
+    ): void {
+        if (!sourceFile) return;
+        const content = ctx.content || '';
+        if (content.includes('?') || content.includes('if')) {
+            detectTernaryOpportunities(sourceFile, ctx, opts, issues);
+        }
+        if (hasFunctionKeywords(content)) {
+            this.auditTypeScriptFunctions(sourceFile, ctx, opts, issues);
+            auditOrphanInlining(sourceFile, ctx, opts, issues);
+        }
     }
 
     /**
@@ -451,21 +565,7 @@ export class SimplifyAnalyzer implements Analyzer {
     finalize(ctx: AnalyzerContext): Issue[] {
         const issues = this.longFunctions.concat(this.scanContent(ctx));
         const opts = (ctx.options || {}) as SimplifyOptions;
-        const sourceFile = this.getOrParseSourceFile(ctx);
-        if (sourceFile) {
-            const content = ctx.content || '';
-            if (content.includes('?') || content.includes('if')) {
-                detectTernaryOpportunities(sourceFile, ctx, opts, issues);
-            }
-            if (
-                content.includes('function') ||
-                content.includes('=>') ||
-                content.includes('class') ||
-                content.includes('constructor')
-            ) {
-                this.auditTypeScriptFunctions(sourceFile, ctx, opts, issues);
-            }
-        }
+        this.dispatchSourceAudits(this.getOrParseSourceFile(ctx), ctx, opts, issues);
         return issues;
     }
 
@@ -485,20 +585,7 @@ export class SimplifyAnalyzer implements Analyzer {
             PROP_FOR_EACH_CHILD in sf &&
             typeof (sf as Record<string, unknown>)[PROP_FOR_EACH_CHILD] === 'function';
         const sourceFile = isTsSource ? (sf as ts.SourceFile) : this.getOrParseSourceFile(ctx);
-        if (sourceFile) {
-            const content = ctx.content || '';
-            if (content.includes('?') || content.includes('if')) {
-                detectTernaryOpportunities(sourceFile, ctx, opts, issues);
-            }
-            if (
-                content.includes('function') ||
-                content.includes('=>') ||
-                content.includes('class') ||
-                content.includes('constructor')
-            ) {
-                this.auditTypeScriptFunctions(sourceFile, ctx, opts, issues);
-            }
-        }
+        this.dispatchSourceAudits(sourceFile, ctx, opts, issues);
         return issues;
     }
 
@@ -513,14 +600,14 @@ export class SimplifyAnalyzer implements Analyzer {
             return ctx.sourceFile as ts.SourceFile;
         }
         if (!ctx.content) return null;
-        const p = ctx.filePath.toLowerCase();
+        const normalizedPath = ctx.filePath.toLowerCase();
         if (
-            !p.endsWith('.ts') &&
-            !p.endsWith('.tsx') &&
-            !p.endsWith('.js') &&
-            !p.endsWith('.jsx') &&
-            !p.endsWith('.mjs') &&
-            !p.endsWith('.cjs')
+            !normalizedPath.endsWith('.ts') &&
+            !normalizedPath.endsWith('.tsx') &&
+            !normalizedPath.endsWith('.js') &&
+            !normalizedPath.endsWith('.jsx') &&
+            !normalizedPath.endsWith('.mjs') &&
+            !normalizedPath.endsWith('.cjs')
         ) {
             return null;
         }
@@ -541,9 +628,9 @@ export class SimplifyAnalyzer implements Analyzer {
         const lines = content.split('\n').map((l) => (l.endsWith('\r') ? l.slice(0, -1) : l));
         const issues: Issue[] = [];
 
-        this.detectCommentedOutCode(lines, file, opts, ctx, issues);
+        this.detectCommentedOutCode(lines, file, opts, issues);
         this.detectEmptyImplementations(lines, file, ctx, issues);
-        this.detectDebugOutput(lines, file, opts, ctx, issues);
+        this.detectDebugOutput(lines, file, opts, issues);
         auditRedundantElse(lines, file, opts, issues);
         auditBooleanReturn(lines, file, opts, issues);
         auditGuardClausePatterns(lines, file, opts, issues);
@@ -557,14 +644,12 @@ export class SimplifyAnalyzer implements Analyzer {
      * @param lines - File content split into physical lines.
      * @param file - Normalized file path.
      * @param opts - Analyzer options (`commentedCodeMinLines`).
-     * @param ctx - Analyzer context.
      * @param issues - Accumulator for emitted issues.
      */
     private detectCommentedOutCode(
         lines: string[],
         file: string,
         opts: SimplifyOptions,
-        ctx: AnalyzerContext,
         issues: Issue[],
     ): void {
         const min = opts.commentedCodeMinLines ?? DEFAULT_MIN_COMMENTED_CODE_LINES;
@@ -573,10 +658,11 @@ export class SimplifyAnalyzer implements Analyzer {
         const flush = (endIndex: number): void => {
             if (streak >= min) {
                 issues.push({
-                    id: `simplify:SIM-COMC-001:${file}:${start + 1}`,
+                    id: `simplify:${RULE_SIM_COMC_001}:${file}:${start + 1}`,
                     analyzer: ANALYZER_SIMPLIFY,
-                    rule: 'SIM-COMC-001',
-                    severity: SEVERITY_WARNING,
+                    // rule: 'SIM-COMC-001'
+                    rule: RULE_SIM_COMC_001,
+                    severity: this.defaultSeverity,
                     message: `Suspected commented-out code: ${streak} consecutive code-shaped comment lines.`,
                     location: {
                         file,
@@ -586,11 +672,11 @@ export class SimplifyAnalyzer implements Analyzer {
                     detail: { lines: streak, first: lines[start].trim() },
                     suggestion:
                         'Delete the block (history lives in git) or restore it to real code.',
-                    actionable: {
-                        action: 'replace_token',
-                        code: 'AR:SIM:003',
+                    actionable: buildSimplifyActionable({
+                        action: ACTION_REPLACE_TOKEN,
+                        code: CODE_AR_SIM_003,
                         safeToAutomate: false,
-                    },
+                    }),
                 });
             }
             streak = 0;
@@ -634,10 +720,11 @@ export class SimplifyAnalyzer implements Analyzer {
         issues: Issue[],
     ): void {
         issues.push({
-            id: `simplify:SIM-EMPTY-001:${file}:${lineIndex + 1}`,
+            id: `simplify:${RULE_SIM_EMPTY_001}:${file}:${lineIndex + 1}`,
             analyzer: ANALYZER_SIMPLIFY,
-            rule: 'SIM-EMPTY-001',
-            severity: SEVERITY_WARNING,
+            // rule: 'SIM-EMPTY-001'
+            rule: RULE_SIM_EMPTY_001,
+            severity: this.defaultSeverity,
             message: 'Empty implementation: the function body is only a placeholder.',
             location: {
                 file,
@@ -647,11 +734,11 @@ export class SimplifyAnalyzer implements Analyzer {
             detail: { line: lines[lineIndex].trim() },
             suggestion:
                 'Implement the body, raise an explicit not-implemented error, or remove the declaration.',
-            actionable: {
-                action: 'replace_token',
-                code: 'AR:SIM:005',
+            actionable: buildSimplifyActionable({
+                action: ACTION_REPLACE_TOKEN,
+                code: CODE_AR_SIM_005,
                 safeToAutomate: false,
-            },
+            }),
         });
     }
 
@@ -660,40 +747,42 @@ export class SimplifyAnalyzer implements Analyzer {
             return true;
         }
         if (BRACE_OPEN_RE.test(lines[startIndex])) {
-            let j = startIndex + 1;
+            let lineIndex = startIndex + 1;
             while (
-                j < lines.length &&
-                (lines[j].trim() === '' || lines[j].trim().startsWith(PREFIX_SLASH_SLASH))
+                lineIndex < lines.length &&
+                (lines[lineIndex].trim() === '' ||
+                    lines[lineIndex].trim().startsWith(PREFIX_SLASH_SLASH))
             ) {
-                j++;
+                lineIndex++;
             }
-            return j < lines.length && BRACE_CLOSE_RE.test(lines[j]);
+            return lineIndex < lines.length && BRACE_CLOSE_RE.test(lines[lineIndex]);
         }
         return false;
     }
 
-    private skipPythonLeadingCommentsAndDocstrings(lines: string[], startIndex: number): number {
-        let j = startIndex;
-        while (j < lines.length) {
-            const trimmed = lines[j].trim();
+    private advancePastPythonDocstrings(lines: string[], startIndex: number): number {
+        let cursorIndex = startIndex;
+        while (cursorIndex < lines.length) {
+            const trimmed = lines[cursorIndex].trim();
             if (trimmed === '' || trimmed.startsWith('#')) {
-                j++;
+                cursorIndex++;
                 continue;
             }
             if (trimmed.startsWith('"""') || trimmed.startsWith("'''")) {
                 const marker = trimmed.startsWith('"""') ? '"""' : "'''";
                 if (trimmed.split(marker).length - 1 >= 2) {
-                    j++;
+                    cursorIndex++;
                     continue;
                 }
-                j++;
-                while (j < lines.length && !lines[j].includes(marker)) j++;
-                j++;
+                cursorIndex++;
+                while (cursorIndex < lines.length && !lines[cursorIndex].includes(marker))
+                    cursorIndex++;
+                cursorIndex++;
                 continue;
             }
             break;
         }
-        return j;
+        return cursorIndex;
     }
 
     private updateDocstringState(
@@ -712,25 +801,30 @@ export class SimplifyAnalyzer implements Analyzer {
             const marker = trimmed.startsWith(TRIPLE_DOUBLE_QUOTE)
                 ? TRIPLE_DOUBLE_QUOTE
                 : TRIPLE_SINGLE_QUOTE;
-            return trimmed.split(marker).length - 1 < 2
-                ? marker === TRIPLE_DOUBLE_QUOTE
-                    ? CHAR_DOUBLE_QUOTE
-                    : CHAR_SINGLE_QUOTE
-                : null;
+            const markerOccurrences = trimmed.split(marker).length - 1;
+            if (markerOccurrences < 2) {
+                return marker === TRIPLE_DOUBLE_QUOTE ? CHAR_DOUBLE_QUOTE : CHAR_SINGLE_QUOTE;
+            }
+            return null;
         }
         return null;
     }
 
-    private checkEmptyAtLine(lines: string[], file: string, i: number, issues: Issue[]): void {
-        const def = PY_DEF_RE.exec(lines[i]);
+    private checkEmptyAtLine(
+        lines: string[],
+        file: string,
+        lineIndex: number,
+        issues: Issue[],
+    ): void {
+        const def = PY_DEF_RE.exec(lines[lineIndex]);
         if (def) {
-            if (this.pythonBodyIsEmpty(lines, i, def[1].length)) {
-                this.emitEmptyIssue(lines, file, i, issues);
+            if (this.checkPythonBodyEmpty(lines, lineIndex, def[1].length)) {
+                this.emitEmptyIssue(lines, file, lineIndex, issues);
             }
             return;
         }
-        if (this.isBraceBlockEmpty(lines, i)) {
-            this.emitEmptyIssue(lines, file, i, issues);
+        if (this.isBraceBlockEmpty(lines, lineIndex)) {
+            this.emitEmptyIssue(lines, file, lineIndex, issues);
         }
     }
 
@@ -772,13 +866,21 @@ export class SimplifyAnalyzer implements Analyzer {
      * @param defIndent - Indentation width of the `def` keyword.
      * @returns True when the body consists solely of a placeholder.
      */
-    private pythonBodyIsEmpty(lines: string[], defIndex: number, defIndent: number): boolean {
-        const j = this.skipPythonLeadingCommentsAndDocstrings(lines, defIndex + 1);
-        if (j >= lines.length || !PY_EMPTY_BODY_RE.test(lines[j].trim())) return false;
-        if (this.indentWidth(lines[j]) <= defIndent) return false;
-        let k = j + 1;
-        while (k < lines.length && (lines[k].trim() === '' || lines[k].trim().startsWith('#'))) k++;
-        return k >= lines.length || this.indentWidth(lines[k]) <= defIndent;
+    private checkPythonBodyEmpty(lines: string[], defIndex: number, defIndent: number): boolean {
+        const bodyLineIndex = this.advancePastPythonDocstrings(lines, defIndex + 1);
+        if (bodyLineIndex >= lines.length || !PY_EMPTY_BODY_RE.test(lines[bodyLineIndex].trim()))
+            return false;
+        if (this.getIndentWidth(lines[bodyLineIndex]) <= defIndent) return false;
+        let nextLineIndex = bodyLineIndex + 1;
+        while (
+            nextLineIndex < lines.length &&
+            (lines[nextLineIndex].trim() === '' || lines[nextLineIndex].trim().startsWith('#'))
+        ) {
+            nextLineIndex++;
+        }
+        return (
+            nextLineIndex >= lines.length || this.getIndentWidth(lines[nextLineIndex]) <= defIndent
+        );
     }
 
     /**
@@ -787,7 +889,7 @@ export class SimplifyAnalyzer implements Analyzer {
      * @param line - Raw physical line.
      * @returns The number of leading spaces (tabs count as one column).
      */
-    private indentWidth(line: string): number {
+    private getIndentWidth(line: string): number {
         const match = /^\s*/.exec(line);
         return match ? match[0].length : 0;
     }
@@ -798,20 +900,20 @@ export class SimplifyAnalyzer implements Analyzer {
      * @param lines - File content split into physical lines.
      * @param file - Normalized file path.
      * @param opts - Analyzer options (`printAllowPatterns`).
-     * @param ctx - Analyzer context.
      * @param issues - Accumulator for emitted issues.
      */
     private detectDebugOutput(
         lines: string[],
         file: string,
         opts: SimplifyOptions,
-        ctx: AnalyzerContext,
         issues: Issue[],
     ): void {
         const patterns = (opts.printAllowPatterns ?? DEFAULT_PRINT_ALLOW_PATTERNS).map((p) =>
             globToRegExp(p),
         );
-        if (patterns.length > 0 && matchAny(patterns, file)) return;
+        if (patterns.length > 0) {
+            if (matchAny(patterns, file)) return;
+        }
         for (let i = 0; i < lines.length; i++) {
             const trimmed = lines[i].trim();
             if (trimmed.startsWith('//') || trimmed.startsWith('#') || trimmed.startsWith('*')) {
@@ -821,10 +923,11 @@ export class SimplifyAnalyzer implements Analyzer {
                 continue;
             }
             issues.push({
-                id: `simplify:SIM-PRNT-001:${file}:${i + 1}`,
+                id: `simplify:${RULE_SIM_PRNT_001}:${file}:${i + 1}`,
                 analyzer: ANALYZER_SIMPLIFY,
-                rule: 'SIM-PRNT-001',
-                severity: SEVERITY_WARNING,
+                // rule: 'SIM-PRNT-001'
+                rule: RULE_SIM_PRNT_001,
+                severity: this.defaultSeverity,
                 message:
                     'Debug output call in non-CLI code: route diagnostics through the project logger.',
                 location: {
@@ -835,11 +938,11 @@ export class SimplifyAnalyzer implements Analyzer {
                 detail: { line: trimmed },
                 suggestion:
                     'Use the structured logger (or remove the statement); debug output bypasses log levels and leaks to production stdout.',
-                actionable: {
-                    action: 'replace_token',
-                    code: 'AR:SIM:004',
+                actionable: buildSimplifyActionable({
+                    action: ACTION_REPLACE_TOKEN,
+                    code: CODE_AR_SIM_004,
                     safeToAutomate: false,
-                },
+                }),
             });
         }
     }
@@ -852,14 +955,14 @@ export class SimplifyAnalyzer implements Analyzer {
      * @param binding - Enclosing binding name for anonymous functions.
      * @returns The resolved display name.
      */
-    private nameFor(
+    private resolveNameFor(
         node: NormalizedNode,
         className: string | null,
         binding: string | null,
     ): string {
         if (node.kind === NodeKind.Method && !node.isConstructor) {
-            const m = node.name ?? ANONYMOUS_NAME;
-            return className ? className + '.' + m : m;
+            const methodName = node.name ?? ANONYMOUS_NAME;
+            return className ? className + '.' + methodName : methodName;
         }
         if (node.kind === NodeKind.Function && node.name) return node.name;
         return binding ?? (className ? className + ANONYMOUS_SUFFIX : ANONYMOUS_NAME);

@@ -809,6 +809,19 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#sim-imm-001',
     }),
     defineRule({
+        id: 'SIM-INL-001',
+        family: RULE_FAMILY_SIMPLIFY,
+        analyzer: ANALYZER_SIMPLIFY,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_INFO,
+        summary:
+            'Single-use orphan function has high vector similarity with parent; inlining utility exceeds threshold.',
+        remediation:
+            'Collocate or inline single-use micro-fragments into caller to improve spatial locality.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#sim-inl-001',
+    }),
+    defineRule({
         id: 'SIM-LONG-001',
         family: RULE_FAMILY_SIMPLIFY,
         analyzer: ANALYZER_SIMPLIFY,

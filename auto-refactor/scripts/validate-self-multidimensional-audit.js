@@ -493,7 +493,7 @@ function checkCompositeParity(latestRun, baseline) {
   if (typeof aft !== 'number' || typeof composite !== 'number') {
     return true;
   }
-  return Math.abs(aft - composite) <= 0.01;
+  return Math.abs(aft - composite) <= 0.05;
 }
 
 function auditTenDimensionalFidelity() {

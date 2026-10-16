@@ -2,13 +2,16 @@
  * Module: Static Analysis Engine — Client Exposure Risk Analyzer
  * File Path: src/analyzers/client-exposure.ts
  * Architecture Role: Domain analyzer guarding against internal API endpoint exposure,
- *   CSS-only auth bypass, inactive feature flag payload leakage, and unreleased test routes.
+ *   CSS-only auth bypass, inactive feature flag payload leakage, unreleased test routes,
+ *   and synthetic iframe message events missing userActivation or origin checks.
  * Dependencies & Triggers: Core types, exposure messages.
  * Responsibilities:
  *   1. SEC-EXP-001: Detect internal or administrative API paths in client code.
  *   2. SEC-EXP-002: Detect CSS/visual hiding used as the sole authorization mechanism.
  *   3. SEC-EXP-003: Detect disabled feature flags delivering full implementation code.
  *   4. SEC-EXP-004: Detect unreleased, debug, or internal staging routes packaged for clients.
+ *   5. SEC-EXP-005: Detect iframe message event listeners invoking sensitive actions
+ *      without userActivation or origin check.
  * Exit Semantics & Design Rationale: Pure, fail-safe scanner returning Issue[]. Zero throw.
  */
 
@@ -31,6 +34,17 @@ const DISABLED_FEATURE_FLAG_RE =
 
 const UNRELEASED_ROUTE_RE =
     /\b(?:path|route)\s*:\s*['"`]\/(?:test|sandbox|debug|preview|internal-only)[a-zA-Z0-9_/-]*['"`]/i;
+
+const MESSAGE_LISTENER_RE =
+    /(?:addEventListener\s*\(\s*['"`]message['"`]|(?:window\.)?onmessage\s*=)/i;
+
+const SENSITIVE_ACTION_RE =
+    /\b(?:window\.open\s*\(|localStorage\.setItem\s*\(|sessionStorage\.setItem\s*\(|\.download\s*=|vscode\.postMessage\s*\(|document\.execCommand\s*\()/i;
+
+const USER_ACTIVATION_OR_ORIGIN_RE =
+    /\b(?:(?:event|e|ev|msg)\.userActivation\b|userActivation\.(?:isActive|hasBeenActive)|\.origin\b)/i;
+
+const MAX_LISTENER_SCAN_WINDOW = 40;
 
 function makeExposureIssue(
     file: string,
@@ -144,6 +158,52 @@ function auditUnreleasedRoutes(file: string, rawLines: string[], issues: Issue[]
     }
 }
 
+function hasGuardedActivationOrOrigin(lines: string[], start: number, end: number): boolean {
+    for (let i = start; i < end; i++) {
+        if (USER_ACTIVATION_OR_ORIGIN_RE.test(lines[i])) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function findSensitiveActionLine(lines: string[], start: number, end: number): number {
+    for (let i = start; i < end; i++) {
+        if (SENSITIVE_ACTION_RE.test(lines[i])) {
+            return i + 1;
+        }
+    }
+    return -1;
+}
+
+function auditIframeUserActivation(file: string, rawLines: string[], issues: Issue[]): void {
+    for (let i = 0; i < rawLines.length; i++) {
+        const line = rawLines[i];
+        if (!MESSAGE_LISTENER_RE.test(line)) {
+            continue;
+        }
+        const windowEnd = Math.min(rawLines.length, i + MAX_LISTENER_SCAN_WINDOW);
+        const sensitiveLine = findSensitiveActionLine(rawLines, i, windowEnd);
+        if (sensitiveLine === -1) {
+            continue;
+        }
+        if (hasGuardedActivationOrOrigin(rawLines, i, windowEnd)) {
+            continue;
+        }
+        issues.push(
+            makeExposureIssue(
+                file,
+                i + 1,
+                'SEC-EXP-005',
+                SEVERITY_ERROR,
+                `${ExposureMessages.IFRAME_SYNTHETIC_USER_ACTIVATION.message}: Sensitive action on line ${sensitiveLine} lacks event.userActivation or origin guard`,
+                ExposureMessages.IFRAME_SYNTHETIC_USER_ACTIVATION.suggestion,
+                { listenerLine: i + 1, sensitiveLine },
+            ),
+        );
+    }
+}
+
 /**
  * Client exposure risk and frontend security analyzer.
  */
@@ -169,6 +229,7 @@ export class ClientExposureAnalyzer implements Analyzer {
         auditCssAuthorizationBypass(file, rawLines, issues);
         auditFeatureFlagCodeSplitting(file, rawLines, issues);
         auditUnreleasedRoutes(file, rawLines, issues);
+        auditIframeUserActivation(file, rawLines, issues);
 
         return issues;
     }

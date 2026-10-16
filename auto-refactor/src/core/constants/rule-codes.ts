@@ -87,6 +87,8 @@ export const ANALYZER_CONTRACT = 'contract';
 export const ANALYZER_PRECISION = 'precision';
 /** Built-in / domain analyzer name for evolution. */
 export const ANALYZER_EVOLUTION = 'evolution';
+/** Built-in / domain analyzer name for standardization. */
+export const ANALYZER_STANDARDIZATION = 'standardization';
 /** Built-in / domain analyzer name for praxis. */
 export const ANALYZER_PRAXIS = 'praxis';
 

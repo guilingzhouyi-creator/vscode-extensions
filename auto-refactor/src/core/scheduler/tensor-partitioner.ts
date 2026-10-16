@@ -37,14 +37,36 @@ export interface TensorPartitionPlan {
     readonly estimatedTotalComputeCost: number;
 }
 
+import {
+    ANALYZER_COMMENTS,
+    ANALYZER_NAMING,
+    ANALYZER_STANDARDIZATION,
+    ANALYZER_COMPLEXITY,
+    ANALYZER_PERFORMANCE,
+    ANALYZER_LARGE_FILE,
+    ANALYZER_CONSTANTS,
+    ANALYZER_SECURITY,
+    ANALYZER_ARCHITECTURE,
+    ANALYZER_DEPENDENCY_GRAPH,
+} from '../constants/rule-codes';
+
+const CHAR_CODE_SLASH = 47;
+const CHAR_CODE_BACKSLASH = 92;
+const MAX_PATH_SEGMENTS = 3;
+const DEFAULT_MAX_FILES_PER_CLUSTER = 15;
+const MAX_DEPTH_ITERATIONS = 20;
+const MODULE_ROOT = 'root';
+const DIR_SRC = 'src';
+const DIR_LIB = 'lib';
+
 /**
  * Standard orthogonal rule families for tensor rule dimension.
  */
 export const DEFAULT_TENSOR_RULE_FAMILIES: Record<string, string[]> = {
-    HYGIENE_AND_STYLE: ['comments', 'naming', 'standardization'],
-    LOGIC_AND_PERFORMANCE: ['complexity', 'performance', 'large-file'],
-    SECURITY_AND_SECRETS: ['constants', 'security'],
-    ARCHITECTURE_AND_BOUNDARIES: ['architecture', 'dependency-graph'],
+    HYGIENE_AND_STYLE: [ANALYZER_COMMENTS, ANALYZER_NAMING, ANALYZER_STANDARDIZATION],
+    LOGIC_AND_PERFORMANCE: [ANALYZER_COMPLEXITY, ANALYZER_PERFORMANCE, ANALYZER_LARGE_FILE],
+    SECURITY_AND_SECRETS: [ANALYZER_CONSTANTS, ANALYZER_SECURITY],
+    ARCHITECTURE_AND_BOUNDARIES: [ANALYZER_ARCHITECTURE, ANALYZER_DEPENDENCY_GRAPH],
 };
 
 /**
@@ -83,21 +105,21 @@ function createCellsForChunk(
 }
 
 /**
- * Partitions files of a single depth band into chunked tensor cells.
+ * Creates tensor partition cells for a single depth band.
  */
-function partitionDepthFiles(
+function createDepthPartitionCells(
     depthFiles: string[],
     maxChunkSize: number,
     ctx: CellBuilderContext,
     targetCells: TensorPartitionCell[],
 ): number {
     let addedCost = 0;
-    for (let i = 0; i < depthFiles.length; i += maxChunkSize) {
-        const chunk = depthFiles.slice(i, i + maxChunkSize);
+    for (let chunkStart = 0; chunkStart < depthFiles.length; chunkStart += maxChunkSize) {
+        const chunk = depthFiles.slice(chunkStart, chunkStart + maxChunkSize);
         const sub = createCellsForChunk(chunk, ctx);
         addedCost += sub.cost;
-        for (const c of sub.cells) {
-            targetCells.push(c);
+        for (const cell of sub.cells) {
+            targetCells.push(cell);
         }
     }
     return addedCost;
@@ -118,27 +140,27 @@ function getOrCreateBucket<K, V>(map: Map<K, V[]>, key: K): V[] {
 /**
  * Groups files of a single cluster by their dependency depth.
  */
-function groupFilesByDepth(
+function collectFilesByDepth(
     clusterFiles: string[],
     depthMap: Map<string, number>,
 ): Map<number, string[]> {
-    const depthGroups = new Map<number, string[]>();
+    const filesByDepthMap = new Map<number, string[]>();
     for (const file of clusterFiles) {
         const depth = depthMap.get(file) ?? 0;
-        getOrCreateBucket(depthGroups, depth).push(file);
+        getOrCreateBucket(filesByDepthMap, depth).push(file);
     }
-    return depthGroups;
+    return filesByDepthMap;
 }
 
 /**
  * Builds dependency adjacency list without per-iteration heap container instantiation.
  */
 function buildImportsGraph(edges: [string, string][]): Map<string, string[]> {
-    const imports = new Map<string, string[]>();
-    for (const [from, to] of edges) {
-        getOrCreateBucket(imports, from).push(to);
+    const importsByFile = new Map<string, string[]>();
+    for (const [fromFile, toFile] of edges) {
+        getOrCreateBucket(importsByFile, fromFile).push(toFile);
     }
-    return imports;
+    return importsByFile;
 }
 
 /**
@@ -157,59 +179,59 @@ function computeMaxPredecessorDepth(importedFiles: string[], depths: Map<string,
 
 /** Checks whether character code is a path separator */
 function isSlash(code: number): boolean {
-    return code === 47 || code === 92;
+    return code === CHAR_CODE_SLASH || code === CHAR_CODE_BACKSLASH;
 }
 
 /** Advances index past contiguous path separators */
-function skipSlashes(p: string, from: number, len: number): number {
-    let i = from;
-    while (i < len && isSlash(p.charCodeAt(i))) {
-        i++;
+function advancePastSlashes(pathStr: string, fromIndex: number, totalLength: number): number {
+    let cursorIndex = fromIndex;
+    while (cursorIndex < totalLength && isSlash(pathStr.charCodeAt(cursorIndex))) {
+        cursorIndex++;
     }
-    return i;
+    return cursorIndex;
 }
 
 /** Finds index of next path separator */
-function findNextSlash(p: string, from: number, len: number): number {
-    let i = from;
-    while (i < len && !isSlash(p.charCodeAt(i))) {
-        i++;
+function findNextSlash(pathStr: string, fromIndex: number, totalLength: number): number {
+    let cursorIndex = fromIndex;
+    while (cursorIndex < totalLength && !isSlash(pathStr.charCodeAt(cursorIndex))) {
+        cursorIndex++;
     }
-    return i;
+    return cursorIndex;
 }
 
 /** Intermediate decomposed path segments */
 interface ExtractedPathParts {
-    readonly p0: string;
-    readonly p1: string;
+    readonly primarySegment: string;
+    readonly secondarySegment: string;
     readonly partsCount: number;
 }
 
 /**
- * Tokenizes leading path segments into prefix elements.
+ * Parses leading path segments into prefix elements.
  */
-function tokenizePathPrefix(filePath: string): ExtractedPathParts {
-    const len = filePath.length;
-    let i = skipSlashes(filePath, 0, len);
-    if (i >= len) {
-        return { p0: '', p1: '', partsCount: 0 };
+function parsePathPrefixSegments(filePath: string): ExtractedPathParts {
+    const totalLength = filePath.length;
+    let cursorIndex = advancePastSlashes(filePath, 0, totalLength);
+    if (cursorIndex >= totalLength) {
+        return { primarySegment: '', secondarySegment: '', partsCount: 0 };
     }
 
     const segments: string[] = [];
-    while (i < len && segments.length < 3) {
-        const next = findNextSlash(filePath, i, len);
-        segments.push(filePath.substring(i, next));
-        i = skipSlashes(filePath, next, len);
+    while (cursorIndex < totalLength && segments.length < MAX_PATH_SEGMENTS) {
+        const next = findNextSlash(filePath, cursorIndex, totalLength);
+        segments.push(filePath.substring(cursorIndex, next));
+        cursorIndex = advancePastSlashes(filePath, next, totalLength);
     }
 
-    const hasRemaining = i < len ? 1 : 0;
-    const isSrcOrLib = segments[0] === 'src' || segments[0] === 'lib';
-    const start = isSrcOrLib ? 1 : 0;
-    const partsCount = segments.length - start + hasRemaining;
-    const p0 = segments[start] ?? '';
-    const p1 = segments[start + 1] ?? '';
+    const hasRemaining = cursorIndex < totalLength ? 1 : 0;
+    const isSrcOrLib = segments[0] === DIR_SRC || segments[0] === DIR_LIB;
+    const startIndex = isSrcOrLib ? 1 : 0;
+    const partsCount = segments.length - startIndex + hasRemaining;
+    const primarySegment = segments[startIndex] ?? '';
+    const secondarySegment = segments[startIndex + 1] ?? '';
 
-    return { p0, p1, partsCount };
+    return { primarySegment, secondarySegment, partsCount };
 }
 
 /**
@@ -220,14 +242,20 @@ function tokenizePathPrefix(filePath: string): ExtractedPathParts {
  * @returns Semantic module group key
  */
 export function extractModuleGroupKeyFast(filePath: string): string {
-    const { p0, p1, partsCount } = tokenizePathPrefix(filePath);
+    const { primarySegment, secondarySegment, partsCount } = parsePathPrefixSegments(filePath);
     if (partsCount <= 1) {
-        return 'root';
+        return MODULE_ROOT;
     }
-    if (partsCount === 2) {
-        return p0;
-    }
-    return `${p0}/${p1}`;
+    return partsCount === 2 ? primarySegment : `${primarySegment}/${secondarySegment}`;
+}
+
+interface ClusterCellParams {
+    moduleKey: string;
+    clusterFiles: string[];
+    depthMap: Map<string, number>;
+    ruleFamilyEntries: [string, string[]][];
+    cellSeq: { current: number };
+    targetCells: TensorPartitionCell[];
 }
 
 /**
@@ -236,8 +264,33 @@ export function extractModuleGroupKeyFast(filePath: string): string {
 export class TensorPartitioner {
     private readonly maxFilesPerDataCluster: number;
 
-    public constructor(maxFilesPerDataCluster = 15) {
+    public constructor(maxFilesPerDataCluster = DEFAULT_MAX_FILES_PER_CLUSTER) {
         this.maxFilesPerDataCluster = Math.max(1, maxFilesPerDataCluster);
+    }
+
+    /**
+     * Appends tensor partition cells for a specific module cluster across all its depth bands.
+     */
+    private appendClusterCells(params: ClusterCellParams): number {
+        const { moduleKey, clusterFiles, depthMap, ruleFamilyEntries, cellSeq, targetCells } =
+            params;
+        let clusterCost = 0;
+        const filesByDepthMap = collectFilesByDepth(clusterFiles, depthMap);
+        for (const [depth, depthFiles] of filesByDepthMap.entries()) {
+            const ctx: CellBuilderContext = {
+                moduleKey,
+                depth,
+                ruleFamilyEntries,
+                cellSeq,
+            };
+            clusterCost += createDepthPartitionCells(
+                depthFiles,
+                this.maxFilesPerDataCluster,
+                ctx,
+                targetCells,
+            );
+        }
+        return clusterCost;
     }
 
     /**
@@ -248,7 +301,7 @@ export class TensorPartitioner {
      * @param ruleFamilies - Optional custom rule families mapping
      * @returns Complete tensor partition plan
      */
-    public partition(
+    public partitionWorkload(
         files: string[],
         edges: [string, string][] = [],
         ruleFamilies: Record<string, string[]> = DEFAULT_TENSOR_RULE_FAMILIES,
@@ -274,7 +327,7 @@ export class TensorPartitioner {
         }
 
         // 2. Data Clustering: Group by module directory prefix
-        const dataClusters = this.clusterByModuleAffinity(files);
+        const dataClusters = this.groupFilesByModuleAffinity(files);
 
         // 3. Assemble 3D Tensor Cells: (DataCluster × Depth × RuleFamily)
         const cells: TensorPartitionCell[] = [];
@@ -283,21 +336,14 @@ export class TensorPartitioner {
         const ruleFamilyEntries = Object.entries(ruleFamilies);
 
         for (const [moduleKey, clusterFiles] of dataClusters.entries()) {
-            const depthGroups = groupFilesByDepth(clusterFiles, depthMap);
-            for (const [depth, depthFiles] of depthGroups.entries()) {
-                const ctx: CellBuilderContext = {
-                    moduleKey,
-                    depth,
-                    ruleFamilyEntries,
-                    cellSeq,
-                };
-                totalCost += partitionDepthFiles(
-                    depthFiles,
-                    this.maxFilesPerDataCluster,
-                    ctx,
-                    cells,
-                );
-            }
+            totalCost += this.appendClusterCells({
+                moduleKey,
+                clusterFiles,
+                depthMap,
+                ruleFamilyEntries,
+                cellSeq,
+                targetCells: cells,
+            });
         }
 
         return {
@@ -311,6 +357,17 @@ export class TensorPartitioner {
     }
 
     /**
+     * Backward-compatible delegation to {@link partitionWorkload}.
+     */
+    public partition(
+        files: string[],
+        edges: [string, string][] = [],
+        ruleFamilies: Record<string, string[]> = DEFAULT_TENSOR_RULE_FAMILIES,
+    ): TensorPartitionPlan {
+        return this.partitionWorkload(files, edges, ruleFamilies);
+    }
+
+    /**
      * Computes topological depth layer for files based on directed dependency edges.
      * Leaf / independent modules get depth 0; importers get max(depth of imported) + 1.
      */
@@ -318,50 +375,50 @@ export class TensorPartitioner {
         files: string[],
         edges: [string, string][],
     ): Map<string, number> {
-        const depths = new Map<string, number>();
+        const depthsByFile = new Map<string, number>();
         for (const f of files) {
-            depths.set(f, 0);
+            depthsByFile.set(f, 0);
         }
 
-        const imports = buildImportsGraph(edges);
+        const importsByFile = buildImportsGraph(edges);
 
         // Iterative relaxation of depths up to max depth bound
         let changed = true;
         let iteration = 0;
-        const maxIterations = Math.min(20, files.length);
+        const maxIterations = Math.min(MAX_DEPTH_ITERATIONS, files.length);
 
         while (changed && iteration < maxIterations) {
             changed = false;
             iteration++;
 
             for (const file of files) {
-                const importedFiles = imports.get(file);
+                const importedFiles = importsByFile.get(file);
                 if (!importedFiles || importedFiles.length === 0) {
                     continue;
                 }
-                const newDepth = computeMaxPredecessorDepth(importedFiles, depths) + 1;
-                if (newDepth !== depths.get(file)) {
-                    depths.set(file, newDepth);
+                const newDepth = computeMaxPredecessorDepth(importedFiles, depthsByFile) + 1;
+                if (newDepth !== depthsByFile.get(file)) {
+                    depthsByFile.set(file, newDepth);
                     changed = true;
                 }
             }
         }
 
-        return depths;
+        return depthsByFile;
     }
 
     /**
      * Groups files into cohesive semantic clusters by normalized directory path prefix.
      */
-    private clusterByModuleAffinity(files: string[]): Map<string, string[]> {
-        const clusters = new Map<string, string[]>();
+    private groupFilesByModuleAffinity(files: string[]): Map<string, string[]> {
+        const clustersByModule = new Map<string, string[]>();
 
         for (const file of files) {
             const key = extractModuleGroupKeyFast(file);
-            getOrCreateBucket(clusters, key).push(file);
+            getOrCreateBucket(clustersByModule, key).push(file);
         }
 
-        return clusters;
+        return clustersByModule;
     }
 }
 

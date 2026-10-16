@@ -331,13 +331,13 @@ export class ConstantsAnalyzer implements Analyzer {
         const classification = classify ? classifyLiteral(lit.value, true) : null;
         if (classification && classification.isReasonable) return null;
 
-        const res = resolveLiteralIssueData(
-            lit.value,
-            true,
+        const res = resolveLiteralIssueData({
+            literalValue: lit.value,
+            numeric: true,
             classification,
             granular,
-            this.suggestName(lit.value, NUM_KIND),
-        );
+            suggestedNameFallback: this.suggestName(lit.value, NUM_KIND),
+        });
 
         return {
             id: `constants:${res.rule}:${ctx.filePath}:${lit.node.start?.line ?? 1}`,
@@ -480,13 +480,13 @@ export class ConstantsAnalyzer implements Analyzer {
         const classification = classify ? classifyLiteral(text, false) : null;
         if (classification && classification.isReasonable) return null;
 
-        const res = resolveLiteralIssueData(
-            text,
-            false,
+        const res = resolveLiteralIssueData({
+            literalValue: text,
+            numeric: false,
             classification,
             granular,
-            this.suggestName(inner, STR_KIND),
-        );
+            suggestedNameFallback: this.suggestName(inner, STR_KIND),
+        });
 
         return {
             id: `constants:${res.rule}:${ctx.filePath}:${lit.node.start?.line ?? 1}`,
@@ -576,16 +576,17 @@ export class ConstantsAnalyzer implements Analyzer {
 
         const ignoreSet = new Set<string>(ctx.options.ignoreLiterals || []);
         const classify = Boolean(ctx.options.classifyLiterals);
-        const groups = groupDuplicates(
-            this.literals,
-            ctx.options.magicNumberMin,
+        const groups = groupDuplicates(this.literals, {
+            magicNumberMin: ctx.options.magicNumberMin,
             ignoreSet,
             classify,
-            isTest,
-            isDataOrConfig,
-            isAlgorithm,
-            isConstLib,
-        );
+            domain: {
+                isTest,
+                isDataOrConfig,
+                isAlgorithm,
+                isConstantFile: isConstLib,
+            },
+        });
 
         this.emitDuplicateIssues(ctx, groups, threshold, suppress, out);
     }

@@ -14,6 +14,8 @@ import * as path from 'path';
 import type { Issue } from '../types';
 import { SEVERITY_ERROR, SEVERITY_WARNING } from '../types';
 import { ArchitectureMessages } from '../messages/architecture';
+import { tokenizeCode } from '../intelligence/token-entropy';
+import { calculateWeightedTokenPayload } from '../intelligence/payload-density';
 
 /** Default minimum effective lines of code for a substantive facade module. */
 export const DEFAULT_MIN_FACADE_ELOC = 15;
@@ -23,6 +25,7 @@ export interface FacadeAuditOptions {
     minFacadeEloc?: number;
     flagVacuousTrampolines?: boolean;
     flagHollowFacades?: boolean;
+    flagPlumbingOverhead?: boolean;
 }
 
 /** Audit result breakdown for facade and trampoline inspection. */
@@ -30,6 +33,7 @@ export interface FacadeAuditResult {
     issues: Issue[];
     trampolineCount: number;
     hollowFacadeCount: number;
+    plumbingCount?: number;
 }
 
 const TRAMPOLINE_REEXPORT_RE =
@@ -121,6 +125,42 @@ function checkHollowFacade(
 }
 
 /**
+ * Evaluates whether a module is dominated by wiring and plumbing overhead (ARCH-PLM-001).
+ */
+function checkPlumbingOverhead(
+    filePath: string,
+    content: string,
+    codeLines: string[],
+    minEloc: number,
+): { isOverhead: boolean; por: number; tspr: number } {
+    if (codeLines.length < minEloc) {
+        return { isOverhead: false, por: 0, tspr: 1.0 };
+    }
+    const baseName = path.basename(filePath);
+    if (
+        baseName.startsWith('index.') ||
+        baseName.includes('constants') ||
+        baseName.includes('token') ||
+        baseName.includes('catalog') ||
+        filePath.endsWith('.d.ts')
+    ) {
+        return { isOverhead: false, por: 0, tspr: 1.0 };
+    }
+    if (SUBSTANTIVE_PAYLOAD_RE.test(content)) {
+        return { isOverhead: false, por: 0, tspr: 1.0 };
+    }
+
+    const tokenStream = tokenizeCode(content);
+    if (tokenStream.tokens.length < 30) {
+        return { isOverhead: false, por: 0, tspr: 1.0 };
+    }
+
+    const { tspr, por } = calculateWeightedTokenPayload(tokenStream.tokens);
+    const isOverhead = por > 0.6 && tspr < 0.35;
+    return { isOverhead, por, tspr };
+}
+
+/**
  * Audits a source file for vacuous trampolines and hollow facade violations.
  *
  * @param filePath - Path to the file being audited.
@@ -136,14 +176,16 @@ export function auditFacadeGovernance(
     const issues: Issue[] = [];
     let trampolineCount = 0;
     let hollowFacadeCount = 0;
+    let plumbingCount = 0;
 
     if (isExemptPath(filePath)) {
-        return { issues, trampolineCount, hollowFacadeCount };
+        return { issues, trampolineCount, hollowFacadeCount, plumbingCount };
     }
 
     const minEloc = options?.minFacadeEloc ?? DEFAULT_MIN_FACADE_ELOC;
     const checkTrampoline = options?.flagVacuousTrampolines !== false;
     const checkFacade = options?.flagHollowFacades !== false;
+    const checkPlumbing = options?.flagPlumbingOverhead !== false;
 
     const stripped = stripComments(content);
     const codeLines = stripped
@@ -205,5 +247,38 @@ export function auditFacadeGovernance(
         }
     }
 
-    return { issues, trampolineCount, hollowFacadeCount };
+    if (checkPlumbing) {
+        const { isOverhead, por, tspr } = checkPlumbingOverhead(
+            filePath,
+            content,
+            codeLines,
+            minEloc,
+        );
+        if (isOverhead) {
+            plumbingCount++;
+            const desc = ArchitectureMessages.PLUMBING_OVERHEAD_RATIO(filePath, por, tspr, 0.6);
+            issues.push({
+                id: `architecture:ARCH-PLM-001:${normPath}:1`,
+                analyzer: 'architecture',
+                rule: 'ARCH-PLM-001',
+                severity: SEVERITY_WARNING,
+                location: {
+                    file: normPath,
+                    start: { line: 1, column: 1 },
+                    end: { line: 1, column: 1 },
+                },
+                message: desc.message,
+                suggestion: desc.suggestion,
+                detail: {
+                    rationale: desc.rationale,
+                    por,
+                    tspr,
+                    threshold: 0.6,
+                    eloc: codeLines.length,
+                },
+            });
+        }
+    }
+
+    return { issues, trampolineCount, hollowFacadeCount, plumbingCount };
 }

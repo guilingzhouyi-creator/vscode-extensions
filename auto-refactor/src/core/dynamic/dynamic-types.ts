@@ -27,8 +27,12 @@ export interface LatencyMetric {
     p95Ms: number;
     /** 99th percentile (tail) latency in milliseconds */
     p99Ms: number;
+    /** Standard domain percentile names without abbreviated milestone prefix */
+    percentile50Ms?: number;
+    percentile95Ms?: number;
+    percentile99Ms?: number;
     /**
-     * Target p99 SLA budget in milliseconds
+     * Target tail latency SLA budget in milliseconds
      * (default: 16.67ms for 60 FPS UI/game, or 100ms for services)
      */
     budgetMs?: number;

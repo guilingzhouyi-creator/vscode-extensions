@@ -21,43 +21,153 @@ import { ZONE_EMBEDDED_TEST } from '../intelligence/zone-partitioner';
 import { RULE_TST_TOP_001 } from './dimensionLiterals';
 
 /** Categorization of code files into testing topology tracks. */
-export type TestTopologyTrack = 'EXPLICIT_TEST_FILE' | 'EMBEDDED_TEST_ZONE' | 'PRODUCTION_CODE';
+export type TestingTrack = 'EXPLICIT_TEST_FILE' | 'EMBEDDED_TEST_ZONE' | 'PRODUCTION_CODE';
+/** Backward-compatible type alias for testing track category. */
+export type TestTopologyTrack = TestingTrack;
+
+const TRACK_PRODUCTION: TestingTrack = 'PRODUCTION_CODE';
+const TRACK_EMBEDDED: TestingTrack = 'EMBEDDED_TEST_ZONE';
+const TRACK_EXPLICIT: TestingTrack = 'EXPLICIT_TEST_FILE';
+
+const SEVERITY_WARNING = 'warning';
+const SEVERITY_ERROR = 'error';
+
+const REASON_CROSS_LANG = 'cross_language_embedded_test_prohibited';
+const REASON_NOT_TAIL = 'embedded_zone_not_tail_isolated';
+const REASON_UNCONDITIONAL_BUILD = 'embedded_test_unconditionally_compiled';
+const REASON_MISSING_INTENT = 'missing_agent_readable_intent';
+
+const ACTION_EXTRACT_TEST_SUITE = 'extract_test_suite';
+const ACTION_RELOCATE_TEST_ZONE = 'relocate_test_zone';
+const ACTION_ANNOTATE_INTENT = 'annotate_test_intent';
+
+const CHAR_CODE_LF = 10;
+const PERFECT_SCORE = 100;
+const PROHIBITED_BASE_SCORE = 40;
+const PENALTY_NOT_TAIL = 25;
+const PENALTY_UNCONDITIONAL_BUILD = 30;
+const PENALTY_MISSING_INTENT = 15;
+const PENALTY_ROOT_TEST = 20;
+
+const MARKER_DESCRIBE = 'describe(';
+const MARKER_TEST = 'test(';
+const MARKER_IT = 'it(';
+const MARKER_CFG_TEST = '#[cfg(test)]';
+const MARKER_MOD_TESTS = 'mod tests';
+const MARKER_PY_MAIN = 'if __name__ == "__main__":';
+
+const PATH_TESTS_DIR = '/tests/';
+const PATH_TEST_DIR = '/test/';
+
+/** Remediation actions available to resolve test topology contract violations. */
+export type TopologyAction = 'extract_test_suite' | 'relocate_test_zone' | 'annotate_test_intent';
+
+/**
+ * Remediation proposal specifying machine-actionable repair steps for test topology violations.
+ */
+export interface ActionableTestProposal {
+    readonly action: TopologyAction;
+    readonly rule: typeof RULE_TST_TOP_001;
+    readonly targetFile: string;
+    readonly rationale: string;
+}
+
+function createActionableProposal(
+    action: TopologyAction,
+    targetFile: string,
+    rationale: string,
+): ActionableTestProposal {
+    return { action, rule: RULE_TST_TOP_001, targetFile, rationale };
+}
+
+/** Diagnostic failure reasons describing breached test topology contracts. */
+export type TopologyViolationReason =
+    | 'cross_language_embedded_test_prohibited'
+    | 'embedded_zone_not_tail_isolated'
+    | 'embedded_test_unconditionally_compiled'
+    | 'missing_agent_readable_intent';
 
 /**
  * Finding generated when test topology discipline or embedded contracts are breached.
  */
-export interface TestTopologyFinding {
+export interface TopologyFinding {
     readonly rule: typeof RULE_TST_TOP_001;
     readonly filePath: string;
     readonly line: number;
     readonly column: number;
     readonly severity: 'warning' | 'error';
-    readonly reason:
-        | 'cross_language_embedded_test_prohibited'
-        | 'embedded_zone_not_tail_isolated'
-        | 'embedded_test_unconditionally_compiled'
-        | 'missing_agent_readable_intent';
+    readonly reason: TopologyViolationReason;
     readonly message: string;
-    readonly actionableProposal: {
-        readonly action: 'extract_test_suite' | 'relocate_test_zone' | 'annotate_test_intent';
-        readonly rule: typeof RULE_TST_TOP_001;
-        readonly targetFile: string;
-        readonly rationale: string;
+    readonly actionableProposal: ActionableTestProposal;
+}
+
+/** Backward-compatible type alias for finding consumer code. */
+export type TestTopologyFinding = TopologyFinding;
+
+interface FindingBuildParams {
+    filePath: string;
+    line?: number;
+    column?: number;
+    severity: 'warning' | 'error';
+    reason: TopologyViolationReason;
+    message: string;
+    action: TopologyAction;
+    rationale: string;
+}
+
+function createTopologyFinding(params: FindingBuildParams): TopologyFinding {
+    return {
+        rule: RULE_TST_TOP_001,
+        filePath: params.filePath,
+        line: params.line ?? 1,
+        column: params.column ?? 1,
+        severity: params.severity,
+        reason: params.reason,
+        message: params.message,
+        actionableProposal: createActionableProposal(
+            params.action,
+            params.filePath,
+            params.rationale,
+        ),
     };
 }
 
 /**
  * Result of dual-track test topology evaluation.
  */
-export interface DualTrackTestEvaluationResult {
+export interface DualTrackEvaluation {
     readonly filePath: string;
-    readonly track: TestTopologyTrack;
+    readonly track: TestingTrack;
     readonly language: string;
     readonly testTopologyScore: number; // 0 - 100
     readonly embeddedTestLines: number;
     readonly productionEffectiveLoc: number;
     readonly isCompliant: boolean;
-    readonly findings: readonly TestTopologyFinding[];
+    readonly findings: readonly TopologyFinding[];
+}
+
+interface EvaluationResultParams {
+    filePath: string;
+    track: TestingTrack;
+    language: string;
+    score: number;
+    lineCount: number;
+    productionLoc: number;
+    findings?: readonly TopologyFinding[];
+}
+
+function buildEvaluationResult(params: EvaluationResultParams): DualTrackEvaluation {
+    const findings = params.findings ?? [];
+    return {
+        filePath: params.filePath,
+        track: params.track,
+        language: params.language,
+        testTopologyScore: Math.max(0, params.score),
+        embeddedTestLines: params.lineCount,
+        productionEffectiveLoc: params.productionLoc,
+        isCompliant: findings.length === 0,
+        findings,
+    };
 }
 
 const TS_JS_TEST_PATTERN = /\.(?:test|spec)\.[jt]sx?$/i;
@@ -76,7 +186,7 @@ function countContentLines(content: string): number {
     }
     let count = 1;
     for (let i = 0; i < content.length; i++) {
-        if (content.charCodeAt(i) === 10) {
+        if (content.charCodeAt(i) === CHAR_CODE_LF) {
             count++;
         }
     }
@@ -88,11 +198,11 @@ function countContentLines(content: string): number {
  */
 function hasEmbeddedMarkers(content: string, ext: string): boolean {
     return (
-        content.includes('#[cfg(test)]') ||
-        content.includes('mod tests') ||
-        content.includes('describe(') ||
-        content.includes('it(') ||
-        (ext === '.py' && content.includes('if __name__ == "__main__":'))
+        content.includes(MARKER_CFG_TEST) ||
+        content.includes(MARKER_MOD_TESTS) ||
+        content.includes(MARKER_DESCRIBE) ||
+        content.includes(MARKER_IT) ||
+        (ext === '.py' && content.includes(MARKER_PY_MAIN))
     );
 }
 
@@ -110,67 +220,62 @@ function createPureProductionResult(
     filePath: string,
     ext: string,
     productionLoc: number,
-): DualTrackTestEvaluationResult {
-    return {
+): DualTrackEvaluation {
+    return buildEvaluationResult({
         filePath,
-        track: 'PRODUCTION_CODE',
+        track: TRACK_PRODUCTION,
         language: ext,
-        testTopologyScore: 100,
-        embeddedTestLines: 0,
-        productionEffectiveLoc: productionLoc,
-        isCompliant: true,
-        findings: [],
-    };
+        score: PERFECT_SCORE,
+        lineCount: 0,
+        productionLoc,
+    });
+}
+
+interface ProhibitedResultParams {
+    filePath: string;
+    content: string;
+    ext: string;
+    lineCount: number;
+    productionLoc: number;
 }
 
 /**
  * Constructs a violation result for embedded tests in forbidden languages.
  */
-function createProhibitedEmbeddedResult(
-    filePath: string,
-    content: string,
-    ext: string,
-    embeddedLines: number,
-    productionLoc: number,
-): DualTrackTestEvaluationResult {
+function createProhibitedEmbeddedResult(params: ProhibitedResultParams): DualTrackEvaluation {
+    const { filePath, content, ext, lineCount, productionLoc } = params;
     const lines = content.split(/\r\n|\n/);
     const testLineIdx = lines.findIndex(
-        (l) => l.includes('describe(') || l.includes('test(') || l.includes('it('),
+        (l) => l.includes(MARKER_DESCRIBE) || l.includes(MARKER_TEST) || l.includes(MARKER_IT),
     );
     const lineNum = testLineIdx >= 0 ? testLineIdx + 1 : 1;
 
-    const findings: TestTopologyFinding[] = [
-        {
-            rule: RULE_TST_TOP_001,
+    const findings: TopologyFinding[] = [
+        createTopologyFinding({
             filePath,
             line: lineNum,
             column: 1,
-            severity: 'warning',
-            reason: 'cross_language_embedded_test_prohibited',
+            severity: SEVERITY_WARNING,
+            reason: REASON_CROSS_LANG,
             message:
                 `Embedded test code domain prohibited in ${ext} production source file. ` +
                 `Enforce explicit test file topology (e.g. create dedicated *.test.ts).`,
-            actionableProposal: {
-                action: 'extract_test_suite',
-                rule: RULE_TST_TOP_001,
-                targetFile: filePath,
-                rationale:
-                    `Extract embedded test assertions from '${filePath}' into an explicit ` +
-                    `standalone test suite to maintain clean architectural boundaries.`,
-            },
-        },
+            action: ACTION_EXTRACT_TEST_SUITE,
+            rationale:
+                `Extract embedded test assertions from '${filePath}' into an explicit ` +
+                `standalone test suite to maintain clean architectural boundaries.`,
+        }),
     ];
 
-    return {
+    return buildEvaluationResult({
         filePath,
-        track: 'EMBEDDED_TEST_ZONE',
+        track: TRACK_EMBEDDED,
         language: ext,
-        testTopologyScore: 40,
-        embeddedTestLines: embeddedLines,
-        productionEffectiveLoc: productionLoc,
-        isCompliant: false,
+        score: PROHIBITED_BASE_SCORE,
+        lineCount,
+        productionLoc,
         findings,
-    };
+    });
 }
 
 /**
@@ -179,7 +284,7 @@ function createProhibitedEmbeddedResult(
 function checkTailIsolation(
     filePath: string,
     segs: readonly SemanticZoneSegment[],
-): TestTopologyFinding | null {
+): TopologyFinding | null {
     let firstTestIdx = -1;
     for (let i = 0; i < segs.length; i++) {
         if (segs[i].zone === ZONE_EMBEDDED_TEST) {
@@ -193,25 +298,20 @@ function checkTailIsolation(
 
     for (let i = firstTestIdx + 1; i < segs.length; i++) {
         if (segs[i].zone !== ZONE_EMBEDDED_TEST) {
-            return {
-                rule: RULE_TST_TOP_001,
+            return createTopologyFinding({
                 filePath,
                 line: segs[firstTestIdx].startLine,
                 column: 1,
-                severity: 'warning',
-                reason: 'embedded_zone_not_tail_isolated',
+                severity: SEVERITY_WARNING,
+                reason: REASON_NOT_TAIL,
                 message:
                     `Embedded test zone is interleaved before production code. ` +
                     `Move embedded test zone to the end of the file.`,
-                actionableProposal: {
-                    action: 'relocate_test_zone',
-                    rule: RULE_TST_TOP_001,
-                    targetFile: filePath,
-                    rationale:
-                        `Relocate test block to file tail to maintain modern zone ` +
-                        `partitioning discipline.`,
-                },
-            };
+                action: ACTION_RELOCATE_TEST_ZONE,
+                rationale:
+                    `Relocate test block to file tail to maintain modern zone ` +
+                    `partitioning discipline.`,
+            });
         }
     }
     return null;
@@ -225,7 +325,7 @@ interface PermittedZoneContext {
 }
 
 interface PermittedZoneContractRule {
-    evaluate(ctx: PermittedZoneContext): { penalty: number; finding: TestTopologyFinding | null };
+    evaluate(ctx: PermittedZoneContext): { penalty: number; finding: TopologyFinding | null };
 }
 
 /**
@@ -238,7 +338,7 @@ const PERMITTED_ZONE_CONTRACTS: readonly PermittedZoneContractRule[] = [
             if (ctx.zoneProfile && ctx.zoneProfile.segments.length > 0) {
                 const tailFinding = checkTailIsolation(ctx.filePath, ctx.zoneProfile.segments);
                 if (tailFinding !== null) {
-                    return { penalty: 25, finding: tailFinding };
+                    return { penalty: PENALTY_NOT_TAIL, finding: tailFinding };
                 }
             }
             return { penalty: 0, finding: null };
@@ -249,28 +349,21 @@ const PERMITTED_ZONE_CONTRACTS: readonly PermittedZoneContractRule[] = [
         evaluate: (ctx) => {
             if (
                 ctx.ext === '.rs' &&
-                ctx.content.includes('mod tests') &&
-                !ctx.content.includes('#[cfg(test)]')
+                ctx.content.includes(MARKER_MOD_TESTS) &&
+                !ctx.content.includes(MARKER_CFG_TEST)
             ) {
                 return {
-                    penalty: 30,
-                    finding: {
-                        rule: RULE_TST_TOP_001,
+                    penalty: PENALTY_UNCONDITIONAL_BUILD,
+                    finding: createTopologyFinding({
                         filePath: ctx.filePath,
-                        line: 1,
-                        column: 1,
-                        severity: 'error',
-                        reason: 'embedded_test_unconditionally_compiled',
+                        severity: SEVERITY_ERROR,
+                        reason: REASON_UNCONDITIONAL_BUILD,
                         message:
                             `Rust embedded test module missing #[cfg(test)] conditional compilation ` +
                             `attribute; risks production binary code bleed.`,
-                        actionableProposal: {
-                            action: 'relocate_test_zone',
-                            rule: RULE_TST_TOP_001,
-                            targetFile: ctx.filePath,
-                            rationale: `Add #[cfg(test)] attribute to isolate test suite from release builds.`,
-                        },
-                    },
+                        action: ACTION_RELOCATE_TEST_ZONE,
+                        rationale: `Add #[cfg(test)] attribute to isolate test suite from release builds.`,
+                    }),
                 };
             }
             return { penalty: 0, finding: null };
@@ -281,30 +374,32 @@ const PERMITTED_ZONE_CONTRACTS: readonly PermittedZoneContractRule[] = [
         evaluate: (ctx) => {
             if (ctx.zoneProfile && ctx.zoneProfile.embeddedTestIntentAnnotatedRatio < 0.5) {
                 return {
-                    penalty: 15,
-                    finding: {
-                        rule: RULE_TST_TOP_001,
+                    penalty: PENALTY_MISSING_INTENT,
+                    finding: createTopologyFinding({
                         filePath: ctx.filePath,
-                        line: 1,
-                        column: 1,
-                        severity: 'warning',
-                        reason: 'missing_agent_readable_intent',
+                        severity: SEVERITY_WARNING,
+                        reason: REASON_MISSING_INTENT,
                         message:
                             `Embedded unit tests lack structured doc comments (Case/Assertion), ` +
                             `inhibiting autonomous agent regression verification.`,
-                        actionableProposal: {
-                            action: 'annotate_test_intent',
-                            rule: RULE_TST_TOP_001,
-                            targetFile: ctx.filePath,
-                            rationale: `Add doc comments with 'Case:' and 'Assertion:' for machine-readability.`,
-                        },
-                    },
+                        action: ACTION_ANNOTATE_INTENT,
+                        rationale: `Add doc comments with 'Case:' and 'Assertion:' for machine-readability.`,
+                    }),
                 };
             }
             return { penalty: 0, finding: null };
         },
     },
 ];
+
+interface PermittedZoneParams {
+    filePath: string;
+    content: string;
+    ext: string;
+    zoneProfile?: IntraFileZoneProfile;
+    lineCount: number;
+    productionLoc: number;
+}
 
 /**
  * Multi-Language Dual-Track Test Topology Evaluator.
@@ -317,7 +412,7 @@ export class DualTrackTestEvaluator {
         filePath: string,
         content: string,
         zoneProfile?: IntraFileZoneProfile,
-    ): DualTrackTestEvaluationResult {
+    ): DualTrackEvaluation {
         const normalizedPath = filePath.replace(/\\/g, '/');
         const ext = path.extname(normalizedPath).toLowerCase();
         const isExplicitTestFile = this.isExplicitTestPath(normalizedPath);
@@ -328,7 +423,7 @@ export class DualTrackTestEvaluator {
         }
 
         // 2. Second Track: Production Files with possible Embedded Test Zones
-        return this.evaluateProductionOrEmbeddedFile(normalizedPath, content, ext, zoneProfile);
+        return this.evaluateSourceTopology(normalizedPath, content, ext, zoneProfile);
     }
 
     private isExplicitTestPath(filePath: string): boolean {
@@ -336,8 +431,8 @@ export class DualTrackTestEvaluator {
             TS_JS_TEST_PATTERN.test(filePath) ||
             PY_TEST_PATTERN.test(filePath) ||
             GDSCRIPT_TEST_PATTERN.test(filePath) ||
-            filePath.includes('/tests/') ||
-            filePath.includes('/test/')
+            filePath.includes(PATH_TESTS_DIR) ||
+            filePath.includes(PATH_TEST_DIR)
         );
     }
 
@@ -345,67 +440,61 @@ export class DualTrackTestEvaluator {
         filePath: string,
         _content: string,
         ext: string,
-    ): DualTrackTestEvaluationResult {
-        const findings: TestTopologyFinding[] = [];
-
-        // Check for anti-pattern: test file placed directly in root without topology structure
+    ): DualTrackEvaluation {
+        const findings: TopologyFinding[] = [];
         const segments = filePath.split('/').filter(Boolean);
-        let topologyScore = 100;
+        let topologyScore = PERFECT_SCORE;
 
         if (segments.length <= 1) {
-            topologyScore -= 20;
+            topologyScore -= PENALTY_ROOT_TEST;
         }
 
-        return {
+        return buildEvaluationResult({
             filePath,
-            track: 'EXPLICIT_TEST_FILE',
+            track: TRACK_EXPLICIT,
             language: ext,
-            testTopologyScore: Math.max(0, topologyScore),
-            embeddedTestLines: 0,
-            productionEffectiveLoc: 0,
-            isCompliant: findings.length === 0,
+            score: topologyScore,
+            lineCount: 0,
+            productionLoc: 0,
             findings,
-        };
+        });
     }
 
-    private evaluatePermittedZoneContracts(
-        filePath: string,
-        content: string,
-        ext: string,
-        zoneProfile: IntraFileZoneProfile | undefined,
-        embeddedLines: number,
-        productionLoc: number,
-    ): DualTrackTestEvaluationResult {
-        let zoneScore = 100;
-        const findings: TestTopologyFinding[] = [];
-        const ctx: PermittedZoneContext = { filePath, content, ext, zoneProfile };
+    private evaluatePermittedZoneContracts(params: PermittedZoneParams): DualTrackEvaluation {
+        let zoneScore = PERFECT_SCORE;
+        const findings: TopologyFinding[] = [];
+        const ctx: PermittedZoneContext = {
+            filePath: params.filePath,
+            content: params.content,
+            ext: params.ext,
+            zoneProfile: params.zoneProfile,
+        };
 
         for (const rule of PERMITTED_ZONE_CONTRACTS) {
-            const res = rule.evaluate(ctx);
-            if (res.finding !== null) {
-                zoneScore -= res.penalty;
-                findings.push(res.finding);
+            const evalResult = rule.evaluate(ctx);
+            if (evalResult.finding !== null) {
+                zoneScore -= evalResult.penalty;
+                findings.push(evalResult.finding);
             }
         }
 
-        return {
-            filePath,
-            track: 'EMBEDDED_TEST_ZONE',
-            language: ext,
-            testTopologyScore: Math.max(0, zoneScore),
-            embeddedTestLines: embeddedLines,
-            productionEffectiveLoc: productionLoc,
-            isCompliant: findings.length === 0,
+        return buildEvaluationResult({
+            filePath: params.filePath,
+            track: TRACK_EMBEDDED,
+            language: params.ext,
+            score: zoneScore,
+            lineCount: params.lineCount,
+            productionLoc: params.productionLoc,
             findings,
-        };
+        });
     }
 
-    private evaluateProductionOrEmbeddedFile(
+    private evaluateSourceTopology(
         filePath: string,
         content: string,
         ext: string,
         zoneProfile?: IntraFileZoneProfile,
-    ): DualTrackTestEvaluationResult {
+    ): DualTrackEvaluation {
         const embeddedLines = zoneProfile ? zoneProfile.embeddedTestLines : 0;
         const productionLoc = zoneProfile
             ? zoneProfile.productionEffectiveLoc
@@ -418,30 +507,30 @@ export class DualTrackTestEvaluator {
 
         // Guard 2: Prohibited embedded test languages
         if (!PERMITTED_EMBEDDED_LANGUAGES.has(ext)) {
-            return createProhibitedEmbeddedResult(
+            return createProhibitedEmbeddedResult({
                 filePath,
                 content,
                 ext,
-                embeddedLines,
+                lineCount: embeddedLines,
                 productionLoc,
-            );
+            });
         }
 
         // Permitted languages governed by contract rules
-        return this.evaluatePermittedZoneContracts(
+        return this.evaluatePermittedZoneContracts({
             filePath,
             content,
             ext,
             zoneProfile,
-            embeddedLines,
+            lineCount: embeddedLines,
             productionLoc,
-        );
+        });
     }
 
     private checkTailIsolation(
         filePath: string,
         segs: readonly SemanticZoneSegment[],
-    ): TestTopologyFinding | null {
+    ): TopologyFinding | null {
         return checkTailIsolation(filePath, segs);
     }
 }

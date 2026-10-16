@@ -57,6 +57,7 @@ const ALL_ANALYZERS = {
   stdlib: { enabled: true },
   'gdscript-game': { enabled: true },
   'vscode-extension': { enabled: true },
+  'token-density': { enabled: true },
 };
 
 /**

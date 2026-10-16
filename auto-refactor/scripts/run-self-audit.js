@@ -12,8 +12,19 @@
 
 'use strict';
 
+const MODULE_PATH = 'path';
+const MODULE_CHILD_PROCESS = 'child_process';
+const MODULE_API = '../dist/api';
+const DIR_REPORTS = 'reports';
+const FILE_BASELINE = 'self-audit-baseline.json';
+const STDIO_MODE_PIPE = 'pipe';
+const KEY_COMPOSITE_SCORE = 'compositeScore';
+const PILLAR_LABEL_WIDTH = 16;
+const DIMENSION_LABEL_WIDTH = 24;
+
 const fs = require('fs');
-const path = require('path');
+const path = require(MODULE_PATH);
+const { execSync } = require(MODULE_CHILD_PROCESS);
 const {
   scan,
   createAuditSnapshot,
@@ -22,12 +33,33 @@ const {
   extractDomainName,
   TrajectoryAccumulator,
   ALL_QUALITY_DIMENSIONS,
-} = require('../dist/api');
+} = require(MODULE_API);
 
 const ROOT = path.join(__dirname, '..');
-const REPORTS_DIR = path.join(ROOT, 'reports');
-const BASELINE_OUTPUT = path.join(REPORTS_DIR, 'self-audit-baseline.json');
+const REPORTS_DIR = path.join(ROOT, DIR_REPORTS);
+const BASELINE_OUTPUT = path.join(REPORTS_DIR, FILE_BASELINE);
 const TRAJECTORY_DIR = path.join(ROOT, '.refactor-trajectory');
+
+const TIER_CRITICAL = 'critical';
+const TIER_HIGH = 'high';
+const TIER_MEDIUM = 'medium';
+const TIER_LOW = 'low';
+const SEVERITY_ERROR = 'error';
+const SEVERITY_WARNING = 'warning';
+const MODULE_NAME_AUTO_ENGINE = 'auto-refactor-engine';
+const AGENT_NAME_SELF_AUDIT = 'self-audit-engine';
+const DEFAULT_MAX_SCORE = 100.0;
+const DIGEST_REVISION_LENGTH = 8;
+const PROGRESS_BAR_SEGMENTS = 20;
+const PROGRESS_BAR_MAX = 100;
+const HOTSPOTS_DISPLAY_LIMIT = 5;
+const TOP_HOTSPOTS_LIMIT = 10;
+const CRITICAL_WEIGHT = 10;
+const HIGH_WEIGHT = 3;
+const DEBT_SAMPLE_LIMIT = 50;
+const MILLISECONDS_PER_SECOND = 1000;
+const PERCENT_MULTIPLIER = 100;
+const RUN_LOG_LEVEL_WARN = 'warn';
 
 const CRITICAL_RULE_RE = /^(?:ARCH-|clean-layer-violation$|expensive-loop-operation$)/;
 const HIGH_RULE_RE = /^(?:high-complexity$|CPX-|PRF-|DAT-|TST-TAU|GOV-GAM)/;
@@ -42,18 +74,18 @@ const MEDIUM_RULE_RE =
  */
 function classifyDebtTier(issue) {
   const rule = issue.rule || '';
-  const sev = issue.severity || 'warning';
+  const sev = issue.severity || SEVERITY_WARNING;
 
-  if (sev === 'error' || CRITICAL_RULE_RE.test(rule)) {
-    return 'critical';
+  if (sev === SEVERITY_ERROR || CRITICAL_RULE_RE.test(rule)) {
+    return TIER_CRITICAL;
+  }
+  if (rule === 'CPX-TRV-001') {
+    return TIER_MEDIUM;
   }
   if (HIGH_RULE_RE.test(rule)) {
-    return 'high';
+    return TIER_HIGH;
   }
-  if (MEDIUM_RULE_RE.test(rule)) {
-    return 'medium';
-  }
-  return 'low';
+  return MEDIUM_RULE_RE.test(rule) ? TIER_MEDIUM : TIER_LOW;
 }
 
 /**
@@ -63,7 +95,12 @@ function classifyDebtTier(issue) {
  * @returns Partitioned debt ledger and file mapping.
  */
 function buildDebtLedger(issues) {
-  const debtByTier = { critical: 0, high: 0, medium: 0, low: 0 };
+  const debtByTier = {
+    [TIER_CRITICAL]: 0,
+    [TIER_HIGH]: 0,
+    [TIER_MEDIUM]: 0,
+    [TIER_LOW]: 0,
+  };
   const criticalItems = [];
   const highItems = [];
   const fileIssuesMap = new Map();
@@ -88,9 +125,9 @@ function buildDebtLedger(issues) {
       message: issue.message,
     };
 
-    if (tier === 'critical') {
+    if (tier === TIER_CRITICAL) {
       criticalItems.push(ledgerEntry);
-    } else if (tier === 'high') {
+    } else if (tier === TIER_HIGH) {
       highItems.push(ledgerEntry);
     }
   }
@@ -133,17 +170,17 @@ function computeFileScores(fileIssuesMap) {
 function computeTopHotspots(fileScores) {
   return [...fileScores]
     .sort((a, b) => b.issues.length - a.issues.length)
-    .slice(0, 10)
+    .slice(0, TOP_HOTSPOTS_LIMIT)
     .map((f) => {
-      const cCount = f.issues.filter((i) => classifyDebtTier(i) === 'critical').length;
-      const hCount = f.issues.filter((i) => classifyDebtTier(i) === 'high').length;
+      const cCount = f.issues.filter((i) => classifyDebtTier(i) === TIER_CRITICAL).length;
+      const hCount = f.issues.filter((i) => classifyDebtTier(i) === TIER_HIGH).length;
       return {
         filePath: f.filePath,
         domain: f.domainName,
         totalIssues: f.issues.length,
         criticalCount: cCount,
         highCount: hCount,
-        compositeScore: f.compositeScore,
+        [KEY_COMPOSITE_SCORE]: f.compositeScore,
         effectiveDensity: f.effectiveDensity,
       };
     });
@@ -202,11 +239,16 @@ function readExistingBaseline() {
  */
 function computeTotalDebtPoints(byDebtTier) {
   if (!byDebtTier) return 0;
-  const critical = byDebtTier.critical || 0;
-  const high = byDebtTier.high || 0;
-  const medium = byDebtTier.medium || 0;
-  return critical * 10 + high * 3 + medium;
+  const critical = byDebtTier[TIER_CRITICAL] || 0;
+  const high = byDebtTier[TIER_HIGH] || 0;
+  const medium = byDebtTier[TIER_MEDIUM] || 0;
+  return critical * CRITICAL_WEIGHT + high * HIGH_WEIGHT + medium;
 }
+
+const GIT_DIFF_NUMSTAT_CMD = 'git diff --numstat HEAD~1';
+const MIN_NUMSTAT_PARTS = 3;
+const SEMANTIC_ELOC_RATIO = 0.8;
+const ADDED_ELOC_RATIO = 0.5;
 
 /**
  * Estimates physical and semantic changed ELOC from git diff if available.
@@ -215,26 +257,25 @@ function computeTotalDebtPoints(byDebtTier) {
  */
 function estimateChangedEloc() {
   try {
-    const { execSync } = require('child_process');
-    const out = execSync('git diff --numstat HEAD~1', {
+    const out = execSync(GIT_DIFF_NUMSTAT_CMD, {
       cwd: ROOT,
       encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
+      stdio: STDIO_MODE_PIPE,
     });
     let changed = 0;
     const lines = out.trim().split('\n');
     for (const l of lines) {
       if (!l) continue;
       const parts = l.split('\t');
-      if (parts.length >= 3) {
+      if (parts.length >= MIN_NUMSTAT_PARTS) {
         const add = parseInt(parts[0], 10) || 0;
         const del = parseInt(parts[1], 10) || 0;
         changed += add + del;
       }
     }
     if (changed > 0) {
-      const semantic = Math.max(1, Math.round(changed * 0.8));
-      return { changed, semantic, added: Math.round(changed * 0.5) };
+      const semantic = Math.max(1, Math.round(changed * SEMANTIC_ELOC_RATIO));
+      return { changed, semantic, added: Math.round(changed * ADDED_ELOC_RATIO) };
     }
   } catch (err) {
     void err;
@@ -245,38 +286,32 @@ function estimateChangedEloc() {
 /**
  * Records an audit run into the persistent trajectory accumulator ledger.
  */
-async function recordRunToTrajectory(
-  snapshot,
-  projectScore,
-  debtByTier,
-  scannedFilesList,
-  startTime,
-  prevBaseline,
-) {
+async function recordRunToTrajectory(params) {
   const trajectoryAccumulator = new TrajectoryAccumulator(TRAJECTORY_DIR);
   const scoreVector = ALL_QUALITY_DIMENSIONS.map((dim) => {
-    return projectScore.tenDimensions?.[dim] ?? 100.0;
+    return params.projectScore.tenDimensions?.[dim] ?? DEFAULT_MAX_SCORE;
   });
 
-  const currentDebtPoints = computeTotalDebtPoints(debtByTier);
-  const prevDebtPoints = prevBaseline?.metrics?.byDebtTier
-    ? computeTotalDebtPoints(prevBaseline.metrics.byDebtTier)
+  const currentDebtPoints = computeTotalDebtPoints(params.debtByTier);
+  const prevDebtPoints = params.prevBaseline?.metrics?.byDebtTier
+    ? computeTotalDebtPoints(params.prevBaseline.metrics.byDebtTier)
     : currentDebtPoints;
 
   const resolvedDebtPoints = Math.max(0, prevDebtPoints - currentDebtPoints);
   const addedDebtPoints = Math.max(0, currentDebtPoints - prevDebtPoints);
 
-  const beforeScore = prevBaseline?.metrics?.compositeScore ?? projectScore.compositeScore;
-  const afterScore = projectScore.compositeScore;
+  const beforeScore =
+    params.prevBaseline?.metrics?.compositeScore ?? params.projectScore.compositeScore;
+  const afterScore = params.projectScore.compositeScore;
   const diffCounters = estimateChangedEloc();
 
   return trajectoryAccumulator.recordAuditRun({
-    runId: `run-${snapshot.snapshotId}`,
-    revision: snapshot.rulesDigest.slice(0, 8),
-    module: 'auto-refactor-engine',
-    agent: 'self-audit-engine',
-    timestamp: startTime,
-    scannedFiles: scannedFilesList,
+    runId: `run-${params.snapshot.snapshotId}`,
+    revision: params.snapshot.rulesDigest.slice(0, DIGEST_REVISION_LENGTH),
+    module: MODULE_NAME_AUTO_ENGINE,
+    agent: AGENT_NAME_SELF_AUDIT,
+    timestamp: params.startTime,
+    scannedFiles: params.scannedFilesList,
     beforeScore,
     afterScore,
     scoreVector,
@@ -287,62 +322,54 @@ async function recordRunToTrajectory(
   });
 }
 
+function buildMetricsSummary(projectScore, scanReport, issues, debtByTier) {
+  const suppressedCount = scanReport.summary.suppressedCount || 0;
+  return {
+    compositeScore: projectScore.compositeScore,
+    grade: projectScore.grade,
+    autonomyRate: scanReport.autonomy?.compositeAutonomyIndex ?? null,
+    effectiveCodeDensity: projectScore.effectiveCodeDensity,
+    totalIssues: issues.length,
+    suppressedIssues: suppressedCount,
+    unsuppressedIssues: issues.length - suppressedCount,
+    bySeverity: scanReport.summary.bySeverity,
+    byDebtTier: debtByTier,
+  };
+}
+
 /**
  * Builds the final self-audit baseline report object.
  */
 function buildBaselineReport(params) {
-  const {
-    snapshot,
-    projectScore,
-    filesScanned,
-    durationMs,
-    issues,
-    scanReport,
-    debtByTier,
-    criticalItems,
-    highItems,
-    topHotspots,
-    trajectoryRes,
-  } = params;
-
   return {
-    snapshotId: snapshot.snapshotId,
+    snapshotId: params.snapshot.snapshotId,
     timestamp: new Date().toISOString(),
-    cai: scanReport.autonomy?.compositeAutonomyIndex ?? null,
-    versions: snapshot.versions,
-    rulesDigest: snapshot.rulesDigest,
-    configDigest: snapshot.configDigest,
-    scope: {
-      root: ROOT,
-      filesScanned,
-      durationMs,
-    },
-    metrics: {
-      compositeScore: projectScore.compositeScore,
-      grade: projectScore.grade,
-      autonomyRate: scanReport.autonomy?.compositeAutonomyIndex ?? null,
-      effectiveCodeDensity: projectScore.effectiveCodeDensity,
-      totalIssues: issues.length,
-      suppressedIssues: scanReport.summary.suppressedCount || 0,
-      unsuppressedIssues: issues.length - (scanReport.summary.suppressedCount || 0),
-      bySeverity: scanReport.summary.bySeverity,
-      byDebtTier: debtByTier,
-    },
+    cai: params.scanReport.autonomy?.compositeAutonomyIndex ?? null,
+    versions: params.snapshot.versions,
+    rulesDigest: params.snapshot.rulesDigest,
+    configDigest: params.snapshot.configDigest,
+    scope: { root: ROOT, filesScanned: params.filesScanned, durationMs: params.durationMs },
+    metrics: buildMetricsSummary(
+      params.projectScore,
+      params.scanReport,
+      params.issues,
+      params.debtByTier,
+    ),
     eightPillars: {
-      pillars: projectScore.eightPillars.pillars,
-      compositeScore: projectScore.compositeScore,
-      weights: projectScore.eightPillars.weights,
-      ceilingsApplied: projectScore.eightPillars.ceilingsApplied,
+      pillars: params.projectScore.eightPillars.pillars,
+      compositeScore: params.projectScore.compositeScore,
+      weights: params.projectScore.eightPillars.weights,
+      ceilingsApplied: params.projectScore.eightPillars.ceilingsApplied,
     },
-    tenDimensions: projectScore.tenDimensions,
-    topHotspots,
+    tenDimensions: params.projectScore.tenDimensions,
+    topHotspots: params.topHotspots,
     technicalDebtLedger: {
-      summary: debtByTier,
-      criticalItems: criticalItems.slice(0, 50),
-      highItems: highItems.slice(0, 50),
+      summary: params.debtByTier,
+      criticalItems: params.criticalItems.slice(0, DEBT_SAMPLE_LIMIT),
+      highItems: params.highItems.slice(0, DEBT_SAMPLE_LIMIT),
     },
     hierarchicalBreakdown: {
-      domains: projectScore.domains.map((d) => ({
+      domains: params.projectScore.domains.map((d) => ({
         domainName: d.domainName,
         compositeScore: d.compositeScore,
         pillars: d.pillars,
@@ -350,9 +377,9 @@ function buildBaselineReport(params) {
       })),
     },
     trajectory: {
-      runEloc: trajectoryRes.runEloc,
-      lifetime: trajectoryRes.lifetimeSummary,
-      isFirstBaseline: trajectoryRes.isFirstBaseline,
+      runEloc: params.trajectoryRes.runEloc,
+      lifetime: params.trajectoryRes.lifetimeSummary,
+      isFirstBaseline: params.trajectoryRes.isFirstBaseline,
     },
   };
 }
@@ -378,7 +405,7 @@ async function runSelfAudit(options = {}) {
     root: ROOT,
     include: ['src/**/*.ts', 'scripts/*.js'],
     autoTune: false,
-    logLevel: 'warn',
+    logLevel: RUN_LOG_LEVEL_WARN,
     ...options.scanOptions,
   });
 
@@ -409,14 +436,14 @@ async function runSelfAudit(options = {}) {
 
   // 6. Automatically Record Run into Trajectory Accumulator
   const scannedFilesList = collectScannedFiles(scanReport.fileMetrics);
-  const trajectoryRes = await recordRunToTrajectory(
+  const trajectoryRes = await recordRunToTrajectory({
     snapshot,
     projectScore,
     debtByTier,
     scannedFilesList,
     startTime,
     prevBaseline,
-  );
+  });
 
   // 7. Build Baseline Report Object
   const baselineReport = buildBaselineReport({
@@ -440,6 +467,100 @@ async function runSelfAudit(options = {}) {
 }
 
 /**
+ * Render ASCII progress bar.
+ *
+ * @param metricScore - Current score value.
+ * @param maxScore - Maximum possible value.
+ * @param barWidth - Number of characters in the bar.
+ * @returns ASCII formatted progress bar string.
+ */
+function formatProgressBar(
+  metricScore,
+  maxScore = PROGRESS_BAR_MAX,
+  barWidth = PROGRESS_BAR_SEGMENTS,
+) {
+  const safeScore = Math.min(Math.max(0, metricScore), maxScore);
+  const barLen = Math.round((safeScore / maxScore) * barWidth);
+  return '█'.repeat(barLen) + '░'.repeat(Math.max(0, barWidth - barLen));
+}
+
+/**
+ * Print eight strategic pillars health radar.
+ *
+ * @param pillars - Health radar values by pillar.
+ */
+function printPillarsRadar(pillars) {
+  if (!pillars) return;
+  console.log('--- [Eight Strategic Pillars Health Radar] ---');
+  for (const [pillar, val] of Object.entries(pillars)) {
+    const progressBar = formatProgressBar(val);
+    const pName = (pillar.charAt(0).toUpperCase() + pillar.slice(1)).padEnd(
+      PILLAR_LABEL_WIDTH,
+      ' ',
+    );
+    console.log(`  ${pName} : [${progressBar}] ${val.toFixed(1)}`);
+  }
+}
+
+/**
+ * Print ten-dimensional micro-quality indices.
+ *
+ * @param dimensions - Quality indices map.
+ */
+function printMicroDimensions(dimensions) {
+  if (!dimensions) return;
+  console.log('\n--- [Ten-Dimensional Micro-Quality Indices] ---');
+  for (const [dim, val] of Object.entries(dimensions)) {
+    const numVal = typeof val === 'number' ? val : DEFAULT_MAX_SCORE;
+    const progressBar = formatProgressBar(numVal);
+    const dName = dim.padEnd(DIMENSION_LABEL_WIDTH, ' ');
+    console.log(`  ${dName} : [${progressBar}] ${numVal.toFixed(1)}`);
+  }
+}
+
+/**
+ * Print technical debt ledger and top hotspots.
+ *
+ * @param metrics - Audit metrics with debt tiers.
+ * @param topHotspots - Identified hotspots array.
+ */
+function printDebtHotspots(metrics, topHotspots) {
+  console.log('\n--- [Technical Debt Ledger Breakdown] ---');
+  console.log(`  Critical Debt : ${metrics.byDebtTier.critical}`);
+  console.log(`  High Debt     : ${metrics.byDebtTier.high}`);
+  console.log(`  Medium Debt   : ${metrics.byDebtTier.medium}`);
+  console.log(`  Low Debt      : ${metrics.byDebtTier.low}`);
+
+  console.log('\n--- [Top 5 Technical Debt Hotspots for Self-Refactoring Refactoring] ---');
+  for (const [idx, h] of topHotspots.slice(0, HOTSPOTS_DISPLAY_LIMIT).entries()) {
+    console.log(
+      `  ${idx + 1}. ${h.filePath} (${h.totalIssues} issues, ` +
+        `critical=${h.criticalCount}, high=${h.highCount}, score=${h.compositeScore})`,
+    );
+  }
+}
+
+/**
+ * Print cumulative ELOC and trajectory summary.
+ *
+ * @param trajectory - Trajectory result object.
+ */
+function printTrajectoryLedger(trajectory) {
+  if (!trajectory || !trajectory.lifetime) return;
+  const lt = trajectory.lifetime;
+  console.log('\n--- [Cumulative ELOC & Long-Term Trajectory Ledger] ---');
+  console.log(`  Run Processed ELOC    : ${trajectory.runEloc.processed.toLocaleString()} lines`);
+  console.log(`  Lifetime Total Runs   : ${lt.totalRuns}`);
+  console.log(
+    `  Lifetime Processed    : ${lt.eloc.processedTotal.toLocaleString()} lines (Additive Accumulation)`,
+  );
+  console.log(
+    `  Lifetime Unique (AST) : ${lt.eloc.uniqueTotal.toLocaleString()} lines (Deduplicated Coverage)`,
+  );
+  console.log(`  Lifetime Gate Pass %  : ${lt.gatePassRate.toFixed(1)}%`);
+}
+
+/**
  * Print terminal formatted executive dashboard.
  *
  * @param report - Self-audit baseline report.
@@ -452,66 +573,23 @@ function printTerminalDashboard(report) {
   console.log(`Snapshot ID    : ${report.snapshotId}`);
   console.log(`Engine Version : ${report.versions.engineVersion}`);
   console.log(
-    `Rule Version   : ${report.versions.ruleVersion} (${report.rulesDigest.slice(0, 8)})`,
+    `Rule Version   : ${report.versions.ruleVersion} (${report.rulesDigest.slice(0, DIGEST_REVISION_LENGTH)})`,
   );
   console.log(
-    `Files Scanned  : ${report.scope.filesScanned} files in ${(report.scope.durationMs / 1000).toFixed(2)}s`,
+    `Files Scanned  : ${report.scope.filesScanned} files in ${(report.scope.durationMs / MILLISECONDS_PER_SECOND).toFixed(2)}s`,
   );
   console.log(`Total Issues   : ${report.metrics.totalIssues}`);
   console.log(
     `Composite Score: ${report.metrics.compositeScore} / 100.0 (Grade: ${report.metrics.grade})`,
   );
-  console.log(`Code Density   : ${(report.metrics.effectiveCodeDensity * 100).toFixed(1)}%\n`);
+  console.log(
+    `Code Density   : ${(report.metrics.effectiveCodeDensity * PERCENT_MULTIPLIER).toFixed(1)}%\n`,
+  );
 
-  console.log('--- [Eight Strategic Pillars Health Radar] ---');
-  const pillars = report.eightPillars.pillars;
-  for (const [pillar, val] of Object.entries(pillars)) {
-    const barLen = Math.round(val / 5);
-    const bar = '█'.repeat(barLen) + '░'.repeat(20 - barLen);
-    const pName = (pillar.charAt(0).toUpperCase() + pillar.slice(1)).padEnd(16, ' ');
-    console.log(`  ${pName} : [${bar}] ${val.toFixed(1)}`);
-  }
-
-  if (report.tenDimensions) {
-    console.log('\n--- [Ten-Dimensional Micro-Quality Indices] ---');
-    for (const [dim, val] of Object.entries(report.tenDimensions)) {
-      const numVal = typeof val === 'number' ? val : 100;
-      const barLen = Math.round(numVal / 5);
-      const bar = '█'.repeat(barLen) + '░'.repeat(20 - barLen);
-      const dName = dim.padEnd(24, ' ');
-      console.log(`  ${dName} : [${bar}] ${numVal.toFixed(1)}`);
-    }
-  }
-
-  console.log('\n--- [Technical Debt Ledger Breakdown] ---');
-  console.log(`  Critical Debt : ${report.metrics.byDebtTier.critical}`);
-  console.log(`  High Debt     : ${report.metrics.byDebtTier.high}`);
-  console.log(`  Medium Debt   : ${report.metrics.byDebtTier.medium}`);
-  console.log(`  Low Debt      : ${report.metrics.byDebtTier.low}`);
-
-  console.log('\n--- [Top 5 Technical Debt Hotspots for Self-Refactoring Refactoring] ---');
-  for (const [idx, h] of report.topHotspots.slice(0, 5).entries()) {
-    console.log(
-      `  ${idx + 1}. ${h.filePath} (${h.totalIssues} issues, ` +
-        `critical=${h.criticalCount}, high=${h.highCount}, score=${h.compositeScore})`,
-    );
-  }
-
-  if (report.trajectory && report.trajectory.lifetime) {
-    const lt = report.trajectory.lifetime;
-    console.log('\n--- [Cumulative ELOC & Long-Term Trajectory Ledger] ---');
-    console.log(
-      `  Run Processed ELOC    : ${report.trajectory.runEloc.processed.toLocaleString()} lines`,
-    );
-    console.log(`  Lifetime Total Runs   : ${lt.totalRuns}`);
-    console.log(
-      `  Lifetime Processed    : ${lt.eloc.processedTotal.toLocaleString()} lines (Additive Accumulation)`,
-    );
-    console.log(
-      `  Lifetime Unique (AST) : ${lt.eloc.uniqueTotal.toLocaleString()} lines (Deduplicated Coverage)`,
-    );
-    console.log(`  Lifetime Gate Pass %  : ${lt.gatePassRate.toFixed(1)}%`);
-  }
+  printPillarsRadar(report.eightPillars && report.eightPillars.pillars);
+  printMicroDimensions(report.tenDimensions);
+  printDebtHotspots(report.metrics, report.topHotspots);
+  printTrajectoryLedger(report.trajectory);
 
   console.log('\n================================================================');
   console.log(`✔ Baseline Report Saved to: ${path.relative(ROOT, BASELINE_OUTPUT)}`);

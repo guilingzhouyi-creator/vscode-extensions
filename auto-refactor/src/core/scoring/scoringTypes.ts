@@ -93,6 +93,7 @@ const ANALYZER_TEST_MODERNITY = 'test-modernity';
 const ANALYZER_GO_MODERN = 'go-modern';
 const ANALYZER_COMMENTS = 'comments';
 const ANALYZER_CONSTANTS = 'constants';
+const ANALYZER_TOKEN_DENSITY = 'token-density';
 
 const SCALE_MODE_DENSITY = 'density';
 const SCALE_MODE_ABSOLUTE = 'absolute';
@@ -119,6 +120,7 @@ export const DIMENSION_ANALYZERS: Record<QualityDimension, readonly string[]> = 
         ANALYZER_GDSCRIPT_GAME,
         ANALYZER_VSCODE_EXTENSION,
         ANALYZER_GATE_ARCHITECTURE,
+        ANALYZER_TOKEN_DENSITY,
     ],
     semanticPurity: [
         ANALYZER_GOVERNANCE,
@@ -140,6 +142,7 @@ export const DIMENSION_ANALYZERS: Record<QualityDimension, readonly string[]> = 
         ANALYZER_GDSCRIPT_GAME,
         ANALYZER_VSCODE_EXTENSION,
         ANALYZER_FRONTEND,
+        ANALYZER_TOKEN_DENSITY,
     ],
     standardization: [
         ANALYZER_HYGIENE,
@@ -174,6 +177,7 @@ export const DIMENSION_ANALYZERS: Record<QualityDimension, readonly string[]> = 
         ANALYZER_SIMPLIFY,
         ANALYZER_FRONTEND,
         ANALYZER_PRODUCTION_HYGIENE,
+        ANALYZER_TOKEN_DENSITY,
     ],
     commentQuality: [ANALYZER_COMMENTS, ANALYZER_VSCODE_EXTENSION, ANALYZER_SIMPLIFY],
     duplication: [ANALYZER_CONSTANTS, ANALYZER_HYGIENE],

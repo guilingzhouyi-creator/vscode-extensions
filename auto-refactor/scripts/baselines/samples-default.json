@@ -925,7 +925,12 @@
       "functions": 3,
       "maxNestingDepth": 6,
       "topLevelDeclarations": 3,
-      "exportedSymbols": 0
+      "exportedSymbols": 0,
+      "effectiveDensity": 0.95,
+      "tspr": 0.912583,
+      "por": 0.087417,
+      "columnDensity": 0.999079,
+      "compositeDensity": 0.762332
     },
     {
       "file": "run-from-script.js",
@@ -934,7 +939,12 @@
       "functions": 2,
       "maxNestingDepth": 3,
       "topLevelDeclarations": 3,
-      "exportedSymbols": 0
+      "exportedSymbols": 0,
+      "effectiveDensity": 0.96,
+      "tspr": 0.884507,
+      "por": 0.115493,
+      "columnDensity": 0.939046,
+      "compositeDensity": 0.748711
     },
     {
       "file": "sample.ts",
@@ -943,7 +953,12 @@
       "functions": 7,
       "maxNestingDepth": 7,
       "topLevelDeclarations": 9,
-      "exportedSymbols": 7
+      "exportedSymbols": 7,
+      "effectiveDensity": 0.9,
+      "tspr": 0.928365,
+      "por": 0.071635,
+      "columnDensity": 0.993139,
+      "compositeDensity": 0.744301
     }
   ]
 }

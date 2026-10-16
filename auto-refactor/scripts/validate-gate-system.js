@@ -28,7 +28,8 @@ const CRLF_REGEX = /\r\n/;
 const CR_REGEX = /\r/;
 const FORBIDDEN_EXEC_SH = /exec sh /;
 const REQUIRED_EXEC_BASH = /exec bash /;
-const AUDIT_ALL_REGEX = /(?:workspace-timing|auto-refactor|WebGames|audit_config\.py|\[5\/5\])/g;
+const AUDIT_ALL_REGEX =
+  /(?:workspace-timing|auto-refactor|WebGames|audit_runner\.py|audit_config\.py|\[5\/5\])/g;
 const PRE_COMMIT_REGEX = /(?:\[\d\/9\]|workspace-timing|auto-refactor|WebGames)/g;
 const PRE_PUSH_REGEX =
   /(?:\[\d\/9\]|workspace-timing|auto-refactor|WebGames|validate-commit-msg-style)/g;
@@ -113,7 +114,10 @@ function verifyAuditAllParity() {
     assert(tokens.has('workspace-timing'), `${name} must cover workspace-timing`);
     assert(tokens.has('auto-refactor'), `${name} must cover auto-refactor`);
     assert(tokens.has('WebGames'), `${name} must cover WebGames`);
-    assert(tokens.has('audit_config.py'), `${name} must run WebGames config audit`);
+    assert(
+      tokens.has('audit_runner.py') || tokens.has('audit_config.py'),
+      `${name} must run WebGames config audit`,
+    );
     assert(tokens.has('[5/5]'), `${name} must have 5 verification steps`);
   }
 }

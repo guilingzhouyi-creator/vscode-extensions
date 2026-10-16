@@ -780,6 +780,7 @@ export const DIMENSION_RULES: DimensionRule[] = [
                 'SIM-IMM-001',
                 'SIM-FLAT-002',
                 'SIM-ARGS-001',
+                'SIM-INL-001',
             ],
             [
                 'ternary',
@@ -791,6 +792,7 @@ export const DIMENSION_RULES: DimensionRule[] = [
                 'else',
                 'parameter',
                 'argument',
+                'inline',
             ],
         ),
         dimension: DIMENSION_MAINTAINABILITY,

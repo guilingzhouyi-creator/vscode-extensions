@@ -56,6 +56,20 @@ export const ExposureMessages = {
         risk: 'High',
     } as const satisfies DiagnosticDescriptor,
 
+    /**
+     * SEC-EXP-005: Iframe/webview message handler lacks
+     * event.userActivation or origin verification.
+     */
+    IFRAME_SYNTHETIC_USER_ACTIVATION: {
+        message:
+            'Cross-window message listener executes sensitive action without event.userActivation or origin verification',
+        suggestion:
+            'Verify event.userActivation.isActive or validate event.origin against a strict whitelist before performing sensitive operations',
+        rationale:
+            'Untrusted iframes or synthetic postMessage events can trigger unauthorized downloads, popups, or state mutation without user intent.',
+        risk: 'High',
+    } as const satisfies DiagnosticDescriptor,
+
     /** PROD-HYG-001: Debugging statements, TODO markers, or internal paths in production. */
     PROD_DEBUG_RESIDUE: {
         message:
@@ -127,5 +141,50 @@ export const ExposureMessages = {
         rationale:
             'Consistent naming conventions clarify component lifecycle and event dispatch boundaries.',
         risk: 'Low',
+    } as const satisfies DiagnosticDescriptor,
+
+    /** UI-ENG-005: Missing CJK IME composition interlock guard on Enter submission. */
+    UI_IME_COMPOSITION_GUARD: {
+        message: 'Enter key submission handler lacks CJK IME composition interlock guard',
+        suggestion:
+            'Add !(e.nativeEvent.isComposing || e.keyCode === 229) guard before handling Enter submission',
+        rationale:
+            'Un-guarded Enter key listeners prematurely trigger submission while users select IME candidate words.',
+        risk: 'Medium',
+    } as const satisfies DiagnosticDescriptor,
+
+    /** UI-ENG-006: Dynamic timer, counter or metric display lacks tabular numbers font locking. */
+    UI_TABULAR_NUMERICS: {
+        message: 'Dynamic timer, timestamp, or counter display lacks tabular-nums font locking',
+        suggestion:
+            'Apply font-variant-numeric: tabular-nums or font-feature-settings: "tnum" to prevent text jitter',
+        rationale:
+            'Proportional figures cause character widths to fluctuate as numbers change, triggering horizontal jitter.',
+        risk: 'Low',
+    } as const satisfies DiagnosticDescriptor,
+
+    /** UI-ENG-007: Nested closed border inside bordered container entity. */
+    UI_SINGLE_BORDER_DISCIPLINE: {
+        message:
+            'Nested closed border detected inside bordered container entity violating single-stroke enclosure',
+        suggestion:
+            'Demote child controls inside bordered containers to ghost hover states or surface contrast fills',
+        rationale:
+            'Russian-doll nested borders generate unnecessary visual noise and heavy cognitive load.',
+        risk: 'Low',
+    } as const satisfies DiagnosticDescriptor,
+
+    /**
+     * UI-ENG-008: Component-scoped @media misuse or CJK text
+     * squashing without anti-squash properties.
+     */
+    UI_CONTAINER_QUERY_ANTI_SQUASH: {
+        message:
+            'Local component uses global viewport @media instead of @container, or text container lacks anti-squash wrapping properties',
+        suggestion:
+            'Use @container queries for component-scoped responsive layout, and apply text-wrap: balance or overflow-wrap: break-word to prevent CJK vertical character collapse',
+        rationale:
+            'Local components embedded in webviews or cards must respond to container width rather than viewport, and CJK text requires wrapping safeguards against single-glyph squashing.',
+        risk: 'Medium',
     } as const satisfies DiagnosticDescriptor,
 };

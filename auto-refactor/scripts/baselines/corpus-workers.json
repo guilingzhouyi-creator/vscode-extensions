@@ -1680,7 +1680,12 @@
       "functions": 12,
       "maxNestingDepth": 2,
       "topLevelDeclarations": 21,
-      "exportedSymbols": 21
+      "exportedSymbols": 21,
+      "effectiveDensity": 0.93,
+      "tspr": 0.954374,
+      "por": 0.045626,
+      "columnDensity": 0.999893,
+      "compositeDensity": 0.762853
     },
     {
       "file": "src/legacy.js",
@@ -1689,7 +1694,12 @@
       "functions": 1,
       "maxNestingDepth": 3,
       "topLevelDeclarations": 2,
-      "exportedSymbols": 0
+      "exportedSymbols": 0,
+      "effectiveDensity": 1,
+      "tspr": 0.917505,
+      "por": 0.082495,
+      "columnDensity": 0.979961,
+      "compositeDensity": 0.779493
     },
     {
       "file": "src/unit_binding_0.ts",
@@ -1698,7 +1708,12 @@
       "functions": 5,
       "maxNestingDepth": 2,
       "topLevelDeclarations": 1,
-      "exportedSymbols": 1
+      "exportedSymbols": 1,
+      "effectiveDensity": 1,
+      "tspr": 0.888889,
+      "por": 0.111111,
+      "columnDensity": 0.883863,
+      "compositeDensity": 0.875488
     },
     {
       "file": "src/unit_binding_1.ts",
@@ -1707,7 +1722,12 @@
       "functions": 5,
       "maxNestingDepth": 2,
       "topLevelDeclarations": 1,
-      "exportedSymbols": 1
+      "exportedSymbols": 1,
+      "effectiveDensity": 1,
+      "tspr": 0.888889,
+      "por": 0.111111,
+      "columnDensity": 0.883863,
+      "compositeDensity": 0.875488
     },
     {
       "file": "src/unit_binding_2.ts",
@@ -1716,7 +1736,12 @@
       "functions": 5,
       "maxNestingDepth": 2,
       "topLevelDeclarations": 1,
-      "exportedSymbols": 1
+      "exportedSymbols": 1,
+      "effectiveDensity": 1,
+      "tspr": 0.888889,
+      "por": 0.111111,
+      "columnDensity": 0.883863,
+      "compositeDensity": 0.875488
     },
     {
       "file": "src/unit_binding_3.ts",
@@ -1725,7 +1750,12 @@
       "functions": 5,
       "maxNestingDepth": 2,
       "topLevelDeclarations": 1,
-      "exportedSymbols": 1
+      "exportedSymbols": 1,
+      "effectiveDensity": 1,
+      "tspr": 0.888889,
+      "por": 0.111111,
+      "columnDensity": 0.883863,
+      "compositeDensity": 0.875488
     },
     {
       "file": "src/unit_cls_0.ts",
@@ -1734,7 +1764,12 @@
       "functions": 4,
       "maxNestingDepth": 6,
       "topLevelDeclarations": 1,
-      "exportedSymbols": 1
+      "exportedSymbols": 1,
+      "effectiveDensity": 0.82,
+      "tspr": 0.93837,
+      "por": 0.06163,
+      "columnDensity": 0.516681,
+      "compositeDensity": 0.78301
     },
     {
       "file": "src/unit_cls_1.ts",
@@ -1743,7 +1778,12 @@
       "functions": 4,
       "maxNestingDepth": 6,
       "topLevelDeclarations": 1,
-      "exportedSymbols": 1
+      "exportedSymbols": 1,
+      "effectiveDensity": 0.82,
+      "tspr": 0.93837,
+      "por": 0.06163,
+      "columnDensity": 0.516681,
+      "compositeDensity": 0.78301
     },
     {
       "file": "src/unit_cls_2.ts",
@@ -1752,7 +1792,12 @@
       "functions": 4,
       "maxNestingDepth": 6,
       "topLevelDeclarations": 1,
-      "exportedSymbols": 1
+      "exportedSymbols": 1,
+      "effectiveDensity": 0.82,
+      "tspr": 0.93837,
+      "por": 0.06163,
+      "columnDensity": 0.516681,
+      "compositeDensity": 0.78301
     },
     {
       "file": "src/unit_cls_3.ts",
@@ -1761,7 +1806,12 @@
       "functions": 4,
       "maxNestingDepth": 6,
       "topLevelDeclarations": 1,
-      "exportedSymbols": 1
+      "exportedSymbols": 1,
+      "effectiveDensity": 0.82,
+      "tspr": 0.93837,
+      "por": 0.06163,
+      "columnDensity": 0.516681,
+      "compositeDensity": 0.78301
     },
     {
       "file": "src/unit_complex_0.ts",
@@ -1770,7 +1820,12 @@
       "functions": 1,
       "maxNestingDepth": 4,
       "topLevelDeclarations": 1,
-      "exportedSymbols": 1
+      "exportedSymbols": 1,
+      "effectiveDensity": 0.92,
+      "tspr": 0.960543,
+      "por": 0.039457,
+      "columnDensity": 0.404004,
+      "compositeDensity": 0.640909
     },
     {
       "file": "src/unit_complex_1.ts",
@@ -1779,7 +1834,12 @@
       "functions": 1,
       "maxNestingDepth": 4,
       "topLevelDeclarations": 1,
-      "exportedSymbols": 1
+      "exportedSymbols": 1,
+      "effectiveDensity": 0.92,
+      "tspr": 0.960543,
+      "por": 0.039457,
+      "columnDensity": 0.404004,
+      "compositeDensity": 0.640909
     },
     {
       "file": "src/unit_complex_2.ts",
@@ -1788,7 +1848,12 @@
       "functions": 1,
       "maxNestingDepth": 4,
       "topLevelDeclarations": 1,
-      "exportedSymbols": 1
+      "exportedSymbols": 1,
+      "effectiveDensity": 0.92,
+      "tspr": 0.960543,
+      "por": 0.039457,
+      "columnDensity": 0.404004,
+      "compositeDensity": 0.640909
     },
     {
       "file": "src/unit_complex_3.ts",
@@ -1797,7 +1862,12 @@
       "functions": 1,
       "maxNestingDepth": 4,
       "topLevelDeclarations": 1,
-      "exportedSymbols": 1
+      "exportedSymbols": 1,
+      "effectiveDensity": 0.92,
+      "tspr": 0.960543,
+      "por": 0.039457,
+      "columnDensity": 0.404004,
+      "compositeDensity": 0.640909
     },
     {
       "file": "src/unit_hardStr_0.ts",
@@ -1806,7 +1876,12 @@
       "functions": 2,
       "maxNestingDepth": 1,
       "topLevelDeclarations": 2,
-      "exportedSymbols": 2
+      "exportedSymbols": 2,
+      "effectiveDensity": 0.86,
+      "tspr": 0.929825,
+      "por": 0.070175,
+      "columnDensity": 0.985778,
+      "compositeDensity": 0.711245
     },
     {
       "file": "src/unit_hardStr_1.ts",
@@ -1815,7 +1890,12 @@
       "functions": 2,
       "maxNestingDepth": 1,
       "topLevelDeclarations": 2,
-      "exportedSymbols": 2
+      "exportedSymbols": 2,
+      "effectiveDensity": 0.86,
+      "tspr": 0.929825,
+      "por": 0.070175,
+      "columnDensity": 0.985778,
+      "compositeDensity": 0.711245
     },
     {
       "file": "src/unit_hardStr_2.ts",
@@ -1824,7 +1904,12 @@
       "functions": 2,
       "maxNestingDepth": 1,
       "topLevelDeclarations": 2,
-      "exportedSymbols": 2
+      "exportedSymbols": 2,
+      "effectiveDensity": 0.86,
+      "tspr": 0.929825,
+      "por": 0.070175,
+      "columnDensity": 0.985778,
+      "compositeDensity": 0.711245
     },
     {
       "file": "src/unit_hardStr_3.ts",
@@ -1833,7 +1918,12 @@
       "functions": 2,
       "maxNestingDepth": 1,
       "topLevelDeclarations": 2,
-      "exportedSymbols": 2
+      "exportedSymbols": 2,
+      "effectiveDensity": 0.86,
+      "tspr": 0.929825,
+      "por": 0.070175,
+      "columnDensity": 0.985778,
+      "compositeDensity": 0.711245
     },
     {
       "file": "src/unit_i18n_0.ts",
@@ -1842,7 +1932,12 @@
       "functions": 2,
       "maxNestingDepth": 1,
       "topLevelDeclarations": 2,
-      "exportedSymbols": 1
+      "exportedSymbols": 1,
+      "effectiveDensity": 1,
+      "tspr": 0.935673,
+      "por": 0.064327,
+      "columnDensity": 0.958645,
+      "compositeDensity": 0.835182
     },
     {
       "file": "src/unit_i18n_1.ts",
@@ -1851,7 +1946,12 @@
       "functions": 2,
       "maxNestingDepth": 1,
       "topLevelDeclarations": 2,
-      "exportedSymbols": 1
+      "exportedSymbols": 1,
+      "effectiveDensity": 1,
+      "tspr": 0.935673,
+      "por": 0.064327,
+      "columnDensity": 0.958645,
+      "compositeDensity": 0.835182
     },
     {
       "file": "src/unit_i18n_2.ts",
@@ -1860,7 +1960,12 @@
       "functions": 2,
       "maxNestingDepth": 1,
       "topLevelDeclarations": 2,
-      "exportedSymbols": 1
+      "exportedSymbols": 1,
+      "effectiveDensity": 1,
+      "tspr": 0.935673,
+      "por": 0.064327,
+      "columnDensity": 0.958645,
+      "compositeDensity": 0.835182
     },
     {
       "file": "src/unit_i18n_3.ts",
@@ -1869,7 +1974,12 @@
       "functions": 2,
       "maxNestingDepth": 1,
       "topLevelDeclarations": 2,
-      "exportedSymbols": 1
+      "exportedSymbols": 1,
+      "effectiveDensity": 1,
+      "tspr": 0.935673,
+      "por": 0.064327,
+      "columnDensity": 0.958645,
+      "compositeDensity": 0.835182
     },
     {
       "file": "src/unit_magicNum_0.ts",
@@ -1878,7 +1988,12 @@
       "functions": 2,
       "maxNestingDepth": 2,
       "topLevelDeclarations": 3,
-      "exportedSymbols": 3
+      "exportedSymbols": 3,
+      "effectiveDensity": 0.86,
+      "tspr": 0.953342,
+      "por": 0.046658,
+      "columnDensity": 0.843871,
+      "compositeDensity": 0.688243
     },
     {
       "file": "src/unit_magicNum_1.ts",
@@ -1887,7 +2002,12 @@
       "functions": 2,
       "maxNestingDepth": 2,
       "topLevelDeclarations": 3,
-      "exportedSymbols": 3
+      "exportedSymbols": 3,
+      "effectiveDensity": 0.86,
+      "tspr": 0.953342,
+      "por": 0.046658,
+      "columnDensity": 0.843871,
+      "compositeDensity": 0.688243
     },
     {
       "file": "src/unit_magicNum_2.ts",
@@ -1896,7 +2016,12 @@
       "functions": 2,
       "maxNestingDepth": 2,
       "topLevelDeclarations": 3,
-      "exportedSymbols": 3
+      "exportedSymbols": 3,
+      "effectiveDensity": 0.86,
+      "tspr": 0.953342,
+      "por": 0.046658,
+      "columnDensity": 0.843871,
+      "compositeDensity": 0.688243
     },
     {
       "file": "src/unit_magicNum_3.ts",
@@ -1905,7 +2030,12 @@
       "functions": 2,
       "maxNestingDepth": 2,
       "topLevelDeclarations": 3,
-      "exportedSymbols": 3
+      "exportedSymbols": 3,
+      "effectiveDensity": 0.86,
+      "tspr": 0.953342,
+      "por": 0.046658,
+      "columnDensity": 0.843871,
+      "compositeDensity": 0.688243
     }
   ]
 }

@@ -403,7 +403,12 @@
       "functions": 2,
       "maxNestingDepth": 1,
       "topLevelDeclarations": 2,
-      "exportedSymbols": 2
+      "exportedSymbols": 2,
+      "effectiveDensity": 0.86,
+      "tspr": 0.917293,
+      "por": 0.082707,
+      "columnDensity": 0.974438,
+      "compositeDensity": 0.722225
     },
     {
       "file": "src/legacy.rs",
@@ -412,7 +417,12 @@
       "functions": 3,
       "maxNestingDepth": 3,
       "topLevelDeclarations": 2,
-      "exportedSymbols": 0
+      "exportedSymbols": 0,
+      "effectiveDensity": 0.92,
+      "tspr": 0.945455,
+      "por": 0.054545,
+      "columnDensity": 0.963436,
+      "compositeDensity": 0.749778
     },
     {
       "file": "src/magic.rs",
@@ -421,7 +431,12 @@
       "functions": 2,
       "maxNestingDepth": 3,
       "topLevelDeclarations": 3,
-      "exportedSymbols": 3
+      "exportedSymbols": 3,
+      "effectiveDensity": 0.88,
+      "tspr": 0.957962,
+      "por": 0.042038,
+      "columnDensity": 0.970958,
+      "compositeDensity": 0.7309
     },
     {
       "file": "src/order.rs",
@@ -430,7 +445,12 @@
       "functions": 4,
       "maxNestingDepth": 7,
       "topLevelDeclarations": 3,
-      "exportedSymbols": 2
+      "exportedSymbols": 2,
+      "effectiveDensity": 0.87,
+      "tspr": 0.945707,
+      "por": 0.054293,
+      "columnDensity": 0.947871,
+      "compositeDensity": 0.726716
     }
   ]
 }

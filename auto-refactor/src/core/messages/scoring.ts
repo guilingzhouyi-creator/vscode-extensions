@@ -500,6 +500,16 @@ export const ScoringRationales = {
         `Frontend component props footprint or template duplication: ${msg}`,
     UI_NAMING_CONVENTION: (msg: string) =>
         `Frontend hook or event handler naming convention defect: ${msg}`,
+    UI_IME_GUARD: (msg: string) =>
+        `Frontend Enter submission missing CJK IME composition guard: ${msg}`,
+    UI_TABULAR_NUMS: (msg: string) =>
+        `Frontend dynamic counter or timestamp lacking tabular-nums: ${msg}`,
+    UI_NESTED_BORDER: (msg: string) =>
+        `Frontend nested border violating single-stroke enclosure discipline: ${msg}`,
+    UI_CONTAINER_QUERY_ANTI_SQUASH: (msg: string) =>
+        `Frontend container query or CJK anti-squash layout defect: ${msg}`,
+    VSCODE_BORDER_JITTER: (msg: string) =>
+        `Webview dynamic border mutation causing box-model layout jitter: ${msg}`,
 
     // ── Production Build Hygiene ─────────────────────────────────────────────────
     PROD_DEBUG_RESIDUE: (msg: string) =>
@@ -517,4 +527,6 @@ export const ScoringRationales = {
         `Disabled feature flag implementation code bundled to client: ${msg}`,
     CLIENT_UNRELEASED_ROUTE: (msg: string) =>
         `Unreleased or test route packaged into production router: ${msg}`,
+    CLIENT_IFRAME_USER_ACTIVATION: (msg: string) =>
+        `Cross-window message handler missing event.userActivation or origin verification: ${msg}`,
 } as const;

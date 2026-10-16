@@ -39,8 +39,9 @@ import {
     auditFunctionNameLengthsAndAbbreviations,
     auditVariableNameLengthsAndAbbreviations,
     auditMemberAbbreviation,
-    isSimpleArrowFunction,
     type NamingActionablePayload,
+    type NamingDiagnosticRecord,
+    type SymbolIndexLike,
 } from './naming-candidate-helper';
 import {
     DEFAULT_VAGUE_BLACKLIST,
@@ -52,6 +53,8 @@ import {
     checkSingleLetterHelper,
     checkCollectionNamingHelper,
     auditDecouplingClustersHelper,
+    isSimpleArrowFunction,
+    type AstNamingContext,
 } from './naming-ast-helper';
 
 export {
@@ -93,14 +96,63 @@ export interface NamingOptions {
     singleLetterAllowed?: string[];
 }
 
+/**
+ * Structured diagnostic payload for formatting naming issues.
+ */
+export interface NamingFindingInput {
+    readonly line: number;
+    readonly column?: number;
+    readonly rule: string;
+    readonly message: string;
+    readonly severity?: Severity;
+    readonly detail?: Record<string, unknown>;
+    readonly suggestion?: string;
+    readonly actionable?: NamingActionablePayload;
+}
+
+/** Scope context for variable audits. */
+export interface VariableScope {
+    readonly isTopLevel: boolean;
+    readonly inLoop: boolean;
+    readonly isConst?: boolean;
+}
+
+/** Target description for variable naming checks. */
+export interface VariableTarget {
+    readonly name: string;
+    readonly decl: ts.Node;
+    readonly pos: ts.LineAndCharacter;
+    readonly isTopLevel?: boolean;
+}
+
 const JS_TS_EXTS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs']);
+
+const CATALOG_PATH_RE = /(?:literals|constants|dictionar(?:y|ies)|tokens|rule-?table)/i;
+
+const KIND_CONSTANT: SymbolDeclarationKind = 'constant';
+const KIND_VARIABLE: SymbolDeclarationKind = 'variable';
+const KIND_TYPE: SymbolDeclarationKind = 'type';
+const KIND_MEMBER: SymbolDeclarationKind = 'member';
+const KIND_FUNCTION: SymbolDeclarationKind = 'function';
+
+const MAX_STATEMENT_PREVIEW_LENGTH = 40;
+const MIN_DECOUPLING_SYMBOLS_COUNT = 4;
+
+/**
+ * Determines whether a file path represents a dedicated constants, literals, or dictionary table
+ * where centralized definition clustering is expected and architectural decoupling proposals
+ * would cause harmful mechanical fragmentation.
+ */
+function isCatalogOrLiteralsPath(filePath: string): boolean {
+    return Boolean(filePath && CATALOG_PATH_RE.test(filePath.replace(/\\/g, '/')));
+}
 
 /**
  * Polyglot Naming and Variable Scope Analyzer.
  */
 export class NamingAnalyzer implements Analyzer {
-    name = 'naming' as const;
-    private decouplingAuditor = new NamingDecouplingAuditor();
+    readonly name = ANALYZER_NAMING;
+    private readonly decouplingAuditor = new NamingDecouplingAuditor();
 
     analyze(sf: ts.SourceFile | undefined, ctx: AnalyzerContext): Issue[] {
         const issues: Issue[] = [];
@@ -108,18 +160,17 @@ export class NamingAnalyzer implements Analyzer {
         const filePath = ctx.filePath.replace(/\\/g, '/');
 
         if (opts.checkFiles !== false || opts.checkDirectories !== false) {
-            auditFileAndDirectoryPaths(
+            auditFileAndDirectoryPaths({
                 filePath,
                 opts,
                 ctx,
-                (line, rule, message, detail, suggestion) =>
-                    this.mkIssue(ctx, line, 1, rule, message, SEVERITY_WARNING, detail, suggestion),
+                mkIssue: (finding) => this.formatIssue(ctx, finding),
                 issues,
-            );
+            });
         }
 
         const ext = path.extname(filePath).toLowerCase();
-        this.dispatchLanguageAudit(ext, sf, ctx, opts, issues);
+        this.dispatchLanguageAudit(ext, sf, ctx, issues);
 
         issues.sort(
             (a, b) =>
@@ -131,28 +182,23 @@ export class NamingAnalyzer implements Analyzer {
         return issues;
     }
 
+    private resolveSourceFile(ctx: AnalyzerContext): ts.SourceFile | undefined {
+        if (!ctx.content) return undefined;
+        return ts.createSourceFile(ctx.filePath, ctx.content, ts.ScriptTarget.Latest, true);
+    }
+
     /**
      * Dispatches naming analysis to language-specific auditors based on file extension.
-     *
-     * @param ext - Normalized lowercase file extension.
-     * @param sf - Optional parsed TypeScript SourceFile.
-     * @param ctx - Execution analysis context.
-     * @param opts - Naming analyzer configuration options.
-     * @param issues - Output issues collection.
      */
     private dispatchLanguageAudit(
         ext: string,
         sf: ts.SourceFile | undefined,
         ctx: AnalyzerContext,
-        opts: NamingOptions,
         issues: Issue[],
     ): void {
+        const opts = (ctx.options || {}) as NamingOptions;
         if (JS_TS_EXTS.has(ext)) {
-            const sourceFile =
-                sf ||
-                (ctx.content
-                    ? ts.createSourceFile(ctx.filePath, ctx.content, ts.ScriptTarget.Latest, true)
-                    : undefined);
+            const sourceFile = sf ?? this.resolveSourceFile(ctx);
             if (sourceFile) {
                 this.auditTypeScriptAst(sourceFile, opts, ctx, issues);
             }
@@ -160,28 +206,22 @@ export class NamingAnalyzer implements Analyzer {
         }
 
         if (ext === '.py') {
-            this.auditPythonSource(ctx.content || '', opts, ctx, issues);
+            this.auditPythonSource(ctx.content || '', ctx, issues);
             return;
         }
 
         if (ext === '.go' || ext === '.rs' || ext === '.gd') {
-            auditPolyglotSource(
-                ctx.content || '',
-                ext,
+            auditPolyglotSource(ctx.content || '', ext, {
                 opts,
                 ctx,
-                (c, line, col, rule, msg, sev, detail, sugg) =>
-                    this.mkIssue(c, line, col, rule, msg, sev, detail, sugg),
+                mkIssue: (finding) => this.formatIssue(ctx, finding),
                 issues,
-            );
+            });
         }
     }
 
     /**
      * Finalizes analysis pass across source file.
-     *
-     * @param ctx - Execution analysis context.
-     * @returns Array of issues identified in the source file.
      */
     finalize(ctx: AnalyzerContext): Issue[] {
         return this.analyze(ctx.sourceFile, ctx);
@@ -189,174 +229,103 @@ export class NamingAnalyzer implements Analyzer {
 
     /**
      * Constructs a standardized naming Issue object.
-     *
-     * @param ctx - Execution analysis context.
-     * @param line - 1-based source line index.
-     * @param column - 1-based source column offset.
-     * @param rule - SSOT rule identifier string.
-     * @param message - Diagnostic message text.
-     * @param severity - Issue severity classification.
-     * @param detail - Structured diagnostic payload dictionary.
-     * @param suggestion - Optional actionable resolution guidance.
-     * @param actionable - Optional machine-executable fix payload.
-     * @returns Formatted issue descriptor.
      */
-    private mkIssue(
-        ctx: AnalyzerContext,
-        line: number,
-        column: number,
-        rule: string,
-        message: string,
-        severity: Severity,
-        detail: Record<string, unknown>,
-        suggestion?: string,
-        actionable?: NamingActionablePayload,
-    ): Issue {
+    private formatIssue(ctx: AnalyzerContext, finding: NamingFindingInput): Issue {
+        const line = Math.max(1, finding.line);
+        const column = Math.max(1, finding.column ?? 1);
         return {
-            id: `naming:${rule}:${ctx.filePath}:${line}`,
+            id: `naming:${finding.rule}:${ctx.filePath}:${line}`,
             analyzer: ANALYZER_NAMING,
-            rule,
-            severity,
-            message,
+            rule: finding.rule,
+            severity: finding.severity ?? SEVERITY_WARNING,
+            message: finding.message,
             location: {
                 file: ctx.filePath,
-                start: { line: Math.max(1, line), column: Math.max(1, column) },
-                end: { line: Math.max(1, line), column: Math.max(1, column) },
+                start: { line, column },
+                end: { line, column },
             },
-            detail,
-            suggestion,
-            actionable,
+            detail: finding.detail ?? {},
+            suggestion: finding.suggestion,
+            actionable: finding.actionable,
         };
     }
 
     /**
-     * Resolves symbol index from analysis context or runtime options.
-     *
-     * @param ctx - Execution analysis context.
-     * @returns Symbol index instance or undefined.
+     * Emits a diagnostic finding into the AST naming context issue list.
      */
-    private getSymbolIndex(ctx: AnalyzerContext): any {
-        return (ctx as any).symbolIndex || (ctx.options as any)?.symbolIndex;
+    private emitDiagnostic(aCtx: AstNamingContext, diagnostic: NamingDiagnosticRecord): void {
+        aCtx.issues.push(this.formatIssue(aCtx.ctx, diagnostic));
+    }
+
+    /**
+     * Resolves symbol index from analysis context or runtime options without unsafe casting.
+     */
+    private extractSymbolIndex(ctx: AnalyzerContext): SymbolIndexLike | undefined {
+        const direct = (ctx as { symbolIndex?: SymbolIndexLike }).symbolIndex;
+        const fromOpts = (ctx.options as { symbolIndex?: SymbolIndexLike } | undefined)
+            ?.symbolIndex;
+        return direct ?? fromOpts;
+    }
+
+    private resolveSymbolIndexAndEmitter(aCtx: AstNamingContext): {
+        readonly index: SymbolIndexLike | undefined;
+        readonly emit: (d: NamingDiagnosticRecord) => void;
+    } {
+        return {
+            index: this.extractSymbolIndex(aCtx.ctx),
+            emit: (d: NamingDiagnosticRecord) => this.emitDiagnostic(aCtx, d),
+        };
     }
 
     /**
      * Audits function name lengths, abbreviations, and verb-noun contract.
-     *
-     * @param name - Identifier string of the function.
-     * @param node - AST node representation.
-     * @param pos - Source position line and character offsets.
-     * @param ctx - Execution analysis context.
-     * @param issues - Output issues collection.
-     * @param opts - Naming analyzer configuration options.
      */
     private checkFunctionName(
         name: string,
         node: ts.Node,
         pos: ts.LineAndCharacter,
-        ctx: AnalyzerContext,
-        issues: Issue[],
-        opts: NamingOptions,
+        aCtx: AstNamingContext,
     ): void {
-        auditFunctionNameLengthsAndAbbreviations(
-            name,
-            node,
-            pos,
-            ctx,
-            opts,
-            this.getSymbolIndex(ctx),
-            (line, column, rule, message, severity, detail, suggestion, actionable) => {
-                issues.push(
-                    this.mkIssue(
-                        ctx,
-                        line,
-                        column,
-                        rule,
-                        message,
-                        severity,
-                        detail,
-                        suggestion,
-                        actionable,
-                    ),
-                );
-            },
-        );
+        const { index, emit } = this.resolveSymbolIndexAndEmitter(aCtx);
+        auditFunctionNameLengthsAndAbbreviations(name, node, pos, aCtx.ctx, aCtx.opts, index, emit);
     }
 
     /**
      * Audits variable naming lengths, abbreviations, and scope contracts.
-     *
-     * @param name - Identifier string of the variable.
-     * @param decl - AST variable declaration node.
-     * @param isTopLevel - True if declared at module root scope.
-     * @param pos - Source position line and character offsets.
-     * @param ctx - Execution analysis context.
-     * @param issues - Output issues collection.
-     * @param opts - Naming analyzer configuration options.
      */
-    private checkVariableName(
-        name: string,
-        decl: ts.Node,
-        isTopLevel: boolean,
-        pos: ts.LineAndCharacter,
-        ctx: AnalyzerContext,
-        issues: Issue[],
-        opts: NamingOptions,
-    ): void {
+    private checkVariableName(target: VariableTarget, aCtx: AstNamingContext): void {
+        const { index, emit } = this.resolveSymbolIndexAndEmitter(aCtx);
         auditVariableNameLengthsAndAbbreviations(
-            name,
-            decl,
-            isTopLevel,
-            pos,
-            ctx,
-            opts,
-            this.getSymbolIndex(ctx),
-            (line, column, rule, message, severity, detail, suggestion, actionable) => {
-                issues.push(
-                    this.mkIssue(
-                        ctx,
-                        line,
-                        column,
-                        rule,
-                        message,
-                        severity,
-                        detail,
-                        suggestion,
-                        actionable,
-                    ),
-                );
-            },
+            target.name,
+            target.decl,
+            target.isTopLevel ?? false,
+            target.pos,
+            aCtx.ctx,
+            aCtx.opts,
+            index,
+            emit,
         );
     }
 
     /**
      * Records discovered symbol and evaluates architectural decoupling boundaries.
-     *
-     * @param name - Symbol identifier string.
-     * @param kind - Semantic classification kind of declaration.
-     * @param pos - Source position coordinates.
-     * @param opts - Naming analyzer configuration options.
-     * @param ctx - Execution analysis context.
-     * @param issues - Output issues collection.
-     * @param symbols - Optional symbol index accumulator.
      */
     private checkDecouplingSymbol(
         name: string,
         kind: SymbolDeclarationKind,
-        pos: ts.LineAndCharacter,
-        opts: NamingOptions,
-        ctx: AnalyzerContext,
-        issues: Issue[],
-        symbols?: SymbolEntry[],
+        pos: { line: number; character: number },
+        aCtx: AstNamingContext,
     ): void {
-        if (symbols) {
-            symbols.push({
+        if (aCtx.symbols) {
+            aCtx.symbols.push({
                 name,
                 kind,
                 line: pos.line + 1,
                 column: pos.character + 1,
             });
         }
-        if (opts.checkDecoupling === false) return;
+        if (aCtx.opts.checkDecoupling === false || isCatalogOrLiteralsPath(aCtx.ctx.filePath))
+            return;
         const finding = this.decouplingAuditor.auditIdentifier(
             name,
             kind,
@@ -364,15 +333,14 @@ export class NamingAnalyzer implements Analyzer {
             pos.character + 1,
         );
         if (finding) {
-            issues.push(
-                this.mkIssue(
-                    ctx,
-                    finding.line,
-                    finding.column,
-                    'NAM-DEC-001',
-                    finding.message,
-                    SEVERITY_WARNING,
-                    {
+            aCtx.issues.push(
+                this.formatIssue(aCtx.ctx, {
+                    line: finding.line,
+                    column: finding.column,
+                    rule: 'NAM-DEC-001',
+                    message: finding.message,
+                    severity: SEVERITY_WARNING,
+                    detail: {
                         symbol: finding.symbol,
                         length: finding.length,
                         segments: finding.segments,
@@ -380,8 +348,8 @@ export class NamingAnalyzer implements Analyzer {
                         suggestedSymbol: finding.suggestedSymbol,
                         actionableProposal: finding.actionableProposal,
                     },
-                    finding.actionableProposal.rationale,
-                ),
+                    suggestion: finding.actionableProposal.rationale,
+                }),
             );
         }
     }
@@ -414,307 +382,222 @@ export class NamingAnalyzer implements Analyzer {
         );
     }
 
-    /** Verifies top-level scalar constants follow UPPER_SNAKE_CASE. */
-    private checkTopLevelConstant(
-        decl: ts.VariableDeclaration,
-        name: string,
-        pos: { line: number; character: number },
-        ctx: AnalyzerContext,
-        issues: Issue[],
+    /** Audits individual binding element in destructuring patterns. */
+    private auditBindingElement(
+        elem: ts.BindingElement,
+        inLoop: boolean,
+        aCtx: AstNamingContext,
     ): void {
-        checkTopLevelConstantHelper(
-            decl,
-            name,
-            pos,
-            ctx,
-            (c, line, col, rule, msg, sev, detail, sugg) =>
-                this.mkIssue(c, line, col, rule, msg, sev, detail, sugg),
-            issues,
-        );
+        if (!ts.isIdentifier(elem.name)) return;
+        const elemName = elem.name.text;
+        const elemPos = aCtx.sf.getLineAndCharacterOfPosition(elem.name.getStart(aCtx.sf));
+        const isPropertyMatch =
+            !elem.propertyName ||
+            (ts.isIdentifier(elem.propertyName) && elem.propertyName.text === elemName);
+        if (!isPropertyMatch) {
+            this.checkVariableName({ name: elemName, decl: elem, pos: elemPos }, aCtx);
+            checkIdentifierVaguenessHelper(elemName, elemPos, aCtx);
+        }
+        checkSingleLetterHelper(elemName, elemPos, inLoop, aCtx);
     }
 
     /** Audits destructuring patterns for vague identifiers and single letters. */
     private checkBindingPattern(
         pattern: ts.BindingPattern,
-        sf: ts.SourceFile,
-        opts: NamingOptions,
-        vagueSet: Set<string>,
-        singleAllowed: Set<string>,
         inLoop: boolean,
-        ctx: AnalyzerContext,
-        issues: Issue[],
+        aCtx: AstNamingContext,
     ): void {
         for (const elem of pattern.elements) {
-            if (ts.isBindingElement(elem) && ts.isIdentifier(elem.name)) {
-                const elemName = elem.name.text;
-                const elemPos = sf.getLineAndCharacterOfPosition(elem.name.getStart(sf));
-                const isPropertyMatch =
-                    !elem.propertyName ||
-                    (ts.isIdentifier(elem.propertyName) && elem.propertyName.text === elemName);
-                if (!isPropertyMatch) {
-                    this.checkVariableName(elemName, elem, false, elemPos, ctx, issues, opts);
-                    this.checkIdentifierVagueness(elemName, elemPos, vagueSet, ctx, issues, opts);
-                }
-                this.checkSingleLetter(elemName, elemPos, inLoop, singleAllowed, ctx, issues, opts);
+            if (ts.isBindingElement(elem)) {
+                this.auditBindingElement(elem, inLoop, aCtx);
             }
         }
     }
 
     private checkVariableDeclaration(
         decl: ts.VariableDeclaration,
-        isTopLevel: boolean,
-        isConst: boolean,
-        sf: ts.SourceFile,
-        opts: NamingOptions,
-        vagueSet: Set<string>,
-        singleAllowed: Set<string>,
-        inLoop: boolean,
-        ctx: AnalyzerContext,
-        issues: Issue[],
-        symbols?: SymbolEntry[],
+        scope: VariableScope,
+        aCtx: AstNamingContext,
     ): void {
         if (ts.isIdentifier(decl.name)) {
             const name = decl.name.text;
-            const pos = sf.getLineAndCharacterOfPosition(decl.name.getStart(sf));
+            const pos = aCtx.sf.getLineAndCharacterOfPosition(decl.name.getStart(aCtx.sf));
 
-            if (isTopLevel && isConst && opts.checkGlobals !== false) {
-                this.checkTopLevelConstant(decl, name, pos, ctx, issues);
+            if (scope.isTopLevel && scope.isConst && aCtx.opts.checkGlobals !== false) {
+                checkTopLevelConstantHelper(decl, name, pos, aCtx);
             }
 
-            this.checkVariableName(name, decl, isTopLevel, pos, ctx, issues, opts);
-            this.checkIdentifierVagueness(name, pos, vagueSet, ctx, issues, opts);
-            this.checkSingleLetter(name, pos, inLoop, singleAllowed, ctx, issues, opts);
-            this.checkCollectionNaming(name, decl.initializer, pos, ctx, issues, opts);
-            if (opts.checkJargon !== false) {
-                this.checkSymbolJargon(name, pos, ctx, issues);
+            this.checkVariableName({ name, decl, pos, isTopLevel: scope.isTopLevel }, aCtx);
+            checkIdentifierVaguenessHelper(name, pos, aCtx);
+            checkSingleLetterHelper(name, pos, scope.inLoop, aCtx);
+            checkCollectionNamingHelper(name, decl.initializer, pos, aCtx);
+            if (aCtx.opts.checkJargon !== false) {
+                checkSymbolJargonHelper(name, pos, aCtx);
             }
             this.checkDecouplingSymbol(
                 name,
-                isConst ? 'constant' : 'variable',
+                scope.isConst ? KIND_CONSTANT : KIND_VARIABLE,
                 pos,
-                opts,
-                ctx,
-                issues,
-                symbols,
+                aCtx,
             );
-        } else if (ts.isObjectBindingPattern(decl.name) || ts.isArrayBindingPattern(decl.name)) {
-            this.checkBindingPattern(
-                decl.name,
-                sf,
-                opts,
-                vagueSet,
-                singleAllowed,
-                inLoop,
-                ctx,
-                issues,
-            );
+            return;
+        }
+
+        if (ts.isObjectBindingPattern(decl.name) || ts.isArrayBindingPattern(decl.name)) {
+            this.checkBindingPattern(decl.name, scope.inLoop, aCtx);
         }
     }
 
     private checkVariableStatement(
         node: ts.VariableStatement,
-        sf: ts.SourceFile,
-        opts: NamingOptions,
-        vagueSet: Set<string>,
-        singleAllowed: Set<string>,
         inLoopDepth: number,
-        ctx: AnalyzerContext,
-        issues: Issue[],
-        symbols?: SymbolEntry[],
+        aCtx: AstNamingContext,
     ): void {
         const isConst = Boolean(node.declarationList.flags & ts.NodeFlags.Const);
-        const isTopLevel = node.parent === sf;
-        if (isTopLevel && !isConst && opts.checkGlobals !== false) {
-            const pos = sf.getLineAndCharacterOfPosition(node.getStart(sf));
-            issues.push(
-                this.mkIssue(
-                    ctx,
-                    pos.line + 1,
-                    pos.character + 1,
-                    'NAM-GLB-002',
-                    'Module-level mutable variable declaration (`let`/`var`) introduces implicit global state.',
-                    SEVERITY_WARNING,
-                    { statement: node.getText(sf).slice(0, 40) },
-                    'Refactor top-level mutable state into function-scoped variables, class instances, or explicit state holders.',
-                ),
+        const isTopLevel = node.parent === aCtx.sf;
+        if (isTopLevel && !isConst && aCtx.opts.checkGlobals !== false) {
+            const pos = aCtx.sf.getLineAndCharacterOfPosition(node.getStart(aCtx.sf));
+            aCtx.issues.push(
+                this.formatIssue(aCtx.ctx, {
+                    line: pos.line + 1,
+                    column: pos.character + 1,
+                    rule: 'NAM-GLB-002',
+                    message:
+                        'Module-level mutable variable declaration (`let`/`var`) introduces implicit global state.',
+                    severity: SEVERITY_WARNING,
+                    detail: {
+                        statement: node.getText(aCtx.sf).slice(0, MAX_STATEMENT_PREVIEW_LENGTH),
+                    },
+                    suggestion:
+                        'Refactor top-level mutable state into function-scoped variables, class instances, or explicit state holders.',
+                }),
             );
         }
 
+        const scope: VariableScope = {
+            isTopLevel,
+            isConst,
+            inLoop: inLoopDepth > 0,
+        };
+
         for (const decl of node.declarationList.declarations) {
-            this.checkVariableDeclaration(
-                decl,
-                isTopLevel,
-                isConst,
-                sf,
-                opts,
-                vagueSet,
-                singleAllowed,
-                inLoopDepth > 0,
-                ctx,
-                issues,
-                symbols,
-            );
+            this.checkVariableDeclaration(decl, scope, aCtx);
         }
     }
 
-    private checkTypeDeclaration(
-        node: ts.Node,
-        sf: ts.SourceFile,
-        opts: NamingOptions,
-        ctx: AnalyzerContext,
-        issues: Issue[],
-        symbols?: SymbolEntry[],
-    ): void {
-        if (opts.checkTypes === false) return;
+    private checkTypeDeclaration(node: ts.Node, aCtx: AstNamingContext): void {
+        if (aCtx.opts.checkTypes === false) return;
         const namedNode = node as
             | ts.ClassDeclaration
             | ts.InterfaceDeclaration
             | ts.TypeAliasDeclaration
             | ts.EnumDeclaration;
-        if (namedNode.name && ts.isIdentifier(namedNode.name)) {
-            const typeName = namedNode.name.text;
-            const pos = sf.getLineAndCharacterOfPosition(namedNode.name.getStart(sf));
-            if (!/^[A-Z][a-zA-Z0-9]*$/.test(typeName)) {
-                issues.push(
-                    this.mkIssue(
-                        ctx,
-                        pos.line + 1,
-                        pos.character + 1,
-                        'NAM-TYP-001',
-                        `Type or class definition '${typeName}' should follow PascalCase naming convention.`,
-                        SEVERITY_WARNING,
-                        { name: typeName },
-                        `Rename '${typeName}' to PascalCase (e.g. '${typeName[0].toUpperCase()}${typeName.slice(1)}').`,
-                    ),
-                );
-            }
-            if (opts.checkJargon !== false) {
-                this.checkSymbolJargon(typeName, pos, ctx, issues);
-            }
-            this.checkDecouplingSymbol(typeName, 'type', pos, opts, ctx, issues, symbols);
+        if (!namedNode.name || !ts.isIdentifier(namedNode.name)) return;
+
+        const typeName = namedNode.name.text;
+        const pos = aCtx.sf.getLineAndCharacterOfPosition(namedNode.name.getStart(aCtx.sf));
+        if (!/^[A-Z][a-zA-Z0-9]*$/.test(typeName)) {
+            aCtx.issues.push(
+                this.formatIssue(aCtx.ctx, {
+                    line: pos.line + 1,
+                    column: pos.character + 1,
+                    rule: 'NAM-TYP-001',
+                    message: `Type or class definition '${typeName}' should follow PascalCase naming convention.`,
+                    severity: SEVERITY_WARNING,
+                    detail: { name: typeName },
+                    suggestion: `Rename '${typeName}' to PascalCase (e.g. '${typeName[0].toUpperCase()}${typeName.slice(1)}').`,
+                }),
+            );
         }
+        if (aCtx.opts.checkJargon !== false) {
+            checkSymbolJargonHelper(typeName, pos, aCtx);
+        }
+        this.checkDecouplingSymbol(typeName, KIND_TYPE, pos, aCtx);
     }
 
-    private checkMemberDeclaration(
-        node: ts.Node,
-        sf: ts.SourceFile,
-        opts: NamingOptions,
-        vagueSet: Set<string>,
-        singleAllowed: Set<string>,
-        ctx: AnalyzerContext,
-        issues: Issue[],
-        symbols?: SymbolEntry[],
+    private auditMemberCamelCase(
+        name: string,
+        pos: ts.LineAndCharacter,
+        aCtx: AstNamingContext,
     ): void {
-        if (opts.checkMembers === false) return;
+        if (/^[_]?[a-z][a-zA-Z0-9]*$/.test(name) || /^[A-Z0-9_]+$/.test(name)) {
+            return;
+        }
+        aCtx.issues.push(
+            this.formatIssue(aCtx.ctx, {
+                line: pos.line + 1,
+                column: pos.character + 1,
+                rule: 'NAM-MBR-001',
+                message: `Member or method '${name}' should follow camelCase naming convention.`,
+                severity: SEVERITY_WARNING,
+                detail: { name },
+                suggestion: `Rename member '${name}' to camelCase.`,
+            }),
+        );
+    }
+
+    private checkMemberDeclaration(node: ts.Node, aCtx: AstNamingContext): void {
+        if (aCtx.opts.checkMembers === false) return;
         const member = node as
             ts.MethodDeclaration | ts.PropertyDeclaration | ts.PropertyAssignment;
-        if (member.name && ts.isIdentifier(member.name)) {
-            const memberName = member.name.text;
-            const pos = sf.getLineAndCharacterOfPosition(member.name.getStart(sf));
-            if (!/^[_]?[a-z][a-zA-Z0-9]*$/.test(memberName) && !/^[A-Z0-9_]+$/.test(memberName)) {
-                issues.push(
-                    this.mkIssue(
-                        ctx,
-                        pos.line + 1,
-                        pos.character + 1,
-                        'NAM-MBR-001',
-                        `Member or method '${memberName}' should follow camelCase naming convention.`,
-                        SEVERITY_WARNING,
-                        { name: memberName },
-                        `Rename member '${memberName}' to camelCase.`,
-                    ),
-                );
-            }
-            if (ts.isMethodDeclaration(member)) {
-                this.checkFunctionName(memberName, member, pos, ctx, issues, opts);
-                this.checkFunctionParameters(
-                    member,
-                    sf,
-                    opts,
-                    vagueSet,
-                    singleAllowed,
-                    ctx,
-                    issues,
-                    symbols,
-                );
-            } else {
-                auditMemberAbbreviation(
-                    memberName,
-                    member,
-                    pos,
-                    ctx,
-                    opts,
-                    this.getSymbolIndex(ctx),
-                    (line, column, rule, message, severity, detail, suggestion, actionable) => {
-                        issues.push(
-                            this.mkIssue(
-                                ctx,
-                                line,
-                                column,
-                                rule,
-                                message,
-                                severity,
-                                detail,
-                                suggestion,
-                                actionable,
-                            ),
-                        );
-                    },
-                );
-            }
-            if (opts.checkJargon !== false) {
-                this.checkSymbolJargon(memberName, pos, ctx, issues);
-            }
-            this.checkDecouplingSymbol(memberName, 'member', pos, opts, ctx, issues, symbols);
+        if (!member.name || !ts.isIdentifier(member.name)) return;
+
+        const memberName = member.name.text;
+        const pos = aCtx.sf.getLineAndCharacterOfPosition(member.name.getStart(aCtx.sf));
+        this.auditMemberCamelCase(memberName, pos, aCtx);
+
+        if (ts.isMethodDeclaration(member)) {
+            this.checkFunctionName(memberName, member, pos, aCtx);
+            this.checkFunctionParameters(member, aCtx);
+        } else {
+            const { index, emit } = this.resolveSymbolIndexAndEmitter(aCtx);
+            auditMemberAbbreviation(memberName, member, pos, aCtx.ctx, aCtx.opts, index, emit);
+        }
+
+        if (aCtx.opts.checkJargon !== false) {
+            checkSymbolJargonHelper(memberName, pos, aCtx);
+        }
+        this.checkDecouplingSymbol(memberName, KIND_MEMBER, pos, aCtx);
+    }
+
+    /** Audits an individual parameter of a function or method. */
+    private auditFunctionParameter(
+        paramDecl: ts.ParameterDeclaration,
+        isArrow: boolean,
+        isExemptVague: boolean,
+        aCtx: AstNamingContext,
+    ): void {
+        if (!ts.isIdentifier(paramDecl.name)) return;
+        const paramName = paramDecl.name.text;
+        const pos = aCtx.sf.getLineAndCharacterOfPosition(paramDecl.name.getStart(aCtx.sf));
+        this.checkVariableName({ name: paramName, decl: paramDecl, pos }, aCtx);
+        if (!isExemptVague) {
+            checkIdentifierVaguenessHelper(paramName, pos, aCtx);
+            checkSingleLetterHelper(paramName, pos, isArrow, aCtx);
+        }
+        if (aCtx.opts.checkJargon !== false) {
+            checkSymbolJargonHelper(paramName, pos, aCtx);
         }
     }
 
-    private checkFunctionParameters(
-        node: ts.Node,
-        sf: ts.SourceFile,
-        opts: NamingOptions,
-        vagueSet: Set<string>,
-        singleAllowed: Set<string>,
-        ctx: AnalyzerContext,
-        issues: Issue[],
-        symbols?: SymbolEntry[],
-    ): void {
+    private checkFunctionParameters(node: ts.Node, aCtx: AstNamingContext): void {
         const fn = node as
             | ts.FunctionDeclaration
             | ts.ArrowFunction
             | ts.FunctionExpression
             | ts.MethodDeclaration;
         if (ts.isFunctionDeclaration(node) && node.name) {
-            const pos = sf.getLineAndCharacterOfPosition(node.name.getStart(sf));
-            this.checkFunctionName(node.name.text, node, pos, ctx, issues, opts);
-            if (opts.checkJargon !== false) {
-                this.checkSymbolJargon(node.name.text, pos, ctx, issues);
+            const pos = aCtx.sf.getLineAndCharacterOfPosition(node.name.getStart(aCtx.sf));
+            this.checkFunctionName(node.name.text, node, pos, aCtx);
+            if (aCtx.opts.checkJargon !== false) {
+                checkSymbolJargonHelper(node.name.text, pos, aCtx);
             }
-            this.checkDecouplingSymbol(node.name.text, 'function', pos, opts, ctx, issues, symbols);
+            this.checkDecouplingSymbol(node.name.text, KIND_FUNCTION, pos, aCtx);
         }
         const isArrow = ts.isArrowFunction(node) || ts.isFunctionExpression(node);
-        const isExemptVague = isSimpleArrowFunction(node, sf);
-        for (const param of fn.parameters) {
-            if (ts.isIdentifier(param.name)) {
-                const paramName = param.name.text;
-                const pos = sf.getLineAndCharacterOfPosition(param.name.getStart(sf));
-                this.checkVariableName(paramName, param, false, pos, ctx, issues, opts);
-                if (!isExemptVague) {
-                    this.checkIdentifierVagueness(paramName, pos, vagueSet, ctx, issues, opts);
-                    this.checkSingleLetter(
-                        paramName,
-                        pos,
-                        isArrow,
-                        singleAllowed,
-                        ctx,
-                        issues,
-                        opts,
-                    );
-                }
-                if (opts.checkJargon !== false) {
-                    this.checkSymbolJargon(paramName, pos, ctx, issues);
-                }
-            }
+        const isExemptVague = isSimpleArrowFunction(node, aCtx.sf);
+        for (const paramDecl of fn.parameters) {
+            this.auditFunctionParameter(paramDecl, isArrow, isExemptVague, aCtx);
         }
     }
 
@@ -736,8 +619,17 @@ export class NamingAnalyzer implements Analyzer {
             : DEFAULT_SINGLE_LETTER_ALLOWED;
 
         const discoveredSymbols: SymbolEntry[] = [];
-        let inLoopDepth = 0;
+        const aCtx: AstNamingContext = {
+            ctx,
+            opts,
+            issues,
+            sf,
+            vagueSet,
+            singleAllowed,
+            symbols: discoveredSymbols,
+        };
 
+        let inLoopDepth = 0;
         const visit = (node: ts.Node): void => {
             const isLoop =
                 ts.isForStatement(node) ||
@@ -746,17 +638,7 @@ export class NamingAnalyzer implements Analyzer {
                 ts.isWhileStatement(node);
             if (isLoop) inLoopDepth++;
 
-            this.dispatchAstNode(
-                node,
-                sf,
-                opts,
-                vagueSet,
-                singleAllowed,
-                inLoopDepth,
-                ctx,
-                issues,
-                discoveredSymbols,
-            );
+            this.dispatchAstNode(node, inLoopDepth, aCtx);
 
             ts.forEachChild(node, visit);
 
@@ -765,201 +647,75 @@ export class NamingAnalyzer implements Analyzer {
 
         ts.forEachChild(sf, visit);
 
-        if (opts.checkDecoupling !== false && discoveredSymbols.length >= 4) {
-            this.auditDecouplingClusters(discoveredSymbols, ctx, issues);
+        if (
+            opts.checkDecoupling !== false &&
+            discoveredSymbols.length >= MIN_DECOUPLING_SYMBOLS_COUNT
+        ) {
+            this.auditDecouplingClusters(aCtx);
         }
     }
 
-    private auditDecouplingClusters(
-        discoveredSymbols: SymbolEntry[],
-        ctx: AnalyzerContext,
-        issues: Issue[],
-    ): void {
-        auditDecouplingClustersHelper(
-            discoveredSymbols,
-            this.decouplingAuditor,
-            ctx,
-            (c, line, col, rule, msg, sev, detail, sugg) =>
-                this.mkIssue(c, line, col, rule, msg, sev, detail, sugg),
-            issues,
-        );
+    private auditDecouplingClusters(aCtx: AstNamingContext): void {
+        if (!aCtx.symbols || isCatalogOrLiteralsPath(aCtx.ctx.filePath)) return;
+        auditDecouplingClustersHelper(aCtx.symbols, this.decouplingAuditor, aCtx);
     }
 
-    private dispatchAstNode(
-        node: ts.Node,
-        sf: ts.SourceFile,
-        opts: NamingOptions,
-        vagueSet: Set<string>,
-        singleAllowed: Set<string>,
-        inLoopDepth: number,
-        ctx: AnalyzerContext,
-        issues: Issue[],
-        symbols?: SymbolEntry[],
-    ): void {
+    private dispatchAstNode(node: ts.Node, inLoopDepth: number, aCtx: AstNamingContext): void {
         if (ts.isVariableStatement(node)) {
-            this.checkVariableStatement(
-                node,
-                sf,
-                opts,
-                vagueSet,
-                singleAllowed,
-                inLoopDepth,
-                ctx,
-                issues,
-                symbols,
-            );
-        } else if (this.isTypeDecl(node)) {
-            this.checkTypeDeclaration(node, sf, opts, ctx, issues, symbols);
-        } else if (this.isMemberDecl(node)) {
-            this.checkMemberDeclaration(
-                node,
-                sf,
-                opts,
-                vagueSet,
-                singleAllowed,
-                ctx,
-                issues,
-                symbols,
-            );
-        } else if (this.isFunctionDecl(node)) {
-            this.checkFunctionParameters(
-                node,
-                sf,
-                opts,
-                vagueSet,
-                singleAllowed,
-                ctx,
-                issues,
-                symbols,
-            );
-        } else if (ts.isCallExpression(node) && opts.checkJargon !== false) {
-            this.checkCallExpressionJargon(node, sf, ctx, issues);
+            this.checkVariableStatement(node, inLoopDepth, aCtx);
+            return;
         }
-    }
-
-    private checkCallExpressionJargon(
-        node: ts.CallExpression,
-        sf: ts.SourceFile,
-        ctx: AnalyzerContext,
-        issues: Issue[],
-    ): void {
-        checkCallExpressionJargonHelper(
-            node,
-            sf,
-            ctx,
-            (c, line, col, rule, msg, sev, detail, sugg) =>
-                this.mkIssue(c, line, col, rule, msg, sev, detail, sugg),
-            issues,
-        );
-    }
-
-    private checkSymbolJargon(
-        name: string,
-        pos: ts.LineAndCharacter,
-        ctx: AnalyzerContext,
-        issues: Issue[],
-    ): void {
-        checkSymbolJargonHelper(
-            name,
-            pos,
-            ctx,
-            (c, line, col, rule, msg, sev, detail, sugg) =>
-                this.mkIssue(c, line, col, rule, msg, sev, detail, sugg),
-            issues,
-        );
-    }
-
-    private checkIdentifierVagueness(
-        name: string,
-        pos: ts.LineAndCharacter,
-        vagueSet: Set<string>,
-        ctx: AnalyzerContext,
-        issues: Issue[],
-        opts: NamingOptions,
-    ): void {
-        checkIdentifierVaguenessHelper(
-            name,
-            pos,
-            vagueSet,
-            ctx,
-            opts,
-            (c, line, col, rule, msg, sev, detail, sugg) =>
-                this.mkIssue(c, line, col, rule, msg, sev, detail, sugg),
-            issues,
-        );
-    }
-
-    private checkSingleLetter(
-        name: string,
-        pos: ts.LineAndCharacter,
-        inLoop: boolean,
-        singleAllowed: Set<string>,
-        ctx: AnalyzerContext,
-        issues: Issue[],
-        opts: NamingOptions,
-    ): void {
-        checkSingleLetterHelper(
-            name,
-            pos,
-            inLoop,
-            singleAllowed,
-            ctx,
-            opts,
-            (c, line, col, rule, msg, sev, detail, sugg) =>
-                this.mkIssue(c, line, col, rule, msg, sev, detail, sugg),
-            issues,
-        );
-    }
-
-    private checkCollectionNaming(
-        name: string,
-        init: ts.Expression | undefined,
-        pos: ts.LineAndCharacter,
-        ctx: AnalyzerContext,
-        issues: Issue[],
-        opts: NamingOptions,
-    ): void {
-        checkCollectionNamingHelper(
-            name,
-            init,
-            pos,
-            ctx,
-            opts,
-            (c, line, col, rule, msg, sev, detail, sugg) =>
-                this.mkIssue(c, line, col, rule, msg, sev, detail, sugg),
-            issues,
-        );
+        if (this.isTypeDecl(node)) {
+            this.checkTypeDeclaration(node, aCtx);
+            return;
+        }
+        if (this.isMemberDecl(node)) {
+            this.checkMemberDeclaration(node, aCtx);
+            return;
+        }
+        if (this.isFunctionDecl(node)) {
+            this.checkFunctionParameters(node, aCtx);
+            return;
+        }
+        if (ts.isCallExpression(node) && aCtx.opts.checkJargon !== false) {
+            checkCallExpressionJargonHelper(node, aCtx.sf, aCtx);
+        }
     }
 
     /**
      * Audits Python source content for function names, length, and anti-jargon conventions.
-     *
-     * @param content - Raw python source code content string.
-     * @param opts - Analyzer naming configuration options.
-     * @param ctx - Execution context.
-     * @param issues - Output issues accumulator.
      */
-    private auditPythonSource(
-        content: string,
-        opts: NamingOptions,
-        ctx: AnalyzerContext,
-        issues: Issue[],
-    ): void {
+    private auditPythonSource(content: string, ctx: AnalyzerContext, issues: Issue[]): void {
+        const opts = (ctx.options || {}) as NamingOptions;
         const vagueSet = opts.vagueBlacklist
             ? new Set(opts.vagueBlacklist)
             : DEFAULT_VAGUE_BLACKLIST;
 
         auditPythonSourceHelper(
             content,
-            opts,
-            vagueSet,
-            hasTransientJargon,
-            (line, rule, msg, detail, sugg) =>
-                this.mkIssue(ctx, line, 1, rule, msg, SEVERITY_WARNING, detail, sugg),
-            (name, kind, loc, syms) =>
-                this.checkDecouplingSymbol(name, kind, loc, opts, ctx, issues, syms),
+            {
+                opts,
+                vagueSet,
+                hasTransientJargon,
+                mkIssue: (finding) => this.formatIssue(ctx, finding),
+                checkDecouplingSymbol: (name, kind, loc, syms) => {
+                    const pyCtx: AstNamingContext = {
+                        ctx,
+                        opts,
+                        issues,
+                        sf: undefined as unknown as ts.SourceFile,
+                        symbols: syms,
+                    };
+                    this.checkDecouplingSymbol(
+                        name,
+                        kind,
+                        { line: loc.line - 1, character: loc.character - 1 },
+                        pyCtx,
+                    );
+                },
+                issues,
+            },
             this.decouplingAuditor,
-            issues,
         );
     }
 }

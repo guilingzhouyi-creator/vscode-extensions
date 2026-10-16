@@ -30,6 +30,10 @@ export interface NamingDecouplingConfig {
     readonly typeErrorSegments: number;
     readonly valueWarningLength: number;
     readonly valueErrorLength: number;
+    readonly constantWarningLength?: number;
+    readonly constantErrorLength?: number;
+    readonly constantWarningSegments?: number;
+    readonly constantErrorSegments?: number;
     readonly clusterMinSymbols: number;
     readonly clusterMinPrefixLength: number;
     readonly clusterMinPrefixSegments: number;
@@ -43,6 +47,10 @@ export const DEFAULT_NAMING_DECOUPLING_CONFIG: NamingDecouplingConfig = {
     typeErrorSegments: 7,
     valueWarningLength: 32,
     valueErrorLength: 42,
+    constantWarningLength: 42,
+    constantErrorLength: 50,
+    constantWarningSegments: 6,
+    constantErrorSegments: 8,
     clusterMinSymbols: 4,
     clusterMinPrefixLength: 12,
     clusterMinPrefixSegments: 2,
@@ -177,27 +185,55 @@ interface ViolationVerdict {
     readonly reason: 'excessive_length' | 'excessive_segments';
 }
 
-function evaluateThresholdViolation(
+function evaluateTypeThreshold(
     len: number,
     segmentCount: number,
-    isType: boolean,
     config: NamingDecouplingConfig,
 ): ViolationVerdict | null {
-    if (isType) {
-        if (len >= config.typeErrorLength) {
-            return { severity: 'error', reason: 'excessive_length' };
-        }
-        if (segmentCount >= config.typeErrorSegments) {
-            return { severity: 'error', reason: 'excessive_segments' };
-        }
-        if (len >= config.typeWarningLength) {
-            return { severity: 'warning', reason: 'excessive_length' };
-        }
-        if (segmentCount >= config.typeWarningSegments) {
-            return { severity: 'warning', reason: 'excessive_segments' };
-        }
-        return null;
+    if (len >= config.typeErrorLength) {
+        return { severity: 'error', reason: 'excessive_length' };
     }
+    if (segmentCount >= config.typeErrorSegments) {
+        return { severity: 'error', reason: 'excessive_segments' };
+    }
+    if (len >= config.typeWarningLength) {
+        return { severity: 'warning', reason: 'excessive_length' };
+    }
+    if (segmentCount >= config.typeWarningSegments) {
+        return { severity: 'warning', reason: 'excessive_segments' };
+    }
+    return null;
+}
+
+function evaluateConstantThreshold(
+    len: number,
+    segmentCount: number,
+    config: NamingDecouplingConfig,
+): ViolationVerdict | null {
+    const constErrorLen = config.constantErrorLength ?? 50;
+    const constErrorSeg = config.constantErrorSegments ?? 8;
+    if (len >= constErrorLen) {
+        return { severity: 'error', reason: 'excessive_length' };
+    }
+    if (segmentCount >= constErrorSeg) {
+        return { severity: 'error', reason: 'excessive_segments' };
+    }
+
+    const constWarnLen = config.constantWarningLength ?? 42;
+    const constWarnSeg = config.constantWarningSegments ?? 6;
+    if (len >= constWarnLen) {
+        return { severity: 'warning', reason: 'excessive_length' };
+    }
+    if (segmentCount >= constWarnSeg) {
+        return { severity: 'warning', reason: 'excessive_segments' };
+    }
+    return null;
+}
+
+function evaluateValueThreshold(
+    len: number,
+    config: NamingDecouplingConfig,
+): ViolationVerdict | null {
     if (len >= config.valueErrorLength) {
         return { severity: 'error', reason: 'excessive_length' };
     }
@@ -205,6 +241,22 @@ function evaluateThresholdViolation(
         return { severity: 'warning', reason: 'excessive_length' };
     }
     return null;
+}
+
+function evaluateThresholdViolation(
+    len: number,
+    segmentCount: number,
+    isType: boolean,
+    isConstant: boolean,
+    config: NamingDecouplingConfig,
+): ViolationVerdict | null {
+    if (isType) {
+        return evaluateTypeThreshold(len, segmentCount, config);
+    }
+    if (isConstant) {
+        return evaluateConstantThreshold(len, segmentCount, config);
+    }
+    return evaluateValueThreshold(len, config);
 }
 
 function extractPrefixKey(
@@ -290,7 +342,14 @@ export class NamingDecouplingAuditor {
         const segments = splitIdentifierTokens(symbol);
         const len = symbol.length;
 
-        const verdict = evaluateThresholdViolation(len, segments.length, isType, this.config);
+        const isConstant = kind === 'constant';
+        const verdict = evaluateThresholdViolation(
+            len,
+            segments.length,
+            isType,
+            isConstant,
+            this.config,
+        );
         if (!verdict) {
             return null;
         }

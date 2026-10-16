@@ -228,21 +228,43 @@ export const NUM_KIND = 'number';
 /** Identifier for string literal kind. */
 export const STR_KIND = 'string';
 
+const PREFIX_CONST = 'CONST';
+const PREFIX_CONST_STR = 'CONST_STR';
+
+const RULE_MAGIC_NUMBER = 'magic-number';
+const RULE_HARDCODED_STRING = 'hardcoded-string';
+
+const THRESHOLD_MULTIPLIER_TEST = 3;
+const THRESHOLD_MIN_TEST = 12;
+const THRESHOLD_MULTIPLIER_DATA = 2;
+const THRESHOLD_MIN_DATA = 8;
+
+const ROLE_CONFIG_CONSTANT = 'config_constant';
+const ROLE_RULES_REGISTRY = 'rules_registry';
+const ROLE_TEST_SUITE = 'test_suite';
+
+const ACTION_EXTRACT_CONSTANT = 'extract_constant';
+const TARGET_SCOPE_MODULE_TOP_LEVEL = 'module_top_level';
+const ANCHOR_POSITION_AFTER_IMPORTS = 'after_imports';
+
 /**
  * Orders two literal observations by source position.
  *
- * @param a - First literal record.
- * @param b - Second literal record.
+ * @param recordA - First literal record.
+ * @param recordB - Second literal record.
  * @returns Sort comparison number.
  */
-export function byPosition(a: LiteralRecord, b: LiteralRecord): number {
-    const al = a.node.start ? a.node.start.line : 0;
-    const bl = b.node.start ? b.node.start.line : 0;
-    if (al !== bl) return al - bl;
-    const ac = a.node.start ? a.node.start.column : 0;
-    const bc = b.node.start ? b.node.start.column : 0;
-    return ac - bc;
+export function computePositionDelta(recordA: LiteralRecord, recordB: LiteralRecord): number {
+    const startLineA = recordA.node.start ? recordA.node.start.line : 0;
+    const startLineB = recordB.node.start ? recordB.node.start.line : 0;
+    if (startLineA !== startLineB) return startLineA - startLineB;
+    const startColA = recordA.node.start ? recordA.node.start.column : 0;
+    const startColB = recordB.node.start ? recordB.node.start.column : 0;
+    return startColA - startColB;
 }
+
+/** Backward-compatible export alias for computePositionDelta. */
+export const byPosition = computePositionDelta;
 
 /**
  * Checks if a character code is a quote or backtick.
@@ -296,62 +318,68 @@ export function resolveSuggestedName(
     if (!classification) return fallback;
     const prefix = classification.suggestedConstPrefix;
     if (numeric) {
-        return prefix !== 'CONST' ? prefix : fallback;
+        return prefix !== PREFIX_CONST ? prefix : fallback;
     }
-    return prefix !== 'CONST_STR' ? `${prefix}_${fallback}` : fallback;
+    return prefix !== PREFIX_CONST_STR ? `${prefix}_${fallback}` : fallback;
 }
 
 /**
  * Resolves diagnostic message for literal extraction issue.
  *
- * @param value - Raw literal value.
+ * @param literalValueText - Raw literal value text.
  * @param numeric - Whether literal is numeric.
  * @param isGranular - Whether granular rule mode is active.
  * @param rationale - Optional classification rationale.
  * @returns Formatted issue message.
  */
 export function resolveLiteralMessage(
-    value: string,
+    literalValueText: string,
     numeric: boolean,
     isGranular: boolean,
     rationale?: string,
 ): string {
     if (isGranular && rationale) {
-        return `${rationale}: ${value} should be extracted.`;
+        return `${rationale}: ${literalValueText} should be extracted.`;
     }
-    return numeric
-        ? `Magic number ${value} should be extracted into a named constant.`
-        : 'Hardcoded string should be extracted into a named constant.';
+    if (numeric) {
+        return `Magic number ${literalValueText} should be extracted into a named constant.`;
+    }
+    return 'Hardcoded string should be extracted into a named constant.';
+}
+
+/** Parameter bundle for resolving literal issue diagnostic payload. */
+export interface LiteralIssueParams {
+    literalValue: string;
+    numeric: boolean;
+    classification: ReturnType<typeof classifyLiteral> | null;
+    granular: boolean;
+    suggestedNameFallback: string;
 }
 
 /**
  * Resolves complete issue payload for a detected literal.
  *
- * @param value - Literal value string.
- * @param numeric - Whether literal is numeric.
- * @param classification - Semantic classification result.
- * @param granular - Whether granular rules are enabled.
- * @param suggestedNameFallback - Fallback name.
+ * @param params - Literal issue resolution parameter object.
  * @returns Literal issue data structure.
  */
-export function resolveLiteralIssueData(
-    value: string,
-    numeric: boolean,
-    classification: ReturnType<typeof classifyLiteral> | null,
-    granular: boolean,
-    suggestedNameFallback: string,
-): LiteralResolution {
+export function resolveLiteralIssueData(params: LiteralIssueParams): LiteralResolution {
+    const { literalValue, numeric, classification, granular, suggestedNameFallback } = params;
     const isGranular = Boolean(
         granular && classification && classification.kind !== LITERAL_KIND_GENERAL,
     );
-    const defaultRule = numeric ? 'magic-number' : 'hardcoded-string';
+    const defaultRule = numeric ? RULE_MAGIC_NUMBER : RULE_HARDCODED_STRING;
     const rule = isGranular ? `literal-${classification!.kind}` : defaultRule;
     const suggested = resolveSuggestedName(numeric, classification, suggestedNameFallback);
-    const message = resolveLiteralMessage(value, numeric, isGranular, classification?.rationale);
+    const message = resolveLiteralMessage(
+        literalValue,
+        numeric,
+        isGranular,
+        classification?.rationale,
+    );
 
     const detail: Record<string, unknown> = numeric
         ? {
-              value,
+              value: literalValue,
               numeric: true,
               suggestedName: suggested,
               ...(classification
@@ -359,8 +387,8 @@ export function resolveLiteralIssueData(
                   : {}),
           }
         : {
-              value,
-              length: stripQuotes(value).length,
+              value: literalValue,
+              length: stripQuotes(literalValue).length,
               suggestedName: suggested,
               ...(classification
                   ? { semanticKind: classification.kind, rationale: classification.rationale }
@@ -385,10 +413,9 @@ export function resolveDuplicateThreshold(
     isDataOrConfig: boolean,
     isConstantFile = false,
 ): number {
-    if (isTest) return Math.max(base * 3, 12);
-    if (isConstantFile) return Math.max(base * 3, 12);
-    if (isDataOrConfig) return Math.max(base * 2, 8);
-    return base;
+    if (isTest || isConstantFile)
+        return Math.max(base * THRESHOLD_MULTIPLIER_TEST, THRESHOLD_MIN_TEST);
+    return isDataOrConfig ? Math.max(base * THRESHOLD_MULTIPLIER_DATA, THRESHOLD_MIN_DATA) : base;
 }
 
 /**
@@ -401,8 +428,8 @@ export function resolveDuplicateThreshold(
  */
 export function isDataOrConfigFile(role: string, filePath: string, content?: string): boolean {
     return (
-        role === 'config_constant' ||
-        role === 'rules_registry' ||
+        role === ROLE_CONFIG_CONSTANT ||
+        role === ROLE_RULES_REGISTRY ||
         filePath.endsWith('.json') ||
         isConstantDefinitionFile(filePath, content)
     );
@@ -417,7 +444,7 @@ export function isDataOrConfigFile(role: string, filePath: string, content?: str
  */
 export function isTestFile(role: string, filePath: string): boolean {
     return (
-        role === 'test_suite' ||
+        role === ROLE_TEST_SUITE ||
         /[\\/](?:tests?|fixtures?|mocks?)[\\/]/i.test(filePath) ||
         /\.(?:test|spec)\.[a-z0-9]+$/i.test(filePath)
     );
@@ -432,7 +459,7 @@ export function isTestFile(role: string, filePath: string): boolean {
  */
 export function isI18nFile(role: string, filePath: string): boolean {
     return (
-        (role === 'config_constant' && /[\\/](?:i18n|locales|lang)[\\/]/i.test(filePath)) ||
+        (role === ROLE_CONFIG_CONSTANT && /[\\/](?:i18n|locales|lang)[\\/]/i.test(filePath)) ||
         /[\\/](?:i18n|locales|lang)[\\/]/i.test(filePath) ||
         /(?:zh-CN|en-US|zh|en)\.[a-z0-9]+$/i.test(filePath)
     );
@@ -441,167 +468,135 @@ export function isI18nFile(role: string, filePath: string): boolean {
 /**
  * Checks if a numeric literal is a duplicate candidate.
  *
- * @param value - Numeric literal value.
+ * @param literalValueText - Numeric literal value.
  * @param magicNumberMin - Magic number minimum threshold.
  * @returns True when numeric value qualifies.
  */
-export function isNumericDuplicateCandidate(value: string, magicNumberMin: number): boolean {
-    if (TRIVIAL_NUMBERS.has(value)) return false;
-    return Math.abs(Number(value)) >= magicNumberMin;
+export function isNumericDuplicateCandidate(
+    literalValueText: string,
+    magicNumberMin: number,
+): boolean {
+    if (TRIVIAL_NUMBERS.has(literalValueText)) return false;
+    return Math.abs(Number(literalValueText)) >= magicNumberMin;
 }
 
 /**
  * Checks if a string literal should be ignored regardless of domain context.
  */
-function isIgnoredLiteralCandidate(value: string, str: string, ignoreSet: Set<string>): boolean {
-    return str.length === 0 || ignoreSet.has(value) || ignoreSet.has(str);
+function isIgnoredLiteralCandidate(
+    literalValueText: string,
+    unquotedText: string,
+    ignoreSet: Set<string>,
+): boolean {
+    return (
+        unquotedText.length === 0 || ignoreSet.has(literalValueText) || ignoreSet.has(unquotedText)
+    );
+}
+
+/** Domain classification flags for literal duplicate candidate filtering. */
+export interface LiteralDomainContext {
+    isTest?: boolean;
+    isDataOrConfig?: boolean;
+    isAlgorithm?: boolean;
+    isConstantFile?: boolean;
+}
+
+/** Parameter bundle configuring duplicate candidate filtering and clustering. */
+export interface DuplicateFilterOptions {
+    magicNumberMin: number;
+    ignoreSet: Set<string>;
+    classify: boolean;
+    domain: LiteralDomainContext;
 }
 
 /**
  * Determines whether a lowered string token is benign within the active domain scope.
  */
-function isDomainBenignToken(
-    lower: string,
-    isTest: boolean,
-    isDataOrConfig: boolean,
-    isAlgorithm: boolean,
-    isConstantFile: boolean,
-): boolean {
-    if (isTest && TEST_SUITE_BENIGN_TOKENS.has(lower)) return true;
-    if (isDataOrConfig && SCHEMA_PROPERTY_TOKENS.has(lower)) return true;
-    if (isAlgorithm && AST_PARSER_BENIGN_TOKENS.has(lower)) return true;
-    if (isConstantFile && CONSTANT_DEFAULT_MAPPING_TOKENS.has(lower)) return true;
-    return false;
+function isDomainBenignToken(lowerToken: string, domain: LiteralDomainContext): boolean {
+    return Boolean(
+        (domain.isTest && TEST_SUITE_BENIGN_TOKENS.has(lowerToken)) ||
+        (domain.isDataOrConfig && SCHEMA_PROPERTY_TOKENS.has(lowerToken)) ||
+        (domain.isAlgorithm && AST_PARSER_BENIGN_TOKENS.has(lowerToken)) ||
+        (domain.isConstantFile && CONSTANT_DEFAULT_MAPPING_TOKENS.has(lowerToken)),
+    );
 }
 
 /**
  * Checks if a string literal is a duplicate candidate.
  *
- * @param value - String literal value.
+ * @param literalValueText - String literal value.
  * @param ignoreSet - Set of ignored string literals.
- * @param isTest - Whether test suite.
- * @param isDataOrConfig - Whether data/config.
- * @param isAlgorithm - Whether algorithm code.
- * @param isConstantFile - Whether dedicated constant catalog.
+ * @param domain - Domain context flags.
  * @returns True when string qualifies.
  */
 export function isStringDuplicateCandidate(
-    value: string,
+    literalValueText: string,
     ignoreSet: Set<string>,
-    isTest: boolean,
-    isDataOrConfig: boolean,
-    isAlgorithm = false,
-    isConstantFile = false,
+    domain: LiteralDomainContext = {},
 ): boolean {
-    const str = stripQuotes(value).trim();
-    if (isIgnoredLiteralCandidate(value, str, ignoreSet)) return false;
-    if (
-        isDomainBenignToken(str.toLowerCase(), isTest, isDataOrConfig, isAlgorithm, isConstantFile)
-    ) {
-        return false;
-    }
-    return true;
+    const unquoted = stripQuotes(literalValueText).trim();
+    if (isIgnoredLiteralCandidate(literalValueText, unquoted, ignoreSet)) return false;
+    return !isDomainBenignToken(unquoted.toLowerCase(), domain);
 }
 
 /**
  * Checks if a literal record is a candidate for duplicate grouping.
  *
  * @param lit - Literal record.
- * @param magicNumberMin - Minimum numeric limit.
- * @param ignoreSet - Ignored literals set.
- * @param classify - Whether classification enabled.
- * @param isTest - Whether test suite.
- * @param isDataOrConfig - Whether data/config.
- * @param isAlgorithm - Whether algorithm file.
- * @param isConstantFile - Whether dedicated constant catalog.
+ * @param options - Duplicate filter options.
  * @returns True when candidate.
  */
-export function isDuplicateCandidate(
-    lit: LiteralRecord,
-    magicNumberMin: number,
-    ignoreSet: Set<string>,
-    classify: boolean,
-    isTest = false,
-    isDataOrConfig = false,
-    isAlgorithm = false,
-    isConstantFile = false,
-): boolean {
+export function isDuplicateCandidate(lit: LiteralRecord, options: DuplicateFilterOptions): boolean {
     if (lit.isConstBound || lit.tolerated) return false;
     const candidate = lit.numeric
-        ? isNumericDuplicateCandidate(lit.value, magicNumberMin)
-        : isStringDuplicateCandidate(
-              lit.value,
-              ignoreSet,
-              isTest,
-              isDataOrConfig,
-              isAlgorithm,
-              isConstantFile,
-          );
+        ? isNumericDuplicateCandidate(lit.value, options.magicNumberMin)
+        : isStringDuplicateCandidate(lit.value, options.ignoreSet, options.domain);
     if (!candidate) return false;
-    return !(classify && classifyLiteral(lit.value, lit.numeric).isReasonable);
+    return !(options.classify && classifyLiteral(lit.value, lit.numeric).isReasonable);
 }
 
 /**
  * Groups duplicate literals across all collected records in a file.
  *
  * @param literals - All collected literal records.
- * @param magicNumberMin - Minimum numeric threshold.
- * @param ignoreSet - Set of ignored literal values.
- * @param classify - Whether semantic classification is enabled.
- * @param isTest - Whether file is test suite.
- * @param isDataOrConfig - Whether file is data/config.
- * @param isAlgorithm - Whether file is algorithm/parser.
- * @param isConstantFile - Whether dedicated constant catalog.
+ * @param options - Duplicate filter options.
  * @returns Map of literal key to array of occurrences.
  */
-export function groupDuplicates(
+export function collectDuplicateGroups(
     literals: LiteralRecord[],
-    magicNumberMin: number,
-    ignoreSet: Set<string>,
-    classify: boolean,
-    isTest = false,
-    isDataOrConfig = false,
-    isAlgorithm = false,
-    isConstantFile = false,
+    options: DuplicateFilterOptions,
 ): Map<string, LiteralRecord[]> {
-    const groups = new Map<string, LiteralRecord[]>();
+    const groupsByKeyMap = new Map<string, LiteralRecord[]>();
     for (const lit of literals) {
-        if (
-            !isDuplicateCandidate(
-                lit,
-                magicNumberMin,
-                ignoreSet,
-                classify,
-                isTest,
-                isDataOrConfig,
-                isAlgorithm,
-                isConstantFile,
-            )
-        ) {
+        if (!isDuplicateCandidate(lit, options)) {
             continue;
         }
         const key = `${lit.numeric ? 'N' : 'S'}:${lit.value}`;
-        const arr = groups.get(key) || [];
-        arr.push(lit);
-        groups.set(key, arr);
+        const existingList = groupsByKeyMap.get(key) || [];
+        existingList.push(lit);
+        groupsByKeyMap.set(key, existingList);
     }
-    return groups;
+    return groupsByKeyMap;
 }
+
+/** Backward-compatible export alias for collectDuplicateGroups. */
+export const groupDuplicates = collectDuplicateGroups;
 
 /**
  * Builds an actionable Issue object for duplicate literals.
  *
  * @param ctx - Analyzer context.
- * @param arr - Array of duplicate literal records.
+ * @param records - Array of duplicate literal records.
  * @param suggested - Suggested constant name.
  * @returns Constructed Issue object.
  */
 export function buildDuplicateIssue(
     ctx: AnalyzerContext,
-    arr: LiteralRecord[],
+    records: LiteralRecord[],
     suggested: string,
 ): Issue {
-    const first = arr[0];
+    const first = records[0];
+    const issueLocation = locN(first.node, ctx.filePath);
     return {
         id:
             `${ANALYZER_CONSTANTS}:${RULE_DUPLICATE_LITERAL}:${ctx.filePath}:` +
@@ -609,13 +604,13 @@ export function buildDuplicateIssue(
         analyzer: ANALYZER_CONSTANTS,
         rule: RULE_DUPLICATE_LITERAL,
         severity: SEVERITY_WARNING,
-        message: `Literal ${first.value} is repeated ${arr.length} times in this file; extract it into a shared constant.`,
-        location: locN(first.node, ctx.filePath),
+        message: `Literal ${first.value} is repeated ${records.length} times in this file; extract it into a shared constant.`,
+        location: issueLocation,
         detail: {
             value: first.value,
             numeric: first.numeric,
-            occurrences: arr.length,
-            lines: arr.map((l) => l.node.start?.line ?? 1),
+            occurrences: records.length,
+            lines: records.map((l) => l.node.start?.line ?? 1),
             suggestedName: suggested,
         },
         suggestion: formatConstantDeclarationSuggestion(
@@ -623,14 +618,14 @@ export function buildDuplicateIssue(
             suggested,
             first.value,
             first.numeric,
-            `used ${arr.length}x`,
+            `used ${records.length}x`,
         ),
         actionable: {
-            action: 'extract_constant',
+            action: ACTION_EXTRACT_CONSTANT,
             code: CODE_CONST_DUPLICATE_LITERAL,
-            targetScope: 'module_top_level',
+            targetScope: TARGET_SCOPE_MODULE_TOP_LEVEL,
             targetSymbol: suggested,
-            insertAnchor: { position: 'after_imports' },
+            insertAnchor: { position: ANCHOR_POSITION_AFTER_IMPORTS },
             safeToAutomate: true,
         },
     };

@@ -68,7 +68,7 @@ function testDataFlowGraphLifecycle() {
   graph.addEdge({ from: 'n5', to: 'n6', transferType: 'async' });
   graph.addEdge({ from: 'n6', to: 'n7', transferType: 'direct' });
 
-  const traversedStages = graph.traceLifecycle('n1');
+  const traversedStages = (graph.computeLifecycleTrace || graph.traceLifecycle).call(graph, 'n1');
   assert.deepStrictEqual(
     traversedStages,
     ['Source', 'Validation', 'Transformation', 'Storage', 'Bus', 'Consumer', 'SideEffect'],

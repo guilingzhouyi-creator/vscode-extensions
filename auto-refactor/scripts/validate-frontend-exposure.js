@@ -124,6 +124,124 @@ function testFrontendAnalyzer() {
     'Should flag hook missing use- prefix and handler missing on/handle prefix',
   );
 
+  // UI-ENG-005: CJK IME composition guard on Enter key handler
+  const unguardedEnterCode = [
+    'const handleKeyDown = (e: React.KeyboardEvent) => {',
+    '  if (e.key === "Enter") {',
+    '    sendMessage();',
+    '  }',
+    '};',
+  ].join('\n');
+  const unguardedIssues = analyzer.analyze(
+    undefined,
+    mockContext('src/components/ChatInput.tsx', unguardedEnterCode),
+  );
+  assert.ok(
+    unguardedIssues.some((i) => i.rule === 'UI-ENG-005'),
+    'Should flag Enter key handler lacking isComposing guard',
+  );
+
+  const guardedEnterCode = [
+    'const handleKeyDown = (e: React.KeyboardEvent) => {',
+    '  if (e.nativeEvent.isComposing || e.keyCode === 229) return;',
+    '  if (e.key === "Enter") {',
+    '    sendMessage();',
+    '  }',
+    '};',
+  ].join('\n');
+  const guardedIssues = analyzer.analyze(
+    undefined,
+    mockContext('src/components/ChatInput.tsx', guardedEnterCode),
+  );
+  assert.strictEqual(
+    guardedIssues.filter((i) => i.rule === 'UI-ENG-005').length,
+    0,
+    'Guarded Enter key handler must not trigger UI-ENG-005',
+  );
+
+  // UI-ENG-006: Tabular numerics on dynamic counter/timer displays
+  const nonTabularTimer = [
+    '<div className="timer-panel">',
+    '  <span className="text-xl font-bold">{formatDuration(elapsedMs)}</span>',
+    '</div>',
+  ].join('\n');
+  const nonTabularIssues = analyzer.analyze(
+    undefined,
+    mockContext('src/components/Timer.tsx', nonTabularTimer),
+  );
+  assert.ok(
+    nonTabularIssues.some((i) => i.rule === 'UI-ENG-006'),
+    'Should flag timer display lacking tabular-nums class or style',
+  );
+
+  const tabularTimer = [
+    '<div className="timer-panel">',
+    '  <span className="text-xl font-bold tabular-nums">{formatDuration(elapsedMs)}</span>',
+    '</div>',
+  ].join('\n');
+  const tabularPassIssues = analyzer.analyze(
+    undefined,
+    mockContext('src/components/Timer.tsx', tabularTimer),
+  );
+  assert.strictEqual(
+    tabularPassIssues.filter((i) => i.rule === 'UI-ENG-006').length,
+    0,
+    'Timer display with tabular-nums must not trigger UI-ENG-006',
+  );
+
+  // UI-ENG-007: Single closed border discipline (no nested borders on children)
+  const nestedBorderMarkup = [
+    '<div className="border border-gray-200 rounded-lg p-4">',
+    '  <p>Card Content</p>',
+    '  <button className="border border-blue-500 rounded px-3 py-1">Submit</button>',
+    '</div>',
+  ].join('\n');
+  const nestedBorderIssues = analyzer.analyze(
+    undefined,
+    mockContext('src/components/Card.tsx', nestedBorderMarkup),
+  );
+  assert.ok(
+    nestedBorderIssues.some((i) => i.rule === 'UI-ENG-007'),
+    'Should flag child button nested inside bordered container duplicating outer border',
+  );
+
+  const cleanBorderMarkup = [
+    '<div className="border border-gray-200 rounded-lg p-4">',
+    '  <p>Card Content</p>',
+    '  <button className="bg-primary hover:bg-primary-hover text-white rounded px-3 py-1">Submit</button>',
+    '</div>',
+  ].join('\n');
+  const cleanBorderIssues = analyzer.analyze(
+    undefined,
+    mockContext('src/components/Card.tsx', cleanBorderMarkup),
+  );
+  assert.strictEqual(
+    cleanBorderIssues.filter((i) => i.rule === 'UI-ENG-007').length,
+    0,
+    'Clean border markup with ghost/contrast button must not trigger UI-ENG-007',
+  );
+
+  // UI-ENG-008: Container queries & CJK anti-squash
+  const mediaInCompCss = '.card { @media (max-width: 600px) { padding: 8px; } }';
+  const mediaIssues = analyzer.analyze(
+    undefined,
+    mockContext('src/components/Card.css', mediaInCompCss),
+  );
+  assert.ok(
+    mediaIssues.some((i) => i.rule === 'UI-ENG-008'),
+    'Should flag @media nested inside component selector',
+  );
+
+  const cjkSquashHtml = ['<div className="card">', '  <h1>标题文本</h1>', '</div>'].join('\n');
+  const cjkIssues = analyzer.analyze(
+    undefined,
+    mockContext('src/components/Card.tsx', cjkSquashHtml),
+  );
+  assert.ok(
+    cjkIssues.some((i) => i.rule === 'UI-ENG-008'),
+    'Should flag CJK text without anti-squash properties',
+  );
+
   console.log('  [PASS] FrontendAnalyzer passed all assertions.');
 }
 
@@ -261,6 +379,37 @@ function testClientExposureAnalyzer() {
     'Should flag unreleased/test route statically configured in client routes',
   );
 
+  // SEC-EXP-005: iframe message handler without userActivation or origin check
+  const unguardedMessageListener = [
+    'window.addEventListener("message", (event) => {',
+    '  window.open(event.data.targetUrl);',
+    '});',
+  ].join('\n');
+  const msgIssues = analyzer.analyze(
+    undefined,
+    mockContext('src/client/MessageBridge.ts', unguardedMessageListener),
+  );
+  assert.ok(
+    msgIssues.some((i) => i.rule === 'SEC-EXP-005'),
+    'Should flag message event listener executing sensitive window.open without userActivation or origin check',
+  );
+
+  const guardedMessageListener = [
+    'window.addEventListener("message", (event) => {',
+    '  if (!event.userActivation || !event.userActivation.isActive) return;',
+    '  window.open(event.data.targetUrl);',
+    '});',
+  ].join('\n');
+  const guardedMsgIssues = analyzer.analyze(
+    undefined,
+    mockContext('src/client/MessageBridge.ts', guardedMessageListener),
+  );
+  assert.strictEqual(
+    guardedMsgIssues.filter((i) => i.rule === 'SEC-EXP-005').length,
+    0,
+    'Guarded message listener must not trigger SEC-EXP-005',
+  );
+
   console.log('  [PASS] ClientExposureAnalyzer passed all assertions.');
 }
 
@@ -288,9 +437,15 @@ function testScoringAndRoutingIntegration() {
   const prodRules = getDimensionRulesForAnalyzer('production-hygiene');
   const clientRules = getDimensionRulesForAnalyzer('client-exposure');
 
-  assert.ok(frontendRules.length >= 4, 'Frontend analyzer must have dimension rules mapped');
+  assert.ok(
+    frontendRules.length >= 8,
+    'Frontend analyzer must have dimension rules mapped (UI-ENG-001..008)',
+  );
   assert.ok(prodRules.length >= 3, 'Production hygiene analyzer must have dimension rules mapped');
-  assert.ok(clientRules.length >= 4, 'Client exposure analyzer must have dimension rules mapped');
+  assert.ok(
+    clientRules.length >= 5,
+    'Client exposure analyzer must have dimension rules mapped (SEC-EXP-001..005)',
+  );
 
   console.log('  [PASS] Scoring and router integration passed all assertions.');
 }

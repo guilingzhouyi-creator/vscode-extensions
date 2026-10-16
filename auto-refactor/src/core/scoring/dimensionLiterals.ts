@@ -712,6 +712,16 @@ export const RULE_UI_ENG_002 = 'UI-ENG-002';
 export const RULE_UI_ENG_003 = 'UI-ENG-003';
 /** Rule id for frontend hook and event handler naming conventions. */
 export const RULE_UI_ENG_004 = 'UI-ENG-004';
+/** Rule id for missing CJK IME composition interlock guard on Enter submission. */
+export const RULE_UI_ENG_005 = 'UI-ENG-005';
+/** Rule id for dynamic counter display lacking tabular numbers font locking. */
+export const RULE_UI_ENG_006 = 'UI-ENG-006';
+/** Rule id for nested container border violating single-stroke enclosure. */
+export const RULE_UI_ENG_007 = 'UI-ENG-007';
+/** Rule id for container query and CJK anti-squash discipline. */
+export const RULE_UI_ENG_008 = 'UI-ENG-008';
+/** Rule id for webview dynamic border width modification causing layout jitter. */
+export const RULE_VSC_UI_004 = 'VSC-UI-004';
 
 /** Rule id for production artifact debug logs, TODOs, and absolute paths. */
 export const RULE_PROD_HYG_001 = 'PROD-HYG-001';
@@ -728,6 +738,8 @@ export const RULE_SEC_EXP_002 = 'SEC-EXP-002';
 export const RULE_SEC_EXP_003 = 'SEC-EXP-003';
 /** Rule id for unreleased or test route packaging in production routers. */
 export const RULE_SEC_EXP_004 = 'SEC-EXP-004';
+/** Rule id for synthetic message listener lacking userActivation or origin guard. */
+export const RULE_SEC_EXP_005 = 'SEC-EXP-005';
 
 /** Points deducted for UI accessibility and semantic structure violations. */
 export const DEDUCTION_UI_A11Y = 10;
@@ -737,6 +749,16 @@ export const DEDUCTION_UI_DOM_DEPTH = 12;
 export const DEDUCTION_UI_COMPONENT_REUSE = 10;
 /** Points deducted for frontend hook/event naming convention defects. */
 export const DEDUCTION_UI_NAMING = 5;
+/** Points deducted for missing IME composition guard on Enter submission. */
+export const DEDUCTION_UI_IME_GUARD = 8;
+/** Points deducted for dynamic numeric display lacking tabular-nums. */
+export const DEDUCTION_UI_TABULAR_NUMS = 5;
+/** Points deducted for nested container borders violating single-stroke enclosure. */
+export const DEDUCTION_UI_NESTED_BORDER = 8;
+/** Points deducted for component-scoped @media misuse or CJK text squashing. */
+export const DEDUCTION_UI_CONTAINER_QUERY = 10;
+/** Points deducted for webview dynamic border toggling layout jitter. */
+export const DEDUCTION_VSC_BORDER_JITTER = 8;
 
 /** Points deducted for debug residue or absolute paths in production. */
 export const DEDUCTION_PROD_DEBUG_RESIDUE = 15;
@@ -753,6 +775,8 @@ export const DEDUCTION_SEC_CSS_AUTH_BYPASS = 30;
 export const DEDUCTION_SEC_DISABLED_FLAG = 15;
 /** Points deducted for unreleased test routes in production. */
 export const DEDUCTION_SEC_UNRELEASED_ROUTE = 25;
+/** Points deducted for synthetic message listener lacking userActivation or origin guard. */
+export const DEDUCTION_SEC_IFRAME_ACTIVATION = 25;
 
 /** Rule id for backward-compatibility shim and transitional wrapper debt. */
 export const RULE_MOD_BWD_001 = 'MOD-BWD-001';
@@ -767,3 +791,20 @@ export const DEDUCTION_BACKWARD_SHIM = 15;
 export const DEDUCTION_FALLBACK_CHAIN = 12;
 /** Points deducted for deprecated symbol access and uncontained legacy API calls. */
 export const DEDUCTION_DEPRECATED_ACCESS = 20;
+
+/** Rule id for plumbing overhead and import/export wiring ratio exceeding threshold. */
+export const RULE_ARCH_PLM_001 = 'ARCH-PLM-001';
+/** Rule id for single-use orphan function that should be considered for inlining. */
+export const RULE_SIM_INL_001 = 'SIM-INL-001';
+/** Rule id for tautological loop traversal with zero or negligible state mutation entropy. */
+export const RULE_CPX_TRV_001 = 'CPX-TRV-001';
+
+/** Points deducted when plumbing overhead ratio (POR) exceeds architectural threshold. */
+export const DEDUCTION_PLUMBING_OVERHEAD = 12;
+/** Points deducted when single-use orphan micro-fragments degrade spatial locality. */
+export const DEDUCTION_ORPHAN_INLINE = 8;
+/** Points deducted when tautological loop traversals add zero state entropy. */
+export const DEDUCTION_TAUTOLOGICAL_LOOP = 10;
+
+/** Analyzer identifier for token and payload density. */
+export const ANALYZER_TOKEN_DENSITY = 'token-density';

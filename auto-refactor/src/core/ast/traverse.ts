@@ -1,6 +1,7 @@
 import type { AnalyzerContext, Issue, FileMetric } from '../types';
 import type { NormalizedNode, LanguageAdapter, NodeProjector, ProjectionPolicy } from './multilang';
 import { NodeKind } from './multilang';
+import { computeEffectiveCodeDensity } from '../scoring/effectiveDensity';
 
 /**
  * Module: Core Engine — Multiplexed AST Traversal and Projection Routing
@@ -301,6 +302,7 @@ export class FileMetricCollector {
                 if (l.trim().length > 0) nonBlankLines++;
             }
         }
+        const density = ctx.content ? computeEffectiveCodeDensity(ctx.content) : null;
         this.metric = {
             file: ctx.filePath,
             lines,
@@ -309,6 +311,11 @@ export class FileMetricCollector {
             maxNestingDepth: this.maxNesting,
             topLevelDeclarations: this.topLevelDeclarations,
             exportedSymbols: this.exportedSymbols,
+            effectiveDensity: density ? density.effectiveDensity : undefined,
+            tspr: density?.tspr,
+            por: density?.por,
+            columnDensity: density?.columnDensity,
+            compositeDensity: density?.compositeDensity,
         };
         return [];
     }

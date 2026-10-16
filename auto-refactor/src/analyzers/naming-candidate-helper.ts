@@ -18,7 +18,7 @@ import * as ts from 'typescript';
 import type { AgentActionablePayload, AnalyzerContext, Severity } from '../core/types';
 import { SEVERITY_WARNING } from '../core/types';
 import type { DiagnosticDescriptor } from '../core/messages/types';
-import { validateFunctionTokensAndSemantics } from './naming-path-helper';
+import { auditFunctionSemantics } from './naming-path-helper';
 
 /** Candidate naming proposal derived by the inference pipeline. */
 export interface NamingCandidate {
@@ -89,7 +89,8 @@ export const MAX_FUNCTION_NAME_LENGTH = 50;
 export const ALLOWED_SHORT_NAMES: ReadonlySet<string> = new Set(
     (
         'x y z dx dy w h id ip i j k l m n p r s t v a b c d e f _ ' +
-        'ts fs cp vm db fd fn cb el sf ns op re ex ev ok no ch tx rx io os ui ci cd eq ne gt lt'
+        'ts fs cp vm db fd fn cb el sf ns op re ex ev ok no ch tx rx io os ui ci cd eq ne gt lt ' +
+        'l1 l2 rl w1 w2 vp vn pm hp hn d0 tn lc'
     ).split(' '),
 );
 
@@ -796,27 +797,23 @@ export function buildNamingActionable(
 }
 
 /** Callback signature for issuing naming diagnostics. */
-export type NamingIssueEmitter = (
-    line: number,
-    column: number,
-    rule: string,
-    message: string,
-    severity: Severity,
-    detail: Record<string, unknown>,
-    suggestion?: string,
-    actionable?: NamingActionablePayload,
-) => void;
-
 /**
- * Audits a function or method name for minimum/maximum length constraints
- * and unapproved abbreviation patterns.
- *
- * @param name - Function or method identifier name.
- * @param node - AST declaration node.
- * @param pos - Position coordinates of the identifier.
- * @param pos.line - 0-based line number.
- * @param pos.character - 0-based character offset.
- * @param ctx - Analyzer execution context.
+ * Structured diagnostic record emitted for naming rule violations.
+ */
+export interface NamingDiagnosticRecord {
+    readonly line: number;
+    readonly column: number;
+    readonly rule: string;
+    readonly message: string;
+    readonly severity: Severity;
+    readonly detail: Record<string, unknown>;
+    readonly suggestion?: string;
+    readonly actionable?: NamingActionablePayload;
+}
+
+/** Callback signature for emitting naming diagnostic records. */
+export type NamingIssueEmitter = (diagnostic: NamingDiagnosticRecord) => void;
+
 /**
  * Options configuring function identifier naming checks.
  */
@@ -835,8 +832,8 @@ export interface FunctionNamingAuditOptions {
  * Emits a structured naming diagnostic issue at the target identifier coordinates.
  *
  * @param pos - Position coordinates of the identifier.
- * @param pos.line - 0-based line number.
- * @param pos.character - 0-based character offset.
+ * @param pos.line - Zero-based line number.
+ * @param pos.character - Zero-based character column.
  * @param rule - Rule identifier string.
  * @param desc - Diagnostic descriptor containing message and suggestion.
  * @param detail - Diagnostic payload map.
@@ -851,16 +848,16 @@ function emitNamingDiagnostic(
     actionable: NamingActionablePayload,
     emitIssue: NamingIssueEmitter,
 ): void {
-    emitIssue(
-        pos.line + 1,
-        pos.character + 1,
+    emitIssue({
+        line: pos.line + 1,
+        column: pos.character + 1,
         rule,
-        desc.message,
-        SEVERITY_WARNING,
-        { ...detail, actionable },
-        desc.suggestion,
+        message: desc.message,
+        severity: SEVERITY_WARNING,
+        detail: { ...detail, actionable },
+        suggestion: desc.suggestion,
         actionable,
-    );
+    });
 }
 
 function checkAndEmitAbbreviation(
@@ -940,7 +937,7 @@ export function auditFunctionNameLengthsAndAbbreviations(
     const cleanName = name.replace(/^[_#]+/, '');
     const tokens = tokenizeIdentifier(cleanName);
     const isAccessor = ts.isGetAccessor(node) || ts.isSetAccessor(node);
-    const finding = validateFunctionTokensAndSemantics(name, tokens, opts, isAccessor);
+    const finding = auditFunctionSemantics(name, tokens, opts, isAccessor);
     if (finding) {
         const actionable = buildNamingActionable(
             name,

@@ -37,30 +37,30 @@ export const CONTROL_OR_BLOCK = new Set<ts.SyntaxKind>([
 /**
  * Test whether a node is a top-level declaration statement.
  *
- * @param n - TypeScript node to classify.
- * @returns True when n is one of the top-level declaration statement kinds.
+ * @param node - TypeScript node to classify.
+ * @returns True when node is one of the top-level declaration statement kinds.
  */
-export function isTopLevelDecl(n: ts.Node): boolean {
+export function isTopLevelDecl(node: ts.Node): boolean {
     return (
-        ts.isFunctionDeclaration(n) ||
-        ts.isClassDeclaration(n) ||
-        ts.isInterfaceDeclaration(n) ||
-        ts.isEnumDeclaration(n) ||
-        ts.isTypeAliasDeclaration(n) ||
-        ts.isModuleDeclaration(n) ||
-        ts.isVariableStatement(n)
+        ts.isFunctionDeclaration(node) ||
+        ts.isClassDeclaration(node) ||
+        ts.isInterfaceDeclaration(node) ||
+        ts.isEnumDeclaration(node) ||
+        ts.isTypeAliasDeclaration(node) ||
+        ts.isModuleDeclaration(node) ||
+        ts.isVariableStatement(node)
     );
 }
 
 /**
  * Test whether a node carries the export modifier.
  *
- * @param n - TypeScript node to inspect.
+ * @param node - TypeScript node to inspect.
  * @returns True when the node's modifier list contains the export keyword.
  */
-export function hasExportModifier(n: ts.Node): boolean {
-    const list = ts.canHaveModifiers(n) ? ts.getModifiers(n) : undefined;
-    return Boolean(list?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword));
+export function hasExportModifier(node: ts.Node): boolean {
+    const list = ts.canHaveModifiers(node) ? ts.getModifiers(node) : undefined;
+    return Boolean(list?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword));
 }
 
 /**
@@ -93,15 +93,15 @@ const LITERAL_KINDS = new Set<ts.SyntaxKind>([
 /**
  * Test whether a token carries no semantic value for analyzers and should be skipped.
  *
- * @param n - TypeScript node to test.
+ * @param node - TypeScript node to test.
  * @returns True when the node is a punctuation, keyword, or identifier token to skip.
  */
-export function isSkippableToken(n: ts.Node): boolean {
+export function isSkippableToken(node: ts.Node): boolean {
     return (
-        ts.isToken(n) &&
-        !LITERAL_KINDS.has(n.kind) &&
-        n.kind !== ts.SyntaxKind.FunctionKeyword &&
-        !ts.isModifier(n)
+        ts.isToken(node) &&
+        !LITERAL_KINDS.has(node.kind) &&
+        node.kind !== ts.SyntaxKind.FunctionKeyword &&
+        !ts.isModifier(node)
     );
 }
 
@@ -166,12 +166,12 @@ const KIND_MAP = new Map<ts.SyntaxKind, NodeKind>([
 /**
  * Map a raw TypeScript SyntaxKind to the normalized NodeKind consumed by analyzers.
  *
- * @param n - Raw TypeScript node.
+ * @param node - Raw TypeScript node.
  * @returns The normalized NodeKind enum value.
  */
-export function kindOf(n: ts.Node): NodeKind {
-    if (CONTROL_FLOW_KINDS.has(n.kind)) return NodeKind.ControlFlow;
-    return KIND_MAP.get(n.kind) ?? NodeKind.Other;
+export function kindOf(node: ts.Node): NodeKind {
+    if (CONTROL_FLOW_KINDS.has(node.kind)) return NodeKind.ControlFlow;
+    return KIND_MAP.get(node.kind) ?? NodeKind.Other;
 }
 
 const BRANCH_WEIGHT_KINDS = new Set<ts.SyntaxKind>([
@@ -182,13 +182,13 @@ const BRANCH_WEIGHT_KINDS = new Set<ts.SyntaxKind>([
 /**
  * Calculate cyclomatic decision-point weight for a TypeScript node.
  *
- * @param n - Raw TypeScript node.
+ * @param node - Raw TypeScript node.
  * @returns Decision point weight (0 or 1).
  */
-export function branchWeightOf(n: ts.Node): number {
-    if (BRANCH_WEIGHT_KINDS.has(n.kind)) return 1;
-    if (n.kind === ts.SyntaxKind.BinaryExpression) {
-        const op = (n as ts.BinaryExpression).operatorToken.kind;
+export function branchWeightOf(node: ts.Node): number {
+    if (BRANCH_WEIGHT_KINDS.has(node.kind)) return 1;
+    if (node.kind === ts.SyntaxKind.BinaryExpression) {
+        const op = (node as ts.BinaryExpression).operatorToken.kind;
         if (
             op === ts.SyntaxKind.AmpersandAmpersandToken ||
             op === ts.SyntaxKind.BarBarToken ||
@@ -203,13 +203,13 @@ export function branchWeightOf(n: ts.Node): number {
 /**
  * Callee name of a call expression, reduced to its final segment.
  *
- * @param n - Candidate node.
+ * @param node - Candidate node.
  * @param sf - Owning source file, used for text extraction.
  * @returns The callee name, or null when not a call expression.
  */
-export function calleeNameOf(n: ts.Node, sf: ts.SourceFile): string | null {
-    if (!ts.isCallExpression(n)) return null;
-    const text = n.expression.getText(sf);
+export function calleeNameOf(node: ts.Node, sf: ts.SourceFile): string | null {
+    if (!ts.isCallExpression(node)) return null;
+    const text = node.expression.getText(sf);
     if (text.length === 0) return null;
     const dot = text.lastIndexOf('.');
     return dot >= 0 ? text.slice(dot + 1) : text;
@@ -218,13 +218,13 @@ export function calleeNameOf(n: ts.Node, sf: ts.SourceFile): string | null {
 /**
  * Resolve the declared name of a node for consumers that need it.
  *
- * @param n - Raw TypeScript node that may carry a name field.
+ * @param node - Raw TypeScript node that may carry a name field.
  * @param sf - Source file used to extract name text.
  * @returns The non-empty name text, or null if unnamed.
  */
-export function nameOf(n: ts.Node, sf: ts.SourceFile): string | null {
-    const t = (n as ts.NamedDeclaration).name?.getText(sf);
-    return typeof t === 'string' && t.length > 0 ? t : null;
+export function nameOf(node: ts.Node, sf: ts.SourceFile): string | null {
+    const nameText = (node as ts.NamedDeclaration).name?.getText(sf);
+    return typeof nameText === 'string' && nameText.length > 0 ? nameText : null;
 }
 
 /** Regex matching common test suite, test case and assertion helper callees. */
@@ -244,19 +244,19 @@ const KEYWORD_CONST = 'const';
 function isAsConst(node: ts.Node | undefined): boolean {
     if (!node) return false;
     if (ts.isAsExpression(node) || ts.isTypeAssertionExpression(node)) {
-        const tn = node.type;
+        const typeNode = node.type;
         return Boolean(
-            ts.isTypeReferenceNode(tn) &&
-            ts.isIdentifier(tn.typeName) &&
-            tn.typeName.text === KEYWORD_CONST,
+            ts.isTypeReferenceNode(typeNode) &&
+            ts.isIdentifier(typeNode.typeName) &&
+            typeNode.typeName.text === KEYWORD_CONST,
         );
     }
     return false;
 }
 
-function isFreezeCall(n: ts.Node | undefined): boolean {
-    if (!n || !ts.isCallExpression(n)) return false;
-    const expr = n.expression;
+function isFreezeCall(node: ts.Node | undefined): boolean {
+    if (!node || !ts.isCallExpression(node)) return false;
+    const expr = node.expression;
     if (ts.isIdentifier(expr) && (expr.text === 'deepFreeze' || expr.text === 'freeze')) {
         return true;
     }
@@ -285,12 +285,13 @@ function isEnclosedInConstDeclaration(
     greatGrandparent?: ts.Node | undefined,
 ): boolean {
     if (isAsConst(parent) || isAsConst(grandparent) || isAsConst(greatGrandparent)) return true;
-    for (const n of [parent, grandparent, greatGrandparent]) {
-        if (!n) continue;
-        if (ts.isNewExpression(n) && ts.isIdentifier(n.expression)) {
-            if (n.expression.text === 'Set' || n.expression.text === 'Map') return true;
+    for (const candidateNode of [parent, grandparent, greatGrandparent]) {
+        if (!candidateNode) continue;
+        if (ts.isNewExpression(candidateNode) && ts.isIdentifier(candidateNode.expression)) {
+            if (candidateNode.expression.text === 'Set' || candidateNode.expression.text === 'Map')
+                return true;
         }
-        if (isFreezeCall(n)) return true;
+        if (isFreezeCall(candidateNode)) return true;
     }
     return false;
 }
@@ -321,9 +322,9 @@ export function isConstBoundOf(
     return isEnclosedInConstDeclaration(parent, grandparent, greatGrandparent);
 }
 
-function tsIsCallTolerated(caller: ts.Node, arg: ts.Node, sf: ts.SourceFile): boolean {
+function tsIsCallTolerated(caller: ts.Node, argumentNode: ts.Node, sf: ts.SourceFile): boolean {
     if (!ts.isCallExpression(caller) && !ts.isNewExpression(caller)) return false;
-    if (!caller.arguments?.includes(arg as ts.Expression)) return false;
+    if (!caller.arguments?.includes(argumentNode as ts.Expression)) return false;
     const callee = caller.expression.getText(sf);
     return (
         /\b(t|i18n\.\w*|translate|fmt|formatMessage)\s*$/.test(callee) ||
@@ -347,77 +348,82 @@ const JSX_ELEMENT_KINDS = new Set<ts.SyntaxKind>([
     ts.SyntaxKind.JsxSelfClosingElement,
 ]);
 
-function isTypeContext(p: ts.Node, grandparent?: ts.Node): boolean {
-    if (ts.isTypeNode(p)) return true;
+function isTypeContext(parentNode: ts.Node, grandparent?: ts.Node): boolean {
+    if (ts.isTypeNode(parentNode)) return true;
     if (grandparent && ts.isTypeNode(grandparent)) return true;
     return false;
 }
 
-function isNamedPropertyContext(p: ts.Node, node: ts.Node): boolean {
-    if (ts.isPropertyAssignment(p)) return p.name === node;
-    if (ts.isJsxAttribute(p)) return p.name === node;
+function isNamedPropertyContext(parentNode: ts.Node, node: ts.Node): boolean {
+    if (ts.isPropertyAssignment(parentNode)) return parentNode.name === node;
+    if (ts.isJsxAttribute(parentNode)) return parentNode.name === node;
     return false;
 }
 
-function isStringConcatTolerated(p: ts.Node, sf: ts.SourceFile, grandparent?: ts.Node): boolean {
+function isStringConcatTolerated(
+    parentNode: ts.Node,
+    sf: ts.SourceFile,
+    grandparent?: ts.Node,
+): boolean {
     if (!grandparent) return false;
-    if (!ts.isBinaryExpression(p)) return false;
-    if (p.operatorToken.kind !== ts.SyntaxKind.PlusToken) return false;
-    return tsIsCallTolerated(grandparent, p, sf);
+    if (!ts.isBinaryExpression(parentNode)) return false;
+    if (parentNode.operatorToken.kind !== ts.SyntaxKind.PlusToken) return false;
+    return tsIsCallTolerated(grandparent, parentNode, sf);
 }
 
 function isToleratedString(
     node: ts.Node,
-    p: ts.Node,
+    parentNode: ts.Node,
     sf: ts.SourceFile,
     grandparent?: ts.Node,
 ): boolean {
-    if (isTypeContext(p, grandparent)) return true;
-    if (TOLERATED_STRING_PARENT_KINDS.has(p.kind)) return true;
-    if (isNamedPropertyContext(p, node)) return true;
-    if (ts.isElementAccessExpression(p)) return p.argumentExpression === node;
-    if (JSX_ELEMENT_KINDS.has(p.kind)) return false;
-    if (tsIsCallTolerated(p, node, sf)) return true;
-    return isStringConcatTolerated(p, sf, grandparent);
+    if (isTypeContext(parentNode, grandparent)) return true;
+    if (TOLERATED_STRING_PARENT_KINDS.has(parentNode.kind)) return true;
+    if (isNamedPropertyContext(parentNode, node)) return true;
+    if (ts.isElementAccessExpression(parentNode)) return parentNode.argumentExpression === node;
+    if (JSX_ELEMENT_KINDS.has(parentNode.kind)) return false;
+    if (tsIsCallTolerated(parentNode, node, sf)) return true;
+    return isStringConcatTolerated(parentNode, sf, grandparent);
 }
 
-function isToleratedCallArg(node: ts.Node, p: ts.Node, sf?: ts.SourceFile): boolean {
-    if (!ts.isCallExpression(p) || !sf) return false;
-    const args = p.arguments;
+function isToleratedCallArg(node: ts.Node, parentNode: ts.Node, sf?: ts.SourceFile): boolean {
+    if (!ts.isCallExpression(parentNode) || !sf) return false;
+    const args = parentNode.arguments;
     const argIdx = args.indexOf(node as ts.Expression);
     if (argIdx < 0) return false;
-    const callee = p.expression.getText(sf);
+    const callee = parentNode.expression.getText(sf);
     const numVal = Number((node as ts.NumericLiteral).text ?? node.getText(sf));
     return isCallArgumentToleratedByPolicy(callee, argIdx, numVal);
 }
 
-function isToleratedNumeric(node: ts.Node, p: ts.Node, sf?: ts.SourceFile): boolean {
+function isToleratedNumeric(node: ts.Node, parentNode: ts.Node, sf?: ts.SourceFile): boolean {
     const isAccess =
-        (ts.isElementAccessExpression(p) && p.argumentExpression === node) ||
-        (ts.isPropertyAssignment(p) && p.name === node);
-    if (isAccess || ts.isPropertyAccessExpression(p) || ts.isEnumMember(p)) return true;
-    if (ts.isTypeNode(p) || ts.isCaseClause(p)) return true;
-    return isToleratedCallArg(node, p, sf);
+        (ts.isElementAccessExpression(parentNode) && parentNode.argumentExpression === node) ||
+        (ts.isPropertyAssignment(parentNode) && parentNode.name === node);
+    if (isAccess || ts.isPropertyAccessExpression(parentNode) || ts.isEnumMember(parentNode))
+        return true;
+    if (ts.isTypeNode(parentNode) || ts.isCaseClause(parentNode)) return true;
+    return isToleratedCallArg(node, parentNode, sf);
 }
 
 /**
  * Test whether a literal node resides in a tolerated context (e.g. imports, i18n).
  *
  * @param node - Literal node to classify.
- * @param p - Raw parent node.
+ * @param parentNode - Raw parent node.
  * @param sf - Source file used to print call callees for the i18n heuristic.
  * @param grandparent - Optional raw grandparent node for compound expressions.
  * @returns True when the literal sits in a tolerated context.
  */
 export function isToleratedOf(
     node: ts.Node,
-    p: ts.Node | undefined,
+    parentNode: ts.Node | undefined,
     sf: ts.SourceFile,
     grandparent?: ts.Node,
 ): boolean {
-    if (!p) return false;
-    if (ts.isNumericLiteral(node)) return isToleratedNumeric(node, p, sf);
-    return isToleratedString(node, p, sf, grandparent);
+    if (!parentNode) return false;
+    if (ts.isNumericLiteral(node)) return isToleratedNumeric(node, parentNode, sf);
+    return isToleratedString(node, parentNode, sf, grandparent);
 }
 
 /**
@@ -428,6 +434,6 @@ export function isToleratedOf(
  * @returns The normalized position with 1-based line and column numbers.
  */
 export function posOf(pos: number, sf: ts.SourceFile): Position {
-    const lc = sf.getLineAndCharacterOfPosition(pos);
-    return { line: lc.line + 1, column: lc.character + 1 };
+    const lineChar = sf.getLineAndCharacterOfPosition(pos);
+    return { line: lineChar.line + 1, column: lineChar.character + 1 };
 }

@@ -180,11 +180,23 @@ export class ShellLintAnalyzer implements Analyzer {
         const { hasE } = scanStrictErrorFlags(maskedLines);
         const hasTtyGuard = maskedLines.some((l) => SH_TTY_GUARD_RE.test(l));
 
+        let inHeredoc = false;
+        let heredocDelimiter = '';
+        const HEREDOC_START_RE = /(?:^|[^<])<<-?\s*['"]?([A-Za-z0-9_]+)['"]?/;
+
         // --- Line-level checks ---
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
             const trimmed = line.trim();
             if (trimmed === '' || trimmed.startsWith('#')) continue;
+
+            if (inHeredoc) {
+                if (trimmed === heredocDelimiter) {
+                    inHeredoc = false;
+                    heredocDelimiter = '';
+                }
+                continue;
+            }
 
             const maskedLine = maskedLines[i];
             const maskedTrimmed = maskedLine.trim();
@@ -200,6 +212,14 @@ export class ShellLintAnalyzer implements Analyzer {
             checkShellDynamicSecurity(trimmed, i, emit);
             checkShellSafety(lineCtx, hasTtyGuard, emit);
             checkShellStrictExitCapture(trimmed, i, hasE, emit);
+
+            if (!trimmed.includes('<<<')) {
+                const heredocMatch = HEREDOC_START_RE.exec(trimmed);
+                if (heredocMatch) {
+                    inHeredoc = true;
+                    heredocDelimiter = heredocMatch[1];
+                }
+            }
         }
     }
 

@@ -145,6 +145,13 @@ export const ANALYZER_MODERN_FRONTEND_RULES: readonly RuleDefinition[] = [
         'Exclude development and staging routes from production bundles using build-time environment checks',
         'sec-exp-004',
     ),
+    defineExposureRule(
+        'SEC-EXP-005',
+        SEVERITY_ERROR,
+        'Cross-window message handlers performing sensitive actions must verify event.userActivation or validate event.origin',
+        'Ensure window message event listeners check event.userActivation?.isActive or event.origin before invoking sensitive actions',
+        'sec-exp-005',
+    ),
 
     // ── Frontend Engineering Rules (UI-ENG) ───────────────────────────────────
     defineUiRule(
@@ -174,5 +181,33 @@ export const ANALYZER_MODERN_FRONTEND_RULES: readonly RuleDefinition[] = [
         'Frontend hooks must start with "use" and event handler callbacks must start with "on" or "handle"',
         'Align hook identifiers with use* and event handler callbacks with handle* or on*',
         'ui-eng-004',
+    ),
+    defineUiRule(
+        'UI-ENG-005',
+        SEVERITY_WARNING,
+        'Keyboard Enter handlers for input/textarea must guard against CJK IME composition state',
+        'Verify e.nativeEvent.isComposing === false and e.keyCode !== 229 before submitting on Enter',
+        'ui-eng-005',
+    ),
+    defineUiRule(
+        'UI-ENG-006',
+        SEVERITY_WARNING,
+        'Dynamic numeric counters, timestamps, or metrics must enable font-variant-numeric: tabular-nums',
+        'Apply tabular-nums or tnum utility class to eliminate jitter from proportional glyph widths',
+        'ui-eng-006',
+    ),
+    defineUiRule(
+        'UI-ENG-007',
+        SEVERITY_WARNING,
+        'Interactive controls inside bordered containers must avoid nested borders (single closed border rule)',
+        'Eliminate redundant child border or replace with background tonal contrast or inset highlight',
+        'ui-eng-007',
+    ),
+    defineUiRule(
+        'UI-ENG-008',
+        SEVERITY_WARNING,
+        'Local components, cards, or webview containers must use @container queries instead of viewport @media, and CJK text containers must configure text-wrap: balance or overflow-wrap: break-word to prevent character squashing',
+        'Replace component-scoped @media with @container query inline responsive flow, and configure text-wrap: balance or overflow-wrap: break-word on text containers',
+        'ui-eng-008',
     ),
 ];

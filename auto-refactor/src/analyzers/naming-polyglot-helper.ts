@@ -14,19 +14,53 @@
 
 import type { AnalyzerContext, Issue, Severity } from '../core/types';
 import { SEVERITY_WARNING } from '../core/types';
-import { validateFunctionTokensAndSemantics, hasTransientJargon } from './naming-path-helper';
+import { auditFunctionSemantics, hasTransientJargon } from './naming-path-helper';
 import type { NamingOptions } from './naming';
 
-type IssueFactory = (
-    ctx: AnalyzerContext,
-    line: number,
-    column: number,
-    rule: string,
-    message: string,
-    severity: Severity,
-    detail: Record<string, unknown>,
-    suggestion?: string,
-) => Issue;
+/**
+ * Diagnostic record payload for polyglot language naming findings.
+ */
+export interface PolyglotFindingInput {
+    readonly line: number;
+    readonly column: number;
+    readonly rule: string;
+    readonly message: string;
+    readonly severity: Severity;
+    readonly detail: Record<string, unknown>;
+    readonly suggestion?: string;
+}
+
+/**
+ * Factory callback converting a structured polyglot finding into a standardized issue record.
+ */
+export type IssueFactory = (finding: PolyglotFindingInput) => Issue;
+
+/**
+ * Execution context carrying options, context, and issue accumulator for polyglot audits.
+ */
+export interface PolyglotNamingContext {
+    readonly opts: NamingOptions;
+    readonly ctx: AnalyzerContext;
+    readonly mkIssue: IssueFactory;
+    readonly issues: Issue[];
+}
+
+/**
+ * Target descriptor for an extracted polyglot function declaration.
+ */
+export interface ExtractedFunctionTarget {
+    readonly fnName: string;
+    readonly lineIdx: number;
+    readonly isSnake: boolean;
+}
+
+const MIN_POLYGLOT_FUNCTION_LENGTH = 3;
+const MAX_POLYGLOT_FUNCTION_LENGTH = 50;
+
+const BENCHMARK_PREFIX = 'Benchmark';
+const FUZZ_PREFIX = 'Fuzz';
+const EXAMPLE_PREFIX = 'Example';
+const CAMEL_TO_SNAKE_PATTERN = '$1_$2';
 
 const GO_FUNC_RE = /^func\s+(?:\([^)]+\)\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*(?:\[[^\]]*\])?\s*\(/;
 const RUST_FN_RE =
@@ -77,108 +111,119 @@ function isGoFunctionExempt(name: string): boolean {
     if (GO_EXEMPT_NAMES.has(name)) return true;
     return (
         name.startsWith('Test') ||
-        name.startsWith('Benchmark') ||
-        name.startsWith('Fuzz') ||
-        name.startsWith('Example')
+        name.startsWith(BENCHMARK_PREFIX) ||
+        name.startsWith(FUZZ_PREFIX) ||
+        name.startsWith(EXAMPLE_PREFIX)
     );
 }
 
 function isRustFunctionExempt(name: string): boolean {
-    if (RUST_EXEMPT_NAMES.has(name)) return true;
-    return name.startsWith('test_');
+    return RUST_EXEMPT_NAMES.has(name) ? true : name.startsWith('test_');
 }
 
 function isGDScriptFunctionExempt(name: string): boolean {
-    if (GDSCRIPT_LIFECYCLE_NAMES.has(name)) return true;
-    return name.startsWith('test_');
+    return GDSCRIPT_LIFECYCLE_NAMES.has(name) ? true : name.startsWith('test_');
 }
 
-function tokenizePolyglotName(name: string, isSnake: boolean): string[] {
+/**
+ * Splits an identifier name into discrete word morphemes for polyglot functions.
+ */
+function splitPolyglotNameTokens(name: string, isSnake: boolean): string[] {
     if (isSnake) {
         return name.split('_').filter(Boolean);
     }
     return name
-        .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+        .replace(/([a-z0-9])([A-Z])/g, CAMEL_TO_SNAKE_PATTERN)
         .split('_')
         .filter(Boolean);
 }
 
-function auditExtractedFunction(
+/**
+ * Validates identifier character length against minimum and maximum thresholds.
+ *
+ * @returns True if length bounds were violated and reported.
+ */
+function auditFunctionLengthBounds(
     fnName: string,
     lineIdx: number,
-    isSnake: boolean,
-    opts: NamingOptions,
-    ctx: AnalyzerContext,
-    mkIssue: IssueFactory,
-    issues: Issue[],
-): void {
-    if (opts.checkJargon !== false && hasTransientJargon(fnName)) {
-        issues.push(
-            mkIssue(
-                ctx,
-                lineIdx + 1,
-                1,
-                'NAM-JRG-002',
-                `Function name '${fnName}' contains transient construction jargon.`,
-                SEVERITY_WARNING,
-                { name: fnName },
-                'Replace transient process markers with semantic domain naming.',
-            ),
-        );
-    }
+    pCtx: PolyglotNamingContext,
+): boolean {
+    if (pCtx.opts.checkLengths === false) return false;
 
-    if (opts.checkLengths === false) return;
-
-    const minLen = opts.minFunctionLength ?? 3;
-    const maxLen = opts.maxFunctionLength ?? 50;
+    const minLen = pCtx.opts.minFunctionLength ?? MIN_POLYGLOT_FUNCTION_LENGTH;
+    const maxLen = pCtx.opts.maxFunctionLength ?? MAX_POLYGLOT_FUNCTION_LENGTH;
 
     if (fnName.length < minLen) {
-        issues.push(
-            mkIssue(
-                ctx,
-                lineIdx + 1,
-                1,
-                'NAM-LEN-002',
-                `Function name '${fnName}' is too short (< ${minLen} characters); lacks description.`,
-                SEVERITY_WARNING,
-                { name: fnName, length: fnName.length, minLen },
-                `Rename '${fnName}' to a descriptive phrase with >= ${minLen} characters.`,
-            ),
+        pCtx.issues.push(
+            pCtx.mkIssue({
+                line: lineIdx + 1,
+                column: 1,
+                rule: 'NAM-LEN-002',
+                message: `Function name '${fnName}' is too short (< ${minLen} characters); lacks description.`,
+                severity: SEVERITY_WARNING,
+                detail: { name: fnName, length: fnName.length, minLen },
+                suggestion: `Rename '${fnName}' to a descriptive phrase with >= ${minLen} characters.`,
+            }),
         );
-        return;
+        return true;
     }
 
     if (fnName.length > maxLen) {
-        issues.push(
-            mkIssue(
-                ctx,
-                lineIdx + 1,
-                1,
-                'NAM-LEN-002',
-                `Function name '${fnName}' is too long (> ${maxLen} characters); decompose responsibilities.`,
-                SEVERITY_WARNING,
-                { name: fnName, length: fnName.length, maxLen },
-                `Refactor '${fnName}' into a concise identifier with <= ${maxLen} characters.`,
-            ),
+        pCtx.issues.push(
+            pCtx.mkIssue({
+                line: lineIdx + 1,
+                column: 1,
+                rule: 'NAM-LEN-002',
+                message: `Function name '${fnName}' is too long (> ${maxLen} characters); decompose responsibilities.`,
+                severity: SEVERITY_WARNING,
+                detail: { name: fnName, length: fnName.length, maxLen },
+                suggestion: `Refactor '${fnName}' into a concise identifier with <= ${maxLen} characters.`,
+            }),
         );
+        return true;
+    }
+
+    return false;
+}
+
+function auditExtractedFunction(
+    target: ExtractedFunctionTarget,
+    pCtx: PolyglotNamingContext,
+): void {
+    const { fnName, lineIdx, isSnake } = target;
+
+    if (pCtx.opts.checkJargon !== false && hasTransientJargon(fnName)) {
+        pCtx.issues.push(
+            pCtx.mkIssue({
+                line: lineIdx + 1,
+                column: 1,
+                rule: 'NAM-JRG-002',
+                message: `Function name '${fnName}' contains transient construction jargon.`,
+                severity: SEVERITY_WARNING,
+                detail: { name: fnName },
+                suggestion: 'Replace transient process markers with semantic domain naming.',
+            }),
+        );
+    }
+
+    if (auditFunctionLengthBounds(fnName, lineIdx, pCtx)) {
         return;
     }
 
-    const tokens = tokenizePolyglotName(fnName, isSnake);
-    const finding = validateFunctionTokensAndSemantics(fnName, tokens, opts);
+    const tokens = splitPolyglotNameTokens(fnName, isSnake);
+    const finding = auditFunctionSemantics(fnName, tokens, pCtx.opts);
     if (!finding) return;
 
-    issues.push(
-        mkIssue(
-            ctx,
-            lineIdx + 1,
-            1,
-            'NAM-LEN-002',
-            finding.message,
-            SEVERITY_WARNING,
-            { name: fnName, findingType: finding.type },
-            `Align function name '${fnName}' with semantic word and morpheme conventions.`,
-        ),
+    pCtx.issues.push(
+        pCtx.mkIssue({
+            line: lineIdx + 1,
+            column: 1,
+            rule: 'NAM-LEN-002',
+            message: finding.message,
+            severity: SEVERITY_WARNING,
+            detail: { name: fnName, findingType: finding.type },
+            suggestion: `Align function name '${fnName}' with semantic word and morpheme conventions.`,
+        }),
     );
 }
 
@@ -186,24 +231,41 @@ type PolyglotLineAuditor = (line: string, lineIndex: number) => void;
 
 function createPolyglotLineAuditor(
     ext: string,
-    opts: NamingOptions,
-    ctx: AnalyzerContext,
-    mkIssue: IssueFactory,
-    issues: Issue[],
+    pCtx: PolyglotNamingContext,
 ): PolyglotLineAuditor | null {
     if (ext === '.go') {
         return (line, i) => {
             const match = GO_FUNC_RE.exec(line);
             if (match && !isGoFunctionExempt(match[1])) {
-                auditExtractedFunction(match[1], i, false, opts, ctx, mkIssue, issues);
+                auditExtractedFunction({ fnName: match[1], lineIdx: i, isSnake: false }, pCtx);
             }
         };
     }
     if (ext === '.rs') {
+        let isNextFnTest = false;
         return (line, i) => {
+            const trimmed = line.trim();
+            if (
+                trimmed.startsWith('#[test]') ||
+                trimmed.startsWith('#[tokio::test]') ||
+                trimmed.startsWith('#[rstest]')
+            ) {
+                isNextFnTest = true;
+                return;
+            }
             const match = RUST_FN_RE.exec(line);
-            if (match && !isRustFunctionExempt(match[1])) {
-                auditExtractedFunction(match[1], i, true, opts, ctx, mkIssue, issues);
+            if (match) {
+                const isTest = isNextFnTest || isRustFunctionExempt(match[1]);
+                isNextFnTest = false;
+                if (!isTest) {
+                    auditExtractedFunction({ fnName: match[1], lineIdx: i, isSnake: true }, pCtx);
+                }
+            } else if (
+                trimmed.length > 0 &&
+                !trimmed.startsWith('//') &&
+                !trimmed.startsWith('#[')
+            ) {
+                isNextFnTest = false;
             }
         };
     }
@@ -211,7 +273,7 @@ function createPolyglotLineAuditor(
         return (line, i) => {
             const match = GDSCRIPT_FUNC_RE.exec(line);
             if (match && !isGDScriptFunctionExempt(match[1])) {
-                auditExtractedFunction(match[1], i, true, opts, ctx, mkIssue, issues);
+                auditExtractedFunction({ fnName: match[1], lineIdx: i, isSnake: true }, pCtx);
             }
         };
     }
@@ -223,20 +285,14 @@ function createPolyglotLineAuditor(
  *
  * @param content - Raw source file content.
  * @param ext - Normalized file extension (.go, .rs, .gd).
- * @param opts - Naming options configured for the scan.
- * @param ctx - Active analyzer context.
- * @param mkIssue - Issue factory callback.
- * @param issues - Output accumulator array.
+ * @param pCtx - Polyglot naming execution context.
  */
 export function auditPolyglotSource(
     content: string,
     ext: string,
-    opts: NamingOptions,
-    ctx: AnalyzerContext,
-    mkIssue: IssueFactory,
-    issues: Issue[],
+    pCtx: PolyglotNamingContext,
 ): void {
-    const auditor = createPolyglotLineAuditor(ext, opts, ctx, mkIssue, issues);
+    const auditor = createPolyglotLineAuditor(ext, pCtx);
     if (!auditor) return;
 
     const lines = content.split(/\r?\n/);

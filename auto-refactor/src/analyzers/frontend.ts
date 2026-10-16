@@ -10,6 +10,10 @@
  *   3. UI-ENG-003: Guard against God components (>10 props) and repetitive DOM templates.
  *   4. UI-ENG-004: Enforce frontend hook (use*) and event handler (on* or handle*)
  *      naming conventions.
+ *   5. UI-ENG-005: Guard against CJK IME composition state collisions on Enter key handling.
+ *   6. UI-ENG-006: Guard against dynamic timer and numeric metric displays lacking tabular-nums.
+ *   7. UI-ENG-007: Guard against nested borders on child controls inside bordered containers.
+ *   8. UI-ENG-008: Guard against local component @media misuse and CJK text squashing.
  * Exit Semantics & Design Rationale: Pure, fail-safe scanner returning Issue[]. Zero throw.
  */
 
@@ -47,6 +51,27 @@ const HOOK_DECLARATION_RE = /\bfunction\s+([A-Za-z0-9_]+)\s*\([^)]*\)\s*\{/g;
 const HANDLER_DECLARATION_RE =
     /\b(?:const|let|var)\s+([A-Za-z0-9_]+)\s*=\s*(?:\([^)]*\)|[A-Za-z0-9_]+)\s*=>/g;
 const INTERFACE_PROPS_RE = /interface\s+([A-Za-z0-9_]*Props)\s*\{([^}]+)\}/g;
+
+const ENTER_KEY_HANDLER_RE =
+    /\b(?:e|event)\.(?:key\s*===?\s*['"]Enter['"]|code\s*===?\s*['"]Enter['"]|keyCode\s*===?\s*13\b)/i;
+const IME_COMPOSITION_GUARD_RE = /\b(?:isComposing|keyCode\s*===?\s*229|which\s*===?\s*229)\b/;
+
+const TIMER_COUNTER_DISPLAY_RE =
+    /(?:\{\s*(?:format(?:Time|Duration|Timer)|[a-zA-Z0-9_]*(?:elapsed|timer|stopwatch|countdown)[a-zA-Z0-9_]*)\b|<(?:span|div|p)\b[^>]*\b(?:timer|stopwatch|clock|counter|elapsed|duration)[^>]*>)/i;
+const TABULAR_NUMS_RE = /\b(?:tabular-nums|tnum|font-variant-numeric)\b/i;
+
+const CONTAINER_BORDER_RE =
+    /<(?:div|section|aside|nav|fieldset)\b[^>]*\bclass(?:Name)?\s*=\s*['"][^'"]*\b(?:border|border-(?:gray|slate|zinc|neutral|stone|solid|dashed|\d{3}))\b[^'"]*['"]/i;
+const CHILD_BORDER_RE =
+    /<(?:button|input|select|span)\b[^>]*\bclass(?:Name)?\s*=\s*['"][^'"]*(?<![tbrl]-)\bborder(?:\s+|-[a-z0-9]+|\b)(?![tbrl]-)[^'"]*['"]/i;
+const SCRIPT_EXT_RE = /\.(?:tsx|jsx|ts|js|vue|svelte)$/i;
+const CLOSING_CONTAINER_TAG_RE = /<\/(?:div|section)>/i;
+
+const CJK_CHAR_RE = /[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]/;
+const ANTI_SQUASH_RE =
+    /\b(?:text-balance|text-wrap:\s*balance\b|textWrap:\s*['"]balance['"]|break-words|overflow-wrap:\s*(?:break-word|anywhere)\b|overflowWrap:\s*['"](?:break-word|anywhere)['"]|word-break:\s*break-word\b)/i;
+const MEDIA_QUERY_RE = /@media\b/i;
+const LOCAL_CLASS_OR_ID_RE = /(?:\.[a-zA-Z_-][\w-]*|#[a-zA-Z_-][\w-]*)\s*\{/;
 
 function makeFrontendIssue(
     file: string,
@@ -279,6 +304,229 @@ function auditFrontendNaming(file: string, content: string, issues: Issue[]): vo
 }
 
 /**
+ * Evaluates whether any line in the given window satisfies IME composition guard patterns.
+ */
+function hasImeGuardInRange(rawLines: string[], start: number, end: number): boolean {
+    for (let index = start; index < end; index++) {
+        if (IME_COMPOSITION_GUARD_RE.test(rawLines[index])) return true;
+    }
+    return false;
+}
+
+/**
+ * Audits keyboard Enter handlers for CJK IME composition state guards (UI-ENG-005).
+ */
+function auditImeCompositionGuard(file: string, rawLines: string[], issues: Issue[]): void {
+    if (!SCRIPT_EXT_RE.test(file)) return;
+
+    for (let i = 0; i < rawLines.length; i++) {
+        const line = rawLines[i];
+        if (!ENTER_KEY_HANDLER_RE.test(line)) continue;
+
+        const windowStart = Math.max(0, i - 4);
+        const windowEnd = Math.min(rawLines.length, i + 5);
+        if (hasImeGuardInRange(rawLines, windowStart, windowEnd)) continue;
+
+        issues.push(
+            makeFrontendIssue(
+                file,
+                i + 1,
+                'UI-ENG-005',
+                SEVERITY_WARNING,
+                `${ExposureMessages.UI_IME_COMPOSITION_GUARD.message}: Enter key handler missing isComposing guard`,
+                ExposureMessages.UI_IME_COMPOSITION_GUARD.suggestion,
+                { violation: 'missing-ime-guard', line: i + 1 },
+            ),
+        );
+    }
+}
+
+/**
+ * Audits dynamic numeric metrics, counters, and timestamps
+ * for tabular-nums font locking (UI-ENG-006).
+ */
+function auditTabularNumerics(file: string, rawLines: string[], issues: Issue[]): void {
+    for (let i = 0; i < rawLines.length; i++) {
+        const line = rawLines[i];
+        if (!TIMER_COUNTER_DISPLAY_RE.test(line)) continue;
+
+        const windowStart = Math.max(0, i - 2);
+        const windowEnd = Math.min(rawLines.length, i + 3);
+        let hasTabularNums = false;
+        for (let j = windowStart; j < windowEnd; j++) {
+            if (TABULAR_NUMS_RE.test(rawLines[j])) {
+                hasTabularNums = true;
+                break;
+            }
+        }
+
+        if (!hasTabularNums) {
+            issues.push(
+                makeFrontendIssue(
+                    file,
+                    i + 1,
+                    'UI-ENG-006',
+                    SEVERITY_WARNING,
+                    `${ExposureMessages.UI_TABULAR_NUMERICS.message}: Numeric counter or timestamp display missing tabular-nums`,
+                    ExposureMessages.UI_TABULAR_NUMERICS.suggestion,
+                    { violation: 'missing-tabular-nums', line: i + 1 },
+                ),
+            );
+        }
+    }
+}
+
+/**
+ * Audits nested borders on child controls inside bordered containers (UI-ENG-007).
+ */
+function auditSingleBorderDiscipline(file: string, rawLines: string[], issues: Issue[]): void {
+    for (let i = 0; i < rawLines.length; i++) {
+        const line = rawLines[i];
+        if (!CONTAINER_BORDER_RE.test(line)) continue;
+
+        const searchEnd = Math.min(rawLines.length, i + 8);
+        for (let j = i + 1; j < searchEnd; j++) {
+            const childLine = rawLines[j];
+            if (CLOSING_CONTAINER_TAG_RE.test(childLine)) break;
+            if (CHILD_BORDER_RE.test(childLine)) {
+                issues.push(
+                    makeFrontendIssue(
+                        file,
+                        j + 1,
+                        'UI-ENG-007',
+                        SEVERITY_WARNING,
+                        `${ExposureMessages.UI_SINGLE_BORDER_DISCIPLINE.message}: Child control nested inside bordered container duplicates outer border`,
+                        ExposureMessages.UI_SINGLE_BORDER_DISCIPLINE.suggestion,
+                        { violation: 'nested-border', line: j + 1 },
+                    ),
+                );
+                break;
+            }
+        }
+    }
+}
+
+/**
+ * Scans forward in CSS lines from a top-level @media line
+ * to determine if it targets local component selectors.
+ */
+function mediaTargetsLocalComponent(rawLines: string[], startIndex: number): boolean {
+    let braceCount = 0;
+    const firstLine = rawLines[startIndex];
+    braceCount += (firstLine.match(/\{/g) || []).length;
+    braceCount -= (firstLine.match(/\}/g) || []).length;
+
+    for (let i = startIndex + 1; i < rawLines.length; i++) {
+        const line = rawLines[i];
+        if (LOCAL_CLASS_OR_ID_RE.test(line)) {
+            return true;
+        }
+        braceCount += (line.match(/\{/g) || []).length;
+        braceCount -= (line.match(/\}/g) || []).length;
+        if (braceCount <= 0) {
+            break;
+        }
+    }
+    return false;
+}
+
+/**
+ * Audits @media misuse in local components (UI-ENG-008).
+ */
+function auditMediaQueryDiscipline(file: string, rawLines: string[], issues: Issue[]): void {
+    let globalBraceDepth = 0;
+    for (let i = 0; i < rawLines.length; i++) {
+        const line = rawLines[i];
+        const isMediaLine = MEDIA_QUERY_RE.test(line);
+
+        if (isMediaLine) {
+            const mediaIndex = line.search(MEDIA_QUERY_RE);
+            const prefix = mediaIndex > 0 ? line.slice(0, mediaIndex) : '';
+            const suffix = mediaIndex >= 0 ? line.slice(mediaIndex) : '';
+            const isNestedInSelector = globalBraceDepth > 0 || /\{/.test(prefix);
+            const sameLineTargetsLocal = LOCAL_CLASS_OR_ID_RE.test(suffix);
+            const targetsLocal =
+                isNestedInSelector ||
+                sameLineTargetsLocal ||
+                mediaTargetsLocalComponent(rawLines, i);
+            if (targetsLocal) {
+                issues.push(
+                    makeFrontendIssue(
+                        file,
+                        i + 1,
+                        'UI-ENG-008',
+                        SEVERITY_WARNING,
+                        `${ExposureMessages.UI_CONTAINER_QUERY_ANTI_SQUASH.message}: Local component uses global viewport @media instead of @container`,
+                        ExposureMessages.UI_CONTAINER_QUERY_ANTI_SQUASH.suggestion,
+                        { violation: 'media-query-local-component', line: i + 1 },
+                    ),
+                );
+            }
+        }
+
+        const openCount = (line.match(/\{/g) || []).length;
+        const closeCount = (line.match(/\}/g) || []).length;
+        globalBraceDepth = Math.max(0, globalBraceDepth + openCount - closeCount);
+    }
+}
+
+/**
+ * Checks if an ancestor opening tag within lookback window specifies anti-squash properties.
+ */
+function ancestorHasAntiSquash(rawLines: string[], currentIndex: number): boolean {
+    const lookbackStart = Math.max(0, currentIndex - 15);
+    for (let j = currentIndex - 1; j >= lookbackStart; j--) {
+        const line = rawLines[j];
+        if (ANTI_SQUASH_RE.test(line)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Audits CJK text containers lacking text-wrap: balance or overflow-wrap: break-word (UI-ENG-008).
+ */
+function auditCjkAntiSquash(file: string, rawLines: string[], issues: Issue[]): void {
+    for (let i = 0; i < rawLines.length; i++) {
+        const line = rawLines[i];
+        const trimmed = line.trim();
+        if (trimmed.startsWith('//') || trimmed.startsWith('/*') || trimmed.startsWith('*')) {
+            continue;
+        }
+        if (!CJK_CHAR_RE.test(line)) {
+            continue;
+        }
+        if (ANTI_SQUASH_RE.test(line)) {
+            continue;
+        }
+        if (ancestorHasAntiSquash(rawLines, i)) {
+            continue;
+        }
+
+        issues.push(
+            makeFrontendIssue(
+                file,
+                i + 1,
+                'UI-ENG-008',
+                SEVERITY_WARNING,
+                `${ExposureMessages.UI_CONTAINER_QUERY_ANTI_SQUASH.message}: CJK text container missing text-wrap: balance or overflow-wrap: break-word`,
+                ExposureMessages.UI_CONTAINER_QUERY_ANTI_SQUASH.suggestion,
+                { violation: 'cjk-missing-anti-squash', line: i + 1 },
+            ),
+        );
+    }
+}
+
+/**
+ * Container query & CJK anti-squash discipline audit (UI-ENG-008).
+ */
+function auditContainerQueryAndAntiSquash(file: string, rawLines: string[], issues: Issue[]): void {
+    auditMediaQueryDiscipline(file, rawLines, issues);
+    auditCjkAntiSquash(file, rawLines, issues);
+}
+
+/**
  * Frontend UI/UX, accessibility, and component hygiene analyzer.
  */
 export class FrontendAnalyzer implements Analyzer {
@@ -303,11 +551,16 @@ export class FrontendAnalyzer implements Analyzer {
         ) {
             auditAccessibilityAndSemantics(file, rawLines, issues);
             auditDomDepthAndAnimationReflow(file, rawLines, issues);
+            auditTabularNumerics(file, rawLines, issues);
+            auditSingleBorderDiscipline(file, rawLines, issues);
+            auditContainerQueryAndAntiSquash(file, rawLines, issues);
         } else if (ext === '.css' || ext === '.scss' || ext === '.less') {
             auditDomDepthAndAnimationReflow(file, rawLines, issues);
+            auditContainerQueryAndAntiSquash(file, rawLines, issues);
         }
         auditComponentPropsAndReuse(file, context.content, issues);
         auditFrontendNaming(file, context.content, issues);
+        auditImeCompositionGuard(file, rawLines, issues);
 
         return issues;
     }

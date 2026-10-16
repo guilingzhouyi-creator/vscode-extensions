@@ -51,6 +51,14 @@ export {
 export type LifecycleStage =
     'Source' | 'Validation' | 'Transformation' | 'Storage' | 'Bus' | 'Consumer' | 'SideEffect';
 
+const STAGE_SOURCE = 'Source' as const;
+const STAGE_VALIDATION = 'Validation' as const;
+const STAGE_TRANSFORMATION = 'Transformation' as const;
+const STAGE_STORAGE = 'Storage' as const;
+const STAGE_BUS = 'Bus' as const;
+const STAGE_CONSUMER = 'Consumer' as const;
+const STAGE_SIDE_EFFECT = 'SideEffect' as const;
+
 /** Lifetime duration of data or state at a specific node. */
 export type LifetimeKind = 'ephemeral' | 'scoped' | 'persistent' | 'unbounded';
 
@@ -126,7 +134,7 @@ export class DataFlowGraph {
      * @returns The matching DataFlowNode if present in the graph, or undefined if not found.
      */
     public getNode(id: string): DataFlowNode | undefined {
-        return this.nodes.get(id);
+        return !id ? undefined : this.nodes.get(id);
     }
 
     /**
@@ -168,12 +176,12 @@ export class DataFlowGraph {
     }
 
     /**
-     * Trace the ordered sequence of distinct lifecycle stages reachable from a start node.
+     * Compute the ordered sequence of distinct lifecycle stages reachable from a start node.
      *
      * @param startNodeId - Identifier of the root node to begin traversal from.
      * @returns Ordered array of distinct lifecycle stages encountered.
      */
-    public traceLifecycle(startNodeId: string): LifecycleStage[] {
+    public computeLifecycleTrace(startNodeId: string): LifecycleStage[] {
         const visited = new Set<string>();
         const seenStages = new Set<LifecycleStage>();
         const stages: LifecycleStage[] = [];
@@ -207,12 +215,12 @@ export class DataFlowGraph {
         const queue = [src.id];
         let head = 0;
         while (head < queue.length) {
-            const cur = queue[head++];
-            if (visited.has(cur)) continue;
-            visited.add(cur);
-            const n = this.nodes.get(cur);
+            const current = queue[head++];
+            if (visited.has(current)) continue;
+            visited.add(current);
+            const n = this.nodes.get(current);
             if (n) lastNode = n;
-            const outgoingEdges = this.outgoing.get(cur);
+            const outgoingEdges = this.outgoing.get(current);
             if (outgoingEdges) {
                 for (const e of outgoingEdges) {
                     if (!visited.has(e.to)) {
@@ -234,7 +242,7 @@ export class DataFlowGraph {
         stages: LifecycleStage[];
         endNode: DataFlowNode;
     }> {
-        const sources = Array.from(this.nodes.values()).filter((n) => n.stage === 'Source');
+        const sources = Array.from(this.nodes.values()).filter((n) => n.stage === STAGE_SOURCE);
         const pipelines: Array<{
             startNode: DataFlowNode;
             stages: LifecycleStage[];
@@ -242,7 +250,7 @@ export class DataFlowGraph {
         }> = [];
 
         for (const src of sources) {
-            const stages = this.traceLifecycle(src.id);
+            const stages = this.computeLifecycleTrace(src.id);
             const lastNode = this.findLastReachableNode(src);
             pipelines.push({
                 startNode: src,
@@ -260,13 +268,13 @@ export class DataFlowGraph {
      */
     public stats(): DataFlowGraphStats {
         const stageDist: Record<LifecycleStage, number> = {
-            Source: 0,
-            Validation: 0,
-            Transformation: 0,
-            Storage: 0,
-            Bus: 0,
-            Consumer: 0,
-            SideEffect: 0,
+            [STAGE_SOURCE]: 0,
+            [STAGE_VALIDATION]: 0,
+            [STAGE_TRANSFORMATION]: 0,
+            [STAGE_STORAGE]: 0,
+            [STAGE_BUS]: 0,
+            [STAGE_CONSUMER]: 0,
+            [STAGE_SIDE_EFFECT]: 0,
         };
         const lifeDist: Record<LifetimeKind, number> = {
             ephemeral: 0,
@@ -307,7 +315,7 @@ export class DataFlowGraph {
      * @param forward - True for forward analysis, false for backward analysis.
      * @returns Converged In and Out sets per node ID.
      */
-    public solveDataflow(
+    public computeDataflow(
         entryNodeId: string,
         gen?: Record<string, string[]>,
         kill?: Record<string, string[]>,
@@ -324,16 +332,30 @@ export class DataFlowGraph {
             kill,
         });
     }
+
+    /**
+     * Backward-compatible alias for computeDataflow.
+     */
+    public solveDataflow(
+        entryNodeId: string,
+        gen?: Record<string, string[]>,
+        kill?: Record<string, string[]>,
+        forward = true,
+    ): NativeDataflowResult {
+        return this.computeDataflow(entryNodeId, gen, kill, forward);
+    }
 }
+
+const REGEX_ESCAPE_REPLACEMENT = '\\$&';
 
 /**
  * Escape a literal for use inside a `RegExp`.
  *
- * @param value - Raw identifier text.
+ * @param rawText - Raw identifier text.
  * @returns The same text with regex metacharacters escaped.
  */
-function escapeRegExp(value: string): string {
-    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+function escapeRegExp(rawText: string): string {
+    return rawText.replace(/[.*+?^${}()|[\]\\]/g, REGEX_ESCAPE_REPLACEMENT);
 }
 
 /**
@@ -441,7 +463,13 @@ export function detectUnboundedGrowth(filePath: string, content: string): Issue[
     let depth = 0;
 
     for (let i = 0; i < masked.length; i++) {
-        const scan = scanLine(masked[i], i + 1, scopes, depth, ctx);
+        const scan = scanLine({
+            code: masked[i],
+            lineNum: i + 1,
+            scopes,
+            depth,
+            ctx,
+        });
         issues.push(...scan.issues);
         depth = scan.depth;
     }
@@ -458,6 +486,18 @@ interface AppendSite {
     /** Length of the matched call text. */
     length: number;
 }
+
+const SCOPE_KIND_PLAIN: ScopeKind = 'plain';
+const SCOPE_KIND_TIMER: ScopeKind = 'timer';
+const SCOPE_KIND_LOOP: ScopeKind = 'loop';
+
+const COMPLEXITY_TIME = 'O(t)';
+const COMPLEXITY_INPUT = 'O(n)';
+const CONTEXT_TIMER = 'timer callback';
+const CONTEXT_LOOP = 'iteration loop';
+const ANALYZER_PERFORMANCE = 'performance';
+const RULE_PRF_LEAK = 'PRF-LEAK-001';
+const SEVERITY_WARNING = 'warning';
 
 /** An opener that may own a braced or braceless body on its line. */
 interface Opener {
@@ -485,11 +525,14 @@ interface GrowthScanContext {
  * @returns One matcher per name, each carrying the global flag for repeated exec.
  */
 function buildAppendRes(names: Iterable<string>): Map<string, RegExp> {
-    const res = new Map<string, RegExp>();
+    const appendPatternByNameMap = new Map<string, RegExp>();
     for (const name of names) {
-        res.set(name, new RegExp(APPEND_CALL_RE.replace('%s', escapeRegExp(name)), 'g'));
+        appendPatternByNameMap.set(
+            name,
+            new RegExp(APPEND_CALL_RE.replaceAll('%s', escapeRegExp(name)), 'g'),
+        );
     }
-    return res;
+    return appendPatternByNameMap;
 }
 
 /**
@@ -513,12 +556,12 @@ function findBoundedCollections(content: string, names: Iterable<string>): Set<s
  * @param code - Masked line.
  * @returns Openers ordered by their index on the line.
  */
-function collectOpeners(code: string): Opener[] {
+function extractOpeners(code: string): Opener[] {
     const openers: Opener[] = [];
     const timer = /\b(?:setInterval|setTimeout)\s*\(/.exec(code);
-    if (timer) openers.push({ kind: 'timer', index: timer.index });
+    if (timer) openers.push({ kind: SCOPE_KIND_TIMER, index: timer.index });
     const loop = /\b(?:while|for)\s*\(/.exec(code);
-    if (loop) openers.push({ kind: 'loop', index: loop.index });
+    if (loop) openers.push({ kind: SCOPE_KIND_LOOP, index: loop.index });
     openers.sort((a, b) => a.index - b.index);
     return openers;
 }
@@ -530,9 +573,10 @@ function collectOpeners(code: string): Opener[] {
  * @param openers - Openers found on this line.
  * @returns The opener owning a braceless body, or null when none does.
  */
-function bracelessOpener(code: string, openers: Opener[]): Opener | null {
+function findBracelessOpener(code: string, openers: Opener[]): Opener | null {
     if (openers.length === 0) return null;
-    return code.indexOf('{', openers[0].index) === -1 ? openers[0] : null;
+    const firstOpener = openers[0];
+    return !code.slice(firstOpener.index).includes('{') ? firstOpener : null;
 }
 
 /**
@@ -555,23 +599,23 @@ function collectAppendSites(code: string, appendRes: Map<string, RegExp>): Appen
     return sites;
 }
 
+/** Scope resolution context parameters. */
+interface ScopeResolutionParams {
+    site: AppendSite;
+    scopes: OpenScope[];
+    braceless: Opener | null;
+    lineNum: number;
+    depth: number;
+}
+
 /**
  * Resolve the scope enclosing an append site.
  *
- * @param site - Append site to place.
- * @param scopes - Scope stack at the site's line.
- * @param braceless - Braceless opener on the line, if any.
- * @param lineNum - 1-based line number.
- * @param depth - Brace depth at the start of the line.
+ * @param params - Scope resolution parameter object.
  * @returns The enclosing scope, or null when the site sits at top level.
  */
-function enclosingScopeOf(
-    site: AppendSite,
-    scopes: OpenScope[],
-    braceless: Opener | null,
-    lineNum: number,
-    depth: number,
-): OpenScope | null {
+function findEnclosingScope(params: ScopeResolutionParams): OpenScope | null {
+    const { site, scopes, braceless, lineNum, depth } = params;
     const innermost = scopes.length > 0 ? scopes[scopes.length - 1] : null;
     if (innermost) return innermost;
     if (braceless && site.index > braceless.index) {
@@ -598,6 +642,47 @@ interface LineScan {
     depth: number;
 }
 
+/** Parameter bundle for scanning a masked source line. */
+interface LineScanParams {
+    code: string;
+    lineNum: number;
+    scopes: OpenScope[];
+    depth: number;
+    ctx: GrowthScanContext;
+}
+
+/** Parameter bundle for emitting append sites at a specific character offset. */
+interface EmitSitesParams {
+    walk: BraceWalk;
+    appends: AppendSite[];
+    charIndex: number;
+    lineNum: number;
+    scopes: OpenScope[];
+    braceless: Opener | null;
+    ctx: GrowthScanContext;
+    out: Issue[];
+}
+
+/** Parameter bundle for resolving growth issues for an append site. */
+interface GrowthIssueParams {
+    site: AppendSite;
+    lineNum: number;
+    scopes: OpenScope[];
+    braceless: Opener | null;
+    depth: number;
+    ctx: GrowthScanContext;
+}
+
+/** Parameter bundle for updating brace depth and active scope tracking. */
+interface BraceCharParams {
+    char: string;
+    charIndex: number;
+    walk: BraceWalk;
+    openers: Opener[];
+    scopes: OpenScope[];
+    lineNum: number;
+}
+
 /**
  * Scan one masked line: emit growth findings and advance the scope stack.
  *
@@ -605,29 +690,36 @@ interface LineScan {
  * closes on one physical line must already be on the scope stack when its own body appends. Two
  * separate passes made that same-line case report nothing.
  *
- * @param code - Masked line.
- * @param lineNum - 1-based line number.
- * @param scopes - Scope stack, mutated in place.
- * @param depth - Brace depth at the start of the line.
- * @param ctx - Per-file scan facts.
+ * @param params - Line scan parameter object.
  * @returns Findings for this line plus the depth after it.
  */
-function scanLine(
-    code: string,
-    lineNum: number,
-    scopes: OpenScope[],
-    depth: number,
-    ctx: GrowthScanContext,
-): LineScan {
-    const openers = collectOpeners(code);
-    const braceless = bracelessOpener(code, openers);
+function scanLine(params: LineScanParams): LineScan {
+    const { code, lineNum, scopes, depth, ctx } = params;
+    const openers = extractOpeners(code);
+    const braceless = findBracelessOpener(code, openers);
     const appends = collectAppendSites(code, ctx.appendRes);
     const walk: BraceWalk = { depth, openerCursor: 0, appendCursor: 0 };
     const issues: Issue[] = [];
 
-    for (let c = 0; c < code.length; c += 1) {
-        emitSitesAt(walk, appends, c, lineNum, scopes, braceless, ctx, issues);
-        applyBraceChar(code[c], c, walk, openers, scopes, lineNum);
+    for (let charIndex = 0; charIndex < code.length; charIndex += 1) {
+        emitSitesAt({
+            walk,
+            appends,
+            charIndex,
+            lineNum,
+            scopes,
+            braceless,
+            ctx,
+            out: issues,
+        });
+        applyBraceChar({
+            char: code[charIndex],
+            charIndex,
+            walk,
+            openers,
+            scopes,
+            lineNum,
+        });
     }
 
     return { issues, depth: walk.depth };
@@ -636,29 +728,21 @@ function scanLine(
 /**
  * Emit findings for the append sites that start at this character index.
  *
- * @param walk - Cursor state for this line.
- * @param appends - Append sites on the line, ordered by index.
- * @param c - Current character index.
- * @param lineNum - 1-based line number.
- * @param scopes - Scope stack at this position.
- * @param braceless - Braceless opener on the line, if any.
- * @param ctx - Per-file scan facts.
- * @param out - Collector for emitted findings.
+ * @param params - Emission parameter object.
  */
-function emitSitesAt(
-    walk: BraceWalk,
-    appends: AppendSite[],
-    c: number,
-    lineNum: number,
-    scopes: OpenScope[],
-    braceless: Opener | null,
-    ctx: GrowthScanContext,
-    out: Issue[],
-): void {
-    while (walk.appendCursor < appends.length && appends[walk.appendCursor].index === c) {
+function emitSitesAt(params: EmitSitesParams): void {
+    const { walk, appends, charIndex, lineNum, scopes, braceless, ctx, out } = params;
+    while (walk.appendCursor < appends.length && appends[walk.appendCursor].index === charIndex) {
         const site = appends[walk.appendCursor];
         walk.appendCursor += 1;
-        const issue = growthIssueFor(site, lineNum, scopes, braceless, walk.depth, ctx);
+        const issue = createGrowthIssue({
+            site,
+            lineNum,
+            scopes,
+            braceless,
+            depth: walk.depth,
+            ctx,
+        });
         if (issue) out.push(issue);
     }
 }
@@ -666,55 +750,33 @@ function emitSitesAt(
 /**
  * Build the finding for one append site, or null when it is out of scope.
  *
- * @param site - Append site to report.
- * @param lineNum - 1-based line number.
- * @param scopes - Scope stack at this position.
- * @param braceless - Braceless opener on the line, if any.
- * @param depth - Current brace depth.
- * @param ctx - Per-file scan facts.
+ * @param params - Growth resolution parameter object.
  * @returns The finding, or null when the site is bounded, pre-declaration or top-level.
  */
-function growthIssueFor(
-    site: AppendSite,
-    lineNum: number,
-    scopes: OpenScope[],
-    braceless: Opener | null,
-    depth: number,
-    ctx: GrowthScanContext,
-): Issue | null {
+function createGrowthIssue(params: GrowthIssueParams): Issue | null {
+    const { site, lineNum, scopes, braceless, depth, ctx } = params;
     const declLine = ctx.collections.get(site.name) ?? 0;
     if (lineNum <= declLine || ctx.bounded.has(site.name)) return null;
-    const enclosing = enclosingScopeOf(site, scopes, braceless, lineNum, depth);
-    if (!enclosing || enclosing.kind === 'plain') return null;
+    const enclosing = findEnclosingScope({ site, scopes, braceless, lineNum, depth });
+    if (!enclosing || enclosing.kind === SCOPE_KIND_PLAIN) return null;
     return buildGrowthIssue(enclosing, site, lineNum, ctx.file);
 }
 
 /**
  * Apply one character of brace bookkeeping.
  *
- * @param char - Character from the masked line.
- * @param c - Index of the character.
- * @param walk - Cursor state, mutated in place.
- * @param openers - Openers found on this line.
- * @param scopes - Scope stack, mutated in place.
- * @param lineNum - 1-based line number.
+ * @param params - Brace character update parameters.
  */
-function applyBraceChar(
-    char: string,
-    c: number,
-    walk: BraceWalk,
-    openers: Opener[],
-    scopes: OpenScope[],
-    lineNum: number,
-): void {
+function applyBraceChar(params: BraceCharParams): void {
+    const { char, charIndex, walk, openers, scopes, lineNum } = params;
     if (char === '{') {
         walk.depth += 1;
         const next = openers[walk.openerCursor];
-        if (next && next.index < c) {
+        if (next && next.index < charIndex) {
             walk.openerCursor += 1;
             scopes.push({ kind: next.kind, line: lineNum, depth: walk.depth });
         } else {
-            scopes.push({ kind: 'plain', line: lineNum, depth: walk.depth });
+            scopes.push({ kind: SCOPE_KIND_PLAIN, line: lineNum, depth: walk.depth });
         }
     } else if (char === '}' && walk.depth > 0) {
         while (scopes.length > 0 && scopes[scopes.length - 1].depth >= walk.depth) {
@@ -739,14 +801,15 @@ function buildGrowthIssue(
     lineNum: number,
     file: string,
 ): Issue {
-    const complexity: 'O(t)' | 'O(n)' = scope.kind === 'timer' ? 'O(t)' : 'O(n)';
-    const context = complexity === 'O(t)' ? 'timer callback' : 'iteration loop';
+    const complexity: 'O(t)' | 'O(n)' =
+        scope.kind === SCOPE_KIND_TIMER ? COMPLEXITY_TIME : COMPLEXITY_INPUT;
+    const context = complexity === COMPLEXITY_TIME ? CONTEXT_TIMER : CONTEXT_LOOP;
     const desc = PerformanceMessages.UNBOUNDED_GROWTH(site.name, complexity, context);
     return {
-        id: `performance:PRF-LEAK-001:${file}:${lineNum}:${site.index}`,
-        analyzer: 'performance',
-        rule: 'PRF-LEAK-001',
-        severity: 'warning',
+        id: `${ANALYZER_PERFORMANCE}:${RULE_PRF_LEAK}:${file}:${lineNum}:${site.index}`,
+        analyzer: ANALYZER_PERFORMANCE,
+        rule: RULE_PRF_LEAK,
+        severity: SEVERITY_WARNING,
         message: desc.message,
         location: {
             file,

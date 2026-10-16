@@ -747,4 +747,17 @@ export const ANALYZER_MODERN_LANGUAGE_RULES: readonly RuleDefinition[] = [
         remediation: 'Add aria-label, aria-labelledby, or bind with <label for="...">.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#vsc-ui-003',
     }),
+    defineRule({
+        id: 'VSC-UI-004',
+        family: RULE_FAMILY_VSCODE_EXTENSION,
+        analyzer: ANALYZER_VSCODE_EXTENSION,
+        canonical: true,
+        languages: [LANGUAGE_TYPESCRIPT, LANGUAGE_JAVASCRIPT],
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            'Webview interactive state style changes must not dynamically modify border width triggering layout jitter.',
+        remediation:
+            'Use box-shadow: inset 0 0 0 <width> <color> or static transparent borders for hover/active states.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#vsc-ui-004',
+    }),
 ];
