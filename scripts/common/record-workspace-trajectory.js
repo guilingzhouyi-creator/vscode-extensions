@@ -18,7 +18,7 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 
-const MAX_RECORD_BYTE_SIZE = 350;
+const MAX_RECORD_BYTE_SIZE = 360;
 const DEFAULT_MAX_ROLLING_RUNS = 100;
 
 const CANONICAL_DIMENSIONS = [
@@ -207,13 +207,16 @@ function serializeCompactRecordLine(record) {
   let line = JSON.stringify(record);
   let byteLen = Buffer.byteLength(line, 'utf8');
 
-  if (byteLen > MAX_RECORD_BYTE_SIZE && record.score) {
+  if (byteLen > MAX_RECORD_BYTE_SIZE) {
     const compacted = {
       ...record,
+      id: String(record.id || '').slice(-8),
+      mod: 'ws',
+      agent: 'audit',
       score: {
         ...record.score,
-        bef: typeof record.score.bef === 'number' ? Math.round(record.score.bef * 10) / 10 : record.score.bef,
-        aft: typeof record.score.aft === 'number' ? Math.round(record.score.aft * 10) / 10 : record.score.aft,
+        bef: typeof record.score.bef === 'number' ? Math.round(record.score.bef * 100) / 100 : record.score.bef,
+        aft: typeof record.score.aft === 'number' ? Math.round(record.score.aft * 100) / 100 : record.score.aft,
       },
     };
     line = JSON.stringify(compacted);
