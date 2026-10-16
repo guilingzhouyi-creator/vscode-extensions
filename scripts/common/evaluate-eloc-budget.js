@@ -38,21 +38,40 @@ const MAX_PLUMBING_RATIO = 0.60;
 const MIN_TOKENS_PER_ELOC = 2.5;
 const MAX_TOKENS_PER_ELOC = 20.0;
 
+const TAG_VOL_ELOC = 'VOL-ELOC-001';
+const TAG_VOL_LOC = 'VOL-LOC-001';
+const TAG_VOL_RATIO = 'VOL-RATIO-001';
+const TAG_VOL_DIL = 'VOL-DIL-001';
+const TAG_VOL_DOC = 'VOL-DOC-001';
+const TAG_ARCH_BENIGN = 'ARCH_BENIGN_CONSTANT_LIBRARY';
+const TAG_HEALTHY = 'HEALTHY';
+
+const SEVERITY_ERROR = 'error';
+const SEVERITY_WARN = 'warn';
+const SEVERITY_PASS = 'pass';
+
+const SUGGESTION_SRP = 'Decompose module into cohesive submodules following Single Responsibility Principle';
+const SUGGESTION_SPLIT = 'Split file to reduce cognitive load and formatting bloat';
+const SUGGESTION_PROSE = 'Remove redundant blank lines or move extended prose documentation to Markdown specs';
+const SUGGESTION_DENSITY = 'Code density is below 33%; eliminate excessive blank padding or redundant boilerplate';
+const SUGGESTION_DOCS = 'Add required type contracts, state machine invariants, or JSDoc specification for complex logic';
+
+const CONSTANT_MAX_ELOC = 1800;
+const CONSTANT_MAX_LOC = 2500;
+const DYNAMIC_MIN_PHYSICAL_LOC = 150;
+const HIGH_LOAD_ELOC_THRESHOLD = 600;
+
 /**
  * Multi-language syntactic verbosity coefficients.
  * Aligned with auto-refactor elastic budget matrix to normalize cognitive footprint.
  */
-const LANGUAGE_VERBOSITY_FACTORS = {
-  '.py': 0.7,
-  '.gd': 0.75,
-  '.ts': 1.0,
-  '.js': 1.0,
-  '.rs': 1.25,
-  '.go': 1.4,
-  '.ps1': 1.1,
-  '.sh': 1.0,
-  '.bash': 1.0,
-};
+const VERBOSITY_RAW = '.py:0.7\n.gd:0.75\n.ts:1.0\n.js:1.0\n.rs:1.25\n.go:1.4\n.ps1:1.1\n.sh:1.0\n.bash:1.0';
+const LANGUAGE_VERBOSITY_FACTORS = Object.freeze(
+  Object.fromEntries(VERBOSITY_RAW.split('\n').map((line) => {
+    const [ext, val] = line.split(':');
+    return [ext, parseFloat(val)];
+  }))
+);
 
 function getLanguageVerbosityFactor(filePath) {
   if (!filePath) return 1.0;
@@ -248,76 +267,27 @@ function countSemanticTokens(text) {
  * @param {string} ext - File extension.
  * @returns {boolean} True if the line is a plumbing statement.
  */
+const RE_PLUMBING_IMPORT = /^(?:import\s+|import\(|from\s+|require\(|(?:const|let|var)\s+.*=\s*require\()/;
+const RE_PLUMBING_EXPORT = /^export\s+(?:\*|type\s+\*|\{[^}]*\}\s*(?:from\s+[^;]+)?;?|default\s+[A-Za-z0-9_$]+;?$)/;
+const RE_PLUMBING_CJS = /^(?:module\.exports\s*=|exports\.)/;
+const RE_PLUMBING_SHELL = /^(?:source\s+|\.\s+|using\s+|Import-Module\s+)/;
+const RE_PLUMBING_GD = /^(?:extends\s+|class_name\s+|(?:const|var)\s+\w+\s*=\s*preload\()/;
+const RE_CONST_DECL = /^(?:export\s+(?:const|enum)|const|readonly)\s+|as\s+const;?$/;
+const RE_FN_OR_CLASS = /function\s+|=>\s*\{|class\s+/;
+
+const CONSTANT_PATH_PATTERNS = Object.freeze(
+  '/constants/,/tokens/,/locales/,/i18n/,constants.ts,tokens.ts,rule-codes.ts,diagnostic-tokens.ts,system-tokens.ts,ast-tokens.ts'.split(',')
+);
+
 function isPlumbingLine(trimmedLine, ext) {
   if (!trimmedLine) return false;
-
-  // 1. Module import / require declarations
-  if (
-    trimmedLine.startsWith('import ') ||
-    trimmedLine.startsWith('import(') ||
-    trimmedLine.startsWith('from ') ||
-    trimmedLine.startsWith('require(') ||
-    /^(?:const|let|var)\s+.*=\s*require\(/.test(trimmedLine)
-  ) {
-    return true;
-  }
-
-  // 2. Pure export statements (re-export, barrel forwarding, default pass-through)
-  if (trimmedLine.startsWith('export ')) {
-    if (
-      trimmedLine.startsWith('export *') ||
-      trimmedLine.startsWith('export type *') ||
-      /^export\s+(?:type\s+)?\{[^}]*\}\s*(?:from\s+[^;]+)?;?$/.test(trimmedLine) ||
-      /^export\s+default\s+[A-Za-z0-9_$]+;?$/.test(trimmedLine)
-    ) {
-      return true;
-    }
-  }
-
-  // 3. CommonJS module wiring
-  if (
-    trimmedLine.startsWith('module.exports =') ||
-    trimmedLine.startsWith('exports.')
-  ) {
-    return true;
-  }
-
-  // 4. Shell / PowerShell sourcing and using
-  if (
-    trimmedLine.startsWith('source ') ||
-    trimmedLine.startsWith('. ') ||
-    trimmedLine.startsWith('using ') ||
-    trimmedLine.startsWith('Import-Module ')
-  ) {
-    return true;
-  }
-
-  // 5. GDScript wiring
-  if (ext === '.gd') {
-    if (
-      trimmedLine.startsWith('extends ') ||
-      trimmedLine.startsWith('class_name ') ||
-      /^(?:const|var)\s+\w+\s*=\s*preload\(/.test(trimmedLine)
-    ) {
-      return true;
-    }
-  }
-
+  if (RE_PLUMBING_IMPORT.test(trimmedLine)) return true;
+  if (RE_PLUMBING_EXPORT.test(trimmedLine)) return true;
+  if (RE_PLUMBING_CJS.test(trimmedLine)) return true;
+  if (RE_PLUMBING_SHELL.test(trimmedLine)) return true;
+  if (ext === '.gd' && RE_PLUMBING_GD.test(trimmedLine)) return true;
   return false;
 }
-
-const CONSTANT_PATH_PATTERNS = [
-  '/constants/',
-  '/tokens/',
-  '/locales/',
-  '/i18n/',
-  'constants.ts',
-  'tokens.ts',
-  'rule-codes.ts',
-  'diagnostic-tokens.ts',
-  'system-tokens.ts',
-  'ast-tokens.ts',
-];
 
 /**
  * Check if the file path matches benign constant catalog patterns.
@@ -351,17 +321,10 @@ function isConstantContentStructure(content) {
   let constCount = 0;
   let fnCount = 0;
   for (const l of lines) {
-    if (
-      l.startsWith('export const ') ||
-      l.startsWith('export enum ') ||
-      l.startsWith('const ') ||
-      l.startsWith('readonly ') ||
-      l.endsWith('as const;') ||
-      l.endsWith('as const')
-    ) {
+    if (RE_CONST_DECL.test(l)) {
       constCount++;
     }
-    if (l.includes('function ') || l.includes('=> {') || l.includes('class ')) {
+    if (RE_FN_OR_CLASS.test(l)) {
       fnCount++;
     }
   }
@@ -406,29 +369,12 @@ function isPlumbingExemptPath(filePath, content = '') {
 }
 
 /**
- * Evaluates semantic code volume metrics, token density, and plumbing overhead
- * for given file content.
+ * Classifies a single line of source code based on language comment conventions.
  *
- * @param {string} content - Raw source code
- * @param {string} ext - File extension (e.g. '.ts', '.gd')
- * @param {string} [filePath=''] - Optional relative or absolute file path for exemption resolution
- * @returns {{
- *   totalLoc: number,
- *   blankLines: number,
- *   commentLines: number,
- *   eloc: number,
- *   commentRatio: number,
- *   dilutionRatio: number,
- *   density: number,
- *   tokenCount: number,
- *   tokensPerEloc: number,
- *   columnDensity: number,
- *   tspr: number,
- *   plumbingRatio: number,
- *   isPlumbingOverhead: boolean,
- *   isColumnDiluted: boolean,
- *   isColumnPacked: boolean
- * }}
+ * @param {string} line - Raw line text.
+ * @param {string} ext - Lowercase file extension.
+ * @param {{ inBlock: boolean, quoteChar: string }} state - Parser block comment state.
+ * @returns {{ isBlank: boolean, isComment: boolean }}
  */
 function classifySourceLine(line, ext, state) {
   if (ext === '.ps1') {
@@ -447,7 +393,7 @@ function classifySourceLine(line, ext, state) {
   return res;
 }
 
-function computeDerivedDensityMetrics(totalLoc, eloc, commentLines, tokenCount, plumbingLines, isExempt) {
+function computeDerivedDensityMetrics({ totalLoc, eloc, commentLines, tokenCount, plumbingLines, isExempt }) {
   const commentRatio = totalLoc > 0 ? Number((commentLines / totalLoc).toFixed(4)) : 0;
   const dilutionRatio = eloc > 0 ? Number((totalLoc / eloc).toFixed(2)) : 0;
   const density = totalLoc > 0 ? Number(((eloc / totalLoc) * 100).toFixed(1)) : 0;
@@ -537,14 +483,14 @@ function evaluateCodeMetrics(content, ext, filePath = '') {
   }
 
   const isExempt = isPlumbingExemptPath(filePath, content);
-  const derived = computeDerivedDensityMetrics(
+  const derived = computeDerivedDensityMetrics({
     totalLoc,
     eloc,
     commentLines,
     tokenCount,
     plumbingLines,
     isExempt,
-  );
+  });
 
   return {
     totalLoc,
@@ -566,40 +512,40 @@ function evaluateDynamicEnvelope(metrics, options, filePath = '', content = '') 
   const baseMaxEloc = options.maxEloc || DEFAULT_MAX_ELOC;
   const baseMaxLoc = options.maxLoc || DEFAULT_MAX_LOC;
   const maxEloc = isConstantCatalog
-    ? Math.max(baseMaxEloc, 1800)
+    ? Math.max(baseMaxEloc, CONSTANT_MAX_ELOC)
     : Math.round(baseMaxEloc * langFactor);
   const maxLoc = isConstantCatalog
-    ? Math.max(baseMaxLoc, 2500)
+    ? Math.max(baseMaxLoc, CONSTANT_MAX_LOC)
     : Math.round(baseMaxLoc * langFactor);
   const densityRatioTarget = options.densityRatio || DEFAULT_TARGET_DENSITY_RATIO;
 
   // 1. Absolute volume bounds
   if (eloc > maxEloc) {
     return {
-      severity: 'error',
-      tag: 'VOL-ELOC-001',
+      severity: SEVERITY_ERROR,
+      tag: TAG_VOL_ELOC,
       message: `Effective code volume budget exceeded: ${eloc} ELOC > maximum limit ${maxEloc} ELOC (raw LOC: ${totalLoc})`,
-      suggestion: 'Decompose module into cohesive submodules following Single Responsibility Principle',
+      suggestion: SUGGESTION_SRP,
     };
   }
   if (totalLoc > maxLoc) {
     return {
-      severity: 'error',
-      tag: 'VOL-LOC-001',
+      severity: SEVERITY_ERROR,
+      tag: TAG_VOL_LOC,
       message: `Physical line count budget exceeded: ${totalLoc} LOC > maximum limit ${maxLoc} LOC (effective: ${eloc} ELOC)`,
-      suggestion: 'Split file to reduce cognitive load and formatting bloat',
+      suggestion: SUGGESTION_SPLIT,
     };
   }
 
   // 2. Forward dynamic LOC constraint
-  const dynamicMaxLoc = Math.min(maxLoc, Math.max(150, Math.ceil(eloc * densityRatioTarget)));
+  const dynamicMaxLoc = Math.min(maxLoc, Math.max(DYNAMIC_MIN_PHYSICAL_LOC, Math.ceil(eloc * densityRatioTarget)));
   if (totalLoc > dynamicMaxLoc && !isConstantCatalog) {
     const actualRatio = (totalLoc / Math.max(1, eloc)).toFixed(2);
     return {
-      severity: 'warn',
-      tag: 'VOL-RATIO-001',
+      severity: SEVERITY_WARN,
+      tag: TAG_VOL_RATIO,
       message: `Dynamic dilution imbalance (ratio 1:${actualRatio} > 1:${densityRatioTarget}): Dynamic physical envelope for ${eloc} ELOC is ${dynamicMaxLoc} LOC, actual is ${totalLoc} LOC`,
-      suggestion: 'Remove redundant blank lines or move extended prose documentation to Markdown specs',
+      suggestion: SUGGESTION_PROSE,
     };
   }
 
@@ -609,29 +555,30 @@ function evaluateDynamicEnvelope(metrics, options, filePath = '', content = '') 
     if (eloc < dynamicMinEloc) {
       const codeDensityPct = ((eloc / totalLoc) * 100).toFixed(1);
       return {
-        severity: 'warn',
-        tag: 'VOL-DIL-001',
+        severity: SEVERITY_WARN,
+        tag: TAG_VOL_DIL,
         message: `Effective logic density too low (${eloc} ELOC < dynamic floor ${dynamicMinEloc} ELOC, code ratio ${codeDensityPct}%): File occupies ${totalLoc} physical lines`,
-        suggestion: 'Code density is below 33%; eliminate excessive blank padding or redundant boilerplate',
+        suggestion: SUGGESTION_DENSITY,
       };
     }
   }
 
-  // 4. High-load contract density constraint (exempt for pure constant catalogs governed by file-level contract)
-  if (eloc >= 600 && !isConstantCatalog) {
+  // 4. High-load contract density constraint
+  // (exempt for pure constant catalogs governed by file-level contract)
+  if (eloc >= HIGH_LOAD_ELOC_THRESHOLD && !isConstantCatalog) {
     const commentRatio = totalLoc > 0 ? commentLines / totalLoc : 0;
     if (commentRatio < MIN_CONTRACT_COMMENT_RATIO) {
       const commentPct = (commentRatio * 100).toFixed(1);
       return {
-        severity: 'warn',
-        tag: 'VOL-DOC-001',
+        severity: SEVERITY_WARN,
+        tag: TAG_VOL_DOC,
         message: `High-load logic lacks architecture contracts: Effective logic (${eloc} ELOC) has insufficient documentation density (${commentPct}% < 8%)`,
-        suggestion: 'Add required type contracts, state machine invariants, or JSDoc specification for complex logic',
+        suggestion: SUGGESTION_DOCS,
       };
     }
   }
 
-  return { severity: 'pass', tag: isConstantCatalog ? 'ARCH_BENIGN_CONSTANT_LIBRARY' : 'HEALTHY' };
+  return { severity: SEVERITY_PASS, tag: isConstantCatalog ? TAG_ARCH_BENIGN : TAG_HEALTHY };
 }
 
 /**
@@ -693,14 +640,10 @@ function findProjectVolumeConfig(targetDir = process.cwd()) {
   return null;
 }
 
-const OPTION_KEY_MAP = {
-  '--max-eloc': 'maxEloc',
-  '--max-loc': 'maxLoc',
-  '--warn-eloc': 'warnEloc',
-  '--warn-loc': 'warnLoc',
-  '--density-ratio': 'densityRatio',
-  '--max-dilution': 'densityRatio',
-};
+const OPTION_MAP_RAW = '--max-eloc:maxEloc\n--max-loc:maxLoc\n--warn-eloc:warnEloc\n--warn-loc:warnLoc\n--density-ratio:densityRatio\n--max-dilution:densityRatio';
+const OPTION_KEY_MAP = Object.freeze(
+  Object.fromEntries(OPTION_MAP_RAW.split('\n').map((l) => l.split(':')))
+);
 
 /**
  * Parses CLI options and targets using flat control flow.
@@ -743,25 +686,19 @@ function parseArgs(args) {
   return options;
 }
 
+const RE_IGNORED_PATHS = /\/(?:dist|out|node_modules|fixtures|baseline|reports|archive)\/|corpus/;
+const AUDITABLE_EXTENSIONS = new Set('.ts,.js,.mjs,.cjs,.gd,.py,.sh,.ps1'.split(','));
+
 /**
  * Filters supported code files and ignores vendor/build outputs.
  */
 function isAuditableCodeFile(file) {
   const normalized = file.replace(/\\/g, '/');
-  if (
-    normalized.includes('/dist/') ||
-    normalized.includes('/out/') ||
-    normalized.includes('/node_modules/') ||
-    normalized.includes('/fixtures/') ||
-    normalized.includes('/baseline') ||
-    normalized.includes('/reports/') ||
-    normalized.includes('/archive/') ||
-    normalized.includes('corpus')
-  ) {
+  if (RE_IGNORED_PATHS.test(normalized)) {
     return false;
   }
   const ext = path.extname(file).toLowerCase();
-  return ['.ts', '.js', '.mjs', '.cjs', '.gd', '.py', '.sh', '.ps1'].includes(ext);
+  return AUDITABLE_EXTENSIONS.has(ext);
 }
 
 function handleEmptyTargets(options) {
