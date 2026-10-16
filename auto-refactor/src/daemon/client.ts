@@ -1,16 +1,3 @@
-import * as net from 'net';
-import type { ScanConfig, ScanReport, WarmStats } from '../core/types';
-import type { RegistryInfo } from './registry';
-import { readRegistry, projectHashFor } from './registry';
-import type {
-    DaemonMessage,
-    HelloAckMessage,
-    ScanDoneMessage,
-    ErrorMessage,
-    PongMessage,
-} from './protocol';
-import { PROTOCOL_VERSION, PROTOCOL_SOFTWARE_VERSION, encodeMessage, decodeLine } from './protocol';
-
 /**
  * Module: Daemon — Warm-Scan IPC Client (docs/01-architecture/02-pipeline-and-caching.md §A2.4)
  * File Path: src/daemon/client.ts
@@ -28,6 +15,19 @@ import { PROTOCOL_VERSION, PROTOCOL_SOFTWARE_VERSION, encodeMessage, decodeLine 
  *   callers degrade to a cold scan; the one-shot tryWarmScan/tryWarmScanDiff wrappers convert
  *   any such failure to null because warm-scan is an accelerator, not a correctness guarantee.
  */
+
+import * as net from 'net';
+import type { ScanConfig, ScanReport, WarmStats } from '../core/types';
+import type { RegistryInfo } from './registry';
+import { readRegistry, projectHashFor } from './registry';
+import type {
+    DaemonMessage,
+    HelloAckMessage,
+    ScanDoneMessage,
+    ErrorMessage,
+    PongMessage,
+} from './protocol';
+import { PROTOCOL_VERSION, PROTOCOL_SOFTWARE_VERSION, encodeMessage, decodeLine } from './protocol';
 
 const CONNECT_TIMEOUT_MS = 500;
 const HANDSHAKE_TIMEOUT_MS = 500;

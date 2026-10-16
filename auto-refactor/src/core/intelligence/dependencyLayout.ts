@@ -17,16 +17,14 @@
  *   structured issues conforming to the Section VII result model.
  */
 
-import * as fs from 'fs';
 import * as path from 'path';
-import type { Issue, SemanticEvidenceStep, SemanticReviewDetail } from '../types';
-import type { ImportCategory, ImportStatementInfo } from './dependencyLayoutHelpers';
+import type { Issue, SemanticEvidenceStep } from '../types';
+import type { ImportStatementInfo } from './dependencyLayoutHelpers';
 import {
     auditFileLayoutOrder,
     auditImportHorizon,
     createDetail,
     pushLayoutIssue,
-    CATEGORY_PRIORITY,
     findAncestorPackageManifest,
     readJsonSafely,
     extractLicenseFromManifest,
@@ -43,15 +41,8 @@ import { isDevOnlyDependency, isUnpinnedVersion } from './dependency-provenance'
 export { categorizeImport, extractExemptionReason } from './dependencyLayoutHelpers';
 export type { ImportCategory, ImportStatementInfo } from './dependencyLayoutHelpers';
 
-const RULE_VERSION = '1.0.0';
-const CONFIG_VERSION = '0.3.0';
-const ANALYZER_ID = 'dependency-layout';
-const DOMAIN_ID = 'dependency-layout';
-const END_COLUMN = 80;
-
 const SEVERITY_WARNING = 'warning';
 const SEVERITY_ERROR = 'error';
-const SEVERITY_INFO = 'info';
 
 const KIND_CALL = 'call';
 const KIND_CONDITION = 'condition';
@@ -59,7 +50,6 @@ const KIND_VARIABLE = 'variable';
 
 const MODULE_IMPORTS = 'imports';
 const MODULE_DEPENDENCIES = 'dependencies';
-const MODULE_LAYOUT = 'layout';
 const MODULE_RESOURCES = 'resources';
 const MODULE_SECURITY = 'security';
 const MODULE_GOVERNANCE = 'governance';
@@ -67,17 +57,9 @@ const MODULE_MAINTENANCE = 'maintenance';
 
 const CATEGORY_STDLIB = 'stdlib';
 const CATEGORY_THIRD_PARTY = 'third-party';
-const CATEGORY_INTERNAL_SHARED = 'internal-shared';
-const CATEGORY_LOCAL = 'local';
-
-const PRIORITY_STDLIB = 1;
-const PRIORITY_THIRD_PARTY = 2;
-const PRIORITY_INTERNAL_SHARED = 3;
-const PRIORITY_LOCAL = 4;
 
 const CONFIDENCE_DEFAULT = 0.95;
 const CONFIDENCE_HIGH = 1.0;
-const CONFIDENCE_RELAXED = 0.9;
 
 const LOW_LEVEL_FILE_RE = /(?:^|[/\\])(?:shared|utils|common)(?:[/\\]|$|\.)/i;
 const HIGH_LEVEL_IMPORT_RE = /\/(?:domain|app|application)\//i;

@@ -101,10 +101,7 @@ const PARAM_PATTERN_TYPES = new Set([
     'typed_default_parameter',
 ]);
 
-const SPLAT_PATTERN_TYPES = new Set([
-    'list_splat_pattern',
-    'dictionary_splat_pattern',
-]);
+const SPLAT_PATTERN_TYPES = new Set(['list_splat_pattern', 'dictionary_splat_pattern']);
 
 function extractTypedOrDefaultPythonParam(child: TreeSitterNode): string | undefined {
     const idNode = child.childForFieldName
@@ -130,8 +127,7 @@ function extractSinglePythonParam(child: TreeSitterNode): string | undefined {
 
 function extractPythonParameters(sn: TreeSitterNode): string[] | undefined {
     const paramsNode = sn.childForFieldName ? sn.childForFieldName('parameters') : null;
-    const resolvedParamsNode =
-        paramsNode ?? sn.namedChildren?.find((c) => c.type === 'parameters');
+    const resolvedParamsNode = paramsNode ?? sn.namedChildren?.find((c) => c.type === 'parameters');
     if (!resolvedParamsNode) return undefined;
 
     const result: string[] = [];

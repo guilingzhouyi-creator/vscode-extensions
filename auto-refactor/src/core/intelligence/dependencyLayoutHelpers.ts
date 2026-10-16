@@ -22,12 +22,12 @@ const CATEGORY_INTERNAL_SHARED = 'internal-shared';
 /** Import category id for a relative in-tree module. */
 const CATEGORY_LOCAL = 'local';
 
-export const PRIORITY_STDLIB = 1;
-export const PRIORITY_THIRD_PARTY = 2;
-export const PRIORITY_INTERNAL_SHARED = 3;
-export const PRIORITY_LOCAL = 4;
+const PRIORITY_STDLIB = 1;
+const PRIORITY_THIRD_PARTY = 2;
+const PRIORITY_INTERNAL_SHARED = 3;
+const PRIORITY_LOCAL = 4;
 
-export const CATEGORY_PRIORITY: Record<ImportCategory, number> = Object.freeze({
+const CATEGORY_PRIORITY: Record<ImportCategory, number> = Object.freeze({
     [CATEGORY_STDLIB]: PRIORITY_STDLIB,
     [CATEGORY_THIRD_PARTY]: PRIORITY_THIRD_PARTY,
     [CATEGORY_INTERNAL_SHARED]: PRIORITY_INTERNAL_SHARED,
@@ -249,7 +249,7 @@ export function extractExemptionReason(
     return undefined;
 }
 
-export interface DetailParams {
+interface DetailParams {
     language: string;
     module: string;
     symbol: string;
@@ -263,6 +263,11 @@ export interface DetailParams {
     canAutofix?: boolean;
 }
 
+/**
+ * Assembles a standardized SemanticReviewDetail payload for dependency layout diagnostics.
+ * @param params Construction parameters describing the diagnostic metadata
+ * @returns Fully populated SemanticReviewDetail descriptor
+ */
 export function createDetail(params: DetailParams): SemanticReviewDetail {
     return {
         language: params.language,
@@ -286,7 +291,7 @@ export function createDetail(params: DetailParams): SemanticReviewDetail {
     };
 }
 
-export interface LayoutIssuePayload {
+interface LayoutIssuePayload {
     rule: string;
     severity: 'info' | 'warning' | 'error';
     loc: { file: string; line: number };
@@ -296,6 +301,11 @@ export interface LayoutIssuePayload {
     confidence?: number;
 }
 
+/**
+ * Emits a structured dependency layout diagnostic issue into the issues collector.
+ * @param issues Mutable array of issues receiving the diagnostic record
+ * @param payload Parameter payload specifying rule, severity, location, and metadata
+ */
 export function pushLayoutIssue(issues: Issue[], payload: LayoutIssuePayload): void {
     const confidence = payload.confidence ?? CONFIDENCE_DEFAULT;
     issues.push({
@@ -315,6 +325,13 @@ export function pushLayoutIssue(issues: Issue[], payload: LayoutIssuePayload): v
     });
 }
 
+/**
+ * Validates canonical top-level import ordering
+ * (stdlib -> third-party -> internal-shared -> local).
+ * @param imports Collected import statements across the target file
+ * @param language Source language identifier
+ * @param issues Mutable issues collector receiving order violation records
+ */
 export function auditFileLayoutOrder(
     imports: ImportStatementInfo[],
     language: string,
@@ -360,6 +377,13 @@ export function auditFileLayoutOrder(
     }
 }
 
+/**
+ * Audits whether top-level imports appear after non-import operational code statements.
+ * @param imports Collected import statements across the target file
+ * @param firstDeclarationLine Line number of the first substantive code declaration
+ * @param language Source language identifier
+ * @param issues Mutable issues collector receiving horizon violation records
+ */
 export function auditImportHorizon(
     imports: ImportStatementInfo[],
     firstDeclarationLine: number | undefined,
@@ -386,8 +410,10 @@ export function auditImportHorizon(
                 ],
                 triggerCondition: 'Import statement declared after non-import declarations',
                 risk: 'Violates top-down file layout and obscures module dependency horizons.',
-                suggestedFix: 'Hoist all import statements to the top import block before types, constants, and functions.',
-                verificationMethod: 'Verify import statements precede types, constants, and functions.',
+                suggestedFix:
+                    'Hoist all import statements to the top import block before types, constants, and functions.',
+                verificationMethod:
+                    'Verify import statements precede types, constants, and functions.',
                 file: imp.file,
                 canAutofix: true,
             });
@@ -405,10 +431,12 @@ export function auditImportHorizon(
     }
 }
 
-export const MAX_ANCESTOR_SEARCH_DEPTH = 3;
+const MAX_ANCESTOR_SEARCH_DEPTH = 3;
 
 /**
  * Safely reads and parses a JSON file, returning null if unreadable or invalid.
+ * @param filePath Absolute or relative path to the JSON file
+ * @returns Parsed JSON object, or null if reading or parsing failed
  */
 export function readJsonSafely(filePath: string): any | null {
     if (!fs.existsSync(filePath)) {
@@ -423,6 +451,9 @@ export function readJsonSafely(filePath: string): any | null {
 
 /**
  * Traverses parent directories to locate package.json for an installed package.
+ * @param rootDir Starting directory for ancestor traversal
+ * @param packageName Target npm package name to resolve
+ * @returns Parsed package.json manifest, or null if not found
  */
 export function findAncestorPackageManifest(rootDir: string, packageName: string): any | null {
     let currentDir = rootDir;
@@ -444,6 +475,8 @@ export function findAncestorPackageManifest(rootDir: string, packageName: string
 
 /**
  * Extracts normalized license identifier from a package.json manifest.
+ * @param manifest Parsed package.json object or raw metadata
+ * @returns Normalized license string, or null if absent
  */
 export function extractLicenseFromManifest(manifest: any): string | null {
     if (!manifest) return null;

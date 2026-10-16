@@ -1,7 +1,3 @@
-import type { NormalizedNode, NormalizedAst, LanguageAdapter, ProjectionSeed } from './multilang';
-import { NodeKind } from './multilang';
-import type { TreeSitterNode, TreeSitterParser } from './tree-sitter-types';
-
 /**
  * Module: Core Engine — Rust Language Adapter
  * File Path: src/core/ast/rust-adapter.ts
@@ -20,6 +16,10 @@ import type { TreeSitterNode, TreeSitterParser } from './tree-sitter-types';
  *   failures to Rust scans. A syntax-only CST is sufficient because the built-in analyzers
  *   are syntax-level, and the documented closure/macro tolerations mirror the TS adapter.
  */
+
+import type { NormalizedNode, NormalizedAst, LanguageAdapter, ProjectionSeed } from './multilang';
+import { NodeKind } from './multilang';
+import type { TreeSitterNode, TreeSitterParser } from './tree-sitter-types';
 
 // Lazily-initialized shared parser (safe: parse is synchronous, workers get their own copy).
 let parser: TreeSitterParser | null = null;

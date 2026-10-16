@@ -1,8 +1,3 @@
-import type { AnalyzerContext, Issue, FileMetric } from '../types';
-import type { NormalizedNode, LanguageAdapter, NodeProjector, ProjectionPolicy } from './multilang';
-import { NodeKind } from './multilang';
-import { computeEffectiveCodeDensity } from '../scoring/effectiveDensity';
-
 /**
  * Module: Core Engine — Multiplexed AST Traversal and Projection Routing
  * File Path: src/core/ast/traverse.ts
@@ -22,6 +17,11 @@ import { computeEffectiveCodeDensity } from '../scoring/effectiveDensity';
  *   falls back to materialized traversal. One descent replaces N re-walks, inlined scope
  *   frames avoid per-node allocation, and staying TypeScript-free preserves oxc byte parity.
  */
+
+import type { AnalyzerContext, Issue, FileMetric } from '../types';
+import type { NormalizedNode, LanguageAdapter, NodeProjector, ProjectionPolicy } from './multilang';
+import { NodeKind } from './multilang';
+import { computeEffectiveCodeDensity } from '../scoring/effectiveDensity';
 
 /** An analyzer + its per-file merged context, participating in the shared pass. */
 export interface StreamingEntry {

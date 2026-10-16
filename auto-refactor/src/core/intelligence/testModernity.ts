@@ -1,8 +1,3 @@
-export {
-    computeTestModernityMetrics,
-    evaluateTestModernityThresholds,
-} from './testModernityMetrics';
-
 /**
  * Module: Core Intelligence — Test Modernity & Contract Fulfillment
  * File Path: src/core/intelligence/testModernity.ts
@@ -17,6 +12,11 @@ export {
  * Exit Semantics & Design Rationale: Pure computational model and AST pattern analyzer;
  *   returns structured diagnostics and metrics.
  */
+
+export {
+    computeTestModernityMetrics,
+    evaluateTestModernityThresholds,
+} from './testModernityMetrics';
 
 import type {
     Issue,

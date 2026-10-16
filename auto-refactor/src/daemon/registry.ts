@@ -1,8 +1,3 @@
-import * as fs from 'fs';
-import * as os from 'os';
-import * as path from 'path';
-import { sha256Hex } from '../core/cache-key';
-
 /**
  * Module: Daemon — Per-Project Discovery Registry
  * File Path: src/daemon/registry.ts
@@ -25,6 +20,11 @@ import { sha256Hex } from '../core/cache-key';
  *   posix: ~/.cache/auto-refactor/daemon-*.json
  * Business caches live in the project itself (.auto-refactor-cache, pipeline doc §B3).
  */
+
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
+import { sha256Hex } from '../core/cache-key';
 
 /** Number of hex characters retained from the SHA-256 project root hash. */
 const PROJECT_HASH_LENGTH = 24;

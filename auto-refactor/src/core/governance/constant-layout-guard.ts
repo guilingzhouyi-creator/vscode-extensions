@@ -31,8 +31,7 @@ const LOCAL_USAGE_COUNT_MAX = 2;
 const DOMAIN_MODULE_CONSTANTS = 'module_constants';
 
 const TYPE_DECL_RE = /^(?:export\s+)?(?:interface|type)\s+([A-Za-z0-9_$]+)/;
-const FN_OR_CLASS_DECL_RE =
-    /^(?:export\s+)?(?:(?:async\s+)?function|class)\s+([A-Za-z0-9_$]+)/;
+const FN_OR_CLASS_DECL_RE = /^(?:export\s+)?(?:(?:async\s+)?function|class)\s+([A-Za-z0-9_$]+)/;
 const IMPORT_STATEMENT_RE = /^(?:import\s|import\{|require\(|export\s+(?:\*|\{)|from\s|use\s)/;
 const LOGIC_DECLARATION_RE =
     /^(?:(?:export\s+)?(?:function|class|interface|type)\b|describe\(|test\()/;

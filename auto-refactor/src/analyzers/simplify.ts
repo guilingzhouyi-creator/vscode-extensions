@@ -84,9 +84,24 @@ const RULE_SIM_EMPTY_001 = 'SIM-EMPTY-001';
 const RULE_SIM_PRNT_001 = 'SIM-PRNT-001';
 
 const LIFECYCLE_HOOK_NAMES: ReadonlySet<string> = new Set([
-    'oninit', 'onmounted', 'onmount', 'ondestroy', 'ondestroyed', 'onready',
-    'onstart', 'onstop', 'onclose', 'onopen', 'ontick', 'onexit', 'onenter',
-    '_ready', '_enter_tree', '_exit_tree', '_process', '_physics_process',
+    'oninit',
+    'onmounted',
+    'onmount',
+    'ondestroy',
+    'ondestroyed',
+    'onready',
+    'onstart',
+    'onstop',
+    'onclose',
+    'onopen',
+    'ontick',
+    'onexit',
+    'onenter',
+    '_ready',
+    '_enter_tree',
+    '_exit_tree',
+    '_process',
+    '_physics_process',
 ]);
 
 const HANDLER_OR_SOLVER_RE =
@@ -134,8 +149,14 @@ const DEFAULT_MAX_FUNCTION_PARAMETERS = 4;
 const DEFAULT_MIN_COMMENTED_CODE_LINES = 3;
 const DEFAULT_MAX_GUARD_CLAUSE_NESTING = 3;
 const DEFAULT_PRINT_ALLOW_PATTERNS = [
-    '**/cli/**', '**/scripts/**', '**/tests/**', '**/test/**',
-    '**/bench/**', '**/benchmark*/**', '**/*.test.*', '**/*.spec.*',
+    '**/cli/**',
+    '**/scripts/**',
+    '**/tests/**',
+    '**/test/**',
+    '**/bench/**',
+    '**/benchmark*/**',
+    '**/*.test.*',
+    '**/*.spec.*',
 ];
 
 /** Keyword-anchored "this comment is code" heuristic, language-neutral. */
@@ -592,7 +613,7 @@ export class SimplifyAnalyzer implements Analyzer {
         const file = ctx.filePath.replace(/\\/g, '/');
         const startLine = node.start?.line ?? 1;
 
-        // SIM-ARGS-001 for non-TS (TS handles this with type signatures in auditTypeScriptFunctions)
+        // SIM-ARGS-001 for non-TS (TS handles via type signatures in auditTypeScriptFunctions)
         if (!this.getOrParseSourceFile(ctx) && params.length > limit) {
             this.longFunctions.push({
                 id: `simplify:${RULE_SIM_ARGS_001}:${file}:${startLine}`,
@@ -612,8 +633,13 @@ export class SimplifyAnalyzer implements Analyzer {
             });
         }
 
-        // SIM-ARGS-002: Minimum parameter count on specialized handlers/solvers (TS handled in auditTypeScriptFunctions)
-        if (!this.getOrParseSourceFile(ctx) && params.length === 0 && isSemanticHandlerOrSolver(name)) {
+        // SIM-ARGS-002: Minimum parameter count on specialized handlers/solvers
+        // (TS handled in auditTypeScriptFunctions)
+        if (
+            !this.getOrParseSourceFile(ctx) &&
+            params.length === 0 &&
+            isSemanticHandlerOrSolver(name)
+        ) {
             this.longFunctions.push({
                 id: `simplify:${RULE_SIM_ARGS_002}:${file}:${startLine}`,
                 analyzer: ANALYZER_SIMPLIFY,

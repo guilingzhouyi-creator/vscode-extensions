@@ -1,9 +1,3 @@
-import * as child_process from 'child_process';
-import * as fs from 'fs';
-import * as path from 'path';
-import { projectHashFor, readRegistry, clearRegistry } from '../daemon/registry';
-import { DaemonClient } from '../daemon/client';
-
 /**
  * Module: CLI — Daemon Lifecycle Commands
  * File Path: src/cli/daemonCmd.ts
@@ -27,6 +21,12 @@ import { DaemonClient } from '../daemon/client';
  *   status: read the registry, ping the daemon, report pid/pipe/uptime or "not running".
  *   Docs: docs/01-architecture/02-pipeline-and-caching.md §A4.2
  */
+
+import * as child_process from 'child_process';
+import * as fs from 'fs';
+import * as path from 'path';
+import { projectHashFor, readRegistry, clearRegistry } from '../daemon/registry';
+import { DaemonClient } from '../daemon/client';
 
 /** Timeout for connect/ping probes against an already-registered daemon, in milliseconds. */
 const DAEMON_PROBE_TIMEOUT_MS = 300;

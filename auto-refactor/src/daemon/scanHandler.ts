@@ -1,17 +1,3 @@
-import * as path from 'path';
-import type {
-    ScanConfig,
-    ScanReport,
-    DiffDeltaReport,
-    WarmStats,
-    DiffInput,
-    DiffStats,
-} from '../core/types';
-import type { WarmSession } from '../core/analyzer';
-import { Scanner, WorkerPoolManager, createWarmSession } from '../core/analyzer';
-import { CacheStore } from '../core/cache';
-import { Logger } from '../core/logger';
-
 /**
  * Module: Daemon — Warm/Diff Scan Handler
  * File Path: src/daemon/scanHandler.ts
@@ -33,6 +19,20 @@ import { Logger } from '../core/logger';
  *   session = per-fingerprint per-file results (L1 hit means zero reads on a repeat scan);
  *   cache = one CacheStore per project, loaded once and kept in memory.
  */
+
+import * as path from 'path';
+import type {
+    ScanConfig,
+    ScanReport,
+    DiffDeltaReport,
+    WarmStats,
+    DiffInput,
+    DiffStats,
+} from '../core/types';
+import type { WarmSession } from '../core/analyzer';
+import { Scanner, WorkerPoolManager, createWarmSession } from '../core/analyzer';
+import { CacheStore } from '../core/cache';
+import { Logger } from '../core/logger';
 
 /**
  * Long-lived daemon assets shared by every scan request: persistent worker pools, the
