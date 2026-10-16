@@ -83,7 +83,7 @@ var canonical_id: String = ""
 var magic_form: MagicForm = MagicForm.INCANTATION
 var magic_rank: MagicRank = MagicRank.RANK_1
 var ability_tier: AbilityTier = AbilityTier.ESP   # 能力分级（独立平行维度）
-# ：弱映射候选集合——与 ability_tier 标量分离（候选可有空/多项，顺序稳定排序；禁止隐式类型转换）
+# 弱映射候选集合——与 ability_tier 标量分离（候选可有空/多项，顺序稳定排序；禁止隐式类型转换）
 var ability_tier_candidates: Array = []
 var rank_band: MagicRankBand = MagicRankBand.LOW   # 阶位档次（第三平行维度）
 var mana_aptitude: ManaAptitude = ManaAptitude.MANA_ADAPTOR
@@ -98,7 +98,7 @@ var backfire_threshold: int = 1        # 资质反噬阈值（配置驱动）
 # ==============================================================================
 
 ## 阶位单调映射：MagicRank -> 1~11（唯一事实源，严格递增，禁跨级倒置）。
-## ：非法值返回 0（显式未登记哨兵——不静默伪装为一阶；仅展示层允许配置化安全兜底）
+## 非法值返回 0（显式未登记哨兵——不静默伪装为一阶；仅展示层允许配置化安全兜底）
 static func rank_to_level(rank: MagicRank) -> int:
 	var v: int = int(rank)
 	return v if v >= 1 and v <= 11 else 0

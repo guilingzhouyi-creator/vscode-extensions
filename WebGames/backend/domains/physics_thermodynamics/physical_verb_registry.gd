@@ -118,3 +118,14 @@ class CombatNarrativeEventPacket extends RefCounted:
 	var is_interrupted: bool = false
 	var narrative_text: String = ""
 	var timestamp_tick: int = 0
+
+	func reset_state() -> void:
+		actor_id = ""
+		target_id = ""
+		verb_name = ""
+		raw_damage = 0.0
+		absorbed_damage = 0.0
+		final_damage = 0.0
+		is_interrupted = false
+		narrative_text = ""
+		timestamp_tick = 0

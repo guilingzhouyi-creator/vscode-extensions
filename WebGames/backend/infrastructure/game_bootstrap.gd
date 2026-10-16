@@ -22,11 +22,11 @@ const ObjectPoolManager = preload("res://backend/infrastructure/object_pool_mana
 
 static var _assembled: bool = false
 static var _catalog: ItemRegistryCatalog = null
-static var _magic_registry: MagicTierRegistry = null  # ：魔法体系统一登记注册表（唯一装配）
-static var _magic_rules: MagicRuleRegistry = null     # ：统一魔法规则注册表（唯一装配）
-static var _ground_loot_listener: GroundLootEventListener = null  # GAP-05：地面掉落事件监听器
+static var _magic_registry: MagicTierRegistry = null  # 魔法体系统一登记注册表（唯一装配）
+static var _magic_rules: MagicRuleRegistry = null     # 统一魔法规则注册表（唯一装配）
+static var _ground_loot_listener: GroundLootEventListener = null  # 地面掉落事件监听器
 static var _quality_registry: QualityTierRegistry = null  # 品质登记表装配期单例（懒装配，见 quality_tier_registry()）
-static var _active_context: VersionedRuntimeContext = null # ：当前激活的版本化运行时上下文
+static var _active_context: VersionedRuntimeContext = null # 当前激活的版本化运行时上下文
 
 # ==============================================================================
 # 二、装配 / 反装配
@@ -43,22 +43,22 @@ static func assemble() -> Dictionary:
 		}
 	GameConfig.ensure_loaded()
 	ObjectPoolManager.initialize()
-	# ：EventBus 2.0 生产单例装配（配置驱动参数；幂等，get_instance 惰性创建）
+	# EventBus 2.0 生产单例装配（配置驱动参数；幂等，get_instance 惰性创建）
 	EventBusCore.get_instance().initialize_from_config()
 	if not _security_ready():
 		return {"success": false, "error_code": "SECURITY_CONFIG_INVALID"}
-	# ：魔法体系统一登记注册表唯一装配——就绪失败阻断装配（不暴露半成品）
+	# 魔法体系统一登记注册表唯一装配——就绪失败阻断装配（不暴露半成品）
 	_magic_registry = MagicTierRegistry.new()
 	_magic_registry.reload_configuration()
 	if not _magic_registry.is_ready():
 		return {"success": false, "error_code": "MAGIC_REGISTRY_INVALID"}
-	# ：统一魔法规则注册表唯一装配——就绪失败阻断装配（不暴露半成品）
+	# 统一魔法规则注册表唯一装配——就绪失败阻断装配（不暴露半成品）
 	_magic_rules = MagicRuleRegistry.new()
 	_magic_rules.reload_configuration()
 	if not _magic_rules.is_ready():
 		return {"success": false, "error_code": "MAGIC_RULES_REGISTRY_INVALID"}
 	_catalog = ItemLoaderPipeline.build_catalog_from_config()
-	# GAP-05：掉落事件监听器装配（注入注册表 catalog，订阅 monster.killed → 地面掉落声明）
+	# 掉落事件监听器装配（注入注册表 catalog，订阅 monster.killed → 地面掉落声明）
 	_ground_loot_listener = GroundLootEventListener.new(_catalog)
 	GmCommandCatalog.register_default_commands()
 	_assembled = true
@@ -131,17 +131,17 @@ static func catalog() -> ItemRegistryCatalog:
 	assemble()
 	return _catalog
 
-## ：访问装配后的魔法登记注册表（解析器/消费方经此注入 registry 查询接口——禁直接读配置）
+## 访问装配后的魔法登记注册表（解析器/消费方经此注入 registry 查询接口——禁直接读配置）
 static func magic_registry() -> MagicTierRegistry:
 	assemble()
 	return _magic_registry
 
-## ：访问装配后的统一魔法规则注册表（规则引擎/求解器经此查询配置段）
+## 访问装配后的统一魔法规则注册表（规则引擎/求解器经此查询配置段）
 static func magic_rules_registry() -> MagicRuleRegistry:
 	assemble()
 	return _magic_rules
 
-## GAP-05：访问装配后的地面掉落事件监听器（衰变清理/拾取链路消费方经此取活跃掉落物）
+## 访问装配后的地面掉落事件监听器（衰变清理/拾取链路消费方经此取活跃掉落物）
 static func ground_loot_listener() -> GroundLootEventListener:
 	assemble()
 	return _ground_loot_listener
@@ -160,7 +160,7 @@ static func quality_tier_registry() -> QualityTierRegistry:
 static func is_assembled() -> bool:
 	return _assembled
 
-## ：全域反装配（对称幂等）：释放静态单例、解绑全局事件监听器并重置装配标记
+## 全域反装配（对称幂等）：释放静态单例、解绑全局事件监听器并重置装配标记
 static func teardown() -> Dictionary:
 	if not _assembled:
 		return {

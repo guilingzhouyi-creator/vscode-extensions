@@ -35,11 +35,19 @@ class SpatialTriggerArea extends RefCounted:
 	var current_state: TriggerState = TriggerState.OUTSIDE
 
 	## 触发区构造（ID/圆心/半径，圆形默认形状）
-	func _init(p_id: String, p_center: Vector2, p_radius: float) -> void:
+	func _init(p_id: String = "", p_center: Vector2 = Vector2.ZERO, p_radius: float = -1.0) -> void:
 		trigger_id = p_id
 		shape = TriggerShape.CIRCLE_RADIUS
 		center_pos = p_center
-		radius = p_radius
+		radius = p_radius if p_radius >= 0.0 else GameConfig.get_float("domains.spatial_movement", "trigger/default_radius", 5.0)
+
+	func reset_state() -> void:
+		trigger_id = ""
+		shape = TriggerShape.CIRCLE_RADIUS
+		center_pos = Vector2.ZERO
+		radius = GameConfig.get_float("domains.spatial_movement", "trigger/default_radius", 5.0)
+		rect_extents = Rect2()
+		current_state = TriggerState.OUTSIDE
 
 ## 触发状态求值：圆形/AABB 包含判定 → ENTERED/INSIDE/EXITED/OUTSIDE 状态机迁移
 static func evaluate_trigger_state(trigger: SpatialTriggerArea, entity_pos: Vector2) -> TriggerState:
