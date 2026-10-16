@@ -95,6 +95,30 @@ description: >-
 - **参数列表传参优先**：调用子进程时优先使用参数列表（ArgumentList 数组）形式替代原始字符串拼接执行，从语义层面彻底阻断 Shell 字符重分词与命令注入隐患；
 - **路径规范化统一收口**：在 Windows 平台统一使用 `Join-Path` 或 `Convert-Path` 规整斜杠与盘符，Bash 脚本统一规整绝对路径后再行双引号包裹。
 
+### 6. 平台与门禁脚本更名五维拓扑闭环规范 (Script Rename 5D Topology Checklist)
+
+当重命名、移动或废弃 `scripts/` 下的门禁、治理或测试工具脚本时（例如 `validate-hygiene.js` $\to$ `validate-physical-hygiene.js`），严禁仅修改单一入口。必须严格依序排查并同步更新以下五维引用拓扑：
+
+```mermaid
+flowchart LR
+    Rename["重命名/废弃目标脚本"] --> D1["1. CI 流水线<br/>.github/workflows/*.yml"]
+    Rename --> D2["2. SubAgent 原型<br/>.agents/subagents/archetypes/*.json"]
+    Rename --> D3["3. 单源规则目录<br/>scripts/common/rule-catalog.json"]
+    Rename --> D4["4. 架构与规范文档<br/>docs/**/*.md, AGENTS.md"]
+    Rename --> D5["5. 聚合门禁总督<br/>scripts/ps1/audit-all.ps1 等"]
+```
+
+1. **第一维：远端 CI 自动化流水线 (`.github/workflows/`)**：
+   检索 CI 工作流 YAML 中所有的 `run: node scripts/...` 与 `run: pwsh scripts/...`，确保 Actions 步骤调用的脚本路径 100% 有效；
+2. **第二维：SubAgent 原型与角色元数据 (`.agents/subagents/archetypes/`)**：
+   检索 `tool_requirements`、`responsibilities` 及自检建议命令中的脚本名称，避免派生的 SubAgent 执行不存在的废弃命令；
+3. **第三维：全工作区单源规则目录 (`scripts/common/rule-catalog.json`)**：
+   若该脚本负责承载或检验特定规则，同步更新规则元数据中的 `source` 或说明字段，运行 `node scripts/common/generate-rule-catalog.js --check-only` 验证；
+4. **第四维：治理规范与蓝图说明文档 (`docs/`, `AGENTS.md`)**：
+   同步更新 `AGENTS.md` 快速作业路由中枢及 `docs/system-spec/` 中的脚本指针，消除所有相对断链；
+5. **第五维：聚合门禁脚本与本地 Git 钩子 (`scripts/ps1/`, `scripts/sh/`)**：
+   同步更新 `audit-all.ps1/sh`、`pre-commit-gate.ps1` 中的受控调用链。
+
 ---
 
 ## 五、 零黑话纪律与技术事实守则

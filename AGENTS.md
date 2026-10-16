@@ -83,14 +83,14 @@
 | 项目 | 核心专属约束与架构红线 | 专属构建/测试命令 | 权威真源指针 |
 | :--- | :--- | :--- | :--- |
 | **`workspace-timing/`**<br/>*(VS Code 扩展)* | ① UI 文本 100% 接入双语字典（zh-CN/en），严禁硬编码未翻译文案与内部技术黑话；<br/>② 审查规则单源登记于 `workspace-timing/scripts/config/review-rules.json`；<br/>③ `tsconfig.json` 保持 `declaration: false` 极速构建。 | `npm run compile`<br/>`npm run test:fast`<br/>`npm run review` | [workspace-timing/README.md](workspace-timing/README.md)<br/>[architecture.md](workspace-timing/docs/architecture.md) |
-| **`auto-refactor/`**<br/>*(Node CLI 引擎)* | ① 30 分析器与 338 条内置规则全量自测 (155/155 套测试)，零孤儿用例；<br/>② Rust 原生算子内核与 pure-TS shim 100% 字节等价；<br/>③ 时间戳强制携带 `*Ms` 物理量纲，紧凑账本遵循 `compactStagingPath` 暂存与原子落盘；Praxis 客户端 SDK 与拓扑差分协议对齐；<br/>④ 单分析器扣分遵循 `MAX_AXES_PER_FINDING <= 4`；受 `validate-project-neutrality.js` 项目中立性守卫管束。 | `npm run gate`<br/>`npm run build`<br/>`npm test` | [auto-refactor/DOCS.md](auto-refactor/DOCS.md)<br/>[auto-refactor/package.json](auto-refactor/package.json) |
-| **`WebGames/`**<br/>*(Godot 引擎)* | ① 统一经 `GameConfig.get_*` 读取配置，严禁根目录平铺配置；<br/>② 视图零业务计算，数据一律经 `apply_snapshot()` 注入；<br/>③ 高承压对象池循环内零瞬态堆分配（`ADV-PRF-002`），必须实现 `reset_state()`；<br/>④ 改动必须先立四阶段方案细则（严格仅 4 份文件），获批后方可编码。 | `check-gdscript.sh`<br/>`test-run.sh`<br/>`audit-all.sh` | [WebGames/docs/README.md](WebGames/docs/README.md)<br/>[路线图总索引.md](WebGames/docs/路线图/路线图总索引.md) |
+| **`auto-refactor/`**<br/>*(Node CLI 引擎)* | ① 30 分析器与 338 条内置规则全量自测 (155/155 套测试)，零孤儿用例；<br/>② Rust 原生算子内核与 pure-TS shim 100% 字节等价；<br/>③ 时间戳强制携带 `*Ms` 物理量纲，紧凑账本遵循 `compactStagingPath` 暂存与原子落盘；Praxis 客户端 SDK 与拓扑差分协议对齐；<br/>④ 单分析器扣分遵循 `MAX_AXES_PER_FINDING <= 4`；受 `validate-project-neutrality.js` 项目中立性守卫管束；<br/>⑤ 严禁在 IPC 守护进程与事件循环关键路径中使用 `*Sync` 同步阻塞 I/O（`GOV-PRF-004` / `PRF-IO-001`）；<br/>⑥ 函数形参 $\ge 4$ 个时强制采用强类型参数对象封装（`SIM-ARGS-001`）。 | `npm run gate`<br/>`npm run build`<br/>`npm test` | [auto-refactor/DOCS.md](auto-refactor/DOCS.md)<br/>[auto-refactor/package.json](auto-refactor/package.json) |
+| **`WebGames/`**<br/>*(Godot 引擎)* | ① 统一经 `GameConfig.get_*` 读取配置，严禁根目录平铺配置；<br/>② 视图零业务计算，数据一律经 `apply_snapshot()` 注入；<br/>③ 高承压对象池循环内零瞬态堆分配（`ADV-PRF-002`），必须实现 `reset_state()`；<br/>④ 改动必须先立四阶段方案细则（严格仅 4 份文件），获批后方可编码；<br/>⑤ 异步派发器必须具备互斥保护与单任务防重入调度机制；必须提供同步 `pump()` 与 `flush()`/`teardown()` 并在测试用例结束前显式排空，严禁残留孤儿 `WorkerThreadPool` 任务导致无头进程退出挂起阻塞。 | `check-gdscript.sh`<br/>`test-run.sh`<br/>`audit-all.sh` | [WebGames/docs/README.md](WebGames/docs/README.md)<br/>[路线图总索引.md](WebGames/docs/路线图/路线图总索引.md) |
 
 ---
 
 ## 四、 工作区一票否决红线禁令
 
-1. **路径与引用红线**：严禁在代码或配置中书写绝对路径、盘符或 `file:///`；重命名或删除文件必须同步修正全库所有引用点；严禁私自修改 baseline/基线文件以消音违规；
+1. **路径与引用红线**：严禁在代码或配置中书写绝对路径、盘符或 `file:///`；重命名、移动或废弃任何脚本与源码文件时，必须严格执行全仓五维引用拓扑闭环（CI 流水线 `.github/workflows/`、SubAgent 原型 `.agents/subagents/archetypes/`、单源规则目录 `rule-catalog.json`、架构说明文档 `docs/`、门禁总督 `audit-all.ps1/sh`），严禁遗留断链与失效指针；严禁私自修改 baseline/基线文件以消音违规；
 2. **规则与防刷分红线**：严禁私自放宽各项目的 linter、formatter、naming 规则或门禁脚本阈值；改动若 $\text{ELOC}_{semantic} \le 15\%$ 且无真实技术债净消除，强制冻结收益并触发 `BLOCK_GAMING_DETECTED` 熔断；
 3. **交付与完整性红线**：严禁创建或遗留 0 字节文件、纯空白文件或仅含占位符、未决 TODO 的半成品代码；严禁未获批准提前在任务路线图上标记完成；严禁交付未通过全量回归测试的缩水实现；
 4. **方案、注释与黑话红线**：方案目录下严格仅允许四阶段细则文件；严禁在 `tests/unit/` 根目录平铺散落脚本；严禁遗留假逻辑空分支与幽灵注释；严禁在代码标识符、测试用例、JSDoc 注释与提交信息中使用施工批次与敏捷工期黑话代号（如 `p[0-9]+`, `W1-W9`, `Pass 1..6`）；

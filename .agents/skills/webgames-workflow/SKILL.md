@@ -105,7 +105,13 @@ description: >-
 4. **双向领域对齐**：新增后端领域测试必须在 `config/infrastructure/domains.json` 与 `test_registry.gd` 中双向注册；
 5. **排版契约与体积预算**：GDScript 源码严格采用 LF 换行符、`snake_case` 命名风格与标准缩进；核心脚本受单文件双轨体积（$\text{ELOC} \le 900 / \text{LOC} \le 1400$）、1:3 动态反推包络及高负荷脚本（$\text{ELOC} \ge 600$）注释密度 $\ge 8\%$ 约束；
 6. **模块头部文档契约**：核心后端求解器与视图控制器入口必须在首行呈现对齐工作区六字段标准的文档块（`Module`, `File Path`, `Architecture Role`, `Dependencies & Triggers`, `Responsibilities`, `Exit Semantics & Design Rationale`）；
-7. **零高危技术债务防线**：全工作区 High/Critical 技术债务历史性归零（0 项），新增改动与架构改造严禁引入任何技术债务反弹（一票否决）。
+7. **零高危技术债务防线**：全工作区 High/Critical 技术债务历史性归零（0 项），新增改动与架构改造严禁引入任何技术债务反弹（一票否决）；
+8. **无头自动化测试并发生命周期与 WorkerThreadPool 汇合守卫**：
+   - **后台任务互斥同步**：涉及多线程派发（如遥测流、后台计算）的服务（如 `AgentAsyncDispatcher`），必须内置 `Mutex` 锁保护核心队列；
+   - **单任务防重入调度**：派发任务进入 `WorkerThreadPool` 前必须检测活跃 Task ID，严禁高频调用时创建无节制的并发孤儿任务；
+   - **测试生命周期显式排空**：派发器必须对外提供同步 `pump()`（立即排空待处理队列）与 `flush()`/`teardown()`（等待后台任务完全退出并释放资源）接口；
+   - **测试用例清理契约**：在集成测试用例的清理分支中，必须显式调用 `flush()` 清理后台任务，确保 Godot 引擎在无头模式退出时不会因等待未完成的工作线程而产生死锁超时（10000ms 挂起）；
+   - **超时排错能见度**：测试运行脚本（`test-run.sh` / `test-run.ps1`）在发生超时失败时，必须自动截取并输出测试日志末尾最后 50 行，提供明确的挂死点上下文。
 
 ---
 

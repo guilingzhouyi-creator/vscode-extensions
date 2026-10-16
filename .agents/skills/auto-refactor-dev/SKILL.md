@@ -84,13 +84,23 @@ description: >-
 
 ---
 
-## 五、 高精度时间戳规范与暂存分流原子落盘
+## 五、 守护进程架构、高精度时间戳规范与暂存分流原子落盘
 
-1. **高精度时间戳命名契约 (`*Ms`)**：所有时间字段必须以 `*Ms` 结尾显式声明毫秒物理量纲（如 `parseStartTimeMs`、`startMs`、`endMs`、`durationMs`），严禁使用 `time`、`ts`、`startTime` 等无量纲模糊命名。
-2. **暂存路径精确语义分流**：
+1. **守护进程异步非阻塞 I/O 铁律 (`GOV-PRF-004` / `PRF-IO-001`)**：
+   - 守护进程服务器（`src/daemon/server.ts`）与客户端 SDK 位于主进程常驻事件循环中；
+   - 严禁在套接字连接建立、客户端握手或清理遗留套接字时使用 `fs.unlinkSync`、`fs.readFileSync` 等阻塞调用；
+   - 套接字清理必须采用 Promise 封装的异步操作，并通过 `catch` 优雅处理 `ENOENT` 正常缺失状态。
+2. **协议指令与错误码顶部常量聚类 (`NAM-LEN-002`)**：
+   - 严禁在 IPC 协议路由分支、扫描结果封装或退出码判定中散落硬编码魔法字符串；
+   - 所有 IPC 消息类型（`SCAN`, `SCAN_DIFF`, `CANCEL`）、信号类型（`SIGTERM`, `SIGINT`）、退出原因必须在模块顶部统一声明为不可变常量对象（如 `IPC_MESSAGE_TYPES`, `EXIT_REASONS`）。
+3. **跨平台测试与基准临时路径中立性**：
+   - 测试脚本与基准套件（`benchmark.js`）严禁硬编码 Windows 盘符（如 `C:\...`）或固定绝对路径；
+   - 统一采用 Node.js `os.tmpdir()` 结合唯一前缀生成独立测试沙箱。
+4. **高精度时间戳命名契约 (`*Ms`)**：所有时间字段必须以 `*Ms` 结尾显式声明毫秒物理量纲（如 `parseStartTimeMs`、`startMs`、`endMs`、`durationMs`），严禁使用 `time`、`ts`、`startTime` 等无量纲模糊命名。
+5. **暂存路径精确语义分流**：
    - `stagingPath`：存放完整未压缩构建、代码切片或阶段产物的标准暂存路径；
    - `compactStagingPath`：存放脱敏、去冗余、紧凑 NDJSON 账本的专用暂存路径；严禁使用 `tmp`、`stage`、`tempDir`。
-3. **暂存原子落盘 (Atomic Rename)**：数据先完整写入暂存文件并校验尺寸/Checksum，再通过 `fs.renameSync` 原子替换目标文件，根除半写（Torn Write）风险。
+6. **暂存原子落盘 (Atomic Rename)**：数据先完整写入暂存文件并校验尺寸/Checksum，再通过 `fs.renameSync` 原子替换目标文件，根除半写（Torn Write）风险。
 
 ---
 
