@@ -80,6 +80,10 @@ const RE_STYLE_FILE_EXT = /\.(?:css|scss|less|sass)\b/i;
 /** Regular expression identifying diagnostic or logging message prefixes. */
 const RE_DIAGNOSTIC_LOG_PREFIX = /^(?:error|failed|warning|info|debug|trace|fatal|assert):/i;
 
+/** Regular expression identifying diagnostic or logging invocation parent contexts. */
+const RE_DIAGNOSTIC_CALL_PARENT =
+    /(?:log(?:ger\b|ging\b|\()|console\.|print\(|new\s+error|raise\s+|reject\(|exit\(|warn(?:ing)?\(|echo\s+|write-host\b)/;
+
 /** Regular expression stripping enclosing quotes from string literals. */
 const RE_OUTER_QUOTES = /^['"`]|['"`]$/g;
 
@@ -424,25 +428,7 @@ export class ConstantsAnalyzer implements Analyzer {
         if (inner.startsWith('[') && inner.includes(']')) return true;
         if (RE_DIAGNOSTIC_LOG_PREFIX.test(inner)) return true;
         const parentText = lit.parent?.text?.toLowerCase();
-        if (
-            parentText &&
-            (parentText.includes('log(') ||
-                parentText.includes('logger.') ||
-                parentText.includes('logging.') ||
-                parentText.includes('console.') ||
-                parentText.includes('print(') ||
-                parentText.includes('new error') ||
-                parentText.includes('raise ') ||
-                parentText.includes('reject(') ||
-                parentText.includes('exit(') ||
-                parentText.includes('warn(') ||
-                parentText.includes('warning(') ||
-                parentText.includes('echo ') ||
-                parentText.includes('write-host'))
-        ) {
-            return true;
-        }
-        return false;
+        return Boolean(parentText && RE_DIAGNOSTIC_CALL_PARENT.test(parentText));
     }
 
     private isHardcodedContextAllowed(

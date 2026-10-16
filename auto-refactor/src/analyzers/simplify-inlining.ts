@@ -180,6 +180,21 @@ function collectMicroCandidates(sf: ts.SourceFile): MicroCandidate[] {
     return candidates;
 }
 
+function matchPropAccessCall(p: ts.Node): ts.Node | null {
+    if (!ts.isPropertyAccessExpression(p)) return null;
+    const gp = p.parent;
+    return gp && ts.isCallExpression(gp) && gp.expression === p ? gp : null;
+}
+
+function matchCallSite(node: ts.Node, targetName: string, targetNode: ts.Node): ts.Node | null {
+    if (!ts.isIdentifier(node)) return null;
+    if (node.text !== targetName || node === targetNode) return null;
+    const p = node.parent;
+    if (!p) return null;
+    if (ts.isCallExpression(p) && p.expression === node) return p;
+    return matchPropAccessCall(p);
+}
+
 function findSingleCallSite(
     sf: ts.SourceFile,
     targetName: string,
@@ -187,17 +202,9 @@ function findSingleCallSite(
 ): ts.Node | null {
     const callSites: ts.Node[] = [];
     const findCalls = (node: ts.Node): void => {
-        if (ts.isIdentifier(node) && node.text === targetName && node !== targetNode) {
-            if (ts.isCallExpression(node.parent) && node.parent.expression === node) {
-                callSites.push(node.parent);
-            } else if (
-                ts.isPropertyAccessExpression(node.parent) &&
-                node.parent.name === node &&
-                ts.isCallExpression(node.parent.parent) &&
-                node.parent.parent.expression === node.parent
-            ) {
-                callSites.push(node.parent.parent);
-            }
+        const site = matchCallSite(node, targetName, targetNode);
+        if (site) {
+            callSites.push(site);
         }
         ts.forEachChild(node, findCalls);
     };

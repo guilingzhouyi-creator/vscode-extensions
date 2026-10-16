@@ -86,9 +86,11 @@ function resolveLoopScaleVariable(lineText: string): string {
  */
 function braceMatchedEnd(masked: string[], headerLine: number, cap: number): number {
     let depth = 0;
+    const firstLineStr = masked[headerLine - 1] ?? '';
+    const firstCharIdx = Math.max(0, firstLineStr.lastIndexOf(')'));
     for (let l = headerLine; l <= cap; l++) {
         const lineStr = masked[l - 1] ?? '';
-        const startCharIdx = l === headerLine ? Math.max(0, lineStr.lastIndexOf(')')) : 0;
+        const startCharIdx = l === headerLine ? firstCharIdx : 0;
         for (let c = startCharIdx; c < lineStr.length; c++) {
             const ch = lineStr[c];
             if (ch === '{') depth++;
@@ -158,7 +160,10 @@ function loopBodyRange(
     const trimmedHeader = header.trim();
     if (trimmedHeader.endsWith(':') && !header.includes('{')) {
         const baseIndent = header.length - header.trimStart().length;
-        return { from: headerLine + 1, to: indentationLoopBodyEnd(targetLines, headerLine, baseIndent, cap) };
+        return {
+            from: headerLine + 1,
+            to: indentationLoopBodyEnd(targetLines, headerLine, baseIndent, cap),
+        };
     }
 
     const afterParen = header.slice(header.lastIndexOf(')') + 1);
@@ -284,6 +289,19 @@ function inspectLoopBody(
     return { hasTransientAllocation, hasBlockingIo, isTautological, deltaEntropy };
 }
 
+function isLoopHeaderCandidate(
+    trimmed: string,
+    lineText: string,
+    isIndentedLang: boolean,
+): boolean {
+    if (trimmed.charCodeAt(0) === 47 /* '/' */ || trimmed.charCodeAt(0) === 35 /* '#' */)
+        return false;
+    if (!LOOP_HEADER_RE.test(lineText)) return false;
+    if (!isIndentedLang) return true;
+    if (trimmed.indexOf(':') === -1) return false;
+    return /^(?:[a-zA-Z0-9_$]+:\s*)?(?:for\s|while\s)/.test(trimmed);
+}
+
 /**
  * Collect the loop sites declared inside one function.
  *
@@ -315,12 +333,7 @@ export function findLoopSitesInFunction(
     for (let l = startLine; l <= endLine && l <= lines.length; l++) {
         const lineText = lines[l - 1] ?? '';
         const trimmed = lineText.trim();
-        if (trimmed.startsWith('//') || trimmed.startsWith('#')) continue;
-        if (!LOOP_HEADER_RE.test(lineText)) continue;
-        if (isIndentedLang) {
-            const startsWithLoop = /^(?:[a-zA-Z0-9_$]+:\s*)?(?:for\s|while\s)/.test(trimmed);
-            if (!startsWithLoop || !trimmed.includes(':')) continue;
-        }
+        if (!isLoopHeaderCandidate(trimmed, lineText, isIndentedLang)) continue;
 
         const scaleVariable = resolveLoopScaleVariable(lineText);
         const body = loopBodyRange(masked, l, endLine, lines);
