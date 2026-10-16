@@ -1,9 +1,9 @@
 {
   "schema": "workspace-rule-catalog/v1",
-  "generatedAt": "2026-10-16T13:59:22.251Z",
-  "totalRules": 464,
+  "generatedAt": "2026-10-16T15:38:12.435Z",
+  "totalRules": 468,
   "counts": {
-    "autoRefactor": 347,
+    "autoRefactor": 351,
     "workspaceTiming": 49,
     "webGames": 77,
     "globalTooling": 21
@@ -661,6 +661,13 @@
       "summary": "File header declared path does not match actual physical file path."
     },
     {
+      "id": "CMT-HDR-004",
+      "project": "auto-refactor",
+      "family": "CMT",
+      "severity": "warning",
+      "summary": "File layout order violation: top-level six-field module header comment must precede all non-directive code statements."
+    },
+    {
       "id": "CMT-INT-001",
       "project": "auto-refactor",
       "family": "CMT",
@@ -736,6 +743,13 @@
       "family": "CONST",
       "severity": "warning",
       "summary": "Module-level constants must be placed in the primary declaration section immediately following imports, not scattered within functions or business logic."
+    },
+    {
+      "id": "CONST-LAY-002",
+      "project": "auto-refactor",
+      "family": "CONST",
+      "severity": "warning",
+      "summary": "Type definitions, interfaces, and contract shapes must be declared before core functions and business logic classes."
     },
     {
       "id": "CONST-LIB-001",
@@ -932,6 +946,13 @@
       "family": "DEP",
       "severity": "info",
       "summary": "File layout and import grouping do not conform to modern polyglot engineering standards."
+    },
+    {
+      "id": "DEP-ORD-002",
+      "project": "auto-refactor",
+      "family": "DEP",
+      "severity": "warning",
+      "summary": "File layout order violation: top-level import statement declared after contract types, constants, or business logic statements."
     },
     {
       "id": "DEP-PHANTOM-001",
@@ -2801,6 +2822,13 @@
       "family": "SIM",
       "severity": "warning",
       "summary": "Function signature parameter count exceeds threshold (> 4 parameters); refactoring with a ParameterObject recommended."
+    },
+    {
+      "id": "SIM-ARGS-002",
+      "project": "auto-refactor",
+      "family": "SIM",
+      "severity": "warning",
+      "summary": "Minimum parameter count threshold breached: public handler, listener, or solver function declares 0 parameters, risking implicit coupling with mutable global state."
     },
     {
       "id": "SIM-BOOL-001",

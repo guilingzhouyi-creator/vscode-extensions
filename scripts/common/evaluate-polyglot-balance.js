@@ -160,8 +160,9 @@ async function samplePythonScore(fastMode = false) {
     if (scanResult.qualityScore && typeof scanResult.qualityScore.compositeScore === 'number') {
       return Math.round(scanResult.qualityScore.compositeScore * 100) / 100;
     }
-  } catch {
-    // Fallback on scan failure
+  } catch (scanErr) {
+    // Best-effort scan fallback: ignore error and return default fallback score
+    void scanErr;
   }
   return LANG_CONFIG.python.defaultFallbackScore;
 }

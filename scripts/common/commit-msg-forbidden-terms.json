@@ -131,7 +131,12 @@
         "全部通过",
         "退出码0全部验证完毕",
         "门禁全部PASS",
-        "全部验证完毕"
+        "全部验证完毕",
+        "完美闭环",
+        "彻底清零",
+        "全量通过并合规",
+        "零违规零错误",
+        "零缺陷全部达标"
       ],
       "asciiPatterns": [
         "\\b(game-?changer|groundbreaking|paradigm\\s*shift|revolutionary|epoch-?making|monumental|quantum\\s*leap|milestone\\s*breakthrough)\\b",
@@ -139,7 +144,8 @@
         "\\b(remove\\s*(boastful|promotional|hyped)\\s*(words?|vocabulary|terms?|language)?)\\b",
         "\\b(adjust(ing)?\\s*(the\\s*)?(tone|wording\\s*tone|writing\\s*style))\\b",
         "\\b(meta-?narrative|style\\s*refactoring|style\\s*upgrade|factual\\s*and\\s*pragmatic)\\b",
-        "\\b(?:all\\s*(?:gates?\\s*)?pass(?:ed)?|exit\\s*code\\s*0\\s*(?:all\\s*)?verified)\\b"
+        "\\b(?:all\\s*(?:gates?\\s*)?pass(?:ed)?|exit\\s*code\\s*0\\s*(?:all\\s*)?verified)\\b",
+        "\\b(perfect\\s*closed-?loop|completely\\s*cleared|zero\\s*violations?)\\b"
       ],
       "reason": "严禁将治理要求、自省表态或文风口号当作改动正文提交（无论中英文），提交说明必须纯粹记录技术改动事实。",
       "guidance": "请直接列出修改的具体文件与小节内容，例如：'更新 README.md 中各项目状态标注，说明部分模块仍处于探索与未完成阶段'。"
@@ -170,14 +176,18 @@
         "项自测",
         "全部通过",
         "套件通过",
-        "检查通过"
+        "检查通过",
+        "全部达标",
+        "测试全绿",
+        "全绿通过"
       ],
       "asciiPatterns": [
         "\\b(?:exit|return)\\s*(?:code\\s*)?0\\b",
         "\\bexit\\s*status\\s*0\\b",
         "\\bwithout\\s*errors?\\b",
         "\\b\\d+\\s*(?:tests?|suites?|items?|checks?)\\s*pass(?:ed)?\\b",
-        "\\ball\\s*\\d*\\s*(?:checks?|tests?|suites?)\\s*pass(?:ed)?\\b"
+        "\\ball\\s*\\d*\\s*(?:checks?|tests?|suites?)\\s*pass(?:ed)?\\b",
+        "\\b(all\\s*(?:tests?\\s*)?green|100%\\s*pass(ed)?)\\b"
       ],
       "reason": "提交说明是长期技术档案，[Verification] 区块严禁使用'退出码0'、'双端返回0'、'XX项检查通过'等程序化流水账替代具体输入输出与断言细节。",
       "guidance": "请陈述具体的验证边界用例、输入参数与功能断言，例如：'运行 node scripts/test-parallel.js，断言 4 个 Rust 嵌入式测试用例与 9 个量化维度路由断言成立'。"

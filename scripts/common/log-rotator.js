@@ -402,7 +402,10 @@ function viewLastFailure(targetDir = DEFAULT_LOG_DIR) {
         const audit = JSON.parse(fs.readFileSync(latestAuditPath, UTF8));
         console.log(`💡 最近一次全工作区审查综合健康分为: ${audit.workspaceHealthScore} (${audit.grade || 'A+'}) | 状态: ${audit.status}`);
         console.log(`   查看全景看板: node scripts/common/record-workspace-audit.js --latest`);
-      } catch {}
+      } catch (readErr) {
+        // Best-effort audit inspection: ignore read failure to preserve view output
+        void readErr;
+      }
     }
     return false;
   }

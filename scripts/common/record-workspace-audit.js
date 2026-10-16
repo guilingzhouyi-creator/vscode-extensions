@@ -49,8 +49,9 @@ function getGitRevision(root) {
       stdio: ['ignore', 'pipe', 'ignore'],
     }).trim();
     if (out.length > 0) return out.slice(0, 8);
-  } catch {
-    // Best effort fallback
+  } catch (gitErr) {
+    // Best-effort git commit resolution: ignore error and fallback to default commit hash
+    void gitErr;
   }
   return '00000000';
 }

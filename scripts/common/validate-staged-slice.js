@@ -31,8 +31,9 @@ for (const p of candidatePaths) {
   try {
     ts = require(p);
     if (ts) break;
-  } catch {
-    // try next candidate
+  } catch (requireErr) {
+    // Best-effort candidate discovery: ignore probe failures and try next candidate
+    void requireErr;
   }
 }
 
@@ -342,8 +343,9 @@ function getStagedHunkMap(explicitFiles) {
       env: getGitEnv(),
     });
     parseGitDiffHunks(raw, map);
-  } catch {
-    // git failed fallback
+  } catch (gitErr) {
+    // Best-effort diff hunk parsing: ignore git failure and use fallback file list
+    void gitErr;
   }
 
   if (map.size === 0) {

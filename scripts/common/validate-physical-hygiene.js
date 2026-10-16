@@ -158,7 +158,10 @@ class PhysicalHygieneAuditor {
         try {
           fs.unlinkSync(fullPath);
           this.fixedCount++;
-        } catch (_) {}
+        } catch (unlinkErr) {
+          // Best-effort auto-fix cleanup: ignore file permission removal errors
+          void unlinkErr;
+        }
       }
       return true;
     }
@@ -333,7 +336,10 @@ class PhysicalHygieneAuditor {
           try {
             fs.rmdirSync(dir);
             this.fixedCount++;
-          } catch (_) {}
+          } catch (rmdirErr) {
+            // Best-effort auto-fix cleanup: ignore empty directory removal errors
+            void rmdirErr;
+          }
         }
       }
       return;

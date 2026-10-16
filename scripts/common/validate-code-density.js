@@ -171,7 +171,10 @@ function recordFailureSnapshot(allViolations) {
       verificationCommand: 'node scripts/common/validate-code-density.js --staged',
       fastRecheckCommand: 'node scripts/common/validate-code-density.js --staged',
     });
-  } catch {}
+  } catch (snapshotErr) {
+    // Best-effort failure snapshot persistence: ignore error to preserve gate exit code
+    void snapshotErr;
+  }
 }
 
 function collectDensityInspections(uniqueFiles, options) {

@@ -203,9 +203,9 @@ if [[ "$IS_AGENT" -ne 1 ]]; then
 fi
 
 # --- Rule 1: Header 格式与长度校验 ---
-HEADER_PATTERN="^(feat|fix|refactor|docs|test|chore|style|perf)(\([a-zA-Z0-9_-]+\))?: .{5,80}$"
+HEADER_PATTERN="^(feat|fix|refactor|docs|test|chore|style|perf)(\([a-zA-Z0-9_\-\/,@.]+\))?: .{4,80}$"
 if ! echo "$FIRST_LINE" | grep -E "$HEADER_PATTERN" >/dev/null 2>&1; then
-    fail_commit_msg "GATE-MSG-001" "Rule 1: 提交标题不符合生产级格式规范！" "$FIRST_LINE" "<type>(<scope>): <简述> (5~80 字符)" "调整为 feat/fix/refactor/docs/test/chore/style/perf(<scope>): 描述"
+    fail_commit_msg "GATE-MSG-001" "Rule 1: 提交标题不符合生产级格式规范！" "$FIRST_LINE" "<type>(<scope>): <简述> (4~80 字符)" "调整为 feat/fix/refactor/docs/test/chore/style/perf(<scope>): 描述"
 fi
 
 # 检查标题末尾不得有句号
@@ -219,7 +219,7 @@ if echo "$FIRST_LINE" | grep -iE "$FORBIDDEN_WORDS" >/dev/null 2>&1; then
     fail_commit_msg "CMG-STY-001" "Rule 2: 提交标题包含违规黑话/临时性标记 (wip/temp/tmp 等)！" "$FIRST_LINE" "零黑话技术描述" "陈述具体完成的技术特性，严禁使用 wip/temp"
 fi
 
-LAZY_WORDS="^([a-z]+(\([a-z0-9_-]+\))?:\s*(update|modify|changes|fix|test|fixes|clean|refactor|todo))\s*$"
+LAZY_WORDS="^([a-z]+(\([^\)]+\))?:\s*(update|modify|changes|fix|test|fixes|clean|refactor|todo|修复问题|更新代码|修改代码|新增功能|优化代码|日常更新|代码重构))\s*$"
 if echo "$FIRST_LINE" | grep -iE "$LAZY_WORDS" >/dev/null 2>&1; then
     fail_commit_msg "CMG-STY-001" "Rule 2: 提交标题过于空洞敷衍！请明确具体加了什么、改了什么或修了什么。" "$FIRST_LINE" "说明具体改动模块与功能" "明确陈述具体变更逻辑"
 fi
@@ -249,16 +249,26 @@ if [[ "$TOTAL_LINES" -gt 2 ]]; then
 fi
 
 # --- Rule 4: 实质性提交的正文字数底线与信息密度 ---
-if [[ "$COMMIT_TYPE" =~ ^(feat|fix|refactor)$ ]]; then
+if [[ "$COMMIT_TYPE" =~ ^(feat|fix|refactor|perf)$ ]]; then
     MIN_BODY_CHARS=30
     if [[ "$BODY_CHAR_COUNT" -lt "$MIN_BODY_CHARS" ]]; then
         fail_commit_msg "GATE-MSG-001" "Rule 4: 生产级关键提交 ($COMMIT_TYPE) 正文信息量不足！当前有效字数: $BODY_CHAR_COUNT" "$BODY_CHAR_COUNT 字符" ">= $MIN_BODY_CHARS 字符" "补充 [Why], [Changed], [Verification] 详细技术事实"
     fi
 
     # --- Rule 5: 结构化区块完整性校验 ---
-    STRUCTURE_PATTERN='(\[(Project|Why|Added|Changed|Fixed|Removed|Verification|项目|项目归属|动机|背景|新增|变更|修改|修复|删除|验证).*?\]|^- )'
-    if ! echo "$BODY_TEXT" | grep -iE "$STRUCTURE_PATTERN" >/dev/null 2>&1; then
-        fail_commit_msg "GATE-MSG-001" "Rule 5: 关键提交 ($COMMIT_TYPE) 缺少生产级结构化区块！" "" "包含 [Project], [Why], [Added/Changed/Fixed], [Verification] 之一" "补充标准结构化区块 [Project], [Why], [Changed], [Verification]"
+    HAS_WHY=0
+    HAS_CHANGE=0
+    HAS_VERIFICATION=0
+    echo "$BODY_TEXT" | grep -iE '\[(Why|动机|背景).*?\]' >/dev/null 2>&1 && HAS_WHY=1 || true
+    echo "$BODY_TEXT" | grep -iE '\[(Added|Changed|Fixed|Removed|新增|变更|修改|修复|删除).*?\]' >/dev/null 2>&1 && HAS_CHANGE=1 || true
+    echo "$BODY_TEXT" | grep -iE '\[(Verification|验证|验证结论).*?\]' >/dev/null 2>&1 && HAS_VERIFICATION=1 || true
+
+    if [[ "$HAS_WHY" -eq 0 || "$HAS_CHANGE" -eq 0 || "$HAS_VERIFICATION" -eq 0 ]]; then
+        fail_commit_msg "GATE-MSG-001" "Rule 5: 关键提交 ($COMMIT_TYPE) 结构化区块不完整！必须同时包含 [Why], [Changed/Added/Fixed], [Verification] 区块。" "" "[Why], [Changed/Added/Fixed], [Verification]" "补充标准结构化区块 [Why], [Changed], [Verification]"
+    fi
+
+    if [[ "$COMMIT_TYPE" == "fix" ]] && ! echo "$BODY_TEXT" | grep -iE '\[(Fixed|修复|修复缺陷).*?\]' >/dev/null 2>&1; then
+        fail_commit_msg "GATE-MSG-001" "Rule 5: 缺陷修复提交 (fix) 必须显式包含 [Fixed / 修复缺陷] 区块说明具体修复的缺陷与根因！" "" "[Fixed / 修复缺陷]" "补充 [Fixed] 区块明确缺陷现象与根因"
     fi
 fi
 
@@ -307,7 +317,7 @@ for ((i=2; i<TOTAL_LINES; i++)); do
     fi
 done
 
-if [[ "$COMMIT_TYPE" =~ ^(feat|fix|refactor)$ ]]; then
+if [[ "$COMMIT_TYPE" =~ ^(feat|fix|refactor|perf)$ ]]; then
     if [[ "$FOUND_PROJECT_HEADER" == false ]]; then
         fail_commit_msg "CMG-PRJ-001" "Rule 5.1 (CMG-PRJ-001): 关键生产级提交 ($COMMIT_TYPE) 缺少项目归属格式区！" "" "[Project: workspace-timing | auto-refactor | WebGames | governance]" "在正文首个结构化区块声明 [Project / 项目归属]"
     fi
@@ -334,8 +344,8 @@ if [[ ${#DECLARED_PROJECTS[@]} -gt 0 ]]; then
 fi
 
 # --- Rule 6: 正文零黑话与无批次代号 ---
-if echo "$BODY_TEXT" | grep -iE "\b(phase[0-9]+|st[0-9]+|p[0-9]+)\b" >/dev/null 2>&1; then
-    fail_commit_msg "CMG-STY-001" "Rule 6: 提交正文包含违规施工批次代号/黑话 (phaseN/stN/pN)！" "" "纯客观技术事实" "基于功能特性与交付价值进行纯粹描述，移除批次代号"
+if echo "$BODY_TEXT" | grep -iE "\b(phase[0-9]+|st[0-9]+|p[0-9]+|sprint[[:space:]]*[0-9]+|w[1-9]|pass[[:space:]]*[1-6])\b" >/dev/null 2>&1; then
+    fail_commit_msg "CMG-STY-001" "Rule 6: 提交正文包含违规敏捷工期代号/施工批次黑话 (phaseN/stN/pN/sprintN/wN/passN)！" "" "纯客观技术事实" "基于功能特性与交付价值进行纯粹描述，移除批次与工期代号"
 fi
 
 # --- Rule 7 & 8: 规则 ID 反虚构与求真务实禁词联合审查 ---

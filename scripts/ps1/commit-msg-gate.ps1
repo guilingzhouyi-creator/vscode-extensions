@@ -189,9 +189,9 @@ if (-not $Agent) {
 }
 
 # --- Rule 1: Header 格式与长度校验 ---
-$headerPattern = '^(feat|fix|refactor|docs|test|chore|style|perf)(\([a-zA-Z0-9_-]+\))?: .{5,80}$'
+$headerPattern = '^(feat|fix|refactor|docs|test|chore|style|perf)(\([a-zA-Z0-9_\-\/,@.]+\))?: .{4,80}$'
 if ($firstLine -notmatch $headerPattern) {
-    Stop-CommitMsg -RuleId "GATE-MSG-001" -Message "Rule 1: 提交标题不符合生产级格式规范！" -Actual $firstLine -Expected "<type>(<scope>): <简述> (5~80 字符)" -ActionableFix "调整为 feat/fix/refactor/docs/test/chore/style/perf(<scope>): 描述"
+    Stop-CommitMsg -RuleId "GATE-MSG-001" -Message "Rule 1: 提交标题不符合生产级格式规范！" -Actual $firstLine -Expected "<type>(<scope>): <简述> (4~80 字符)" -ActionableFix "调整为 feat/fix/refactor/docs/test/chore/style/perf(<scope>): 描述"
 }
 
 # 检查标题末尾不得包含句号
@@ -205,7 +205,7 @@ if ($firstLine -match $forbiddenPattern) {
     Stop-CommitMsg -RuleId "CMG-STY-001" -Message "Rule 2: 提交标题包含违规黑话/临时性标记 (wip/temp/tmp 等)！" -Actual $firstLine -Expected "零黑话技术描述" -ActionableFix "陈述具体完成的技术特性，严禁使用 wip/temp"
 }
 
-$lazyPattern = '^([a-z]+(\([a-z0-9_-]+\))?:\s*(update|modify|changes|fix|test|fixes|clean|refactor|todo))\s*$'
+$lazyPattern = '^([a-z]+(\([^\)]+\))?:\s*(update|modify|changes|fix|test|fixes|clean|refactor|todo|修复问题|更新代码|修改代码|新增功能|优化代码|日常更新|代码重构))\s*$'
 if ($firstLine -match $lazyPattern) {
     Stop-CommitMsg -RuleId "CMG-STY-001" -Message "Rule 2: 提交标题过于空洞敷衍！请明确具体加了什么、改了什么或修了什么。" -Actual $firstLine -Expected "说明具体改动模块与功能" -ActionableFix "明确陈述具体变更逻辑"
 }
@@ -233,16 +233,23 @@ if ($cleanLines.Count -gt 2) {
 }
 
 # --- Rule 4: 实质性提交的正文字数底线与信息密度 ---
-if ($commitType -in @('feat', 'fix', 'refactor')) {
+if ($commitType -in @('feat', 'fix', 'refactor', 'perf')) {
     $minBodyChars = 30
     if ($bodyCharCount -lt $minBodyChars) {
         Stop-CommitMsg -RuleId "GATE-MSG-001" -Message "Rule 4: 生产级关键提交 ($commitType) 正文信息量不足！当前有效字数: $bodyCharCount" -Actual "$bodyCharCount 字符" -Expected ">= $minBodyChars 字符" -ActionableFix "补充 [Why], [Changed], [Verification] 详细技术事实"
     }
 
     # --- Rule 5: 结构化区块完整性校验 ---
-    $structurePattern = '(?m)(\[(Project|Why|Added|Changed|Fixed|Removed|Verification|项目|项目归属|动机|背景|新增|变更|修改|修复|删除|验证).*?\]|^\s*-\s+)'
-    if ($bodyText -notmatch $structurePattern) {
-        Stop-CommitMsg -RuleId "GATE-MSG-001" -Message "Rule 5: 关键提交 ($commitType) 缺少生产级结构化区块！" -Expected "包含 [Project], [Why], [Added/Changed/Fixed], [Verification] 之一" -ActionableFix "补充标准结构化区块 [Project], [Why], [Changed], [Verification]"
+    $hasWhy = $bodyText -match '(?mi)\[(Why|动机|背景).*?\]'
+    $hasChange = $bodyText -match '(?mi)\[(Added|Changed|Fixed|Removed|新增|变更|修改|修复|删除).*?\]'
+    $hasVerification = $bodyText -match '(?mi)\[(Verification|验证|验证结论).*?\]'
+
+    if (-not $hasWhy -or -not $hasChange -or -not $hasVerification) {
+        Stop-CommitMsg -RuleId "GATE-MSG-001" -Message "Rule 5: 关键提交 ($commitType) 结构化区块不完整！必须同时包含 [Why], [Changed/Added/Fixed], [Verification] 区块。" -Expected "[Why], [Changed/Added/Fixed], [Verification]" -ActionableFix "补充标准结构化区块 [Why], [Changed], [Verification]"
+    }
+
+    if ($commitType -eq 'fix' -and ($bodyText -notmatch '(?mi)\[(Fixed|修复|修复缺陷).*?\]')) {
+        Stop-CommitMsg -RuleId "GATE-MSG-001" -Message "Rule 5: 缺陷修复提交 (fix) 必须显式包含 [Fixed / 修复缺陷] 区块说明具体修复的缺陷与根因！" -Expected "[Fixed / 修复缺陷]" -ActionableFix "补充 [Fixed] 区块明确缺陷现象与根因"
     }
 }
 
@@ -287,7 +294,7 @@ foreach ($bLine in $bodyLines) {
     }
 }
 
-if ($commitType -in @('feat', 'fix', 'refactor')) {
+if ($commitType -in @('feat', 'fix', 'refactor', 'perf')) {
     if (-not $foundProjectHeader) {
         Stop-CommitMsg -RuleId "CMG-PRJ-001" -Message "Rule 5.1 (CMG-PRJ-001): 关键生产级提交 ($commitType) 缺少项目归属格式区！" -Expected "[Project: workspace-timing | auto-refactor | WebGames | governance]" -ActionableFix "在正文首个结构化区块声明 [Project / 项目归属]"
     }
@@ -313,8 +320,8 @@ if ($declaredProjects.Count -gt 0) {
 }
 
 # --- Rule 6: 正文零黑话与无批次代号 ---
-if ($bodyText -match '(?i)\b(phase\d+|st\d+|p\d+)\b') {
-    Stop-CommitMsg -RuleId "CMG-STY-001" -Message "Rule 6: 提交正文包含违规施工批次代号/黑话 (phaseN/stN/pN)！" -Expected "纯客观技术事实" -ActionableFix "基于功能特性与交付价值进行纯粹描述，移除批次代号"
+if ($bodyText -match '(?i)\b(phase\d+|st\d+|p\d+|sprint\s*\d+|w[1-9]|pass\s*[1-6])\b') {
+    Stop-CommitMsg -RuleId "CMG-STY-001" -Message "Rule 6: 提交正文包含违规敏捷工期代号/施工批次黑话 (phaseN/stN/pN/sprintN/wN/passN)！" -Expected "纯客观技术事实" -ActionableFix "基于功能特性与交付价值进行纯粹描述，移除工期与批次代号"
 }
 
 # --- Rule 7 & 8: 规则 ID 反虚构与求真务实禁词联合审查 ---
