@@ -197,15 +197,32 @@ if (-not $Json -and -not $Agent) {
 $startTime = [System.Diagnostics.Stopwatch]::StartNew()
 $failed = $false
 
-# 1. 物理卫生与零空文件看守
+$transientDir = [System.IO.Path]::GetTempPath()
+$randSuffix = [System.Guid]::NewGuid().ToString().Substring(0, 8)
+$logHygieneOut = Join-Path $transientDir "audit-hygiene-$randSuffix.json"
+
+# 1. 物理卫生八维刚性公理与全域巡检
 if (-not $Json -and -not $Agent) { Write-Host "▶ [1/5] 检查全工作区物理卫生、同构脚本、.gitignore 治理与零空文件..." -ForegroundColor Gray }
-$res = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-no-empty-files.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
+$res = Start-Process -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-physical-hygiene.js", "--json") -WorkingDirectory $repoRoot -RedirectStandardOutput $logHygieneOut -NoNewWindow -PassThru -Wait
 $resIso = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-script-isomorphism.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
 $resGi = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-gitignore-governance.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
-$codeEmpty = $res.ExitCode
+$codeHygiene = $res.ExitCode
 $codeIso = $resIso.ExitCode
 $codeGi = $resGi.ExitCode
-if ($codeEmpty -ne 0 -or $codeIso -ne 0 -or $codeGi -ne 0) {
+
+$rawHygieneScore = $null
+try {
+    if (Test-Path $logHygieneOut) {
+        $hygieneData = Get-Content -Path $logHygieneOut -Raw -Encoding utf8 | ConvertFrom-Json
+        if ($null -ne $hygieneData -and $null -ne $hygieneData.score) {
+            $rawHygieneScore = [double]$hygieneData.score
+        }
+    }
+} catch {
+    $rawHygieneScore = $null
+}
+
+if ($codeHygiene -ne 0 -or $codeIso -ne 0 -or $codeGi -ne 0) {
     $statusHygiene = "FAIL"
     $failed = $true
 } else {
@@ -235,8 +252,6 @@ if (-not $Json -and -not $Agent) {
     Write-Host "▶ [5/5] 并行调度 auto-refactor 静态引擎多维自审与质量门禁..." -ForegroundColor Gray
 }
 
-$transientDir = [System.IO.Path]::GetTempPath()
-$randSuffix = [System.Guid]::NewGuid().ToString().Substring(0, 8)
 $logWtOut = Join-Path $transientDir "audit-wt-$randSuffix.out.log"
 $logWtErr = Join-Path $transientDir "audit-wt-$randSuffix.err.log"
 $logWgOut = Join-Path $transientDir "audit-wg-$randSuffix.out.log"
@@ -445,15 +460,11 @@ $dimDefinitions = @(
 # 计算各子系统归一化得分 [0.0 ~ 100.0]（纯客观连续度量，杜绝静态硬编码常数与断崖断层）
 $SCORE_FLOOR = 15.0
 
-# 1. 物理卫生基石得分（动态判定：零空文件/跳板与同构脚本对双项全合规 100.0，按违规项比例连续度量）
-$hygienePassedCount = 0
-if ($codeEmpty -eq 0) { $hygienePassedCount += 1 }
-if ($codeIso -eq 0) { $hygienePassedCount += 1 }
-$scoreHygiene = if ($hygienePassedCount -eq 2) {
-    100.0
-} else {
-    [math]::Max($SCORE_FLOOR, [math]::Round(100.0 * ($hygienePassedCount / 2.0), 1))
-}
+# 1. 物理卫生基石得分（基于八维物理卫生矩阵连续客观计算与同构/.gitignore治理守卫）
+$baseHygiene = if ($null -ne $rawHygieneScore) { $rawHygieneScore } else { if ($codeHygiene -eq 0) { 100.0 } else { 50.0 } }
+if ($codeIso -ne 0) { $baseHygiene = [math]::Max($SCORE_FLOOR, $baseHygiene - 20.0) }
+if ($codeGi -ne 0) { $baseHygiene = [math]::Max($SCORE_FLOOR, $baseHygiene - 10.0) }
+$scoreHygiene = [math]::Max($SCORE_FLOOR, [math]::Round($baseHygiene, 1))
 
 # 2. 单源规则目录基石得分（基于 SSOT 规则目录一致性与技能文档字节等价比对动态判定）
 $ruleCatalogPath = Join-Path $repoRoot "scripts\common\rule-catalog.json"
@@ -574,13 +585,23 @@ $scoreWg = if ($statusWg -eq "PASS") {
     [math]::Max($SCORE_FLOOR, [math]::Round($baseWg - 60.0, 1))
 }
 
-if ($null -eq $polyglotIndex -and $scoreAr -gt 0 -and $scoreWg -gt 0) {
-    $langScores = @($scoreAr, $scoreWg, 100.0)
-    $lMean = ($scoreAr + $scoreWg + 100.0) / 3.0
-    $lVar = 0.0
-    foreach ($ls in $langScores) { $lVar += [math]::Pow($ls - $lMean, 2) }
-    $lStd = [math]::Sqrt($lVar / 3.0)
-    $polyglotIndex = [math]::Round($lMean * [math]::Max(0.0, 1.0 - ($lStd / 100.0)), 2)
+$polyglotBreakdown = $null
+try {
+    $polyglotScript = Join-Path $repoRoot "scripts\common\evaluate-polyglot-balance.js"
+    if (Test-Path $polyglotScript) {
+        $pArgs = @($polyglotScript, "--json")
+        if ($Fast) { $pArgs += "--fast" }
+        $polyglotRaw = & node @pArgs 2>$null
+        if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($polyglotRaw)) {
+            $polyglotJson = $polyglotRaw | ConvertFrom-Json
+            if ($null -ne $polyglotJson.polyglotIndex) {
+                $polyglotIndex = [double]$polyglotJson.polyglotIndex
+                $polyglotBreakdown = $polyglotJson.breakdown
+            }
+        }
+    }
+} catch {
+    # Non-blocking evaluator failure
 }
 
 # 全工作区综合健康分（五大核心子系统基石分平权加权各占 20%：0.2 * (Hygiene + Rules + AR + WT + WG)）
@@ -620,6 +641,7 @@ $summary = [ordered]@{
     grade = $wsGrade
     autonomyRate = if ($null -ne $autonomyRate) { [double]$autonomyRate } else { $null }
     polyglotIndex = if ($null -ne $polyglotIndex) { [double]$polyglotIndex } else { $null }
+    polyglotBreakdown = $polyglotBreakdown
     totalDebt = if ($null -ne $totalDebt) { [int]$totalDebt } else { $null }
     catalogRuleCount = $catalogRuleCount
     projects = [ordered]@{

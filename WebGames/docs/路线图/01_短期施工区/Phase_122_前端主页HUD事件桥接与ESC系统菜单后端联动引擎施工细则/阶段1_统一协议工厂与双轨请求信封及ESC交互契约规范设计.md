@@ -54,45 +54,45 @@ var lease_nonce: int = 0                 # 人类控制租约流水号
 var client_timestamp_ms: int = 0         # 客户端发射时毫秒时间戳
 
 func reset_state() -> void:
-	request_id = ""
-	session_token = ""
-	account_id = ""
-	character_id = ""
-	actor_type = ACTOR_HUMAN_UI
-	domain = ""
-	action_type = ""
-	payload.clear()
-	lease_nonce = 0
-	client_timestamp_ms = 0
+  request_id = ""
+  session_token = ""
+  account_id = ""
+  character_id = ""
+  actor_type = ACTOR_HUMAN_UI
+  domain = ""
+  action_type = ""
+  payload.clear()
+  lease_nonce = 0
+  client_timestamp_ms = 0
 
 func to_dto() -> Dictionary:
-	return {
-		"request_id": request_id,
-		"session_token": session_token,
-		"account_id": account_id,
-		"character_id": character_id,
-		"actor_type": actor_type,
-		"domain": domain,
-		"action_type": action_type,
-		"payload": payload.duplicate(true),
-		"lease_nonce": lease_nonce,
-		"client_timestamp_ms": client_timestamp_ms
-	}
+  return {
+    "request_id": request_id,
+    "session_token": session_token,
+    "account_id": account_id,
+    "character_id": character_id,
+    "actor_type": actor_type,
+    "domain": domain,
+    "action_type": action_type,
+    "payload": payload.duplicate(true),
+    "lease_nonce": lease_nonce,
+    "client_timestamp_ms": client_timestamp_ms
+  }
 
 static func from_dto(data: Dictionary) -> ClientRequestEnvelopeDTO:
-	var req := ClientRequestEnvelopeDTO.new()
-	req.request_id = str(data.get("request_id", ""))
-	req.session_token = str(data.get("session_token", ""))
-	req.account_id = str(data.get("account_id", ""))
-	req.character_id = str(data.get("character_id", ""))
-	req.actor_type = str(data.get("actor_type", ACTOR_HUMAN_UI))
-	req.domain = str(data.get("domain", ""))
-	req.action_type = str(data.get("action_type", ""))
-	var raw_p: Variant = data.get("payload", {})
-	req.payload = (raw_p as Dictionary).duplicate(true) if raw_p is Dictionary else {}
-	req.lease_nonce = int(data.get("lease_nonce", 0))
-	req.client_timestamp_ms = int(data.get("client_timestamp_ms", 0))
-	return req
+  var req := ClientRequestEnvelopeDTO.new()
+  req.request_id = str(data.get("request_id", ""))
+  req.session_token = str(data.get("session_token", ""))
+  req.account_id = str(data.get("account_id", ""))
+  req.character_id = str(data.get("character_id", ""))
+  req.actor_type = str(data.get("actor_type", ACTOR_HUMAN_UI))
+  req.domain = str(data.get("domain", ""))
+  req.action_type = str(data.get("action_type", ""))
+  var raw_p: Variant = data.get("payload", {})
+  req.payload = (raw_p as Dictionary).duplicate(true) if raw_p is Dictionary else {}
+  req.lease_nonce = int(data.get("lease_nonce", 0))
+  req.client_timestamp_ms = int(data.get("client_timestamp_ms", 0))
+  return req
 ```
 
 ### 2. 统一后端响应信封模型 (`UnifiedResponseEnvelopeDTO`)
@@ -117,37 +117,37 @@ var causal_delta: Dictionary = {}        # 操作引发的因果突变 (供 HUD 
 var server_timestamp_ms: int = 0         # 服务端响应落盘时间戳
 
 func reset_state() -> void:
-	request_id = ""
-	success = false
-	error_code = ""
-	error_message = ""
-	data.clear()
-	causal_delta.clear()
-	server_timestamp_ms = 0
+  request_id = ""
+  success = false
+  error_code = ""
+  error_message = ""
+  data.clear()
+  causal_delta.clear()
+  server_timestamp_ms = 0
 
 func to_dto() -> Dictionary:
-	return {
-		"request_id": request_id,
-		"success": success,
-		"error_code": error_code,
-		"error_message": error_message,
-		"data": data.duplicate(true),
-		"causal_delta": causal_delta.duplicate(true),
-		"server_timestamp_ms": server_timestamp_ms
-	}
+  return {
+    "request_id": request_id,
+    "success": success,
+    "error_code": error_code,
+    "error_message": error_message,
+    "data": data.duplicate(true),
+    "causal_delta": causal_delta.duplicate(true),
+    "server_timestamp_ms": server_timestamp_ms
+  }
 
 static func from_dto(data_dict: Dictionary) -> UnifiedResponseEnvelopeDTO:
-	var resp := UnifiedResponseEnvelopeDTO.new()
-	resp.request_id = str(data_dict.get("request_id", ""))
-	resp.success = bool(data_dict.get("success", false))
-	resp.error_code = str(data_dict.get("error_code", ""))
-	resp.error_message = str(data_dict.get("error_message", ""))
-	var raw_d: Variant = data_dict.get("data", {})
-	resp.data = (raw_d as Dictionary).duplicate(true) if raw_d is Dictionary else {}
-	var raw_c: Variant = data_dict.get("causal_delta", {})
-	resp.causal_delta = (raw_c as Dictionary).duplicate(true) if raw_c is Dictionary else {}
-	resp.server_timestamp_ms = int(data_dict.get("server_timestamp_ms", 0))
-	return resp
+  var resp := UnifiedResponseEnvelopeDTO.new()
+  resp.request_id = str(data_dict.get("request_id", ""))
+  resp.success = bool(data_dict.get("success", false))
+  resp.error_code = str(data_dict.get("error_code", ""))
+  resp.error_message = str(data_dict.get("error_message", ""))
+  var raw_d: Variant = data_dict.get("data", {})
+  resp.data = (raw_d as Dictionary).duplicate(true) if raw_d is Dictionary else {}
+  var raw_c: Variant = data_dict.get("causal_delta", {})
+  resp.causal_delta = (raw_c as Dictionary).duplicate(true) if raw_c is Dictionary else {}
+  resp.server_timestamp_ms = int(data_dict.get("server_timestamp_ms", 0))
+  return resp
 ```
 
 ### 3. 统一协议工厂契约 (`UnifiedProtocolFactory`)
@@ -168,65 +168,65 @@ static var _request_counter: int = 1
 
 ## 创建人类 UI 标准请求信封
 static func create_human_request(
-	domain: String,
-	action_type: String,
-	payload: Dictionary = {},
-	session_token: String = "",
-	account_id: String = "",
-	character_id: String = ""
+  domain: String,
+  action_type: String,
+  payload: Dictionary = {},
+  session_token: String = "",
+  account_id: String = "",
+  character_id: String = ""
 ) -> ClientRequestEnvelopeDTO:
-	var req := ClientRequestEnvelopeDTO.new()
-	req.request_id = "REQ_H_%d_%d" % [Time.get_ticks_msec(), _request_counter]
-	_request_counter += 1
-	req.actor_type = ClientRequestEnvelopeDTO.ACTOR_HUMAN_UI
-	req.domain = domain
-	req.action_type = action_type
-	req.payload = payload.duplicate(true)
-	req.session_token = session_token
-	req.account_id = account_id
-	req.character_id = character_id
-	req.lease_nonce = _lease_counter
-	_lease_counter += 1
-	req.client_timestamp_ms = Time.get_ticks_msec()
-	return req
+  var req := ClientRequestEnvelopeDTO.new()
+  req.request_id = "REQ_H_%d_%d" % [Time.get_ticks_msec(), _request_counter]
+  _request_counter += 1
+  req.actor_type = ClientRequestEnvelopeDTO.ACTOR_HUMAN_UI
+  req.domain = domain
+  req.action_type = action_type
+  req.payload = payload.duplicate(true)
+  req.session_token = session_token
+  req.account_id = account_id
+  req.character_id = character_id
+  req.lease_nonce = _lease_counter
+  _lease_counter += 1
+  req.client_timestamp_ms = Time.get_ticks_msec()
+  return req
 
 ## 从既有 AgentActionPacketDTO 转换为统一请求信封（实现双轨统一收口）
 static func wrap_agent_action(
-	agent_pkt: AgentActionPacketDTO,
-	session_token: String = "",
-	account_id: String = ""
+  agent_pkt: AgentActionPacketDTO,
+  session_token: String = "",
+  account_id: String = ""
 ) -> ClientRequestEnvelopeDTO:
-	var req := ClientRequestEnvelopeDTO.new()
-	req.request_id = "REQ_A_%d_%d" % [Time.get_ticks_msec(), agent_pkt.sequence_index]
-	req.actor_type = ClientRequestEnvelopeDTO.ACTOR_AGENT
-	req.domain = "world_state"
-	req.action_type = agent_pkt.directive_id if not agent_pkt.directive_id.is_empty() else agent_pkt.action_id
-	req.payload = agent_pkt.params.duplicate(true)
-	req.session_token = session_token
-	req.account_id = account_id
-	req.character_id = agent_pkt.session_id
-	req.lease_nonce = 0  # Agent 不具备人类租约，租约序号归零
-	req.client_timestamp_ms = agent_pkt.client_timestamp_ms
-	return req
+  var req := ClientRequestEnvelopeDTO.new()
+  req.request_id = "REQ_A_%d_%d" % [Time.get_ticks_msec(), agent_pkt.sequence_index]
+  req.actor_type = ClientRequestEnvelopeDTO.ACTOR_AGENT
+  req.domain = "world_state"
+  req.action_type = agent_pkt.directive_id if not agent_pkt.directive_id.is_empty() else agent_pkt.action_id
+  req.payload = agent_pkt.params.duplicate(true)
+  req.session_token = session_token
+  req.account_id = account_id
+  req.character_id = agent_pkt.session_id
+  req.lease_nonce = 0  # Agent 不具备人类租约，租约序号归零
+  req.client_timestamp_ms = agent_pkt.client_timestamp_ms
+  return req
 
 ## 创建标准服务端响应信封
 static func create_response(
-	request_id: String,
-	success: bool,
-	data: Dictionary = {},
-	error_code: String = "",
-	error_message: String = "",
-	causal_delta: Dictionary = {}
+  request_id: String,
+  success: bool,
+  data: Dictionary = {},
+  error_code: String = "",
+  error_message: String = "",
+  causal_delta: Dictionary = {}
 ) -> UnifiedResponseEnvelopeDTO:
-	var resp := UnifiedResponseEnvelopeDTO.new()
-	resp.request_id = request_id
-	resp.success = success
-	resp.error_code = error_code
-	resp.error_message = error_message
-	resp.data = data.duplicate(true)
-	resp.causal_delta = causal_delta.duplicate(true)
-	resp.server_timestamp_ms = Time.get_ticks_msec()
-	return resp
+  var resp := UnifiedResponseEnvelopeDTO.new()
+  resp.request_id = request_id
+  resp.success = success
+  resp.error_code = error_code
+  resp.error_message = error_message
+  resp.data = data.duplicate(true)
+  resp.causal_delta = causal_delta.duplicate(true)
+  resp.server_timestamp_ms = Time.get_ticks_msec()
+  return resp
 ```
 
 ---
@@ -295,4 +295,3 @@ flowchart TD
 | TC-UPE-S1-02 | 统一协议工厂双轨请求装箱与反装箱 | 调用 create_human_request 与 wrap_agent_action | 正确区分 actor_type 与 lease_nonce，反装箱无损 |
 | TC-UPE-S1-03 | ESC 核心指令集与参数契约清册完备 | 校验 5 大 ESC 指令映射定义与参数值域 | 指令、领域与载荷结构 100% 覆盖并对齐领域服务 |
 | TC-UPE-S1-04 | 文档格式与代码块健全性 | 静态文档规则审查 | 符合四阶段规范且无语法/路径错误 |
-

@@ -119,4 +119,3 @@ func clear() -> void:
 	_queue.clear()
 	_total_dispatched = 0
 	_total_dropped = 0
-

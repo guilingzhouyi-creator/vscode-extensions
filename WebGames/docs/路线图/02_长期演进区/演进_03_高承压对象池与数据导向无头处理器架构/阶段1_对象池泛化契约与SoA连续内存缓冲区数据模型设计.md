@@ -33,77 +33,77 @@
 
 # 2. 对象池容量与指标配置 DTO
 class_name ObjectPoolConfigDTO extends RefCounted:
-	var pool_name: String = ""
-	var preallocate_size: int = 32
-	var max_capacity: int = 512
-	var allow_overflow_alloc: bool = true
-	var overflow_warning_threshold: int = 256
+  var pool_name: String = ""
+  var preallocate_size: int = 32
+  var max_capacity: int = 512
+  var allow_overflow_alloc: bool = true
+  var overflow_warning_threshold: int = 256
 
-	func to_dto() -> Dictionary:
-		return {
-			"pool_name": pool_name,
-			"preallocate_size": preallocate_size,
-			"max_capacity": max_capacity,
-			"allow_overflow_alloc": allow_overflow_alloc,
-			"overflow_warning_threshold": overflow_warning_threshold
-		}
+  func to_dto() -> Dictionary:
+    return {
+      "pool_name": pool_name,
+      "preallocate_size": preallocate_size,
+      "max_capacity": max_capacity,
+      "allow_overflow_alloc": allow_overflow_alloc,
+      "overflow_warning_threshold": overflow_warning_threshold
+    }
 
-	static func from_dto(data: Dictionary) -> ObjectPoolConfigDTO:
-		var dto := ObjectPoolConfigDTO.new()
-		dto.pool_name = str(data.get("pool_name", "generic_pool"))
-		dto.preallocate_size = maxi(0, int(data.get("preallocate_size", 32)))
-		dto.max_capacity = maxi(dto.preallocate_size, int(data.get("max_capacity", 512)))
-		dto.allow_overflow_alloc = bool(data.get("allow_overflow_alloc", true))
-		dto.overflow_warning_threshold = maxi(1, int(data.get("overflow_warning_threshold", 256)))
-		return dto
+  static func from_dto(data: Dictionary) -> ObjectPoolConfigDTO:
+    var dto := ObjectPoolConfigDTO.new()
+    dto.pool_name = str(data.get("pool_name", "generic_pool"))
+    dto.preallocate_size = maxi(0, int(data.get("preallocate_size", 32)))
+    dto.max_capacity = maxi(dto.preallocate_size, int(data.get("max_capacity", 512)))
+    dto.allow_overflow_alloc = bool(data.get("allow_overflow_alloc", true))
+    dto.overflow_warning_threshold = maxi(1, int(data.get("overflow_warning_threshold", 256)))
+    return dto
 
 # 3. 对象池运行状态遥测快照 DTO
 class ObjectPoolStatsDTO extends RefCounted:
-	var pool_name: String = ""
-	var total_allocated: int = 0
-	var active_in_use: int = 0
-	var idle_in_pool: int = 0
-	var peak_active: int = 0
-	var total_acquires: int = 0
-	var total_releases: int = 0
-	var total_overflows: int = 0
+  var pool_name: String = ""
+  var total_allocated: int = 0
+  var active_in_use: int = 0
+  var idle_in_pool: int = 0
+  var peak_active: int = 0
+  var total_acquires: int = 0
+  var total_releases: int = 0
+  var total_overflows: int = 0
 
-	func to_dto() -> Dictionary:
-		return {
-			"pool_name": pool_name,
-			"total_allocated": total_allocated,
-			"active_in_use": active_in_use,
-			"idle_in_pool": idle_in_pool,
-			"peak_active": peak_active,
-			"total_acquires": total_acquires,
-			"total_releases": total_releases,
-			"total_overflows": total_overflows
-		}
+  func to_dto() -> Dictionary:
+    return {
+      "pool_name": pool_name,
+      "total_allocated": total_allocated,
+      "active_in_use": active_in_use,
+      "idle_in_pool": idle_in_pool,
+      "peak_active": peak_active,
+      "total_acquires": total_acquires,
+      "total_releases": total_releases,
+      "total_overflows": total_overflows
+    }
 
 # 4. 数据导向 SoA 连续内存缓冲区契约 (面向实体批处理，如移动与物理)
 # 模块路径: res://backend/infrastructure/soa_entity_buffer.gd
 class_name SoAEntityBuffer extends RefCounted:
-	var capacity: int = 0
-	var active_count: int = 0
+  var capacity: int = 0
+  var active_count: int = 0
 
-	# 平铺连续紧凑数组 (Struct of Arrays)
-	var entity_ids: PackedInt32Array = PackedInt32Array()
-	var pos_x: PackedFloat32Array = PackedFloat32Array()
-	var pos_y: PackedFloat32Array = PackedFloat32Array()
-	var vel_x: PackedFloat32Array = PackedFloat32Array()
-	var vel_y: PackedFloat32Array = PackedFloat32Array()
-	var flags: PackedInt32Array = PackedInt32Array() # 位标记：活跃/销毁/碰撞/冰冻
+  # 平铺连续紧凑数组 (Struct of Arrays)
+  var entity_ids: PackedInt32Array = PackedInt32Array()
+  var pos_x: PackedFloat32Array = PackedFloat32Array()
+  var pos_y: PackedFloat32Array = PackedFloat32Array()
+  var vel_x: PackedFloat32Array = PackedFloat32Array()
+  var vel_y: PackedFloat32Array = PackedFloat32Array()
+  var flags: PackedInt32Array = PackedInt32Array() # 位标记：活跃/销毁/碰撞/冰冻
 
-	func is_aligned() -> bool:
-		var c := active_count
-		return (
-			entity_ids.size() >= c and
-			pos_x.size() >= c and
-			pos_y.size() >= c and
-			vel_x.size() >= c and
-			vel_y.size() >= c and
-			flags.size() >= c
-		)
+  func is_aligned() -> bool:
+    var c := active_count
+    return (
+      entity_ids.size() >= c and
+      pos_x.size() >= c and
+      pos_y.size() >= c and
+      vel_x.size() >= c and
+      vel_y.size() >= c and
+      flags.size() >= c
+    )
 ```
 
 ---

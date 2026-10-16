@@ -1,38 +1,311 @@
 /**
  * Module: Static Analysis Engine — Ternary Simplification & Immutable Folding
  * File Path: src/analyzers/simplify-ternary.ts
- * Architecture Role: Traverses AST blocks to detect redundant if-else branches that can
- *   be folded into pure shallow ternary expressions or immutable const bindings.
+ * Architecture Role: High-cohesion AST traversal and pattern matcher detecting redundant if-else
+ *   branches that can be folded into pure shallow ternary expressions or immutable const bindings.
  * Dependencies & Triggers: TypeScript AST parser, core issue types, and simplify options;
  *   invoked by SimplifyAnalyzer when analyzing TypeScript and JavaScript sources.
- * Responsibilities: Scan statement lists and sibling statement pairs to invoke matchers for
- *   conditional returns, assignments, and immutable declaration promotions.
+ * Responsibilities:
+ *   1. Inspect statement lists and sibling pairs for foldable return and assignment branches;
+ *   2. Check side-effect purity and shallow depth on candidate conditional branches;
+ *   3. Enforce maximum line length constraints (default 80 characters);
+ *   4. Emit standardized Issue records with cognitive delta and reward metrics.
  * Exit Semantics & Design Rationale: Stateless and deterministic traversal; never mutates input
- *   AST nodes; accumulates standardized Issue records without side-effects.
+ *   AST nodes; consolidates pattern matchers and traversals into a single cohesive module.
  */
 
 import * as ts from 'typescript';
 import type { AnalyzerContext, Issue } from '../core/types';
+import { SEVERITY_INFO } from '../core/types';
+import { ANALYZER_SIMPLIFY } from '../core/scoring/dimensionLiterals';
 import type { SimplifyOptions } from './simplify';
-import {
-    type TernaryMatcherContext,
-    type StatementPositionRange,
-    tryFoldReturnTernary,
-    tryFoldTernaryCandidate,
-    unwrapSingleStatement,
-    isPureShallowExpression,
-    formatTernaryCandidate,
-    getStatementPositionRange,
-    makeSimplifyIssue,
-    RULE_SIM_TRN,
-    OPPORTUNITY_SEQUENTIAL_RETURN,
-    PREFIX_RETURN,
-} from './simplify-ternary-matchers';
+
+/**
+ * Shared context for ternary matching and opportunity registration.
+ */
+export interface TernaryMatcherContext {
+    sf: ts.SourceFile;
+    file: string;
+    maxLen: number;
+    issues: Issue[];
+}
+
+/**
+ * 0-based character and line range of an AST node statement span.
+ */
+interface StatementPositionRange {
+    start: ts.LineAndCharacter;
+    end: ts.LineAndCharacter;
+}
+
+/** Rule identifier for ternary return and assignment simplifications. */
+export const RULE_SIM_TRN = 'SIM-TRN-001';
+/** Rule identifier for immutable const promotion simplifications. */
+export const RULE_SIM_IMM = 'SIM-IMM-001';
 
 const DEFAULT_MAX_TERNARY_LENGTH = 80;
-const RULE_SIM_IMM = 'SIM-IMM-001';
+const REWARD_BONUS_IMMUTABLE = 5;
+const REWARD_BONUS_SHALLOW = 3;
+const COGNITIVE_DELTA_IMMUTABLE = -REWARD_BONUS_IMMUTABLE;
+const COGNITIVE_DELTA_SHALLOW = -REWARD_BONUS_SHALLOW;
+
+const OPPORTUNITY_CONDITIONAL_RETURN = 'conditional-return';
+const OPPORTUNITY_SEQUENTIAL_RETURN = 'sequential-return';
 const OPPORTUNITY_CONDITIONAL_ASSIGNMENT_IMMUTABLE = 'conditional-assignment-immutable';
 const OPPORTUNITY_CONDITIONAL_ASSIGNMENT = 'conditional-assignment';
+const PREFIX_RETURN = 'return ';
+
+/**
+ * Check if a node is an increment or decrement expression.
+ */
+function isIncrementOrDecrement(n: ts.Node): boolean {
+    return (
+        (ts.isPrefixUnaryExpression(n) || ts.isPostfixUnaryExpression(n)) &&
+        (n.operator === ts.SyntaxKind.PlusPlusToken || n.operator === ts.SyntaxKind.MinusMinusToken)
+    );
+}
+
+/**
+ * Check whether an AST node introduces side-effects or multi-level nesting.
+ */
+function isImpureNode(n: ts.Node): boolean {
+    if (ts.isConditionalExpression(n) || ts.isAwaitExpression(n) || ts.isYieldExpression(n)) {
+        return true;
+    }
+    if (isIncrementOrDecrement(n)) {
+        return true;
+    }
+    return (
+        ts.isBinaryExpression(n) &&
+        n.operatorToken.kind >= ts.SyntaxKind.FirstAssignment &&
+        n.operatorToken.kind <= ts.SyntaxKind.LastAssignment
+    );
+}
+
+/**
+ * Check whether an AST node is a pure, side-effect-free, and shallow expression.
+ *
+ * @param node - AST node to inspect.
+ * @returns True if the node and its descendants are pure and shallow.
+ */
+function isPureShallowExpression(node: ts.Node): boolean {
+    let pure = true;
+
+    function walk(n: ts.Node): void {
+        if (!pure) {
+            return;
+        }
+        if (isImpureNode(n)) {
+            pure = false;
+            return;
+        }
+        ts.forEachChild(n, walk);
+    }
+
+    walk(node);
+    return pure;
+}
+
+/**
+ * Unwrap a single statement from a statement or a 1-statement block.
+ *
+ * @param stmt - Statement or block to unwrap.
+ * @returns Inner statement, or null if empty or multi-statement.
+ */
+function unwrapSingleStatement(stmt: ts.Statement): ts.Statement | null {
+    if (ts.isBlock(stmt)) {
+        return stmt.statements.length === 1 ? stmt.statements[0] : null;
+    }
+    return stmt;
+}
+
+/**
+ * Helper to obtain the 0-based line/col range between two AST nodes.
+ *
+ * @param sf - Source file for position translation.
+ * @param startNode - AST node defining range start.
+ * @param endNode - AST node defining range end.
+ * @returns 0-based start and end position range.
+ */
+function getStatementPositionRange(
+    sf: ts.SourceFile,
+    startNode: ts.Node,
+    endNode: ts.Node,
+): StatementPositionRange {
+    return {
+        start: sf.getLineAndCharacterOfPosition(startNode.getStart(sf)),
+        end: sf.getLineAndCharacterOfPosition(endNode.getEnd()),
+    };
+}
+
+/**
+ * Format a ternary statement candidate and verify line length constraints.
+ *
+ * @param prefix - Prefix statement text (e.g. `return ` or `x = `).
+ * @param condText - Evaluated condition expression text.
+ * @param trueExpr - Expression for true branch.
+ * @param falseExpr - Expression for false branch.
+ * @param sf - Source file for expression text extraction.
+ * @param maxLen - Maximum line length threshold.
+ * @returns Formatted statement string if within maxLen, else null.
+ */
+function formatTernaryCandidate(
+    prefix: string,
+    condText: string,
+    trueExpr: ts.Expression,
+    falseExpr: ts.Expression,
+    sf: ts.SourceFile,
+    maxLen: number,
+): string | null {
+    const text = `${prefix}${condText} ? ${trueExpr.getText(sf).trim()} : ${falseExpr.getText(sf).trim()};`;
+    return text.length <= maxLen ? text : null;
+}
+
+/**
+ * Construct a standardized simplify issue with cognitive and reward scoring metrics.
+ *
+ * @param file - Relative file path.
+ * @param rule - Rule identifier.
+ * @param message - Descriptive issue message.
+ * @param suggestion - Remediation advice.
+ * @param pos - Statement position range.
+ * @param opportunity - Descriptive refactoring opportunity tag.
+ * @param canMakeImmutable - Whether refactoring allows const declaration.
+ * @param candidate - Formatted suggested replacement code.
+ * @returns Standardized simplify issue record.
+ */
+function makeSimplifyIssue(
+    file: string,
+    rule: string,
+    message: string,
+    suggestion: string,
+    pos: StatementPositionRange,
+    opportunity: string,
+    canMakeImmutable: boolean,
+    candidate: string,
+): Issue {
+    const start = { line: pos.start.line + 1, column: pos.start.character + 1 };
+    const end = { line: pos.end.line + 1, column: pos.end.character + 1 };
+    return {
+        id: `simplify:${rule}:${file}:${start.line}`,
+        analyzer: ANALYZER_SIMPLIFY,
+        rule,
+        severity: SEVERITY_INFO,
+        message,
+        location: { file, start, end },
+        detail: {
+            opportunity,
+            canMakeImmutable,
+            cognitiveDelta: canMakeImmutable ? COGNITIVE_DELTA_IMMUTABLE : COGNITIVE_DELTA_SHALLOW,
+            rewardBonus: canMakeImmutable ? REWARD_BONUS_IMMUTABLE : REWARD_BONUS_SHALLOW,
+            suggestedCode: candidate,
+        },
+        suggestion,
+    };
+}
+
+/**
+ * True and false branch expression pair.
+ */
+interface TernaryBranchPair {
+    trueExpr: ts.Expression;
+    falseExpr: ts.Expression;
+}
+
+/**
+ * Candidate folded ternary expression with statement position range.
+ */
+interface FoldedCandidate {
+    candidate: string;
+    pos: StatementPositionRange;
+}
+
+/**
+ * Attempt to fold expressions into a candidate ternary with position metadata.
+ *
+ * @param stmt - Enclosing if-statement node.
+ * @param prefix - Target assignment or return prefix.
+ * @param condText - Condition expression string.
+ * @param pair - True and false branch expression pair.
+ * @param sf - Source file for formatting.
+ * @param maxLen - Maximum line length threshold.
+ * @returns Folded candidate record, or null if impure or exceeds length.
+ */
+function tryFoldTernaryCandidate(
+    stmt: ts.IfStatement,
+    prefix: string,
+    condText: string,
+    pair: TernaryBranchPair,
+    sf: ts.SourceFile,
+    maxLen: number,
+): FoldedCandidate | null {
+    if (!isPureShallowExpression(pair.trueExpr) || !isPureShallowExpression(pair.falseExpr)) {
+        return null;
+    }
+    const candidate = formatTernaryCandidate(
+        prefix,
+        condText,
+        pair.trueExpr,
+        pair.falseExpr,
+        sf,
+        maxLen,
+    );
+    if (!candidate) {
+        return null;
+    }
+    return { candidate, pos: getStatementPositionRange(sf, stmt, stmt) };
+}
+
+/**
+ * Attempt to fold if (c) return a; else return b; into a ternary return.
+ *
+ * @param stmt - Parent if statement node.
+ * @param thenStmt - Then branch statement.
+ * @param elseStmt - Else branch statement.
+ * @param condText - Condition expression text.
+ * @param ctx - Context carrying analysis options and issue accumulator.
+ * @returns True if successfully matched and recorded finding.
+ */
+function tryFoldReturnTernary(
+    stmt: ts.IfStatement,
+    thenStmt: ts.Statement,
+    elseStmt: ts.Statement,
+    condText: string,
+    ctx: TernaryMatcherContext,
+): boolean {
+    if (!ts.isReturnStatement(thenStmt) || !ts.isReturnStatement(elseStmt)) {
+        return false;
+    }
+    if (!thenStmt.expression || !elseStmt.expression) {
+        return false;
+    }
+
+    const folded = tryFoldTernaryCandidate(
+        stmt,
+        PREFIX_RETURN,
+        condText,
+        { trueExpr: thenStmt.expression, falseExpr: elseStmt.expression },
+        ctx.sf,
+        ctx.maxLen,
+    );
+    if (!folded) {
+        return false;
+    }
+
+    ctx.issues.push(
+        makeSimplifyIssue(
+            ctx.file,
+            RULE_SIM_TRN,
+            'Conditional return can be simplified to a shallow ternary return.',
+            `Fold into shallow ternary return: \`${folded.candidate}\``,
+            folded.pos,
+            OPPORTUNITY_CONDITIONAL_RETURN,
+            false,
+            folded.candidate,
+        ),
+    );
+    return true;
+}
 
 /**
  * Check if a preceding statement is an uninitialized or default let declaration.
@@ -103,8 +376,8 @@ function emitAssignmentTernaryIssues(
             makeSimplifyIssue(
                 ctx.file,
                 RULE_SIM_IMM,
-                `Mutable \`let ${targetName}\` with conditional initialization can be folded into an immutable \`const\` binding.`,
-                `Fold mutable binding into immutable const declaration: \`${candidate}\``,
+                `Conditional assignment to '${targetName}' can be folded into an immutable const declaration with a ternary.`,
+                `Fold into const declaration: \`${candidate}\``,
                 pos,
                 OPPORTUNITY_CONDITIONAL_ASSIGNMENT_IMMUTABLE,
                 true,
@@ -112,15 +385,16 @@ function emitAssignmentTernaryIssues(
             ),
         );
     }
+
     ctx.issues.push(
         makeSimplifyIssue(
             ctx.file,
             RULE_SIM_TRN,
-            `Conditional assignment to \`${targetName}\` can be folded into a shallow ternary expression.`,
-            `Fold into shallow ternary expression: \`${candidate}\``,
+            `Conditional assignment to '${targetName}' can be simplified to a shallow ternary assignment.`,
+            `Fold into ternary assignment: \`${candidate}\``,
             pos,
             OPPORTUNITY_CONDITIONAL_ASSIGNMENT,
-            canMakeImmutable,
+            false,
             candidate,
         ),
     );
@@ -128,9 +402,9 @@ function emitAssignmentTernaryIssues(
 
 function tryFoldAssignmentTernary(
     stmt: ts.IfStatement,
-    prevStmt: ts.Statement | undefined,
     thenStmt: ts.Statement,
     elseStmt: ts.Statement,
+    prevStmt: ts.Statement | undefined,
     condText: string,
     ctx: TernaryMatcherContext,
 ): boolean {
@@ -141,30 +415,39 @@ function tryFoldAssignmentTernary(
 
     const canMakeImmutable = isPrecedingLetDeclaration(prevStmt, pair.targetName);
     const prefix = canMakeImmutable ? `const ${pair.targetName} = ` : `${pair.targetName} = `;
-    const folded = tryFoldTernaryCandidate(stmt, prefix, condText, pair, ctx.sf, ctx.maxLen);
+
+    const folded = tryFoldTernaryCandidate(
+        stmt,
+        prefix,
+        condText,
+        { trueExpr: pair.trueExpr, falseExpr: pair.falseExpr },
+        ctx.sf,
+        ctx.maxLen,
+    );
     if (!folded) {
         return false;
     }
 
-    emitAssignmentTernaryIssues(
-        pair.targetName,
-        folded.candidate,
-        canMakeImmutable,
-        folded.pos,
-        ctx,
-    );
+    const pos =
+        canMakeImmutable && prevStmt
+            ? getStatementPositionRange(ctx.sf, prevStmt, stmt)
+            : folded.pos;
+
+    emitAssignmentTernaryIssues(pair.targetName, folded.candidate, canMakeImmutable, pos, ctx);
     return true;
 }
 
-/**
- * Check and emit ternary simplification opportunities for an if statement with else.
- */
 function checkIfElseTernary(
     stmt: ts.IfStatement,
     prevStmt: ts.Statement | undefined,
     ctx: TernaryMatcherContext,
 ): void {
-    if (!stmt.elseStatement || ts.isIfStatement(stmt.elseStatement)) {
+    if (!stmt.elseStatement) {
+        return;
+    }
+
+    const cond = stmt.expression;
+    if (!isPureShallowExpression(cond)) {
         return;
     }
 
@@ -174,27 +457,23 @@ function checkIfElseTernary(
         return;
     }
 
-    const cond = stmt.expression;
-    if (!isPureShallowExpression(cond)) {
-        return;
-    }
     const condText = cond.getText(ctx.sf).trim();
-
     if (tryFoldReturnTernary(stmt, thenStmt, elseStmt, condText, ctx)) {
         return;
     }
-    tryFoldAssignmentTernary(stmt, prevStmt, thenStmt, elseStmt, condText, ctx);
+
+    tryFoldAssignmentTernary(stmt, thenStmt, elseStmt, prevStmt, condText, ctx);
 }
 
-/**
- * Check whether statements match a sequential return pattern.
- */
 function isSequentialReturnCandidate(
     stmt: ts.IfStatement,
     nextStmt: ts.Statement | undefined,
     thenStmt: ts.Statement | null,
 ): boolean {
-    if (stmt.elseStatement || !nextStmt || !ts.isReturnStatement(nextStmt)) {
+    if (stmt.elseStatement) {
+        return false;
+    }
+    if (!nextStmt || !ts.isReturnStatement(nextStmt)) {
         return false;
     }
     if (!thenStmt || !ts.isReturnStatement(thenStmt)) {
@@ -203,9 +482,6 @@ function isSequentialReturnCandidate(
     return Boolean(thenStmt.expression && nextStmt.expression);
 }
 
-/**
- * Check consecutive statements for: if (c) return a; return b;
- */
 function checkSequentialReturnTernary(
     stmt: ts.IfStatement,
     nextStmt: ts.Statement | undefined,
@@ -254,15 +530,6 @@ function checkSequentialReturnTernary(
     );
 }
 
-/**
- * Scan a list of sibling statements within a block, function, or source file.
- *
- * @param statements - Sequence of sibling statements.
- * @param sf - Source file.
- * @param file - Normalized file path.
- * @param maxLen - Maximum allowable line length.
- * @param issues - Issues accumulator.
- */
 function scanStatements(
     statements: readonly ts.Statement[],
     sf: ts.SourceFile,
@@ -283,15 +550,6 @@ function scanStatements(
     }
 }
 
-/**
- * Traverse an AST node recursively and inspect all statement sequences.
- *
- * @param node - AST node.
- * @param sf - Source file.
- * @param file - Normalized file path.
- * @param maxLen - Maximum allowable line length.
- * @param issues - Issues accumulator.
- */
 function walkNode(
     node: ts.Node,
     sf: ts.SourceFile,

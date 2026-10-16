@@ -226,4 +226,3 @@ static func test_frontend_workbench_view_stub_contract() -> Dictionary:
 		"bound_ok": bound_ok,
 		"snap_ok": snap_ok
 	})
-

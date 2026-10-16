@@ -73,6 +73,16 @@ function resolveFileLanguage(ext: string): string | null {
     if (ext === '.rs') return 'rust';
     if (ext === '.go') return 'go';
     if (ext === '.gd') return 'gdscript';
+    if (
+        ext === '.ps1' ||
+        ext === '.psm1' ||
+        ext === '.psd1' ||
+        ext === '.sh' ||
+        ext === '.bash' ||
+        ext === '.zsh'
+    ) {
+        return 'shell';
+    }
     return null;
 }
 

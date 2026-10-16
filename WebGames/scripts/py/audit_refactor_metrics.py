@@ -55,8 +55,9 @@ def find_node_executable() -> str:
                 first = r.stdout.strip().splitlines()[0].strip()
                 if Path(first).exists():
                     return first
-        except Exception:
-            pass
+        except (OSError, subprocess.SubprocessError) as exc:
+            # where.exe 探测失败时记录调试信息并回退至标准固定安装路径扫描
+            sys.stderr.write(f"[DEBUG] where.exe node 探测跳过: {exc}\n")
     win_paths = [
         Path(os.environ.get("ProgramFiles", "C:\\Program Files")) / "nodejs" / "node.exe",
         Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "node" / "node.exe",

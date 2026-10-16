@@ -108,4 +108,3 @@ func reset_state() -> void:
 	world_slot_status = GameConfig.get_string("domains.account", "save_slot/defaults/world_slot_status", "OCCUPIED")
 	world_id = GameConfig.get_string("domains.account", "save_slot/defaults/world_id", "WORLD_DEFAULT_SP_01")
 	character_profile = null
-

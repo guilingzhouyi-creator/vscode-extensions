@@ -89,4 +89,3 @@ flowchart TD
 | TC-SDK-CHECK-02 | 悬空引用拦截与内联文本放行 | 运行 `check_mod.py` 检验故意写错 `prologue_dag_id` 的包，以及仅含 `inline_text` 的极简包 | 悬空包准确抛出 `ERR_DESTINY_UNKNOWN_DAG_REF`，内联包 100% 绿色通过且无需 `i18n/` 目录 |
 | TC-SDK-PLAY-03 | 一键全分支试玩推演战报 | 运行 `python mod_sdk/tools/play_mod.py mod_sdk/templates/starter_story --choice-strategy all-branches --json` | 返回有效 JSON，包含 `schema_version`、3 步水化台词记录且 `is_success == true` |
 | TC-SDK-SCAFFOLD-04 | 脚手架开箱即通过校验与试玩 | 运行 `scaffold_mod.py --id mod_test_box --name "测试模组" --dir <tmp>` 后接 `check_mod.py` 与 `play_mod.py` | 静态预检 0 错误 0 告警，推演战报 `is_success == true` |
-

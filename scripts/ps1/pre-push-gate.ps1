@@ -292,7 +292,7 @@ if ($runAll) {
 
 # --- Gate 1: 全工作区零空文件、物理卫生、.gitignore 治理与五维代码密度守卫 ---
 Write-GateHost "[1/9] 校验全工作区零物理空文件、空白脚本、.gitignore 治理与五维代码密度守卫..." -ForegroundColor Gray
-$code = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-no-empty-files.js") -WorkingDirectory $repoRoot -StepName "Gate 1 (零物理空文件)" -TimeoutSeconds 30
+$code = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-physical-hygiene.js") -WorkingDirectory $repoRoot -StepName "Gate 1 (物理卫生八维全域巡检)" -TimeoutSeconds 30
 $codeGi = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-gitignore-governance.js") -WorkingDirectory $repoRoot -StepName "Gate 1 (.gitignore 治理)" -TimeoutSeconds 30
 $densityArgs = if ($range) { @("scripts/common/validate-code-density.js", "--range", $range) } else { @("scripts/common/validate-code-density.js") }
 $codeDensity = Invoke-GateStep -FilePath $nodeCmd -ArgumentList $densityArgs -WorkingDirectory $repoRoot -StepName "Gate 1 (五维代码密度)" -TimeoutSeconds 30

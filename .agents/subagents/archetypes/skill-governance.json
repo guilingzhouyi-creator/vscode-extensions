@@ -28,4 +28,3 @@
     "node scripts/common/sync-skills.js --check"
   ]
 }
-

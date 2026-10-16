@@ -169,4 +169,3 @@ export const TIMING_VIEWPORT_STYLES = /* css */ `
     border-color: var(--focus);
   }
 `;
-

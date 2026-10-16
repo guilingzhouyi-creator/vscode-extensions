@@ -130,4 +130,3 @@ export class RovingFocusController {
         this.container.removeEventListener('keydown', this.onKeyDown);
     }
 }
-

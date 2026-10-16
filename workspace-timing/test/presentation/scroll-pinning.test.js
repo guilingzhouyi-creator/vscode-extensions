@@ -139,4 +139,3 @@ describe('ScrollPinningController（150ms 冷却视口图钉控制器）', () =>
         assert.strictEqual(container.listeners.get('scroll').length, 0);
     });
 });
-

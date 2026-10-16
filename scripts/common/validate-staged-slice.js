@@ -15,6 +15,7 @@
 const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
+const { getSafeGitEnv } = require("./git-env");
 
 let ts;
 const REPO_ROOT = path.resolve(__dirname, "../..");
@@ -215,12 +216,7 @@ function parseCliFlags(args) {
  * @returns {Record<string, string>}
  */
 function getGitEnv() {
-  return {
-    ...process.env,
-    GIT_CONFIG_GLOBAL: "NUL",
-    GIT_CONFIG_SYSTEM: "NUL",
-    GIT_CONFIG_NOSYSTEM: "1",
-  };
+  return getSafeGitEnv(REPO_ROOT);
 }
 
 /**

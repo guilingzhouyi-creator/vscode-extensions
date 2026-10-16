@@ -7,8 +7,6 @@
  * Exit Semantics & Design Rationale: 统一本地时区口径，杜绝 UTC 导致的午夜偏离；MAX_EXPANSION_SEGMENTS (4000) 边界守卫阻断死循环。
  */
 
-import { TimeSession } from '../models';
-
 const DAYS_TO_SUNDAY = 6;
 const MAX_EXPANSION_SEGMENTS = 4000;
 
@@ -66,16 +64,4 @@ export function eachDaySegment(
         fn(localDateStr(cursor), cursor, segEnd);
         cursor = segEnd;
     }
-}
-
-/**
- * 将区间 [startMs, endMs) 按本地自然日切分为 TimeSession 片段。
- */
-export function splitByNaturalDay(startMs: number, endMs: number): TimeSession[] {
-    const out: TimeSession[] = [];
-    if (!(startMs > 0) || !(endMs > startMs)) return out;
-    eachDaySegment(startMs, endMs, (_date, segStart, segEnd) => {
-        out.push({ startMs: segStart, endMs: segEnd, durationMs: segEnd - segStart });
-    });
-    return out;
 }

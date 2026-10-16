@@ -198,4 +198,3 @@ static func teardown() -> Dictionary:
 		"catalog_released": true,
 		"listeners_disposed": true
 	}
-

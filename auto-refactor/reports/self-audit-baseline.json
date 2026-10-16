@@ -1,7 +1,14 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1792149372709",
-  "timestamp": "2026-10-16T11:16:21.894Z",
+  "snapshotId": "snapshot-v0.4.0-1792154448392",
+  "timestamp": "2026-10-16T12:41:00.187Z",
   "cai": 86.04,
+  "polyglotGeneralization": {
+    "index": 94.46,
+    "meanScore": 94.46,
+    "dispersionPenalty": 1,
+    "standardDeviation": 0,
+    "languageCount": 1
+  },
   "versions": {
     "engineVersion": "0.4.0",
     "ruleVersion": "2026.09-v1",
@@ -14,25 +21,32 @@
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
     "filesScanned": 637,
-    "durationMs": 7178
+    "durationMs": 7779
   },
   "metrics": {
     "compositeScore": 99.07,
     "grade": "A+",
     "autonomyRate": 86.04,
+    "polyglotGeneralization": {
+      "index": 94.46,
+      "meanScore": 94.46,
+      "dispersionPenalty": 1,
+      "standardDeviation": 0,
+      "languageCount": 1
+    },
     "effectiveCodeDensity": 0.95,
-    "totalIssues": 6284,
+    "totalIssues": 6294,
     "suppressedIssues": 167,
-    "unsuppressedIssues": 6117,
+    "unsuppressedIssues": 6127,
     "bySeverity": {
       "info": 767,
-      "warning": 5517,
+      "warning": 5527,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
-      "high": 1,
-      "medium": 2958,
+      "high": 5,
+      "medium": 2964,
       "low": 3325
     }
   },
@@ -40,7 +54,7 @@
     "pillars": {
       "architecture": 98.85,
       "maintainability": 98.19,
-      "performance": 99.47,
+      "performance": 99.46,
       "data": 99.76,
       "testing": 100,
       "reliability": 99.68,
@@ -66,11 +80,11 @@
     "codeSecurity": 99.85,
     "performanceEfficiency": 99.21,
     "standardization": 93.63,
-    "modernity": 99.59,
-    "maintainability": 97.17,
+    "modernity": 99.58,
+    "maintainability": 97.15,
     "commentQuality": 99.99,
-    "duplication": 94.18,
-    "techDebtRisk": 99.75
+    "duplication": 94.15,
+    "techDebtRisk": 99.74
   },
   "topHotspots": [
     {
@@ -167,8 +181,8 @@
   "technicalDebtLedger": {
     "summary": {
       "critical": 0,
-      "high": 1,
-      "medium": 2958,
+      "high": 5,
+      "medium": 2964,
       "low": 3325
     },
     "criticalItems": [],
@@ -181,6 +195,42 @@
         "file": "src/analyzers/complexity-loops.ts",
         "line": 91,
         "message": "Nested collection linear lookup anti-pattern: Calling 'lastIndexOf()' inside loop (depth 1) causes O(N*M) polynomial complexity"
+      },
+      {
+        "id": "complexity:high-complexity:src/analyzers/complexity-loops.ts:113",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/complexity-loops.ts",
+        "line": 113,
+        "message": "Function \"loopBodyRange\" has cyclomatic complexity 19 (threshold 12)."
+      },
+      {
+        "id": "complexity:high-complexity:src/analyzers/complexity-loops.ts:288",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/complexity-loops.ts",
+        "line": 288,
+        "message": "Function \"findLoopSitesInFunction\" has cyclomatic complexity 15 (threshold 12)."
+      },
+      {
+        "id": "performance:PRF-ALG-002:src/analyzers/complexity-loops.ts:313",
+        "rule": "PRF-ALG-002",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/complexity-loops.ts",
+        "line": 313,
+        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
+      },
+      {
+        "id": "complexity:high-complexity:src/analyzers/constants.ts:421",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/constants.ts",
+        "line": 421,
+        "message": "Function \"ConstantsAnalyzer.isDiagnosticOrLogMessage\" has cyclomatic complexity 18 (threshold 12)."
       }
     ]
   },
@@ -203,16 +253,16 @@
       },
       {
         "domainName": "analyzers",
-        "compositeScore": 98.69,
+        "compositeScore": 98.64,
         "pillars": {
-          "architecture": 98.95,
-          "maintainability": 96.66,
-          "performance": 99.2,
-          "data": 99.53,
+          "architecture": 98.93,
+          "maintainability": 96.51,
+          "performance": 99.15,
+          "data": 99.52,
           "testing": 100,
-          "reliability": 99.37,
+          "reliability": 99.31,
           "security": 99.84,
-          "extensibility": 95.91
+          "extensibility": 95.78
         },
         "moduleCount": 1
       },
@@ -683,16 +733,16 @@
       },
       {
         "domainName": "reporting",
-        "compositeScore": 99.25,
+        "compositeScore": 99.33,
         "pillars": {
-          "architecture": 99.47,
-          "maintainability": 98.3,
-          "performance": 99.63,
+          "architecture": 99.53,
+          "maintainability": 98.48,
+          "performance": 99.67,
           "data": 100,
           "testing": 100,
           "reliability": 100,
-          "security": 99.9,
-          "extensibility": 96.47
+          "security": 99.91,
+          "extensibility": 96.86
         },
         "moduleCount": 1
       },
@@ -782,7 +832,7 @@
           "testing": 100,
           "reliability": 99.75,
           "security": 99.86,
-          "extensibility": 94.45
+          "extensibility": 94.44
         },
         "moduleCount": 1
       },
@@ -940,27 +990,27 @@
   },
   "trajectory": {
     "runEloc": {
-      "processed": 145980,
-      "unique": 117703,
-      "changed": 77,
-      "semantic": 62,
+      "processed": 146104,
+      "unique": 117832,
+      "changed": 7320,
+      "semantic": 5856,
       "relocated": 0,
       "cosmetic": 0,
       "boilerplate": 0,
-      "added": 39,
+      "added": 3660,
       "deleted": 0,
       "modified": 0
     },
     "lifetime": {
       "weekId": "LIFETIME",
       "startMs": 1791102755050,
-      "endMs": 1792149372707,
+      "endMs": 1792154448389,
       "totalRuns": 252,
       "eloc": {
-        "processedTotal": 33687593,
-        "uniqueTotal": 117703,
-        "changedTotal": 276153,
-        "semanticTotal": 220921
+        "processedTotal": 33687717,
+        "uniqueTotal": 117832,
+        "changedTotal": 283396,
+        "semanticTotal": 226715
       },
       "qed": {
         "mean": 0.0001,

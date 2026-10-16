@@ -54,4 +54,3 @@ static func from_dto(data_dict: Dictionary) -> UnifiedResponseEnvelopeDTO:
 	resp.causal_delta = (raw_c as Dictionary).duplicate(true) if raw_c is Dictionary else {}
 	resp.server_timestamp_ms = int(data_dict.get("server_timestamp_ms", 0))
 	return resp
-

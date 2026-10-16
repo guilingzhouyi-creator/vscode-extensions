@@ -328,6 +328,10 @@ function buildMetricsSummary(projectScore, scanReport, issues, debtByTier) {
     compositeScore: projectScore.compositeScore,
     grade: projectScore.grade,
     autonomyRate: scanReport.autonomy?.compositeAutonomyIndex ?? null,
+    polyglotGeneralization:
+      scanReport.qualityScore?.polyglotGeneralization ??
+      projectScore.polyglotGeneralization ??
+      null,
     effectiveCodeDensity: projectScore.effectiveCodeDensity,
     totalIssues: issues.length,
     suppressedIssues: suppressedCount,
@@ -345,6 +349,10 @@ function buildBaselineReport(params) {
     snapshotId: params.snapshot.snapshotId,
     timestamp: new Date().toISOString(),
     cai: params.scanReport.autonomy?.compositeAutonomyIndex ?? null,
+    polyglotGeneralization:
+      params.scanReport.qualityScore?.polyglotGeneralization ??
+      params.projectScore.polyglotGeneralization ??
+      null,
     versions: params.snapshot.versions,
     rulesDigest: params.snapshot.rulesDigest,
     configDigest: params.snapshot.configDigest,

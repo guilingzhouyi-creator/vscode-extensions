@@ -181,4 +181,3 @@ static func _sync_observation(src: AgentHudContextSliceDTO, dst: AgentHudContext
 	for n in src.ui_notices:
 		if n != null:
 			dst.ui_notices.append(n)
-

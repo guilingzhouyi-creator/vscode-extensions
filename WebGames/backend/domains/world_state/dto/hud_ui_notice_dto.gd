@@ -51,4 +51,3 @@ static func from_dto(data: Dictionary) -> HudUiNoticeDTO:
 	for act in raw_actions:
 		dto.action_directive_ids.append(str(act))
 	return dto
-

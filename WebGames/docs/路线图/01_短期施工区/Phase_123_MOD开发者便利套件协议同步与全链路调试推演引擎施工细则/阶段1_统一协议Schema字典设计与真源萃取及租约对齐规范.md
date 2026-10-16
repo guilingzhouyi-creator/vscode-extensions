@@ -114,4 +114,3 @@
 | TC-MSDK-S1-02 | 租约保护窗口单源真源对齐 | 检查 capabilities.json 中租约配置 | human_preemption_lease_ms 精确等于 3000ms |
 | TC-MSDK-S1-03 | 统一协议能力清单静态自动萃取 | 运行 python scripts/py/sync_mod_sdk.py --check-only | 0 差异通过，capabilities.json 包含 unified_protocol_capabilities |
 | TC-MSDK-S1-04 | 错误码清单收敛性 | 检查 capabilities.json supported_error_codes | 完整包含 Phase 122 新增的 5 大核心协议错误码 |
-

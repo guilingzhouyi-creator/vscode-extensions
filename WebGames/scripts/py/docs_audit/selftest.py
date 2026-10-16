@@ -114,4 +114,3 @@ def cmd_self_test() -> int:
         return 1
     print("【audit-docs self-test】全部用例通过")
     return 0
-

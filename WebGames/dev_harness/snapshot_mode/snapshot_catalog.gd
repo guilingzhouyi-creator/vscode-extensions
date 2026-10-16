@@ -118,4 +118,3 @@ static func fixture_combat_critical() -> TestSnapshotBundleDTO:
 	}
 	snap.location_name = "ABYSSAL_DUNGEON_DEPTHS"
 	return snap
-

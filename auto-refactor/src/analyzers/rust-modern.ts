@@ -22,6 +22,7 @@ import type { Analyzer, AnalyzerContext, Issue, Severity, AgentActionType } from
 import { SEVERITY_WARNING, SEVERITY_INFO } from '../core/types';
 import { ANALYZER_RUST_MODERN } from '../core/scoring/dimensionLiterals';
 import { maskSourceText, type SourceMaskConfig } from '../core/policy/source-mask';
+import { buildCanonicalIssue } from '../core/reporting/canonical-issue-builder';
 
 /** Extension the pack accepts; the content-only path sees every language. */
 const SOURCE_EXTENSION = '.rs';
@@ -520,17 +521,17 @@ function makeIssue(
           }
         : undefined;
 
-    return {
-        id: `${ANALYZER_RUST_MODERN}:${rule}:${file}:${line}`,
+    return buildCanonicalIssue({
         analyzer: ANALYZER_RUST_MODERN,
         rule,
+        file,
+        line,
         severity,
         message,
-        location: { file, start: { line, column: 1 }, end: { line, column: 1 } },
-        detail,
         suggestion,
-        ...(actionable ? { actionable } : {}),
-    };
+        detail,
+        actionable,
+    });
 }
 
 /**

@@ -296,4 +296,3 @@ printEnvelope(envelope({
 }));
 
 process.exit(status === STATUS.PASS ? 0 : 1);
-

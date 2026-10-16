@@ -56,15 +56,16 @@ fi
 FAILED=0
 START_TIME=$("$NODE_BIN" -e 'process.stdout.write(Date.now().toString())')
 
-# 1. 物理卫生与零空文件看守
+# 1. 物理卫生八维刚性公理与全域巡检
 if [[ "$JSON_MODE" -eq 0 && "$AGENT_MODE" -eq 0 ]]; then echo "▶ [1/5] 检查全工作区物理卫生、同构脚本、.gitignore 治理与零空文件..."; fi
-CODE_EMPTY=0
-"$NODE_BIN" scripts/common/validate-no-empty-files.js >/dev/null 2>&1 || CODE_EMPTY=$?
+LOG_HYGIENE=$(mktemp)
+CODE_HYGIENE=0
+"$NODE_BIN" scripts/common/validate-physical-hygiene.js --json >"$LOG_HYGIENE" 2>&1 || CODE_HYGIENE=$?
 CODE_ISO=0
 "$NODE_BIN" scripts/common/validate-script-isomorphism.js >/dev/null 2>&1 || CODE_ISO=$?
 CODE_GI=0
 "$NODE_BIN" scripts/common/validate-gitignore-governance.js >/dev/null 2>&1 || CODE_GI=$?
-if [[ "$CODE_EMPTY" -ne 0 || "$CODE_ISO" -ne 0 || "$CODE_GI" -ne 0 ]]; then
+if [[ "$CODE_HYGIENE" -ne 0 || "$CODE_ISO" -ne 0 || "$CODE_GI" -ne 0 ]]; then
     STATUS_HYGIENE="FAIL"
     FAILED=1
 else
@@ -88,7 +89,7 @@ LOG_WT=$(mktemp)
 LOG_WG=$(mktemp)
 LOG_AR=$(mktemp)
 LOG_AR_SELF=$(mktemp)
-trap 'rm -f "$LOG_WT" "$LOG_WG" "$LOG_AR" "$LOG_AR_SELF"' EXIT
+trap 'rm -f "$LOG_WT" "$LOG_WG" "$LOG_AR" "$LOG_AR_SELF" "$LOG_HYGIENE"' EXIT
 
 # 辅助函数: 带看门狗超时的后台进程等待机制
 wait_with_timeout() {
@@ -254,10 +255,12 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF"
   const statusWt = process.argv[7];
   const statusWg = process.argv[8];
   const rootDir = process.argv[9];
-  const codeEmpty = Number(process.argv[10] || 0);
+  const codeHygiene = Number(process.argv[10] || 0);
   const codeIso = Number(process.argv[11] || 0);
   const codeCatalog = Number(process.argv[12] || 0);
   const codeSkills = Number(process.argv[13] || 0);
+  const hygieneReportFile = process.argv[16] || "";
+  const codeGi = Number(process.argv[17] || 0);
   const baselineFile = path.join(rootDir, "auto-refactor", "reports", "self-audit-baseline.json");
   const wtReportFile = path.join(rootDir, "workspace-timing", "reports", "review", "report-latest.json");
   const summaryFile = process.env.GITHUB_STEP_SUMMARY;
@@ -288,11 +291,24 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF"
 
   const SCORE_FLOOR = 15.0;
 
-  // 1. 物理卫生基石得分（动态判定：零空文件/跳板与同构脚本对双项全合规 100.0，按违规项比例连续度量）
-  let hygienePassedCount = 0;
-  if (codeEmpty === 0) hygienePassedCount += 1;
-  if (codeIso === 0) hygienePassedCount += 1;
-  const scoreHygiene = hygienePassedCount === 2 ? 100.0 : Math.max(SCORE_FLOOR, Number((100.0 * (hygienePassedCount / 2.0)).toFixed(1)));
+  // 1. 物理卫生基石得分（基于八维物理卫生矩阵连续客观计算与同构/.gitignore治理守卫）
+  let baseHygiene = null;
+  try {
+    if (fs.existsSync(hygieneReportFile)) {
+      const hygData = JSON.parse(fs.readFileSync(hygieneReportFile, "utf8"));
+      if (hygData && typeof hygData.score === "number") {
+        baseHygiene = hygData.score;
+      }
+    }
+  } catch (_) {
+    baseHygiene = null;
+  }
+  if (baseHygiene === null) {
+    baseHygiene = codeHygiene === 0 ? 100.0 : 50.0;
+  }
+  if (codeIso !== 0) baseHygiene = Math.max(SCORE_FLOOR, baseHygiene - 20.0);
+  if (codeGi !== 0) baseHygiene = Math.max(SCORE_FLOOR, baseHygiene - 10.0);
+  const scoreHygiene = Math.max(SCORE_FLOOR, Number(baseHygiene.toFixed(1)));
 
   // 2. 单源规则目录基石得分（基于 SSOT 规则目录一致性与技能文档字节等价比对动态判定）
   const ruleCatalogPath = path.join(rootDir, "scripts", "common", "rule-catalog.json");
@@ -378,6 +394,24 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF"
   }
   const scoreWg = statusWg === "PASS" ? baseWg : Math.max(SCORE_FLOOR, Number((baseWg - 60.0).toFixed(1)));
 
+  let polyglotIndex = null;
+  let polyglotBreakdown = null;
+  try {
+    const polyScript = path.join(rootDir, "scripts", "common", "evaluate-polyglot-balance.js");
+    if (fs.existsSync(polyScript)) {
+      const isFast = process.argv[14] === "1";
+      const pArgs = [polyScript, "--json"];
+      if (isFast) pArgs.push("--fast");
+      const { execFileSync } = require("child_process");
+      const pOut = execFileSync(process.execPath, pArgs, { cwd: rootDir, encoding: "utf8" });
+      const pJson = JSON.parse(pOut);
+      if (pJson && pJson.polyglotIndex != null) {
+        polyglotIndex = Number(pJson.polyglotIndex);
+        polyglotBreakdown = pJson.breakdown || null;
+      }
+    }
+  } catch (_) {}
+
   // 全工作区综合健康分（五大核心子系统基石分平权加权各占 20%：0.2 * (Hygiene + Rules + AR + WT + WG)）
   const workspaceHealthScore = Number((0.2 * (scoreHygiene + scoreRules + scoreAr + scoreWt + scoreWg)).toFixed(2));
   const wsHealthStr = workspaceHealthScore % 1 === 0 ? workspaceHealthScore.toFixed(1) : String(workspaceHealthScore);
@@ -417,6 +451,7 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF"
     grade: wsGrade,
     autonomyRate: autonomyRate != null ? Number(autonomyRate) : null,
     polyglotIndex: polyglotIndex != null ? Number(polyglotIndex) : null,
+    polyglotBreakdown: polyglotBreakdown,
     totalDebt: totalDebt != null ? Number(totalDebt) : null,
     catalogRuleCount: catalogRuleCount || null,
     projects: {
@@ -552,23 +587,6 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF"
   console.log(formatDashboardRow(" ".repeat(titlePad) + titleText, targetWidth));
   console.log(borderMid);
 
-  let polyglotIndex = null;
-  try {
-    if (fs.existsSync(baselineFile)) {
-      const b = JSON.parse(fs.readFileSync(baselineFile, "utf8"));
-      const m = b.metrics || {};
-      const polyData = b.polyglotGeneralization || m.polyglotGeneralization || null;
-      if (polyData && polyData.index != null) polyglotIndex = Number(polyData.index);
-    }
-  } catch (_) {}
-  if (polyglotIndex === null && scoreAr > 0 && scoreWg > 0) {
-    const lScores = [scoreAr, scoreWg, 100.0];
-    const lMean = (scoreAr + scoreWg + 100.0) / 3.0;
-    const lVar = lScores.reduce((acc, s) => acc + Math.pow(s - lMean, 2), 0) / 3.0;
-    const lStd = Math.sqrt(lVar);
-    polyglotIndex = Math.round(lMean * Math.max(0.0, 1.0 - (lStd / 100.0)) * 100) / 100;
-  }
-
   let summaryText = `综合健康分: ${wsHealthStr} (${wsGrade})`;
   if (autonomyRate != null) summaryText += ` | 自研率: ${Number(autonomyRate).toFixed(2)}%`;
   if (polyglotIndex != null) summaryText += ` | 语言均衡: ${Number(polyglotIndex).toFixed(2)}`;
@@ -687,7 +705,7 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF"
       fs.appendFileSync(summaryFile, md, "utf8");
     } catch (_) {}
   }
-' "$START_TIME" "$FAILED" "$JSON_MODE" "$STATUS_HYGIENE" "$STATUS_RULES" "$STATUS_AR" "$STATUS_WT" "$STATUS_WG" "$ROOT_DIR" "$CODE_EMPTY" "$CODE_ISO" "$CODE_CATALOG" "$CODE_SKILLS" "$FAST_MODE" "$AGENT_MODE"
+' "$START_TIME" "$FAILED" "$JSON_MODE" "$STATUS_HYGIENE" "$STATUS_RULES" "$STATUS_AR" "$STATUS_WT" "$STATUS_WG" "$ROOT_DIR" "$CODE_HYGIENE" "$CODE_ISO" "$CODE_CATALOG" "$CODE_SKILLS" "$FAST_MODE" "$AGENT_MODE" "$LOG_HYGIENE" "$CODE_GI"
 
 if [[ "$JSON_MODE" -eq 1 || "$AGENT_MODE" -eq 1 ]]; then
     exit "$FAILED"

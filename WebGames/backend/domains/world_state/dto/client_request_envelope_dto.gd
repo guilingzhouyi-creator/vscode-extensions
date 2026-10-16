@@ -68,4 +68,3 @@ static func from_dto(data: Dictionary) -> ClientRequestEnvelopeDTO:
 	req.lease_nonce = int(data.get("lease_nonce", 0))
 	req.client_timestamp_ms = int(data.get("client_timestamp_ms", 0))
 	return req
-

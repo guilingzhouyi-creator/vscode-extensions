@@ -21,7 +21,7 @@
 | **测试工程与性能基准** | 确定性时钟/RNG 隔离；零孤儿用例；TB-REGRESSION 耗时预算 | [auto-refactor/DOCS.md](auto-refactor/DOCS.md) | [test-benchmark-engineering](.agents/skills/test-benchmark-engineering/SKILL.md) | `cd auto-refactor && npm test` |
 | **产品交付与发布日志** | 面向真实用户；零工程重构黑话；Keep-a-Changelog 规范； | [workspace-timing/README.md](workspace-timing/README.md) | [product-release-docs](.agents/skills/product-release-docs/SKILL.md) | `bash scripts/sh/check-display-assets.sh` |
 | **扩展打包发布与热同步** | 产物自动轮转；`-HotSync` 注册表自愈；SemVer 干净树；资产健全 | [scripts/README.md](scripts/README.md) | [release-package-workflow](.agents/skills/release-package-workflow/SKILL.md) | `pwsh -File scripts/ps1/package.ps1 -HotSync` |
-| **单源规则目录与元治理** | 428 规则 SSOT；规则 ID 零虚构 (`RCFG-RULE-DRIFT`)；三大项目与全局门禁对齐 | [rule-catalog.json](scripts/common/rule-catalog.json) | [rule-catalog-governance](.agents/skills/rule-catalog-governance/SKILL.md) | `node scripts/common/generate-rule-catalog.js --check-only` |
+| **单源规则目录与元治理** | 464 规则 SSOT；规则 ID 零虚构 (`RCFG-RULE-DRIFT`)；三大项目与全局门禁对齐 | [rule-catalog.json](scripts/common/rule-catalog.json) | [rule-catalog-governance](.agents/skills/rule-catalog-governance/SKILL.md) | `node scripts/common/generate-rule-catalog.js --check-only` |
 | **全工作区统一质量审查** | 5 大支柱 100% 绿色通行；零规则漂移 (`RCFG-RULE-DRIFT`) | [scripts/README.md](scripts/README.md)<br/>[rule-catalog.json](scripts/common/rule-catalog.json) | [gate-governance](.agents/skills/gate-governance/SKILL.md) | `pwsh -File scripts/ps1/audit-all.ps1` |
 | **顶层蓝图与历史全宗** | Cell 平权自治体系；一体两面 Diff；归档案卷元数据规范 | [agent-native-system-blueprint.md](docs/agent-native-system-blueprint.md)<br/>[deliverables/README.md](archive/deliverables/README.md) | [docs-archive-governance](.agents/skills/docs-archive-governance/SKILL.md) | — |
 | **技能集结构与同构治理** | 物理四件套结构；JIT 渐进披露；根目录与插件 100% 字节等价 | [validate-skills.js](scripts/common/validate-skills.js)<br/>[sync-skills.js](scripts/common/sync-skills.js) | [skill-governance](.agents/skills/skill-governance/SKILL.md) | `node scripts/common/validate-skills.js` |
@@ -32,11 +32,15 @@
 
 ## 二、 工作区全局刚性公理
 
-### 1. 物理卫生与排版契约
-- **零空文件**：全仓严禁创建或遗留 0 字节物理空文件或纯空白字符虚空文件；
-- **换行契约**：PowerShell 脚本（`.ps1`）在磁盘必须严格保持 CRLF 换行；Bash（`.sh`）、GDScript（`.gd`）、TypeScript/JavaScript（`.ts`/`.js`）、Markdown（`.md`）与 JSON（`.json`）严格保持 LF 换行；
-- **缩进规范**：TypeScript 保持 4 空格缩进，其余源码与配置文件保持 2 空格缩进；
-- **文件命名**：全局遵循 `kebab-case`（*例外*：WebGames 的 `config/**/*.json` 与 `.gd` 脚本保持 `snake_case` 对齐领域惯例）。
+### 1. 物理卫生八维刚性契约与排版公理
+- **零物理空文件与纯注释空壳（`HYG-EMP-001` / `HYG-EMP-002`）**：全仓严禁创建或遗留 0 字节物理空文件、纯空白字符虚空文件；严禁剥离注释后有效代码为 0 的纯注释空壳文件；
+- **全仓换行契约（`HYG-EOL-001`）**：PowerShell 脚本（`.ps1`）在磁盘必须严格保持 CRLF 换行；Bash（`.sh`）、GDScript（`.gd`）、TypeScript/JavaScript（`.ts`/`.js`）、Markdown（`.md`）与 JSON（`.json`）全量源文件、报告与配置文件严格保持 LF 换行；
+- **UTF-8 无 BOM 格式洁净度（`HYG-BOM-001`）**：全仓文本文件严格使用 UTF-8 无 BOM（NO-BOM）格式，严禁出现 `0xEF, 0xBB, 0xBF` 前缀；
+- **POSIX 单 EOF 换行与末尾零空行（`HYG-TRL-001`）**：所有文本文件末尾必须有且仅有 1 个标准换行符，严禁缺失末尾换行，严禁文件末尾堆叠 $\ge 2$ 个连续多余空行；
+- **纯空格缩进契约（`HYG-IND-001`）**：非 GDScript、非 Makefile 文件严禁出现 Tab 制表符；TypeScript 保持 4 空格缩进，其余源码与配置文件保持 2 空格纯空格缩进；
+- **零残留物理空目录（`HYG-DIR-001`）**：活跃源码树与工具目录严禁遗留 0 文件的空文件夹；
+- **零系统与临时脏文件（`HYG-CLT-001`）**：严禁提交或在工作区遗留 `Thumbs.db`、`.DS_Store`、`desktop.ini`、`*.tmp`、`*.bak` 或未受控临时脏文件；
+- **文件命名契约（`NAM-FIL-001` / `NAM-DIR-001`）**：全局遵循 `kebab-case`（*例外*：WebGames 的 `config/**/*.json` 与 `.gd` 脚本保持 `snake_case` 对齐领域惯例）；严禁包含空格、大写驼峰或施工批次黑话代号。
 
 ### 2. 代码复杂度、体积与注释契约三轨预算
 - **AST 切片预算（`GATE-AST-001`）**：暂存区生产代码与工具脚本受 AST 局部切片守卫约束：单函数圈复杂度基准 $\text{CC} \le 15$；引入函数爆炸半径感知（Blast Radius），未导出的文件私有局部纯函数（无循环且 $\text{Depth} \le 3$）享 $\text{CC} \le 18 \sim 20$ 低爆炸半径弹性包络，对外导出公共 API 严格执行 $\text{CC} \le 15$ 刚性基线；无循环且 $\text{Depth} \le 2$ 的平铺分发器/状态映射器与探针模块享 $\text{CC} \le 20 \sim 25$ 弹性包络；控制流嵌套深度 $\text{Depth} \le 4$、单行噪声比 $\text{Noise} \le 4.0$；循环体与调度逻辑须平铺控制流并采用卫语句提前返回；
@@ -115,4 +119,3 @@
      - 暂存区检查：`pwsh -File scripts/ps1/pre-commit-gate.ps1`
      - 提交信息检查：`pwsh -File scripts/ps1/commit-msg-gate.ps1 <path-to-msg>`
 4. **全量回归**：改动落地后，执行对应项目专属全量测试及全工作区统一审查（`pwsh -File scripts/ps1/audit-all.ps1`），确保 100% 绿色通行后方可交割。
-

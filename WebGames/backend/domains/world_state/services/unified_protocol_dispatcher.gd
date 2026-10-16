@@ -103,4 +103,3 @@ static func _dispatch_settings_action(req: ClientRequestEnvelopeDTO) -> UnifiedR
 	return UnifiedProtocolFactory.create_response(
 		req.request_id, true, {"applied_settings": req.payload}, "", "设置应用成功"
 	)
-

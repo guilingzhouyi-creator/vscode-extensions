@@ -112,4 +112,3 @@ describe('ThinkingAccordionLock（分析过程手风琴折叠互斥状态机）'
         assert.strictEqual(output, '> 第一行\n>\n> 第二行');
     });
 });
-

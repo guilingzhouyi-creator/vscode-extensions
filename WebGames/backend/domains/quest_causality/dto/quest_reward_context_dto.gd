@@ -53,4 +53,3 @@ static func from_dto(data: Dictionary) -> QuestRewardContextDto:
 			dto.item_rewards.append(String(item))
 	dto.granted_timestamp_utc = int(data.get("granted_timestamp_utc", 0))
 	return dto
-

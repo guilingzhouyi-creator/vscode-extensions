@@ -353,4 +353,3 @@ static func test_companion_observer_bus_refactor_backward_compatibility() -> Dic
 
 	CompanionObserverBus.reset_for_tests()
 	return TestCase.make_result("test_companion_observer_bus_refactor_backward_compatibility", true)
-

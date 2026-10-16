@@ -627,4 +627,3 @@ export function generateBarrelFacade(clusters: SymbolCluster[], fileExtension: s
 
     return lines.join('\n') + '\n';
 }
-

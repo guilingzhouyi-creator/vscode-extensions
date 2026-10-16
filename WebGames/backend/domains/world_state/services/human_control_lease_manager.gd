@@ -58,4 +58,3 @@ static func _get_current_time_ms() -> int:
 ## 重置测试单例与租约状态机为初始值
 static func reset_for_tests() -> void:
 	release_lease()
-

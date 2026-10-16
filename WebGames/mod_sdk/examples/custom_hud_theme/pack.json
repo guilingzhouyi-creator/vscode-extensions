@@ -5,6 +5,7 @@
   "author": "Kalar UI Working Group",
   "engine_api_version": "1.0.0",
   "priority": 150,
+  "tier": "TIER_2_AUDIOVISUAL",
   "mod_tier": "AUDIO_VISUAL",
   "dependencies": [],
   "incompatible_packs": [],

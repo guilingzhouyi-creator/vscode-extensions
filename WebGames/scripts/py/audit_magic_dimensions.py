@@ -11,7 +11,7 @@
 #   python scripts/py/audit_magic_dimensions.py
 #   python scripts/py/audit_magic_dimensions.py --json
 # ==============================================================================
-"""魔法双维度体系深度审查：校验魔法阶位配置与双语文案的事实源一致性（Phase 26）。"""
+"""魔法双维度体系深度审查：校验魔法阶位配置与双语文案的事实源一致性。"""
 
 import json
 import re
@@ -32,7 +32,7 @@ TIER_KEYS = ("ESP", "HEROIC", "DIVINE", "GOD", "SUPERTIER")
 
 def run_magic_dimensions_audit() -> int:
     print("=" * 80)
-    print("🛡️ 卡拉尔世界引擎：魔法双维度体系深度审查报告 (Phase 26)")
+    print("🛡️ 卡拉尔世界引擎：魔法双维度体系深度审查报告")
     print("=" * 80)
 
     violations = []

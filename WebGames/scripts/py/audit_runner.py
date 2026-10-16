@@ -65,7 +65,7 @@ class AuditTask:
     script_name: str
     default_args: List[str] = field(default_factory=list)
     scopes: Set[str] = field(default_factory=set)  # 'config', 'gd', 'docs', 'all', 'test'
-    group: str = "audit"        # audit | bench | archive（Phase 32 统一调度入口）
+    group: str = "audit"        # audit | bench | archive（统一调度入口）
     exclusive: bool = False     # True=独享串行（写操作任务，如归档，防并行写冲突）
 
 
@@ -182,7 +182,7 @@ AUDIT_TASKS: List[AuditTask] = [
     ),
     AuditTask(
         task_id="event_channels",
-        name="EventBus 频道纪律与叙事契约（Phase 71）",
+        name="EventBus 频道纪律与叙事契约",
         script_name="audit_event_channels.py",
         default_args=[],
         scopes={"config", "gd"}
@@ -208,7 +208,7 @@ AUDIT_TASKS: List[AuditTask] = [
         default_args=["--baseline", "benchmarks/reports/docs_baseline.json"],
         scopes={"docs"}
     ),
-    # ---- bench 组（Phase 32 统一调度入口：性能门禁报告）----
+    # ---- bench 组（性能门禁报告）----
     AuditTask(
         task_id="report_aggregate",
         name="性能门禁聚合报告（--gate/--promote）",
@@ -225,7 +225,7 @@ AUDIT_TASKS: List[AuditTask] = [
         scopes={"bench"},
         group="bench"
     ),
-    # ---- archive 组（Phase 32 统一调度入口：归档系统，exclusive 串行防写冲突）----
+    # ---- archive 组（归档系统，exclusive 串行防写冲突）----
     AuditTask(
         task_id="archive_volume",
         name="短期施工区周期归档（--detect/--cycle/--all）",
@@ -896,4 +896,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-

@@ -152,4 +152,3 @@ if (require.main === module) {
 }
 
 module.exports = { compareDirectories, syncDirectories, collectRelativeFiles };
-

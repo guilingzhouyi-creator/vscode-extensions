@@ -15,117 +15,159 @@
 from dataclasses import dataclass, field
 from pathlib import Path
 import json
+import logging
 import re
 import sys
+from typing import Any, Dict, List, Pattern
 
-## 唯一仓库根解析（消除 parents[2] / parent.parent.parent / parent 三变体深度漂移）
+CHARSET_UTF8 = "utf-8"
+ERR_IGNORE = "ignore"
+ERR_REPLACE = "replace"
+PLATFORM_WINDOWS = "win32"
+SEVERITY_DEFAULT = "error"
+CATEGORY_DEFAULT = "general"
+SEPARATOR_WIDTH = 80
+SEPARATOR_CHAR = "-"
+KALAR_DEV_PREFIX = "KALAR-DEV-2026"
+
+KEY_RULE = "rule"
+KEY_RULE_ID = "rule_id"
+KEY_FILE = "file"
+KEY_LINE = "line"
+KEY_SEVERITY = "severity"
+KEY_CATEGORY = "category"
+KEY_MESSAGE = "message"
+KEY_SUGGESTION = "suggestion"
+KEY_CONTEXT = "context"
+
+LOGGER = logging.getLogger("audit_common")
+
+
 def resolve_repo_root() -> Path:
+    """唯一仓库根解析（消除 parents 深度漂移）。"""
     return Path(__file__).resolve().parents[2]
 
-## utf-8 输出样板（Windows 控制台安全；幂等）
-def ensure_utf8_stdout() -> None:
-    if sys.platform == "win32" and hasattr(sys.stdout, "reconfigure"):
-        try:
-            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-            sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-        except Exception:
-            pass
 
-## 容错 JSON 读取（不抛 Fatal；路径不存在返回空 dict）
-def load_json(path: Path) -> dict:
-    if not path.exists():
+def ensure_utf8_stdout() -> None:
+    """保障跨平台 UTF-8 控制台输出，避免 Windows 控制台异常编码。"""
+    if sys.platform == PLATFORM_WINDOWS and hasattr(sys.stdout, "reconfigure"):
+        try:
+            sys.stdout.reconfigure(encoding=CHARSET_UTF8, errors=ERR_REPLACE)
+            sys.stderr.reconfigure(encoding=CHARSET_UTF8, errors=ERR_REPLACE)
+        except (AttributeError, io.UnsupportedOperation) as exc:
+            LOGGER.debug("Console reconfigure suppressed: %s", exc)
+
+
+def load_json(path: Path) -> Dict[str, Any]:
+    """容错读取 JSON 文件，路径不存在或解析失败返回空字典。"""
+    if not path.is_file():
         return {}
     try:
-        return json.loads(path.read_text(encoding="utf-8", errors="ignore"))
-    except Exception:
+        raw_text = path.read_text(encoding=CHARSET_UTF8, errors=ERR_IGNORE)
+        return json.loads(raw_text)
+    except (json.JSONDecodeError, OSError) as exc:
+        LOGGER.debug("Failed reading JSON %s: %s", path, exc)
         return {}
+
 
 @dataclass
 class Finding:
+    """审计发现条目结构体。"""
+
     rule: str
     file: str
     line: int
     message: str
     suggestion: str = ""
-    severity: str = "error"
-    category: str = "general"
-    context: dict = field(default_factory=dict)
+    severity: str = SEVERITY_DEFAULT
+    category: str = CATEGORY_DEFAULT
+    context: Dict[str, Any] = field(default_factory=dict)
 
     @property
     def rule_id(self) -> str:
+        """获取规则唯一标识符。"""
         return self.rule
 
     @rule_id.setter
     def rule_id(self, val: str) -> None:
+        """设置规则唯一标识符。"""
         self.rule = val
 
     @property
     def file_path(self) -> str:
+        """获取违规文件路径。"""
         return self.file
 
     @file_path.setter
     def file_path(self, val: str) -> None:
+        """设置违规文件路径。"""
         self.file = val
 
     @property
     def line_number(self) -> int:
+        """获取违规所在行号。"""
         return self.line
 
     @line_number.setter
     def line_number(self, val: int) -> None:
+        """设置违规所在行号。"""
         self.line = val
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> Dict[str, Any]:
+        """将发现条目转换为标准字典表示。"""
         return {
-            "rule": self.rule,
-            "rule_id": self.rule,
-            "file": self.file,
-            "line": self.line,
-            "severity": self.severity,
-            "category": self.category,
-            "message": self.message,
-            "suggestion": self.suggestion,
-            "context": self.context,
+            KEY_RULE: self.rule,
+            KEY_RULE_ID: self.rule,
+            KEY_FILE: self.file,
+            KEY_LINE: self.line,
+            KEY_SEVERITY: self.severity,
+            KEY_CATEGORY: self.category,
+            KEY_MESSAGE: self.message,
+            KEY_SUGGESTION: self.suggestion,
+            KEY_CONTEXT: self.context,
         }
 
-## 统一结论打印（「审查结论」分级一致性；返回进程退出码）
-def print_conclusion(violations: list, hints: list, name: str) -> int:
-    print(f"违规总数: {len(violations)} / 提示: {len(hints)}")
-    for v in violations:
-        print(f"  ✗ {v}")
-    for h in hints:
-        print(f"  · {h}")
-    print("-" * 80)
+
+def print_conclusion(violations: List[str], hints: List[str], name: str) -> int:
+    """统一结论打印，输出标准结论行并返回进程退出码。"""
+    count_summary = f"违规总数: {len(violations)} / 提示: {len(hints)}"
+    print(count_summary)
+    if violations:
+        formatted_violations = "\n".join(f"  ✗ {v}" for v in violations)
+        print(formatted_violations)
+    if hints:
+        formatted_hints = "\n".join(f"  · {h}" for h in hints)
+        print(formatted_hints)
+
+    divider = SEPARATOR_CHAR * SEPARATOR_WIDTH
+    print(divider)
     if violations:
         print(f"【审查结论】未通过（{name} 违规，已阻断！）")
         return 1
     print(f"【审查结论】通过（{name} 合规）")
     return 0
 
-## ---- 三检查项共享助手（收敛跨脚本重写，语义与原逻辑一致）----
 
-## 旧式占位符残留（%s / %.1f / 空 {}）
 LEGACY_PLACEHOLDER_RE = re.compile(r"%[sd]|%\.\d*f|\{\}")
 
-def scan_legacy_placeholders(text: str) -> list:
+
+def scan_legacy_placeholders(text: str) -> List[str]:
+    """扫描文本中遗留的旧式占位符（如 %s, %.1f, 空 {}）。"""
     return LEGACY_PLACEHOLDER_RE.findall(text)
 
-## 档号编号体系前缀（G2 审查收敛：集中单一声明，替换散落字面量）。
-## KALAR-DEV-<年度> 为卡拉尔开发档体系唯一前缀，audit_docs.py / archive_volume.py
-## 归档命名正则与档号生成均引用本常量——年度/体系演进只改此处。
-KALAR_DEV_PREFIX = "KALAR-DEV-2026"
 
-## 中文（CJK）检测：含 \u4e00-\u9fff 区间即判定含中文
 CJK_RE = re.compile(r"[\u4e00-\u9fff]")
 
+
 def contains_cjk(text: str) -> bool:
+    """检测输入文本是否包含中文字符。"""
     return bool(CJK_RE.search(text))
 
-## 键契约正则：三段式点分小写键（<域>.<条目>.<字段>）
-def key_contract_re() -> re.Pattern:
+
+def key_contract_re() -> Pattern[str]:
+    """生成三段式点分小写键契约正则表达式（<域>.<条目>.<字段>）。"""
     return re.compile(r"[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+")
 
-## ---- GDScript 循环/配置共享正则（Phase 60 收敛：audit_gd.py 与 audit_perf_hotspots.py 同字面量）----
-## GD 循环头（for/while …:，尾随注释容忍）；GameConfig 类型化读取（循环内热点判定用）
+
 GD_LOOP_HEAD_RE = re.compile(r"^\s*(for|while)\s+.+:\s*(#.*)?$")
 GD_GAMECONFIG_GETTER_RE = re.compile(r"GameConfig\.\w+\(")

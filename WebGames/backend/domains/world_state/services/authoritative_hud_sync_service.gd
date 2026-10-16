@@ -274,4 +274,3 @@ static func _resolve_mode_features(context: Dictionary) -> ModeFeatureManifestDT
 	if context.has("game_mode"):
 		return GameModeFeatureSolver.resolve_features(int(context.get("game_mode")))
 	return GameModeFeatureSolver.resolve_features(GameModeFeatureSolver.MODE_SINGLE_PLAYER)
-

@@ -226,4 +226,3 @@ export class ProceduralAudioSynth {
         }, cleanupDelayMs);
     }
 }
-

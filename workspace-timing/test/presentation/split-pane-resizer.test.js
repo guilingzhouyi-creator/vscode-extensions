@@ -151,4 +151,3 @@ describe('SplitPaneResizer（分栏物理分割手柄）', () => {
         assert.strictEqual(collapsedNotified, true);
     });
 });
-

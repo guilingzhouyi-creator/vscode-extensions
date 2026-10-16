@@ -12,27 +12,10 @@ const { setLogLevel, LogLevel } = require('../../out/integration/logger.js');
 
 setLogLevel(LogLevel.None);
 
-function emptyData() {
-    return { version: 1, totalMs: 0, workspaces: {}, lastUpdatedAt: 0 };
-}
-
-/** 假全局存储：可注入保存失败 */
-class FakeGlobalStore {
-    constructor(initial) {
-        this.data = initial ?? emptyData();
-        this.available = true;
-        this.saveCalls = 0;
-        this.failSave = false;
-    }
-    isAvailable() { return this.available; }
-    async load() { return JSON.parse(JSON.stringify(this.data)); }
-    async save(d) {
-        this.saveCalls++;
-        if (this.failSave) throw new Error('quota exceeded');
-        this.data = JSON.parse(JSON.stringify(d));
-    }
-    async delete() { this.data = emptyData(); }
-}
+const {
+    FakeGlobalStore,
+    createEmptyGlobalData: emptyData,
+} = require('../fixtures/fakes.js');
 
 function makeAggregator(store) {
     return new GlobalAggregator(store, () => ({ id: 'ws-1', name: 'Demo', uri: 'file:///demo' }));

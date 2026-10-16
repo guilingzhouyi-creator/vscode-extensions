@@ -133,4 +133,3 @@ class Response extends RefCounted:
 				if slot_data is Dictionary:
 					resp.save_slot_summaries[k] = SaveSlotSummaryDTO.deserialize(slot_data)
 		return resp
-

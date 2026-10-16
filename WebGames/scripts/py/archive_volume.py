@@ -100,7 +100,7 @@ def run_self_test() -> bool:
         # 6. 关键词深度归纳提取自测断言（杜绝样板同质化）
         mock_stage_path = tmp_path / "mock_stage1.md"
         mock_stage_path.write_text(
-            "# 施工细则：Phase 99 模块B —— 阶段1：核心数据契约设计\n\n"
+            "# 施工细则：架构演进 模块B —— 阶段1：核心数据契约设计\n\n"
             "> [!NOTE]\n"
             "> **【施工目标】**：全面构建模块B数据核心：\n"
             "> 1. 设计标准数据模型（`ModuleBManifestDTO` 与 `ModuleBStateDTO`）\n"
@@ -115,7 +115,7 @@ def run_self_test() -> bool:
             "## 三、 数据结构验收矩阵\n",
             encoding="utf-8"
         )
-        extracted = extract_stage_keywords(mock_stage_path, "Phase_99_模块B", 1, "核心数据契约设计")
+        extracted = extract_stage_keywords(mock_stage_path, "架构演进_模块B", 1, "核心数据契约设计")
         for bp in ["数据结构设计与代码契约", "命令式施工执行清单", "数据结构验收矩阵"]:
             if bp in extracted:
                 print(f"  ❌ 关键词断言失败: 样板标题 [{bp}] 未被过滤！提取结果: {extracted}")
@@ -128,7 +128,7 @@ def run_self_test() -> bool:
         # 7. 蛇形/驼峰去重与路径/噪声过滤自测断言
         mock_stage2 = tmp_path / "mock_stage2.md"
         mock_stage2.write_text(
-            "# 施工细则：Phase 99 模块B —— 阶段2：算法实现\n\n"
+            "# 施工细则：架构演进 模块B —— 阶段2：算法实现\n\n"
             "> [!NOTE]\n"
             "> **【施工目标】**：\n"
             "> 1. 建立资源生命周期管理器（ResourceLifecycleManager / resource_lifecycle_manager.gd）\n"

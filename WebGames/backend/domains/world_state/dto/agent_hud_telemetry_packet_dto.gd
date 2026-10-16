@@ -122,4 +122,3 @@ static func from_dto(data: Dictionary) -> AgentHudTelemetryPacketDTO:
 			pkt.action_space.append(AgentActionDirectiveDTO.from_dto(a))
 
 	return pkt
-

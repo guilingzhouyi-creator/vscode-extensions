@@ -20,6 +20,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
+const { getSafeGitEnv } = require('./git-env');
 const {
   validateCommitMessageContent,
   formatDiagnosticReport,
@@ -106,13 +107,7 @@ function validateSingleCommitMessage(content) {
 
 function validateCommitRange(range) {
   const root = path.resolve(__dirname, '../..');
-  const env = {
-    ...process.env,
-    GIT_CONFIG_GLOBAL: process.env.GIT_CONFIG_GLOBAL || 'NUL',
-    GIT_CONFIG_SYSTEM: process.env.GIT_CONFIG_SYSTEM || 'NUL',
-    GIT_CONFIG_NOSYSTEM: process.env.GIT_CONFIG_NOSYSTEM || '1',
-    XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME || root,
-  };
+  const env = getSafeGitEnv(root);
 
   let rawLog = '';
   try {

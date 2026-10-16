@@ -77,4 +77,3 @@ static func extract_param_keys(template_str: String) -> Array[String]:
 		if not keys.has(key):
 			keys.append(key)
 	return keys
-

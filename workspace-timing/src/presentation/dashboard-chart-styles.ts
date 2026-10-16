@@ -8,11 +8,6 @@
  */
 
 export const DASHBOARD_CHART_STYLES = /* css */ `
-    :root {
-      --bar-scale: 0;
-      --fill-scale: 0;
-    }
-
     /* ==============================================================================
      * 1. 活跃曲线层架构契约 (Active Curve Canvas & Grids)
      * 职责契约：承载动态 SVG 样条平滑曲线、毛玻璃背景、Y 轴参考刻度线与悬浮同心发光锚点。
@@ -782,17 +777,6 @@ export const DASHBOARD_CHART_STYLES = /* css */ `
       z-index: 100;
       box-shadow: 0 4px 18px rgba(0,0,0,0.35);
       pointer-events: none;
-    }
-    /* 动画契约：气泡提示入场动画与独立动画命名空间 */
-    @keyframes tooltipFadeIn {
-      from {
-        opacity: 0;
-        transform: translate(-50%, 4px);
-      }
-      to {
-        opacity: 1;
-        transform: translate(-50%, 0);
-      }
     }
 
     /* 浮层展示契约：帮助图标悬停时触发淡入上浮动画展示说明气泡 */

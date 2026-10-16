@@ -13,33 +13,7 @@ const { setLogLevel, LogLevel } = require('../../out/integration/logger.js');
 
 setLogLevel(LogLevel.None);
 
-/** 假 journal 存储：记录调用时序，可注入失败 */
-class FakeJournalStore {
-    constructor() {
-        this.appendCalls = [];
-        this.truncateCalls = 0;
-        this.inFlight = 0;
-        this.maxConcurrentAppend = 0;
-        this.failAppend = false;
-    }
-
-    async appendBatch(slices) {
-        this.inFlight++;
-        this.maxConcurrentAppend = Math.max(this.maxConcurrentAppend, this.inFlight);
-        await new Promise(r => setTimeout(r, 5));
-        if (this.failAppend) {
-            this.inFlight--;
-            throw new Error('disk full');
-        }
-        this.appendCalls.push(slices);
-        this.inFlight--;
-    }
-
-    async readJournal() { return []; }
-    async exists() { return true; }
-    async delete() {}
-    async truncate() { this.truncateCalls++; }
-}
+const { FakeJournalStore } = require('../fixtures/fakes.js');
 
 function slice(ts, delta) { return { timestamp: ts, deltaMs: delta }; }
 

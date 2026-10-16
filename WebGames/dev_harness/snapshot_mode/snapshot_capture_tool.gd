@@ -134,4 +134,3 @@ static func save_snapshot_to_file(bundle: TestSnapshotBundleDTO, file_path: Stri
 	file.store_string(content)
 	file.close()
 	return true
-

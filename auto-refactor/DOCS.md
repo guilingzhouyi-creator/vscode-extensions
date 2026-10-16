@@ -119,4 +119,3 @@
 | `trajectory` | `auto-refactor trajectory [<file>\|--summary]` | 检查全局 review 紧凑账本历史大盘或单文件修订演化轨迹 |
 | `memory` | `auto-refactor memory` | 查看活跃审查内存索引记录数、历史修订池及拓扑缓存容量 |
 | `stats` | `auto-refactor stats [--root <dir>]` | 统计目标工程的代码体积、物理 LOC、有效逻辑 ELOC、代码密度比与稀释率大盘 |
-

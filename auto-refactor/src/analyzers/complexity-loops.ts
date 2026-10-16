@@ -101,6 +101,33 @@ function braceMatchedEnd(masked: string[], headerLine: number, cap: number): num
     return cap;
 }
 
+function indentationLoopBodyEnd(
+    targetLines: string[],
+    headerLine: number,
+    baseIndent: number,
+    cap: number,
+): number {
+    let lastBodyLine = headerLine;
+    for (let l = headerLine + 1; l <= cap; l++) {
+        const line = targetLines[l - 1] ?? '';
+        const trimmedLine = line.trim();
+        if (
+            trimmedLine.length === 0 ||
+            trimmedLine.startsWith('#') ||
+            trimmedLine.startsWith('//')
+        ) {
+            continue;
+        }
+        const lineIndent = line.length - line.trimStart().length;
+        if (lineIndent > baseIndent) {
+            lastBodyLine = l;
+        } else {
+            break;
+        }
+    }
+    return Math.max(headerLine + 1, lastBodyLine);
+}
+
 /**
  * Locate the first and last line of a loop body.
  *
@@ -125,6 +152,13 @@ function loopBodyRange(
     if (header.trim().length === 0 && rawLines.length >= headerLine) {
         targetLines = rawLines;
         header = rawLines[headerLine - 1] ?? '';
+    }
+
+    // Python / GDScript indentation-based loop: header ends with ':' and does not contain '{'
+    const trimmedHeader = header.trim();
+    if (trimmedHeader.endsWith(':') && !header.includes('{')) {
+        const baseIndent = header.length - header.trimStart().length;
+        return { from: headerLine + 1, to: indentationLoopBodyEnd(targetLines, headerLine, baseIndent, cap) };
     }
 
     const afterParen = header.slice(header.lastIndexOf(')') + 1);
@@ -155,6 +189,9 @@ function isCommentLine(trimmed: string): boolean {
 function extractLoopStatementText(trimmed: string): string | null {
     if (!LOOP_HEADER_RE.test(trimmed)) {
         return trimmed;
+    }
+    if (trimmed.endsWith(':') && !trimmed.includes('{')) {
+        return null;
     }
     const lastClose = trimmed.lastIndexOf(')');
     if (lastClose < 0) return null;
@@ -273,12 +310,17 @@ export function findLoopSitesInFunction(
     const startLine = fnNode.start?.line ?? 1;
     const endLine = fnNode.end?.line ?? lines.length;
     const transientRegex = resolveTransientRegex(filePath);
+    const isIndentedLang = filePath.endsWith('.py') || filePath.endsWith('.gd');
 
     for (let l = startLine; l <= endLine && l <= lines.length; l++) {
         const lineText = lines[l - 1] ?? '';
         const trimmed = lineText.trim();
         if (trimmed.startsWith('//') || trimmed.startsWith('#')) continue;
         if (!LOOP_HEADER_RE.test(lineText)) continue;
+        if (isIndentedLang) {
+            const startsWithLoop = /^(?:[a-zA-Z0-9_$]+:\s*)?(?:for\s|while\s)/.test(trimmed);
+            if (!startsWithLoop || !trimmed.includes(':')) continue;
+        }
 
         const scaleVariable = resolveLoopScaleVariable(lineText);
         const body = loopBodyRange(masked, l, endLine, lines);

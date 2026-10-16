@@ -44,17 +44,17 @@
 ```gdscript
 # 改造前（低效）：
 func broadcast_event(event_type: String, payload: Dictionary) -> void:
-	var entry: Dictionary = {
-		"event_type": event_type,
-		"payload": payload.duplicate(true), # 💥 拷贝 1
-		"timestamp": int(Time.get_unix_time_from_system())
-	}
-	if _ring_buffer.size() >= MAX_CAPACITY:
-		_ring_buffer.pop_front() # 💥 O(N) 移位
-	_ring_buffer.append(entry)
-	var read_only_payload: Dictionary = payload.duplicate(true) # 💥 拷贝 2
-	for obs in _observers:
-		obs.call(event_type, read_only_payload)
+  var entry: Dictionary = {
+    "event_type": event_type,
+    "payload": payload.duplicate(true), # 💥 拷贝 1
+    "timestamp": int(Time.get_unix_time_from_system())
+  }
+  if _ring_buffer.size() >= MAX_CAPACITY:
+    _ring_buffer.pop_front() # 💥 O(N) 移位
+  _ring_buffer.append(entry)
+  var read_only_payload: Dictionary = payload.duplicate(true) # 💥 拷贝 2
+  for obs in _observers:
+    obs.call(event_type, read_only_payload)
 
 # 改造后（高效）：
 # 使用预分配固定槽位 _ring_slots: Array[Dictionary]
@@ -76,24 +76,24 @@ var _trajectory_ring: AgentTrajectoryRingBuffer = null
 var _async_dispatcher: AgentAsyncDispatcher = null
 
 func _init() -> void:
-	var cap: int = GameConfig.get_int("domains.world_state", "agent_telemetry_stream/ring_buffer_capacity", 32)
-	_trajectory_ring = AgentTrajectoryRingBuffer.new(cap)
-	_async_dispatcher = AgentAsyncDispatcher.new()
+  var cap: int = GameConfig.get_int("domains.world_state", "agent_telemetry_stream/ring_buffer_capacity", 32)
+  _trajectory_ring = AgentTrajectoryRingBuffer.new(cap)
+  _async_dispatcher = AgentAsyncDispatcher.new()
 
 ## 推进单步并推流：原子装箱 -> 写入轨迹环形缓冲 -> 异步派发
 func step_and_publish(cause: String = "") -> AgentHudTelemetryPacketDTO:
-	# ... 原有装箱逻辑 ...
-	_trajectory_ring.append_packet(packet)
-	_async_dispatcher.dispatch_telemetry(packet)
-	return packet
+  # ... 原有装箱逻辑 ...
+  _trajectory_ring.append_packet(packet)
+  _async_dispatcher.dispatch_telemetry(packet)
+  return packet
 
 ## 获取最近 k 步时序轨迹切片（供 LLM 决策反思）
 func get_trajectory_history(steps: int = 8) -> Array[AgentHudTelemetryPacketDTO]:
-	return _trajectory_ring.get_trajectory_window(steps)
+  return _trajectory_ring.get_trajectory_window(steps)
 
 ## 获取自某时步以来的累积因果突变
 func get_cumulative_deltas(from_sequence: int = 0) -> Array[HudCausalDeltaDTO]:
-	return _trajectory_ring.get_cumulative_deltas(from_sequence)
+  return _trajectory_ring.get_cumulative_deltas(from_sequence)
 ```
 
 ---
@@ -111,47 +111,47 @@ const PROTOCOL_VER: int = 1
 
 ## 二进制序列化：将遥测包压缩为紧凑字节流 (<= 256 字节)
 static func encode_to_bytes(packet: AgentHudTelemetryPacketDTO) -> PackedByteArray:
-	var spb := StreamPeerBuffer.new()
-	spb.big_endian = false
+  var spb := StreamPeerBuffer.new()
+  spb.big_endian = false
 
-	# 1. 头部信封 (16 字节)
-	spb.put_u32(MAGIC_HEADER)
-	spb.put_u8(PROTOCOL_VER)
-	spb.put_u8(1 if packet.preempted_by_human else 0)
-	spb.put_u16(packet.sequence_index & 0xFFFF)
-	spb.put_u64(packet.timestamp_ms)
+  # 1. 头部信封 (16 字节)
+  spb.put_u32(MAGIC_HEADER)
+  spb.put_u8(PROTOCOL_VER)
+  spb.put_u8(1 if packet.preempted_by_human else 0)
+  spb.put_u16(packet.sequence_index & 0xFFFF)
+  spb.put_u64(packet.timestamp_ms)
 
-	# 2. 标量观测值紧凑编码 (归一化比率用 u8 编码：0~255 映射 0.0~1.0)
-	if packet.observation != null:
-		var obs := packet.observation
-		spb.put_u16(obs.level)
-		spb.put_u8(int(obs.hp_ratio * 255.0))
-		spb.put_u8(int(obs.mp_ratio * 255.0))
-		spb.put_u8(int(obs.ap_ratio * 255.0))
-		spb.put_u32(obs.wallet_gold)
-		spb.put_u16(obs.unallocated_potential_points)
-		spb.put_u16(obs.unread_mail_count)
+  # 2. 标量观测值紧凑编码 (归一化比率用 u8 编码：0~255 映射 0.0~1.0)
+  if packet.observation != null:
+    var obs := packet.observation
+    spb.put_u16(obs.level)
+    spb.put_u8(int(obs.hp_ratio * 255.0))
+    spb.put_u8(int(obs.mp_ratio * 255.0))
+    spb.put_u8(int(obs.ap_ratio * 255.0))
+    spb.put_u32(obs.wallet_gold)
+    spb.put_u16(obs.unallocated_potential_points)
+    spb.put_u16(obs.unread_mail_count)
 
-	# 3. 差分与行动空间标志位编码
-	spb.put_u8(packet.causal_deltas.size())
-	for delta in packet.causal_deltas:
-		_encode_delta(spb, delta)
+  # 3. 差分与行动空间标志位编码
+  spb.put_u8(packet.causal_deltas.size())
+  for delta in packet.causal_deltas:
+    _encode_delta(spb, delta)
 
-	spb.put_u8(packet.action_space.size())
-	for directive in packet.action_space:
-		_encode_directive(spb, directive)
+  spb.put_u8(packet.action_space.size())
+  for directive in packet.action_space:
+    _encode_directive(spb, directive)
 
-	return spb.data_array
+  return spb.data_array
 
 ## 二进制反序列化：高效还原为标准 DTO
 static func decode_from_bytes(
-	bytes: PackedByteArray,
-	out_packet: AgentHudTelemetryPacketDTO = null
+  bytes: PackedByteArray,
+  out_packet: AgentHudTelemetryPacketDTO = null
 ) -> AgentHudTelemetryPacketDTO:
-	var pkt: AgentHudTelemetryPacketDTO = out_packet if out_packet != null else AgentHudTelemetryPacketDTO.new()
-	pkt.reset_state()
-	# 使用 StreamPeerBuffer 快速反解...
-	return pkt
+  var pkt: AgentHudTelemetryPacketDTO = out_packet if out_packet != null else AgentHudTelemetryPacketDTO.new()
+  pkt.reset_state()
+  # 使用 StreamPeerBuffer 快速反解...
+  return pkt
 ```
 
 ---
@@ -182,4 +182,3 @@ static func decode_from_bytes(
 | TC-ATP-S3-02 | 轨迹切片时间窗口连贯性 | 连续提取近 K 步轨迹窗口 | 轨迹内各包序号单调递增，无断代与时间倒流异常 |
 | TC-ATP-S3-03 | 二进制 PackedByteArray 吞吐 | 执行高吞吐编码与解码压测 | 编解码单次耗时 <= 0.1ms，满足微秒级低延迟 |
 | TC-ATP-S3-04 | 单源配置生效性与零硬编码 | 读取对象池与通道各参数 | 100% 经由 GameConfig.get_* 获取，零内联硬编码 |
-

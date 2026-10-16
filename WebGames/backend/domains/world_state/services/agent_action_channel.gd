@@ -53,4 +53,3 @@ static func dispatch_action(action_pkt: AgentActionPacketDTO, context: Dictionar
 		"cause": cause,
 		"next_packet": next_pkt.to_dto()
 	}
-

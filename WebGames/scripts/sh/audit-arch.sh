@@ -22,9 +22,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && { pwd -W 2>/dev/null || pwd; })"
 
 if ! command -v "$GODOT" >/dev/null 2>&1; then
-	echo "[错误] 未找到 Godot 可执行文件: $GODOT" >&2
-	echo "       请安装 Godot 4.x 并通过 GODOT 环境变量指定路径" >&2
-	exit 127
+  echo "[错误] 未找到 Godot 可执行文件: $GODOT" >&2
+  echo "       请安装 Godot 4.x 并通过 GODOT 环境变量指定路径" >&2
+  exit 127
 fi
 
 echo "[信息] 使用引擎: $($GODOT --version 2>/dev/null || echo "$GODOT")"
@@ -35,8 +35,8 @@ cd "$PROJECT_ROOT" || exit 1
 code=$?
 
 if [ $code -eq 0 ]; then
-	echo "[通过] 架构护栏审查通过"
+  echo "[通过] 架构护栏审查通过"
 else
-	echo "[失败] 架构护栏存在违规项（退出码 $code）" >&2
+  echo "[失败] 架构护栏存在违规项（退出码 $code）" >&2
 fi
 exit $code

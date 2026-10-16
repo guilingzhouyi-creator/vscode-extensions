@@ -123,7 +123,7 @@ $$\text{Family (3 字母)} - \text{Topic (3 字母)} - \text{Sequence (3 位数�
 
 ## 八、 提交说明规则反虚构门禁 (`RCFG-RULE-DRIFT`)
 
-`commit-msg-gate` 集成 `scripts/common/validate-commit-msg-rules.js`：
+`commit-msg-gate` 集成 `scripts/common/validate-commit-msg.js`：
 1. **正则精准捕获**：自动提取形如 `[A-Z]{2,4}-[A-Z0-9]+-[0-9]{3}`、`L[0-5]-[A-Z0-9\-]+` 与 `RCFG-[A-Z\-]+` 的规则词条；
 2. **白名单过滤**：豁免标准协议与编码常量（`UTF-8`, `SHA-256`, `RFC-7231`, `HTTP-2`, `IEEE-754` 等）；
 3. **一票否决阻断**：捕获的规则词条若在 `rule-catalog.json` 中查无记录，立即以 `[REJECT] RCFG-RULE-DRIFT` 阻断提交。
@@ -148,7 +148,7 @@ node scripts/common/generate-rule-catalog.js
 node scripts/common/generate-rule-catalog.js --check-only
 
 # 3. 本地验证提交说明中的规则 ID 是否真实存在
-node scripts/common/validate-commit-msg-rules.js <path-to-commit-msg-file>
+node scripts/common/validate-commit-msg.js <path-to-commit-msg-file>
 
 # 4. 运行 pre-commit 门禁中的规则一致性校验 (Gate 7)
 pwsh -File scripts/ps1/pre-commit-gate.ps1

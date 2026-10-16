@@ -90,7 +90,29 @@ static func get_domain_data(domain_id: String) -> Dictionary:
 				],
 				"marching_routes": [
 					{ "from": "VALAN_CAPITAL", "to": "IRON_FORTRESS", "hours_remain": 6, "terrain": "PLAINS" }
-				]
+				],
+				"town_facilities": [
+					{ "id": "FAC_INN", "name": "ui.fe10.mock.fac.inn.name", "desc": "ui.fe10.mock.fac.inn.desc" },
+					{ "id": "FAC_SMITH", "name": "ui.fe10.mock.fac.smith.name", "desc": "ui.fe10.mock.fac.smith.desc" },
+					{ "id": "FAC_GUILD", "name": "ui.fe10.mock.fac.guild.name", "desc": "ui.fe10.mock.fac.guild.desc" },
+					{ "id": "FAC_MARKET", "name": "ui.fe10.mock.fac.market.name", "desc": "ui.fe10.mock.fac.market.desc" }
+				],
+				"town_npcs": [
+					{ "id": "NPC_INNKEEPER", "name": "ui.fe10.mock.npc.innkeeper.name", "desc": "ui.fe10.mock.npc.innkeeper.desc" },
+					{ "id": "NPC_BLACKSMITH", "name": "ui.fe10.mock.npc.blacksmith.name", "desc": "ui.fe10.mock.npc.blacksmith.desc" },
+					{ "id": "NPC_GUILDMASTER", "name": "ui.fe10.mock.npc.guildmaster.name", "desc": "ui.fe10.mock.npc.guildmaster.desc" }
+				],
+				"territories": [
+					{ "id": "TERR_01", "name": "ui.fe10.mock.terr.farmland.name", "food": 50, "wood": 10, "ore": 0, "garrison": 20, "construction": 0.65 },
+					{ "id": "TERR_02", "name": "ui.fe10.mock.terr.silver_woods.name", "food": 20, "wood": 80, "ore": 5, "garrison": 10, "construction": 1.0 }
+				],
+				"sovereignty": {
+					"nation_name": "ui.fe10.mock.sov.nation_name",
+					"monarch": "ui.fe10.mock.sov.monarch",
+					"population": 1200,
+					"territory_count": 2,
+					"level": "ui.fe10.mock.sov.level"
+				}
 			}
 		"economy":
 			return {

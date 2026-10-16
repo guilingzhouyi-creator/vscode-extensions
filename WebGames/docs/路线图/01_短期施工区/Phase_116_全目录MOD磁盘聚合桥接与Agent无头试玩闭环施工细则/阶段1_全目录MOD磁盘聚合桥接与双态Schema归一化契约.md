@@ -85,4 +85,3 @@ flowchart TD
 | TC-MOD-DISK-01 | 磁盘五件套模板无损聚合 | 调用 `ModPackageDiscoverySolver.load_full_mod_package_from_dir("res://mod_sdk/templates/starter_story")` | 返回字典非空，包含 `pack_id == "starter_story"`、`custom_origins`、`dag_graphs["DAG_STARTER_MINIMAL"]` 与 `custom_i18n` |
 | TC-MOD-NORM-02 | 数组型特质与套件双态归一化 | 将 `starter_story` 聚合字典传入 `DestinyModManifestDTO.from_dto` 与 `precheck_single_mod` | `precheck_single_mod` 返回 `valid == true`，`custom_traits` 与 `custom_starter_kits` 正确归一化为键值字典且 `initial_items` 与 `items` 双向对齐 |
 | TC-MOD-DAG-03 | 内嵌非法 DAG 与悬空套件拦截 | 传入含环路 DAG 图或引用不存在 `starter_kit_id` 的 MOD 清单 | `precheck_single_mod` 返回 `valid == false`，分别命中 `ERR_DESTINY_INVALID_DAG_GRAPH` 与 `ERR_DESTINY_UNKNOWN_KIT_REF` |
-

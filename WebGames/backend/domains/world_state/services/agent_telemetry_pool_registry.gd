@@ -134,4 +134,3 @@ static func recycle_delta(delta: HudCausalDeltaDTO) -> void:
 ## 测试隔离专用：重置注册标记
 static func reset_for_tests() -> void:
 	_pools_registered = false
-

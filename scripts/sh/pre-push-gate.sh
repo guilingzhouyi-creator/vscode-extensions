@@ -229,7 +229,7 @@ fi
 # --- Gate 1: 全工作区零空文件、物理卫生、.gitignore 治理与五维代码密度守卫 ---
 log_gate "[1/9] 校验全工作区零物理空文件、空白脚本、.gitignore 治理与五维代码密度守卫..."
 GATE1_FAIL=0
-run_gate_step 30 "Gate 1 (零物理空文件)" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-no-empty-files.js || GATE1_FAIL=1
+run_gate_step 30 "Gate 1 (物理卫生八维全域巡检)" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-physical-hygiene.js || GATE1_FAIL=1
 run_gate_step 30 "Gate 1 (.gitignore 治理)" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-gitignore-governance.js || GATE1_FAIL=1
 if [[ -n "$RANGE" ]]; then
     run_gate_step 30 "Gate 1 (五维代码密度)" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-code-density.js --range "$RANGE" || GATE1_FAIL=1

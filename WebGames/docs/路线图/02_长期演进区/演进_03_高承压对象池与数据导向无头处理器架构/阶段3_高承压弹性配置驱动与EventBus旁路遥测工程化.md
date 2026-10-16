@@ -61,38 +61,38 @@
 
 class_name ObjectPoolManager extends RefCounted:
 
-	static var _pools: Dictionary = {} # pool_name -> ObjectPool
-	static var _initialized: bool = false
+  static var _pools: Dictionary = {} # pool_name -> ObjectPool
+  static var _initialized: bool = false
 
-	static func initialize() -> void:
-		if _initialized:
-			return
-		_pools.clear()
-		_initialized = true
+  static func initialize() -> void:
+    if _initialized:
+      return
+    _pools.clear()
+    _initialized = true
 
-	static func register_pool(pool_name: String, factory: Callable) -> ObjectPool:
-		initialize()
-		var cfg := _load_pool_config(pool_name)
-		var pool := ObjectPool.new(factory, cfg)
-		_pools[pool_name] = pool
-		return pool
+  static func register_pool(pool_name: String, factory: Callable) -> ObjectPool:
+    initialize()
+    var cfg := _load_pool_config(pool_name)
+    var pool := ObjectPool.new(factory, cfg)
+    _pools[pool_name] = pool
+    return pool
 
-	static func get_pool(pool_name: String) -> ObjectPool:
-		return _pools.get(pool_name, null)
+  static func get_pool(pool_name: String) -> ObjectPool:
+    return _pools.get(pool_name, null)
 
-	static func teardown() -> void:
-		_pools.clear()
-		_initialized = false
+  static func teardown() -> void:
+    _pools.clear()
+    _initialized = false
 
-	static func _load_pool_config(pool_name: String) -> ObjectPoolConfigDTO:
-		var prefix := "pools/" + pool_name + "/"
-		var dto := ObjectPoolConfigDTO.new()
-		dto.pool_name = pool_name
-		dto.preallocate_size = maxi(0, GameConfig.get_int("infrastructure.object_pool", prefix + "preallocate_size", 32))
-		dto.max_capacity = maxi(dto.preallocate_size, GameConfig.get_int("infrastructure.object_pool", prefix + "max_capacity", 512))
-		dto.allow_overflow_alloc = GameConfig.get_bool("infrastructure.object_pool", prefix + "allow_overflow_alloc", true)
-		dto.overflow_warning_threshold = maxi(1, GameConfig.get_int("infrastructure.object_pool", prefix + "overflow_warning_threshold", 256))
-		return dto
+  static func _load_pool_config(pool_name: String) -> ObjectPoolConfigDTO:
+    var prefix := "pools/" + pool_name + "/"
+    var dto := ObjectPoolConfigDTO.new()
+    dto.pool_name = pool_name
+    dto.preallocate_size = maxi(0, GameConfig.get_int("infrastructure.object_pool", prefix + "preallocate_size", 32))
+    dto.max_capacity = maxi(dto.preallocate_size, GameConfig.get_int("infrastructure.object_pool", prefix + "max_capacity", 512))
+    dto.allow_overflow_alloc = GameConfig.get_bool("infrastructure.object_pool", prefix + "allow_overflow_alloc", true)
+    dto.overflow_warning_threshold = maxi(1, GameConfig.get_int("infrastructure.object_pool", prefix + "overflow_warning_threshold", 256))
+    return dto
 ```
 
 ---

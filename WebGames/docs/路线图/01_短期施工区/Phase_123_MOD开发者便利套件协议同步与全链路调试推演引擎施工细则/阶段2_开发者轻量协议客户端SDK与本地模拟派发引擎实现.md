@@ -76,4 +76,3 @@ WebGames/mod_sdk/tools/kalar_protocol_client.py
 | TC-MSDK-S2-02 | 租约流水号单调自增断言 | 连续构造 10 次人类请求 | lease_nonce 严格连续递增 1..10 |
 | TC-MSDK-S2-03 | 本地模拟调度器租约抢占拦截 | 先发人类请求后立即发射 Agent 请求 | Agent 请求在 3000ms 窗内返回 ERR_PREEMPTED_BY_HUMAN |
 | TC-MSDK-S2-04 | 离线 Schema 校验拦截能力 | 输入缺少必需字段的请求信封 | validate_envelope 返回 (false, 错误原因) 并拦截发送 |
-

@@ -118,4 +118,3 @@ describe('Spectral Gamma Math Operator', () => {
         expect(buffer[3]).toBe(1.0);
     });
 });
-

@@ -438,4 +438,3 @@ static func test_four_domains_channel_mapping_purity() -> Dictionary:
 
 	var passed := channels_ok and storage_ok and mode_ok
 	return TestCase.make_result("TC-HMA-12: 四大领域通道映射纯度", passed)
-

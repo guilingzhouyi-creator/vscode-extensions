@@ -6,8 +6,6 @@
 class_name MockServiceContainer
 extends ServiceContainer
 
-const ServiceContainer = preload("res://frontend/domain_boundary/service_container.gd")
-
 static var _instance: MockServiceContainer
 static func get_instance() -> MockServiceContainer:
 	if _instance == null:
@@ -40,17 +38,6 @@ func _init_default_services() -> void:
 	register_service("misc_edge", MockMiscEdgeService.new())
 	register_service("mail", MockMailService.new())
 	register_service("snapshot_data", MockSnapshotDataService.new())
-
-## 注册服务
-func register_service(service_name: String, instance: RefCounted) -> void:
-	_services[service_name] = instance
-
-## 获取服务
-func get_service(service_name: String) -> RefCounted:
-	if not _services.has(service_name):
-		printerr("[MockServiceContainer] 未注册的服务: %s" % service_name)
-		return null
-	return _services[service_name]
 
 ## 泛化便捷访问
 func auth() -> IAuthService:

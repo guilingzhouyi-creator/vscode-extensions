@@ -49,7 +49,7 @@ GETTER_RE = re.compile(
 MSG_RE = re.compile(r'GameConfig\.msg\(\s*"([a-z0-9_]+)"')
 NARRATIVE_RE = re.compile(r'(?:render_narrative|emit_narrative_by_key)\(\s*"([a-z0-9_]+)/')
 FULLNAME_RE = re.compile(r'"(infrastructure|domains|frontend|narratives|items)(?:\.[a-z0-9_]+)+"')
-# Phase 71 对齐：配置驱动频道引用识别——<domain_id>.<event_name> 形态（如 account.registered）
+# 契约对齐：配置驱动频道引用识别——<domain_id>.<event_name> 形态（如 account.registered）
 # 首段必须是 domains.json 已登记领域 id，解析为对 narratives.<首段> 的动态叙事引用。
 CHANNEL_RE = re.compile(r"^([a-z][a-z0-9_]*)\.([a-z0-9_]+(?:\.[a-z0-9_]+)*)$")
 
@@ -64,9 +64,9 @@ def collect_domain_ids() -> set[str]:
 
 
 def collect_channel_narrative_refs() -> set[str]:
-    """扫描频道声明源（Phase 71 契约）解析为对 narratives.<域> 的动态引用。
+    """扫描频道声明源契约解析为对 narratives.<域> 的动态引用。
 
-    Phase 71：HudEventContract / event_bus_config.channel_registry.legacy 均为配置驱动
+    配置驱动：HudEventContract / event_bus_config.channel_registry.legacy 均为配置驱动
     频道，此前 narratives.world_state 因仅被配置引用而误报"疑似死配置"；本函数将
     配置声明的频道解析为对 narratives.<域> 的动态引用，消除误报并收紧死配置判定。
     仅扫描频道声明表（domains.account auth/channels、domains.world_state hud/channels、
@@ -165,15 +165,17 @@ def main() -> int:
     dynamic_narratives |= channel_refs
     referenced |= dynamic_narratives | weak
 
-    # 演进 01 对齐：若领域主配置表被引用，其声明的 sub_tables 均视为动态路由引用
-    try:
-        domains_manifest = json.loads((CONFIG_DIR / "infrastructure" / "domains.json").read_text(encoding="utf-8"))
-        for d_entry in domains_manifest.get("domains", []):
-            if isinstance(d_entry, dict) and d_entry.get("config") in referenced:
-                for st in d_entry.get("sub_tables", []):
-                    referenced.add(str(st))
-    except Exception:
-        pass
+    manifest_path = CONFIG_DIR / "infrastructure" / "domains.json"
+    if manifest_path.is_file():
+        try:
+            domains_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            for d_entry in domains_manifest.get("domains", []):
+                if isinstance(d_entry, dict) and d_entry.get("config") in referenced:
+                    for st in d_entry.get("sub_tables", []):
+                        referenced.add(str(st))
+        except (json.JSONDecodeError, OSError) as exc:
+            # 基础设施清单读取或解析异常属于非致命错误，记录告警后回退
+            print(f"[WARN] domains.json 解析跳过: {exc}")
     for t in list(referenced):
         core_candidate = f"{t}.core"
         if core_candidate in all_names:

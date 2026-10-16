@@ -27,62 +27,13 @@ const { init, setLocale } = require('../../out/i18n/index.js');
  * @param fn - 冻结期间执行的回调。
  * @returns 回调返回值。
  */
-function withFixedNow(iso, fn) {
-    const RealDate = Date;
-    const fixedMs = new RealDate(iso).getTime();
-    class FixedDate extends RealDate {
-        constructor(...args) {
-            super(...(args.length ? args : [fixedMs]));
-        }
-        static now() {
-            return fixedMs;
-        }
-    }
-    global.Date = FixedDate;
-    try {
-        return fn();
-    } finally {
-        global.Date = RealDate;
-    }
-}
-
-class FakeStorageCoordinator {
-    constructor(initialData = null) {
-        this.data = initialData;
-    }
-    async load() { return { data: this.data, source: 'fake' }; }
-    async save(data) { this.data = { ...data }; }
-}
-
-class FakeJournalWriter {
-    async flushAll() { return 0; }
-    async truncate() { return true; }
-    async tryFlush() { return false; }
-    push() {}
-    updateFlushInterval() {}
-}
-
-class FakeRecoveryService {
-    async recover() {
-        return {
-            version: 2,
-            totalMs: 0,
-            currentSessionStartMs: 0,
-            lastSavedAtMs: 0,
-            isEnabled: true,
-            sessions: [],
-            dailyTotals: {},
-        };
-    }
-}
-
-class FakeGlobalStore {
-    constructor() {
-        this.data = { version: 1, workspaces: {}, lastUpdatedAt: 0 };
-    }
-    async load() { return this.data; }
-    async save(d) { this.data = d; }
-}
+const {
+    withFixedNow,
+    FakeStorageCoordinator,
+    FakeJournalWriter,
+    FakeRecoveryService,
+    FakeGlobalStore,
+} = require('../fixtures/fakes.js');
 
 describe('TimerOrchestrator（周工作上限模块）', () => {
     let timer;

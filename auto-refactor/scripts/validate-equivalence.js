@@ -416,7 +416,7 @@ async function main() {
       logLevel: 'silent',
       parser: s.parser,
     });
-    const json = JSON.stringify(normalize(r), null, 2);
+    const json = JSON.stringify(normalize(r), null, 2) + '\n';
     const bp = path.join(BASELINES, (s.baseline || s.name) + '.json');
     if (UPDATE) {
       fs.writeFileSync(bp, json);
@@ -428,7 +428,7 @@ async function main() {
       failed++;
       continue;
     }
-    if (fs.readFileSync(bp, 'utf8') === json) {
+    if (fs.readFileSync(bp, 'utf8').trimEnd() === json.trimEnd()) {
       console.log(
         `PASS ${s.name}  files=${r.summary.filesScanned} issues=${r.summary.issuesTotal}`,
       );

@@ -56,4 +56,3 @@ static func from_dto(data: Dictionary) -> HudCausalDeltaDTO:
 	dto.initiator = str(data.get("initiator", "SYSTEM_TICK_SIMULATION"))
 	dto.reason = str(data.get("reason", ""))
 	return dto
-

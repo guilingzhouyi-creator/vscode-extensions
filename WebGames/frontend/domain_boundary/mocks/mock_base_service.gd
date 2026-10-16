@@ -27,3 +27,21 @@ static func delayed_call(callback: Callable, result: Dictionary, delay_ms: int =
 			return
 		callback.call(result)
 	tree.create_timer(float(delay_ms) / 1000.0).timeout.connect(cb)
+
+## 统一构造成功响应字典（浅拷贝注入附加数据，消除各服务重复样板）
+static func reply_success(data: Dictionary = {}) -> Dictionary:
+	var res: Dictionary = { "success": true }
+	for k in data.keys():
+		res[k] = data[k]
+	return res
+
+## 统一构造错误响应字典（标准化 error_code 与 message）
+static func reply_error(code: String, msg: String, extra: Dictionary = {}) -> Dictionary:
+	var res: Dictionary = {
+		"success": false,
+		"error_code": code,
+		"message": msg
+	}
+	for k in extra.keys():
+		res[k] = extra[k]
+	return res

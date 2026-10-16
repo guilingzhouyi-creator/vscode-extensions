@@ -112,68 +112,39 @@ export const MAX_NESTING_DEPTH = 5;
 /**  */
 export const MAX_EXPORTED_SYMBOLS = 30;
 
-/**  */
-export const ANALYZER_ARCHITECTURE = 'architecture';
-
-/**  */
-export const ANALYZER_DEPENDENCY_GRAPH = 'dependency-graph';
-
-/**  */
-export const ANALYZER_GOVERNANCE = 'governance';
-
-/**  */
-export const ANALYZER_HYGIENE = 'hygiene';
-
-/**  */
-export const ANALYZER_NAMING = 'naming';
-
-/**  */
-export const ANALYZER_SECURITY = 'security';
-
-/**  */
-export const ANALYZER_SECRETS = 'secrets';
-
-/**  */
-export const ANALYZER_PERFORMANCE = 'performance';
-
-/**  */
-export const ANALYZER_LARGE_FILE = 'large-file';
-
-/**  */
-export const ANALYZER_COMPLEXITY = 'complexity';
-
-/**  */
-export const ANALYZER_COMMENTS = 'comments';
-
-/**  */
-export const ANALYZER_CONSTANTS = 'constants';
-
-/**  */
-export const ANALYZER_SIMPLIFY = 'simplify';
-
-/**  */
-export const ANALYZER_PYTHON_MODERN = 'python-modern';
-
-/**  */
-export const ANALYZER_TYPESCRIPT_MODERN = 'ts-modern';
-
-/**  */
-export const ANALYZER_RUST_MODERN = 'rust-modern';
-
-/**  */
-export const ANALYZER_GDSCRIPT_MODERN = 'gdscript-modern';
-
-/**  */
-export const ANALYZER_GO_MODERN = 'go-modern';
-
-/**  */
-export const ANALYZER_DOCS = 'docs';
-
-/**  */
-export const ANALYZER_GDSCRIPT_GAME = 'gdscript-game';
-
-/**  */
-export const ANALYZER_VSCODE_EXTENSION = 'vscode-extension';
+// Re-export built-in analyzer identifiers directly from Single Source of Truth
+export {
+    ANALYZER_ARCHITECTURE,
+    ANALYZER_DEPENDENCY_GRAPH,
+    ANALYZER_GOVERNANCE,
+    ANALYZER_HYGIENE,
+    ANALYZER_NAMING,
+    ANALYZER_SECURITY,
+    ANALYZER_SECRETS,
+    ANALYZER_PERFORMANCE,
+    ANALYZER_LARGE_FILE,
+    ANALYZER_COMPLEXITY,
+    ANALYZER_COMMENTS,
+    ANALYZER_CONSTANTS,
+    ANALYZER_SIMPLIFY,
+    ANALYZER_PYTHON_MODERN,
+    ANALYZER_TYPESCRIPT_MODERN,
+    ANALYZER_RUST_MODERN,
+    ANALYZER_GDSCRIPT_MODERN,
+    ANALYZER_GO_MODERN,
+    ANALYZER_DOCS,
+    ANALYZER_GDSCRIPT_GAME,
+    ANALYZER_VSCODE_EXTENSION,
+    ANALYZER_DATA_ARCHITECTURE,
+    ANALYZER_TEST_MODERNITY,
+    ANALYZER_DEPENDENCY_LAYOUT,
+    ANALYZER_SHELL_LINT,
+    ANALYZER_STDLIB,
+    ANALYZER_GATE_ARCHITECTURE,
+    ANALYZER_FRONTEND,
+    ANALYZER_PRODUCTION_HYGIENE,
+    ANALYZER_CLIENT_EXPOSURE,
+} from '../constants/rule-codes';
 
 /**  */
 export const DIMENSION_SEMANTIC_PURITY = 'semanticPurity';
@@ -321,19 +292,6 @@ export const FRAGMENT_WARNING = 'warning';
 
 /**  */
 export const FRAGMENT_KEY = 'key';
-
-/** Analyzer id for data architecture modernization. */
-export const ANALYZER_DATA_ARCHITECTURE = 'data-architecture';
-/** Analyzer id for test code modernization and effectiveness. */
-export const ANALYZER_TEST_MODERNITY = 'test-modernity';
-/** Analyzer id for dependency layout and resource hygiene. */
-export const ANALYZER_DEPENDENCY_LAYOUT = 'dependency-layout';
-/** Analyzer id for shell/PowerShell lint rules. */
-export const ANALYZER_SHELL_LINT = 'shell-lint';
-/** Analyzer id for standard library and systems runtime verification. */
-export const ANALYZER_STDLIB = 'stdlib';
-/** Analyzer id for repository gate architecture governance. */
-export const ANALYZER_GATE_ARCHITECTURE = 'gate-architecture';
 
 /** Rule id for bare panic/unwrap escaping public API. */
 export const RULE_STDLIB_PANIC_001 = 'STDLIB-PANIC-001';
@@ -696,13 +654,6 @@ export const RULE_NAM_LEN_002 = 'NAM-LEN-002';
 export const RULE_NAM_ABR_001 = 'NAM-ABR-001';
 /** Rule id for excessive function parameters guard (>4 parameters). */
 export const RULE_SIM_ARGS_001 = 'SIM-ARGS-001';
-
-/** Analyzer id for frontend UI/UX and component hygiene. */
-export const ANALYZER_FRONTEND = 'frontend';
-/** Analyzer id for production build hygiene and residue detection. */
-export const ANALYZER_PRODUCTION_HYGIENE = 'production-hygiene';
-/** Analyzer id for client exposure risks and frontend security. */
-export const ANALYZER_CLIENT_EXPOSURE = 'client-exposure';
 
 /** Rule id for HTML semantics and accessibility violations. */
 export const RULE_UI_ENG_001 = 'UI-ENG-001';

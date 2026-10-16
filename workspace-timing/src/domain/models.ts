@@ -445,4 +445,3 @@ export const DEFAULT_CONFIG: TimingConfig = {
 };
 
 export * from './constants';
-

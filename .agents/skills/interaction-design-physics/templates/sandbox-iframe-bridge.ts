@@ -115,4 +115,3 @@ export class SandboxIframeBridge {
         window.removeEventListener('message', this.handleWindowMessage);
     }
 }
-

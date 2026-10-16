@@ -94,4 +94,3 @@ sequenceDiagram
 | TC-MOD-RT-02 | 大小写双轨占位符与 MOD i18n 水化 | 渲染 `starter_story` 的 `narrative.starter.awaken`（含小写 `{player_name}`）及大写 `{ORIGIN_NAME}` | 返回文本中 `{player_name}` 与 `{ORIGIN_NAME}` 均被准确替换为角色名与身世名，零未解析花括号残留 |
 | TC-MOD-RT-03 | 内联文本 `inline_text` 语法糖兜底 | 节点未配置 `i18n` 词条但声明 `inline_text: "星界旅者 {PLAYER_NAME} 踏入虚空"` | `resolve_narrative_key` 自动采用 `inline_text` 并完成 `{PLAYER_NAME}` 水化 |
 | TC-MOD-RT-04 | 端到端无头试玩与突变结算 | 调用 `PrologueExecutionKernel.execute_headless_mod_playthrough` 跑完 `starter_story` 全流程 | 产出完整 `transcript_steps`（3 步台词全水化）、角色穿戴初始铁剑且终态 `is_completed == true` |
-

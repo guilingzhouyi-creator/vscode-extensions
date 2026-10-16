@@ -205,4 +205,3 @@ class DocsAuditor:
             for doc, _ot, _ol, _oi, nt in changed:
                 doc.path.write_bytes(nt.replace("\n", doc.eol).encode("utf-8"))
         return applied, residual
-

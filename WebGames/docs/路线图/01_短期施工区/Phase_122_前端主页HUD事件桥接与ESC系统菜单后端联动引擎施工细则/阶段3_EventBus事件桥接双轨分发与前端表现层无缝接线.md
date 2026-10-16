@@ -45,9 +45,9 @@ const FrontendHudSnapshot = preload("res://frontend/domain_boundary/contracts/fr
 
 static var _instance: HudEventBridge = null
 static func get_instance() -> HudEventBridge:
-	if _instance == null:
-		_instance = HudEventBridge.new()
-	return _instance
+  if _instance == null:
+    _instance = HudEventBridge.new()
+  return _instance
 
 var _view_ref: WeakRef = null
 var _is_attached: bool = false
@@ -55,98 +55,98 @@ var _bus_tokens: Array = []
 
 ## 绑定主页 HUD 视图宿主（幂等）
 func attach_hud(view: MainHUDView) -> void:
-	if view == null:
-		return
-	if _is_attached and _view_ref != null and _view_ref.get_ref() == view:
-		return
-	detach_hud()
+  if view == null:
+    return
+  if _is_attached and _view_ref != null and _view_ref.get_ref() == view:
+    return
+  detach_hud()
 
-	_view_ref = weakref(view)
-	_is_attached = true
-	_setup_bus_subscriptions()
+  _view_ref = weakref(view)
+  _is_attached = true
+  _setup_bus_subscriptions()
 
 ## 解绑主页 HUD 并注销事件总线监听（幂等·防泄漏）
 func detach_hud() -> void:
-	for tok in _bus_tokens:
-		if tok != null and tok.has_method("unbind"):
-			tok.unbind()
-	_bus_tokens.clear()
-	_view_ref = null
-	_is_attached = false
+  for tok in _bus_tokens:
+    if tok != null and tok.has_method("unbind"):
+      tok.unbind()
+  _bus_tokens.clear()
+  _view_ref = null
+  _is_attached = false
 
 func _setup_bus_subscriptions() -> void:
-	var bus := EventBusCore.get_instance()
-	if bus == null:
-		return
+  var bus := EventBusCore.get_instance()
+  if bus == null:
+    return
 
-	# 1. 订阅权威 HUD 快照全量推流信道
-	var t1 = bus.on_channel("world_state.hud_snapshot_published", _on_authoritative_snapshot_received)
-	_bus_tokens.append(t1)
+  # 1. 订阅权威 HUD 快照全量推流信道
+  var t1 = bus.on_channel("world_state.hud_snapshot_published", _on_authoritative_snapshot_received)
+  _bus_tokens.append(t1)
 
-	# 2. 订阅钱包变更增量同步
-	var t2 = bus.on_channel("currency.wallet.mutated", _on_wallet_mutated)
-	_bus_tokens.append(t2)
+  # 2. 订阅钱包变更增量同步
+  var t2 = bus.on_channel("currency.wallet.mutated", _on_wallet_mutated)
+  _bus_tokens.append(t2)
 
-	# 3. 订阅序章与剧情叙事步进事件
-	var t3 = bus.on_channel("prologue.step_advanced", _on_prologue_advanced)
-	_bus_tokens.append(t3)
+  # 3. 订阅序章与剧情叙事步进事件
+  var t3 = bus.on_channel("prologue.step_advanced", _on_prologue_advanced)
+  _bus_tokens.append(t3)
 
-	# 4. 订阅世界进入与网关事件
-	var t4 = bus.on_channel("world_gateway.world_entered", _on_world_entered)
-	_bus_tokens.append(t4)
+  # 4. 订阅世界进入与网关事件
+  var t4 = bus.on_channel("world_gateway.world_entered", _on_world_entered)
+  _bus_tokens.append(t4)
 
 func _on_authoritative_snapshot_received(pkt: Variant) -> void:
-	var view: MainHUDView = _get_view()
-	if view == null:
-		return
-	var payload: Dictionary = pkt.payload_data if (pkt != null and pkt.get("payload_data") is Dictionary) else {}
-	if payload.is_empty():
-		return
+  var view: MainHUDView = _get_view()
+  if view == null:
+    return
+  var payload: Dictionary = pkt.payload_data if (pkt != null and pkt.get("payload_data") is Dictionary) else {}
+  if payload.is_empty():
+    return
 
-	# 将后端权威快照转为前端快照字典并注入
-	var snap_dict: Dictionary = {
-		"account_id": payload.get("account_id", ""),
-		"character_name": payload.get("character_name", ""),
-		"hp_current": payload.get("hp_current", 100.0),
-		"hp_max": payload.get("hp_max", 100.0),
-		"mp_current": payload.get("mp_current", 50.0),
-		"mp_max": payload.get("mp_max", 50.0),
-		"ap_current": payload.get("ap_current", 10.0),
-		"ap_max": payload.get("ap_max", 10.0),
-		"gold": payload.get("wallet_gold", 0),
-		"mana_monocrystals": payload.get("wallet_mana_monocrystals", 0),
-		"level": payload.get("level", 1)
-	}
-	view.apply_snapshot(snap_dict)
+  # 将后端权威快照转为前端快照字典并注入
+  var snap_dict: Dictionary = {
+    "account_id": payload.get("account_id", ""),
+    "character_name": payload.get("character_name", ""),
+    "hp_current": payload.get("hp_current", 100.0),
+    "hp_max": payload.get("hp_max", 100.0),
+    "mp_current": payload.get("mp_current", 50.0),
+    "mp_max": payload.get("mp_max", 50.0),
+    "ap_current": payload.get("ap_current", 10.0),
+    "ap_max": payload.get("ap_max", 10.0),
+    "gold": payload.get("wallet_gold", 0),
+    "mana_monocrystals": payload.get("wallet_mana_monocrystals", 0),
+    "level": payload.get("level", 1)
+  }
+  view.apply_snapshot(snap_dict)
 
 func _on_wallet_mutated(pkt: Variant) -> void:
-	var view: MainHUDView = _get_view()
-	if view == null:
-		return
-	var payload: Dictionary = pkt.payload_data if (pkt != null and pkt.get("payload_data") is Dictionary) else {}
-	var gold: int = int(payload.get("current_gold", payload.get("gold", view.wallet_gold)))
-	var crystals: int = int(payload.get("current_crystals", payload.get("crystals", view.wallet_mana_crystals)))
-	view.apply_snapshot({"gold": gold, "mana_monocrystals": crystals})
+  var view: MainHUDView = _get_view()
+  if view == null:
+    return
+  var payload: Dictionary = pkt.payload_data if (pkt != null and pkt.get("payload_data") is Dictionary) else {}
+  var gold: int = int(payload.get("current_gold", payload.get("gold", view.wallet_gold)))
+  var crystals: int = int(payload.get("current_crystals", payload.get("crystals", view.wallet_mana_crystals)))
+  view.apply_snapshot({"gold": gold, "mana_monocrystals": crystals})
 
 func _on_prologue_advanced(pkt: Variant) -> void:
-	var view: MainHUDView = _get_view()
-	if view == null:
-		return
-	var payload: Dictionary = pkt.payload_data if (pkt != null and pkt.get("payload_data") is Dictionary) else {}
-	var text: String = str(payload.get("narrative_text", payload.get("text", "")))
-	if not text.is_empty():
-		view.append_terminal_log("NARRATIVE", text)
+  var view: MainHUDView = _get_view()
+  if view == null:
+    return
+  var payload: Dictionary = pkt.payload_data if (pkt != null and pkt.get("payload_data") is Dictionary) else {}
+  var text: String = str(payload.get("narrative_text", payload.get("text", "")))
+  if not text.is_empty():
+    view.append_terminal_log("NARRATIVE", text)
 
 func _on_world_entered(pkt: Variant) -> void:
-	var view: MainHUDView = _get_view()
-	if view == null:
-		return
-	view.append_battle_log("SYSTEM", "已成功同步世界权威状态")
+  var view: MainHUDView = _get_view()
+  if view == null:
+    return
+  view.append_battle_log("SYSTEM", "已成功同步世界权威状态")
 
 func _get_view() -> MainHUDView:
-	if not _is_attached or _view_ref == null:
-		return null
-	return _view_ref.get_ref() as MainHUDView
+  if not _is_attached or _view_ref == null:
+    return null
+  return _view_ref.get_ref() as MainHUDView
 ```
 
 ### 2. 前端表现层视图接线改造 (`MainHUDSubpanels` 与 `SystemSaveView`)
@@ -156,50 +156,50 @@ func _get_view() -> MainHUDView:
 ```gdscript
 # 改造点 1: 打开 ESC 菜单时异步查询保存就绪状态，动态控制界面保存按钮可用性
 func toggle_main_menu() -> void:
-	if _view == null or _view._main_menu_panel == null:
-		return
-	_view.main_menu_visible = not _view.main_menu_visible
-	_view._main_menu_panel.visible = _view.main_menu_visible
-	if _view.main_menu_visible:
-		append_battle_log("SYSTEM", UIIntermediary.text("ui.fe02.battle_log.menu_opened"))
-		# 触发保存就绪态主动检测
-		_query_and_refresh_save_readiness()
-	else:
-		append_battle_log("SYSTEM", UIIntermediary.text("ui.fe02.battle_log.menu_closed"))
+  if _view == null or _view._main_menu_panel == null:
+    return
+  _view.main_menu_visible = not _view.main_menu_visible
+  _view._main_menu_panel.visible = _view.main_menu_visible
+  if _view.main_menu_visible:
+    append_battle_log("SYSTEM", UIIntermediary.text("ui.fe02.battle_log.menu_opened"))
+    # 触发保存就绪态主动检测
+    _query_and_refresh_save_readiness()
+  else:
+    append_battle_log("SYSTEM", UIIntermediary.text("ui.fe02.battle_log.menu_closed"))
 
 func _query_and_refresh_save_readiness() -> void:
-	var req := UnifiedProtocolFactory.create_human_request(
-		"world_state", "ESC_QUERY_READINESS", {"in_combat": false, "in_cutscene": false}
-	)
-	var resp := UnifiedProtocolDispatcher.dispatch_request(req)
-	var is_ready: bool = bool(resp.data.get("is_ready", true))
-	# 若不可保存，对菜单内保存按钮实施视觉置灰与提示
-	if _view._menu_btn_settings:
-		_view._menu_btn_settings.tooltip_text = "" if is_ready else "当前处于特殊状态，暂时不可保存"
+  var req := UnifiedProtocolFactory.create_human_request(
+    "world_state", "ESC_QUERY_READINESS", {"in_combat": false, "in_cutscene": false}
+  )
+  var resp := UnifiedProtocolDispatcher.dispatch_request(req)
+  var is_ready: bool = bool(resp.data.get("is_ready", true))
+  # 若不可保存，对菜单内保存按钮实施视觉置灰与提示
+  if _view._menu_btn_settings:
+    _view._menu_btn_settings.tooltip_text = "" if is_ready else "当前处于特殊状态，暂时不可保存"
 
 # 改造点 2: 点击退出游戏 -> 触发统一协议优雅停机
 func on_menu_exit_pressed() -> void:
-	append_battle_log("SYSTEM", UIIntermediary.text("ui.fe02.battle_log.exit_game"))
-	var req := UnifiedProtocolFactory.create_human_request(
-		"lifecycle", "ESC_QUIT_GAME", {"slot_id": "SLOT_01"}
-	)
-	var resp := UnifiedProtocolDispatcher.dispatch_request(req)
-	if resp.success:
-		# 停机成功，平稳退出桌面
-		_view.get_tree().quit(0)
-	else:
-		NavManager.get_instance().show_toast("优雅停机失败，已安全取消退出", NavTypes.ToastLevel.ERROR)
+  append_battle_log("SYSTEM", UIIntermediary.text("ui.fe02.battle_log.exit_game"))
+  var req := UnifiedProtocolFactory.create_human_request(
+    "lifecycle", "ESC_QUIT_GAME", {"slot_id": "SLOT_01"}
+  )
+  var resp := UnifiedProtocolDispatcher.dispatch_request(req)
+  if resp.success:
+    # 停机成功，平稳退出桌面
+    _view.get_tree().quit(0)
+  else:
+    NavManager.get_instance().show_toast("优雅停机失败，已安全取消退出", NavTypes.ToastLevel.ERROR)
 
 # 改造点 3: 退出到世界档案 -> 触发网关内存全量洗脱并重置页面
 func on_menu_exit_to_gateway_pressed(gateway: WorldGatewayFSM) -> void:
-	var req := UnifiedProtocolFactory.create_human_request(
-		"world_gateway", "ESC_EXIT_TO_GATEWAY", {"auto_save": true}
-	)
-	var resp := UnifiedProtocolDispatcher.dispatch_request(req, gateway)
-	if resp.success:
-		NavManager.get_instance().replace_screen("account_entry")
-	else:
-		NavManager.get_instance().show_toast("退出世界失败: " + resp.error_message, NavTypes.ToastLevel.ERROR)
+  var req := UnifiedProtocolFactory.create_human_request(
+    "world_gateway", "ESC_EXIT_TO_GATEWAY", {"auto_save": true}
+  )
+  var resp := UnifiedProtocolDispatcher.dispatch_request(req, gateway)
+  if resp.success:
+    NavManager.get_instance().replace_screen("account_entry")
+  else:
+    NavManager.get_instance().show_toast("退出世界失败: " + resp.error_message, NavTypes.ToastLevel.ERROR)
 ```
 
 ---
@@ -265,4 +265,3 @@ func on_menu_exit_to_gateway_pressed(gateway: WorldGatewayFSM) -> void:
 | TC-UPE-S3-02 | EventBus 信号推送与轻量快照灌入 | 发射 hud_snapshot_published 领域事件 | 桥接器成功拦截并单向驱动 apply_snapshot 刷新视图 |
 | TC-UPE-S3-03 | 前端 ESC 菜单真实后端联动交互 | 触发菜单退出世界与退出游戏按钮 | 成功向 UnifiedProtocolDispatcher 发射信封并处理结果 |
 | TC-UPE-S3-04 | 视图表现层零业务逻辑计算核查 | 审查 MainHUDView 与 Subpanels 代码 | 表现层无业务结算与数值公式，严格保持数据向表现单向流动 |
-

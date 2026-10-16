@@ -47,4 +47,3 @@ flowchart LR
 - [ ] Step 3.1: 编写 `backend/infrastructure/companion_ipc_server.gd` 本地安全管道服务
 - [ ] Step 3.2: 编写基于文件修改时间的原子热重载调度器 `mod_hot_reload_solver.gd`
 - [ ] Step 3.3: 编写配套的 Node/Python 客户端 SDK 示例与 VS Code 扩展联动调试器
-

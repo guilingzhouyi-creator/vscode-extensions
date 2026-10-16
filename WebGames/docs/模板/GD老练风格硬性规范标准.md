@@ -89,31 +89,31 @@ flowchart TD
 ```gdscript
 # 范例 1：控制流卫语句与模式匹配
 func handle_action(payload: Dictionary) -> Dictionary:
-	if payload.is_empty():
-		return {"success": false, "error_code": "EMPTY_PAYLOAD"}
-	if not _is_ready:
-		return {"success": false, "error_code": "NOT_READY"}
+  if payload.is_empty():
+    return {"success": false, "error_code": "EMPTY_PAYLOAD"}
+  if not _is_ready:
+    return {"success": false, "error_code": "NOT_READY"}
 
-	match payload:
-		{"type": "damage", "amount": var dmg} when dmg > 100:
-			return _trigger_critical(dmg)
-		{"type": "heal", "amount": var heal}:
-			return _apply_heal(heal)
-		_:
-			return {"success": false, "error_code": "UNKNOWN_ACTION"}
+  match payload:
+    {"type": "damage", "amount": var dmg} when dmg > 100:
+      return _trigger_critical(dmg)
+    {"type": "heal", "amount": var heal}:
+      return _apply_heal(heal)
+    _:
+      return {"success": false, "error_code": "UNKNOWN_ACTION"}
 
 # 范例 2：受控属性 Accessor 与弱引用守卫
 var current_gold: int:
-	get:
-		return _wallet.get("gold", 0)
-	set(value):
-		_wallet["gold"] = maxi(0, value)
-		EventBusCore.get_instance().emit_domain_event("wallet.changed", {"wallet": _wallet})
+  get:
+    return _wallet.get("gold", 0)
+  set(value):
+    _wallet["gold"] = maxi(0, value)
+    EventBusCore.get_instance().emit_domain_event("wallet.changed", {"wallet": _wallet})
 
 func safe_notify_node(target: Node, event: String) -> void:
-	if not is_instance_valid(target) or target.is_queued_for_deletion():
-		return
-	target.call("on_custom_event", event)
+  if not is_instance_valid(target) or target.is_queued_for_deletion():
+    return
+  target.call("on_custom_event", event)
 ```
 
 ---
@@ -206,24 +206,24 @@ func safe_notify_node(target: Node, event: String) -> void:
 class_name TestExampleDomain extends TestCase
 
 static func run_all_tests() -> Dictionary:
-	setup()
-	var results: Array[Dictionary] = []
-	results.append(_test_initialization())
-	results.append(_test_state_mutation())
-	teardown()
-	return TestCase.pack_results("example", results)
+  setup()
+  var results: Array[Dictionary] = []
+  results.append(_test_initialization())
+  results.append(_test_state_mutation())
+  teardown()
+  return TestCase.pack_results("example", results)
 
 static func _test_initialization() -> Dictionary:
-	var instance := ExampleModel.new()
-	var ok := TestCase.assert_not_null(instance, "实例初始化非空")
-	ok = ok and TestCase.assert_eq(instance.get_status(), "IDLE", "初始状态为 IDLE")
-	return TestCase.make_result("initialization", ok)
+  var instance := ExampleModel.new()
+  var ok := TestCase.assert_not_null(instance, "实例初始化非空")
+  ok = ok and TestCase.assert_eq(instance.get_status(), "IDLE", "初始状态为 IDLE")
+  return TestCase.make_result("initialization", ok)
 
 static func _test_state_mutation() -> Dictionary:
-	var instance := ExampleModel.new()
-	var res: Dictionary = instance.execute_action({"action": "start"})
-	var ok := TestCase.assert_true(res.get("success", false), "动作执行成功")
-	return TestCase.make_result("state_mutation", ok)
+  var instance := ExampleModel.new()
+  var res: Dictionary = instance.execute_action({"action": "start"})
+  var ok := TestCase.assert_true(res.get("success", false), "动作执行成功")
+  return TestCase.make_result("state_mutation", ok)
 ```
 
 ### 8.3 确定性、环境隔离与测试质量矩阵
@@ -259,17 +259,17 @@ class_name BaseScreen extends Control
 var _snapshot: Dictionary = {}
 
 func on_screen_enter(params: Dictionary = {}) -> void:
-	_apply_enter_params(params)
+  _apply_enter_params(params)
 
 func apply_snapshot(snapshot: Dictionary) -> void:
-	_snapshot = snapshot
-	_render_from_snapshot()
+  _snapshot = snapshot
+  _render_from_snapshot()
 
 func _render_from_snapshot() -> void:
-	pass
+  pass
 
 func on_screen_exit() -> void:
-	UIIntermediary.clear_view_bindings(self)
+  UIIntermediary.clear_view_bindings(self)
 ```
 
 - 所有业务数据一律经 `apply_snapshot(snapshot)` 注入；视图严禁自读 `skeleton_mock.json`、`GameConfig` 业务数值或内联 mock；

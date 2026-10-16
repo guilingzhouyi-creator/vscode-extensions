@@ -320,4 +320,3 @@ frontend/
     ├── economy_mock.json
     └── ...
 ```
-

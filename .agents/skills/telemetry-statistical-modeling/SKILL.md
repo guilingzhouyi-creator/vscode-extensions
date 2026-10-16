@@ -119,4 +119,3 @@ node auto-refactor/scripts/validate-project-neutrality.js
 - [jeffreys-beta-credible-interval.md](references/jeffreys-beta-credible-interval.md)：无信息 Jeffreys 先验共轭后验详细数学推导指南；
 - [anti-gaming-detection-mechanics.md](references/anti-gaming-detection-mechanics.md)：反刷分熔断判定机制与作弊特征指南；
 - [bayesian-confidence-evaluator.ts](templates/bayesian-confidence-evaluator.ts)：开箱即用的贝叶斯置信度计算与反刷分判定模板。
-

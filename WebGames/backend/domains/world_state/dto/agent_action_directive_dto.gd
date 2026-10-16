@@ -56,4 +56,3 @@ static func from_dto(data: Dictionary) -> AgentActionDirectiveDTO:
 	dto.is_executable = bool(data.get("is_executable", true))
 	dto.blocked_reason = str(data.get("blocked_reason", ""))
 	return dto
-

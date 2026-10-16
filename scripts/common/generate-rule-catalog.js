@@ -223,6 +223,41 @@ function collectPlatformGovernanceRules() {
       severity: 'error',
       summary: 'Substantive facade payload guard: facade module must satisfy ELOC >= 15 or aggregate >= 3 subdomains with immutability',
     },
+    {
+      id: 'HYG-BOM-001',
+      project: 'global-tooling',
+      family: 'HYG',
+      severity: 'error',
+      summary: 'UTF-8 BOM hygiene guard: all workspace text files must be strictly UTF-8 NO-BOM without 0xEF, 0xBB, 0xBF byte prefix',
+    },
+    {
+      id: 'HYG-TRL-001',
+      project: 'global-tooling',
+      family: 'HYG',
+      severity: 'error',
+      summary: 'POSIX EOF newline guard: text files must end with exactly one standard newline without trailing blank line buildup',
+    },
+    {
+      id: 'HYG-IND-001',
+      project: 'global-tooling',
+      family: 'HYG',
+      severity: 'error',
+      summary: 'Pure space indentation guard: non-GDScript and non-Makefile source files must use spaces exclusively without tab characters',
+    },
+    {
+      id: 'HYG-DIR-001',
+      project: 'global-tooling',
+      family: 'HYG',
+      severity: 'error',
+      summary: 'Lingering empty directory guard: active source and tooling directories must not retain zero-file lingering empty folders',
+    },
+    {
+      id: 'HYG-CLT-001',
+      project: 'global-tooling',
+      family: 'HYG',
+      severity: 'error',
+      summary: 'System and transient clutter guard: workspace must remain clean of OS clutter and uncontrolled transient files',
+    },
   ];
 }
 

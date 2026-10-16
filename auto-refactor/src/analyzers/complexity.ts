@@ -80,9 +80,6 @@ const RE_CONTROL_FLOW_ESCAPE = /^(?:return\b|throw\b|break\b|continue\b)/;
 /** Regular expression detecting case or default labels in switch statements. */
 const RE_STATE_MACHINE_BRANCH = /^(?:case\b|default:)/;
 
-/** Canonical analyzer rule identifier for cyclomatic complexity. */
-const _RULE_HIGH_COMPLEXITY = 'high-complexity';
-
 /** Syntactic keyword name for function declarations. */
 const KIND_FUNCTION_KEYWORD = 'FunctionKeyword';
 

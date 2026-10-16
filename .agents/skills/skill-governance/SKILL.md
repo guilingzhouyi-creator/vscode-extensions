@@ -128,4 +128,3 @@ node scripts/common/sync-skills.js
 # 4. 执行包含技能验证的全工作区统一质量审查
 pwsh -File scripts/ps1/audit-all.ps1 -Fast
 ```
-

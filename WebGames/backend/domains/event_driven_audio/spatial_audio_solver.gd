@@ -67,4 +67,3 @@ static func dispatch_spatial_audio_event(source_pos: Vector3, audio_cmd: RefCoun
 	packet.payload_dto = audio_cmd
 	bus.dispatch_spatial(packet, source_pos, max_dist)
 	bus.recycle_packet(packet)
-

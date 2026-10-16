@@ -159,11 +159,11 @@ console.log('=== Running Frontend Architecture & Governance Validation Pipeline 
   const extractor = new TrajectoryRecipeExtractor();
   const beforeCode = `
 func _ready():
-	submit_btn.pressed.connect(_on_submit)
+  submit_btn.pressed.connect(_on_submit)
 `;
   const afterCode = `
 func _ready():
-	submit_btn.debounced_pressed.connect(_on_submit)
+  submit_btn.debounced_pressed.connect(_on_submit)
 `;
   const recipe = extractor.extractRecipeFromTrajectory({
     trajectoryId: 'traj-deb-001',
@@ -189,11 +189,11 @@ func _ready():
   const extractor = new TrajectoryRecipeExtractor();
   const beforeCode = `
 func trigger_combat():
-	_current_state = State.COMBAT
+  _current_state = State.COMBAT
 `;
   const afterCode = `
 func trigger_combat():
-	fsm.transition_to(State.COMBAT, {})
+  fsm.transition_to(State.COMBAT, {})
 `;
   const recipe = extractor.extractRecipeFromTrajectory({
     trajectoryId: 'traj-fsm-001',
@@ -222,11 +222,11 @@ func trigger_combat():
   const extractor = new TrajectoryRecipeExtractor();
   const beforeCode = `
 func register_listener(node):
-	_observers.append(node)
+  _observers.append(node)
 `;
   const afterCode = `
 func register_listener(node):
-	_observers.append(weakref(node))
+  _observers.append(weakref(node))
 `;
   const recipe = extractor.extractRecipeFromTrajectory({
     trajectoryId: 'traj-weak-001',
@@ -252,11 +252,11 @@ func register_listener(node):
   const extractor = new TrajectoryRecipeExtractor();
   const beforeCode = `
 func _on_buy():
-	snapshot.gold -= 100
+  snapshot.gold -= 100
 `;
   const afterCode = `
 func _on_buy():
-	dispatch_intent("purchase_item", 100)
+  dispatch_intent("purchase_item", 100)
 `;
   const recipe = extractor.extractRecipeFromTrajectory({
     trajectoryId: 'traj-uni-001',

@@ -46,27 +46,27 @@ static var _active_lease_nonce: int = 0
 
 ## 续订人类前台控制租约
 static func renew_human_lease(account_id: String, lease_nonce: int, window_ms: int = DEFAULT_LEASE_WINDOW_MS) -> void:
-	_last_human_activity_ms = Time.get_ticks_msec()
-	_current_lease_holder = account_id
-	_active_lease_nonce = lease_nonce
+  _last_human_activity_ms = Time.get_ticks_msec()
+  _current_lease_holder = account_id
+  _active_lease_nonce = lease_nonce
 
 ## 判定当前是否处于人类控制租约保护期
 static func is_lease_active(account_id: String = "") -> bool:
-	var now := Time.get_ticks_msec()
-	if now - _last_human_activity_ms > DEFAULT_LEASE_WINDOW_MS:
-		return false
-	if not account_id.is_empty() and not _current_lease_holder.is_empty():
-		return account_id == _current_lease_holder
-	return true
+  var now := Time.get_ticks_msec()
+  if now - _last_human_activity_ms > DEFAULT_LEASE_WINDOW_MS:
+    return false
+  if not account_id.is_empty() and not _current_lease_holder.is_empty():
+    return account_id == _current_lease_holder
+  return true
 
 ## 显式主动释放人类控制租约（例如用户主动闲置或退出世界）
 static func release_lease() -> void:
-	_last_human_activity_ms = -100000
-	_current_lease_holder = ""
-	_active_lease_nonce = 0
+  _last_human_activity_ms = -100000
+  _current_lease_holder = ""
+  _active_lease_nonce = 0
 
 static func reset_for_tests() -> void:
-	release_lease()
+  release_lease()
 ```
 
 ### 2. 统一协议解析与路由调度器 (`UnifiedProtocolDispatcher`)
@@ -88,61 +88,61 @@ const UnifiedProtocolFactory = preload("res://backend/domains/world_state/servic
 
 ## 核心派发入口：处理一切来自客户端或 Agent 包装的统一请求信封
 static func dispatch_request(req: ClientRequestEnvelopeDTO, gateway: WorldGatewayFSM = null) -> UnifiedResponseEnvelopeDTO:
-	if req == null:
-		return UnifiedProtocolFactory.create_response(
-			"", false, {}, "ERR_NULL_REQUEST", "请求信封不能为空"
-		)
+  if req == null:
+    return UnifiedProtocolFactory.create_response(
+      "", false, {}, "ERR_NULL_REQUEST", "请求信封不能为空"
+    )
 
-	# 1. 租约与并发冲突仲裁
-	if req.actor_type == ClientRequestEnvelopeDTO.ACTOR_HUMAN_UI:
-		HumanControlLeaseManager.renew_human_lease(req.account_id, req.lease_nonce)
-	elif req.actor_type == ClientRequestEnvelopeDTO.ACTOR_AGENT:
-		if HumanControlLeaseManager.is_lease_active(req.account_id):
-			return UnifiedProtocolFactory.create_response(
-				req.request_id, false, {}, "ERR_PREEMPTED_BY_HUMAN", "人类前台正在操作，Agent 动作已被抢占式阻断"
-			)
+  # 1. 租约与并发冲突仲裁
+  if req.actor_type == ClientRequestEnvelopeDTO.ACTOR_HUMAN_UI:
+    HumanControlLeaseManager.renew_human_lease(req.account_id, req.lease_nonce)
+  elif req.actor_type == ClientRequestEnvelopeDTO.ACTOR_AGENT:
+    if HumanControlLeaseManager.is_lease_active(req.account_id):
+      return UnifiedProtocolFactory.create_response(
+        req.request_id, false, {}, "ERR_PREEMPTED_BY_HUMAN", "人类前台正在操作，Agent 动作已被抢占式阻断"
+      )
 
-	# 2. 按领域路由分发
-	match req.domain:
-		"world_state", "world_gateway", "lifecycle":
-			if req.action_type.begins_with("ESC_"):
-				return EscMenuBackendService.handle_esc_action(req, gateway)
-			elif req.domain == "world_state" and req.actor_type == ClientRequestEnvelopeDTO.ACTOR_AGENT:
-				# 兼容派发至 Agent 既有动作求解器
-				return _dispatch_agent_action_compat(req)
-		"game_settings":
-			return _dispatch_settings_action(req)
-		_:
-			return UnifiedProtocolFactory.create_response(
-				req.request_id, false, {}, "ERR_UNKNOWN_DOMAIN", "未知业务领域: %s" % req.domain
-			)
+  # 2. 按领域路由分发
+  match req.domain:
+    "world_state", "world_gateway", "lifecycle":
+      if req.action_type.begins_with("ESC_"):
+        return EscMenuBackendService.handle_esc_action(req, gateway)
+      elif req.domain == "world_state" and req.actor_type == ClientRequestEnvelopeDTO.ACTOR_AGENT:
+        # 兼容派发至 Agent 既有动作求解器
+        return _dispatch_agent_action_compat(req)
+    "game_settings":
+      return _dispatch_settings_action(req)
+    _:
+      return UnifiedProtocolFactory.create_response(
+        req.request_id, false, {}, "ERR_UNKNOWN_DOMAIN", "未知业务领域: %s" % req.domain
+      )
 
-	return UnifiedProtocolFactory.create_response(
-		req.request_id, false, {}, "ERR_UNHANDLED_ACTION", "未支持的操作指令: %s" % req.action_type
-	)
+  return UnifiedProtocolFactory.create_response(
+    req.request_id, false, {}, "ERR_UNHANDLED_ACTION", "未支持的操作指令: %s" % req.action_type
+  )
 
 static func _dispatch_agent_action_compat(req: ClientRequestEnvelopeDTO) -> UnifiedResponseEnvelopeDTO:
-	var agent_pkt := AgentActionPacketDTO.new()
-	agent_pkt.session_id = req.character_id
-	agent_pkt.directive_id = req.action_type
-	agent_pkt.params = req.payload
-	agent_pkt.client_timestamp_ms = req.client_timestamp_ms
-	var hud_snap := AuthoritativeHudSyncService.get_authoritative_snapshot({"account_id": req.account_id})
-	var res := AgentActionExecutionSolver.validate_and_execute(agent_pkt, hud_snap, false)
-	return UnifiedProtocolFactory.create_response(
-		req.request_id,
-		bool(res.get("success", false)),
-		res,
-		str(res.get("error_code", "")),
-		str(res.get("cause", "")),
-		res.get("causal_delta", {}) if res.has("causal_delta") else {}
-	)
+  var agent_pkt := AgentActionPacketDTO.new()
+  agent_pkt.session_id = req.character_id
+  agent_pkt.directive_id = req.action_type
+  agent_pkt.params = req.payload
+  agent_pkt.client_timestamp_ms = req.client_timestamp_ms
+  var hud_snap := AuthoritativeHudSyncService.get_authoritative_snapshot({"account_id": req.account_id})
+  var res := AgentActionExecutionSolver.validate_and_execute(agent_pkt, hud_snap, false)
+  return UnifiedProtocolFactory.create_response(
+    req.request_id,
+    bool(res.get("success", false)),
+    res,
+    str(res.get("error_code", "")),
+    str(res.get("cause", "")),
+    res.get("causal_delta", {}) if res.has("causal_delta") else {}
+  )
 
 static func _dispatch_settings_action(req: ClientRequestEnvelopeDTO) -> UnifiedResponseEnvelopeDTO:
-	# 设置中心属性批量更新
-	return UnifiedProtocolFactory.create_response(
-		req.request_id, true, {"applied_settings": req.payload}, "", "设置应用成功"
-	)
+  # 设置中心属性批量更新
+  return UnifiedProtocolFactory.create_response(
+    req.request_id, true, {"applied_settings": req.payload}, "", "设置应用成功"
+  )
 ```
 
 ### 3. ESC 菜单后端联动服务 (`EscMenuBackendService`)
@@ -166,66 +166,66 @@ const GameLifecycleModel = preload("res://backend/domains/lifecycle/lifecycle_mo
 const UnifiedProtocolFactory = preload("res://backend/domains/world_state/services/unified_protocol_factory.gd")
 
 static func handle_esc_action(req: ClientRequestEnvelopeDTO, gateway: WorldGatewayFSM = null) -> UnifiedResponseEnvelopeDTO:
-	match req.action_type:
-		"ESC_QUERY_READINESS":
-			var in_combat: bool = bool(req.payload.get("in_combat", false))
-			var in_cutscene: bool = bool(req.payload.get("in_cutscene", false))
-			var is_dead: bool = bool(req.payload.get("is_dead", false))
-			var readiness := SaveReadinessGuard.evaluate_save_readiness(in_combat, in_cutscene, is_dead)
-			return UnifiedProtocolFactory.create_response(
-				req.request_id, true, readiness, "", "保存就绪状态查询成功"
-			)
+  match req.action_type:
+    "ESC_QUERY_READINESS":
+      var in_combat: bool = bool(req.payload.get("in_combat", false))
+      var in_cutscene: bool = bool(req.payload.get("in_cutscene", false))
+      var is_dead: bool = bool(req.payload.get("is_dead", false))
+      var readiness := SaveReadinessGuard.evaluate_save_readiness(in_combat, in_cutscene, is_dead)
+      return UnifiedProtocolFactory.create_response(
+        req.request_id, true, readiness, "", "保存就绪状态查询成功"
+      )
 
-		"ESC_SAVE_GAME":
-			var slot_id: String = str(req.payload.get("slot_id", "SLOT_01"))
-			var mode: int = int(req.payload.get("game_mode", WorldGatewayModel.GameMode.SINGLE_PLAYER))
-			var path_safety := SaveReadinessGuard.evaluate_storage_path_safety("user://offline_vault/%s.sav" % slot_id.to_lower(), mode)
-			if not bool(path_safety.get("is_safe", false)):
-				return UnifiedProtocolFactory.create_response(
-					req.request_id, false, path_safety, "ERR_STORAGE_UNSAFE", "存储路径不符合模式隔离规范"
-				)
+    "ESC_SAVE_GAME":
+      var slot_id: String = str(req.payload.get("slot_id", "SLOT_01"))
+      var mode: int = int(req.payload.get("game_mode", WorldGatewayModel.GameMode.SINGLE_PLAYER))
+      var path_safety := SaveReadinessGuard.evaluate_storage_path_safety("user://offline_vault/%s.sav" % slot_id.to_lower(), mode)
+      if not bool(path_safety.get("is_safe", false)):
+        return UnifiedProtocolFactory.create_response(
+          req.request_id, false, path_safety, "ERR_STORAGE_UNSAFE", "存储路径不符合模式隔离规范"
+        )
 
-			var save_res := SaveDataAccessLayer.save_game(slot_id, req.payload.get("game_data", {}))
-			var ok := bool(save_res.get("success", false))
-			return UnifiedProtocolFactory.create_response(
-				req.request_id, ok, save_res,
-				"" if ok else str(save_res.get("error_code", "ERR_SAVE_FAILED")),
-				"存档保存成功" if ok else "存档保存失败"
-			)
+      var save_res := SaveDataAccessLayer.save_game(slot_id, req.payload.get("game_data", {}))
+      var ok := bool(save_res.get("success", false))
+      return UnifiedProtocolFactory.create_response(
+        req.request_id, ok, save_res,
+        "" if ok else str(save_res.get("error_code", "ERR_SAVE_FAILED")),
+        "存档保存成功" if ok else "存档保存失败"
+      )
 
-		"ESC_EXIT_TO_GATEWAY":
-			if gateway == null:
-				return UnifiedProtocolFactory.create_response(
-					req.request_id, false, {}, "ERR_GATEWAY_NOT_BOUND", "未绑定当前世界的运行网关实例"
-				)
-			# 若指定 auto_save，执行前置快速刷盘
-			if bool(req.payload.get("auto_save", true)) and not req.character_id.is_empty():
-				SaveDataAccessLayer.save_game(gateway.context.selected_slot_id, {})
+    "ESC_EXIT_TO_GATEWAY":
+      if gateway == null:
+        return UnifiedProtocolFactory.create_response(
+          req.request_id, false, {}, "ERR_GATEWAY_NOT_BOUND", "未绑定当前世界的运行网关实例"
+        )
+      # 若指定 auto_save，执行前置快速刷盘
+      if bool(req.payload.get("auto_save", true)) and not req.character_id.is_empty():
+        SaveDataAccessLayer.save_game(gateway.context.selected_slot_id, {})
 
-			# 触发网关全量内存洗脱
-			var scrub_res := gateway.exit_to_gateway()
-			HumanControlLeaseManager.release_lease()
-			return UnifiedProtocolFactory.create_response(
-				req.request_id, bool(scrub_res.get("success", false)), scrub_res, "", "已成功退出世界并洗脱网关内存"
-			)
+      # 触发网关全量内存洗脱
+      var scrub_res := gateway.exit_to_gateway()
+      HumanControlLeaseManager.release_lease()
+      return UnifiedProtocolFactory.create_response(
+        req.request_id, bool(scrub_res.get("success", false)), scrub_res, "", "已成功退出世界并洗脱网关内存"
+      )
 
-		"ESC_QUIT_GAME":
-			var shut_req := GameShutdownDTO.Request.new()
-			shut_req.session_token = req.session_token
-			shut_req.account_id = req.account_id
-			shut_req.exit_reason = GameLifecycleModel.ExitReason.USER_DESKTOP_QUIT
-			shut_req.target_save_slot = str(req.payload.get("slot_id", "SLOT_01"))
+    "ESC_QUIT_GAME":
+      var shut_req := GameShutdownDTO.Request.new()
+      shut_req.session_token = req.session_token
+      shut_req.account_id = req.account_id
+      shut_req.exit_reason = GameLifecycleModel.ExitReason.USER_DESKTOP_QUIT
+      shut_req.target_save_slot = str(req.payload.get("slot_id", "SLOT_01"))
 
-			var shut_resp := GameLifecycleService.execute_graceful_shutdown(shut_req)
-			HumanControlLeaseManager.release_lease()
-			return UnifiedProtocolFactory.create_response(
-				req.request_id, shut_resp.is_success, shut_resp.to_dto(),
-				shut_resp.error_code, "五阶段安全停机管线已执行完毕"
-			)
+      var shut_resp := GameLifecycleService.execute_graceful_shutdown(shut_req)
+      HumanControlLeaseManager.release_lease()
+      return UnifiedProtocolFactory.create_response(
+        req.request_id, shut_resp.is_success, shut_resp.to_dto(),
+        shut_resp.error_code, "五阶段安全停机管线已执行完毕"
+      )
 
-	return UnifiedProtocolFactory.create_response(
-		req.request_id, false, {}, "ERR_INVALID_ESC_ACTION", "未识别的 ESC 指令: %s" % req.action_type
-	)
+  return UnifiedProtocolFactory.create_response(
+    req.request_id, false, {}, "ERR_INVALID_ESC_ACTION", "未识别的 ESC 指令: %s" % req.action_type
+  )
 ```
 
 ---
@@ -246,4 +246,3 @@ static func handle_esc_action(req: ClientRequestEnvelopeDTO, gateway: WorldGatew
 | TC-UPE-S2-02 | ESC 菜单后端联动服务调用闭环 | 依次调用 readiness, save, exit_to_gateway, quit_game | 真实穿透至持久化与生命周期底座，状态码符合预期 |
 | TC-UPE-S2-03 | 统一协议调度解析器双轨分流 | 分发各类领域指令至对应领域服务 | 路由准确率 100%，响应格式严格统一 |
 | TC-UPE-S2-04 | 协议对象零瞬态堆分配自测 | 高频反复派发 100 次指令 | 对象支持原位复用与安全重置，无多余堆内存泄漏 |
-

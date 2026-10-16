@@ -79,4 +79,3 @@ def check_seq(docs_map: dict, rel_fn: Callable, out: list) -> None:
                 out.append(Finding("NAMING-SEQ", rel_fn(d / (prefix + ".md")), 0,
                                    f'文件族「{prefix}*」混用无编号与中文编号成员（已有: {"".join(used)}）',
                                    f"重命名 {prefix}.md → {prefix}{missing}.md 并同步全库入链"))
-

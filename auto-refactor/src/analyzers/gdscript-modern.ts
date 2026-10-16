@@ -20,6 +20,7 @@
 import type { Analyzer, AnalyzerContext, Issue, Severity, AgentActionType } from '../core/types';
 import { ANALYZER_GDSCRIPT_MODERN } from '../core/scoring/dimensionLiterals';
 import { maskSourceText, type SourceMaskConfig } from '../core/policy/source-mask';
+import { buildCanonicalIssue } from '../core/reporting/canonical-issue-builder';
 
 const SEV_WARN: Severity = 'warning';
 const SEV_INFO: Severity = 'info';
@@ -455,17 +456,18 @@ function makeIssue(
           }
         : undefined;
 
-    return {
-        id: `${ANALYZER_GDSCRIPT_MODERN}:${spec.rule}:${file}:${line}`,
+    return buildCanonicalIssue({
         analyzer: ANALYZER_GDSCRIPT_MODERN,
         rule: spec.rule,
+        file,
+        line,
+        column: 1,
         severity: spec.severity,
         message: spec.message,
-        location: { file, start: { line, column: 1 }, end: { line, column: 1 } },
-        detail,
         suggestion: spec.suggestion,
-        ...(actionable ? { actionable } : {}),
-    };
+        detail,
+        actionable,
+    });
 }
 
 const FSM_EXEMPT_PATH_TOKENS: ReadonlySet<string> = new Set(['fsm', 'state_machine']);

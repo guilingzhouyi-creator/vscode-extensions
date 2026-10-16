@@ -295,4 +295,3 @@ func create_state_panel() -> KStatePanel:
 	if state_panel == null:
 		state_panel = KStatePanelClass.new()
 	return state_panel
-

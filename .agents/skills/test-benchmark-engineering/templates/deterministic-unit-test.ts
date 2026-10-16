@@ -68,4 +68,3 @@ export async function runDeterministicSuiteExample(): Promise<void> {
     // 3. Wall clock restored
     assert.notStrictEqual(Date.now(), targetTimeMs, 'Original clock must be restored after isolation block');
 }
-

@@ -57,4 +57,3 @@ export async function withFixedNow<T>(
    测试产生的所有临时文件、快照或测试数据库必须建立在带随机后缀的独立临时目录（如 `os.tmpdir()/test-<uuid>/`）；
 2. **两阶段资源清理保证**：
    无论测试成功与否，必须在 `afterEach` 或 `try ... finally` 中物理清理临时文件与监听器，严禁污染源码树或系统临时目录。
-

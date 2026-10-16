@@ -10,8 +10,8 @@
 /** 一周天数 */
 export const DAYS_PER_WEEK = 7;
 
-/** 一天小时数 */
-export const HOURS_PER_DAY = 24;
+/** 一天小时数（SSOT 对齐 models.ts） */
+export { HOURS_PER_DAY } from './models';
 
 /** 周日相对偏移量（用于星期转换） */
 export const DAYS_TO_SUNDAY = 6;

@@ -289,4 +289,3 @@ def check_phase_stage_file(sf_path: Path, doc: Any, rel_fn: Callable, out: list)
                 f"细则代码块违规包含非确定性随机调用: {s[:60]}",
                 "根据 ADV-RNG-001 规范，细则示例代码严禁调用全局 randf/randi，应使用确定性伪随机/LCG 计算"
             ))
-

@@ -427,9 +427,18 @@ export class ConstantsAnalyzer implements Analyzer {
         if (
             parentText &&
             (parentText.includes('log(') ||
+                parentText.includes('logger.') ||
+                parentText.includes('logging.') ||
                 parentText.includes('console.') ||
+                parentText.includes('print(') ||
                 parentText.includes('new error') ||
-                parentText.includes('reject('))
+                parentText.includes('raise ') ||
+                parentText.includes('reject(') ||
+                parentText.includes('exit(') ||
+                parentText.includes('warn(') ||
+                parentText.includes('warning(') ||
+                parentText.includes('echo ') ||
+                parentText.includes('write-host'))
         ) {
             return true;
         }

@@ -51,4 +51,3 @@ const NARRATIVE_EVENT_TEXT: int      = 0x0601
 const DOMAIN_EVENT_GENERIC: int      = 0x0602
 const WORLD_CLOCK_ADVANCED: int      = 0x0603
 const PROFESSION_PROMOTED: int       = 0x0604
-

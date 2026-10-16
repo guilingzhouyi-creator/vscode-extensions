@@ -23,6 +23,7 @@ import type { Analyzer, AnalyzerContext, Issue, Severity, AgentActionType } from
 import { SEVERITY_WARNING, SEVERITY_INFO } from '../core/types';
 import { ANALYZER_TYPESCRIPT_MODERN } from '../core/scoring/dimensionLiterals';
 import { maskSourceText, type SourceMaskConfig } from '../core/policy/source-mask';
+import { buildCanonicalIssue } from '../core/reporting/canonical-issue-builder';
 
 /** Extensions the pack accepts: the content-only path sees every language, so gate on the path. */
 const SUPPORTED_EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'];
@@ -246,17 +247,18 @@ function makeIssue(
           }
         : undefined;
 
-    return {
-        id: `${ANALYZER_TYPESCRIPT_MODERN}:${rule}:${file}:${line}`,
+    return buildCanonicalIssue({
         analyzer: ANALYZER_TYPESCRIPT_MODERN,
         rule,
+        file,
+        line,
+        column,
         severity,
         message,
-        location: { file, start: { line, column }, end: { line, column } },
-        detail,
         suggestion,
-        ...(actionable ? { actionable } : {}),
-    };
+        detail,
+        actionable,
+    });
 }
 
 /**

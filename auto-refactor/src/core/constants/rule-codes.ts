@@ -71,6 +71,12 @@ export const ANALYZER_GDSCRIPT_GAME = 'gdscript-game';
 export const ANALYZER_VSCODE_EXTENSION = 'vscode-extension';
 /** Built-in analyzer name for gate-architecture. */
 export const ANALYZER_GATE_ARCHITECTURE = 'gate-architecture';
+/** Built-in analyzer name for frontend. */
+export const ANALYZER_FRONTEND = 'frontend';
+/** Built-in analyzer name for production-hygiene. */
+export const ANALYZER_PRODUCTION_HYGIENE = 'production-hygiene';
+/** Built-in analyzer name for client-exposure. */
+export const ANALYZER_CLIENT_EXPOSURE = 'client-exposure';
 
 // Domain / Specialized analyzer identifiers
 /** Built-in / domain analyzer name for config. */
@@ -92,7 +98,7 @@ export const ANALYZER_STANDARDIZATION = 'standardization';
 /** Built-in / domain analyzer name for praxis. */
 export const ANALYZER_PRAXIS = 'praxis';
 
-/** Complete collection of built-in analyzer identifiers (27 built-in analyzers). */
+/** Complete collection of built-in analyzer identifiers (30 built-in analyzers). */
 export const BUILTIN_ANALYZERS = Object.freeze([
     ANALYZER_CONSTANTS,
     ANALYZER_LARGE_FILE,
@@ -121,6 +127,9 @@ export const BUILTIN_ANALYZERS = Object.freeze([
     ANALYZER_GDSCRIPT_GAME,
     ANALYZER_VSCODE_EXTENSION,
     ANALYZER_GATE_ARCHITECTURE,
+    ANALYZER_FRONTEND,
+    ANALYZER_PRODUCTION_HYGIENE,
+    ANALYZER_CLIENT_EXPOSURE,
 ] as const);
 
 // ============================================================================

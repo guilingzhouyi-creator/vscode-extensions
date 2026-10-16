@@ -38,4 +38,3 @@ This extension contributes the following settings:
 ## Feedback & Issues
 
 Encountered an issue or have a suggestion? Please submit a ticket through the official repository issues tracker.
-

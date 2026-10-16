@@ -156,6 +156,18 @@ function renderMarkdownDashboard(data) {
 
   lines.push(...renderSubsystemsTableRows(data));
 
+  if (data.polyglotBreakdown && typeof data.polyglotBreakdown === 'object') {
+    lines.push('');
+    lines.push('### 🌐 多语言技术栈质量均衡与离散度分布');
+    lines.push('');
+    lines.push('| 语言栈 | 源码文件 | 物理行数 (LOC) | 对数权重 | 质量得分 | 状态 |');
+    lines.push('| :--- | :---: | :---: | :---: | :---: | :---: |');
+    for (const item of Object.values(data.polyglotBreakdown)) {
+      const status = item.score >= 90 ? '✔ 优秀' : item.score >= 80 ? '▲ 良好' : '✖ 滞后';
+      lines.push(`| ${item.label} | ${item.files} | ${item.loc} | ${item.weight} | ${item.score.toFixed(1)} | ${status} |`);
+    }
+  }
+
   lines.push('');
   lines.push('### 🎯 auto-refactor 静态引擎十维工程质量全景指数');
   lines.push('');
@@ -223,6 +235,7 @@ function recordAuditRun(inputPayload) {
     grade,
     autonomyRate: inputPayload.autonomyRate != null ? Number(Number(inputPayload.autonomyRate).toFixed(2)) : null,
     polyglotIndex: inputPayload.polyglotIndex != null ? Number(Number(inputPayload.polyglotIndex).toFixed(2)) : null,
+    polyglotBreakdown: inputPayload.polyglotBreakdown || null,
     totalDebt: inputPayload.totalDebt != null ? Number(inputPayload.totalDebt) : null,
     catalogRuleCount: inputPayload.catalogRuleCount ? Number(inputPayload.catalogRuleCount) : null,
     projects: inputPayload.projects || {},

@@ -143,14 +143,12 @@ class ArchitectureAuditContext:
       raw = file_path.read_text(encoding="utf-8")
       stripped_c = strip_comments(raw)
       self.gd_sources[file_path] = (raw, stripped_c)
-      try:
+      if DOMAINS_DIR in file_path.parents:
         rel = file_path.relative_to(DOMAINS_DIR)
         domain_id = rel.parts[0]
         if domain_id not in self.domain_gd_files:
           self.domain_gd_files[domain_id] = []
         self.domain_gd_files[domain_id].append(file_path)
-      except ValueError:
-        pass
 
   def get_subtables_for_domain(self, domain_name: str) -> List[str]:
     """获取指定领域下辖的细分子表清单（与 ConfigRouterEngine 一致）。"""

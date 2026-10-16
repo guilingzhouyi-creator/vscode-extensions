@@ -223,4 +223,3 @@ static func validate_network_channel_discipline(current_mode: int, channel_name:
 		"error_code": "",
 		"message": "信道通信合规"
 	}
-

@@ -1,12 +1,12 @@
 {
   "schema": "workspace-rule-catalog/v1",
-  "generatedAt": "2026-10-16T10:50:36.493Z",
-  "totalRules": 459,
+  "generatedAt": "2026-10-16T12:40:55.048Z",
+  "totalRules": 464,
   "counts": {
     "autoRefactor": 347,
     "workspaceTiming": 49,
     "webGames": 77,
-    "globalTooling": 16
+    "globalTooling": 21
   },
   "rules": [
     {
@@ -1753,6 +1753,13 @@
       "summary": "Local variable or parameter shadows Python built-in name."
     },
     {
+      "id": "HYG-BOM-001",
+      "project": "global-tooling",
+      "family": "HYG",
+      "severity": "error",
+      "summary": "UTF-8 BOM hygiene guard: all workspace text files must be strictly UTF-8 NO-BOM without 0xEF, 0xBB, 0xBF byte prefix"
+    },
+    {
       "id": "HYG-CLN-001",
       "project": "auto-refactor",
       "family": "HYG",
@@ -1760,11 +1767,25 @@
       "summary": "Duplicated code clone detected across multiple lines based on rolling polynomial hash."
     },
     {
+      "id": "HYG-CLT-001",
+      "project": "global-tooling",
+      "family": "HYG",
+      "severity": "error",
+      "summary": "System and transient clutter guard: workspace must remain clean of OS clutter and uncontrolled transient files"
+    },
+    {
       "id": "HYG-DED-001",
       "project": "auto-refactor",
       "family": "HYG",
       "severity": "warning",
       "summary": "Unreachable dead code detected after terminating control flow (return, throw, break, raise)."
+    },
+    {
+      "id": "HYG-DIR-001",
+      "project": "global-tooling",
+      "family": "HYG",
+      "severity": "error",
+      "summary": "Lingering empty directory guard: active source and tooling directories must not retain zero-file lingering empty folders"
     },
     {
       "id": "HYG-EMP-001",
@@ -1786,6 +1807,13 @@
       "family": "HYG",
       "severity": "warning",
       "summary": "Exception variable in except clause is not named exc."
+    },
+    {
+      "id": "HYG-IND-001",
+      "project": "global-tooling",
+      "family": "HYG",
+      "severity": "error",
+      "summary": "Pure space indentation guard: non-GDScript and non-Makefile source files must use spaces exclusively without tab characters"
     },
     {
       "id": "HYG-NAM-001",
@@ -1821,6 +1849,13 @@
       "family": "HYG",
       "severity": "error",
       "summary": "Unannotated compiler or linter suppression directive (@ts-ignore, @ts-nocheck, eslint-disable, # noqa) without approved exemption."
+    },
+    {
+      "id": "HYG-TRL-001",
+      "project": "global-tooling",
+      "family": "HYG",
+      "severity": "error",
+      "summary": "POSIX EOF newline guard: text files must end with exactly one standard newline without trailing blank line buildup"
     },
     {
       "id": "HYG-WRAP-001",

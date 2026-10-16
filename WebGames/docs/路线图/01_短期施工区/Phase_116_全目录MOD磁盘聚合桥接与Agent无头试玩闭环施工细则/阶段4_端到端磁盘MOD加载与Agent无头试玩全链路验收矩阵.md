@@ -81,4 +81,3 @@ flowchart TD
 | TC-FMP-04 | 内联文本与大小写双轨水化 | 渲染含 `inline_text` 及 `{player_name}` / `{PLAYER_NAME}` 的节点文本 | 占位符 100% 替换且无未解析花括号，零语法异常 |
 | TC-FMP-05 | 后端无头试玩与因果突变结算 | 执行 `execute_headless_mod_playthrough` 推演 `starter_story` 全部步骤 | 产出结构化战报，金币与行囊正确落盘，终态 `is_completed == true` |
 | TC-FMP-06 | 跨平台双端试玩同构等价 | 对比 `play_mod.py --json` 与 GDScript 推演返回的战报关键字段 | 最终步数、触发的 `mutations` 序列与装备物品清单完全一致 |
-

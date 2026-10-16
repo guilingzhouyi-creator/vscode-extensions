@@ -69,43 +69,43 @@ extends TestCase
 ## 统一测试运行入口 (Runner Entry Point)
 ## -----------------------------------------------------------------------------
 static func run_all_tests() -> Dictionary:
-	setup()
-	var results: Array[Dictionary] = []
+  setup()
+  var results: Array[Dictionary] = []
 
-	results.append(_test_stage1_contracts())
-	results.append(_test_stage2_state_transitions())
-	results.append(_test_stage3_config_fallback())
-	results.append(_test_stage4_boundary_defense())
+  results.append(_test_stage1_contracts())
+  results.append(_test_stage2_state_transitions())
+  results.append(_test_stage3_config_fallback())
+  results.append(_test_stage4_boundary_defense())
 
-	teardown()
-	return TestCase.pack_results("example", results)
+  teardown()
+  return TestCase.pack_results("example", results)
 
 ## -----------------------------------------------------------------------------
 ## 测试用例定义 (Test Cases)
 ## -----------------------------------------------------------------------------
 static func _test_stage1_contracts() -> Dictionary:
-	var model := ExampleModel.new()
-	var ok := TestCase.assert_not_null(model, "模型实例非空")
-	ok = ok and TestCase.assert_eq(model.get_type(), "DEFAULT", "契约类型默认对齐")
-	return TestCase.make_result("stage1_contracts", ok)
+  var model := ExampleModel.new()
+  var ok := TestCase.assert_not_null(model, "模型实例非空")
+  ok = ok and TestCase.assert_eq(model.get_type(), "DEFAULT", "契约类型默认对齐")
+  return TestCase.make_result("stage1_contracts", ok)
 
 static func _test_stage2_state_transitions() -> Dictionary:
-	var model := ExampleModel.new()
-	var res: Dictionary = model.transition_to("ACTIVE")
-	var ok := TestCase.assert_true(res.get("success", false), "成功转移至活跃态")
-	return TestCase.make_result("stage2_state_transitions", ok, {"extra_info": "state verified"})
+  var model := ExampleModel.new()
+  var res: Dictionary = model.transition_to("ACTIVE")
+  var ok := TestCase.assert_true(res.get("success", false), "成功转移至活跃态")
+  return TestCase.make_result("stage2_state_transitions", ok, {"extra_info": "state verified"})
 
 static func _test_stage3_config_fallback() -> Dictionary:
-	# 验证配置不存在时安全降级
-	var val: int = GameConfig.get_int("domains.example", "missing_key", 42)
-	var ok := TestCase.assert_eq(val, 42, "配置缺失时回退默认降级值")
-	return TestCase.make_result("stage3_config_fallback", ok)
+  # 验证配置不存在时安全降级
+  var val: int = GameConfig.get_int("domains.example", "missing_key", 42)
+  var ok := TestCase.assert_eq(val, 42, "配置缺失时回退默认降级值")
+  return TestCase.make_result("stage3_config_fallback", ok)
 
 static func _test_stage4_boundary_defense() -> Dictionary:
-	var model := ExampleModel.new()
-	var res: Dictionary = model.transition_to("")
-	var ok := TestCase.assert_false(res.get("success", true), "非法参数应被优雅拒绝")
-	return TestCase.make_result("stage4_boundary_defense", ok)
+  var model := ExampleModel.new()
+  var res: Dictionary = model.transition_to("")
+  var ok := TestCase.assert_false(res.get("success", true), "非法参数应被优雅拒绝")
+  return TestCase.make_result("stage4_boundary_defense", ok)
 ```
 
 ---
@@ -176,4 +176,3 @@ powershell -ExecutionPolicy Bypass -File scripts/ps1/audit-all.ps1
 | **环境与状态泄漏** | 总线监听未解绑、测试存档未清理 | `teardown()` 中幂等解绑 EventBus，沙箱路径销毁 | 测试无副作用契约 |
 | **伪数据工厂倒错** | 工厂命名为 `test_<entity>_factory.gd` | 统一命名为 `<entity>_factory.gd`（严禁 `test_` 前缀） | `test_architecture_guard.gd` |
 | **裸脚本无底座** | 脚本未继承 `TestCase`、自制断言 | 统一继承 `TestCase` 并调用 `pack_results` 打包汇总 | CI/CD 自动化汇总 |
-

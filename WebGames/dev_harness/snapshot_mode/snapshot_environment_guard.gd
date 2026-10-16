@@ -60,4 +60,3 @@ static func set_test_override(enabled: bool, permitted_value: bool) -> void:
 static func reset_for_test() -> void:
 	_test_override_enabled = false
 	_test_override_value = true
-

@@ -78,4 +78,3 @@ python WebGames/mod_sdk/tools/kalar_mod.py play ./my_mod --with-hud --json
 | TC-MSDK-S3-02 | play_mod --with-hud 贯通推演 | 运行 play_mod ./templates/starter_story --with-hud --json | 战报尾部包含 home_hud_slice 节点，包含六维属性与初始资产 |
 | TC-MSDK-S3-03 | CLI 门面子命令完整性 | 检查 kalar_mod.py 支持的命令列表 | 包含 7 大核心子命令，无遗漏项 |
 | TC-MSDK-S3-04 | 创作者速查指南同步 | 检查 MOD_SPEC.md 文本 | 完整收录 dispatch 命令与统一协议信封速查指南 |
-

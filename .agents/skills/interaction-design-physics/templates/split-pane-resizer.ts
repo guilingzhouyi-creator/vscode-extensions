@@ -164,4 +164,3 @@ export class SplitPaneResizer {
         this.applyIframeShield(false);
     }
 }
-

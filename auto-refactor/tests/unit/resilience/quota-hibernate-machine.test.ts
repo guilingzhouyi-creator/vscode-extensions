@@ -111,4 +111,3 @@ describe('QuotaHibernateMachine', () => {
         await expect(taskPromise).rejects.toThrow('Machine terminated');
     });
 });
-

@@ -54,4 +54,3 @@ function runBenchmarkSuite(suiteName, workload, options = {}) {
 }
 
 module.exports = { runBenchmarkSuite };
-

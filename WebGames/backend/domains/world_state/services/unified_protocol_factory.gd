@@ -92,4 +92,3 @@ static func create_response(
 static func reset_for_tests() -> void:
 	_lease_counter = 1
 	_request_counter = 1
-

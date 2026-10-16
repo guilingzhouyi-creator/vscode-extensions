@@ -109,29 +109,11 @@ var marching_routes: Array = []
 var selected_landmark_id: String = ""
 var selected_town_id: String = "" # 白模测试契约字段（TC-FE10-02 断言）
 
-# 城镇设施数据（骨架阶段 Mock）
-var _mock_town_facilities: Array = [
-	{ "id": "FAC_INN", "name": "ui.fe10.mock.fac.inn.name", "desc": "ui.fe10.mock.fac.inn.desc" },
-	{ "id": "FAC_SMITH", "name": "ui.fe10.mock.fac.smith.name", "desc": "ui.fe10.mock.fac.smith.desc" },
-	{ "id": "FAC_GUILD", "name": "ui.fe10.mock.fac.guild.name", "desc": "ui.fe10.mock.fac.guild.desc" },
-	{ "id": "FAC_MARKET", "name": "ui.fe10.mock.fac.market.name", "desc": "ui.fe10.mock.fac.market.desc" }
-]
-
-# 城镇 NPC 数据（骨架阶段 Mock）
-var _mock_town_npcs: Array = [
-	{ "id": "NPC_INNKEEPER", "name": "ui.fe10.mock.npc.innkeeper.name", "desc": "ui.fe10.mock.npc.innkeeper.desc" },
-	{ "id": "NPC_BLACKSMITH", "name": "ui.fe10.mock.npc.blacksmith.name", "desc": "ui.fe10.mock.npc.blacksmith.desc" },
-	{ "id": "NPC_GUILDMASTER", "name": "ui.fe10.mock.npc.guildmaster.name", "desc": "ui.fe10.mock.npc.guildmaster.desc" }
-]
-
-# 领地数据（骨架阶段 Mock）
-var _mock_territories: Array = [
-	{ "id": "TERR_01", "name": "ui.fe10.mock.terr.farmland.name", "food": 50, "wood": 10, "ore": 0, "garrison": 20, "construction": 0.65 },
-	{ "id": "TERR_02", "name": "ui.fe10.mock.terr.silver_woods.name", "food": 20, "wood": 80, "ore": 5, "garrison": 10, "construction": 1.0 }
-]
-
-# 主权国家数据（骨架阶段 Mock）
-var _mock_sovereignty: Dictionary = {"nation_name": "ui.fe10.mock.sov.nation_name", "monarch": "ui.fe10.mock.sov.monarch", "population": 1200, "territory_count": 2, "level": "ui.fe10.mock.sov.level"}
+# 城镇设施、NPC、领地与主权数据（单一真源收敛于 MockDataCatalog）
+var _mock_town_facilities: Array = []
+var _mock_town_npcs: Array = []
+var _mock_territories: Array = []
+var _mock_sovereignty: Dictionary = {}
 
 # 行军队伍状态（骨架阶段本地模拟）
 var _marching_active: bool = false
@@ -216,6 +198,14 @@ func _load_mock_snapshot() -> void:
 				lm["name"] = _LANDMARK_NAME_KEYS[lid]
 	if world_map.has("marching_routes"):
 		marching_routes = FrontendSnapshot.read_array(world_map, "marching_routes")
+	if world_map.has("town_facilities"):
+		_mock_town_facilities = FrontendSnapshot.read_array(world_map, "town_facilities")
+	if world_map.has("town_npcs"):
+		_mock_town_npcs = FrontendSnapshot.read_array(world_map, "town_npcs")
+	if world_map.has("territories"):
+		_mock_territories = FrontendSnapshot.read_array(world_map, "territories")
+	if world_map.has("sovereignty"):
+		_mock_sovereignty = (world_map.get("sovereignty", {}) as Dictionary).duplicate(true)
 
 # ==============================================================================
 # Tab 标题设置

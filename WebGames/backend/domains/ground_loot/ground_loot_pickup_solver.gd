@@ -38,7 +38,7 @@ static func attempt_pickup(
 		}
 
 	# 2. 空间物理距离检定（欧氏距离 ≤ 拾取半径）
-	if player_pos.distance_to(drop.local_coordinates) > drop.pickup_radius_meters:
+	if not SpatialProximitySolver.is_within_radius_2d(player_pos, drop.local_coordinates, drop.pickup_radius_meters):
 		return {
 			"success": false,
 			"error_code": "OUT_OF_PICKUP_RANGE",

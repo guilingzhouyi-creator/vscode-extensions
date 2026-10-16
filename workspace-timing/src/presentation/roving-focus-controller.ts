@@ -199,4 +199,3 @@ export class RovingFocusController {
         return this.currentIndex;
     }
 }
-

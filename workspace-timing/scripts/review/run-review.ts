@@ -267,11 +267,11 @@ const report = {
 };
 if (!args.flags['no-report']) {
   await mkdir(REVIEW_REPORT_DIR, { recursive: true });
-  await writeFile(path.join(REVIEW_REPORT_DIR, 'report-latest.json'), JSON.stringify(report, null, 2), 'utf8');
+  await writeFile(path.join(REVIEW_REPORT_DIR, 'report-latest.json'), JSON.stringify(report, null, 2) + '\n', 'utf8');
 
   if (args.flags['history']) {
     const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    await writeFile(path.join(REVIEW_REPORT_DIR, `report-${stamp}.json`), JSON.stringify(report, null, 2), 'utf8');
+    await writeFile(path.join(REVIEW_REPORT_DIR, `report-${stamp}.json`), JSON.stringify(report, null, 2) + '\n', 'utf8');
     try {
       const historyFiles = (await readdir(REVIEW_REPORT_DIR))
         .filter((f) => f.startsWith('report-20') && f.endsWith('.json'))
@@ -299,7 +299,7 @@ if (!args.flags['no-report']) {
     ...(allFindings.length
       ? allFindings.map((f) => `- \`${f.ruleId}\` [${f.severity}] ${f.file ?? ''}${f.location ? ':' + f.location.line : ''} — ${f.message}${f.suggestedFix ? `（建议: ${f.suggestedFix}）` : ''}`)
       : ['（无发现）']),
-  ].join('\n');
+  ].join('\n') + '\n';
   await writeFile(path.join(REVIEW_REPORT_DIR, 'report-latest.md'), md, 'utf8');
   log.info(`报告已写入 ${toRel(REVIEW_REPORT_DIR)}/report-latest.{json,md}`);
 }

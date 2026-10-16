@@ -364,4 +364,3 @@ static func test_tc_mde_09_mod_topological_sort_and_dependencies() -> Dictionary
 	_teardown_env()
 	var passed: bool = dag_ok and missing_ok and cycle_ok
 	return TestCase.make_result("TC-MDE-09: 命途 MOD 声明清单依赖拓扑排序与环路检测算法断言", passed)
-

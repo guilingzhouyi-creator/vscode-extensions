@@ -28,4 +28,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Security
 - 增强本地双写存储与追加日志崩溃安全机制，杜绝异常断电或进程强制退出导致的数据损坏。
-

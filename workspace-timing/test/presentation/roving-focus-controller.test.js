@@ -141,4 +141,3 @@ describe('RovingFocusController（全键盘盲操漫游控制器）', () => {
         assert.strictEqual(item3.tabIndex, 0);
     });
 });
-

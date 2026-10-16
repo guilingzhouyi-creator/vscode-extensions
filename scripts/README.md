@@ -13,7 +13,7 @@
 |------|------|------|--------|--------|
 | `sh/` | Bash | `audit-all.sh` | audit / review（全工作区跨项目统一审查中枢） | 本地 CLI、CI |
 | `ps1/` | PowerShell | `audit-all.ps1` | audit / review（audit-all.sh 同构双实现） | 本地 CLI（Windows） |
-| `common/` | Node.js | `validate-no-empty-files.js` | audit / hygiene（全工作区零物理空文件与空包跳板守卫） | `pre-push-gate`、`audit-all`、CI |
+| `common/` | Node.js | `validate-physical-hygiene.js` | audit / hygiene（全工作区物理卫生八维刚性公理守卫） | `pre-commit-gate`、`pre-push-gate`、`audit-all`、CI |
 | `common/` | Node.js | `validate-script-isomorphism.js` | audit / isomorphism（跨平台同构脚本 ps1/sh 结构对应性、换行与防御契约守卫） | `audit-all`、CI |
 | `common/` | Node.js | `validate-skills.js` | audit / skills（全工作区 24 项研发技能规范、死链与镜像等价性守卫） | `audit-all`、CI |
 | `common/` | Node.js | `sync-skills.js` | tooling / skills（根目录技能集与 workspace-governance 插件双向同步工具） | 本地 CLI |
@@ -24,14 +24,13 @@
 | `common/` | Node.js | `evaluate-eloc-budget.js` | audit / complexity（双轨体积 ELOC<=900/LOC<=1400 与 1:3 动态包络评估器） | `pre-commit-gate`、CI |
 | `common/` | Node.js | `generate-rule-catalog.js` | audit / ssot（全工作区 428 条规则单源目录聚合与零漂移核验器） | 本地 CLI、pre-push 门禁、CI |
 | `common/` | Node.js | `validate-commit-msg.js` | gate / commit（生产级结构化提交信息格式、区块与有效字数综合调度器） | `commit-msg-gate` |
-| `common/` | Node.js | `validate-commit-msg-rules.js` | gate / ssot（提交信息规则 ID 反虚构校验器） | `commit-msg-gate` |
 | `common/` | Node.js | `validate-commit-msg-style.js` | gate / style（提交信息文本风格与四维禁词核验器） | `commit-msg-gate`、`pre-push-gate`、CI |
+| `common/` | Node.js | `git-env.js` | tooling / git（Git 运行环境隔离、暂存与提交范围文件检索 SSOT 工具） | 门禁与体积审查脚本集 |
 | `common/` | Node.js | `record-workspace-trajectory.js` | telemetry / ledger（全工作区审查轨迹账本记录与版本增量追加工具） | `audit-all` |
 | `common/` | Node.js | `validate-trajectory-ledger.js` | audit / ledger（全工作区演化轨迹账本哈希单调性与完整性校验器） | 本地 CLI、CI |
 | `common/` | Node.js | `log-rotator.js` | tooling / hygiene（门禁失败快照保留、尾部截断 <=100KB 与 FIFO <=2MB 轮转清理管理器） | `pre-commit-gate`、`commit-msg-gate`、`pre-push-gate`、`audit-all` |
 | `common/` | JSON | `commit-msg-forbidden-terms.json` | data / ssot（提交信息四维禁词与白名单单源字典） | `validate-commit-msg-style` |
 | `common/` | JSON | `rule-catalog.json` | data / ssot（全工作区规则事实真源聚合目录） | 静态审查与门禁工具链 |
-| `sh/` | Bash | `gate-common.sh` | gate（冲突分级单源规则库，被 source） | `pr-gate.sh` / `auto-merge-gate.sh` |
 | `sh/` | Bash | `pre-commit-gate.sh` | gate（本地提交物理卫生与多项前置检查，含 AST 切片） | `.githooks/pre-commit`、本地 CLI |
 | `ps1/` | PowerShell | `pre-commit-gate.ps1` | gate（pre-commit-gate.sh 同构双实现） | 本地 CLI（Windows） |
 | `sh/` | Bash | `commit-msg-gate.sh` | gate（生产工程级结构化提交信息格式、区块、字数、反虚构与风格求实 8 项门禁） | `.githooks/commit-msg`、本地 CLI |
@@ -183,4 +182,3 @@ Python 版使用 docstring + `if __name__ == "__main__":` 守卫。
 | **提交信息门禁** | `pwsh scripts/ps1/commit-msg-gate.ps1 <msg>` | `pwsh scripts/ps1/commit-msg-gate.ps1 <msg> -Agent` | `pwsh scripts/ps1/commit-msg-gate.ps1 -ViewLog` |
 | **推送前置门禁** | `pwsh scripts/ps1/pre-push-gate.ps1` | `pwsh scripts/ps1/pre-push-gate.ps1 -Agent` | `pwsh scripts/ps1/pre-push-gate.ps1 -ViewLog` |
 | **失败快照轮转器** | `node scripts/common/log-rotator.js --view` | `node scripts/common/log-rotator.js --agent` | 自动保留最近一次失败至 `.audit-logs/last-failure.json` |
-

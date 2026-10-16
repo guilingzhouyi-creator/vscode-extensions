@@ -93,4 +93,3 @@ describe('SEC-EXP-005: sec-iframe-synthetic-user-activation', () => {
         expect(issues).toHaveLength(0);
     });
 });
-

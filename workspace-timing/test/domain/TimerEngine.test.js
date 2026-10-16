@@ -9,30 +9,10 @@
 
 const assert = require('assert');
 const { TimerEngine } = require('../../out/domain/TimerEngine.js');
-const { createEmptyTimingData } = require('../../out/domain/models.js');
-
-/**
- * 在固定时刻内运行回调：冻结 Date（覆盖 Date.now() 与 new Date()），
- * 防止用例在午夜前后的前 10~30 分钟执行时跨越自然日边界导致今日累计切分偏差。
- */
-function withFixedNow(iso, fn) {
-  const RealDate = Date;
-  const fixedMs = new RealDate(iso).getTime();
-  class FixedDate extends RealDate {
-    constructor(...args) {
-      super(...(args.length ? args : [fixedMs]));
-    }
-    static now() {
-      return fixedMs;
-    }
-  }
-  global.Date = FixedDate;
-  try {
-    return fn();
-  } finally {
-    global.Date = RealDate;
-  }
-}
+const {
+  createEmptyTimingData,
+  withFixedNow,
+} = require('../fixtures/fakes.js');
 
 describe('TimerEngine（计时核心）', () => {
   it('初始状态：未运行、累计为 0、无会话', () => {

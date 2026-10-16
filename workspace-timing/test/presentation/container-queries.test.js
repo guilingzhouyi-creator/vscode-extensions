@@ -13,8 +13,6 @@
 'use strict';
 
 const assert = require('assert');
-const fs = require('fs');
-const path = require('path');
 const {
     TIMING_VIEWPORT_CONTAINER_CLASS,
     TIMING_VIEWPORT_STYLES,
@@ -52,14 +50,10 @@ describe('ContainerQueries（容器查询与防挤压排版契约）', () => {
         assert.ok(TIMING_VIEWPORT_STYLES.includes('border-right: none;'));
     });
 
-    it('与独立 timing-viewport.css 保持选择器与关键声明同构一致', () => {
-        const cssPath = path.resolve(__dirname, '../../src/presentation/timing-viewport.css');
-        assert.ok(fs.existsSync(cssPath), 'timing-viewport.css 物理文件必须存在');
-        const rawCss = fs.readFileSync(cssPath, 'utf8');
-
-        assert.ok(rawCss.includes('.timing-viewport-container'));
-        assert.ok(rawCss.includes('container-name: timing-viewport;'));
-        assert.ok(rawCss.includes('@container timing-viewport (max-width: 240px)'));
-        assert.ok(rawCss.includes('@container timing-viewport (min-width: 385px)'));
+    it('TIMING_VIEWPORT_STYLES 包含核心容器与自适应排版关键声明', () => {
+        assert.ok(TIMING_VIEWPORT_STYLES.includes('.timing-viewport-container'));
+        assert.ok(TIMING_VIEWPORT_STYLES.includes('container-name: timing-viewport;'));
+        assert.ok(TIMING_VIEWPORT_STYLES.includes('@container timing-viewport (max-width: 240px)'));
+        assert.ok(TIMING_VIEWPORT_STYLES.includes('@container timing-viewport (min-width: 385px)'));
     });
 });

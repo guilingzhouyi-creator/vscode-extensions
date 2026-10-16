@@ -21,11 +21,11 @@
 - 遵循零瞬态堆分配与单源收口公理，保证引擎运行时与模组开发契约 100% 绝对一致。
 
 五阶段同步状态机 (Synchronization Pipeline State Machine):
-  Phase 1 [Discovery]: 定位 WebGames 根目录并加载核心领域配置 JSON；
-  Phase 2 [Extraction]: AST/JSON 符号深度遍历提取受支持种族、DAG 标识符、占位符及状态突变事件；
-  Phase 3 [Compilation]: 汇总命途扩展能力契约、数值边界与 UI 受控策略；
-  Phase 4 [Generation]: 渲染规整能力清单 capabilities.json 与 MOD_SPEC.md Markdown 文档；
-  Phase 5 [Verification/Sync]: 对比磁盘文件判定契约漂移，或原子回写磁盘并保持 LF 换行。
+  Step 1 [Discovery]: 定位 WebGames 根目录并加载核心领域配置 JSON；
+  Step 2 [Extraction]: AST/JSON 符号深度遍历提取受支持种族、DAG 标识符、占位符及状态突变事件；
+  Step 3 [Compilation]: 汇总命途扩展能力契约、数值边界与 UI 受控策略；
+  Step 4 [Generation]: 渲染规整能力清单 capabilities.json 与 MOD_SPEC.md Markdown 文档；
+  Step 5 [Verification/Sync]: 对比磁盘文件判定契约漂移，或原子回写磁盘并保持 LF 换行。
 
 设计依据与不变式契约：
 - 单一事实源 (SSOT)：capabilities.json 必须完全由源码与配置导出，禁止人工维护分叉副本；
@@ -48,8 +48,9 @@ def ensure_utf8_stdout() -> None:
         try:
             sys.stdout.reconfigure(encoding="utf-8", errors="replace")
             sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-        except Exception:
-            pass
+        except (AttributeError, OSError) as exc:
+            # 某些重定向控制台环境不支持 reconfigure，写入调试记录并保持默认
+            sys.stderr.write(f"[DEBUG] 控制台 UTF-8 重配置跳过: {exc}\n")
 
 
 def resolve_webgames_root() -> Path:

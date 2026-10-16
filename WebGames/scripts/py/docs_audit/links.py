@@ -114,4 +114,3 @@ def fix_abs_links(text: str, src: Path, abs_target_fn: Callable) -> tuple:
         return "](" + rel + (("#" + anchor) if anchor else "") + ")"
 
     return ABSLINK_RE.sub(repl, text), n
-

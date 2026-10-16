@@ -59,4 +59,3 @@ static func _create_fallback_realms() -> Array[Dictionary]:
 			"is_canary": false
 		}
 	]
-

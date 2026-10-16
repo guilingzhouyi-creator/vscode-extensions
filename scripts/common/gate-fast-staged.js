@@ -24,6 +24,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
+const { getSafeGitEnv, getStagedFiles: queryStagedFiles } = require('./git-env');
 
 const SECRET_PATTERN =
   /(?:AIza[0-9A-Za-z_-]{35}|sk-[a-zA-Z0-9]{32,}|ghp_[a-zA-Z0-9]{36}|-----BEGIN (?:RSA|EC|OPENSSH|PRIVATE) KEY-----)/;
@@ -47,7 +48,7 @@ const STANDARD_TECH_ABBREVIATIONS = new Set([
   'gd', 'rs', '2d', '3d', '4k', 'ssl', 'ssh', 'tcp', 'udp', 'dns',
   'rpc', 'ipc', 'csr', 'soa', 'swar', 'simd', 'cc', 'eloc', 'loc',
   'diff', 'rgb', 'hex', 'fn', 'cb', 'rx', 'tx', 'env', 'app', 'dev',
-  'fsm', 'npc', 'gm', 'rpg', 'pve', 'pvp', 'hp', 'mp',
+  'fsm', 'npc', 'gm', 'rpg', 'pve', 'pvp', 'hp', 'mp', 'cdc',
   'vs', 'prf', 'mcp', 'ssot', 'ir', 'cai', 'e2e', 'wasm', 'zh', 'cn',
 ]);
 
@@ -55,37 +56,10 @@ const IGNORED_BASENAMES = new Set([
   'index', 'main', 'lib', 'mod', 'api', 'types', 'cli', 'readme', 'changelog', 'license',
 ]);
 
-function getSafeGitEnv() {
-  const root = path.resolve(__dirname, '../..');
-  return {
-    ...process.env,
-    GIT_CONFIG_GLOBAL: process.env.GIT_CONFIG_GLOBAL || 'NUL',
-    GIT_CONFIG_SYSTEM: process.env.GIT_CONFIG_SYSTEM || 'NUL',
-    GIT_CONFIG_NOSYSTEM: process.env.GIT_CONFIG_NOSYSTEM || '1',
-    XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME || root,
-  };
-}
+
 
 function getStagedFiles(repoRoot) {
-  const args = process.argv.slice(2);
-  const explicitFiles = args.filter((a) => !a.startsWith('-'));
-  if (explicitFiles.length > 0) {
-    return explicitFiles;
-  }
-  try {
-    const raw = execSync('git diff --cached --name-only "--diff-filter=ACM"', {
-      cwd: repoRoot,
-      env: getSafeGitEnv(),
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-    });
-    return raw
-      .split(/\r?\n/)
-      .map((f) => f.trim())
-      .filter((f) => f.length > 0);
-  } catch {
-    return [];
-  }
+  return queryStagedFiles(repoRoot, process.argv.slice(2));
 }
 
 function getStagedDiff(repoRoot) {

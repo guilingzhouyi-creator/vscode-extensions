@@ -92,4 +92,3 @@ pwsh -File scripts/ps1/pre-commit-gate.ps1
 - [user-facing-changelog-guide.md](references/user-facing-changelog-guide.md)：面向用户的变更日志写作深度指南；
 - [keep-a-changelog-user-template.md](templates/keep-a-changelog-user-template.md)：标准 Keep-a-Changelog 用户模板；
 - [product-readme-template.md](templates/product-readme-template.md)：面向终端用户的发布页 README 骨架模板。
-

@@ -116,4 +116,3 @@ def extract_agent_telemetry_capabilities(config_dir: Path) -> Dict[str, Any]:
 | TC-MSDK-S2-02 | Schema 物理落盘与路径合规 | 检查 mod_sdk/schemas/ 目录 | 文件命名严格遵循规范契约 |
 | TC-MSDK-S2-03 | 能力清单自动化同步回写 | 萃取脚本同步能力字典 | capabilities.json 自动更新版本与支持指令清单 |
 | TC-MSDK-S2-04 | 静态萃取无破坏性覆盖 | 多次运行萃取脚本 | 产物具备幂等性，未引入额外未经确认的 Diff |
-

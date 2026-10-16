@@ -128,7 +128,7 @@ def check_gacha_rates_and_pity(violations: list) -> dict:
 
 def run_cdc_audit() -> int:
     print("=" * 80)
-    print("🛡️ 卡拉尔世界引擎：配置驱动收口与单一真源审查 (Phase 25)")
+    print("🛡️ 卡拉尔世界引擎：配置驱动收口与单一真源审查")
     print("=" * 80)
 
     violations = []

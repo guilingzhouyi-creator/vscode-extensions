@@ -229,4 +229,3 @@ static func decode_from_bytes(
 		pkt.action_space.append(dir)
 
 	return pkt
-

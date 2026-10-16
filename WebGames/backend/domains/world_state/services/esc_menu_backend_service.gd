@@ -106,4 +106,3 @@ static func handle_esc_action(req: ClientRequestEnvelopeDTO, gateway: WorldGatew
 	return UnifiedProtocolFactory.create_response(
 		req.request_id, false, {}, "ERR_INVALID_ESC_ACTION", "未识别的 ESC 指令: %s" % req.action_type
 	)
-

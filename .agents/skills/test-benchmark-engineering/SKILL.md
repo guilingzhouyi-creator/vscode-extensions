@@ -99,4 +99,3 @@ pwsh -File scripts/ps1/audit-all.ps1 -Fast
 - [test-duration-ratchet-mechanics.md](references/test-duration-ratchet-mechanics.md)：测试耗时基准棘轮与防回归机制；
 - [deterministic-unit-test.ts](templates/deterministic-unit-test.ts)：确定性单元测试标准样板代码；
 - [benchmark-suite-skeleton.js](templates/benchmark-suite-skeleton.js)：性能微基准套件标准骨架。
-

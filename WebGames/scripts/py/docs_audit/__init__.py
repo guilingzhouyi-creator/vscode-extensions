@@ -72,4 +72,3 @@ __all__ = [
     "check_phase_stage_file",
     "cmd_self_test",
 ]
-

@@ -144,4 +144,3 @@ export class AffinePanZoomEngine {
         return `matrix(${state.scale.toFixed(4)}, 0, 0, ${state.scale.toFixed(4)}, ${state.tx.toFixed(2)}, ${state.ty.toFixed(2)})`;
     }
 }
-

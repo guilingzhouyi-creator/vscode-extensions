@@ -22,7 +22,7 @@ from audit_common import ensure_utf8_stdout, resolve_repo_root
 
 ensure_utf8_stdout()
 
-"""audit_event_channels.py — EventBus 频道纪律与叙事契约严格审查（Phase 71/72 对齐）。
+"""audit_event_channels.py — EventBus 频道纪律与叙事契约严格审查。
 
 校验频道命名合规、叙事键对齐、注册表与常量对齐、广播载荷契约。"""
 
@@ -60,7 +60,7 @@ def collect_domain_mapping() -> dict[str, dict]:
 
 
 def collect_config_channels(domain_map: dict) -> list[dict]:
-    """仅扫描频道声明源（Phase 71 契约）：
+    """仅扫描频道声明源契约：
        - domains/account.json  auth.channels.*
        - domains/world_state.json hud.channels.*
        - event_bus_config.json channel_registry[].legacy
@@ -320,7 +320,7 @@ def main() -> int:
     warns = [f for f in findings if f["severity"] == "WARN"]
 
     print("=" * 80)
-    print("🛡️ 卡拉尔世界引擎：EventBus 频道纪律与叙事契约审查报告 (Phase 71)")
+    print("🛡️ 卡拉尔世界引擎：EventBus 频道纪律与叙事契约审查报告")
     print("=" * 80)
     print(f"频道候选: {len(channels)} 条（配置驱动 + 代码字面量）/ 注册表: {len(registry)} 条 / 常量: {len(consts)} 条")
     for f in findings:

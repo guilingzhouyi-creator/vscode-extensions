@@ -148,9 +148,9 @@ class_name AgentAsyncDispatcher
 extends RefCounted
 
 enum BackpressureStrategy {
-	DROP_OLDEST, # 丢弃最旧包（保持最新前沿）
-	DROP_NEWEST, # 丢弃新包（限流保护）
-	WARN_BLOCK   # 阻塞等待（高可靠事务）
+  DROP_OLDEST, # 丢弃最旧包（保持最新前沿）
+  DROP_NEWEST, # 丢弃新包（限流保护）
+  WARN_BLOCK   # 阻塞等待（高可靠事务）
 }
 
 ## 注册异步消费处理器 (Callable 接收 packet: AgentHudTelemetryPacketDTO)
@@ -207,4 +207,3 @@ static func decode_from_bytes(bytes: PackedByteArray, out_packet: AgentHudTeleme
 | TC-ATP-S1-02 | 环形轨迹滑动窗口淘汰 | 连续推入超出窗口大小的条目 | 最老条目安全覆盖淘汰，最新切片严格保留且索引单调 |
 | TC-ATP-S1-03 | 异步派发背压丢弃策略 | 模拟高频超载写入场景 | 触发 DROP_OLDEST 策略，丢弃计数精准上报且不阻塞发送端 |
 | TC-ATP-S1-04 | 二进制编解码字节上限约束 | 构造满载数据包序列化 | 编码结果体积严格 <= 256 字节，逆向解码无损还原 |
-

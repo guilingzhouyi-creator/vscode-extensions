@@ -87,4 +87,3 @@ def check_mermaid(doc: Doc, add_fn: Callable) -> None:
                    f"节点标签含未加引号的特殊字符（{open_ch}…）",
                    f'{open_ch}"{content}"' + SHAPE_CLOSE[open_ch],
                    {"content": content[:80]})
-

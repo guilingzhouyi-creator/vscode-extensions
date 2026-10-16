@@ -536,9 +536,9 @@ class SimplificationAuditor:
                     cname = m_cls.group(1)
                     bname = m_ext.group(1) if m_ext else "RefCounted"
                     self.class_hierarchy[cname] = bname
-                    self.class_to_file[cname] = f
-            except Exception:
-                pass
+            except (OSError, UnicodeDecodeError) as exc:
+                # 异常文件读取失败属于孤立缺陷，记录告警后继续处理其余文件
+                print(f"[WARN] 读取文件分析继承链失败: {f} ({exc})")
 
     def get_inheritance_depth(self, class_name: str, visited: Optional[Set[str]] = None) -> int:
         """递归计算继承链深度"""
@@ -860,5 +860,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-
-

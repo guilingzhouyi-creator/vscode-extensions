@@ -21,11 +21,11 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
+const { getRangeFiles, getStagedFiles } = require('./git-env');
 const {
   evaluateCodeMetrics,
   isPlumbingExemptPath,
   isAuditableCodeFile,
-  getStagedFiles,
 } = require('./evaluate-eloc-budget');
 
 const DEFAULT_POR_LIMIT = 0.60;
@@ -33,36 +33,7 @@ const DEFAULT_MIN_TAU = 2.5;
 const DEFAULT_MAX_TAU = 20.0;
 const MIN_REPRESENTATIVE_ELOC = 10;
 
-/**
- * Resolves changed files across a Git commit range.
- *
- * @param {string} range - Git revision range (e.g. '@{u}..HEAD' or 'origin/main..HEAD')
- * @returns {string[]} File paths changed in range.
- */
-function getRangeFiles(range) {
-  const root = path.resolve(__dirname, '..', '..');
-  const env = {
-    ...process.env,
-    GIT_CONFIG_GLOBAL: process.env.GIT_CONFIG_GLOBAL || 'NUL',
-    GIT_CONFIG_SYSTEM: process.env.GIT_CONFIG_SYSTEM || 'NUL',
-    GIT_CONFIG_NOSYSTEM: process.env.GIT_CONFIG_NOSYSTEM || '1',
-    XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME || root,
-  };
-  try {
-    const raw = execSync(`git diff --name-only --diff-filter=ACMR ${range}`, {
-      cwd: root,
-      env,
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
-    });
-    return raw
-      .split(/\r?\n/)
-      .map((s) => s.trim())
-      .filter(Boolean);
-  } catch {
-    return [];
-  }
-}
+
 
 /**
  * Parses command line options for code density validation.
@@ -339,4 +310,3 @@ module.exports = {
   DEFAULT_MIN_TAU,
   DEFAULT_MAX_TAU,
 };
-

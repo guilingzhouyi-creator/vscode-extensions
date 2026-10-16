@@ -190,4 +190,3 @@ export function clampAffineTranslate(
     const clampedY = Math.min(Math.max(ty, -maxTy), maxTy);
     return { x: clampedX, y: clampedY };
 }
-

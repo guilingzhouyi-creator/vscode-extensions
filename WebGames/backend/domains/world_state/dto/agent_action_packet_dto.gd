@@ -62,4 +62,3 @@ static func from_dto(data: Dictionary) -> AgentActionPacketDTO:
 	pkt.agent_signature = str(data.get("agent_signature", ""))
 	pkt.client_timestamp_ms = int(data.get("client_timestamp_ms", 0))
 	return pkt
-

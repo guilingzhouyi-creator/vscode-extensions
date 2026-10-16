@@ -21,6 +21,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
+const { getStagedFiles: queryStagedFiles } = require('./git-env');
 
 const DEFAULT_MAX_ELOC = 900;
 const DEFAULT_MAX_LOC = 1400;
@@ -639,18 +640,8 @@ function evaluateDynamicEnvelope(metrics, options, filePath = '', content = '') 
  * @returns {string[]}
  */
 function getStagedFiles() {
-  try {
-    const output = execSync('git diff --cached --name-only --diff-filter=ACM', {
-      encoding: 'utf8',
-      stdio: ['pipe', 'pipe', 'ignore'],
-    });
-    return output
-      .split('\n')
-      .map((f) => f.trim())
-      .filter((f) => f.length > 0 && fs.existsSync(f));
-  } catch {
-    return [];
-  }
+  const root = path.resolve(__dirname, '..', '..');
+  return queryStagedFiles(root).filter((f) => fs.existsSync(f));
 }
 
 /**

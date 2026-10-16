@@ -40,79 +40,79 @@ const ConfigRouteDTO = preload("res://backend/infrastructure/config_route_dto.gd
 
 ## 主表兼容别名映射（请求表名 -> 默认主子表）
 static var _primary_aliases: Dictionary = {
-	"domains.combat": "domains.combat.mechanics"
+  "domains.combat": "domains.combat.mechanics"
 }
 
 ## 领域下辖子表注册表（领域表名 -> 包含的所有子表清单）
 static var _domain_subtables: Dictionary = {
-	"domains.combat": [
-		"domains.combat.mechanics",
-		"domains.combat.damage_formulas",
-		"domains.combat.buff_definitions"
-	]
+  "domains.combat": [
+    "domains.combat.mechanics",
+    "domains.combat.damage_formulas",
+    "domains.combat.buff_definitions"
+  ]
 }
 
 ## 键前缀路由规则表（请求表名 -> { 键前缀: 目标子表名 }）
 static var _prefix_routes: Dictionary = {
-	"domains.combat": {
-		"kinetic": "domains.combat.damage_formulas",
-		"phase_transition": "domains.combat.damage_formulas",
-		"buff_types": "domains.combat.buff_definitions",
-		"resistance_coefficients": "domains.combat.buff_definitions"
-	}
+  "domains.combat": {
+    "kinetic": "domains.combat.damage_formulas",
+    "phase_transition": "domains.combat.damage_formulas",
+    "buff_types": "domains.combat.buff_definitions",
+    "resistance_coefficients": "domains.combat.buff_definitions"
+  }
 }
 
 ## 构造规范的点分子表名
 static func build_subtable_key(root_layer: String, domain_id: String, sub_table: String) -> String:
-	return "%s.%s.%s" % [root_layer, domain_id, sub_table]
+  return "%s.%s.%s" % [root_layer, domain_id, sub_table]
 
 ## 判断给定表名是否为多表子域的子表
 static func is_subtable(table_name: String) -> bool:
-	var parts := table_name.split(".")
-	return parts.size() >= 3
+  var parts := table_name.split(".")
+  return parts.size() >= 3
 
 ## 获取给定领域的全部子表清单
 static func get_subtables_for_domain(domain_name: String) -> Array:
-	return _domain_subtables.get(domain_name, [])
+  return _domain_subtables.get(domain_name, [])
 
 ## 基础别名解析（单一表名）
 static func resolve_table_name(requested_table: String) -> String:
-	return _primary_aliases.get(requested_table, requested_table)
+  return _primary_aliases.get(requested_table, requested_table)
 
 ## 全要素智能路由解析（表名 + 键路径 -> ConfigRouteDTO）
 static func resolve_route(requested_table: String, path: String = "") -> ConfigRouteDTO:
-	var route := ConfigRouteDTO.new(requested_table, requested_table, ConfigRouteDTO.RouteResolutionMode.DIRECT_PASSTHROUGH)
-	var parts := requested_table.split(".")
-	if parts.size() >= 2:
-		route.root_layer = parts[0]
-		route.domain_id = parts[1]
-	if parts.size() >= 3:
-		route.sub_table_id = parts[2]
-		route.resolution_mode = ConfigRouteDTO.RouteResolutionMode.EXACT_SUBTABLE
-		return route
+  var route := ConfigRouteDTO.new(requested_table, requested_table, ConfigRouteDTO.RouteResolutionMode.DIRECT_PASSTHROUGH)
+  var parts := requested_table.split(".")
+  if parts.size() >= 2:
+    route.root_layer = parts[0]
+    route.domain_id = parts[1]
+  if parts.size() >= 3:
+    route.sub_table_id = parts[2]
+    route.resolution_mode = ConfigRouteDTO.RouteResolutionMode.EXACT_SUBTABLE
+    return route
 
-	# 检查是否为多表子域别名
-	if _prefix_routes.has(requested_table) and not path.is_empty():
-		var first_seg := path.split("/")[0]
-		var subtable_target: String = _prefix_routes[requested_table].get(first_seg, "")
-		if not subtable_target.is_empty():
-			route.resolved_table = subtable_target
-			route.resolution_mode = ConfigRouteDTO.RouteResolutionMode.SUBTABLE_FALLBACK
-			var sub_parts := subtable_target.split(".")
-			if sub_parts.size() >= 3:
-				route.sub_table_id = sub_parts[2]
-			return route
+  # 检查是否为多表子域别名
+  if _prefix_routes.has(requested_table) and not path.is_empty():
+    var first_seg := path.split("/")[0]
+    var subtable_target: String = _prefix_routes[requested_table].get(first_seg, "")
+    if not subtable_target.is_empty():
+      route.resolved_table = subtable_target
+      route.resolution_mode = ConfigRouteDTO.RouteResolutionMode.SUBTABLE_FALLBACK
+      var sub_parts := subtable_target.split(".")
+      if sub_parts.size() >= 3:
+        route.sub_table_id = sub_parts[2]
+      return route
 
-	# 回退至主表别名
-	if _primary_aliases.has(requested_table):
-		route.resolved_table = _primary_aliases[requested_table]
-		route.resolution_mode = ConfigRouteDTO.RouteResolutionMode.LEGACY_COMPAT_ALIAS
-		var alias_parts := route.resolved_table.split(".")
-		if alias_parts.size() >= 3:
-			route.sub_table_id = alias_parts[2]
-		return route
+  # 回退至主表别名
+  if _primary_aliases.has(requested_table):
+    route.resolved_table = _primary_aliases[requested_table]
+    route.resolution_mode = ConfigRouteDTO.RouteResolutionMode.LEGACY_COMPAT_ALIAS
+    var alias_parts := route.resolved_table.split(".")
+    if alias_parts.size() >= 3:
+      route.sub_table_id = alias_parts[2]
+    return route
 
-	return route
+  return route
 ```
 
 ---
@@ -123,27 +123,27 @@ static func resolve_route(requested_table: String, path: String = "") -> ConfigR
 在 `GameConfig.get_value(table_name, path, default)` 与 `GameConfig.has(table_name, path)` 中引入 `ConfigRouterEngine`：
 ```gdscript
 static func get_value(table_name: String, path: String, default: Variant = null) -> Variant:
-	ensure_loaded()
-	var route := ConfigRouterEngine.resolve_route(table_name, path)
-	var target_table := route.resolved_table
-	if not _tables.has(target_table):
-		_ensure_table_loaded_jit(target_table)
+  ensure_loaded()
+  var route := ConfigRouterEngine.resolve_route(table_name, path)
+  var target_table := route.resolved_table
+  if not _tables.has(target_table):
+    _ensure_table_loaded_jit(target_table)
 
-	# 优先从解析后的目标表取值
-	var val = _lookup_in_table(target_table, path)
-	if val != null:
-		return val
+  # 优先从解析后的目标表取值
+  var val = _lookup_in_table(target_table, path)
+  if val != null:
+    return val
 
-	# 若为多表领域且未命中，执行域内全子表保底寻址
-	if ConfigRouterEngine.get_subtables_for_domain(table_name).size() > 0:
-		for sub in ConfigRouterEngine.get_subtables_for_domain(table_name):
-			if sub == target_table:
-				continue
-			var fallback_val = _lookup_in_table(sub, path)
-			if fallback_val != null:
-				return fallback_val
+  # 若为多表领域且未命中，执行域内全子表保底寻址
+  if ConfigRouterEngine.get_subtables_for_domain(table_name).size() > 0:
+    for sub in ConfigRouterEngine.get_subtables_for_domain(table_name):
+      if sub == target_table:
+        continue
+      var fallback_val = _lookup_in_table(sub, path)
+      if fallback_val != null:
+        return fallback_val
 
-	return default
+  return default
 ```
 
 ### 2. 批量读取 `get_many` 智能分流

@@ -197,4 +197,3 @@ static func from_dto(data: Dictionary) -> AgentHudContextSliceDTO:
 			dto.ui_notices.append(HudUiNoticeDTO.from_dto(item))
 
 	return dto
-

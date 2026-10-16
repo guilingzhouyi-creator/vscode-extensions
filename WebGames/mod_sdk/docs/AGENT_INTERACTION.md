@@ -350,4 +350,3 @@ Agent 经由专属逻辑动作通道（`AgentActionChannel`）提交上行决策
 2. **紧凑二进制编解码 (`BinaryTelemetryCodec`)**：
    - 针对高频通信场景，支持通过 Godot 原生 `PackedByteArray` 序列化；
    - 包含 `0x4B414C52` (`KALR`) 魔数校验与单字节紧凑字段映射，单包体积压缩至 ~85 字节（压缩率达 95.7%）。
-

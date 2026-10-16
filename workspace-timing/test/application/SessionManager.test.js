@@ -12,86 +12,13 @@ const { RecoveryService } = require('../../out/application/RecoveryService.js');
 const { TimerEngine } = require('../../out/domain/TimerEngine.js');
 const { TimeAggregator, parseLocalDate, localDateStr } = require('../../out/domain/TimeAggregator.js');
 
-class FakeStorageCoordinator {
-    constructor(initialData = null) {
-        this.data = initialData;
-        this.saved = [];
-    }
-    async load() {
-        return { data: this.data, source: 'fake' };
-    }
-    async save(data, forceFileBackup = false) {
-        this.saved.push({ ...data });
-        this.data = { ...data };
-    }
-}
-
-class FakeJournalWriter {
-    constructor() {
-        this.flushed = [];
-    }
-    async flushAll() { return 0; }
-    async truncate() { return true; }
-    async tryFlush() { return false; }
-}
-
-class FakeRecoveryService {
-    async recover(retentionDays) {
-        return {
-            version: 2,
-            totalMs: 0,
-            currentSessionStartMs: 0,
-            lastSavedAtMs: 0,
-            isEnabled: true,
-            sessions: [],
-            dailyTotals: {},
-        };
-    }
-}
-
-/** 假 journal store（IJournalStore 端口）：可注入切片，供真实 RecoveryService 回放 */
-class FakeJournalStore {
-    constructor(slices = []) {
-        this.slices = slices;
-        this.truncateCalls = 0;
-    }
-    async exists() { return true; }
-    async readJournal() { return [...this.slices]; }
-    async truncate() { this.slices = []; this.truncateCalls++; }
-    async delete() { this.slices = []; }
-    async appendBatch(batch) { this.slices.push(...batch); }
-}
-
-/**
- * 在固定时刻内运行回调：冻结 Date（覆盖 Date.now() 与 new Date()），
- * 防止用例在午夜前后的前 10~30 分钟执行时跨越自然日边界导致今日累计切分偏差。
- */
-function withFixedNow(iso, fn) {
-    const RealDate = Date;
-    const fixedMs = new RealDate(iso).getTime();
-    class FixedDate extends RealDate {
-        constructor(...args) {
-            super(...(args.length ? args : [fixedMs]));
-        }
-        static now() {
-            return fixedMs;
-        }
-    }
-    global.Date = FixedDate;
-    try {
-        const res = fn();
-        if (res && typeof res.then === 'function') {
-            return res.finally(() => {
-                global.Date = RealDate;
-            });
-        }
-        global.Date = RealDate;
-        return res;
-    } catch (err) {
-        global.Date = RealDate;
-        throw err;
-    }
-}
+const {
+    FakeStorageCoordinator,
+    FakeJournalWriter,
+    FakeRecoveryService,
+    FakeJournalStore,
+    withFixedNow,
+} = require('../fixtures/fakes.js');
 
 describe('SessionManager（跨午夜与休眠管理）', () => {
     let timer;

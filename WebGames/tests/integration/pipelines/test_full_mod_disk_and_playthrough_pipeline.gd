@@ -297,4 +297,3 @@ static func test_python_and_gdscript_transcript_equivalence() -> Dictionary:
 		"dag_match": dag_match,
 		"terminal_match": terminal_match
 	})
-

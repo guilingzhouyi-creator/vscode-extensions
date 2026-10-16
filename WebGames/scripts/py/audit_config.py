@@ -99,7 +99,7 @@ def check_format(f: Path, raw: bytes, text: str, obj: Any, rel: str, violations:
 
 
 ## =============================================================================
-## Phase 63: 声明式配置值域校验引擎（Declarative Config Rule Evaluator）
+## 核心引擎: 声明式配置值域校验引擎（Declarative Config Rule Evaluator）
 ## 彻底解耦业务表与 Python 审查脚本，由 scripts/config/value_domain_rules.json 驱动
 ## =============================================================================
 
@@ -465,7 +465,7 @@ def main() -> int:
     report_dest = Path(args.report) if args.report else (ROOT / "reports" / "audit-latest.json")
     try:
         report_dest.parent.mkdir(parents=True, exist_ok=True)
-        report_dest.write_text(json.dumps(report_data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        report_dest.write_text(json.dumps(report_data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8", newline="\n")
     except OSError as oe:
         print(f"  ⚠ 报告落盘失败 ({report_dest}): {oe}")
 

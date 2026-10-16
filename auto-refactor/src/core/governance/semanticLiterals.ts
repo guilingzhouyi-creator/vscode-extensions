@@ -348,7 +348,7 @@ const LOCALE_TAG_RE = /^[a-z]{2}(?:-[A-Za-z]{2})?$/;
  * @param lowered - Lowercased token string.
  * @returns True if matched as conventional token.
  */
-function isConventionalVocabulary(raw: string, lowered: string): boolean {
+export function isConventionalVocabulary(raw: string, lowered: string): boolean {
     if (
         CONVENTIONAL_TOKENS.has(lowered) ||
         TEST_FRAMEWORK_SYMBOLS.has(lowered) ||

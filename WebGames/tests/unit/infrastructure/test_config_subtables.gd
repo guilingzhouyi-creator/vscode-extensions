@@ -127,4 +127,3 @@ static func test_generic_alias_resolution_without_primary_map() -> Dictionary:
 		"test": "TC-SUB-09: 通用别名规则自然承接子表解析（52条冗余别名消融断言 Inv-BC2-1）",
 		"passed": passed
 	}
-
