@@ -52,55 +52,11 @@ const TERMINATOR_BODY_RE = /^(?:return|throw|break|continue)\b/;
 
 /** Set of language keywords to exclude from identifier extraction. */
 const KEYWORDS = new Set([
-    'const',
-    'let',
-    'var',
-    'function',
-    'class',
-    'return',
-    'throw',
-    'if',
-    'else',
-    'for',
-    'while',
-    'do',
-    'switch',
-    'case',
-    'default',
-    'break',
-    'continue',
-    'try',
-    'catch',
-    'finally',
-    'new',
-    'typeof',
-    'instanceof',
-    'void',
-    'delete',
-    'await',
-    'async',
-    'true',
-    'false',
-    'null',
-    'undefined',
-    'in',
-    'of',
-    'this',
-    'super',
-    'import',
-    'export',
-    'from',
-    'as',
-    'extends',
-    'implements',
-    'interface',
-    'type',
-    'enum',
-    'public',
-    'private',
-    'protected',
-    'readonly',
-    'static',
+    'const', 'let', 'var', 'function', 'class', 'return', 'throw', 'if', 'else', 'for',
+    'while', 'do', 'switch', 'case', 'default', 'break', 'continue', 'try', 'catch', 'finally',
+    'new', 'typeof', 'instanceof', 'void', 'delete', 'await', 'async', 'true', 'false', 'null',
+    'undefined', 'in', 'of', 'this', 'super', 'import', 'export', 'from', 'as', 'extends',
+    'implements', 'interface', 'type', 'enum', 'public', 'private', 'protected', 'readonly', 'static',
 ]);
 
 /** Pattern identifying known asynchronous function or method invocations. */
@@ -187,8 +143,7 @@ function classifyStatementKind(trimmed: string): CfgStatementKind {
     if (BREAK_MATCH_RE.test(trimmed)) return BREAK_KEYWORD;
     if (CONTINUE_MATCH_RE.test(trimmed)) return CONTINUE_KEYWORD;
     if (VAR_DEF_RE.test(trimmed) || REASSIGN_RE.test(trimmed)) return ASSIGNMENT_KIND;
-    if (IF_MATCH_RE.test(trimmed)) return CONDITION_KIND;
-    return EXPRESSION_KIND;
+    return IF_MATCH_RE.test(trimmed) ? CONDITION_KIND : EXPRESSION_KIND;
 }
 
 /**
@@ -276,10 +231,6 @@ function findMatchingParen(text: string, openIndex: number): number {
     return -1;
 }
 
-function isTerminatorStatement(body: string): boolean {
-    return TERMINATOR_BODY_RE.test(body);
-}
-
 /**
  * Builder creating function-level control flow graphs with branch and loop awareness.
  */
@@ -293,7 +244,7 @@ export class CfgBuilder {
      * @param kind - Classification of the block.
      * @returns Newly allocated basic block.
      */
-    private createBlock(kind: BasicBlock['kind'] = NORMAL_BLOCK_KIND): BasicBlock {
+    private createBlock(kind: BasicBlockKind = NORMAL_BLOCK_KIND): BasicBlock {
         const block = new BasicBlock(this.nextBlockId++, kind);
         this.blocks.push(block);
         return block;
@@ -322,7 +273,7 @@ export class CfgBuilder {
         if (body === '' || body === '{}' || body === '{') {
             return false;
         }
-        return isTerminatorStatement(body);
+        return TERMINATOR_BODY_RE.test(body);
     }
 
     /**
