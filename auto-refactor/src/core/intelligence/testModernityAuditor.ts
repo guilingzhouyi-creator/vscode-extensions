@@ -26,6 +26,36 @@ import {
     evaluateTestModernityThresholds,
 } from './testModernityMetrics';
 
+/** Permitted test file naming suffixes and directories. */
+const TEST_DIR_NAME = '/tests/';
+const TEST_FILE_PREFIX = '/test_';
+const PYTHON_TEST_SUFFIX = '_test.py';
+const GDSCRIPT_TEST_SUFFIX = '_test.gd';
+const RUST_TEST_SUFFIX = '_test.rs';
+
+/** Skip marker keywords across testing frameworks. */
+const PYTEST_SKIP_MARKER = '@pytest.mark.skip';
+const UNITTEST_SKIP_MARKER = '@unittest.skip';
+const DECORATOR_SKIP_MARKER = '@skip';
+const RUST_IGNORE_MARKER = '#[ignore]';
+
+/** Default fallback names and values. */
+const DEFAULT_SKIPPED_TEST_NAME = 'skipped-test';
+const DEFAULT_ACTIVE_TEST_NLOC = 100;
+const FALLBACK_DOMAIN_NAME = 'core';
+const DEFAULT_DOMAIN_NAME = 'domain';
+
+/** Severity constant string. */
+const SEVERITY_ERROR_LITERAL = 'error';
+
+/** Pre-compiled patterns for symbol risk weighting. */
+const RE_CRITICAL_SYMBOLS = /(?:payment|auth|crypto|security)/;
+const RE_CORE_DOMAIN_SYMBOLS = /(?:service|repository|domain|pipeline|controller)/;
+const RE_LOW_RISK_SYMBOLS = /(?:util|helper|format)/;
+
+/** Node kinds eligible for business-to-test semantic mapping. */
+const ELIGIBLE_NODE_KINDS: ReadonlySet<string> = new Set(['function', 'type', 'module']);
+
 /**
  * Detect whether a file path corresponds to a test file.
  *
@@ -38,13 +68,13 @@ export function isTestFilePath(filePath: string): boolean {
         lower.includes('.test.') ||
         lower.includes('.spec.') ||
         lower.includes('__tests__/') ||
-        lower.includes('/tests/') ||
+        lower.includes(TEST_DIR_NAME) ||
         lower.startsWith('tests/') ||
         lower.startsWith('test_') ||
-        lower.endsWith('_test.py') ||
-        lower.endsWith('_test.gd') ||
-        lower.endsWith('_test.rs') ||
-        lower.includes('/test_')
+        lower.endsWith(PYTHON_TEST_SUFFIX) ||
+        lower.endsWith(GDSCRIPT_TEST_SUFFIX) ||
+        lower.endsWith(RUST_TEST_SUFFIX) ||
+        lower.includes(TEST_FILE_PREFIX)
     );
 }
 
@@ -89,7 +119,7 @@ const GENERAL_ASSERTION_PATTERNS: readonly RegExp[] = [
  * @param line - Trimmed line of code.
  * @returns True if tautological.
  */
-function isTautologicalLine(line: string): boolean {
+function hasTautologicalAssertion(line: string): boolean {
     return TAUTOLOGY_PATTERNS.some((pattern) => pattern.test(line));
 }
 
@@ -121,10 +151,10 @@ function isGeneralAssertionLine(line: string): boolean {
  */
 function isSkipMarkerLine(line: string): boolean {
     return (
-        line.startsWith('@pytest.mark.skip') ||
-        line.startsWith('@unittest.skip') ||
-        line.startsWith('@skip') ||
-        line.startsWith('#[ignore]')
+        line.startsWith(PYTEST_SKIP_MARKER) ||
+        line.startsWith(UNITTEST_SKIP_MARKER) ||
+        line.startsWith(DECORATOR_SKIP_MARKER) ||
+        line.startsWith(RUST_IGNORE_MARKER)
     );
 }
 
@@ -159,28 +189,31 @@ function matchTestDeclaration(
             line.match(/(?:it|test|describe)\.skip\s*\(/) ||
             line.match(/\b(?:xit|xdescribe)\s*\(/)
         ) {
-            const sm = line.match(
+            const suiteMatch = line.match(
                 /(?:it|test|describe|xit|xdescribe)(?:\.skip)?\s*\(\s*['"`]([^'"`]+)['"`]/,
             );
-            return { testName: sm ? sm[1] : 'skipped-test', isSkipped: true };
+            return {
+                testName: suiteMatch ? suiteMatch[1] : DEFAULT_SKIPPED_TEST_NAME,
+                isSkipped: true,
+            };
         }
-        const m = line.match(/(?:it|test)(?:\.only)?\s*\(\s*['"`]([^'"`]+)['"`]/);
-        return m ? { testName: m[1], isSkipped: false } : null;
+        const regMatch = line.match(/(?:it|test)(?:\.only)?\s*\(\s*['"`]([^'"`]+)['"`]/);
+        return regMatch ? { testName: regMatch[1], isSkipped: false } : null;
     }
     if (ext === '.py') {
-        const m = line.match(/def\s+(test_\w+)\s*\(/);
-        return m ? { testName: m[1], isSkipped: false } : null;
+        const regMatch = line.match(/def\s+(test_\w+)\s*\(/);
+        return regMatch ? { testName: regMatch[1], isSkipped: false } : null;
     }
     if (ext === '.gd') {
-        const m = line.match(/func\s+(test_\w+)\s*\(/);
-        return m ? { testName: m[1], isSkipped: false } : null;
+        const regMatch = line.match(/func\s+(test_\w+)\s*\(/);
+        return regMatch ? { testName: regMatch[1], isSkipped: false } : null;
     }
     if (ext === '.rs') {
-        const m = line.match(/fn\s+(test_\w+)\s*\(/);
-        return m ? { testName: m[1], isSkipped: false } : null;
+        const regMatch = line.match(/fn\s+(test_\w+)\s*\(/);
+        return regMatch ? { testName: regMatch[1], isSkipped: false } : null;
     }
-    const m = line.match(/(?:it|test|func|def|fn)\s+['"`]?([a-zA-Z0-9_-]+)['"`]?\s*\(/);
-    return m ? { testName: m[1], isSkipped: false } : null;
+    const regMatch = line.match(/(?:it|test|func|def|fn)\s+['"`]?([a-zA-Z0-9_-]+)['"`]?\s*\(/);
+    return regMatch ? { testName: regMatch[1], isSkipped: false } : null;
 }
 
 /**
@@ -215,29 +248,24 @@ function createTestSite(
     testName: string,
     flags: Partial<TestSite> = {},
 ): TestSite {
+    const isSkipped = flags.isSkipped ?? false;
+    const isTautological = flags.isTautological ?? false;
+    const isMockOnly = flags.isMockOnly ?? false;
+    const referencesDeprecatedContract = flags.referencesDeprecatedContract ?? false;
     return {
         file,
         line,
         testName,
-        isSkipped: flags.isSkipped ?? false,
-        isTautological: flags.isTautological ?? false,
-        isMockOnly: flags.isMockOnly ?? false,
-        referencesDeprecatedContract: flags.referencesDeprecatedContract ?? false,
+        isSkipped,
+        isTautological,
+        isMockOnly,
+        referencesDeprecatedContract,
         contractVersion: flags.contractVersion,
         activeContractVersion: flags.activeContractVersion,
         testedSymbol: flags.testedSymbol,
     };
 }
 
-/**
- * Audits test source code across multiple languages for integrity illusions,
- * tautological assertions, and orphaned skipped tests.
- *
- * @param filePath - Path to the test file.
- * @param content - Test file content string.
- * @param options - Configuration options.
- * @returns Detected test modernity issues.
- */
 /**
  * Single-file test site collection state machine for AST-free modernity auditing.
  */
@@ -258,7 +286,7 @@ class TestSiteCollector {
         this.ext = filePath.slice(filePath.lastIndexOf('.')).toLowerCase();
     }
 
-    public collect(): TestSite[] {
+    public collectSites(): TestSite[] {
         const lines = this.content.split('\n');
         for (let i = 0; i < lines.length; i++) {
             this.processLine(lines[i].trim(), i + 1);
@@ -334,7 +362,7 @@ class TestSiteCollector {
     }
 
     private handleAssertionLine(trimmed: string, lineNum: number): void {
-        if (isTautologicalLine(trimmed)) {
+        if (hasTautologicalAssertion(trimmed)) {
             this.currentAssertions++;
             this.sites.push(
                 createTestSite(this.filePath, lineNum, this.currentTestName!, {
@@ -371,13 +399,13 @@ class TestSiteCollector {
 /**
  * Escalates rule severities to error under strict or fatal configuration.
  */
-function escalateSeverities(issues: Issue[], options: TestModernityOptions): void {
+function applySeverityEscalation(issues: Issue[], options: TestModernityOptions): void {
     if (!options.strict && !options.tautologicalIsFatal) {
         return;
     }
     for (const issue of issues) {
         if (issue.rule === 'TST-TAU-001' || issue.rule === 'TST-ILS-001') {
-            issue.severity = 'error';
+            issue.severity = SEVERITY_ERROR_LITERAL;
         }
     }
 }
@@ -397,9 +425,9 @@ export function auditTestSource(
     options: TestModernityOptions = {},
 ): Issue[] {
     const collector = new TestSiteCollector(filePath, content);
-    const sites = collector.collect();
+    const sites = collector.collectSites();
     const issues = analyzeTestModernitySites(sites, [], options);
-    escalateSeverities(issues, options);
+    applySeverityEscalation(issues, options);
     return issues;
 }
 
@@ -411,27 +439,13 @@ export function auditTestSource(
  */
 function inferSymbolRiskWeight(name: string): number {
     const lower = name.toLowerCase();
-    if (
-        lower.includes('payment') ||
-        lower.includes('auth') ||
-        lower.includes('crypto') ||
-        lower.includes('security')
-    ) {
+    if (RE_CRITICAL_SYMBOLS.test(lower)) {
         return 1.0;
     }
-    if (
-        lower.includes('service') ||
-        lower.includes('repository') ||
-        lower.includes('domain') ||
-        lower.includes('pipeline') ||
-        lower.includes('controller')
-    ) {
+    if (RE_CORE_DOMAIN_SYMBOLS.test(lower)) {
         return 0.9;
     }
-    if (lower.includes('util') || lower.includes('helper') || lower.includes('format')) {
-        return 0.5;
-    }
-    return 0.7;
+    return RE_LOW_RISK_SYMBOLS.test(lower) ? 0.5 : 0.7;
 }
 
 /**
@@ -495,7 +509,7 @@ function indexMatchingSitesBySymbol(
 export function mapBusinessToTests(
     productionGraph: SemanticGraph,
     testSites: TestSite[],
-    activeTestNloc: number = 100,
+    activeTestNloc: number = DEFAULT_ACTIVE_TEST_NLOC,
     options: TestModernityOptions = {},
 ): BusinessTestMappingResult {
     const nodes = productionGraph.getAllNodes();
@@ -503,7 +517,7 @@ export function mapBusinessToTests(
     const uncoveredSymbols: string[] = [];
 
     const businessNodes = nodes.filter((n: SemanticNode) => {
-        if (n.kind !== 'function' && n.kind !== 'type' && n.kind !== 'module') {
+        if (!ELIGIBLE_NODE_KINDS.has(n.kind)) {
             return false;
         }
         const file = n.location?.file ?? '';
@@ -529,7 +543,7 @@ export function mapBusinessToTests(
             : { freshness: 1.0, effectiveness: 1.0 };
 
         const parts = pathLower.split('/');
-        const domain = parts.length > 2 ? parts[parts.length - 2] : 'core';
+        const domain = parts.length > 2 ? parts[parts.length - 2] : FALLBACK_DOMAIN_NAME;
 
         semanticUnits.push({
             id: node.id,
@@ -543,7 +557,7 @@ export function mapBusinessToTests(
     }
 
     const metrics = computeTestModernityMetrics(semanticUnits, activeTestNloc);
-    const domain = semanticUnits.length > 0 ? semanticUnits[0].domain : 'domain';
+    const domain = semanticUnits.length > 0 ? semanticUnits[0].domain : DEFAULT_DOMAIN_NAME;
     const issues = evaluateTestModernityThresholds(metrics, domain, options);
 
     return {
@@ -559,6 +573,12 @@ export function mapBusinessToTests(
  */
 export class TestModernityEvaluator {
     private readonly options: TestModernityOptions;
+    /** Backward compatible bound audit runner property. */
+    public readonly audit: (
+        filePath: string,
+        content: string,
+        options?: TestModernityOptions,
+    ) => Issue[];
 
     /**
      * Initializes evaluator with customizable test modernity thresholds.
@@ -567,6 +587,11 @@ export class TestModernityEvaluator {
      */
     public constructor(options: TestModernityOptions = {}) {
         this.options = options;
+        this.audit = (
+            filePath: string,
+            content: string,
+            auditOptions?: TestModernityOptions,
+        ): Issue[] => this.auditTestSource(filePath, content, auditOptions);
     }
 
     /**
@@ -583,18 +608,6 @@ export class TestModernityEvaluator {
         options?: TestModernityOptions,
     ): Issue[] {
         return auditTestSource(filePath, content, { ...this.options, ...options });
-    }
-
-    /**
-     * Unified audit entry point.
-     *
-     * @param filePath - Path to the test file.
-     * @param content - Test file content string.
-     * @param options - Configuration options.
-     * @returns List of detected issues.
-     */
-    public audit(filePath: string, content: string, options?: TestModernityOptions): Issue[] {
-        return this.auditTestSource(filePath, content, options);
     }
 
     /**
