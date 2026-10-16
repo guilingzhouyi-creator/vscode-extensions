@@ -40,7 +40,10 @@ const REQUIRED_ISOMORPHIC_PAIRS = [
  */
 const REQUIRED_FLAG_ALIGNMENTS = {
   'audit-all': ['Fast', 'Json'],
+  'commit-msg-gate': ['Agent', 'ViewLog'],
   package: ['HotSync'],
+  'pre-commit-gate': ['Agent', 'ViewLog'],
+  'pre-push-gate': ['Agent', 'ViewLog'],
   'release-tag': ['DryRun', 'NoPush'],
   'version-bump': ['DryRun'],
 };

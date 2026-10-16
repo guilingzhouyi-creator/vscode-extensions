@@ -12,37 +12,73 @@
 # ==============================================================================
 set -euo pipefail
 
-MSG_FILE="${1:?用法错误: 请传入 commit-msg 文件路径}"
+NODE_BIN=$(command -v node 2>/dev/null || command -v node.exe 2>/dev/null || echo "node")
+ROOT_DIR=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
+
+IS_AGENT=0
+MSG_FILE=""
+
+for arg in "$@"; do
+    case "$arg" in
+        --view-log|-v)
+            exec "$NODE_BIN" "$ROOT_DIR/scripts/common/log-rotator.js" --view
+            ;;
+        --agent|-a)
+            IS_AGENT=1
+            ;;
+        *)
+            if [[ -z "$MSG_FILE" && "$arg" != -* ]]; then
+                MSG_FILE="$arg"
+            fi
+            ;;
+    esac
+done
+
+if [[ -z "$MSG_FILE" ]]; then
+    if [[ "$IS_AGENT" -eq 1 ]]; then
+        cat <<EOF
+{
+  "protocolVersion": "1.0.0",
+  "status": "BLOCK",
+  "gate": "commit-msg",
+  "summary": "用法错误: 请传入 commit-msg 文件路径",
+  "violations": [{
+    "ruleId": "GATE-MSG-001",
+    "severity": "BLOCK",
+    "message": "用法错误: 请传入 commit-msg 文件路径",
+    "actionableFix": "请传入有效的文件路径作为参数"
+  }]
+}
+EOF
+        exit 1
+    fi
+    echo "用法错误: 请传入 commit-msg 文件路径 (或 --view-log 查看上一次失败)"
+    exit 1
+fi
 
 if [[ ! -f "$MSG_FILE" ]]; then
+    if [[ "$IS_AGENT" -eq 1 ]]; then
+        cat <<EOF
+{
+  "protocolVersion": "1.0.0",
+  "status": "BLOCK",
+  "gate": "commit-msg",
+  "summary": "提交信息文件不存在: $MSG_FILE",
+  "violations": [{
+    "ruleId": "GATE-MSG-001",
+    "severity": "BLOCK",
+    "file": "$MSG_FILE",
+    "message": "提交信息文件不存在: $MSG_FILE",
+    "actionableFix": "请传入已存在的提交信息文件"
+  }]
+}
+EOF
+        exit 1
+    fi
     echo "❌ [FAIL] 提交信息文件不存在: $MSG_FILE"
     exit 1
 fi
 
-NODE_BIN=$(command -v node 2>/dev/null || command -v node.exe 2>/dev/null || echo "node")
-
-echo "================================================================="
-echo "📝 执行生产工程级 Commit-Msg 规范与结构化内容门禁"
-echo "================================================================="
-
-# 读取全部非注释行（忽略以 # 开头的 Git 默认注释）
-CLEAN_LINES=()
-while IFS= read -r line || [[ -n "$line" ]]; do
-    clean_line=$(echo "$line" | sed 's/\r$//')
-    [[ "$clean_line" =~ ^# ]] && continue
-    CLEAN_LINES+=("$clean_line")
-done < "$MSG_FILE"
-
-TOTAL_LINES=${#CLEAN_LINES[@]}
-if [[ "$TOTAL_LINES" -eq 0 ]]; then
-    echo "❌ [FAIL] 提交信息不能为空！"
-    exit 1
-fi
-
-FIRST_LINE="${CLEAN_LINES[0]}"
-echo "提交标题: $FIRST_LINE"
-
-# --- 打印标准模板辅助函数 ---
 print_template_guide() {
     echo ""
     echo "💡 【生产工程级提交信息标准模板指引】:"
@@ -69,37 +105,104 @@ print_template_guide() {
     echo "-----------------------------------------------------------------"
 }
 
+fail_commit_msg() {
+    local rule_id="$1"
+    local message="$2"
+    local actual="${3:-}"
+    local expected="${4:-}"
+    local actionable_fix="${5:-}"
+
+    DIAG_DIR="$ROOT_DIR/.audit-logs"
+    mkdir -p "$DIAG_DIR" 2>/dev/null || true
+    FAIL_LOG="$DIAG_DIR/last-commit-msg.log"
+    {
+        echo "================================================================="
+        echo "❌ Commit-Msg 门禁拦截现场快照"
+        echo "时间: $(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || echo 'unknown')"
+        echo "规则: $rule_id"
+        echo "说明: $message"
+        echo "-----------------------------------------------------------------"
+        echo "【提交信息原内容】:"
+        if [[ -f "$MSG_FILE" ]]; then
+            cat "$MSG_FILE"
+        fi
+        echo "================================================================="
+    } > "$FAIL_LOG" 2>/dev/null || true
+
+    SNAPSHOT_JSON="$DIAG_DIR/last-failure.json"
+    cat <<EOF > "$SNAPSHOT_JSON" 2>/dev/null || true
+{
+  "protocolVersion": "1.0.0",
+  "recordedAt": "$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || echo 'unknown')",
+  "status": "BLOCK",
+  "gate": "commit-msg",
+  "step": "Commit-Msg Validation ($rule_id)",
+  "failedCommand": "bash scripts/sh/commit-msg-gate.sh $MSG_FILE",
+  "exitCode": 1,
+  "summary": "$message",
+  "logFile": ".audit-logs/last-commit-msg.log",
+  "violations": [
+    {
+      "ruleId": "$rule_id",
+      "severity": "BLOCK",
+      "file": "$MSG_FILE",
+      "actual": "$actual",
+      "expected": "$expected",
+      "message": "$message",
+      "actionableFix": "$actionable_fix",
+      "verificationCommand": "bash scripts/sh/commit-msg-gate.sh $MSG_FILE"
+    }
+  ],
+  "agentDirectives": {
+    "targetFiles": ["$MSG_FILE"],
+    "remediationPriority": ["$rule_id"],
+    "verificationCommand": "bash scripts/sh/commit-msg-gate.sh $MSG_FILE",
+    "fastRecheckCommand": "bash scripts/sh/commit-msg-gate.sh $MSG_FILE"
+  }
+}
+EOF
+
+    if [[ "$IS_AGENT" -eq 1 ]]; then
+        cat "$SNAPSHOT_JSON"
+        exit 1
+    fi
+
+    echo "❌ [FAIL] ${rule_id}: $message"
+    if [[ -n "$actionable_fix" ]]; then
+        echo "   💡 建议: $actionable_fix"
+    fi
+    print_template_guide
+    echo "💡 失败诊断快照已保留至: .audit-logs/last-commit-msg.log"
+    echo "   (可运行 bash scripts/sh/commit-msg-gate.sh --view-log 快速查看)"
+    exit 1
+}
+
+if [[ "$IS_AGENT" -ne 1 ]]; then
+    echo "================================================================="
+    echo "📝 执行生产工程级 Commit-Msg 规范与结构化内容门禁"
+    echo "================================================================="
+fi
+
 # --- Rule 1: Header 格式与长度校验 ---
 HEADER_PATTERN="^(feat|fix|refactor|docs|test|chore|style|perf)(\([a-zA-Z0-9_-]+\))?: .{5,80}$"
 if ! echo "$FIRST_LINE" | grep -E "$HEADER_PATTERN" >/dev/null 2>&1; then
-    echo "❌ [FAIL] Rule 1: 提交标题不符合生产级格式规范！"
-    echo "   标准格式: <type>(<scope>): <简述> 或 <type>: <简述>"
-    echo "   允许类型: feat, fix, refactor, docs, test, chore, style, perf"
-    echo "   标题长度: 冒号后描述必须在 5~80 字符之间"
-    print_template_guide
-    exit 1
+    fail_commit_msg "GATE-MSG-001" "Rule 1: 提交标题不符合生产级格式规范！" "$FIRST_LINE" "<type>(<scope>): <简述> (5~80 字符)" "调整为 feat/fix/refactor/docs/test/chore/style/perf(<scope>): 描述"
 fi
 
 # 检查标题末尾不得有句号
 if [[ "$FIRST_LINE" =~ [.。]$ ]]; then
-    echo "❌ [FAIL] Rule 1: 提交标题末尾严禁包含句号（. 或 。）！"
-    print_template_guide
-    exit 1
+    fail_commit_msg "GATE-MSG-001" "Rule 1: 提交标题末尾严禁包含句号（. 或 。）！" "$FIRST_LINE" "末尾无句号" "移除标题末尾句号"
 fi
 
 # --- Rule 2: 零黑话与空洞泛化词拦截 ---
 FORBIDDEN_WORDS="\b(wip|temp|test temp|tmp)\b"
 if echo "$FIRST_LINE" | grep -iE "$FORBIDDEN_WORDS" >/dev/null 2>&1; then
-    echo "❌ [FAIL] Rule 2: 提交标题包含违规黑话/临时性标记 (wip/temp/tmp 等)！"
-    print_template_guide
-    exit 1
+    fail_commit_msg "CMG-STY-001" "Rule 2: 提交标题包含违规黑话/临时性标记 (wip/temp/tmp 等)！" "$FIRST_LINE" "零黑话技术描述" "陈述具体完成的技术特性，严禁使用 wip/temp"
 fi
 
 LAZY_WORDS="^([a-z]+(\([a-z0-9_-]+\))?:\s*(update|modify|changes|fix|test|fixes|clean|refactor|todo))\s*$"
 if echo "$FIRST_LINE" | grep -iE "$LAZY_WORDS" >/dev/null 2>&1; then
-    echo "❌ [FAIL] Rule 2: 提交标题过于空洞敷衍！请明确具体加了什么、改了什么或修了什么。"
-    print_template_guide
-    exit 1
+    fail_commit_msg "CMG-STY-001" "Rule 2: 提交标题过于空洞敷衍！请明确具体加了什么、改了什么或修了什么。" "$FIRST_LINE" "说明具体改动模块与功能" "明确陈述具体变更逻辑"
 fi
 
 # 提取提交类型
@@ -109,9 +212,7 @@ COMMIT_TYPE=$(echo "$FIRST_LINE" | sed -E 's/^([a-z]+)(\(.*\))?:.*$/\1/')
 if [[ "$TOTAL_LINES" -gt 1 ]]; then
     SECOND_LINE="${CLEAN_LINES[1]}"
     if [[ -n "$SECOND_LINE" ]]; then
-        echo "❌ [FAIL] Rule 3: 标题与正文之间第 2 行必须保留空行（当前直接粘连正文）！"
-        print_template_guide
-        exit 1
+        fail_commit_msg "GATE-MSG-001" "Rule 3: 标题与正文之间第 2 行必须保留空行（当前直接粘连正文）！" "$SECOND_LINE" "第 2 行为独立空行" "在标题与正文之间插入一个空行"
     fi
 fi
 
@@ -129,32 +230,16 @@ if [[ "$TOTAL_LINES" -gt 2 ]]; then
 fi
 
 # --- Rule 4: 实质性提交的正文字数底线与信息密度 ---
-# 对于 feat, fix, refactor 等关键生产提交，强制要求正文且有字数底线
 if [[ "$COMMIT_TYPE" =~ ^(feat|fix|refactor)$ ]]; then
     MIN_BODY_CHARS=30
     if [[ "$BODY_CHAR_COUNT" -lt "$MIN_BODY_CHARS" ]]; then
-        echo "❌ [FAIL] Rule 4: 生产级关键提交 ($COMMIT_TYPE) 正文信息量不足！"
-        echo "   当前正文有效字数: $BODY_CHAR_COUNT (最低要求: >= $MIN_BODY_CHARS 字符)"
-        echo "   必须详细说明改动动机、具体涉及的新增/修改/修复内容与验证结论。"
-        print_template_guide
-        exit 1
+        fail_commit_msg "GATE-MSG-001" "Rule 4: 生产级关键提交 ($COMMIT_TYPE) 正文信息量不足！当前有效字数: $BODY_CHAR_COUNT" "$BODY_CHAR_COUNT 字符" ">= $MIN_BODY_CHARS 字符" "补充 [Why], [Changed], [Verification] 详细技术事实"
     fi
 
     # --- Rule 5: 结构化区块完整性校验 ---
-    # 必须包含结构化区块标识（如 [Why], [Added], [Changed], [Fixed], [Removed], [Verification] 或其中文对应）
-    # 或者具备规范的列表小节（以 '- ' 开头的详细阐述）
     STRUCTURE_PATTERN='(\[(Project|Why|Added|Changed|Fixed|Removed|Verification|项目|项目归属|动机|背景|新增|变更|修改|修复|删除|验证).*?\]|^- )'
     if ! echo "$BODY_TEXT" | grep -iE "$STRUCTURE_PATTERN" >/dev/null 2>&1; then
-        echo "❌ [FAIL] Rule 5: 关键提交 ($COMMIT_TYPE) 缺少生产级结构化区块！"
-        echo "   请至少包含以下标准区块之一："
-        echo "   • [Project / 项目归属]"
-        echo "   • [Why / 动机背景]"
-        echo "   • [Added / 新增内容]"
-        echo "   • [Changed / 变更调整]"
-        echo "   • [Fixed / 修复缺陷]"
-        echo "   • [Verification / 验证结论]"
-        print_template_guide
-        exit 1
+        fail_commit_msg "GATE-MSG-001" "Rule 5: 关键提交 ($COMMIT_TYPE) 缺少生产级结构化区块！" "" "包含 [Project], [Why], [Added/Changed/Fixed], [Verification] 之一" "补充标准结构化区块 [Project], [Why], [Changed], [Verification]"
     fi
 fi
 
@@ -162,7 +247,7 @@ fi
 FOUND_PROJECT_HEADER=false
 IN_PROJECT_SECTION=false
 DECLARED_PROJECTS=()
-PROJECT_HEADER_REGEX='^\[[[:space:]]*([pP][rR][oO][jJ][eE][cC][tT]|项目|项目归属)([[:space:]]*[/|][^]]*)?\]([[:space:]]*:[[:space:]]*(.*))?$'
+PROJECT_HEADER_REGEX='^\[[[:space:]]*([pP][rR][oO][jJ][eE][cC][tT]|项目|项目归属)([[:space:]]*[:/|][[:space:]]*([^]]*))?\]([[:space:]]*:[[:space:]]*(.*))?$'
 
 for ((i=2; i<TOTAL_LINES; i++)); do
     cur_line="${CLEAN_LINES[$i]}"
@@ -170,7 +255,10 @@ for ((i=2; i<TOTAL_LINES; i++)); do
     if [[ "$trimmed_line" =~ $PROJECT_HEADER_REGEX ]]; then
         FOUND_PROJECT_HEADER=true
         IN_PROJECT_SECTION=true
-        inline_val="${BASH_REMATCH[4]}"
+        inline_val="${BASH_REMATCH[3]}"
+        if [[ -z "$inline_val" ]]; then
+            inline_val="${BASH_REMATCH[5]}"
+        fi
         if [[ -n "$inline_val" ]]; then
             IFS=',，、' read -ra parts <<< "$inline_val"
             for p in "${parts[@]}"; do
@@ -202,27 +290,11 @@ done
 
 if [[ "$COMMIT_TYPE" =~ ^(feat|fix|refactor)$ ]]; then
     if [[ "$FOUND_PROJECT_HEADER" == false ]]; then
-        echo "❌ [FAIL] Rule 5.1 (CMG-PRJ-001): 关键生产级提交 ($COMMIT_TYPE) 缺少项目归属格式区！"
-        echo "   必须在正文首个结构化区块声明 [Project / 项目归属] 并指定所属项目："
-        echo "   示例："
-        echo "   [Project / 项目归属]"
-        echo "   - workspace-timing"
-        echo ""
-        echo "   合法项目枚举列表："
-        echo "   • workspace-timing (VS Code 计时器插件)"
-        echo "   • auto-refactor    (Node CLI / Rust 静态重构与审查引擎)"
-        echo "   • WebGames         (Godot 卡拉尔世界游戏引擎)"
-        echo "   • governance       (工作区工程效能、门禁脚本、顶层案卷与全局工具链)"
-        print_template_guide
-        exit 1
+        fail_commit_msg "CMG-PRJ-001" "Rule 5.1 (CMG-PRJ-001): 关键生产级提交 ($COMMIT_TYPE) 缺少项目归属格式区！" "" "[Project: workspace-timing | auto-refactor | WebGames | governance]" "在正文首个结构化区块声明 [Project / 项目归属]"
     fi
 
     if [[ ${#DECLARED_PROJECTS[@]} -eq 0 ]]; then
-        echo "❌ [FAIL] Rule 5.1 (CMG-PRJ-001): [Project / 项目归属] 区块未声明任何项目名称！"
-        echo "   请至少指定一个合法项目："
-        echo "   • workspace-timing | auto-refactor | WebGames | governance"
-        print_template_guide
-        exit 1
+        fail_commit_msg "CMG-PRJ-001" "Rule 5.1 (CMG-PRJ-001): [Project / 项目归属] 区块未声明任何项目名称！" "" "workspace-timing | auto-refactor | WebGames | governance" "指定合法的项目归属名称"
     fi
 fi
 
@@ -237,35 +309,48 @@ if [[ ${#DECLARED_PROJECTS[@]} -gt 0 ]]; then
     done
 
     if [[ ${#INVALID_PROJECTS[@]} -gt 0 ]]; then
-        echo "❌ [FAIL] Rule 5.1 (CMG-PRJ-001): 声明的项目归属包含未授权/非法的项目标识！"
-        for inv in "${INVALID_PROJECTS[@]}"; do
-            echo "   • 未知项目标识: '$inv'"
-        done
-        echo "   合法项目枚举仅限于："
-        echo "   • workspace-timing (VS Code 计时器插件)"
-        echo "   • auto-refactor    (Node CLI / Rust 静态重构与审查引擎)"
-        echo "   • WebGames         (Godot 卡拉尔世界游戏引擎)"
-        echo "   • governance       (工作区工程效能、门禁脚本、顶层案卷与全局工具链)"
-        print_template_guide
-        exit 1
+        INV_STR=$(IFS=', '; echo "${INVALID_PROJECTS[*]}")
+        fail_commit_msg "CMG-PRJ-001" "Rule 5.1 (CMG-PRJ-001): 声明的项目归属包含未授权/非法的项目标识: $INV_STR" "$INV_STR" "workspace-timing | auto-refactor | WebGames | governance" "纠正项目名称为合法枚举之一"
     fi
 fi
 
 # --- Rule 6: 正文零黑话与无批次代号 ---
 if echo "$BODY_TEXT" | grep -iE "\b(phase[0-9]+|st[0-9]+|p[0-9]+)\b" >/dev/null 2>&1; then
-    echo "❌ [FAIL] Rule 6: 提交正文包含违规施工批次代号/黑话 (phaseN/stN/pN)！"
-    echo "   必须基于功能特性与交付价值进行纯粹描述。"
-    print_template_guide
-    exit 1
+    fail_commit_msg "CMG-STY-001" "Rule 6: 提交正文包含违规施工批次代号/黑话 (phaseN/stN/pN)！" "" "纯客观技术事实" "基于功能特性与交付价值进行纯粹描述，移除批次代号"
 fi
 
-# --- Rule 7 & 8: 规则 ID 反虚构与求真务实禁词联合审查 (单次加载 SSOT & 禁词表) ---
-# 挂载 scripts/common/validate-commit-msg.js (融合 validate-commit-msg-rules.js 与 validate-commit-msg-style.js / commit-msg-forbidden-terms.json)
+# --- Rule 7 & 8: 规则 ID 反虚构与求真务实禁词联合审查 ---
 ROOT_DIR=$(git rev-parse --show-toplevel 2>/dev/null || (cd "$(dirname "$0")/../.." && pwd))
 RESOLVED_MSG_FILE=$(realpath "$MSG_FILE" 2>/dev/null || readlink -f "$MSG_FILE" 2>/dev/null || echo "$MSG_FILE")
-if ! (cd "$ROOT_DIR" && "$NODE_BIN" scripts/common/validate-commit-msg.js "$RESOLVED_MSG_FILE"); then
-    print_template_guide
-    exit 1
+VALIDATE_ARGS=("$RESOLVED_MSG_FILE")
+if [[ "$IS_AGENT" -eq 1 ]]; then
+    VALIDATE_ARGS+=("--agent")
+fi
+
+if [[ "$IS_AGENT" -eq 1 ]]; then
+    if ! (cd "$ROOT_DIR" && "$NODE_BIN" scripts/common/validate-commit-msg.js "${VALIDATE_ARGS[@]}" >/dev/null 2>&1); then
+        if [[ -f "$ROOT_DIR/.audit-logs/last-failure.json" ]]; then
+            cat "$ROOT_DIR/.audit-logs/last-failure.json"
+        fi
+        exit 1
+    fi
+else
+    if ! (cd "$ROOT_DIR" && "$NODE_BIN" scripts/common/validate-commit-msg.js "${VALIDATE_ARGS[@]}"); then
+        print_template_guide
+        exit 1
+    fi
+fi
+
+if [[ "$IS_AGENT" -eq 1 ]]; then
+    cat <<EOF
+{
+  "protocolVersion": "1.0.0",
+  "status": "PASS",
+  "gate": "commit-msg",
+  "summary": "All commit-msg validation rules passed cleanly."
+}
+EOF
+    exit 0
 fi
 
 echo "  ✔ Rule 1: Header 格式与长度 (5~80 字符, 无句号) 合规"

@@ -79,7 +79,9 @@ function findProjectConfig(filePath) {
     const gov = pkg?.governance?.complexity || pkg?.governance?.astSlice;
     if (gov) return gov;
 
-    const cfg = readJsonSafe(path.join(curr, "autoRefactor.config.json"));
+    const cfg =
+      readJsonSafe(path.join(curr, "auto-refactor.config.json")) ||
+      readJsonSafe(path.join(curr, "autoRefactor.config.json"));
     if (cfg?.thresholds) return cfg.thresholds;
 
     curr = path.dirname(curr);
@@ -131,12 +133,14 @@ function resolveConfig(filePath, overrides = {}) {
   const cfg = { ...DEFAULT_CONFIG };
   applyConfigOverrides(cfg, findProjectConfig(filePath));
 
+  const normalized = filePath.replace(/\\/g, "/");
   const isProbe = /(?:archetype|parser|scanner|detector|lexer|tokenizer)/i.test(
-    filePath,
+    normalized,
   );
-  const isTest = /(?:\.test\.|\.spec\.|scripts\/validate-|tests\/)/i.test(
-    filePath,
-  );
+  const isTest =
+    /(?:\.test\.|\.spec\.|scripts\/(?:common\/)?validate-|tests\/)/i.test(
+      normalized,
+    );
   if (isProbe) {
     cfg.maxFunctionComplexity = Math.max(
       cfg.maxFunctionComplexity,
@@ -181,7 +185,11 @@ function parseSingleFlag(arg, flags, explicitFiles) {
     flags.lowBlastRadiusBonus = false;
     return;
   }
-  if (!arg.startsWith("--")) {
+  if (arg === "--agent" || arg === "-a" || arg === "--json") {
+    flags.agentMode = true;
+    return;
+  }
+  if (!arg.startsWith("-")) {
     explicitFiles.push(arg);
   }
 }
@@ -275,6 +283,22 @@ function mapFromExplicitFiles(explicitFiles) {
 }
 
 /**
+ * Ensure entry exists in hunk map for target file.
+ *
+ * @param {Map<string, { changedLines: Set<number>, isNew: boolean }>} map - Diff hunk map
+ * @param {string} filePath - Absolute file path
+ * @param {boolean} isNew - Indicates whether file is newly created
+ */
+function registerDiffFileEntry(map, filePath, isNew) {
+  if (!map.has(filePath)) {
+    map.set(filePath, {
+      changedLines: new Set(),
+      isNew,
+    });
+  }
+}
+
+/**
  * State Machine: Parses raw git diff text into per-file changed line intervals.
  *
  * @param {string} raw - Raw unified diff output
@@ -283,17 +307,13 @@ function mapFromExplicitFiles(explicitFiles) {
 function parseGitDiffHunks(raw, map) {
   let currentFile = null;
   let isCurrentNew = false;
-  for (const line of raw.split("\n")) {
+  const diffLines = raw.split("\n");
+  for (const line of diffLines) {
     if (line.startsWith("+++ b/")) {
       const rel = line.slice(6).trim();
       if (isEligibleSourcePath(rel)) {
         currentFile = path.resolve(REPO_ROOT, rel);
-        if (!map.has(currentFile)) {
-          map.set(currentFile, {
-            changedLines: new Set(),
-            isNew: isCurrentNew,
-          });
-        }
+        registerDiffFileEntry(map, currentFile, isCurrentNew);
       } else {
         currentFile = null;
       }
@@ -760,24 +780,31 @@ const UNSEMANTIC_FUNCTION_NAMES = new Set([
  * @param {number} lineNum - 1-based source line number
  * @returns {{ rule: string, severity: string, message: string, line: number, suggestedFix: string } | null}
  */
-function validateFunctionName(node, sourceFile, cfg, lineNum) {
+/**
+ * Extract clean identifier string from function AST node.
+ *
+ * @param {ts.Node} node - Target function AST node
+ * @param {ts.SourceFile} sourceFile - TypeScript source file
+ * @returns {string|null} Cleaned identifier or null
+ */
+function extractCleanIdentifier(node, sourceFile) {
   if (!node.name) return null;
-
   const rawName = node.name.getText(sourceFile);
   const name = rawName.startsWith("#") ? rawName.slice(1) : rawName;
   if (!/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(name)) return null;
+  return name;
+}
 
-  const lower = name.toLowerCase();
-  if (UNSEMANTIC_FUNCTION_NAMES.has(lower)) {
-    return {
-      rule: "NAM-VAG-001",
-      severity: "error",
-      message: `函数/方法 '${name}' 为无语义或临时占位命名`,
-      line: lineNum,
-      suggestedFix: "替换为具有明确领域语义与操作意图的命名",
-    };
-  }
-
+/**
+ * Validate identifier length against minimum and maximum boundaries.
+ *
+ * @param {string} name - Cleaned function name
+ * @param {string} lower - Lowercased function name
+ * @param {Record<string, any>} cfg - Configuration options
+ * @param {number} lineNum - 1-based source line number
+ * @returns {object|null} Violation descriptor or null
+ */
+function checkIdentifierLengthBounds(name, lower, cfg, lineNum) {
   const minLen = cfg.minFunctionNameLength || 3;
   const maxLen = cfg.maxFunctionNameLength || 50;
 
@@ -802,6 +829,34 @@ function validateFunctionName(node, sourceFile, cfg, lineNum) {
   }
 
   return null;
+}
+
+/**
+ * Evaluates function/method identifier length and semantic expressiveness.
+ * Enforces length in [3, 50], blocking single-letter or placeholder identifiers.
+ *
+ * @param {ts.Node} node - Target function AST node
+ * @param {ts.SourceFile} sourceFile - TypeScript source file
+ * @param {Record<string, any>} cfg - Complexity & naming thresholds
+ * @param {number} lineNum - 1-based source line number
+ * @returns {{ rule: string, severity: string, message: string, line: number, suggestedFix: string } | null}
+ */
+function validateFunctionName(node, sourceFile, cfg, lineNum) {
+  const name = extractCleanIdentifier(node, sourceFile);
+  if (!name) return null;
+
+  const lower = name.toLowerCase();
+  if (UNSEMANTIC_FUNCTION_NAMES.has(lower)) {
+    return {
+      rule: "NAM-VAG-001",
+      severity: "error",
+      message: `函数/方法 '${name}' 为无语义或临时占位命名`,
+      line: lineNum,
+      suggestedFix: "替换为具有明确领域语义与操作意图的命名",
+    };
+  }
+
+  return checkIdentifierLengthBounds(name, lower, cfg, lineNum);
 }
 
 /**
@@ -855,6 +910,8 @@ function analyzeFunction(node, sourceFile, cfg) {
       severity: "error",
       message: `函数 '${funcName}' 圈复杂度超标 (CC = ${complexity} > ${effectiveMaxCC}, ${tag})`,
       line: lineNum,
+      actual: `CC = ${complexity}`,
+      expected: `CC <= ${effectiveMaxCC}`,
       suggestedFix: "拆分多分支判定为策略表或提取独立辅助纯函数",
     });
   }
@@ -865,6 +922,8 @@ function analyzeFunction(node, sourceFile, cfg) {
       severity: "error",
       message: `函数 '${funcName}' 控制流嵌套过深 (Depth = ${maxNesting.val} > ${cfg.maxNestingDepth})`,
       line: lineNum,
+      actual: `Depth = ${maxNesting.val}`,
+      expected: `Depth <= ${cfg.maxNestingDepth}`,
       suggestedFix: "采用卫语句 (Guard Clause) 提前返回以平铺嵌套分支",
     });
   }
@@ -930,6 +989,9 @@ function analyzeSourceText(
       severity: "error",
       message: `代码稀释/注水指数超标 (kappa_noise = ${noiseRatio.toFixed(2)} > ${cfg.maxNoiseRatio})，有效代码行过低 (${eloc}/${totalLines})`,
       line: 1,
+      actual: `kappa_noise = ${noiseRatio.toFixed(2)}`,
+      expected: `kappa_noise <= ${cfg.maxNoiseRatio}`,
+      suggestedFix: "精简多余空行与无意义注释堆叠，提高代码紧凑度与语义密度",
     });
   }
 
@@ -952,45 +1014,198 @@ function analyzeFile(filePath, overrides = {}, changedLines = null) {
   return analyzeSourceText(content, filePath, overrides, changedLines);
 }
 
-function run() {
-  const { flags, explicitFiles } = parseCliFlags(process.argv.slice(2));
-  const hunkMap = getStagedHunkMap(explicitFiles);
-
-  if (hunkMap.size === 0) {
+/**
+ * Handle early exit when no staged TS/JS files require review.
+ *
+ * @param {boolean} isAgentMode - Autonomous Agent format flag.
+ */
+function handleEmptyHunkMap(isAgentMode) {
+  if (isAgentMode) {
+    console.log(
+      JSON.stringify(
+        {
+          protocolVersion: "1.0.0",
+          status: "PASS",
+          gate: "pre-commit:ast-slice",
+          summary: "No staged TS/JS files require AST slice review.",
+        },
+        null,
+        2,
+      ),
+    );
+  } else {
     console.log("  ✔ [PASS] 暂存区无 TS/JS 源码需执行 AST 切片审查");
-    process.exit(0);
   }
+  process.exit(0);
+}
 
-  console.log(
-    `  ▶ 扫描暂存区 ${hunkMap.size} 个文件的 AST 局部切片 (支持 Hunk 精准切片与分发器/低爆炸半径弹性包络)...`,
-  );
-  let totalErrors = 0;
-
+/**
+ * Scan hunk-mapped files and aggregate AST slice violations.
+ *
+ * @param {Map<string, { changedLines: Set<number>, isNew: boolean }>} hunkMap - Mapped staged files.
+ * @param {Record<string, any>} flags - Configuration override flags.
+ * @returns {Array<object>} Accumulated violation descriptors.
+ */
+function collectHunkSliceViolations(hunkMap, flags) {
+  const allViolations = [];
   for (const [file, info] of hunkMap.entries()) {
     const rel = path.relative(process.cwd(), file).replace(/\\/g, "/");
     const findings = analyzeFile(file, flags, info.changedLines);
-    if (findings.length > 0) {
-      console.error(`  ❌ [FAIL] ${rel}:`);
-      for (const f of findings) {
-        console.error(
-          `     - L${f.line} [${f.rule}] ${f.message}${f.suggestedFix ? " → 建议: " + f.suggestedFix : ""}`,
-        );
-      }
-      totalErrors += findings.length;
+    if (findings.length === 0) {
+      continue;
+    }
+    for (const f of findings) {
+      allViolations.push({
+        ruleId: f.rule,
+        severity: "BLOCK",
+        file: rel,
+        line: f.line,
+        actual: f.actual || f.message,
+        expected:
+          f.expected ||
+          (f.rule === "CPX-BUD-001"
+            ? "CC <= 15"
+            : f.rule === "CPX-NEST-001"
+              ? "Depth <= 4"
+              : "Noise <= 4.0"),
+        message: f.message,
+        actionableFix: f.suggestedFix || "平铺控制流或拆分复杂函数",
+        verificationCommand: `node scripts/common/validate-staged-slice.js ${rel}`,
+      });
+    }
+  }
+  return allViolations;
+}
+
+/**
+ * Persist failure snapshot envelope for downstream diagnostic and auto-repair triage.
+ *
+ * @param {Array<object>} allViolations - Detected violation records.
+ */
+function recordSliceFailureSnapshot(allViolations) {
+  try {
+    const { writeFailureSnapshot } = require("./log-rotator");
+    writeFailureSnapshot({
+      gate: "pre-commit:ast-slice",
+      step: "Gate 9: AST Staged Slice Review",
+      failedCommand: "node scripts/common/validate-staged-slice.js",
+      exitCode: 1,
+      summary: `AST slice review blocked commit due to ${allViolations.length} complexity or nesting violations.`,
+      violations: allViolations,
+      targetFiles: Array.from(
+        new Set(allViolations.map((v) => v.file).filter(Boolean)),
+      ),
+      verificationCommand: "node scripts/common/validate-staged-slice.js",
+    });
+  } catch {
+    // Best-effort snapshot recording
+  }
+}
+
+/**
+ * Render failure details and terminate process with exit code 1.
+ *
+ * @param {Array<object>} allViolations - Detected violation records.
+ * @param {boolean} isAgentMode - Autonomous Agent format flag.
+ */
+function renderSliceViolations(allViolations, isAgentMode) {
+  if (isAgentMode) {
+    const envelope = {
+      protocolVersion: "1.0.0",
+      status: "BLOCK",
+      gate: "pre-commit:ast-slice",
+      step: "Gate 9: AST Staged Slice Review",
+      failedCommand: "node scripts/common/validate-staged-slice.js",
+      exitCode: 1,
+      summary: `AST slice review blocked commit due to ${allViolations.length} complexity or nesting violations.`,
+      violations: allViolations,
+      agentDirectives: {
+        targetFiles: Array.from(
+          new Set(allViolations.map((v) => v.file).filter(Boolean)),
+        ),
+        remediationPriority: Array.from(
+          new Set(allViolations.map((v) => v.ruleId)),
+        ),
+        verificationCommand: "node scripts/common/validate-staged-slice.js",
+        fastRecheckCommand: "node scripts/common/validate-staged-slice.js",
+      },
+    };
+    console.log(JSON.stringify(envelope, null, 2));
+    process.exit(1);
+  }
+
+  const fileGroups = new Map();
+  for (const v of allViolations) {
+    if (!fileGroups.has(v.file)) fileGroups.set(v.file, []);
+    fileGroups.get(v.file).push(v);
+  }
+
+  for (const [rel, violations] of fileGroups) {
+    console.error(`  ❌ [FAIL] ${rel}:`);
+    for (const v of violations) {
+      console.error(
+        `     - L${v.line} [${v.ruleId}] ${v.message}${v.actionableFix ? " → 建议: " + v.actionableFix : ""}`,
+      );
     }
   }
 
-  if (totalErrors > 0) {
-    console.error(
-      `\n❌ [AST 切片审查阻断] 共发现 ${totalErrors} 处关键架构/复杂度违规！请重构后重新提交。`,
+  console.error(
+    `\n❌ [AST 切片审查阻断] 共发现 ${allViolations.length} 处关键架构/复杂度违规！请重构后重新提交。`,
+  );
+  process.exit(1);
+}
+
+/**
+ * Render success message and exit cleanly.
+ *
+ * @param {boolean} isAgentMode - Autonomous Agent format flag.
+ */
+function renderSliceSuccess(isAgentMode) {
+  if (isAgentMode) {
+    console.log(
+      JSON.stringify(
+        {
+          protocolVersion: "1.0.0",
+          status: "PASS",
+          gate: "pre-commit:ast-slice",
+          summary: "AST staged slice complexity review passed cleanly.",
+        },
+        null,
+        2,
+      ),
     );
-    process.exit(1);
   } else {
     console.log(
       `  ✔ [PASS] 暂存区 AST 切片审查通过（圈复杂度 <= 15 [私有 <= 18, 分发器 <= 25], 嵌套 <= 4, 噪声比 <= 4.0）`,
     );
-    process.exit(0);
   }
+  process.exit(0);
+}
+
+function run() {
+  const { flags, explicitFiles } = parseCliFlags(process.argv.slice(2));
+  const isAgentMode = Boolean(flags.agentMode);
+  const hunkMap = getStagedHunkMap(explicitFiles);
+
+  if (hunkMap.size === 0) {
+    handleEmptyHunkMap(isAgentMode);
+    return;
+  }
+
+  if (!isAgentMode) {
+    console.log(
+      `  ▶ 扫描暂存区 ${hunkMap.size} 个文件的 AST 局部切片 (支持 Hunk 精准切片与分发器/低爆炸半径弹性包络)...`,
+    );
+  }
+
+  const allViolations = collectHunkSliceViolations(hunkMap, flags);
+  if (allViolations.length > 0) {
+    recordSliceFailureSnapshot(allViolations);
+    renderSliceViolations(allViolations, isAgentMode);
+    return;
+  }
+
+  renderSliceSuccess(isAgentMode);
 }
 
 if (require.main === module) {

@@ -1,15 +1,19 @@
 /**
- * Module: Workspace Governance — Dual-Scale Code Volume & ELOC Evaluator
+ * Module: Workspace Governance — Dual-Scale Code Volume & 5D Code Density Evaluator
  * File Path: scripts/common/evaluate-eloc-budget.js
- * Architecture Role: Single source of truth for measuring Effective Lines of Code (ELOC)
- *   and Physical Lines of Code (LOC) across all languages in the repository.
+ * Architecture Role: Single source of truth for measuring Effective Lines of Code (ELOC),
+ *   Physical Lines of Code (LOC), semantic token column density, and plumbing overhead
+ *   across all languages in the repository.
  * Dependencies & Triggers: Node.js standard library (fs, path, child_process);
- *   invoked by pre-commit-gate (ps1/sh), self-audit suites, and manual CLI checks.
+ *   invoked by pre-commit-gate (ps1/sh), validate-code-density.js, self-audit suites,
+ *   and manual CLI checks.
  * Responsibilities:
  *   1. Strip comments (single-line //, #, ;, -- and multi-line /*...*\/) and blank lines
  *      to compute true semantic complexity (ELOC);
- *   2. Guard against cognitive overload (ELOC <= 800) and editor bloat (LOC <= 1200);
- *   3. Emit structured findings and exit non-zero on threshold breaches.
+ *   2. Calculate semantic token density tau and log-normal column density rho_col;
+ *   3. Enforce dynamic volume envelopes (ELOC <= 900, LOC <= 1400, density ratio 1:3);
+ *   4. Evaluate True Semantic Payload Ratio (TSPR) and Plumbing Overhead Ratio (POR);
+ *   5. Emit structured findings and exit non-zero on threshold breaches.
  * Exit Semantics & Design Rationale: 0 = PASS, 1 = FAIL on budget violation or file access error.
  */
 'use strict';
@@ -25,6 +29,13 @@ const DEFAULT_WARN_LOC = 1100;
 const DEFAULT_TARGET_DENSITY_RATIO = 3.0;
 const MIN_CONTRACT_COMMENT_RATIO = 0.08;
 const MIN_REPRESENTATIVE_LOC = 250;
+
+const LOG_NORMAL_MU = Math.log(7.5);
+const LOG_NORMAL_SIGMA = 0.55;
+const LOG_NORMAL_DENOM = 2 * LOG_NORMAL_SIGMA * LOG_NORMAL_SIGMA; // 0.605
+const MAX_PLUMBING_RATIO = 0.60;
+const MIN_TOKENS_PER_ELOC = 2.5;
+const MAX_TOKENS_PER_ELOC = 20.0;
 
 /**
  * Multi-language syntactic verbosity coefficients.
@@ -166,53 +177,132 @@ function classifyPowerShellLine(line, inBlockComment) {
   return { isBlank: false, isComment: false, inBlock: false };
 }
 
+const HASH_COMMENT_EXTS = new Set(['.gd', '.py', '.sh', '.bash', '.ps1']);
+const QUOTE_CHARS = new Set(['"', "'", '`']);
+
+function isCommentStart(ch, nextCh, isHash) {
+  if (isHash) return ch === '#';
+  return ch === '/' && nextCh === '/';
+}
+
 /**
- * Evaluates semantic code volume metrics for given file content.
+ * Strips trailing single-line comments from an effective code line,
+ * taking string literals into account to avoid false truncation.
  *
- * @param {string} content - Raw source code
- * @param {string} ext - File extension (e.g. '.ts', '.gd')
- * @returns {{ totalLoc: number, blankLines: number, commentLines: number, eloc: number, commentRatio: number, dilutionRatio: number, density: number }}
+ * @param {string} line - Raw line text.
+ * @param {string} ext - File extension.
+ * @returns {string} Code text with trailing comments removed.
  */
-function evaluateCodeMetrics(content, ext) {
-  const lines = content.split(/\r?\n/);
-  const totalLoc = lines.length;
-  let blankLines = 0;
-  let commentLines = 0;
-  let eloc = 0;
+function stripInlineComment(line, ext) {
+  if (!line) return '';
+  const isHash = HASH_COMMENT_EXTS.has(ext);
+  let inQuote = null;
+  let isEscaped = false;
+  const len = line.length;
 
-  const isPowerShell = ext === '.ps1';
-  const isHashLang = ext === '.gd' || ext === '.py' || ext === '.sh' || ext === '.bash';
-  let inBlock = false;
-  let quoteChar = '';
-
-  for (const line of lines) {
-    let result;
-    if (isPowerShell) {
-      result = classifyPowerShellLine(line, inBlock);
-      inBlock = result.inBlock;
-    } else if (isHashLang) {
-      result = classifyHashStyleLine(line, inBlock, quoteChar);
-      inBlock = result.inBlock;
-      quoteChar = result.quoteChar;
-    } else {
-      result = classifyCStyleLine(line, inBlock);
-      inBlock = result.inBlock;
+  for (let i = 0; i < len; i++) {
+    const ch = line[i];
+    if (isEscaped) {
+      isEscaped = false;
+      continue;
     }
+    if (ch === '\\') {
+      isEscaped = true;
+      continue;
+    }
+    if (inQuote) {
+      if (ch === inQuote) inQuote = null;
+      continue;
+    }
+    if (QUOTE_CHARS.has(ch)) {
+      inQuote = ch;
+      continue;
+    }
+    if (isCommentStart(ch, line[i + 1], isHash)) {
+      return line.slice(0, i);
+    }
+  }
+  return line;
+}
 
-    if (result.isBlank) {
-      blankLines++;
-    } else if (result.isComment) {
-      commentLines++;
-    } else {
-      eloc++;
+const TOKEN_PATTERN = /[a-zA-Z0-9_$]+|===|!==|==|!=|<=|>=|=>|&&|\|\||\+\+|--|[^\s\w]/g;
+
+/**
+ * Counts the number of semantic tokens in a code segment.
+ *
+ * @param {string} text - Code text stripped of comments.
+ * @returns {number} Token count.
+ */
+function countSemanticTokens(text) {
+  if (!text) return 0;
+  const matches = text.match(TOKEN_PATTERN);
+  return matches ? matches.length : 0;
+}
+
+/**
+ * Detects whether a code line represents pure wiring/plumbing
+ * (import, export forwarding, from, require, use, source).
+ *
+ * @param {string} trimmedLine - Cleaned, trimmed code line.
+ * @param {string} ext - File extension.
+ * @returns {boolean} True if the line is a plumbing statement.
+ */
+function isPlumbingLine(trimmedLine, ext) {
+  if (!trimmedLine) return false;
+
+  // 1. Module import / require declarations
+  if (
+    trimmedLine.startsWith('import ') ||
+    trimmedLine.startsWith('import(') ||
+    trimmedLine.startsWith('from ') ||
+    trimmedLine.startsWith('require(') ||
+    /^(?:const|let|var)\s+.*=\s*require\(/.test(trimmedLine)
+  ) {
+    return true;
+  }
+
+  // 2. Pure export statements (re-export, barrel forwarding, default pass-through)
+  if (trimmedLine.startsWith('export ')) {
+    if (
+      trimmedLine.startsWith('export *') ||
+      trimmedLine.startsWith('export type *') ||
+      /^export\s+(?:type\s+)?\{[^}]*\}\s*(?:from\s+[^;]+)?;?$/.test(trimmedLine) ||
+      /^export\s+default\s+[A-Za-z0-9_$]+;?$/.test(trimmedLine)
+    ) {
+      return true;
     }
   }
 
-  const commentRatio = totalLoc > 0 ? Number((commentLines / totalLoc).toFixed(4)) : 0;
-  const dilutionRatio = eloc > 0 ? Number((totalLoc / eloc).toFixed(2)) : 0;
-  const density = totalLoc > 0 ? Number(((eloc / totalLoc) * 100).toFixed(1)) : 0;
+  // 3. CommonJS module wiring
+  if (
+    trimmedLine.startsWith('module.exports =') ||
+    trimmedLine.startsWith('exports.')
+  ) {
+    return true;
+  }
 
-  return { totalLoc, blankLines, commentLines, eloc, commentRatio, dilutionRatio, density };
+  // 4. Shell / PowerShell sourcing and using
+  if (
+    trimmedLine.startsWith('source ') ||
+    trimmedLine.startsWith('. ') ||
+    trimmedLine.startsWith('using ') ||
+    trimmedLine.startsWith('Import-Module ')
+  ) {
+    return true;
+  }
+
+  // 5. GDScript wiring
+  if (ext === '.gd') {
+    if (
+      trimmedLine.startsWith('extends ') ||
+      trimmedLine.startsWith('class_name ') ||
+      /^(?:const|var)\s+\w+\s*=\s*preload\(/.test(trimmedLine)
+    ) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 const CONSTANT_PATH_PATTERNS = [
@@ -287,6 +377,182 @@ function isConstantContentStructure(content) {
 function isBenignConstantCatalog(filePath, content) {
   if (isConstantPath(filePath)) return true;
   return isConstantContentStructure(content);
+}
+
+/**
+ * Checks whether a file path or content structure qualifies for plumbing/density exemptions.
+ *
+ * @param {string} filePath - Path to file.
+ * @param {string} content - Raw content.
+ * @returns {boolean} True if exempt from plumbing overhead check.
+ */
+function isPlumbingExemptPath(filePath, content = '') {
+  if (!filePath) return false;
+  const norm = filePath.replace(/\\/g, '/').toLowerCase();
+  const base = path.basename(norm);
+
+  // 1. Barrel index files (facades specifically designed for re-exporting)
+  if (base.startsWith('index.')) return true;
+
+  // 2. TypeScript definition catalogs
+  if (norm.endsWith('.d.ts')) return true;
+
+  // 3. Benign constant & token catalogs
+  if (isConstantPath(filePath)) return true;
+  if (content && isConstantContentStructure(content)) return true;
+
+  return false;
+}
+
+/**
+ * Evaluates semantic code volume metrics, token density, and plumbing overhead
+ * for given file content.
+ *
+ * @param {string} content - Raw source code
+ * @param {string} ext - File extension (e.g. '.ts', '.gd')
+ * @param {string} [filePath=''] - Optional relative or absolute file path for exemption resolution
+ * @returns {{
+ *   totalLoc: number,
+ *   blankLines: number,
+ *   commentLines: number,
+ *   eloc: number,
+ *   commentRatio: number,
+ *   dilutionRatio: number,
+ *   density: number,
+ *   tokenCount: number,
+ *   tokensPerEloc: number,
+ *   columnDensity: number,
+ *   tspr: number,
+ *   plumbingRatio: number,
+ *   isPlumbingOverhead: boolean,
+ *   isColumnDiluted: boolean,
+ *   isColumnPacked: boolean
+ * }}
+ */
+function classifySourceLine(line, ext, state) {
+  if (ext === '.ps1') {
+    const res = classifyPowerShellLine(line, state.inBlock);
+    state.inBlock = res.inBlock;
+    return res;
+  }
+  if (HASH_COMMENT_EXTS.has(ext)) {
+    const res = classifyHashStyleLine(line, state.inBlock, state.quoteChar);
+    state.inBlock = res.inBlock;
+    state.quoteChar = res.quoteChar;
+    return res;
+  }
+  const res = classifyCStyleLine(line, state.inBlock);
+  state.inBlock = res.inBlock;
+  return res;
+}
+
+function computeDerivedDensityMetrics(totalLoc, eloc, commentLines, tokenCount, plumbingLines, isExempt) {
+  const commentRatio = totalLoc > 0 ? Number((commentLines / totalLoc).toFixed(4)) : 0;
+  const dilutionRatio = eloc > 0 ? Number((totalLoc / eloc).toFixed(2)) : 0;
+  const density = totalLoc > 0 ? Number(((eloc / totalLoc) * 100).toFixed(1)) : 0;
+
+  const tokensPerEloc = eloc > 0 ? Number((tokenCount / eloc).toFixed(2)) : 0;
+  let columnDensity = 0;
+  if (tokensPerEloc > 0) {
+    const lnTau = Math.log(tokensPerEloc);
+    const diff = lnTau - LOG_NORMAL_MU;
+    columnDensity = Number(Math.exp(-(diff * diff) / LOG_NORMAL_DENOM).toFixed(4));
+  }
+
+  const rawPor = eloc > 0 ? plumbingLines / eloc : 0;
+  const rawTspr = 1.0 - rawPor;
+  const tspr = Number(Math.max(0, Math.min(1.0, rawTspr)).toFixed(4));
+  const plumbingRatio = Number(Math.max(0, Math.min(1.0, rawPor)).toFixed(4));
+
+  const isPlumbingOverhead = !isExempt && plumbingRatio > MAX_PLUMBING_RATIO;
+  const isColumnDiluted = eloc > 0 && tokensPerEloc < MIN_TOKENS_PER_ELOC;
+  const isColumnPacked = tokensPerEloc > MAX_TOKENS_PER_ELOC;
+
+  return {
+    commentRatio,
+    dilutionRatio,
+    density,
+    tokensPerEloc,
+    columnDensity,
+    tspr,
+    plumbingRatio,
+    isPlumbingOverhead,
+    isColumnDiluted,
+    isColumnPacked,
+  };
+}
+
+/**
+ * Parses and evaluates all code volume and 5D density metrics for a file.
+ *
+ * @param {string} content - Raw source code content.
+ * @param {string} ext - Lowercase file extension (e.g. '.ts', '.gd').
+ * @param {string} filePath - Path to file for exemption evaluation.
+ * @returns {{
+ *   totalLoc: number,
+ *   blankLines: number,
+ *   commentLines: number,
+ *   eloc: number,
+ *   commentRatio: number,
+ *   dilutionRatio: number,
+ *   density: number,
+ *   tokenCount: number,
+ *   tokensPerEloc: number,
+ *   columnDensity: number,
+ *   tspr: number,
+ *   plumbingRatio: number,
+ *   isPlumbingOverhead: boolean,
+ *   isColumnDiluted: boolean,
+ *   isColumnPacked: boolean
+ * }}
+ */
+function evaluateCodeMetrics(content, ext, filePath = '') {
+  const lines = content.split(/\r?\n/);
+  const totalLoc = lines.length;
+  let blankLines = 0;
+  let commentLines = 0;
+  let eloc = 0;
+  let tokenCount = 0;
+  let plumbingLines = 0;
+
+  const state = { inBlock: false, quoteChar: '' };
+
+  for (const line of lines) {
+    const result = classifySourceLine(line, ext, state);
+    if (result.isBlank) {
+      blankLines++;
+    } else if (result.isComment) {
+      commentLines++;
+    } else {
+      eloc++;
+      const cleaned = stripInlineComment(line, ext).trim();
+      if (cleaned.length > 0) {
+        tokenCount += countSemanticTokens(cleaned);
+        if (isPlumbingLine(cleaned, ext)) {
+          plumbingLines++;
+        }
+      }
+    }
+  }
+
+  const isExempt = isPlumbingExemptPath(filePath, content);
+  const derived = computeDerivedDensityMetrics(
+    totalLoc,
+    eloc,
+    commentLines,
+    tokenCount,
+    plumbingLines,
+    isExempt,
+  );
+
+  return {
+    totalLoc,
+    blankLines,
+    commentLines,
+    eloc,
+    tokenCount,
+    ...derived,
+  };
 }
 
 /**
@@ -458,6 +724,7 @@ function parseArgs(args) {
     densityRatio:
       typeof projCfg?.densityRatio === 'number' ? projCfg.densityRatio : DEFAULT_TARGET_DENSITY_RATIO,
     staged: false,
+    json: false,
     files: [],
   };
 
@@ -466,6 +733,10 @@ function parseArgs(args) {
     const arg = args[i++];
     if (arg === '--staged') {
       options.staged = true;
+      continue;
+    }
+    if (arg === '--json') {
+      options.json = true;
       continue;
     }
     const targetKey = OPTION_KEY_MAP[arg];
@@ -502,32 +773,29 @@ function isAuditableCodeFile(file) {
   return ['.ts', '.js', '.mjs', '.cjs', '.gd', '.py', '.sh', '.ps1'].includes(ext);
 }
 
-/**
- * Main evaluation runner.
- */
-function run() {
-  const options = parseArgs(process.argv.slice(2));
-  let targets = options.files;
-
-  if (options.staged || targets.length === 0) {
-    const staged = getStagedFiles();
-    targets = targets.concat(staged);
-  }
-
-  // Remove duplicates and apply ignore filters
-  const uniqueFiles = Array.from(new Set(targets)).filter(
-    (f) => fs.existsSync(f) && isAuditableCodeFile(f),
-  );
-
-  if (uniqueFiles.length === 0) {
-    console.log('  ✔ [PASS] 无代码文件需要执行双轨体积与 ELOC 预算检查');
+function handleEmptyTargets(options) {
+  if (options.json) {
+    console.log(
+      JSON.stringify(
+        {
+          protocolVersion: '1.0.0',
+          status: 'PASS',
+          totalFiles: 0,
+          violations: [],
+          warnings: [],
+          files: [],
+        },
+        null,
+        2,
+      ),
+    );
     process.exit(0);
   }
+  console.log('  ✔ [PASS] 无代码文件需要执行双轨体积与 ELOC 预算检查');
+  process.exit(0);
+}
 
-  console.log(
-    `  ▶ 检查 ${uniqueFiles.length} 个源文件的双轨体积与双向动态密度 (ELOC <= ${options.maxEloc}, LOC <= ${options.maxLoc}, 目标密度比 1:${options.densityRatio})...`,
-  );
-
+function auditFileCollection(uniqueFiles, options) {
   const violations = [];
   const warnings = [];
   const summaries = [];
@@ -535,8 +803,8 @@ function run() {
   for (const file of uniqueFiles) {
     const content = fs.readFileSync(file, 'utf8');
     const ext = path.extname(file).toLowerCase();
-    const metrics = evaluateCodeMetrics(content, ext);
     const relPath = path.relative(process.cwd(), file).replace(/\\/g, '/');
+    const metrics = evaluateCodeMetrics(content, ext, relPath);
 
     const envelope = evaluateDynamicEnvelope(metrics, options, relPath, content);
     summaries.push({ relPath, ...metrics, envelope });
@@ -558,6 +826,10 @@ function run() {
     }
   }
 
+  return { violations, warnings, summaries };
+}
+
+function printHumanAuditSummary(summaries, warnings, violations) {
   if (warnings.length > 0) {
     console.log(`  ℹ️ [NOTICE] ${warnings.length} file(s) touched dynamic envelope threshold:`);
     for (const w of warnings) {
@@ -581,7 +853,59 @@ function run() {
   console.log(
     `  ✔ [PASS] 100% 文件符合双轨体积与动态包络约束 (最高观测: ${top.relPath} -> ${top.eloc} ELOC / ${top.totalLoc} LOC, 密度: ${top.density}%, 稀释比: 1:${top.dilutionRatio})`,
   );
+  console.log(
+    `     📊 [DENSITY] 语义载荷与列密度监控: TSPR ${(top.tspr * 100).toFixed(1)}%, τ = ${top.tokensPerEloc} tokens/line, ρ_col = ${top.columnDensity}`,
+  );
   process.exit(0);
+}
+
+/**
+ * Main evaluation runner.
+ */
+function run() {
+  const options = parseArgs(process.argv.slice(2));
+  let targets = options.files;
+
+  if (options.staged || targets.length === 0) {
+    const staged = getStagedFiles();
+    targets = targets.concat(staged);
+  }
+
+  // Remove duplicates and apply ignore filters
+  const uniqueFiles = Array.from(new Set(targets)).filter(
+    (f) => fs.existsSync(f) && isAuditableCodeFile(f),
+  );
+
+  if (uniqueFiles.length === 0) {
+    handleEmptyTargets(options);
+    return;
+  }
+
+  if (!options.json) {
+    console.log(
+      `  ▶ 检查 ${uniqueFiles.length} 个源文件的双轨体积与双向动态密度 (ELOC <= ${options.maxEloc}, LOC <= ${options.maxLoc}, 目标密度比 1:${options.densityRatio})...`,
+    );
+  }
+
+  const { violations, warnings, summaries } = auditFileCollection(uniqueFiles, options);
+
+  if (options.json) {
+    const report = {
+      protocolVersion: '1.0.0',
+      status: violations.length === 0 ? 'PASS' : 'FAIL',
+      maxEloc: options.maxEloc,
+      maxLoc: options.maxLoc,
+      targetDensityRatio: options.densityRatio,
+      totalFiles: uniqueFiles.length,
+      violations,
+      warnings,
+      files: summaries,
+    };
+    console.log(JSON.stringify(report, null, 2));
+    process.exit(violations.length === 0 ? 0 : 1);
+  }
+
+  printHumanAuditSummary(summaries, warnings, violations);
 }
 
 if (require.main === module) {
@@ -594,4 +918,14 @@ module.exports = {
   classifyCStyleLine,
   classifyHashStyleLine,
   classifyPowerShellLine,
+  stripInlineComment,
+  countSemanticTokens,
+  isPlumbingLine,
+  isPlumbingExemptPath,
+  isConstantPath,
+  isConstantContentStructure,
+  isBenignConstantCatalog,
+  getLanguageVerbosityFactor,
+  isAuditableCodeFile,
+  getStagedFiles,
 };

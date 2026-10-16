@@ -166,6 +166,7 @@ function Wait-ProcessWithTimeout {
             $diagLines.Add("================================================================================")
             [System.IO.File]::WriteAllLines($diagFile, $diagLines, [System.Text.UTF8Encoding]::new($false))
             Write-Host "💡 超时诊断快照已落盘至: $diagFile" -ForegroundColor Yellow
+            Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/log-rotator.js", "--prune" -WorkingDirectory $repoRoot -NoNewWindow -Wait -ErrorAction SilentlyContinue
         } catch {
             # 诊断快照落盘失败不阻断异常主流程
         }
@@ -195,12 +196,14 @@ $startTime = [System.Diagnostics.Stopwatch]::StartNew()
 $failed = $false
 
 # 1. 物理卫生与零空文件看守
-if (-not $Json) { Write-Host "▶ [1/5] 检查全工作区物理卫生、同构脚本与零空文件..." -ForegroundColor Gray }
+if (-not $Json) { Write-Host "▶ [1/5] 检查全工作区物理卫生、同构脚本、.gitignore 治理与零空文件..." -ForegroundColor Gray }
 $res = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-no-empty-files.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
 $resIso = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-script-isomorphism.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
+$resGi = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-gitignore-governance.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
 $codeEmpty = $res.ExitCode
 $codeIso = $resIso.ExitCode
-if ($codeEmpty -ne 0 -or $codeIso -ne 0) {
+$codeGi = $resGi.ExitCode
+if ($codeEmpty -ne 0 -or $codeIso -ne 0 -or $codeGi -ne 0) {
     $statusHygiene = "FAIL"
     $failed = $true
 } else {
@@ -242,7 +245,11 @@ $logArSelfOut = Join-Path $transientDir "audit-ar-self-$randSuffix.out.log"
 $logArSelfErr = Join-Path $transientDir "audit-ar-self-$randSuffix.err.log"
 
 $procWt = Start-Process -FilePath $npmCmd -ArgumentList @("run", "review") -WorkingDirectory $workspaceTimingDir -RedirectStandardOutput $logWtOut -RedirectStandardError $logWtErr -PassThru
-$procWg = Start-Process -FilePath $pythonCmd -ArgumentList @("WebGames/scripts/py/audit_config.py", "--strict", "--arch") -WorkingDirectory $repoRoot -RedirectStandardOutput $logWgOut -RedirectStandardError $logWgErr -PassThru
+$procWg = if ($Fast) {
+    Start-Process -FilePath $pythonCmd -ArgumentList @("WebGames/scripts/py/audit_runner.py", "--diff") -WorkingDirectory $repoRoot -RedirectStandardOutput $logWgOut -RedirectStandardError $logWgErr -PassThru
+} else {
+    Start-Process -FilePath $pythonCmd -ArgumentList @("WebGames/scripts/py/audit_runner.py") -WorkingDirectory $repoRoot -RedirectStandardOutput $logWgOut -RedirectStandardError $logWgErr -PassThru
+}
 $procAr = if ($Fast) {
     Start-Process -FilePath $nodeCmd -ArgumentList @("scripts/validate-self-multidimensional-audit.js") -WorkingDirectory $autoRefactorDir -RedirectStandardOutput $logArOut -RedirectStandardError $logArErr -PassThru
 } else {
@@ -323,6 +330,7 @@ if ($failed) {
             if (Test-Path $logArErr) { Copy-Item -Path $logArErr -Destination (Join-Path $diagDir "fail-auto-refactor-$timestamp.err.log") -Force -ErrorAction SilentlyContinue }
         }
         Write-Host "💡 失败审查完整日志已保留至: .audit-logs/" -ForegroundColor Yellow
+        Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/log-rotator.js", "--prune" -WorkingDirectory $repoRoot -NoNewWindow -Wait -ErrorAction SilentlyContinue
     } catch {
         # 归档日志失败不阻断异常主流程
     }
@@ -581,47 +589,65 @@ $workspaceHealthScore = [math]::Round(
 $wsHealthStr = if ($workspaceHealthScore % 1 -eq 0) { $workspaceHealthScore.ToString("0.0") } else { $workspaceHealthScore.ToString("0.##") }
 $wsGrade = (Get-GradeFromScore $workspaceHealthScore).Trim()
 
-if ($Json) {
-    $qualityVectorObj = if ($null -ne $tenDimensions) {
-        $qObj = [ordered]@{}
-        foreach ($d in $dimDefinitions) {
-            $rawScore = Get-SafeProp $tenDimensions $d.key
-            $parsedScore = 0.0
-            if ($null -ne $rawScore -and [double]::TryParse([string]$rawScore, [ref]$parsedScore) -and -not [double]::IsNaN($parsedScore) -and $parsedScore -gt 0) {
-                $qObj[$d.key] = $parsedScore
-            } else {
-                $qObj[$d.key] = $null
-            }
+$qualityVectorObj = if ($null -ne $tenDimensions) {
+    $qObj = [ordered]@{}
+    foreach ($d in $dimDefinitions) {
+        $rawScore = Get-SafeProp $tenDimensions $d.key
+        $parsedScore = 0.0
+        if ($null -ne $rawScore -and [double]::TryParse([string]$rawScore, [ref]$parsedScore) -and -not [double]::IsNaN($parsedScore) -and $parsedScore -gt 0) {
+            $qObj[$d.key] = $parsedScore
+        } else {
+            $qObj[$d.key] = $null
         }
-        $qObj
-    } else {
-        $null
     }
+    $qObj
+} else {
+    $null
+}
 
-    $summary = [ordered]@{
-        timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
-        status = if ($failed) { "FAIL" } else { "PASS" }
-        elapsedSeconds = $elapsedSec
-        projects = [ordered]@{
-            hygiene = $statusHygiene
-            rulesCatalog = $statusRules
-            autoRefactor = $statusAr
-            workspaceTiming = $statusWt
-            webGames = $statusWg
-        }
-        projectScores = [ordered]@{
-            hygiene = $scoreHygiene
-            rulesCatalog = $scoreRules
-            autoRefactor = $scoreAr
-            workspaceTiming = $scoreWt
-            webGames = $scoreWg
-        }
-        workspaceHealthScore = $workspaceHealthScore
-        compositeScore = $workspaceHealthScore
-        arCompositeScore = $compositeScore
-        tenDimensions = $qualityVectorObj
-        qualityVector = $qualityVectorObj
+$summary = [ordered]@{
+    protocolVersion = "1.0.0"
+    timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
+    gitRevision = (git rev-parse --short HEAD 2>$null)
+    fastMode = [bool]$Fast
+    status = if ($failed) { "FAIL" } else { "PASS" }
+    exitCode = $exitCode
+    elapsedSeconds = $elapsedSec
+    workspaceHealthScore = $workspaceHealthScore
+    compositeScore = $workspaceHealthScore
+    grade = $wsGrade
+    autonomyRate = if ($null -ne $autonomyRate) { [double]$autonomyRate } else { $null }
+    polyglotIndex = if ($null -ne $polyglotIndex) { [double]$polyglotIndex } else { $null }
+    totalDebt = if ($null -ne $totalDebt) { [int]$totalDebt } else { $null }
+    catalogRuleCount = $catalogRuleCount
+    projects = [ordered]@{
+        hygiene = $statusHygiene
+        rulesCatalog = $statusRules
+        autoRefactor = $statusAr
+        workspaceTiming = $statusWt
+        webGames = $statusWg
     }
+    projectScores = [ordered]@{
+        hygiene = $scoreHygiene
+        rulesCatalog = $scoreRules
+        autoRefactor = $scoreAr
+        workspaceTiming = $scoreWt
+        webGames = $scoreWg
+    }
+    arCompositeScore = $compositeScore
+    tenDimensions = $qualityVectorObj
+    qualityVector = $qualityVectorObj
+}
+
+# 无论审查通过或失败，第一时间原子持久化全工作区最新审查快照与历史分数轨迹
+try {
+    $summaryJson = $summary | ConvertTo-Json -Depth 5 -Compress
+    $summaryJson | & $nodeCmd "scripts/common/record-workspace-audit.js" --record-stdin | Out-Null
+} catch {
+    # 留痕失败不阻断门禁主流程
+}
+
+if ($Json) {
     $summary | ConvertTo-Json -Depth 4
     exit $exitCode
 }
@@ -718,6 +744,8 @@ if ($null -ne $totalDebt) { $bottomSummary += "  |  技术债: {0}项" -f $total
 $bottomSummary += "  |  全局状态: {0}" -f $globalStatus
 Write-Host (Format-DashboardRow $bottomSummary $targetWidth) -ForegroundColor $globalColor
 Write-Host ("└" + ("─" * $targetWidth) + "┘") -ForegroundColor Cyan
+Write-Host "💡 统一审查快照已落盘至: .audit-logs/audit-latest.json | audit-latest.md" -ForegroundColor Gray
+Write-Host "💡 质量历史轨迹已追加至: .audit-logs/audit-history.jsonl" -ForegroundColor Gray
 
 if ($env:GITHUB_STEP_SUMMARY) {
     try {

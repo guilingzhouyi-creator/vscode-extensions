@@ -10,7 +10,10 @@
 #   pwsh -File scripts/ps1/pre-push-gate.ps1
 # ==============================================================================
 [CmdletBinding()]
-param()
+param(
+    [switch]$ViewLog,
+    [switch]$Agent
+)
 Set-StrictMode -Version Latest
 
 $ErrorActionPreference = 'Stop'
@@ -20,23 +23,53 @@ $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 $PSDefaultParameterValues['Get-Content:Encoding'] = 'utf8'
 $PSDefaultParameterValues['Set-Content:Encoding'] = 'utf8'
 
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "../..")).Path
+$npmCmd = if ($IsWindows -or $env:OS -match "Windows") { "npm.cmd" } else { "npm" }
+$nodeCmd = if ($IsWindows -or $env:OS -match "Windows") { "node.exe" } else { "node" }
+$pythonCmd = if (Get-Command python3.12 -ErrorAction SilentlyContinue) { "python3.12" } elseif (Get-Command python -ErrorAction SilentlyContinue) { "python" } elseif (Get-Command python3 -ErrorAction SilentlyContinue) { "python3" } else { "py" }
+
+if ($ViewLog) {
+    & $nodeCmd (Join-Path $repoRoot "scripts/common/log-rotator.js") --view
+    exit $LASTEXITCODE
+}
+
 if (-not $env:GIT_CONFIG_GLOBAL) { $env:GIT_CONFIG_GLOBAL = 'NUL' }
 if (-not $env:GIT_CONFIG_SYSTEM) { $env:GIT_CONFIG_SYSTEM = 'NUL' }
 if (-not $env:GIT_CONFIG_NOSYSTEM) { $env:GIT_CONFIG_NOSYSTEM = '1' }
 if (-not $env:XDG_CONFIG_HOME) { $env:XDG_CONFIG_HOME = (Get-Location).Path }
 
-Write-Host "=================================================================" -ForegroundColor Cyan
-Write-Host "🔒 执行本地 Pre-Push 推送前回归检查 (PowerShell 版)" -ForegroundColor Cyan
-Write-Host "=================================================================" -ForegroundColor Cyan
+if (-not $Agent) {
+    Write-Host "=================================================================" -ForegroundColor Cyan
+    Write-Host "🔒 执行本地 Pre-Push 推送前回归检查 (PowerShell 版)" -ForegroundColor Cyan
+    Write-Host "=================================================================" -ForegroundColor Cyan
+}
 
-$npmCmd = if ($IsWindows -or $env:OS -match "Windows") { "npm.cmd" } else { "npm" }
-$nodeCmd = if ($IsWindows -or $env:OS -match "Windows") { "node.exe" } else { "node" }
-$pythonCmd = if (Get-Command python3.12 -ErrorAction SilentlyContinue) { "python3.12" } elseif (Get-Command python -ErrorAction SilentlyContinue) { "python" } elseif (Get-Command python3 -ErrorAction SilentlyContinue) { "python3" } else { "py" }
 $failed = $false
-
-$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "../..")).Path
 $autoRefactorDir = Join-Path $repoRoot "auto-refactor"
 $workspaceTimingDir = Join-Path $repoRoot "workspace-timing"
+
+function Get-StepRuleId {
+    [CmdletBinding()]
+    param([string]$StepName)
+    if ($StepName -match "Gate 1") { return "HYG-EMP-001" }
+    if ($StepName -match "Gate 2") { return "GATE-SSOT-001" }
+    if ($StepName -match "Gate 3") { return "RCFG-RULE-DRIFT" }
+    if ($StepName -match "Gate 4") { return "GATE-BUDGET-001" }
+    if ($StepName -match "Gate 5") { return "GATE-BUDGET-001" }
+    if ($StepName -match "Gate 6") { return "RCFG-MATRIX" }
+    if ($StepName -match "Gate 7") { return "ARCH-CFG-001" }
+    if ($StepName -match "Gate 8") { return "ADV-CFG-001" }
+    if ($StepName -match "Gate 9") { return "GATE-MSG-001" }
+    return "GATE-SYS-001"
+}
+
+function Write-GateHost {
+    [CmdletBinding()]
+    param([string]$Message, [string]$ForegroundColor = "Gray")
+    if (-not $Agent) {
+        Write-Host $Message -ForegroundColor $ForegroundColor
+    }
+}
 
 function Wait-ProcessWithTimeout {
     [CmdletBinding()]
@@ -90,6 +123,7 @@ function Wait-ProcessWithTimeout {
             $diagLines.Add("================================================================================")
             [System.IO.File]::WriteAllLines($diagFile, $diagLines, [System.Text.UTF8Encoding]::new($false))
             Write-Host "💡 超时诊断快照已落盘至: $diagFile" -ForegroundColor Yellow
+            Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/log-rotator.js", "--prune" -WorkingDirectory $repoRoot -NoNewWindow -Wait -ErrorAction SilentlyContinue
         } catch {}
 
         return $false
@@ -124,20 +158,61 @@ function Invoke-GateStep {
 
     $ok = Wait-ProcessWithTimeout -Process $p -TimeoutSeconds $TimeoutSeconds -ProcessName $StepName -LogFile $stepLog
     if (-not $ok) {
-        Write-Host "❌ $StepName 执行超时 (已超过 ${TimeoutSeconds} 秒)" -ForegroundColor Red
+        if (-not $Agent) { Write-Host "❌ $StepName 执行超时 (已超过 ${TimeoutSeconds} 秒)" -ForegroundColor Red }
         return 124
     }
     if ($p.ExitCode -ne 0) {
-        Write-Host "❌ $StepName 失败 (退出码: $($p.ExitCode))" -ForegroundColor Red
-        if (Test-Path $stepLog) {
-            $tail = Get-Content -Path $stepLog -Tail 20 -ErrorAction SilentlyContinue
-            if ($tail) {
-                Write-Host "   --- 错误日志摘要 ---" -ForegroundColor DarkRed
-                foreach ($line in $tail) {
-                    Write-Host "   $line" -ForegroundColor DarkRed
+        if (-not $Agent) {
+            Write-Host "❌ $StepName 失败 (退出码: $($p.ExitCode))" -ForegroundColor Red
+            if (Test-Path $stepLog) {
+                $tail = Get-Content -Path $stepLog -Tail 20 -ErrorAction SilentlyContinue
+                if ($tail) {
+                    Write-Host "   --- 错误日志摘要 ---" -ForegroundColor DarkRed
+                    foreach ($line in $tail) {
+                        Write-Host "   $line" -ForegroundColor DarkRed
+                    }
                 }
             }
         }
+        # 保留现场快照与 Agent-Native Envelope
+        try {
+            $lastLog = Join-Path $logDir "last-pre-push.log"
+            Copy-Item -Path $stepLog -Destination $lastLog -Force -ErrorAction SilentlyContinue
+            Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/log-rotator.js", "--truncate", $lastLog -WorkingDirectory $repoRoot -NoNewWindow -Wait -ErrorAction SilentlyContinue
+
+            $ruleId = Get-StepRuleId -StepName $StepName
+            $cmdStr = "$FilePath $($ArgumentList -join ' ')"
+            $violation = [ordered]@{
+                ruleId = $ruleId
+                severity = "BLOCK"
+                file = $WorkingDirectory
+                message = "Step $StepName failed with exit code $($p.ExitCode)"
+                verificationCommand = $cmdStr
+            }
+            $envelope = [ordered]@{
+                protocolVersion = "1.0.0"
+                recordedAt = (Get-Date).ToString("o")
+                status = "BLOCK"
+                gate = "pre-push"
+                step = $StepName
+                failedCommand = $cmdStr
+                exitCode = $p.ExitCode
+                summary = "Step $StepName failed with exit code $($p.ExitCode)"
+                logFile = ".audit-logs/last-pre-push.log"
+                violations = @($violation)
+                agentDirectives = [ordered]@{
+                    targetFiles = @($WorkingDirectory)
+                    remediationPriority = @($ruleId)
+                    verificationCommand = $cmdStr
+                    fastRecheckCommand = "pwsh -File scripts/ps1/pre-push-gate.ps1 -Agent"
+                }
+            }
+            $snapshotJson = $envelope | ConvertTo-Json -Depth 5
+            [System.IO.File]::WriteAllText((Join-Path $logDir "last-failure.json"), $snapshotJson, [System.Text.UTF8Encoding]::new($false))
+        } catch {}
+    } else {
+        # 步骤执行成功，清理临时 step 日志保持目录干净
+        if (Test-Path $stepLog) { Remove-Item -Path $stepLog -Force -ErrorAction SilentlyContinue }
     }
     return $p.ExitCode
 }
@@ -188,136 +263,153 @@ $runWt = $runAll -or $touchedWt
 $runWg = $runAll -or $touchedWg
 
 if ($runAll) {
-    Write-Host "ℹ️  检测到跨项目/共享治理改动或全量基准，执行全量门禁回归" -ForegroundColor Yellow
+    Write-GateHost "ℹ️  检测到跨项目/共享治理改动或全量基准，执行全量门禁回归" -ForegroundColor Yellow
 } else {
     $activeProj = @()
     if ($runAr) { $activeProj += "auto-refactor" }
     if ($runWt) { $activeProj += "workspace-timing" }
     if ($runWg) { $activeProj += "WebGames" }
-    Write-Host "ℹ️  智能影响路由生效: 仅回归受影响项目 [$($activeProj -join ', ')]" -ForegroundColor Green
+    Write-GateHost "ℹ️  智能影响路由生效: 仅回归受影响项目 [$($activeProj -join ', ')]" -ForegroundColor Green
 }
 
-# --- Gate 1: 全工作区零空文件与物理卫生守卫 ---
-Write-Host "[1/9] 校验全工作区零物理空文件与空白脚本守卫..." -ForegroundColor Gray
+# --- Gate 1: 全工作区零空文件、物理卫生与 .gitignore 治理守卫 ---
+Write-GateHost "[1/9] 校验全工作区零物理空文件、空白脚本与 .gitignore 治理守卫..." -ForegroundColor Gray
 $code = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-no-empty-files.js") -WorkingDirectory $repoRoot -StepName "Gate 1 (零物理空文件)" -TimeoutSeconds 30
-if ($code -ne 0) {
+$codeGi = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-gitignore-governance.js") -WorkingDirectory $repoRoot -StepName "Gate 1 (.gitignore 治理)" -TimeoutSeconds 30
+if ($code -ne 0 -or $codeGi -ne 0) {
     $failed = $true
 } else {
-    Write-Host "  ✔ 全工作区零空文件校验通过" -ForegroundColor Green
+    Write-GateHost "  ✔ 全工作区零空文件与 .gitignore 治理校验通过" -ForegroundColor Green
 }
 
 # --- Gate 2: 规则单源目录一致性同步 ---
-Write-Host "[2/9] 校验全工作区单源规则目录同步..." -ForegroundColor Gray
+Write-GateHost "[2/9] 校验全工作区单源规则目录同步..." -ForegroundColor Gray
 $code = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/generate-rule-catalog.js") -WorkingDirectory $repoRoot -StepName "Gate 2 (单源规则目录)" -TimeoutSeconds 30
 if ($code -ne 0) {
     $failed = $true
 } else {
-    Write-Host "  ✔ 全工作区单源规则目录同步通过" -ForegroundColor Green
+    Write-GateHost "  ✔ 全工作区单源规则目录同步通过" -ForegroundColor Green
 }
 
 # --- Gate 3: auto-refactor 引擎全量门禁与回归套件 ---
 if ($runAr) {
-    Write-Host "[3/9] 执行 auto-refactor 全量门禁与回归套件 (Rust/Build/Self/Tests)..." -ForegroundColor Gray
+    Write-GateHost "[3/9] 执行 auto-refactor 全量门禁与回归套件 (Rust/Build/Self/Tests)..." -ForegroundColor Gray
     $codeRust = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/gate-rust.js") -WorkingDirectory $autoRefactorDir -StepName "auto-refactor Rust Gate" -TimeoutSeconds 60
     $codeBuild = Invoke-GateStep -FilePath $npmCmd -ArgumentList @("run", "build") -WorkingDirectory $autoRefactorDir -StepName "auto-refactor Build" -TimeoutSeconds 90
     $codeSelf = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/gate-self.js") -WorkingDirectory $autoRefactorDir -StepName "auto-refactor Self Gate" -TimeoutSeconds 60
     $codeTest = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/test-parallel.js") -WorkingDirectory $autoRefactorDir -StepName "auto-refactor Tests" -TimeoutSeconds 180
     if ($codeRust -ne 0 -or $codeBuild -ne 0 -or $codeSelf -ne 0 -or $codeTest -ne 0) {
-        Write-Host "❌ Gate 3: auto-refactor 门禁或测试套件未通过" -ForegroundColor Red
+        Write-GateHost "❌ Gate 3: auto-refactor 门禁或测试套件未通过" -ForegroundColor Red
         $failed = $true
     } else {
-        Write-Host "  ✔ auto-refactor 全量门禁与测试套件通过" -ForegroundColor Green
+        Write-GateHost "  ✔ auto-refactor 全量门禁与测试套件通过" -ForegroundColor Green
     }
 } else {
-    Write-Host "  ✔ [Gate 3] auto-refactor 未受影响，智能跳过全量门禁" -ForegroundColor Green
+    Write-GateHost "  ✔ [Gate 3] auto-refactor 未受影响，智能跳过全量门禁" -ForegroundColor Green
 }
 
 # --- Gate 4: auto-refactor 多维自审与质量基线 ---
 if ($runAr) {
-    Write-Host "[4/9] 执行 auto-refactor 质量基线与多维自审 (LOC预算/熵/密度/BIF)..." -ForegroundColor Gray
+    Write-GateHost "[4/9] 执行 auto-refactor 质量基线与多维自审 (LOC预算/熵/密度/BIF)..." -ForegroundColor Gray
     $code = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/validate-self-multidimensional-audit.js") -WorkingDirectory $autoRefactorDir -StepName "Gate 4 (auto-refactor 质量基线)" -TimeoutSeconds 60
     if ($code -ne 0) {
         $failed = $true
     } else {
-        Write-Host "  ✔ auto-refactor 质量基线与自审达标" -ForegroundColor Green
+        Write-GateHost "  ✔ auto-refactor 质量基线与自审达标" -ForegroundColor Green
     }
 } else {
-    Write-Host "  ✔ [Gate 4] auto-refactor 未受影响，智能跳过质量基线" -ForegroundColor Green
+    Write-GateHost "  ✔ [Gate 4] auto-refactor 未受影响，智能跳过质量基线" -ForegroundColor Green
 }
 
 # --- Gate 5: workspace-timing 快速单元测试套件 ---
 if ($runWt) {
-    Write-Host "[5/9] 执行 workspace-timing 快速单元测试套件..." -ForegroundColor Gray
+    Write-GateHost "[5/9] 执行 workspace-timing 快速单元测试套件..." -ForegroundColor Gray
     $code = Invoke-GateStep -FilePath $npmCmd -ArgumentList @("run", "test:fast") -WorkingDirectory $workspaceTimingDir -StepName "Gate 5 (workspace-timing 快速单元测试)" -TimeoutSeconds 60
     if ($code -ne 0) {
         $failed = $true
     } else {
-        Write-Host "  ✔ workspace-timing 快速单元测试通过" -ForegroundColor Green
+        Write-GateHost "  ✔ workspace-timing 快速单元测试通过" -ForegroundColor Green
     }
 } else {
-    Write-Host "  ✔ [Gate 5] workspace-timing 未受影响，智能跳过单元测试" -ForegroundColor Green
+    Write-GateHost "  ✔ [Gate 5] workspace-timing 未受影响，智能跳过单元测试" -ForegroundColor Green
 }
 
 # --- Gate 6: workspace-timing L0~L5 六层审查门禁 ---
 if ($runWt) {
-    Write-Host "[6/9] 执行 workspace-timing L0~L5 六层审查门禁..." -ForegroundColor Gray
+    Write-GateHost "[6/9] 执行 workspace-timing L0~L5 六层审查门禁..." -ForegroundColor Gray
     $code = Invoke-GateStep -FilePath $npmCmd -ArgumentList @("run", "review") -WorkingDirectory $workspaceTimingDir -StepName "Gate 6 (workspace-timing 审查门禁)" -TimeoutSeconds 60
     if ($code -ne 0) {
         $failed = $true
     } else {
-        Write-Host "  ✔ workspace-timing 审查门禁通过" -ForegroundColor Green
+        Write-GateHost "  ✔ workspace-timing 审查门禁通过" -ForegroundColor Green
     }
 } else {
-    Write-Host "  ✔ [Gate 6] workspace-timing 未受影响，智能跳过审查门禁" -ForegroundColor Green
+    Write-GateHost "  ✔ [Gate 6] workspace-timing 未受影响，智能跳过审查门禁" -ForegroundColor Green
 }
 
 # --- Gate 7: auto-refactor 长期轨迹账本物理约束守卫 ---
 if ($runAr) {
-    Write-Host "[7/9] 校验 auto-refactor 长期轨迹账本物理约束 (<350B/条, <=2MB)..." -ForegroundColor Gray
+    Write-GateHost "[7/9] 校验 auto-refactor 长期轨迹账本物理约束 (<350B/条, <=2MB)..." -ForegroundColor Gray
     $code = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-trajectory-ledger.js") -WorkingDirectory $repoRoot -StepName "Gate 7 (长期轨迹账本约束)" -TimeoutSeconds 30
     if ($code -ne 0) {
         $failed = $true
     } else {
-        Write-Host "  ✔ auto-refactor 长期轨迹账本物理约束通过" -ForegroundColor Green
+        Write-GateHost "  ✔ auto-refactor 长期轨迹账本物理约束通过" -ForegroundColor Green
     }
 } else {
-    Write-Host "  ✔ [Gate 7] 长期轨迹账本未受影响，智能跳过" -ForegroundColor Green
+    Write-GateHost "  ✔ [Gate 7] 长期轨迹账本未受影响，智能跳过" -ForegroundColor Green
 }
 
 # --- Gate 8: WebGames 配置架构与必需表一致性审查 ---
 if ($runWg) {
-    Write-Host "[8/9] 执行 WebGames 配置架构与必需表一致性审查..." -ForegroundColor Gray
-    $code = Invoke-GateStep -FilePath $pythonCmd -ArgumentList @("WebGames/scripts/py/audit_config.py", "--strict") -WorkingDirectory $repoRoot -StepName "Gate 8 (WebGames 配置架构审查)" -TimeoutSeconds 30
+    Write-GateHost "[8/9] 执行 WebGames 全域质量门禁与配置架构审查..." -ForegroundColor Gray
+    $code = Invoke-GateStep -FilePath $pythonCmd -ArgumentList @("WebGames/scripts/py/audit_runner.py", "--diff") -WorkingDirectory $repoRoot -StepName "Gate 8 (WebGames 全域质量门禁)" -TimeoutSeconds 60
     if ($code -ne 0) {
         $failed = $true
     } else {
-        Write-Host "  ✔ WebGames 配置架构审查通过" -ForegroundColor Green
+        Write-GateHost "  ✔ WebGames 全域质量门禁与配置架构审查通过" -ForegroundColor Green
     }
 } else {
-    Write-Host "  ✔ [Gate 8] WebGames 配置未受影响，智能跳过审查" -ForegroundColor Green
+    Write-GateHost "  ✔ [Gate 8] WebGames 未受影响，智能跳过审查" -ForegroundColor Green
 }
 
 # --- Gate 9: 待推送提交历史风格与禁词审查 (validate-commit-msg-style / validate-commit-msg) ---
 if ($range) {
-    Write-Host "[9/9] 审查待推送提交历史风格与文本约束 (流式扫描: $range)..." -ForegroundColor Gray
+    Write-GateHost "[9/9] 审查待推送提交历史风格与文本约束 (流式扫描: $range)..." -ForegroundColor Gray
     $code = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-commit-msg.js", "--range", $range) -WorkingDirectory $repoRoot -StepName "Gate 9 (待推送分支提交历史风格与禁词审查)" -TimeoutSeconds 30
     if ($code -ne 0) {
         $failed = $true
     } else {
-        Write-Host "  ✔ 待推送分支提交历史风格与文本约束校验通过" -ForegroundColor Green
+        Write-GateHost "  ✔ 待推送分支提交历史风格与文本约束校验通过" -ForegroundColor Green
     }
 } else {
-    Write-Host "  ✔ [Gate 9] 首次推送或无上游对比基准，跳过历史扫描" -ForegroundColor Green
+    Write-GateHost "  ✔ [Gate 9] 首次推送或无上游对比基准，跳过历史扫描" -ForegroundColor Green
 }
 
-Write-Host "=================================================================" -ForegroundColor Cyan
+if ($Agent) {
+    if ($failed) {
+        $lastFailurePath = Join-Path $repoRoot ".audit-logs/last-failure.json"
+        if (Test-Path $lastFailurePath) {
+            Get-Content $lastFailurePath -Raw
+        }
+        exit 1
+    } else {
+        Write-Output '{"protocolVersion":"1.0.0","status":"PASS","gate":"pre-push","summary":"All pre-push quality gates passed."}'
+        exit 0
+    }
+}
+
+Write-GateHost "=================================================================" -ForegroundColor Cyan
 if ($failed) {
-    Write-Host "❌ Pre-Push 检查未通过，已阻止推送至远程分支" -ForegroundColor Red
-    Write-Host "   请在本地修复上述失败项后重试推送。" -ForegroundColor Red
-    Write-Host "=================================================================" -ForegroundColor Cyan
+    Write-GateHost "❌ Pre-Push 检查未通过，已阻止推送至远程分支" -ForegroundColor Red
+    Write-GateHost "   请在本地修复上述失败项后重试推送。" -ForegroundColor Red
+    Write-GateHost "💡 失败诊断快照已保留至: .audit-logs/last-pre-push.log" -ForegroundColor Yellow
+    Write-GateHost "   (可运行 pwsh -File scripts/ps1/pre-push-gate.ps1 -ViewLog 快速查看)" -ForegroundColor Yellow
+    Write-GateHost "   (Agent 消费模式: pwsh -File scripts/ps1/pre-push-gate.ps1 -Agent)" -ForegroundColor Yellow
+    Write-GateHost "=================================================================" -ForegroundColor Cyan
     exit 1
 } else {
-    Write-Host "✅ Pre-Push 检查通过，允许推送至远程" -ForegroundColor Green
-    Write-Host "=================================================================" -ForegroundColor Cyan
+    Write-GateHost "✅ Pre-Push 检查通过，允许推送至远程" -ForegroundColor Green
+    Write-GateHost "=================================================================" -ForegroundColor Cyan
     exit 0
 }

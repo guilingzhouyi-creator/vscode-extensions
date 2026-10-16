@@ -15,11 +15,20 @@
 | `ps1/` | PowerShell | `audit-all.ps1` | audit / review（audit-all.sh 同构双实现） | 本地 CLI（Windows） |
 | `common/` | Node.js | `validate-no-empty-files.js` | audit / hygiene（全工作区零物理空文件与空包跳板守卫） | `pre-push-gate`、`audit-all`、CI |
 | `common/` | Node.js | `validate-script-isomorphism.js` | audit / isomorphism（跨平台同构脚本 ps1/sh 结构对应性、换行与防御契约守卫） | `audit-all`、CI |
+| `common/` | Node.js | `validate-skills.js` | audit / skills（全工作区 24 项研发技能规范、死链与镜像等价性守卫） | `audit-all`、CI |
+| `common/` | Node.js | `sync-skills.js` | tooling / skills（根目录技能集与 workspace-governance 插件双向同步工具） | 本地 CLI |
+| `common/` | Node.js | `gate-fast-staged.js` | gate / fast-staged（暂存区文件单遍内存流式前置 6 大门禁判定，<90ms） | `pre-commit-gate` |
 | `common/` | Node.js | `validate-staged-slice.js` | gate / complexity（平台级增量 AST 切片圈复杂度/嵌套/噪声比审查器） | `pre-commit-gate`、CI |
+| `common/` | Node.js | `validate-code-density.js` | gate / density（多维代码密度、接线率 POR<=60% 与列密度审查器） | `pre-commit-gate`、`pre-push-gate`、CI |
+| `common/` | Node.js | `validate-gitignore-governance.js` | audit / hygiene（全仓 .gitignore 换行、安全底线守卫与防误伤断言门禁） | `pre-push-gate`、`audit-all`、CI |
 | `common/` | Node.js | `evaluate-eloc-budget.js` | audit / complexity（双轨体积 ELOC<=900/LOC<=1400 与 1:3 动态包络评估器） | `pre-commit-gate`、CI |
-| `common/` | Node.js | `generate-rule-catalog.js` | audit / ssot（全工作区 380+ 条规则单源目录聚合器） | 本地 CLI、pre-push 门禁 |
+| `common/` | Node.js | `generate-rule-catalog.js` | audit / ssot（全工作区 428 条规则单源目录聚合与零漂移核验器） | 本地 CLI、pre-push 门禁、CI |
+| `common/` | Node.js | `validate-commit-msg.js` | gate / commit（生产级结构化提交信息格式、区块与有效字数综合调度器） | `commit-msg-gate` |
 | `common/` | Node.js | `validate-commit-msg-rules.js` | gate / ssot（提交信息规则 ID 反虚构校验器） | `commit-msg-gate` |
 | `common/` | Node.js | `validate-commit-msg-style.js` | gate / style（提交信息文本风格与四维禁词核验器） | `commit-msg-gate`、`pre-push-gate`、CI |
+| `common/` | Node.js | `record-workspace-trajectory.js` | telemetry / ledger（全工作区审查轨迹账本记录与版本增量追加工具） | `audit-all` |
+| `common/` | Node.js | `validate-trajectory-ledger.js` | audit / ledger（全工作区演化轨迹账本哈希单调性与完整性校验器） | 本地 CLI、CI |
+| `common/` | Node.js | `log-rotator.js` | tooling / hygiene（门禁失败快照保留、尾部截断 <=100KB 与 FIFO <=2MB 轮转清理管理器） | `pre-commit-gate`、`commit-msg-gate`、`pre-push-gate`、`audit-all` |
 | `common/` | JSON | `commit-msg-forbidden-terms.json` | data / ssot（提交信息四维禁词与白名单单源字典） | `validate-commit-msg-style` |
 | `common/` | JSON | `rule-catalog.json` | data / ssot（全工作区规则事实真源聚合目录） | 静态审查与门禁工具链 |
 | `sh/` | Bash | `gate-common.sh` | gate（冲突分级单源规则库，被 source） | `pr-gate.sh` / `auto-merge-gate.sh` |
@@ -35,6 +44,10 @@
 | `ps1/` | PowerShell | `check-display-assets.ps1` | ci（check-display-assets.sh 同构双实现） | `package.ps1`、本地 CLI（Windows） |
 | `sh/` | Bash | `package.sh` | package（扩展打包，联动展示资产校验） | 本地 CLI（README） |
 | `ps1/` | PowerShell | `package.ps1` | package（package.sh 同构双实现，联动资产校验与热同步） | 本地 CLI（Windows） |
+| `sh/` | Bash | `release-tag.sh` | release（Git 语义化标签创建与自动化推送发布） | 本地 CLI |
+| `ps1/` | PowerShell | `release-tag.ps1` | release（release-tag.sh 同构双实现） | 本地 CLI（Windows） |
+| `sh/` | Bash | `version-bump.sh` | release（全工作区版本号一致性递增工具） | 本地 CLI |
+| `ps1/` | PowerShell | `version-bump.ps1` | release（version-bump.sh 同构双实现） | 本地 CLI（Windows） |
 | `py/` | Python | （预留，暂无脚本） | — | — |
 
 > 职能域语义：`gate`=协作门禁（CNB 流水线触发）、`release`=发布流程、
@@ -118,3 +131,56 @@ Python 版使用 docstring + `if __name__ == "__main__":` 守卫。
   在语言分域重构后的根路径失效与 `check-display-assets.sh` 的 icon 校验静默禁用，
   并在 `.github/workflows/ci.yml` 增补 hygiene 作业永久看守三类回归。
 - 各脚本详细设计文档见 [`scripts/sh/README.md`](./sh/README.md)。
+
+---
+
+## 八、面向自主 Agent 的门禁协议规范 (Agent-Native Gate Protocol v1.0.0)
+
+工作区门禁系统（`pre-commit-gate`、`commit-msg-gate`、`pre-push-gate`、`gate-fast-staged`、`validate-staged-slice`、`validate-commit-msg`）原生支持**双轨运行界面**：
+1. **人类交互模式 (默认)**：保留高对比度彩色终端、清晰横幅进度与步骤摘要；
+2. **Agent 原生消费模式 (`-Agent` / `--agent` / `--json`)**：彻底剥离控制台彩色散文与非必要输出，在标准输出 (stdout) 仅发射单份确定性、机器可读的结构化 JSON 协议包。
+
+### 1. 协议包 Schema 契约 (`AgentFailureEnvelope`)
+
+```json
+{
+  "protocolVersion": "1.0.0",
+  "status": "PASS | BLOCK",
+  "gate": "pre-commit | commit-msg | pre-push",
+  "step": "失败步骤名称",
+  "failedCommand": "触发失败的精确命令",
+  "exitCode": 1,
+  "summary": "纯客观技术事实摘要",
+  "logFile": ".audit-logs/last-failure.log",
+  "violations": [
+    {
+      "ruleId": "SSOT登记规则ID (如 HYG-EOL-001, CMG-PRJ-001, CPX-BUD-001)",
+      "severity": "BLOCK | WARN",
+      "file": "违规目标相对路径",
+      "line": 42,
+      "column": 5,
+      "actual": "当前实际值 (如 CC=22, CRLF, 未声明项目归属)",
+      "expected": "预期合规值 (如 CC<=15, LF, [Project: governance])",
+      "message": "精确违规描述",
+      "actionableFix": "明确且唯一的自愈建议",
+      "verificationCommand": "针对本违规项的快速单点验证命令"
+    }
+  ],
+  "agentDirectives": {
+    "targetFiles": ["待修复的绝对或相对文件路径列表"],
+    "remediationPriority": ["优先修复的规则ID列表"],
+    "verificationCommand": "单点验证命令",
+    "fastRecheckCommand": "极速重测命令 (如 pwsh -File scripts/ps1/pre-commit-gate.ps1 -Agent)"
+  }
+}
+```
+
+### 2. 核心调度与快照自愈指令
+
+| 门禁与工具 | 人类模式命令 | Agent 原生模式命令 | 诊断快照查看 |
+|:---|:---|:---|:---|
+| **提交前置门禁** | `pwsh scripts/ps1/pre-commit-gate.ps1` | `pwsh scripts/ps1/pre-commit-gate.ps1 -Agent` | `pwsh scripts/ps1/pre-commit-gate.ps1 -ViewLog` |
+| **提交信息门禁** | `pwsh scripts/ps1/commit-msg-gate.ps1 <msg>` | `pwsh scripts/ps1/commit-msg-gate.ps1 <msg> -Agent` | `pwsh scripts/ps1/commit-msg-gate.ps1 -ViewLog` |
+| **推送前置门禁** | `pwsh scripts/ps1/pre-push-gate.ps1` | `pwsh scripts/ps1/pre-push-gate.ps1 -Agent` | `pwsh scripts/ps1/pre-push-gate.ps1 -ViewLog` |
+| **失败快照轮转器** | `node scripts/common/log-rotator.js --view` | `node scripts/common/log-rotator.js --agent` | 自动保留最近一次失败至 `.audit-logs/last-failure.json` |
+

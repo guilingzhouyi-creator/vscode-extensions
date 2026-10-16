@@ -11,8 +11,10 @@
 # ==============================================================================
 [CmdletBinding()]
 param(
-    [Parameter(Mandatory = $true, Position = 0)]
-    [string]$MsgFile
+    [Parameter(Mandatory = $false, Position = 0)]
+    [string]$MsgFile,
+    [switch]$ViewLog,
+    [switch]$Agent
 )
 Set-StrictMode -Version Latest
 
@@ -23,11 +25,31 @@ $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 $PSDefaultParameterValues['Get-Content:Encoding'] = 'utf8'
 $PSDefaultParameterValues['Set-Content:Encoding'] = 'utf8'
 
-if (-not $env:GIT_CONFIG_GLOBAL) { $env:GIT_CONFIG_GLOBAL = 'NUL' }
-if (-not $env:GIT_CONFIG_SYSTEM) { $env:GIT_CONFIG_SYSTEM = 'NUL' }
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+$nodeCmd = if ($IsWindows -or $env:OS -match "Windows") { "node.exe" } else { "node" }
 
-if (-not (Test-Path $MsgFile -PathType Leaf)) {
-    Write-Host "❌ [FAIL] 提交信息文件不存在: $MsgFile" -ForegroundColor Red
+if ($ViewLog) {
+    & $nodeCmd (Join-Path $repoRoot "scripts/common/log-rotator.js") --view
+    exit $LASTEXITCODE
+}
+
+if (-not $MsgFile -or -not (Test-Path $MsgFile -PathType Leaf)) {
+    if ($Agent) {
+        Write-Output (@{
+            protocolVersion = "1.0.0"
+            status = "BLOCK"
+            gate = "commit-msg"
+            summary = "提交信息文件不存在或未提供: $MsgFile"
+            violations = @(@{
+                ruleId = "GATE-MSG-001"
+                severity = "BLOCK"
+                message = "提交信息文件不存在或未提供: $MsgFile"
+                actionableFix = "请传入有效的 Git 提交信息文件路径"
+            })
+        } | ConvertTo-Json -Depth 5)
+    } else {
+        Write-Host "❌ [FAIL] 提交信息文件不存在或未提供: $MsgFile" -ForegroundColor Red
+    }
     exit 1
 }
 
@@ -59,9 +81,94 @@ function Show-CommitTemplateGuide {
     Write-Host "-----------------------------------------------------------------" -ForegroundColor Gray
 }
 
-Write-Host "=================================================================" -ForegroundColor Cyan
-Write-Host "📝 执行生产工程级 Commit-Msg 规范与结构化内容门禁 (PowerShell 版)" -ForegroundColor Cyan
-Write-Host "=================================================================" -ForegroundColor Cyan
+function Stop-CommitMsg {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RuleId,
+        [Parameter(Mandatory = $true)]
+        [string]$Message,
+        [string]$Actual = "",
+        [string]$Expected = "",
+        [string]$ActionableFix = ""
+    )
+
+    $diagDir = Join-Path $repoRoot ".audit-logs"
+    if (-not (Test-Path $diagDir)) { [void](New-Item -ItemType Directory -Path $diagDir -Force) }
+    $failLog = Join-Path $diagDir "last-commit-msg.log"
+
+    try {
+        $diagLines = [System.Collections.Generic.List[string]]::new()
+        $diagLines.Add("=================================================================")
+        $diagLines.Add("❌ Commit-Msg 门禁拦截现场快照")
+        $diagLines.Add("时间: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')")
+        $diagLines.Add("规则: $RuleId")
+        $diagLines.Add("说明: $Message")
+        $diagLines.Add("-----------------------------------------------------------------")
+        $diagLines.Add("【提交信息原内容】:")
+        if ($MsgFile -and (Test-Path $MsgFile)) {
+            $rawContent = Get-Content -Path $MsgFile -Encoding utf8 -ErrorAction SilentlyContinue
+            if ($rawContent) { $diagLines.AddRange($rawContent) }
+        }
+        $diagLines.Add("=================================================================")
+        [System.IO.File]::WriteAllLines($failLog, $diagLines, [System.Text.UTF8Encoding]::new($false))
+    } catch {}
+
+    $violation = [ordered]@{
+        ruleId = $RuleId
+        severity = "BLOCK"
+        file = $MsgFile
+        actual = $Actual
+        expected = $Expected
+        message = $Message
+        actionableFix = $ActionableFix
+        verificationCommand = "pwsh -File scripts/ps1/commit-msg-gate.ps1 $MsgFile"
+    }
+
+    $envelope = [ordered]@{
+        protocolVersion = "1.0.0"
+        recordedAt = (Get-Date).ToString("o")
+        status = "BLOCK"
+        gate = "commit-msg"
+        step = "Commit-Msg Validation ($RuleId)"
+        failedCommand = "pwsh -File scripts/ps1/commit-msg-gate.ps1 $MsgFile"
+        exitCode = 1
+        summary = $Message
+        logFile = ".audit-logs/last-commit-msg.log"
+        violations = @($violation)
+        agentDirectives = [ordered]@{
+            targetFiles = @($MsgFile)
+            remediationPriority = @($RuleId)
+            verificationCommand = "pwsh -File scripts/ps1/commit-msg-gate.ps1 $MsgFile"
+            fastRecheckCommand = "pwsh -File scripts/ps1/commit-msg-gate.ps1 $MsgFile"
+        }
+    }
+
+    $snapshotJson = $envelope | ConvertTo-Json -Depth 5
+    try {
+        [System.IO.File]::WriteAllText((Join-Path $diagDir "last-failure.json"), $snapshotJson, [System.Text.UTF8Encoding]::new($false))
+    } catch {}
+
+    if ($Agent) {
+        Write-Output $snapshotJson
+        exit 1
+    }
+
+    Write-Host "❌ [FAIL] ${RuleId}: $Message" -ForegroundColor Red
+    if ($ActionableFix) {
+        Write-Host "   💡 建议: $ActionableFix" -ForegroundColor Yellow
+    }
+    Show-CommitTemplateGuide
+    Write-Host "💡 失败诊断快照已保留至: .audit-logs/last-commit-msg.log" -ForegroundColor Yellow
+    Write-Host "   (可运行 pwsh -File scripts/ps1/commit-msg-gate.ps1 -ViewLog 快速查看)" -ForegroundColor Yellow
+    exit 1
+}
+
+if (-not $Agent) {
+    Write-Host "=================================================================" -ForegroundColor Cyan
+    Write-Host "📝 执行生产工程级 Commit-Msg 规范与结构化内容门禁 (PowerShell 版)" -ForegroundColor Cyan
+    Write-Host "=================================================================" -ForegroundColor Cyan
+}
 
 # 读取所有行并过滤掉以 # 开头的注释行
 $rawLines = Get-Content $MsgFile -Encoding utf8
@@ -73,44 +180,34 @@ foreach ($l in $rawLines) {
 }
 
 if (-not $cleanLines -or $cleanLines.Count -eq 0 -or [string]::IsNullOrWhiteSpace($cleanLines[0])) {
-    Write-Host "❌ [FAIL] 提交信息不能为空！" -ForegroundColor Red
-    exit 1
+    Stop-CommitMsg -RuleId "GATE-MSG-001" -Message "提交信息不能为空！" -Expected "符合 Conventional Commits 格式的提交内容" -ActionableFix "请参考规范填写格式化提交信息"
 }
 
 $firstLine = $cleanLines[0].Trim()
-Write-Host "提交标题: $firstLine" -ForegroundColor Gray
+if (-not $Agent) {
+    Write-Host "提交标题: $firstLine" -ForegroundColor Gray
+}
 
 # --- Rule 1: Header 格式与长度校验 ---
 $headerPattern = '^(feat|fix|refactor|docs|test|chore|style|perf)(\([a-zA-Z0-9_-]+\))?: .{5,80}$'
 if ($firstLine -notmatch $headerPattern) {
-    Write-Host "❌ [FAIL] Rule 1: 提交标题不符合生产级格式规范！" -ForegroundColor Red
-    Write-Host "   标准格式: <type>(<scope>): <简述> 或 <type>: <简述>" -ForegroundColor Yellow
-    Write-Host "   允许类型: feat, fix, refactor, docs, test, chore, style, perf" -ForegroundColor Yellow
-    Write-Host "   标题长度: 冒号后描述必须在 5~80 字符之间" -ForegroundColor Yellow
-    Show-CommitTemplateGuide
-    exit 1
+    Stop-CommitMsg -RuleId "GATE-MSG-001" -Message "Rule 1: 提交标题不符合生产级格式规范！" -Actual $firstLine -Expected "<type>(<scope>): <简述> (5~80 字符)" -ActionableFix "调整为 feat/fix/refactor/docs/test/chore/style/perf(<scope>): 描述"
 }
 
 # 检查标题末尾不得包含句号
 if ($firstLine -match '[.。]$') {
-    Write-Host "❌ [FAIL] Rule 1: 提交标题末尾严禁包含句号（. 或 。）！" -ForegroundColor Red
-    Show-CommitTemplateGuide
-    exit 1
+    Stop-CommitMsg -RuleId "GATE-MSG-001" -Message "Rule 1: 提交标题末尾严禁包含句号（. 或 。）！" -Actual $firstLine -Expected "末尾无句号" -ActionableFix "移除标题末尾句号"
 }
 
 # --- Rule 2: 零黑话与空洞泛化词拦截 ---
 $forbiddenPattern = '\b(wip|temp|test temp|tmp)\b'
 if ($firstLine -match $forbiddenPattern) {
-    Write-Host "❌ [FAIL] Rule 2: 提交标题包含违规黑话/临时性标记 (wip/temp/tmp 等)！" -ForegroundColor Red
-    Show-CommitTemplateGuide
-    exit 1
+    Stop-CommitMsg -RuleId "CMG-STY-001" -Message "Rule 2: 提交标题包含违规黑话/临时性标记 (wip/temp/tmp 等)！" -Actual $firstLine -Expected "零黑话技术描述" -ActionableFix "陈述具体完成的技术特性，严禁使用 wip/temp"
 }
 
 $lazyPattern = '^([a-z]+(\([a-z0-9_-]+\))?:\s*(update|modify|changes|fix|test|fixes|clean|refactor|todo))\s*$'
 if ($firstLine -match $lazyPattern) {
-    Write-Host "❌ [FAIL] Rule 2: 提交标题过于空洞敷衍！请明确具体加了什么、改了什么或修了什么。" -ForegroundColor Red
-    Show-CommitTemplateGuide
-    exit 1
+    Stop-CommitMsg -RuleId "CMG-STY-001" -Message "Rule 2: 提交标题过于空洞敷衍！请明确具体加了什么、改了什么或修了什么。" -Actual $firstLine -Expected "说明具体改动模块与功能" -ActionableFix "明确陈述具体变更逻辑"
 }
 
 $commitType = ($firstLine -replace '^([a-z]+)(\(.*\))?:.*$', '$1').ToLower()
@@ -119,9 +216,7 @@ $commitType = ($firstLine -replace '^([a-z]+)(\(.*\))?:.*$', '$1').ToLower()
 if ($cleanLines.Count -gt 1) {
     $secondLine = $cleanLines[1].Trim()
     if (-not [string]::IsNullOrEmpty($secondLine)) {
-        Write-Host "❌ [FAIL] Rule 3: 标题与正文之间第 2 行必须保留空行（当前直接粘连正文）！" -ForegroundColor Red
-        Show-CommitTemplateGuide
-        exit 1
+        Stop-CommitMsg -RuleId "GATE-MSG-001" -Message "Rule 3: 标题与正文之间第 2 行必须保留空行（当前直接粘连正文）！" -Expected "第 2 行为独立空行" -ActionableFix "在标题与正文之间插入一个空行"
     }
 }
 
@@ -141,26 +236,13 @@ if ($cleanLines.Count -gt 2) {
 if ($commitType -in @('feat', 'fix', 'refactor')) {
     $minBodyChars = 30
     if ($bodyCharCount -lt $minBodyChars) {
-        Write-Host "❌ [FAIL] Rule 4: 生产级关键提交 ($commitType) 正文信息量不足！" -ForegroundColor Red
-        Write-Host "   当前正文有效字数: $bodyCharCount (最低要求: >= $minBodyChars 字符)" -ForegroundColor Yellow
-        Write-Host "   必须详细说明改动动机、具体涉及的新增/修改/修复内容与验证结论。" -ForegroundColor Yellow
-        Show-CommitTemplateGuide
-        exit 1
+        Stop-CommitMsg -RuleId "GATE-MSG-001" -Message "Rule 4: 生产级关键提交 ($commitType) 正文信息量不足！当前有效字数: $bodyCharCount" -Actual "$bodyCharCount 字符" -Expected ">= $minBodyChars 字符" -ActionableFix "补充 [Why], [Changed], [Verification] 详细技术事实"
     }
 
     # --- Rule 5: 结构化区块完整性校验 ---
     $structurePattern = '(?m)(\[(Project|Why|Added|Changed|Fixed|Removed|Verification|项目|项目归属|动机|背景|新增|变更|修改|修复|删除|验证).*?\]|^\s*-\s+)'
     if ($bodyText -notmatch $structurePattern) {
-        Write-Host "❌ [FAIL] Rule 5: 关键提交 ($commitType) 缺少生产级结构化区块！" -ForegroundColor Red
-        Write-Host "   请至少包含以下标准区块之一：" -ForegroundColor Yellow
-        Write-Host "   • [Project / 项目归属]" -ForegroundColor Yellow
-        Write-Host "   • [Why / 动机背景]" -ForegroundColor Yellow
-        Write-Host "   • [Added / 新增内容]" -ForegroundColor Yellow
-        Write-Host "   • [Changed / 变更调整]" -ForegroundColor Yellow
-        Write-Host "   • [Fixed / 修复缺陷]" -ForegroundColor Yellow
-        Write-Host "   • [Verification / 验证结论]" -ForegroundColor Yellow
-        Show-CommitTemplateGuide
-        exit 1
+        Stop-CommitMsg -RuleId "GATE-MSG-001" -Message "Rule 5: 关键提交 ($commitType) 缺少生产级结构化区块！" -Expected "包含 [Project], [Why], [Added/Changed/Fixed], [Verification] 之一" -ActionableFix "补充标准结构化区块 [Project], [Why], [Changed], [Verification]"
     }
 }
 
@@ -172,10 +254,10 @@ $declaredProjects = @()
 $bodyLines = $bodyText -split '\r?\n'
 foreach ($bLine in $bodyLines) {
     $trimmedLine = $bLine.Trim()
-    if ($trimmedLine -match '^(?i)\[(?:Project|项目|项目归属)(?:\s*[\/|].*?)?\](?:\s*:\s*(.*))?$') {
+    if ($trimmedLine -match '^(?i)\[(?:Project|项目|项目归属)(?:\s*[:\/|]\s*(.*?))?\](?:\s*:\s*(.*))?$') {
         $foundProjectHeader = $true
         $inProjectSection = $true
-        $inlineVal = $Matches[1]
+        $inlineVal = if ($Matches[1]) { $Matches[1] } else { $Matches[2] }
         if ($inlineVal) {
             $parts = $inlineVal -split '[,，、]'
             foreach ($p in $parts) {
@@ -207,27 +289,11 @@ foreach ($bLine in $bodyLines) {
 
 if ($commitType -in @('feat', 'fix', 'refactor')) {
     if (-not $foundProjectHeader) {
-        Write-Host "❌ [FAIL] Rule 5.1 (CMG-PRJ-001): 关键生产级提交 ($commitType) 缺少项目归属格式区！" -ForegroundColor Red
-        Write-Host "   必须在正文首个结构化区块声明 [Project / 项目归属] 并指定所属项目：" -ForegroundColor Yellow
-        Write-Host "   示例：" -ForegroundColor Yellow
-        Write-Host "   [Project / 项目归属]" -ForegroundColor Cyan
-        Write-Host "   - workspace-timing" -ForegroundColor Cyan
-        Write-Host "" -ForegroundColor Yellow
-        Write-Host "   合法项目枚举列表：" -ForegroundColor Yellow
-        Write-Host "   • workspace-timing (VS Code 计时器插件)" -ForegroundColor Yellow
-        Write-Host "   • auto-refactor    (Node CLI / Rust 静态重构与审查引擎)" -ForegroundColor Yellow
-        Write-Host "   • WebGames         (Godot 卡拉尔世界游戏引擎)" -ForegroundColor Yellow
-        Write-Host "   • governance       (工作区工程效能、门禁脚本、顶层案卷与全局工具链)" -ForegroundColor Yellow
-        Show-CommitTemplateGuide
-        exit 1
+        Stop-CommitMsg -RuleId "CMG-PRJ-001" -Message "Rule 5.1 (CMG-PRJ-001): 关键生产级提交 ($commitType) 缺少项目归属格式区！" -Expected "[Project: workspace-timing | auto-refactor | WebGames | governance]" -ActionableFix "在正文首个结构化区块声明 [Project / 项目归属]"
     }
 
     if ($declaredProjects.Count -eq 0) {
-        Write-Host "❌ [FAIL] Rule 5.1 (CMG-PRJ-001): [Project / 项目归属] 区块未声明任何项目名称！" -ForegroundColor Red
-        Write-Host "   请至少指定一个合法项目：" -ForegroundColor Yellow
-        Write-Host "   • workspace-timing | auto-refactor | WebGames | governance" -ForegroundColor Yellow
-        Show-CommitTemplateGuide
-        exit 1
+        Stop-CommitMsg -RuleId "CMG-PRJ-001" -Message "Rule 5.1 (CMG-PRJ-001): [Project / 项目归属] 区块未声明任何项目名称！" -Expected "workspace-timing | auto-refactor | WebGames | governance" -ActionableFix "指定合法的项目归属名称"
     }
 }
 
@@ -242,37 +308,47 @@ if ($declaredProjects.Count -gt 0) {
     }
 
     if ($invalidProjects.Count -gt 0) {
-        Write-Host "❌ [FAIL] Rule 5.1 (CMG-PRJ-001): 声明的项目归属包含未授权/非法的项目标识！" -ForegroundColor Red
-        foreach ($inv in $invalidProjects) {
-            Write-Host "   • 未知项目标识: '$inv'" -ForegroundColor Red
-        }
-        Write-Host "   合法项目枚举仅限于：" -ForegroundColor Yellow
-        Write-Host "   • workspace-timing (VS Code 计时器插件)" -ForegroundColor Yellow
-        Write-Host "   • auto-refactor    (Node CLI / Rust 静态重构与审查引擎)" -ForegroundColor Yellow
-        Write-Host "   • WebGames         (Godot 卡拉尔世界游戏引擎)" -ForegroundColor Yellow
-        Write-Host "   • governance       (工作区工程效能、门禁脚本、顶层案卷与全局工具链)" -ForegroundColor Yellow
-        Show-CommitTemplateGuide
-        exit 1
+        Stop-CommitMsg -RuleId "CMG-PRJ-001" -Message "Rule 5.1 (CMG-PRJ-001): 声明的项目归属包含未授权/非法的项目标识: $($invalidProjects -join ', ')" -Actual ($invalidProjects -join ', ') -Expected "workspace-timing | auto-refactor | WebGames | governance" -ActionableFix "纠正项目名称为合法枚举之一"
     }
 }
 
 # --- Rule 6: 正文零黑话与无批次代号 ---
 if ($bodyText -match '(?i)\b(phase\d+|st\d+|p\d+)\b') {
-    Write-Host "❌ [FAIL] Rule 6: 提交正文包含违规施工批次代号/黑话 (phaseN/stN/pN)！" -ForegroundColor Red
-    Write-Host "   必须基于功能特性与交付价值进行纯粹描述。" -ForegroundColor Yellow
-    Show-CommitTemplateGuide
-    exit 1
+    Stop-CommitMsg -RuleId "CMG-STY-001" -Message "Rule 6: 提交正文包含违规施工批次代号/黑话 (phaseN/stN/pN)！" -Expected "纯客观技术事实" -ActionableFix "基于功能特性与交付价值进行纯粹描述，移除批次代号"
 }
 
-# --- Rule 7 & 8: 规则 ID 反虚构与求真务实禁词联合审查 (单次加载 SSOT & 禁词表) ---
-# 挂载 scripts/common/validate-commit-msg.js (融合 validate-commit-msg-rules.js 与 validate-commit-msg-style.js / commit-msg-forbidden-terms.json)
+# --- Rule 7 & 8: 规则 ID 反虚构与求真务实禁词联合审查 ---
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $resolvedMsgFile = (Resolve-Path $MsgFile).Path
 $nodeCmd = if ($IsWindows -or $env:OS -match "Windows") { "node.exe" } else { "node" }
-$process = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-commit-msg.js", $resolvedMsgFile -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
-if ($process.ExitCode -ne 0) {
-    Show-CommitTemplateGuide
-    exit 1
+if ($Agent) {
+    $outNode = & $nodeCmd (Join-Path $repoRoot "scripts/common/validate-commit-msg.js") $resolvedMsgFile --agent 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        $lastFailurePath = Join-Path $repoRoot ".audit-logs/last-failure.json"
+        if (Test-Path $lastFailurePath) {
+            Get-Content $lastFailurePath -Raw
+        } else {
+            Write-Output ($outNode -join "`n")
+        }
+        exit 1
+    }
+} else {
+    $nodeArgs = @("scripts/common/validate-commit-msg.js", $resolvedMsgFile)
+    $process = Start-Process -FilePath $nodeCmd -ArgumentList $nodeArgs -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
+    if ($process.ExitCode -ne 0) {
+        Show-CommitTemplateGuide
+        exit $process.ExitCode
+    }
+}
+
+if ($Agent) {
+    Write-Output (@{
+        protocolVersion = "1.0.0"
+        status = "PASS"
+        gate = "commit-msg"
+        summary = "All commit-msg validation rules passed cleanly."
+    } | ConvertTo-Json)
+    exit 0
 }
 
 Write-Host "  ✔ Rule 1: Header 格式与长度 (5~80 字符, 无句号) 合规" -ForegroundColor Green

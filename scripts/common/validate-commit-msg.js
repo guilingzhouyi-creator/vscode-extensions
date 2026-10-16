@@ -163,47 +163,108 @@ function validateCommitRange(range) {
   return { passed: failedCount === 0, total: records.length, failedCount };
 }
 
-function main() {
-  const args = process.argv.slice(2);
-
-  if (args.includes('--test')) {
-    runStyleSelfTest();
-    console.log('✔ 单源规则反虚构 (Rule 7) 与风格禁词 (Rule 8) 联合自检通过');
-    process.exit(0);
+function buildCommitMsgViolations(res, target) {
+  const violations = [];
+  for (const h of res.hallucinatedRules) {
+    violations.push({
+      ruleId: 'GATE-SSOT-001',
+      severity: 'BLOCK',
+      actual: h,
+      expected: '在 rule-catalog.json 登记的真实规则 ID',
+      message: `提交信息中提及未在单源注册表中登记的虚构/漂移规则 ID: ${h}`,
+      actionableFix: '检查规则拼写，或在规则注册表 / review-rules.json 中登记该规则后重新生成目录',
+      verificationCommand: `node scripts/common/validate-commit-msg.js ${target || '.git/COMMIT_EDITMSG'}`,
+    });
   }
 
-  const rangeIdx = args.indexOf('--range');
-  if (rangeIdx !== -1 && args[rangeIdx + 1]) {
-    const range = args[rangeIdx + 1];
-    const res = validateCommitRange(range);
-    if (!res.passed) {
-      process.exit(1);
-    }
+  for (const f of res.styleFindings) {
+    violations.push({
+      ruleId: f.ruleId || 'CMG-STY-001',
+      severity: 'BLOCK',
+      line: f.lineNum,
+      actual: f.term,
+      expected: f.guidance || '纯客观技术事实质性描述',
+      message: `命中风格禁词或违规口吻 [${f.category}]: '${f.term}'`,
+      actionableFix: f.guidance ? `根据建议替换: ${f.guidance}` : '移除该违规词汇，采用纯技术事实与质性逻辑断言',
+      verificationCommand: `node scripts/common/validate-commit-msg.js ${target || '.git/COMMIT_EDITMSG'}`,
+    });
+  }
+  return violations;
+}
+
+function handleRangeMode(range, isAgentMode) {
+  const res = validateCommitRange(range);
+  if (!res.passed) {
+    process.exit(1);
+  }
+  if (isAgentMode) {
+    console.log(
+      JSON.stringify(
+        {
+          protocolVersion: '1.0.0',
+          status: 'PASS',
+          gate: 'commit-msg:range',
+          summary: `Range ${range} validated cleanly across ${res.total} commits.`,
+        },
+        null,
+        2,
+      ),
+    );
+  } else {
     console.log(
       `  ✔ 待推送分支提交历史风格审查通过 (流式验证 ${res.total} 笔提交，零违规)`,
     );
-    process.exit(0);
   }
+  process.exit(0);
+}
 
-  if (args.length === 0) {
-    console.error('用法: node validate-commit-msg.js <msg-file | -> [--range <git-range>]');
+function readCommitContent(target) {
+  if (target === '-') {
+    return fs.readFileSync(0, 'utf8');
+  }
+  if (!fs.existsSync(target)) {
+    console.error(`❌ [FAIL] 提交信息文件不存在: ${target}`);
     process.exit(1);
   }
+  return fs.readFileSync(target, 'utf8');
+}
 
-  const target = args[0];
-  let content = '';
+function reportCommitMsgFailure(res, target, isAgentMode) {
+  const violations = buildCommitMsgViolations(res, target);
+  try {
+    const { writeFailureSnapshot } = require('./log-rotator');
+    writeFailureSnapshot({
+      gate: 'commit-msg:rules-7-8',
+      step: 'Commit-Msg Rules 7 & 8 Verification',
+      failedCommand: `node scripts/common/validate-commit-msg.js ${target}`,
+      exitCode: 1,
+      summary: `Commit message verification failed with ${violations.length} rule hallucination or forbidden style violations.`,
+      violations,
+      targetFiles: [target].filter((t) => t && t !== '-'),
+      verificationCommand: `node scripts/common/validate-commit-msg.js ${target}`,
+    });
+  } catch {}
 
-  if (target === '-') {
-    content = fs.readFileSync(0, 'utf8');
-  } else {
-    if (!fs.existsSync(target)) {
-      console.error(`❌ [FAIL] 提交信息文件不存在: ${target}`);
-      process.exit(1);
-    }
-    content = fs.readFileSync(target, 'utf8');
+  if (isAgentMode) {
+    const envelope = {
+      protocolVersion: '1.0.0',
+      status: 'BLOCK',
+      gate: 'commit-msg:rules-7-8',
+      step: 'Commit-Msg Rules 7 & 8 Verification',
+      failedCommand: `node scripts/common/validate-commit-msg.js ${target}`,
+      exitCode: 1,
+      summary: `Commit message verification failed with ${violations.length} rule hallucination or forbidden style violations.`,
+      violations,
+      agentDirectives: {
+        targetFiles: [target].filter((t) => t && t !== '-'),
+        remediationPriority: Array.from(new Set(violations.map((v) => v.ruleId))),
+        verificationCommand: `node scripts/common/validate-commit-msg.js ${target}`,
+        fastRecheckCommand: `node scripts/common/validate-commit-msg.js ${target}`,
+      },
+    };
+    console.log(JSON.stringify(envelope, null, 2));
+    process.exit(1);
   }
-
-  const res = validateSingleCommitMessage(content);
 
   if (res.hallucinatedRules.length > 0) {
     console.error(
@@ -215,17 +276,67 @@ function main() {
     console.error(
       '   提示: 请检查规则拼写，或先在规则注册表 / review-rules.json 中登记该规则后重新生成目录。',
     );
-    process.exit(1);
   }
 
   if (res.styleFindings.length > 0) {
     console.error(formatDiagnosticReport(res.styleFindings));
+  }
+  process.exit(1);
+}
+
+function handleSingleCommitValidation(target, content, isAgentMode) {
+  const res = validateSingleCommitMessage(content);
+
+  if (!res.valid) {
+    reportCommitMsgFailure(res, target, isAgentMode);
+    return;
+  }
+
+  if (isAgentMode) {
+    console.log(
+      JSON.stringify(
+        {
+          protocolVersion: '1.0.0',
+          status: 'PASS',
+          gate: 'commit-msg:rules-7-8',
+          summary: 'Commit message rules 7 & 8 style and anti-hallucination checks passed cleanly.',
+        },
+        null,
+        2,
+      ),
+    );
+  } else {
+    console.log('  ✔ Rule 7: 规则 ID 单源目录一致性防虚构校验通过');
+    console.log('  ✔ Rule 8: 提交文本求真务实与禁词审查合规 (零临时/零夸大/零贬损/零元叙事口号)');
+  }
+  process.exit(0);
+}
+
+function main() {
+  const args = process.argv.slice(2);
+  const isAgentMode = args.includes('--agent') || args.includes('-a') || args.includes('--json');
+
+  if (args.includes('--test')) {
+    runStyleSelfTest();
+    console.log('✔ 单源规则反虚构 (Rule 7) 与风格禁词 (Rule 8) 联合自检通过');
+    process.exit(0);
+  }
+
+  const rangeIdx = args.indexOf('--range');
+  if (rangeIdx !== -1 && args[rangeIdx + 1]) {
+    handleRangeMode(args[rangeIdx + 1], isAgentMode);
+    return;
+  }
+
+  const posArgs = args.filter((a) => !a.startsWith('-') || a === '-');
+  if (posArgs.length === 0) {
+    console.error('用法: node validate-commit-msg.js <msg-file | -> [--range <git-range>] [--agent]');
     process.exit(1);
   }
 
-  console.log('  ✔ Rule 7: 规则 ID 单源目录一致性防虚构校验通过');
-  console.log('  ✔ Rule 8: 提交文本求真务实与禁词审查合规 (零临时/零夸大/零贬损/零元叙事口号)');
-  process.exit(0);
+  const target = posArgs[0];
+  const content = readCommitContent(target);
+  handleSingleCommitValidation(target, content, isAgentMode);
 }
 
 if (require.main === module) {

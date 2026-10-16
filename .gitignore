@@ -1,41 +1,50 @@
+# ==============================================================================
+# 工作区根级统一忽略规范 (Root .gitignore)
+# 职责：全仓跨栈（Node/TS, Rust/Cargo, Godot 4, Python, Agent）第一道刚性防御中枢
+# ==============================================================================
+
+# 1. Node.js & TypeScript 构建与打包产物
 node_modules/
+dist/
+out/
+scripts/dist/
+**/scripts/dist/
+coverage/
+*.tsbuildinfo
 *.vsix
 *.tgz
 .vscode-test/
 
-# 统一打包输出目录（本地构建产物，不入库；正式产物发布到 GitHub Releases）
-dist/
+# 2. Rust & Cargo 编译产物
+target/
+**/target/
+**/*.rs.bk
 
-# 各扩展编译产物与覆盖率报告（根级零配置覆盖：任何顶层扩展的 out/、coverage/ 均不入库）
-out/
-coverage/
-
-# 统一审查 SARIF 报告产物（本地与 CI 运行 audit-all --sarif-out 生成，不入库）
-sarif/
-
-# 本地运行时数据与工具目录（不入库）
-.workspace-timing-data/
-.workbuddy/
-.vscode/workspace-timing.json
-.vscode/workspace-timing.journal
-# AI 助手的本地偏好记忆（沟通风格与工作流约定，逐机不同，不属于项目代码）
-.commandcode/
+# 3. Python 运行时、虚拟环境与测试缓存
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+ENV/
+*.venv
+.pytest_cache/
+.ruff_cache/
 .mypy_cache/
-.atomcode/
-/deliverables/
-WebGames/.agents/
-.agents/plugins/
+htmlcov/
+.coverage
 
-# 本地插件管理与下载临时产物（不入库）
-.dsh-plugin-download/
-dsh-uninstall-*.tsv
-**/.trae-html-share-packages/
-status_summary.txt
-**/scratch/
-**/scratch_*.json
-scratch_*.json
+# 4. Godot 4 游戏引擎与 WebGames 产物
+.godot/
+**/.godot/
+*.translation
+*.pck
+user/
+**/user/
 
-# auto-refactor 运行时缓存、测试语料与基准临时文件（不入库）
+# 5. auto-refactor 引擎与运行时缓存
 **/.auto-refactor-cache/
 **/.auto-refactor-cache-*/
 **/.praxis/
@@ -48,32 +57,67 @@ auto-refactor/bench/
 **/.*.actual.json
 **/.t04-keypoints-*/
 **/.t04-keypoints-*
-*.log
-*.tsbuildinfo
-err.txt
-out.txt
+
+# 6. 统一治理门禁、诊断报表与日志（精准匹配临时报告，避免误伤基线）
+.audit-logs/
+**/.audit-logs/
+sarif/
+**/sarif/
+workspace-timing/reports/
+WebGames/reports/
+tests/reports/
 **/reports/audit-*.json
 **/reports/refactor-metrics*.json
+*.log
+err.txt
+out.txt
+status_summary.txt
 
-# 版本归档（历史快照 / 备份 / 演示材料，统一集中管理）
+# 7. AI 助手偏好记忆、插件下载与临时探针/草稿
+.commandcode/
+.atomcode/
+.workbuddy/
+.cursor/
+.windsurf/
+.agents/plugins/
+WebGames/.agents/
+.dsh-plugin-download/
+dsh-uninstall-*.tsv
+**/.trae-html-share-packages/
+.probe-*
+probe-*.*
+*.probe.*
+**/scratch/
+scratch/
+scratch_*.*
+*.scratch.*
+
+# 8. 本地运行时数据、临时文件与交换文件
+tmp/
+**/tmp/
+temp/
+**/temp/
+*.tmp
+*.temp
+.workspace-timing-data/
+.vscode/workspace-timing.json
+.vscode/workspace-timing.journal
+
+# 9. 历史版本与文档归档（物理冻结，针对性锚定，避免误伤代码包）
 /archive/
-**/archive/
+/auto-refactor/archive/
+/deliverables/
 
-# ============ 密钥与凭证（防误提交泄露；示例模板与公钥除外） ============
-# 环境变量 / 本地覆盖配置（.env.example 等示例模板仍可提交）
+# 10. 凭证、密钥与操作系统/IDE 杂物（严格防泄露）
 .env
 .env.*
 *.env
 !.env.example
 !*.env.example
 *.local
-*.local.json
-*.local.yaml
-*.local.yml
+*.local.*
 config.local.*
 settings.local.json
-
-# 私钥 / 密钥库（*.pub 公钥与 *.crt 证书可正常提交）
 *.key
 *.pem
 *.pfx
@@ -88,8 +132,6 @@ id_dsa*
 *.jceks
 *.keystore
 debug.keystore
-
-# 云平台 / OAuth 服务账号凭证
 .aws/
 .azure/
 credentials.json
@@ -97,8 +139,6 @@ service_account*.json
 service-account*.json
 client_secret*.json
 client_secrets*.json
-
-# 通用密钥环 / 凭证库
 *.secret
 *.token
 .git-credentials
@@ -108,13 +148,18 @@ _netrc
 .my.cnf
 .htpasswd
 *.keychain
-
-# 包管理器认证
 .npmrc
 .pypirc
 .gem/credentials
-
-# 操作系统杂物
 .DS_Store
 Thumbs.db
 desktop.ini
+.idea/
+.vs/
+*.swp
+*.swo
+*~
+*.bak
+*.orig
+*.rej
+.directory

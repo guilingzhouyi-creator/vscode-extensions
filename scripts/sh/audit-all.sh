@@ -54,12 +54,14 @@ FAILED=0
 START_TIME=$("$NODE_BIN" -e 'process.stdout.write(Date.now().toString())')
 
 # 1. 物理卫生与零空文件看守
-if [[ "$JSON_MODE" -eq 0 ]]; then echo "▶ [1/5] 检查全工作区物理卫生、同构脚本与零空文件..."; fi
+if [[ "$JSON_MODE" -eq 0 ]]; then echo "▶ [1/5] 检查全工作区物理卫生、同构脚本、.gitignore 治理与零空文件..."; fi
 CODE_EMPTY=0
 "$NODE_BIN" scripts/common/validate-no-empty-files.js >/dev/null 2>&1 || CODE_EMPTY=$?
 CODE_ISO=0
 "$NODE_BIN" scripts/common/validate-script-isomorphism.js >/dev/null 2>&1 || CODE_ISO=$?
-if [[ "$CODE_EMPTY" -ne 0 || "$CODE_ISO" -ne 0 ]]; then
+CODE_GI=0
+"$NODE_BIN" scripts/common/validate-gitignore-governance.js >/dev/null 2>&1 || CODE_GI=$?
+if [[ "$CODE_EMPTY" -ne 0 || "$CODE_ISO" -ne 0 || "$CODE_GI" -ne 0 ]]; then
     STATUS_HYGIENE="FAIL"
     FAILED=1
 else
@@ -125,6 +127,7 @@ wait_with_timeout() {
                 echo "================================================================================"
             } > "$diag_file" 2>/dev/null || true
             echo "💡 超时诊断快照已落盘至: $diag_file" >&2
+            "$NODE_BIN" "$ROOT_DIR/scripts/common/log-rotator.js" --prune >/dev/null 2>&1 || true
             return 124
         fi
         sleep 1
@@ -145,7 +148,11 @@ fi
 (cd workspace-timing && "$NPM_BIN" run review) >"$LOG_WT" 2>&1 &
 PID_WT=$!
 
-("$PYTHON_BIN" WebGames/scripts/py/audit_config.py --strict --arch) >"$LOG_WG" 2>&1 &
+if [[ "$FAST_MODE" -eq 1 ]]; then
+    ("$PYTHON_BIN" WebGames/scripts/py/audit_runner.py --diff) >"$LOG_WG" 2>&1 &
+else
+    ("$PYTHON_BIN" WebGames/scripts/py/audit_runner.py) >"$LOG_WG" 2>&1 &
+fi
 PID_WG=$!
 
 if [[ "$FAST_MODE" -eq 1 ]]; then
@@ -225,6 +232,7 @@ if [[ "$FAILED" -ne 0 ]]; then
     [[ "$STATUS_WG" != "PASS" && -s "$LOG_WG" ]] && cp "$LOG_WG" "$DIAG_DIR/fail-webgames-$TIMESTAMP.log" 2>/dev/null || true
     [[ "$STATUS_AR" != "PASS" && -s "$LOG_AR" ]] && cp "$LOG_AR" "$DIAG_DIR/fail-auto-refactor-$TIMESTAMP.log" 2>/dev/null || true
     echo "💡 失败审查完整日志已保留至: .audit-logs/" >&2
+    "$NODE_BIN" "$ROOT_DIR/scripts/common/log-rotator.js" --prune >/dev/null 2>&1 || true
 fi
 
 rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF"
@@ -387,31 +395,51 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF"
 
   const wsGrade = getGradeFromScore(workspaceHealthScore);
 
+  const summary = {
+    protocolVersion: "1.0.0",
+    timestamp: new Date().toISOString(),
+    gitRevision: (function() {
+      try {
+        const { execSync } = require("child_process");
+        return execSync("git rev-parse --short HEAD", { cwd: rootDir, encoding: "utf8" }).trim().slice(0, 8);
+      } catch (_) { return "00000000"; }
+    })(),
+    fastMode: process.argv[14] === "1",
+    status: failed ? "FAIL" : "PASS",
+    exitCode: failed ? 1 : 0,
+    elapsedSeconds: Number(elapsedSec),
+    workspaceHealthScore,
+    compositeScore: workspaceHealthScore,
+    grade: wsGrade,
+    autonomyRate: autonomyRate != null ? Number(autonomyRate) : null,
+    polyglotIndex: polyglotIndex != null ? Number(polyglotIndex) : null,
+    totalDebt: totalDebt != null ? Number(totalDebt) : null,
+    catalogRuleCount: catalogRuleCount || null,
+    projects: {
+      hygiene: statusHygiene,
+      rulesCatalog: statusRules,
+      autoRefactor: statusAr,
+      workspaceTiming: statusWt,
+      webGames: statusWg
+    },
+    projectScores: {
+      hygiene: scoreHygiene,
+      rulesCatalog: scoreRules,
+      autoRefactor: scoreAr,
+      workspaceTiming: scoreWt,
+      webGames: scoreWg
+    },
+    arCompositeScore: compositeScore,
+    tenDimensions,
+    qualityVector
+  };
+
+  try {
+    const { recordAuditRun } = require(path.join(rootDir, "scripts", "common", "record-workspace-audit.js"));
+    recordAuditRun(summary);
+  } catch (_) {}
+
   if (jsonMode) {
-    const summary = {
-      timestamp: new Date().toISOString(),
-      status: failed ? "FAIL" : "PASS",
-      elapsedSeconds: Number(elapsedSec),
-      projects: {
-        hygiene: statusHygiene,
-        rulesCatalog: statusRules,
-        autoRefactor: statusAr,
-        workspaceTiming: statusWt,
-        webGames: statusWg
-      },
-      projectScores: {
-        hygiene: scoreHygiene,
-        rulesCatalog: scoreRules,
-        autoRefactor: scoreAr,
-        workspaceTiming: scoreWt,
-        webGames: scoreWg
-      },
-      workspaceHealthScore,
-      compositeScore: workspaceHealthScore,
-      arCompositeScore: compositeScore,
-      tenDimensions,
-      qualityVector
-    };
     console.log(JSON.stringify(summary, null, 2));
     process.exit(0);
   }
