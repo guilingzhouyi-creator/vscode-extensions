@@ -8,7 +8,8 @@
     "defaultModel",
     "archetypes",
     "postures",
-    "presets"
+    "presets",
+    "dshModes"
   ],
   "properties": {
     "version": { "type": "string" },
@@ -21,21 +22,50 @@
       "type": "object",
       "additionalProperties": { "type": "string" }
     },
+    "dshModes": {
+      "type": "object",
+      "description": "DSH 治理模式族注册表（模式 id -> 姿态与工具面契约）；权威真源为 .agents/dsh/presets/",
+      "additionalProperties": false,
+      "properties": {
+        "wg-construct": { "$ref": "#/$defs/dshMode" },
+        "wg-refactor": { "$ref": "#/$defs/dshMode" },
+        "wg-review": { "$ref": "#/$defs/dshMode" },
+        "wg-explore": { "$ref": "#/$defs/dshMode" }
+      }
+    },
     "presets": {
       "type": "object",
       "additionalProperties": {
         "type": "object",
-        "required": ["archetype", "posture", "description"],
+        "required": ["archetype", "posture", "description", "dshMode"],
         "properties": {
           "archetype": { "type": "string" },
           "posture": { "type": "string" },
           "description": { "type": "string" },
           "model": { "type": "string", "enum": ["inherit", "flash"] },
-          "workspaceMode": { "type": "string", "enum": ["inherit", "branch", "share"] }
+          "workspaceMode": { "type": "string", "enum": ["inherit", "branch", "share"] },
+          "dshMode": {
+            "type": "string",
+            "enum": ["wg-construct", "wg-refactor", "wg-review", "wg-explore"],
+            "description": "承载该专员的 DSH 治理模式；其 posture 必须与该专员的姿态一致"
+          }
         },
         "additionalProperties": false
       }
     }
   },
-  "additionalProperties": false
+  "additionalProperties": false,
+  "$defs": {
+    "dshMode": {
+      "type": "object",
+      "required": ["posture", "name", "order", "terminal"],
+      "properties": {
+        "posture": { "type": "string", "enum": ["construct", "review", "refactor", "explore", "guardian"] },
+        "name": { "type": "string" },
+        "order": { "type": "integer" },
+        "terminal": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    }
+  }
 }

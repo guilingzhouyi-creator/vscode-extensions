@@ -600,6 +600,8 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF"
   const bottomSummary = ` 耗时: ${elapsedSec}s${totalDebt !== null ? `  |  技术债: ${totalDebt}项` : ""}  |  全局状态: ${globalStatus}`;
   console.log(formatDashboardRow(bottomSummary, targetWidth));
   console.log(borderBot);
+  console.log("💡 统一审查快照已落盘至: .audit-logs/audit-latest.json | audit-latest.md");
+  console.log("💡 质量历史轨迹已追加至: .audit-logs/audit-history.jsonl");
 
   if (summaryFile) {
     const passBadge = (s) => (s === "PASS" ? "✅ PASS" : "❌ FAIL");
@@ -643,7 +645,7 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF"
       fs.appendFileSync(summaryFile, md, "utf8");
     } catch (_) {}
   }
-' "$START_TIME" "$FAILED" "$JSON_MODE" "$STATUS_HYGIENE" "$STATUS_RULES" "$STATUS_AR" "$STATUS_WT" "$STATUS_WG" "$ROOT_DIR" "$CODE_EMPTY" "$CODE_ISO" "$CODE_CATALOG" "$CODE_SKILLS"
+' "$START_TIME" "$FAILED" "$JSON_MODE" "$STATUS_HYGIENE" "$STATUS_RULES" "$STATUS_AR" "$STATUS_WT" "$STATUS_WG" "$ROOT_DIR" "$CODE_EMPTY" "$CODE_ISO" "$CODE_CATALOG" "$CODE_SKILLS" "$FAST_MODE"
 
 if [[ "$JSON_MODE" -eq 1 ]]; then
     exit "$FAILED"

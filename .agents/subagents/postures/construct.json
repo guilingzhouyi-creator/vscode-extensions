@@ -2,6 +2,9 @@
   "posture": "construct",
   "displayName": "业务生产与增量编码姿态",
   "model": "inherit",
+  "dshModes": [
+    "wg-construct"
+  ],
   "toolPermissions": {
     "enableWriteTools": true,
     "enableMcpTools": false,

@@ -47,7 +47,7 @@ TypeScript 采用结构化类型系统（Duck Typing），在没有名义区分�
   ```
 
 ### 3. 模板字面量类型与规则拓扑约束 (Template Literal Types)
-全工作区 425 条规则遵循严格的单源命名拓扑（`DOMAIN:FAMILY:NUM`）。
+全工作区 428 条规则遵循严格的单源命名拓扑（`DOMAIN:FAMILY:NUM`）。
 - **编译期防漂移类型**：
   ```typescript
   type RuleDomain = 'HYG' | 'SIM' | 'CPX' | 'TSM' | 'GOV' | 'PRF' | 'NAM';

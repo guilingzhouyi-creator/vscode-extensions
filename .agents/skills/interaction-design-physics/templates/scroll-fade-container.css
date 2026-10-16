@@ -1,0 +1,88 @@
+/**
+ * Module: 7-Stop Non-Linear Power-Law Scroll Fade Mask Stylesheet
+ * File Path: .agents/skills/interaction-design-physics/templates/scroll-fade-container.css
+ * Architecture Role: Edge fade styling implementing Weber-Fechner y ≈ x^1.5 perceptual curve.
+ * Responsibilities:
+ *   1. Define 7-stop non-linear Alpha gradient across 28px feather distance.
+ *   2. Dynamically collapse edge masks when container touches top/bottom boundary.
+ *   3. Eliminate color banding, Mach bands, and hairline clipping on Retina displays.
+ */
+
+:root {
+  --scroll-fade-distance: 28px;
+  --scroll-fade-mask-top: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0) 0%,
+    rgba(0, 0, 0, 0.051) 15%,
+    rgba(0, 0, 0, 0.149) 30%,
+    rgba(0, 0, 0, 0.302) 45%,
+    rgba(0, 0, 0, 0.502) 60%,
+    rgba(0, 0, 0, 0.702) 75%,
+    rgba(0, 0, 0, 0.851) 87%,
+    rgba(0, 0, 0, 1) 100%
+  );
+  --scroll-fade-mask-bottom: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0) 0%,
+    rgba(0, 0, 0, 0.051) 15%,
+    rgba(0, 0, 0, 0.149) 30%,
+    rgba(0, 0, 0, 0.302) 45%,
+    rgba(0, 0, 0, 0.502) 60%,
+    rgba(0, 0, 0, 0.702) 75%,
+    rgba(0, 0, 0, 0.851) 87%,
+    rgba(0, 0, 0, 1) 100%
+  );
+}
+
+.scroll-fade-container {
+  position: relative;
+  overflow-y: auto;
+  overflow-x: hidden;
+  mask-image: linear-gradient(to bottom,
+    transparent 0px,
+    black var(--scroll-fade-distance),
+    black calc(100% - var(--scroll-fade-distance)),
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(to bottom,
+    transparent 0px,
+    black var(--scroll-fade-distance),
+    black calc(100% - var(--scroll-fade-distance)),
+    transparent 100%
+  );
+}
+
+/* Dynamic sensor: Top boundary reached, collapse top fade */
+.scroll-fade-container[data-scroll-top="true"] {
+  mask-image: linear-gradient(to bottom,
+    black 0px,
+    black calc(100% - var(--scroll-fade-distance)),
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(to bottom,
+    black 0px,
+    black calc(100% - var(--scroll-fade-distance)),
+    transparent 100%
+  );
+}
+
+/* Dynamic sensor: Bottom boundary reached, collapse bottom fade */
+.scroll-fade-container[data-scroll-bottom="true"] {
+  mask-image: linear-gradient(to bottom,
+    transparent 0px,
+    black var(--scroll-fade-distance),
+    black 100%
+  );
+  -webkit-mask-image: linear-gradient(to bottom,
+    transparent 0px,
+    black var(--scroll-fade-distance),
+    black 100%
+  );
+}
+
+/* Dynamic sensor: Fully contained, both top and bottom collapsed */
+.scroll-fade-container[data-scroll-top="true"][data-scroll-bottom="true"] {
+  mask-image: none;
+  -webkit-mask-image: none;
+}
+

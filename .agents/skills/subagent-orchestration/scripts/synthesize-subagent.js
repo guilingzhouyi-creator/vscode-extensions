@@ -5,7 +5,8 @@
  *   from orthogonal domain archetypes and action postures, with dynamic SSOT binding.
  * Dependencies & Triggers: Invoked via CLI or Node require; depends on fs, path, subagent-catalog.json, rule-catalog.json.
  * Responsibilities: Deduces (Archetype x Posture) from natural language intent, binds live rule counts from
- *   rule-catalog.json, and generates 5-layer system contracts and Zero-Intersection Path Jail task shells.
+ *   rule-catalog.json and the DSH governance mode declared by catalog.dshModes, and generates
+ *   5-layer system contracts and Zero-Intersection Path Jail task shells.
  * Exit Semantics & Design Rationale: 0 = PASS, 1 = Config/Arg Error; decouples generic posture invariants from workspace-unified SSOT metrics.
  */
 'use strict';
@@ -29,6 +30,8 @@ const SUBAGENTS_ROOT = path.join(REPO_ROOT, '.agents/subagents');
 const CATALOG_PATH = path.join(SUBAGENTS_ROOT, 'subagent-catalog.json');
 const RULE_CATALOG_PATH = path.join(REPO_ROOT, 'scripts/common/rule-catalog.json');
 
+const MODE_ID_PATTERN = /^wg-[a-z]+$/u;
+
 function readJson(filePath) {
   if (!fs.existsSync(filePath)) {
     throw new Error(`Config file not found: ${filePath}`);
@@ -40,17 +43,26 @@ function getTotalRuleCount() {
   try {
     if (fs.existsSync(RULE_CATALOG_PATH)) {
       const ruleCat = JSON.parse(fs.readFileSync(RULE_CATALOG_PATH, 'utf8'));
-      if (typeof ruleCat?.summary?.totalRules === 'number') {
-        return ruleCat.summary.totalRules;
-      }
-      if (ruleCat?.rules && typeof ruleCat.rules === 'object') {
-        return Object.keys(ruleCat.rules).length;
+      if (typeof ruleCat?.totalRules === 'number') {
+        return ruleCat.totalRules;
       }
     }
   } catch (_err) {
-    return 425;
+    return 0;
   }
-  return 425;
+  return 0;
+}
+
+function resolveDshMode(presetDshMode, cliOptions, catalog) {
+  const declared = presetDshMode || (MODE_ID_PATTERN.test(cliOptions.dshMode || '') ? cliOptions.dshMode : null);
+  if (!declared) {
+    return null;
+  }
+  const info = (catalog.dshModes || {})[declared];
+  if (!info) {
+    throw new Error(`Unknown DSH governance mode: ${declared}`);
+  }
+  return { id: declared, ...info };
 }
 
 function resolveIntent(intent) {
@@ -99,6 +111,7 @@ const VALUE_ARG_MAP = {
   '--task': 'taskGoal',
   '--files': 'exclusiveFiles',
   '--workspace-mode': 'workspaceMode',
+  '--dsh-mode': 'dshMode',
 };
 
 const BOOLEAN_ARG_MAP = {
@@ -118,6 +131,7 @@ function parseCliArgs(argv) {
     exclusiveFiles: null,
     workspaceMode: 'inherit',
     model: 'inherit',
+    dshMode: null,
     dumpAll: false,
     json: false,
   };
@@ -239,7 +253,7 @@ ${preDeliverySection}
 `;
 }
 
-function synthesizeSingle(archKey, postKey, cliOptions, catalog, presetKey = null, defaultDesc = '') {
+function synthesizeSingle(archKey, postKey, cliOptions, catalog, presetKey = null, defaultDesc = '', presetDshMode = null) {
   const archRel = catalog.archetypes[archKey];
   const postRel = catalog.postures[postKey];
   if (!archRel) throw new Error(`Unknown archetype: ${archKey}`);
@@ -259,6 +273,7 @@ function synthesizeSingle(archKey, postKey, cliOptions, catalog, presetKey = nul
   );
 
   const targetModel = cliOptions.model || postureObj.model || catalog.defaultModel || 'inherit';
+  const dshMode = resolveDshMode(presetDshMode, cliOptions, catalog);
 
   return {
     subagentName,
@@ -268,6 +283,7 @@ function synthesizeSingle(archKey, postKey, cliOptions, catalog, presetKey = nul
     description: subagentDesc,
     model: targetModel,
     workspaceMode: cliOptions.workspaceMode || 'inherit',
+    dshMode,
     defineArgs: {
       name: subagentName,
       description: subagentDesc,
@@ -296,16 +312,17 @@ function resolvePresetTarget(presetKey, catalog) {
     postKey: preset.posture,
     defaultDesc: preset.description,
     matchedPresetKey: presetKey,
+    dshMode: preset.dshMode || null,
   };
 }
 
 function matchPresetByKeys(archKey, postKey, catalog) {
   for (const [pKey, pVal] of Object.entries(catalog.presets)) {
     if (pVal.archetype === archKey && pVal.posture === postKey) {
-      return { matchedPresetKey: pKey, defaultDesc: pVal.description };
+      return { matchedPresetKey: pKey, defaultDesc: pVal.description, dshMode: pVal.dshMode || null };
     }
   }
-  return { matchedPresetKey: null, defaultDesc: '' };
+  return { matchedPresetKey: null, defaultDesc: '', dshMode: null };
 }
 
 function resolveArchetypeAndPosture(cliOptions, catalog) {
@@ -328,8 +345,8 @@ function resolveArchetypeAndPosture(cliOptions, catalog) {
     );
   }
 
-  const { matchedPresetKey, defaultDesc } = matchPresetByKeys(archKey, postKey, catalog);
-  return { archKey, postKey, defaultDesc, matchedPresetKey };
+  const { matchedPresetKey, defaultDesc, dshMode } = matchPresetByKeys(archKey, postKey, catalog);
+  return { archKey, postKey, defaultDesc, matchedPresetKey, dshMode };
 }
 
 function synthesize(cliOptions) {
@@ -344,17 +361,18 @@ function synthesize(cliOptions) {
         cliOptions,
         catalog,
         pKey,
-        preset.description
+        preset.description,
+        preset.dshMode || null
       );
     }
     return { dumpAll: true, presets: allResults };
   }
 
-  const { archKey, postKey, defaultDesc, matchedPresetKey } = resolveArchetypeAndPosture(
+  const { archKey, postKey, defaultDesc, matchedPresetKey, dshMode } = resolveArchetypeAndPosture(
     cliOptions,
     catalog
   );
-  return synthesizeSingle(archKey, postKey, cliOptions, catalog, matchedPresetKey, defaultDesc);
+  return synthesizeSingle(archKey, postKey, cliOptions, catalog, matchedPresetKey, defaultDesc, dshMode);
 }
 
 function run() {
@@ -368,7 +386,7 @@ function run() {
       console.log(`🤖 全工作区预置 SubAgent 批量导出 (${Object.keys(result.presets).length} 专员)`);
       console.log(`======================================================`);
       for (const [k, p] of Object.entries(result.presets)) {
-        console.log(`• [${k}]: ${p.displayName} -> WriteTools=${p.defineArgs.enable_write_tools}, Model=${p.model}`);
+        console.log(`• [${k}]: ${p.displayName} -> WriteTools=${p.defineArgs.enable_write_tools}, Model=${p.model}, DshMode=${p.dshMode ? p.dshMode.id : '无'}`);
       }
     } else {
       console.log(`\n======================================================`);
@@ -378,6 +396,10 @@ function run() {
       console.log(`• 作业姿态: ${result.posture}`);
       console.log(`• 选定模型: ${result.model} (同构继承主会话 ${result.model})`);
       console.log(`• 工作区模式: ${result.workspaceMode}`);
+      const modeLine = result.dshMode
+        ? `${result.dshMode.id} (${result.dshMode.name}, posture=${result.dshMode.posture}, order=${result.dshMode.order}, terminal=${result.dshMode.terminal})`
+        : '未绑定 (请显式传入 --dsh-mode wg-construct|wg-refactor|wg-review|wg-explore)';
+      console.log(`• DSH 治理模式: ${modeLine}`);
       console.log(`• 权限开关: 写入/命令=${result.defineArgs.enable_write_tools}, MCP=${result.defineArgs.enable_mcp_tools}, SubAgent=${result.defineArgs.enable_subagent_tools}`);
       console.log(`\n--- 组装完成的 define_subagent 元数据 ---`);
       console.log(JSON.stringify(result.defineArgs, null, 2));

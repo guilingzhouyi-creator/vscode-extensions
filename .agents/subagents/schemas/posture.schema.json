@@ -8,7 +8,8 @@
     "displayName",
     "model",
     "toolPermissions",
-    "behaviorRules"
+    "behaviorRules",
+    "dshModes"
   ],
   "properties": {
     "posture": {
@@ -21,6 +22,15 @@
     "model": {
       "type": "string",
       "enum": ["inherit", "flash"]
+    },
+    "dshModes": {
+      "type": "array",
+      "minItems": 1,
+      "description": "该姿态允许承载的 DSH 治理模式；装配模式时其姿态应出现在此列表内",
+      "items": {
+        "type": "string",
+        "enum": ["wg-construct", "wg-refactor", "wg-review", "wg-explore"]
+      }
     },
     "toolPermissions": {
       "type": "object",

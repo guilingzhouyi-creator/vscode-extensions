@@ -1,10 +1,8 @@
 ---
 name: workspace-timing-dev
 description: >-
-  workspace-timing VS Code 计时扩展五层架构解耦、双写崩溃安全与双语字典规范。
-  指导 Agent 在 workspace-timing 项目中维护时间聚合核心、RingBuffer 与日志追加崩溃防护、
-  规范化命名（stagingUri、segmentedSessions、[DELTA]）、100% 双语国际化（zh-CN/en）、
-  暗色高对比度 UI 以及与全仓双层同构门禁的深度对接。
+  workspace-timing VS Code 计时扩展五层解耦与双写崩溃安全规范。指导 Agent 在扩展开发中维护时间聚合核心、
+  RingBuffer 与 Journal 追加崩溃防护、100% 双语国际化字典 (zh-CN/en) 与暗色高对比度 UI。
 ---
 
 # workspace-timing-dev — VS Code 扩展五层架构与崩溃安全研发规范
@@ -97,6 +95,12 @@ description: >-
 ### 3. 产品交付物与工程日志严格隔离契约
 - 面向用户的扩展 `README.md` 严格定位为商用级产品发布展示页，严禁平铺开发路线图与内部施工标记；
 - 面向用户的 `CHANGELOG.md` 严格以用户价值与体验提升为导向，绝对严禁泄露内部架构重构黑话（如消融单行跳板、RingBuffer崩溃安全、AST切片局部复杂度等工程治理术语）。
+
+### 4. Webview 交互物理学与抗抖动排版契约
+- **等宽数字绝对锁定**：所有展示计时器跳动、Token 统计或会话工时数值的容器，强制配置 `font-variant-numeric: tabular-nums`，杜绝数字位宽不一致引起的整行抖动；
+- **发丝细边与零重排过渡**：交互项激活/聚焦时，严禁动态修改 `border-width` 或切换边框（易引发 1px 盒模型重排抖动），统一使用 `box-shadow: inset 0 0 0 1px ...` 平滑过渡；
+- **CJK 输入法互锁守卫**：Webview 内的输入与搜索框，在 Enter 键响应时必须包含 `isComposing` 与 `keyCode === 229` 守卫；
+- **单闭合边框原则**：仪表盘卡片与面板内部的子操作按钮，必须降级为 `Ghost` 悬浮态或表面填充，严禁在卡片内部套娃边框。
 
 ---
 

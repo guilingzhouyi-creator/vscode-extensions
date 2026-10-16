@@ -2,6 +2,9 @@
   "posture": "guardian",
   "displayName": "复合门禁防御与质量裁决姿态",
   "model": "inherit",
+  "dshModes": [
+    "wg-refactor"
+  ],
   "toolPermissions": {
     "enableWriteTools": true,
     "enableMcpTools": false,

@@ -1,9 +1,8 @@
 ---
 name: gate-governance
 description: >-
-  通用双层门禁架构与跨平台脚本工程化治理。指导 Agent 落实 Tier 1 本地左移极速流式判定（gate-fast-staged.js <90ms、
-  validate-commit-msg.js）与 Tier 2 远端 CI 同构防御，运用受影响项目智能分流（auto-refactor 30 分析器与 335 规则自测）、
-  子进程显式工作目录隔离（-WorkingDirectory）与 pwsh 7+ 优先原则，看守代码卫生与零黑话纪律。
+  通用双层门禁架构与跨平台脚本工程治理规范。指导 Agent 落实 Tier 1 本地左移流式判定（<90ms）、
+  Tier 2 远端同构防御、受影响项目智能分流（auto-refactor 338 规则自测）、子进程工作目录隔离与零黑话纪律。
 ---
 
 # gate-governance — 通用双层门禁架构与跨平台脚本工程治理
@@ -49,7 +48,7 @@ description: >-
 ### 1. 路径特征探测与精准映射
 通过 `git diff --cached --name-only` 提取暂存区文件路径向量，精确映射至四大受控域：
 - **`workspace-timing/**`** $\rightarrow$ 路由至 VS Code 扩展套件：触发快速增量编译（`npm run compile`）、单元测试（`npm run test:fast`）与双语字典审查（`npm run review`）；
-- **`auto-refactor/**`** $\rightarrow$ 路由至 CLI 引擎套件：触发 30 分析器与 335 规则自测 (155/155 套测试，`npm test`)、Rust/TS 双轨内核等价性校验与项目中立性守卫（`npm run gate`）；
+- **`auto-refactor/**`** $\rightarrow$ 路由至 CLI 引擎套件：触发 30 分析器与 338 规则自测 (155/155 套测试，`npm test`)、Rust/TS 双轨内核等价性校验与项目中立性守卫（`npm run gate`）；
 - **`WebGames/**`** $\rightarrow$ 路由至 Godot 引擎套件：触发 GDScript 语法审查（`check-gdscript.sh`）、无头回归套件（`test-run.ps1`）与配置同构审计；
 - **`scripts/**` / `.github/**` / `AGENTS.md` / `.agents/skills/**` / 根目录配置** $\rightarrow$ 标记为 `governance` 域：触发工作区单源规则目录一致性、技能集规范性核验与全宗审计（`audit-all.ps1`，内置 `validate-skills.js`）。
 
@@ -85,6 +84,16 @@ description: >-
 ### 3. Bash 严格错误标志与平铺退出码
 - **严格管道安全**：Bash 脚本开头必须声明 `set -euo pipefail`；
 - **平铺退出码捕获**：预期允许非 0 退出码的探测指令，严禁裸调导致脚本隐式中断，必须采用 `STATUS=0; cmd || STATUS=$?` 平铺捕获或 `if cmd; then` 守卫分支。
+
+### 4. Windows 二进制路径硬锁定规范 (Trusted Binary Path Hardening)
+- **拒绝系统 PATH 模糊检索**：调用外部可执行程序（如 `ssh.exe`、`git.exe`、`node.exe`、`tar.exe`）时，严禁直接依赖系统环境变量 `PATH` 模糊查找，以防当前工作目录或不受信临时目录下的同名假冒二进制被意外优先执行（PATH 劫持防御）；
+- **显式探测与受信任安全路径单源绑定**：必须按确定性优先级探测受信任的绝对安全路径（如 `$env:WINDIR\System32\OpenSSH\ssh.exe`、`$env:ProgramFiles\Git\bin\git.exe`、`[System.Environment]::GetFolderPath('ProgramFiles')`），探测失败时抛出带有确定性解决指引的异常，严禁静默退化至未经验证的模糊路径；
+- **物理存在性与执行权限前置断言**：在将可执行程序路径传入子进程管道之前，必须前置执行 `Test-Path -PathType Leaf`（PowerShell）或 `[ -f "$BIN_PATH" ] && [ -x "$BIN_PATH" ]`（POSIX Shell）物理校验。
+
+### 5. 跨平台带空格命令行双引号硬包裹防御契约 (Space-Safe Quoting Discipline)
+- **参数硬包裹防转义裂化**：在跨平台脚本（PowerShell/Bash）拼接命令字符串或传递动态路径（包含 Windows 常见带空格目录如 `Program Files`、`Game Development`）时，所有路径变量与动态参数必须强制采用外层或转义双引号硬包裹（如 `"`$targetPath`"` 或 `"$TARGET_PATH"`）；
+- **参数列表传参优先**：调用子进程时优先使用参数列表（ArgumentList 数组）形式替代原始字符串拼接执行，从语义层面彻底阻断 Shell 字符重分词与命令注入隐患；
+- **路径规范化统一收口**：在 Windows 平台统一使用 `Join-Path` 或 `Convert-Path` 规整斜杠与盘符，Bash 脚本统一规整绝对路径后再行双引号包裹。
 
 ---
 

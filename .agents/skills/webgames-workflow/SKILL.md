@@ -1,10 +1,8 @@
 ---
 name: webgames-workflow
 description: >-
-  Godot 4.7 卡拉尔世界引擎纯逻辑解耦与配置驱动开发工作流。指导 Agent 在 WebGames 项目中
-  严格执行先四阶段蓝图获批后编码的两轮施工纪律、全域配置驱动（GameConfig）、
-  视图表现层零业务计算与强类型 Tabs 视图控制器（apply_snapshot）、高承压对象池循环零堆分配（ADV-PRF-002）
-  以及原生 Python 静态提取门禁（audit_arch_static.py）极速分析。
+  Godot 4 引擎纯逻辑解耦与配置驱动工作流。指导 Agent 在 WebGames 项目中执行先方案后编码施工纪律、
+  全域配置驱动 (GameConfig)、视图表现层单向快照注入 (apply_snapshot) 与对象池循环零堆分配 (ADV-PRF-002)。
 ---
 
 # webgames-workflow — Godot 4.7 引擎纯逻辑解耦与配置驱动开发规范

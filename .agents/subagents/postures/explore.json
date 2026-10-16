@@ -2,6 +2,9 @@
   "posture": "explore",
   "displayName": "只读探索与调用链挖掘姿态",
   "model": "inherit",
+  "dshModes": [
+    "wg-explore"
+  ],
   "toolPermissions": {
     "enableWriteTools": false,
     "enableMcpTools": false,

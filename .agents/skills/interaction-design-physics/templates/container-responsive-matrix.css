@@ -1,0 +1,152 @@
+/**
+ * Universal Container Responsive Matrix & CJK Text Preservation
+ * File Path: templates/container-responsive-matrix.css
+ * 
+ * 4 阶容器查询响应梯队与 CJK 防挤压排版契约：
+ *   - Tier 1 (< 576px): 中屏/双栏模式，外边距收窄，操作区弹性紧凑化
+ *   - Tier 2 (< 480px): 紧凑容器，双列降级单列，图标与文字微缩
+ *   - Tier 3 (< 384px): 窄侧边栏/小窗，隐藏辅助性文字标签，保留关键图标
+ *   - Tier 4 (< 320px): 极限极小容器，单列平铺，绝对禁止水平溢出
+ */
+
+/* 1. 容器上下文声明与自适应根基 */
+.interactive-pane-root {
+  container-type: inline-size;
+  container-name: pane-view;
+  width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+
+/* 2. CJK 防挤压与动态排版公理 */
+.pane-title,
+.pane-heading {
+  text-wrap: balance;
+  text-wrap: pretty;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  margin: 0;
+  line-height: 1.35;
+}
+
+.pane-body-text,
+.pane-description {
+  overflow-wrap: break-word;
+  word-break: break-word;
+  hyphens: auto;
+  line-height: 1.5;
+}
+
+.pane-numeric-value,
+.pane-timestamp,
+.pane-counter {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.pane-inline-icon {
+  display: inline-block;
+  vertical-align: -0.125em;
+  flex-shrink: 0;
+}
+
+/* 3. 基础弹性工具栏与内容区 */
+.pane-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+}
+
+.pane-grid-container {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 12px;
+}
+
+.pane-action-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  white-space: nowrap;
+  border-radius: 6px;
+}
+
+/* ==========================================================================
+   4 阶容器响应断点矩阵 (@container)
+   ========================================================================== */
+
+/* 梯队 1: 双栏/中屏收窄 (< 576px) */
+@container pane-view (max-width: 576px) {
+  .pane-toolbar {
+    padding: 6px 8px;
+    gap: 6px;
+  }
+
+  .pane-grid-container {
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .pane-action-pill {
+    padding: 4px 8px;
+    font-size: 0.875rem;
+  }
+}
+
+/* 梯队 2: 紧凑容器单列流 (< 480px) */
+@container pane-view (max-width: 480px) {
+  .pane-grid-container {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .pane-toolbar {
+    flex-wrap: wrap;
+  }
+
+  .pane-toolbar-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+/* 梯队 3: 侧边栏/小窗 (< 384px) - 隐藏次要文本标签 */
+@container pane-view (max-width: 384px) {
+  .pane-action-pill .pill-label {
+    display: none;
+  }
+
+  .pane-action-pill {
+    padding: 6px;
+    justify-content: center;
+  }
+
+  .pane-input-group {
+    width: 100%;
+  }
+}
+
+/* 梯队 4: 极限空间 (< 320px) - 绝对零横向溢出 */
+@container pane-view (max-width: 320px) {
+  .pane-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    padding: 4px;
+  }
+
+  .pane-grid-container {
+    padding: 4px;
+    gap: 6px;
+  }
+
+  .pane-action-pill {
+    width: 100%;
+    box-sizing: border-box;
+  }
+}
+

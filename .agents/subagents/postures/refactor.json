@@ -2,6 +2,9 @@
   "posture": "refactor",
   "displayName": "结构消融与复杂度平铺姿态",
   "model": "inherit",
+  "dshModes": [
+    "wg-refactor"
+  ],
   "toolPermissions": {
     "enableWriteTools": true,
     "enableMcpTools": false,

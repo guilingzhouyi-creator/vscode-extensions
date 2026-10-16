@@ -1,11 +1,11 @@
 {
   "schema": "workspace-rule-catalog/v1",
-  "generatedAt": "2026-10-14T05:50:57.711Z",
-  "totalRules": 428,
+  "generatedAt": "2026-10-16T07:48:27.624Z",
+  "totalRules": 459,
   "counts": {
-    "autoRefactor": 338,
+    "autoRefactor": 347,
     "workspaceTiming": 49,
-    "webGames": 55,
+    "webGames": 77,
     "globalTooling": 16
   },
   "rules": [
@@ -325,6 +325,13 @@
       "summary": "Layer boundary breach: outer implementations are directly referenced by inner layers (Clean/DDD inverted hierarchy)."
     },
     {
+      "id": "ARCH-PLM-001",
+      "project": "auto-refactor",
+      "family": "ARCH",
+      "severity": "warning",
+      "summary": "Plumbing overhead ratio (POR) exceeds threshold; wiring code dominates logic payload."
+    },
+    {
       "id": "ARCH-ROL-001",
       "project": "auto-refactor",
       "family": "ARCH",
@@ -365,6 +372,160 @@
       "family": "L5",
       "severity": "error",
       "summary": "auto-refactor 结构审查（经适配层隔离，工具不可用时优雅降级） (ARF-*)"
+    },
+    {
+      "id": "ART-AUD-005",
+      "project": "WebGames",
+      "family": "ART",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/README.md)"
+    },
+    {
+      "id": "ART-ICO-012",
+      "project": "WebGames",
+      "family": "ART",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/README.md)"
+    },
+    {
+      "id": "ART-REC-001",
+      "project": "WebGames",
+      "family": "ART",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md)"
+    },
+    {
+      "id": "ART-REC-002",
+      "project": "WebGames",
+      "family": "ART",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md)"
+    },
+    {
+      "id": "ART-REC-003",
+      "project": "WebGames",
+      "family": "ART",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md)"
+    },
+    {
+      "id": "ART-REC-004",
+      "project": "WebGames",
+      "family": "ART",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md)"
+    },
+    {
+      "id": "ART-REC-005",
+      "project": "WebGames",
+      "family": "ART",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md)"
+    },
+    {
+      "id": "ART-REC-006",
+      "project": "WebGames",
+      "family": "ART",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md)"
+    },
+    {
+      "id": "ART-REC-007",
+      "project": "WebGames",
+      "family": "ART",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md)"
+    },
+    {
+      "id": "ART-REC-008",
+      "project": "WebGames",
+      "family": "ART",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md)"
+    },
+    {
+      "id": "ART-REC-009",
+      "project": "WebGames",
+      "family": "ART",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md)"
+    },
+    {
+      "id": "ART-SPEC-001",
+      "project": "WebGames",
+      "family": "ART",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md)"
+    },
+    {
+      "id": "ART-SPEC-002",
+      "project": "WebGames",
+      "family": "ART",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md)"
+    },
+    {
+      "id": "ART-SPEC-003",
+      "project": "WebGames",
+      "family": "ART",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md)"
+    },
+    {
+      "id": "ART-SPEC-004",
+      "project": "WebGames",
+      "family": "ART",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md)"
+    },
+    {
+      "id": "ART-SPEC-005",
+      "project": "WebGames",
+      "family": "ART",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md)"
+    },
+    {
+      "id": "ART-SPEC-006",
+      "project": "WebGames",
+      "family": "ART",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md)"
+    },
+    {
+      "id": "ART-SPEC-007",
+      "project": "WebGames",
+      "family": "ART",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md)"
+    },
+    {
+      "id": "ART-SPEC-008",
+      "project": "WebGames",
+      "family": "ART",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md)"
+    },
+    {
+      "id": "ART-UI-001",
+      "project": "WebGames",
+      "family": "ART",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/README.md)"
+    },
+    {
+      "id": "ART-VIG-003",
+      "project": "WebGames",
+      "family": "ART",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/README.md)"
+    },
+    {
+      "id": "ART-XXX-000",
+      "project": "WebGames",
+      "family": "ART",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/README.md)"
     },
     {
       "id": "clean-layer-violation",
@@ -680,6 +841,13 @@
       "family": "CPX",
       "severity": "warning",
       "summary": "Unbounded polynomial time complexity across function/file boundaries: nestediteration call chains incur prohibitive overhead."
+    },
+    {
+      "id": "CPX-TRV-001",
+      "project": "auto-refactor",
+      "family": "CPX",
+      "severity": "warning",
+      "summary": "Tautological loop traversal detected with zero or negligible state mutation entropy delta."
     },
     {
       "id": "DAT-DEF-001",
@@ -2425,6 +2593,13 @@
       "summary": "Unreleased, experimental, or test preview routes must not be packaged into production routes"
     },
     {
+      "id": "SEC-EXP-005",
+      "project": "auto-refactor",
+      "family": "SEC",
+      "severity": "error",
+      "summary": "Cross-window message handlers performing sensitive actions must verify event.userActivation or validate event.origin"
+    },
+    {
       "id": "SEC-LEAK-001",
       "project": "auto-refactor",
       "family": "SEC",
@@ -2661,6 +2836,13 @@
       "family": "SIM",
       "severity": "error",
       "summary": "WebGames domain gate rule (source: WebGames/scripts/config/code_governance_rules.json)"
+    },
+    {
+      "id": "SIM-INL-001",
+      "project": "auto-refactor",
+      "family": "SIM",
+      "severity": "info",
+      "summary": "Single-use orphan function has high vector similarity with parent; inlining utility exceeds threshold."
     },
     {
       "id": "SIM-LONG-001",
@@ -2901,6 +3083,34 @@
       "summary": "Frontend hooks must start with \"use\" and event handler callbacks must start with \"on\" or \"handle\""
     },
     {
+      "id": "UI-ENG-005",
+      "project": "auto-refactor",
+      "family": "UI",
+      "severity": "warning",
+      "summary": "Keyboard Enter handlers for input/textarea must guard against CJK IME composition state"
+    },
+    {
+      "id": "UI-ENG-006",
+      "project": "auto-refactor",
+      "family": "UI",
+      "severity": "warning",
+      "summary": "Dynamic numeric counters, timestamps, or metrics must enable font-variant-numeric: tabular-nums"
+    },
+    {
+      "id": "UI-ENG-007",
+      "project": "auto-refactor",
+      "family": "UI",
+      "severity": "warning",
+      "summary": "Interactive controls inside bordered containers must avoid nested borders (single closed border rule)"
+    },
+    {
+      "id": "UI-ENG-008",
+      "project": "auto-refactor",
+      "family": "UI",
+      "severity": "warning",
+      "summary": "Local components, cards, or webview containers must use @container queries instead of viewport @media, and CJK text containers must configure text-wrap: balance or overflow-wrap: break-word to prevent character squashing"
+    },
+    {
       "id": "unused-export",
       "project": "auto-refactor",
       "family": "DEP",
@@ -3004,6 +3214,13 @@
       "family": "VSC",
       "severity": "warning",
       "summary": "Webview interactive form control lacks accessible label binding (WCAG 4.1.2)."
+    },
+    {
+      "id": "VSC-UI-004",
+      "project": "auto-refactor",
+      "family": "VSC",
+      "severity": "warning",
+      "summary": "Webview interactive state style changes must not dynamically modify border width triggering layout jitter."
     }
   ]
 }

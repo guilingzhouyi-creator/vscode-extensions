@@ -2,15 +2,13 @@
 name: auto-refactor-dev
 description: >-
   auto-refactor 静态分析重构引擎、Rust+TS 双轨内核与 Praxis 客户端 SDK 开发规范。指导 Agent 在
-  auto-refactor 项目中维护 30 内置分析器与 335 条规则体系、保证 Rust 算子与纯 TS 桥接 100% 字节等价、
-  落实四阶段分析器流水线拓扑 (Stage 0~3) 与有序装配意义、Praxis 表现层语义聚合引擎与 correlatedRules 消费规范、
-  一体两面三层拓扑 Diff 引擎、AgentDirectives 结构化协议、高精度时间戳与暂存分流原子落盘、
-  以及现代 TypeScript 高级类型学契约（名义量纲烙印、穷尽推导、只读防污染）与全域避免重复开销架构。
+  auto-refactor 项目中维护 30 内置分析器与 338 条规则体系，看守 Rust 与 TS 100% 字节等价、
+  四阶段流水线拓扑、一体两面 Diff 引擎、名义量纲烙印与高精度暂存落盘规范。
 ---
 
 # auto-refactor-dev — 静态重构引擎与双轨算子开发规范
 
-本技能规范了 `auto-refactor/` 静态代码分析与治理引擎的核心架构原则、双轨算子等价性约束、30 个内置分析器的四阶段流水线拓扑（Stage 0~3）、335 条规则治理体系（155/155 套测试）、Praxis 客户端 SDK 与表现层语义聚合引擎、一体两面三层拓扑 Diff 引擎、高精度时间戳规范、暂存分流原子落盘以及 12 项热路径与内存治理范式。
+本技能规范了 `auto-refactor/` 静态代码分析与治理引擎的核心架构原则、双轨算子等价性约束、30 个内置分析器的四阶段流水线拓扑（Stage 0~3）、338 条规则治理体系（155/155 套测试）、Praxis 客户端 SDK 与表现层语义聚合引擎、一体两面三层拓扑 Diff 引擎、高精度时间戳规范、暂存分流原子落盘以及 12 项热路径与内存治理范式。
 
 ---
 
@@ -18,7 +16,7 @@ description: >-
 
 在以下任一场景中，必须激活本技能：
 1. **新增或修改静态代码分析器**（30 个内置分析器，位于 `src/analyzers/*.ts`）；
-2. **注册或调整规则元数据**（335 条内置规则，位于 `src/core/rules/` 与 `src/core/scoring/dimensionRuleTable.ts`）；
+2. **注册或调整规则元数据**（338 条内置规则，位于 `src/core/rules/` 与 `src/core/scoring/dimensionRuleTable.ts`）；
 3. **开发 Rust N-API 原生算子或更新纯 TS Shim 回退实现**（`crates/` 与 `src/core/native/`）；
 4. **调用或扩展 Praxis 审查客户端 SDK**（`IPraxisReviewClient`、`createPraxisClient`、`src/core/praxis/`）；
 5. **维护一体两面三层拓扑 Diff 引擎或 AgentDirectives 协议**（`diff-topology.ts`、`agent-directives.ts`）；
@@ -32,7 +30,7 @@ description: >-
 `auto-refactor` 采用 TypeScript 调度编排与 Rust N-API 原生算子内核结合的双轨架构：
 - **L1 原生算子层**：`crates/auto-refactor-core` 与 `crates/ops-{diff,graph,pattern,mask,clone}`；
 - **L2 语法与语义层**：`NormalizedNode` 统一语法树与 `SemanticGraph` 跨语言（8 种语言）图底座；
-- **L3 规则与分析器**：30 个内置分析器与 335 条规则金字塔治理体系；
+- **L3 规则与分析器**：30 个内置分析器与 338 条规则金字塔治理体系；
 - **L4 调度与快轨**：Sparse MoE 变更熵密门禁路由器与 `<10ms` AST 切片快轨；
 - **L5 质量度量平面**：静态（10 支柱）+ 动态证据 + 演化（CAI 指数）；
 - **L6 Praxis 交付层**：统一客户端 SDK、多 Agent 冲突仲裁、轨迹配方学习与级联回滚。
@@ -62,7 +60,7 @@ description: >-
 - **快速短路熔断 (Fail-Fast Early Triage)**：Stage 0/1 在不消耗 AST 资源前即可短路拦截空文件、密钥泄露或巨石文件；仅当单文件 AST 完备时才进入 Stage 3 跨模块图分析；
 - **增量执行与内存常驻控制**：Sparse MoE 路由器按文件变更熵与角色按需激活分析器（增量耗时 `<100ms`），杜绝冷启动全量实例化占满 V8 堆内存。
 
-### 3. 四层规则金字塔与扣分预算 (335 条内置规则)
+### 3. 四层规则金字塔与扣分预算 (338 条内置规则)
 - **四层金字塔**：Layer 1（通用基础）$\to$ Layer 2（工程架构）$\to$ Layer 3（语言进阶）$\to$ Layer 4（演化自治 CAI / ROI）；
 - **单源登记**：遵循 `FAMILY-TOPIC-NNN` 规范，必须在 `src/core/rules/`、`src/core/scoring/dimensionRuleTable.ts` 及全局 `scripts/common/rule-catalog.json` 同步注册；
 - **单 Finding 扣分预算**：单个 Finding 扣分维度严格受限 $\text{AxesPerFinding} \le 4$；
@@ -137,7 +135,7 @@ description: >-
 
 1. **名义类型与量纲烙印 (`Brand<T, B>`)**：核心时间戳（`TimestampMs`）、代码行列（`LineNumber`, `ColumnNumber`）与指纹哈希（`FileHash`）通过 `unique symbol` 名义烙印，零运行时开销，编译期杜绝量纲混用；
 2. **穷尽性推导与不可达断言 (`assertNever`)**：针对 `GateStage`、`DiffSemanticCategory` 等联合类型，分发器末尾必须调用 `assertNever(variant)`，利用 `never` 强制编译期覆盖所有状态分支；
-3. **模板字面量规则代码收窄 (`StandardRuleId`)**：`AR:${Domain}:${Family}-${Number}` 模板字面量类型前置锁定 425 规则命名拓扑，拦截规则漂移（`RCFG-RULE-DRIFT`）；
+3. **模板字面量规则代码收窄 (`StandardRuleId`)**：`AR:${Domain}:${Family}-${Number}` 模板字面量类型前置锁定 428 规则命名拓扑，拦截规则漂移（`RCFG-RULE-DRIFT`）；
 4. **精确类型谓词与零盲目强转 (`is`)**：彻底消融 `as any` 与盲目 `as` 强转，所有异构或跨进程数据必须经类型守卫（`hasWorkerSymbols`）校验后安全收窄；
 5. **深度只读与共享 AST 防污染 (`DeepReadonly`)**：单趟磁带流共享的 `ReadonlyAstNode` 声明为深度不可变，杜绝分析器就地变异污染语法树；
 6. **全域避免重复开销四重架构**：

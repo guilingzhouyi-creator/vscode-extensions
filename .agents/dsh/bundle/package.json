@@ -1,0 +1,16 @@
+{
+  "name": "@local/dsh-workspace-governance",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "DSH 工作区治理模式族：四个 Agent Preset 声明（治理·施工/重构/审查/探索）与自研 Path Jail 物理守卫插件。",
+  "exports": {
+    ".": "./host-plugin.js",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}

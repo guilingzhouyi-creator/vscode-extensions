@@ -1,10 +1,8 @@
 ---
 name: subagent-orchestration
 description: >-
-  全工作区通用泛化 SubAgent 动态装配、四重防线契约注入与多智能体调度工作流。
-  在用户提及 SubAgent、并行任务、委派施工、后台审查或多智能体协作时激活本技能。
-  指导主 Agent 基于 (Archetype x Posture) 正交派生专员、全量同构继承模型、
-  独占 Zero-Intersection Path Jail 物理防冲突机制、只读与写入协同流及主 Agent 8 步交叉复审闭环 SOP。
+  通用泛化 SubAgent 动态装配与多智能体调度工作流。指导 Agent 基于 (Archetype x Posture) 正交派生专员，
+  同构继承模型、注入独占 Zero-Intersection Path Jail 物理防冲突、只读与写入协同流及 8 步交叉复审闭环 SOP。
 ---
 
 # subagent-orchestration — 全工作区泛化 SubAgent 调度规范
@@ -58,7 +56,7 @@ description: >-
 | :--- | :--- | :--- | :--- |
 | **`explore`** | 只读探索与依赖图分析 | 严禁写文件；仅输出调用拓扑与死代码证据 | `enable_write_tools: false` |
 | **`construct`** | 业务特性与增量代码生产 | 严格限制在 Path Jail 内；强制平铺控制流 (CC<=15, Depth<=4) | `enable_write_tools: true` |
-| **`review`** | 静态审查与规则匹配分析 | 严禁直接改代码；对照 425 规则库输出精确行号与质性依据 | `enable_write_tools: false` |
+| **`review`** | 静态审查与规则匹配分析 | 严禁直接改代码；对照 428 规则库输出精确行号与质性依据 | `enable_write_tools: false` |
 | **`refactor`** | 结构消融与复杂度平铺 | 优先消除循环内瞬态分配；消除空包跳板；动态稀释比 <= 1:3 | `enable_write_tools: true` |
 | **`guardian`** | 复合门禁防御与质量裁决 | 严禁改业务代码；执行测试与门禁并执行一票否决裁决 | `enable_write_tools: true` (限测试) |
 
@@ -91,12 +89,17 @@ description: >-
 在大型特性演进或复杂重构中，推荐实施 **Explore/Review 先行 $\rightarrow$ Construct/Refactor 施工 $\rightarrow$ Guardian 复核** 闭环流：
 1. **第一阶段：只读审查勘测 (`enable_write_tools: false`)**：
    - 调度 `review` 或 `explore` 姿态专员，物理拔除写入工具；
-   - 专员全量读取 AST、跨文件引用图与 425 规则库，输出精确违规行号、调用链以及质性重构方案；
+   - 专员全量读取 AST、跨文件引用图与 428 规则库，输出精确违规行号、调用链以及质性重构方案；
 2. **第二阶段：定点施工重构 (`enable_write_tools: true`)**：
    - 调度 `construct` 或 `refactor` 姿态专员，赋予独占文件列表的写权限；
    - 专员严格按第一阶段输出的方案在 Path Jail 范围内实施小步改动，禁止蔓延扩写；
 3. **第三阶段：门禁自检与证据交割**：
    - 施工专员在自身沙箱执行对应的 Layer 4 门禁自检命令，产出执行通过的日志证据后汇报主 Agent。
+
+### 3. 长程任务分卷章节标记协议 (mark_chapter 规范)
+面对多模块、跨层级的大型长程重构或批量施工任务，SubAgent 严禁一口气全量改写到底导致不可逆混乱与注意力耗尽，必须在关键拓扑检查点（如契约固化、底层算子重构、分批提交前夕）显式进行分卷章节标记（`mark_chapter`）：
+- **检查点状态快照**：显式声明当前章节编号（如 `Chapter 1: 底层契约落地`）、本章已验证通过的测试断言、受影响独占文件集合以及未决事项；
+- **断点续传与精准回退**：若后续章节发生回归或门禁阻断，主 Agent 可精准定位至上一章节标记点进行增量排错或单章回滚，杜绝“牵一发而动全身”式推倒重来。
 
 ---
 
@@ -155,7 +158,7 @@ SubAgent 汇报任务完成并返回消息后，主 Agent **绝对不能盲目�
 1. **① 沙箱隔离审计 (Path Jail Guard Audit)**：主 Agent 执行 `git status` 与 `git diff --name-only`，比对修改文件是否严格局限于独占 Path Jail 授权列表，严禁发生跨领域越界修改；
 2. **② 领域编译构建自检 (Domain Build & Compile Gate)**：在受影响项目子目录执行类型与编译检查（`workspace-timing`: `npm run compile`; `auto-refactor`: `npm run build`; `WebGames`: `python scripts/py/audit_config.py --strict`；`scripts/`: 平台语法检查），确保 0 编译错误，0 类型告警；
 3. **③ 体积与复杂度双轨预算 (Complexity & Volume Budget Gate)**：执行 `node scripts/common/evaluate-eloc-budget.js`，核查单文件双轨体积（$\text{ELOC} \le 900 / \text{LOC} \le 1400$）、AST 切片守卫（$\text{CC} \le 15, \text{Depth} \le 4, \text{Noise} \le 4.0$）、1:3 动态包络及高负荷注释密度 $\ge 8\%$；
-4. **④ 单源规则目录与防虚构校验 (Rule Catalog Anti-Drift Gate)**：执行 `node scripts/common/generate-rule-catalog.js --check-only`，核实 425 条规则目录计数零漂移，任何汇报与提交说明零虚构规则 ID（`RCFG-RULE-DRIFT`）；
+4. **④ 单源规则目录与防虚构校验 (Rule Catalog Anti-Drift Gate)**：执行 `node scripts/common/generate-rule-catalog.js --check-only`，核实 428 条规则目录计数零漂移，任何汇报与提交说明零虚构规则 ID（`RCFG-RULE-DRIFT`）；
 5. **⑤ 领域专属架构守卫 (Domain Specialized Architectural Guard)**：
    - `auto-refactor`：执行 `node auto-refactor/scripts/validate-facade-governance.js`（消融空包跳板 `ARCH-ABS-001`）与 `node auto-refactor/scripts/validate-project-neutrality.js`（项目中立性）；
    - `workspace-timing`：执行 `cd workspace-timing && npm run review`（五层解耦与双语字典覆盖）；
@@ -182,7 +185,9 @@ SubAgent 汇报任务完成并返回消息后，主 Agent **绝对不能盲目�
    ```bash
    node .agents/skills/subagent-orchestration/scripts/validate-subagent-catalog.js
    ```
-   确保 100% 通过验证。
+   确保 100% 通过验证；
+5. **长程重构分卷标记纪律**：跨批次长程重构任务必须在每个逻辑拓扑层完成并自检通过后，显式输出 `mark_chapter` 进度锚点，清晰汇报当前章节输入输出与下一章节执行契约；
+6. **后台 Agent 焦点防抢占守卫 (Background Agent Focus Shield)**：SubAgent 以后台异步、守护进程或只读审查姿态运行时，严禁执行任何会抢占操作系统全局焦点、桌面顶层窗口或活动编辑器光标的操作（包括弹出系统级模态对话框、执行强制窗口激活、或在 Webview/DOM 中滥用 `element.focus()` 抢夺人类光标），确保人类工程师在前台编程时的注意力流（Flow State）零被打断。
 
 ---
 

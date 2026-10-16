@@ -55,6 +55,7 @@ description: >-
 | **5. 单趟磁带与算子融合**<br/>*(Single-Pass Tape Fusion)* | $K$ 条规则对同一文件各自执行一遍行遍历或词法扫描（$K \times N$） | 在单趟词法脱敏（`maskSource`）时同步产出**结构化特征磁带**（每行偏移、缩进、算子/引号/注释位标志）并预过滤紧凑 `ActiveHook[]` | 将 $O(K \cdot N)$ 压缩为严格单趟 $O(N)$，消除空转回调 |
 | **6. 时代戳 $O(1)$ 零清零复用**<br/>*(Epoch Counter Reset)* | 每次子图查询或循环迭代调用 `visited.fill(0)` 或 `new Set()`（导致 $Q \times O(V)$ 退化） | 维护全局复用 `visitedEpoch = new Int32Array(maxV)` 与单调递增 `currentEpoch++`；通过 `visitedEpoch[u] === currentEpoch` 判重 | 每次查询间的状态重置开销从 $O(V)$ 降至严格 $O(1)$ |
 | **7. 多模态自适应混合包络**<br/>*(Poly-Algorithmic Envelope)* | 单一重型算法硬扛所有规模与熵分布输入 | $N \le 16$ 走寄存器位掩码/线性扫描；中等规模低差异走 Bit-Parallel Myers；跨度 $>1500$ 行或矩阵 $>2\text{M}$ 单元格自动降级 `histogramDiff` | 兼顾小输入零常数开销与极端退化输入下的零 OOM 保障 |
+| **8. 交互动力学与感知信号算子**<br/>*(Kinetic & Perceptual Operators)* | 连续 requestAnimationFrame 步进数值积分或粗暴线性插值 | 采用 **二阶阻尼谐振子解析解算子**（直接代入 $e^{-\zeta \omega_0 t}$）+ **光标不动点仿射变换** + **感知幂律 Gamma 压缩** | 消除积分累积误差，每帧开销从步进迭代压缩为单次代数解算 |
 
 ---
 
