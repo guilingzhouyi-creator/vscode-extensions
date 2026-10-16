@@ -610,6 +610,19 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#dep-ord-001',
     }),
     defineRule({
+        id: 'DEP-ORD-002',
+        family: RULE_FAMILY_DEPENDENCY,
+        analyzer: ANALYZER_DEPENDENCY_LAYOUT,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            'File layout order violation: top-level import statement declared after contract types, constants, or business logic statements.',
+        remediation:
+            'Relocate import statement to top-level import section before types, constants, and functions.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#dep-ord-002',
+    }),
+    defineRule({
         id: 'DEP-PHANTOM-001',
         family: RULE_FAMILY_DEPENDENCY,
         analyzer: ANALYZER_DEPENDENCY_LAYOUT,

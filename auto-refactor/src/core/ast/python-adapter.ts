@@ -95,6 +95,46 @@ function resolveChildMapContext(ctx: MapContext, sn: TreeSitterNode): MapContext
     };
 }
 
+function extractSinglePythonParam(child: TreeSitterNode): string | undefined {
+    if (child.type === 'identifier' && child.text) {
+        return child.text;
+    }
+    if (
+        child.type === 'typed_parameter' ||
+        child.type === 'default_parameter' ||
+        child.type === 'typed_default_parameter'
+    ) {
+        const idNode = child.childForFieldName
+            ? child.childForFieldName('name')
+            : child.namedChildren?.find((c) => c.type === 'identifier');
+        if (idNode?.text) return idNode.text;
+        if (child.text) return child.text.split(/[:=]/)[0].trim();
+    }
+    if (
+        (child.type === 'list_splat_pattern' ||
+            child.type === 'dictionary_splat_pattern') &&
+        child.text
+    ) {
+        return child.text;
+    }
+    return undefined;
+}
+
+function extractPythonParameters(sn: TreeSitterNode): string[] | undefined {
+    const paramsNode = sn.childForFieldName ? sn.childForFieldName('parameters') : null;
+    const resolvedParamsNode =
+        paramsNode ?? sn.namedChildren?.find((c) => c.type === 'parameters');
+    if (!resolvedParamsNode) return undefined;
+
+    const result: string[] = [];
+    const children = resolvedParamsNode.namedChildren || [];
+    for (let i = 0; i < children.length; i++) {
+        const paramName = extractSinglePythonParam(children[i]);
+        if (paramName) result.push(paramName);
+    }
+    return result;
+}
+
 /**
  * Language adapter projecting Python syntax into normalized
  * language-agnostic AST using Tree-sitter.
@@ -178,6 +218,7 @@ export class PythonAdapter implements LanguageAdapter {
             // Python has no constructor keyword; `__init__` stays a plain Method so complexity
             // reports the idiomatic `Class.__init__` name instead of a synthetic "constructor".
             isConstructor: false,
+            parameters: fnLike ? extractPythonParameters(sn) : undefined,
         };
 
         const topLevel = isTopLevel(sn);

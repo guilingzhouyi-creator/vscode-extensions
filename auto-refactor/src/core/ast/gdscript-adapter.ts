@@ -73,6 +73,55 @@ function findCallClosingParen(rawLine: string, openIdx: number): number {
     return -1;
 }
 
+function pushParamIdentifier(params: string[], rawToken: string): void {
+    const trimmed = rawToken.trim();
+    if (!trimmed) return;
+    const idMatch = trimmed.match(/^([a-zA-Z_][a-zA-Z0-9_]*)/);
+    if (idMatch) params.push(idMatch[1]);
+}
+
+function updateQuoteAndDepth(ch: string, state: { inStr: string | null; depth: number }): void {
+    if (state.inStr) {
+        if (ch === state.inStr) state.inStr = null;
+        return;
+    }
+    if (ch === '"' || ch === "'") {
+        state.inStr = ch;
+    } else if (ch === '(' || ch === '[' || ch === '{') {
+        state.depth++;
+    } else if (ch === ')' || ch === ']' || ch === '}') {
+        state.depth--;
+    }
+}
+
+function extractGDScriptParams(rawLine: string, openIdx: number): string[] {
+    const closeIdx = findCallClosingParen(rawLine, openIdx);
+    if (closeIdx === -1) return [];
+    const paramStr = rawLine.slice(openIdx + 1, closeIdx).trim();
+    if (!paramStr) return [];
+
+    const params: string[] = [];
+    let cur = '';
+    const state = { inStr: null as string | null, depth: 0 };
+
+    for (let i = 0; i < paramStr.length; i++) {
+        const ch = paramStr[i];
+        if (state.inStr && ch === '\\') {
+            cur += ch + (paramStr[++i] || '');
+            continue;
+        }
+        if (ch === ',' && !state.inStr && state.depth === 0) {
+            pushParamIdentifier(params, cur);
+            cur = '';
+            continue;
+        }
+        updateQuoteAndDepth(ch, state);
+        cur += ch;
+    }
+    pushParamIdentifier(params, cur);
+    return params;
+}
+
 /** Engine and framework method names whose argument lists carry canonical keys or tokens. */
 export const TOLERANT_CALL_NAMES: ReadonlySet<string> = new Set([
     'render_narrative',
@@ -190,12 +239,15 @@ function tryParseFuncDecl(
 ): boolean {
     const mFunc = rawLine.match(FUNC_RE);
     if (!mFunc) return false;
+    const openIdx = rawLine.indexOf('(', mFunc.index ?? 0);
+    const params = openIdx !== -1 ? extractGDScriptParams(rawLine, openIdx) : [];
     const isMethod =
         scopeStack.length > 1 && scopeStack[scopeStack.length - 1].node.isClassDefining;
     const fnNode: NormalizedNode = {
         kind: isMethod ? NodeKind.Method : NodeKind.Function,
         name: mFunc[1],
         functionLike: true,
+        parameters: params,
         increasesNesting: true,
         topLevel: indent === 0,
         start: { line: lineNum, column: indent + 1 },

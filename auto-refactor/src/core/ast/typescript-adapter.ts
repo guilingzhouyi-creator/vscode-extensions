@@ -184,7 +184,7 @@ export class TypeScriptAdapter implements LanguageAdapter {
         ) {
             return undefined;
         }
-        if (!n.parameters || n.parameters.length === 0) return undefined;
+        if (!n.parameters) return [];
         return n.parameters.map((p) => p.name.getText(sf));
     }
 

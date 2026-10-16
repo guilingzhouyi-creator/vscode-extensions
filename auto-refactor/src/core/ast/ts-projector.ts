@@ -384,6 +384,7 @@ export class TsNodeProjector implements NodeProjector {
             increasesNesting: isScope,
             isConstructor:
                 Boolean(this.policy.needComplexity) && ts.isConstructorDeclaration(astNode),
+            parameters: fnLike ? this.extractFnParameters(astNode) : undefined,
             topLevel,
             exported:
                 topLevel &&
@@ -392,6 +393,20 @@ export class TsNodeProjector implements NodeProjector {
                     ts.isExportDeclaration(astNode)),
         };
         return node;
+    }
+
+    private extractFnParameters(n: ts.Node): string[] | undefined {
+        if (
+            !ts.isFunctionDeclaration(n) &&
+            !ts.isMethodDeclaration(n) &&
+            !ts.isFunctionExpression(n) &&
+            !ts.isArrowFunction(n) &&
+            !ts.isConstructorDeclaration(n)
+        ) {
+            return undefined;
+        }
+        if (!n.parameters) return [];
+        return n.parameters.map((p) => p.name.getText(this.sf));
     }
 
     private applyProjectedMetadata(

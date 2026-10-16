@@ -85,6 +85,19 @@ export const CommentMessages = {
         risk: 'High',
     }),
 
+    // CMT-HDR-004
+    INVERTED_FILE_HEADER: (
+        firstCodeLine: number,
+        headerStartLine: number,
+    ): DiagnosticDescriptor => ({
+        message: `Module header comment inverted: header starts at line ${headerStartLine} after code declarations (line ${firstCodeLine})`,
+        suggestion:
+            'Move the file-level module header comment to the top of the file before imports and operational code declarations',
+        rationale:
+            'Standard module headers establish architectural context and must precede dependencies and operational logic.',
+        risk: 'Medium',
+    }),
+
     // CMT-DOC-001
     MISSING_PUBLIC_DOC: (symbol: string): DiagnosticDescriptor => ({
         message: `Missing documentation commentary (JSDoc / Docstring) for public exported symbol '${symbol}'`,

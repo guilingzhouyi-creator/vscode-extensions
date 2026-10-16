@@ -32,6 +32,18 @@ export const ConstantsMessages = {
         risk: RISK_MEDIUM,
     }),
 
+    // CONST-LAY-002: Contract type declaration sequence
+    TYPE_LAYOUT_ORDER_BREACH: (
+        symbolName: string,
+        firstFunctionLine: number,
+    ): DiagnosticDescriptor => ({
+        message: `Contract type declaration order violation: '${symbolName}' must appear before core function and class declarations (first function/class at line ${firstFunctionLine})`,
+        suggestion: `Hoist type/interface '${symbolName}' above function and class implementations to maintain top-down contract readability`,
+        rationale:
+            'Contract shapes and interfaces establish the domain schema that subsequent operational logic implements; declaring types after functions obscures domain contracts.',
+        risk: RISK_MEDIUM,
+    }),
+
     // CONST-SCP-001: Scope over-widening guard
     SCOPE_OVERWIDENING: (
         symbolName: string,

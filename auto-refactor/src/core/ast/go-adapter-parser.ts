@@ -159,6 +159,57 @@ function parseTypeDeclaration(
     };
 }
 
+function findGoCloseParen(trimmed: string, openIdx: number): number {
+    let depth = 1;
+    for (let i = openIdx + 1; i < trimmed.length; i++) {
+        const ch = trimmed[i];
+        if (ch === '(' || ch === '[' || ch === '{') depth++;
+        else if (ch === ')' || ch === ']' || ch === '}') {
+            depth--;
+            if (depth === 0) return i;
+        }
+    }
+    return -1;
+}
+
+function splitGoParamSegments(paramStr: string): string[] {
+    const segments: string[] = [];
+    let cur = '';
+    let pDepth = 0;
+    for (let i = 0; i < paramStr.length; i++) {
+        const ch = paramStr[i];
+        if (ch === '(' || ch === '[' || ch === '{') {
+            pDepth++;
+            cur += ch;
+        } else if (ch === ')' || ch === ']' || ch === '}') {
+            pDepth--;
+            cur += ch;
+        } else if (ch === ',' && pDepth === 0) {
+            segments.push(cur.trim());
+            cur = '';
+        } else {
+            cur += ch;
+        }
+    }
+    if (cur.trim()) segments.push(cur.trim());
+    return segments;
+}
+
+function extractGoParams(trimmed: string, openIdx: number): string[] {
+    const closeIdx = findGoCloseParen(trimmed, openIdx);
+    if (closeIdx === -1) return [];
+    const paramStr = trimmed.slice(openIdx + 1, closeIdx).trim();
+    if (!paramStr) return [];
+
+    const segments = splitGoParamSegments(paramStr);
+    const names: string[] = [];
+    for (const seg of segments) {
+        const idMatch = seg.match(/^([A-Za-z_][A-Za-z0-9_]*)/);
+        if (idMatch) names.push(idMatch[1]);
+    }
+    return names;
+}
+
 /**
  * Parse function or method declaration: `func Foo(...)` or `func (r *R) Method(...)`.
  *
@@ -171,10 +222,13 @@ function parseFuncOrMethod(trimmed: string, line: string, lineNum: number): Norm
     const methodMatch = METHOD_DECL_RE.exec(trimmed);
     if (methodMatch) {
         const methodName = methodMatch[1];
+        const openIdx = methodMatch.index + methodMatch[0].length - 1;
+        const params = extractGoParams(trimmed, openIdx);
         return {
             kind: NodeKind.Method,
             name: methodName,
             functionLike: true,
+            parameters: params,
             introducesBinding: true,
             bindingName: methodName,
             topLevel: true,
@@ -187,10 +241,13 @@ function parseFuncOrMethod(trimmed: string, line: string, lineNum: number): Norm
     const funcMatch = FUNC_DECL_RE.exec(trimmed);
     if (funcMatch) {
         const funcName = funcMatch[1];
+        const openIdx = funcMatch.index + funcMatch[0].length - 1;
+        const params = extractGoParams(trimmed, openIdx);
         return {
             kind: NodeKind.Function,
             name: funcName,
             functionLike: true,
+            parameters: params,
             introducesBinding: true,
             bindingName: funcName,
             topLevel: true,

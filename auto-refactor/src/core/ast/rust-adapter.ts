@@ -226,6 +226,7 @@ export class RustAdapter implements LanguageAdapter {
             // insertion order / hidden class as the TS and oxc adapters, keeping a uniform
             // node shape across all adapters.
             isConstructor: false,
+            parameters: fnLike ? extractRustParameters(syntaxNode) : undefined,
         };
 
         const exportStatus = checkRustExported(syntaxNode, parent);
@@ -417,4 +418,32 @@ function checkRustExported(
         }
     }
     return { topLevel: true, exported: false };
+}
+
+function extractRustParameters(syntaxNode: TreeSitterNode): string[] | undefined {
+    const paramsNode = syntaxNode.childForFieldName
+        ? syntaxNode.childForFieldName('parameters')
+        : syntaxNode.namedChildren?.find((c) => c.type === 'parameters');
+    if (!paramsNode) return undefined;
+    const names: string[] = [];
+    const children = paramsNode.namedChildren || [];
+    for (let i = 0; i < children.length; i++) {
+        const child = children[i];
+        if (child.type === 'self_parameter') {
+            names.push('self');
+        } else if (child.type === 'parameter') {
+            const pat = child.childForFieldName ? child.childForFieldName('pattern') : null;
+            if (pat?.text) {
+                names.push(pat.text);
+            } else {
+                const idNode = child.namedChildren?.find((c) => c.type === 'identifier');
+                if (idNode?.text) {
+                    names.push(idNode.text);
+                } else if (child.text) {
+                    names.push(child.text.split(':')[0].trim());
+                }
+            }
+        }
+    }
+    return names;
 }

@@ -25,6 +25,7 @@ const DOCS_ANCHOR_BASE = 'docs/04-analyzers-and-rules/01-builtin-rules.md#';
 const RULE_ID_CONST_CLU_001 = 'CONST-CLU-001';
 const RULE_ID_CONST_DRF_001 = 'CONST-DRF-001';
 const RULE_ID_CONST_LAY_001 = 'CONST-LAY-001';
+const RULE_ID_CONST_LAY_002 = 'CONST-LAY-002';
 const RULE_ID_CONST_LIB_001 = 'CONST-LIB-001';
 const RULE_ID_CONST_OWN_001 = 'CONST-OWN-001';
 const RULE_ID_CONST_SCP_001 = 'CONST-SCP-001';
@@ -67,6 +68,11 @@ export const CONSTANT_GOVERNANCE_RULES: readonly RuleDefinition[] = [
         RULE_ID_CONST_LAY_001,
         'Module-level constants must be placed in the primary declaration section immediately following imports, not scattered within functions or business logic.',
         'Hoist module-level constants to the designated declaration block after import/require statements and before function/class definitions.',
+    ),
+    createGovernanceRule(
+        RULE_ID_CONST_LAY_002,
+        'Type definitions, interfaces, and contract shapes must be declared before core functions and business logic classes.',
+        'Hoist types and interfaces above operational business logic and functions to maintain a top-down contract readability order.',
     ),
     createGovernanceRule(
         RULE_ID_CONST_LIB_001,

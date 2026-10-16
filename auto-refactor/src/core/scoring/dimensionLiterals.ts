@@ -654,6 +654,14 @@ export const RULE_NAM_LEN_002 = 'NAM-LEN-002';
 export const RULE_NAM_ABR_001 = 'NAM-ABR-001';
 /** Rule id for excessive function parameters guard (>4 parameters). */
 export const RULE_SIM_ARGS_001 = 'SIM-ARGS-001';
+/** Rule id for minimum parameter count threshold on handlers/solvers. */
+export const RULE_SIM_ARGS_002 = 'SIM-ARGS-002';
+/** Rule id for module header comment precedence violation. */
+export const RULE_CMT_HDR_004 = 'CMT-HDR-004';
+/** Rule id for import statement horizon breach. */
+export const RULE_DEP_ORD_002 = 'DEP-ORD-002';
+/** Rule id for contract types declared after business logic. */
+export const RULE_CONST_LAY_002 = 'CONST-LAY-002';
 
 /** Rule id for HTML semantics and accessibility violations. */
 export const RULE_UI_ENG_001 = 'UI-ENG-001';

@@ -32,6 +32,8 @@ import {
     ANALYZER_SIMPLIFY,
     ANALYZER_PYTHON_MODERN,
     RULE_SIM_ARGS_001,
+    RULE_SIM_ARGS_002,
+    RULE_CMT_HDR_004,
 } from '../../scoring/dimensionLiterals';
 import { REMEDIATION_STANDARD_AND_ABOVE, ANALYZER_MODERN_RULES } from './analyzers-modern';
 
@@ -122,6 +124,19 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         summary: 'File header declared path does not match actual physical file path.',
         remediation: '`strict`',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#cmt-hdr-003',
+    }),
+    defineRule({
+        id: RULE_CMT_HDR_004,
+        family: RULE_FAMILY_COMMENTS,
+        analyzer: ANALYZER_COMMENTS,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            'File layout order violation: top-level six-field module header comment must precede all non-directive code statements.',
+        remediation:
+            'Relocate module header JSDoc block to line 1 immediately following optional shebang or encoding directive.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#cmt-hdr-004',
     }),
     defineRule({
         id: 'CMT-INT-001',
@@ -760,6 +775,19 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
         remediation:
             'Group related parameters into a cohesive parameter object or options interface to simplify call-sites.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#sim-args-001',
+    }),
+    defineRule({
+        id: RULE_SIM_ARGS_002,
+        family: RULE_FAMILY_SIMPLIFY,
+        analyzer: ANALYZER_SIMPLIFY,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            'Minimum parameter count threshold breached: public handler, listener, or solver function declares 0 parameters, risking implicit coupling with mutable global state.',
+        remediation:
+            'Declare explicit context or payload parameter instead of reading implicit module-level state.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#sim-args-002',
     }),
     defineRule({
         id: 'SIM-COMC-001',
