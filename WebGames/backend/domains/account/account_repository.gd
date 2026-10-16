@@ -110,7 +110,7 @@ func has_username(username: String) -> bool:
 
 ## 获取已装载账号总数
 func get_account_count() -> int:
-	if not _is_loaded:
+	if not _loaded:
 		load_all()
 	return _accounts_cache.size()
 

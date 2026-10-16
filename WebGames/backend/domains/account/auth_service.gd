@@ -190,8 +190,18 @@ static func authenticate_local(username: String, pass_plain: String, account: Ac
 	if not device_fingerprint.is_empty() and not account.local_device_fingerprint.is_empty() and device_fingerprint != account.local_device_fingerprint:
 		var code_fp := GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "auth/errors/device_mismatch", "ERR_DEVICE_MISMATCH")
 		return {"success": false, "code": code_fp, "token": ""}
-	# 口令单轨校验：统一按配置盐哈希（向前兼容，无向后历史包袱）
+	# 口令校验：默认按配置盐哈希；若历史账号为无盐版本 (salt_version == 0) 则平滑迁移重铸
 	var input_hash := hash_password(pass_plain)
+	var rehashed := false
+	if account.username == username and not account.is_guest_mode and account.salt_version == 0:
+		if account.password_hash_sha256 == pass_plain.sha256_text():
+			account.password_hash_sha256 = input_hash
+			account.salt_version = 1
+			rehashed = true
+			var repo := AccountRepository.get_instance()
+			if repo.has_account(account.account_id):
+				repo.save_account(account)
+
 	var matched := account.username == username and (account.is_guest_mode or account.password_hash_sha256 == input_hash)
 	if matched:
 		account.last_login_timestamp_utc = int(Time.get_unix_time_from_system())
@@ -228,7 +238,7 @@ static func authenticate_local(username: String, pass_plain: String, account: Ac
 		})
 		_dispatch_auth_hooks("post_login", {"account_id": account.account_id, "username": account.username, "token": token, "auto_enter_gateway": auto_enter})
 
-		return {"success": true, "code": code_ok, "token": token, "account_id": account.account_id, "username": account.username, "issued_at": issued_at, "expires_at": issued_at + ttl, "rehashed": false, "auto_enter_gateway": auto_enter}
+		return {"success": true, "code": code_ok, "token": token, "account_id": account.account_id, "username": account.username, "issued_at": issued_at, "expires_at": issued_at + ttl, "rehashed": rehashed, "auto_enter_gateway": auto_enter}
 	var code_inv := GameConfig.get_string(DOMAIN_ACCOUNT_CONFIG, "auth/errors/invalid_credentials", "ERR_INVALID_CREDENTIALS")
 	return {"success": false, "code": code_inv, "token": ""}
 
