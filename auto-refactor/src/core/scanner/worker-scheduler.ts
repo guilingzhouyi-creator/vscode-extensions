@@ -41,6 +41,7 @@ export type WorkerRawResultItem = {
 const DEFAULT_WORKER_FLUSH_TIMEOUT_MS = 3000;
 const TYPEOF_OBJECT = 'object';
 const EVENT_ERROR = 'error';
+const EVENT_EXIT = 'exit';
 
 /** Scale factor turning a 0-1 elapsed-time ratio into a whole percentage (AR-TIMING). */
 const TIMING_PERCENT_SCALE = 100;
@@ -667,6 +668,7 @@ export async function dispatchBatches(
                 symbolsMap?: { file: string; symbols?: WorkerSymbolsPayload }[];
             }) => void;
             onError: (err: unknown) => void;
+            onExit: (exitCode: number) => void;
         }
         const listenerBindings: WorkerListenerBinding[] = [];
 
@@ -676,6 +678,7 @@ export async function dispatchBatches(
             for (const binding of listenerBindings) {
                 binding.worker.off('message', binding.onMessage);
                 binding.worker.off(EVENT_ERROR, binding.onError);
+                binding.worker.off(EVENT_EXIT, binding.onExit);
             }
             listenerBindings.length = 0;
         };
@@ -731,7 +734,7 @@ export async function dispatchBatches(
             const absPath = path.join(absRoot, rel);
             try {
                 const pre = opts.preloaded && opts.preloaded.get(rel);
-                const fileBuffer = pre || (await fs.promises.readFile(absPath));
+                const fileBuffer = pre ? Buffer.from(pre) : await fs.promises.readFile(absPath);
                 return { file: rel, absPath, buf: toTransferable(fileBuffer) };
             } catch {
                 results[idx] = { issues: [] as Issue[], metric: null as FileMetric | null };
@@ -915,9 +918,19 @@ export async function dispatchBatches(
             const onError = (err: unknown) => {
                 fail(err);
             };
+            const onExit = (exitCode: number) => {
+                if (exitCode !== 0 && !failed) {
+                    fail(
+                        new Error(
+                            `Worker ${workerIndex} exited unexpectedly with code ${exitCode}`,
+                        ),
+                    );
+                }
+            };
             targetWorker.on('message', onMessage);
             targetWorker.on(EVENT_ERROR, onError);
-            listenerBindings.push({ worker: targetWorker, onMessage, onError });
+            targetWorker.on(EVENT_EXIT, onExit);
+            listenerBindings.push({ worker: targetWorker, onMessage, onError, onExit });
             void dispatch(targetWorker);
         };
 

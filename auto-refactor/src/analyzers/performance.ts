@@ -235,7 +235,12 @@ export class PerformanceAnalyzer implements Analyzer {
         loopStack: LoopScope[],
         issues: Issue[],
     ): void {
-        if (loopStack.length > 0 && scanConfig.checkAlloc && !scanConfig.allocAllowlisted) {
+        if (
+            loopStack.length > 0 &&
+            scanConfig.checkAlloc &&
+            !scanConfig.allocAllowlisted &&
+            !LOOP_KEYWORD_RE.test(trimmed)
+        ) {
             this.checkTransientAllocation(trimmed, lineIdx, ctx, loopStack.length, issues);
         }
     }

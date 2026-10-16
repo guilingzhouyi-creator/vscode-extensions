@@ -117,30 +117,62 @@ function countSharedIdentifiers(
     return Math.min(shared, 10);
 }
 
+function isEligibleTargetNode(
+    node: ts.Node,
+): (ts.FunctionDeclaration | ts.MethodDeclaration) | null {
+    if (!ts.isFunctionDeclaration(node) && !ts.isMethodDeclaration(node)) {
+        return null;
+    }
+    const name = node.name && ts.isIdentifier(node.name) ? node.name.text : null;
+    if (!name || EXEMPT_NAMES.has(name) || isExportedNode(node)) {
+        return null;
+    }
+    return node;
+}
+
+function isEligibleOrphanSpan(
+    sf: ts.SourceFile,
+    node: ts.Node,
+): { start: number; end: number; childEloc: number; calleeText: string } | null {
+    const start = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1;
+    const end = sf.getLineAndCharacterOfPosition(node.getEnd()).line + 1;
+    const span = end - start + 1;
+    if (span > MAX_ORPHAN_LINE_SPAN || span < 2) {
+        return null;
+    }
+    const calleeText = node.getText(sf);
+    const childEloc = countEffectiveLines(calleeText);
+    if (childEloc > MAX_ORPHAN_ELOC || childEloc < 1) {
+        return null;
+    }
+    return { start, end, childEloc, calleeText };
+}
+
+function tryExtractMicroCandidate(node: ts.Node, sf: ts.SourceFile): MicroCandidate | null {
+    const fnNode = isEligibleTargetNode(node);
+    if (!fnNode || !fnNode.name || !ts.isIdentifier(fnNode.name)) {
+        return null;
+    }
+    const spanInfo = isEligibleOrphanSpan(sf, fnNode);
+    if (!spanInfo) {
+        return null;
+    }
+    return {
+        node: fnNode,
+        name: fnNode.name.text,
+        startLine: spanInfo.start,
+        endLine: spanInfo.end,
+        childEloc: spanInfo.childEloc,
+        calleeText: spanInfo.calleeText,
+    };
+}
+
 function collectMicroCandidates(sf: ts.SourceFile): MicroCandidate[] {
     const candidates: MicroCandidate[] = [];
     const walk = (node: ts.Node): void => {
-        if (ts.isFunctionDeclaration(node) || ts.isMethodDeclaration(node)) {
-            const name = node.name && ts.isIdentifier(node.name) ? node.name.text : null;
-            if (name && !EXEMPT_NAMES.has(name) && !isExportedNode(node)) {
-                const start = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1;
-                const end = sf.getLineAndCharacterOfPosition(node.getEnd()).line + 1;
-                const span = end - start + 1;
-                if (span <= MAX_ORPHAN_LINE_SPAN && span >= 2) {
-                    const calleeText = node.getText(sf);
-                    const childEloc = countEffectiveLines(calleeText);
-                    if (childEloc <= MAX_ORPHAN_ELOC && childEloc >= 1) {
-                        candidates.push({
-                            node,
-                            name,
-                            startLine: start,
-                            endLine: end,
-                            childEloc,
-                            calleeText,
-                        });
-                    }
-                }
-            }
+        const candidate = tryExtractMicroCandidate(node, sf);
+        if (candidate) {
+            candidates.push(candidate);
         }
         ts.forEachChild(node, walk);
     };

@@ -743,6 +743,48 @@ export class ComplexityAnalyzer implements Analyzer {
         });
     }
 
+    private isTautologyExempt(normFile: string): boolean {
+        return (
+            normFile.includes('/test/') ||
+            normFile.includes('/tests/') ||
+            normFile.includes('/fixtures/') ||
+            normFile.includes('/bench') ||
+            normFile.endsWith('.test.ts') ||
+            normFile.endsWith('.spec.ts')
+        );
+    }
+
+    private collectTautologicalIssues(normFile: string): Issue[] {
+        const tautologyIssues: Issue[] = [];
+        for (const [fnSymbol, loops] of this.loopSites.entries()) {
+            for (let i = 0; i < loops.length; i++) {
+                const loop = loops[i];
+                if (!loop.isTautological) {
+                    continue;
+                }
+                tautologyIssues.push({
+                    id: `${ANALYZER_COMPLEXITY}:${RULE_CPX_TRV_001}:${normFile}:${loop.line}`,
+                    analyzer: ANALYZER_COMPLEXITY,
+                    rule: RULE_CPX_TRV_001,
+                    severity: SEVERITY_WARNING,
+                    message: `Tautological loop traversal detected in '${fnSymbol}': iteration exhibits zero or negligible state mutation entropy delta (deltaEntropy: ${loop.deltaEntropy ?? 0} <= 0.05).`,
+                    location: {
+                        file: normFile,
+                        start: { line: loop.line, column: 1 },
+                        end: { line: loop.line, column: 1 },
+                    },
+                    detail: {
+                        symbol: fnSymbol,
+                        scaleVariable: loop.scaleVariable,
+                        deltaEntropy: loop.deltaEntropy ?? 0,
+                    },
+                    suggestion: SUGGESTION_TAUTOLOGICAL_LOOP,
+                });
+            }
+        }
+        return tautologyIssues;
+    }
+
     private finalizeAmplification(ctx: AnalyzerContext): void {
         if (this.loopSites.size === 0) return;
         const thresh = ctx.config?.thresholds as unknown as Record<string, unknown> | undefined;
@@ -759,40 +801,8 @@ export class ComplexityAnalyzer implements Analyzer {
         this.issues.push(...ampIssues);
 
         const normFile = ctx.filePath.replace(/\\/g, '/');
-        const isExempt =
-            normFile.includes('/test/') ||
-            normFile.includes('/tests/') ||
-            normFile.includes('/fixtures/') ||
-            normFile.includes('/bench') ||
-            normFile.endsWith('.test.ts') ||
-            normFile.endsWith('.spec.ts');
-
-        if (!isExempt) {
-            for (const [fnSymbol, loops] of this.loopSites.entries()) {
-                for (let i = 0; i < loops.length; i++) {
-                    const loop = loops[i];
-                    if (loop.isTautological) {
-                        this.issues.push({
-                            id: `${ANALYZER_COMPLEXITY}:${RULE_CPX_TRV_001}:${normFile}:${loop.line}`,
-                            analyzer: ANALYZER_COMPLEXITY,
-                            rule: RULE_CPX_TRV_001,
-                            severity: SEVERITY_WARNING,
-                            message: `Tautological loop traversal detected in '${fnSymbol}': iteration exhibits zero or negligible state mutation entropy delta (deltaEntropy: ${loop.deltaEntropy ?? 0} <= 0.05).`,
-                            location: {
-                                file: normFile,
-                                start: { line: loop.line, column: 1 },
-                                end: { line: loop.line, column: 1 },
-                            },
-                            detail: {
-                                symbol: fnSymbol,
-                                scaleVariable: loop.scaleVariable,
-                                deltaEntropy: loop.deltaEntropy ?? 0,
-                            },
-                            suggestion: SUGGESTION_TAUTOLOGICAL_LOOP,
-                        });
-                    }
-                }
-            }
+        if (!this.isTautologyExempt(normFile)) {
+            this.issues.push(...this.collectTautologicalIssues(normFile));
         }
     }
 

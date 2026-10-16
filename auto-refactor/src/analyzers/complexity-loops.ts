@@ -87,7 +87,10 @@ function resolveLoopScaleVariable(lineText: string): string {
 function braceMatchedEnd(masked: string[], headerLine: number, cap: number): number {
     let depth = 0;
     for (let l = headerLine; l <= cap; l++) {
-        for (const ch of masked[l - 1] ?? '') {
+        const lineStr = masked[l - 1] ?? '';
+        const startCharIdx = l === headerLine ? Math.max(0, lineStr.lastIndexOf(')')) : 0;
+        for (let c = startCharIdx; c < lineStr.length; c++) {
+            const ch = lineStr[c];
             if (ch === '{') depth++;
             else if (ch === '}') {
                 depth--;
@@ -136,9 +139,9 @@ function loopBodyRange(
 }
 
 const MUTATION_RE =
-    /(?:[=+\-*/%&|^]|\b(?:push|pop|shift|unshift|set|add|delete|clear|splice)\s*\()/;
+    /(?:[=+\-*/%&|^]|\b(?:push|pop|shift|unshift|set|add|delete|clear|splice|return|break|yield|throw)\b)/;
 const SIDE_EFFECT_RE =
-    /(?:console\.|fs\.|print\s*\(|write\s*\(|send\s*\(|emit\s*\(|emit_signal\s*\(|\b(?:dispose|close|destroy|cleanup|release|cancel|unsubscribe|flush)\s*\()/;
+    /(?:console\.|fs\.|print\s*\(|write\s*\(|\.write\s*\(|send\s*\(|\.send\s*\(|emit\s*\(|emit_signal\s*\(|\.emit\s*\(|\.set\s*\(|\.delete\s*\(|\.add\s*\(|\.push\s*\(|\b(?:dispose|close|destroy|cleanup|release|cancel|unsubscribe|flush|disconnect|dispatchEvent)\b|\bawait\b|\b[A-Za-z0-9_$]+\s*\()/;
 
 function isCommentLine(trimmed: string): boolean {
     return (
@@ -155,7 +158,10 @@ function extractLoopStatementText(trimmed: string): string | null {
     }
     const lastClose = trimmed.lastIndexOf(')');
     if (lastClose < 0) return null;
-    const afterParen = trimmed.slice(lastClose + 1).replace(/[{}]/g, '').trim();
+    const afterParen = trimmed
+        .slice(lastClose + 1)
+        .replace(/[{}]/g, '')
+        .trim();
     return afterParen.length > 0 ? afterParen : null;
 }
 
@@ -163,10 +169,42 @@ function isPunctuationOrPass(text: string): boolean {
     return text.length === 0 || text === '{' || text === '}' || text === 'pass';
 }
 
+interface LoopLineInspection {
+    isEffective: boolean;
+    isMutation: boolean;
+    hasSideEffect: boolean;
+    hasTransient: boolean;
+    hasBlockingIo: boolean;
+}
+
+function inspectSingleLoopLine(txt: string, transientRegex: RegExp): LoopLineInspection {
+    const trimmed = txt.trim();
+    if (isCommentLine(trimmed)) {
+        return {
+            isEffective: false,
+            isMutation: false,
+            hasSideEffect: false,
+            hasTransient: false,
+            hasBlockingIo: false,
+        };
+    }
+    const statementText = extractLoopStatementText(trimmed);
+    const isEffective = Boolean(statementText && !isPunctuationOrPass(statementText));
+    const isMutation = Boolean(statementText && isEffective && MUTATION_RE.test(statementText));
+    const hasSideEffect = Boolean(
+        statementText && isEffective && SIDE_EFFECT_RE.test(statementText),
+    );
+    const hasTransient = transientRegex.test(txt);
+    const hasBlockingIo = BLOCKING_IO_RE.test(txt);
+
+    return { isEffective, isMutation, hasSideEffect, hasTransient, hasBlockingIo };
+}
+
 /**
- * Scan a loop body for per-iteration allocation and blocking I/O.
+ * Scan the source lines spanning a loop body to detect transient heap allocations
+ * and blocking synchronous I/O calls.
  *
- * @param lines - Raw file lines.
+ * @param lines - Array of full source lines.
  * @param from - First body line (inclusive, 1-based).
  * @param to - Last body line (inclusive, 1-based).
  * @param transientRegex - Pre-compiled regex matching transient container allocations.
@@ -190,31 +228,18 @@ function inspectLoopBody(
     let effectiveStatements = 0;
 
     for (let l = from; l <= to && l <= lines.length; l++) {
-        const txt = lines[l - 1] ?? '';
-        const trimmed = txt.trim();
-        if (isCommentLine(trimmed)) {
-            continue;
-        }
-        const statementText = extractLoopStatementText(trimmed);
-        if (statementText && !isPunctuationOrPass(statementText)) {
+        const lineInfo = inspectSingleLoopLine(lines[l - 1] ?? '', transientRegex);
+        if (lineInfo.isEffective) {
             effectiveStatements++;
-            if (MUTATION_RE.test(statementText)) {
-                stateMutationsCount++;
-            }
-            if (SIDE_EFFECT_RE.test(statementText)) {
-                hasSideEffects = true;
-            }
+            if (lineInfo.isMutation) stateMutationsCount++;
+            if (lineInfo.hasSideEffect) hasSideEffects = true;
         }
-        if (!hasTransientAllocation && transientRegex.test(txt)) {
-            hasTransientAllocation = true;
-        }
-        if (!hasBlockingIo && BLOCKING_IO_RE.test(txt)) {
-            hasBlockingIo = true;
-        }
+        if (lineInfo.hasTransient) hasTransientAllocation = true;
+        if (lineInfo.hasBlockingIo) hasBlockingIo = true;
     }
 
     const { deltaEntropy, isTautological } = calculateLoopStateEntropy(
-        Math.max(1, effectiveStatements + 5),
+        Math.max(1, effectiveStatements),
         stateMutationsCount,
         hasSideEffects || hasBlockingIo,
     );

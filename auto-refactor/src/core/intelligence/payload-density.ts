@@ -148,7 +148,7 @@ export function calculateLoopStateEntropy(
         return { deltaEntropy: 0, isTautological: true };
     }
 
-    const n = iterationItemsCount;
+    const n = Math.max(1, iterationItemsCount);
     const ratio = Math.min(m, n) / n;
     const entropyGrowth = ratio * (Math.log2(1.0 + m) / Math.log2(2.0 + n));
     const sideEffectBonus = hasSideEffects ? 0.2 : 0.0;
