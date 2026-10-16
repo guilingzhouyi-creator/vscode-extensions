@@ -25,6 +25,7 @@ const IGNORED_DIRS = new Set([
   '.workbuddy',
   '.commandcode',
   '.auto-refactor-cache',
+  '.audit-logs',
   'archive',
 ]);
 

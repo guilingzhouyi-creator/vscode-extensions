@@ -27,6 +27,7 @@ const IGNORED_DIRS = new Set([
   '.commandcode',
   '.auto-refactor-cache',
   '.gemini',
+  '.audit-logs',
   'archive',
 ]);
 

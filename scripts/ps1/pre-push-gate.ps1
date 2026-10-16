@@ -81,7 +81,9 @@ function Wait-ProcessWithTimeout {
         [Parameter(Mandatory = $false)]
         [string]$ProcessName = "Process",
         [Parameter(Mandatory = $false)]
-        [string]$LogFile = ""
+        [string]$LogFile = "",
+        [Parameter(Mandatory = $false)]
+        [string]$ErrLogFile = ""
     )
     $hasExited = $Process.WaitForExit($TimeoutSeconds * 1000)
     if (-not $hasExited) {
@@ -112,12 +114,19 @@ function Wait-ProcessWithTimeout {
             $diagLines.Add("--------------------------------------------------------------------------------")
             $diagLines.Add("【最后捕获的标准输出与错误日志】:")
             if ($LogFile -and (Test-Path $LogFile)) {
-                $diagLines.Add("--- 来源日志: $LogFile ---")
+                $diagLines.Add("--- 来源标准输出: $LogFile ---")
                 $tailContent = Get-Content -Path $LogFile -Encoding utf8 -Tail 100 -ErrorAction SilentlyContinue
                 if ($tailContent) {
                     $diagLines.AddRange($tailContent)
                 } else {
-                    $diagLines.Add("(日志内容为空或未捕获到输出)")
+                    $diagLines.Add("(标准输出为空或未捕获到输出)")
+                }
+            }
+            if ($ErrLogFile -and (Test-Path $ErrLogFile)) {
+                $diagLines.Add("--- 来源标准错误: $ErrLogFile ---")
+                $tailErr = Get-Content -Path $ErrLogFile -Encoding utf8 -Tail 100 -ErrorAction SilentlyContinue
+                if ($tailErr) {
+                    $diagLines.AddRange($tailErr)
                 }
             }
             $diagLines.Add("================================================================================")
@@ -151,12 +160,21 @@ function Invoke-GateStep {
         [void](New-Item -ItemType Directory -Path $logDir -Force)
     }
     $stepLog = Join-Path $logDir "pre-push-step.log"
+    $stepErrLog = Join-Path $logDir "pre-push-step.err.log"
     if (Test-Path $stepLog) { Remove-Item -Path $stepLog -Force -ErrorAction SilentlyContinue }
+    if (Test-Path $stepErrLog) { Remove-Item -Path $stepErrLog -Force -ErrorAction SilentlyContinue }
 
     $p = Start-Process -FilePath $FilePath -ArgumentList $ArgumentList -WorkingDirectory $WorkingDirectory `
-        -RedirectStandardOutput $stepLog -RedirectStandardError $stepLog -NoNewWindow -PassThru
+        -RedirectStandardOutput $stepLog -RedirectStandardError $stepErrLog -NoNewWindow -PassThru
 
-    $ok = Wait-ProcessWithTimeout -Process $p -TimeoutSeconds $TimeoutSeconds -ProcessName $StepName -LogFile $stepLog
+    $ok = Wait-ProcessWithTimeout -Process $p -TimeoutSeconds $TimeoutSeconds -ProcessName $StepName -LogFile $stepLog -ErrLogFile $stepErrLog
+    if (Test-Path $stepErrLog) {
+        $errContent = Get-Content -Path $stepErrLog -Raw -ErrorAction SilentlyContinue
+        if ($errContent) {
+            Add-Content -Path $stepLog -Value "`n--- Standard Error ---`n$errContent" -ErrorAction SilentlyContinue
+        }
+        Remove-Item -Path $stepErrLog -Force -ErrorAction SilentlyContinue
+    }
     if (-not $ok) {
         if (-not $Agent) { Write-Host "❌ $StepName 执行超时 (已超过 ${TimeoutSeconds} 秒)" -ForegroundColor Red }
         return 124
