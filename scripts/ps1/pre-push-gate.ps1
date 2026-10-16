@@ -53,7 +53,7 @@ function Get-StepRuleId {
     param([string]$StepName)
     if ($StepName -match "Gate 1") { return "HYG-EMP-001" }
     if ($StepName -match "Gate 2") { return "GATE-SSOT-001" }
-    if ($StepName -match "Gate 3") { return "RCFG-RULE-DRIFT" }
+    if ($StepName -match "Gate 3|auto-refactor") { return "RCFG-RULE-DRIFT" }
     if ($StepName -match "Gate 4") { return "GATE-BUDGET-001" }
     if ($StepName -match "Gate 5") { return "GATE-BUDGET-001" }
     if ($StepName -match "Gate 6") { return "RCFG-MATRIX" }
@@ -290,19 +290,21 @@ if ($runAll) {
     Write-GateHost "ℹ️  智能影响路由生效: 仅回归受影响项目 [$($activeProj -join ', ')]" -ForegroundColor Green
 }
 
-# --- Gate 1: 全工作区零空文件、物理卫生与 .gitignore 治理守卫 ---
-Write-GateHost "[1/9] 校验全工作区零物理空文件、空白脚本与 .gitignore 治理守卫..." -ForegroundColor Gray
+# --- Gate 1: 全工作区零空文件、物理卫生、.gitignore 治理与五维代码密度守卫 ---
+Write-GateHost "[1/9] 校验全工作区零物理空文件、空白脚本、.gitignore 治理与五维代码密度守卫..." -ForegroundColor Gray
 $code = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-no-empty-files.js") -WorkingDirectory $repoRoot -StepName "Gate 1 (零物理空文件)" -TimeoutSeconds 30
 $codeGi = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-gitignore-governance.js") -WorkingDirectory $repoRoot -StepName "Gate 1 (.gitignore 治理)" -TimeoutSeconds 30
-if ($code -ne 0 -or $codeGi -ne 0) {
+$densityArgs = if ($range) { @("scripts/common/validate-code-density.js", "--range", $range) } else { @("scripts/common/validate-code-density.js") }
+$codeDensity = Invoke-GateStep -FilePath $nodeCmd -ArgumentList $densityArgs -WorkingDirectory $repoRoot -StepName "Gate 1 (五维代码密度)" -TimeoutSeconds 30
+if ($code -ne 0 -or $codeGi -ne 0 -or $codeDensity -ne 0) {
     $failed = $true
 } else {
-    Write-GateHost "  ✔ 全工作区零空文件与 .gitignore 治理校验通过" -ForegroundColor Green
+    Write-GateHost "  ✔ 全工作区零空文件、.gitignore 治理与五维代码密度校验通过" -ForegroundColor Green
 }
 
 # --- Gate 2: 规则单源目录一致性同步 ---
 Write-GateHost "[2/9] 校验全工作区单源规则目录同步..." -ForegroundColor Gray
-$code = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/generate-rule-catalog.js") -WorkingDirectory $repoRoot -StepName "Gate 2 (单源规则目录)" -TimeoutSeconds 30
+$code = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/generate-rule-catalog.js", "--check-only") -WorkingDirectory $repoRoot -StepName "Gate 2 (单源规则目录)" -TimeoutSeconds 30
 if ($code -ne 0) {
     $failed = $true
 } else {

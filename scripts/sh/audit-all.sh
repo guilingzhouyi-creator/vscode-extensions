@@ -28,23 +28,26 @@ PYTHON_BIN=$(command -v python3 2>/dev/null || command -v python 2>/dev/null || 
 
 FAST_MODE=0
 JSON_MODE=0
+AGENT_MODE=0
 
 for arg in "$@"; do
     case "$arg" in
         --fast|-f|-Fast) FAST_MODE=1 ;;
         --json|-j|-Json) JSON_MODE=1 ;;
+        --agent|-a|-Agent) AGENT_MODE=1 ;;
         --help|-h|-Help)
             echo "用法: bash scripts/sh/audit-all.sh [选项]"
             echo "选项:"
             echo "  --fast, -f, -Fast    快速审查模式 (跳过耗时深层自审)"
             echo "  --json, -j, -Json    以 JSON 格式输出审查摘要"
+            echo "  --agent, -a, -Agent  以 Agent-Native JSON 信封格式输出审查结果"
             echo "  --help, -h, -Help    显示此帮助信息"
             exit 0
             ;;
     esac
 done
 
-if [[ "$JSON_MODE" -eq 0 ]]; then
+if [[ "$JSON_MODE" -eq 0 && "$AGENT_MODE" -eq 0 ]]; then
     echo "================================================================="
     echo "🌐 全工作区跨项目统一审查中枢 (Unified Workspace Review Engine)"
     echo "================================================================="
@@ -54,7 +57,7 @@ FAILED=0
 START_TIME=$("$NODE_BIN" -e 'process.stdout.write(Date.now().toString())')
 
 # 1. 物理卫生与零空文件看守
-if [[ "$JSON_MODE" -eq 0 ]]; then echo "▶ [1/5] 检查全工作区物理卫生、同构脚本、.gitignore 治理与零空文件..."; fi
+if [[ "$JSON_MODE" -eq 0 && "$AGENT_MODE" -eq 0 ]]; then echo "▶ [1/5] 检查全工作区物理卫生、同构脚本、.gitignore 治理与零空文件..."; fi
 CODE_EMPTY=0
 "$NODE_BIN" scripts/common/validate-no-empty-files.js >/dev/null 2>&1 || CODE_EMPTY=$?
 CODE_ISO=0
@@ -69,7 +72,7 @@ else
 fi
 
 # 2. 单源规则注册表与目录一致性及技能集规范
-if [[ "$JSON_MODE" -eq 0 ]]; then echo "▶ [2/5] 聚合与校验全工作区单源规则目录与技能集规范..."; fi
+if [[ "$JSON_MODE" -eq 0 && "$AGENT_MODE" -eq 0 ]]; then echo "▶ [2/5] 聚合与校验全工作区单源规则目录与技能集规范..."; fi
 CODE_CATALOG=0
 "$NODE_BIN" scripts/common/generate-rule-catalog.js >/dev/null 2>&1 || CODE_CATALOG=$?
 CODE_SKILLS=0
@@ -138,7 +141,7 @@ wait_with_timeout() {
 }
 
 # 3~5. 并行并发调度 workspace-timing、WebGames 与 auto-refactor 三大项目审查
-if [[ "$JSON_MODE" -eq 0 ]]; then
+if [[ "$JSON_MODE" -eq 0 && "$AGENT_MODE" -eq 0 ]]; then
     echo "▶ [3/5] 并行调度 workspace-timing 审查 (VS Code 扩展)..."
     echo "▶ [4/5] 并行调度 WebGames 领域配置与架构审查..."
     echo "▶ [5/5] 并行调度 auto-refactor 静态引擎多维自审与质量门禁..."
@@ -204,21 +207,21 @@ fi
 
 # 日志输出与清理：子进程失败后回显末尾 15 行日志
 if [[ "$STATUS_WT" != "PASS" ]]; then
-    if [[ "$JSON_MODE" -eq 0 && -s "$LOG_WT" ]]; then
+    if [[ "$JSON_MODE" -eq 0 && "$AGENT_MODE" -eq 0 && -s "$LOG_WT" ]]; then
         echo "❌ workspace-timing 审查未通过:"
         tail -n 15 "$LOG_WT" | sed 's/^/   /'
     fi
 fi
 
 if [[ "$STATUS_WG" != "PASS" ]]; then
-    if [[ "$JSON_MODE" -eq 0 && -s "$LOG_WG" ]]; then
+    if [[ "$JSON_MODE" -eq 0 && "$AGENT_MODE" -eq 0 && -s "$LOG_WG" ]]; then
         echo "❌ WebGames 审查未通过:"
         tail -n 15 "$LOG_WG" | sed 's/^/   /'
     fi
 fi
 
 if [[ "$STATUS_AR" != "PASS" ]]; then
-    if [[ "$JSON_MODE" -eq 0 && -s "$LOG_AR" ]]; then
+    if [[ "$JSON_MODE" -eq 0 && "$AGENT_MODE" -eq 0 && -s "$LOG_AR" ]]; then
         echo "❌ auto-refactor 审查未通过:"
         tail -n 15 "$LOG_AR" | sed 's/^/   /'
     fi
@@ -244,6 +247,7 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF"
   const startTime = Number(process.argv[1]);
   const failed = process.argv[2] === "1";
   const jsonMode = process.argv[3] === "1";
+  const agentMode = process.argv[15] === "1";
   const statusHygiene = process.argv[4];
   const statusRules = process.argv[5];
   const statusAr = process.argv[6];
@@ -442,6 +446,44 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF"
   if (jsonMode) {
     console.log(JSON.stringify(summary, null, 2));
     process.exit(0);
+  }
+
+  if (agentMode) {
+    const subsystemsStatus = {
+      hygiene: statusHygiene,
+      rules: statusRules,
+      autoRefactor: statusAr,
+      workspaceTiming: statusWt,
+      webGames: statusWg
+    };
+    const failedSubsystems = [];
+    if (statusHygiene !== "PASS") failedSubsystems.push("hygiene");
+    if (statusRules !== "PASS") failedSubsystems.push("rules");
+    if (statusAr !== "PASS") failedSubsystems.push("auto-refactor");
+    if (statusWt !== "PASS") failedSubsystems.push("workspace-timing");
+    if (statusWg !== "PASS") failedSubsystems.push("WebGames");
+
+    const envelope = {
+      protocolVersion: "1.0.0",
+      recordedAt: new Date().toISOString(),
+      status: failed ? "FAIL" : "PASS",
+      gate: "audit-all",
+      exitCode: failed ? 1 : 0,
+      summary: failed
+        ? `Unified workspace review failed with violations in: ${failedSubsystems.join(", ")}.`
+        : "All workspace quality checks passed across 5 core subsystems.",
+      compositeHealth: workspaceHealthScore,
+      grade: wsGrade,
+      subsystems: subsystemsStatus,
+      agentDirectives: {
+        targetFiles: [],
+        remediationPriority: failedSubsystems,
+        verificationCommand: "bash scripts/sh/audit-all.sh --fast",
+        fastRecheckCommand: "bash scripts/sh/audit-all.sh --fast"
+      }
+    };
+    console.log(JSON.stringify(envelope, null, 2));
+    process.exit(failed ? 1 : 0);
   }
 
   function isWide(code) {
@@ -645,9 +687,9 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF"
       fs.appendFileSync(summaryFile, md, "utf8");
     } catch (_) {}
   }
-' "$START_TIME" "$FAILED" "$JSON_MODE" "$STATUS_HYGIENE" "$STATUS_RULES" "$STATUS_AR" "$STATUS_WT" "$STATUS_WG" "$ROOT_DIR" "$CODE_EMPTY" "$CODE_ISO" "$CODE_CATALOG" "$CODE_SKILLS" "$FAST_MODE"
+' "$START_TIME" "$FAILED" "$JSON_MODE" "$STATUS_HYGIENE" "$STATUS_RULES" "$STATUS_AR" "$STATUS_WT" "$STATUS_WG" "$ROOT_DIR" "$CODE_EMPTY" "$CODE_ISO" "$CODE_CATALOG" "$CODE_SKILLS" "$FAST_MODE" "$AGENT_MODE"
 
-if [[ "$JSON_MODE" -eq 1 ]]; then
+if [[ "$JSON_MODE" -eq 1 || "$AGENT_MODE" -eq 1 ]]; then
     exit "$FAILED"
 fi
 

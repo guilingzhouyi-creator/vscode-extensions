@@ -183,6 +183,25 @@ if [[ "$IS_AGENT" -ne 1 ]]; then
     echo "================================================================="
 fi
 
+# 读取所有行并过滤掉以 # 开头的注释行
+mapfile -t RAW_LINES < "$MSG_FILE"
+CLEAN_LINES=()
+for line in "${RAW_LINES[@]}"; do
+    trimmed=$(echo "$line" | sed 's/[[:space:]]*$//')
+    [[ "$trimmed" =~ ^[[:space:]]*# ]] && continue
+    CLEAN_LINES+=("$trimmed")
+done
+TOTAL_LINES=${#CLEAN_LINES[@]}
+
+if [[ "$TOTAL_LINES" -eq 0 || -z "${CLEAN_LINES[0]}" ]]; then
+    fail_commit_msg "GATE-MSG-001" "提交信息不能为空！" "" "符合 Conventional Commits 格式的提交内容" "请参考规范填写格式化提交信息"
+fi
+
+FIRST_LINE="${CLEAN_LINES[0]}"
+if [[ "$IS_AGENT" -ne 1 ]]; then
+    echo "提交标题: $FIRST_LINE"
+fi
+
 # --- Rule 1: Header 格式与长度校验 ---
 HEADER_PATTERN="^(feat|fix|refactor|docs|test|chore|style|perf)(\([a-zA-Z0-9_-]+\))?: .{5,80}$"
 if ! echo "$FIRST_LINE" | grep -E "$HEADER_PATTERN" >/dev/null 2>&1; then

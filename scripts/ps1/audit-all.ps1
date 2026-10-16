@@ -10,11 +10,13 @@
 #   pwsh -File scripts/ps1/audit-all.ps1
 #   pwsh -File scripts/ps1/audit-all.ps1 -Fast
 #   pwsh -File scripts/ps1/audit-all.ps1 -Json
+#   pwsh -File scripts/ps1/audit-all.ps1 -Agent
 # ==============================================================================
 [CmdletBinding()]
 param(
     [switch]$Fast,
-    [switch]$Json
+    [switch]$Json,
+    [switch]$Agent
 )
 Set-StrictMode -Version Latest
 
@@ -186,7 +188,7 @@ $nodeCmd = if ($IsWindows -or $env:OS -match "Windows") { "node.exe" } else { "n
 $npmCmd = if ($IsWindows -or $env:OS -match "Windows") { "npm.cmd" } else { "npm" }
 $pythonCmd = if (Get-Command python3.12 -ErrorAction SilentlyContinue) { "python3.12" } elseif (Get-Command python -ErrorAction SilentlyContinue) { "python" } elseif (Get-Command python3 -ErrorAction SilentlyContinue) { "python3" } else { "py" }
 
-if (-not $Json) {
+if (-not $Json -and -not $Agent) {
     Write-Host "=================================================================" -ForegroundColor Cyan
     Write-Host "🌐 全工作区跨项目统一审查中枢 (Unified Workspace Review Engine)" -ForegroundColor Cyan
     Write-Host "=================================================================" -ForegroundColor Cyan
@@ -196,7 +198,7 @@ $startTime = [System.Diagnostics.Stopwatch]::StartNew()
 $failed = $false
 
 # 1. 物理卫生与零空文件看守
-if (-not $Json) { Write-Host "▶ [1/5] 检查全工作区物理卫生、同构脚本、.gitignore 治理与零空文件..." -ForegroundColor Gray }
+if (-not $Json -and -not $Agent) { Write-Host "▶ [1/5] 检查全工作区物理卫生、同构脚本、.gitignore 治理与零空文件..." -ForegroundColor Gray }
 $res = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-no-empty-files.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
 $resIso = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-script-isomorphism.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
 $resGi = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-gitignore-governance.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
@@ -211,7 +213,7 @@ if ($codeEmpty -ne 0 -or $codeIso -ne 0 -or $codeGi -ne 0) {
 }
 
 # 2. 单源规则注册表与目录一致性及技能集规范
-if (-not $Json) { Write-Host "▶ [2/5] 聚合与校验全工作区单源规则目录与技能集规范..." -ForegroundColor Gray }
+if (-not $Json -and -not $Agent) { Write-Host "▶ [2/5] 聚合与校验全工作区单源规则目录与技能集规范..." -ForegroundColor Gray }
 $res = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/generate-rule-catalog.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
 $resSkills = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-skills.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
 $codeCatalog = $res.ExitCode
@@ -227,7 +229,7 @@ if ($codeCatalog -ne 0 -or $codeSkills -ne 0) {
 $workspaceTimingDir = Join-Path $repoRoot "workspace-timing"
 $autoRefactorDir = Join-Path $repoRoot "auto-refactor"
 
-if (-not $Json) {
+if (-not $Json -and -not $Agent) {
     Write-Host "▶ [3/5] 并行调度 workspace-timing 审查 (VS Code 扩展)..." -ForegroundColor Gray
     Write-Host "▶ [4/5] 并行调度 WebGames 领域配置与架构审查..." -ForegroundColor Gray
     Write-Host "▶ [5/5] 并行调度 auto-refactor 静态引擎多维自审与质量门禁..." -ForegroundColor Gray
@@ -652,6 +654,46 @@ if ($Json) {
     exit $exitCode
 }
 
+if ($Agent) {
+    $subsystemsStatus = [ordered]@{
+        hygiene = $statusHygiene
+        rules = $statusRules
+        autoRefactor = $statusAr
+        workspaceTiming = $statusWt
+        webGames = $statusWg
+    }
+    $failedSubsystems = @()
+    if ($statusHygiene -ne "PASS") { $failedSubsystems += "hygiene" }
+    if ($statusRules -ne "PASS") { $failedSubsystems += "rules" }
+    if ($statusAr -ne "PASS") { $failedSubsystems += "auto-refactor" }
+    if ($statusWt -ne "PASS") { $failedSubsystems += "workspace-timing" }
+    if ($statusWg -ne "PASS") { $failedSubsystems += "WebGames" }
+
+    $envelope = [ordered]@{
+        protocolVersion = "1.0.0"
+        recordedAt = (Get-Date).ToString("o")
+        status = if ($failed) { "FAIL" } else { "PASS" }
+        gate = "audit-all"
+        exitCode = $exitCode
+        summary = if ($failed) {
+            "Unified workspace review failed with violations in: $($failedSubsystems -join ', ')."
+        } else {
+            "All workspace quality checks passed across 5 core subsystems."
+        }
+        compositeHealth = [double]$wsHealthStr
+        grade = $wsGrade
+        subsystems = $subsystemsStatus
+        agentDirectives = [ordered]@{
+            targetFiles = @()
+            remediationPriority = $failedSubsystems
+            verificationCommand = "pwsh -File scripts/ps1/audit-all.ps1 -Fast"
+            fastRecheckCommand = "pwsh -File scripts/ps1/audit-all.ps1 -Fast"
+        }
+    }
+    $envelope | ConvertTo-Json -Depth 5
+    exit $exitCode
+}
+
 Write-Host ""
 $targetWidth = 71
 Write-Host ("┌" + ("─" * $targetWidth) + "┐") -ForegroundColor Cyan
@@ -819,7 +861,7 @@ if ($env:GITHUB_STEP_SUMMARY) {
 
 # 6. 汇流记录工作区统一质量轨迹
 $trajArg = if ($failed) { "scripts/common/record-workspace-trajectory.js", "--failed" } else { "scripts/common/record-workspace-trajectory.js" }
-Start-Process -FilePath $nodeCmd -ArgumentList $trajArg -NoNewWindow -PassThru -Wait | Out-Null
+Start-Process -FilePath $nodeCmd -ArgumentList $trajArg -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait | Out-Null
 
 if ($failed) {
     Write-Host "❌ 审查中枢检测到未通过项，请排查修复对应项目" -ForegroundColor Red

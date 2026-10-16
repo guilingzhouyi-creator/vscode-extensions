@@ -20,6 +20,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { execSync } = require('child_process');
 const {
   evaluateCodeMetrics,
   isPlumbingExemptPath,
@@ -33,14 +34,47 @@ const DEFAULT_MAX_TAU = 20.0;
 const MIN_REPRESENTATIVE_ELOC = 10;
 
 /**
+ * Resolves changed files across a Git commit range.
+ *
+ * @param {string} range - Git revision range (e.g. '@{u}..HEAD' or 'origin/main..HEAD')
+ * @returns {string[]} File paths changed in range.
+ */
+function getRangeFiles(range) {
+  const root = path.resolve(__dirname, '..', '..');
+  const env = {
+    ...process.env,
+    GIT_CONFIG_GLOBAL: process.env.GIT_CONFIG_GLOBAL || 'NUL',
+    GIT_CONFIG_SYSTEM: process.env.GIT_CONFIG_SYSTEM || 'NUL',
+    GIT_CONFIG_NOSYSTEM: process.env.GIT_CONFIG_NOSYSTEM || '1',
+    XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME || root,
+  };
+  try {
+    const raw = execSync(`git diff --name-only --diff-filter=ACMR ${range}`, {
+      cwd: root,
+      env,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    return raw
+      .split(/\r?\n/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Parses command line options for code density validation.
  *
  * @param {string[]} args
- * @returns {{ staged: boolean, json: boolean, agent: boolean, porLimit: number, minTau: number, maxTau: number, files: string[] }}
+ * @returns {{ staged: boolean, range: string|null, all: boolean, json: boolean, agent: boolean, porLimit: number, minTau: number, maxTau: number, files: string[] }}
  */
 function parseArgs(args) {
   const options = {
     staged: false,
+    range: null,
+    all: false,
     json: false,
     agent: false,
     porLimit: DEFAULT_POR_LIMIT,
@@ -54,6 +88,14 @@ function parseArgs(args) {
     const arg = args[i++];
     if (arg === '--staged') {
       options.staged = true;
+      continue;
+    }
+    if (arg === '--range' && i < args.length) {
+      options.range = args[i++];
+      continue;
+    }
+    if (arg === '--all') {
+      options.all = true;
       continue;
     }
     if (arg === '--json' || arg === '--agent') {
@@ -234,9 +276,11 @@ function printHumanDensityReport(allViolations, uniqueFilesLength, exemptCount) 
  */
 function run() {
   const options = parseArgs(process.argv.slice(2));
-  let targets = options.files;
+  let targets = [...options.files];
 
-  if (options.staged || targets.length === 0) {
+  if (options.range) {
+    targets = targets.concat(getRangeFiles(options.range));
+  } else if (options.staged || targets.length === 0) {
     targets = targets.concat(getStagedFiles());
   }
 

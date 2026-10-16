@@ -39,7 +39,7 @@ const REQUIRED_ISOMORPHIC_PAIRS = [
  * Key parameter flags that must be supported identically across root dual implementations.
  */
 const REQUIRED_FLAG_ALIGNMENTS = {
-  'audit-all': ['Fast', 'Json'],
+  'audit-all': ['Fast', 'Json', 'Agent'],
   'commit-msg-gate': ['Agent', 'ViewLog'],
   package: ['HotSync'],
   'pre-commit-gate': ['Agent', 'ViewLog'],

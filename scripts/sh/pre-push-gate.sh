@@ -54,7 +54,7 @@ get_step_rule_id() {
     local step_name="$1"
     if [[ "$step_name" =~ "Gate 1" ]]; then echo "HYG-EMP-001"; return; fi
     if [[ "$step_name" =~ "Gate 2" ]]; then echo "GATE-SSOT-001"; return; fi
-    if [[ "$step_name" =~ "Gate 3" ]]; then echo "RCFG-RULE-DRIFT"; return; fi
+    if [[ "$step_name" =~ Gate\ 3|auto-refactor ]]; then echo "RCFG-RULE-DRIFT"; return; fi
     if [[ "$step_name" =~ "Gate 4" ]]; then echo "GATE-BUDGET-001"; return; fi
     if [[ "$step_name" =~ "Gate 5" ]]; then echo "GATE-BUDGET-001"; return; fi
     if [[ "$step_name" =~ "Gate 6" ]]; then echo "RCFG-MATRIX"; return; fi
@@ -226,20 +226,25 @@ else
     log_gate "ℹ️  智能影响路由生效: 仅回归受影响项目 [$(IFS=', '; echo "${ACTIVE_PROJ[*]}") ]"
 fi
 
-# --- Gate 1: 全工作区零空文件、物理卫生与 .gitignore 治理守卫 ---
-log_gate "[1/9] 校验全工作区零物理空文件、空白脚本与 .gitignore 治理守卫..."
+# --- Gate 1: 全工作区零空文件、物理卫生、.gitignore 治理与五维代码密度守卫 ---
+log_gate "[1/9] 校验全工作区零物理空文件、空白脚本、.gitignore 治理与五维代码密度守卫..."
 GATE1_FAIL=0
 run_gate_step 30 "Gate 1 (零物理空文件)" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-no-empty-files.js || GATE1_FAIL=1
 run_gate_step 30 "Gate 1 (.gitignore 治理)" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-gitignore-governance.js || GATE1_FAIL=1
+if [[ -n "$RANGE" ]]; then
+    run_gate_step 30 "Gate 1 (五维代码密度)" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-code-density.js --range "$RANGE" || GATE1_FAIL=1
+else
+    run_gate_step 30 "Gate 1 (五维代码密度)" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-code-density.js || GATE1_FAIL=1
+fi
 if [[ "$GATE1_FAIL" -ne 0 ]]; then
     FAILED=1
 else
-    log_gate "  ✔ 全工作区零空文件与 .gitignore 治理校验通过"
+    log_gate "  ✔ 全工作区零空文件、.gitignore 治理与五维代码密度校验通过"
 fi
 
 # --- Gate 2: 规则单源目录一致性同步 ---
 log_gate "[2/9] 校验全工作区单源规则目录同步..."
-if ! run_gate_step 30 "Gate 2 (单源规则目录)" "$ROOT_DIR" "$NODE_BIN" scripts/common/generate-rule-catalog.js; then
+if ! run_gate_step 30 "Gate 2 (单源规则目录)" "$ROOT_DIR" "$NODE_BIN" scripts/common/generate-rule-catalog.js --check-only; then
     FAILED=1
 else
     log_gate "  ✔ 全工作区单源规则目录同步通过"

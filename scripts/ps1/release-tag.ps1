@@ -178,7 +178,7 @@ if ($LASTEXITCODE -ne 0) {
 # ─── 步骤 3：资产预检 ───
 Write-Host "【$Ext】步骤 3/6: 展示资产预检 ..." -ForegroundColor Gray
 $cdaScript = Join-Path $PSScriptRoot "check-display-assets.ps1"
-& pwsh -File $cdaScript $Ext -Phase pre
+& pwsh -File $cdaScript $extDir 'pre'
 if ($LASTEXITCODE -ne 0) { exit 1 }
 
 # ─── 步骤 4：vsce 打包 ───
@@ -200,7 +200,7 @@ Set-Content -Path (Join-Path $outDir "SHA256SUMS.txt") -Value "$sha  $vsixName" 
 
 # ─── 步骤 5：资产后检 ───
 Write-Host "【$Ext】步骤 5/6: 展示资产后检 ..." -ForegroundColor Gray
-& pwsh -File $cdaScript $Ext -Phase post -VsixPath $vsixPath
+& pwsh -File $cdaScript $extDir 'post' $vsixPath
 if ($LASTEXITCODE -ne 0) { exit 1 }
 
 # ─── 步骤 6：提交 + 打 Tag + 推送 ───
