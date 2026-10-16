@@ -208,7 +208,7 @@ ${TIMING_VIEWPORT_STYLES}
           <div class="label">${args.labels['panel.today.activeWindow']}</div>
         </div>
       </div>
-      <div id="sessionList" class="session-list timing-scroll-mask timing-fade-viewport" style="display:none"></div>
+      <div id="sessionList" class="session-list" style="display:none"></div>
       <div class="empty-hint" id="sessionEmpty" style="display:none">${args.labels['panel.today.empty']}</div>
       <div class="hourly-wrapper" id="hourlyWrapper" style="display:none">
         <div class="hourly-header-row">

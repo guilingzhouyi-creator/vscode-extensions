@@ -7,6 +7,8 @@
  * Exit Semantics & Design Rationale: State-machine-based gesture tracking; guarantees zero iframe pointer theft and zero accidental micro-jitter during layout adjustments
  */
 
+import { PERCENT_MULTIPLIER } from '../domain/models.js';
+
 export interface SplitPaneResizerOptions {
     container: HTMLElement;
     handle: HTMLElement;
@@ -22,7 +24,6 @@ export interface SplitPaneResizerOptions {
 const DEFAULT_COLLAPSE_THRESHOLD = 0.18;
 const GESTURE_DEAD_ZONE_PX = 4;
 const DEFAULT_INITIAL_RATIO = 0.5;
-const PERCENT_MULTIPLIER = 100;
 
 export class SplitPaneResizer {
     private readonly container: HTMLElement;

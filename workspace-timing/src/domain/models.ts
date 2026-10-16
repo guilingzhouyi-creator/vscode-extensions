@@ -25,6 +25,13 @@ export const DEFAULT_JOURNAL_FLUSH_SECONDS = 10;
 export const JOURNAL_WARN_MB = 5;
 export const SLEEP_DETECT_GAP_SECONDS = 15;
 export const RADIX_DECIMAL = 10;
+export const PERCENT_MULTIPLIER = 100;
+
+// ─── 提示音声学频率常量 (Hz) ──────────────
+export const FREQ_A4_HZ = 440;
+export const FREQ_A5_HZ = 880;
+export const FREQ_E4_HZ = 330;
+export const FREQ_E5_HZ = 660;
 
 // ─── 计时状态机枚举（单一真源契约）───────────────────
 export const ORCHESTRATOR_STATES = {

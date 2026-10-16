@@ -117,6 +117,9 @@ describe('SessionManager（跨午夜与休眠管理）', () => {
         assert.strictEqual(sessionManager.isSessionActive, false);
         assert.strictEqual(timer.isRunning, false);
         assert.ok(storage.saved.length > 0, '会话结束时触发了存盘');
+        const lastSaved = storage.saved[storage.saved.length - 1];
+        assert.ok((lastSaved.metadata?.lastJournalTs ?? 0) > 0, '存盘时必须保留有效安全水位线防断电双重累加');
+        assert.strictEqual(timer.data.metadata?.lastJournalTs ?? 0, 0, '截断成功后内存水位线原子归零');
     });
 
     it('rotateSessionAtMidnight：跨午夜轮转将会话封存入昨天，今天从零起算', async () => {

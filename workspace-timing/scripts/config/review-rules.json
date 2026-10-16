@@ -306,6 +306,7 @@
       "comment": "结构性常量豁免：domain/models.ts 是项目唯一常量家园；模板文件、样式文件与测试不在扫描面；0/1/2 等计数基元不判违规",
       "exemptPaths": [
         "src/domain/",
+        "src/presentation/container-queries.ts",
         "src/presentation/dashboardTemplate.ts",
         "src/presentation/dashboard-script.ts",
         "src/presentation/dashboard-base-styles.ts",
@@ -324,6 +325,7 @@
         "src/presentation/"
       ],
       "exemptPaths": [
+        "src/presentation/container-queries.ts",
         "src/presentation/dashboardTemplate.ts",
         "src/presentation/dashboard-script.ts",
         "src/presentation/dashboard-base-styles.ts",

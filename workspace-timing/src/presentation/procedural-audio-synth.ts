@@ -7,6 +7,14 @@
  * Exit Semantics & Design Rationale: Zero external audio assets (MP3/WAV) to ensure lightweight offline portability; exponential envelope ramp eliminates speaker pop/click artifacts
  */
 
+import {
+    FREQ_A4_HZ,
+    FREQ_A5_HZ,
+    FREQ_E4_HZ,
+    FREQ_E5_HZ,
+    MS_PER_SECOND,
+} from '../domain/models.js';
+
 export type SoundEffectType = 'timer_completed' | 'break_ended';
 
 export interface ProceduralSynthOptions {
@@ -19,18 +27,9 @@ export interface ProceduralSynthOptions {
 const DEFAULT_LOCKED_VOLUME = 0.3;
 const EXPONENTIAL_MIN_GAIN = 0.0001;
 
-/** 声学谐波与共鸣频率常量 (Hz) */
-const FREQ_A4_HZ = 440;
-const FREQ_A5_HZ = 880;
-const FREQ_E4_HZ = 330;
-const FREQ_E5_HZ = 660;
-
 /** 泛音增益缩放常量 */
 const HARMONIC_GAIN_SCALE = 0.35;
 const OVERTONE_GAIN_SCALE = 0.4;
-
-/** 时间换算毫秒常量 */
-const MS_PER_SECOND = 1000;
 
 export class ProceduralAudioSynth {
     private context: AudioContext | null = null;

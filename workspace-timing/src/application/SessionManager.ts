@@ -184,15 +184,25 @@ export class SessionManager {
         this.foldIfNeeded();
 
         // 4. 全量存盘（会话结束属关键事件，强制 JSON 备份）
+        // 关键时序防护：落盘持久化时必须携带有效时间戳作为安全水位线。
+        // 若在 save 之后、truncate 之前遭遇异常崩溃/断电，下次启动恢复时此水位线能杜绝未截断的 journal 切片被二次回放累加。
+        const endWatermark = this.timer.data.lastSavedAtMs || Date.now();
         const finalData: WorkspaceTimingData = {
             ...this.timer.data,
             sessions: [...this.timer.data.sessions],
-            metadata: { ...this.timer.data.metadata, lastJournalTs: 0 },
+            metadata: { ...this.timer.data.metadata, lastJournalTs: endWatermark },
         };
         await this.storage.save(finalData, true);
 
         // 5. 清空 journal（await 确保退出路径上 truncate 落盘）
         await this.journal.truncate();
+
+        // 6. 截断成功后原子复位内存水位线
+        this.timer.replaceData({
+            ...this.timer.data,
+            sessions: [...this.timer.data.sessions],
+            metadata: { ...this.timer.data.metadata, lastJournalTs: 0 },
+        });
 
         const foldedCount = Object.values(this.timer.data.dailyTotals ?? {}).reduce(
             (sum, b) => sum + (b.sessionCount || 0),

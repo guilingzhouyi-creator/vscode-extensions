@@ -1043,7 +1043,9 @@ export function buildDashboardScript(labels: Record<string, string>): string {
       window.addEventListener('resize', () => {
         if (pendingData && pendingData.dailyStats) {
           clearTimeout(resizeTimer);
-          resizeTimer = setTimeout(() => renderActiveCurve(pendingData.dailyStats), 80);
+          resizeTimer = setTimeout(() => {
+            renderActiveCurve(pendingData.dailyStats, pendingData.chartDualTrackDisplay !== false);
+          }, 80);
         }
       });
 
