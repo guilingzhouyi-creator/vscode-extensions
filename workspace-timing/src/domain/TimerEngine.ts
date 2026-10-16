@@ -85,25 +85,31 @@ export class TimerEngine {
         return Math.max(0, Math.min(e, dayStart + MS_PER_DAY) - Math.max(s, dayStart));
     }
 
+    private static sumIdleSessions(idleSessions?: readonly { durationMs: number }[]): number {
+        if (!idleSessions) return 0;
+        let sum = 0;
+        for (let i = 0; i < idleSessions.length; i++) {
+            sum += idleSessions[i].durationMs;
+        }
+        return sum;
+    }
+
+    private static sumDailyIdleTotals(dailyTotals?: Record<string, { idleTotalMs?: number }>): number {
+        if (!dailyTotals) return 0;
+        let sum = 0;
+        const keys = Object.keys(dailyTotals);
+        for (let i = 0; i < keys.length; i++) {
+            sum += dailyTotals[keys[i]].idleTotalMs ?? 0;
+        }
+        return sum;
+    }
+
     /** 初始化空闲历史总时长（O(1) 状态栏常驻前置计算） */
     private static computeInitialIdleTotal(data: WorkspaceTimingData): number {
         if (typeof data.idleTotalMs === 'number' && Number.isFinite(data.idleTotalMs) && data.idleTotalMs >= 0) {
             return data.idleTotalMs;
         }
-        let total = 0;
-        const idleSessions = data.idleSessions;
-        if (idleSessions) {
-            for (let i = 0; i < idleSessions.length; i++) total += idleSessions[i].durationMs;
-        }
-        const dailyTotals = data.dailyTotals;
-        if (dailyTotals) {
-            for (const k in dailyTotals) {
-                if (Object.prototype.hasOwnProperty.call(dailyTotals, k)) {
-                    total += (dailyTotals[k].idleTotalMs ?? 0);
-                }
-            }
-        }
-        return total;
+        return TimerEngine.sumIdleSessions(data.idleSessions) + TimerEngine.sumDailyIdleTotals(data.dailyTotals);
     }
 
     /** 提取日桶预聚合统计（纯函数） */

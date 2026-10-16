@@ -101,12 +101,20 @@ export class RovingFocusController {
         return true;
     }
 
+    private static readonly ARROW_STEPS: Record<string, { delta: number; axis: 'vertical' | 'horizontal' }> = {
+        ArrowDown: { delta: 1, axis: 'vertical' },
+        ArrowUp: { delta: -1, axis: 'vertical' },
+        ArrowRight: { delta: 1, axis: 'horizontal' },
+        ArrowLeft: { delta: -1, axis: 'horizontal' },
+    };
+
     private resolveArrowStep(key: string): number | null {
-        if ((key === 'ArrowDown' || key === 'ArrowUp') && this.orientation === 'horizontal') return null;
-        if ((key === 'ArrowRight' || key === 'ArrowLeft') && this.orientation === 'vertical') return null;
-        if (key === 'ArrowDown' || key === 'ArrowRight') return 1;
-        if (key === 'ArrowUp' || key === 'ArrowLeft') return -1;
-        return null;
+        const stepDef = RovingFocusController.ARROW_STEPS[key];
+        if (!stepDef) return null;
+        if (this.orientation !== 'both' && this.orientation !== stepDef.axis) {
+            return null;
+        }
+        return stepDef.delta;
     }
 
     private resolveKeyTarget(key: string, items: HTMLElement[]): number {

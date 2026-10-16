@@ -63,6 +63,37 @@ import * as DailyAgg from './aggregator/daily-aggregator';
 import * as WeeklyAgg from './aggregator/weekly-aggregator';
 import * as HeatmapAgg from './aggregator/heatmap-aggregator';
 
+function allocateSegmentManualAi(
+    segDuration: number,
+    totalDuration: number,
+    manualMs: number,
+    remaining: { manual: number; ai: number },
+): { segManual: number; segAi: number } {
+    const ratio = totalDuration > 0 ? (segDuration / totalDuration) : 0;
+    const segManual = Math.min(remaining.manual, Math.round(manualMs * ratio));
+    const segAi = Math.min(remaining.ai, segDuration - segManual);
+    remaining.manual -= segManual;
+    remaining.ai -= segAi;
+    return { segManual, segAi };
+}
+
+function adjustResidualManualAi(
+    sessions: TimeSession[],
+    remainingManual: number,
+    remainingAi: number,
+): void {
+    if (sessions.length === 0) return;
+    const last = sessions[sessions.length - 1];
+    const newManual = (last.manualMs ?? 0) + remainingManual;
+    const newAi = (last.aiMs ?? 0) + remainingAi;
+    last.manualMs = newManual;
+    last.aiMs = newAi;
+    const total = newManual + newAi;
+    if (total > 0) {
+        last.durationMs = total;
+    }
+}
+
 /**
  * 将区间 [startMs, endMs) 按本地自然日切分为 TimeSession 片段。
  * 若传入 manualMs / aiMs，各自然日切片按时长等比切分分配 manualMs 与 aiMs，确保切片守恒。
@@ -77,8 +108,10 @@ export function splitByNaturalDay(
     if (!(startMs > 0) || !(endMs > startMs)) return out;
     const totalDuration = endMs - startMs;
     const hasManualAi = typeof manualMs === 'number' && typeof aiMs === 'number';
-    let remainingManual = hasManualAi ? manualMs! : 0;
-    let remainingAi = hasManualAi ? aiMs! : 0;
+    const remaining = {
+        manual: hasManualAi ? manualMs! : 0,
+        ai: hasManualAi ? aiMs! : 0,
+    };
 
     DateUtils.eachDaySegment(startMs, endMs, (_date, segStart, segEnd) => {
         const segDuration = segEnd - segStart;
@@ -86,11 +119,12 @@ export function splitByNaturalDay(
             out.push({ startMs: segStart, endMs: segEnd, durationMs: segDuration });
             return;
         }
-        const ratio = totalDuration > 0 ? (segDuration / totalDuration) : 0;
-        const segManual = Math.min(remainingManual, Math.round(manualMs! * ratio));
-        const segAi = Math.min(remainingAi, segDuration - segManual);
-        remainingManual -= segManual;
-        remainingAi -= segAi;
+        const { segManual, segAi } = allocateSegmentManualAi(
+            segDuration,
+            totalDuration,
+            manualMs!,
+            remaining,
+        );
         out.push({
             startMs: segStart,
             endMs: segEnd,
@@ -100,13 +134,8 @@ export function splitByNaturalDay(
         });
     });
 
-    if (hasManualAi && out.length > 0) {
-        const last = out[out.length - 1];
-        last.manualMs = (last.manualMs ?? 0) + remainingManual;
-        last.aiMs = (last.aiMs ?? 0) + remainingAi;
-        if ((last.manualMs ?? 0) + (last.aiMs ?? 0) > 0) {
-            last.durationMs = (last.manualMs ?? 0) + (last.aiMs ?? 0);
-        }
+    if (hasManualAi) {
+        adjustResidualManualAi(out, remaining.manual, remaining.ai);
     }
     return out;
 }

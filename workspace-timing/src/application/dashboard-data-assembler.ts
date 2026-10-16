@@ -72,6 +72,50 @@ function buildTodayDetail(data: ReadonlyTimingData): DailyDetail | null {
     return detail;
 }
 
+interface ResolvedDashboardConfig {
+    readonly isEnabled: boolean;
+    readonly globalDisabled: boolean;
+    readonly locale: 'auto' | 'zh-CN' | 'en';
+    readonly statusBarEnabled: boolean;
+    readonly journalEnabled: boolean;
+    readonly backupToFile: boolean;
+    readonly ringBufferCapacity: number;
+    readonly journalFlushIntervalMs: number;
+    readonly fullSaveIntervalMs: number;
+    readonly maxSessions: number;
+    readonly historyRawRetentionDays: number;
+    readonly safetySnapshot: boolean;
+    readonly weeklyLimitEnabled: boolean;
+    readonly weeklyLimitHours: number;
+    readonly idleTimeoutMinutes: number;
+    readonly aiDetectionEnabled: boolean;
+    readonly aiCooldownSeconds: number;
+    readonly chartDualTrackDisplay: boolean;
+}
+
+function resolveDashboardConfig(config: TimingConfig): ResolvedDashboardConfig {
+    return {
+        isEnabled: config.enabled,
+        globalDisabled: config.globalDisabled,
+        locale: config.locale ?? 'auto',
+        statusBarEnabled: config.statusBarEnabled,
+        journalEnabled: config.journalEnabled ?? true,
+        backupToFile: config.backupToFile ?? true,
+        ringBufferCapacity: config.ringBufferCapacity ?? DEFAULT_RING_BUFFER_CAP,
+        journalFlushIntervalMs: config.journalFlushIntervalMs ?? DEFAULT_JOURNAL_FLUSH_MS,
+        fullSaveIntervalMs: config.fullSaveIntervalMs ?? MS_PER_MINUTE,
+        maxSessions: config.maxSessions ?? DEFAULT_MAX_SESSIONS,
+        historyRawRetentionDays: config.historyRawRetentionDays ?? DEFAULT_RAW_RETENTION_DAYS,
+        safetySnapshot: config.safetySnapshot ?? true,
+        weeklyLimitEnabled: config.weeklyLimitEnabled ?? false,
+        weeklyLimitHours: config.weeklyLimitHours ?? DEFAULT_WEEKLY_LIMIT_HOURS,
+        idleTimeoutMinutes: config.idleTimeoutMinutes,
+        aiDetectionEnabled: config.aiDetectionEnabled,
+        aiCooldownSeconds: config.aiCooldownSeconds,
+        chartDualTrackDisplay: config.chartDualTrackDisplay ?? true,
+    };
+}
+
 /**
  * 组装完整的 DashboardData 视图模型（纯函数，无状态，不触发任何副作用）。
  */
@@ -102,6 +146,7 @@ export function buildDashboardData(ctx: AssembleContext): DashboardData {
 
     // 面板会话数与当期有效会话严格对齐（已结束条目 + 进行中会话）
     const effectiveSessions = data.sessions.length + (data.currentSessionStartMs > 0 ? 1 : 0);
+    const resolvedConfig = resolveDashboardConfig(config);
 
     return {
         totalMs: currentTotalMs,
@@ -126,23 +171,6 @@ export function buildDashboardData(ctx: AssembleContext): DashboardData {
         globalTotalMs: global.totalMs,
         workspaceCount: global.workspaceCount,
         workspaceList: global.workspaces,
-        isEnabled: config.enabled,
-        globalDisabled: config.globalDisabled,
-        locale: config.locale ?? 'auto',
-        statusBarEnabled: config.statusBarEnabled,
-        journalEnabled: config.journalEnabled ?? true,
-        backupToFile: config.backupToFile ?? true,
-        ringBufferCapacity: config.ringBufferCapacity ?? DEFAULT_RING_BUFFER_CAP,
-        journalFlushIntervalMs: config.journalFlushIntervalMs ?? DEFAULT_JOURNAL_FLUSH_MS,
-        fullSaveIntervalMs: config.fullSaveIntervalMs ?? MS_PER_MINUTE,
-        maxSessions: config.maxSessions ?? DEFAULT_MAX_SESSIONS,
-        historyRawRetentionDays: config.historyRawRetentionDays ?? DEFAULT_RAW_RETENTION_DAYS,
-        safetySnapshot: config.safetySnapshot ?? true,
-        weeklyLimitEnabled: config.weeklyLimitEnabled ?? false,
-        weeklyLimitHours: config.weeklyLimitHours ?? DEFAULT_WEEKLY_LIMIT_HOURS,
-        idleTimeoutMinutes: config.idleTimeoutMinutes,
-        aiDetectionEnabled: config.aiDetectionEnabled,
-        aiCooldownSeconds: config.aiCooldownSeconds,
-        chartDualTrackDisplay: config.chartDualTrackDisplay ?? true,
+        ...resolvedConfig,
     };
 }

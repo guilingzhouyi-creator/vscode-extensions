@@ -198,6 +198,29 @@ function computeActiveWindow(hourly: readonly HourlyBucket[]): string {
     return `${String(bestStart).padStart(2, '0')}:00-${String(endHour).padStart(2, '0')}:00`;
 }
 
+function allocateSessionManualAi(
+    target: SessionDurationSlice,
+    durationMs: number,
+    totalSessionDuration: number,
+): { manualMs: number; aiMs: number } {
+    if (totalSessionDuration <= 0) {
+        return { manualMs: durationMs, aiMs: 0 };
+    }
+    if (durationMs === totalSessionDuration) {
+        const m = target.manualMs ?? durationMs;
+        const a = target.aiMs ?? 0;
+        if (m + a === durationMs) {
+            return { manualMs: m, aiMs: a };
+        }
+        const boundedManual = Math.min(durationMs, Math.max(0, m));
+        return { manualMs: boundedManual, aiMs: durationMs - boundedManual };
+    }
+    const m = target.manualMs ?? totalSessionDuration;
+    const ratio = durationMs / totalSessionDuration;
+    const scaledManual = Math.max(0, Math.min(durationMs, Math.round(m * ratio)));
+    return { manualMs: scaledManual, aiMs: durationMs - scaledManual };
+}
+
 /**
  * 获取指定日期的会话明细（支持双轨时长与活动模式透传）
  */
@@ -226,29 +249,11 @@ export function dailyDetail(
 
         const isRunningTail = running && visEnd >= Date.now();
         const totalSessionDuration = endMs - startMs;
-        let entryManualMs: number;
-        let entryAiMs: number;
-
-        if (totalSessionDuration <= 0) {
-            entryManualMs = durationMs;
-            entryAiMs = 0;
-        } else if (durationMs === totalSessionDuration) {
-            const m = target.manualMs ?? durationMs;
-            const a = target.aiMs ?? 0;
-            if (m + a === durationMs) {
-                entryManualMs = m;
-                entryAiMs = a;
-            } else {
-                entryManualMs = Math.min(durationMs, Math.max(0, m));
-                entryAiMs = durationMs - entryManualMs;
-            }
-        } else {
-            const m = target.manualMs ?? totalSessionDuration;
-            const ratio = durationMs / totalSessionDuration;
-            entryManualMs = Math.round(m * ratio);
-            entryManualMs = Math.max(0, Math.min(durationMs, entryManualMs));
-            entryAiMs = durationMs - entryManualMs;
-        }
+        const { manualMs: entryManualMs, aiMs: entryAiMs } = allocateSessionManualAi(
+            target,
+            durationMs,
+            totalSessionDuration,
+        );
 
         entries.push({
             startMs: visStart,
