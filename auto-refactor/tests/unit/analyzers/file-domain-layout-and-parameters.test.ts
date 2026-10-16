@@ -311,5 +311,42 @@ describe('File Domain Layout Monotonicity & Parameter Count Bounds', () => {
 
             expect(zeroParamIssue).toBeUndefined();
         });
+
+        it('emits SIM-ARGS-002 on GDScript event handler with 0 parameters', () => {
+            const gdAdapter = new GDScriptAdapter();
+            const gdCode = [
+                'func _on_submit():',
+                '    print("clicked")',
+            ].join('\n');
+
+            const parsed = gdAdapter.parse(gdCode, 'scripts/ui/form.gd');
+            const root = gdAdapter.root(parsed);
+            const ctx = createContext('scripts/ui/form.gd', gdCode, gdAdapter);
+
+            const issues = simplifyAnalyzer.analyze(root, ctx);
+            const zeroParamIssue = issues.find((i) => i.rule === 'SIM-ARGS-002');
+
+            expect(zeroParamIssue).toBeDefined();
+            expect(zeroParamIssue?.rule).toBe('SIM-ARGS-002');
+            expect(zeroParamIssue?.message).toContain('_on_submit');
+        });
+
+        it('emits exactly one SIM-ARGS-002 on TypeScript event handler in full finalize scan', () => {
+            const freshAnalyzer = new SimplifyAnalyzer();
+            const code = [
+                'export function onEventTrigger(): void {',
+                '    console.log("fired");',
+                '}',
+            ].join('\n');
+
+            const ctx = createContext('src/emitter.ts', code);
+            const sf = ts.createSourceFile('src/emitter.ts', code, ts.ScriptTarget.Latest, true);
+
+            // Simulate streaming run: analyze TS SourceFile
+            const issues = freshAnalyzer.analyze(sf, ctx);
+            const zeroParamIssues = issues.filter((i) => i.rule === 'SIM-ARGS-002');
+
+            expect(zeroParamIssues.length).toBe(1);
+        });
     });
 });

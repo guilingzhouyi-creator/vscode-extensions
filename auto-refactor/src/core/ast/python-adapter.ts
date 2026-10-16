@@ -95,27 +95,35 @@ function resolveChildMapContext(ctx: MapContext, sn: TreeSitterNode): MapContext
     };
 }
 
+const PARAM_PATTERN_TYPES = new Set([
+    'typed_parameter',
+    'default_parameter',
+    'typed_default_parameter',
+]);
+
+const SPLAT_PATTERN_TYPES = new Set([
+    'list_splat_pattern',
+    'dictionary_splat_pattern',
+]);
+
+function extractTypedOrDefaultPythonParam(child: TreeSitterNode): string | undefined {
+    const idNode = child.childForFieldName
+        ? child.childForFieldName('name')
+        : child.namedChildren?.find((c) => c.type === 'identifier');
+    if (idNode?.text) return idNode.text;
+    if (child.text) return child.text.split(/[:=]/)[0].trim();
+    return undefined;
+}
+
 function extractSinglePythonParam(child: TreeSitterNode): string | undefined {
-    if (child.type === 'identifier' && child.text) {
-        return child.text;
+    if (child.type === 'identifier') {
+        return child.text || undefined;
     }
-    if (
-        child.type === 'typed_parameter' ||
-        child.type === 'default_parameter' ||
-        child.type === 'typed_default_parameter'
-    ) {
-        const idNode = child.childForFieldName
-            ? child.childForFieldName('name')
-            : child.namedChildren?.find((c) => c.type === 'identifier');
-        if (idNode?.text) return idNode.text;
-        if (child.text) return child.text.split(/[:=]/)[0].trim();
+    if (PARAM_PATTERN_TYPES.has(child.type)) {
+        return extractTypedOrDefaultPythonParam(child);
     }
-    if (
-        (child.type === 'list_splat_pattern' ||
-            child.type === 'dictionary_splat_pattern') &&
-        child.text
-    ) {
-        return child.text;
+    if (SPLAT_PATTERN_TYPES.has(child.type)) {
+        return child.text || undefined;
     }
     return undefined;
 }

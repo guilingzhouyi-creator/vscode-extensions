@@ -612,8 +612,8 @@ export class SimplifyAnalyzer implements Analyzer {
             });
         }
 
-        // SIM-ARGS-002: Minimum parameter count on specialized handlers/solvers
-        if (params.length === 0 && isSemanticHandlerOrSolver(name)) {
+        // SIM-ARGS-002: Minimum parameter count on specialized handlers/solvers (TS handled in auditTypeScriptFunctions)
+        if (!this.getOrParseSourceFile(ctx) && params.length === 0 && isSemanticHandlerOrSolver(name)) {
             this.longFunctions.push({
                 id: `simplify:${RULE_SIM_ARGS_002}:${file}:${startLine}`,
                 analyzer: ANALYZER_SIMPLIFY,

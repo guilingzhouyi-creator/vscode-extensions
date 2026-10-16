@@ -341,6 +341,22 @@ export class TsNodeProjector implements NodeProjector {
         return undefined;
     }
 
+    private isExportedTopLevel(astNode: ts.Node, topLevel: boolean): boolean {
+        if (!topLevel) return false;
+        return (
+            hasExportModifier(astNode) ||
+            ts.isExportAssignment(astNode) ||
+            ts.isExportDeclaration(astNode)
+        );
+    }
+
+    private resolveProjectedRawKind(isFuncKw: boolean): string | undefined {
+        if (isFuncKw && this.policy.needComplexity) {
+            return 'FunctionKeyword';
+        }
+        return undefined;
+    }
+
     private buildProjectedNode(
         astNode: ts.Node,
         kindMeta: TsKindInfo,
@@ -367,7 +383,7 @@ export class TsNodeProjector implements NodeProjector {
 
         const node: NormalizedNode = {
             kind: kindMeta.kind,
-            rawKind: isFuncKw && this.policy.needComplexity ? 'FunctionKeyword' : undefined,
+            rawKind: this.resolveProjectedRawKind(isFuncKw),
             text: isLiteral && this.policy.needLiterals ? astNode.getText(this.sf) : undefined,
             start: pos.start,
             end: pos.end,
@@ -386,11 +402,7 @@ export class TsNodeProjector implements NodeProjector {
                 Boolean(this.policy.needComplexity) && ts.isConstructorDeclaration(astNode),
             parameters: fnLike ? this.extractFnParameters(astNode) : undefined,
             topLevel,
-            exported:
-                topLevel &&
-                (hasExportModifier(astNode) ||
-                    ts.isExportAssignment(astNode) ||
-                    ts.isExportDeclaration(astNode)),
+            exported: this.isExportedTopLevel(astNode, topLevel),
         };
         return node;
     }

@@ -420,6 +420,31 @@ function checkRustExported(
     return { topLevel: true, exported: false };
 }
 
+function extractRustParamName(child: TreeSitterNode): string | undefined {
+    const pat = child.childForFieldName ? child.childForFieldName('pattern') : null;
+    if (pat?.text) {
+        return pat.text;
+    }
+    const idNode = child.namedChildren?.find((c) => c.type === 'identifier');
+    if (idNode?.text) {
+        return idNode.text;
+    }
+    if (child.text) {
+        return child.text.split(':')[0].trim();
+    }
+    return undefined;
+}
+
+function extractSingleRustParam(child: TreeSitterNode): string | undefined {
+    if (child.type === 'self_parameter') {
+        return 'self';
+    }
+    if (child.type === 'parameter') {
+        return extractRustParamName(child);
+    }
+    return undefined;
+}
+
 function extractRustParameters(syntaxNode: TreeSitterNode): string[] | undefined {
     const paramsNode = syntaxNode.childForFieldName
         ? syntaxNode.childForFieldName('parameters')
@@ -428,21 +453,9 @@ function extractRustParameters(syntaxNode: TreeSitterNode): string[] | undefined
     const names: string[] = [];
     const children = paramsNode.namedChildren || [];
     for (let i = 0; i < children.length; i++) {
-        const child = children[i];
-        if (child.type === 'self_parameter') {
-            names.push('self');
-        } else if (child.type === 'parameter') {
-            const pat = child.childForFieldName ? child.childForFieldName('pattern') : null;
-            if (pat?.text) {
-                names.push(pat.text);
-            } else {
-                const idNode = child.namedChildren?.find((c) => c.type === 'identifier');
-                if (idNode?.text) {
-                    names.push(idNode.text);
-                } else if (child.text) {
-                    names.push(child.text.split(':')[0].trim());
-                }
-            }
+        const paramName = extractSingleRustParam(children[i]);
+        if (paramName) {
+            names.push(paramName);
         }
     }
     return names;
