@@ -121,7 +121,7 @@ jobs:
             fi
             CHANGED=$(git diff --name-only "$BEFORE" "$GITHUB_SHA" || true)
             echo "Changed files (vs $BEFORE):"
-            echo "$CHANGED" | head -50
+            echo "$CHANGED" | sed -n '1,50p'
             for EXT in $ALL_EXTS; do
               if echo "$CHANGED" | grep -q "^${EXT}/"; then
                 TARGETS="$TARGETS $EXT"

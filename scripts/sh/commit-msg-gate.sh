@@ -266,7 +266,7 @@ fi
 FOUND_PROJECT_HEADER=false
 IN_PROJECT_SECTION=false
 DECLARED_PROJECTS=()
-PROJECT_HEADER_REGEX='^\[[[:space:]]*([pP][rR][oO][jJ][eE][cC][tT]|项目|项目归属)([[:space:]]*[:/|][[:space:]]*([^]]*))?\]([[:space:]]*:[[:space:]]*(.*))?$'
+PROJECT_HEADER_REGEX='^\[[[:space:]]*([pP][rR][oO][jJ][eE][cC][tT]([[:space:]]*/[[:space:]]*(项目|项目归属))?|项目归属|项目)([[:space:]]*:[[:space:]]*([^]]*))?\]([[:space:]]*:[[:space:]]*(.*))?$'
 
 for ((i=2; i<TOTAL_LINES; i++)); do
     cur_line="${CLEAN_LINES[$i]}"
@@ -274,9 +274,9 @@ for ((i=2; i<TOTAL_LINES; i++)); do
     if [[ "$trimmed_line" =~ $PROJECT_HEADER_REGEX ]]; then
         FOUND_PROJECT_HEADER=true
         IN_PROJECT_SECTION=true
-        inline_val="${BASH_REMATCH[3]}"
+        inline_val="${BASH_REMATCH[4]}"
         if [[ -z "$inline_val" ]]; then
-            inline_val="${BASH_REMATCH[5]}"
+            inline_val="${BASH_REMATCH[6]}"
         fi
         if [[ -n "$inline_val" ]]; then
             IFS=',，、' read -ra parts <<< "$inline_val"

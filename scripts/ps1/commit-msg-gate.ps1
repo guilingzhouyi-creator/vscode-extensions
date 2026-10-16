@@ -254,7 +254,7 @@ $declaredProjects = @()
 $bodyLines = $bodyText -split '\r?\n'
 foreach ($bLine in $bodyLines) {
     $trimmedLine = $bLine.Trim()
-    if ($trimmedLine -match '^(?i)\[(?:Project|项目|项目归属)(?:\s*[:\/|]\s*(.*?))?\](?:\s*:\s*(.*))?$') {
+    if ($trimmedLine -match '^(?i)\[(?:Project(?:\s*/\s*(?:项目|项目归属))?|项目归属|项目)(?:\s*:\s*(.*?))?\](?:\s*:\s*(.*))?$') {
         $foundProjectHeader = $true
         $inProjectSection = $true
         $inlineVal = if ($Matches[1]) { $Matches[1] } else { $Matches[2] }
