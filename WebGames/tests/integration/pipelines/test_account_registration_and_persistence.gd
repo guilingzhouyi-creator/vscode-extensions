@@ -10,6 +10,11 @@
 class_name TestAccountRegistrationAndPersistence
 extends TestCase
 
+const AccountRegistrationDTO = preload("res://backend/domains/account/dto/account_registration_dto.gd")
+const AccountCompositeAuthDTO = preload("res://backend/domains/account/dto/account_composite_auth_dto.gd")
+const AuthService = preload("res://backend/domains/account/auth_service.gd")
+const AccountRepository = preload("res://backend/domains/account/account_repository.gd")
+const AccountProfileAggregate = preload("res://backend/domains/account/account_profile.gd")
 
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []
