@@ -17,7 +17,7 @@
  *   3. Enforce dual-scale ELOC/LOC volume budgets across staged source files;
  *   4. Emit structured diagnostic console logs and fail-closed exit codes.
  * Exit Semantics & Design Rationale: Exits 0 on clean check, 1 on any violation.
- *   Employs single-pass in-memory stream parsing to achieve <90ms pre-commit execution without disk thrashing.
+ *   Employs single-pass in-memory stream parsing to achieve <90ms pre-commit execution.
  */
 'use strict';
 
@@ -25,6 +25,40 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 const { getSafeGitEnv, getStagedFiles: queryStagedFiles } = require('./git-env');
+
+const RULE_HYG_NAM_001 = 'HYG-NAM-001';
+const RULE_HYG_EOL_001 = 'HYG-EOL-001';
+const RULE_HYG_EMP_001 = 'HYG-EMP-001';
+const RULE_VOL_ELOC_001 = 'VOL-ELOC-001';
+const RULE_VOL_LOC_001 = 'VOL-LOC-001';
+const RULE_SEC_LEAK_001 = 'SEC-LEAK-001';
+const RULE_SEC_VUL_001 = 'SEC-VUL-001';
+
+const SEVERITY_BLOCK = 'BLOCK';
+const EOL_CRLF = 'CRLF';
+const EOL_LF = 'LF';
+const FAST_STAGED_GATE = 'pre-commit:fast-staged';
+const STATUS_PASS = 'PASS';
+const PROTOCOL_VERSION = '1.0.0';
+const ENCODING_UTF8 = 'utf8';
+const GIT_DIFF_COMMAND = 'git diff --cached -U0 --no-color';
+const STDIO_PIPE = Object.freeze(['ignore', 'pipe', 'ignore']);
+const SCRIPT_NAME = 'node scripts/common/gate-fast-staged.js';
+const STEP_NAME = 'Gate 1~6 Fast Staged Stream Review';
+const FLAG_AGENT = '--agent';
+const FLAG_JSON = '--json';
+const FLAG_SHORT_A = '-a';
+const RE_EXEMPT_SLANG = /WebGames\/docs\/(?:路线图|归档库)\//;
+
+const MAX_ELOC_BUDGET = 900;
+const MAX_LOC_BUDGET = 1400;
+const MIN_FILENAME_STEM_LENGTH = 3;
+const MAX_FILENAME_STEM_LENGTH = 55;
+const MAX_PATH_LEAK_DISPLAY = 5;
+const MAX_SECRET_LEAK_DISPLAY = 3;
+const BYTE_CR = 0x0d;
+const MAX_FILENAME_SEGMENTS_SRC = 5;
+const MAX_FILENAME_SEGMENTS_TEST = 8;
 
 const SECRET_PATTERN =
   /(?:AIza[0-9A-Za-z_-]{35}|sk-[a-zA-Z0-9]{32,}|ghp_[a-zA-Z0-9]{36}|-----BEGIN (?:RSA|EC|OPENSSH|PRIVATE) KEY-----)/;
@@ -36,27 +70,69 @@ const ABS_PATH_WHITELIST_PATTERN = /(?:node_modules|\.gemini|file:\/\/)/;
 
 const SLANG_FILENAME_PATTERN = /(?:^|[-_.])(?:temp|wip|new|st\d+|p\d+)(?:[-_.]|$)/i;
 
-const ALLOWED_SHORT_STEMS = new Set([
-  'ui', 'en', 'zh', 'db', 'io', 'ci', 'os', 'vm', 'fs', 're', 'id', 'ip', 'gm',
-]);
+const ALLOWED_SHORT_STEMS = new Set(
+  'ui en zh db io ci os vm fs re id ip gm'.split(' ')
+);
 
-const STANDARD_TECH_ABBREVIATIONS = new Set([
-  'ui', 'db', 'io', 'os', 'vm', 'fs', 'id', 'ip', 'ci', 'cd',
-  'sdk', 'api', 'cli', 'ast', 'cfg', 'lut', 'doc', 'req', 'res',
-  'msg', 'btn', 'pkg', 'src', 'ctx', 'fmt', 'cmd', 'ptr', 'str',
-  'std', 'fps', 'rng', 'pr', 'sh', 'ps', 'md', 'ts', 'js', 'py',
-  'gd', 'rs', '2d', '3d', '4k', 'ssl', 'ssh', 'tcp', 'udp', 'dns',
-  'rpc', 'ipc', 'csr', 'soa', 'swar', 'simd', 'cc', 'eloc', 'loc',
-  'diff', 'rgb', 'hex', 'fn', 'cb', 'rx', 'tx', 'env', 'app', 'dev',
-  'fsm', 'npc', 'gm', 'rpg', 'pve', 'pvp', 'hp', 'mp', 'cdc',
-  'vs', 'prf', 'mcp', 'ssot', 'ir', 'cai', 'e2e', 'wasm', 'zh', 'cn',
-]);
+const STANDARD_TECH_ABBREVIATIONS = new Set(
+  ('ui db io os vm fs id ip ci cd sdk api cli ast cfg lut doc req res msg btn pkg src ctx fmt cmd ptr str ' +
+   'std fps rng pr sh ps md ts js py gd rs 2d 3d 4k ssl ssh tcp udp dns rpc ipc csr soa swar simd cc eloc loc ' +
+   'diff rgb hex fn cb rx tx env app dev fsm npc gm rpg pve pvp hp mp cdc vs prf mcp ssot ir cai e2e wasm zh cn').split(' ')
+);
 
-const IGNORED_BASENAMES = new Set([
-  'index', 'main', 'lib', 'mod', 'api', 'types', 'cli', 'readme', 'changelog', 'license',
-]);
+const IGNORED_BASENAMES = new Set(
+  'index main lib mod api types cli readme changelog license'.split(' ')
+);
 
+const RAW_GATE_SPECS = `1|暂存区零空文件检查通过||
+2|换行符契约 (ps1 CRLF, 其余 LF) 检查通过||
+3|绝对路径与协议防泄漏检查通过|5|❌ [FAIL] Gate 3: 检测到新增代码中包含绝对路径或盘符泄漏:
+4|零黑话与规范命名检查通过||
+5|双轨体积预算 (ELOC<=900, LOC<=1400) 检查通过||
+6|密钥与敏感 Token 防泄漏扫描通过|3|❌ [FAIL] Gate 6: 检测到暂存代码中疑似包含未脱敏的真实密钥或私钥！`;
 
+const GATE_SPECS = Object.freeze(
+  RAW_GATE_SPECS.split('\n').map((row) => {
+    const parts = row.split('|');
+    return {
+      num: parseInt(parts[0], 10),
+      name: parts[1],
+      limit: parts[2] ? parseInt(parts[2], 10) : undefined,
+      header: parts[3] || undefined,
+    };
+  })
+);
+
+const RAW_VIOLATION_TPLS = `SLANG_NAME|零黑话与规范命名 (禁止 temp/wip/new/stN/pN)|重命名文件以移除临时黑话标记
+NAME_VOWEL|含元音语素或标准技术缩写|修正文件名单词拼写或使用标准技术缩写
+NAME_SEGMENTS|按子目录分层重构文件名，减少连接词段数
+NAME_SHORT|>= 3 chars|重命名文件以提供具有领域语义的描述名称
+NAME_LONG|<= 55 chars|通过划分清晰子目录解耦超长文件名
+EOL_PS1|CRLF|将该 PowerShell 脚本换行符转换为 CRLF
+EOL_LF|LF|将该文件换行符转换为 LF
+VOL_ELOC|ELOC <= 900|消除冗余实现并提取子模块以控制 ELOC <= 900
+VOL_LOC|LOC <= 1400|重构超大文件，按子领域解耦以控制 LOC <= 1400
+EMPTY_FILE|0 bytes|> 0 bytes with semantic payload|删除该空文件或实现实质代码逻辑
+EMPTY_WS|0 non-whitespace characters|实质内容|删除该虚空文件或填充代码
+PATH_LEAK|相对路径或环境变量动态解析|替换绝对路径或盘符为相对路径或 path.resolve(__dirname, ...)
+SECRET_LEAK|暂存代码包含疑似未脱敏的密钥或私钥|敏感凭证特征串|环境变量或模拟密钥|立即移除真实密钥并配置环境变量注入，严禁提交凭证到版本库`;
+
+const VIOLATION_TPLS = Object.freeze(
+  RAW_VIOLATION_TPLS.split('\n').reduce((acc, row) => {
+    const parts = row.split('|');
+    const [key, p1, p2, p3, p4] = parts;
+    if (parts.length === 5) {
+      acc[key] = { message: p1, actual: p2, expected: p3, actionableFix: p4 };
+    } else if (parts.length === 4) {
+      acc[key] = { actual: p1, expected: p2, actionableFix: p3 };
+    } else if (parts.length === 2) {
+      acc[key] = { actionableFix: p1 };
+    } else {
+      acc[key] = { expected: p1, actionableFix: p2 };
+    }
+    return acc;
+  }, {})
+);
 
 function getStagedFiles(repoRoot) {
   return queryStagedFiles(repoRoot, process.argv.slice(2));
@@ -64,11 +140,11 @@ function getStagedFiles(repoRoot) {
 
 function getStagedDiff(repoRoot) {
   try {
-    return execSync('git diff --cached -U0 --no-color', {
+    return execSync(GIT_DIFF_COMMAND, {
       cwd: repoRoot,
       env: getSafeGitEnv(),
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
+      encoding: ENCODING_UTF8,
+      stdio: STDIO_PIPE,
     });
   } catch {
     return '';
@@ -77,11 +153,7 @@ function getStagedDiff(repoRoot) {
 
 function isExemptSlangPath(filePath, baseName) {
   const norm = filePath.replace(/\\/g, '/');
-  return (
-    norm.includes('WebGames/docs/路线图/') ||
-    norm.includes('WebGames/docs/归档库/') ||
-    /^fe_\d{2}/.test(baseName)
-  );
+  return RE_EXEMPT_SLANG.test(norm) || /^fe_\d{2}/.test(baseName);
 }
 
 function classifyCLine(line, inBlockComment) {
@@ -189,19 +261,20 @@ function calculateEloc(content, ext) {
 /**
  * Constructs a structured violation payload adhering to the Agent Directives Protocol.
  *
- * @param {string} ruleId - Unique catalogued rule identifier.
- * @param {string} file - Path to target file with violation.
- * @param {string} message - Factual diagnostic explanation.
- * @param {string} actual - Observed non-compliant state.
- * @param {string} expected - Target compliant invariant.
- * @param {string} actionableFix - Actionable prescription for Agent self-healing.
- * @param {number} [line] - 1-indexed target line number.
+ * @param {object} violation - Violation parameters.
+ * @param {string} violation.ruleId - Unique catalogued rule identifier.
+ * @param {string} violation.file - Path to target file with violation.
+ * @param {string} violation.message - Factual diagnostic explanation.
+ * @param {string} violation.actual - Observed non-compliant state.
+ * @param {string} violation.expected - Target compliant invariant.
+ * @param {string} violation.actionableFix - Actionable prescription for Agent self-healing.
+ * @param {number} [violation.line] - 1-indexed target line number.
  * @returns {object} Structured violation envelope.
  */
-function createViolation(ruleId, file, message, actual, expected, actionableFix, line = undefined) {
+function createViolation({ ruleId, file, message, actual, expected, actionableFix, line = undefined }) {
   const item = {
     ruleId,
-    severity: 'BLOCK',
+    severity: SEVERITY_BLOCK,
     file: file ? file.replace(/\\/g, '/') : undefined,
     line,
     actual,
@@ -224,15 +297,16 @@ function createViolation(ruleId, file, message, actual, expected, actionableFix,
 function validateFilenameSlang(file, gate4Violations) {
   const baseName = path.basename(file);
   if (!isExemptSlangPath(file, baseName) && SLANG_FILENAME_PATTERN.test(baseName)) {
+    const tpl = VIOLATION_TPLS.SLANG_NAME;
     gate4Violations.push(
-      createViolation(
-        'HYG-NAM-001',
+      createViolation({
+        ruleId: RULE_HYG_NAM_001,
         file,
-        `文件名包含临时性违规黑话标记: ${file}`,
-        baseName,
-        '零黑话与规范命名 (禁止 temp/wip/new/stN/pN)',
-        '重命名文件以移除临时黑话标记',
-      ),
+        message: `文件名包含临时性违规黑话标记: ${file}`,
+        actual: baseName,
+        expected: tpl.expected,
+        actionableFix: tpl.actionableFix,
+      }),
     );
   }
 }
@@ -261,32 +335,34 @@ function isMorphemeValid(seg) {
 function validateFilenameSegments(file, stem, gate4Violations) {
   const norm = file.replace(/\\/g, '/');
   const isTest = /(?:tests\/|\.test\.|\.spec\.|test_)/i.test(norm);
-  const maxSegments = isTest ? 8 : 5;
+  const maxSegments = isTest ? MAX_FILENAME_SEGMENTS_TEST : MAX_FILENAME_SEGMENTS_SRC;
   const cleanStem = stem.replace(/\.(?:test|spec)$/i, '').replace(/^test[_-]/i, '');
   const segments = cleanStem.split(/[-_]+/).filter(Boolean);
   if (segments.length > maxSegments) {
+    const tpl = VIOLATION_TPLS.NAME_SEGMENTS;
     gate4Violations.push(
-      createViolation(
-        'HYG-NAM-001',
+      createViolation({
+        ruleId: RULE_HYG_NAM_001,
         file,
-        `文件名单词段数过多 (> ${maxSegments} 段，过度堆叠): ${file}`,
-        `${segments.length} segments`,
-        `<= ${maxSegments} segments`,
-        '按子目录分层重构文件名，减少连接词段数',
-      ),
+        message: `文件名单词段数过多 (> ${maxSegments} 段，过度堆叠): ${file}`,
+        actual: `${segments.length} segments`,
+        expected: `<= ${maxSegments} segments`,
+        actionableFix: tpl.actionableFix,
+      }),
     );
   }
   for (const seg of segments) {
     if (!isMorphemeValid(seg)) {
+      const tpl = VIOLATION_TPLS.NAME_VOWEL;
       gate4Violations.push(
-        createViolation(
-          'HYG-NAM-001',
+        createViolation({
+          ruleId: RULE_HYG_NAM_001,
           file,
-          `文件名单词段 '${seg}' 缺乏元音语素且非标准技术缩写: ${file}`,
-          seg,
-          '含元音语素或标准技术缩写',
-          '修正文件名单词拼写或使用标准技术缩写',
-        ),
+          message: `文件名单词段 '${seg}' 缺乏元音语素且非标准技术缩写: ${file}`,
+          actual: seg,
+          expected: tpl.expected,
+          actionableFix: tpl.actionableFix,
+        }),
       );
     }
   }
@@ -307,29 +383,31 @@ function validateFilenameLength(file, gate4Violations) {
   const stem = baseName.slice(0, baseName.length - ext.length);
   const lower = stem.toLowerCase();
   if (IGNORED_BASENAMES.has(lower)) return;
-  if (stem.length < 3 && !ALLOWED_SHORT_STEMS.has(lower)) {
+  if (stem.length < MIN_FILENAME_STEM_LENGTH && !ALLOWED_SHORT_STEMS.has(lower)) {
+    const tpl = VIOLATION_TPLS.NAME_SHORT;
     gate4Violations.push(
-      createViolation(
-        'HYG-NAM-001',
+      createViolation({
+        ruleId: RULE_HYG_NAM_001,
         file,
-        `文件名过短 (< 3 字符，缺乏语义描述): ${file}`,
-        `${stem.length} chars`,
-        '>= 3 chars',
-        '重命名文件以提供具有领域语义的描述名称',
-      ),
+        message: `文件名过短 (< ${MIN_FILENAME_STEM_LENGTH} 字符，缺乏语义描述): ${file}`,
+        actual: `${stem.length} chars`,
+        expected: tpl.expected,
+        actionableFix: tpl.actionableFix,
+      }),
     );
     return;
   }
-  if (stem.length > 55) {
+  if (stem.length > MAX_FILENAME_STEM_LENGTH) {
+    const tpl = VIOLATION_TPLS.NAME_LONG;
     gate4Violations.push(
-      createViolation(
-        'HYG-NAM-001',
+      createViolation({
+        ruleId: RULE_HYG_NAM_001,
         file,
-        `文件名过长 (> 55 字符，建议按子目录解耦): ${file}`,
-        `${stem.length} chars`,
-        '<= 55 chars',
-        '通过划分清晰子目录解耦超长文件名',
-      ),
+        message: `文件名过长 (> ${MAX_FILENAME_STEM_LENGTH} 字符，建议按子目录解耦): ${file}`,
+        actual: `${stem.length} chars`,
+        expected: tpl.expected,
+        actionableFix: tpl.actionableFix,
+      }),
     );
   }
   validateFilenameSegments(file, stem, gate4Violations);
@@ -343,31 +421,31 @@ function validateFilenameLength(file, gate4Violations) {
  * @param {Array} gate2Violations - Collector array for Gate 2 findings.
  */
 function validateFileEol(file, buffer, gate2Violations) {
-  const hasCR = buffer.includes(0x0d);
+  const hasCR = buffer.includes(BYTE_CR);
   if (file.endsWith('.ps1')) {
     if (!hasCR) {
       gate2Violations.push(
-        createViolation(
-          'HYG-EOL-001',
+        createViolation({
+          ruleId: RULE_HYG_EOL_001,
           file,
-          `PowerShell 脚本必须使用 CRLF 换行符: ${file}`,
-          'LF',
-          'CRLF',
-          '将该 PowerShell 脚本换行符转换为 CRLF',
-        ),
+          message: `PowerShell 脚本必须使用 CRLF 换行符: ${file}`,
+          actual: EOL_LF,
+          expected: EOL_CRLF,
+          actionableFix: VIOLATION_TPLS.EOL_PS1.actionableFix,
+        }),
       );
     }
   } else if (/\.(?:sh|ts|js|gd|json|md)$/i.test(file)) {
     if (hasCR) {
       gate2Violations.push(
-        createViolation(
-          'HYG-EOL-001',
+        createViolation({
+          ruleId: RULE_HYG_EOL_001,
           file,
-          `代码/文档必须使用 LF 换行符，检测到 CRLF: ${file}`,
-          'CRLF',
-          'LF',
-          '将该文件换行符转换为 LF',
-        ),
+          message: `代码/文档必须使用 LF 换行符，检测到 CRLF: ${file}`,
+          actual: EOL_CRLF,
+          expected: EOL_LF,
+          actionableFix: VIOLATION_TPLS.EOL_LF.actionableFix,
+        }),
       );
     }
   }
@@ -390,28 +468,30 @@ function validateFileVolume(file, content, gate5Violations) {
   }
   const ext = path.extname(file).toLowerCase();
   const { totalLoc, eloc } = calculateEloc(content, ext);
-  if (eloc > 900) {
+  if (eloc > MAX_ELOC_BUDGET) {
+    const tpl = VIOLATION_TPLS.VOL_ELOC;
     gate5Violations.push(
-      createViolation(
-        'VOL-ELOC-001',
+      createViolation({
+        ruleId: RULE_VOL_ELOC_001,
         file,
-        `单文件有效行数超标 (${eloc} > 900 ELOC): ${file}`,
-        `ELOC = ${eloc}`,
-        'ELOC <= 900',
-        '消除冗余实现并提取子模块以控制 ELOC <= 900',
-      ),
+        message: `单文件有效行数超标 (${eloc} > ${MAX_ELOC_BUDGET} ELOC): ${file}`,
+        actual: `ELOC = ${eloc}`,
+        expected: tpl.expected,
+        actionableFix: tpl.actionableFix,
+      }),
     );
   }
-  if (totalLoc > 1400) {
+  if (totalLoc > MAX_LOC_BUDGET) {
+    const tpl = VIOLATION_TPLS.VOL_LOC;
     gate5Violations.push(
-      createViolation(
-        'VOL-LOC-001',
+      createViolation({
+        ruleId: RULE_VOL_LOC_001,
         file,
-        `单文件行数超标 (${totalLoc} > 1400 LOC): ${file}`,
-        `LOC = ${totalLoc}`,
-        'LOC <= 1400',
-        '重构超大文件，按子领域解耦以控制 LOC <= 1400',
-      ),
+        message: `单文件行数超标 (${totalLoc} > ${MAX_LOC_BUDGET} LOC): ${file}`,
+        actual: `LOC = ${totalLoc}`,
+        expected: tpl.expected,
+        actionableFix: tpl.actionableFix,
+      }),
     );
   }
 }
@@ -435,15 +515,16 @@ function inspectStagedFile(repoRoot, file, collectors) {
   try {
     stat = fs.statSync(fullPath);
     if (stat.size === 0) {
+      const tpl = VIOLATION_TPLS.EMPTY_FILE;
       collectors.gate1.push(
-        createViolation(
-          'HYG-EMP-001',
+        createViolation({
+          ruleId: RULE_HYG_EMP_001,
           file,
-          `发现 0 字节物理空文件: ${file}`,
-          '0 bytes',
-          '> 0 bytes with semantic payload',
-          '删除该空文件或实现实质代码逻辑',
-        ),
+          message: `发现 0 字节物理空文件: ${file}`,
+          actual: tpl.actual,
+          expected: tpl.expected,
+          actionableFix: tpl.actionableFix,
+        }),
       );
       return;
     }
@@ -452,17 +533,18 @@ function inspectStagedFile(repoRoot, file, collectors) {
     return;
   }
 
-  const content = buffer.toString('utf8');
+  const content = buffer.toString(ENCODING_UTF8);
   if (content.trim().length === 0) {
+    const tpl = VIOLATION_TPLS.EMPTY_WS;
     collectors.gate1.push(
-      createViolation(
-        'HYG-EMP-001',
+      createViolation({
+        ruleId: RULE_HYG_EMP_001,
         file,
-        `发现仅含空白字符的虚空文件: ${file}`,
-        '0 non-whitespace characters',
-        '实质内容',
-        '删除该虚空文件或填充代码',
-      ),
+        message: `发现仅含空白字符的虚空文件: ${file}`,
+        actual: tpl.actual,
+        expected: tpl.expected,
+        actionableFix: tpl.actionableFix,
+      }),
     );
     return;
   }
@@ -536,16 +618,17 @@ function checkDiffStream(diffText) {
       ABS_PATH_PATTERN.test(addedContent) &&
       !ABS_PATH_WHITELIST_PATTERN.test(addedContent)
     ) {
+      const tpl = VIOLATION_TPLS.PATH_LEAK;
       gate3Violations.push(
-        createViolation(
-          'SEC-LEAK-001',
-          currentFile,
-          `新增代码包含绝对路径或盘符泄漏: ${addedContent.trim()}`,
-          addedContent.trim(),
-          '相对路径或环境变量动态解析',
-          '替换绝对路径或盘符为相对路径或 path.resolve(__dirname, ...)',
-          currentLine,
-        ),
+        createViolation({
+          ruleId: RULE_SEC_LEAK_001,
+          file: currentFile,
+          message: `新增代码包含绝对路径或盘符泄漏: ${addedContent.trim()}`,
+          actual: addedContent.trim(),
+          expected: tpl.expected,
+          actionableFix: tpl.actionableFix,
+          line: currentLine,
+        }),
       );
     }
 
@@ -553,16 +636,17 @@ function checkDiffStream(diffText) {
       SECRET_PATTERN.test(addedContent) &&
       !SECRET_WHITELIST_PATTERN.test(addedContent)
     ) {
+      const tpl = VIOLATION_TPLS.SECRET_LEAK;
       gate6Violations.push(
-        createViolation(
-          'SEC-VUL-001',
-          currentFile,
-          '暂存代码包含疑似未脱敏的密钥或私钥',
-          '敏感凭证特征串',
-          '环境变量或模拟密钥',
-          '立即移除真实密钥并配置环境变量注入，严禁提交凭证到版本库',
-          currentLine,
-        ),
+        createViolation({
+          ruleId: RULE_SEC_VUL_001,
+          file: currentFile,
+          message: tpl.message,
+          actual: tpl.actual,
+          expected: tpl.expected,
+          actionableFix: tpl.actionableFix,
+          line: currentLine,
+        }),
       );
     }
   }
@@ -570,33 +654,30 @@ function checkDiffStream(diffText) {
   return { gate3Violations, gate6Violations };
 }
 
-function logSingleGateResult(num, name, items, limit = 0, header = '') {
+function logSingleGateResult(spec, items) {
   if (items.length === 0) {
-    console.log(`  ✔ [Gate ${num}] ${name}`);
+    console.log(`  ✔ [Gate ${spec.num}] ${spec.name}`);
     return;
   }
-  if (header) {
-    console.error(header);
+  if (spec.header) {
+    console.error(spec.header);
   }
-  const slice = limit > 0 ? items.slice(0, limit) : items;
+  const slice = spec.limit && spec.limit > 0 ? items.slice(0, spec.limit) : items;
   for (const v of slice) {
     const loc = v.file ? `${v.file}${v.line ? ':' + v.line : ''} - ` : '';
-    console.error(header ? `   ${loc}${v.message}` : `❌ [FAIL] Gate ${num}: ${v.message}`);
+    console.error(spec.header ? `   ${loc}${v.message}` : `❌ [FAIL] Gate ${spec.num}: ${v.message}`);
   }
 }
 
-function reportHumanViolations(g1, g2, g3, g4, g5, g6) {
-  logSingleGateResult(1, '暂存区零空文件检查通过', g1);
-  logSingleGateResult(2, '换行符契约 (ps1 CRLF, 其余 LF) 检查通过', g2);
-  logSingleGateResult(3, '绝对路径与协议防泄漏检查通过', g3, 5, '❌ [FAIL] Gate 3: 检测到新增代码中包含绝对路径或盘符泄漏:');
-  logSingleGateResult(4, '零黑话与规范命名检查通过', g4);
-  logSingleGateResult(5, '双轨体积预算 (ELOC<=900, LOC<=1400) 检查通过', g5);
-  logSingleGateResult(6, '密钥与敏感 Token 防泄漏扫描通过', g6, 3, '❌ [FAIL] Gate 6: 检测到暂存代码中疑似包含未脱敏的真实密钥或私钥！');
+function reportHumanViolations(violationsByGate) {
+  for (let i = 0; i < GATE_SPECS.length; i++) {
+    logSingleGateResult(GATE_SPECS[i], violationsByGate[i]);
+  }
 }
 
 function runFastStaged() {
   const args = process.argv.slice(2);
-  const isAgentMode = args.includes('--agent') || args.includes('-a') || args.includes('--json');
+  const isAgentMode = args.includes(FLAG_AGENT) || args.includes(FLAG_SHORT_A) || args.includes(FLAG_JSON);
   const repoRoot = path.resolve(__dirname, '../..');
   const stagedFiles = getStagedFiles(repoRoot);
 
@@ -605,9 +686,9 @@ function runFastStaged() {
       console.log(
         JSON.stringify(
           {
-            protocolVersion: '1.0.0',
-            status: 'PASS',
-            gate: 'pre-commit:fast-staged',
+            protocolVersion: PROTOCOL_VERSION,
+            status: STATUS_PASS,
+            gate: FAST_STAGED_GATE,
             summary: 'Staged area is empty, fast-staged review skipped.',
           },
           null,
@@ -638,14 +719,14 @@ function runFastStaged() {
   if (allViolations.length > 0) {
     const { writeFailureSnapshot } = require('./log-rotator');
     const envelope = {
-      gate: 'pre-commit:fast-staged',
-      step: 'Gate 1~6 Fast Staged Stream Review',
-      failedCommand: 'node scripts/common/gate-fast-staged.js',
+      gate: FAST_STAGED_GATE,
+      step: STEP_NAME,
+      failedCommand: SCRIPT_NAME,
       exitCode: 1,
       summary: `Fast staged check blocked commit due to ${allViolations.length} physical hygiene or security violations.`,
       violations: allViolations,
       targetFiles: Array.from(new Set(allViolations.map((v) => v.file).filter(Boolean))),
-      verificationCommand: 'node scripts/common/gate-fast-staged.js',
+      verificationCommand: SCRIPT_NAME,
     };
     writeFailureSnapshot(envelope);
 
@@ -654,14 +735,14 @@ function runFastStaged() {
       process.exit(1);
     }
 
-    reportHumanViolations(
+    reportHumanViolations([
       gate1Violations,
       gate2Violations,
       gate3Violations,
       gate4Violations,
       gate5Violations,
       gate6Violations,
-    );
+    ]);
     process.exit(1);
   }
 
@@ -669,9 +750,9 @@ function runFastStaged() {
     console.log(
       JSON.stringify(
         {
-          protocolVersion: '1.0.0',
-          status: 'PASS',
-          gate: 'pre-commit:fast-staged',
+          protocolVersion: PROTOCOL_VERSION,
+          status: STATUS_PASS,
+          gate: FAST_STAGED_GATE,
           summary: 'All fast-staged hygiene and security checks passed.',
         },
         null,
@@ -679,12 +760,9 @@ function runFastStaged() {
       ),
     );
   } else {
-    console.log('  ✔ [Gate 1] 暂存区零空文件检查通过');
-    console.log('  ✔ [Gate 2] 换行符契约 (ps1 CRLF, 其余 LF) 检查通过');
-    console.log('  ✔ [Gate 3] 绝对路径与协议防泄漏检查通过');
-    console.log('  ✔ [Gate 4] 零黑话与规范命名检查通过');
-    console.log('  ✔ [Gate 5] 双轨体积预算 (ELOC<=900, LOC<=1400) 检查通过');
-    console.log('  ✔ [Gate 6] 密钥与敏感 Token 防泄漏扫描通过');
+    for (const spec of GATE_SPECS) {
+      console.log(`  ✔ [Gate ${spec.num}] ${spec.name}`);
+    }
   }
   process.exit(0);
 }
