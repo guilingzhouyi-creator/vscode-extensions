@@ -74,12 +74,30 @@ const RULE_SIM_LONG_001 = 'SIM-LONG-001';
 const RULE_SIM_FLAT_002 = 'SIM-FLAT-002';
 // rule: 'SIM-ARGS-001'
 const RULE_SIM_ARGS_001 = 'SIM-ARGS-001';
+// rule: 'SIM-ARGS-002'
+const RULE_SIM_ARGS_002 = 'SIM-ARGS-002';
 // rule: 'SIM-COMC-001'
 const RULE_SIM_COMC_001 = 'SIM-COMC-001';
 // rule: 'SIM-EMPTY-001'
 const RULE_SIM_EMPTY_001 = 'SIM-EMPTY-001';
 // rule: 'SIM-PRNT-001'
 const RULE_SIM_PRNT_001 = 'SIM-PRNT-001';
+
+const LIFECYCLE_HOOK_NAMES: ReadonlySet<string> = new Set([
+    'oninit', 'onmounted', 'onmount', 'ondestroy', 'ondestroyed', 'onready',
+    'onstart', 'onstop', 'onclose', 'onopen', 'ontick', 'onexit', 'onenter',
+    '_ready', '_enter_tree', '_exit_tree', '_process', '_physics_process',
+]);
+
+const HANDLER_OR_SOLVER_RE =
+    /^(?:on[A-Z]|handle[A-Z]|resolve[A-Z]|solve[A-Z]|dispatch[A-Z]|_on_[a-z0-9]|_input$|_gui_input$|_unhandled_input$)/;
+
+function isSemanticHandlerOrSolver(name: string): boolean {
+    if (!name || LIFECYCLE_HOOK_NAMES.has(name.toLowerCase())) {
+        return false;
+    }
+    return HANDLER_OR_SOLVER_RE.test(name);
+}
 
 const ACTION_SPLIT_FUNCTION: AgentActionType = 'split_function';
 const ACTION_SIMPLIFY_CONTROL_FLOW: AgentActionType = 'simplify_control_flow';
@@ -116,14 +134,8 @@ const DEFAULT_MAX_FUNCTION_PARAMETERS = 4;
 const DEFAULT_MIN_COMMENTED_CODE_LINES = 3;
 const DEFAULT_MAX_GUARD_CLAUSE_NESTING = 3;
 const DEFAULT_PRINT_ALLOW_PATTERNS = [
-    '**/cli/**',
-    '**/scripts/**',
-    '**/tests/**',
-    '**/test/**',
-    '**/bench/**',
-    '**/benchmark*/**',
-    '**/*.test.*',
-    '**/*.spec.*',
+    '**/cli/**', '**/scripts/**', '**/tests/**', '**/test/**',
+    '**/bench/**', '**/benchmark*/**', '**/*.test.*', '**/*.spec.*',
 ];
 
 /** Keyword-anchored "this comment is code" heuristic, language-neutral. */
@@ -218,6 +230,25 @@ function computeControlFlowNesting(rootNode: NormalizedNode): number {
         pushNonFunctionChildren(currentNode.children, currentDepth, nodeStack, depthStack);
     }
     return max;
+}
+
+function isNormalizedNode(node: unknown): node is NormalizedNode {
+    return (
+        typeof node === 'object' &&
+        node !== null &&
+        'kind' in node &&
+        typeof (node as { kind: unknown }).kind === 'string'
+    );
+}
+
+function walkNormalizedTree(node: NormalizedNode, visitor: (n: NormalizedNode) => void): void {
+    visitor(node);
+    const children = node.children;
+    if (children) {
+        for (let i = 0; i < children.length; i++) {
+            walkNormalizedTree(children[i], visitor);
+        }
+    }
 }
 
 function findSourceFunction(
@@ -451,57 +482,80 @@ export class SimplifyAnalyzer implements Analyzer {
         const { node, sf, ctx, opts, issues } = params;
         const limit = opts.maxFunctionParameters ?? DEFAULT_MAX_FUNCTION_PARAMETERS;
         const nodeParams = node.parameters;
-        if (nodeParams.length <= limit) return;
+        const name = resolveFunctionDeclarationName(node);
+        const file = ctx.filePath.replace(/\\/g, '/');
 
         const startPos = sf.getLineAndCharacterOfPosition(node.getStart(sf));
         const endPos = sf.getLineAndCharacterOfPosition(node.getEnd());
         const startLine = startPos.line + 1;
         const startCol = startPos.character + 1;
 
-        const name = resolveFunctionDeclarationName(node);
-        const paramNames = nodeParams.map((p) => p.name.getText(sf));
-        const paramInfo = nodeParams.map((p) => ({
-            name: p.name.getText(sf),
-            type: p.type ? p.type.getText(sf) : undefined,
-        }));
+        if (nodeParams.length > limit) {
+            const paramNames = nodeParams.map((p) => p.name.getText(sf));
+            const paramInfo = nodeParams.map((p) => ({
+                name: p.name.getText(sf),
+                type: p.type ? p.type.getText(sf) : undefined,
+            }));
 
-        const template = generateParameterObjectSnippet(name, paramInfo);
-        const file = ctx.filePath.replace(/\\/g, '/');
+            const template = generateParameterObjectSnippet(name, paramInfo);
 
-        issues.push({
-            id: `simplify:${RULE_SIM_ARGS_001}:${file}:${startLine}`,
-            analyzer: ANALYZER_SIMPLIFY,
-            // rule: 'SIM-ARGS-001'
-            rule: RULE_SIM_ARGS_001,
-            severity: this.defaultSeverity,
-            message: `Function "${name}" has ${nodeParams.length} parameters (limit ${limit}). Introduce a parameter object.`,
-            location: {
-                file,
-                start: { line: startLine, column: startCol },
-                end: { line: endPos.line + 1, column: endPos.character + 1 },
-            },
-            detail: {
-                function: name,
-                parameters: paramNames,
-                parameterCount: nodeParams.length,
-                limit,
-            },
-            suggestion:
-                'Encapsulate parameter list into a single options/parameter object using introduce_parameter_object.',
-            actionable: buildSimplifyActionable({
-                action: ACTION_INTRODUCE_PARAM_OBJECT,
-                code: CODE_AR_SIM_006,
-                taxonomy: TAXONOMY_CTRL_FLOW,
-                targetScope: SCOPE_FUNCTION_LOCAL,
-                targetSymbol: name,
-                templateSnippet: template,
-                targetArguments: {
-                    functionName: name,
-                    parameterCount: nodeParams.length,
-                    parameters: paramNames,
+            issues.push({
+                id: `simplify:${RULE_SIM_ARGS_001}:${file}:${startLine}`,
+                analyzer: ANALYZER_SIMPLIFY,
+                // rule: 'SIM-ARGS-001'
+                rule: RULE_SIM_ARGS_001,
+                severity: this.defaultSeverity,
+                message: `Function "${name}" has ${nodeParams.length} parameters (limit ${limit}). Introduce a parameter object.`,
+                location: {
+                    file,
+                    start: { line: startLine, column: startCol },
+                    end: { line: endPos.line + 1, column: endPos.character + 1 },
                 },
-            }),
-        });
+                detail: {
+                    function: name,
+                    parameters: paramNames,
+                    parameterCount: nodeParams.length,
+                    limit,
+                },
+                suggestion:
+                    'Encapsulate parameter list into a single options/parameter object using introduce_parameter_object.',
+                actionable: buildSimplifyActionable({
+                    action: ACTION_INTRODUCE_PARAM_OBJECT,
+                    code: CODE_AR_SIM_006,
+                    taxonomy: TAXONOMY_CTRL_FLOW,
+                    targetScope: SCOPE_FUNCTION_LOCAL,
+                    targetSymbol: name,
+                    templateSnippet: template,
+                    targetArguments: {
+                        functionName: name,
+                        parameterCount: nodeParams.length,
+                        parameters: paramNames,
+                    },
+                }),
+            });
+        }
+
+        if (nodeParams.length === 0 && isSemanticHandlerOrSolver(name)) {
+            issues.push({
+                id: `simplify:${RULE_SIM_ARGS_002}:${file}:${startLine}`,
+                analyzer: ANALYZER_SIMPLIFY,
+                rule: RULE_SIM_ARGS_002,
+                severity: this.defaultSeverity,
+                message: `Specialized handler/solver "${name}" declared with 0 parameters. Expected event payload or context parameter.`,
+                location: {
+                    file,
+                    start: { line: startLine, column: startCol },
+                    end: { line: endPos.line + 1, column: endPos.character + 1 },
+                },
+                detail: {
+                    function: name,
+                    parameterCount: 0,
+                    expectedMinimum: 1,
+                },
+                suggestion:
+                    'Declare required event payload, context, or request parameters to fulfill the handler contract.',
+            });
+        }
     }
 
     private auditTypeScriptFunctions(
@@ -525,6 +579,59 @@ export class SimplifyAnalyzer implements Analyzer {
         walk(sf);
     }
 
+    private checkFunctionParameters(
+        node: NormalizedNode,
+        ctx: AnalyzerContext,
+        opts: SimplifyOptions,
+        name: string,
+    ): void {
+        const params = node.parameters;
+        if (!params) return;
+
+        const limit = opts.maxFunctionParameters ?? DEFAULT_MAX_FUNCTION_PARAMETERS;
+        const file = ctx.filePath.replace(/\\/g, '/');
+        const startLine = node.start?.line ?? 1;
+
+        // SIM-ARGS-001 for non-TS (TS handles this with type signatures in auditTypeScriptFunctions)
+        if (!this.getOrParseSourceFile(ctx) && params.length > limit) {
+            this.longFunctions.push({
+                id: `simplify:${RULE_SIM_ARGS_001}:${file}:${startLine}`,
+                analyzer: ANALYZER_SIMPLIFY,
+                rule: RULE_SIM_ARGS_001,
+                severity: this.defaultSeverity,
+                message: `Function "${name}" has ${params.length} parameters (limit ${limit}). Introduce a parameter object.`,
+                location: resolveNodeLocation(node, ctx.filePath),
+                detail: {
+                    function: name,
+                    parameters: params,
+                    parameterCount: params.length,
+                    limit,
+                },
+                suggestion:
+                    'Encapsulate parameter list into a single options/parameter object using introduce_parameter_object.',
+            });
+        }
+
+        // SIM-ARGS-002: Minimum parameter count on specialized handlers/solvers
+        if (params.length === 0 && isSemanticHandlerOrSolver(name)) {
+            this.longFunctions.push({
+                id: `simplify:${RULE_SIM_ARGS_002}:${file}:${startLine}`,
+                analyzer: ANALYZER_SIMPLIFY,
+                rule: RULE_SIM_ARGS_002,
+                severity: this.defaultSeverity,
+                message: `Specialized handler/solver "${name}" declared with 0 parameters. Expected event payload or context parameter.`,
+                location: resolveNodeLocation(node, ctx.filePath),
+                detail: {
+                    function: name,
+                    parameterCount: 0,
+                    expectedMinimum: 1,
+                },
+                suggestion:
+                    'Declare required event payload, context, or request parameters to fulfill the handler contract.',
+            });
+        }
+    }
+
     visit(
         node: NormalizedNode,
         ctx: AnalyzerContext,
@@ -537,6 +644,7 @@ export class SimplifyAnalyzer implements Analyzer {
         const name = this.resolveNameFor(node, className, binding);
         this.checkFunctionLength(node, ctx, opts, name);
         this.checkGuardClauseNesting(node, ctx, opts, name);
+        this.checkFunctionParameters(node, ctx, opts, name);
     }
 
     private dispatchSourceAudits(
@@ -579,6 +687,11 @@ export class SimplifyAnalyzer implements Analyzer {
     analyze(sf: unknown, ctx: AnalyzerContext): Issue[] {
         const issues = this.scanContent(ctx);
         const opts = (ctx.options || {}) as SimplifyOptions;
+        if (isNormalizedNode(sf)) {
+            walkNormalizedTree(sf, (node) => this.visit(node, ctx));
+            issues.push(...this.longFunctions);
+            this.longFunctions = [];
+        }
         const isTsSource =
             typeof sf === 'object' &&
             sf !== null &&

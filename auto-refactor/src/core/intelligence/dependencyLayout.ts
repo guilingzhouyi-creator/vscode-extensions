@@ -22,6 +22,16 @@ import * as path from 'path';
 import type { Issue, SemanticEvidenceStep, SemanticReviewDetail } from '../types';
 import type { ImportCategory, ImportStatementInfo } from './dependencyLayoutHelpers';
 import {
+    auditFileLayoutOrder,
+    auditImportHorizon,
+    createDetail,
+    pushLayoutIssue,
+    CATEGORY_PRIORITY,
+    findAncestorPackageManifest,
+    readJsonSafely,
+    extractLicenseFromManifest,
+} from './dependencyLayoutHelpers';
+import {
     checkKnownPackageVulnerability,
     parsePackageSpecifier,
 } from './dependency-vulnerabilities';
@@ -65,7 +75,6 @@ const PRIORITY_THIRD_PARTY = 2;
 const PRIORITY_INTERNAL_SHARED = 3;
 const PRIORITY_LOCAL = 4;
 
-const MAX_ANCESTOR_SEARCH_DEPTH = 3;
 const CONFIDENCE_DEFAULT = 0.95;
 const CONFIDENCE_HIGH = 1.0;
 const CONFIDENCE_RELAXED = 0.9;
@@ -73,13 +82,6 @@ const CONFIDENCE_RELAXED = 0.9;
 const LOW_LEVEL_FILE_RE = /(?:^|[/\\])(?:shared|utils|common)(?:[/\\]|$|\.)/i;
 const HIGH_LEVEL_IMPORT_RE = /\/(?:domain|app|application)\//i;
 const EXTERNAL_URL_RE = /^(?:https?|wss?):\/\//;
-
-const CATEGORY_PRIORITY: Record<ImportCategory, number> = Object.freeze({
-    [CATEGORY_STDLIB]: PRIORITY_STDLIB,
-    [CATEGORY_THIRD_PARTY]: PRIORITY_THIRD_PARTY,
-    [CATEGORY_INTERNAL_SHARED]: PRIORITY_INTERNAL_SHARED,
-    [CATEGORY_LOCAL]: PRIORITY_LOCAL,
-});
 
 /** Descriptor of an external URL or resource reference. */
 export interface ExternalResourceRef {
@@ -106,72 +108,7 @@ export interface DependencyLayoutOptions {
     rootDir?: string;
     manifestDependencies?: Set<string>;
     manifestInventory?: ProjectManifestInventory;
-}
-
-interface DetailParams {
-    language: string;
-    module: string;
-    symbol: string;
-    currentBehavior: string;
-    evidence: SemanticEvidenceStep[];
-    triggerCondition: string;
-    risk: string;
-    suggestedFix: string;
-    verificationMethod: string;
-    file: string;
-    canAutofix?: boolean;
-}
-
-function createDetail(params: DetailParams): SemanticReviewDetail {
-    return {
-        language: params.language,
-        module: params.module,
-        symbol: params.symbol,
-        codeDomain: DOMAIN_ID,
-        currentBehavior: params.currentBehavior,
-        semanticEvidenceChain: params.evidence,
-        triggerCondition: params.triggerCondition,
-        risk: params.risk,
-        blastRadius: [params.file],
-        isDeterministic: true,
-        requiresManualConfirm: false,
-        suggestedFix: params.suggestedFix,
-        impactedCallers: [],
-        impactedTests: [],
-        verificationMethod: params.verificationMethod,
-        ruleVersion: RULE_VERSION,
-        configVersion: CONFIG_VERSION,
-        canAutofix: params.canAutofix ?? false,
-    };
-}
-
-interface LayoutIssuePayload {
-    rule: string;
-    severity: 'info' | 'warning' | 'error';
-    loc: { file: string; line: number };
-    message: string;
-    suggestion: string;
-    detail: SemanticReviewDetail;
-    confidence?: number;
-}
-
-function pushLayoutIssue(issues: Issue[], payload: LayoutIssuePayload): void {
-    const confidence = payload.confidence ?? CONFIDENCE_DEFAULT;
-    issues.push({
-        id: `${ANALYZER_ID}:${payload.rule}:${payload.loc.file}:${payload.loc.line}`,
-        analyzer: ANALYZER_ID,
-        rule: payload.rule,
-        severity: payload.severity,
-        message: payload.message,
-        location: {
-            file: payload.loc.file,
-            start: { line: payload.loc.line, column: 1 },
-            end: { line: payload.loc.line, column: END_COLUMN },
-        },
-        detail: payload.detail,
-        suggestion: payload.suggestion,
-        evidence: { confidence, requiresRuntime: false },
-    });
+    firstDeclarationLine?: number;
 }
 
 interface SingleImportIssueConfig {
@@ -427,51 +364,6 @@ function auditInvertedDependencies(
     }
 }
 
-function auditFileLayoutOrder(
-    imports: ImportStatementInfo[],
-    language: string,
-    issues: Issue[],
-): void {
-    if (imports.length <= 1) return;
-    const topLevel = imports.filter((imp) => !imp.isInsideFunction);
-    for (let i = 0; i < topLevel.length - 1; i++) {
-        const currentImport = topLevel[i];
-        const nextImport = topLevel[i + 1];
-        if (CATEGORY_PRIORITY[currentImport.category] <= CATEGORY_PRIORITY[nextImport.category])
-            continue;
-        const detail = createDetail({
-            language,
-            module: MODULE_LAYOUT,
-            symbol: nextImport.moduleSpecifier,
-            currentBehavior: `Import ordering inversion: '${currentImport.category}' placed before '${nextImport.category}'.`,
-            evidence: [
-                {
-                    kind: KIND_CONDITION,
-                    description: `'${currentImport.moduleSpecifier}' (${currentImport.category}) precedes '${nextImport.moduleSpecifier}' (${nextImport.category})`,
-                    file: currentImport.file,
-                    line: nextImport.line,
-                },
-            ],
-            triggerCondition: 'Import group order does not follow canonical sequence',
-            risk: 'Violates repository layout conventions.',
-            suggestedFix: 'Reorder imports: standard library first, third-party, then local.',
-            verificationMethod: 'Verify import groups follow canonical ordering.',
-            file: currentImport.file,
-            canAutofix: true,
-        });
-        pushLayoutIssue(issues, {
-            rule: 'DEP-ORD-001',
-            severity: SEVERITY_INFO,
-            loc: nextImport,
-            message: `Import layout order violation: '${nextImport.moduleSpecifier}' should precede '${currentImport.category}'.`,
-            suggestion: 'Sort import groups into Stdlib -> ThirdParty -> InternalShared -> Local.',
-            detail,
-            confidence: CONFIDENCE_RELAXED,
-        });
-        break;
-    }
-}
-
 function auditExternalResources(
     resources: ExternalResourceRef[],
     language: string,
@@ -515,44 +407,6 @@ const PKG_KEY_TO_VERSION_MAP = new Map<string, string | null>();
 
 /** Known host-provided or ambient modules exempt from phantom dependency flags */
 const KNOWN_AMBIENT_MODULES: ReadonlySet<string> = new Set(['vscode', 'electron']);
-
-function readJsonSafely(filePath: string): any | null {
-    if (!fs.existsSync(filePath)) {
-        return null;
-    }
-    try {
-        return JSON.parse(fs.readFileSync(filePath, 'utf8'));
-    } catch {
-        return null;
-    }
-}
-
-function findAncestorPackageManifest(rootDir: string, packageName: string): any | null {
-    let currentDir = rootDir;
-    for (let i = 0; i < MAX_ANCESTOR_SEARCH_DEPTH; i++) {
-        const manifest = readJsonSafely(
-            path.join(currentDir, 'node_modules', packageName, 'package.json'),
-        );
-        if (manifest) {
-            return manifest;
-        }
-        const parent = path.dirname(currentDir);
-        if (parent === currentDir) {
-            break;
-        }
-        currentDir = parent;
-    }
-    return null;
-}
-
-function extractLicenseFromManifest(manifest: any): string | null {
-    if (!manifest) return null;
-    if (typeof manifest.license === 'string') return manifest.license;
-    if (typeof manifest.license?.type === 'string') return manifest.license.type;
-    if (Array.isArray(manifest.licenses) && manifest.licenses[0]?.type)
-        return manifest.licenses[0].type;
-    return null;
-}
 
 /**
  * Resolves license metadata for an external package across ancestor node_modules directories.
@@ -964,6 +818,7 @@ function auditSyntaxLayoutPasses(ctx: SyntaxLayoutContext, issues: Issue[]): voi
     auditInvertedDependencies(ctx.imports, isLowLevel, ctx.language, issues);
     if (ctx.options.enforceFileLayout ?? true) {
         auditFileLayoutOrder(ctx.imports, ctx.language, issues);
+        auditImportHorizon(ctx.imports, ctx.options.firstDeclarationLine, ctx.language, issues);
     }
     if (ctx.options.flagUnmanagedResources ?? true) {
         auditExternalResources(ctx.resources, ctx.language, issues);

@@ -52,6 +52,14 @@ const TS_IMPORT_RE =
     /^\s*(?:import\s+(?:type\s+)?(?:[\s\S]*?from\s+)?|const\s+.*=\s*require\()['"]([^'"]+)['"]/;
 const TS_WILDCARD_RE = /\b(?:import\s+\*\s+as|import\s+\*)/;
 
+function isPolyglotImportLine(trimmed: string, language: string): boolean {
+    if (language === 'python') return PY_IMPORT_RE.test(trimmed);
+    if (language === 'rust') return RUST_USE_RE.test(trimmed);
+    if (language === 'gdscript') return GDSCRIPT_IMPORT_RE.test(trimmed);
+    if (language === 'go') return /^package\s+|^import\b/.test(trimmed);
+    return TS_IMPORT_RE.test(trimmed);
+}
+
 function buildEnrichedOptions(
     normPath: string,
     filePath: string,
@@ -87,6 +95,38 @@ function buildEnrichedOptions(
     };
 }
 
+function findFirstTsDeclarationLine(sf: ts.SourceFile): number | undefined {
+    for (const stmt of sf.statements) {
+        if (
+            !ts.isImportDeclaration(stmt) &&
+            !ts.isImportEqualsDeclaration(stmt) &&
+            !ts.isEmptyStatement(stmt)
+        ) {
+            return sf.getLineAndCharacterOfPosition(stmt.getStart(sf)).line + 1;
+        }
+    }
+    return undefined;
+}
+
+function findFirstPolyglotDeclarationLine(lines: string[], language: string): number | undefined {
+    for (let i = 0; i < lines.length; i++) {
+        const trimmed = lines[i].trim();
+        if (
+            !trimmed ||
+            trimmed.startsWith('#') ||
+            trimmed.startsWith('//') ||
+            trimmed.startsWith('/*') ||
+            trimmed.startsWith('*')
+        ) {
+            continue;
+        }
+        if (!isPolyglotImportLine(trimmed, language)) {
+            return i + 1;
+        }
+    }
+    return undefined;
+}
+
 /**
  * Analyzer enforcing file layout, import discipline, and external resource management.
  */
@@ -107,6 +147,7 @@ export class DependencyLayoutAnalyzer implements Analyzer {
         const imports: ImportStatementInfo[] = [];
         const resources: ExternalResourceRef[] = [];
 
+        const firstDeclarationLine = this.resolveFirstDeclarationLine(language, sf, this.fileLines);
         if (language === 'typescript' && sf && typeof sf.forEachChild === 'function') {
             this.analyzeTsWithAst(sf, ctx, imports, options);
         } else {
@@ -120,11 +161,22 @@ export class DependencyLayoutAnalyzer implements Analyzer {
         const enrichedOptions = buildEnrichedOptions(
             normPath,
             ctx.filePath,
-            options,
+            { ...options, firstDeclarationLine },
             ctx.config?.root,
         );
 
         return analyzeDependencyLayout(imports, resources, language, enrichedOptions);
+    }
+
+    private resolveFirstDeclarationLine(
+        language: string,
+        sf: ts.SourceFile | undefined,
+        lines: string[],
+    ): number | undefined {
+        if (language === 'typescript' && sf && typeof sf.forEachChild === 'function') {
+            return findFirstTsDeclarationLine(sf);
+        }
+        return findFirstPolyglotDeclarationLine(lines, language);
     }
 
     private handleCallImport(

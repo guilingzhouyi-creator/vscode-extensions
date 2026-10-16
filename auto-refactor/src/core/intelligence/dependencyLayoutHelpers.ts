@@ -9,6 +9,10 @@
  *   option defaults, and severity policy.
  */
 
+import * as fs from 'fs';
+import * as path from 'path';
+import type { Issue, SemanticEvidenceStep, SemanticReviewDetail } from '../types';
+
 /** Import category id for a language standard-library module. */
 const CATEGORY_STDLIB = 'stdlib';
 /** Import category id for a third-party package. */
@@ -17,6 +21,31 @@ const CATEGORY_THIRD_PARTY = 'third-party';
 const CATEGORY_INTERNAL_SHARED = 'internal-shared';
 /** Import category id for a relative in-tree module. */
 const CATEGORY_LOCAL = 'local';
+
+export const PRIORITY_STDLIB = 1;
+export const PRIORITY_THIRD_PARTY = 2;
+export const PRIORITY_INTERNAL_SHARED = 3;
+export const PRIORITY_LOCAL = 4;
+
+export const CATEGORY_PRIORITY: Record<ImportCategory, number> = Object.freeze({
+    [CATEGORY_STDLIB]: PRIORITY_STDLIB,
+    [CATEGORY_THIRD_PARTY]: PRIORITY_THIRD_PARTY,
+    [CATEGORY_INTERNAL_SHARED]: PRIORITY_INTERNAL_SHARED,
+    [CATEGORY_LOCAL]: PRIORITY_LOCAL,
+});
+
+const RULE_VERSION = '1.0.0';
+const CONFIG_VERSION = '0.3.0';
+const ANALYZER_ID = 'dependency-layout';
+const DOMAIN_ID = 'dependency-layout';
+const END_COLUMN = 80;
+const CONFIDENCE_DEFAULT = 0.95;
+const CONFIDENCE_HIGH = 1.0;
+const CONFIDENCE_RELAXED = 0.9;
+const SEVERITY_INFO = 'info';
+const SEVERITY_WARNING = 'warning';
+const KIND_CONDITION = 'condition';
+const MODULE_LAYOUT = 'layout';
 
 /**
  * Category an import specifier falls into for the dependency-layout report.
@@ -218,4 +247,210 @@ export function extractExemptionReason(
         return EXEMPTION_LOOKUP[match[0].toLowerCase()];
     }
     return undefined;
+}
+
+export interface DetailParams {
+    language: string;
+    module: string;
+    symbol: string;
+    currentBehavior: string;
+    evidence: SemanticEvidenceStep[];
+    triggerCondition: string;
+    risk: string;
+    suggestedFix: string;
+    verificationMethod: string;
+    file: string;
+    canAutofix?: boolean;
+}
+
+export function createDetail(params: DetailParams): SemanticReviewDetail {
+    return {
+        language: params.language,
+        module: params.module,
+        symbol: params.symbol,
+        codeDomain: DOMAIN_ID,
+        currentBehavior: params.currentBehavior,
+        semanticEvidenceChain: params.evidence,
+        triggerCondition: params.triggerCondition,
+        risk: params.risk,
+        blastRadius: [params.file],
+        isDeterministic: true,
+        requiresManualConfirm: false,
+        suggestedFix: params.suggestedFix,
+        impactedCallers: [],
+        impactedTests: [],
+        verificationMethod: params.verificationMethod,
+        ruleVersion: RULE_VERSION,
+        configVersion: CONFIG_VERSION,
+        canAutofix: params.canAutofix ?? false,
+    };
+}
+
+export interface LayoutIssuePayload {
+    rule: string;
+    severity: 'info' | 'warning' | 'error';
+    loc: { file: string; line: number };
+    message: string;
+    suggestion: string;
+    detail: SemanticReviewDetail;
+    confidence?: number;
+}
+
+export function pushLayoutIssue(issues: Issue[], payload: LayoutIssuePayload): void {
+    const confidence = payload.confidence ?? CONFIDENCE_DEFAULT;
+    issues.push({
+        id: `${ANALYZER_ID}:${payload.rule}:${payload.loc.file}:${payload.loc.line}`,
+        analyzer: ANALYZER_ID,
+        rule: payload.rule,
+        severity: payload.severity,
+        message: payload.message,
+        location: {
+            file: payload.loc.file,
+            start: { line: payload.loc.line, column: 1 },
+            end: { line: payload.loc.line, column: END_COLUMN },
+        },
+        detail: payload.detail,
+        suggestion: payload.suggestion,
+        evidence: { confidence, requiresRuntime: false },
+    });
+}
+
+export function auditFileLayoutOrder(
+    imports: ImportStatementInfo[],
+    language: string,
+    issues: Issue[],
+): void {
+    if (imports.length <= 1) return;
+    const topLevel = imports.filter((imp) => !imp.isInsideFunction);
+    for (let i = 0; i < topLevel.length - 1; i++) {
+        const currentImport = topLevel[i];
+        const nextImport = topLevel[i + 1];
+        if (CATEGORY_PRIORITY[currentImport.category] <= CATEGORY_PRIORITY[nextImport.category])
+            continue;
+        const detail = createDetail({
+            language,
+            module: MODULE_LAYOUT,
+            symbol: nextImport.moduleSpecifier,
+            currentBehavior: `Import ordering inversion: '${currentImport.category}' placed before '${nextImport.category}'.`,
+            evidence: [
+                {
+                    kind: KIND_CONDITION,
+                    description: `'${currentImport.moduleSpecifier}' (${currentImport.category}) precedes '${nextImport.moduleSpecifier}' (${nextImport.category})`,
+                    file: currentImport.file,
+                    line: nextImport.line,
+                },
+            ],
+            triggerCondition: 'Import group order does not follow canonical sequence',
+            risk: 'Violates repository layout conventions.',
+            suggestedFix: 'Reorder imports: standard library first, third-party, then local.',
+            verificationMethod: 'Verify import groups follow canonical ordering.',
+            file: currentImport.file,
+            canAutofix: true,
+        });
+        pushLayoutIssue(issues, {
+            rule: 'DEP-ORD-001',
+            severity: SEVERITY_INFO,
+            loc: nextImport,
+            message: `Import layout order violation: '${nextImport.moduleSpecifier}' should precede '${currentImport.category}'.`,
+            suggestion: 'Sort import groups into Stdlib -> ThirdParty -> InternalShared -> Local.',
+            detail,
+            confidence: CONFIDENCE_RELAXED,
+        });
+        break;
+    }
+}
+
+export function auditImportHorizon(
+    imports: ImportStatementInfo[],
+    firstDeclarationLine: number | undefined,
+    language: string,
+    issues: Issue[],
+): void {
+    if (!firstDeclarationLine || firstDeclarationLine <= 0) return;
+    const topLevel = imports.filter((imp) => !imp.isInsideFunction);
+    for (let i = 0; i < topLevel.length; i++) {
+        const imp = topLevel[i];
+        if (imp.line > firstDeclarationLine) {
+            const detail = createDetail({
+                language,
+                module: MODULE_LAYOUT,
+                symbol: imp.moduleSpecifier,
+                currentBehavior: `Import statement declared after non-import declarations (line ${imp.line} > line ${firstDeclarationLine}).`,
+                evidence: [
+                    {
+                        kind: KIND_CONDITION,
+                        description: `Import '${imp.moduleSpecifier}' declared at line ${imp.line} breaches the import horizon (first declaration at line ${firstDeclarationLine})`,
+                        file: imp.file,
+                        line: imp.line,
+                    },
+                ],
+                triggerCondition: 'Import statement declared after non-import declarations',
+                risk: 'Violates top-down file layout and obscures module dependency horizons.',
+                suggestedFix: 'Hoist all import statements to the top import block before types, constants, and functions.',
+                verificationMethod: 'Verify import statements precede types, constants, and functions.',
+                file: imp.file,
+                canAutofix: true,
+            });
+            pushLayoutIssue(issues, {
+                rule: 'DEP-ORD-002',
+                severity: SEVERITY_WARNING,
+                loc: imp,
+                message: `Import statement horizon breach: '${imp.moduleSpecifier}' declared at line ${imp.line} after non-import declarations (first non-import statement at line ${firstDeclarationLine}).`,
+                suggestion:
+                    'Hoist all module-level import statements to the top import block before types, constants, and functions.',
+                detail,
+                confidence: CONFIDENCE_HIGH,
+            });
+        }
+    }
+}
+
+export const MAX_ANCESTOR_SEARCH_DEPTH = 3;
+
+/**
+ * Safely reads and parses a JSON file, returning null if unreadable or invalid.
+ */
+export function readJsonSafely(filePath: string): any | null {
+    if (!fs.existsSync(filePath)) {
+        return null;
+    }
+    try {
+        return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Traverses parent directories to locate package.json for an installed package.
+ */
+export function findAncestorPackageManifest(rootDir: string, packageName: string): any | null {
+    let currentDir = rootDir;
+    for (let i = 0; i < MAX_ANCESTOR_SEARCH_DEPTH; i++) {
+        const manifest = readJsonSafely(
+            path.join(currentDir, 'node_modules', packageName, 'package.json'),
+        );
+        if (manifest) {
+            return manifest;
+        }
+        const parent = path.dirname(currentDir);
+        if (parent === currentDir) {
+            break;
+        }
+        currentDir = parent;
+    }
+    return null;
+}
+
+/**
+ * Extracts normalized license identifier from a package.json manifest.
+ */
+export function extractLicenseFromManifest(manifest: any): string | null {
+    if (!manifest) return null;
+    if (typeof manifest.license === 'string') return manifest.license;
+    if (typeof manifest.license?.type === 'string') return manifest.license.type;
+    if (Array.isArray(manifest.licenses) && manifest.licenses[0]?.type) {
+        return manifest.licenses[0].type;
+    }
+    return null;
 }

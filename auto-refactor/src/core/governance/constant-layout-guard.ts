@@ -23,12 +23,16 @@ import { ConstantsMessages } from '../messages/constants';
 
 const ANALYZER_NAME = 'constants';
 const RULE_CONST_LAY_001 = 'CONST-LAY-001';
+const RULE_CONST_LAY_002 = 'CONST-LAY-002';
 const RULE_CONST_SCP_001 = 'CONST-SCP-001';
 const SEVERITY_WARNING = 'warning';
 const LOCAL_SCOPE_SPAN_THRESHOLD = 15;
 const LOCAL_USAGE_COUNT_MAX = 2;
 const DOMAIN_MODULE_CONSTANTS = 'module_constants';
 
+const TYPE_DECL_RE = /^(?:export\s+)?(?:interface|type)\s+([A-Za-z0-9_$]+)/;
+const FN_OR_CLASS_DECL_RE =
+    /^(?:export\s+)?(?:(?:async\s+)?function|class)\s+([A-Za-z0-9_$]+)/;
 const IMPORT_STATEMENT_RE = /^(?:import\s|import\{|require\(|export\s+(?:\*|\{)|from\s|use\s)/;
 const LOGIC_DECLARATION_RE =
     /^(?:(?:export\s+)?(?:function|class|interface|type)\b|describe\(|test\()/;
@@ -146,6 +150,94 @@ function checkScopeOverWidening(
     return null;
 }
 
+function isIgnoredLayoutLine(
+    rawLine: string,
+    trimmed: string,
+    commentState: { inBlock: boolean },
+): boolean {
+    if (commentState.inBlock) {
+        if (trimmed.includes('*/')) commentState.inBlock = false;
+        return true;
+    }
+    if (trimmed.startsWith('/*')) {
+        if (!trimmed.includes('*/')) commentState.inBlock = true;
+        return true;
+    }
+    if (!trimmed || trimmed.startsWith('//') || trimmed.startsWith('#')) {
+        return true;
+    }
+    return rawLine.startsWith(' ') || rawLine.startsWith('\t');
+}
+
+function createTypeOrderBreachIssue(
+    typeName: string,
+    lineNo: number,
+    rawLine: string,
+    norm: string,
+    firstFunctionOrClassLine: number,
+): Issue {
+    const desc = ConstantsMessages.TYPE_LAYOUT_ORDER_BREACH(typeName, firstFunctionOrClassLine);
+    const startCol = rawLine.indexOf(typeName) + 1;
+    return {
+        id: `${ANALYZER_NAME}:${RULE_CONST_LAY_002}:${norm}:${lineNo}`,
+        analyzer: ANALYZER_NAME,
+        rule: RULE_CONST_LAY_002,
+        severity: SEVERITY_WARNING,
+        message: desc.message,
+        location: {
+            file: norm,
+            start: { line: lineNo, column: startCol },
+            end: { line: lineNo, column: startCol + typeName.length },
+        },
+        detail: {
+            symbol: typeName,
+            declaredLine: lineNo,
+            firstFunctionOrClassLine,
+        },
+        suggestion: desc.suggestion,
+    };
+}
+
+function checkMisplacedTypeLayout(lines: string[], filePath: string): Issue[] {
+    const norm = filePath.replace(/\\/g, '/');
+    if (norm.includes('.test.') || norm.includes('.spec.') || norm.includes('/tests/')) {
+        return [];
+    }
+    const issues: Issue[] = [];
+    let firstFunctionOrClassLine = 0;
+    const commentState = { inBlock: false };
+
+    for (let i = 0; i < lines.length; i++) {
+        const rawLine = lines[i];
+        const trimmed = rawLine.trim();
+        const lineNo = i + 1;
+
+        if (isIgnoredLayoutLine(rawLine, trimmed, commentState)) {
+            continue;
+        }
+
+        if (firstFunctionOrClassLine === 0) {
+            const fnMatch = FN_OR_CLASS_DECL_RE.exec(trimmed);
+            if (fnMatch) firstFunctionOrClassLine = lineNo;
+            continue;
+        }
+
+        const typeMatch = TYPE_DECL_RE.exec(trimmed);
+        if (typeMatch) {
+            issues.push(
+                createTypeOrderBreachIssue(
+                    typeMatch[1],
+                    lineNo,
+                    rawLine,
+                    norm,
+                    firstFunctionOrClassLine,
+                ),
+            );
+        }
+    }
+    return issues;
+}
+
 /**
  * Validates intra-file constant layout and scope boundaries.
  *
@@ -175,6 +267,9 @@ export function checkConstantLayoutAndScope(content: string, filePath: string): 
         const scopeIssue = checkScopeOverWidening(entity, lines, filePath);
         if (scopeIssue) issues.push(scopeIssue);
     }
+
+    const typeIssues = checkMisplacedTypeLayout(lines, filePath);
+    issues.push(...typeIssues);
 
     return issues;
 }

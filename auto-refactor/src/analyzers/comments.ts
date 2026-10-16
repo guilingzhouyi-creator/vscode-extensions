@@ -577,7 +577,8 @@ export class CommentAnalyzer implements Analyzer {
     }
 
     private auditFileHeader(content: string, len: number, state: FileAuditState): void {
-        const { headerText, hasAnyHeaderComment } = this.extractHeaderText(content, len);
+        const { headerText, hasAnyHeaderComment, headerStartLine, firstCodeLine } =
+            this.extractHeaderText(content, len);
 
         if (!hasAnyHeaderComment) {
             const desc = CommentMessages.MISSING_FILE_HEADER(state.file);
@@ -593,6 +594,19 @@ export class CommentAnalyzer implements Analyzer {
             return;
         }
 
+        if (firstCodeLine > 0 && headerStartLine > firstCodeLine) {
+            const desc = CommentMessages.INVERTED_FILE_HEADER(firstCodeLine, headerStartLine);
+            state.issues.push(
+                this.createIssue(state.ctx, headerStartLine - 1, {
+                    rule: 'CMT-HDR-004',
+                    message: desc.message,
+                    severity: SEVERITY_WARNING,
+                    detail: { file: state.file, firstCodeLine, headerStartLine },
+                    suggestion: desc.suggestion,
+                }),
+            );
+        }
+
         if (state.level === AUDIT_LEVEL.STRICT || state.opts.strictSixFields) {
             this.auditSixFields(headerText, state);
             this.auditDeclaredPath(headerText, state);
@@ -602,17 +616,36 @@ export class CommentAnalyzer implements Analyzer {
     private extractHeaderText(
         content: string,
         len: number,
-    ): { headerText: string; hasAnyHeaderComment: boolean } {
+    ): {
+        headerText: string;
+        hasAnyHeaderComment: boolean;
+        headerStartLine: number;
+        firstCodeLine: number;
+    } {
         let headerLinesCount = 0;
         let lineStart = 0;
         let headerCursor = 0;
         let hasAnyHeaderComment = false;
+        let headerStartLine = 0;
+        let firstCodeLine = 0;
+
+        const inspectLine = (start: number, end: number, lineNo: number): void => {
+            const lineEnd = this.trimCarriageReturn(content, start, end);
+            const trimmed = content.slice(start, lineEnd).trim();
+            if (!trimmed || trimmed.startsWith('#!') || /^#\s*-\*-\s*coding/i.test(trimmed)) {
+                return;
+            }
+            if (this.isHeaderCommentLine(trimmed)) {
+                if (headerStartLine === 0) headerStartLine = lineNo;
+                hasAnyHeaderComment = true;
+            } else if (firstCodeLine === 0 && headerStartLine === 0) {
+                firstCodeLine = lineNo;
+            }
+        };
 
         for (let i = 0; i < len && headerLinesCount < HEADER_SCAN_LINES; i++) {
             if (content.charCodeAt(i) === CHAR_CODE_LF) {
-                if (this.checkHeaderSlice(content, lineStart, i)) {
-                    hasAnyHeaderComment = true;
-                }
+                inspectLine(lineStart, i, headerLinesCount + 1);
                 headerLinesCount++;
                 headerCursor = i + 1;
                 lineStart = i + 1;
@@ -620,13 +653,16 @@ export class CommentAnalyzer implements Analyzer {
         }
 
         if (headerLinesCount < HEADER_SCAN_LINES && lineStart < len) {
-            if (this.checkHeaderSlice(content, lineStart, len)) {
-                hasAnyHeaderComment = true;
-            }
+            inspectLine(lineStart, len, headerLinesCount + 1);
             headerCursor = len;
         }
 
-        return { headerText: content.slice(0, headerCursor), hasAnyHeaderComment };
+        return {
+            headerText: content.slice(0, headerCursor),
+            hasAnyHeaderComment,
+            headerStartLine,
+            firstCodeLine,
+        };
     }
 
     private trimCarriageReturn(content: string, start: number, end: number): number {
