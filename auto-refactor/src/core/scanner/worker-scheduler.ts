@@ -467,9 +467,19 @@ export function spawnWorkerPoolThreads(
 function terminateWorkerGroup(workers: Worker[]): void {
     for (const workerInstance of workers) {
         try {
-            workerInstance.terminate();
+            workerInstance.postMessage({ exit: true });
         } catch {
             /* ignore worker termination errors */
+        }
+        const timer = setTimeout(() => {
+            try {
+                workerInstance.terminate();
+            } catch {
+                /* ignore */
+            }
+        }, 500);
+        if (typeof timer.unref === 'function') {
+            timer.unref();
         }
     }
 }
@@ -814,7 +824,7 @@ export async function dispatchBatches(
             if (nextIdx >= files.length) {
                 if (!timingTelemetry && !keepAlive) {
                     try {
-                        targetWorker.terminate();
+                        targetWorker.postMessage({ exit: true });
                     } catch {
                         /* ignore */
                     }

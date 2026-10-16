@@ -27,20 +27,9 @@ import * as path from 'path';
 import type { ScanConfig } from '../core/types';
 import { Logger } from '../core/logger';
 import type { DaemonMessage, HelloAckMessage, HelloMessage } from './protocol';
-import {
-    PROTOCOL_VERSION,
-    PROTOCOL_SOFTWARE_VERSION,
-    encodeMessage,
-    decodeLine,
-} from './protocol';
+import { PROTOCOL_VERSION, PROTOCOL_SOFTWARE_VERSION, encodeMessage, decodeLine } from './protocol';
 import type { RegistryInfo } from './registry';
-import {
-    projectHashFor,
-    pipeNameFor,
-    writeRegistry,
-    clearRegistry,
-    logFilePath,
-} from './registry';
+import { projectHashFor, pipeNameFor, writeRegistry, clearRegistry, logFilePath } from './registry';
 import type { DaemonScanContext } from './scanHandler';
 import { createDaemonContext, handleScan, handleScanDiff } from './scanHandler';
 
@@ -300,7 +289,9 @@ export class DaemonServer {
             close: () => socket.destroy(),
             id: () => this.nextId++,
         };
-        socket.on(EVENT_DATA, (chunk: string) => this.processIncomingChunk(chunk, bufferState, io, socket));
+        socket.on(EVENT_DATA, (chunk: string) =>
+            this.processIncomingChunk(chunk, bufferState, io, socket),
+        );
         socket.on(EVENT_CLOSE, () => {
             this.abortSocketPending(socket);
             this.scheduleIdle();
@@ -384,7 +375,9 @@ export class DaemonServer {
                 });
                 break;
             case MSG_TYPE_SHUTDOWN:
-                this.logger.info(`shutdown requested (${msg.reason || REASON_CLIENT_DEFAULT}); exiting`);
+                this.logger.info(
+                    `shutdown requested (${msg.reason || REASON_CLIENT_DEFAULT}); exiting`,
+                );
                 this.shutdown(msg.reason || REASON_CLIENT_REQUEST);
                 break;
             default:
@@ -399,7 +392,7 @@ export class DaemonServer {
     }
 
     private async runScan(task: ScanTask): Promise<void> {
-        const { id, requestId, configJson, options, io, socket } = task;
+        const { id, requestId, configJson, options, socket } = task;
         const config = configJson as unknown as ScanConfig;
         const abortController = new AbortController();
         this.pending.set(requestId, {
@@ -422,7 +415,7 @@ export class DaemonServer {
     }
 
     private async runScanDiff(task: ScanDiffTask): Promise<void> {
-        const { id, requestId, configJson, diffs, options, io, socket } = task;
+        const { id, requestId, configJson, diffs, options, socket } = task;
         const config = configJson as unknown as ScanConfig;
         const abortController = new AbortController();
         this.pending.set(requestId, {
@@ -460,10 +453,7 @@ export class DaemonServer {
         this.scheduleIdle();
     }
 
-    private handleScanError(
-        task: ScanTask | ScanDiffTask,
-        err: unknown,
-    ): void {
+    private handleScanError(task: ScanTask | ScanDiffTask, err: unknown): void {
         const message = err instanceof Error ? err.message : String(err);
         task.io.write({
             v: 1,

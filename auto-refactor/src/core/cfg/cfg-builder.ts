@@ -12,7 +12,7 @@
  */
 
 import { BasicBlock } from './basic-block';
-import type { CfgEdge, CfgStatement, CfgStatementKind } from './types';
+import type { BasicBlockKind, CfgEdge, CfgStatement, CfgStatementKind } from './types';
 
 /** Regular expression identifying variable declarations and assignments. */
 const VAR_DEF_RE = /\b(?:const|let|var)\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=/;
@@ -20,6 +20,36 @@ const VAR_DEF_RE = /\b(?:const|let|var)\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=/;
 const REASSIGN_RE = /^\s*([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=(?!=)/;
 /** Regular expression extracting variable identifiers from an expression. */
 const IDENT_EXTRACT_RE = /\b[a-zA-Z_$][a-zA-Z0-9_$]*\b/g;
+
+/** Statement kind and keyword constants. */
+const RETURN_KEYWORD = 'return';
+const THROW_KEYWORD = 'throw';
+const BREAK_KEYWORD = 'break';
+const CONTINUE_KEYWORD = 'continue';
+const ASSIGNMENT_KIND: CfgStatementKind = 'assignment';
+const CONDITION_KIND: CfgStatementKind = 'condition';
+const EXPRESSION_KIND: CfgStatementKind = 'expression';
+
+/** Block classification constants. */
+const NORMAL_BLOCK_KIND: BasicBlockKind = 'normal';
+const ENTRY_BLOCK_KIND: BasicBlockKind = 'entry';
+const EXIT_BLOCK_KIND: BasicBlockKind = 'exit';
+const CONDITION_BLOCK_KIND: BasicBlockKind = 'condition';
+
+/** Edge classification constants. */
+const UNCONDITIONAL_EDGE = 'unconditional';
+const TRUE_BRANCH_EDGE = 'true-branch';
+const FALSE_BRANCH_EDGE = 'false-branch';
+
+/** Fast regex matchers for statement classification and prefixes. */
+const RETURN_MATCH_RE = /^return(?:\s|;|$)/;
+const THROW_MATCH_RE = /^throw\s/;
+const BREAK_MATCH_RE = /^break(?:;|$)/;
+const CONTINUE_MATCH_RE = /^continue(?:;|$)/;
+const IF_MATCH_RE = /^if(?:\s|\()/;
+const SAFE_AWAIT_PREFIX_RE = /^(?:await\s|return\s|void\s)/;
+const TERMINATOR_BODY_RE = /^(?:return|throw|break|continue)\b/;
+
 /** Set of language keywords to exclude from identifier extraction. */
 const KEYWORDS = new Set([
     'const',
@@ -90,7 +120,7 @@ export class ControlFlowGraph {
     /** Dedicated single exit sink basic block for the graph. */
     readonly exit: BasicBlock;
     /** All basic blocks contained in this control flow graph. */
-    readonly blocks: readonly BasicBlock[];
+    readonly blocks: ReadonlyArray<BasicBlock>;
 
     /**
      * Constructs a completed control flow graph.
@@ -99,7 +129,7 @@ export class ControlFlowGraph {
      * @param exit - Exit sink node.
      * @param blocks - All allocated basic blocks.
      */
-    constructor(entry: BasicBlock, exit: BasicBlock, blocks: readonly BasicBlock[]) {
+    constructor(entry: BasicBlock, exit: BasicBlock, blocks: ReadonlyArray<BasicBlock>) {
         this.entry = entry;
         this.exit = exit;
         this.blocks = blocks;
@@ -123,17 +153,17 @@ export class ControlFlowGraph {
      *
      * @returns List of reachable basic blocks.
      */
-    getReachableBlocks(): BasicBlock[] {
+    getReachableBlocks(): Array<BasicBlock> {
         const visited = new Set<number>();
-        const queue: BasicBlock[] = [this.entry];
-        const result: BasicBlock[] = [];
+        const queue: Array<BasicBlock> = [this.entry];
+        const reachableBlocks: Array<BasicBlock> = [];
         let head = 0;
 
         while (head < queue.length) {
             const current = queue[head++];
             if (visited.has(current.id)) continue;
             visited.add(current.id);
-            result.push(current);
+            reachableBlocks.push(current);
 
             for (const succ of current.successors) {
                 if (!visited.has(succ.id)) {
@@ -141,7 +171,7 @@ export class ControlFlowGraph {
                 }
             }
         }
-        return result;
+        return reachableBlocks;
     }
 }
 
@@ -152,15 +182,13 @@ export class ControlFlowGraph {
  * @returns Detected statement kind.
  */
 function classifyStatementKind(trimmed: string): CfgStatementKind {
-    if (trimmed.startsWith('return ') || trimmed === 'return' || trimmed.startsWith('return;')) {
-        return 'return';
-    }
-    if (trimmed.startsWith('throw ')) return 'throw';
-    if (trimmed.startsWith('break;') || trimmed === 'break') return 'break';
-    if (trimmed.startsWith('continue;') || trimmed === 'continue') return 'continue';
-    if (VAR_DEF_RE.test(trimmed) || REASSIGN_RE.test(trimmed)) return 'assignment';
-    if (trimmed.startsWith('if ') || trimmed.startsWith('if(')) return 'condition';
-    return 'expression';
+    if (RETURN_MATCH_RE.test(trimmed)) return RETURN_KEYWORD;
+    if (THROW_MATCH_RE.test(trimmed)) return THROW_KEYWORD;
+    if (BREAK_MATCH_RE.test(trimmed)) return BREAK_KEYWORD;
+    if (CONTINUE_MATCH_RE.test(trimmed)) return CONTINUE_KEYWORD;
+    if (VAR_DEF_RE.test(trimmed) || REASSIGN_RE.test(trimmed)) return ASSIGNMENT_KIND;
+    if (IF_MATCH_RE.test(trimmed)) return CONDITION_KIND;
+    return EXPRESSION_KIND;
 }
 
 /**
@@ -173,8 +201,7 @@ function extractDefinedVariableNames(trimmed: string): string[] {
     const varMatch = VAR_DEF_RE.exec(trimmed);
     if (varMatch) return [varMatch[1]];
     const reassignMatch = REASSIGN_RE.exec(trimmed);
-    if (reassignMatch) return [reassignMatch[1]];
-    return [];
+    return reassignMatch ? [reassignMatch[1]] : [];
 }
 
 /**
@@ -220,15 +247,10 @@ function extractFunctionCalls(trimmed: string): string[] {
  * @returns True if the call is an unawaited floating promise.
  */
 function checkFloatingPromiseCall(trimmed: string): boolean {
-    if (
-        trimmed.startsWith('await ') ||
-        trimmed.startsWith('return ') ||
-        trimmed.startsWith('void ')
-    ) {
+    if (SAFE_AWAIT_PREFIX_RE.test(trimmed)) {
         return false;
     }
-    if (VAR_DEF_RE.test(trimmed)) return false;
-    return ASYNC_CALL_PATTERN.test(trimmed);
+    return VAR_DEF_RE.test(trimmed) ? false : ASYNC_CALL_PATTERN.test(trimmed);
 }
 
 /**
@@ -255,12 +277,7 @@ function findMatchingParen(text: string, openIndex: number): number {
 }
 
 function isTerminatorStatement(body: string): boolean {
-    return (
-        body.startsWith('return') ||
-        body.startsWith('throw') ||
-        body.startsWith('break') ||
-        body.startsWith('continue')
-    );
+    return TERMINATOR_BODY_RE.test(body);
 }
 
 /**
@@ -268,7 +285,7 @@ function isTerminatorStatement(body: string): boolean {
  */
 export class CfgBuilder {
     private nextBlockId = 0;
-    private readonly blocks: BasicBlock[] = [];
+    private readonly blocks: Array<BasicBlock> = [];
 
     /**
      * Allocates a new basic block with a unique identifier.
@@ -276,7 +293,7 @@ export class CfgBuilder {
      * @param kind - Classification of the block.
      * @returns Newly allocated basic block.
      */
-    private createBlock(kind: BasicBlock['kind'] = 'normal'): BasicBlock {
+    private createBlock(kind: BasicBlock['kind'] = NORMAL_BLOCK_KIND): BasicBlock {
         const block = new BasicBlock(this.nextBlockId++, kind);
         this.blocks.push(block);
         return block;
@@ -286,16 +303,11 @@ export class CfgBuilder {
      * Whether a condition line carries a terminator in its body, such as
      * `if (!user) return;` or `if (!conn) throw new Error();`.
      *
-     * The closing paren of the condition is located first so a `return` appearing inside the
-     * condition itself (`if (list.includes(x)) return;`) is not mistaken for a terminator.
-     * A trailing brace means the body opens a block, which this line-oriented builder does not
-     * follow, so those forms are left to the normal two-branch handling.
-     *
      * @param trimmed - Trimmed source line.
      * @returns True when the guarded branch leaves the function on this line.
      */
-    static inlineTerminator(trimmed: string): boolean {
-        if (!trimmed.startsWith('if ') && !trimmed.startsWith('if(')) {
+    static hasInlineTerminator(trimmed: string): boolean {
+        if (!IF_MATCH_RE.test(trimmed)) {
             return false;
         }
         const open = trimmed.indexOf('(');
@@ -312,6 +324,13 @@ export class CfgBuilder {
         }
         return isTerminatorStatement(body);
     }
+
+    /**
+     * Backward-compatible facade preserving static accessor signature.
+     */
+    static inlineTerminator = (trimmed: string): boolean => {
+        return CfgBuilder.hasInlineTerminator(trimmed);
+    };
 
     /**
      * Parses a single statement line into a structured CfgStatement.
@@ -355,8 +374,8 @@ export class CfgBuilder {
         this.nextBlockId = 0;
         this.blocks.length = 0;
 
-        const entry = this.createBlock('entry');
-        const exit = this.createBlock('exit');
+        const entry = this.createBlock(ENTRY_BLOCK_KIND);
+        const exit = this.createBlock(EXIT_BLOCK_KIND);
 
         let currentBlock = entry;
         let stmtCounter = 0;
@@ -372,33 +391,28 @@ export class CfgBuilder {
             const stmtId = `s_${stmtCounter++}`;
             const stmt = CfgBuilder.parseStatement(trimmed, lineNum, stmtId);
 
-            if (stmt.kind === 'condition') {
-                const condBlock = this.createBlock('condition');
+            if (stmt.kind === CONDITION_KIND) {
+                const condBlock = this.createBlock(CONDITION_BLOCK_KIND);
                 condBlock.addStatement(stmt);
-                currentBlock.addSuccessor(condBlock, 'unconditional');
+                currentBlock.addSuccessor(condBlock, UNCONDITIONAL_EDGE);
 
-                // An inline terminator (`if (!x) return;`) makes the guarded branch leave
-                // the function instead of falling through. Without this the whole line was
-                // classified as a condition, the trailing `return` was dropped, and the
-                // fall-through block looked like a non-terminating guard, so every later
-                // `x.field` read was reported as an unguarded dereference.
-                if (CfgBuilder.inlineTerminator(trimmed)) {
-                    condBlock.addSuccessor(exit, 'true-branch');
-                    const fallthroughBlock = this.createBlock('normal');
-                    condBlock.addSuccessor(fallthroughBlock, 'false-branch');
+                if (CfgBuilder.hasInlineTerminator(trimmed)) {
+                    condBlock.addSuccessor(exit, TRUE_BRANCH_EDGE);
+                    const fallthroughBlock = this.createBlock(NORMAL_BLOCK_KIND);
+                    condBlock.addSuccessor(fallthroughBlock, FALSE_BRANCH_EDGE);
                     currentBlock = fallthroughBlock;
                 } else {
-                    const thenBlock = this.createBlock('normal');
-                    const elseBlock = this.createBlock('normal');
-                    condBlock.addSuccessor(thenBlock, 'true-branch');
-                    condBlock.addSuccessor(elseBlock, 'false-branch');
+                    const thenBlock = this.createBlock(NORMAL_BLOCK_KIND);
+                    const elseBlock = this.createBlock(NORMAL_BLOCK_KIND);
+                    condBlock.addSuccessor(thenBlock, TRUE_BRANCH_EDGE);
+                    condBlock.addSuccessor(elseBlock, FALSE_BRANCH_EDGE);
 
                     currentBlock = thenBlock;
                 }
-            } else if (stmt.kind === 'return' || stmt.kind === 'throw') {
+            } else if (stmt.kind === RETURN_KEYWORD || stmt.kind === THROW_KEYWORD) {
                 currentBlock.addStatement(stmt);
-                currentBlock.addSuccessor(exit, 'unconditional');
-                currentBlock = this.createBlock('normal');
+                currentBlock.addSuccessor(exit, UNCONDITIONAL_EDGE);
+                currentBlock = this.createBlock(NORMAL_BLOCK_KIND);
             } else {
                 currentBlock.addStatement(stmt);
             }
@@ -408,7 +422,7 @@ export class CfgBuilder {
             !currentBlock.isTerminator() &&
             !currentBlock.successors.some((s) => s.id === exit.id)
         ) {
-            currentBlock.addSuccessor(exit, 'unconditional');
+            currentBlock.addSuccessor(exit, UNCONDITIONAL_EDGE);
         }
 
         return new ControlFlowGraph(entry, exit, [...this.blocks]);

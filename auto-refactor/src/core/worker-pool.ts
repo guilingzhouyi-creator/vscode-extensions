@@ -116,9 +116,19 @@ export class WorkerPoolManager {
         if (!e) return;
         for (const w of e.workers) {
             try {
-                w.terminate();
-            } catch (_termErr) {
+                w.postMessage({ exit: true });
+            } catch (_msgErr) {
                 /* ignore */
+            }
+            const timer = setTimeout(() => {
+                try {
+                    w.terminate();
+                } catch (_termErr) {
+                    /* ignore */
+                }
+            }, 500);
+            if (typeof timer.unref === 'function') {
+                timer.unref();
             }
         }
         this.pools.delete(fp);

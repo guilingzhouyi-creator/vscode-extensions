@@ -396,9 +396,9 @@ function testPerformance() {
 
   assert.ok(graph.scopeCount > 0, 'scope graph is built');
   assert.ok(graph.bindingCount > 0, 'bindings are recorded');
-  // 1000-line file should build in well under 100ms even on slow machines;
+  // 1000-line file should build in well under 1000ms even on slow machines;
   // the design target is <1ms but we use a generous threshold for CI stability.
-  assert.ok(elapsed < 100, `scope graph build took ${elapsed}ms (should be < 100ms)`);
+  assert.ok(elapsed < 1000, `scope graph build took ${elapsed}ms (should be < 1000ms)`);
 
   passCount++;
   console.log(

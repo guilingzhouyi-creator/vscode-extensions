@@ -229,7 +229,8 @@ function extractDeclaredKeys(content: string): Set<string> {
 }
 
 function collectObjectKeys(targetRecord: unknown, keys: Set<string>, depth = 0): void {
-    if (!targetRecord || typeof targetRecord !== 'object' || depth > MAX_CONFIG_OBJECT_DEPTH) return;
+    if (!targetRecord || typeof targetRecord !== 'object' || depth > MAX_CONFIG_OBJECT_DEPTH)
+        return;
     for (const [k, v] of Object.entries(targetRecord)) {
         if (k && k.length >= 2 && isNaN(Number(k)) && !IGNORED_CONFIG_KEYS.has(k)) {
             keys.add(k);

@@ -646,6 +646,7 @@ function runOne(
 interface WorkerTaskMessage {
     tasks?: { file: string; absPath?: string; buf?: Uint8Array }[];
     flush?: boolean;
+    exit?: boolean;
     fp?: string;
     config?: ScanConfig;
     descs?: Desc[];
@@ -705,6 +706,10 @@ function postWorkerResults(
 
 if (parentPort) {
     parentPort.on(EVENT_MESSAGE, (msg: WorkerTaskMessage) => {
+        if (msg && msg.exit) {
+            parentPort!.close();
+            return;
+        }
         if (AR_TIMING && msg && msg.flush) {
             printWorkerTable();
             parentPort!.postMessage({ flushed: true });
