@@ -35,6 +35,47 @@ const MIN_REPRESENTATIVE_ELOC = 10;
 
 
 
+function parseNumericFlag(argValue, fallback) {
+  const val = parseFloat(argValue);
+  return Number.isNaN(val) ? fallback : val;
+}
+
+function applyValueOptionFlag(arg, value, options) {
+  switch (arg) {
+    case '--range':
+      options.range = value;
+      return true;
+    case '--por-limit':
+      options.porLimit = parseNumericFlag(value, options.porLimit);
+      return true;
+    case '--min-tau':
+      options.minTau = parseNumericFlag(value, options.minTau);
+      return true;
+    case '--max-tau':
+      options.maxTau = parseNumericFlag(value, options.maxTau);
+      return true;
+    default:
+      return false;
+  }
+}
+
+function applyBooleanOptionFlag(arg, options) {
+  if (arg === '--staged') {
+    options.staged = true;
+    return true;
+  }
+  if (arg === '--all') {
+    options.all = true;
+    return true;
+  }
+  if (arg === '--json' || arg === '--agent') {
+    options.json = true;
+    options.agent = true;
+    return true;
+  }
+  return false;
+}
+
 /**
  * Parses command line options for code density validation.
  *
@@ -54,39 +95,13 @@ function parseArgs(args) {
     files: [],
   };
 
-  let i = 0;
-  while (i < args.length) {
-    const arg = args[i++];
-    if (arg === '--staged') {
-      options.staged = true;
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if (applyBooleanOptionFlag(arg, options)) {
       continue;
     }
-    if (arg === '--range' && i < args.length) {
-      options.range = args[i++];
-      continue;
-    }
-    if (arg === '--all') {
-      options.all = true;
-      continue;
-    }
-    if (arg === '--json' || arg === '--agent') {
-      options.json = true;
-      options.agent = true;
-      continue;
-    }
-    if (arg === '--por-limit' && i < args.length) {
-      const val = parseFloat(args[i++]);
-      if (!Number.isNaN(val)) options.porLimit = val;
-      continue;
-    }
-    if (arg === '--min-tau' && i < args.length) {
-      const val = parseFloat(args[i++]);
-      if (!Number.isNaN(val)) options.minTau = val;
-      continue;
-    }
-    if (arg === '--max-tau' && i < args.length) {
-      const val = parseFloat(args[i++]);
-      if (!Number.isNaN(val)) options.maxTau = val;
+    if (i + 1 < args.length && applyValueOptionFlag(arg, args[i + 1], options)) {
+      i++;
       continue;
     }
     if (!arg.startsWith('--')) {

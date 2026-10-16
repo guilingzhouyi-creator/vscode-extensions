@@ -386,6 +386,21 @@ function renderSnapshotLogTail(targetDir, logFile) {
   }
 }
 
+function displayLatestAuditFallback(targetDir) {
+  const latestAuditPath = path.join(targetDir, 'audit-latest.json');
+  if (!fs.existsSync(latestAuditPath)) {
+    return;
+  }
+  try {
+    const audit = JSON.parse(fs.readFileSync(latestAuditPath, UTF8));
+    console.log(`💡 最近一次全工作区审查综合健康分为: ${audit.workspaceHealthScore} (${audit.grade || 'A+'}) | 状态: ${audit.status}`);
+    console.log('   查看全景看板: node scripts/common/record-workspace-audit.js --latest');
+  } catch (readErr) {
+    // Best-effort audit inspection: ignore read failure to preserve view output
+    void readErr;
+  }
+}
+
 /**
  * Print formatted triage details of the most recent recorded failure.
  *
@@ -396,17 +411,7 @@ function viewLastFailure(targetDir = DEFAULT_LOG_DIR) {
   const snapshotPath = path.join(targetDir, FAILURE_SNAPSHOT_NAME);
   if (!fs.existsSync(snapshotPath)) {
     console.log('\nℹ️ 未发现最近一次门禁失败快照记录 (last-failure.json)。');
-    const latestAuditPath = path.join(targetDir, 'audit-latest.json');
-    if (fs.existsSync(latestAuditPath)) {
-      try {
-        const audit = JSON.parse(fs.readFileSync(latestAuditPath, UTF8));
-        console.log(`💡 最近一次全工作区审查综合健康分为: ${audit.workspaceHealthScore} (${audit.grade || 'A+'}) | 状态: ${audit.status}`);
-        console.log(`   查看全景看板: node scripts/common/record-workspace-audit.js --latest`);
-      } catch (readErr) {
-        // Best-effort audit inspection: ignore read failure to preserve view output
-        void readErr;
-      }
-    }
+    displayLatestAuditFallback(targetDir);
     return false;
   }
 
