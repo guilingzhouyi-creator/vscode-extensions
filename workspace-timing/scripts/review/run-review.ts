@@ -1,12 +1,12 @@
 // @wt-script review/run-review
 // @purpose 自动化审查编排器 + Quality Gate：按注册表两波调度全部检查器，聚合统一结果，产出 JSON/MD 报告并裁决阻断
 // @origin native（两波 DAG 调度与注册表驱动思想参考 WebGames audit_runner.py，按本项目规模简化为 stage 1/2）
-// @usage node dist/review/run-review.js [--gate] [--strict] [--json] [--no-report] [--only <id,id>] [--changed] [--self-test] [--update-baseline]
+// @usage node dist/review/run-review.js [--gate] [--strict] [--json] [--agent] [--no-report] [--only <id,id>] [--changed] [--self-test] [--update-baseline]
 // @exit 0=PASS（含降级，见报告状态标注） 1=审查未通过（阻断） 2=编排配置损坏
 // @exit 说明：--gate 下 FAIL/CONFIG_ERROR/TIMEOUT → 1；--strict 额外把 SKIP/NOT_AVAILABLE 也判为未通过（CI 推荐）
 
 import path from 'node:path';
-import { mkdir, writeFile, rm } from 'node:fs/promises';
+import { mkdir, writeFile, readFile, rm, readdir, unlink } from 'node:fs/promises';
 import { accessSync } from 'node:fs';
 import { parseArgs, helpFromHeader } from '../common/cli.js';
 import { createLogger } from '../common/logger.js';
@@ -267,9 +267,24 @@ const report = {
 };
 if (!args.flags['no-report']) {
   await mkdir(REVIEW_REPORT_DIR, { recursive: true });
-  const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-  await writeFile(path.join(REVIEW_REPORT_DIR, `report-${stamp}.json`), JSON.stringify(report, null, 2), 'utf8');
   await writeFile(path.join(REVIEW_REPORT_DIR, 'report-latest.json'), JSON.stringify(report, null, 2), 'utf8');
+
+  if (args.flags['history']) {
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    await writeFile(path.join(REVIEW_REPORT_DIR, `report-${stamp}.json`), JSON.stringify(report, null, 2), 'utf8');
+    try {
+      const historyFiles = (await readdir(REVIEW_REPORT_DIR))
+        .filter((f) => f.startsWith('report-20') && f.endsWith('.json'))
+        .sort();
+      if (historyFiles.length > 3) {
+        for (const staleFile of historyFiles.slice(0, historyFiles.length - 3)) {
+          await unlink(path.join(REVIEW_REPORT_DIR, staleFile));
+        }
+      }
+    } catch {
+      // 容错忽略清理异常
+    }
+  }
 
   const md = [
     `# 审查报告 ${report.generatedAt}`,
@@ -289,7 +304,62 @@ if (!args.flags['no-report']) {
   log.info(`报告已写入 ${toRel(REVIEW_REPORT_DIR)}/report-latest.{json,md}`);
 }
 
-if (!args.json) {
+if (verdictStr === 'BLOCK') {
+  const repoAuditLogsDir = path.join(path.resolve(ROOT, '..'), '.audit-logs');
+  const blockingFindings = allFindings.filter((f) => rank(f.severity) >= rank(blockOn as Severity));
+  const effectiveFindings = blockingFindings.length ? blockingFindings : allFindings;
+  const violations = effectiveFindings.map((f) => ({
+    ruleId: f.ruleId,
+    severity: 'BLOCK',
+    file: f.file ? toRel(path.resolve(ROOT, f.file)) : 'workspace-timing',
+    line: f.location?.line,
+    message: f.message,
+    actionableFix: f.suggestedFix || 'Resolve workspace-timing architecture or lint violations.',
+    verificationCommand: 'npm --prefix workspace-timing run review',
+  }));
+
+  const envelope = {
+    protocolVersion: '1.0.0',
+    recordedAt: new Date().toISOString(),
+    status: 'BLOCK',
+    gate: 'workspace-timing-review',
+    step: `workspace-timing Review (${gateFailures.join(', ')})`,
+    failedCommand: 'npm --prefix workspace-timing run review',
+    exitCode: 1,
+    summary: `workspace-timing review blocked by ${gateFailures.length} checker(s): ${gateFailures.join(', ')}`,
+    logFile: 'workspace-timing/reports/review/report-latest.json',
+    violations,
+    agentDirectives: {
+      targetFiles: Array.from(new Set(violations.map((v) => v.file).filter(Boolean))),
+      remediationPriority: Array.from(new Set(violations.map((v) => v.ruleId))),
+      verificationCommand: 'npm --prefix workspace-timing run review',
+      fastRecheckCommand: 'npm --prefix workspace-timing run review',
+    },
+  };
+
+  try {
+    await mkdir(repoAuditLogsDir, { recursive: true });
+    await writeFile(path.join(repoAuditLogsDir, 'last-failure.json'), JSON.stringify(envelope, null, 2), 'utf8');
+  } catch {
+    // 容错忽略落盘异常
+  }
+}
+
+if (args.flags.agent === true) {
+  if (verdictStr === 'BLOCK') {
+    const lastFailPath = path.join(path.resolve(ROOT, '..'), '.audit-logs', 'last-failure.json');
+    try {
+      const content = await readFile(lastFailPath, 'utf8');
+      process.stdout.write(content + '\n');
+    } catch {
+      process.stdout.write(JSON.stringify({ protocolVersion: '1.0.0', status: 'BLOCK', gate: 'workspace-timing-review', summary: `Blocked by ${gateFailures.join(', ')}` }, null, 2) + '\n');
+    }
+  } else {
+    process.stdout.write(JSON.stringify({ protocolVersion: '1.0.0', status: 'PASS', gate: 'workspace-timing-review', summary: 'All checkers passed.' }, null, 2) + '\n');
+  }
+}
+
+if (!args.json && args.flags.agent !== true) {
   process.stderr.write('\n===== 审查摘要 =====\n');
   for (const r of results) process.stderr.write(`${r.status === STATUS.PASS ? '✅' : (r.status === STATUS.FAIL ? '❌' : '⚠️ ')} ${r.id.padEnd(20)} ${r.status.padEnd(14)} findings=${r.findings.length}\n`);
   process.stderr.write(`-----\n【门禁结论】${verdictStr}${gateFailures.length ? `（阻断来源: ${gateFailures.join(', ')}）` : ''}\n`);

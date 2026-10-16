@@ -46,6 +46,9 @@ export const DASHBOARD_BASE_STYLES = /* css */ `
       --fill-scale: 0;
       --manual-scale: 0;
       --ai-scale: 0;
+      --fade-size: 28px;
+      --fade-top: 0px;
+      --fade-bottom: 28px;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }

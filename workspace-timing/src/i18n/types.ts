@@ -248,4 +248,6 @@ export interface I18nStrings {
     'panel.today.hourlyStackedTooltip': string;
     /** 无障碍帮助图标标签 (Accessibility help label) */
     'panel.aria.help': string;
+    /** 分析过程与手风琴引用导出头部契约 */
+    'accordion.thinking.header': string;
 }

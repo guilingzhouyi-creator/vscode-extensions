@@ -9,6 +9,7 @@
 
 import { DASHBOARD_BASE_STYLES } from './dashboard-base-styles';
 import { DASHBOARD_CHART_STYLES } from './dashboard-chart-styles';
+import { TIMING_VIEWPORT_STYLES, TIMING_VIEWPORT_CONTAINER_CLASS } from './container-queries';
 import { buildDashboardScript } from './dashboard-script';
 
 export interface DashboardTemplateArgs {
@@ -96,9 +97,10 @@ export function buildDashboardHtml(args: DashboardTemplateArgs): string {
   <style>
 ${DASHBOARD_BASE_STYLES}
 ${DASHBOARD_CHART_STYLES}
+${TIMING_VIEWPORT_STYLES}
   </style>
 </head>
-<body>
+<body class="${TIMING_VIEWPORT_CONTAINER_CLASS}">
 
   <!-- 头部主标题栏 -->
   <div class="main-header">
@@ -206,7 +208,7 @@ ${DASHBOARD_CHART_STYLES}
           <div class="label">${args.labels['panel.today.activeWindow']}</div>
         </div>
       </div>
-      <div id="sessionList" class="session-list" style="display:none"></div>
+      <div id="sessionList" class="session-list timing-scroll-mask timing-fade-viewport" style="display:none"></div>
       <div class="empty-hint" id="sessionEmpty" style="display:none">${args.labels['panel.today.empty']}</div>
       <div class="hourly-wrapper" id="hourlyWrapper" style="display:none">
         <div class="hourly-header-row">

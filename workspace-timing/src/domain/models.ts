@@ -79,6 +79,10 @@ export const CSP_NONCE_LENGTH = 32;
 export const STATUS_BAR_PRIORITY = 100;
 /** 外部写盘与文件系统重载脉冲保护窗口 (1200ms) */
 export const DEFAULT_AI_BURST_WINDOW_MS = 1200;
+/** 流式视口图钉控制器默认常数 (40px 吸附容差、120px 微胶囊门限、150ms 冷却窗口) */
+export const DEFAULT_PIN_TOLERANCE_PX = 40;
+export const DEFAULT_CAPSULE_THRESHOLD_PX = 120;
+export const DEFAULT_VIEWPORT_COOLDOWN_MS = 150;
 
 // ─── 配置边界单一真源 ────────────────────────────────
 // 以下上下界是配置合法域的【唯一权威】，与 package.json contributes 的

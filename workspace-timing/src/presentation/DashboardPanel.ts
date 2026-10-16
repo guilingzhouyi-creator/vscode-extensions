@@ -14,6 +14,34 @@ import { CSP_NONCE_LENGTH } from '../domain/models';
 import { buildDashboardHtml } from './dashboardTemplate';
 import { labelsWithPrefix, t, currentLocale } from '../i18n/index';
 export type { DashboardData, DashboardMessage }; // 重新导出以便其他文件引用
+export { ProceduralAudioSynth } from './procedural-audio-synth';
+export type { SoundEffectType, ProceduralSynthOptions } from './procedural-audio-synth';
+export { SplitPaneResizer } from './split-pane-resizer';
+export type { SplitPaneResizerOptions } from './split-pane-resizer';
+export { RovingFocusController } from './roving-focus-controller';
+export type { RovingFocusOptions } from './roving-focus-controller';
+export { TIMING_VIEWPORT_STYLES, TIMING_VIEWPORT_CONTAINER_CLASS } from './container-queries';
+export { ScrollPinningController } from './scroll-pinning';
+export type { ScrollPinningOptions, ScrollContainerLike } from './scroll-pinning';
+export {
+    computeAffineScaleTransform,
+    computeAffinePan,
+    isWithinDeadzone,
+    clampAffineTranslate,
+} from './affine-viewport';
+export type {
+    AffinePoint,
+    AffineViewportParams,
+    AffineTransformResult,
+    AffinePanParams,
+    AffinePanResult,
+} from './affine-viewport';
+export { ThinkingAccordionLock } from './thinking-accordion-lock';
+export type {
+    ThinkingAccordionState,
+    ThinkingAccordionOptions,
+    ExportQuoteOptions,
+} from './thinking-accordion-lock';
 
 export class DashboardPanel {
   public static currentPanel: DashboardPanel | undefined;
@@ -140,10 +168,8 @@ export class DashboardPanel {
 
     DashboardPanel.currentPanel = undefined;
     this._panel.dispose();
-    while (this._disposables.length) {
-      const d = this._disposables.pop();
-      if (d) d.dispose();
-    }
+    vscode.Disposable.from(...this._disposables).dispose();
+    this._disposables.length = 0;
   }
 
   /** 生成 HTML（含 CSP + nonce 安全加固；模板本体见 ./dashboardTemplate.ts） */

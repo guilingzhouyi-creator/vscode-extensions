@@ -44,7 +44,7 @@
 
 ## 3. 脚本头契约（机器可检查）
 
-每个 `.mjs` 文件头 20 行内必须包含以下标签（由 `audit/script-standard.mjs` 强制）：
+每个 `.ts` 源码文件头 20 行内必须包含以下标签（由 `audit/script-standard.ts` 强制）：
 
 ```text
 // @wt-script <目录>/<名称>       身份（与文件路径一致）
@@ -64,15 +64,15 @@
 
 ## 5. 新增检查器 Checklist
 
-1. 在对应目录创建 `<verb>-<name>.mjs`（kebab-case），补齐头契约标签；
-2. stdout 输出 `wt-checker/v1` 信封（复用 `common/result.mjs`），退出码符合 §4；
-3. 在 `scripts/config/review-rules.json` 的 `checkers` 注册：id/layer/stage/timeoutMs/origin/ruleIds（声明↔实施双向核对由 `audit/review-config.mjs` 强制，孤儿/悬空由 `audit/script-standard.mjs` 阻断）；
+1. 在对应目录创建 `<verb>-<name>.ts`（kebab-case），补齐头契约标签；
+2. stdout 输出 `wt-checker/v1` 信封（复用 `common/result.ts`），退出码符合 §4；
+3. 在 `scripts/config/review-rules.json` 的 `checkers` 注册：id/layer/stage/timeoutMs/origin/ruleIds（声明↔实施双向核对由 `audit/review-config.ts` 强制，孤儿/悬空由 `audit/script-standard.ts` 阻断）；
 4. 确定性优先：能用 AST/正则/依赖图判定的不做启发式；启发式默认提示级（非 --strict 不阻断）；
 5. 若为 L5 外部能力：只允许经 `tooling/` 适配，外部配置进 `refactor-adapter.json`，禁止绝对路径。
 
 ## 6. 外部工具（auto-refactor）接入边界
 
-- 唯一接触点：`scripts/tooling/refactor-adapter.mjs`；只依赖其**稳定外部契约**（`scan` 子命令 + `--root/--config/--format json` + ScanReport JSON 结构 + 0/1/2 退出码），不 import 内部模块、不修改其源码/配置。
+- 唯一接触点：`scripts/tooling/refactor-adapter.ts`；只依赖其**稳定外部契约**（`scan` 子命令 + `--root/--config/--format json` + ScanReport JSON 结构 + 0/1/2 退出码），不 import 内部模块、不修改其源码/配置。
 - 路径参数化：环境变量 `WT_REFACTOR_CLI` > `refactor-adapter.json` 候选路径（项目相对）；禁止盘符路径入库。
 - 故障隔离矩阵：工具缺失 → `NOT_AVAILABLE`（默认放行并显式留痕；CI 可用 `--strict` 收紧）；超时 → `TIMEOUT`（同上）；引擎崩溃 → `NOT_AVAILABLE`；**有输出但解析失败 → FAIL（fail-closed，损坏输出比无输出危险）**。
 - **存量债务棘轮**（引擎 0.2.0 原生）：适配器透传 `--baseline/--update-baseline --baseline-granularity grouped`，按（分析器|规则|文件）分组比对——只有【新增】发现（默认 warning 及以上）阻断，存量保持提示级；基线文件 `scripts/config/refactor-baseline.json` 入库，禁止用 `--update-baseline` 消音。
@@ -86,12 +86,12 @@ npm run review:gate         # CI 门禁模式（阻断即非零退出）
 npm run review:strict       # 严格门禁（SKIP/NOT_AVAILABLE 也阻断）
 npm run review:selftest     # 夹具自检：验证审查引擎确实能命中已知违规
 npm run refactor:scan       # 单独运行 auto-refactor 适配层
-node scripts/benchmark/test-budget.mjs --update-baseline   # 记录测试时长基线（仅应有理由时使用）
+node scripts/dist/benchmark/test-budget.js --update-baseline   # 记录测试时长基线（仅应有理由时使用）
 ```
 
 ## 8. 元审查（审查审查系统）
 
-- `audit/script-standard.mjs`：孤儿检查器 / 悬空注册 / 头契约漂移（含 `@origin` 来源声明）/ 命名漂移；
-- `audit/review-config.mjs`：配置 schema、规则声明↔实施双向核对、**跨检查器规则 ID 归属冲突**、依赖矩阵路径存在性（防规则绑定旧路径永不触发）、工具 glob 命中数、外部工具路径健康；
+- `audit/script-standard.ts`：孤儿检查器 / 悬空注册 / 头契约漂移（含 `@origin` 来源声明）/ 命名漂移；
+- `audit/review-config.ts`：配置 schema、规则声明↔实施双向核对、**跨检查器规则 ID 归属冲突**、依赖矩阵路径存在性（防规则绑定旧路径永不触发）、工具 glob 命中数、外部工具路径健康；
 - 编排器运行时校验：**信封身份核对**（检查器不得伪装他人 id）、发现结构校验（ruleId/severity/message 契约）、空跑拒绝（选择器未命中即 exit 2，禁止未执行输出 PASS）；
-- `run-review.mjs --self-test`：构造含已知违规的临时夹具项目，断言 L2/L3/L4 引擎全部命中（验证"审查未实际执行却输出 PASS"不可能发生）。
+- `run-review.ts --self-test`：构造含已知违规的临时夹具项目，断言 L2/L3/L4 引擎全部命中（验证"审查未实际执行却输出 PASS"不可能发生）。
