@@ -48,7 +48,7 @@ const STANDARD_TECH_ABBREVIATIONS = new Set([
   'rpc', 'ipc', 'csr', 'soa', 'swar', 'simd', 'cc', 'eloc', 'loc',
   'diff', 'rgb', 'hex', 'fn', 'cb', 'rx', 'tx', 'env', 'app', 'dev',
   'fsm', 'npc', 'gm', 'rpg', 'pve', 'pvp', 'hp', 'mp',
-  'vs', 'prf', 'mcp', 'ssot', 'ir', 'cai', 'e2e', 'wasm',
+  'vs', 'prf', 'mcp', 'ssot', 'ir', 'cai', 'e2e', 'wasm', 'zh', 'cn',
 ]);
 
 const IGNORED_BASENAMES = new Set([
