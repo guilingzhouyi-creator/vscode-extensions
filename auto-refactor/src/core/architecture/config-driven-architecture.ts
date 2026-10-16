@@ -122,6 +122,63 @@ const SCATTERED_CONFIG_PATTERNS = ['config.', 'Config.', 'GameConfig.', 'readFil
 const SCALE_SCORE_SMALL_PROJECT = 90;
 const SCALE_SCORE_STANDARD_PROJECT = 80;
 
+/** Maximum recursive depth for configuration object parsing. */
+const MAX_CONFIG_OBJECT_DEPTH = 5;
+
+/** Standard column limit used in diagnostic location ranges. */
+const DIAGNOSTIC_END_COLUMN = 80;
+
+/** Maximum samples shown in diagnostic details or summaries. */
+const MAX_DIAGNOSTIC_SAMPLES = 3;
+
+/** Standard 100 percentage baseline. */
+const MAX_PERCENT_SCORE = 100;
+
+/** Threshold constants for small vs standard project scaling. */
+const SMALL_PROJECT_MAX_FILES = 25;
+const SMALL_PROJECT_MAX_DOMAINS = 2;
+
+/** Declarative score tier cutoffs without flat prefix clustering. */
+const EXCELLENT_MIN_SCORE = 90;
+const GOOD_MIN_SCORE = 75;
+const PASS_MIN_SCORE = 60;
+const BASIC_MIN_SCORE = 40;
+
+const TOP_TIER_LEVEL = 4;
+const ADVANCED_TIER_LEVEL = 3;
+const INTERMEDIATE_TIER_LEVEL = 2;
+const INITIAL_TIER_LEVEL = 1;
+
+/** Declarative maturity grade ladder mapping minimum scores to tier grades. */
+const MATURITY_GRADE_LADDER: readonly {
+    readonly minScore: number;
+    readonly level: number;
+    readonly grade: ConfigMaturityGrade;
+}[] = [
+    { minScore: EXCELLENT_MIN_SCORE, level: TOP_TIER_LEVEL, grade: 'L4' },
+    { minScore: GOOD_MIN_SCORE, level: ADVANCED_TIER_LEVEL, grade: 'L3' },
+    { minScore: PASS_MIN_SCORE, level: INTERMEDIATE_TIER_LEVEL, grade: 'L2' },
+    { minScore: BASIC_MIN_SCORE, level: INITIAL_TIER_LEVEL, grade: 'L1' },
+];
+
+/** Weight penalties and ratios for maturity score calculation. */
+const BASE_ACTIVE_CONFIG_SCORE = 70;
+const BASE_INACTIVE_CONFIG_SCORE = 30;
+const DECLARED_CONFIG_BONUS = 30;
+
+const PENALTY_DUPLICATE_CONFIG = 10;
+const PENALTY_DIRECT_ENV = 15;
+const PENALTY_FLAT_SPRAWL = 15;
+const PENALTY_DIRECT_IO_SMALL = 10;
+const PENALTY_UNROUTED_SUBTABLE_SMALL = 10;
+const PENALTY_DIRECT_IO_STANDARD = 20;
+const PENALTY_UNROUTED_SUBTABLE_STANDARD = 12;
+
+/** Thresholds for over-abstraction detection. */
+const OVER_ABSTRACTION_FILE_LIMIT = 30;
+const OVER_ABSTRACTION_MIN_CONFIGS = 6;
+const DEFAULT_FLAT_CONFIG_SPRAWL_THRESHOLD = 12;
+
 const _DOMAIN_SEGMENT = '/domain/';
 const _CORE_SEGMENT = '/core/';
 const DOMAIN_OR_CORE_RE = /\/(?:domain|core)\//;
@@ -171,9 +228,9 @@ function extractDeclaredKeys(content: string): Set<string> {
     return keys;
 }
 
-function collectObjectKeys(obj: unknown, keys: Set<string>, depth = 0): void {
-    if (!obj || typeof obj !== 'object' || depth > 5) return;
-    for (const [k, v] of Object.entries(obj)) {
+function collectObjectKeys(targetRecord: unknown, keys: Set<string>, depth = 0): void {
+    if (!targetRecord || typeof targetRecord !== 'object' || depth > MAX_CONFIG_OBJECT_DEPTH) return;
+    for (const [k, v] of Object.entries(targetRecord)) {
         if (k && k.length >= 2 && isNaN(Number(k)) && !IGNORED_CONFIG_KEYS.has(k)) {
             keys.add(k);
         }
@@ -214,29 +271,29 @@ function partitionScanFiles(
     return { configFiles, sourceFiles };
 }
 
-function appendMapStringList(map: Map<string, string[]>, key: string, item: string): void {
+function appendMapStringList(map: Map<string, string[]>, key: string, valueEntry: string): void {
     let list = map.get(key);
     if (!list) {
         list = [];
         map.set(key, list);
     }
-    list.push(item);
+    list.push(valueEntry);
 }
 
 function collectDeclaredConfigKeys(configFiles: ConfigScanFile[]): {
     declaredKeys: Set<string>;
-    keyOrigins: Map<string, string[]>;
+    keyToOriginsMap: Map<string, string[]>;
 } {
     const declaredKeys = new Set<string>();
-    const keyOrigins = new Map<string, string[]>();
+    const keyToOriginsMap = new Map<string, string[]>();
     for (const cfg of configFiles) {
         const keys = extractDeclaredKeys(cfg.content);
         for (const k of keys) {
             declaredKeys.add(k);
-            appendMapStringList(keyOrigins, k, cfg.filePath);
+            appendMapStringList(keyToOriginsMap, k, cfg.filePath);
         }
     }
-    return { declaredKeys, keyOrigins };
+    return { declaredKeys, keyToOriginsMap };
 }
 
 function hasOverrideSource(origins: readonly string[]): boolean {
@@ -248,9 +305,9 @@ function hasOverrideSource(origins: readonly string[]): boolean {
     return false;
 }
 
-function detectDuplicateConfigs(keyOrigins: Map<string, string[]>, issues: Issue[]): number {
+function detectDuplicateConfigs(keyToOriginsMap: Map<string, string[]>, issues: Issue[]): number {
     let duplicateKeyCount = 0;
-    for (const [key, origins] of keyOrigins.entries()) {
+    for (const [key, origins] of keyToOriginsMap.entries()) {
         if (origins.length > 1 && !hasOverrideSource(origins)) {
             duplicateKeyCount++;
             issues.push({
@@ -264,7 +321,7 @@ function detectDuplicateConfigs(keyOrigins: Map<string, string[]>, issues: Issue
                 location: {
                     file: origins[0],
                     start: { line: 1, column: 1 },
-                    end: { line: 1, column: 80 },
+                    end: { line: 1, column: DIAGNOSTIC_END_COLUMN },
                 },
                 detail: { key, origins },
                 suggestion:
@@ -301,9 +358,9 @@ function checkDomainLeakage(
                 location: {
                     file: src.filePath,
                     start: { line: 1, column: 1 },
-                    end: { line: 1, column: 80 },
+                    end: { line: 1, column: DIAGNOSTIC_END_COLUMN },
                 },
-                detail: { envMatches: matches.slice(0, 3) },
+                detail: { envMatches: matches.slice(0, MAX_DIAGNOSTIC_SAMPLES) },
                 suggestion:
                     'Inject typed configuration via constructor/factory rather than reading process.env.',
             });
@@ -325,7 +382,7 @@ function checkDomainLeakage(
                 location: {
                     file: src.filePath,
                     start: { line: 1, column: 1 },
-                    end: { line: 1, column: 80 },
+                    end: { line: 1, column: DIAGNOSTIC_END_COLUMN },
                 },
                 detail: { filePath: src.filePath },
                 suggestion:
@@ -364,17 +421,21 @@ function collectReferencedTokens(
     }
 }
 
+interface DomainLeakageCollector {
+    readonly domainFilesWithDirectEnv: ConfigScanFile[];
+    readonly domainFilesWithDirectIO: ConfigScanFile[];
+    readonly domainConfigAccesses: { file: string; line: number }[];
+}
+
 function processDomainLeakage(
     src: ConfigScanFile,
     issues: Issue[],
-    domainFilesWithDirectEnv: ConfigScanFile[],
-    domainFilesWithDirectIO: ConfigScanFile[],
-    domainConfigAccesses: { file: string; line: number }[],
+    collector: DomainLeakageCollector,
 ): void {
     const leakage = checkDomainLeakage(src, issues);
-    if (leakage.hasEnv) domainFilesWithDirectEnv.push(src);
-    if (leakage.hasIO) domainFilesWithDirectIO.push(src);
-    if (leakage.hasScattered) domainConfigAccesses.push({ file: src.filePath, line: 1 });
+    if (leakage.hasEnv) collector.domainFilesWithDirectEnv.push(src);
+    if (leakage.hasIO) collector.domainFilesWithDirectIO.push(src);
+    if (leakage.hasScattered) collector.domainConfigAccesses.push({ file: src.filePath, line: 1 });
 }
 
 function scanSourceFiles(
@@ -386,6 +447,11 @@ function scanSourceFiles(
     const domainFilesWithDirectEnv: ConfigScanFile[] = [];
     const domainFilesWithDirectIO: ConfigScanFile[] = [];
     const domainConfigAccesses: { file: string; line: number }[] = [];
+    const collector: DomainLeakageCollector = {
+        domainFilesWithDirectEnv,
+        domainFilesWithDirectIO,
+        domainConfigAccesses,
+    };
 
     for (const src of sourceFiles) {
         const normPath = src.filePath.replace(/\\/g, '/');
@@ -394,13 +460,7 @@ function scanSourceFiles(
         collectReferencedTokens(src.content, declaredKeys, referencedKeys);
 
         if (isDomain) {
-            processDomainLeakage(
-                src,
-                issues,
-                domainFilesWithDirectEnv,
-                domainFilesWithDirectIO,
-                domainConfigAccesses,
-            );
+            processDomainLeakage(src, issues, collector);
         }
     }
 
@@ -425,7 +485,7 @@ function detectDeadConfigs(
         }
     }
     if (deadKeys.length > 0 && configFiles.length > 0) {
-        const sampleDead = deadKeys.slice(0, 5);
+        const sampleDead = deadKeys.slice(0, MAX_CONFIG_OBJECT_DEPTH);
         issues.push({
             id: `architecture:${RULE_ARCH_CFG_002}:${configFiles[0].filePath}:1`,
             analyzer: ANALYZER_ARCHITECTURE,
@@ -437,7 +497,7 @@ function detectDeadConfigs(
             location: {
                 file: configFiles[0].filePath,
                 start: { line: 1, column: 1 },
-                end: { line: 1, column: 80 },
+                end: { line: 1, column: DIAGNOSTIC_END_COLUMN },
             },
             detail: { deadCount: deadKeys.length, sampleDead },
             suggestion:
@@ -451,7 +511,7 @@ function detectScatteredConfig(
     domainConfigAccesses: { file: string; line: number }[],
     issues: Issue[],
 ): void {
-    if (domainConfigAccesses.length < 3) return;
+    if (domainConfigAccesses.length < MAX_DIAGNOSTIC_SAMPLES) return;
     const target = domainConfigAccesses[0];
     issues.push({
         id: `architecture:${RULE_ARCH_CFG_005}:${target.file}:1`,
@@ -464,7 +524,7 @@ function detectScatteredConfig(
         location: {
             file: target.file,
             start: { line: 1, column: 1 },
-            end: { line: 1, column: 80 },
+            end: { line: 1, column: DIAGNOSTIC_END_COLUMN },
         },
         detail: { totalScatteredCalls: domainConfigAccesses.length },
         suggestion:
@@ -477,7 +537,12 @@ function detectOverAbstraction(
     configFiles: ConfigScanFile[],
     issues: Issue[],
 ): void {
-    if (scale.fileCount >= 30 || configFiles.length < 6) return;
+    if (
+        scale.fileCount >= OVER_ABSTRACTION_FILE_LIMIT ||
+        configFiles.length < OVER_ABSTRACTION_MIN_CONFIGS
+    ) {
+        return;
+    }
     issues.push({
         id: `architecture:${RULE_ARCH_CFG_007}:${configFiles[0].filePath}:1`,
         analyzer: ANALYZER_ARCHITECTURE,
@@ -489,7 +554,7 @@ function detectOverAbstraction(
         location: {
             file: configFiles[0].filePath,
             start: { line: 1, column: 1 },
-            end: { line: 1, column: 80 },
+            end: { line: 1, column: DIAGNOSTIC_END_COLUMN },
         },
         detail: { fileCount: scale.fileCount, configFileCount: configFiles.length },
         suggestion: 'Consolidate multiple small config files into a unified configuration.',
@@ -504,7 +569,7 @@ function extractFileDirectory(normPath: string): string {
 function detectFlatConfigSprawl(
     configFiles: ConfigScanFile[],
     issues: Issue[],
-    maxFlatThreshold = 12,
+    maxFlatThreshold = DEFAULT_FLAT_CONFIG_SPRAWL_THRESHOLD,
 ): number {
     const dirMap = new Map<string, string[]>();
     for (const f of configFiles) {
@@ -518,7 +583,7 @@ function detectFlatConfigSprawl(
         if (filesInDir.length >= maxFlatThreshold) {
             flatSprawlCount++;
             const sample = filesInDir
-                .slice(0, 3)
+                .slice(0, MAX_DIAGNOSTIC_SAMPLES)
                 .map((p) => p.split('/').pop())
                 .join(', ');
             issues.push({
@@ -532,7 +597,7 @@ function detectFlatConfigSprawl(
                 location: {
                     file: filesInDir[0],
                     start: { line: 1, column: 1 },
-                    end: { line: 1, column: 80 },
+                    end: { line: 1, column: DIAGNOSTIC_END_COLUMN },
                 },
                 detail: { directory: dir, tableCount: filesInDir.length },
                 suggestion:
@@ -593,64 +658,103 @@ function detectUnroutedSubtables(sourceFiles: ConfigScanFile[], issues: Issue[])
 }
 
 function calculateMaturityGrade(score: number): { level: number; grade: ConfigMaturityGrade } {
-    if (score >= 90) return { level: 4, grade: 'L4' };
-    if (score >= 75) return { level: 3, grade: 'L3' };
-    if (score >= 60) return { level: 2, grade: 'L2' };
-    if (score >= 40) return { level: 1, grade: 'L1' };
+    const entry = MATURITY_GRADE_LADDER.find((t) => score >= t.minScore);
+    if (entry) return { level: entry.level, grade: entry.grade };
     return { level: 0, grade: 'L0' };
 }
 
-function calculateMaturityScores(
-    scale: ProjectScaleProfile,
-    configCount: number,
-    declaredCount: number,
-    referencedCount: number,
+interface MaturityScoreInput {
+    readonly scale: ProjectScaleProfile;
+    readonly configCount: number;
+    readonly declaredCount: number;
+    readonly referencedCount: number;
+    readonly duplicateCount: number;
+    readonly directEnvCount: number;
+    readonly directIOCount: number;
+    readonly flatSprawlCount?: number;
+    readonly unroutedSubtableCount?: number;
+}
+
+function computeDecouplingScore(
+    isSmallProject: boolean,
+    directIOCount: number,
+    directEnvCount: number,
+    unroutedSubtableCount: number,
+): number {
+    if (isSmallProject) {
+        const raw =
+            MAX_PERCENT_SCORE -
+            directIOCount * PENALTY_DIRECT_IO_SMALL -
+            unroutedSubtableCount * PENALTY_UNROUTED_SUBTABLE_SMALL;
+        return Math.max(0, Math.min(MAX_PERCENT_SCORE, raw));
+    }
+    const raw =
+        MAX_PERCENT_SCORE -
+        directIOCount * PENALTY_DIRECT_IO_STANDARD -
+        directEnvCount * PENALTY_DIRECT_ENV -
+        unroutedSubtableCount * PENALTY_UNROUTED_SUBTABLE_STANDARD;
+    return Math.max(0, Math.min(MAX_PERCENT_SCORE, raw));
+}
+
+function computeHygieneScore(
     duplicateCount: number,
     directEnvCount: number,
-    directIOCount: number,
-    flatSprawlCount: number = 0,
-    unroutedSubtableCount: number = 0,
-) {
-    const isSmallProject = scale.fileCount <= 25 && scale.domainCount <= 2;
+    flatSprawlCount: number,
+): number {
+    const penalty =
+        duplicateCount * PENALTY_DUPLICATE_CONFIG +
+        directEnvCount * PENALTY_DIRECT_ENV +
+        flatSprawlCount * PENALTY_FLAT_SPRAWL;
+    return Math.max(0, Math.min(MAX_PERCENT_SCORE, MAX_PERCENT_SCORE - penalty));
+}
+
+function computeSeparationScore(configCount: number, declaredCount: number): number {
+    const base = configCount > 0 ? BASE_ACTIVE_CONFIG_SCORE : BASE_INACTIVE_CONFIG_SCORE;
+    const bonus = declaredCount > 0 ? DECLARED_CONFIG_BONUS : 0;
+    return Math.max(0, Math.min(MAX_PERCENT_SCORE, base + bonus));
+}
+
+function calculateMaturityScores(input: MaturityScoreInput) {
+    const {
+        scale,
+        configCount,
+        declaredCount,
+        referencedCount,
+        duplicateCount,
+        directEnvCount,
+        directIOCount,
+        flatSprawlCount = 0,
+        unroutedSubtableCount = 0,
+    } = input;
+    const isSmallProject =
+        scale.fileCount <= SMALL_PROJECT_MAX_FILES &&
+        scale.domainCount <= SMALL_PROJECT_MAX_DOMAINS;
     const activeRefRatio =
         declaredCount > 0 ? referencedCount / declaredCount : configCount > 0 ? 0.8 : 0.4;
 
-    const separationScore = Math.max(
+    const separationScore = computeSeparationScore(configCount, declaredCount);
+    const decisionParticipationScore = Math.max(
         0,
-        Math.min(100, (configCount > 0 ? 70 : 30) + (declaredCount > 0 ? 30 : 0)),
+        Math.min(MAX_PERCENT_SCORE, Math.round(activeRefRatio * MAX_PERCENT_SCORE)),
     );
-    const decisionParticipationScore = Math.max(0, Math.min(100, Math.round(activeRefRatio * 100)));
-    const hygieneScore = Math.max(
-        0,
-        Math.min(100, 100 - duplicateCount * 10 - directEnvCount * 15 - flatSprawlCount * 15),
+    const hygieneScore = computeHygieneScore(duplicateCount, directEnvCount, flatSprawlCount);
+    const decouplingScore = computeDecouplingScore(
+        isSmallProject,
+        directIOCount,
+        directEnvCount,
+        unroutedSubtableCount,
     );
-    const decouplingScore = isSmallProject
-        ? Math.max(0, Math.min(100, 100 - directIOCount * 10 - unroutedSubtableCount * 10))
-        : Math.max(
-              0,
-              Math.min(
-                  100,
-                  100 - directIOCount * 20 - directEnvCount * 15 - unroutedSubtableCount * 12,
-              ),
-          );
     const scaleCalibrationScore = isSmallProject
         ? SCALE_SCORE_SMALL_PROJECT
         : SCALE_SCORE_STANDARD_PROJECT;
 
-    const maturityScore = Math.max(
-        0,
-        Math.min(
-            100,
-            Math.round(
-                separationScore * 0.25 +
-                    decisionParticipationScore * 0.25 +
-                    hygieneScore * 0.2 +
-                    decouplingScore * 0.15 +
-                    scaleCalibrationScore * 0.15,
-            ),
-        ),
-    );
-
+    const weightedScore =
+        separationScore * 0.25 +
+        decisionParticipationScore * 0.25 +
+        hygieneScore * 0.2 +
+        decouplingScore * 0.15 +
+        scaleCalibrationScore * 0.15;
+    const maturityScore = Math.max(0, Math.min(MAX_PERCENT_SCORE, Math.round(weightedScore)));
     const { level: maturityLevel, grade: maturityGrade } = calculateMaturityGrade(maturityScore);
 
     return {
@@ -667,20 +771,30 @@ function calculateMaturityScores(
     };
 }
 
-function buildRecommendations(
-    directEnvCount: number,
-    directIOCount: number,
-    deadCount: number,
-    duplicateCount: number,
-    flatSprawlCount: number = 0,
-    unroutedSubtableCount: number = 0,
-): string[] {
+interface RecommendationInput {
+    readonly directEnvCount: number;
+    readonly directIOCount: number;
+    readonly deadCount: number;
+    readonly duplicateCount: number;
+    readonly flatSprawlCount?: number;
+    readonly unroutedSubtableCount?: number;
+}
+
+function buildRecommendations(input: RecommendationInput): string[] {
+    const {
+        directEnvCount,
+        directIOCount,
+        deadCount,
+        duplicateCount,
+        flatSprawlCount = 0,
+        unroutedSubtableCount = 0,
+    } = input;
     const recs: string[] = [];
     if (directEnvCount > 0) {
         recs.push('Eliminate process.env calls from domain core; declare typed config models.');
     }
     if (directIOCount > 0) {
-        recs.push('Remove direct file I/O for config in domain; inject config objects via DI.');
+        recs.push('Remove direct configuration file I/O in domain; inject config objects via DI.');
     }
     if (deadCount > 0) {
         recs.push(`Prune or activate ${deadCount} unreferenced configuration keys.`);
@@ -720,8 +834,8 @@ export function auditConfigDrivenArchitecture(
     const patterns = options.configFilePatterns ?? DEFAULT_CONFIG_FILE_PATTERNS;
 
     const { configFiles, sourceFiles } = partitionScanFiles(files, patterns);
-    const { declaredKeys, keyOrigins } = collectDeclaredConfigKeys(configFiles);
-    const duplicateKeyCount = detectDuplicateConfigs(keyOrigins, issues);
+    const { declaredKeys, keyToOriginsMap } = collectDeclaredConfigKeys(configFiles);
+    const duplicateKeyCount = detectDuplicateConfigs(keyToOriginsMap, issues);
 
     const {
         referencedKeys,
@@ -734,31 +848,32 @@ export function auditConfigDrivenArchitecture(
     detectScatteredConfig(domainConfigAccesses, issues);
     detectOverAbstraction(scale, configFiles, issues);
 
-    const flatSprawlThreshold = options.maxFlatConfigThreshold ?? 12;
+    const flatSprawlThreshold =
+        options.maxFlatConfigThreshold ?? DEFAULT_FLAT_CONFIG_SPRAWL_THRESHOLD;
     const flatSprawlCount = detectFlatConfigSprawl(configFiles, issues, flatSprawlThreshold);
     const unroutedSubtableCount = detectUnroutedSubtables(sourceFiles, issues);
 
     const totalDeclared = declaredKeys.size;
-    const { maturityScore, maturityGrade, maturityLevel, breakdown } = calculateMaturityScores(
+    const { maturityScore, maturityGrade, maturityLevel, breakdown } = calculateMaturityScores({
         scale,
-        configFiles.length,
-        totalDeclared,
-        referencedKeys.size,
-        duplicateKeyCount,
-        domainFilesWithDirectEnv.length,
-        domainFilesWithDirectIO.length,
+        configCount: configFiles.length,
+        declaredCount: totalDeclared,
+        referencedCount: referencedKeys.size,
+        duplicateCount: duplicateKeyCount,
+        directEnvCount: domainFilesWithDirectEnv.length,
+        directIOCount: domainFilesWithDirectIO.length,
         flatSprawlCount,
         unroutedSubtableCount,
-    );
+    });
 
-    const recommendations = buildRecommendations(
-        domainFilesWithDirectEnv.length,
-        domainFilesWithDirectIO.length,
-        deadKeys.length,
-        duplicateKeyCount,
+    const recommendations = buildRecommendations({
+        directEnvCount: domainFilesWithDirectEnv.length,
+        directIOCount: domainFilesWithDirectIO.length,
+        deadCount: deadKeys.length,
+        duplicateCount: duplicateKeyCount,
         flatSprawlCount,
         unroutedSubtableCount,
-    );
+    });
 
     return {
         maturityScore,
