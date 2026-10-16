@@ -7,7 +7,7 @@
  * Exit Semantics & Design Rationale: State-machine-based gesture tracking; guarantees zero iframe pointer theft and zero accidental micro-jitter during layout adjustments
  */
 
-import { PERCENT_MULTIPLIER } from '../domain/models.js';
+import { PERCENT_MULTIPLIER } from '../domain/models';
 
 export interface SplitPaneResizerOptions {
     container: HTMLElement;

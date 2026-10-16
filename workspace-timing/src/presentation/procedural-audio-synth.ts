@@ -13,7 +13,7 @@ import {
     FREQ_E4_HZ,
     FREQ_E5_HZ,
     MS_PER_SECOND,
-} from '../domain/models.js';
+} from '../domain/models';
 
 export type SoundEffectType = 'timer_completed' | 'break_ended';
 
