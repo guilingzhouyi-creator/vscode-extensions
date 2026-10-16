@@ -232,6 +232,13 @@ static func test_async_dispatcher_backpressure_drop_oldest_strategy() -> Diction
 			"error": "丢弃统计计数不符合 DROP_OLDEST: %d (预期 15)" % dispatcher.get_total_dropped()
 		})
 
+	var drained: int = dispatcher.pump()
+	if drained != 10 or dispatcher.get_queue_depth() != 0:
+		return TestCase.make_result("test_async_dispatcher_backpressure_drop_oldest_strategy", false, {
+			"error": "pump() 排空队列后深度异常: %d (排空项: %d)" % [dispatcher.get_queue_depth(), drained]
+		})
+
+	dispatcher.clear()
 	return TestCase.make_result("test_async_dispatcher_backpressure_drop_oldest_strategy", true)
 
 ## -----------------------------------------------------------------------------

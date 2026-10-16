@@ -46,7 +46,8 @@ if command -v timeout >/dev/null 2>&1; then
   timeout 180s "$GODOT_BIN" --headless --path "$ROOT_DIR" -s res://tests/test_runner.gd >"$LOG" 2>&1
   CODE=$?
   if [ "$CODE" -eq 124 ]; then
-    echo "【test-run】测试执行超时（超过 180s 未退出，判定为异常阻塞挂起），进程已被终止"
+    echo "【test-run】测试执行超时（超过 180s 未退出，判定为异常阻塞挂起），进程已被终止，最后输出："
+    tail -n 50 "$LOG"
     exit 1
   fi
 else
