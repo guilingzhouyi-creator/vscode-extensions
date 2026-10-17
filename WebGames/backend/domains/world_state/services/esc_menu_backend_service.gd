@@ -48,7 +48,7 @@ static func handle_esc_action(req: ClientRequestEnvelopeDTO, gateway: WorldGatew
 			if not bool(readiness.get("is_ready", false)):
 				return UnifiedProtocolFactory.create_response(
 					req.request_id, false, readiness,
-					str(readiness.get("blocked_reason", "ERR_SAVE_BLOCKED")),
+					"ERR_SAVE_GUARD_BLOCKED",
 					"当前状态被守卫拦截，不可保存"
 				)
 

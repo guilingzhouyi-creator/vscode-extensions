@@ -29,24 +29,40 @@ static func evaluate_save_readiness(
 	if in_combat:
 		return {
 			"allowed": false,
+			"is_ready": false,
+			"can_save": false,
+			"can_exit": false,
+			"blocked_reason": "CANNOT_SAVE_DURING_COMBAT",
 			"error_code": ERR_CANNOT_SAVE_IN_COMBAT,
 			"reason_narrative_key": "errors.save_blocked_combat"
 		}
 	if in_critical_narrative:
 		return {
 			"allowed": false,
+			"is_ready": false,
+			"can_save": false,
+			"can_exit": false,
+			"blocked_reason": "CANNOT_SAVE_DURING_CUTSCENE",
 			"error_code": ERR_CANNOT_SAVE_IN_NARRATIVE,
 			"reason_narrative_key": "errors.save_blocked_narrative"
 		}
 	if is_world_quarantined:
 		return {
 			"allowed": false,
+			"is_ready": false,
+			"can_save": false,
+			"can_exit": false,
+			"blocked_reason": "CANNOT_SAVE_WHEN_DEAD",
 			"error_code": ERR_WORLD_QUARANTINED,
 			"reason_narrative_key": "errors.save_blocked_quarantine"
 		}
 
 	return {
 		"allowed": true,
+		"is_ready": true,
+		"can_save": true,
+		"can_exit": true,
+		"blocked_reason": "",
 		"error_code": "",
 		"reason_narrative_key": ""
 	}

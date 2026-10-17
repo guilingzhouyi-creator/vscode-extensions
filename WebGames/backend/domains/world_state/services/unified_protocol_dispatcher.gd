@@ -56,7 +56,7 @@ static func dispatch_request(req: ClientRequestEnvelopeDTO, gateway: WorldGatewa
 	if req.actor_type == ClientRequestEnvelopeDTO.ACTOR_HUMAN_UI:
 		HumanControlLeaseManager.renew_human_lease(req.account_id, req.lease_nonce)
 	elif req.actor_type == ClientRequestEnvelopeDTO.ACTOR_AGENT:
-		if HumanControlLeaseManager.is_lease_active(req.account_id):
+		if HumanControlLeaseManager.is_lease_active():
 			return UnifiedProtocolFactory.create_response(
 				req.request_id, false, {}, "ERR_PREEMPTED_BY_HUMAN", "人类前台正在操作，Agent 动作已被抢占式阻断"
 			)
@@ -72,7 +72,7 @@ static func dispatch_request(req: ClientRequestEnvelopeDTO, gateway: WorldGatewa
 		"world_state", "world_gateway", "lifecycle":
 			if req.action_type.begins_with("ESC_"):
 				return EscMenuBackendService.handle_esc_action(req, gateway)
-			elif req.domain == "world_state" and req.actor_type == ClientRequestEnvelopeDTO.ACTOR_AGENT:
+			elif req.domain == "world_state":
 				return _dispatch_agent_action_compat(req)
 		"game_settings":
 			return _dispatch_settings_action(req)
@@ -92,7 +92,7 @@ static func _dispatch_agent_action_compat(req: ClientRequestEnvelopeDTO) -> Unif
 	agent_pkt.params = req.payload
 	agent_pkt.client_timestamp_ms = req.client_timestamp_ms
 	var hud_snap := AuthoritativeHudSyncService.get_authoritative_snapshot({"account_id": req.account_id})
-	var is_human_active := HumanControlLeaseManager.is_lease_active(req.account_id)
+	var is_human_active: bool = false if req.actor_type == ClientRequestEnvelopeDTO.ACTOR_HUMAN_UI else HumanControlLeaseManager.is_lease_active()
 	var res := AgentActionExecutionSolver.validate_and_execute(agent_pkt, hud_snap, is_human_active)
 	return UnifiedProtocolFactory.create_response(
 		req.request_id,
