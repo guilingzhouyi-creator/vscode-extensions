@@ -16,9 +16,46 @@
 
 import { RULE_NAM_DEC_001 } from '../scoring/dimensionLiterals';
 
+const TYPE_WARN_CHARS = 35;
+const TYPE_ERROR_CHARS = 45;
+const TYPE_WARN_SEGS = 5;
+const TYPE_ERROR_SEGS = 7;
+const VAL_WARN_CHARS = 32;
+const VAL_ERROR_CHARS = 42;
+const CONST_WARN_CHARS = 42;
+const CONST_ERROR_CHARS = 50;
+const CONST_WARN_SEGS = 6;
+const CONST_ERROR_SEGS = 8;
+const CLUST_MIN_SYMS = 4;
+const CLUST_MIN_PFX_CHARS = 12;
+const CLUST_MIN_PFX_SEGS = 2;
+
+const ACTION_DECOMPOSE_MODULE = 'decompose_module' as const;
+const SEVERITY_WARNING = 'warning' as const;
+const SEVERITY_ERROR = 'error' as const;
+const REASON_EXCESSIVE_LENGTH = 'excessive_length' as const;
+const REASON_EXCESSIVE_SEGMENTS = 'excessive_segments' as const;
+const REASON_PREFIX_CLUSTERING = 'domain_prefix_clustering' as const;
+
+const KIND_TYPE = 'type' as const;
+const KIND_CLASS = 'class' as const;
+const KIND_INTERFACE = 'interface' as const;
+const KIND_CONSTANT = 'constant' as const;
+
+const FALLBACK_DOMAIN_PREFIX_LENGTH = 10;
+const LONG_SEGMENT_THRESHOLD = 5;
+const DEFAULT_PREFIX_SLICE_COUNT = 2;
+const SHORT_PREFIX_SLICE_COUNT = 1;
+
 /** Permitted AST symbol declaration kinds audited for architectural coupling. */
 export type SymbolDeclarationKind =
     'type' | 'class' | 'interface' | 'function' | 'method' | 'variable' | 'constant' | 'member';
+
+/** Suggested domain directory and symbol output of a decomposition proposal. */
+export interface DomainProposalOutcome {
+    readonly suggestedDomainDirectory: string;
+    readonly suggestedSymbol: string;
+}
 
 /**
  * Configuration thresholds for identifier length and architectural decomposition analysis.
@@ -41,37 +78,35 @@ export interface NamingDecouplingConfig {
 
 /** Default configuration thresholds for naming decoupling and prefix clustering audits. */
 export const DEFAULT_NAMING_DECOUPLING_CONFIG: NamingDecouplingConfig = {
-    typeWarningLength: 35,
-    typeErrorLength: 45,
-    typeWarningSegments: 5,
-    typeErrorSegments: 7,
-    valueWarningLength: 32,
-    valueErrorLength: 42,
-    constantWarningLength: 42,
-    constantErrorLength: 50,
-    constantWarningSegments: 6,
-    constantErrorSegments: 8,
-    clusterMinSymbols: 4,
-    clusterMinPrefixLength: 12,
-    clusterMinPrefixSegments: 2,
+    typeWarningLength: TYPE_WARN_CHARS,
+    typeErrorLength: TYPE_ERROR_CHARS,
+    typeWarningSegments: TYPE_WARN_SEGS,
+    typeErrorSegments: TYPE_ERROR_SEGS,
+    valueWarningLength: VAL_WARN_CHARS,
+    valueErrorLength: VAL_ERROR_CHARS,
+    constantWarningLength: CONST_WARN_CHARS,
+    constantErrorLength: CONST_ERROR_CHARS,
+    constantWarningSegments: CONST_WARN_SEGS,
+    constantErrorSegments: CONST_ERROR_SEGS,
+    clusterMinSymbols: CLUST_MIN_SYMS,
+    clusterMinPrefixLength: CLUST_MIN_PFX_CHARS,
+    clusterMinPrefixSegments: CLUST_MIN_PFX_SEGS,
 };
 
 /**
  * Machine-actionable decoupling proposal payload for AI Agent dispatch.
  */
-export interface ActionableDecouplingProposal {
+export interface ActionableDecouplingProposal extends DomainProposalOutcome {
     readonly action: 'decompose_module';
     readonly rule: typeof RULE_NAM_DEC_001;
     readonly targetSymbol: string;
-    readonly suggestedDomainDirectory: string;
-    readonly suggestedSymbol: string;
     readonly rationale: string;
 }
 
 /**
  * Finding produced when an identifier exhibits architectural inflation.
  */
-export interface NamingDecouplingFinding {
+export interface NamingDecouplingFinding extends DomainProposalOutcome {
     readonly symbol: string;
     readonly kind: SymbolDeclarationKind;
     readonly line: number;
@@ -80,8 +115,6 @@ export interface NamingDecouplingFinding {
     readonly segments: readonly string[];
     readonly severity: 'warning' | 'error';
     readonly reason: 'excessive_length' | 'excessive_segments' | 'domain_prefix_clustering';
-    readonly suggestedDomainDirectory: string;
-    readonly suggestedSymbol: string;
     readonly actionableProposal: ActionableDecouplingProposal;
     readonly message: string;
 }
@@ -115,15 +148,15 @@ export function splitIdentifierTokens(name: string): string[] {
     }
 
     // PascalCase / camelCase / acronyms (e.g., HTTPResponseHandler -> HTTP, Response, Handler)
-    const result: string[] = [];
+    const tokenList: string[] = [];
     const pattern = /([A-Z]+(?=[A-Z][a-z0-9]|$)|[A-Z][a-z0-9]*|[a-z0-9]+)/g;
     let match: RegExpExecArray | null;
     while ((match = pattern.exec(name)) !== null) {
         if (match[0].length > 0) {
-            result.push(match[0]);
+            tokenList.push(match[0]);
         }
     }
-    return result.length > 0 ? result : [name];
+    return tokenList.length > 0 ? tokenList : [name];
 }
 
 /**
@@ -134,6 +167,13 @@ function toKebabPath(tokens: readonly string[]): string {
         .map((t) => t.toLowerCase())
         .join('/')
         .concat('/');
+}
+
+function buildDomainProposal(
+    suggestedDomainDirectory: string,
+    suggestedSymbol: string,
+): { suggestedDomainDirectory: string; suggestedSymbol: string } {
+    return { suggestedDomainDirectory, suggestedSymbol };
 }
 
 /**
@@ -150,39 +190,64 @@ export function deriveDomainProposal(
     isUpperSnake: boolean,
 ): { suggestedDomainDirectory: string; suggestedSymbol: string } {
     if (segments.length <= 2) {
-        const fallbackDir = `domain/${name.toLowerCase().slice(0, 10)}/`;
-        return { suggestedDomainDirectory: fallbackDir, suggestedSymbol: name };
+        const domainSlug = name.toLowerCase().slice(0, FALLBACK_DOMAIN_PREFIX_LENGTH);
+        return buildDomainProposal(`domain/${domainSlug}/`, name);
     }
 
     // Take leading 2 segments (or 1 if 3 segments total) as the domain namespace
-    const prefixCount = segments.length >= 5 ? 2 : 1;
+    const prefixCount = segments.length >= LONG_SEGMENT_THRESHOLD
+        ? DEFAULT_PREFIX_SLICE_COUNT
+        : SHORT_PREFIX_SLICE_COUNT;
     const prefixSegments = segments.slice(0, prefixCount);
     const remainderSegments = segments.slice(prefixCount);
 
-    const suggestedDomainDirectory = `domain/${toKebabPath(prefixSegments)}`;
+    const domainPath = `domain/${toKebabPath(prefixSegments)}`;
 
-    let suggestedSymbol: string;
+    let candidateSymbol: string;
     if (isUpperSnake) {
-        suggestedSymbol = remainderSegments.join('_');
+        candidateSymbol = remainderSegments.join('_');
     } else {
-        suggestedSymbol = remainderSegments.join('');
+        candidateSymbol = remainderSegments.join('');
     }
 
     // Guard against empty remainder
-    if (!suggestedSymbol || suggestedSymbol.length === 0) {
-        suggestedSymbol = name;
-    }
+    const cleanSymbol = candidateSymbol && candidateSymbol.length > 0 ? candidateSymbol : name;
 
-    return { suggestedDomainDirectory, suggestedSymbol };
+    return buildDomainProposal(domainPath, cleanSymbol);
 }
 
 function isTypeSymbol(kind: SymbolDeclarationKind): boolean {
-    return kind === 'type' || kind === 'class' || kind === 'interface';
+    return kind === KIND_TYPE || kind === KIND_CLASS || kind === KIND_INTERFACE;
 }
 
 interface ViolationVerdict {
-    readonly severity: 'warning' | 'error';
-    readonly reason: 'excessive_length' | 'excessive_segments';
+    readonly severity: typeof SEVERITY_WARNING | typeof SEVERITY_ERROR;
+    readonly reason: typeof REASON_EXCESSIVE_LENGTH | typeof REASON_EXCESSIVE_SEGMENTS;
+}
+
+interface ThresholdLimits {
+    readonly errorLength: number;
+    readonly errorSegments: number;
+    readonly warningLength: number;
+    readonly warningSegments: number;
+}
+
+function evaluateMetricBounds(
+    len: number,
+    segmentCount: number,
+    limits: ThresholdLimits,
+): ViolationVerdict | null {
+    const isError = len >= limits.errorLength || segmentCount >= limits.errorSegments;
+    if (isError) {
+        const reason = len >= limits.errorLength ? REASON_EXCESSIVE_LENGTH : REASON_EXCESSIVE_SEGMENTS;
+        return { severity: SEVERITY_ERROR, reason };
+    }
+    const isWarning = len >= limits.warningLength || segmentCount >= limits.warningSegments;
+    if (isWarning) {
+        const reason = len >= limits.warningLength ? REASON_EXCESSIVE_LENGTH : REASON_EXCESSIVE_SEGMENTS;
+        return { severity: SEVERITY_WARNING, reason };
+    }
+    return null;
 }
 
 function evaluateTypeThreshold(
@@ -190,19 +255,12 @@ function evaluateTypeThreshold(
     segmentCount: number,
     config: NamingDecouplingConfig,
 ): ViolationVerdict | null {
-    if (len >= config.typeErrorLength) {
-        return { severity: 'error', reason: 'excessive_length' };
-    }
-    if (segmentCount >= config.typeErrorSegments) {
-        return { severity: 'error', reason: 'excessive_segments' };
-    }
-    if (len >= config.typeWarningLength) {
-        return { severity: 'warning', reason: 'excessive_length' };
-    }
-    if (segmentCount >= config.typeWarningSegments) {
-        return { severity: 'warning', reason: 'excessive_segments' };
-    }
-    return null;
+    return evaluateMetricBounds(len, segmentCount, {
+        errorLength: config.typeErrorLength,
+        errorSegments: config.typeErrorSegments,
+        warningLength: config.typeWarningLength,
+        warningSegments: config.typeWarningSegments,
+    });
 }
 
 function evaluateConstantThreshold(
@@ -210,24 +268,12 @@ function evaluateConstantThreshold(
     segmentCount: number,
     config: NamingDecouplingConfig,
 ): ViolationVerdict | null {
-    const constErrorLen = config.constantErrorLength ?? 50;
-    const constErrorSeg = config.constantErrorSegments ?? 8;
-    if (len >= constErrorLen) {
-        return { severity: 'error', reason: 'excessive_length' };
-    }
-    if (segmentCount >= constErrorSeg) {
-        return { severity: 'error', reason: 'excessive_segments' };
-    }
-
-    const constWarnLen = config.constantWarningLength ?? 42;
-    const constWarnSeg = config.constantWarningSegments ?? 6;
-    if (len >= constWarnLen) {
-        return { severity: 'warning', reason: 'excessive_length' };
-    }
-    if (segmentCount >= constWarnSeg) {
-        return { severity: 'warning', reason: 'excessive_segments' };
-    }
-    return null;
+    return evaluateMetricBounds(len, segmentCount, {
+        errorLength: config.constantErrorLength ?? CONST_ERROR_CHARS,
+        errorSegments: config.constantErrorSegments ?? CONST_ERROR_SEGS,
+        warningLength: config.constantWarningLength ?? CONST_WARN_CHARS,
+        warningSegments: config.constantWarningSegments ?? CONST_WARN_SEGS,
+    });
 }
 
 function evaluateValueThreshold(
@@ -235,28 +281,32 @@ function evaluateValueThreshold(
     config: NamingDecouplingConfig,
 ): ViolationVerdict | null {
     if (len >= config.valueErrorLength) {
-        return { severity: 'error', reason: 'excessive_length' };
+        return { severity: SEVERITY_ERROR, reason: REASON_EXCESSIVE_LENGTH };
     }
     if (len >= config.valueWarningLength) {
-        return { severity: 'warning', reason: 'excessive_length' };
+        return { severity: SEVERITY_WARNING, reason: REASON_EXCESSIVE_LENGTH };
     }
     return null;
 }
 
+interface ThresholdEvaluationContext {
+    readonly len: number;
+    readonly segmentCount: number;
+    readonly isType: boolean;
+    readonly isConstant: boolean;
+    readonly config: NamingDecouplingConfig;
+}
+
 function evaluateThresholdViolation(
-    len: number,
-    segmentCount: number,
-    isType: boolean,
-    isConstant: boolean,
-    config: NamingDecouplingConfig,
+    context: ThresholdEvaluationContext,
 ): ViolationVerdict | null {
-    if (isType) {
-        return evaluateTypeThreshold(len, segmentCount, config);
+    if (context.isType) {
+        return evaluateTypeThreshold(context.len, context.segmentCount, context.config);
     }
-    if (isConstant) {
-        return evaluateConstantThreshold(len, segmentCount, config);
+    if (context.isConstant) {
+        return evaluateConstantThreshold(context.len, context.segmentCount, context.config);
     }
-    return evaluateValueThreshold(len, config);
+    return evaluateValueThreshold(context.len, context.config);
 }
 
 function extractPrefixKey(
@@ -272,46 +322,91 @@ function extractPrefixKey(
     const prefixSegments = segments.slice(0, 2);
     const separator = isUpperSnake ? '_' : '';
     const prefixKey = prefixSegments.map((seg) => seg.toLowerCase()).join(separator);
-    if (prefixKey.length < minLength) {
-        return null;
-    }
-    return prefixKey;
+    return prefixKey.length >= minLength ? prefixKey : null;
+}
+
+function buildNamingFinding(params: {
+    symbol: string;
+    kind: SymbolDeclarationKind;
+    line: number;
+    column: number;
+    len: number;
+    segments: readonly string[];
+    severity: typeof SEVERITY_WARNING | typeof SEVERITY_ERROR;
+    reason: typeof REASON_EXCESSIVE_LENGTH | typeof REASON_EXCESSIVE_SEGMENTS;
+    proposal: DomainProposalOutcome;
+}): NamingDecouplingFinding {
+    const { symbol, kind, line, column, len, segments, severity, reason, proposal } = params;
+    const rationale =
+        `Identifier '${symbol}' has ${len} chars (${segments.length} segments). ` +
+        `Extract namespace into '${proposal.suggestedDomainDirectory}' to decouple ` +
+        `architecture and simplify symbol to '${proposal.suggestedSymbol}'.`;
+
+    const actionableProposal: ActionableDecouplingProposal = {
+        action: ACTION_DECOMPOSE_MODULE,
+        rule: RULE_NAM_DEC_001,
+        targetSymbol: symbol,
+        ...proposal,
+        rationale,
+    };
+
+    const message =
+        `Symbol '${symbol}' exhibits excessive length (${len} chars, ` +
+        `${segments.length} segments), indicating missing architectural encapsulation. ` +
+        `Decompose into domain directory '${proposal.suggestedDomainDirectory}'.`;
+
+    return {
+        symbol,
+        kind,
+        line,
+        column,
+        length: len,
+        segments,
+        severity,
+        reason,
+        ...proposal,
+        actionableProposal,
+        message,
+    };
 }
 
 function createClusterFinding(
-    item: SymbolEntry,
+    targetSymbol: SymbolEntry,
     prefix: string,
     clusterSize: number,
     suggestedDir: string,
 ): NamingDecouplingFinding {
-    const isUpperSnake = /^[A-Z0-9_]+$/.test(item.name);
-    const segments = splitIdentifierTokens(item.name);
-    const proposal = deriveDomainProposal(item.name, segments, isUpperSnake);
+    const isUpperSnake = /^[A-Z0-9_]+$/.test(targetSymbol.name);
+    const segments = splitIdentifierTokens(targetSymbol.name);
+    const proposal = deriveDomainProposal(targetSymbol.name, segments, isUpperSnake);
     const rationale =
         `${clusterSize} symbols share prefix '${prefix}'. ` +
         `Submerge into '${suggestedDir}' to achieve architectural encapsulation.`;
 
-    return {
-        symbol: item.name,
-        kind: item.kind,
-        line: item.line,
-        column: item.column,
-        length: item.name.length,
-        segments,
-        severity: 'warning',
-        reason: 'domain_prefix_clustering',
+    const domainOutcome: DomainProposalOutcome = {
         suggestedDomainDirectory: suggestedDir,
         suggestedSymbol: proposal.suggestedSymbol,
+    };
+
+    return {
+        symbol: targetSymbol.name,
+        kind: targetSymbol.kind,
+        line: targetSymbol.line,
+        column: targetSymbol.column,
+        length: targetSymbol.name.length,
+        segments,
+        severity: SEVERITY_WARNING,
+        reason: REASON_PREFIX_CLUSTERING,
+        ...domainOutcome,
         actionableProposal: {
-            action: 'decompose_module',
+            action: ACTION_DECOMPOSE_MODULE,
             rule: RULE_NAM_DEC_001,
-            targetSymbol: item.name,
-            suggestedDomainDirectory: suggestedDir,
-            suggestedSymbol: proposal.suggestedSymbol,
+            targetSymbol: targetSymbol.name,
+            ...domainOutcome,
             rationale,
         },
         message:
-            `Symbol '${item.name}' belongs to a flat prefix cluster ` +
+            `Symbol '${targetSymbol.name}' belongs to a flat prefix cluster ` +
             `('${prefix}', ${clusterSize} symbols). Extract into ` +
             `module '${suggestedDir}'.`,
     };
@@ -342,53 +437,31 @@ export class NamingDecouplingAuditor {
         const segments = splitIdentifierTokens(symbol);
         const len = symbol.length;
 
-        const isConstant = kind === 'constant';
-        const verdict = evaluateThresholdViolation(
+        const isConstant = kind === KIND_CONSTANT;
+        const verdict = evaluateThresholdViolation({
             len,
-            segments.length,
+            segmentCount: segments.length,
             isType,
             isConstant,
-            this.config,
-        );
+            config: this.config,
+        });
         if (!verdict) {
             return null;
         }
 
         const isUpperSnake = /^[A-Z0-9_]+$/.test(symbol) && symbol.includes('_');
         const proposal = deriveDomainProposal(symbol, segments, isUpperSnake);
-        const rationale =
-            `Identifier '${symbol}' has ${len} chars (${segments.length} segments). ` +
-            `Extract namespace into '${proposal.suggestedDomainDirectory}' to decouple ` +
-            `architecture and simplify symbol to '${proposal.suggestedSymbol}'.`;
-
-        const actionableProposal: ActionableDecouplingProposal = {
-            action: 'decompose_module',
-            rule: RULE_NAM_DEC_001,
-            targetSymbol: symbol,
-            suggestedDomainDirectory: proposal.suggestedDomainDirectory,
-            suggestedSymbol: proposal.suggestedSymbol,
-            rationale,
-        };
-
-        const message =
-            `Symbol '${symbol}' exhibits excessive length (${len} chars, ` +
-            `${segments.length} segments), indicating missing architectural encapsulation. ` +
-            `Decompose into domain directory '${proposal.suggestedDomainDirectory}'.`;
-
-        return {
+        return buildNamingFinding({
             symbol,
             kind,
             line,
             column,
-            length: len,
+            len,
             segments,
             severity: verdict.severity,
             reason: verdict.reason,
-            suggestedDomainDirectory: proposal.suggestedDomainDirectory,
-            suggestedSymbol: proposal.suggestedSymbol,
-            actionableProposal,
-            message,
-        };
+            proposal,
+        });
     }
 
     /**
@@ -424,15 +497,15 @@ export class NamingDecouplingAuditor {
             if (grouped.length < this.config.clusterMinSymbols) {
                 continue;
             }
-            const prefixSegments = splitIdentifierTokens(grouped[0].name).slice(0, 2);
+            const prefixSegments = splitIdentifierTokens(grouped[0].name).slice(0, DEFAULT_PREFIX_SLICE_COUNT);
             const suggestedDir = `domain/${toKebabPath(prefixSegments)}`;
 
-            for (const item of grouped) {
-                if (seenSymbols.has(item.name)) {
+            for (const clusterEntry of grouped) {
+                if (seenSymbols.has(clusterEntry.name)) {
                     continue;
                 }
-                seenSymbols.add(item.name);
-                findings.push(createClusterFinding(item, prefix, grouped.length, suggestedDir));
+                seenSymbols.add(clusterEntry.name);
+                findings.push(createClusterFinding(clusterEntry, prefix, grouped.length, suggestedDir));
             }
         }
 

@@ -13,6 +13,54 @@
 
 import { SCORE_ROUNDING, PERCENT_SCALE } from './scorer-formulas';
 
+const SCORE_MAX = 100;
+const SCORE_PERFECT_FLOAT = 100.0;
+const DEFAULT_LAYOUT_BASE_DEPTH = 4;
+const DEFAULT_LAYOUT_ELASTICITY = 10.0;
+const DEFAULT_VIEW_LOC_BASE = 1000;
+const VIEW_LOC_SCALE_FACTOR = 1000.0;
+const DEFAULT_INTERACTIONS_COUNT = 10;
+const MIN_PROFILE_SCORE_FLOOR = 15;
+
+/**
+ * Options for evaluating Pareto Zero-Cost Modern Utility score.
+ */
+export interface ZeroCostUtilityOptions {
+    readonly throughputRatio: number;
+    readonly indirectionDepth: number;
+    readonly transientAllocRatio?: number;
+    readonly strictTypedRatio?: number;
+    readonly lambda?: number;
+}
+
+function resolveZeroCostUtilityParams(
+    optionsOrThroughput: ZeroCostUtilityOptions | number,
+    restArgs: readonly number[],
+): {
+    throughput: number;
+    depth: number;
+    allocRatio: number;
+    typedRatio: number;
+    lambdaPenalty: number;
+} {
+    if (typeof optionsOrThroughput === 'object' && optionsOrThroughput !== null) {
+        return {
+            throughput: optionsOrThroughput.throughputRatio,
+            depth: optionsOrThroughput.indirectionDepth,
+            allocRatio: optionsOrThroughput.transientAllocRatio ?? 0,
+            typedRatio: optionsOrThroughput.strictTypedRatio ?? 1.0,
+            lambdaPenalty: optionsOrThroughput.lambda ?? 0.2,
+        };
+    }
+    return {
+        throughput: optionsOrThroughput,
+        depth: restArgs[0] ?? 0,
+        allocRatio: restArgs[1] ?? 0,
+        typedRatio: restArgs[2] ?? 1.0,
+        lambdaPenalty: restArgs[3] ?? 0.2,
+    };
+}
+
 /**
  * Compute Pareto Zero-Cost Modern Utility Score.
  *
@@ -20,27 +68,23 @@ import { SCORE_ROUNDING, PERCENT_SCALE } from './scorer-formulas';
  * E_{\text{zero}} = \frac{\text{ThroughputRatio}}{1.0 + \lambda \cdot \text{IndirectionDepth}}
  *   \cdot (1 - \text{TransientAllocRatio}) \cdot \text{StrictTypedRatio}
  *
- * @param throughputRatio - Ratio of modern execution throughput relative to baseline.
- * @param indirectionDepth - Number of abstraction layer indirections.
- * @param transientAllocRatio - Fraction of operations triggering heap allocation.
- * @param strictTypedRatio - Proportion of API strictly typed with zero `any` or loose dictionaries.
- * @param lambda - Indirection penalty coefficient (default 0.2).
+ * @param options - Structured utility options or raw throughput ratio.
+ * @param restArgs - Legacy positional arguments for backward compatibility.
  * @returns Zero-cost utility score in [0, 100].
  */
-export function calculateZeroCostModernUtility(
-    throughputRatio: number,
-    indirectionDepth: number,
-    transientAllocRatio: number = 0,
-    strictTypedRatio: number = 1.0,
-    lambda: number = 0.2,
+export function computeZeroCostModernUtility(
+    options: ZeroCostUtilityOptions | number,
+    ...restArgs: number[]
 ): number {
-    const safeThroughput = Math.max(0.1, throughputRatio);
-    const denominator = 1.0 + lambda * Math.max(0, indirectionDepth);
-    const allocEfficiency = Math.max(0, 1.0 - Math.min(1.0, Math.max(0, transientAllocRatio)));
-    const typeDiscipline = Math.max(0, Math.min(1.0, strictTypedRatio));
-    const utility = (safeThroughput / denominator) * allocEfficiency * typeDiscipline * 100;
-    return Math.round(Math.min(100, utility) * SCORE_ROUNDING) / SCORE_ROUNDING;
+    const params = resolveZeroCostUtilityParams(options, restArgs);
+    const safeThroughput = Math.max(0.1, params.throughput);
+    const denominator = 1.0 + params.lambdaPenalty * Math.max(0, params.depth);
+    const allocEfficiency = Math.max(0, 1.0 - Math.min(1.0, Math.max(0, params.allocRatio)));
+    const typeDiscipline = Math.max(0, Math.min(1.0, params.typedRatio));
+    const utility = (safeThroughput / denominator) * allocEfficiency * typeDiscipline * SCORE_MAX;
+    return Math.round(Math.min(SCORE_MAX, utility) * SCORE_ROUNDING) / SCORE_ROUNDING;
 }
+export { computeZeroCostModernUtility as calculateZeroCostModernUtility };
 
 /**
  * Compute Modern Construct Adoption Rate.
@@ -52,7 +96,7 @@ export function calculateZeroCostModernUtility(
  * @param legacyConstructsCount - Count of legacy constructs.
  * @returns Adoption rate in [0, 1].
  */
-export function calculateModernConstructAdoptionRate(
+export function computeModernAdoptionRate(
     modernConstructsCount: number,
     legacyConstructsCount: number,
 ): number {
@@ -63,6 +107,46 @@ export function calculateModernConstructAdoptionRate(
     const rate = Math.max(0, modernConstructsCount) / total;
     return Math.round(rate * PERCENT_SCALE) / PERCENT_SCALE;
 }
+export { computeModernAdoptionRate as calculateModernConstructAdoptionRate };
+
+/**
+ * Options for evaluating interactive debounce and anti-spam protection index.
+ */
+export interface DebounceProtectionOptions {
+    readonly debouncedActions: number;
+    readonly loadingFencedActions: number;
+    readonly criticalActions: number;
+    readonly omega?: number;
+    readonly powerExponent?: number;
+}
+
+function resolveDebounceParams(
+    optionsOrActions: DebounceProtectionOptions | number,
+    restArgs: readonly number[],
+): {
+    debounced: number;
+    loading: number;
+    critical: number;
+    omegaWeight: number;
+    exponent: number;
+} {
+    if (typeof optionsOrActions === 'object' && optionsOrActions !== null) {
+        return {
+            debounced: optionsOrActions.debouncedActions,
+            loading: optionsOrActions.loadingFencedActions,
+            critical: optionsOrActions.criticalActions,
+            omegaWeight: optionsOrActions.omega ?? 0.5,
+            exponent: optionsOrActions.powerExponent ?? 1.0,
+        };
+    }
+    return {
+        debounced: optionsOrActions,
+        loading: restArgs[0] ?? 0,
+        critical: restArgs[1] ?? 0,
+        omegaWeight: restArgs[2] ?? 0.5,
+        exponent: restArgs[3] ?? 1.0,
+    };
+}
 
 /**
  * Compute Interactive Debounce & Anti-Spam Protection Index.
@@ -72,29 +156,64 @@ export function calculateModernConstructAdoptionRate(
  *   100 \times
  *   ((N_{\text{deb}} + \omega \cdot N_{\text{fen}}) / (N_{\text{crit}} + \epsilon))^{\mu}
  *
- * @param debouncedActions - Actions protected by >= 0.3s debounce or throttle.
- * @param loadingFencedActions - Actions protected by loading/disabled state locks.
- * @param criticalActions - Total critical/asynchronous user actions.
- * @param omega - Weight for loading fencing (default 0.5).
- * @param mu - Power decay scaling exponent (default 1.0).
+ * @param options - Structured debounce options or debounced action count.
+ * @param restArgs - Legacy positional arguments for backward compatibility.
  * @returns Debounce protection index in [0, 100].
  */
-export function calculateDebounceProtectionIndex(
-    debouncedActions: number,
-    loadingFencedActions: number,
-    criticalActions: number,
-    omega: number = 0.5,
-    mu: number = 1.0,
+export function computeDebounceIndex(
+    options: DebounceProtectionOptions | number,
+    ...restArgs: number[]
 ): number {
-    if (criticalActions <= 0) {
-        return 100.0;
+    const params = resolveDebounceParams(options, restArgs);
+    if (params.critical <= 0) {
+        return SCORE_PERFECT_FLOAT;
     }
-    const safeDebounced = Math.max(0, debouncedActions);
-    const safeLoading = Math.max(0, loadingFencedActions);
-    const rawProtected = (safeDebounced + omega * safeLoading) / Math.max(1, criticalActions);
+    const safeDebounced = Math.max(0, params.debounced);
+    const safeLoading = Math.max(0, params.loading);
+    const rawProtected = (safeDebounced + params.omegaWeight * safeLoading) / Math.max(1, params.critical);
     const normalized = Math.min(1.0, Math.max(0, rawProtected));
-    const score = Math.pow(normalized, Math.max(0.1, mu)) * 100;
+    const score = Math.pow(normalized, Math.max(0.1, params.exponent)) * SCORE_MAX;
     return Math.round(score * SCORE_ROUNDING) / SCORE_ROUNDING;
+}
+export { computeDebounceIndex as calculateDebounceProtectionIndex };
+
+/**
+ * Options for evaluating Finite State Machine structural determinism score.
+ */
+export interface FsmDeterminismOptions {
+    readonly wildMutations: number;
+    readonly guardedTransitions: number;
+    readonly guardedStates: number;
+    readonly totalStates: number;
+    readonly severityWeight?: number;
+}
+
+function resolveFsmParams(
+    optionsOrMutations: FsmDeterminismOptions | number,
+    restArgs: readonly number[],
+): {
+    wild: number;
+    transitions: number;
+    states: number;
+    total: number;
+    weight: number;
+} {
+    if (typeof optionsOrMutations === 'object' && optionsOrMutations !== null) {
+        return {
+            wild: optionsOrMutations.wildMutations,
+            transitions: optionsOrMutations.guardedTransitions,
+            states: optionsOrMutations.guardedStates,
+            total: optionsOrMutations.totalStates,
+            weight: optionsOrMutations.severityWeight ?? 1.0,
+        };
+    }
+    return {
+        wild: optionsOrMutations,
+        transitions: restArgs[0] ?? 0,
+        states: restArgs[1] ?? 0,
+        total: restArgs[2] ?? 0,
+        weight: restArgs[3] ?? 1.0,
+    };
 }
 
 /**
@@ -106,32 +225,28 @@ export function calculateDebounceProtectionIndex(
  *   \left(1 - \min(1.0, (\sum W \cdot N_{\text{wild}}) / (N_{\text{trans}} + 1))\right)
  *   \cdot \left(\frac{N_{\text{guarded}}}{N_{\text{states}}}\right)
  *
- * @param wildMutations - Direct state variable mutations bypassing transition guards.
- * @param guardedTransitions - Total formal transitions routed through state machine guards.
- * @param guardedStates - States declaring complete entry/exit invariants.
- * @param totalStates - Total states in enum/catalog.
- * @param severityWeight - Penalty multiplier for wild mutations (default 1.0).
+ * @param options - Structured FSM determinism options or wild mutations count.
+ * @param restArgs - Legacy positional arguments for backward compatibility.
  * @returns FSM determinism score in [0, 100].
  */
-export function calculateFsmDeterminismScore(
-    wildMutations: number,
-    guardedTransitions: number,
-    guardedStates: number,
-    totalStates: number,
-    severityWeight: number = 1.0,
+export function computeFsmDeterminism(
+    options: FsmDeterminismOptions | number,
+    ...restArgs: number[]
 ): number {
-    if (totalStates <= 0) {
-        return 100.0;
+    const params = resolveFsmParams(options, restArgs);
+    if (params.total <= 0) {
+        return SCORE_PERFECT_FLOAT;
     }
     const mutationPenalty = Math.min(
         1.0,
-        (Math.max(0, wildMutations) * Math.max(0.1, severityWeight)) /
-            (Math.max(0, guardedTransitions) + 1),
+        (Math.max(0, params.wild) * Math.max(0.1, params.weight)) /
+            (Math.max(0, params.transitions) + 1),
     );
-    const guardRatio = Math.min(1.0, Math.max(0, guardedStates) / Math.max(1, totalStates));
-    const score = (1.0 - mutationPenalty) * guardRatio * 100;
-    return Math.round(Math.max(0, Math.min(100, score)) * SCORE_ROUNDING) / SCORE_ROUNDING;
+    const guardRatio = Math.min(1.0, Math.max(0, params.states) / Math.max(1, params.total));
+    const score = (1.0 - mutationPenalty) * guardRatio * SCORE_MAX;
+    return Math.round(Math.max(0, Math.min(SCORE_MAX, score)) * SCORE_ROUNDING) / SCORE_ROUNDING;
 }
+export { computeFsmDeterminism as calculateFsmDeterminismScore };
 
 /**
  * Compute UI Layout Hierarchy Nesting Density Index.
@@ -147,24 +262,25 @@ export function calculateFsmDeterminismScore(
  * @param totalViews - Total views or screen files analyzed (default 1).
  * @returns Nesting density index in [0, 100].
  */
-export function calculateLayoutNestingDensityIndex(
+export function computeLayoutNestingDensity(
     depths: number[],
-    baseThreshold: number = 4,
-    kappa: number = 10.0,
+    baseThreshold: number = DEFAULT_LAYOUT_BASE_DEPTH,
+    kappa: number = DEFAULT_LAYOUT_ELASTICITY,
     totalViews: number = 1,
 ): number {
     if (!depths || depths.length === 0) {
-        return 100.0;
+        return SCORE_PERFECT_FLOAT;
     }
     let excessSumSquared = 0;
-    for (const d of depths) {
-        const excess = Math.max(0, d - baseThreshold);
+    for (const depth of depths) {
+        const excess = Math.max(0, depth - baseThreshold);
         excessSumSquared += excess * excess;
     }
     const normalizer = Math.max(1, totalViews) * Math.max(1.0, kappa);
-    const score = 100.0 * Math.exp(-excessSumSquared / normalizer);
-    return Math.round(Math.max(0, Math.min(100, score)) * SCORE_ROUNDING) / SCORE_ROUNDING;
+    const score = SCORE_PERFECT_FLOAT * Math.exp(-excessSumSquared / normalizer);
+    return Math.round(Math.max(0, Math.min(SCORE_MAX, score)) * SCORE_ROUNDING) / SCORE_ROUNDING;
 }
+export { computeLayoutNestingDensity as calculateLayoutNestingDensityIndex };
 
 /**
  * Compute Observer WeakRef Reference Hygiene Index.
@@ -186,7 +302,7 @@ export function calculateObserverWeakRefHygiene(
     totalStrongRefs: number = 0,
 ): number {
     if (totalDynamicBindings <= 0 && totalStrongRefs <= 0) {
-        return 100.0;
+        return SCORE_PERFECT_FLOAT;
     }
     const coverageRatio = Math.min(
         1.0,
@@ -196,8 +312,8 @@ export function calculateObserverWeakRefHygiene(
         1.0,
         Math.max(0, uncleanedStrongRefs) / (Math.max(0, totalStrongRefs) + 1),
     );
-    const score = coverageRatio * (1.0 - leakPenalty) * 100;
-    return Math.round(Math.max(0, Math.min(100, score)) * SCORE_ROUNDING) / SCORE_ROUNDING;
+    const score = coverageRatio * (1.0 - leakPenalty) * SCORE_MAX;
+    return Math.round(Math.max(0, Math.min(SCORE_MAX, score)) * SCORE_ROUNDING) / SCORE_ROUNDING;
 }
 
 /**
@@ -214,14 +330,14 @@ export function calculateObserverWeakRefHygiene(
  * @param fontScalableRatio - Fraction of text elements with adaptive font scales.
  * @returns Responsive scalability index in [0, 100].
  */
-export function calculateResponsiveScalabilityIndex(
+export function computeResponsiveIndex(
     hardcodedPixelBounds: number,
     layoutElements: number,
     anchorDrivenRatio: number = 1.0,
     fontScalableRatio: number = 1.0,
 ): number {
     if (layoutElements <= 0) {
-        return 100.0;
+        return SCORE_PERFECT_FLOAT;
     }
     const hardcodedPenalty = Math.min(
         1.0,
@@ -230,8 +346,48 @@ export function calculateResponsiveScalabilityIndex(
     const adaptiveFactor =
         0.6 * Math.min(1.0, Math.max(0, anchorDrivenRatio)) +
         0.4 * Math.min(1.0, Math.max(0, fontScalableRatio));
-    const score = (1.0 - hardcodedPenalty) * adaptiveFactor * 100;
-    return Math.round(Math.max(0, Math.min(100, score)) * SCORE_ROUNDING) / SCORE_ROUNDING;
+    const score = (1.0 - hardcodedPenalty) * adaptiveFactor * SCORE_MAX;
+    return Math.round(Math.max(0, Math.min(SCORE_MAX, score)) * SCORE_ROUNDING) / SCORE_ROUNDING;
+}
+export { computeResponsiveIndex as calculateResponsiveScalabilityIndex };
+
+/**
+ * Options for evaluating unidirectional data flow integrity and CQRS mutation purity.
+ */
+export interface UnidirectionalFlowOptions {
+    readonly dtoMutations: number;
+    readonly directDomainMutations: number;
+    readonly viewLoc?: number;
+    readonly lambda?: number;
+    readonly domainMutationWeight?: number;
+}
+
+function resolveUnidirectionalParams(
+    optionsOrDto: UnidirectionalFlowOptions | number,
+    restArgs: readonly number[],
+): {
+    dtoCount: number;
+    domainCount: number;
+    locLines: number;
+    dtoWeight: number;
+    domainWeight: number;
+} {
+    if (typeof optionsOrDto === 'object' && optionsOrDto !== null) {
+        return {
+            dtoCount: optionsOrDto.dtoMutations,
+            domainCount: optionsOrDto.directDomainMutations,
+            locLines: optionsOrDto.viewLoc ?? DEFAULT_VIEW_LOC_BASE,
+            dtoWeight: optionsOrDto.lambda ?? 1.2,
+            domainWeight: optionsOrDto.domainMutationWeight ?? 2.0,
+        };
+    }
+    return {
+        dtoCount: optionsOrDto,
+        domainCount: restArgs[0] ?? 0,
+        locLines: restArgs[1] ?? DEFAULT_VIEW_LOC_BASE,
+        dtoWeight: restArgs[2] ?? 1.2,
+        domainWeight: restArgs[3] ?? 2.0,
+    };
 }
 
 /**
@@ -242,26 +398,23 @@ export function calculateResponsiveScalabilityIndex(
  *   100 \times
  *   \exp(-(\lambda N_{\text{dto}} + \nu N_{\text{dom}}) / \max(1, K_{\text{loc}} / 1000))
  *
- * @param dtoMutations - Direct mutations to immutable Snapshot DTOs inside views.
- * @param directDomainMutations - Direct invocations of domain entity write methods from views.
- * @param viewLoc - Total physical lines of presentation code.
- * @param lambda - DTO in-place mutation penalty weight (default 1.2).
- * @param nu - Direct domain mutation penalty weight (default 2.0).
+ * @param options - Structured unidirectional flow options or DTO mutations count.
+ * @param restArgs - Legacy positional arguments for backward compatibility.
  * @returns Unidirectional data flow integrity in [0, 100].
  */
-export function calculateUnidirectionalFlowIntegrity(
-    dtoMutations: number,
-    directDomainMutations: number,
-    viewLoc: number = 1000,
-    lambda: number = 1.2,
-    nu: number = 2.0,
+export function computeUnidirectionalFlow(
+    options: UnidirectionalFlowOptions | number,
+    ...restArgs: number[]
 ): number {
+    const params = resolveUnidirectionalParams(options, restArgs);
     const totalPenalty =
-        Math.max(0, dtoMutations) * lambda + Math.max(0, directDomainMutations) * nu;
-    const locScale = Math.max(1.0, viewLoc / 1000.0);
-    const score = 100.0 * Math.exp(-totalPenalty / locScale);
-    return Math.round(Math.max(0, Math.min(100, score)) * SCORE_ROUNDING) / SCORE_ROUNDING;
+        Math.max(0, params.dtoCount) * params.dtoWeight +
+        Math.max(0, params.domainCount) * params.domainWeight;
+    const locScale = Math.max(1.0, params.locLines / VIEW_LOC_SCALE_FACTOR);
+    const score = SCORE_PERFECT_FLOAT * Math.exp(-totalPenalty / locScale);
+    return Math.round(Math.max(0, Math.min(SCORE_MAX, score)) * SCORE_ROUNDING) / SCORE_ROUNDING;
 }
+export { computeUnidirectionalFlow as calculateUnidirectionalFlowIntegrity };
 
 /**
  * Compute Component Adoption Index (CAI) measuring standardized UI component adoption.
@@ -279,13 +432,13 @@ export function calculateComponentAdoptionIndex(
     const kComp = Math.max(0, kComponentUsages);
     const total = Math.max(0, totalComponentUsages);
     const legacy = Math.max(0, legacyElements);
-    if (kComp === 0 && total === 0 && legacy === 0) return 100.0;
+    if (kComp === 0 && total === 0 && legacy === 0) return SCORE_PERFECT_FLOAT;
     const denom = kComp + legacy;
-    if (denom <= 0) return 100.0;
+    if (denom <= 0) return SCORE_PERFECT_FLOAT;
     const ratio = kComp / denom;
     const coverage = Math.min(1.0, kComp / Math.max(1, total));
-    const score = ratio * coverage * 100.0;
-    return Math.round(Math.max(0, Math.min(100, score)) * SCORE_ROUNDING) / SCORE_ROUNDING;
+    const score = ratio * coverage * SCORE_PERFECT_FLOAT;
+    return Math.round(Math.max(0, Math.min(SCORE_MAX, score)) * SCORE_ROUNDING) / SCORE_ROUNDING;
 }
 
 /**
@@ -296,7 +449,7 @@ export function calculateComponentAdoptionIndex(
  * @param hardcodedPixelSizes - Count of hardcoded pixel sizes.
  * @returns Design token compliance score.
  */
-export function calculateDesignTokenComplianceIndex(
+export function computeDesignTokenCompliance(
     tokenUsages: number,
     hardcodedColorLiterals: number,
     hardcodedPixelSizes: number = 0,
@@ -304,12 +457,13 @@ export function calculateDesignTokenComplianceIndex(
     const token = Math.max(0, tokenUsages);
     const color = Math.max(0, hardcodedColorLiterals);
     const pixel = Math.max(0, hardcodedPixelSizes);
-    if (token === 0 && color === 0 && pixel === 0) return 100.0;
+    if (token === 0 && color === 0 && pixel === 0) return SCORE_PERFECT_FLOAT;
     const denom = token + 2.0 * color + 1.5 * pixel;
-    if (denom <= 0) return 100.0;
-    const score = (token / denom) * 100.0;
-    return Math.round(Math.max(0, Math.min(100, score)) * SCORE_ROUNDING) / SCORE_ROUNDING;
+    if (denom <= 0) return SCORE_PERFECT_FLOAT;
+    const score = (token / denom) * SCORE_PERFECT_FLOAT;
+    return Math.round(Math.max(0, Math.min(SCORE_MAX, score)) * SCORE_ROUNDING) / SCORE_ROUNDING;
 }
+export { computeDesignTokenCompliance as calculateDesignTokenComplianceIndex };
 
 /**
  * Compute i18n Symmetry Index (ISI) measuring text localization purity.
@@ -327,11 +481,11 @@ export function calculateI18nSymmetryIndex(
     const trCount = Math.max(0, trCallCount);
     const rawUi = Math.max(0, rawUiStringLiterals);
     const dyn = Math.max(0, dynamicInterpolations);
-    if (trCount === 0 && rawUi === 0 && dyn === 0) return 100.0;
+    if (trCount === 0 && rawUi === 0 && dyn === 0) return SCORE_PERFECT_FLOAT;
     const denom = trCount + 2.5 * rawUi + 0.5 * dyn;
-    if (denom <= 0) return 100.0;
-    const score = (trCount / denom) * 100.0;
-    return Math.round(Math.max(0, Math.min(100, score)) * SCORE_ROUNDING) / SCORE_ROUNDING;
+    if (denom <= 0) return SCORE_PERFECT_FLOAT;
+    const score = (trCount / denom) * SCORE_PERFECT_FLOAT;
+    return Math.round(Math.max(0, Math.min(SCORE_MAX, score)) * SCORE_ROUNDING) / SCORE_ROUNDING;
 }
 
 /**
@@ -342,7 +496,7 @@ export function calculateI18nSymmetryIndex(
  * @param viewCount - View component count.
  * @returns Decoupling index value.
  */
-export function calculatePresentationDecouplingIndex(
+export function computePresentationDecoupling(
     backendDirectRefs: number,
     eventBusDirectSubs: number,
     viewCount: number = 1,
@@ -350,9 +504,10 @@ export function calculatePresentationDecouplingIndex(
     const backend = Math.max(0, backendDirectRefs);
     const eventBus = Math.max(0, eventBusDirectSubs);
     const views = Math.max(1, viewCount);
-    const score = 100.0 * Math.exp(-(2.5 * backend + 1.8 * eventBus) / views);
-    return Math.round(Math.max(0, Math.min(100, score)) * SCORE_ROUNDING) / SCORE_ROUNDING;
+    const score = SCORE_PERFECT_FLOAT * Math.exp(-(2.5 * backend + 1.8 * eventBus) / views);
+    return Math.round(Math.max(0, Math.min(SCORE_MAX, score)) * SCORE_ROUNDING) / SCORE_ROUNDING;
 }
+export { computePresentationDecoupling as calculatePresentationDecouplingIndex };
 
 /**
  * Compute Boundary Interoperability Factor (BIF) across frontend-backend domain surfaces.
@@ -361,41 +516,80 @@ export function calculatePresentationDecouplingIndex(
  * @param totalInteractions - Total interaction count.
  * @returns Interoperability factor value.
  */
-export function calculateBoundaryInteroperabilityFactor(
+export function computeBoundaryInteroperability(
     crossBoundaryViolations: number,
-    totalInteractions: number = 10,
+    totalInteractions: number = DEFAULT_INTERACTIONS_COUNT,
 ): number {
     const leaks = Math.max(0, crossBoundaryViolations);
     const total = Math.max(1, totalInteractions);
     const factor = Math.exp(-0.8 * (leaks / total));
     return Math.round(Math.max(0, Math.min(1.0, factor)) * PERCENT_SCALE) / PERCENT_SCALE;
 }
+export { computeBoundaryInteroperability as calculateBoundaryInteroperabilityFactor };
+
+/**
+ * Options for computing composite frontend-backend quality profile score.
+ */
+export interface ProfileCompositeOptions {
+    readonly frontendScore: number;
+    readonly backendScore: number;
+    readonly feWeight?: number;
+    readonly beWeight?: number;
+    readonly boundaryFactor?: number;
+}
+
+function resolveProfileParams(
+    optionsOrFe: ProfileCompositeOptions | number,
+    restArgs: readonly number[],
+): {
+    feScore: number;
+    beScore: number;
+    weightFe: number;
+    weightBe: number;
+    factorBoundary: number;
+} {
+    if (typeof optionsOrFe === 'object' && optionsOrFe !== null) {
+        return {
+            feScore: optionsOrFe.frontendScore,
+            beScore: optionsOrFe.backendScore,
+            weightFe: optionsOrFe.feWeight ?? 1.0,
+            weightBe: optionsOrFe.beWeight ?? 1.0,
+            factorBoundary: optionsOrFe.boundaryFactor ?? 1.0,
+        };
+    }
+    return {
+        feScore: optionsOrFe,
+        beScore: restArgs[0] ?? 0,
+        weightFe: restArgs[1] ?? 1.0,
+        weightBe: restArgs[2] ?? 1.0,
+        factorBoundary: restArgs[3] ?? 1.0,
+    };
+}
 
 /**
  * Compute Composite Profile Quality Score combining frontend and backend assessments.
  *
- * @param frontendScore - Frontend domain quality score.
- * @param backendScore - Backend domain quality score.
- * @param feWeight - Frontend weighting factor.
- * @param beWeight - Backend weighting factor.
- * @param boundaryFactor - Boundary interoperability factor.
+ * @param options - Structured profile composite options or frontend score.
+ * @param restArgs - Legacy positional arguments for backward compatibility.
  * @returns Composite profile quality score.
  */
-export function calculateProfileCompositeScore(
-    frontendScore: number,
-    backendScore: number,
-    feWeight: number = 1.0,
-    beWeight: number = 1.0,
-    boundaryFactor: number = 1.0,
+export function computeProfileCompositeScore(
+    options: ProfileCompositeOptions | number,
+    ...restArgs: number[]
 ): number {
-    const fe = Math.max(15, Math.min(100, frontendScore));
-    const be = Math.max(15, Math.min(100, backendScore));
-    const wFe = Math.max(0.01, feWeight);
-    const wBe = Math.max(0.01, beWeight);
-    const geomMean = Math.exp((wFe * Math.log(fe) + wBe * Math.log(be)) / (wFe + wBe));
-    const rawComposite = geomMean * Math.max(0.1, Math.min(1.0, boundaryFactor));
-    return Math.round(Math.max(0, Math.min(100, rawComposite)) * SCORE_ROUNDING) / SCORE_ROUNDING;
+    const params = resolveProfileParams(options, restArgs);
+    const boundedFe = Math.max(MIN_PROFILE_SCORE_FLOOR, Math.min(SCORE_MAX, params.feScore));
+    const boundedBe = Math.max(MIN_PROFILE_SCORE_FLOOR, Math.min(SCORE_MAX, params.beScore));
+    const weightFe = Math.max(0.01, params.weightFe);
+    const weightBe = Math.max(0.01, params.weightBe);
+    const geomMean = Math.exp(
+        (weightFe * Math.log(boundedFe) + weightBe * Math.log(boundedBe)) /
+            (weightFe + weightBe),
+    );
+    const rawComposite = geomMean * Math.max(0.1, Math.min(1.0, params.factorBoundary));
+    return Math.round(Math.max(0, Math.min(SCORE_MAX, rawComposite)) * SCORE_ROUNDING) / SCORE_ROUNDING;
 }
+export { computeProfileCompositeScore as calculateProfileCompositeScore };
 
 /**
  * Compute Shannon Information Entropy of identifier tokens for anti-gaming defense.
@@ -439,17 +633,14 @@ function extractSafeScore(raw: unknown): number {
     if (typeof raw !== 'number' || !Number.isFinite(raw)) {
         return 0;
     }
-    return Math.min(100, Math.max(0, raw));
+    return Math.min(SCORE_MAX, Math.max(0, raw));
 }
 
 /**
  * Safely extract a positive weighting value.
  */
 function extractSafeWeight(raw: unknown): number {
-    if (typeof raw !== 'number' || !Number.isFinite(raw) || raw <= 0) {
-        return 0;
-    }
-    return raw;
+    return typeof raw === 'number' && Number.isFinite(raw) && raw > 0 ? raw : 0;
 }
 
 /**
@@ -469,6 +660,22 @@ function computeTotalCustomWeight(
     return total;
 }
 
+interface ScoredLanguageWeight {
+    readonly score: number;
+    readonly weight: number;
+}
+
+function resolveLanguageScoreWeight(
+    key: string,
+    scores: Readonly<Record<string, number>>,
+    weights?: Readonly<Record<string, number>>,
+): ScoredLanguageWeight {
+    return {
+        score: extractSafeScore(scores[key]),
+        weight: weights ? extractSafeWeight(weights[key]) : 1.0,
+    };
+}
+
 /**
  * Compute weighted mean score across active languages.
  */
@@ -480,33 +687,31 @@ function computeWeightedMean(
 ): number {
     let sum = 0;
     for (let i = 0; i < keys.length; i += 1) {
-        const key = keys[i];
-        const s = extractSafeScore(scores[key]);
-        const w = weights ? extractSafeWeight(weights[key]) : 1.0;
-        sum += s * w;
+        const scoredEntry = resolveLanguageScoreWeight(keys[i], scores, weights);
+        sum += scoredEntry.score * scoredEntry.weight;
     }
     return sum / totalWeight;
+}
+
+interface WeightedVarianceContext {
+    readonly keys: readonly string[];
+    readonly scores: Readonly<Record<string, number>>;
+    readonly weights?: Readonly<Record<string, number>>;
+    readonly mean: number;
+    readonly totalWeight: number;
 }
 
 /**
  * Compute weighted variance across active languages.
  */
-function computeWeightedVariance(
-    keys: readonly string[],
-    scores: Readonly<Record<string, number>>,
-    weights: Readonly<Record<string, number>> | undefined,
-    mean: number,
-    totalWeight: number,
-): number {
+function computeWeightedVariance(context: WeightedVarianceContext): number {
     let sum = 0;
-    for (let i = 0; i < keys.length; i += 1) {
-        const key = keys[i];
-        const s = extractSafeScore(scores[key]);
-        const w = weights ? extractSafeWeight(weights[key]) : 1.0;
-        const diff = s - mean;
-        sum += w * diff * diff;
+    for (let i = 0; i < context.keys.length; i += 1) {
+        const scoredEntry = resolveLanguageScoreWeight(context.keys[i], context.scores, context.weights);
+        const delta = scoredEntry.score - context.mean;
+        sum += scoredEntry.weight * delta * delta;
     }
-    return sum / totalWeight;
+    return sum / context.totalWeight;
 }
 
 /**
@@ -526,16 +731,16 @@ function computeWeightedVariance(
  * @param languageWeights - Optional weighting map for languages (defaults to equal weight 1.0).
  * @returns Balanced polyglot generalization index in [0, 100].
  */
-export function calculatePolyglotGeneralizationIndex(
+export function computePolyglotIndex(
     languageScores: Readonly<Record<string, number>>,
     languageWeights?: Readonly<Record<string, number>>,
 ): number {
     if (!languageScores || typeof languageScores !== 'object') {
-        return 100.0;
+        return SCORE_PERFECT_FLOAT;
     }
     const keys = Object.keys(languageScores);
     if (keys.length === 0) {
-        return 100.0;
+        return SCORE_PERFECT_FLOAT;
     }
     if (keys.length === 1) {
         const raw = languageScores[keys[0]];
@@ -547,17 +752,18 @@ export function calculatePolyglotGeneralizationIndex(
     const totalWeight = customWeightSum > 0 ? customWeightSum : keys.length;
 
     const sMean = computeWeightedMean(keys, languageScores, activeWeights, totalWeight);
-    const variance = computeWeightedVariance(
+    const variance = computeWeightedVariance({
         keys,
-        languageScores,
-        activeWeights,
-        sMean,
+        scores: languageScores,
+        weights: activeWeights,
+        mean: sMean,
         totalWeight,
-    );
+    });
     const sigmaS = Math.sqrt(Math.max(0, variance));
 
-    const dispersionPenalty = Math.max(0, 1.0 - sigmaS / 100.0);
+    const dispersionPenalty = Math.max(0, 1.0 - sigmaS / SCORE_PERFECT_FLOAT);
     const polyglotScore = sMean * dispersionPenalty;
-    const clampedScore = Math.max(0, Math.min(100, polyglotScore));
+    const clampedScore = Math.max(0, Math.min(SCORE_MAX, polyglotScore));
     return Math.round(clampedScore * SCORE_ROUNDING) / SCORE_ROUNDING;
 }
+export { computePolyglotIndex as calculatePolyglotGeneralizationIndex };

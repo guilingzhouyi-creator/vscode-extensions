@@ -38,6 +38,30 @@ const RISK_IMPACT_PENALTY = 0.2;
 const RISK_MAX_SCORE = 1.0;
 const RISK_DEFAULT_CONFIDENCE = 0.95;
 
+const SEVERITY_STR_ERROR = 'error';
+const SEVERITY_STR_WARN = 'warning';
+const VERDICT_BLOCK = 'BLOCK';
+const VERDICT_WARN = 'WARN';
+const VERDICT_PASS = 'PASS';
+const TEXT_YES = 'Yes';
+const TEXT_NO = 'No';
+const TEXT_RECOMMENDED = ' (Recommended)';
+const LINE_TYPE_INSERT = 'insert';
+const LINE_TYPE_DELETE = 'delete';
+const STATUS_MAJOR_REWORK = 'major_rework_needed';
+const STATUS_MINOR_FIX = 'minor_fix_needed';
+const ACTION_AUTO_PATCH = 'auto_patch';
+const ACTION_REWORK = 'rework';
+const ACTION_AUTO_FIX = 'auto_fix';
+const COLOR_YELLOW: PraxisBadgeColor = 'yellow';
+const COLOR_GREEN: PraxisBadgeColor = 'green';
+const COLOR_RED: PraxisBadgeColor = 'red';
+const FILE_MERGE_DIFF = 'merge-diff';
+const DEFAULT_UNSPECIFIED_RULE = 'unspecified-violation';
+const SEVERITY_BLOCK: PraxisPresentationSeverity = 'block';
+const SEVERITY_WARN_PRES: PraxisPresentationSeverity = 'warn';
+const PROP_PROMPT_QUESTION = 'promptQuestion';
+
 /**
  * Extracts structured directive items from static analysis issues.
  *
@@ -50,12 +74,12 @@ export function extractDirectiveItems(
     maxDirectives: number = DEFAULT_MAX_DIRECTIVES,
 ): AgentDirectiveItem[] {
     const count = Math.min(issues.length, maxDirectives);
-    const items: AgentDirectiveItem[] = new Array(count);
+    const items: AgentDirectiveItem[] = [];
 
     for (let i = 0; i < count; i++) {
         const issue = issues[i];
         const actionable = issue.actionable;
-        items[i] = {
+        items.push({
             id: issue.id,
             rule: issue.rule,
             severity: issue.severity,
@@ -68,36 +92,33 @@ export function extractDirectiveItems(
             taxonomy: actionable?.taxonomy,
             templateSnippet: actionable?.templateSnippet,
             suggestion: issue.suggestion,
-        };
+        });
     }
 
     return items;
 }
 
-/**
- * Formats structured Markdown directives tailored for Agent context ingestion.
- *
- * @param issues - Detected issues
- * @param target - Scan target root or file
- * @param cardContext - Optional Praxis multi-agent context
- * @param maxDirectives - Maximum findings to render
- * @returns Rendered markdown string
- */
 interface IssueSeverityCounts {
     errorCount: number;
     warnCount: number;
     infoCount: number;
 }
 
+/**
+ * Counts severity occurrences across all detected static analysis issues.
+ *
+ * @param issues - Detected diagnostic issues
+ * @returns Partitioned error, warning, and informational counts
+ */
 function countIssueSeverities(issues: Issue[]): IssueSeverityCounts {
     let errorCount = 0;
     let warnCount = 0;
     let infoCount = 0;
     for (let i = 0; i < issues.length; i++) {
         const sev = issues[i].severity;
-        if (sev === 'error') {
+        if (sev === SEVERITY_STR_ERROR) {
             errorCount++;
-        } else if (sev === 'warning') {
+        } else if (sev === SEVERITY_STR_WARN) {
             warnCount++;
         } else {
             infoCount++;
@@ -111,7 +132,7 @@ function extractIssueClarification(issue: Issue): AgentClarificationRequest | un
         (issue as unknown as Record<string, unknown>).clarificationRequest ??
         issue.detail?.clarificationRequest ??
         (issue.actionable as unknown as Record<string, unknown> | undefined)?.clarificationRequest;
-    if (raw && typeof raw === 'object' && 'promptQuestion' in (raw as Record<string, unknown>)) {
+    if (raw && typeof raw === 'object' && PROP_PROMPT_QUESTION in (raw as Record<string, unknown>)) {
         return raw as AgentClarificationRequest;
     }
     return undefined;
@@ -139,7 +160,7 @@ function formatClarificationOptions(clarification: AgentClarificationRequest): s
     lines.push('  * Candidate Options:');
     for (const opt of clarification.candidateOptions) {
         const optObj = typeof opt === 'string' ? { key: opt, label: opt } : opt;
-        const rec = optObj.recommended ? ' (Recommended)' : '';
+        const rec = optObj.recommended ? TEXT_RECOMMENDED : '';
         const def = optObj.key === clarification.defaultChoiceKey ? ' [Default]' : '';
         const desc = optObj.description ? ` - ${optObj.description}` : '';
         lines.push(`    - [${optObj.key}] ${optObj.label}${rec}${def}${desc}`);
@@ -150,9 +171,9 @@ function formatClarificationOptions(clarification: AgentClarificationRequest): s
 function formatCrossFileContextLines(crossFileContext: CrossFileUsageContext): string[] {
     const lines: string[] = [
         '  * Cross-File Impact:',
-        `    - Exported Symbol: ${crossFileContext.isExportedSymbol ? 'Yes' : 'No'}`,
+        `    - Exported Symbol: ${crossFileContext.isExportedSymbol ? TEXT_YES : TEXT_NO}`,
         `    - Reference Count: ${crossFileContext.referenceCount}`,
-        `    - Coordinated Rename Required: ${crossFileContext.requiresCoordinatedRename ? 'Yes' : 'No'}`,
+        `    - Coordinated Rename Required: ${crossFileContext.requiresCoordinatedRename ? TEXT_YES : TEXT_NO}`,
     ];
 
     if (crossFileContext.impactedFiles && crossFileContext.impactedFiles.length > 0) {
@@ -206,9 +227,9 @@ function formatFindingHeader(issue: Issue): string[] {
 function formatCrossFileDetails(crossFileContext: CrossFileUsageContext): string[] {
     const lines: string[] = [
         '- Cross-File Impact:',
-        `  * Exported Symbol: ${crossFileContext.isExportedSymbol ? 'Yes' : 'No'}`,
+        `  * Exported Symbol: ${crossFileContext.isExportedSymbol ? TEXT_YES : TEXT_NO}`,
         `  * Reference Count: ${crossFileContext.referenceCount}`,
-        `  * Coordinated Rename Required: ${crossFileContext.requiresCoordinatedRename ? 'Yes' : 'No'}`,
+        `  * Coordinated Rename Required: ${crossFileContext.requiresCoordinatedRename ? TEXT_YES : TEXT_NO}`,
     ];
     if (crossFileContext.impactedFiles && crossFileContext.impactedFiles.length > 0) {
         lines.push(
@@ -271,7 +292,7 @@ export function formatDirectivesMarkdown(
     maxDirectives: number = DEFAULT_MAX_DIRECTIVES,
 ): string {
     const counts = countIssueSeverities(issues);
-    const verdict = counts.errorCount > 0 ? 'BLOCK' : counts.warnCount > 0 ? 'WARN' : 'PASS';
+    const verdict = counts.errorCount > 0 ? VERDICT_BLOCK : counts.warnCount > 0 ? VERDICT_WARN : VERDICT_PASS;
     const lines: string[] = [
         '# Static Analysis Review Directives for AI Agent',
         `- Target: ${target}`,
@@ -285,9 +306,9 @@ export function formatDirectivesMarkdown(
     }
 
     if (cardContext) {
-        const chk = cardContext.checkpointId ? ` | Checkpoint: ${cardContext.checkpointId}` : '';
+        const checkpointInfo = cardContext.checkpointId ? ` | Checkpoint: ${cardContext.checkpointId}` : '';
         lines.push(
-            `- Praxis Context: Cell: ${cardContext.cellId} | Agent: ${cardContext.agentUid} | Card: ${cardContext.cardId}${chk}`,
+            `- Praxis Context: Cell: ${cardContext.cellId} | Agent: ${cardContext.agentUid} | Card: ${cardContext.cardId}${checkpointInfo}`,
         );
     }
     lines.push('');
@@ -343,9 +364,9 @@ export function buildAgentDirectivesBundle(
 
     for (let i = 0; i < issues.length; i++) {
         const s = issues[i].severity;
-        if (s === 'error') {
+        if (s === SEVERITY_STR_ERROR) {
             blockCount++;
-        } else if (s === 'warning') {
+        } else if (s === SEVERITY_STR_WARN) {
             warnCount++;
         } else {
             infoCount++;
@@ -382,9 +403,9 @@ function computeLineRisk(
     associatedRules?: string[],
 ): { riskScore: number; confidence: number; associatedRules?: string[] } {
     let score = 0;
-    if (lineType === 'insert') {
+    if (lineType === LINE_TYPE_INSERT) {
         score = RISK_BASE_INSERT;
-    } else if (lineType === 'delete') {
+    } else if (lineType === LINE_TYPE_DELETE) {
         score = RISK_BASE_DELETE;
     }
 
@@ -478,11 +499,11 @@ function buildGateDiagnosticCards(
     for (let i = 0; i < violations.length; i++) {
         const v = violations[i];
         const match = v.match(/\[([a-zA-Z0-9_\-:]+)\]\s*(.*)/);
-        const ruleId = match ? match[1] : 'unspecified-violation';
+        const ruleId = match ? match[1] : DEFAULT_UNSPECIFIED_RULE;
         const msg = match ? match[2] : v;
         const isError = !approved || /BLOCK|error/i.test(v);
-        const severity: PraxisPresentationSeverity = isError ? 'block' : 'warn';
-        const badgeColor: PraxisBadgeColor = isError ? 'red' : 'yellow';
+        const severity: PraxisPresentationSeverity = isError ? SEVERITY_BLOCK : SEVERITY_WARN_PRES;
+        const badgeColor: PraxisBadgeColor = isError ? COLOR_RED : COLOR_YELLOW;
         const badgeText = isError
             ? locale === 'zh-CN'
                 ? '[阻断]'
@@ -496,13 +517,13 @@ function buildGateDiagnosticCards(
             ruleId,
             title: ruleId,
             message: msg,
-            file: 'merge-diff',
+            file: FILE_MERGE_DIFF,
             line: 1,
             severity,
             badgeText,
             badgeColor,
             remediation: msg,
-            sourceAgentDirective: `[GUARD|${isError ? 'BLOCK' : 'WARN'}|${ruleId}] merge-diff:1 -> ${msg}`,
+            sourceAgentDirective: `[GUARD|${isError ? VERDICT_BLOCK : VERDICT_WARN}|${ruleId}] merge-diff:1 -> ${msg}`,
         });
     }
 
@@ -522,7 +543,7 @@ interface HunkAggregates {
 }
 
 function accumulateHunkLineStats(
-    h: ReviewDiffHunk,
+    hunk: ReviewDiffHunk,
     counts: {
         linesAdded: number;
         linesDeleted: number;
@@ -531,10 +552,10 @@ function accumulateHunkLineStats(
         ratedLines: number;
     },
 ): void {
-    for (const line of h.lines) {
-        if (line.type === 'insert') {
+    for (const line of hunk.lines) {
+        if (line.type === LINE_TYPE_INSERT) {
             counts.linesAdded++;
-        } else if (line.type === 'delete') {
+        } else if (line.type === LINE_TYPE_DELETE) {
             counts.linesDeleted++;
         } else {
             counts.linesUnchanged++;
@@ -564,31 +585,28 @@ function aggregateHunkMetrics(hunks: ReviewDiffHunk[]): HunkAggregates {
     const affectedFileSet = new Set<string>();
     const actionSet = new Set<string>();
 
-    for (const h of hunks) {
-        if (h.astContext?.enclosingSymbol) {
-            symbolScopeSet.add(h.astContext.enclosingSymbol);
+    for (const hunk of hunks) {
+        if (hunk.astContext?.enclosingSymbol) {
+            symbolScopeSet.add(hunk.astContext.enclosingSymbol);
         }
-        if (h.astContext?.impactFiles) {
-            h.astContext.impactFiles.forEach((file) => impactFileSet.add(file));
+        if (hunk.astContext?.impactFiles) {
+            hunk.astContext.impactFiles.forEach((file) => impactFileSet.add(file));
         }
-        const colonIdx = h.hunkId.indexOf(':');
-        if (colonIdx !== -1) {
-            const parts = h.hunkId.split(':');
-            if (parts.length > 1) {
-                affectedFileSet.add(parts[1]);
-            }
+        const colonMatch = /^[^:]+:([^:]+)/.exec(hunk.hunkId);
+        if (colonMatch && colonMatch[1]) {
+            affectedFileSet.add(colonMatch[1]);
         }
 
-        if (h.reviewVerdict?.suggestedPatch) {
-            actionSet.add('auto_patch');
+        if (hunk.reviewVerdict?.suggestedPatch) {
+            actionSet.add(ACTION_AUTO_PATCH);
         }
-        if (h.reviewVerdict?.status === 'major_rework_needed') {
-            actionSet.add('rework');
-        } else if (h.reviewVerdict?.status === 'minor_fix_needed') {
-            actionSet.add('auto_fix');
+        if (hunk.reviewVerdict?.status === STATUS_MAJOR_REWORK) {
+            actionSet.add(ACTION_REWORK);
+        } else if (hunk.reviewVerdict?.status === STATUS_MINOR_FIX) {
+            actionSet.add(ACTION_AUTO_FIX);
         }
 
-        accumulateHunkLineStats(h, counts);
+        accumulateHunkLineStats(hunk, counts);
     }
 
     return {
@@ -601,59 +619,103 @@ function aggregateHunkMetrics(hunks: ReviewDiffHunk[]): HunkAggregates {
 }
 
 /**
+ * Options for assembling Dual-Faced Diff representation.
+ */
+export interface DualFacedDiffOptions {
+    readonly hunks: ReviewDiffHunk[];
+    readonly sourceBranch: string;
+    readonly targetBranch: string;
+    readonly gateApproved: boolean;
+    readonly violations: string[];
+    readonly cardContext?: PraxisCardContext;
+    readonly locale?: PraxisLocale;
+}
+
+function resolveDualFacedDiffParams(
+    optionsOrHunks: DualFacedDiffOptions | ReviewDiffHunk[],
+    sourceBranch?: string,
+    targetBranch?: string,
+    restArgs: readonly unknown[] = [],
+): {
+    hunks: ReviewDiffHunk[];
+    sourceBranch: string;
+    targetBranch: string;
+    gateApproved: boolean;
+    violations: string[];
+    cardContext?: PraxisCardContext;
+    locale: PraxisLocale;
+} {
+    if (!Array.isArray(optionsOrHunks) && typeof optionsOrHunks === 'object' && optionsOrHunks !== null) {
+        return {
+            hunks: optionsOrHunks.hunks,
+            sourceBranch: optionsOrHunks.sourceBranch,
+            targetBranch: optionsOrHunks.targetBranch,
+            gateApproved: optionsOrHunks.gateApproved,
+            violations: optionsOrHunks.violations,
+            cardContext: optionsOrHunks.cardContext,
+            locale: optionsOrHunks.locale ?? 'zh-CN',
+        };
+    }
+    return {
+        hunks: optionsOrHunks,
+        sourceBranch: sourceBranch ?? '',
+        targetBranch: targetBranch ?? '',
+        gateApproved: Boolean(restArgs[0]),
+        violations: (restArgs[1] as string[]) ?? [],
+        cardContext: restArgs[2] as PraxisCardContext | undefined,
+        locale: (restArgs[3] as PraxisLocale) ?? 'zh-CN',
+    };
+}
+
+/**
  * Assembles Dual-Faced Diff representation combining Agent Face and Human Face.
  *
- * @param hunks - Tagged diff hunks
- * @param sourceBranch - Source branch
- * @param targetBranch - Target branch
- * @param gateApproved - Whether merge gate approved
- * @param violations - Detected violations
- * @param cardContext - Optional Praxis task card context
- * @param locale - Locale for Human Face presentation
+ * @param optionsOrHunks - Structured diff options or tagged diff hunks
+ * @param sourceBranch - Source branch (legacy positional)
+ * @param targetBranch - Target branch (legacy positional)
+ * @param restArgs - Legacy positional arguments for backward compatibility
  * @returns DualFacedDiffResult
  */
 export function buildDualFacedDiff(
-    hunks: ReviewDiffHunk[],
-    sourceBranch: string,
-    targetBranch: string,
-    gateApproved: boolean,
-    violations: string[],
-    cardContext?: PraxisCardContext,
-    locale: PraxisLocale = 'zh-CN',
+    optionsOrHunks: DualFacedDiffOptions | ReviewDiffHunk[],
+    sourceBranch?: string,
+    targetBranch?: string,
+    ...restArgs: unknown[]
 ): DualFacedDiffResult {
-    const agg = aggregateHunkMetrics(hunks);
+    const params = resolveDualFacedDiffParams(optionsOrHunks, sourceBranch, targetBranch, restArgs);
+    const agg = aggregateHunkMetrics(params.hunks);
     const averageRiskScore =
         agg.ratedLines > 0 ? Number((agg.totalRisk / agg.ratedLines).toFixed(2)) : 0;
-    let badgeColor: PraxisBadgeColor = 'yellow';
-    if (gateApproved) {
-        badgeColor = 'green';
-    } else if (violations.some((v) => v.includes('BLOCK') || v.includes('error'))) {
-        badgeColor = 'red';
+    let badgeColor: PraxisBadgeColor = COLOR_YELLOW;
+    if (params.gateApproved) {
+        badgeColor = COLOR_GREEN;
+    } else if (params.violations.some((v) => v.includes(VERDICT_BLOCK) || v.includes(SEVERITY_STR_ERROR))) {
+        badgeColor = COLOR_RED;
     }
 
-    const statusText = gateApproved
-        ? `[APPROVED] Clean merge gate from ${sourceBranch} to ${targetBranch}`
-        : `[REWORK NEEDED] ${violations.length} violation(s) detected during merge gate evaluation`;
+    const statusText = params.gateApproved
+        ? `[APPROVED] Clean merge gate from ${params.sourceBranch} to ${params.targetBranch}`
+        : `[REWORK NEEDED] ${params.violations.length} violation(s) detected during merge gate evaluation`;
 
-    const diagnosticCards = buildGateDiagnosticCards(violations, gateApproved, locale);
+    const diagnosticCards = buildGateDiagnosticCards(params.violations, params.gateApproved, params.locale);
 
     return {
         agentFace: {
-            attributedHunks: hunks,
+            attributedHunks: params.hunks,
             symbolScopes: Array.from(agg.symbolScopeSet),
             impactFiles: Array.from(agg.impactFileSet),
             averageRiskScore,
             suggestedActions: Array.from(agg.actionSet),
         },
         humanFace: {
-            approved: gateApproved,
+            approved: params.gateApproved,
             statusText,
             badgeColor,
             linesAdded: agg.linesAdded,
             linesDeleted: agg.linesDeleted,
             linesUnchanged: agg.linesUnchanged,
             affectedFiles: Array.from(agg.affectedFileSet),
-            violations,
+            violations: params.violations,
             diagnosticCards,
         },
     };
