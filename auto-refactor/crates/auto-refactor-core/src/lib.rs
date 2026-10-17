@@ -263,3 +263,28 @@ pub fn solve_dataflow(
     let kill = kill_map.unwrap_or_default();
     ops_graph::solve_dataflow(&entry, &nodes, &edges, fwd, &gen, &kill).into()
 }
+
+#[napi(js_name = "computeBitParallelDistance")]
+pub fn compute_bit_parallel_distance(
+    pattern: napi::bindgen_prelude::Uint32Array,
+    text: napi::bindgen_prelude::Uint32Array,
+) -> u32 {
+    ops_diff::compute_bit_parallel_myers_distance(pattern.as_ref(), text.as_ref())
+}
+
+#[napi(js_name = "computeSimHash64")]
+pub fn compute_simhash_64(tokens: Vec<String>) -> String {
+    ops_clone::compute_simhash_64_hex(&tokens)
+}
+
+#[napi(js_name = "calculateSimHashHammingSimilarity")]
+pub fn calculate_simhash_hamming_similarity(hash_a: String, hash_b: String) -> f64 {
+    let a = ops_clone::parse_u64_fingerprint(&hash_a);
+    let b = ops_clone::parse_u64_fingerprint(&hash_b);
+    ops_clone::calculate_simhash_hamming_similarity(a, b)
+}
+
+#[napi(js_name = "calculateTrigramCosineSimilarity")]
+pub fn calculate_trigram_cosine_similarity(tokens_a: Vec<String>, tokens_b: Vec<String>) -> f64 {
+    ops_clone::calculate_trigram_cosine_similarity(&tokens_a, &tokens_b)
+}

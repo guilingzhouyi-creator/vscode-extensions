@@ -25,6 +25,10 @@ import {
     nativeFindClonePairs,
     nativeComputeDominatorTree,
     nativeSolveDataflow,
+    nativeBitParallelMyersDistance,
+    nativeSimHash64,
+    nativeSimHashHammingSimilarity,
+    nativeTrigramCosineSimilarity,
 } from './native-bridge';
 import type { NativeCoreStatus } from './native-types';
 
@@ -80,4 +84,8 @@ export const NativeCoreFacade = Object.freeze({
     findClonePairs: nativeFindClonePairs,
     computeDominatorTree: nativeComputeDominatorTree,
     solveDataflow: nativeSolveDataflow,
+    bitParallelMyersDistance: nativeBitParallelMyersDistance,
+    simHash64: nativeSimHash64,
+    simHashHammingSimilarity: nativeSimHashHammingSimilarity,
+    trigramCosineSimilarity: nativeTrigramCosineSimilarity,
 });

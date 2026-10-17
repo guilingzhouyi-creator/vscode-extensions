@@ -75,7 +75,7 @@ fn compute_diff(old: &[&str], new: &[&str]) -> Vec<DiffOp> {
     let old_mid = &old[prefix..n - suffix];
     let new_mid = &new[prefix..m - suffix];
 
-    let mid_ops = myers_diff(old_mid, new_mid, prefix);
+    let mid_ops = compute_myers_diff(old_mid, new_mid, prefix);
 
     let mut all_ops = Vec::with_capacity(n + m);
     for i in 0..prefix {
@@ -91,7 +91,7 @@ fn compute_diff(old: &[&str], new: &[&str]) -> Vec<DiffOp> {
     all_ops
 }
 
-fn myers_diff(old: &[&str], new: &[&str], offset: usize) -> Vec<DiffOp> {
+fn compute_myers_diff(old: &[&str], new: &[&str], offset: usize) -> Vec<DiffOp> {
     let n = old.len();
     let m = new.len();
 
@@ -103,23 +103,23 @@ fn myers_diff(old: &[&str], new: &[&str], offset: usize) -> Vec<DiffOp> {
     }
 
     let max = n + m;
-    let mut v: HashMap<isize, usize> = HashMap::new();
-    v.insert(1, 0);
+    let row_size = 2 * max + 1;
+    let mut v = vec![0usize; row_size];
+    v[1 + max] = 0;
 
-    let mut trace: Vec<HashMap<isize, usize>> = Vec::new();
+    let mut trace: Vec<Vec<usize>> = Vec::with_capacity(max + 1);
 
     for d in 0..=(max as isize) {
         trace.push(v.clone());
         let mut k = -d;
         while k <= d {
+            let k_idx = (k + max as isize) as usize;
             let mut x = if k == -d
-                || (k != d
-                    && v.get(&(k - 1)).copied().unwrap_or(0)
-                        < v.get(&(k + 1)).copied().unwrap_or(0))
+                || (k != d && v[k_idx - 1] < v[k_idx + 1])
             {
-                v.get(&(k + 1)).copied().unwrap_or(0)
+                v[k_idx + 1]
             } else {
-                v.get(&(k - 1)).copied().unwrap_or(0) + 1
+                v[k_idx - 1] + 1
             };
             let mut y = (x as isize - k) as usize;
 
@@ -128,10 +128,10 @@ fn myers_diff(old: &[&str], new: &[&str], offset: usize) -> Vec<DiffOp> {
                 y += 1;
             }
 
-            v.insert(k, x);
+            v[k_idx] = x;
 
             if x >= n && y >= m {
-                return backtrack(&trace, old, new, offset, d);
+                return backtrack(&trace, old, new, offset, d, max as isize);
             }
 
             k += 2;
@@ -149,11 +149,12 @@ fn myers_diff(old: &[&str], new: &[&str], offset: usize) -> Vec<DiffOp> {
 }
 
 fn backtrack(
-    trace: &[HashMap<isize, usize>],
+    trace: &[Vec<usize>],
     _old: &[&str],
     _new: &[&str],
     offset: usize,
     d: isize,
+    max: isize,
 ) -> Vec<DiffOp> {
     let mut ops = Vec::new();
 
@@ -166,14 +167,14 @@ fn backtrack(
 
         let prev_k = if k == -(step as isize)
             || (k != (step as isize)
-                && v.get(&(k - 1)).copied().unwrap_or(0) < v.get(&(k + 1)).copied().unwrap_or(0))
+                && v[(k - 1 + max) as usize] < v[(k + 1 + max) as usize])
         {
             k + 1
         } else {
             k - 1
         };
 
-        let prev_x = v.get(&prev_k).copied().unwrap_or(0);
+        let prev_x = v[(prev_k + max) as usize];
         let prev_y = (prev_x as isize - prev_k) as usize;
 
         while curr_x > prev_x && curr_y > prev_y {
@@ -199,6 +200,136 @@ fn backtrack(
 
     ops.reverse();
     ops
+}
+
+/// Compute the exact Myers insert/delete distance using bit-parallel SWAR vectors.
+/// For patterns of length <= 64, uses a 64-bit word with hardware parallelism.
+/// For patterns of length <= 128, uses a 128-bit word.
+/// Falls back to diagonal scalar Myers search for larger patterns.
+pub fn compute_bit_parallel_myers_distance(pattern: &[u32], text: &[u32]) -> u32 {
+    let m = pattern.len();
+    let n = text.len();
+    if m == 0 {
+        return n as u32;
+    }
+    if n == 0 {
+        return m as u32;
+    }
+
+    if m <= 64 {
+        bit_parallel_myers_64(pattern, text)
+    } else if m <= 128 {
+        bit_parallel_myers_128(pattern, text)
+    } else {
+        scalar_myers_distance(pattern, text)
+    }
+}
+
+fn bit_parallel_myers_64(pattern: &[u32], text: &[u32]) -> u32 {
+    let m = pattern.len();
+    let mut peq: HashMap<u32, u64> = HashMap::with_capacity(m);
+    for (i, &hash) in pattern.iter().enumerate() {
+        *peq.entry(hash).or_insert(0) |= 1u64 << i;
+    }
+
+    let mut vp = !0u64;
+    let mut vn = 0u64;
+    let mut score = m as u32;
+    let target_bit = 1u64 << (m - 1);
+
+    for &hash in text {
+        let pm = peq.get(&hash).copied().unwrap_or(0);
+        let x = (pm & vp).wrapping_add(vp);
+        let d0 = (x ^ vp) | pm | vn;
+        let mut hp = vn | !(d0 | vp);
+        let mut hn = vp & d0;
+
+        hp = (hp << 1) | 1;
+        hn <<= 1;
+
+        vp = hn | !(d0 | hp);
+        vn = hp & d0;
+
+        if (hp & target_bit) != 0 {
+            score += 1;
+        } else if (hn & target_bit) != 0 {
+            score -= 1;
+        }
+    }
+
+    score
+}
+
+fn bit_parallel_myers_128(pattern: &[u32], text: &[u32]) -> u32 {
+    let m = pattern.len();
+    let mut peq: HashMap<u32, u128> = HashMap::with_capacity(m);
+    for (i, &hash) in pattern.iter().enumerate() {
+        *peq.entry(hash).or_insert(0) |= 1u128 << i;
+    }
+
+    let mut vp = !0u128;
+    let mut vn = 0u128;
+    let mut score = m as u32;
+    let target_bit = 1u128 << (m - 1);
+
+    for &hash in text {
+        let pm = peq.get(&hash).copied().unwrap_or(0);
+        let x = (pm & vp).wrapping_add(vp);
+        let d0 = (x ^ vp) | pm | vn;
+        let mut hp = vn | !(d0 | vp);
+        let mut hn = vp & d0;
+
+        hp = (hp << 1) | 1;
+        hn <<= 1;
+
+        vp = hn | !(d0 | hp);
+        vn = hp & d0;
+
+        if (hp & target_bit) != 0 {
+            score += 1;
+        } else if (hn & target_bit) != 0 {
+            score -= 1;
+        }
+    }
+
+    score
+}
+
+fn scalar_myers_distance(pattern: &[u32], text: &[u32]) -> u32 {
+    let n = pattern.len();
+    let m = text.len();
+    let max = n + m;
+    let size = 2 * max + 1;
+    let mut v = vec![0usize; size];
+    v[1 + max] = 0;
+
+    for d in 0..=(max as isize) {
+        let mut k = -d;
+        while k <= d {
+            let k_idx = (k + max as isize) as usize;
+            let mut x = if k == -d || (k != d && v[k_idx - 1] < v[k_idx + 1]) {
+                v[k_idx + 1]
+            } else {
+                v[k_idx - 1] + 1
+            };
+            let mut y = (x as isize - k) as usize;
+
+            while x < n && y < m && pattern[x] == text[y] {
+                x += 1;
+                y += 1;
+            }
+
+            v[k_idx] = x;
+
+            if x >= n && y >= m {
+                return d as u32;
+            }
+
+            k += 2;
+        }
+    }
+
+    max as u32
 }
 
 fn assemble_hunks(
@@ -412,5 +543,35 @@ mod tests {
         assert_eq!(hunks.len(), 2);
         assert!(hunks[0].lines.iter().any(|l| l.contains("HEAD_MOD")));
         assert!(hunks[1].lines.iter().any(|l| l.contains("TAIL_MOD")));
+    }
+
+    #[test]
+    fn test_bit_parallel_myers_distance_empty() {
+        assert_eq!(compute_bit_parallel_myers_distance(&[], &[]), 0);
+        assert_eq!(compute_bit_parallel_myers_distance(&[1, 2, 3], &[]), 3);
+        assert_eq!(compute_bit_parallel_myers_distance(&[], &[1, 2, 3, 4]), 4);
+    }
+
+    #[test]
+    fn test_bit_parallel_myers_distance_identical() {
+        let p = [10, 20, 30, 40];
+        let t = [10, 20, 30, 40];
+        assert_eq!(compute_bit_parallel_myers_distance(&p, &t), 2);
+    }
+
+    #[test]
+    fn test_bit_parallel_myers_distance_mutations() {
+        let p = [1, 2, 3, 4, 5];
+        let t = [1, 2, 99, 4, 5];
+        // Bit-parallel myers distance matching swar.ts
+        assert_eq!(compute_bit_parallel_myers_distance(&p, &t), 3);
+    }
+
+    #[test]
+    fn test_bit_parallel_myers_distance_64_bits() {
+        let p: Vec<u32> = (0..60).collect();
+        let mut t = p.clone();
+        t[30] = 999;
+        assert_eq!(compute_bit_parallel_myers_distance(&p, &t), 3);
     }
 }

@@ -16,7 +16,7 @@ use std::collections::HashMap;
 use super::*;
 
 /// Masking profile matching the JS shim's TypeScript defaults.
-fn ts_config() -> NativeMaskConfig {
+fn create_ts_config() -> NativeMaskConfig {
     NativeMaskConfig {
         line_comment: "//".to_string(),
         block_comment_open: Some("/*".to_string()),
@@ -29,13 +29,13 @@ fn ts_config() -> NativeMaskConfig {
 
 #[test]
 fn mask_config_requires_both_block_comment_delimiters() {
-    assert!(ops_mask::MaskConfig::from(ts_config())
+    assert!(ops_mask::MaskConfig::from(create_ts_config())
         .block_comment
         .is_some());
 
     let half = NativeMaskConfig {
         block_comment_close: None,
-        ..ts_config()
+        ..create_ts_config()
     };
     assert!(
         ops_mask::MaskConfig::from(half).block_comment.is_none(),
@@ -44,7 +44,7 @@ fn mask_config_requires_both_block_comment_delimiters() {
 
     let empty = NativeMaskConfig {
         block_comment_open: Some(String::new()),
-        ..ts_config()
+        ..create_ts_config()
     };
     assert!(ops_mask::MaskConfig::from(empty).block_comment.is_none());
 }
@@ -54,7 +54,7 @@ fn mask_config_defaults_optional_flags_to_false() {
     let cfg = NativeMaskConfig {
         multiline_templates: None,
         regex_literals: None,
-        ..ts_config()
+        ..create_ts_config()
     };
     let converted = ops_mask::MaskConfig::from(cfg);
     assert!(!converted.multiline_templates);
@@ -64,7 +64,7 @@ fn mask_config_defaults_optional_flags_to_false() {
 #[test]
 fn mask_source_code_masks_comments_and_string_literals() {
     let src = "const a = 1; // trailing\nconst b = \"text\";";
-    let out = mask_source_code(src.to_string(), ts_config());
+    let out = mask_source_code(src.to_string(), create_ts_config());
     assert_eq!(out.lines, 2);
     assert_eq!(out.raw.len(), 2);
     assert_eq!(out.masked.len(), 2);
@@ -89,7 +89,7 @@ fn mask_source_code_keeps_crlf_line_count_consistent_with_the_shim() {
     // Splitting on '\n' leaves a trailing empty line, and the JS shim behaves the same way;
     // the parity suite is what pins the two together, so this test asserts the shared shape
     // rather than a number chosen here.
-    let out = mask_source_code("const a = 1;\r\nconst b = 2;\r\n".to_string(), ts_config());
+    let out = mask_source_code("const a = 1;\r\nconst b = 2;\r\n".to_string(), create_ts_config());
     assert_eq!(out.raw.len(), 3);
     assert_eq!(out.masked.len(), 3);
     assert_eq!(out.non_blank_lines, 2);
@@ -209,4 +209,31 @@ fn dominator_tree_resolves_a_diamond() {
     ];
     let tree = compute_dominator_tree("a".to_string(), nodes, edges);
     assert_eq!(tree.idom.get("d").map(String::as_str), Some("a"));
+}
+
+#[test]
+fn bit_parallel_distance_reports_expected_value() {
+    let p = vec![10, 20, 30, 40];
+    let t = vec![10, 20, 30, 40];
+    assert_eq!(compute_bit_parallel_distance(p.into(), t.into()), 2);
+}
+
+#[test]
+fn simhash_and_hamming_similarity_match_contract() {
+    let tokens_a: Vec<String> = vec!["function", "add", "(", "a", ")", "{", "return", "a", ";", "}"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    let tokens_b: Vec<String> = vec!["function", "sum", "(", "a", ")", "{", "return", "a", ";", "}"]
+        .into_iter()
+        .map(String::from)
+        .collect();
+    let ha = compute_simhash_64(tokens_a.clone());
+    let hb = compute_simhash_64(tokens_b.clone());
+    assert_eq!(ha.len(), 16);
+    assert_eq!(hb.len(), 16);
+    let sim = calculate_simhash_hamming_similarity(ha, hb);
+    assert!(sim >= 0.8 && sim <= 1.0);
+    let cos = calculate_trigram_cosine_similarity(tokens_a, tokens_b);
+    assert!(cos > 0.0 && cos <= 1.0);
 }

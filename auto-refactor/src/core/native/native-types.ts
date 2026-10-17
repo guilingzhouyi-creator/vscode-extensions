@@ -187,6 +187,29 @@ export interface INativeCore {
     solveDataflow(params: NativeDataflowParams): NativeDataflowResult;
 
     /**
+     * Computes the bit-parallel Myers edit distance between two token/line hash arrays.
+     */
+    computeBitParallelDistance(pattern: Uint32Array, text: Uint32Array): number;
+
+    /**
+     * Computes a 64-bit SimHash fingerprint for an array of tokens, returning a 16-character hex string.
+     */
+    computeSimHash64(tokens: readonly string[]): string;
+
+    /**
+     * Calculates SimHash Hamming similarity [0.0, 1.0] between two 64-bit SimHash fingerprints.
+     */
+    calculateSimHashHammingSimilarity(hashA: string, hashB: string): number;
+
+    /**
+     * Calculates cosine similarity [0.0, 1.0] between two token sequences using 3-gram feature vectors.
+     */
+    calculateTrigramCosineSimilarity(
+        tokensA: readonly string[],
+        tokensB: readonly string[],
+    ): number;
+
+    /**
      * Inspects active engine status and capabilities.
      */
     getStatus(): NativeCoreStatus;

@@ -13,6 +13,13 @@
  */
 
 import type { NativeCloneBlock, NativeClonePair } from './native-types';
+import { bitParallelMyers64Distance } from '../ast/swar';
+import {
+    computeSimHash64,
+    calculateSimHashHammingSimilarity,
+    extractTokenTrigrams,
+    calculateTrigramCosineSimilarity,
+} from '../intelligence/semantic-vector';
 
 /**
  * 64 prime coefficient pairs (a, b) for MinHash universal hashing: h(x) = (a * x + b) >>> 0.
@@ -344,4 +351,51 @@ export function findClonePairsShim(signatures: number[][], threshold: number): N
     }
 
     return evaluateCloneCandidates(signatures, candidateMap, threshold);
+}
+
+/**
+ * Pure JavaScript fallback for bit-parallel Myers distance.
+ */
+export function computeBitParallelDistanceShim(
+    pattern: Uint32Array,
+    text: Uint32Array,
+): number {
+    return bitParallelMyers64Distance(pattern, text);
+}
+
+/**
+ * Pure JavaScript fallback for SimHash-64 generation.
+ */
+export function computeSimHash64Shim(tokens: readonly string[]): string {
+    const hash = computeSimHash64(tokens);
+    return hash.toString(16).padStart(16, '0');
+}
+
+/**
+ * Pure JavaScript fallback for SimHash Hamming similarity.
+ */
+export function calculateSimHashHammingSimilarityShim(
+    hashA: string,
+    hashB: string,
+): number {
+    const parse = (s: string): bigint => {
+        const trimmed = s.trim();
+        if (trimmed.startsWith('0x') || trimmed.startsWith('0X')) {
+            return BigInt(trimmed);
+        }
+        return BigInt(`0x${trimmed}`);
+    };
+    return calculateSimHashHammingSimilarity(parse(hashA), parse(hashB));
+}
+
+/**
+ * Pure JavaScript fallback for trigram cosine similarity.
+ */
+export function calculateTrigramCosineSimilarityShim(
+    tokensA: readonly string[],
+    tokensB: readonly string[],
+): number {
+    const vecA = extractTokenTrigrams(tokensA);
+    const vecB = extractTokenTrigrams(tokensB);
+    return calculateTrigramCosineSimilarity(vecA, vecB);
 }

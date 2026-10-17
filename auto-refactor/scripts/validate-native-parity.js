@@ -222,9 +222,7 @@ function runAll() {
     () => native.computeDominatorTree('a', GRAPH_NODES, GRAPH_EDGES),
     () => shim.computeDominatorTree('a', GRAPH_NODES, GRAPH_EDGES),
   );
-  // The native binding takes positional arguments; the shim takes the params object that
-  // `native-bridge.ts` unpacks into them. The comparison must call each in its own shape.
-  compare(
+    compare(
     'solveDataflow',
     () => native.solveDataflow('a', GRAPH_NODES, GRAPH_EDGES, true, { a: ['seed'] }, {}),
     () =>
@@ -235,6 +233,37 @@ function runAll() {
         forward: true,
         gen: { a: ['seed'] },
       }),
+  );
+
+  // Vector, SimHash & Bit-Parallel Myers operators.
+  const pat = new Uint32Array([10, 20, 30, 40]);
+  const txt = new Uint32Array([10, 20, 99, 40]);
+  compare(
+    'computeBitParallelDistance',
+    () => native.computeBitParallelDistance(pat, txt),
+    () => shim.computeBitParallelDistance(pat, txt),
+  );
+
+  const sampleTokensA = ['function', 'compute', '(', 'x', ',', 'y', ')', '{', 'return', 'x', '+', 'y', ';', '}'];
+  const sampleTokensB = ['function', 'calculate', '(', 'x', ',', 'y', ')', '{', 'return', 'x', '+', 'y', ';', '}'];
+  const hashNativeA = native.computeSimHash64(sampleTokensA);
+  const hashShimA = shim.computeSimHash64(sampleTokensA);
+  const hashNativeB = native.computeSimHash64(sampleTokensB);
+  const hashShimB = shim.computeSimHash64(sampleTokensB);
+
+  compare('computeSimHash64', () => hashNativeA, () => hashShimA);
+  compare('computeSimHash64', () => hashNativeB, () => hashShimB);
+
+  compare(
+    'calculateSimHashHammingSimilarity',
+    () => native.calculateSimHashHammingSimilarity(hashNativeA, hashNativeB),
+    () => shim.calculateSimHashHammingSimilarity(hashShimA, hashShimB),
+  );
+
+  compare(
+    'calculateTrigramCosineSimilarity',
+    () => native.calculateTrigramCosineSimilarity(sampleTokensA, sampleTokensB),
+    () => shim.calculateTrigramCosineSimilarity(sampleTokensA, sampleTokensB),
   );
 
   console.log('\nALL NATIVE/SHIM PARITY CHECKS PASSED SUCCESSFULLY!');

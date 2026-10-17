@@ -240,6 +240,109 @@ function benchmarkHistogramDiff(corpus, iterations = 10) {
   };
 }
 
+/**
+ * Benchmark bit-parallel Myers distance.
+ */
+function benchmarkBitParallelMyers(iterations = 200) {
+  const pattern = new Uint32Array(64);
+  const text = new Uint32Array(64);
+  for (let i = 0; i < 64; i++) {
+    pattern[i] = (i * 31 + 7) >>> 0;
+    text[i] = ((i % 5 === 0 ? i + 100 : i) * 31 + 7) >>> 0;
+  }
+
+  // Warmup
+  nativeCore.computeBitParallelDistance(pattern, text);
+  shim.computeBitParallelDistance(pattern, text);
+
+  const t0Native = performance.now();
+  for (let i = 0; i < iterations; i++) {
+    nativeCore.computeBitParallelDistance(pattern, text);
+  }
+  const nativeElapsedMs = (performance.now() - t0Native) / iterations;
+
+  const t0Shim = performance.now();
+  for (let i = 0; i < iterations; i++) {
+    shim.computeBitParallelDistance(pattern, text);
+  }
+  const shimElapsedMs = (performance.now() - t0Shim) / iterations;
+  const speedup = shimElapsedMs / Math.max(0.0001, nativeElapsedMs);
+
+  return {
+    operator: 'Bit-Parallel Myers',
+    nativeElapsedMs,
+    shimElapsedMs,
+    speedup,
+  };
+}
+
+/**
+ * Benchmark 64-bit SimHash and hardware POPCNT Hamming similarity.
+ */
+function benchmarkSimHashSemantic(iterations = 100) {
+  const tokens = Array.from({ length: 150 }, (_, i) => `token_ident_${i % 25}`);
+
+  // Warmup
+  const hNat = nativeCore.computeSimHash64(tokens);
+  const hShm = shim.computeSimHash64(tokens);
+  nativeCore.calculateSimHashHammingSimilarity(hNat, hNat);
+  shim.calculateSimHashHammingSimilarity(hShm, hShm);
+
+  const t0Native = performance.now();
+  for (let i = 0; i < iterations; i++) {
+    const h = nativeCore.computeSimHash64(tokens);
+    nativeCore.calculateSimHashHammingSimilarity(h, h);
+  }
+  const nativeElapsedMs = (performance.now() - t0Native) / iterations;
+
+  const t0Shim = performance.now();
+  for (let i = 0; i < iterations; i++) {
+    const h = shim.computeSimHash64(tokens);
+    shim.calculateSimHashHammingSimilarity(h, h);
+  }
+  const shimElapsedMs = (performance.now() - t0Shim) / iterations;
+  const speedup = shimElapsedMs / Math.max(0.0001, nativeElapsedMs);
+
+  return {
+    operator: 'SimHash-64 & POPCNT',
+    nativeElapsedMs,
+    shimElapsedMs,
+    speedup,
+  };
+}
+
+/**
+ * Benchmark 3-gram feature vector cosine similarity.
+ */
+function benchmarkTrigramCosine(iterations = 100) {
+  const tokensA = Array.from({ length: 80 }, (_, i) => `sym_${i % 12}`);
+  const tokensB = Array.from({ length: 80 }, (_, i) => `sym_${(i + 2) % 12}`);
+
+  // Warmup
+  nativeCore.calculateTrigramCosineSimilarity(tokensA, tokensB);
+  shim.calculateTrigramCosineSimilarity(tokensA, tokensB);
+
+  const t0Native = performance.now();
+  for (let i = 0; i < iterations; i++) {
+    nativeCore.calculateTrigramCosineSimilarity(tokensA, tokensB);
+  }
+  const nativeElapsedMs = (performance.now() - t0Native) / iterations;
+
+  const t0Shim = performance.now();
+  for (let i = 0; i < iterations; i++) {
+    shim.calculateTrigramCosineSimilarity(tokensA, tokensB);
+  }
+  const shimElapsedMs = (performance.now() - t0Shim) / iterations;
+  const speedup = shimElapsedMs / Math.max(0.0001, nativeElapsedMs);
+
+  return {
+    operator: 'Trigram Cosine',
+    nativeElapsedMs,
+    shimElapsedMs,
+    speedup,
+  };
+}
+
 function runBenchmark() {
   console.log('=== [Native Benchmark & Guard] Performance Acceleration Verification ===');
 
@@ -256,6 +359,9 @@ function runBenchmark() {
     benchmarkCloneDetection(corpus),
     benchmarkGraphTopology(),
     benchmarkHistogramDiff(corpus),
+    benchmarkBitParallelMyers(),
+    benchmarkSimHashSemantic(),
+    benchmarkTrigramCosine(),
   ];
 
   console.log('-----------------------------------------------------------------------------');

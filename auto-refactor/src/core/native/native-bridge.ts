@@ -45,6 +45,10 @@ import {
     detectCloneBlocksShim,
     computeMinHashShim,
     findClonePairsShim,
+    computeBitParallelDistanceShim,
+    computeSimHash64Shim,
+    calculateSimHashHammingSimilarityShim,
+    calculateTrigramCosineSimilarityShim,
     HASH_COEFFS,
 } from './native-clone-shim';
 import { computeDominatorTreeShim, solveDataflowShim } from './native-flow-shim';
@@ -69,6 +73,9 @@ const CAPABILITY_CLONE_DETECTION = 'clone-detection';
 const CAPABILITY_MINHASH_LSH = 'minhash-lsh';
 const CAPABILITY_DOMINATOR_TREE = 'dominator-tree';
 const CAPABILITY_DATAFLOW_SOLVER = 'dataflow-solver';
+const CAPABILITY_BIT_PARALLEL_MYERS = 'bit-parallel-myers';
+const CAPABILITY_SIMHASH_SEMANTIC = 'simhash-semantic';
+const CAPABILITY_TRIGRAM_COSINE = 'trigram-cosine';
 
 const CAPABILITY_SIMD_HISTOGRAM_DIFF = 'simd-histogram-diff';
 const CAPABILITY_PARALLEL_TARJAN_SCC = 'parallel-tarjan-scc';
@@ -84,6 +91,9 @@ const SHIM_CAPABILITIES: readonly string[] = Object.freeze([
     CAPABILITY_MINHASH_LSH,
     CAPABILITY_DOMINATOR_TREE,
     CAPABILITY_DATAFLOW_SOLVER,
+    CAPABILITY_BIT_PARALLEL_MYERS,
+    CAPABILITY_SIMHASH_SEMANTIC,
+    CAPABILITY_TRIGRAM_COSINE,
 ]);
 
 const NATIVE_CORE_CAPABILITIES: readonly string[] = Object.freeze([
@@ -580,6 +590,37 @@ export class PureJsNativeShim implements INativeCore {
     }
 
     /**
+     * Computes the bit-parallel Myers edit distance between two token/line hash arrays.
+     */
+    public computeBitParallelDistance(pattern: Uint32Array, text: Uint32Array): number {
+        return computeBitParallelDistanceShim(pattern, text);
+    }
+
+    /**
+     * Computes a 64-bit SimHash fingerprint for an array of tokens, returning a 16-character hex string.
+     */
+    public computeSimHash64(tokens: readonly string[]): string {
+        return computeSimHash64Shim(tokens);
+    }
+
+    /**
+     * Calculates SimHash Hamming similarity [0.0, 1.0] between two 64-bit SimHash fingerprints.
+     */
+    public calculateSimHashHammingSimilarity(hashA: string, hashB: string): number {
+        return calculateSimHashHammingSimilarityShim(hashA, hashB);
+    }
+
+    /**
+     * Calculates cosine similarity [0.0, 1.0] between two token sequences using 3-gram feature vectors.
+     */
+    public calculateTrigramCosineSimilarity(
+        tokensA: readonly string[],
+        tokensB: readonly string[],
+    ): number {
+        return calculateTrigramCosineSimilarityShim(tokensA, tokensB);
+    }
+
+    /**
      * Finds preceding equal context line count before a cluster start.
      */
     private findPrecedingContextCount(
@@ -758,6 +799,13 @@ interface RawNativeBinding {
         gen: Record<string, string[]>,
         kill: Record<string, string[]>,
     ) => NativeDataflowResult;
+    readonly computeBitParallelDistance?: (pattern: Uint32Array, text: Uint32Array) => number;
+    readonly computeSimHash64?: (tokens: readonly string[]) => string;
+    readonly calculateSimHashHammingSimilarity?: (hashA: string, hashB: string) => number;
+    readonly calculateTrigramCosineSimilarity?: (
+        tokensA: readonly string[],
+        tokensB: readonly string[],
+    ) => number;
     readonly version?: string;
     readonly VERSION?: string;
 }
@@ -798,6 +846,18 @@ function assembleNativeBindingCore(
                 params.gen ?? {},
                 params.kill ?? {},
             ),
+        computeBitParallelDistance:
+            binding.computeBitParallelDistance ||
+            ((pattern, text) => jsShim.computeBitParallelDistance(pattern, text)),
+        computeSimHash64:
+            binding.computeSimHash64 ||
+            ((tokens) => jsShim.computeSimHash64(tokens)),
+        calculateSimHashHammingSimilarity:
+            binding.calculateSimHashHammingSimilarity ||
+            ((hashA, hashB) => jsShim.calculateSimHashHammingSimilarity(hashA, hashB)),
+        calculateTrigramCosineSimilarity:
+            binding.calculateTrigramCosineSimilarity ||
+            ((tokensA, tokensB) => jsShim.calculateTrigramCosineSimilarity(tokensA, tokensB)),
         getStatus: () => ({
             isNativeAvailable: true,
             activeEngine: ENGINE_RUST_NATIVE,
@@ -1002,6 +1062,57 @@ export function solveNativeDataflow(params: NativeDataflowParams): NativeDataflo
     return nativeCore.solveDataflow(params);
 }
 
+/**
+ * Computes the bit-parallel Myers edit distance between two token/line hash arrays.
+ *
+ * @param pattern - Pattern line/token hashes (length <= 64 for native SIMD SWAR).
+ * @param text - Text line/token hashes to compare against.
+ * @returns Minimum insert/delete edit distance.
+ */
+export function computeNativeBitParallelDistance(
+    pattern: Uint32Array,
+    text: Uint32Array,
+): number {
+    return nativeCore.computeBitParallelDistance(pattern, text);
+}
+
+/**
+ * Computes a 64-bit SimHash fingerprint for an array of tokens.
+ *
+ * @param tokens - Ordered token strings.
+ * @returns 16-character lowercase hexadecimal 64-bit fingerprint string.
+ */
+export function computeNativeSimHash64(tokens: readonly string[]): string {
+    return nativeCore.computeSimHash64(tokens);
+}
+
+/**
+ * Calculates SimHash Hamming similarity [0.0, 1.0] between two 64-bit SimHash fingerprints.
+ *
+ * @param hashA - First 64-bit SimHash (hex or decimal string).
+ * @param hashB - Second 64-bit SimHash (hex or decimal string).
+ * @returns Similarity score in [0.0, 1.0] rounded to 6 decimal places.
+ */
+export function calculateNativeSimHashHammingSimilarity(
+    hashA: string,
+    hashB: string,
+): number {
+    return nativeCore.calculateSimHashHammingSimilarity(hashA, hashB);
+}
+
+/**
+ * Calculates cosine similarity [0.0, 1.0] between two token sequences using 3-gram feature vectors.
+ *
+ * @param tokensA - First token sequence.
+ * @returns Cosine similarity score in [0.0, 1.0] rounded to 6 decimal places.
+ */
+export function calculateNativeTrigramCosineSimilarity(
+    tokensA: readonly string[],
+    tokensB: readonly string[],
+): number {
+    return nativeCore.calculateTrigramCosineSimilarity(tokensA, tokensB);
+}
+
 // ─── Substantive Backwards-Compatibility Aliases ────────────────────────────
 
 /** Backward compatibility alias for computeNativeHistogramDiff. */
@@ -1033,3 +1144,15 @@ export const nativeComputeDominatorTree = computeNativeDominatorTree;
 
 /** Backward compatibility alias for solveNativeDataflow. */
 export const nativeSolveDataflow = solveNativeDataflow;
+
+/** Backward compatibility alias for computeNativeBitParallelDistance. */
+export const nativeBitParallelMyersDistance = computeNativeBitParallelDistance;
+
+/** Backward compatibility alias for computeNativeSimHash64. */
+export const nativeSimHash64 = computeNativeSimHash64;
+
+/** Backward compatibility alias for calculateNativeSimHashHammingSimilarity. */
+export const nativeSimHashHammingSimilarity = calculateNativeSimHashHammingSimilarity;
+
+/** Backward compatibility alias for calculateNativeTrigramCosineSimilarity. */
+export const nativeTrigramCosineSimilarity = calculateNativeTrigramCosineSimilarity;

@@ -93,13 +93,150 @@ pub struct ClonePair {
 }
 
 /// Compute 32-bit FNV-1a hash of a UTF-16 sequence (matching JS hashString32)
-pub fn hash_string_32(s: &str) -> u32 {
+pub fn compute_string_hash_32(s: &str) -> u32 {
     let mut hash = FNV1A_32_OFFSET_BASIS;
     for c in s.encode_utf16() {
         hash ^= c as u32;
         hash = hash.wrapping_mul(FNV1A_32_PRIME);
     }
     hash
+}
+
+#[inline]
+pub fn hash_string_32(s: &str) -> u32 {
+    compute_string_hash_32(s)
+}
+
+const FNV_OFFSET_BASIS_64: u64 = 0xcbf29ce484222325;
+const FNV_PRIME_64: u64 = 0x100000001b3;
+
+/// Compute 64-bit FNV-1a hash of a UTF-16 sequence matching JS fnv1a64
+pub fn compute_string_hash_64(s: &str) -> u64 {
+    let mut hash = FNV_OFFSET_BASIS_64;
+    for code in s.encode_utf16() {
+        hash ^= code as u64;
+        hash = hash.wrapping_mul(FNV_PRIME_64);
+    }
+    hash
+}
+
+/// Compute 64-bit SimHash fingerprint from tokens
+pub fn compute_simhash_64(tokens: &[String]) -> u64 {
+    if tokens.is_empty() {
+        return 0;
+    }
+
+    let mut weights = [0i32; 64];
+    for token in tokens {
+        let h = compute_string_hash_64(token);
+        for (b, weight) in weights.iter_mut().enumerate() {
+            let bit = (h >> b) & 1;
+            if bit == 1 {
+                *weight += 1;
+            } else {
+                *weight -= 1;
+            }
+        }
+    }
+
+    let mut fingerprint = 0u64;
+    for (b, &weight) in weights.iter().enumerate() {
+        if weight > 0 {
+            fingerprint |= 1u64 << b;
+        }
+    }
+
+    fingerprint
+}
+
+/// Compute SimHash-64 fingerprint and return as 16-character lowercase hex string
+pub fn compute_simhash_64_hex(tokens: &[String]) -> String {
+    format!("{:016x}", compute_simhash_64(tokens))
+}
+
+/// Calculate SimHash Hamming similarity via 64-bit hardware POPCNT instruction
+pub fn calculate_simhash_hamming_similarity(hash_a: u64, hash_b: u64) -> f64 {
+    let diff = hash_a ^ hash_b;
+    if diff == 0 {
+        return 1.0;
+    }
+    let distance = diff.count_ones();
+    let sim = 1.0 - (distance as f64) / 64.0;
+    let clamped = sim.clamp(0.0, 1.0);
+    (clamped * 1e6).round() / 1e6
+}
+
+/// Parse hex string or decimal string into u64
+pub fn parse_u64_fingerprint(s: &str) -> u64 {
+    let trimmed = s.trim();
+    if let Some(stripped) = trimmed.strip_prefix("0x").or_else(|| trimmed.strip_prefix("0X")) {
+        u64::from_str_radix(stripped, 16).unwrap_or(0)
+    } else {
+        trimmed
+            .parse::<u64>()
+            .unwrap_or_else(|_| u64::from_str_radix(trimmed, 16).unwrap_or(0))
+    }
+}
+
+/// Extract 3-gram sparse token frequency vector
+pub fn extract_token_trigrams(tokens: &[String]) -> HashMap<String, u32> {
+    let mut map = HashMap::new();
+    if tokens.len() < 3 {
+        return map;
+    }
+    for i in 0..(tokens.len() - 2) {
+        let key = format!("{} {} {}", tokens[i], tokens[i + 1], tokens[i + 2]);
+        *map.entry(key).or_insert(0) += 1;
+    }
+    map
+}
+
+/// Calculate cosine similarity between two token arrays using 3-gram feature vectors
+pub fn calculate_trigram_cosine_similarity(
+    tokens_a: &[String],
+    tokens_b: &[String],
+) -> f64 {
+    let map_a = extract_token_trigrams(tokens_a);
+    let map_b = extract_token_trigrams(tokens_b);
+    if map_a.is_empty() || map_b.is_empty() {
+        return 0.0;
+    }
+
+    let (smaller, larger) = if map_a.len() <= map_b.len() {
+        (&map_a, &map_b)
+    } else {
+        (&map_b, &map_a)
+    };
+
+    let mut dot_product = 0.0;
+    for (k, &count_a) in smaller {
+        if let Some(&count_b) = larger.get(k) {
+            dot_product += (count_a as f64) * (count_b as f64);
+        }
+    }
+
+    if dot_product <= 0.0 {
+        return 0.0;
+    }
+
+    let mut sum_sq_a = 0.0;
+    for &val in map_a.values() {
+        sum_sq_a += (val as f64) * (val as f64);
+    }
+
+    let mut sum_sq_b = 0.0;
+    for &val in map_b.values() {
+        sum_sq_b += (val as f64) * (val as f64);
+    }
+
+    let denom = sum_sq_a.sqrt() * sum_sq_b.sqrt();
+    if denom <= 0.0 {
+        return 0.0;
+    }
+
+    let sim = dot_product / denom;
+    let clamped = sim.clamp(0.0, 1.0);
+    (clamped * 1e6).round() / 1e6
 }
 
 /// Counts duplicated non-blank lines in source content matching JS countDuplicateLines
@@ -157,7 +294,7 @@ pub fn detect_clone_blocks(content: &str, min_clone_lines: u32) -> Vec<CloneBloc
             && trimmed != "{"
             && trimmed != "}"
         {
-            meaningful_lines.push((line_idx + 1, hash_string_32(trimmed)));
+            meaningful_lines.push((line_idx + 1, compute_string_hash_32(trimmed)));
         }
     }
 
@@ -211,7 +348,7 @@ pub fn compute_minhash(content: &str, num_perm: usize) -> Vec<u32> {
             && trimmed != "{"
             && trimmed != "}"
         {
-            meaningful_hashes.push(hash_string_32(trimmed));
+            meaningful_hashes.push(compute_string_hash_32(trimmed));
         }
     }
 
@@ -444,5 +581,34 @@ mod tests {
         for clone in &clones {
             assert!(clone.start_line >= clone.original_line + clone.line_span);
         }
+    }
+
+    #[test]
+    fn test_simhash_64_and_hamming_similarity() {
+        let tokens_a: Vec<String> = vec![
+            "function", "add", "(", "a", ",", "b", ")", "{", "return", "a", "+", "b", ";", "}",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+        let tokens_b: Vec<String> = vec![
+            "function", "sum", "(", "a", ",", "b", ")", "{", "return", "a", "+", "b", ";", "}",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+
+        let h_a_hex = compute_simhash_64_hex(&tokens_a);
+        let h_b_hex = compute_simhash_64_hex(&tokens_b);
+        assert_eq!(h_a_hex, "af63f44c86018c8c");
+        assert_eq!(h_b_hex, "af63b44c86018c88");
+
+        let h_a = compute_simhash_64(&tokens_a);
+        let h_b = compute_simhash_64(&tokens_b);
+        let sim = calculate_simhash_hamming_similarity(h_a, h_b);
+        assert_eq!(sim, 0.96875);
+
+        let trigram_cos_sim = calculate_trigram_cosine_similarity(&tokens_a, &tokens_b);
+        assert_eq!(trigram_cos_sim, 0.833333);
     }
 }
