@@ -1,7 +1,7 @@
 {
   "version": "1.2.0",
   "granularity": "grouped",
-  "timestamp": "2026-10-17T10:35:39.494Z",
+  "timestamp": "2026-10-17T11:03:20.959Z",
   "groups": [
     {
       "key": "comments|CMT-HDR-001|crates/auto-refactor-core/build.rs",
@@ -1831,48 +1831,6 @@
       }
     },
     {
-      "key": "hygiene|HYG-STB-001|src/analyzers/go-modern.ts",
-      "count": 1,
-      "severities": {
-        "info": 1
-      }
-    },
-    {
-      "key": "governance|GOV-DAT-001|src/analyzers/go-modern.ts",
-      "count": 3,
-      "severities": {
-        "info": 3
-      }
-    },
-    {
-      "key": "hygiene|HYG-WRAP-001|src/analyzers/go-modern.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/analyzers/go-modern.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "simplify|SIM-BOOL-001|src/analyzers/go-modern.ts",
-      "count": 3,
-      "severities": {
-        "info": 3
-      }
-    },
-    {
-      "key": "simplify|SIM-TRN-001|src/analyzers/go-modern.ts",
-      "count": 3,
-      "severities": {
-        "info": 3
-      }
-    },
-    {
       "key": "constants|hardcoded-string|src/analyzers/governance.ts",
       "count": 2,
       "severities": {
@@ -1919,13 +1877,6 @@
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "governance|GOV-DAT-001|src/analyzers/rust-modern.ts",
-      "count": 1,
-      "severities": {
-        "info": 1
       }
     },
     {
@@ -3837,27 +3788,6 @@
       "count": 2,
       "severities": {
         "warning": 2
-      }
-    },
-    {
-      "key": "constants|duplicate-literal|src/core/policy/source-mask.ts",
-      "count": 2,
-      "severities": {
-        "warning": 2
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/policy/source-mask.ts",
-      "count": 3,
-      "severities": {
-        "warning": 3
-      }
-    },
-    {
-      "key": "simplify|SIM-TRN-001|src/core/policy/source-mask.ts",
-      "count": 1,
-      "severities": {
-        "info": 1
       }
     },
     {

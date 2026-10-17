@@ -26,8 +26,10 @@ const { performance } = require('perf_hooks');
 const { getNativeCoreStatus, nativeCore, PureJsNativeShim } = require('../dist/core/native');
 const {
   SOURCE_MASK_PRESETS,
-  MASK_LANGUAGE_TYPESCRIPT,
+  MASK_LANGUAGES,
 } = require('../dist/core/policy/source-mask');
+
+const MASK_LANGUAGE_TYPESCRIPT = MASK_LANGUAGES.TYPESCRIPT;
 
 const shim = new PureJsNativeShim();
 

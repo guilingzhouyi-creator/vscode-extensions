@@ -59,32 +59,73 @@ export interface MaskedSource {
     nonBlankLines?: number;
 }
 
-/** Canonical language id for TypeScript sources. */
-export const MASK_LANGUAGE_TYPESCRIPT = 'typescript';
-/** Canonical language id for JavaScript sources. */
-export const MASK_LANGUAGE_JAVASCRIPT = 'javascript';
-/** Canonical language id for Python sources. */
-export const MASK_LANGUAGE_PYTHON = 'python';
-/** Canonical language id for GDScript sources. */
-export const MASK_LANGUAGE_GDSCRIPT = 'gdscript';
-/** Canonical language id for Rust sources. */
-export const MASK_LANGUAGE_RUST = 'rust';
-/** Canonical language id for Go sources. */
-export const MASK_LANGUAGE_GO = 'go';
-/** Canonical language id for POSIX shell sources. */
-export const MASK_LANGUAGE_SHELL = 'shell';
-/** Canonical language id for PowerShell sources. */
-export const MASK_LANGUAGE_POWERSHELL = 'powershell';
+/** Canonical language ids supported by the shared source masker. */
+export const MASK_LANGUAGES = Object.freeze({
+    TYPESCRIPT: 'typescript',
+    JAVASCRIPT: 'javascript',
+    PYTHON: 'python',
+    GDSCRIPT: 'gdscript',
+    RUST: 'rust',
+    GO: 'go',
+    SHELL: 'shell',
+    POWERSHELL: 'powershell',
+} as const);
+
+const COMMENT_SLASH_LINE = '//';
+const COMMENT_SLASH_BLOCK_OPEN = '/*';
+const COMMENT_SLASH_BLOCK_CLOSE = '*/';
+const COMMENT_HASH_LINE = '#';
+const COMMENT_PS_BLOCK_OPEN = '<#';
+const COMMENT_PS_BLOCK_CLOSE = '#>';
+const QUOTE_CHARS_COMMON = '\'"';
+const QUOTE_CHARS_ALL = '\'"`';
+const QUOTE_CHARS_DOUBLE_TICK = '"`';
+const QUOTE_CHARS_DOUBLE = '"';
+
+interface MaskConfigParams {
+    lineComment: string;
+    quoteChars: string;
+    blockOpen?: string;
+    blockClose?: string;
+    hasMultilineTemplates?: boolean;
+    regexLiterals?: boolean;
+    htmlComment?: boolean;
+    rawStrings?: boolean;
+}
+
+function buildMaskConfig(params: MaskConfigParams): SourceMaskConfig {
+    const config: SourceMaskConfig = {
+        lineComment: params.lineComment,
+        quoteChars: params.quoteChars,
+    };
+    if (params.blockOpen && params.blockClose) {
+        config.blockComment = { open: params.blockOpen, close: params.blockClose };
+    }
+    if (params.hasMultilineTemplates) {
+        config.multilineTemplates = true;
+    }
+    if (params.regexLiterals) {
+        config.regexLiterals = true;
+    }
+    if (params.htmlComment) {
+        config.htmlComment = true;
+    }
+    if (params.rawStrings) {
+        config.rawStrings = true;
+    }
+    return Object.freeze(config);
+}
 
 /** The C-family syntax shared by TypeScript and JavaScript. */
-const C_FAMILY_MASK: SourceMaskConfig = {
-    lineComment: '//',
-    blockComment: { open: '/*', close: '*/' },
-    quoteChars: '\'"`',
-    multilineTemplates: true,
+const C_FAMILY_MASK = buildMaskConfig({
+    lineComment: COMMENT_SLASH_LINE,
+    blockOpen: COMMENT_SLASH_BLOCK_OPEN,
+    blockClose: COMMENT_SLASH_BLOCK_CLOSE,
+    quoteChars: QUOTE_CHARS_ALL,
+    hasMultilineTemplates: true,
     regexLiterals: true,
     htmlComment: true,
-};
+});
 
 /**
  * Comment, quote and regex syntax per canonical language id.
@@ -93,63 +134,67 @@ const C_FAMILY_MASK: SourceMaskConfig = {
  * different masking policies: Rust omits `'` because char literals and lifetimes would otherwise
  * swallow the rest of the line, and only the C family opts into regex literals.
  */
-export const SOURCE_MASK_PRESETS: Record<string, SourceMaskConfig> = {
-    [MASK_LANGUAGE_TYPESCRIPT]: C_FAMILY_MASK,
-    [MASK_LANGUAGE_JAVASCRIPT]: C_FAMILY_MASK,
-    [MASK_LANGUAGE_PYTHON]: { lineComment: '#', quoteChars: '\'"' },
-    [MASK_LANGUAGE_GDSCRIPT]: { lineComment: '#', quoteChars: '\'"`' },
-    [MASK_LANGUAGE_RUST]: {
-        lineComment: '//',
-        blockComment: { open: '/*', close: '*/' },
-        quoteChars: '"',
+export const SOURCE_MASK_PRESETS: Readonly<Record<string, SourceMaskConfig>> = Object.freeze({
+    [MASK_LANGUAGES.TYPESCRIPT]: C_FAMILY_MASK,
+    [MASK_LANGUAGES.JAVASCRIPT]: C_FAMILY_MASK,
+    [MASK_LANGUAGES.PYTHON]: buildMaskConfig({ lineComment: COMMENT_HASH_LINE, quoteChars: QUOTE_CHARS_COMMON }),
+    [MASK_LANGUAGES.GDSCRIPT]: buildMaskConfig({ lineComment: COMMENT_HASH_LINE, quoteChars: QUOTE_CHARS_ALL }),
+    [MASK_LANGUAGES.RUST]: buildMaskConfig({
+        lineComment: COMMENT_SLASH_LINE,
+        blockOpen: COMMENT_SLASH_BLOCK_OPEN,
+        blockClose: COMMENT_SLASH_BLOCK_CLOSE,
+        quoteChars: QUOTE_CHARS_DOUBLE,
         rawStrings: true,
-    },
-    [MASK_LANGUAGE_GO]: {
-        lineComment: '//',
-        blockComment: { open: '/*', close: '*/' },
-        quoteChars: '"`',
-        multilineTemplates: true, // backtick raw strings can span lines
-    },
-    [MASK_LANGUAGE_SHELL]: { lineComment: '#', quoteChars: '\'"' },
-    [MASK_LANGUAGE_POWERSHELL]: {
-        lineComment: '#',
-        blockComment: { open: '<#', close: '#>' },
-        quoteChars: '\'"',
-    },
-};
+    }),
+    [MASK_LANGUAGES.GO]: buildMaskConfig({
+        lineComment: COMMENT_SLASH_LINE,
+        blockOpen: COMMENT_SLASH_BLOCK_OPEN,
+        blockClose: COMMENT_SLASH_BLOCK_CLOSE,
+        quoteChars: QUOTE_CHARS_DOUBLE_TICK,
+        hasMultilineTemplates: true,
+    }),
+    [MASK_LANGUAGES.SHELL]: buildMaskConfig({ lineComment: COMMENT_HASH_LINE, quoteChars: QUOTE_CHARS_COMMON }),
+    [MASK_LANGUAGES.POWERSHELL]: buildMaskConfig({
+        lineComment: COMMENT_HASH_LINE,
+        blockOpen: COMMENT_PS_BLOCK_OPEN,
+        blockClose: COMMENT_PS_BLOCK_CLOSE,
+        quoteChars: QUOTE_CHARS_COMMON,
+    }),
+});
 
 /** Fallback syntax for a language this module does not know: the C family without regex support. */
-const DEFAULT_MASK: SourceMaskConfig = {
-    lineComment: '//',
-    blockComment: { open: '/*', close: '*/' },
-    quoteChars: '\'"`',
-    multilineTemplates: true,
-};
+const DEFAULT_MASK: SourceMaskConfig = buildMaskConfig({
+    lineComment: COMMENT_SLASH_LINE,
+    blockOpen: COMMENT_SLASH_BLOCK_OPEN,
+    blockClose: COMMENT_SLASH_BLOCK_CLOSE,
+    quoteChars: QUOTE_CHARS_ALL,
+    hasMultilineTemplates: true,
+});
 
 /** File extension to canonical language id, for callers that only have a path. */
 const EXTENSION_LANGUAGE: Record<string, string> = {
-    '.ts': MASK_LANGUAGE_TYPESCRIPT,
-    '.tsx': MASK_LANGUAGE_TYPESCRIPT,
-    '.mts': MASK_LANGUAGE_TYPESCRIPT,
-    '.cts': MASK_LANGUAGE_TYPESCRIPT,
-    '.js': MASK_LANGUAGE_JAVASCRIPT,
-    '.jsx': MASK_LANGUAGE_JAVASCRIPT,
-    '.mjs': MASK_LANGUAGE_JAVASCRIPT,
-    '.cjs': MASK_LANGUAGE_JAVASCRIPT,
-    '.py': MASK_LANGUAGE_PYTHON,
-    '.gd': MASK_LANGUAGE_GDSCRIPT,
-    '.rs': MASK_LANGUAGE_RUST,
-    '.go': MASK_LANGUAGE_GO,
-    '.sh': MASK_LANGUAGE_SHELL,
-    '.bash': MASK_LANGUAGE_SHELL,
-    '.zsh': MASK_LANGUAGE_SHELL,
-    '.ps1': MASK_LANGUAGE_POWERSHELL,
-    '.psm1': MASK_LANGUAGE_POWERSHELL,
-    '.psd1': MASK_LANGUAGE_POWERSHELL,
-    '.html': MASK_LANGUAGE_JAVASCRIPT,
-    '.htm': MASK_LANGUAGE_JAVASCRIPT,
-    '.vue': MASK_LANGUAGE_TYPESCRIPT,
-    '.svelte': MASK_LANGUAGE_TYPESCRIPT,
+    '.ts': MASK_LANGUAGES.TYPESCRIPT,
+    '.tsx': MASK_LANGUAGES.TYPESCRIPT,
+    '.mts': MASK_LANGUAGES.TYPESCRIPT,
+    '.cts': MASK_LANGUAGES.TYPESCRIPT,
+    '.js': MASK_LANGUAGES.JAVASCRIPT,
+    '.jsx': MASK_LANGUAGES.JAVASCRIPT,
+    '.mjs': MASK_LANGUAGES.JAVASCRIPT,
+    '.cjs': MASK_LANGUAGES.JAVASCRIPT,
+    '.py': MASK_LANGUAGES.PYTHON,
+    '.gd': MASK_LANGUAGES.GDSCRIPT,
+    '.rs': MASK_LANGUAGES.RUST,
+    '.go': MASK_LANGUAGES.GO,
+    '.sh': MASK_LANGUAGES.SHELL,
+    '.bash': MASK_LANGUAGES.SHELL,
+    '.zsh': MASK_LANGUAGES.SHELL,
+    '.ps1': MASK_LANGUAGES.POWERSHELL,
+    '.psm1': MASK_LANGUAGES.POWERSHELL,
+    '.psd1': MASK_LANGUAGES.POWERSHELL,
+    '.html': MASK_LANGUAGES.JAVASCRIPT,
+    '.htm': MASK_LANGUAGES.JAVASCRIPT,
+    '.vue': MASK_LANGUAGES.TYPESCRIPT,
+    '.svelte': MASK_LANGUAGES.TYPESCRIPT,
 };
 
 const ASCII_TABLE_SIZE = 128;
@@ -261,13 +306,15 @@ export function maskSourceText(content: string, config: SourceMaskConfig): Maske
  * @param filePath - Path of the source file, in any separator style.
  * @returns The canonical language id, or null when the extension is not mapped.
  */
-export function languageIdFromPath(filePath: string): string | null {
+export function getLanguageIdFromPath(filePath: string): string | null {
     const lower = filePath.replace(/\\/g, '/').toLowerCase();
     const slash = lower.lastIndexOf('/');
     const dot = lower.lastIndexOf('.');
-    if (dot <= slash) return null;
-    return EXTENSION_LANGUAGE[lower.slice(dot)] ?? null;
+    return dot <= slash ? null : (EXTENSION_LANGUAGE[lower.slice(dot)] ?? null);
 }
+
+/** Legacy alias for backward compatibility. */
+export const languageIdFromPath = getLanguageIdFromPath;
 
 /**
  * Resolve the masking syntax for a language id.
@@ -290,9 +337,12 @@ export function maskPresetForLanguage(languageId: string | null | undefined): So
  * @param languageId - Canonical language id, or null to fall back to extension/preset inference.
  * @returns One masked string per line, each the same length as its raw line.
  */
-export function maskedLinesOf(content: string, languageId: string | null | undefined): string[] {
+export function getMaskedLines(content: string, languageId: string | null | undefined): string[] {
     return maskSourceText(content, maskPresetForLanguage(languageId)).masked;
 }
+
+/** Legacy alias for backward compatibility. */
+export const maskedLinesOf = getMaskedLines;
 
 /**
  * Build the masked view of a file from its path alone.
@@ -303,9 +353,12 @@ export function maskedLinesOf(content: string, languageId: string | null | undef
  * @param content - Full file content as read from disk.
  * @returns One masked string per line, each the same length as its raw line.
  */
-export function maskedLinesOfPath(filePath: string, content: string): string[] {
-    return maskedLinesOf(content, languageIdFromPath(filePath));
+export function getMaskedLinesOfPath(filePath: string, content: string): string[] {
+    return getMaskedLines(content, getLanguageIdFromPath(filePath));
 }
+
+/** Legacy alias for backward compatibility. */
+export const maskedLinesOfPath = getMaskedLinesOfPath;
 
 /** Masking state carried across lines: block comments and template literals span lines. */
 interface MaskState {
@@ -380,7 +433,7 @@ function getTriggerTable(config: SourceMaskConfig): Uint8Array {
 /**
  * Decide whether a slash opens a regex literal rather than dividing.
  */
-function opensRegexLiteral(line: string, index: number): boolean {
+function checkOpeningRegexLiteral(line: string, index: number): boolean {
     for (let back = index - 1; back >= 0; back -= 1) {
         const code = line.charCodeAt(back);
         if (code === CHAR_SPACE || code === CHAR_TAB) continue;
@@ -419,7 +472,7 @@ function scanQuotedSpan(
 /**
  * Advance past regex trailing flags starting at the character immediately after closing slash.
  */
-function consumeRegexFlags(line: string, startIndex: number): number {
+function scanRegexFlags(line: string, startIndex: number): number {
     let cursor = startIndex;
     const len = line.length;
     while (cursor < len) {
@@ -448,7 +501,7 @@ function scanRegexSpan(line: string, startIndex: number): number {
         } else if (regexChar === CHAR_CLOSE_BRACKET) {
             inClass = false;
         } else if (regexChar === CHAR_SLASH && !inClass) {
-            return consumeRegexFlags(line, cursor + 1);
+            return scanRegexFlags(line, cursor + 1);
         }
         cursor++;
     }
@@ -506,7 +559,7 @@ function scanQuoteOrRegex(
         state.quote = char;
         return scanQuotedSpan(line, index + 1, char, state);
     }
-    if (config.regexLiterals && char === '/' && opensRegexLiteral(line, index)) {
+    if (config.regexLiterals && char === '/' && checkOpeningRegexLiteral(line, index)) {
         return scanRegexSpan(line, index);
     }
     return -1;
@@ -633,28 +686,31 @@ function scanMultiLineState(
     return -1;
 }
 
+/** Context bundle for inspecting a candidate masked span at a specific line offset. */
+interface MaskSpanContext {
+    readonly line: string;
+    readonly index: number;
+    readonly code: number;
+    readonly state: MaskState;
+    readonly config: SourceMaskConfig;
+}
+
 /**
  * Fast-path check and scan for quote tokens (', ", `).
  */
-function scanQuoteFast(
-    line: string,
-    index: number,
-    code: number,
-    state: MaskState,
-    config: SourceMaskConfig,
-): number {
-    if (code !== CHAR_SINGLE_QUOTE && code !== CHAR_DOUBLE_QUOTE && code !== CHAR_BACKTICK) {
+function scanQuoteFast(ctx: MaskSpanContext): number {
+    if (ctx.code !== CHAR_SINGLE_QUOTE && ctx.code !== CHAR_DOUBLE_QUOTE && ctx.code !== CHAR_BACKTICK) {
         return -1;
     }
-    const char = line[index];
-    if (!config.quoteChars.includes(char)) {
+    const char = ctx.line[ctx.index];
+    if (!ctx.config.quoteChars.includes(char)) {
         return -1;
     }
-    if (code === CHAR_BACKTICK && !config.multilineTemplates) {
-        return index + 1;
+    if (ctx.code === CHAR_BACKTICK && !ctx.config.multilineTemplates) {
+        return ctx.index + 1;
     }
-    state.quote = char;
-    return scanQuotedSpan(line, index + 1, char, state);
+    ctx.state.quote = char;
+    return scanQuotedSpan(ctx.line, ctx.index + 1, char, ctx.state);
 }
 
 /**
@@ -667,12 +723,12 @@ function scanSlashFast(
     config: SourceMaskConfig,
 ): number {
     const nextCode = line.charCodeAt(index + 1);
-    if (nextCode === CHAR_SLASH && config.lineComment === '//') {
+    if (nextCode === CHAR_SLASH && config.lineComment === COMMENT_SLASH_LINE) {
         return line.length;
     }
-    if (nextCode === CHAR_ASTERISK && config.blockComment?.open === '/*') {
+    if (nextCode === CHAR_ASTERISK && config.blockComment?.open === COMMENT_SLASH_BLOCK_OPEN) {
         state.inBlockComment = true;
-        const close = state.close || '*/';
+        const close = state.close || COMMENT_SLASH_BLOCK_CLOSE;
         const cIdx = line.indexOf(close, index + 2);
         if (cIdx !== -1) {
             state.inBlockComment = false;
@@ -680,7 +736,7 @@ function scanSlashFast(
         }
         return line.length;
     }
-    if (config.regexLiterals && opensRegexLiteral(line, index)) {
+    if (config.regexLiterals && checkOpeningRegexLiteral(line, index)) {
         return scanRegexSpan(line, index);
     }
     return -1;
@@ -689,30 +745,24 @@ function scanSlashFast(
 /**
  * Fast-path check and scan for hash comments, HTML comments, or raw strings.
  */
-function scanOtherPrefixFast(
-    line: string,
-    index: number,
-    code: number,
-    state: MaskState,
-    config: SourceMaskConfig,
-): number {
-    if (code === CHAR_HASH && config.lineComment === '#') {
-        return line.length;
+function scanOtherPrefixFast(ctx: MaskSpanContext): number {
+    if (ctx.code === CHAR_HASH && ctx.config.lineComment === COMMENT_HASH_LINE) {
+        return ctx.line.length;
     }
-    if (code === CHAR_LESS_THAN) {
-        if (config.htmlComment && line.startsWith(HTML_COMMENT_OPEN, index)) {
-            state.inHtmlComment = true;
-            const cIdx = line.indexOf(HTML_COMMENT_CLOSE, index + HTML_COMMENT_OPEN.length);
+    if (ctx.code === CHAR_LESS_THAN) {
+        if (ctx.config.htmlComment && ctx.line.startsWith(HTML_COMMENT_OPEN, ctx.index)) {
+            ctx.state.inHtmlComment = true;
+            const cIdx = ctx.line.indexOf(HTML_COMMENT_CLOSE, ctx.index + HTML_COMMENT_OPEN.length);
             if (cIdx !== -1) {
-                state.inHtmlComment = false;
+                ctx.state.inHtmlComment = false;
                 return cIdx + HTML_COMMENT_CLOSE.length;
             }
-            return line.length;
+            return ctx.line.length;
         }
         return -1;
     }
-    if (code === CHAR_LOWER_R || code === CHAR_LOWER_B || code === CHAR_LOWER_C) {
-        return scanOpeningRawString(line, index, config, state);
+    if (ctx.code === CHAR_LOWER_R || ctx.code === CHAR_LOWER_B || ctx.code === CHAR_LOWER_C) {
+        return scanOpeningRawString(ctx.line, ctx.index, ctx.config, ctx.state);
     }
     return -1;
 }
@@ -730,10 +780,7 @@ function scanFallback(
         return line.length;
     }
     const bcEnd = scanOpeningBlockComment(line, index, config, state);
-    if (bcEnd !== -1) {
-        return bcEnd;
-    }
-    return scanQuoteOrRegex(line, index, config, state);
+    return bcEnd !== -1 ? bcEnd : scanQuoteOrRegex(line, index, config, state);
 }
 
 /**
@@ -751,17 +798,16 @@ function scanNextMaskSpan(
     }
 
     const code = line.charCodeAt(index);
-    const qEnd = scanQuoteFast(line, index, code, state, config);
+    const spanCtx: MaskSpanContext = { line, index, code, state, config };
+    const qEnd = scanQuoteFast(spanCtx);
     if (qEnd !== -1) return qEnd;
 
     if (code === CHAR_SLASH) {
         return scanSlashFast(line, index, state, config);
     }
 
-    const pEnd = scanOtherPrefixFast(line, index, code, state, config);
-    if (pEnd !== -1) return pEnd;
-
-    return scanFallback(line, index, state, config);
+    const pEnd = scanOtherPrefixFast(spanCtx);
+    return pEnd !== -1 ? pEnd : scanFallback(line, index, state, config);
 }
 
 /**

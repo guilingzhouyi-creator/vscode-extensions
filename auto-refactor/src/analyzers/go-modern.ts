@@ -20,6 +20,7 @@ import type { Analyzer, AnalyzerContext, Issue, Severity, AgentActionType } from
 import { SEVERITY_WARNING, SEVERITY_INFO } from '../core/types';
 import { ANALYZER_GO_MODERN } from '../core/scoring/dimensionLiterals';
 import { maskSourceText, type SourceMaskConfig } from '../core/policy/source-mask';
+import { buildCanonicalIssue } from '../core/reporting/canonical-issue-builder';
 
 /** Extension the pack accepts; the content-only path sees every language. */
 const SOURCE_EXTENSION = '.go';
@@ -54,6 +55,7 @@ const UNCHECKED_ERROR_RE = /,\s*_\s*(?::=|=)|^_\s*(?::=|=)/;
  * is NOT the first parameter after the opening paren.
  */
 const CONTEXT_IN_PARAMS_RE = /context\.Context/;
+const CONTEXT_PACKAGE_TYPE = 'context.Context';
 
 /** Function / method signature start — used to locate parameter lists. */
 const FUNC_SIGNATURE_RE = /^func\s+(?:\([^)]+\)\s+)?[A-Za-z_][A-Za-z0-9_]*\s*(?:\[[^\]]*\])?\s*\(/;
@@ -84,7 +86,7 @@ const MAX_RECEIVER_NAME_LEN = 3;
 const VAR_ERROR_TYPE_RE = /^var\s+([A-Za-z_][A-Za-z0-9_]*)\s+error\b/;
 
 /**
- * Package comment: the line immediately before `package xxx` should be a comment.
+ * Package comment: the line immediately before package declaration should be a comment.
  *
  * Detected by looking at the line before the package declaration.
  */
@@ -96,101 +98,112 @@ const COMMENT_LINE_RE = /^\s*(?:\/\/|\/\*)/;
 // --- Rule definitions ---
 
 interface LineRule {
-    rule: string;
-    severity: Severity;
-    message: string;
-    suggestion: string;
+    readonly rule: string;
+    readonly severity: Severity;
+    readonly message: string;
+    readonly suggestion: string;
 }
 
-const UNCHECKED_ERROR_RULE: LineRule = {
+const UNCHECKED_ERROR_RULE: LineRule = Object.freeze({
     rule: 'GOM-ERR-001',
-    severity: SEVERITY_WARNING,
+    severity: (SEVERITY_WARNING),
     message: 'Error return value is discarded with `_`, silently hiding potential failures.',
     suggestion:
         'Check the error explicitly (`if err != nil { return err }`) or document why it is safe to ignore.',
-};
+});
 
-const CONTEXT_FIRST_RULE: LineRule = {
+const CONTEXT_FIRST_RULE: LineRule = Object.freeze({
     rule: 'GOM-CTX-001',
-    severity: SEVERITY_WARNING,
+    severity: (SEVERITY_WARNING),
     message: '`context.Context` should be the first parameter of a function.',
     suggestion:
         'Move `ctx context.Context` to be the first parameter — this is the Go convention and matches `ctx`-first APIs like `net/http` and database drivers.',
-};
+});
 
-const RECEIVER_NAMING_RULE: LineRule = {
+const RECEIVER_NAMING_RULE: LineRule = Object.freeze({
     rule: 'GOM-STYLE-001',
-    severity: SEVERITY_INFO,
+    severity: (SEVERITY_INFO),
     message: 'Receiver name does not follow Go naming conventions.',
     suggestion:
         'Use a short (1-2 letter) abbreviation of the type name (e.g. `s` for `Server`, `c` for `Client`), and keep it consistent across all methods of the type.',
-};
+});
 
-const ERROR_NAMING_RULE: LineRule = {
+const ERROR_NAMING_RULE: LineRule = Object.freeze({
     rule: 'GOM-STYLE-002',
-    severity: SEVERITY_INFO,
+    severity: (SEVERITY_INFO),
     message: 'Error variable does not follow Go naming conventions (should start with `err`).',
     suggestion:
         'Rename the variable to start with `err` (e.g. `errOpen` instead of `openErr` or `err` for a general error).',
-};
+});
 
-const PACKAGE_COMMENT_RULE: LineRule = {
+const PACKAGE_COMMENT_RULE: LineRule = Object.freeze({
     rule: 'GOM-STYLE-003',
-    severity: SEVERITY_INFO,
+    severity: (SEVERITY_INFO),
     message: 'Package is missing a documentation comment.',
     suggestion:
         'Add a comment before `package` that starts with `Package <name> ` and briefly describes the package purpose (Go convention for godoc).',
-};
+});
 
-// --- Issue factory ---
+// --- Actionable snippet mappings ---
 
-const GOM_ACTIONABLE_MAP: Record<
-    string,
-    { action: AgentActionType; code: string; safeToAutomate: boolean; templateSnippet: string }
-> = {
-    'GOM-ERR-001': {
-        action: 'apply_guard_clause',
-        code: 'AR:GOM:001',
-        safeToAutomate: false,
-        templateSnippet: 'if err != nil { return err }',
-    },
-    'GOM-CTX-001': {
-        action: 'simplify_control_flow',
-        code: 'AR:GOM:002',
-        safeToAutomate: false,
-        templateSnippet: 'func $1(ctx context.Context, $2)',
-    },
-    'GOM-STYLE-001': {
-        action: 'rename_symbol',
-        code: 'AR:GOM:003',
-        safeToAutomate: false,
-        templateSnippet: 'func ($1 *$2) $3()',
-    },
-    'GOM-STYLE-002': {
-        action: 'rename_symbol',
-        code: 'AR:GOM:004',
-        safeToAutomate: false,
-        templateSnippet: 'err$1',
-    },
-    'GOM-STYLE-003': {
-        action: 'insert_comment_contract',
-        code: 'AR:GOM:005',
-        safeToAutomate: false,
-        templateSnippet: '// Package $1 provides ...',
-    },
-};
+const ACT_GUARD_CLAUSE: AgentActionType = 'apply_guard_clause';
+const ACT_SIMPLIFY_FLOW: AgentActionType = 'simplify_control_flow';
+const ACT_RENAME_SYMBOL: AgentActionType = 'rename_symbol';
+const ACT_INSERT_COMMENT: AgentActionType = 'insert_comment_contract';
+
+const SNIPPET_GUARD_ERR = 'if err != nil { return err }';
+const SNIPPET_CTX_FIRST = 'func $1(ctx context.Context, $2)';
+const SNIPPET_RECEIVER = 'func ($1 *$2) $3()';
+const SNIPPET_ERR_NAME = 'err$1';
+const SNIPPET_PKG_COMMENT = '// Package $1 provides ...';
+
+interface ActionableEntry {
+    readonly rule: string;
+    readonly codeId: string;
+    readonly snippet: string;
+    readonly action: AgentActionType;
+    readonly autoSafe?: boolean;
+}
+
+const ACTIONABLE_ENTRIES: readonly ActionableEntry[] = [
+    { rule: 'GOM-ERR-001', codeId: '001', snippet: SNIPPET_GUARD_ERR, action: ACT_GUARD_CLAUSE },
+    { rule: 'GOM-CTX-001', codeId: '002', snippet: SNIPPET_CTX_FIRST, action: ACT_SIMPLIFY_FLOW },
+    { rule: 'GOM-STYLE-001', codeId: '003', snippet: SNIPPET_RECEIVER, action: ACT_RENAME_SYMBOL },
+    { rule: 'GOM-STYLE-002', codeId: '004', snippet: SNIPPET_ERR_NAME, action: ACT_RENAME_SYMBOL },
+    { rule: 'GOM-STYLE-003', codeId: '005', snippet: SNIPPET_PKG_COMMENT, action: ACT_INSERT_COMMENT },
+];
+
+const GOM_ACTIONABLE_MAP: Readonly<
+    Record<
+        string,
+        { action: AgentActionType; code: string; safeToAutomate: boolean; templateSnippet: string }
+    >
+> = Object.freeze(
+    ACTIONABLE_ENTRIES.reduce(
+        (acc, entry) => {
+            acc[entry.rule] = {
+                action: entry.action,
+                code: `AR:GOM:${entry.codeId}`,
+                safeToAutomate: entry.autoSafe ?? false,
+                templateSnippet: entry.snippet,
+            };
+            return acc;
+        },
+        {} as Record<
+            string,
+            { action: AgentActionType; code: string; safeToAutomate: boolean; templateSnippet: string }
+        >,
+    ),
+);
 
 function makeIssue(
     file: string,
     lineIndex: number,
-    rule: string,
-    severity: Severity,
-    message: string,
-    suggestion: string,
+    ruleSpec: LineRule,
     detail: Record<string, unknown>,
 ): Issue {
     const line = lineIndex + 1;
-    const mapped = GOM_ACTIONABLE_MAP[rule];
+    const mapped = GOM_ACTIONABLE_MAP[ruleSpec.rule];
     const actionable = mapped
         ? {
               action: mapped.action,
@@ -200,30 +213,20 @@ function makeIssue(
           }
         : undefined;
 
-    return {
-        id: `${ANALYZER_GO_MODERN}:${rule}:${file}:${line}`,
+    return buildCanonicalIssue({
         analyzer: ANALYZER_GO_MODERN,
-        rule,
-        severity,
-        message,
-        location: { file, start: { line, column: 1 }, end: { line, column: 1 } },
+        rule: ruleSpec.rule,
+        file,
+        line,
+        severity: ruleSpec.severity,
+        message: ruleSpec.message,
+        suggestion: ruleSpec.suggestion,
         detail,
-        suggestion,
-        ...(actionable ? { actionable } : {}),
-    };
+        actionable,
+    });
 }
 
 // --- Per-rule detection helpers ---
-
-/**
- * Check if a line discards an error with `_`.
- *
- * @param code - Masked line (comments/strings blanked).
- * @returns True when the line contains a `, _ :=` or `, _ =` pattern.
- */
-function hasUncheckedError(code: string): boolean {
-    return UNCHECKED_ERROR_RE.test(code);
-}
 
 /**
  * Check if a function signature has `context.Context` but not as the first parameter.
@@ -251,10 +254,7 @@ function hasContextNotFirst(code: string): boolean {
 
     // Check if context.Context is the first parameter
     const firstParam = paramsStr.split(',')[0].trim();
-    if (firstParam.includes('context.Context')) return false;
-
-    // context.Context is present but not first — that's a violation
-    return true;
+    return !firstParam.includes(CONTEXT_PACKAGE_TYPE);
 }
 
 /**
@@ -266,12 +266,7 @@ function hasContextNotFirst(code: string): boolean {
 function hasBadReceiverName(code: string): boolean {
     const match = RECEIVER_RE.exec(code);
     if (!match) return false;
-    const receiverName = match[1];
-    // Bad names: self, this, me, etc.
-    if (BAD_RECEIVER_NAMES.has(receiverName)) return true;
-    // Too long (Go convention is 1-2 letters, allow 3 for edge cases)
-    if (receiverName.length > MAX_RECEIVER_NAME_LEN) return true;
-    return false;
+    return BAD_RECEIVER_NAMES.has(match[1]) || match[1].length > MAX_RECEIVER_NAME_LEN;
 }
 
 /**
@@ -282,97 +277,41 @@ function hasBadReceiverName(code: string): boolean {
  */
 function hasBadErrorName(code: string): boolean {
     const match = VAR_ERROR_TYPE_RE.exec(code);
-    if (!match) return false;
-    const varName = match[1];
-    // Skip if name already starts with err or Err
-    if (/^err/i.test(varName)) return false;
-    return true;
+    return match ? !/^err/i.test(match[1]) : false;
 }
 
-function checkGoStyleRules(
-    file: string,
-    index: number,
-    trimmed: string,
-    rawLine: string,
-    out: Issue[],
-): void {
-    if (hasUncheckedError(trimmed)) {
-        out.push(
-            makeIssue(
-                file,
-                index,
-                UNCHECKED_ERROR_RULE.rule,
-                UNCHECKED_ERROR_RULE.severity,
-                UNCHECKED_ERROR_RULE.message,
-                UNCHECKED_ERROR_RULE.suggestion,
-                { line: rawLine },
-            ),
-        );
+/** Context object for single-line Go inspection procedures. */
+interface GoLineContext {
+    readonly file: string;
+    readonly index: number;
+    readonly trimmed: string;
+    readonly rawLine: string;
+    readonly raw: string[];
+    readonly out: Issue[];
+}
+
+function checkGoStyleRules(ctx: GoLineContext): void {
+    if (UNCHECKED_ERROR_RE.test(ctx.trimmed)) {
+        ctx.out.push(makeIssue(ctx.file, ctx.index, UNCHECKED_ERROR_RULE, { line: ctx.rawLine }));
     }
-    if (hasContextNotFirst(trimmed)) {
-        out.push(
-            makeIssue(
-                file,
-                index,
-                CONTEXT_FIRST_RULE.rule,
-                CONTEXT_FIRST_RULE.severity,
-                CONTEXT_FIRST_RULE.message,
-                CONTEXT_FIRST_RULE.suggestion,
-                { line: rawLine },
-            ),
-        );
+    if (hasContextNotFirst(ctx.trimmed)) {
+        ctx.out.push(makeIssue(ctx.file, ctx.index, CONTEXT_FIRST_RULE, { line: ctx.rawLine }));
     }
-    if (hasBadReceiverName(trimmed)) {
-        out.push(
-            makeIssue(
-                file,
-                index,
-                RECEIVER_NAMING_RULE.rule,
-                RECEIVER_NAMING_RULE.severity,
-                RECEIVER_NAMING_RULE.message,
-                RECEIVER_NAMING_RULE.suggestion,
-                { line: rawLine },
-            ),
-        );
+    if (hasBadReceiverName(ctx.trimmed)) {
+        ctx.out.push(makeIssue(ctx.file, ctx.index, RECEIVER_NAMING_RULE, { line: ctx.rawLine }));
     }
-    if (hasBadErrorName(trimmed)) {
-        out.push(
-            makeIssue(
-                file,
-                index,
-                ERROR_NAMING_RULE.rule,
-                ERROR_NAMING_RULE.severity,
-                ERROR_NAMING_RULE.message,
-                ERROR_NAMING_RULE.suggestion,
-                { line: rawLine },
-            ),
-        );
+    if (hasBadErrorName(ctx.trimmed)) {
+        ctx.out.push(makeIssue(ctx.file, ctx.index, ERROR_NAMING_RULE, { line: ctx.rawLine }));
     }
 }
 
-function checkGoPackageComment(
-    file: string,
-    index: number,
-    raw: string[],
-    rawLine: string,
-    out: Issue[],
-): void {
-    let prevIdx = index - 1;
-    while (prevIdx >= 0 && raw[prevIdx].trim().length === 0) {
+function checkGoPackageComment(ctx: GoLineContext): void {
+    let prevIdx = ctx.index - 1;
+    while (prevIdx >= 0 && ctx.raw[prevIdx].trim().length === 0) {
         prevIdx--;
     }
-    if (prevIdx < 0 || !COMMENT_LINE_RE.test(raw[prevIdx])) {
-        out.push(
-            makeIssue(
-                file,
-                index,
-                PACKAGE_COMMENT_RULE.rule,
-                PACKAGE_COMMENT_RULE.severity,
-                PACKAGE_COMMENT_RULE.message,
-                PACKAGE_COMMENT_RULE.suggestion,
-                { line: rawLine },
-            ),
-        );
+    if (prevIdx < 0 || !COMMENT_LINE_RE.test(ctx.raw[prevIdx])) {
+        ctx.out.push(makeIssue(ctx.file, ctx.index, PACKAGE_COMMENT_RULE, { line: ctx.rawLine }));
     }
 }
 
@@ -418,10 +357,19 @@ export class GoModernAnalyzer implements Analyzer {
             if (trimmed.length === 0) continue;
             const rawLine = raw[index].trim();
 
-            checkGoStyleRules(file, index, trimmed, rawLine, out);
+            const lineCtx: GoLineContext = {
+                file,
+                index,
+                trimmed,
+                rawLine,
+                raw,
+                out,
+            };
+
+            checkGoStyleRules(lineCtx);
 
             if (PACKAGE_DECL_RE.test(trimmed)) {
-                checkGoPackageComment(file, index, raw, rawLine, out);
+                checkGoPackageComment(lineCtx);
             }
         }
 

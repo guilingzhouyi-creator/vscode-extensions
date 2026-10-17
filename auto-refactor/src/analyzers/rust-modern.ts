@@ -95,22 +95,26 @@ interface FnSigState {
     inSig: boolean;
 }
 
-/** One keyword-anchored rule: pattern to match on the masked line plus its report text. */
-interface LineRule {
+/** Canonical issue specification for reporting Rust modernization findings. */
+interface RustIssueSpec {
     /** Canonical rule id (`RSM-TOPIC-NNN`). */
-    rule: string;
+    readonly rule: string;
     /** Finding severity. */
-    severity: Severity;
-    /** Pattern run against the masked line. */
-    pattern: RegExp;
+    readonly severity: Severity;
     /** Why the modern form is preferable. */
-    message: string;
+    readonly message: string;
     /** One-line rewrite guidance. */
-    suggestion: string;
+    readonly suggestion: string;
+}
+
+/** One keyword-anchored rule: pattern to match on the masked line plus its report text. */
+interface LineRule extends RustIssueSpec {
+    /** Pattern run against the masked line. */
+    readonly pattern: RegExp;
 }
 
 /** Keyword rules, all of which fit on one physical line. */
-const LINE_RULES: LineRule[] = [
+const LINE_RULES: readonly LineRule[] = [
     {
         rule: 'RSM-TRY-001',
         severity: SEVERITY_WARNING,
@@ -158,6 +162,47 @@ const LINE_RULES: LineRule[] = [
     },
 ];
 
+const SPEC_STR_REF: RustIssueSpec = Object.freeze({
+    rule: 'RSM-STR-001',
+    severity: SEVERITY_WARNING,
+    message: '`&String` forces every caller to own a String; `&str` borrows either form.',
+    suggestion: 'Take `&str` (or `impl AsRef<str>`) and let callers pass `&my_string`.',
+});
+
+const SPEC_FORMAT_CAPTURE: RustIssueSpec = Object.freeze({
+    rule: 'RSM-FORMAT-001',
+    severity: SEVERITY_WARNING,
+    message: 'Positional `{}` captures drift out of sync with the argument list.',
+    suggestion: 'Inline the binding (`format!("{value}")`) so the compiler checks it.',
+});
+
+const SPEC_LET_ELSE: RustIssueSpec = Object.freeze({
+    rule: 'RSM-ELSE-001',
+    severity: SEVERITY_WARNING,
+    message: '`if let ... else { return/break }` can be simplified with `let ... else` syntax.',
+    suggestion: 'Rewrite as `let Pattern = expr else { return/break; };` to reduce nesting.',
+});
+
+const SPEC_FOR_FIND: RustIssueSpec = Object.freeze({
+    rule: 'RSM-FIND-001',
+    severity: SEVERITY_INFO,
+    message: 'Manual `for ... in` loop searching with an immediate return can be simplified.',
+    suggestion: 'Use iterator methods like `.find()`, `.any()`, or `.position()`.',
+});
+
+const SPEC_LOCK_AWAIT: RustIssueSpec = Object.freeze({
+    rule: 'RSM-LOCK-001',
+    severity: SEVERITY_WARNING,
+    message:
+        'Holding a synchronous `std::sync` lock guard across `.await` can cause deadlocks and violates `Send`.',
+    suggestion:
+        'Use `tokio::sync::Mutex` or drop the synchronous lock guard before invoking `.await`.',
+});
+
+const MAX_MULTILINE_FORMAT_SPAN_LINES = 10;
+const MAX_LET_ELSE_SPAN_LINES = 25;
+const MAX_FOR_FIND_SPAN_LINES = 6;
+
 /**
  * Test whether a formatting macro call contains positional `{}` arguments,
  * supporting single-line and multi-line macro calls.
@@ -170,7 +215,7 @@ function isPositionalFormatCall(raw: string[], startIndex: number): boolean {
     if (POSITIONAL_PLACEHOLDER_RE.test(raw[startIndex])) {
         return true;
     }
-    const maxLine = Math.min(startIndex + 10, raw.length);
+    const maxLine = Math.min(startIndex + MAX_MULTILINE_FORMAT_SPAN_LINES, raw.length);
     const chunk = raw.slice(startIndex, maxLine).join('\n');
     return MULTILINE_FORMAT_RE.test(chunk);
 }
@@ -242,10 +287,7 @@ function checkAmpStringInLine(code: string, state: FnSigState): boolean {
     if (state.inSig) {
         return checkSigOpenParen(code, state);
     }
-    if (FN_DECL_RE.test(code)) {
-        return checkFnDeclLine(code, state);
-    }
-    return false;
+    return FN_DECL_RE.test(code) ? checkFnDeclLine(code, state) : false;
 }
 
 /**
@@ -281,7 +323,7 @@ function isLetElseCandidate(lines: string[], startIndex: number): boolean {
     if (!IF_LET_RE.test(lines[startIndex])) {
         return false;
     }
-    const maxLine = Math.min(startIndex + 25, lines.length);
+    const maxLine = Math.min(startIndex + MAX_LET_ELSE_SPAN_LINES, lines.length);
     let chunk = '';
     for (let j = startIndex; j < maxLine; j += 1) {
         chunk += (j === startIndex ? '' : '\n') + lines[j];
@@ -317,7 +359,7 @@ function isForFindCandidate(lines: string[], startIndex: number): boolean {
     if (!FOR_IN_RE.test(lines[startIndex])) {
         return false;
     }
-    const maxLine = Math.min(startIndex + 6, lines.length);
+    const maxLine = Math.min(startIndex + MAX_FOR_FIND_SPAN_LINES, lines.length);
     const chunk = lines.slice(startIndex, maxLine).join(' ');
     return FOR_FIND_RE.test(chunk);
 }
@@ -349,47 +391,41 @@ function resolveAsyncFnScope(
             }
         }
     }
-    if (bodyStart !== -1) {
-        return { bodyStart, bodyEnd: lines.length - 1 };
-    }
-    return null;
+    return bodyStart !== -1 ? { bodyStart, bodyEnd: lines.length - 1 } : null;
+}
+
+/** Scope context for detecting synchronous lock guards across await boundaries. */
+interface AsyncLockScopeContext {
+    readonly file: string;
+    readonly raw: string[];
+    readonly lines: string[];
+    readonly scope: { bodyStart: number; bodyEnd: number };
 }
 
 /**
  * Record findings for synchronous std guard instances held across `.await` points.
  *
- * @param file - Relative file path.
- * @param raw - Raw source lines.
- * @param lines - Masked source lines.
- * @param scope - Body line range of async function.
- * @param scope.bodyStart - Starting line index of function body.
- * @param scope.bodyEnd - Ending line index of function body.
+ * @param ctx - Scope context for async lock inspection.
  * @param out - Issue accumulator list.
  */
 function collectLocksAcrossAwait(
-    file: string,
-    raw: string[],
-    lines: string[],
-    scope: { bodyStart: number; bodyEnd: number },
+    ctx: AsyncLockScopeContext,
     out: Issue[],
 ): void {
     const lockLines: number[] = [];
     let maxAwaitLine = -1;
-    for (let j = scope.bodyStart; j <= scope.bodyEnd; j += 1) {
-        if (STD_LOCK_RE.test(lines[j])) lockLines.push(j);
-        if (AWAIT_RE.test(lines[j])) maxAwaitLine = j;
+    for (let j = ctx.scope.bodyStart; j <= ctx.scope.bodyEnd; j += 1) {
+        if (STD_LOCK_RE.test(ctx.lines[j])) lockLines.push(j);
+        if (AWAIT_RE.test(ctx.lines[j])) maxAwaitLine = j;
     }
     for (const lk of lockLines) {
         if (maxAwaitLine > lk) {
             out.push(
                 makeIssue(
-                    file,
+                    ctx.file,
                     lk,
-                    'RSM-LOCK-001',
-                    SEVERITY_WARNING,
-                    'Holding a synchronous `std::sync` lock guard across `.await` can cause deadlocks and violates `Send`.',
-                    'Use `tokio::sync::Mutex` or drop the synchronous lock guard before invoking `.await`.',
-                    { line: raw[lk].trim() },
+                    SPEC_LOCK_AWAIT,
+                    { line: ctx.raw[lk].trim() },
                 ),
             );
         }
@@ -413,105 +449,102 @@ function scanAsyncLockIssues(file: string, raw: string[], masked: string[], out:
         if (!scope) {
             continue;
         }
-        collectLocksAcrossAwait(file, raw, masked, scope, out);
+        collectLocksAcrossAwait({ file, raw, lines: masked, scope }, out);
     }
 }
 
-const RSM_ACTIONABLE_MAP: Record<
-    string,
-    { action: AgentActionType; code: string; safeToAutomate: boolean; templateSnippet: string }
-> = {
-    'RSM-TRY-001': {
-        action: 'replace_token',
-        code: 'AR:RSM:001',
-        safeToAutomate: true,
-        templateSnippet: '$1?',
+const ACT_REPLACE_TOKEN: AgentActionType = 'replace_token';
+const ACT_APPLY_GUARD_CLAUSE: AgentActionType = 'apply_guard_clause';
+
+const SNIPPET_QUESTION = '$1?';
+const SNIPPET_USE_PATH = 'use $1::$2;';
+const SNIPPET_USE_GROUP = 'use $1::{$2};';
+const SNIPPET_STR_REF = '&str';
+const SNIPPET_BORROW = '&$1';
+const SNIPPET_CONTEXT_PROPAGATE = '$1.context("$2")?';
+const SNIPPET_TRY_FROM = '$1::try_from($2)?';
+const SNIPPET_INLINE_FORMAT = 'format!("{var}")';
+const SNIPPET_LET_ELSE = 'let $1 = $2 else { return $3; };';
+const SNIPPET_ITER_FIND = '$1.iter().find(|$2| $3)';
+const SNIPPET_DROP_GUARD = 'drop($guard);';
+
+interface ActionableEntry {
+    readonly rule: string;
+    readonly codeId: string;
+    readonly snippet: string;
+    readonly action?: AgentActionType;
+    readonly autoSafe?: boolean;
+}
+
+const ACTIONABLE_ENTRIES: readonly ActionableEntry[] = [
+    { rule: 'RSM-TRY-001', codeId: '001', snippet: SNIPPET_QUESTION, autoSafe: true },
+    { rule: 'RSM-EXTERN-001', codeId: '002', snippet: SNIPPET_USE_PATH },
+    { rule: 'RSM-MACRO-001', codeId: '003', snippet: SNIPPET_USE_GROUP },
+    { rule: 'RSM-STR-001', codeId: '004', snippet: SNIPPET_STR_REF },
+    { rule: 'RSM-CLONE-001', codeId: '005', snippet: SNIPPET_BORROW },
+    {
+        rule: 'RSM-UNWRAP-001',
+        codeId: '006',
+        snippet: SNIPPET_CONTEXT_PROPAGATE,
+        action: ACT_APPLY_GUARD_CLAUSE,
     },
-    'RSM-EXTERN-001': {
-        action: 'replace_token',
-        code: 'AR:RSM:002',
-        safeToAutomate: false,
-        templateSnippet: 'use $1::$2;',
+    { rule: 'RSM-CAST-001', codeId: '007', snippet: SNIPPET_TRY_FROM },
+    { rule: 'RSM-FORMAT-001', codeId: '008', snippet: SNIPPET_INLINE_FORMAT },
+    {
+        rule: 'RSM-ELSE-001',
+        codeId: '009',
+        snippet: SNIPPET_LET_ELSE,
+        action: ACT_APPLY_GUARD_CLAUSE,
     },
-    'RSM-MACRO-001': {
-        action: 'replace_token',
-        code: 'AR:RSM:003',
-        safeToAutomate: false,
-        templateSnippet: 'use $1::{$2};',
+    { rule: 'RSM-FIND-001', codeId: '010', snippet: SNIPPET_ITER_FIND },
+    {
+        rule: 'RSM-LOCK-001',
+        codeId: '011',
+        snippet: SNIPPET_DROP_GUARD,
+        action: ACT_APPLY_GUARD_CLAUSE,
     },
-    'RSM-STR-001': {
-        action: 'replace_token',
-        code: 'AR:RSM:004',
-        safeToAutomate: false,
-        templateSnippet: '&str',
-    },
-    'RSM-CLONE-001': {
-        action: 'replace_token',
-        code: 'AR:RSM:005',
-        safeToAutomate: false,
-        templateSnippet: '&$1',
-    },
-    'RSM-UNWRAP-001': {
-        action: 'apply_guard_clause',
-        code: 'AR:RSM:006',
-        safeToAutomate: false,
-        templateSnippet: '$1.context("$2")?',
-    },
-    'RSM-CAST-001': {
-        action: 'replace_token',
-        code: 'AR:RSM:007',
-        safeToAutomate: false,
-        templateSnippet: '$1::try_from($2)?',
-    },
-    'RSM-FORMAT-001': {
-        action: 'replace_token',
-        code: 'AR:RSM:008',
-        safeToAutomate: false,
-        templateSnippet: 'format!("{var}")',
-    },
-    'RSM-ELSE-001': {
-        action: 'apply_guard_clause',
-        code: 'AR:RSM:009',
-        safeToAutomate: false,
-        templateSnippet: 'let $1 = $2 else { return $3; };',
-    },
-    'RSM-FIND-001': {
-        action: 'replace_token',
-        code: 'AR:RSM:010',
-        safeToAutomate: false,
-        templateSnippet: '$1.iter().find(|$2| $3)',
-    },
-    'RSM-LOCK-001': {
-        action: 'apply_guard_clause',
-        code: 'AR:RSM:011',
-        safeToAutomate: false,
-        templateSnippet: 'drop($guard);',
-    },
-};
+];
+
+const RSM_ACTIONABLE_MAP: Readonly<
+    Record<
+        string,
+        { action: AgentActionType; code: string; safeToAutomate: boolean; templateSnippet: string }
+    >
+> = Object.freeze(
+    ACTIONABLE_ENTRIES.reduce(
+        (acc, entry) => {
+            acc[entry.rule] = {
+                action: entry.action ?? ACT_REPLACE_TOKEN,
+                code: `AR:RSM:${entry.codeId}`,
+                safeToAutomate: entry.autoSafe ?? false,
+                templateSnippet: entry.snippet,
+            };
+            return acc;
+        },
+        {} as Record<
+            string,
+            { action: AgentActionType; code: string; safeToAutomate: boolean; templateSnippet: string }
+        >,
+    ),
+);
 
 /**
  * Build one finding anchored to a source line.
  *
  * @param file - Normalized repository-relative path.
  * @param lineIndex - Zero-based line index.
- * @param rule - Canonical rule id.
- * @param severity - Finding severity.
- * @param message - Why the modern form is preferable.
- * @param suggestion - One-line rewrite guidance.
+ * @param spec - Canonical issue metadata specification.
  * @param detail - Structured evidence for machines.
  * @returns The finding, ready to be pushed onto the result list.
  */
 function makeIssue(
     file: string,
     lineIndex: number,
-    rule: string,
-    severity: Severity,
-    message: string,
-    suggestion: string,
+    spec: RustIssueSpec,
     detail: Record<string, unknown>,
 ): Issue {
     const line = lineIndex + 1;
-    const mapped = RSM_ACTIONABLE_MAP[rule];
+    const mapped = RSM_ACTIONABLE_MAP[spec.rule];
     const actionable = mapped
         ? {
               action: mapped.action,
@@ -523,95 +556,65 @@ function makeIssue(
 
     return buildCanonicalIssue({
         analyzer: ANALYZER_RUST_MODERN,
-        rule,
+        rule: spec.rule,
         file,
         line,
-        severity,
-        message,
-        suggestion,
+        severity: spec.severity,
+        message: spec.message,
+        suggestion: spec.suggestion,
         detail,
         actionable,
     });
 }
 
-/**
- * Scan a single masked source line for modernization issues.
- */
-function scanLineRules(
-    file: string,
-    raw: string[],
-    masked: string[],
-    index: number,
-    fnSigState: FnSigState,
-    out: Issue[],
-): void {
-    const code = masked[index];
-    if (code.trim().length === 0) return;
+/** Context object for line-level scan procedures. */
+interface LineScanContext {
+    readonly file: string;
+    readonly raw: string[];
+    readonly masked: string[];
+    readonly fnSigState: FnSigState;
+    readonly out: Issue[];
+}
 
+/** Scan keyword regex patterns on the line. */
+function scanPatternRules(ctx: LineScanContext, index: number, code: string): void {
     for (const rule of LINE_RULES) {
         if (!rule.pattern.test(code)) continue;
-        out.push(
-            makeIssue(file, index, rule.rule, rule.severity, rule.message, rule.suggestion, {
-                line: raw[index].trim(),
+        ctx.out.push(
+            makeIssue(ctx.file, index, rule, {
+                line: ctx.raw[index].trim(),
             }),
         );
     }
+}
 
-    if (checkAmpStringInLine(code, fnSigState)) {
-        out.push(
-            makeIssue(
-                file,
-                index,
-                'RSM-STR-001',
-                SEVERITY_WARNING,
-                '`&String` forces every caller to own a String; `&str` borrows either form.',
-                'Take `&str` (or `impl AsRef<str>`) and let callers pass `&my_string`.',
-                { line: raw[index].trim() },
-            ),
-        );
+/** Scan contextual and multiline syntactic rules on the line. */
+function scanContextualRules(ctx: LineScanContext, index: number, code: string): void {
+    if (checkAmpStringInLine(code, ctx.fnSigState)) {
+        ctx.out.push(makeIssue(ctx.file, index, SPEC_STR_REF, { line: ctx.raw[index].trim() }));
     }
+    if (FORMAT_CALL_RE.test(code) && isPositionalFormatCall(ctx.raw, index)) {
+        ctx.out.push(makeIssue(ctx.file, index, SPEC_FORMAT_CAPTURE, { line: ctx.raw[index].trim() }));
+    }
+    if (isLetElseCandidate(ctx.masked, index)) {
+        ctx.out.push(makeIssue(ctx.file, index, SPEC_LET_ELSE, { line: ctx.raw[index].trim() }));
+    }
+    if (isForFindCandidate(ctx.masked, index)) {
+        ctx.out.push(makeIssue(ctx.file, index, SPEC_FOR_FIND, { line: ctx.raw[index].trim() }));
+    }
+}
 
-    if (FORMAT_CALL_RE.test(code) && isPositionalFormatCall(raw, index)) {
-        out.push(
-            makeIssue(
-                file,
-                index,
-                'RSM-FORMAT-001',
-                SEVERITY_WARNING,
-                'Positional `{}` captures drift out of sync with the argument list.',
-                'Inline the binding (`format!("{value}")`) so the compiler checks it.',
-                { line: raw[index].trim() },
-            ),
-        );
-    }
-
-    if (isLetElseCandidate(masked, index)) {
-        out.push(
-            makeIssue(
-                file,
-                index,
-                'RSM-ELSE-001',
-                SEVERITY_WARNING,
-                '`if let ... else { return/break }` can be simplified with `let ... else` syntax.',
-                'Rewrite as `let Pattern = expr else { return/break; };` to reduce nesting.',
-                { line: raw[index].trim() },
-            ),
-        );
-    }
-
-    if (isForFindCandidate(masked, index)) {
-        out.push(
-            makeIssue(
-                file,
-                index,
-                'RSM-FIND-001',
-                SEVERITY_INFO,
-                'Manual `for ... in` loop searching with an immediate return can be simplified.',
-                'Use iterator methods like `.find()`, `.any()`, or `.position()`.',
-                { line: raw[index].trim() },
-            ),
-        );
-    }
+/**
+ * Scan a single masked source line for modernization issues.
+ *
+ * @param ctx - Context carrying source arrays, state, and output accumulator.
+ * @param index - Current line index.
+ */
+function scanLineRules(ctx: LineScanContext, index: number): void {
+    const code = ctx.masked[index];
+    if (code.trim().length === 0) return;
+    scanPatternRules(ctx, index, code);
+    scanContextualRules(ctx, index, code);
 }
 
 /** Rust modernization pack: eleven rules over a masked view of the file. */
@@ -644,9 +647,16 @@ export class RustModernAnalyzer implements Analyzer {
         const { raw, masked } = maskSourceText(content, RUST_MASK);
         const out: Issue[] = [];
         const fnSigState: FnSigState = { inParams: false, inSig: false };
+        const scanCtx: LineScanContext = {
+            file,
+            raw,
+            masked,
+            fnSigState,
+            out,
+        };
 
         for (let index = 0; index < masked.length; index += 1) {
-            scanLineRules(file, raw, masked, index, fnSigState, out);
+            scanLineRules(scanCtx, index);
         }
 
         scanAsyncLockIssues(file, raw, masked, out);
