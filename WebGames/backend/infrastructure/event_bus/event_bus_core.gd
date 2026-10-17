@@ -331,8 +331,20 @@ func emit_narrative_by_key(template_key: String, category_key: String, args: Arr
 ## 广播泛化领域事件：结构化 payload 经 DOMAIN_EVENT_GENERIC 信道派发；
 ## 能解析出文案时追加叙事派发（与旧总线两步语义一致）
 func emit_domain_event(channel: String, payload: Dictionary = {}) -> void:
-	var packet := borrow_packet(EventChannelDefinition.DOMAIN_EVENT_GENERIC, EventCategoryMask.NARRATIVE_TEXT, payload)
-	packet.payload_data = {"channel": channel, "payload": payload}
+	var channel_def: int = EventChannelDefinition.DOMAIN_EVENT_GENERIC
+	match channel:
+		"world_state.hud_snapshot_published":
+			channel_def = EventChannelDefinition.HUD_STATUS_SNAPSHOT
+		"currency.wallet.mutated":
+			channel_def = EventChannelDefinition.HUD_WALLET_MUTATED
+		_:
+			channel_def = EventChannelDefinition.DOMAIN_EVENT_GENERIC
+
+	var packet := borrow_packet(channel_def, EventCategoryMask.NARRATIVE_TEXT, payload)
+	var pdata: Dictionary = {"channel": channel, "payload": payload}
+	for k in payload.keys():
+		pdata[k] = payload[k]
+	packet.payload_data = pdata
 	dispatch_now(packet)
 	recycle_packet(packet)
 	var text := render_domain_event_text(channel, payload)

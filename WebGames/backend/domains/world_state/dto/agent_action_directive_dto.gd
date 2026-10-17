@@ -33,16 +33,22 @@ func reset_state() -> void:
 
 ## 序列化当前对象为通用字典传输结构
 func to_dto() -> Dictionary:
-	return {
+	var d: Dictionary = {
 		"directive_id": directive_id,
 		"domain": domain,
-		"description": description,
-		"cost_payload": cost_payload.duplicate(true),
-		"preconditions": preconditions.duplicate(true),
-		"allowed_parameters": allowed_parameters.duplicate(true),
-		"is_executable": is_executable,
-		"blocked_reason": blocked_reason
+		"is_executable": is_executable
 	}
+	if not description.is_empty():
+		d["description"] = description
+	if not cost_payload.is_empty():
+		d["cost_payload"] = cost_payload.duplicate(true)
+	if not preconditions.is_empty():
+		d["preconditions"] = preconditions.duplicate(true)
+	if not allowed_parameters.is_empty():
+		d["allowed_parameters"] = allowed_parameters.duplicate(true)
+	if not blocked_reason.is_empty():
+		d["blocked_reason"] = blocked_reason
+	return d
 
 ## 从输入字典反序列化还原传输对象
 static func from_dto(data: Dictionary) -> AgentActionDirectiveDTO:

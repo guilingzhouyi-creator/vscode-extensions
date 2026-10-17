@@ -19,7 +19,7 @@ const STATIC_DIR_SPECS: Array[Dictionary] = [
 	{
 		"id": "ALLOCATE_POTENTIAL_STAT",
 		"domain": "ASSET",
-		"desc": "分配未分配潜能点至基础属性",
+		"desc": "分配潜能点",
 		"cost": {"potential_points": 1},
 		"pre": {"unallocated_points_min": 1},
 		"params": {"stat_target": ["STR", "AGI", "INT", "STA"]}
@@ -27,7 +27,7 @@ const STATIC_DIR_SPECS: Array[Dictionary] = [
 	{
 		"id": "REST_AND_ADVANCE_TIME",
 		"domain": "RETENTION",
-		"desc": "在安全宿屋休息推进时相并恢复体能",
+		"desc": "休息推时",
 		"cost": {"ap": 2.0},
 		"pre": {"ap_min": 2.0},
 		"params": {}
@@ -35,7 +35,7 @@ const STATIC_DIR_SPECS: Array[Dictionary] = [
 	{
 		"id": "CLAIM_QUEST_OBJECTIVE",
 		"domain": "ACTION",
-		"desc": "交付当前达标的任务目标并领取报酬",
+		"desc": "领任务报酬",
 		"cost": {},
 		"pre": {"quest_completable": true},
 		"params": {}
@@ -43,7 +43,7 @@ const STATIC_DIR_SPECS: Array[Dictionary] = [
 	{
 		"id": "INSPECT_INVENTORY_SLOT",
 		"domain": "ASSET",
-		"desc": "查验背包轻量道具槽位",
+		"desc": "查验背包",
 		"cost": {},
 		"pre": {},
 		"params": {}
@@ -51,7 +51,7 @@ const STATIC_DIR_SPECS: Array[Dictionary] = [
 	{
 		"id": "TOGGLE_MODE_ADAPTATION",
 		"domain": "META",
-		"desc": "探测并调整单机/联机自适应特性",
+		"desc": "切换模式",
 		"cost": {},
 		"pre": {},
 		"params": {}
@@ -59,7 +59,7 @@ const STATIC_DIR_SPECS: Array[Dictionary] = [
 	{
 		"id": "MARK_MAIL_READ",
 		"domain": "RETENTION",
-		"desc": "读取未读信件并收取附件奖励",
+		"desc": "查阅信件",
 		"cost": {},
 		"pre": {"unread_mail_min": 1},
 		"params": {}

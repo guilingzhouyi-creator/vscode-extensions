@@ -80,6 +80,8 @@ func _on_authoritative_snapshot_received(pkt: Variant) -> void:
 	var payload: Dictionary = {}
 	if pkt != null and pkt.get("payload_data") is Dictionary:
 		payload = pkt.payload_data
+		if payload.has("payload") and payload.get("payload") is Dictionary:
+			payload = payload.get("payload")
 	elif pkt is Dictionary:
 		payload = pkt
 	if payload.is_empty():
@@ -107,11 +109,25 @@ func _on_wallet_mutated(pkt: Variant) -> void:
 	var payload: Dictionary = {}
 	if pkt != null and pkt.get("payload_data") is Dictionary:
 		payload = pkt.payload_data
+		if payload.has("payload") and payload.get("payload") is Dictionary:
+			payload = payload.get("payload")
 	elif pkt is Dictionary:
 		payload = pkt
 	var gold: int = int(payload.get("current_gold", payload.get("gold", view.wallet_gold)))
 	var crystals: int = int(payload.get("current_crystals", payload.get("crystals", view.wallet_mana_crystals)))
-	view.apply_snapshot({"gold": gold, "mana_monocrystals": crystals})
+	view.wallet_gold = gold
+	view.wallet_mana_crystals = crystals
+	view.apply_snapshot({
+		"hp_current": view.stat_hp_current,
+		"hp_max": view.stat_hp_max,
+		"mp_current": view.stat_mp_current,
+		"mp_max": view.stat_mp_max,
+		"ap_current": view.stat_ap_current,
+		"ap_max": view.stat_ap_max,
+		"character_name": view.character_name,
+		"gold": gold,
+		"mana_monocrystals": crystals
+	})
 
 func _on_prologue_advanced(pkt: Variant) -> void:
 	var view: MainHUDView = _get_view()

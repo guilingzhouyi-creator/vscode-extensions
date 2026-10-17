@@ -3,6 +3,36 @@
     "domain": "world_state",
     "extensions_note": "Phase 118 六大业务支柱聚合、网关模式自适应与四大领域通信存储分流配置单源"
   },
+  "channels": {
+    "action_stream": "action.stream",
+    "asset_rpc": "asset.rpc",
+    "retention_sync": "retention.sync",
+    "meta_polling": "meta.polling"
+  },
+  "storage": {
+    "offline_vault_prefix": "user://offline_vault/",
+    "online_cache_prefix": "user://online_cache/"
+  },
+  "mode_features": {
+    "single_player": {
+      "show_matchmaking": false,
+      "show_online_chat": false,
+      "show_real_money_shop": false,
+      "show_cross_server_guild": false,
+      "enable_offline_cdkey": true,
+      "enable_offline_gacha": true,
+      "enable_local_story_mail": true
+    },
+    "multiplayer": {
+      "show_matchmaking": true,
+      "show_online_chat": true,
+      "show_real_money_shop": true,
+      "show_cross_server_guild": true,
+      "enable_offline_cdkey": false,
+      "enable_offline_gacha": false,
+      "enable_local_story_mail": true
+    }
+  },
   "hud": {
     "channels": {
       "snapshot": "world_state.snapshot_published",
