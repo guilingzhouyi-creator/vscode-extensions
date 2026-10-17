@@ -43,6 +43,8 @@ export type {
     ExportQuoteOptions,
 } from './thinking-accordion-lock';
 
+const DASHBOARD_PANEL_VIEW_TYPE = 'workspaceTiming.dashboard';
+
 export class DashboardPanel {
   public static currentPanel: DashboardPanel | undefined;
   /** 全局消息处理器，所有面板共享 */
@@ -129,7 +131,7 @@ export class DashboardPanel {
     }
 
     const panel = vscode.window.createWebviewPanel(
-      'workspaceTiming.dashboard',
+      DASHBOARD_PANEL_VIEW_TYPE,
       t()['panel.title'],
       column ?? vscode.ViewColumn.One,
       {

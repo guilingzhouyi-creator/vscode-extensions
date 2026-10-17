@@ -20,6 +20,11 @@ import { ActivityWatcher } from '../integration/ActivityWatcher';
 import { exportTimingToFile, exportAggregatedToFile } from './dashboardMessages';
 import { TIMING_COMMAND_IDS } from '../domain/models';
 
+const LOG_COMMANDS_REGISTERED = 'CommandRegistrar: all commands registered';
+const LOG_TOGGLE_GLOBAL_PERSIST_FAILED = 'toggleGlobal persist failed';
+const LOG_SHOW_STATUS_PERSIST_FAILED = 'showStatus persist failed';
+const LOG_COMMAND_REGISTRAR_DISPOSED = 'CommandRegistrar: disposed';
+
 export class CommandRegistrar {
     private readonly subscriptions: vscode.Disposable[] = [];
 
@@ -38,7 +43,7 @@ export class CommandRegistrar {
             context.subscriptions.push(d);
         }
 
-        log(LogLevel.Info, 'CommandRegistrar: all commands registered');
+        log(LogLevel.Info, LOG_COMMANDS_REGISTERED);
     }
 
     private registerSwitchCommands(
@@ -75,7 +80,7 @@ export class CommandRegistrar {
             orchestrator.disable.updateConfig({ globalDisabled: !current });
             await orchestrator.onDisableStateChanged(orchestrator.disable.resolveState());
             persistTimingConfig({ globalDisabled: !current }).catch(err =>
-                log(LogLevel.Error, 'toggleGlobal persist failed', err as Error)
+                log(LogLevel.Error, LOG_TOGGLE_GLOBAL_PERSIST_FAILED, err as Error)
             );
 
             vscode.window.showInformationMessage(
@@ -87,7 +92,7 @@ export class CommandRegistrar {
             if (!statusBar) { this.noWorkspaceMsg(); return; }
             const nextMode = statusBar.cycleMode();
             persistTimingConfig({ statusBarMode: nextMode }).catch(err =>
-                log(LogLevel.Error, 'showStatus persist failed', err as Error)
+                log(LogLevel.Error, LOG_SHOW_STATUS_PERSIST_FAILED, err as Error)
             );
             vscode.window.showInformationMessage(
                 format(t()['cmd.modeSwitched'], statusBarModeLabel(nextMode))
@@ -299,6 +304,6 @@ export class CommandRegistrar {
             d.dispose();
         }
         this.subscriptions.length = 0;
-        log(LogLevel.Debug, 'CommandRegistrar: disposed');
+        log(LogLevel.Debug, LOG_COMMAND_REGISTRAR_DISPOSED);
     }
 }

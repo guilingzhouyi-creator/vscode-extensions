@@ -14,6 +14,10 @@ import { TimeSlice } from '../domain/models';
 import { IJournalStore } from '../cache/IJournalStore';
 import { LogLevel, log } from '../integration/logger';
 
+const LOG_APPEND_BATCH_FAILED = 'JournalStorageProvider: appendBatch failed';
+const LOG_READ_JOURNAL_FAILED = 'JournalStorageProvider: readJournal failed';
+const LOG_JOURNAL_TRUNCATED = 'JournalStorageProvider: journal truncated';
+
 const JOURNAL_FILE = 'workspace-timing.journal';
 
 export class JournalStorageProvider implements IJournalStore {
@@ -59,7 +63,7 @@ export class JournalStorageProvider implements IJournalStore {
 
             await this.doAppend(text);
         } catch (err) {
-            log(LogLevel.Error, 'JournalStorageProvider: appendBatch failed', err as Error);
+            log(LogLevel.Error, LOG_APPEND_BATCH_FAILED, err as Error);
             throw err;
         }
     }
@@ -100,7 +104,7 @@ export class JournalStorageProvider implements IJournalStore {
 
             return slices;
         } catch (err) {
-            log(LogLevel.Warn, 'JournalStorageProvider: readJournal failed', err as Error);
+            log(LogLevel.Warn, LOG_READ_JOURNAL_FAILED, err as Error);
             return [];
         }
     }
@@ -113,7 +117,7 @@ export class JournalStorageProvider implements IJournalStore {
         }
 
         await fs.promises.writeFile(this.filePath, '', 'utf-8');
-        log(LogLevel.Debug, 'JournalStorageProvider: journal truncated');
+        log(LogLevel.Debug, LOG_JOURNAL_TRUNCATED);
     }
 
     /** 解析并校验单行 journal 数据，损坏或非法时安全过滤 */

@@ -24,6 +24,9 @@ import { JournalWriter } from '../cache/JournalWriter';
 import { RecoveryService } from './RecoveryService';
 import { LogLevel, log } from '../integration/logger';
 
+const LOG_STARTING_SESSION = 'SessionManager: starting session';
+const LOG_ENDING_SESSION = 'SessionManager: ending session';
+
 /**
  * 契约模型：会话结束落盘计算结果 (SessionResult)
  * 不变量契约：elapsedMs >= 0 且总工时 totalMs 满足单调非递减性。
@@ -142,7 +145,7 @@ export class SessionManager {
      * @returns 恢复并启动后的工作区最新计时数据快照
      */
     async startSession(): Promise<WorkspaceTimingData> {
-        log(LogLevel.Info, 'SessionManager: starting session');
+        log(LogLevel.Info, LOG_STARTING_SESSION);
 
         // 1. 崩溃恢复
         const data = await this.recovery.recover(this._rawRetentionDays, this.maxSessions);
@@ -168,7 +171,7 @@ export class SessionManager {
             return { elapsedMs: 0, totalMs: this.timer.data.totalMs, sessionCount: 0 };
         }
 
-        log(LogLevel.Info, 'SessionManager: ending session');
+        log(LogLevel.Info, LOG_ENDING_SESSION);
 
         // 1. 强制 flush 所有缓存数据到 journal
         const flushedCount = await this.journal.flushAll();

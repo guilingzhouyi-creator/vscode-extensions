@@ -61,15 +61,17 @@ export function log(level: LogLevel, message: string, ...args: unknown[]): void 
   const timestamp = new Date().toISOString().slice(ISO_TIME_START, ISO_TIME_END);
   const prefix = `[WSTiming][${label}][${timestamp}]`;
 
+  const nativeConsole = console;
+
   if (args.length > 0) {
     // 是否包含 Error 对象
     const errorArg = args.find(a => a instanceof Error);
     if (errorArg) {
       const err = errorArg as Error;
       if (level >= LogLevel.Warn) {
-        console.warn(prefix, message, err.message, err.stack);
+        nativeConsole.warn(prefix, message, err.message, err.stack);
       } else {
-        console.info(prefix, message, err.message);
+        nativeConsole.info(prefix, message, err.message);
       }
       return;
     }
@@ -77,13 +79,13 @@ export function log(level: LogLevel, message: string, ...args: unknown[]): void 
 
   switch (level) {
     case LogLevel.Error:
-      console.error(prefix, message);
+      nativeConsole.error(prefix, message);
       break;
     case LogLevel.Warn:
-      console.warn(prefix, message);
+      nativeConsole.warn(prefix, message);
       break;
     default:
-      console.info(prefix, message);
+      nativeConsole.info(prefix, message);
       break;
   }
 }

@@ -23,6 +23,11 @@ import { migrateToFolded } from '../domain/history-folder';
 import { IJournalStore } from '../cache/IJournalStore';
 import { LogLevel, log } from '../integration/logger';
 
+const LOG_RECOVERY_STARTED = 'RecoveryService: crash recovery started';
+const LOG_NO_EXISTING_DATA = 'RecoveryService: no existing data, starting fresh';
+const LOG_JOURNAL_TRUNCATE_FAILED =
+    'RecoveryService: journal truncate FAILED — residual slices will be deduplicated via metadata.lastJournalTs on next recovery';
+
 /** 切片连续性判定容差：3 秒（心跳间隔 1s 的 3 倍） */
 const SLICE_CONTINUITY_GAP_MS = 3 * MS_PER_SECOND;
 
@@ -53,7 +58,7 @@ export class RecoveryService {
         retentionDays = DEFAULT_RAW_RETENTION_DAYS,
         maxSessions = DEFAULT_SESSION_CAP,
     ): Promise<WorkspaceTimingData> {
-        log(LogLevel.Info, 'RecoveryService: crash recovery started');
+        log(LogLevel.Info, LOG_RECOVERY_STARTED);
 
         // Step 1: 加载主数据
         const loaded = await this.store.load();
@@ -61,7 +66,7 @@ export class RecoveryService {
         const source = loaded.source;
 
         if (!loaded.data) {
-            log(LogLevel.Info, 'RecoveryService: no existing data, starting fresh');
+            log(LogLevel.Info, LOG_NO_EXISTING_DATA);
         } else {
             log(LogLevel.Info, `RecoveryService: loaded from ${source}, totalMs=${data.totalMs}`);
         }
@@ -162,12 +167,7 @@ export class RecoveryService {
         try {
             await this.journal.truncate();
         } catch (err) {
-            log(
-                LogLevel.Error,
-                'RecoveryService: journal truncate FAILED — residual slices will be ' +
-                    'deduplicated via metadata.lastJournalTs on next recovery',
-                err as Error,
-            );
+            log(LogLevel.Error, LOG_JOURNAL_TRUNCATE_FAILED, err as Error);
         }
 
         return journalReplayed;

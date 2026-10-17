@@ -21,6 +21,9 @@ import {
     ActivityMode,
 } from '../domain/models';
 
+const LOG_JOURNAL_FLUSH_FAILED = 'Scheduler: journal flush failed';
+const LOG_FULL_SAVE_FAILED = 'Scheduler: full save failed';
+
 export interface SchedulerOptions {
     /** journal flush 间隔 (ms) */
     journalFlushIntervalMs: number;
@@ -233,7 +236,7 @@ export class Scheduler {
         try {
             await this.journal.tryFlush();
         } catch (err) {
-            log(LogLevel.Error, 'Scheduler: journal flush failed', err as Error);
+            log(LogLevel.Error, LOG_JOURNAL_FLUSH_FAILED, err as Error);
         } finally {
             this._flushing = false;
         }
@@ -249,7 +252,7 @@ export class Scheduler {
                 await this.sessionManager.saveCheckpoint();
                 await this.fullSavedCallback?.();
             } catch (err) {
-                log(LogLevel.Error, 'Scheduler: full save failed', err as Error);
+                log(LogLevel.Error, LOG_FULL_SAVE_FAILED, err as Error);
             } finally {
                 this._saving = false;
                 this._savingPromise = null;

@@ -93,27 +93,69 @@ interface ResolvedDashboardConfig {
     readonly chartDualTrackDisplay: boolean;
 }
 
-function resolveDashboardConfig(config: TimingConfig): ResolvedDashboardConfig {
-    return {
+const DEFAULT_CONFIG_FALLBACKS: Readonly<{
+    locale: 'auto' | 'zh-CN' | 'en';
+    journalEnabled: boolean;
+    backupToFile: boolean;
+    ringBufferCapacity: number;
+    journalFlushIntervalMs: number;
+    fullSaveIntervalMs: number;
+    maxSessions: number;
+    historyRawRetentionDays: number;
+    safetySnapshot: boolean;
+    weeklyLimitEnabled: boolean;
+    weeklyLimitHours: number;
+    chartDualTrackDisplay: boolean;
+}> = Object.freeze({
+    locale: 'auto',
+    journalEnabled: true,
+    backupToFile: true,
+    ringBufferCapacity: DEFAULT_RING_BUFFER_CAP,
+    journalFlushIntervalMs: DEFAULT_JOURNAL_FLUSH_MS,
+    fullSaveIntervalMs: MS_PER_MINUTE,
+    maxSessions: DEFAULT_MAX_SESSIONS,
+    historyRawRetentionDays: DEFAULT_RAW_RETENTION_DAYS,
+    safetySnapshot: true,
+    weeklyLimitEnabled: false,
+    weeklyLimitHours: DEFAULT_WEEKLY_LIMIT_HOURS,
+    chartDualTrackDisplay: true,
+});
+
+function applyConfigDefaults(config: TimingConfig): ResolvedDashboardConfig {
+    const fallbacks = DEFAULT_CONFIG_FALLBACKS;
+    const base: ResolvedDashboardConfig = {
         isEnabled: config.enabled,
         globalDisabled: config.globalDisabled,
-        locale: config.locale ?? 'auto',
+        locale: fallbacks.locale,
         statusBarEnabled: config.statusBarEnabled,
-        journalEnabled: config.journalEnabled ?? true,
-        backupToFile: config.backupToFile ?? true,
-        ringBufferCapacity: config.ringBufferCapacity ?? DEFAULT_RING_BUFFER_CAP,
-        journalFlushIntervalMs: config.journalFlushIntervalMs ?? DEFAULT_JOURNAL_FLUSH_MS,
-        fullSaveIntervalMs: config.fullSaveIntervalMs ?? MS_PER_MINUTE,
-        maxSessions: config.maxSessions ?? DEFAULT_MAX_SESSIONS,
-        historyRawRetentionDays: config.historyRawRetentionDays ?? DEFAULT_RAW_RETENTION_DAYS,
-        safetySnapshot: config.safetySnapshot ?? true,
-        weeklyLimitEnabled: config.weeklyLimitEnabled ?? false,
-        weeklyLimitHours: config.weeklyLimitHours ?? DEFAULT_WEEKLY_LIMIT_HOURS,
+        journalEnabled: fallbacks.journalEnabled,
+        backupToFile: fallbacks.backupToFile,
+        ringBufferCapacity: fallbacks.ringBufferCapacity,
+        journalFlushIntervalMs: fallbacks.journalFlushIntervalMs,
+        fullSaveIntervalMs: fallbacks.fullSaveIntervalMs,
+        maxSessions: fallbacks.maxSessions,
+        historyRawRetentionDays: fallbacks.historyRawRetentionDays,
+        safetySnapshot: fallbacks.safetySnapshot,
+        weeklyLimitEnabled: fallbacks.weeklyLimitEnabled,
+        weeklyLimitHours: fallbacks.weeklyLimitHours,
         idleTimeoutMinutes: config.idleTimeoutMinutes,
         aiDetectionEnabled: config.aiDetectionEnabled,
         aiCooldownSeconds: config.aiCooldownSeconds,
-        chartDualTrackDisplay: config.chartDualTrackDisplay ?? true,
+        chartDualTrackDisplay: fallbacks.chartDualTrackDisplay,
     };
+
+    const keys = Object.keys(fallbacks) as (keyof typeof fallbacks)[];
+    for (const key of keys) {
+        const val = config[key as keyof TimingConfig];
+        if (val !== undefined && val !== null) {
+            (base as unknown as Record<string, unknown>)[key] = val;
+        }
+    }
+    return base;
+}
+
+function resolveDashboardConfig(config: TimingConfig): ResolvedDashboardConfig {
+    return applyConfigDefaults(config);
 }
 
 /**

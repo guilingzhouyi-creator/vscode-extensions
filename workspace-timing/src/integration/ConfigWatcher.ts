@@ -31,6 +31,10 @@ import { DashboardData } from '../domain/dashboard-types';
 import { LogLevel, log } from './logger';
 import { setLocale, resolveLocale } from '../i18n/index';
 
+const LOG_PERSIST_CONFIG_FAILED = 'ConfigWatcher: failed to persist configuration to VS Code settings';
+const LOG_APPLY_CONFIG_FAILED = 'ConfigWatcher: failed to apply config change';
+const LOG_LOCALE_CHANGED = 'ConfigWatcher: locale changed, dashboard recreated';
+
 /**
  * 读取当前用户配置（唯一入口，避免多处重复实现导致配置漂移）。
  * 供 ConfigWatcher 与 extension.ts 初始化共用，保证初始化/运行期配置同源。
@@ -124,7 +128,7 @@ export async function persistTimingConfig(
         await Promise.all(promises);
         log(LogLevel.Debug, `ConfigWatcher: persisted config update (${touched.join(', ')})`);
     } catch (err) {
-        log(LogLevel.Error, 'ConfigWatcher: failed to persist configuration to VS Code settings', err as Error);
+        log(LogLevel.Error, LOG_PERSIST_CONFIG_FAILED, err as Error);
     }
 }
 
@@ -182,7 +186,7 @@ export class ConfigWatcher implements vscode.Disposable {
                     const config = this.readConfig();
                     this.applyConfig(config);
                 } catch (err) {
-                    log(LogLevel.Error, 'ConfigWatcher: failed to apply config change', err as Error);
+                    log(LogLevel.Error, LOG_APPLY_CONFIG_FAILED, err as Error);
                 }
             }),
         );
@@ -206,7 +210,7 @@ export class ConfigWatcher implements vscode.Disposable {
             setLocale(resolveLocale(config.locale));
             if (!isFirstApply) {
                 this.recreatePanel();
-                log(LogLevel.Info, 'ConfigWatcher: locale changed, dashboard recreated');
+                log(LogLevel.Info, LOG_LOCALE_CHANGED);
             }
         }
 

@@ -13,6 +13,11 @@ import { WorkspaceTimingData } from '../domain/models';
 import { IStorageProvider } from './IStorageProvider';
 import { LogLevel, log } from '../integration/logger';
 
+const LOG_INVALID_DATA_FORMAT = 'FileStorageProvider: invalid data format, ignoring';
+const LOG_LOAD_FAILED = 'FileStorageProvider: load failed';
+const LOG_WRITE_FAILED = 'FileStorageProvider: write failed';
+const LOG_DELETE_FAILED = 'FileStorageProvider: delete failed';
+
 const FILE_NAME = 'workspace-timing.json';
 
 export class FileStorageProvider implements IStorageProvider {
@@ -44,13 +49,13 @@ export class FileStorageProvider implements IStorageProvider {
             const data: WorkspaceTimingData = JSON.parse(text);
 
             if (typeof data.totalMs !== 'number' || typeof data.version !== 'number') {
-                log(LogLevel.Warn, 'FileStorageProvider: invalid data format, ignoring');
+                log(LogLevel.Warn, LOG_INVALID_DATA_FORMAT);
                 return null;
             }
 
             return data;
         } catch (err) {
-            log(LogLevel.Warn, 'FileStorageProvider: load failed', err as Error);
+            log(LogLevel.Warn, LOG_LOAD_FAILED, err as Error);
             this._available = false;
             return null;
         }
@@ -91,7 +96,7 @@ export class FileStorageProvider implements IStorageProvider {
             await vscode.workspace.fs.writeFile(stagingUri, bytes);
             await vscode.workspace.fs.rename(stagingUri, target, { overwrite: true });
         } catch (err) {
-            log(LogLevel.Error, 'FileStorageProvider: write failed', err as Error);
+            log(LogLevel.Error, LOG_WRITE_FAILED, err as Error);
             throw err;
         }
     }
@@ -105,7 +110,7 @@ export class FileStorageProvider implements IStorageProvider {
             }
             await vscode.workspace.fs.delete(this.fileUri);
         } catch (err) {
-            log(LogLevel.Error, 'FileStorageProvider: delete failed', err as Error);
+            log(LogLevel.Error, LOG_DELETE_FAILED, err as Error);
             throw err;
         }
     }

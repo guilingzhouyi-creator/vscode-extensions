@@ -12,6 +12,11 @@ import { WorkspaceTimingData } from '../domain/models';
 import { IStorageProvider } from './IStorageProvider';
 import { LogLevel, log } from '../integration/logger';
 
+const LOG_INVALID_FORMAT = 'WorkspaceStateProvider: invalid data format, ignoring';
+const LOG_LOAD_FAIL = 'WorkspaceStateProvider: load failed';
+const LOG_SAVE_FAIL = 'WorkspaceStateProvider: save failed';
+const LOG_DELETE_FAIL = 'WorkspaceStateProvider: delete failed';
+
 const STORAGE_KEY = 'workspaceTiming:data';
 
 export class WorkspaceStateProvider implements IStorageProvider {
@@ -35,13 +40,13 @@ export class WorkspaceStateProvider implements IStorageProvider {
 
             const data: WorkspaceTimingData = JSON.parse(raw);
             if (typeof data.totalMs !== 'number' || typeof data.version !== 'number') {
-                log(LogLevel.Warn, 'WorkspaceStateProvider: invalid data format, ignoring');
+                log(LogLevel.Warn, LOG_INVALID_FORMAT);
                 return null;
             }
 
             return data;
         } catch (err) {
-            log(LogLevel.Warn, 'WorkspaceStateProvider: load failed', err as Error);
+            log(LogLevel.Warn, LOG_LOAD_FAIL, err as Error);
             this._available = false;
             return null;
         }
@@ -52,7 +57,7 @@ export class WorkspaceStateProvider implements IStorageProvider {
             const raw = JSON.stringify(data);
             await this.context.workspaceState.update(STORAGE_KEY, raw);
         } catch (err) {
-            log(LogLevel.Error, 'WorkspaceStateProvider: save failed', err as Error);
+            log(LogLevel.Error, LOG_SAVE_FAIL, err as Error);
             throw err;
         }
     }
@@ -61,7 +66,7 @@ export class WorkspaceStateProvider implements IStorageProvider {
         try {
             await this.context.workspaceState.update(STORAGE_KEY, undefined);
         } catch (err) {
-            log(LogLevel.Error, 'WorkspaceStateProvider: delete failed', err as Error);
+            log(LogLevel.Error, LOG_DELETE_FAIL, err as Error);
             throw err;
         }
     }

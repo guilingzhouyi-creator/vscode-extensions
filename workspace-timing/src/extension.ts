@@ -47,6 +47,13 @@ import { init as initI18n } from './i18n/index';
 import { ConfigWatcher, readTimingConfig } from './integration/ConfigWatcher';
 import { ActivityWatcher } from './integration/ActivityWatcher';
 
+const LOG_ACTIVATING = 'WorkspaceTiming: activating...';
+const LOG_NO_WORKSPACE = 'WorkspaceTiming: no workspace folder, running in degraded mode';
+const LOG_ACTIVATION_FAILED = 'WorkspaceTiming: activation failed';
+const LOG_DEACTIVATING = 'WorkspaceTiming: deactivating...';
+const LOG_DEACTIVATION_ERROR = 'WorkspaceTiming: deactivation error';
+const LOG_DEACTIVATED = 'WorkspaceTiming: deactivated';
+
 let orchestrator: TimerOrchestrator | null = null;
 let statusBar: StatusBarController | null = null;
 let commandRegistrar: CommandRegistrar | null = null;
@@ -87,7 +94,7 @@ export function activate(context: vscode.ExtensionContext): void {
         ? LogLevel.Debug
         : LogLevel.Info);
 
-    log(LogLevel.Info, 'WorkspaceTiming: activating...');
+    log(LogLevel.Info, LOG_ACTIVATING);
 
     try {
         // ─── 获取工作区根目录 ───
@@ -215,7 +222,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
         } else {
             // ═══ 无工作区：降级模式（仅注册命令）═══
-            log(LogLevel.Info, 'WorkspaceTiming: no workspace folder, running in degraded mode');
+            log(LogLevel.Info, LOG_NO_WORKSPACE);
         }
 
         // ─── 无论有无工作区，命令必须注册 ───
@@ -227,12 +234,12 @@ export function activate(context: vscode.ExtensionContext): void {
         log(LogLevel.Info, `WorkspaceTiming: activated in ${elapsed}ms`);
 
     } catch (err) {
-        log(LogLevel.Error, 'WorkspaceTiming: activation failed', err as Error);
+        log(LogLevel.Error, LOG_ACTIVATION_FAILED, err as Error);
     }
 }
 
 export async function deactivate(): Promise<void> {
-    log(LogLevel.Info, 'WorkspaceTiming: deactivating...');
+    log(LogLevel.Info, LOG_DEACTIVATING);
 
     try {
         // 停止活动监听
@@ -260,8 +267,8 @@ export async function deactivate(): Promise<void> {
         DashboardPanel.setMessageHandler(null);
 
     } catch (err) {
-        log(LogLevel.Error, 'WorkspaceTiming: deactivation error', err as Error);
+        log(LogLevel.Error, LOG_DEACTIVATION_ERROR, err as Error);
     }
 
-    log(LogLevel.Info, 'WorkspaceTiming: deactivated');
+    log(LogLevel.Info, LOG_DEACTIVATED);
 }

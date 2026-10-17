@@ -17,6 +17,13 @@ import { persistTimingConfig } from '../integration/ConfigWatcher';
 import { t, format, setLocale, resolveLocale } from '../i18n/index';
 import { DashboardPanel } from './DashboardPanel';
 
+const LOG_UPDATE_CONFIG_PERSIST_FAILED = 'updateConfig persist failed';
+const LOG_EXPORT_CSV_FAILED = 'WorkspaceTiming: export CSV failed';
+const LOG_EXPORT_REPORT_FAILED = 'WorkspaceTiming: export report failed';
+const LOG_AGGREGATED_EXPORT_FAILED = 'WorkspaceTiming: aggregated export failed';
+const TOAST_KEY_REPORT_DAILY = 'toast.exportReportDaily';
+const TOAST_KEY_REPORT_WEEKLY = 'toast.exportReportWeekly';
+
 /** 路由依赖（组合根注入） */
 export interface MessageRouterContext {
     getOrchestrator(): TimerOrchestrator | null;
@@ -45,7 +52,7 @@ const MESSAGE_STRATEGIES: {
         ctx.getOrchestrator()?.applyDashboardConfig(msg.payload);
         // 2. 持久化写入 VS Code settings.json，防止重载窗口后失效
         persistTimingConfig(msg.payload).catch(err =>
-            log(LogLevel.Error, 'updateConfig persist failed', err as Error)
+            log(LogLevel.Error, LOG_UPDATE_CONFIG_PERSIST_FAILED, err as Error)
         );
         // 3. locale 显式切换：热生效 i18n + 重建面板（webview 静态词条在渲染时注入）
         if (msg.payload.locale !== undefined) {
@@ -178,7 +185,7 @@ export async function exportTimingToFile(ctx: MessageRouterContext): Promise<voi
         defaultFileName: (ws) => `${ws}-timing-${TimeAggregator.todayStr()}.csv`,
         filters: { [t()['export.filter.csv']]: ['csv'] },
         generator: (orch, ws) => orch.exportCSV(ws),
-        logTag: 'WorkspaceTiming: export CSV failed',
+        logTag: LOG_EXPORT_CSV_FAILED,
     });
 }
 
@@ -194,7 +201,7 @@ export async function exportReportToFile(
     const prefix = kind === 'daily'
         ? t()['export.filename.daily']
         : t()['export.filename.weekly'];
-    const key = kind === 'daily' ? 'toast.exportReportDaily' : 'toast.exportReportWeekly';
+    const key = kind === 'daily' ? TOAST_KEY_REPORT_DAILY : TOAST_KEY_REPORT_WEEKLY;
 
     return runFileExportPipeline({
         ctx,
@@ -202,7 +209,7 @@ export async function exportReportToFile(
         filters: { [t()['export.filter.md']]: ['md'] },
         generator: (orch) => orch.exportReport(kind),
         successMessage: (filePath) => format(t()[key], filePath),
-        logTag: 'WorkspaceTiming: export report failed',
+        logTag: LOG_EXPORT_REPORT_FAILED,
     });
 }
 
@@ -216,6 +223,6 @@ export async function exportAggregatedToFile(ctx: MessageRouterContext): Promise
         defaultFileName: (ws) => `${ws}-timing-${t()['export.filename.aggregated']}-${TimeAggregator.todayStr()}.csv`,
         filters: { [t()['export.filter.csv']]: ['csv'] },
         generator: (orch, ws) => orch.exportAggregatedCSV(ws),
-        logTag: 'WorkspaceTiming: aggregated export failed',
+        logTag: LOG_AGGREGATED_EXPORT_FAILED,
     });
 }

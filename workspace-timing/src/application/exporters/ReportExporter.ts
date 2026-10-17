@@ -11,6 +11,8 @@ import { TimeAggregator, DailyDetail, WeeklySummary } from '../../domain/TimeAgg
 import { WeeklyTrendEntry } from '../../domain/dashboard-types';
 import { t, format } from '../../i18n/index';
 
+const MARKDOWN_TREND_TABLE_SEPARATOR = '|-----------------------|------|--------|';
+
 export type ReportKind = 'daily' | 'weekly';
 
 export class ReportExporter {
@@ -82,7 +84,7 @@ export class ReportExporter {
             lines.push(`## ${dict['report.weekly.trend']}`);
             lines.push('');
             lines.push(`| ${dict['report.table.weekRange']} | ${dict['report.table.duration']} | ${dict['report.table.sessionCount']} |`);
-            lines.push('|-----------------------|------|--------|');
+            lines.push(MARKDOWN_TREND_TABLE_SEPARATOR);
             for (const w of trend) {
                 const rangeLabel = w.weekEnd ? `${w.weekStart} ~ ${w.weekEnd}` : w.weekStart;
                 lines.push(

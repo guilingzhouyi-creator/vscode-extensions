@@ -8,18 +8,22 @@
  */
 
 import * as vscode from 'vscode';
-import { StatusBarMode, STATUS_BAR_PRIORITY } from '../domain/models';
+import { StatusBarMode, STATUS_BAR_PRIORITY, TIMING_COMMAND_IDS } from '../domain/models';
 import { TimeAggregator } from '../domain/TimeAggregator';
 import { LogLevel, log } from '../integration/logger';
 import { t, format } from '../i18n/index';
 
 export type { StatusBarMode };
 
+const KEY_MODE_TODAY_TOTAL = 'statusBar.mode.today-total';
+const KEY_MODE_TOTAL_TODAY = 'statusBar.mode.total-today';
+const KEY_MODE_COMPACT = 'statusBar.mode.compact';
+
 /** 模式名 i18n key（命令提示与 tooltip 共用，杜绝硬编码中文双轨） */
-const MODE_LABEL_KEYS: Record<StatusBarMode, 'statusBar.mode.today-total' | 'statusBar.mode.total-today' | 'statusBar.mode.compact'> = {
-    'today-total': 'statusBar.mode.today-total',
-    'total-today': 'statusBar.mode.total-today',
-    'compact': 'statusBar.mode.compact',
+const MODE_LABEL_KEYS: Record<StatusBarMode, typeof KEY_MODE_TODAY_TOTAL | typeof KEY_MODE_TOTAL_TODAY | typeof KEY_MODE_COMPACT> = {
+    'today-total': KEY_MODE_TODAY_TOTAL,
+    'total-today': KEY_MODE_TOTAL_TODAY,
+    'compact': KEY_MODE_COMPACT,
 };
 
 /** 获取模式显示名（本地化） */
@@ -57,7 +61,7 @@ export class StatusBarController {
             STATUS_BAR_PRIORITY,
         );
         this.statusBarItem.name = t()['panel.title'];
-        this.statusBarItem.command = 'workspaceTiming.showStatus';
+        this.statusBarItem.command = TIMING_COMMAND_IDS.SHOW_STATUS;
         this.updateTooltipAndA11y('');
     }
 

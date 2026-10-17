@@ -19,6 +19,8 @@ import { ICacheStrategy, TimeBasedCacheStrategy } from './ICacheStrategy';
 import { IJournalStore } from './IJournalStore';
 import { LogLevel, log } from '../integration/logger';
 
+const LOG_JOURNAL_TRUNCATED_AND_CLEARED = 'JournalWriter: journal truncated and memory buffer cleared';
+
 export class JournalWriter {
     private readonly ringBuffer: RingBuffer<TimeSlice>;
     private readonly storage: IJournalStore;
@@ -127,7 +129,7 @@ export class JournalWriter {
         try {
             this.ringBuffer.clear();
             await this.storage.truncate();
-            log(LogLevel.Debug, 'JournalWriter: journal truncated and memory buffer cleared');
+            log(LogLevel.Debug, LOG_JOURNAL_TRUNCATED_AND_CLEARED);
         } finally {
             this._flushingMutex = null;
             releaseMutex();

@@ -11,6 +11,8 @@ import { GlobalTimingData, WorkspaceRecord } from '../domain/global-types';
 import { GLOBAL_STALE_TTL_MS, MS_PER_HOUR } from '../domain/models';
 import { LogLevel, log } from '../integration/logger';
 
+const LOG_SYNC_FAILED = 'GlobalAggregator: sync failed';
+
 /** 当前工作区标识（由组合根注入，替代直读 vscode.workspace） */
 export interface WorkspaceInfo {
     /** 归一化工作区 id（normalizeWorkspaceId 结果） */
@@ -127,7 +129,7 @@ export class GlobalAggregator {
                 `GlobalAggregator: synced (workspace=${info.name}, totalMs=${localTotalMs}, global=${global.totalMs})`,
             );
         } catch (err) {
-            log(LogLevel.Warn, 'GlobalAggregator: sync failed', err as Error);
+            log(LogLevel.Warn, LOG_SYNC_FAILED, err as Error);
             return false;
         }
         return true;

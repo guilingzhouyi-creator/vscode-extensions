@@ -9,6 +9,8 @@
 
 import { TimeAggregator, DailyStats } from '../../domain/TimeAggregator';
 
+const CSV_HEADER_DATE_TOTAL_SESSIONS = 'Date,Total (ms),Sessions';
+
 export class AggregatedCsvExporter {
     readonly formatName = 'aggregated-csv';
 
@@ -20,7 +22,7 @@ export class AggregatedCsvExporter {
         lines.push(`# Days: ${series.length}`);
         lines.push('');
 
-        lines.push('Date,Total (ms),Sessions');
+        lines.push(CSV_HEADER_DATE_TOTAL_SESSIONS);
         for (const d of series) {
             lines.push(`${d.date},${d.totalMs},${d.sessionCount}`);
         }

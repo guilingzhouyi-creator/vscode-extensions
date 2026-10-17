@@ -12,6 +12,9 @@ import { IStorageProvider } from './IStorageProvider';
 import { IJournalStore } from '../cache/IJournalStore';
 import { LogLevel, log } from '../integration/logger';
 
+const LOG_JOURNAL_TRUNCATE_AFTER_RESTORE_FAILED = 'StorageCoordinator: journal truncate after restore failed';
+const LOG_ALL_DATA_DELETED = 'StorageCoordinator: all data deleted';
+
 /** 可生成命名快照的文件存储提供者接口 */
 export interface ISnapshotStorageProvider extends IStorageProvider {
     saveAs(data: WorkspaceTimingData, fileName: string): Promise<void>;
@@ -103,7 +106,7 @@ export class StorageCoordinator {
         try {
             await this.journal.truncate();
         } catch (err) {
-            log(LogLevel.Warn, 'StorageCoordinator: journal truncate after restore failed', err as Error);
+            log(LogLevel.Warn, LOG_JOURNAL_TRUNCATE_AFTER_RESTORE_FAILED, err as Error);
         }
         log(LogLevel.Info, `StorageCoordinator: data restored (totalMs=${data.totalMs}, sessions=${data.sessions.length})`);
     }
@@ -142,6 +145,6 @@ export class StorageCoordinator {
         } catch {
             // ignore
         }
-        log(LogLevel.Info, 'StorageCoordinator: all data deleted');
+        log(LogLevel.Info, LOG_ALL_DATA_DELETED);
     }
 }

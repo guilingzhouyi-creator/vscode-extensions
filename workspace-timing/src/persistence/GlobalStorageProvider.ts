@@ -11,6 +11,10 @@ import * as vscode from 'vscode';
 import { GlobalTimingData, createEmptyGlobalData } from '../domain/global-types';
 import { LogLevel, log } from '../integration/logger';
 
+const LOG_GLOBAL_LOAD_FAILED = 'GlobalStorage: load failed';
+const LOG_GLOBAL_SAVE_FAILED = 'GlobalStorage: save failed';
+const LOG_GLOBAL_DELETE_FAILED = 'GlobalStorage: delete failed';
+
 const STORAGE_KEY = 'workspaceTiming:global';
 
 export class GlobalStorageProvider {
@@ -37,7 +41,7 @@ export class GlobalStorageProvider {
             }
             return data;
         } catch (err) {
-            log(LogLevel.Warn, 'GlobalStorage: load failed', err as Error);
+            log(LogLevel.Warn, LOG_GLOBAL_LOAD_FAILED, err as Error);
             this._available = false;
             return createEmptyGlobalData();
         }
@@ -50,7 +54,7 @@ export class GlobalStorageProvider {
             const raw = JSON.stringify(data);
             await this.context.globalState.update(STORAGE_KEY, raw);
         } catch (err) {
-            log(LogLevel.Error, 'GlobalStorage: save failed', err as Error);
+            log(LogLevel.Error, LOG_GLOBAL_SAVE_FAILED, err as Error);
             throw err;
         }
     }
@@ -60,7 +64,7 @@ export class GlobalStorageProvider {
         try {
             await this.context.globalState.update(STORAGE_KEY, undefined);
         } catch (err) {
-            log(LogLevel.Error, 'GlobalStorage: delete failed', err as Error);
+            log(LogLevel.Error, LOG_GLOBAL_DELETE_FAILED, err as Error);
         }
     }
 }

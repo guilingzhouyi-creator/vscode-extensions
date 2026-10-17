@@ -10,6 +10,9 @@
 import { WorkspaceTimingData } from '../../domain/models';
 import { TimeAggregator } from '../../domain/TimeAggregator';
 
+const CSV_HEADER_SESSION_START_END_DURATION = 'Session Start,Session End,Duration (ms)';
+const CSV_HEADER_DATE_TOTAL_SESSIONS = 'Date,Total (ms),Sessions';
+
 /** 本地时区日期时间（YYYY-MM-DD HH:MM:SS） */
 function localDateTime(ts: number): string {
     const d = new Date(ts);
@@ -28,7 +31,7 @@ export class CsvExporter {
         lines.push(`# Total: ${data.totalMs}ms`);
         lines.push('');
 
-        lines.push('Session Start,Session End,Duration (ms)');
+        lines.push(CSV_HEADER_SESSION_START_END_DURATION);
         for (const session of data.sessions) {
             const start = localDateTime(session.startMs);
             const end = localDateTime(session.endMs);
@@ -37,7 +40,7 @@ export class CsvExporter {
 
         // 按日统计（与面板日报同源，跨午夜会话已按自然日切分归桶）
         lines.push('');
-        lines.push('Date,Total (ms),Sessions');
+        lines.push(CSV_HEADER_DATE_TOTAL_SESSIONS);
         for (const d of TimeAggregator.dailyStats(data.sessions)) {
             lines.push(`${d.date},${d.totalMs},${d.sessionCount}`);
         }
