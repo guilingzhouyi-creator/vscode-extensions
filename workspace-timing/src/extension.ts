@@ -11,7 +11,7 @@ import * as vscode from 'vscode';
 
 // Domain
 import { TimerEngine } from './domain/TimerEngine';
-import { LogLevel, setLogLevel, log } from './integration/logger';
+import { LogLevel, setLogLevel, log, addLogSink } from './integration/logger';
 
 // Cache
 import { JournalWriter } from './cache/JournalWriter';
@@ -93,6 +93,15 @@ export function activate(context: vscode.ExtensionContext): void {
     setLogLevel(context.extensionMode === vscode.ExtensionMode.Development
         ? LogLevel.Debug
         : LogLevel.Info);
+
+    // 建立 VS Code 原生 OutputChannel 并挂载为双轨日志汇流接收器
+    const outputChannel = vscode.window.createOutputChannel('Workspace Timing');
+    context.subscriptions.push(outputChannel);
+    const unsubscribeSink = addLogSink((entry) => {
+        const errorDetail = entry.detail ? `\n${entry.detail}` : '';
+        outputChannel.appendLine(`${entry.prefix} ${entry.message}${errorDetail}`);
+    });
+    context.subscriptions.push({ dispose: unsubscribeSink });
 
     log(LogLevel.Info, LOG_ACTIVATING);
 
