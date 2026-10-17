@@ -44,8 +44,10 @@ $ErrorActionPreference = "Continue"
 $code = $LASTEXITCODE
 $ErrorActionPreference = $prevEAP
 if ($code -ne 0) {
-  Write-Host "【test-run】Godot 运行异常（exit=$code）"
-  Get-Content $LogPath -Tail 20 | ForEach-Object { Write-Host $_ }
+  Write-Host "【test-run】Godot 运行异常（exit=$code），测试失败项清单："
+  Select-String -Path $LogPath -Pattern '\[ FAIL \]|❌|FAILED' | Select-Object -First 100 | ForEach-Object { Write-Host $_.Line }
+  Write-Host "--- 最近输出 ---"
+  Get-Content $LogPath -Tail 40 | ForEach-Object { Write-Host $_ }
   exit 1
 }
 

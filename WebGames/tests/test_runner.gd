@@ -80,6 +80,9 @@ func _initialize() -> void:
 				else:
 					print("    ❌  %s [FAILED]" % t_name)
 					failure_reports.append({ "domain": domain_name, "test": t_name })
+			if res_list.is_empty():
+				print("    ❌  测试套件未返回任何结果项")
+				failure_reports.append({ "domain": domain_name, "test": "未返回任何结果项" })
 		print("")
 
 	print("==============================================================================")
@@ -95,11 +98,13 @@ func _initialize() -> void:
 	# 全域资源与单例清理，杜绝进程退出期 ObjectDB 泄漏
 	UIBindingRegistry.reset_instance()
 
-	if failure_reports.is_empty():
+	if failure_reports.is_empty() and passed_domains == total_domains:
 		print("  🎉 恭喜！卡拉尔世界引擎全域 %d 套测试套件全量单元测试 100%% 验收通过！" % total_domains)
 		print("==============================================================================\n")
 		quit(0)
 	else:
-		print("  ⚠️  存在未通过测试项，请检查上述错误报告！")
+		print("  ⚠️  存在未通过测试项（共 %d 项未通过，失败套件数: %d）：" % [failure_reports.size(), total_domains - passed_domains])
+		for rep in failure_reports:
+			print("    ❌ [%s] %s" % [rep.get("domain", ""), rep.get("test", "")])
 		print("==============================================================================\n")
 		quit(1)
