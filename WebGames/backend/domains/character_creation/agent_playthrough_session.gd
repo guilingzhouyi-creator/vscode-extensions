@@ -275,6 +275,7 @@ func get_summary_transcript() -> Dictionary:
 			completed.append(str(nid))
 
 	return {
+		"is_success": true,
 		"session_id": session_id,
 		"step_index": step_index,
 		"is_terminal": is_terminal,
@@ -303,7 +304,14 @@ func _resolve_mod_manifest(config: Dictionary) -> Dictionary:
 				"adapted_manifest": (raw_man as Dictionary).duplicate(true)
 			}
 
-	var cand_packs: Array = config.get("candidate_packs", [])
+	var cand_packs: Array = config.get("candidate_packs", []).duplicate()
+	var mod_dirs: Array = config.get("mod_dirs", [])
+	if cand_packs.is_empty() and not mod_dirs.is_empty():
+		for d in mod_dirs:
+			var pkg := ModPackageDiscoverySolver.load_full_mod_package_from_dir(str(d))
+			if not pkg.is_empty():
+				cand_packs.append(pkg)
+
 	var enabled_ids: Array = config.get("enabled_pack_ids", ["*"])
 	return ModPrecheckAndAdaptationSolver.precheck_and_adapt_mod_list(cand_packs, enabled_ids)
 
@@ -319,6 +327,12 @@ func _build_creation_request(config: Dictionary) -> AuthoritativeCharacterCreati
 	var raw_extra: Variant = config.get("extra_custom_fields", {})
 	if raw_extra is Dictionary:
 		req.extra_custom_fields = (raw_extra as Dictionary).duplicate(true)
+	var origin_id: String = str(config.get("origin_id", "")).strip_edges()
+	if not origin_id.is_empty():
+		req.extra_custom_fields["selected_origin_id"] = origin_id
+	var race_id: String = str(config.get("race_id", "")).strip_edges()
+	if not race_id.is_empty():
+		req.extra_custom_fields["selected_race_id"] = race_id
 	return req
 
 func _build_character_profile(solve_res: Dictionary, req: AuthoritativeCharacterCreationRequestDTO) -> CharacterProfile:
