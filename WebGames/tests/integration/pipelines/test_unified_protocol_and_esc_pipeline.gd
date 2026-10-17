@@ -278,7 +278,7 @@ static func test_tc_upe_06_esc_exit_to_gateway_memory_scrubbing() -> Dictionary:
 	var account_id := "ACC_SCRUB_01"
 	var gateway := WorldGatewayFSM.new(account_id)
 	gateway.enter_gateway()
-	gateway.select_mode(WorldGatewayModel.GameMode.SINGLE_PLAYER, {}, [], "WORLD_01", "SLOT_01")
+	gateway.select_mode(WorldGatewayModel.GameMode.SINGLE_PLAYER, {}, [])
 	gateway.attach_ready_character("CHAR_SCRUB_01")
 	gateway.enter_world()
 
@@ -301,7 +301,16 @@ static func test_tc_upe_06_esc_exit_to_gateway_memory_scrubbing() -> Dictionary:
 
 	_teardown_env()
 	var passed: bool = in_world_before and exit_ok and phase_back and mode_scrubbed and slot_scrubbed and char_scrubbed and mods_scrubbed and lease_released
-	return TestCase.make_result("TC-UPE-06: ESC 退出到世界档案触发网关全量内存洗脱断言", passed)
+	return TestCase.make_result("TC-UPE-06: ESC 退出到世界档案触发网关全量内存洗脱断言", passed, {
+		"in_world_before": in_world_before,
+		"exit_ok": exit_ok,
+		"phase_back": phase_back,
+		"mode_scrubbed": mode_scrubbed,
+		"slot_scrubbed": slot_scrubbed,
+		"char_scrubbed": char_scrubbed,
+		"mods_scrubbed": mods_scrubbed,
+		"lease_released": lease_released
+	})
 
 ## -----------------------------------------------------------------------------
 ## TC-UPE-07: ESC 退出游戏触发五阶段优雅停机断言

@@ -243,7 +243,7 @@ func _cache_result(path: String, data: Variant) -> void:
 		_cached_results[path] = data
 		return
 	while _cache_keys_fifo.size() >= _max_cache_entries:
-		var oldest_key := _cache_keys_fifo.pop_front()
+		var oldest_key: String = String(_cache_keys_fifo.pop_front())
 		_cached_results.erase(oldest_key)
 	_cached_results[path] = data
 	_cache_keys_fifo.append(path)

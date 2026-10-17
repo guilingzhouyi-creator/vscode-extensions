@@ -175,7 +175,7 @@ static func test_resource_dependency_dag_and_targeted_hot_reload() -> Dictionary
 	assert_true(invalidations.has("inventory_ui"), "TC-DDS-05B: 失效子图应包含传递下游 inventory_ui")
 
 	# 定向热重载成功路径
-	var reloaded_nodes := []
+	var reloaded_nodes: Array = []
 	var resolver := func(node_id: String) -> Dictionary:
 		reloaded_nodes.append(node_id)
 		return {"success": true, "data": "updated_" + node_id}
