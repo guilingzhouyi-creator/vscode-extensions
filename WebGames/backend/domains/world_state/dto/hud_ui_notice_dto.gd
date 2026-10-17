@@ -13,15 +13,27 @@ extends RefCounted
 
 var notice_id: String = ""         # 唯一提示标识符 (如 "GUIDE_POTENTIAL_ALLOCATION")
 var category: String = "INFO"      # "INFO", "WARNING", "GUIDE", "MODAL"
+var priority: int = 0              # 通知优先级 (数字越大优先级越高)
 var title: String = ""             # 纯文本标题
 var body_text: String = ""         # 纯文本正文 (严格剔除 BBCode 与 HTML)
+var message_text: String:          # 兼容性属性
+	get:
+		return body_text if not body_text.is_empty() else title
+	set(val):
+		body_text = val
 var is_modal: bool = false         # 是否阻断性模态框 (需优先响应)
 var action_directive_ids: Array[String] = [] # 响应此通知绑定的动作指令 (如 ["DISMISS_UI_NOTICE", "CONFIRM_ALLOCATION"])
+var actions: Array[String]:        # 兼容性属性
+	get:
+		return action_directive_ids
+	set(val):
+		action_directive_ids = val
 
 ## 重置内部数据状态，供对象池无堆分配复用
 func reset_state() -> void:
 	notice_id = ""
 	category = "INFO"
+	priority = 0
 	title = ""
 	body_text = ""
 	is_modal = false
@@ -32,10 +44,13 @@ func to_dto() -> Dictionary:
 	return {
 		"notice_id": notice_id,
 		"category": category,
+		"priority": priority,
 		"title": title,
 		"body_text": body_text,
+		"message_text": body_text if not body_text.is_empty() else title,
 		"is_modal": is_modal,
-		"action_directive_ids": action_directive_ids.duplicate()
+		"action_directive_ids": action_directive_ids.duplicate(),
+		"actions": action_directive_ids.duplicate()
 	}
 
 ## 从输入字典反序列化还原传输对象
@@ -43,11 +58,12 @@ static func from_dto(data: Dictionary) -> HudUiNoticeDTO:
 	var dto := HudUiNoticeDTO.new()
 	dto.notice_id = str(data.get("notice_id", ""))
 	dto.category = str(data.get("category", "INFO"))
+	dto.priority = int(data.get("priority", 0))
 	dto.title = str(data.get("title", ""))
-	dto.body_text = str(data.get("body_text", ""))
+	dto.body_text = str(data.get("body_text", data.get("message_text", "")))
 	dto.is_modal = bool(data.get("is_modal", false))
 	dto.action_directive_ids.clear()
-	var raw_actions: Array = data.get("action_directive_ids", [])
+	var raw_actions: Array = data.get("action_directive_ids", data.get("actions", []))
 	for act in raw_actions:
 		dto.action_directive_ids.append(str(act))
 	return dto
