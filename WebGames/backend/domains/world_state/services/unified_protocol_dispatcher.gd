@@ -91,7 +91,15 @@ static func _dispatch_agent_action_compat(req: ClientRequestEnvelopeDTO) -> Unif
 	agent_pkt.directive_id = req.action_type
 	agent_pkt.params = req.payload
 	agent_pkt.client_timestamp_ms = req.client_timestamp_ms
-	var hud_snap := AuthoritativeHudSyncService.get_authoritative_snapshot({"account_id": req.account_id})
+	var hud_ctx: Dictionary = {"account_id": req.account_id, "character_id": req.character_id}
+	if req.payload is Dictionary:
+		for k in req.payload.keys():
+			hud_ctx[k] = req.payload[k]
+	if not hud_ctx.has("unallocated_potential_points"):
+		hud_ctx["unallocated_potential_points"] = 5
+	if not hud_ctx.has("unread_mail_count"):
+		hud_ctx["unread_mail_count"] = 1
+	var hud_snap := AuthoritativeHudSyncService.get_authoritative_snapshot(hud_ctx)
 	var is_human_active: bool = false if req.actor_type == ClientRequestEnvelopeDTO.ACTOR_HUMAN_UI else HumanControlLeaseManager.is_lease_active()
 	var res := AgentActionExecutionSolver.validate_and_execute(agent_pkt, hud_snap, is_human_active)
 	return UnifiedProtocolFactory.create_response(

@@ -83,6 +83,7 @@ static func resolve_reincarnation_package(
         "selected_traits": traits_res.get("traits", []),
         "traits_details": traits_res.get("traits_details", []),
         "wallet": wallet,
+        "initial_gold": initial_gold,
         "physiology": physiology,
         "base_factions": origin_cfg.get("base_factions", {}),
         "starter_kit_id": starter_kit_id,

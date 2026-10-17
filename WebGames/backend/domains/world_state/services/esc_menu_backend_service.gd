@@ -85,7 +85,12 @@ static func handle_esc_action(req: ClientRequestEnvelopeDTO, gateway: WorldGatew
 			# 若指定 auto_save，执行前置快速刷盘
 			if bool(req.payload.get("auto_save", true)):
 				var slot: String = gateway.context.selected_slot_id if (gateway.context != null and not gateway.context.selected_slot_id.is_empty()) else "SLOT_01"
-				SaveDataAccessLayer.save_game(slot, {})
+				var auto_save_data: Dictionary = {
+					"slot_id": slot,
+					"account_id": gateway.context.account_id if gateway.context != null else "",
+					"saved_at": Time.get_unix_time_from_system()
+				}
+				SaveDataAccessLayer.save_game(slot, auto_save_data)
 
 			# 触发网关全量内存洗脱
 			var scrub_res := gateway.exit_to_gateway()

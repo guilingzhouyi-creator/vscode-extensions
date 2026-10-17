@@ -51,7 +51,7 @@ func is_within_window(target_pos: Vector2, target_scene_id: String) -> bool:
 
 ## 批量过滤出落在窗口内部的候选资源列表
 func filter_candidates(candidates: Array) -> Array:
-	var filtered := []
+	var filtered: Array = []
 	for item in candidates:
 		if not item is Dictionary:
 			continue

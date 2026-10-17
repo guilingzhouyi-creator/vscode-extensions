@@ -373,11 +373,11 @@ static func test_tc_upe_09_custom_domain_handler_scalability() -> Dictionary:
 	_setup_env()
 
 	var custom_domain := "inventory_market"
-	var custom_called := false
+	var custom_called_box := [false]
 	var custom_action := "BUY_COMMODITY"
 
 	UnifiedProtocolDispatcher.register_domain_handler(custom_domain, func(req: ClientRequestEnvelopeDTO, gateway: WorldGatewayFSM) -> UnifiedResponseEnvelopeDTO:
-		custom_called = true
+		custom_called_box[0] = true
 		return UnifiedProtocolFactory.create_response(
 			req.request_id,
 			true,
@@ -397,7 +397,7 @@ static func test_tc_upe_09_custom_domain_handler_scalability() -> Dictionary:
 	req.actor_type = ClientRequestEnvelopeDTO.ACTOR_HUMAN_UI
 
 	var resp := UnifiedProtocolDispatcher.dispatch_request(req)
-	var dispatch_ok: bool = resp.success and custom_called and int(resp.data.get("qty", 0)) == 5
+	var dispatch_ok: bool = resp.success and custom_called_box[0] and int(resp.data.get("qty", 0)) == 5
 
 	UnifiedProtocolDispatcher.unregister_domain_handler(custom_domain)
 	var has_unregistered: bool = not UnifiedProtocolDispatcher.has_domain_handler(custom_domain)

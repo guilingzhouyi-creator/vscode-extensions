@@ -26,10 +26,12 @@ static func renew_human_lease(account_id: String, lease_nonce: int, window_ms: i
 
 ## 判定当前是否处于人类控制租约保护期
 static func is_lease_active(account_id: String = "") -> bool:
+	if _current_lease_holder.is_empty():
+		return false
 	var now := _get_current_time_ms()
 	if now - _last_human_activity_ms > DEFAULT_LEASE_WINDOW_MS:
 		return false
-	if not account_id.is_empty() and not _current_lease_holder.is_empty():
+	if not account_id.is_empty():
 		return account_id == _current_lease_holder
 	return true
 

@@ -92,7 +92,7 @@ static func _dispatch_domain_execution(
 
 	match directive_id:
 		"ALLOCATE_POTENTIAL_STAT", "ALLOCATE_POTENTIAL":
-			var stat: String = str(params.get("stat_target", params.get("attribute", "STR")))
+			var stat: String = str(params.get("stat_target", params.get("stat", params.get("attribute", "STR"))))
 			var pts: int = int(params.get("points", params.get("amount", 1)))
 			if stat.is_empty() or pts <= 0 or snapshot.unallocated_potential_points < pts:
 				return {

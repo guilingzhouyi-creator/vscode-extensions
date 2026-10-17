@@ -171,7 +171,7 @@ func cancel_task(target: Variant) -> bool:
 		var i := _pending_queue.size() - 1
 		while i >= 0:
 			if _pending_queue[i].token == target:
-				var t := _pending_queue[i]
+				var t: AsyncLoadTask = _pending_queue[i]
 				t.status = STATUS_CANCELLED
 				t.error_code = StorageContractInterfaces.ERR_TASK_CANCELLED
 				_pending_queue.remove_at(i)
@@ -184,7 +184,7 @@ func cancel_task(target: Variant) -> bool:
 	var tid := int(target)
 	for i in range(_pending_queue.size()):
 		if _pending_queue[i].task_id == tid:
-			var t := _pending_queue[i]
+			var t: AsyncLoadTask = _pending_queue[i]
 			t.status = STATUS_CANCELLED
 			t.error_code = StorageContractInterfaces.ERR_TASK_CANCELLED
 			_pending_queue.remove_at(i)

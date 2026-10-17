@@ -455,6 +455,7 @@ static func _build_headless_transcript(
 
 	var init_gold: int = int(reinc_res.get("initial_gold", profile.personal_resources.get("gold", 50)))
 	var starter_kit_id: String = str(reinc_res.get("starter_kit_id", ctx.assigned_starter_kit_id))
+	profile.personal_resources["gold"] = init_gold
 
 	return {
 		"schema_version": "kalar.mod_sdk.playthrough_transcript.v1",

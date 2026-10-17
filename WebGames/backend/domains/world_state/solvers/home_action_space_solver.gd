@@ -19,7 +19,7 @@ const STATIC_DIR_SPECS: Array[Dictionary] = [
 	{
 		"id": "ALLOCATE_POTENTIAL_STAT",
 		"domain": "ASSET",
-		"desc": "分配潜能点",
+		"desc": "",
 		"cost": {"potential_points": 1},
 		"pre": {"unallocated_points_min": 1},
 		"params": {"stat_target": ["STR", "AGI", "INT", "STA"]}
@@ -27,7 +27,7 @@ const STATIC_DIR_SPECS: Array[Dictionary] = [
 	{
 		"id": "REST_AND_ADVANCE_TIME",
 		"domain": "RETENTION",
-		"desc": "休息推时",
+		"desc": "",
 		"cost": {"ap": 2.0},
 		"pre": {"ap_min": 2.0},
 		"params": {}
@@ -35,7 +35,7 @@ const STATIC_DIR_SPECS: Array[Dictionary] = [
 	{
 		"id": "CLAIM_QUEST_OBJECTIVE",
 		"domain": "ACTION",
-		"desc": "领任务报酬",
+		"desc": "",
 		"cost": {},
 		"pre": {"quest_completable": true},
 		"params": {}
@@ -43,7 +43,7 @@ const STATIC_DIR_SPECS: Array[Dictionary] = [
 	{
 		"id": "INSPECT_INVENTORY_SLOT",
 		"domain": "ASSET",
-		"desc": "查验背包",
+		"desc": "",
 		"cost": {},
 		"pre": {},
 		"params": {}
@@ -51,7 +51,7 @@ const STATIC_DIR_SPECS: Array[Dictionary] = [
 	{
 		"id": "TOGGLE_MODE_ADAPTATION",
 		"domain": "META",
-		"desc": "切换模式",
+		"desc": "",
 		"cost": {},
 		"pre": {},
 		"params": {}
@@ -59,7 +59,7 @@ const STATIC_DIR_SPECS: Array[Dictionary] = [
 	{
 		"id": "MARK_MAIL_READ",
 		"domain": "RETENTION",
-		"desc": "查阅信件",
+		"desc": "",
 		"cost": {},
 		"pre": {"unread_mail_min": 1},
 		"params": {}
