@@ -580,8 +580,8 @@ function getCustomAnalyzers(
 function isValidCustomAnalyzerContract(customAnalyzer: CustomAnalyzerDeclaration): boolean {
     return Boolean(
         Array.isArray(customAnalyzer.signals) &&
-            customAnalyzer.signals.length > 0 &&
-            customAnalyzer.track,
+        customAnalyzer.signals.length > 0 &&
+        customAnalyzer.track,
     );
 }
 

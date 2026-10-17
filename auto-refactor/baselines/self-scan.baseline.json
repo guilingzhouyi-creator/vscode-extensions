@@ -1,7 +1,7 @@
 {
   "version": "1.2.0",
   "granularity": "grouped",
-  "timestamp": "2026-10-17T03:48:19.440Z",
+  "timestamp": "2026-10-17T04:20:10.041Z",
   "groups": [
     {
       "key": "comments|CMT-HDR-001|crates/auto-refactor-core/build.rs",
@@ -2853,34 +2853,6 @@
       }
     },
     {
-      "key": "hygiene|HYG-CLN-001|src/core/config/config.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "simplify|SIM-LONG-001|src/core/config/config.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/config/config.ts",
-      "count": 17,
-      "severities": {
-        "warning": 17
-      }
-    },
-    {
-      "key": "governance|GOV-PRF-004|src/core/config/config.ts",
-      "count": 4,
-      "severities": {
-        "warning": 4
-      }
-    },
-    {
       "key": "simplify|SIM-COMC-001|src/core/config/metric-parser.ts",
       "count": 1,
       "severities": {
@@ -2983,20 +2955,6 @@
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|magic-number|src/core/diff/incremental-state.ts",
-      "count": 7,
-      "severities": {
-        "warning": 7
-      }
-    },
-    {
-      "key": "hygiene|HYG-WRAP-001|src/core/diff/incremental-state.ts",
-      "count": 3,
-      "severities": {
-        "warning": 3
       }
     },
     {
@@ -5727,41 +5685,6 @@
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/index.ts",
-      "count": 15,
-      "severities": {
-        "warning": 15
-      }
-    },
-    {
-      "key": "constants|duplicate-literal|src/index.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|magic-number|src/index.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "governance|GOV-PRF-004|src/index.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "simplify|SIM-TRN-001|src/index.ts",
-      "count": 1,
-      "severities": {
-        "info": 1
       }
     },
     {

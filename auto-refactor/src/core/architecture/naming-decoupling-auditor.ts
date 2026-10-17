@@ -195,9 +195,10 @@ export function deriveDomainProposal(
     }
 
     // Take leading 2 segments (or 1 if 3 segments total) as the domain namespace
-    const prefixCount = segments.length >= LONG_SEGMENT_THRESHOLD
-        ? DEFAULT_PREFIX_SLICE_COUNT
-        : SHORT_PREFIX_SLICE_COUNT;
+    const prefixCount =
+        segments.length >= LONG_SEGMENT_THRESHOLD
+            ? DEFAULT_PREFIX_SLICE_COUNT
+            : SHORT_PREFIX_SLICE_COUNT;
     const prefixSegments = segments.slice(0, prefixCount);
     const remainderSegments = segments.slice(prefixCount);
 
@@ -239,12 +240,14 @@ function evaluateMetricBounds(
 ): ViolationVerdict | null {
     const isError = len >= limits.errorLength || segmentCount >= limits.errorSegments;
     if (isError) {
-        const reason = len >= limits.errorLength ? REASON_EXCESSIVE_LENGTH : REASON_EXCESSIVE_SEGMENTS;
+        const reason =
+            len >= limits.errorLength ? REASON_EXCESSIVE_LENGTH : REASON_EXCESSIVE_SEGMENTS;
         return { severity: SEVERITY_ERROR, reason };
     }
     const isWarning = len >= limits.warningLength || segmentCount >= limits.warningSegments;
     if (isWarning) {
-        const reason = len >= limits.warningLength ? REASON_EXCESSIVE_LENGTH : REASON_EXCESSIVE_SEGMENTS;
+        const reason =
+            len >= limits.warningLength ? REASON_EXCESSIVE_LENGTH : REASON_EXCESSIVE_SEGMENTS;
         return { severity: SEVERITY_WARNING, reason };
     }
     return null;
@@ -297,9 +300,7 @@ interface ThresholdEvaluationContext {
     readonly config: NamingDecouplingConfig;
 }
 
-function evaluateThresholdViolation(
-    context: ThresholdEvaluationContext,
-): ViolationVerdict | null {
+function evaluateThresholdViolation(context: ThresholdEvaluationContext): ViolationVerdict | null {
     if (context.isType) {
         return evaluateTypeThreshold(context.len, context.segmentCount, context.config);
     }
@@ -497,7 +498,10 @@ export class NamingDecouplingAuditor {
             if (grouped.length < this.config.clusterMinSymbols) {
                 continue;
             }
-            const prefixSegments = splitIdentifierTokens(grouped[0].name).slice(0, DEFAULT_PREFIX_SLICE_COUNT);
+            const prefixSegments = splitIdentifierTokens(grouped[0].name).slice(
+                0,
+                DEFAULT_PREFIX_SLICE_COUNT,
+            );
             const suggestedDir = `domain/${toKebabPath(prefixSegments)}`;
 
             for (const clusterEntry of grouped) {
@@ -505,7 +509,9 @@ export class NamingDecouplingAuditor {
                     continue;
                 }
                 seenSymbols.add(clusterEntry.name);
-                findings.push(createClusterFinding(clusterEntry, prefix, grouped.length, suggestedDir));
+                findings.push(
+                    createClusterFinding(clusterEntry, prefix, grouped.length, suggestedDir),
+                );
             }
         }
 

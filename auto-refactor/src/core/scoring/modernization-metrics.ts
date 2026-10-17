@@ -170,7 +170,8 @@ export function computeDebounceIndex(
     }
     const safeDebounced = Math.max(0, params.debounced);
     const safeLoading = Math.max(0, params.loading);
-    const rawProtected = (safeDebounced + params.omegaWeight * safeLoading) / Math.max(1, params.critical);
+    const rawProtected =
+        (safeDebounced + params.omegaWeight * safeLoading) / Math.max(1, params.critical);
     const normalized = Math.min(1.0, Math.max(0, rawProtected));
     const score = Math.pow(normalized, Math.max(0.1, params.exponent)) * SCORE_MAX;
     return Math.round(score * SCORE_ROUNDING) / SCORE_ROUNDING;
@@ -583,11 +584,12 @@ export function computeProfileCompositeScore(
     const weightFe = Math.max(0.01, params.weightFe);
     const weightBe = Math.max(0.01, params.weightBe);
     const geomMean = Math.exp(
-        (weightFe * Math.log(boundedFe) + weightBe * Math.log(boundedBe)) /
-            (weightFe + weightBe),
+        (weightFe * Math.log(boundedFe) + weightBe * Math.log(boundedBe)) / (weightFe + weightBe),
     );
     const rawComposite = geomMean * Math.max(0.1, Math.min(1.0, params.factorBoundary));
-    return Math.round(Math.max(0, Math.min(SCORE_MAX, rawComposite)) * SCORE_ROUNDING) / SCORE_ROUNDING;
+    return (
+        Math.round(Math.max(0, Math.min(SCORE_MAX, rawComposite)) * SCORE_ROUNDING) / SCORE_ROUNDING
+    );
 }
 export { computeProfileCompositeScore as calculateProfileCompositeScore };
 
@@ -707,7 +709,11 @@ interface WeightedVarianceContext {
 function computeWeightedVariance(context: WeightedVarianceContext): number {
     let sum = 0;
     for (let i = 0; i < context.keys.length; i += 1) {
-        const scoredEntry = resolveLanguageScoreWeight(context.keys[i], context.scores, context.weights);
+        const scoredEntry = resolveLanguageScoreWeight(
+            context.keys[i],
+            context.scores,
+            context.weights,
+        );
         const delta = scoredEntry.score - context.mean;
         sum += scoredEntry.weight * delta * delta;
     }

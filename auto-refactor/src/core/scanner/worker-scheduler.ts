@@ -77,7 +77,9 @@ export const AUTO_WORKER_MAX = Math.min(
     DEFAULT_AUTO_WORKER_MAX,
     Math.max(
         DEFAULT_AUTO_WORKER_MIN,
-        (os.availableParallelism ? os.availableParallelism() : os.cpus().length || DEFAULT_FALLBACK_CPUS) - 1,
+        (os.availableParallelism
+            ? os.availableParallelism()
+            : os.cpus().length || DEFAULT_FALLBACK_CPUS) - 1,
     ),
 );
 

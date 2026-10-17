@@ -399,8 +399,8 @@ export function updateIncrementalTouch(
 
 /**
  * Evict least-recently-used entries from `bucket` until at most `maxFiles` remain. Each removed
- * state has its caches cleared via {@link IncrementalFileState.evictCaches}; eviction is loss-free for
- * output and only increases the work of the next change to those files.
+ * state has its caches cleared via {@link IncrementalFileState.evictCaches}; eviction is
+ * loss-free for output and only increases the work of the next change to those files.
  *
  * @param bucket - Per-fingerprint LRU-ordered map of incremental states.
  * @param maxFiles - Retention bound; defaults to the env-aware getIncrementalMaxFiles() value.
@@ -474,7 +474,7 @@ function clearAllStates(incremental: Map<string, Map<string, IncrementalFileStat
  * @param session.incremental - Fingerprint-keyed buckets holding per-file incremental states.
  * @returns Total number of per-file states evicted; 0 when RSS is within the soft cap.
  */
-export function checkIncrementalRssGuard(session: {
+export function auditMemoryPressureGuard(session: {
     incremental: Map<string, Map<string, IncrementalFileState>>;
 }): number {
     const rss0 = process.memoryUsage().rss;
@@ -512,5 +512,6 @@ export {
     getLineOfByte as lineOfByte,
     getIncrementalMaxFiles as incrementalMaxFiles,
     updateIncrementalTouch as touchIncremental,
-    checkIncrementalRssGuard as incrementalRssGuard,
+    auditMemoryPressureGuard as incrementalRssGuard,
+    auditMemoryPressureGuard as checkIncrementalRssGuard,
 };

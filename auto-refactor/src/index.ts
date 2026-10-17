@@ -88,6 +88,60 @@ const ADDED_POINTS_PER_REGRESSION = 5;
 const LOC_TO_EQUIV_RATIO = 1.37;
 const MILLION_DIVISOR = 1000000;
 
+/** String literals and operational constants */
+const LOG_LEVEL_SILENT = 'silent';
+const LOG_LEVEL_WARN = 'warn';
+const KIND_PAD_WIDTH = 9;
+const PERCENTAGE_FACTOR = 100;
+const DEFAULT_DILUTION_RATIO = '1.00';
+const TRAJECTORY_DIR_NAME = '.refactor-trajectory';
+const LIFETIME_SUMMARY_FILE = 'lifetime.summary.json';
+const ACTIVE_RUNS_FILE = 'active-runs.ndjson';
+const MODE_DRY_RUN = 'DRY-RUN';
+const MODE_IN_PLACE = 'IN-PLACE';
+const DEFAULT_AGENT_REVISION = 'codemod';
+const DEFAULT_AGENT_NAME = 'codemod-fix';
+const DIFF_CHANGED_MULTIPLIER = 3;
+const STATUS_OK = 'ok';
+const STATUS_FAILED = 'FAILED';
+const DEFAULT_GATE_STAGE: GateStage = 'pre-commit';
+const DEFAULT_STATIC_ERROR_ID = 'STATIC_ERROR';
+const CONFIG_FILE_NAME = 'auto-refactor.config.json';
+const PROJECT_SUBDIR_NAME = 'auto-refactor';
+const SEVERITY_ERROR = 'error';
+const SCORE_VECTOR_LENGTH = 10;
+
+/**
+ * Asynchronously checks if a path exists without blocking the event loop.
+ */
+async function checkPathExists(targetPath: string): Promise<boolean> {
+    try {
+        await fs.promises.access(targetPath);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+interface DirectoryProcessingContext {
+    curr: string;
+    entries: fs.Dirent[];
+    queue: string[];
+    supportedExts: Set<string>;
+    ignoredDirs: Set<string>;
+}
+
+interface GateMetricsContext {
+    beforeScore: number;
+    currentScore: number;
+    scoreVector: number[];
+    counters: ReturnType<typeof buildTrajectoryCounters>;
+    resolvedDebtPoints: number;
+    addedDebtPoints: number;
+    regressionCount: number;
+    unsuppressedErrors: Array<{ id?: string; rule?: string }>;
+}
+
 async function handleSymbolsCommand(args: string[]): Promise<void> {
     const target = args[args.indexOf(CMD_SYMBOLS) + 1];
     if (!target) {
@@ -99,14 +153,14 @@ async function handleSymbolsCommand(args: string[]): Promise<void> {
     try {
         const symbolQueryResult = await querySymbols(target, {
             root,
-            logLevel: 'silent',
+            logLevel: LOG_LEVEL_SILENT,
             cache: false,
         });
 
         process.stdout.write(`\n=== Symbol: ${target} ===\n`);
         for (const definition of symbolQueryResult.definitions) {
             process.stdout.write(
-                `  defined  ${definition.kind.padEnd(9)} ${definition.file}:${definition.line ?? '?'}\n`,
+                `  defined  ${definition.kind.padEnd(KIND_PAD_WIDTH)} ${definition.file}:${definition.line ?? '?'}\n`,
             );
         }
         for (const reference of symbolQueryResult.references) {
@@ -141,7 +195,7 @@ function handleGuideCommand(args: string[]): void {
 }
 
 async function printRecentActiveRuns(activeRunsFile: string): Promise<void> {
-    if (!fs.existsSync(activeRunsFile)) return;
+    if (!(await checkPathExists(activeRunsFile))) return;
     const rawContent = await fs.promises.readFile(activeRunsFile, 'utf8');
     const raw = rawContent.trim().split('\n').filter(Boolean);
     const recent = raw.slice(-RECENT_RUNS_WINDOW);
@@ -162,17 +216,17 @@ async function printRecentActiveRuns(activeRunsFile: string): Promise<void> {
 
 async function printLedgerSummary(customRoot?: string): Promise<void> {
     const baseDir = customRoot ? path.resolve(customRoot) : process.cwd();
-    let ledgerDir = path.join(baseDir, '.refactor-trajectory');
-    if (!fs.existsSync(ledgerDir)) {
-        const sub = path.join(baseDir, 'auto-refactor', '.refactor-trajectory');
-        if (fs.existsSync(sub)) {
+    let ledgerDir = path.join(baseDir, TRAJECTORY_DIR_NAME);
+    if (!(await checkPathExists(ledgerDir))) {
+        const sub = path.join(baseDir, PROJECT_SUBDIR_NAME, TRAJECTORY_DIR_NAME);
+        if (await checkPathExists(sub)) {
             ledgerDir = sub;
         }
     }
-    const lifetimeFile = path.join(ledgerDir, 'lifetime.summary.json');
-    const activeRunsFile = path.join(ledgerDir, 'active-runs.ndjson');
+    const lifetimeFile = path.join(ledgerDir, LIFETIME_SUMMARY_FILE);
+    const activeRunsFile = path.join(ledgerDir, ACTIVE_RUNS_FILE);
 
-    if (!fs.existsSync(lifetimeFile)) {
+    if (!(await checkPathExists(lifetimeFile))) {
         process.stdout.write(`\nNo persistent refactoring ledger found at ${ledgerDir}\n`);
         process.exit(0);
     }
@@ -275,12 +329,9 @@ function countLinesEloc(content: string): { loc: number; eloc: number } {
 }
 
 async function processDirectoryEntries(
-    curr: string,
-    entries: fs.Dirent[],
-    queue: string[],
-    supportedExts: Set<string>,
-    ignoredDirs: Set<string>,
+    context: DirectoryProcessingContext,
 ): Promise<{ files: number; loc: number; eloc: number }> {
+    const { curr, entries, queue, supportedExts, ignoredDirs } = context;
     let files = 0;
     let loc = 0;
     let eloc = 0;
@@ -336,13 +387,13 @@ async function collectDirectoryStats(
             /* ignored: unreadable directory permission */
             continue;
         }
-        const delta = await processDirectoryEntries(
+        const delta = await processDirectoryEntries({
             curr,
             entries,
             queue,
-            SUPPORTED_EXTS,
-            IGNORED_DIRS,
-        );
+            supportedExts: SUPPORTED_EXTS,
+            ignoredDirs: IGNORED_DIRS,
+        });
         totalFiles += delta.files;
         totalLoc += delta.loc;
         totalEloc += delta.eloc;
@@ -356,8 +407,10 @@ async function handleStatsCommand(args: string[]): Promise<void> {
 
     const { totalFiles, totalLoc, totalEloc } = await collectDirectoryStats(targetRoot);
 
-    const densityPct = totalLoc > 0 ? ((totalEloc / totalLoc) * 100).toFixed(1) : '0.0';
-    const dilutionRatio = totalEloc > 0 ? (totalLoc / totalEloc).toFixed(2) : '1.00';
+    const densityPct =
+        totalLoc > 0 ? ((totalEloc / totalLoc) * PERCENTAGE_FACTOR).toFixed(1) : '0.0';
+    const dilutionRatio =
+        totalEloc > 0 ? (totalLoc / totalEloc).toFixed(2) : DEFAULT_DILUTION_RATIO;
 
     process.stdout.write(`\n=== Code Volume & Complexity Statistics ===\n`);
     process.stdout.write(`Target Scope Root       : ${targetRoot}\n`);
@@ -370,7 +423,8 @@ async function handleStatsCommand(args: string[]): Promise<void> {
     process.exit(0);
 }
 
-function handleMemoryCommand(): void {
+function handleMemoryCommand(args: string[] = []): void {
+    void args;
     const mem = getReviewMemory();
     const stats = mem.getStats();
     process.stdout.write(`\n=== Review Memory Status ===\n`);
@@ -422,12 +476,12 @@ async function handleFixWorkflow(cli: CliOptions): Promise<number> {
     let totalSkipped = 0;
 
     process.stdout.write(
-        `\n=== Automated Codemod Repair (${cli.fixDryRun ? 'DRY-RUN' : 'IN-PLACE'}) ===\n`,
+        `\n=== Automated Codemod Repair (${cli.fixDryRun ? MODE_DRY_RUN : MODE_IN_PLACE}) ===\n`,
     );
 
     for (const [relPath, fixes] of fixesByFile.entries()) {
         const fullPath = path.resolve(rootDir, relPath);
-        if (!fs.existsSync(fullPath)) continue;
+        if (!(await checkPathExists(fullPath))) continue;
 
         const content = await fs.promises.readFile(fullPath, 'utf8');
         const patchApplyResult = defaultPatchEngine.applyFixes(fullPath, content, fixes, {
@@ -464,14 +518,14 @@ async function recordCodemodTrajectory(
 ): Promise<void> {
     if (cli.fixDryRun || totalApplied === 0) return;
     try {
-        const trajectoryDir = path.join(rootDir, '.refactor-trajectory');
-        if (!fs.existsSync(trajectoryDir)) return;
+        const trajectoryDir = path.join(rootDir, TRAJECTORY_DIR_NAME);
+        if (!(await checkPathExists(trajectoryDir))) return;
 
         const accumulator = new TrajectoryAccumulator(trajectoryDir);
         const modifiedFilesList = [];
         for (const relPath of fixesByFile.keys()) {
             const fullPath = path.resolve(rootDir, relPath);
-            if (fs.existsSync(fullPath)) {
+            if (await checkPathExists(fullPath)) {
                 modifiedFilesList.push({
                     filePath: relPath,
                     content: await fs.promises.readFile(fullPath, 'utf8'),
@@ -484,9 +538,9 @@ async function recordCodemodTrajectory(
             runId: `fix-${Date.now()}`,
             revision: maybeRevision
                 ? String(maybeRevision).slice(0, REVISION_ID_DISPLAY_LENGTH)
-                : 'codemod',
+                : DEFAULT_AGENT_REVISION,
             module: path.basename(rootDir),
-            agent: 'codemod-fix',
+            agent: DEFAULT_AGENT_NAME,
             timestamp: Date.now(),
             scannedFiles: modifiedFilesList,
             beforeScore: SCORE_INITIAL_FIX_BASELINE,
@@ -498,7 +552,7 @@ async function recordCodemodTrajectory(
             addedDebtPoints: 0,
             regressionFindingsCount: 0,
             diffCounters: {
-                changed: totalApplied * 3,
+                changed: totalApplied * DIFF_CHANGED_MULTIPLIER,
                 semantic: totalApplied * 2,
                 modified: totalApplied,
             },
@@ -517,15 +571,11 @@ async function handleScanCommand(args: string[]): Promise<number> {
         const cache = new CacheStore(cli.cacheDir, cfg.root);
         const ok = cache.clear();
         process.stderr.write(
-            `[auto-refactor] cache cleared (${ok ? 'ok' : 'FAILED'}): ${cache.dir}\n`,
+            `[auto-refactor] cache cleared (${ok ? STATUS_OK : STATUS_FAILED}): ${cache.dir}\n`,
         );
     }
 
-    if (cli.fix || cli.fixDryRun) {
-        return handleFixWorkflow(cli);
-    }
-
-    return scanAndRender(cli);
+    return cli.fix || cli.fixDryRun ? handleFixWorkflow(cli) : scanAndRender(cli);
 }
 
 function parseGateOptions(args: string[]): {
@@ -533,7 +583,7 @@ function parseGateOptions(args: string[]): {
     root: string;
 } {
     const stageIdx = args.indexOf(FLAG_STAGE);
-    let stage: GateStage = 'pre-commit';
+    let stage: GateStage = DEFAULT_GATE_STAGE;
     if (stageIdx !== -1 && args[stageIdx + 1]) {
         stage = args[stageIdx + 1] as GateStage;
     }
@@ -561,20 +611,22 @@ function computeProcessedDensityAndRatio(
     const processedEloc = Math.max(totalFiles, totalProcessedEloc);
     let density = 0.8;
     if (totalPhysicalLoc > 0) {
-        density = Math.round((processedEloc / totalPhysicalLoc) * 100) / 100;
+        density =
+            Math.round((processedEloc / totalPhysicalLoc) * PERCENTAGE_FACTOR) / PERCENTAGE_FACTOR;
     }
 
     let ratio = 1.25;
     if (processedEloc > 0) {
-        ratio = Math.round((totalPhysicalLoc / processedEloc) * 100) / 100;
+        ratio =
+            Math.round((totalPhysicalLoc / processedEloc) * PERCENTAGE_FACTOR) / PERCENTAGE_FACTOR;
     }
 
     return { processedEloc, density, ratio };
 }
 
 async function readHistoricalMeanScore(root: string): Promise<number | undefined> {
-    const trajectoryDir = path.join(root, '.refactor-trajectory');
-    if (!fs.existsSync(trajectoryDir)) {
+    const trajectoryDir = path.join(root, TRAJECTORY_DIR_NAME);
+    if (!(await checkPathExists(trajectoryDir))) {
         return undefined;
     }
 
@@ -611,41 +663,34 @@ function buildTrajectoryCounters(processedEloc: number, density: number, ratio: 
     };
 }
 
-function buildGateMetrics(
-    beforeScore: number,
-    currentScore: number,
-    scoreVector: number[],
-    counters: ReturnType<typeof buildTrajectoryCounters>,
-    resolvedDebtPoints: number,
-    addedDebtPoints: number,
-    regressionCount: number,
-    unsuppressedErrors: Array<{ id?: string; rule?: string }>,
-) {
-    const netDebtPointsDelta = resolvedDebtPoints - addedDebtPoints;
+function buildGateMetrics(context: GateMetricsContext) {
+    const netDebtPointsDelta = context.resolvedDebtPoints - context.addedDebtPoints;
     return computeTrajectoryQualityMetrics({
-        beforeScore,
-        afterScore: currentScore,
-        scoreVector,
-        counters,
+        beforeScore: context.beforeScore,
+        afterScore: context.currentScore,
+        scoreVector: context.scoreVector,
+        counters: context.counters,
         debtDelta: {
-            resolvedDebtPoints,
-            addedDebtPoints,
+            resolvedDebtPoints: context.resolvedDebtPoints,
+            addedDebtPoints: context.addedDebtPoints,
             netDebtCleared: netDebtPointsDelta,
-            regressionFindingsCount: regressionCount,
-            regressionFindingIds: unsuppressedErrors.map(
-                (issue) => issue.id || issue.rule || 'STATIC_ERROR',
+            regressionFindingsCount: context.regressionCount,
+            regressionFindingIds: context.unsuppressedErrors.map(
+                (issue) => issue.id || issue.rule || DEFAULT_STATIC_ERROR_ID,
             ),
         },
     });
 }
 
-function resolveGateConfigFile(root: string): string | undefined {
-    const configPath = path.join(root, 'auto-refactor.config.json');
-    return fs.existsSync(configPath) ? configPath : undefined;
+async function resolveGateConfigFile(root: string): Promise<string | undefined> {
+    const configPath = path.join(root, CONFIG_FILE_NAME);
+    return (await checkPathExists(configPath)) ? configPath : undefined;
 }
 
 function extractUnsuppressedErrors(issues: ScanReport['issues']): ScanReport['issues'] {
-    return (issues || []).filter((issue) => issue.severity === 'error' && !issue.suppression);
+    return (issues || []).filter(
+        (issue) => issue.severity === SEVERITY_ERROR && !issue.suppression,
+    );
 }
 
 function resolveGateScores(
@@ -661,7 +706,7 @@ function resolveGateScores(
         currentScore = scanResult.qualityScore.compositeScore;
     }
     const beforeScore = historicalBeforeScore ?? currentScore;
-    let scoreVector = new Array(10).fill(currentScore);
+    let scoreVector = Array(SCORE_VECTOR_LENGTH).fill(currentScore);
     if (scanResult.qualityScore?.indices) {
         scoreVector = recordToVector(scanResult.qualityScore.indices);
     }
@@ -673,14 +718,14 @@ async function executeGateScan(root: string): Promise<{
     unsuppressedErrors: ScanReport['issues'];
     staticPass: boolean;
 }> {
-    const configFile = resolveGateConfigFile(root);
-    const scanResult = await scan({ root, configFile, logLevel: 'warn' });
+    const configFile = await resolveGateConfigFile(root);
+    const scanResult = await scan({ root, configFile, logLevel: LOG_LEVEL_WARN });
     const unsuppressedErrors = extractUnsuppressedErrors(scanResult.issues);
     const staticPass = unsuppressedErrors.length === 0;
     return { scanResult, unsuppressedErrors, staticPass };
 }
 
-async function prepareGateEvaluation(
+async function getGateEvaluationData(
     root: string,
     scanData: {
         scanResult: ScanReport;
@@ -711,7 +756,7 @@ async function prepareGateEvaluation(
     const addedDebtPoints = regressionCount * ADDED_POINTS_PER_REGRESSION;
 
     const counters = buildTrajectoryCounters(processedEloc, density, ratio);
-    const metrics = buildGateMetrics(
+    const metrics = buildGateMetrics({
         beforeScore,
         currentScore,
         scoreVector,
@@ -720,7 +765,7 @@ async function prepareGateEvaluation(
         addedDebtPoints,
         regressionCount,
         unsuppressedErrors,
-    );
+    });
     return { staticPass, counters, metrics };
 }
 
@@ -744,7 +789,7 @@ function evaluateGateStatus(
 async function handleGateCommand(args: string[]): Promise<void> {
     const { stage, root } = parseGateOptions(args);
     const scanData = await executeGateScan(root);
-    const evalData = await prepareGateEvaluation(root, scanData);
+    const evalData = await getGateEvaluationData(root, scanData);
     const compositeGateResult = evaluateGateStatus(stage, evalData);
     process.stdout.write(compositeGateResult.summaryText + '\n');
     process.exit(compositeGateResult.passed ? 0 : 1);

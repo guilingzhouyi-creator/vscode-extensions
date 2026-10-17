@@ -50,11 +50,6 @@ const LAYER_L4_PRESENTATION: AgentTopologyLayer = 'L4_PRESENTATION';
 const LAYER_L5_GOVERNANCE: AgentTopologyLayer = 'L5_GOVERNANCE';
 
 const PROP_PROMPT_QUESTION = 'promptQuestion';
-const RULE_HIGH_COMPLEXITY = 'HIGH-COMPLEXITY';
-const PREFIX_CPX = 'CPX-';
-const PREFIX_ADV_CMP = 'ADV-CMP';
-const PREFIX_GOV_SAN = 'GOV-SAN';
-const PREFIX_CMG = 'CMG-';
 
 /**
  * Caller-supplied target selector for AgentConstraintGenerator.generate.
@@ -375,7 +370,11 @@ export function extractClarificationRequest(issue: Issue): AgentClarificationReq
         (issue as unknown as Record<string, unknown>).clarificationRequest ??
         issue.detail?.clarificationRequest ??
         (issue.actionable as unknown as Record<string, unknown> | undefined)?.clarificationRequest;
-    if (raw && typeof raw === 'object' && PROP_PROMPT_QUESTION in (raw as Record<string, unknown>)) {
+    if (
+        raw &&
+        typeof raw === 'object' &&
+        PROP_PROMPT_QUESTION in (raw as Record<string, unknown>)
+    ) {
         return raw as AgentClarificationRequest;
     }
     return undefined;
@@ -506,7 +505,8 @@ export function formatCompactAgentPrompt(
     const verdict = hasBlock ? VERDICT_BLOCK : hasWarn ? VERDICT_WARN : VERDICT_PASS;
 
     const hasClarify = directives.some((d) => d.directiveType === DIRECTIVE_TYPE_CLARIFY);
-    const version: '1.0' | '2.0' = protocolVersion ?? (hasClarify ? PROTOCOL_VERSION_2_0 : PROTOCOL_VERSION_1_0);
+    const version: '1.0' | '2.0' =
+        protocolVersion ?? (hasClarify ? PROTOCOL_VERSION_2_0 : PROTOCOL_VERSION_1_0);
 
     const renderedDirectives = directives.map((d) => d.renderedDirective);
     const count = directives.length;
@@ -642,7 +642,9 @@ function isPurityRequired(layer: AgentTopologyLayer, msg: string): boolean {
 }
 
 function isZeroHeapRequired(rule: string, layer: AgentTopologyLayer, msg: string): boolean {
-    return layer === LAYER_L2_OPERATOR || ZERO_HEAP_RULE_RE.test(rule) || ZERO_HEAP_MSG_RE.test(msg);
+    return (
+        layer === LAYER_L2_OPERATOR || ZERO_HEAP_RULE_RE.test(rule) || ZERO_HEAP_MSG_RE.test(msg)
+    );
 }
 
 function isImmutableRequired(rule: string, layer: AgentTopologyLayer, msg: string): boolean {
@@ -784,7 +786,10 @@ const VERIFICATION_DIRECTIVE_STRATEGIES: readonly VerificationDirectiveRuleStrat
             ),
     },
     {
-        matcher: (_file, rule) => rule === RULE_NAME_HIGH_COMPLEXITY || rule.startsWith(RULE_PREFIX_CPX) || rule.startsWith(RULE_PREFIX_ADV_CMP),
+        matcher: (_file, rule) =>
+            rule === RULE_NAME_HIGH_COMPLEXITY ||
+            rule.startsWith(RULE_PREFIX_CPX) ||
+            rule.startsWith(RULE_PREFIX_ADV_CMP),
         factory: () =>
             createVerificationDirective(
                 'node scripts/common/evaluate-eloc-budget.js',
@@ -796,7 +801,8 @@ const VERIFICATION_DIRECTIVE_STRATEGIES: readonly VerificationDirectiveRuleStrat
             ),
     },
     {
-        matcher: (_file, rule) => rule.startsWith(RULE_PREFIX_GOV_SAN) || rule.startsWith(RULE_PREFIX_CMG),
+        matcher: (_file, rule) =>
+            rule.startsWith(RULE_PREFIX_GOV_SAN) || rule.startsWith(RULE_PREFIX_CMG),
         factory: () =>
             createVerificationDirective(
                 'node scripts/validate-governance-exemptions.js',

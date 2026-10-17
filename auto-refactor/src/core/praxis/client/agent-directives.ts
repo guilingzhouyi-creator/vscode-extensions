@@ -132,7 +132,11 @@ function extractIssueClarification(issue: Issue): AgentClarificationRequest | un
         (issue as unknown as Record<string, unknown>).clarificationRequest ??
         issue.detail?.clarificationRequest ??
         (issue.actionable as unknown as Record<string, unknown> | undefined)?.clarificationRequest;
-    if (raw && typeof raw === 'object' && PROP_PROMPT_QUESTION in (raw as Record<string, unknown>)) {
+    if (
+        raw &&
+        typeof raw === 'object' &&
+        PROP_PROMPT_QUESTION in (raw as Record<string, unknown>)
+    ) {
         return raw as AgentClarificationRequest;
     }
     return undefined;
@@ -292,7 +296,8 @@ export function formatDirectivesMarkdown(
     maxDirectives: number = DEFAULT_MAX_DIRECTIVES,
 ): string {
     const counts = countIssueSeverities(issues);
-    const verdict = counts.errorCount > 0 ? VERDICT_BLOCK : counts.warnCount > 0 ? VERDICT_WARN : VERDICT_PASS;
+    const verdict =
+        counts.errorCount > 0 ? VERDICT_BLOCK : counts.warnCount > 0 ? VERDICT_WARN : VERDICT_PASS;
     const lines: string[] = [
         '# Static Analysis Review Directives for AI Agent',
         `- Target: ${target}`,
@@ -306,7 +311,9 @@ export function formatDirectivesMarkdown(
     }
 
     if (cardContext) {
-        const checkpointInfo = cardContext.checkpointId ? ` | Checkpoint: ${cardContext.checkpointId}` : '';
+        const checkpointInfo = cardContext.checkpointId
+            ? ` | Checkpoint: ${cardContext.checkpointId}`
+            : '';
         lines.push(
             `- Praxis Context: Cell: ${cardContext.cellId} | Agent: ${cardContext.agentUid} | Card: ${cardContext.cardId}${checkpointInfo}`,
         );
@@ -645,7 +652,11 @@ function resolveDualFacedDiffParams(
     cardContext?: PraxisCardContext;
     locale: PraxisLocale;
 } {
-    if (!Array.isArray(optionsOrHunks) && typeof optionsOrHunks === 'object' && optionsOrHunks !== null) {
+    if (
+        !Array.isArray(optionsOrHunks) &&
+        typeof optionsOrHunks === 'object' &&
+        optionsOrHunks !== null
+    ) {
         return {
             hunks: optionsOrHunks.hunks,
             sourceBranch: optionsOrHunks.sourceBranch,
@@ -689,7 +700,9 @@ export function buildDualFacedDiff(
     let badgeColor: PraxisBadgeColor = COLOR_YELLOW;
     if (params.gateApproved) {
         badgeColor = COLOR_GREEN;
-    } else if (params.violations.some((v) => v.includes(VERDICT_BLOCK) || v.includes(SEVERITY_STR_ERROR))) {
+    } else if (
+        params.violations.some((v) => v.includes(VERDICT_BLOCK) || v.includes(SEVERITY_STR_ERROR))
+    ) {
         badgeColor = COLOR_RED;
     }
 
@@ -697,7 +710,11 @@ export function buildDualFacedDiff(
         ? `[APPROVED] Clean merge gate from ${params.sourceBranch} to ${params.targetBranch}`
         : `[REWORK NEEDED] ${params.violations.length} violation(s) detected during merge gate evaluation`;
 
-    const diagnosticCards = buildGateDiagnosticCards(params.violations, params.gateApproved, params.locale);
+    const diagnosticCards = buildGateDiagnosticCards(
+        params.violations,
+        params.gateApproved,
+        params.locale,
+    );
 
     return {
         agentFace: {

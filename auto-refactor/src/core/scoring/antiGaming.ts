@@ -191,7 +191,10 @@ function checkArtificialSplitting(
     }
 
     // If there are 5 or more trivial forwarders and density drops below 0.65
-    if (density.forwardingCount >= FORWARDING_SPLIT_THRESHOLD && density.effectiveDensity < DENSITY_SPLIT_THRESHOLD) {
+    if (
+        density.forwardingCount >= FORWARDING_SPLIT_THRESHOLD &&
+        density.effectiveDensity < DENSITY_SPLIT_THRESHOLD
+    ) {
         gamingKinds.push(GAMING_KIND_ARTIFICIAL_SPLITTING);
         issues.push(
             createGamingIssue({
@@ -342,8 +345,13 @@ function checkNamingEntropyAnomaly(
     const names = varMatches.map((m) => m.replace(RE_VAR_KEYWORD_PREFIX, ''));
     const concatenated = names.join('');
     const entropy = calculateShannonEntropy(concatenated);
-    const isDegenerate = names.filter((n) => RE_DEGENERATE_IDENTIFIER.test(n)).length >= ENTROPY_CONFIG.degenerateThreshold;
-    if ((entropy < ENTROPY_CONFIG.degenerateBound && isDegenerate) || entropy < ENTROPY_CONFIG.lowBound) {
+    const isDegenerate =
+        names.filter((n) => RE_DEGENERATE_IDENTIFIER.test(n)).length >=
+        ENTROPY_CONFIG.degenerateThreshold;
+    if (
+        (entropy < ENTROPY_CONFIG.degenerateBound && isDegenerate) ||
+        entropy < ENTROPY_CONFIG.lowBound
+    ) {
         gamingKinds.push(GAMING_KIND_NAMING_ENTROPY);
         issues.push(
             createGamingIssue({
@@ -469,12 +477,7 @@ export function detectScoreGaming(filePath: string, content: string): AntiGaming
     const testPenalty = checkTautologicalTestPadding(filePath, content, issues, gamingKinds);
     const commentPenalty = checkTautologicalCommentPadding(filePath, content, issues, gamingKinds);
     const entropyPenalty = checkNamingEntropyAnomaly(filePath, content, issues, gamingKinds);
-    const traversalPenalty = checkTautologicalPadding(
-        filePath,
-        content,
-        issues,
-        gamingKinds,
-    );
+    const traversalPenalty = checkTautologicalPadding(filePath, content, issues, gamingKinds);
     const lowEntropyTokenPenalty = checkLowEntropyTokenPadding(
         filePath,
         content,
