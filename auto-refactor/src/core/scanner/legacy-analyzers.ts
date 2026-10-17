@@ -84,7 +84,7 @@ export function runLegacyPhase(
                 continue;
             }
             const sev: Severity = base.config.failOnAnalyzerError ? 'error' : 'info';
-            host.logger.error(`analyzer "${p.name}" threw on ${base.rel}: ${String(e)}`);
+            host.logger.error(`analyzer "${p.name}" threw on ${base.rel}`, e);
             issues.push({
                 id: `core:analyzer-error:${base.rel}:1`,
                 analyzer: p.name,
@@ -96,8 +96,9 @@ export function runLegacyPhase(
                     start: { line: 1, column: 1 },
                     end: { line: 1, column: 1 },
                 },
-                detail: { error: String(e) },
+                detail: { error: String(e), stack: e instanceof Error ? e.stack : undefined },
             });
+
         }
     }
     return issues;

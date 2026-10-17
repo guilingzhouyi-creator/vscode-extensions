@@ -18,6 +18,7 @@
 
 import * as net from 'net';
 import type { ScanConfig, ScanReport, WarmStats } from '../core/types';
+import type { Logger } from '../core/logger';
 import type { RegistryInfo } from './registry';
 import { readRegistry, projectHashFor } from './registry';
 import type {
@@ -481,6 +482,7 @@ export async function tryWarmScan(
         workers?: number;
         parser?: string;
     },
+    logger?: Logger,
 ): Promise<WarmScanResult | null> {
     const client = new DaemonClient(root);
     try {
@@ -488,8 +490,9 @@ export async function tryWarmScan(
         const result = await client.scan(config, options);
         client.close();
         return result;
-    } catch {
+    } catch (e) {
         client.close();
+        logger?.debug(`warm scan fallback to cold scan: ${e instanceof Error ? e.message : String(e)}`);
         return null;
     }
 }
@@ -511,6 +514,7 @@ export async function tryWarmScan(
  * @param options.parser - Optional parser selection override ('typescript' | 'oxc').
  * @param options.verifyDiskContent - When true, the daemon re-reads disk content before reuse.
  * @param options.delta - When true, request the changed-file subset instead of a full report.
+ * @param logger - Optional Logger instance for recording debug diagnostics.
  * @returns Diff-scan result `{ report, stats }`, or null when unusable; this async call
  *          resolves after the client closes.
  */
@@ -527,19 +531,23 @@ export async function tryWarmScanDiff(
         verifyDiskContent: boolean;
         delta: boolean;
     },
+    logger?: Logger,
 ): Promise<{ report: unknown; stats: unknown } | null> {
     const client = new DaemonClient(root);
     try {
         await client.connect();
         if (!client.hasDiffCap()) {
             client.close();
+            logger?.debug('warm scan diff rejected: daemon lacks diff capability');
             return null;
         }
         const result = await client.scanDiff(config, diffs, options);
         client.close();
         return result;
-    } catch {
+    } catch (e) {
         client.close();
+        logger?.debug(`warm scan diff fallback to cold scan: ${e instanceof Error ? e.message : String(e)}`);
         return null;
     }
 }
+

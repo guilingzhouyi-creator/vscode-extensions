@@ -25,7 +25,7 @@
 import * as child_process from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
-import { projectHashFor, readRegistry, clearRegistry } from '../daemon/registry';
+import { projectHashFor, readRegistry, clearRegistry, logFilePath } from '../daemon/registry';
 import { DaemonClient } from '../daemon/client';
 
 /** Timeout for connect/ping probes against an already-registered daemon, in milliseconds. */
@@ -112,25 +112,82 @@ export async function ensureDaemon(root: string): Promise<boolean> {
  *
  * @param root - Workspace root passed to the detached server process.
  * @param projectHash - Registry key derived from `root`.
+/**
+ * Probe whether a daemon is already alive for the project, clearing any stale registry entry.
+ */
+async function checkExistingDaemon(root: string, projectHash: string): Promise<DaemonCliResult | null> {
+    const existing = readRegistry(projectHash);
+    if (!existing) return null;
+
+    const probe = new DaemonClient(root, projectHash);
+    try {
+        await probe.connect(DAEMON_PROBE_TIMEOUT_MS);
+        await probe.ping(DAEMON_PROBE_TIMEOUT_MS);
+        probe.close();
+        return {
+            code: 0,
+            text: `daemon already running (pid ${existing.pid}, pipe ${existing.pipe})`,
+        };
+    } catch {
+        // Registry exists but the process is dead — stale entry; proceed to start fresh.
+        clearRegistry(projectHash);
+        return null;
+    }
+}
+
+/**
+ * Launch the detached daemon child process redirected to the daemon log file.
+ */
+function spawnServerProcess(serverJs: string, root: string, daemonLog: string): void {
+    let bootErrFd: number | null = null;
+    try {
+        fs.mkdirSync(path.dirname(daemonLog), { recursive: true });
+        bootErrFd = fs.openSync(daemonLog, 'a');
+    } catch {
+        /* best-effort */
+    }
+
+    const child = child_process.spawn(process.execPath, [serverJs, '--root', root], {
+        detached: true,
+        stdio: ['ignore', 'ignore', bootErrFd !== null ? bootErrFd : 'ignore'],
+        windowsHide: true,
+    });
+    if (bootErrFd !== null) {
+        try {
+            fs.closeSync(bootErrFd);
+        } catch {
+            /* ignore */
+        }
+    }
+    child.unref();
+}
+
+/**
+ * Read the trailing log line from daemon boot log for failure diagnostics.
+ */
+function readDaemonLogDetail(daemonLog: string): string {
+    try {
+        if (!fs.existsSync(daemonLog)) return '';
+        const rawLines = fs.readFileSync(daemonLog, 'utf8').trim().split('\n');
+        const recent = rawLines.slice(-2).join('; ');
+        return recent ? ` (last log: ${recent})` : '';
+    } catch {
+        /* best-effort */
+        return '';
+    }
+}
+
+/**
+ * Spawn or reuse the daemon for `root` and await registry visibility plus a ping.
+ * An existing registry entry is probed first; a dead one is cleared before starting fresh.
+ *
+ * @param root - Workspace root passed to the detached server process.
+ * @param projectHash - Registry key derived from `root`.
  * @returns The lifecycle result, with code 2 when the built server file is missing.
  */
 async function startDaemon(root: string, projectHash: string): Promise<DaemonCliResult> {
-    const existing = readRegistry(projectHash);
-    if (existing) {
-        const probe = new DaemonClient(root, projectHash);
-        try {
-            await probe.connect(DAEMON_PROBE_TIMEOUT_MS);
-            await probe.ping(DAEMON_PROBE_TIMEOUT_MS);
-            probe.close();
-            return {
-                code: 0,
-                text: `daemon already running (pid ${existing.pid}, pipe ${existing.pipe})`,
-            };
-        } catch {
-            // Registry exists but the process is dead — stale entry; proceed to start fresh.
-            clearRegistry(projectHash);
-        }
-    }
+    const existingResult = await checkExistingDaemon(root, projectHash);
+    if (existingResult) return existingResult;
 
     const serverJs = serverJsPath();
     if (!fs.existsSync(serverJs)) {
@@ -139,20 +196,18 @@ async function startDaemon(root: string, projectHash: string): Promise<DaemonCli
             text: `daemon server not found: ${serverJs} (build first: npm run build)`,
         };
     }
-    const child = child_process.spawn(process.execPath, [serverJs, '--root', root], {
-        detached: true,
-        stdio: 'ignore',
-        windowsHide: true,
-    });
-    child.unref();
+
+    const daemonLog = logFilePath(projectHash);
+    spawnServerProcess(serverJs, root, daemonLog);
 
     // Wait for the registry + a successful ping (up to ~5s).
     const pollResult = await pollDaemonReady(root, projectHash);
-    if (pollResult) {
-        return pollResult;
-    }
-    return { code: 1, text: `daemon failed to become ready within 5s (root=${root})` };
+    if (pollResult) return pollResult;
+
+    const detail = readDaemonLogDetail(daemonLog);
+    return { code: 1, text: `daemon failed to become ready within 5s (root=${root})${detail}` };
 }
+
 
 /**
  * Polls the daemon registry and probes the socket until successfully connected or timeout.

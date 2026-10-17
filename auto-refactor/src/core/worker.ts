@@ -406,9 +406,10 @@ function executeLegacyAnalyzers(context: LegacyExecutionContext): Issue[] {
                 severity: sev,
                 message: `Analyzer "${a.name}" threw: ${(e as Error).message}`,
                 location: { file, start: { line: 1, column: 1 }, end: { line: 1, column: 1 } },
-                detail: { error: String(e) },
+                detail: { error: String(e), stack: e instanceof Error ? e.stack : undefined },
             });
         }
+
     }
 
     return issues;

@@ -86,19 +86,23 @@ export async function handleScan(
         : new CacheStore(undefined, cfg.root, { disabled: true });
 
     const logger = new Logger(cfg.logLevel || 'silent', cfg.logFile);
-    const scanner = new Scanner(cfg, logger);
-    const result = await scanner.scanWithCache({
-        cache,
-        session: ctx.session,
-        pool: ctx.pools,
-        cacheCustom: options.cacheCustom === true,
-    });
-    logger.close();
+    try {
+        const scanner = new Scanner(cfg, logger);
+        const result = await scanner.scanWithCache({
+            cache,
+            session: ctx.session,
+            pool: ctx.pools,
+            cacheCustom: options.cacheCustom === true,
+        });
 
-    result.stats.daemonUsed = true;
-    result.stats.daemonMs = Date.now() - t0;
-    return result;
+        result.stats.daemonUsed = true;
+        result.stats.daemonMs = Date.now() - t0;
+        return result;
+    } finally {
+        logger.close();
+    }
 }
+
 
 /**
  * Build a deduplicated file-path-to-DiffInput map from raw diff inputs.
@@ -164,27 +168,31 @@ export async function handleScanDiff(
         : new CacheStore(undefined, cfg.root, { disabled: true });
 
     const logger = new Logger(cfg.logLevel || 'silent', cfg.logFile);
-    const scanner = new Scanner(cfg, logger);
-    const diffHints = buildDiffHintsMap(diffs);
+    try {
+        const scanner = new Scanner(cfg, logger);
+        const diffHints = buildDiffHintsMap(diffs);
 
-    const baseOpts = {
-        cache,
-        session: ctx.session,
-        pool: ctx.pools,
-        cacheCustom: options.cacheCustom === true,
-        diffHints,
-        verifyDiskContent: options.verifyDiskContent !== false,
-    };
-    const result =
-        options.delta === true
-            ? await scanner.scanWithDiff({ ...baseOpts, deltaOnly: true })
-            : await scanner.scanWithDiff({ ...baseOpts, deltaOnly: false });
-    logger.close();
+        const baseOpts = {
+            cache,
+            session: ctx.session,
+            pool: ctx.pools,
+            cacheCustom: options.cacheCustom === true,
+            diffHints,
+            verifyDiskContent: options.verifyDiskContent !== false,
+        };
+        const result =
+            options.delta === true
+                ? await scanner.scanWithDiff({ ...baseOpts, deltaOnly: true })
+                : await scanner.scanWithDiff({ ...baseOpts, deltaOnly: false });
 
-    result.stats.daemonUsed = true;
-    result.stats.daemonMs = Date.now() - t0;
-    return { report: result.report, stats: result.stats as DiffStats };
+        result.stats.daemonUsed = true;
+        result.stats.daemonMs = Date.now() - t0;
+        return { report: result.report, stats: result.stats as DiffStats };
+    } finally {
+        logger.close();
+    }
 }
+
 
 /**
  * Build the default per-daemon scan context: one shared worker-pool manager, one warm

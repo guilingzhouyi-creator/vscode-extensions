@@ -503,9 +503,15 @@ export class DaemonServer {
             }
         }
         this.logger.info(`daemon exiting (${reason})`);
+        try {
+            this.logger.close();
+        } catch {
+            /* ignore */
+        }
         setImmediate(() => process.exit(0));
     }
 }
+
 
 const FLAG_ROOT = '--root';
 const FLAG_STDIO = '--stdio';

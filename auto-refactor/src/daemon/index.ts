@@ -77,7 +77,8 @@ export function installDaemonRejectionGuard(
             message: error.message,
             stack: error.stack,
         });
-        process.stderr.write(`[auto-refactor daemon] unhandledRejection: ${record.message}\n`);
+        const stackTrace = record.stack ? `\n${record.stack}` : '';
+        process.stderr.write(`[auto-refactor daemon] unhandledRejection: ${record.message}${stackTrace}\n`);
         if (typeof onRejection === 'function') {
             try {
                 onRejection(record);

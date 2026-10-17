@@ -235,12 +235,14 @@ interface DaemonClientModuleExports {
         root: string,
         config: ScanConfig,
         options: LazyWarmScanOptions,
+        logger?: Logger,
     ) => Promise<{ report: ScanReport; stats: WarmStats } | null>;
     tryWarmScanDiff: (
         root: string,
         config: ScanConfig,
         diffs: DiffInput[],
         options: WarmScanDiffOptions,
+        logger?: Logger,
     ) => Promise<{ report: ScanReport | DiffDeltaReport; stats: DiffStats } | null>;
 }
 
@@ -260,9 +262,10 @@ function runLazyWarmScan(
     root: string,
     config: ScanConfig,
     options: LazyWarmScanOptions,
+    logger?: Logger,
 ): Promise<{ report: ScanReport; stats: WarmStats } | null> {
     const { tryWarmScan } = loadDaemonModule<DaemonClientModuleExports>(MODULE_DAEMON_CLIENT);
-    return tryWarmScan(root, config, options);
+    return tryWarmScan(root, config, options, logger);
 }
 
 /** Lazy daemon auto-start access (only used by daemon:'on'). */
@@ -277,10 +280,12 @@ function runLazyWarmScanDiff(
     config: ScanConfig,
     diffs: DiffInput[],
     options: WarmScanDiffOptions,
+    logger?: Logger,
 ): Promise<{ report: ScanReport | DiffDeltaReport; stats: DiffStats } | null> {
     const { tryWarmScanDiff } = loadDaemonModule<DaemonClientModuleExports>(MODULE_DAEMON_CLIENT);
-    return tryWarmScanDiff(root, config, diffs, options);
+    return tryWarmScanDiff(root, config, diffs, options, logger);
 }
+
 
 /**
  * Programmatic entry point. Call `await scan(...)` with root and options; inspect
@@ -303,45 +308,48 @@ export async function scan(options: ScanOptions = {}): Promise<ScanReport> {
     }
     const config = resolveConfig(options);
     const logger = new Logger(config.logLevel, config.logFile);
-    const scanner = new Scanner(config, logger);
+    try {
+        const scanner = new Scanner(config, logger);
 
-    let report!: ScanReport;
-    // A warm/daemon report originates in another process, so this process's `scanner` holds an
-    // empty graph: leave `reportScanner` null and let the post-scan pipeline rebuild it. A
-    // cold/cache pass fills it in so the cycle pass can reuse the graph already built.
-    let reportScanner: Scanner | null = null;
-    const runColdPass = async (): Promise<void> => {
-        if (options.cache) {
-            const cache = new CacheStore(options.cacheDir, config.root);
-            const cachedScan = await scanner.scanWithCache({
-                cache,
-                cacheCustom: options.cacheCustom,
-            });
-            report = cachedScan.report;
-        } else {
-            report = await scanner.scan();
-        }
-        reportScanner = scanner;
-    };
+        let report!: ScanReport;
+        // A warm/daemon report originates in another process, so this process's `scanner` holds an
+        // empty graph: leave `reportScanner` null and let the post-scan pipeline rebuild it. A
+        // cold/cache pass fills it in so the cycle pass can reuse the graph already built.
+        let reportScanner: Scanner | null = null;
+        const runColdPass = async (): Promise<void> => {
+            if (options.cache) {
+                const cache = new CacheStore(options.cacheDir, config.root, { logger });
+                const cachedScan = await scanner.scanWithCache({
+                    cache,
+                    cacheCustom: options.cacheCustom,
+                });
+                report = cachedScan.report;
+            } else {
+                report = await scanner.scan();
+            }
+            reportScanner = scanner;
+        };
 
-    if (options.warm && options.daemon !== DAEMON_MODE_OFF) {
-        const mode = options.daemon || DAEMON_MODE_AUTO;
-        if (mode === DAEMON_MODE_ON) await runLazyEnsureDaemon(config.root);
-        const warm = await runLazyWarmScan(config.root, config, buildWarmOptions(options, false));
-        if (warm) {
-            report = warm.report;
+        if (options.warm && options.daemon !== DAEMON_MODE_OFF) {
+            const mode = options.daemon || DAEMON_MODE_AUTO;
+            if (mode === DAEMON_MODE_ON) await runLazyEnsureDaemon(config.root);
+            const warm = await runLazyWarmScan(config.root, config, buildWarmOptions(options, false), logger);
+            if (warm) {
+                report = warm.report;
+            } else {
+                await runColdPass();
+            }
         } else {
             await runColdPass();
         }
-    } else {
-        await runColdPass();
-    }
 
-    // The post-scan pipeline (suppressions / dependency graph / baseline) is part of scan(), so
-    // library callers and the CLI observe exactly the same report.
-    await finalizeReport(report, config, options, logger, reportScanner);
-    logger.close();
-    return report;
+        // The post-scan pipeline (suppressions / dependency graph / baseline) is part of scan(), so
+        // library callers and the CLI observe exactly the same report.
+        await finalizeReport(report, config, options, logger, reportScanner);
+        return report;
+    } finally {
+        logger.close();
+    }
 }
 
 /**
@@ -364,46 +372,48 @@ export async function scanWarm(
     const mode = options.daemon || DAEMON_MODE_AUTO;
     const logger = new Logger(config.logLevel, config.logFile);
 
-    if (mode !== DAEMON_MODE_OFF) {
-        if (mode === DAEMON_MODE_ON) await runLazyEnsureDaemon(config.root);
-        const warm = await runLazyWarmScan(config.root, config, buildWarmOptions(options, true));
-        if (warm) {
-            // Daemon reports arrive unfinalized (the daemon runs the raw scanner), so apply the
-            // same post-scan pipeline here with no in-process graph to reuse.
-            await finalizeReport(warm.report, config, options, logger, null);
-            logger.close();
-            return warm;
+    try {
+        if (mode !== DAEMON_MODE_OFF) {
+            if (mode === DAEMON_MODE_ON) await runLazyEnsureDaemon(config.root);
+            const warm = await runLazyWarmScan(config.root, config, buildWarmOptions(options, true), logger);
+            if (warm) {
+                // Daemon reports arrive unfinalized (the daemon runs the raw scanner), so apply the
+                // same post-scan pipeline here with no in-process graph to reuse.
+                await finalizeReport(warm.report, config, options, logger, null);
+                return warm;
+            }
         }
-    }
 
-    // ---- degrade to cold ----
-    const scanner = new Scanner(config, logger);
-    if (options.cache !== false) {
-        const cache = new CacheStore(options.cacheDir, config.root);
-        const cachedScan = await scanner.scanWithCache({ cache, cacheCustom: options.cacheCustom });
-        await finalizeReport(cachedScan.report, config, options, logger, scanner);
+        // ---- degrade to cold ----
+        const scanner = new Scanner(config, logger);
+        if (options.cache !== false) {
+            const cache = new CacheStore(options.cacheDir, config.root, { logger });
+            const cachedScan = await scanner.scanWithCache({ cache, cacheCustom: options.cacheCustom });
+            await finalizeReport(cachedScan.report, config, options, logger, scanner);
+            return cachedScan;
+        }
+        const report = await scanner.scan();
+        await finalizeReport(report, config, options, logger, scanner);
+        return {
+            report,
+            stats: {
+                daemonUsed: false,
+                l1Hit: 0,
+                l2Hit: 0,
+                cacheHit: 0,
+                cacheTotal: report.summary.filesScanned,
+                analyzed: report.summary.filesScanned,
+                poolWarm: false,
+                daemonMs: 0,
+                incrementalFiles: 0,
+                incrementalHit: 0,
+            },
+        };
+    } finally {
         logger.close();
-        return cachedScan;
     }
-    const report = await scanner.scan();
-    await finalizeReport(report, config, options, logger, scanner);
-    logger.close();
-    return {
-        report,
-        stats: {
-            daemonUsed: false,
-            l1Hit: 0,
-            l2Hit: 0,
-            cacheHit: 0,
-            cacheTotal: report.summary.filesScanned,
-            analyzed: report.summary.filesScanned,
-            poolWarm: false,
-            daemonMs: 0,
-            incrementalFiles: 0,
-            incrementalHit: 0,
-        },
-    };
 }
+
 
 /** Decode any Buffer content fields in DiffInput[] to UTF-16 strings (JSON-safe for daemon). */
 function decodeDiffs(diffs: DiffInput[]): DiffInput[] {
@@ -442,7 +452,7 @@ async function runInProcessDiff(
     const cache =
         options.cache === false
             ? new CacheStore(undefined, config.root, { disabled: true })
-            : new CacheStore(options.cacheDir, config.root);
+            : new CacheStore(options.cacheDir, config.root, { logger });
     const diffHintsByPath = new Map<string, DiffInput>(
         norm.map((diffInput) => [diffInput.filePath, diffInput]),
     );
@@ -463,7 +473,6 @@ async function runInProcessDiff(
         scanner,
         POST_SCAN_SCOPE_INCREMENTAL,
     );
-    logger.close();
     return { report: diffScanResult.report, stats: diffScanResult.stats };
 }
 
@@ -477,36 +486,40 @@ async function runDiff(
     const norm = decodeDiffs(diffs);
     const logger = new Logger(config.logLevel, config.logFile);
 
-    const mode = options.daemon || DAEMON_MODE_AUTO;
-    if (mode !== DAEMON_MODE_OFF) {
-        if (mode === DAEMON_MODE_ON) await runLazyEnsureDaemon(config.root);
-        const warm = await runLazyWarmScanDiff(config.root, config, norm, {
-            cache: options.cache !== false,
-            cacheDir: options.cacheDir,
-            cacheCustom: options.cacheCustom,
-            workers: options.workers,
-            parser: options.parser,
-            verifyDiskContent: options.verifyDiskContent !== false,
-            delta,
-        });
-        if (warm) {
-            // Incremental reports never carry cross-file passes (partial file set); they still
-            // get reasoned suppressions and baseline annotations, exactly like a full scan.
-            await finalizeReport(
-                warm.report as ScanReport,
-                config,
-                options as ScanOptions,
-                logger,
-                null,
-                POST_SCAN_SCOPE_INCREMENTAL,
-            );
-            logger.close();
-            return warm;
+    try {
+        const mode = options.daemon || DAEMON_MODE_AUTO;
+        if (mode !== DAEMON_MODE_OFF) {
+            if (mode === DAEMON_MODE_ON) await runLazyEnsureDaemon(config.root);
+            const warm = await runLazyWarmScanDiff(config.root, config, norm, {
+                cache: options.cache !== false,
+                cacheDir: options.cacheDir,
+                cacheCustom: options.cacheCustom,
+                workers: options.workers,
+                parser: options.parser,
+                verifyDiskContent: options.verifyDiskContent !== false,
+                delta,
+            }, logger);
+            if (warm) {
+                // Incremental reports never carry cross-file passes (partial file set); they still
+                // get reasoned suppressions and baseline annotations, exactly like a full scan.
+                await finalizeReport(
+                    warm.report as ScanReport,
+                    config,
+                    options as ScanOptions,
+                    logger,
+                    null,
+                    POST_SCAN_SCOPE_INCREMENTAL,
+                );
+                return warm;
+            }
         }
-    }
 
-    return runInProcessDiff({ config, norm, options, delta, logger });
+        return await runInProcessDiff({ config, norm, options, delta, logger });
+    } finally {
+        logger.close();
+    }
 }
+
 
 /**
  * Full diff scan (docs/03-incremental-and-diff/02-diff-interface-spec.md §1.4): returns a report
@@ -744,9 +757,9 @@ function handleScanError(error: unknown): number {
  * @returns Exit code after awaiting scan, finalization, and render; never rejects.
  */
 export async function scanAndRender(options: ScanOptions = {}): Promise<number> {
+    const config = resolveConfig(options);
+    const logger = new Logger(config.logLevel, config.logFile);
     try {
-        const config = resolveConfig(options);
-        const logger = new Logger(config.logLevel, config.logFile);
         const mode = options.daemon || DAEMON_MODE_OFF;
 
         if (options.showProfile && config.profile) {
@@ -778,12 +791,14 @@ export async function scanAndRender(options: ScanOptions = {}): Promise<number> 
                 printAutonomyAssessment(report.autonomy);
             }
         }
-        logger.close();
         return evaluateGateExitCode(report, config);
     } catch (error) {
         return handleScanError(error);
+    } finally {
+        logger.close();
     }
 }
+
 
 export { finalizeReport, recomputeSummary, groupCounts } from './core/reporting/reportFinalizer';
 

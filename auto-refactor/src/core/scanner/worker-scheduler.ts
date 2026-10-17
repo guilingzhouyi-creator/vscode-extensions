@@ -480,7 +480,10 @@ function stopWorkerGroup(workers: Worker[]): void {
     }
 }
 
-function printTimelineBatches(timeline: WorkerTelemetrySnapshot['timeline']): void {
+function printTimelineBatches(
+    timeline: WorkerTelemetrySnapshot['timeline'],
+    logger?: Logger,
+): void {
     const lines: string[] = [];
     for (const entry of timeline) {
         lines.push(
@@ -488,15 +491,19 @@ function printTimelineBatches(timeline: WorkerTelemetrySnapshot['timeline']): vo
         );
     }
     for (let i = 0; i < lines.length; i += TIMING_BATCH_LINES) {
-        console.error(
-            `[AR-TIMING main] batch: ${lines.slice(i, i + TIMING_BATCH_LINES).join(' | ')}`,
-        );
+        const text = `[AR-TIMING main] batch: ${lines.slice(i, i + TIMING_BATCH_LINES).join(' | ')}`;
+        if (logger) {
+            logger.debug(text);
+        } else {
+            console.error(text);
+        }
     }
 }
 
 function printMainTelemetryTable(
     timingTelemetry: WorkerTelemetrySnapshot,
     workerCount: number,
+    logger?: Logger,
 ): void {
     const wall = nowMs() - timingTelemetry.poolStart;
     const spawnTotal = timingTelemetry.spawnMs.reduce(
@@ -511,11 +518,20 @@ function printMainTelemetryTable(
     const idle = Math.max(0, wall - busy);
     const formatPercentage = (valueNum: number): string =>
         ((valueNum / Math.max(1, wall)) * TIMING_PERCENT_SCALE).toFixed(1);
-    console.error(
+
+    const logLine = (msg: string): void => {
+        if (logger) {
+            logger.debug(msg);
+        } else {
+            console.error(msg);
+        }
+    };
+
+    logLine(
         `[AR-TIMING main] poolWall=${wall.toFixed(1)}ms busy=${busy.toFixed(1)}ms(${formatPercentage(busy)}%) ` +
             `idle=${idle.toFixed(1)}ms(${formatPercentage(idle)}%)`,
     );
-    console.error(
+    logLine(
         `[AR-TIMING main] spawn=[${timingTelemetry.spawnMs.map((timingVal) => timingVal.toFixed(1)).join(',')}]ms firstMsg=[${timingTelemetry.firstMsgMs
             .map((timingVal) => timingVal.toFixed(1))
             .join(
@@ -523,7 +539,7 @@ function printMainTelemetryTable(
             )}]ms read=${timingTelemetry.readTotal.toFixed(1)}ms(${timingTelemetry.readCount} batches, avg=${(timingTelemetry.readTotal / Math.max(1, timingTelemetry.readCount)).toFixed(1)}, max=${Math.max(...timingTelemetry.readTimes, 0).toFixed(1)}) ` +
             `dispatchSync=${timingTelemetry.dispatchSyncTotal.toFixed(1)}ms merge=${timingTelemetry.mergeTotal.toFixed(1)}ms`,
     );
-    console.error(
+    logLine(
         `[AR-TIMING main] hybrid: k=${timingTelemetry.hybridK} files=${timingTelemetry.hybridFiles} done=${timingTelemetry.hybridDone} ` +
             `doneBeforeFirstWorkerMsg=${timingTelemetry.hybridDoneAtFirstMsg} ms=${timingTelemetry.hybridMs.toFixed(1)}ms`,
     );
@@ -545,13 +561,14 @@ function printMainTelemetryTable(
         ? rtAll.reduce((sumVal, currentVal) => sumVal + currentVal, 0) / rtAll.length
         : 0;
     const rtMax = rtAll.length ? Math.max(...rtAll) : 0;
-    console.error(
+    logLine(
         `[AR-TIMING main] roundTrips n=${rtAll.length} avg=${rtAvg.toFixed(1)}ms max=${rtMax.toFixed(1)}ms ` +
             `perWorkerBusy=[${perWorkerBusy.map((busyVal) => busyVal.toFixed(0)).join(',')}]ms ` +
             `perWorkerWaitGaps=[${perWorkerGaps.map((gapVal) => gapVal.toFixed(0)).join(',')}]ms`,
     );
-    printTimelineBatches(timingTelemetry.timeline);
+    printTimelineBatches(timingTelemetry.timeline, logger);
 }
+
 
 async function flushWorkerTelemetry(
     timingTelemetry: WorkerTelemetrySnapshot | null,
@@ -632,8 +649,18 @@ function applyWorkerMessageResults(
 export async function dispatchBatches(
     opts: DispatchOpts,
 ): Promise<{ issues: Issue[]; metric: FileMetric | null; symbols?: WorkerSymbolsPayload }[]> {
-    const { files, absRoot, config, descs, numWorkers, runAnalyzersFn, hybridK, keepAlive, fp } =
-        opts;
+    const {
+        files,
+        absRoot,
+        config,
+        descs,
+        numWorkers,
+        logger,
+        runAnalyzersFn,
+        hybridK,
+        keepAlive,
+        fp,
+    } = opts;
     if (files.length === 0) return [];
     const workerPath = path.resolve(__dirname, '..', WORKER_SCRIPT_FILE);
     const workerCount = Math.max(1, Math.min(numWorkers, files.length));
@@ -735,7 +762,7 @@ export async function dispatchBatches(
             }
             if (!timingTelemetry.flushing) {
                 timingTelemetry.flushing = true;
-                printMainTelemetryTable(timingTelemetry, workerCount);
+                printMainTelemetryTable(timingTelemetry, workerCount, logger);
                 void flushWorkerTelemetry(timingTelemetry, workers).then(() => {
                     finalizeAndResolve();
                 });

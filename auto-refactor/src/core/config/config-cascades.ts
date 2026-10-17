@@ -9,6 +9,7 @@
  * Exit Semantics & Design Rationale: Pure in-memory mutation of the analyzer map handed in; an
  *   explicit config-file or CLI level always wins over the built-in default.
  */
+import * as path from 'path';
 import type {
     AnalyzerDeclaration,
     CommentLevel,
@@ -482,6 +483,14 @@ export function assembleExecutionOptions(
 }
 
 /**
+ * Resolves an optional raw log file path relative to project root.
+ */
+function resolveLogFilePath(root: string, rawPath?: string): string | undefined {
+    if (!rawPath) return undefined;
+    return path.isAbsolute(rawPath) ? rawPath : path.resolve(root, rawPath);
+}
+
+/**
  * Assembles output, logging, baseline, and suppression reporting options.
  *
  * @param base - Baseline configuration.
@@ -497,15 +506,27 @@ export function assembleReportingOptions(
     ScanConfig,
     'format' | 'logLevel' | 'logFile' | 'suppressions' | 'baselineGranularity' | 'out'
 > {
+    const rawLogLevel =
+        (overrides.logLevel as LogLevel) ||
+        (process.env.AUTO_REFACTOR_LOG_LEVEL as LogLevel) ||
+        fileCfg.logLevel ||
+        base.logLevel;
+    const rawLogFile =
+        overrides.logFile ||
+        process.env.AUTO_REFACTOR_LOG_FILE ||
+        fileCfg.logFile ||
+        base.logFile;
+
     return {
         format: overrides.format || fileCfg.format || base.format,
-        logLevel: (overrides.logLevel as LogLevel) || fileCfg.logLevel || base.logLevel,
-        logFile: overrides.logFile || fileCfg.logFile || base.logFile,
+        logLevel: rawLogLevel,
+        logFile: resolveLogFilePath(base.root, rawLogFile),
         suppressions: fileCfg.suppressions ?? base.suppressions,
         baselineGranularity: fileCfg.baselineGranularity ?? base.baselineGranularity,
         out: overrides.out || fileCfg.out,
     };
 }
+
 
 /**
  * Merges layered literal governance policies into a single active configuration.
