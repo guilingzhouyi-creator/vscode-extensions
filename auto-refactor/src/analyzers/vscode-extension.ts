@@ -28,48 +28,129 @@ import {
     type PresentationLiteralPattern,
 } from '../core/patterns';
 
-const ACCEPTED_EXTENSIONS = ['.ts', '.js'];
+// ── File Extension & Source Masking Constants ──
+const EXT_TS = '.ts';
+const EXT_JS = '.js';
+const ACCEPTED_EXTENSIONS: readonly string[] = Object.freeze([EXT_TS, EXT_JS] as const);
 
-const TS_JS_MASK: SourceMaskConfig = {
-    lineComment: '//',
-    blockComment: { open: '/*', close: '*/' },
-    quoteChars: '"\'`',
+const MASK_LINE_COMMENT = '//';
+const MASK_BLOCK_OPEN = '/*';
+const MASK_BLOCK_CLOSE = '*/';
+const MASK_QUOTE_CHARS = '"\'`';
+
+const TS_JS_MASK: SourceMaskConfig = Object.freeze({
+    lineComment: MASK_LINE_COMMENT,
+    blockComment: Object.freeze({ open: MASK_BLOCK_OPEN, close: MASK_BLOCK_CLOSE }),
+    quoteChars: MASK_QUOTE_CHARS,
     multilineTemplates: true,
-};
+});
 
-const VSC_LIFECYCLE_PATTERN: ResourceLifecyclePattern = {
-    name: 'vsc-disposables',
+// ── Pattern Configuration Constants ──
+const TRACKING_WINDOW_LINES = 6;
+const PATTERN_NAME_DISPOSABLES = 'vsc-disposables';
+const PATTERN_NAME_BLOCKING_FS = 'vsc-blocking-fs';
+const PATTERN_NAME_NOTIFICATIONS = 'vsc-notifications';
+
+const VSC_LIFECYCLE_PATTERN: ResourceLifecyclePattern = Object.freeze({
+    name: PATTERN_NAME_DISPOSABLES,
     acquisitionPatterns: [
         /(?:vscode\.)?(?:commands\.(?:registerCommand|registerTextEditorCommand)|window\.onDidChange\w+|workspace\.onDidChange\w+|languages\.register\w+)\s*\(/,
     ],
     containerPatterns: [/(?:subscriptions|context\.subscriptions)\.push\s*\(/],
-    trackingWindowLines: 6,
-};
+    trackingWindowLines: TRACKING_WINDOW_LINES,
+});
 
-const VSC_BLOCKING_PATTERN: BlockingCallPattern = {
-    name: 'vsc-blocking-fs',
+const VSC_BLOCKING_PATTERN: BlockingCallPattern = Object.freeze({
+    name: PATTERN_NAME_BLOCKING_FS,
     blockingCalls: [
         /\bfs\.(?:readFileSync|writeFileSync|appendFileSync|mkdirSync|rmSync|unlinkSync)\s*\(/,
     ],
-};
+});
 
-const VSC_I18N_PATTERN: PresentationLiteralPattern = {
-    name: 'vsc-notifications',
+const VSC_I18N_PATTERN: PresentationLiteralPattern = Object.freeze({
+    name: PATTERN_NAME_NOTIFICATIONS,
     presentationSinks: [
         /(?:vscode\.)?window\.(?:showInformationMessage|showWarningMessage|showErrorMessage|setStatusBarMessage)\s*\(\s*(['"`][^'"`]+['"`])/,
     ],
     i18nWrappers: [/(?:vscode\.l10n\.t|l10n\.t|i18n\.t|localize|t)\s*\(/],
-};
+});
 
-function makeVscIssue(
-    file: string,
-    line: number,
-    rule: string,
-    severity: Severity,
-    message: string,
-    suggestion: string,
-    detail: Record<string, unknown>,
-): Issue {
+// ── Numerical Window & Layout Limits ──
+const COLLECTION_WINDOW_BEFORE = 4;
+const COLLECTION_WINDOW_AFTER = 5;
+const FORM_A11Y_WINDOW_BEFORE = 2;
+const FORM_A11Y_WINDOW_AFTER = 3;
+
+// ── Query Tokens & Format Constants ──
+const REASON_UNREGISTERED = 'unregistered';
+const THEME_CSS_VAR_PREFIX = 'var(--vscode-';
+const DEFAULT_FORM_TAG = 'input';
+const LINE_BREAK = '\n';
+
+// ── Frozen Monochrome Palette Set (O(1) Search, Zero Transient Allocations) ──
+const MONOCHROME_COLORS: ReadonlySet<string> = new Set([
+    '#000',
+    '#000000',
+    '#fff',
+    '#ffffff',
+    'black',
+    'white',
+]);
+
+// ── Regular Expression for Exempt Path Matching ──
+const EXEMPT_PATH_RE = /(?:^|\/)(?:tests?|fixtures|scripts)\/|\.(?:test|spec)\./;
+
+// ── Diagnostic Messages & Suggestions (SSOT) ──
+const MSG_MEM_UNREGISTERED =
+    'VS Code Disposable resource created without subscription registration.';
+const SUGG_MEM_UNREGISTERED =
+    'Wrap call in context.subscriptions.push(...) or track in a composite Disposable.';
+const SUGG_MEM_TRACK_VARIABLE =
+    'Push the disposable variable to context.subscriptions to prevent memory leak upon reload.';
+
+const MSG_PERF_BLOCKING_FS =
+    'Synchronous file I/O call on Extension Host main thread risks freezing the IDE editor UI.';
+const SUGG_PERF_BLOCKING_FS =
+    'Replace synchronous fs call with asynchronous fs.promises or vscode.workspace.fs.';
+
+const SUGG_I18N_LOCALIZE =
+    'Wrap user-facing messages in vscode.l10n.t(...) or import strings from the bilingual dictionary.';
+
+const MSG_UI_UNBOUNDED_COLLECTION =
+    'Webview collection list rendering lacks bounded density or folding controls.';
+const SUGG_UI_UNBOUNDED_COLLECTION =
+    'Add .slice(0, threshold) or collapse/expand controls to prevent unbounded UI height.';
+
+const SUGG_UI_THEME_CSS_VARS =
+    'Replace hardcoded color with var(--vscode-*) or adaptive color scheme variable.';
+
+const SUGG_PERF_LAYOUT_TRANSITIONS =
+    "Replace geometry transition with GPU-accelerated 'transform' (e.g. scaleX/scaleY) or 'opacity'.";
+
+const SUGG_UI_A11Y_FORM_LABELS =
+    "Add 'aria-label', 'aria-labelledby', or associate with a '<label for=\"...\">'.";
+
+const MSG_UI_DYNAMIC_BORDER_JITTER =
+    'Webview interactive state style changes must not dynamically modify border width triggering layout jitter.';
+const SUGG_UI_DYNAMIC_BORDER_JITTER =
+    'Use box-shadow: inset 0 0 0 <width> <color> or static transparent borders for hover/active states.';
+
+/**
+ * Strongly typed parameter object for constructing domain Issues.
+ * Eliminates GOV-DAT-001 by encapsulating discrete parameters into a single contract.
+ */
+interface VscIssueParams {
+    readonly file: string;
+    readonly line: number;
+    readonly rule: string;
+    readonly severity: Severity;
+    readonly message: string;
+    readonly suggestion: string;
+    readonly detail: Record<string, unknown>;
+}
+
+function makeVscIssue(params: VscIssueParams): Issue {
+    const { file, line, rule, severity, message, suggestion, detail } = params;
     return {
         id: `${ANALYZER_VSCODE_EXTENSION}:${rule}:${file}:${line}`,
         analyzer: ANALYZER_VSCODE_EXTENSION,
@@ -83,19 +164,7 @@ function makeVscIssue(
 }
 
 function isExemptPath(file: string): boolean {
-    const lower = file.toLowerCase();
-    return (
-        lower.startsWith('test/') ||
-        lower.startsWith('tests/') ||
-        lower.startsWith('fixtures/') ||
-        lower.startsWith('scripts/') ||
-        lower.includes('/test/') ||
-        lower.includes('/tests/') ||
-        lower.includes('/fixtures/') ||
-        lower.includes('/scripts/') ||
-        lower.includes('.test.') ||
-        lower.includes('.spec.')
-    );
+    return EXEMPT_PATH_RE.test(file.toLowerCase());
 }
 
 /**
@@ -138,19 +207,24 @@ export class VscodeExtensionAnalyzer implements Analyzer {
         // 1. VSC-MEM-001 via generalized lifecycle matcher
         const lifecycleViolations = matchResourceLifecycle(masked, VSC_LIFECYCLE_PATTERN);
         for (const v of lifecycleViolations) {
-            const msg =
-                v.reason === 'unregistered'
-                    ? 'VS Code Disposable resource created without subscription registration.'
-                    : `Disposable '${v.resourceIdentifier}' is not registered into context.subscriptions.`;
-            const sugg =
-                v.reason === 'unregistered'
-                    ? 'Wrap call in context.subscriptions.push(...) or track in a composite Disposable.'
-                    : 'Push the disposable variable to context.subscriptions to prevent memory leak upon reload.';
+            const isUnregistered = v.reason === REASON_UNREGISTERED;
+            const msg = isUnregistered
+                ? MSG_MEM_UNREGISTERED
+                : `Disposable '${v.resourceIdentifier}' is not registered into context.subscriptions.`;
+            const sugg = isUnregistered ? SUGG_MEM_UNREGISTERED : SUGG_MEM_TRACK_VARIABLE;
             issues.push(
-                makeVscIssue(file, v.line, 'VSC-MEM-001', SEVERITY_ERROR, msg, sugg, {
+                makeVscIssue({
+                    file,
                     line: v.line,
-                    text: v.rawText,
-                    variable: v.resourceIdentifier,
+                    rule: 'VSC-MEM-001',
+                    severity: SEVERITY_ERROR,
+                    message: msg,
+                    suggestion: sugg,
+                    detail: {
+                        line: v.line,
+                        text: v.rawText,
+                        variable: v.resourceIdentifier,
+                    },
                 }),
             );
         }
@@ -159,15 +233,15 @@ export class VscodeExtensionAnalyzer implements Analyzer {
         const blockingViolations = matchBlockingCalls(masked, VSC_BLOCKING_PATTERN);
         for (const b of blockingViolations) {
             issues.push(
-                makeVscIssue(
+                makeVscIssue({
                     file,
-                    b.line,
-                    'VSC-PERF-001',
-                    SEVERITY_WARNING,
-                    'Synchronous file I/O call on Extension Host main thread risks freezing the IDE editor UI.',
-                    'Replace synchronous fs call with asynchronous fs.promises or vscode.workspace.fs.',
-                    { line: b.line, call: b.callName },
-                ),
+                    line: b.line,
+                    rule: 'VSC-PERF-001',
+                    severity: SEVERITY_WARNING,
+                    message: MSG_PERF_BLOCKING_FS,
+                    suggestion: SUGG_PERF_BLOCKING_FS,
+                    detail: { line: b.line, call: b.callName },
+                }),
             );
         }
 
@@ -175,15 +249,15 @@ export class VscodeExtensionAnalyzer implements Analyzer {
         const i18nViolations = matchPresentationLiterals(raw, VSC_I18N_PATTERN);
         for (const lit of i18nViolations) {
             issues.push(
-                makeVscIssue(
+                makeVscIssue({
                     file,
-                    lit.line,
-                    'VSC-I18N-001',
-                    SEVERITY_WARNING,
-                    `User-facing notification contains hardcoded string literal ${lit.literalText} without localization.`,
-                    'Wrap user-facing messages in vscode.l10n.t(...) or import strings from the bilingual dictionary.',
-                    { line: lit.line, text: lit.literalText },
-                ),
+                    line: lit.line,
+                    rule: 'VSC-I18N-001',
+                    severity: SEVERITY_WARNING,
+                    message: `User-facing notification contains hardcoded string literal ${lit.literalText} without localization.`,
+                    suggestion: SUGG_I18N_LOCALIZE,
+                    detail: { line: lit.line, text: lit.literalText },
+                }),
             );
         }
 
@@ -191,15 +265,15 @@ export class VscodeExtensionAnalyzer implements Analyzer {
         const uiFoldingViolations = this.detectUnboundedCollectionRendering(raw, masked);
         for (const f of uiFoldingViolations) {
             issues.push(
-                makeVscIssue(
+                makeVscIssue({
                     file,
-                    f.line,
-                    'VSC-UI-001',
-                    SEVERITY_WARNING,
-                    'Webview collection list rendering lacks bounded density or folding controls.',
-                    'Add .slice(0, threshold) or collapse/expand controls to prevent unbounded UI height.',
-                    { line: f.line, text: f.text },
-                ),
+                    line: f.line,
+                    rule: 'VSC-UI-001',
+                    severity: SEVERITY_WARNING,
+                    message: MSG_UI_UNBOUNDED_COLLECTION,
+                    suggestion: SUGG_UI_UNBOUNDED_COLLECTION,
+                    detail: { line: f.line, text: f.text },
+                }),
             );
         }
 
@@ -207,15 +281,15 @@ export class VscodeExtensionAnalyzer implements Analyzer {
         const colorViolations = this.detectHardcodedThemeColors(raw);
         for (const c of colorViolations) {
             issues.push(
-                makeVscIssue(
+                makeVscIssue({
                     file,
-                    c.line,
-                    'VSC-UI-002',
-                    SEVERITY_ERROR,
-                    `Webview UI contains hardcoded color '${c.color}' instead of theme CSS variables.`,
-                    'Replace hardcoded color with var(--vscode-*) or adaptive color scheme variable.',
-                    { line: c.line, text: c.text, color: c.color },
-                ),
+                    line: c.line,
+                    rule: 'VSC-UI-002',
+                    severity: SEVERITY_ERROR,
+                    message: `Webview UI contains hardcoded color '${c.color}' instead of theme CSS variables.`,
+                    suggestion: SUGG_UI_THEME_CSS_VARS,
+                    detail: { line: c.line, text: c.text, color: c.color },
+                }),
             );
         }
 
@@ -223,15 +297,15 @@ export class VscodeExtensionAnalyzer implements Analyzer {
         const layoutTransitionViolations = this.detectLayoutTransitions(raw);
         for (const t of layoutTransitionViolations) {
             issues.push(
-                makeVscIssue(
+                makeVscIssue({
                     file,
-                    t.line,
-                    'VSC-PERF-002',
-                    SEVERITY_WARNING,
-                    `Webview CSS transition directly animates geometry layout property '${t.prop}' triggering expensive browser reflow.`,
-                    "Replace geometry transition with GPU-accelerated 'transform' (e.g. scaleX/scaleY) or 'opacity'.",
-                    { line: t.line, text: t.text, prop: t.prop },
-                ),
+                    line: t.line,
+                    rule: 'VSC-PERF-002',
+                    severity: SEVERITY_WARNING,
+                    message: `Webview CSS transition directly animates geometry layout property '${t.prop}' triggering expensive browser reflow.`,
+                    suggestion: SUGG_PERF_LAYOUT_TRANSITIONS,
+                    detail: { line: t.line, text: t.text, prop: t.prop },
+                }),
             );
         }
 
@@ -240,15 +314,15 @@ export class VscodeExtensionAnalyzer implements Analyzer {
         const a11yViolations = this.detectInaccessibleFormControls(raw);
         for (const a of a11yViolations) {
             issues.push(
-                makeVscIssue(
+                makeVscIssue({
                     file,
-                    a.line,
-                    'VSC-UI-003',
-                    SEVERITY_WARNING,
-                    `Webview interactive <${a.tag}> form control lacks accessible label binding (WCAG 4.1.2).`,
-                    "Add 'aria-label', 'aria-labelledby', or associate with a '<label for=\"...\">'.",
-                    { line: a.line, text: a.text, tag: a.tag },
-                ),
+                    line: a.line,
+                    rule: 'VSC-UI-003',
+                    severity: SEVERITY_WARNING,
+                    message: `Webview interactive <${a.tag}> form control lacks accessible label binding (WCAG 4.1.2).`,
+                    suggestion: SUGG_UI_A11Y_FORM_LABELS,
+                    detail: { line: a.line, text: a.text, tag: a.tag },
+                }),
             );
         }
 
@@ -256,15 +330,15 @@ export class VscodeExtensionAnalyzer implements Analyzer {
         const borderJitterViolations = this.detectDynamicBorderJitter(raw);
         for (const b of borderJitterViolations) {
             issues.push(
-                makeVscIssue(
+                makeVscIssue({
                     file,
-                    b.line,
-                    'VSC-UI-004',
-                    SEVERITY_WARNING,
-                    'Webview interactive state style changes must not dynamically modify border width triggering layout jitter.',
-                    'Use box-shadow: inset 0 0 0 <width> <color> or static transparent borders for hover/active states.',
-                    { line: b.line, text: b.text },
-                ),
+                    line: b.line,
+                    rule: 'VSC-UI-004',
+                    severity: SEVERITY_WARNING,
+                    message: MSG_UI_DYNAMIC_BORDER_JITTER,
+                    suggestion: SUGG_UI_DYNAMIC_BORDER_JITTER,
+                    detail: { line: b.line, text: b.text },
+                }),
             );
         }
 
@@ -286,9 +360,9 @@ export class VscodeExtensionAnalyzer implements Analyzer {
                     /`[^`]*(?:<tr|<li|<div|<option)/i.test(rawLines[i + 1]));
 
             if (isMapping) {
-                const windowStart = Math.max(0, i - 4);
-                const windowEnd = Math.min(rawLines.length, i + 5);
-                const surrounding = rawLines.slice(windowStart, windowEnd).join('\n');
+                const windowStart = Math.max(0, i - COLLECTION_WINDOW_BEFORE);
+                const windowEnd = Math.min(rawLines.length, i + COLLECTION_WINDOW_AFTER);
+                const surrounding = rawLines.slice(windowStart, windowEnd).join(LINE_BREAK);
                 const hasBounds =
                     /(?:\.slice\s*\(|isExpanded|expanded|fold|collapse|limit|maxCount|truncate|showAll|threshold)/i.test(
                         surrounding,
@@ -315,8 +389,7 @@ export class VscodeExtensionAnalyzer implements Analyzer {
             const m = colorRe.exec(line);
             if (m) {
                 const matchedColor = m[1].toLowerCase();
-                const monochrome = ['#000', '#000000', '#fff', '#ffffff', 'black', 'white'];
-                if (monochrome.includes(matchedColor) && !line.includes('var(--vscode-')) {
+                if (MONOCHROME_COLORS.has(matchedColor) && !line.includes(THEME_CSS_VAR_PREFIX)) {
                     violations.push({ line: i + 1, text: line.trim(), color: m[1] });
                 }
             }
@@ -345,25 +418,25 @@ export class VscodeExtensionAnalyzer implements Analyzer {
         const violations: Array<{ line: number; text: string; tag: string }> = [];
         for (let i = 0; i < rawLines.length; i++) {
             const line = rawLines[i];
-            if (/<(?:input|select)\b/i.test(line)) {
-                if (/type\s*=\s*['"]hidden['"]/i.test(line)) continue;
-                const hasA11y =
-                    /aria-label|aria-labelledby|role\s*=\s*['"]switch['"]/i.test(line) ||
-                    /<label\b[^>]*\bfor\s*=/i.test(line);
-                if (!hasA11y) {
-                    const windowStart = Math.max(0, i - 2);
-                    const windowEnd = Math.min(rawLines.length, i + 3);
-                    const surrounding = rawLines.slice(windowStart, windowEnd).join('\n');
-                    const windowHasA11y =
-                        /aria-label|aria-labelledby|role\s*=\s*['"]switch['"]|<label\b[^>]*\bfor\s*=/i.test(
-                            surrounding,
-                        );
-                    if (!windowHasA11y) {
-                        const tag = /<([a-z]+)/i.exec(line)?.[1] ?? 'input';
-                        violations.push({ line: i + 1, text: line.trim(), tag });
-                    }
-                }
-            }
+            if (!/<(?:input|select)\b/i.test(line)) continue;
+            if (/type\s*=\s*['"]hidden['"]/i.test(line)) continue;
+
+            const hasA11y =
+                /aria-label|aria-labelledby|role\s*=\s*['"]switch['"]/i.test(line) ||
+                /<label\b[^>]*\bfor\s*=/i.test(line);
+            if (hasA11y) continue;
+
+            const windowStart = Math.max(0, i - FORM_A11Y_WINDOW_BEFORE);
+            const windowEnd = Math.min(rawLines.length, i + FORM_A11Y_WINDOW_AFTER);
+            const surrounding = rawLines.slice(windowStart, windowEnd).join(LINE_BREAK);
+            const windowHasA11y =
+                /aria-label|aria-labelledby|role\s*=\s*['"]switch['"]|<label\b[^>]*\bfor\s*=/i.test(
+                    surrounding,
+                );
+            if (windowHasA11y) continue;
+
+            const tag = /<([a-z]+)/i.exec(line)?.[1] ?? DEFAULT_FORM_TAG;
+            violations.push({ line: i + 1, text: line.trim(), tag });
         }
         return violations;
     }

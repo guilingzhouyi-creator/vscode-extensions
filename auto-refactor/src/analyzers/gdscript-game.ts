@@ -22,16 +22,22 @@ import {
     type BoundaryIsolationPattern,
 } from '../core/patterns';
 
-const ACCEPTED_EXTENSIONS = ['.gd'];
+const EXT_GD = '.gd';
+const ACCEPTED_EXTENSIONS: readonly string[] = Object.freeze([EXT_GD] as const);
 
-const GD_MASK: SourceMaskConfig = {
-    lineComment: '#',
-    quoteChars: '"\'`',
+const GD_COMMENT_CHAR = '#';
+const GD_QUOTE_CHARS = '"\'`';
+
+const GD_MASK: SourceMaskConfig = Object.freeze({
+    lineComment: GD_COMMENT_CHAR,
+    quoteChars: GD_QUOTE_CHARS,
     multilineTemplates: false,
-};
+});
 
-const GAME_HOT_PATH_PATTERN: HotPathPattern = {
-    name: 'gdscript-process-loops',
+const HOT_PATH_PATTERN_NAME = 'gdscript-process-loops';
+
+const GAME_HOT_PATH_PATTERN: HotPathPattern = Object.freeze({
+    name: HOT_PATH_PATTERN_NAME,
     hotPathScopes: [
         /\bfunc\s+(?:_process|_physics_process)\s*\([^)]*\)\s*:/,
         /\b(?:for|while)\b.*:/,
@@ -43,44 +49,114 @@ const GAME_HOT_PATH_PATTERN: HotPathPattern = {
         /\{\s*\}/,
     ],
     poolExemptions: [/\.acquire\s*\(/, /\.reset_state\s*\(/],
-};
+});
 
-const GAME_ISOLATION_PATTERN: BoundaryIsolationPattern = {
-    name: 'gdscript-domain-isolation',
-    sourceLayerIndicators: [
-        '/domain/',
-        '/domains/',
-        '/logic/',
-        '/model/',
-        '/entities/',
-        'extends RefCounted',
-        'extends Resource',
-        '@domain',
-        '@pure-logic',
-    ],
-    forbiddenTargets: [
-        'extends Node',
-        'extends Control',
-        'extends Node2D',
-        'extends Node3D',
-        'extends CanvasItem',
-        'EventBus',
-        'get_node(',
-        '$"',
-        "$' ",
-    ],
-    reason: 'Pure domain logic must remain decoupled from Godot scene tree and global EventBus',
-};
+const ISOLATION_PATTERN_NAME = 'gdscript-domain-isolation';
+const ISOLATION_REASON =
+    'Pure domain logic must remain decoupled from Godot scene tree and global EventBus';
 
-function makeGameIssue(
-    file: string,
-    line: number,
-    rule: string,
-    severity: Severity,
-    message: string,
-    suggestion: string,
-    detail: Record<string, unknown>,
-): Issue {
+const SOURCE_LAYER_INDICATORS: readonly string[] = Object.freeze([
+    '/domain/',
+    '/domains/',
+    '/logic/',
+    '/model/',
+    '/entities/',
+    'extends RefCounted',
+    'extends Resource',
+    '@domain',
+    '@pure-logic',
+] as const);
+
+const FORBIDDEN_TARGETS: readonly string[] = Object.freeze([
+    'extends Node',
+    'extends Control',
+    'extends Node2D',
+    'extends Node3D',
+    'extends CanvasItem',
+    'EventBus',
+    'get_node(',
+    '$"',
+    "$' ",
+] as const);
+
+const GAME_ISOLATION_PATTERN: BoundaryIsolationPattern = Object.freeze({
+    name: ISOLATION_PATTERN_NAME,
+    sourceLayerIndicators: SOURCE_LAYER_INDICATORS,
+    forbiddenTargets: FORBIDDEN_TARGETS,
+    reason: ISOLATION_REASON,
+});
+
+const EXEMPT_PATH_RE = /(?:^|\/)(?:tests?|fixtures|scripts)\//i;
+
+function isExemptPath(file: string): boolean {
+    return EXEMPT_PATH_RE.test(file);
+}
+
+const KEYWORD_POOL = 'pool';
+const KEYWORD_FACTORY = 'factory';
+
+const POOL_ACQUIRE_NAMES: ReadonlySet<string> = new Set(['acquire', 'get_obj']);
+const POOL_RESET_NAMES: ReadonlySet<string> = new Set(['reset_state']);
+
+const FUNC_DEF_RE = /^\s*func\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/;
+const RESET_STATE_CALL_RE = /(?:\.|\b)(reset_state)\s*\(/;
+const SIGNAL_CONNECT_RE = /\.connect\s*\(/;
+const SIGNAL_DISCONNECT_RE = /\.disconnect\s*\(/;
+
+const MSG_POOL_MISSING_RESET = 'Object pool acquisition logic missing reset_state() contract.';
+const SUGGEST_POOL_MISSING_RESET =
+    'Ensure recycled objects invoke reset_state() before returning to caller to avoid state corruption.';
+
+const SUGGEST_SIGNAL_LEAK =
+    'Ensure dynamic signal connections are disconnected in cleanup or use one-shot flags.';
+
+const SUGGEST_HOT_PATH_ALLOC =
+    'Pre-allocate collections outside loops, use object pools, or reuse buffer instances.';
+
+const SUGGEST_DOMAIN_ISOLATION =
+    'Decouple domain logic from scene tree. Use dependency injection, data snapshots, or pure state machine.';
+
+/** Structured diagnostic messaging catalog for GDScript game domain rules. */
+const GAME_DIAGNOSTICS = Object.freeze({
+    poolMissingReset: {
+        message: MSG_POOL_MISSING_RESET,
+        suggestion: SUGGEST_POOL_MISSING_RESET,
+    },
+    signalLeak: {
+        suggestion: SUGGEST_SIGNAL_LEAK,
+    },
+    hotPath: {
+        suggestion: SUGGEST_HOT_PATH_ALLOC,
+    },
+    isolation: {
+        suggestion: SUGGEST_DOMAIN_ISOLATION,
+    },
+});
+
+function formatSignalLeakMessage(connectCount: number, disconnectCount: number): string {
+    return `Potential signal leak: ${connectCount} connects vs ${disconnectCount} disconnects without lifecycle cleanup.`;
+}
+
+function formatHotPathMessage(allocationType: string): string {
+    return `Transient heap allocation (${allocationType}) in loop or hot path risks frame drops.`;
+}
+
+function formatIsolationMessage(targetIdentifier: string): string {
+    return `Domain logic imports/references presentation or scene node '${targetIdentifier}'.`;
+}
+
+interface GameIssueParams {
+    readonly file: string;
+    readonly line: number;
+    readonly rule: string;
+    readonly severity: Severity;
+    readonly message: string;
+    readonly suggestion: string;
+    readonly detail: Record<string, unknown>;
+}
+
+function makeGameIssue(params: GameIssueParams): Issue {
+    const { file, line, rule, severity, message, suggestion, detail } = params;
     return {
         id: `${ANALYZER_GDSCRIPT_GAME}:${rule}:${file}:${line}`,
         analyzer: ANALYZER_GDSCRIPT_GAME,
@@ -93,30 +169,8 @@ function makeGameIssue(
     };
 }
 
-function isExemptPath(file: string): boolean {
-    const lower = file.toLowerCase();
-    return (
-        lower.startsWith('test/') ||
-        lower.startsWith('tests/') ||
-        lower.startsWith('fixtures/') ||
-        lower.startsWith('scripts/') ||
-        lower.includes('/test/') ||
-        lower.includes('/tests/') ||
-        lower.includes('/fixtures/') ||
-        lower.includes('/scripts/')
-    );
-}
-
-const POOL_ACQUIRE_NAMES: ReadonlySet<string> = new Set(['acquire', 'get_obj']);
-const POOL_RESET_NAMES: ReadonlySet<string> = new Set(['reset_state']);
-
-const FUNC_DEF_RE = /^\s*func\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/;
-const RESET_STATE_CALL_RE = /(?:\.|\b)(reset_state)\s*\(/;
-const SIGNAL_CONNECT_RE = /\.connect\s*\(/;
-const SIGNAL_DISCONNECT_RE = /\.disconnect\s*\(/;
-
 function auditPoolContracts(file: string, raw: readonly string[], issues: Issue[]): void {
-    const isPoolFile = file.includes('pool') || file.includes('factory');
+    const isPoolFile = file.includes(KEYWORD_POOL) || file.includes(KEYWORD_FACTORY);
     if (!isPoolFile) return;
 
     let hasAcquireOrGet = false;
@@ -135,15 +189,15 @@ function auditPoolContracts(file: string, raw: readonly string[], issues: Issue[
 
     if (hasAcquireOrGet && !hasResetInvocation) {
         issues.push(
-            makeGameIssue(
+            makeGameIssue({
                 file,
-                1,
-                'GDM-POL-001',
-                SEVERITY_ERROR,
-                'Object pool acquisition logic missing reset_state() contract.',
-                'Ensure recycled objects invoke reset_state() before returning to caller to avoid state corruption.',
-                { file },
-            ),
+                line: 1,
+                rule: 'GDM-POL-001',
+                severity: SEVERITY_ERROR,
+                message: GAME_DIAGNOSTICS.poolMissingReset.message,
+                suggestion: GAME_DIAGNOSTICS.poolMissingReset.suggestion,
+                detail: { file },
+            }),
         );
     }
 }
@@ -159,15 +213,15 @@ function auditSignalConnections(file: string, masked: readonly string[], issues:
 
     if (connectCount > disconnectCount + 2) {
         issues.push(
-            makeGameIssue(
+            makeGameIssue({
                 file,
-                1,
-                'GDM-SIG-001',
-                SEVERITY_WARNING,
-                `Potential signal leak: ${connectCount} connects vs ${disconnectCount} disconnects without lifecycle cleanup.`,
-                'Ensure dynamic signal connections are disconnected in cleanup or use one-shot flags.',
-                { connects: connectCount, disconnects: disconnectCount },
-            ),
+                line: 1,
+                rule: 'GDM-SIG-001',
+                severity: SEVERITY_WARNING,
+                message: formatSignalLeakMessage(connectCount, disconnectCount),
+                suggestion: GAME_DIAGNOSTICS.signalLeak.suggestion,
+                detail: { connects: connectCount, disconnects: disconnectCount },
+            }),
         );
     }
 }
@@ -213,15 +267,15 @@ export class GdscriptGameAnalyzer implements Analyzer {
         const hotViolations = matchHotPathAllocations(masked, GAME_HOT_PATH_PATTERN);
         for (const h of hotViolations) {
             issues.push(
-                makeGameIssue(
+                makeGameIssue({
                     file,
-                    h.line,
-                    'GDM-PRF-001',
-                    SEVERITY_ERROR,
-                    `Transient heap allocation (${h.allocationType}) in loop or hot path risks frame drops.`,
-                    'Pre-allocate collections outside loops, use object pools, or reuse buffer instances.',
-                    { line: h.line, text: h.rawText, scope: h.scopeName },
-                ),
+                    line: h.line,
+                    rule: 'GDM-PRF-001',
+                    severity: SEVERITY_ERROR,
+                    message: formatHotPathMessage(h.allocationType),
+                    suggestion: GAME_DIAGNOSTICS.hotPath.suggestion,
+                    detail: { line: h.line, text: h.rawText, scope: h.scopeName },
+                }),
             );
         }
 
@@ -235,15 +289,15 @@ export class GdscriptGameAnalyzer implements Analyzer {
         const isoViolations = matchBoundaryIsolation(file, masked, GAME_ISOLATION_PATTERN);
         for (const iso of isoViolations) {
             issues.push(
-                makeGameIssue(
+                makeGameIssue({
                     file,
-                    iso.line,
-                    'GDM-ISO-001',
-                    SEVERITY_ERROR,
-                    `Domain logic imports/references presentation or scene node '${iso.targetIdentifier}'.`,
-                    'Decouple domain logic from scene tree. Use dependency injection, data snapshots, or pure state machine.',
-                    { line: iso.line, text: iso.rawText, target: iso.targetIdentifier },
-                ),
+                    line: iso.line,
+                    rule: 'GDM-ISO-001',
+                    severity: SEVERITY_ERROR,
+                    message: formatIsolationMessage(iso.targetIdentifier),
+                    suggestion: GAME_DIAGNOSTICS.isolation.suggestion,
+                    detail: { line: iso.line, text: iso.rawText, target: iso.targetIdentifier },
+                }),
             );
         }
 
