@@ -55,13 +55,20 @@ static func handle_esc_action(req: ClientRequestEnvelopeDTO, gateway: WorldGatew
 			var slot_id: String = str(req.payload.get("slot_id", "SLOT_01"))
 			var mode: int = int(req.payload.get("game_mode", WorldGatewayModel.GameMode.SINGLE_PLAYER))
 			var path_safety := SaveReadinessGuard.evaluate_storage_path_safety("user://offline_vault/%s.sav" % slot_id.to_lower(), mode)
-			if not bool(path_safety.get("is_safe", false)):
+			if not bool(path_safety.get("safe", path_safety.get("is_safe", false))):
 				return UnifiedProtocolFactory.create_response(
 					req.request_id, false, path_safety, "ERR_STORAGE_UNSAFE", "存储路径不符合模式隔离规范"
 				)
 
-			var raw_game_data: Variant = req.payload.get("game_data", {})
-			var game_data: Dictionary = (raw_game_data as Dictionary).duplicate(true) if raw_game_data is Dictionary else {}
+			var raw_game_data: Variant = req.payload.get("game_data", null)
+			var game_data: Dictionary = {}
+			if raw_game_data is Dictionary and not (raw_game_data as Dictionary).is_empty():
+				game_data = (raw_game_data as Dictionary).duplicate(true)
+			else:
+				game_data = {
+					"slot_id": slot_id,
+					"saved_at": Time.get_unix_time_from_system()
+				}
 			var save_res := SaveDataAccessLayer.save_game(slot_id, game_data)
 			var ok := bool(save_res.get("success", false))
 			return UnifiedProtocolFactory.create_response(

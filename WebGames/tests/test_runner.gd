@@ -52,6 +52,10 @@ func _initialize() -> void:
 			var domain_name: String = test_cls.resource_path if (test_cls is Resource and not test_cls.resource_path.is_empty()) else "未实现套件"
 			print("[ FAIL ] === %s === (0/1 PASS)" % domain_name)
 			print("    ❌  测试套件未暴露 run_all_tests() 入口")
+			if test_cls is GDScript:
+				var can_inst: bool = test_cls.can_instantiate()
+				var reload_code: int = test_cls.reload()
+				print("        [DEBUG] can_instantiate=%s, reload=%d" % [can_inst, reload_code])
 			print("")
 			total_assertions += 1
 			failure_reports.append({ "domain": domain_name, "test": "未暴露 run_all_tests() 入口" })
@@ -76,16 +80,20 @@ func _initialize() -> void:
 			passed_domains += 1
 			print("[ PASS ] === %s === (%d/%d PASS)" % [domain_name, p_cnt, t_cnt])
 			for item in res_list:
-				print("    ✅  %s" % item.get("test", "未命名测试项"))
+				print("    ✅  %s" % item.get("test", item.get("name", item.get("title", "未命名测试项"))))
 		else:
 			print("[ FAIL ] === %s === (%d/%d PASS)" % [domain_name, p_cnt, t_cnt])
 			for item in res_list:
 				var t_pass: bool = item.get("passed", false)
-				var t_name: String = item.get("test", "未命名测试项")
+				var t_name: String = item.get("test", item.get("name", item.get("title", "未命名测试项")))
 				if t_pass:
 					print("    ✅  %s" % t_name)
 				else:
-					print("    ❌  %s [FAILED]" % t_name)
+					var detail_msg: String = str(item.get("detail", item.get("message", item.get("error", ""))))
+					if detail_msg != "":
+						print("    ❌  %s [FAILED]: %s" % [t_name, detail_msg])
+					else:
+						print("    ❌  %s [FAILED]" % t_name)
 					failure_reports.append({ "domain": domain_name, "test": t_name })
 			if res_list.is_empty():
 				print("    ❌  测试套件未返回任何结果项")

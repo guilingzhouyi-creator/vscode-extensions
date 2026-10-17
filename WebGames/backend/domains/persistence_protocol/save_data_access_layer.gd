@@ -165,9 +165,6 @@ static func save_game(slot_name: String, payload: Dictionary = {}) -> Dictionary
 	var target_payload := payload
 	if target_payload.is_empty():
 		target_payload = build_save_payload()
-		var dd: Dictionary = target_payload.get("data", {})
-		if dd.is_empty():
-			target_payload = { "data": { "meta": { "slot": slot_name, "saved_at": Time.get_unix_time_from_system() } } }
 	elif not target_payload.has("data"):
 		target_payload = { "data": payload.duplicate(true) }
 

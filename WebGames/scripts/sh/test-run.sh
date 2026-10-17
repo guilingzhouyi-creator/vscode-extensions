@@ -55,10 +55,12 @@ else
   CODE=$?
 fi
 if [ "$CODE" -ne 0 ]; then
-  echo "【test-run】Godot 运行异常（真实退出码=$CODE），测试失败项清单："
-  grep -E "(\[ FAIL \]|❌|FAILED)" "$LOG" | head -100 || true
+  echo "【test-run】Godot 运行异常（真实退出码=$CODE），测试失败项与脚本错误清单："
+  grep -E "(\[ FAIL \]|❌|FAILED|SCRIPT ERROR|Parse Error|Compile Error)" "$LOG" | head -150 || true
   echo "--- 最近输出 ---"
-  tail -40 "$LOG"
+  tail -60 "$LOG"
+  echo "--- 错误与警告明细 ---"
+  grep -E "(ERROR|WARNING|SCRIPT ERROR|Parse Error)" "$LOG" | head -100 || true
   echo "【test-run】失败日志已保留: $LOG"
   exit 1
 fi

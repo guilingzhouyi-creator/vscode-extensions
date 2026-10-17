@@ -57,6 +57,7 @@ static func evaluate_storage_path_safety(target_path: String, game_mode: int) ->
 	if target_path.is_empty() or target_path.contains("..") or target_path.contains("\\"):
 		return {
 			"safe": false,
+			"is_safe": false,
 			"error_code": ERR_ILLEGAL_PATH_TRAVERSAL,
 			"message": "Path traversal or separator anomaly detected"
 		}
@@ -67,6 +68,7 @@ static func evaluate_storage_path_safety(target_path: String, game_mode: int) ->
 			if not target_path.begins_with("user://offline_vault/"):
 				return {
 					"safe": false,
+					"is_safe": false,
 					"error_code": ERR_OFFLINE_STORAGE_ESCAPE,
 					"message": "Single-player saves must reside strictly under user://offline_vault/"
 				}
@@ -74,18 +76,21 @@ static func evaluate_storage_path_safety(target_path: String, game_mode: int) ->
 			if not target_path.begins_with("user://online_cache/"):
 				return {
 					"safe": false,
+					"is_safe": false,
 					"error_code": ERR_ONLINE_CACHE_ESCAPE,
 					"message": "Multiplayer cache must reside strictly under user://online_cache/"
 				}
 		_:
 			return {
 				"safe": false,
+				"is_safe": false,
 				"error_code": ERR_UNKNOWN_GAME_MODE_STORAGE,
 				"message": "Unrecognized game mode for storage validation"
 			}
 
 	return {
 		"safe": true,
+		"is_safe": true,
 		"error_code": "",
 		"message": "Storage path verified airtight"
 	}
