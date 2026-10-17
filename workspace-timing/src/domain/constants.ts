@@ -105,6 +105,7 @@ export const TYPEOF_BOOLEAN = 'boolean';
 export const TYPEOF_STRING = 'string';
 export const TYPEOF_NUMBER = 'number';
 export const TYPEOF_OBJECT = 'object';
+export const TYPEOF_UNDEFINED = 'undefined';
 export const STRING_LITERAL_TRUE = 'true';
 
 /**

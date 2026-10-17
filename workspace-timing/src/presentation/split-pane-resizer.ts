@@ -8,7 +8,34 @@
  */
 
 import { PERCENT_MULTIPLIER } from '../domain/models';
+import { TYPEOF_NUMBER, TYPEOF_UNDEFINED } from '../domain/constants';
 
+const DIRECTION_HORIZONTAL = 'horizontal';
+const DIRECTION_VERTICAL = 'vertical';
+
+const EVENT_POINTER_DOWN = 'pointerdown';
+const EVENT_DBLCLICK = 'dblclick';
+const EVENT_POINTER_MOVE = 'pointermove';
+const EVENT_POINTER_UP = 'pointerup';
+const EVENT_POINTER_CANCEL = 'pointercancel';
+const EVENT_KEY_DOWN = 'keydown';
+
+const KEY_ESCAPE = 'Escape';
+
+const ATTR_DATA_PANE_DRAGGING = 'data-pane-dragging';
+const ATTR_VAL_TRUE = 'true';
+
+const SELECTOR_IFRAME = 'iframe';
+const STYLE_POINTER_EVENTS_NONE = 'none';
+const STYLE_EMPTY = '';
+
+const DEFAULT_COLLAPSE_THRESHOLD = 0.18;
+const GESTURE_DEAD_ZONE_PX = 4;
+const DEFAULT_INITIAL_RATIO = 0.5;
+
+/**
+ * Options for configuring the split pane gesture resizer.
+ */
 export interface SplitPaneResizerOptions {
     container: HTMLElement;
     handle: HTMLElement;
@@ -21,10 +48,9 @@ export interface SplitPaneResizerOptions {
     onCollapse?: (collapsed: boolean) => void;
 }
 
-const DEFAULT_COLLAPSE_THRESHOLD = 0.18;
-const GESTURE_DEAD_ZONE_PX = 4;
-const DEFAULT_INITIAL_RATIO = 0.5;
-
+/**
+ * Presentation layer gesture-based layout controller for split pane resizing.
+ */
 export class SplitPaneResizer {
     private readonly container: HTMLElement;
     private readonly handle: HTMLElement;
@@ -49,13 +75,13 @@ export class SplitPaneResizer {
         this.handle = options.handle;
         this.firstPane = options.firstPane;
         this.secondPane = options.secondPane;
-        this.direction = options.direction ?? 'horizontal';
+        this.direction = options.direction ?? DIRECTION_HORIZONTAL;
         this.collapseThreshold = options.collapseThreshold ?? DEFAULT_COLLAPSE_THRESHOLD;
         this.onResize = options.onResize;
         this.onCollapse = options.onCollapse;
 
-        this.currentRatio = typeof options.initialRatio === 'number'
-            ? Math.max(0, Math.min(1.0, options.initialRatio))
+        this.currentRatio = typeof options.initialRatio === TYPEOF_NUMBER
+            ? Math.max(0, Math.min(1.0, options.initialRatio as number))
             : DEFAULT_INITIAL_RATIO;
         this.preDragRatio = this.currentRatio;
 
@@ -117,24 +143,24 @@ export class SplitPaneResizer {
     }
 
     private bindEvents(): void {
-        this.handle.addEventListener('pointerdown', this.onPointerDown);
-        this.handle.addEventListener('dblclick', this.onDblClick);
-        if (typeof window !== 'undefined') {
-            window.addEventListener('pointermove', this.onPointerMove);
-            window.addEventListener('pointerup', this.onPointerUp);
-            window.addEventListener('pointercancel', this.onPointerUp);
-            window.addEventListener('keydown', this.onKeyDown);
+        this.handle.addEventListener(EVENT_POINTER_DOWN, this.onPointerDown);
+        this.handle.addEventListener(EVENT_DBLCLICK, this.onDblClick);
+        if (typeof window !== TYPEOF_UNDEFINED) {
+            window.addEventListener(EVENT_POINTER_MOVE, this.onPointerMove);
+            window.addEventListener(EVENT_POINTER_UP, this.onPointerUp);
+            window.addEventListener(EVENT_POINTER_CANCEL, this.onPointerUp);
+            window.addEventListener(EVENT_KEY_DOWN, this.onKeyDown);
         }
     }
 
     private unbindEvents(): void {
-        this.handle.removeEventListener('pointerdown', this.onPointerDown);
-        this.handle.removeEventListener('dblclick', this.onDblClick);
-        if (typeof window !== 'undefined') {
-            window.removeEventListener('pointermove', this.onPointerMove);
-            window.removeEventListener('pointerup', this.onPointerUp);
-            window.removeEventListener('pointercancel', this.onPointerUp);
-            window.removeEventListener('keydown', this.onKeyDown);
+        this.handle.removeEventListener(EVENT_POINTER_DOWN, this.onPointerDown);
+        this.handle.removeEventListener(EVENT_DBLCLICK, this.onDblClick);
+        if (typeof window !== TYPEOF_UNDEFINED) {
+            window.removeEventListener(EVENT_POINTER_MOVE, this.onPointerMove);
+            window.removeEventListener(EVENT_POINTER_UP, this.onPointerUp);
+            window.removeEventListener(EVENT_POINTER_CANCEL, this.onPointerUp);
+            window.removeEventListener(EVENT_KEY_DOWN, this.onKeyDown);
         }
     }
 
@@ -175,27 +201,27 @@ export class SplitPaneResizer {
     };
 
     private onKeyDown = (e: KeyboardEvent): void => {
-        if (e.key === 'Escape' && this.isDraggingActive) {
+        if (e.key === KEY_ESCAPE && this.isDraggingActive) {
             this.rollback();
         }
     };
 
     private startDragging(): void {
         this.isDraggingActive = true;
-        this.container.setAttribute('data-pane-dragging', 'true');
+        this.container.setAttribute(ATTR_DATA_PANE_DRAGGING, ATTR_VAL_TRUE);
         this.toggleIframeBlocker(true);
     }
 
     private stopDragging(): void {
         this.isPointerDown = false;
         this.isDraggingActive = false;
-        this.container.removeAttribute('data-pane-dragging');
+        this.container.removeAttribute(ATTR_DATA_PANE_DRAGGING);
         this.toggleIframeBlocker(false);
     }
 
     private toggleIframeBlocker(block: boolean): void {
-        const iframes = this.container.querySelectorAll('iframe');
-        const styleVal = block ? 'none' : '';
+        const iframes = this.container.querySelectorAll(SELECTOR_IFRAME);
+        const styleVal = block ? STYLE_POINTER_EVENTS_NONE : STYLE_EMPTY;
         for (let i = 0; i < iframes.length; i++) {
             (iframes[i] as HTMLElement).style.pointerEvents = styleVal;
         }
@@ -203,7 +229,7 @@ export class SplitPaneResizer {
 
     private calculateRatioFromEvent(e: PointerEvent): number {
         const rect = this.container.getBoundingClientRect();
-        if (this.direction === 'horizontal') {
+        if (this.direction === DIRECTION_HORIZONTAL) {
             if (rect.width <= 0) return 0.5;
             return (e.clientX - rect.left) / rect.width;
         }
@@ -215,12 +241,7 @@ export class SplitPaneResizer {
         const pct = (ratio * PERCENT_MULTIPLIER).toFixed(2);
         const invPct = ((1.0 - ratio) * PERCENT_MULTIPLIER).toFixed(2);
 
-        if (this.direction === 'horizontal') {
-            this.firstPane.style.flex = `0 0 ${pct}%`;
-            this.secondPane.style.flex = `0 0 ${invPct}%`;
-        } else {
-            this.firstPane.style.flex = `0 0 ${pct}%`;
-            this.secondPane.style.flex = `0 0 ${invPct}%`;
-        }
+        this.firstPane.style.flex = `0 0 ${pct}%`;
+        this.secondPane.style.flex = `0 0 ${invPct}%`;
     }
 }

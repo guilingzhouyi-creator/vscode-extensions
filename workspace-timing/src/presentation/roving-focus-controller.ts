@@ -7,6 +7,29 @@
  * Exit Semantics & Design Rationale: Pure stateful controller operating on DOM node collections; eliminates keyboard trap and guarantees 100% blind-keyboard accessible navigation
  */
 
+import { TYPEOF_NUMBER } from '../domain/constants';
+
+const KEY_ARROW_DOWN = 'ArrowDown';
+const KEY_ARROW_UP = 'ArrowUp';
+const KEY_ARROW_RIGHT = 'ArrowRight';
+const KEY_ARROW_LEFT = 'ArrowLeft';
+const KEY_HOME = 'Home';
+const KEY_END = 'End';
+
+const ORIENTATION_VERTICAL = 'vertical';
+const ORIENTATION_HORIZONTAL = 'horizontal';
+const ORIENTATION_BOTH = 'both';
+
+const EVENT_KEY_DOWN = 'keydown';
+const EVENT_FOCUS_IN = 'focusin';
+
+const ATTR_DISABLED = 'disabled';
+const ATTR_ARIA_DISABLED = 'aria-disabled';
+const ATTR_VAL_TRUE = 'true';
+
+/**
+ * Configuration options for initializing the roving focus controller.
+ */
 export interface RovingFocusOptions {
     container: HTMLElement;
     itemSelector: string;
@@ -16,6 +39,9 @@ export interface RovingFocusOptions {
     onFocusChange?: (index: number, element: HTMLElement) => void;
 }
 
+/**
+ * Stateful controller maintaining WAI-ARIA roving tabindex invariant across list items.
+ */
 export class RovingFocusController {
     private readonly container: HTMLElement;
     private readonly itemSelector: string;
@@ -29,12 +55,12 @@ export class RovingFocusController {
     constructor(options: RovingFocusOptions) {
         this.container = options.container;
         this.itemSelector = options.itemSelector;
-        this.orientation = options.orientation ?? 'vertical';
+        this.orientation = options.orientation ?? ORIENTATION_VERTICAL;
         this.loop = options.loop ?? true;
         this.onFocusChange = options.onFocusChange;
 
-        if (typeof options.initialIndex === 'number' && options.initialIndex >= 0) {
-            this.currentIndex = options.initialIndex;
+        if (typeof options.initialIndex === TYPEOF_NUMBER && (options.initialIndex as number) >= 0) {
+            this.currentIndex = options.initialIndex as number;
         }
 
         this.bindEvents();
@@ -102,16 +128,16 @@ export class RovingFocusController {
     }
 
     private static readonly ARROW_STEPS: Record<string, { delta: number; axis: 'vertical' | 'horizontal' }> = {
-        ArrowDown: { delta: 1, axis: 'vertical' },
-        ArrowUp: { delta: -1, axis: 'vertical' },
-        ArrowRight: { delta: 1, axis: 'horizontal' },
-        ArrowLeft: { delta: -1, axis: 'horizontal' },
+        [KEY_ARROW_DOWN]: { delta: 1, axis: ORIENTATION_VERTICAL },
+        [KEY_ARROW_UP]: { delta: -1, axis: ORIENTATION_VERTICAL },
+        [KEY_ARROW_RIGHT]: { delta: 1, axis: ORIENTATION_HORIZONTAL },
+        [KEY_ARROW_LEFT]: { delta: -1, axis: ORIENTATION_HORIZONTAL },
     };
 
     private resolveArrowStep(key: string): number | null {
         const stepDef = RovingFocusController.ARROW_STEPS[key];
         if (!stepDef) return null;
-        if (this.orientation !== 'both' && this.orientation !== stepDef.axis) {
+        if (this.orientation !== ORIENTATION_BOTH && this.orientation !== stepDef.axis) {
             return null;
         }
         return stepDef.delta;
@@ -122,10 +148,10 @@ export class RovingFocusController {
         if (step !== null) {
             return this.findNextIndex(items, step);
         }
-        if (key === 'Home') {
+        if (key === KEY_HOME) {
             return this.findFirstEnabledIndex(items);
         }
-        if (key === 'End') {
+        if (key === KEY_END) {
             return this.findLastEnabledIndex(items);
         }
         return -1;
@@ -135,13 +161,13 @@ export class RovingFocusController {
     public dispose(): void {
         if (this.isDisposed) return;
         this.isDisposed = true;
-        this.container.removeEventListener('keydown', this.onContainerKeyDown);
-        this.container.removeEventListener('focusin', this.onContainerFocusIn);
+        this.container.removeEventListener(EVENT_KEY_DOWN, this.onContainerKeyDown);
+        this.container.removeEventListener(EVENT_FOCUS_IN, this.onContainerFocusIn);
     }
 
     private bindEvents(): void {
-        this.container.addEventListener('keydown', this.onContainerKeyDown);
-        this.container.addEventListener('focusin', this.onContainerFocusIn);
+        this.container.addEventListener(EVENT_KEY_DOWN, this.onContainerKeyDown);
+        this.container.addEventListener(EVENT_FOCUS_IN, this.onContainerFocusIn);
     }
 
     private onContainerKeyDown = (e: KeyboardEvent): void => {
@@ -169,8 +195,8 @@ export class RovingFocusController {
 
     private isItemInteractive(item: HTMLElement): boolean {
         if (!item) return false;
-        if (item.hasAttribute('disabled')) return false;
-        if (item.getAttribute('aria-disabled') === 'true') return false;
+        if (item.hasAttribute(ATTR_DISABLED)) return false;
+        if (item.getAttribute(ATTR_ARIA_DISABLED) === ATTR_VAL_TRUE) return false;
         return true;
     }
 
