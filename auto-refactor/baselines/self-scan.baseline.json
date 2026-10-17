@@ -1,7 +1,7 @@
 {
   "version": "1.2.0",
   "granularity": "grouped",
-  "timestamp": "2026-10-17T10:11:53.654Z",
+  "timestamp": "2026-10-17T10:35:39.494Z",
   "groups": [
     {
       "key": "comments|CMT-HDR-001|crates/auto-refactor-core/build.rs",
@@ -2097,13 +2097,6 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|src/api.ts",
-      "count": 8,
-      "severities": {
-        "warning": 8
-      }
-    },
-    {
       "key": "large-file|large-file|src/cli/cli-parser.ts",
       "count": 1,
       "severities": {
@@ -2892,34 +2885,6 @@
       "count": 1,
       "severities": {
         "info": 1
-      }
-    },
-    {
-      "key": "constants|duplicate-literal|src/core/dynamic/dynamic-quality-scorer.ts",
-      "count": 3,
-      "severities": {
-        "warning": 3
-      }
-    },
-    {
-      "key": "constants|magic-number|src/core/dynamic/dynamic-quality-scorer.ts",
-      "count": 17,
-      "severities": {
-        "warning": 17
-      }
-    },
-    {
-      "key": "hygiene|HYG-STB-002|src/core/dynamic/dynamic-quality-scorer.ts",
-      "count": 3,
-      "severities": {
-        "warning": 3
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/dynamic/dynamic-quality-scorer.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
       }
     },
     {
@@ -3841,34 +3806,6 @@
     },
     {
       "key": "hygiene|HYG-CLN-001|src/core/pipeline/cycle-detector.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/pipeline/dualTrackPipeline.ts",
-      "count": 11,
-      "severities": {
-        "warning": 11
-      }
-    },
-    {
-      "key": "governance|GOV-DAT-001|src/core/pipeline/dualTrackPipeline.ts",
-      "count": 7,
-      "severities": {
-        "info": 7
-      }
-    },
-    {
-      "key": "simplify|SIM-LONG-001|src/core/pipeline/dualTrackPipeline.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "hygiene|HYG-CLN-001|src/core/pipeline/dualTrackPipeline.ts",
       "count": 1,
       "severities": {
         "warning": 1

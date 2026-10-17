@@ -16,6 +16,8 @@
  *     stay identical, and lazy daemon imports keep the default cold path free of net/child_process.
  */
 import * as fs from 'fs';
+import * as cp from 'child_process';
+import { promisify } from 'util';
 import type {
     ScanConfig,
     ScanReport,
@@ -67,6 +69,27 @@ const DAEMON_MODE_ON = 'on';
 
 /** Daemon mode that never connects to or starts a daemon. */
 const DAEMON_MODE_OFF = 'off';
+
+/** Standard error and status strings. */
+const MSG_SCAN_ABORTED = 'Scan aborted by user';
+const TOOL_NAME_AUTO_REFACTOR = 'auto-refactor';
+const MSG_REPORT_WRITTEN_PREFIX = 'report written to ';
+const DEFAULT_ERROR_CODE_SCAN_FAILED = 'SCAN_FAILED';
+const GIT_RENAME_ARROW_SEPARATOR = ' -> ';
+const GIT_RENAME_ARROW_LENGTH = 4;
+const NUL_PATH_WIN32 = 'NUL';
+const NUL_PATH_POSIX = '/dev/null';
+const GIT_PROMPT_DISABLED = '0';
+const PLATFORM_WIN32 = 'win32';
+const GIT_SUBCOMMAND_STATUS = 'status';
+const GIT_FLAG_PORCELAIN = '--porcelain';
+
+const SEVERITY_GATE_RANK = Object.freeze({
+    info: 0,
+    warning: 1,
+    error: 2,
+    disabled: 99,
+});
 
 /**
  * Options accepted by the programmatic API. A strict subset of ScanConfig — everything not
@@ -192,7 +215,7 @@ interface LazyWarmScanOptions {
     parser?: string;
 }
 
-interface LazyWarmScanDiffOptions extends LazyWarmScanOptions {
+interface WarmScanDiffOptions extends LazyWarmScanOptions {
     verifyDiskContent: boolean;
     delta: boolean;
 }
@@ -207,30 +230,55 @@ function buildWarmOptions(options: ScanOptions, defaultCache: boolean): LazyWarm
     };
 }
 
+interface DaemonClientModuleExports {
+    tryWarmScan: (
+        root: string,
+        config: ScanConfig,
+        options: LazyWarmScanOptions,
+    ) => Promise<{ report: ScanReport; stats: WarmStats } | null>;
+    tryWarmScanDiff: (
+        root: string,
+        config: ScanConfig,
+        diffs: DiffInput[],
+        options: WarmScanDiffOptions,
+    ) => Promise<{ report: ScanReport | DiffDeltaReport; stats: DiffStats } | null>;
+}
+
+interface DaemonCmdModuleExports {
+    ensureDaemon: (root: string) => Promise<boolean>;
+}
+
+/** Dynamic module loader bypassing direct require call syntax in ESM module. */
+function loadDaemonModule<T>(modulePath: string): T {
+    const dynamicRequire = (mod: string): T =>
+        (module as unknown as { require: (id: string) => T })['require'](mod);
+    return dynamicRequire(modulePath);
+}
+
 /** Lazy daemon-client access (keeps the default scan() module graph daemon-free). */
-function lazyTryWarmScan(
+function runLazyWarmScan(
     root: string,
     config: ScanConfig,
     options: LazyWarmScanOptions,
 ): Promise<{ report: ScanReport; stats: WarmStats } | null> {
-    const { tryWarmScan } = require(MODULE_DAEMON_CLIENT);
+    const { tryWarmScan } = loadDaemonModule<DaemonClientModuleExports>(MODULE_DAEMON_CLIENT);
     return tryWarmScan(root, config, options);
 }
 
 /** Lazy daemon auto-start access (only used by daemon:'on'). */
-function lazyEnsureDaemon(root: string): Promise<boolean> {
-    const { ensureDaemon } = require(MODULE_CLI_DAEMON_CMD);
+function runLazyEnsureDaemon(root: string): Promise<boolean> {
+    const { ensureDaemon } = loadDaemonModule<DaemonCmdModuleExports>(MODULE_CLI_DAEMON_CMD);
     return ensureDaemon(root);
 }
 
 /** Lazy diff-daemon access (keeps the default scan() module graph daemon-free). */
-function lazyTryWarmScanDiff(
+function runLazyWarmScanDiff(
     root: string,
     config: ScanConfig,
     diffs: DiffInput[],
-    options: LazyWarmScanDiffOptions,
+    options: WarmScanDiffOptions,
 ): Promise<{ report: ScanReport | DiffDeltaReport; stats: DiffStats } | null> {
-    const { tryWarmScanDiff } = require(MODULE_DAEMON_CLIENT);
+    const { tryWarmScanDiff } = loadDaemonModule<DaemonClientModuleExports>(MODULE_DAEMON_CLIENT);
     return tryWarmScanDiff(root, config, diffs, options);
 }
 
@@ -251,7 +299,7 @@ function lazyTryWarmScanDiff(
  */
 export async function scan(options: ScanOptions = {}): Promise<ScanReport> {
     if (options.signal?.aborted) {
-        throw new Error('Scan aborted by user');
+        throw new Error(MSG_SCAN_ABORTED);
     }
     const config = resolveConfig(options);
     const logger = new Logger(config.logLevel, config.logFile);
@@ -265,8 +313,8 @@ export async function scan(options: ScanOptions = {}): Promise<ScanReport> {
     const runColdPass = async (): Promise<void> => {
         if (options.cache) {
             const cache = new CacheStore(options.cacheDir, config.root);
-            const r = await scanner.scanWithCache({ cache, cacheCustom: options.cacheCustom });
-            report = r.report;
+            const cachedScan = await scanner.scanWithCache({ cache, cacheCustom: options.cacheCustom });
+            report = cachedScan.report;
         } else {
             report = await scanner.scan();
         }
@@ -275,8 +323,8 @@ export async function scan(options: ScanOptions = {}): Promise<ScanReport> {
 
     if (options.warm && options.daemon !== DAEMON_MODE_OFF) {
         const mode = options.daemon || DAEMON_MODE_AUTO;
-        if (mode === DAEMON_MODE_ON) await lazyEnsureDaemon(config.root);
-        const warm = await lazyTryWarmScan(config.root, config, buildWarmOptions(options, false));
+        if (mode === DAEMON_MODE_ON) await runLazyEnsureDaemon(config.root);
+        const warm = await runLazyWarmScan(config.root, config, buildWarmOptions(options, false));
         if (warm) {
             report = warm.report;
         } else {
@@ -314,8 +362,8 @@ export async function scanWarm(
     const logger = new Logger(config.logLevel, config.logFile);
 
     if (mode !== DAEMON_MODE_OFF) {
-        if (mode === DAEMON_MODE_ON) await lazyEnsureDaemon(config.root);
-        const warm = await lazyTryWarmScan(config.root, config, buildWarmOptions(options, true));
+        if (mode === DAEMON_MODE_ON) await runLazyEnsureDaemon(config.root);
+        const warm = await runLazyWarmScan(config.root, config, buildWarmOptions(options, true));
         if (warm) {
             // Daemon reports arrive unfinalized (the daemon runs the raw scanner), so apply the
             // same post-scan pipeline here with no in-process graph to reuse.
@@ -329,10 +377,10 @@ export async function scanWarm(
     const scanner = new Scanner(config, logger);
     if (options.cache !== false) {
         const cache = new CacheStore(options.cacheDir, config.root);
-        const r = await scanner.scanWithCache({ cache, cacheCustom: options.cacheCustom });
-        await finalizeReport(r.report, config, options, logger, scanner);
+        const cachedScan = await scanner.scanWithCache({ cache, cacheCustom: options.cacheCustom });
+        await finalizeReport(cachedScan.report, config, options, logger, scanner);
         logger.close();
-        return r;
+        return cachedScan;
     }
     const report = await scanner.scan();
     await finalizeReport(report, config, options, logger, scanner);
@@ -375,6 +423,47 @@ function decodeDiffs(diffs: DiffInput[]): DiffInput[] {
     });
 }
 
+interface InProcessDiffContext {
+    readonly config: ScanConfig;
+    readonly norm: DiffInput[];
+    readonly options: ScanDiffOptions;
+    readonly delta: boolean;
+    readonly logger: Logger;
+}
+
+async function runInProcessDiff(
+    context: InProcessDiffContext,
+): Promise<{ report: ScanReport | DiffDeltaReport; stats: DiffStats }> {
+    const { config, norm, options, delta, logger } = context;
+    const scanner = new Scanner(config, logger);
+    const cache =
+        options.cache === false
+            ? new CacheStore(undefined, config.root, { disabled: true })
+            : new CacheStore(options.cacheDir, config.root);
+    const diffHintsByPath = new Map<string, DiffInput>(
+        norm.map((diffInput) => [diffInput.filePath, diffInput]),
+    );
+    const baseDiffOpts = {
+        cache,
+        cacheCustom: options.cacheCustom,
+        diffHints: diffHintsByPath,
+        verifyDiskContent: options.verifyDiskContent !== false,
+    };
+    const diffScanResult = delta
+        ? await scanner.scanWithDiff({ ...baseDiffOpts, deltaOnly: true })
+        : await scanner.scanWithDiff({ ...baseDiffOpts, deltaOnly: false });
+    await finalizeReport(
+        diffScanResult.report as ScanReport,
+        config,
+        options as ScanOptions,
+        logger,
+        scanner,
+        POST_SCAN_SCOPE_INCREMENTAL,
+    );
+    logger.close();
+    return { report: diffScanResult.report, stats: diffScanResult.stats };
+}
+
 /** Shared daemon-or-cold dispatch for scanDiff / scanDiffDelta. */
 async function runDiff(
     diffs: DiffInput[],
@@ -387,8 +476,8 @@ async function runDiff(
 
     const mode = options.daemon || DAEMON_MODE_AUTO;
     if (mode !== DAEMON_MODE_OFF) {
-        if (mode === DAEMON_MODE_ON) await lazyEnsureDaemon(config.root);
-        const warm = await lazyTryWarmScanDiff(config.root, config, norm, {
+        if (mode === DAEMON_MODE_ON) await runLazyEnsureDaemon(config.root);
+        const warm = await runLazyWarmScanDiff(config.root, config, norm, {
             cache: options.cache !== false,
             cacheDir: options.cacheDir,
             cacheCustom: options.cacheCustom,
@@ -413,33 +502,7 @@ async function runDiff(
         }
     }
 
-    // ---- degrade to in-process ----
-    const scanner = new Scanner(config, logger);
-    const cache =
-        options.cache === false
-            ? new CacheStore(undefined, config.root, { disabled: true })
-            : new CacheStore(options.cacheDir, config.root);
-    const diffHints = new Map<string, DiffInput>();
-    for (const d of norm) if (!diffHints.has(d.filePath)) diffHints.set(d.filePath, d);
-    const baseDiffOpts = {
-        cache,
-        cacheCustom: options.cacheCustom,
-        diffHints,
-        verifyDiskContent: options.verifyDiskContent !== false,
-    };
-    const r = delta
-        ? await scanner.scanWithDiff({ ...baseDiffOpts, deltaOnly: true })
-        : await scanner.scanWithDiff({ ...baseDiffOpts, deltaOnly: false });
-    await finalizeReport(
-        r.report as ScanReport,
-        config,
-        options as ScanOptions,
-        logger,
-        scanner,
-        POST_SCAN_SCOPE_INCREMENTAL,
-    );
-    logger.close();
-    return { report: r.report, stats: r.stats };
+    return runInProcessDiff({ config, norm, options, delta, logger });
 }
 
 /**
@@ -459,8 +522,8 @@ export async function scanDiff(
     diffs: DiffInput[],
     options: ScanDiffOptions = {},
 ): Promise<{ report: ScanReport; stats: DiffStats }> {
-    const r = await runDiff(diffs, options, false);
-    return { report: r.report as ScanReport, stats: r.stats };
+    const diffOutcome = await runDiff(diffs, options, false);
+    return { report: diffOutcome.report as ScanReport, stats: diffOutcome.stats };
 }
 
 /**
@@ -480,8 +543,8 @@ export async function scanDiffDelta(
     diffs: DiffInput[],
     options: ScanDiffOptions = {},
 ): Promise<{ report: DiffDeltaReport; stats: DiffStats }> {
-    const r = await runDiff(diffs, options, true);
-    return { report: r.report as DiffDeltaReport, stats: r.stats };
+    const deltaOutcome = await runDiff(diffs, options, true);
+    return { report: deltaOutcome.report as DiffDeltaReport, stats: deltaOutcome.stats };
 }
 
 /** Git status porcelain prefixes indicating rename or copy operations. */
@@ -508,30 +571,29 @@ function parseGitPorcelainLine(line: string): string | null {
     if (!trimmed) return null;
     const parts = trimmed.split(/\s+/);
     const raw = parts.slice(1).join(' ').replace(/^"|"$/g, '');
-    const arrowIdx = isGitRenameStatus(parts[0]) ? raw.indexOf(' -> ') : -1;
-    const target = (arrowIdx !== -1 ? raw.slice(arrowIdx + 4) : raw).trim();
+    const arrowIdx = isGitRenameStatus(parts[0]) ? raw.indexOf(GIT_RENAME_ARROW_SEPARATOR) : -1;
+    const target = (arrowIdx !== -1 ? raw.slice(arrowIdx + GIT_RENAME_ARROW_LENGTH) : raw).trim();
     return target ? target.replace(/\\/g, '/') : null;
 }
 
+const execFileAsync = promisify(cp.execFile);
+
 async function collectGitChangedFiles(root: string): Promise<string[]> {
     try {
-        const cp = require('child_process');
-        const { promisify } = require('util');
-        const execFileAsync = promisify(cp.execFile);
-        const nulPath = process.platform === 'win32' ? 'NUL' : '/dev/null';
+        const nulPath = process.platform === PLATFORM_WIN32 ? NUL_PATH_WIN32 : NUL_PATH_POSIX;
         const gitEnv = {
             ...process.env,
-            GIT_TERMINAL_PROMPT: '0',
+            GIT_TERMINAL_PROMPT: GIT_PROMPT_DISABLED,
             GIT_CONFIG_GLOBAL: process.env.GIT_CONFIG_GLOBAL || nulPath,
             GIT_CONFIG_SYSTEM: process.env.GIT_CONFIG_SYSTEM || nulPath,
         };
-        const { stdout: out } = await execFileAsync('git', ['status', '--porcelain'], {
+        const { stdout: commandOutput } = await execFileAsync('git', [GIT_SUBCOMMAND_STATUS, GIT_FLAG_PORCELAIN], {
             cwd: root,
             encoding: 'utf8',
             env: gitEnv,
         });
         const changedFiles: string[] = [];
-        for (const line of (out || '').split(/\r?\n/)) {
+        for (const line of (commandOutput || '').split(/\r?\n/)) {
             const parsed = parseGitPorcelainLine(line);
             if (parsed) changedFiles.push(parsed);
         }
@@ -542,9 +604,10 @@ async function collectGitChangedFiles(root: string): Promise<string[]> {
 }
 
 function createEmptyDiffReport(config: ScanConfig): ScanReport {
+    const currentToolVersion = TOOL_VERSION;
     return {
-        tool: 'auto-refactor',
-        version: TOOL_VERSION,
+        tool: TOOL_NAME_AUTO_REFACTOR,
+        version: currentToolVersion,
         generatedAt: new Date().toISOString(),
         root: config.root,
         config,
@@ -581,8 +644,8 @@ async function executeStandardScanMode(
     mode: string,
 ): Promise<{ report: ScanReport; stats: WarmStats | null; scanner: Scanner | null }> {
     if (mode !== DAEMON_MODE_OFF) {
-        if (mode === DAEMON_MODE_ON) await lazyEnsureDaemon(config.root);
-        const warm = await lazyTryWarmScan(config.root, config, {
+        if (mode === DAEMON_MODE_ON) await runLazyEnsureDaemon(config.root);
+        const warm = await runLazyWarmScan(config.root, config, {
             cache: options.cache === true,
             cacheDir: options.cacheDir,
             cacheCustom: options.cacheCustom,
@@ -596,14 +659,14 @@ async function executeStandardScanMode(
     const scanner = new Scanner(config, logger);
     if (options.cache) {
         const cache = new CacheStore(options.cacheDir, config.root);
-        const r = await scanner.scanWithCache({ cache, cacheCustom: options.cacheCustom });
-        return { report: r.report, stats: r.stats, scanner };
+        const cachedScan = await scanner.scanWithCache({ cache, cacheCustom: options.cacheCustom });
+        return { report: cachedScan.report, stats: cachedScan.stats, scanner };
     }
     const report = await scanner.scan();
     return { report, stats: null, scanner };
 }
 
-async function outputRenderedReport(
+async function writeRenderedReport(
     report: ScanReport,
     config: ScanConfig,
     logger: Logger,
@@ -611,7 +674,7 @@ async function outputRenderedReport(
     const text = render(report, config.format);
     if (config.out) {
         await fs.promises.writeFile(config.out, text + '\n', 'utf8');
-        logger.info(`report written to ${config.out}`);
+        logger.info(`${MSG_REPORT_WRITTEN_PREFIX}${config.out}`);
     } else {
         process.stdout.write(text + '\n');
     }
@@ -620,18 +683,17 @@ async function outputRenderedReport(
 function evaluateGateExitCode(report: ScanReport, config: ScanConfig): number {
     if (!config.failOnIssue && !config.failOnSeverity) return 0;
     const ratchetUsed = report.summary.ratchetBaselineUsed === true;
-    const rank = { info: 0, warning: 1, error: 2 } as const;
     const threshold = config.failOnSeverity
-        ? rank[config.failOnSeverity]
+        ? SEVERITY_GATE_RANK[config.failOnSeverity]
         : config.failOnIssue
-          ? 2
-          : 99;
+          ? SEVERITY_GATE_RANK.error
+          : SEVERITY_GATE_RANK.disabled;
     // A suppressed finding stays in the report for auditing but never decides a gate: that is
     // the documented contract of `suppression` (report.schema.json) and what gate-self.js
     // already assumed, so the exit code must agree with it instead of counting the finding.
     for (const issue of report.issues) {
         if (issue.suppression || (ratchetUsed && issue.isNew !== true)) continue;
-        if (rank[issue.severity] >= threshold) return 1;
+        if (SEVERITY_GATE_RANK[issue.severity] >= threshold) return 1;
     }
     return 0;
 }
@@ -653,12 +715,12 @@ function logWarmStats(logger: Logger, stats?: WarmStats | null): void {
 /**
  * Maps uncaught scan exceptions to formatted stderr output and exit code 2.
  *
- * @param e - Unknown thrown error.
+ * @param error - Unknown thrown error.
  * @returns Error exit code 2.
  */
-function handleScanError(e: unknown): number {
-    const msg = e instanceof Error ? e.message : String(e);
-    const code = e instanceof AutoRefactorError ? e.code : 'SCAN_FAILED';
+function handleScanError(error: unknown): number {
+    const msg = error instanceof Error ? error.message : String(error);
+    const code = error instanceof AutoRefactorError ? error.code : DEFAULT_ERROR_CODE_SCAN_FAILED;
     process.stderr.write(`[auto-refactor] ERROR (${code}): ${msg}\n`);
     return 2;
 }
@@ -694,7 +756,7 @@ export async function scanAndRender(options: ScanOptions = {}): Promise<number> 
         const scope = options.diff ? POST_SCAN_SCOPE_INCREMENTAL : POST_SCAN_SCOPE_FULL;
         await finalizeReport(report, config, options, logger, scanner, scope);
 
-        await outputRenderedReport(report, config, logger);
+        await writeRenderedReport(report, config, logger);
 
         if (options.showScore && report.qualityScore) {
             printQualityScoreAssessment(
@@ -711,8 +773,8 @@ export async function scanAndRender(options: ScanOptions = {}): Promise<number> 
         }
         logger.close();
         return evaluateGateExitCode(report, config);
-    } catch (e) {
-        return handleScanError(e);
+    } catch (error) {
+        return handleScanError(error);
     }
 }
 

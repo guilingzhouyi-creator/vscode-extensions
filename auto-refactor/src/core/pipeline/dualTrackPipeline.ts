@@ -31,6 +31,7 @@ import type { Scanner } from '../analyzer';
 import type { Issue, FileMetric, ProjectArchetype } from '../types';
 import { SEVERITY_ERROR } from '../types';
 import { classifyDiff } from '../router/diffClassifier';
+import type { DiffClassificationResult } from '../router/diffClassifier';
 import type { SparseRouteResult } from '../router/sparseRuleRouter';
 import { routeDiffToAnalyzers } from '../router/sparseRuleRouter';
 import type { EscalationEvent } from './escalationChannel';
@@ -44,7 +45,7 @@ import { AgentConstraintGenerator } from '../guidance/agentConstraintGenerator';
 import { ModuleDependencyGraph } from '../dependency-graph';
 import type { FileRevision } from '../trajectory/types';
 import type { ReviewMemoryManager } from '../memory/reviewMemory';
-import type { CodeDomainFingerprint } from '../memory/types';
+import type { CodeDomainFingerprint, ReviewMemoryRecord } from '../memory/types';
 import type { ChangeTrajectoryManager } from '../trajectory/changeTrajectory';
 import { detectDependencyCycles, detectDependencyCyclesAsync } from './cycle-detector';
 
@@ -66,6 +67,18 @@ const ANALYZER_ARCHITECTURE = 'architecture';
 /** Dependency graph analyzer identifier for circular dependency checks. */
 const ANALYZER_DEPENDENCY_GRAPH = 'dependency-graph';
 
+/** Comments analyzer identifier. */
+const ANALYZER_COMMENTS = 'comments';
+
+/** Constants analyzer identifier. */
+const ANALYZER_CONSTANTS = 'constants';
+
+/** Secrets analyzer identifier. */
+const ANALYZER_SECRETS = 'secrets';
+
+/** Diff classification literal only category identifier. */
+const DIFF_CATEGORY_LITERAL_ONLY = 'LITERAL_ONLY';
+
 /** Clean layer violation rule identifier. */
 const RULE_CLEAN_LAYER_VIOLATION = 'clean-layer-violation';
 
@@ -83,6 +96,39 @@ const STATUS_ESCALATED = 'ESCALATED';
 
 /** DeepTrack status when no escalation events were published. */
 const STATUS_CONFIRMED = 'CONFIRMED';
+
+/** Memory record status when rejected. */
+const STATUS_REJECTED = 'REJECTED';
+
+/** Memory record status when approved. */
+const STATUS_APPROVED = 'APPROVED';
+
+/** Memory record status when contaminated. */
+const STATUS_CONTAMINATED = 'CONTAMINATED';
+
+/** FastTrack verdict status when passed. */
+const VERDICT_SPECULATIVE_PASSED = 'SPECULATIVE_PASSED';
+
+/** FastTrack verdict status when rejected. */
+const VERDICT_SPECULATIVE_REJECTED = 'SPECULATIVE_REJECTED';
+
+/** Default agent author string. */
+const DEFAULT_AGENT_AUTHOR = 'agent-worker';
+
+/** Fallback file path when missing. */
+const FALLBACK_FILE_PATH = 'unknown';
+
+/** Arrow connector for stringifying dependency cycles. */
+const CYCLE_CONNECTOR = ' -> ';
+
+/** Root location line number for synthesized issues. */
+const DEFAULT_LOCATION_LINE = 1;
+
+/** Root location column number for synthesized issues. */
+const DEFAULT_LOCATION_COL = 1;
+
+/** Colon-one suffix for root line location ID. */
+const ROOT_LOCATION_SUFFIX = ':1';
 
 /** Path pattern identifying core or domain modules subject to architecture layering rules. */
 const ARCH_CORE_DOMAIN_PATH_RE = /[/\\](?:core|domain)[/\\]/i;
@@ -182,42 +228,93 @@ export interface DualTrackOptions {
 
 export { detectDependencyCycles, detectDependencyCyclesAsync };
 
-/**
- * Run the asymmetric dual-track audit: a foreground pass produces a speculative verdict from
- * sparse, localized scans, then an async deep closure resolves the confirmed or escalated
- * verdict over the whole dependency graph.
- *
- * Concurrency: the deep track is an async closure that awaits a governor yield before heavy
- * work, so it never delays the fast result. Inputs are processed sequentially, but scanner-owned
- * review memory and trajectory are mutated in place, so callers must serialize concurrent calls
- * that share one scanner. Fast-track failures reject the returned promise; deep-track failures
- * reject only `deepPromise`.
- *
- * @param scanner - Scanner supplying analyzers, review memory, trajectory, scorer and graph.
- * @param inputs - File mutations to audit; an empty list still yields a fallback verdict.
- * @param options - Optional collaborators, author, dependency graph and routing overrides.
- * @returns Fast verdict plus the pending deep promise; the deep track is not awaited inline.
- * @throws Propagates fast-track scanner/analyzer errors; deep work rejects deepPromise instead.
- */
+/** Parameter context for refining active analyzers based on ReviewMemory match. */
+export interface RefineAnalyzersContext {
+    readonly existingRecord?: ReviewMemoryRecord;
+    readonly isTainted: boolean;
+    readonly newContent: string;
+    readonly currentDomains: CodeDomainFingerprint[];
+    readonly classification: DiffClassificationResult;
+    readonly defaultAnalyzers: Set<string>;
+}
+
+/** Parameter context for persisting audit findings to review memory and trajectory. */
+export interface MemoryTrajectoryContext {
+    readonly memory: ReviewMemoryManager;
+    readonly trajectory: ChangeTrajectoryManager;
+    readonly filePath: string;
+    readonly newContent: string;
+    readonly currentDomains: CodeDomainFingerprint[];
+    readonly fileIssues: Issue[];
+    readonly scoreBreakdown: QualityScoreBreakdown;
+    readonly author: string;
+    readonly activeAnalyzers: string[];
+    readonly allAnomalies: string[];
+}
+
+/** Parameter context for executing background deep analysis track. */
+export interface DeepTrackExecutionPlan {
+    readonly scanner: Scanner;
+    readonly inputs: DiffFileInput[];
+    readonly options: DualTrackOptions;
+    readonly governor: LoadGovernor;
+    readonly channel: EscalationChannel;
+    readonly memory: ReviewMemoryManager;
+    readonly trajectory: ChangeTrajectoryManager;
+}
+
+/** Parameter context for checking architecture boundary violations. */
+interface ArchitectureBreachCheckContext {
+    readonly inputs: DiffFileInput[];
+    readonly affectedFiles: string[];
+    readonly deepIssues: Issue[];
+    readonly escalationEvents: EscalationEvent[];
+    readonly channel: EscalationChannel;
+    readonly memory: ReviewMemoryManager;
+    readonly trajectory: ChangeTrajectoryManager;
+}
+
+/** Parameter context for resolving sparse active analyzers for a single file. */
+interface ResolveAnalyzersContext {
+    readonly scanner: Scanner;
+    readonly input: DiffFileInput;
+    readonly options: DualTrackOptions;
+    readonly memory: ReviewMemoryManager;
+    readonly archetype: ProjectArchetype | undefined;
+    readonly acc: FastTrackAccumulator;
+}
+
+/** Parameter context for auditing a single file mutation in fast track. */
+interface AuditFileInputContext {
+    readonly scanner: Scanner;
+    readonly input: DiffFileInput;
+    readonly options: DualTrackOptions;
+    readonly memory: ReviewMemoryManager;
+    readonly trajectory: ChangeTrajectoryManager;
+    readonly scorer: QualityScorer;
+    readonly author: string;
+    readonly archetype: ProjectArchetype | undefined;
+    readonly acc: FastTrackAccumulator;
+}
+
+/** Parameter context for building fast track speculative verdict. */
+interface FastTrackVerdictContext {
+    readonly acc: FastTrackAccumulator;
+    readonly inputs: DiffFileInput[];
+    readonly scorer: QualityScorer;
+    readonly memory: ReviewMemoryManager;
+    readonly trajectory: ChangeTrajectoryManager;
+    readonly fastTrackStartTimeMs: number;
+}
+
 /**
  * Refine active analyzers via ReviewMemory domain matching when clean.
  *
- * @param existingRecord - Cached review record for the file.
- * @param isTainted - True if file was previously contaminated/rejected by DeepTrack.
- * @param newContent - New file content string.
- * @param currentDomains - Extracted code domains from the new content.
- * @param classification - Diff semantic classification.
- * @param defaultAnalyzers - Default routed analyzers from MoE router.
+ * @param context - Parameter context for analyzer refinement.
  * @returns Narrowed active analyzer set.
  */
-function refineActiveAnalyzers(
-    existingRecord: import('../memory/types').ReviewMemoryRecord | undefined,
-    isTainted: boolean,
-    newContent: string,
-    currentDomains: import('../memory/types').CodeDomainFingerprint[],
-    classification: import('../router/diffClassifier').DiffClassificationResult,
-    defaultAnalyzers: Set<string>,
-): Set<string> {
+function computeRefinedActiveAnalyzers(context: RefineAnalyzersContext): Set<string> {
+    const { existingRecord, isTainted, newContent, currentDomains, classification, defaultAnalyzers } = context;
     if (!existingRecord || isTainted) return defaultAnalyzers;
 
     const matchResult = matchDomains(existingRecord, newContent, currentDomains);
@@ -228,10 +325,10 @@ function refineActiveAnalyzers(
 
     if (isClean) {
         if (classification.isDocOnly) {
-            return new Set(['comments']);
+            return new Set([ANALYZER_COMMENTS]);
         }
-        if (classification.categories.has('LITERAL_ONLY')) {
-            return new Set(['constants', 'secrets']);
+        if (classification.categories.has(DIFF_CATEGORY_LITERAL_ONLY)) {
+            return new Set([ANALYZER_CONSTANTS, ANALYZER_SECRETS]);
         }
     }
     return defaultAnalyzers;
@@ -240,100 +337,75 @@ function refineActiveAnalyzers(
 /**
  * Persist audit findings to ReviewMemory and record trajectory revision.
  *
- * @param memory - Review memory manager.
- * @param trajectory - Change trajectory manager.
- * @param filePath - Path to modified file.
- * @param newContent - Current file content.
- * @param currentDomains - Code domain fingerprints.
- * @param fileIssues - Localized issues found in this file.
- * @param scoreBreakdown - Transparent quality breakdown.
- * @param author - Agent author UID.
- * @param activeAnalyzers - Analyzers activated for this file.
- * @param allAnomalies - Mutable array receiving detected anomaly kinds.
+ * @param context - Parameter context for memory and trajectory recording.
  */
-function recordMemoryAndTrajectory(
-    memory: ReviewMemoryManager,
-    trajectory: ChangeTrajectoryManager,
-    filePath: string,
-    newContent: string,
-    currentDomains: CodeDomainFingerprint[],
-    fileIssues: Issue[],
-    scoreBreakdown: QualityScoreBreakdown,
-    author: string,
-    activeAnalyzers: string[],
-    allAnomalies: string[],
-): void {
+function runMemoryAndTrajectoryRecording(context: MemoryTrajectoryContext): void {
+    const {
+        memory,
+        trajectory,
+        filePath,
+        newContent,
+        currentDomains,
+        fileIssues,
+        scoreBreakdown,
+        author,
+        activeAnalyzers,
+        allAnomalies,
+    } = context;
+
     const contentDigest = computeAstDigest(undefined, newContent);
+    const hasErrorIssue = fileIssues.some((issue) => issue.severity === SEVERITY_ERROR);
+    const revisionId = contentDigest.slice(0, REVISION_ID_LENGTH);
+
     memory.put({
         filePath,
         fileHash: contentDigest,
         astDigest: contentDigest,
         codeDomains: currentDomains,
-        ruleHits: fileIssues.map((i) => ({
-            id: i.id,
-            analyzer: i.analyzer,
-            rule: i.rule,
-            severity: i.severity,
-            line: i.location.start.line,
-            message: i.message,
+        ruleHits: fileIssues.map((issue) => ({
+            id: issue.id,
+            analyzer: issue.analyzer,
+            rule: issue.rule,
+            severity: issue.severity,
+            line: issue.location.start.line,
+            message: issue.message,
         })),
         qualityScores: scoreBreakdown,
         lastAudited: Date.now(),
-        revisionId: contentDigest.slice(0, REVISION_ID_LENGTH),
+        revisionId,
         contextWindows: { imports: [], exports: [] },
         fixResults: [],
-        status: fileIssues.some((i) => i.severity === SEVERITY_ERROR) ? 'REJECTED' : 'APPROVED',
+        status: hasErrorIssue ? STATUS_REJECTED : STATUS_APPROVED,
         activeAnalyzers,
         overallScore: scoreBreakdown.compositeScore,
     });
 
     const revision: FileRevision = {
-        revisionId: contentDigest.slice(0, REVISION_ID_LENGTH),
+        revisionId,
         timestamp: Date.now(),
         agentUid: author,
         fileHash: contentDigest,
         astDigest: contentDigest,
         qualityScore: scoreBreakdown,
-        ruleHitIds: fileIssues.map((i) => i.id),
+        ruleHitIds: fileIssues.map((issue) => issue.id),
     };
 
     const comparison = trajectory.recordRevision(filePath, revision);
     if (comparison && comparison.anomalies.length > 0) {
-        for (const a of comparison.anomalies) {
-            allAnomalies.push(a.kind);
+        for (const anomaly of comparison.anomalies) {
+            allAnomalies.push(anomaly.kind);
         }
     }
 }
 
 /**
- * Execute DeepTrack background closure: dependency impact, cycles and layer checks.
- *
- * @param scanner - Scanner supplying dependency graph and plan.
- * @param inputs - Mutated file inputs.
- * @param options - Collaborators and graph overrides.
- * @param governor - Cooperative load governor.
- * @param channel - Escalation broadcast channel.
- * @param memory - Review memory manager for taint propagation.
- * @param trajectory - Trajectory manager for regression recording.
- * @returns Confirmed or escalated verdict.
+ * Register mutated inputs and compute transitive affected files closure.
  */
-async function executeDeepTrack(
-    scanner: Scanner,
+async function computeAffectedFilesClosure(
+    graph: ModuleDependencyGraph,
     inputs: DiffFileInput[],
-    options: DualTrackOptions,
     governor: LoadGovernor,
-    channel: EscalationChannel,
-    memory: ReviewMemoryManager,
-    trajectory: ChangeTrajectoryManager,
-): Promise<DeepTrackVerdict> {
-    const deepTrackStartTimeMs = Date.now();
-    const deepIssues: Issue[] = [];
-    const escalationEvents: EscalationEvent[] = [];
-
-    await governor.yieldEventLoop();
-
-    const graph = options.graph || scanner.getDependencyGraph() || new ModuleDependencyGraph();
-
+): Promise<string[]> {
     for (const input of inputs) {
         graph.registerFromContent(input.filePath, input.newContent);
     }
@@ -343,30 +415,48 @@ async function executeDeepTrack(
 
     for (const input of inputs) {
         const affected = graph.getAffectedFiles(input.filePath);
-        for (const af of affected) affectedFilesSet.add(af);
+        for (let i = 0; i < affected.length; i++) {
+            affectedFilesSet.add(affected[i]);
+        }
         yieldCounter++;
         if (yieldCounter % AFFECTED_FILES_YIELD_BATCH === 0) {
             await governor.yieldEventLoop();
         }
     }
-    const affectedFiles = Array.from(affectedFilesSet);
+    return Array.from(affectedFilesSet);
+}
 
-    const modifiedPaths = inputs.map((i) => i.filePath);
+/** Parameter context for cycle escalation auditing. */
+interface CycleEscalationContext {
+    readonly plan: DeepTrackExecutionPlan;
+    readonly graph: ModuleDependencyGraph;
+    readonly affectedFiles: string[];
+    readonly deepIssues: Issue[];
+    readonly escalationEvents: EscalationEvent[];
+}
+
+/**
+ * Detect circular dependencies across changed roots and publish escalation events.
+ */
+async function auditCycleEscalations(context: CycleEscalationContext): Promise<string[][]> {
+    const { plan, graph, affectedFiles, deepIssues, escalationEvents } = context;
+    const { inputs, governor, channel, memory, trajectory } = plan;
+    const modifiedPaths = inputs.map((input) => input.filePath);
     const cycles = await detectDependencyCyclesAsync(graph, modifiedPaths, governor);
 
     for (const cycle of cycles) {
-        const cycleStr = cycle.join(' -> ');
+        const cycleStr = cycle.join(CYCLE_CONNECTOR);
         const rootFile = inputs[0]?.filePath || cycle[0];
         const cycleIssue: Issue = {
-            id: `${ANALYZER_DEPENDENCY_GRAPH}:${RULE_IMPORT_CYCLE}:${rootFile}:1`,
+            id: `${ANALYZER_DEPENDENCY_GRAPH}:${RULE_IMPORT_CYCLE}:${rootFile}${ROOT_LOCATION_SUFFIX}`,
             analyzer: ANALYZER_DEPENDENCY_GRAPH,
-            rule: 'import-cycle',
+            rule: RULE_IMPORT_CYCLE,
             severity: SEVERITY_ERROR,
             message: `DeepTrack detected circular dependency: ${cycleStr}`,
             location: {
                 file: rootFile,
-                start: { line: 1, column: 1 },
-                end: { line: 1, column: 1 },
+                start: { line: DEFAULT_LOCATION_LINE, column: DEFAULT_LOCATION_COL },
+                end: { line: DEFAULT_LOCATION_LINE, column: DEFAULT_LOCATION_COL },
             },
             detail: { cycle: cycleStr },
         };
@@ -384,10 +474,36 @@ async function executeDeepTrack(
         escalationEvents.push(escalation);
         await channel.publish(escalation, memory, trajectory);
     }
+    return cycles;
+}
 
-    const archEnabled = scanner.getPlan().some((p) => p.name === ANALYZER_ARCHITECTURE);
+/**
+ * Execute DeepTrack background closure: dependency impact, cycles and layer checks.
+ *
+ * @param plan - Parameter context for deep track execution.
+ * @returns Confirmed or escalated verdict.
+ */
+async function executeDeepTrack(plan: DeepTrackExecutionPlan): Promise<DeepTrackVerdict> {
+    const { scanner, inputs, options, governor, channel, memory, trajectory } = plan;
+    const deepTrackStartTimeMs = Date.now();
+    const deepIssues: Issue[] = [];
+    const escalationEvents: EscalationEvent[] = [];
+
+    await governor.yieldEventLoop();
+
+    const graph = options.graph || scanner.getDependencyGraph() || new ModuleDependencyGraph();
+    const affectedFiles = await computeAffectedFilesClosure(graph, inputs, governor);
+    const cycles = await auditCycleEscalations({
+        plan,
+        graph,
+        affectedFiles,
+        deepIssues,
+        escalationEvents,
+    });
+
+    const archEnabled = scanner.getPlan().some((planEntry) => planEntry.name === ANALYZER_ARCHITECTURE);
     if (archEnabled) {
-        await checkArchitectureLayerBreaches(
+        await checkArchitectureLayerBreaches({
             inputs,
             affectedFiles,
             deepIssues,
@@ -395,7 +511,7 @@ async function executeDeepTrack(
             channel,
             memory,
             trajectory,
-        );
+        });
     }
 
     const deepLatencyMs = Date.now() - deepTrackStartTimeMs;
@@ -412,15 +528,9 @@ async function executeDeepTrack(
 /**
  * Detect clean architecture boundary violations where core/domain imports outer layers.
  */
-async function checkArchitectureLayerBreaches(
-    inputs: DiffFileInput[],
-    affectedFiles: string[],
-    deepIssues: Issue[],
-    escalationEvents: EscalationEvent[],
-    channel: EscalationChannel,
-    memory: ReviewMemoryManager,
-    trajectory: ChangeTrajectoryManager,
-): Promise<void> {
+async function checkArchitectureLayerBreaches(context: ArchitectureBreachCheckContext): Promise<void> {
+    const { inputs, affectedFiles, deepIssues, escalationEvents, channel, memory, trajectory } = context;
+
     for (const input of inputs) {
         if (!ARCH_CORE_DOMAIN_PATH_RE.test(input.filePath)) {
             continue;
@@ -435,7 +545,7 @@ async function checkArchitectureLayerBreaches(
         const archIssue: Issue = {
             id: `${ANALYZER_ARCHITECTURE}:${RULE_CLEAN_LAYER_VIOLATION}:${input.filePath}:1`,
             analyzer: ANALYZER_ARCHITECTURE,
-            rule: 'clean-layer-violation',
+            rule: RULE_CLEAN_LAYER_VIOLATION,
             severity: SEVERITY_ERROR,
             message: `Architecture boundary breach: core layer imports outer layer '${importsFromUpper[1]}'`,
             location: {
@@ -473,21 +583,15 @@ interface FastTrackAccumulator {
 /**
  * Classify file diff and resolve sparse active analyzers using review memory.
  */
-function resolveActiveAnalyzersForFile(
-    scanner: Scanner,
-    input: DiffFileInput,
-    options: DualTrackOptions,
-    memory: ReviewMemoryManager,
-    archetype: ProjectArchetype | undefined,
-    acc: FastTrackAccumulator,
-): {
+function resolveActiveAnalyzersForFile(context: ResolveAnalyzersContext): {
     activeAnalyzers: Set<string>;
     currentDomains: ReturnType<typeof extractCodeDomains>;
 } {
+    const { scanner, input, options, memory, archetype, acc } = context;
     const { filePath, oldContent, newContent } = input;
     const classification = classifyDiff(oldContent, newContent, { filePath });
     const routing = routeDiffToAnalyzers(classification, {
-        availableAnalyzers: scanner.getPlan().map((p) => p.name),
+        availableAnalyzers: scanner.getPlan().map((planEntry) => planEntry.name),
         forceFull: options.forceFull,
         archetype,
     });
@@ -496,16 +600,16 @@ function resolveActiveAnalyzersForFile(
     const currentDomains = extractCodeDomains(undefined, newContent);
     const existingRecord = memory.get(filePath);
     const isTainted =
-        existingRecord?.status === 'REJECTED' || existingRecord?.status === 'CONTAMINATED';
+        existingRecord?.status === STATUS_REJECTED || existingRecord?.status === STATUS_CONTAMINATED;
 
-    const activeAnalyzers = refineActiveAnalyzers(
+    const activeAnalyzers = computeRefinedActiveAnalyzers({
         existingRecord,
         isTainted,
         newContent,
         currentDomains,
         classification,
-        routing.activeAnalyzers,
-    );
+        defaultAnalyzers: routing.activeAnalyzers,
+    });
     return { activeAnalyzers, currentDomains };
 }
 
@@ -513,63 +617,45 @@ function resolveActiveAnalyzersForFile(
  * Audit a single file mutation in FastTrack: diff classification, sparse MoE routing,
  * localized scan execution, scoring and memory persistence.
  */
-async function auditSingleFileInput(
-    scanner: Scanner,
-    input: DiffFileInput,
-    options: DualTrackOptions,
-    memory: ReviewMemoryManager,
-    trajectory: ChangeTrajectoryManager,
-    scorer: QualityScorer,
-    author: string,
-    archetype: ProjectArchetype | undefined,
-    acc: FastTrackAccumulator,
-): Promise<void> {
-    const { filePath, newContent } = input;
-    const { activeAnalyzers, currentDomains } = resolveActiveAnalyzersForFile(
-        scanner,
-        input,
-        options,
-        memory,
-        archetype,
-        acc,
+async function auditSingleFileInput(context: AuditFileInputContext): Promise<void> {
+    const inputTarget = context.input;
+    const { activeAnalyzers, currentDomains } = resolveActiveAnalyzersForFile(context);
+
+    const fileResult = await context.scanner.runAnalyzers(
+        inputTarget.filePath,
+        inputTarget.newContent,
+        undefined,
+        activeAnalyzers,
     );
 
-    const fileResult = await scanner.runAnalyzers(filePath, newContent, undefined, activeAnalyzers);
-
-    acc.fastIssues.push(...fileResult.issues);
+    context.acc.fastIssues.push(...fileResult.issues);
     if (fileResult.metric) {
-        acc.fastMetrics.push(fileResult.metric);
+        context.acc.fastMetrics.push(fileResult.metric);
     }
 
-    const scoreBreakdown = scorer.evaluateFile(filePath, fileResult.issues, fileResult.metric);
-    acc.lastScoreBreakdown = scoreBreakdown;
+    const scoreBreakdown = context.scorer.evaluateFile(inputTarget.filePath, fileResult.issues, fileResult.metric);
+    context.acc.lastScoreBreakdown = scoreBreakdown;
 
-    recordMemoryAndTrajectory(
-        memory,
-        trajectory,
-        filePath,
-        newContent,
+    runMemoryAndTrajectoryRecording({
+        memory: context.memory,
+        trajectory: context.trajectory,
+        filePath: inputTarget.filePath,
+        newContent: inputTarget.newContent,
         currentDomains,
-        fileResult.issues,
+        fileIssues: fileResult.issues,
         scoreBreakdown,
-        author,
-        Array.from(activeAnalyzers),
-        acc.allAnomalies,
-    );
+        author: context.author,
+        activeAnalyzers: Array.from(activeAnalyzers),
+        allAnomalies: context.acc.allAnomalies,
+    });
 }
 
 /**
  * Assemble fast-track speculative verdict, scoring breakdown and agent prompt.
  */
-function buildFastTrackVerdict(
-    acc: FastTrackAccumulator,
-    inputs: DiffFileInput[],
-    scorer: QualityScorer,
-    memory: ReviewMemoryManager,
-    trajectory: ChangeTrajectoryManager,
-    fastTrackStartTimeMs: number,
-): FastTrackVerdict {
-    const firstPath = inputs[0]?.filePath || 'unknown';
+function buildFastTrackVerdict(context: FastTrackVerdictContext): FastTrackVerdict {
+    const { acc, inputs, scorer, memory, trajectory, fastTrackStartTimeMs } = context;
+    const firstPath = inputs[0]?.filePath || FALLBACK_FILE_PATH;
     const overallFastScore =
         acc.lastScoreBreakdown ||
         scorer.evaluateFile(firstPath, acc.fastIssues, acc.fastMetrics[0] || null);
@@ -581,9 +667,9 @@ function buildFastTrackVerdict(
         trajectory.getTrajectory(inputs[0]?.filePath || ''),
     );
 
-    const hasErrors = acc.fastIssues.some((i) => i.severity === SEVERITY_ERROR);
+    const hasErrors = acc.fastIssues.some((issue) => issue.severity === SEVERITY_ERROR);
     return {
-        status: hasErrors ? 'SPECULATIVE_REJECTED' : 'SPECULATIVE_PASSED',
+        status: hasErrors ? VERDICT_SPECULATIVE_REJECTED : VERDICT_SPECULATIVE_PASSED,
         issues: acc.fastIssues,
         score: overallFastScore,
         latencyMs: fastLatencyMs,
@@ -621,7 +707,7 @@ export async function executeDualTrack(
     const memory = scanner.getReviewMemory();
     const trajectory = scanner.getTrajectoryManager();
     const scorer = scanner.getQualityScorer();
-    const author = options.author || 'agent-worker';
+    const author = options.author || DEFAULT_AGENT_AUTHOR;
     const archetype = options.archetype || scanner.getArchetype?.();
 
     // ----------------------------------------------------------------------
@@ -635,7 +721,7 @@ export async function executeDualTrack(
     };
 
     for (const input of inputs) {
-        await auditSingleFileInput(
+        await auditSingleFileInput({
             scanner,
             input,
             options,
@@ -645,22 +731,22 @@ export async function executeDualTrack(
             author,
             archetype,
             acc,
-        );
+        });
     }
 
-    const fastVerdict = buildFastTrackVerdict(
+    const fastVerdict = buildFastTrackVerdict({
         acc,
         inputs,
         scorer,
         memory,
         trajectory,
         fastTrackStartTimeMs,
-    );
+    });
 
     // ----------------------------------------------------------------------
     // TRACK 2: DeepTrack (Background Asynchronous Deep Analysis)
     // ----------------------------------------------------------------------
-    const deepPromise = executeDeepTrack(
+    const deepPromise = executeDeepTrack({
         scanner,
         inputs,
         options,
@@ -668,7 +754,7 @@ export async function executeDualTrack(
         channel,
         memory,
         trajectory,
-    );
+    });
 
     return {
         fastVerdict,
