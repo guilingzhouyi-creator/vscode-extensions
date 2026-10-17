@@ -3,8 +3,8 @@
  * File Path: src/analyzers/ts-modern.ts
  * Architecture Role: TS/JS-only style analyzer (a language pack bound to the language family,
  *     never to a project) — the TypeScript counterpart of the Python modernization pack
- * Dependencies & Triggers: core types only; enabled when a config declares `analyzers.ts-modern`;
- *     specialized packs are default-off, so registering it cannot change an existing gate result
+ * Dependencies & Triggers: DeclarativeModernAnalyzer metapack, core types, dimensionLiterals;
+ *     enabled when a config declares `analyzers.ts-modern`.
  * Responsibilities: Report ten modernization findings on `.ts`/`.tsx`/`.js`/`.jsx`/`.mjs`/`.cjs`
  *     files: TSM-VAR-001 (`var`), TSM-REQUIRE-001 (CommonJS `require` inside an ESM module),
  *     TSM-CTOR-001 (wrapper constructors), TSM-ARGS-001 (`arguments`), TSM-SPREAD-001
@@ -12,18 +12,19 @@
  *     TSM-SUBSTR-001 (deprecated `substr`), TSM-REPLACE-001 (string-pattern `replace`, which only
  *     rewrites the first hit), TSM-ANY-001 (explicit `any`) and TSM-TYPE-001 (a named import that
  *     is only ever used in type positions)
- * Exit Semantics & Design Rationale: Pure line scanner over a string/comment-masked copy of the
- *     file; never throws and returns [] for every other language. Masking first keeps `var` inside
- *     a string, a `require(` in a template or a commented-out statement from being reported, while
- *     the heuristics stay keyword-anchored: a missed modernization is preferred over a wrong
- *     rewrite suggestion, and the two judgement-heavy rules (global `replace`, type-only imports)
- *     report at info severity instead of demanding a mechanical rewrite.
+ * Exit Semantics & Design Rationale: Built upon DeclarativeModernAnalyzer; never throws and returns
+ *     [] for non-matching extensions or declaration files (.d.ts). Preserves 100% oracle parity.
  */
-import type { Analyzer, AnalyzerContext, Issue, Severity, AgentActionType } from '../core/types';
+
+import type { Issue } from '../core/types';
 import { SEVERITY_WARNING, SEVERITY_INFO } from '../core/types';
 import { ANALYZER_TYPESCRIPT_MODERN } from '../core/scoring/dimensionLiterals';
-import { maskSourceText, type SourceMaskConfig } from '../core/policy/source-mask';
-import { buildCanonicalIssue } from '../core/reporting/canonical-issue-builder';
+import type { SourceMaskConfig } from '../core/policy/source-mask';
+import {
+    DeclarativeModernAnalyzer,
+    type DeclarativeLineRule,
+    type LineScanContext,
+} from './declarative-modern-pack';
 
 /** Extensions the pack accepts: the content-only path sees every language, so gate on the path. */
 const SUPPORTED_EXTENSIONS = ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'];
@@ -80,91 +81,11 @@ const TS_MASK: SourceMaskConfig = {
     multilineTemplates: true,
 };
 
-/** One keyword-anchored rule: pattern to match on the masked line plus its report text. */
-interface LineRule {
-    /** Canonical rule id (`TSM-TOPIC-NNN`). */
-    rule: string;
-    /** Finding severity. */
-    severity: Severity;
-    /** Pattern run against the masked line. */
-    pattern: RegExp;
-    /** Why the modern form is preferable. */
-    message: string;
-    /** One-line rewrite guidance. */
-    suggestion: string;
-}
-
 const RULE_TSM_INCLUDES = 'TSM-INCLUDES-001';
 const RULE_TSM_REQUIRE = 'TSM-REQUIRE-001';
 const RULE_TSM_REPLACE = 'TSM-REPLACE-001';
 const LABEL_IMPORTS = 'imports';
 const LABEL_IMPORT = 'import';
-
-/** Keyword rules shared by every supported extension. */
-const LINE_RULES: LineRule[] = [
-    {
-        rule: 'TSM-VAR-001',
-        severity: SEVERITY_WARNING,
-        pattern: VAR_DECL_RE,
-        message:
-            '`var` is function-scoped and hoisted; block-scoped `const` (or `let`) states intent.',
-        suggestion: 'Declare with `const`, or `let` when the binding is reassigned.',
-    },
-    {
-        rule: 'TSM-CTOR-001',
-        severity: SEVERITY_WARNING,
-        pattern: WRAPPER_CTOR_RE,
-        message: 'Wrapper constructor called with `new`; a literal or the primitive is equivalent.',
-        suggestion: 'Use `[]`, `{}`, `String(x)`, `Number(x)` or `Boolean(x)` instead of `new`.',
-    },
-    {
-        rule: 'TSM-ARGS-001',
-        severity: SEVERITY_WARNING,
-        pattern: ARGUMENTS_USE_RE,
-        message: '`arguments` is array-like, untyped and unavailable in arrow functions.',
-        suggestion: 'Take a rest parameter (`(...args: T[])`) and use it directly.',
-    },
-    {
-        rule: 'TSM-SPREAD-001',
-        severity: SEVERITY_WARNING,
-        pattern: OBJECT_ASSIGN_RE,
-        message: '`Object.assign({}, …)` shallow-merges where object spread says the same thing.',
-        suggestion:
-            'Merge with `{ ...source }`, which is typed and avoids the empty-object argument.',
-    },
-    {
-        rule: RULE_TSM_INCLUDES,
-        severity: SEVERITY_WARNING,
-        pattern: INDEX_OF_BOUNDARY_RE,
-        message: '`indexOf` compared against -1/0 is less direct than the boolean the check wants.',
-        suggestion:
-            'Use `includes(value)` (or `indexOf(...) >= 0` when the index itself is needed).',
-    },
-    {
-        rule: 'TSM-SUBSTR-001',
-        severity: SEVERITY_WARNING,
-        pattern: SUBSTR_RE,
-        message: '`String.prototype.substr` is deprecated and absent from the language standard.',
-        suggestion: 'Use `slice(start, start + length)`, which has identical semantics here.',
-    },
-];
-
-/**
- * Structured finding factory shared by every rule, so ids and locations stay uniform.
- *
- * @param file - Normalized repository-relative path.
- * @param lineIndex - Zero-based index of the reported line.
- * @param rule - Canonical rule id.
- * @param severity - Finding severity.
- * @param message - Why the modern form is preferable.
- * @param suggestion - One-line rewrite guidance.
- * @param detail - Structured evidence for machines (masked line, candidates, …).
- * @param column - 1-based column of the evidence on that line.
- * @returns The finding, ready to be pushed onto the result list.
- */
-const ACTION_REPLACE_TOKEN: AgentActionType = 'replace_token';
-const ACTION_SPLIT_FUNCTION: AgentActionType = 'split_function';
-const ACTION_APPLY_GUARD: AgentActionType = 'apply_guard_clause';
 
 const SNIPPET_VAR = 'const $1 = $2;';
 const SNIPPET_CTOR = '[]';
@@ -178,156 +99,187 @@ const SNIPPET_TYPE = 'import type { $1 } from $2;';
 const SNIPPET_REQUIRE = 'import $1 from $2;';
 const SNIPPET_DISP = 'context.subscriptions.push($1);';
 
-const CODE_TSM_001 = 'AR:TSM:001';
-const CODE_TSM_002 = 'AR:TSM:002';
-const CODE_TSM_003 = 'AR:TSM:003';
-const CODE_TSM_004 = 'AR:TSM:004';
-const CODE_TSM_005 = 'AR:TSM:005';
-const CODE_TSM_006 = 'AR:TSM:006';
-const CODE_TSM_007 = 'AR:TSM:007';
-const CODE_TSM_008 = 'AR:TSM:008';
-const CODE_TSM_009 = 'AR:TSM:009';
-const CODE_TSM_010 = 'AR:TSM:010';
-const CODE_TSM_011 = 'AR:TSM:011';
+const ISOLATED_DISPOSABLE_RE =
+    /^\s*(?:vscode\.(?:window|workspace|languages|commands)\.(?:onDidChange[A-Za-z0-9_]+|onDidOpen[A-Za-z0-9_]+|onDidClose[A-Za-z0-9_]+|onDidSave[A-Za-z0-9_]+|registerCommand|registerTextEditorCommand)|setInterval)\s*\(/;
 
-type TsmActionTuple = readonly [action: AgentActionType, code: string, snippet: string];
+function isTypedPath(file: string): boolean {
+    return TYPED_EXTENSIONS.some((extension) => file.endsWith(extension));
+}
 
-const TSM_ACTION_TUPLES: Record<string, TsmActionTuple> = {
-    'TSM-VAR-001': [ACTION_REPLACE_TOKEN, CODE_TSM_001, SNIPPET_VAR],
-    'TSM-CTOR-001': [ACTION_REPLACE_TOKEN, CODE_TSM_002, SNIPPET_CTOR],
-    'TSM-ARGS-001': [ACTION_SPLIT_FUNCTION, CODE_TSM_003, SNIPPET_ARGS],
-    'TSM-SPREAD-001': [ACTION_REPLACE_TOKEN, CODE_TSM_004, SNIPPET_SPREAD],
-    'TSM-INCLUDES-001': [ACTION_REPLACE_TOKEN, CODE_TSM_005, SNIPPET_INCLUDES],
-    'TSM-SUBSTR-001': [ACTION_REPLACE_TOKEN, CODE_TSM_006, SNIPPET_SUBSTR],
-    'TSM-REPLACE-001': [ACTION_REPLACE_TOKEN, CODE_TSM_007, SNIPPET_REPLACE],
-    'TSM-ANY-001': [ACTION_REPLACE_TOKEN, CODE_TSM_008, SNIPPET_ANY],
-    'TSM-TYPE-001': [ACTION_REPLACE_TOKEN, CODE_TSM_009, SNIPPET_TYPE],
-    'TSM-REQUIRE-001': [ACTION_REPLACE_TOKEN, CODE_TSM_010, SNIPPET_REQUIRE],
-    'TSM-DISP-001': [ACTION_APPLY_GUARD, CODE_TSM_011, SNIPPET_DISP],
+/** Declarative line-level rules for TypeScript/JavaScript modernization. */
+const TS_LINE_RULES: readonly DeclarativeLineRule[] = [
+    {
+        rule: 'TSM-VAR-001',
+        severity: SEVERITY_WARNING,
+        pattern: VAR_DECL_RE,
+        message:
+            '`var` is function-scoped and hoisted; block-scoped `const` (or `let`) states intent.',
+        suggestion: 'Declare with `const`, or `let` when the binding is reassigned.',
+        actionable: {
+            action: 'replace_token',
+            codeId: '001',
+            templateSnippet: SNIPPET_VAR,
+        },
+    },
+    {
+        rule: 'TSM-CTOR-001',
+        severity: SEVERITY_WARNING,
+        pattern: WRAPPER_CTOR_RE,
+        message: 'Wrapper constructor called with `new`; a literal or the primitive is equivalent.',
+        suggestion: 'Use `[]`, `{}`, `String(x)`, `Number(x)` or `Boolean(x)` instead of `new`.',
+        actionable: {
+            action: 'replace_token',
+            codeId: '002',
+            templateSnippet: SNIPPET_CTOR,
+        },
+    },
+    {
+        rule: 'TSM-ARGS-001',
+        severity: SEVERITY_WARNING,
+        pattern: ARGUMENTS_USE_RE,
+        message: '`arguments` is array-like, untyped and unavailable in arrow functions.',
+        suggestion: 'Take a rest parameter (`(...args: T[])`) and use it directly.',
+        actionable: {
+            action: 'split_function',
+            codeId: '003',
+            templateSnippet: SNIPPET_ARGS,
+        },
+    },
+    {
+        rule: 'TSM-SPREAD-001',
+        severity: SEVERITY_WARNING,
+        pattern: OBJECT_ASSIGN_RE,
+        message: '`Object.assign({}, …)` shallow-merges where object spread says the same thing.',
+        suggestion:
+            'Merge with `{ ...source }`, which is typed and avoids the empty-object argument.',
+        actionable: {
+            action: 'replace_token',
+            codeId: '004',
+            templateSnippet: SNIPPET_SPREAD,
+        },
+    },
+    {
+        rule: RULE_TSM_INCLUDES,
+        severity: SEVERITY_WARNING,
+        pattern: INDEX_OF_BOUNDARY_RE,
+        message: '`indexOf` compared against -1/0 is less direct than the boolean the check wants.',
+        suggestion:
+            'Use `includes(value)` (or `indexOf(...) >= 0` when the index itself is needed).',
+        actionable: {
+            action: 'replace_token',
+            codeId: '005',
+            templateSnippet: SNIPPET_INCLUDES,
+        },
+    },
+    {
+        rule: 'TSM-SUBSTR-001',
+        severity: SEVERITY_WARNING,
+        pattern: SUBSTR_RE,
+        message: '`String.prototype.substr` is deprecated and absent from the language standard.',
+        suggestion: 'Use `slice(start, start + length)`, which has identical semantics here.',
+        actionable: {
+            action: 'replace_token',
+            codeId: '006',
+            templateSnippet: SNIPPET_SUBSTR,
+        },
+    },
+    {
+        rule: RULE_TSM_REQUIRE,
+        severity: SEVERITY_WARNING,
+        pattern: REQUIRE_CALL_RE,
+        condition: (ctx: LineScanContext) => ESM_SYNTAX_RE.test(ctx.allMaskedLines.join('\n')),
+        message: 'CommonJS `require` in a module that already uses ESM syntax.',
+        suggestion:
+            'Import the binding (`import x from "m"` / `import { y } from "m"`) instead.',
+        actionable: {
+            action: 'replace_token',
+            codeId: '010',
+            templateSnippet: SNIPPET_REQUIRE,
+        },
+    },
+    {
+        rule: 'TSM-ANY-001',
+        severity: SEVERITY_WARNING,
+        pattern: ANY_TYPE_RE,
+        condition: (ctx: LineScanContext) => isTypedPath(ctx.file),
+        message: 'Explicit `any` disables checking for every value it touches.',
+        suggestion:
+            'Prefer `unknown` plus a narrowing check, or a precise generic/union type.',
+        actionable: {
+            action: 'replace_token',
+            codeId: '008',
+            templateSnippet: SNIPPET_ANY,
+        },
+    },
+];
+
+const DISP_RULE_DEF: DeclarativeLineRule = {
+    rule: 'TSM-DISP-001',
+    severity: SEVERITY_WARNING,
+    message:
+        'Disposable resource/listener created in isolated statement without tracking in subscriptions.',
+    suggestion:
+        'Pass to `context.subscriptions.push(...)` or store in a Disposable collection to prevent memory leaks.',
+    actionable: {
+        action: 'apply_guard_clause',
+        codeId: '011',
+        templateSnippet: SNIPPET_DISP,
+    },
 };
 
-const TSM_ACTIONABLE_MAP: Record<
-    string,
-    { action: AgentActionType; code: string; safeToAutomate: boolean; templateSnippet: string }
-> = Object.fromEntries(
-    Object.entries(TSM_ACTION_TUPLES).map(([rule, [action, code, templateSnippet]]) => [
-        rule,
-        { action, code, safeToAutomate: false, templateSnippet },
-    ]),
-);
+const REPLACE_RULE_DEF: DeclarativeLineRule = {
+    rule: RULE_TSM_REPLACE,
+    severity: SEVERITY_INFO,
+    message: '`replace` with a string pattern rewrites only the first occurrence.',
+    suggestion: 'Use `replaceAll(pattern, value)` when every occurrence should change.',
+    actionable: {
+        action: 'replace_token',
+        codeId: '007',
+        templateSnippet: SNIPPET_REPLACE,
+    },
+};
 
-interface TsModernIssueOptions {
-    readonly file: string;
-    readonly lineIndex: number;
-    readonly rule: string;
-    readonly severity: Severity;
-    readonly message: string;
-    readonly suggestion: string;
-    readonly detail: Record<string, unknown>;
-    readonly column: number;
-}
-
-function makeIssue(options: TsModernIssueOptions): Issue {
-    const { file, lineIndex, rule, severity, message, suggestion, detail, column } = options;
-    const line = lineIndex + 1;
-    const mapped = TSM_ACTIONABLE_MAP[rule];
-    const actionable = mapped
-        ? {
-              action: mapped.action,
-              code: mapped.code,
-              safeToAutomate: mapped.safeToAutomate,
-              templateSnippet: mapped.templateSnippet,
-          }
-        : undefined;
-
-    return buildCanonicalIssue({
-        analyzer: ANALYZER_TYPESCRIPT_MODERN,
-        rule,
-        file,
-        line,
-        column,
-        severity,
-        message,
-        suggestion,
-        detail,
-        actionable,
-    });
-}
-
-/**
- * Count the non-overlapping matches of a pattern in one masked line.
- *
- * @param code - Masked line to search.
- * @param pattern - Global or non-global pattern; a copy with the `g` flag is used internally.
- * @returns Number of matches.
- */
-function countMatches(code: string, pattern: RegExp): number {
-    pattern.lastIndex = 0;
-    return code.match(pattern)?.length ?? 0;
-}
-
-const REGEX_ESCAPE_RE = /[.*+?^${}()|[\]\\]/g;
-const REGEX_MATCH_SUBSTITUTION = '\\$&';
-
-/**
- * Escape the characters that are special to a regular expression.
- *
- * @param text - Literal text (an imported identifier).
- * @returns Text safe to interpolate into a pattern.
- */
-function escapeRegExp(text: string): string {
-    return text.replace(REGEX_ESCAPE_RE, REGEX_MATCH_SUBSTITUTION);
-}
+const TYPE_IMPORT_RULE_DEF: DeclarativeLineRule = {
+    rule: 'TSM-TYPE-001',
+    severity: SEVERITY_INFO,
+    message: 'Named import used only as a type.',
+    suggestion: 'Mark the clause `import type { … }` so the binding is erased at compile time.',
+    actionable: {
+        action: 'replace_token',
+        codeId: '009',
+        templateSnippet: SNIPPET_TYPE,
+    },
+};
 
 /** TypeScript/JavaScript modernization pack: ten rules over a masked view of the file. */
-export class TsModernAnalyzer implements Analyzer {
-    name = ANALYZER_TYPESCRIPT_MODERN;
-
-    /**
-     * Streaming-path entry point: the engine invokes this once per file. Content-only analyzers
-     * must expose it, because the legacy `analyze` path exists for the TS-family adapters only.
-     *
-     * @param ctx - Analyzer context carrying the file content and path.
-     * @returns All findings for the file.
-     */
-    finalize(ctx: AnalyzerContext): Issue[] {
-        return this.analyze(undefined, ctx);
+export class TsModernAnalyzer extends DeclarativeModernAnalyzer {
+    constructor() {
+        super({
+            analyzerId: ANALYZER_TYPESCRIPT_MODERN,
+            fileExtensions: SUPPORTED_EXTENSIONS,
+            maskConfig: TS_MASK,
+            pathFilter: (filePath: string) => !filePath.endsWith(DECLARATION_SUFFIX),
+            rules: [...TS_LINE_RULES, DISP_RULE_DEF, REPLACE_RULE_DEF, TYPE_IMPORT_RULE_DEF],
+            multiLineScanner: (raw, masked, file, issues) => {
+                this.scanMultiLine(raw, masked, file, issues);
+            },
+        });
     }
 
-    /**
-     * Scan one TypeScript/JavaScript file for modernization findings.
-     *
-     * @param _sf - Unused TypeScript source file (kept for the analyzer contract).
-     * @param ctx - Analyzer context carrying the file content and path.
-     * @returns All findings for the file.
-     */
-    analyze(_sf: unknown, ctx: AnalyzerContext): Issue[] {
-        const file = ctx.filePath.replace(/\\/g, '/');
-        if (!this.checkAcceptance(file)) return [];
-        const content = ctx.content || '';
-        if (content.length === 0) return [];
-        const { raw, masked } = maskSourceText(content, TS_MASK);
-        const out: Issue[] = [];
-
-        this.reportLineRules(masked, file, out);
-        this.reportRequireCalls(masked, file, out);
-        this.reportStringPatternReplace(masked, raw, file, out);
+    private scanMultiLine(
+        raw: readonly string[],
+        masked: readonly string[],
+        file: string,
+        out: Issue[],
+    ): void {
         this.reportDisposableLeaks(masked, file, out);
-        if (this.isTyped(file)) {
-            this.reportExplicitAny(masked, file, out);
+        this.reportStringPatternReplace(masked, raw, file, out);
+        if (isTypedPath(file)) {
             this.reportTypeOnlyImports(masked, raw, file, out);
         }
-        return out;
     }
 
-    /**
-     * Report isolated Disposable creations / event registrations that are not
-     * tracked in subscriptions.
-     */
-    private reportDisposableLeaks(masked: string[], file: string, out: Issue[]): void {
-        const ISOLATED_DISPOSABLE_RE =
-            /^\s*(?:vscode\.(?:window|workspace|languages|commands)\.(?:onDidChange[A-Za-z0-9_]+|onDidOpen[A-Za-z0-9_]+|onDidClose[A-Za-z0-9_]+|onDidSave[A-Za-z0-9_]+|registerCommand|registerTextEditorCommand)|setInterval)\s*\(/;
-
+    private reportDisposableLeaks(masked: readonly string[], file: string, out: Issue[]): void {
         let openParenDepth = 0;
         for (let i = 0; i < masked.length; i++) {
             const line = masked[i];
@@ -337,21 +289,16 @@ export class TsModernAnalyzer implements Analyzer {
             const isStartOfDisposable = ISOLATED_DISPOSABLE_RE.test(line);
             const notPassedAsArg = !isArgOnPreviousLine(masked, i);
             if (isStartOfDisposable && openParenDepth === 0 && notPassedAsArg) {
-                const m = line.match(ISOLATED_DISPOSABLE_RE)!;
+                const matchResult = line.match(ISOLATED_DISPOSABLE_RE)!;
                 const col = findFirstNonWhitespaceColumn(line);
                 out.push(
-                    makeIssue({
+                    this.emitIssue(
+                        DISP_RULE_DEF,
                         file,
-                        lineIndex: i,
-                        rule: 'TSM-DISP-001',
-                        severity: SEVERITY_WARNING,
-                        message:
-                            'Disposable resource/listener created in isolated statement without tracking in subscriptions.',
-                        suggestion:
-                            'Pass to `context.subscriptions.push(...)` or store in a Disposable collection to prevent memory leaks.',
-                        detail: { matched: m[0].trim() },
-                        column: col,
-                    }),
+                        i + 1,
+                        { matched: matchResult[0].trim() },
+                        col,
+                    ),
                 );
             }
 
@@ -359,106 +306,9 @@ export class TsModernAnalyzer implements Analyzer {
         }
     }
 
-    /**
-     * Report whether the pack accepts this path.
-     *
-     * @param file - Normalized repository-relative path.
-     * @returns True for a supported extension that is not a declaration file.
-     */
-    private checkAcceptance(file: string): boolean {
-        if (file.endsWith(DECLARATION_SUFFIX)) return false;
-        return SUPPORTED_EXTENSIONS.some((extension) => file.endsWith(extension));
-    }
-
-    /**
-     * Report whether the file can carry type annotations.
-     *
-     * @param file - Normalized repository-relative path.
-     * @returns True for TypeScript sources (declaration files are already filtered out).
-     */
-    private isTyped(file: string): boolean {
-        return TYPED_EXTENSIONS.some((extension) => file.endsWith(extension));
-    }
-
-    private applyLineRulesToCode(code: string, file: string, index: number, out: Issue[]): void {
-        for (const rule of LINE_RULES) {
-            if (!rule.pattern.test(code)) continue;
-            out.push(
-                makeIssue({
-                    file,
-                    lineIndex: index,
-                    rule: rule.rule,
-                    severity: rule.severity,
-                    message: rule.message,
-                    suggestion: rule.suggestion,
-                    detail: { line: code.trim() },
-                    column: 1,
-                }),
-            );
-        }
-    }
-
-    /**
-     * Run the keyword rules over every masked line.
-     *
-     * @param masked - Masked lines.
-     * @param file - Normalized repository-relative path.
-     * @param out - Finding sink.
-     */
-    private reportLineRules(masked: string[], file: string, out: Issue[]): void {
-        for (let index = 0; index < masked.length; index += 1) {
-            const code = masked[index];
-            if (code.trim().length === 0) continue;
-            this.applyLineRulesToCode(code, file, index, out);
-        }
-    }
-
-    /**
-     * Report CommonJS `require` calls inside a module that already uses ESM syntax.
-     *
-     * A module that is deliberately CommonJS keeps its `require` calls: only the mixed style is a
-     * modernization finding, which is what makes this rule quiet on legacy scripts.
-     *
-     * @param masked - Masked lines.
-     * @param file - Normalized repository-relative path.
-     * @param out - Finding sink.
-     */
-    private reportRequireCalls(masked: string[], file: string, out: Issue[]): void {
-        if (!ESM_SYNTAX_RE.test(masked.join('\n'))) return;
-        for (let index = 0; index < masked.length; index += 1) {
-            const code = masked[index];
-            if (!REQUIRE_CALL_RE.test(code)) continue;
-            out.push(
-                makeIssue({
-                    file,
-                    lineIndex: index,
-                    rule: RULE_TSM_REQUIRE,
-                    severity: SEVERITY_WARNING,
-                    message: 'CommonJS `require` in a module that already uses ESM syntax.',
-                    suggestion:
-                        'Import the binding (`import x from "m"` / `import { y } from "m"`) instead.',
-                    detail: { line: code.trim() },
-                    column: 1,
-                }),
-            );
-        }
-    }
-
-    /**
-     * Report `replace('literal', …)` calls, which rewrite only the first occurrence.
-     *
-     * The masked line proves the call is real code, the raw line proves the first argument is a
-     * string literal; together they distinguish `text.replace('a', 'b')` from a call whose
-     * pattern is a variable or a regular expression.
-     *
-     * @param masked - Masked lines.
-     * @param raw - Raw lines (quotes intact).
-     * @param file - Normalized repository-relative path.
-     * @param out - Finding sink.
-     */
     private reportStringPatternReplace(
-        masked: string[],
-        raw: string[],
+        masked: readonly string[],
+        raw: readonly string[],
         file: string,
         out: Issue[],
     ): void {
@@ -467,63 +317,20 @@ export class TsModernAnalyzer implements Analyzer {
             const match = REPLACE_LITERAL_RE.exec(raw[index]);
             if (!match) continue;
             out.push(
-                makeIssue({
+                this.emitIssue(
+                    REPLACE_RULE_DEF,
                     file,
-                    lineIndex: index,
-                    rule: RULE_TSM_REPLACE,
-                    severity: SEVERITY_INFO,
-                    message: '`replace` with a string pattern rewrites only the first occurrence.',
-                    suggestion:
-                        'Use `replaceAll(pattern, value)` when every occurrence should change.',
-                    detail: { line: masked[index].trim(), quote: match[1] },
-                    column: match.index + 1,
-                }),
+                    index + 1,
+                    { line: masked[index].trim(), quote: match[1] },
+                    match.index + 1,
+                ),
             );
         }
     }
 
-    /**
-     * Report explicit `any` used in a type position.
-     *
-     * @param masked - Masked lines.
-     * @param file - Normalized repository-relative path.
-     * @param out - Finding sink.
-     */
-    private reportExplicitAny(masked: string[], file: string, out: Issue[]): void {
-        for (let index = 0; index < masked.length; index += 1) {
-            const code = masked[index];
-            if (code.trim().length === 0 || !ANY_TYPE_RE.test(code)) continue;
-            out.push(
-                makeIssue({
-                    file,
-                    lineIndex: index,
-                    rule: 'TSM-ANY-001',
-                    severity: SEVERITY_WARNING,
-                    message: 'Explicit `any` disables checking for every value it touches.',
-                    suggestion:
-                        'Prefer `unknown` plus a narrowing check, or a precise generic/union type.',
-                    detail: { line: code.trim() },
-                    column: 1,
-                }),
-            );
-        }
-    }
-
-    /**
-     * Report named imports whose identifiers only ever appear in type positions.
-     *
-     * The check is deliberately conservative: a single value-position occurrence (a call, a
-     * `new`, a member access or a plain reference) clears the import, so the rule proposes
-     * `import type` only when the evidence is unambiguous.
-     *
-     * @param masked - Masked lines.
-     * @param raw - Raw lines (quotes intact), used for the reported evidence text.
-     * @param file - Normalized repository-relative path.
-     * @param out - Finding sink.
-     */
     private reportTypeOnlyImports(
-        masked: string[],
-        raw: string[],
+        masked: readonly string[],
+        raw: readonly string[],
         file: string,
         out: Issue[],
     ): void {
@@ -553,18 +360,18 @@ export class TsModernAnalyzer implements Analyzer {
             }
             if (typeOnly.length === 0) continue;
             const label = typeOnly.length > 1 ? LABEL_IMPORTS : LABEL_IMPORT;
+            const dynamicRule: DeclarativeLineRule = {
+                ...TYPE_IMPORT_RULE_DEF,
+                message: `Named ${label} used only as a type: ${typeOnly.join(', ')}.`,
+            };
             out.push(
-                makeIssue({
+                this.emitIssue(
+                    dynamicRule,
                     file,
-                    lineIndex,
-                    rule: 'TSM-TYPE-001',
-                    severity: SEVERITY_INFO,
-                    message: `Named ${label} used only as a type: ${typeOnly.join(', ')}.`,
-                    suggestion:
-                        'Mark the clause `import type { … }` so the binding is erased at compile time.',
-                    detail: { line: raw[lineIndex].trim(), names: typeOnly },
-                    column: 1,
-                }),
+                    lineIndex + 1,
+                    { line: raw[lineIndex].trim(), names: typeOnly },
+                    1,
+                ),
             );
         }
     }
@@ -581,14 +388,6 @@ export class TsModernAnalyzer implements Analyzer {
         return { lineTotal, lineTyped };
     }
 
-    /**
-     * Accumulate type usage occurrences across candidate lines.
-     *
-     * @param candidateIndices - Iterable of line indexes to scan.
-     * @param scope - Bundled file masking, import index, and compiled pattern scope.
-     * @param mustTestFallbackWord - Whether to pre-test fallback word before full pattern matching.
-     * @returns Total matches and type-position matches across the candidate lines.
-     */
     private computeUsageAcrossLines(
         candidateIndices: Iterable<number>,
         scope: UsageScanScope,
@@ -607,18 +406,9 @@ export class TsModernAnalyzer implements Analyzer {
         return { total, typed };
     }
 
-    /**
-     * Decide whether one imported identifier is used exclusively in type positions.
-     *
-     * @param name - Imported local identifier.
-     * @param masked - Masked lines.
-     * @param importLines - Line indexes holding import clauses, excluded from the usage scan.
-     * @param lineIndexByWord - Pre-indexed line occurrences per candidate identifier.
-     * @returns True when the identifier appears at least once and never in a value position.
-     */
     private isTypeOnlyName(
         name: string,
-        masked: string[],
+        masked: readonly string[],
         importLines: Set<number>,
         lineIndexByWord?: Map<string, Set<number>>,
     ): boolean {
@@ -636,6 +426,18 @@ export class TsModernAnalyzer implements Analyzer {
 
         return total > 0 && typed >= total;
     }
+}
+
+function countMatches(code: string, pattern: RegExp): number {
+    pattern.lastIndex = 0;
+    return code.match(pattern)?.length ?? 0;
+}
+
+const REGEX_ESCAPE_RE = /[.*+?^${}()|[\]\\]/g;
+const REGEX_MATCH_SUBSTITUTION = '\\$&';
+
+function escapeRegExp(text: string): string {
+    return text.replace(REGEX_ESCAPE_RE, REGEX_MATCH_SUBSTITUTION);
 }
 
 const CHAR_CODE_SPACE = 32;
@@ -678,7 +480,10 @@ interface ImportClauseRecord {
     names: string[];
 }
 
-function collectImportClauses(masked: string[], importLines: Set<number>): ImportClauseRecord[] {
+function collectImportClauses(
+    masked: readonly string[],
+    importLines: Set<number>,
+): ImportClauseRecord[] {
     const records: ImportClauseRecord[] = [];
     for (const index of importLines) {
         const clause = NAMED_IMPORT_RE.exec(masked[index]);
@@ -692,7 +497,7 @@ function collectImportClauses(masked: string[], importLines: Set<number>): Impor
 }
 
 interface UsageScanScope {
-    readonly masked: string[];
+    readonly masked: readonly string[];
     readonly importLines: Set<number>;
     readonly patterns: CompiledTypePatterns;
 }
@@ -701,12 +506,6 @@ interface CompiledTypePatterns {
     word: RegExp;
     fallbackWord: RegExp;
     typePatterns: RegExp[];
-}
-
-interface UsageScanScope {
-    readonly masked: string[];
-    readonly importLines: Set<number>;
-    readonly patterns: CompiledTypePatterns;
 }
 
 const typePatternsByNameMap = new Map<string, CompiledTypePatterns>();
@@ -752,7 +551,7 @@ function initializeWordSetEntry(map: Map<string, Set<number>>, word: string): vo
 }
 
 function buildCandidateLineIndex(
-    masked: string[],
+    masked: readonly string[],
     importLines: Set<number>,
     records: ImportClauseRecord[],
 ): Map<string, Set<number>> {
@@ -784,7 +583,7 @@ function buildCandidateLineIndex(
 
 const PREV_LINE_ARG_TERMINATOR_RE = /[(=,[]$/;
 
-function isArgOnPreviousLine(masked: string[], start: number): boolean {
+function isArgOnPreviousLine(masked: readonly string[], start: number): boolean {
     for (let prev = start - 1; prev >= 0; prev--) {
         const prevTrim = masked[prev].trim();
         if (prevTrim.length === 0) continue;

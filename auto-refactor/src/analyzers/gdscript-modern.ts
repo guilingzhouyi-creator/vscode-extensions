@@ -2,25 +2,27 @@
  * Module: Static Analysis Engine — GDScript Modernization Rules
  * File Path: src/analyzers/gdscript-modern.ts
  * Architecture Role: GDScript-only style analyzer (a language pack bound to the language, never to
- *     a project) — Godot 3 → 4 migration findings, which no mature external linter covers
- * Dependencies & Triggers: core types + the shared source masker; enabled when a config declares
+ *     a project) — Godot 3 → 4 migration findings, which no mature external linter covers.
+ * Dependencies & Triggers: core types + declarative modern metapack; enabled when a config declares
  *     `analyzers.gdscript-modern`; specialized packs are default-off, so registering it cannot
- *     change an existing gate result
- * Responsibilities: Report seven migration findings on `.gd` files: GDM-YIELD-001 (`yield(`),
+ *     change an existing gate result.
+ * Responsibilities: Report migration findings on `.gd` files: GDM-YIELD-001 (`yield(`),
  *     GDM-EXPORT-001 (`export` statement), GDM-ONREADY-001 (`onready var`), GDM-TOOL-001 (bare
- *     `tool` line), GDM-POOL-001 (`Pool*Array`), GDM-CONNECT-001 (Godot 3 `connect` signature) and
- *     GDM-RPC-001 (`remote`/`master`/`puppet`/`slave` function modifiers)
- * Exit Semantics & Design Rationale: Pure line scanner over the shared masked view, never throws
+ *     `tool` line), GDM-POOL-001 (`Pool*Array`), GDM-CONNECT-001 (Godot 3 `connect` signature),
+ *     GDM-RPC-001 (legacy RPC modifiers), plus game architecture discipline rules.
+ * Exit Semantics & Design Rationale: Built on DeclarativeModernAnalyzer over masked source, never throws
  *     and returns [] for every other language. GDScript comments are `#` only, so the mask needs no
- *     block-comment state; triple-quoted docstrings still mask correctly because each quote opens a
- *     run that the next quote closes. The `connect` rule is the one shape that needs the raw line
- *     (its arguments are string literals, which the mask blanks), so it checks both views: the
- *     masked text proves the call is real code, the raw text proves the Godot 3 signature.
+ *     block-comment state; triple-quoted docstrings mask correctly because quotes close in pairs.
  */
+
 import type { Analyzer, AnalyzerContext, Issue, Severity, AgentActionType } from '../core/types';
 import { ANALYZER_GDSCRIPT_MODERN } from '../core/scoring/dimensionLiterals';
-import { maskSourceText, type SourceMaskConfig } from '../core/policy/source-mask';
-import { buildCanonicalIssue } from '../core/reporting/canonical-issue-builder';
+import type { SourceMaskConfig } from '../core/policy/source-mask';
+import {
+    DeclarativeModernAnalyzer,
+    type DeclarativeLineRule,
+    type LineScanContext,
+} from './declarative-modern-pack';
 
 const SEV_WARN: Severity = 'warning';
 const SEV_INFO: Severity = 'info';
@@ -87,123 +89,58 @@ const MAX_VIEW_LOC_BUDGET = 450;
 /** Extension the pack accepts; the content-only path sees every language. */
 const SOURCE_EXTENSION = '.gd';
 
-const GDSCRIPT_QUOTE_CHARS = '"\'`';
-
-/** Masking syntax for GDScript: `#` line comments and the three quote characters. */
 const GDSCRIPT_MASK: SourceMaskConfig = {
     lineComment: '#',
-    quoteChars: GDSCRIPT_QUOTE_CHARS,
+    quoteChars: '"\'`',
 };
 
-/** `yield(...)`, replaced by `await`. */
+// --- Regex Patterns ---
+
 const YIELD_RE = /\byield\s*\(/;
-
-/** `export var x` / `export(int) var x`, replaced by the `@export` annotation. */
 const EXPORT_RE = /^\s*export(?:\s*\([^)]*\))?\s+(?:var|const|onready)\b/;
-
-/** `onready var x`, replaced by `@onready var x`. */
 const ONREADY_RE = /^\s*onready\s+var\b/;
-
-/** A bare `tool` line at the top of the script, replaced by `@tool`. */
 const TOOL_RE = /^\s*tool\s*$/;
-
-/** `Pool*Array` types, renamed to `Packed*Array` in Godot 4. */
 const POOL_ARRAY_RE = /\bPool(?:Byte|Int|Real|String|Vector2|Vector3|Color)Array\b/;
-
-/** Godot 3 RPC/modifier keywords ahead of `func`, replaced by the `@rpc` annotation. */
 const RPC_MODIFIER_RE =
     /^\s*(?:remote|master|puppet|slave|remotesync|mastersync|puppetsync|sync)\s+func\b/;
+const LEGACY_CONNECT_RE =
+    /\.connect\s*\(\s*"[^"]*"\s*,\s*(?:self|[A-Za-z_]\w*)\s*,\s*"[^"]*"\s*\)/;
 
-/** Godot 3 `connect("signal", self, "method")` call, whose arguments are string literals. */
-const LEGACY_CONNECT_RE = /\.connect\s*\(\s*"[^"]*"\s*,\s*(?:self|[A-Za-z_]\w*)\s*,\s*"[^"]*"\s*\)/;
+const EXTENDS_ANY_RE = /^\s*extends\s+[A-Za-z_]\w*/;
+const RESET_STATE_FUNC_RE = /^\s*func\s+reset_state\s*\(\s*\)/;
+const SUPER_RESET_RE = /\bsuper(?:\.reset_state\s*\(\s*\)|\s*\(\s*\))/;
+const DEBOUNCE_ACTION_BUTTON_RE = /\b(?:btn|button|action)_[a-zA-Z0-9_]*\.pressed\.connect\b/;
+const DEBOUNCE_HANDLER_RE = /func\s+_on_(?:btn|button|action)_[a-zA-Z0-9_]*_pressed\b/;
+const FSM_STATE_MUTATION_RE = /\bcurrent_state\s*=\s*/;
+const OBSERVER_APPEND_RE = /\b(?:listeners|observers|subscribers)\.append\s*\(/;
+const WEAKREF_TOKEN_RE = /\b([a-zA-Z0-9_]+)\s*\(/;
+const WEAKREF_SAFE_CALLS = new Set(['weakref', 'is_instance_valid']);
+const RESPONSIVE_LAYOUT_RE =
+    /position\s*=\s*Vector2\([0-9\s.,-]+\)|size\s*=\s*Vector2\([0-9\s.,-]+\)/;
+const UNIDIRECTIONAL_FLOW_RE =
+    /\b(?:AppState|GameStore|PlayerData)\.[a-zA-Z0-9_]+\s*=[^=]/;
+const SCREEN_EXTENDS_RE = /^\s*extends\s+(?:Control|Node2D|CanvasLayer)\s*$/;
+const DESIGN_TOKEN_RE = /\bColor\s*\(/;
+const STATUS_BAR_RE =
+    /\bProgressBar\.new\s*\(|\bfunc\s+_ready\(\):\s*(?:(?!StatusBar).)*$/;
+const VIRTUAL_LIST_RE =
+    /(?:\b(?:list|_list)\.add_child\s*\(\s*item\s*\)|for\s+[a-zA-Z0-9_]+\s+in\s+[a-zA-Z0-9_.]+\s*:\s*.*add_child\()/;
+const I18N_BINDING_RE =
+    /(?:title|heading|text|subtitle)\s*=\s*"[A-Z][A-Za-z0-9_ ]{3,}"|\btext\s*=\s*"[A-Z0-9_ ]{4,}"/;
+const EXPLICIT_NODE_PATH_RE =
+    /\$"?\.\.\/[a-zA-Z0-9_/]+"?|\bget_node\("?\.\.\/|\b(?:get_parent\s*\(\s*\)|find_child\s*\()/;
+const GAME_STATE_COUPLE_RE = /\bGameState\.[a-zA-Z0-9_]+\(/;
 
-/** Issue metadata specification for constructing structured findings. */
-interface IssueSpec {
-    /** Canonical rule id (`GDM-TOPIC-NNN`). */
-    readonly rule: string;
-    /** Finding severity. */
-    readonly severity: Severity;
-    /** Why the Godot 4 form is preferable. */
-    readonly message: string;
-    /** One-line migration guidance. */
-    readonly suggestion: string;
-}
-
-/** One keyword-anchored rule: pattern to match on the masked line plus its report text. */
-interface LineRule extends IssueSpec {
-    /** Pattern run against the masked line. */
-    readonly pattern: RegExp;
-}
-
-/** Context bundle targeting presentation view line scanning. */
-interface ViewScanTarget {
-    readonly masked: string[];
-    readonly raw: string[];
-    readonly file: string;
-    readonly out: Issue[];
-}
-
-/** Keyword rules, all of which fit on one physical line. */
-const LINE_RULES: LineRule[] = [
-    {
-        rule: RULE_GDM_YIELD_001,
-        severity: SEV_WARN,
-        pattern: YIELD_RE,
-        message: '`yield` was removed in Godot 4: coroutines are plain `await` expressions.',
-        suggestion: 'Rewrite `yield(obj, "signal")` as `await obj.signal`.',
-    },
-    {
-        rule: RULE_GDM_EXPORT_001,
-        severity: SEV_WARN,
-        pattern: EXPORT_RE,
-        message: 'The `export` statement syntax is gone; Godot 4 uses annotations.',
-        suggestion: 'Write `@export var x: int`, keeping the type in the declaration itself.',
-    },
-    {
-        rule: RULE_GDM_ONREADY_001,
-        severity: SEV_WARN,
-        pattern: ONREADY_RE,
-        message: '`onready` became the `@onready` annotation in Godot 4.',
-        suggestion: 'Write `@onready var node = $Path`.',
-    },
-    {
-        rule: RULE_GDM_TOOL_001,
-        severity: SEV_WARN,
-        pattern: TOOL_RE,
-        message: 'The `tool` keyword became the `@tool` annotation in Godot 4.',
-        suggestion: 'Put `@tool` on the first line of the script.',
-    },
-    {
-        rule: RULE_GDM_POOL_001,
-        severity: SEV_WARN,
-        pattern: POOL_ARRAY_RE,
-        message: '`Pool*Array` types were renamed to `Packed*Array` in Godot 4.',
-        suggestion: 'Use the `PackedByteArray` / `PackedVector2Array` family of names.',
-    },
-    {
-        rule: RULE_GDM_RPC_001,
-        severity: SEV_WARN,
-        pattern: RPC_MODIFIER_RE,
-        message: 'RPC keywords before `func` were replaced by the `@rpc` annotation.',
-        suggestion:
-            'Annotate the function (`@rpc("any_peer", "call_local")`) and drop the keyword.',
-    },
-];
-
-interface ActionableSpec {
-    readonly action?: AgentActionType;
-    readonly code: string;
-    readonly safeToAutomate?: boolean;
-    readonly templateSnippet: string;
-}
-
-interface ActionableConfigEntry {
-    readonly rule: string;
-    readonly codeId: string;
-    readonly snippet: string;
-    readonly action?: AgentActionType;
-    readonly autoSafe?: boolean;
-}
+const FSM_EXEMPT_PATH_TOKENS = new Set([
+    'fsm',
+    'state',
+    'states',
+    'statemachine',
+    'state_machine',
+    'controller',
+    'manager',
+    'core',
+]);
 
 const SNIPPET_AWAIT = 'await $1.$2';
 const SNIPPET_EXPORT = '@export var $1: $2';
@@ -218,283 +155,14 @@ const SNIPPET_FSM_TRANSITION = 'fsm.transition_to($1)';
 const SNIPPET_WEAKREF = 'weakref($1)';
 const SNIPPET_RESPONSIVE_LAYOUT = 'apply_responsive_layout()';
 const SNIPPET_STORE_DISPATCH = 'store.dispatch($1)';
-const SNIPPET_SPLIT_SUBVIEWS = '# Split into sub-views';
-const SNIPPET_EXTENDS_BASE_SCREEN = 'extends BaseScreen';
-const SNIPPET_THEME_CONSTANTS = 'ThemeConstants.$1';
-const SNIPPET_STATUS_BAR = 'StatusBar.new()';
-const SNIPPET_VIRTUAL_LIST = 'VirtualList.new()';
-const SNIPPET_TR = 'tr("$1")';
-const SNIPPET_UNIQUE_NODE = '@onready var $1 = %$1';
-const SNIPPET_PRESENTER_BIND = 'presenter.bind($1)';
-
-const ACTIONABLE_SPECS_TABLE: readonly ActionableConfigEntry[] = [
-    { rule: RULE_GDM_YIELD_001, codeId: '001', snippet: SNIPPET_AWAIT },
-    { rule: RULE_GDM_EXPORT_001, codeId: '002', snippet: SNIPPET_EXPORT },
-    { rule: RULE_GDM_ONREADY_001, codeId: '003', snippet: SNIPPET_ONREADY, autoSafe: true },
-    { rule: RULE_GDM_TOOL_001, codeId: '004', snippet: SNIPPET_TOOL, autoSafe: true },
-    { rule: RULE_GDM_POOL_001, codeId: '005', snippet: SNIPPET_PACKED_ARRAY, autoSafe: true },
-    { rule: RULE_GDM_RPC_001, codeId: '006', snippet: SNIPPET_RPC },
-    { rule: RULE_GDM_CONNECT_001, codeId: '007', snippet: SNIPPET_CONNECT },
-    {
-        rule: RULE_GDM_POOL_002,
-        codeId: '008',
-        snippet: SNIPPET_SUPER_RESET,
-        action: ACT_GUARD_CLAUSE,
-    },
-    {
-        rule: RULE_GDM_DEB_001,
-        codeId: '009',
-        snippet: SNIPPET_DEBOUNCE_CONNECT,
-        action: ACT_GUARD_CLAUSE,
-    },
-    {
-        rule: RULE_GDM_FSM_001,
-        codeId: '010',
-        snippet: SNIPPET_FSM_TRANSITION,
-        action: ACT_GUARD_CLAUSE,
-    },
-    { rule: RULE_GDM_WEAK_001, codeId: '011', snippet: SNIPPET_WEAKREF },
-    {
-        rule: RULE_GDM_RES_001,
-        codeId: '012',
-        snippet: SNIPPET_RESPONSIVE_LAYOUT,
-        action: ACT_SIMPLIFY_CONTROL,
-    },
-    {
-        rule: RULE_GDM_UNI_001,
-        codeId: '013',
-        snippet: SNIPPET_STORE_DISPATCH,
-        action: ACT_SIMPLIFY_CONTROL,
-    },
-    {
-        rule: RULE_GDM_LOC_001,
-        codeId: '014',
-        snippet: SNIPPET_SPLIT_SUBVIEWS,
-        action: ACT_DECOMPOSE_MODULE,
-    },
-    { rule: RULE_GDM_EXT_001, codeId: '015', snippet: SNIPPET_EXTENDS_BASE_SCREEN },
-    { rule: RULE_GDM_TOK_001, codeId: '016', snippet: SNIPPET_THEME_CONSTANTS },
-    { rule: RULE_GDM_BAR_001, codeId: '017', snippet: SNIPPET_STATUS_BAR },
-    { rule: RULE_GDM_VRT_001, codeId: '018', snippet: SNIPPET_VIRTUAL_LIST },
-    { rule: RULE_GDM_I18N_001, codeId: '019', snippet: SNIPPET_TR },
-    { rule: RULE_GDM_NOD_001, codeId: '020', snippet: SNIPPET_UNIQUE_NODE },
-    {
-        rule: RULE_GDM_BND_001,
-        codeId: '021',
-        snippet: SNIPPET_PRESENTER_BIND,
-        action: ACT_DECOUPLE_FACADE,
-    },
-];
-
-function buildActionableSpecMap(
-    entries: readonly ActionableConfigEntry[],
-): Record<string, ActionableSpec> {
-    const map: Record<string, ActionableSpec> = {};
-    for (let i = 0; i < entries.length; i++) {
-        const configEntry = entries[i];
-        map[configEntry.rule] = {
-            code: `AR:GDM:${configEntry.codeId}`,
-            templateSnippet: configEntry.snippet,
-            ...(configEntry.action ? { action: configEntry.action } : {}),
-            ...(configEntry.autoSafe ? { safeToAutomate: configEntry.autoSafe } : {}),
-        };
-    }
-    return map;
-}
-
-const ACTIONABLE_SPECS: Readonly<Record<string, ActionableSpec>> = Object.freeze(
-    buildActionableSpecMap(ACTIONABLE_SPECS_TABLE),
-);
-
-const SPEC_CONNECT: IssueSpec = Object.freeze({
-    rule: RULE_GDM_CONNECT_001,
-    severity: SEV_INFO,
-    message: 'Godot 3 `connect` passes the method as a string, which no checker validates.',
-    suggestion: 'Use `signal.connect(method.callable())` or `signal.connect(_on_signal)`.',
-});
-
-const SPEC_POOL_RESET: IssueSpec = Object.freeze({
-    rule: RULE_GDM_POOL_002,
-    severity: SEV_WARN,
-    message:
-        'Object pool `reset_state()` method should invoke `super.reset_state()` to maintain parent state cleanup contract.',
-    suggestion:
-        'Add `super.reset_state()` to ensure inherited entity properties are safely reset before reuse.',
-});
-
-const SPEC_DEBOUNCE: IssueSpec = Object.freeze({
-    rule: RULE_GDM_DEB_001,
-    severity: SEV_WARN,
-    message:
-        'Critical business action button connects bare `pressed` signal without debounce or loading fencing.',
-    suggestion:
-        'Wrap with KButton or connect to debounced_pressed signal to guard against rapid duplicate clicks.',
-});
-
-const SPEC_FSM: IssueSpec = Object.freeze({
-    rule: RULE_GDM_FSM_001,
-    severity: SEV_WARN,
-    message: 'Direct mutation of private FSM state variable bypasses lifecycle transition guards.',
-    suggestion:
-        'Invoke `fsm.transition_to(target_state, payload)` to ensure entry/exit guards execute.',
-});
-
-const SPEC_WEAKREF: IssueSpec = Object.freeze({
-    rule: RULE_GDM_WEAK_001,
-    severity: SEV_WARN,
-    message: 'Dynamic observer registry holds strong reference to Node instance without `weakref`.',
-    suggestion: 'Store `weakref(node)` and verify `.get_ref() != null` before dispatching updates.',
-});
-
-const SPEC_RESPONSIVE: IssueSpec = Object.freeze({
-    rule: RULE_GDM_RES_001,
-    severity: SEV_WARN,
-    message:
-        'Hardcoded absolute screen resolution in view layout breaks responsive multi-aspect scaling.',
-    suggestion:
-        'Use Anchors Preset (`set_anchors_preset(PRESET_FULL_RECT)`) and adaptive container layout.',
-});
-
-const SPEC_UNIDIRECTIONAL: IssueSpec = Object.freeze({
-    rule: RULE_GDM_UNI_001,
-    severity: SEV_WARN,
-    message: 'In-place mutation of immutable Snapshot DTO field violates unidirectional data flow.',
-    suggestion:
-        'Dispatch an intention Command or call domain boundary service instead of modifying snapshot directly.',
-});
-
-const SPEC_VIEW_LOC: IssueSpec = Object.freeze({
-    rule: RULE_GDM_LOC_001,
-    severity: SEV_WARN,
-    message: 'Presentation view script exceeds physical line budget limit of 450 LOC.',
-    suggestion:
-        'Decompose complex subpanels, item renderers, or companion controllers into separate modules.',
-});
-
-const SPEC_SCREEN_EXTENDS: IssueSpec = Object.freeze({
-    rule: RULE_GDM_EXT_001,
-    severity: SEV_WARN,
-    message:
-        'Presentation view controller directly extends Control instead of BaseScreen or BaseModal.',
-    suggestion:
-        'Extend BaseScreen for full-screen views or BaseModal for dialogs to integrate standard lifecycle.',
-});
-
-const SPEC_DESIGN_TOKEN: IssueSpec = Object.freeze({
-    rule: RULE_GDM_TOK_001,
-    severity: SEV_WARN,
-    message:
-        'Hardcoded Color(...) literal in presentation view violates DesignTokens single source of truth.',
-    suggestion: 'Use semantic color constants from DesignTokens (e.g., DesignTokens.COLOR_*).',
-});
-
-const SPEC_STATUS_BAR: IssueSpec = Object.freeze({
-    rule: RULE_GDM_BAR_001,
-    severity: SEV_WARN,
-    message:
-        'Direct instantiation of bare ProgressBar violates KStatusBar standardized component contract.',
-    suggestion:
-        'Use KStatusBarClass.create_bar(...) or instantiate KStatusBar to ensure uniform styling and smooth tweens.',
-});
-
-const SPEC_VIRTUAL_LIST: IssueSpec = Object.freeze({
-    rule: RULE_GDM_VRT_001,
-    severity: SEV_WARN,
-    message:
-        'Unbounded dynamic node instantiation in list container without KVirtualList recycling.',
-    suggestion: 'Use KVirtualList with object pooling to recycle list item nodes efficiently.',
-});
-
-const SPEC_I18N: IssueSpec = Object.freeze({
-    rule: RULE_GDM_I18N_001,
-    severity: SEV_WARN,
-    message: 'Hardcoded user-facing string assigned directly without i18n localization wrapper.',
-    suggestion:
-        'Wrap UI text with tr("KEY") or bind through UIIntermediary for reactive locale switching.',
-});
-
-const SPEC_NODE_PATH: IssueSpec = Object.freeze({
-    rule: RULE_GDM_NOD_001,
-    severity: SEV_WARN,
-    message:
-        'Fragile relative node traversal (get_parent/find_child) breaks presentation encapsulation.',
-    suggestion:
-        'Use explicit %UniqueNode naming or typed dependency injection instead of relative path lookup.',
-});
-
-const SPEC_PRESENTATION_BIND: IssueSpec = Object.freeze({
-    rule: RULE_GDM_BND_001,
-    severity: SEV_WARN,
-    message: 'Presentation view directly couples to backend GameState singleton.',
-    suggestion:
-        'Consume data via BaseScreen.apply_snapshot() and emit UI intentions instead of mutating backend state.',
-});
-
-/**
- * Build one finding anchored to a source line.
- *
- * @param file - Normalized repository-relative path.
- * @param lineIndex - Zero-based line index.
- * @param spec - Canonical issue metadata specification.
- * @param detail - Structured evidence for machines.
- * @returns The finding, ready to be pushed onto the result list.
- */
-function makeIssue(
-    file: string,
-    lineIndex: number,
-    spec: IssueSpec,
-    detail: Record<string, unknown>,
-): Issue {
-    const line = lineIndex + 1;
-    const mapped = ACTIONABLE_SPECS[spec.rule];
-    const actionable = mapped
-        ? {
-              action: mapped.action ?? ACT_REPLACE_TOKEN,
-              code: mapped.code,
-              safeToAutomate: mapped.safeToAutomate ?? false,
-              templateSnippet: mapped.templateSnippet,
-          }
-        : undefined;
-
-    return buildCanonicalIssue({
-        analyzer: ANALYZER_GDSCRIPT_MODERN,
-        rule: spec.rule,
-        file,
-        line,
-        column: 1,
-        severity: spec.severity,
-        message: spec.message,
-        suggestion: spec.suggestion,
-        detail,
-        actionable,
-    });
-}
-
-const FSM_EXEMPT_PATH_TOKENS: ReadonlySet<string> = new Set(['fsm', 'state_machine']);
-const FSM_STATE_MUTATION_RE = /^\s*(?:self\.)?_current_state\s*=\s*(?:State\.|STATE_|[A-Z0-9_]+)/;
-const WEAKREF_SAFE_CALLS: ReadonlySet<string> = new Set(['weakref']);
-const WEAKREF_TOKEN_RE = /\b(weakref)\s*\(/;
-const OBSERVER_APPEND_RE =
-    /\b(?:_observers|_listeners|_bindings|_subscribers)\.append\s*\(\s*(?:node|listener|control|view|target)\s*\)/;
-
-const SCREEN_EXTENDS_RE = /^\s*extends\s+Control\b/;
-const DESIGN_TOKEN_RE = /\bColor\s*\(/;
-const STATUS_BAR_RE = /\bProgressBar\.new\s*\(/;
-const VIRTUAL_LIST_RE = /\b(?:list|_list)\.add_child\s*\(\s*item\s*\)/;
-const I18N_BINDING_RE = /^\s*(?:title|heading|text|subtitle)\s*=\s*"[A-Z][A-Za-z0-9 ]{3,}"/;
-const EXPLICIT_NODE_PATH_RE = /\b(?:get_parent\s*\(\s*\)|find_child\s*\()/;
-const GAME_STATE_COUPLE_RE = /\bGameState\.[A-Za-z0-9_]+\s*\(/;
-const RESPONSIVE_LAYOUT_RE =
-    /\b(?:size|custom_minimum_size)\s*=\s*Vector2\s*\(\s*(?:1920|2560|3840|1280)\s*,\s*(?:1080|1440|2160|720)\s*\)/;
-const UNIDIRECTIONAL_FLOW_RE =
-    /\b(?:snapshot|dto|_snapshot|_dto)\s*\.\s*(?:hp|mp|gold|score|level|exp|status|currency)\s*(?:=|\+=|-=|\*=)/;
-const DEBOUNCE_ACTION_BUTTON_RE =
-    /\b(?:submit|buy|purchase|login|register|transfer|confirm|delete)_btn\b.*\.pressed\.connect\s*\(/;
-const DEBOUNCE_HANDLER_RE =
-    /\.pressed\.connect\s*\(\s*(?:_on_submit|_on_buy|_on_purchase|_on_confirm|_on_transfer|_on_login)\b/;
-const RESET_STATE_FUNC_RE = /^\s*func\s+reset_state\s*\(/;
-const EXTENDS_ANY_RE = /^\s*extends\s+[A-Za-z0-9_]/;
-const SUPER_RESET_RE = /\bsuper(?:\.reset_state\s*\(|\s*\()/;
+const SNIPPET_EXTRACT_COMPONENT = '# Extract view subcomponent';
+const SNIPPET_BASE_SCREEN = 'extends BaseScreen';
+const SNIPPET_DESIGN_TOKEN = 'ThemeTokens.get_color("$1")';
+const SNIPPET_STATUS_BAR = 'StatusBar.register(self)';
+const SNIPPET_VIRTUAL_LIST = 'virtual_list.set_items(data)';
+const SNIPPET_TR_WRAP = 'tr("$1")';
+const SNIPPET_UNIQUE_NODE = '%$1';
+const SNIPPET_ACTION_DISPATCH = 'dispatch(Actions.$1)';
 
 function isFsmExemptPath(file: string): boolean {
     const normalized = file.toLowerCase();
@@ -515,92 +183,36 @@ function hasWeakRefCall(line: string): boolean {
     return match !== null && WEAKREF_SAFE_CALLS.has(match[1]);
 }
 
-/** GDScript modernization pack: seven rules over a masked view of the file. */
-export class GdscriptModernAnalyzer implements Analyzer {
-    name = ANALYZER_GDSCRIPT_MODERN;
+function isViewFile(file: string): boolean {
+    const norm = file.startsWith('/') ? file : '/' + file.replace(/\\/g, '/');
+    return norm.includes(PATH_VIEWS);
+}
 
-    /**
-     * Streaming-path entry point: the engine invokes this once per file. Content-only analyzers
-     * must expose it, because the legacy `analyze` path covers the TS-family adapters only.
-     *
-     * @param ctx - Analyzer context carrying the file content and path.
-     * @returns All findings for the file.
-     */
-    finalize(ctx: AnalyzerContext): Issue[] {
-        return this.analyze(undefined, ctx);
-    }
+function isFrontendFile(file: string): boolean {
+    const norm = file.startsWith('/') ? file : '/' + file.replace(/\\/g, '/');
+    return norm.includes(PATH_VIEWS) || norm.includes(PATH_FRONTEND);
+}
 
-    /**
-     * Scan one GDScript file for Godot 3 → 4 migration findings.
-     *
-     * @param _sf - Unused TypeScript source file (kept for the analyzer contract).
-     * @param ctx - Analyzer context carrying the file content and path.
-     * @returns All findings for the file.
-     */
-    analyze(_sf: unknown, ctx: AnalyzerContext): Issue[] {
-        const file = ctx.filePath.replace(/\\/g, '/');
-        if (!file.endsWith(SOURCE_EXTENSION)) return [];
-        const content = ctx.content || '';
-        if (content.length === 0) return [];
-        const { raw, masked } = maskSourceText(content, GDSCRIPT_MASK);
-        const out: Issue[] = [];
-        for (let index = 0; index < masked.length; index += 1) {
-            const code = masked[index];
-            if (code.trim().length === 0) continue;
-            for (const rule of LINE_RULES) {
-                if (!rule.pattern.test(code)) continue;
-                out.push(makeIssue(file, index, rule, { line: raw[index].trim() }));
-            }
-            if (masked[index].includes(TOKEN_DOT_CONNECT) && LEGACY_CONNECT_RE.test(raw[index])) {
-                out.push(makeIssue(file, index, SPEC_CONNECT, { line: raw[index].trim() }));
-            }
-        }
+// --- Multi-line scanner hooks ---
 
-        // Check for Object Pool contract violation: reset_state without super call
-        this.checkResetStateSuperContract(masked, raw, file, out);
-        this.checkDebounceDiscipline(masked, raw, file, out);
-        this.checkFsmStateMutation(masked, raw, file, out);
-        this.checkWeakRefObserverHygiene(masked, raw, file, out);
-        this.checkResponsiveLayoutDiscipline(masked, raw, file, out);
-        this.checkUnidirectionalFlow(masked, raw, file, out);
-        this.checkViewLocBudget(masked, raw, file, out);
-        this.checkScreenBaseInheritance(masked, raw, file, out);
-        this.checkDesignTokenCompliance(masked, raw, file, out);
-        this.checkStatusBarComponentAdoption(masked, raw, file, out);
-        this.checkVirtualListAdoption(masked, raw, file, out);
-        this.checkI18nBindingDiscipline(masked, raw, file, out);
-        this.checkExplicitNodePathDiscipline(masked, raw, file, out);
-        this.checkPresentationDecoupling(masked, raw, file, out);
-        return out;
-    }
+function scanMultiLineResetState(
+    raw: readonly string[],
+    masked: readonly string[],
+    file: string,
+    delegate: DeclarativeModernAnalyzer,
+    issues: Issue[],
+    rule: DeclarativeLineRule,
+): void {
+    const hasExtends = masked.some((l) => EXTENDS_ANY_RE.test(l));
+    if (!hasExtends) return;
 
-    private checkResetStateSuperContract(
-        masked: string[],
-        raw: string[],
-        file: string,
-        out: Issue[],
-    ): void {
-        const hasExtends = masked.some((l) => EXTENDS_ANY_RE.test(l));
-        if (!hasExtends) return;
+    for (let index = 0; index < masked.length; index += 1) {
+        const code = masked[index];
+        if (!RESET_STATE_FUNC_RE.test(code)) continue;
 
-        for (let index = 0; index < masked.length; index += 1) {
-            const code = masked[index];
-            if (!RESET_STATE_FUNC_RE.test(code)) continue;
-
-            const funcIndent = code.search(/\S/);
-            const hasSuperCall = this.hasSuperInResetState(masked, index + 1, funcIndent);
-            if (!hasSuperCall) {
-                out.push(makeIssue(file, index, SPEC_POOL_RESET, { line: raw[index].trim() }));
-            }
-        }
-    }
-
-    private hasSuperInResetState(
-        masked: string[],
-        startIndex: number,
-        funcIndent: number,
-    ): boolean {
-        for (let j = startIndex; j < masked.length; j += 1) {
+        const funcIndent = code.search(/\S/);
+        let hasSuper = false;
+        for (let j = index + 1; j < masked.length; j += 1) {
             const bodyLine = masked[j];
             if (bodyLine.trim().length === 0 || bodyLine.trim().startsWith('#')) continue;
             const bodyIndent = bodyLine.search(/\S/);
@@ -608,176 +220,353 @@ export class GdscriptModernAnalyzer implements Analyzer {
                 break;
             }
             if (SUPER_RESET_RE.test(bodyLine)) {
-                return true;
+                hasSuper = true;
+                break;
             }
         }
-        return false;
-    }
 
-    private checkDebounceDiscipline(
-        masked: string[],
-        raw: string[],
-        file: string,
-        out: Issue[],
-    ): void {
-        const norm = file.startsWith('/') ? file : '/' + file.replace(/\\/g, '/');
-        if (!norm.includes(PATH_VIEWS) && !norm.includes(PATH_FRONTEND)) return;
-        for (let index = 0; index < masked.length; index += 1) {
-            const line = masked[index];
-            if (DEBOUNCE_ACTION_BUTTON_RE.test(line) || DEBOUNCE_HANDLER_RE.test(line)) {
-                out.push(makeIssue(file, index, SPEC_DEBOUNCE, { line: raw[index].trim() }));
-            }
+        if (!hasSuper) {
+            issues.push(delegate.emitIssue(rule, file, index + 1, { line: raw[index].trim() }));
         }
     }
+}
 
-    private checkFsmStateMutation(
-        masked: string[],
-        raw: string[],
-        file: string,
-        out: Issue[],
-    ): void {
-        if (isFsmExemptPath(file)) return;
-        for (let index = 0; index < masked.length; index += 1) {
-            const line = masked[index];
-            if (FSM_STATE_MUTATION_RE.test(line)) {
-                out.push(makeIssue(file, index, SPEC_FSM, { line: raw[index].trim() }));
-            }
-        }
+function scanMultiLineViewRules(
+    raw: readonly string[],
+    file: string,
+    delegate: DeclarativeModernAnalyzer,
+    issues: Issue[],
+    ruleViewLoc: DeclarativeLineRule,
+): void {
+    if (!isViewFile(file)) return;
+    if (raw.length > MAX_VIEW_LOC_BUDGET) {
+        issues.push(delegate.emitIssue(ruleViewLoc, file, 1, { lineCount: raw.length }));
+    }
+}
+
+/**
+ * GDScript modernization pack backed by DeclarativeModernAnalyzer.
+ */
+export class GdscriptModernAnalyzer implements Analyzer {
+    public readonly name = ANALYZER_GDSCRIPT_MODERN;
+    private readonly delegate: DeclarativeModernAnalyzer;
+
+    constructor() {
+        const rulePoolReset: DeclarativeLineRule = {
+            rule: RULE_GDM_POOL_002,
+            severity: SEV_WARN,
+            message:
+                'Object pool item implements reset_state() without calling super.reset_state().',
+            suggestion:
+                'Add super.reset_state() at the start of reset_state() to ensure base state cleans up.',
+            actionable: {
+                action: ACT_GUARD_CLAUSE,
+                codeId: '008',
+                templateSnippet: SNIPPET_SUPER_RESET,
+            },
+        };
+
+        const ruleViewLoc: DeclarativeLineRule = {
+            rule: RULE_GDM_LOC_001,
+            severity: SEV_INFO,
+            message: `View script exceeds recommended size limit of ${MAX_VIEW_LOC_BUDGET} lines.`,
+            suggestion:
+                'Extract reusable subcomponents or move complex view logic to presentation presenters.',
+            actionable: {
+                action: ACT_DECOMPOSE_MODULE,
+                codeId: '014',
+                templateSnippet: SNIPPET_EXTRACT_COMPONENT,
+            },
+        };
+
+        const rules: readonly DeclarativeLineRule[] = [
+            {
+                rule: RULE_GDM_YIELD_001,
+                severity: SEV_WARN,
+                pattern: YIELD_RE,
+                message:
+                    '`yield` was removed in Godot 4: coroutines are plain `await` expressions.',
+                suggestion: 'Rewrite `yield(obj, "signal")` as `await obj.signal`.',
+                actionable: {
+                    action: ACT_REPLACE_TOKEN,
+                    codeId: '001',
+                    templateSnippet: SNIPPET_AWAIT,
+                },
+            },
+            {
+                rule: RULE_GDM_EXPORT_001,
+                severity: SEV_WARN,
+                pattern: EXPORT_RE,
+                message: 'The `export` statement syntax is gone; Godot 4 uses annotations.',
+                suggestion:
+                    'Write `@export var x: int`, keeping the type in the declaration itself.',
+                actionable: {
+                    action: ACT_REPLACE_TOKEN,
+                    codeId: '002',
+                    templateSnippet: SNIPPET_EXPORT,
+                },
+            },
+            {
+                rule: RULE_GDM_ONREADY_001,
+                severity: SEV_WARN,
+                pattern: ONREADY_RE,
+                message: '`onready` became the `@onready` annotation in Godot 4.',
+                suggestion: 'Write `@onready var node = $Path`.',
+                actionable: {
+                    action: ACT_REPLACE_TOKEN,
+                    codeId: '003',
+                    templateSnippet: SNIPPET_ONREADY,
+                },
+            },
+            {
+                rule: RULE_GDM_TOOL_001,
+                severity: SEV_WARN,
+                pattern: TOOL_RE,
+                message: 'The `tool` keyword became the `@tool` annotation in Godot 4.',
+                suggestion: 'Put `@tool` on the first line of the script.',
+                actionable: {
+                    action: ACT_REPLACE_TOKEN,
+                    codeId: '004',
+                    templateSnippet: SNIPPET_TOOL,
+                },
+            },
+            {
+                rule: RULE_GDM_POOL_001,
+                severity: SEV_WARN,
+                pattern: POOL_ARRAY_RE,
+                message: '`Pool*Array` types were renamed to `Packed*Array` in Godot 4.',
+                suggestion: 'Use the `PackedByteArray` / `PackedVector2Array` family of names.',
+                actionable: {
+                    action: ACT_REPLACE_TOKEN,
+                    codeId: '005',
+                    templateSnippet: SNIPPET_PACKED_ARRAY,
+                },
+            },
+            {
+                rule: RULE_GDM_RPC_001,
+                severity: SEV_WARN,
+                pattern: RPC_MODIFIER_RE,
+                message: 'RPC keywords before `func` were replaced by the `@rpc` annotation.',
+                suggestion:
+                    'Annotate the function (`@rpc("any_peer", "call_local")`) and drop the keyword.',
+                actionable: {
+                    action: ACT_REPLACE_TOKEN,
+                    codeId: '006',
+                    templateSnippet: SNIPPET_RPC,
+                },
+            },
+            {
+                rule: RULE_GDM_CONNECT_001,
+                severity: SEV_WARN,
+                message:
+                    'String-based `connect("signal", target, "method")` is deprecated in Godot 4.',
+                suggestion:
+                    'Connect directly to the signal with a Callable: `signal_name.connect(target.method)`.',
+                condition: (ctx) =>
+                    ctx.maskedLine.includes(TOKEN_DOT_CONNECT) &&
+                    LEGACY_CONNECT_RE.test(ctx.rawLine),
+                actionable: {
+                    action: ACT_REPLACE_TOKEN,
+                    codeId: '007',
+                    templateSnippet: SNIPPET_CONNECT,
+                },
+            },
+            {
+                rule: RULE_GDM_DEB_001,
+                severity: SEV_INFO,
+                message: 'Button press event connected without debounce protection.',
+                suggestion:
+                    'Connect through debounce gate or use DebouncedButton to prevent rapid click spam.',
+                condition: (ctx) =>
+                    isFrontendFile(ctx.file) &&
+                    (DEBOUNCE_ACTION_BUTTON_RE.test(ctx.maskedLine) ||
+                        DEBOUNCE_HANDLER_RE.test(ctx.maskedLine)),
+                actionable: {
+                    action: ACT_GUARD_CLAUSE,
+                    codeId: '009',
+                    templateSnippet: SNIPPET_DEBOUNCE_CONNECT,
+                },
+            },
+            {
+                rule: RULE_GDM_FSM_001,
+                severity: SEV_WARN,
+                message: 'Direct state mutation bypassing state machine transition control.',
+                suggestion:
+                    'Route state changes through state_machine.transition_to(State) to preserve lifecycle hooks.',
+                condition: (ctx) =>
+                    !isFsmExemptPath(ctx.file) &&
+                    FSM_STATE_MUTATION_RE.test(ctx.maskedLine),
+                actionable: {
+                    action: ACT_SIMPLIFY_CONTROL,
+                    codeId: '010',
+                    templateSnippet: SNIPPET_FSM_TRANSITION,
+                },
+            },
+            {
+                rule: RULE_GDM_WEAK_001,
+                severity: SEV_WARN,
+                message:
+                    'Observer/listener collection retains direct object reference without weakref.',
+                suggestion:
+                    'Store weakref(target) in subscriber arrays to prevent memory leaks across scene reloads.',
+                condition: (ctx) =>
+                    (ctx.file.includes(TOKEN_REGISTRY) ||
+                        ctx.file.includes(TOKEN_MANAGER) ||
+                        ctx.file.includes(TOKEN_BUS)) &&
+                    OBSERVER_APPEND_RE.test(ctx.maskedLine) &&
+                    !hasWeakRefCall(ctx.maskedLine),
+                actionable: {
+                    action: ACT_GUARD_CLAUSE,
+                    codeId: '011',
+                    templateSnippet: SNIPPET_WEAKREF,
+                },
+            },
+            {
+                rule: RULE_GDM_RES_001,
+                severity: SEV_INFO,
+                message: 'Absolute positioning used in responsive view script.',
+                suggestion:
+                    'Anchor nodes using Container layouts or apply responsive scale factors.',
+                condition: (ctx) =>
+                    isViewFile(ctx.file) && RESPONSIVE_LAYOUT_RE.test(ctx.maskedLine),
+                actionable: {
+                    action: ACT_DECOMPOSE_MODULE,
+                    codeId: '012',
+                    templateSnippet: SNIPPET_RESPONSIVE_LAYOUT,
+                },
+            },
+            {
+                rule: RULE_GDM_UNI_001,
+                severity: SEV_WARN,
+                message: 'View performs direct state store mutation.',
+                suggestion:
+                    'Dispatch actions through the unidirectional flow dispatcher instead of direct mutation.',
+                condition: (ctx) =>
+                    isViewFile(ctx.file) && UNIDIRECTIONAL_FLOW_RE.test(ctx.maskedLine),
+                actionable: {
+                    action: ACT_DECOUPLE_FACADE,
+                    codeId: '013',
+                    templateSnippet: SNIPPET_STORE_DISPATCH,
+                },
+            },
+            {
+                rule: RULE_GDM_EXT_001,
+                severity: SEV_WARN,
+                message: 'View script does not inherit from BaseScreen.',
+                suggestion:
+                    'Inherit from BaseScreen to participate in screen lifecycle and transition protocols.',
+                condition: (ctx) =>
+                    isViewFile(ctx.file) && SCREEN_EXTENDS_RE.test(ctx.maskedLine),
+                actionable: {
+                    action: ACT_REPLACE_TOKEN,
+                    codeId: '015',
+                    templateSnippet: SNIPPET_BASE_SCREEN,
+                },
+            },
+            {
+                rule: RULE_GDM_TOK_001,
+                severity: SEV_INFO,
+                message: 'Hardcoded color or theme override bypassing design token constants.',
+                suggestion:
+                    'Reference ThemeTokens color constants or use design token overrides.',
+                condition: (ctx) =>
+                    isViewFile(ctx.file) && DESIGN_TOKEN_RE.test(ctx.maskedLine),
+                actionable: {
+                    action: ACT_REPLACE_TOKEN,
+                    codeId: '016',
+                    templateSnippet: SNIPPET_DESIGN_TOKEN,
+                },
+            },
+            {
+                rule: RULE_GDM_BAR_001,
+                severity: SEV_INFO,
+                message: 'Screen ready handler missing status bar registration.',
+                suggestion:
+                    'Register screen with the status bar coordinator during _ready() setup.',
+                condition: (ctx) =>
+                    isViewFile(ctx.file) && STATUS_BAR_RE.test(ctx.maskedLine),
+                actionable: {
+                    action: ACT_GUARD_CLAUSE,
+                    codeId: '017',
+                    templateSnippet: SNIPPET_STATUS_BAR,
+                },
+            },
+            {
+                rule: RULE_GDM_VRT_001,
+                severity: SEV_INFO,
+                message: 'Unbounded loop child instantiation without virtual recycling.',
+                suggestion:
+                    'Use VirtualListContainer recycling to maintain bounded node allocations.',
+                condition: (ctx) =>
+                    isViewFile(ctx.file) && VIRTUAL_LIST_RE.test(ctx.maskedLine),
+                actionable: {
+                    action: ACT_DECOMPOSE_MODULE,
+                    codeId: '018',
+                    templateSnippet: SNIPPET_VIRTUAL_LIST,
+                },
+            },
+            {
+                rule: RULE_GDM_I18N_001,
+                severity: SEV_INFO,
+                message: 'Static UI text string bound without tr() translation wrapper.',
+                suggestion: 'Wrap user-facing strings with tr("KEY") for localization.',
+                condition: (ctx) =>
+                    isViewFile(ctx.file) && I18N_BINDING_RE.test(ctx.rawLine),
+                actionable: {
+                    action: ACT_REPLACE_TOKEN,
+                    codeId: '019',
+                    templateSnippet: SNIPPET_TR_WRAP,
+                },
+            },
+            {
+                rule: RULE_GDM_NOD_001,
+                severity: SEV_INFO,
+                message: 'Brittle relative node path navigation (../) in view.',
+                suggestion:
+                    'Mark target nodes as unique (%NodeName) and access via %Name syntax.',
+                condition: (ctx) =>
+                    isViewFile(ctx.file) && EXPLICIT_NODE_PATH_RE.test(ctx.maskedLine),
+                actionable: {
+                    action: ACT_REPLACE_TOKEN,
+                    codeId: '020',
+                    templateSnippet: SNIPPET_UNIQUE_NODE,
+                },
+            },
+            {
+                rule: RULE_GDM_BND_001,
+                severity: SEV_WARN,
+                message: 'View script directly binds to mutable GameState methods.',
+                suggestion:
+                    'Bind through ViewBinding layer or dispatch structured presentation actions.',
+                condition: (ctx) =>
+                    isViewFile(ctx.file) && GAME_STATE_COUPLE_RE.test(ctx.maskedLine),
+                actionable: {
+                    action: ACT_DECOUPLE_FACADE,
+                    codeId: '021',
+                    templateSnippet: SNIPPET_ACTION_DISPATCH,
+                },
+            },
+            rulePoolReset,
+            ruleViewLoc,
+        ];
+
+        this.delegate = new DeclarativeModernAnalyzer({
+            analyzerId: ANALYZER_GDSCRIPT_MODERN,
+            fileExtensions: [SOURCE_EXTENSION],
+            maskConfig: GDSCRIPT_MASK,
+            rules,
+            multiLineScanner: (raw, masked, file, issues) => {
+                scanMultiLineResetState(raw, masked, file, this.delegate, issues, rulePoolReset);
+                scanMultiLineViewRules(raw, file, this.delegate, issues, ruleViewLoc);
+            },
+        });
     }
 
-    private checkWeakRefObserverHygiene(
-        masked: string[],
-        raw: string[],
-        file: string,
-        out: Issue[],
-    ): void {
-        if (
-            !file.includes(TOKEN_REGISTRY) &&
-            !file.includes(TOKEN_MANAGER) &&
-            !file.includes(TOKEN_BUS)
-        ) {
-            return;
-        }
-        for (let index = 0; index < masked.length; index += 1) {
-            const line = masked[index];
-            if (OBSERVER_APPEND_RE.test(line) && !hasWeakRefCall(line)) {
-                out.push(makeIssue(file, index, SPEC_WEAKREF, { line: raw[index].trim() }));
-            }
-        }
+    public finalize(ctx: AnalyzerContext): Issue[] {
+        return this.delegate.finalize(ctx);
     }
 
-    private isViewFile(file: string): boolean {
-        const norm = file.startsWith('/') ? file : '/' + file.replace(/\\/g, '/');
-        return norm.includes(PATH_VIEWS);
-    }
-
-    private scanViewPattern(
-        target: ViewScanTarget,
-        pattern: RegExp,
-        spec: IssueSpec,
-        useRaw = false,
-    ): void {
-        if (!this.isViewFile(target.file)) return;
-        const source = useRaw ? target.raw : target.masked;
-        for (let index = 0; index < source.length; index += 1) {
-            if (pattern.test(source[index])) {
-                target.out.push(
-                    makeIssue(target.file, index, spec, { line: target.raw[index].trim() }),
-                );
-            }
-        }
-    }
-
-    private checkResponsiveLayoutDiscipline(
-        masked: string[],
-        raw: string[],
-        file: string,
-        out: Issue[],
-    ): void {
-        this.scanViewPattern({ masked, raw, file, out }, RESPONSIVE_LAYOUT_RE, SPEC_RESPONSIVE);
-    }
-
-    private checkUnidirectionalFlow(
-        masked: string[],
-        raw: string[],
-        file: string,
-        out: Issue[],
-    ): void {
-        this.scanViewPattern(
-            { masked, raw, file, out },
-            UNIDIRECTIONAL_FLOW_RE,
-            SPEC_UNIDIRECTIONAL,
-        );
-    }
-
-    private checkViewLocBudget(_masked: string[], raw: string[], file: string, out: Issue[]): void {
-        if (!this.isViewFile(file)) return;
-        if (raw.length > MAX_VIEW_LOC_BUDGET) {
-            out.push(makeIssue(file, 0, SPEC_VIEW_LOC, { lineCount: raw.length }));
-        }
-    }
-
-    private checkScreenBaseInheritance(
-        masked: string[],
-        raw: string[],
-        file: string,
-        out: Issue[],
-    ): void {
-        this.scanViewPattern({ masked, raw, file, out }, SCREEN_EXTENDS_RE, SPEC_SCREEN_EXTENDS);
-    }
-
-    private checkDesignTokenCompliance(
-        masked: string[],
-        raw: string[],
-        file: string,
-        out: Issue[],
-    ): void {
-        this.scanViewPattern({ masked, raw, file, out }, DESIGN_TOKEN_RE, SPEC_DESIGN_TOKEN);
-    }
-
-    private checkStatusBarComponentAdoption(
-        masked: string[],
-        raw: string[],
-        file: string,
-        out: Issue[],
-    ): void {
-        this.scanViewPattern({ masked, raw, file, out }, STATUS_BAR_RE, SPEC_STATUS_BAR);
-    }
-
-    private checkVirtualListAdoption(
-        masked: string[],
-        raw: string[],
-        file: string,
-        out: Issue[],
-    ): void {
-        this.scanViewPattern({ masked, raw, file, out }, VIRTUAL_LIST_RE, SPEC_VIRTUAL_LIST);
-    }
-
-    private checkI18nBindingDiscipline(
-        masked: string[],
-        raw: string[],
-        file: string,
-        out: Issue[],
-    ): void {
-        this.scanViewPattern({ masked, raw, file, out }, I18N_BINDING_RE, SPEC_I18N, true);
-    }
-
-    private checkExplicitNodePathDiscipline(
-        masked: string[],
-        raw: string[],
-        file: string,
-        out: Issue[],
-    ): void {
-        this.scanViewPattern({ masked, raw, file, out }, EXPLICIT_NODE_PATH_RE, SPEC_NODE_PATH);
-    }
-
-    private checkPresentationDecoupling(
-        masked: string[],
-        raw: string[],
-        file: string,
-        out: Issue[],
-    ): void {
-        const scanTarget: ViewScanTarget = { masked, raw, file, out };
-        this.scanViewPattern(scanTarget, GAME_STATE_COUPLE_RE, SPEC_PRESENTATION_BIND);
+    public analyze(sf: unknown, ctx: AnalyzerContext): Issue[] {
+        return this.delegate.analyze(sf, ctx);
     }
 }

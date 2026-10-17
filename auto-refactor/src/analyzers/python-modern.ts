@@ -161,6 +161,13 @@ const SPEC_UNION: IssueSpec = Object.freeze({
     suggestion: 'Write `X | None` / `X | Y` instead of Optional/Union.',
 });
 
+const SUGGESTION_ABC =
+    'Import these names from collections.abc (the typing aliases are deprecated).';
+const SUGGESTION_IMPORT_ORDER = 'Sort each import section alphabetically by whole line.';
+const SUGGESTION_SHADOW =
+    'Rename the variable or use a different name to avoid shadowing the outer binding.';
+const TYPEOF_STRING = 'string';
+
 const SPEC_RAISE: IssueSpec = Object.freeze({
     rule: RULE_PYM_RAISE_001,
     severity: SEVERITY_WARNING,
@@ -548,8 +555,7 @@ export class PythonModernAnalyzer implements Analyzer {
                     rule: RULE_PYM_ABC_001,
                     severity: SEVERITY_ERROR,
                     message: `Abstract type(s) ${offenders.join(', ')} belong to collections.abc, not typing.`,
-                    suggestion:
-                        'Import these names from collections.abc (the typing aliases are deprecated).',
+                    suggestion: SUGGESTION_ABC,
                 };
                 emit(lineIndex, spec, { names: offenders });
             }
@@ -707,7 +713,13 @@ export class PythonModernAnalyzer implements Analyzer {
             seenSection = Math.max(seenSection, record.section);
         }
         const sections: ImportRecord[][] = [[], [], []];
-        for (const record of records) sections[record.section].push(record);
+        for (let idx = 0; idx < records.length; idx++) {
+            const currentRecord = records[idx];
+            const targetSection = sections[currentRecord.section];
+            if (targetSection) {
+                targetSection.push(currentRecord);
+            }
+        }
         for (let sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
             this.checkSectionAlphabetical(sections[sectionIndex], sectionIndex, emit);
         }
@@ -726,7 +738,7 @@ export class PythonModernAnalyzer implements Analyzer {
                     rule: RULE_PYM_IMPORT_001,
                     severity: SEVERITY_WARNING,
                     message: `${SECTION_LABELS[sectionIndex]} imports are not alphabetically ordered (expected \`${ordered[recordPos]}\` at this position).`,
-                    suggestion: 'Sort each import section alphabetically by whole line.',
+                    suggestion: SUGGESTION_IMPORT_ORDER,
                 };
                 emit(group[recordPos].line - 1, spec, {
                     line: texts[recordPos],
@@ -774,7 +786,7 @@ export class PythonModernAnalyzer implements Analyzer {
         const ignoreNames = new Set<string>(SHADOW_IGNORE_NAMES);
         if (Array.isArray(raw.ignoreNames)) {
             for (const name of raw.ignoreNames) {
-                if (typeof name === 'string') ignoreNames.add(name);
+                if (typeof name === TYPEOF_STRING) ignoreNames.add(name);
             }
         }
         return { enabled, ignoreNames };
@@ -969,8 +981,7 @@ export class PythonModernAnalyzer implements Analyzer {
                 rule: RULE_PYM_SHADOW_001,
                 severity: SEVERITY_WARNING,
                 message: `Variable \`${name}\` may shadow an outer-scope declaration (line ${outerLine}).`,
-                suggestion:
-                    'Rename the variable or use a different name to avoid shadowing the outer binding.',
+                suggestion: SUGGESTION_SHADOW,
             };
             shadowCtx.emit(targetLine - 1, spec, {
                 name,

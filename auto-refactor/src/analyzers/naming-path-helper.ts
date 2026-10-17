@@ -69,7 +69,7 @@ export function isMorphemePhonetic(token: string): boolean {
 }
 
 const ALLOWED_ACRONYMS_LIST =
-    'id ip db os vm fs ui ci io re fk pk tx rx ch fn cb el sf ns op cp fd src cfg msg idx cnt ctx ptr mgr btn tbl chk doc err len num pos req res str sync async grpc http https html json yaml toml xml css dom url uri urn uuid guid jwt sql cli api sdk dto dao rpc ssl tls tcp udp dns ftp ssh cpu gpu ram rom png jpg svg gif csv tsv pdf ast loc eloc sloc dfa nfa fsm lut swar csr soa aos simd fps rng crc md5 sha ssot pr cd qa env dev prod std fmt log tmp pkg bin lib ref opt arg cmd sys cwd pid gid uid tty zh en ts js py rs gd l1 l2 l3';
+    'id ip db os vm fs ui ci io re fk pk tx rx ch fn cb el sf ns ms us op cp fd src cfg msg idx cnt ctx ptr mgr btn tbl chk doc err len num pos req res str sync async grpc http https html json yaml toml xml css dom url uri urn uuid guid jwt sql cli api sdk dto dao rpc ssl tls tcp udp dns ftp ssh cpu gpu ram rom png jpg svg gif csv tsv pdf ast loc eloc sloc dfa nfa fsm lut swar csr soa aos simd fps rng crc md5 sha ssot pr cd qa env dev prod std fmt log tmp pkg bin lib ref opt arg cmd sys cwd pid gid uid tty zh en ts js py rs gd l1 l2 l3';
 
 /**
  * Standard technical acronyms permitted without vowel phonetics or with domain meaning.
@@ -126,7 +126,7 @@ export function hasTransientJargon(name: string): boolean {
 }
 
 const IGNORED_FILE_BASENAMES = new Set(
-    'index main lib mod api types cli readme changelog license'.split(' '),
+    'index main lib mod api types cli readme changelog license build tests'.split(' '),
 );
 
 const IGNORED_DIRS = new Set(
@@ -576,7 +576,7 @@ function auditDirectoryName(pCtx: PathNamingContext): void {
 }
 
 const APPROVED_ACTION_VERBS_LIST =
-    'abort accumulate add advance aggregate align allocate allows analyze append apply arbitrate as assemble assert attach audit benchmark bind broadcast build calculate can cancel capitalize categorize check clamp classify clean cleanup clear clone close collect compile compose compress compute construct contains convert copy count create debounce decode decompress deduce define delete dequeue derive deserialize destroy detach detect diff dispatch dispose do does drain drop dump emit encode enqueue ensure escape estimate evaluate evict examine execute exists extract fast fetch filter finalize find flatten flush format forward freeze from generate get group guard handle has index infer ingest init initialize inspect install instantiate intercept introduce introduces invert invoke is isolate iterate lint load log lookup loop make map mask match matches measure merge mk mock must needs normalize notify obtain open parse partition patch pause peek perform persist pipe poll pop populate precompute print probe process produce project propagate prune publish pull push put query queue read receive reclaim record redirect reduce refresh register reload remove render rename replace report reset resolve resume retrieve retry review route run safe sanitize save scan schedule score search seed select send serialize set setup shift should solve sort spawn split start stop store strip subscribe sum supports sync synthesize tag test throttle to track transform transpile traverse trigger trim truncate try tune unbind unescape uninstall unregister unshift unwrap update validate verify visit walk was were will wrap write';
+    'abort accumulate add advance aggregate align allocate allows analyze append apply arbitrate as assemble assert attach audit backtrack bench benchmark bind broadcast build calculate can cancel capitalize categorize check clamp classify clean cleanup clear clone close collect compile compose compress compute construct contains convert copy count create debounce decode decompress deduce define delete dequeue derive deserialize destroy detach detect diff dispatch dispose do does drain drop dump emit encode enqueue enrich ensure escape estimate evaluate evict examine execute exists extract fast fetch filter finalize find flatten flush format forward freeze from generate get group guard handle has index infer ingest init initialize inspect install instantiate intercept introduce introduces invert invoke is isolate iterate lint load log lookup loop make map mask match matches measure merge mk mock must needs normalize notify obtain open parse partition patch pause peek perform persist pipe poll pop populate precompute print probe process produce project propagate prune publish pull push put query queue read receive reclaim record redirect reduce refresh register reload remove render rename replace report reset resolve resume retrieve retry review rotate route run safe sanitize save scan schedule score search seed select send serialize set setup shift should solve sort spawn split start stop store strip subscribe sum supports sync synthesize tag test throttle to trace track transform transpile traverse trigger trim truncate try tune unbind unescape uninstall unregister unshift unwrap update validate verify visit walk warm was were will wrap write';
 
 /** Standard engineering action verbs initiating descriptive function identifiers. */
 export const APPROVED_ACTION_VERBS: ReadonlySet<string> = new Set(
@@ -611,6 +611,11 @@ export const EXEMPT_METHOD_NAMES: ReadonlySet<string> = new Set([
     'then',
     'catch',
     'finally',
+    'error',
+    'warn',
+    'info',
+    'debug',
+    'trace',
     'main',
     'analyze',
     'finalize',
