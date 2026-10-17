@@ -24,27 +24,11 @@ const os = require('os');
 const path = require('path');
 
 const { scan, scanDiff, scanDiffDelta, scanAndRender } = require('../dist/api');
-
-const DEFAULT_TMP_DIR = process.env.AUTO_REFACTOR_TMPDIR || path.join(os.tmpdir(), 'ar-diffif');
-try {
-  fs.mkdirSync(DEFAULT_TMP_DIR, { recursive: true });
-} catch {
-  // best-effort
-}
-
-/**
- * Write a set of fixture files into a directory tree.
- *
- * @param root - Absolute directory that receives the files.
- * @param files - Map of relative path to UTF-8 content.
- */
-function writeFiles(root, files) {
-  for (const [name, content] of Object.entries(files)) {
-    const abs = path.join(root, name);
-    fs.mkdirSync(path.dirname(abs), { recursive: true });
-    fs.writeFileSync(abs, content);
-  }
-}
+const {
+  createTempTestDir,
+  cleanupTempDir,
+  deployFixtures,
+} = require('./common/test-runner-harness');
 
 /**
  * Reduce a report to comparable issue tuples.
@@ -88,7 +72,7 @@ const CONFIG = {
 
 async function main() {
   // ── 1. Full scan: all passes, cross-file findings included ──
-  const root = fs.mkdtempSync(path.join(DEFAULT_TMP_DIR, 'ar-diffif-'));
+  const root = createTempTestDir('ar-diffif-');
   const configPath = path.join(root, 'auto-refactor.config.json');
   const baselinePath = path.join(root, 'baseline.json');
   const reportPath = path.join(root, 'report.json');
@@ -109,7 +93,7 @@ async function main() {
     '}\n' +
     'export const A = OTHER;\n';
   try {
-    writeFiles(root, {
+    deployFixtures(root, {
       'auto-refactor.config.json': JSON.stringify(CONFIG, null, 2),
       'src/a.ts': A_NEW,
       'src/b.ts': "import { A } from './a';\nexport const OTHER = A + 1;\n",
@@ -174,7 +158,7 @@ async function main() {
     console.log('  [PASS] delta report is a strict filter of the diff report');
 
     // ── 4. CLI changed-set mode: exact paths, incremental scope declared ──
-    const gitRoot = fs.mkdtempSync(path.join(DEFAULT_TMP_DIR, 'ar-diffcli-'));
+    const gitRoot = createTempTestDir('ar-diffcli-');
     // A fixture repository must not inherit the developer's global git identity, and must never
     // block: with `commit.gpgsign=true` globally and an unavailable keyring, `git commit` waits for
     // a passphrase forever and hangs the entire gate. The timeout turns any future hang into a loud
@@ -193,7 +177,7 @@ async function main() {
         },
       });
     try {
-      writeFiles(gitRoot, {
+      deployFixtures(gitRoot, {
         'auto-refactor.config.json': JSON.stringify(CONFIG, null, 2),
         'src/a.ts': A_OLD,
         'src/new.ts': 'export const FRESH = 7;\n',
@@ -212,7 +196,7 @@ async function main() {
         '-qm',
         'init',
       );
-      writeFiles(gitRoot, { 'src/new.ts': 'export const FRESH = 9;\n' });
+      deployFixtures(gitRoot, { 'src/new.ts': 'export const FRESH = 9;\n' });
 
       const code = await scanAndRender({
         root: gitRoot,
@@ -241,10 +225,10 @@ async function main() {
       );
       console.log('  [PASS] CLI --diff scans only changed paths and declares incremental scope');
     } finally {
-      fs.rmSync(gitRoot, { recursive: true, force: true });
+      cleanupTempDir(gitRoot);
     }
   } finally {
-    fs.rmSync(root, { recursive: true, force: true });
+    cleanupTempDir(root);
   }
 }
 

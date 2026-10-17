@@ -23,6 +23,11 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const {
+  createTempTestDir,
+  cleanupTempDir,
+  deployFixtures,
+} = require('./common/test-runner-harness');
 
 const {
   scan,
@@ -324,15 +329,11 @@ async function main() {
   assert.notStrictEqual(toKey(webRoute), toKey(gameRoute));
   assert.notStrictEqual(toKey(gameRoute), toKey(libRoute));
 
-  const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'archetype-scan-'));
+  const tmpRoot = createTempTestDir('archetype-scan-');
   // Helper to create and scan archetype test fixtures
   const setupWs = (dirName, files) => {
     const wsDir = path.join(tmpRoot, dirName);
-    for (const [rel, content] of Object.entries(files)) {
-      const full = path.join(wsDir, rel);
-      fs.mkdirSync(path.dirname(full), { recursive: true });
-      fs.writeFileSync(full, content);
-    }
+    deployFixtures(wsDir, files);
     return wsDir;
   };
 
@@ -381,7 +382,7 @@ async function main() {
 
     console.log('Archetype activations verified across demo, web, game, library.');
   } finally {
-    fs.rmSync(tmpRoot, { recursive: true, force: true });
+    cleanupTempDir(tmpRoot);
   }
 
   console.log('✔ Archetype Sparse Reviewer Activation on Main Scan Path verified.\n');

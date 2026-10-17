@@ -18,9 +18,10 @@
 
 const assert = require('assert');
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
 const { scan } = require('../dist/api');
+const { createTempTestDir, cleanupTempDir, deployFixtures } = require('./common/test-runner-harness');
+
 
 const LEGACY = [
   '"""Module docstring."""',
@@ -162,20 +163,22 @@ const MODERN_TYPING = [
  * @returns Absolute path of the generated config file.
  */
 function writeWorkspace(root) {
-  fs.writeFileSync(path.join(root, 'legacy.py'), LEGACY);
-  fs.writeFileSync(path.join(root, 'modern.py'), MODERN);
-  fs.writeFileSync(path.join(root, 'edge_cases.py'), EDGE_CASES);
-  fs.writeFileSync(path.join(root, 'legacy_typing.py'), LEGACY_TYPING);
-  fs.writeFileSync(path.join(root, 'modern_typing.py'), MODERN_TYPING);
-  fs.writeFileSync(path.join(root, 'decoy.ts'), 'export const osPath = "os.path.join";\n');
-  const configPath = path.join(root, 'ar.config.json');
-  fs.writeFileSync(configPath, JSON.stringify({}));
-  return configPath;
+  deployFixtures(root, {
+    'legacy.py': LEGACY,
+    'modern.py': MODERN,
+    'edge_cases.py': EDGE_CASES,
+    'legacy_typing.py': LEGACY_TYPING,
+    'modern_typing.py': MODERN_TYPING,
+    'decoy.ts': 'export const osPath = "os.path.join";\n',
+    'ar.config.json': JSON.stringify({}),
+  });
+  return path.join(root, 'ar.config.json');
 }
 
 async function run() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ar-pymod-'));
+  const root = createTempTestDir('ar-pymod');
   try {
+
     const configFile = writeWorkspace(root);
     const report = await scan({
       root,
@@ -255,8 +258,9 @@ async function run() {
     );
     console.log('  [PASS] async/raise edge cases produce no false positives');
   } finally {
-    fs.rmSync(root, { recursive: true, force: true });
+    cleanupTempDir(root);
   }
+
 }
 
 run()

@@ -19,10 +19,11 @@
 
 const assert = require('assert');
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
 
 const { scan } = require('../dist/api');
+const { createTempTestDir, cleanupTempDir, deployFixtures } = require('./common/test-runner-harness');
+
 
 /** One diagnostic shape per rule: the pack must report every id in this list exactly once. */
 const ALL_RULE_IDS = [
@@ -98,13 +99,8 @@ const BOUNDARY_SILENT = "const index = name.indexOf('x') === 2;\n";
  * @returns Live (suppression-free) `TSM-*` findings.
  */
 async function scanFixture(root, files, analyzers) {
-  fs.rmSync(root, { recursive: true, force: true });
-  fs.mkdirSync(root, { recursive: true });
-  for (const [name, content] of Object.entries(files)) {
-    const absolute = path.join(root, name);
-    fs.mkdirSync(path.dirname(absolute), { recursive: true });
-    fs.writeFileSync(absolute, content);
-  }
+  cleanupTempDir(root);
+  deployFixtures(root, files);
   const configFile = path.join(root, 'auto-refactor.config.json');
   fs.writeFileSync(
     configFile,
@@ -115,9 +111,10 @@ async function scanFixture(root, files, analyzers) {
 }
 
 async function main() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ar-ts-modern-'));
+  const root = createTempTestDir('ar-ts-modern');
   const packOn = { 'ts-modern': { enabled: true } };
   try {
+
     // ── 1. Every rule fires on its canonical shape ──
     const hits = await scanFixture(root, { 'src/positive.ts': POSITIVE }, packOn);
     const hitIds = [...new Set(hits.map((issue) => issue.rule))].sort();
@@ -172,8 +169,9 @@ async function main() {
     );
     console.log('  [PASS] indexOf boundary rule fires on >= 0 and stays silent otherwise');
   } finally {
-    fs.rmSync(root, { recursive: true, force: true });
+    cleanupTempDir(root);
   }
+
 }
 
 main()

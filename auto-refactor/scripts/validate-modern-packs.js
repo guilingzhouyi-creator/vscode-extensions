@@ -19,10 +19,11 @@
 
 const assert = require('assert');
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
 
 const { scan } = require('../dist/api');
+const { createTempTestDir, cleanupTempDir, deployFixtures } = require('./common/test-runner-harness');
+
 
 /** One diagnostic shape per Rust rule; the fixture must produce exactly this id set. */
 const RUST_RULE_IDS = [
@@ -113,13 +114,8 @@ const GDSCRIPT_NEGATIVE = [
  * @returns Live (suppression-free) findings.
  */
 async function scanFixture(root, files, analyzers) {
-  fs.rmSync(root, { recursive: true, force: true });
-  fs.mkdirSync(root, { recursive: true });
-  for (const [name, content] of Object.entries(files)) {
-    const absolute = path.join(root, name);
-    fs.mkdirSync(path.dirname(absolute), { recursive: true });
-    fs.writeFileSync(absolute, content);
-  }
+  cleanupTempDir(root);
+  deployFixtures(root, files);
   const configFile = path.join(root, 'auto-refactor.config.json');
   fs.writeFileSync(configFile, JSON.stringify({ include: ['**/*'], analyzers }, null, 2));
   const report = await scan({ root, configFile, logLevel: 'silent', cache: false });
@@ -139,9 +135,10 @@ function ruleIds(issues) {
 }
 
 async function main() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ar-modern-packs-'));
+  const root = createTempTestDir('ar-modern-packs');
   const bothPacks = { 'rust-modern': { enabled: true }, 'gdscript-modern': { enabled: true } };
   try {
+
     // ── 1. Every Rust rule fires on its canonical shape ──
     const rustHits = await scanFixture(root, { 'src/main.rs': RUST_POSITIVE }, bothPacks);
     assert.deepStrictEqual(
@@ -200,8 +197,9 @@ async function main() {
     assert.deepStrictEqual(off, [], 'specialized packs must stay off until they are declared');
     console.log('  [PASS] modernization packs stay default-off until a config declares them');
   } finally {
-    fs.rmSync(root, { recursive: true, force: true });
+    cleanupTempDir(root);
   }
+
 }
 
 main()

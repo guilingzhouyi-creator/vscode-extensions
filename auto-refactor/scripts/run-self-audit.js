@@ -23,6 +23,7 @@ const PILLAR_LABEL_WIDTH = 16;
 const DIMENSION_LABEL_WIDTH = 24;
 
 const fs = require('fs');
+const os = require('os');
 const path = require(MODULE_PATH);
 const { execSync } = require(MODULE_CHILD_PROCESS);
 const {
@@ -409,10 +410,12 @@ async function runSelfAudit(options = {}) {
   const snapshot = createAuditSnapshot();
 
   // 2. Execute Full Production Scan over Engine Sources
+  const defaultWorkers = Math.max(1, Math.min(4, os.cpus().length || 4));
   const scanReport = await scan({
     root: ROOT,
     include: ['src/**/*.ts', 'scripts/*.js'],
     autoTune: false,
+    workers: defaultWorkers,
     logLevel: RUN_LOG_LEVEL_WARN,
     ...options.scanOptions,
   });
