@@ -41,6 +41,11 @@ class Request extends RefCounted:
 ## 注册响应载荷（仅身份信息，无任何口令/哈希痕迹）
 class Response extends RefCounted:
 	var success: bool = false
+	var is_success: bool:
+		get:
+			return success
+		set(val):
+			success = val
 	var error_code: String = "OK"
 	var account_id: String = ""
 	var username: String = ""
@@ -50,6 +55,7 @@ class Response extends RefCounted:
 	func to_dto() -> Dictionary:
 		return {
 			"success": success,
+			"is_success": success,
 			"error_code": error_code,
 			"account_id": account_id,
 			"username": username,
