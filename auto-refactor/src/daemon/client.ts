@@ -550,4 +550,3 @@ export async function tryWarmScanDiff(
         return null;
     }
 }
-
