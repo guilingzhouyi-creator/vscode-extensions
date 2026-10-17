@@ -22,7 +22,7 @@ var _submission_queue: Array[Dictionary] = []
 ## 获取单例全局静态唯一实例
 static func get_instance() -> RefCounted:
 	if _instance == null:
-		_instance = new()
+		_instance = FrameBudgetDispatcher.new()
 	return _instance
 
 func _init() -> void:

@@ -66,7 +66,7 @@ var _deterministic_mode: bool = true
 ## 获取单例全局静态唯一实例
 static func get_instance() -> RefCounted:
 	if _instance == null:
-		_instance = new()
+		_instance = AuxiliaryWorkerPool.new()
 	return _instance
 
 func _init() -> void:

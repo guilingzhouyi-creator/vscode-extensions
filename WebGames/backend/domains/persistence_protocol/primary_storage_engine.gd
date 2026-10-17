@@ -36,7 +36,7 @@ static var _instance = null
 ## 获取单例全局静态唯一实例
 static func get_instance() -> RefCounted:
 	if _instance == null:
-		_instance = new()
+		_instance = PrimaryStorageEngine.new()
 	return _instance
 
 ## 快速恢复最小可运行世界状态（极速达成 TTFI）

@@ -23,7 +23,7 @@ var _window_radius: float = DEFAULT_WINDOW_RADIUS
 ## 获取单例全局静态唯一实例
 static func get_instance() -> RefCounted:
 	if _instance == null:
-		_instance = new()
+		_instance = PreloadWindowGovernor.new()
 	return _instance
 
 func _init() -> void:

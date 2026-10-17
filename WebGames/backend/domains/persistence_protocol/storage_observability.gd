@@ -35,7 +35,7 @@ var _peak_memory_bytes: int = 0
 ## 获取单例全局静态唯一实例
 static func get_instance() -> RefCounted:
 	if _instance == null:
-		_instance = new()
+		_instance = StorageObservability.new()
 	return _instance
 
 func _init() -> void:

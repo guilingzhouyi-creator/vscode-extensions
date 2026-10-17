@@ -58,19 +58,19 @@ func _setup_bus_subscriptions() -> void:
 		return
 
 	# 1. 订阅权威 HUD 快照全量推流信道
-	var t1 = bus.on_channel("world_state.hud_snapshot_published", _on_authoritative_snapshot_received)
+	var t1 = bus.on_channel(EventChannelDefinition.HUD_STATUS_SNAPSHOT, _on_authoritative_snapshot_received)
 	_bus_tokens.append(t1)
 
 	# 2. 订阅钱包变更增量同步
-	var t2 = bus.on_channel("currency.wallet.mutated", _on_wallet_mutated)
+	var t2 = bus.on_channel(EventChannelDefinition.HUD_WALLET_MUTATED, _on_wallet_mutated)
 	_bus_tokens.append(t2)
 
 	# 3. 订阅序章与剧情叙事步进事件
-	var t3 = bus.on_channel("prologue.step_advanced", _on_prologue_advanced)
+	var t3 = bus.on_channel(EventChannelDefinition.DOMAIN_EVENT_GENERIC, _on_prologue_advanced)
 	_bus_tokens.append(t3)
 
 	# 4. 订阅世界进入与网关事件
-	var t4 = bus.on_channel("world_gateway.world_entered", _on_world_entered)
+	var t4 = bus.on_channel(EventChannelDefinition.DOMAIN_EVENT_GENERIC, _on_world_entered)
 	_bus_tokens.append(t4)
 
 func _on_authoritative_snapshot_received(pkt: Variant) -> void:

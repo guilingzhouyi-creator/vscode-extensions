@@ -104,7 +104,7 @@ static func test_auxiliary_worker_pool_fifo_cache_budget() -> Dictionary:
 	var oldest_evicted: bool = (not pool._cached_results.has("res://mock/path_0.json"))
 	var newest_retained: bool = pool._cached_results.has("res://mock/path_69.json")
 
-	var evicted_count := pool.evict_idle_resources()
+	var evicted_count: int = int(pool.evict_idle_resources())
 	var clean_size: int = pool._cached_results.size()
 	var clean_fifo: int = pool._cache_keys_fifo.size()
 
@@ -122,9 +122,9 @@ static func test_auxiliary_worker_pool_task_closure_cleanup() -> Dictionary:
 	var pool: Variant = AuxiliaryWorkerPool.get_instance()
 
 	var callback_executed := false
-	var task_id := pool.request_resource_async("res://config/game_config.json", 1, null, func(ok: bool, _data, _err):
+	var task_id: int = int(pool.request_resource_async("res://config/game_config.json", 1, null, func(ok: bool, _data, _err):
 		callback_executed = true
-	)
+	))
 
 	# 提取已完成任务并检查其闭包引用已被释放
 	var completed_task_found := false
@@ -159,7 +159,7 @@ static func test_auth_service_expired_token_no_reanimation() -> Dictionary:
 	}
 
 	var pre_contains: bool = AuthService._sessions.has(token_hash)
-	var res := AuthService.validate_token(dummy_token, "", "", now)
+	var res: Dictionary = AuthService.validate_token(dummy_token, "", "", now)
 	var err_code: String = str(res.get("error_code", ""))
 	var post_contains: bool = AuthService._sessions.has(token_hash)
 
@@ -183,8 +183,8 @@ static func test_auth_service_unregister_hook() -> Dictionary:
 	var count_after_first := trigger_count
 
 	# 精确解绑 Hook
-	var unregister_ok := AuthService.unregister_hook("post_test", hook_cb)
-	var unregister_repeat := AuthService.unregister_hook("post_test", hook_cb)
+	var unregister_ok: bool = AuthService.unregister_hook("post_test", hook_cb)
+	var unregister_repeat: bool = AuthService.unregister_hook("post_test", hook_cb)
 
 	AuthService._dispatch_auth_hooks("post_test", {"value": 2})
 	var count_after_unreg := trigger_count

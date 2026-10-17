@@ -21,6 +21,11 @@ var _head: int = 0
 var _count: int = 0
 var _observers: Array[Callable] = []
 
+## 兼容性属性：向后兼容旧测试与观察者直接读取 _ring_buffer
+var _ring_buffer: Array:
+	get:
+		return get_recent_events(MAX_CAPACITY)
+
 # ==============================================================================
 # 一、单例生命周期管理
 # ==============================================================================

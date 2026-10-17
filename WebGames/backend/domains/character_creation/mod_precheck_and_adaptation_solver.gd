@@ -54,7 +54,7 @@ const STARTER_KIT_MAX_ITEMS: int = 10
 # ==============================================================================
 
 ## 校验单个命途 MOD 声明清单的预算边界、因果平衡与初始套件合法性
-static func precheck_single_mod(manifest_input: Variant) -> Dictionary:
+static func precheck_single_mod(manifest_input: Variant, base_manifest: Variant = null) -> Dictionary:
     var dto: DestinyModManifestDTO = _coerce_to_manifest_dto(manifest_input)
     var errors: Array[Dictionary] = []
 
@@ -63,14 +63,19 @@ static func precheck_single_mod(manifest_input: Variant) -> Dictionary:
 
     _validate_ui_capabilities(dto.ui_capabilities, errors)
     _validate_custom_origins(dto.custom_origins, errors)
-    _validate_origin_references(dto, errors)
+    _validate_origin_references(dto, errors, base_manifest)
     _validate_paired_presets(dto.paired_presets, dto.custom_traits, errors)
     _validate_custom_starter_kits(dto.custom_starter_kits, errors)
     _validate_dag_graphs(dto.dag_graphs, errors)
 
     var first_code: String = ""
+    var error_code_list: Array = []
     if not errors.is_empty():
         first_code = str(errors[0].get("error_code", ""))
+        for err in errors:
+            var c: String = str(err.get("error_code", ""))
+            if not c.is_empty() and not error_code_list.has(c):
+                error_code_list.append(c)
 
     var is_ok: bool = errors.is_empty()
     return {
@@ -79,7 +84,8 @@ static func precheck_single_mod(manifest_input: Variant) -> Dictionary:
         "pack_id": dto.pack_id,
         "pack_name": dto.pack_name,
         "error_code": first_code,
-        "errors": errors,
+        "errors": error_code_list,
+        "error_details": errors,
         "manifest": dto
     }
 
@@ -331,7 +337,7 @@ static func _validate_and_count_kit_item(item_entry: Variant) -> int:
         return -1
     return count
 
-static func _validate_origin_references(dto: DestinyModManifestDTO, errors: Array[Dictionary]) -> void:
+static func _validate_origin_references(dto: DestinyModManifestDTO, errors: Array[Dictionary], _base_manifest: Variant = null) -> void:
     var builtin_kits: Dictionary = GameConfig.get_dict("domains.starter_loadout", "starter_kits", {})
     var builtin_dags: Dictionary = GameConfig.get_dict("narratives.prologue_dag_catalog", "dag_graphs", {})
     for orig in dto.custom_origins:
@@ -339,7 +345,7 @@ static func _validate_origin_references(dto: DestinyModManifestDTO, errors: Arra
         if not kid.is_empty() and not dto.custom_starter_kits.has(kid) and not builtin_kits.has(kid):
             _append_error(errors, "ERR_DESTINY_UNKNOWN_KIT_REF", "未定义的套件引用: " + kid)
         var did: String = str(orig.get("prologue_dag_id", "")).strip_edges()
-        if not dto.dag_graphs.is_empty() and not did.is_empty() and not dto.dag_graphs.has(did) and not builtin_dags.has(did):
+        if not did.is_empty() and not dto.dag_graphs.has(did) and not builtin_dags.has(did):
             _append_error(errors, "ERR_DESTINY_UNKNOWN_DAG_REF", "未定义的剧情DAG引用: " + did)
 
 static func _validate_dag_graphs(dag_graphs: Dictionary, errors: Array[Dictionary]) -> void:

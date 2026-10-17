@@ -24,9 +24,8 @@ var _lcg_multiplier_snap: int = 0
 var _lcg_increment_snap: int = 0
 var _lcg_mask_snap: int = 0
 
-# ==============================================================================
-# 二、实例工厂与共享实例
-# ==============================================================================
+func _init(seed_value: int = 1) -> void:
+	set_seed(seed_value)
 
 ## 以显式种子构造独立实例（同种子必然产生同序列）
 static func from_seed(seed_value: int) -> DeterministicRNG:

@@ -10,7 +10,7 @@
 # ==============================================================================
 
 ## StorageResourceCatalog：Unified Storage Resource Catalog & Index Orchestrator
-class_name StorageResourceCatalog extends StorageContractInterfaces.ResourceIndexProviderContract
+class_name StorageResourceCatalog extends RefCounted
 
 const StorageContractInterfaces = preload("res://backend/domains/persistence_protocol/storage_contract_interfaces.gd")
 const ResourceIndexEntryDTO = preload("res://backend/domains/persistence_protocol/dto/resource_index_entry_dto.gd")
@@ -37,7 +37,7 @@ var _loaded: bool = false
 ## 获取单例全局静态唯一实例
 static func get_instance() -> RefCounted:
 	if _instance == null:
-		_instance = new()
+		_instance = StorageResourceCatalog.new()
 	return _instance
 
 func _init() -> void:

@@ -121,19 +121,19 @@ static func test_world_calendar_environment_phases() -> Dictionary:
 ## TC-HMA-05: ESC 菜单保存安全守卫状态机阻断裁决
 ## -----------------------------------------------------------------------------
 static func test_save_readiness_guard_block_and_allow() -> Dictionary:
-	var in_combat := SaveReadinessGuard.evaluate_save_readiness(true, false, false)
-	var combat_blocked := not in_combat["allowed"] and in_combat["error_code"] == SaveReadinessGuard.ERR_CANNOT_SAVE_IN_COMBAT
+	var in_combat: Dictionary = SaveReadinessGuard.evaluate_save_readiness(true, false, false)
+	var combat_blocked: bool = not bool(in_combat.get("allowed", true)) and str(in_combat.get("error_code")) == SaveReadinessGuard.ERR_CANNOT_SAVE_IN_COMBAT
 
-	var in_narrative := SaveReadinessGuard.evaluate_save_readiness(false, true, false)
-	var narrative_blocked := not in_narrative["allowed"] and in_narrative["error_code"] == SaveReadinessGuard.ERR_CANNOT_SAVE_IN_NARRATIVE
+	var in_narrative: Dictionary = SaveReadinessGuard.evaluate_save_readiness(false, true, false)
+	var narrative_blocked: bool = not bool(in_narrative.get("allowed", true)) and str(in_narrative.get("error_code")) == SaveReadinessGuard.ERR_CANNOT_SAVE_IN_NARRATIVE
 
-	var in_quarantine := SaveReadinessGuard.evaluate_save_readiness(false, false, true)
-	var quarantine_blocked := not in_quarantine["allowed"] and in_quarantine["error_code"] == SaveReadinessGuard.ERR_WORLD_QUARANTINED
+	var in_quarantine: Dictionary = SaveReadinessGuard.evaluate_save_readiness(false, false, true)
+	var quarantine_blocked: bool = not bool(in_quarantine.get("allowed", true)) and str(in_quarantine.get("error_code")) == SaveReadinessGuard.ERR_WORLD_QUARANTINED
 
-	var safe_state := SaveReadinessGuard.evaluate_save_readiness(false, false, false)
-	var safe_allowed := safe_state["allowed"] and safe_state["error_code"].is_empty()
+	var safe_state: Dictionary = SaveReadinessGuard.evaluate_save_readiness(false, false, false)
+	var safe_allowed: bool = bool(safe_state.get("allowed", false)) and str(safe_state.get("error_code", "")).is_empty()
 
-	var passed := combat_blocked and narrative_blocked and quarantine_blocked and safe_allowed
+	var passed: bool = combat_blocked and narrative_blocked and quarantine_blocked and safe_allowed
 	return TestCase.make_result("TC-HMA-05: ESC 菜单保存安全守卫状态机阻断裁决", passed)
 
 ## -----------------------------------------------------------------------------
@@ -365,25 +365,25 @@ static func test_light_heavy_asset_payload_purity() -> Dictionary:
 ## -----------------------------------------------------------------------------
 static func test_storage_path_airtight_isolation() -> Dictionary:
 	# 1. 单机模式路径
-	var sp_ok := SaveReadinessGuard.evaluate_storage_path_safety("user://offline_vault/slot_01.sav", WorldGatewayModel.GameMode.SINGLE_PLAYER)
-	var sp_escape := SaveReadinessGuard.evaluate_storage_path_safety("user://online_cache/slot_01.sav", WorldGatewayModel.GameMode.SINGLE_PLAYER)
-	var sp_blocked := not sp_escape["safe"] and sp_escape["error_code"] == SaveReadinessGuard.ERR_OFFLINE_STORAGE_ESCAPE
+	var sp_ok: Dictionary = SaveReadinessGuard.evaluate_storage_path_safety("user://offline_vault/slot_01.sav", WorldGatewayModel.GameMode.SINGLE_PLAYER)
+	var sp_escape: Dictionary = SaveReadinessGuard.evaluate_storage_path_safety("user://online_cache/slot_01.sav", WorldGatewayModel.GameMode.SINGLE_PLAYER)
+	var sp_blocked: bool = not bool(sp_escape.get("safe", true)) and str(sp_escape.get("error_code")) == SaveReadinessGuard.ERR_OFFLINE_STORAGE_ESCAPE
 
 	# 2. 联机模式路径
-	var mp_ok := SaveReadinessGuard.evaluate_storage_path_safety("user://online_cache/session_cache.json", WorldGatewayModel.GameMode.MULTIPLAYER)
-	var mp_escape := SaveReadinessGuard.evaluate_storage_path_safety("user://offline_vault/session_cache.json", WorldGatewayModel.GameMode.MULTIPLAYER)
-	var mp_blocked := not mp_escape["safe"] and mp_escape["error_code"] == SaveReadinessGuard.ERR_ONLINE_CACHE_ESCAPE
+	var mp_ok: Dictionary = SaveReadinessGuard.evaluate_storage_path_safety("user://online_cache/session_cache.json", WorldGatewayModel.GameMode.MULTIPLAYER)
+	var mp_escape: Dictionary = SaveReadinessGuard.evaluate_storage_path_safety("user://offline_vault/session_cache.json", WorldGatewayModel.GameMode.MULTIPLAYER)
+	var mp_blocked: bool = not bool(mp_escape.get("safe", true)) and str(mp_escape.get("error_code")) == SaveReadinessGuard.ERR_ONLINE_CACHE_ESCAPE
 
 	# 3. 相对路径穿透拦截
-	var traversal := SaveReadinessGuard.evaluate_storage_path_safety("user://offline_vault/../hacked.sav", WorldGatewayModel.GameMode.SINGLE_PLAYER)
-	var traversal_blocked := not traversal["safe"] and traversal["error_code"] == SaveReadinessGuard.ERR_ILLEGAL_PATH_TRAVERSAL
+	var traversal: Dictionary = SaveReadinessGuard.evaluate_storage_path_safety("user://offline_vault/../hacked.sav", WorldGatewayModel.GameMode.SINGLE_PLAYER)
+	var traversal_blocked: bool = not bool(traversal.get("safe", true)) and str(traversal.get("error_code")) == SaveReadinessGuard.ERR_ILLEGAL_PATH_TRAVERSAL
 
 	# 4. 反斜杠与空路径拦截
-	var backslash := SaveReadinessGuard.evaluate_storage_path_safety("user://offline_vault\\slot.sav", WorldGatewayModel.GameMode.SINGLE_PLAYER)
-	var empty_path := SaveReadinessGuard.evaluate_storage_path_safety("", WorldGatewayModel.GameMode.SINGLE_PLAYER)
-	var separator_blocked := not backslash["safe"] and not empty_path["safe"]
+	var backslash: Dictionary = SaveReadinessGuard.evaluate_storage_path_safety("user://offline_vault\\slot.sav", WorldGatewayModel.GameMode.SINGLE_PLAYER)
+	var empty_path: Dictionary = SaveReadinessGuard.evaluate_storage_path_safety("", WorldGatewayModel.GameMode.SINGLE_PLAYER)
+	var separator_blocked: bool = not bool(backslash.get("safe", true)) and not bool(empty_path.get("safe", true))
 
-	var passed := sp_ok["safe"] and sp_blocked and mp_ok["safe"] and mp_blocked and traversal_blocked and separator_blocked
+	var passed: bool = bool(sp_ok.get("safe", false)) and sp_blocked and bool(mp_ok.get("safe", false)) and mp_blocked and traversal_blocked and separator_blocked
 	return TestCase.make_result("TC-HMA-11: 单机与联机存储路径气密隔离与越界拦截", passed)
 
 ## -----------------------------------------------------------------------------

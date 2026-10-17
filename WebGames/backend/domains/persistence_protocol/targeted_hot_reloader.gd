@@ -28,7 +28,7 @@ var _cache_store: Dictionary = {} # node_id -> Variant (最新有效缓存备份
 ## 获取单例全局静态唯一实例
 static func get_instance() -> RefCounted:
 	if _instance == null:
-		_instance = new()
+		_instance = TargetedHotReloader.new()
 	return _instance
 
 func _init() -> void:

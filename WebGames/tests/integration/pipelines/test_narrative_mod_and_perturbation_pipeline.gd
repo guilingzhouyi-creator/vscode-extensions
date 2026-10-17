@@ -251,10 +251,12 @@ static func test_world_mod_lock_affinity_binding() -> Dictionary:
 		{"pack_id": "mod_starfall_causality", "version": "2.0.0", "priority": 120}
 	]
 
-	# 1. 初次固化
+	# 1. 初次固化 (清理历史残留保证确定性)
+	var lock_path := mgr.get_lock_file_path(world_id)
+	if FileAccess.file_exists(lock_path):
+		DirAccess.remove_absolute(lock_path)
 	var init_res := mgr.verify_and_bind_world_mods(world_id, installed_mods, false)
 	var init_ok: bool = bool(init_res.get("success", false)) and str(init_res.get("status", "")) == "INITIALIZED"
-	var lock_path := mgr.get_lock_file_path(world_id)
 	var file_exists_ok: bool = FileAccess.file_exists(lock_path)
 
 	# 2. 读取锁文件校验内容完备性

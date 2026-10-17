@@ -128,7 +128,14 @@ func save_world_mod_lock(world_id: String, active_packs: Array) -> Dictionary:
 
 	var rename_err := DirAccess.rename_absolute(tmp_path, target_path)
 	if rename_err != OK:
-		return {"success": false, "error": "ERR_RENAME_FAILED", "code": rename_err}
+		var direct_file := FileAccess.open(target_path, FileAccess.WRITE)
+		if direct_file != null:
+			direct_file.store_string(json_str)
+			direct_file.flush()
+			direct_file.close()
+			DirAccess.remove_absolute(tmp_path)
+		else:
+			return {"success": false, "error": "ERR_RENAME_FAILED", "code": rename_err}
 
 	return {
 		"success": true,

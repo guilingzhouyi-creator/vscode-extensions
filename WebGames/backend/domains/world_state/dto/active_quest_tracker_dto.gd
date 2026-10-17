@@ -14,13 +14,17 @@ extends RefCounted
 var main_quest: Dictionary = {}
 var side_quest: Dictionary = {}
 var daily_quest: Dictionary = {}
+var tracked_quest_id: String = ""
+var is_completable: bool = false
 
 ## 序列化当前对象为通用字典传输结构
 func to_dto() -> Dictionary:
 	return {
 		"main_quest": main_quest.duplicate(),
 		"side_quest": side_quest.duplicate(),
-		"daily_quest": daily_quest.duplicate()
+		"daily_quest": daily_quest.duplicate(),
+		"tracked_quest_id": tracked_quest_id,
+		"is_completable": is_completable
 	}
 
 ## 从输入字典反序列化还原传输对象
@@ -35,4 +39,6 @@ static func from_dto(data: Dictionary) -> ActiveQuestTrackerDTO:
 	var dq = data.get("daily_quest", {})
 	if dq is Dictionary:
 		dto.daily_quest = dq.duplicate()
+	dto.tracked_quest_id = str(data.get("tracked_quest_id", ""))
+	dto.is_completable = bool(data.get("is_completable", false))
 	return dto

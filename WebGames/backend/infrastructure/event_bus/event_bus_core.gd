@@ -384,5 +384,18 @@ func emit_profession_promoted(character_id: String, profession_archetype: Dictio
 
 ## 结构化信道订阅便捷入口：回调收到 EventPacket，载荷按信道语义取
 ## payload_data（Narrative/Domain/Clock/Profession/Log 各迁正信道的 Dictionary/DTO）
-func on_channel(channel_id: int, callback: Callable) -> EventBusSubscriptionToken:
-	return subscribe(channel_id, EventCategoryMask.MASK_ALL, callback)
+func on_channel(channel_id: Variant, callback: Callable) -> EventBusSubscriptionToken:
+	if channel_id is int:
+		return subscribe(channel_id, EventCategoryMask.MASK_ALL, callback)
+	if channel_id is String:
+		var ch_str: String = channel_id as String
+		var resolved_id: int = EventChannelDefinition.DOMAIN_EVENT_GENERIC
+		match ch_str:
+			"world_state.hud_snapshot_published":
+				resolved_id = EventChannelDefinition.HUD_STATUS_SNAPSHOT
+			"currency.wallet.mutated":
+				resolved_id = EventChannelDefinition.HUD_WALLET_MUTATED
+			_:
+				resolved_id = EventChannelDefinition.DOMAIN_EVENT_GENERIC
+		return subscribe(resolved_id, EventCategoryMask.MASK_ALL, callback)
+	return subscribe(int(channel_id), EventCategoryMask.MASK_ALL, callback)

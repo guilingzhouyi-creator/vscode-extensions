@@ -163,7 +163,7 @@ static func test_companion_observer_bus_broadcast_and_bounded_capacity() -> Dict
 
 	var tail: Array[Dictionary] = bus.get_recent_events(8)
 	var tail_ok: bool = tail.size() == 8
-	var cap_ok: bool = bus._ring_buffer.size() <= CompanionObserverBus.MAX_CAPACITY
+	var cap_ok: bool = bus.get_recent_events(CompanionObserverBus.MAX_CAPACITY).size() <= CompanionObserverBus.MAX_CAPACITY
 
 	CompanionObserverBus.reset_for_tests()
 	var passed: bool = dispatch_ok and tail_ok and cap_ok

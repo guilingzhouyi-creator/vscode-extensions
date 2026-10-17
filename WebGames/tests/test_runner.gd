@@ -89,7 +89,8 @@ func _initialize() -> void:
 				if t_pass:
 					print("    ✅  %s" % t_name)
 				else:
-					var detail_msg: String = str(item.get("detail", item.get("message", item.get("error", ""))))
+					var detail_val: Variant = item.get("details", item.get("detail", item.get("message", item.get("error", ""))))
+					var detail_msg: String = str(detail_val) if detail_val != null and str(detail_val) != "{}" else ""
 					if detail_msg != "":
 						print("    ❌  %s [FAILED]: %s" % [t_name, detail_msg])
 					else:
