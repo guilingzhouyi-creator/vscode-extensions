@@ -19,12 +19,18 @@ var show_cross_server_guild: bool = false
 var enable_offline_cdkey: bool = false
 var enable_offline_gacha: bool = false
 var enable_local_story_mail: bool = false
+var party_matchmaking_enabled: bool:
+	get:
+		return show_matchmaking
+	set(value):
+		show_matchmaking = value
 
 ## 序列化当前对象为通用字典传输结构
 func to_dto() -> Dictionary:
 	return {
 		"game_mode": game_mode,
 		"show_matchmaking": show_matchmaking,
+		"party_matchmaking_enabled": show_matchmaking,
 		"show_online_chat": show_online_chat,
 		"show_real_money_shop": show_real_money_shop,
 		"show_cross_server_guild": show_cross_server_guild,
@@ -37,7 +43,7 @@ func to_dto() -> Dictionary:
 static func from_dto(data: Dictionary) -> ModeFeatureManifestDTO:
 	var dto := ModeFeatureManifestDTO.new()
 	dto.game_mode = int(data.get("game_mode", 0))
-	dto.show_matchmaking = bool(data.get("show_matchmaking", false))
+	dto.show_matchmaking = bool(data.get("show_matchmaking", data.get("party_matchmaking_enabled", false)))
 	dto.show_online_chat = bool(data.get("show_online_chat", false))
 	dto.show_real_money_shop = bool(data.get("show_real_money_shop", false))
 	dto.show_cross_server_guild = bool(data.get("show_cross_server_guild", false))

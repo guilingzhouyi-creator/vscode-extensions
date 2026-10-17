@@ -73,7 +73,7 @@ static func test_six_pillars_authoritative_snapshot_and_guards() -> Dictionary:
 	var legacy := snapshot.to_legacy_snapshot()
 	var legacy_ok := legacy != null and legacy.account_id == "ACC_TEST_01" and legacy.character_name == "阿尔托莉雅"
 
-	var passed := has_identity and has_guards and has_wallet and has_calendar and has_social and has_mode and legacy_ok
+	var passed: bool = has_identity and has_guards and has_wallet and has_calendar and has_social and has_mode and legacy_ok
 	return TestCase.make_result("TC-HMA-01: 六大支柱权威快照聚合与防零下限守卫", passed)
 
 ## -----------------------------------------------------------------------------
@@ -85,7 +85,7 @@ static func test_single_player_mode_features_hidden() -> Dictionary:
 	var action_hidden := not manifest.show_matchmaking and not manifest.show_online_chat and not manifest.show_cross_server_guild
 	var asset_offline := not manifest.show_real_money_shop
 	var retention_local := manifest.enable_offline_cdkey and manifest.enable_offline_gacha and manifest.enable_local_story_mail
-	var passed := manifest.game_mode == GameModeFeatureSolver.MODE_SINGLE_PLAYER and action_hidden and asset_offline and retention_local
+	var passed: bool = manifest != null and manifest.game_mode == GameModeFeatureSolver.MODE_SINGLE_PLAYER and action_hidden and asset_offline and retention_local
 
 	return TestCase.make_result("TC-HMA-02: 网关单机模式特性清单求解与联机组件受控隐藏", passed)
 
@@ -98,7 +98,7 @@ static func test_multiplayer_mode_features_activated() -> Dictionary:
 	var action_active := manifest.show_matchmaking and manifest.show_online_chat and manifest.show_cross_server_guild
 	var asset_online := manifest.show_real_money_shop
 	var retention_server := not manifest.enable_offline_cdkey and not manifest.enable_offline_gacha and not manifest.enable_local_story_mail
-	var passed := manifest.game_mode == GameModeFeatureSolver.MODE_MULTIPLAYER and action_active and asset_online and retention_server
+	var passed: bool = manifest != null and manifest.game_mode == GameModeFeatureSolver.MODE_MULTIPLAYER and action_active and asset_online and retention_server
 
 	return TestCase.make_result("TC-HMA-03: 网关联机模式特性全量激活断言", passed)
 
@@ -215,14 +215,14 @@ static func test_full_lifecycle_with_mode_switch_and_exit() -> Dictionary:
 		"created_timestamp_utc": 0,
 		"last_played_timestamp_utc": 0
 	}
-	var create_res := CharacterCreationService.process_character_creation(char_req, slot_dict, {})
+	var create_res: Dictionary = CharacterCreationService.process_character_creation(char_req, slot_dict, {})
 	var opening: OpeningEventStreamDTO = create_res.get("opening_event", null)
-	var char_id := opening.character_id if opening != null else "CHAR_P118"
+	var char_id: String = opening.character_id if opening != null else "CHAR_P118"
 
 	# 进世界并聚合六支柱权威快照
 	gateway.attach_ready_character(char_id)
 	gateway.enter_world()
-	var hud_snap := AuthoritativeHudSyncService.get_authoritative_snapshot({
+	var hud_snap: AuthoritativeHudSnapshotDTO = AuthoritativeHudSyncService.get_authoritative_snapshot({
 		"account_id": reg_resp.account_id,
 		"character_id": char_id,
 		"character_name": "晨曦旅者",
@@ -231,13 +231,13 @@ static func test_full_lifecycle_with_mode_switch_and_exit() -> Dictionary:
 	AuthoritativeHudSyncService.publish_hud_snapshot(hud_snap)
 
 	# ESC 菜单保存守卫放行
-	var save_check := SaveReadinessGuard.evaluate_save_readiness(false, false, false)
-	var path_check := SaveReadinessGuard.evaluate_storage_path_safety("user://offline_vault/slot_01.sav", WorldGatewayModel.GameMode.SINGLE_PLAYER)
+	var save_check: Dictionary = SaveReadinessGuard.evaluate_save_readiness(false, false, false)
+	var path_check: Dictionary = SaveReadinessGuard.evaluate_storage_path_safety("user://offline_vault/slot_01.sav", WorldGatewayModel.GameMode.SINGLE_PLAYER)
 
 	# 退出世界并切换至联机网关
 	gateway.exit_to_gateway()
 	gateway.select_mode(WorldGatewayModel.GameMode.MULTIPLAYER, {}, [], "WORLD_MULTI_01", "SLOT_01")
-	var mp_manifest := GameModeFeatureSolver.resolve_features(WorldGatewayModel.GameMode.MULTIPLAYER)
+	var mp_manifest: ModeFeatureManifestDTO = GameModeFeatureSolver.resolve_features(WorldGatewayModel.GameMode.MULTIPLAYER)
 
 	# 安全停机与注销
 	GameBootstrap.assemble()
@@ -246,15 +246,15 @@ static func test_full_lifecycle_with_mode_switch_and_exit() -> Dictionary:
 	shut_req.account_id = reg_resp.account_id
 	shut_req.exit_reason = GameLifecycleModel.ExitReason.USER_DESKTOP_QUIT
 	shut_req.target_save_slot = "SLOT_01"
-	var shut_resp := GameLifecycleService.execute_graceful_shutdown(shut_req)
+	var shut_resp: GameShutdownDTO.Response = GameLifecycleService.execute_graceful_shutdown(shut_req)
 	GameLifecycleManager.reset_for_test()
 
-	var token_val := AuthService.validate_token(token)
-	var token_revoked := not bool(token_val.get("success", true))
+	var token_val: Dictionary = AuthService.validate_token(token)
+	var token_revoked: bool = not bool(token_val.get("success", true))
 
-	var passed := not sp_manifest.show_matchmaking and mp_manifest.show_matchmaking \
-		and hud_snap != null and save_check["allowed"] and path_check["safe"] \
-		and shut_resp.success and token_revoked
+	var passed: bool = not sp_manifest.show_matchmaking and mp_manifest.show_matchmaking \
+		and hud_snap != null and bool(save_check.get("allowed", false)) and bool(path_check.get("safe", false)) \
+		and (shut_resp != null and shut_resp.is_success) and token_revoked
 
 	return TestCase.make_result("TC-HMA-07: 全生命周期主干链路端到端闭环断言", passed)
 
@@ -311,7 +311,7 @@ static func test_pagination_slice_solver_guards_and_bounds() -> Dictionary:
 	var last_res := PaginationSliceSolver.slice_array(source, last_query)
 	var last_ok := last_res.page_index == 1 and last_res.items.size() == 50 and not last_res.has_next and last_res.has_prev
 
-	var passed := empty_ok and neg_ok and huge_ok and last_ok
+	var passed: bool = empty_ok and neg_ok and huge_ok and last_ok
 	return TestCase.make_result("TC-HMA-09: 通用无头分页切片求解与边界安全防线", passed)
 
 ## -----------------------------------------------------------------------------
@@ -355,7 +355,7 @@ static func test_light_heavy_asset_payload_purity() -> Dictionary:
 		and not dto_dict.has("raw_event_journal") \
 		and not dto_dict.has("backpack_items")
 
-	var passed := size_pure and heavy_free
+	var passed: bool = size_pure and heavy_free
 	return TestCase.make_result("TC-HMA-10: 轻重资产装配体积与字段纯度断言", passed, {
 		"payload_bytes": payload_bytes
 	})
@@ -406,5 +406,5 @@ static func test_four_domains_channel_mapping_purity() -> Dictionary:
 	var mp_mode := GameConfig.get_dict("domains.world_state", "mode_features/multiplayer")
 	var mode_ok := not bool(sp_mode.get("show_matchmaking", true)) and bool(mp_mode.get("show_matchmaking", false))
 
-	var passed := channels_ok and storage_ok and mode_ok
+	var passed: bool = channels_ok and storage_ok and mode_ok
 	return TestCase.make_result("TC-HMA-12: 四大领域通道映射纯度", passed)

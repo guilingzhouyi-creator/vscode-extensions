@@ -161,7 +161,7 @@ func mount_attribute(mount: ItemAttributeMountInstance) -> void:
 ## 两处刻意保留的差异兜底：custom_name 走独立的 deserialize_name 键（损坏存档回落
 ## 「未知物品」而非「未命名物品」）；combat_metrics / affix_sockets 缺键回落空字典
 ## （非配置富缺省，与既有存档兼容语义一致）。
-static func deserialize(d: Dictionary) -> ItemEntity:
+static func deserialize(d: Dictionary, _instance_discriminator: String = "") -> ItemEntity:
 	var item := ItemEntity.new()
 	if d == null:
 		return item

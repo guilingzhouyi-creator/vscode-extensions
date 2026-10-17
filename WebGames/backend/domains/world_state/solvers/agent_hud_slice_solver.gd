@@ -122,8 +122,11 @@ static func solve_slice(
 
 	# 运行模式与社交
 	if snapshot.mode_features != null:
-		slice.game_mode = "MULTIPLAYER" if snapshot.mode_features.game_mode == 1 else "SINGLE_PLAYER"
-		slice.is_multiplayer_ready = snapshot.mode_features.party_matchmaking_enabled
+		var mf: Variant = snapshot.mode_features
+		var is_mp: bool = (int(mf.get("game_mode", 0)) == 1 or int(mf.get("game_mode", 0)) == 2) if mf is Dictionary else (int(mf.game_mode) == 1 or int(mf.game_mode) == 2 or bool(mf.show_matchmaking))
+		slice.game_mode = "MULTIPLAYER" if is_mp else "SINGLE_PLAYER"
+		var party_ready: bool = bool(mf.get("party_matchmaking_enabled", mf.get("show_matchmaking", false))) if mf is Dictionary else (bool(mf.party_matchmaking_enabled) if "party_matchmaking_enabled" in mf else bool(mf.show_matchmaking))
+		slice.is_multiplayer_ready = party_ready
 	slice.unread_mail_count = snapshot.unread_mail_count
 
 	# UI 公告与活动引导去表现化提取 (Inv-UI-FEED-STRUCTURAL-PURITY-9)

@@ -345,7 +345,7 @@ static func _validate_origin_references(dto: DestinyModManifestDTO, errors: Arra
         if not kid.is_empty() and not dto.custom_starter_kits.has(kid) and not builtin_kits.has(kid):
             _append_error(errors, "ERR_DESTINY_UNKNOWN_KIT_REF", "未定义的套件引用: " + kid)
         var did: String = str(orig.get("prologue_dag_id", "")).strip_edges()
-        if not did.is_empty() and not dto.dag_graphs.has(did) and not builtin_dags.has(did):
+        if not dto.dag_graphs.is_empty() and not did.is_empty() and not dto.dag_graphs.has(did) and not builtin_dags.has(did):
             _append_error(errors, "ERR_DESTINY_UNKNOWN_DAG_REF", "未定义的剧情DAG引用: " + did)
 
 static func _validate_dag_graphs(dag_graphs: Dictionary, errors: Array[Dictionary]) -> void:

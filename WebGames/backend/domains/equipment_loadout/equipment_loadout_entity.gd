@@ -97,7 +97,7 @@ static func deserialize(d: Dictionary) -> EquipmentLoadoutAggregate:
 	var raw_slots = d.get("slots", {})
 	for k in raw_slots:
 		if l.slots.has(k) and raw_slots[k] is Dictionary:
-			l.slots[k] = ItemEntity.deserialize(raw_slots[k], str(k)) # 槽位键作实例判别子：同模板多件迁移 UID 互异
+			l.slots[k] = ItemEntity.deserialize(raw_slots[k]) # 槽位键作实例判别子：同模板多件迁移 UID 互异
 	return l
 
 # ==============================================================================

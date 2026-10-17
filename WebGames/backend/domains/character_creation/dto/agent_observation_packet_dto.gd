@@ -77,9 +77,9 @@ static func from_dto(raw: Dictionary) -> AgentObservationPacketDTO:
 	return dto
 
 # ==============================================================================
-# 四、动作包契约类 (AgentActionPacketDTO)
+# 四、动作包契约类 (AgentSessionActionDTO)
 # ==============================================================================
-class AgentActionPacketDTO extends RefCounted:
+class AgentSessionActionDTO extends RefCounted:
 	var session_id: String = ""
 	var action_type: String = "" # "CHOOSE", "ROLLBACK", "QUIT"
 	var choice_id: String = ""
@@ -102,8 +102,8 @@ class AgentActionPacketDTO extends RefCounted:
 		}
 
 	## 从输入字典反序列化还原传输对象
-	static func from_dto(raw: Dictionary) -> AgentActionPacketDTO:
-		var dto := AgentActionPacketDTO.new()
+	static func from_dto(raw: Dictionary) -> AgentSessionActionDTO:
+		var dto := AgentSessionActionDTO.new()
 		if raw.is_empty():
 			return dto
 		dto.session_id = str(raw.get("session_id", ""))

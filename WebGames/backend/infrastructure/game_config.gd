@@ -412,6 +412,14 @@ static func get_table(table_name: String, default: Variant = {}) -> Variant:
 		_ensure_table_loaded_jit(target_table)
 	return _tables.get(target_table, default)
 
+## 判定指定配置表是否存在且可加载
+static func has_table(table_name: String) -> bool:
+	ensure_loaded()
+	var target_table := ConfigRouterEngine.resolve_table_name(table_name)
+	if not _tables.has(target_table):
+		_ensure_table_loaded_jit(target_table)
+	return _tables.has(target_table)
+
 ## 判断「表 + 多级路径」是否存在
 static func has(table_name: String, path: String) -> bool:
 	ensure_loaded()

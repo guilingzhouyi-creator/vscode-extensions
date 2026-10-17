@@ -103,9 +103,9 @@ static func handle_esc_action(req: ClientRequestEnvelopeDTO, gateway: WorldGatew
 
 			var shut_resp := GameLifecycleService.execute_graceful_shutdown(shut_req)
 			HumanControlLeaseManager.release_lease()
-			var shut_ok := shut_resp != null and shut_resp.is_success
-			var shut_dto := shut_resp.to_dto() if shut_resp != null else {}
-			var err_code := shut_resp.error_code if shut_resp != null else "ERR_SHUTDOWN_FAILED"
+			var shut_ok: bool = bool(shut_resp != null and shut_resp.is_success)
+			var shut_dto: Dictionary = (shut_resp.to_dto() as Dictionary) if shut_resp != null else {}
+			var err_code: String = str(shut_resp.error_code) if shut_resp != null else "ERR_SHUTDOWN_FAILED"
 			return UnifiedProtocolFactory.create_response(
 				req.request_id, shut_ok, shut_dto, err_code, "五阶段安全停机管线已执行完毕"
 			)
