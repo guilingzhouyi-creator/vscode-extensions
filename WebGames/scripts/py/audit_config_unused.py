@@ -63,27 +63,40 @@ def collect_domain_ids() -> set[str]:
         return set()
 
 
-def collect_channel_narrative_refs() -> set[str]:
-    """扫描频道声明源契约解析为对 narratives.<域> 的动态引用。
+def _walk_string_values(o: Any, out: list[str]) -> None:
+    """递归提取嵌套字典与列表中的所有字符串字面量。"""
+    if isinstance(o, dict):
+        for v in o.values():
+            _walk_string_values(v, out)
+    elif isinstance(o, list):
+        for v in o:
+            _walk_string_values(v, out)
+    elif isinstance(o, str):
+        out.append(o)
 
-    配置驱动：HudEventContract / event_bus_config.channel_registry.legacy 均为配置驱动
-    频道，此前 narratives.world_state 因仅被配置引用而误报"疑似死配置"；本函数将
-    配置声明的频道解析为对 narratives.<域> 的动态引用，消除误报并收紧死配置判定。
-    仅扫描频道声明表（domains.account auth/channels、domains.world_state hud/channels、
-    event_bus_config.channel_registry.legacy），contracts.json 契约字段等非频道声明不入检。
-    """
+
+def _extract_channel_candidates(data: dict, subkey: str | None) -> list[str]:
+    """从单个数据对象中按 subkey 提取频道候选字符串。"""
+    candidates: list[str] = []
+    if subkey is None:
+        for entry in data.get("channel_registry", []):
+            if isinstance(entry, dict) and entry.get("legacy"):
+                candidates.append(str(entry["legacy"]))
+        return candidates
+
+    node: Any = data
+    for part in subkey.split("/"):
+        if not isinstance(node, dict) or part not in node:
+            return candidates
+        node = node[part]
+    _walk_string_values(node, candidates)
+    return candidates
+
+
+def collect_channel_narrative_refs() -> set[str]:
+    """扫描频道声明源契约解析为对 narratives.<域> 的动态引用。"""
     domain_ids = collect_domain_ids()
     refs: set[str] = set()
-
-    def walk_values(o: Any, out: list) -> None:
-        if isinstance(o, dict):
-            for v in o.values():
-                walk_values(v, out)
-        elif isinstance(o, list):
-            for v in o:
-                walk_values(v, out)
-        elif isinstance(o, str):
-            out.append(o)
 
     account_path = CONFIG_DIR / "domains" / "account" / "core.json"
     if not account_path.exists():
@@ -91,7 +104,7 @@ def collect_channel_narrative_refs() -> set[str]:
     world_state_path = CONFIG_DIR / "domains" / "world_state" / "core.json"
     if not world_state_path.exists():
         world_state_path = CONFIG_DIR / "domains" / "world_state.json"
-    channel_sources: list[tuple[Path, str]] = [
+    channel_sources: list[tuple[Path, str | None]] = [
         (account_path, "auth/channels"),
         (world_state_path, "hud/channels"),
         (CONFIG_DIR / "infrastructure" / "event_bus_config.json", None),
@@ -103,22 +116,7 @@ def collect_channel_narrative_refs() -> set[str]:
             data = json.loads(path.read_text(encoding="utf-8"))
         except Exception:
             continue
-        candidates: list[str] = []
-        if subkey is None:
-            for entry in data.get("channel_registry", []):
-                if isinstance(entry, dict) and entry.get("legacy"):
-                    candidates.append(str(entry["legacy"]))
-        else:
-            node = data
-            ok = True
-            for part in subkey.split("/"):
-                if isinstance(node, dict) and part in node:
-                    node = node[part]
-                else:
-                    ok = False
-                    break
-            if ok:
-                walk_values(node, candidates)
+        candidates = _extract_channel_candidates(data, subkey)
         for raw in candidates:
             m = CHANNEL_RE.match(raw.strip())
             if m and m.group(1) in domain_ids:

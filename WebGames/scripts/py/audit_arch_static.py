@@ -52,6 +52,7 @@ CONFIG_CALL_RE = re.compile(
 )
 TOKEN_RE = re.compile(r'("(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'|#[^\r\n]*)')
 RANDOM_CALL_RE = re.compile(r"\b(randf|randi|randomize)\s*\(")
+RE_DOMAIN_LITERAL = re.compile(r'"(domains\.[A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)*)"')
 
 
 def strip_comments(source: str) -> str:
@@ -214,6 +215,35 @@ class ArchitectureAuditContext:
         self._flatten_keys(item, seg, out)
 
 
+def _collect_disk_domain_ids() -> List[str]:
+  """收集 backend/domains/ 目录下除保留名以外的实际领域目录名。"""
+  disk_ids: List[str] = []
+  if DOMAINS_DIR.exists():
+    for sub in DOMAINS_DIR.iterdir():
+      if sub.is_dir() and sub.name not in ("contract_registry", "lifecycle", "version_governance"):
+        disk_ids.append(sub.name)
+  disk_ids.sort()
+  return disk_ids
+
+
+def _validate_manifest_ids(manifest: List[Dict[str, Any]]) -> Tuple[List[str], List[str], List[str]]:
+  """从清单解析领域 ID 列表、重复项与缺失项。"""
+  manifest_ids: List[str] = []
+  duplicates: List[str] = []
+  errors: List[str] = []
+  for entry in manifest:
+    entry_id = str(entry.get("id", ""))
+    if not entry_id:
+      errors.append("清单存在缺失 id 的条目")
+      continue
+    if entry_id in manifest_ids:
+      duplicates.append(entry_id)
+    else:
+      manifest_ids.append(entry_id)
+  manifest_ids.sort()
+  return manifest_ids, duplicates, errors
+
+
 def check_tc_arch_01(ctx: ArchitectureAuditContext) -> Dict[str, Any]:
   """TC-ARCH-01: 领域目录集合与清单 id 集合双向一致（含 depends_on 引用完整性）。"""
   violations: List[str] = []
@@ -221,25 +251,9 @@ def check_tc_arch_01(ctx: ArchitectureAuditContext) -> Dict[str, Any]:
     violations.append("领域清单为空或解析失败: res://config/infrastructure/domains.json")
     return make_result("TC-ARCH-01: 领域目录集合与清单 id 集合双向一致", violations)
 
-  disk_ids: List[str] = []
-  if DOMAINS_DIR.exists():
-    for sub in DOMAINS_DIR.iterdir():
-      if sub.is_dir() and sub.name not in ("contract_registry", "lifecycle", "version_governance"):
-        disk_ids.append(sub.name)
-  disk_ids.sort()
-
-  manifest_ids: List[str] = []
-  duplicates: List[str] = []
-  for entry in ctx.manifest:
-    entry_id = str(entry.get("id", ""))
-    if not entry_id:
-      violations.append("清单存在缺失 id 的条目")
-      continue
-    if entry_id in manifest_ids:
-      duplicates.append(entry_id)
-    else:
-      manifest_ids.append(entry_id)
-  manifest_ids.sort()
+  disk_ids = _collect_disk_domain_ids()
+  manifest_ids, duplicates, id_errors = _validate_manifest_ids(ctx.manifest)
+  violations.extend(id_errors)
 
   for d in disk_ids:
     if d not in manifest_ids:
@@ -263,7 +277,7 @@ def check_tc_arch_01(ctx: ArchitectureAuditContext) -> Dict[str, Any]:
 def check_tc_arch_02(ctx: ArchitectureAuditContext) -> Dict[str, Any]:
   """TC-ARCH-02: 清单声明的配置表/文案表存在，且代码引用的 domains.* 字面量均有落地表。"""
   violations: List[str] = []
-  re_literal = re.compile(r'"(domains\.[A-Za-z0-9_]+(?:\.[A-Za-z0-9_]+)*)"')
+  scanned_literals: Set[str] = set()
 
   for entry in ctx.manifest:
     eid = str(entry.get("id", ""))
@@ -286,10 +300,10 @@ def check_tc_arch_02(ctx: ArchitectureAuditContext) -> Dict[str, Any]:
       violations.append(f"{eid}: 文案表缺失 {narr} -> res://{ctx.table_path_rel(narr)}")
 
     files = ctx.domain_gd_files.get(eid, [])
-    scanned_literals: Set[str] = set()
+    scanned_literals.clear()
     for gd_file in files:
       _, code = ctx.gd_sources[gd_file]
-      for m in re_literal.finditer(code):
+      for m in RE_DOMAIN_LITERAL.finditer(code):
         scanned_literals.add(m.group(1))
 
     for table in sorted(scanned_literals):
@@ -300,11 +314,28 @@ def check_tc_arch_02(ctx: ArchitectureAuditContext) -> Dict[str, Any]:
   return make_result("TC-ARCH-02: 配置表与文案表齐备且代码字面量全部落地", violations)
 
 
+def _parse_registry_symbols(registry_body: str) -> List[str]:
+  """从 get_all_test_classes() 返回数组体解析测试类符号列表。"""
+  m_arr = re.search(r"return\s*\[(.*?)\]", registry_body, re.DOTALL)
+  actual_symbols: List[str] = []
+  if not m_arr:
+    return actual_symbols
+  for line in m_arr.group(1).splitlines():
+    c = line.split("#")[0].strip()
+    if not c:
+      continue
+    for item in c.split(","):
+      s = item.strip()
+      if s:
+        actual_symbols.append(s)
+  return actual_symbols
+
+
 def check_tc_arch_03(ctx: ArchitectureAuditContext) -> Dict[str, Any]:
   """TC-ARCH-03: 测试文件存在、已在注册表 preload、已进 get_all_test_classes()，总数自洽。"""
   violations: List[str] = []
   if not REGISTRY_FILE.exists():
-    violations.append(f"无法读取测试注册表: res://tests/test_registry.gd")
+    violations.append("无法读取测试注册表: res://tests/test_registry.gd")
     return make_result("TC-ARCH-03: 测试套件注册完整且注册表条目数自洽", violations)
 
   registry_text = REGISTRY_FILE.read_text(encoding="utf-8")
@@ -334,17 +365,7 @@ def check_tc_arch_03(ctx: ArchitectureAuditContext) -> Dict[str, Any]:
     if f'preload("{cc_path}")' not in registry_text:
       violations.append(f"横切测试套件未在注册表 preload: {cc_path}")
 
-  m_arr = re.search(r"return\s*\[(.*?)\]", registry_body, re.DOTALL)
-  actual_symbols: List[str] = []
-  if m_arr:
-    for line in m_arr.group(1).splitlines():
-      c = line.split("#")[0].strip()
-      if c:
-        for item in c.split(","):
-          s = item.strip()
-          if s:
-            actual_symbols.append(s)
-
+  actual_symbols = _parse_registry_symbols(registry_body)
   expected = len(ctx.manifest) + len(ctx.cross_cutting_suites)
   if len(actual_symbols) != expected:
     violations.append(
@@ -358,6 +379,7 @@ def check_tc_arch_04(ctx: ArchitectureAuditContext) -> Dict[str, Any]:
   """TC-ARCH-04: 业务代码禁止裸调用 Godot 全局 randf()/randi()/randomize()。"""
   violations: List[str] = []
   scanned = 0
+  hits: Set[str] = set()
 
   for gd_file in ctx.backend_files:
     if gd_file.name == RNG_IMPL_FILE:
@@ -365,7 +387,7 @@ def check_tc_arch_04(ctx: ArchitectureAuditContext) -> Dict[str, Any]:
     scanned += 1
     raw, _ = ctx.gd_sources[gd_file]
     code = strip_non_code(raw)
-    hits: Set[str] = set()
+    hits.clear()
     for m in RANDOM_CALL_RE.finditer(code):
       fn = m.group(1)
       start = m.start()
@@ -408,6 +430,36 @@ def check_tc_arch_05(ctx: ArchitectureAuditContext) -> Dict[str, Any]:
   return make_result("TC-ARCH-05: 文档领域计数与清单条目数一致", violations)
 
 
+def _validate_gd_config_calls(
+  ctx: ArchitectureAuditContext,
+  eid: str,
+  gd_file: Path,
+  violations: List[str],
+) -> int:
+  """校验单个 GDScript 源码中静态 GameConfig 调用的表与键真实存在。"""
+  _, source = ctx.gd_sources[gd_file]
+  rel_gd = "res://" + gd_file.relative_to(ctx.root).as_posix()
+  checked = 0
+  for m in CONFIG_CALL_RE.finditer(source):
+    key = m.group(2)
+    if is_dynamic_key(key):
+      continue
+    table = m.group(1)
+    checked += 1
+    line = source[:m.start()].count("\n") + 1
+    keys = ctx.get_table_keys(table)
+    if keys is None:
+      msg = f"{eid}: 配置表缺失或解析失败 {table} -> res://{ctx.table_path_rel(table)}（引用处 {rel_gd}:{line}）"
+      if msg not in violations:
+        violations.append(msg)
+      continue
+    if key not in keys:
+      msg = f"{eid}: 表 {table} 缺少键 {key}（引用处 {rel_gd}:{line}）"
+      if msg not in violations:
+        violations.append(msg)
+  return checked
+
+
 def check_tc_arch_06(ctx: ArchitectureAuditContext) -> Dict[str, Any]:
   """TC-ARCH-06: 代码读取的「表 + 键路径」必须在配置表中真实存在。"""
   violations: List[str] = []
@@ -417,24 +469,7 @@ def check_tc_arch_06(ctx: ArchitectureAuditContext) -> Dict[str, Any]:
     eid = str(entry.get("id", ""))
     files = ctx.domain_gd_files.get(eid, [])
     for gd_file in files:
-      _, source = ctx.gd_sources[gd_file]
-      rel_gd = "res://" + gd_file.relative_to(ctx.root).as_posix()
-      for m in CONFIG_CALL_RE.finditer(source):
-        table = m.group(1)
-        key = m.group(2)
-        if is_dynamic_key(key):
-          continue
-        checked += 1
-        line = source[:m.start()].count("\n") + 1
-        keys = ctx.get_table_keys(table)
-        if keys is None:
-          msg = f"{eid}: 配置表缺失或解析失败 {table} -> res://{ctx.table_path_rel(table)}（引用处 {rel_gd}:{line}）"
-          if msg not in violations:
-            violations.append(msg)
-        elif key not in keys:
-          msg = f"{eid}: 表 {table} 缺少键 {key}（引用处 {rel_gd}:{line}）"
-          if msg not in violations:
-            violations.append(msg)
+      checked += _validate_gd_config_calls(ctx, eid, gd_file, violations)
 
   if checked == 0:
     violations.append("未扫描到任何静态配置键引用: res://backend/domains")

@@ -59,35 +59,50 @@ def collect_domain_mapping() -> dict[str, dict]:
     return out
 
 
+def _walk_string_values(o: Any, out: list[str]) -> None:
+    """递归提取嵌套字典与列表中的所有字符串字面量。"""
+    if isinstance(o, dict):
+        for v in o.values():
+            _walk_string_values(v, out)
+    elif isinstance(o, list):
+        for v in o:
+            _walk_string_values(v, out)
+    elif isinstance(o, str):
+        out.append(o)
+
+
+def _extract_channel_candidates(data: dict, subkey: str | None) -> list[str]:
+    """从单个数据对象中按 subkey 提取频道候选字符串。"""
+    candidates: list[str] = []
+    if subkey is None:
+        for entry in data.get("channel_registry", []):
+            if isinstance(entry, dict) and entry.get("legacy"):
+                candidates.append(str(entry["legacy"]))
+        return candidates
+
+    node: Any = data
+    for part in subkey.split("/"):
+        if not isinstance(node, dict) or part not in node:
+            return candidates
+        node = node[part]
+    _walk_string_values(node, candidates)
+    return candidates
+
+
 def collect_config_channels(domain_map: dict) -> list[dict]:
-    """仅扫描频道声明源契约：
-       - domains/account.json  auth.channels.*
-       - domains/world_state.json hud.channels.*
-       - event_bus_config.json channel_registry[].legacy
-    其余配置（contracts.json 契约字段等）非频道声明，禁止误判为事件频道。
-    """
+    """仅扫描频道声明源契约。"""
     account_path = CONFIG / "domains" / "account" / "core.json"
     if not account_path.exists():
         account_path = CONFIG / "domains" / "account.json"
     world_state_path = CONFIG / "domains" / "world_state" / "core.json"
     if not world_state_path.exists():
         world_state_path = CONFIG / "domains" / "world_state.json"
-    channel_sources: list[tuple[Path, str]] = [
+    channel_sources: list[tuple[Path, str | None]] = [
         (account_path, "auth/channels"),
         (world_state_path, "hud/channels"),
-        (CONFIG / "infrastructure" / "event_bus_config.json", None),  # 特例：channel_registry.legacy
+        (CONFIG / "infrastructure" / "event_bus_config.json", None),
     ]
     channels: list[dict] = []
-
-    def walk_values(o: Any, out: list) -> None:
-        if isinstance(o, dict):
-            for v in o.values():
-                walk_values(v, out)
-        elif isinstance(o, list):
-            for v in o:
-                walk_values(v, out)
-        elif isinstance(o, str):
-            out.append(o)
 
     for path, subkey in channel_sources:
         if not path.exists():
@@ -96,23 +111,7 @@ def collect_config_channels(domain_map: dict) -> list[dict]:
             data = json.loads(path.read_text(encoding="utf-8"))
         except Exception:
             continue
-        candidates: list[str] = []
-        if subkey is None:
-            # event_bus_config.json：仅取 channel_registry 条目的 legacy 字段
-            for entry in data.get("channel_registry", []):
-                if isinstance(entry, dict) and entry.get("legacy"):
-                    candidates.append(str(entry["legacy"]))
-        else:
-            node = data
-            ok = True
-            for part in subkey.split("/"):
-                if isinstance(node, dict) and part in node:
-                    node = node[part]
-                else:
-                    ok = False
-                    break
-            if ok:
-                walk_values(node, candidates)
+        candidates = _extract_channel_candidates(data, subkey)
         for raw in candidates:
             m = CHANNEL_RE.match(raw.strip())
             if m and m.group(1) in domain_map:

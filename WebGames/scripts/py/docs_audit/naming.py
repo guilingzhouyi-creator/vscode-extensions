@@ -19,6 +19,63 @@ from typing import Callable
 from docs_audit.models import CN_NUMERALS, Finding
 
 
+def _check_recursive_sub_naming(
+    rule: dict,
+    scope: Path,
+    dir_index: dict,
+    rel_fn: Callable,
+    out: list,
+) -> None:
+    """递归检查 scope 深层全部文件命名。"""
+    patterns = rule.get("files")
+    if not patterns:
+        return
+    compiled = [re.compile(p) for p in patterns]
+    scope_prefix = str(scope) + os.sep
+    for d, descs in dir_index.items():
+        if not d.startswith(scope_prefix):
+            continue
+        for p in descs:
+            if not p.is_file() or p.parent == scope:
+                continue
+            if not any(pat.fullmatch(p.name) for pat in compiled):
+                out.append(Finding(
+                    "NAMING-FILE",
+                    rel_fn(p),
+                    0,
+                    f'文件名「{p.name}」不符合 scope「{rule["scope"]}」声明模式',
+                ))
+
+
+def _check_scope_entries(
+    rule: dict,
+    entries: list,
+    rel_fn: Callable,
+    out: list,
+) -> None:
+    """检查单级 scope 下目录与文件命名。"""
+    dir_pats = [re.compile(p) for p in rule["dirs"]] if rule.get("dirs") else None
+    file_pats = [re.compile(p) for p in rule["files"]] if rule.get("files") else None
+    scope_str = rule.get("scope", "")
+
+    for p in entries:
+        rel = rel_fn(p)
+        if p.is_dir() and dir_pats and not any(pat.fullmatch(p.name) for pat in dir_pats):
+            out.append(Finding(
+                "NAMING-DIR",
+                rel,
+                0,
+                f'目录名「{p.name}」不符合 scope「{scope_str}」声明模式',
+            ))
+        elif p.is_file() and file_pats and not any(pat.fullmatch(p.name) for pat in file_pats):
+            out.append(Finding(
+                "NAMING-FILE",
+                rel,
+                0,
+                f'文件名「{p.name}」不符合 scope「{scope_str}」声明模式',
+            ))
+
+
 def check_naming(
     docs_dir: Path,
     dir_index: dict,
@@ -35,27 +92,10 @@ def check_naming(
         entries = dir_index.get(str(scope))
         if entries is None:
             continue
-        if rule.get("sub"):                        # 递归约束 scope 深层全部文件
-            scope_prefix = str(scope) + os.sep
-            for d, descs in dir_index.items():
-                if not d.startswith(scope_prefix):
-                    continue
-                for p in descs:
-                    if p.is_file() and p.parent != scope and rule.get("files") \
-                            and not any(re.fullmatch(pat, p.name) for pat in rule["files"]):
-                        out.append(Finding("NAMING-FILE", rel_fn(p), 0,
-                                           f'文件名「{p.name}」不符合 scope「{rule["scope"]}」声明模式'))
+        if rule.get("sub"):
+            _check_recursive_sub_naming(rule, scope, dir_index, rel_fn, out)
             continue
-        for p in entries:
-            rel = rel_fn(p)
-            if p.is_dir() and rule.get("dirs"):
-                if not any(re.fullmatch(pat, p.name) for pat in rule["dirs"]):
-                    out.append(Finding("NAMING-DIR", rel, 0,
-                                       f'目录名「{p.name}」不符合 scope「{rule["scope"]}」声明模式'))
-            elif p.is_file() and rule.get("files"):
-                if not any(re.fullmatch(pat, p.name) for pat in rule["files"]):
-                    out.append(Finding("NAMING-FILE", rel, 0,
-                                       f'文件名「{p.name}」不符合 scope「{rule["scope"]}」声明模式'))
+        _check_scope_entries(rule, entries, rel_fn, out)
     check_seq(docs_map, rel_fn, out)
 
 

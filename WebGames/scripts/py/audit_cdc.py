@@ -86,27 +86,15 @@ def check_ast_kind_single_source(violations: list) -> set:
     return kinds
 
 
-def check_gacha_rates_and_pity(violations: list) -> dict:
-    """校验 domains.gacha 概率表值域与保底阶梯单调性"""
-    gacha_file = CONFIG / "domains" / "gacha" / "core.json"
-    if not gacha_file.exists():
-        gacha_file = CONFIG / "domains" / "gacha.json"
-    if not gacha_file.exists():
-        violations.append(f"[配置缺失] 找不到 Gacha 配置文件: {gacha_file}")
-        return {}
-
-    try:
-        data = json.loads(gacha_file.read_text(encoding="utf-8"))
-    except Exception as e:
-        violations.append(f"[JSON解析失败] gacha.json: {e}")
-        return {}
-
-    rates = data.get("rates", {})
+def _validate_rates(rates: dict, violations: list) -> None:
+    """校验 Gacha 各档位基础概率合法性。"""
     for key, val in rates.items():
         if not isinstance(val, (int, float)) or val < 0.0 or val > 1.0:
             violations.append(f"[Gacha概率越界] rates.{key} = {val} 超出 [0.0, 1.0] 合法值域")
 
-    pity = data.get("pity", {})
+
+def _validate_pity_thresholds(pity: dict, violations: list) -> None:
+    """校验保底软硬阈值、步进递增与绝对保底率。"""
     soft = pity.get("soft_threshold")
     hard = pity.get("hard_threshold")
     inc = pity.get("soft_increment_per_pull")
@@ -123,6 +111,24 @@ def check_gacha_rates_and_pity(violations: list) -> dict:
     if guaranteed != 1.0:
         violations.append(f"[Gacha绝对保底非法] pity.hard_guaranteed_rate = {guaranteed} 必须严格为 1.0")
 
+
+def check_gacha_rates_and_pity(violations: list) -> dict:
+    """校验 domains.gacha 概率表值域与保底阶梯单调性"""
+    gacha_file = CONFIG / "domains" / "gacha" / "core.json"
+    if not gacha_file.exists():
+        gacha_file = CONFIG / "domains" / "gacha.json"
+    if not gacha_file.exists():
+        violations.append(f"[配置缺失] 找不到 Gacha 配置文件: {gacha_file}")
+        return {}
+
+    try:
+        data = json.loads(gacha_file.read_text(encoding="utf-8"))
+    except Exception as e:
+        violations.append(f"[JSON解析失败] gacha.json: {e}")
+        return {}
+
+    _validate_rates(data.get("rates", {}), violations)
+    _validate_pity_thresholds(data.get("pity", {}), violations)
     return data
 
 

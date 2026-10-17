@@ -36,6 +36,76 @@ def resolve_abs_target(frag: str, docs_dir: Path) -> str:
     return str(cand) if cand.exists() else ""
 
 
+def _check_abs_link_match(
+    m: Any,
+    line_idx: int,
+    doc: Doc,
+    add_fn: Callable,
+    get_doc_fn: Callable,
+    abs_target_fn: Callable,
+) -> None:
+    frag, _, anchor = m.group()[2:-1].strip().partition("#")
+    target = abs_target_fn(frag)
+    if not target:
+        add_fn(doc, "LINK-DEAD", line_idx, f"file:/// 链接目标不存在: {urllib.parse.unquote(frag)[:90]}")
+        return
+    add_fn(doc, "LINK-ABS-FILE-URI", line_idx, "file:/// 绝对路径链接（目标可解析，可安全转相对链接）", suggestion=target)
+    tpath = Path(target)
+    if not (anchor and tpath.suffix == ".md"):
+        return
+    tdoc = get_doc_fn(tpath)
+    if tdoc is None:
+        return
+    slug = slugify(urllib.parse.unquote(anchor))
+    if slug not in tdoc.heading_slugs:
+        tail = slug.rsplit("-", 1)[-1]
+        cands = [s for s in tdoc.heading_slugs if s.rsplit("-", 1)[-1] == tail][:3]
+        add_fn(
+            doc,
+            "LINK-ANCHOR-DEAD",
+            line_idx,
+            f'锚点失效: #{urllib.parse.unquote(anchor)[:60]}（目标 {tpath.name}）',
+            "候选: " + " | ".join(cands) if cands else "无相近候选，需人工核对目标章节",
+        )
+
+
+def _check_rel_link_match(
+    m: Any,
+    line_idx: int,
+    doc: Doc,
+    docs_map: dict,
+    add_fn: Callable,
+    get_doc_fn: Callable,
+    rel_fn: Callable,
+) -> None:
+    t = m.group(1)
+    if t.startswith(("http://", "https://", "file:///")):
+        return
+    frag, _, anchor = t.partition("#")
+    frag_norm = urllib.parse.unquote(frag).replace("\\", "/")
+    dest = doc.path.parent / frag_norm
+    dest_key = str(dest)
+    if dest_key not in docs_map and not dest.exists():
+        add_fn(doc, "LINK-DEAD", line_idx, f"相对链接目标不存在: {frag}")
+        return
+    if not anchor or dest.suffix != ".md":
+        return
+    target_doc = get_doc_fn(dest)
+    if target_doc is None:
+        return
+    slug = slugify(urllib.parse.unquote(anchor))
+    if slug not in target_doc.heading_slugs:
+        tail = slug.rsplit("-", 1)[-1]
+        cands = [s for s in target_doc.heading_slugs if s.rsplit("-", 1)[-1] == tail][:3]
+        add_fn(
+            doc,
+            "LINK-ANCHOR-DEAD",
+            line_idx,
+            f'锚点失效: #{urllib.parse.unquote(anchor)[:60]}（目标 {rel_fn(dest)}）',
+            "候选: " + " | ".join(cands) if cands else "无相近候选，需人工核对目标章节",
+        )
+
+
 def check_links(
     doc: Doc,
     docs_map: dict,
@@ -46,56 +116,14 @@ def check_links(
 ) -> None:
     """审查文档内的绝对路径、相对路径与目标锚点完整性。"""
     for i, (ln, ins) in enumerate(zip(doc.lines, doc.inside), 1):
-        if ins:
+        if ins or doc.rel.startswith("docs/模板/"):
             continue
-        if doc.rel.startswith("docs/模板/"):
-            continue  # 模板目录的占位链接（<相对路径>/NN）不做死链判定
 
         for m in ABSLINK_RE.finditer(ln):
-            frag, _, anchor = m.group()[2:-1].strip().partition("#")
-            target = abs_target_fn(frag)
-            if not target:
-                add_fn(doc, "LINK-DEAD", i,
-                       f"file:/// 链接目标不存在: {urllib.parse.unquote(frag)[:90]}")
-                continue
-            add_fn(doc, "LINK-ABS-FILE-URI", i,
-                   "file:/// 绝对路径链接（目标可解析，可安全转相对链接）",
-                   suggestion=target)
-            tpath = Path(target)
-            if anchor and tpath.suffix == ".md":
-                tdoc = get_doc_fn(tpath)
-                if tdoc is not None:
-                    slug = slugify(urllib.parse.unquote(anchor))
-                    if slug not in tdoc.heading_slugs:
-                        tail = slug.rsplit("-", 1)[-1]
-                        cands = [s for s in tdoc.heading_slugs if s.rsplit("-", 1)[-1] == tail][:3]
-                        add_fn(doc, "LINK-ANCHOR-DEAD", i,
-                               f'锚点失效: #{urllib.parse.unquote(anchor)[:60]}（目标 {tpath.name}）',
-                               "候选: " + " | ".join(cands) if cands else "无相近候选，需人工核对目标章节")
+            _check_abs_link_match(m, i, doc, add_fn, get_doc_fn, abs_target_fn)
 
         for m in RELLINK_RE.finditer(ln):
-            t = m.group(1)
-            if t.startswith(("http://", "https://", "file:///")):
-                continue
-            frag, _, anchor = t.partition("#")
-            frag_norm = urllib.parse.unquote(frag).replace('\\', '/')
-            dest = doc.path.parent / frag_norm
-            dest_key = str(dest)
-            if dest_key not in docs_map and not dest.exists():
-                add_fn(doc, "LINK-DEAD", i, f"相对链接目标不存在: {frag}")
-                continue
-            if not anchor or dest.suffix != ".md":
-                continue
-            target_doc = get_doc_fn(dest)
-            if target_doc is None:
-                continue
-            slug = slugify(urllib.parse.unquote(anchor))
-            if slug not in target_doc.heading_slugs:
-                tail = slug.rsplit("-", 1)[-1]
-                cands = [s for s in target_doc.heading_slugs if s.rsplit("-", 1)[-1] == tail][:3]
-                add_fn(doc, "LINK-ANCHOR-DEAD", i,
-                       f'锚点失效: #{urllib.parse.unquote(anchor)[:60]}（目标 {rel_fn(dest)}）',
-                       "候选: " + " | ".join(cands) if cands else "无相近候选，需人工核对目标章节")
+            _check_rel_link_match(m, i, doc, docs_map, add_fn, get_doc_fn, rel_fn)
 
 
 def fix_abs_links(text: str, src: Path, abs_target_fn: Callable) -> tuple:

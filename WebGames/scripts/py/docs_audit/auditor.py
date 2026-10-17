@@ -150,6 +150,58 @@ class DocsAuditor:
         findings.sort(key=lambda f: (f.file, f.line, f.rule))
         return findings
 
+def _should_pad_table_row(cur: str, prev_lines: list) -> bool:
+    if not (TABLE_ROW_RE.match(cur) and prev_lines):
+        return False
+    prev = prev_lines[-1]
+    if not prev.strip():
+        return False
+    lstrip_prev = prev.lstrip()
+    if lstrip_prev.startswith(("#", ">", "|")):
+        return False
+    if LIST_PREFIX_RE.match(prev) or FENCE_RE.match(prev) or TABLE_ROW_RE.match(prev):
+        return False
+    return True
+
+
+def _fix_single_line(cur: str, in_mermaid: bool, new_lines: list) -> tuple:
+    if in_mermaid:
+        return mermaid_fix_line(cur)
+
+    fixes = 0
+    if WS_TAIL_RE.search(cur):
+        cur = WS_TAIL_RE.sub("", cur)
+        fixes += 1
+    br_matches = len(BR_TAG_RE.findall(cur))
+    if br_matches:
+        cur = BR_TAG_RE.sub("<br/>", cur)
+        fixes += br_matches
+    hm = HEADING_NOSPACE_RE.match(cur)
+    if hm:
+        cur = hm.group(1) + " " + hm.group(2)
+        fixes += 1
+    if _should_pad_table_row(cur, new_lines):
+        new_lines.append("")
+        fixes += 1
+    return cur, fixes
+
+
+def _process_doc_lines(lines: list) -> tuple:
+    new_lines: list = []
+    n_fix = 0
+    in_mermaid = False
+    for ln in lines:
+        if FENCE_RE.match(ln):
+            lang = FENCE_RE.match(ln).group(2).lower()
+            in_mermaid = (lang == "mermaid") if not in_mermaid else False
+            new_lines.append(ln)
+            continue
+        cur, n = _fix_single_line(ln, in_mermaid, new_lines)
+        n_fix += n
+        new_lines.append(cur)
+    return new_lines, n_fix
+
+
     # ---------- 修复域（仅安全六类） ----------
     def fix(self, dry_run: bool = False) -> tuple:
         """应用安全修复。返回 (applied 列表, 修复后残留 findings)。
@@ -158,38 +210,7 @@ class DocsAuditor:
         """
         applied, changed = [], []
         for doc in self.docs_map.values():
-            new_lines, n_fix = [], 0
-            in_mermaid = False
-            for ln in doc.lines:
-                if FENCE_RE.match(ln):
-                    lang = FENCE_RE.match(ln).group(2).lower()
-                    in_mermaid = (lang == "mermaid") if not in_mermaid else False
-                    new_lines.append(ln)
-                    continue
-                cur = ln
-                if in_mermaid:
-                    cur, n = mermaid_fix_line(cur)
-                    n_fix += n
-                else:
-                    if WS_TAIL_RE.search(cur):
-                        cur = WS_TAIL_RE.sub("", cur)
-                        n_fix += 1
-                    n_br = len(BR_TAG_RE.findall(cur))
-                    if n_br:
-                        cur = BR_TAG_RE.sub("<br/>", cur)
-                        n_fix += n_br
-                    hm = HEADING_NOSPACE_RE.match(cur)
-                    if hm:
-                        cur = hm.group(1) + " " + hm.group(2)
-                        n_fix += 1
-                    if TABLE_ROW_RE.match(cur) and new_lines and new_lines[-1].strip() \
-                            and not new_lines[-1].lstrip().startswith(("#", ">", "|")) \
-                            and not LIST_PREFIX_RE.match(new_lines[-1]) \
-                            and not FENCE_RE.match(new_lines[-1]) \
-                            and not TABLE_ROW_RE.match(new_lines[-1]):
-                        new_lines.append("")
-                        n_fix += 1
-                new_lines.append(cur)
+            new_lines, n_fix = _process_doc_lines(doc.lines)
             new_text, n_abs = fix_abs_links("\n".join(new_lines), doc.path, self._abs_target)
             n_fix += n_abs
             if n_fix and new_text != doc.text:
