@@ -35,6 +35,20 @@ export interface PathNamingOptions {
     allowedShortFiles?: string[];
 }
 
+/** Rule identifier for file naming conventions and transient jargon violations. */
+export const RULE_NAM_FIL_001 = 'NAM-FIL-001';
+/** Rule identifier for directory naming conventions and transient jargon violations. */
+export const RULE_NAM_DIR_001 = 'NAM-DIR-001';
+
+const SUGGESTION_REMOVE_FILE_MARKERS = 'Remove temporary process markers from file name.';
+const SUGGESTION_REMOVE_DIR_MARKERS = 'Remove temporary process markers from directory name.';
+const SUGGESTION_RENAME_DIR_KEBAB = 'Rename directory to kebab-case.';
+const SUGGESTION_USE_ENGLISH_DOMAINS =
+    'Use recognizable English domain terms containing vowels for file name segments.';
+const DEFAULT_LANGUAGE_TYPESCRIPT = 'typescript';
+const EXEMPT_PREFIX_RE = /^(?:test_|on_)/;
+const NAME_TEST_LITERAL = 'test';
+
 const VOWEL_RE = /[aeiouy]/i;
 const LETTERS_RE = /[a-z]/i;
 const SNAKE_CLEAN_RE = /^_+|_+$/g;
@@ -54,21 +68,13 @@ export function isMorphemePhonetic(token: string): boolean {
     return VOWEL_RE.test(lower) || ALLOWED_ACRONYMS.has(lower);
 }
 
+const ALLOWED_ACRONYMS_LIST =
+    'id ip db os vm fs ui ci io re fk pk tx rx ch fn cb el sf ns op cp fd src cfg msg idx cnt ctx ptr mgr btn tbl chk doc err len num pos req res str sync async grpc http https html json yaml toml xml css dom url uri urn uuid guid jwt sql cli api sdk dto dao rpc ssl tls tcp udp dns ftp ssh cpu gpu ram rom png jpg svg gif csv tsv pdf ast loc eloc sloc dfa nfa fsm lut swar csr soa aos simd fps rng crc md5 sha ssot pr cd qa env dev prod std fmt log tmp pkg bin lib ref opt arg cmd sys cwd pid gid uid tty zh en ts js py rs gd l1 l2 l3';
+
 /**
  * Standard technical acronyms permitted without vowel phonetics or with domain meaning.
  */
-export const ALLOWED_ACRONYMS: ReadonlySet<string> = new Set(
-    (
-        'id ip db os vm fs ui ci io re fk pk tx rx ch fn cb el sf ns ' +
-        'op cp fd src cfg msg idx cnt ctx ptr mgr btn tbl chk doc err len num ' +
-        'pos req res str sync async grpc http https html json yaml toml xml css dom ' +
-        'url uri urn uuid guid jwt sql cli api sdk dto dao rpc ssl tls tcp udp ' +
-        'dns ftp ssh cpu gpu ram rom png jpg svg gif csv tsv pdf ast loc eloc ' +
-        'sloc dfa nfa fsm lut swar csr soa aos simd fps rng crc md5 sha ssot pr cd ' +
-        'qa env dev prod std fmt log tmp pkg bin lib ref opt arg cmd sys cwd ' +
-        'pid gid uid tty zh en ts js py rs gd l1 l2 l3'
-    ).split(' '),
-);
+export const ALLOWED_ACRONYMS: ReadonlySet<string> = new Set(ALLOWED_ACRONYMS_LIST.split(' '));
 
 /** Minimum permitted character length for source file stem without exemption. */
 export const DEFAULT_MIN_FILE_NAME_LENGTH = 3;
@@ -197,7 +203,7 @@ export function auditStructuredResourceFile(
                 symbolCount: SYNTHETIC_SYMBOL_COUNT,
                 literalCount: SYNTHETIC_LITERAL_COUNT,
                 astDepth: SYNTHETIC_AST_DEPTH,
-                language: path.extname(filePath).slice(1) || 'typescript',
+                language: path.extname(filePath).slice(1) || DEFAULT_LANGUAGE_TYPESCRIPT,
                 isExecutableLogic: false,
             },
         ],
@@ -270,7 +276,7 @@ function auditJsTsFileName(target: FileNamingTarget, mkIssue: IssueFactory): Iss
         .toLowerCase();
     return mkIssue({
         line: 1,
-        rule: 'NAM-FIL-001',
+        rule: RULE_NAM_FIL_001,
         message: `File name '${baseName}' violates strict kebab-case naming convention for TypeScript/JavaScript.`,
         detail: { file: filePath, baseName, suggested: `${suggested}${ext}` },
         suggestion: `Rename file to '${suggested}${ext}'.`,
@@ -290,7 +296,7 @@ function auditSnakeFileName(target: FileNamingTarget, mkIssue: IssueFactory): Is
         .toLowerCase();
     return mkIssue({
         line: 1,
-        rule: 'NAM-FIL-001',
+        rule: RULE_NAM_FIL_001,
         message: `File name '${baseName}' violates strict snake_case naming convention for ${ext.slice(1)}.`,
         detail: { file: filePath, baseName, suggested: `${suggested}${ext}` },
         suggestion: `Rename file to '${suggested}${ext}'.`,
@@ -316,10 +322,10 @@ function checkFileJargonOrIgnored(target: FileNamingTarget, pCtx: PathNamingCont
         pCtx.issues.push(
             pCtx.mkIssue({
                 line: 1,
-                rule: 'NAM-FIL-001',
+                rule: RULE_NAM_FIL_001,
                 message: `File name '${target.baseName}' contains transient process jargon or milestone tags.`,
                 detail: { file: pCtx.filePath, baseName: target.baseName },
-                suggestion: 'Remove temporary process markers from file name.',
+                suggestion: SUGGESTION_REMOVE_FILE_MARKERS,
             }),
         );
         return true;
@@ -344,6 +350,43 @@ function isFixtureOrBenchPath(filePath: string): boolean {
     return FIXTURE_OR_BENCH_PATH_RE.test(filePath.replace(/\\/g, '/').toLowerCase());
 }
 
+interface FileLengthAuditOptions {
+    readonly pCtx: PathNamingContext;
+    readonly target: FileNamingTarget;
+    readonly limit: number;
+    readonly isTooShort: boolean;
+}
+
+function emitFileLengthIssue(params: FileLengthAuditOptions): void {
+    const { pCtx, target, limit, isTooShort } = params;
+    const message = isTooShort
+        ? `File name '${target.baseName}' is excessively short (< ${limit} characters); lacks domain description.`
+        : `File name '${target.baseName}' is excessively long (> ${limit} characters); consider decomposing responsibilities into subdirectories.`;
+    const suggestion = isTooShort
+        ? `Rename file '${target.baseName}' to a descriptive identifier conveying domain purpose.`
+        : `Decompose or shorten file name '${target.baseName}' to focus on core domain entity.`;
+    const detail: Record<string, unknown> = {
+        file: pCtx.filePath,
+        baseName: target.baseName,
+        length: target.nameWithoutExt.length,
+    };
+    if (isTooShort) {
+        detail.minLen = limit;
+    } else {
+        detail.maxLen = limit;
+    }
+
+    pCtx.issues.push(
+        pCtx.mkIssue({
+            line: 1,
+            rule: RULE_NAM_FIL_001,
+            message,
+            detail,
+            suggestion,
+        }),
+    );
+}
+
 function checkFileNameLength(target: FileNamingTarget, pCtx: PathNamingContext): void {
     if (isFixtureOrBenchPath(pCtx.filePath)) return;
     const minLen = pCtx.opts.minFileLength ?? DEFAULT_MIN_FILE_NAME_LENGTH;
@@ -354,44 +397,12 @@ function checkFileNameLength(target: FileNamingTarget, pCtx: PathNamingContext):
 
     const lower = target.nameWithoutExt.toLowerCase();
     if (target.nameWithoutExt.length < minLen && !allowedSet.has(lower)) {
-        const msg =
-            `File name '${target.baseName}' is excessively short ` +
-            `(< ${minLen} characters); lacks domain description.`;
-        pCtx.issues.push(
-            pCtx.mkIssue({
-                line: 1,
-                rule: 'NAM-FIL-001',
-                message: msg,
-                detail: {
-                    file: pCtx.filePath,
-                    baseName: target.baseName,
-                    length: target.nameWithoutExt.length,
-                    minLen,
-                },
-                suggestion: `Rename file '${target.baseName}' to a descriptive identifier conveying domain purpose.`,
-            }),
-        );
+        emitFileLengthIssue({ pCtx, target, limit: minLen, isTooShort: true });
         return;
     }
 
     if (target.nameWithoutExt.length > maxLen) {
-        const msg =
-            `File name '${target.baseName}' is excessively long ` +
-            `(> ${maxLen} characters); consider decomposing responsibilities into subdirectories.`;
-        pCtx.issues.push(
-            pCtx.mkIssue({
-                line: 1,
-                rule: 'NAM-FIL-001',
-                message: msg,
-                detail: {
-                    file: pCtx.filePath,
-                    baseName: target.baseName,
-                    length: target.nameWithoutExt.length,
-                    maxLen,
-                },
-                suggestion: `Decompose or shorten file name '${target.baseName}' to focus on core domain entity.`,
-            }),
-        );
+        emitFileLengthIssue({ pCtx, target, limit: maxLen, isTooShort: false });
     }
 }
 
@@ -427,19 +438,15 @@ function checkFileWordLimits(
         pCtx.issues.push(
             pCtx.mkIssue({
                 line: 1,
-                rule: 'NAM-FIL-001',
-                message:
-                    `File name '${target.baseName}' has too few word segments ` +
-                    `(${wordCount} < ${pCtx.opts.minFileWords}); lacks domain specificity.`,
+                rule: RULE_NAM_FIL_001,
+                message: `File name '${target.baseName}' has too few word segments (${wordCount} < ${pCtx.opts.minFileWords}); lacks domain specificity.`,
                 detail: {
                     file: pCtx.filePath,
                     baseName: target.baseName,
                     wordCount,
                     minWords: pCtx.opts.minFileWords,
                 },
-                suggestion:
-                    `Expand file name '${target.baseName}' with domain qualifying words ` +
-                    `(at least ${pCtx.opts.minFileWords} word segments).`,
+                suggestion: `Expand file name '${target.baseName}' with domain qualifying words (at least ${pCtx.opts.minFileWords} word segments).`,
             }),
         );
     }
@@ -448,10 +455,8 @@ function checkFileWordLimits(
         pCtx.issues.push(
             pCtx.mkIssue({
                 line: 1,
-                rule: 'NAM-FIL-001',
-                message:
-                    `File name '${target.baseName}' has too many word segments ` +
-                    `(${wordCount} > ${pCtx.opts.maxFileWords}); consider simplifying file naming.`,
+                rule: RULE_NAM_FIL_001,
+                message: `File name '${target.baseName}' has too many word segments (${wordCount} > ${pCtx.opts.maxFileWords}); consider simplifying file naming.`,
                 detail: {
                     file: pCtx.filePath,
                     baseName: target.baseName,
@@ -476,14 +481,10 @@ function checkFileMorphemes(
             pCtx.issues.push(
                 pCtx.mkIssue({
                     line: 1,
-                    rule: 'NAM-FIL-001',
-                    message:
-                        `File name '${target.baseName}' contains segment '${seg}' with ` +
-                        `invalid morpheme phonetics (missing vowel or unapproved acronym).`,
+                    rule: RULE_NAM_FIL_001,
+                    message: `File name '${target.baseName}' contains segment '${seg}' with invalid morpheme phonetics (missing vowel or unapproved acronym).`,
                     detail: { file: pCtx.filePath, baseName: target.baseName, segment: seg },
-                    suggestion:
-                        `Use recognizable English domain terms containing vowels ` +
-                        `for file name segments.`,
+                    suggestion: SUGGESTION_USE_ENGLISH_DOMAINS,
                 }),
             );
             break;
@@ -550,10 +551,10 @@ function auditDirectoryName(pCtx: PathNamingContext): void {
             pCtx.issues.push(
                 pCtx.mkIssue({
                     line: 1,
-                    rule: 'NAM-DIR-001',
+                    rule: RULE_NAM_DIR_001,
                     message: `Directory name '${segment}' contains transient process jargon or milestone tags.`,
                     detail: { dir, segment },
-                    suggestion: 'Remove temporary process markers from directory name.',
+                    suggestion: SUGGESTION_REMOVE_DIR_MARKERS,
                 }),
             );
             return;
@@ -563,10 +564,10 @@ function auditDirectoryName(pCtx: PathNamingContext): void {
             pCtx.issues.push(
                 pCtx.mkIssue({
                     line: 1,
-                    rule: 'NAM-DIR-001',
+                    rule: RULE_NAM_DIR_001,
                     message: `Directory '${segment}' should follow kebab-case convention.`,
                     detail: { dir, segment },
-                    suggestion: 'Rename directory to kebab-case.',
+                    suggestion: SUGGESTION_RENAME_DIR_KEBAB,
                 }),
             );
             return;
@@ -574,29 +575,12 @@ function auditDirectoryName(pCtx: PathNamingContext): void {
     }
 }
 
+const APPROVED_ACTION_VERBS_LIST =
+    'abort accumulate add advance aggregate align allocate allows analyze append apply arbitrate as assemble assert attach audit benchmark bind broadcast build calculate can cancel capitalize categorize check clamp classify clean cleanup clear clone close collect compile compose compress compute construct contains convert copy count create debounce decode decompress deduce define delete dequeue derive deserialize destroy detach detect diff dispatch dispose do does drain drop dump emit encode enqueue ensure escape estimate evaluate evict examine execute exists extract fast fetch filter finalize find flatten flush format forward freeze from generate get group guard handle has index infer ingest init initialize inspect install instantiate intercept introduce introduces invert invoke is isolate iterate lint load log lookup loop make map mask match matches measure merge mk mock must needs normalize notify obtain open parse partition patch pause peek perform persist pipe poll pop populate precompute print probe process produce project propagate prune publish pull push put query queue read receive reclaim record redirect reduce refresh register reload remove render rename replace report reset resolve resume retrieve retry review route run safe sanitize save scan schedule score search seed select send serialize set setup shift should solve sort spawn split start stop store strip subscribe sum supports sync synthesize tag test throttle to track transform transpile traverse trigger trim truncate try tune unbind unescape uninstall unregister unshift unwrap update validate verify visit walk was were will wrap write';
+
 /** Standard engineering action verbs initiating descriptive function identifiers. */
 export const APPROVED_ACTION_VERBS: ReadonlySet<string> = new Set(
-    (
-        'abort accumulate add advance aggregate align allocate allows analyze append apply arbitrate as ' +
-        'assemble assert attach audit benchmark bind broadcast build calculate can cancel capitalize categorize ' +
-        'check clamp classify clean cleanup clear clone close collect compile compose compress compute construct ' +
-        'contains convert copy count create debounce decode decompress deduce define delete dequeue ' +
-        'derive deserialize destroy detach detect diff dispatch dispose do does drain drop ' +
-        'dump emit encode enqueue ensure escape estimate evaluate evict examine execute exists ' +
-        'extract fast fetch filter finalize find flatten flush format forward freeze from ' +
-        'generate get group guard handle has index infer ingest init initialize inspect ' +
-        'install instantiate intercept introduce introduces invert invoke is isolate iterate lint load log lookup loop ' +
-        'make map mask match matches measure merge mk mock must needs normalize ' +
-        'notify obtain open parse partition patch pause peek perform persist pipe poll ' +
-        'pop populate precompute print probe process produce project propagate prune publish pull push ' +
-        'put query queue read receive reclaim record redirect reduce refresh register reload ' +
-        'remove render rename replace report reset resolve resume retrieve retry review route run ' +
-        'safe sanitize save scan schedule score search seed select send serialize set ' +
-        'setup shift should solve sort spawn split start stop store strip subscribe sum ' +
-        'supports sync synthesize tag test throttle to track transform transpile traverse trigger ' +
-        'trim truncate try tune unbind unescape uninstall unregister unshift unwrap update validate ' +
-        'verify visit walk was were will wrap write'
-    ).split(' '),
+    APPROVED_ACTION_VERBS_LIST.split(' '),
 );
 
 /** Standard test framework runner functions exempt from verb-noun naming checks. */
@@ -707,7 +691,7 @@ export function isExemptFunctionName(name: string, isAccessor?: boolean): boolea
     if (EXEMPT_METHOD_NAMES.has(name)) return true;
     if (EVENT_CALLBACK_RE.test(name)) return true;
     if (PYTHON_SPECIAL_METHOD_RE.test(name)) return true;
-    if (name.startsWith('test_') || name === 'test' || name.startsWith('on_')) return true;
+    if (EXEMPT_PREFIX_RE.test(name) || name === NAME_TEST_LITERAL) return true;
     return isAccessor === true;
 }
 
@@ -751,10 +735,7 @@ function checkFunctionVerbNoun(name: string, firstToken: string): FunctionSemant
     return {
         type: TYPE_VERB_NOUN,
         token: firstWord,
-        message:
-            `Function or method name '${name}' violates verb-noun contract; ` +
-            `must begin with an approved action verb ` +
-            `(e.g. 'get', 'check', 'compute', 'handle', 'run').`,
+        message: `Function or method name '${name}' violates verb-noun contract; must begin with an approved action verb (e.g. 'get', 'check', 'compute', 'handle', 'run').`,
     };
 }
 
@@ -796,9 +777,7 @@ function checkFunctionMorphemes(name: string, tokens: string[]): FunctionSemanti
                 return {
                     type: TYPE_INVALID_MORPHEME,
                     token,
-                    message:
-                        `Function or method name '${name}' contains segment '${token}' with ` +
-                        `invalid morpheme phonetics (missing vowel or unapproved acronym).`,
+                    message: `Function or method name '${name}' contains segment '${token}' with invalid morpheme phonetics (missing vowel or unapproved acronym).`,
                 };
             }
         } else if (token.length === 1 && !ALLOWED_SINGLE_LETTER_TOKENS.has(tokenLower)) {

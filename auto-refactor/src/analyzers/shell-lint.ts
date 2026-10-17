@@ -43,6 +43,7 @@ import {
     PS_NON_INTERACTIVE_FLAG_RE,
     type ShellEmitter,
     type PowerShellScanState,
+    type ShellLineScanContext,
     scanStrictErrorFlags,
     checkDeprecatedSyntax,
     checkShellConditionSyntax,
@@ -57,25 +58,87 @@ import {
     checkPowerShellDynamicSecurity,
     checkPowerShellSafety,
     checkShellSafety,
+    RULE_SH_INIT_001,
+    RULE_SH_ERR_001,
+    RULE_SH_CMD_001,
+    RULE_SH_READ_001,
+    RULE_SH_ARRAY_001,
+    RULE_SH_ECHO_001,
+    RULE_PS_CMDLET_001,
+    RULE_PS_PARAM_001,
+    RULE_PS_ERROR_001,
+    RULE_PS_VERB_001,
+    RULE_PS_ALIAS_001,
 } from './shell-lint-rules';
 
-const SHELL_ACTIONABLE_MAP: Record<
-    string,
-    { action: AgentActionType; code: string; safeToAutomate: boolean; templateSnippet: string }
-> = {
-    'SH-ERR-001': {
-        action: 'replace_token',
-        code: 'AR:SHL:001',
-        safeToAutomate: true,
-        templateSnippet: 'set -euo pipefail',
-    },
-    'SH-QUOTE-001': {
-        action: 'replace_token',
-        code: 'AR:SHL:002',
-        safeToAutomate: false,
-        templateSnippet: '"$VAR"',
-    },
+const ACTION_REPLACE_TOKEN: AgentActionType = 'replace_token';
+const ACTION_CODE_SHL_ERR = 'AR:SHL:001';
+const ACTION_CODE_SHL_QUOTE = 'AR:SHL:002';
+const SNIPPET_SET_EUO_PIPEFAIL = 'set -euo pipefail';
+const SNIPPET_QUOTED_VAR = '"$VAR"';
+
+interface ActionableConfig {
+    readonly action: AgentActionType;
+    readonly code: string;
+    readonly safeToAutomate: boolean;
+    readonly templateSnippet: string;
+}
+
+function buildActionable(code: string, snippet: string, safeToAutomate: boolean): ActionableConfig {
+    return {
+        action: ACTION_REPLACE_TOKEN,
+        code,
+        safeToAutomate,
+        templateSnippet: snippet,
+    };
+}
+
+const SHELL_ACTIONABLE_MAP: Record<string, ActionableConfig> = {
+    [RULE_SH_ERR_001]: buildActionable(ACTION_CODE_SHL_ERR, SNIPPET_SET_EUO_PIPEFAIL, true),
+    'SH-QUOTE-001': buildActionable(ACTION_CODE_SHL_QUOTE, SNIPPET_QUOTED_VAR, false),
 };
+
+const HASH_COMMENT_CHAR = '#';
+const MAX_SCAN_LINES = 30;
+const ALIAS_FOREACH = 'foreach';
+const PARAM_ATTR_PREFIX = '[Parameter';
+const EMPTY_LINE_PLACEHOLDER = '(empty)';
+
+const FLAG_MISSING_ERREXIT = '-e (errexit)';
+const FLAG_MISSING_NOUNSET = '-u (nounset)';
+const FLAG_MISSING_PIPEFAIL = '-o pipefail';
+
+const BUILTIN_PS_VALUES: ReadonlySet<string> = new Set(['true', 'false', 'null']);
+
+const SHELL_SCAN_MESSAGES = {
+    shebangMissing: 'Script is missing a shebang line (#!/bin/bash or #!/usr/bin/env bash).',
+    shebangSuggestion:
+        'Add `#!/usr/bin/env bash` (or `#!/bin/bash`) as the first line so the script runs with the correct interpreter.',
+    cdUnchecked:
+        '`cd` without error check: a failed cd will silently continue in the wrong directory.',
+    cdSuggestion:
+        'Use `cd foo || exit 1` or `cd foo && ...` so the script aborts when the directory is unreachable.',
+    readWithoutR: '`read` without `-r` mangles backslashes in the input.',
+    readSuggestion:
+        'Use `read -r` to preserve backslashes in the input (almost always the intended behavior).',
+    arrayDollarStar:
+        '`$*` joins all arguments into one string; use `$@` to preserve individual arguments.',
+    arraySuggestion:
+        'Replace `$*` with `"$@"` so each positional parameter is preserved as a separate word.',
+    echoVsPrintf: '`echo -e` / `echo -n` is not portable; use `printf` for complex output.',
+    echoSuggestion:
+        'Use `printf "%s\\n" "text"` instead of `echo -e` — printf is POSIX-standard and behaves consistently.',
+    errorActionMissing:
+        "Script does not set `$ErrorActionPreference = 'Stop'` — non-terminating errors will be silently ignored.",
+    errorActionSuggestion:
+        "Add `$ErrorActionPreference = 'Stop'` near the top of the script so non-terminating errors are treated as terminating.",
+    strictErrorSuggestion:
+        'Add `set -euo pipefail` near the top of the script to make errors and unset variables fail fast.',
+    untypedParamSuggestion:
+        'Add type annotations (e.g. `[string]$Name`) to parameters for self-documentation and input validation.',
+    approvedVerbSuggestion:
+        'Use an approved verb (e.g. Get, Set, New, Remove, Start, Stop, Invoke, ConvertTo, ConvertFrom). See `Get-Verb` for the full list.',
+} as const;
 
 const FOREACH_STATEMENT_RE = /(?:^|[\s;{}])foreach\s*\(/i;
 
@@ -126,14 +189,8 @@ export class ShellLintAnalyzer implements Analyzer {
     }
 
     private createIssueEmitter(file: string, issues: Issue[]): ShellEmitter {
-        return (
-            lineIdx: number,
-            rule: string,
-            message: string,
-            severity: Severity,
-            suggestion: string,
-            detail: Record<string, unknown>,
-        ): void => {
+        return (...args: Parameters<ShellEmitter>): void => {
+            const [lineIdx, rule, message, severity, suggestion, detail] = args;
             const mapped = SHELL_ACTIONABLE_MAP[rule];
             const actionable = mapped
                 ? {
@@ -166,7 +223,7 @@ export class ShellLintAnalyzer implements Analyzer {
      * ========================================================================= */
 
     private analyzeShell(content: string, file: string, emit: ShellEmitter): void {
-        const { raw, masked } = maskSourceText(content, this.shellMaskConfig());
+        const { raw, masked } = maskSourceText(content, this.getShellMaskConfig());
         const lines = raw;
         const maskedLines = masked;
 
@@ -188,7 +245,7 @@ export class ShellLintAnalyzer implements Analyzer {
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
             const trimmed = line.trim();
-            if (trimmed === '' || trimmed.startsWith('#')) continue;
+            if (trimmed === '' || trimmed.startsWith(HASH_COMMENT_CHAR)) continue;
 
             if (inHeredoc) {
                 if (trimmed === heredocDelimiter) {
@@ -207,7 +264,7 @@ export class ShellLintAnalyzer implements Analyzer {
             this.checkCdWithoutCheck(trimmed, i, emit);
             this.checkReadWithoutR(trimmed, i, emit);
             this.checkArraySyntax(trimmed, i, emit);
-            this.checkEchoVsPrintf(trimmed, i, emit);
+            this.checkEchoPortability(trimmed, i, emit);
             checkUnquotedVariables(line, maskedTrimmed, i, emit);
             checkShellDynamicSecurity(trimmed, i, emit);
             checkShellSafety(lineCtx, hasTtyGuard, emit);
@@ -223,8 +280,8 @@ export class ShellLintAnalyzer implements Analyzer {
         }
     }
 
-    private shellMaskConfig(): SourceMaskConfig {
-        return { lineComment: '#', quoteChars: '\'"' };
+    private getShellMaskConfig(): SourceMaskConfig {
+        return { lineComment: HASH_COMMENT_CHAR, quoteChars: '\'"' };
     }
 
     private checkShebang(lines: string[], _file: string, emit: ShellEmitter): void {
@@ -233,11 +290,11 @@ export class ShellLintAnalyzer implements Analyzer {
         if (!SHEBANG_RE.test(firstLine)) {
             emit(
                 0,
-                'SH-INIT-001',
-                'Script is missing a shebang line (#!/bin/bash or #!/usr/bin/env bash).',
+                RULE_SH_INIT_001,
+                SHELL_SCAN_MESSAGES.shebangMissing,
                 SEVERITY_WARNING,
-                'Add `#!/usr/bin/env bash` (or `#!/bin/bash`) as the first line so the script runs with the correct interpreter.',
-                { line: firstLine || '(empty)' },
+                SHELL_SCAN_MESSAGES.shebangSuggestion,
+                { line: firstLine || EMPTY_LINE_PLACEHOLDER },
             );
         }
     }
@@ -247,67 +304,67 @@ export class ShellLintAnalyzer implements Analyzer {
         if (hasE && hasU && hasPipefail) return;
 
         const missing: string[] = [];
-        if (!hasE) missing.push('-e (errexit)');
-        if (!hasU) missing.push('-u (nounset)');
-        if (!hasPipefail) missing.push('-o pipefail');
+        if (!hasE) missing.push(FLAG_MISSING_ERREXIT);
+        if (!hasU) missing.push(FLAG_MISSING_NOUNSET);
+        if (!hasPipefail) missing.push(FLAG_MISSING_PIPEFAIL);
 
         emit(
             0,
-            'SH-ERR-001',
+            RULE_SH_ERR_001,
             `Script does not set strict error handling (missing: ${missing.join(', ')}).`,
             SEVERITY_INFO,
-            'Add `set -euo pipefail` near the top of the script to make errors and unset variables fail fast.',
+            SHELL_SCAN_MESSAGES.strictErrorSuggestion,
             { missing },
         );
     }
 
-    private checkCdWithoutCheck(trimmed: string, i: number, emit: ShellEmitter): void {
+    private checkCdWithoutCheck(trimmed: string, lineIndex: number, emit: ShellEmitter): void {
         if (CD_WITHOUT_CHECK_RE.test(trimmed)) {
             emit(
-                i,
-                'SH-CMD-001',
-                '`cd` without error check: a failed cd will silently continue in the wrong directory.',
+                lineIndex,
+                RULE_SH_CMD_001,
+                SHELL_SCAN_MESSAGES.cdUnchecked,
                 SEVERITY_WARNING,
-                'Use `cd foo || exit 1` or `cd foo && ...` so the script aborts when the directory is unreachable.',
+                SHELL_SCAN_MESSAGES.cdSuggestion,
                 { line: trimmed },
             );
         }
     }
 
-    private checkReadWithoutR(trimmed: string, i: number, emit: ShellEmitter): void {
+    private checkReadWithoutR(trimmed: string, lineIndex: number, emit: ShellEmitter): void {
         if (READ_CMD_RE.test(trimmed) && !READ_HAS_R_RE.test(trimmed)) {
             emit(
-                i,
-                'SH-READ-001',
-                '`read` without `-r` mangles backslashes in the input.',
+                lineIndex,
+                RULE_SH_READ_001,
+                SHELL_SCAN_MESSAGES.readWithoutR,
                 SEVERITY_INFO,
-                'Use `read -r` to preserve backslashes in the input (almost always the intended behavior).',
+                SHELL_SCAN_MESSAGES.readSuggestion,
                 { line: trimmed },
             );
         }
     }
 
-    private checkArraySyntax(trimmed: string, i: number, emit: ShellEmitter): void {
+    private checkArraySyntax(trimmed: string, lineIndex: number, emit: ShellEmitter): void {
         if (DOLLAR_STAR_RE.test(trimmed)) {
             emit(
-                i,
-                'SH-ARRAY-001',
-                '`$*` joins all arguments into one string; use `$@` to preserve individual arguments.',
+                lineIndex,
+                RULE_SH_ARRAY_001,
+                SHELL_SCAN_MESSAGES.arrayDollarStar,
                 SEVERITY_INFO,
-                'Replace `$*` with `"$@"` so each positional parameter is preserved as a separate word.',
+                SHELL_SCAN_MESSAGES.arraySuggestion,
                 { line: trimmed },
             );
         }
     }
 
-    private checkEchoVsPrintf(trimmed: string, i: number, emit: ShellEmitter): void {
+    private checkEchoPortability(trimmed: string, lineIndex: number, emit: ShellEmitter): void {
         if (ECHO_FLAG_RE.test(trimmed)) {
             emit(
-                i,
-                'SH-ECHO-001',
-                '`echo -e` / `echo -n` is not portable; use `printf` for complex output.',
+                lineIndex,
+                RULE_SH_ECHO_001,
+                SHELL_SCAN_MESSAGES.echoVsPrintf,
                 SEVERITY_INFO,
-                'Use `printf "%s\\n" "text"` instead of `echo -e` — printf is POSIX-standard and behaves consistently.',
+                SHELL_SCAN_MESSAGES.echoSuggestion,
                 { line: trimmed },
             );
         }
@@ -319,7 +376,7 @@ export class ShellLintAnalyzer implements Analyzer {
 
     private analyzePowerShell(content: string, file: string, emit: ShellEmitter): void {
         const { raw, masked } = maskSourceText(content, {
-            lineComment: '#',
+            lineComment: HASH_COMMENT_CHAR,
             blockComment: { open: '<#', close: '#>' },
             quoteChars: '\'"',
         });
@@ -349,10 +406,10 @@ export class ShellLintAnalyzer implements Analyzer {
             const trimmed = line.trim();
             const maskedTrimmed = maskedLines[i].trim();
 
-            if (trimmed === '' || trimmed.startsWith('#')) continue;
+            if (trimmed === '' || trimmed.startsWith(HASH_COMMENT_CHAR)) continue;
 
             const lineCtx = { raw: line, trimmed, maskedTrimmed, lineIndex: i };
-            this.updatePowerShellFunctionState(state, line, trimmed, maskedTrimmed, i, emit);
+            this.updatePowerShellFunctionState(state, lineCtx, emit);
             this.checkPowerShellAliases(trimmed, maskedTrimmed, i, emit);
             checkPowerShellDynamicSecurity(trimmed, i, emit);
             checkPowerShellSafety(lineCtx, hasInteractiveGuard, emit);
@@ -361,20 +418,17 @@ export class ShellLintAnalyzer implements Analyzer {
 
     private updatePowerShellFunctionState(
         state: PowerShellScanState,
-        line: string,
-        trimmed: string,
-        maskedTrimmed: string,
-        lineIdx: number,
+        lineCtx: ShellLineScanContext,
         emit: ShellEmitter,
     ): void {
-        this.checkPowerShellFunctionEntry(state, trimmed, lineIdx, emit);
-        this.checkPowerShellParamBlock(state, trimmed, maskedTrimmed);
+        this.checkPowerShellFunctionEntry(state, lineCtx.trimmed, lineCtx.lineIndex, emit);
+        this.checkPowerShellParamBlock(state, lineCtx.trimmed, lineCtx.maskedTrimmed);
 
-        if (state.inFunction && PS_CMDLET_BINDING_RE.test(trimmed)) {
+        if (state.inFunction && PS_CMDLET_BINDING_RE.test(lineCtx.trimmed)) {
             state.seenCmdletBinding = true;
         }
 
-        if (state.inFunction && /^\s*\}\s*$/.test(line)) {
+        if (state.inFunction && /^\s*\}\s*$/.test(lineCtx.raw)) {
             this.finalizePowerShellFunction(state, emit);
         }
     }
@@ -421,7 +475,7 @@ export class ShellLintAnalyzer implements Analyzer {
             if (/^[A-Z]/.test(state.functionName)) {
                 emit(
                     state.functionStartLine,
-                    'PS-CMDLET-001',
+                    RULE_PS_CMDLET_001,
                     `Function \`${state.functionName}\` is missing \`[CmdletBinding()]\` — common parameters (-Verbose, -WhatIf, etc.) will not work.`,
                     SEVERITY_INFO,
                     `Add \`[CmdletBinding()]\` before the \`param()\` block of \`${state.functionName}\` to enable common parameters and pipeline support.`,
@@ -433,10 +487,10 @@ export class ShellLintAnalyzer implements Analyzer {
         if (state.hasUntypedParam) {
             emit(
                 state.functionStartLine,
-                'PS-PARAM-001',
+                RULE_PS_PARAM_001,
                 `Function \`${state.functionName}\` has parameters without explicit type annotations.`,
                 SEVERITY_INFO,
-                `Add type annotations (e.g. \`[string]$Name\`) to parameters for self-documentation and input validation.`,
+                SHELL_SCAN_MESSAGES.untypedParamSuggestion,
                 { function: state.functionName },
             );
         }
@@ -449,10 +503,10 @@ export class ShellLintAnalyzer implements Analyzer {
 
     private checkErrorActionPreference(lines: string[], emit: ShellEmitter): void {
         let found = false;
-        const maxScan = Math.min(lines.length, 30);
+        const maxScan = Math.min(lines.length, MAX_SCAN_LINES);
         for (let i = 0; i < maxScan; i++) {
             const trimmed = lines[i].trim();
-            if (trimmed === '' || trimmed.startsWith('#')) continue;
+            if (trimmed === '' || trimmed.startsWith(HASH_COMMENT_CHAR)) continue;
             if (PS_ERROR_ACTION_RE.test(trimmed)) {
                 found = true;
                 break;
@@ -461,27 +515,27 @@ export class ShellLintAnalyzer implements Analyzer {
         if (!found) {
             emit(
                 0,
-                'PS-ERROR-001',
-                "Script does not set `$ErrorActionPreference = 'Stop'` — non-terminating errors will be silently ignored.",
+                RULE_PS_ERROR_001,
+                SHELL_SCAN_MESSAGES.errorActionMissing,
                 SEVERITY_INFO,
-                "Add `$ErrorActionPreference = 'Stop'` near the top of the script so non-terminating errors are treated as terminating.",
+                SHELL_SCAN_MESSAGES.errorActionSuggestion,
                 {},
             );
         }
     }
 
-    private checkApprovedVerb(functionName: string, i: number, emit: ShellEmitter): void {
+    private checkApprovedVerb(functionName: string, lineIndex: number, emit: ShellEmitter): void {
         const dashIdx = functionName.indexOf('-');
         const verb = dashIdx > 0 ? functionName.slice(0, dashIdx) : functionName;
         const verbNormalized = verb.charAt(0).toUpperCase() + verb.slice(1).toLowerCase();
 
         if (dashIdx > 0 && !PS_APPROVED_VERBS.has(verbNormalized)) {
             emit(
-                i,
-                'PS-VERB-001',
+                lineIndex,
+                RULE_PS_VERB_001,
                 `Function \`${functionName}\` uses verb \`${verb}\` which is not in the PowerShell approved verb list.`,
                 SEVERITY_WARNING,
-                'Use an approved verb (e.g. Get, Set, New, Remove, Start, Stop, Invoke, ConvertTo, ConvertFrom). See `Get-Verb` for the full list.',
+                SHELL_SCAN_MESSAGES.approvedVerbSuggestion,
                 { function: functionName, verb },
             );
         }
@@ -490,7 +544,7 @@ export class ShellLintAnalyzer implements Analyzer {
     private checkPowerShellAliases(
         trimmed: string,
         maskedTrimmed: string,
-        i: number,
+        lineIndex: number,
         emit: ShellEmitter,
     ): void {
         if (maskedTrimmed === '') return;
@@ -501,15 +555,16 @@ export class ShellLintAnalyzer implements Analyzer {
             const alias = match[1].toLowerCase();
             // In PowerShell, `foreach ($var in $col)` is a language statement keyword,
             // not a pipeline alias for `ForEach-Object`.
-            const isForeachStatement = alias === 'foreach' && FOREACH_STATEMENT_RE.test(trimmed);
+            const isForeachStatement =
+                alias === ALIAS_FOREACH && FOREACH_STATEMENT_RE.test(trimmed);
             if (isForeachStatement) {
                 continue;
             }
             const canonical = POWERSHELL_ALIASES[alias];
             if (canonical) {
                 emit(
-                    i,
-                    'PS-ALIAS-001',
+                    lineIndex,
+                    RULE_PS_ALIAS_001,
                     `Alias \`${alias}\` should be written as \`${canonical}\` for readability.`,
                     SEVERITY_INFO,
                     `Use the full cmdlet name \`${canonical}\` instead of the alias \`${alias}\` — it is more self-documenting and works everywhere.`,
@@ -530,13 +585,13 @@ export class ShellLintAnalyzer implements Analyzer {
  * @returns True if the candidate is an untyped variable parameter.
  */
 function isUntypedParamCandidate(trimmed: string, maskedTrimmed: string): boolean {
-    if (trimmed.startsWith('[Parameter') || PS_PARAM_WITH_TYPE_RE.test(trimmed)) {
+    if (trimmed.startsWith(PARAM_ATTR_PREFIX) || PS_PARAM_WITH_TYPE_RE.test(trimmed)) {
         return false;
     }
     const match = PS_PARAM_SIMPLE_RE.exec(trimmed);
     if (!match) return false;
     const varName = match[1].toLowerCase();
-    if (varName === 'true' || varName === 'false' || varName === 'null') {
+    if (BUILTIN_PS_VALUES.has(varName)) {
         return false;
     }
     return /\$[A-Za-z]/.test(maskedTrimmed);

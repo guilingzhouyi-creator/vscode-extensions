@@ -1,10 +1,10 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1792241095506",
-  "timestamp": "2026-10-17T12:45:06.836Z",
+  "snapshotId": "snapshot-v0.4.0-1792242769325",
+  "timestamp": "2026-10-17T13:12:59.870Z",
   "cai": 86.12,
   "polyglotGeneralization": {
-    "index": 94.77,
-    "meanScore": 94.77,
+    "index": 94.78,
+    "meanScore": 94.78,
     "dispersionPenalty": 1,
     "standardDeviation": 0,
     "languageCount": 1
@@ -21,33 +21,33 @@
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
     "filesScanned": 637,
-    "durationMs": 9248
+    "durationMs": 8234
   },
   "metrics": {
     "compositeScore": 99.15,
     "grade": "A+",
     "autonomyRate": 86.12,
     "polyglotGeneralization": {
-      "index": 94.77,
-      "meanScore": 94.77,
+      "index": 94.78,
+      "meanScore": 94.78,
       "dispersionPenalty": 1,
       "standardDeviation": 0,
       "languageCount": 1
     },
     "effectiveCodeDensity": 0.95,
-    "totalIssues": 5050,
+    "totalIssues": 5029,
     "suppressedIssues": 131,
-    "unsuppressedIssues": 4919,
+    "unsuppressedIssues": 4898,
     "bySeverity": {
       "info": 496,
-      "warning": 4554,
+      "warning": 4533,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
       "high": 0,
-      "medium": 2470,
-      "low": 2580
+      "medium": 2460,
+      "low": 2569
     }
   },
   "eightPillars": {
@@ -59,7 +59,7 @@
       "testing": 100,
       "reliability": 99.73,
       "security": 99.88,
-      "extensibility": 97.02
+      "extensibility": 97.03
     },
     "compositeScore": 99.15,
     "weights": {
@@ -75,15 +75,15 @@
     "ceilingsApplied": []
   },
   "tenDimensions": {
-    "architectureConsistency": 98.7,
+    "architectureConsistency": 98.71,
     "semanticPurity": 99.48,
     "codeSecurity": 99.85,
     "performanceEfficiency": 99.49,
-    "standardization": 94.39,
+    "standardization": 94.43,
     "modernity": 99.76,
-    "maintainability": 97.07,
+    "maintainability": 97.08,
     "commentQuality": 99.99,
-    "duplication": 96.11,
+    "duplication": 96.15,
     "techDebtRisk": 99.83
   },
   "topHotspots": [
@@ -182,8 +182,8 @@
     "summary": {
       "critical": 0,
       "high": 0,
-      "medium": 2470,
-      "low": 2580
+      "medium": 2460,
+      "low": 2569
     },
     "criticalItems": [],
     "highItems": []
@@ -207,16 +207,16 @@
       },
       {
         "domainName": "analyzers",
-        "compositeScore": 98.88,
+        "compositeScore": 98.92,
         "pillars": {
-          "architecture": 99.2,
-          "maintainability": 96.06,
+          "architecture": 99.27,
+          "maintainability": 96.15,
           "performance": 99.58,
           "data": 99.66,
           "testing": 100,
           "reliability": 99.58,
           "security": 99.83,
-          "extensibility": 97.43
+          "extensibility": 97.61
         },
         "moduleCount": 1
       },
@@ -944,8 +944,8 @@
   },
   "trajectory": {
     "runEloc": {
-      "processed": 148858,
-      "unique": 119868,
+      "processed": 148936,
+      "unique": 119843,
       "changed": 0,
       "semantic": 0,
       "relocated": 0,
@@ -958,11 +958,11 @@
     "lifetime": {
       "weekId": "LIFETIME",
       "startMs": 1791102755050,
-      "endMs": 1792241095504,
+      "endMs": 1792242769324,
       "totalRuns": 252,
       "eloc": {
-        "processedTotal": 33690471,
-        "uniqueTotal": 119868,
+        "processedTotal": 33690549,
+        "uniqueTotal": 119843,
         "changedTotal": 276076,
         "semanticTotal": 220859
       },
@@ -973,7 +973,7 @@
       },
       "debt": {
         "totalAdded": 1569,
-        "totalResolved": 1741,
+        "totalResolved": 1749,
         "totalRegressions": 0,
         "netYield": 0.01
       },

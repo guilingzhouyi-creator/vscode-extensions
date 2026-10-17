@@ -38,6 +38,86 @@ export const RULE_PS_SEC_001 = 'PS-SEC-001';
 export const RULE_PS_SAFE_001 = 'PS-SAFE-001';
 /** Rule identifier for missing non-interactive safety guards in shell. */
 export const RULE_SH_SAFE_001 = 'SH-SAFE-001';
+/** Rule identifier for missing shebang line in shell scripts. */
+export const RULE_SH_INIT_001 = 'SH-INIT-001';
+/** Rule identifier for missing strict error handling (set -euo pipefail). */
+export const RULE_SH_ERR_001 = 'SH-ERR-001';
+/** Rule identifier for unverified directory changes (cd without error check). */
+export const RULE_SH_CMD_001 = 'SH-CMD-001';
+/** Rule identifier for read without -r option. */
+export const RULE_SH_READ_001 = 'SH-READ-001';
+/** Rule identifier for fragile $* parameter array expansion. */
+export const RULE_SH_ARRAY_001 = 'SH-ARRAY-001';
+/** Rule identifier for non-portable echo flags. */
+export const RULE_SH_ECHO_001 = 'SH-ECHO-001';
+/** Rule identifier for PowerShell functions lacking CmdletBinding attribute. */
+export const RULE_PS_CMDLET_001 = 'PS-CMDLET-001';
+/** Rule identifier for untyped parameters in PowerShell functions. */
+export const RULE_PS_PARAM_001 = 'PS-PARAM-001';
+/** Rule identifier for missing ErrorActionPreference = Stop in PowerShell. */
+export const RULE_PS_ERROR_001 = 'PS-ERROR-001';
+/** Rule identifier for unapproved PowerShell verbs in function names. */
+export const RULE_PS_VERB_001 = 'PS-VERB-001';
+/** Rule identifier for command alias usage in PowerShell scripts. */
+export const RULE_PS_ALIAS_001 = 'PS-ALIAS-001';
+
+/** Canonical diagnostic messages and remediation suggestions for shell lint rules. */
+export const SHELL_RULE_MESSAGES = {
+    backtickDeprecated: 'Backtick command substitution is deprecated: use $(...) instead.',
+    backtickSuggestion:
+        'Replace `` `cmd` `` with `$(cmd)` — it nests cleanly and is easier to read.',
+    fragileBracketTest: 'The `[` test command is fragile; use `[[` for safer string/number tests.',
+    fragileBracketSuggestion:
+        'Use `[[ ... ]]` instead of `[ ... ]` — it handles empty variables safely and supports pattern matching.',
+    conditionRegexError:
+        'Regex operator `=~` is invalid inside single brackets `[ ... ]`; use `[[ ... ]]`.',
+    conditionRegexSuggestion:
+        'Upgrade condition to `[[ ... =~ ... ]]` to enable regex pattern matching.',
+    conditionLogicalError:
+        'Logical `&&` / `||` inside single brackets `[ ... ]` causes syntax errors; use `[[ ... ]]`.',
+    conditionLogicalSuggestion:
+        'Upgrade condition to `[[ ... && ... ]]` or use separate test invocations.',
+    conditionEqualityWarning:
+        'Equality operator `==` inside single brackets `[ ... ]` violates POSIX portability.',
+    conditionEqualitySuggestion:
+        'Use single `=` inside `[ ... ]` for portability, or upgrade to `[[ ... == ... ]]`.',
+    shellDocMissing: 'Shell script lacks standard module documentation contract header.',
+    shellDocSuggestion:
+        'Add a standard module header (# Module:, # Description:, # Usage:) near the top.',
+    psDocMissing:
+        'PowerShell script lacks standard documentation header (.SYNOPSIS/.DESCRIPTION or Module header).',
+    psDocSuggestion:
+        'Add standard comment help (<# .SYNOPSIS ... .DESCRIPTION ... #>) or module metadata at script start.',
+    shellEolCrlf:
+        'Shell script contains CRLF (\\r\\n) line endings; execution will fail on POSIX/containers.',
+    shellEolSuggestion:
+        'Convert line endings from CRLF to LF using dos2unix or your editor line-ending setting.',
+    shellExitUnchecked:
+        'Command expected to return non-zero exit codes executed bare under `set -e`, risking early abort.',
+    shellExitSuggestion:
+        'Capture exit status explicitly: `STATUS=0; cmd || STATUS=$?` or wrap in `if cmd; then`.',
+    shellTrapMissing: 'Temporary file/directory created without registering EXIT cleanup trap.',
+    shellTrapSuggestion:
+        'Register a cleanup trap immediately after creating temporary resources: `trap \'rm -rf "$TMP"\' EXIT`.',
+    psResourceDisposalMissing:
+        'Critical system handle created without try-finally resource disposal.',
+    psResourceDisposalSuggestion:
+        'Wrap handle usage in `try { ... } finally { $handle.Dispose() }` to guarantee release.',
+    shellDynamicEval: 'Dynamic `eval` with variable expansion risks arbitrary command injection.',
+    shellDynamicEvalSuggestion:
+        'Use an array invocation (`"${CMD[@]}"`) or direct function dispatch instead of dynamic eval.',
+    psDynamicIex:
+        'Dynamic `Invoke-Expression` (iex) with variable input risks arbitrary code injection.',
+    psDynamicIexSuggestion:
+        'Use the call operator (`& $cmd @params`) or script block invocation instead of Invoke-Expression.',
+    psInteractiveUnguarded: 'Interactive input cmdlet used without non-interactive terminal guard.',
+    psInteractiveSuggestion:
+        'Guard interactive input with `if ([Environment]::UserInteractive -and -not [Console]::IsOutputRedirected)` or support `-Force`.',
+    shellInteractiveUnguarded:
+        'Interactive `read` without timeout risks hanging unattended CI/Agent subprocesses.',
+    shellInteractiveSuggestion:
+        'Add a timeout flag (`read -t 10`) or verify terminal interactivity with `[[ -t 0 ]]` before prompting.',
+} as const;
 
 const SCRIPTS_DIR_FRAGMENT = '/scripts/';
 const SCRIPTS_DIR_PREFIX = 'scripts/';
@@ -168,14 +248,7 @@ function buildAliasMap(): Record<string, string> {
 export const POWERSHELL_ALIASES: Record<string, string> = buildAliasMap();
 
 const PS_VERB_TOKENS =
-    'Add Approve Assert Backup Block Build Checkpoint Clear Close Compare Complete Compress ' +
-    'Confirm Connect Convert ConvertFrom ConvertTo Copy Debug Deny Disable Disconnect Dismount ' +
-    'Edit Enable Enter Exit Expand Export Find Format Get Grant Group Hide Import Initialize ' +
-    'Install Invoke Join Limit Lock Measure Merge Mount Move New Open Optimize Out Ping Pop ' +
-    'Protect Publish Push Put Read Receive Redo Register Remove Rename Repair Request Reset ' +
-    'Resize Resolve Restart Restore Resume Revoke Save Search Select Send Set Show Skip Split ' +
-    'Start Step Stop Submit Suspend Switch Sync Test Trace Undo Uninstall Unlock Unprotect ' +
-    'Unpublish Unregister Update Use Wait Watch Write';
+    'Add Approve Assert Backup Block Build Checkpoint Clear Close Compare Complete Compress Confirm Connect Convert ConvertFrom ConvertTo Copy Debug Deny Disable Disconnect Dismount Edit Enable Enter Exit Expand Export Find Format Get Grant Group Hide Import Initialize Install Invoke Join Limit Lock Measure Merge Mount Move New Open Optimize Out Ping Pop Protect Publish Push Put Read Receive Redo Register Remove Rename Repair Request Reset Resize Resolve Restart Restore Resume Revoke Save Search Select Send Set Show Skip Split Start Step Stop Submit Suspend Switch Sync Test Trace Undo Uninstall Unlock Unprotect Unpublish Unregister Update Use Wait Watch Write';
 
 export const PS_APPROVED_VERBS = new Set(PS_VERB_TOKENS.split(' '));
 
@@ -270,9 +343,9 @@ export function checkDeprecatedSyntax(lineCtx: ShellLineScanContext, emit: Shell
             emit(
                 idx,
                 RULE_SH_DEPR_001,
-                'Backtick command substitution is deprecated: use $(...) instead.',
+                SHELL_RULE_MESSAGES.backtickDeprecated,
                 SEVERITY_WARNING,
-                'Replace `` `cmd` `` with `$(cmd)` — it nests cleanly and is easier to read.',
+                SHELL_RULE_MESSAGES.backtickSuggestion,
                 { line: trimmed },
             );
         }
@@ -288,9 +361,9 @@ export function checkDeprecatedSyntax(lineCtx: ShellLineScanContext, emit: Shell
             emit(
                 idx,
                 RULE_SH_DEPR_001,
-                'The `[` test command is fragile; use `[[` for safer string/number tests.',
+                SHELL_RULE_MESSAGES.fragileBracketTest,
                 SEVERITY_WARNING,
-                'Use `[[ ... ]]` instead of `[ ... ]` — it handles empty variables safely and supports pattern matching.',
+                SHELL_RULE_MESSAGES.fragileBracketSuggestion,
                 { line: trimmed },
             );
         }
@@ -328,27 +401,27 @@ export function checkShellConditionSyntax(
         emit(
             lineIndex,
             RULE_SH_COND_001,
-            'Regex operator `=~` is invalid inside single brackets `[ ... ]`; use `[[ ... ]]`.',
+            SHELL_RULE_MESSAGES.conditionRegexError,
             SEVERITY_ERROR,
-            'Upgrade condition to `[[ ... =~ ... ]]` to enable regex pattern matching.',
+            SHELL_RULE_MESSAGES.conditionRegexSuggestion,
             { line: trimmed },
         );
     } else if (/(?:&&|\|\|)/.test(inner)) {
         emit(
             lineIndex,
             RULE_SH_COND_001,
-            'Logical `&&` / `||` inside single brackets `[ ... ]` causes syntax errors; use `[[ ... ]]`.',
+            SHELL_RULE_MESSAGES.conditionLogicalError,
             SEVERITY_ERROR,
-            'Upgrade condition to `[[ ... && ... ]]` or use separate test invocations.',
+            SHELL_RULE_MESSAGES.conditionLogicalSuggestion,
             { line: trimmed },
         );
     } else if (/(?:^|\s)==(?:\s|$)/.test(inner)) {
         emit(
             lineIndex,
             RULE_SH_COND_001,
-            'Equality operator `==` inside single brackets `[ ... ]` violates POSIX portability.',
+            SHELL_RULE_MESSAGES.conditionEqualityWarning,
             SEVERITY_WARNING,
-            'Use single `=` inside `[ ... ]` for portability, or upgrade to `[[ ... == ... ]]`.',
+            SHELL_RULE_MESSAGES.conditionEqualitySuggestion,
             { line: trimmed },
         );
     }
@@ -417,9 +490,9 @@ export function checkShellDocContract(lines: string[], filePath: string, emit: S
     emit(
         0,
         RULE_SH_DOC_001,
-        'Shell script lacks standard module documentation contract header.',
+        SHELL_RULE_MESSAGES.shellDocMissing,
         SEVERITY_WARNING,
-        'Add a standard module header (# Module:, # Description:, # Usage:) near the top.',
+        SHELL_RULE_MESSAGES.shellDocSuggestion,
         { lines: lines.length },
     );
 }
@@ -446,9 +519,9 @@ export function checkPowerShellDocContract(
     emit(
         0,
         RULE_PS_DOC_001,
-        'PowerShell script lacks standard documentation header (.SYNOPSIS/.DESCRIPTION or Module header).',
+        SHELL_RULE_MESSAGES.psDocMissing,
         SEVERITY_WARNING,
-        'Add standard comment help (<# .SYNOPSIS ... .DESCRIPTION ... #>) or module metadata at script start.',
+        SHELL_RULE_MESSAGES.psDocSuggestion,
         { lines: lines.length },
     );
 }
@@ -464,9 +537,9 @@ export function checkShellLineEndings(content: string, emit: ShellEmitter): void
         emit(
             0,
             RULE_SH_EOL_001,
-            'Shell script contains CRLF (\\r\\n) line endings; execution will fail on POSIX/containers.',
+            SHELL_RULE_MESSAGES.shellEolCrlf,
             SEVERITY_ERROR,
-            'Convert line endings from CRLF to LF using dos2unix or your editor line-ending setting.',
+            SHELL_RULE_MESSAGES.shellEolSuggestion,
             {},
         );
     }
@@ -491,9 +564,9 @@ export function checkShellStrictExitCapture(
         emit(
             lineIdx,
             RULE_SH_EXIT_001,
-            'Command expected to return non-zero exit codes executed bare under `set -e`, risking early abort.',
+            SHELL_RULE_MESSAGES.shellExitUnchecked,
             SEVERITY_WARNING,
-            'Capture exit status explicitly: `STATUS=0; cmd || STATUS=$?` or wrap in `if cmd; then`.',
+            SHELL_RULE_MESSAGES.shellExitSuggestion,
             { line: trimmed },
         );
     }
@@ -531,9 +604,9 @@ export function checkShellResourceCleanup(
         emit(
             resourceLine,
             RULE_SH_TRAP_001,
-            'Temporary file/directory created without registering EXIT cleanup trap.',
+            SHELL_RULE_MESSAGES.shellTrapMissing,
             SEVERITY_ERROR,
-            'Register a cleanup trap immediately after creating temporary resources: `trap \'rm -rf "$TMP"\' EXIT`.',
+            SHELL_RULE_MESSAGES.shellTrapSuggestion,
             {},
         );
     }
@@ -569,9 +642,9 @@ export function checkPowerShellResourceDisposal(
         emit(
             handleLine,
             RULE_PS_TRAP_001,
-            'Critical system handle created without try-finally resource disposal.',
+            SHELL_RULE_MESSAGES.psResourceDisposalMissing,
             SEVERITY_WARNING,
-            'Wrap handle usage in `try { ... } finally { $handle.Dispose() }` to guarantee release.',
+            SHELL_RULE_MESSAGES.psResourceDisposalSuggestion,
             {},
         );
     }
@@ -593,9 +666,9 @@ export function checkShellDynamicSecurity(
         emit(
             lineIdx,
             RULE_SH_SEC_001,
-            'Dynamic `eval` with variable expansion risks arbitrary command injection.',
+            SHELL_RULE_MESSAGES.shellDynamicEval,
             SEVERITY_ERROR,
-            'Use an array invocation (`"${CMD[@]}"`) or direct function dispatch instead of dynamic eval.',
+            SHELL_RULE_MESSAGES.shellDynamicEvalSuggestion,
             { line: trimmed },
         );
     }
@@ -617,17 +690,14 @@ export function checkPowerShellDynamicSecurity(
         emit(
             lineIdx,
             RULE_PS_SEC_001,
-            'Dynamic `Invoke-Expression` (iex) with variable input risks arbitrary code injection.',
+            SHELL_RULE_MESSAGES.psDynamicIex,
             SEVERITY_ERROR,
-            'Use the call operator (`& $cmd @params`) or script block invocation instead of Invoke-Expression.',
+            SHELL_RULE_MESSAGES.psDynamicIexSuggestion,
             { line: trimmed },
         );
     }
 }
 
-/**
- * Checks for interactive input without guard in PowerShell (PS-SAFE-001).
- *
 /**
  * Checks for interactive input without guard in PowerShell (PS-SAFE-001).
  *
@@ -645,9 +715,9 @@ export function checkPowerShellSafety(
         emit(
             lineCtx.lineIndex,
             RULE_PS_SAFE_001,
-            'Interactive input cmdlet used without non-interactive terminal guard.',
+            SHELL_RULE_MESSAGES.psInteractiveUnguarded,
             SEVERITY_ERROR,
-            'Guard interactive input with `if ([Environment]::UserInteractive -and -not [Console]::IsOutputRedirected)` or support `-Force`.',
+            SHELL_RULE_MESSAGES.psInteractiveSuggestion,
             { line: lineCtx.trimmed },
         );
     }
@@ -673,9 +743,9 @@ export function checkShellSafety(
         emit(
             lineCtx.lineIndex,
             RULE_SH_SAFE_001,
-            'Interactive `read` without timeout risks hanging unattended CI/Agent subprocesses.',
+            SHELL_RULE_MESSAGES.shellInteractiveUnguarded,
             SEVERITY_ERROR,
-            'Add a timeout flag (`read -t 10`) or verify terminal interactivity with `[[ -t 0 ]]` before prompting.',
+            SHELL_RULE_MESSAGES.shellInteractiveSuggestion,
             { line: lineCtx.trimmed },
         );
     }
