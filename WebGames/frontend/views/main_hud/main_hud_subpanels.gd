@@ -9,9 +9,6 @@ extends BaseScreen
 const KBadgeClass = preload("res://frontend/components/k_badge.gd")
 const KCurrencyBarClass = preload("res://frontend/components/k_currency_bar.gd")
 const KStatusBarClass = preload("res://frontend/components/k_status_bar.gd")
-const UnifiedProtocolFactory = preload("res://backend/domains/world_state/services/unified_protocol_factory.gd")
-const UnifiedProtocolDispatcher = preload("res://backend/domains/world_state/services/unified_protocol_dispatcher.gd")
-const WorldGatewayFSM = preload("res://backend/domains/world_gateway/world_gateway_fsm.gd")
 
 var currency_bar: KCurrencyBar = null
 var hp_status_bar: KStatusBar = null
@@ -203,18 +200,8 @@ func toggle_main_menu() -> void:
 	_view._main_menu_panel.visible = _view.main_menu_visible
 	if _view.main_menu_visible:
 		append_battle_log("SYSTEM", UIIntermediary.text("ui.fe02.battle_log.menu_opened"))
-		query_and_refresh_save_readiness()
 	else:
 		append_battle_log("SYSTEM", UIIntermediary.text("ui.fe02.battle_log.menu_closed"))
-
-func query_and_refresh_save_readiness() -> void:
-	var req := UnifiedProtocolFactory.create_human_request(
-		"world_state", "ESC_QUERY_READINESS", {"in_combat": false, "in_cutscene": false}
-	)
-	var resp := UnifiedProtocolDispatcher.dispatch_request(req)
-	var is_ready: bool = bool(resp.data.get("is_ready", true)) if resp != null else true
-	if _view and _view._menu_btn_settings:
-		_view._menu_btn_settings.tooltip_text = "" if is_ready else "当前处于特殊状态，暂时不可保存"
 
 func attach_mail_red_dot_badge() -> void:
 	if _view == null or _view._menu_btn_mail == null:
@@ -256,15 +243,7 @@ func on_menu_settings_pressed() -> void:
 
 func on_menu_exit_pressed() -> void:
 	append_battle_log("SYSTEM", UIIntermediary.text("ui.fe02.battle_log.exit_game"))
-	var req := UnifiedProtocolFactory.create_human_request(
-		"lifecycle", "ESC_QUIT_GAME", {"slot_id": "SLOT_01"}
-	)
-	var resp := UnifiedProtocolDispatcher.dispatch_request(req)
-	if resp != null and resp.success:
-		if _view and _view.get_tree() != null:
-			_view.get_tree().quit(0)
-	else:
-		NavManager.get_instance().replace_screen("account_entry")
+	NavManager.get_instance().replace_screen("account_entry")
 
 func on_menu_exit_to_gateway_pressed(gateway: WorldGatewayFSM = null) -> void:
 	append_battle_log("SYSTEM", "正在退出世界并返回世界档案...")

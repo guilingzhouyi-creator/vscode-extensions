@@ -165,6 +165,8 @@ func remove_item(item: ItemEntity) -> bool:
 func equip_item(slot: String, item: ItemEntity) -> bool:
 	if not equipped_slots.has(slot) or item == null:
 		return false
+	if item.item_uid.is_empty():
+		item.item_uid = ItemUIDGenerator.generate_uid("SRV_")
 	if equipped_slots[slot] != null or _contains_uid(item.item_uid):
 		return false
 	equipped_slots[slot] = item

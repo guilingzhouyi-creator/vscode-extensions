@@ -11,36 +11,6 @@
 class_name TestAuthoritativeHudAndModeAdaptationPipeline
 extends TestCase
 
-const AccountRegistrationDTO = preload("res://backend/domains/account/dto/account_registration_dto.gd")
-const AuthService = preload("res://backend/domains/account/auth_service.gd")
-const AccountProfileAggregate = preload("res://backend/domains/account/account_profile.gd")
-const WorldGatewayFSM = preload("res://backend/domains/world_gateway/world_gateway_fsm.gd")
-const WorldGatewayModel = preload("res://backend/domains/world_gateway/world_gateway_model.gd")
-const CharacterCreationRequestDTO = preload("res://backend/domains/character_creation/character_creation_request_dto.gd")
-const CharacterCreationService = preload("res://backend/domains/character_creation/character_creation_service.gd")
-const OpeningEventStreamDTO = preload("res://backend/domains/character_creation/opening_event_stream_dto.gd")
-const PrologueExecutionKernel = preload("res://backend/domains/character_creation/prologue_execution_kernel.gd")
-const CharacterPrologueContext = preload("res://backend/domains/character_creation/character_prologue_context.gd")
-const InputDeviceStateAggregate = preload("res://backend/domains/hardware_input/input_device_state_aggregate.gd")
-const GameLifecycleModel = preload("res://backend/domains/lifecycle/lifecycle_model.gd")
-const GameShutdownDTO = preload("res://backend/domains/lifecycle/dto/game_shutdown_dto.gd")
-const GameLifecycleService = preload("res://backend/domains/lifecycle/game_lifecycle_service.gd")
-const GameLifecycleManager = preload("res://backend/domains/lifecycle/game_lifecycle_manager.gd")
-const GameBootstrap = preload("res://backend/infrastructure/game_bootstrap.gd")
-const LifecycleStageHookRegistry = preload("res://backend/domains/lifecycle/lifecycle_stage_hook_registry.gd")
-const SessionFlowContextDTO = preload("res://backend/domains/lifecycle/dto/session_flow_context_dto.gd")
-
-const AuthoritativeHudSyncService = preload("res://backend/domains/world_state/services/authoritative_hud_sync_service.gd")
-const AuthoritativeHudSnapshotDTO = preload("res://backend/domains/world_state/dto/authoritative_hud_snapshot_dto.gd")
-const ModeFeatureManifestDTO = preload("res://backend/domains/world_state/dto/mode_feature_manifest_dto.gd")
-const WorldCalendarEnvironmentDTO = preload("res://backend/domains/world_state/dto/world_calendar_environment_dto.gd")
-const ActiveQuestTrackerDTO = preload("res://backend/domains/world_state/dto/active_quest_tracker_dto.gd")
-const PaginationQueryDTO = preload("res://backend/domains/world_state/dto/pagination_query_dto.gd")
-const PagedResultDTO = preload("res://backend/domains/world_state/dto/paged_result_dto.gd")
-const GameModeFeatureSolver = preload("res://backend/domains/world_state/solvers/game_mode_feature_solver.gd")
-const PaginationSliceSolver = preload("res://backend/domains/world_state/solvers/pagination_slice_solver.gd")
-const WorldCalendarEnvironmentResolver = preload("res://backend/domains/world_state/resolvers/world_calendar_environment_resolver.gd")
-const SaveReadinessGuard = preload("res://backend/domains/world_state/guards/save_readiness_guard.gd")
 
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []

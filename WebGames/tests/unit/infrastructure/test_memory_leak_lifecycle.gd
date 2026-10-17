@@ -6,13 +6,6 @@
 # ==============================================================================
 class_name TestMemoryLeakLifecycle extends RefCounted
 
-const EventBusCore = preload("res://backend/infrastructure/event_bus/event_bus_core.gd")
-const EventBusSubscriptionToken = preload("res://backend/infrastructure/event_bus/event_bus_subscription_token.gd")
-const EventPacket = preload("res://backend/infrastructure/event_bus/event_packet.gd")
-const AuxiliaryWorkerPool = preload("res://backend/domains/persistence_protocol/auxiliary_worker_pool.gd")
-const AuthService = preload("res://backend/domains/account/auth_service.gd")
-const VersionedRuntimeContext = preload("res://backend/domains/version_governance/version_runtime_context.gd")
-const ActivationTokenDTO = preload("res://backend/domains/version_governance/activation_token_dto.gd")
 
 static func run_all_tests() -> Dictionary:
 	var results: Array = []

@@ -122,7 +122,7 @@ static func test_tc_arp_02_memory_reset_and_cold_boot_restore() -> Dictionary:
 	# 模拟冷启动重置：清空内存缓存与单例
 	AccountRepository.reset_for_tests()
 	var cold_repo := AccountRepository.get_instance()
-	if cold_repo.get_account_count() != 0:
+	if cold_repo.is_loaded():
 		return TestCase.make_result("TC-ARP-02: 内存仓储重置与冷启动后磁盘加载自愈（模拟重启恢复）", false, {"reason": "reset failed"})
 
 	var load_res: Dictionary = cold_repo.load_all()

@@ -58,6 +58,7 @@ static func test_world_archive_multi_instance_and_recovery() -> Dictionary:
 	if inst1 != null:
 		inst1.advance_world_time(25)
 		repo.save_world(inst1)
+		repo.save_world(inst1)
 
 	var reloaded_w1: WorldInstance = repo.load_world("WORLD_SP_ALPHA")
 	var reloaded_w2: WorldInstance = repo.load_world("WORLD_SP_BETA")

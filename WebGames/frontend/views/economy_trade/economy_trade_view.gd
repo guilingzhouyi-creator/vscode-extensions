@@ -282,6 +282,8 @@ func _refresh_shop_mode() -> void:
 
 ## 填充商店货架列表（无 Mock 数据时 GameConfig 默认货架兜底）
 func _populate_shop_list() -> void:
+	if _shop_item_list == null:
+		return
 	_shop_item_list.clear()
 	if shop_shelves.is_empty():
 		shop_shelves = [
@@ -300,6 +302,8 @@ func _populate_shop_list() -> void:
 
 ## 刷新交易合计：按买/卖模式计算并渲染（卖出乘回购折扣）
 func _refresh_shop_total() -> void:
+	if _shop_item_list == null:
+		return
 	_shop_selected_index = _shop_item_list.get_selected_items()[0] if _shop_item_list.get_selected_items().size() > 0 else -1
 	if _shop_selected_index < 0 or _shop_selected_index >= shop_shelves.size():
 		UIIntermediary.resolve(_label_shop_total, "ui.fe05.shop.select_prompt")
@@ -326,6 +330,12 @@ func _refresh_shop_display() -> void:
 	_resolve_shop_title()
 	_populate_shop_list()
 	_refresh_shop_total()
+
+## 刷新物价走势：委托子面板控制器渲染（树内守卫）
+func _refresh_price_trend_display() -> void:
+	if not is_inside_tree():
+		return
+	_get_tabs()._refresh_price_trend_display()
 
 # ==============================================================================
 # 商店 Tab 信号处理

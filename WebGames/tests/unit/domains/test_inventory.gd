@@ -147,6 +147,7 @@ static func test_restore_deep_payload_only() -> Dictionary:
 	var inv := WearableInventoryAggregate.new()
 	var helm := ItemEntity.new()
 	helm.item_id = "DEEP_SNAP_HELM"
+	helm.item_uid = "UID_DEEP_SNAP_HELM"
 	helm.custom_name = "深快照头盔"
 	inv.equip_item("HEAD", helm)
 	var snap := inv.snapshot()

@@ -10,16 +10,6 @@
 class_name TestModSdkDeveloperErgonomicsPipeline
 extends TestCase
 
-const UnifiedProtocolFactory = preload("res://backend/domains/world_state/services/unified_protocol_factory.gd")
-const UnifiedProtocolDispatcher = preload("res://backend/domains/world_state/services/unified_protocol_dispatcher.gd")
-const HumanControlLeaseManager = preload("res://backend/domains/world_state/services/human_control_lease_manager.gd")
-const ClientRequestEnvelopeDTO = preload("res://backend/domains/world_state/dto/client_request_envelope_dto.gd")
-const UnifiedResponseEnvelopeDTO = preload("res://backend/domains/world_state/dto/unified_response_envelope_dto.gd")
-const AgentActionPacketDTO = preload("res://backend/domains/world_state/dto/agent_action_packet_dto.gd")
-const SaveDataAccessLayer = preload("res://backend/domains/persistence_protocol/save_data_access_layer.gd")
-const GameLifecycleManager = preload("res://backend/domains/lifecycle/game_lifecycle_manager.gd")
-const ModPrecheckAndAdaptationSolver = preload("res://backend/domains/character_creation/mod_precheck_and_adaptation_solver.gd")
-const DestinyModManifestDTO = preload("res://backend/domains/character_creation/dto/destiny_mod_manifest_dto.gd")
 
 static func run_all_tests() -> Dictionary:
 	var results: Array[Dictionary] = []

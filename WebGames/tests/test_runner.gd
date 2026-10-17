@@ -41,7 +41,14 @@ func _initialize() -> void:
 			failure_reports.append({ "domain": "未知测试套件", "test": "测试套件脚本加载失败 (null)" })
 			continue
 
-		if not test_cls.has_method("run_all_tests"):
+		var has_run: bool = test_cls.has_method("run_all_tests")
+		if not has_run and test_cls is Object:
+			for m in test_cls.get_script_method_list():
+				if m.get("name") == "run_all_tests":
+					has_run = true
+					break
+
+		if not has_run:
 			var domain_name: String = test_cls.resource_path if (test_cls is Resource and not test_cls.resource_path.is_empty()) else "未实现套件"
 			print("[ FAIL ] === %s === (0/1 PASS)" % domain_name)
 			print("    ❌  测试套件未暴露 run_all_tests() 入口")
@@ -50,7 +57,7 @@ func _initialize() -> void:
 			failure_reports.append({ "domain": domain_name, "test": "未暴露 run_all_tests() 入口" })
 			continue
 
-		var result: Dictionary = test_cls.run_all_tests()
+		var result: Dictionary = test_cls.call("run_all_tests") if not test_cls.has_method("run_all_tests") else test_cls.run_all_tests()
 		var domain_name: String = result.get("domain", "未知测试套件")
 		var all_ok: bool = result.get("all_passed", false)
 		var res_list: Array = result.get("results", [])
