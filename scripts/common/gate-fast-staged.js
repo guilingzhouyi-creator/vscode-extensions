@@ -62,6 +62,10 @@ const HASH_COMMENT_EXTENSIONS = new Set(['.gd', '.py', '.sh', '.bash']);
 const COMMENT_CHECK_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.gd', '.py', '.rs', '.sh', '.ps1']);
 const INDENT_WIDTH_BY_EXT = Object.freeze({ '.ts': 4, '.tsx': 4, '.js': 2, '.jsx': 2, '.mjs': 2, '.cjs': 2 });
 const MAX_INDENT_WARNINGS_PER_FILE = 3;
+const BINARY_EXTENSIONS = new Set([
+  '.node', '.png', '.jpg', '.jpeg', '.gif', '.ico', '.webp', '.pdf',
+  '.wasm', '.exe', '.dll', '.so', '.dylib', '.bin', '.zip', '.tar', '.gz', '.7z'
+]);
 const MAX_FILENAME_SEGMENTS_SRC = 5;
 const MAX_FILENAME_SEGMENTS_TEST = 8;
 
@@ -670,6 +674,11 @@ function inspectStagedFile(repoRoot, file, collectors, useIndex) {
         actionableFix: tpl.actionableFix,
       }),
     );
+    return;
+  }
+
+  const ext = path.extname(file).toLowerCase();
+  if (BINARY_EXTENSIONS.has(ext)) {
     return;
   }
 
