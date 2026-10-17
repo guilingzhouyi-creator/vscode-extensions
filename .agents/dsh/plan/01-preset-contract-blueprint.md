@@ -1,4 +1,4 @@
-> **实施后修正（以 bundle 事实为准）**：本细则成文于旧目录格式时期，其中 `$DSH_HOME/.agent-presets/<id>/` 目录、`preset.yml` 与 `agent.cordis.yml` 双文件、`shared/jail.mjs` 分片镜像等描述**已作废**。现行真源为 `bundle/` 下的 `package.json`、`cordis.patch.yml`、`host-plugin.js` 三件；装载机制、生效边界（模块代际需重启 DSH）与验证结论见 [../README.md](../README.md)。细则的约束意图（工具裁剪矩阵、守卫判定次序、可观测性、防漂移）仍然有效。
+> **实施后修正（以 bundle 事实为准）**：本细则成文于旧目录格式时期，其中 `$DSH_HOME/.agent-presets/<id>/` 目录、`preset.yml` 与 `agent.cordis.yml` 双文件、`shared/jail.mjs` 分片镜像等描述**已作废**。现行真源为 `bundle/` 下的 `package.json`、`cordis.patch.yml`、`guard-plugin.js` 三件；装载机制、生效边界（模块代际需重启 DSH）与验证结论见 [../README.md](../README.md)。细则的约束意图（工具裁剪矩阵、守卫判定次序、可观测性、防漂移）仍然有效。
 # 阶段一细则：Preset 契约与仓库内单源蓝图
 
 > 本文件为「工作区治理模式族」落地细则的第一阶段，定义 Agent Preset 的物理契约、单源目录结构与命名规范。
@@ -84,7 +84,7 @@
 - [ ] 四模式 id、`order`、UI 名称三张表冻结且无冲突；
 - [ ] 单源目录结构与合约文件边界（哪些文件属单源、哪些属生成物）逐条明确；
 - [ ] `preset.yml` 字段集与 `agent.cordis.yml` 五段次序形成可校验清单；
-- [ ] 已识别必须在阶段二前定点查证的悬置项（见阶段五细则），且未以推测填补。
+- [ ] 已识别必须在阶段二前定点查证的悬置项（见 [04 附录七](04-verification-matrix.md)），且未以推测填补。
 
 ## 八、本阶段不做
 

@@ -1,6 +1,6 @@
 /**
  * Module: Workspace Path Jail
- * File Path: .agents/dsh/bundle/host-plugin.js
+ * File Path: .agents/dsh/bundle/guard-plugin.js
  * Architecture Role: 治理模式族的 Host 插件本体。把工作区治理公理「SubAgent 严禁触碰授权路径之外的文件」
  *   从提示词层承诺升级为运行时执行点，由四个 Agent Preset 各自的声明行挂载。
  * Dependencies & Triggers: 依赖宿主 `tools` 注册表服务（经 preset 挂载域解析）与 `agentPresets` 注册表
@@ -9,9 +9,9 @@
  * Responsibilities: 按调用方 Agent 的预设身份解析姿态策略；归一化工作区相对路径；拒绝命中禁用工具、
  *   读姿态下的写类工具、禁止根与授权面之外的目标，并以结构化原因字符串给出被拒路径与规则名。
  * Exit Semantics & Design Rationale: 拒绝只以「返回原因字符串」表达，这是 ToolGuard 契约的全部通道。
- *   姿态必须按调用方解析而非按注册域解析：同一 bundle 的四个声明行由同一个进程级注册表服务持有，
- *   按注册域区分的姿态会让某个模式的只读姿态泄漏到其他模式的会话（实测 wg-construct 的授权路径写入
- *   曾被读姿态拒绝）；按调用方解析后，四种模式的判定与挂载顺序、注册域归属均无关，且未登记预设放行。
+ *   姿态按调用方 Agent 的预设身份解析，而策略只在本文的 POLICY_TABLE 定义一份：四个声明行共享同一份
+ *   物理实现与同一张策略表，避免四份配置各自漂移，也使判定与挂载顺序无关。声明行仍携带一个模式身份
+ *   标签（`config.preset`），它只在 `agentPresets` 注册表不可用的降级路径上作为姿态来源，绝不参与正常判定。
  *   守卫对自身缺陷采取 fail-open（告警一次后放行），因为宿主沙箱仍是外层边界，且此处缺陷绝不能让会话变砖。
  *   判定次序为 deny 优先于 allow：禁止根压过授权列表，使重叠配置不会被误读为授权。
  */
@@ -19,8 +19,8 @@
 export const name = 'wg-path-jail'
 export const inject = ['tools']
 
-/** 代码代际标记：写入拒绝文案，用于在真实会话中判定运行态加载的是哪一代模块。 */
-const GUARD_GENERATION = 'caller-resolved-2'
+/** 声明行携带的模式身份标签格式；仅用于注册表不可用时的姿态兜底。 */
+const PRESET_ID_PATTERN = /^wg-[a-z]+$/u
 
 const WRITE_TOOL_NAMES = Object.freeze([
   'write',
@@ -161,7 +161,8 @@ function deniedToolReason(policy, toolName) {
 
 function writePostureReason(policy, toolName) {
   if (!WRITE_TOOL_NAMES.includes(toolName)) return undefined
-  return `${name}[${GUARD_GENERATION}]: tool "${toolName}" writes to disk, but this preset runs the read posture.`
+  if (policy.mode !== MODE_READ) return undefined
+  return `${name}: tool "${toolName}" writes to disk, but this preset runs the read posture.`
 }
 
 function denyRootReason(policy, target) {
@@ -209,21 +210,34 @@ function readPresetRegistry(ctx) {
   return registry
 }
 
-function resolveCaller(ctx, execution) {
-  const agent = execution.agent
-  if (agent === null || agent === undefined) return { id: 'no-agent', policy: undefined }
-  if (agent.ctx === undefined) return { id: 'no-agent-ctx', policy: undefined }
-  const registry = readPresetRegistry(ctx)
-  if (registry === undefined) return { id: 'no-registry', policy: undefined }
-  const id = registry.composedPreset(agent.ctx)
-  return { id: id === undefined || id === null ? 'unbound' : String(id), policy: POLICIES.get(id) }
+/**
+ * 读取声明行的模式身份标签。该标签只在 `agentPresets` 注册表不可用时充当姿态兜底，
+ * 正常判定一律以调用方 Agent 的实时预设身份为准；非法或缺失一律视为未标注。
+ */
+function readRowPreset(config) {
+  if (config === null || typeof config !== 'object') return undefined
+  const candidate = config.preset
+  if (typeof candidate !== 'string') return undefined
+  return PRESET_ID_PATTERN.test(candidate) ? candidate : undefined
 }
 
-function createGuard(ctx) {
+function resolveCaller(ctx, execution, rowPreset) {
+  const fallback = rowPreset === undefined ? undefined : POLICIES.get(rowPreset)
+  const agent = execution.agent
+  if (agent === null || agent === undefined) return { id: 'no-agent', policy: fallback }
+  if (agent.ctx === undefined) return { id: 'no-agent-ctx', policy: fallback }
+  const registry = readPresetRegistry(ctx)
+  if (registry === undefined) return { id: 'no-registry', policy: fallback }
+  const id = registry.composedPreset(agent.ctx)
+  if (id === undefined || id === null) return { id: 'unbound', policy: fallback }
+  return { id: String(id), policy: POLICIES.get(id) ?? fallback }
+}
+
+function createGuard(ctx, rowPreset) {
   let warned = false
   return (execution) => {
     try {
-      const { id, policy } = resolveCaller(ctx, execution)
+      const { id, policy } = resolveCaller(ctx, execution, rowPreset)
       if (policy === undefined) return undefined
       return checkPaths(policy, String(execution.name), execution.arguments, id)
     } catch (error) {
@@ -236,20 +250,23 @@ function createGuard(ctx) {
   }
 }
 
-function warnWhenRegistryMissing(ctx) {
+function warnWhenRegistryMissing(ctx, rowPreset) {
   if (readPresetRegistry(ctx) !== undefined) return
   ctx.logger.warn(
-    '[%s] agentPresets registry is unavailable; caller postures cannot be resolved and every call is allowed',
+    '[%s] agentPresets registry is unavailable; postures resolve from the declaration row tag (row tag: %s)',
     name,
+    rowPreset === undefined ? 'absent, every call allowed' : rowPreset,
   )
 }
 
-export function apply(ctx) {
-  warnWhenRegistryMissing(ctx)
-  ctx.effect(() => ctx.tools.guard(createGuard(ctx)))
+export function apply(ctx, config) {
+  const rowPreset = readRowPreset(config)
+  warnWhenRegistryMissing(ctx, rowPreset)
+  ctx.effect(() => ctx.tools.guard(createGuard(ctx, rowPreset)))
   ctx.logger.info(
-    '[%s] guard active: caller-resolved postures for [%s]',
+    '[%s] guard active: caller-resolved postures for [%s] (row tag: %s)',
     name,
     [...POLICIES.keys()].join(', '),
+    rowPreset === undefined ? 'absent' : rowPreset,
   )
 }

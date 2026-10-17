@@ -4,7 +4,7 @@
  * Architecture Role: 单源真源与运行时安装面之间的唯一同步信道（构建期工具，非运行时依赖）。
  * Dependencies & Triggers: node:fs / node:path / node:os / node:url；手工触发或门禁脚本调用。
  * Responsibilities: 把 .agents/dsh/bundle/ 下的治理 bundle 单源（package.json、
- *   cordis.patch.yml、host-plugin.js 三件）逐字节镜像到
+ *   cordis.patch.yml、guard-plugin.js 三件）逐字节镜像到
  *   $DSH_PROFILE_DIR/.dsh-plugin-download/<包名>/（plugin_manager install_bundle 的安装源），
  *   并提供 --check-only 同构校验（单源与安装源字节等价）。
  * Exit Semantics & Design Rationale: 校验模式发现任何差异即以退出码 1 结束并逐条打印漂移坐标，

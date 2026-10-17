@@ -5,7 +5,7 @@
 #   plugin_manager action=install_bundle target=<本目录绝对路径>
 #
 # 守卫行 `@local/dsh-workspace-governance` 由本 bundle 自身的 package.json
-# `exports` 根映射导出（实现在同目录 `host-plugin.js`），四个模式共用同一份物理实现。
+# `exports` 根映射导出（实现在同目录 `guard-plugin.js`），四个模式共用同一份物理实现。
 # 依据 `editing-cordis-compositions` 技能与 `host-plugin` 参考：插件资源必须从
 # **已安装包**按其根导出解析，不得引用预设目录内的相对路径文件，也不得依赖
 # 包内子路径——这两种写法都会让该行以 `never started` 告终。
@@ -15,11 +15,12 @@
 # （执行前拒绝写类调用），不是权限档——权限档是会话级粗粒度开关，无法表达
 # 「可读全库、不可写任何文件」。
 #
-# 守卫行**刻意不带 `config`**：姿态策略（mode / allowRoots / denyRoots /
-# deniedTools）单源登记在 `host-plugin.js` 的 `POLICY_TABLE`，由守卫按**调用方 Agent
-# 的预设身份**在每次调用时解析。原因是四个声明行共享同一个进程级守卫注册表，
-# 实测按注册域区分的姿态会互相泄漏（wg-construct 的授权路径写入曾被读姿态拒绝）；
-# 按调用方解析后判定与挂载顺序无关。若在此处添加 `config`，守卫不会读取它。
+# 守卫行的 `config.preset` 是**模式身份标签**（`wg-construct` 等），不是策略载体：
+# 姿态策略（mode / allowRoots / denyRoots / deniedTools）单源登记在
+# `guard-plugin.js` 的 `POLICY_TABLE`，由守卫按**调用方 Agent 的预设身份**在每次调用时
+# 解析，故判定与挂载顺序无关；标签只在 `agentPresets` 注册表不可用的降级路径上充当
+# 姿态兜底。修改策略必须改 `POLICY_TABLE`——标签本身不表达任何授权面，改它不会放宽
+# 或收紧任何路径。
 #
 # `plan-mode` 的 `config.section` 为必填（DSH 无默认值），此处采用
 # `@deepseek-ai/dsh-web-app/presets/standard.patch.yml` 的规范文本，故不重复注释。
@@ -42,6 +43,8 @@
         plugins:
           - id: path-jail-construct
             name: '@local/dsh-workspace-governance'
+            config:
+              preset: wg-construct
           - id: persona
             name: '@deepseek-ai/dsh-persona'
             config:
@@ -160,6 +163,8 @@
         plugins:
           - id: path-jail-refactor
             name: '@local/dsh-workspace-governance'
+            config:
+              preset: wg-refactor
           - id: persona
             name: '@deepseek-ai/dsh-persona'
             config:
@@ -278,6 +283,8 @@
         plugins:
           - id: path-jail-review
             name: '@local/dsh-workspace-governance'
+            config:
+              preset: wg-review
           - id: persona
             name: '@deepseek-ai/dsh-persona'
             config:
@@ -361,6 +368,8 @@
         plugins:
           - id: path-jail-explore
             name: '@local/dsh-workspace-governance'
+            config:
+              preset: wg-explore
           - id: persona
             name: '@deepseek-ai/dsh-persona'
             config:
