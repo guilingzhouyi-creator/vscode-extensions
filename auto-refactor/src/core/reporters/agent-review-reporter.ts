@@ -129,7 +129,13 @@ function buildTargetContext(
     const endColumn = issue.location?.end?.column;
     const baseDir = options?.baseDir || reportRoot;
     const radius = options?.contextRadius ?? 2;
-    const anchorCodeSlice = extractAnchorCodeSlice(file, startLine, endLine, baseDir, radius);
+    const anchorCodeSlice = extractAnchorCodeSlice({
+        filePath: file,
+        startLine,
+        endLine,
+        baseDir,
+        radius,
+    });
 
     return {
         filePath: file,

@@ -113,16 +113,16 @@ async function runWithTransientPool(
 ): Promise<{ results: { issues: Issue[]; metric: FileMetric | null }[]; poolWarm: boolean }> {
     let results: { issues: Issue[]; metric: FileMetric | null }[];
     try {
-        results = await runWorkerPool(
-            missFiles,
+        results = await runWorkerPool({
+            files: missFiles,
             absRoot,
-            cfg,
-            workerDescs,
-            effWorkers,
-            scanner.logger,
-            (rel, content) => scanner.runAnalyzers(rel, content),
+            config: cfg,
+            descs: workerDescs,
+            numWorkers: effWorkers,
+            logger: scanner.logger,
+            runAnalyzersFn: (rel, content) => scanner.runAnalyzers(rel, content),
             preloaded,
-        );
+        });
     } catch (e) {
         scanner.logger.warn(`worker pool failed (${String(e)}); falling back to in-process scan`);
         results = await scanner.runInProcess(missFiles, absRoot, preloaded);

@@ -30,6 +30,32 @@ import type {
 /** Maximum number of memory rule hits rendered as frequent violations in the guidance prompt. */
 const MAX_MEMORY_RULE_HITS = 5;
 
+const LAYER_DOMAIN = 'domain';
+const LAYER_INFRASTRUCTURE = 'infrastructure';
+const LAYER_INTERFACE = 'interface';
+const LAYER_FRONTEND = 'frontend';
+
+const DIRECTIVE_TYPE_GUARD = 'GUARD' as const;
+const DIRECTIVE_TYPE_CLARIFY = 'CLARIFY' as const;
+const PROTOCOL_VERSION_1_0 = '1.0' as const;
+const PROTOCOL_VERSION_2_0 = '2.0' as const;
+const DEFAULT_FALLBACK_OPTION_KEY = 'default';
+const DEFAULT_UNKNOWN_BASENAME = 'unknown';
+const METHOD_NAME_GENERATE = 'generate';
+
+const LAYER_L1_CONTRACT: AgentTopologyLayer = 'L1_CONTRACT';
+const LAYER_L2_OPERATOR: AgentTopologyLayer = 'L2_OPERATOR';
+const LAYER_L3_CONFIG: AgentTopologyLayer = 'L3_CONFIG';
+const LAYER_L4_PRESENTATION: AgentTopologyLayer = 'L4_PRESENTATION';
+const LAYER_L5_GOVERNANCE: AgentTopologyLayer = 'L5_GOVERNANCE';
+
+const PROP_PROMPT_QUESTION = 'promptQuestion';
+const RULE_HIGH_COMPLEXITY = 'HIGH-COMPLEXITY';
+const PREFIX_CPX = 'CPX-';
+const PREFIX_ADV_CMP = 'ADV-CMP';
+const PREFIX_GOV_SAN = 'GOV-SAN';
+const PREFIX_CMG = 'CMG-';
+
 /**
  * Caller-supplied target selector for AgentConstraintGenerator.generate.
  *
@@ -98,12 +124,12 @@ function resolveHardConstraints(effectiveLayer?: string): string[] {
     const hardConstraints: string[] = [];
     if (!effectiveLayer) return hardConstraints;
 
-    if (effectiveLayer === 'domain') {
+    if (effectiveLayer === LAYER_DOMAIN) {
         hardConstraints.push(GuidanceMessages.DOMAIN_LAYER_HARD);
         hardConstraints.push(GuidanceMessages.DOMAIN_PURITY_HARD);
-    } else if (effectiveLayer === 'infrastructure') {
+    } else if (effectiveLayer === LAYER_INFRASTRUCTURE) {
         hardConstraints.push(GuidanceMessages.INFRA_RESPONSIBILITY_HARD);
-    } else if (effectiveLayer === 'interface' || effectiveLayer === 'frontend') {
+    } else if (effectiveLayer === LAYER_INTERFACE || effectiveLayer === LAYER_FRONTEND) {
         hardConstraints.push(GuidanceMessages.INTERFACE_BOUNDARY_HARD);
     }
     return hardConstraints;
@@ -160,27 +186,32 @@ function extractTrajectoryPitfalls(
     return historicalPitfalls;
 }
 
+interface GuidanceMarkdownParams {
+    filePath: string;
+    domainTitle: string;
+    effectiveLayer?: string;
+    hardConstraints: string[];
+    historicalPitfalls: string[];
+    frequentViolations: string[];
+    recommendedPatterns: string[];
+}
+
 /**
  * Render complete guidance prompt into formatted Markdown lines.
  *
- * @param filePath - Path to the audited target file.
- * @param domainTitle - Formatted domain scope title.
- * @param effectiveLayer - Effective architectural layer.
- * @param hardConstraints - Array of hard constraints.
- * @param historicalPitfalls - Array of historical pitfalls.
- * @param frequentViolations - Array of frequent violations.
- * @param recommendedPatterns - Array of recommended patterns.
+ * @param params - Guidance markdown generation context.
  * @returns Joined Markdown string.
  */
-function renderGuidanceMarkdown(
-    filePath: string,
-    domainTitle: string,
-    effectiveLayer: string | undefined,
-    hardConstraints: string[],
-    historicalPitfalls: string[],
-    frequentViolations: string[],
-    recommendedPatterns: string[],
-): string {
+function renderGuidanceMarkdown(params: GuidanceMarkdownParams): string {
+    const {
+        filePath,
+        domainTitle,
+        effectiveLayer,
+        hardConstraints,
+        historicalPitfalls,
+        frequentViolations,
+        recommendedPatterns,
+    } = params;
     const lines: string[] = [
         GuidanceMessages.TITLE_LOCAL_GUARDRAILS(filePath),
         GuidanceMessages.TARGET_SCOPE_LABEL(domainTitle, effectiveLayer),
@@ -189,24 +220,24 @@ function renderGuidanceMarkdown(
 
     if (hardConstraints.length > 0) {
         lines.push(GuidanceMessages.SECTION_HARD_CONSTRAINTS);
-        for (const c of hardConstraints) lines.push(`- ⚠️ ${c}`);
+        lines.push(...hardConstraints.map((c) => `- ⚠️ ${c}`));
         lines.push('');
     }
 
     if (historicalPitfalls.length > 0) {
         lines.push(GuidanceMessages.SECTION_HISTORICAL_PITFALLS);
-        for (const p of historicalPitfalls) lines.push(`- ❌ ${p}`);
+        lines.push(...historicalPitfalls.map((p) => `- ❌ ${p}`));
         lines.push('');
     }
 
     if (frequentViolations.length > 0) {
         lines.push(GuidanceMessages.SECTION_FREQUENT_VIOLATIONS);
-        for (const v of frequentViolations) lines.push(`- 🔍 ${v}`);
+        lines.push(...frequentViolations.map((v) => `- 🔍 ${v}`));
         lines.push('');
     }
 
     lines.push(GuidanceMessages.SECTION_RECOMMENDED_PATTERNS);
-    for (const r of recommendedPatterns) lines.push(`- ✨ ${r}`);
+    lines.push(...recommendedPatterns.map((r) => `- ✨ ${r}`));
     lines.push('');
 
     return lines.join('\n');
@@ -229,7 +260,7 @@ export class AgentConstraintGenerator {
      * @param trajectory - Optional change trajectory supplying historical anomalies.
      * @returns A prompt with hard constraints, pitfalls, violations, patterns, and Markdown.
      */
-    generate(
+    generateConstraints(
         options: AgentConstraintOptions,
         memory?: ReviewMemoryRecord,
         trajectory?: FileChangeTrajectory,
@@ -252,17 +283,7 @@ export class AgentConstraintGenerator {
             ? `\`${targetDomainObj.name}\` (${targetDomainObj.kind})`
             : 'Whole File Scope';
 
-        const renderedMarkdown = renderGuidanceMarkdown(
-            filePath,
-            domainTitle,
-            effectiveLayer,
-            hardConstraints,
-            historicalPitfalls,
-            frequentViolations,
-            recommendedPatterns,
-        );
-
-        return {
+        const promptData: Omit<AgentConstraintPrompt, 'renderedMarkdown'> = {
             filePath,
             targetDomain: targetDomainObj?.name,
             layer: effectiveLayer,
@@ -270,8 +291,28 @@ export class AgentConstraintGenerator {
             historicalPitfalls,
             frequentViolations,
             recommendedPatterns,
+        };
+
+        const renderedMarkdown = renderGuidanceMarkdown({
+            domainTitle,
+            ...promptData,
+        });
+
+        return {
+            ...promptData,
             renderedMarkdown,
         };
+    }
+
+    /**
+     * Backward-compatible delegation to generateConstraints.
+     */
+    [METHOD_NAME_GENERATE](
+        options: AgentConstraintOptions,
+        memory?: ReviewMemoryRecord,
+        trajectory?: FileChangeTrajectory,
+    ): AgentConstraintPrompt {
+        return this.generateConstraints(options, memory, trajectory);
     }
 }
 
@@ -334,7 +375,7 @@ export function extractClarificationRequest(issue: Issue): AgentClarificationReq
         (issue as unknown as Record<string, unknown>).clarificationRequest ??
         issue.detail?.clarificationRequest ??
         (issue.actionable as unknown as Record<string, unknown> | undefined)?.clarificationRequest;
-    if (raw && typeof raw === 'object' && 'promptQuestion' in (raw as Record<string, unknown>)) {
+    if (raw && typeof raw === 'object' && PROP_PROMPT_QUESTION in (raw as Record<string, unknown>)) {
         return raw as AgentClarificationRequest;
     }
     return undefined;
@@ -357,32 +398,36 @@ function resolveDirectiveSeverity(severity: string | undefined): CompactDirectiv
 }
 
 function resolveFileBasename(filePath: string | undefined): string {
-    const raw = filePath || 'unknown';
+    const raw = filePath || DEFAULT_UNKNOWN_BASENAME;
     if (!raw.includes('/') && !raw.includes('\\')) {
         return raw;
     }
     return raw.split(/[/\\]/).pop() || raw;
 }
 
-function renderClarifyDirective(
-    issue: Issue,
-    clarify: AgentClarificationRequest,
-    sev: CompactDirectiveSeverity,
-    file: string,
-    line: number,
-): CompactGuardDirective {
+interface DirectiveRenderParams {
+    issue: Issue;
+    sev: CompactDirectiveSeverity;
+    file: string;
+    line: number;
+    clarify?: AgentClarificationRequest;
+}
+
+function renderClarifyDirective(params: DirectiveRenderParams): CompactGuardDirective {
+    const { issue, clarify, sev, file, line } = params;
     const ruleId = issue.rule;
-    const question = (clarify.promptQuestion || issue.message || '').replace(/\s+/g, ' ').trim();
-    const optKeys = (clarify.candidateOptions || [])
+    const clarifyReq = clarify!;
+    const question = (clarifyReq.promptQuestion || issue.message || '').replace(/\s+/g, ' ').trim();
+    const optKeys = (clarifyReq.candidateOptions || [])
         .map((o) => (typeof o === 'string' ? o : o.key))
         .join(',');
-    const firstOpt = clarify.candidateOptions?.[0];
+    const firstOpt = clarifyReq.candidateOptions?.[0];
     const fallbackKey = firstOpt
         ? typeof firstOpt === 'string'
             ? firstOpt
             : firstOpt.key
-        : 'default';
-    const defKey = clarify.defaultChoiceKey || fallbackKey;
+        : DEFAULT_FALLBACK_OPTION_KEY;
+    const defKey = clarifyReq.defaultChoiceKey || fallbackKey;
     const renderedDirective = `[CLARIFY|${sev}|${ruleId}] ${file}:${line} -> ${question} ?opts=[${optKeys}] def=${defKey}`;
 
     return {
@@ -392,18 +437,14 @@ function renderClarifyDirective(
         line,
         summary: question,
         actionable: issue.actionable,
-        directiveType: 'CLARIFY',
-        clarificationRequest: clarify,
+        directiveType: DIRECTIVE_TYPE_CLARIFY,
+        clarificationRequest: clarifyReq,
         renderedDirective,
     };
 }
 
-function renderGuardDirective(
-    issue: Issue,
-    sev: CompactDirectiveSeverity,
-    file: string,
-    line: number,
-): CompactGuardDirective {
+function renderGuardDirective(params: DirectiveRenderParams): CompactGuardDirective {
+    const { issue, sev, file, line } = params;
     const ruleId = issue.rule;
     const summary = (issue.message || '').replace(/\s+/g, ' ').trim();
     const fixHint = issue.suggestion ? issue.suggestion.replace(/\s+/g, ' ').trim() : undefined;
@@ -422,7 +463,7 @@ function renderGuardDirective(
         summary,
         fixHint,
         actionable,
-        directiveType: 'GUARD',
+        directiveType: DIRECTIVE_TYPE_GUARD,
         renderedDirective,
     };
 }
@@ -439,10 +480,11 @@ export function formatCompactGuardDirective(issue: Issue): CompactGuardDirective
     const line = issue.location?.start?.line ?? 1;
 
     const clarify = extractClarificationRequest(issue);
+    const renderParams: DirectiveRenderParams = { issue, sev, file, line, clarify };
     if (clarify) {
-        return renderClarifyDirective(issue, clarify, sev, file, line);
+        return renderClarifyDirective(renderParams);
     }
-    return renderGuardDirective(issue, sev, file, line);
+    return renderGuardDirective(renderParams);
 }
 
 /**
@@ -463,8 +505,8 @@ export function formatCompactAgentPrompt(
     const hasWarn = directives.some((d) => d.severity === VERDICT_WARN);
     const verdict = hasBlock ? VERDICT_BLOCK : hasWarn ? VERDICT_WARN : VERDICT_PASS;
 
-    const hasClarify = directives.some((d) => d.directiveType === 'CLARIFY');
-    const version: '1.0' | '2.0' = protocolVersion ?? (hasClarify ? '2.0' : '1.0');
+    const hasClarify = directives.some((d) => d.directiveType === DIRECTIVE_TYPE_CLARIFY);
+    const version: '1.0' | '2.0' = protocolVersion ?? (hasClarify ? PROTOCOL_VERSION_2_0 : PROTOCOL_VERSION_1_0);
 
     const renderedDirectives = directives.map((d) => d.renderedDirective);
     const count = directives.length;
@@ -529,25 +571,26 @@ export function formatAnchorSlice(
 }
 
 /**
+ * Options for extracting contextual anchor code slices.
+ */
+export interface AnchorSliceExtractionParams {
+    filePath: string;
+    startLine: number;
+    endLine: number;
+    baseDir?: string;
+    radius?: number;
+    sourceContent?: string;
+}
+
+/**
  * Extract anchor code slice with surrounding context lines.
  *
- * @param filePath - Repository-relative or absolute file path.
- * @param startLine - 1-indexed starting line.
- * @param endLine - 1-indexed ending line.
- * @param baseDir - Optional base directory to resolve relative paths.
- * @param radius - Number of surrounding context lines (defaults to 2).
- * @param sourceContent - Optional in-memory source content.
+ * @param params - Contextual extraction parameters.
  * @returns Formatted code anchor slice or undefined if unreadable.
  */
-export function extractAnchorCodeSlice(
-    filePath: string,
-    startLine: number,
-    endLine: number,
-    baseDir?: string,
-    radius = 2,
-    sourceContent?: string,
-): string | undefined {
-    if (!filePath || filePath === 'unknown' || !sourceContent) {
+export function extractAnchorCodeSlice(params: AnchorSliceExtractionParams): string | undefined {
+    const { filePath, startLine, endLine, sourceContent, radius = 2 } = params;
+    if (!filePath || filePath === DEFAULT_UNKNOWN_BASENAME || !sourceContent) {
         return undefined;
     }
     return formatAnchorSlice(sourceContent, startLine, endLine, radius);
@@ -571,22 +614,22 @@ const L4_PATH_RE = /(?:\/reporters\/|\/presentation\/|\/views\/)/;
  * @returns One of the five architectural layers (L1 to L5).
  */
 export function resolveTopologyLayer(rule: string, filePath?: string): AgentTopologyLayer {
-    const r = (rule || '').toUpperCase();
-    const p = (filePath || '').replace(/\\/g, '/').toLowerCase();
+    const ruleUpper = (rule || '').toUpperCase();
+    const pathNormalized = (filePath || '').replace(/\\/g, '/').toLowerCase();
 
-    if (L1_RULE_RE.test(r) || L1_PATH_RE.test(p)) {
-        return 'L1_CONTRACT';
+    if (L1_RULE_RE.test(ruleUpper) || L1_PATH_RE.test(pathNormalized)) {
+        return LAYER_L1_CONTRACT;
     }
-    if (L2_RULE_RE.test(r) || L2_PATH_RE.test(p)) {
-        return 'L2_OPERATOR';
+    if (L2_RULE_RE.test(ruleUpper) || L2_PATH_RE.test(pathNormalized)) {
+        return LAYER_L2_OPERATOR;
     }
-    if (L3_RULE_RE.test(r) || L3_PATH_RE.test(p)) {
-        return 'L3_CONFIG';
+    if (L3_RULE_RE.test(ruleUpper) || L3_PATH_RE.test(pathNormalized)) {
+        return LAYER_L3_CONFIG;
     }
-    if (L4_RULE_RE.test(r) || L4_PATH_RE.test(p)) {
-        return 'L4_PRESENTATION';
+    if (L4_RULE_RE.test(ruleUpper) || L4_PATH_RE.test(pathNormalized)) {
+        return LAYER_L4_PRESENTATION;
     }
-    return 'L5_GOVERNANCE';
+    return LAYER_L5_GOVERNANCE;
 }
 
 const PURITY_MSG_RE = /(?:pure|precision)/;
@@ -595,17 +638,17 @@ const ZERO_HEAP_MSG_RE = /(?:loop|allocation)/;
 const IMMUTABLE_MSG_RE = /(?:immutable|freeze)/;
 
 function isPurityRequired(layer: AgentTopologyLayer, msg: string): boolean {
-    return layer === 'L1_CONTRACT' || layer === 'L2_OPERATOR' || PURITY_MSG_RE.test(msg);
+    return layer === LAYER_L1_CONTRACT || layer === LAYER_L2_OPERATOR || PURITY_MSG_RE.test(msg);
 }
 
 function isZeroHeapRequired(rule: string, layer: AgentTopologyLayer, msg: string): boolean {
-    return layer === 'L2_OPERATOR' || ZERO_HEAP_RULE_RE.test(rule) || ZERO_HEAP_MSG_RE.test(msg);
+    return layer === LAYER_L2_OPERATOR || ZERO_HEAP_RULE_RE.test(rule) || ZERO_HEAP_MSG_RE.test(msg);
 }
 
 function isImmutableRequired(rule: string, layer: AgentTopologyLayer, msg: string): boolean {
     return (
-        layer === 'L1_CONTRACT' ||
-        layer === 'L3_CONFIG' ||
+        layer === LAYER_L1_CONTRACT ||
+        layer === LAYER_L3_CONFIG ||
         rule === 'ARCH-FAC-001' ||
         IMMUTABLE_MSG_RE.test(msg)
     );
@@ -661,7 +704,7 @@ export function generateImmutableConstraints(
     const immutableStateSnapshot = isImmutableRequired(rule, layer, msg);
     const elocBudgetConstraint = true;
     const noExternalSideEffects =
-        layer === 'L1_CONTRACT' || layer === 'L2_OPERATOR' || layer === 'L5_GOVERNANCE';
+        layer === LAYER_L1_CONTRACT || layer === LAYER_L2_OPERATOR || layer === LAYER_L5_GOVERNANCE;
 
     const contractRules = buildContractRulesList({
         zeroHeapAllocationInLoop,
@@ -680,6 +723,92 @@ export function generateImmutableConstraints(
     };
 }
 
+interface VerificationDirectiveRuleStrategy {
+    matcher: (file: string, rule: string) => boolean;
+    factory: (issue: Issue) => AgentVerificationDirective;
+}
+
+const RULE_PREFIX_CPX = 'CPX-';
+const RULE_PREFIX_ADV_CMP = 'ADV-CMP';
+const RULE_PREFIX_GOV_SAN = 'GOV-SAN';
+const RULE_PREFIX_CMG = 'CMG-';
+const RULE_NAME_HIGH_COMPLEXITY = 'HIGH-COMPLEXITY';
+const RULE_NAME_ARCH_FAC = 'ARCH-FAC-001';
+const RULE_NAME_ARCH_ABS = 'ARCH-ABS-001';
+const RULE_NAME_NUM_PREC = 'NUM-PREC-001';
+const RULE_NAME_TST_FLT = 'TST-FLT-001';
+
+function createVerificationDirective(
+    command: string,
+    description: string,
+    assertionCriteria: string[],
+): AgentVerificationDirective {
+    return { command, description, assertionCriteria };
+}
+
+const VERIFICATION_DIRECTIVE_STRATEGIES: readonly VerificationDirectiveRuleStrategy[] = [
+    {
+        matcher: (file) => file.endsWith('.gd'),
+        factory: () =>
+            createVerificationDirective(
+                'pwsh scripts/ps1/check-gdscript.ps1',
+                'Static GDScript syntax, typing, and architectural rule verification.',
+                [
+                    'Ensure strict typing on all function arguments and return types',
+                    'Verify zero transient heap allocation in hot processing loops',
+                ],
+            ),
+    },
+    {
+        matcher: (_file, rule) => rule === RULE_NAME_ARCH_FAC || rule === RULE_NAME_ARCH_ABS,
+        factory: () =>
+            createVerificationDirective(
+                'node scripts/validate-facade-governance.js',
+                'Facade discipline validation checking ELOC budget and trampoline elimination.',
+                [
+                    'Ensure facade entry satisfies ELOC >= 15 or immutable freeze guarantee',
+                    'Verify elimination of single-target pass-through trampolines',
+                ],
+            ),
+    },
+    {
+        matcher: (_file, rule) => rule === RULE_NAME_NUM_PREC || rule === RULE_NAME_TST_FLT,
+        factory: () =>
+            createVerificationDirective(
+                'node scripts/validate-dual-faced-presentation.js',
+                'Dual-faced presentation and numeric precision governance verification.',
+                [
+                    'Verify floating point tolerance assertion matches expected epsilon',
+                    'Confirm numeric rounding produces non-lossy 0.01 precision',
+                ],
+            ),
+    },
+    {
+        matcher: (_file, rule) => rule === RULE_NAME_HIGH_COMPLEXITY || rule.startsWith(RULE_PREFIX_CPX) || rule.startsWith(RULE_PREFIX_ADV_CMP),
+        factory: () =>
+            createVerificationDirective(
+                'node scripts/common/evaluate-eloc-budget.js',
+                'AST slice budget and cyclomatic complexity verification.',
+                [
+                    'Confirm function cyclomatic complexity CC <= 15',
+                    'Ensure control flow nesting depth Depth <= 4 with guard returns',
+                ],
+            ),
+    },
+    {
+        matcher: (_file, rule) => rule.startsWith(RULE_PREFIX_GOV_SAN) || rule.startsWith(RULE_PREFIX_CMG),
+        factory: () =>
+            createVerificationDirective(
+                'node scripts/validate-governance-exemptions.js',
+                'Technical prose hygiene validation checking promotional or hyperbolic phrases.',
+                [
+                    'Confirm removal of non-objective or promotional phrases',
+                    'Ensure purely technical, verifiable factual statements',
+                ],
+            ),
+    },
+];
+
 /**
  * Generate targeted verification directive recommending exact qualitative test or gate commands.
  *
@@ -696,61 +825,10 @@ export function generateVerificationDirective(
     const file = (issue.location?.file || '').replace(/\\/g, '/');
     const rule = (issue.rule || '').toUpperCase();
 
-    if (file.endsWith('.gd')) {
-        return {
-            command: 'pwsh scripts/ps1/check-gdscript.ps1',
-            description: 'Static GDScript syntax, typing, and architectural rule verification.',
-            assertionCriteria: [
-                'Ensure strict typing on all function arguments and return types',
-                'Verify zero transient heap allocation in hot processing loops',
-            ],
-        };
-    }
-
-    if (rule === 'ARCH-FAC-001' || rule === 'ARCH-ABS-001') {
-        return {
-            command: 'node scripts/validate-facade-governance.js',
-            description:
-                'Facade discipline validation checking ELOC budget and trampoline elimination.',
-            assertionCriteria: [
-                'Ensure facade entry satisfies ELOC >= 15 or immutable freeze guarantee',
-                'Verify elimination of single-target pass-through trampolines',
-            ],
-        };
-    }
-
-    if (rule === 'NUM-PREC-001' || rule === 'TST-FLT-001') {
-        return {
-            command: 'node scripts/validate-dual-faced-presentation.js',
-            description: 'Dual-faced presentation and numeric precision governance verification.',
-            assertionCriteria: [
-                'Verify floating point tolerance assertion matches expected epsilon',
-                'Confirm numeric rounding produces non-lossy 0.01 precision',
-            ],
-        };
-    }
-
-    if (rule === 'HIGH-COMPLEXITY' || rule.startsWith('CPX-') || rule.startsWith('ADV-CMP')) {
-        return {
-            command: 'node scripts/common/evaluate-eloc-budget.js',
-            description: 'AST slice budget and cyclomatic complexity verification.',
-            assertionCriteria: [
-                'Confirm function cyclomatic complexity CC <= 15',
-                'Ensure control flow nesting depth Depth <= 4 with guard returns',
-            ],
-        };
-    }
-
-    if (rule.startsWith('GOV-SAN') || rule.startsWith('CMG-')) {
-        return {
-            command: 'node scripts/validate-governance-exemptions.js',
-            description:
-                'Technical prose hygiene validation checking promotional or hyperbolic phrases.',
-            assertionCriteria: [
-                'Confirm removal of non-objective or promotional phrases',
-                'Ensure purely technical, verifiable factual statements',
-            ],
-        };
+    for (const strategy of VERIFICATION_DIRECTIVE_STRATEGIES) {
+        if (strategy.matcher(file, rule)) {
+            return strategy.factory(issue);
+        }
     }
 
     return {

@@ -94,15 +94,15 @@ export async function runParseAnalyzeStage(
     const effWorkers = effectiveWorkers(cfg.workers, files.length);
     if (effWorkers <= 1) return host.runInProcess(files, absRoot);
     try {
-        const perFile = await runWorkerPool(
+        const perFile = await runWorkerPool({
             files,
             absRoot,
-            cfg,
-            workerDescs(host.plan),
-            effWorkers,
-            host.logger,
-            host.runAnalyzers.bind(host),
-        );
+            config: cfg,
+            descs: workerDescs(host.plan),
+            numWorkers: effWorkers,
+            logger: host.logger,
+            runAnalyzersFn: host.runAnalyzers.bind(host),
+        });
         if (host.recordWorkerSymbols) {
             for (const r of perFile) {
                 if (r.symbols) {
