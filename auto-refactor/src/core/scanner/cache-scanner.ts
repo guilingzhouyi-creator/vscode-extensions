@@ -86,9 +86,9 @@ export async function executeScanWithCache(
     };
 
     const statResults = collectStatFingerprints(absRoot, files);
-    for (const s of statResults) {
-        await probeSingleFileCache(
-            s,
+    for (const statEntry of statResults) {
+        await probeSingleFileCache({
+            statEntry,
             absRoot,
             cache,
             fpContext,
@@ -98,35 +98,35 @@ export async function executeScanWithCache(
             queue,
             incEnabled,
             incMinLines,
-        );
+        });
     }
 
     const fpByRel = new Map<string, Fingerprint>(queue.l1Fps.map((w) => [w.rel, w.fp]));
-    const missStats = await executeCacheMisses(
+    const missStats = await executeCacheMisses({
         scanner,
-        queue.toAnalyze,
+        toAnalyze: queue.toAnalyze,
         files,
         absRoot,
         cfg,
-        fpContext.poolFp,
-        fpContext.l2Enabled,
+        poolFp: fpContext.poolFp,
+        l2Enabled: fpContext.l2Enabled,
         opts,
         sessionBucket,
         perFile,
         fpByRel,
         cache,
-    );
+    });
 
-    const incStats = await executeIncrementalFiles(
+    const incStats = await executeIncrementalFiles({
         scanner,
-        queue.toIncremental,
+        toIncremental: queue.toIncremental,
         incBucket,
-        fpContext.l2Enabled,
+        l2Enabled: fpContext.l2Enabled,
         sessionBucket,
         perFile,
         fpByRel,
         cache,
-    );
+    });
 
     const incPruned = pruneIncrementalBucket(incBucket, incrementalMaxFiles());
     const incRssEvicted = incrementalRssGuard(session);

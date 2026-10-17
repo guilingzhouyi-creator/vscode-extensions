@@ -1,7 +1,7 @@
 {
   "version": "1.2.0",
   "granularity": "grouped",
-  "timestamp": "2026-10-17T04:20:10.041Z",
+  "timestamp": "2026-10-17T05:09:15.921Z",
   "groups": [
     {
       "key": "comments|CMT-HDR-001|crates/auto-refactor-core/build.rs",
@@ -3294,41 +3294,6 @@
       }
     },
     {
-      "key": "large-file|large-file|src/core/intelligence/architectureBoundaryChecks.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/intelligence/architectureBoundaryChecks.ts",
-      "count": 13,
-      "severities": {
-        "warning": 13
-      }
-    },
-    {
-      "key": "simplify|SIM-LONG-001|src/core/intelligence/architectureBoundaryChecks.ts",
-      "count": 3,
-      "severities": {
-        "warning": 3
-      }
-    },
-    {
-      "key": "constants|duplicate-literal|src/core/intelligence/architectureBoundaryChecks.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "hygiene|HYG-CLN-001|src/core/intelligence/architectureBoundaryChecks.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "constants|hardcoded-string|src/core/intelligence/boundary-discipline-engine.ts",
       "count": 10,
       "severities": {
@@ -3484,13 +3449,6 @@
     },
     {
       "key": "large-file|large-file|src/core/intelligence/dependency-provenance.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "hygiene|HYG-CLN-001|src/core/intelligence/dependency-provenance.ts",
       "count": 1,
       "severities": {
         "warning": 1
@@ -4631,34 +4589,6 @@
       }
     },
     {
-      "key": "large-file|large-file|src/core/scanner/cache-probe.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "governance|GOV-DAT-001|src/core/scanner/cache-probe.ts",
-      "count": 9,
-      "severities": {
-        "info": 9
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/scanner/cache-probe.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "simplify|SIM-LONG-001|src/core/scanner/cache-probe.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "simplify|SIM-LONG-001|src/core/scanner/cache-scanner.ts",
       "count": 1,
       "severities": {
@@ -4957,48 +4887,6 @@
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/scoring/change-quality-arbiter.ts",
-      "count": 15,
-      "severities": {
-        "warning": 15
-      }
-    },
-    {
-      "key": "governance|GOV-DAT-001|src/core/scoring/change-quality-arbiter.ts",
-      "count": 3,
-      "severities": {
-        "info": 3
-      }
-    },
-    {
-      "key": "constants|magic-number|src/core/scoring/change-quality-arbiter.ts",
-      "count": 8,
-      "severities": {
-        "warning": 8
-      }
-    },
-    {
-      "key": "constants|duplicate-literal|src/core/scoring/change-quality-arbiter.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "hygiene|HYG-CLN-001|src/core/scoring/change-quality-arbiter.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "simplify|SIM-LONG-001|src/core/scoring/change-quality-arbiter.ts",
-      "count": 2,
-      "severities": {
-        "warning": 2
       }
     },
     {

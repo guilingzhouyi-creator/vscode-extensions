@@ -25,6 +25,40 @@ import { evaluateNetCognitiveCost } from './cognitive-cost-model';
 import { computeEffectiveCodeDensity } from './effectiveDensity';
 import { SCORE_ROUNDING } from './scorer-formulas';
 
+const APPROVED_DELTA_CC_MAGNITUDE = 4;
+const MAX_APPROVED_PARAM_COUNT = 3;
+const GAMING_KIND_ARTIFICIAL_SPLITTING = 'artificial_function_splitting';
+const RULE_GAMING_001 = 'GAMING-001';
+const RULE_SPLITTING_KEYWORD = 'splitting';
+
+const SEVERITY_ERROR_TAG = 'error';
+const SEVERITY_WARNING_TAG = 'warning';
+
+const PENALTY_ERROR_SEVERITY = 15.0;
+const PENALTY_WARNING_SEVERITY = 5.0;
+const PENALTY_INFO_SEVERITY = 1.0;
+const PENALTY_MAINTENANCE_SUPPRESSION = 10.0;
+const PENALTY_GAMING_REJECT_OFFSET = 50.0;
+const BONUS_APPROVED_REFACTORING = 5.0;
+
+const THRESHOLD_APPROVED_SCORE = 5.0;
+const THRESHOLD_DEGRADED_REGRESSION = 10.0;
+
+const SAFETY_INDEX_DECIMAL_PLACES = 3;
+const DIFF_ENTROPY_DECIMAL_PLACES = 2;
+const ROI_DECIMAL_PLACES = 2;
+
+const VERDICT_GAMING_REJECTED: ChangeArbiterVerdict = 'gaming_rejected';
+const VERDICT_APPROVED: ChangeArbiterVerdict = 'approved';
+const VERDICT_DEGRADED: ChangeArbiterVerdict = 'degraded';
+const VERDICT_NEUTRAL: ChangeArbiterVerdict = 'neutral';
+
+const DECISION_AUTO_APPLY: AgentDecisionVerdict = 'AUTO_APPLY';
+const DECISION_HUMAN_REVIEW: AgentDecisionVerdict = 'HUMAN_REVIEW';
+const DECISION_AUTO_REJECT: AgentDecisionVerdict = 'AUTO_REJECT';
+
+const SUPPRESSION_DIRECTIVE_PATTERN = /@ts-ignore|@ts-nocheck|eslint-disable/g;
+
 /**
  * Approved architectural refactoring pattern declaration.
  */
@@ -107,30 +141,52 @@ export interface ChangeEvaluationResult {
     explanation: string[];
 }
 
-/**
- * Evaluates modification for true engineering improvement and anti-gaming compliance:
- * ChangeScore = deltaQ - Regression - ComplexityCost - MaintenanceDebt
- *
- * @param input - Change evaluation parameters.
- * @returns Fully audited ChangeEvaluationResult.
- */
+/** Context object for anti-gaming resolution with pattern immunity. */
+interface AntiGamingResolutionContext {
+    readonly input: ChangeEvaluationInput;
+    readonly filePath: string;
+    readonly beforeContent: string;
+    readonly afterContent: string;
+    readonly explanation: string[];
+}
+
+/** Context object for cognitive complexity cost computation. */
+interface ComplexityCostContext {
+    readonly input: ChangeEvaluationInput;
+    readonly beforeContent: string;
+    readonly afterContent: string;
+    readonly filePath: string;
+    readonly explanation: string[];
+}
+
+/** Context object for maintenance debt computation. */
+interface MaintenanceDebtContext {
+    readonly input: ChangeEvaluationInput;
+    readonly beforeContent: string;
+    readonly afterContent: string;
+    readonly explanation: string[];
+}
+
+/** Context object for arbiter verdict resolution. */
+interface ArbiterVerdictContext {
+    readonly isGaming: boolean;
+    readonly gamingKinds: readonly GamingPatternKind[];
+    readonly changeScore: number;
+    readonly regressionPenalty: number;
+    readonly explanation: string[];
+}
+
 /**
  * Resolves anti-gaming analysis and checks approved refactoring pattern immunity.
  */
-function resolveAntiGamingWithImmunity(
-    input: ChangeEvaluationInput,
-    filePath: string,
-    beforeContent: string,
-    afterContent: string,
-    explanation: string[],
-): {
+function resolveAntiGamingWithImmunity(ctx: AntiGamingResolutionContext): {
     gamingKinds: GamingPatternKind[];
     gamingIssues: Issue[];
     isApprovedRefactoring: boolean;
     isGaming: boolean;
 } {
-    const diffGaming = detectDiffScoreGaming(filePath, beforeContent, afterContent);
-    const staticGaming = detectScoreGaming(filePath, afterContent);
+    const diffGaming = detectDiffScoreGaming(ctx.filePath, ctx.beforeContent, ctx.afterContent);
+    const staticGaming = detectScoreGaming(ctx.filePath, ctx.afterContent);
 
     let gamingKinds: GamingPatternKind[] = Array.from(
         new Set([...diffGaming.gamingKinds, ...staticGaming.gamingKinds]),
@@ -138,15 +194,21 @@ function resolveAntiGamingWithImmunity(
     let gamingIssues: Issue[] = [...diffGaming.issues, ...staticGaming.issues];
 
     let isApprovedRefactoring = false;
-    if (input.approvedPattern) {
-        const { deltaCC, maxSubParamCount = 2, isNarrowScope = true } = input.approvedPattern;
-        if (deltaCC <= -4 && maxSubParamCount <= 3 && isNarrowScope) {
+    if (ctx.input.approvedPattern) {
+        const { deltaCC, maxSubParamCount = 2, isNarrowScope = true } = ctx.input.approvedPattern;
+        if (
+            deltaCC <= -APPROVED_DELTA_CC_MAGNITUDE &&
+            maxSubParamCount <= MAX_APPROVED_PARAM_COUNT &&
+            isNarrowScope
+        ) {
             isApprovedRefactoring = true;
-            gamingKinds = gamingKinds.filter((k) => k !== 'artificial_function_splitting');
+            gamingKinds = gamingKinds.filter((k) => k !== GAMING_KIND_ARTIFICIAL_SPLITTING);
             gamingIssues = gamingIssues.filter(
-                (i) => i.rule !== 'GAMING-001' && !i.message.toLowerCase().includes('splitting'),
+                (i) =>
+                    i.rule !== RULE_GAMING_001 &&
+                    !i.message.toLowerCase().includes(RULE_SPLITTING_KEYWORD),
             );
-            explanation.push(
+            ctx.explanation.push(
                 `Approved Refactoring: Validated atomic function extraction (ΔCC=${deltaCC}, ` +
                     `params<=${maxSubParamCount}). Immune to G-03 mechanical splitting guard.`,
             );
@@ -173,12 +235,12 @@ function computeRegressionPenalty(
 
     let penalty = 0;
     for (const reg of totalRegressions) {
-        if (reg.severity === 'error') {
-            penalty += 15.0;
-        } else if (reg.severity === 'warning') {
-            penalty += 5.0;
+        if (reg.severity === SEVERITY_ERROR_TAG) {
+            penalty += PENALTY_ERROR_SEVERITY;
+        } else if (reg.severity === SEVERITY_WARNING_TAG) {
+            penalty += PENALTY_WARNING_SEVERITY;
         } else {
-            penalty += 1.0;
+            penalty += PENALTY_INFO_SEVERITY;
         }
     }
     const rounded = Math.round(penalty * SCORE_ROUNDING) / SCORE_ROUNDING;
@@ -193,24 +255,18 @@ function computeRegressionPenalty(
 /**
  * Calculates cognitive complexity hop cost for added forwarding wrappers.
  */
-function computeComplexityCost(
-    input: ChangeEvaluationInput,
-    beforeContent: string,
-    afterContent: string,
-    filePath: string,
-    explanation: string[],
-): number {
-    if (input.cognitiveHopCost !== undefined) {
-        if (input.cognitiveHopCost > 0) {
-            explanation.push(
-                `Complexity cost (cognitive jump overhead): -${input.cognitiveHopCost}`,
+function computeComplexityCost(ctx: ComplexityCostContext): number {
+    if (ctx.input.cognitiveHopCost !== undefined) {
+        if (ctx.input.cognitiveHopCost > 0) {
+            ctx.explanation.push(
+                `Complexity cost (cognitive jump overhead): -${ctx.input.cognitiveHopCost}`,
             );
         }
-        return input.cognitiveHopCost;
+        return ctx.input.cognitiveHopCost;
     }
 
-    const afterDensity = computeEffectiveCodeDensity(afterContent);
-    const beforeDensity = computeEffectiveCodeDensity(beforeContent);
+    const afterDensity = computeEffectiveCodeDensity(ctx.afterContent);
+    const beforeDensity = computeEffectiveCodeDensity(ctx.beforeContent);
     const addedForwarders = Math.max(
         0,
         afterDensity.forwardingCount - beforeDensity.forwardingCount,
@@ -218,7 +274,7 @@ function computeComplexityCost(
     let cost = 0;
     if (addedForwarders >= 2) {
         const hopEval = evaluateNetCognitiveCost(
-            filePath,
+            ctx.filePath,
             Array.from({ length: addedForwarders }, (_, i) => ({
                 name: `wrapper_${i + 1}`,
                 loc: 2,
@@ -230,7 +286,7 @@ function computeComplexityCost(
         cost = Math.round(hopEval.hopPenalty * SCORE_ROUNDING) / SCORE_ROUNDING;
     }
     if (cost > 0) {
-        explanation.push(`Complexity cost (cognitive jump overhead): -${cost}`);
+        ctx.explanation.push(`Complexity cost (cognitive jump overhead): -${cost}`);
     }
     return cost;
 }
@@ -238,25 +294,19 @@ function computeComplexityCost(
 /**
  * Calculates new maintenance debt from added suppression directives.
  */
-function computeMaintenanceDebt(
-    input: ChangeEvaluationInput,
-    beforeContent: string,
-    afterContent: string,
-    explanation: string[],
-): number {
-    if (input.maintenanceDebtPoints !== undefined) {
-        if (input.maintenanceDebtPoints > 0) {
-            explanation.push(`Maintenance debt penalty: -${input.maintenanceDebtPoints}`);
+function computeMaintenanceDebt(ctx: MaintenanceDebtContext): number {
+    if (ctx.input.maintenanceDebtPoints !== undefined) {
+        if (ctx.input.maintenanceDebtPoints > 0) {
+            ctx.explanation.push(`Maintenance debt penalty: -${ctx.input.maintenanceDebtPoints}`);
         }
-        return input.maintenanceDebtPoints;
+        return ctx.input.maintenanceDebtPoints;
     }
-    const ignorePattern = /@ts-ignore|@ts-nocheck|eslint-disable/g;
-    const beforeIgnores = (beforeContent.match(ignorePattern) ?? []).length;
-    const afterIgnores = (afterContent.match(ignorePattern) ?? []).length;
+    const beforeIgnores = (ctx.beforeContent.match(SUPPRESSION_DIRECTIVE_PATTERN) ?? []).length;
+    const afterIgnores = (ctx.afterContent.match(SUPPRESSION_DIRECTIVE_PATTERN) ?? []).length;
     const newIgnores = Math.max(0, afterIgnores - beforeIgnores);
-    const debt = newIgnores * 10.0;
+    const debt = newIgnores * PENALTY_MAINTENANCE_SUPPRESSION;
     if (debt > 0) {
-        explanation.push(`Maintenance debt penalty: -${debt}`);
+        ctx.explanation.push(`Maintenance debt penalty: -${debt}`);
     }
     return debt;
 }
@@ -264,31 +314,155 @@ function computeMaintenanceDebt(
 /**
  * Resolves final arbitration verdict and score.
  */
-function resolveArbiterVerdict(
-    isGaming: boolean,
-    gamingKinds: GamingPatternKind[],
-    changeScore: number,
-    regressionPenalty: number,
-    explanation: string[],
-): { verdict: ChangeArbiterVerdict; finalScore: number } {
-    if (isGaming) {
-        const finalScore = Math.min(-50.0, changeScore - 50.0);
-        explanation.push(
-            `CRITICAL: Anti-gaming violation detected (${gamingKinds.join(', ')}). ` +
+function resolveArbiterVerdict(ctx: ArbiterVerdictContext): {
+    verdict: ChangeArbiterVerdict;
+    finalScore: number;
+} {
+    if (ctx.isGaming) {
+        const finalScore = Math.min(
+            -PENALTY_GAMING_REJECT_OFFSET,
+            ctx.changeScore - PENALTY_GAMING_REJECT_OFFSET,
+        );
+        ctx.explanation.push(
+            `CRITICAL: Anti-gaming violation detected (${ctx.gamingKinds.join(', ')}). ` +
                 `Change strictly rejected.`,
         );
-        return { verdict: 'gaming_rejected', finalScore };
+        return { verdict: VERDICT_GAMING_REJECTED, finalScore };
     }
-    if (changeScore >= 5.0 && regressionPenalty === 0) {
-        explanation.push(`Verdict: Approved. Genuine positive improvement (+${changeScore}).`);
-        return { verdict: 'approved', finalScore: changeScore };
+    if (ctx.changeScore >= THRESHOLD_APPROVED_SCORE && ctx.regressionPenalty === 0) {
+        ctx.explanation.push(
+            `Verdict: Approved. Genuine positive improvement (+${ctx.changeScore}).`,
+        );
+        return { verdict: VERDICT_APPROVED, finalScore: ctx.changeScore };
     }
-    if (changeScore <= -5.0 || regressionPenalty >= 10.0) {
-        explanation.push(`Verdict: Degraded. Significant regression or net loss (${changeScore}).`);
-        return { verdict: 'degraded', finalScore: changeScore };
+    if (
+        ctx.changeScore <= -THRESHOLD_APPROVED_SCORE ||
+        ctx.regressionPenalty >= THRESHOLD_DEGRADED_REGRESSION
+    ) {
+        ctx.explanation.push(
+            `Verdict: Degraded. Significant regression or net loss (${ctx.changeScore}).`,
+        );
+        return { verdict: VERDICT_DEGRADED, finalScore: ctx.changeScore };
     }
-    explanation.push(`Verdict: Neutral. Minor or negligible delta (${changeScore}).`);
-    return { verdict: 'neutral', finalScore: changeScore };
+    ctx.explanation.push(`Verdict: Neutral. Minor or negligible delta (${ctx.changeScore}).`);
+    return { verdict: VERDICT_NEUTRAL, finalScore: ctx.changeScore };
+}
+
+/**
+ * Calculates refactoring bonus for validated architectural decoupling.
+ */
+function calculateRefactoringBonus(
+    isApprovedRefactoring: boolean,
+    regressionPenalty: number,
+    explanation: string[],
+): number {
+    if (!isApprovedRefactoring || regressionPenalty !== 0) {
+        return 0;
+    }
+    explanation.push(
+        `Refactoring incentive: +${BONUS_APPROVED_REFACTORING} pts for validated architectural decoupling.`,
+    );
+    return BONUS_APPROVED_REFACTORING;
+}
+
+/**
+ * Evaluates modification for true engineering improvement and anti-gaming compliance:
+/** Context object for assembling the change evaluation result. */
+interface EvaluationResultAssemblyContext {
+    readonly deltaQ: number;
+    readonly regressionPenalty: number;
+    readonly complexityCost: number;
+    readonly maintenanceDebt: number;
+    readonly refactoringBonus: number;
+    readonly isApprovedRefactoring: boolean;
+    readonly isGaming: boolean;
+    readonly gamingKinds: readonly GamingPatternKind[];
+    readonly gamingIssues: readonly Issue[];
+    readonly explanation: string[];
+}
+
+/**
+ * Assembles the final ChangeEvaluationResult structure with verdict calculations.
+ */
+function assembleEvaluationResult(ctx: EvaluationResultAssemblyContext): ChangeEvaluationResult {
+    const netDelta =
+        ctx.deltaQ -
+        ctx.regressionPenalty -
+        ctx.complexityCost -
+        ctx.maintenanceDebt +
+        ctx.refactoringBonus;
+    const preliminaryScore = Math.round(netDelta * SCORE_ROUNDING) / SCORE_ROUNDING;
+
+    const { verdict, finalScore } = resolveArbiterVerdict({
+        isGaming: ctx.isGaming,
+        gamingKinds: ctx.gamingKinds,
+        changeScore: preliminaryScore,
+        regressionPenalty: ctx.regressionPenalty,
+        explanation: ctx.explanation,
+    });
+
+    return {
+        deltaQ: ctx.deltaQ,
+        regressionPenalty: ctx.regressionPenalty,
+        complexityCost: ctx.complexityCost,
+        maintenanceDebt: ctx.maintenanceDebt,
+        changeScore: finalScore,
+        isGamingRejected: ctx.isGaming,
+        gamingKinds: [...ctx.gamingKinds],
+        gamingIssues: [...ctx.gamingIssues],
+        isApprovedRefactoring: ctx.isApprovedRefactoring,
+        refactoringBonus: ctx.refactoringBonus,
+        verdict,
+        explanation: ctx.explanation,
+    };
+}
+
+interface PenaltyCostContext {
+    readonly input: ChangeEvaluationInput;
+    readonly beforeContent: string;
+    readonly afterContent: string;
+    readonly filePath: string;
+    readonly isApprovedRefactoring: boolean;
+    readonly existingIssues: Issue[];
+    readonly newIssues: Issue[];
+    readonly regressionIssues: Issue[];
+    readonly explanation: string[];
+}
+
+/**
+ * Calculates all regression, complexity, maintenance penalties and refactoring bonus.
+ */
+function calculatePenaltiesAndBonus(ctx: PenaltyCostContext): {
+    regressionPenalty: number;
+    complexityCost: number;
+    maintenanceDebt: number;
+    refactoringBonus: number;
+} {
+    const regressionPenalty = computeRegressionPenalty(
+        ctx.existingIssues,
+        ctx.newIssues,
+        ctx.regressionIssues,
+        ctx.explanation,
+    );
+    const complexityCost = computeComplexityCost({
+        input: ctx.input,
+        beforeContent: ctx.beforeContent,
+        afterContent: ctx.afterContent,
+        filePath: ctx.filePath,
+        explanation: ctx.explanation,
+    });
+    const maintenanceDebt = computeMaintenanceDebt({
+        input: ctx.input,
+        beforeContent: ctx.beforeContent,
+        afterContent: ctx.afterContent,
+        explanation: ctx.explanation,
+    });
+    const refactoringBonus = calculateRefactoringBonus(
+        ctx.isApprovedRefactoring,
+        regressionPenalty,
+        ctx.explanation,
+    );
+    return { regressionPenalty, complexityCost, maintenanceDebt, refactoringBonus };
 }
 
 /**
@@ -311,72 +485,45 @@ export function evaluateChangeQuality(input: ChangeEvaluationInput): ChangeEvalu
     } = input;
 
     const explanation: string[] = [];
-
-    // 1. Calculate raw quality delta: deltaQ = Q_after - Q_before
     const deltaQ = Math.round((afterScore - beforeScore) * SCORE_ROUNDING) / SCORE_ROUNDING;
     explanation.push(
         `Raw quality delta: ΔQ = ${deltaQ > 0 ? '+' : ''}${deltaQ} (${beforeScore} -> ${afterScore})`,
     );
 
-    // 2. Anti-Gaming Detection & Approved Refactoring Pattern Immunity
     const { gamingKinds, gamingIssues, isApprovedRefactoring, isGaming } =
-        resolveAntiGamingWithImmunity(input, filePath, beforeContent, afterContent, explanation);
+        resolveAntiGamingWithImmunity({
+            input,
+            filePath,
+            beforeContent,
+            afterContent,
+            explanation,
+        });
 
-    // 3. Regression Penalty calculation
-    const regressionPenalty = computeRegressionPenalty(
-        existingIssues,
-        newIssues,
-        regressionIssues,
-        explanation,
-    );
+    const { regressionPenalty, complexityCost, maintenanceDebt, refactoringBonus } =
+        calculatePenaltiesAndBonus({
+            input,
+            beforeContent,
+            afterContent,
+            filePath,
+            isApprovedRefactoring,
+            existingIssues,
+            newIssues,
+            regressionIssues,
+            explanation,
+        });
 
-    // 4. Complexity Cost calculation (Call Hopping & Forwarding Wrappers)
-    const complexityCost = computeComplexityCost(
-        input,
-        beforeContent,
-        afterContent,
-        filePath,
-        explanation,
-    );
-
-    // 5. Maintenance Debt calculation
-    const maintenanceDebt = computeMaintenanceDebt(input, beforeContent, afterContent, explanation);
-
-    // 6. Net ChangeScore: deltaQ - Regression - ComplexityCost - MaintenanceDebt + RefactorBonus
-    let refactoringBonus = 0;
-    let netDelta = deltaQ - regressionPenalty - complexityCost - maintenanceDebt;
-    if (isApprovedRefactoring && regressionPenalty === 0) {
-        refactoringBonus = 5.0;
-        netDelta += refactoringBonus;
-        explanation.push(
-            `Refactoring incentive: +${refactoringBonus} pts for validated architectural decoupling.`,
-        );
-    }
-    const preliminaryScore = Math.round(netDelta * SCORE_ROUNDING) / SCORE_ROUNDING;
-
-    // 7. Anti-Gaming Verdict Enforcement
-    const { verdict, finalScore } = resolveArbiterVerdict(
-        isGaming,
-        gamingKinds,
-        preliminaryScore,
-        regressionPenalty,
-        explanation,
-    );
-
-    return {
+    return assembleEvaluationResult({
         deltaQ,
         regressionPenalty,
         complexityCost,
         maintenanceDebt,
-        changeScore: finalScore,
-        isGamingRejected: isGaming,
+        refactoringBonus,
+        isApprovedRefactoring,
+        isGaming,
         gamingKinds,
         gamingIssues,
-        isApprovedRefactoring,
-        refactoringBonus,
-        verdict,
         explanation,
-    };
+    });
 }
 
 /**
@@ -427,6 +574,79 @@ export interface AgentPatchArbitrationOptions {
 }
 
 /**
+ * Computes safety metrics and index for an incoming patch.
+ */
+function computePatchSafetyMetrics(options?: AgentPatchArbitrationOptions): PatchSafetyMetrics {
+    const apiDrift = options?.hasApiDrift ? 1.0 : 0.0;
+    const uncoveredRisk = Math.max(0.0, Math.min(1.0, options?.uncoveredRiskScore ?? 0.0));
+    const semanticBleed = Math.max(0.0, Math.min(1.0, options?.semanticBleedScore ?? 0.0));
+    const rawSafety = 1.0 - (0.4 * apiDrift + 0.3 * uncoveredRisk + 0.3 * semanticBleed);
+    const safetyIndex = +Math.max(0.0, Math.min(1.0, rawSafety)).toFixed(
+        SAFETY_INDEX_DECIMAL_PLACES,
+    );
+
+    return {
+        apiDriftScore: apiDrift,
+        uncoveredRiskScore: uncoveredRisk,
+        semanticBleedScore: semanticBleed,
+        safetyIndex,
+    };
+}
+
+/**
+ * Computes diff entropy heuristic from line modification count.
+ */
+function computeDiffEntropy(beforeContent: string, afterContent: string): number {
+    const beforeLines = beforeContent.split(/\r\n|\n/).length;
+    const afterLines = afterContent.split(/\r\n|\n/).length;
+    const lineDelta = Math.abs(afterLines - beforeLines);
+    return +(1.0 + Math.log10(1 + lineDelta)).toFixed(DIFF_ENTROPY_DECIMAL_PLACES);
+}
+
+/**
+ * Resolves automated decision and recommendation message for a patch.
+ */
+function resolvePatchDecision(
+    baseEvaluation: ChangeEvaluationResult,
+    safety: PatchSafetyMetrics,
+    roi: number,
+): { decision: AgentDecisionVerdict; recommendation: string } {
+    if (
+        baseEvaluation.isGamingRejected ||
+        safety.apiDriftScore >= 0.8 ||
+        safety.safetyIndex < 0.7 ||
+        baseEvaluation.verdict === VERDICT_DEGRADED ||
+        roi < 0.5
+    ) {
+        return {
+            decision: DECISION_AUTO_REJECT,
+            recommendation:
+                `Patch rejected by safety arbiter. SafetyIndex=${safety.safetyIndex}, ROI=${roi}, ` +
+                `Gaming=${baseEvaluation.isGamingRejected}, ApiDrift=${safety.apiDriftScore > 0}. Automated rollback executed.`,
+        };
+    }
+    if (
+        safety.safetyIndex >= 0.9 &&
+        roi >= 2.0 &&
+        baseEvaluation.verdict === VERDICT_APPROVED &&
+        baseEvaluation.regressionPenalty === 0
+    ) {
+        return {
+            decision: DECISION_AUTO_APPLY,
+            recommendation:
+                `Patch verified safe with high ROI (${roi}) and robust SafetyIndex (${safety.safetyIndex}). ` +
+                `Approved for automated non-blocking application.`,
+        };
+    }
+    return {
+        decision: DECISION_HUMAN_REVIEW,
+        recommendation:
+            `Patch meets basic stability but requires human verification. ` +
+            `SafetyIndex=${safety.safetyIndex}, ROI=${roi}.`,
+    };
+}
+
+/**
  * Arbitrate an automated agent patch considering ROI, Safety, and regression hazards.
  *
  * @param input - The change evaluation input containing before and after states.
@@ -438,69 +658,22 @@ export function arbitrateAgentPatch(
     options?: AgentPatchArbitrationOptions,
 ): AgentPatchArbitrationResult {
     const baseEvaluation = evaluateChangeQuality(input);
-
     const centrality = options?.centralityMultiplier ?? 1.0;
-    const apiDrift = options?.hasApiDrift ? 1.0 : 0.0;
-    const uncoveredRisk = Math.max(0.0, Math.min(1.0, options?.uncoveredRiskScore ?? 0.0));
-    const semanticBleed = Math.max(0.0, Math.min(1.0, options?.semanticBleedScore ?? 0.0));
-
-    // 1. Safety Index = 1.0 - (0.4 * ApiDrift + 0.3 * UncoveredRisk + 0.3 * SemanticBleed)
-    const rawSafety = 1.0 - (0.4 * apiDrift + 0.3 * uncoveredRisk + 0.3 * semanticBleed);
-    const safetyIndex = +Math.max(0.0, Math.min(1.0, rawSafety)).toFixed(3);
-
-    // 2. Diff Entropy heuristic from line modifications
-    const beforeLines = input.beforeContent.split(/\r\n|\n/).length;
-    const afterLines = input.afterContent.split(/\r\n|\n/).length;
-    const lineDelta = Math.abs(afterLines - beforeLines);
-    const diffEntropy = +(1.0 + Math.log10(1 + lineDelta)).toFixed(2);
-
-    // 3. Cognitive Load from baseEvaluation
+    const safety = computePatchSafetyMetrics(options);
+    const diffEntropy = computeDiffEntropy(input.beforeContent, input.afterContent);
     const cognitiveLoad = Math.max(0.1, baseEvaluation.complexityCost);
 
-    // 4. Refactoring ROI: (deltaQ * Centrality) / (diffEntropy + cognitiveLoad + 0.1)
     const effectiveDeltaQ = Math.max(0, baseEvaluation.changeScore);
-    const roi = +((effectiveDeltaQ * centrality) / (diffEntropy + cognitiveLoad + 0.1)).toFixed(2);
+    const roi = +(
+        (effectiveDeltaQ * centrality) /
+        (diffEntropy + cognitiveLoad + 0.1)
+    ).toFixed(ROI_DECIMAL_PLACES);
 
-    // 5. Decision Arbitration
-    let decision: AgentDecisionVerdict = 'HUMAN_REVIEW';
-    let recommendation = '';
-
-    if (
-        baseEvaluation.isGamingRejected ||
-        apiDrift >= 0.8 ||
-        safetyIndex < 0.7 ||
-        baseEvaluation.verdict === 'degraded' ||
-        roi < 0.5
-    ) {
-        decision = 'AUTO_REJECT';
-        recommendation =
-            `Patch rejected by safety arbiter. SafetyIndex=${safetyIndex}, ROI=${roi}, ` +
-            `Gaming=${baseEvaluation.isGamingRejected}, ApiDrift=${apiDrift > 0}. Automated rollback executed.`;
-    } else if (
-        safetyIndex >= 0.9 &&
-        roi >= 2.0 &&
-        baseEvaluation.verdict === 'approved' &&
-        baseEvaluation.regressionPenalty === 0
-    ) {
-        decision = 'AUTO_APPLY';
-        recommendation =
-            `Patch verified safe with high ROI (${roi}) and robust SafetyIndex (${safetyIndex}). ` +
-            `Approved for automated non-blocking application.`;
-    } else {
-        decision = 'HUMAN_REVIEW';
-        recommendation =
-            `Patch meets basic stability but requires human verification. ` +
-            `SafetyIndex=${safetyIndex}, ROI=${roi}.`;
-    }
+    const { decision, recommendation } = resolvePatchDecision(baseEvaluation, safety, roi);
 
     return {
         decision,
-        safety: {
-            apiDriftScore: apiDrift,
-            uncoveredRiskScore: uncoveredRisk,
-            semanticBleedScore: semanticBleed,
-            safetyIndex,
-        },
+        safety,
         roi: {
             deltaQualityScore: baseEvaluation.changeScore,
             centralityMultiplier: centrality,
@@ -518,6 +691,9 @@ export function arbitrateAgentPatch(
  */
 export class ChangeQualityArbiter {
     public evaluateChange(input: ChangeEvaluationInput): ChangeEvaluationResult {
+        if (!input || !input.filePath) {
+            throw new Error('ChangeEvaluationInput requires a non-empty filePath');
+        }
         return evaluateChangeQuality(input);
     }
 
@@ -525,6 +701,9 @@ export class ChangeQualityArbiter {
         input: ChangeEvaluationInput,
         options?: AgentPatchArbitrationOptions,
     ): AgentPatchArbitrationResult {
+        if (!input || !input.filePath) {
+            throw new Error('ChangeEvaluationInput requires a non-empty filePath');
+        }
         return arbitrateAgentPatch(input, options);
     }
 }
