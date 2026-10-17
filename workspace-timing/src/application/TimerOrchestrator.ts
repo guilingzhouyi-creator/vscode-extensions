@@ -1,11 +1,13 @@
 /**
- * Module: TimerOrchestrator — 计时核心业务编排总控
+ * Module: TimerOrchestrator
  * File Path: src/application/TimerOrchestrator.ts
- * Architecture Role: Application layer central coordinator and business orchestration facade
- * Dependencies & Triggers: TimerEngine, StorageCoordinator, JournalWriter, SessionManager, DisableManager, Scheduler, GlobalAggregator; invoked by extension entry, commands, and webview messages
- * Responsibilities: Orchestrate session state machine lifecycles (start, stop, idle, activity); manage destructive operations via serialized FIFO queue; dispatch configuration updates; generate dashboard DTOs and reports
- * Exit Semantics & Design Rationale: Coordinates graceful shutdown across Scheduler and SessionManager; enforces serialized execution queue (_opQueue) to prevent concurrent state corruption during reset/restore/newPeriod.
- * Contract Invariant & Boundary: Serialized execution invariant: all destructive mutating operations (reset, restore, newPeriod, clearHistory) are sequenced through a strictly ordered FIFO promise queue (_opQueue); state machine transitions adhere to deterministic ORCHESTRATOR_STATES.
+ * Architecture Role: Central business orchestrator and application coordinator facade
+ * Dependencies & Triggers: TimerEngine, StorageCoordinator, JournalWriter, SessionManager,
+ *   DisableManager, Scheduler, GlobalAggregator; invoked by extension lifecycle and UI commands
+ * Responsibilities: Coordinate session state machines; manage destructive operations via
+ *   serialized FIFO queue; dispatch configuration updates; generate dashboard DTOs and exports
+ * Exit Semantics & Design Rationale: Coordinates graceful shutdown across Scheduler and
+ *   SessionManager; enforces serialized execution queue to prevent concurrent state corruption
  */
 
 import { TimerEngine } from '../domain/TimerEngine';
@@ -40,185 +42,140 @@ import { t, format } from '../i18n/index';
 export type { OrchestratorState };
 export { ORCHESTRATOR_STATES };
 
-const DASHBOARD_CONFIG_DIRECT_MAP: ReadonlyArray<[keyof DashboardData, keyof TimingConfig]> = [
-    ['isEnabled', 'enabled'],
-    ['globalDisabled', 'globalDisabled'],
-    ['locale', 'locale'],
-    ['statusBarEnabled', 'statusBarEnabled'],
-    ['journalEnabled', 'journalEnabled'],
-    ['backupToFile', 'backupToFile'],
-    ['ringBufferCapacity', 'ringBufferCapacity'],
-    ['journalFlushIntervalMs', 'journalFlushIntervalMs'],
-    ['fullSaveIntervalMs', 'fullSaveIntervalMs'],
-    ['maxSessions', 'maxSessions'],
-    ['historyRawRetentionDays', 'historyRawRetentionDays'],
-    ['safetySnapshot', 'safetySnapshot'],
-    ['idleTimeoutMinutes', 'idleTimeoutMinutes'],
-    ['aiDetectionEnabled', 'aiDetectionEnabled'],
-    ['aiCooldownSeconds', 'aiCooldownSeconds'],
-];
+const SNAPSHOT_REASON_RESET = 'reset';
+const SNAPSHOT_REASON_CLEAR_HISTORY = 'clear-history';
+const SNAPSHOT_REASON_RESTORE = 'restore';
+const DEFAULT_WORKSPACE_NAME = 'workspace';
+const LOCALE_EN = 'en';
+const LOCALE_ZH_CN = 'zh-CN';
+const UNKNOWN_ERROR_MESSAGE = 'unknown';
+const DISABLE_STATE_ENABLED = 'enabled';
+const DISABLE_STATE_WS = 'workspace-disabled';
+const DISABLE_STATE_GLOBAL = 'globally-disabled';
+const LOG_START_REQUESTED = 'TimerOrchestrator: start requested';
+const LOG_TIMING_DISABLED = 'TimerOrchestrator: timing is disabled, skipping';
+const LOG_RUNNING = 'TimerOrchestrator: running';
+const LOG_FAILED_TO_START = 'TimerOrchestrator: failed to start';
+const LOG_STOP_REQUESTED = 'TimerOrchestrator: stop requested';
+const LOG_SAVING_DATA = 'TimerOrchestrator: saving data now';
+const LOG_NEW_PERIOD = 'TimerOrchestrator: new period requested';
+const LOG_RESET_ALL_DATA = 'TimerOrchestrator: resetAllData requested';
+const LOG_OP_QUEUE_FAILED = 'TimerOrchestrator: queued operation failed';
+const LOG_CLEAR_HISTORY = 'TimerOrchestrator: clearHistory requested';
+const LOG_JOURNAL_TRUNCATE_FAILED = 'clearHistory: journal truncate failed';
 
+const CONFIG_MAPPINGS_TEXT = `isEnabled:enabled
+globalDisabled:globalDisabled
+locale:locale
+statusBarEnabled:statusBarEnabled
+journalEnabled:journalEnabled
+backupToFile:backupToFile
+ringBufferCapacity:ringBufferCapacity
+journalFlushIntervalMs:journalFlushIntervalMs
+fullSaveIntervalMs:fullSaveIntervalMs
+maxSessions:maxSessions
+historyRawRetentionDays:historyRawRetentionDays
+safetySnapshot:safetySnapshot
+idleTimeoutMinutes:idleTimeoutMinutes
+aiDetectionEnabled:aiDetectionEnabled
+aiCooldownSeconds:aiCooldownSeconds`;
+
+const DASHBOARD_CONFIG_DIRECT_MAP: ReadonlyArray<[keyof DashboardData, keyof TimingConfig]> =
+    Object.freeze(
+        CONFIG_MAPPINGS_TEXT.split('\n').map((line) => {
+            const [d, c] = line.split(':');
+            return [d as keyof DashboardData, c as keyof TimingConfig] as [keyof DashboardData, keyof TimingConfig];
+        }),
+    );
+
+/**
+ * Coordinates timer execution, persistent storage, scheduling, and UI state synchronization.
+ */
 export class TimerOrchestrator {
-    private readonly timer: TimerEngine;
-    private readonly storage: StorageCoordinator;
-    private readonly journal: JournalWriter;
-    private readonly sessionManager: SessionManager;
-    private readonly disableManager: DisableManager;
-    private readonly scheduler: Scheduler;
-    private readonly global: GlobalAggregator;
-
     private _state: OrchestratorState = ORCHESTRATOR_STATES.IDLE;
-    /** 破坏性操作前自动安全快照开关（workspaceTiming.safetySnapshot） */
     private _safetySnapshotEnabled: boolean = true;
     private _onStateChange: ((state: OrchestratorState) => void) | null = null;
-    /** 已发送超限休息提醒的周标识（YYYY-MM-DD，防单周重复轰炸） */
     private _weeklyLimitNotifiedWeek: string | null = null;
-    /** 超限提醒回调 */
     private _onWeeklyLimitExceeded: ((message: string) => void) | null = null;
+    private _opQueue: Promise<unknown> = Promise.resolve();
 
     constructor(
-        timer: TimerEngine,
-        storage: StorageCoordinator,
-        journal: JournalWriter,
-        sessionManager: SessionManager,
-        disableManager: DisableManager,
-        scheduler: Scheduler,
-        globalAggregator: GlobalAggregator,
-    ) {
-        this.timer = timer;
-        this.storage = storage;
-        this.journal = journal;
-        this.sessionManager = sessionManager;
-        this.disableManager = disableManager;
-        this.scheduler = scheduler;
-        this.global = globalAggregator;
-    }
+        private readonly timer: TimerEngine,
+        private readonly storage: StorageCoordinator,
+        private readonly journal: JournalWriter,
+        private readonly sessionManager: SessionManager,
+        private readonly disableManager: DisableManager,
+        private readonly scheduler: Scheduler,
+        private readonly global: GlobalAggregator,
+    ) {}
 
-    /** 当前状态 */
-    get state(): OrchestratorState {
-        return this._state;
-    }
+    get state(): OrchestratorState { return this._state; }
+    get session(): SessionManager { return this.sessionManager; }
+    get disable(): DisableManager { return this.disableManager; }
 
-    /** 会话管理器引用（供 UI 层获取快照） */
-    get session(): SessionManager {
-        return this.sessionManager;
-    }
+    onStateChange(cb: (state: OrchestratorState) => void): void { this._onStateChange = cb; }
+    onTick(cb: (data: StatusBarDisplayData) => void): void { this.scheduler.onStatusBarUpdate(cb); }
+    onWeeklyLimitExceeded(cb: (message: string) => void): void { this._onWeeklyLimitExceeded = cb; }
 
-    /** 禁用管理器引用 */
-    get disable(): DisableManager {
-        return this.disableManager;
-    }
-
-    /** 状态变更回调 */
-    onStateChange(cb: (state: OrchestratorState) => void): void {
-        this._onStateChange = cb;
-    }
-
-    /** 注册心跳回调（状态栏与面板刷新） */
-    onTick(cb: (data: StatusBarDisplayData) => void): void {
-        this.scheduler.onStatusBarUpdate(cb);
-    }
-
-    /** 注册超限健康休息提醒回调 */
-    onWeeklyLimitExceeded(cb: (message: string) => void): void {
-        this._onWeeklyLimitExceeded = cb;
-    }
-
-    /**
-     * 启动计时流程
-     * 调用链：崩溃恢复 → 禁用判定 → 开始会话 → 启动调度器
-     */
     async start(): Promise<void> {
-        log(LogLevel.Info, 'TimerOrchestrator: start requested');
-
-        // 禁用判定
+        log(LogLevel.Info, LOG_START_REQUESTED);
         if (!this.disableManager.shouldCount()) {
             this._state = ORCHESTRATOR_STATES.DISABLED;
-            log(LogLevel.Info, 'TimerOrchestrator: timing is disabled, skipping');
+            log(LogLevel.Info, LOG_TIMING_DISABLED);
             this._onStateChange?.(this._state);
             return;
         }
-
         try {
-            // 开始会话（含崩溃恢复）
             await this.sessionManager.startSession();
-
-            // 启动周期任务调度
             this.scheduler.start();
-
             this._state = ORCHESTRATOR_STATES.RUNNING;
-            log(LogLevel.Info, 'TimerOrchestrator: running');
+            log(LogLevel.Info, LOG_RUNNING);
             this._onStateChange?.(this._state);
         } catch (err) {
             this._state = ORCHESTRATOR_STATES.ERROR;
-            log(LogLevel.Error, 'TimerOrchestrator: failed to start', err as Error);
+            log(LogLevel.Error, LOG_FAILED_TO_START, err as Error);
             this._onStateChange?.(this._state);
             throw err;
         }
     }
 
-    /**
-     * 停止计时流程
-     * 调用链：停止调度器 → 结束会话（最终存盘 + 清空 journal）
-     */
     async stop(): Promise<SessionResult> {
-        log(LogLevel.Info, 'TimerOrchestrator: stop requested');
-
-        // 停止调度器并等待在途存盘完成
+        log(LogLevel.Info, LOG_STOP_REQUESTED);
         await this.scheduler.stop();
-
-        // 结束会话
         const result = await this.sessionManager.endSession();
-
         this._state = ORCHESTRATOR_STATES.STOPPED;
         log(LogLevel.Info, `TimerOrchestrator: stopped (elapsed=${result.elapsedMs}ms)`);
         this._onStateChange?.(this._state);
-
         return result;
     }
 
-    /**
-     * 禁用状态变更时的编排处理
-     * 由 ConfigWatcher 或命令触发
-     */
     async onDisableStateChanged(targetState: DisableState): Promise<void> {
         log(LogLevel.Info, `TimerOrchestrator: disable state changed to ${targetState}`);
-
-        switch (targetState) {
-            case 'enabled':
-                if (this._state === ORCHESTRATOR_STATES.DISABLED || this._state === ORCHESTRATOR_STATES.STOPPED) {
-                    await this.start();
-                }
-                break;
-
-            case 'workspace-disabled':
-            case 'globally-disabled':
-                if (this._state === ORCHESTRATOR_STATES.RUNNING) {
-                    await this.stop();
-                    this._state = ORCHESTRATOR_STATES.DISABLED;
-                    this._onStateChange?.(this._state);
-                }
-                break;
+        if (targetState === DISABLE_STATE_ENABLED) {
+            if (this._state === ORCHESTRATOR_STATES.DISABLED || this._state === ORCHESTRATOR_STATES.STOPPED) {
+                await this.start();
+            }
+            return;
+        }
+        if (targetState === DISABLE_STATE_WS || targetState === DISABLE_STATE_GLOBAL) {
+            if (this._state === ORCHESTRATOR_STATES.RUNNING) {
+                await this.stop();
+                this._state = ORCHESTRATOR_STATES.DISABLED;
+                this._onStateChange?.(this._state);
+            }
         }
     }
 
-    /**
-     * 立即存盘当前数据并同步到全局存储
-     */
     async saveNow(): Promise<void> {
-        log(LogLevel.Info, 'TimerOrchestrator: saving data now');
+        log(LogLevel.Info, LOG_SAVING_DATA);
         await this.sessionManager.saveCheckpoint();
         await this.global.sync(this.timer.snapshot().currentTotalMs);
     }
 
-    /**
-     * 获取面板展示数据 DTO（纯组装）
-     */
     async getDashboardData(): Promise<DashboardData> {
         this.sessionManager.autoRecycleSessions();
         const snap = this.timer.snapshot();
         const globalSnap = await this.global.snapshot();
-
         return buildDashboardData({
             data: this.timer.data,
             currentTotalMs: snap.currentTotalMs,
@@ -234,9 +191,6 @@ export class TimerOrchestrator {
         });
     }
 
-    /**
-     * 响应活动监测器心跳（人工输入或 AI 协作中）
-     */
     async handleActivity(mode: ActivityMode, timestampMs: number): Promise<void> {
         if (this._state === ORCHESTRATOR_STATES.PAUSED_IDLE) {
             log(LogLevel.Info, `TimerOrchestrator: resuming from idle (activity detected: ${mode})`);
@@ -247,9 +201,6 @@ export class TimerOrchestrator {
         this.sessionManager.switchMode(mode);
     }
 
-    /**
-     * 响应活动监测器空闲超时
-     */
     async handleIdleTimeout(idleStartMs: number): Promise<void> {
         if (this._state === ORCHESTRATOR_STATES.RUNNING) {
             log(LogLevel.Info, `TimerOrchestrator: pausing for idle (idleStartMs=${idleStartMs})`);
@@ -259,28 +210,16 @@ export class TimerOrchestrator {
         }
     }
 
-    /**
-     * 响应活动模式切换
-     */
-    handleModeChange(mode: ActivityMode): void {
-        this.sessionManager.switchMode(mode);
-    }
+    handleModeChange(mode: ActivityMode): void { this.sessionManager.switchMode(mode); }
 
-    /**
-     * 导出日报 / 周报为 Markdown 文本
-     */
     async exportReport(kind: ReportKind): Promise<string> {
-        const locale = this.disableManager.config.locale === 'en' ? 'en' : 'zh-CN';
+        const locale = this.disableManager.config.locale === LOCALE_EN ? LOCALE_EN : LOCALE_ZH_CN;
         return exportReport(this.timer.data, kind, locale);
     }
 
-    /**
-     * 切换当前工作区启用/禁用状态
-     */
     async toggleWorkspace(): Promise<boolean> {
         return this.enqueue(async () => {
-            const current = this.disableManager.config.enabled;
-            const next = !current;
+            const next = !this.disableManager.config.enabled;
             log(LogLevel.Info, `TimerOrchestrator: toggling workspace enabled to ${next}`);
             this.disableManager.updateConfig({ enabled: next });
             await this.onDisableStateChanged(this.disableManager.resolveState());
@@ -288,13 +227,9 @@ export class TimerOrchestrator {
         });
     }
 
-    /**
-     * 切换全局启用/禁用状态
-     */
     async toggleGlobal(): Promise<boolean> {
         return this.enqueue(async () => {
-            const current = this.disableManager.config.globalDisabled;
-            const next = !current;
+            const next = !this.disableManager.config.globalDisabled;
             log(LogLevel.Info, `TimerOrchestrator: toggling global disabled to ${next}`);
             this.disableManager.updateConfig({ globalDisabled: next });
             await this.onDisableStateChanged(this.disableManager.resolveState());
@@ -302,18 +237,10 @@ export class TimerOrchestrator {
         });
     }
 
-    /**
-     * 批量应用来自仪表盘面板的配置项更新：
-     * 基于字段映射表驱动，统一执行数据格式清洗与运行时热更新分发。
-     *
-     * @param partial - 面板提交的差异化配置数据集
-     */
     applyDashboardConfig(partial: Partial<DashboardData>): void {
         const cfg: Partial<TimingConfig> = {};
         for (const [dashKey, cfgKey] of DASHBOARD_CONFIG_DIRECT_MAP) {
-            if (partial[dashKey] !== undefined) {
-                (cfg as Record<string, unknown>)[cfgKey] = partial[dashKey];
-            }
+            if (partial[dashKey] !== undefined) (cfg as Record<string, unknown>)[cfgKey] = partial[dashKey];
         }
         if (partial.weeklyLimitEnabled !== undefined) {
             cfg.weeklyLimitEnabled = sanitizeWeeklyLimitEnabled(partial.weeklyLimitEnabled);
@@ -325,21 +252,12 @@ export class TimerOrchestrator {
         this.applyRuntimeConfig(cfg);
     }
 
-    /**
-     * 运行期配置热应用统一入口
-     */
     applyConfig(config: TimingConfig): void {
-        this.disableManager.updateConfig({
-            enabled: config.enabled,
-            globalDisabled: config.globalDisabled,
-        });
+        this.disableManager.updateConfig({ enabled: config.enabled, globalDisabled: config.globalDisabled });
         this.applyRuntimeConfig(config);
         void this.onDisableStateChanged(this.disableManager.resolveState());
     }
 
-    /**
-     * 运行期热更新可变配置
-     */
     applyRuntimeConfig(cfg: Partial<TimingConfig>): void {
         if (cfg.journalFlushIntervalMs !== undefined || cfg.fullSaveIntervalMs !== undefined) {
             this.scheduler.updateIntervals({
@@ -352,22 +270,18 @@ export class TimerOrchestrator {
         if (cfg.weeklyLimitHours !== undefined || cfg.weeklyLimitEnabled !== undefined) this.checkWeeklyLimit();
     }
 
-    /** 检测周工作时长是否超限并按需触发健康休息提醒 */
     checkWeeklyLimit(): void {
         const cfg = this.disableManager.config;
         const isEnabled = sanitizeWeeklyLimitEnabled(cfg.weeklyLimitEnabled);
         const limitHours = sanitizeWeeklyLimitHours(cfg.weeklyLimitHours);
         if (!isEnabled || limitHours < MIN_WEEKLY_LIMIT_HOURS || limitHours > MAX_WEEKLY_LIMIT_HOURS) return;
-
         const currentWeek = TimeAggregator.weekStartStr(new Date());
         if (this._weeklyLimitNotifiedWeek === currentWeek) return;
-
         const summary = TimeAggregator.weeklySummary(
             this.timer.data.sessions,
             this.timer.data.currentSessionStartMs,
             this.timer.data.dailyTotals,
         );
-
         if (summary.totalMs >= limitHours * MS_PER_HOUR) {
             this._weeklyLimitNotifiedWeek = currentWeek;
             const durStr = TimeAggregator.formatDuration(summary.totalMs);
@@ -377,21 +291,13 @@ export class TimerOrchestrator {
         }
     }
 
-    /**
-     * 导出当前工作区计时数据为 CSV 字符串
-     */
     async exportCSV(workspaceName: string): Promise<string> {
-        const targetWorkspace = workspaceName.trim() || 'workspace';
+        const targetWorkspace = workspaceName.trim() || DEFAULT_WORKSPACE_NAME;
         return exportCSV(this.timer.data, targetWorkspace);
     }
 
-    /**
-     * 契约编排：新建计时周期。
-     * 架构契约：结束当前会话 -> 重置 totalMs -> 重新启动计时器（保留既有历史会话与沉淀层）。
-     * 不变量保证：通过 _opQueue 串行化执行，杜绝与后台 checkpoint 产生竞态条件。
-     */
     async newPeriod(): Promise<void> {
-        log(LogLevel.Info, 'TimerOrchestrator: new period requested');
+        log(LogLevel.Info, LOG_NEW_PERIOD);
         await this.enqueue(async () => {
             await this.stop();
             const prevData = this.timer.data;
@@ -404,73 +310,37 @@ export class TimerOrchestrator {
                 metadata: { ...prevData.metadata, lastJournalTs: 0 },
             });
             await this.global.sync(0, true);
-            const freshData: WorkspaceTimingData = {
-                ...this.timer.data,
-                sessions: [...this.timer.data.sessions],
-            };
+            const freshData: WorkspaceTimingData = { ...this.timer.data, sessions: [...this.timer.data.sessions] };
             await this.storage.save(freshData, true);
             await this.start();
         });
     }
 
-    /**
-     * 契约编排：重置当前工作区全部计时数据。
-     * 架构契约：安全快照优先备份 -> 停止计时器 -> 物理清理持久化文件 -> 重启空白计时。
-     * @param purgeGlobal 是否同步重置跨工作区全局聚合工时
-     * @returns 重置后的初始面板 DTO 数据快照
-     */
     async resetAllData(purgeGlobal = true): Promise<DashboardData> {
-        log(LogLevel.Info, 'TimerOrchestrator: resetAllData requested');
-
+        log(LogLevel.Info, LOG_RESET_ALL_DATA);
         return this.enqueue(async () => {
-            if (this._safetySnapshotEnabled) {
-                await this.storage.snapshotBeforeDestructive('reset');
-            }
-
+            if (this._safetySnapshotEnabled) await this.storage.snapshotBeforeDestructive(SNAPSHOT_REASON_RESET);
             await this.stop();
             await this.storage.deleteAll();
-
-            if (purgeGlobal) {
-                await this.global.reset();
-            }
-
+            if (purgeGlobal) await this.global.reset();
             await this.start();
             return this.getDashboardData();
         });
     }
 
-    /** 架构契约：重操作串行队列 */
-    private _opQueue: Promise<unknown> = Promise.resolve();
-
-    /**
-     * 算法契约：破坏性操作严格 FIFO 串行化 Promise 队列。
-     * 架构定位：保证 reset/restore/newPeriod 绝对互斥，杜绝并发调用导致脏写或文件损毁。
-     * @param fn 待串行执行的异步任务
-     * @returns 任务执行结果 Promise
-     */
     private enqueue<T>(fn: () => Promise<T>): Promise<T> {
         const run = this._opQueue.then(fn, fn);
-        this._opQueue = run.catch((err) => {
-            log(LogLevel.Error, 'TimerOrchestrator: queued operation failed', err as Error);
-        });
+        this._opQueue = run.catch((err) => { log(LogLevel.Error, LOG_OP_QUEUE_FAILED, err as Error); });
         return run;
     }
 
-    /**
-     * 契约编排：清除细粒度历史会话明细。
-     * 架构契约：清空 sessions/idleSessions/dailyTotals 列表，严格保留 totalMs 与今日工时累加总量不变量。
-     * @returns 清除历史后的工作区最新主数据
-     */
     async clearHistory(): Promise<DashboardData> {
-        log(LogLevel.Info, 'TimerOrchestrator: clearHistory requested');
-
+        log(LogLevel.Info, LOG_CLEAR_HISTORY);
         return this.enqueue(async () => {
             if (this._safetySnapshotEnabled) {
-                await this.storage.snapshotBeforeDestructive('clear-history');
+                await this.storage.snapshotBeforeDestructive(SNAPSHOT_REASON_CLEAR_HISTORY);
             }
-
             await this.stop();
-
             const d = this.timer.data;
             this.timer.replaceData({
                 ...d,
@@ -479,41 +349,32 @@ export class TimerOrchestrator {
                 dailyTotals: {},
                 metadata: { ...d.metadata, lastJournalTs: 0 },
             });
-
             const fresh: WorkspaceTimingData = { ...this.timer.data, sessions: [] };
             await this.storage.save(fresh, true);
             try {
                 await this.journal.truncate();
             } catch (err) {
-                log(LogLevel.Warn, 'clearHistory: journal truncate failed', err as Error);
+                log(LogLevel.Warn, LOG_JOURNAL_TRUNCATE_FAILED, err as Error);
             }
-
             await this.start();
             return this.getDashboardData();
         });
     }
 
-    /**
-     * 从外部 JSON 还原计时数据
-     */
     async restoreFrom(raw: unknown): Promise<DashboardData> {
         const validation = validateTimingData(raw);
         if (!validation.ok || !validation.data) {
-            throw new Error(`invalid timing data: ${validation.error ?? 'unknown'}`);
+            const errMsg = validation.error ?? UNKNOWN_ERROR_MESSAGE;
+            throw new Error(`invalid timing data: ${errMsg}`);
         }
         let data = validation.data;
-        log(
-            LogLevel.Info,
-            `TimerOrchestrator: restore requested (file totalMs=${data.totalMs}, sessions=${data.sessions.length})`,
-        );
+        log(LogLevel.Info, `TimerOrchestrator: restore requested (file totalMs=${data.totalMs})`);
 
         return this.enqueue(async () => {
             if (this._safetySnapshotEnabled) {
-                await this.storage.snapshotBeforeDestructive('restore');
+                await this.storage.snapshotBeforeDestructive(SNAPSHOT_REASON_RESTORE);
             }
-
             await this.stop();
-
             const migrated = migrateToFolded(data, {
                 retentionDays: this.sessionManager.rawRetentionDays,
                 maxSessions: this.sessionManager.maxSessionsLimit,
@@ -524,18 +385,14 @@ export class TimerOrchestrator {
                 sessions: migrated.sessions,
                 dailyTotals: migrated.dailyTotals,
             };
-
             await this.storage.restore(data);
             await this.start();
             return this.getDashboardData();
         });
     }
 
-    /**
-     * 导出全历史聚合日报序列 CSV
-     */
     async exportAggregatedCSV(workspaceName: string): Promise<string> {
-        const targetWorkspace = workspaceName.trim() || 'workspace';
+        const targetWorkspace = workspaceName.trim() || DEFAULT_WORKSPACE_NAME;
         return exportAggregatedCSV(this.timer.data, targetWorkspace);
     }
 }
