@@ -101,7 +101,11 @@ get_step_meta() {
         "Gate 7 (长期轨迹账本约束)") echo "PP-07-01|GOV-TRJ-001" ;;
         "Gate 8 (WebGames 全域质量门禁)") echo "PP-08-01|ADV-CFG-001" ;;
         "Gate 9 (待推送分支提交历史风格与禁词审查)") echo "PP-09-01|CMG-STY-001" ;;
-        *) echo "PP-00-00|$(get_step_rule_id "$step_name")" ;;
+        *)
+            local default_rule
+            default_rule=$(get_step_rule_id "$step_name")
+            echo "PP-00-00|$default_rule"
+            ;;
     esac
 }
 

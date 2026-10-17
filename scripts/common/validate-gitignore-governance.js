@@ -182,6 +182,13 @@ function checkAntiOverblocking(repoRoot) {
       cwd: repoRoot,
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
+      env: {
+        ...process.env,
+        GIT_CONFIG_GLOBAL: 'nul',
+        GIT_CONFIG_SYSTEM: 'nul',
+        GIT_CONFIG_NOSYSTEM: '1',
+        XDG_CONFIG_HOME: repoRoot,
+      },
     });
   } catch (err) {
     // Fail-closed: an unevaluated anti-overblocking check must not be reported as passing.
