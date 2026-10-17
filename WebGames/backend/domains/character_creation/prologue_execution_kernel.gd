@@ -444,6 +444,18 @@ static func _build_headless_transcript(
 	ctx: CharacterPrologueContext,
 	transcript_steps: Array[Dictionary]
 ) -> Dictionary:
+	var all_mutations: Array = []
+	for s in transcript_steps:
+		for m in s.get("applied_mutations", []):
+			all_mutations.append(m)
+
+	var last_visited: String = ""
+	if not engine.completed_node_ids.is_empty():
+		last_visited = engine.completed_node_ids[-1]
+
+	var init_gold: int = int(reinc_res.get("initial_gold", profile.personal_resources.get("gold", 50)))
+	var starter_kit_id: String = str(reinc_res.get("starter_kit_id", ctx.assigned_starter_kit_id))
+
 	return {
 		"schema_version": "kalar.mod_sdk.playthrough_transcript.v1",
 		"is_success": true,
@@ -456,9 +468,13 @@ static func _build_headless_transcript(
 			"wallet": profile.personal_resources.duplicate(true),
 			"inventory": profile.inventory.duplicate(true),
 			"equipment": profile.equipment.duplicate(true),
-			"selected_traits": (reinc_res.get("selected_traits", []) as Array).duplicate()
+			"selected_traits": (reinc_res.get("selected_traits", []) as Array).duplicate(),
+			"initial_gold": init_gold,
+			"starter_kit_id": starter_kit_id,
+			"starter_kit_name": str(reinc_res.get("starter_kit_name", starter_kit_id))
 		},
 		"dag_routing": {
+			"target_dag_id": engine.graph.graph_id,
 			"dag_id": engine.graph.graph_id,
 			"origin_id": eff_origin,
 			"race_id": eff_race
@@ -466,9 +482,13 @@ static func _build_headless_transcript(
 		"transcript_steps": transcript_steps,
 		"final_state": {
 			"is_completed": ctx.is_completed,
+			"prologue_completed": ctx.is_completed,
+			"reached_terminal": engine.is_terminated or ctx.is_completed,
+			"terminal_node_id": last_visited,
 			"completed_node_ids": engine.completed_node_ids.duplicate(),
 			"active_node_ids": engine.active_node_ids.duplicate(),
-			"is_terminated": engine.is_terminated
+			"is_terminated": engine.is_terminated,
+			"applied_mutations": all_mutations
 		}
 	}
 

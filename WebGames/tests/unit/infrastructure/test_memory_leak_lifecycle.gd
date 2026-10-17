@@ -174,20 +174,20 @@ static func test_auth_service_expired_token_no_reanimation() -> Dictionary:
 ## TC-MEM-06: AuthService unregister_hook 钩子精确注销验证
 static func test_auth_service_unregister_hook() -> Dictionary:
 	AuthService.clear_hooks()
-	var trigger_count: int = 0
+	var trigger_counter: Array[int] = [0]
 	var hook_cb: Callable = func(_payload):
-		trigger_count += 1
+		trigger_counter[0] += 1
 
 	AuthService.register_hook("post_test", hook_cb)
 	AuthService._dispatch_auth_hooks("post_test", {"value": 1})
-	var count_after_first: int = trigger_count
+	var count_after_first: int = trigger_counter[0]
 
 	# 精确解绑 Hook
 	var unregister_ok: bool = AuthService.unregister_hook("post_test", hook_cb)
 	var unregister_repeat: bool = AuthService.unregister_hook("post_test", hook_cb)
 
 	AuthService._dispatch_auth_hooks("post_test", {"value": 2})
-	var count_after_unreg: int = trigger_count
+	var count_after_unreg: int = trigger_counter[0]
 
 	AuthService.clear_hooks()
 	var passed: bool = (count_after_first == 1) and unregister_ok and (not unregister_repeat) and (count_after_unreg == 1)

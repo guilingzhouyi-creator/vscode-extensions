@@ -26,13 +26,13 @@ func _initialize() -> void:
 	print("  ⚔️  卡拉尔世界引擎 (KALAR WORLD ENGINE) - 全域 %d 套测试套件自动化执行  ⚔️" % test_classes.size())
 	print("==============================================================================\n")
 
-	var total_domains = test_classes.size()
-	var passed_domains := 0
-	var total_assertions := 0
-	var passed_assertions := 0
+	var total_domains: int = test_classes.size()
+	var passed_domains: int = 0
+	var total_assertions: int = 0
+	var passed_assertions: int = 0
 	var failure_reports: Array[Dictionary] = []
 
-	for test_cls in test_classes:
+	for test_cls: Variant in test_classes:
 		if test_cls == null:
 			print("[ FAIL ] === 未知测试套件 === (0/1 PASS)")
 			print("    ❌  测试套件脚本加载失败 (null)")
@@ -69,8 +69,8 @@ func _initialize() -> void:
 		var p_cnt: int = result.get("passed_count", 0)
 
 		if p_cnt == 0 and not res_list.is_empty():
-			for it in res_list:
-				if it.get("passed", false):
+			for it: Variant in res_list:
+				if it is Dictionary and (it as Dictionary).get("passed", false):
 					p_cnt += 1
 
 		total_assertions += t_cnt
@@ -79,23 +79,27 @@ func _initialize() -> void:
 		if all_ok:
 			passed_domains += 1
 			print("[ PASS ] === %s === (%d/%d PASS)" % [domain_name, p_cnt, t_cnt])
-			for item in res_list:
-				print("    ✅  %s" % item.get("test", item.get("name", item.get("title", "未命名测试项"))))
+			for item: Variant in res_list:
+				if item is Dictionary:
+					var d: Dictionary = item as Dictionary
+					print("    ✅  %s" % d.get("test", d.get("name", d.get("title", "未命名测试项"))))
 		else:
 			print("[ FAIL ] === %s === (%d/%d PASS)" % [domain_name, p_cnt, t_cnt])
-			for item in res_list:
-				var t_pass: bool = item.get("passed", false)
-				var t_name: String = item.get("test", item.get("name", item.get("title", "未命名测试项")))
-				if t_pass:
-					print("    ✅  %s" % t_name)
-				else:
-					var detail_val: Variant = item.get("details", item.get("detail", item.get("message", item.get("error", ""))))
-					var detail_msg: String = str(detail_val) if detail_val != null and str(detail_val) != "{}" else ""
-					if detail_msg != "":
-						print("    ❌  %s [FAILED]: %s" % [t_name, detail_msg])
+			for item: Variant in res_list:
+				if item is Dictionary:
+					var d: Dictionary = item as Dictionary
+					var t_pass: bool = d.get("passed", false)
+					var t_name: String = d.get("test", d.get("name", d.get("title", "未命名测试项")))
+					if t_pass:
+						print("    ✅  %s" % t_name)
 					else:
-						print("    ❌  %s [FAILED]" % t_name)
-					failure_reports.append({ "domain": domain_name, "test": t_name })
+						var detail_val: Variant = d.get("details", d.get("detail", d.get("message", d.get("error", ""))))
+						var detail_msg: String = str(detail_val) if detail_val != null and str(detail_val) != "{}" else ""
+						if detail_msg != "":
+							print("    ❌  %s [FAILED]: %s" % [t_name, detail_msg])
+						else:
+							print("    ❌  %s [FAILED]" % t_name)
+						failure_reports.append({ "domain": domain_name, "test": t_name })
 			if res_list.is_empty():
 				print("    ❌  测试套件未返回任何结果项")
 				failure_reports.append({ "domain": domain_name, "test": "未返回任何结果项" })
@@ -120,7 +124,7 @@ func _initialize() -> void:
 		quit(0)
 	else:
 		print("  ⚠️  存在未通过测试项（共 %d 项未通过，失败套件数: %d）：" % [failure_reports.size(), total_domains - passed_domains])
-		for rep in failure_reports:
+		for rep: Dictionary in failure_reports:
 			print("    ❌ [%s] %s" % [rep.get("domain", ""), rep.get("test", "")])
 		print("==============================================================================\n")
 		quit(1)
