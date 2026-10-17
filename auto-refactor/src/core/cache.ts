@@ -3,22 +3,20 @@
  * File Path: src/core/cache.ts
  * Architecture Role: Local persistence adapter that owns the manifest, L1 fingerprint, L2
  *   result, and L3 path-index files plus their in-memory mirrors for warm scans.
- * Dependencies & Triggers: Imports `fs`, `path`, core `Issue`/`FileMetric` types,
+ * Dependencies & Triggers: Imports `path`, core `Issue`/`FileMetric` types,
  *   `TOOL_VERSION`, and cacheKey helpers (`CACHE_FORMAT_VERSION`, `sha256Hex`,
  *   `canonicalJson`, `l2Key`); constructed by the CLI/daemon when cache options are
  *   resolved and used by `Scanner.scanWithCache` and `Scanner.scanWithDiff`.
- * Responsibilities: Initialize the cache directory, probe writability, create/rebuild the
- *   manifest, load L1/L2/L3 with corrupt-line recovery and an L2 size guard, buffer writes,
- *   flush atomically via `.tmp` + rename, clear the store, lookup/write L1 and L2, maintain
- *   the fingerprint-keyed byPath index, namespace shared cache dirs per project, and run
- *   TTL/LRU trimming with `size()`/`dump()` diagnostics.
+ * Responsibilities: Initialize cache directory, probe writability, create/rebuild manifest,
+ *   load L1/L2/L3 with corrupt-line recovery, support Append-Only (WAL) updates and periodic
+ *   compaction to eliminate I/O amplification, buffer writes, flush atomically via `.tmp` + rename,
+ *   clear the store, maintain path index, namespace per project, and run TTL/LRU trimming.
  * Exit Semantics & Design Rationale: The cache is strictly best-effort: unwritable dirs
  *   auto-disable it, bad manifests rebuild empty, corrupt lines are skipped, oversized
  *   result files are not loaded, `flush()` swallows write failures, and `clear()` returns
- *   false instead of throwing; atomic renames ensure a crash can lose only the newest
- *   entries, never corrupt older ones.
+ *   false instead of throwing; atomic renames and append-only WAL ensure a crash can lose only
+ *   the newest entries, never corrupt older ones.
  */
-import * as fs from 'fs';
 import * as path from 'path';
 import type { Issue, FileMetric } from './types';
 import type { Logger } from './logger';
@@ -27,10 +25,15 @@ import { CACHE_FORMAT_VERSION, sha256Hex, canonicalJson, l2Key } from './cache-k
 import {
     TYPEOF_STRING,
     TYPEOF_NUMBER,
+    NEWLINE_CHAR,
     type L2EntryRecord,
+    SyncIoBarrier,
     readTextFileSync,
     readLinesSafe,
     writeFileAtomic,
+    writeFileAtomicAsync,
+    appendLinesSafe,
+    appendLinesSafeAsync,
     probeWritable,
     parseL1Line,
     isValidL2,
@@ -38,6 +41,8 @@ import {
     serializeL1,
     serializeL2,
     serializePaths,
+    serializeDirtyPaths,
+    computePathKey,
     removeCacheDir,
 } from './cache-persistence';
 
@@ -97,6 +102,10 @@ const SEVERITY_STR_ERROR = 'error';
 const RETENTION_HOT_DAYS = 7;
 const REFRESH_TIMESTAMP_INTERVAL_MS = 60_000;
 
+/** Compaction threshold: cumulative appended records before triggering compaction snapshot. */
+const COMPACTION_THRESHOLD_L1_ENTRIES = 1000;
+const COMPACTION_THRESHOLD_L2_ENTRIES = 500;
+
 /**
  * Computes a deterministic truncated SHA-256 hash identifying a project root.
  *
@@ -109,7 +118,7 @@ export function projectHashFor(root: string): string {
 }
 
 /**
- * Best-effort two-level cache for warm scans.
+ * Best-effort two-level cache with WAL Append-Only persistence for warm scans.
  */
 export class CacheStore {
     readonly dir: string;
@@ -129,6 +138,8 @@ export class CacheStore {
     private loaded = false;
     private l2LoadLevel: 'full' | 'hot' | 'metadata' | 'disabled' = CACHE_LOAD_LEVEL_FULL;
     private readonly logger?: Logger;
+    private appendedL1Count = 0;
+    private appendedL2Count = 0;
 
     constructor(dir?: string, root?: string, opts: CacheStoreOptions = {}) {
         const projectRoot = root || process.cwd();
@@ -155,7 +166,7 @@ export class CacheStore {
 
     private initializeCache(): boolean {
         try {
-            fs.mkdirSync(this.dir, { recursive: true });
+            SyncIoBarrier.mkdir(this.dir);
         } catch {
             return false;
         }
@@ -185,19 +196,14 @@ export class CacheStore {
     }
 
     private rebuildCacheManifest(): void {
-        const currentToolVersion = TOOL_VERSION;
         const manifest = {
             formatVersion: CACHE_FORMAT_VERSION,
-            toolVersion: currentToolVersion,
+            toolVersion: TOOL_VERSION,
             createdAt: new Date().toISOString(),
             maxEntries: this.maxEntries,
             maxAgeDays: this.maxAgeDays,
         };
-        writeFileAtomic(this.manifestPath, JSON.stringify(manifest, null, 2) + '\n');
-    }
-
-    private rebuildManifest(): void {
-        this.rebuildCacheManifest();
+        writeFileAtomic(this.manifestPath, JSON.stringify(manifest, null, 2) + NEWLINE_CHAR);
     }
 
     private loadCacheFromDisk(): void {
@@ -227,13 +233,8 @@ export class CacheStore {
     }
 
     private loadResults(): void {
-        let fileSize: number;
-        try {
-            const statInfo = fs.statSync(this.resultsPath);
-            fileSize = statInfo.size;
-        } catch {
-            return;
-        }
+        const fileSize = SyncIoBarrier.statSize(this.resultsPath);
+        if (fileSize < 0) return;
 
         const ratio = fileSize / this.maxL2LoadBytes;
 
@@ -312,13 +313,6 @@ export class CacheStore {
             this.l2.set(entryRecord.k, entryRecord);
             this.indexSecondaryCacheByPath(entryRecord);
         }
-    }
-
-    private parseL2Line(line: string): void {
-        const entryRecord = this.parseL2Record(line, false);
-        if (!entryRecord) return;
-        this.l2.set(entryRecord.k, entryRecord);
-        this.indexSecondaryCacheByPath(entryRecord);
     }
 
     private loadPaths(): void {
@@ -420,7 +414,7 @@ export class CacheStore {
     }
 
     private indexSecondaryCacheByPath(entryRecord: L2Entry): void {
-        const pathKey = this.computePathKey(
+        const pathKey = computePathKey(
             entryRecord.k,
             entryRecord.p,
             entryRecord.fm,
@@ -428,22 +422,6 @@ export class CacheStore {
         );
         const existing = this.l2ByPath.get(pathKey);
         if (!existing || entryRecord.ts >= existing.ts) this.l2ByPath.set(pathKey, entryRecord);
-    }
-
-    private extractFingerprintHash(keyString: string): string {
-        const matchResult = /^v1:([0-9a-f]+):[0-9a-f]+$/.exec(keyString);
-        return matchResult ? matchResult[1] : '';
-    }
-
-    private computePathKey(
-        l2key: string,
-        relPath: string,
-        mtimeMs?: number,
-        size?: number,
-    ): string {
-        const fingerprintMtimeMs = typeof mtimeMs === TYPEOF_NUMBER ? String(mtimeMs) : '*';
-        const fingerprintSizeBytes = typeof size === TYPEOF_NUMBER ? String(size) : '*';
-        return `${this.extractFingerprintHash(l2key)}\u0000${relPath}\u0000${fingerprintMtimeMs}\u0000${fingerprintSizeBytes}`;
     }
 
     lookupSecondaryCacheByPath(
@@ -475,6 +453,32 @@ export class CacheStore {
         return this.lookupSecondaryCacheByPath(fpHashValue, relPath, mtimeMs, size);
     }
 
+    /**
+     * Compacts the cache on disk, performing a complete atomic snapshot rewrite
+     * and resetting the WAL append log counter.
+     */
+    compactCache(): void {
+        if (!this.enabled) return;
+        try {
+            writeFileAtomic(this.fingerprintsPath, serializeL1(this.l1));
+            writeFileAtomic(this.resultsPath, serializeL2(this.l2));
+            writeFileAtomic(this.pathsPath, serializePaths(this.l2ByPath));
+            this.appendedL1Count = 0;
+            this.appendedL2Count = 0;
+            this.dirtyL1.clear();
+            this.dirtyL2.clear();
+        } catch {
+            /* Best-effort */
+        }
+    }
+
+    compact(): void {
+        this.compactCache();
+    }
+
+    /**
+     * Flushes dirty entries to disk using Append-Only WAL or periodic compaction snapshot.
+     */
     flushCacheToDisk(): void {
         if (!this.enabled) return;
         try {
@@ -482,12 +486,31 @@ export class CacheStore {
                 this.executeCleanupIfNeeded();
             }
             if (this.dirtyL1.size > 0) {
-                writeFileAtomic(this.fingerprintsPath, serializeL1(this.l1));
+                if (
+                    this.appendedL1Count >= COMPACTION_THRESHOLD_L1_ENTRIES ||
+                    !SyncIoBarrier.exists(this.fingerprintsPath)
+                ) {
+                    writeFileAtomic(this.fingerprintsPath, serializeL1(this.l1));
+                    this.appendedL1Count = 0;
+                } else {
+                    appendLinesSafe(this.fingerprintsPath, serializeL1(this.dirtyL1));
+                    this.appendedL1Count += this.dirtyL1.size;
+                }
                 this.dirtyL1.clear();
             }
             if (this.dirtyL2.size > 0) {
-                writeFileAtomic(this.resultsPath, serializeL2(this.l2));
-                writeFileAtomic(this.pathsPath, serializePaths(this.l2ByPath));
+                if (
+                    this.appendedL2Count >= COMPACTION_THRESHOLD_L2_ENTRIES ||
+                    !SyncIoBarrier.exists(this.resultsPath)
+                ) {
+                    writeFileAtomic(this.resultsPath, serializeL2(this.l2));
+                    writeFileAtomic(this.pathsPath, serializePaths(this.l2ByPath));
+                    this.appendedL2Count = 0;
+                } else {
+                    appendLinesSafe(this.resultsPath, serializeL2(this.dirtyL2));
+                    appendLinesSafe(this.pathsPath, serializeDirtyPaths(this.dirtyL2.values()));
+                    this.appendedL2Count += this.dirtyL2.size;
+                }
                 this.dirtyL2.clear();
             }
         } catch {
@@ -497,6 +520,55 @@ export class CacheStore {
 
     flush(): void {
         this.flushCacheToDisk();
+    }
+
+    /**
+     * Flushes dirty entries asynchronously using Append-Only WAL or periodic compaction snapshot.
+     */
+    async flushCacheToDiskAsync(): Promise<void> {
+        if (!this.enabled) return;
+        try {
+            if (this.dirtyL1.size > 0 || this.dirtyL2.size > 0) {
+                this.executeCleanupIfNeeded();
+            }
+            if (this.dirtyL1.size > 0) {
+                if (
+                    this.appendedL1Count >= COMPACTION_THRESHOLD_L1_ENTRIES ||
+                    !SyncIoBarrier.exists(this.fingerprintsPath)
+                ) {
+                    await writeFileAtomicAsync(this.fingerprintsPath, serializeL1(this.l1));
+                    this.appendedL1Count = 0;
+                } else {
+                    await appendLinesSafeAsync(this.fingerprintsPath, serializeL1(this.dirtyL1));
+                    this.appendedL1Count += this.dirtyL1.size;
+                }
+                this.dirtyL1.clear();
+            }
+            if (this.dirtyL2.size > 0) {
+                if (
+                    this.appendedL2Count >= COMPACTION_THRESHOLD_L2_ENTRIES ||
+                    !SyncIoBarrier.exists(this.resultsPath)
+                ) {
+                    await writeFileAtomicAsync(this.resultsPath, serializeL2(this.l2));
+                    await writeFileAtomicAsync(this.pathsPath, serializePaths(this.l2ByPath));
+                    this.appendedL2Count = 0;
+                } else {
+                    await appendLinesSafeAsync(this.resultsPath, serializeL2(this.dirtyL2));
+                    await appendLinesSafeAsync(
+                        this.pathsPath,
+                        serializeDirtyPaths(this.dirtyL2.values()),
+                    );
+                    this.appendedL2Count += this.dirtyL2.size;
+                }
+                this.dirtyL2.clear();
+            }
+        } catch {
+            /* Best-effort */
+        }
+    }
+
+    async flushAsync(): Promise<void> {
+        await this.flushCacheToDiskAsync();
     }
 
     executeCleanupIfNeeded(): void {
@@ -514,7 +586,7 @@ export class CacheStore {
 
     private removeSecondaryCacheEntry(entryRecord: L2Entry): void {
         this.l2.delete(entryRecord.k);
-        const pathKey = this.computePathKey(
+        const pathKey = computePathKey(
             entryRecord.k,
             entryRecord.p,
             entryRecord.fm,
@@ -549,6 +621,8 @@ export class CacheStore {
         try {
             if (!removeCacheDir(this.dir)) return false;
             this.resetMemoryMaps();
+            this.appendedL1Count = 0;
+            this.appendedL2Count = 0;
             this.enabled = this.initializeCache();
             if (this.enabled) this.rebuildCacheManifest();
             return this.enabled;
@@ -565,8 +639,20 @@ export class CacheStore {
         this.dirtyL2.clear();
     }
 
-    getCacheMetrics(): { l1: number; l2: number; l2LoadLevel: string } {
-        return { l1: this.l1.size, l2: this.l2.size, l2LoadLevel: this.l2LoadLevel };
+    getCacheMetrics(): {
+        l1: number;
+        l2: number;
+        l2LoadLevel: string;
+        appendedL1: number;
+        appendedL2: number;
+    } {
+        return {
+            l1: this.l1.size,
+            l2: this.l2.size,
+            l2LoadLevel: this.l2LoadLevel,
+            appendedL1: this.appendedL1Count,
+            appendedL2: this.appendedL2Count,
+        };
     }
 
     size(): { l1: number; l2: number; l2LoadLevel: string } {

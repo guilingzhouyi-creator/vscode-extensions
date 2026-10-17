@@ -17,9 +17,7 @@
 import * as childProcess from 'child_process';
 import * as path from 'path';
 
-/**
- * Structured record representing a single git commit modifying a file.
- */
+/** Structured record representing a single git commit modifying a file. */
 export interface GitCommitRecord {
     hash: string;
     author: string;
@@ -28,9 +26,7 @@ export interface GitCommitRecord {
     isBugFix: boolean;
 }
 
-/**
- * Aggregated evolution history profile for a specific file.
- */
+/** Aggregated evolution history profile for a specific file. */
 export interface GitFileHistoryProfile {
     filePath: string;
     isGitAvailable: boolean;
@@ -43,17 +39,56 @@ export interface GitFileHistoryProfile {
     recentCommits: GitCommitRecord[];
 }
 
+/** Parameter context for indexing profile aliases in inverted maps. */
+interface ProfileAliasContext {
+    readonly profilesMap: Map<string, GitFileHistoryProfile>;
+    readonly profile: GitFileHistoryProfile;
+    readonly absPath: string;
+    readonly relCwd: string;
+    readonly relTop: string;
+}
+
 /** Regex pattern matching commit subjects indicating bug repairs or hotfixes */
 export const BUG_FIX_COMMIT_PATTERN =
     /\b(?:fix|fixes|fixed|bug|bugs|patch|hotfix|resolve|resolves|resolved|defect|issue)\b/i;
+
+const CMD_GIT = 'git';
+const ENCODING_UTF8 = 'utf8';
+const STDIO_IGNORE = 'ignore';
+const STDIO_PIPE = 'pipe';
+const FORWARD_SLASH = '/';
+const ASCII_RECORD_SEP = '\x1e';
+const ASCII_FIELD_SEP = '\x1f';
+const NEWLINE_SPLIT_RE = /\r?\n/;
+const BACKSLASH_GLOBAL_RE = /\\/g;
+
+const STR_TRUE = 'true';
+const MIN_HEADER_FIELD_COUNT = 4;
+const MILLIS_PER_SECOND = 1000;
+const DEFAULT_MAX_COMMITS = 100;
+const TIMEOUT_REPO_PROBE_MS = 2000;
+const TIMEOUT_BATCH_LOG_MS = 10000;
+const TIMEOUT_SINGLE_LOG_MS = 3000;
+const MAX_BUFFER_BYTES = 33554432;
+
+const ARG_REV_PARSE = 'rev-parse';
+const ARG_INSIDE_WORK_TREE = '--is-inside-work-tree';
+const ARG_SHOW_TOPLEVEL = '--show-toplevel';
+const ARG_LOG = 'log';
+const ARG_NAME_ONLY = '--name-only';
+const ARG_DOUBLE_DASH = '--';
+const FORMAT_BATCH_STR = '%x1e%H%x1f%an%x1f%ct%x1f%s';
+const FORMAT_SINGLE_STR = '%H%x1f%an%x1f%ct%x1f%s%x1e';
+
+const DEFAULT_SPAWN_STDIO: childProcess.StdioOptions = [STDIO_IGNORE, STDIO_PIPE, STDIO_IGNORE];
 
 function parseCommitChunk(
     trimmed: string,
 ): { record: GitCommitRecord; fileLines: string[] } | null {
     const newlineIdx = trimmed.indexOf('\n');
     const header = newlineIdx === -1 ? trimmed : trimmed.slice(0, newlineIdx).trim();
-    const fields = header.split('\x1f');
-    if (fields.length < 4) return null;
+    const fields = header.split(ASCII_FIELD_SEP);
+    if (fields.length < MIN_HEADER_FIELD_COUNT) return null;
 
     const hash = fields[0].trim();
     const author = fields[1].trim();
@@ -64,12 +99,13 @@ function parseCommitChunk(
     const record: GitCommitRecord = {
         hash,
         author,
-        timestamp: timestampSeconds * 1000,
+        timestamp: timestampSeconds * MILLIS_PER_SECOND,
         subject,
         isBugFix: BUG_FIX_COMMIT_PATTERN.test(subject),
     };
 
-    const fileLines = newlineIdx !== -1 ? trimmed.slice(newlineIdx + 1).split(/\r?\n/) : [];
+    const fileLines =
+        newlineIdx !== -1 ? trimmed.slice(newlineIdx + 1).split(NEWLINE_SPLIT_RE) : [];
     return { record, fileLines };
 }
 
@@ -92,25 +128,19 @@ function recordCommitFiles(
     fileLines: string[],
 ): void {
     for (const rawFile of fileLines) {
-        const normFile = rawFile.trim().replace(/\\/g, '/');
+        const normFile = rawFile.trim().replace(BACKSLASH_GLOBAL_RE, FORWARD_SLASH);
         if (!normFile) continue;
         appendCommitRecord(commitsByFile, normFile, record);
     }
 }
 
-function indexProfileAliases(
-    profilesMap: Map<string, GitFileHistoryProfile>,
-    profile: GitFileHistoryProfile,
-    absPath: string,
-    relCwd: string,
-    relTop: string,
-): void {
-    profilesMap.set(absPath, profile);
-    profilesMap.set(absPath.toLowerCase(), profile);
-    profilesMap.set(relCwd, profile);
-    profilesMap.set(relCwd.toLowerCase(), profile);
-    profilesMap.set(relTop, profile);
-    profilesMap.set(relTop.toLowerCase(), profile);
+function indexProfileAliases(ctx: ProfileAliasContext): void {
+    ctx.profilesMap.set(ctx.absPath, ctx.profile);
+    ctx.profilesMap.set(ctx.absPath.toLowerCase(), ctx.profile);
+    ctx.profilesMap.set(ctx.relCwd, ctx.profile);
+    ctx.profilesMap.set(ctx.relCwd.toLowerCase(), ctx.profile);
+    ctx.profilesMap.set(ctx.relTop, ctx.profile);
+    ctx.profilesMap.set(ctx.relTop.toLowerCase(), ctx.profile);
 }
 
 /**
@@ -119,66 +149,52 @@ function indexProfileAliases(
 export class GitHistoryMiner {
     private readonly repoRoot?: string;
     private readonly maxCommits: number;
+    private batchCache: Map<string, GitFileHistoryProfile> | null = null;
+    private batchCacheCwd: string | null = null;
+    private batchGitAvailable: boolean = false;
 
     constructor(options?: { repoRoot?: string; maxCommits?: number }) {
         this.repoRoot = options?.repoRoot;
-        this.maxCommits = options?.maxCommits ?? 100;
+        this.maxCommits = options?.maxCommits ?? DEFAULT_MAX_COMMITS;
     }
 
-    /**
-     * Check if git executable is reachable and current directory is inside a git working tree.
-     */
+    /** Check if git executable is reachable and current directory is inside a git working tree. */
     public isGitRepository(targetDir?: string): boolean {
         const cwd = targetDir || this.repoRoot || process.cwd();
         try {
-            const res = childProcess.spawnSync('git', ['rev-parse', '--is-inside-work-tree'], {
+            const res = childProcess.spawnSync(CMD_GIT, [ARG_REV_PARSE, ARG_INSIDE_WORK_TREE], {
                 cwd,
-                encoding: 'utf8',
-                timeout: 2000,
-                stdio: ['ignore', 'pipe', 'ignore'],
+                encoding: ENCODING_UTF8,
+                timeout: TIMEOUT_REPO_PROBE_MS,
+                stdio: DEFAULT_SPAWN_STDIO,
             });
-            return res.status === 0 && res.stdout.trim() === 'true';
+            return res.status === 0 && res.stdout.trim() === STR_TRUE;
         } catch {
             return false;
         }
     }
 
-    private batchCache: Map<string, GitFileHistoryProfile> | null = null;
-    private batchCacheCwd: string | null = null;
-    private batchGitAvailable: boolean = false;
-
-    /**
-     * Check if batch history cache is currently loaded.
-     *
-     * @returns Boolean indicating whether batch cache is populated.
-     */
+    /** Check if batch history cache is currently loaded. */
     public hasBatchCache(): boolean {
         return this.batchCache !== null;
     }
 
-    /**
-     * Clear the in-memory batch history cache.
-     */
+    /** Clear the in-memory batch history cache. */
     public clearCache(): void {
         this.batchCache = null;
         this.batchCacheCwd = null;
         this.batchGitAvailable = false;
     }
 
-    /**
-     * Get the Git repository top level directory.
-     *
-     * @param targetDir - Optional root directory.
-     * @returns Git root path or null if not in a git repository.
-     */
+    /** Get the Git repository top level directory. */
     public getGitTopLevel(targetDir?: string): string | null {
         const cwd = targetDir || this.repoRoot || process.cwd();
         try {
-            const res = childProcess.spawnSync('git', ['rev-parse', '--show-toplevel'], {
+            const res = childProcess.spawnSync(CMD_GIT, [ARG_REV_PARSE, ARG_SHOW_TOPLEVEL], {
                 cwd,
-                encoding: 'utf8',
-                timeout: 2000,
-                stdio: ['ignore', 'pipe', 'ignore'],
+                encoding: ENCODING_UTF8,
+                timeout: TIMEOUT_REPO_PROBE_MS,
+                stdio: DEFAULT_SPAWN_STDIO,
             });
             return res.status === 0 && res.stdout ? res.stdout.trim() : null;
         } catch {
@@ -186,14 +202,7 @@ export class GitHistoryMiner {
         }
     }
 
-    /**
-     * Mine repository history in batch using a single git log execution.
-     * Builds an in-memory inverted index of file paths to commit records.
-     *
-     * @param targetDir - Optional root directory.
-     * @param maxCommits - Optional maximum number of commits to mine.
-     * @returns Map of relative file paths to aggregated GitFileHistoryProfile.
-     */
+    /** Mine repository history in batch using a single git log execution. */
     public mineRepositoryHistoryBatch(
         targetDir?: string,
         maxCommits?: number,
@@ -216,16 +225,20 @@ export class GitHistoryMiner {
 
         const commitLimit = maxCommits ?? this.maxCommits;
         try {
-            const formatStr = '%x1e%H%x1f%an%x1f%ct%x1f%s';
             const res = childProcess.spawnSync(
-                'git',
-                ['log', `--max-count=${commitLimit}`, `--format=${formatStr}`, '--name-only'],
+                CMD_GIT,
+                [
+                    ARG_LOG,
+                    `--max-count=${commitLimit}`,
+                    `--format=${FORMAT_BATCH_STR}`,
+                    ARG_NAME_ONLY,
+                ],
                 {
                     cwd,
-                    encoding: 'utf8',
-                    timeout: 10000,
-                    maxBuffer: 32 * 1024 * 1024,
-                    stdio: ['ignore', 'pipe', 'ignore'],
+                    encoding: ENCODING_UTF8,
+                    timeout: TIMEOUT_BATCH_LOG_MS,
+                    maxBuffer: MAX_BUFFER_BYTES,
+                    stdio: DEFAULT_SPAWN_STDIO,
                 },
             );
 
@@ -241,13 +254,7 @@ export class GitHistoryMiner {
         return profilesMap;
     }
 
-    /**
-     * Preload repository history in batch into memory.
-     *
-     * @param targetDir - Optional root directory.
-     * @param maxCommits - Optional maximum number of commits.
-     * @returns Map of indexed file profiles.
-     */
+    /** Preload repository history in batch into memory. */
     public preloadRepository(
         targetDir?: string,
         maxCommits?: number,
@@ -255,14 +262,6 @@ export class GitHistoryMiner {
         return this.mineRepositoryHistoryBatch(targetDir, maxCommits);
     }
 
-    /**
-     * Parse batch git log output and populate profiles map.
-     *
-     * @param rawOutput - Raw git log output with name-only diffs.
-     * @param topLevel - Git top-level root path.
-     * @param cwd - Current execution working directory.
-     * @param profilesMap - Destination map for file profiles.
-     */
     private populateBatchProfiles(
         rawOutput: string,
         topLevel: string,
@@ -270,7 +269,7 @@ export class GitHistoryMiner {
         profilesMap: Map<string, GitFileHistoryProfile>,
     ): void {
         const commitsByFile = new Map<string, GitCommitRecord[]>();
-        const chunks = rawOutput.split('\x1e');
+        const chunks = rawOutput.split(ASCII_RECORD_SEP);
 
         for (const chunk of chunks) {
             const trimmed = chunk.trim();
@@ -281,25 +280,22 @@ export class GitHistoryMiner {
         }
 
         for (const [relTop, commits] of commitsByFile.entries()) {
-            const absPath = path.resolve(topLevel, relTop).replace(/\\/g, '/');
-            const relCwd = path.relative(cwd, absPath).replace(/\\/g, '/');
+            const absPath = path
+                .resolve(topLevel, relTop)
+                .replace(BACKSLASH_GLOBAL_RE, FORWARD_SLASH);
+            const relCwd = path.relative(cwd, absPath).replace(BACKSLASH_GLOBAL_RE, FORWARD_SLASH);
             const profile = this.aggregateCommitRecords(absPath, commits);
             profile.isGitAvailable = true;
-            indexProfileAliases(profilesMap, profile, absPath, relCwd, relTop);
+            indexProfileAliases({ profilesMap, profile, absPath, relCwd, relTop });
         }
     }
 
-    /**
-     * Safely extract the file history profile using `git log`.
-     *
-     * @param targetFilePath - Absolute or relative file path.
-     * @param targetDir - Optional root directory for git execution.
-     * @returns Aggregated GitFileHistoryProfile with seamless fallback.
-     */
+    /** Safely extract the file history profile using `git log`. */
     public mineFileHistory(targetFilePath: string, targetDir?: string): GitFileHistoryProfile {
         const cwd = targetDir || this.repoRoot || process.cwd();
+
         if (this.batchCache) {
-            const normPath = targetFilePath.replace(/\\/g, '/');
+            const normPath = targetFilePath.replace(BACKSLASH_GLOBAL_RE, FORWARD_SLASH);
             const cached =
                 this.batchCache.get(normPath) || this.batchCache.get(normPath.toLowerCase());
             if (cached) {
@@ -335,26 +331,24 @@ export class GitHistoryMiner {
         }
 
         try {
-            // Format: hash%x1fauthor%x1f%ct%x1fsymbolic subject%x1e
-            const formatStr = '%H%x1f%an%x1f%ct%x1f%s%x1e';
             const relativePath = path.isAbsolute(targetFilePath)
                 ? path.relative(cwd, targetFilePath)
                 : targetFilePath;
 
             const res = childProcess.spawnSync(
-                'git',
+                CMD_GIT,
                 [
-                    'log',
+                    ARG_LOG,
                     `--max-count=${this.maxCommits}`,
-                    `--format=${formatStr}`,
-                    '--',
+                    `--format=${FORMAT_SINGLE_STR}`,
+                    ARG_DOUBLE_DASH,
                     relativePath,
                 ],
                 {
                     cwd,
-                    encoding: 'utf8',
-                    timeout: 3000,
-                    stdio: ['ignore', 'pipe', 'ignore'],
+                    encoding: ENCODING_UTF8,
+                    timeout: TIMEOUT_SINGLE_LOG_MS,
+                    stdio: DEFAULT_SPAWN_STDIO,
                 },
             );
 
@@ -371,19 +365,17 @@ export class GitHistoryMiner {
         }
     }
 
-    /**
-     * Parse raw git log string delimited by ASCII unit and record separators.
-     */
+    /** Parse raw git log string delimited by ASCII unit and record separators. */
     public parseGitLogOutput(rawOutput: string): GitCommitRecord[] {
         const records: GitCommitRecord[] = [];
-        const rawEntries = rawOutput.split('\x1e');
+        const rawEntries = rawOutput.split(ASCII_RECORD_SEP);
 
         for (const entry of rawEntries) {
             const trimmed = entry.trim();
             if (!trimmed) continue;
 
-            const fields = trimmed.split('\x1f');
-            if (fields.length < 4) continue;
+            const fields = trimmed.split(ASCII_FIELD_SEP);
+            if (fields.length < MIN_HEADER_FIELD_COUNT) continue;
 
             const hash = fields[0].trim();
             const author = fields[1].trim();
@@ -395,7 +387,7 @@ export class GitHistoryMiner {
             records.push({
                 hash,
                 author,
-                timestamp: timestampSeconds * 1000,
+                timestamp: timestampSeconds * MILLIS_PER_SECOND,
                 subject,
                 isBugFix: BUG_FIX_COMMIT_PATTERN.test(subject),
             });
@@ -404,9 +396,7 @@ export class GitHistoryMiner {
         return records;
     }
 
-    /**
-     * Aggregate parsed commit records into structured file history.
-     */
+    /** Aggregate parsed commit records into structured file history. */
     public aggregateCommitRecords(
         filePath: string,
         commits: GitCommitRecord[],

@@ -58,166 +58,218 @@ import {
     type ScanWithDiffOptions,
 } from './diff-hints';
 
+interface PersistentPoolContext {
+    readonly scanner: ScannerContext;
+    readonly missFiles: string[];
+    readonly absRoot: string;
+    readonly cfg: ScanConfig;
+    readonly poolFp: string;
+    readonly opts: ScanWithDiffOptions;
+    readonly preloaded: Map<string, Buffer>;
+    readonly workerDescs: WorkerAnalyzerDesc[];
+    readonly effWorkers: number;
+}
+
+interface TransientPoolContext {
+    readonly scanner: ScannerContext;
+    readonly missFiles: string[];
+    readonly absRoot: string;
+    readonly cfg: ScanConfig;
+    readonly preloaded: Map<string, Buffer>;
+    readonly workerDescs: WorkerAnalyzerDesc[];
+    readonly effWorkers: number;
+}
+
+interface RecordAnalyzedContext {
+    readonly toAnalyze: DiffRoutingState['toAnalyze'];
+    readonly results: { issues: Issue[]; metric: FileMetric | null }[];
+    readonly perFile: ({ issues: Issue[]; metric: FileMetric | null } | null)[];
+    readonly sessionBucket: Map<string, { issues: Issue[]; metric: FileMetric | null }>;
+    readonly l2Enabled: boolean;
+    readonly cache: CacheStore;
+    readonly fpByRel: Map<string, Fingerprint>;
+}
+
+interface DiffMissBatchesContext {
+    readonly scanner: ScannerContext;
+    readonly toAnalyze: DiffRoutingState['toAnalyze'];
+    readonly files: string[];
+    readonly absRoot: string;
+    readonly cfg: ScanConfig;
+    readonly poolFp: string;
+    readonly l2Enabled: boolean;
+    readonly opts: ScanWithDiffOptions;
+    readonly sessionBucket: Map<string, { issues: Issue[]; metric: FileMetric | null }>;
+    readonly perFile: ({ issues: Issue[]; metric: FileMetric | null } | null)[];
+    readonly fpByRel: Map<string, Fingerprint>;
+    readonly cache: CacheStore;
+}
+
+interface DiffIncrementalFilesContext {
+    readonly scanner: ScannerContext;
+    readonly toIncremental: DiffRoutingState['toIncremental'];
+    readonly incBucket: Map<string, IncrementalFileState>;
+    readonly l2Enabled: boolean;
+    readonly sessionBucket: Map<string, { issues: Issue[]; metric: FileMetric | null }>;
+    readonly perFile: ({ issues: Issue[]; metric: FileMetric | null } | null)[];
+    readonly fpByRel: Map<string, Fingerprint>;
+    readonly cache: CacheStore;
+}
+
+interface CommitRoutingContext {
+    readonly routingState: DiffRoutingState;
+    readonly cache: CacheStore;
+    readonly incBucket: Map<string, IncrementalFileState>;
+    readonly session: ReturnType<typeof createWarmSession>;
+    readonly scanner: ScannerContext;
+}
+
+interface CreateDiffStatsContext {
+    readonly routingState: DiffRoutingState;
+    readonly totalFiles: number;
+    readonly totalAnalyzed: number;
+    readonly missStats: { poolWarm: boolean };
+    readonly incStats: { incrementalFiles: number; incrementalHit: number };
+    readonly diffIgnored: number;
+}
+
 async function runWithPersistentPool(
-    scanner: ScannerContext,
-    missFiles: string[],
-    absRoot: string,
-    cfg: ScanConfig,
-    poolFp: string,
-    opts: ScanWithDiffOptions,
-    preloaded: Map<string, Buffer>,
-    workerDescs: WorkerAnalyzerDesc[],
-    effWorkers: number,
+    ctx: PersistentPoolContext,
 ): Promise<{ results: { issues: Issue[]; metric: FileMetric | null }[]; poolWarm: boolean }> {
-    const entry = opts.pool!.getOrCreate(poolFp, cfg, workerDescs, effWorkers);
+    const entry = ctx.opts.pool!.getOrCreate(ctx.poolFp, ctx.cfg, ctx.workerDescs, ctx.effWorkers);
     const poolWarm = entry.warm;
     let results: { issues: Issue[]; metric: FileMetric | null }[];
     try {
         results = await dispatchBatches({
             workers: entry.workers,
             workerIdx: entry.workerIdx,
-            files: missFiles,
-            absRoot,
-            config: cfg,
-            descs: workerDescs,
+            files: ctx.missFiles,
+            absRoot: ctx.absRoot,
+            config: ctx.cfg,
+            descs: ctx.workerDescs,
             numWorkers: entry.n,
-            logger: scanner.logger,
-            runAnalyzersFn: (rel, content) => scanner.runAnalyzers(rel, content),
-            hybridK: entry.warm ? 0 : computeHybridK(cfg, missFiles.length, entry.n),
+            logger: ctx.scanner.logger,
+            runAnalyzersFn: (rel, content) => ctx.scanner.runAnalyzers(rel, content),
+            hybridK: entry.warm ? 0 : computeHybridK(ctx.cfg, ctx.missFiles.length, entry.n),
             keepAlive: true,
-            fp: poolFp,
-            preloaded,
+            fp: ctx.poolFp,
+            preloaded: ctx.preloaded,
         });
         entry.warm = true;
         entry.lastUsed = Date.now();
-        opts.pool!.touch(poolFp);
+        ctx.opts.pool!.touch(ctx.poolFp);
     } catch (e) {
-        scanner.logger.warn(
+        ctx.scanner.logger.warn(
             `persistent worker pool failed (${String(e)}); falling back to in-process`,
         );
-        opts.pool!.destroy(poolFp);
-        results = await scanner.runInProcess(missFiles, absRoot, preloaded);
+        ctx.opts.pool!.destroy(ctx.poolFp);
+        results = await ctx.scanner.runInProcess(ctx.missFiles, ctx.absRoot, ctx.preloaded);
     }
-    opts.pool!.rssGuard();
+    ctx.opts.pool!.rssGuard();
     return { results, poolWarm };
 }
 
 async function runWithTransientPool(
-    scanner: ScannerContext,
-    missFiles: string[],
-    absRoot: string,
-    cfg: ScanConfig,
-    preloaded: Map<string, Buffer>,
-    workerDescs: WorkerAnalyzerDesc[],
-    effWorkers: number,
+    ctx: TransientPoolContext,
 ): Promise<{ results: { issues: Issue[]; metric: FileMetric | null }[]; poolWarm: boolean }> {
     let results: { issues: Issue[]; metric: FileMetric | null }[];
     try {
         results = await runWorkerPool({
-            files: missFiles,
-            absRoot,
-            config: cfg,
-            descs: workerDescs,
-            numWorkers: effWorkers,
-            logger: scanner.logger,
-            runAnalyzersFn: (rel, content) => scanner.runAnalyzers(rel, content),
-            preloaded,
+            files: ctx.missFiles,
+            absRoot: ctx.absRoot,
+            config: ctx.cfg,
+            descs: ctx.workerDescs,
+            numWorkers: ctx.effWorkers,
+            logger: ctx.scanner.logger,
+            runAnalyzersFn: (rel, content) => ctx.scanner.runAnalyzers(rel, content),
+            preloaded: ctx.preloaded,
         });
     } catch (e) {
-        scanner.logger.warn(`worker pool failed (${String(e)}); falling back to in-process scan`);
-        results = await scanner.runInProcess(missFiles, absRoot, preloaded);
+        ctx.scanner.logger.warn(
+            `worker pool failed (${String(e)}); falling back to in-process scan`,
+        );
+        results = await ctx.scanner.runInProcess(ctx.missFiles, ctx.absRoot, ctx.preloaded);
     }
     return { results, poolWarm: false };
 }
 
-function recordAnalyzedResults(
-    toAnalyze: DiffRoutingState['toAnalyze'],
-    results: { issues: Issue[]; metric: FileMetric | null }[],
-    perFile: ({ issues: Issue[]; metric: FileMetric | null } | null)[],
-    sessionBucket: Map<string, { issues: Issue[]; metric: FileMetric | null }>,
-    l2Enabled: boolean,
-    cache: CacheStore,
-    fpByRel: Map<string, Fingerprint>,
-): number {
+function recordAnalyzedResults(ctx: RecordAnalyzedContext): number {
     let analyzed = 0;
-    for (let k = 0; k < toAnalyze.length; k++) {
-        const t = toAnalyze[k];
-        perFile[t.idx] = results[k];
-        sessionBucket.set(t.rel, results[k]);
+    for (let k = 0; k < ctx.toAnalyze.length; k++) {
+        const t = ctx.toAnalyze[k];
+        ctx.perFile[t.idx] = ctx.results[k];
+        ctx.sessionBucket.set(t.rel, ctx.results[k]);
         analyzed++;
-        if (l2Enabled) {
-            cache.writeL2(t.fpHash, t.contentHash, t.rel, results[k], fpByRel.get(t.rel));
+        if (ctx.l2Enabled) {
+            ctx.cache.writeL2(
+                t.fpHash,
+                t.contentHash,
+                t.rel,
+                ctx.results[k],
+                ctx.fpByRel.get(t.rel),
+            );
         }
     }
     return analyzed;
 }
 
 async function executeDiffMissBatches(
-    scanner: ScannerContext,
-    toAnalyze: DiffRoutingState['toAnalyze'],
-    files: string[],
-    absRoot: string,
-    cfg: ScanConfig,
-    poolFp: string,
-    l2Enabled: boolean,
-    opts: ScanWithDiffOptions,
-    sessionBucket: Map<string, { issues: Issue[]; metric: FileMetric | null }>,
-    perFile: ({ issues: Issue[]; metric: FileMetric | null } | null)[],
-    fpByRel: Map<string, Fingerprint>,
-    cache: CacheStore,
+    ctx: DiffMissBatchesContext,
 ): Promise<{ analyzed: number; poolWarm: boolean }> {
-    if (toAnalyze.length === 0) return { analyzed: 0, poolWarm: false };
-    const missFiles = toAnalyze.map((t) => files[t.idx]);
-    const workerDescs: WorkerAnalyzerDesc[] = scanner.plan.map((p) => ({
+    if (ctx.toAnalyze.length === 0) return { analyzed: 0, poolWarm: false };
+    const missFiles = ctx.toAnalyze.map((t) => ctx.files[t.idx]);
+    const workerDescs: WorkerAnalyzerDesc[] = ctx.scanner.plan.map((p) => ({
         name: p.name,
         modulePath: p.modulePath,
         options: (p.options ?? {}) as Record<string, any>,
     }));
-    const effWorkers = effectiveWorkers(cfg.workers, missFiles.length);
+    const effWorkers = effectiveWorkers(ctx.cfg.workers, missFiles.length);
     const useWorkers = effWorkers > 1;
     const preloaded = new Map<string, Buffer>();
-    for (const t of toAnalyze) if (t.buf) preloaded.set(t.rel, t.buf);
+    ctx.toAnalyze.forEach((item) => {
+        if (item.buf) preloaded.set(item.rel, item.buf);
+    });
 
     let batchResult: {
         results: { issues: Issue[]; metric: FileMetric | null }[];
         poolWarm: boolean;
     };
-    if (hasWorkerPool(useWorkers, opts)) {
-        batchResult = await runWithPersistentPool(
-            scanner,
+    if (hasWorkerPool(useWorkers, ctx.opts)) {
+        batchResult = await runWithPersistentPool({
+            scanner: ctx.scanner,
             missFiles,
-            absRoot,
-            cfg,
-            poolFp,
-            opts,
+            absRoot: ctx.absRoot,
+            cfg: ctx.cfg,
+            poolFp: ctx.poolFp,
+            opts: ctx.opts,
             preloaded,
             workerDescs,
             effWorkers,
-        );
+        });
     } else if (useWorkers) {
-        batchResult = await runWithTransientPool(
-            scanner,
+        batchResult = await runWithTransientPool({
+            scanner: ctx.scanner,
             missFiles,
-            absRoot,
-            cfg,
+            absRoot: ctx.absRoot,
+            cfg: ctx.cfg,
             preloaded,
             workerDescs,
             effWorkers,
-        );
+        });
     } else {
-        const inProcResults = await scanner.runInProcess(missFiles, absRoot, preloaded);
+        const inProcResults = await ctx.scanner.runInProcess(missFiles, ctx.absRoot, preloaded);
         batchResult = { results: inProcResults, poolWarm: false };
     }
 
-    const analyzed = recordAnalyzedResults(
-        toAnalyze,
-        batchResult.results,
-        perFile,
-        sessionBucket,
-        l2Enabled,
-        cache,
-        fpByRel,
-    );
+    const analyzed = recordAnalyzedResults({
+        toAnalyze: ctx.toAnalyze,
+        results: batchResult.results,
+        perFile: ctx.perFile,
+        sessionBucket: ctx.sessionBucket,
+        l2Enabled: ctx.l2Enabled,
+        cache: ctx.cache,
+        fpByRel: ctx.fpByRel,
+    });
     return { analyzed, poolWarm: batchResult.poolWarm };
 }
 
@@ -257,27 +309,20 @@ async function recoverIncrementalAnalysis(
 }
 
 async function executeDiffIncrementalFiles(
-    scanner: ScannerContext,
-    toIncremental: DiffRoutingState['toIncremental'],
-    incBucket: Map<string, IncrementalFileState>,
-    l2Enabled: boolean,
-    sessionBucket: Map<string, { issues: Issue[]; metric: FileMetric | null }>,
-    perFile: ({ issues: Issue[]; metric: FileMetric | null } | null)[],
-    fpByRel: Map<string, Fingerprint>,
-    cache: CacheStore,
+    ctx: DiffIncrementalFilesContext,
 ): Promise<{ incrementalFiles: number; incrementalHit: number }> {
     let incrementalFiles = 0;
     let incrementalHit = 0;
 
-    for (const t of toIncremental) {
-        const result = await runSingleIncrementalAnalysis(scanner, t, incBucket);
+    for (const t of ctx.toIncremental) {
+        const result = await runSingleIncrementalAnalysis(ctx.scanner, t, ctx.incBucket);
         t.state.finalize();
-        perFile[t.idx] = result;
-        sessionBucket.set(t.rel, result);
+        ctx.perFile[t.idx] = result;
+        ctx.sessionBucket.set(t.rel, result);
         incrementalHit += t.state.reuseHits;
         incrementalFiles++;
-        if (l2Enabled) {
-            cache.writeL2(t.fpHash, t.contentHash, t.rel, result, fpByRel.get(t.rel));
+        if (ctx.l2Enabled) {
+            ctx.cache.writeL2(t.fpHash, t.contentHash, t.rel, result, ctx.fpByRel.get(t.rel));
         }
     }
     return { incrementalFiles, incrementalHit };
@@ -325,58 +370,45 @@ function aggregateScanResults(perFile: ({ issues: Issue[]; metric: FileMetric | 
     return { issues, fileMetrics };
 }
 
-function commitRoutingCaches(
-    routingState: DiffRoutingState,
-    cache: CacheStore,
-    incBucket: Map<string, IncrementalFileState>,
-    session: ReturnType<typeof createWarmSession>,
-    scanner: ScannerContext,
-): void {
-    const incPruned = pruneIncrementalBucket(incBucket, incrementalMaxFiles());
-    const incRssEvicted = incrementalRssGuard(session);
+function commitRoutingCaches(ctx: CommitRoutingContext): void {
+    const incPruned = pruneIncrementalBucket(ctx.incBucket, incrementalMaxFiles());
+    const incRssEvicted = incrementalRssGuard(ctx.session);
     if (incPruned > 0) {
-        scanner.logger.debug(
-            `incremental LRU: evicted ${incPruned} file state(s) (bucket=${incBucket.size})`,
+        ctx.scanner.logger.debug(
+            `incremental LRU: evicted ${incPruned} file state(s) (bucket=${ctx.incBucket.size})`,
         );
     }
     if (incRssEvicted > 0) {
-        scanner.logger.warn(`incremental RSS guard: cleared ${incRssEvicted} file state(s)`);
+        ctx.scanner.logger.warn(`incremental RSS guard: cleared ${incRssEvicted} file state(s)`);
     }
 
-    for (const w of routingState.l1Fps) cache.writeL1(w.rel, w.fp);
-    for (const w of routingState.l2Refresh) {
-        cache.writeL2(w.fpHash, w.contentHash, w.rel, w.result, w.fp);
-    }
-    cache.flush();
+    ctx.routingState.l1Fps.forEach((item) => ctx.cache.writeL1(item.rel, item.fp));
+    ctx.routingState.l2Refresh.forEach((item) => {
+        ctx.cache.writeL2(item.fpHash, item.contentHash, item.rel, item.result, item.fp);
+    });
+    ctx.cache.flush();
 }
 
-function createDiffStats(
-    routingState: DiffRoutingState,
-    totalFiles: number,
-    totalAnalyzed: number,
-    missStats: { poolWarm: boolean },
-    incStats: { incrementalFiles: number; incrementalHit: number },
-    diffIgnored: number,
-): DiffStats {
+function createDiffStats(ctx: CreateDiffStatsContext): DiffStats {
     return {
         daemonUsed: false,
-        l1Hit: routingState.l1Hit,
-        l2Hit: routingState.l2Hit,
-        cacheHit: routingState.l1Hit + routingState.l2Hit,
-        cacheTotal: totalFiles,
-        analyzed: totalAnalyzed,
-        poolWarm: missStats.poolWarm,
+        l1Hit: ctx.routingState.l1Hit,
+        l2Hit: ctx.routingState.l2Hit,
+        cacheHit: ctx.routingState.l1Hit + ctx.routingState.l2Hit,
+        cacheTotal: ctx.totalFiles,
+        analyzed: ctx.totalAnalyzed,
+        poolWarm: ctx.missStats.poolWarm,
         daemonMs: 0,
-        incrementalFiles: incStats.incrementalFiles,
-        incrementalHit: incStats.incrementalHit,
-        diffFiles: routingState.diffFiles,
-        diffIgnored,
-        byteEqual: routingState.byteEqual,
-        diffIncremental: routingState.diffIncremental,
-        diffFull: routingState.diffFull,
-        rangesProvided: routingState.rangesProvided,
-        rangesFallback: routingState.rangesFallback,
-        oldContentFromDaemon: routingState.oldContentFromDaemon,
+        incrementalFiles: ctx.incStats.incrementalFiles,
+        incrementalHit: ctx.incStats.incrementalHit,
+        diffFiles: ctx.routingState.diffFiles,
+        diffIgnored: ctx.diffIgnored,
+        byteEqual: ctx.routingState.byteEqual,
+        diffIncremental: ctx.routingState.diffIncremental,
+        diffFull: ctx.routingState.diffFull,
+        rangesProvided: ctx.routingState.rangesProvided,
+        rangesFallback: ctx.routingState.rangesFallback,
+        oldContentFromDaemon: ctx.routingState.oldContentFromDaemon,
     };
 }
 
@@ -480,33 +512,33 @@ export async function executeScanWithDiff(
     }
 
     const fpByRel = new Map<string, Fingerprint>(routingState.l1Fps.map((w) => [w.rel, w.fp]));
-    const missStats = await executeDiffMissBatches(
+    const missStats = await executeDiffMissBatches({
         scanner,
-        routingState.toAnalyze,
+        toAnalyze: routingState.toAnalyze,
         files,
         absRoot,
         cfg,
-        fpContext.poolFp,
-        fpContext.l2Enabled,
+        poolFp: fpContext.poolFp,
+        l2Enabled: fpContext.l2Enabled,
         opts,
         sessionBucket,
         perFile,
         fpByRel,
         cache,
-    );
+    });
 
-    const incStats = await executeDiffIncrementalFiles(
+    const incStats = await executeDiffIncrementalFiles({
         scanner,
-        routingState.toIncremental,
+        toIncremental: routingState.toIncremental,
         incBucket,
-        fpContext.l2Enabled,
+        l2Enabled: fpContext.l2Enabled,
         sessionBucket,
         perFile,
         fpByRel,
         cache,
-    );
+    });
 
-    commitRoutingCaches(routingState, cache, incBucket, session, scanner);
+    commitRoutingCaches({ routingState, cache, incBucket, session, scanner });
 
     const { issues, fileMetrics } = aggregateScanResults(perFile);
     const durationMs = Date.now() - t0;
@@ -517,13 +549,13 @@ export async function executeScanWithDiff(
             `[diff=${routingState.diffFiles} byteEqual=${routingState.byteEqual} inc=${routingState.diffIncremental} full=${routingState.diffFull} analyzed=${totalAnalyzed}/${files.length}]`,
     );
 
-    const stats = createDiffStats(
+    const stats = createDiffStats({
         routingState,
-        files.length,
+        totalFiles: files.length,
         totalAnalyzed,
         missStats,
         incStats,
         diffIgnored,
-    );
+    });
     return { report: report as unknown as ScanReport | DiffDeltaReport, stats };
 }

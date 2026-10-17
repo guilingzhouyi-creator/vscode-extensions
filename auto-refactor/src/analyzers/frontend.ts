@@ -25,6 +25,70 @@ import { ExposureMessages } from '../core/messages/exposure';
 /** Canonical analyzer identifier for frontend UI/UX, A11y, and component architecture audits. */
 export const ANALYZER_FRONTEND_ID = 'frontend';
 
+/** Rule ID: HTML semantic and accessibility (A11y) violations. */
+export const RULE_UI_ENG_001 = 'UI-ENG-001';
+/** Rule ID: Excessive DOM nesting and reflow-inducing CSS transitions. */
+export const RULE_UI_ENG_002 = 'UI-ENG-002';
+/** Rule ID: Component props footprint and template complexity. */
+export const RULE_UI_ENG_003 = 'UI-ENG-003';
+/** Rule ID: Frontend hook and event handler naming conventions. */
+export const RULE_UI_ENG_004 = 'UI-ENG-004';
+/** Rule ID: CJK IME composition state collisions on Enter key handling. */
+export const RULE_UI_ENG_005 = 'UI-ENG-005';
+/** Rule ID: Dynamic timer and numeric metric displays lacking tabular-nums. */
+export const RULE_UI_ENG_006 = 'UI-ENG-006';
+/** Rule ID: Nested borders on child controls inside bordered containers. */
+export const RULE_UI_ENG_007 = 'UI-ENG-007';
+/** Rule ID: Local component @media misuse and CJK text squashing. */
+export const RULE_UI_ENG_008 = 'UI-ENG-008';
+
+const MAX_RECOMMENDED_DOM_DEPTH = 12;
+const MAX_RECOMMENDED_COMPONENT_PROPS = 10;
+const ASCII_SPACE_CODE = 32;
+const ASCII_NEWLINE_CODE = 10;
+const IME_WINDOW_LOOKBACK_LINES = 4;
+const IME_WINDOW_LOOKAHEAD_LINES = 5;
+const TABULAR_WINDOW_LOOKBACK_LINES = 2;
+const TABULAR_WINDOW_LOOKAHEAD_LINES = 3;
+const BORDER_LOOKAHEAD_LINES = 8;
+const ANTI_SQUASH_LOOKBACK_LINES = 15;
+
+const VIOLATION_IMG_MISSING_ALT = 'img-missing-alt';
+const VIOLATION_INTERACTIVE_A11Y = 'interactive-element-a11y';
+const VIOLATION_CSS_REFLOW = 'css-reflow-property';
+const VIOLATION_EXCESSIVE_DOM_DEPTH = 'excessive-dom-depth';
+const VIOLATION_MISSING_IME_GUARD = 'missing-ime-guard';
+const VIOLATION_MISSING_TABULAR_NUMS = 'missing-tabular-nums';
+const VIOLATION_NESTED_BORDER = 'nested-border';
+const VIOLATION_MEDIA_QUERY_LOCAL = 'media-query-local-component';
+const VIOLATION_CJK_MISSING_ANTI_SQUASH = 'cjk-missing-anti-squash';
+
+const MSG_SUFFIX_IMG_MISSING_ALT = ': <img> missing alt attribute';
+const MSG_SUFFIX_INTERACTIVE_A11Y = ': interactive non-semantic element missing role or tabIndex';
+const MSG_SUFFIX_CSS_REFLOW = ': CSS transition/animation on geometry property causes reflow';
+const MSG_PREFIX_DOM_DEPTH = ': DOM hierarchy depth ';
+const MSG_SUFFIX_DOM_DEPTH_BUDGET = ' exceeds budget 12';
+const MSG_PREFIX_PROPS_FOOTPRINT = ': Component props footprint (';
+const MSG_SUFFIX_PROPS_FOOTPRINT_LIMIT = ') exceeds 10';
+const MSG_PREFIX_HOOK_NAME = ": Hook function '";
+const MSG_SUFFIX_HOOK_NAME = "' must start with 'use'";
+const MSG_PREFIX_HANDLER_NAME = ": Handler '";
+const MSG_SUFFIX_HANDLER_NAME = "' should start with 'on' or 'handle'";
+const MSG_SUFFIX_IME_GUARD = ': Enter key handler missing isComposing guard';
+const MSG_SUFFIX_TABULAR_NUMS = ': Numeric counter or timestamp display missing tabular-nums';
+const MSG_SUFFIX_NESTED_BORDER =
+    ': Child control nested inside bordered container duplicates outer border';
+const MSG_SUFFIX_MEDIA_QUERY_LOCAL =
+    ': Local component uses global viewport @media instead of @container';
+const MSG_SUFFIX_CJK_ANTI_SQUASH =
+    ': CJK text container missing text-wrap: balance or overflow-wrap: break-word';
+
+const SUFFIX_HOOK = 'Hook';
+const SUFFIX_HANDLER = 'Handler';
+const PREFIX_HANDLE = 'handle';
+const PREFIX_USE = 'use';
+const PREFIX_ON = 'on';
+
 const FRONTEND_EXTENSIONS = new Set([
     '.html',
     '.htm',
@@ -73,24 +137,31 @@ const ANTI_SQUASH_RE =
 const MEDIA_QUERY_RE = /@media\b/i;
 const LOCAL_CLASS_OR_ID_RE = /(?:\.[a-zA-Z_-][\w-]*|#[a-zA-Z_-][\w-]*)\s*\{/;
 
-function makeFrontendIssue(
-    file: string,
-    line: number,
-    rule: string,
-    severity: Severity,
-    message: string,
-    suggestion: string,
-    detail: Record<string, unknown>,
-): Issue {
+/** Structured parameter context for constructing frontend issues. */
+interface FrontendIssueContext {
+    readonly file: string;
+    readonly line: number;
+    readonly rule: string;
+    readonly severity: Severity;
+    readonly message: string;
+    readonly suggestion: string;
+    readonly detail: Record<string, unknown>;
+}
+
+function makeFrontendIssue(context: FrontendIssueContext): Issue {
     return {
-        id: `${ANALYZER_FRONTEND_ID}:${rule}:${file}:${line}`,
+        id: `${ANALYZER_FRONTEND_ID}:${context.rule}:${context.file}:${context.line}`,
         analyzer: ANALYZER_FRONTEND_ID,
-        rule,
-        severity,
-        message,
-        location: { file, start: { line, column: 1 }, end: { line, column: 1 } },
-        detail,
-        suggestion,
+        rule: context.rule,
+        severity: context.severity,
+        message: context.message,
+        location: {
+            file: context.file,
+            start: { line: context.line, column: 1 },
+            end: { line: context.line, column: 1 },
+        },
+        detail: context.detail,
+        suggestion: context.suggestion,
     };
 }
 
@@ -102,15 +173,15 @@ function auditAccessibilityAndSemantics(file: string, rawLines: string[], issues
         const line = rawLines[i];
         if (IMG_TAG_WITHOUT_ALT_RE.test(line)) {
             issues.push(
-                makeFrontendIssue(
+                makeFrontendIssue({
                     file,
-                    i + 1,
-                    'UI-ENG-001',
-                    SEVERITY_WARNING,
-                    `${ExposureMessages.UI_A11Y_SEMANTIC.message}: <img> missing alt attribute`,
-                    ExposureMessages.UI_A11Y_SEMANTIC.suggestion,
-                    { violation: 'img-missing-alt', line: i + 1 },
-                ),
+                    line: i + 1,
+                    rule: RULE_UI_ENG_001,
+                    severity: SEVERITY_WARNING,
+                    message: `${ExposureMessages.UI_A11Y_SEMANTIC.message}${MSG_SUFFIX_IMG_MISSING_ALT}`,
+                    suggestion: ExposureMessages.UI_A11Y_SEMANTIC.suggestion,
+                    detail: { violation: VIOLATION_IMG_MISSING_ALT, line: i + 1 },
+                }),
             );
         }
         if (INTERACTIVE_DIV_SPAN_RE.test(line)) {
@@ -118,15 +189,15 @@ function auditAccessibilityAndSemantics(file: string, rawLines: string[], issues
             const hasTab = HAS_TABINDEX_RE.test(line);
             if (!hasRole || !hasTab) {
                 issues.push(
-                    makeFrontendIssue(
+                    makeFrontendIssue({
                         file,
-                        i + 1,
-                        'UI-ENG-001',
-                        SEVERITY_WARNING,
-                        `${ExposureMessages.UI_A11Y_SEMANTIC.message}: interactive non-semantic element missing role or tabIndex`,
-                        ExposureMessages.UI_A11Y_SEMANTIC.suggestion,
-                        { violation: 'interactive-element-a11y', line: i + 1 },
-                    ),
+                        line: i + 1,
+                        rule: RULE_UI_ENG_001,
+                        severity: SEVERITY_WARNING,
+                        message: `${ExposureMessages.UI_A11Y_SEMANTIC.message}${MSG_SUFFIX_INTERACTIVE_A11Y}`,
+                        suggestion: ExposureMessages.UI_A11Y_SEMANTIC.suggestion,
+                        detail: { violation: VIOLATION_INTERACTIVE_A11Y, line: i + 1 },
+                    }),
                 );
             }
         }
@@ -145,15 +216,15 @@ function auditDomDepthAndAnimationReflow(file: string, rawLines: string[], issue
         const line = rawLines[i];
         if (CSS_REFLOW_PROPERTIES_RE.test(line)) {
             issues.push(
-                makeFrontendIssue(
+                makeFrontendIssue({
                     file,
-                    i + 1,
-                    'UI-ENG-002',
-                    SEVERITY_WARNING,
-                    `${ExposureMessages.UI_DOM_DEPTH_REFLOW.message}: CSS transition/animation on geometry property causes reflow`,
-                    ExposureMessages.UI_DOM_DEPTH_REFLOW.suggestion,
-                    { violation: 'css-reflow-property', line: i + 1 },
-                ),
+                    line: i + 1,
+                    rule: RULE_UI_ENG_002,
+                    severity: SEVERITY_WARNING,
+                    message: `${ExposureMessages.UI_DOM_DEPTH_REFLOW.message}${MSG_SUFFIX_CSS_REFLOW}`,
+                    suggestion: ExposureMessages.UI_DOM_DEPTH_REFLOW.suggestion,
+                    detail: { violation: VIOLATION_CSS_REFLOW, line: i + 1 },
+                }),
             );
         }
 
@@ -174,17 +245,17 @@ function auditDomDepthAndAnimationReflow(file: string, rawLines: string[], issue
         }
     }
 
-    if (maxDepth > 12) {
+    if (maxDepth > MAX_RECOMMENDED_DOM_DEPTH) {
         issues.push(
-            makeFrontendIssue(
+            makeFrontendIssue({
                 file,
-                maxDepthLine,
-                'UI-ENG-002',
-                SEVERITY_WARNING,
-                `${ExposureMessages.UI_DOM_DEPTH_REFLOW.message}: DOM hierarchy depth ${maxDepth} exceeds budget 12`,
-                ExposureMessages.UI_DOM_DEPTH_REFLOW.suggestion,
-                { violation: 'excessive-dom-depth', maxDepth },
-            ),
+                line: maxDepthLine,
+                rule: RULE_UI_ENG_002,
+                severity: SEVERITY_WARNING,
+                message: `${ExposureMessages.UI_DOM_DEPTH_REFLOW.message}${MSG_PREFIX_DOM_DEPTH}${maxDepth}${MSG_SUFFIX_DOM_DEPTH_BUDGET}`,
+                suggestion: ExposureMessages.UI_DOM_DEPTH_REFLOW.suggestion,
+                detail: { violation: VIOLATION_EXCESSIVE_DOM_DEPTH, maxDepth },
+            }),
         );
     }
 }
@@ -200,12 +271,12 @@ function countInterfaceBodyProps(body: string): number {
 
     for (let i = 0; i < len; i++) {
         const ch = body.charCodeAt(i);
-        if (ch === 10 /* '\n' */) {
+        if (ch === ASCII_NEWLINE_CODE) {
             if (hasVisibleCharOnLine) {
                 count++;
                 hasVisibleCharOnLine = false;
             }
-        } else if (ch > 32) {
+        } else if (ch > ASCII_SPACE_CODE) {
             hasVisibleCharOnLine = true;
         }
     }
@@ -237,17 +308,17 @@ function auditComponentPropsAndReuse(file: string, content: string, issues: Issu
     for (const bodies of interfaceMap.values()) {
         for (const body of bodies) {
             const propCount = countInterfaceBodyProps(body);
-            if (propCount > 10) {
+            if (propCount > MAX_RECOMMENDED_COMPONENT_PROPS) {
                 issues.push(
-                    makeFrontendIssue(
+                    makeFrontendIssue({
                         file,
-                        1,
-                        'UI-ENG-003',
-                        SEVERITY_WARNING,
-                        `${ExposureMessages.UI_COMPONENT_REUSE.message}: Component props footprint (${propCount}) exceeds 10`,
-                        ExposureMessages.UI_COMPONENT_REUSE.suggestion,
-                        { propCount },
-                    ),
+                        line: 1,
+                        rule: RULE_UI_ENG_003,
+                        severity: SEVERITY_WARNING,
+                        message: `${ExposureMessages.UI_COMPONENT_REUSE.message}${MSG_PREFIX_PROPS_FOOTPRINT}${propCount}${MSG_SUFFIX_PROPS_FOOTPRINT_LIMIT}`,
+                        suggestion: ExposureMessages.UI_COMPONENT_REUSE.suggestion,
+                        detail: { propCount },
+                    }),
                 );
                 return;
             }
@@ -265,17 +336,17 @@ function auditFrontendNaming(file: string, content: string, issues: Issue[]): vo
     let match: RegExpExecArray | null;
     while ((match = HOOK_DECLARATION_RE.exec(content)) !== null) {
         const fnName = match[1];
-        if (fnName.endsWith('Hook') && !fnName.startsWith('use')) {
+        if (fnName.endsWith(SUFFIX_HOOK) && !fnName.startsWith(PREFIX_USE)) {
             issues.push(
-                makeFrontendIssue(
+                makeFrontendIssue({
                     file,
-                    1,
-                    'UI-ENG-004',
-                    SEVERITY_INFO,
-                    `${ExposureMessages.UI_NAMING_STATE.message}: Hook function '${fnName}' must start with 'use'`,
-                    ExposureMessages.UI_NAMING_STATE.suggestion,
-                    { identifier: fnName },
-                ),
+                    line: 1,
+                    rule: RULE_UI_ENG_004,
+                    severity: SEVERITY_INFO,
+                    message: `${ExposureMessages.UI_NAMING_STATE.message}${MSG_PREFIX_HOOK_NAME}${fnName}${MSG_SUFFIX_HOOK_NAME}`,
+                    suggestion: ExposureMessages.UI_NAMING_STATE.suggestion,
+                    detail: { identifier: fnName },
+                }),
             );
         }
     }
@@ -284,20 +355,20 @@ function auditFrontendNaming(file: string, content: string, issues: Issue[]): vo
     while ((match = HANDLER_DECLARATION_RE.exec(content)) !== null) {
         const varName = match[1];
         if (
-            varName.endsWith('Handler') &&
-            !varName.startsWith('on') &&
-            !varName.startsWith('handle')
+            varName.endsWith(SUFFIX_HANDLER) &&
+            !varName.startsWith(PREFIX_ON) &&
+            !varName.startsWith(PREFIX_HANDLE)
         ) {
             issues.push(
-                makeFrontendIssue(
+                makeFrontendIssue({
                     file,
-                    1,
-                    'UI-ENG-004',
-                    SEVERITY_INFO,
-                    `${ExposureMessages.UI_NAMING_STATE.message}: Handler '${varName}' should start with 'on' or 'handle'`,
-                    ExposureMessages.UI_NAMING_STATE.suggestion,
-                    { identifier: varName },
-                ),
+                    line: 1,
+                    rule: RULE_UI_ENG_004,
+                    severity: SEVERITY_INFO,
+                    message: `${ExposureMessages.UI_NAMING_STATE.message}${MSG_PREFIX_HANDLER_NAME}${varName}${MSG_SUFFIX_HANDLER_NAME}`,
+                    suggestion: ExposureMessages.UI_NAMING_STATE.suggestion,
+                    detail: { identifier: varName },
+                }),
             );
         }
     }
@@ -323,20 +394,20 @@ function auditImeCompositionGuard(file: string, rawLines: string[], issues: Issu
         const line = rawLines[i];
         if (!ENTER_KEY_HANDLER_RE.test(line)) continue;
 
-        const windowStart = Math.max(0, i - 4);
-        const windowEnd = Math.min(rawLines.length, i + 5);
+        const windowStart = Math.max(0, i - IME_WINDOW_LOOKBACK_LINES);
+        const windowEnd = Math.min(rawLines.length, i + IME_WINDOW_LOOKAHEAD_LINES);
         if (hasImeGuardInRange(rawLines, windowStart, windowEnd)) continue;
 
         issues.push(
-            makeFrontendIssue(
+            makeFrontendIssue({
                 file,
-                i + 1,
-                'UI-ENG-005',
-                SEVERITY_WARNING,
-                `${ExposureMessages.UI_IME_COMPOSITION_GUARD.message}: Enter key handler missing isComposing guard`,
-                ExposureMessages.UI_IME_COMPOSITION_GUARD.suggestion,
-                { violation: 'missing-ime-guard', line: i + 1 },
-            ),
+                line: i + 1,
+                rule: RULE_UI_ENG_005,
+                severity: SEVERITY_WARNING,
+                message: `${ExposureMessages.UI_IME_COMPOSITION_GUARD.message}${MSG_SUFFIX_IME_GUARD}`,
+                suggestion: ExposureMessages.UI_IME_COMPOSITION_GUARD.suggestion,
+                detail: { violation: VIOLATION_MISSING_IME_GUARD, line: i + 1 },
+            }),
         );
     }
 }
@@ -350,8 +421,8 @@ function auditTabularNumerics(file: string, rawLines: string[], issues: Issue[])
         const line = rawLines[i];
         if (!TIMER_COUNTER_DISPLAY_RE.test(line)) continue;
 
-        const windowStart = Math.max(0, i - 2);
-        const windowEnd = Math.min(rawLines.length, i + 3);
+        const windowStart = Math.max(0, i - TABULAR_WINDOW_LOOKBACK_LINES);
+        const windowEnd = Math.min(rawLines.length, i + TABULAR_WINDOW_LOOKAHEAD_LINES);
         let hasTabularNums = false;
         for (let j = windowStart; j < windowEnd; j++) {
             if (TABULAR_NUMS_RE.test(rawLines[j])) {
@@ -362,15 +433,15 @@ function auditTabularNumerics(file: string, rawLines: string[], issues: Issue[])
 
         if (!hasTabularNums) {
             issues.push(
-                makeFrontendIssue(
+                makeFrontendIssue({
                     file,
-                    i + 1,
-                    'UI-ENG-006',
-                    SEVERITY_WARNING,
-                    `${ExposureMessages.UI_TABULAR_NUMERICS.message}: Numeric counter or timestamp display missing tabular-nums`,
-                    ExposureMessages.UI_TABULAR_NUMERICS.suggestion,
-                    { violation: 'missing-tabular-nums', line: i + 1 },
-                ),
+                    line: i + 1,
+                    rule: RULE_UI_ENG_006,
+                    severity: SEVERITY_WARNING,
+                    message: `${ExposureMessages.UI_TABULAR_NUMERICS.message}${MSG_SUFFIX_TABULAR_NUMS}`,
+                    suggestion: ExposureMessages.UI_TABULAR_NUMERICS.suggestion,
+                    detail: { violation: VIOLATION_MISSING_TABULAR_NUMS, line: i + 1 },
+                }),
             );
         }
     }
@@ -384,21 +455,21 @@ function auditSingleBorderDiscipline(file: string, rawLines: string[], issues: I
         const line = rawLines[i];
         if (!CONTAINER_BORDER_RE.test(line)) continue;
 
-        const searchEnd = Math.min(rawLines.length, i + 8);
+        const searchEnd = Math.min(rawLines.length, i + BORDER_LOOKAHEAD_LINES);
         for (let j = i + 1; j < searchEnd; j++) {
             const childLine = rawLines[j];
             if (CLOSING_CONTAINER_TAG_RE.test(childLine)) break;
             if (CHILD_BORDER_RE.test(childLine)) {
                 issues.push(
-                    makeFrontendIssue(
+                    makeFrontendIssue({
                         file,
-                        j + 1,
-                        'UI-ENG-007',
-                        SEVERITY_WARNING,
-                        `${ExposureMessages.UI_SINGLE_BORDER_DISCIPLINE.message}: Child control nested inside bordered container duplicates outer border`,
-                        ExposureMessages.UI_SINGLE_BORDER_DISCIPLINE.suggestion,
-                        { violation: 'nested-border', line: j + 1 },
-                    ),
+                        line: j + 1,
+                        rule: RULE_UI_ENG_007,
+                        severity: SEVERITY_WARNING,
+                        message: `${ExposureMessages.UI_SINGLE_BORDER_DISCIPLINE.message}${MSG_SUFFIX_NESTED_BORDER}`,
+                        suggestion: ExposureMessages.UI_SINGLE_BORDER_DISCIPLINE.suggestion,
+                        detail: { violation: VIOLATION_NESTED_BORDER, line: j + 1 },
+                    }),
                 );
                 break;
             }
@@ -451,15 +522,15 @@ function auditMediaQueryDiscipline(file: string, rawLines: string[], issues: Iss
                 mediaTargetsLocalComponent(rawLines, i);
             if (targetsLocal) {
                 issues.push(
-                    makeFrontendIssue(
+                    makeFrontendIssue({
                         file,
-                        i + 1,
-                        'UI-ENG-008',
-                        SEVERITY_WARNING,
-                        `${ExposureMessages.UI_CONTAINER_QUERY_ANTI_SQUASH.message}: Local component uses global viewport @media instead of @container`,
-                        ExposureMessages.UI_CONTAINER_QUERY_ANTI_SQUASH.suggestion,
-                        { violation: 'media-query-local-component', line: i + 1 },
-                    ),
+                        line: i + 1,
+                        rule: RULE_UI_ENG_008,
+                        severity: SEVERITY_WARNING,
+                        message: `${ExposureMessages.UI_CONTAINER_QUERY_ANTI_SQUASH.message}${MSG_SUFFIX_MEDIA_QUERY_LOCAL}`,
+                        suggestion: ExposureMessages.UI_CONTAINER_QUERY_ANTI_SQUASH.suggestion,
+                        detail: { violation: VIOLATION_MEDIA_QUERY_LOCAL, line: i + 1 },
+                    }),
                 );
             }
         }
@@ -474,7 +545,7 @@ function auditMediaQueryDiscipline(file: string, rawLines: string[], issues: Iss
  * Checks if an ancestor opening tag within lookback window specifies anti-squash properties.
  */
 function ancestorHasAntiSquash(rawLines: string[], currentIndex: number): boolean {
-    const lookbackStart = Math.max(0, currentIndex - 15);
+    const lookbackStart = Math.max(0, currentIndex - ANTI_SQUASH_LOOKBACK_LINES);
     for (let j = currentIndex - 1; j >= lookbackStart; j--) {
         const line = rawLines[j];
         if (ANTI_SQUASH_RE.test(line)) {
@@ -505,15 +576,15 @@ function auditCjkAntiSquash(file: string, rawLines: string[], issues: Issue[]): 
         }
 
         issues.push(
-            makeFrontendIssue(
+            makeFrontendIssue({
                 file,
-                i + 1,
-                'UI-ENG-008',
-                SEVERITY_WARNING,
-                `${ExposureMessages.UI_CONTAINER_QUERY_ANTI_SQUASH.message}: CJK text container missing text-wrap: balance or overflow-wrap: break-word`,
-                ExposureMessages.UI_CONTAINER_QUERY_ANTI_SQUASH.suggestion,
-                { violation: 'cjk-missing-anti-squash', line: i + 1 },
-            ),
+                line: i + 1,
+                rule: RULE_UI_ENG_008,
+                severity: SEVERITY_WARNING,
+                message: `${ExposureMessages.UI_CONTAINER_QUERY_ANTI_SQUASH.message}${MSG_SUFFIX_CJK_ANTI_SQUASH}`,
+                suggestion: ExposureMessages.UI_CONTAINER_QUERY_ANTI_SQUASH.suggestion,
+                detail: { violation: VIOLATION_CJK_MISSING_ANTI_SQUASH, line: i + 1 },
+            }),
         );
     }
 }
@@ -532,7 +603,7 @@ function auditContainerQueryAndAntiSquash(file: string, rawLines: string[], issu
 export class FrontendAnalyzer implements Analyzer {
     readonly name = ANALYZER_FRONTEND_ID;
 
-    analyze(_sf: any, context: AnalyzerContext): Issue[] {
+    analyze(_sf: unknown, context: AnalyzerContext): Issue[] {
         const file = context.filePath;
         const ext = path.extname(file).toLowerCase();
         if (!FRONTEND_EXTENSIONS.has(ext) && !context.content.includes('<template>')) {
