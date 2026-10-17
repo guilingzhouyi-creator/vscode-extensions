@@ -45,7 +45,7 @@ static func _teardown_all_test_artifacts() -> void:
 static func test_tc_arp_01_registration_and_persistence_roundtrip() -> Dictionary:
 	var repo := AccountRepository.get_instance()
 	var uname := "PersistHero01"
-	var pass := "ValidPass123"
+	var plain_pass := "ValidPass123"
 
 	var existing := repo.find_by_username(uname)
 	if existing != null:
@@ -53,7 +53,7 @@ static func test_tc_arp_01_registration_and_persistence_roundtrip() -> Dictionar
 
 	var req := AccountRegistrationDTO.Request.new()
 	req.username = uname
-	req.password_plain = pass
+	req.password_plain = plain_pass
 	req.device_fingerprint = "FP_ARP_01"
 
 	var resp := AuthService.register_account(req)
@@ -70,7 +70,7 @@ static func test_tc_arp_01_registration_and_persistence_roundtrip() -> Dictionar
 	if cached == null or cached.username != uname:
 		return TestCase.make_result("TC-ARP-01: 账号标准注册与物理落盘加载一致性断言", false, {"reason": "cached aggregate mismatch"})
 
-	var expected_hash := AuthService.hash_password(pass)
+	var expected_hash := AuthService.hash_password(plain_pass)
 	if cached.password_hash_sha256 != expected_hash:
 		return TestCase.make_result("TC-ARP-01: 账号标准注册与物理落盘加载一致性断言", false, {"reason": "hash mismatch"})
 
@@ -103,7 +103,7 @@ static func test_tc_arp_01_registration_and_persistence_roundtrip() -> Dictionar
 static func test_tc_arp_02_memory_reset_and_cold_boot_restore() -> Dictionary:
 	var repo := AccountRepository.get_instance()
 	var uname := "ColdBootHero"
-	var pass := "ColdPass456"
+	var plain_pass := "ColdPass456"
 
 	var existing := repo.find_by_username(uname)
 	if existing != null:
@@ -111,13 +111,13 @@ static func test_tc_arp_02_memory_reset_and_cold_boot_restore() -> Dictionary:
 
 	var req := AccountRegistrationDTO.Request.new()
 	req.username = uname
-	req.password_plain = pass
+	req.password_plain = plain_pass
 	var reg_resp := AuthService.register_account(req)
 	if not reg_resp.success:
 		return TestCase.make_result("TC-ARP-02: 内存仓储重置与冷启动后磁盘加载自愈（模拟重启恢复）", false, {"reason": "registration failed"})
 
 	var original_id := reg_resp.account_id
-	var original_hash := AuthService.hash_password(pass)
+	var original_hash := AuthService.hash_password(plain_pass)
 
 	# 模拟冷启动重置：清空内存缓存与单例
 	AccountRepository.reset_for_tests()
@@ -145,7 +145,7 @@ static func test_tc_arp_02_memory_reset_and_cold_boot_restore() -> Dictionary:
 static func test_tc_arp_03_duplicate_rejection_and_case_insensitive() -> Dictionary:
 	var repo := AccountRepository.get_instance()
 	var uname := "CaseHero"
-	var pass := "Pass12345"
+	var plain_pass := "Pass12345"
 
 	var existing := repo.find_by_username(uname)
 	if existing != null:
@@ -153,7 +153,7 @@ static func test_tc_arp_03_duplicate_rejection_and_case_insensitive() -> Diction
 
 	var req := AccountRegistrationDTO.Request.new()
 	req.username = uname
-	req.password_plain = pass
+	req.password_plain = plain_pass
 	var reg_resp := AuthService.register_account(req)
 	if not reg_resp.success:
 		return TestCase.make_result("TC-ARP-03: 重名冲突拦截与不区分大小写检索", false, {"reason": "initial registration failed"})
@@ -189,7 +189,7 @@ static func test_tc_arp_03_duplicate_rejection_and_case_insensitive() -> Diction
 static func test_tc_arp_04_composite_auth_auto_registration() -> Dictionary:
 	var repo := AccountRepository.get_instance()
 	var uname := "AutoCompositeHero"
-	var pass := "AutoPass789"
+	var plain_pass := "AutoPass789"
 
 	var existing := repo.find_by_username(uname)
 	if existing != null:
@@ -197,7 +197,7 @@ static func test_tc_arp_04_composite_auth_auto_registration() -> Dictionary:
 
 	var comp_req := AccountCompositeAuthDTO.Request.new()
 	comp_req.username = uname
-	comp_req.password_plain = pass
+	comp_req.password_plain = plain_pass
 	comp_req.action_mode = AccountCompositeAuthDTO.MODE_AUTO
 
 	var comp_resp := AuthService.composite_authenticate(comp_req)
@@ -217,7 +217,7 @@ static func test_tc_arp_04_composite_auth_auto_registration() -> Dictionary:
 	# 纯登录二次验证
 	var login_req := AccountCompositeAuthDTO.Request.new()
 	login_req.username = uname
-	login_req.password_plain = pass
+	login_req.password_plain = plain_pass
 	login_req.action_mode = AccountCompositeAuthDTO.MODE_LOGIN_ONLY
 	var login_resp := AuthService.composite_authenticate(login_req)
 	if not login_resp.success or login_resp.is_new_registration or login_resp.account_id != comp_resp.account_id:
@@ -272,7 +272,7 @@ static func test_tc_arp_05_legacy_salt_rehash_atomic_persistence() -> Dictionary
 static func test_tc_arp_06_account_deletion_and_index_cleanup() -> Dictionary:
 	var repo := AccountRepository.get_instance()
 	var uname := "UserToDelete06"
-	var pass := "DelPass123"
+	var plain_pass := "DelPass123"
 
 	var existing := repo.find_by_username(uname)
 	if existing != null:
@@ -280,7 +280,7 @@ static func test_tc_arp_06_account_deletion_and_index_cleanup() -> Dictionary:
 
 	var req := AccountRegistrationDTO.Request.new()
 	req.username = uname
-	req.password_plain = pass
+	req.password_plain = plain_pass
 	var reg_resp := AuthService.register_account(req)
 	if not reg_resp.success:
 		return TestCase.make_result("TC-ARP-06: 账号删除与索引清理", false, {"reason": "registration failed"})
