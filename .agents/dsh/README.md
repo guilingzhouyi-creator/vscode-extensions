@@ -165,8 +165,8 @@ fresh JavaScript module generation」。
 | V5 | 装配失败诊断闭环 | 逐条消除 `never started` / `waiting for workflowEngine` / `PlanModeConfig` 诊断 | ✅ 四条声明行全部 `fiberPhase: active` |
 | V6 | 守卫拦截实测 | 审查模式会话内发起 `write` | ✅ 返回 `… runs the read posture` 并保持目标文件未被触碰 |
 | V7 | 守卫降级 | 守卫内部异常路径 | ✅ fail-open 且仅告警一次（代码路径，未构造运行态异常） |
-| V8 | 物理卫生 | 交付面 10 份文件逐一核对 LF 与字节数 | ✅ 零 CRLF、零 0 字节 |
-| V9 | 全工作区统一审查 | `pwsh -File scripts/ps1/audit-all.ps1` | ⚠️ 仅剩与本改动无关的既有失败项（见下） |
+| V8 | 物理卫生 | 交付面 9 份文件逐一核对 LF 与字节数 | ✅ 零 CRLF、零 BOM、零 0 字节 |
+| V9 | 全工作区统一审查 | `pwsh -File scripts/ps1/audit-all.ps1` | ⚠️ 综合 99.34（A+）；唯一未通过项为 `scratch/` 内被 gitignore 的临时草稿文件（见下） |
 | V10 | 守卫判定离线矩阵 | 伪造 ctx 直调 `apply`，四调用方 × 授权/越权/禁用根/读类样本 | ✅ 全部判定分支与设计一致 |
 | V11 | 写姿态运行态复核 | `mode: wg-construct` 会话内三次写入 | ⏳ 待一次 DSH 重启后执行（宿主模块解析映射不可变） |
 
@@ -193,12 +193,18 @@ fresh JavaScript module generation」。
 同一取证会话应得「授权根放行、`scripts/` 拒绝、`docs/` 拒绝」三行结果。其余 V1–V10
 结论不受该代际问题影响（离线矩阵直接调用磁盘上的现行实现）。
 
-V9 结论：审查中枢报出的失败项为既有问题，与本改动无关 ——
-`.vscode/workspace-timing.journal`（0 字节运行期日志）、`auto-refactor` 套件
-`validate-no-empty-scripts`（由上述同一 0 字节文件触发）与 `workspace-timing`
-的既有失败。同一次审查中与本改动相关的检查全部通过：「24 对同构脚本全部合规」
-「All 25 skills (90 markdown documents) verified successfully with plugin parity」。
-根因须单独立项修复，不在本改动内夹带。
+V9 结论（提交 `c711798` 时点的全量审查）：综合健康分 99.34（A+），技术债 5536 项，
+五项基石得分 物理卫生 99.5 / 单源规则目录 100.0（468 规则）/ auto-refactor 99.09 /
+workspace-timing 98.1 / WebGames 100.0。唯一未通过项是
+`node scripts/common/validate-physical-hygiene.js` 的 `HYG-TRL-001`（POSIX 单 EOF
+换行）：受检 3327 个文件中命中 9 处，全部位于 **`scratch/`** ——该目录被
+`.gitignore:91` 整体忽略、`git ls-files scratch` 为 0 项，属本机临时草稿，不在本
+改动的交付面内，故未代为修改（红线 11：不得触碰授权面之外的他人文件）。
+早前记录的 `.vscode/workspace-timing.journal` 零字节违规在该时点已不复存在
+（该运行期日志已增长到 262972 字节），由它连带触发的 auto-refactor
+`validate-no-empty-scripts` 失败亦随之消失。与本改动直接相关的检查在该次审查中
+均为 PASS：「24 对同构脚本全部合规」「All 25 skills (90 markdown documents)
+verified successfully with plugin parity」。
 
 ## 七、 防漂移纪律
 
