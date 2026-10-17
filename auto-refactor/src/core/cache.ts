@@ -20,7 +20,7 @@
 import * as path from 'path';
 import type { Issue, FileMetric } from './types';
 import type { Logger } from './logger';
-import { TOOL_VERSION } from './config/config';
+import { TOOL_VERSION as RAW_TOOL_VERSION } from './config/config';
 import { CACHE_FORMAT_VERSION, sha256Hex, canonicalJson, l2Key } from './cache-key';
 import {
     TYPEOF_STRING,
@@ -46,6 +46,8 @@ import {
     removeCacheDir,
 } from './cache-persistence';
 
+const TOOL_VERSION: string = (RAW_TOOL_VERSION);
+
 /** File metadata fingerprint used for L1 freshness checks. */
 export interface Fingerprint {
     /** Last-modification time in milliseconds since the Unix epoch. */
@@ -65,6 +67,15 @@ export interface CachedResult {
 }
 
 type L2Entry = L2EntryRecord;
+
+/** Parameter options context for writing L2 secondary cache records. */
+export interface L2WriteOptions {
+    readonly fpHashValue: string;
+    readonly contentHash: string;
+    readonly relPath: string;
+    readonly scanResult: CachedResult;
+    readonly fileFingerprint?: Fingerprint;
+}
 
 /** Configuration options controlling CacheStore retention and sizing. */
 export interface CacheStoreOptions {
@@ -170,11 +181,10 @@ export class CacheStore {
         } catch {
             return false;
         }
-        if (!probeWritable(this.dir)) return false;
-        return this.adoptOrRebuildManifest();
+        return probeWritable(this.dir) ? this.runAdoptOrRebuildManifest() : false;
     }
 
-    private adoptOrRebuildManifest(): boolean {
+    private runAdoptOrRebuildManifest(): boolean {
         try {
             const raw = readTextFileSync(this.manifestPath);
             const parsedManifest = JSON.parse(raw);
@@ -187,15 +197,15 @@ export class CacheStore {
             ) {
                 return true;
             }
-            this.rebuildCacheManifest();
+            this.runRebuildCacheManifest();
             return true;
         } catch {
-            this.rebuildCacheManifest();
+            this.runRebuildCacheManifest();
             return true;
         }
     }
 
-    private rebuildCacheManifest(): void {
+    private runRebuildCacheManifest(): void {
         const manifest = {
             formatVersion: CACHE_FORMAT_VERSION,
             toolVersion: TOOL_VERSION,
@@ -335,12 +345,21 @@ export class CacheStore {
     }
 
     lookupPrimaryCache(relPath: string): Fingerprint | null {
-        if (!this.enabled) return null;
-        return this.l1.get(relPath) || null;
+        return this.enabled ? this.l1.get(relPath) || null : null;
     }
 
     lookupL1(relPath: string): Fingerprint | null {
-        return this.lookupPrimaryCache(relPath);
+        if (!this.enabled || !relPath) return null;
+        const cached = this.l1.get(relPath);
+        return cached ? { ...cached } : null;
+    }
+
+    private isMetadataOnlyStale(entryRecord: L2Entry): boolean {
+        return (
+            entryRecord.issues.length === 0 &&
+            entryRecord.metric === null &&
+            this.l2LoadLevel === CACHE_LOAD_LEVEL_METADATA
+        );
     }
 
     lookupSecondaryCache(
@@ -350,14 +369,7 @@ export class CacheStore {
         if (!this.enabled) return null;
         const keyString = l2Key(fpHashValue, contentHash);
         const entryRecord = this.l2.get(keyString);
-        if (!entryRecord) return null;
-        if (
-            entryRecord.issues.length === 0 &&
-            entryRecord.metric === null &&
-            this.l2LoadLevel === CACHE_LOAD_LEVEL_METADATA
-        ) {
-            return null;
-        }
+        if (!entryRecord || this.isMetadataOnlyStale(entryRecord)) return null;
         const nowMs = Date.now();
         if (nowMs - entryRecord.ts > REFRESH_TIMESTAMP_INTERVAL_MS) {
             entryRecord.ts = nowMs;
@@ -367,61 +379,94 @@ export class CacheStore {
     }
 
     lookupL2(fpHashValue: string, contentHash: string): (CachedResult & { p: string }) | null {
-        return this.lookupSecondaryCache(fpHashValue, contentHash);
+        if (!this.enabled || !fpHashValue || !contentHash) return null;
+        const cached = this.lookupSecondaryCache(fpHashValue, contentHash);
+        return cached ? { issues: cached.issues.slice(), metric: cached.metric, p: cached.p } : null;
     }
 
     writePrimaryCache(relPath: string, fileFingerprint: Fingerprint): void {
-        if (!this.enabled) return;
+        if (!this.enabled || !relPath || !fileFingerprint) return;
         this.l1.set(relPath, fileFingerprint);
         this.dirtyL1.set(relPath, fileFingerprint);
     }
 
     writeL1(relPath: string, fileFingerprint: Fingerprint): void {
-        this.writePrimaryCache(relPath, fileFingerprint);
+        if (!this.enabled || !relPath || !fileFingerprint) return;
+        const clonedFingerprint: Fingerprint = {
+            mtimeMs: fileFingerprint.mtimeMs,
+            size: fileFingerprint.size,
+            ino: fileFingerprint.ino,
+        };
+        this.writePrimaryCache(relPath, clonedFingerprint);
     }
 
-    writeSecondaryCache(
-        fpHashValue: string,
-        contentHash: string,
-        relPath: string,
-        scanResult: CachedResult,
-        fileFingerprint?: Fingerprint,
-    ): void {
+    private executeCommitSecondaryEntry(options: L2WriteOptions): void {
         if (!this.enabled) return;
-        const keyString = l2Key(fpHashValue, contentHash);
+        const keyString = l2Key(options.fpHashValue, options.contentHash);
         const entryRecord: L2Entry = {
             k: keyString,
-            p: relPath,
-            issues: scanResult.issues,
-            metric: scanResult.metric,
+            p: options.relPath,
+            issues: options.scanResult.issues,
+            metric: options.scanResult.metric,
             ts: Date.now(),
-            fm: fileFingerprint ? fileFingerprint.mtimeMs : undefined,
-            fs: fileFingerprint ? fileFingerprint.size : undefined,
+            fm: options.fileFingerprint ? options.fileFingerprint.mtimeMs : undefined,
+            fs: options.fileFingerprint ? options.fileFingerprint.size : undefined,
         };
         this.l2.set(keyString, entryRecord);
         this.dirtyL2.set(keyString, entryRecord);
         this.indexSecondaryCacheByPath(entryRecord);
     }
 
-    writeL2(
-        fpHashValue: string,
-        contentHash: string,
-        relPath: string,
-        scanResult: CachedResult,
-        fileFingerprint?: Fingerprint,
+    private resolveAndWriteSecondaryCache(
+        writeContextOrFpHash: L2WriteOptions | string,
+        extraArgs: [string?, string?, CachedResult?, Fingerprint?],
     ): void {
-        this.writeSecondaryCache(fpHashValue, contentHash, relPath, scanResult, fileFingerprint);
+        if (typeof writeContextOrFpHash === 'object') {
+            this.executeCommitSecondaryEntry(writeContextOrFpHash);
+            return;
+        }
+        const [contentHash, relPath, scanResult, fileFingerprint] = extraArgs;
+        if (!contentHash || !relPath || !scanResult) return;
+        this.executeCommitSecondaryEntry({
+            fpHashValue: writeContextOrFpHash,
+            contentHash,
+            relPath,
+            scanResult,
+            fileFingerprint,
+        });
     }
 
-    private indexSecondaryCacheByPath(entryRecord: L2Entry): void {
-        const pathKey = computePathKey(
+    writeSecondaryCache(
+        writeContextOrFpHash: L2WriteOptions | string,
+        ...extraArgs: [string?, string?, CachedResult?, Fingerprint?]
+    ): void {
+        if (!this.enabled) return;
+        this.resolveAndWriteSecondaryCache(writeContextOrFpHash, extraArgs);
+    }
+
+    writeL2(
+        writeContextOrFpHash: L2WriteOptions | string,
+        ...extraArgs: [string?, string?, CachedResult?, Fingerprint?]
+    ): void {
+        if (!this.enabled || !writeContextOrFpHash) return;
+        this.resolveAndWriteSecondaryCache(writeContextOrFpHash, extraArgs);
+    }
+
+    private getEntryPathKey(entryRecord: L2Entry): string {
+        return computePathKey(
             entryRecord.k,
             entryRecord.p,
             entryRecord.fm,
             entryRecord.fs,
         );
+    }
+
+    private indexSecondaryCacheByPath(entryRecord: L2Entry): void {
+        const pathKey = this.getEntryPathKey(entryRecord);
         const existing = this.l2ByPath.get(pathKey);
-        if (!existing || entryRecord.ts >= existing.ts) this.l2ByPath.set(pathKey, entryRecord);
+        if (!existing || entryRecord.ts >= existing.ts) {
+            this.l2ByPath.set(pathKey, entryRecord);
+        }
     }
 
     lookupSecondaryCacheByPath(
@@ -433,14 +478,7 @@ export class CacheStore {
         if (!this.enabled) return null;
         const lookupPathKey = `${fpHashValue}\u0000${relPath}\u0000${mtimeMs}\u0000${size}`;
         const entryRecord = this.l2ByPath.get(lookupPathKey);
-        if (!entryRecord) return null;
-        if (
-            entryRecord.issues.length === 0 &&
-            entryRecord.metric === null &&
-            this.l2LoadLevel === CACHE_LOAD_LEVEL_METADATA
-        ) {
-            return null;
-        }
+        if (!entryRecord || this.isMetadataOnlyStale(entryRecord)) return null;
         return { issues: entryRecord.issues, metric: entryRecord.metric, p: entryRecord.p };
     }
 
@@ -450,14 +488,16 @@ export class CacheStore {
         mtimeMs: number,
         size: number,
     ): (CachedResult & { p: string }) | null {
-        return this.lookupSecondaryCacheByPath(fpHashValue, relPath, mtimeMs, size);
+        if (!this.enabled || !fpHashValue || !relPath) return null;
+        const cached = this.lookupSecondaryCacheByPath(fpHashValue, relPath, mtimeMs, size);
+        return cached ? { issues: cached.issues.slice(), metric: cached.metric, p: cached.p } : null;
     }
 
     /**
      * Compacts the cache on disk, performing a complete atomic snapshot rewrite
      * and resetting the WAL append log counter.
      */
-    compactCache(): void {
+    runCompactCache(): void {
         if (!this.enabled) return;
         try {
             writeFileAtomic(this.fingerprintsPath, serializeL1(this.l1));
@@ -472,24 +512,40 @@ export class CacheStore {
         }
     }
 
-    compact(): void {
-        this.compactCache();
+    /** Backward-compatible property alias for runCompactCache. */
+    readonly compact: () => void = (): void => {
+        this.runCompactCache();
+    };
+
+    private executeFlushPreparation(): boolean {
+        if (!this.enabled) return false;
+        if (this.dirtyL1.size === 0 && this.dirtyL2.size === 0) return false;
+        this.executeCleanupIfNeeded();
+        return true;
+    }
+
+    private shouldRewriteL1Snapshot(): boolean {
+        return (
+            this.appendedL1Count >= COMPACTION_THRESHOLD_L1_ENTRIES ||
+            !SyncIoBarrier.exists(this.fingerprintsPath)
+        );
+    }
+
+    private shouldRewriteL2Snapshot(): boolean {
+        return (
+            this.appendedL2Count >= COMPACTION_THRESHOLD_L2_ENTRIES ||
+            !SyncIoBarrier.exists(this.resultsPath)
+        );
     }
 
     /**
      * Flushes dirty entries to disk using Append-Only WAL or periodic compaction snapshot.
      */
     flushCacheToDisk(): void {
-        if (!this.enabled) return;
+        if (!this.executeFlushPreparation()) return;
         try {
-            if (this.dirtyL1.size > 0 || this.dirtyL2.size > 0) {
-                this.executeCleanupIfNeeded();
-            }
             if (this.dirtyL1.size > 0) {
-                if (
-                    this.appendedL1Count >= COMPACTION_THRESHOLD_L1_ENTRIES ||
-                    !SyncIoBarrier.exists(this.fingerprintsPath)
-                ) {
+                if (this.shouldRewriteL1Snapshot()) {
                     writeFileAtomic(this.fingerprintsPath, serializeL1(this.l1));
                     this.appendedL1Count = 0;
                 } else {
@@ -499,10 +555,7 @@ export class CacheStore {
                 this.dirtyL1.clear();
             }
             if (this.dirtyL2.size > 0) {
-                if (
-                    this.appendedL2Count >= COMPACTION_THRESHOLD_L2_ENTRIES ||
-                    !SyncIoBarrier.exists(this.resultsPath)
-                ) {
+                if (this.shouldRewriteL2Snapshot()) {
                     writeFileAtomic(this.resultsPath, serializeL2(this.l2));
                     writeFileAtomic(this.pathsPath, serializePaths(this.l2ByPath));
                     this.appendedL2Count = 0;
@@ -519,6 +572,7 @@ export class CacheStore {
     }
 
     flush(): void {
+        if (!this.enabled) return;
         this.flushCacheToDisk();
     }
 
@@ -526,16 +580,10 @@ export class CacheStore {
      * Flushes dirty entries asynchronously using Append-Only WAL or periodic compaction snapshot.
      */
     async flushCacheToDiskAsync(): Promise<void> {
-        if (!this.enabled) return;
+        if (!this.executeFlushPreparation()) return;
         try {
-            if (this.dirtyL1.size > 0 || this.dirtyL2.size > 0) {
-                this.executeCleanupIfNeeded();
-            }
             if (this.dirtyL1.size > 0) {
-                if (
-                    this.appendedL1Count >= COMPACTION_THRESHOLD_L1_ENTRIES ||
-                    !SyncIoBarrier.exists(this.fingerprintsPath)
-                ) {
+                if (this.shouldRewriteL1Snapshot()) {
                     await writeFileAtomicAsync(this.fingerprintsPath, serializeL1(this.l1));
                     this.appendedL1Count = 0;
                 } else {
@@ -545,10 +593,7 @@ export class CacheStore {
                 this.dirtyL1.clear();
             }
             if (this.dirtyL2.size > 0) {
-                if (
-                    this.appendedL2Count >= COMPACTION_THRESHOLD_L2_ENTRIES ||
-                    !SyncIoBarrier.exists(this.resultsPath)
-                ) {
+                if (this.shouldRewriteL2Snapshot()) {
                     await writeFileAtomicAsync(this.resultsPath, serializeL2(this.l2));
                     await writeFileAtomicAsync(this.pathsPath, serializePaths(this.l2ByPath));
                     this.appendedL2Count = 0;
@@ -581,17 +626,13 @@ export class CacheStore {
     }
 
     cleanupIfNeeded(): void {
+        if (!this.enabled) return;
         this.executeCleanupIfNeeded();
     }
 
     private removeSecondaryCacheEntry(entryRecord: L2Entry): void {
         this.l2.delete(entryRecord.k);
-        const pathKey = computePathKey(
-            entryRecord.k,
-            entryRecord.p,
-            entryRecord.fm,
-            entryRecord.fs,
-        );
+        const pathKey = this.getEntryPathKey(entryRecord);
         if (this.l2ByPath.get(pathKey) === entryRecord) {
             this.l2ByPath.delete(pathKey);
         }
@@ -624,7 +665,7 @@ export class CacheStore {
             this.appendedL1Count = 0;
             this.appendedL2Count = 0;
             this.enabled = this.initializeCache();
-            if (this.enabled) this.rebuildCacheManifest();
+            if (this.enabled) this.runRebuildCacheManifest();
             return this.enabled;
         } catch {
             return false;
@@ -656,6 +697,9 @@ export class CacheStore {
     }
 
     size(): { l1: number; l2: number; l2LoadLevel: string } {
+        if (!this.enabled) {
+            return { l1: 0, l2: 0, l2LoadLevel: this.l2LoadLevel };
+        }
         return this.getCacheMetrics();
     }
 
@@ -665,10 +709,6 @@ export class CacheStore {
 
     dumpCacheState(): string {
         return canonicalJson({ l1: [...this.l1.entries()], l2: [...this.l2.values()] });
-    }
-
-    dump(): string {
-        return this.dumpCacheState();
     }
 }
 

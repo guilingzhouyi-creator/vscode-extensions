@@ -73,6 +73,7 @@ export const SyncIoBarrier = {
             return -1;
         }
     },
+    queryStat: (filePath: string): fs.Stats => syncFsStat(filePath),
     exists: syncFsExists,
     remove: (targetPath: string): void => {
         try {
@@ -111,16 +112,16 @@ export function readLinesSafe(filePath: string): string[] {
  * Appends lines safely to a target file synchronously, creating if absent.
  *
  * @param filePath - Target file path.
- * @param data - Content string to append.
+ * @param appendContent - Content string to append.
  */
-export function appendLinesSafe(filePath: string, data: string): void {
-    if (!data) return;
+export function appendLinesSafe(filePath: string, appendContent: string): void {
+    if (!appendContent) return;
     try {
         if (!SyncIoBarrier.exists(filePath)) {
-            writeFileAtomic(filePath, data);
+            writeFileAtomic(filePath, appendContent);
             return;
         }
-        appendTextFileSync(filePath, data);
+        appendTextFileSync(filePath, appendContent);
     } catch {
         /* Best-effort: ignore append failure */
     }
@@ -129,14 +130,14 @@ export function appendLinesSafe(filePath: string, data: string): void {
 /**
  * Atomic write: .tmp-<pid>-<rand> + rename.
  *
- * @param file - Target file path.
- * @param data - Content string to write.
+ * @param targetFile - Target file path.
+ * @param fileContent - Content string to write.
  */
-export function writeFileAtomic(file: string, data: string): void {
-    const stagingPath = `${file}.tmp-${process.pid}-${Math.random().toString(RANDOM_STRING_RADIX).slice(2, STAGING_SUFFIX_SLICE_END)}`;
-    writeTextFileSync(stagingPath, data);
+export function writeFileAtomic(targetFile: string, fileContent: string): void {
+    const stagingPath = `${targetFile}.tmp-${process.pid}-${Math.random().toString(RANDOM_STRING_RADIX).slice(2, STAGING_SUFFIX_SLICE_END)}`;
+    writeTextFileSync(stagingPath, fileContent);
     try {
-        SyncIoBarrier.rename(stagingPath, file);
+        SyncIoBarrier.rename(stagingPath, targetFile);
     } catch (e) {
         SyncIoBarrier.remove(stagingPath);
         throw e;
@@ -160,14 +161,14 @@ export function probeWritable(dir: string): boolean {
     }
 }
 
-function isValidL1(o: unknown): o is { t: string; p: string; m: number; s: number; i?: number } {
-    const obj = o as Record<string, unknown> | null;
+function isValidL1(candidateObj: unknown): candidateObj is { t: string; p: string; m: number; s: number; i?: number } {
+    const rawRecord = candidateObj as Record<string, unknown> | null;
     return Boolean(
-        obj &&
-        obj.t === 'f' &&
-        typeof obj.p === TYPEOF_STRING &&
-        typeof obj.m === TYPEOF_NUMBER &&
-        typeof obj.s === TYPEOF_NUMBER,
+        rawRecord &&
+        rawRecord.t === 'f' &&
+        typeof rawRecord.p === TYPEOF_STRING &&
+        typeof rawRecord.m === TYPEOF_NUMBER &&
+        typeof rawRecord.s === TYPEOF_NUMBER,
     );
 }
 
@@ -179,12 +180,12 @@ function isValidL1(o: unknown): o is { t: string; p: string; m: number; s: numbe
  */
 export function parseL1Line(line: string, targetMap: Map<string, Fingerprint>): void {
     try {
-        const o = JSON.parse(line);
-        if (!isValidL1(o)) return;
-        targetMap.set(o.p, {
-            mtimeMs: o.m,
-            size: o.s,
-            ino: typeof o.i === TYPEOF_NUMBER ? o.i : undefined,
+        const parsedRecord = JSON.parse(line);
+        if (!isValidL1(parsedRecord)) return;
+        targetMap.set(parsedRecord.p, {
+            mtimeMs: parsedRecord.m,
+            size: parsedRecord.s,
+            ino: typeof parsedRecord.i === TYPEOF_NUMBER ? parsedRecord.i : undefined,
         });
     } catch {
         /* Best-effort: skip corrupt line */
@@ -194,10 +195,10 @@ export function parseL1Line(line: string, targetMap: Map<string, Fingerprint>): 
 /**
  * Type guard validating whether an object is a valid L2 cache record.
  *
- * @param o - Object to validate.
+ * @param candidateObj - Object to validate.
  * @returns True if object is a valid L2 record.
  */
-export function isValidL2(o: unknown): o is {
+export function isValidL2(candidateObj: unknown): candidateObj is {
     t: string;
     k: string;
     p: string;
@@ -207,26 +208,26 @@ export function isValidL2(o: unknown): o is {
     fm?: number;
     fs?: number;
 } {
-    const obj = o as Record<string, unknown> | null;
+    const rawRecord = candidateObj as Record<string, unknown> | null;
     return Boolean(
-        obj &&
-        obj.t === 'r' &&
-        typeof obj.k === TYPEOF_STRING &&
-        typeof obj.p === TYPEOF_STRING &&
-        Array.isArray(obj.issues),
+        rawRecord &&
+        rawRecord.t === 'r' &&
+        typeof rawRecord.k === TYPEOF_STRING &&
+        typeof rawRecord.p === TYPEOF_STRING &&
+        Array.isArray(rawRecord.issues),
     );
 }
 
 /**
  * Type guard validating whether an object is a valid path index record.
  *
- * @param o - Object to validate.
+ * @param candidateObj - Object to validate.
  * @returns True if object is a valid path entry.
  */
-export function isValidPathEntry(o: unknown): o is { t: string; pk: string; k: string } {
-    const obj = o as Record<string, unknown> | null;
+export function isValidPathEntry(candidateObj: unknown): candidateObj is { t: string; pk: string; k: string } {
+    const rawRecord = candidateObj as Record<string, unknown> | null;
     return Boolean(
-        obj && obj.t === 'x' && typeof obj.pk === TYPEOF_STRING && typeof obj.k === TYPEOF_STRING,
+        rawRecord && rawRecord.t === 'x' && typeof rawRecord.pk === TYPEOF_STRING && typeof rawRecord.k === TYPEOF_STRING,
     );
 }
 
@@ -238,10 +239,10 @@ export function isValidPathEntry(o: unknown): o is { t: string; pk: string; k: s
  */
 export function serializeL1(l1: Map<string, Fingerprint>): string {
     const lines: string[] = [];
-    for (const [p, fp] of l1) {
-        const o: Record<string, unknown> = { t: 'f', p, m: fp.mtimeMs, s: fp.size };
-        if (fp.ino !== undefined) o.i = fp.ino;
-        lines.push(JSON.stringify(o));
+    for (const [relPath, fingerprint] of l1) {
+        const lineObj: Record<string, unknown> = { t: 'f', p: relPath, m: fingerprint.mtimeMs, s: fingerprint.size };
+        if (fingerprint.ino !== undefined) lineObj.i = fingerprint.ino;
+        lines.push(JSON.stringify(lineObj));
     }
     return lines.join(NEWLINE_CHAR) + (lines.length ? NEWLINE_CHAR : '');
 }
@@ -254,18 +255,18 @@ export function serializeL1(l1: Map<string, Fingerprint>): string {
  */
 export function serializeL2(l2: Map<string, L2EntryRecord>): string {
     const lines: string[] = [];
-    for (const e of l2.values()) {
-        const o: Record<string, unknown> = {
+    for (const entry of l2.values()) {
+        const lineObj: Record<string, unknown> = {
             t: 'r',
-            k: e.k,
-            p: e.p,
-            issues: e.issues,
-            metric: e.metric,
-            ts: e.ts,
+            k: entry.k,
+            p: entry.p,
+            issues: entry.issues,
+            metric: entry.metric,
+            ts: entry.ts,
         };
-        if (e.fm !== undefined) o.fm = e.fm;
-        if (e.fs !== undefined) o.fs = e.fs;
-        lines.push(JSON.stringify(o));
+        if (entry.fm !== undefined) lineObj.fm = entry.fm;
+        if (entry.fs !== undefined) lineObj.fs = entry.fs;
+        lines.push(JSON.stringify(lineObj));
     }
     return lines.join(NEWLINE_CHAR) + (lines.length ? NEWLINE_CHAR : '');
 }
@@ -309,8 +310,8 @@ export function computePathKey(
  */
 export function serializePaths(l2ByPath: Map<string, L2EntryRecord>): string {
     const lines: string[] = [];
-    for (const [pk, e] of l2ByPath) {
-        lines.push(JSON.stringify({ t: 'x', pk, k: e.k }));
+    for (const [pathKey, entryRecord] of l2ByPath) {
+        lines.push(JSON.stringify({ t: 'x', pk: pathKey, k: entryRecord.k }));
     }
     return lines.join(NEWLINE_CHAR) + (lines.length ? NEWLINE_CHAR : '');
 }
@@ -324,8 +325,8 @@ export function serializePaths(l2ByPath: Map<string, L2EntryRecord>): string {
 export function serializeDirtyPaths(dirtyEntries: Iterable<L2EntryRecord>): string {
     const lines: string[] = [];
     for (const entry of dirtyEntries) {
-        const pk = computePathKey(entry.k, entry.p, entry.fm, entry.fs);
-        lines.push(JSON.stringify({ t: 'x', pk, k: entry.k }));
+        const pathKey = computePathKey(entry.k, entry.p, entry.fm, entry.fs);
+        lines.push(JSON.stringify({ t: 'x', pk: pathKey, k: entry.k }));
     }
     return lines.join(NEWLINE_CHAR) + (lines.length ? NEWLINE_CHAR : '');
 }
@@ -369,20 +370,20 @@ export async function readTextFileAsync(filePath: string): Promise<string> {
  * Writes file contents asynchronously as UTF-8 string.
  *
  * @param filePath - Path to file.
- * @param data - Content string to write.
+ * @param fileContent - Content string to write.
  */
-export async function writeTextFileAsync(filePath: string, data: string): Promise<void> {
-    await fs.promises.writeFile(filePath, data, ENCODING_UTF8);
+export async function writeTextFileAsync(filePath: string, fileContent: string): Promise<void> {
+    await fs.promises.writeFile(filePath, fileContent, ENCODING_UTF8);
 }
 
 /**
  * Appends file contents asynchronously as UTF-8 string.
  *
  * @param filePath - Path to file.
- * @param data - Content string to append.
+ * @param appendContent - Content string to append.
  */
-export async function appendTextFileAsync(filePath: string, data: string): Promise<void> {
-    await fs.promises.appendFile(filePath, data, ENCODING_UTF8);
+export async function appendTextFileAsync(filePath: string, appendContent: string): Promise<void> {
+    await fs.promises.appendFile(filePath, appendContent, ENCODING_UTF8);
 }
 
 /**
@@ -398,11 +399,11 @@ export async function readLinesSafeAsync(filePath: string): Promise<string[]> {
         }
         const lines: string[] = [];
         const fileStream = fs.createReadStream(filePath, { encoding: ENCODING_UTF8 });
-        const rl = readline.createInterface({
+        const lineReader = readline.createInterface({
             input: fileStream,
             crlfDelay: Infinity,
         });
-        for await (const line of rl) {
+        for await (const line of lineReader) {
             lines.push(line);
         }
         return lines;
@@ -414,14 +415,14 @@ export async function readLinesSafeAsync(filePath: string): Promise<string[]> {
 /**
  * Atomic write asynchronously: .tmp-<pid>-<rand> + rename.
  *
- * @param file - Target file path.
- * @param data - Content string to write.
+ * @param targetFile - Target file path.
+ * @param fileContent - Content string to write.
  */
-export async function writeFileAtomicAsync(file: string, data: string): Promise<void> {
-    const stagingPath = `${file}.tmp-${process.pid}-${Math.random().toString(RANDOM_STRING_RADIX).slice(2, STAGING_SUFFIX_SLICE_END)}`;
-    await writeTextFileAsync(stagingPath, data);
+export async function writeFileAtomicAsync(targetFile: string, fileContent: string): Promise<void> {
+    const stagingPath = `${targetFile}.tmp-${process.pid}-${Math.random().toString(RANDOM_STRING_RADIX).slice(2, STAGING_SUFFIX_SLICE_END)}`;
+    await writeTextFileAsync(stagingPath, fileContent);
     try {
-        await fs.promises.rename(stagingPath, file);
+        await fs.promises.rename(stagingPath, targetFile);
     } catch (e) {
         try {
             await fs.promises.unlink(stagingPath);
@@ -436,16 +437,16 @@ export async function writeFileAtomicAsync(file: string, data: string): Promise<
  * Appends lines safely to a target file asynchronously, creating if absent.
  *
  * @param filePath - Target file path.
- * @param data - Content string to append.
+ * @param appendContent - Content string to append.
  */
-export async function appendLinesSafeAsync(filePath: string, data: string): Promise<void> {
-    if (!data) return;
+export async function appendLinesSafeAsync(filePath: string, appendContent: string): Promise<void> {
+    if (!appendContent) return;
     try {
         if (!SyncIoBarrier.exists(filePath)) {
-            await writeFileAtomicAsync(filePath, data);
+            await writeFileAtomicAsync(filePath, appendContent);
             return;
         }
-        await appendTextFileAsync(filePath, data);
+        await appendTextFileAsync(filePath, appendContent);
     } catch {
         /* Best-effort: ignore append failure */
     }

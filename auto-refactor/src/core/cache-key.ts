@@ -22,8 +22,11 @@ import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import type { ScanConfig, ParserKind } from './types';
-import { TOOL_VERSION } from './config/config';
+import { TOOL_VERSION as RAW_TOOL_VERSION } from './config/config';
 import { policyFromAnalyzers, fastPathEnabled, FAST_PATH_ANALYZERS } from './ast/traverse';
+
+/** Canonical tool version identity string. */
+export const TOOL_VERSION: string = (RAW_TOOL_VERSION);
 
 /**
  * Warm-scan cache key construction (docs/01-architecture/02-pipeline-and-caching.md §B2).
@@ -66,13 +69,31 @@ const DECIMAL_RADIX = 10;
 /** Adapter id for TypeScript/JavaScript-family files; also the default ParserKind. */
 const TYPESCRIPT_ADAPTER_ID = 'typescript';
 
+/** Module path constant for constants analyzer. */
+const MODULE_PATH_CONSTANTS = '../analyzers/constants';
+
+/** Module path constant for large-file analyzer. */
+const MODULE_PATH_LARGE_FILE = '../analyzers/large-file';
+
+/** Module path constant for complexity analyzer. */
+const MODULE_PATH_COMPLEXITY = '../analyzers/complexity';
+
+/** Module path constant for governance analyzer. */
+const MODULE_PATH_GOVERNANCE = '../analyzers/governance';
+
 /** Built-in adapter module-path map (mirrors analyzer.ts BUILTIN_MODULE_PATHS). */
 const BUILTIN_MODULE_PATHS: Record<string, string> = {
-    constants: '../analyzers/constants',
-    'large-file': '../analyzers/large-file',
-    complexity: '../analyzers/complexity',
-    governance: '../analyzers/governance',
+    constants: MODULE_PATH_CONSTANTS,
+    'large-file': MODULE_PATH_LARGE_FILE,
+    complexity: MODULE_PATH_COMPLEXITY,
+    governance: MODULE_PATH_GOVERNANCE,
 };
+
+/** Null byte delimiter for multi-part hashing. */
+const NULL_BYTE_DELIMITER = '\u0000';
+
+/** Default fallback severity for unsupported file languages. */
+const DEFAULT_UNSUPPORTED_SEVERITY = 'error';
 
 /**
  * Serialize a value to canonical JSON with object keys sorted lexicographically, arrays kept
@@ -80,27 +101,28 @@ const BUILTIN_MODULE_PATHS: Record<string, string> = {
  * keys and tests (docs/01-architecture/02-pipeline-and-caching.md Appendix A); non-finite
  * numbers become `null` so hashes stay stable and JSON-compatible.
  *
- * @param obj - Value to serialize; callers should pass JSON-compatible data.
+ * @param serializeTarget - Value to serialize; callers should pass JSON-compatible data.
  * @returns Stable JSON text suitable for hashing, independent of object key insertion order.
  */
-export function canonicalJson(obj: unknown): string {
-    return stableStringify(obj);
+export function getCanonicalJson(serializeTarget: unknown): string {
+    if (serializeTarget === null || typeof serializeTarget !== 'object') {
+        if (typeof serializeTarget === 'number' && !Number.isFinite(serializeTarget)) {
+            return 'null';
+        }
+        return JSON.stringify(serializeTarget);
+    }
+    if (Array.isArray(serializeTarget)) {
+        return '[' + serializeTarget.map(getCanonicalJson).join(',') + ']';
+    }
+    const sortedKeys = Object.keys(serializeTarget as Record<string, unknown>).sort();
+    const entryPairs = sortedKeys.map(
+        (keyName) => JSON.stringify(keyName) + ':' + getCanonicalJson((serializeTarget as Record<string, unknown>)[keyName]),
+    );
+    return '{' + entryPairs.join(',') + '}';
 }
 
-function stableStringify(value: unknown): string {
-    if (value === null || typeof value !== 'object') {
-        if (typeof value === 'number' && !Number.isFinite(value)) return 'null';
-        return JSON.stringify(value);
-    }
-    if (Array.isArray(value)) {
-        return '[' + value.map(stableStringify).join(',') + ']';
-    }
-    const keys = Object.keys(value as Record<string, unknown>).sort();
-    const parts = keys.map(
-        (k) => JSON.stringify(k) + ':' + stableStringify((value as Record<string, unknown>)[k]),
-    );
-    return '{' + parts.join(',') + '}';
-}
+/** Backward-compatible export alias for canonicalJson. */
+export const canonicalJson = getCanonicalJson;
 
 /**
  * Compute the lowercase hex SHA-256 digest of a string or Buffer. Passing a Buffer hashes its
@@ -109,9 +131,12 @@ function stableStringify(value: unknown): string {
  * @param input - UTF-8 text to hash, or raw bytes when a Buffer is supplied.
  * @returns 64-character lowercase hexadecimal digest.
  */
-export function sha256Hex(input: string | Buffer): string {
+export function computeSha256Hex(input: string | Buffer): string {
     return crypto.createHash('sha256').update(input).digest('hex');
 }
+
+/** Backward-compatible export alias for sha256Hex. */
+export const sha256Hex = computeSha256Hex;
 
 /** Fingerprint description of one enabled analyzer (used to build the cache key). */
 export interface FingerprintAnalyzerDesc {
@@ -177,36 +202,39 @@ function collectBuiltinDescs(
     }
 }
 
-function collectCustomDescs(
-    customAnalyzers:
+interface CustomAnalyzerCollectorContext {
+    readonly customAnalyzers:
         | Array<{
               name: string;
               module: string;
               enabled?: boolean;
               options?: Record<string, unknown>;
           }>
-        | undefined,
-    thresholds: ScanConfig['thresholds'],
-    baseDir: string | undefined,
-    descs: FingerprintAnalyzerDesc[],
-    seen: Set<string>,
-): void {
+        | undefined;
+    readonly thresholds: ScanConfig['thresholds'];
+    readonly baseDir: string | undefined;
+    readonly descs: FingerprintAnalyzerDesc[];
+    readonly seen: Set<string>;
+}
+
+function collectCustomDescs(context: CustomAnalyzerCollectorContext): void {
+    const { customAnalyzers, thresholds, baseDir, descs, seen } = context;
     if (!customAnalyzers || customAnalyzers.length === 0) {
         return;
     }
-    for (const c of customAnalyzers) {
-        if (c.enabled === false || seen.has(c.name)) continue;
-        const modPath = path.isAbsolute(c.module)
-            ? c.module
-            : path.resolve(baseDir || process.cwd(), c.module);
+    for (const customEntry of customAnalyzers) {
+        if (customEntry.enabled === false || seen.has(customEntry.name)) continue;
+        const modPath = path.isAbsolute(customEntry.module)
+            ? customEntry.module
+            : path.resolve(baseDir || process.cwd(), customEntry.module);
         descs.push({
-            name: c.name,
+            name: customEntry.name,
             version: 1,
             modulePath: modPath,
-            options: mergeAnalyzerOptions(thresholds, c.options),
+            options: mergeAnalyzerOptions(thresholds, customEntry.options),
             legacy: true,
         });
-        seen.add(c.name);
+        seen.add(customEntry.name);
     }
 }
 
@@ -225,13 +253,22 @@ function readCustomModuleBuffer(modulePath: string): Buffer | null {
  * @param config - Scan configuration supplying enabled analyzers and thresholds.
  * @returns Array of fingerprint descriptors used for cache validation.
  */
-export function fingerprintAnalyzerDescs(config: ScanConfig): FingerprintAnalyzerDesc[] {
+export function getFingerprintAnalyzerDescs(config: ScanConfig): FingerprintAnalyzerDesc[] {
     const descs: FingerprintAnalyzerDesc[] = [];
     const seen = new Set<string>();
     collectBuiltinDescs(config.analyzers, config.thresholds, descs, seen);
-    collectCustomDescs(config.customAnalyzers, config.thresholds, config.baseDir, descs, seen);
+    collectCustomDescs({
+        customAnalyzers: config.customAnalyzers,
+        thresholds: config.thresholds,
+        baseDir: config.baseDir,
+        descs,
+        seen,
+    });
     return descs;
 }
+
+/** Backward-compatible export alias for fingerprintAnalyzerDescs. */
+export const fingerprintAnalyzerDescs = getFingerprintAnalyzerDescs;
 
 /**
  * Resolve an adapter id without loading any adapter module, keeping the daemon main thread
@@ -243,13 +280,17 @@ export function fingerprintAnalyzerDescs(config: ScanConfig): FingerprintAnalyze
  * @param parser - TS/JS-family parser preference; it is ignored for Rust and unknown types.
  * @returns Adapter id stored in cache fingerprints (`typescript`, `oxc`, or `rust`).
  */
-export function adapterIdFor(rel: string, parser: ParserKind = TYPESCRIPT_ADAPTER_ID): string {
+export function getAdapterIdFor(rel: string, parser: ParserKind = TYPESCRIPT_ADAPTER_ID): string {
     const ext = path.extname(rel).toLowerCase();
     const tsFamily = ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'];
-    if (tsFamily.includes(ext)) return parser === 'oxc' ? 'oxc' : TYPESCRIPT_ADAPTER_ID;
-    if (ext === '.rs') return 'rust';
-    return TYPESCRIPT_ADAPTER_ID;
+    if (tsFamily.includes(ext)) {
+        return parser === 'oxc' ? 'oxc' : TYPESCRIPT_ADAPTER_ID;
+    }
+    return ext === '.rs' ? 'rust' : TYPESCRIPT_ADAPTER_ID;
 }
+
+/** Backward-compatible export alias for adapterIdFor. */
+export const adapterIdFor = getAdapterIdFor;
 
 /**
  * Hash the custom-analyzer modules that participate in L2 caching
@@ -262,16 +303,15 @@ export function adapterIdFor(rel: string, parser: ParserKind = TYPESCRIPT_ADAPTE
  */
 export function computeCustomHash(descs: FingerprintAnalyzerDesc[]): string | null {
     const parts: string[] = [];
-    for (const d of descs) {
-        if (!d.legacy) continue; // only external plug-ins participate in the custom hash
-        const content = readCustomModuleBuffer(d.modulePath);
+    for (const desc of descs) {
+        if (!desc.legacy) continue; // only external plug-ins participate in the custom hash
+        const content = readCustomModuleBuffer(desc.modulePath);
         if (!content) return null;
-        parts.push(d.modulePath);
-        parts.push(sha256Hex(content));
-        parts.push(canonicalJson(d.options));
+        parts.push(desc.modulePath);
+        parts.push(computeSha256Hex(content));
+        parts.push(getCanonicalJson(desc.options));
     }
-    if (parts.length === 0) return null;
-    return sha256Hex(parts.join('\u0000'));
+    return parts.length === 0 ? null : computeSha256Hex(parts.join(NULL_BYTE_DELIMITER));
 }
 
 /**
@@ -306,6 +346,40 @@ export interface FingerprintPayload {
 }
 
 /**
+ * Optional options bag for buildFingerprintPayload to avoid parameter expansion.
+ */
+export interface FingerprintPayloadOptions {
+    readonly descs?: FingerprintAnalyzerDesc[];
+    readonly customHash?: string | null;
+}
+
+function parseFingerprintOptionalArgs(
+    optionalArgs: [(FingerprintAnalyzerDesc[] | FingerprintPayloadOptions)?, (string | null)?],
+): { descs?: FingerprintAnalyzerDesc[]; customHash: string | null } {
+    const firstOptional = optionalArgs[0];
+    if (firstOptional && !Array.isArray(firstOptional) && typeof firstOptional === 'object') {
+        return {
+            descs: firstOptional.descs,
+            customHash: firstOptional.customHash ?? null,
+        };
+    }
+    return {
+        descs: firstOptional as FingerprintAnalyzerDesc[] | undefined,
+        customHash: optionalArgs[1] ?? null,
+    };
+}
+
+function isFastPathEligible(
+    legacyCount: number,
+    streamingNames: string[],
+    adapterId: string,
+): boolean {
+    if (!fastPathEnabled() || legacyCount !== 0) return false;
+    if (adapterId !== TYPESCRIPT_ADAPTER_ID && adapterId !== 'oxc') return false;
+    return streamingNames.every((analyzerName) => FAST_PATH_ANALYZERS.has(analyzerName));
+}
+
+/**
  * Build the FingerprintPayload for one (adapterId, fileExt) combination.
  *
  * `descs` is optional: when provided (the scan pipeline passes its resolved plan) it is used
@@ -315,32 +389,29 @@ export interface FingerprintPayload {
  * @param config - Resolved scan config supplying thresholds and fallback descriptors.
  * @param adapterId - Adapter identity for this file family (typescript/oxc/rust).
  * @param fileExt - Lower-case file extension recorded in the payload.
- * @param descs - Optional resolved analyzer plan; derived from `config` when omitted or empty.
- * @param customHash - Optional custom-analyzer hash; null disables custom L2 entries.
+ * @param optionalArgs - Optional descriptors array, options object, and custom hash.
  * @returns Fingerprint payload whose canonical hash forms the stable per-file cache key.
  */
 export function buildFingerprintPayload(
     config: ScanConfig,
     adapterId: string,
     fileExt: string,
-    descs?: FingerprintAnalyzerDesc[],
-    customHash: string | null = null,
+    ...optionalArgs: [(FingerprintAnalyzerDesc[] | FingerprintPayloadOptions)?, (string | null)?]
 ): FingerprintPayload {
-    const resolved = descs && descs.length > 0 ? descs : fingerprintAnalyzerDescs(config);
-    const legacyCount = resolved.filter((d) => d.legacy).length;
-    const streamingNames = resolved.filter((d) => !d.legacy).map((d) => d.name);
+    const parsed = parseFingerprintOptionalArgs(optionalArgs);
+    const resolved = parsed.descs && parsed.descs.length > 0
+        ? parsed.descs
+        : getFingerprintAnalyzerDescs(config);
+    const legacyCount = resolved.filter((desc) => desc.legacy).length;
+    const streamingNames = resolved.filter((desc) => !desc.legacy).map((desc) => desc.name);
     const policy = policyFromAnalyzers(streamingNames);
-    const fastPath =
-        fastPathEnabled() &&
-        legacyCount === 0 &&
-        streamingNames.every((n) => FAST_PATH_ANALYZERS.has(n)) &&
-        (adapterId === TYPESCRIPT_ADAPTER_ID || adapterId === 'oxc');
+    const fastPath = isFastPathEligible(legacyCount, streamingNames, adapterId);
 
-    const analyzers = resolved.map((d) => ({
-        name: d.name,
-        version: d.version,
-        modulePath: d.modulePath,
-        optionsHash: sha256Hex(canonicalJson(d.options)),
+    const analyzers = resolved.map((desc) => ({
+        name: desc.name,
+        version: desc.version,
+        modulePath: desc.modulePath,
+        optionsHash: computeSha256Hex(getCanonicalJson(desc.options)),
     }));
 
     return {
@@ -352,13 +423,13 @@ export function buildFingerprintPayload(
         projection: {
             fastPath,
             legacyCount,
-            policyHash: sha256Hex(canonicalJson(policy)),
+            policyHash: computeSha256Hex(getCanonicalJson(policy)),
         },
         analyzers,
         thresholds: config.thresholds as Record<string, any>,
-        customHash,
+        customHash: parsed.customHash,
         fileExt,
-        unsupportedLanguage: config.unsupportedLanguage ?? 'error',
+        unsupportedLanguage: config.unsupportedLanguage ?? DEFAULT_UNSUPPORTED_SEVERITY,
     };
 }
 
@@ -369,9 +440,12 @@ export function buildFingerprintPayload(
  * @param payload - Complete fingerprint payload built by `buildFingerprintPayload`.
  * @returns 64-character lowercase hex fingerprint hash.
  */
-export function fpHash(payload: FingerprintPayload): string {
-    return sha256Hex(canonicalJson(payload));
+export function computeFingerprintHash(payload: FingerprintPayload): string {
+    return computeSha256Hex(getCanonicalJson(payload));
 }
+
+/** Backward-compatible export alias for fpHash. */
+export const fpHash = computeFingerprintHash;
 
 /**
  * Compose the versioned L2 storage key from a configuration fingerprint and a file content
@@ -382,9 +456,12 @@ export function fpHash(payload: FingerprintPayload): string {
  * @param contentHash - SHA-256 hash of the file's raw bytes.
  * @returns Versioned L2 cache key.
  */
-export function l2Key(fpHashValue: string, contentHash: string): string {
+export function computeL2Key(fpHashValue: string, contentHash: string): string {
     return `v1:${fpHashValue}:${contentHash}`;
 }
+
+/** Backward-compatible export alias for l2Key. */
+export const l2Key = computeL2Key;
 
 /**
  * Build the config-level pool fingerprint
@@ -400,19 +477,19 @@ export function buildPoolFingerprint(
     config: ScanConfig,
     descs?: FingerprintAnalyzerDesc[],
 ): string {
-    const resolved = descs && descs.length > 0 ? descs : fingerprintAnalyzerDescs(config);
+    const resolved = descs && descs.length > 0 ? descs : getFingerprintAnalyzerDescs(config);
     const payload = {
         toolVersion: TOOL_VERSION,
         nodeMajor: parseInt(process.versions.node.split('.')[0], DECIMAL_RADIX) || 0,
         parser: config.parser,
-        analyzers: resolved.map((d) => ({
-            name: d.name,
-            version: d.version,
-            modulePath: d.modulePath,
-            optionsHash: sha256Hex(canonicalJson(d.options)),
+        analyzers: resolved.map((desc) => ({
+            name: desc.name,
+            version: desc.version,
+            modulePath: desc.modulePath,
+            optionsHash: computeSha256Hex(getCanonicalJson(desc.options)),
         })),
         thresholds: config.thresholds as Record<string, any>,
         customHash: computeCustomHash(resolved),
     };
-    return sha256Hex(canonicalJson(payload));
+    return computeSha256Hex(getCanonicalJson(payload));
 }

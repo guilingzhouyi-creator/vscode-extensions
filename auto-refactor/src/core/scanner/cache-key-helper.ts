@@ -10,7 +10,6 @@
  *   remaps file-path references for L2 sharing without mutating original cached records.
  */
 
-import * as fs from 'fs';
 import * as path from 'path';
 import type { ScanConfig, Issue, FileMetric } from '../types';
 import type { ResolvedAnalyzer } from '../analyzer-registry';
@@ -24,6 +23,7 @@ import {
     buildPoolFingerprint,
 } from '../cache-key';
 import type { CachedResult, Fingerprint } from '../cache';
+import { SyncIoBarrier } from '../cache-persistence';
 import type { IncrementalFileState } from '../diff/incremental-state';
 
 /** TypeScript declaration-file suffix, keyed separately from a plain `.ts` extension. */
@@ -61,28 +61,31 @@ export interface CacheFingerprintContext {
  * Re-map a cached per-file result from the path it was originally computed for to the
  * current rel path.
  *
- * @param result - Original cached result.
+ * @param cachedResult - Original cached result.
  * @param fromRel - Source path in cache entry.
  * @param toRel - Destination path in current scan.
  * @returns New result object with updated issue IDs and locations.
  */
-export function remapCachedResult(
-    result: CachedResult,
+export function getRemappedCachedResult(
+    cachedResult: CachedResult,
     fromRel: string,
     toRel: string,
 ): CachedResult {
-    if (fromRel === toRel) return result;
-    const issues = result.issues.map((it) => {
-        const line = it.location && it.location.start ? it.location.start.line : 1;
+    if (fromRel === toRel) return cachedResult;
+    const issues = cachedResult.issues.map((issueItem) => {
+        const line = issueItem.location && issueItem.location.start ? issueItem.location.start.line : 1;
         return {
-            ...it,
-            id: `${it.analyzer}:${it.rule}:${toRel}:${line}`,
-            location: it.location ? { ...it.location, file: toRel } : it.location,
+            ...issueItem,
+            id: `${issueItem.analyzer}:${issueItem.rule}:${toRel}:${line}`,
+            location: issueItem.location ? { ...issueItem.location, file: toRel } : issueItem.location,
         };
     });
-    const metric = result.metric ? { ...result.metric, file: toRel } : null;
+    const metric = cachedResult.metric ? { ...cachedResult.metric, file: toRel } : null;
     return { issues, metric };
 }
+
+/** Backward-compatible export alias for remapCachedResult. */
+export const remapCachedResult = getRemappedCachedResult;
 
 /**
  * Normalize a diff-input filePath to a rel path (POSIX '/') inside root, or null if illegal.
@@ -135,13 +138,13 @@ export function buildCacheFingerprintContext(
             ? DTS_EXTENSION
             : path.extname(rel).toLowerCase();
         const key = adapterId + '|' + fileExt;
-        let h = payloadByAdapter.get(key);
-        if (!h) {
-            const payload = buildFingerprintPayload(cfg, adapterId, fileExt, descs, customHash);
-            h = fpHash(payload);
-            payloadByAdapter.set(key, h);
+        let fpHashValue = payloadByAdapter.get(key);
+        if (!fpHashValue) {
+            const payload = buildFingerprintPayload(cfg, adapterId, fileExt, { descs, customHash });
+            fpHashValue = fpHash(payload);
+            payloadByAdapter.set(key, fpHashValue);
         }
-        return h;
+        return fpHashValue;
     };
 
     return { descs, customHash, l2Enabled, poolFp, fpHashFor };
@@ -189,18 +192,18 @@ export interface StatResultEntry {
  * @returns Array of stat results with timestamps, sizes, and inodes.
  */
 export function collectStatFingerprints(absRoot: string, files: string[]): StatResultEntry[] {
-    const statResults: StatResultEntry[] = new Array(files.length);
+    const statResults: StatResultEntry[] = [];
     for (let i = 0; i < files.length; i++) {
         const rel = files[i];
         try {
-            const st = fs.statSync(path.join(absRoot, rel));
-            statResults[i] = {
+            const fileStat = SyncIoBarrier.queryStat(path.join(absRoot, rel));
+            statResults.push({
                 rel,
-                fp: { mtimeMs: st.mtimeMs, size: st.size, ino: st.ino },
+                fp: { mtimeMs: fileStat.mtimeMs, size: fileStat.size, ino: fileStat.ino },
                 idx: i,
-            };
+            });
         } catch {
-            statResults[i] = { rel, fp: null, idx: i };
+            statResults.push({ rel, fp: null, idx: i });
         }
     }
     return statResults;

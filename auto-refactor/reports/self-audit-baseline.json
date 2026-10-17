@@ -1,10 +1,10 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1792234943095",
-  "timestamp": "2026-10-17T11:02:31.473Z",
-  "cai": 86.1,
+  "snapshotId": "snapshot-v0.4.0-1792238250558",
+  "timestamp": "2026-10-17T11:57:40.786Z",
+  "cai": 86.11,
   "polyglotGeneralization": {
-    "index": 94.72,
-    "meanScore": 94.72,
+    "index": 94.76,
+    "meanScore": 94.76,
     "dispersionPenalty": 1,
     "standardDeviation": 0,
     "languageCount": 1
@@ -21,47 +21,47 @@
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
     "filesScanned": 637,
-    "durationMs": 6758
+    "durationMs": 8180
   },
   "metrics": {
-    "compositeScore": 99.14,
+    "compositeScore": 99.15,
     "grade": "A+",
-    "autonomyRate": 86.1,
+    "autonomyRate": 86.11,
     "polyglotGeneralization": {
-      "index": 94.72,
-      "meanScore": 94.72,
+      "index": 94.76,
+      "meanScore": 94.76,
       "dispersionPenalty": 1,
       "standardDeviation": 0,
       "languageCount": 1
     },
     "effectiveCodeDensity": 0.95,
-    "totalIssues": 5142,
+    "totalIssues": 5077,
     "suppressedIssues": 131,
-    "unsuppressedIssues": 5011,
+    "unsuppressedIssues": 4946,
     "bySeverity": {
-      "info": 509,
-      "warning": 4633,
+      "info": 496,
+      "warning": 4581,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
       "high": 0,
-      "medium": 2516,
-      "low": 2626
+      "medium": 2502,
+      "low": 2575
     }
   },
   "eightPillars": {
     "pillars": {
       "architecture": 99,
-      "maintainability": 98.07,
+      "maintainability": 98.09,
       "performance": 99.6,
       "data": 99.8,
       "testing": 100,
-      "reliability": 99.73,
+      "reliability": 99.74,
       "security": 99.88,
-      "extensibility": 96.98
+      "extensibility": 97.01
     },
-    "compositeScore": 99.14,
+    "compositeScore": 99.15,
     "weights": {
       "architecture": 0.15,
       "maintainability": 0.15,
@@ -76,14 +76,14 @@
   },
   "tenDimensions": {
     "architectureConsistency": 98.7,
-    "semanticPurity": 99.47,
+    "semanticPurity": 99.5,
     "codeSecurity": 99.85,
-    "performanceEfficiency": 99.48,
-    "standardization": 94.31,
+    "performanceEfficiency": 99.49,
+    "standardization": 94.41,
     "modernity": 99.76,
-    "maintainability": 97.02,
+    "maintainability": 97.05,
     "commentQuality": 99.99,
-    "duplication": 96.04,
+    "duplication": 96.07,
     "techDebtRisk": 99.83
   },
   "topHotspots": [
@@ -182,8 +182,8 @@
     "summary": {
       "critical": 0,
       "high": 0,
-      "medium": 2516,
-      "low": 2626
+      "medium": 2502,
+      "low": 2575
     },
     "criticalItems": [],
     "highItems": []
@@ -252,16 +252,16 @@
       },
       {
         "domainName": "core",
-        "compositeScore": 98.97,
+        "compositeScore": 99.18,
         "pillars": {
           "architecture": 99.84,
-          "maintainability": 97.53,
+          "maintainability": 98.09,
           "performance": 99.03,
-          "data": 99.68,
+          "data": 99.92,
           "testing": 100,
-          "reliability": 99.52,
+          "reliability": 99.76,
           "security": 99.86,
-          "extensibility": 95.99
+          "extensibility": 96.84
         },
         "moduleCount": 1
       },
@@ -732,16 +732,16 @@
       },
       {
         "domainName": "scanner",
-        "compositeScore": 99.16,
+        "compositeScore": 99.24,
         "pillars": {
           "architecture": 100,
           "maintainability": 97.08,
-          "performance": 99.34,
+          "performance": 99.61,
           "data": 99.73,
           "testing": 100,
           "reliability": 99.63,
           "security": 99.88,
-          "extensibility": 97.76
+          "extensibility": 98.16
         },
         "moduleCount": 1
       },
@@ -944,8 +944,8 @@
   },
   "trajectory": {
     "runEloc": {
-      "processed": 148422,
-      "unique": 119552,
+      "processed": 148500,
+      "unique": 119619,
       "changed": 0,
       "semantic": 0,
       "relocated": 0,
@@ -958,11 +958,11 @@
     "lifetime": {
       "weekId": "LIFETIME",
       "startMs": 1791102755050,
-      "endMs": 1792234943092,
+      "endMs": 1792238250557,
       "totalRuns": 252,
       "eloc": {
-        "processedTotal": 33690035,
-        "uniqueTotal": 119552,
+        "processedTotal": 33690113,
+        "uniqueTotal": 119619,
         "changedTotal": 276076,
         "semanticTotal": 220859
       },
