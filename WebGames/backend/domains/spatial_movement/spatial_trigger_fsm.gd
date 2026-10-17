@@ -11,8 +11,6 @@
 class_name SpatialTriggerFSM
 extends RefCounted
 
-const MultiEntityTriggerRegistryClass = preload("res://backend/domains/spatial_movement/multi_entity_trigger_registry.gd")
-
 enum TriggerShape {
 	CIRCLE_RADIUS,
 	AABB_RECTANGLE

@@ -235,7 +235,7 @@ static func test_full_lifecycle_with_mode_switch_and_exit() -> Dictionary:
 	var path_check := SaveReadinessGuard.evaluate_storage_path_safety("user://offline_vault/slot_01.sav", WorldGatewayModel.GameMode.SINGLE_PLAYER)
 
 	# 退出世界并切换至联机网关
-	gateway.exit_world()
+	gateway.exit_to_gateway()
 	gateway.select_mode(WorldGatewayModel.GameMode.MULTIPLAYER, {}, [], "WORLD_MULTI_01", "SLOT_01")
 	var mp_manifest := GameModeFeatureSolver.resolve_features(WorldGatewayModel.GameMode.MULTIPLAYER)
 

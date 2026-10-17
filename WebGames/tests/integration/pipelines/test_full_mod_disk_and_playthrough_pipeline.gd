@@ -28,7 +28,7 @@ static func run_all_tests() -> Dictionary:
 	results.append(test_headless_mod_playthrough_and_causal_mutations())
 	results.append(test_python_and_gdscript_transcript_equivalence())
 
-	return pack_results("Full Mod Disk & Headless Playthrough Pipeline", results)
+	return TestCase.pack_results("Full Mod Disk & Headless Playthrough Pipeline", results)
 
 ## 装配纯净隔离沙箱
 static func _setup_environment() -> void:
@@ -93,7 +93,7 @@ static func test_disk_mod_package_discovery_and_normalization() -> Dictionary:
 	var sync_ok: bool = not items_array.is_empty() and not initial_items_array.is_empty()
 
 	var passed: bool = load_ok and dto_ok and sync_ok
-	return make_result("TC-FMP-01: 磁盘五件套模板聚合与双态Schema归一化", passed, {
+	return TestCase.make_result("TC-FMP-01: 磁盘五件套模板聚合与双态Schema归一化", passed, {
 		"load_ok": load_ok,
 		"dto_ok": dto_ok,
 		"sync_ok": sync_ok
@@ -120,7 +120,7 @@ static func test_world_gateway_single_player_disk_discovery_and_precheck() -> Di
 	_teardown_environment()
 
 	var passed: bool = disc_ok and manifest_has_dag and poison_blocked
-	return make_result("TC-FMP-02: 网关单机一站式磁盘发现预检挂载闭环", passed, {
+	return TestCase.make_result("TC-FMP-02: 网关单机一站式磁盘发现预检挂载闭环", passed, {
 		"disc_ok": disc_ok,
 		"manifest_has_dag": manifest_has_dag,
 		"poison_blocked": poison_blocked
@@ -168,7 +168,7 @@ static func test_dangling_dag_and_kit_cross_table_rejection() -> Dictionary:
 		and (res_graph.get("errors", []) as Array).has("ERR_DESTINY_INVALID_DAG_GRAPH")
 
 	var passed: bool = dag_blocked and kit_blocked and graph_blocked
-	return make_result("TC-FMP-03: 悬空序章DAG与悬空初始套件跨表拦截", passed, {
+	return TestCase.make_result("TC-FMP-03: 悬空序章DAG与悬空初始套件跨表拦截", passed, {
 		"dag_blocked": dag_blocked,
 		"kit_blocked": kit_blocked,
 		"graph_blocked": graph_blocked
@@ -208,7 +208,7 @@ static func test_inline_text_and_dual_track_placeholders() -> Dictionary:
 	var node_ok: bool = node.inline_text == "你好 {player_name}" and node.choices.size() == 1
 
 	var passed: bool = text_ok and node_ok
-	return make_result("TC-FMP-04: 内联文本语法糖与大小写双轨占位符水化", passed, {
+	return TestCase.make_result("TC-FMP-04: 内联文本语法糖与大小写双轨占位符水化", passed, {
 		"text_ok": text_ok,
 		"node_ok": node_ok,
 		"hydrated_text": hydrated_text
@@ -248,7 +248,7 @@ static func test_headless_mod_playthrough_and_causal_mutations() -> Dictionary:
 	var gold_ok: bool = int(char_sheet.get("initial_gold", 0)) == 150
 
 	var passed: bool = success and schema_match and steps_count_ok and completed and has_completed_mutation and gold_ok
-	return make_result("TC-FMP-05: 后端无头试玩推演与因果突变结算闭环", passed, {
+	return TestCase.make_result("TC-FMP-05: 后端无头试玩推演与因果突变结算闭环", passed, {
 		"success": success,
 		"schema_match": schema_match,
 		"steps_count_ok": steps_count_ok,
@@ -288,7 +288,7 @@ static func test_python_and_gdscript_transcript_equivalence() -> Dictionary:
 	var terminal_match: bool = str(final_st.get("terminal_node_id", "")) == "NODE_STARTER_DEPART"
 
 	var passed: bool = gd_ok and v_match and sum_conserved and gold_match and kit_match and dag_match and terminal_match
-	return make_result("TC-FMP-06: Python play_mod.py 与 GDScript 引擎同构等价验证", passed, {
+	return TestCase.make_result("TC-FMP-06: Python play_mod.py 与 GDScript 引擎同构等价验证", passed, {
 		"gd_ok": gd_ok,
 		"v_match": v_match,
 		"sum_conserved": sum_conserved,

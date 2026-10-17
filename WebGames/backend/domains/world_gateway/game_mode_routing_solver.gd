@@ -190,10 +190,6 @@ static func _resolve_effective_slots(
 	res: RoutingResultDTO
 ) -> Array:
 	if account_slots.is_empty():
-		if not target_slot_id.is_empty():
-			res.error_code = "GATEWAY_ERR_SLOT_NOT_FOUND"
-			res.message = GameConfig.msg_fmt("world_gateway", "slot_not_found", {"slot_id": target_slot_id})
-			return []
 		var slot_id := target_slot_id if not target_slot_id.is_empty() else GameConfig.get_string("domains.world_gateway", "single_player/default_slot_id", "SLOT_SP_01")
 		var default_slot := SaveSlotStateDTO.new()
 		default_slot.slot_id = slot_id

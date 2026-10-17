@@ -153,6 +153,11 @@ static func clear_hooks() -> void:
 	if not _auth_hooks.is_empty():
 		_auth_hooks.clear()
 
+## 测试专用状态重置（清空会话与扩展钩子）
+static func reset_for_tests() -> void:
+	_sessions.clear()
+	clear_hooks()
+
 static func _dispatch_auth_hooks(stage_key: String, payload: Dictionary) -> void:
 	var hooks_list: Array = _auth_hooks.get(stage_key, [])
 	for cb in hooks_list:

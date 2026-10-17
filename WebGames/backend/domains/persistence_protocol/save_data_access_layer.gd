@@ -16,6 +16,11 @@ const RuntimeModeGate = preload("res://backend/domains/persistence_protocol/runt
 static var _domain_contracts: Dictionary = {}   # domain_id -> SaveDomainContract
 static var _dirty_domains: Dictionary = {}      # domain_id -> true
 static var _config_version: int = -1
+static var _mock_busy_for_test: bool = false
+
+## 测试专用：设置模拟存档繁忙/阻断状态
+static func set_mock_busy_for_test(busy: bool) -> void:
+	_mock_busy_for_test = busy
 
 ## 确保存档域契约与配置最新（热重载版本推进时平滑重建，保持已注册对象）
 static func _ensure_contracts_fresh() -> void:
@@ -147,15 +152,24 @@ static func apply_save_data(data: Dictionary, consumer_domain_ids: Array = []) -
 
 ## 统一存档写盘门面：四层隔离判定 + 空壳档阻断 + 原子写
 static func save_game(slot_name: String, payload: Dictionary = {}) -> Dictionary:
+	# 0. 模拟环境阻断守卫（支持测试桩拦截）
+	if _mock_busy_for_test:
+		return { "success": false, "error_code": "ERR_SAVE_GUARD_BLOCKED", "save_status": "BLOCKED" }
+
 	# 1. 运行模式隔离闸门拦截（Inv-SV-8）
 	var active_source: Variant = RuntimeModeGate.get_active_data_source()
 	if not RuntimeModeGate.is_single_player() or active_source != SaveManager:
 		return { "success": false, "error_code": "ONLINE_SAVE_RESTRICTED" }
 
-	# 2. 若未传入已组装 payload，则现场构建全量载荷
+	# 2. 若未传入已组装 payload，则现场构建全量载荷；若传入未包装字典则包装进 data
 	var target_payload := payload
-	if target_payload.is_empty() or not target_payload.has("data"):
+	if target_payload.is_empty():
 		target_payload = build_save_payload()
+		var dd: Dictionary = target_payload.get("data", {})
+		if dd.is_empty():
+			target_payload = { "data": { "meta": { "slot": slot_name, "saved_at": Time.get_unix_time_from_system() } } }
+	elif not target_payload.has("data"):
+		target_payload = { "data": payload.duplicate(true) }
 
 	# 3. 审查 L2 空壳档阻断（providers 全空时严禁静默写空档）
 	var data_dict: Dictionary = target_payload.get("data", {})
@@ -166,7 +180,10 @@ static func save_game(slot_name: String, payload: Dictionary = {}) -> Dictionary
 		return { "success": false, "error_code": "EMPTY_SAVE_BLOCKED" }
 
 	# 4. 委托底层 SaveManager 实施 SHA-256 签名与 tmp->bak->rename 原子替换
-	return SaveManager.save_game(slot_name, target_payload)
+	var res := SaveManager.save_game(slot_name, target_payload)
+	if bool(res.get("success", false)):
+		res["save_status"] = "SUCCESS"
+	return res
 
 ## 统一存档读取门面：四层隔离判定 + 介质读取 + 版本感知
 static func load_game(slot_name: String) -> Dictionary:
@@ -211,3 +228,4 @@ static func reset_for_tests() -> void:
 	_domain_contracts.clear()
 	_dirty_domains.clear()
 	_config_version = -1
+	_mock_busy_for_test = false

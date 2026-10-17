@@ -362,6 +362,10 @@ func _assimilate_perturbations(effective_world_id: String) -> void:
         broker.mark_world_visited(p.perturbation_id, effective_world_id)
     repo.save_world(world_inst)
 
+## 退出世界回到世界栏主界面（门面方法，等价于 exit_to_gateway）
+func exit_world() -> Dictionary:
+    return exit_to_gateway()
+
 ## 5. 退回世界栏主界面并实施内存全量洗脱 (Full Memory Scrubbing)
 func exit_to_gateway() -> Dictionary:
     # 全量洗脱重置运行时所有模式、槽位、世界与角色状态

@@ -41,6 +41,10 @@ static func has_domain_handler(domain: String) -> bool:
 static func reset_custom_handlers_for_tests() -> void:
 	_custom_handlers.clear()
 
+## 快捷派发门面（对齐 dispatch_request）
+static func dispatch(req: ClientRequestEnvelopeDTO, gateway: WorldGatewayFSM = null) -> UnifiedResponseEnvelopeDTO:
+	return dispatch_request(req, gateway)
+
 ## 核心派发入口：处理一切来自客户端或 Agent 包装的统一请求信封
 static func dispatch_request(req: ClientRequestEnvelopeDTO, gateway: WorldGatewayFSM = null) -> UnifiedResponseEnvelopeDTO:
 	if req == null:

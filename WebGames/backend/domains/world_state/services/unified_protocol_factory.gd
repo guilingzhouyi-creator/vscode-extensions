@@ -69,6 +69,29 @@ static func wrap_agent_action(
 		req.client_timestamp_ms = Time.get_ticks_msec()
 	return req
 
+## 创建无头 Agent 标准请求信封
+static func create_agent_request(
+	domain: String,
+	action_type: String,
+	payload: Dictionary = {},
+	account_id: String = "",
+	character_id: String = "",
+	session_token: String = ""
+) -> ClientRequestEnvelopeDTO:
+	var req := ClientRequestEnvelopeDTO.new()
+	req.request_id = "REQ_A_%d_%d" % [Time.get_ticks_msec(), _request_counter]
+	_request_counter += 1
+	req.actor_type = ClientRequestEnvelopeDTO.ACTOR_AGENT
+	req.domain = domain
+	req.action_type = action_type
+	req.payload = payload.duplicate(true)
+	req.session_token = session_token
+	req.account_id = account_id
+	req.character_id = character_id
+	req.lease_nonce = 0
+	req.client_timestamp_ms = Time.get_ticks_msec()
+	return req
+
 ## 创建标准服务端响应信封
 static func create_response(
 	request_id: String,
