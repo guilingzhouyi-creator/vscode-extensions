@@ -32,9 +32,7 @@ import type {
     AgentTopologyLayer,
     AgentTargetContext,
     AgentRuleContract,
-    AgentImmutableConstraints,
     AgentRemediationRecipe,
-    AgentVerificationDirective,
     AgentActionableDirective,
     AgentDirectiveEnvelope,
     AgentBuilderDirective,
@@ -42,12 +40,9 @@ import type {
     AgentDirectivesMetrics,
     AgentReviewDirectivesPayload,
     AgentDirectiveTrack,
-    CrossFileCallSite,
     CrossFileUsageContext,
-    ClarificationOption,
     AgentClarificationRequest,
     AgentStandardizationProposal,
-    AgentExactPatch,
 } from './agent-directives-types';
 
 export type * from './agent-directives-types';
@@ -182,7 +177,11 @@ function extractIssueClarification(issue: Issue): AgentClarificationRequest | un
         (issue as unknown as Record<string, unknown>).clarificationRequest ??
         issue.detail?.clarificationRequest ??
         (issue.actionable as unknown as Record<string, unknown> | undefined)?.clarificationRequest;
-    if (raw && typeof raw === 'object' && PROP_PROMPT_QUESTION in (raw as Record<string, unknown>)) {
+    if (
+        raw &&
+        typeof raw === 'object' &&
+        PROP_PROMPT_QUESTION in (raw as Record<string, unknown>)
+    ) {
         return raw as AgentClarificationRequest;
     }
     return undefined;
@@ -300,7 +299,9 @@ function mapIssueToDirective(
 
 function generateEnvelopeId(): string {
     const timestamp = Date.now().toString(RADIX_BASE36);
-    const randomSuffix = Math.random().toString(RADIX_BASE36).slice(RANDOM_SLICE_START, RANDOM_SLICE_END);
+    const randomSuffix = Math.random()
+        .toString(RADIX_BASE36)
+        .slice(RANDOM_SLICE_START, RANDOM_SLICE_END);
     return `ENV-${timestamp}-${randomSuffix}`;
 }
 
@@ -360,7 +361,9 @@ function buildBuilderDirectives(directives: AgentActionableDirective[]): AgentBu
     });
 }
 
-function buildReviewerDirectives(directives: AgentActionableDirective[]): AgentReviewerCrossCheckPoint[] {
+function buildReviewerDirectives(
+    directives: AgentActionableDirective[],
+): AgentReviewerCrossCheckPoint[] {
     return directives.map((d) => ({
         checkPointId: `CP-${d.directiveId}`,
         targetFile: d.targetContext.filePath,

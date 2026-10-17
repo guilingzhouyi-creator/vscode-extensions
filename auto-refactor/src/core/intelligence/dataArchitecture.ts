@@ -28,12 +28,21 @@ const DEFAULT_CONFIG_VERSION = '0.3.0';
 
 const FILE_TOKEN_STORE = 'store';
 const CALL_ARROW_SEPARATOR = ' -> ';
-const EVIDENCE_KIND_CALL = 'call';
-const EVIDENCE_KIND_CONDITION = 'condition';
-const EVIDENCE_KIND_LOOP = 'loop';
-const EVIDENCE_KIND_ALLOCATION = 'allocation';
-const EVIDENCE_KIND_IO = 'io';
+const EVIDENCE_KINDS = Object.freeze({
+    call: 'call',
+    condition: 'condition',
+    loop: 'loop',
+    allocation: 'allocation',
+    io: 'io',
+});
 const EDGE_KIND_CALLS = 'calls';
+
+const DETAIL_KEYS = Object.freeze({
+    trigger: 'triggerCondition',
+    reliable: 'isDeterministic',
+    remedy: 'suggestedFix',
+    method: 'verificationMethod',
+});
 
 const MODULE_DATA_ACCESS = 'data-access';
 const ANALYZER_DATA_ARCHITECTURE = 'data-architecture';
@@ -54,11 +63,13 @@ const DEFAULT_REPORT_COLUMN = 80;
 const KEYWORD_LIMIT = 'limit';
 const KEYWORD_TAKE = 'take';
 
-const PATH_SEGMENT_DOMAIN = '/domain/';
-const PATH_SEGMENT_SERVICES = '/services/';
-const PATH_SEGMENT_CORE = '/core/';
-const PATH_SEGMENT_TEST = '/test/';
-const PATH_SEGMENT_SCRIPTS = '/scripts/';
+const PATH_SEGMENTS = Object.freeze({
+    domain: '/domain/',
+    services: '/services/',
+    core: '/core/',
+    test: '/test/',
+    scripts: '/scripts/',
+});
 const TOKEN_MIGRATION = 'migration';
 const TOKEN_DATA = 'data';
 const TOKEN_DB = 'db';
@@ -134,9 +145,9 @@ function isDriverCallLine(line: string): boolean {
 function isPureDomainFile(filePath: string): boolean {
     const lower = filePath.toLowerCase();
     return (
-        (lower.includes(PATH_SEGMENT_DOMAIN) ||
-            lower.includes(PATH_SEGMENT_SERVICES) ||
-            lower.includes(PATH_SEGMENT_CORE)) &&
+        (lower.includes(PATH_SEGMENTS.domain) ||
+            lower.includes(PATH_SEGMENTS.services) ||
+            lower.includes(PATH_SEGMENTS.core)) &&
         !lower.includes(TOKEN_REPOSITORY) &&
         !lower.includes(TOKEN_DATA) &&
         !lower.includes(TOKEN_DB)
@@ -159,8 +170,8 @@ function isOnlinePath(
 ): boolean {
     const lower = filePath.toLowerCase();
     if (
-        lower.includes(PATH_SEGMENT_TEST) ||
-        lower.includes(PATH_SEGMENT_SCRIPTS) ||
+        lower.includes(PATH_SEGMENTS.test) ||
+        lower.includes(PATH_SEGMENTS.scripts) ||
         lower.includes(TOKEN_MIGRATION)
     ) {
         return false;
@@ -173,111 +184,120 @@ function isOnlinePath(
     );
 }
 
-function buildSimpleReviewDetail(
-    filePath: string,
-    behavior: string,
-    risk: string,
-    fix: string,
-    evidence: SemanticEvidenceStep[] = [],
-): SemanticReviewDetail {
+interface SimpleReviewContext {
+    readonly filePath: string;
+    readonly behavior: string;
+    readonly risk: string;
+    readonly fix: string;
+    readonly evidence?: SemanticEvidenceStep[];
+}
+
+function buildSimpleReviewDetail(ctx: SimpleReviewContext): SemanticReviewDetail {
     return {
         language: LANGUAGE_TYPESCRIPT,
         module: MODULE_DATA_ACCESS,
         symbol: SYMBOL_GLOBAL,
         codeDomain: CODE_DOMAIN_DATA_ARCHITECTURE,
-        currentBehavior: behavior,
-        semanticEvidenceChain: evidence,
-        triggerCondition: behavior,
-        risk,
-        blastRadius: [filePath],
-        isDeterministic: true,
+        currentBehavior: ctx.behavior,
+        semanticEvidenceChain: ctx.evidence ?? [],
+        [DETAIL_KEYS.trigger]: ctx.behavior,
+        risk: ctx.risk,
+        blastRadius: [ctx.filePath],
+        [DETAIL_KEYS.reliable]: true,
         requiresManualConfirm: false,
-        suggestedFix: fix,
+        [DETAIL_KEYS.remedy]: ctx.fix,
         impactedCallers: [],
         impactedTests: [],
-        verificationMethod: 'Run automated static and integration checks.',
+        [DETAIL_KEYS.method]: 'Run automated static and integration checks.',
         ruleVersion: DEFAULT_RULE_VERSION,
         configVersion: DEFAULT_CONFIG_VERSION,
         canAutofix: false,
     };
 }
 
-function createDataArchitectureIssue(
-    filePath: string,
-    line: number,
-    rule: string,
-    severity: 'error' | 'warning' | 'info',
-    message: string,
-    behavior: string,
-    risk: string,
-    suggestion: string,
-): Issue {
+interface DataArchitectureIssueContext {
+    readonly filePath: string;
+    readonly line: number;
+    readonly rule: string;
+    readonly severity: 'error' | 'warning' | 'info';
+    readonly message: string;
+    readonly behavior: string;
+    readonly risk: string;
+    readonly suggestion: string;
+}
+
+function createDataArchitectureIssue(ctx: DataArchitectureIssueContext): Issue {
     return {
-        id: `data-architecture:${rule}:${filePath}:${line}`,
+        id: `data-architecture:${ctx.rule}:${ctx.filePath}:${ctx.line}`,
         analyzer: ANALYZER_DATA_ARCHITECTURE,
-        rule,
-        severity,
-        message,
+        rule: ctx.rule,
+        severity: ctx.severity,
+        message: ctx.message,
         location: {
-            file: filePath,
-            start: { line, column: 1 },
-            end: { line, column: 1 },
+            file: ctx.filePath,
+            start: { line: ctx.line, column: 1 },
+            end: { line: ctx.line, column: 1 },
         },
-        detail: buildSimpleReviewDetail(filePath, behavior, risk, suggestion),
-        suggestion,
+        detail: buildSimpleReviewDetail({
+            filePath: ctx.filePath,
+            behavior: ctx.behavior,
+            risk: ctx.risk,
+            fix: ctx.suggestion,
+        }),
+        suggestion: ctx.suggestion,
     };
 }
 
 function createLoopQueryIssue(filePath: string, line: number, text: string): Issue {
-    return createDataArchitectureIssue(
+    return createDataArchitectureIssue({
         filePath,
         line,
-        'DAT-NPL-001',
-        SEVERITY_ERROR,
-        `N+1 query hazard: persistent storage query executed inside loop: '${text}'.`,
-        `Persistent storage query executed inside loop: '${text}'`,
-        'Dispatches N separate roundtrips across iterations.',
-        'Hoist query outside loop and use a batch IN clause or dataloader pattern.',
-    );
+        rule: 'DAT-NPL-001',
+        severity: SEVERITY_ERROR,
+        message: `N+1 query hazard: persistent storage query executed inside loop: '${text}'.`,
+        behavior: `Persistent storage query executed inside loop: '${text}'`,
+        risk: 'Dispatches N separate roundtrips across iterations.',
+        suggestion: 'Hoist query outside loop and use a batch IN clause or dataloader pattern.',
+    });
 }
 
 function createUnboundedQueryIssue(filePath: string, line: number, text: string): Issue {
-    return createDataArchitectureIssue(
+    return createDataArchitectureIssue({
         filePath,
         line,
-        'DAT-QRY-001',
-        SEVERITY_WARNING,
-        `Unbounded query without limit or pagination on online path: '${text}'.`,
-        `Unbounded query executed on online path: '${text}'`,
-        'Risk of memory exhaustion or large DB lock.',
-        'Enforce maximum page size or cursor limit on online queries.',
-    );
+        rule: 'DAT-QRY-001',
+        severity: SEVERITY_WARNING,
+        message: `Unbounded query without limit or pagination on online path: '${text}'.`,
+        behavior: `Unbounded query executed on online path: '${text}'`,
+        risk: 'Risk of memory exhaustion or large DB lock.',
+        suggestion: 'Enforce maximum page size or cursor limit on online queries.',
+    });
 }
 
 function createLoopSerializationIssue(filePath: string, line: number, text: string): Issue {
-    return createDataArchitectureIssue(
+    return createDataArchitectureIssue({
         filePath,
         line,
-        'DAT-SER-001',
-        SEVERITY_INFO,
-        `Repetitive serialization inside iteration: '${text}'.`,
-        `Repetitive JSON serialization inside iteration: '${text}'`,
-        'CPU churn and GC memory pressure in hot loops.',
-        'Operate on native in-memory objects; serialize only at network perimeter.',
-    );
+        rule: 'DAT-SER-001',
+        severity: SEVERITY_INFO,
+        message: `Repetitive serialization inside iteration: '${text}'.`,
+        behavior: `Repetitive JSON serialization inside iteration: '${text}'`,
+        risk: 'CPU churn and GC memory pressure in hot loops.',
+        suggestion: 'Operate on native in-memory objects; serialize only at network perimeter.',
+    });
 }
 
 function createLeakyAbstractionIssue(filePath: string, line: number, text: string): Issue {
-    return createDataArchitectureIssue(
+    return createDataArchitectureIssue({
         filePath,
         line,
-        'DAT-LAY-001',
-        SEVERITY_WARNING,
-        `Leaky data access abstraction: raw persistence driver call in domain layer: '${text}'.`,
-        `Raw persistence driver call in domain layer: '${text}'`,
-        'Tight coupling to storage implementation.',
-        'Abstract database operations behind a repository interface.',
-    );
+        rule: 'DAT-LAY-001',
+        severity: SEVERITY_WARNING,
+        message: `Leaky data access abstraction: raw persistence driver call in domain layer: '${text}'.`,
+        behavior: `Raw persistence driver call in domain layer: '${text}'`,
+        risk: 'Tight coupling to storage implementation.',
+        suggestion: 'Abstract database operations behind a repository interface.',
+    });
 }
 
 /** Regex pattern detecting resource registration call sites. */
@@ -292,16 +312,17 @@ function createResourceRegistryIssue(
     text: string,
     detailMsg: string,
 ): Issue {
-    return createDataArchitectureIssue(
+    return createDataArchitectureIssue({
         filePath,
         line,
-        'DAT-RES-001',
-        SEVERITY_WARNING,
-        `Resource registry bidirectional mapping inconsistency: ${detailMsg} ('${text}').`,
-        `Resource registry broken or dangling mapping in '${filePath}': '${text}'`,
-        'Broken asset loading, dangling memory pointer, or orphan assets.',
-        'Ensure bidirectional registration in resource center and eliminate dangling asset paths.',
-    );
+        rule: 'DAT-RES-001',
+        severity: SEVERITY_WARNING,
+        message: `Resource registry bidirectional mapping inconsistency: ${detailMsg} ('${text}').`,
+        behavior: `Resource registry broken or dangling mapping in '${filePath}': '${text}'`,
+        risk: 'Broken asset loading, dangling memory pointer, or orphan assets.',
+        suggestion:
+            'Ensure bidirectional registration in resource center and eliminate dangling asset paths.',
+    });
 }
 
 /**
@@ -315,8 +336,8 @@ export function checkResourceRegistrySite(site: DataAccessSite): Issue | null {
     const match = DANGLING_RESOURCE_PATH_RE.exec(site.expressionText);
     if (!match) return null;
     const key = match[1]?.trim();
-    const tp = match[2]?.trim();
-    if (!key || tp === undefined || DANGLING_TARGET_RE.test(tp)) {
+    const assetPath = match[2]?.trim();
+    if (!key || assetPath === undefined || DANGLING_TARGET_RE.test(assetPath)) {
         return createResourceRegistryIssue(
             site.file,
             site.line,
@@ -354,221 +375,236 @@ export interface DataArchitectureOptions {
     offlinePathPatterns?: string[];
 }
 
-function buildSiteDetail(
-    site: DataAccessSite,
-    behavior: string,
-    evidence: SemanticEvidenceStep[],
-    triggerCondition: string,
-    risk: string,
-    suggestedFix: string,
-    verificationMethod: string,
-    deterministic = true,
-): SemanticReviewDetail {
+interface SiteDetailOptions {
+    readonly behavior: string;
+    readonly evidence: SemanticEvidenceStep[];
+    readonly trigger: string;
+    readonly risk: string;
+    readonly remedy: string;
+    readonly method: string;
+    readonly reliable?: boolean;
+}
+
+function buildSiteDetail(site: DataAccessSite, options: SiteDetailOptions): SemanticReviewDetail {
+    const isDeterministic = options.reliable ?? true;
     return {
         language: LANGUAGE_TYPESCRIPT,
         module: MODULE_DATA_ACCESS,
         symbol: site.symbol,
         codeDomain: CODE_DOMAIN_DATA_ARCHITECTURE,
-        currentBehavior: behavior,
-        semanticEvidenceChain: evidence,
-        triggerCondition,
-        risk,
+        currentBehavior: options.behavior,
+        semanticEvidenceChain: options.evidence,
+        [DETAIL_KEYS.trigger]: options.trigger,
+        risk: options.risk,
         blastRadius: [site.file],
-        isDeterministic: deterministic,
-        requiresManualConfirm: !deterministic,
-        suggestedFix,
+        [DETAIL_KEYS.reliable]: isDeterministic,
+        requiresManualConfirm: !isDeterministic,
+        [DETAIL_KEYS.remedy]: options.remedy,
         impactedCallers: [],
         impactedTests: [],
-        verificationMethod,
+        [DETAIL_KEYS.method]: options.method,
         ruleVersion: DEFAULT_RULE_VERSION,
         configVersion: DEFAULT_CONFIG_VERSION,
         canAutofix: false,
     };
 }
 
-function buildSiteIssue(
-    site: DataAccessSite,
-    rule: string,
-    severity: 'warning' | 'error' | 'info',
-    message: string,
-    suggestion: string,
-    detail: SemanticReviewDetail,
-    confidence = 0.95,
-): Issue {
+interface SiteIssueOptions {
+    readonly rule: string;
+    readonly severity: 'warning' | 'error' | 'info';
+    readonly message: string;
+    readonly suggestion: string;
+    readonly detail: SemanticReviewDetail;
+    readonly confidence?: number;
+}
+
+function buildSiteIssue(site: DataAccessSite, options: SiteIssueOptions): Issue {
     return {
-        id: `data-architecture:${rule}:${site.file}:${site.line}`,
+        id: `data-architecture:${options.rule}:${site.file}:${site.line}`,
         analyzer: ANALYZER_DATA_ARCHITECTURE,
-        rule,
-        severity,
-        message,
+        rule: options.rule,
+        severity: options.severity,
+        message: options.message,
         location: {
             file: site.file,
             start: { line: site.line, column: 1 },
             end: { line: site.line, column: DEFAULT_REPORT_COLUMN },
         },
-        detail,
-        suggestion,
-        evidence: { confidence, requiresRuntime: false },
+        detail: options.detail,
+        suggestion: options.suggestion,
+        evidence: { confidence: options.confidence ?? 0.95, requiresRuntime: false },
     };
+}
+
+interface DiagnosticSpec {
+    readonly site: DataAccessSite;
+    readonly rule: string;
+    readonly severity: 'warning' | 'error' | 'info';
+    readonly summary: string;
+    readonly remedy: string;
+    readonly behavior: string;
+    readonly evidence: SemanticEvidenceStep[];
+    readonly trigger: string;
+    readonly risk: string;
+    readonly method: string;
+    readonly confidence?: number;
+    readonly reliable?: boolean;
+}
+
+function buildSiteFinding(spec: DiagnosticSpec): Issue {
+    const detail = buildSiteDetail(spec.site, {
+        behavior: spec.behavior,
+        evidence: spec.evidence,
+        trigger: spec.trigger,
+        risk: spec.risk,
+        remedy: spec.remedy,
+        method: spec.method,
+        reliable: spec.reliable,
+    });
+    return buildSiteIssue(spec.site, {
+        rule: spec.rule,
+        severity: spec.severity,
+        message: spec.summary,
+        suggestion: spec.remedy,
+        detail,
+        confidence: spec.confidence,
+    });
 }
 
 function checkUnboundedQuerySite(site: DataAccessSite): Issue | null {
     if (!site.isOnlinePath || !site.isUnboundedQuery) return null;
-    const evidence: SemanticEvidenceStep[] = [
-        {
-            kind: EVIDENCE_KIND_CONDITION,
-            description: `Online request handler in '${site.symbol}'`,
-            file: site.file,
-            line: site.line,
-            symbol: site.symbol,
-        },
-        {
-            kind: EVIDENCE_KIND_IO,
-            description: `Unbounded query without pagination/cursor limit: '${site.expressionText}'`,
-            file: site.file,
-            line: site.line,
-            symbol: site.symbol,
-        },
-    ];
-    const detail = buildSiteDetail(
+    return buildSiteFinding({
         site,
-        `Querying persistent storage with unbounded fetch: '${site.expressionText}'.`,
-        evidence,
-        'Unpaginated query execution detected within an online request handler',
-        'Database query may return unbounded records under production data volume, causing OOM or high latency.',
-        'Add cursor-based or limit/offset pagination with an explicit maximum page size.',
-        'Verify query SQL/ORM execution includes LIMIT and OFFSET/cursor constraints.',
-    );
-    return buildSiteIssue(
-        site,
-        'DAT-QRY-001',
-        SEVERITY_WARNING,
-        `Unbounded query on online request path: '${site.expressionText}' lacks pagination limit.`,
-        'Introduce limit/cursor parameters to enforce bounded result sets.',
-        detail,
-    );
+        rule: 'DAT-QRY-001',
+        severity: SEVERITY_WARNING,
+        summary: `Unbounded query on online request path: '${site.expressionText}' lacks pagination limit.`,
+        remedy: 'Introduce limit/cursor parameters to enforce bounded result sets.',
+        behavior: `Querying persistent storage with unbounded fetch: '${site.expressionText}'.`,
+        evidence: [
+            {
+                kind: EVIDENCE_KINDS.condition,
+                description: `Online request handler in '${site.symbol}'`,
+                file: site.file,
+                line: site.line,
+                symbol: site.symbol,
+            },
+            {
+                kind: EVIDENCE_KINDS.io,
+                description: `Unbounded query without pagination/cursor limit: '${site.expressionText}'`,
+                file: site.file,
+                line: site.line,
+                symbol: site.symbol,
+            },
+        ],
+        trigger: 'Unpaginated query execution detected within an online request handler',
+        risk: 'Database query may return unbounded records under production data volume, causing OOM or high latency.',
+        method: 'Verify query SQL/ORM execution includes LIMIT and OFFSET/cursor constraints.',
+    });
 }
 
-function checkNPlusOneSite(site: DataAccessSite): Issue | null {
+function checkLoopQuerySite(site: DataAccessSite): Issue | null {
     if (!site.isLoopContext || site.operationKind !== OP_KIND_QUERY) return null;
-    const evidence: SemanticEvidenceStep[] = [
-        {
-            kind: EVIDENCE_KIND_LOOP,
-            description: `Iterative execution block in '${site.symbol}'`,
-            file: site.file,
-            line: site.line,
-            symbol: site.symbol,
-        },
-        {
-            kind: EVIDENCE_KIND_IO,
-            description: `Database or storage query executed inside iteration: '${site.expressionText}'`,
-            file: site.file,
-            line: site.line,
-            symbol: site.symbol,
-        },
-    ];
-    const detail = buildSiteDetail(
+    return buildSiteFinding({
         site,
-        `Executing query '${site.expressionText}' inside a loop or mapping iteration.`,
-        evidence,
-        'Persistent storage query dispatched inside an iteration loop',
-        'Dispatches N separate database roundtrips for N items, causing severe database connection starvation.',
-        'Batch identifiers into a single batch query (e.g. IN (...) clause or batch lookup) outside the loop.',
-        'Assert database query count equals 1 regardless of collection size.',
-    );
-    return buildSiteIssue(
-        site,
-        'DAT-NPL-001',
-        SEVERITY_ERROR,
-        `N+1 query hazard: persistent storage fetch executed inside iteration in '${site.symbol}'.`,
-        'Hoist query outside loop and use a batch IN clause or dataloader pattern.',
-        detail,
-    );
+        rule: 'DAT-NPL-001',
+        severity: SEVERITY_ERROR,
+        summary: `N+1 query hazard: persistent storage fetch executed inside iteration in '${site.symbol}'.`,
+        remedy: 'Hoist query outside loop and use a batch IN clause or dataloader pattern.',
+        behavior: `Executing query '${site.expressionText}' inside a loop or mapping iteration.`,
+        evidence: [
+            {
+                kind: EVIDENCE_KINDS.loop,
+                description: `Iterative execution block in '${site.symbol}'`,
+                file: site.file,
+                line: site.line,
+                symbol: site.symbol,
+            },
+            {
+                kind: EVIDENCE_KINDS.io,
+                description: `Database or storage query executed inside iteration: '${site.expressionText}'`,
+                file: site.file,
+                line: site.line,
+                symbol: site.symbol,
+            },
+        ],
+        trigger: 'Persistent storage query dispatched inside an iteration loop',
+        risk: 'Dispatches N separate database roundtrips for N items, causing severe database connection starvation.',
+        method: 'Assert database query count equals 1 regardless of collection size.',
+    });
 }
 
 function checkRedundantSerializationSite(site: DataAccessSite): Issue | null {
     if (site.operationKind !== OP_KIND_SERIALIZATION || !site.isLoopContext) return null;
-    const evidence: SemanticEvidenceStep[] = [
-        {
-            kind: EVIDENCE_KIND_LOOP,
-            description: `Loop iteration in '${site.symbol}'`,
-            file: site.file,
-            line: site.line,
-            symbol: site.symbol,
-        },
-        {
-            kind: EVIDENCE_KIND_ALLOCATION,
-            description: `Repetitive serialization/deserialization: '${site.expressionText}'`,
-            file: site.file,
-            line: site.line,
-            symbol: site.symbol,
-        },
-    ];
-    const detail = buildSiteDetail(
+    return buildSiteFinding({
         site,
-        `Repeatedly parsing or stringifying objects inside an iteration block: '${site.expressionText}'.`,
-        evidence,
-        'Serialization roundtrip invoked per item within an iteration loop',
-        'Excessive CPU overhead and memory churn from JSON encoding/decoding inside critical paths.',
-        'Pass strongly-typed in-memory representations directly; serialize only at network perimeter.',
-        'Benchmark JSON parse/stringify invocations across pipeline execution.',
-    );
-    return buildSiteIssue(
-        site,
-        'DAT-SER-001',
-        SEVERITY_INFO,
-        `Redundant serialization cycle inside iteration: '${site.expressionText}'.`,
-        'Operate on native objects in memory and serialize only at the external boundary.',
-        detail,
-        0.85,
-    );
+        rule: 'DAT-SER-001',
+        severity: SEVERITY_INFO,
+        summary: `Redundant serialization cycle inside iteration: '${site.expressionText}'.`,
+        remedy: 'Operate on native objects in memory and serialize only at the external boundary.',
+        behavior: `Repeatedly parsing or stringifying objects inside an iteration block: '${site.expressionText}'.`,
+        evidence: [
+            {
+                kind: EVIDENCE_KINDS.loop,
+                description: `Loop iteration in '${site.symbol}'`,
+                file: site.file,
+                line: site.line,
+                symbol: site.symbol,
+            },
+            {
+                kind: EVIDENCE_KINDS.allocation,
+                description: `Repetitive serialization/deserialization: '${site.expressionText}'`,
+                file: site.file,
+                line: site.line,
+                symbol: site.symbol,
+            },
+        ],
+        trigger: 'Serialization roundtrip invoked per item within an iteration loop',
+        risk: 'Excessive CPU overhead and memory churn from JSON encoding/decoding inside critical paths.',
+        method: 'Benchmark JSON parse/stringify invocations across pipeline execution.',
+        confidence: 0.85,
+    });
 }
 
 function checkDefensiveExcessSite(
     site: DataAccessSite,
-    validationCountInSymbol: Map<string, number>,
+    validationCounts: Map<string, number>,
 ): Issue | null {
     if (site.operationKind !== OP_KIND_VALIDATION) return null;
-    const count = (validationCountInSymbol.get(site.symbol) ?? 0) + 1;
-    validationCountInSymbol.set(site.symbol, count);
+    const count = (validationCounts.get(site.symbol) ?? 0) + 1;
+    validationCounts.set(site.symbol, count);
 
     if (count <= 2 || site.isOnlinePath) return null;
 
-    const evidence: SemanticEvidenceStep[] = [
-        {
-            kind: EVIDENCE_KIND_CONDITION,
-            description: `Internal non-perimeter domain logic in '${site.symbol}'`,
-            file: site.file,
-            line: site.line,
-            symbol: site.symbol,
-        },
-        {
-            kind: EVIDENCE_KIND_CONDITION,
-            description: `Repeated defensive validation of already established invariant: '${site.expressionText}'`,
-            file: site.file,
-            line: site.line,
-            symbol: site.symbol,
-        },
-    ];
-    const detail = buildSiteDetail(
+    return buildSiteFinding({
         site,
-        `Repeated redundant parameter and invariant validation in internal function '${site.symbol}'.`,
-        evidence,
-        'Multiple repetitive assertions on trusted internal domain types within non-perimeter code',
-        'Obscures business flow with noisy defensive checks; masks true ownership of invariant enforcement.',
-        'Enforce domain invariants once at construction or trust boundary; rely on type guarantees internally.',
-        'Verify unit tests validate invariant failures at boundary rather than internal functions.',
-        false,
-    );
-    return buildSiteIssue(
-        site,
-        'DAT-DEF-001',
-        SEVERITY_INFO,
-        `Excessive defensive validation in internal domain logic: '${site.expressionText}'.`,
-        'Retain perimeter validation at entry boundaries; rely on typed value objects internally.',
-        detail,
-        0.8,
-    );
+        rule: 'DAT-DEF-001',
+        severity: SEVERITY_INFO,
+        summary: `Excessive defensive validation in internal domain logic: '${site.expressionText}'.`,
+        remedy: 'Retain perimeter validation at entry boundaries; rely on typed value objects internally.',
+        behavior: `Repeated redundant parameter and invariant validation in internal function '${site.symbol}'.`,
+        evidence: [
+            {
+                kind: EVIDENCE_KINDS.condition,
+                description: `Internal non-perimeter domain logic in '${site.symbol}'`,
+                file: site.file,
+                line: site.line,
+                symbol: site.symbol,
+            },
+            {
+                kind: EVIDENCE_KINDS.condition,
+                description: `Repeated defensive validation of already established invariant: '${site.expressionText}'`,
+                file: site.file,
+                line: site.line,
+                symbol: site.symbol,
+            },
+        ],
+        trigger:
+            'Multiple repetitive assertions on trusted internal domain types within non-perimeter code',
+        risk: 'Obscures business flow with noisy defensive checks; masks true ownership of invariant enforcement.',
+        method: 'Verify unit tests validate invariant failures at boundary rather than internal functions.',
+        confidence: 0.8,
+        reliable: false,
+    });
 }
 
 function checkLeakyAbstractionSite(site: DataAccessSite): Issue | null {
@@ -579,33 +615,27 @@ function checkLeakyAbstractionSite(site: DataAccessSite): Issue | null {
     ) {
         return null;
     }
-    const evidence: SemanticEvidenceStep[] = [
-        {
-            kind: EVIDENCE_KIND_CALL,
-            description: `Low-level database driver call in business domain: '${site.expressionText}'`,
-            file: site.file,
-            line: site.line,
-            symbol: site.symbol,
-        },
-    ];
-    const detail = buildSiteDetail(
+    return buildSiteFinding({
         site,
-        `Directly invoking storage driver/SQL execution from non-repository file '${site.file}'.`,
-        evidence,
-        'Low-level persistence API directly referenced outside repository layer',
-        'Tight coupling of domain logic to specific persistence driver prevents testing and schema evolution.',
-        'Encapsulate database driver access behind a repository interface or gateway abstraction.',
-        'Verify domain module imports only repository interfaces, not raw database clients.',
-    );
-    return buildSiteIssue(
-        site,
-        'DAT-LAY-001',
-        SEVERITY_WARNING,
-        `Leaky data access abstraction: raw persistence driver call in domain layer '${site.file}'.`,
-        'Abstract database operations behind a repository interface.',
-        detail,
-        0.9,
-    );
+        rule: 'DAT-LAY-001',
+        severity: SEVERITY_WARNING,
+        summary: `Leaky data access abstraction: raw persistence driver call in domain layer '${site.file}'.`,
+        remedy: 'Abstract database operations behind a repository interface.',
+        behavior: `Directly invoking storage driver/SQL execution from non-repository file '${site.file}'.`,
+        evidence: [
+            {
+                kind: EVIDENCE_KINDS.call,
+                description: `Low-level database driver call in business domain: '${site.expressionText}'`,
+                file: site.file,
+                line: site.line,
+                symbol: site.symbol,
+            },
+        ],
+        trigger: 'Low-level persistence API directly referenced outside repository layer',
+        risk: 'Tight coupling of domain logic to specific persistence driver prevents testing and schema evolution.',
+        method: 'Verify domain module imports only repository interfaces, not raw database clients.',
+        confidence: 0.9,
+    });
 }
 
 function collectSiteIssues(
@@ -616,8 +646,8 @@ function collectSiteIssues(
 ): void {
     const unb = options.checkUnboundedQueries !== false ? checkUnboundedQuerySite(site) : null;
     if (unb) issues.push(unb);
-    const n1 = options.checkNPlusOne !== false ? checkNPlusOneSite(site) : null;
-    if (n1) issues.push(n1);
+    const loopQueryIssue = options.checkNPlusOne !== false ? checkLoopQuerySite(site) : null;
+    if (loopQueryIssue) issues.push(loopQueryIssue);
     const red =
         options.checkRedundantSerialization !== false
             ? checkRedundantSerializationSite(site)
@@ -630,8 +660,8 @@ function collectSiteIssues(
     if (def) issues.push(def);
     const leaky = checkLeakyAbstractionSite(site);
     if (leaky) issues.push(leaky);
-    const res = checkResourceRegistrySite(site);
-    if (res) issues.push(res);
+    const registryIssue = checkResourceRegistrySite(site);
+    if (registryIssue) issues.push(registryIssue);
 }
 
 /**
@@ -646,10 +676,10 @@ export function analyzeDataAccessSites(
     options: DataArchitectureOptions = {},
 ): Issue[] {
     const issues: Issue[] = [];
-    const validationCountInSymbol = new Map<string, number>();
+    const symbolValidationCountMap = new Map<string, number>();
 
     for (const site of sites) {
-        collectSiteIssues(site, options, validationCountInSymbol, issues);
+        collectSiteIssues(site, options, symbolValidationCountMap, issues);
     }
 
     return issues;
@@ -687,7 +717,7 @@ function findIndirectStorageQueryIssue(
 
             const newPath = [...current.path, targetNode.name];
             if (isDataQuerySymbol(targetNode.name, targetNode.location.file)) {
-                return createIndirectNPlusOneIssue(node, targetNode, newPath);
+                return createIndirectQueryIssue(node, targetNode, newPath);
             }
             queue.push({ id: targetId, path: newPath });
         }
@@ -702,7 +732,7 @@ function findIndirectStorageQueryIssue(
  * @param options - Data architecture options.
  * @returns Detected cross-procedural data architecture issues.
  */
-export function analyzeDataArchitectureWithGraph(
+export function auditDataGraphArchitecture(
     graph: SemanticGraph,
     options: DataArchitectureOptions = {},
 ): Issue[] {
@@ -728,6 +758,9 @@ export function analyzeDataArchitectureWithGraph(
 
     return issues;
 }
+
+/** Backward-compatible export alias for auditDataGraphArchitecture. */
+export const analyzeDataArchitectureWithGraph = auditDataGraphArchitecture;
 
 /**
  * Tests if a symbol name implies iterative or loop execution.
@@ -768,10 +801,42 @@ function isDataQuerySymbol(name: string, filePath: string): boolean {
     return isQueryName || isRepoFile;
 }
 
+interface IndirectDetailContext {
+    readonly callerName: string;
+    readonly queryFile: string;
+    readonly callerFile: string;
+    readonly pathStr: string;
+    readonly evidence: SemanticEvidenceStep[];
+}
+
+function buildIndirectDetail(ctx: IndirectDetailContext): SemanticReviewDetail {
+    return {
+        language: LANGUAGE_TYPESCRIPT,
+        module: MODULE_DATA_ACCESS,
+        symbol: ctx.callerName,
+        codeDomain: CODE_DOMAIN_DATA_ARCHITECTURE,
+        currentBehavior: `Indirect N+1 query dispatched via downstream call: ${ctx.pathStr}`,
+        semanticEvidenceChain: ctx.evidence,
+        [DETAIL_KEYS.trigger]: 'Iterative context dispatches calls reaching persistence queries',
+        risk: 'Dispatches N separate database roundtrips across call boundaries.',
+        blastRadius: [ctx.callerFile, ctx.queryFile],
+        [DETAIL_KEYS.reliable]: true,
+        requiresManualConfirm: false,
+        [DETAIL_KEYS.remedy]:
+            'Batch identifiers into a single batch query before entering the loop.',
+        impactedCallers: [],
+        impactedTests: [],
+        [DETAIL_KEYS.method]: 'Verify query count is constant (O(1)) across iterations.',
+        ruleVersion: DEFAULT_RULE_VERSION,
+        configVersion: DEFAULT_CONFIG_VERSION,
+        canAutofix: false,
+    };
+}
+
 /**
  * Creates an issue for indirect inter-procedural N+1 query.
  */
-function createIndirectNPlusOneIssue(
+function createIndirectQueryIssue(
     caller: { location: { file: string; start: { line: number; column: number } }; name: string },
     queryTarget: { location: { file: string }; name: string },
     callPath: string[],
@@ -779,21 +844,21 @@ function createIndirectNPlusOneIssue(
     const pathStr = callPath.join(CALL_ARROW_SEPARATOR);
     const evidence: SemanticEvidenceStep[] = [
         {
-            kind: EVIDENCE_KIND_LOOP,
+            kind: EVIDENCE_KINDS.loop,
             description: `Iteration caller method '${caller.name}'`,
             file: caller.location.file,
             line: caller.location.start.line,
             symbol: caller.name,
         },
         {
-            kind: EVIDENCE_KIND_CALL,
+            kind: EVIDENCE_KINDS.call,
             description: `Inter-procedural call sequence: ${pathStr}`,
             file: caller.location.file,
             line: caller.location.start.line,
             symbol: caller.name,
         },
         {
-            kind: 'io',
+            kind: EVIDENCE_KINDS.io,
             description: `Terminal database query in '${queryTarget.name}'`,
             file: queryTarget.location.file,
             line: 1,
@@ -801,26 +866,13 @@ function createIndirectNPlusOneIssue(
         },
     ];
 
-    const detail: SemanticReviewDetail = {
-        language: 'typescript',
-        module: MODULE_DATA_ACCESS,
-        symbol: caller.name,
-        codeDomain: 'data-architecture',
-        currentBehavior: `Indirect N+1 query dispatched via downstream call: ${pathStr}`,
-        semanticEvidenceChain: evidence,
-        triggerCondition: 'Iterative context dispatches calls reaching persistence queries',
-        risk: 'Dispatches N separate database roundtrips across call boundaries.',
-        blastRadius: [caller.location.file, queryTarget.location.file],
-        isDeterministic: true,
-        requiresManualConfirm: false,
-        suggestedFix: 'Batch identifiers into a single batch query before entering the loop.',
-        impactedCallers: [],
-        impactedTests: [],
-        verificationMethod: 'Verify query count is constant (O(1)) across iterations.',
-        ruleVersion: DEFAULT_RULE_VERSION,
-        configVersion: DEFAULT_CONFIG_VERSION,
-        canAutofix: false,
-    };
+    const detail = buildIndirectDetail({
+        callerName: caller.name,
+        queryFile: queryTarget.location.file,
+        callerFile: caller.location.file,
+        pathStr,
+        evidence,
+    });
 
     return {
         id: `${ANALYZER_DATA_ARCHITECTURE}:DAT-NPL-001:${caller.location.file}:${caller.location.start.line}`,
@@ -854,43 +906,47 @@ function updateLoopDepth(trimmed: string, inLoop: number): number {
     return nextDepth;
 }
 
-function auditDataArchitectureLine(
-    filePath: string,
-    lineNo: number,
-    trimmed: string,
-    inLoop: number,
-    isOnline: boolean,
-    issues: Issue[],
-): void {
-    if (inLoop > 0) {
-        if (isDatabaseQueryLine(trimmed)) {
-            issues.push(createLoopQueryIssue(filePath, lineNo, trimmed));
-        } else if (trimmed.includes(STRING_JSON_STRINGIFY) || trimmed.includes(STRING_JSON_PARSE)) {
-            issues.push(createLoopSerializationIssue(filePath, lineNo, trimmed));
+interface LineAuditContext {
+    readonly filePath: string;
+    readonly lineNo: number;
+    readonly trimmed: string;
+    readonly inLoop: number;
+    readonly isOnline: boolean;
+}
+
+function auditDataArchitectureLine(ctx: LineAuditContext, issues: Issue[]): void {
+    if (ctx.inLoop > 0) {
+        if (isDatabaseQueryLine(ctx.trimmed)) {
+            issues.push(createLoopQueryIssue(ctx.filePath, ctx.lineNo, ctx.trimmed));
+        } else if (
+            ctx.trimmed.includes(STRING_JSON_STRINGIFY) ||
+            ctx.trimmed.includes(STRING_JSON_PARSE)
+        ) {
+            issues.push(createLoopSerializationIssue(ctx.filePath, ctx.lineNo, ctx.trimmed));
         }
     }
 
-    if (isOnline && isUnboundedQueryLine(trimmed)) {
-        issues.push(createUnboundedQueryIssue(filePath, lineNo, trimmed));
+    if (ctx.isOnline && isUnboundedQueryLine(ctx.trimmed)) {
+        issues.push(createUnboundedQueryIssue(ctx.filePath, ctx.lineNo, ctx.trimmed));
     }
 
-    if (isDriverCallLine(trimmed) && isPureDomainFile(filePath)) {
-        issues.push(createLeakyAbstractionIssue(filePath, lineNo, trimmed));
+    if (isDriverCallLine(ctx.trimmed) && isPureDomainFile(ctx.filePath)) {
+        issues.push(createLeakyAbstractionIssue(ctx.filePath, ctx.lineNo, ctx.trimmed));
     }
 
-    if (DANGLING_RESOURCE_PATH_RE.test(trimmed)) {
+    if (DANGLING_RESOURCE_PATH_RE.test(ctx.trimmed)) {
         const syntheticSite: DataAccessSite = {
-            file: filePath,
-            line: lineNo,
+            file: ctx.filePath,
+            line: ctx.lineNo,
             symbol: SYMBOL_GLOBAL,
-            isOnlinePath: isOnline,
-            isLoopContext: inLoop > 0,
+            isOnlinePath: ctx.isOnline,
+            isLoopContext: ctx.inLoop > 0,
             isUnboundedQuery: false,
             operationKind: OP_KIND_RESOURCE_REGISTRY,
-            expressionText: trimmed,
+            expressionText: ctx.trimmed,
         };
-        const resIssue = checkResourceRegistrySite(syntheticSite);
-        if (resIssue) issues.push(resIssue);
+        const registryIssue = checkResourceRegistrySite(syntheticSite);
+        if (registryIssue) issues.push(registryIssue);
     }
 }
 
@@ -919,7 +975,7 @@ export function auditDataArchitectureSource(
         const lineNo = i + 1;
 
         inLoop = updateLoopDepth(trimmed, inLoop);
-        auditDataArchitectureLine(filePath, lineNo, trimmed, inLoop, isOnline, issues);
+        auditDataArchitectureLine({ filePath, lineNo, trimmed, inLoop, isOnline }, issues);
 
         if (isLoopEnd(trimmed) && inLoop > 0) {
             inLoop--;
@@ -930,9 +986,32 @@ export function auditDataArchitectureSource(
 }
 
 /**
+ * Evaluator contract supporting both standard and legacy audit invocation styles.
+ */
+export interface IDataArchitectureEvaluator {
+    audit?(
+        filePath: string,
+        content: string,
+        graph?: SemanticGraph,
+        options?: DataArchitectureOptions,
+    ): Issue[];
+}
+
+/**
  * Unified data architecture evaluator combining AST source inspection and semantic graphs.
  */
-export class DataArchitectureEvaluator {
+export class DataArchitectureEvaluator implements IDataArchitectureEvaluator {
+    public readonly audit: (
+        filePath: string,
+        content: string,
+        graph?: SemanticGraph,
+        options?: DataArchitectureOptions,
+    ) => Issue[];
+
+    public constructor() {
+        this.audit = (f, c, g, o) => this.auditDataArchitecture(f, c, g, o);
+    }
+
     /**
      * Executes data architecture review across file source and optional graph.
      *
@@ -942,7 +1021,7 @@ export class DataArchitectureEvaluator {
      * @param options - Review configuration options.
      * @returns Array of detected issues.
      */
-    public audit(
+    public auditDataArchitecture(
         filePath: string,
         content: string,
         graph?: SemanticGraph,
@@ -950,7 +1029,7 @@ export class DataArchitectureEvaluator {
     ): Issue[] {
         const issues: Issue[] = [...auditDataArchitectureSource(filePath, content, options)];
         if (graph) {
-            issues.push(...analyzeDataArchitectureWithGraph(graph, options));
+            issues.push(...auditDataGraphArchitecture(graph, options));
         }
         return issues;
     }

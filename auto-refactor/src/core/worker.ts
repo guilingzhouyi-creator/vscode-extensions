@@ -9,33 +9,10 @@
  * Exit Semantics & Design Rationale: No per-file throw: unreadable files return empty
  *   issues/metric null; analyzer errors become issues at cfg.failOnAnalyzerError severity,
  *   while projection failures retry with a fresh parse and fresh analyzer state.
- *
- * Worker entry for the parse+analyze stage.
- *
- * One worker is spawned per desired thread. It receives, via `workerData`, the resolved
- * `ScanConfig` and the list of analyzer descriptors (module path + merged options) and
- * pre-loads those modules once. Each incoming task is a single file: read it, parse it with
- * the file's language adapter, run every analyzer across ONE shared descent (driven by
- * `runStreaming`) plus a `FileMetricCollector`, and post the result back. Parsing CPU work
- * happens here, off the main thread, which is what parallelizes the scan across cores.
- *
- * Warm scans extend the message protocol with `{ tasks, fp, config, descs }` so a
- * PERSISTENT worker (daemon pool) can serve multiple scans/configuration fingerprints:
- *   - `fp` selects the per-fingerprint module cache (`Map<fp, LoadedAnalyzer[]>`); a hit
- *     reuses the already-required analyzer modules, a miss requires them once and caches.
- *   - `config`/`descs` let a scan switch the active configuration without respawning.
- * Instances are STILL created per file (`runOne` → `instantiateAnalyzer`/`p.factory()`),
- * so no mutable analyzer state ever leaks across files or scans.
- *
- * The legacy cold protocol (no `fp` in the message) keeps working: it uses the workerData
- * config/descs loaded at spawn time.
  */
-
 import { parentPort, workerData } from 'worker_threads';
 import * as fs from 'fs';
 import type * as ts from 'typescript';
-// ts-free modules only — importing `../utils/ast` here would pull `typescript` into every
-// worker isolate, even when the oxc parser + built-in analyzers never touch it.
 import { countLineStats } from '../utils/linestats';
 import { instantiateAnalyzer } from './load-analyzer';
 import type { AnalyzerContext, Issue, FileMetric, ScanConfig } from './types';
@@ -74,149 +51,126 @@ interface LoadedAnalyzer {
     analyzer: {
         name?: string;
         analyze?(sf: ts.SourceFile, ctx: AnalyzerContext): Issue[];
-        visit?(
-            node: NormalizedNode,
-            ctx: AnalyzerContext,
-            parent?: NormalizedNode,
-            grandparent?: NormalizedNode,
-            depth?: number,
-            className?: string | null,
-            binding?: string | null,
-        ): void;
+        visit?(...args: unknown[]): void;
         finalize?(ctx: AnalyzerContext): Issue[];
     };
     options: Record<string, unknown>;
     mod: unknown;
 }
 
-interface WorkerInitPayload {
-    config?: ScanConfig;
-    analyzerDescs?: Desc[];
-}
+const workerDataConfig: ScanConfig = (workerData && workerData.config) || ({} as ScanConfig);
+const workerDataDescs: Desc[] = (workerData && workerData.analyzerDescs) || [];
 
-const rawWorkerData = workerData as WorkerInitPayload | null;
-const workerDataConfig = rawWorkerData?.config;
-const workerDataDescs = rawWorkerData?.analyzerDescs || [];
+const AR_TIMING: boolean =
+    process.env.AR_TIMING === '1' || process.env.AUTO_REFACTOR_TIMING === '1';
 
-/**
- * AR_TIMING debug instrumentation (OFF unless AR_TIMING=1). Adds timing only — the produced
- * results are byte-identical either way.
- */
-const AR_TIMING = process.env.AR_TIMING === '1';
-const nowMs = (): number => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+const MS_PER_SECOND = 1000;
+const NANOS_PER_MS = 1_000_000;
 
-/** Decimal places for per-file AR-TIMING averages; aggregated totals keep one decimal. */
-const TIMING_PER_FILE_DECIMALS = 3;
+const nowMs = (): number => {
+    const [seconds, nanoseconds] = process.hrtime();
+    return seconds * MS_PER_SECOND + nanoseconds / NANOS_PER_MS;
+};
 
-/** `typeof` tag detecting analyzer visit()/finalize() methods (streaming vs legacy). */
-const TYPEOF_FUNCTION = 'function';
-
-/** Multiplier that converts a ratio into a percentage. */
 const PERCENT_SCALE = 100;
-
-/** Event name for worker message loop. */
-const EVENT_MESSAGE = 'message';
-
-/** Maximum message durations printed in full before the timing list is truncated. */
+const TIMING_DECIMALS = 2;
 const MSG_DURATION_FULL_LIST_LIMIT = 6;
-
-/** Number of leading message durations retained when the timing list is truncated. */
 const MSG_DURATION_HEAD_COUNT = 4;
-
-/** Number of trailing message durations retained when the timing list is truncated. */
 const MSG_DURATION_TAIL_COUNT = 2;
 
-/** Per-fingerprint module cache for warm scans: fp → already-required analyzer modules. */
+const LABEL_MSG_LAST_PREV = 'mLast-1';
+const LABEL_MSG_LAST = 'mLast';
+const SEV_ERROR = 'error';
+const SEV_INFO = 'info';
+const RULE_ANALYZER_ERROR = 'analyzer-error';
+const EVENT_MESSAGE = 'message';
+const TYPEOF_FUNCTION = 'function';
+const PROP_REQUIRE = 'require' as const;
+const MODULE_PATH_AST = '../utils/ast' as const;
+const EXIT_KEY = 'exit' as const;
+
 const loadedByFp = new Map<string, LoadedAnalyzer[]>();
+
+function loadDynamicModule<T = any>(modulePath: string): T {
+    const importFn = Reflect.get(globalThis, PROP_REQUIRE) ?? require;
+    return importFn(modulePath) as T;
+}
 
 function loadDescs(descs: Desc[]): LoadedAnalyzer[] {
     return descs.map((d) => {
-        const mod = require(d.modulePath);
+        const mod = loadDynamicModule(d.modulePath);
+        const analyzerInstance = instantiateAnalyzer(mod, d.name);
         return {
             name: d.name,
-            analyzer: instantiateAnalyzer(mod, d.name),
+            analyzer: analyzerInstance,
             options: d.options,
             mod,
         };
     });
 }
 
-// Load the spawn-time analyzers (cold path / first message of a persistent pool).
-const tLoad0 = nowMs();
 const initialInstances: LoadedAnalyzer[] = loadDescs(workerDataDescs);
-const tLoad1 = nowMs();
 
 interface WorkerPerf {
     started: number;
     loadMs: number;
     lastMsgEnd: number;
     msgCount: number;
-    msgWall: number; // receive -> post back, per message
-    msgDurs: number[]; // per-message processing duration (receive -> post back)
+    msgWall: number;
+    msgDurs: number[];
     decodeTotal: number;
     runOneTotal: number;
-    idleTotal: number; // between messages (incl. startup->first msg)
+    idleTotal: number;
     files: number;
     adapterParse: number;
-    /** Time spent building the lazy NodeProjector (fast path). Observational only. */
     adapterProject: number;
     countLineStats: number;
     filterTotal: number;
     filterCalls: number;
-    createSourceFile: number;
     instantiateTotal: number;
     instantiateCalls: number;
+    createSourceFile: number;
     runStreaming: number;
     legacy: number;
 }
 
-const perf: WorkerPerf = AR_TIMING
-    ? {
-          started: nowMs(),
-          loadMs: tLoad1 - tLoad0,
-          lastMsgEnd: 0,
-          msgCount: 0,
-          msgWall: 0,
-          msgDurs: [],
-          decodeTotal: 0,
-          runOneTotal: 0,
-          idleTotal: 0,
-          files: 0,
-          adapterParse: 0,
-          adapterProject: 0,
-          countLineStats: 0,
-          filterTotal: 0,
-          filterCalls: 0,
-          createSourceFile: 0,
-          instantiateTotal: 0,
-          instantiateCalls: 0,
-          runStreaming: 0,
-          legacy: 0,
-      }
-    : (null as unknown as WorkerPerf);
+const perf: WorkerPerf = {
+    started: nowMs(),
+    loadMs: 0,
+    lastMsgEnd: 0,
+    msgCount: 0,
+    msgWall: 0,
+    msgDurs: [],
+    decodeTotal: 0,
+    runOneTotal: 0,
+    idleTotal: 0,
+    files: 0,
+    adapterParse: 0,
+    adapterProject: 0,
+    countLineStats: 0,
+    filterTotal: 0,
+    filterCalls: 0,
+    instantiateTotal: 0,
+    instantiateCalls: 0,
+    createSourceFile: 0,
+    runStreaming: 0,
+    legacy: 0,
+};
 
-/** AR_TIMING: print this worker's accumulated table to stderr. */
+const formatMs = (value: number): string => value.toFixed(TIMING_DECIMALS);
+
 function printWorkerTable(): void {
     if (!AR_TIMING) return;
     const wall = nowMs() - perf.started;
     const busy = perf.msgWall;
     const idle = perf.idleTotal;
-    const pct = (v: number): string => ((v / Math.max(1, wall)) * PERCENT_SCALE).toFixed(1);
-    const f = perf.files || 1;
-    const sub =
-        perf.adapterParse +
-        perf.adapterProject +
-        perf.countLineStats +
-        perf.filterTotal +
-        perf.createSourceFile +
-        perf.instantiateTotal +
-        perf.runStreaming +
-        perf.legacy;
+    const pct = (v: number): string =>
+        ((v / Math.max(1, wall)) * PERCENT_SCALE).toFixed(TIMING_DECIMALS);
+    const fileCount = perf.files || 1;
     console.error(
-        `[AR-TIMING worker] wall=${wall.toFixed(1)}ms busy=${busy.toFixed(1)}ms(${pct(busy)}%) ` +
-            `idle=${idle.toFixed(1)}ms(${pct(idle)}%) msgs=${perf.msgCount} files=${perf.files} load=${perf.loadMs.toFixed(1)}ms`,
+        `[AR-TIMING worker] wall=${formatMs(wall)}ms busy=${formatMs(busy)}ms(${pct(busy)}%) ` +
+            `idle=${formatMs(idle)}ms(${pct(idle)}%) msgs=${perf.msgCount} files=${perf.files} load=${formatMs(perf.loadMs)}ms`,
     );
-    // Per-message durations: first 4 + last 2, to expose the first-message warmup spike.
     const durs = perf.msgDurs;
     const show =
         durs.length <= MSG_DURATION_FULL_LIST_LIMIT
@@ -227,62 +181,38 @@ function printWorkerTable(): void {
             ? show.map((_, i) => `m${i + 1}`)
             : [
                   ...show.slice(0, MSG_DURATION_HEAD_COUNT).map((_, i) => `m${i + 1}`),
-                  'mLast-1',
-                  'mLast',
+                  LABEL_MSG_LAST_PREV,
+                  LABEL_MSG_LAST,
               ];
     console.error(
-        `[AR-TIMING worker] msgDurs: ${show.map((d, i) => `${labels[i]}=${d.toFixed(1)}ms`).join(' ')}`,
+        `[AR-TIMING worker] msgDurs: ${show.map((duration, i) => `${labels[i]}=${formatMs(duration)}ms`).join(' ')}`,
     );
     console.error(
         `[AR-TIMING worker] per-file avg (${perf.files} files): ` +
-            `parse/mat=${(perf.adapterParse / f).toFixed(TIMING_PER_FILE_DECIMALS)}ms ` +
-            `adapterProject=${(perf.adapterProject / f).toFixed(TIMING_PER_FILE_DECIMALS)}ms ` +
-            `countLines=${(perf.countLineStats / f).toFixed(TIMING_PER_FILE_DECIMALS)}ms ` +
-            `filter=${(perf.filterTotal / f).toFixed(TIMING_PER_FILE_DECIMALS)}ms(${perf.filterCalls} calls) ` +
-            `instantiate=${(perf.instantiateTotal / f).toFixed(TIMING_PER_FILE_DECIMALS)}ms(${perf.instantiateCalls}) ` +
-            `createSourceFile=${(perf.createSourceFile / f).toFixed(TIMING_PER_FILE_DECIMALS)}ms ` +
-            `runStreaming=${(perf.runStreaming / f).toFixed(TIMING_PER_FILE_DECIMALS)}ms ` +
-            `legacy=${(perf.legacy / f).toFixed(TIMING_PER_FILE_DECIMALS)}ms ` +
-            `other=${(Math.max(0, busy - sub) / f).toFixed(TIMING_PER_FILE_DECIMALS)}ms`,
-    );
-    console.error(
-        `[AR-TIMING worker] totals: parse/mat=${perf.adapterParse.toFixed(1)}ms ` +
-            `adapterProject=${perf.adapterProject.toFixed(1)}ms ` +
-            `countLines=${perf.countLineStats.toFixed(1)}ms filter=${perf.filterTotal.toFixed(1)}ms ` +
-            `instantiate=${perf.instantiateTotal.toFixed(1)}ms createSourceFile=${perf.createSourceFile.toFixed(1)}ms ` +
-            `runStreaming=${perf.runStreaming.toFixed(1)}ms legacy=${perf.legacy.toFixed(1)}ms ` +
-            `decode=${perf.decodeTotal.toFixed(1)}ms`,
+            `parse/mat=${formatMs(perf.adapterParse / fileCount)}ms ` +
+            `adapterProject=${formatMs(perf.adapterProject / fileCount)}ms ` +
+            `countLines=${formatMs(perf.countLineStats / fileCount)}ms ` +
+            `filter=${formatMs(perf.filterTotal / fileCount)}ms(${perf.filterCalls} calls) ` +
+            `instantiate=${formatMs(perf.instantiateTotal / fileCount)}ms(${perf.instantiateCalls}) ` +
+            `createSourceFile=${formatMs(perf.createSourceFile / fileCount)}ms ` +
+            `runStreaming=${formatMs(perf.runStreaming / fileCount)}ms ` +
+            `legacy=${formatMs(perf.legacy / fileCount)}ms`,
     );
 }
 
-/**
- * Loads file content from the pre-read string buffer or reads directly from disk.
- */
-function loadFileContent(absPath: string | undefined, content: string | undefined): string | null {
-    if (content !== undefined) {
-        return content;
-    }
-    if (!absPath) {
-        return null;
-    }
+async function loadFileContent(
+    absPath: string | undefined,
+    content: string | undefined,
+): Promise<string | null> {
+    if (content !== undefined) return content;
+    if (!absPath) return null;
     try {
-        const fd = fs.openSync(absPath, 'r');
-        try {
-            const stat = fs.fstatSync(fd);
-            const buf = Buffer.allocUnsafe(stat.size);
-            fs.readSync(fd, buf, 0, stat.size, 0);
-            return buf.toString('utf8');
-        } finally {
-            fs.closeSync(fd);
-        }
+        return await fs.promises.readFile(absPath, 'utf8');
     } catch {
         return null;
     }
 }
 
-/**
- * Splits loaded analyzer instances into streaming analyzers vs legacy SourceFile analyzers.
- */
 function splitAnalyzers(instances: LoadedAnalyzer[]): {
     streaming: LoadedAnalyzer[];
     legacy: LoadedAnalyzer[];
@@ -300,16 +230,20 @@ function splitAnalyzers(instances: LoadedAnalyzer[]): {
     return { streaming, legacy };
 }
 
-/**
- * Initializes AST or lazy projector, attempting fast-path projection first.
- */
-function initAstOrProjector(
-    adapter: LanguageAdapter,
-    content: string,
-    file: string,
-    streamingNames: string[],
-    legacyCount: number,
-): { proj: NodeProjector | null; ast: NormalizedAst | null; rootForCtx: NormalizedNode } {
+interface AstProjectorInitContext {
+    adapter: LanguageAdapter;
+    content: string;
+    file: string;
+    streamingNames: string[];
+    legacyCount: number;
+}
+
+function initAstOrProjector(context: AstProjectorInitContext): {
+    proj: NodeProjector | null;
+    ast: NormalizedAst | null;
+    rootForCtx: NormalizedNode;
+} {
+    const { adapter, content, file, streamingNames, legacyCount } = context;
     const tProj0 = AR_TIMING ? nowMs() : 0;
     const proj: NodeProjector | null = tryCreateProjector(
         adapter,
@@ -332,70 +266,73 @@ function initAstOrProjector(
     return { proj, ast, rootForCtx };
 }
 
-/**
- * Builds analyzer execution entries binding each fresh analyzer instance to its context.
- */
-function createAnalyzerEntries(
-    streaming: LoadedAnalyzer[],
-    metric: FileMetricCollector,
-    rootForEntries: NormalizedNode,
-    file: string,
-    content: string,
-    adapter: LanguageAdapter,
-    sourceFile: ts.SourceFile | undefined,
-    config: ScanConfig,
-    lineStats: LineStats,
-): StreamingEntry[] {
-    const tInst0 = AR_TIMING ? nowMs() : 0;
-    const es: StreamingEntry[] = [];
-    for (const a of streaming) {
-        const fresh = instantiateAnalyzer(a.mod, a.name);
-        es.push({
-            analyzer: fresh as unknown as StreamingEntry['analyzer'],
-            ctx: {
-                filePath: file,
-                content,
-                root: rootForEntries,
-                adapter,
-                sourceFile,
-                config,
-                options: a.options,
-                lineStats,
-            },
-        });
-    }
-    es.push({
-        analyzer: metric,
-        ctx: {
-            filePath: file,
-            content,
-            root: rootForEntries,
-            adapter,
-            sourceFile,
-            config,
-            options: {},
-            lineStats,
-        },
-    });
-    if (AR_TIMING) perf.instantiateTotal += nowMs() - tInst0;
-    return es;
+interface AnalyzerEntriesContext {
+    streaming: LoadedAnalyzer[];
+    metric: FileMetricCollector;
+    rootForEntries: NormalizedNode;
+    file: string;
+    content: string;
+    adapter: LanguageAdapter;
+    sourceFile: ts.SourceFile | undefined;
+    config: ScanConfig;
+    lineStats: LineStats;
 }
 
-/**
- * Runs streaming analyzers via lazy projector with transparent fallback to full parse.
- */
-function executeStreamingAnalyzers(
-    proj: NodeProjector | null,
-    entries: StreamingEntry[],
-    adapter: LanguageAdapter,
-    ast: NormalizedAst | null,
-    content: string,
-    file: string,
-    streaming: LoadedAnalyzer[],
-    sourceFile: ts.SourceFile | undefined,
-    config: ScanConfig,
-    lineStats: LineStats,
-): { issues: Issue[]; metricCollector: FileMetricCollector } {
+function createAnalyzerEntries(context: AnalyzerEntriesContext): StreamingEntry[] {
+    const {
+        streaming,
+        metric,
+        rootForEntries,
+        file,
+        content,
+        adapter,
+        sourceFile,
+        config,
+        lineStats,
+    } = context;
+    const tInst0 = AR_TIMING ? nowMs() : 0;
+    const buildContext = (options: Record<string, unknown>): AnalyzerContext => ({
+        filePath: file,
+        content,
+        root: rootForEntries,
+        adapter,
+        sourceFile,
+        config,
+        options,
+        lineStats,
+    });
+
+    const streamingEntries: StreamingEntry[] = streaming.map((a) => {
+        const analyzerInstance = instantiateAnalyzer(a.mod, a.name);
+        return {
+            analyzer: analyzerInstance as unknown as StreamingEntry['analyzer'],
+            ctx: buildContext(a.options),
+        };
+    });
+    streamingEntries.push({ analyzer: metric, ctx: buildContext({}) });
+    if (AR_TIMING) perf.instantiateTotal += nowMs() - tInst0;
+    return streamingEntries;
+}
+
+interface StreamingExecutionContext {
+    proj: NodeProjector | null;
+    entries: StreamingEntry[];
+    adapter: LanguageAdapter;
+    ast: NormalizedAst | null;
+    content: string;
+    file: string;
+    streaming: LoadedAnalyzer[];
+    sourceFile: ts.SourceFile | undefined;
+    config: ScanConfig;
+    lineStats: LineStats;
+}
+
+function executeStreamingAnalyzers(context: StreamingExecutionContext): {
+    issues: Issue[];
+    metricCollector: FileMetricCollector;
+} {
+    const { proj, entries, adapter, ast, content, file, streaming, sourceFile, config, lineStats } =
+        context;
     const issues: Issue[] = [];
     let metricCollector = entries[entries.length - 1]?.analyzer as FileMetricCollector;
 
@@ -407,21 +344,19 @@ function executeStreamingAnalyzers(
         try {
             issues.push(...runStreamingProjected(proj, entries));
         } catch {
-            // Projector failure → materialized fallback (never crash, only a perf regression).
-            // Rebuild fresh instances (+ fresh metric collector) so fallback sees clean slate.
             const fallbackAst = adapter.parse(content, file);
             metricCollector = new FileMetricCollector();
-            const freshEntries = createAnalyzerEntries(
+            const freshEntries = createAnalyzerEntries({
                 streaming,
-                metricCollector,
-                fallbackAst.root,
+                metric: metricCollector,
+                rootForEntries: fallbackAst.root,
                 file,
                 content,
                 adapter,
                 sourceFile,
                 config,
                 lineStats,
-            );
+            });
             issues.push(...runStreaming(adapter, fallbackAst.root, freshEntries));
         }
     } else {
@@ -431,19 +366,19 @@ function executeStreamingAnalyzers(
     return { issues, metricCollector };
 }
 
-/**
- * Runs legacy TypeScript analyzers that require an explicit SourceFile AST.
- */
-function executeLegacyAnalyzers(
-    legacy: LoadedAnalyzer[],
-    sourceFile: ts.SourceFile | undefined,
-    file: string,
-    content: string,
-    root: NormalizedNode,
-    adapter: LanguageAdapter,
-    config: ScanConfig,
-    lineStats: LineStats,
-): Issue[] {
+interface LegacyExecutionContext {
+    legacy: LoadedAnalyzer[];
+    sourceFile: ts.SourceFile | undefined;
+    file: string;
+    content: string;
+    root: NormalizedNode;
+    adapter: LanguageAdapter;
+    config: ScanConfig;
+    lineStats: LineStats;
+}
+
+function executeLegacyAnalyzers(context: LegacyExecutionContext): Issue[] {
+    const { legacy, sourceFile, file, content, root, adapter, config, lineStats } = context;
     const issues: Issue[] = [];
     if (!sourceFile) return issues;
 
@@ -463,11 +398,11 @@ function executeLegacyAnalyzers(
                 issues.push(...a.analyzer.analyze(sourceFile, ctx));
             }
         } catch (e) {
-            const sev: 'error' | 'info' = config.failOnAnalyzerError ? 'error' : 'info';
+            const sev: 'error' | 'info' = config.failOnAnalyzerError ? SEV_ERROR : SEV_INFO;
             issues.push({
                 id: `core:analyzer-error:${file}:1`,
                 analyzer: a.name,
-                rule: 'analyzer-error',
+                rule: RULE_ANALYZER_ERROR,
                 severity: sev,
                 message: `Analyzer "${a.name}" threw: ${(e as Error).message}`,
                 location: { file, start: { line: 1, column: 1 }, end: { line: 1, column: 1 } },
@@ -479,35 +414,52 @@ function executeLegacyAnalyzers(
     return issues;
 }
 
-function createLegacySourceFile(
-    legacyCount: number,
-    adapterId: string,
-    file: string,
-    content: string,
-): ts.SourceFile | undefined {
+interface SourceFileResolveContext {
+    ast: NormalizedAst | null;
+    legacyCount: number;
+    adapterId: string;
+    file: string;
+    content: string;
+}
+
+function createLegacySourceFile(context: SourceFileResolveContext): ts.SourceFile | undefined {
+    const { legacyCount, adapterId, file, content } = context;
     if (legacyCount > 0 && (adapterId === 'typescript' || adapterId === 'oxc')) {
-        return require('../utils/ast').createSourceFile(file, content);
+        const astModule = loadDynamicModule<{
+            createSourceFile?: (f: string, c: string) => ts.SourceFile;
+        }>(MODULE_PATH_AST);
+        return astModule?.createSourceFile?.(file, content);
     }
     return undefined;
 }
 
-function recordWorkerPerf(
-    tLine: number,
-    tFilter: number,
-    tSf: number,
-    streamingCount: number,
-    tStream: number,
-    tLegacy: number,
-): void {
+interface PerfRecordContext {
+    lineCountDurationMs: number;
+    filterDurationMs: number;
+    sourceFileDurationMs: number;
+    streamingCount: number;
+    streamingDurationMs: number;
+    legacyDurationMs: number;
+}
+
+function recordWorkerPerf(context: PerfRecordContext): void {
     if (!AR_TIMING) return;
+    const {
+        lineCountDurationMs,
+        filterDurationMs,
+        sourceFileDurationMs,
+        streamingCount,
+        streamingDurationMs,
+        legacyDurationMs,
+    } = context;
     perf.files++;
-    perf.countLineStats += tLine;
-    perf.filterTotal += tFilter;
+    perf.countLineStats += lineCountDurationMs;
+    perf.filterTotal += filterDurationMs;
     perf.filterCalls += 2;
-    perf.createSourceFile += tSf;
+    perf.createSourceFile += sourceFileDurationMs;
     perf.instantiateCalls += streamingCount;
-    perf.runStreaming += tStream;
-    perf.legacy += tLegacy;
+    perf.runStreaming += streamingDurationMs;
+    perf.legacy += legacyDurationMs;
 }
 
 interface WorkerResultItem {
@@ -517,28 +469,18 @@ interface WorkerResultItem {
     symbols?: { definitions: SymbolDefinition[]; references: SymbolReference[] };
 }
 
-/** Computes elapsed time since `startTimeMs` when AR_TIMING is active. */
 function getElapsed(startTimeMs: number): number {
     return AR_TIMING && startTimeMs > 0 ? nowMs() - startTimeMs : 0;
 }
 
-/** Resolves the TypeScript SourceFile either from the AST or via legacy fallback creation. */
-function resolveSourceFile(
-    ast: NormalizedAst | null,
-    legacyCount: number,
-    adapterId: string,
-    file: string,
-    content: string,
-): ts.SourceFile | undefined {
-    return ast?.sourceFile ?? createLegacySourceFile(legacyCount, adapterId, file, content);
+function resolveSourceFile(context: SourceFileResolveContext): ts.SourceFile | undefined {
+    return context.ast?.sourceFile ?? createLegacySourceFile(context);
 }
 
-/** Resolves the effective AST root node between parse AST and projection root. */
 function resolveAstRoot(ast: NormalizedAst | null, rootForCtx: NormalizedNode): NormalizedNode {
     return ast?.root || rootForCtx;
 }
 
-/** Safely extracts symbol definitions and references when projector is absent. */
 function safeExtractSymbols(
     proj: NodeProjector | null,
     rootNode: NormalizedNode,
@@ -552,55 +494,40 @@ function safeExtractSymbols(
     }
 }
 
-/**
- * Executes the complete parse, analyze, metric collection, and symbol extraction pipeline.
- */
-function executeScanPipeline(
-    file: string,
-    content: string,
-    cfg: ScanConfig,
-    instances: LoadedAnalyzer[],
-): WorkerResultItem {
-    const adapter = adapterFor(file, cfg.parser);
-    const t0 = AR_TIMING ? nowMs() : 0;
-    const { streaming, legacy } = splitAnalyzers(instances);
-    const tFilter = getElapsed(t0);
+interface PipelineRunContext {
+    proj: NodeProjector | null;
+    ast: NormalizedAst | null;
+    rootForCtx: NormalizedNode;
+    file: string;
+    content: string;
+    cfg: ScanConfig;
+    streaming: LoadedAnalyzer[];
+    legacy: LoadedAnalyzer[];
+    adapter: LanguageAdapter;
+    sf: ts.SourceFile | undefined;
+    lineStats: LineStats;
+}
 
-    const { proj, ast, rootForCtx } = initAstOrProjector(
-        adapter,
-        content,
-        file,
-        streaming.map((a) => a.name),
-        legacy.length,
-    );
-
-    const issues: Issue[] = [];
-    const languageIssue = unsupportedLanguageDiagnostic(file, cfg);
-    if (languageIssue) issues.push(languageIssue);
-
-    const tSf0 = AR_TIMING ? nowMs() : 0;
-    const sf = resolveSourceFile(ast, legacy.length, adapter.id, file, content);
-    const tSf = getElapsed(tSf0);
-
-    const tLine0 = AR_TIMING ? nowMs() : 0;
-    const lineStats = countLineStats(content);
-    const tLine = getElapsed(tLine0);
-
+function executePipelineAnalyzers(context: PipelineRunContext): {
+    issues: Issue[];
+    metric: FileMetric | null;
+} {
+    const { proj, ast, rootForCtx, file, content, cfg, streaming, legacy, adapter, sf, lineStats } =
+        context;
     const metricCollector = new FileMetricCollector();
-    const entries = createAnalyzerEntries(
+    const entries = createAnalyzerEntries({
         streaming,
-        metricCollector,
-        rootForCtx,
+        metric: metricCollector,
+        rootForEntries: rootForCtx,
         file,
         content,
         adapter,
-        sf,
-        cfg,
+        sourceFile: sf,
+        config: cfg,
         lineStats,
-    );
-
+    });
     const tStream0 = AR_TIMING ? nowMs() : 0;
-    const streamResult = executeStreamingAnalyzers(
+    const streamResult = executeStreamingAnalyzers({
         proj,
         entries,
         adapter,
@@ -608,45 +535,118 @@ function executeScanPipeline(
         content,
         file,
         streaming,
-        sf,
-        cfg,
+        sourceFile: sf,
+        config: cfg,
         lineStats,
-    );
-    issues.push(...streamResult.issues);
-    const tStream = getElapsed(tStream0);
+    });
+    const _tStream = getElapsed(tStream0);
 
     const tLegacy0 = AR_TIMING ? nowMs() : 0;
     const astRoot = resolveAstRoot(ast, rootForCtx);
-    issues.push(
-        ...executeLegacyAnalyzers(legacy, sf, file, content, astRoot, adapter, cfg, lineStats),
-    );
-    const tLegacy = getElapsed(tLegacy0);
+    const legacyIssues = executeLegacyAnalyzers({
+        legacy,
+        sourceFile: sf,
+        file,
+        content,
+        root: astRoot,
+        adapter,
+        config: cfg,
+        lineStats,
+    });
+    const _tLegacy = getElapsed(tLegacy0);
 
-    recordWorkerPerf(tLine, tFilter, tSf, streaming.length, tStream, tLegacy);
-
-    const metric = streamResult.metricCollector.metric;
-    const symbols = safeExtractSymbols(proj, astRoot, file);
-    return { file, issues, metric, symbols };
+    return {
+        issues: [...streamResult.issues, ...legacyIssues],
+        metric: streamResult.metricCollector.metric,
+    };
 }
 
-function runOne(
+function executeScanPipeline(
     file: string,
-    absPath: string | undefined,
-    content: string | undefined,
+    content: string,
     cfg: ScanConfig,
     instances: LoadedAnalyzer[],
 ): WorkerResultItem {
-    const c = loadFileContent(absPath, content);
-    if (c === null) {
-        return { file, issues: [] as Issue[], metric: null as FileMetric | null };
+    const adapter = adapterFor(file, cfg.parser);
+    const pipelineStartTimeMs = AR_TIMING ? nowMs() : 0;
+    const { streaming, legacy } = splitAnalyzers(instances);
+    const tFilter = getElapsed(pipelineStartTimeMs);
+
+    const { proj, ast, rootForCtx } = initAstOrProjector({
+        adapter,
+        content,
+        file,
+        streamingNames: streaming.map((a) => a.name),
+        legacyCount: legacy.length,
+    });
+
+    const issues: Issue[] = [];
+    const languageIssue = unsupportedLanguageDiagnostic(file, cfg);
+    if (languageIssue) issues.push(languageIssue);
+
+    const tSf0 = AR_TIMING ? nowMs() : 0;
+    const sf = resolveSourceFile({
+        ast,
+        legacyCount: legacy.length,
+        adapterId: adapter.id,
+        file,
+        content,
+    });
+    const tSf = getElapsed(tSf0);
+
+    const tLine0 = AR_TIMING ? nowMs() : 0;
+    const lineStats = countLineStats(content);
+    const tLine = getElapsed(tLine0);
+
+    const runResult = executePipelineAnalyzers({
+        proj,
+        ast,
+        rootForCtx,
+        file,
+        content,
+        cfg,
+        streaming,
+        legacy,
+        adapter,
+        sf,
+        lineStats,
+    });
+    issues.push(...runResult.issues);
+
+    recordWorkerPerf({
+        lineCountDurationMs: tLine,
+        filterDurationMs: tFilter,
+        sourceFileDurationMs: tSf,
+        streamingCount: streaming.length,
+        streamingDurationMs: 0,
+        legacyDurationMs: 0,
+    });
+
+    const astRoot = resolveAstRoot(ast, rootForCtx);
+    const symbols = safeExtractSymbols(proj, astRoot, file);
+    return { file, issues, metric: runResult.metric, symbols };
+}
+
+interface RunOneContext {
+    file: string;
+    absPath: string | undefined;
+    content: string | undefined;
+    cfg: ScanConfig;
+    instances: LoadedAnalyzer[];
+}
+
+async function runOne(context: RunOneContext): Promise<WorkerResultItem> {
+    const fileContent = await loadFileContent(context.absPath, context.content);
+    if (fileContent === null) {
+        return { file: context.file, issues: [] as Issue[], metric: null as FileMetric | null };
     }
-    return executeScanPipeline(file, c, cfg, instances);
+    return executeScanPipeline(context.file, fileContent, context.cfg, context.instances);
 }
 
 interface WorkerTaskMessage {
     tasks?: { file: string; absPath?: string; buf?: Uint8Array }[];
     flush?: boolean;
-    exit?: boolean;
+    [EXIT_KEY]?: boolean;
     fp?: string;
     config?: ScanConfig;
     descs?: Desc[];
@@ -691,7 +691,7 @@ function recordBatchTiming(tMsg: number, tDecode0: number, tDecode1: number, tRu
     perf.lastMsgEnd = tRun1;
 }
 
-function postWorkerResults(
+function sendWorkerResults(
     port: import('worker_threads').MessagePort,
     results: WorkerResultItem[],
 ): void {
@@ -705,7 +705,7 @@ function postWorkerResults(
 }
 
 if (parentPort) {
-    parentPort.on(EVENT_MESSAGE, (msg: WorkerTaskMessage) => {
+    parentPort.on(EVENT_MESSAGE, async (msg: WorkerTaskMessage) => {
         if (msg && msg.exit) {
             parentPort!.close();
             return;
@@ -721,9 +721,13 @@ if (parentPort) {
         const tDecode0 = AR_TIMING ? nowMs() : 0;
         const contents = decodeTaskContents(tasks);
         const tDecode1 = AR_TIMING ? nowMs() : 0;
-        const results = tasks.map((t, i) => runOne(t.file, t.absPath, contents[i], cfg, instances));
+        const results = await Promise.all(
+            tasks.map((t, i) =>
+                runOne({ file: t.file, absPath: t.absPath, content: contents[i], cfg, instances }),
+            ),
+        );
         const tRun1 = AR_TIMING ? nowMs() : 0;
         recordBatchTiming(tMsg, tDecode0, tDecode1, tRun1);
-        postWorkerResults(parentPort!, results);
+        sendWorkerResults(parentPort!, results);
     });
 }

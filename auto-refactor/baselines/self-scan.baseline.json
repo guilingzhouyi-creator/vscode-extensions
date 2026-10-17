@@ -1,7 +1,7 @@
 {
   "version": "1.2.0",
   "granularity": "grouped",
-  "timestamp": "2026-10-17T05:09:15.921Z",
+  "timestamp": "2026-10-17T05:36:44.031Z",
   "groups": [
     {
       "key": "comments|CMT-HDR-001|crates/auto-refactor-core/build.rs",
@@ -2188,20 +2188,6 @@
       }
     },
     {
-      "key": "large-file|large-file|src/core/analyzer-registry.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/analyzer-registry.ts",
-      "count": 26,
-      "severities": {
-        "warning": 26
-      }
-    },
-    {
       "key": "large-file|large-file|src/core/analyzer.ts",
       "count": 1,
       "severities": {
@@ -3414,27 +3400,6 @@
     },
     {
       "key": "large-file|large-file|src/core/intelligence/dataArchitecture.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "governance|GOV-DAT-001|src/core/intelligence/dataArchitecture.ts",
-      "count": 5,
-      "severities": {
-        "info": 5
-      }
-    },
-    {
-      "key": "hygiene|HYG-CLN-001|src/core/intelligence/dataArchitecture.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "simplify|SIM-LONG-001|src/core/intelligence/dataArchitecture.ts",
       "count": 1,
       "severities": {
         "warning": 1
@@ -5471,35 +5436,7 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|src/core/worker.ts",
-      "count": 6,
-      "severities": {
-        "warning": 6
-      }
-    },
-    {
-      "key": "governance|GOV-PRF-004|src/core/worker.ts",
-      "count": 2,
-      "severities": {
-        "warning": 2
-      }
-    },
-    {
-      "key": "governance|GOV-DAT-001|src/core/worker.ts",
-      "count": 6,
-      "severities": {
-        "info": 6
-      }
-    },
-    {
       "key": "hygiene|HYG-CLN-001|src/core/worker.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "simplify|SIM-LONG-001|src/core/worker.ts",
       "count": 1,
       "severities": {
         "warning": 1

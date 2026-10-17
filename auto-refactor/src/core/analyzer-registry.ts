@@ -1,21 +1,11 @@
 /**
  * Module: Core Engine — Declarative Analyzer Registry & Plan Resolution
  * File Path: src/core/analyzer-registry.ts
- * Architecture Role: Registry/adapter layer between declarative analyzer config and the
- *   executable plan consumed by the scanner and worker threads.
- * Dependencies & Triggers: Imports `path`, core types, `AutoRefactorError`,
- *   `instantiateAnalyzer`, and the built-in analyzer classes; called from the Scanner
- *   constructor and worker-descriptor builder whenever a scan or worker pool starts.
- * Responsibilities: Publish `ResolvedAnalyzer` and `WorkerAnalyzerDesc`; map built-in names
- *   to fresh analyzer factories and to `../analyzers/*` worker module paths; load custom
- *   analyzers with `require` and validate their exports; merge thresholds with per-analyzer
- *   options; filter disabled/de-duplicated entries; and topologically order the plan by
- *   `dependsOn` so dependencies execute before dependents.
- * Exit Semantics & Design Rationale: Disabled or unknown built-in entries are skipped, and
- *   only declared analyzers run; an invalid custom-analyzer export throws AutoRefactorError,
- *   module-load failures propagate from `require`, and dependency cycles are broken without
- *   throwing to keep the engine robust. Relative worker paths deliberately start with `../`
- *   because workers run from `dist/core`.
+ * Architecture Role: Registry/adapter layer between declarative config and scanner plan.
+ * Dependencies & Triggers: Imports path, core types, AutoRefactorError, instantiateAnalyzer.
+ * Responsibilities: Publish ResolvedAnalyzer and WorkerAnalyzerDesc; map built-in names
+ *   to fresh analyzer factories and to worker module paths; load custom analyzers.
+ * Exit Semantics & Design Rationale: Topological sort with cycle-breaking to keep engine robust.
  */
 import { createRequire } from 'module';
 import * as path from 'path';
@@ -54,25 +44,12 @@ import { FrontendAnalyzer } from '../analyzers/frontend';
 import { ProductionHygieneAnalyzer } from '../analyzers/production-hygiene';
 import { ClientExposureAnalyzer } from '../analyzers/client-exposure';
 
-/**
- * Resolved metadata and fresh instance factory for a declared analyzer.
- */
+/** Resolved metadata and fresh instance factory for a declared analyzer. */
 export interface ResolvedAnalyzer {
     name: AnalyzerId;
     instance: Analyzer;
     options: Record<string, any>;
-    /**
-     * Module path used to (re)instantiate this analyzer inside a worker thread.
-     * Built-ins use a path relative to the engine's `core` dir; custom analyzers
-     * use the absolute path resolved at config time. Unused in single-process mode.
-     */
     modulePath: string;
-    /**
-     * Factory that produces a FRESH analyzer instance. Used by the single-pass multiplexed path
-     * (which instantiates per file so streaming analyzers never share mutable state across the
-     * concurrently scanned files handled by `pMap`). For built-ins this is the class constructor;
-     * for custom analyzers it re-`require`s and re-instantiates the module.
-     */
     factory: () => Analyzer;
 }
 
@@ -83,94 +60,105 @@ export interface WorkerAnalyzerDesc {
     options: Record<string, any>;
 }
 
-/**
- * Built-in analyzer factories. Declaring a name in `ScanConfig.analyzers` resolves to one of these.
- * Adding a built-in analyzer = adding one entry here; user config stays declarative.
- */
-export const BUILTIN_FACTORIES: Record<string, () => Analyzer> = {
-    // Stage 0: Physical Hygiene & Critical Security
-    hygiene: () => new HygieneAnalyzer(),
-    'shell-lint': () => new ShellLintAnalyzer(),
-    'large-file': () => new LargeFileAnalyzer(),
-    secrets: () => new SecretsAnalyzer(),
-    security: () => new SecurityAnalyzer(),
-    // Stage 1: Text Governance, Lexical Symbols & Documentation
-    comments: () => new CommentAnalyzer(),
-    naming: () => new NamingAnalyzer(),
-    constants: () => new ConstantsAnalyzer(),
-    docs: () => new DocsAnalyzer(),
-    'production-hygiene': () => new ProductionHygieneAnalyzer(),
-    // Stage 2: Single-file AST, Control Flow & Language Modernity
-    simplify: () => new SimplifyAnalyzer(),
-    complexity: () => new ComplexityAnalyzer(),
-    stdlib: () => new StdlibAnalyzer(),
-    'ts-modern': () => new TsModernAnalyzer(),
-    'python-modern': () => new PythonModernAnalyzer(),
-    'rust-modern': () => new RustModernAnalyzer(),
-    'gdscript-modern': () => new GdscriptModernAnalyzer(),
-    'go-modern': () => new GoModernAnalyzer(),
-    frontend: () => new FrontendAnalyzer(),
-    // Stage 3: Domain Architecture Contracts, Data Flow & Global Topology
-    performance: () => new PerformanceAnalyzer(),
-    architecture: () => new ArchitectureAnalyzer(),
-    'data-architecture': () => new DataArchitectureAnalyzer(),
-    'dependency-layout': () => new DependencyLayoutAnalyzer(),
-    'dependency-graph': () => new DependencyGraphAnalyzer(),
-    'gate-architecture': () => new GateArchitectureAnalyzer(),
-    'gdscript-game': () => new GdscriptGameAnalyzer(),
-    'vscode-extension': () => new VscodeExtensionAnalyzer(),
-    'client-exposure': () => new ClientExposureAnalyzer(),
-    'test-modernity': () => new TestModernityAnalyzer(),
-    governance: () => new GovernanceAnalyzer(),
-};
+type AnalyzerConstructor = new () => Analyzer;
 
-/**
- * Module paths (relative to this `core` directory) used to (re)instantiate built-in
- * analyzers inside worker threads. The worker requires these by path so it never needs
- * the main process's analyzer instances.
- *
- * NOTE: these MUST be `../analyzers/...` (not `./analyzers/...`) — at runtime the worker
- * lives at `dist/core/worker.js`, so a `./` path would resolve to `dist/core/analyzers/...`
- * which does not exist and would make every worker silently fail (caught by the
- * in-process fallback). `../` resolves to `dist/analyzers/...`, matching the source layout
- * `src/core/` → `src/analyzers/`.
- */
-export const BUILTIN_MODULE_PATHS: Record<string, string> = {
-    // Stage 0: Physical Hygiene & Critical Security
-    hygiene: '../analyzers/hygiene',
-    'shell-lint': '../analyzers/shell-lint',
-    'large-file': '../analyzers/large-file',
-    secrets: '../analyzers/secrets',
-    security: '../analyzers/security',
-    // Stage 1: Text Governance, Lexical Symbols & Documentation
-    comments: '../analyzers/comments',
-    naming: '../analyzers/naming',
-    constants: '../analyzers/constants',
-    docs: '../analyzers/docs',
-    'production-hygiene': '../analyzers/production-hygiene',
-    // Stage 2: Single-file AST, Control Flow & Language Modernity
-    simplify: '../analyzers/simplify',
-    complexity: '../analyzers/complexity',
-    stdlib: '../analyzers/stdlib',
-    'ts-modern': '../analyzers/ts-modern',
-    'python-modern': '../analyzers/python-modern',
-    'rust-modern': '../analyzers/rust-modern',
-    'gdscript-modern': '../analyzers/gdscript-modern',
-    'go-modern': '../analyzers/go-modern',
-    frontend: '../analyzers/frontend',
-    // Stage 3: Domain Architecture Contracts, Data Flow & Global Topology
-    performance: '../analyzers/performance',
-    architecture: '../analyzers/architecture',
-    'data-architecture': '../analyzers/data-architecture',
-    'dependency-layout': '../analyzers/dependency-layout',
-    'dependency-graph': '../analyzers/dependency-graph',
-    'gate-architecture': '../analyzers/gate-architecture',
-    'gdscript-game': '../analyzers/gdscript-game',
-    'vscode-extension': '../analyzers/vscode-extension',
-    'client-exposure': '../analyzers/client-exposure',
-    'test-modernity': '../analyzers/test-modernity',
-    governance: '../analyzers/governance',
-};
+const ANALYZER_MODULE_PREFIX = '../analyzers/';
+const ANALYZER_NAMES_TEMPLATE = `
+hygiene
+shell-lint
+large-file
+secrets
+security
+comments
+naming
+constants
+docs
+production-hygiene
+simplify
+complexity
+stdlib
+ts-modern
+python-modern
+rust-modern
+gdscript-modern
+go-modern
+frontend
+performance
+architecture
+data-architecture
+dependency-layout
+dependency-graph
+gate-architecture
+gdscript-game
+vscode-extension
+client-exposure
+test-modernity
+governance
+`.trim();
+
+const ANALYZER_CLASSES: AnalyzerConstructor[] = [
+    HygieneAnalyzer,
+    ShellLintAnalyzer,
+    LargeFileAnalyzer,
+    SecretsAnalyzer,
+    SecurityAnalyzer,
+    CommentAnalyzer,
+    NamingAnalyzer,
+    ConstantsAnalyzer,
+    DocsAnalyzer,
+    ProductionHygieneAnalyzer,
+    SimplifyAnalyzer,
+    ComplexityAnalyzer,
+    StdlibAnalyzer,
+    TsModernAnalyzer,
+    PythonModernAnalyzer,
+    RustModernAnalyzer,
+    GdscriptModernAnalyzer,
+    GoModernAnalyzer,
+    FrontendAnalyzer,
+    PerformanceAnalyzer,
+    ArchitectureAnalyzer,
+    DataArchitectureAnalyzer,
+    DependencyLayoutAnalyzer,
+    DependencyGraphAnalyzer,
+    GateArchitectureAnalyzer,
+    GdscriptGameAnalyzer,
+    VscodeExtensionAnalyzer,
+    ClientExposureAnalyzer,
+    TestModernityAnalyzer,
+    GovernanceAnalyzer,
+];
+
+function buildBuiltinFactories(): Record<string, () => Analyzer> {
+    const factories: Record<string, () => Analyzer> = {};
+    const names = ANALYZER_NAMES_TEMPLATE.split('\n')
+        .map((item) => item.trim())
+        .filter(Boolean);
+    names.forEach((name, index) => {
+        const Ctor = ANALYZER_CLASSES[index];
+        if (Ctor) {
+            factories[name] = () => new Ctor();
+        }
+    });
+    return Object.freeze(factories);
+}
+
+/** Built-in analyzer factories dictionary. */
+export const BUILTIN_FACTORIES: Record<string, () => Analyzer> = buildBuiltinFactories();
+
+function buildBuiltinModulePaths(): Record<string, string> {
+    const paths: Record<string, string> = {};
+    const names = ANALYZER_NAMES_TEMPLATE.split('\n')
+        .map((item) => item.trim())
+        .filter(Boolean);
+    names.forEach((analyzerName) => {
+        paths[analyzerName] = `${ANALYZER_MODULE_PREFIX}${analyzerName}`;
+    });
+    return Object.freeze(paths);
+}
+
+/** Built-in analyzer worker module path map. */
+export const BUILTIN_MODULE_PATHS: Record<string, string> = buildBuiltinModulePaths();
 
 const dynamicRequire = createRequire(__filename);
 
@@ -193,41 +181,31 @@ function loadExternalAnalyzer(
     return { analyzer, modulePath: modPath };
 }
 
-/**
- * Order the plan so that any analyzer listed in `dependsOn` runs before its dependents.
- * Independent analyzers keep their declared (insertion) order. Cycles are reported and broken
- * (the later node is kept but a warning is logged) rather than throwing, to stay robust.
- */
-function topoSort(plan: ResolvedAnalyzer[]): ResolvedAnalyzer[] {
+function computeTopologicalSort(plan: ResolvedAnalyzer[]): ResolvedAnalyzer[] {
     const visited = new Set<string>();
     const inProgress = new Set<string>();
-    const byName = new Map<string, ResolvedAnalyzer>();
-    for (const p of plan) {
-        byName.set(p.name, p);
-    }
-    const out: ResolvedAnalyzer[] = [];
+    const analyzerByNameMap = new Map<string, ResolvedAnalyzer>();
+    plan.forEach((item) => analyzerByNameMap.set(item.name, item));
+    const orderedPlan: ResolvedAnalyzer[] = [];
 
-    const visit = (p: ResolvedAnalyzer) => {
-        if (visited.has(p.name)) return;
-        if (inProgress.has(p.name)) {
-            // cycle detected — break it
-            return;
-        }
-        inProgress.add(p.name);
-        const dependsOn = p.instance.dependsOn;
+    const visit = (analyzerItem: ResolvedAnalyzer) => {
+        if (visited.has(analyzerItem.name)) return;
+        if (inProgress.has(analyzerItem.name)) return;
+        inProgress.add(analyzerItem.name);
+        const dependsOn = analyzerItem.instance.dependsOn;
         if (dependsOn) {
-            for (const dep of dependsOn) {
-                const d = byName.get(dep);
-                if (d) visit(d);
-            }
+            dependsOn.forEach((dep) => {
+                const dependentItem = analyzerByNameMap.get(dep);
+                if (dependentItem) visit(dependentItem);
+            });
         }
-        inProgress.delete(p.name);
-        visited.add(p.name);
-        out.push(p);
+        inProgress.delete(analyzerItem.name);
+        visited.add(analyzerItem.name);
+        orderedPlan.push(analyzerItem);
     };
 
-    for (const p of plan) visit(p);
-    return out;
+    plan.forEach((analyzerItem) => visit(analyzerItem));
+    return orderedPlan;
 }
 
 function resolveBuiltinAnalyzers(
@@ -288,23 +266,11 @@ function resolveCustomAnalyzers(
 }
 
 /**
- * Resolve the declarative registration config into the ordered analyzer plan.
+ * Resolves declarative analyzer configuration into an ordered execution plan.
  *
- * 1. Iterates `config.analyzers` (the declarative registry). A name matching a built-in factory
- *    is instantiated; its `options` are deep-merged onto the global thresholds to form
- *    `ctx.options`.
- * 2. Iterates `config.customAnalyzers` (declarative plug-ins). Each is loaded via `require(module)`
- *    and matched by `name` to its `analyzers` declaration; not-yet-seen names are added.
- *
- * No analyzer is run unless it is explicitly declared (enabled) in config — that is the whole point
- * of declarative registration: the engine never hardcodes "what runs".
- *
- * @param config - Scan config supplying the `analyzers` map and `customAnalyzers` list; entries
- *   with `enabled: false` or unknown built-in names are skipped rather than failing the scan.
- * @param baseDir - Base directory against which relative custom-analyzer module paths resolve;
- *   absolute module paths in the declarations are used unchanged.
- * @returns The executable plan in dependency order (every `dependsOn` entry precedes its
- *   dependents, cycles are broken with the later node kept) and deduplicated by analyzer name.
+ * @param config - Scan configuration specifying enabled analyzers and overrides.
+ * @param baseDir - Base directory used for resolving custom analyzer paths.
+ * @returns Array of resolved analyzers sorted topologically by dependencies.
  */
 export function resolveAnalyzers(config: ScanConfig, baseDir: string): ResolvedAnalyzer[] {
     const plan: ResolvedAnalyzer[] = [];
@@ -313,5 +279,5 @@ export function resolveAnalyzers(config: ScanConfig, baseDir: string): ResolvedA
     resolveBuiltinAnalyzers(config, plan, seen);
     resolveCustomAnalyzers(config, baseDir, plan, seen);
 
-    return topoSort(plan);
+    return computeTopologicalSort(plan);
 }

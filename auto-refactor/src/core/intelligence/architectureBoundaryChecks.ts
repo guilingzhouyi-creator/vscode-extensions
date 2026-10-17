@@ -235,11 +235,7 @@ function createReviewDetail(inputs: ReviewDetailInputs): SemanticReviewDetail {
 /**
  * Builds a standardized architecture boundary issue.
  */
-function buildBoundaryIssue(
-    ruleId: string,
-    file: ArchitecturalFileInfo,
-    symbol: string,
-): Issue {
+function buildBoundaryIssue(ruleId: string, file: ArchitecturalFileInfo, symbol: string): Issue {
     const spec = RULE_SPECS_MAP.get(ruleId);
     if (!spec) {
         throw new Error(`Unregistered boundary rule: ${ruleId}`);

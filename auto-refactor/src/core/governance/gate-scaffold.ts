@@ -415,7 +415,9 @@ function buildScaffoldHooks(): GateScaffoldPayload['suggestedStructure']['hooks'
 /**
  * Builds executable runner scripts for Bash and PowerShell.
  */
-function buildScaffoldRunners(archetype: ProjectArchetype): GateScaffoldPayload['suggestedStructure']['runnerScripts'] {
+function buildScaffoldRunners(
+    archetype: ProjectArchetype,
+): GateScaffoldPayload['suggestedStructure']['runnerScripts'] {
     return [
         {
             filePath: 'scripts/pre-commit-gate.sh',

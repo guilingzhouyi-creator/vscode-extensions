@@ -21,7 +21,12 @@ import { IncrementalFileState, touchIncremental } from '../diff/incremental-stat
 import type { ScannerContext } from './scanner-context';
 import type { WarmSession, CacheFingerprintContext, StatResultEntry } from './cache-key-helper';
 import { remapCachedResult } from './cache-key-helper';
-import { effectiveWorkers, computeHybridK, dispatchBatches, runWorkerPool } from './worker-scheduler';
+import {
+    effectiveWorkers,
+    computeHybridK,
+    dispatchBatches,
+    runWorkerPool,
+} from './worker-scheduler';
 import { isFreshL1Hit, hasWorkerPool } from './scan-guards';
 
 const MODE_INCREMENTAL = 'incremental' as const;
@@ -38,8 +43,21 @@ export interface ScanWithCacheOptions {
 /** Index-aligned work lists collected while probing files against the two cache levels. */
 export interface CacheAnalysisQueue {
     toAnalyze: { idx: number; rel: string; fpHash: string; contentHash: string; buf?: Buffer }[];
-    toIncremental: { idx: number; rel: string; fpHash: string; contentHash: string; state: IncrementalFileState; content: string }[];
-    l2Refresh: { fpHash: string; contentHash: string; rel: string; result: CachedResult; fp?: Fingerprint }[];
+    toIncremental: {
+        idx: number;
+        rel: string;
+        fpHash: string;
+        contentHash: string;
+        state: IncrementalFileState;
+        content: string;
+    }[];
+    l2Refresh: {
+        fpHash: string;
+        contentHash: string;
+        rel: string;
+        result: CachedResult;
+        fp?: Fingerprint;
+    }[];
     l1Fps: { rel: string; fp: Fingerprint }[];
     l1Hit: number;
     l2Hit: number;
@@ -97,20 +115,36 @@ interface ProbeL1Context {
 }
 
 interface QueueIncrementalContext {
-    rel: string; idx: number; fpHash: string; contentHash: string; buf: Buffer;
-    incBucket: Map<string, IncrementalFileState>; queue: CacheAnalysisQueue;
-    incEnabled: boolean; incMinLines: number;
+    rel: string;
+    idx: number;
+    fpHash: string;
+    contentHash: string;
+    buf: Buffer;
+    incBucket: Map<string, IncrementalFileState>;
+    queue: CacheAnalysisQueue;
+    incEnabled: boolean;
+    incMinLines: number;
 }
 
 interface L2PathContext {
-    cache: CacheStore; fpContext: CacheFingerprintContext; fpHash: string;
-    rel: string; mtimeMs: number; size: number;
+    cache: CacheStore;
+    fpContext: CacheFingerprintContext;
+    fpHash: string;
+    rel: string;
+    mtimeMs: number;
+    size: number;
 }
 
 interface DispatchMissContext {
-    scanner: ScannerContext; missFiles: string[]; absRoot: string; cfg: ScanConfig;
-    poolFp: string; opts: ScanWithCacheOptions; preloadedBufferMap: Map<string, Buffer>;
-    workerDescs: WorkerAnalyzerDesc[]; effWorkers: number;
+    scanner: ScannerContext;
+    missFiles: string[];
+    absRoot: string;
+    cfg: ScanConfig;
+    poolFp: string;
+    opts: ScanWithCacheOptions;
+    preloadedBufferMap: Map<string, Buffer>;
+    workerDescs: WorkerAnalyzerDesc[];
+    effWorkers: number;
 }
 
 interface RecordAnalyzedContext {
@@ -118,7 +152,9 @@ interface RecordAnalyzedContext {
     results: { issues: Issue[]; metric: FileMetric | null }[];
     perFile: ({ issues: Issue[]; metric: FileMetric | null } | null)[];
     sessionBucket: Map<string, { issues: Issue[]; metric: FileMetric | null }>;
-    l2Enabled: boolean; cache: CacheStore; fpByRel: Map<string, Fingerprint>;
+    l2Enabled: boolean;
+    cache: CacheStore;
+    fpByRel: Map<string, Fingerprint>;
 }
 
 function lookupFreshL2ByPath(context: L2PathContext): (CachedResult & { p: string }) | null {
@@ -135,25 +171,38 @@ function lookupFreshL2(
     return fpContext.l2Enabled ? cache.lookupL2(fpHash, contentHash) : null;
 }
 
-function tryProbeL1Hit(context: ProbeL1Context): { issues: Issue[]; metric: FileMetric | null } | null {
+function tryProbeL1Hit(
+    context: ProbeL1Context,
+): { issues: Issue[]; metric: FileMetric | null } | null {
     const { rel, fingerprint, l1, sessionBucket, cache, fpContext } = context;
-    if (fingerprint == null || !isFreshL1Hit(fingerprint.mtimeMs, fingerprint.size, l1)) return null;
+    if (fingerprint == null || !isFreshL1Hit(fingerprint.mtimeMs, fingerprint.size, l1))
+        return null;
     const cached = sessionBucket.get(rel);
     if (cached) return cached;
 
     const fpHash = fpContext.fpHashFor(rel);
     const byPath = lookupFreshL2ByPath({
-        cache, fpContext, fpHash, rel, mtimeMs: fingerprint.mtimeMs, size: fingerprint.size,
+        cache,
+        fpContext,
+        fpHash,
+        rel,
+        mtimeMs: fingerprint.mtimeMs,
+        size: fingerprint.size,
     });
     if (!byPath) return null;
 
-    const cachedResultPayload = remapCachedResult({ issues: byPath.issues, metric: byPath.metric }, byPath.p, rel);
+    const cachedResultPayload = remapCachedResult(
+        { issues: byPath.issues, metric: byPath.metric },
+        byPath.p,
+        rel,
+    );
     sessionBucket.set(rel, cachedResultPayload);
     return cachedResultPayload;
 }
 
 function tryQueueIncremental(context: QueueIncrementalContext): boolean {
-    const { rel, idx, fpHash, contentHash, buf, incBucket, queue, incEnabled, incMinLines } = context;
+    const { rel, idx, fpHash, contentHash, buf, incBucket, queue, incEnabled, incMinLines } =
+        context;
     if (!incEnabled) return false;
     const newContent = buf.toString(ENCODING_UTF8);
     if (countLines(newContent) < incMinLines) return false;
@@ -161,28 +210,67 @@ function tryQueueIncremental(context: QueueIncrementalContext): boolean {
     const oldState = incBucket.get(rel);
     if (oldState) {
         touchIncremental(incBucket, rel);
-        const incrementalRoute = route(rel, oldState.content, newContent, oldState, { enabled: true, minLines: incMinLines });
+        const incrementalRoute = route(rel, oldState.content, newContent, oldState, {
+            enabled: true,
+            minLines: incMinLines,
+        });
         if (incrementalRoute.mode === MODE_INCREMENTAL) {
             oldState.prepare(newContent, contentHash);
-            queue.toIncremental.push({ idx, rel, fpHash, contentHash, state: oldState, content: newContent });
+            queue.toIncremental.push({
+                idx,
+                rel,
+                fpHash,
+                contentHash,
+                state: oldState,
+                content: newContent,
+            });
             return true;
         }
     }
     const freshState = new IncrementalFileState(newContent, contentHash);
     freshState.prepare(newContent, contentHash);
     incBucket.set(rel, freshState);
-    queue.toIncremental.push({ idx, rel, fpHash, contentHash, state: freshState, content: newContent });
+    queue.toIncremental.push({
+        idx,
+        rel,
+        fpHash,
+        contentHash,
+        state: freshState,
+        content: newContent,
+    });
     return true;
 }
 
-/** Probe a single file against L1 session state and L2 disk cache. */
+/**
+ * Probe a single file against L1 session state and L2 disk cache.
+ *
+ * @param options - Probe parameters including cache, buckets and target file.
+ */
 export async function probeSingleFileCache(options: ProbeSingleFileOptions): Promise<void> {
-    const { statEntry, absRoot, cache, fpContext, sessionBucket, incBucket, perFile, queue, incEnabled, incMinLines } = options;
+    const {
+        statEntry,
+        absRoot,
+        cache,
+        fpContext,
+        sessionBucket,
+        incBucket,
+        perFile,
+        queue,
+        incEnabled,
+        incMinLines,
+    } = options;
     const fileIndex = statEntry.idx;
     const rel = statEntry.rel;
     if (statEntry.fp) queue.l1Fps.push({ rel, fp: statEntry.fp });
 
-    const l1Hit = tryProbeL1Hit({ rel, fingerprint: statEntry.fp, l1: cache.lookupL1(rel), sessionBucket, cache, fpContext });
+    const l1Hit = tryProbeL1Hit({
+        rel,
+        fingerprint: statEntry.fp,
+        l1: cache.lookupL1(rel),
+        sessionBucket,
+        cache,
+        fpContext,
+    });
     if (l1Hit) {
         perFile[fileIndex] = l1Hit;
         queue.l1Hit++;
@@ -201,15 +289,37 @@ export async function probeSingleFileCache(options: ProbeSingleFileOptions): Pro
     const fpHash = fpContext.fpHashFor(rel);
     const l2 = lookupFreshL2(cache, fpContext, fpHash, contentHash);
     if (l2) {
-        const cachedResultPayload = remapCachedResult({ issues: l2.issues, metric: l2.metric }, l2.p, rel);
+        const cachedResultPayload = remapCachedResult(
+            { issues: l2.issues, metric: l2.metric },
+            l2.p,
+            rel,
+        );
         perFile[fileIndex] = cachedResultPayload;
         sessionBucket.set(rel, cachedResultPayload);
         queue.l2Hit++;
-        queue.l2Refresh.push({ fpHash, contentHash, rel, result: cachedResultPayload, fp: statEntry.fp || undefined });
+        queue.l2Refresh.push({
+            fpHash,
+            contentHash,
+            rel,
+            result: cachedResultPayload,
+            fp: statEntry.fp || undefined,
+        });
         return;
     }
 
-    if (tryQueueIncremental({ rel, idx: fileIndex, fpHash, contentHash, buf, incBucket, queue, incEnabled, incMinLines })) {
+    if (
+        tryQueueIncremental({
+            rel,
+            idx: fileIndex,
+            fpHash,
+            contentHash,
+            buf,
+            incBucket,
+            queue,
+            incEnabled,
+            incMinLines,
+        })
+    ) {
         return;
     }
 
@@ -219,7 +329,17 @@ export async function probeSingleFileCache(options: ProbeSingleFileOptions): Pro
 async function runWithPersistentPool(
     context: DispatchMissContext,
 ): Promise<{ results: { issues: Issue[]; metric: FileMetric | null }[]; poolWarm: boolean }> {
-    const { scanner, missFiles, absRoot, cfg, poolFp, opts, preloadedBufferMap, workerDescs, effWorkers } = context;
+    const {
+        scanner,
+        missFiles,
+        absRoot,
+        cfg,
+        poolFp,
+        opts,
+        preloadedBufferMap,
+        workerDescs,
+        effWorkers,
+    } = context;
     const entry = opts.pool!.getOrCreate(poolFp, cfg, workerDescs, effWorkers);
     const poolWarm = entry.warm;
     let hybridKValue = 0;
@@ -229,16 +349,27 @@ async function runWithPersistentPool(
     let results: { issues: Issue[]; metric: FileMetric | null }[];
     try {
         results = await dispatchBatches({
-            workers: entry.workers, workerIdx: entry.workerIdx, files: missFiles, absRoot,
-            config: cfg, descs: workerDescs, numWorkers: entry.n, logger: scanner.logger,
+            workers: entry.workers,
+            workerIdx: entry.workerIdx,
+            files: missFiles,
+            absRoot,
+            config: cfg,
+            descs: workerDescs,
+            numWorkers: entry.n,
+            logger: scanner.logger,
             runAnalyzersFn: (rel, content) => scanner.runAnalyzers(rel, content),
-            hybridK: hybridKValue, keepAlive: true, fp: poolFp, preloaded: preloadedBufferMap,
+            hybridK: hybridKValue,
+            keepAlive: true,
+            fp: poolFp,
+            preloaded: preloadedBufferMap,
         });
         entry.warm = true;
         entry.lastUsed = Date.now();
         opts.pool!.touch(poolFp);
     } catch (e) {
-        scanner.logger.warn(`persistent worker pool failed (${String(e)}); falling back to in-process`);
+        scanner.logger.warn(
+            `persistent worker pool failed (${String(e)}); falling back to in-process`,
+        );
         opts.pool!.destroy(poolFp);
         results = await scanner.runInProcess(missFiles, absRoot, preloadedBufferMap);
     }
@@ -249,12 +380,18 @@ async function runWithPersistentPool(
 async function runWithTransientPool(
     context: DispatchMissContext,
 ): Promise<{ results: { issues: Issue[]; metric: FileMetric | null }[]; poolWarm: boolean }> {
-    const { scanner, missFiles, absRoot, cfg, preloadedBufferMap, workerDescs, effWorkers } = context;
+    const { scanner, missFiles, absRoot, cfg, preloadedBufferMap, workerDescs, effWorkers } =
+        context;
     let results: { issues: Issue[]; metric: FileMetric | null }[];
     try {
         results = await runWorkerPool({
-            files: missFiles, absRoot, config: cfg, descs: workerDescs, numWorkers: effWorkers,
-            logger: scanner.logger, runAnalyzersFn: (rel, content) => scanner.runAnalyzers(rel, content),
+            files: missFiles,
+            absRoot,
+            config: cfg,
+            descs: workerDescs,
+            numWorkers: effWorkers,
+            logger: scanner.logger,
+            runAnalyzersFn: (rel, content) => scanner.runAnalyzers(rel, content),
             preloaded: preloadedBufferMap,
         });
     } catch (e) {
@@ -270,7 +407,11 @@ async function dispatchMissBatch(
     const useWorkers = context.effWorkers > 1;
     if (hasWorkerPool(useWorkers, context.opts)) return runWithPersistentPool(context);
     if (useWorkers) return runWithTransientPool(context);
-    const inProcResults = await context.scanner.runInProcess(context.missFiles, context.absRoot, context.preloadedBufferMap);
+    const inProcResults = await context.scanner.runInProcess(
+        context.missFiles,
+        context.absRoot,
+        context.preloadedBufferMap,
+    );
     return { results: inProcResults, poolWarm: false };
 }
 
@@ -283,17 +424,41 @@ function recordAnalyzedResults(context: RecordAnalyzedContext): number {
         sessionBucket.set(targetItem.rel, results[targetIndex]);
         analyzed++;
         if (l2Enabled) {
-            cache.writeL2(targetItem.fpHash, targetItem.contentHash, targetItem.rel, results[targetIndex], fpByRel.get(targetItem.rel));
+            cache.writeL2(
+                targetItem.fpHash,
+                targetItem.contentHash,
+                targetItem.rel,
+                results[targetIndex],
+                fpByRel.get(targetItem.rel),
+            );
         }
     }
     return analyzed;
 }
 
-/** Analyze the files the probe could not serve from either cache level. */
+/**
+ * Analyze the files the probe could not serve from either cache level.
+ *
+ * @param options - Execution context and files scheduled for full analysis.
+ * @returns Number of analyzed files and pool warm status.
+ */
 export async function executeCacheMisses(
     options: ExecuteCacheMissesOptions,
 ): Promise<{ analyzed: number; poolWarm: boolean }> {
-    const { scanner, toAnalyze, files, absRoot, cfg, poolFp, l2Enabled, opts, sessionBucket, perFile, fpByRel, cache } = options;
+    const {
+        scanner,
+        toAnalyze,
+        files,
+        absRoot,
+        cfg,
+        poolFp,
+        l2Enabled,
+        opts,
+        sessionBucket,
+        perFile,
+        fpByRel,
+        cache,
+    } = options;
     if (toAnalyze.length === 0) return { analyzed: 0, poolWarm: false };
     const missFiles = toAnalyze.map((queueItem) => files[queueItem.idx]);
     const workerDescs: WorkerAnalyzerDesc[] = scanner.plan.map((planItem) => ({
@@ -309,11 +474,25 @@ export async function executeCacheMisses(
     );
 
     const batchResult = await dispatchMissBatch({
-        scanner, missFiles, absRoot, cfg, poolFp, opts, preloadedBufferMap, workerDescs, effWorkers,
+        scanner,
+        missFiles,
+        absRoot,
+        cfg,
+        poolFp,
+        opts,
+        preloadedBufferMap,
+        workerDescs,
+        effWorkers,
     });
 
     const analyzed = recordAnalyzedResults({
-        toAnalyze, results: batchResult.results, perFile, sessionBucket, l2Enabled, cache, fpByRel,
+        toAnalyze,
+        results: batchResult.results,
+        perFile,
+        sessionBucket,
+        l2Enabled,
+        cache,
+        fpByRel,
     });
     return { analyzed, poolWarm: batchResult.poolWarm };
 }
@@ -324,7 +503,11 @@ async function runSingleIncrementalAnalysis(
     incBucket: Map<string, IncrementalFileState>,
 ): Promise<{ issues: Issue[]; metric: FileMetric | null }> {
     try {
-        return await scanner.runAnalyzers(fileQueueItem.rel, fileQueueItem.content, fileQueueItem.state);
+        return await scanner.runAnalyzers(
+            fileQueueItem.rel,
+            fileQueueItem.content,
+            fileQueueItem.state,
+        );
     } catch (e) {
         return runIncrementalRecovery(scanner, fileQueueItem, incBucket, e);
     }
@@ -336,7 +519,9 @@ async function runIncrementalRecovery(
     incBucket: Map<string, IncrementalFileState>,
     initialError: unknown,
 ): Promise<{ issues: Issue[]; metric: FileMetric | null }> {
-    scanner.logger.warn(`line-level incremental failed on ${fileQueueItem.rel}: ${String(initialError)}; full rescan`);
+    scanner.logger.warn(
+        `line-level incremental failed on ${fileQueueItem.rel}: ${String(initialError)}; full rescan`,
+    );
     fileQueueItem.state.finalize();
     const freshState = new IncrementalFileState(fileQueueItem.content, fileQueueItem.contentHash);
     freshState.prepare(fileQueueItem.content, fileQueueItem.contentHash);
@@ -344,28 +529,46 @@ async function runIncrementalRecovery(
     try {
         return await scanner.runAnalyzers(fileQueueItem.rel, fileQueueItem.content, freshState);
     } catch (e2) {
-        scanner.logger.warn(`seeded materialization failed on ${fileQueueItem.rel}: ${String(e2)}; unseeded rescan`);
+        scanner.logger.warn(
+            `seeded materialization failed on ${fileQueueItem.rel}: ${String(e2)}; unseeded rescan`,
+        );
         return scanner.runAnalyzers(fileQueueItem.rel, fileQueueItem.content);
     }
 }
 
-/** Analyze the files whose changed line ranges allow subtree reuse. */
+/**
+ * Analyze the files whose changed line ranges allow subtree reuse.
+ *
+ * @param options - Incremental execution parameters and files to process.
+ * @returns Execution statistics for incremental files.
+ */
 export async function executeIncrementalFiles(
     options: ExecuteIncrementalFilesOptions,
 ): Promise<{ incrementalFiles: number; incrementalHit: number }> {
-    const { scanner, toIncremental, incBucket, l2Enabled, sessionBucket, perFile, fpByRel, cache } = options;
+    const { scanner, toIncremental, incBucket, l2Enabled, sessionBucket, perFile, fpByRel, cache } =
+        options;
     let incrementalFiles = 0;
     let incrementalHit = 0;
 
     for (const fileQueueItem of toIncremental) {
-        const routedAnalysisResult = await runSingleIncrementalAnalysis(scanner, fileQueueItem, incBucket);
+        const routedAnalysisResult = await runSingleIncrementalAnalysis(
+            scanner,
+            fileQueueItem,
+            incBucket,
+        );
         fileQueueItem.state.finalize();
         perFile[fileQueueItem.idx] = routedAnalysisResult;
         sessionBucket.set(fileQueueItem.rel, routedAnalysisResult);
         incrementalHit += fileQueueItem.state.reuseHits;
         incrementalFiles++;
         if (l2Enabled) {
-            cache.writeL2(fileQueueItem.fpHash, fileQueueItem.contentHash, fileQueueItem.rel, routedAnalysisResult, fpByRel.get(fileQueueItem.rel));
+            cache.writeL2(
+                fileQueueItem.fpHash,
+                fileQueueItem.contentHash,
+                fileQueueItem.rel,
+                routedAnalysisResult,
+                fpByRel.get(fileQueueItem.rel),
+            );
         }
     }
     return { incrementalFiles, incrementalHit };

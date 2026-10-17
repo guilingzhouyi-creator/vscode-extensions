@@ -664,10 +664,9 @@ export function arbitrateAgentPatch(
     const cognitiveLoad = Math.max(0.1, baseEvaluation.complexityCost);
 
     const effectiveDeltaQ = Math.max(0, baseEvaluation.changeScore);
-    const roi = +(
-        (effectiveDeltaQ * centrality) /
-        (diffEntropy + cognitiveLoad + 0.1)
-    ).toFixed(ROI_DECIMAL_PLACES);
+    const roi = +((effectiveDeltaQ * centrality) / (diffEntropy + cognitiveLoad + 0.1)).toFixed(
+        ROI_DECIMAL_PLACES,
+    );
 
     const { decision, recommendation } = resolvePatchDecision(baseEvaluation, safety, roi);
 
