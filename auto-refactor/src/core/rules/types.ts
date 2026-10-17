@@ -18,7 +18,8 @@ export type TopicGlossary = Readonly<Record<string, string>>;
 
 /** Canonical topic code representation, strictly 3 upper-case alphanumeric letters. */
 export type CanonicalTopicCode = string;
-import type { Severity } from '../types';
+import { SEVERITY_WARNING, type Severity } from '../types';
+
 
 export {
     SEVERITY_INFO,
@@ -189,4 +190,48 @@ export const ALL_LANGUAGES: readonly string[] = ['all'];
  */
 export function defineRule(definition: RuleDefinition): RuleDefinition {
     return definition;
+}
+
+/** Compact rule specification omitting predictable boilerplate defaults. */
+export interface CompactRuleSpec {
+    readonly id: string;
+    readonly analyzer: string;
+    readonly languages: readonly string[];
+    readonly summary: string;
+    readonly remediation: string;
+    readonly defaultSeverity?: RuleSeverity;
+    readonly family?: RuleFamily | string;
+    readonly canonical?: boolean;
+    readonly legacyReason?: string;
+    readonly docsAnchor?: string;
+}
+
+/**
+ * Compact rule definition factory that derives family, canonical flag, and documentation
+ * anchor automatically, reducing registration boilerplate.
+ *
+ * @param spec - Compact rule metadata.
+ * @returns Fully populated immutable RuleDefinition.
+ */
+export function defineRuleCompact(spec: CompactRuleSpec): RuleDefinition {
+    const isCanonical = spec.canonical ?? RULE_ID_PATTERN.test(spec.id);
+    const derivedFamily =
+        spec.family ?? (spec.id.includes('-') ? spec.id.split('-')[0] : RULE_FAMILY_LEGACY);
+    const derivedSeverity = spec.defaultSeverity ?? SEVERITY_WARNING;
+    const derivedAnchor =
+        spec.docsAnchor ??
+        `docs/04-analyzers-and-rules/01-builtin-rules.md#${spec.id.toLowerCase()}`;
+
+    return Object.freeze({
+        id: spec.id,
+        family: derivedFamily,
+        analyzer: spec.analyzer,
+        canonical: isCanonical,
+        legacyReason: spec.legacyReason,
+        languages: spec.languages,
+        defaultSeverity: derivedSeverity,
+        summary: spec.summary,
+        remediation: spec.remediation,
+        docsAnchor: derivedAnchor,
+    });
 }

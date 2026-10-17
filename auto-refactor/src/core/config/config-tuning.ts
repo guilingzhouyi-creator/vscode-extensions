@@ -192,7 +192,8 @@ function mergeThresholds(
  * @returns The evaluated scale grade.
  */
 function scaleFromProfile(profile: ReturnType<typeof detectProjectProfile>): ScaleGrade {
-    const sampleCount = Object.values(profile.languages).reduce((a, b) => a + b, 0);
+    const languages = profile?.languages || {};
+    const sampleCount = Object.values(languages).reduce((a, b) => a + b, 0);
     return evaluateScaleGrade({
         fileCount: sampleCount * 2,
         sloc: sampleCount * 2 * SLOC_PER_LANGUAGE_SAMPLE,
