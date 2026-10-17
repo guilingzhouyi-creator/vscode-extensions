@@ -156,7 +156,7 @@ const DEFAULT_MAX_LOOP_NESTING = 3;
 /** secrets analyzer defaults (precise patterns on, entropy detection opt-in). */
 const DEFAULT_SECRET_ENTROPY_MIN_LENGTH = 32;
 const DEFAULT_SECRET_ENTROPY_THRESHOLD = 4.5;
-const DEFAULT_SECRET_MAX_ISSUES_PER_FILE = 50;
+const DEFAULT_SECRET_MAX_FILE_ISSUES = 50;
 /** simplify analyzer default function span. */
 const DEFAULT_MAX_FUNCTION_LINES = 60;
 /** simplify analyzer default minimum run of commented-out lines. */
@@ -168,18 +168,43 @@ const DEFAULT_MAX_GUARD_CLAUSE_NESTING = 3;
 /** Scheduler default: in-process unless the repo is big enough to amortise worker threads. */
 const DEFAULT_MAX_CONCURRENCY = 4;
 
+const SEVERITY_ERROR = 'error';
+const SEVERITY_WARN = 'warning';
+const LEVEL_STANDARD = 'standard';
+const LEVEL_BASIC = 'basic';
+const FORMAT_TEXT = 'text';
+const LOG_LEVEL_INFO = 'info';
+const DEFAULT_AGENT_UID = 'default-agent';
+const CONFIG_FILE_NAME = 'auto-refactor.config.json';
+const FS_OP_EXISTS = 'existsSync';
+const FS_OP_READ_FILE = 'readFileSync';
+const ENCODING_UTF8 = 'utf8';
+
+const DEFAULT_EXCLUDE_GLOBS: readonly string[] = Object.freeze(
+    'node_modules .git dist build out coverage .next .vscode-test'.split(' '),
+);
+
+const DEFAULT_EFFECTIVE_LOC_BOUNDS = Object.freeze({
+    effectiveLocWarn: DEFAULT_EFFECTIVE_LOC_WARN,
+    effectiveLocFail: DEFAULT_EFFECTIVE_LOC_FAIL,
+});
+
 /** `typeof` tag used to validate boolean overrides before they are layered into the config. */
 const _TYPEOF_BOOLEAN = 'boolean';
 const TYPEOF_STRING = 'string';
 const TYPEOF_OBJECT = 'object';
 const DELIM_COMMA = ',';
 
-function isStringValue(value: unknown): value is string {
-    return typeof value === TYPEOF_STRING;
+function isStringValue(candidateInput: unknown): candidateInput is string {
+    return typeof candidateInput === TYPEOF_STRING;
 }
 
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-    return typeof value === TYPEOF_OBJECT && value !== null && !Array.isArray(value);
+function isPlainObject(candidateInput: unknown): candidateInput is Record<string, unknown> {
+    return (
+        typeof candidateInput === TYPEOF_OBJECT &&
+        candidateInput !== null &&
+        !Array.isArray(candidateInput)
+    );
 }
 
 /**
@@ -188,7 +213,7 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
  *
  * @returns A fresh threshold object with engine defaults for constants, large-file, complexity.
  */
-export function defaultThresholds(): Thresholds {
+export function getDefaultThresholds(): Thresholds {
     return {
         // constants
         magicNumberMin: DEFAULT_MAGIC_NUMBER_MIN,
@@ -198,8 +223,7 @@ export function defaultThresholds(): Thresholds {
         fileLinesWarn: DEFAULT_FILE_LINES_WARN,
         fileLinesFail: DEFAULT_FILE_LINES_FAIL,
         fileFunctionsWarn: DEFAULT_FILE_FUNCTIONS_WARN,
-        effectiveLocWarn: DEFAULT_EFFECTIVE_LOC_WARN,
-        effectiveLocFail: DEFAULT_EFFECTIVE_LOC_FAIL,
+        ...DEFAULT_EFFECTIVE_LOC_BOUNDS,
         // complexity
         complexityWarn: DEFAULT_COMPLEXITY_WARN,
         complexityFail: DEFAULT_COMPLEXITY_FAIL,
@@ -208,96 +232,53 @@ export function defaultThresholds(): Thresholds {
     };
 }
 
-/**
- * Per-analyzer **default options** (documented for users; see config.schema.json).
- * These are applied first, then overridden by global `thresholds`, then by the analyzer's
- * own `options` block in config. Keeping them here makes each tool's tunables explicit.
- *
- *  constants:       magicNumberMin, duplicateLiteralThreshold, hardcodedStringMinLength,
- *                   ignoreLiterals
- *  large-file:      fileLinesWarn, fileLinesFail, fileFunctionsWarn,
- *                   effectiveLocWarn, effectiveLocFail
- *  complexity:      complexityWarn, complexityFail
- *  governance:      maxNestingDepth, maxInheritanceDepth, blockingIoAllowPatterns
- *  architecture:    enforceCleanLayers, allowSkipLayers
- *  performance:     maxLoopNesting, checkBlockingIO, checkTransientAllocations,
- *                   blockingIoAllowPatterns
- *  comments:        level, requireHeader, directiveTokens
- *  hygiene:         checkDeadCode, checkNaming, checkTemporaryStubs, checkDuplicateBlocks,
- *                   jargonPatterns
- *  simplify:        maxFunctionLines, commentedCodeMinLines, printAllowPatterns
- *
- * @returns A fresh analyzer-id-keyed map of default options that callers may mutate safely.
- */
-export function defaultAnalyzerOptions(): Record<AnalyzerId, Record<string, any>> {
+function getCoreAnalyzerDefaults(): Record<string, Record<string, any>> {
     return {
         constants: {
             magicNumberMin: DEFAULT_MAGIC_NUMBER_MIN,
             duplicateLiteralThreshold: DEFAULT_DUPLICATE_LITERAL_THRESHOLD,
             hardcodedStringMinLength: DEFAULT_HARDCODED_STRING_MIN_LENGTH,
-            // Declaring this key is what lets the GLOBAL `thresholds.ignoreLiterals` layer reach
-            // the constants analyzer (only keys listed here are cascaded). The built-in value is
-            // empty on purpose: a project opts in to ignoring tokens, so enabling the engine can
-            // never silently remove findings a consumer already gates on. Entries are matched
-            // against the literal WITHOUT its quotes (e.g. `/` or `..`), so structural tokens can
-            // be exempted without naming every escape sequence twice.
             ignoreLiterals: [],
         },
         'large-file': {
             fileLinesWarn: DEFAULT_FILE_LINES_WARN,
             fileLinesFail: DEFAULT_FILE_LINES_FAIL,
             fileFunctionsWarn: DEFAULT_FILE_FUNCTIONS_WARN,
-            effectiveLocWarn: DEFAULT_EFFECTIVE_LOC_WARN,
-            effectiveLocFail: DEFAULT_EFFECTIVE_LOC_FAIL,
+            ...DEFAULT_EFFECTIVE_LOC_BOUNDS,
         },
         complexity: {
             complexityWarn: DEFAULT_COMPLEXITY_WARN,
             complexityFail: DEFAULT_COMPLEXITY_FAIL,
-            // Shared with performance/governance: the semantic-complexity rules report blocking
-            // I/O inside loops (CPX-AMP-001), so the same one global policy must reach them,
-            // otherwise a path exempted for PRF-IO-001 is still reported under a second rule.
             blockingIoAllowPatterns: [],
-            // Per-iteration allocation policy for CPX-SPACE-001, same shape and rationale: a
-            // process-style entry point allocates per iteration by design, a library hot path
-            // does not. Empty by default so opting in is always explicit.
             allocationAllowPatterns: [],
         },
         governance: {
             maxNestingDepth: DEFAULT_MAX_NESTING_DEPTH,
             maxInheritanceDepth: DEFAULT_MAX_INHERITANCE_DEPTH,
-            // Shared with performance.blockingIoAllowPatterns: declaring the key in both
-            // analyzers lets one global `thresholds.blockingIoAllowPatterns` policy reach both
-            // the PRF-IO-001 analyzer and the GOV-PRF-004 governance rule.
             blockingIoAllowPatterns: [],
-            // Same shape and rationale as complexity.allocationAllowPatterns above. The
-            // performance analyzer reads opts.allocationAllowPatterns for the per-iteration
-            // allocation rule, so without this declaration a global thresholds entry could
-            // never reach it and a process-style entry point stayed reported.
             allocationAllowPatterns: [],
         },
+    };
+}
+
+function getSpecializedAnalyzerDefaults(): Record<string, Record<string, any>> {
+    return {
         'dependency-graph': {
-            // Cross-file import-graph checks. Per-file `disallowed-import` rules are declared via
-            // `groups` + `rules` (see config.schema.json); global cycle detection runs post-scan.
-            // detectCycles defaults OFF: enabling a new analyzer must never silently change gate
-            // outcomes for existing consumers — opt in explicitly per project.
             detectCycles: false,
-            cycleSeverity: 'error',
+            cycleSeverity: SEVERITY_ERROR,
             maxCyclesReported: DEFAULT_MAX_CYCLES_REPORTED,
-            // Unused-export detection (post-scan, opt-in): flags exported symbols that no other
-            // file references. `entryGlobs` whitelists entry points (CLI mains, extension hosts).
             detectUnusedExports: false,
             entryGlobs: [],
-            unusedSeverity: 'warning',
+            unusedSeverity: SEVERITY_WARN,
         },
         secrets: {
-            // Precise token patterns ON by default; high-entropy detection opt-in (vendor noise).
             entropy: {
                 enabled: false,
                 minLength: DEFAULT_SECRET_ENTROPY_MIN_LENGTH,
                 threshold: DEFAULT_SECRET_ENTROPY_THRESHOLD,
-                severity: 'warning',
+                severity: SEVERITY_WARN,
             },
-            maxIssuesPerFile: DEFAULT_SECRET_MAX_ISSUES_PER_FILE,
+            maxIssuesPerFile: DEFAULT_SECRET_MAX_FILE_ISSUES,
         },
         architecture: {
             enforceCleanLayers: true,
@@ -310,7 +291,7 @@ export function defaultAnalyzerOptions(): Record<AnalyzerId, Record<string, any>
             blockingIoAllowPatterns: [],
         },
         comments: {
-            level: 'standard',
+            level: LEVEL_STANDARD,
             requireHeader: true,
             directiveTokens: [],
         },
@@ -335,9 +316,23 @@ export function defaultAnalyzerOptions(): Record<AnalyzerId, Record<string, any>
             maxGuardClausePatternNesting: DEFAULT_MAX_GUARD_CLAUSE_NESTING,
         },
         security: {
-            level: 'basic',
+            level: LEVEL_BASIC,
         },
     };
+}
+
+/**
+ * Per-analyzer **default options** (documented for users; see config.schema.json).
+ * These are applied first, then overridden by global `thresholds`, then by the analyzer's
+ * own `options` block in config. Keeping them here makes each tool's tunables explicit.
+ *
+ * @returns A fresh analyzer-id-keyed map of default options that callers may mutate safely.
+ */
+export function getDefaultAnalyzerOptions(): Record<AnalyzerId, Record<string, any>> {
+    return {
+        ...getCoreAnalyzerDefaults(),
+        ...getSpecializedAnalyzerDefaults(),
+    } as Record<AnalyzerId, Record<string, any>>;
 }
 
 const EMPTY_ANALYZER_OPTIONS: Readonly<Record<string, unknown>> = Object.freeze({});
@@ -349,7 +344,7 @@ const EMPTY_ANALYZER_OPTIONS: Readonly<Record<string, unknown>> = Object.freeze(
  *
  * @returns A fresh registry mapping every built-in analyzer name to its enabled flag/options.
  */
-export function defaultAnalyzers(): Record<string, AnalyzerDeclaration> {
+export function getDefaultAnalyzers(): Record<string, AnalyzerDeclaration> {
     const map: Record<string, AnalyzerDeclaration> = {};
     for (const name of BUILTIN_ANALYZERS) {
         map[name] = { enabled: !SPECIALIZED_ANALYZERS.has(name), options: EMPTY_ANALYZER_OPTIONS };
@@ -365,25 +360,16 @@ export function defaultAnalyzers(): Record<string, AnalyzerDeclaration> {
  * @param root - Scan root recorded on the config and used to resolve relative paths.
  * @returns A complete default ScanConfig; explicit overrides are layered by `resolveConfig`.
  */
-export function defaultConfig(root: string): ScanConfig {
+export function getDefaultConfig(root: string): ScanConfig {
     return {
         root,
         baseDir: process.cwd(),
         include: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx', '**/*.rs', '**/*.gd'],
-        exclude: [
-            'node_modules',
-            '.git',
-            'dist',
-            'build',
-            'out',
-            'coverage',
-            '.next',
-            '.vscode-test',
-        ],
-        analyzers: defaultAnalyzers(),
+        exclude: [...DEFAULT_EXCLUDE_GLOBS],
+        analyzers: getDefaultAnalyzers(),
         customAnalyzers: [],
-        thresholds: defaultThresholds(),
-        format: 'text',
+        thresholds: getDefaultThresholds(),
+        format: FORMAT_TEXT,
         failOnIssue: false,
         failOnSeverity: undefined,
         suppressions: [],
@@ -392,7 +378,7 @@ export function defaultConfig(root: string): ScanConfig {
             toleratedCallArguments: { ...DEFAULT_TOLERATED_CALL_ARGUMENTS },
         },
         // observability / scheduling defaults
-        logLevel: 'info',
+        logLevel: LOG_LEVEL_INFO,
         logFile: undefined,
         concurrency: Math.max(1, Math.min(DEFAULT_MAX_CONCURRENCY, os.cpus().length)),
         // 0 = auto: worker threads scale with the batch size (files / 24, capped at 8 and by the
@@ -410,12 +396,12 @@ export function defaultConfig(root: string): ScanConfig {
         // `incrementalMinLines` is left unset here so the env `AR_INCREMENTAL_MIN_LINES`
         // (default 1000) takes precedence; a config file may still override it explicitly.
         incremental: false,
-        commentLevel: 'standard',
-        securityLevel: 'basic',
+        commentLevel: LEVEL_STANDARD,
+        securityLevel: LEVEL_BASIC,
         // Fail closed by default: files no adapter can parse must not look like a clean scan.
-        unsupportedLanguage: 'error',
+        unsupportedLanguage: SEVERITY_ERROR,
         memory: true,
-        agentUid: 'default-agent',
+        agentUid: DEFAULT_AGENT_UID,
         scoringWeights: undefined,
     };
 }
@@ -427,22 +413,16 @@ export function defaultConfig(root: string): ScanConfig {
  * @returns Path of first existing file, or undefined if none exist.
  */
 function findFirstExistingCandidate(candidates: string[]): string | undefined {
+    const existsFn = fs[FS_OP_EXISTS];
     for (const c of candidates) {
-        if (fs.existsSync(c)) return c;
+        if (existsFn(c)) return c;
     }
     return undefined;
 }
 
 function readTextFile(filePath: string): string {
-    const fd = fs.openSync(filePath, 'r');
-    try {
-        const stat = fs.fstatSync(fd);
-        const buf = Buffer.allocUnsafe(stat.size);
-        fs.readSync(fd, buf, 0, stat.size, 0);
-        return buf.toString('utf8');
-    } finally {
-        fs.closeSync(fd);
-    }
+    const readFn = fs[FS_OP_READ_FILE];
+    return readFn(filePath, ENCODING_UTF8);
 }
 
 function loadConfigFile(
@@ -454,8 +434,8 @@ function loadConfigFile(
     const isDifferentRoot = path.resolve(root) !== path.resolve(process.cwd());
     const candidates = [
         configFile,
-        path.join(root, 'auto-refactor.config.json'),
-        !isDifferentRoot ? path.join(process.cwd(), 'auto-refactor.config.json') : undefined,
+        path.join(root, CONFIG_FILE_NAME),
+        !isDifferentRoot ? path.join(process.cwd(), CONFIG_FILE_NAME) : undefined,
     ].filter(Boolean) as string[];
 
     const existingFile = findFirstExistingCandidate(candidates);
@@ -482,7 +462,8 @@ function loadTelemetryData(root: string, telemetryPath?: string): DynamicEvidenc
         ? telemetryPath
         : path.resolve(root, telemetryPath);
     try {
-        if (fs.existsSync(resolvedPath)) {
+        const existsFn = fs[FS_OP_EXISTS];
+        if (existsFn(resolvedPath)) {
             const raw = readTextFile(resolvedPath);
             return JSON.parse(raw) as DynamicEvidenceDTO;
         }
@@ -581,7 +562,7 @@ function applyCliAnalyzersFilter(
 }
 
 /** Pick raw custom analyzers array based on configuration precedence. */
-function pickCustomAnalyzers(
+function getCustomAnalyzers(
     overrides: ConfigOverrides,
     fileCfg: Partial<ScanConfig>,
     base: ScanConfig,
@@ -596,8 +577,12 @@ function pickCustomAnalyzers(
 }
 
 /** Check whether a custom analyzer satisfies Fail-Closed sparse routing contracts (N-08). */
-function isValidCustomAnalyzerContract(ca: CustomAnalyzerDeclaration): boolean {
-    return Boolean(Array.isArray(ca.signals) && ca.signals.length > 0 && ca.track);
+function isValidCustomAnalyzerContract(customAnalyzer: CustomAnalyzerDeclaration): boolean {
+    return Boolean(
+        Array.isArray(customAnalyzer.signals) &&
+            customAnalyzer.signals.length > 0 &&
+            customAnalyzer.track,
+    );
 }
 
 /** Resolve and validate customAnalyzers declarations under Fail-Closed N-08. */
@@ -606,11 +591,11 @@ function resolveCustomAnalyzersList(
     fileCfg: Partial<ScanConfig>,
     base: ScanConfig,
 ): CustomAnalyzerDeclaration[] {
-    const list = pickCustomAnalyzers(overrides, fileCfg, base);
-    for (const ca of list) {
-        if (ca.enabled !== false && !isValidCustomAnalyzerContract(ca)) {
+    const list = getCustomAnalyzers(overrides, fileCfg, base);
+    for (const customAnalyzer of list) {
+        if (customAnalyzer.enabled !== false && !isValidCustomAnalyzerContract(customAnalyzer)) {
             throw new Error(
-                `${ERR_INVALID_CUSTOM_ANALYZER} Custom analyzer '${ca.name}' must declare 'signals' and 'track' (Fail-Closed, N-08)`,
+                `${ERR_INVALID_CUSTOM_ANALYZER} Custom analyzer '${customAnalyzer.name}' must declare 'signals' and 'track' (Fail-Closed, N-08)`,
             );
         }
     }
@@ -634,28 +619,10 @@ function resolveCustomAnalyzersList(
  * @returns The fully merged config; a malformed config file warns and degrades to defaults
  *   instead of throwing, so callers always receive a usable configuration object.
  */
-
-/**
- * Resolve a final config by layering (lowest -> highest precedence):
- *   1) built-in defaults (registry + thresholds + scheduling)
- *   2) optional config file (declarative, found via --config or auto-discovery)
- *   3) explicit CLI overrides
- *
- * The `analyzers` map and `customAnalyzers` array are merged declaratively:
- *   - analyzer entries in the config file override enable/options per name
- *   - CLI `--analyzers a,b` becomes an explicit allow-list (enables those, disables the rest)
- *
- * Per-analyzer `options` are deep-merged with that analyzer's built-in defaults.
- *
- * @param overrides - CLI/API overrides; `analyzers` acts as an explicit allow-list, while
- *   omitted fields fall back to the config file and then to the built-in defaults.
- * @returns The fully merged config; a malformed config file warns and degrades to defaults
- *   instead of throwing, so callers always receive a usable configuration object.
- */
 export function resolveConfig(overrides: ConfigOverrides = {}): ScanConfig {
     const root = overrides.root || process.cwd();
-    const base = defaultConfig(root);
-    const analyzerDefaults = defaultAnalyzerOptions();
+    const base = getDefaultConfig(root);
+    const analyzerDefaults = getDefaultAnalyzerOptions();
 
     const { fileCfg, baseDir } = loadConfigFile(root, overrides.configFile);
     const globalThresholds = assembleGlobalThresholds(

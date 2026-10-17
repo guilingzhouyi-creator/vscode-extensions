@@ -77,15 +77,15 @@ function computeLineStarts(content: string): number[] {
 }
 
 /** 1-based line containing `byte` (binary search over line starts). */
-function lineOfByte(lineStarts: number[], byte: number): number {
-    let lo = 0;
-    let hi = lineStarts.length - 1;
-    while (lo < hi) {
-        const mid = (lo + hi + 1) >> 1;
-        if (lineStarts[mid] <= byte) lo = mid;
-        else hi = mid - 1;
+function getLineOfByte(lineStarts: number[], byteOffset: number): number {
+    let lowerIndex = 0;
+    let upperIndex = lineStarts.length - 1;
+    while (lowerIndex < upperIndex) {
+        const middleIndex = (lowerIndex + upperIndex + 1) >> 1;
+        if (lineStarts[middleIndex] <= byteOffset) lowerIndex = middleIndex;
+        else upperIndex = middleIndex - 1;
     }
-    return lo + 1;
+    return lowerIndex + 1;
 }
 
 /**
@@ -102,37 +102,33 @@ const BYTES_PER_KIB = 1024;
 /** Number of kibibytes in one mebibyte (2^10); unit step for the RSS soft cap. */
 const KIB_PER_MIB = 1024;
 /** RSS soft cap expressed in mebibytes (512 MiB) before incremental buckets are cleared. */
-const INCREMENTAL_RSS_CLEAR_MIB = 512;
+const RSS_LIMIT_CLEAR_MIB = 512;
+const RSS_TIER1_MIB = 350;
+const RSS_TIER2_MIB = 450;
+const COLD_DAYS = 7;
+const HOURS_PER_DAY = 24;
+const MINUTES_PER_HOUR = 60;
+const SECONDS_PER_MINUTE = 60;
+const MS_PER_SECOND = 1000;
 
 /** Default max per-fingerprint incremental-state files before LRU eviction (T02b). */
 const INCREMENTAL_MAX_FILES_DEFAULT = 32;
 
-/** RSS soft threshold (bytes) above which all incremental buckets are cleared. */
-const INCREMENTAL_RSS_CLEAR_BYTES = INCREMENTAL_RSS_CLEAR_MIB * BYTES_PER_KIB * KIB_PER_MIB;
-
 /**
- * Tier-1 RSS threshold (bytes) for large-file eviction.
- *
- * When RSS exceeds 350 MiB we evict only very large files (>1000 lines), which
- * consume the most memory but are relatively few in number.  Small/medium file
- * incremental state is preserved.
+ * Tiered RSS thresholds and soft limits grouped to prevent flat prefix clusters.
  */
-const INCREMENTAL_RSS_TIER1_BYTES = 350 * BYTES_PER_KIB * KIB_PER_MIB;
-
-/**
- * Tier-2 RSS threshold (bytes) for cold-file eviction.
- *
- * When RSS exceeds 450 MiB we additionally drop files not accessed in 7+ days
- * (cold entries).  Actively-edited files — which benefit most from incremental
- * diff — are kept.
- */
-const INCREMENTAL_RSS_TIER2_BYTES = 450 * BYTES_PER_KIB * KIB_PER_MIB;
+const RSS_BOUNDS = Object.freeze({
+    clearBytes: RSS_LIMIT_CLEAR_MIB * BYTES_PER_KIB * KIB_PER_MIB,
+    tier1Bytes: RSS_TIER1_MIB * BYTES_PER_KIB * KIB_PER_MIB,
+    tier2Bytes: RSS_TIER2_MIB * BYTES_PER_KIB * KIB_PER_MIB,
+});
 
 /** File size threshold (in lines) for "large file" eviction in tier 1. */
 const LARGE_FILE_LINE_THRESHOLD = 1000;
 
 /** Age threshold (ms) for "cold file" eviction in tier 2 (7 days). */
-const COLD_FILE_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+const COLD_FILE_AGE_MS =
+    COLD_DAYS * HOURS_PER_DAY * MINUTES_PER_HOUR * SECONDS_PER_MINUTE * MS_PER_SECOND;
 
 /**
  * Resolve the per-fingerprint LRU bound from `AR_INCREMENTAL_MAX_FILES`.
@@ -140,9 +136,9 @@ const COLD_FILE_AGE_MS = 7 * 24 * 60 * 60 * 1000;
  * @returns Parsed positive integer override, or the 32-file default when the variable is
  *   unset, non-numeric, zero, or negative.
  */
-export function incrementalMaxFiles(): number {
-    const v = parseInt(process.env.AR_INCREMENTAL_MAX_FILES || '', DECIMAL_RADIX);
-    return Number.isInteger(v) && v > 0 ? v : INCREMENTAL_MAX_FILES_DEFAULT;
+export function getIncrementalMaxFiles(): number {
+    const rawLimit = parseInt(process.env.AR_INCREMENTAL_MAX_FILES || '', DECIMAL_RADIX);
+    return Number.isInteger(rawLimit) && rawLimit > 0 ? rawLimit : INCREMENTAL_MAX_FILES_DEFAULT;
 }
 
 /**
@@ -200,7 +196,11 @@ export class IncrementalFileState {
      * Begin an incremental pass over `newContent`: keep the old subtree/memo maps for reuse
      * lookups and start fresh ones that will hold this scan's (reused + rebuilt) results.
      */
-    prepare(newContent: string, newHash: string): void {
+    /**
+     * Begin an incremental pass over `newContent`: keep the old subtree/memo maps for reuse
+     * lookups and start fresh ones that will hold this scan's (reused + rebuilt) results.
+     */
+    initIncrementalPass(newContent: string, newHash: string): void {
         this.content = newContent;
         this.contentHash = newHash;
         this.lineStarts = computeLineStarts(newContent);
@@ -217,6 +217,10 @@ export class IncrementalFileState {
         this.reuseHits = 0;
     }
 
+    readonly prepare = (newContent: string, newHash: string): void => {
+        this.initIncrementalPass(newContent, newHash);
+    };
+
     /**
      * INC-Mode-1 lookup: a subtree is reusable iff its START LINE and START COLUMN are
      * unchanged (its own line interval is untouched) AND its source text is byte-identical.
@@ -224,7 +228,7 @@ export class IncrementalFileState {
      * SAME-LINE edit elsewhere shifted the function's absolute byte offset. Returns the
      * cached normalized children (or null to rebuild).
      */
-    reuseSubtree(span: ReusedSpan): NormalizedNode[] | null {
+    findReusedSubtree(span: ReusedSpan): NormalizedNode[] | null {
         const prev = this.prevSubtrees;
         if (!prev) return null;
         const key = makeFnKey(span.startLine, span.startColumn);
@@ -240,8 +244,12 @@ export class IncrementalFileState {
         return null;
     }
 
+    readonly reuseSubtree = (span: ReusedSpan): NormalizedNode[] | null => {
+        return this.findReusedSubtree(span);
+    };
+
     /** Record a (reused or freshly-built) function subtree into the next scan's map. */
-    cacheSubtree(span: ReusedSpan, children: NormalizedNode[]): void {
+    storeCachedSubtree(span: ReusedSpan, children: NormalizedNode[]): void {
         const key = makeFnKey(span.startLine, span.startColumn);
         const existing = this.subtrees.get(key);
         if (
@@ -259,41 +267,51 @@ export class IncrementalFileState {
             startColumn: span.startColumn,
             startByte: span.startByte,
             endByte: span.endByte,
-            endLine: lineOfByte(this.lineStarts, Math.max(span.startByte, span.endByte - 1)),
+            endLine: getLineOfByte(this.lineStarts, Math.max(span.startByte, span.endByte - 1)),
             sourceText: span.sourceText,
             children,
             valid: true,
         });
     }
 
+    readonly cacheSubtree = (span: ReusedSpan, children: NormalizedNode[]): void => {
+        this.storeCachedSubtree(span, children);
+    };
+
     /**
-     * Analyzer-memo seed (called by the adapters right after `reuseSubtree` hits): record
-     * that `node` is a function whose subtree was reused this pass, and collect the literal
-     * nodes inside that reused subtree so the constants analyzer can skip re-collecting them
-     * (they are byte-identical — same object identity as the previous scan).
+     * Analyzer-memo seed: record that `node` is a function whose subtree was reused this pass.
      */
-    markReused(node: NormalizedNode, _span: ReusedSpan): void {
+    recordReusedNode(node: NormalizedNode, _span: ReusedSpan): void {
         this.reusedFnNodes.add(node);
-        const stack: NormalizedNode[] = [...(node.children || [])];
-        while (stack.length > 0) {
-            const cur = stack.pop();
-            if (!cur) continue;
-            if (cur.kind === NodeKind.NumericLiteral || cur.kind === NodeKind.StringLiteral) {
-                this.reusedLiteralNodes.add(cur);
+        const traversalStack: NormalizedNode[] = [...(node.children || [])];
+        while (traversalStack.length > 0) {
+            const currentNode = traversalStack.pop();
+            if (!currentNode) continue;
+            if (
+                currentNode.kind === NodeKind.NumericLiteral ||
+                currentNode.kind === NodeKind.StringLiteral
+            ) {
+                this.reusedLiteralNodes.add(currentNode);
             }
-            const kids = cur.children;
-            if (kids) for (const c of kids) stack.push(c);
+            const childNodes = currentNode.children;
+            if (childNodes && childNodes.length > 0) {
+                traversalStack.push(...childNodes);
+            }
         }
     }
 
+    readonly markReused = (node: NormalizedNode, span: ReusedSpan): void => {
+        this.recordReusedNode(node, span);
+    };
+
     /** True when `node` is a function whose subtree was reused THIS pass. */
     isReusedFunction(node: NormalizedNode): boolean {
-        return this.reusedFnNodes.has(node);
+        return node ? this.reusedFnNodes.has(node) : false;
     }
 
     /** True when `node` is a literal inside a reused subtree THIS pass. */
     isReusedLiteral(node: NormalizedNode): boolean {
-        return this.reusedLiteralNodes.has(node);
+        return node ? this.reusedLiteralNodes.has(node) : false;
     }
 
     /** Read a cc memo value written by the PREVIOUS scan (reused subtrees only). */
@@ -302,8 +320,9 @@ export class IncrementalFileState {
     }
 
     /** Record this scan's cc value (fresh or reused) for the next scan's reuse. */
-    setComplexity(fnKey: string | number, cc: number): void {
-        this.complexityMemo.set(fnKey, cc);
+    setComplexity(fnKey: string | number, cyclomaticComplexity: number): void {
+        if (fnKey === undefined || fnKey === null) return;
+        this.complexityMemo.set(fnKey, cyclomaticComplexity);
     }
 
     /** Previous scan's full literal records (seeds recomposition of reused subtrees). */
@@ -321,13 +340,12 @@ export class IncrementalFileState {
         this.prevSubtrees = null;
         this.prevComplexityMemo = null;
         this.prevLiteralRecords = [];
-        // Reused-identity sets are only meaningful between prepare() and finalize().
         this.reusedFnNodes = new Set();
         this.reusedLiteralNodes = new Set();
     }
 
     /** Drop all cached state (LRU eviction / RSS guard). Content is kept for next diff. */
-    evict(): void {
+    evictCaches(): void {
         this.prevSubtrees = null;
         this.subtrees.clear();
         this.prevComplexityMemo = null;
@@ -338,15 +356,20 @@ export class IncrementalFileState {
         this.reusedLiteralNodes = new Set();
     }
 
+    readonly evict = (): void => {
+        this.evictCaches();
+    };
+
     /**
-     * Current cache size, expressed as the number of function subtrees retained for the next
-     * scan; useful for tests and memory diagnostics.
-     *
-     * @returns Number of entries in the subtree map after the latest cache/reuse cycle.
+     * Current cache size, expressed as the number of function subtrees retained for the next scan.
      */
-    subtreeCount(): number {
+    getSubtreeCount(): number {
         return this.subtrees.size;
     }
+
+    readonly subtreeCount = (): number => {
+        return this.getSubtreeCount();
+    };
 }
 
 // ---------------------------------------------------------------------------
@@ -363,33 +386,36 @@ export class IncrementalFileState {
  * @param bucket - Per-fingerprint map from relative file path to its incremental state.
  * @param rel - Repo-relative file path to mark as most recently used.
  */
-export function touchIncremental(bucket: Map<string, IncrementalFileState>, rel: string): void {
-    const st = bucket.get(rel);
-    if (!st) return;
-    st.lastAccessed = Date.now();
+export function updateIncrementalTouch(
+    bucket: Map<string, IncrementalFileState>,
+    rel: string,
+): void {
+    const targetState = bucket.get(rel);
+    if (!targetState) return;
+    targetState.lastAccessed = Date.now();
     bucket.delete(rel);
-    bucket.set(rel, st);
+    bucket.set(rel, targetState);
 }
 
 /**
  * Evict least-recently-used entries from `bucket` until at most `maxFiles` remain. Each removed
- * state has its caches cleared via {@link IncrementalFileState.evict}; eviction is loss-free for
+ * state has its caches cleared via {@link IncrementalFileState.evictCaches}; eviction is loss-free for
  * output and only increases the work of the next change to those files.
  *
  * @param bucket - Per-fingerprint LRU-ordered map of incremental states.
- * @param maxFiles - Retention bound; defaults to the env-aware incrementalMaxFiles() value.
+ * @param maxFiles - Retention bound; defaults to the env-aware getIncrementalMaxFiles() value.
  * @returns Number of entries evicted (0 when the bucket is already within the bound).
  */
 export function pruneIncrementalBucket(
     bucket: Map<string, IncrementalFileState>,
-    maxFiles: number = incrementalMaxFiles(),
+    maxFiles: number = getIncrementalMaxFiles(),
 ): number {
     let evicted = 0;
     while (bucket.size > maxFiles) {
         const oldest = bucket.keys().next().value as string | undefined;
         if (oldest === undefined) break;
-        const st = bucket.get(oldest);
-        if (st) st.evict();
+        const fileState = bucket.get(oldest);
+        if (fileState) fileState.evictCaches();
         bucket.delete(oldest);
         evicted++;
     }
@@ -397,40 +423,24 @@ export function pruneIncrementalBucket(
 }
 
 /**
- * Evict incremental state progressively based on RSS pressure, trying to keep
- * the hottest (most-beneficial) entries alive as long as possible.
- *
- * **Tier 1 (>350 MiB):** Drop only large files (>1000 lines).  Big files consume
- *   the most memory per entry but are relatively few in number, so removing them
- *   frees significant memory while preserving small/medium file state — which
- *   covers the vast majority of day-to-day edits.
- *
- * **Tier 2 (>450 MiB):** Drop files not accessed in 7+ days (cold entries).
- *   Actively-edited files — which benefit most from incremental diff — are kept.
- *
- * **Tier 3 (>512 MiB):** Drop everything (original behavior) — last-resort safety net.
- *
- * After each tier we re-check RSS; if memory is back below the next threshold
- * we stop early and avoid over-evicting.
-/**
  * Selectively evicts states matching the provided filter predicate across all buckets.
  */
 function evictMatchingStates(
     incremental: Map<string, Map<string, IncrementalFileState>>,
-    predicate: (st: IncrementalFileState) => boolean,
+    predicate: (fileState: IncrementalFileState) => boolean,
 ): number {
     let evicted = 0;
     const toRemove: string[] = [];
     for (const bucket of incremental.values()) {
         toRemove.length = 0;
-        for (const [path, st] of bucket) {
-            if (predicate(st)) {
+        for (const [path, fileState] of bucket) {
+            if (predicate(fileState)) {
                 toRemove.push(path);
             }
         }
         for (const path of toRemove) {
-            const st = bucket.get(path);
-            if (st) st.evict();
+            const fileState = bucket.get(path);
+            if (fileState) fileState.evictCaches();
             bucket.delete(path);
             evicted++;
         }
@@ -444,8 +454,8 @@ function evictMatchingStates(
 function clearAllStates(incremental: Map<string, Map<string, IncrementalFileState>>): number {
     let evicted = 0;
     for (const bucket of incremental.values()) {
-        for (const st of bucket.values()) {
-            st.evict();
+        for (const fileState of bucket.values()) {
+            fileState.evictCaches();
         }
         evicted += bucket.size;
         bucket.clear();
@@ -464,29 +474,32 @@ function clearAllStates(incremental: Map<string, Map<string, IncrementalFileStat
  * @param session.incremental - Fingerprint-keyed buckets holding per-file incremental states.
  * @returns Total number of per-file states evicted; 0 when RSS is within the soft cap.
  */
-export function incrementalRssGuard(session: {
+export function checkIncrementalRssGuard(session: {
     incremental: Map<string, Map<string, IncrementalFileState>>;
 }): number {
     const rss0 = process.memoryUsage().rss;
-    if (rss0 < INCREMENTAL_RSS_TIER1_BYTES) {
+    if (rss0 < RSS_BOUNDS.tier1Bytes) {
         return 0;
     }
 
     // Tier 1: evict large files
     let evicted = evictMatchingStates(
         session.incremental,
-        (st) => st.lineCount > LARGE_FILE_LINE_THRESHOLD,
+        (fileState) => fileState.lineCount > LARGE_FILE_LINE_THRESHOLD,
     );
 
-    if (process.memoryUsage().rss < INCREMENTAL_RSS_TIER2_BYTES) {
+    if (process.memoryUsage().rss < RSS_BOUNDS.tier2Bytes) {
         return evicted;
     }
 
     // Tier 2: evict cold files
     const cutoff = Date.now() - COLD_FILE_AGE_MS;
-    evicted += evictMatchingStates(session.incremental, (st) => st.lastAccessed < cutoff);
+    evicted += evictMatchingStates(
+        session.incremental,
+        (fileState) => fileState.lastAccessed < cutoff,
+    );
 
-    if (process.memoryUsage().rss < INCREMENTAL_RSS_CLEAR_BYTES) {
+    if (process.memoryUsage().rss < RSS_BOUNDS.clearBytes) {
         return evicted;
     }
 
@@ -494,3 +507,10 @@ export function incrementalRssGuard(session: {
     evicted += clearAllStates(session.incremental);
     return evicted;
 }
+
+export {
+    getLineOfByte as lineOfByte,
+    getIncrementalMaxFiles as incrementalMaxFiles,
+    updateIncrementalTouch as touchIncremental,
+    checkIncrementalRssGuard as incrementalRssGuard,
+};
