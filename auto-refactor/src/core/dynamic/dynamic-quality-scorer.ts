@@ -84,7 +84,9 @@ export function evaluateDynamicCompleteness(dto: DynamicEvidenceDTO): DynamicCom
     if (dto.concurrency !== undefined) observed.push('C');
     if (dto.execution !== undefined) observed.push('E');
 
-    const completeness = Math.round((observed.length / TOTAL_OBSERVED_AXES_BASE) * HUNDRED_PERCENT_MULTIPLIER) / HUNDRED_PERCENT_MULTIPLIER;
+    const completeness =
+        Math.round((observed.length / TOTAL_OBSERVED_AXES_BASE) * HUNDRED_PERCENT_MULTIPLIER) /
+        HUNDRED_PERCENT_MULTIPLIER;
     const confidenceFactor = Math.max(MIN_CONFIDENCE_THRESHOLD, completeness);
 
     return {
@@ -100,7 +102,8 @@ export function evaluateDynamicCompleteness(dto: DynamicEvidenceDTO): DynamicCom
 function evaluateLatencyScore(dto: DynamicEvidenceDTO, priorScore: number): number {
     if (dto.latency === undefined) return priorScore;
     const lat = dto.latency;
-    const latencyPercentile99Ms = lat.percentile99Ms ?? lat['p99Ms'] ?? DEFAULT_LATENCY_PERCENTILE_99_MS;
+    const latencyPercentile99Ms =
+        lat.percentile99Ms ?? lat['p99Ms'] ?? DEFAULT_LATENCY_PERCENTILE_99_MS;
     const budget = lat.budgetMs ?? DEFAULT_LATENCY_BUDGET_MS;
     let scoreL = MAX_SCORE;
     if (latencyPercentile99Ms > budget) {
@@ -118,7 +121,9 @@ function evaluateThroughputScore(dto: DynamicEvidenceDTO, priorScore: number): n
     const thr = dto.throughput;
     const ops = thr.opsPerSec ?? DEFAULT_THROUGHPUT_OPS;
     const targetOps = thr.targetOpsPerSec ?? DEFAULT_THROUGHPUT_OPS;
-    return targetOps > 0 ? Math.max(MIN_SCORE, Math.min(MAX_SCORE, (ops / targetOps) * MAX_SCORE)) : MAX_SCORE;
+    return targetOps > 0
+        ? Math.max(MIN_SCORE, Math.min(MAX_SCORE, (ops / targetOps) * MAX_SCORE))
+        : MAX_SCORE;
 }
 
 /**
@@ -165,8 +170,18 @@ function evaluateExecutionScore(dto: DynamicEvidenceDTO, priorScore: number): nu
     const branchCov = Math.max(0.0, Math.min(MAX_SCORE, exec.branchCoveragePct ?? lineCov));
     const calls = exec.callCount ?? 0;
     const callDepthFactor =
-        calls > 0 ? Math.min(1.0, Math.log10(calls + 1) / CALL_DEPTH_DIVISOR) : lineCov > 0 ? 0.85 : 0.2;
-    return Math.max(MIN_SCORE, Math.min(MAX_SCORE, (lineCov * COVERAGE_LINE_WEIGHT + branchCov * COVERAGE_BRANCH_WEIGHT) * callDepthFactor));
+        calls > 0
+            ? Math.min(1.0, Math.log10(calls + 1) / CALL_DEPTH_DIVISOR)
+            : lineCov > 0
+              ? 0.85
+              : 0.2;
+    return Math.max(
+        MIN_SCORE,
+        Math.min(
+            MAX_SCORE,
+            (lineCov * COVERAGE_LINE_WEIGHT + branchCov * COVERAGE_BRANCH_WEIGHT) * callDepthFactor,
+        ),
+    );
 }
 
 /**
@@ -242,24 +257,55 @@ export function computeDynamicHotspotRisk(
         params = hotspotIdOrParams ?? {};
         hotspotId = DEFAULT_HOTSPOT_ID;
     }
-    const behavioralScope = Math.max(MIN_HOTSPOT_DIMENSION_SCORE, Math.min(MAX_HOTSPOT_DIMENSION_SCORE, params.behavioralScope ?? DEFAULT_HOTSPOT_DIMENSION_SCORE));
+    const behavioralScope = Math.max(
+        MIN_HOTSPOT_DIMENSION_SCORE,
+        Math.min(
+            MAX_HOTSPOT_DIMENSION_SCORE,
+            params.behavioralScope ?? DEFAULT_HOTSPOT_DIMENSION_SCORE,
+        ),
+    );
 
     // Frequency factor F_i: log10(invocationsPerHour + 1)
     let frequencyFactor = params.frequencyFactor;
     if (frequencyFactor === undefined) {
         const invocationsPerHour = params.invocationsPerHour ?? DEFAULT_INVOCATIONS_PER_HOUR;
-        frequencyFactor = Math.max(MIN_FREQUENCY_FACTOR, Math.min(MAX_NORMALIZED_RISK, Math.log10(invocationsPerHour + 1)));
+        frequencyFactor = Math.max(
+            MIN_FREQUENCY_FACTOR,
+            Math.min(MAX_NORMALIZED_RISK, Math.log10(invocationsPerHour + 1)),
+        );
     } else {
-        frequencyFactor = Math.max(MIN_FREQUENCY_FACTOR, Math.min(MAX_NORMALIZED_RISK, frequencyFactor));
+        frequencyFactor = Math.max(
+            MIN_FREQUENCY_FACTOR,
+            Math.min(MAX_NORMALIZED_RISK, frequencyFactor),
+        );
     }
 
-    const resourceConsumption = Math.max(MIN_HOTSPOT_DIMENSION_SCORE, Math.min(MAX_NORMALIZED_RISK, params.resourceConsumption ?? DEFAULT_HOTSPOT_DIMENSION_SCORE));
-    const businessSensitivity = Math.max(MIN_HOTSPOT_DIMENSION_SCORE, Math.min(MAX_HOTSPOT_DIMENSION_SCORE, params.businessSensitivity ?? DEFAULT_HOTSPOT_DIMENSION_SCORE));
+    const resourceConsumption = Math.max(
+        MIN_HOTSPOT_DIMENSION_SCORE,
+        Math.min(
+            MAX_NORMALIZED_RISK,
+            params.resourceConsumption ?? DEFAULT_HOTSPOT_DIMENSION_SCORE,
+        ),
+    );
+    const businessSensitivity = Math.max(
+        MIN_HOTSPOT_DIMENSION_SCORE,
+        Math.min(
+            MAX_HOTSPOT_DIMENSION_SCORE,
+            params.businessSensitivity ?? DEFAULT_HOTSPOT_DIMENSION_SCORE,
+        ),
+    );
 
     const rawRisk = behavioralScope * frequencyFactor * resourceConsumption * businessSensitivity;
     // Bounded normalization: 5 * 10 * 10 * 5 = 2500 max raw -> normalize to 0..10
     // scale with standard 0.01 precision
-    const normalizedRisk = Math.min(MAX_NORMALIZED_RISK, Math.max(MIN_NORMALIZED_RISK, Math.round((rawRisk / RISK_NORMALIZATION_DIVISOR) * HUNDRED_PERCENT_MULTIPLIER) / HUNDRED_PERCENT_MULTIPLIER));
+    const normalizedRisk = Math.min(
+        MAX_NORMALIZED_RISK,
+        Math.max(
+            MIN_NORMALIZED_RISK,
+            Math.round((rawRisk / RISK_NORMALIZATION_DIVISOR) * HUNDRED_PERCENT_MULTIPLIER) /
+                HUNDRED_PERCENT_MULTIPLIER,
+        ),
+    );
     const hasEvidence =
         params.invocationsPerHour !== undefined || params.frequencyFactor !== undefined;
     const evidenceConfidence = hasEvidence ? FULL_CONFIDENCE : PARTIAL_CONFIDENCE;

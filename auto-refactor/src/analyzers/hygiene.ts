@@ -64,7 +64,6 @@ const STUB_WORD_TOKENS = Buffer.from(ENCODED_STUB_TOKEN_LIST, ENCODING_BASE64)
 const UNRESOLVED_MARKER_PATTERN = new RegExp(`\\b(?:${STUB_WORD_TOKENS.join('|')})\\b`, 'i');
 const TERMINAL_STMT_RE = /^\s*(?:return\b|throw\s+|break;|continue;|raise\s+|exit\b)/;
 
-
 const SUPPRESSION_DIRECTIVE_RE =
     /^\s*(?:\/\/|\/\*|#|\*)\s*(?:@ts-(?:ignore|expect-error|nocheck)|eslint-disable|biome-ignore|#\s*noqa)\b/i;
 const VAGUE_THROW_RE =
@@ -243,7 +242,6 @@ export interface StubsAuditContext {
     readonly issues: Issue[];
 }
 
-
 function reportEolMismatch(
     context: FileBasicsContext,
     expectedEol: string,
@@ -306,7 +304,15 @@ export class HygieneAnalyzer implements Analyzer {
         const content = ctx.content || '';
         const file = ctx.filePath.replace(/\\/g, '/');
 
-        if (auditFileBasics({ content, file, ctx, issues, makeIssue: this.makeHygieneIssue.bind(this) })) {
+        if (
+            auditFileBasics({
+                content,
+                file,
+                ctx,
+                issues,
+                makeIssue: this.makeHygieneIssue.bind(this),
+            })
+        ) {
             return issues;
         }
 
@@ -411,7 +417,9 @@ export class HygieneAnalyzer implements Analyzer {
         issues: Issue[];
     }): void {
         const isIndentBased = params.file.endsWith('.py') || params.file.endsWith('.gd');
-        const jargonRe = buildJargonRe((params.ctx.options as HygieneOptions | undefined)?.jargonPatterns);
+        const jargonRe = buildJargonRe(
+            (params.ctx.options as HygieneOptions | undefined)?.jargonPatterns,
+        );
         let lineStart = 0;
         let lineIdx = 0;
         const deadState = { hadTerminalStmt: false, lastTerminalIndent: 0 };
@@ -569,7 +577,7 @@ export class HygieneAnalyzer implements Analyzer {
     ): void {
         if (!UNRESOLVED_MARKER_PATTERN.test(trimmed)) return;
         const match = trimmed.match(UNRESOLVED_MARKER_PATTERN);
-        const marker = match ? match[0] : ('TO' + 'DO');
+        const marker = match ? match[0] : 'TO' + 'DO';
         const desc = HygieneMessages.TEMPORARY_STUB(marker);
         issues.push(
             this.makeHygieneIssue({
@@ -724,7 +732,8 @@ export class HygieneAnalyzer implements Analyzer {
         for (let i = 0; i <= total - minCloneLines; i++) {
             let hashValue = 0;
             for (let k = 0; k < minCloneLines; k++) {
-                hashValue = (Math.imul(hashValue, CLONE_ROLLING_HASH_MULTIPLIER) + lineHashes[i + k]) | 0;
+                hashValue =
+                    (Math.imul(hashValue, CLONE_ROLLING_HASH_MULTIPLIER) + lineHashes[i + k]) | 0;
             }
 
             const prevLine = blockMap.get(hashValue);
@@ -739,7 +748,11 @@ export class HygieneAnalyzer implements Analyzer {
                         rule: 'HYG-CLN-001',
                         message: desc.message,
                         severity: SEVERITY_WARNING,
-                        detail: { startLine: actualStartLine, originalLine, lineSpan: minCloneLines },
+                        detail: {
+                            startLine: actualStartLine,
+                            originalLine,
+                            lineSpan: minCloneLines,
+                        },
                         suggestion: desc.suggestion,
                     }),
                 );

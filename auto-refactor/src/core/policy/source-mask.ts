@@ -137,8 +137,14 @@ const C_FAMILY_MASK = buildMaskConfig({
 export const SOURCE_MASK_PRESETS: Readonly<Record<string, SourceMaskConfig>> = Object.freeze({
     [MASK_LANGUAGES.TYPESCRIPT]: C_FAMILY_MASK,
     [MASK_LANGUAGES.JAVASCRIPT]: C_FAMILY_MASK,
-    [MASK_LANGUAGES.PYTHON]: buildMaskConfig({ lineComment: COMMENT_HASH_LINE, quoteChars: QUOTE_CHARS_COMMON }),
-    [MASK_LANGUAGES.GDSCRIPT]: buildMaskConfig({ lineComment: COMMENT_HASH_LINE, quoteChars: QUOTE_CHARS_ALL }),
+    [MASK_LANGUAGES.PYTHON]: buildMaskConfig({
+        lineComment: COMMENT_HASH_LINE,
+        quoteChars: QUOTE_CHARS_COMMON,
+    }),
+    [MASK_LANGUAGES.GDSCRIPT]: buildMaskConfig({
+        lineComment: COMMENT_HASH_LINE,
+        quoteChars: QUOTE_CHARS_ALL,
+    }),
     [MASK_LANGUAGES.RUST]: buildMaskConfig({
         lineComment: COMMENT_SLASH_LINE,
         blockOpen: COMMENT_SLASH_BLOCK_OPEN,
@@ -153,7 +159,10 @@ export const SOURCE_MASK_PRESETS: Readonly<Record<string, SourceMaskConfig>> = O
         quoteChars: QUOTE_CHARS_DOUBLE_TICK,
         hasMultilineTemplates: true,
     }),
-    [MASK_LANGUAGES.SHELL]: buildMaskConfig({ lineComment: COMMENT_HASH_LINE, quoteChars: QUOTE_CHARS_COMMON }),
+    [MASK_LANGUAGES.SHELL]: buildMaskConfig({
+        lineComment: COMMENT_HASH_LINE,
+        quoteChars: QUOTE_CHARS_COMMON,
+    }),
     [MASK_LANGUAGES.POWERSHELL]: buildMaskConfig({
         lineComment: COMMENT_HASH_LINE,
         blockOpen: COMMENT_PS_BLOCK_OPEN,
@@ -699,7 +708,11 @@ interface MaskSpanContext {
  * Fast-path check and scan for quote tokens (', ", `).
  */
 function scanQuoteFast(ctx: MaskSpanContext): number {
-    if (ctx.code !== CHAR_SINGLE_QUOTE && ctx.code !== CHAR_DOUBLE_QUOTE && ctx.code !== CHAR_BACKTICK) {
+    if (
+        ctx.code !== CHAR_SINGLE_QUOTE &&
+        ctx.code !== CHAR_DOUBLE_QUOTE &&
+        ctx.code !== CHAR_BACKTICK
+    ) {
         return -1;
     }
     const char = ctx.line[ctx.index];

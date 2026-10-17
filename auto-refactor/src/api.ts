@@ -313,7 +313,10 @@ export async function scan(options: ScanOptions = {}): Promise<ScanReport> {
     const runColdPass = async (): Promise<void> => {
         if (options.cache) {
             const cache = new CacheStore(options.cacheDir, config.root);
-            const cachedScan = await scanner.scanWithCache({ cache, cacheCustom: options.cacheCustom });
+            const cachedScan = await scanner.scanWithCache({
+                cache,
+                cacheCustom: options.cacheCustom,
+            });
             report = cachedScan.report;
         } else {
             report = await scanner.scan();
@@ -587,11 +590,15 @@ async function collectGitChangedFiles(root: string): Promise<string[]> {
             GIT_CONFIG_GLOBAL: process.env.GIT_CONFIG_GLOBAL || nulPath,
             GIT_CONFIG_SYSTEM: process.env.GIT_CONFIG_SYSTEM || nulPath,
         };
-        const { stdout: commandOutput } = await execFileAsync('git', [GIT_SUBCOMMAND_STATUS, GIT_FLAG_PORCELAIN], {
-            cwd: root,
-            encoding: 'utf8',
-            env: gitEnv,
-        });
+        const { stdout: commandOutput } = await execFileAsync(
+            'git',
+            [GIT_SUBCOMMAND_STATUS, GIT_FLAG_PORCELAIN],
+            {
+                cwd: root,
+                encoding: 'utf8',
+                env: gitEnv,
+            },
+        );
         const changedFiles: string[] = [];
         for (const line of (commandOutput || '').split(/\r?\n/)) {
             const parsed = parseGitPorcelainLine(line);

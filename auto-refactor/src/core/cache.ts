@@ -20,7 +20,7 @@
 import * as path from 'path';
 import type { Issue, FileMetric } from './types';
 import type { Logger } from './logger';
-import { TOOL_VERSION as RAW_TOOL_VERSION } from './config/config';
+import { TOOL_VERSION } from './config/config';
 import { CACHE_FORMAT_VERSION, sha256Hex, canonicalJson, l2Key } from './cache-key';
 import {
     TYPEOF_STRING,
@@ -45,8 +45,6 @@ import {
     computePathKey,
     removeCacheDir,
 } from './cache-persistence';
-
-const TOOL_VERSION: string = (RAW_TOOL_VERSION);
 
 /** File metadata fingerprint used for L1 freshness checks. */
 export interface Fingerprint {
@@ -381,7 +379,9 @@ export class CacheStore {
     lookupL2(fpHashValue: string, contentHash: string): (CachedResult & { p: string }) | null {
         if (!this.enabled || !fpHashValue || !contentHash) return null;
         const cached = this.lookupSecondaryCache(fpHashValue, contentHash);
-        return cached ? { issues: cached.issues.slice(), metric: cached.metric, p: cached.p } : null;
+        return cached
+            ? { issues: cached.issues.slice(), metric: cached.metric, p: cached.p }
+            : null;
     }
 
     writePrimaryCache(relPath: string, fileFingerprint: Fingerprint): void {
@@ -453,12 +453,7 @@ export class CacheStore {
     }
 
     private getEntryPathKey(entryRecord: L2Entry): string {
-        return computePathKey(
-            entryRecord.k,
-            entryRecord.p,
-            entryRecord.fm,
-            entryRecord.fs,
-        );
+        return computePathKey(entryRecord.k, entryRecord.p, entryRecord.fm, entryRecord.fs);
     }
 
     private indexSecondaryCacheByPath(entryRecord: L2Entry): void {
@@ -490,7 +485,9 @@ export class CacheStore {
     ): (CachedResult & { p: string }) | null {
         if (!this.enabled || !fpHashValue || !relPath) return null;
         const cached = this.lookupSecondaryCacheByPath(fpHashValue, relPath, mtimeMs, size);
-        return cached ? { issues: cached.issues.slice(), metric: cached.metric, p: cached.p } : null;
+        return cached
+            ? { issues: cached.issues.slice(), metric: cached.metric, p: cached.p }
+            : null;
     }
 
     /**

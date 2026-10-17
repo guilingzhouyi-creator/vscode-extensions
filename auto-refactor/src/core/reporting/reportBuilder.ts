@@ -321,7 +321,8 @@ function resolveGovernanceProfile(cfg: ScanConfig): GovernanceProjectProfile {
 
     let domain: GovernanceProjectProfile['domain'] = DOMAIN_CORE_FRAMEWORK;
     if (cfg.archetype === ARCHETYPE_LIBRARY) domain = DOMAIN_ALGORITHM_LIB;
-    else if (cfg.archetype === ARCHETYPE_GAME || cfg.archetype === ARCHETYPE_WEB) domain = DOMAIN_BUSINESS_APP;
+    else if (cfg.archetype === ARCHETYPE_GAME || cfg.archetype === ARCHETYPE_WEB)
+        domain = DOMAIN_BUSINESS_APP;
 
     return { stage, scale, domain };
 }
@@ -355,7 +356,13 @@ export function buildScanReport(params: BuildScanReportContext): ScanReport {
         DEFAULT_PERFECT_SCORE,
         resolveGovernanceProfile(cfg),
     );
-    const autonomy = evaluateProjectAutonomy(params.fileMetrics, params.issues, cfg, undefined, host.symbolIndex);
+    const autonomy = evaluateProjectAutonomy(
+        params.fileMetrics,
+        params.issues,
+        cfg,
+        undefined,
+        host.symbolIndex,
+    );
 
     host.reviewMemory.flush();
     const runnerToolName = TOOL_NAME;

@@ -24,10 +24,7 @@ const fs = require('fs');
 const path = require('path');
 
 const { getNativeCoreStatus, nativeCore, PureJsNativeShim } = require('../dist/core/native');
-const {
-  SOURCE_MASK_PRESETS,
-  MASK_LANGUAGES,
-} = require('../dist/core/policy/source-mask');
+const { SOURCE_MASK_PRESETS, MASK_LANGUAGES } = require('../dist/core/policy/source-mask');
 
 const MASK_LANGUAGE_TYPESCRIPT = MASK_LANGUAGES.TYPESCRIPT;
 const MASK_LANGUAGE_JAVASCRIPT = MASK_LANGUAGES.JAVASCRIPT;

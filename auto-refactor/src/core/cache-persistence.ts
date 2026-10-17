@@ -161,7 +161,9 @@ export function probeWritable(dir: string): boolean {
     }
 }
 
-function isValidL1(candidateObj: unknown): candidateObj is { t: string; p: string; m: number; s: number; i?: number } {
+function isValidL1(
+    candidateObj: unknown,
+): candidateObj is { t: string; p: string; m: number; s: number; i?: number } {
     const rawRecord = candidateObj as Record<string, unknown> | null;
     return Boolean(
         rawRecord &&
@@ -224,10 +226,15 @@ export function isValidL2(candidateObj: unknown): candidateObj is {
  * @param candidateObj - Object to validate.
  * @returns True if object is a valid path entry.
  */
-export function isValidPathEntry(candidateObj: unknown): candidateObj is { t: string; pk: string; k: string } {
+export function isValidPathEntry(
+    candidateObj: unknown,
+): candidateObj is { t: string; pk: string; k: string } {
     const rawRecord = candidateObj as Record<string, unknown> | null;
     return Boolean(
-        rawRecord && rawRecord.t === 'x' && typeof rawRecord.pk === TYPEOF_STRING && typeof rawRecord.k === TYPEOF_STRING,
+        rawRecord &&
+        rawRecord.t === 'x' &&
+        typeof rawRecord.pk === TYPEOF_STRING &&
+        typeof rawRecord.k === TYPEOF_STRING,
     );
 }
 
@@ -240,7 +247,12 @@ export function isValidPathEntry(candidateObj: unknown): candidateObj is { t: st
 export function serializeL1(l1: Map<string, Fingerprint>): string {
     const lines: string[] = [];
     for (const [relPath, fingerprint] of l1) {
-        const lineObj: Record<string, unknown> = { t: 'f', p: relPath, m: fingerprint.mtimeMs, s: fingerprint.size };
+        const lineObj: Record<string, unknown> = {
+            t: 'f',
+            p: relPath,
+            m: fingerprint.mtimeMs,
+            s: fingerprint.size,
+        };
         if (fingerprint.ino !== undefined) lineObj.i = fingerprint.ino;
         lines.push(JSON.stringify(lineObj));
     }

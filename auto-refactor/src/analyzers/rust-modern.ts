@@ -403,15 +403,12 @@ interface AsyncLockScopeContext {
 }
 
 /**
- * Record findings for synchronous std guard instances held across `.await` points.
+ * Inspect and record findings for standard library guard instances held across `.await` points.
  *
- * @param ctx - Scope context for async lock inspection.
+ * @param ctx - Scope context for async guard inspection.
  * @param out - Issue accumulator list.
  */
-function collectLocksAcrossAwait(
-    ctx: AsyncLockScopeContext,
-    out: Issue[],
-): void {
+function collectLocksAcrossAwait(ctx: AsyncLockScopeContext, out: Issue[]): void {
     const lockLines: number[] = [];
     let maxAwaitLine = -1;
     for (let j = ctx.scope.bodyStart; j <= ctx.scope.bodyEnd; j += 1) {
@@ -420,14 +417,7 @@ function collectLocksAcrossAwait(
     }
     for (const lk of lockLines) {
         if (maxAwaitLine > lk) {
-            out.push(
-                makeIssue(
-                    ctx.file,
-                    lk,
-                    SPEC_LOCK_AWAIT,
-                    { line: ctx.raw[lk].trim() },
-                ),
-            );
+            out.push(makeIssue(ctx.file, lk, SPEC_LOCK_AWAIT, { line: ctx.raw[lk].trim() }));
         }
     }
 }
@@ -523,7 +513,12 @@ const RSM_ACTIONABLE_MAP: Readonly<
         },
         {} as Record<
             string,
-            { action: AgentActionType; code: string; safeToAutomate: boolean; templateSnippet: string }
+            {
+                action: AgentActionType;
+                code: string;
+                safeToAutomate: boolean;
+                templateSnippet: string;
+            }
         >,
     ),
 );
@@ -594,7 +589,9 @@ function scanContextualRules(ctx: LineScanContext, index: number, code: string):
         ctx.out.push(makeIssue(ctx.file, index, SPEC_STR_REF, { line: ctx.raw[index].trim() }));
     }
     if (FORMAT_CALL_RE.test(code) && isPositionalFormatCall(ctx.raw, index)) {
-        ctx.out.push(makeIssue(ctx.file, index, SPEC_FORMAT_CAPTURE, { line: ctx.raw[index].trim() }));
+        ctx.out.push(
+            makeIssue(ctx.file, index, SPEC_FORMAT_CAPTURE, { line: ctx.raw[index].trim() }),
+        );
     }
     if (isLetElseCandidate(ctx.masked, index)) {
         ctx.out.push(makeIssue(ctx.file, index, SPEC_LET_ELSE, { line: ctx.raw[index].trim() }));

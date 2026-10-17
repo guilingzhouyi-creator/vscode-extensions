@@ -73,11 +73,14 @@ export function getRemappedCachedResult(
 ): CachedResult {
     if (fromRel === toRel) return cachedResult;
     const issues = cachedResult.issues.map((issueItem) => {
-        const line = issueItem.location && issueItem.location.start ? issueItem.location.start.line : 1;
+        const line =
+            issueItem.location && issueItem.location.start ? issueItem.location.start.line : 1;
         return {
             ...issueItem,
             id: `${issueItem.analyzer}:${issueItem.rule}:${toRel}:${line}`,
-            location: issueItem.location ? { ...issueItem.location, file: toRel } : issueItem.location,
+            location: issueItem.location
+                ? { ...issueItem.location, file: toRel }
+                : issueItem.location,
         };
     });
     const metric = cachedResult.metric ? { ...cachedResult.metric, file: toRel } : null;

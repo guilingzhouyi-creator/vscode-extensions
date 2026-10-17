@@ -22,11 +22,11 @@ import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import type { ScanConfig, ParserKind } from './types';
-import { TOOL_VERSION as RAW_TOOL_VERSION } from './config/config';
+import { TOOL_VERSION } from './config/config';
 import { policyFromAnalyzers, fastPathEnabled, FAST_PATH_ANALYZERS } from './ast/traverse';
 
 /** Canonical tool version identity string. */
-export const TOOL_VERSION: string = (RAW_TOOL_VERSION);
+export { TOOL_VERSION };
 
 /**
  * Warm-scan cache key construction (docs/01-architecture/02-pipeline-and-caching.md §B2).
@@ -116,7 +116,10 @@ export function getCanonicalJson(serializeTarget: unknown): string {
     }
     const sortedKeys = Object.keys(serializeTarget as Record<string, unknown>).sort();
     const entryPairs = sortedKeys.map(
-        (keyName) => JSON.stringify(keyName) + ':' + getCanonicalJson((serializeTarget as Record<string, unknown>)[keyName]),
+        (keyName) =>
+            JSON.stringify(keyName) +
+            ':' +
+            getCanonicalJson((serializeTarget as Record<string, unknown>)[keyName]),
     );
     return '{' + entryPairs.join(',') + '}';
 }
@@ -399,9 +402,10 @@ export function buildFingerprintPayload(
     ...optionalArgs: [(FingerprintAnalyzerDesc[] | FingerprintPayloadOptions)?, (string | null)?]
 ): FingerprintPayload {
     const parsed = parseFingerprintOptionalArgs(optionalArgs);
-    const resolved = parsed.descs && parsed.descs.length > 0
-        ? parsed.descs
-        : getFingerprintAnalyzerDescs(config);
+    const resolved =
+        parsed.descs && parsed.descs.length > 0
+            ? parsed.descs
+            : getFingerprintAnalyzerDescs(config);
     const legacyCount = resolved.filter((desc) => desc.legacy).length;
     const streamingNames = resolved.filter((desc) => !desc.legacy).map((desc) => desc.name);
     const policy = policyFromAnalyzers(streamingNames);

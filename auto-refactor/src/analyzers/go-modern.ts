@@ -106,7 +106,7 @@ interface LineRule {
 
 const UNCHECKED_ERROR_RULE: LineRule = Object.freeze({
     rule: 'GOM-ERR-001',
-    severity: (SEVERITY_WARNING),
+    severity: SEVERITY_WARNING,
     message: 'Error return value is discarded with `_`, silently hiding potential failures.',
     suggestion:
         'Check the error explicitly (`if err != nil { return err }`) or document why it is safe to ignore.',
@@ -114,7 +114,7 @@ const UNCHECKED_ERROR_RULE: LineRule = Object.freeze({
 
 const CONTEXT_FIRST_RULE: LineRule = Object.freeze({
     rule: 'GOM-CTX-001',
-    severity: (SEVERITY_WARNING),
+    severity: SEVERITY_WARNING,
     message: '`context.Context` should be the first parameter of a function.',
     suggestion:
         'Move `ctx context.Context` to be the first parameter — this is the Go convention and matches `ctx`-first APIs like `net/http` and database drivers.',
@@ -122,7 +122,7 @@ const CONTEXT_FIRST_RULE: LineRule = Object.freeze({
 
 const RECEIVER_NAMING_RULE: LineRule = Object.freeze({
     rule: 'GOM-STYLE-001',
-    severity: (SEVERITY_INFO),
+    severity: SEVERITY_INFO,
     message: 'Receiver name does not follow Go naming conventions.',
     suggestion:
         'Use a short (1-2 letter) abbreviation of the type name (e.g. `s` for `Server`, `c` for `Client`), and keep it consistent across all methods of the type.',
@@ -130,7 +130,7 @@ const RECEIVER_NAMING_RULE: LineRule = Object.freeze({
 
 const ERROR_NAMING_RULE: LineRule = Object.freeze({
     rule: 'GOM-STYLE-002',
-    severity: (SEVERITY_INFO),
+    severity: SEVERITY_INFO,
     message: 'Error variable does not follow Go naming conventions (should start with `err`).',
     suggestion:
         'Rename the variable to start with `err` (e.g. `errOpen` instead of `openErr` or `err` for a general error).',
@@ -138,7 +138,7 @@ const ERROR_NAMING_RULE: LineRule = Object.freeze({
 
 const PACKAGE_COMMENT_RULE: LineRule = Object.freeze({
     rule: 'GOM-STYLE-003',
-    severity: (SEVERITY_INFO),
+    severity: SEVERITY_INFO,
     message: 'Package is missing a documentation comment.',
     suggestion:
         'Add a comment before `package` that starts with `Package <name> ` and briefly describes the package purpose (Go convention for godoc).',
@@ -170,7 +170,12 @@ const ACTIONABLE_ENTRIES: readonly ActionableEntry[] = [
     { rule: 'GOM-CTX-001', codeId: '002', snippet: SNIPPET_CTX_FIRST, action: ACT_SIMPLIFY_FLOW },
     { rule: 'GOM-STYLE-001', codeId: '003', snippet: SNIPPET_RECEIVER, action: ACT_RENAME_SYMBOL },
     { rule: 'GOM-STYLE-002', codeId: '004', snippet: SNIPPET_ERR_NAME, action: ACT_RENAME_SYMBOL },
-    { rule: 'GOM-STYLE-003', codeId: '005', snippet: SNIPPET_PKG_COMMENT, action: ACT_INSERT_COMMENT },
+    {
+        rule: 'GOM-STYLE-003',
+        codeId: '005',
+        snippet: SNIPPET_PKG_COMMENT,
+        action: ACT_INSERT_COMMENT,
+    },
 ];
 
 const GOM_ACTIONABLE_MAP: Readonly<
@@ -191,7 +196,12 @@ const GOM_ACTIONABLE_MAP: Readonly<
         },
         {} as Record<
             string,
-            { action: AgentActionType; code: string; safeToAutomate: boolean; templateSnippet: string }
+            {
+                action: AgentActionType;
+                code: string;
+                safeToAutomate: boolean;
+                templateSnippet: string;
+            }
         >,
     ),
 );

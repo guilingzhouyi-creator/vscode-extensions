@@ -132,7 +132,6 @@ export interface SecretLineAuditContext {
     readonly issues: Issue[];
 }
 
-
 /**
  * Optional configuration for secret detection.
  *
@@ -207,7 +206,8 @@ interface ResolvedEntropyConfig {
 function shouldSkipSecrets(normPath: string, level: SecurityLevel, opts: SecretsOptions): boolean {
     if (level === LEVEL_OFF) return true;
     const isTestOrFixture = /(?:tests?|specs?|fixtures?|mocks?|benchmark)[\\/]/i.test(normPath);
-    const ignoreInTests = opts.ignoreInTests !== undefined ? opts.ignoreInTests : level !== LEVEL_FULL;
+    const ignoreInTests =
+        opts.ignoreInTests !== undefined ? opts.ignoreInTests : level !== LEVEL_FULL;
     return isTestOrFixture && ignoreInTests;
 }
 
@@ -385,8 +385,14 @@ export class SecretsAnalyzer implements Analyzer {
             context.lineText,
             (tokenMatch) => {
                 const tokenEntropy = computeShannonEntropy(tokenMatch[0]);
-                if (tokenEntropy >= entropy.threshold && tokenMatch[0].length >= entropy.minLength) {
-                    const desc = SecretMessages.HIGH_ENTROPY_TOKEN(tokenEntropy, tokenMatch[0].length);
+                if (
+                    tokenEntropy >= entropy.threshold &&
+                    tokenMatch[0].length >= entropy.minLength
+                ) {
+                    const desc = SecretMessages.HIGH_ENTROPY_TOKEN(
+                        tokenEntropy,
+                        tokenMatch[0].length,
+                    );
                     context.issues.push(
                         this.makeSecretIssue({
                             ctx: context.ctx,
@@ -444,7 +450,11 @@ export class SecretsAnalyzer implements Analyzer {
             rule: params.rule,
             severity: params.severity,
             message: params.message,
-            location: { file, start: { line: params.line, column: 1 }, end: { line: params.line, column: 1 } },
+            location: {
+                file,
+                start: { line: params.line, column: 1 },
+                end: { line: params.line, column: 1 },
+            },
             detail: params.detail,
             suggestion:
                 params.suggestion ||

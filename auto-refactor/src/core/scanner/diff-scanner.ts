@@ -257,7 +257,11 @@ async function executeDiffMissBatches(
             effWorkers,
         });
     } else {
-        const inProcResults = await ctx.scanner.runInProcess(missFiles, ctx.absRoot, preloadedBufferMap);
+        const inProcResults = await ctx.scanner.runInProcess(
+            missFiles,
+            ctx.absRoot,
+            preloadedBufferMap,
+        );
         batchResult = { results: inProcResults, poolWarm: false };
     }
 
@@ -279,7 +283,11 @@ async function runSingleIncrementalAnalysis(
     incBucket: Map<string, IncrementalFileState>,
 ): Promise<{ issues: Issue[]; metric: FileMetric | null }> {
     try {
-        return await scanner.runAnalyzers(targetIncremental.rel, targetIncremental.content, targetIncremental.state);
+        return await scanner.runAnalyzers(
+            targetIncremental.rel,
+            targetIncremental.content,
+            targetIncremental.state,
+        );
     } catch (analysisError) {
         return runRecoverIncrementalAnalysis(scanner, targetIncremental, incBucket, analysisError);
     }
@@ -295,11 +303,18 @@ async function runRecoverIncrementalAnalysis(
         `line-level incremental failed on ${targetIncremental.rel}: ${String(initialError)}; full rescan`,
     );
     targetIncremental.state.finalize();
-    const freshState = new IncrementalFileState(targetIncremental.content, targetIncremental.contentHash);
+    const freshState = new IncrementalFileState(
+        targetIncremental.content,
+        targetIncremental.contentHash,
+    );
     freshState.prepare(targetIncremental.content, targetIncremental.contentHash);
     incBucket.set(targetIncremental.rel, freshState);
     try {
-        return await scanner.runAnalyzers(targetIncremental.rel, targetIncremental.content, freshState);
+        return await scanner.runAnalyzers(
+            targetIncremental.rel,
+            targetIncremental.content,
+            freshState,
+        );
     } catch (fallbackError) {
         scanner.logger.warn(
             `seeded materialization failed on ${targetIncremental.rel}: ${String(fallbackError)}; unseeded rescan`,
@@ -315,7 +330,11 @@ async function executeDiffIncrementalFiles(
     let incrementalHit = 0;
 
     for (const targetIncremental of ctx.toIncremental) {
-        const incrementalResult = await runSingleIncrementalAnalysis(ctx.scanner, targetIncremental, ctx.incBucket);
+        const incrementalResult = await runSingleIncrementalAnalysis(
+            ctx.scanner,
+            targetIncremental,
+            ctx.incBucket,
+        );
         targetIncremental.state.finalize();
         ctx.perFile[targetIncremental.idx] = incrementalResult;
         ctx.sessionBucket.set(targetIncremental.rel, incrementalResult);
@@ -353,13 +372,23 @@ function filterDiffHints(
 }
 
 function computeIssueSortOrder(leftIssue: Issue, rightIssue: Issue): number {
-    const fileComparison = leftIssue.location.file < rightIssue.location.file ? -1 : (leftIssue.location.file > rightIssue.location.file ? 1 : 0);
+    const fileComparison =
+        leftIssue.location.file < rightIssue.location.file
+            ? -1
+            : leftIssue.location.file > rightIssue.location.file
+              ? 1
+              : 0;
     if (fileComparison !== 0) return fileComparison;
 
     const lineComparison = leftIssue.location.start.line - rightIssue.location.start.line;
     if (lineComparison !== 0) return lineComparison;
 
-    const analyzerComparison = leftIssue.analyzer < rightIssue.analyzer ? -1 : (leftIssue.analyzer > rightIssue.analyzer ? 1 : 0);
+    const analyzerComparison =
+        leftIssue.analyzer < rightIssue.analyzer
+            ? -1
+            : leftIssue.analyzer > rightIssue.analyzer
+              ? 1
+              : 0;
     if (analyzerComparison !== 0) return analyzerComparison;
 
     return leftIssue.rule < rightIssue.rule ? -1 : 1;
@@ -466,15 +495,36 @@ async function runDiffRoutingPass(ctx: DiffRoutingPassContext): Promise<void> {
         const diffInput = ctx.hintsMap.get(relPath);
         if (diffInput) {
             await processChangedFileHint(
-                relPath, diffInput, fileIdx, ctx.absRoot, ctx.fpContext, ctx.opts,
-                ctx.incBucket, ctx.sessionBucket, ctx.perFile, ctx.cache,
-                ctx.routingState, ctx.incEnabled, ctx.incMinLines, statEntry, ctx.scanner,
+                relPath,
+                diffInput,
+                fileIdx,
+                ctx.absRoot,
+                ctx.fpContext,
+                ctx.opts,
+                ctx.incBucket,
+                ctx.sessionBucket,
+                ctx.perFile,
+                ctx.cache,
+                ctx.routingState,
+                ctx.incEnabled,
+                ctx.incMinLines,
+                statEntry,
+                ctx.scanner,
             );
         } else {
             await processUnchangedFile(
-                relPath, fileIdx, statEntry, ctx.absRoot, ctx.fpContext,
-                ctx.incBucket, ctx.sessionBucket, ctx.perFile, ctx.cache,
-                ctx.routingState, ctx.incEnabled, ctx.incMinLines,
+                relPath,
+                fileIdx,
+                statEntry,
+                ctx.absRoot,
+                ctx.fpContext,
+                ctx.incBucket,
+                ctx.sessionBucket,
+                ctx.perFile,
+                ctx.cache,
+                ctx.routingState,
+                ctx.incEnabled,
+                ctx.incMinLines,
             );
         }
     }
@@ -517,9 +567,10 @@ interface ExecuteDiffPipelinesContext {
     readonly session: ReturnType<typeof createWarmSession>;
 }
 
-async function runDiffPipelines(
-    ctx: ExecuteDiffPipelinesContext,
-): Promise<{ missStats: { analyzed: number; poolWarm: boolean }; incStats: { incrementalFiles: number; incrementalHit: number } }> {
+async function runDiffPipelines(ctx: ExecuteDiffPipelinesContext): Promise<{
+    missStats: { analyzed: number; poolWarm: boolean };
+    incStats: { incrementalFiles: number; incrementalHit: number };
+}> {
     const fpByRel = new Map<string, Fingerprint>(ctx.routingState.l1Fps.map((w) => [w.rel, w.fp]));
     const missStats = await executeDiffMissBatches({
         scanner: ctx.scanner,
@@ -567,9 +618,7 @@ interface DiffReportContext {
     readonly totalAnalyzed: number;
 }
 
-function buildFinalDiffScanReport(
-    ctx: DiffReportContext,
-): ScanReport | DiffDeltaReport {
+function buildFinalDiffScanReport(ctx: DiffReportContext): ScanReport | DiffDeltaReport {
     const { issues, fileMetrics } = aggregateScanResults(ctx.perFile);
     const durationMs = Date.now() - ctx.startTimeMs;
     const report = ctx.scanner.buildReport(ctx.filesCount, issues, fileMetrics, durationMs);
@@ -616,14 +665,34 @@ export async function executeScanWithDiff(
     const routingState = createInitialRoutingState();
 
     await runDiffRoutingPass({
-        absRoot, files, hintsMap: prepared.hintsMap, fpContext, opts,
-        incBucket, sessionBucket, perFile, cache: opts.cache,
-        routingState, incEnabled, incMinLines, scanner,
+        absRoot,
+        files,
+        hintsMap: prepared.hintsMap,
+        fpContext,
+        opts,
+        incBucket,
+        sessionBucket,
+        perFile,
+        cache: opts.cache,
+        routingState,
+        incEnabled,
+        incMinLines,
+        scanner,
     });
 
     const { missStats, incStats } = await runDiffPipelines({
-        scanner, routingState, files, absRoot, cfg, fpContext, opts,
-        sessionBucket, incBucket, perFile, cache: opts.cache, session,
+        scanner,
+        routingState,
+        files,
+        absRoot,
+        cfg,
+        fpContext,
+        opts,
+        sessionBucket,
+        incBucket,
+        perFile,
+        cache: opts.cache,
+        session,
     });
 
     const totalAnalyzed = missStats.analyzed + incStats.incrementalFiles;
@@ -636,8 +705,12 @@ export async function executeScanWithDiff(
         totalAnalyzed,
     });
     const stats = createDiffStats({
-        routingState, totalFiles: files.length, totalAnalyzed,
-        missStats, incStats, diffIgnored: prepared.diffIgnored,
+        routingState,
+        totalFiles: files.length,
+        totalAnalyzed,
+        missStats,
+        incStats,
+        diffIgnored: prepared.diffIgnored,
     });
     return { report, stats };
 }

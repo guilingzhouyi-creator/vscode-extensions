@@ -167,7 +167,9 @@ interface PythonNameContext {
 
 function checkPythonName(params: PythonNameContext): void {
     if (params.name === PY_SELF_NAME || params.name === PY_CLS_NAME) return;
-    const builtinExempt = params.inClassBody || (params.kind === PY_KIND_PARAMETER && PY_PROTOCOL_FIELDS.has(params.name));
+    const builtinExempt =
+        params.inClassBody ||
+        (params.kind === PY_KIND_PARAMETER && PY_PROTOCOL_FIELDS.has(params.name));
     if (!builtinExempt && PY_BUILTIN_NAMES.has(params.name)) {
         params.issues.push(
             params.mkIssue({
@@ -177,7 +179,8 @@ function checkPythonName(params: PythonNameContext): void {
                 message: `Name '${params.name}' shadows a Python builtin`,
                 severity: SEVERITY_WARNING,
                 detail: { file: params.file, name: params.name, kind: params.kind },
-                suggestion: 'Rename the binding (e.g. add a domain qualifier); shadowing builtins hides the standard meaning.',
+                suggestion:
+                    'Rename the binding (e.g. add a domain qualifier); shadowing builtins hides the standard meaning.',
             }),
         );
     }
@@ -190,7 +193,8 @@ function checkPythonName(params: PythonNameContext): void {
                 message: `Single-letter name '${params.name}' hurts readability`,
                 severity: SEVERITY_WARNING,
                 detail: { file: params.file, name: params.name, kind: params.kind },
-                suggestion: "Use a descriptive name; only 'i'/'j'/'k' and '_' are tolerated as throwaways.",
+                suggestion:
+                    "Use a descriptive name; only 'i'/'j'/'k' and '_' are tolerated as throwaways.",
             }),
         );
     }

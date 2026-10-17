@@ -314,7 +314,14 @@ interface FastTrackVerdictContext {
  * @returns Narrowed active analyzer set.
  */
 function computeRefinedActiveAnalyzers(context: RefineAnalyzersContext): Set<string> {
-    const { existingRecord, isTainted, newContent, currentDomains, classification, defaultAnalyzers } = context;
+    const {
+        existingRecord,
+        isTainted,
+        newContent,
+        currentDomains,
+        classification,
+        defaultAnalyzers,
+    } = context;
     if (!existingRecord || isTainted) return defaultAnalyzers;
 
     const matchResult = matchDomains(existingRecord, newContent, currentDomains);
@@ -501,7 +508,9 @@ async function executeDeepTrack(plan: DeepTrackExecutionPlan): Promise<DeepTrack
         escalationEvents,
     });
 
-    const archEnabled = scanner.getPlan().some((planEntry) => planEntry.name === ANALYZER_ARCHITECTURE);
+    const archEnabled = scanner
+        .getPlan()
+        .some((planEntry) => planEntry.name === ANALYZER_ARCHITECTURE);
     if (archEnabled) {
         await checkArchitectureLayerBreaches({
             inputs,
@@ -528,8 +537,11 @@ async function executeDeepTrack(plan: DeepTrackExecutionPlan): Promise<DeepTrack
 /**
  * Detect clean architecture boundary violations where core/domain imports outer layers.
  */
-async function checkArchitectureLayerBreaches(context: ArchitectureBreachCheckContext): Promise<void> {
-    const { inputs, affectedFiles, deepIssues, escalationEvents, channel, memory, trajectory } = context;
+async function checkArchitectureLayerBreaches(
+    context: ArchitectureBreachCheckContext,
+): Promise<void> {
+    const { inputs, affectedFiles, deepIssues, escalationEvents, channel, memory, trajectory } =
+        context;
 
     for (const input of inputs) {
         if (!ARCH_CORE_DOMAIN_PATH_RE.test(input.filePath)) {
@@ -600,7 +612,8 @@ function resolveActiveAnalyzersForFile(context: ResolveAnalyzersContext): {
     const currentDomains = extractCodeDomains(undefined, newContent);
     const existingRecord = memory.get(filePath);
     const isTainted =
-        existingRecord?.status === STATUS_REJECTED || existingRecord?.status === STATUS_CONTAMINATED;
+        existingRecord?.status === STATUS_REJECTED ||
+        existingRecord?.status === STATUS_CONTAMINATED;
 
     const activeAnalyzers = computeRefinedActiveAnalyzers({
         existingRecord,
@@ -633,7 +646,11 @@ async function auditSingleFileInput(context: AuditFileInputContext): Promise<voi
         context.acc.fastMetrics.push(fileResult.metric);
     }
 
-    const scoreBreakdown = context.scorer.evaluateFile(inputTarget.filePath, fileResult.issues, fileResult.metric);
+    const scoreBreakdown = context.scorer.evaluateFile(
+        inputTarget.filePath,
+        fileResult.issues,
+        fileResult.metric,
+    );
     context.acc.lastScoreBreakdown = scoreBreakdown;
 
     runMemoryAndTrajectoryRecording({
