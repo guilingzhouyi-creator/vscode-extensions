@@ -12,19 +12,18 @@
  * Exit Semantics & Design Rationale: Pure functional helper populating Issue[] with zero I/O.
  */
 
-import type { AnalyzerContext, Issue } from '../core/types';
-import { SEVERITY_WARNING } from '../core/types';
+import type { AnalyzerContext, Issue, Severity } from '../core/types';
 
 /** Callback factory for instantiating canonical Issue records. */
-export type HygieneIssueFactory = (
-    ctx: AnalyzerContext,
-    lineIdx: number,
-    rule: string,
-    message: string,
-    severity: 'info' | typeof SEVERITY_WARNING | 'error',
-    detail: Record<string, unknown>,
-    suggestion?: string,
-) => Issue;
+export type HygieneIssueFactory = (params: {
+    ctx: AnalyzerContext;
+    lineIdx: number;
+    rule: string;
+    message: string;
+    severity: Severity;
+    detail: Record<string, unknown>;
+    suggestion?: string;
+}) => Issue;
 
 const PY_BUILTIN_NAMES = new Set([
     'abs',
@@ -102,13 +101,19 @@ const PY_BUILTIN_NAMES = new Set([
 const PY_PROTOCOL_FIELDS = new Set(['id', 'type', 'help', 'format', 'input', 'next']);
 const PY_SHORT_ALLOWED = new Set(['i', 'j', 'k', '_']);
 const PY_EXCEPT_NAME = 'exc';
+const PY_SELF_NAME = 'self';
+const PY_CLS_NAME = 'cls';
+const PY_KIND_CLASS = 'class';
+const PY_KIND_DEF = 'def';
+const PY_KIND_PARAMETER = 'parameter';
+const PY_BINDING_ASSIGNMENT = 'assignment';
+const SEVERITY_WARNING: Severity = 'warning';
 const PY_ASSIGN_RE = /^([A-Za-z_]\w*)\s*(?::[^=]+)?=(?!=)/;
 const PY_FOR_RE = /^for\s+([A-Za-z_]\w*)\s+in\b/;
 const PY_EXCEPT_AS_RE = /^except\b[^:]*\bas\s+([A-Za-z_]\w*)\s*:/;
 const PY_CLASS_RE = /^class\s+[A-Za-z_]\w*/;
 const PY_DEF_LINE_RE = /^(?:async\s+)?def\s+[A-Za-z_]\w*\s*\(([^)]*)\)/;
 const PY_WITH_AS_RE = /\bas\s+([A-Za-z_]\w*)\s*(?:,|:)/g;
-const PY_BINDING_ASSIGNMENT = 'assignment';
 
 function updateDocstringState(
     line: string,
@@ -133,11 +138,14 @@ function updateBlockNesting(
     indent: number,
     blocks: Array<{ indent: number; kind: 'class' | 'def' }>,
 ): boolean {
-    while (blocks.length > 0 && indent <= blocks[blocks.length - 1].indent) blocks.pop();
-    return blocks.length > 0 && blocks[blocks.length - 1].kind === 'class';
+    while (blocks.length > 0 && indent <= (blocks[blocks.length - 1]?.indent ?? -1)) {
+        blocks.pop();
+    }
+    const current = blocks[blocks.length - 1];
+    return Boolean(current && current.kind === PY_KIND_CLASS);
 }
 
-function bracketDelta(code: string): number {
+function computeBracketDelta(code: string): number {
     let depth = 0;
     for (const ch of code) {
         if (ch === '(' || ch === '[' || ch === '{') depth++;
@@ -146,167 +154,172 @@ function bracketDelta(code: string): number {
     return depth;
 }
 
-function checkPythonName(
-    lineIdx: number,
-    name: string,
-    kind: typeof PY_BINDING_ASSIGNMENT | 'parameter',
-    inClassBody: boolean,
-    file: string,
-    ctx: AnalyzerContext,
-    mkIssue: HygieneIssueFactory,
-    issues: Issue[],
-): void {
-    if (name === 'self' || name === 'cls') return;
-    const builtinExempt = inClassBody || (kind === 'parameter' && PY_PROTOCOL_FIELDS.has(name));
-    if (!builtinExempt && PY_BUILTIN_NAMES.has(name)) {
-        issues.push(
-            mkIssue(
-                ctx,
-                lineIdx,
-                'HYG-BLT-001',
-                `Name '${name}' shadows a Python builtin`,
-                SEVERITY_WARNING,
-                { file, name, kind },
-                'Rename the binding (e.g. add a domain qualifier); shadowing builtins hides the standard meaning.',
-            ),
+interface PythonNameContext {
+    readonly lineIdx: number;
+    readonly name: string;
+    readonly kind: typeof PY_BINDING_ASSIGNMENT | typeof PY_KIND_PARAMETER;
+    readonly inClassBody: boolean;
+    readonly file: string;
+    readonly ctx: AnalyzerContext;
+    readonly mkIssue: HygieneIssueFactory;
+    readonly issues: Issue[];
+}
+
+function checkPythonName(params: PythonNameContext): void {
+    if (params.name === PY_SELF_NAME || params.name === PY_CLS_NAME) return;
+    const builtinExempt = params.inClassBody || (params.kind === PY_KIND_PARAMETER && PY_PROTOCOL_FIELDS.has(params.name));
+    if (!builtinExempt && PY_BUILTIN_NAMES.has(params.name)) {
+        params.issues.push(
+            params.mkIssue({
+                ctx: params.ctx,
+                lineIdx: params.lineIdx,
+                rule: 'HYG-BLT-001',
+                message: `Name '${params.name}' shadows a Python builtin`,
+                severity: SEVERITY_WARNING,
+                detail: { file: params.file, name: params.name, kind: params.kind },
+                suggestion: 'Rename the binding (e.g. add a domain qualifier); shadowing builtins hides the standard meaning.',
+            }),
         );
     }
-    if (name.length === 1 && !PY_SHORT_ALLOWED.has(name)) {
-        issues.push(
-            mkIssue(
-                ctx,
-                lineIdx,
-                'HYG-SGL-001',
-                `Single-letter name '${name}' hurts readability`,
-                SEVERITY_WARNING,
-                { file, name, kind },
-                "Use a descriptive name; only 'i'/'j'/'k' and '_' are tolerated as throwaways.",
-            ),
+    if (params.name.length === 1 && !PY_SHORT_ALLOWED.has(params.name)) {
+        params.issues.push(
+            params.mkIssue({
+                ctx: params.ctx,
+                lineIdx: params.lineIdx,
+                rule: 'HYG-SGL-001',
+                message: `Single-letter name '${params.name}' hurts readability`,
+                severity: SEVERITY_WARNING,
+                detail: { file: params.file, name: params.name, kind: params.kind },
+                suggestion: "Use a descriptive name; only 'i'/'j'/'k' and '_' are tolerated as throwaways.",
+            }),
         );
     }
 }
 
-function auditPythonDefParameters(
-    rawArgsList: string,
-    lineIdx: number,
-    file: string,
-    ctx: AnalyzerContext,
-    mkIssue: HygieneIssueFactory,
-    issues: Issue[],
-): void {
-    for (const rawArg of rawArgsList.split(',')) {
+interface PythonDefContext {
+    readonly rawArgsList: string;
+    readonly lineIdx: number;
+    readonly file: string;
+    readonly ctx: AnalyzerContext;
+    readonly mkIssue: HygieneIssueFactory;
+    readonly issues: Issue[];
+}
+
+function auditPythonDefParameters(params: PythonDefContext): void {
+    for (const rawArg of params.rawArgsList.split(',')) {
         const cleaned = rawArg.trim().replace(/^\*{0,2}/, '');
         const name = cleaned.split(/[:=]/)[0].trim();
         if (!name || name === '/') continue;
-        checkPythonName(lineIdx, name, 'parameter', false, file, ctx, mkIssue, issues);
+        checkPythonName({
+            lineIdx: params.lineIdx,
+            name,
+            kind: PY_KIND_PARAMETER,
+            inClassBody: false,
+            file: params.file,
+            ctx: params.ctx,
+            mkIssue: params.mkIssue,
+            issues: params.issues,
+        });
     }
 }
 
-function auditPythonWithBindings(
-    trimmed: string,
-    lineIdx: number,
-    inClassBody: boolean,
-    file: string,
-    ctx: AnalyzerContext,
-    mkIssue: HygieneIssueFactory,
-    issues: Issue[],
+interface PythonLineContext {
+    readonly trimmed: string;
+    readonly lineIdx: number;
+    readonly inClassBody: boolean;
+    readonly file: string;
+    readonly ctx: AnalyzerContext;
+    readonly mkIssue: HygieneIssueFactory;
+    readonly issues: Issue[];
+}
+
+function dispatchNameCheck(
+    lineCtx: PythonLineContext,
+    targetName: string,
+    bindingKind: typeof PY_BINDING_ASSIGNMENT | typeof PY_KIND_PARAMETER = PY_BINDING_ASSIGNMENT,
 ): void {
+    checkPythonName({
+        lineIdx: lineCtx.lineIdx,
+        name: targetName,
+        kind: bindingKind,
+        inClassBody: lineCtx.inClassBody,
+        file: lineCtx.file,
+        ctx: lineCtx.ctx,
+        mkIssue: lineCtx.mkIssue,
+        issues: lineCtx.issues,
+    });
+}
+
+function auditPythonWithBindings(params: PythonLineContext): void {
     PY_WITH_AS_RE.lastIndex = 0;
     let match: RegExpExecArray | null;
-    while ((match = PY_WITH_AS_RE.exec(trimmed)) !== null) {
-        checkPythonName(
-            lineIdx,
-            match[1],
-            PY_BINDING_ASSIGNMENT,
-            inClassBody,
-            file,
-            ctx,
-            mkIssue,
-            issues,
-        );
+    while ((match = PY_WITH_AS_RE.exec(params.trimmed)) !== null) {
+        dispatchNameCheck(params, match[1]);
     }
 }
 
-function auditPythonLineBindings(
-    trimmed: string,
-    lineIdx: number,
-    inClassBody: boolean,
-    file: string,
-    ctx: AnalyzerContext,
-    mkIssue: HygieneIssueFactory,
-    issues: Issue[],
-): void {
-    const exceptMatch = PY_EXCEPT_AS_RE.exec(trimmed);
+function auditPythonLineBindings(params: PythonLineContext): void {
+    const exceptMatch = PY_EXCEPT_AS_RE.exec(params.trimmed);
     if (exceptMatch && exceptMatch[1] !== PY_EXCEPT_NAME) {
-        issues.push(
-            mkIssue(
-                ctx,
-                lineIdx,
-                'HYG-EXC-001',
-                `Exception variable '${exceptMatch[1]}' should be named '${PY_EXCEPT_NAME}'`,
-                SEVERITY_WARNING,
-                { file, name: exceptMatch[1] },
-                `Rename the handler binding to '${PY_EXCEPT_NAME}' so error-handling code reads uniformly.`,
-            ),
+        params.issues.push(
+            params.mkIssue({
+                ctx: params.ctx,
+                lineIdx: params.lineIdx,
+                rule: 'HYG-EXC-001',
+                message: `Exception variable '${exceptMatch[1]}' should be named '${PY_EXCEPT_NAME}'`,
+                severity: SEVERITY_WARNING,
+                detail: { file: params.file, name: exceptMatch[1] },
+                suggestion: `Rename the handler binding to '${PY_EXCEPT_NAME}' so error-handling code reads uniformly.`,
+            }),
         );
     }
 
-    const defMatch = PY_DEF_LINE_RE.exec(trimmed);
+    const defMatch = PY_DEF_LINE_RE.exec(params.trimmed);
     if (defMatch) {
-        auditPythonDefParameters(defMatch[1], lineIdx, file, ctx, mkIssue, issues);
+        auditPythonDefParameters({
+            rawArgsList: defMatch[1],
+            lineIdx: params.lineIdx,
+            file: params.file,
+            ctx: params.ctx,
+            mkIssue: params.mkIssue,
+            issues: params.issues,
+        });
     }
 
-    const assignMatch = PY_ASSIGN_RE.exec(trimmed);
+    const assignMatch = PY_ASSIGN_RE.exec(params.trimmed);
     if (assignMatch) {
-        checkPythonName(
-            lineIdx,
-            assignMatch[1],
-            PY_BINDING_ASSIGNMENT,
-            inClassBody,
-            file,
-            ctx,
-            mkIssue,
-            issues,
-        );
+        dispatchNameCheck(params, assignMatch[1]);
     }
 
-    const forMatch = PY_FOR_RE.exec(trimmed);
+    const forMatch = PY_FOR_RE.exec(params.trimmed);
     if (forMatch) {
-        checkPythonName(
-            lineIdx,
-            forMatch[1],
-            PY_BINDING_ASSIGNMENT,
-            inClassBody,
-            file,
-            ctx,
-            mkIssue,
-            issues,
-        );
+        dispatchNameCheck(params, forMatch[1]);
     }
 
-    if (/^(?:async\s+)?with\b/.test(trimmed)) {
-        auditPythonWithBindings(trimmed, lineIdx, inClassBody, file, ctx, mkIssue, issues);
+    if (/^(?:async\s+)?with\b/.test(params.trimmed)) {
+        auditPythonWithBindings(params);
     }
+}
+
+/**
+ * Context object for executing Python naming hygiene analysis.
+ */
+export interface PythonHygieneContext {
+    readonly content: string;
+    readonly file: string;
+    readonly ctx: AnalyzerContext;
+    readonly mkIssue: HygieneIssueFactory;
+    readonly issues: Issue[];
 }
 
 /**
  * Audit Python naming hygiene: builtin shadowing (HYG-BLT-001), single-letter names
  * (HYG-SGL-001) and exception-variable naming (HYG-EXC-001).
  *
- * @param content - Raw Python source text.
- * @param file - Normalized file path.
- * @param ctx - Analyzer context.
- * @param mkIssue - Issue factory callback.
- * @param issues - Accumulator for emitted issues.
+ * @param params - Execution context containing source content, file path, and callbacks.
  */
-export function auditPythonHygiene(
-    content: string,
-    file: string,
-    ctx: AnalyzerContext,
-    mkIssue: HygieneIssueFactory,
-    issues: Issue[],
-): void {
-    const lines = content.split('\n');
+export function auditPythonHygiene(params: PythonHygieneContext): void {
+    const lines = params.content.split('\n');
     const blocks: Array<{ indent: number; kind: 'class' | 'def' }> = [];
     let inTriple: '"' | "'" | null = null;
     let bracketDepth = 0;
@@ -322,7 +335,7 @@ export function auditPythonHygiene(
 
         const depthAtStart = bracketDepth;
         const codeOnly = trimmed.split('#')[0];
-        bracketDepth += bracketDelta(codeOnly);
+        bracketDepth += computeBracketDelta(codeOnly);
 
         const indent = line.length - line.trimStart().length;
         const inClassBody = updateBlockNesting(indent, blocks);
@@ -330,9 +343,17 @@ export function auditPythonHygiene(
         // Inside an open call/collection every `name=` is a keyword argument, not a binding.
         if (depthAtStart > 0) continue;
 
-        auditPythonLineBindings(trimmed, i, inClassBody, file, ctx, mkIssue, issues);
+        auditPythonLineBindings({
+            trimmed,
+            lineIdx: i,
+            inClassBody,
+            file: params.file,
+            ctx: params.ctx,
+            mkIssue: params.mkIssue,
+            issues: params.issues,
+        });
 
-        if (PY_CLASS_RE.test(trimmed)) blocks.push({ indent, kind: 'class' });
-        else if (PY_DEF_LINE_RE.test(trimmed)) blocks.push({ indent, kind: 'def' });
+        if (PY_CLASS_RE.test(trimmed)) blocks.push({ indent, kind: PY_KIND_CLASS });
+        else if (PY_DEF_LINE_RE.test(trimmed)) blocks.push({ indent, kind: PY_KIND_DEF });
     }
 }

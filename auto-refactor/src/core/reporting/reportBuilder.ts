@@ -51,6 +51,30 @@ const UNMEASURED_TOKEN = 'unmeasured';
 /** Default agent identity recorded when the config carries no explicit agent uid. */
 const DEFAULT_AGENT_UID = 'default-agent';
 
+const MATURITY_INDUSTRIAL = 'industrial';
+const MATURITY_DEMO = 'demo';
+const MATURITY_PROTOTYPE = 'prototype';
+const STAGE_INDUSTRIAL_INFRA = 'industrial_infrastructure';
+const STAGE_PROTOTYPE = 'prototype';
+const STAGE_PRODUCTION = 'production';
+
+const SCALE_ENTERPRISE = 'enterprise';
+const SCALE_GRADE_LARGE = 'large';
+const SCALE_GRADE_MEDIUM = 'medium';
+const SCALE_MASSIVE = 'massive';
+const SCALE_LARGE = 'large';
+const SCALE_MEDIUM = 'medium';
+const SCALE_SMALL = 'small';
+
+const ARCHETYPE_LIBRARY = 'library';
+const ARCHETYPE_GAME = 'game';
+const ARCHETYPE_WEB = 'web';
+const DOMAIN_CORE_FRAMEWORK = 'core_framework';
+const DOMAIN_ALGORITHM_LIB = 'algorithm_lib';
+const DOMAIN_BUSINESS_APP = 'business_app';
+
+const DEFAULT_PERFECT_SCORE = 100.0;
+
 /**
  * Scanner collaborators the report builder needs: the effective config plus the per-instance
  * scorers and cross-file stores filled during the scan.
@@ -72,17 +96,40 @@ interface IssueTallies {
 }
 
 /**
+ * Context parameters required to build the scan summary section.
+ */
+export interface BuildSummaryContext {
+    readonly host: ReportHost;
+    readonly filesScanned: number;
+    readonly issues: Issue[];
+    readonly fileMetrics: FileMetric[];
+    readonly durationMs: number;
+    readonly tallies: IssueTallies;
+}
+
+/**
+ * Context parameters required to build the unified ScanReport.
+ */
+export interface BuildScanReportContext {
+    readonly host: ReportHost;
+    readonly filesScanned: number;
+    readonly issues: Issue[];
+    readonly fileMetrics: FileMetric[];
+    readonly durationMs: number;
+}
+
+/**
  * Tally issues per severity and per analyzer for the report summary.
  *
  * @param issues - Aggregated issues of this scan.
  * @returns Severity and analyzer counters, both zero-initialized.
  */
-function tallyIssues(issues: Issue[]): IssueTallies {
+function computeTallyIssues(issues: Issue[]): IssueTallies {
     const bySeverity: Record<Severity, number> = { info: 0, warning: 0, error: 0 };
     const byAnalyzer: Record<string, number> = {};
-    for (const it of issues) {
-        bySeverity[it.severity]++;
-        byAnalyzer[it.analyzer] = (byAnalyzer[it.analyzer] || 0) + 1;
+    for (const issueItem of issues) {
+        bySeverity[issueItem.severity]++;
+        byAnalyzer[issueItem.analyzer] = (byAnalyzer[issueItem.analyzer] || 0) + 1;
     }
     return { bySeverity, byAnalyzer };
 }
@@ -94,15 +141,15 @@ function tallyIssues(issues: Issue[]): IssueTallies {
  * @returns Map keyed by file path; issues without a location are skipped.
  */
 function groupIssuesByFile(issues: Issue[]): Map<string, Issue[]> {
-    const byFile = new Map<string, Issue[]>();
-    for (const it of issues) {
-        const f = it.location?.file;
-        if (!f) continue;
-        const list = byFile.get(f);
-        if (list) list.push(it);
-        else byFile.set(f, [it]);
+    const issuesByFileMap = new Map<string, Issue[]>();
+    for (const issueItem of issues) {
+        const filePath = issueItem.location?.file;
+        if (!filePath) continue;
+        const list = issuesByFileMap.get(filePath);
+        if (list) list.push(issueItem);
+        else issuesByFileMap.set(filePath, [issueItem]);
     }
-    return byFile;
+    return issuesByFileMap;
 }
 
 /**
@@ -122,18 +169,29 @@ function buildMemoryRecord(
 ): ReviewMemoryRecord {
     const cfg = host.config;
     const lastAudited = Date.now();
+    const calculatedFileHash = sha256Hex(metric.file + ':' + metric.lines);
+    const astDigest = computeAstDigest(undefined, metric.file);
+    const codeDomains = extractCodeDomains(undefined, '', fileIssues);
+    const revisionHash = sha256Hex(
+        metric.file +
+            ':' +
+            (Number.isFinite(score.compositeScore) ? score.compositeScore : UNMEASURED_TOKEN) +
+            ':' +
+            lastAudited,
+    );
+
     return {
         filePath: metric.file,
-        fileHash: sha256Hex(metric.file + ':' + metric.lines),
-        astDigest: computeAstDigest(undefined, metric.file),
-        codeDomains: extractCodeDomains(undefined, '', fileIssues),
-        ruleHits: fileIssues.map((it) => ({
-            id: it.id,
-            analyzer: it.analyzer,
-            rule: it.rule,
-            severity: it.severity,
-            line: it.location?.start?.line ?? 1,
-            message: it.message,
+        fileHash: calculatedFileHash,
+        astDigest,
+        codeDomains,
+        ruleHits: fileIssues.map((issueItem) => ({
+            id: issueItem.id,
+            analyzer: issueItem.analyzer,
+            rule: issueItem.rule,
+            severity: issueItem.severity,
+            line: issueItem.location?.start?.line ?? 1,
+            message: issueItem.message,
         })),
         qualityScores: score,
         lastAudited,
@@ -141,13 +199,7 @@ function buildMemoryRecord(
         // containing "NaN", which is not a stable identity: two identical unmeasured states
         // are indistinguishable from two different ones. A fixed token keeps the id
         // deterministic while still distinguishing measured from unmeasured revisions.
-        revisionId: sha256Hex(
-            metric.file +
-                ':' +
-                (Number.isFinite(score.compositeScore) ? score.compositeScore : UNMEASURED_TOKEN) +
-                ':' +
-                lastAudited,
-        ).slice(0, REVISION_ID_LENGTH),
+        revisionId: revisionHash.slice(0, REVISION_ID_LENGTH),
         agentUid: cfg.agentUid || DEFAULT_AGENT_UID,
         contextWindows: {
             imports: [],
@@ -198,10 +250,7 @@ const EMPTY_FILE_ISSUES: readonly Issue[] = Object.freeze([]);
  */
 function resolveFileIssues(issuesByFile: Map<string, Issue[]>, file: string): Issue[] {
     const list = issuesByFile.get(file);
-    if (list !== undefined) {
-        return list;
-    }
-    return EMPTY_FILE_ISSUES as unknown as Issue[];
+    return list !== undefined ? list : (EMPTY_FILE_ISSUES as unknown as Issue[]);
 }
 
 /**
@@ -230,75 +279,49 @@ function collectFileQuality(
 /**
  * Assemble the summary block of the report, including coverage and index statistics.
  *
- * @param host - Report host carrying the config and the cross-file stores.
- * @param filesScanned - Total count of files scanned.
- * @param issues - Aggregated issues of this scan.
- * @param fileMetrics - Per-file metric records of this scan.
- * @param durationMs - Total scan duration in milliseconds.
- * @param tallies - Precomputed severity/analyzer counters.
+ * @param params - Summary execution context.
  * @returns The summary object embedded in the final report.
  */
-function buildSummary(
-    host: ReportHost,
-    filesScanned: number,
-    issues: Issue[],
-    fileMetrics: FileMetric[],
-    durationMs: number,
-    tallies: IssueTallies,
-): ScanReport['summary'] {
+function buildSummary(params: BuildSummaryContext): ScanReport['summary'] {
+    const uncertaintySummary = summarizeUncertainty(params.issues);
     return {
-        filesScanned,
-        issuesTotal: issues.length,
-        bySeverity: tallies.bySeverity,
-        byAnalyzer: tallies.byAnalyzer,
-        durationMs,
-        symbolIndex: host.symbolIndex.stats(),
-        literalIndex: host.literalIndex.stats(),
-        callGraph: new CallGraph(host.symbolIndex).stats(),
-        activatedReviewers: host.activatedReviewers,
-        uncertainty: summarizeUncertainty(issues),
-        ...analyzerCoverage(host.config, fileMetrics),
+        filesScanned: params.filesScanned,
+        issuesTotal: params.issues.length,
+        bySeverity: params.tallies.bySeverity,
+        byAnalyzer: params.tallies.byAnalyzer,
+        durationMs: params.durationMs,
+        symbolIndex: params.host.symbolIndex.stats(),
+        literalIndex: params.host.literalIndex.stats(),
+        callGraph: new CallGraph(params.host.symbolIndex).stats(),
+        activatedReviewers: params.host.activatedReviewers,
+        uncertainty: uncertaintySummary,
+        ...analyzerCoverage(params.host.config, params.fileMetrics),
     };
 }
 
-/**
- * Build the unified ScanReport from scanned files, collected issues, and metrics.
- *
- * A scan is the natural durability boundary for review memory: the records are upserted while
- * the report is assembled, so the buffered audits are written (and the log compacted) exactly
- * once here, at the end — flushing at the start would have written the PREVIOUS scan's batch and
- * left this one in memory.
- *
- * @param host - Report host carrying the config, scorer, stores, and memory managers.
- * @param filesScanned - Total count of files scanned.
- * @param issues - Aggregated issues list.
- * @param fileMetrics - Per-file metric records.
- * @param durationMs - Total scan duration in milliseconds.
- * @returns Assembled ScanReport structure.
- */
 /**
  * Map ScanConfig profile, scale, maturity, and archetype to GovernanceProjectProfile.
  */
 function resolveGovernanceProfile(cfg: ScanConfig): GovernanceProjectProfile {
     const stage: GovernanceProjectProfile['stage'] =
-        cfg.maturityTier === 'industrial'
-            ? 'industrial_infrastructure'
-            : cfg.maturityTier === 'demo' || cfg.maturityTier === 'prototype'
-              ? 'prototype'
-              : 'production';
+        cfg.maturityTier === MATURITY_INDUSTRIAL
+            ? STAGE_INDUSTRIAL_INFRA
+            : cfg.maturityTier === MATURITY_DEMO || cfg.maturityTier === MATURITY_PROTOTYPE
+              ? STAGE_PROTOTYPE
+              : STAGE_PRODUCTION;
 
     const scale: GovernanceProjectProfile['scale'] =
-        cfg.scaleGrade === 'enterprise'
-            ? 'massive'
-            : cfg.scaleGrade === 'large'
-              ? 'large'
-              : cfg.scaleGrade === 'medium'
-                ? 'medium'
-                : 'small';
+        cfg.scaleGrade === SCALE_ENTERPRISE
+            ? SCALE_MASSIVE
+            : cfg.scaleGrade === SCALE_GRADE_LARGE
+              ? SCALE_LARGE
+              : cfg.scaleGrade === SCALE_GRADE_MEDIUM
+                ? SCALE_MEDIUM
+                : SCALE_SMALL;
 
-    let domain: GovernanceProjectProfile['domain'] = 'core_framework';
-    if (cfg.archetype === 'library') domain = 'algorithm_lib';
-    else if (cfg.archetype === 'game' || cfg.archetype === 'web') domain = 'business_app';
+    let domain: GovernanceProjectProfile['domain'] = DOMAIN_CORE_FRAMEWORK;
+    if (cfg.archetype === ARCHETYPE_LIBRARY) domain = DOMAIN_ALGORITHM_LIB;
+    else if (cfg.archetype === ARCHETYPE_GAME || cfg.archetype === ARCHETYPE_WEB) domain = DOMAIN_BUSINESS_APP;
 
     return { stage, scale, domain };
 }
@@ -306,29 +329,20 @@ function resolveGovernanceProfile(cfg: ScanConfig): GovernanceProjectProfile {
 /**
  * Assembles the final unified ScanReport including summaries, quality scores, and issues.
  *
- * @param host - Reporting host providing configuration and scorers.
- * @param filesScanned - Total count of inspected files.
- * @param issues - Complete list of detected issues.
- * @param fileMetrics - Per-file complexity and LOC metrics.
- * @param durationMs - Total wall-clock scan duration in milliseconds.
+ * @param params - Scan report construction context.
  * @returns Fully constructed ScanReport object.
  */
-export function buildScanReport(
-    host: ReportHost,
-    filesScanned: number,
-    issues: Issue[],
-    fileMetrics: FileMetric[],
-    durationMs: number,
-): ScanReport {
+export function buildScanReport(params: BuildScanReportContext): ScanReport {
+    const host = params.host;
     const cfg = host.config;
-    const tallies = tallyIssues(issues);
-    const issuesByFile = groupIssuesByFile(issues);
-    const fileQualityScores = collectFileQuality(host, fileMetrics, issuesByFile);
+    const tallies = computeTallyIssues(params.issues);
+    const issuesByFile = groupIssuesByFile(params.issues);
+    const fileQualityScores = collectFileQuality(host, params.fileMetrics, issuesByFile);
     const projectQualityScore = host.scorer.evaluateProject(
         fileQualityScores,
-        fileMetrics,
+        params.fileMetrics,
         cfg,
-        issues,
+        params.issues,
     );
     const staticVector = synthesizeStaticQualityVector(projectQualityScore.indices);
     const dynamicTelemetry = cfg.telemetryData;
@@ -338,21 +352,30 @@ export function buildScanReport(
     const triPlaneQuality = computeUnifiedQualityScore(
         staticVector,
         dynamicVector,
-        100.0,
+        DEFAULT_PERFECT_SCORE,
         resolveGovernanceProfile(cfg),
     );
-    const autonomy = evaluateProjectAutonomy(fileMetrics, issues, cfg, undefined, host.symbolIndex);
+    const autonomy = evaluateProjectAutonomy(params.fileMetrics, params.issues, cfg, undefined, host.symbolIndex);
 
     host.reviewMemory.flush();
+    const runnerToolName = TOOL_NAME;
+    const runnerToolVersion = TOOL_VERSION;
     return {
-        tool: TOOL_NAME,
-        version: TOOL_VERSION,
+        tool: runnerToolName,
+        version: runnerToolVersion,
         generatedAt: new Date().toISOString(),
         root: path.resolve(cfg.root),
         config: cfg,
-        summary: buildSummary(host, filesScanned, issues, fileMetrics, durationMs, tallies),
-        issues,
-        fileMetrics,
+        summary: buildSummary({
+            host,
+            filesScanned: params.filesScanned,
+            issues: params.issues,
+            fileMetrics: params.fileMetrics,
+            durationMs: params.durationMs,
+            tallies,
+        }),
+        issues: params.issues,
+        fileMetrics: params.fileMetrics,
         qualityScore: projectQualityScore,
         fileQualityScores,
         triPlaneQuality,

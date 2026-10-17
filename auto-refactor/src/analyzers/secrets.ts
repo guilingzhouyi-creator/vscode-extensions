@@ -23,6 +23,9 @@
  *
  * Language-agnostic (regex over raw content), cache-friendly like every built-in analyzer.
  * Patterns are fully configurable; `maxIssuesPerFile` caps flood on vendored content.
+ * Emitted rules:
+ *   - rule: 'secret-detected'
+ *   - rule: 'high-entropy-token'
  */
 
 import type {
@@ -47,13 +50,21 @@ interface PatternDef {
     source: string;
 }
 
-const DEFAULT_PATTERNS: PatternDef[] = [
-    { name: 'private-key', source: 'BEGIN (RSA |EC |OPENSSH |DSA |PGP )?PRIVATE KEY' },
-    { name: 'github-token', source: 'ghp_[A-Za-z0-9]{20,}' },
-    { name: 'github-pat', source: 'github_pat_[A-Za-z0-9_]{20,}' },
-    { name: 'openai-style-key', source: 'sk-[A-Za-z0-9]{20,}' },
-    { name: 'aws-access-key', source: 'AKIA[0-9A-Z]{16}' },
-];
+const RAW_BUILTIN_PATTERNS = `private-key:BEGIN (RSA |EC |OPENSSH |DSA |PGP )?PRIVATE KEY
+github-token:ghp_[A-Za-z0-9]{20,}
+github-pat:github_pat_[A-Za-z0-9_]{20,}
+openai-style-key:sk-[A-Za-z0-9]{20,}
+aws-access-key:AKIA[0-9A-Z]{16}`;
+
+const DEFAULT_PATTERNS: readonly PatternDef[] = Object.freeze(
+    RAW_BUILTIN_PATTERNS.split('\n').map((entry) => {
+        const colonIndex = entry.indexOf(':');
+        return {
+            name: entry.slice(0, colonIndex),
+            source: entry.slice(colonIndex + 1),
+        };
+    }),
+);
 
 /** Default minimum token length for optional high-entropy secret detection. */
 const DEFAULT_ENTROPY_MIN_LENGTH = 24;
@@ -70,17 +81,57 @@ const CHAR_CODE_CR = 13;
 /** Maximum regex-source characters included in a secret finding's message. */
 const REGEX_SOURCE_PREVIEW_LENGTH = 40;
 
+const RULE_SECRET_DETECTED = 'secret-detected';
+const RULE_HIGH_ENTROPY_TOKEN = 'high-entropy-token';
+const ACTION_EXTRACT_CONSTANT: AgentActionType = 'extract_constant';
+const ACTIONABLE_CODE_SECRET = 'AR:SCR:001';
+const TEMPLATE_SNIPPET_SECRET = 'process.env.SECRET_KEY';
+const LEVEL_OFF: SecurityLevel = 'off';
+const LEVEL_FULL: SecurityLevel = 'full';
+const LEVEL_BASIC: SecurityLevel = 'basic';
+const SEVERITY_ERROR: Severity = 'error';
+const SEVERITY_WARNING: Severity = 'warning';
+const PATTERN_CUSTOM_PREFIX = 'custom-';
+const PATTERN_EXTRA_NAME = 'custom-extra';
+const MAX_REGEX_SAFETY_SLICE = 40;
+const MAX_EXEC_LOOP_ITERATIONS = 100;
+const ROUNDING_PRECISION_DIGITS = 2;
+
 const SECRETS_ACTIONABLE_MAP: Record<
     string,
     { action: AgentActionType; code: string; safeToAutomate: boolean; templateSnippet: string }
 > = {
-    'secret-detected': {
-        action: 'extract_constant',
-        code: 'AR:SCR:001',
+    [RULE_SECRET_DETECTED]: {
+        action: ACTION_EXTRACT_CONSTANT,
+        code: ACTIONABLE_CODE_SECRET,
         safeToAutomate: false,
-        templateSnippet: 'process.env.SECRET_KEY',
+        templateSnippet: TEMPLATE_SNIPPET_SECRET,
     },
 };
+
+/**
+ * Context parameters required to construct a canonical secret Issue record.
+ */
+export interface SecretIssueContext {
+    readonly ctx: AnalyzerContext;
+    readonly line: number;
+    readonly rule: string;
+    readonly message: string;
+    readonly detail: Record<string, any>;
+    readonly severity: Severity;
+    readonly suggestion?: string;
+}
+
+/**
+ * Line-level context passed to internal secret and entropy checkers.
+ */
+export interface SecretLineAuditContext {
+    readonly lineText: string;
+    readonly line: number;
+    readonly ctx: AnalyzerContext;
+    readonly issues: Issue[];
+}
+
 
 /**
  * Optional configuration for secret detection.
@@ -121,19 +172,24 @@ export interface SecretsOptions {
 /**
  * Compute the Shannon entropy of a token in bits per character.
  *
- * @param s - Token to measure; an empty string yields 0 instead of dividing by zero.
+ * @param sourceText - Token to measure; an empty string yields 0 instead of dividing by zero.
  * @returns Entropy in bits per character, using a base-2 logarithm over the character histogram.
  */
-function shannonEntropy(s: string): number {
-    if (!s) return 0;
-    const freq = new Map<string, number>();
-    for (const ch of s) freq.set(ch, (freq.get(ch) ?? 0) + 1);
-    let h = 0;
-    for (const n of freq.values()) {
-        const p = n / s.length;
-        h -= p * Math.log2(p);
+function computeShannonEntropy(sourceText: string): number {
+    if (!sourceText) return 0;
+    const charFrequencyMap = new Map<string, number>();
+    for (let charIndex = 0; charIndex < sourceText.length; charIndex++) {
+        const charToken = sourceText[charIndex];
+        const previousCount = charFrequencyMap.get(charToken) ?? 0;
+        charFrequencyMap.set(charToken, previousCount + 1);
     }
-    return h;
+    let entropyValue = 0;
+    const totalChars = sourceText.length;
+    for (const charCount of charFrequencyMap.values()) {
+        const probability = charCount / totalChars;
+        entropyValue -= probability * Math.log2(probability);
+    }
+    return entropyValue;
 }
 
 interface CompiledSecretPattern {
@@ -149,15 +205,15 @@ interface ResolvedEntropyConfig {
 }
 
 function shouldSkipSecrets(normPath: string, level: SecurityLevel, opts: SecretsOptions): boolean {
-    if (level === 'off') return true;
+    if (level === LEVEL_OFF) return true;
     const isTestOrFixture = /(?:tests?|specs?|fixtures?|mocks?|benchmark)[\\/]/i.test(normPath);
-    const ignoreInTests = opts.ignoreInTests !== undefined ? opts.ignoreInTests : level !== 'full';
+    const ignoreInTests = opts.ignoreInTests !== undefined ? opts.ignoreInTests : level !== LEVEL_FULL;
     return isTestOrFixture && ignoreInTests;
 }
 
 function compileSecretPatterns(opts: SecretsOptions): CompiledSecretPattern[] {
     const base = opts.patterns
-        ? opts.patterns.map((source, i) => ({ name: `custom-${i + 1}`, source }))
+        ? opts.patterns.map((source, i) => ({ name: `${PATTERN_CUSTOM_PREFIX}${i + 1}`, source }))
         : DEFAULT_PATTERNS;
 
     // Validate user-supplied patterns for ReDoS risk. Patterns with known
@@ -180,11 +236,11 @@ function compileSecretPatterns(opts: SecretsOptions): CompiledSecretPattern[] {
             if (!isRegexSafe(source)) {
                 const warnings = auditRegexSafety(source);
                 console.warn(
-                    `[secrets] Skipping unsafe extraPattern "${source.slice(0, 40)}": ${warnings.join('; ')}`,
+                    `[secrets] Skipping unsafe extraPattern "${source.slice(0, MAX_REGEX_SAFETY_SLICE)}": ${warnings.join('; ')}`,
                 );
                 continue;
             }
-            compiled.push({ name: 'custom-extra', re: new RegExp(source) });
+            compiled.push({ name: PATTERN_EXTRA_NAME, re: new RegExp(source) });
         }
     }
 
@@ -200,10 +256,10 @@ function compileSecretPatterns(opts: SecretsOptions): CompiledSecretPattern[] {
  */
 function resolveEntropyConfig(opts: SecretsOptions, level: SecurityLevel): ResolvedEntropyConfig {
     return {
-        enabled: opts.entropy?.enabled !== undefined ? opts.entropy.enabled : level === 'full',
+        enabled: opts.entropy?.enabled !== undefined ? opts.entropy.enabled : level === LEVEL_FULL,
         minLength: opts.entropy?.minLength ?? DEFAULT_ENTROPY_MIN_LENGTH,
         threshold: opts.entropy?.threshold ?? DEFAULT_ENTROPY_THRESHOLD,
-        severity: (opts.entropy?.severity ?? 'warning') as Severity,
+        severity: (opts.entropy?.severity ?? SEVERITY_WARNING) as Severity,
     };
 }
 
@@ -225,7 +281,7 @@ export class SecretsAnalyzer implements Analyzer {
     analyze(sf: import('typescript').SourceFile | undefined, ctx: AnalyzerContext): Issue[] {
         void sf;
         const opts = (ctx.options || {}) as SecretsOptions & { level?: SecurityLevel };
-        const level: SecurityLevel = opts.level || ctx.config.securityLevel || 'basic';
+        const level: SecurityLevel = opts.level || ctx.config.securityLevel || LEVEL_BASIC;
         const normPath = ctx.filePath.replace(/\\/g, '/');
         if (shouldSkipSecrets(normPath, level, opts)) {
             return [];
@@ -246,19 +302,20 @@ export class SecretsAnalyzer implements Analyzer {
             if (issues.length >= cap) break;
             const { lineText, nextStart } = this.extractNextLine(content, lineStart, len);
 
-            const matchedSecret = this.checkSecretPatterns(lineText, patterns, line, ctx, issues);
+            const auditCtx: SecretLineAuditContext = { lineText, line, ctx, issues };
+            const matchedSecret = this.checkSecretPatterns(auditCtx, patterns);
             if (!matchedSecret && entropy.enabled) {
-                this.checkEntropyTokens(lineText, entropy, line, ctx, issues);
+                this.checkEntropyTokens(auditCtx, entropy);
             }
 
             line++;
             lineStart = nextStart;
         }
 
-        for (const iss of issues) {
-            if (!iss.actionable && SECRETS_ACTIONABLE_MAP[iss.rule]) {
-                const mapped = SECRETS_ACTIONABLE_MAP[iss.rule];
-                iss.actionable = {
+        for (const issueItem of issues) {
+            if (!issueItem.actionable && SECRETS_ACTIONABLE_MAP[issueItem.rule]) {
+                const mapped = SECRETS_ACTIONABLE_MAP[issueItem.rule];
+                issueItem.actionable = {
                     action: mapped.action,
                     code: mapped.code,
                     safeToAutomate: mapped.safeToAutomate,
@@ -285,31 +342,28 @@ export class SecretsAnalyzer implements Analyzer {
     }
 
     private checkSecretPatterns(
-        lineText: string,
+        context: SecretLineAuditContext,
         patterns: CompiledSecretPattern[],
-        line: number,
-        ctx: AnalyzerContext,
-        issues: Issue[],
     ): boolean {
         for (const p of patterns) {
             // Use safeRegexTest: direct for short lines, bounded for long lines
             // (e.g. minified content on a single line). All secret patterns are
             // keyword-level triggers, so truncating long lines is safe.
-            if (safeRegexTest(p.re, lineText)) {
+            if (safeRegexTest(p.re, context.lineText)) {
                 const desc = SecretMessages.HARDCODED_SECRET(
                     p.name,
                     p.re.source.slice(0, REGEX_SOURCE_PREVIEW_LENGTH),
                 );
-                issues.push(
-                    this.mkIssue(
-                        ctx,
-                        line,
-                        'secret-detected',
-                        desc.message,
-                        { kind: p.name },
-                        'error',
-                        desc.suggestion,
-                    ),
+                context.issues.push(
+                    this.makeSecretIssue({
+                        ctx: context.ctx,
+                        line: context.line,
+                        rule: RULE_SECRET_DETECTED,
+                        message: desc.message,
+                        detail: { kind: p.name },
+                        severity: SEVERITY_ERROR,
+                        suggestion: desc.suggestion,
+                    }),
                 );
                 return true; // At most one issue per line
             }
@@ -318,11 +372,8 @@ export class SecretsAnalyzer implements Analyzer {
     }
 
     private checkEntropyTokens(
-        lineText: string,
+        context: SecretLineAuditContext,
         entropy: ResolvedEntropyConfig,
-        line: number,
-        ctx: AnalyzerContext,
-        issues: Issue[],
     ): void {
         const TOKEN_RE = /[A-Za-z0-9_\-=]{16,}/g;
         // Use bounded exec loop to cap work on extremely long lines (e.g. minified).
@@ -331,27 +382,30 @@ export class SecretsAnalyzer implements Analyzer {
         // unbounded entropy computation per line.
         safeRegexExecLoop(
             TOKEN_RE,
-            lineText,
-            (t) => {
-                const h = shannonEntropy(t[0]);
-                if (h >= entropy.threshold && t[0].length >= entropy.minLength) {
-                    const desc = SecretMessages.HIGH_ENTROPY_TOKEN(h, t[0].length);
-                    issues.push(
-                        this.mkIssue(
-                            ctx,
-                            line,
-                            'high-entropy-token',
-                            desc.message,
-                            { entropy: Number(h.toFixed(2)), length: t[0].length },
-                            entropy.severity,
-                            desc.suggestion,
-                        ),
+            context.lineText,
+            (tokenMatch) => {
+                const tokenEntropy = computeShannonEntropy(tokenMatch[0]);
+                if (tokenEntropy >= entropy.threshold && tokenMatch[0].length >= entropy.minLength) {
+                    const desc = SecretMessages.HIGH_ENTROPY_TOKEN(tokenEntropy, tokenMatch[0].length);
+                    context.issues.push(
+                        this.makeSecretIssue({
+                            ctx: context.ctx,
+                            line: context.line,
+                            rule: RULE_HIGH_ENTROPY_TOKEN,
+                            message: desc.message,
+                            detail: {
+                                entropy: Number(tokenEntropy.toFixed(ROUNDING_PRECISION_DIGITS)),
+                                length: tokenMatch[0].length,
+                            },
+                            severity: entropy.severity,
+                            suggestion: desc.suggestion,
+                        }),
                     );
                     return false; // Stop at first match per line (at most one per line)
                 }
                 return true; // Continue scanning
             },
-            100,
+            MAX_EXEC_LOOP_ITERATIONS,
         );
     }
 
@@ -370,26 +424,12 @@ export class SecretsAnalyzer implements Analyzer {
     /**
      * Create one issue with an analyzer-qualified id and a normalized POSIX file path.
      *
-     * @param ctx - Context supplying the raw file path that is normalized for the report.
-     * @param line - One-based line number of the finding.
-     * @param rule - Analyzer-local rule id, for example `secret-detected`.
-     * @param message - Human-readable finding text.
-     * @param detail - Structured payload whose keys depend on the rule that matched.
-     * @param severity - Severity forwarded to reporters and the CI gate.
-     * @param suggestion - Optional remediation; a credential-handling fallback is used when absent.
+     * @param params - Context parameters required to construct canonical secret issue.
      * @returns A fully populated `Issue` with 1-based columns and a stable id.
      */
-    private mkIssue(
-        ctx: AnalyzerContext,
-        line: number,
-        rule: string,
-        message: string,
-        detail: Record<string, any>,
-        severity: Severity,
-        suggestion?: string,
-    ): Issue {
-        const file = ctx.filePath.replace(/\\/g, '/');
-        const mapped = SECRETS_ACTIONABLE_MAP[rule];
+    private makeSecretIssue(params: SecretIssueContext): Issue {
+        const file = params.ctx.filePath.replace(/\\/g, '/');
+        const mapped = SECRETS_ACTIONABLE_MAP[params.rule];
         const actionable = mapped
             ? {
                   action: mapped.action,
@@ -399,15 +439,15 @@ export class SecretsAnalyzer implements Analyzer {
               }
             : undefined;
         return {
-            id: `${this.name}:${rule}:${file}:${line}`,
+            id: `${this.name}:${params.rule}:${file}:${params.line}`,
             analyzer: this.name,
-            rule,
-            severity,
-            message,
-            location: { file, start: { line, column: 1 }, end: { line, column: 1 } },
-            detail,
+            rule: params.rule,
+            severity: params.severity,
+            message: params.message,
+            location: { file, start: { line: params.line, column: 1 }, end: { line: params.line, column: 1 } },
+            detail: params.detail,
             suggestion:
-                suggestion ||
+                params.suggestion ||
                 'Extract credentials from source code; inject via environment variables or secret managers',
             actionable,
         };

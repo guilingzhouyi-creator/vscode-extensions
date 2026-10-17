@@ -559,8 +559,8 @@ export class Scanner implements ScannerContext {
         fileMetrics: FileMetric[],
         durationMs: number,
     ): ScanReport {
-        return buildScanReport(
-            {
+        return buildScanReport({
+            host: {
                 config: this.config,
                 scorer: this.scorer,
                 reviewMemory: this.reviewMemory,
@@ -573,7 +573,7 @@ export class Scanner implements ScannerContext {
             issues,
             fileMetrics,
             durationMs,
-        );
+        });
     }
 }
 

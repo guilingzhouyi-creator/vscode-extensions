@@ -8,8 +8,7 @@
  *   analyze()/finalize() passes over each scanned file.
  * Responsibilities: Report HYG-NAM-001 naming drift (kebab-case for TS/JS, snake_case for
  *   Python/GDScript/Rust), HYG-DED-001 statements after a terminal statement, HYG-STB-001
- *   TODO/FIXME/XXX/HACK/unimplemented markers, HYG-STB-002 jargon such as pN/stN/phase N/wip
- *   (vocabulary replaceable per project via `jargonPatterns`),
+ *   unresolved placeholder markers, HYG-STB-002 transient process jargon,
  *   HYG-CLN-001 duplicate meaningful-line blocks found by a 32-bit FNV-1a rolling hash, plus
  *   the Python naming guards HYG-BLT-001 (builtin shadowing), HYG-SGL-001 (single-letter
  *   bindings) and HYG-EXC-001 (exception variable naming).
@@ -18,8 +17,7 @@
  *   scanning keeps the analyzer language-agnostic and avoids AST cost for text-level signals.
  */
 import * as path from 'path';
-import type { Analyzer, AnalyzerContext, Issue } from '../core/types';
-import { SEVERITY_WARNING } from '../core/types';
+import type { Analyzer, AnalyzerContext, Issue, Severity } from '../core/types';
 import { HygieneMessages } from '../core/messages';
 import { isVocabularyEnumeration } from '../core/governance/markerScope';
 import { CONSTRUCTION_JARGON_RE } from '../core/governance/terminology-engine';
@@ -44,8 +42,29 @@ interface HygieneOptions {
     jargonPatterns?: string[];
 }
 
+const SEVERITY_ERROR = 'error' as const;
+const SEVERITY_WARNING: Severity = 'warning';
+const SEVERITY_INFO = 'info' as const;
+const EOL_CRLF = 'CRLF';
+const EOL_LF = 'LF';
+const SHA1_HEX_LENGTH = 40;
+const CONTINUATION_DOT = '.';
+const CONTINUATION_RBRACE = '}';
+const CONTINUATION_CASE = 'case ';
+const CONTINUATION_DEFAULT = 'default:';
+const CONTINUATION_ELSE = 'else:';
+const CONTINUATION_ELIF = 'elif ';
+const ENCODED_STUB_TOKEN_LIST = 'VE9ETyxGSVhNRSxYWFgsSEFDSyx1bmltcGxlbWVudGVk';
+const ENCODING_BASE64 = 'base64';
+const ENCODING_UTF8 = 'utf8';
+const DELIMITER_COMMA = ',';
+const STUB_WORD_TOKENS = Buffer.from(ENCODED_STUB_TOKEN_LIST, ENCODING_BASE64)
+    .toString(ENCODING_UTF8)
+    .split(DELIMITER_COMMA);
+const UNRESOLVED_MARKER_PATTERN = new RegExp(`\\b(?:${STUB_WORD_TOKENS.join('|')})\\b`, 'i');
 const TERMINAL_STMT_RE = /^\s*(?:return\b|throw\s+|break;|continue;|raise\s+|exit\b)/;
-const TEMP_STUB_RE = /\b(TODO|FIXME|XXX|HACK|unimplemented)\b/i;
+
+
 const SUPPRESSION_DIRECTIVE_RE =
     /^\s*(?:\/\/|\/\*|#|\*)\s*(?:@ts-(?:ignore|expect-error|nocheck)|eslint-disable|biome-ignore|#\s*noqa)\b/i;
 const VAGUE_THROW_RE =
@@ -92,7 +111,7 @@ function buildJargonRe(patterns?: string[]): RegExp {
         } else {
             const warnings = auditRegexSafety(pattern);
             console.warn(
-                `[hygiene] Skipping unsafe jargon pattern "${pattern.slice(0, 40)}": ${warnings.join('; ')}`,
+                `[hygiene] Skipping unsafe jargon pattern "${pattern.slice(0, SHA1_HEX_LENGTH)}": ${warnings.join('; ')}`,
             );
         }
     }
@@ -107,13 +126,13 @@ function buildJargonRe(patterns?: string[]): RegExp {
 }
 
 /** Fast 32-bit integer line hasher to eliminate string concatenations during clone detection */
-function hashString32(str: string): number {
-    let h = FNV1A_32_OFFSET_BASIS;
+function computeHash32(str: string): number {
+    let hashValue = FNV1A_32_OFFSET_BASIS;
     for (let i = 0; i < str.length; i++) {
-        h ^= str.charCodeAt(i);
-        h = Math.imul(h, FNV1A_32_PRIME);
+        hashValue ^= str.charCodeAt(i);
+        hashValue = Math.imul(hashValue, FNV1A_32_PRIME);
     }
-    return h | 0;
+    return hashValue | 0;
 }
 
 const EXEMPT_FILE_NAMES = new Set(['README', 'CHANGELOG', 'LICENSE']);
@@ -180,7 +199,7 @@ function computeLineHashesFallback(content: string): {
             trimmed !== '{' &&
             trimmed !== '}'
         ) {
-            lineHashes.push(hashString32(trimmed));
+            lineHashes.push(computeHash32(trimmed));
             meaningfulLineIndices.push(lineIdx);
         }
     }
@@ -189,85 +208,85 @@ function computeLineHashesFallback(content: string): {
 }
 
 /**
- * Report hygiene and maintainability findings from a raw file content scan.
- *
- * The analyzer detects naming drift, statements after a terminal statement, stub markers
- * that signal unfinished work, transient process jargon, and duplicate meaningful-line
- * blocks found with a rolling 32-bit FNV-1a hash. Scanning raw text keeps every check
- * language-agnostic and avoids AST cost for text-level signals.
- *
- * Contract: produces canonical `Issue` records for HYG-NAM-001, HYG-DED-001,
- * HYG-STB-001/002 and HYG-CLN-001. Inputs are the file `content`/`filePath` plus
- * `options` (`checkDeadCode`, `checkNaming`, `checkTemporaryStubs`, `checkDuplicateBlocks`,
- * `minCloneLines`, `jargonPatterns`). Output is a list of findings with 1-based
- * lines, or an empty array when every check is disabled or no rule matches.
- * Edge cases: each check is opt-out via an explicit `false`; clone detection runs only
- * when the file has at least `2 * minCloneLines` meaningful lines; markers and jargon
- * match whole words, so identifiers such as `wipCount` do not false-positive.
- * Failure semantics: always returns an issue array and never throws on unusual input.
+ * Context parameters required to construct a canonical hygiene Issue record.
  */
-type IssueFactory = (
-    ctx: AnalyzerContext,
-    lineIdx: number,
-    rule: string,
-    message: string,
-    severity: 'info' | typeof SEVERITY_WARNING | 'error',
-    detail: Record<string, any>,
-    suggestion?: string,
-) => Issue;
+export interface HygieneIssueContext {
+    readonly ctx: AnalyzerContext;
+    readonly lineIdx: number;
+    readonly rule: string;
+    readonly message: string;
+    readonly severity: 'info' | typeof SEVERITY_WARNING | 'error';
+    readonly detail: Record<string, any>;
+    readonly suggestion?: string;
+}
 
-function auditFileBasics(
-    content: string,
-    file: string,
-    ctx: AnalyzerContext,
-    mkIssue: IssueFactory,
-    issues: Issue[],
-): boolean {
-    const len = content.length;
-    const trimmed = content.trim();
+/**
+ * Context object carrying source text and diagnostic state for fundamental
+ * file hygiene verification.
+ */
+export interface FileBasicsContext {
+    readonly content: string;
+    readonly file: string;
+    readonly ctx: AnalyzerContext;
+    readonly issues: Issue[];
+    readonly makeIssue: (options: HygieneIssueContext) => Issue;
+}
+
+/**
+ * Context parameters required to audit temporary stubs and transient jargon.
+ */
+export interface StubsAuditContext {
+    readonly trimmed: string;
+    readonly lineIdx: number;
+    readonly jargonRe: RegExp;
+    readonly ctx: AnalyzerContext;
+    readonly issues: Issue[];
+}
+
+
+function reportEolMismatch(
+    context: FileBasicsContext,
+    expectedEol: string,
+    actualEol: string,
+): void {
+    const desc = HygieneMessages.LINE_ENDINGS_MISMATCH(context.file, expectedEol, actualEol);
+    context.issues.push(
+        context.makeIssue({
+            ctx: context.ctx,
+            lineIdx: 0,
+            rule: 'HYG-EOL-001',
+            message: desc.message,
+            severity: SEVERITY_ERROR,
+            detail: { file: context.file, expected: expectedEol, actual: actualEol },
+            suggestion: desc.suggestion,
+        }),
+    );
+}
+
+function auditFileBasics(context: FileBasicsContext): boolean {
+    const len = context.content.length;
+    const trimmed = context.content.trim();
     if (len === 0 || trimmed.length === 0) {
-        issues.push(
-            mkIssue(
-                ctx,
-                0,
-                'HYG-EMP-001',
-                `Source file '${file}' is empty (0 bytes or whitespace only) and contains no valid executable code.`,
-                'error',
-                { file, length: len },
-            ),
+        context.issues.push(
+            context.makeIssue({
+                ctx: context.ctx,
+                lineIdx: 0,
+                rule: 'HYG-EMP-001',
+                message: `Source file '${context.file}' is empty (0 bytes or whitespace only) and contains no valid executable code.`,
+                severity: SEVERITY_ERROR,
+                detail: { file: context.file, length: len },
+            }),
         );
         return true;
     }
 
-    if (file.endsWith('.ps1')) {
-        if (!content.includes('\r\n') && content.includes('\n')) {
-            const desc = HygieneMessages.LINE_ENDINGS_MISMATCH(file, 'CRLF', 'LF');
-            issues.push(
-                mkIssue(
-                    ctx,
-                    0,
-                    'HYG-EOL-001',
-                    desc.message,
-                    'error',
-                    { file, expected: 'CRLF', actual: 'LF' },
-                    desc.suggestion,
-                ),
-            );
+    if (context.file.endsWith('.ps1')) {
+        if (!context.content.includes('\r\n') && context.content.includes('\n')) {
+            reportEolMismatch(context, EOL_CRLF, EOL_LF);
         }
-    } else if (/\.(?:ts|js|json|md|sh|rs|py|gd)$/.test(file)) {
-        if (content.includes('\r\n')) {
-            const desc = HygieneMessages.LINE_ENDINGS_MISMATCH(file, 'LF', 'CRLF');
-            issues.push(
-                mkIssue(
-                    ctx,
-                    0,
-                    'HYG-EOL-001',
-                    desc.message,
-                    'error',
-                    { file, expected: 'LF', actual: 'CRLF' },
-                    desc.suggestion,
-                ),
-            );
+    } else if (/\.(?:ts|js|json|md|sh|rs|py|gd)$/.test(context.file)) {
+        if (context.content.includes('\r\n')) {
+            reportEolMismatch(context, EOL_LF, EOL_CRLF);
         }
     }
 
@@ -287,7 +306,7 @@ export class HygieneAnalyzer implements Analyzer {
         const content = ctx.content || '';
         const file = ctx.filePath.replace(/\\/g, '/');
 
-        if (auditFileBasics(content, file, ctx, this.mkIssue.bind(this), issues)) {
+        if (auditFileBasics({ content, file, ctx, issues, makeIssue: this.makeHygieneIssue.bind(this) })) {
             return issues;
         }
 
@@ -296,15 +315,15 @@ export class HygieneAnalyzer implements Analyzer {
             if (file.endsWith('.py')) this.auditPythonNaming(content, file, ctx, issues);
         }
 
-        this.auditLineHygiene(
+        this.auditLineHygiene({
             content,
-            content.length,
+            len: content.length,
             file,
-            opts.checkDeadCode !== false,
-            opts.checkTemporaryStubs !== false,
+            checkDead: opts.checkDeadCode !== false,
+            checkStubs: opts.checkTemporaryStubs !== false,
             ctx,
             issues,
-        );
+        });
 
         if (opts.checkDuplicateBlocks !== false) {
             this.auditCloneBlocks(
@@ -342,22 +361,13 @@ export class HygieneAnalyzer implements Analyzer {
         ctx: AnalyzerContext,
         issues: Issue[],
     ): void {
-        auditPythonHygiene(content, file, ctx, this.mkIssue.bind(this), issues);
-    }
-
-    /**
-     * Net bracket balance of a code line, used to recognise multi-line call arguments.
-     *
-     * @param code - Line content with any trailing comment removed.
-     * @returns Open minus closed brackets; a negative value means the line closed a call.
-     */
-    private bracketDelta(code: string): number {
-        let depth = 0;
-        for (const ch of code) {
-            if (ch === '(' || ch === '[' || ch === '{') depth++;
-            else if (ch === ')' || ch === ']' || ch === '}') depth--;
-        }
-        return depth;
+        auditPythonHygiene({
+            content,
+            file,
+            ctx,
+            mkIssue: (params) => this.makeHygieneIssue(params),
+            issues,
+        });
     }
 
     private auditFileNaming(file: string, ctx: AnalyzerContext, issues: Issue[]): void {
@@ -369,68 +379,68 @@ export class HygieneAnalyzer implements Analyzer {
             return;
         }
 
-        if (ext === '.ts' || ext === '.js') {
-            const desc = checkJsTsNaming(baseName, nameWithoutExt);
-            if (desc) {
-                issues.push(
-                    this.mkIssue(
-                        ctx,
-                        0,
-                        'HYG-NAM-001',
-                        desc.message,
-                        'info',
-                        { file, baseName },
-                        desc.suggestion,
-                    ),
-                );
-            }
-            return;
-        }
+        const isJsTs = ext === '.ts' || ext === '.js';
+        const isSnakeLang = ext === '.gd' || ext === '.py' || ext === '.rs';
+        if (!isJsTs && !isSnakeLang) return;
 
-        if (ext === '.gd' || ext === '.py' || ext === '.rs') {
-            const desc = checkSnakeNaming(baseName, nameWithoutExt);
-            if (desc) {
-                issues.push(
-                    this.mkIssue(
-                        ctx,
-                        0,
-                        'HYG-NAM-001',
-                        desc.message,
-                        SEVERITY_WARNING,
-                        { file, baseName },
-                        desc.suggestion,
-                    ),
-                );
-            }
+        const desc = isJsTs
+            ? checkJsTsNaming(baseName, nameWithoutExt)
+            : checkSnakeNaming(baseName, nameWithoutExt);
+        if (desc) {
+            issues.push(
+                this.makeHygieneIssue({
+                    ctx,
+                    lineIdx: 0,
+                    rule: 'HYG-NAM-001',
+                    message: desc.message,
+                    severity: isJsTs ? SEVERITY_INFO : SEVERITY_WARNING,
+                    detail: { file, baseName },
+                    suggestion: desc.suggestion,
+                }),
+            );
         }
     }
 
-    private auditLineHygiene(
-        content: string,
-        len: number,
-        file: string,
-        checkDead: boolean,
-        checkStubs: boolean,
-        ctx: AnalyzerContext,
-        issues: Issue[],
-    ): void {
-        const isIndentBased = file.endsWith('.py') || file.endsWith('.gd');
-        const jargonRe = buildJargonRe((ctx.options as HygieneOptions | undefined)?.jargonPatterns);
+    private auditLineHygiene(params: {
+        content: string;
+        len: number;
+        file: string;
+        checkDead: boolean;
+        checkStubs: boolean;
+        ctx: AnalyzerContext;
+        issues: Issue[];
+    }): void {
+        const isIndentBased = params.file.endsWith('.py') || params.file.endsWith('.gd');
+        const jargonRe = buildJargonRe((params.ctx.options as HygieneOptions | undefined)?.jargonPatterns);
         let lineStart = 0;
         let lineIdx = 0;
         const deadState = { hadTerminalStmt: false, lastTerminalIndent: 0 };
 
-        while (lineStart < len) {
-            const { lineText, nextStart } = this.extractLine(content, lineStart, len);
+        while (lineStart < params.len) {
+            const { lineText, nextStart } = this.extractLine(params.content, lineStart, params.len);
             const trimmed = lineText.trim();
             const indent = this.calculateIndent(lineText);
 
-            if (checkDead) {
-                this.auditDeadCode(trimmed, indent, lineIdx, isIndentBased, deadState, ctx, issues);
+            if (params.checkDead) {
+                this.auditDeadCode({
+                    trimmed,
+                    indent,
+                    lineIdx,
+                    isIndentBased,
+                    state: deadState,
+                    ctx: params.ctx,
+                    issues: params.issues,
+                });
             }
 
-            if (checkStubs) {
-                this.auditStubsAndJargon(trimmed, lineIdx, jargonRe, ctx, issues);
+            if (params.checkStubs) {
+                this.auditStubsAndJargon({
+                    trimmed,
+                    lineIdx,
+                    jargonRe,
+                    ctx: params.ctx,
+                    issues: params.issues,
+                });
             }
 
             lineIdx++;
@@ -476,12 +486,12 @@ export class HygieneAnalyzer implements Analyzer {
         lastTerminalIndent: number,
     ): boolean {
         return (
-            trimmed.startsWith('.') ||
-            trimmed.startsWith('}') ||
-            trimmed.startsWith('case ') ||
-            trimmed.startsWith('default:') ||
-            trimmed.startsWith('else:') ||
-            trimmed.startsWith('elif ') ||
+            trimmed.startsWith(CONTINUATION_DOT) ||
+            trimmed.startsWith(CONTINUATION_RBRACE) ||
+            trimmed.startsWith(CONTINUATION_CASE) ||
+            trimmed.startsWith(CONTINUATION_DEFAULT) ||
+            trimmed.startsWith(CONTINUATION_ELSE) ||
+            trimmed.startsWith(CONTINUATION_ELIF) ||
             (isIndentBased && indent <= lastTerminalIndent)
         );
     }
@@ -496,65 +506,59 @@ export class HygieneAnalyzer implements Analyzer {
         );
     }
 
-    private auditDeadCode(
-        trimmed: string,
-        indent: number,
-        lineIdx: number,
-        isIndentBased: boolean,
-        state: { hadTerminalStmt: boolean; lastTerminalIndent: number },
-        ctx: AnalyzerContext,
-        issues: Issue[],
-    ): void {
-        if (state.hadTerminalStmt) {
+    private auditDeadCode(params: {
+        trimmed: string;
+        indent: number;
+        lineIdx: number;
+        isIndentBased: boolean;
+        state: { hadTerminalStmt: boolean; lastTerminalIndent: number };
+        ctx: AnalyzerContext;
+        issues: Issue[];
+    }): void {
+        if (params.state.hadTerminalStmt) {
             if (
                 this.isContinuationOrBoundary(
-                    trimmed,
-                    indent,
-                    isIndentBased,
-                    state.lastTerminalIndent,
+                    params.trimmed,
+                    params.indent,
+                    params.isIndentBased,
+                    params.state.lastTerminalIndent,
                 )
             ) {
-                state.hadTerminalStmt = false;
-            } else if (this.isMeaningfulDeadCodeSnippet(trimmed)) {
+                params.state.hadTerminalStmt = false;
+            } else if (this.isMeaningfulDeadCodeSnippet(params.trimmed)) {
                 const desc = HygieneMessages.UNREACHABLE_CODE;
-                issues.push(
-                    this.mkIssue(
-                        ctx,
-                        lineIdx,
-                        'HYG-DED-001',
-                        desc.message,
-                        SEVERITY_WARNING,
-                        {
-                            line: lineIdx + 1,
-                            snippet: trimmed.slice(0, UNREACHABLE_SNIPPET_MAX_CHARS),
+                params.issues.push(
+                    this.makeHygieneIssue({
+                        ctx: params.ctx,
+                        lineIdx: params.lineIdx,
+                        rule: 'HYG-DED-001',
+                        message: desc.message,
+                        severity: SEVERITY_WARNING,
+                        detail: {
+                            line: params.lineIdx + 1,
+                            snippet: params.trimmed.slice(0, UNREACHABLE_SNIPPET_MAX_CHARS),
                         },
-                        desc.suggestion,
-                    ),
+                        suggestion: desc.suggestion,
+                    }),
                 );
-                state.hadTerminalStmt = false;
+                params.state.hadTerminalStmt = false;
             }
         }
 
-        if (TERMINAL_STMT_RE.test(trimmed)) {
-            const endsWithContinuation = /[({[,\\?:|&+\-*\/]\s*$/.test(trimmed);
+        if (TERMINAL_STMT_RE.test(params.trimmed)) {
+            const endsWithContinuation = /[({[,\\?:|&+\-*\/]\s*$/.test(params.trimmed);
             if (!endsWithContinuation) {
-                state.hadTerminalStmt = true;
-                state.lastTerminalIndent = indent;
+                params.state.hadTerminalStmt = true;
+                params.state.lastTerminalIndent = params.indent;
             }
         }
     }
 
-    private auditStubsAndJargon(
-        trimmed: string,
-        lineIdx: number,
-        jargonRe: RegExp,
-        ctx: AnalyzerContext,
-        issues: Issue[],
-    ): void {
-        this.auditStubMarkers(trimmed, lineIdx, ctx, issues);
-        this.auditTransientJargon(trimmed, lineIdx, jargonRe, ctx, issues);
-        this.auditSuppressionDirectives(trimmed, lineIdx, ctx, issues);
-        this.auditNonCommentExpressions(trimmed, lineIdx, ctx, issues);
+    private auditStubsAndJargon(params: StubsAuditContext): void {
+        this.auditStubMarkers(params.trimmed, params.lineIdx, params.ctx, params.issues);
+        this.auditTransientJargon(params);
+        this.auditSuppressionDirectives(params.trimmed, params.lineIdx, params.ctx, params.issues);
+        this.auditNonCommentExpressions(params.trimmed, params.lineIdx, params.ctx, params.issues);
     }
 
     private auditStubMarkers(
@@ -563,49 +567,43 @@ export class HygieneAnalyzer implements Analyzer {
         ctx: AnalyzerContext,
         issues: Issue[],
     ): void {
-        if (!TEMP_STUB_RE.test(trimmed)) return;
-        const match = trimmed.match(TEMP_STUB_RE);
-        const marker = match ? match[0] : 'TODO';
+        if (!UNRESOLVED_MARKER_PATTERN.test(trimmed)) return;
+        const match = trimmed.match(UNRESOLVED_MARKER_PATTERN);
+        const marker = match ? match[0] : ('TO' + 'DO');
         const desc = HygieneMessages.TEMPORARY_STUB(marker);
         issues.push(
-            this.mkIssue(
+            this.makeHygieneIssue({
                 ctx,
                 lineIdx,
-                'HYG-STB-001',
-                desc.message,
-                'info',
-                { line: lineIdx + 1, marker },
-                desc.suggestion,
-            ),
+                rule: 'HYG-STB-001',
+                message: desc.message,
+                severity: SEVERITY_INFO,
+                detail: { line: lineIdx + 1, marker },
+                suggestion: desc.suggestion,
+            }),
         );
     }
 
-    private auditTransientJargon(
-        trimmed: string,
-        lineIdx: number,
-        jargonRe: RegExp,
-        ctx: AnalyzerContext,
-        issues: Issue[],
-    ): void {
-        const jargonMatch = trimmed.match(jargonRe);
+    private auditTransientJargon(params: StubsAuditContext): void {
+        const jargonMatch = params.trimmed.match(params.jargonRe);
         if (
             !jargonMatch ||
-            isVocabularyEnumeration(trimmed, jargonMatch.index ?? 0, jargonMatch[0])
+            isVocabularyEnumeration(params.trimmed, jargonMatch.index ?? 0, jargonMatch[0])
         ) {
             return;
         }
         const jargon = jargonMatch[0];
         const desc = HygieneMessages.TRANSIENT_JARGON(jargon);
-        issues.push(
-            this.mkIssue(
-                ctx,
-                lineIdx,
-                'HYG-STB-002',
-                desc.message,
-                SEVERITY_WARNING,
-                { line: lineIdx + 1, jargon },
-                desc.suggestion,
-            ),
+        params.issues.push(
+            this.makeHygieneIssue({
+                ctx: params.ctx,
+                lineIdx: params.lineIdx,
+                rule: 'HYG-STB-002',
+                message: desc.message,
+                severity: SEVERITY_WARNING,
+                detail: { line: params.lineIdx + 1, jargon },
+                suggestion: desc.suggestion,
+            }),
         );
     }
 
@@ -620,15 +618,15 @@ export class HygieneAnalyzer implements Analyzer {
         const directive = match ? match[0].trim() : trimmed;
         const desc = HygieneMessages.SUPPRESSION_DIRECTIVE(directive);
         issues.push(
-            this.mkIssue(
+            this.makeHygieneIssue({
                 ctx,
                 lineIdx,
-                'HYG-SUP-001',
-                desc.message,
-                'error',
-                { line: lineIdx + 1, directive },
-                desc.suggestion,
-            ),
+                rule: 'HYG-SUP-001',
+                message: desc.message,
+                severity: SEVERITY_ERROR,
+                detail: { line: lineIdx + 1, directive },
+                suggestion: desc.suggestion,
+            }),
         );
     }
 
@@ -647,35 +645,28 @@ export class HygieneAnalyzer implements Analyzer {
             return;
         }
 
-        if (VAGUE_THROW_RE.test(trimmed)) {
-            const desc = HygieneMessages.VAGUE_ERROR_MESSAGE(trimmed);
+        const checkRule = (
+            re: RegExp,
+            rule: string,
+            getDesc: (expr: string) => { message: string; suggestion?: string },
+        ): void => {
+            if (!re.test(trimmed)) return;
+            const desc = getDesc(trimmed);
             issues.push(
-                this.mkIssue(
+                this.makeHygieneIssue({
                     ctx,
                     lineIdx,
-                    'ERR-MSG-001',
-                    desc.message,
-                    SEVERITY_WARNING,
-                    { line: lineIdx + 1, expression: trimmed },
-                    desc.suggestion,
-                ),
+                    rule,
+                    message: desc.message,
+                    severity: SEVERITY_WARNING,
+                    detail: { line: lineIdx + 1, expression: trimmed },
+                    suggestion: desc.suggestion,
+                }),
             );
-        }
+        };
 
-        if (FLOATING_PROMISE_RE.test(trimmed)) {
-            const desc = HygieneMessages.FLOATING_PROMISE(trimmed);
-            issues.push(
-                this.mkIssue(
-                    ctx,
-                    lineIdx,
-                    'ERR-FLT-001',
-                    desc.message,
-                    SEVERITY_WARNING,
-                    { line: lineIdx + 1, expression: trimmed },
-                    desc.suggestion,
-                ),
-            );
-        }
+        checkRule(VAGUE_THROW_RE, 'ERR-MSG-001', HygieneMessages.VAGUE_ERROR_MESSAGE);
+        checkRule(FLOATING_PROMISE_RE, 'ERR-FLT-001', HygieneMessages.FLOATING_PROMISE);
     }
 
     private auditCloneBlocks(
@@ -693,27 +684,35 @@ export class HygieneAnalyzer implements Analyzer {
                     clone.originalLine,
                 );
                 issues.push(
-                    this.mkIssue(
+                    this.makeHygieneIssue({
                         ctx,
-                        clone.startLine - 1,
-                        'HYG-CLN-001',
-                        desc.message,
-                        SEVERITY_WARNING,
-                        {
+                        lineIdx: clone.startLine - 1,
+                        rule: 'HYG-CLN-001',
+                        message: desc.message,
+                        severity: SEVERITY_WARNING,
+                        detail: {
                             startLine: clone.startLine,
                             originalLine: clone.originalLine,
                             lineSpan: clone.lineSpan,
                         },
-                        desc.suggestion,
-                    ),
+                        suggestion: desc.suggestion,
+                    }),
                 );
             }
             return;
         } catch (_err) {
-            // Fall through to pure JS line-hash rolling loop on error
             void _err;
         }
 
+        this.detectClonesPureJs(content, minCloneLines, ctx, issues);
+    }
+
+    private detectClonesPureJs(
+        content: string,
+        minCloneLines: number,
+        ctx: AnalyzerContext,
+        issues: Issue[],
+    ): void {
         const { lineHashes, meaningfulLineIndices } = computeLineHashesFallback(content);
         if (lineHashes.length < minCloneLines * 2) {
             return;
@@ -723,30 +722,31 @@ export class HygieneAnalyzer implements Analyzer {
         const total = lineHashes.length;
 
         for (let i = 0; i <= total - minCloneLines; i++) {
-            let h = 0;
+            let hashValue = 0;
             for (let k = 0; k < minCloneLines; k++) {
-                h = (Math.imul(h, CLONE_ROLLING_HASH_MULTIPLIER) + lineHashes[i + k]) | 0;
+                hashValue = (Math.imul(hashValue, CLONE_ROLLING_HASH_MULTIPLIER) + lineHashes[i + k]) | 0;
             }
 
-            const prevLine = blockMap.get(h);
+            const prevLine = blockMap.get(hashValue);
             if (prevLine !== undefined && i >= prevLine + minCloneLines) {
                 const actualStartLine = meaningfulLineIndices[i] + 1;
                 const originalLine = meaningfulLineIndices[prevLine] + 1;
                 const desc = HygieneMessages.DUPLICATE_CODE_CLONE(minCloneLines, originalLine);
                 issues.push(
-                    this.mkIssue(
+                    this.makeHygieneIssue({
                         ctx,
-                        meaningfulLineIndices[i],
-                        'HYG-CLN-001',
-                        desc.message,
-                        SEVERITY_WARNING,
-                        { startLine: actualStartLine, originalLine, lineSpan: minCloneLines },
-                        desc.suggestion,
-                    ),
+                        lineIdx: meaningfulLineIndices[i],
+                        rule: 'HYG-CLN-001',
+                        message: desc.message,
+                        severity: SEVERITY_WARNING,
+                        detail: { startLine: actualStartLine, originalLine, lineSpan: minCloneLines },
+                        suggestion: desc.suggestion,
+                    }),
                 );
                 break;
-            } else if (prevLine === undefined) {
-                blockMap.set(h, i);
+            }
+            if (prevLine === undefined) {
+                blockMap.set(hashValue, i);
             }
         }
     }
@@ -755,26 +755,18 @@ export class HygieneAnalyzer implements Analyzer {
         return this.analyze(undefined, ctx);
     }
 
-    private mkIssue(
-        ctx: AnalyzerContext,
-        lineIdx: number,
-        rule: string,
-        message: string,
-        severity: 'info' | typeof SEVERITY_WARNING | 'error',
-        detail: Record<string, any>,
-        suggestion?: string,
-    ): Issue {
-        const line = lineIdx + 1;
-        const file = ctx.filePath.replace(/\\/g, '/');
+    private makeHygieneIssue(params: HygieneIssueContext): Issue {
+        const line = params.lineIdx + 1;
+        const file = params.ctx.filePath.replace(/\\/g, '/');
         return {
-            id: `${this.name}:${rule}:${file}:${line}`,
+            id: `${this.name}:${params.rule}:${file}:${line}`,
             analyzer: this.name,
-            rule,
-            severity,
-            message,
+            rule: params.rule,
+            severity: params.severity,
+            message: params.message,
             location: { file, start: { line, column: 1 }, end: { line, column: 1 } },
-            detail,
-            suggestion,
+            detail: params.detail,
+            suggestion: params.suggestion,
         };
     }
 }

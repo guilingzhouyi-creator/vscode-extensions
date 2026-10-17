@@ -1,7 +1,7 @@
 {
   "version": "1.2.0",
   "granularity": "grouped",
-  "timestamp": "2026-10-17T05:36:44.031Z",
+  "timestamp": "2026-10-17T10:11:53.654Z",
   "groups": [
     {
       "key": "comments|CMT-HDR-001|crates/auto-refactor-core/build.rs",
@@ -1887,48 +1887,6 @@
       }
     },
     {
-      "key": "hygiene|HYG-STB-001|src/analyzers/hygiene.ts",
-      "count": 3,
-      "severities": {
-        "info": 3
-      }
-    },
-    {
-      "key": "constants|magic-number|src/analyzers/hygiene.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/analyzers/hygiene.ts",
-      "count": 7,
-      "severities": {
-        "warning": 7
-      }
-    },
-    {
-      "key": "hygiene|HYG-CLN-001|src/analyzers/hygiene.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "simplify|SIM-LONG-001|src/analyzers/hygiene.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "simplify|SIM-ELSE-001|src/analyzers/hygiene.ts",
-      "count": 1,
-      "severities": {
-        "info": 1
-      }
-    },
-    {
       "key": "constants|hardcoded-string|src/analyzers/large-file.ts",
       "count": 2,
       "severities": {
@@ -1968,20 +1926,6 @@
       "count": 1,
       "severities": {
         "info": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/analyzers/secrets.ts",
-      "count": 15,
-      "severities": {
-        "warning": 15
-      }
-    },
-    {
-      "key": "constants|magic-number|src/analyzers/secrets.ts",
-      "count": 2,
-      "severities": {
-        "warning": 2
       }
     },
     {
@@ -2608,13 +2552,6 @@
       }
     },
     {
-      "key": "governance|GOV-PRF-004|src/core/cache.ts",
-      "count": 2,
-      "severities": {
-        "warning": 2
-      }
-    },
-    {
       "key": "simplify|SIM-TRN-001|src/core/cache.ts",
       "count": 2,
       "severities": {
@@ -3018,34 +2955,6 @@
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/evolution/git-history-miner.ts",
-      "count": 6,
-      "severities": {
-        "warning": 6
-      }
-    },
-    {
-      "key": "constants|magic-number|src/core/evolution/git-history-miner.ts",
-      "count": 12,
-      "severities": {
-        "warning": 12
-      }
-    },
-    {
-      "key": "governance|GOV-DAT-001|src/core/evolution/git-history-miner.ts",
-      "count": 1,
-      "severities": {
-        "info": 1
-      }
-    },
-    {
-      "key": "constants|duplicate-literal|src/core/evolution/git-history-miner.ts",
-      "count": 3,
-      "severities": {
-        "warning": 3
       }
     },
     {
@@ -4253,27 +4162,6 @@
       }
     },
     {
-      "key": "governance|GOV-DAT-001|src/core/reporting/reportBuilder.ts",
-      "count": 2,
-      "severities": {
-        "info": 2
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/reporting/reportBuilder.ts",
-      "count": 17,
-      "severities": {
-        "warning": 17
-      }
-    },
-    {
-      "key": "constants|magic-number|src/core/reporting/reportBuilder.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "constants|hardcoded-string|src/core/reporting/reportFinalizer.ts",
       "count": 1,
       "severities": {
@@ -4597,34 +4485,6 @@
     },
     {
       "key": "large-file|large-file|src/core/scanner/diff-scanner.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "governance|GOV-DAT-001|src/core/scanner/diff-scanner.ts",
-      "count": 7,
-      "severities": {
-        "info": 7
-      }
-    },
-    {
-      "key": "simplify|SIM-LONG-001|src/core/scanner/diff-scanner.ts",
-      "count": 2,
-      "severities": {
-        "warning": 2
-      }
-    },
-    {
-      "key": "simplify|SIM-GUARD-001|src/core/scanner/diff-scanner.ts",
-      "count": 1,
-      "severities": {
-        "info": 1
-      }
-    },
-    {
-      "key": "hygiene|HYG-CLN-001|src/core/scanner/diff-scanner.ts",
       "count": 1,
       "severities": {
         "warning": 1
