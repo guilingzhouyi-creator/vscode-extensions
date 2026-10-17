@@ -121,5 +121,3 @@ export const FILE_TIMING_JSON = 'workspace-timing.json';
 export const EXT_JSON = 'json';
 export const WILDCARD_STAR = '*';
 export const ENCODING_UTF8 = 'utf-8';
-
-
