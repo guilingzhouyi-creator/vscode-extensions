@@ -1,13 +1,13 @@
 ---
 name: rule-catalog-governance
 description: >-
-  全工作区单源规则目录（SSOT）、元数据一致性与规则反虚构治理规范。指导 Agent 聚合全仓 428 条跨项目规则，
+  全工作区单源规则目录（SSOT）、元数据一致性与规则反虚构治理规范。指导 Agent 聚合全仓跨项目规则，
   落实标准 3-3-3 命名拓扑与 104 项权威词典、三阶别名等价网络、底层诊断与表现层去重解耦及 RCFG-RULE-DRIFT 防虚构门禁。
 ---
 
 # rule-catalog-governance — 全仓单源规则目录与元数据一致性治理
 
-本技能规范了工作区 428 条静态分析与审查规则的单源聚合机制（Single Source of Truth, SSOT）、标准 3-3-3 命名拓扑公理、权威 104 项三字母映射词典、三阶双轨别名等价网络、底层完备诊断与表现层语义去重双层解耦公理、跨项目规则族命名空间边界、三大项目规范注册流程与规则防虚构门禁（`RCFG-RULE-DRIFT`）。
+本技能规范了工作区静态分析与审查规则的单源聚合机制（Single Source of Truth, SSOT）、标准 3-3-3 命名拓扑公理、权威 104 项三字母映射词典、三阶双轨别名等价网络、底层完备诊断与表现层语义去重双层解耦公理、跨项目规则族命名空间边界、三大项目规范注册流程与规则防虚构门禁（`RCFG-RULE-DRIFT`）。
 
 ---
 
@@ -27,11 +27,11 @@ description: >-
 工作区维护全局唯一的规则真源注册表，任何规则必须在注册表中登记后方可在代码、配置、分析报告或提交说明中生效：
 - **SSOT 文件路径**：`scripts/common/rule-catalog.json`
 - **生成与聚合脚本**：`scripts/common/generate-rule-catalog.js`
-- **纳管规模与形态**：跨三大项目聚合 428 条活跃规则，结构元数据如下：
+- **纳管规模与形态**：跨三大项目聚合活跃规则（计数以 `scripts/common/rule-catalog.json` 为准），结构元数据如下：
   ```json
   {
     "schema": "workspace-rule-catalog/v1",
-    "totalRules": 428,
+    "totalRules": "<generated>",
     "counts": {
       "autoRefactor": 338,
       "workspaceTiming": 49,
@@ -52,7 +52,7 @@ description: >-
   }
   ```
 
-### 规则分布矩阵 (428 条活跃规则)
+### 规则分布矩阵
 1. **`autoRefactor` (338 条)**：涵盖 30 个内置分析器与四层金字塔体系，通用多语言代码重构、AST 语法树、Rust 双轨算子与架构质量模型；
 2. **`workspaceTiming` (49 条)**：涵盖 VS Code 扩展审查体系的 L0~L5 六层刚性防线（编译、存储崩溃安全、时间守恒、i18n、性能与 UI 对比度）；
 3. **`webGames` (29 条)**：涵盖 Godot 游戏工程的文档治理（`DOC-`、`LINK-`）、高性能脚本契约（`ADV-`）与配置架构审查规则；

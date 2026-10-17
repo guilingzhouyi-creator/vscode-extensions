@@ -1,10 +1,25 @@
 #!/usr/bin/env bash
-# Git Pre-Push Hook — 智能双运行期路由 (pwsh / bash)
+# Git Pre-Push Hook — 智能双运行期路由 (pwsh / bash) + 真实推送 refs 采集
 set -euo pipefail
 ROOT_DIR="$(git rev-parse --show-toplevel)"
-if command -v pwsh >/dev/null 2>&1 && [[ -f "$ROOT_DIR/scripts/ps1/pre-push-gate.ps1" ]]; then
-    exec pwsh -File "$ROOT_DIR/scripts/ps1/pre-push-gate.ps1"
-else
-    exec bash "$ROOT_DIR/scripts/sh/pre-push-gate.sh"
+
+# Git 通过 stdin 传入 "<local ref> <local sha> <remote ref> <remote sha>"。
+# 采集首个非删除推送，供门禁按真实推送范围扫描，而非固定使用当前分支上游。
+PUSHED_SHA=""
+REMOTE_SHA=""
+if [[ ! -t 0 ]]; then
+    REFS="$(cat)"
+    while read -r _local_ref local_sha _remote_ref remote_sha; do
+        if [[ -n "${local_sha:-}" && "$local_sha" != "0000000000000000000000000000000000000000" ]]; then
+            PUSHED_SHA="$local_sha"
+            REMOTE_SHA="$remote_sha"
+            break
+        fi
+    done <<< "$REFS"
 fi
 
+if command -v pwsh >/dev/null 2>&1 && [[ -f "$ROOT_DIR/scripts/ps1/pre-push-gate.ps1" ]]; then
+    exec pwsh -File "$ROOT_DIR/scripts/ps1/pre-push-gate.ps1" -PushedSha "$PUSHED_SHA" -RemoteSha "$REMOTE_SHA"
+else
+    exec bash "$ROOT_DIR/scripts/sh/pre-push-gate.sh" --pushed-sha "$PUSHED_SHA" --remote-sha "$REMOTE_SHA"
+fi

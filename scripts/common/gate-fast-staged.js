@@ -24,7 +24,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
-const { getSafeGitEnv, getStagedFiles: queryStagedFiles } = require('./git-env');
+const { getSafeGitEnv, getStagedFiles: queryStagedFiles, readStagedBufferSafe } = require('./git-env');
 
 const RULE_HYG_NAM_001 = 'HYG-NAM-001';
 const RULE_HYG_EOL_001 = 'HYG-EOL-001';
@@ -57,6 +57,11 @@ const MAX_FILENAME_STEM_LENGTH = 55;
 const MAX_PATH_LEAK_DISPLAY = 5;
 const MAX_SECRET_LEAK_DISPLAY = 3;
 const BYTE_CR = 0x0d;
+const BYTE_BOM = Object.freeze([0xef, 0xbb, 0xbf]);
+const HASH_COMMENT_EXTENSIONS = new Set(['.gd', '.py', '.sh', '.bash']);
+const COMMENT_CHECK_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.gd', '.py', '.rs', '.sh', '.ps1']);
+const INDENT_WIDTH_BY_EXT = Object.freeze({ '.ts': 4, '.tsx': 4, '.js': 2, '.jsx': 2, '.mjs': 2, '.cjs': 2 });
+const MAX_INDENT_WARNINGS_PER_FILE = 3;
 const MAX_FILENAME_SEGMENTS_SRC = 5;
 const MAX_FILENAME_SEGMENTS_TEST = 8;
 
@@ -84,8 +89,8 @@ const IGNORED_BASENAMES = new Set(
   'index main lib mod api types cli readme changelog license'.split(' ')
 );
 
-const RAW_GATE_SPECS = `1|暂存区零空文件检查通过||
-2|换行符契约 (ps1 CRLF, 其余 LF) 检查通过||
+const RAW_GATE_SPECS = `1|暂存区零空文件与零纯注释空壳检查通过||
+2|换行/编码/EOF/缩进契约 (ps1 CRLF, 其余 LF, 无 BOM, 单 EOF, 无 Tab) 检查通过||
 3|绝对路径与协议防泄漏检查通过|5|❌ [FAIL] Gate 3: 检测到新增代码中包含绝对路径或盘符泄漏:
 4|零黑话与规范命名检查通过||
 5|双轨体积预算 (ELOC<=900, LOC<=1400) 检查通过||
@@ -134,13 +139,14 @@ const VIOLATION_TPLS = Object.freeze(
   }, {})
 );
 
-function getStagedFiles(repoRoot) {
-  return queryStagedFiles(repoRoot, process.argv.slice(2));
+function getStagedFiles(repoRoot, explicitFiles = []) {
+  return queryStagedFiles(repoRoot, explicitFiles);
 }
 
-function getStagedDiff(repoRoot) {
+function getStagedDiff(repoRoot, range = '') {
+  const command = range ? `git diff -U0 --no-color ${range}` : GIT_DIFF_COMMAND;
   try {
-    return execSync(GIT_DIFF_COMMAND, {
+    return execSync(command, {
       cwd: repoRoot,
       env: getSafeGitEnv(),
       encoding: ENCODING_UTF8,
@@ -232,6 +238,9 @@ function classifyPowerShellLine(line, inBlock) {
 
 function calculateEloc(content, ext) {
   const lines = content.split(/\r?\n/);
+  if (lines.length > 0 && lines[lines.length - 1] === '') {
+    lines.pop();
+  }
   const totalLoc = lines.length;
   let eloc = 0;
   const isPowerShell = ext === '.ps1';
@@ -435,7 +444,7 @@ function validateFileEol(file, buffer, gate2Violations) {
         }),
       );
     }
-  } else if (/\.(?:sh|ts|js|gd|json|md)$/i.test(file)) {
+  } else if (/\.(?:sh|ts|tsx|js|jsx|mjs|cjs|gd|json|md|py|rs|ya?ml|toml|css|html|svg)$/i.test(file)) {
     if (hasCR) {
       gate2Violations.push(
         createViolation({
@@ -458,6 +467,140 @@ function validateFileEol(file, buffer, gate2Violations) {
  * @param {string} content - Raw text content of the file.
  * @param {Array} gate5Violations - Collector array for Gate 5 findings.
  */
+/**
+ * Rejects UTF-8 BOM prefixes on staged text files.
+ *
+ * @param {Buffer} buffer - Raw staged bytes.
+ * @param {string} file - Relative file path.
+ * @param {Array} violations - Collector array.
+ * @returns {void}
+ */
+function validateFileBom(buffer, file, violations) {
+  const hasBom =
+    buffer.length >= 3 &&
+    buffer[0] === BYTE_BOM[0] &&
+    buffer[1] === BYTE_BOM[1] &&
+    buffer[2] === BYTE_BOM[2];
+  if (!hasBom) return;
+  violations.push(
+    createViolation({
+      ruleId: 'HYG-BOM-001',
+      file,
+      message: `检测到 UTF-8 BOM 前缀，必须为 NO-BOM: ${file}`,
+      actual: 'UTF-8 with BOM',
+      expected: 'UTF-8 without BOM',
+      actionableFix: '以 UTF-8 无 BOM 重新保存该文件',
+    }),
+  );
+}
+
+/**
+ * Enforces a single POSIX terminal newline without trailing blank lines.
+ *
+ * @param {string} content - Decoded staged content.
+ * @param {string} file - Relative file path.
+ * @param {Array} violations - Collector array.
+ * @returns {void}
+ */
+function validateFileTerminalNewline(content, file, violations) {
+  const missing = !content.endsWith('\n') && !content.endsWith('\r');
+  const multiple = /\n[ \t]*\n[ \t]*$/.test(content);
+  if (!missing && !multiple) return;
+  violations.push(
+    createViolation({
+      ruleId: 'HYG-TRL-001',
+      file,
+      message: missing ? `文件末尾缺少 POSIX 换行: ${file}` : `文件末尾存在多余空行: ${file}`,
+      actual: missing ? 'missing terminal newline' : 'multiple trailing newlines',
+      expected: 'exactly one terminal newline',
+      actionableFix: '保留且仅保留一个文件末尾换行符',
+    }),
+  );
+}
+
+/**
+ * Rejects tab indentation outside GDScript and Makefile.
+ *
+ * @param {string} file - Relative file path.
+ * @param {string} content - Decoded staged content.
+ * @param {Array} violations - Collector array.
+ * @returns {void}
+ */
+function validateFileIndent(file, content, violations) {
+  const ext = path.extname(file).toLowerCase();
+  if (ext === '.gd' || path.basename(file) === 'Makefile') return;
+  if (!content.includes('\t')) return;
+  violations.push(
+    createViolation({
+      ruleId: 'HYG-IND-001',
+      file,
+      message: `非 GDScript 文件出现 Tab 缩进: ${file}`,
+      actual: 'tab indentation',
+      expected: 'space indentation only',
+      actionableFix: '将 Tab 替换为空格（TS 4 个，其余 2 个）',
+    }),
+  );
+}
+
+/**
+ * Detects comment-only hollow files after stripping language comment syntax.
+ *
+ * @param {string} file - Relative file path.
+ * @param {string} content - Decoded staged content.
+ * @param {Array} violations - Collector array.
+ * @returns {void}
+ */
+function validateCommentOnly(file, content, violations) {
+  const ext = path.extname(file).toLowerCase();
+  if (!COMMENT_CHECK_EXTENSIONS.has(ext)) return;
+  let text = content;
+  if (ext === '.ps1') text = text.replace(/<#[\s\S]*?#>/g, '');
+  if (HASH_COMMENT_EXTENSIONS.has(ext) || ext === '.ps1') {
+    text = text.replace(/"""[\s\S]*?"""/g, '').replace(/'''[\s\S]*?'''/g, '');
+    text = text.replace(/(^|\n)[ \t]*#.*?(?=\n|$)/g, '\n');
+  } else {
+    text = text.replace(/\/\*[\s\S]*?\*\//g, '');
+    text = text.replace(/(^|\n)[ \t]*\/\/.*?(?=\n|$)/g, '\n');
+  }
+  if (text.trim().length > 0) return;
+  violations.push(
+    createViolation({
+      ruleId: 'HYG-EMP-002',
+      file,
+      message: `发现纯注释空壳文件（剥离注释后无有效代码）: ${file}`,
+      actual: 'comment-only payload',
+      expected: 'executable or type declarations',
+      actionableFix: '补充实质代码或删除该空壳文件',
+    }),
+  );
+}
+
+/**
+ * Collects advisory indent-width warnings for TS/JS files (non-blocking).
+ *
+ * @param {string} file - Relative file path.
+ * @param {string} content - Decoded staged content.
+ * @param {Array} warnings - Collector array.
+ * @returns {void}
+ */
+function collectIndentWidthWarnings(file, content, warnings) {
+  const ext = path.extname(file).toLowerCase();
+  const width = INDENT_WIDTH_BY_EXT[ext];
+  if (!width) return;
+  const lines = content.split(/\r?\n/);
+  let reported = 0;
+  for (let index = 0; index < lines.length && reported < MAX_INDENT_WARNINGS_PER_FILE; index += 1) {
+    if (/^\s*(?:\*|\/\/|#)/.test(lines[index])) continue;
+    const previous = index > 0 ? lines[index - 1].trimEnd() : '';
+    if (/[+,[(=?:&|]$/.test(previous)) continue;
+    const match = lines[index].match(/^( +)\S/);
+    if (!match) continue;
+    if (match[1].length % width === 0) continue;
+    warnings.push({ file, line: index + 1, actual: `${match[1].length} spaces`, expected: `multiple of ${width}` });
+    reported += 1;
+  }
+}
+
 function validateFileVolume(file, content, gate5Violations) {
   const norm = file.replace(/\\/g, '/');
   if (
@@ -503,33 +646,30 @@ function validateFileVolume(file, content, gate5Violations) {
  * @param {string} file - Relative file path.
  * @param {object} collectors - Bucket collectors for gate violations.
  */
-function inspectStagedFile(repoRoot, file, collectors) {
+function inspectStagedFile(repoRoot, file, collectors, useIndex) {
   validateFilenameSlang(file, collectors.gate4);
   validateFilenameLength(file, collectors.gate4);
 
-  const fullPath = path.resolve(repoRoot, file);
-  if (!fs.existsSync(fullPath)) return;
-
-  let stat;
   let buffer;
   try {
-    stat = fs.statSync(fullPath);
-    if (stat.size === 0) {
-      const tpl = VIOLATION_TPLS.EMPTY_FILE;
-      collectors.gate1.push(
-        createViolation({
-          ruleId: RULE_HYG_EMP_001,
-          file,
-          message: `发现 0 字节物理空文件: ${file}`,
-          actual: tpl.actual,
-          expected: tpl.expected,
-          actionableFix: tpl.actionableFix,
-        }),
-      );
-      return;
-    }
-    buffer = fs.readFileSync(fullPath);
+    buffer = useIndex ? readStagedBufferSafe(repoRoot, file) : fs.readFileSync(path.resolve(repoRoot, file));
   } catch {
+    return;
+  }
+  if (!buffer) return;
+
+  if (buffer.length === 0) {
+    const tpl = VIOLATION_TPLS.EMPTY_FILE;
+    collectors.gate1.push(
+      createViolation({
+        ruleId: RULE_HYG_EMP_001,
+        file,
+        message: `发现 0 字节物理空文件: ${file}`,
+        actual: tpl.actual,
+        expected: tpl.expected,
+        actionableFix: tpl.actionableFix,
+      }),
+    );
     return;
   }
 
@@ -549,7 +689,20 @@ function inspectStagedFile(repoRoot, file, collectors) {
     return;
   }
 
-  validateFileEol(file, buffer, collectors.gate2);
+  validateFileBom(buffer, file, collectors.gate2);
+  let eolBuffer = buffer;
+  if (useIndex) {
+    try {
+      eolBuffer = fs.readFileSync(path.resolve(repoRoot, file));
+    } catch {
+      eolBuffer = buffer;
+    }
+  }
+  validateFileEol(file, eolBuffer, collectors.gate2);
+  validateFileTerminalNewline(content, file, collectors.gate2);
+  validateFileIndent(file, content, collectors.gate2);
+  validateCommentOnly(file, content, collectors.gate1);
+  collectIndentWidthWarnings(file, content, collectors.warnings);
   validateFileVolume(file, content, collectors.gate5);
 }
 
@@ -560,16 +713,17 @@ function inspectStagedFile(repoRoot, file, collectors) {
  * @param {string[]} stagedFiles - List of staged file paths.
  * @returns {object} Aggregated violation buckets.
  */
-function checkFileStream(repoRoot, stagedFiles) {
+function checkFileStream(repoRoot, stagedFiles, useIndex = true) {
   const collectors = {
     gate1: [],
     gate2: [],
     gate4: [],
     gate5: [],
+    warnings: [],
   };
 
   for (const file of stagedFiles) {
-    inspectStagedFile(repoRoot, file, collectors);
+    inspectStagedFile(repoRoot, file, collectors, useIndex);
   }
 
   return {
@@ -577,6 +731,7 @@ function checkFileStream(repoRoot, stagedFiles) {
     gate2Violations: collectors.gate2,
     gate4Violations: collectors.gate4,
     gate5Violations: collectors.gate5,
+    warnings: collectors.warnings,
   };
 }
 
@@ -675,11 +830,29 @@ function reportHumanViolations(violationsByGate) {
   }
 }
 
-function runFastStaged() {
-  const args = process.argv.slice(2);
+/**
+ * Parses CLI arguments into execution mode, revision range, and explicit file targets.
+ *
+ * @param {string[]} args - Raw process arguments.
+ * @returns {{isAgentMode: boolean, range: string, explicitFiles: string[], useIndex: boolean}} Parsed run options.
+ */
+function parseRunArgs(args) {
   const isAgentMode = args.includes(FLAG_AGENT) || args.includes(FLAG_SHORT_A) || args.includes(FLAG_JSON);
+  const rangeIndex = args.indexOf('--range');
+  const rangeValueIndex = rangeIndex === -1 ? -1 : rangeIndex + 1;
+  const range = rangeValueIndex !== -1 && args[rangeValueIndex] ? args[rangeValueIndex] : '';
+  if (range && !/^[A-Za-z0-9_./~^@{}:-]+$/.test(range)) {
+    console.error(`Invalid --range value: ${range}`);
+    process.exit(2);
+  }
+  const explicitFiles = args.filter((arg, index) => !arg.startsWith('-') && index !== rangeValueIndex);
+  return { isAgentMode, range, explicitFiles, useIndex: explicitFiles.length === 0 };
+}
+
+function runFastStaged() {
+  const { isAgentMode, range, explicitFiles, useIndex } = parseRunArgs(process.argv.slice(2));
   const repoRoot = path.resolve(__dirname, '../..');
-  const stagedFiles = getStagedFiles(repoRoot);
+  const stagedFiles = getStagedFiles(repoRoot, explicitFiles);
 
   if (stagedFiles.length === 0) {
     if (isAgentMode) {
@@ -701,10 +874,10 @@ function runFastStaged() {
     process.exit(0);
   }
 
-  const { gate1Violations, gate2Violations, gate4Violations, gate5Violations } =
-    checkFileStream(repoRoot, stagedFiles);
+  const { gate1Violations, gate2Violations, gate4Violations, gate5Violations, warnings } =
+    checkFileStream(repoRoot, stagedFiles, useIndex);
 
-  const diffText = getStagedDiff(repoRoot);
+  const diffText = getStagedDiff(repoRoot, range);
   const { gate3Violations, gate6Violations } = checkDiffStream(diffText);
 
   const allViolations = [
@@ -725,6 +898,7 @@ function runFastStaged() {
       exitCode: 1,
       summary: `Fast staged check blocked commit due to ${allViolations.length} physical hygiene or security violations.`,
       violations: allViolations,
+      warnings: warnings.slice(0, 20),
       targetFiles: Array.from(new Set(allViolations.map((v) => v.file).filter(Boolean))),
       verificationCommand: SCRIPT_NAME,
     };
@@ -754,6 +928,7 @@ function runFastStaged() {
           status: STATUS_PASS,
           gate: FAST_STAGED_GATE,
           summary: 'All fast-staged hygiene and security checks passed.',
+          warnings: warnings.slice(0, 20),
         },
         null,
         2,
@@ -762,6 +937,12 @@ function runFastStaged() {
   } else {
     for (const spec of GATE_SPECS) {
       console.log(`  ✔ [Gate ${spec.num}] ${spec.name}`);
+    }
+    if (warnings.length > 0) {
+      console.warn(`  ⚠ [WARN] ${warnings.length} 处缩进宽度不符合契约（仅告警，不阻断）`);
+      for (const item of warnings.slice(0, 5)) {
+        console.warn(`     ${item.file}:${item.line} ${item.actual} != ${item.expected}`);
+      }
     }
   }
   process.exit(0);

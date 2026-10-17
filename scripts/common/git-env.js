@@ -59,7 +59,7 @@ function getStagedFiles(repoRoot, explicitArgs) {
   }
 
   try {
-    const raw = execSync('git diff --cached --name-only --diff-filter=ACM', {
+    const raw = execSync('git diff --cached --name-only --diff-filter=ACMR', {
       cwd: root,
       env: getSafeGitEnv(root),
       encoding: 'utf8',
@@ -130,10 +130,39 @@ function readStagedContentSafe(repoRoot, relPath) {
   }
 }
 
+/**
+ * Reads the staged (index) version of a file as a raw buffer, falling back to the
+ * working tree only when the path is not present in the index.
+ *
+ * @param {string} repoRoot - Repository root directory.
+ * @param {string} relPath - Relative path of the file from repoRoot.
+ * @returns {Buffer|null} Raw staged bytes, or null when neither index nor disk has the path.
+ */
+function readStagedBufferSafe(repoRoot, relPath) {
+  const root = repoRoot || DEFAULT_REPO_ROOT;
+  const gitPath = relPath.replace(/\\/g, '/');
+
+  try {
+    return execSync(`git show ":${gitPath}"`, {
+      cwd: root,
+      env: getSafeGitEnv(root),
+      stdio: ['ignore', 'pipe', 'ignore'],
+      maxBuffer: 32 * 1024 * 1024,
+    });
+  } catch {
+    const fullPath = path.join(root, relPath);
+    if (fs.existsSync(fullPath)) {
+      return fs.readFileSync(fullPath);
+    }
+    return null;
+  }
+}
+
 module.exports = Object.freeze({
   DEFAULT_REPO_ROOT,
   getSafeGitEnv,
   getStagedFiles,
   getRangeFiles,
   readStagedContentSafe,
+  readStagedBufferSafe,
 });

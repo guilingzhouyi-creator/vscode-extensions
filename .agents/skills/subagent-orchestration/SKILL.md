@@ -56,7 +56,7 @@ description: >-
 | :--- | :--- | :--- | :--- |
 | **`explore`** | 只读探索与依赖图分析 | 严禁写文件；仅输出调用拓扑与死代码证据 | `enable_write_tools: false` |
 | **`construct`** | 业务特性与增量代码生产 | 严格限制在 Path Jail 内；强制平铺控制流 (CC<=15, Depth<=4) | `enable_write_tools: true` |
-| **`review`** | 静态审查与规则匹配分析 | 严禁直接改代码；对照 428 规则库输出精确行号与质性依据 | `enable_write_tools: false` |
+| **`review`** | 静态审查与规则匹配分析 | 严禁直接改代码；对照规则库输出精确行号与质性依据 | `enable_write_tools: false` |
 | **`refactor`** | 结构消融与复杂度平铺 | 优先消除循环内瞬态分配；消除空包跳板；动态稀释比 <= 1:3 | `enable_write_tools: true` |
 | **`guardian`** | 复合门禁防御与质量裁决 | 严禁改业务代码；执行测试与门禁并执行一票否决裁决 | `enable_write_tools: true` (限测试) |
 
@@ -89,7 +89,7 @@ description: >-
 在大型特性演进或复杂重构中，推荐实施 **Explore/Review 先行 $\rightarrow$ Construct/Refactor 施工 $\rightarrow$ Guardian 复核** 闭环流：
 1. **第一阶段：只读审查勘测 (`enable_write_tools: false`)**：
    - 调度 `review` 或 `explore` 姿态专员，物理拔除写入工具；
-   - 专员全量读取 AST、跨文件引用图与 428 规则库，输出精确违规行号、调用链以及质性重构方案；
+   - 专员全量读取 AST、跨文件引用图与规则库，输出精确违规行号、调用链以及质性重构方案；
 2. **第二阶段：定点施工重构 (`enable_write_tools: true`)**：
    - 调度 `construct` 或 `refactor` 姿态专员，赋予独占文件列表的写权限；
    - 专员严格按第一阶段输出的方案在 Path Jail 范围内实施小步改动，禁止蔓延扩写；
@@ -158,7 +158,7 @@ SubAgent 汇报任务完成并返回消息后，主 Agent **绝对不能盲目�
 1. **① 沙箱隔离审计 (Path Jail Guard Audit)**：主 Agent 执行 `git status` 与 `git diff --name-only`，比对修改文件是否严格局限于独占 Path Jail 授权列表，严禁发生跨领域越界修改；
 2. **② 领域编译构建自检 (Domain Build & Compile Gate)**：在受影响项目子目录执行类型与编译检查（`workspace-timing`: `npm run compile`; `auto-refactor`: `npm run build`; `WebGames`: `python scripts/py/audit_config.py --strict`；`scripts/`: 平台语法检查），确保 0 编译错误，0 类型告警；
 3. **③ 体积与复杂度双轨预算 (Complexity & Volume Budget Gate)**：执行 `node scripts/common/evaluate-eloc-budget.js`，核查单文件双轨体积（$\text{ELOC} \le 900 / \text{LOC} \le 1400$）、AST 切片守卫（$\text{CC} \le 15, \text{Depth} \le 4, \text{Noise} \le 4.0$）、1:3 动态包络及高负荷注释密度 $\ge 8\%$；
-4. **④ 单源规则目录与防虚构校验 (Rule Catalog Anti-Drift Gate)**：执行 `node scripts/common/generate-rule-catalog.js --check-only`，核实 428 条规则目录计数零漂移，任何汇报与提交说明零虚构规则 ID（`RCFG-RULE-DRIFT`）；
+4. **④ 单源规则目录与防虚构校验 (Rule Catalog Anti-Drift Gate)**：执行 `node scripts/common/generate-rule-catalog.js --check-only`，核实规则目录计数零漂移，任何汇报与提交说明零虚构规则 ID（`RCFG-RULE-DRIFT`）；
 5. **⑤ 领域专属架构守卫 (Domain Specialized Architectural Guard)**：
    - `auto-refactor`：执行 `node auto-refactor/scripts/validate-facade-governance.js`（消融空包跳板 `ARCH-ABS-001`）与 `node auto-refactor/scripts/validate-project-neutrality.js`（项目中立性）；
    - `workspace-timing`：执行 `cd workspace-timing && npm run review`（五层解耦与双语字典覆盖）；

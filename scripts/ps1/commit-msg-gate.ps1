@@ -190,7 +190,7 @@ if (-not $Agent) {
 
 # --- Rule 1: Header 格式与长度校验 ---
 $headerPattern = '^(feat|fix|refactor|docs|test|chore|style|perf)(\([a-zA-Z0-9_\-\/,@.]+\))?: .{4,80}$'
-if ($firstLine -notmatch $headerPattern) {
+if ($firstLine -cnotmatch $headerPattern) {
     Stop-CommitMsg -RuleId "GATE-MSG-001" -Message "Rule 1: 提交标题不符合生产级格式规范！" -Actual $firstLine -Expected "<type>(<scope>): <简述> (4~80 字符)" -ActionableFix "调整为 feat/fix/refactor/docs/test/chore/style/perf(<scope>): 描述"
 }
 
@@ -223,20 +223,33 @@ if ($cleanLines.Count -gt 1) {
 # --- 统计正文内容（第 3 行及之后）---
 $bodyText = ""
 $bodyCharCount = 0
+$bodySubstantiveChars = 0
+$inProjectBlock = $false
 if ($cleanLines.Count -gt 2) {
     for ($i = 2; $i -lt $cleanLines.Count; $i++) {
         $curLine = $cleanLines[$i]
         $bodyText += $curLine + "`n"
         $nonWs = $curLine -replace '\s', ''
         $bodyCharCount += $nonWs.Length
+
+        $trimmedBodyLine = $curLine.Trim()
+        if ($trimmedBodyLine -match '^\[[^\]]+\](\s*:.*)?\s*$') {
+            $inProjectBlock = $trimmedBodyLine -match '^\[(Project|项目|项目归属)'
+            continue
+        }
+        if ($inProjectBlock) {
+            if ([string]::IsNullOrWhiteSpace($trimmedBodyLine) -or $trimmedBodyLine -match '^-') { continue }
+            $inProjectBlock = $false
+        }
+        $bodySubstantiveChars += $nonWs.Length
     }
 }
 
 # --- Rule 4: 实质性提交的正文字数底线与信息密度 ---
 if ($commitType -in @('feat', 'fix', 'refactor', 'perf')) {
     $minBodyChars = 30
-    if ($bodyCharCount -lt $minBodyChars) {
-        Stop-CommitMsg -RuleId "GATE-MSG-001" -Message "Rule 4: 生产级关键提交 ($commitType) 正文信息量不足！当前有效字数: $bodyCharCount" -Actual "$bodyCharCount 字符" -Expected ">= $minBodyChars 字符" -ActionableFix "补充 [Why], [Changed], [Verification] 详细技术事实"
+    if ($bodySubstantiveChars -lt $minBodyChars) {
+        Stop-CommitMsg -RuleId "GATE-MSG-001" -Message "Rule 4: 生产级关键提交 ($commitType) 正文实质信息量不足！当前实质字数: $bodySubstantiveChars（区块标题与项目归属不计入）" -Actual "$bodySubstantiveChars 字符" -Expected ">= $minBodyChars 字符" -ActionableFix "补充 [Why], [Changed], [Verification] 的实质技术事实"
     }
 
     # --- Rule 5: 结构化区块完整性校验 ---
@@ -361,7 +374,7 @@ if ($Agent) {
 Write-Host "  ✔ Rule 1: Header 格式与长度 (5~80 字符, 无句号) 合规" -ForegroundColor Green
 Write-Host "  ✔ Rule 2: 零黑话与空洞词检测通过" -ForegroundColor Green
 Write-Host "  ✔ Rule 3: Header-Body 空行分割契约合规" -ForegroundColor Green
-Write-Host "  ✔ Rule 4: 正文有效字数与信息密度 ($bodyCharCount 字符) 达标" -ForegroundColor Green
+Write-Host "  ✔ Rule 4: 正文实质字数与信息密度 ($bodySubstantiveChars 字符，区块标题不计入) 达标" -ForegroundColor Green
 Write-Host "  ✔ Rule 5: 生产工程级结构化区块校验通过" -ForegroundColor Green
 if ($declaredProjects.Count -gt 0) {
     Write-Host "  ✔ Rule 5.1: 项目归属格式区合规 ([Project: $($declaredProjects -join ', ')])" -ForegroundColor Green
@@ -369,8 +382,7 @@ if ($declaredProjects.Count -gt 0) {
     Write-Host "  ✔ Rule 5.1: 项目归属格式区校验通过 (免检/非强制类型)" -ForegroundColor Green
 }
 Write-Host "  ✔ Rule 6: 正文零施工批次黑话校验通过" -ForegroundColor Green
-Write-Host "  ✔ Rule 7: 规则 ID 单源目录一致性防虚构校验通过" -ForegroundColor Green
-Write-Host "  ✔ Rule 8: 提交文本求真务实与禁词审查合规 (零临时/零夸大/零贬损/零元叙事口号)" -ForegroundColor Green
+Write-Host "  ✔ Rule 7/8: 规则 ID 反虚构与文本求真审查通过（详见上方 Node 校验输出）" -ForegroundColor Green
 Write-Host "=================================================================" -ForegroundColor Cyan
 Write-Host "✅ Commit-Msg 检查通过" -ForegroundColor Green
 Write-Host "=================================================================" -ForegroundColor Cyan

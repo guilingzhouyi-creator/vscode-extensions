@@ -1,0 +1,103 @@
+{
+  "schema": "global-tooling-rules/v1",
+  "generatedAt": "2026-10-17T14:47:38.915Z",
+  "totalRules": 16,
+  "rules": [
+    {
+      "id": "ARCH-ABS-001",
+      "family": "ARCH",
+      "severity": "error",
+      "summary": "Vacuous forwarding trampoline elimination guard: empty forwarding modules with ELOC <= 3 are strictly blocked"
+    },
+    {
+      "id": "ARCH-FAC-001",
+      "family": "ARCH",
+      "severity": "error",
+      "summary": "Substantive facade payload guard: facade module must satisfy ELOC >= 15 or aggregate >= 3 subdomains with immutability"
+    },
+    {
+      "id": "GATE-AST-001",
+      "family": "GATE",
+      "severity": "error",
+      "summary": "Pre-commit gate staged AST slice complexity (CC <= 15), nesting depth (Depth <= 4), and noise ratio guard"
+    },
+    {
+      "id": "GATE-ISO-001",
+      "family": "GATE",
+      "severity": "error",
+      "summary": "Cross-platform script isomorphism guard: dual ps1/sh parity, strict CRLF/LF line endings, and defensive directives"
+    },
+    {
+      "id": "HYG-BOM-001",
+      "family": "HYG",
+      "severity": "error",
+      "summary": "UTF-8 BOM hygiene guard: all workspace text files must be strictly UTF-8 NO-BOM without 0xEF, 0xBB, 0xBF byte prefix"
+    },
+    {
+      "id": "HYG-CLT-001",
+      "family": "HYG",
+      "severity": "error",
+      "summary": "System and transient clutter guard: workspace must remain clean of OS clutter and uncontrolled transient files"
+    },
+    {
+      "id": "HYG-DIR-001",
+      "family": "HYG",
+      "severity": "error",
+      "summary": "Lingering empty directory guard: active source and tooling directories must not retain zero-file lingering empty folders"
+    },
+    {
+      "id": "HYG-EMP-002",
+      "family": "HYG",
+      "severity": "error",
+      "summary": "Comment-only hollow file guard: files whose stripped content is empty after removing comments are strictly blocked"
+    },
+    {
+      "id": "HYG-IND-001",
+      "family": "HYG",
+      "severity": "error",
+      "summary": "Pure space indentation guard: non-GDScript and non-Makefile source files must use spaces exclusively without tab characters"
+    },
+    {
+      "id": "HYG-TRL-001",
+      "family": "HYG",
+      "severity": "error",
+      "summary": "POSIX EOF newline guard: text files must end with exactly one standard newline without trailing blank line buildup"
+    },
+    {
+      "id": "RCFG-COUNTS-001",
+      "family": "RCFG",
+      "severity": "error",
+      "summary": "Rule catalog counter coherence guard: totalRules must equal rules.length and the sum of deduplicated per-project counts"
+    },
+    {
+      "id": "VOL-DIL-001",
+      "family": "VOL",
+      "severity": "warning",
+      "summary": "Logic density floor guard: effective code density must not fall below 33% of total file lines"
+    },
+    {
+      "id": "VOL-DOC-001",
+      "family": "VOL",
+      "severity": "error",
+      "summary": "High-load logic architecture contract guard: modules with ELOC >= 600 must maintain comment ratio >= 8%"
+    },
+    {
+      "id": "VOL-ELOC-001",
+      "family": "VOL",
+      "severity": "error",
+      "summary": "Effective code volume budget guard: single file ELOC must not exceed 900"
+    },
+    {
+      "id": "VOL-LOC-001",
+      "family": "VOL",
+      "severity": "error",
+      "summary": "Physical line count budget guard: single file raw LOC must not exceed 1400"
+    },
+    {
+      "id": "VOL-RATIO-001",
+      "family": "VOL",
+      "severity": "warning",
+      "summary": "Dynamic dilution envelope guard: physical line count must not exceed dynamic ratio 1:3 envelope"
+    }
+  ]
+}

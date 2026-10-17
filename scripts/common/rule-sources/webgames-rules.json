@@ -1,0 +1,307 @@
+{
+  "schema": "webgames-rules-catalog/v1",
+  "generatedAt": "2026-10-17T14:47:32.215Z",
+  "totalRules": 50,
+  "rules": [
+    {
+      "id": "ADV-BND-001",
+      "family": "ADV",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第06期_55到64/Phase_63_自动化脚本库审查边界提升与规范性泛化治理/KALAR-DEV-2026-ST59-001_阶段1_声明式规则元模型与统一Finding数据模型设计.md)"
+    },
+    {
+      "id": "ADV-CFG-001",
+      "family": "ADV",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第07期_65到74/Phase_71_用户会话全生命周期与主页HUD事件流双轨闭环治理/KALAR-DEV-2026-ST67-003_阶段3_配置驱动扩展与全域EventBus无头接线工程化.md)"
+    },
+    {
+      "id": "ADV-CFG-002",
+      "family": "ADV",
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第07期_65到74/Phase_70_配置库唯一事实提纯与冗余收敛治理/KALAR-DEV-2026-ST66-002_阶段2_配置血缘静态判重引擎与漂移检测算法实现.md) [documentation-defined; not enforced]"
+    },
+    {
+      "id": "ADV-DEC-001",
+      "family": "ADV",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/scripts/config/code_governance_rules.json)"
+    },
+    {
+      "id": "ADV-EVT-001",
+      "family": "ADV",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/backend/infrastructure/event_bus/event_bus_core.gd)"
+    },
+    {
+      "id": "ADV-EVT-002",
+      "family": "ADV",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/scripts/config/code_governance_rules.json)"
+    },
+    {
+      "id": "ADV-EVT-003",
+      "family": "ADV",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/scripts/config/code_governance_rules.json)"
+    },
+    {
+      "id": "ADV-EVT-004",
+      "family": "ADV",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/scripts/config/code_governance_rules.json)"
+    },
+    {
+      "id": "ADV-LAM-001",
+      "family": "ADV",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第06期_55到64/Phase_63_自动化脚本库审查边界提升与规范性泛化治理/KALAR-DEV-2026-ST59-001_阶段1_声明式规则元模型与统一Finding数据模型设计.md)"
+    },
+    {
+      "id": "ADV-NAM-001",
+      "family": "ADV",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/scripts/config/code_governance_rules.json)"
+    },
+    {
+      "id": "ADV-POOL-001",
+      "family": "ADV",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/backend/domains/character_creation/dto/destiny_mod_manifest_dto.gd)"
+    },
+    {
+      "id": "ADV-PRF-001",
+      "family": "ADV",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/backend/domains/character_creation/starter_loadout_dispatcher.gd)"
+    },
+    {
+      "id": "ADV-PRF-002",
+      "family": "ADV",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/backend/domains/character_creation/agent_playthrough_session.gd)"
+    },
+    {
+      "id": "ADV-PRF-003",
+      "family": "ADV",
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/模板/GD老练风格硬性规范标准.md) [documentation-defined; not enforced]"
+    },
+    {
+      "id": "ADV-PRF-004",
+      "family": "ADV",
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/模板/GD老练风格硬性规范标准.md) [documentation-defined; not enforced]"
+    },
+    {
+      "id": "ADV-RNG-001",
+      "family": "ADV",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第08期_75到84/Phase_77_前端基础架构重构与根骨架施工细则/KALAR-DEV-2026-ST73-003_阶段3_UI可视化状态容器与全域Mock闭环工程化.md)"
+    },
+    {
+      "id": "ADV-SIG-001",
+      "family": "ADV",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第06期_55到64/Phase_63_自动化脚本库审查边界提升与规范性泛化治理/KALAR-DEV-2026-ST59-001_阶段1_声明式规则元模型与统一Finding数据模型设计.md)"
+    },
+    {
+      "id": "ADV-TYP-001",
+      "family": "ADV",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/scripts/config/code_governance_rules.json)"
+    },
+    {
+      "id": "ADV-TYP-002",
+      "family": "ADV",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/scripts/config/code_governance_rules.json)"
+    },
+    {
+      "id": "ADV-TYP-003",
+      "family": "ADV",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第06期_55到64/Phase_63_自动化脚本库审查边界提升与规范性泛化治理/KALAR-DEV-2026-ST59-001_阶段1_声明式规则元模型与统一Finding数据模型设计.md)"
+    },
+    {
+      "id": "ADV-UI-001",
+      "family": "ADV",
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/模板/GD老练风格硬性规范标准.md) [documentation-defined; not enforced]"
+    },
+    {
+      "id": "ART-AUD-005",
+      "family": "ART",
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/README.md) [documentation-defined; not enforced]"
+    },
+    {
+      "id": "ART-ICO-012",
+      "family": "ART",
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/README.md) [documentation-defined; not enforced]"
+    },
+    {
+      "id": "ART-REC-001",
+      "family": "ART",
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]"
+    },
+    {
+      "id": "ART-REC-002",
+      "family": "ART",
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]"
+    },
+    {
+      "id": "ART-REC-003",
+      "family": "ART",
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]"
+    },
+    {
+      "id": "ART-REC-004",
+      "family": "ART",
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]"
+    },
+    {
+      "id": "ART-REC-005",
+      "family": "ART",
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]"
+    },
+    {
+      "id": "ART-REC-006",
+      "family": "ART",
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]"
+    },
+    {
+      "id": "ART-REC-007",
+      "family": "ART",
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]"
+    },
+    {
+      "id": "ART-REC-008",
+      "family": "ART",
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]"
+    },
+    {
+      "id": "ART-REC-009",
+      "family": "ART",
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]"
+    },
+    {
+      "id": "ART-SPEC-001",
+      "family": "ART",
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]"
+    },
+    {
+      "id": "ART-SPEC-002",
+      "family": "ART",
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]"
+    },
+    {
+      "id": "ART-SPEC-003",
+      "family": "ART",
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]"
+    },
+    {
+      "id": "ART-SPEC-004",
+      "family": "ART",
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]"
+    },
+    {
+      "id": "ART-SPEC-005",
+      "family": "ART",
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]"
+    },
+    {
+      "id": "ART-SPEC-006",
+      "family": "ART",
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]"
+    },
+    {
+      "id": "ART-SPEC-007",
+      "family": "ART",
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]"
+    },
+    {
+      "id": "ART-SPEC-008",
+      "family": "ART",
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]"
+    },
+    {
+      "id": "ART-UI-001",
+      "family": "ART",
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/README.md) [documentation-defined; not enforced]"
+    },
+    {
+      "id": "ART-VIG-003",
+      "family": "ART",
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/README.md) [documentation-defined; not enforced]"
+    },
+    {
+      "id": "GOV-HOK-001",
+      "family": "GOV",
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第10期_95到104/Phase_98_十阶段全链路资源内存优化与审查系统能力内化施工细则/KALAR-DEV-2026-ST94-003_阶段3_审查系统能力内化与全域通用规则演进.md) [documentation-defined; not enforced]"
+    },
+    {
+      "id": "PRF-DUP-001",
+      "family": "PRF",
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第10期_95到104/Phase_98_十阶段全链路资源内存优化与审查系统能力内化施工细则/KALAR-DEV-2026-ST94-003_阶段3_审查系统能力内化与全域通用规则演进.md) [documentation-defined; not enforced]"
+    },
+    {
+      "id": "RES-SHUT-001",
+      "family": "RES",
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第10期_95到104/Phase_98_十阶段全链路资源内存优化与审查系统能力内化施工细则/KALAR-DEV-2026-ST94-003_阶段3_审查系统能力内化与全域通用规则演进.md) [documentation-defined; not enforced]"
+    },
+    {
+      "id": "SIM-CMP-001",
+      "family": "SIM",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第06期_55到64/Phase_61_脚本库完整性修复与泛化收敛加固/KALAR-DEV-2026-ST57-001_阶段1_注册契约与阈值数据模型设计.md)"
+    },
+    {
+      "id": "SIM-DED-001",
+      "family": "SIM",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第06期_55到64/Phase_61_脚本库完整性修复与泛化收敛加固/KALAR-DEV-2026-ST57-001_阶段1_注册契约与阈值数据模型设计.md)"
+    },
+    {
+      "id": "SIM-INH-001",
+      "family": "SIM",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/scripts/config/code_governance_rules.json)"
+    },
+    {
+      "id": "SIM-WRP-001",
+      "family": "SIM",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第06期_55到64/Phase_61_脚本库完整性修复与泛化收敛加固/KALAR-DEV-2026-ST57-001_阶段1_注册契约与阈值数据模型设计.md)"
+    },
+    {
+      "id": "UUID-REENTRANT-001",
+      "family": "UUID",
+      "severity": "error",
+      "summary": "WebGames domain gate rule (source: WebGames/tests/integration/pipelines/test_game_lifecycle_pipeline.gd)"
+    }
+  ]
+}

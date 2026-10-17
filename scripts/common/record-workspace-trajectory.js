@@ -252,10 +252,12 @@ function main() {
   const root = path.resolve(__dirname, '..', '..');
   const args = process.argv.slice(2);
   const isFailed = args.includes('--fail') || args.includes('--failed');
+  const commitLedger = args.includes('--commit-ledger');
   const gateCode = isFailed ? 'FAIL' : 'PASS';
   const gatePass = !isFailed;
 
-  const ledgerDir = resolveLedgerDir(root);
+  const trackedLedgerDir = resolveLedgerDir(root);
+  const ledgerDir = commitLedger ? trackedLedgerDir : path.join(root, '.audit-logs', 'trajectory');
   if (!fs.existsSync(ledgerDir)) {
     try {
       fs.mkdirSync(ledgerDir, { recursive: true });
@@ -264,6 +266,7 @@ function main() {
     }
   }
 
+  const trackedRunsPath = path.join(trackedLedgerDir, 'active-runs.ndjson');
   const activeRunsPath = path.join(ledgerDir, 'active-runs.ndjson');
   const revision = getGitRevision(root);
   const runId = String(Date.now()).slice(-12);
@@ -274,7 +277,9 @@ function main() {
   const eloc = resolveElocCounters(baseline);
   const debt = extractDebtCounters(baseline);
 
-  const prevRecord = readPreviousRecord(activeRunsPath);
+  const prevRecord =
+    readPreviousRecord(activeRunsPath) ||
+    (commitLedger ? null : readPreviousRecord(trackedRunsPath));
   const scoreBef =
     prevRecord && prevRecord.score && typeof prevRecord.score.aft === 'number'
       ? prevRecord.score.aft
@@ -318,7 +323,10 @@ function main() {
 
   fs.appendFileSync(activeRunsPath, line + '\n', 'utf8');
   pruneActiveRunsIfExceeded(activeRunsPath, DEFAULT_MAX_ROLLING_RUNS);
-  console.log(`  ✔ [Trajectory] Workspace audit run appended to ledger (${byteLen}B, rev: ${revision})`);
+  const ledgerScope = commitLedger ? 'tracked ledger' : 'runtime .audit-logs';
+  console.log(
+    `  ✔ [Trajectory] Workspace audit run appended to ${ledgerScope} (${byteLen}B, rev: ${revision})`,
+  );
 }
 
 main();

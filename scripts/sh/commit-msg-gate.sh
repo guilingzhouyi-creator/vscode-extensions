@@ -187,7 +187,7 @@ fi
 mapfile -t RAW_LINES < "$MSG_FILE"
 CLEAN_LINES=()
 for line in "${RAW_LINES[@]}"; do
-    trimmed=$(echo "$line" | sed 's/[[:space:]]*$//')
+    trimmed="${line%"${line##*[![:space:]]}"}"
     [[ "$trimmed" =~ ^[[:space:]]*# ]] && continue
     CLEAN_LINES+=("$trimmed")
 done
@@ -238,21 +238,41 @@ fi
 # --- 统计正文内容（第 3 行及之后）---
 BODY_TEXT=""
 BODY_CHAR_COUNT=0
+BODY_SUBSTANTIVE_CHARS=0
+IN_PROJECT_BLOCK=0
 if [[ "$TOTAL_LINES" -gt 2 ]]; then
     for ((i=2; i<TOTAL_LINES; i++)); do
         line="${CLEAN_LINES[$i]}"
         BODY_TEXT="${BODY_TEXT}${line}"$'\n'
-        # 统计非空白字符
-        non_ws_line=$(echo "$line" | tr -d ' \t\r\n')
+        # 统计非空白字符（参数展开，避免循环内子进程）
+        non_ws_line="${line//[[:space:]]/}"
         BODY_CHAR_COUNT=$((BODY_CHAR_COUNT + ${#non_ws_line}))
+
+        trimmed_body_line="${line#"${line%%[![:space:]]*}"}"
+        trimmed_body_line="${trimmed_body_line%"${trimmed_body_line##*[![:space:]]}"}"
+        if echo "$trimmed_body_line" | grep -qE '^\[[^]]+\]([[:space:]]*:.*)?[[:space:]]*$'; then
+            if echo "$trimmed_body_line" | grep -qiE '^\[(Project|项目|项目归属)'; then
+                IN_PROJECT_BLOCK=1
+            else
+                IN_PROJECT_BLOCK=0
+            fi
+            continue
+        fi
+        if [[ "$IN_PROJECT_BLOCK" -eq 1 ]]; then
+            if [[ -z "$trimmed_body_line" ]] || [[ "$trimmed_body_line" =~ ^- ]]; then
+                continue
+            fi
+            IN_PROJECT_BLOCK=0
+        fi
+        BODY_SUBSTANTIVE_CHARS=$((BODY_SUBSTANTIVE_CHARS + ${#non_ws_line}))
     done
 fi
 
 # --- Rule 4: 实质性提交的正文字数底线与信息密度 ---
 if [[ "$COMMIT_TYPE" =~ ^(feat|fix|refactor|perf)$ ]]; then
     MIN_BODY_CHARS=30
-    if [[ "$BODY_CHAR_COUNT" -lt "$MIN_BODY_CHARS" ]]; then
-        fail_commit_msg "GATE-MSG-001" "Rule 4: 生产级关键提交 ($COMMIT_TYPE) 正文信息量不足！当前有效字数: $BODY_CHAR_COUNT" "$BODY_CHAR_COUNT 字符" ">= $MIN_BODY_CHARS 字符" "补充 [Why], [Changed], [Verification] 详细技术事实"
+    if [[ "$BODY_SUBSTANTIVE_CHARS" -lt "$MIN_BODY_CHARS" ]]; then
+        fail_commit_msg "GATE-MSG-001" "Rule 4: 生产级关键提交 ($COMMIT_TYPE) 正文实质信息量不足！当前实质字数: $BODY_SUBSTANTIVE_CHARS（区块标题与项目归属不计入）" "$BODY_SUBSTANTIVE_CHARS 字符" ">= $MIN_BODY_CHARS 字符" "补充 [Why], [Changed], [Verification] 的实质技术事实"
     fi
 
     # --- Rule 5: 结构化区块完整性校验 ---
@@ -280,7 +300,8 @@ PROJECT_HEADER_REGEX='^\[[[:space:]]*([pP][rR][oO][jJ][eE][cC][tT]([[:space:]]*/
 
 for ((i=2; i<TOTAL_LINES; i++)); do
     cur_line="${CLEAN_LINES[$i]}"
-    trimmed_line=$(echo "$cur_line" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+    trimmed_line="${cur_line#"${cur_line%%[![:space:]]*}"}"
+    trimmed_line="${trimmed_line%"${trimmed_line##*[![:space:]]}"}"
     if [[ "$trimmed_line" =~ $PROJECT_HEADER_REGEX ]]; then
         FOUND_PROJECT_HEADER=true
         IN_PROJECT_SECTION=true
@@ -291,7 +312,13 @@ for ((i=2; i<TOTAL_LINES; i++)); do
         if [[ -n "$inline_val" ]]; then
             IFS=',，、' read -ra parts <<< "$inline_val"
             for p in "${parts[@]}"; do
-                p_clean=$(echo "$p" | sed -e 's/^[[:space:]-]*//' -e 's/[[:space:]]*$//' -e 's/[([（].*$//' -e 's/[[:space:]].*$//')
+                p_clean="${p#"${p%%[![:space:]]*}"}"
+                p_clean="${p_clean#-}"
+                p_clean="${p_clean#"${p_clean%%[![:space:]]*}"}"
+                p_clean="${p_clean%%(*}"
+                p_clean="${p_clean%%（*}"
+                p_clean="${p_clean%"${p_clean##*[![:space:]]}"}"
+                p_clean="${p_clean%%[[:space:]]*}"
                 if [[ -n "$p_clean" ]]; then
                     DECLARED_PROJECTS+=("$p_clean")
                 fi
@@ -306,7 +333,11 @@ for ((i=2; i<TOTAL_LINES; i++)); do
             item_val="${BASH_REMATCH[1]}"
             IFS=',，、' read -ra parts <<< "$item_val"
             for p in "${parts[@]}"; do
-                p_clean=$(echo "$p" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/[([（].*$//' -e 's/[[:space:]].*$//')
+                p_clean="${p#"${p%%[![:space:]]*}"}"
+                p_clean="${p_clean%%(*}"
+                p_clean="${p_clean%%（*}"
+                p_clean="${p_clean%"${p_clean##*[![:space:]]}"}"
+                p_clean="${p_clean%%[[:space:]]*}"
                 if [[ -n "$p_clean" ]]; then
                     DECLARED_PROJECTS+=("$p_clean")
                 fi
@@ -331,7 +362,7 @@ if [[ ${#DECLARED_PROJECTS[@]} -gt 0 ]]; then
     VALID_NORM=" workspace-timing auto-refactor webgames web-games governance "
     INVALID_PROJECTS=()
     for p in "${DECLARED_PROJECTS[@]}"; do
-        p_lower=$(echo "$p" | tr '[:upper:]' '[:lower:]')
+        p_lower="${p,,}"
         if [[ ! "$VALID_NORM" =~ [[:space:]]"$p_lower"[[:space:]] ]]; then
             INVALID_PROJECTS+=("$p")
         fi
@@ -385,7 +416,7 @@ fi
 echo "  ✔ Rule 1: Header 格式与长度 (5~80 字符, 无句号) 合规"
 echo "  ✔ Rule 2: 零黑话与空洞词检测通过"
 echo "  ✔ Rule 3: Header-Body 空行分割契约合规"
-echo "  ✔ Rule 4: 正文有效字数与信息密度 ($BODY_CHAR_COUNT 字符) 达标"
+echo "  ✔ Rule 4: 正文实质字数与信息密度 ($BODY_SUBSTANTIVE_CHARS 字符，区块标题不计入) 达标"
 echo "  ✔ Rule 5: 生产工程级结构化区块校验通过"
 if [[ ${#DECLARED_PROJECTS[@]} -gt 0 ]]; then
     PROJ_STR=$(IFS=', '; echo "${DECLARED_PROJECTS[*]}")

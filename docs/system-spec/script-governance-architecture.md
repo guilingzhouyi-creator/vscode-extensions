@@ -11,26 +11,42 @@
 ```
 scripts/
 ├── README.md                      # 仓库级脚本中枢索引与语言/职能矩阵
-├── common/                        # Node.js 语言域：跨平台核心算法、规则单源与流式门禁 (12 个 .js)
-│   ├── gate-fast-staged.js        # Tier 1 极速内存流式门禁 (<250ms)
-│   ├── validate-script-isomorphism.js # 跨平台同构脚本与防御契约自动化守卫
-│   ├── validate-no-empty-files.js # 全工作区物理空文件与空包跳板守卫 (带 8KB 短路)
-│   ├── validate-staged-slice.js   # AST 增量切片圈复杂度/嵌套深度/噪声比守卫
-│   ├── evaluate-eloc-budget.js    # 双轨体积 ELOC<=900 / LOC<=1400 动态包络评估器
-│   ├── generate-rule-catalog.js   # 400+ 规则单源目录聚合器
-│   └── rule-catalog.json          # 全仓规则事实真源 (SSOT)
-├── ps1/                           # PowerShell 语言域：Windows 本地交互与门禁同构实现 (7 个 .ps1)
+├── common/                        # Node.js 语言域：跨平台算法、规则单源与流式门禁
+│   ├── gate-fast-staged.js        # Tier 1 极速内存流式门禁 (Gates 1~6)
+│   ├── validate-staged-slice.js   # AST 增量切片 CC/Depth/Noise 守卫（缺依赖即 fail-closed）
+│   ├── validate-code-density.js   # 五维密度、POR/TSPR 与稀释审查
+│   ├── evaluate-eloc-budget.js    # 双轨体积 ELOC<=900 / LOC<=1400 与 1:3 包络
+│   ├── validate-physical-hygiene.js # 物理卫生八维全域巡检
+│   ├── validate-gitignore-governance.js # .gitignore 换行、底线与反误伤守卫
+│   ├── validate-skills.js         # 技能集结构、死链与插件同构
+│   ├── validate-script-isomorphism.js # 跨平台脚本结构与防御契约守卫
+│   ├── validate-rule-id-closure.js # 门禁引用规则 ID 与目录登记闭包
+│   ├── generate-rule-catalog.js   # 规则单源目录聚合器（默认只读，--write 重生成）
+│   ├── bootstrap-gates.js         # 钩子激活与依赖/构建一键引导
+│   ├── test-gate-parity.js        # 双实现提交门禁行为差分
+│   ├── test-gate-selftest.js      # 门禁三态自检矩阵
+│   ├── rule-catalog.json          # 全仓规则事实真源 (SSOT)
+│   └── rule-sources/              # 受控规则源（auto-refactor / WebGames / global）
+├── ps1/                           # PowerShell 语言域：Windows 本地交互与门禁同构实现
 │   ├── audit-all.ps1              # 全工作区跨项目统一审查中枢
 │   ├── pre-commit-gate.ps1        # 本地提交前置门禁
 │   ├── commit-msg-gate.ps1        # 提交信息结构化与风格门禁
 │   ├── pre-push-gate.ps1          # 本地推送前置综合门禁
-│   └── package.ps1                # 本地打包与热同步 (-HotSync)
-└── sh/                            # Bash 语言域：Linux / CI 流水线同构实现与发布工具链 (15 个 .sh)
-    ├── audit-all.sh               # CI / Linux 统一审查中枢
-    ├── pre-commit-gate.sh         # Linux / Git Hooks 提交前置门禁
-    ├── commit-msg-gate.sh         # CI 提交信息门禁
-    ├── pre-push-gate.sh           # CI 推送门禁
-    └── package.sh / release.sh    # 发布流与语义化版本递增 (version-bump.sh)
+│   ├── install-hooks.ps1          # 钩子激活
+│   ├── package.ps1                # 打包与热同步 (-HotSync)
+│   ├── check-display-assets.ps1   # 打包资产校验
+│   ├── release-tag.ps1            # 发布闭环
+│   └── version-bump.ps1           # 语义化版本递增
+└── sh/                            # Bash 语言域：Linux / CI 流水线同构实现与发布工具链
+    ├── audit-all.sh               # Linux 统一审查中枢
+    ├── pre-commit-gate.sh         # Git Hooks 提交前置门禁
+    ├── commit-msg-gate.sh         # 提交信息门禁
+    ├── pre-push-gate.sh           # 推送门禁
+    ├── install-hooks.sh           # 钩子激活
+    ├── package.sh                 # 打包
+    ├── check-display-assets.sh    # 打包资产校验
+    ├── release-tag.sh             # 发布闭环
+    └── version-bump.sh            # 语义化版本递增
 ```
 
 ---

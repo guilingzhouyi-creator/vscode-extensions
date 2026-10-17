@@ -60,8 +60,23 @@ function Write-PreCommitFailure {
         [string]$ActionableFix,
         [string]$VerifyCmd,
         [string[]]$TargetFiles,
-        [string]$Details = ""
+        [string]$Details = "",
+        [string]$StepId = ""
     )
+
+    if (-not $StepId) {
+        $StepId = switch -Wildcard ($StepName) {
+            'Gate 7: Rules Registry*' { 'PC-03-01' }
+            'Gate 7: Skills*' { 'PC-03-02' }
+            'Gate 8: workspace-timing Compilation*' { 'PC-04-01' }
+            'Gate 8: workspace-timing Text Layout*' { 'PC-04-02' }
+            'Gate 8: workspace-timing Layout Build*' { 'PC-04-02' }
+            'Gate 8: auto-refactor Compilation*' { 'PC-04-03' }
+            'Gate 8: WebGames*' { 'PC-04-04' }
+            'Gate 9: Dual-Scale Volume*' { 'PC-05-02' }
+            default { 'PC-00-00' }
+        }
+    }
 
     $diagDir = Join-Path $repoRoot ".audit-logs"
     if (-not (Test-Path $diagDir)) { [void](New-Item -ItemType Directory -Path $diagDir -Force) }
@@ -95,10 +110,12 @@ function Write-PreCommitFailure {
 
     $envelope = [ordered]@{
         protocolVersion = "1.0.0"
+        runId = $runId
         recordedAt = (Get-Date).ToString("o")
         status = "BLOCK"
         gate = "pre-commit"
         step = $StepName
+        stepId = $StepId
         failedCommand = $VerifyCmd
         exitCode = 1
         summary = $Summary
@@ -141,6 +158,12 @@ if (-not $Agent) {
 }
 
 $failed = $false
+$runId = [Guid]::NewGuid().ToString('N').Substring(0, 12)
+
+if ($Agent) {
+    $staleSnapshot = Join-Path $repoRoot ".audit-logs/last-failure.json"
+    if (Test-Path $staleSnapshot) { Remove-Item -Path $staleSnapshot -Force -ErrorAction SilentlyContinue }
+}
 
 # --- Gate 1~6: 快速暂存区统一流式审查 ([1/9] 零空文件, [2/9] 换行契约, [3/9] 绝对路径, [4/9] 零黑话, [5/9] 双轨体积, [6/9] 密钥防泄漏) ---
 if ($Agent) {
@@ -257,7 +280,15 @@ $hasWtDoc = $stagedFiles | Where-Object { $_ -match "^workspace-timing/(CHANGELO
 if ($hasWtDoc) {
     if (-not $Agent) { Write-Host "  ▶ 触发 workspace-timing 文档布局与变更日志真实性门禁 (L3-DOC-LAYOUT)..." -ForegroundColor Cyan }
     if ($Agent) {
-        $out = Invoke-ChildCommand -WorkingDir (Join-Path $repoRoot "workspace-timing") -Action { & $nodeCmd "scripts/dist/audit/text-layout.js" 2>&1 }
+        $out = Invoke-ChildCommand -WorkingDir (Join-Path $repoRoot "workspace-timing") -Action {
+            $buildLog = @()
+            if (-not (Test-Path "scripts/dist/audit/text-layout.js")) {
+                $buildLog = & $npmCmd run scripts:build 2>&1
+                if ($LASTEXITCODE -ne 0) { return $buildLog }
+            }
+            $runLog = & $nodeCmd "scripts/dist/audit/text-layout.js" 2>&1
+            return @($buildLog) + @($runLog)
+        }
         if ($LASTEXITCODE -ne 0) {
             $json = Write-PreCommitFailure `
                 -StepName "Gate 8: workspace-timing Text Layout (L3-DOC-LAYOUT)" `
@@ -271,12 +302,26 @@ if ($hasWtDoc) {
             exit 1
         }
     } else {
-        $docProc = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/dist/audit/text-layout.js" -WorkingDirectory (Join-Path $repoRoot "workspace-timing") -NoNewWindow -PassThru -Wait
-        if ($docProc.ExitCode -ne 0) {
-            Write-Host "❌ [FAIL] Gate 8: workspace-timing 文档文本布局或变更日志真实性核验未通过！" -ForegroundColor Red
-            $failed = $true
-        } else {
-            Write-Host "  ✔ [PASS] workspace-timing 文档布局与变更日志真实性校验通过" -ForegroundColor Green
+        $wtLayoutDir = Join-Path $repoRoot "workspace-timing"
+        $wtLayoutArtifact = Join-Path $wtLayoutDir "scripts/dist/audit/text-layout.js"
+        $wtLayoutReady = $true
+        if (-not (Test-Path $wtLayoutArtifact)) {
+            Write-Host "  ▶ 构建 workspace-timing 审查脚本产物 (npm run scripts:build)..." -ForegroundColor Cyan
+            $buildProc = Start-Process -FilePath $npmCmd -ArgumentList "run", "scripts:build" -WorkingDirectory $wtLayoutDir -NoNewWindow -PassThru -Wait
+            if ($buildProc.ExitCode -ne 0) {
+                Write-Host "❌ [FAIL] Gate 8: workspace-timing 审查脚本构建失败 (npm run scripts:build)！" -ForegroundColor Red
+                $failed = $true
+                $wtLayoutReady = $false
+            }
+        }
+        if ($wtLayoutReady) {
+            $docProc = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/dist/audit/text-layout.js" -WorkingDirectory $wtLayoutDir -NoNewWindow -PassThru -Wait
+            if ($docProc.ExitCode -ne 0) {
+                Write-Host "❌ [FAIL] Gate 8: workspace-timing 文档文本布局或变更日志真实性核验未通过！" -ForegroundColor Red
+                $failed = $true
+            } else {
+                Write-Host "  ✔ [PASS] workspace-timing 文档布局与变更日志真实性校验通过" -ForegroundColor Green
+            }
         }
     }
 }
@@ -377,6 +422,31 @@ if ($touchedAuditable) {
         $resDensity = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-code-density.js", "--staged" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
         if ($resDensity.ExitCode -ne 0) {
             Write-Host "❌ [FAIL] Gate 9: 暂存区代码密度与接线载荷审查未通过！" -ForegroundColor Red
+            $failed = $true
+        }
+    }
+}
+
+if ($touchedAuditable) {
+    if (-not $Agent) { Write-Host "  ▶ 审查暂存区双轨体积与 1:3 动态包络 (ELOC<=900, LOC<=1400)..." -ForegroundColor Gray }
+    if ($Agent) {
+        $outEloc = & $nodeCmd (Join-Path $repoRoot "scripts/common/evaluate-eloc-budget.js") --staged --json 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            $json = Write-PreCommitFailure `
+                -StepName "Gate 9: Dual-Scale Volume Budget (VOL-ELOC-001)" `
+                -RuleId "VOL-ELOC-001" `
+                -Summary "Staged code exceeds ELOC/LOC budgets or the 1:3 dynamic envelope." `
+                -ActionableFix "Run 'node scripts/common/evaluate-eloc-budget.js --staged' and split or densify the offending module." `
+                -VerifyCmd "node scripts/common/evaluate-eloc-budget.js --staged" `
+                -TargetFiles @($touchedAuditable) `
+                -Details ($outEloc -join "`n")
+            Write-Output $json
+            exit 1
+        }
+    } else {
+        $resEloc = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/evaluate-eloc-budget.js", "--staged" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
+        if ($resEloc.ExitCode -ne 0) {
+            Write-Host "❌ [FAIL] Gate 9: 暂存区双轨体积与动态包络审查未通过！" -ForegroundColor Red
             $failed = $true
         }
     }

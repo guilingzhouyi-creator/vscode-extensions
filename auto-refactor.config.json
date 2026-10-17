@@ -1,5 +1,7 @@
 {
   "$schema": "./auto-refactor/config.schema.json",
+  "$comment": "Advisory review profile only. Blocking enforcement lives in scripts/ps1|sh gates; do not use this file as a gate entry.",
+  "profile": "advisory",
   "format": "text",
   "failOnIssue": false,
   "commentLevel": "standard",
@@ -29,8 +31,8 @@
     "effectiveLocWarn": 750,
     "effectiveLocFail": 900,
     "fileFunctionsWarn": 20,
-    "complexityWarn": 15,
-    "complexityFail": 25,
+    "complexityWarn": 12,
+    "complexityFail": 15,
     "blockingIoAllowPatterns": [
       "scripts/**",
       "tests/**",

@@ -37,17 +37,12 @@ function loadTermsConfig() {
 function sanitizeLineForChecking(line, whitelist) {
   let sanitized = line;
 
-  // 1. Mask inline code blocks `...`
-  sanitized = sanitized.replace(/`[^`]+`/g, ' __CODE_SPAN__ ');
+  // 1. Mask registered/standard rule IDs (e.g. CMG-STY-001, ADV-PRF-002)
+  sanitized = sanitized.replace(/\b[A-Z]{2,4}(?:-[A-Z0-9]+){2,}\b/g, ' __RULE_ID__ ');
 
-  // 2. Mask registered/standard rule IDs (e.g. CMG-STY-001, ADV-PRF-002)
-  sanitized = sanitized.replace(/\b[A-Z]{2,4}-[A-Z0-9]+-[0-9]{3}\b/g, ' __RULE_ID__ ');
-
-  // 3. Mask explicit external quotes "..." and “...”
-  sanitized = sanitized.replace(/"[^"]+"/g, ' __QUOTE_SPAN__ ');
-  sanitized = sanitized.replace(/“[^”]+”/g, ' __QUOTE_SPAN__ ');
-
-  // 4. Mask whitelisted technical compound terms
+  // 2. Mask whitelisted technical compound terms only. Quoted spans and code spans
+  //    are intentionally NOT masked: blanket masking allowed forbidden wording to
+  //    bypass detection by wrapping it in quotes or backticks.
   for (const term of whitelist) {
     if (!term) continue;
     if (/^[a-zA-Z\s-]+$/.test(term)) {

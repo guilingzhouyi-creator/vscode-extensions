@@ -211,7 +211,6 @@ function validateMarkdownFile(filePath, registeredRules) {
 function validatePluginBundle(repoRoot) {
   const pluginDir = path.join(repoRoot, '.agents/plugins/workspace-governance');
   if (!fs.existsSync(pluginDir)) return [];
-
   const errors = [];
   const pluginJsonPath = path.join(pluginDir, 'plugin.json');
   if (!fs.existsSync(pluginJsonPath)) {
@@ -301,7 +300,11 @@ function main() {
     return 1;
   }
 
-  process.stdout.write(`\n✔ [PASS] All ${skillFolders.length} skills (${allMdFiles.length} markdown documents) verified successfully with plugin parity.\n`);
+  const pluginBundlePresent = fs.existsSync(path.join(repoRoot, '.agents/plugins/workspace-governance'));
+  const parityNote = pluginBundlePresent
+    ? 'with plugin parity'
+    : 'plugin parity skipped (bundle absent)';
+  process.stdout.write(`\n✔ [PASS] All ${skillFolders.length} skills (${allMdFiles.length} markdown documents) verified successfully ${parityNote}.\n`);
   return 0;
 }
 

@@ -178,10 +178,15 @@ function checkAntiOverblocking(repoRoot) {
   let output = '';
 
   try {
-    const cmd = 'cmd.exe /c "set HOME=%TEMP% && set USERPROFILE=%TEMP% && git ls-files -i -c --exclude-standard"';
-    output = execSync(cmd, { cwd: repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
-  } catch {
-    return [];
+    output = execSync('git ls-files -i -c --exclude-standard', {
+      cwd: repoRoot,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
+  } catch (err) {
+    // Fail-closed: an unevaluated anti-overblocking check must not be reported as passing.
+    violations.push(`Anti-Overblocking check could not be evaluated: ${err.message}`);
+    return violations;
   }
 
   const ignoredTrackedFiles = output

@@ -12,7 +12,9 @@
 [CmdletBinding()]
 param(
     [switch]$ViewLog,
-    [switch]$Agent
+    [switch]$Agent,
+    [string]$PushedSha = "",
+    [string]$RemoteSha = ""
 )
 Set-StrictMode -Version Latest
 
@@ -45,8 +47,14 @@ if (-not $Agent) {
 }
 
 $failed = $false
+$runId = [Guid]::NewGuid().ToString('N').Substring(0, 12)
 $autoRefactorDir = Join-Path $repoRoot "auto-refactor"
 $workspaceTimingDir = Join-Path $repoRoot "workspace-timing"
+
+if ($Agent) {
+    $staleSnapshot = Join-Path $repoRoot ".audit-logs/last-failure.json"
+    if (Test-Path $staleSnapshot) { Remove-Item -Path $staleSnapshot -Force -ErrorAction SilentlyContinue }
+}
 
 function Get-StepRuleId {
     [CmdletBinding()]
@@ -61,6 +69,36 @@ function Get-StepRuleId {
     if ($StepName -match "Gate 8") { return "ADV-CFG-001" }
     if ($StepName -match "Gate 9") { return "GATE-MSG-001" }
     return "GATE-SYS-001"
+}
+
+$script:StepMetaTable = @{
+    'Gate 1 (物理卫生八维全域巡检)' = @{ Id = 'PP-01-01'; Rule = 'HYG-EMP-001' }
+    'Gate 1 (.gitignore 治理)' = @{ Id = 'PP-01-02'; Rule = 'GATE-HYG-001' }
+    'Gate 1 (五维代码密度)' = @{ Id = 'PP-01-03'; Rule = 'VOL-DIL-001' }
+    'Gate 2 (单源规则目录)' = @{ Id = 'PP-02-01'; Rule = 'RCFG-RULE-DRIFT' }
+    'Gate 2 (规则 ID 闭包)' = @{ Id = 'PP-02-02'; Rule = 'RCFG-RULE-DRIFT' }
+    'Gate 2 (文档一致性)' = @{ Id = 'PP-02-03'; Rule = 'RCFG-RULE-DRIFT' }
+    'Gate 2 (规则可达性)' = @{ Id = 'PP-02-04'; Rule = 'RCFG-RULE-DRIFT' }
+    'auto-refactor Rust Gate' = @{ Id = 'PP-03-01'; Rule = 'GATE-SYS-001' }
+    'auto-refactor Build' = @{ Id = 'PP-03-02'; Rule = 'GATE-SYS-001' }
+    'auto-refactor Facade Gate' = @{ Id = 'PP-03-03'; Rule = 'ARCH-FAC-001' }
+    'auto-refactor Self Gate' = @{ Id = 'PP-03-04'; Rule = 'GATE-SYS-001' }
+    'auto-refactor Tests' = @{ Id = 'PP-03-05'; Rule = 'GATE-SYS-001' }
+    'Gate 4 (auto-refactor 质量基线)' = @{ Id = 'PP-04-01'; Rule = 'GATE-BUDGET-001' }
+    'Gate 5 (workspace-timing 快速单元测试)' = @{ Id = 'PP-05-01'; Rule = 'GATE-SYS-001' }
+    'Gate 6 (workspace-timing 审查门禁)' = @{ Id = 'PP-06-01'; Rule = 'RCFG-MATRIX' }
+    'Gate 7 (长期轨迹账本约束)' = @{ Id = 'PP-07-01'; Rule = 'GOV-TRJ-001' }
+    'Gate 8 (WebGames 全域质量门禁)' = @{ Id = 'PP-08-01'; Rule = 'ADV-CFG-001' }
+    'Gate 9 (待推送分支提交历史风格与禁词审查)' = @{ Id = 'PP-09-01'; Rule = 'CMG-STY-001' }
+}
+
+function Resolve-StepMeta {
+    [CmdletBinding()]
+    param([string]$StepName)
+    if ($script:StepMetaTable.ContainsKey($StepName)) {
+        return $script:StepMetaTable[$StepName]
+    }
+    return @{ Id = 'PP-00-00'; Rule = (Get-StepRuleId -StepName $StepName) }
 }
 
 function Write-GateHost {
@@ -198,7 +236,8 @@ function Invoke-GateStep {
             Copy-Item -Path $stepLog -Destination $lastLog -Force -ErrorAction SilentlyContinue
             Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/log-rotator.js", "--truncate", $lastLog -WorkingDirectory $repoRoot -NoNewWindow -Wait -ErrorAction SilentlyContinue
 
-            $ruleId = Get-StepRuleId -StepName $StepName
+            $ruleId = (Resolve-StepMeta -StepName $StepName).Rule
+            $stepId = (Resolve-StepMeta -StepName $StepName).Id
             $cmdStr = "$FilePath $($ArgumentList -join ' ')"
             $violation = [ordered]@{
                 ruleId = $ruleId
@@ -209,10 +248,12 @@ function Invoke-GateStep {
             }
             $envelope = [ordered]@{
                 protocolVersion = "1.0.0"
+                runId = $runId
                 recordedAt = (Get-Date).ToString("o")
                 status = "BLOCK"
                 gate = "pre-push"
                 step = $StepName
+                stepId = $stepId
                 failedCommand = $cmdStr
                 exitCode = $p.ExitCode
                 summary = "Step $StepName failed with exit code $($p.ExitCode)"
@@ -237,10 +278,20 @@ function Invoke-GateStep {
 
 # --- 影响域智能分析 (Impact-driven Routing) ---
 $range = ""
-try {
-    git rev-parse --verify '@{u}' 2>$null | Out-Null
-    if ($LASTEXITCODE -eq 0) { $range = '@{u}..HEAD' }
-} catch {}
+if ($PushedSha -match '^[0-9a-f]{7,40}$') {
+    if ($RemoteSha -match '^[0-9a-f]{7,40}$' -and $RemoteSha -notmatch '^0+$') {
+        $range = "$RemoteSha..$PushedSha"
+    } else {
+        $mergeBase = git merge-base $PushedSha origin/main 2>$null
+        $range = if ($LASTEXITCODE -eq 0 -and $mergeBase) { "$mergeBase..$PushedSha" } else { "$PushedSha~1..$PushedSha" }
+    }
+}
+if (-not $range) {
+    try {
+        git rev-parse --verify '@{u}' 2>$null | Out-Null
+        if ($LASTEXITCODE -eq 0) { $range = '@{u}..HEAD' }
+    } catch {}
+}
 if (-not $range) {
     try {
         git rev-parse --verify origin/main 2>$null | Out-Null
@@ -305,10 +356,13 @@ if ($code -ne 0 -or $codeGi -ne 0 -or $codeDensity -ne 0) {
 # --- Gate 2: 规则单源目录一致性同步 ---
 Write-GateHost "[2/9] 校验全工作区单源规则目录同步..." -ForegroundColor Gray
 $code = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/generate-rule-catalog.js", "--check-only") -WorkingDirectory $repoRoot -StepName "Gate 2 (单源规则目录)" -TimeoutSeconds 30
-if ($code -ne 0) {
+$codeClosure = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-rule-id-closure.js") -WorkingDirectory $repoRoot -StepName "Gate 2 (规则 ID 闭包)" -TimeoutSeconds 30
+$codeDocs = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-docs-consistency.js") -WorkingDirectory $repoRoot -StepName "Gate 2 (文档一致性)" -TimeoutSeconds 30
+$codeReach = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-rule-reachability.js") -WorkingDirectory $repoRoot -StepName "Gate 2 (规则可达性)" -TimeoutSeconds 60
+if ($code -ne 0 -or $codeClosure -ne 0 -or $codeDocs -ne 0 -or $codeReach -ne 0) {
     $failed = $true
 } else {
-    Write-GateHost "  ✔ 全工作区单源规则目录同步通过" -ForegroundColor Green
+    Write-GateHost "  ✔ 全工作区单源规则目录同步与规则 ID 闭包校验通过" -ForegroundColor Green
 }
 
 # --- Gate 3: auto-refactor 引擎全量门禁与回归套件 ---
@@ -316,9 +370,10 @@ if ($runAr) {
     Write-GateHost "[3/9] 执行 auto-refactor 全量门禁与回归套件 (Rust/Build/Self/Tests)..." -ForegroundColor Gray
     $codeRust = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/gate-rust.js") -WorkingDirectory $autoRefactorDir -StepName "auto-refactor Rust Gate" -TimeoutSeconds 60
     $codeBuild = Invoke-GateStep -FilePath $npmCmd -ArgumentList @("run", "build") -WorkingDirectory $autoRefactorDir -StepName "auto-refactor Build" -TimeoutSeconds 90
+    $codeFacade = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/validate-facade-governance.js") -WorkingDirectory $autoRefactorDir -StepName "auto-refactor Facade Gate" -TimeoutSeconds 60
     $codeSelf = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/gate-self.js") -WorkingDirectory $autoRefactorDir -StepName "auto-refactor Self Gate" -TimeoutSeconds 60
     $codeTest = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/test-parallel.js") -WorkingDirectory $autoRefactorDir -StepName "auto-refactor Tests" -TimeoutSeconds 180
-    if ($codeRust -ne 0 -or $codeBuild -ne 0 -or $codeSelf -ne 0 -or $codeTest -ne 0) {
+    if ($codeRust -ne 0 -or $codeBuild -ne 0 -or $codeFacade -ne 0 -or $codeSelf -ne 0 -or $codeTest -ne 0) {
         Write-GateHost "❌ Gate 3: auto-refactor 门禁或测试套件未通过" -ForegroundColor Red
         $failed = $true
     } else {

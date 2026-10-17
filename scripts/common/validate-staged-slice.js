@@ -38,10 +38,12 @@ for (const p of candidatePaths) {
 }
 
 if (!ts) {
-  console.log(
-    "  ℹ️ [NOTICE] 未检测到 typescript 运行环境，跳过 AST 局部切片审查",
+  console.error(
+    '❌ [BLOCK] TypeScript runtime is required for AST slice review but was not resolvable.\n' +
+      '   Remediation: npm ci --prefix auto-refactor (or npm install --prefix workspace-timing).\n' +
+      '   Fail-closed policy: a skipped complexity gate is treated as a failed complexity gate.',
   );
-  process.exit(0);
+  process.exit(1);
 }
 
 /** Default baseline configuration contract. */

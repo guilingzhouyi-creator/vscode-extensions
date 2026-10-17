@@ -19,7 +19,36 @@ const path = require('path');
 
 const ROOT = path.resolve(__dirname, '../..');
 const OUTPUT_FILE = path.join(__dirname, 'rule-catalog.json');
-const MATCH_EXTENSIONS = new Set(['.gd', '.sh', '.json', '.md']);
+const SOURCE_DIR = path.join(__dirname, 'rule-sources');
+const AUTO_REFACTOR_SOURCE = path.join(SOURCE_DIR, 'auto-refactor-rules.json');
+const WEBGAMES_SOURCE = path.join(SOURCE_DIR, 'webgames-rules.json');
+const GLOBAL_SOURCE = path.join(SOURCE_DIR, 'global-rules.json');
+
+const PROJECT_COUNT_KEYS = Object.freeze({
+  'auto-refactor': 'autoRefactor',
+  'workspace-timing': 'workspaceTiming',
+  WebGames: 'webGames',
+  'global-tooling': 'globalTooling',
+});
+
+/**
+ * Loads a committed rule source catalog and rejects empty or missing sources.
+ *
+ * @param {string} file - Absolute source catalog path.
+ * @param {string} label - Human-readable source label for diagnostics.
+ * @returns {Array<object>} Rule entries declared by the source catalog.
+ */
+function readRuleSource(file, label) {
+  if (!fs.existsSync(file)) {
+    throw new Error(`${label} source missing: ${path.relative(ROOT, file)}`);
+  }
+  const parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
+  const list = Array.isArray(parsed) ? parsed : parsed.rules;
+  if (!Array.isArray(list) || list.length === 0) {
+    throw new Error(`${label} source is empty: ${path.relative(ROOT, file)}`);
+  }
+  return list;
+}
 
 function mapRuleEntry(r) {
   if (!r || !r.id) return null;
@@ -34,18 +63,24 @@ function mapRuleEntry(r) {
 
 function collectAutoRefactorRules() {
   const registryPath = path.join(ROOT, 'auto-refactor/dist/core/rules/registry.js');
-  if (!fs.existsSync(registryPath)) {
-    return [];
+  if (fs.existsSync(registryPath)) {
+    try {
+      const { RULE_REGISTRY } = require(registryPath);
+      const list = Array.isArray(RULE_REGISTRY) ? RULE_REGISTRY : Object.values(RULE_REGISTRY);
+      const mapped = list.map(mapRuleEntry).filter(Boolean);
+      if (mapped.length > 0) return mapped;
+    } catch (err) {
+      console.warn('Warning: Could not load auto-refactor compiled registry:', err.message);
+    }
   }
 
-  try {
-    const { RULE_REGISTRY } = require(registryPath);
-    const list = Array.isArray(RULE_REGISTRY) ? RULE_REGISTRY : Object.values(RULE_REGISTRY);
-    return list.map(mapRuleEntry).filter(Boolean);
-  } catch (err) {
-    console.warn('Warning: Could not load auto-refactor compiled registry:', err.message);
-    return [];
-  }
+  return readRuleSource(AUTO_REFACTOR_SOURCE, 'auto-refactor rules registry snapshot').map((r) => ({
+    id: r.id,
+    project: 'auto-refactor',
+    family: r.family || 'general',
+    severity: r.severity || 'error',
+    summary: r.summary || '',
+  }));
 }
 
 function processCheckerRules(checker, rules) {
@@ -88,56 +123,14 @@ function collectWorkspaceTimingRules() {
   return rules;
 }
 
-function scanFileForRules(fullPath, rulePattern, found) {
-  const text = fs.readFileSync(fullPath, 'utf8');
-  let m;
-  while ((m = rulePattern.exec(text)) !== null) {
-    const id = m[1];
-    if (!found.has(id)) {
-      found.set(id, path.relative(ROOT, fullPath).replace(/\\/g, '/'));
-    }
-  }
-}
-
-function collectCandidateFiles(dir, accumulator = []) {
-  const entries = fs.readdirSync(dir, { withFileTypes: true });
-  for (const entry of entries) {
-    if (entry.name === '.git' || entry.name === 'node_modules') continue;
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) {
-      collectCandidateFiles(full, accumulator);
-    } else if (MATCH_EXTENSIONS.has(path.extname(entry.name))) {
-      accumulator.push(full);
-    }
-  }
-  return accumulator;
-}
-
 function collectWebGamesRules() {
-  const webgamesDir = path.join(ROOT, 'WebGames');
-  if (!fs.existsSync(webgamesDir)) {
-    return [];
-  }
-
-  const rulePattern = /\b([A-Z]{2,4}-[A-Z0-9]+-[0-9]{3})\b/g;
-  const found = new Map();
-  const candidateFiles = collectCandidateFiles(webgamesDir);
-
-  for (const file of candidateFiles) {
-    scanFileForRules(file, rulePattern, found);
-  }
-
-  const rules = [];
-  for (const [id, source] of found.entries()) {
-    rules.push({
-      id,
-      project: 'WebGames',
-      family: id.split('-')[0],
-      severity: 'error',
-      summary: `WebGames domain gate rule (source: ${source})`,
-    });
-  }
-  return rules;
+  return readRuleSource(WEBGAMES_SOURCE, 'WebGames rule catalog').map((r) => ({
+    id: r.id,
+    project: 'WebGames',
+    family: r.family || r.id.split('-')[0],
+    severity: r.severity || 'error',
+    summary: r.summary || '',
+  }));
 }
 
 function collectCommitMsgRules() {
@@ -159,106 +152,13 @@ function collectCommitMsgRules() {
 }
 
 function collectPlatformGovernanceRules() {
-  return [
-    {
-      id: 'VOL-DOC-001',
-      project: 'global-tooling',
-      family: 'VOL',
-      severity: 'error',
-      summary: 'High-load logic architecture contract guard: modules with ELOC >= 600 must maintain comment ratio >= 8%',
-    },
-    {
-      id: 'VOL-ELOC-001',
-      project: 'global-tooling',
-      family: 'VOL',
-      severity: 'error',
-      summary: 'Effective code volume budget guard: single file ELOC must not exceed 900',
-    },
-    {
-      id: 'VOL-LOC-001',
-      project: 'global-tooling',
-      family: 'VOL',
-      severity: 'error',
-      summary: 'Physical line count budget guard: single file raw LOC must not exceed 1400',
-    },
-    {
-      id: 'VOL-RATIO-001',
-      project: 'global-tooling',
-      family: 'VOL',
-      severity: 'warning',
-      summary: 'Dynamic dilution envelope guard: physical line count must not exceed dynamic ratio 1:3 envelope',
-    },
-    {
-      id: 'VOL-DIL-001',
-      project: 'global-tooling',
-      family: 'VOL',
-      severity: 'warning',
-      summary: 'Logic density floor guard: effective code density must not fall below 33% of total file lines',
-    },
-    {
-      id: 'GATE-AST-001',
-      project: 'global-tooling',
-      family: 'GATE',
-      severity: 'error',
-      summary: 'Pre-commit gate staged AST slice complexity (CC <= 15), nesting depth (Depth <= 4), and noise ratio guard',
-    },
-    {
-      id: 'GATE-ISO-001',
-      project: 'global-tooling',
-      family: 'GATE',
-      severity: 'error',
-      summary: 'Cross-platform script isomorphism guard: dual ps1/sh parity, strict CRLF/LF line endings, and defensive directives',
-    },
-    {
-      id: 'ARCH-ABS-001',
-      project: 'global-tooling',
-      family: 'ARCH',
-      severity: 'error',
-      summary: 'Vacuous forwarding trampoline elimination guard: empty forwarding modules with ELOC <= 3 are strictly blocked',
-    },
-    {
-      id: 'ARCH-FAC-001',
-      project: 'global-tooling',
-      family: 'ARCH',
-      severity: 'error',
-      summary: 'Substantive facade payload guard: facade module must satisfy ELOC >= 15 or aggregate >= 3 subdomains with immutability',
-    },
-    {
-      id: 'HYG-BOM-001',
-      project: 'global-tooling',
-      family: 'HYG',
-      severity: 'error',
-      summary: 'UTF-8 BOM hygiene guard: all workspace text files must be strictly UTF-8 NO-BOM without 0xEF, 0xBB, 0xBF byte prefix',
-    },
-    {
-      id: 'HYG-TRL-001',
-      project: 'global-tooling',
-      family: 'HYG',
-      severity: 'error',
-      summary: 'POSIX EOF newline guard: text files must end with exactly one standard newline without trailing blank line buildup',
-    },
-    {
-      id: 'HYG-IND-001',
-      project: 'global-tooling',
-      family: 'HYG',
-      severity: 'error',
-      summary: 'Pure space indentation guard: non-GDScript and non-Makefile source files must use spaces exclusively without tab characters',
-    },
-    {
-      id: 'HYG-DIR-001',
-      project: 'global-tooling',
-      family: 'HYG',
-      severity: 'error',
-      summary: 'Lingering empty directory guard: active source and tooling directories must not retain zero-file lingering empty folders',
-    },
-    {
-      id: 'HYG-CLT-001',
-      project: 'global-tooling',
-      family: 'HYG',
-      severity: 'error',
-      summary: 'System and transient clutter guard: workspace must remain clean of OS clutter and uncontrolled transient files',
-    },
-  ];
+  return readRuleSource(GLOBAL_SOURCE, 'global tooling rule catalog').map((r) => ({
+    id: r.id,
+    project: 'global-tooling',
+    family: r.family || r.id.split('-')[0],
+    severity: r.severity || 'error',
+    summary: r.summary || '',
+  }));
 }
 
 function collectGlobalToolingRules() {
@@ -269,6 +169,45 @@ function collectGlobalToolingRules() {
     dedup.set(r.id, r);
   }
   return Array.from(dedup.values());
+}
+
+/**
+ * Aggregates deduplicated rule counts by owning project after first-wins resolution.
+ *
+ * @param {Array<object>} rules - Final catalog rule list.
+ * @returns {Record<string, number>} Counts keyed by catalog project counters.
+ */
+function buildProjectCounts(rules) {
+  const counts = { autoRefactor: 0, workspaceTiming: 0, webGames: 0, globalTooling: 0 };
+  for (const rule of rules) {
+    const key = PROJECT_COUNT_KEYS[rule.project];
+    if (key) counts[key] += 1;
+  }
+  return counts;
+}
+
+/**
+ * Asserts structural invariants of a generated catalog before comparison or write.
+ *
+ * @param {Array<object>} rules - Final catalog rule list.
+ * @param {Record<string, number>} counts - Deduplicated per-project counts.
+ * @returns {void}
+ */
+function assertCatalogIntegrity(rules, counts) {
+  const ids = new Set();
+  for (const rule of rules) {
+    if (!rule.id || !rule.project || !rule.family || !rule.severity || !rule.summary) {
+      throw new Error(`Rule entry lacks mandatory fields: ${JSON.stringify(rule)}`);
+    }
+    if (ids.has(rule.id)) {
+      throw new Error(`Duplicate rule id detected: ${rule.id}`);
+    }
+    ids.add(rule.id);
+  }
+  const countSum = Object.values(counts).reduce((sum, value) => sum + value, 0);
+  if (countSum !== rules.length) {
+    throw new Error(`Count sum ${countSum} does not match rule total ${rules.length}`);
+  }
 }
 
 function generate(checkOnly = false) {
@@ -287,6 +226,8 @@ function generate(checkOnly = false) {
   }
 
   const generatedRules = Array.from(ruleMap.values()).sort((a, b) => a.id.localeCompare(b.id));
+  const counts = buildProjectCounts(generatedRules);
+  assertCatalogIntegrity(generatedRules, counts);
 
   if (checkOnly) {
     if (!fs.existsSync(OUTPUT_FILE)) {
@@ -298,11 +239,19 @@ function generate(checkOnly = false) {
 
     const missingOnDisk = generatedRules.filter((r) => !existingMap.has(r.id)).map((r) => r.id);
     const orphanOnDisk = (existing.rules || []).filter((r) => !ruleMap.has(r.id)).map((r) => r.id);
+    const existingCountSum = Object.values(existing.counts || {}).reduce((sum, value) => sum + value, 0);
 
     if (missingOnDisk.length > 0 || orphanOnDisk.length > 0) {
       console.error(`❌ [RCFG-RULE-DRIFT] Detected rule catalog drift between registry and disk!`);
       if (missingOnDisk.length > 0) console.error(`   Missing on disk: ${missingOnDisk.join(', ')}`);
       if (orphanOnDisk.length > 0) console.error(`   Orphan on disk: ${orphanOnDisk.join(', ')}`);
+      process.exit(1);
+    }
+
+    if (existing.totalRules !== existing.rules.length || existingCountSum !== existing.totalRules) {
+      console.error(
+        `❌ [RCFG-COUNTS-001] Catalog counters are inconsistent: totalRules=${existing.totalRules}, rules=${existing.rules.length}, countsSum=${existingCountSum}. Run with --write to regenerate.`,
+      );
       process.exit(1);
     }
 
@@ -313,13 +262,8 @@ function generate(checkOnly = false) {
   const catalog = {
     schema: 'workspace-rule-catalog/v1',
     generatedAt: new Date().toISOString(),
-    totalRules: ruleMap.size,
-    counts: {
-      autoRefactor: arRules.length,
-      workspaceTiming: wtRules.length,
-      webGames: wgRules.length,
-      globalTooling: globalRules.length,
-    },
+    totalRules: generatedRules.length,
+    counts,
     rules: generatedRules,
   };
 
@@ -329,8 +273,11 @@ function generate(checkOnly = false) {
 }
 
 if (require.main === module) {
-  const isCheckOnly = process.argv.includes('--check-only');
-  generate(isCheckOnly);
+  const isWrite = process.argv.includes('--write');
+  if (!isWrite && !process.argv.includes('--check-only')) {
+    console.log('ℹ️  Default mode is read-only parity check. Pass --write to regenerate rule-catalog.json.');
+  }
+  generate(!isWrite);
 }
 
 module.exports = {

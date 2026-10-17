@@ -300,10 +300,12 @@ function formatAgentEnvelope(snapshotData, targetDir = DEFAULT_LOG_DIR) {
 
   return {
     protocolVersion: PROTOCOL_VERSION,
+    runId: snapshotData.runId || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
     recordedAt: snapshotData.recordedAt || new Date().toISOString(),
     status: snapshotData.status || 'BLOCK',
     gate: snapshotData.gate || 'unknown-gate',
     step: snapshotData.step || 'unknown-step',
+    stepId: snapshotData.stepId || undefined,
     failedCommand: snapshotData.failedCommand || '',
     exitCode: snapshotData.exitCode ?? 1,
     summary: snapshotData.summary || 'Gate check failed.',

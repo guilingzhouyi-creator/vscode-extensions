@@ -224,6 +224,7 @@ jobs:
             mkdir -p "dist/$EXT"
             ( cd "$EXT"
               npm ci
+              npm test --if-present
               npm run compile
               npx --yes @vscode/vsce package -o "../dist/$EXT/$EXT-$VERSION.vsix"
             )

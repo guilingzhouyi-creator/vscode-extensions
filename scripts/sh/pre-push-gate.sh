@@ -27,6 +27,17 @@ NPM_BIN=$(command -v npm 2>/dev/null || command -v npm.cmd 2>/dev/null || echo "
 PYTHON_BIN=$(command -v python3.12 2>/dev/null || command -v python3 2>/dev/null || command -v python 2>/dev/null || command -v py 2>/dev/null || echo "python3")
 
 AGENT_MODE=0
+PUSHED_SHA=""
+REMOTE_SHA=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --pushed-sha) PUSHED_SHA="${2:-}"; shift 2 ;;
+        --remote-sha) REMOTE_SHA="${2:-}"; shift 2 ;;
+        *) break ;;
+    esac
+done
+
 for arg in "$@"; do
     case "$arg" in
         --view-log|-v)
@@ -45,6 +56,11 @@ if [[ "$AGENT_MODE" -eq 0 ]]; then
 fi
 
 FAILED=0
+RUN_ID="$(date -u +%s 2>/dev/null || echo 0)-$$"
+
+if [[ "$AGENT_MODE" -eq 1 ]]; then
+    rm -f "$ROOT_DIR/.audit-logs/last-failure.json" 2>/dev/null || true
+fi
 
 AUDIT_LOG_DIR="$ROOT_DIR/.audit-logs"
 mkdir -p "$AUDIT_LOG_DIR"
@@ -62,6 +78,31 @@ get_step_rule_id() {
     if [[ "$step_name" =~ "Gate 8" ]]; then echo "ADV-CFG-001"; return; fi
     if [[ "$step_name" =~ "Gate 9" ]]; then echo "GATE-MSG-001"; return; fi
     echo "GATE-SYS-001"
+}
+
+get_step_meta() {
+    local step_name="$1"
+    case "$step_name" in
+        "Gate 1 (物理卫生八维全域巡检)") echo "PP-01-01|HYG-EMP-001" ;;
+        "Gate 1 (.gitignore 治理)") echo "PP-01-02|GATE-HYG-001" ;;
+        "Gate 1 (五维代码密度)") echo "PP-01-03|VOL-DIL-001" ;;
+        "Gate 2 (单源规则目录)") echo "PP-02-01|RCFG-RULE-DRIFT" ;;
+        "Gate 2 (规则 ID 闭包)") echo "PP-02-02|RCFG-RULE-DRIFT" ;;
+        "Gate 2 (文档一致性)") echo "PP-02-03|RCFG-RULE-DRIFT" ;;
+        "Gate 2 (规则可达性)") echo "PP-02-04|RCFG-RULE-DRIFT" ;;
+        "auto-refactor Rust Gate") echo "PP-03-01|GATE-SYS-001" ;;
+        "auto-refactor Build") echo "PP-03-02|GATE-SYS-001" ;;
+        "auto-refactor Facade Gate") echo "PP-03-03|ARCH-FAC-001" ;;
+        "auto-refactor Self Gate") echo "PP-03-04|GATE-SYS-001" ;;
+        "auto-refactor Tests") echo "PP-03-05|GATE-SYS-001" ;;
+        "Gate 4 (auto-refactor 质量基线)") echo "PP-04-01|GATE-BUDGET-001" ;;
+        "Gate 5 (workspace-timing 快速单元测试)") echo "PP-05-01|GATE-SYS-001" ;;
+        "Gate 6 (workspace-timing 审查门禁)") echo "PP-06-01|RCFG-MATRIX" ;;
+        "Gate 7 (长期轨迹账本约束)") echo "PP-07-01|GOV-TRJ-001" ;;
+        "Gate 8 (WebGames 全域质量门禁)") echo "PP-08-01|ADV-CFG-001" ;;
+        "Gate 9 (待推送分支提交历史风格与禁词审查)") echo "PP-09-01|CMG-STY-001" ;;
+        *) echo "PP-00-00|$(get_step_rule_id "$step_name")" ;;
+    esac
 }
 
 log_gate() {
@@ -137,15 +178,19 @@ run_gate_step() {
         local last_log="$AUDIT_LOG_DIR/last-pre-push.log"
         cp "$STEP_LOG" "$last_log" 2>/dev/null || true
         "$NODE_BIN" "$ROOT_DIR/scripts/common/log-rotator.js" --truncate "$last_log" >/dev/null 2>&1 || true
-        local rule_id
-        rule_id=$(get_step_rule_id "$step_name")
+        local rule_id step_id meta
+        meta=$(get_step_meta "$step_name")
+        step_id="${meta%%|*}"
+        rule_id="${meta##*|}"
         cat <<EOF > "$AUDIT_LOG_DIR/last-failure.json" 2>/dev/null || true
 {
   "protocolVersion": "1.0.0",
+  "runId": "$RUN_ID",
   "recordedAt": "$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || echo 'unknown')",
   "status": "BLOCK",
   "gate": "pre-push",
   "step": "$step_name",
+  "stepId": "$step_id",
   "failedCommand": "$*",
   "exitCode": $status,
   "summary": "Step $step_name failed with exit code $status",
@@ -175,7 +220,18 @@ EOF
 
 # --- 影响域智能分析 (Impact-driven Routing) ---
 RANGE=""
-if git rev-parse --verify @{u} >/dev/null 2>&1; then
+if [[ "$PUSHED_SHA" =~ ^[0-9a-f]{7,40}$ ]]; then
+    if [[ "$REMOTE_SHA" =~ ^[0-9a-f]{7,40}$ && ! "$REMOTE_SHA" =~ ^0+$ ]]; then
+        RANGE="$REMOTE_SHA..$PUSHED_SHA"
+    else
+        MERGE_BASE=$(git merge-base "$PUSHED_SHA" origin/main 2>/dev/null || true)
+        if [[ -n "$MERGE_BASE" ]]; then
+            RANGE="$MERGE_BASE..$PUSHED_SHA"
+        else
+            RANGE="$PUSHED_SHA~1..$PUSHED_SHA"
+        fi
+    fi
+elif git rev-parse --verify '@{u}' >/dev/null 2>&1; then
     RANGE="@{u}..HEAD"
 elif git rev-parse --verify origin/main >/dev/null 2>&1; then
     RANGE="origin/main..HEAD"
@@ -246,8 +302,14 @@ fi
 log_gate "[2/9] 校验全工作区单源规则目录同步..."
 if ! run_gate_step 30 "Gate 2 (单源规则目录)" "$ROOT_DIR" "$NODE_BIN" scripts/common/generate-rule-catalog.js --check-only; then
     FAILED=1
+elif ! run_gate_step 30 "Gate 2 (规则 ID 闭包)" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-rule-id-closure.js; then
+    FAILED=1
+elif ! run_gate_step 30 "Gate 2 (文档一致性)" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-docs-consistency.js; then
+    FAILED=1
+elif ! run_gate_step 60 "Gate 2 (规则可达性)" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-rule-reachability.js; then
+    FAILED=1
 else
-    log_gate "  ✔ 全工作区单源规则目录同步通过"
+    log_gate "  ✔ 全工作区单源规则目录同步与规则 ID 闭包校验通过"
 fi
 
 # --- Gate 3: auto-refactor 引擎全量门禁与回归套件 ---
@@ -256,6 +318,7 @@ if [[ "$RUN_AR" -eq 1 ]]; then
     AR_FAIL=0
     run_gate_step 60 "auto-refactor Rust Gate" "$ROOT_DIR/auto-refactor" "$NODE_BIN" scripts/gate-rust.js || AR_FAIL=1
     run_gate_step 90 "auto-refactor Build" "$ROOT_DIR/auto-refactor" "$NPM_BIN" run build || AR_FAIL=1
+    run_gate_step 60 "auto-refactor Facade Gate" "$ROOT_DIR/auto-refactor" "$NODE_BIN" scripts/validate-facade-governance.js || AR_FAIL=1
     run_gate_step 60 "auto-refactor Self Gate" "$ROOT_DIR/auto-refactor" "$NODE_BIN" scripts/gate-self.js || AR_FAIL=1
     run_gate_step 180 "auto-refactor Tests" "$ROOT_DIR/auto-refactor" "$NODE_BIN" scripts/test-parallel.js || AR_FAIL=1
     if [[ "$AR_FAIL" -ne 0 ]]; then

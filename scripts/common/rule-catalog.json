@@ -1,12 +1,12 @@
 {
   "schema": "workspace-rule-catalog/v1",
-  "generatedAt": "2026-10-17T05:38:46.418Z",
-  "totalRules": 468,
+  "generatedAt": "2026-10-17T15:23:22.338Z",
+  "totalRules": 469,
   "counts": {
     "autoRefactor": 351,
     "workspaceTiming": 49,
-    "webGames": 77,
-    "globalTooling": 21
+    "webGames": 50,
+    "globalTooling": 19
   },
   "rules": [
     {
@@ -27,8 +27,8 @@
       "id": "ADV-CFG-002",
       "project": "WebGames",
       "family": "ADV",
-      "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第07期_65到74/Phase_70_配置库唯一事实提纯与冗余收敛治理/KALAR-DEV-2026-ST66-002_阶段2_配置血缘静态判重引擎与漂移检测算法实现.md)"
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第07期_65到74/Phase_70_配置库唯一事实提纯与冗余收敛治理/KALAR-DEV-2026-ST66-002_阶段2_配置血缘静态判重引擎与漂移检测算法实现.md) [documentation-defined; not enforced]"
     },
     {
       "id": "ADV-DEC-001",
@@ -104,15 +104,15 @@
       "id": "ADV-PRF-003",
       "project": "WebGames",
       "family": "ADV",
-      "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/模板/GD老练风格硬性规范标准.md)"
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/模板/GD老练风格硬性规范标准.md) [documentation-defined; not enforced]"
     },
     {
       "id": "ADV-PRF-004",
       "project": "WebGames",
       "family": "ADV",
-      "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/模板/GD老练风格硬性规范标准.md)"
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/模板/GD老练风格硬性规范标准.md) [documentation-defined; not enforced]"
     },
     {
       "id": "ADV-RNG-001",
@@ -153,8 +153,8 @@
       "id": "ADV-UI-001",
       "project": "WebGames",
       "family": "ADV",
-      "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/模板/GD老练风格硬性规范标准.md)"
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/模板/GD老练风格硬性规范标准.md) [documentation-defined; not enforced]"
     },
     {
       "id": "analyzer-error",
@@ -377,155 +377,148 @@
       "id": "ART-AUD-005",
       "project": "WebGames",
       "family": "ART",
-      "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/README.md)"
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/README.md) [documentation-defined; not enforced]"
     },
     {
       "id": "ART-ICO-012",
       "project": "WebGames",
       "family": "ART",
-      "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/README.md)"
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/README.md) [documentation-defined; not enforced]"
     },
     {
       "id": "ART-REC-001",
       "project": "WebGames",
       "family": "ART",
-      "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md)"
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]"
     },
     {
       "id": "ART-REC-002",
       "project": "WebGames",
       "family": "ART",
-      "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md)"
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]"
     },
     {
       "id": "ART-REC-003",
       "project": "WebGames",
       "family": "ART",
-      "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md)"
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]"
     },
     {
       "id": "ART-REC-004",
       "project": "WebGames",
       "family": "ART",
-      "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md)"
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]"
     },
     {
       "id": "ART-REC-005",
       "project": "WebGames",
       "family": "ART",
-      "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md)"
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]"
     },
     {
       "id": "ART-REC-006",
       "project": "WebGames",
       "family": "ART",
-      "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md)"
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]"
     },
     {
       "id": "ART-REC-007",
       "project": "WebGames",
       "family": "ART",
-      "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md)"
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]"
     },
     {
       "id": "ART-REC-008",
       "project": "WebGames",
       "family": "ART",
-      "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md)"
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]"
     },
     {
       "id": "ART-REC-009",
       "project": "WebGames",
       "family": "ART",
-      "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md)"
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]"
     },
     {
       "id": "ART-SPEC-001",
       "project": "WebGames",
       "family": "ART",
-      "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md)"
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]"
     },
     {
       "id": "ART-SPEC-002",
       "project": "WebGames",
       "family": "ART",
-      "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md)"
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]"
     },
     {
       "id": "ART-SPEC-003",
       "project": "WebGames",
       "family": "ART",
-      "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md)"
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]"
     },
     {
       "id": "ART-SPEC-004",
       "project": "WebGames",
       "family": "ART",
-      "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md)"
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]"
     },
     {
       "id": "ART-SPEC-005",
       "project": "WebGames",
       "family": "ART",
-      "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md)"
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]"
     },
     {
       "id": "ART-SPEC-006",
       "project": "WebGames",
       "family": "ART",
-      "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md)"
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]"
     },
     {
       "id": "ART-SPEC-007",
       "project": "WebGames",
       "family": "ART",
-      "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md)"
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]"
     },
     {
       "id": "ART-SPEC-008",
       "project": "WebGames",
       "family": "ART",
-      "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md)"
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/第一幕长夜薪火艺术工单总表.md) [documentation-defined; not enforced]"
     },
     {
       "id": "ART-UI-001",
       "project": "WebGames",
       "family": "ART",
-      "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/README.md)"
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/README.md) [documentation-defined; not enforced]"
     },
     {
       "id": "ART-VIG-003",
       "project": "WebGames",
       "family": "ART",
-      "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/README.md)"
-    },
-    {
-      "id": "ART-XXX-000",
-      "project": "WebGames",
-      "family": "ART",
-      "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/README.md)"
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/艺术工单需求表/README.md) [documentation-defined; not enforced]"
     },
     {
       "id": "clean-layer-violation",
@@ -1539,8 +1532,8 @@
       "id": "GOV-HOK-001",
       "project": "WebGames",
       "family": "GOV",
-      "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第10期_95到104/Phase_98_十阶段全链路资源内存优化与审查系统能力内化施工细则/KALAR-DEV-2026-ST94-003_阶段3_审查系统能力内化与全域通用规则演进.md)"
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第10期_95到104/Phase_98_十阶段全链路资源内存优化与审查系统能力内化施工细则/KALAR-DEV-2026-ST94-003_阶段3_审查系统能力内化与全域通用规则演进.md) [documentation-defined; not enforced]"
     },
     {
       "id": "GOV-LOG-001",
@@ -1814,6 +1807,13 @@
       "family": "HYG",
       "severity": "error",
       "summary": "Zero-byte empty file, blank comment-only file, or hollow shell file lacking AST semantic payload."
+    },
+    {
+      "id": "HYG-EMP-002",
+      "project": "global-tooling",
+      "family": "HYG",
+      "severity": "error",
+      "summary": "Comment-only hollow file guard: files whose stripped content is empty after removing comments are strictly blocked"
     },
     {
       "id": "HYG-EOL-001",
@@ -2204,8 +2204,8 @@
       "id": "PRF-DUP-001",
       "project": "WebGames",
       "family": "PRF",
-      "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第10期_95到104/Phase_98_十阶段全链路资源内存优化与审查系统能力内化施工细则/KALAR-DEV-2026-ST94-003_阶段3_审查系统能力内化与全域通用规则演进.md)"
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第10期_95到104/Phase_98_十阶段全链路资源内存优化与审查系统能力内化施工细则/KALAR-DEV-2026-ST94-003_阶段3_审查系统能力内化与全域通用规则演进.md) [documentation-defined; not enforced]"
     },
     {
       "id": "PRF-IO-001",
@@ -2439,6 +2439,13 @@
       "summary": "Legacy Optional[...] or Union[...] used in type annotation or alias."
     },
     {
+      "id": "RCFG-COUNTS-001",
+      "project": "global-tooling",
+      "family": "RCFG",
+      "severity": "error",
+      "summary": "Rule catalog counter coherence guard: totalRules must equal rules.length and the sum of deduplicated per-project counts"
+    },
+    {
       "id": "RCFG-GLOBS",
       "project": "workspace-timing",
       "family": "L3",
@@ -2477,8 +2484,8 @@
       "id": "RES-SHUT-001",
       "project": "WebGames",
       "family": "RES",
-      "severity": "error",
-      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第10期_95到104/Phase_98_十阶段全链路资源内存优化与审查系统能力内化施工细则/KALAR-DEV-2026-ST94-003_阶段3_审查系统能力内化与全域通用规则演进.md)"
+      "severity": "info",
+      "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第10期_95到104/Phase_98_十阶段全链路资源内存优化与审查系统能力内化施工细则/KALAR-DEV-2026-ST94-003_阶段3_审查系统能力内化与全域通用规则演进.md) [documentation-defined; not enforced]"
     },
     {
       "id": "RES-TOPO-NAMING-DEPTH",

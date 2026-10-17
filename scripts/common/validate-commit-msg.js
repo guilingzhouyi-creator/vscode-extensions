@@ -66,6 +66,9 @@ const DEFAULT_COMMIT_EDITMSG = '.git/COMMIT_EDITMSG';
 const PREFIX_UTF = 'UTF-';
 const PREFIX_SHA = 'SHA-';
 const PREFIX_RFC = 'RFC-';
+const PREFIX_CVE = 'CVE-';
+const PREFIX_ISO = 'ISO-';
+const EXTERNAL_ID_PREFIXES = Object.freeze([PREFIX_UTF, PREFIX_SHA, PREFIX_RFC, PREFIX_CVE, PREFIX_ISO]);
 
 const { getSafeGitEnv } = require(MODULE_GIT_ENV);
 const {
@@ -85,7 +88,7 @@ function getValidRuleIds() {
 
   if (!fs.existsSync(CATALOG_FILE)) {
     try {
-      require(MODULE_GENERATE_CATALOG).generate();
+      require(MODULE_GENERATE_CATALOG).generate(true);
     } catch (err) {
       console.warn('Warning: Failed to dynamically generate rule catalog:', err.message);
     }
@@ -116,13 +119,16 @@ function loadTermsConfig() {
 
 function validateRuleAntiHallucination(content) {
   const validIds = getValidRuleIds();
-  const rulePattern = /\b([A-Z]{2,4}-[A-Z0-9]+-[0-9]{3}|L[0-5]-[A-Z0-9]+)\b/g;
+  const rulePattern = /\b([A-Z]{2,4}(?:-[A-Z0-9]+){2,}|L[0-5]-[A-Z0-9]+)\b/g;
   let match;
   const hallucinated = [];
 
   while ((match = rulePattern.exec(content)) !== null) {
     const id = match[1];
-    if (id.startsWith(PREFIX_UTF) || id.startsWith(PREFIX_SHA) || id.startsWith(PREFIX_RFC)) {
+    if (EXTERNAL_ID_PREFIXES.some((prefix) => id.startsWith(prefix))) {
+      continue;
+    }
+    if (/^(?:PC|PP)-\d{2}-\d{2}$/.test(id)) {
       continue;
     }
     if (!validIds.has(id)) {
@@ -152,14 +158,14 @@ function validateCommitRange(range) {
 
   let rawLog = '';
   try {
-    rawLog = execSync(`git log --no-merges --max-count=30 --format="%x1e%H%x1f%B" ${range}`, {
+    rawLog = execSync(`git log --no-merges --format="%x1e%H%x1f%B" ${range}`, {
       cwd: root,
       env,
       encoding: ENCODING_UTF8,
       stdio: [STDIO_IGNORE, STDIO_PIPE, STDIO_IGNORE],
     });
-  } catch {
-    return { passed: true, total: 0 };
+  } catch (err) {
+    return { passed: false, total: 0, failure: `Unable to resolve commit range '${range}': ${err.message}` };
   }
 
   const records = rawLog.split(ASCII_RECORD_SEP).filter(Boolean);
@@ -226,7 +232,10 @@ function buildCommitMsgViolations(res, target) {
 
 function handleRangeMode(range, isAgentMode) {
   const res = validateCommitRange(range);
-  if (!res.passed) process.exit(1);
+  if (!res.passed) {
+    if (res.failure) console.error(`❌ [FAIL] ${res.failure}`);
+    process.exit(1);
+  }
 
   if (isAgentMode) {
     console.log(

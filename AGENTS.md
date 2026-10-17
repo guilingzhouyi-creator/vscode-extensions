@@ -21,7 +21,7 @@
 | **测试工程与性能基准** | 确定性时钟/RNG 隔离；零孤儿用例；TB-REGRESSION 耗时预算 | [auto-refactor/DOCS.md](auto-refactor/DOCS.md) | [test-benchmark-engineering](.agents/skills/test-benchmark-engineering/SKILL.md) | `cd auto-refactor && npm test` |
 | **产品交付与发布日志** | 面向真实用户；零工程重构黑话；Keep-a-Changelog 规范； | [workspace-timing/README.md](workspace-timing/README.md) | [product-release-docs](.agents/skills/product-release-docs/SKILL.md) | `bash scripts/sh/check-display-assets.sh` |
 | **扩展打包发布与热同步** | 产物自动轮转；`-HotSync` 注册表自愈；SemVer 干净树；资产健全 | [scripts/README.md](scripts/README.md) | [release-package-workflow](.agents/skills/release-package-workflow/SKILL.md) | `pwsh -File scripts/ps1/package.ps1 -HotSync` |
-| **单源规则目录与元治理** | 464 规则 SSOT；规则 ID 零虚构 (`RCFG-RULE-DRIFT`)；三大项目与全局门禁对齐 | [rule-catalog.json](scripts/common/rule-catalog.json) | [rule-catalog-governance](.agents/skills/rule-catalog-governance/SKILL.md) | `node scripts/common/generate-rule-catalog.js --check-only` |
+| **单源规则目录与元治理** | 规则 SSOT 零漂移（计数以 `rule-catalog.json` 为准）；规则 ID 双向闭包 (`RCFG-RULE-DRIFT` / `RCFG-COUNTS-001`)；三大项目与全局门禁对齐 | [rule-catalog.json](scripts/common/rule-catalog.json)<br/>[rule-catalog-governance](.agents/skills/rule-catalog-governance/SKILL.md) | [rule-catalog-governance](.agents/skills/rule-catalog-governance/SKILL.md) | `node scripts/common/generate-rule-catalog.js --check-only`<br/>`node scripts/common/validate-rule-id-closure.js` |
 | **全工作区统一质量审查** | 5 大支柱 100% 绿色通行；零规则漂移 (`RCFG-RULE-DRIFT`) | [scripts/README.md](scripts/README.md)<br/>[rule-catalog.json](scripts/common/rule-catalog.json) | [gate-governance](.agents/skills/gate-governance/SKILL.md) | `pwsh -File scripts/ps1/audit-all.ps1` |
 | **顶层蓝图与历史全宗** | Cell 平权自治体系；一体两面 Diff；归档案卷元数据规范 | [agent-native-system-blueprint.md](docs/agent-native-system-blueprint.md)<br/>[deliverables/README.md](archive/deliverables/README.md) | [docs-archive-governance](.agents/skills/docs-archive-governance/SKILL.md) | — |
 | **技能集结构与同构治理** | 物理四件套结构；JIT 渐进披露；根目录与插件 100% 字节等价 | [validate-skills.js](scripts/common/validate-skills.js)<br/>[sync-skills.js](scripts/common/sync-skills.js) | [skill-governance](.agents/skills/skill-governance/SKILL.md) | `node scripts/common/validate-skills.js` |
@@ -57,7 +57,7 @@
 
 ### 4. Git 提交规范与技术事实纪律
 - **提交格式**：`<type>(<scope>): <祈使句中文摘要标题>`（长度 5~80 字符，结尾不加句号；`<type>` 限于 feat/fix/refactor/docs/test/chore/style/perf）；
-- **结构化区块**：关键生产提交（feat/fix/refactor）正文首区块必须包含 `[Project: workspace-timing | auto-refactor | WebGames | governance]`（`CMG-PRJ-001`）；正文必须包含 `[Why]`、`[Added]`、`[Changed]`、`[Fixed]`（如有修复缺陷）、`[Verification]` 标签，非轻量提交正文有效字符 $\ge 30$；
+- **结构化区块**：关键生产提交（feat/fix/refactor/perf）正文首区块必须包含 `[Project: workspace-timing | auto-refactor | WebGames | governance]`（`CMG-PRJ-001`）；正文必须包含 `[Why]`、`[Added]`、`[Changed]`、`[Fixed]`（如有修复缺陷）、`[Verification]` 标签，非轻量提交正文实质字符 $\ge 30$；
 - **技术事实与零黑话**：
   ① 严禁敷衍词汇（`CMG-STY-001`）、夸大词汇（`CMG-STY-002`）、贬损词汇（`CMG-STY-003`）或“调整语调为低调中肯”等元叙事口号（`CMG-STY-004`）（禁词单源见 [commit-msg-forbidden-terms.json](scripts/common/commit-msg-forbidden-terms.json)）；
   ② 严禁在代码、测试、路径或提交信息中使用施工批次与临时标记（禁止词：`p[0-9]+`、`phase[0-9]+`、`st[0-9]+`、`temp`、`new`、`v[0-9]+`、`wip`；WebGames 前端视图保留 `fe_01`~`fe_17` 除外）；
@@ -96,7 +96,7 @@
 4. **方案、注释与黑话红线**：方案目录下严格仅允许四阶段细则文件；严禁在 `tests/unit/` 根目录平铺散落脚本；严禁遗留假逻辑空分支与幽灵注释；严禁在代码标识符、测试用例、JSDoc 注释与提交信息中使用施工批次与敏捷工期黑话代号（如 `p[0-9]+`, `W1-W9`, `Pass 1..6`）；
 5. **规则一致性红线**：严禁在检查器代码中发射或在提交信息中书写未在 [rule-catalog.json](scripts/common/rule-catalog.json) 登记的规则 ID（违者触发 `RCFG-RULE-DRIFT` 阻断）；
 6. **防线与验证红线**：严禁使用 `--no-verify` 或跳过本地门禁提交或推送代码；向远端推送后必须确保 CI 流水线完全通过；严禁对未跟踪文件执行 `git rm`；
-7. **原子提交与归属红线**：关键生产级提交（feat/fix/refactor）必须显式声明 `[Project]` 并限定于四大受控项目（`CMG-PRJ-001`）；提交前必须先通过本地 `commit-msg-gate` 与 `pre-commit-gate` 预审；
+7. **原子提交与归属红线**：关键生产级提交（feat/fix/refactor/perf）必须显式声明 `[Project]` 并限定于四大受控项目（`CMG-PRJ-001`）；提交前必须先通过本地 `commit-msg-gate` 与 `pre-commit-gate` 预审；
 8. **跳板消融红线**：严禁创建或保留有效代码 $\le 3$ 行且仅向单一目标透传的空包跳板文件；门面层违反实质承载预算强制触发 `ARCH-FAC-001` 阻断；
 9. **客观求实红线**：提交信息严禁夹带敷衍（`CMG-STY-001`）、夸大（`CMG-STY-002`）、贬损（`CMG-STY-003`）或元叙事口号（`CMG-STY-004`）；`[Verification]` 严禁程序化流水账（`CMG-STY-005`）与执行数字统计流水账（`CMG-STY-006`）；
 10. **度量求真红线**：严禁在评分算法与自研度量中注入虚假倍率或固定加分；严禁使用伪造的统计误差区间；

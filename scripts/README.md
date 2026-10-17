@@ -13,16 +13,22 @@
 |------|------|------|--------|--------|
 | `sh/` | Bash | `audit-all.sh` | audit / review（全工作区跨项目统一审查中枢） | 本地 CLI、CI |
 | `ps1/` | PowerShell | `audit-all.ps1` | audit / review（audit-all.sh 同构双实现） | 本地 CLI（Windows） |
-| `common/` | Node.js | `validate-physical-hygiene.js` | audit / hygiene（全工作区物理卫生八维刚性公理守卫） | `pre-commit-gate`、`pre-push-gate`、`audit-all`、CI |
+| `common/` | Node.js | `validate-physical-hygiene.js` | audit / hygiene（全工作区物理卫生八维刚性公理守卫） | `pre-push-gate`、`audit-all`、CI |
 | `common/` | Node.js | `validate-script-isomorphism.js` | audit / isomorphism（跨平台同构脚本 ps1/sh 结构对应性、换行与防御契约守卫） | `audit-all`、CI |
-| `common/` | Node.js | `validate-skills.js` | audit / skills（全工作区 24 项研发技能规范、死链与镜像等价性守卫） | `audit-all`、CI |
+| `common/` | Node.js | `validate-skills.js` | audit / skills（全工作区研发技能规范、死链与镜像等价性守卫） | `pre-commit-gate`、`audit-all` |
 | `common/` | Node.js | `sync-skills.js` | tooling / skills（根目录技能集与 workspace-governance 插件双向同步工具） | 本地 CLI |
 | `common/` | Node.js | `gate-fast-staged.js` | gate / fast-staged（暂存区文件单遍内存流式前置 6 大门禁判定，<90ms） | `pre-commit-gate` |
 | `common/` | Node.js | `validate-staged-slice.js` | gate / complexity（平台级增量 AST 切片圈复杂度/嵌套/噪声比审查器） | `pre-commit-gate`、CI |
 | `common/` | Node.js | `validate-code-density.js` | gate / density（多维代码密度、接线率 POR<=60% 与列密度审查器） | `pre-commit-gate`、`pre-push-gate`、CI |
-| `common/` | Node.js | `validate-gitignore-governance.js` | audit / hygiene（全仓 .gitignore 换行、安全底线守卫与防误伤断言门禁） | `pre-push-gate`、`audit-all`、CI |
-| `common/` | Node.js | `evaluate-eloc-budget.js` | audit / complexity（双轨体积 ELOC<=900/LOC<=1400 与 1:3 动态包络评估器） | `pre-commit-gate`、CI |
-| `common/` | Node.js | `generate-rule-catalog.js` | audit / ssot（全工作区 428 条规则单源目录聚合与零漂移核验器） | 本地 CLI、pre-push 门禁、CI |
+| `common/` | Node.js | `validate-gitignore-governance.js` | audit / hygiene（全仓 .gitignore 换行、安全底线守卫与防误伤断言门禁） | `pre-push-gate`、`audit-all` |
+| `common/` | Node.js | `evaluate-eloc-budget.js` | audit / complexity（双轨体积 ELOC<=900/LOC<=1400 与 1:3 动态包络评估器） | `pre-commit-gate`、本地 CLI |
+| `common/` | Node.js | `generate-rule-catalog.js` | audit / ssot（全工作区规则单源目录聚合与零漂移核验器；默认只读，`--write` 显式重生成） | 本地 CLI、`pre-push` 门禁、CI |
+| `common/` | Node.js | `validate-rule-id-closure.js` | audit / ssot（门禁引用规则 ID 与目录登记的双向闭包守卫） | `pre-push-gate`、CI |
+| `common/` | Node.js | `validate-docs-consistency.js` | audit / docs（治理文档硬编码计数与脚本死链守卫） | `pre-push-gate`、CI |
+| `common/` | Node.js | `validate-rule-reachability.js` | audit / ssot（error 级规则执行入口可达性守卫） | `pre-push-gate`、CI |
+| `common/` | Node.js | `bootstrap-gates.js` | tooling / bootstrap（钩子激活、依赖安装与构建一键引导） | 本地 CLI |
+| `common/` | Node.js | `test-gate-parity.js` | validate / parity（双实现提交门禁行为差分） | CI、本地 CLI |
+| `common/` | Node.js | `test-gate-selftest.js` | validate / selftest（门禁 PASS/违规/缺依赖三态矩阵） | CI、本地 CLI |
 | `common/` | Node.js | `validate-commit-msg.js` | gate / commit（生产级结构化提交信息格式、区块与有效字数综合调度器） | `commit-msg-gate` |
 | `common/` | Node.js | `validate-commit-msg-style.js` | gate / style（提交信息文本风格与四维禁词核验器） | `commit-msg-gate`、`pre-push-gate`、CI |
 | `common/` | Node.js | `git-env.js` | tooling / git（Git 运行环境隔离、暂存与提交范围文件检索 SSOT 工具） | 门禁与体积审查脚本集 |
@@ -113,6 +119,7 @@ Python 版使用 docstring + `if __name__ == "__main__":` 守卫。
 
 ## 六、新增脚本 Checklist
 
+0. 首次使用先执行 `npm run gate:bootstrap`（激活钩子、安装依赖并构建 auto-refactor 产物）
 1. 确定职能域与语言域，放入对应目录（`sh/` `ps1/` `py/`）
 2. 按第四节模板补全头注释
 3. 遵循第五节错误处理规范

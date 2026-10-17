@@ -16,7 +16,8 @@
 param(
     [switch]$Fast,
     [switch]$Json,
-    [switch]$Agent
+    [switch]$Agent,
+    [switch]$CommitLedger
 )
 Set-StrictMode -Version Latest
 
@@ -231,7 +232,7 @@ if ($codeHygiene -ne 0 -or $codeIso -ne 0 -or $codeGi -ne 0) {
 
 # 2. 单源规则注册表与目录一致性及技能集规范
 if (-not $Json -and -not $Agent) { Write-Host "▶ [2/5] 聚合与校验全工作区单源规则目录与技能集规范..." -ForegroundColor Gray }
-$res = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/generate-rule-catalog.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
+$res = Start-Process -FilePath $nodeCmd -ArgumentList @("scripts/common/generate-rule-catalog.js", "--check-only") -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
 $resSkills = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-skills.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
 $codeCatalog = $res.ExitCode
 $codeSkills = $resSkills.ExitCode
@@ -881,8 +882,10 @@ if ($env:GITHUB_STEP_SUMMARY) {
     }
 }
 
-# 6. 汇流记录工作区统一质量轨迹
-$trajArg = if ($failed) { "scripts/common/record-workspace-trajectory.js", "--failed" } else { "scripts/common/record-workspace-trajectory.js" }
+# 6. 汇流记录工作区统一质量轨迹（默认写入运行期目录，--CommitLedger 才写入受控账本）
+$trajArg = @("scripts/common/record-workspace-trajectory.js")
+if ($failed) { $trajArg += "--failed" }
+if ($CommitLedger) { $trajArg += "--commit-ledger" }
 Start-Process -FilePath $nodeCmd -ArgumentList $trajArg -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait | Out-Null
 
 if ($failed) {

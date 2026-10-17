@@ -29,18 +29,21 @@ PYTHON_BIN=$(command -v python3 2>/dev/null || command -v python 2>/dev/null || 
 FAST_MODE=0
 JSON_MODE=0
 AGENT_MODE=0
+COMMIT_LEDGER=0
 
 for arg in "$@"; do
     case "$arg" in
         --fast|-f|-Fast) FAST_MODE=1 ;;
         --json|-j|-Json) JSON_MODE=1 ;;
         --agent|-a|-Agent) AGENT_MODE=1 ;;
+        --commit-ledger|-CommitLedger) COMMIT_LEDGER=1 ;;
         --help|-h|-Help)
             echo "用法: bash scripts/sh/audit-all.sh [选项]"
             echo "选项:"
             echo "  --fast, -f, -Fast    快速审查模式 (跳过耗时深层自审)"
             echo "  --json, -j, -Json    以 JSON 格式输出审查摘要"
             echo "  --agent, -a, -Agent  以 Agent-Native JSON 信封格式输出审查结果"
+            echo "  --commit-ledger      将本次审查写入受控轨迹账本 (默认写入运行期目录)"
             echo "  --help, -h, -Help    显示此帮助信息"
             exit 0
             ;;
@@ -75,7 +78,7 @@ fi
 # 2. 单源规则注册表与目录一致性及技能集规范
 if [[ "$JSON_MODE" -eq 0 && "$AGENT_MODE" -eq 0 ]]; then echo "▶ [2/5] 聚合与校验全工作区单源规则目录与技能集规范..."; fi
 CODE_CATALOG=0
-"$NODE_BIN" scripts/common/generate-rule-catalog.js >/dev/null 2>&1 || CODE_CATALOG=$?
+"$NODE_BIN" scripts/common/generate-rule-catalog.js --check-only >/dev/null 2>&1 || CODE_CATALOG=$?
 CODE_SKILLS=0
 "$NODE_BIN" scripts/common/validate-skills.js >/dev/null 2>&1 || CODE_SKILLS=$?
 if [[ "$CODE_CATALOG" -ne 0 || "$CODE_SKILLS" -ne 0 ]]; then
@@ -711,12 +714,11 @@ if [[ "$JSON_MODE" -eq 1 || "$AGENT_MODE" -eq 1 ]]; then
     exit "$FAILED"
 fi
 
-# 6. 汇流记录工作区统一质量轨迹
-if [[ "$FAILED" -ne 0 ]]; then
-    "$NODE_BIN" scripts/common/record-workspace-trajectory.js --failed >/dev/null 2>&1 || true
-else
-    "$NODE_BIN" scripts/common/record-workspace-trajectory.js >/dev/null 2>&1 || true
-fi
+# 6. 汇流记录工作区统一质量轨迹（默认写入运行期目录，--commit-ledger 才写入受控账本）
+TRAJ_ARGS=()
+[[ "$FAILED" -ne 0 ]] && TRAJ_ARGS+=("--failed")
+[[ "$COMMIT_LEDGER" -eq 1 ]] && TRAJ_ARGS+=("--commit-ledger")
+"$NODE_BIN" scripts/common/record-workspace-trajectory.js ${TRAJ_ARGS[@]+"${TRAJ_ARGS[@]}"} >/dev/null 2>&1 || true
 
 if [[ "$FAILED" -ne 0 ]]; then
     echo "❌ 审查中枢检测到未通过项，请排查修复对应项目"

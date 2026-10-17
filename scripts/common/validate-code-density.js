@@ -21,7 +21,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
-const { getRangeFiles, getStagedFiles } = require('./git-env');
+const { getRangeFiles, getStagedFiles, readStagedContentSafe } = require('./git-env');
 const {
   evaluateCodeMetrics,
   isPlumbingExemptPath,
@@ -119,8 +119,8 @@ function parseArgs(args) {
  * @param {object} options - Validation options
  * @returns {{ file: string, metrics: object, isExempt: boolean, violations: object[] }}
  */
-function auditFileDensity(filePath, options) {
-  const content = fs.readFileSync(filePath, 'utf8');
+function auditFileDensity(filePath, options, contentOverride = undefined) {
+  const content = contentOverride === undefined ? fs.readFileSync(filePath, 'utf8') : contentOverride;
   const ext = path.extname(filePath).toLowerCase();
   const relPath = path.relative(process.cwd(), filePath).replace(/\\/g, '/');
   const metrics = evaluateCodeMetrics(content, ext, relPath);
@@ -198,7 +198,8 @@ function collectDensityInspections(uniqueFiles, options) {
   let exemptCount = 0;
 
   for (const file of uniqueFiles) {
-    const result = auditFileDensity(file, options);
+    const stagedContent = options.staged ? readStagedContentSafe(process.cwd(), file) : undefined;
+    const result = auditFileDensity(file, options, stagedContent);
     inspections.push(result);
     if (result.isExempt) {
       exemptCount++;

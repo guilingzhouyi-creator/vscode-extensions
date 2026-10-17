@@ -65,6 +65,19 @@ record_pre_commit_failure() {
         details=$(cat "$STEP_LOG" 2>/dev/null || true)
     fi
 
+    local step_id
+    case "$step_name" in
+        "Gate 7: Rules Registry"*) step_id="PC-03-01" ;;
+        "Gate 7: Skills"*) step_id="PC-03-02" ;;
+        "Gate 8: workspace-timing Compilation"*) step_id="PC-04-01" ;;
+        "Gate 8: workspace-timing Text Layout"*) step_id="PC-04-02" ;;
+        "Gate 8: workspace-timing Layout Build"*) step_id="PC-04-02" ;;
+        "Gate 8: auto-refactor Compilation"*) step_id="PC-04-03" ;;
+        "Gate 8: WebGames"*) step_id="PC-04-04" ;;
+        "Gate 9: Dual-Scale Volume"*) step_id="PC-05-02" ;;
+        *) step_id="PC-00-00" ;;
+    esac
+
     local diag_dir="$ROOT_DIR/.audit-logs"
     mkdir -p "$diag_dir" 2>/dev/null || true
     local fail_log="$diag_dir/last-pre-commit.log"
@@ -85,10 +98,12 @@ record_pre_commit_failure() {
     cat <<EOF > "$snapshot_json" 2>/dev/null || true
 {
   "protocolVersion": "1.0.0",
+  "runId": "$RUN_ID",
   "recordedAt": "$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || echo 'unknown')",
   "status": "BLOCK",
   "gate": "pre-commit",
   "step": "$step_name",
+  "stepId": "$step_id",
   "failedCommand": "$verify_cmd",
   "exitCode": 1,
   "summary": "$summary",
@@ -120,6 +135,11 @@ if [[ "$AGENT_MODE" -eq 0 ]]; then
 fi
 
 FAILED=0
+RUN_ID="$(date -u +%s 2>/dev/null || echo 0)-$$"
+
+if [[ "$AGENT_MODE" -eq 1 ]]; then
+    rm -f "$ROOT_DIR/.audit-logs/last-failure.json" 2>/dev/null || true
+fi
 
 # --- Gate 1~6: 快速暂存区统一流式审查 ([1/9] 零空文件, [2/9] 换行契约, [3/9] 绝对路径, [4/9] 零黑话, [5/9] 双轨体积, [6/9] 密钥防泄漏) ---
 if [[ "$AGENT_MODE" -eq 1 ]]; then
@@ -221,25 +241,48 @@ fi
 
 TOUCHED_WT_DOC=$(echo "$STAGED_FILES" | grep -E '^workspace-timing/(CHANGELOG\.md|README\.md|package\.json)' || true)
 if [[ -n "$TOUCHED_WT_DOC" ]]; then
-    if [[ "$AGENT_MODE" -eq 1 ]]; then
-        if ! (cd workspace-timing && "$NODE_BIN" scripts/dist/audit/text-layout.js) >"$STEP_LOG" 2>&1; then
-            record_pre_commit_failure "Gate 8: workspace-timing Text Layout (L3-DOC-LAYOUT)" \
-                "L3-DOC-LAYOUT" \
-                "workspace-timing text layout or changelog authenticity check failed." \
-                "Review CHANGELOG.md / README.md to ensure Keep-a-Changelog compliance." \
-                "node workspace-timing/scripts/dist/audit/text-layout.js" \
-                "workspace-timing/CHANGELOG.md"
-            cat "$ROOT_DIR/.audit-logs/last-failure.json"
-            exit 1
-        fi
-    else
-        echo "  ▶ 触发 workspace-timing 文档布局与变更日志真实性门禁 (L3-DOC-LAYOUT)..."
-        if ! (cd workspace-timing && "$NODE_BIN" scripts/dist/audit/text-layout.js) >"$STEP_LOG" 2>&1; then
-            echo "❌ [FAIL] Gate 8: workspace-timing 文档文本布局或变更日志真实性核验未通过！"
+    WT_LAYOUT_READY=1
+    WT_LAYOUT_ARTIFACT="workspace-timing/scripts/dist/audit/text-layout.js"
+    if [[ ! -f "$WT_LAYOUT_ARTIFACT" ]]; then
+        echo "  ▶ 构建 workspace-timing 审查脚本产物 (npm run scripts:build)..."
+        if ! (cd workspace-timing && "$NPM_BIN" run scripts:build) >"$STEP_LOG" 2>&1; then
+            WT_LAYOUT_READY=0
+            if [[ "$AGENT_MODE" -eq 1 ]]; then
+                record_pre_commit_failure "Gate 8: workspace-timing Layout Build (L3-DOC-LAYOUT)" \
+                    "L3-DOC-LAYOUT" \
+                    "workspace-timing scripts:build failed; text-layout artifact is unavailable." \
+                    "Run 'npm run scripts:build' in workspace-timing and resolve compiler errors." \
+                    "npm --prefix workspace-timing run scripts:build" \
+                    "workspace-timing/scripts/audit/text-layout.ts"
+                cat "$ROOT_DIR/.audit-logs/last-failure.json"
+                exit 1
+            fi
+            echo "❌ [FAIL] Gate 8: workspace-timing 审查脚本构建失败 (npm run scripts:build)！"
             tail -n 15 "$STEP_LOG" | sed 's/^/   /'
             FAILED=1
+        fi
+    fi
+    if [[ "$WT_LAYOUT_READY" -eq 1 ]]; then
+        if [[ "$AGENT_MODE" -eq 1 ]]; then
+            if ! (cd workspace-timing && "$NODE_BIN" scripts/dist/audit/text-layout.js) >"$STEP_LOG" 2>&1; then
+                record_pre_commit_failure "Gate 8: workspace-timing Text Layout (L3-DOC-LAYOUT)" \
+                    "L3-DOC-LAYOUT" \
+                    "workspace-timing text layout or changelog authenticity check failed." \
+                    "Review CHANGELOG.md / README.md to ensure Keep-a-Changelog compliance." \
+                    "node workspace-timing/scripts/dist/audit/text-layout.js" \
+                    "workspace-timing/CHANGELOG.md"
+                cat "$ROOT_DIR/.audit-logs/last-failure.json"
+                exit 1
+            fi
         else
-            echo "  ✔ [PASS] workspace-timing 文档布局与变更日志真实性校验通过"
+            echo "  ▶ 触发 workspace-timing 文档布局与变更日志真实性门禁 (L3-DOC-LAYOUT)..."
+            if ! (cd workspace-timing && "$NODE_BIN" scripts/dist/audit/text-layout.js) >"$STEP_LOG" 2>&1; then
+                echo "❌ [FAIL] Gate 8: workspace-timing 文档文本布局或变更日志真实性核验未通过！"
+                tail -n 15 "$STEP_LOG" | sed 's/^/   /'
+                FAILED=1
+            else
+                echo "  ✔ [PASS] workspace-timing 文档布局与变更日志真实性校验通过"
+            fi
         fi
     fi
 fi
@@ -324,6 +367,27 @@ if [[ -n "$TOUCHED_AUDITABLE" ]]; then
         echo "  ▶ 审查暂存区代码密度与接线载荷 (POR<=60%, tau in [2.5, 20.0])..."
         if ! "$NODE_BIN" scripts/common/validate-code-density.js --staged; then
             echo "❌ [FAIL] Gate 9: 暂存区代码密度与接线载荷审查未通过！"
+            FAILED=1
+        fi
+    fi
+fi
+
+if [[ -n "$TOUCHED_AUDITABLE" ]]; then
+    if [[ "$AGENT_MODE" -eq 1 ]]; then
+        if ! "$NODE_BIN" scripts/common/evaluate-eloc-budget.js --staged --json >"$STEP_LOG" 2>&1; then
+            record_pre_commit_failure "Gate 9: Dual-Scale Volume Budget (VOL-ELOC-001)" \
+                "VOL-ELOC-001" \
+                "Staged code exceeds ELOC/LOC budgets or the 1:3 dynamic envelope." \
+                "Run 'node scripts/common/evaluate-eloc-budget.js --staged' and split or densify the offending module." \
+                "node scripts/common/evaluate-eloc-budget.js --staged" \
+                "scripts"
+            cat "$ROOT_DIR/.audit-logs/last-failure.json"
+            exit 1
+        fi
+    else
+        echo "  ▶ 审查暂存区双轨体积与 1:3 动态包络 (ELOC<=900, LOC<=1400)..."
+        if ! "$NODE_BIN" scripts/common/evaluate-eloc-budget.js --staged; then
+            echo "❌ [FAIL] Gate 9: 暂存区双轨体积与动态包络审查未通过！"
             FAILED=1
         fi
     fi
