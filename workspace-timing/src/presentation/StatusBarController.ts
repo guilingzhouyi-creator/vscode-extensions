@@ -8,7 +8,17 @@
  */
 
 import * as vscode from 'vscode';
-import { StatusBarMode, STATUS_BAR_PRIORITY, TIMING_COMMAND_IDS } from '../domain/models';
+import {
+    StatusBarMode,
+    STATUS_BAR_PRIORITY,
+    TIMING_COMMAND_IDS,
+    STATUS_BAR_MODE_TODAY_TOTAL,
+    STATUS_BAR_MODE_TOTAL_TODAY,
+    STATUS_BAR_MODE_COMPACT,
+    STATE_PAUSED_IDLE,
+    ACTIVITY_MODE_MANUAL,
+    ACTIVITY_MODE_AI,
+} from '../domain/models';
 import { TimeAggregator } from '../domain/TimeAggregator';
 import { LogLevel, log } from '../integration/logger';
 import { t, format } from '../i18n/index';
@@ -19,11 +29,16 @@ const KEY_MODE_TODAY_TOTAL = 'statusBar.mode.today-total';
 const KEY_MODE_TOTAL_TODAY = 'statusBar.mode.total-today';
 const KEY_MODE_COMPACT = 'statusBar.mode.compact';
 
+const A11Y_ROLE_BUTTON = 'button';
+const ICON_WATCH = '$(watch)';
+const ICON_DEBUG_PAUSE = '$(debug-pause)';
+const ICON_SPARKLE = '$(sparkle)';
+
 /** 模式名 i18n key（命令提示与 tooltip 共用，杜绝硬编码中文双轨） */
 const MODE_LABEL_KEYS: Record<StatusBarMode, typeof KEY_MODE_TODAY_TOTAL | typeof KEY_MODE_TOTAL_TODAY | typeof KEY_MODE_COMPACT> = {
-    'today-total': KEY_MODE_TODAY_TOTAL,
-    'total-today': KEY_MODE_TOTAL_TODAY,
-    'compact': KEY_MODE_COMPACT,
+    [STATUS_BAR_MODE_TODAY_TOTAL]: KEY_MODE_TODAY_TOTAL,
+    [STATUS_BAR_MODE_TOTAL_TODAY]: KEY_MODE_TOTAL_TODAY,
+    [STATUS_BAR_MODE_COMPACT]: KEY_MODE_COMPACT,
 };
 
 /** 获取模式显示名（本地化） */
@@ -31,7 +46,11 @@ export function statusBarModeLabel(mode: StatusBarMode): string {
     return t()[MODE_LABEL_KEYS[mode]];
 }
 
-const MODE_CYCLE: StatusBarMode[] = ['today-total', 'total-today', 'compact'];
+const MODE_CYCLE: readonly StatusBarMode[] = [
+    STATUS_BAR_MODE_TODAY_TOTAL,
+    STATUS_BAR_MODE_TOTAL_TODAY,
+    STATUS_BAR_MODE_COMPACT,
+];
 
 export interface StatusBarConfig {
     enabled?: boolean;
@@ -42,7 +61,7 @@ export interface StatusBarConfig {
 export class StatusBarController {
     private readonly statusBarItem: vscode.StatusBarItem;
     private _enabled: boolean = true;
-    private _mode: StatusBarMode = 'today-total';
+    private _mode: StatusBarMode = STATUS_BAR_MODE_TODAY_TOTAL;
     private _todayMs: number = 0;
     private _totalMs: number = 0;
     /** 上次渲染的文本（变更检测，避免每秒无谓重绘） */
@@ -53,7 +72,7 @@ export class StatusBarController {
     private _todayManualMs: number = 0;
     private _todayAiMs: number = 0;
     private _todayIdleMs: number = 0;
-    private _activityMode: string = 'manual';
+    private _activityMode: string = ACTIVITY_MODE_MANUAL;
 
     constructor() {
         this.statusBarItem = vscode.window.createStatusBarItem(
@@ -95,9 +114,9 @@ export class StatusBarController {
     /** 同步更新 Tooltip、Name 与无障碍信息，确保语言热切换与模式切换即时生效 */
     private updateTooltipAndA11y(rawText: string): void {
         let activityLabel = '';
-        if (this._activityMode === 'paused_idle') {
+        if (this._activityMode === STATE_PAUSED_IDLE) {
             activityLabel = t()['statusBar.idle'];
-        } else if (this._activityMode === 'ai') {
+        } else if (this._activityMode === ACTIVITY_MODE_AI) {
             activityLabel = t()['statusBar.ai'];
         }
 
@@ -128,7 +147,7 @@ export class StatusBarController {
             this._lastA11yLabel = a11yLabel;
             this.statusBarItem.accessibilityInformation = {
                 label: a11yLabel,
-                role: 'button',
+                role: A11Y_ROLE_BUTTON,
             };
         }
     }
@@ -146,26 +165,26 @@ export class StatusBarController {
 
         let text: string;
         switch (this._mode) {
-            case 'today-total':
+            case STATUS_BAR_MODE_TODAY_TOTAL:
                 text = format(t()['statusBar.todayTotal'],
                     TimeAggregator.formatDurationCompact(this._todayMs),
                     TimeAggregator.formatDurationCompact(this._totalMs));
                 break;
-            case 'total-today':
+            case STATUS_BAR_MODE_TOTAL_TODAY:
                 text = format(t()['statusBar.totalToday'],
                     TimeAggregator.formatDurationCompact(this._totalMs),
                     TimeAggregator.formatDurationCompact(this._todayMs));
                 break;
-            case 'compact':
+            case STATUS_BAR_MODE_COMPACT:
                 text = TimeAggregator.formatDurationCompact(this._todayMs);
                 break;
         }
 
-        let icon = '$(watch)';
-        if (this._activityMode === 'paused_idle') {
-            icon = '$(debug-pause)';
-        } else if (this._activityMode === 'ai') {
-            icon = '$(sparkle)';
+        let icon = ICON_WATCH;
+        if (this._activityMode === STATE_PAUSED_IDLE) {
+            icon = ICON_DEBUG_PAUSE;
+        } else if (this._activityMode === ACTIVITY_MODE_AI) {
+            icon = ICON_SPARKLE;
         }
 
         const displayText = `${icon} ${text}`;

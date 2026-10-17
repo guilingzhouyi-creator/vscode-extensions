@@ -18,11 +18,25 @@ import { t, format } from '../i18n/index';
 import { TimeAggregator } from '../domain/TimeAggregator';
 import { ActivityWatcher } from '../integration/ActivityWatcher';
 import { exportTimingToFile, exportAggregatedToFile } from './dashboardMessages';
-import { TIMING_COMMAND_IDS } from '../domain/models';
+import {
+    TIMING_COMMAND_IDS,
+    ACTIVITY_MODE_MANUAL,
+    ACTIVITY_MODE_AI,
+    TYPEOF_OBJECT,
+    TYPEOF_NUMBER,
+    DIR_DOT_VSCODE,
+    FILE_TIMING_JSON,
+    EXT_JSON,
+    WILDCARD_STAR,
+    ENCODING_UTF8,
+} from '../domain/models';
 
 const LOG_COMMANDS_REGISTERED = 'CommandRegistrar: all commands registered';
 const LOG_TOGGLE_GLOBAL_PERSIST_FAILED = 'toggleGlobal persist failed';
 const LOG_SHOW_STATUS_PERSIST_FAILED = 'showStatus persist failed';
+const LOG_ENABLE_PERSIST_FAILED = 'enable persist failed';
+const LOG_DISABLE_PERSIST_FAILED = 'disable persist failed';
+const LOG_RESTORE_FAILED = 'restore failed';
 const LOG_COMMAND_REGISTRAR_DISPOSED = 'CommandRegistrar: disposed';
 
 export class CommandRegistrar {
@@ -57,7 +71,7 @@ export class CommandRegistrar {
             orchestrator.disable.updateConfig({ enabled: true, globalDisabled: false });
             await orchestrator.onDisableStateChanged(orchestrator.disable.resolveState());
             persistTimingConfig({ enabled: true, globalDisabled: false }).catch(err =>
-                log(LogLevel.Error, 'enable persist failed', err as Error)
+                log(LogLevel.Error, LOG_ENABLE_PERSIST_FAILED, err as Error)
             );
             vscode.window.showInformationMessage(t()['cmd.enabled']);
         });
@@ -68,7 +82,7 @@ export class CommandRegistrar {
             orchestrator.disable.updateConfig({ enabled: false });
             await orchestrator.onDisableStateChanged(orchestrator.disable.resolveState());
             persistTimingConfig({ enabled: false }).catch(err =>
-                log(LogLevel.Error, 'disable persist failed', err as Error)
+                log(LogLevel.Error, LOG_DISABLE_PERSIST_FAILED, err as Error)
             );
             vscode.window.showInformationMessage(t()['cmd.disabled']);
         });
@@ -104,9 +118,9 @@ export class CommandRegistrar {
             if (!activityWatcher) { this.noWorkspaceMsg(); return; }
             const nextOverride = activityWatcher.toggleModeOverride();
             let label = t()['mode.label.auto'];
-            if (nextOverride === 'ai') {
+            if (nextOverride === ACTIVITY_MODE_AI) {
                 label = t()['mode.label.ai'];
-            } else if (nextOverride === 'manual') {
+            } else if (nextOverride === ACTIVITY_MODE_MANUAL) {
                 label = t()['mode.label.manual'];
             }
             vscode.window.showInformationMessage(format(t()['cmd.activityModeSwitched'], label));
@@ -115,14 +129,14 @@ export class CommandRegistrar {
         /** 注册强制锁定为 AI 协作模式命令 */
         this.registerCommand(TIMING_COMMAND_IDS.SET_MODE_AI, () => {
             if (!activityWatcher) { this.noWorkspaceMsg(); return; }
-            activityWatcher.setModeOverride('ai');
+            activityWatcher.setModeOverride(ACTIVITY_MODE_AI);
             vscode.window.showInformationMessage(t()['cmd.activityModeAi']);
         });
 
         /** 注册强制锁定为人工开发模式命令 */
         this.registerCommand(TIMING_COMMAND_IDS.SET_MODE_MANUAL, () => {
             if (!activityWatcher) { this.noWorkspaceMsg(); return; }
-            activityWatcher.setModeOverride('manual');
+            activityWatcher.setModeOverride(ACTIVITY_MODE_MANUAL);
             vscode.window.showInformationMessage(t()['cmd.activityModeManual']);
         });
 
@@ -257,11 +271,11 @@ export class CommandRegistrar {
         const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri;
         if (!workspaceRoot) { this.noWorkspaceMsg(); return; }
 
-        const defaultUri = vscode.Uri.joinPath(workspaceRoot, '.vscode', 'workspace-timing.json');
+        const defaultUri = vscode.Uri.joinPath(workspaceRoot, DIR_DOT_VSCODE, FILE_TIMING_JSON);
         const picked = await vscode.window.showOpenDialog({
             defaultUri,
             canSelectMany: false,
-            filters: { [t()['export.filter.json']]: ['json'], [t()['export.filter.all']]: ['*'] },
+            filters: { [t()['export.filter.json']]: [EXT_JSON], [t()['export.filter.all']]: [WILDCARD_STAR] },
             openLabel: t()['toast.exportSaveLabel'],
         });
         if (!picked || picked.length === 0) return;
@@ -269,7 +283,7 @@ export class CommandRegistrar {
         let raw: unknown;
         try {
             const bytes = await vscode.workspace.fs.readFile(picked[0]);
-            raw = JSON.parse(Buffer.from(bytes).toString('utf-8'));
+            raw = JSON.parse(Buffer.from(bytes).toString(ENCODING_UTF8));
         } catch (err) {
             vscode.window.showErrorMessage(format(t()['toast.restoreFailed'], (err as Error).message));
             return;
@@ -277,8 +291,8 @@ export class CommandRegistrar {
 
         // 双侧摘要确认（当前 vs 文件）
         const dash = await orchestrator.getDashboardData();
-        const fileData = (raw && typeof raw === 'object') ? (raw as { totalMs?: unknown; sessions?: unknown[] }) : undefined;
-        const fileTotal = fileData && typeof fileData.totalMs === 'number' ? fileData.totalMs : 0;
+        const fileData = (raw && typeof raw === TYPEOF_OBJECT) ? (raw as { totalMs?: unknown; sessions?: unknown[] }) : undefined;
+        const fileTotal = fileData && typeof fileData.totalMs === TYPEOF_NUMBER ? (fileData.totalMs as number) : 0;
         const fileSessions = Array.isArray(fileData?.sessions) ? fileData!.sessions!.length : 0;
         // 模板参数索引：{0}=当前累计 {1}=当前会话数 {2}=文件累计 {3}=文件会话数
         const summary = format(t()['confirm.restore'],
@@ -293,7 +307,7 @@ export class CommandRegistrar {
             statusBar.updateTime(data.todayMs, data.totalMs);
             vscode.window.showInformationMessage(format(t()['toast.restored'], picked[0].fsPath));
         } catch (err) {
-            log(LogLevel.Error, 'restore failed', err as Error);
+            log(LogLevel.Error, LOG_RESTORE_FAILED, err as Error);
             vscode.window.showErrorMessage(
                 format(t()['toast.restoreFailed'], (err as Error).message));
         }

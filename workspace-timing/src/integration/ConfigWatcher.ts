@@ -26,6 +26,7 @@ import {
     sanitizeAiDetectionEnabled,
     sanitizeAiCooldownSeconds,
     sanitizeChartDualTrackDisplay,
+    TIMING_CONFIG_FIELDS,
 } from '../domain/models';
 import { DashboardData } from '../domain/dashboard-types';
 import { LogLevel, log } from './logger';
@@ -34,6 +35,7 @@ import { setLocale, resolveLocale } from '../i18n/index';
 const LOG_PERSIST_CONFIG_FAILED = 'ConfigWatcher: failed to persist configuration to VS Code settings';
 const LOG_APPLY_CONFIG_FAILED = 'ConfigWatcher: failed to apply config change';
 const LOG_LOCALE_CHANGED = 'ConfigWatcher: locale changed, dashboard recreated';
+const LOG_CONFIG_WATCHER_STARTED = 'ConfigWatcher: started';
 
 /**
  * 读取当前用户配置（唯一入口，避免多处重复实现导致配置漂移）。
@@ -79,25 +81,25 @@ const PERSIST_FIELDS: ReadonlyArray<{
     key: string;
     sanitize?: (v: unknown) => unknown;
 }> = [
-    { field: TIMING_CONFIG_KEYS.ENABLED, key: TIMING_CONFIG_KEYS.ENABLED },
-    { field: 'globalDisabled', key: TIMING_CONFIG_KEYS.GLOBAL_DISABLED },
-    { field: 'locale', key: TIMING_CONFIG_KEYS.LOCALE },
-    { field: 'statusBarEnabled', key: TIMING_CONFIG_KEYS.STATUS_BAR_ENABLED },
-    { field: 'statusBarMode', key: TIMING_CONFIG_KEYS.STATUS_BAR_MODE },
-    { field: 'journalEnabled', key: TIMING_CONFIG_KEYS.STORAGE_JOURNAL_ENABLED },
-    { field: 'backupToFile', key: TIMING_CONFIG_KEYS.STORAGE_BACKUP_TO_FILE },
-    { field: 'ringBufferCapacity', key: TIMING_CONFIG_KEYS.STORAGE_RING_BUFFER_CAPACITY },
-    { field: 'journalFlushIntervalMs', key: TIMING_CONFIG_KEYS.STORAGE_JOURNAL_FLUSH_INTERVAL },
-    { field: 'fullSaveIntervalMs', key: TIMING_CONFIG_KEYS.STORAGE_FULL_SAVE_INTERVAL },
-    { field: 'maxSessions', key: TIMING_CONFIG_KEYS.STORAGE_MAX_SESSIONS },
-    { field: 'historyRawRetentionDays', key: TIMING_CONFIG_KEYS.STORAGE_HISTORY_RAW_RETENTION_DAYS },
-    { field: 'safetySnapshot', key: TIMING_CONFIG_KEYS.STORAGE_SAFETY_SNAPSHOT },
-    { field: 'weeklyLimitEnabled', key: TIMING_CONFIG_KEYS.WEEKLY_LIMIT_ENABLED, sanitize: sanitizeWeeklyLimitEnabled },
-    { field: 'weeklyLimitHours', key: TIMING_CONFIG_KEYS.WEEKLY_LIMIT_HOURS, sanitize: sanitizeWeeklyLimitHours },
-    { field: 'idleTimeoutMinutes', key: TIMING_CONFIG_KEYS.IDLE_TIMEOUT_MINUTES, sanitize: sanitizeIdleTimeoutMinutes },
-    { field: 'aiDetectionEnabled', key: TIMING_CONFIG_KEYS.AI_DETECTION_ENABLED, sanitize: sanitizeAiDetectionEnabled },
-    { field: 'aiCooldownSeconds', key: TIMING_CONFIG_KEYS.AI_COOLDOWN_SECONDS, sanitize: sanitizeAiCooldownSeconds },
-    { field: 'chartDualTrackDisplay', key: TIMING_CONFIG_KEYS.CHART_DUAL_TRACK_DISPLAY, sanitize: sanitizeChartDualTrackDisplay },
+    { field: TIMING_CONFIG_FIELDS.ENABLED, key: TIMING_CONFIG_KEYS.ENABLED },
+    { field: TIMING_CONFIG_FIELDS.GLOBAL_DISABLED, key: TIMING_CONFIG_KEYS.GLOBAL_DISABLED },
+    { field: TIMING_CONFIG_FIELDS.LOCALE, key: TIMING_CONFIG_KEYS.LOCALE },
+    { field: TIMING_CONFIG_FIELDS.STATUS_BAR_ENABLED, key: TIMING_CONFIG_KEYS.STATUS_BAR_ENABLED },
+    { field: TIMING_CONFIG_FIELDS.STATUS_BAR_MODE, key: TIMING_CONFIG_KEYS.STATUS_BAR_MODE },
+    { field: TIMING_CONFIG_FIELDS.JOURNAL_ENABLED, key: TIMING_CONFIG_KEYS.STORAGE_JOURNAL_ENABLED },
+    { field: TIMING_CONFIG_FIELDS.BACKUP_TO_FILE, key: TIMING_CONFIG_KEYS.STORAGE_BACKUP_TO_FILE },
+    { field: TIMING_CONFIG_FIELDS.RING_BUFFER_CAPACITY, key: TIMING_CONFIG_KEYS.STORAGE_RING_BUFFER_CAPACITY },
+    { field: TIMING_CONFIG_FIELDS.JOURNAL_FLUSH_INTERVAL_MS, key: TIMING_CONFIG_KEYS.STORAGE_JOURNAL_FLUSH_INTERVAL },
+    { field: TIMING_CONFIG_FIELDS.FULL_SAVE_INTERVAL_MS, key: TIMING_CONFIG_KEYS.STORAGE_FULL_SAVE_INTERVAL },
+    { field: TIMING_CONFIG_FIELDS.MAX_SESSIONS, key: TIMING_CONFIG_KEYS.STORAGE_MAX_SESSIONS },
+    { field: TIMING_CONFIG_FIELDS.HISTORY_RAW_RETENTION_DAYS, key: TIMING_CONFIG_KEYS.STORAGE_HISTORY_RAW_RETENTION_DAYS },
+    { field: TIMING_CONFIG_FIELDS.SAFETY_SNAPSHOT, key: TIMING_CONFIG_KEYS.STORAGE_SAFETY_SNAPSHOT },
+    { field: TIMING_CONFIG_FIELDS.WEEKLY_LIMIT_ENABLED, key: TIMING_CONFIG_KEYS.WEEKLY_LIMIT_ENABLED, sanitize: sanitizeWeeklyLimitEnabled },
+    { field: TIMING_CONFIG_FIELDS.WEEKLY_LIMIT_HOURS, key: TIMING_CONFIG_KEYS.WEEKLY_LIMIT_HOURS, sanitize: sanitizeWeeklyLimitHours },
+    { field: TIMING_CONFIG_FIELDS.IDLE_TIMEOUT_MINUTES, key: TIMING_CONFIG_KEYS.IDLE_TIMEOUT_MINUTES, sanitize: sanitizeIdleTimeoutMinutes },
+    { field: TIMING_CONFIG_FIELDS.AI_DETECTION_ENABLED, key: TIMING_CONFIG_KEYS.AI_DETECTION_ENABLED, sanitize: sanitizeAiDetectionEnabled },
+    { field: TIMING_CONFIG_FIELDS.AI_COOLDOWN_SECONDS, key: TIMING_CONFIG_KEYS.AI_COOLDOWN_SECONDS, sanitize: sanitizeAiCooldownSeconds },
+    { field: TIMING_CONFIG_FIELDS.CHART_DUAL_TRACK_DISPLAY, key: TIMING_CONFIG_KEYS.CHART_DUAL_TRACK_DISPLAY, sanitize: sanitizeChartDualTrackDisplay },
 ];
 
 /**
@@ -194,7 +196,7 @@ export class ConfigWatcher implements vscode.Disposable {
         const config = this.readConfig();
         this.applyConfig(config);
 
-        log(LogLevel.Info, 'ConfigWatcher: started');
+        log(LogLevel.Info, LOG_CONFIG_WATCHER_STARTED);
     }
 
     /** 读取当前配置 */

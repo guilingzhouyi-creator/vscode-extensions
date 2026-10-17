@@ -35,6 +35,32 @@ export const TIMING_CONFIG_KEYS = Object.freeze({
 } as const);
 
 /**
+ * 架构契约：TimingConfig 领域实体属性字段名唯一真源字典 (TIMING_CONFIG_FIELDS)
+ * 约束公理：消除配置映射表与反射写入时的散落硬编码字段名。
+ */
+export const TIMING_CONFIG_FIELDS = Object.freeze({
+    ENABLED: 'enabled',
+    GLOBAL_DISABLED: 'globalDisabled',
+    LOCALE: 'locale',
+    STATUS_BAR_ENABLED: 'statusBarEnabled',
+    STATUS_BAR_MODE: 'statusBarMode',
+    JOURNAL_ENABLED: 'journalEnabled',
+    BACKUP_TO_FILE: 'backupToFile',
+    RING_BUFFER_CAPACITY: 'ringBufferCapacity',
+    JOURNAL_FLUSH_INTERVAL_MS: 'journalFlushIntervalMs',
+    FULL_SAVE_INTERVAL_MS: 'fullSaveIntervalMs',
+    MAX_SESSIONS: 'maxSessions',
+    HISTORY_RAW_RETENTION_DAYS: 'historyRawRetentionDays',
+    SAFETY_SNAPSHOT: 'safetySnapshot',
+    WEEKLY_LIMIT_ENABLED: 'weeklyLimitEnabled',
+    WEEKLY_LIMIT_HOURS: 'weeklyLimitHours',
+    IDLE_TIMEOUT_MINUTES: 'idleTimeoutMinutes',
+    AI_DETECTION_ENABLED: 'aiDetectionEnabled',
+    AI_COOLDOWN_SECONDS: 'aiCooldownSeconds',
+    CHART_DUAL_TRACK_DISPLAY: 'chartDualTrackDisplay',
+} as const);
+
+/**
  * 架构契约：VS Code 命令标识符唯一真源映射字典 (TIMING_COMMAND_IDS)
  * 约束公理：命令注册、调用与交互面板派发必须收敛于此单一真源。
  */
@@ -57,3 +83,43 @@ export const TIMING_COMMAND_IDS = Object.freeze({
     EXPORT: 'workspaceTiming.export',
     EXPORT_AGGREGATED: 'workspaceTiming.exportAggregated',
 } as const);
+
+/**
+ * 语言区域标识符常量 (SSOT)
+ */
+export const LOCALE_AUTO = 'auto';
+export const LOCALE_ZH_CN = 'zh-CN';
+export const LOCALE_EN = 'en';
+
+/**
+ * 状态栏展示模式常量 (SSOT)
+ */
+export const STATUS_BAR_MODE_TODAY_TOTAL = 'today-total';
+export const STATUS_BAR_MODE_TOTAL_TODAY = 'total-today';
+export const STATUS_BAR_MODE_COMPACT = 'compact';
+
+/**
+ * 原生类型与字面量常量 (消灭散落硬编码与重复字面量)
+ */
+export const TYPEOF_BOOLEAN = 'boolean';
+export const TYPEOF_STRING = 'string';
+export const TYPEOF_NUMBER = 'number';
+export const TYPEOF_OBJECT = 'object';
+export const STRING_LITERAL_TRUE = 'true';
+
+/**
+ * 计时活动模式常量 (SSOT)
+ */
+export const ACTIVITY_MODE_MANUAL = 'manual';
+export const ACTIVITY_MODE_AI = 'ai';
+
+/**
+ * 文件名、目录与格式编码常量 (SSOT)
+ */
+export const DIR_DOT_VSCODE = '.vscode';
+export const FILE_TIMING_JSON = 'workspace-timing.json';
+export const EXT_JSON = 'json';
+export const WILDCARD_STAR = '*';
+export const ENCODING_UTF8 = 'utf-8';
+
+

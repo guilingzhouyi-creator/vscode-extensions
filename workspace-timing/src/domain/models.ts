@@ -8,6 +8,19 @@
  * Contract Invariant & Boundary: 强类型不变量保证：所有工时量度均为物理量纲非负毫秒数 (*Ms)；各配置边界上下界在 clamp 净化器中严格闭合；状态机转换仅允许 ORCHESTRATOR_STATES 定义的确定性状态。
  */
 
+import {
+    LOCALE_AUTO,
+    LOCALE_ZH_CN,
+    LOCALE_EN,
+    STATUS_BAR_MODE_TODAY_TOTAL,
+    STATUS_BAR_MODE_TOTAL_TODAY,
+    STATUS_BAR_MODE_COMPACT,
+    TYPEOF_BOOLEAN,
+    TYPEOF_STRING,
+    TYPEOF_NUMBER,
+    STRING_LITERAL_TRUE,
+} from './constants';
+
 /** 契约版本：数据存储格式版本 3（双轨模式 manual/ai、idleSessions 与沉淀层，满足向前兼容） */
 export const LATEST_VERSION = 3;
 
@@ -34,14 +47,22 @@ export const FREQ_E4_HZ = 330;
 export const FREQ_E5_HZ = 660;
 
 // ─── 计时状态机枚举（单一真源契约）───────────────────
+export const STATE_IDLE = 'idle';
+export const STATE_RUNNING = 'running';
+export const STATE_DISABLED = 'disabled';
+export const STATE_SAVING = 'saving';
+export const STATE_STOPPED = 'stopped';
+export const STATE_ERROR = 'error';
+export const STATE_PAUSED_IDLE = 'paused_idle';
+
 export const ORCHESTRATOR_STATES = {
-    IDLE: 'idle',
-    RUNNING: 'running',
-    DISABLED: 'disabled',
-    SAVING: 'saving',
-    STOPPED: 'stopped',
-    ERROR: 'error',
-    PAUSED_IDLE: 'paused_idle',
+    IDLE: STATE_IDLE,
+    RUNNING: STATE_RUNNING,
+    DISABLED: STATE_DISABLED,
+    SAVING: STATE_SAVING,
+    STOPPED: STATE_STOPPED,
+    ERROR: STATE_ERROR,
+    PAUSED_IDLE: STATE_PAUSED_IDLE,
 } as const;
 export type OrchestratorState = typeof ORCHESTRATOR_STATES[keyof typeof ORCHESTRATOR_STATES];
 
@@ -134,9 +155,9 @@ export function clampNumber(
     max: number,
     fallback: number,
 ): number {
-    if (val === null || val === undefined || typeof val === 'boolean') return fallback;
-    if (typeof val === 'string' && val.trim() === '') return fallback;
-    const n = typeof val === 'number' ? val : Number(val);
+    if (val === null || val === undefined || typeof val === TYPEOF_BOOLEAN) return fallback;
+    if (typeof val === TYPEOF_STRING && (val as string).trim() === '') return fallback;
+    const n = typeof val === TYPEOF_NUMBER ? (val as number) : Number(val);
     if (!Number.isFinite(n)) return fallback;
     return Math.min(max, Math.max(min, Math.round(n)));
 }
@@ -167,7 +188,7 @@ export function sanitizeIdleTimeoutMinutes(val: unknown): number {
 
 export function sanitizeAiDetectionEnabled(val: unknown): boolean {
     if (val === undefined || val === null) return DEFAULT_AI_DETECTION_ENABLED;
-    return val === true || val === 'true';
+    return val === true || val === STRING_LITERAL_TRUE;
 }
 
 export function sanitizeAiCooldownSeconds(val: unknown): number {
@@ -180,10 +201,14 @@ export const DEFAULT_CHART_DUAL_TRACK_DISPLAY = true;
 /** 双轨图表展示开关净化 */
 export function sanitizeChartDualTrackDisplay(val: unknown): boolean {
     if (val === undefined || val === null) return DEFAULT_CHART_DUAL_TRACK_DISPLAY;
-    return val === true || val === 'true';
+    return val === true || val === STRING_LITERAL_TRUE;
 }
 
-const STATUS_BAR_MODES: ReadonlySet<string> = new Set(['today-total', 'total-today', 'compact']);
+const STATUS_BAR_MODES: ReadonlySet<string> = new Set([
+    STATUS_BAR_MODE_TODAY_TOTAL,
+    STATUS_BAR_MODE_TOTAL_TODAY,
+    STATUS_BAR_MODE_COMPACT,
+]);
 
 /** 状态栏模式净化：非枚举值（手写配置漂移）回退默认 */
 export function sanitizeStatusBarMode(val: unknown): StatusBarMode {
@@ -191,7 +216,7 @@ export function sanitizeStatusBarMode(val: unknown): StatusBarMode {
     return DEFAULT_CONFIG.statusBarMode;
 }
 
-const LOCALES: ReadonlySet<string> = new Set(['auto', 'zh-CN', 'en']);
+const LOCALES: ReadonlySet<string> = new Set([LOCALE_AUTO, LOCALE_ZH_CN, LOCALE_EN]);
 
 /** 语言净化：非枚举值（手写配置漂移）回退 auto */
 export function sanitizeLocale(val: unknown): Locale {
@@ -201,14 +226,14 @@ export function sanitizeLocale(val: unknown): Locale {
 
 /** 字符串类型守卫（复用避免字面量 'string' 散布） */
 function isString(val: unknown): val is string {
-    return typeof val === 'string';
+    return typeof val === TYPEOF_STRING;
 }
 
 /** 校验并钳制周工作时长上限（小时），非法输入（非数字/NaN/Infinity/越界）自动纠偏到 [1, 168] */
 export function sanitizeWeeklyLimitHours(val: unknown): number {
     let n: number;
-    if (typeof val === 'number') {
-        n = val;
+    if (typeof val === TYPEOF_NUMBER) {
+        n = val as number;
     } else if (isString(val)) {
         n = parseInt(val, RADIX_DECIMAL);
     } else {
@@ -223,7 +248,7 @@ export function sanitizeWeeklyLimitHours(val: unknown): number {
 
 /** 校验周工作时长上限开关 */
 export function sanitizeWeeklyLimitEnabled(val: unknown): boolean {
-    return val === true || val === 'true';
+    return val === true || val === STRING_LITERAL_TRUE;
 }
 
 /**
@@ -425,7 +450,7 @@ export interface TimingConfig {
 export const DEFAULT_CONFIG: TimingConfig = {
     enabled: true,
     globalDisabled: false,
-    locale: 'auto',
+    locale: LOCALE_AUTO,
     historyRawRetentionDays: DEFAULT_RAW_RETENTION_DAYS,
     safetySnapshot: true,
     weeklyLimitEnabled: false,
@@ -436,7 +461,7 @@ export const DEFAULT_CONFIG: TimingConfig = {
     ringBufferCapacity: DEFAULT_RING_BUFFER_CAP,
     journalFlushIntervalMs: DEFAULT_JOURNAL_FLUSH_MS,
     fullSaveIntervalMs: MS_PER_MINUTE,
-    statusBarMode: 'today-total',
+    statusBarMode: STATUS_BAR_MODE_TODAY_TOTAL,
     maxSessions: DEFAULT_MAX_SESSIONS,
     idleTimeoutMinutes: DEFAULT_IDLE_TIMEOUT_MINUTES,
     aiDetectionEnabled: DEFAULT_AI_DETECTION_ENABLED,
