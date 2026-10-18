@@ -1,7 +1,7 @@
 # 02. 三级增量缓存与拓扑失效体系
 
 > **所属层级**：L1 核心架构与原生内核 (`docs/01-architecture/`)  
-> **对应代码真源**：[`src/core/cache.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/cache.ts)、[`src/core/cache-key.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/cache-key.ts)、[`src/core/cache-persistence.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/cache-persistence.ts)、[`src/core/scheduler/topology-cache-manager.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/scheduler/topology-cache-manager.ts)、[`src/core/reporting/reportFinalizer.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/reporting/reportFinalizer.ts)
+> **对应代码真源**：[`src/core/cache.ts`](../../src/core/cache.ts)、[`src/core/cache-key.ts`](../../src/core/cache-key.ts)、[`src/core/cache-persistence.ts`](../../src/core/cache-persistence.ts)、[`src/core/scheduler/topology-cache-manager.ts`](../../src/core/scheduler/topology-cache-manager.ts)、[`src/core/reporting/reportFinalizer.ts`](../../src/core/reporting/reportFinalizer.ts)
 
 ---
 
@@ -83,7 +83,7 @@ flowchart TD
 
 大型工业工程在持续集成或长时间演进中，`results.jsonl` 文件大小可能累积增长到数十兆乃至上百兆。若守护进程或 CLI 在启动时机械式执行全量内存反序列化，极易导致 Node.js 堆内存瞬时暴涨，甚至引发 OOM。
 
-在 [`src/core/cache.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/cache.ts) 的 `loadResults()` 阶段，系统引入了以基准装载预算（`maxL2LoadBytes`，默认 64 MiB）为参照的四级动态装载保护机制：
+在 [`src/core/cache.ts`](../../src/core/cache.ts) 的 `loadResults()` 阶段，系统引入了以基准装载预算（`maxL2LoadBytes`，默认 64 MiB）为参照的四级动态装载保护机制：
 
 $$\text{LoadRatio} = \frac{\operatorname{Stat}(\text{results.jsonl}).\text{size}}{\text{maxL2LoadBytes}}$$
 
@@ -114,7 +114,7 @@ flowchart TD
 
 ### 3.1 复合缓存键构成公式
 
-位于 [`src/core/cache-key.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/cache-key.ts) 的 L2 缓存键遵循三段式规范结构：
+位于 [`src/core/cache-key.ts`](../../src/core/cache-key.ts) 的 L2 缓存键遵循三段式规范结构：
 
 $$\text{L2Key} = \texttt{"v1:"} + \text{fpHash} + \texttt{":"} + \text{contentHash}$$
 
@@ -154,14 +154,14 @@ export interface FingerprintPayload {
 - **零命令自洁**：由于任何分析因子的改变都会直接推导出全新的 `fpHash`，旧配置下的缓存键将永久失去索引入口，并在达到 `maxAgeDays` 后被后台 LRU 清理线程安全驱逐，**不需要任何手动执行 `cache clear` 命令**。
 - **扫描后处理与缓存解耦**：
   - 单文件缓存（`results.jsonl`）**仅**保存无上下文依赖的单文件静态分析 Issue；
-  - 跨文件循环依赖分析（`runCyclePass`）、基线棘轮比对（`baseline.json`）、Suppressions 过滤以及十维质量总分汇总统一在 [`src/core/reporting/reportFinalizer.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/reporting/reportFinalizer.ts) 对合并后的全集执行；
+  - 跨文件循环依赖分析（`runCyclePass`）、基线棘轮比对（`baseline.json`）、Suppressions 过滤以及十维质量总分汇总统一在 [`src/core/reporting/reportFinalizer.ts`](../../src/core/reporting/reportFinalizer.ts) 对合并后的全集执行；
   - 该设计通过 `npm run validate-postscan-parity` 门禁保障，确保命中缓存的 `ScanReport` 与全新冷扫描**逐字节绝对全等**。
 
 ---
 
 ## 4. 高阶拓扑缓存管理器 (`TopologyCacheManager`)
 
-单纯的文件级哈希缓存无法处理跨模块依赖的级联影响。[`src/core/scheduler/topology-cache-manager.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/scheduler/topology-cache-manager.ts) 构建了一套独立的、具备有向依赖 DAG 反向扩散能力的高阶拓扑缓存层：
+单纯的文件级哈希缓存无法处理跨模块依赖的级联影响。[`src/core/scheduler/topology-cache-manager.ts`](../../src/core/scheduler/topology-cache-manager.ts) 构建了一套独立的、具备有向依赖 DAG 反向扩散能力的高阶拓扑缓存层：
 
 ```mermaid
 flowchart TD
@@ -202,7 +202,7 @@ flowchart TD
 
 ## 5. 原子刷盘机制与 I/O 隔离屏障
 
-文件系统写入异常（如磁盘满、进程崩溃、断电）若损坏缓存文件，会导致后续扫描失败。[`src/core/cache-persistence.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/cache-persistence.ts) 构建了严密的物理隔离屏障：
+文件系统写入异常（如磁盘满、进程崩溃、断电）若损坏缓存文件，会导致后续扫描失败。[`src/core/cache-persistence.ts`](../../src/core/cache-persistence.ts) 构建了严密的物理隔离屏障：
 
 ```mermaid
 sequenceDiagram

@@ -1,7 +1,7 @@
 # 03. 跨平台守护进程与统一 IPC 协议规范
 
 > **所属层级**：L1 核心架构与原生内核 (`docs/01-architecture/`)  
-> **对应代码真源**：[`src/daemon/server.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/daemon/server.ts)、[`src/daemon/client.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/daemon/client.ts)、[`src/daemon/protocol.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/daemon/protocol.ts)、[`src/daemon/registry.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/daemon/registry.ts)、[`src/daemon/scanHandler.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/daemon/scanHandler.ts)
+> **对应代码真源**：[`src/daemon/server.ts`](../../src/daemon/server.ts)、[`src/daemon/client.ts`](../../src/daemon/client.ts)、[`src/daemon/protocol.ts`](../../src/daemon/protocol.ts)、[`src/daemon/registry.ts`](../../src/daemon/registry.ts)、[`src/daemon/scanHandler.ts`](../../src/daemon/scanHandler.ts)
 
 ---
 
@@ -112,7 +112,7 @@ sequenceDiagram
 
 ## 3. 客户端连接、握手、超时控制与透明无感冷退回
 
-在 [`src/daemon/client.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/daemon/client.ts) 中，客户端对外承诺**绝对零故障阻断**。暖扫描在体系中被定位为「纯加速器」，任何守护进程异常均不可破坏主线业务的正确性：
+在 [`src/daemon/client.ts`](../../src/daemon/client.ts) 中，客户端对外承诺**绝对零故障阻断**。暖扫描在体系中被定位为「纯加速器」，任何守护进程异常均不可破坏主线业务的正确性：
 
 ```mermaid
 flowchart TD
@@ -151,7 +151,7 @@ flowchart TD
 
 ## 4. 服务端任务追踪与 AbortController 生命周期
 
-在并发扫描或客户端被用户强行按 `Ctrl+C` 中断时，必须防止后台 Worker 线程无休止空转。[`src/daemon/server.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/daemon/server.ts) 建立了严格的任务生命周期追踪：
+在并发扫描或客户端被用户强行按 `Ctrl+C` 中断时，必须防止后台 Worker 线程无休止空转。[`src/daemon/server.ts`](../../src/daemon/server.ts) 建立了严格的任务生命周期追踪：
 
 ```typescript
 export interface PendingScan {

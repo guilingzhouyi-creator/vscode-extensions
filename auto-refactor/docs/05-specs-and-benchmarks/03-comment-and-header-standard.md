@@ -1,7 +1,7 @@
 # 03. 规范文件头与有效注释密度 (ECD-C) 规范
 
 > **所属层级**：L5 规范、三平面质量度量与性能基准 (`docs/05-specs-and-benchmarks/`)  
-> **对应代码真源**：[`comments`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/comments/)、[`comments.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/analyzers/comments.ts)、[`gate-comments.js`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/scripts/gate-comments.js)、[`validate-comment-hygiene.js`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/scripts/validate-comment-hygiene.js)
+> **对应代码真源**：[`comments`](../../src/core/comments/)、[`comments.ts`](../../src/analyzers/comments.ts)、[`gate-comments.js`](../../scripts/gate-comments.js)、[`validate-comment-hygiene.js`](../../scripts/validate-comment-hygiene.js)
 
 ---
 
@@ -20,13 +20,13 @@
  */
 ```
 
-- 若核心源文件缺少上述六字段头或字段名残缺，将直接触发 [`CMT-HDR-001`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/analyzers/comments.ts) 违规。
+- 若核心源文件缺少上述六字段头或字段名残缺，将直接触发 [`CMT-HDR-001`](../../src/analyzers/comments.ts) 违规。
 
 ---
 
 ## 2. 有效注释密度模型 (Effective Comment Density — ECD-C)
 
-传统基于「注释物理行数 / 源码总行数」的简易度量极易被无意义的样板代码、被注释掉的死代码或大面积装饰横幅恶意刷分。[`src/core/comments/`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/comments/) 实现了基于信息熵与结构语义的 **有效注释密度（ECD-C）** 评估算法：
+传统基于「注释物理行数 / 源码总行数」的简易度量极易被无意义的样板代码、被注释掉的死代码或大面积装饰横幅恶意刷分。[`src/core/comments/`](../../src/core/comments/) 实现了基于信息熵与结构语义的 **有效注释密度（ECD-C）** 评估算法：
 
 ### 2.1 高价值有效注释信号 (Positive Signal)
 - 解释「为什么（Why）」的设计权衡与不变量说明；
@@ -61,7 +61,7 @@
 
 ## 4. 注释门禁棘轮 (`npm run gate:comments`)
 
-在持续集成流水线中，[`scripts/gate-comments.js`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/scripts/gate-comments.js) 作为 `npm run gate` 的必经硬门禁执行：
+在持续集成流水线中，[`scripts/gate-comments.js`](../../scripts/gate-comments.js) 作为 `npm run gate` 的必经硬门禁执行：
 
 1. **新增文件全量检验**：任何新加入的代码文件若缺少六字段模块头，立即以非零退出码阻断；
 2. **符号文档覆盖率看守**：公共导出类型与接口必须具备 JSDoc 契约；

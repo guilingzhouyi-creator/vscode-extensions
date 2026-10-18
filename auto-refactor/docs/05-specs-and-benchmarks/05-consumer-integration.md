@@ -1,7 +1,7 @@
 # 05. 外部工程接入与基线棘轮指南
 
 > **所属层级**：L5 规范、三平面质量度量与性能基准 (`docs/05-specs-and-benchmarks/`)  
-> **对应代码真源**：[`reportFinalizer.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/reporting/reportFinalizer.ts)、[`validate-baseline-ratchet.js`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/scripts/validate-baseline-ratchet.js)、[`validate-consumer-runner.js`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/scripts/validate-consumer-runner.js)、[`templates/consumer/run.mjs`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/templates/consumer/run.mjs)
+> **对应代码真源**：[`reportFinalizer.ts`](../../src/core/reporting/reportFinalizer.ts)、[`validate-baseline-ratchet.js`](../../scripts/validate-baseline-ratchet.js)、[`validate-consumer-runner.js`](../../scripts/validate-consumer-runner.js)、[`templates/consumer/run.mjs`](../../templates/consumer/run.mjs)
 
 ---
 
@@ -41,7 +41,7 @@ $$\text{CriticalDebt} \equiv 0, \qquad \text{HighRiskDebt} \equiv 0$$
 
 ### 3.1 `workspace-timing/`（VS Code 插件 L0~L5 全维门禁联动）
 
-- **配置文件定位**：引用 [`presets/vscode-extension.config.json`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/presets/vscode-extension.config.json)；
+- **配置文件定位**：引用 [`presets/vscode-extension.config.json`](../../presets/vscode-extension.config.json)；
 - **扫描路径定义**：包含 `**/*.ts`, `**/*.js`，排除 `node_modules/**`, `dist/**`, `tests/**`；
 - **核心启用分析器**：
   - `vscode-extension`：专项审查 `Disposable` 内存泄漏、主线程长任务阻塞、国际化字面量解耦；
@@ -68,7 +68,7 @@ $$\text{CriticalDebt} \equiv 0, \qquad \text{HighRiskDebt} \equiv 0$$
 
 ### 3.2 `WebGames/`（Godot 4.7 GDScript 游戏引擎接入）
 
-- **配置文件定位**：引用 [`presets/godot-game.config.json`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/presets/godot-game.config.json)；
+- **配置文件定位**：引用 [`presets/godot-game.config.json`](../../presets/godot-game.config.json)；
 - **扫描路径定义**：包含 `**/*.gd`，排除 `addons/**`, `test/**`；
 - **核心启用分析器**：
   - `gdscript-modern`：GDScript 2.0 强类型注解、静态推导与现代语法糖；
@@ -93,7 +93,7 @@ $$\text{CriticalDebt} \equiv 0, \qquad \text{HighRiskDebt} \equiv 0$$
 
 ## 4. 标准 CI 接入命令与执行模板
 
-消费工程通过 [`templates/consumer/run.mjs`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/templates/consumer/run.mjs) 封装统一调用命令：
+消费工程通过 [`templates/consumer/run.mjs`](../../templates/consumer/run.mjs) 封装统一调用命令：
 
 ```bash
 # 1. 增量 PR 看守：对比 baseline.json，仅拦截新增违规 (Exit 1)

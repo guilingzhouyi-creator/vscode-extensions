@@ -1,7 +1,7 @@
 # 03. Praxis 团队联调操作手册与交付验收矩阵
 
 > **所属层级**：L6 Praxis 团队交付专层 (`docs/06-praxis-delivery/`)  
-> **对应代码真源**：[`praxis-review-client.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/praxis-review-client.ts)、[`semantic-correlation.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/presentation/semantic-correlation.ts)、[`presentation-adapter.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/presentation/presentation-adapter.ts)、[`sliceAuditService.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/sliceAuditService.ts)、[`scripts/test-parallel.js`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/scripts/test-parallel.js)
+> **对应代码真源**：[`praxis-review-client.ts`](../../src/core/praxis/praxis-review-client.ts)、[`semantic-correlation.ts`](../../src/core/praxis/presentation/semantic-correlation.ts)、[`presentation-adapter.ts`](../../src/core/praxis/presentation/presentation-adapter.ts)、[`sliceAuditService.ts`](../../src/core/praxis/sliceAuditService.ts)、[`scripts/test-parallel.js`](../../scripts/test-parallel.js)
 
 ---
 
@@ -12,13 +12,13 @@
 - **模块入口**：CommonJS `dist/api.js`，TypeScript 类型声明 `dist/api.d.ts`
 - **Rust N-API 原生算子自动降级**：
   - 若 `crates/*/index.node` 存在，自动启用 Rust 原生加速；
-  - 若处于无编译环境的沙箱或轻量容器中，[`native-bridge.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/native/native-bridge.ts) 自动无缝降级至 100% 字节等价的纯 TypeScript 算子实现，调用端零感知。
+  - 若处于无编译环境的沙箱或轻量容器中，[`native-bridge.ts`](../../src/core/native/native-bridge.ts) 自动无缝降级至 100% 字节等价的纯 TypeScript 算子实现，调用端零感知。
 
 ---
 
 ## 2. 端到端最佳实践：基于 `createPraxisClient` 的双载荷审查
 
-Praxis 推荐统一使用 [`createPraxisClient`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/praxis-review-client.ts) 进行代码审查，一次调用即可同时获得给 **AI Agent 消费的机器指令** 与给 **人类审查者消费的 UI 诊断卡片**：
+Praxis 推荐统一使用 [`createPraxisClient`](../../src/core/praxis/praxis-review-client.ts) 进行代码审查，一次调用即可同时获得给 **AI Agent 消费的机器指令** 与给 **人类审查者消费的 UI 诊断卡片**：
 
 ```ts
 import { createPraxisClient } from 'auto-refactor';
@@ -71,7 +71,7 @@ async function executePraxisReview() {
 
 ## 3. `SEMANTIC_OVERLAP_GROUPS` 并查集去重消费规范
 
-在密集代码重构中，一个局部坏味道往往会并发触发 3~4 条相关规则（例如深层嵌套同时触发圈复杂度、卫语句缺失与扁平化建议）。为了消除开发者认知疲劳，[`semantic-correlation.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/presentation/semantic-correlation.ts) 维护了 **11 组语义重叠规则族**，并在表现层通过并查集算法聚合：
+在密集代码重构中，一个局部坏味道往往会并发触发 3~4 条相关规则（例如深层嵌套同时触发圈复杂度、卫语句缺失与扁平化建议）。为了消除开发者认知疲劳，[`semantic-correlation.ts`](../../src/core/praxis/presentation/semantic-correlation.ts) 维护了 **11 组语义重叠规则族**，并在表现层通过并查集算法聚合：
 
 ### 3.1 十一组语义重叠规则族权威清单
 
@@ -100,29 +100,33 @@ export const SEMANTIC_OVERLAP_GROUPS: ReadonlyArray<ReadonlySet<string>> = Objec
    - 选举集合内严重度最高的卡片作为唯一主卡展示，其余次级规则写入主卡的 `correlatedRules: string[]` 元数据。
 3. **双端差异化消费原则**：
    - **UI 呈现端**：仅渲染主卡，在折叠标签中显示「同时关联：X 规则」，界面清晰清爽；
-   - **Agent 执行端**：底层仍保留完整的 325 条细粒度规则诊断与 `sourceAgentDirective`，确保 AI 智能体拥有 100% 的准确依据以产出无遗漏的补丁。
+   - **Agent 执行端**：底层仍保留完整的 338 条细粒度规则诊断与 `sourceAgentDirective`，确保 AI 智能体拥有 100% 的准确依据以产出无遗漏的补丁。
 
 ---
 
-## 4. 交付验收矩阵与 153/153 自动化门禁
+## 4. 交付验收矩阵与 157/157 自动化门禁
 
-Praxis 交付以 **153/153 套自动化门禁套件**（148 套独立并行验证套件 + 5 套串行守护进程套件）为刚性验收基线：
+Praxis 交付以 **157/157 套自动化门禁套件**（151 套独立并行验证套件 + 5 套串行守护进程套件 + vitest 单元套件）为刚性验收基线：
 
 | 验收核心域 | 验证命令 / 脚本路径 | 核心断言内容 | 验收标准 |
 | :--- | :--- | :--- | :---: |
-| **规则完整性与注册一致性** | `npm run validate-rules-registry` | 30 个分析器与 325 条注册规则 100% 覆盖无孤儿规则 | **PASS** |
+| **规则完整性与注册一致性** | `npm run validate-rules-registry` | 30 个分析器与 338 条注册规则 100% 覆盖无孤儿规则（全工作区 473 条） | **PASS** |
 | **Praxis 统一 SDK 与双载荷** | `npm run validate-praxis-presentation` | `createPraxisClient` 全工作区、单文件、双载荷与 i18n 汉化 | **PASS** |
 | **11 组语义重叠并查集去重** | `npm run validate-dual-faced-presentation` | 验证并查集 `findRoot`/`union` 正确归并，次级规则沉淀到元数据 | **PASS** |
 | **毫秒级切片与 Sparse MoE 路由** | `npm run validate-self-slice-audit` | 单切片执行时延 **< 10ms**，分析器绕过率 $\ge 70\%$ | **PASS** |
+| **LayerVFS 虚拟分叉与 CAS 存储** | `node --test tests/praxis-vfs.test.ts` | FastCDC 切块、SQLite WAL CAS 去重、Fork `< 3ms`、回滚 `< 1ms` | **PASS** |
+| **MCTS 探索树与沙箱投影** | `node --test tests/praxis-mcts.test.ts` | 物理投影受控隔离、UCT 评估与重构锦标赛优胜提拔 | **PASS** |
 | **Rust N-API 与纯 TS 字节等价性** | `npm run validate-native-parity` | 6 大原生算子与纯 TS Shim 逐字节等价无漂移 | **PASS** |
 | **自研率 CAI 与贝叶斯置信区间** | `npm run validate-autonomy-scorer` | 6 维正交自研率、L1~L5 边界、Jeffreys Beta(0.5, 0.5) 置信下界 | **PASS** |
 | **三平面风险融合与共振放大** | `npm run validate-risk-fusion-engine` | $Risk = S^{1.0} \cdot D^{1.2} \cdot H^{0.8}$，双向确认升级 Critical | **PASS** |
-| **全量自动化测试套件矩阵** | `npm test` | **153/153 全量测试套件并行与串行回归验证** | **153/153 PASS** |
+| **全量自动化测试套件矩阵** | `npm test` | **157/157 全量测试套件并行与串行回归验证** | **157/157 PASS** |
 
 ---
 
 ## 5. 关联文档导航
 
 - [01. Praxis 对接架构全景与六大 SPI 契约手册](./01-praxis-architecture-and-spi-contracts.md)
-- [02. Praxis 七大核心治理服务与开发者 SDK 门面手册](./02-praxis-six-governance-services-api.md)
+- [02. Praxis 核心治理服务与开发者 SDK 门面手册](./02-praxis-six-governance-services-api.md)
+- [04. Praxis-LayerVFS 瞬时工作区对接手册与联调规范](./04-praxis-layervfs-integration-guide.md)
+- [06. LayerVFS 虚拟分叉与 MCTS 探索树架构规范](../01-architecture/06-layervfs-virtual-storage-and-mcts.md)
 - [PRAXIS_HANDOFF_REPORT.md](../PRAXIS_HANDOFF_REPORT.md)

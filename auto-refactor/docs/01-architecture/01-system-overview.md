@@ -1,7 +1,7 @@
 # 01. 系统六层架构全景与核心数据流
 
 > **所属层级**：L1 核心架构与原生内核 (`docs/01-architecture/`)  
-> **对应代码真源**：[`src/api.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/api.ts)、[`src/core/analyzer.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/analyzer.ts)、[`src/core/pipeline/dualTrackPipeline.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/pipeline/dualTrackPipeline.ts)、[`src/core/pipeline/escalationChannel.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/pipeline/escalationChannel.ts)、[`src/core/router/sparseRuleRouter.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/router/sparseRuleRouter.ts)、[`src/core/router/sparseMoEGate.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/router/sparseMoEGate.ts)、[`src/core/profiler/loadGovernor.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/profiler/loadGovernor.ts)
+> **对应代码真源**：[`src/api.ts`](../../src/api.ts)、[`src/core/analyzer.ts`](../../src/core/analyzer.ts)、[`src/core/pipeline/dualTrackPipeline.ts`](../../src/core/pipeline/dualTrackPipeline.ts)、[`src/core/pipeline/escalationChannel.ts`](../../src/core/pipeline/escalationChannel.ts)、[`src/core/router/sparseRuleRouter.ts`](../../src/core/router/sparseRuleRouter.ts)、[`src/core/router/sparseMoEGate.ts`](../../src/core/router/sparseMoEGate.ts)、[`src/core/profiler/loadGovernor.ts`](../../src/core/profiler/loadGovernor.ts)、[`src/core/praxis/vfs/index.ts`](../../src/core/praxis/vfs/index.ts)
 
 ---
 
@@ -11,10 +11,11 @@
 
 ```mermaid
 flowchart TD
-  subgraph L6["L6. 交付与编排门面层 (Delivery & Orchestration Facade)"]
+  subgraph L6["L6. 交付、LayerVFS 与编排门面层 (Delivery, LayerVFS & Orchestration Facade)"]
     CLI["src/index.ts (CLI 入口)"]
     API["src/api.ts (scan / scanWarm / scanDiff / scanAndRender)"]
-    PRAXIS["src/core/praxis/* (6 大治理门面 + 5 大 SPI)"]
+    PRAXIS["src/core/praxis/* (6 大治理门面 + 统一客户端 SDK)"]
+    VFS["src/core/praxis/vfs/* (LayerVFS CAS 存储 + 沙箱投影 + MCTS)"]
     DAEMON["src/daemon/* (NDJSON IPC 守护进程)"]
   end
 
@@ -63,10 +64,10 @@ flowchart TD
 
 - **L1 原生算子层**：基于 Rust 2021 Edition 构建的 6 Crate 工作区，通过 N-API (`crates/auto-refactor-core/`) 暴露底层高性能差分、支配树、数据流求解、词法脱敏与克隆检测算子；同时在 TypeScript 侧提供 100% 字节等价的纯 JS Shim，保证任何环境零编译即可运行。
 - **L2 语义拓扑层**：屏蔽 TypeScript、JavaScript、Python、Rust、Go、Shell、GDScript 等语言的具体 AST 差异，构建统一的 `NormalizedNode` 语法树与跨模块语义拓扑图（`SemanticGraph`）。
-- **L3 规则分析层**：维护由单一真源注册表（`src/core/rules/registry.ts`）严格看守的 325 条内置规则（310 条规范命名规则 + 15 条历史兼容别名规则）与 30 个内置分析器，划分为 4 个离散执行阶段。
+- **L3 规则分析层**：维护由单一真源注册表（`src/core/rules/registry.ts`）严格看守的 338 条内置规则（323 条规范命名规则 + 15 条历史兼容别名规则，全工作区 SSOT 单源收录 473 条）与 30 个内置分析器，划分为 4 个离散执行阶段。
 - **L4 调度路由层**：集成 Cedar 稀疏混合专家门控（Sparse MoE Router）、双轨并发管道（`DualTrackPipeline`）与负载总督（`LoadGovernor`），以 `< 15ms` 极速返回前台推测性结论，并在后台异步执行全图闭包分析与资源熔断保护。
 - **L5 质量度量层**：基于 10 大战略支柱执行倒数饱和曲线转换与加权几何平均，结合运行时动态遥测与 Git 演化轨迹进行动态调权。
-- **L6 交付编排层**：对外暴露 CLI、进程内 TypeScript API、NDJSON IPC 守护进程接口，以及面向自主智能体协同的 Praxis 治理门面与 5 大 SPI。
+- **L6 交付与 VFS 编排层**：对外暴露 CLI、进程内 TypeScript API、NDJSON IPC 守护进程接口、LayerVFS 虚拟分叉与沙箱投影执行器，以及面向自主智能体协同的 Praxis 治理门面与统一开发者 SDK。
 
 ---
 
@@ -83,8 +84,8 @@ flowchart TD
 
 ### 2.1 单一真源规则注册表 (`RULE_REGISTRY`)
 
-系统内所有可触发规则均由 [`src/core/rules/registry.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/rules/registry.ts) 统一管理：
-- **325 条注册规则**：包含 310 条规范命名规则（如 `CONST-LAY-001`、`GOV-SLC-001`、`GOV-AGN-001`、`HYG-DED-001`）与 15 条向后兼容的历史别名规则（如 `import-cycle`、`clean-layer-violation`）。
+系统内所有可触发规则均由 [`src/core/rules/registry.ts`](../../src/core/rules/registry.ts) 统一管理：
+- **338 条注册规则**：包含 323 条规范命名规则（如 `CONST-LAY-001`、`GOV-SLC-001`、`GOV-AGN-001`、`HYG-DED-001`）与 15 条向后兼容的历史别名规则（如 `import-cycle`、`clean-layer-violation`）。
 - **30 个标准规则族系**：由 `CANONICAL_TOPIC_CATALOG` 建立映射，确保无规则名称漂移（Zero Rule Drift）。
 - **门禁严格约束**：通过 `node scripts/validate-rules-registry.js` 门禁断言文档、分析器工厂与注册表 100% 覆盖对齐。
 
@@ -92,7 +93,7 @@ flowchart TD
 
 ## 3. 双轨并发分析流水线 (Dual-Track Pipeline)
 
-在智能体高频微编辑或 IDE 保存即审场景下，全仓扫描开销不可接受。[`src/core/pipeline/dualTrackPipeline.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/pipeline/dualTrackPipeline.ts) 将审查执行解耦为前台推测轨与后台全图轨：
+在智能体高频微编辑或 IDE 保存即审场景下，全仓扫描开销不可接受。[`src/core/pipeline/dualTrackPipeline.ts`](../../src/core/pipeline/dualTrackPipeline.ts) 将审查执行解耦为前台推测轨与后台全图轨：
 
 ```mermaid
 sequenceDiagram
@@ -150,7 +151,7 @@ sequenceDiagram
 
 ### 3.3 异步升级通道 (`EscalationChannel`)
 
-位于 [`src/core/pipeline/escalationChannel.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/pipeline/escalationChannel.ts) 的发布订阅总线：
+位于 [`src/core/pipeline/escalationChannel.ts`](../../src/core/pipeline/escalationChannel.ts) 的发布订阅总线：
 - **广播事件类别**：
   - `CIRCULAR_DEPENDENCY`: 模块间产生导入环路；
   - `ARCHITECTURE_BREACH`: 核心层反向依赖展现层等分层倒置违规；
@@ -167,7 +168,7 @@ sequenceDiagram
 
 ### 4.1 文件级宏观类别路由 (`sparseRuleRouter.ts`)
 
-位于 [`src/core/router/sparseRuleRouter.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/router/sparseRuleRouter.ts) 的路由层根据 Diff 变更语义分类（`DiffSemanticCategory`）与工程原型（`ProjectArchetype`）裁剪候选分析器：
+位于 [`src/core/router/sparseRuleRouter.ts`](../../src/core/router/sparseRuleRouter.ts) 的路由层根据 Diff 变更语义分类（`DiffSemanticCategory`）与工程原型（`ProjectArchetype`）裁剪候选分析器：
 
 1. **始终在线核心基座 (Always-On Core)**：
    `hygiene`、`secrets`、`security`、`governance` 等安全与工程规范分析器在任何代码变更下恒定激活。
@@ -179,7 +180,7 @@ sequenceDiagram
 
 ### 4.2 AST 局部切片微观专家门控 (`sparseMoEGate.ts`)
 
-位于 [`src/core/router/sparseMoEGate.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/router/sparseMoEGate.ts) 的条件专家分发门控（Conditional Expert Dispatching, CED）更进一步，直接基于 AST 切片特征向量（`SliceFeatureVector`）在函数与代码块级别决策：
+位于 [`src/core/router/sparseMoEGate.ts`](../../src/core/router/sparseMoEGate.ts) 的条件专家分发门控（Conditional Expert Dispatching, CED）更进一步，直接基于 AST 切片特征向量（`SliceFeatureVector`）在函数与代码块级别决策：
 
 ```typescript
 export interface SliceFeatureVector {
@@ -201,7 +202,7 @@ export interface SliceFeatureVector {
 
 ## 5. 规模自适应调优与负载总督 (`LoadGovernor`)
 
-在连续扫描与后台全图分析中，为了防止由于海量 AST 驻留导致宿主 Node.js 进程耗尽内存，[`src/core/profiler/loadGovernor.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/profiler/loadGovernor.ts) 充当运行期资源总督：
+在连续扫描与后台全图分析中，为了防止由于海量 AST 驻留导致宿主 Node.js 进程耗尽内存，[`src/core/profiler/loadGovernor.ts`](../../src/core/profiler/loadGovernor.ts) 充当运行期资源总督：
 
 ### 5.1 资源熔断硬基线
 

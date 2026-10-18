@@ -1,4 +1,4 @@
-# 01. 四层规则金字塔、30 个内置分析器与 335 条全量规则字典
+# 01. 四层规则金字塔、30 个内置分析器与 353 条全量规则字典 (338 规范 + 15 历史别名)
 
 > **所属层级**：L4 规则引擎与内置分析器 (`docs/04-analyzers-and-rules/`)  
 > **对应代码真源**：`src/core/rules/registry.ts`、`src/core/rules/entries/*.ts`、`src/core/analyzer-registry.ts`、`src/analyzers/*.ts`
@@ -7,20 +7,20 @@
 
 ## 1. 四层规则金字塔与双轨文案架构
 
-`auto-refactor` 将全部 **338 条内置规则**（含 **323 条规范化 `FAMILY-TOPIC-NNN` 规则**与 **15 条向后兼容别名规则**）统一收拢于 `src/core/rules/registry.ts` 单一真源注册表中，并由 `npm run validate-rules-registry` 门禁在每次构建时强制校验「发射集 = 注册集 = 文档覆盖集（338/338）」。在工作区全域单源规则目录快照（`scripts/common/rule-catalog.json`）中，活跃规则规模保持 **423 条全仓 SSOT 活跃规则**。
+`auto-refactor` 将全部 **353 条内置规则**（含 **338 条规范化 `FAMILY-TOPIC-NNN` 规则**与 **15 条向后兼容别名规则**）统一收拢于 `src/core/rules/registry.ts` 单一真源注册表中，并由 `npm run validate-rules-registry` 门禁在每次构建时强制校验「发射集 = 注册集 = 文档覆盖集（353/353）」。在工作区全域单源规则目录快照（`scripts/common/rule-catalog.json`）中，活跃规则规模保持 **473 条全仓 SSOT 活跃规则**。
 
 ### 1.1 四层规则金字塔拓扑
 
 | 金字塔层级 | 规则数量 | 包含规则族前缀 | 核心守护边界 |
 | :--- | :---: | :--- | :--- |
-| **Layer 1：全域安全与卫生底线** | 49 条 | `SEC` / `HYG` / `ERR` / `CMT` / `DOC` / `SIM` | 凭证防泄露、注入防御、错误吞没拦截、代码物理卫生、注释质量 (ECD-C) 与文档结构完整性 |
-| **Layer 2：语言族现代化与标准库** | 101 条 | `TSM` / `MOD` / `PYM` / `RSM` / `GOM` / `GDM` / `SH` / `PS` (`SHL`) / `STDLIB` (`STD`) / `UI` / `PROD` | TypeScript、Python、Rust、Go、GDScript、Shell、PowerShell 现代语法惯用法、标准库手写轮子替换与前端工程现代化 |
-| **Layer 3：架构拓扑、治理、数据与性能** | 141 条 | `ARCH` / `GOV` / `DAT` / `PRF` / `DEP` / `NAM` / `CONST` / `CPX` / `GATE` / `CMP` / `NUM` | 分层单向依赖、架构防腐、多 Agent 协作防冲突 (`GOV-AGN-001`)、切片破坏防范 (`GOV-SLC-001`)、轨迹回归检验 (`GOV-TRJ-001`)、N+1 数据库查询阻断与热循环零分配 |
-| **Layer 4：领域专精、测试现代性与历史兼容** | 37 条 | `GDM` (`gdscript-game`) / `VSC` / `TST` / `SEC` (`client-exposure`) + 15 条 Legacy Aliases | Godot 4 游戏引擎运行态契约、VS Code 扩展清单与事件规范、测试有效覆盖深度与历史规则平滑迁移过渡窗口 |
+| **Layer 1：全域安全与卫生底线** | 51 条 | `SEC` / `HYG` / `ERR` / `CMT` / `DOC` / `SIM` | 凭证防泄露、注入防御、错误吞没拦截、代码物理卫生、注释质量 (ECD-C) 与文档结构完整性 |
+| **Layer 2：语言族现代化与标准库** | 102 条 | `TSM` / `MOD` / `PYM` / `RSM` / `GOM` / `GDM` / `SH` / `PS` (`SHL`) / `STDLIB` (`STD`) / `UI` / `PROD` | TypeScript、Python、Rust、Go、GDScript、Shell、PowerShell 现代语法惯用法、标准库手写轮子替换与前端工程现代化 |
+| **Layer 3：架构拓扑、治理、数据与性能** | 144 条 | `ARCH` / `GOV` / `DAT` / `PRF` / `DEP` / `NAM` / `CONST` / `CPX` / `GATE` / `CMP` / `NUM` | 分层单向依赖、架构防腐、多 Agent 协作防冲突 (`GOV-AGN-001`)、切片破坏防范 (`GOV-SLC-001`)、轨迹回归检验 (`GOV-TRJ-001`)、N+1 数据库查询阻断与热循环零分配 |
+| **Layer 4：领域专精、测试现代性与历史兼容** | 41 条 | `GDM` (`gdscript-game`) / `VSC` / `TST` / `SEC` (`client-exposure`) + 15 条 Legacy Aliases | Godot 4 游戏引擎运行态契约、VS Code 扩展清单与事件规范、测试有效覆盖深度与历史规则平滑迁移过渡窗口 |
 
 ### 1.2 双轨文案分层契约（Dual-Track Wording Architecture）
 
-- **机读/执行轨（Machine & Agent Track）**：位于 `src/core/messages/`、`src/core/rules/entries/` 与 `src/core/guidance/`，底层规则注册表（`RULE_REGISTRY`）与内核诊断统一为 **100% 国际工业英文标准**（涵盖所有 `summary` 与 `remediation` 规范元数据），输出高 Token 密度、确定性的 SARIF 2.1.0 诊断载荷与 CAPP 智能体修复提示词，并作为工作区单源规则目录（`scripts/common/rule-catalog.json`，420 条全仓 SSOT）的唯一真源底座。
+- **机读/执行轨（Machine & Agent Track）**：位于 `src/core/messages/`、`src/core/rules/entries/` 与 `src/core/guidance/`，底层规则注册表（`RULE_REGISTRY`）与内核诊断统一为 **100% 国际工业英文标准**（涵盖所有 `summary` 与 `remediation` 规范元数据），输出高 Token 密度、确定性的 SARIF 2.1.0 诊断载荷与 CAPP 智能体修复提示词，并作为工作区单源规则目录（`scripts/common/rule-catalog.json`，473 条全仓 SSOT）的唯一真源底座。
 - **人读/呈现轨（Human & Presentation Track）**：由 **Praxis 表现层**（`src/core/praxis/presentation/`）与 `PraxisI18nProvider` 独占承载，采用模块化领域分包双语字典（`zh-cn/` 与 `en/`），面向人类工程师与 IDE 富文本诊断卡片（`PraxisDiagnosticCard`）提供完整、专业、细粒度的人机可读本地化转译与交互式修复指引。
 
 ### 1.3 标准 3-3-3 命名拓扑公理、权威三字母映射与三阶双轨别名等价网络
@@ -91,6 +91,7 @@
 | `CMT-HDR-001` | <a id="cmt-hdr-001"></a>`comments` | `CMT` | `warning` | `all` | 源码文件顶部缺少文件层级职责与设计意图注释。 | `basic` 及以上 |
 | `CMT-HDR-002` | <a id="cmt-hdr-002"></a>`comments` | `CMT` | `warning` | `all` | 规范严格六字段题头契约缺失六字段之一 (模块归属、文件路径、架构定位、依赖与触发、职责说明、退出语义与设计依据)。 | `strict` |
 | `CMT-HDR-003` | <a id="cmt-hdr-003"></a>`comments` | `CMT` | `warning` | `all` | 题头声明路径与物理文件路径失真不一致。 | `strict` |
+| `CMT-HDR-004` | <a id="cmt-hdr-004"></a>`comments` | `CMT` | `warning` | `all` | 文件排版顺序违规：顶层六字段模块头注释必须置于所有非指令代码语句之前。 | 调整文件物理排版，将模块头 JSDoc 块移至文件第 1 行（或 shebang 之后）。 |
 | `CMT-INT-001` | <a id="cmt-int-001"></a>`comments` | `CMT` | `warning` | `all` | 注释声称的职责特征（如纯函数、无副作用、并发安全）与 AST 实际数据流/副作用特征矛盾。 | 修正注释使其真实反映实现行为，或重构代码消除未声明的副作用与竞态条件。 |
 | `CMT-LNG-001` | <a id="cmt-lng-001"></a>`comments` | `CMT` | `warning` | `all` | 注释书写语言显著偏离项目或代码域的主导规范（例如英文主导库中突兀插入中文注释）。 | 将注释语言对齐项目推荐规范，保持代码域内部风格一致性。 |
 | `CMT-LNG-002` | <a id="cmt-lng-002"></a>`comments` | `CMT` | `warning` | `all` | 单个文件内部中英文注释无序交错混杂（中文与英文占比均较高且缺乏分层规律）。 | 统一单文件内的注释语言规范，避免局部多语言风格碎片化。 |
@@ -127,6 +128,7 @@
 | `SEC-VUL-005` | <a id="sec-vul-005"></a>`security` | `SEC` | `warning` | `all` | 弱哈希：md5/sha1 用于完整性或口令场景。 | 改用 sha256 及以上；口令使用 bcrypt/argon2 等加盐慢哈希。 |
 | `SEC-VUL-006` | <a id="sec-vul-006"></a>`security` | `SEC` | `warning` | `all` | 路径穿越：用外部输入拼接文件路径。 | 规范化后校验是否仍位于允许的根目录内，并拒绝 .. 片段。 |
 | `SIM-ARGS-001` | <a id="sim-args-001"></a>`simplify` | `SIM` | `warning` | `all` | 单个函数入参超过 4 个（默认阈值 4），导致调用方参数传递脆弱且难以扩展。 | 将离散参数重构封装为强类型参数对象（ParameterObject 或 Options 结构体）。 |
+| `SIM-ARGS-002` | <a id="sim-args-002"></a>`simplify` | `SIM` | `warning` | `all` | 最小参数计数违背：公共处理函数或求解器声明 0 个入参，存在隐式耦合可变全局状态风险。 | 声明显式上下文或载荷参数，避免隐式读取模块级全局状态。 |
 | `SIM-BOOL-001` | <a id="sim-bool-001"></a>`simplify` | `SIM` | `info` | `typescript, javascript` | 冗余的布尔字面量显式比对。 | 简化为直接条件判断或布尔否定。 |
 | `SIM-COMC-001` | <a id="sim-comc-001"></a>`simplify` | `SIM` | `warning` | `all` | 直接删除（历史在 git 里）或恢复为真实代码 | 连续 ≥ `commentedCodeMinLines`（默认 3）行「代码形状」注释。关键字锚定（`def`/`function`/`return`/`if`/`import`… 或 `NAME =` 形式），散文注释不会命中。 |
 | `SIM-ELSE-001` | <a id="sim-else-001"></a>`simplify` | `SIM` | `info` | `typescript, javascript` | 提前终止语句之后存在冗余 else 分支。 | 移除冗余 else 并平铺后续主体逻辑。 |
@@ -247,6 +249,7 @@
 | `UI-ENG-005` | <a id="ui-eng-005"></a>`frontend` | `UI` | `warning` | `all` | 输入框或文本域的回车事件处理未做 CJK 拼音输入法合成状态守卫（isComposing / 229）。 | 在 Enter 处理前增加 e.nativeEvent.isComposing === false 与 e.keyCode !== 229 拦截。 |
 | `UI-ENG-006` | <a id="ui-eng-006"></a>`frontend` | `UI` | `warning` | `all` | 动态计数器、计时时间戳或度量数值展示未开启等宽对齐数字（tabular-nums）。 | 声明 font-variant-numeric: tabular-nums 或添加 tnum 工具类以消除宽度跳动。 |
 | `UI-ENG-007` | <a id="ui-eng-007"></a>`frontend` | `UI` | `warning` | `all` | 边框容器内部交互控件嵌套双重边框（单闭合线框律冲突）。 | 消除子元素多余边框，改用明度差底色或 box-shadow 内发光微凸显。 |
+| `UI-ENG-008` | <a id="ui-eng-008"></a>`frontend` | `UI` | `warning` | `all` | 局部组件容器未使用容器查询 (@container) 或 CJK 文本容器缺失文本换行平衡配置。 | 将组件级 @media 替换为 @container 容器查询流，并在 CJK 文本容器配置 text-wrap: balance 或 overflow-wrap: break-word。 |
 
 ### Layer 3 — 架构拓扑、工程治理、数据与性能层 (Architecture, Governance, Data & Performance)
 
@@ -288,6 +291,7 @@
 | `CONST-CLU-001` | <a id="const-clu-001"></a>`constants` | `CONST` | `warning` | `all` | 同调用域内存在未抽取的同源硬编码字面量（状态码/协议值/路径/事件名），应一揽子打包抽取。 | 结合临近代码域聚类建议，将同一语义族的同源字面量一并抽离为常量，避免遗留散乱硬编码。 |
 | `CONST-DRF-001` | <a id="const-drf-001"></a>`constants` | `CONST` | `warning` | `all` | 跨文件同源语义常量存在命名分裂或数值微小漂移，必须建立单一真源（SSOT）。 | 将多文件维护的同源常量统一定义在领域或协议共享常量库中，并消除数值或命名漂移。 |
 | `CONST-LAY-001` | <a id="const-lay-001"></a>`constants` | `CONST` | `warning` | `all` | 模块级稳定常量在依赖区后必须进入首个正式代码声明域，严禁散落在函数内部、文件中段或业务逻辑之间。 | 将模块级常量统一定义在文件导入声明（import/require）之后、任何函数/类声明之前的常量区。 |
+| `CONST-LAY-002` | <a id="const-lay-002"></a>`constants` | `CONST` | `warning` | `all` | 类型定义、接口契约必须声明在核心函数与业务逻辑类之前。 | 将类型与接口声明提升至业务逻辑函数之前，保持自顶向下的契约可读性。 |
 | `CONST-LIB-001` | <a id="const-lib-001"></a>`constants` | `CONST` | `warning` | `all` | 大规模常量散落于业务代码文件中，缺乏集中分层的常量库目录结构。 | 根据 Agent 建议的目录拓扑与分片模块，在 constants/ 集中归档并提供统一 index.ts 导出。 |
 | `CONST-OWN-001` | <a id="const-own-001"></a>`constants` | `CONST` | `warning` | `all` | 共享常量所有权分层错误，严禁塞入全局大杂烩 constants 文件或藏匿在底层私有模块。 | 按照所有权四层模型，分流至 Module-Private、Domain-Shared、Protocol-Shared 或 System-Config。 |
 | `CONST-SCP-001` | <a id="const-scp-001"></a>`constants` | `CONST` | `warning` | `all` | 单函数局部不变量、延迟初始化值或受限生命周期资源禁止滥用扩大作用域提升至顶层。 | 保持局部不变量在单函数或局部代码块内部的作用域范围，避免盲目提升至文件全局。 |
@@ -316,6 +320,7 @@
 | `DEP-LIC-001` | <a id="dep-lic-001"></a>`dependency-layout` | `DEP` | `warning` | `all` | 商业与专有闭源工程中引入高风险限制性或强传染性开源许可证（AGPL/GPL）依赖。 | 替换为宽松许可证（MIT/Apache/BSD）替代库，或将关联逻辑隔离至独立网络微服务边界之外。 |
 | `DEP-OBS-001` | <a id="dep-obs-001"></a>`dependency-layout` | `DEP` | `warning` | `all` | 废弃与缺乏维护的第三方库导入：使用了已被官方弃用、停止维护或已被语言/运行期标准库内置能力淘汰的过时依赖。 | 迁移至社区主流受维护的现代替代方案或标准运行期内置能力（如 fetch、crypto.randomUUID、URLSearchParams）。 |
 | `DEP-ORD-001` | <a id="dep-ord-001"></a>`dependency-layout` | `DEP` | `info` | `all` | 文件布局与导入分组不符合当前语言现代化工程规范。 | 调整导入顺序为 Stdlib -> ThirdParty -> InternalShared -> Local。 |
+| `DEP-ORD-002` | <a id="dep-ord-002"></a>`dependency-layout` | `DEP` | `warning` | `all` | 文件布局顺序违规：顶层 import 语句声明在契约类型、常量或业务逻辑之后。 | 将 import 语句统一移至文件顶部导入区，置于类型、常量与函数之前。 |
 | `DEP-PHANTOM-001` | <a id="dep-phantom-001"></a>`dependency-layout` | `DEP` | `warning` | `all` | 幽灵依赖：源码直接导入未在项目包清单（package.json、pyproject.toml、Cargo.toml）显式声明的外部依赖包。 | 将依赖项显式登记至项目包配置清单中，或改用工程内置实现与官方标准库等价模块。 |
 | `DEP-PIN-001` | <a id="dep-pin-001"></a>`dependency-layout` | `DEP` | `warning` | `all` | 浮动或未固定版本依赖：外部依赖包在配置清单（package.json、Cargo.toml、pyproject.toml）中使用通配符（*、latest、开放区间）声明版本。 | 在包清单中将依赖项锁定为具体确定版本或标准 semver-caret 区间（如 ^1.2.3），规避供应链漂移与投毒风险。 |
 | `DEP-RES-001` | <a id="dep-res-001"></a>`dependency-layout` | `DEP` | `warning` | `all` | 业务逻辑中散落硬编码的未纳管外部 URL、文件路径或连接串。 | 将外部资源地址统一抽取至配置文件或服务资源注册中心。 |
@@ -390,6 +395,7 @@
 | `NAM-SGL-001` | <a id="nam-sgl-001"></a>`naming` | `NAM` | `warning` | `all` | 严禁在业务逻辑中使用单字母变量名（仅循环头计数器与 discard 占位符豁免）。 | 改用能表达具体意图的具名标识符；仅 `for (let i = ...)`、`_` 允许单字母。 |
 | `NAM-TYP-001` | <a id="nam-typ-001"></a>`naming` | `NAM` | `warning` | `all` | 类型定义与类声明必须遵循 PascalCase 大驼峰命名。 | 将类、接口、类型别名或枚举重命名为大驼峰格式（如 `Scanner`、`RuleDefinition`）。 |
 | `NAM-VAG-001` | <a id="nam-vag-001"></a>`naming` | `NAM` | `warning` | `all` | 严禁使用无业务语义的模糊泛化变量名（如 data、res、ret、tmp、item 等裸词）。 | 结合业务领域语义补齐前缀或后缀（如 `parseResult`、`tokenPayload`、`ruleEntry`）。 |
+| `NUM-BND-001` | <a id="num-bnd-001"></a>`governance` | `NUM` | `warning` | `all` | 递归深度、循环边界或容量检查中暴露单侧无界数值参数或条件，缺失双向走廊上下界保护。 | 施加下界与上界双向约束并配合 Number.isFinite 守卫（如 clamp(val, min, max)），消除拒绝服务与负溢出风险。 |
 | `NUM-PREC-001` | <a id="num-prec-001"></a>`governance` | `NUM` | `warning` | `typescript, javascript` | 数值截断精度失衡：数学计算路径中存在丢精度的四舍五入或比例失配风险。 | 使用标准 0.01 精度舍入（如 * 100 / 100）或显式容差界限以保留有效精度。 |
 | `PRF-ALG-001` | <a id="prf-alg-001"></a>`performance` | `PRF` | `warning` | `all` | 发现 $\ge 3$ 层循环嵌套 (潜在 $O(N^3)$ 多项式计算热点)。 | 将内层查找通过 Map/Set 哈希预索引降维为 $O(1)$。 |
 | `PRF-ALG-002` | <a id="prf-alg-002"></a>`performance` | `PRF` | `warning` | `all` | 循环内集合线性检索或数组首部操作反模式：在循环内部进行线性检索（find/includes/has 等）或反复执行首部变异（shift/unshift），导致整体算法复杂度恶化至 O(N*M) 或 O(N^2)。 | 在循环外预先将外部集合构建为 Map/Set 哈希索引，或使用游标索引/双端队列（Deque/RingBuffer）替代首部出入队，将内层开销降至 O(1)。 |
@@ -414,12 +420,14 @@
 | `SEC-EXP-002` | <a id="sec-exp-002"></a>`client-exposure` | `SEC` | `error` | `all` | 前端以 CSS 隐藏或按钮禁用代替服务端鉴权。 | 在服务端对敏感操作进行基于角色的鉴权校验。 |
 | `SEC-EXP-003` | <a id="sec-exp-003"></a>`client-exposure` | `SEC` | `warning` | `all` | 关闭的 Feature Flag 仍然将完整实现代码打包下发。 | 采用构建期代码擦除或动态代码分割隔离未发布功能。 |
 | `SEC-EXP-004` | <a id="sec-exp-004"></a>`client-exposure` | `SEC` | `error` | `all` | 未发布或测试演练路由静态打包暴露在生产路由中。 | 在构建期通过环境判定过滤排除开发与测试路由。 |
+| `SEC-EXP-005` | <a id="sec-exp-005"></a>`client-exposure` | `SEC` | `error` | `all` | 跨窗口消息处理函数执行敏感操作前必须校验 event.userActivation 或 event.origin。 | 确保跨窗口 message 事件监听器在触发敏感操作前校验 event.userActivation?.isActive 或 event.origin。 |
 | `TST-DBT-001` | <a id="tst-dbt-001"></a>`test-modernity` | `TST` | `info` | `all` | 未登记里程碑收敛计划或责任人的滞后测试技术债务。 | 在测试债务登记表中补全责任 Agent 及目标收敛里程碑。 |
 | `TST-DEN-001` | <a id="tst-den-001"></a>`test-modernity` | `TST` | `info` | `all` | 关键业务模块的有效现代化测试密度 (EMTD) 或当前业务承接率 (CBCR) 低于阈值。 | 补齐高风险语义单元的契约测试与边界测试，提高实际故障感知能力。 |
 | `TST-FLT-001` | <a id="tst-flt-001"></a>`test-modernity` | `TST` | `warning` | `all` | 浮点断言脆弱性：测试直接对裸浮点字面量进行全等断言而缺乏容差控制或公式推导。 | 通过数学公式推导预期值或使用容差断言（如 toBeCloseTo 或 is_equal_approx）。 |
 | `TST-ILS-001` | <a id="tst-ils-001"></a>`test-modernity` | `TST` | `warning` | `all` | 测试完整性幻觉：测试仅校验 Mock 配置或绑定已废弃业务契约。 | 将测试迁移至验证活跃业务契约与实际领域状态变化。 |
 | `TST-SKP-001` | <a id="tst-skp-001"></a>`test-modernity` | `TST` | `warning` | `all` | 核心业务域中长期滞留的跳过、隔离或未执行测试用例。 | 修复并恢复测试用例，或正式登记入测试债务清单并设定收敛里程碑。 |
 | `TST-TAU-001` | <a id="tst-tau-001"></a>`test-modernity` | `TST` | `warning` | `all` | 缺乏真实业务断言或包含恒真断言的无效测试。 | 替换恒真断言为针对业务实体输出和错误边界的有效验证。 |
+| `TST-ORC-001` | <a id="tst-orc-001"></a>`test-modernity` | `TST` | `warning` | `all` | 脆弱魔法断言断言神谕反模式：测试对实体总量或浮点标量进行精确全等断言，而非基于不变式走廊或动态相对基线。 | 迁移至基于属性的不变式断言或有界走廊评估（如 assertWithinCorridor 或动态范围比较）。 |
 | `TST-TOP-001` | <a id="tst-top-001"></a>`test-modernity` | `TST` | `warning` | `all` | 多语言测试拓扑双轨纪律：严禁在 TS/GDScript 等语言生产代码中内嵌测试代码域，强化 Rust 计算库物理分区与面向 Agent 可读注释契约。 | 将内嵌在非 Rust 生产文件中的测试逻辑迁移至显式独立测试文件（如 *.test.ts），Rust 计算库测试必须置于 #[cfg(test)] 尾部分区并补充 Agent 可读注释。 |
 | `VSC-I18N-001` | <a id="vsc-i18n-001"></a>`vscode-extension` | `VSC` | `warning` | `typescript, javascript` | 用户可见消息使用硬编码字符串字面量未接入国际化字典。 | 使用 vscode.l10n.t(...) 或双语字典常量进行包装。 |
 | `VSC-MEM-001` | <a id="vsc-mem-001"></a>`vscode-extension` | `VSC` | `error` | `typescript, javascript` | VS Code Disposable 资源创建后未压入 context.subscriptions。 | 使用 context.subscriptions.push(...) 注册或纳入复合 Disposable 管理。 |

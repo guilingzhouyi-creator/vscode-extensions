@@ -1,19 +1,19 @@
 # 01. 配置模式与多格式报告契约
 
 > **所属层级**：L5 规范、三平面质量度量与性能基准 (`docs/05-specs-and-benchmarks/`)  
-> **对应代码真源**：[`config.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/config/config.ts)、[`config.schema.json`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/config.schema.json)、[`report.schema.json`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/report.schema.json)、[`reporters`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/reporters/)、[`compact-ledger-store.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/trajectory/compact-ledger-store.ts)
+> **对应代码真源**：[`config.ts`](../../src/core/config/config.ts)、[`config.schema.json`](../../config.schema.json)、[`report.schema.json`](../../report.schema.json)、[`reporters`](../../src/core/reporters/)、[`compact-ledger-store.ts`](../../src/core/trajectory/compact-ledger-store.ts)
 
 ---
 
 ## 1. 三层配置解析优先级 (`resolveConfig`)
 
-[`resolveConfig`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/config/config.ts) 采用**声明式三层覆盖模型**，高优先级字段自动覆盖低优先级默认值：
+[`resolveConfig`](../../src/core/config/config.ts) 采用**声明式三层覆盖模型**，高优先级字段自动覆盖低优先级默认值：
 
 $$\text{FinalConfig} = \text{BuiltInDefaults} \;\triangleleft\; \text{ConfigFile (`auto-refactor.config.json` / `ar.config.json`)} \;\triangleleft\; \text{CLI / ScanOptions Overrides}$$
 
 - **内置默认层 (`BuiltInDefaults`)**：内置 30 大分析器与 325 条注册规则的默认安全阈值与开关配置。
-- **项目配置层 (`ConfigFile`)**：项目根目录下的 `auto-refactor.config.json`、`ar.config.json` 或由 `--config` 指定的文件。若 JSON 语法损坏（如尾随逗号、括号失配），引擎通过 [`Logger.warn`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/logger.ts) 显式警告并回退至安全默认值，绝不静默吞没错误。
-- **命令行与 API 覆盖层 (`CLI / Overrides`)**：通过 CLI 参数（如 `--fail-on-severity`, `--analyzers`, `--format`）或编程式 [`ScanOptions`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/api.ts) 传入的即时参数，具备最高优先级。
+- **项目配置层 (`ConfigFile`)**：项目根目录下的 `auto-refactor.config.json`、`ar.config.json` 或由 `--config` 指定的文件。若 JSON 语法损坏（如尾随逗号、括号失配），引擎通过 [`Logger.warn`](../../src/core/logger.ts) 显式警告并回退至安全默认值，绝不静默吞没错误。
+- **命令行与 API 覆盖层 (`CLI / Overrides`)**：通过 CLI 参数（如 `--fail-on-severity`, `--analyzers`, `--format`）或编程式 [`ScanOptions`](../../src/api.ts) 传入的即时参数，具备最高优先级。
 
 ---
 
@@ -29,14 +29,14 @@ $$\text{FinalConfig} = \text{BuiltInDefaults} \;\triangleleft\; \text{ConfigFile
 | `failOnSeverity` | `'info' \| 'warning' \| 'error'` | `'error'` | 广义门禁阻断阈值（仅统计未被 `suppressions` 命中的有效发现） |
 | `commentLevel` | `'off' \| 'basic' \| 'standard' \| 'strict'` | `'standard'` | 四档注释与文件头审计等级（`standard` 强制六字段模块头与 ECD-C） |
 | `securityLevel` | `'off' \| 'basic' \| 'full'` | `'basic'` | 安全与密钥扫描深度档位（`off` 时彻底禁用 `security` 与 `secrets`） |
-| `autoTuneScale` | `boolean` | `true` | 是否根据项目代码规模自适应缩放弹性阈值 ([`scaleTuner.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/profiler/scaleTuner.ts)) |
+| `autoTuneScale` | `boolean` | `true` | 是否根据项目代码规模自适应缩放弹性阈值 ([`scaleTuner.ts`](../../src/core/profiler/scaleTuner.ts)) |
 | `classifyLiterals` | `boolean` | `true` | 启用语义字面量分类（自动豁免分隔符、编码格式名、HTTP 动词等良性字面量） |
 | `thresholds` | `ThresholdsConfig` | 见下表 | 圈复杂度、物理行数、有效代码行、重复字面量与魔法数阈值 |
 | `suppressions` | `SuppressionEntry[]` | `[]` | 按 `matchFile` + `matchRule` + `reason` 精细登记的作用域豁免表 |
 
 ### 2.1 核心阈值参数真实基线 (`thresholds`)
 
-根据 [`src/core/config/config.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/config/config.ts) 代码真源，核心阈值默认值严格定义如下：
+根据 [`src/core/config/config.ts`](../../src/core/config/config.ts) 代码真源，核心阈值默认值严格定义如下：
 
 | 阈值键名 | 默认值 | 物理量纲 | 治理目标与工程语义 |
 | :--- | :---: | :---: | :--- |
@@ -56,7 +56,7 @@ $$\text{FinalConfig} = \text{BuiltInDefaults} \;\triangleleft\; \text{ConfigFile
 
 ## 3. 多格式结构化报告契约 (`report.schema.json`)
 
-引擎产出的 [`ScanReport`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/types.ts) 顶层结构包含以下标准化核心载荷：
+引擎产出的 [`ScanReport`](../../src/core/types.ts) 顶层结构包含以下标准化核心载荷：
 
 ```json
 {
@@ -136,7 +136,7 @@ $$\text{FinalConfig} = \text{BuiltInDefaults} \;\triangleleft\; \text{ConfigFile
 
 ## 4. 重构演进紧凑账本格式 (`.refactor-trajectory/`)
 
-为记录长期重构轨迹与 ELOC 演进，系统通过 [`compact-ledger-store.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/trajectory/compact-ledger-store.ts) 维护有界轻量账本：
+为记录长期重构轨迹与 ELOC 演进，系统通过 [`compact-ledger-store.ts`](../../src/core/trajectory/compact-ledger-store.ts) 维护有界轻量账本：
 
 ### 4.1 单行 NDJSON 紧凑记录契约
 

@@ -2,11 +2,11 @@
 
 > **所属层级**：L2 跨语言解析与语义图底座 (`docs/02-parsers-and-ast/`)  
 > **代码真源**：  
-> - 归一化 AST 契约：[`src/core/ast/multilang.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/ast/multilang.ts)  
-> - 语言适配器注册表：[`src/core/ast/adapters.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/ast/adapters.ts)  
-> - 语义图数据模型：[`src/core/semantic/types.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/semantic/types.ts)  
-> - 语义图拓扑引擎：[`src/core/semantic/semanticGraph.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/semantic/semanticGraph.ts)  
-> - 闭锁守卫：[`src/core/ast/language-support.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/ast/language-support.ts)
+> - 归一化 AST 契约：[`src/core/ast/multilang.ts`](../../src/core/ast/multilang.ts)  
+> - 语言适配器注册表：[`src/core/ast/adapters.ts`](../../src/core/ast/adapters.ts)  
+> - 语义图数据模型：[`src/core/semantic/types.ts`](../../src/core/semantic/types.ts)  
+> - 语义图拓扑引擎：[`src/core/semantic/semanticGraph.ts`](../../src/core/semantic/semanticGraph.ts)  
+> - 闭锁守卫：[`src/core/ast/language-support.ts`](../../src/core/ast/language-support.ts)
 
 ---
 
@@ -44,13 +44,13 @@ flowchart TD
 ```
 
 > [!NOTE]
-> **物理路径纠偏**：早期设计文档曾提及虚构的 `src/core/parsers/` 与 `src/core/ir/` 目录。在真实代码实现中，归一化语法树全部收敛于 [`src/core/ast/`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/ast/)，而跨语言语义图模型与拓扑索引引擎全部收敛于 [`src/core/semantic/`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/semantic/)。
+> **物理路径纠偏**：早期设计文档曾提及虚构的 `src/core/parsers/` 与 `src/core/ir/` 目录。在真实代码实现中，归一化语法树全部收敛于 [`src/core/ast/`](../../src/core/ast/)，而跨语言语义图模型与拓扑索引引擎全部收敛于 [`src/core/semantic/`](../../src/core/semantic/)。
 
 ---
 
 ## 2. 真实 AST 适配器矩阵 (7 类)
 
-系统在 [`src/core/ast/adapters.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/ast/adapters.ts) 中声明并按需懒加载（Lazy Loading）7 类官方语言适配器：
+系统在 [`src/core/ast/adapters.ts`](../../src/core/ast/adapters.ts) 中声明并按需懒加载（Lazy Loading）7 类官方语言适配器：
 
 | 适配器 ID | 对应类名 | 声明扩展名 | 解析引擎与特点 |
 | :--- | :--- | :--- | :--- |
@@ -69,7 +69,7 @@ flowchart TD
 
 ## 3. 归一化语法树实体：`NodeKind` 与预计算语义标志
 
-在 [`src/core/ast/multilang.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/ast/multilang.ts) 中，所有语言的原生节点在解析阶段被归一化为统一的 `NormalizedNode`。
+在 [`src/core/ast/multilang.ts`](../../src/core/ast/multilang.ts) 中，所有语言的原生节点在解析阶段被归一化为统一的 `NormalizedNode`。
 
 ### 3.1 19 种语言无关 `NodeKind` 枚举
 
@@ -135,7 +135,7 @@ export interface NormalizedNode {
 
 ## 4. 统一语义图实体：`SemanticNode` 与 `SemanticEdge`
 
-在 [`src/core/semantic/types.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/semantic/types.ts) 与 [`src/core/semantic/semanticGraph.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/semantic/semanticGraph.ts) 中，跨文件调用关系、继承体系与数据流动被建模为语义有向图。
+在 [`src/core/semantic/types.ts`](../../src/core/semantic/types.ts) 与 [`src/core/semantic/semanticGraph.ts`](../../src/core/semantic/semanticGraph.ts) 中，跨文件调用关系、继承体系与数据流动被建模为语义有向图。
 
 ### 4.1 17 种 `SemanticNodeKind`
 
@@ -185,9 +185,9 @@ export type SemanticEdgeKind =
 ## 5. 闭锁式未知语言守卫 (`LANG-UNSUPPORTED`)
 
 `auto-refactor` 奉行**默认闭锁（Fail-Closed）**安全哲学：
-1. **历史回退机制**：为了向后兼容，[`src/core/ast/adapters.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/ast/adapters.ts) 中的 `adapterFor` 在遇到未注册扩展名时默认返回 TypeScript 适配器，而不会抛出异常。
+1. **历史回退机制**：为了向后兼容，[`src/core/ast/adapters.ts`](../../src/core/ast/adapters.ts) 中的 `adapterFor` 在遇到未注册扩展名时默认返回 TypeScript 适配器，而不会抛出异常。
 2. **闭锁断言**：如果引擎直接静默放行未识别的文件，会导致该文件解析产生 0 个 Issue 并产生虚假的“质量合格”假象（Fail-Open）。
-3. **`hasAdapterFor` 与诊断触发**：位于 [`src/core/ast/language-support.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/ast/language-support.ts) 的 `hasAdapterFor(filePath, parser)` 会主动核查扩展名是否由 7 类真实适配器显式认领。
+3. **`hasAdapterFor` 与诊断触发**：位于 [`src/core/ast/language-support.ts`](../../src/core/ast/language-support.ts) 的 `hasAdapterFor(filePath, parser)` 会主动核查扩展名是否由 7 类真实适配器显式认领。
 4. **规则发射**：当 `hasAdapterFor` 返回 `false` 且 `ScanConfig.unsupportedLanguage` 未设为 `'off'` 时（默认值为 `'error'`），引擎将发射 `LANG-UNSUPPORTED` 门禁诊断阻断流程：
 
 ```ts

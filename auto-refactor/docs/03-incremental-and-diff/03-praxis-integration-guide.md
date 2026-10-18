@@ -2,10 +2,10 @@
 
 > **所属层级**：L3 增量计算与向量化 Diff (`docs/03-incremental-and-diff/`)  
 > **代码真源**：  
-> - 环形缓冲与淘汰持久化：[`src/core/ring-buffer.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/ring-buffer.ts)  
-> - 语义富集器：[`src/core/praxis/semanticEnricher.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/semanticEnricher.ts)  
-> - 差分治理门面：[`src/core/praxis/diffGovernance.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/diffGovernance.ts)  
-> - SPI 契约定义：[`src/core/praxis/contracts.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/contracts.ts)
+> - 环形缓冲与淘汰持久化：[`src/core/ring-buffer.ts`](../../src/core/ring-buffer.ts)  
+> - 语义富集器：[`src/core/praxis/semanticEnricher.ts`](../../src/core/praxis/semanticEnricher.ts)  
+> - 差分治理门面：[`src/core/praxis/diffGovernance.ts`](../../src/core/praxis/diffGovernance.ts)  
+> - SPI 契约定义：[`src/core/praxis/contracts.ts`](../../src/core/praxis/contracts.ts)
 
 ---
 
@@ -43,7 +43,7 @@ sequenceDiagram
 
 ## 2. `CircularDiffBuffer` 核心配置与淘汰生命周期
 
-在 [`src/core/ring-buffer.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/ring-buffer.ts) 中，环形缓冲区维护固定容量的 FIFO 循环队列。
+在 [`src/core/ring-buffer.ts`](../../src/core/ring-buffer.ts) 中，环形缓冲区维护固定容量的 FIFO 循环队列。
 
 ### 2.1 真实常数与构造参数
 
@@ -95,7 +95,7 @@ private evictHunk(hunk: ReviewDiffHunk): void {
 
 ## 3. `SemanticPraxisContextEnricher` 语义富集机制
 
-位于 [`src/core/praxis/semanticEnricher.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/semanticEnricher.ts) 的富集器实现了 `IPraxisContextEnricher` 契约，对每个待审查的 `ReviewDiffHunk` 实施三步增强：
+位于 [`src/core/praxis/semanticEnricher.ts`](../../src/core/praxis/semanticEnricher.ts) 的富集器实现了 `IPraxisContextEnricher` 契约，对每个待审查的 `ReviewDiffHunk` 实施三步增强：
 
 ### 3.1 步骤一：外围符号锚定
 
@@ -127,7 +127,7 @@ const action = hunk.lines.length > HUNK_REWORK_LINE_THRESHOLD ? 'rework' : 'auto
 
 ## 4. `PraxisDiffGovernanceService.reviewDiff` 统一治理门面
 
-位于 [`src/core/praxis/diffGovernance.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/diffGovernance.ts) 的 `PraxisDiffGovernanceService` 统一收口端到端的补丁审查工作流：
+位于 [`src/core/praxis/diffGovernance.ts`](../../src/core/praxis/diffGovernance.ts) 的 `PraxisDiffGovernanceService` 统一收口端到端的补丁审查工作流：
 
 ```ts
 export class PraxisDiffGovernanceService implements IPraxisDiffGovernanceService {

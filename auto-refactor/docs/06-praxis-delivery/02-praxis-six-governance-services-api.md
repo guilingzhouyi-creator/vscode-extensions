@@ -1,29 +1,30 @@
 # 02. Praxis 七大核心治理服务与开发者 SDK 门面手册
 
 > **所属层级**：L6 Praxis 团队交付专层 (`docs/06-praxis-delivery/`)  
-> **对应代码真源**：[`praxis-review-client.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/praxis-review-client.ts)、[`client/types.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/client/types.ts)、[`diffGovernance.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/diffGovernance.ts)、[`sliceAuditService.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/sliceAuditService.ts)、[`multiAgentGovernance.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/multiAgentGovernance.ts)、[`trajectoryLearningService.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/trajectoryLearningService.ts)、[`feedback-adaptive-supervisor.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/feedback-adaptive-supervisor.ts)、[`rollback.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/rollback.ts)
+> **对应代码真源**：[`praxis-review-client.ts`](../../src/core/praxis/praxis-review-client.ts)、[`client/types.ts`](../../src/core/praxis/client/types.ts)、[`diffGovernance.ts`](../../src/core/praxis/diffGovernance.ts)、[`sliceAuditService.ts`](../../src/core/praxis/sliceAuditService.ts)、[`multiAgentGovernance.ts`](../../src/core/praxis/multiAgentGovernance.ts)、[`trajectoryLearningService.ts`](../../src/core/praxis/trajectoryLearningService.ts)、[`feedback-adaptive-supervisor.ts`](../../src/core/praxis/feedback-adaptive-supervisor.ts)、[`rollback.ts`](../../src/core/rollback.ts)
 
 ---
 
 ## 1. 服务门面矩阵总览
 
-为了满足 Praxis 平台在单文件审查、增量 Diff 治理、毫秒级切片自检、并发冲突仲裁、轨迹学习、反馈调权与原子回滚的完整研发生命周期，`auto-refactor` 在顶层 API ([`src/api.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/api.ts)) 导出了六大细粒度治理服务与**第七大核心开发者统一门面 SDK (`PraxisReviewClient`)**：
+为了满足 Praxis 平台在单文件审查、增量 Diff 治理、毫秒级切片自检、并发冲突仲裁、轨迹学习、反馈调权与原子回滚的完整研发生命周期，`auto-refactor` 在顶层 API ([`src/api.ts`](../../src/api.ts)) 导出了六大细粒度治理服务与**第七大核心开发者统一门面 SDK (`PraxisReviewClient`)**：
 
 | 门面编号 | 服务门面接口 / 类 | 核心源码路径 | 职责定位与核心特性 |
 | :---: | :--- | :--- | :--- |
-| **S-01** | `IPraxisDiffGovernanceService` | [`diffGovernance.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/diffGovernance.ts) | 语义感知的 Diff 全维审查、逆向依赖闭包计算、八支柱补丁质量评估与合入门禁 |
-| **S-02** | `IPraxisSliceAuditService` | [`sliceAuditService.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/sliceAuditService.ts) | **< 10ms** 局部 AST 切片提取、Sparse MoE 稀疏路由（$\ge 70\%$ 绕过率）、CAPP 指令合成 |
-| **S-03** | `IPraxisMultiAgentGovernanceService` | [`multiAgentGovernance.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/multiAgentGovernance.ts) | 多 Agent 并发补丁冲突检测、跨 Agent 循环依赖拦截 (`GOV-AGN-001`)、重复劳动仲裁 |
-| **S-04** | `IPraxisTrajectoryLearningService` | [`trajectoryLearningService.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/trajectoryLearningService.ts) | 从 Bad$\rightarrow$Good 演进中提取 `RefactoringRecipe`，拦截循环震荡 (`GOV-TRJ-001`) |
-| **S-05** | `FeedbackAdaptiveSupervisor` | [`feedback-adaptive-supervisor.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/feedback-adaptive-supervisor.ts) | 生产事故与回滚台账维护、三平面权重 $(W_s, W_d, W_f)$ 凸投影演化与规则可靠性阻尼 |
-| **S-06** | `PraxisRollbackEngine` & `scanDiffStream` | [`rollback.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/rollback.ts)<br/>[`stream.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/stream.ts) | 异步生成器响应式 Diff 流式推送与 TaskCard 级逆序无损原子回滚 |
-| **S-07** | **`PraxisReviewClient`<br/>(`createPraxisClient`)** | [`praxis-review-client.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/praxis-review-client.ts) | **【统一开发者总门面】** 整合全仓/单文件/Diff/合入门禁，输出一体两面双载荷 (Agent/UI) |
+| **S-01** | `IPraxisDiffGovernanceService` | [`diffGovernance.ts`](../../src/core/praxis/diffGovernance.ts) | 语义感知的 Diff 全维审查、逆向依赖闭包计算、八支柱补丁质量评估与合入门禁 |
+| **S-02** | `IPraxisSliceAuditService` | [`sliceAuditService.ts`](../../src/core/praxis/sliceAuditService.ts) | **< 10ms** 局部 AST 切片提取、Sparse MoE 稀疏路由（$\ge 70\%$ 绕过率）、CAPP 指令合成 |
+| **S-03** | `IPraxisMultiAgentGovernanceService` | [`multiAgentGovernance.ts`](../../src/core/praxis/multiAgentGovernance.ts) | 多 Agent 并发补丁冲突检测、跨 Agent 循环依赖拦截 (`GOV-AGN-001`)、重复劳动仲裁 |
+| **S-04** | `IPraxisTrajectoryLearningService` | [`trajectoryLearningService.ts`](../../src/core/praxis/trajectoryLearningService.ts) | 从 Bad$\rightarrow$Good 演进中提取 `RefactoringRecipe`，拦截循环震荡 (`GOV-TRJ-001`) |
+| **S-05** | `FeedbackAdaptiveSupervisor` | [`feedback-adaptive-supervisor.ts`](../../src/core/praxis/feedback-adaptive-supervisor.ts) | 生产事故与回滚台账维护、三平面权重 $(W_s, W_d, W_f)$ 凸投影演化与规则可靠性阻尼 |
+| **S-06** | `PraxisRollbackEngine` & `scanDiffStream` | [`rollback.ts`](../../src/core/rollback.ts)<br/>[`stream.ts`](../../src/core/stream.ts) | 异步生成器响应式 Diff 流式推送与 TaskCard 级逆序无损原子回滚 |
+| **S-07** | **`PraxisReviewClient`<br/>(`createPraxisClient`)** | [`praxis-review-client.ts`](../../src/core/praxis/praxis-review-client.ts) | **【统一开发者总门面】** 整合全仓/单文件/Diff/合入门禁/VFS，输出一体两面双载荷 (Agent/UI) |
+| **S-08** | **`WorkspaceManager`<br/>(`ManagedWorkspace`)** | [`managed-workspace.ts`](../../src/core/praxis/vfs/managed-workspace.ts)<br/>[`sqlite-vfs-storage.ts`](../../src/core/praxis/vfs/sqlite-vfs-storage.ts) | **【LayerVFS 虚拟分叉与沙箱】** CAS 块级去重存储、微秒级虚拟分叉与受控物理沙箱投影 |
 
 ---
 
 ## 2. S-07：统一开发者门面 SDK (`PraxisReviewClient`)
 
-[`PraxisReviewClient`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/praxis-review-client.ts) 是 Praxis 业务团队接入的首选入口，封装了内部底层复杂度，提供高度内聚的面向对象方法与强类型双载荷：
+[`PraxisReviewClient`](../../src/core/praxis/praxis-review-client.ts) 是 Praxis 业务团队接入的首选入口，封装了内部底层复杂度，提供高度内聚的面向对象方法与强类型双载荷：
 
 ```mermaid
 flowchart TD
@@ -33,6 +34,7 @@ flowchart TD
     CLIENT --> M2["reviewFile(path, content, options)"]
     CLIENT --> M3["reviewDiff(input, options)"]
     CLIENT --> M4["evaluateMergeGate(source, target, hunks)"]
+    CLIENT --> M5["createWorkspace(options) / revertWorkspace()"]
     
     subgraph Payloads["一体两面双载荷交付 (Dual-Faced Delivery)"]
         AGENT_FACE["Agent Face (机器面)<br/>• agentDirectives (CAPP DSL)<br/>• directivesMarkdown (LLM 提示词)<br/>• 100% 完整差分 AST"]
@@ -43,6 +45,7 @@ flowchart TD
     M2 --> Payloads
     M3 --> Payloads
     M4 --> Payloads
+    M5 --> VFS_BOX["LayerVFS 虚拟工作区分叉 & 物理沙箱"]
 ```
 
 ### 2.1 核心服务接口定义 (`IPraxisReviewClient`)
@@ -74,6 +77,11 @@ export interface IPraxisReviewClient {
         targetBranch: string,
         hunks: ReviewDiffHunk[],
     ): Promise<PraxisMergeGateVerdict>;
+
+    // 5. LayerVFS 虚拟分叉与工作区管理
+    createWorkspace(options: CreateWorkspaceOptions): Promise<ManagedWorkspace>;
+    revertWorkspace(workspaceId: string, snapshotId: string): Promise<boolean>;
+    getWorkspaceManager(): WorkspaceManager;
 }
 ```
 
@@ -83,7 +91,7 @@ export interface IPraxisReviewClient {
   - `issues`: 包含全量未失真诊断的原始静态分析违规集合；
   - `agentDirectives`: 符合 CAPP 协议的机器可操作指令包，供 AI 智能体直接消费；
   - `directivesMarkdown`: 渲染完备的 Markdown 提示词片段，可直接拼接注入 LLM 上下文；
-  - `presentationPayload`: 包含已完成并查集去重的本地化 UI 诊断卡片数组（[`PraxisPresentationPayload`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/presentation/presentation-types.ts)）；
+  - `presentationPayload`: 包含已完成并查集去重的本地化 UI 诊断卡片数组（[`PraxisPresentationPayload`](../../src/core/praxis/presentation/presentation-types.ts)）；
 - **`DualFacedDiffResult`**：
   - `agentFace`: 聚合受影响符号作用域、跨文件逆向闭包列表与平均风险分；
   - `humanFace`: 状态徽标颜色（`red` / `yellow` / `blue` / `green`）、增删行数、违规清单与本地化卡片。
@@ -92,7 +100,7 @@ export interface IPraxisReviewClient {
 
 ## 3. S-01：语义差分治理门面 (`IPraxisDiffGovernanceService`)
 
-- **职责**：将增量文本 Diff 与跨语言 [`SemanticGraph`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/semantic/semanticGraph.ts) 拓扑结合，调用五层审查器（Layer 1 安全、算法性能、数据架构、测试现代性、元架构）完成八支柱补丁质量评估 (`PatchQualityResult`)。
+- **职责**：将增量文本 Diff 与跨语言 [`SemanticGraph`](../../src/core/semantic/semanticGraph.ts) 拓扑结合，调用五层审查器（Layer 1 安全、算法性能、数据架构、测试现代性、元架构）完成八支柱补丁质量评估 (`PatchQualityResult`)。
 - **关键方法**：
   - `reviewDiff(input, options)`: 返回带有精确起止行、符号归属、逆向影响闭包的 `PraxisDiffGovernanceResult`；
   - `enrichHunks(filePath, hunks, graph)`: 为裸 Diff Hunk 注入外围函数/类边界与受影响下游文件列表。
@@ -142,8 +150,19 @@ export interface IPraxisReviewClient {
 
 ---
 
-## 9. 关联文档导航
+## 9. S-08：LayerVFS 虚拟工作区管理器 (`WorkspaceManager` & `ManagedWorkspace`)
+
+- **毫秒级虚拟分叉**：`baseWorkspace.fork("candidate-branch")` 基于 Merkle 树克隆根指针，耗时 $< 3\text{ms}$，内存与物理磁盘零冗余拷贝；
+- **CAS 块级去重存储**：借助 FastCDC 动态切块与 SQLite WAL 单文件持久化，修改文件仅写入变动分块；
+- **快照与原子回退**：`createSnapshot(name)` 固化命名快照，`revertWorkspace(workspaceId, snapshotId)` 在 $< 1\text{ms}$ 内瞬间回退根节点，消除并发探索分支污染；
+- **受控沙箱物理投影**：`workspace.project()` 异步创建系统临时隔离沙箱，`sandbox.run(cmd)` 严格将 `cwd` 锚定在临时路径中，执行真实编译与单测；`sandbox.cleanup()` 全生命周期物理零残留析构。
+
+---
+
+## 10. 关联文档导航
 
 - [01. Praxis 对接架构全景与六大 SPI 契约手册](./01-praxis-architecture-and-spi-contracts.md)
 - [03. Praxis 团队联调操作手册与交付验收矩阵](./03-praxis-integration-runbook-and-acceptance.md)
+- [04. Praxis-LayerVFS 瞬时工作区对接手册与联调规范](./04-praxis-layervfs-integration-guide.md)
+- [06. LayerVFS 虚拟分叉与 MCTS 探索树架构规范](../01-architecture/06-layervfs-virtual-storage-and-mcts.md)
 - [PRAXIS_HANDOFF_REPORT.md](../PRAXIS_HANDOFF_REPORT.md)

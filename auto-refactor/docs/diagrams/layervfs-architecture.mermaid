@@ -1,0 +1,45 @@
+sequenceDiagram
+    autonumber
+    participant Agent as Praxis / Multi-Agent
+    participant Client as PraxisReviewClient
+    participant WS as ManagedWorkspace
+    participant VFS as SqliteVfsStorage (CAS)
+    participant Proj as ProjectionEngine
+    participant MCTS as MCTSEngine
+
+    Note over Agent, VFS: 阶段一：毫秒级虚拟工作区分叉 (Fork)
+    Agent->>Client: createWorkspace({ workspaceId, sourceDir })
+    Client->>WS: 初始化工作区
+    WS->>VFS: FastCDC 切块并存入 CAS (vfs_chunks & vfs_nodes)
+    VFS-->>WS: 根 Merkle 节点哈希 (root_node_id)
+    Client-->>Agent: Base Workspace 实例
+
+    Agent->>WS: fork("candidate-branch-a")
+    WS->>VFS: forkWorkspace("base", "candidate-a") (仅克隆根指针)
+    VFS-->>WS: 零拷贝分叉完成 (耗时 < 3ms)
+    WS-->>Agent: Forked Workspace 实例
+
+    Note over Agent, Proj: 阶段二：受控沙箱物理投影与验证
+    Agent->>WS: writeFile("core/parser.ts", optimizedAstCode)
+    WS->>VFS: 写入变动分块并更新虚拟目录树
+    Agent->>WS: project()
+    WS->>Proj: projectWorkspace(workspaceId, tempDir)
+    Proj-->>WS: 物理投影沙箱根目录 (praxis-sandbox-*)
+    Agent->>Proj: runInSandbox("npm test", { timeoutMs: 30000 })
+    Note over Proj: cwd 严格隔离在临时目录，超时返回 124
+    Proj-->>Agent: 执行结果 (exitCode, stdout, stderr)
+
+    Note over Agent, MCTS: 阶段三：MCTS 启发式评估与 UCT 锦标赛择优
+    Agent->>MCTS: runTournament([candidateA, candidateB], targetSpec)
+    MCTS->>MCTS: 计算 Delta CC 与 AST 深度增益
+    MCTS->>MCTS: UCT 算法打分与回溯更新访问频次
+    MCTS-->>Agent: 最优优胜策略节点 (Winner Candidate)
+
+    Note over Agent, VFS: 阶段四：方案落盘或原子闪回 (Rollback)
+    alt 方案测试未达标
+        Agent->>Client: revertWorkspace("candidate-a", snapshotId)
+        Client->>VFS: 原子替换 root_node_id (耗时 < 1ms)
+    else 优胜方案采纳
+        Agent->>Client: 合并至主工作树
+    end
+    Agent->>Proj: cleanOnClose() (临时物理文件零残留析构)

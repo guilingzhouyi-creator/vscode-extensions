@@ -2,11 +2,11 @@
 
 > **所属层级**：L2 跨语言解析与语义图底座 (`docs/02-parsers-and-ast/`)  
 > **代码真源**：  
-> - 适配器包装：[`src/core/ast/oxc-adapter.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/ast/oxc-adapter.ts)  
-> - 懒投影器与缓存：[`src/core/ast/oxc-projector.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/ast/oxc-projector.ts)  
-> - 遍历与快轨门控：[`src/core/ast/traverse.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/ast/traverse.ts)  
-> - 谓词与等价补偿：[`src/core/ast/oxc-predicates.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/ast/oxc-predicates.ts)  
-> - 关键点验证门禁：[`scripts/validate-oxc-keypoints.js`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/scripts/validate-oxc-keypoints.js)
+> - 适配器包装：[`src/core/ast/oxc-adapter.ts`](../../src/core/ast/oxc-adapter.ts)  
+> - 懒投影器与缓存：[`src/core/ast/oxc-projector.ts`](../../src/core/ast/oxc-projector.ts)  
+> - 遍历与快轨门控：[`src/core/ast/traverse.ts`](../../src/core/ast/traverse.ts)  
+> - 谓词与等价补偿：[`src/core/ast/oxc-predicates.ts`](../../src/core/ast/oxc-predicates.ts)  
+> - 关键点验证门禁：[`scripts/validate-oxc-keypoints.js`](../../scripts/validate-oxc-keypoints.js)
 
 ---
 
@@ -45,7 +45,7 @@ flowchart TD
 
 ### 2.1 适用范围与 10 项快轨分析器 (`FAST_PATH_ANALYZERS`)
 
-在 [`src/core/ast/traverse.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/ast/traverse.ts) 中，快轨默认开启（`fastPathEnabled()` 检查 `process.env.AR_FASTPATH !== '0'`）。当启用的分析器全部落入 `FAST_PATH_ANALYZERS` 集合时，引擎自动启用 Mode A：
+在 [`src/core/ast/traverse.ts`](../../src/core/ast/traverse.ts) 中，快轨默认开启（`fastPathEnabled()` 检查 `process.env.AR_FASTPATH !== '0'`）。当启用的分析器全部落入 `FAST_PATH_ANALYZERS` 集合时，引擎自动启用 Mode A：
 
 ```ts
 export const FAST_PATH_ANALYZERS = new Set([
@@ -64,7 +64,7 @@ export const FAST_PATH_ANALYZERS = new Set([
 
 ### 2.2 `OTHER_PLACEHOLDER` 节点折叠与 78% 堆内存消除
 
-在 Mode A 下，[`src/core/ast/oxc-projector.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/ast/oxc-projector.ts) 不会物化整棵 `NormalizedNode` 树。对于不影响当前激活规则判定（如纯表达式语句、无度量价值的中间包裹节点），`project` 方法直接返回预先冻结的单例：
+在 Mode A 下，[`src/core/ast/oxc-projector.ts`](../../src/core/ast/oxc-projector.ts) 不会物化整棵 `NormalizedNode` 树。对于不影响当前激活规则判定（如纯表达式语句、无度量价值的中间包裹节点），`project` 方法直接返回预先冻结的单例：
 
 ```ts
 // src/core/ast/oxc-projector.ts
@@ -79,7 +79,7 @@ if (this.shouldCollapseToPlaceholder(t, isLiteral, isObservable, n)) {
 
 ## 3. Mode B：函数子树复用与物化补偿
 
-当分析器需要深入函数体内部细粒度语法结构（如精确判定函数内嵌套分支、闭包与控制流）时，[`src/core/ast/oxc-projector.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/ast/oxc-projector.ts) 启动 Mode B 机制：
+当分析器需要深入函数体内部细粒度语法结构（如精确判定函数内嵌套分支、闭包与控制流）时，[`src/core/ast/oxc-projector.ts`](../../src/core/ast/oxc-projector.ts) 启动 Mode B 机制：
 
 1. **`functionSubtrees` 映射**：维护 `Map<OxcNode, OxcNode[]>`，记录函数原生节点到其直接子节点的映射关系，避免重复展开。
 2. **`cheapProject` 紧凑投影**：仅计算函数体所需的关键字段（`kind`, `branchWeight`, `increasesNesting`, `isConstructor`），不派生多余元数据。
@@ -93,7 +93,7 @@ if (this.shouldCollapseToPlaceholder(t, isLiteral, isObservable, n)) {
 
 `oxc-parser` 产出基于 UTF-16 的单维标量字符偏移（`start`, `end`），而 `auto-refactor` 的 Issue 报告需要 1-based 的 `(line, column)` 行列坐标。
 
-在 [`src/core/ast/oxc-predicates.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/ast/oxc-predicates.ts) 中，通过预先计算的换行符起始偏移表 `lineStarts: number[]`，利用高效二分查找在 $O(\log L)$ 时间内精准计算行列：
+在 [`src/core/ast/oxc-predicates.ts`](../../src/core/ast/oxc-predicates.ts) 中，通过预先计算的换行符起始偏移表 `lineStarts: number[]`，利用高效二分查找在 $O(\log L)$ 时间内精准计算行列：
 
 ```ts
 export function oxcPosOf(off: number, ctx: Ctx): Position {
@@ -111,7 +111,7 @@ export function oxcPosOf(off: number, ctx: Ctx): Position {
 
 ### 4.2 4 项精准等价补偿细则
 
-由于 oxc 的 ESTree 结构与官方 TypeScript AST 存在差异，[`src/core/ast/oxc-predicates.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/ast/oxc-predicates.ts) 内置了四项严格的等价补偿：
+由于 oxc 的 ESTree 结构与官方 TypeScript AST 存在差异，[`src/core/ast/oxc-predicates.ts`](../../src/core/ast/oxc-predicates.ts) 内置了四项严格的等价补偿：
 
 1. **分支权重与逻辑算子对齐 (`oxcBranchWeightOf`)**：
    - 将 `LogicalExpression` 中的 `&&`、`||`、`??` 统一赋予权重 1；
@@ -133,7 +133,7 @@ export function oxcPosOf(off: number, ctx: Ctx): Position {
 
 ## 5. 门禁锁死验证 (`validate-oxc-keypoints.js`)
 
-在提交与 CI 构建过程中，[`scripts/validate-oxc-keypoints.js`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/scripts/validate-oxc-keypoints.js) 自动化执行严格的双模比对校验：
+在提交与 CI 构建过程中，[`scripts/validate-oxc-keypoints.js`](../../scripts/validate-oxc-keypoints.js) 自动化执行严格的双模比对校验：
 
 1. 生成动态临时测试固件，涵盖字符串字面量联合类型别名、类属性装饰器入参、`as const` 对象字面量、模块重新导出（`export *` / `export { x }`）以及包含内部函数定义的 `static {}` 静态代码块；
 2. 分别使用 `AR_FASTPATH=0`（物化基准）与 `AR_FASTPATH=1`（流式快轨）对同一组源码进行两次扫描；

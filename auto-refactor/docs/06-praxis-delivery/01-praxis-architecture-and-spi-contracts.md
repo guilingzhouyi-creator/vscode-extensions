@@ -1,7 +1,7 @@
 # 01. Praxis 对接架构全景与六大 SPI 契约手册
 
 > **所属层级**：L6 Praxis 团队交付专层 (`docs/06-praxis-delivery/`)  
-> **对应代码真源**：[`contracts.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/contracts.ts)、[`defaults.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/defaults.ts)、[`presentation-types.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/presentation/presentation-types.ts)、[`presentation-adapter.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/presentation/presentation-adapter.ts)、[`semanticEnricher.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/semanticEnricher.ts)
+> **对应代码真源**：[`contracts.ts`](../../src/core/praxis/contracts.ts)、[`defaults.ts`](../../src/core/praxis/defaults.ts)、[`presentation-types.ts`](../../src/core/praxis/presentation/presentation-types.ts)、[`presentation-adapter.ts`](../../src/core/praxis/presentation/presentation-adapter.ts)、[`semanticEnricher.ts`](../../src/core/praxis/semanticEnricher.ts)
 
 ---
 
@@ -16,7 +16,7 @@ flowchart TD
     DIFF["原始补丁与代码输入 (DiffInput / AST Slice)"] --> CORE["auto-refactor 核心差分与语法分析底座"]
     
     subgraph MachinePlane["【底层机器平面】100% 完整性保真 (Machine Fidelity)"]
-        AST_COMPLETE["完整差分 AST 语法证据<br/>(保留全量行号/列号/325 规则全集)"]
+        AST_COMPLETE["完整差分 AST 语法证据<br/>(保留全量行号/列号/338 规则全集)"]
         CAPP["CAPP 紧凑指令流 (Compact Agent Prompt)"]
     end
     
@@ -104,23 +104,23 @@ flowchart LR
 
 ### 3.1 SPI-1：动态身份与任务卡溯源 (`IPraxisAttributionResolver`)
 - **核心职责**：根据文件路径与行区间 `{ startLine, endLine }` 实时反查修改归属的 `PraxisCardContext`。
-- **内置实现**：[`DefaultPraxisAttributionResolver`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/defaults.ts)，维护内存区间索引并支持 `registerAttribution` 动态注入。
+- **内置实现**：[`DefaultPraxisAttributionResolver`](../../src/core/praxis/defaults.ts)，维护内存区间索引并支持 `registerAttribution` 动态注入。
 
 ### 3.2 SPI-2：AST 与跨文件语义富集器 (`IPraxisContextEnricher`)
 - **核心职责**：为 Hunk 注入所处符号名、语法节点类型与跨文件逆向受影响集合（`impactFiles`）。
-- **内置实现**：[`SemanticPraxisContextEnricher`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/semanticEnricher.ts)，深度绑定 [`SemanticGraph`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/semantic/semanticGraph.ts)。
+- **内置实现**：[`SemanticPraxisContextEnricher`](../../src/core/praxis/semanticEnricher.ts)，深度绑定 [`SemanticGraph`](../../src/core/semantic/semanticGraph.ts)。
 
 ### 3.3 SPI-3：熔断阈值与 L3A 升级策略 (`IPraxisThresholdPolicy`)
 - **核心职责**：依据代码增删行数、作用域敏感度与爆炸半径，判定是否上报 Praxis 首席架构师仲裁（`shouldEscalateToL3A: true`）。
-- **内置实现**：[`DefaultPraxisThresholdPolicy`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/defaults.ts)。
+- **内置实现**：[`DefaultPraxisThresholdPolicy`](../../src/core/praxis/defaults.ts)。
 
 ### 3.4 SPI-4：环形缓冲与 R4 二进制归档 (`IPraxisHumanFaceStorage`)
 - **核心职责**：维护高频流式 Diff 环形队列，将淘汰记录转储为压缩二进制，杜绝长生命周期进程内存泄漏。
-- **内置实现**：[`CircularDiffBuffer`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/defaults.ts)。
+- **内置实现**：[`CircularDiffBuffer`](../../src/core/praxis/defaults.ts)。
 
 ### 3.5 SPI-5：分形分支门禁与原子回滚 (`IPraxisRollbackGatekeeper`)
 - **核心职责**：合入前校验分支不变式，支持单 Hunk 或整卡多文件的原子逆序无损回滚。
-- **内置实现**：[`DefaultPraxisRollbackGatekeeper`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/defaults.ts)。
+- **内置实现**：[`DefaultPraxisRollbackGatekeeper`](../../src/core/praxis/defaults.ts)。
 
 ### 3.6 SPI-6：表现层双面载荷适配器 (`IPraxisPresentationService`)
 - **核心职责**：将机器端纯净 CAPP 指令转化为人读 UI 诊断卡片，并执行 11 组语义并查集去重。
@@ -150,12 +150,14 @@ flowchart LR
       ): Promise<PraxisPresentationPayload>;
   }
   ```
-- **内置实现**：[`PraxisPresentationAdapter`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/presentation/presentation-adapter.ts)。
+- **内置实现**：[`PraxisPresentationAdapter`](../../src/core/praxis/presentation/presentation-adapter.ts)。
 
 ---
 
 ## 4. 关联文档导航
 
-- [02. Praxis 六大核心治理服务门面 API 手册](./02-praxis-six-governance-services-api.md)
+- [02. Praxis 核心治理服务门面 API 手册](./02-praxis-six-governance-services-api.md)
 - [03. Praxis 团队联调操作手册与交付验收矩阵](./03-praxis-integration-runbook-and-acceptance.md)
+- [04. Praxis-LayerVFS 瞬时工作区对接手册与联调规范](./04-praxis-layervfs-integration-guide.md)
+- [06. LayerVFS 虚拟分叉与 MCTS 探索树架构规范](../01-architecture/06-layervfs-virtual-storage-and-mcts.md)
 - [PRAXIS_HANDOFF_REPORT.md](../PRAXIS_HANDOFF_REPORT.md)

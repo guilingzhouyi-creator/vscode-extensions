@@ -26,9 +26,13 @@
 │  • reviewFile()            : 单文件 AST 切片与 MoE 稀疏路由审查        │
 │  • reviewDiff()            : 内存/暂存区 Diff 审查与拓扑影响闭包计算   │
 │  • evaluateMergeGate()     : 分形 Git 合并门禁与回滚判定               │
+│  • createWorkspace()      : LayerVFS 虚拟工作区分叉与 CAS 快照        │
+│  • revertWorkspace()      : 毫秒级虚拟工作区快照原子回退              │
+│  • getWorkspaceManager()  : 获取底座 VFS 工作区管理器                 │
 ├────────────────────────────────────────────────────────────────────────┤
 │  • 一体两面三层拓扑 Diff   : Agent Face (补丁) / Human Face (UI 胶囊) │
 │  • 面向 Agent 结构化指令   : 5 维结构化指令包 (锚点/契约/模板/分层/验证)│
+│  • LayerVFS 瞬时分叉沙箱   : FastCDC 动态切块 + CAS 零拷贝分叉 (<3ms)  │
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -183,6 +187,39 @@ if (!gateVerdict.approved) {
 } else {
     console.log('合并通过，一体两面 Diff 胶囊已生成:', gateVerdict.dualFacedDiff.humanFace.statusText);
 }
+```
+
+### 5. 意图 E：LayerVFS 虚拟工作区分叉、快照闪回与沙箱物理投影
+
+适用于多 Agent 并发生成变体、试错重构以及受控测试沙箱执行：
+
+```typescript
+// 1. 创建或挂载基础虚拟工作区
+const baseWs = await client.createWorkspace({
+    workspaceId: 'agent-evolution-root',
+    sourceDir: './src',
+});
+
+// 2. 毫秒级分叉候选策略分支（零拷贝分叉 < 3ms）
+const candidateWs = await baseWs.fork('candidate-refactor-ast');
+await candidateWs.writeFile('core/pipeline.ts', optimizedCode);
+
+// 3. 固化快照点（耗时 < 1ms）
+const snapshot = await candidateWs.createSnapshot('pre-test');
+
+// 4. 沙箱受控物理投影执行
+const sandbox = await candidateWs.project();
+const execResult = await sandbox.run('npm test', { timeoutMs: 30000 });
+
+if (execResult.exitCode !== 0) {
+    // 方案未达标，原子回滚至快照点
+    await client.revertWorkspace('candidate-refactor-ast', snapshot.id);
+} else {
+    console.log('候选方案验证通过，准备进入 MCTS 锦标赛');
+}
+
+// 5. 释放沙箱临时目录，物理零残留
+await sandbox.cleanup();
 ```
 
 ---

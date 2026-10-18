@@ -1,7 +1,7 @@
 # 07. 三平面质量量化模型与代码自治度 (CAI) 规范
 
 > **所属层级**：L5 规范、三平面质量度量与性能基准 (`docs/05-specs-and-benchmarks/`)  
-> **对应代码真源**：[`scoringTypes.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/scoring/scoringTypes.ts)、[`eightPillarModel.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/scoring/eightPillarModel.ts)、[`scorer-formulas.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/scoring/scorer-formulas.ts)、[`riskWeightModel.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/scoring/riskWeightModel.ts)、[`risk-fusion-engine.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/scoring/risk-fusion-engine.ts)、[`autonomy-scorer.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/scoring/autonomy-scorer.ts)
+> **对应代码真源**：[`scoringTypes.ts`](../../src/core/scoring/scoringTypes.ts)、[`eightPillarModel.ts`](../../src/core/scoring/eightPillarModel.ts)、[`scorer-formulas.ts`](../../src/core/scoring/scorer-formulas.ts)、[`riskWeightModel.ts`](../../src/core/scoring/riskWeightModel.ts)、[`risk-fusion-engine.ts`](../../src/core/scoring/risk-fusion-engine.ts)、[`autonomy-scorer.ts`](../../src/core/scoring/autonomy-scorer.ts)
 
 ---
 
@@ -44,7 +44,7 @@ flowchart TD
 
 ### 2.1 维度与支柱映射矩阵 (`DIMENSION_TO_PILLAR_MAP`)
 
-根据 [`eightPillarModel.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/scoring/eightPillarModel.ts) 单一真源，10 大细粒度维度与 8 大战略支柱映射如下：
+根据 [`eightPillarModel.ts`](../../src/core/scoring/eightPillarModel.ts) 单一真源，10 大细粒度维度与 8 大战略支柱映射如下：
 
 | 八大战略支柱 (`PrimaryQualityPillar`) | 默认权重 | 汇聚归属的细粒度维度 (`QualityDimension`) | 核心评估关注点 |
 | :--- | :---: | :--- | :--- |
@@ -63,7 +63,7 @@ flowchart TD
 
 ### 3.1 双曲饱和衰减模型 (Hyperbolic Saturation Decay)
 
-为了消除传统线性扣分「超量扣分直接跌穿 0 分导致失真」以及负指数衰减在极端负债下缺乏区分度的弊端，[`scorer-formulas.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/scoring/scorer-formulas.ts) 采用**倒数型双曲饱和衰减公式**：
+为了消除传统线性扣分「超量扣分直接跌穿 0 分导致失真」以及负指数衰减在极端负债下缺乏区分度的弊端，[`scorer-formulas.ts`](../../src/core/scoring/scorer-formulas.ts) 采用**倒数型双曲饱和衰减公式**：
 
 $$\text{density} = \frac{\text{rawPoints}}{\text{effectiveScale}}, \qquad \text{Score} = \frac{\text{DIMENSION\_MAX\_SCORE} \times \text{SATURATION\_HALFPOINT}}{\text{SATURATION\_HALFPOINT} + \text{density}}$$
 
@@ -99,7 +99,7 @@ $$\text{CompositeScore} = \exp\left( \frac{\sum_{i \in \text{Evaluated}} w_i \ln
 
 ## 4. 三平面风险融合引擎与非线性共振模型
 
-[`risk-fusion-engine.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/scoring/risk-fusion-engine.ts) 实现了静态分析、运行时遥测与历史演化的跨平面共振：
+[`risk-fusion-engine.ts`](../../src/core/scoring/risk-fusion-engine.ts) 实现了静态分析、运行时遥测与历史演化的跨平面共振：
 
 $$Risk_i = S_i^{\alpha} \cdot D_i^{\beta} \cdot H_i^{\gamma}$$
 
@@ -127,7 +127,7 @@ $$Q_{\text{total}} = W_s \cdot Q_s + W_d \cdot Q_d + W_f \cdot Q_f$$
 
 ## 5. 客观代码自研率指数 (Code Autonomy Index — CAI 2.0)
 
-废黜任何主观虚构的定性指标，[`autonomy-scorer.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/scoring/autonomy-scorer.ts) 建立了**基于代码真源与依赖拓扑的纯客观六大正交自研率模型**：
+废黜任何主观虚构的定性指标，[`autonomy-scorer.ts`](../../src/core/scoring/autonomy-scorer.ts) 建立了**基于代码真源与依赖拓扑的纯客观六大正交自研率模型**：
 
 ### 5.1 六大正交自研率维度 (`AutonomyDimensions`)
 

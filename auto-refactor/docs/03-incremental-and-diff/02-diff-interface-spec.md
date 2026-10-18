@@ -2,13 +2,13 @@
 
 > **所属层级**：L3 增量计算与向量化 Diff (`docs/03-incremental-and-diff/`)  
 > **代码真源**：  
-> - SWAR 与位并行算子：[`src/core/ast/swar.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/ast/swar.ts)  
-> - 差分计算与行哈希：[`src/core/diff/edit-diff.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/diff/edit-diff.ts)  
-> - Myers 最短编辑脚本：[`src/core/diff/myers-algorithm.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/diff/myers-algorithm.ts)  
-> - 直方图差分算法：[`src/core/diff/histogram-diff.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/diff/histogram-diff.ts)  
-> - Rust 原生差分算子：[`crates/ops-diff/`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/crates/ops-diff/)  
-> - 响应式流式管线：[`src/core/stream.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/stream.ts)  
-> - 差分契约类型：[`src/core/diff/diff-types.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/diff/diff-types.ts)
+> - SWAR 与位并行算子：[`src/core/ast/swar.ts`](../../src/core/ast/swar.ts)  
+> - 差分计算与行哈希：[`src/core/diff/edit-diff.ts`](../../src/core/diff/edit-diff.ts)  
+> - Myers 最短编辑脚本：[`src/core/diff/myers-algorithm.ts`](../../src/core/diff/myers-algorithm.ts)  
+> - 直方图差分算法：[`src/core/diff/histogram-diff.ts`](../../src/core/diff/histogram-diff.ts)  
+> - Rust 原生差分算子：[`crates/ops-diff/`](../../crates/ops-diff/)  
+> - 响应式流式管线：[`src/core/stream.ts`](../../src/core/stream.ts)  
+> - 差分契约类型：[`src/core/diff/diff-types.ts`](../../src/core/diff/diff-types.ts)
 
 ---
 
@@ -46,9 +46,9 @@ flowchart TD
 
 ### 1.1 L0 级：SWAR 64 位探测、字内位并行与 32 位 FNV-1a 行哈希
 
-- **SWAR 64 位 ASCII 探测 (`isPureAsciiSWAR64`)**：在 [`src/core/ast/swar.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/ast/swar.ts) 中，单步处理 8 字节（`WORD64_BYTES = 8`），通过双 32 位 DataView 读取与高位掩码（`HIGH_BITS_32 = 0x80808080`），零 BigInt 内存开销完成全 ASCII 验证；
+- **SWAR 64 位 ASCII 探测 (`isPureAsciiSWAR64`)**：在 [`src/core/ast/swar.ts`](../../src/core/ast/swar.ts) 中，单步处理 8 字节（`WORD64_BYTES = 8`），通过双 32 位 DataView 读取与高位掩码（`HIGH_BITS_32 = 0x80808080`），零 BigInt 内存开销完成全 ASCII 验证；
 - **字内 Myers 位并行距离**：针对 $\le 32$ 行的局部微模式采用快速 32 位 Smi 算子（`bitParallelMyers32Distance`），针对 33 ~ 64 行采用 64 位算子（`bitParallelMyers64Distance`）；
-- **32 位 FNV-1a 整数哈希**：在 [`src/core/diff/edit-diff.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/diff/edit-diff.ts) 中，`computeLineStartsAndHashes` 在单趟源码遍历中同时计算行起始偏移与每行的 32 位 FNV-1a 哈希（`FNV1A_32_OFFSET_BASIS = 0x811c9dc5`, `FNV1A_32_PRIME = 0x01000193`），将昂贵的多行字符串比对降维为 CPU 寄存器友好的 `Uint32Array` 整数比对。
+- **32 位 FNV-1a 整数哈希**：在 [`src/core/diff/edit-diff.ts`](../../src/core/diff/edit-diff.ts) 中，`computeLineStartsAndHashes` 在单趟源码遍历中同时计算行起始偏移与每行的 32 位 FNV-1a 哈希（`FNV1A_32_OFFSET_BASIS = 0x811c9dc5`, `FNV1A_32_PRIME = 0x01000193`），将昂贵的多行字符串比对降维为 CPU 寄存器友好的 `Uint32Array` 整数比对。
 
 ### 1.2 L1 级：前后缀剥离极速差分 (`trimPrefixSuffix` / `fastDiff`)
 
@@ -65,14 +65,14 @@ flowchart TD
 
 ### 1.4 L3 级：低频锚点直方图差分 (`histogramDiff`) 与 Rust 原生算子
 
-- **直方图差分 (`histogramDiff`)**：位于 [`src/core/diff/histogram-diff.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/diff/histogram-diff.ts)，统计中间区域行出现频次，优先挑选出现频度最低的唯一代码行（如唯一方法签名、专有声明语句）作为对齐锚点（Anchor），以此为基准递归划分左右子序列，消除大括号 `{}` 或空行错位引起的面条式 Diff；
+- **直方图差分 (`histogramDiff`)**：位于 [`src/core/diff/histogram-diff.ts`](../../src/core/diff/histogram-diff.ts)，统计中间区域行出现频次，优先挑选出现频度最低的唯一代码行（如唯一方法签名、专有声明语句）作为对齐锚点（Anchor），以此为基准递归划分左右子序列，消除大括号 `{}` 或空行错位引起的面条式 Diff；
 - **Rust 原生算子 (`crates/ops-diff`)**：通过 Node-API 桥接的 `fastNativeDiff`（`nativeCore.computeHistogramDiff`），利用 Rust 底层原生算子提供数倍于 V8 的直方图差分吞吐。
 
 ---
 
 ## 2. 统一 Diff 输入契约 (`DiffInput`)
 
-在 [`src/core/diff/diff-types.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/diff/diff-types.ts) 中，差分管线定义了结构化增量输入类型 `DiffInput`：
+在 [`src/core/diff/diff-types.ts`](../../src/core/diff/diff-types.ts) 中，差分管线定义了结构化增量输入类型 `DiffInput`：
 
 ```ts
 export type DiffInput =
@@ -95,13 +95,13 @@ export type DiffInput =
     };
 ```
 
-此外，对于外部工具传入的标准 Unified Diff 补丁，系统通过 [`src/core/diff/hunk-builder.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/diff/hunk-builder.ts) 的 `formatUnifiedDiff` 与 `renderHunksToUnifiedPatch` 提供互转与解析支持。
+此外，对于外部工具传入的标准 Unified Diff 补丁，系统通过 [`src/core/diff/hunk-builder.ts`](../../src/core/diff/hunk-builder.ts) 的 `formatUnifiedDiff` 与 `renderHunksToUnifiedPatch` 提供互转与解析支持。
 
 ---
 
 ## 3. 响应式异步生成器事件协议 (`scanDiffStream`)
 
-在 [`src/core/stream.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/stream.ts) 中，`scanDiffStream` 被实现为一个异步生成器（`AsyncGenerator<DiffStreamEvent>`）：
+在 [`src/core/stream.ts`](../../src/core/stream.ts) 中，`scanDiffStream` 被实现为一个异步生成器（`AsyncGenerator<DiffStreamEvent>`）：
 
 ```ts
 export type DiffStreamEvent =

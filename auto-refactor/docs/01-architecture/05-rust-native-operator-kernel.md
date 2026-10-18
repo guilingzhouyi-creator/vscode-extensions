@@ -1,7 +1,7 @@
 # 05. Rust N-API 原生加速内核与双轨等价桥
 
 > **所属层级**：L1 核心架构与原生内核 (`docs/01-architecture/`)  
-> **对应代码真源**：[`crates/Cargo.toml`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/crates/Cargo.toml)、[`crates/auto-refactor-core/`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/crates/auto-refactor-core/)、[`crates/ops-diff/`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/crates/ops-diff/)、[`crates/ops-graph/`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/crates/ops-graph/)、[`crates/ops-pattern/`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/crates/ops-pattern/)、[`crates/ops-mask/`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/crates/ops-mask/)、[`crates/ops-clone/`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/crates/ops-clone/)、[`src/core/native/native-bridge.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/native/native-bridge.ts)、[`src/core/native/native-clone-shim.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/native/native-clone-shim.ts)、[`src/core/native/native-flow-shim.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/native/native-flow-shim.ts)
+> **对应代码真源**：[`crates/Cargo.toml`](../../crates/Cargo.toml)、[`crates/auto-refactor-core/`](../../crates/auto-refactor-core/)、[`crates/ops-diff/`](../../crates/ops-diff/)、[`crates/ops-graph/`](../../crates/ops-graph/)、[`crates/ops-pattern/`](../../crates/ops-pattern/)、[`crates/ops-mask/`](../../crates/ops-mask/)、[`crates/ops-clone/`](../../crates/ops-clone/)、[`src/core/native/native-bridge.ts`](../../src/core/native/native-bridge.ts)、[`src/core/native/native-clone-shim.ts`](../../src/core/native/native-clone-shim.ts)、[`src/core/native/native-flow-shim.ts`](../../src/core/native/native-flow-shim.ts)
 
 ---
 
@@ -55,7 +55,7 @@ flowchart TD
 
 ## 2. `ops-mask` 原生词法脱敏内核深入解剖
 
-在静态分析中，为了避免正则表达式和 AST 分析器被注释、多行字符串以及内联字面量干扰，必须在词法阶段将干扰字符抹平。[`crates/ops-mask/src/lib.rs`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/crates/ops-mask/src/lib.rs) 实现了一套零内存重分配的单趟有限状态自动机（FSM）：
+在静态分析中，为了避免正则表达式和 AST 分析器被注释、多行字符串以及内联字面量干扰，必须在词法阶段将干扰字符抹平。[`crates/ops-mask/src/lib.rs`](../../crates/ops-mask/src/lib.rs) 实现了一套零内存重分配的单趟有限状态自动机（FSM）：
 
 ```mermaid
 stateDiagram-v2
@@ -140,7 +140,7 @@ pub fn is_ecma_whitespace(ch: u32) -> bool {
 
 在 Node.js 中调用 Rust 编写的 N-API 原生插件并非毫无成本。参数封包、V8 堆内存拷贝与跨语言 C FFI 跨边界调用通常伴随约 `0.02 ~ 0.08ms` 的固有上下文切换开销。对于微小输入，FFI 调用本身的耗时甚至可能远远高于纯 JavaScript 运行时间。
 
-[`src/core/native/native-bridge.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/native/native-bridge.ts) 实现了**自适应微尺寸门限分流机制**：
+[`src/core/native/native-bridge.ts`](../../src/core/native/native-bridge.ts) 实现了**自适应微尺寸门限分流机制**：
 
 ```mermaid
 flowchart TD
@@ -170,12 +170,12 @@ flowchart TD
 
 ### 4.1 纯 JS Shim 实现矩阵
 
-1. **[`src/core/native/native-clone-shim.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/native/native-clone-shim.ts)**：
+1. **[`src/core/native/native-clone-shim.ts`](../../src/core/native/native-clone-shim.ts)**：
    - `countDuplicateLinesShim`: 统计重复行；
    - `detectCloneBlocksShim`: 贪心滑动窗口克隆代码块检测；
    - `computeMinHashShim`: 包含与 Rust `ops-clone` 严格一致的 64 组伪随机置换系数（`HASH_COEFFS`），采用完全相同的无符号 32 位溢出运算（`Math.imul` 与 `>>> 0`）；
    - `findClonePairsShim`: 局部敏感哈希 (LSH) 桶聚类算法。
-2. **[`src/core/native/native-flow-shim.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/native/native-flow-shim.ts)**：
+2. **[`src/core/native/native-flow-shim.ts`](../../src/core/native/native-flow-shim.ts)**：
    - `computeDominatorTreeShim`: 纯 TypeScript 完整实现 Lengauer-Tarjan 支配树算法，计算即时支配节点（`idom`）、支配边界（`dominance_frontiers`）与回边集（`back_edges`）；
    - `solveDataflowShim`: 纯 TypeScript 实现的前向/后向单调数据流方程不动点迭代求解器。
 

@@ -1,22 +1,22 @@
 # 04. 分形 Git 工作树与多级门禁回滚规范
 
 > **所属层级**：L1 核心架构与原生内核 (`docs/01-architecture/`)  
-> **对应代码真源**：[`src/core/rollback.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/rollback.ts)、[`src/core/praxis/diff-topology.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/diff-topology.ts)、[`src/core/praxis/diff-topology-types.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/diff-topology-types.ts)、[`src/core/praxis/diff-dual-faced.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/diff-dual-faced.ts)、[`src/core/praxis/contracts.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/contracts.ts)、[`src/core/pipeline/escalationChannel.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/pipeline/escalationChannel.ts)、[`src/core/ring-buffer.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/ring-buffer.ts)
+> **对应代码真源**：[`src/core/rollback.ts`](../../src/core/rollback.ts)、[`src/core/praxis/diff-topology.ts`](../../src/core/praxis/diff-topology.ts)、[`src/core/praxis/diff-topology-types.ts`](../../src/core/praxis/diff-topology-types.ts)、[`src/core/praxis/diff-dual-faced.ts`](../../src/core/praxis/diff-dual-faced.ts)、[`src/core/praxis/contracts.ts`](../../src/core/praxis/contracts.ts)、[`src/core/pipeline/escalationChannel.ts`](../../src/core/pipeline/escalationChannel.ts)、[`src/core/ring-buffer.ts`](../../src/core/ring-buffer.ts)、[`src/core/praxis/vfs/index.ts`](../../src/core/praxis/vfs/index.ts)
 
 ---
 
 ## 1. 分形 Git 工作树拓扑与三级递进门禁体系
 
-在多智能体（Multi-Agent）高度并发的研发作业场景中，代码协作不再是一条简单的单向提交流，而是呈现为**自顶向下分形展开的分形工作树拓扑（Fractal Git Worktree Topology）**：
+在多智能体（Multi-Agent）高度并发的研发作业场景中，代码协作不再是一条简单的单向提交流，而是呈现为**自顶向下分形展开的分形工作树拓扑（Fractal Git Worktree Topology）**。而在物理工作树之下，`auto-refactor` 通过 **LayerVFS 虚拟文件系统** 实现毫秒级工作区分叉（Fork < 3ms）与零物理拷贝：
 
 ```mermaid
 flowchart TD
   TRUNK["主干稳定分支 (Trunk / Main)<br/>质量综合评分 >= 85 | Error = 0 | 零破坏性导出"]
   CELL_A["单元集成分支 (Cell-Alpha)<br/>L2 单元多 Agent 协同仲裁门禁"]
   CELL_B["单元集成分支 (Cell-Beta)<br/>L2 单元多 Agent 协同仲裁门禁"]
-  CARD_1["Agent-1 沙箱工作树 (Card-101)<br/>L1 切片内环门禁 (< 10ms)"]
-  CARD_2["Agent-2 沙箱工作树 (Card-102)<br/>L1 切片内环门禁 (< 10ms)"]
-  CARD_3["Agent-3 沙箱工作树 (Card-103)<br/>L1 切片内环门禁 (< 10ms)"]
+  CARD_1["Agent-1 虚拟工作区 (LayerVFS Fork)<br/>L1 切片内环门禁 (< 10ms)"]
+  CARD_2["Agent-2 虚拟工作区 (LayerVFS Fork)<br/>L1 切片内环门禁 (< 10ms)"]
+  CARD_3["Agent-3 虚拟工作区 (LayerVFS Fork)<br/>L1 切片内环门禁 (< 10ms)"]
   L3A["L3A 首席架构师仲裁通道<br/>(EscalationChannel 广播 / 阻断自动合入)"]
 
   TRUNK --> CELL_A
@@ -35,13 +35,13 @@ flowchart TD
 | :--- | :--- | :---: | :--- |
 | **L1 切片内环门禁** | Agent 在 `TaskCard` 沙箱内单次保存或小步提交时<br/>`PraxisSliceAuditService.auditSlice` | `< 10ms` | 抽取局部 AST 语法包围盒进行极速扫描；若出现语法解析破损、未捕获的高危安全漏洞或 `error` 级缺陷，立即阻断保存并由 `AgentConstraintGenerator` 原地注入 CAPP 提示词要求 Agent 自我修正 |
 | **L2 单元仲裁门禁** | 多个 `TaskCard` 补丁申请合入功能单元 `Cell` 分支时<br/>`PraxisMultiAgentGovernanceService` | `50 ~ 200ms` | 检测不同智能体并发修改的语义重叠、重复造轮子与跨 Agent 循环调用（`GOV-AGN-001`）；未通过者标为 `rework_needed` 并打回对应的任务卡沙箱 |
-| **L3A 架构升级门禁** | 跨越领域模块边界、修改核心公共导出签名或单 Hunk 膨胀超限时<br/>[`src/core/pipeline/escalationChannel.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/pipeline/escalationChannel.ts) | 异步实时 | 任何触发 `GOV-SLC-001`（切片边界破坏）、`CIRCULAR_DEPENDENCY` 或 `ARCHITECTURE_BREACH` 时，广播升级事件并将 `verdict.shouldEscalateToL3A` 设为 `true`，立即挂起分支自动合入，交由人类架构师或高阶决策 Agent 终审 |
+| **L3A 架构升级门禁** | 跨越领域模块边界、修改核心公共导出签名或单 Hunk 膨胀超限时<br/>[`src/core/pipeline/escalationChannel.ts`](../../src/core/pipeline/escalationChannel.ts) | 异步实时 | 任何触发 `GOV-SLC-001`（切片边界破坏）、`CIRCULAR_DEPENDENCY` 或 `ARCHITECTURE_BREACH` 时，广播升级事件并将 `verdict.shouldEscalateToL3A` 设为 `true`，立即挂起分支自动合入，交由人类架构师或高阶决策 Agent 终审 |
 
 ---
 
 ## 2. 三层拓扑 Diff 架构 (`ThreeTierTopologicalDiff`)
 
-传统 Git Diff 仅局限于字符行的物理比对，缺乏语法作用域与架构依赖感知。[`src/core/praxis/diff-topology.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/diff-topology.ts) 实现了从单一切片到全图风险的三层渐进拓扑：
+传统 Git Diff 仅局限于字符行的物理比对，缺乏语法作用域与架构依赖感知。[`src/core/praxis/diff-topology.ts`](../../src/core/praxis/diff-topology.ts) 实现了从单一切片到全图风险的三层渐进拓扑：
 
 ```mermaid
 flowchart TD
@@ -95,7 +95,7 @@ flowchart TD
 
 ## 3. 一体两面双载荷机制 (`DualFacedDiffHunk`)
 
-同一个变更补丁在智能体与人类之间存在天然的认知屏障：机器需要极致精准的行号偏移与 AST 坐标，人类需要结构化的视觉分层、双语描述与操作指引。[`src/core/praxis/diff-dual-faced.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/praxis/diff-dual-faced.ts) 实现了两面同构对称的统一载荷：
+同一个变更补丁在智能体与人类之间存在天然的认知屏障：机器需要极致精准的行号偏移与 AST 坐标，人类需要结构化的视觉分层、双语描述与操作指引。[`src/core/praxis/diff-dual-faced.ts`](../../src/core/praxis/diff-dual-faced.ts) 实现了两面同构对称的统一载荷：
 
 ```typescript
 export interface DualFacedDiffHunk {
@@ -135,7 +135,7 @@ flowchart LR
 
 ## 4. 三级联动原子回滚引擎 (`PraxisRollbackEngine`)
 
-当某个任务卡的代码合入功能单元分支后，若在后续门禁或动态监控中发现隐蔽缺陷，必须在不暴力重置分支历史的前提下执行外科手术式的精准回退。[`src/core/rollback.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/rollback.ts) 提供了三级原子回滚引擎：
+当某个任务卡的代码合入功能单元分支后，若在后续门禁或动态监控中发现隐蔽缺陷，必须在不暴力重置分支历史的前提下执行外科手术式的精准回退。[`src/core/rollback.ts`](../../src/core/rollback.ts) 提供了三级原子回滚引擎：
 
 ```mermaid
 flowchart TD
@@ -177,7 +177,7 @@ flowchart TD
 
 ## 5. 环形缓冲与 R4 冷存淘汰联动 (`CircularDiffBuffer`)
 
-在长时间多轮次的代码审查与演化流中，内存中保留的 Diff 数据必须拥有严格的物理边界。[`src/core/ring-buffer.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/ring-buffer.ts) 设计了内存常驻环形队列与 R4 归档的 Fail-Safe 联动体系：
+在长时间多轮次的代码审查与演化流中，内存中保留的 Diff 数据必须拥有严格的物理边界。[`src/core/ring-buffer.ts`](../../src/core/ring-buffer.ts) 设计了内存常驻环形队列与 R4 归档的 Fail-Safe 联动体系：
 
 ```mermaid
 sequenceDiagram

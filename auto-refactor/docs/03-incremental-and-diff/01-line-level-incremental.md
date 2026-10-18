@@ -2,16 +2,16 @@
 
 > **所属层级**：L3 增量计算与向量化 Diff (`docs/03-incremental-and-diff/`)  
 > **代码真源**：  
-> - 增量路由与门控：[`src/core/diff/incremental.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/diff/incremental.ts)  
-> - 归一化子树复用契约：[`src/core/ast/multilang.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/ast/multilang.ts)  
-> - AST 切片提取器：[`src/core/router/sliceExtractor.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/router/sliceExtractor.ts)  
-> - 调用链冲击追踪器：[`src/core/intelligence/callChainImpactTracer.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/intelligence/callChainImpactTracer.ts)
+> - 增量路由与门控：[`src/core/diff/incremental.ts`](../../src/core/diff/incremental.ts)  
+> - 归一化子树复用契约：[`src/core/ast/multilang.ts`](../../src/core/ast/multilang.ts)  
+> - AST 切片提取器：[`src/core/router/sliceExtractor.ts`](../../src/core/router/sliceExtractor.ts)  
+> - 调用链冲击追踪器：[`src/core/intelligence/callChainImpactTracer.ts`](../../src/core/intelligence/callChainImpactTracer.ts)
 
 ---
 
 ## 1. 行级增量路由与门控机制 (`route`)
 
-在 IDE 实时响应与 Agent 连续交互场景中，文件往往仅发生局部修改。然而，盲目对小文件或巨量变更进行增量分析反而会增加维护状态的额外开销。`auto-refactor` 在 [`src/core/diff/incremental.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/diff/incremental.ts) 中建立了严格的门控调度机制。
+在 IDE 实时响应与 Agent 连续交互场景中，文件往往仅发生局部修改。然而，盲目对小文件或巨量变更进行增量分析反而会增加维护状态的额外开销。`auto-refactor` 在 [`src/core/diff/incremental.ts`](../../src/core/diff/incremental.ts) 中建立了严格的门控调度机制。
 
 ```mermaid
 flowchart TD
@@ -51,7 +51,7 @@ flowchart TD
 
 ## 2. AST 子树复用 (`ProjectionSeed`)
 
-在增量路径下，未受编辑影响的代码块无需重新遍历其 AST 子树。在 [`src/core/ast/multilang.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/ast/multilang.ts) 中，通过 `ProjectionSeed` 注入各语言适配器的 `parse` 方法：
+在增量路径下，未受编辑影响的代码块无需重新遍历其 AST 子树。在 [`src/core/ast/multilang.ts`](../../src/core/ast/multilang.ts) 中，通过 `ProjectionSeed` 注入各语言适配器的 `parse` 方法：
 
 ```ts
 export interface ReusedSpan {
@@ -78,7 +78,7 @@ export interface ProjectionSeed {
 
 ## 3. 语法包围盒与切片特征提取 (`ASTSliceExtractor`)
 
-位于 [`src/core/router/sliceExtractor.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/router/sliceExtractor.ts) 的切片提取器将行级修改局部化为包含它们的最小语法包围盒：
+位于 [`src/core/router/sliceExtractor.ts`](../../src/core/router/sliceExtractor.ts) 的切片提取器将行级修改局部化为包含它们的最小语法包围盒：
 
 ### 3.1 声明包围盒识别与 `braceDepth` 统计
 
@@ -119,7 +119,7 @@ export interface SliceFeatureVector {
 
 ## 4. 逆向调用链冲击追踪 (`CallChainImpactTracer`)
 
-当切片特征向量表明存在签名突变（`hasSignatureMutation: true`）时，[`src/core/intelligence/callChainImpactTracer.ts`](file:///c:/CODE_game-development/vscode-extensions/auto-refactor/src/core/intelligence/callChainImpactTracer.ts) 在 `CallGraph` 上执行广度优先搜索（BFS）逆向闭包分析：
+当切片特征向量表明存在签名突变（`hasSignatureMutation: true`）时，[`src/core/intelligence/callChainImpactTracer.ts`](../../src/core/intelligence/callChainImpactTracer.ts) 在 `CallGraph` 上执行广度优先搜索（BFS）逆向闭包分析：
 
 ### 4.1 深度受限逆向搜索 (默认 `maxDepth = 3`)
 
