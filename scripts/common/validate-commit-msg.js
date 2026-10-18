@@ -37,10 +37,12 @@ const MODULE_GENERATE_CATALOG = './generate-rule-catalog';
 const MODULE_GIT_ENV = './git-env';
 const MODULE_STYLE = './validate-commit-msg-style';
 const MODULE_LOG_ROTATOR = './log-rotator';
+const MODULE_DEBT_CORRIDOR = './tech-debt-corridor';
 
 const PROTOCOL_VERSION = '1.0.0';
 const STATUS_PASS = 'PASS';
 const STATUS_BLOCK = 'BLOCK';
+const STATUS_PASS_WITH_WARNING = 'PASS_WITH_WARNING';
 const SEVERITY_BLOCK = 'BLOCK';
 
 const GATE_COMMIT_MSG_RANGE = 'commit-msg:range';
@@ -139,16 +141,22 @@ function validateRuleAntiHallucination(content) {
 }
 
 function validateStyleAndTone(content) {
-  return validateCommitMessageContent(content).findings;
+  return validateCommitMessageContent(content);
 }
 
 function validateSingleCommitMessage(content) {
   const hallucinatedRules = validateRuleAntiHallucination(content);
-  const styleFindings = validateStyleAndTone(content);
+  const styleResult = validateStyleAndTone(content);
+  const styleFindings = styleResult.findings;
+  const isPermittedUnderCorridor = hallucinatedRules.length === 0 && Boolean(styleResult.isPermittedUnderCorridor);
+
   return {
-    valid: hallucinatedRules.length === 0 && styleFindings.length === 0,
+    valid: hallucinatedRules.length === 0 && styleResult.valid,
+    isPermittedUnderCorridor,
     hallucinatedRules,
     styleFindings,
+    guardrail: styleResult.guardrail,
+    debtVerdict: styleResult.debtVerdict,
   };
 }
 
@@ -267,6 +275,8 @@ function readCommitContent(target) {
 
 function reportCommitMsgFailure(res, target, isAgentMode) {
   const violations = buildCommitMsgViolations(res, target);
+  const failureSummary = res.debtVerdict?.reason || `Commit message verification failed with ${violations.length} rule hallucination or forbidden style violations.`;
+
   try {
     const { writeFailureSnapshot } = require(MODULE_LOG_ROTATOR);
     writeFailureSnapshot({
@@ -274,7 +284,7 @@ function reportCommitMsgFailure(res, target, isAgentMode) {
       step: STEP_RULES_VERIFY,
       failedCommand: `node scripts/common/validate-commit-msg.js ${target}`,
       exitCode: 1,
-      summary: `Commit message verification failed with ${violations.length} rule hallucination or forbidden style violations.`,
+      summary: failureSummary,
       violations,
       targetFiles: [target].filter((t) => t && t !== STDIN_TOKEN),
       verificationCommand: `node scripts/common/validate-commit-msg.js ${target}`,
@@ -291,9 +301,10 @@ function reportCommitMsgFailure(res, target, isAgentMode) {
       step: STEP_RULES_VERIFY,
       failedCommand: `node scripts/common/validate-commit-msg.js ${target}`,
       exitCode: 1,
-      summary: `Commit message verification failed with ${violations.length} rule hallucination or forbidden style violations.`,
+      summary: failureSummary,
       violations,
-      agentDirectives: {
+      debtCorridor: res.debtVerdict,
+      agentDirectives: res.debtVerdict?.agentDirectives || {
         targetFiles: [target].filter((t) => t && t !== STDIN_TOKEN),
         remediationPriority: Array.from(new Set(violations.map((v) => v.ruleId))),
         verificationCommand: `node scripts/common/validate-commit-msg.js ${target}`,
@@ -302,6 +313,10 @@ function reportCommitMsgFailure(res, target, isAgentMode) {
     };
     console.log(JSON.stringify(envelope, null, 2));
     process.exit(1);
+  }
+
+  if (res.debtVerdict?.reason) {
+    console.error(`❌ [DEBT-CORRIDOR-BLOCK] ${res.debtVerdict.reason}`);
   }
 
   if (res.hallucinatedRules.length > 0) {
@@ -320,9 +335,50 @@ function reportCommitMsgFailure(res, target, isAgentMode) {
 
 function handleSingleCommitValidation(target, content, isAgentMode) {
   const res = validateSingleCommitMessage(content);
-  if (!res.valid) {
+  const commitType = res.guardrail?.parsedStructure?.type || '';
+
+  // 1. Blocked: Critical failure or debt ceiling exhausted
+  if (!res.isPermittedUnderCorridor) {
     reportCommitMsgFailure(res, target, isAgentMode);
     return;
+  }
+
+  // 2. Elastic Warning Corridor: Permitted with temporary High Debt
+  if (!res.valid) {
+    const { updateDebtLedger } = require(MODULE_DEBT_CORRIDOR);
+    const highIssues = res.styleFindings.filter((f) => f.isHighDebt);
+    updateDebtLedger({ newHighIssues: highIssues });
+
+    if (isAgentMode) {
+      console.log(
+        JSON.stringify(
+          {
+            protocolVersion: PROTOCOL_VERSION,
+            status: STATUS_PASS_WITH_WARNING,
+            gate: GATE_COMMIT_MSG_RULES,
+            summary: `Commit message permitted under elastic corridor with ${highIssues.length} high-risk style debt items.`,
+            debtCorridor: res.debtVerdict,
+            agentDirectives: res.debtVerdict?.agentDirectives,
+          },
+          null,
+          2
+        )
+      );
+    } else {
+      console.log('  ⚠️ [DEBT-CORRIDOR] 提交信息包含弹性高危风格技术债 (已在弹性走廊配额内放行，已记入账本，后续提交请优先清偿):');
+      for (const h of highIssues) {
+        console.log(`     • [${h.ruleId}] 第 ${h.lineNum} 行: ${h.term} -> 推荐: ${h.guidance}`);
+      }
+      console.log('  ✔ Rule 7: 规则 ID 单源目录一致性防虚构校验通过');
+      console.log('  ✔ Rule 8: 提交文本在弹性走廊配额内放行 (PASS_WITH_WARNING)');
+    }
+    process.exit(0);
+  }
+
+  // 3. Fully Clean Pass: Zero violations. If refactor/fix, settle previous debt!
+  if (commitType === 'refactor' || commitType === 'fix') {
+    const { updateDebtLedger } = require(MODULE_DEBT_CORRIDOR);
+    updateDebtLedger({ isCleanCommit: true });
   }
 
   if (isAgentMode) {
@@ -333,10 +389,11 @@ function handleSingleCommitValidation(target, content, isAgentMode) {
           status: STATUS_PASS,
           gate: GATE_COMMIT_MSG_RULES,
           summary: SUMMARY_RULES_PASS,
+          debtCorridor: res.debtVerdict,
         },
         null,
-        2,
-      ),
+        2
+      )
     );
   } else {
     console.log('  ✔ Rule 7: 规则 ID 单源目录一致性防虚构校验通过');

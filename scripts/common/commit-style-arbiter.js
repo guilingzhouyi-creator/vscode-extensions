@@ -24,6 +24,7 @@ const {
   extractBilingualTokens,
   buildTrie,
   searchLongestPrefix,
+  analyzeEnglishVerbInflection,
 } = require('./commit-tokenizer');
 
 /** Standard approved Chinese imperative verbs for commit title summary */
@@ -50,7 +51,11 @@ const APPROVED_ENGLISH_VERBS = new Set([
 /** Narrative and non-imperative leading phrases to intercept in commit title */
 const DISALLOWED_LEADING_PREFIXES = [
   '修改了', '增加了', '修复了', '优化了', '完成了', '进行了', '做出了', '做了',
-  '已修复', '已完成', '已通过', '已经', '被', '关于', '针对', '通过'
+  '已修复', '已完成', '已通过', '已经', '被', '关于', '针对', '通过',
+  // Intentional and subjective forward-looking modality (CMG-STY-007)
+  '打算', '准备', '计划', '尝试', '开始', '想要', '希望能', '希望', '拟',
+  // Narrative meta-subject prefixes
+  '本提交', '本次提交', '本次改动', '本次更新', '主要修复', '主要是', '主要'
 ];
 
 /** First-person pronouns (Zero-POV violation) */
@@ -73,6 +78,15 @@ const ACADEMIC_TEST_ORACLE_PHRASES = [
 ];
 
 const ACADEMIC_ORACLE_TRIE = buildTrie(ACADEMIC_TEST_ORACLE_PHRASES);
+
+/** Unified frozen vocabulary Trie for zero-allocation Forward Maximum Matching (FMM) */
+const GLOBAL_VOCABULARY_LIST = [
+  ...APPROVED_CHINESE_VERBS,
+  ...DISALLOWED_LEADING_PREFIXES,
+  ...FIRST_PERSON_PRONOUNS_ZH,
+  ...ACADEMIC_TEST_ORACLE_PHRASES,
+];
+const GLOBAL_VOCABULARY_TRIE = Object.freeze(buildTrie(GLOBAL_VOCABULARY_LIST));
 
 /**
  * Checks if a match on "神谕" is an academic software testing term rather than mythical hyperbole.
@@ -108,18 +122,49 @@ function findDisallowedNarrativePrefix(normalized) {
 
 function checkEnglishVerbImperative(lowerVerb, verb, summary, lineNum) {
   if (APPROVED_ENGLISH_VERBS.has(lowerVerb)) return null;
-  const isPastTense = DISALLOWED_ENGLISH_PAST_TENSE.has(lowerVerb) || (lowerVerb.endsWith('ed') && lowerVerb !== 'embed' && lowerVerb.length > 4);
-  if (!isPastTense) return null;
 
-  return {
-    lineNum,
-    rawLine: summary,
-    ruleId: 'CMG-STY-007',
-    category: 'imperative_mood',
-    term: verb,
-    reason: 'Commit title summary must use the imperative mood (e.g. "add", "fix", "refactor"), not past tense or declarative phrasing.',
-    guidance: `Replace past-tense '${verb}' with the base imperative verb.`,
-  };
+  // 1. Check explicit past tense list
+  if (DISALLOWED_ENGLISH_PAST_TENSE.has(lowerVerb)) {
+    const base = lowerVerb.endsWith('ed') ? lowerVerb.slice(0, -2) : lowerVerb;
+    return {
+      lineNum,
+      rawLine: summary,
+      ruleId: 'CMG-STY-007',
+      category: 'imperative_mood',
+      term: verb,
+      isHighDebt: true,
+      reason: 'Commit title summary must use the imperative mood (e.g. "add", "fix", "refactor"), not past tense.',
+      guidance: `Replace past-tense '${verb}' with the base imperative verb '${base}'.`,
+    };
+  }
+
+  // 2. Check general inflection (-ing, -s, -es, -ed)
+  const inflection = analyzeEnglishVerbInflection(lowerVerb);
+  if (inflection) {
+    let suggested = inflection.baseForm;
+    if (!APPROVED_ENGLISH_VERBS.has(suggested) && APPROVED_ENGLISH_VERBS.has(suggested + 'e')) {
+      suggested = suggested + 'e';
+    }
+
+    const tenseDesc = inflection.tense === 'participle'
+      ? 'present participle (-ing)'
+      : inflection.tense === 'third_singular'
+        ? 'third-person singular (-s/-es)'
+        : 'past tense (-ed)';
+
+    return {
+      lineNum,
+      rawLine: summary,
+      ruleId: 'CMG-STY-007',
+      category: 'imperative_mood',
+      term: verb,
+      isHighDebt: true,
+      reason: `Commit title summary must use the base imperative verb, not ${tenseDesc}.`,
+      guidance: `Replace '${verb}' with the base imperative verb '${suggested}'.`,
+    };
+  }
+
+  return null;
 }
 
 function isApprovedChineseVerb(verb) {
@@ -136,11 +181,18 @@ function isApprovedChineseVerb(verb) {
  * @param {number} lineNum - Header line number (usually 1)
  * @returns {object | null} Finding if invalid
  */
+/**
+ * Validates header imperative mood and verb taxonomy (CMG-STY-007).
+ *
+ * @param {string} summary - Commit title summary
+ * @param {number} lineNum - Header line number (usually 1)
+ * @returns {object | null} Finding if invalid
+ */
 function checkHeaderImperativeMood(summary, lineNum = 1) {
   if (!summary) return null;
   const normalized = normalizeText(summary).trim();
 
-  // 1. Check for disallowed narrative prefixes
+  // 1. Check for disallowed narrative prefixes (including intent modality like '打算', '准备', '计划')
   const disallowedPrefix = findDisallowedNarrativePrefix(normalized);
   if (disallowedPrefix) {
     return {
@@ -149,7 +201,8 @@ function checkHeaderImperativeMood(summary, lineNum = 1) {
       ruleId: 'CMG-STY-007',
       category: 'imperative_mood',
       term: disallowedPrefix,
-      reason: '提交标题必须使用祈使句（以标准祈使动词开头），严禁使用陈述句、过去式或被动完成态描述。',
+      isHighDebt: true,
+      reason: '提交标题必须使用祈使句（以标准祈使动词开头），严禁使用陈述句、过去式、未决意图词（如打算/准备/计划）或被动描述。',
       guidance: `将前缀 '${disallowedPrefix}' 改写为明确的祈使动词（如 '新增'、'修复'、'重构'、'优化'）。`,
     };
   }
@@ -163,6 +216,7 @@ function checkHeaderImperativeMood(summary, lineNum = 1) {
       ruleId: 'CMG-STY-007',
       category: 'imperative_mood',
       term: summary.substring(0, 6),
+      isHighDebt: true,
       reason: '提交标题摘要缺少清晰的祈使句开头动词。',
       guidance: '标题摘要首词应使用标准祈使动词（如 新增、修复、重构、对齐、加固、消除 等）。',
     };
@@ -183,6 +237,7 @@ function checkHeaderImperativeMood(summary, lineNum = 1) {
       ruleId: 'CMG-STY-007',
       category: 'imperative_mood',
       term: verb,
+      isHighDebt: true,
       reason: '提交标题使用了非祈使句叙述口吻。',
       guidance: `建议使用标准祈使动词（如 '新增'、'修复'、'重构'、'对齐' 等）替换 '${verb}'。`,
     };
@@ -194,15 +249,18 @@ function checkHeaderImperativeMood(summary, lineNum = 1) {
 /**
  * Checks for first-person pronouns and non-objective narrative perspective (CMG-STY-008).
  *
- * @param {string} line - Source line
+ * @param {string} line - Source line (already masked for code blocks)
  * @param {number} lineNum - Line index
+ * @param {string} [rawDisplayLine] - Original unmasked line for diagnostic rendering
  * @returns {Array<object>} Findings
  */
-function checkZeroPOV(line, lineNum) {
+function checkZeroPOV(line, lineNum, rawDisplayLine = '') {
   const findings = [];
-  if (!line || line.trim().startsWith('#')) return findings;
+  if (!line || line.trim().startsWith('#') || line.includes('__CODE_BLOCK__')) return findings;
 
-  // Mask code blocks and URLs
+  const displayLine = (rawDisplayLine || line).trim();
+
+  // Mask inline code blocks and URLs
   const sanitized = line.replace(/`[^`]+`/g, ' ').replace(/https?:\/\/[^\s]+/g, ' ');
 
   // Chinese first-person pronouns: sort by length descending to match longest first
@@ -212,10 +270,11 @@ function checkZeroPOV(line, lineNum) {
     if (prose.includes(pronoun)) {
       findings.push({
         lineNum,
-        rawLine: line.trim(),
+        rawLine: displayLine,
         ruleId: 'CMG-STY-008',
         category: 'zero_pov',
         term: pronoun,
+        isHighDebt: true,
         reason: 'Git 提交信息属于长期客观技术档案，必须使用零人称/客观第三人称视角，严禁使用第一人称主观代词。',
         guidance: `移除第一人称代词 '${pronoun}'，采用直接陈述客观技术事实的祈使句或无主语句。`,
       });
@@ -229,10 +288,11 @@ function checkZeroPOV(line, lineNum) {
   if (enMatch) {
     findings.push({
       lineNum,
-      rawLine: line.trim(),
+      rawLine: displayLine,
       ruleId: 'CMG-STY-008',
       category: 'zero_pov',
       term: enMatch[0],
+      isHighDebt: true,
       reason: 'Commit messages must maintain an objective third-person / zero-POV tone; first-person pronouns are forbidden.',
       guidance: `Replace first-person pronoun '${enMatch[0]}' with objective declarative or imperative phrasing.`,
     });
@@ -246,20 +306,23 @@ function checkZeroPOV(line, lineNum) {
  *
  * @param {string} line - Source line
  * @param {number} lineNum - Line index
+ * @param {string} [rawDisplayLine] - Original unmasked line
  * @returns {Array<object>} Findings
  */
-function checkProjectNomenclature(line, lineNum) {
+function checkProjectNomenclature(line, lineNum, rawDisplayLine = '') {
   const findings = [];
-  if (!line) return findings;
+  if (!line || line.includes('__CODE_BLOCK__')) return findings;
 
+  const displayLine = (rawDisplayLine || line).trim();
   for (const [misnomer, canonical] of PROJECT_NOMENCLATURE_MAP.entries()) {
     if (line.toLowerCase().includes(misnomer) && !line.includes(canonical)) {
       findings.push({
         lineNum,
-        rawLine: line.trim(),
+        rawLine: displayLine,
         ruleId: 'CMG-PRJ-001',
         category: 'nomenclature_drift',
         term: misnomer,
+        isHighDebt: false,
         reason: `检测到非标准项目名称标识 '${misnomer}'，项目专有名词应严格保持单源一致。`,
         guidance: `将 '${misnomer}' 规范化为官方标准名称 '${canonical}'。`,
       });
@@ -294,7 +357,7 @@ function calculateShannonEntropy(tokens) {
  * Performs full guardrail analysis on a structured commit message.
  *
  * @param {string} content - Full commit message
- * @returns {{ findings: Array<object>, styleScore: number, entropy: number }}
+ * @returns {{ findings: Array<object>, styleScore: number, entropy: number, highDebtCount: number, parsedStructure: object }}
  */
 function auditCommitStyleGuardrails(content) {
   const parsed = parseCommitStructure(content);
@@ -308,26 +371,36 @@ function auditCommitStyleGuardrails(content) {
     }
   }
 
-  // 2. Line-by-line Zero-POV (CMG-STY-008) & Project Nomenclature
-  for (let i = 0; i < parsed.allLines.length; i++) {
-    const line = parsed.allLines[i];
-    const povFindings = checkZeroPOV(line, i + 1);
+  // 2. Line-by-line Zero-POV (CMG-STY-008) & Project Nomenclature using masked code blocks
+  const auditLines = parsed.maskedLines || parsed.allLines;
+  for (let i = 0; i < auditLines.length; i++) {
+    const line = auditLines[i];
+    const rawLine = parsed.allLines[i] || line;
+
+    const povFindings = checkZeroPOV(line, i + 1, rawLine);
     findings.push(...povFindings);
 
-    const nomFindings = checkProjectNomenclature(line, i + 1);
+    const nomFindings = checkProjectNomenclature(line, i + 1, rawLine);
     findings.push(...nomFindings);
   }
 
-  // 3. Information entropy evaluation
-  const tokenData = extractBilingualTokens(content);
+  // 3. Information entropy evaluation using single-pass FMM with global Trie
+  const tokenData = extractBilingualTokens(content, GLOBAL_VOCABULARY_TRIE);
   const entropy = calculateShannonEntropy(tokenData.allTokens);
 
-  // 4. Composite Style Score
+  // 4. Composite Style Score & High Debt quantification
   let deductions = 0;
+  let highDebtCount = 0;
   for (const f of findings) {
-    if (f.ruleId === 'CMG-STY-007') deductions += 15;
-    if (f.ruleId === 'CMG-STY-008') deductions += 10;
-    if (f.ruleId === 'CMG-PRJ-001') deductions += 5;
+    if (f.ruleId === 'CMG-STY-007') {
+      deductions += 15;
+      highDebtCount += 1;
+    } else if (f.ruleId === 'CMG-STY-008') {
+      deductions += 10;
+      highDebtCount += 1;
+    } else if (f.ruleId === 'CMG-PRJ-001') {
+      deductions += 5;
+    }
   }
   const styleScore = Math.max(0, 100 - deductions);
 
@@ -335,6 +408,7 @@ function auditCommitStyleGuardrails(content) {
     findings,
     styleScore,
     entropy,
+    highDebtCount,
     parsedStructure: parsed,
   };
 }

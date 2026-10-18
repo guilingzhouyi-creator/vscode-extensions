@@ -20,6 +20,8 @@ const fs = require('fs');
 const path = require('path');
 const { normalizeText } = require('./commit-tokenizer');
 const { auditCommitStyleGuardrails } = require('./commit-style-arbiter');
+const { evaluateDebtCorridor } = require('./tech-debt-corridor');
+const { recordCommitGuardrailAudit } = require('./commit-guardrail-logger');
 
 const TERMS_FILE = path.join(__dirname, 'commit-msg-forbidden-terms.json');
 
@@ -194,46 +196,46 @@ function checkExecutionSectionNumeric(rawLine, lineNum, rule) {
 }
 
 /**
- * Checks a commit message string for prohibited terms and execution numeric rules.
- * @param {string} content - Full commit message
- * @returns {{ valid: boolean, findings: Array<object> }} Validation result with findings
+ * Scans individual lines of a commit message against lexical patterns and numeric constraints.
+ *
+ * @param {string[]} lines - Split text lines of the commit message.
+ * @param {string[]|undefined} maskedLines - Masked lines with code blocks redacted.
+ * @param {Array<object>} rules - Active forbidden rules.
+ * @param {string[]} whitelist - Allowed term exceptions.
+ * @param {object|undefined} rule6 - Execution numeric forbidden rule (CMG-STY-006).
+ * @returns {Array<object>} List of detected rule violation findings.
  */
-function validateCommitMessageContent(content) {
-  const normalized = normalizeText(content);
-  const config = loadTermsConfig();
-  const rules = config.rules || config.forbiddenRules || [];
-  const whitelist = config.whitelist || [];
-  const rule6 = rules.find((r) => r.id === 'CMG-STY-006');
-
-  const lines = normalized.split(/\r?\n/);
-  const findings = [];
-  let inExecutionSection = false;
-
+function auditLinesLexicalRules(lines, maskedLines, rules, whitelist, rule6) {
   const EXECUTION_HEADER_REGEX = /^\s*(?:\[|#{1,4}\s*|\b)(?:Verification|Execution|验证|执行|测试)(?:[\s\/\]:]|$)/i;
   const OTHER_HEADER_REGEX = /^\s*(?:\[|#{1,4}\s*|\b)(?:Project|Why|Added|Changed|Fixed|Removed|Refactor|Docs|Chore|项目|项目归属|动机|背景|新增|变更|修改|修复|删除)(?:[\s\/\]:]|$)/i;
 
-  // 1. Structural style guardrail auditing (CMG-STY-007 imperative mood, CMG-STY-008 zero-POV, CMG-PRJ-001 nomenclature)
-  const guardrailResult = auditCommitStyleGuardrails(normalized);
-  findings.push(...guardrailResult.findings);
+  const activeLexicalRules = rules.filter(
+    (r) => r.id !== 'CMG-STY-007' && r.id !== 'CMG-STY-008' && r.id !== 'CMG-STY-006' && r.id !== 'CMG-PRJ-001'
+  );
 
-  // 2. Lexical & numeric constraint verification
+  const findings = [];
+  let inExecutionSection = false;
+
   for (let i = 0; i < lines.length; i++) {
     const rawLine = lines[i];
     if (/^\s*#/.test(rawLine) || !rawLine.trim()) continue;
 
+    // Skip lines inside multiline Markdown code blocks
+    if (maskedLines && maskedLines[i] && maskedLines[i].includes('__CODE_BLOCK__')) {
+      continue;
+    }
+
     if (EXECUTION_HEADER_REGEX.test(rawLine)) {
       inExecutionSection = true;
       continue;
-    } else if (OTHER_HEADER_REGEX.test(rawLine)) {
+    }
+    if (OTHER_HEADER_REGEX.test(rawLine)) {
       inExecutionSection = false;
     }
 
     const sanitizedLine = sanitizeLineForChecking(rawLine, whitelist);
 
-    for (const rule of rules) {
-      if (rule.id === 'CMG-STY-007' || rule.id === 'CMG-STY-008' || rule.id === 'CMG-STY-006' || rule.id === 'CMG-PRJ-001') {
-        continue;
-      }
+    for (const rule of activeLexicalRules) {
       findings.push(...checkPatternMatch(sanitizedLine, rawLine, i + 1, rule));
       findings.push(...checkAsciiMatch(sanitizedLine, rawLine, i + 1, rule));
     }
@@ -243,7 +245,76 @@ function validateCommitMessageContent(content) {
     }
   }
 
-  return { valid: findings.length === 0, findings, guardrail: guardrailResult };
+  return findings;
+}
+
+/**
+ * Checks a commit message string for prohibited terms, execution numeric rules,
+ * imperative mood contracts, and elastic technical debt corridor limits.
+ *
+ * @param {string} content - Full commit message
+ * @param {object} [options={}] - Optional execution options (e.g. logDir, skipLog)
+ * @returns {{ valid: boolean, isPermittedUnderCorridor: boolean, findings: Array<object>, guardrail: object, debtVerdict: object }}
+ */
+function validateCommitMessageContent(content, options = {}) {
+  const normalized = normalizeText(content);
+  const config = loadTermsConfig();
+  const rules = config.rules || config.forbiddenRules || [];
+  const whitelist = config.whitelist || [];
+  const rule6 = rules.find((r) => r.id === 'CMG-STY-006');
+
+  const lines = normalized.split(/\r?\n/);
+  const findings = [];
+
+  // 1. Structural style guardrail auditing (CMG-STY-007 imperative mood, CMG-STY-008 zero-POV, CMG-PRJ-001 nomenclature)
+  const guardrailResult = auditCommitStyleGuardrails(normalized);
+  findings.push(...guardrailResult.findings);
+
+  // 2. Lexical & numeric constraint verification
+  const maskedLines = guardrailResult.parsedStructure?.maskedLines;
+  findings.push(...auditLinesLexicalRules(lines, maskedLines, rules, whitelist, rule6));
+
+  // 3. Elastic High-Risk Technical Debt Corridor Evaluation
+  const commitType = guardrailResult.parsedStructure?.type || '';
+  const debtVerdict = evaluateDebtCorridor({
+    findings,
+    styleScore: guardrailResult.styleScore,
+    commitType,
+    logDir: options.logDir,
+  });
+
+  // 4. Centralized telemetry & audit logging (persists both clean passes and intercepted blocks)
+  if (!options.skipLog) {
+    recordCommitGuardrailAudit(
+      {
+        status: debtVerdict.status,
+        styleScore: guardrailResult.styleScore,
+        entropy: guardrailResult.entropy,
+        tokenStats: {
+          totalLines: lines.length,
+          highDebtCount: guardrailResult.highDebtCount,
+        },
+        headerAudit: {
+          type: guardrailResult.parsedStructure?.type || '',
+          scope: guardrailResult.parsedStructure?.scope || '',
+          summary: guardrailResult.parsedStructure?.summary || '',
+        },
+        debtCorridor: debtVerdict,
+        findings,
+      },
+      options.logDir
+    );
+  }
+
+  const isPermittedUnderCorridor = debtVerdict.status !== 'BLOCK';
+
+  return {
+    valid: findings.length === 0,
+    isPermittedUnderCorridor,
+    findings,
+    guardrail: guardrailResult,
+    debtVerdict,
+  };
 }
 
 /**
@@ -309,6 +380,11 @@ const TEST_CASES = [
   { name: 'CAT-08 Chinese First-Person Pronouns Violation', msg: 'feat(core): 重构分词器实现\n\n[Project: governance]\n[Why]\n我们在本次改动中优化了架构。\n\n[Verification]\n断言测试成立。', expectRule: 'CMG-STY-008', expectValid: false },
   { name: 'CAT-08 English First-Person Pronouns Violation', msg: 'feat(core): refactor tokenizer implementation\n\n[Project: governance]\n[Why]\nWe refactored the tokenizer.\n\n[Verification]\nAssert tests pass.', expectRule: 'CMG-STY-008', expectValid: false },
   { name: 'CAT-02 Adversarial Zero-Width Evasion Normalization', msg: 'feat(core): 完\u200B美实现分词器\n\n[Project: governance]\n[Why]\n提高稳定性。\n\n[Verification]\n断言测试成立。', expectRule: 'CMG-STY-002', expectValid: false },
+  { name: 'CAT-07 English Verb Participle (-ing)', msg: 'feat(core): adding new features to pipeline\n\n[Project: governance]\n[Why]\nEnhance features.\n\n[Verification]\nAssert tests pass.', expectRule: 'CMG-STY-007', expectValid: false },
+  { name: 'CAT-07 English Verb Third Person (-s)', msg: 'fix(core): fixes parser crash on edge cases\n\n[Project: governance]\n[Why]\nPrevent crash.\n\n[Verification]\nAssert tests pass.', expectRule: 'CMG-STY-007', expectValid: false },
+  { name: 'CAT-07 Chinese Intentional Modality (打算)', msg: 'feat(core): 打算支持新分词协议\n\n[Project: governance]\n[Why]\n规范演进。\n\n[Verification]\n断言测试成立。', expectRule: 'CMG-STY-007', expectValid: false },
+  { name: 'CAT-07 Chinese Intentional Modality (计划)', msg: 'feat(core): 计划重构分词器\n\n[Project: governance]\n[Why]\n规范演进。\n\n[Verification]\n断言测试成立。', expectRule: 'CMG-STY-007', expectValid: false },
+  { name: 'Whitelist Multiline Code Block Masking', msg: 'feat(core): 重构分词器实现\n\n[Project: governance]\n[Why]\n代码样例如下：\n```typescript\n// In code block, we use temp variables and subjective words:\nconst we = 1;\nlet temp = "for now";\n```\n\n[Verification]\n运行自测试卷。', expectValid: true },
   { name: 'Whitelist Academic Test Oracle Context', msg: 'feat(rules): 引入脆性断言神谕与差分神谕检测器\n\n[Project: auto-refactor]\n[Why]\n学术测试理论中的测试神谕（Test Oracle）用于判定程序行为。\n\n[Verification]\n运行断言神谕检测套件。', expectValid: true },
 ];
 

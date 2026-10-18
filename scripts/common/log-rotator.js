@@ -36,6 +36,9 @@ const PROTECTED_SNAPSHOT_FILES = new Set([
   'audit-latest.json',
   'audit-latest.md',
   'audit-history.jsonl',
+  'commit-guardrail-latest.json',
+  'commit-guardrail-history.jsonl',
+  'tech-debt-ledger.json',
 ]);
 
 /**
