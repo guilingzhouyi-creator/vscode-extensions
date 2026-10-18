@@ -611,3 +611,47 @@ jobs:
         if: steps.scope.outputs.run == 'true'
         working-directory: auto-refactor
         run: npm run gate
+
+  # ─── fractal-git 核心引擎门禁（Rust 9大微 Crate 回归套件）───
+  fractal-git:
+    name: fractal-git gate (check/tests)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect fractal-git changes
+        id: scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          BEFORE="${{ github.event.before }}"
+          if [[ -z "$BEFORE" || "$BEFORE" == 0000000000000000000000000000000000000000 ]]; then
+            BEFORE=$(git rev-parse HEAD~1 2>/dev/null || echo "$GITHUB_SHA")
+          fi
+          if git diff --name-only "$BEFORE" "$GITHUB_SHA" | grep -q '^fractal-git/'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::fractal-git/ 无变更 → 门禁空跑跳过。"
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup Rust toolchain
+        if: steps.scope.outputs.run == 'true'
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cargo check
+        if: steps.scope.outputs.run == 'true'
+        working-directory: fractal-git
+        run: cargo check --all-targets
+
+      - name: Cargo test
+        if: steps.scope.outputs.run == 'true'
+        working-directory: fractal-git
+        run: cargo test

@@ -29,6 +29,7 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "../..")).Path
 $nodeCmd = if ($IsWindows -or $env:OS -match "Windows") { "node.exe" } else { "node" }
 $npmCmd = if ($IsWindows -or $env:OS -match "Windows") { "npm.cmd" } else { "npm" }
 $pythonCmd = if (Get-Command python3.12 -ErrorAction SilentlyContinue) { "python3.12" } elseif (Get-Command python -ErrorAction SilentlyContinue) { "python" } elseif (Get-Command python3 -ErrorAction SilentlyContinue) { "python3" } else { "py" }
+$cargoCmd = if (Get-Command cargo -ErrorAction SilentlyContinue) { "cargo" } else { $null }
 
 if ($ViewLog) {
     & $nodeCmd (Join-Path $repoRoot "scripts/common/log-rotator.js") --view
@@ -69,10 +70,13 @@ function Write-PreCommitFailure {
             'Gate 7: Rules Registry*' { 'PC-03-01' }
             'Gate 7: Skills*' { 'PC-03-02' }
             'Gate 8: workspace-timing Compilation*' { 'PC-04-01' }
+            'Gate 8: workspace-timing Fast Tests*' { 'PC-04-01' }
             'Gate 8: workspace-timing Text Layout*' { 'PC-04-02' }
             'Gate 8: workspace-timing Layout Build*' { 'PC-04-02' }
             'Gate 8: auto-refactor Compilation*' { 'PC-04-03' }
+            'Gate 8: auto-refactor Impacted Unit Tests*' { 'PC-04-03' }
             'Gate 8: WebGames*' { 'PC-04-04' }
+            'Gate 8: fractal-git Compilation*' { 'PC-04-05' }
             'Gate 9: Dual-Scale Volume*' { 'PC-05-02' }
             default { 'PC-00-00' }
         }
@@ -248,6 +252,7 @@ if (-not $Agent) { Write-Host "[8/9] 检查相关项目增量编译与语法..."
 $hasWtCompile = $stagedFiles | Where-Object { $_ -match "^workspace-timing/(src/.+\.ts|tsconfig.*\.json)" }
 $hasArCompile = $stagedFiles | Where-Object { $_ -match "^auto-refactor/(src/.+\.ts|tsconfig.*\.json)" }
 $hasWgAudit = $stagedFiles | Where-Object { $_ -match "^WebGames/(config/|scripts/py/audit_config\.py)" }
+$hasFgCompile = $stagedFiles | Where-Object { $_ -match "^fractal-git/(crates/.+\.rs|src/.+\.rs|Cargo\.(toml|lock))" }
 
 if ($hasWtCompile) {
     if (-not $Agent) { Write-Host "  ▶ 触发 workspace-timing 增量编译校验..." -ForegroundColor Cyan }
@@ -270,6 +275,33 @@ if ($hasWtCompile) {
         if ($process.ExitCode -ne 0) {
             Write-Host "❌ [FAIL] Gate 8: workspace-timing 编译失败！" -ForegroundColor Red
             $failed = $true
+        }
+    }
+
+    if (-not $failed) {
+        if (-not $Agent) { Write-Host "  ▶ 触发 workspace-timing 增量快速单测 (npm run test:fast)..." -ForegroundColor Cyan }
+        if ($Agent) {
+            $outFast = Invoke-ChildCommand -WorkingDir (Join-Path $repoRoot "workspace-timing") -Action { & $npmCmd run test:fast 2>&1 }
+            if ($LASTEXITCODE -ne 0) {
+                $json = Write-PreCommitFailure `
+                    -StepName "Gate 8: workspace-timing Fast Tests" `
+                    -RuleId "GATE-SYS-001" `
+                    -Summary "Unit tests failed in workspace-timing." `
+                    -ActionableFix "Run 'npm run test:fast' in workspace-timing and resolve failing tests." `
+                    -VerifyCmd "npm --prefix workspace-timing run test:fast" `
+                    -TargetFiles @("workspace-timing/src") `
+                    -Details ($outFast -join "`n")
+                Write-Output $json
+                exit 1
+            }
+        } else {
+            $pFast = Start-Process -FilePath $npmCmd -ArgumentList "run", "test:fast" -WorkingDirectory (Join-Path $repoRoot "workspace-timing") -NoNewWindow -PassThru -Wait
+            if ($pFast.ExitCode -ne 0) {
+                Write-Host "❌ [FAIL] Gate 8: workspace-timing 快速单测未通过！" -ForegroundColor Red
+                $failed = $true
+            } else {
+                Write-Host "  ✔ [PASS] workspace-timing 快速单元测试通过 (205 tests)" -ForegroundColor Green
+            }
         }
     }
 } elseif (-not $Agent -and ($stagedFiles | Where-Object { $_ -match "^workspace-timing/" })) {
@@ -349,6 +381,41 @@ if ($hasArCompile) {
             $failed = $true
         }
     }
+
+    if (-not $failed) {
+        $arStagedCode = @($stagedFiles | Where-Object { $_ -match "^auto-refactor/(src|tests/unit)/.+\.ts$" })
+        if ($arStagedCode -and $arStagedCode.Count -gt 0) {
+            $arRelArgs = @($arStagedCode | ForEach-Object { $_ -replace "^auto-refactor/", "" })
+            if (-not $Agent) { Write-Host "  ▶ 触发 auto-refactor 增量影响单元测试 (vitest related)..." -ForegroundColor Cyan }
+            $npxCmd = if ($IsWindows -or $env:OS -match "Windows") { "npx.cmd" } else { "npx" }
+            if ($Agent) {
+                $outVitest = Invoke-ChildCommand -WorkingDir (Join-Path $repoRoot "auto-refactor") -Action {
+                    & $npxCmd vitest related $arRelArgs --run 2>&1
+                }
+                if ($LASTEXITCODE -ne 0) {
+                    $json = Write-PreCommitFailure `
+                        -StepName "Gate 8: auto-refactor Impacted Unit Tests" `
+                        -RuleId "GATE-SYS-001" `
+                        -Summary "Impacted unit tests failed in auto-refactor." `
+                        -ActionableFix "Run 'npx vitest related $($arRelArgs -join ' ') --run' in auto-refactor." `
+                        -VerifyCmd "npx --prefix auto-refactor vitest related $($arRelArgs -join ' ') --run" `
+                        -TargetFiles $arStagedCode `
+                        -Details ($outVitest -join "`n")
+                    Write-Output $json
+                    exit 1
+                }
+            } else {
+                $vArgs = @("vitest", "related") + $arRelArgs + @("--run")
+                $pVitest = Start-Process -FilePath $npxCmd -ArgumentList $vArgs -WorkingDirectory (Join-Path $repoRoot "auto-refactor") -NoNewWindow -PassThru -Wait
+                if ($pVitest.ExitCode -ne 0) {
+                    Write-Host "❌ [FAIL] Gate 8: auto-refactor 增量影响单测未通过！" -ForegroundColor Red
+                    $failed = $true
+                } else {
+                    Write-Host "  ✔ [PASS] auto-refactor 增量影响单测通过" -ForegroundColor Green
+                }
+            }
+        }
+    }
 } elseif (-not $Agent -and ($stagedFiles | Where-Object { $_ -match "^auto-refactor/" })) {
     Write-Host "  ✔ [Gate 8] auto-refactor 仅文档/配置变更，跳过增量编译" -ForegroundColor Green
 }
@@ -376,6 +443,42 @@ if ($hasWgAudit) {
             $failed = $true
         }
     }
+}
+
+if ($hasFgCompile) {
+    if (-not $Agent) { Write-Host "  ▶ 触发 fractal-git 增量编译与语法校验 (cargo check)..." -ForegroundColor Cyan }
+    if ($cargoCmd) {
+        $fgToml = Join-Path $repoRoot "fractal-git/Cargo.toml"
+        if ($Agent) {
+            $out = & $cargoCmd check --manifest-path $fgToml --all-targets 2>&1
+            if ($LASTEXITCODE -ne 0) {
+                $json = Write-PreCommitFailure `
+                    -StepName "Gate 8: fractal-git Compilation (L0-COMPILE)" `
+                    -RuleId "L0-COMPILE" `
+                    -Summary "Cargo check compilation failed in fractal-git." `
+                    -ActionableFix "Run 'cargo check --manifest-path fractal-git/Cargo.toml --all-targets' and resolve compiler errors." `
+                    -VerifyCmd "cargo check --manifest-path fractal-git/Cargo.toml --all-targets" `
+                    -TargetFiles @("fractal-git/Cargo.toml") `
+                    -Details ($out -join "`n")
+                Write-Output $json
+                exit 1
+            }
+        } else {
+            $process = Start-Process -FilePath $cargoCmd -ArgumentList "check", "--manifest-path", $fgToml, "--all-targets" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
+            if ($process.ExitCode -ne 0) {
+                Write-Host "❌ [FAIL] Gate 8: fractal-git 增量编译未通过！" -ForegroundColor Red
+                $failed = $true
+            } else {
+                Write-Host "  ✔ [PASS] fractal-git 增量编译与语法校验通过" -ForegroundColor Green
+            }
+        }
+    } else {
+        if (-not $Agent) {
+            Write-Host "  ⚠️ 未检测到 cargo 命令，跳过 fractal-git 本地编译校验（将在 CI 门禁中强制验证）" -ForegroundColor Yellow
+        }
+    }
+} elseif (-not $Agent -and ($stagedFiles | Where-Object { $_ -match "^fractal-git/" })) {
+    Write-Host "  ✔ [Gate 8] fractal-git 仅文档/配置变更，跳过增量编译" -ForegroundColor Green
 }
 
 # --- Gate 9: 暂存区增量 AST 切片质量与复杂度审查 ---

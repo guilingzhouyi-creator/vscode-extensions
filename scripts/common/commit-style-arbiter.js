@@ -68,6 +68,7 @@ const PROJECT_NOMENCLATURE_MAP = new Map([
   ['workspacetiming', 'workspace-timing'],
   ['timing扩展', 'workspace-timing'],
   ['网页游戏', 'WebGames'],
+  ['fractalgit', 'fractal-git'],
 ]);
 
 /** Academic test theory terms permitted under formal verification context */

@@ -25,6 +25,7 @@ export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$ROOT_DIR}"
 NODE_BIN=$(command -v node 2>/dev/null || command -v node.exe 2>/dev/null || echo "node")
 NPM_BIN=$(command -v npm 2>/dev/null || command -v npm.cmd 2>/dev/null || echo "npm")
 PYTHON_BIN=$(command -v python3.12 2>/dev/null || command -v python3 2>/dev/null || command -v python 2>/dev/null || command -v py 2>/dev/null || echo "python3")
+CARGO_BIN=$(command -v cargo 2>/dev/null || echo "")
 
 AGENT_MODE=0
 for arg in "$@"; do
@@ -70,10 +71,13 @@ record_pre_commit_failure() {
         "Gate 7: Rules Registry"*) step_id="PC-03-01" ;;
         "Gate 7: Skills"*) step_id="PC-03-02" ;;
         "Gate 8: workspace-timing Compilation"*) step_id="PC-04-01" ;;
+        "Gate 8: workspace-timing Fast Tests"*) step_id="PC-04-01" ;;
         "Gate 8: workspace-timing Text Layout"*) step_id="PC-04-02" ;;
         "Gate 8: workspace-timing Layout Build"*) step_id="PC-04-02" ;;
         "Gate 8: auto-refactor Compilation"*) step_id="PC-04-03" ;;
+        "Gate 8: auto-refactor Impacted Unit Tests"*) step_id="PC-04-03" ;;
         "Gate 8: WebGames"*) step_id="PC-04-04" ;;
+        "Gate 8: fractal-git Compilation"*) step_id="PC-04-05" ;;
         "Gate 9: Dual-Scale Volume"*) step_id="PC-05-02" ;;
         *) step_id="PC-00-00" ;;
     esac
@@ -214,6 +218,7 @@ fi
 TOUCHED_WT_COMPILE=$(echo "$STAGED_FILES" | grep -E '^workspace-timing/(src/.+\.ts|tsconfig.*\.json)' || true)
 TOUCHED_AR_COMPILE=$(echo "$STAGED_FILES" | grep -E '^auto-refactor/(src/.+\.ts|tsconfig.*\.json)' || true)
 TOUCHED_WG_AUDIT=$(echo "$STAGED_FILES" | grep -E '^WebGames/(config/|scripts/py/audit_config\.py)' || true)
+TOUCHED_FG_COMPILE=$(echo "$STAGED_FILES" | grep -E '^fractal-git/(crates/.+\.rs|src/.+\.rs|Cargo\.(toml|lock))' || true)
 
 if [[ -n "$TOUCHED_WT_COMPILE" ]]; then
     if [[ "$AGENT_MODE" -eq 1 ]]; then
@@ -233,6 +238,30 @@ if [[ -n "$TOUCHED_WT_COMPILE" ]]; then
             echo "❌ [FAIL] Gate 8: workspace-timing 编译失败！"
             tail -n 15 "$STEP_LOG" | sed 's/^/   /'
             FAILED=1
+        fi
+    fi
+
+    if [[ "$FAILED" -eq 0 ]]; then
+        if [[ "$AGENT_MODE" -eq 1 ]]; then
+            if ! (cd workspace-timing && "$NPM_BIN" run test:fast) >"$STEP_LOG" 2>&1; then
+                record_pre_commit_failure "Gate 8: workspace-timing Fast Tests" \
+                    "GATE-SYS-001" \
+                    "Unit tests failed in workspace-timing." \
+                    "Run 'npm run test:fast' in workspace-timing and resolve failing tests." \
+                    "npm --prefix workspace-timing run test:fast" \
+                    "workspace-timing/src"
+                cat "$ROOT_DIR/.audit-logs/last-failure.json"
+                exit 1
+            fi
+        else
+            echo "  ▶ 触发 workspace-timing 增量快速单测 (npm run test:fast)..."
+            if ! (cd workspace-timing && "$NPM_BIN" run test:fast) >"$STEP_LOG" 2>&1; then
+                echo "❌ [FAIL] Gate 8: workspace-timing 快速单测未通过！"
+                tail -n 15 "$STEP_LOG" | sed 's/^/   /'
+                FAILED=1
+            else
+                echo "  ✔ [PASS] workspace-timing 快速单元测试通过 (205 tests)"
+            fi
         fi
     fi
 elif [[ "$AGENT_MODE" -eq 0 ]] && echo "$STAGED_FILES" | grep -q '^workspace-timing/'; then
@@ -307,6 +336,34 @@ if [[ -n "$TOUCHED_AR_COMPILE" ]]; then
             FAILED=1
         fi
     fi
+
+    if [[ "$FAILED" -eq 0 ]]; then
+        AR_STAGED_TS=$(echo "$STAGED_FILES" | grep -E '^auto-refactor/(src|tests/unit)/.+\.ts$' || true)
+        if [[ -n "$AR_STAGED_TS" ]]; then
+            AR_REL_FILES=$(echo "$AR_STAGED_TS" | sed 's|^auto-refactor/||' | tr '\n' ' ')
+            if [[ "$AGENT_MODE" -eq 1 ]]; then
+                if ! (cd auto-refactor && npx vitest related "$AR_REL_FILES" --run) >"$STEP_LOG" 2>&1; then
+                    record_pre_commit_failure "Gate 8: auto-refactor Impacted Unit Tests" \
+                        "GATE-SYS-001" \
+                        "Impacted unit tests failed in auto-refactor." \
+                        "Run 'npx vitest related ... --run' in auto-refactor." \
+                        "npx --prefix auto-refactor vitest related \"$AR_REL_FILES\" --run" \
+                        "auto-refactor/src"
+                    cat "$ROOT_DIR/.audit-logs/last-failure.json"
+                    exit 1
+                fi
+            else
+                echo "  ▶ 触发 auto-refactor 增量影响单元测试 (vitest related)..."
+                if ! (cd auto-refactor && npx vitest related "$AR_REL_FILES" --run) >"$STEP_LOG" 2>&1; then
+                    echo "❌ [FAIL] Gate 8: auto-refactor 增量影响单测未通过！"
+                    tail -n 15 "$STEP_LOG" | sed 's/^/   /'
+                    FAILED=1
+                else
+                    echo "  ✔ [PASS] auto-refactor 增量影响单测通过"
+                fi
+            fi
+        fi
+    fi
 elif [[ "$AGENT_MODE" -eq 0 ]] && echo "$STAGED_FILES" | grep -q '^auto-refactor/'; then
     echo "  ✔ [Gate 8] auto-refactor 仅文档/配置变更，跳过增量编译"
 fi
@@ -331,6 +388,40 @@ if [[ -n "$TOUCHED_WG_AUDIT" ]]; then
             FAILED=1
         fi
     fi
+fi
+
+if [[ -n "$TOUCHED_FG_COMPILE" ]]; then
+    if [[ "$AGENT_MODE" -eq 0 ]]; then
+        echo "  ▶ 触发 fractal-git 增量编译与语法校验 (cargo check)..."
+    fi
+    if [[ -n "$CARGO_BIN" ]]; then
+        if [[ "$AGENT_MODE" -eq 1 ]]; then
+            if ! "$CARGO_BIN" check --manifest-path fractal-git/Cargo.toml --all-targets >"$STEP_LOG" 2>&1; then
+                record_pre_commit_failure "Gate 8: fractal-git Compilation (L0-COMPILE)" \
+                    "L0-COMPILE" \
+                    "Cargo check compilation failed in fractal-git." \
+                    "Run 'cargo check --manifest-path fractal-git/Cargo.toml --all-targets' and resolve compiler errors." \
+                    "cargo check --manifest-path fractal-git/Cargo.toml --all-targets" \
+                    "fractal-git/Cargo.toml"
+                cat "$ROOT_DIR/.audit-logs/last-failure.json"
+                exit 1
+            fi
+        else
+            if ! "$CARGO_BIN" check --manifest-path fractal-git/Cargo.toml --all-targets >"$STEP_LOG" 2>&1; then
+                echo "❌ [FAIL] Gate 8: fractal-git 增量编译未通过！"
+                tail -n 15 "$STEP_LOG" | sed 's/^/   /'
+                FAILED=1
+            else
+                echo "  ✔ [PASS] fractal-git 增量编译与语法校验通过"
+            fi
+        fi
+    else
+        if [[ "$AGENT_MODE" -eq 0 ]]; then
+            echo "  ⚠️ 未检测到 cargo 命令，跳过 fractal-git 本地编译校验（将在 CI 门禁中强制验证）"
+        fi
+    fi
+elif [[ "$AGENT_MODE" -eq 0 ]] && echo "$STAGED_FILES" | grep -q '^fractal-git/'; then
+    echo "  ✔ [Gate 8] fractal-git 仅文档/配置变更，跳过增量编译"
 fi
 
 # --- Gate 9: 暂存区增量 AST 切片质量与复杂度审查 ---

@@ -37,10 +37,14 @@ const SCAN_ROOTS = Object.freeze([
   'WebGames/backend',
   'WebGames/frontend',
   'WebGames/tests',
+  'fractal-git/src',
+  'fractal-git/crates',
+  'fractal-git/scripts',
+  'fractal-git/tests',
 ]);
 
-const SCAN_EXTENSIONS = new Set(['.js', '.ts', '.ps1', '.sh', '.yml', '.yaml', '.py', '.json', '.gd']);
-const IGNORED_DIRS = new Set(['node_modules', 'dist', 'out', 'archive', '.git']);
+const SCAN_EXTENSIONS = new Set(['.js', '.ts', '.ps1', '.sh', '.yml', '.yaml', '.py', '.json', '.gd', '.rs', '.toml']);
+const IGNORED_DIRS = new Set(['node_modules', 'dist', 'out', 'archive', '.git', 'target']);
 const EXCLUDED_PATTERNS = Object.freeze([
   /rule-catalog\.json$/,
   /rule-sources\//,

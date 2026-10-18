@@ -62,7 +62,7 @@ function Show-CommitTemplateGuide {
     Write-Host "<type>(<scope>): <祈使句中文摘要标题，5~80 字符，不以句号结尾>" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "[Project / 项目归属]" -ForegroundColor Cyan
-    Write-Host "- <workspace-timing | auto-refactor | WebGames | governance>" -ForegroundColor Gray
+    Write-Host "- <workspace-timing | auto-refactor | WebGames | fractal-git | governance>" -ForegroundColor Gray
     Write-Host ""
     Write-Host "[Why / 动机背景]" -ForegroundColor Cyan
     Write-Host "- 业务背景、关联需求 ID 或解决的核心痛点。" -ForegroundColor Gray
@@ -309,16 +309,16 @@ foreach ($bLine in $bodyLines) {
 
 if ($commitType -in @('feat', 'fix', 'refactor', 'perf')) {
     if (-not $foundProjectHeader) {
-        Stop-CommitMsg -RuleId "CMG-PRJ-001" -Message "Rule 5.1 (CMG-PRJ-001): 关键生产级提交 ($commitType) 缺少项目归属格式区！" -Expected "[Project: workspace-timing | auto-refactor | WebGames | governance]" -ActionableFix "在正文首个结构化区块声明 [Project / 项目归属]"
+        Stop-CommitMsg -RuleId "CMG-PRJ-001" -Message "Rule 5.1 (CMG-PRJ-001): 关键生产级提交 ($commitType) 缺少项目归属格式区！" -Expected "[Project: workspace-timing | auto-refactor | WebGames | fractal-git | governance]" -ActionableFix "在正文首个结构化区块声明 [Project / 项目归属]"
     }
 
     if ($declaredProjects.Count -eq 0) {
-        Stop-CommitMsg -RuleId "CMG-PRJ-001" -Message "Rule 5.1 (CMG-PRJ-001): [Project / 项目归属] 区块未声明任何项目名称！" -Expected "workspace-timing | auto-refactor | WebGames | governance" -ActionableFix "指定合法的项目归属名称"
+        Stop-CommitMsg -RuleId "CMG-PRJ-001" -Message "Rule 5.1 (CMG-PRJ-001): [Project / 项目归属] 区块未声明任何项目名称！" -Expected "workspace-timing | auto-refactor | WebGames | fractal-git | governance" -ActionableFix "指定合法的项目归属名称"
     }
 }
 
 if ($declaredProjects.Count -gt 0) {
-    $validNorm = @('workspace-timing', 'auto-refactor', 'webgames', 'web-games', 'governance')
+    $validNorm = @('workspace-timing', 'auto-refactor', 'webgames', 'web-games', 'fractal-git', 'fractalgit', 'governance')
     $invalidProjects = @()
     foreach ($p in $declaredProjects) {
         $pNorm = $p.ToLower()
@@ -328,7 +328,7 @@ if ($declaredProjects.Count -gt 0) {
     }
 
     if ($invalidProjects.Count -gt 0) {
-        Stop-CommitMsg -RuleId "CMG-PRJ-001" -Message "Rule 5.1 (CMG-PRJ-001): 声明的项目归属包含未授权/非法的项目标识: $($invalidProjects -join ', ')" -Actual ($invalidProjects -join ', ') -Expected "workspace-timing | auto-refactor | WebGames | governance" -ActionableFix "纠正项目名称为合法枚举之一"
+        Stop-CommitMsg -RuleId "CMG-PRJ-001" -Message "Rule 5.1 (CMG-PRJ-001): 声明的项目归属包含未授权/非法的项目标识: $($invalidProjects -join ', ')" -Actual ($invalidProjects -join ', ') -Expected "workspace-timing | auto-refactor | WebGames | fractal-git | governance" -ActionableFix "纠正项目名称为合法枚举之一"
     }
 }
 

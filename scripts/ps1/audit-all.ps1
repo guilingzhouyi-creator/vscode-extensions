@@ -188,6 +188,7 @@ if (-not $env:XDG_CONFIG_HOME) { $env:XDG_CONFIG_HOME = (Get-Location).Path }
 $nodeCmd = if ($IsWindows -or $env:OS -match "Windows") { "node.exe" } else { "node" }
 $npmCmd = if ($IsWindows -or $env:OS -match "Windows") { "npm.cmd" } else { "npm" }
 $pythonCmd = if (Get-Command python3.12 -ErrorAction SilentlyContinue) { "python3.12" } elseif (Get-Command python -ErrorAction SilentlyContinue) { "python" } elseif (Get-Command python3 -ErrorAction SilentlyContinue) { "python3" } else { "py" }
+$cargoCmd = if (Get-Command cargo.exe -ErrorAction SilentlyContinue) { "cargo.exe" } elseif (Get-Command cargo -ErrorAction SilentlyContinue) { "cargo" } else { $null }
 
 if (-not $Json -and -not $Agent) {
     Write-Host "=================================================================" -ForegroundColor Cyan
@@ -243,14 +244,16 @@ if ($codeCatalog -ne 0 -or $codeSkills -ne 0) {
     $statusRules = "PASS"
 }
 
-# 3~5. 并行并发调度 workspace-timing、WebGames 与 auto-refactor 三大项目审查
+# 3~6. 并行并发调度 workspace-timing、WebGames、auto-refactor 与 fractal-git 四大项目审查
 $workspaceTimingDir = Join-Path $repoRoot "workspace-timing"
 $autoRefactorDir = Join-Path $repoRoot "auto-refactor"
+$fractalGitDir = Join-Path $repoRoot "fractal-git"
 
 if (-not $Json -and -not $Agent) {
-    Write-Host "▶ [3/5] 并行调度 workspace-timing 审查 (VS Code 扩展)..." -ForegroundColor Gray
-    Write-Host "▶ [4/5] 并行调度 WebGames 领域配置与架构审查..." -ForegroundColor Gray
-    Write-Host "▶ [5/5] 并行调度 auto-refactor 静态引擎多维自审与质量门禁..." -ForegroundColor Gray
+    Write-Host "▶ [3/6] 并行调度 workspace-timing 审查 (VS Code 扩展)..." -ForegroundColor Gray
+    Write-Host "▶ [4/6] 并行调度 WebGames 领域配置与架构审查..." -ForegroundColor Gray
+    Write-Host "▶ [5/6] 并行调度 auto-refactor 静态引擎多维自审与质量门禁..." -ForegroundColor Gray
+    Write-Host "▶ [6/6] 并行调度 fractal-git 9大微 Crate 回归套件 (Rust)..." -ForegroundColor Gray
 }
 
 $logWtOut = Join-Path $transientDir "audit-wt-$randSuffix.out.log"
@@ -261,6 +264,8 @@ $logArOut = Join-Path $transientDir "audit-ar-$randSuffix.out.log"
 $logArErr = Join-Path $transientDir "audit-ar-$randSuffix.err.log"
 $logArSelfOut = Join-Path $transientDir "audit-ar-self-$randSuffix.out.log"
 $logArSelfErr = Join-Path $transientDir "audit-ar-self-$randSuffix.err.log"
+$logFgOut = Join-Path $transientDir "audit-fg-$randSuffix.out.log"
+$logFgErr = Join-Path $transientDir "audit-fg-$randSuffix.err.log"
 
 $procWt = Start-Process -FilePath $npmCmd -ArgumentList @("run", "review") -WorkingDirectory $workspaceTimingDir -RedirectStandardOutput $logWtOut -RedirectStandardError $logWtErr -PassThru
 $procWg = if ($Fast) {
@@ -273,18 +278,40 @@ $procAr = if ($Fast) {
 } else {
     Start-Process -FilePath $nodeCmd -ArgumentList @("scripts/test-parallel.js") -WorkingDirectory $autoRefactorDir -RedirectStandardOutput $logArOut -RedirectStandardError $logArErr -PassThru
 }
+$procFg = if ($cargoCmd) {
+    if ($Fast) {
+        Start-Process -FilePath $cargoCmd -ArgumentList @("check", "--manifest-path", "fractal-git/Cargo.toml", "--all-targets") -WorkingDirectory $repoRoot -RedirectStandardOutput $logFgOut -RedirectStandardError $logFgErr -PassThru
+    } else {
+        Start-Process -FilePath $cargoCmd -ArgumentList @("test", "--manifest-path", "fractal-git/Cargo.toml") -WorkingDirectory $repoRoot -RedirectStandardOutput $logFgOut -RedirectStandardError $logFgErr -PassThru
+    }
+} else {
+    $null
+}
 
 $timeoutWt = if ($Fast) { 60 } else { 120 }
 $timeoutWg = if ($Fast) { 60 } else { 120 }
 $timeoutAr = if ($Fast) { 90 } else { 240 }
+$timeoutFg = if ($Fast) { 60 } else { 120 }
 
 $wtClean = Wait-ProcessWithTimeout -Process $procWt -TimeoutSeconds $timeoutWt -ProcessName "workspace-timing" -LogFiles @($logWtOut, $logWtErr)
 $wgClean = Wait-ProcessWithTimeout -Process $procWg -TimeoutSeconds $timeoutWg -ProcessName "WebGames" -LogFiles @($logWgOut, $logWgErr)
 $arClean = Wait-ProcessWithTimeout -Process $procAr -TimeoutSeconds $timeoutAr -ProcessName "auto-refactor" -LogFiles @($logArOut, $logArErr)
+$fgClean = if ($procFg) {
+    Wait-ProcessWithTimeout -Process $procFg -TimeoutSeconds $timeoutFg -ProcessName "fractal-git" -LogFiles @($logFgOut, $logFgErr)
+} else {
+    $true
+}
 
 $statusWt = if ($wtClean -and $procWt.ExitCode -eq 0) { "PASS" } else { "FAIL" }
 $statusWg = if ($wgClean -and $procWg.ExitCode -eq 0) { "PASS" } else { "FAIL" }
 $statusAr = if ($arClean -and $procAr.ExitCode -eq 0) { "PASS" } else { "FAIL" }
+$statusFg = if ($null -eq $procFg) {
+    "PASS"
+} elseif ($fgClean -and $procFg.ExitCode -eq 0) {
+    "PASS"
+} else {
+    "FAIL"
+}
 
 if (-not $Fast -and $statusAr -eq "PASS") {
     $procGateSelf = Start-Process -FilePath $nodeCmd -ArgumentList @("scripts/gate-self.js") -WorkingDirectory $autoRefactorDir -RedirectStandardOutput $logArSelfOut -RedirectStandardError $logArSelfErr -PassThru
@@ -327,6 +354,17 @@ if ($statusAr -ne "PASS") {
         }
     }
 }
+if ($statusFg -ne "PASS") {
+    $failed = $true
+    if (-not $Json) {
+        Write-Host "❌ fractal-git 审查未通过:" -ForegroundColor Red
+        foreach ($logFile in @($logFgOut, $logFgErr)) {
+            if (Test-Path $logFile) {
+                Get-Content $logFile -Encoding utf8 | Select-Object -Last 15 | ForEach-Object { Write-Host "   $_" -ForegroundColor DarkRed }
+            }
+        }
+    }
+}
 
 if ($failed) {
     try {
@@ -347,6 +385,10 @@ if ($failed) {
             if (Test-Path $logArOut) { Copy-Item -Path $logArOut -Destination (Join-Path $diagDir "fail-auto-refactor-$timestamp.out.log") -Force -ErrorAction SilentlyContinue }
             if (Test-Path $logArErr) { Copy-Item -Path $logArErr -Destination (Join-Path $diagDir "fail-auto-refactor-$timestamp.err.log") -Force -ErrorAction SilentlyContinue }
         }
+        if ($statusFg -ne "PASS") {
+            if (Test-Path $logFgOut) { Copy-Item -Path $logFgOut -Destination (Join-Path $diagDir "fail-fractal-git-$timestamp.out.log") -Force -ErrorAction SilentlyContinue }
+            if (Test-Path $logFgErr) { Copy-Item -Path $logFgErr -Destination (Join-Path $diagDir "fail-fractal-git-$timestamp.err.log") -Force -ErrorAction SilentlyContinue }
+        }
         Write-Host "💡 失败审查完整日志已保留至: .audit-logs/" -ForegroundColor Yellow
         Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/log-rotator.js", "--prune" -WorkingDirectory $repoRoot -NoNewWindow -Wait -ErrorAction SilentlyContinue
     } catch {
@@ -354,7 +396,7 @@ if ($failed) {
     }
 }
 
-Remove-Item -Path $logArOut, $logArErr, $logArSelfOut, $logArSelfErr, $logWtOut, $logWtErr, $logWgOut, $logWgErr -Force -ErrorAction SilentlyContinue
+Remove-Item -Path $logArOut, $logArErr, $logArSelfOut, $logArSelfErr, $logWtOut, $logWtErr, $logWgOut, $logWgErr, $logFgOut, $logFgErr -Force -ErrorAction SilentlyContinue
 
 $startTime.Stop()
 $elapsedSec = [math]::Round($startTime.Elapsed.TotalSeconds, 2)
@@ -586,6 +628,9 @@ $scoreWg = if ($statusWg -eq "PASS") {
     [math]::Max($SCORE_FLOOR, [math]::Round($baseWg - 60.0, 1))
 }
 
+# 6. fractal-git 质量基线得分（基于 cargo test 9 大微 Crate 回归达标判定）
+$scoreFg = if ($statusFg -eq "PASS") { 100.0 } else { $SCORE_FLOOR }
+
 $polyglotBreakdown = $null
 try {
     $polyglotScript = Join-Path $repoRoot "scripts\common\evaluate-polyglot-balance.js"
@@ -605,9 +650,9 @@ try {
     # Non-blocking evaluator failure
 }
 
-# 全工作区综合健康分（五大核心子系统基石分平权加权各占 20%：0.2 * (Hygiene + Rules + AR + WT + WG)）
+# 全工作区综合健康分（六大核心子系统基石分平权加权各占 1/6：(Hygiene + Rules + AR + WT + WG + FG) / 6.0）
 $workspaceHealthScore = [math]::Round(
-    0.2 * ($scoreHygiene + $scoreRules + $scoreAr + $scoreWt + $scoreWg),
+    ($scoreHygiene + $scoreRules + $scoreAr + $scoreWt + $scoreWg + $scoreFg) / 6.0,
     2
 )
 $wsHealthStr = if ($workspaceHealthScore % 1 -eq 0) { $workspaceHealthScore.ToString("0.0") } else { $workspaceHealthScore.ToString("0.##") }
@@ -651,6 +696,7 @@ $summary = [ordered]@{
         autoRefactor = $statusAr
         workspaceTiming = $statusWt
         webGames = $statusWg
+        fractalGit = $statusFg
     }
     projectScores = [ordered]@{
         hygiene = $scoreHygiene
@@ -658,6 +704,7 @@ $summary = [ordered]@{
         autoRefactor = $scoreAr
         workspaceTiming = $scoreWt
         webGames = $scoreWg
+        fractalGit = $scoreFg
     }
     arCompositeScore = $compositeScore
     tenDimensions = $qualityVectorObj
@@ -684,6 +731,7 @@ if ($Agent) {
         autoRefactor = $statusAr
         workspaceTiming = $statusWt
         webGames = $statusWg
+        fractalGit = $statusFg
     }
     $failedSubsystems = @()
     if ($statusHygiene -ne "PASS") { $failedSubsystems += "hygiene" }
@@ -691,6 +739,7 @@ if ($Agent) {
     if ($statusAr -ne "PASS") { $failedSubsystems += "auto-refactor" }
     if ($statusWt -ne "PASS") { $failedSubsystems += "workspace-timing" }
     if ($statusWg -ne "PASS") { $failedSubsystems += "WebGames" }
+    if ($statusFg -ne "PASS") { $failedSubsystems += "fractal-git" }
 
     $envelope = [ordered]@{
         protocolVersion = "1.0.0"
@@ -701,7 +750,7 @@ if ($Agent) {
         summary = if ($failed) {
             "Unified workspace review failed with violations in: $($failedSubsystems -join ', ')."
         } else {
-            "All workspace quality checks passed across 5 core subsystems."
+            "All workspace quality checks passed across 6 core subsystems."
         }
         compositeHealth = [double]$wsHealthStr
         grade = $wsGrade
@@ -730,7 +779,7 @@ if ($autonomyRate) { $summaryText += " | 自研率: {0}%" -f $autonomyRate }
 if ($null -ne $polyglotIndex) { $summaryText += " | 语言均衡: {0}" -f $polyglotIndex }
 Write-Host (Format-DashboardRow (" " + $summaryText) $targetWidth) -ForegroundColor White
 
-$sepTitle1 = "─ [全工作区五大核心子系统基石得分] "
+$sepTitle1 = "─ [全工作区六大核心子系统基石得分] "
 $sep1 = "├" + $sepTitle1 + ("─" * ($targetWidth - (Get-DisplayWidth $sepTitle1))) + "┤"
 Write-Host $sep1 -ForegroundColor Cyan
 
@@ -739,7 +788,8 @@ $sysDefinitions = @(
     @{ num = " 2."; name = "单源规则目录";     score = $scoreRules;   note = "($($catalogRuleCount)规则/SSOT)" },
     @{ num = " 3."; name = "auto-refactor";    score = $scoreAr;      note = "(CLI静态引擎基线)" },
     @{ num = " 4."; name = "workspace-timing"; score = $scoreWt;      note = "(VSCode扩展门禁)" },
-    @{ num = " 5."; name = "WebGames配置架构"; score = $scoreWg;      note = "(卡拉尔领域配置)" }
+    @{ num = " 5."; name = "WebGames配置架构"; score = $scoreWg;      note = "(卡拉尔领域配置)" },
+    @{ num = " 6."; name = "fractal-git";      score = $scoreFg;      note = "(9微Crate/Rust)" }
 )
 
 foreach ($sys in $sysDefinitions) {

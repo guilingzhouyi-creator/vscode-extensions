@@ -1,7 +1,7 @@
 {
   "schema": "global-tooling-rules/v1",
   "generatedAt": "2026-10-17T14:47:38.915Z",
-  "totalRules": 16,
+  "totalRules": 17,
   "rules": [
     {
       "id": "ARCH-ABS-001",
@@ -20,6 +20,12 @@
       "family": "GATE",
       "severity": "error",
       "summary": "Pre-commit gate staged AST slice complexity (CC <= 15), nesting depth (Depth <= 4), and noise ratio guard"
+    },
+    {
+      "id": "GATE-ENT-001",
+      "family": "GATE",
+      "severity": "error",
+      "summary": "Change Shannon entropy and diffusion guard: prevents chaotic cross-domain modifications exceeding cognitive budgets"
     },
     {
       "id": "GATE-ISO-001",

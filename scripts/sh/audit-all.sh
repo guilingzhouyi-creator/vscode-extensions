@@ -25,6 +25,7 @@ export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$ROOT_DIR}"
 NODE_BIN=$(command -v node 2>/dev/null || command -v node.exe 2>/dev/null || echo "node")
 NPM_BIN=$(command -v npm 2>/dev/null || command -v npm.cmd 2>/dev/null || echo "npm")
 PYTHON_BIN=$(command -v python3 2>/dev/null || command -v python 2>/dev/null || command -v py 2>/dev/null || echo "python3")
+CARGO_BIN=$(command -v cargo 2>/dev/null || command -v cargo.exe 2>/dev/null || echo "")
 
 FAST_MODE=0
 JSON_MODE=0
@@ -92,7 +93,8 @@ LOG_WT=$(mktemp)
 LOG_WG=$(mktemp)
 LOG_AR=$(mktemp)
 LOG_AR_SELF=$(mktemp)
-trap 'rm -f "$LOG_WT" "$LOG_WG" "$LOG_AR" "$LOG_AR_SELF" "$LOG_HYGIENE"' EXIT
+LOG_FG=$(mktemp)
+trap 'rm -f "$LOG_WT" "$LOG_WG" "$LOG_AR" "$LOG_AR_SELF" "$LOG_FG" "$LOG_HYGIENE"' EXIT
 
 # 辅助函数: 带看门狗超时的后台进程等待机制
 wait_with_timeout() {
@@ -144,14 +146,15 @@ wait_with_timeout() {
     return 0
 }
 
-# 3~5. 并行并发调度 workspace-timing、WebGames 与 auto-refactor 三大项目审查
+# 3~6. 并行并发调度 workspace-timing、WebGames、auto-refactor 与 fractal-git 四大项目审查
 if [[ "$JSON_MODE" -eq 0 && "$AGENT_MODE" -eq 0 ]]; then
-    echo "▶ [3/5] 并行调度 workspace-timing 审查 (VS Code 扩展)..."
-    echo "▶ [4/5] 并行调度 WebGames 领域配置与架构审查..."
-    echo "▶ [5/5] 并行调度 auto-refactor 静态引擎多维自审与质量门禁..."
+    echo "▶ [3/6] 并行调度 workspace-timing 审查 (VS Code 扩展)..."
+    echo "▶ [4/6] 并行调度 WebGames 领域配置与架构审查..."
+    echo "▶ [5/6] 并行调度 auto-refactor 静态引擎多维自审与质量门禁..."
+    echo "▶ [6/6] 并行调度 fractal-git 9大微 Crate 回归套件 (Rust)..."
 fi
 
-# 并发拉起三大项目审查任务 (后台异步派发)
+# 并发拉起四大项目审查任务 (后台异步派发)
 (cd workspace-timing && "$NPM_BIN" run review) >"$LOG_WT" 2>&1 &
 PID_WT=$!
 
@@ -170,10 +173,22 @@ else
     PID_AR=$!
 fi
 
+if [[ -n "$CARGO_BIN" ]]; then
+    if [[ "$FAST_MODE" -eq 1 ]]; then
+        ("$CARGO_BIN" check --manifest-path fractal-git/Cargo.toml --all-targets) >"$LOG_FG" 2>&1 &
+    else
+        ("$CARGO_BIN" test --manifest-path fractal-git/Cargo.toml) >"$LOG_FG" 2>&1 &
+    fi
+    PID_FG=$!
+else
+    PID_FG=""
+fi
+
 # 看门狗超时守卫：防止子进程挂起导致审查无限阻塞
 TIMEOUT_WT=$([[ "$FAST_MODE" -eq 1 ]] && echo 60 || echo 120)
 TIMEOUT_WG=$([[ "$FAST_MODE" -eq 1 ]] && echo 60 || echo 120)
 TIMEOUT_AR=$([[ "$FAST_MODE" -eq 1 ]] && echo 90 || echo 240)
+TIMEOUT_FG=$([[ "$FAST_MODE" -eq 1 ]] && echo 60 || echo 120)
 
 STATUS_WT="PASS"
 CODE_WT=0
@@ -197,6 +212,16 @@ wait_with_timeout "$PID_AR" "$TIMEOUT_AR" "auto-refactor" "$LOG_AR" || CODE_AR=$
 if [[ "$CODE_AR" -ne 0 ]]; then
     STATUS_AR="FAIL"
     FAILED=1
+fi
+
+STATUS_FG="PASS"
+CODE_FG=0
+if [[ -n "$PID_FG" ]]; then
+    wait_with_timeout "$PID_FG" "$TIMEOUT_FG" "fractal-git" "$LOG_FG" || CODE_FG=$?
+    if [[ "$CODE_FG" -ne 0 ]]; then
+        STATUS_FG="FAIL"
+        FAILED=1
+    fi
 fi
 
 if [[ "$FAST_MODE" -eq 0 && "$STATUS_AR" == "PASS" ]]; then
@@ -231,6 +256,13 @@ if [[ "$STATUS_AR" != "PASS" ]]; then
     fi
 fi
 
+if [[ "$STATUS_FG" != "PASS" ]]; then
+    if [[ "$JSON_MODE" -eq 0 && "$AGENT_MODE" -eq 0 && -s "$LOG_FG" ]]; then
+        echo "❌ fractal-git 审查未通过:"
+        tail -n 15 "$LOG_FG" | sed 's/^/   /'
+    fi
+fi
+
 if [[ "$FAILED" -ne 0 ]]; then
     DIAG_DIR="$ROOT_DIR/.audit-logs"
     mkdir -p "$DIAG_DIR" 2>/dev/null || true
@@ -238,11 +270,12 @@ if [[ "$FAILED" -ne 0 ]]; then
     [[ "$STATUS_WT" != "PASS" && -s "$LOG_WT" ]] && cp "$LOG_WT" "$DIAG_DIR/fail-workspace-timing-$TIMESTAMP.log" 2>/dev/null || true
     [[ "$STATUS_WG" != "PASS" && -s "$LOG_WG" ]] && cp "$LOG_WG" "$DIAG_DIR/fail-webgames-$TIMESTAMP.log" 2>/dev/null || true
     [[ "$STATUS_AR" != "PASS" && -s "$LOG_AR" ]] && cp "$LOG_AR" "$DIAG_DIR/fail-auto-refactor-$TIMESTAMP.log" 2>/dev/null || true
+    [[ "$STATUS_FG" != "PASS" && -s "$LOG_FG" ]] && cp "$LOG_FG" "$DIAG_DIR/fail-fractal-git-$TIMESTAMP.log" 2>/dev/null || true
     echo "💡 失败审查完整日志已保留至: .audit-logs/" >&2
     "$NODE_BIN" "$ROOT_DIR/scripts/common/log-rotator.js" --prune >/dev/null 2>&1 || true
 fi
 
-rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF"
+rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF" "$LOG_FG"
 
 # 统一合并执行报告、十维质量看板与步骤摘要生成（消除多进程重复启动）
 "$NODE_BIN" -e '
@@ -264,6 +297,7 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF"
   const codeSkills = Number(process.argv[13] || 0);
   const hygieneReportFile = process.argv[16] || "";
   const codeGi = Number(process.argv[17] || 0);
+  const statusFg = process.argv[18] || "PASS";
   const baselineFile = path.join(rootDir, "auto-refactor", "reports", "self-audit-baseline.json");
   const wtReportFile = path.join(rootDir, "workspace-timing", "reports", "review", "report-latest.json");
   const summaryFile = process.env.GITHUB_STEP_SUMMARY;
@@ -396,6 +430,7 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF"
     baseWg = statusWg === "PASS" ? 100.0 : SCORE_FLOOR;
   }
   const scoreWg = statusWg === "PASS" ? baseWg : Math.max(SCORE_FLOOR, Number((baseWg - 60.0).toFixed(1)));
+  const scoreFg = statusFg === "PASS" ? 100.0 : SCORE_FLOOR;
 
   let polyglotIndex = null;
   let polyglotBreakdown = null;
@@ -415,8 +450,8 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF"
     }
   } catch (_) {}
 
-  // 全工作区综合健康分（五大核心子系统基石分平权加权各占 20%：0.2 * (Hygiene + Rules + AR + WT + WG)）
-  const workspaceHealthScore = Number((0.2 * (scoreHygiene + scoreRules + scoreAr + scoreWt + scoreWg)).toFixed(2));
+  // 全工作区综合健康分（六大核心子系统基石分平权加权各占 1/6：(Hygiene + Rules + AR + WT + WG + FG) / 6.0）
+  const workspaceHealthScore = Number(((scoreHygiene + scoreRules + scoreAr + scoreWt + scoreWg + scoreFg) / 6.0).toFixed(2));
   const wsHealthStr = workspaceHealthScore % 1 === 0 ? workspaceHealthScore.toFixed(1) : String(workspaceHealthScore);
 
   function getGradeTag(score) {
@@ -462,14 +497,16 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF"
       rulesCatalog: statusRules,
       autoRefactor: statusAr,
       workspaceTiming: statusWt,
-      webGames: statusWg
+      webGames: statusWg,
+      fractalGit: statusFg
     },
     projectScores: {
       hygiene: scoreHygiene,
       rulesCatalog: scoreRules,
       autoRefactor: scoreAr,
       workspaceTiming: scoreWt,
-      webGames: scoreWg
+      webGames: scoreWg,
+      fractalGit: scoreFg
     },
     arCompositeScore: compositeScore,
     tenDimensions,
@@ -492,7 +529,8 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF"
       rules: statusRules,
       autoRefactor: statusAr,
       workspaceTiming: statusWt,
-      webGames: statusWg
+      webGames: statusWg,
+      fractalGit: statusFg
     };
     const failedSubsystems = [];
     if (statusHygiene !== "PASS") failedSubsystems.push("hygiene");
@@ -500,6 +538,7 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF"
     if (statusAr !== "PASS") failedSubsystems.push("auto-refactor");
     if (statusWt !== "PASS") failedSubsystems.push("workspace-timing");
     if (statusWg !== "PASS") failedSubsystems.push("WebGames");
+    if (statusFg !== "PASS") failedSubsystems.push("fractal-git");
 
     const envelope = {
       protocolVersion: "1.0.0",
@@ -509,7 +548,7 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF"
       exitCode: failed ? 1 : 0,
       summary: failed
         ? `Unified workspace review failed with violations in: ${failedSubsystems.join(", ")}.`
-        : "All workspace quality checks passed across 5 core subsystems.",
+        : "All workspace quality checks passed across 6 core subsystems.",
       compositeHealth: workspaceHealthScore,
       grade: wsGrade,
       subsystems: subsystemsStatus,
@@ -577,7 +616,7 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF"
   const borderMid = "├" + "─".repeat(targetWidth) + "┤";
   const borderBot = "└" + "─".repeat(targetWidth) + "┘";
 
-  const sepTitle1 = "─ [全工作区五大核心子系统基石得分] ";
+  const sepTitle1 = "─ [全工作区六大核心子系统基石得分] ";
   const sep1 = "├" + sepTitle1 + "─".repeat(targetWidth - strWidth(sepTitle1)) + "┤";
 
   const sepTitle2 = "─ [auto-refactor 静态引擎十维工程质量全景指数] ";
@@ -602,7 +641,8 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF"
     { num: " 2.", name: "单源规则目录",     score: scoreRules,   note: `(${catalogRuleCount}规则/SSOT)` },
     { num: " 3.", name: "auto-refactor",    score: scoreAr,      note: "(CLI静态引擎基线)" },
     { num: " 4.", name: "workspace-timing", score: scoreWt,      note: "(VSCode扩展门禁)" },
-    { num: " 5.", name: "WebGames配置架构", score: scoreWg,      note: "(卡拉尔领域配置)" }
+    { num: " 5.", name: "WebGames配置架构", score: scoreWg,      note: "(卡拉尔领域配置)" },
+    { num: " 6.", name: "fractal-git",      score: scoreFg,      note: "(9微Crate/Rust)" }
   ];
 
   for (const sys of sysDefinitions) {
@@ -674,14 +714,15 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF"
     const pStr = polyglotIndex !== null ? ` &nbsp;|&nbsp; **语言均衡**: **${polyglotIndex}**` : "";
     const dStr = totalDebt !== null ? ` &nbsp;|&nbsp; **技术债总量**: **${totalDebt} 项**` : "";
     md += `> **综合健康分**: **${wsHealthStr}**${gStr}${aStr}${pStr}${dStr}\n\n`;
-    md += "### 📊 全工作区五大核心子系统基石得分\n\n";
+    md += "### 📊 全工作区六大核心子系统基石得分\n\n";
     md += "| 序号 | 核心子系统 | 判定结果 | 归一化得分 | 进度可视化 | 覆盖说明 |\n";
     md += "| :---: | :--- | :---: | :---: | :--- | :--- |\n";
     md += `| 1 | 工作区物理卫生 | ${passBadge(statusHygiene)} | ${scoreHygiene.toFixed(1)} | \`[${makeBar(scoreHygiene, 20)}]\` | 全仓零空文件/同构契约 |\n`;
     md += `| 2 | 单源规则目录 | ${passBadge(statusRules)} | ${scoreRules.toFixed(1)} | \`[${makeBar(scoreRules, 20)}]\` | ${catalogRuleCount}规则/SSOT一致性 |\n`;
     md += `| 3 | auto-refactor | ${passBadge(statusAr)} | ${scoreAr.toFixed(1)} | \`[${makeBar(scoreAr, 20)}]\` | CLI静态引擎质量基线 |\n`;
     md += `| 4 | workspace-timing | ${passBadge(statusWt)} | ${scoreWt.toFixed(1)} | \`[${makeBar(scoreWt, 20)}]\` | VSCode扩展审查门禁 |\n`;
-    md += `| 5 | WebGames配置架构 | ${passBadge(statusWg)} | ${scoreWg.toFixed(1)} | \`[${makeBar(scoreWg, 20)}]\` | 卡拉尔领域配置审查 |\n\n`;
+    md += `| 5 | WebGames配置架构 | ${passBadge(statusWg)} | ${scoreWg.toFixed(1)} | \`[${makeBar(scoreWg, 20)}]\` | 卡拉尔领域配置审查 |\n`;
+    md += `| 6 | fractal-git | ${passBadge(statusFg)} | ${scoreFg.toFixed(1)} | \`[${makeBar(scoreFg, 20)}]\` | 9微Crate/Rust回归套件 |\n\n`;
     md += `> **耗时**: ${elapsedSec}s &nbsp;|&nbsp; **全局状态**: ${globalStatus}\n\n`;
 
     md += "### 🎯 auto-refactor 静态引擎十维工程质量全景指数\n\n";
@@ -708,7 +749,7 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF"
       fs.appendFileSync(summaryFile, md, "utf8");
     } catch (_) {}
   }
-' "$START_TIME" "$FAILED" "$JSON_MODE" "$STATUS_HYGIENE" "$STATUS_RULES" "$STATUS_AR" "$STATUS_WT" "$STATUS_WG" "$ROOT_DIR" "$CODE_HYGIENE" "$CODE_ISO" "$CODE_CATALOG" "$CODE_SKILLS" "$FAST_MODE" "$AGENT_MODE" "$LOG_HYGIENE" "$CODE_GI"
+' "$START_TIME" "$FAILED" "$JSON_MODE" "$STATUS_HYGIENE" "$STATUS_RULES" "$STATUS_AR" "$STATUS_WT" "$STATUS_WG" "$ROOT_DIR" "$CODE_HYGIENE" "$CODE_ISO" "$CODE_CATALOG" "$CODE_SKILLS" "$FAST_MODE" "$AGENT_MODE" "$LOG_HYGIENE" "$CODE_GI" "$STATUS_FG"
 
 if [[ "$JSON_MODE" -eq 1 || "$AGENT_MODE" -eq 1 ]]; then
     exit "$FAILED"

@@ -22,12 +22,14 @@ const OUTPUT_FILE = path.join(__dirname, 'rule-catalog.json');
 const SOURCE_DIR = path.join(__dirname, 'rule-sources');
 const AUTO_REFACTOR_SOURCE = path.join(SOURCE_DIR, 'auto-refactor-rules.json');
 const WEBGAMES_SOURCE = path.join(SOURCE_DIR, 'webgames-rules.json');
+const FRACTAL_GIT_SOURCE = path.join(SOURCE_DIR, 'fractal-git-rules.json');
 const GLOBAL_SOURCE = path.join(SOURCE_DIR, 'global-rules.json');
 
 const PROJECT_COUNT_KEYS = Object.freeze({
   'auto-refactor': 'autoRefactor',
   'workspace-timing': 'workspaceTiming',
   WebGames: 'webGames',
+  'fractal-git': 'fractalGit',
   'global-tooling': 'globalTooling',
 });
 
@@ -133,6 +135,16 @@ function collectWebGamesRules() {
   }));
 }
 
+function collectFractalGitRules() {
+  return readRuleSource(FRACTAL_GIT_SOURCE, 'fractal-git rule catalog').map((r) => ({
+    id: r.id,
+    project: 'fractal-git',
+    family: r.family || r.id.split('-')[1] || 'FGT',
+    severity: r.severity || 'error',
+    summary: r.summary || '',
+  }));
+}
+
 function collectCommitMsgRules() {
   const termsFile = path.join(__dirname, 'commit-msg-forbidden-terms.json');
   if (!fs.existsSync(termsFile)) return [];
@@ -178,7 +190,7 @@ function collectGlobalToolingRules() {
  * @returns {Record<string, number>} Counts keyed by catalog project counters.
  */
 function buildProjectCounts(rules) {
-  const counts = { autoRefactor: 0, workspaceTiming: 0, webGames: 0, globalTooling: 0 };
+  const counts = { autoRefactor: 0, workspaceTiming: 0, webGames: 0, fractalGit: 0, globalTooling: 0 };
   for (const rule of rules) {
     const key = PROJECT_COUNT_KEYS[rule.project];
     if (key) counts[key] += 1;
@@ -215,11 +227,12 @@ function generate(checkOnly = false) {
   const arRules = collectAutoRefactorRules();
   const wtRules = collectWorkspaceTimingRules();
   const wgRules = collectWebGamesRules();
+  const fgRules = collectFractalGitRules();
   const globalRules = collectGlobalToolingRules();
 
   const ruleMap = new Map();
 
-  for (const r of [...arRules, ...wtRules, ...wgRules, ...globalRules]) {
+  for (const r of [...arRules, ...wtRules, ...wgRules, ...fgRules, ...globalRules]) {
     if (!ruleMap.has(r.id)) {
       ruleMap.set(r.id, r);
     }

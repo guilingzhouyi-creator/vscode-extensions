@@ -1,0 +1,67 @@
+{
+  "schema": "fractal-git-rules/v1",
+  "generatedAt": "2026-10-18T14:15:00.000Z",
+  "totalRules": 10,
+  "rules": [
+    {
+      "id": "FGT-COR-001",
+      "family": "COR",
+      "severity": "error",
+      "summary": "Core data model and error contract guard: Zero-panic Result propagation and immutable OID hashing semantics"
+    },
+    {
+      "id": "FGT-OBJ-001",
+      "family": "OBJ",
+      "severity": "error",
+      "summary": "Git object model serialization guard: Strict standard loose/pack object header format and SHA-1/SHA-256 dual compatibility"
+    },
+    {
+      "id": "FGT-IDX-001",
+      "family": "IDX",
+      "severity": "error",
+      "summary": "Lockless in-memory git index concurrency guard: Conflict stage resolution and lock-free slot allocation"
+    },
+    {
+      "id": "FGT-ALG-001",
+      "family": "ALG",
+      "severity": "error",
+      "summary": "Myers diff, 3-way merge, and FastCDC chunking algorithm boundary and determinism guard"
+    },
+    {
+      "id": "FGT-POL-001",
+      "family": "POL",
+      "severity": "error",
+      "summary": "Resource recycling pool bounded governor: Zero unbounded transient memory allocations and lifecycle reclamation"
+    },
+    {
+      "id": "FGT-STO-001",
+      "family": "STO",
+      "severity": "error",
+      "summary": "Storage layer crash safety: Append-only WAL journal consistency, loose ODB integrity, and CAS block deduplication"
+    },
+    {
+      "id": "FGT-TOP-001",
+      "family": "TOP",
+      "severity": "error",
+      "summary": "DAG topology traversal guard: Cycle detection, ancestor generation indexing, and branch divergence safety"
+    },
+    {
+      "id": "FGT-TRN-001",
+      "family": "TRN",
+      "severity": "error",
+      "summary": "Smart HTTP transport and packet-line streaming framing protocol compliance guard"
+    },
+    {
+      "id": "FGT-GAT-001",
+      "family": "GAT",
+      "severity": "error",
+      "summary": "Fractal Git domain gate guard: AST complexity constraints (CC <= 15), non-blocking I/O, and platform portability"
+    },
+    {
+      "id": "FGT-CAS-001",
+      "family": "CAS",
+      "severity": "error",
+      "summary": "LayerVFS CAS snapshot materializer bridge: Fixed-time O(1) page cache mapping and atomic tree commit"
+    }
+  ]
+}

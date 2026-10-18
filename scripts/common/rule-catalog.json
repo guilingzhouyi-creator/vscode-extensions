@@ -1,12 +1,13 @@
 {
   "schema": "workspace-rule-catalog/v1",
-  "generatedAt": "2026-10-18T06:48:59.859Z",
-  "totalRules": 473,
+  "generatedAt": "2026-10-18T14:14:44.884Z",
+  "totalRules": 484,
   "counts": {
     "autoRefactor": 353,
     "workspaceTiming": 49,
     "webGames": 50,
-    "globalTooling": 21
+    "fractalGit": 10,
+    "globalTooling": 22
   },
   "rules": [
     {
@@ -1151,6 +1152,76 @@
       "summary": "Expensive deep copy (.duplicate(true)) or blocking serialization/IO executed inside a loop."
     },
     {
+      "id": "FGT-ALG-001",
+      "project": "fractal-git",
+      "family": "ALG",
+      "severity": "error",
+      "summary": "Myers diff, 3-way merge, and FastCDC chunking algorithm boundary and determinism guard"
+    },
+    {
+      "id": "FGT-CAS-001",
+      "project": "fractal-git",
+      "family": "CAS",
+      "severity": "error",
+      "summary": "LayerVFS CAS snapshot materializer bridge: Fixed-time O(1) page cache mapping and atomic tree commit"
+    },
+    {
+      "id": "FGT-COR-001",
+      "project": "fractal-git",
+      "family": "COR",
+      "severity": "error",
+      "summary": "Core data model and error contract guard: Zero-panic Result propagation and immutable OID hashing semantics"
+    },
+    {
+      "id": "FGT-GAT-001",
+      "project": "fractal-git",
+      "family": "GAT",
+      "severity": "error",
+      "summary": "Fractal Git domain gate guard: AST complexity constraints (CC <= 15), non-blocking I/O, and platform portability"
+    },
+    {
+      "id": "FGT-IDX-001",
+      "project": "fractal-git",
+      "family": "IDX",
+      "severity": "error",
+      "summary": "Lockless in-memory git index concurrency guard: Conflict stage resolution and lock-free slot allocation"
+    },
+    {
+      "id": "FGT-OBJ-001",
+      "project": "fractal-git",
+      "family": "OBJ",
+      "severity": "error",
+      "summary": "Git object model serialization guard: Strict standard loose/pack object header format and SHA-1/SHA-256 dual compatibility"
+    },
+    {
+      "id": "FGT-POL-001",
+      "project": "fractal-git",
+      "family": "POL",
+      "severity": "error",
+      "summary": "Resource recycling pool bounded governor: Zero unbounded transient memory allocations and lifecycle reclamation"
+    },
+    {
+      "id": "FGT-STO-001",
+      "project": "fractal-git",
+      "family": "STO",
+      "severity": "error",
+      "summary": "Storage layer crash safety: Append-only WAL journal consistency, loose ODB integrity, and CAS block deduplication"
+    },
+    {
+      "id": "FGT-TOP-001",
+      "project": "fractal-git",
+      "family": "TOP",
+      "severity": "error",
+      "summary": "DAG topology traversal guard: Cycle detection, ancestor generation indexing, and branch divergence safety"
+    },
+    {
+      "id": "FGT-TRN-001",
+      "project": "fractal-git",
+      "family": "TRN",
+      "severity": "error",
+      "summary": "Smart HTTP transport and packet-line streaming framing protocol compliance guard"
+    },
+    {
       "id": "GATE-AST-001",
       "project": "auto-refactor",
       "family": "GATE",
@@ -1163,6 +1234,13 @@
       "family": "GATE",
       "severity": "warning",
       "summary": "Pre-commit gate runs unconstrained whole-repo test suites without staged-file filtering, risking budget overrun."
+    },
+    {
+      "id": "GATE-ENT-001",
+      "project": "global-tooling",
+      "family": "GATE",
+      "severity": "error",
+      "summary": "Change Shannon entropy and diffusion guard: prevents chaotic cross-domain modifications exceeding cognitive budgets"
     },
     {
       "id": "GATE-ERR-001",

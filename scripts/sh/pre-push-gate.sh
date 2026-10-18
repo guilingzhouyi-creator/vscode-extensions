@@ -25,6 +25,7 @@ export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$ROOT_DIR}"
 NODE_BIN=$(command -v node 2>/dev/null || command -v node.exe 2>/dev/null || echo "node")
 NPM_BIN=$(command -v npm 2>/dev/null || command -v npm.cmd 2>/dev/null || echo "npm")
 PYTHON_BIN=$(command -v python3.12 2>/dev/null || command -v python3 2>/dev/null || command -v python 2>/dev/null || command -v py 2>/dev/null || echo "python3")
+CARGO_BIN=$(command -v cargo 2>/dev/null || command -v cargo.exe 2>/dev/null || echo "")
 
 AGENT_MODE=0
 PUSHED_SHA=""
@@ -76,7 +77,8 @@ get_step_rule_id() {
     if [[ "$step_name" =~ "Gate 6" ]]; then echo "RCFG-MATRIX"; return; fi
     if [[ "$step_name" =~ "Gate 7" ]]; then echo "ARCH-CFG-001"; return; fi
     if [[ "$step_name" =~ "Gate 8" ]]; then echo "ADV-CFG-001"; return; fi
-    if [[ "$step_name" =~ "Gate 9" ]]; then echo "GATE-MSG-001"; return; fi
+    if [[ "$step_name" =~ "Gate 9" ]]; then echo "GATE-SYS-001"; return; fi
+    if [[ "$step_name" =~ "Gate 10" ]]; then echo "GATE-MSG-001"; return; fi
     echo "GATE-SYS-001"
 }
 
@@ -100,7 +102,8 @@ get_step_meta() {
         "Gate 6 (workspace-timing 审查门禁)") echo "PP-06-01|RCFG-MATRIX" ;;
         "Gate 7 (长期轨迹账本约束)") echo "PP-07-01|GOV-TRJ-001" ;;
         "Gate 8 (WebGames 全域质量门禁)") echo "PP-08-01|ADV-CFG-001" ;;
-        "Gate 9 (待推送分支提交历史风格与禁词审查)") echo "PP-09-01|CMG-STY-001" ;;
+        "Gate 9 (fractal-git 9大微 Crate 回归套件)") echo "PP-09-01|GATE-SYS-001" ;;
+        "Gate 10 (待推送分支提交历史风格与禁词审查)") echo "PP-10-01|CMG-STY-001" ;;
         *)
             local default_rule
             default_rule=$(get_step_rule_id "$step_name")
@@ -244,6 +247,7 @@ fi
 TOUCHED_AR=0
 TOUCHED_WT=0
 TOUCHED_WG=0
+TOUCHED_FG=0
 TOUCHED_SHARED=0
 PROJECT_COUNT=0
 
@@ -258,6 +262,8 @@ if [[ -n "$RANGE" ]]; then
                 TOUCHED_WT=1
             elif [[ "$f" =~ ^WebGames/ ]]; then
                 TOUCHED_WG=1
+            elif [[ "$f" =~ ^fractal-git/ ]]; then
+                TOUCHED_FG=1
             else
                 TOUCHED_SHARED=1
             fi
@@ -265,7 +271,7 @@ if [[ -n "$RANGE" ]]; then
     fi
 fi
 
-PROJECT_COUNT=$((TOUCHED_AR + TOUCHED_WT + TOUCHED_WG))
+PROJECT_COUNT=$((TOUCHED_AR + TOUCHED_WT + TOUCHED_WG + TOUCHED_FG))
 
 RUN_ALL=0
 if [[ -z "$RANGE" || "$TOUCHED_SHARED" -eq 1 || "$PROJECT_COUNT" -gt 1 || -z "${CHANGED_FILES:-}" ]]; then
@@ -275,6 +281,7 @@ fi
 RUN_AR=$([[ "$RUN_ALL" -eq 1 || "$TOUCHED_AR" -eq 1 ]] && echo 1 || echo 0)
 RUN_WT=$([[ "$RUN_ALL" -eq 1 || "$TOUCHED_WT" -eq 1 ]] && echo 1 || echo 0)
 RUN_WG=$([[ "$RUN_ALL" -eq 1 || "$TOUCHED_WG" -eq 1 ]] && echo 1 || echo 0)
+RUN_FG=$([[ "$RUN_ALL" -eq 1 || "$TOUCHED_FG" -eq 1 ]] && echo 1 || echo 0)
 
 if [[ "$RUN_ALL" -eq 1 ]]; then
     log_gate "ℹ️  检测到跨项目/共享治理改动或全量基准，执行全量门禁回归"
@@ -283,11 +290,12 @@ else
     [[ "$RUN_AR" -eq 1 ]] && ACTIVE_PROJ+=("auto-refactor")
     [[ "$RUN_WT" -eq 1 ]] && ACTIVE_PROJ+=("workspace-timing")
     [[ "$RUN_WG" -eq 1 ]] && ACTIVE_PROJ+=("WebGames")
+    [[ "$RUN_FG" -eq 1 ]] && ACTIVE_PROJ+=("fractal-git")
     log_gate "ℹ️  智能影响路由生效: 仅回归受影响项目 [$(IFS=', '; echo "${ACTIVE_PROJ[*]}") ]"
 fi
 
 # --- Gate 1: 全工作区零空文件、物理卫生、.gitignore 治理与五维代码密度守卫 ---
-log_gate "[1/9] 校验全工作区零物理空文件、空白脚本、.gitignore 治理与五维代码密度守卫..."
+log_gate "[1/10] 校验全工作区零物理空文件、空白脚本、.gitignore 治理与五维代码密度守卫..."
 GATE1_FAIL=0
 run_gate_step 30 "Gate 1 (物理卫生八维全域巡检)" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-physical-hygiene.js || GATE1_FAIL=1
 run_gate_step 30 "Gate 1 (.gitignore 治理)" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-gitignore-governance.js || GATE1_FAIL=1
@@ -303,7 +311,7 @@ else
 fi
 
 # --- Gate 2: 规则单源目录一致性同步 ---
-log_gate "[2/9] 校验全工作区单源规则目录同步..."
+log_gate "[2/10] 校验全工作区单源规则目录同步..."
 if ! run_gate_step 30 "Gate 2 (单源规则目录)" "$ROOT_DIR" "$NODE_BIN" scripts/common/generate-rule-catalog.js --check-only; then
     FAILED=1
 elif ! run_gate_step 30 "Gate 2 (规则 ID 闭包)" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-rule-id-closure.js; then
@@ -318,7 +326,7 @@ fi
 
 # --- Gate 3: auto-refactor 引擎全量门禁与回归套件 ---
 if [[ "$RUN_AR" -eq 1 ]]; then
-    log_gate "[3/9] 执行 auto-refactor 全量门禁与回归套件 (Rust/Build/Self/Tests)..."
+    log_gate "[3/10] 执行 auto-refactor 全量门禁与回归套件 (Rust/Build/Self/Tests)..."
     AR_FAIL=0
     run_gate_step 60 "auto-refactor Rust Gate" "$ROOT_DIR/auto-refactor" "$NODE_BIN" scripts/gate-rust.js || AR_FAIL=1
     run_gate_step 90 "auto-refactor Build" "$ROOT_DIR/auto-refactor" "$NPM_BIN" run build || AR_FAIL=1
@@ -337,7 +345,7 @@ fi
 
 # --- Gate 4: auto-refactor 多维自审与质量基线 ---
 if [[ "$RUN_AR" -eq 1 ]]; then
-    log_gate "[4/9] 执行 auto-refactor 质量基线与多维自审 (LOC预算/熵/密度/BIF)..."
+    log_gate "[4/10] 执行 auto-refactor 质量基线与多维自审 (LOC预算/熵/密度/BIF)..."
     if ! run_gate_step 60 "Gate 4 (auto-refactor 质量基线)" "$ROOT_DIR/auto-refactor" "$NODE_BIN" scripts/validate-self-multidimensional-audit.js; then
         FAILED=1
     else
@@ -349,7 +357,7 @@ fi
 
 # --- Gate 5: workspace-timing 快速单元测试套件 ---
 if [[ "$RUN_WT" -eq 1 ]]; then
-    log_gate "[5/9] 执行 workspace-timing 快速单元测试套件..."
+    log_gate "[5/10] 执行 workspace-timing 快速单元测试套件..."
     if ! run_gate_step 60 "Gate 5 (workspace-timing 快速单元测试)" "$ROOT_DIR/workspace-timing" "$NPM_BIN" run test:fast; then
         FAILED=1
     else
@@ -361,7 +369,7 @@ fi
 
 # --- Gate 6: workspace-timing L0~L5 六层审查门禁 ---
 if [[ "$RUN_WT" -eq 1 ]]; then
-    log_gate "[6/9] 执行 workspace-timing L0~L5 六层审查门禁..."
+    log_gate "[6/10] 执行 workspace-timing L0~L5 六层审查门禁..."
     if ! run_gate_step 60 "Gate 6 (workspace-timing 审查门禁)" "$ROOT_DIR/workspace-timing" "$NPM_BIN" run review; then
         FAILED=1
     else
@@ -373,7 +381,7 @@ fi
 
 # --- Gate 7: auto-refactor 长期轨迹账本物理约束守卫 ---
 if [[ "$RUN_AR" -eq 1 ]]; then
-    log_gate "[7/9] 校验 auto-refactor 长期轨迹账本物理约束 (<350B/条, <=2MB)..."
+    log_gate "[7/10] 校验 auto-refactor 长期轨迹账本物理约束 (<350B/条, <=2MB)..."
     if ! run_gate_step 30 "Gate 7 (长期轨迹账本约束)" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-trajectory-ledger.js; then
         FAILED=1
     else
@@ -385,7 +393,7 @@ fi
 
 # --- Gate 8: WebGames 配置架构与必需表一致性审查 ---
 if [[ "$RUN_WG" -eq 1 ]]; then
-    log_gate "[8/9] 执行 WebGames 全域质量门禁与配置架构审查..."
+    log_gate "[8/10] 执行 WebGames 全域质量门禁与配置架构审查..."
     if ! run_gate_step 60 "Gate 8 (WebGames 全域质量门禁)" "$ROOT_DIR" "$PYTHON_BIN" WebGames/scripts/py/audit_runner.py --diff; then
         FAILED=1
     else
@@ -395,16 +403,32 @@ else
     log_gate "  ✔ [Gate 8] WebGames 配置未受影响，智能跳过审查"
 fi
 
-# --- Gate 9: 待推送提交历史风格与禁词审查 (validate-commit-msg-style / validate-commit-msg) ---
+# --- Gate 9: fractal-git 9大微 Crate 回归测试套件 ---
+if [[ "$RUN_FG" -eq 1 ]]; then
+    log_gate "[9/10] 执行 fractal-git 9大微 Crate 回归测试套件 (cargo test)..."
+    if [[ -z "$CARGO_BIN" ]]; then
+        log_gate "  ⚠️  未检测到 cargo 命令，跳过本地 fractal-git 编译测试（CI 将严格校验）"
+    else
+        if ! run_gate_step 120 "Gate 9 (fractal-git 9大微 Crate 回归套件)" "$ROOT_DIR" "$CARGO_BIN" test --manifest-path fractal-git/Cargo.toml; then
+            FAILED=1
+        else
+            log_gate "  ✔ fractal-git 9大微 Crate 回归测试套件通过"
+        fi
+    fi
+else
+    log_gate "  ✔ [Gate 9] fractal-git 未受影响，智能跳过回归套件"
+fi
+
+# --- Gate 10: 待推送提交历史风格与禁词审查 (validate-commit-msg-style / validate-commit-msg) ---
 if [[ -n "$RANGE" ]]; then
-    log_gate "[9/9] 审查待推送提交历史风格与文本约束 (流式扫描: $RANGE)..."
-    if ! run_gate_step 30 "Gate 9 (待推送提交历史风格与禁词审查)" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-commit-msg.js --range "$RANGE"; then
+    log_gate "[10/10] 审查待推送提交历史风格与文本约束 (流式扫描: $RANGE)..."
+    if ! run_gate_step 30 "Gate 10 (待推送分支提交历史风格与禁词审查)" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-commit-msg.js --range "$RANGE"; then
         FAILED=1
     else
         log_gate "  ✔ 待推送分支提交历史风格与文本约束校验通过"
     fi
 else
-    log_gate "  ✔ [Gate 9] 首次推送或无上游对比基准，跳过历史扫描"
+    log_gate "  ✔ [Gate 10] 首次推送或无上游对比基准，跳过历史扫描"
 fi
 
 if [[ "$AGENT_MODE" -eq 1 ]]; then

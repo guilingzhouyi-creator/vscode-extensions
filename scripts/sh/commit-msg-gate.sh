@@ -86,7 +86,7 @@ print_template_guide() {
     echo "<type>(<scope>): <祈使句中文摘要标题，5~80 字符，不以句号结尾>"
     echo ""
     echo "[Project / 项目归属]"
-    echo "- <workspace-timing | auto-refactor | WebGames | governance>"
+    echo "- <workspace-timing | auto-refactor | WebGames | fractal-git | governance>"
     echo ""
     echo "[Why / 动机背景]"
     echo "- 业务背景、关联需求 ID 或解决的核心痛点。"
@@ -350,16 +350,16 @@ done
 
 if [[ "$COMMIT_TYPE" =~ ^(feat|fix|refactor|perf)$ ]]; then
     if [[ "$FOUND_PROJECT_HEADER" == false ]]; then
-        fail_commit_msg "CMG-PRJ-001" "Rule 5.1 (CMG-PRJ-001): 关键生产级提交 ($COMMIT_TYPE) 缺少项目归属格式区！" "" "[Project: workspace-timing | auto-refactor | WebGames | governance]" "在正文首个结构化区块声明 [Project / 项目归属]"
+        fail_commit_msg "CMG-PRJ-001" "Rule 5.1 (CMG-PRJ-001): 关键生产级提交 ($COMMIT_TYPE) 缺少项目归属格式区！" "" "[Project: workspace-timing | auto-refactor | WebGames | fractal-git | governance]" "在正文首个结构化区块声明 [Project / 项目归属]"
     fi
 
     if [[ ${#DECLARED_PROJECTS[@]} -eq 0 ]]; then
-        fail_commit_msg "CMG-PRJ-001" "Rule 5.1 (CMG-PRJ-001): [Project / 项目归属] 区块未声明任何项目名称！" "" "workspace-timing | auto-refactor | WebGames | governance" "指定合法的项目归属名称"
+        fail_commit_msg "CMG-PRJ-001" "Rule 5.1 (CMG-PRJ-001): [Project / 项目归属] 区块未声明任何项目名称！" "" "workspace-timing | auto-refactor | WebGames | fractal-git | governance" "指定合法的项目归属名称"
     fi
 fi
 
 if [[ ${#DECLARED_PROJECTS[@]} -gt 0 ]]; then
-    VALID_NORM=" workspace-timing auto-refactor webgames web-games governance "
+    VALID_NORM=" workspace-timing auto-refactor webgames web-games fractal-git fractalgit governance "
     INVALID_PROJECTS=()
     for p in "${DECLARED_PROJECTS[@]}"; do
         p_lower="${p,,}"
@@ -370,7 +370,7 @@ if [[ ${#DECLARED_PROJECTS[@]} -gt 0 ]]; then
 
     if [[ ${#INVALID_PROJECTS[@]} -gt 0 ]]; then
         INV_STR=$(IFS=', '; echo "${INVALID_PROJECTS[*]}")
-        fail_commit_msg "CMG-PRJ-001" "Rule 5.1 (CMG-PRJ-001): 声明的项目归属包含未授权/非法的项目标识: $INV_STR" "$INV_STR" "workspace-timing | auto-refactor | WebGames | governance" "纠正项目名称为合法枚举之一"
+        fail_commit_msg "CMG-PRJ-001" "Rule 5.1 (CMG-PRJ-001): 声明的项目归属包含未授权/非法的项目标识: $INV_STR" "$INV_STR" "workspace-timing | auto-refactor | WebGames | fractal-git | governance" "纠正项目名称为合法枚举之一"
     fi
 fi
 

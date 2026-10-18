@@ -16,6 +16,7 @@
 | **`workspace-timing/` 研发** | 五层解耦；RingBuffer+Journal 崩溃安全；UI 100% 双语字典 | [workspace-timing/README.md](workspace-timing/README.md) | [workspace-timing-dev](.agents/skills/workspace-timing-dev/SKILL.md) | `cd workspace-timing && npm run test:fast` |
 | **`auto-refactor/` 研发** | 30 分析器与 338 规则自测全通过 (155/155 套测试)；Rust 与 TS 100% 等价；Praxis 客户端 SDK | [auto-refactor/DOCS.md](auto-refactor/DOCS.md) | [auto-refactor-dev](.agents/skills/auto-refactor-dev/SKILL.md) | `cd auto-refactor && npm test` |
 | **`WebGames/` 研发** | 全域配置驱动；循环内零堆分配 (`ADV-PRF-002`)；先四阶段方案后编码 | [WebGames/docs/README.md](WebGames/docs/README.md)<br/>[WebGames/config/README.md](WebGames/config/README.md) | [webgames-workflow](.agents/skills/webgames-workflow/SKILL.md) | `cd WebGames && pwsh scripts/ps1/audit-all.ps1` |
+| **`fractal-git/` 研发** | 9 大微 Crate 矩阵全自测通过；CAS 快照物化；零瞬态堆分配复用池 | [fractal-git/README.md](fractal-git/README.md)<br/>[fractal-git/docs/README.md](fractal-git/docs/README.md) | [algorithmic-operator-engineering](.agents/skills/algorithmic-operator-engineering/SKILL.md) | `cargo test --manifest-path fractal-git/Cargo.toml` |
 | **度量评估与统计建模** | 零注水纯客观统计；主流统计学 Jeffreys Beta 后验模型 | [auto-refactor/DOCS.md](auto-refactor/DOCS.md) | [telemetry-statistical-modeling](.agents/skills/telemetry-statistical-modeling/SKILL.md) | `node auto-refactor/scripts/validate-autonomy-scorer.js` |
 | **算法与算子第一性原理突破** | 五步降维协议（零工预筛、CSR/SoA 表示反转、256-LUT/SWAR 位并行、单趟磁带融合、时代戳 $O(1)$ 复位）；100% 差分基准等价 | [auto-refactor/DOCS.md](auto-refactor/DOCS.md) | [algorithmic-operator-engineering](.agents/skills/algorithmic-operator-engineering/SKILL.md) | `node auto-refactor/scripts/bench-hot-paths.js` |
 | **测试工程与性能基准** | 确定性时钟/RNG 隔离；零孤儿用例；TB-REGRESSION 耗时预算 | [auto-refactor/DOCS.md](auto-refactor/DOCS.md) | [test-benchmark-engineering](.agents/skills/test-benchmark-engineering/SKILL.md) | `cd auto-refactor && npm test` |
@@ -57,7 +58,7 @@
 
 ### 4. Git 提交规范与技术事实纪律
 - **提交格式**：`<type>(<scope>): <祈使句中文摘要标题>`（长度 5~80 字符，结尾不加句号；`<type>` 限于 feat/fix/refactor/docs/test/chore/style/perf）；
-- **结构化区块**：关键生产提交（feat/fix/refactor/perf）正文首区块必须包含 `[Project: workspace-timing | auto-refactor | WebGames | governance]`（`CMG-PRJ-001`）；正文必须包含 `[Why]`、`[Added]`、`[Changed]`、`[Fixed]`（如有修复缺陷）、`[Verification]` 标签，非轻量提交正文实质字符 $\ge 30$；
+- **结构化区块**：关键生产提交（feat/fix/refactor/perf）正文首区块必须包含 `[Project: workspace-timing | auto-refactor | WebGames | fractal-git | governance]`（`CMG-PRJ-001`）；正文必须包含 `[Why]`、`[Added]`、`[Changed]`、`[Fixed]`（如有修复缺陷）、`[Verification]` 标签，非轻量提交正文实质字符 $\ge 30$；
 - **技术事实与零黑话**：
   ① 严禁敷衍词汇（`CMG-STY-001`）、夸大词汇（`CMG-STY-002`）、贬损词汇（`CMG-STY-003`）或“调整语调为低调中肯”等元叙事口号（`CMG-STY-004`）（禁词单源见 [commit-msg-forbidden-terms.json](scripts/common/commit-msg-forbidden-terms.json)）；
   ② 严禁在代码、测试、路径或提交信息中使用施工批次与临时标记（禁止词：`p[0-9]+`、`phase[0-9]+`、`st[0-9]+`、`temp`、`new`、`v[0-9]+`、`wip`；WebGames 前端视图保留 `fe_01`~`fe_17` 除外）；
@@ -78,13 +79,14 @@
 
 ---
 
-## 三、 三大项目专属核心约束速查
+## 三、 四大研发项目专属核心约束速查
 
 | 项目 | 核心专属约束与架构红线 | 专属构建/测试命令 | 权威真源指针 |
 | :--- | :--- | :--- | :--- |
 | **`workspace-timing/`**<br/>*(VS Code 扩展)* | ① UI 文本 100% 接入双语字典（zh-CN/en），严禁硬编码未翻译文案与内部技术黑话；<br/>② 审查规则单源登记于 `workspace-timing/scripts/config/review-rules.json`；<br/>③ `tsconfig.json` 保持 `declaration: false` 极速构建。 | `npm run compile`<br/>`npm run test:fast`<br/>`npm run review` | [workspace-timing/README.md](workspace-timing/README.md)<br/>[architecture.md](workspace-timing/docs/architecture.md) |
 | **`auto-refactor/`**<br/>*(Node CLI 引擎)* | ① 30 分析器与 338 条内置规则全量自测 (155/155 套测试)，零孤儿用例；<br/>② Rust 原生算子内核与 pure-TS shim 100% 字节等价；<br/>③ 时间戳强制携带 `*Ms` 物理量纲，紧凑账本遵循 `compactStagingPath` 暂存与原子落盘；Praxis 客户端 SDK 与拓扑差分协议对齐；<br/>④ 单分析器扣分遵循 `MAX_AXES_PER_FINDING <= 4`；受 `validate-project-neutrality.js` 项目中立性守卫管束；<br/>⑤ 严禁在 IPC 守护进程与事件循环关键路径中使用 `*Sync` 同步阻塞 I/O（`GOV-PRF-004` / `PRF-IO-001`）；<br/>⑥ 函数形参 $\ge 4$ 个时强制采用强类型参数对象封装（`SIM-ARGS-001`）。 | `npm run gate`<br/>`npm run build`<br/>`npm test` | [auto-refactor/DOCS.md](auto-refactor/DOCS.md)<br/>[auto-refactor/package.json](auto-refactor/package.json) |
 | **`WebGames/`**<br/>*(Godot 引擎)* | ① 统一经 `GameConfig.get_*` 读取配置，严禁根目录平铺配置；<br/>② 视图零业务计算，数据一律经 `apply_snapshot()` 注入；<br/>③ 高承压对象池循环内零瞬态堆分配（`ADV-PRF-002`），必须实现 `reset_state()`；<br/>④ 改动必须先立四阶段方案细则（严格仅 4 份文件），获批后方可编码；<br/>⑤ 异步派发器必须具备互斥保护与单任务防重入调度机制；必须提供同步 `pump()` 与 `flush()`/`teardown()` 并在测试用例结束前显式排空，严禁残留孤儿 `WorkerThreadPool` 任务导致无头进程退出挂起阻塞。 | `check-gdscript.sh`<br/>`test-run.sh`<br/>`audit-all.sh` | [WebGames/docs/README.md](WebGames/docs/README.md)<br/>[路线图总索引.md](WebGames/docs/路线图/路线图总索引.md) |
+| **`fractal-git/`**<br/>*(Git 引擎内核)* | ① 9 大微 Crate 分层解耦（L1 核心/L2 资源池与存储/L3 拓扑门禁与协议）；<br/>② 循环内零堆分配复用池（Buffer/Object/Sandbox/Worktree）；<br/>③ CAS 快照物化与无锁内存树并发安全；<br/>④ 100% 差分等价性与全套单元测试通过。 | `cargo check`<br/>`cargo test` | [fractal-git/README.md](fractal-git/README.md)<br/>[fractal-git/docs/README.md](fractal-git/docs/README.md) |
 
 ---
 
@@ -96,7 +98,7 @@
 4. **方案、注释与黑话红线**：方案目录下严格仅允许四阶段细则文件；严禁在 `tests/unit/` 根目录平铺散落脚本；严禁遗留假逻辑空分支与幽灵注释；严禁在代码标识符、测试用例、JSDoc 注释与提交信息中使用施工批次与敏捷工期黑话代号（如 `p[0-9]+`, `W1-W9`, `Pass 1..6`）；
 5. **规则一致性红线**：严禁在检查器代码中发射或在提交信息中书写未在 [rule-catalog.json](scripts/common/rule-catalog.json) 登记的规则 ID（违者触发 `RCFG-RULE-DRIFT` 阻断）；
 6. **防线与验证红线**：严禁使用 `--no-verify` 或跳过本地门禁提交或推送代码；向远端推送后必须确保 CI 流水线完全通过；严禁对未跟踪文件执行 `git rm`；
-7. **原子提交与归属红线**：关键生产级提交（feat/fix/refactor/perf）必须显式声明 `[Project]` 并限定于四大受控项目（`CMG-PRJ-001`）；提交前必须先通过本地 `commit-msg-gate` 与 `pre-commit-gate` 预审；
+7. **原子提交与归属红线**：关键生产级提交（feat/fix/refactor/perf）必须显式声明 `[Project]` 并限定于五大受控项目（`CMG-PRJ-001`）；提交前必须先通过本地 `commit-msg-gate` 与 `pre-commit-gate` 预审；
 8. **跳板消融红线**：严禁创建或保留有效代码 $\le 3$ 行且仅向单一目标透传的空包跳板文件；门面层违反实质承载预算强制触发 `ARCH-FAC-001` 阻断；
 9. **客观求实红线**：提交信息严禁夹带敷衍（`CMG-STY-001`）、夸大（`CMG-STY-002`）、贬损（`CMG-STY-003`）或元叙事口号（`CMG-STY-004`）；`[Verification]` 严禁程序化流水账（`CMG-STY-005`）与执行数字统计流水账（`CMG-STY-006`）；
 10. **度量求真红线**：严禁在评分算法与自研度量中注入虚假倍率或固定加分；严禁使用伪造的统计误差区间；
