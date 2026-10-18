@@ -1,0 +1,14 @@
+[package]
+name = "fg-object"
+version = "0.1.0"
+edition = "2021"
+description = "Canonical Git loose object codecs (Blob, Tree, Commit) for Fractal Git."
+authors = ["Google DeepMind Advanced Agentic Coding Pair"]
+license = "MIT"
+
+[dependencies]
+fg-core = { path = "../fg-core" }
+sha1 = "0.10"
+flate2 = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"

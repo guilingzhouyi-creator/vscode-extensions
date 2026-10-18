@@ -1,0 +1,12 @@
+[package]
+name = "fg-topology"
+version = "0.1.0"
+edition = "2021"
+description = "Self-similar fractal topology, hierarchical reference namespaces, and worktree state machine for Fractal Git."
+authors = ["Google DeepMind Advanced Agentic Coding Pair"]
+license = "MIT"
+
+[dependencies]
+fg-core = { path = "../fg-core" }
+serde = { version = "1.0", features = ["derive"] }
+chrono = { version = "0.4", features = ["serde"] }

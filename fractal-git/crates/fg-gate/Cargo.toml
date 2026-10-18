@@ -1,0 +1,12 @@
+[package]
+name = "fg-gate"
+version = "0.1.0"
+edition = "2021"
+description = "Protocol-level quality gates, authorization hooks, and conflict hygiene guards for Fractal Git."
+authors = ["Google DeepMind Advanced Agentic Coding Pair"]
+license = "MIT"
+
+[dependencies]
+fg-core = { path = "../fg-core" }
+fg-object = { path = "../fg-object" }
+fg-topology = { path = "../fg-topology" }

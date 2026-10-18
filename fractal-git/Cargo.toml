@@ -1,0 +1,69 @@
+[workspace]
+members = [
+    "crates/fg-core",
+    "crates/fg-object",
+    "crates/fg-index",
+    "crates/fg-algorithms",
+    "crates/fg-pools",
+    "crates/fg-storage",
+    "crates/fg-topology",
+    "crates/fg-transport",
+    "crates/fg-gate",
+]
+resolver = "2"
+
+[package]
+name = "fractal-git"
+version = "0.1.0"
+edition = "2021"
+description = "Agent-native fractal git engine: lockless in-memory index, CAS snapshot materialization, and self-similar worktree reclamation."
+authors = ["Google DeepMind Advanced Agentic Coding Pair"]
+license = "MIT"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+fg-core = { path = "crates/fg-core" }
+fg-object = { path = "crates/fg-object" }
+fg-index = { path = "crates/fg-index" }
+fg-algorithms = { path = "crates/fg-algorithms" }
+fg-pools = { path = "crates/fg-pools" }
+fg-storage = { path = "crates/fg-storage" }
+fg-topology = { path = "crates/fg-topology" }
+fg-transport = { path = "crates/fg-transport" }
+fg-gate = { path = "crates/fg-gate" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+flate2 = "1.0"
+sha1 = "0.10"
+thiserror = "1.0"
+parking_lot = "0.12"
+
+[dev-dependencies]
+tempfile = "3.8"
+
+[[test]]
+name = "test_in_memory_index"
+path = "tests/rust/test_in_memory_index.rs"
+
+[[test]]
+name = "test_self_hosted_ipc"
+path = "tests/rust/test_self_hosted_ipc.rs"
+
+[[test]]
+name = "test_algorithms"
+path = "tests/rust/test_algorithms.rs"
+
+[[test]]
+name = "test_pools"
+path = "tests/rust/test_pools.rs"
+
+[[test]]
+name = "test_storage"
+path = "tests/rust/test_storage.rs"
+
+[[test]]
+name = "test_index"
+path = "tests/rust/test_index.rs"

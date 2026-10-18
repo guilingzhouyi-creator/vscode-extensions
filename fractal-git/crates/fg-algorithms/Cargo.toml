@@ -1,0 +1,11 @@
+[package]
+name = "fg-algorithms"
+version = "0.1.0"
+edition = "2021"
+description = "Pure algorithmic operators (FastCDC, Tree Diff, DAG traversal) for Fractal Git."
+authors = ["Google DeepMind Advanced Agentic Coding Pair"]
+license = "MIT"
+
+[dependencies]
+fg-core = { path = "../fg-core" }
+sha1 = "0.10"

@@ -1,0 +1,11 @@
+[package]
+name = "fg-index"
+version = "0.1.0"
+edition = "2021"
+description = "Lockless in-memory staging index, multi-stage conflict slots, and virtual tree builder for Fractal Git."
+authors = ["Google DeepMind Advanced Agentic Coding Pair"]
+license = "MIT"
+
+[dependencies]
+fg-core = { path = "../fg-core" }
+fg-object = { path = "../fg-object" }
