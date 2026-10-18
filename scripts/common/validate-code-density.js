@@ -46,13 +46,13 @@ function applyValueOptionFlag(arg, value, options) {
       options.range = value;
       return true;
     case '--por-limit':
-      options.porLimit = parseNumericFlag(value, options.porLimit);
+      options.porLimit = Math.max(0.0, Math.min(1.0, parseNumericFlag(value, options.porLimit)));
       return true;
     case '--min-tau':
-      options.minTau = parseNumericFlag(value, options.minTau);
+      options.minTau = Math.max(0.5, Math.min(50.0, parseNumericFlag(value, options.minTau)));
       return true;
     case '--max-tau':
-      options.maxTau = parseNumericFlag(value, options.maxTau);
+      options.maxTau = Math.max(options.minTau, Math.min(100.0, parseNumericFlag(value, options.maxTau)));
       return true;
     default:
       return false;

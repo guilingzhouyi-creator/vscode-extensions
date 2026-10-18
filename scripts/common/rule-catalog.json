@@ -1,9 +1,9 @@
 {
   "schema": "workspace-rule-catalog/v1",
-  "generatedAt": "2026-10-17T15:23:22.338Z",
-  "totalRules": 469,
+  "generatedAt": "2026-10-18T05:12:08.179Z",
+  "totalRules": 471,
   "counts": {
-    "autoRefactor": 351,
+    "autoRefactor": 353,
     "workspaceTiming": 49,
     "webGames": 50,
     "globalTooling": 19
@@ -2180,6 +2180,13 @@
       "summary": "Redundant constant nesting: indirect constant aliases, deep constant objects, or pseudo-constants in nested scopes."
     },
     {
+      "id": "NUM-BND-001",
+      "project": "auto-refactor",
+      "family": "NUM",
+      "severity": "warning",
+      "summary": "One-sided unbounded numeric parameter or condition exposed in recursion depth,loop bound, or capacity check without bidirectional corridor bound."
+    },
+    {
       "id": "NUM-PREC-001",
       "project": "auto-refactor",
       "family": "NUM",
@@ -3102,6 +3109,13 @@
       "family": "TST",
       "severity": "warning",
       "summary": "Test completeness illusion: tests solely verify mock configurations or bind todeprecated business contracts."
+    },
+    {
+      "id": "TST-ORC-001",
+      "project": "auto-refactor",
+      "family": "TST",
+      "severity": "warning",
+      "summary": "Brittle magic assertion oracle detected: test asserts exact equality on physical entitytotals or float scalars instead of invariant corridor or dynamic relative baseline."
     },
     {
       "id": "TST-SKP-001",
