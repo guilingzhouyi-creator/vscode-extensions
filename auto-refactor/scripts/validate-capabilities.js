@@ -162,10 +162,10 @@ async function main() {
   const serviceCode = `
 /** Fixture: payment service whose exported symbol is traced by impact analysis. */
 export class PaymentService {
-  process() {}
+  process() { return true; }
 }
 /** Fixture: invoice factory imported under an alias by the controller fixture. */
-export function createInvoice() {}
+export function createInvoice() { return {}; }
 `;
   const controllerCode = `
 import { PaymentService, createInvoice as makeBill } from '../services/paymentService';

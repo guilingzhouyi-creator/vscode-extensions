@@ -63,7 +63,7 @@ export class QuotaHibernateMachine extends EventEmitter {
     private hibernateStartMs: number = 0;
     private hibernateDurationMs: number = 0;
     private activeTimer: unknown = null;
-    private taskQueue: PendingTask<any>[] = [];
+    private taskQueue: PendingTask[] = [];
 
     constructor(
         clock: VirtualClock = SYSTEM_CLOCK,
@@ -160,7 +160,12 @@ export class QuotaHibernateMachine extends EventEmitter {
         }
 
         return new Promise<T>((resolve, reject) => {
-            this.taskQueue.push({ id, execute, resolve, reject });
+            this.taskQueue.push({
+                id,
+                execute: execute as () => Promise<unknown>,
+                resolve: resolve as (value: unknown) => void,
+                reject,
+            });
         });
     }
 

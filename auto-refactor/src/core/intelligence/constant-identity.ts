@@ -384,10 +384,7 @@ export function isConstantDefinitionFile(filePath: string, content?: string): bo
     if (isConstantPath(filePath)) {
         return true;
     }
-    if (content && hasConstantTableCharacteristics(content)) {
-        return true;
-    }
-    return false;
+    return Boolean(content && hasConstantTableCharacteristics(content));
 }
 
 /**

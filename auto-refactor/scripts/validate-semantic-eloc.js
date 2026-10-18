@@ -144,16 +144,12 @@ function runTests() {
   console.log('  ▶ [Test 5] Testing genuine semantic logic modifications...');
   const oldLogic = `
         function validate(num: number): boolean {
-            if (num < 0) return false;
-            return true;
+            return num >= 0;
         }
     `;
   const newLogic = `
         function validate(num: number): boolean {
-            if (num < 0 || num > 100 || !Number.isFinite(num)) {
-                return false;
-            }
-            return true;
+            return num >= 0 && num <= 100 && Number.isFinite(num);
         }
     `;
 

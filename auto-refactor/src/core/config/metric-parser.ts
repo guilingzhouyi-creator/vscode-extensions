@@ -66,14 +66,12 @@ function parseStringMetric(input: string, fallback: number): number {
 /**
  * Parses a human-readable metric string or raw number into a positive integer.
  *
- * Examples:
- *   parseHumanMetric(800)      => 800
- *   parseHumanMetric('800')    => 800
- *   parseHumanMetric('1k')     => 1000
- *   parseHumanMetric('2.5k')   => 2500
- *   parseHumanMetric('50k')    => 50000
- *   parseHumanMetric('0.5M')   => 500000
- *   parseHumanMetric('invalid', 800) => 800
+ * Supported formats:
+ * - Direct numeric value: `800` -> `800`
+ * - String representation: `'800'` -> `800`
+ * - Kilo suffixes: `'1k'` -> `1000`, `'2.5k'` -> `2500`, `'50k'` -> `50000`
+ * - Mega suffixes: `'0.5M'` -> `500000`
+ * - Unparseable string with fallback: `'invalid', 800` -> `800`
  *
  * @param input - Numeric value or metric string with optional suffix (k, K, m, M).
  * @param fallback - Fallback value used when input is unparseable or negative.

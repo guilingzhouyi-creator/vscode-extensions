@@ -117,8 +117,7 @@ function shouldTraverseDirectory(
     gitignore: ((rel: string) => boolean) | null,
 ): boolean {
     if (matchAny(excludeRx, rel) || matchAny(excludeRx, dirName)) return false;
-    if (gitignore && gitignore(rel)) return false;
-    return true;
+    return !gitignore || !gitignore(rel);
 }
 
 function shouldIncludeFile(

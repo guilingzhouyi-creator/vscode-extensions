@@ -212,8 +212,7 @@ export function scanNearLiteralClusters(literals: LiteralRecord[], filePath: str
 
     const candidates = literals.filter((l) => {
         if (l.tolerated) return false;
-        if (l.numeric && TOLERATED_NUMERIC_STRINGS.has(l.value)) return false;
-        return true;
+        return !l.numeric || !TOLERATED_NUMERIC_STRINGS.has(l.value);
     });
 
     const clusters: SiblingLiteralCluster[] = [];

@@ -722,10 +722,7 @@ function handleCommentLine(trimmed: string, ctx: ParseContext): boolean {
         }
         return true;
     }
-    if (trimmed.startsWith(LINE_COMMENT_PREFIX)) {
-        return true;
-    }
-    return false;
+    return trimmed.startsWith(LINE_COMMENT_PREFIX);
 }
 
 /**

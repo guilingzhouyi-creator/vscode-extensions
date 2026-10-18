@@ -161,7 +161,7 @@ ${'export'} class User {}
   const ctxSkipLayer = {
     filePath: 'src/interface/controllers/userController.ts',
     content: `import { UserRepo } from '../../infrastructure/userRepo';
-${'export'} function handler() {}
+${'export'} function handler() { return UserRepo; }
 `,
     options: { enforceCleanLayers: true, allowSkipLayers: false },
     config: {
@@ -340,7 +340,7 @@ ${'export'} function calculateTotal(items: any[]) { return 100; }
 // 依赖与触发: 定时任务
 // 职责说明: 处理扣款
 // 退出语义与设计依据: 0=成功
-export function pay() {}
+export function pay() { return 0; }
 `,
     options: { level: 'strict', strictSixFields: true },
     config: { commentLevel: 'strict' },

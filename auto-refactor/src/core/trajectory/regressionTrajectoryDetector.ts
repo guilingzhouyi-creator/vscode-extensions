@@ -88,10 +88,7 @@ export class RegressionTrajectoryDetector {
         if (a.fileHash && b.fileHash && a.fileHash === b.fileHash) {
             return true;
         }
-        if (a.astDigest && b.astDigest && a.astDigest === b.astDigest) {
-            return true;
-        }
-        return false;
+        return Boolean(a.astDigest && b.astDigest && a.astDigest === b.astDigest);
     }
 
     /**

@@ -57,6 +57,7 @@ import {
     type SemanticComplexityOptions,
 } from './intelligence/semanticComplexity';
 import { QualityScorer } from './scoring/qualityScorer';
+import type { QualityWeights } from './scoring/scoringTypes';
 import { ChangeTrajectoryManager } from './trajectory/changeTrajectory';
 import { detectProjectArchetype } from './profiler/projectProfiler';
 import { ALL_BUILTIN_ANALYZERS, routeArchetypeToAnalyzers } from './router/sparseRuleRouter';
@@ -150,7 +151,10 @@ export class Scanner implements ScannerContext {
             detectProjectArchetype(config.root, config.profile);
         this.archetype = detectedArchetype;
         const effectiveScorerArchetype = config.reviewProfile ?? config.archetype;
-        this.scorer = new QualityScorer(config.scoringWeights as any, effectiveScorerArchetype);
+        this.scorer = new QualityScorer(
+            config.scoringWeights as Partial<QualityWeights>,
+            effectiveScorerArchetype,
+        );
 
         const sparseResult = routeArchetypeToAnalyzers(detectedArchetype, {
             customAnalyzers: config.customAnalyzers?.map((c) => c.name),

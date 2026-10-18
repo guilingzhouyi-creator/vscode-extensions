@@ -46,7 +46,7 @@ export interface GovernanceIssueDetail {
     targetLanguage: string;
     ruleId: string;
     suggestedPatch?: string;
-    [key: string]: any;
+    [key: string]: unknown;
 }
 
 /**

@@ -62,6 +62,11 @@ export interface PatchScoreMetrics {
     effectiveDensityBefore: number;
     effectiveDensityAfter: number;
     effectiveDensityDelta: number;
+    compositeDensityBefore?: number;
+    compositeDensityAfter?: number;
+    compositeDensityDelta?: number;
+    tsprDelta?: number;
+    porDelta?: number;
 }
 
 /**
@@ -181,6 +186,23 @@ function buildPatchExplanations(
         `Effective code density shifted from ${metrics.effectiveDensityBefore} to ${metrics.effectiveDensityAfter} (Delta: ${metrics.effectiveDensityDelta}).`,
     ];
 
+    if (
+        metrics.compositeDensityDelta !== undefined &&
+        metrics.compositeDensityBefore !== undefined &&
+        metrics.compositeDensityAfter !== undefined &&
+        Math.abs(metrics.compositeDensityDelta) >= 0.05
+    ) {
+        explanation.push(
+            `Composite multi-dimensional density shifted from ${metrics.compositeDensityBefore} to ${metrics.compositeDensityAfter} (Delta: ${metrics.compositeDensityDelta > 0 ? '+' : ''}${metrics.compositeDensityDelta}).`,
+        );
+    }
+
+    if (metrics.porDelta !== undefined && metrics.porDelta >= 0.25) {
+        explanation.push(
+            `WARNING: Wiring code overhead increased by +${Math.round(metrics.porDelta * 100)}%; ensure new trampolines are avoided.`,
+        );
+    }
+
     if (relocationAnalysis.hasPureRelocationsOnly) {
         explanation.push(
             `DEBOUNCED: Detected ${relocationAnalysis.relocatedCount} pure constant relocation(s) without semantic improvement; score gain clamped to 0.0.`,
@@ -214,6 +236,59 @@ function buildPatchExplanations(
  * @param params - Configuration parameters including file path and before/after contents.
  * @returns Quantified patch quality result including delta score and verdict.
  */
+interface PatchDensityMetricsResult {
+    compositeDensityBefore: number;
+    compositeDensityAfter: number;
+    compositeDensityDelta: number;
+    tsprDelta: number;
+    porDelta: number;
+}
+
+function computePatchDensityMetrics(
+    beforeDetails: FileQualityScore,
+    afterDetails: FileQualityScore,
+    effectiveDensityBefore: number,
+    effectiveDensityAfter: number,
+): PatchDensityMetricsResult {
+    const compositeDensityBefore =
+        beforeDetails.densityMetrics?.compositeDensity ?? effectiveDensityBefore;
+    const compositeDensityAfter =
+        afterDetails.densityMetrics?.compositeDensity ?? effectiveDensityAfter;
+    const compositeDensityDelta =
+        Math.round((compositeDensityAfter - compositeDensityBefore) * 100) / 100;
+
+    const tsprBefore = beforeDetails.densityMetrics?.tspr ?? effectiveDensityBefore;
+    const tsprAfter = afterDetails.densityMetrics?.tspr ?? effectiveDensityAfter;
+    const tsprDelta = Math.round((tsprAfter - tsprBefore) * 1000) / 1000;
+
+    const porBefore =
+        beforeDetails.densityMetrics?.por ?? Math.max(0, 1.0 - effectiveDensityBefore);
+    const porAfter =
+        afterDetails.densityMetrics?.por ?? Math.max(0, 1.0 - effectiveDensityAfter);
+    const porDelta = Math.round((porAfter - porBefore) * 1000) / 1000;
+
+    return {
+        compositeDensityBefore,
+        compositeDensityAfter,
+        compositeDensityDelta,
+        tsprDelta,
+        porDelta,
+    };
+}
+
+function computePillarDeltas(
+    beforeDetails: FileQualityScore,
+    afterDetails: FileQualityScore,
+): Record<PrimaryQualityPillar, number> {
+    const pillarDeltas = {} as Record<PrimaryQualityPillar, number>;
+    for (const pillar of ALL_PRIMARY_PILLARS) {
+        const pBefore = beforeDetails.eightPillars.pillars[pillar];
+        const pAfter = afterDetails.eightPillars.pillars[pillar];
+        pillarDeltas[pillar] = Math.round((pAfter - pBefore) * 100) / 100;
+    }
+    return pillarDeltas;
+}
+
 export function evaluatePatchQuality(params: EvaluatePatchParams): PatchQualityResult {
     const {
         filePath,
@@ -273,17 +348,20 @@ export function evaluatePatchQuality(params: EvaluatePatchParams): PatchQualityR
     const effectiveDensityDelta =
         Math.round((effectiveDensityAfter - effectiveDensityBefore) * 100) / 100;
 
-    const pillarDeltas = {} as Record<PrimaryQualityPillar, number>;
-    for (const pillar of ALL_PRIMARY_PILLARS) {
-        const pBefore = beforeDetails.eightPillars.pillars[pillar];
-        const pAfter = afterDetails.eightPillars.pillars[pillar];
-        // An unmeasured side yields NaN here too; keep it NaN rather than coercing to 0,
-        // which would read as "this pillar did not change".
-        pillarDeltas[pillar] = Math.round((pAfter - pBefore) * 100) / 100;
-    }
+    const patchDensity = computePatchDensityMetrics(
+        beforeDetails,
+        afterDetails,
+        effectiveDensityBefore,
+        effectiveDensityAfter,
+    );
+
+    const pillarDeltas = computePillarDeltas(beforeDetails, afterDetails);
 
     let verdict = resolvePatchVerdict(deltaScore, gaming.length);
     if (relocationAnalysis.hasPureRelocationsOnly && verdict === VERDICT_IMPROVED) {
+        verdict = VERDICT_NEUTRAL;
+    }
+    if (patchDensity.porDelta >= 0.35 && deltaScore !== null && deltaScore <= 0.5 && verdict === VERDICT_IMPROVED) {
         verdict = VERDICT_NEUTRAL;
     }
 
@@ -296,6 +374,7 @@ export function evaluatePatchQuality(params: EvaluatePatchParams): PatchQualityR
         effectiveDensityBefore,
         effectiveDensityAfter,
         effectiveDensityDelta,
+        ...patchDensity,
     };
 
     const explanation = buildPatchExplanations(

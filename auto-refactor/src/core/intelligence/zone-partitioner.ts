@@ -82,8 +82,7 @@ const STATE_NODE_KINDS = new Set<NodeKind>([NodeKind.Class, NodeKind.Struct, Nod
 
 function isTestNodeName(name: string): boolean {
     if (TEST_EXACT_NAMES.has(name)) return true;
-    if (name.startsWith('test_') || name.endsWith('_test')) return true;
-    return false;
+    return name.startsWith('test_') || name.endsWith('_test');
 }
 
 function isLookupTableNode(node: NormalizedNode, name: string): boolean {

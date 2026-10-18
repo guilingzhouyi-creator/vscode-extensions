@@ -87,8 +87,7 @@ export function calculateTax(income: number): number {
  */
 export class OrderService {
   processOrder(id: string): boolean {
-    if (!id) return false;
-    return true;
+    return Boolean(id);
   }
 }
 `;

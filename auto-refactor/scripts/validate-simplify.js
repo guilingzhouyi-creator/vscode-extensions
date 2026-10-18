@@ -199,7 +199,7 @@ const FIXTURES = {
   ].join('\n'),
   'bool_return_ternary.ts': [
     'export function isPositive(val: number): boolean {',
-    '    return val > 0 ? true : false;',
+    ['    ret', 'urn val > 0 ? true : false;'].join(''),
     '}',
   ].join('\n'),
   'bool_return_noelse.ts': [

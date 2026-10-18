@@ -18,7 +18,7 @@
  *   returns [] on irrelevant files or test suites.
  */
 
-import type { Analyzer, AnalyzerContext, Issue } from '../core/types';
+import type { Analyzer, AnalyzerContext, Issue, AgentActionType } from '../core/types';
 import { SEVERITY_WARNING, SEVERITY_ERROR } from '../core/types';
 import {
     ANALYZER_STDLIB,
@@ -121,7 +121,10 @@ export class StdlibAnalyzer implements Analyzer {
         suggestion: string,
         detail: Record<string, unknown> = {},
     ): void {
-        const actionableMap: Record<string, { action: any; code: string; safe: boolean }> = {
+        const actionableMap: Record<
+            string,
+            { action: AgentActionType; code: string; safe: boolean }
+        > = {
             'STDLIB-PANIC-001': {
                 action: 'replace_token',
                 code: CODE_STB_PANIC_ESCAPE,

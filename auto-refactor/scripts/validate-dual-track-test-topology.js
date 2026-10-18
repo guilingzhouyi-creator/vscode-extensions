@@ -135,11 +135,11 @@ function testRustEmbeddedContracts() {
 
   // Test Contract: Missing #[cfg(test)]
   const missingCfgTest = `
-pub fn kernel() {}
+pub fn kernel() { 1 }
 
 mod tests {
     #[test]
-    fn test_uncond() {}
+    fn test_uncond() { assert!(true); }
 }
 `;
   const res1 = evaluator.evaluateFile('src/native/hash.rs', missingCfgTest);
@@ -152,15 +152,15 @@ mod tests {
 
   // Test Contract: Not tail-isolated (production code placed after test block)
   const interleavedTest = `
-pub fn part1() {}
+pub fn part1() { 1 }
 
 #[cfg(test)]
 mod tests {
     #[test]
-    fn t1() {}
+    fn t1() { assert!(true); }
 }
 
-pub fn part2_after_test() {}
+pub fn part2_after_test() { 2 }
 `;
   const density = analyzeCodeDensity(interleavedTest, 'src/native/interleaved.rs');
   const zoneProfile = partitionFileZones(interleavedTest, 'src/native/interleaved.rs', density);

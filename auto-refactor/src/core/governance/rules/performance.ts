@@ -131,7 +131,8 @@ function advanceLoopState(ctx: LoopContext, line: string, indent: number): boole
                 ctx.inLoop = false;
                 return false;
             }
-        } else if (indent <= ctx.loopIndent) {
+        }
+        if (ctx.loopBraces === 0 && indent <= ctx.loopIndent) {
             ctx.inLoop = false;
         }
     }

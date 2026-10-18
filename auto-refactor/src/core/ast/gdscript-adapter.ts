@@ -389,11 +389,7 @@ export class GDScriptAdapter implements LanguageAdapter {
         // 2. Subscript index: `target["key"]`
         const beforeStr = rawLine.slice(0, matchIdx);
         const isIndexedAccess = /[A-Za-z0-9_\)\]]\s*\[\s*$/.test(beforeStr);
-        if (isIndexedAccess && /^\s*\]/.test(afterStr)) {
-            return true;
-        }
-
-        return false;
+        return isIndexedAccess && /^\s*\]/.test(afterStr);
     }
 
     /** Check if a numeric literal is an index inside a subscript expression, e.g. `arr[0]`. */

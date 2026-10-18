@@ -281,10 +281,15 @@ export class PraxisPresentationAdapter implements IPraxisPresentationService {
         options?: PraxisPresentationOptions,
         callGraph?: CallGraph,
     ): Promise<PraxisPresentationPayload> {
+        const raw = input as PraxisSliceAuditInput & {
+            file?: string;
+            oldCode?: string;
+            newCode?: string;
+        };
         const normalizedInput: PraxisSliceAuditInput = {
-            filePath: input.filePath || (input as any).file || '',
-            oldContent: input.oldContent ?? (input as any).oldCode ?? '',
-            newContent: input.newContent ?? (input as any).newCode ?? '',
+            filePath: input.filePath || raw.file || '',
+            oldContent: input.oldContent ?? raw.oldCode ?? '',
+            newContent: input.newContent ?? raw.newCode ?? '',
             changedLines: input.changedLines,
             maxCallDepth: input.maxCallDepth,
         };

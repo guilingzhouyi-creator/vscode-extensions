@@ -11,13 +11,16 @@
  *   stateless concurrent execution across scanner workers.
  */
 
+/** Untyped ESTree AST node dynamic property payload. */
+type AstProperty = any;
+
 /** Loose structural view of an oxc ESTree-style node (reflection traversal). */
 export interface OxcNode {
     type: string;
     /** UTF-16 code-unit offsets — identical to JS string indices and TS offsets. */
     start: number;
     end: number;
-    [key: string]: any;
+    [key: string]: AstProperty;
 }
 
 /** Result shape returned by the oxc parser sync entry point. */

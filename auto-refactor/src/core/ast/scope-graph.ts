@@ -318,11 +318,9 @@ function finalizeEndLines(scope: Scope, parentEnd: number): void {
  * Streaming scope graph builder that integrates with `runStreaming`.
  * Builds the scope graph in the single shared pass — zero extra traversal.
  *
- * Usage:
- *   const scopeBuilder = new ScopeGraphStreamer(root);
- *   const entries = [scopeBuilder.asEntry(ctx), ...otherEntries];
- *   runStreaming(adapter, root, entries);
- *   const graph = scopeBuilder.graph;
+ * Usage: instantiate `new ScopeGraphStreamer(root)`, prepend its `asEntry(ctx)`
+ * to the entries array, run `runStreaming(adapter, root, entries)`, and
+ * inspect the generated `scopeBuilder.graph`.
  *
  * Ordering note: the streamer entry MUST be first in the entries array so that:
  *   - its `visit` runs first (scope is pushed before other analyzers visit)

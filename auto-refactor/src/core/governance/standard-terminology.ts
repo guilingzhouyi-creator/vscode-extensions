@@ -100,7 +100,13 @@ export type StandardActionVerb =
     | 'request_clarification'
     | 'rename_symbol'
     | 'introduce_parameter_object'
-    | 'decompose_module';
+    | 'decompose_module'
+    | 'inline_orphan_function'
+    | 'melt_trampoline'
+    | 'compact_diluted_lines'
+    | 'decompose_congested_tokens'
+    | 'enrich_facade'
+    | 'eliminate_tautological_loop';
 
 /** Specification contract for a standardized remediation action verb */
 export interface ActionVerbSpec {
@@ -300,6 +306,60 @@ export const ACTION_VERB_SPECS: Readonly<Record<StandardActionVerb, ActionVerbSp
             zhDescription: '将过大或多职责模块拆解为内聚的单一职责子模块。',
             safeToAutomateDefault: false,
             typicalFixTemplate: 'Extract cohesive procedures and types into dedicated submodules.',
+        }),
+        inline_orphan_function: Object.freeze({
+            verb: 'inline_orphan_function',
+            taxonomy: 'CTRL_FLOW',
+            description:
+                'Inline a single-use orphan function into its sole call site to eliminate parameter mud and enhance locality.',
+            zhDescription: '将单次调用孤儿微函数就地内联至调用点以消除参数泥团并增强局部内聚。',
+            safeToAutomateDefault: true,
+            typicalFixTemplate: '// Inline orphan function body into call site',
+        }),
+        melt_trampoline: Object.freeze({
+            verb: 'melt_trampoline',
+            taxonomy: 'ARCH_LAYER',
+            description:
+                'Melt a single-target forwarding wrapper or trampoline so callers directly access the underlying target.',
+            zhDescription: '消融单目标透明转发跳板使调用方直接引用目标底层实现。',
+            safeToAutomateDefault: true,
+            typicalFixTemplate: '// Redirect call directly to destination symbol and eliminate trampoline',
+        }),
+        compact_diluted_lines: Object.freeze({
+            verb: 'compact_diluted_lines',
+            taxonomy: 'GOV_NORM',
+            description:
+                'Merge vertically fragmented line breaks or over-split chain calls into concise statements.',
+            zhDescription: '紧凑化过度垂直分散的代码换行或碎片化链式调用为紧凑语句。',
+            safeToAutomateDefault: true,
+            typicalFixTemplate: '// Consolidate fragmented expressions onto cohesive lines',
+        }),
+        decompose_congested_tokens: Object.freeze({
+            verb: 'decompose_congested_tokens',
+            taxonomy: 'CTRL_FLOW',
+            description:
+                'Break down horizontally congested expressions (tau > 20 tokens/line) with intermediate local constants.',
+            zhDescription: '通过提取局部只读中间常量分解单行严重拥挤的复合表达式。',
+            safeToAutomateDefault: true,
+            typicalFixTemplate: 'const intermediate = ...;\nreturn use(intermediate);',
+        }),
+        enrich_facade: Object.freeze({
+            verb: 'enrich_facade',
+            taxonomy: 'ARCH_LAYER',
+            description:
+                'Enrich an empty facade with parameter contract verification, domain aggregation, or immutability freezing.',
+            zhDescription: '为接线比率超标的门面注入参数契约校验、不可变冻结保障或领域聚合逻辑。',
+            safeToAutomateDefault: false,
+            typicalFixTemplate: 'export const Facade = Object.freeze({ ... });',
+        }),
+        eliminate_tautological_loop: Object.freeze({
+            verb: 'eliminate_tautological_loop',
+            taxonomy: 'CTRL_FLOW',
+            description:
+                'Eliminate zero-entropy state transitions or trivial loops with direct access or pure filters.',
+            zhDescription: '移除代数条件熵增趋零的形式主义循环，替换为直接查找或高阶纯函数。',
+            safeToAutomateDefault: true,
+            typicalFixTemplate: '// Replace loop with direct lookup or pure filter',
         }),
     });
 

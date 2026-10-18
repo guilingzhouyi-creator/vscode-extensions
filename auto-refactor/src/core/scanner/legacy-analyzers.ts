@@ -65,7 +65,7 @@ export function runLegacyPhase(
     const issues: Issue[] = [];
     const sf = base.sourceFile;
     for (const p of legacy) {
-        if (!sf && (p.instance as any).requiresSourceFile === true) continue;
+        if (!sf && p.instance.requiresSourceFile) continue;
         const ctx: AnalyzerContext = {
             filePath: base.rel,
             content: base.content,

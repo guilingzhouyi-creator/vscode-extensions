@@ -177,6 +177,19 @@ export interface AgentActionablePayload {
     templateSnippet?: string;
     /** Standardized execution arguments for automation engines */
     targetArguments?: Record<string, unknown>;
+    /** Fine-grained code density, volume, and telemetry metrics breakdown */
+    metricsBreakdown?: {
+        eloc?: number;
+        totalLoc?: number;
+        tokensPerEloc?: number;
+        columnDensity?: number;
+        tspr?: number;
+        por?: number;
+        compositeDensity?: number;
+        threshold?: number;
+    };
+    /** Plain technical rationale for automated agent comprehension */
+    rationale?: string;
     /** Whether an automated Agent can safely apply this patch without human arbitration */
     safeToAutomate: boolean;
 }
@@ -524,6 +537,8 @@ export interface Analyzer {
      * current pure-function model does not require.
      */
     dependsOn?: AnalyzerId[];
+    /** Whether the analyzer strictly requires a TypeScript SourceFile AST. */
+    requiresSourceFile?: boolean;
     /**
      * Standalone entry point. Run against one source file; return zero or more structured
      * Issues. Must not throw.

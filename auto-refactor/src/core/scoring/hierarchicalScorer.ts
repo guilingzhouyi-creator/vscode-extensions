@@ -14,7 +14,7 @@ import type { Issue } from '../types';
 import type { EightPillarBreakdown, PrimaryQualityPillar } from './eightPillarModel';
 import { ALL_PRIMARY_PILLARS, synthesizeEightPillars } from './eightPillarModel';
 import { computeRiskWeightedPenalties } from './riskWeightModel';
-import { computeEffectiveCodeDensity } from './effectiveDensity';
+import { computeEffectiveCodeDensity, type EffectiveDensityResult } from './effectiveDensity';
 import { detectScoreGaming } from './antiGaming';
 import type { QualityDimension, QualityGrade } from './scoringTypes';
 import { ALL_QUALITY_DIMENSIONS } from './scoringTypes';
@@ -53,6 +53,16 @@ export interface FileQualityScore {
     eightPillars: EightPillarBreakdown;
     tenDimensions: Record<QualityDimension, number>;
     effectiveDensity: number;
+    densityMetrics?: {
+        effectiveDensity: number;
+        compositeDensity: number;
+        tspr: number;
+        por: number;
+        tokensPerEloc: number;
+        columnDensity: number;
+        sufr: number;
+        gaussianHealth: number;
+    };
     functions: FunctionQualityScore[];
     issues: Issue[];
     loc?: number;
@@ -90,10 +100,85 @@ export interface ProjectQualityScore {
     eightPillars: EightPillarBreakdown;
     tenDimensions: Record<QualityDimension, number>;
     effectiveCodeDensity: number;
+    densityTensorSummary?: {
+        compositeDensity: number;
+        averageTspr: number;
+        averagePor: number;
+        averageColumnDensity: number;
+    };
     domains: DomainQualityScore[];
     totalFiles: number;
     totalIssues: number;
     fatalCount: number;
+}
+
+/**
+ * Calculates additional dimension deductions stemming from 5D code density, wiring, and fragmentation.
+ */
+function computeDensityDimensionDeduction(
+    dim: QualityDimension,
+    densityResult: EffectiveDensityResult,
+    isExemptFacade: boolean,
+): number {
+    if (densityResult.totalLoc < 15) {
+        return 0;
+    }
+    if (dim === 'maintainability') {
+        if (densityResult.isLowDensity) {
+            return 15;
+        }
+        return 0;
+    }
+    if (dim === 'architectureConsistency') {
+        if (!isExemptFacade && typeof densityResult.por === 'number' && densityResult.por > 0.60) {
+            return Math.round(15 * ((densityResult.por - 0.60) / 0.40));
+        }
+        return 0;
+    }
+    if (dim === 'performanceEfficiency') {
+        if (
+            typeof densityResult.compositeDensity === 'number' &&
+            densityResult.compositeDensity < 0.35
+        ) {
+            return Math.round(10 * ((0.35 - densityResult.compositeDensity) / 0.35));
+        }
+        return 0;
+    }
+    return 0;
+}
+
+function computeDimensionIndices(
+    riskResult: ReturnType<typeof computeRiskWeightedPenalties>,
+    densityResult: EffectiveDensityResult,
+    isExemptFacade: boolean,
+    securityCeiling: number,
+): Record<QualityDimension, number> {
+    const indices: Record<QualityDimension, number> = {} as Record<QualityDimension, number>;
+    for (const dim of ALL_QUALITY_DIMENSIONS) {
+        const riskPenalty = riskResult.dimensionPenalties?.[dim] ?? 0;
+        const densityPenalty = computeDensityDimensionDeduction(dim, densityResult, isExemptFacade);
+        const dimPenalty = riskPenalty + densityPenalty;
+        const baseScore = dim === 'codeSecurity' ? securityCeiling : DIMENSION_MAX_SCORE;
+        indices[dim] = Math.max(
+            0,
+            Math.round((baseScore - dimPenalty) * SCORE_ROUNDING) / SCORE_ROUNDING,
+        );
+    }
+    return indices;
+}
+
+function buildFileDensityMetrics(densityResult: EffectiveDensityResult) {
+    const compositeDensity = densityResult.compositeDensity ?? densityResult.effectiveDensity;
+    return {
+        effectiveDensity: densityResult.effectiveDensity,
+        compositeDensity,
+        tspr: densityResult.tspr ?? densityResult.effectiveDensity,
+        por: densityResult.por ?? Math.max(0, 1.0 - densityResult.effectiveDensity),
+        tokensPerEloc: densityResult.tokensPerEloc ?? 0,
+        columnDensity: densityResult.columnDensity ?? 0,
+        sufr: densityResult.sufr ?? 0,
+        gaussianHealth: densityResult.gaussianHealth ?? 1.0,
+    };
 }
 
 /**
@@ -124,20 +209,14 @@ export function scoreFileQuality(
     const scaleFactor = Math.max(1, loc / 100);
     const securityCeiling = computeSecurityCeiling(null, scaleFactor);
 
-    // 3. Base dimension indices (starts at securityCeiling or 100,
-    //    deducted by riskResult.dimensionPenalties)
-    const indices: Record<QualityDimension, number> = {} as Record<QualityDimension, number>;
-    for (const dim of ALL_QUALITY_DIMENSIONS) {
-        let dimPenalty = riskResult.dimensionPenalties?.[dim] ?? 0;
-        if (dim === 'maintainability' && densityResult.isLowDensity) {
-            dimPenalty += 15;
-        }
-        const baseScore = dim === 'codeSecurity' ? securityCeiling : DIMENSION_MAX_SCORE;
-        indices[dim] = Math.max(
-            0,
-            Math.round((baseScore - dimPenalty) * SCORE_ROUNDING) / SCORE_ROUNDING,
-        );
-    }
+    // 3. Base dimension indices
+    const isExemptFacade = filePath.endsWith('index.ts') || filePath.endsWith('.d.ts');
+    const indices = computeDimensionIndices(
+        riskResult,
+        densityResult,
+        isExemptFacade,
+        securityCeiling,
+    );
 
     const dataScore = Math.max(0, 100 - riskResult.pillarPenalties.data);
     const testingScore = Math.max(0, 100 - riskResult.pillarPenalties.testing);
@@ -150,6 +229,8 @@ export function scoreFileQuality(
         riskResult.ceilings,
     );
 
+    const densityMetrics = buildFileDensityMetrics(densityResult);
+
     return {
         filePath,
         domainName,
@@ -158,6 +239,7 @@ export function scoreFileQuality(
         eightPillars,
         tenDimensions: { ...indices },
         effectiveDensity: densityResult.effectiveDensity,
+        densityMetrics,
         functions: [],
         issues: allIssues,
         loc,
@@ -386,6 +468,12 @@ function createEmptyProjectScore(): ProjectQualityScore {
         eightPillars: emptyPillars,
         tenDimensions: emptyDimensions,
         effectiveCodeDensity: 1.0,
+        densityTensorSummary: {
+            compositeDensity: 1.0,
+            averageTspr: 1.0,
+            averagePor: 0.0,
+            averageColumnDensity: 1.0,
+        },
         domains: [],
         totalFiles: 0,
         totalIssues: 0,
@@ -401,6 +489,10 @@ interface AccumulatedProjectMetrics {
     readonly totalIssues: number;
     readonly fatalCount: number;
     readonly totalDensity: number;
+    readonly totalCompositeDensity: number;
+    readonly totalTspr: number;
+    readonly totalPor: number;
+    readonly totalColumnDensity: number;
     readonly totalLoc: number;
     readonly projectDimSums: Record<QualityDimension, number>;
 }
@@ -458,6 +550,10 @@ function accumulateProjectMetrics(fileScores: FileQualityScore[]): AccumulatedPr
     let totalIssues = 0;
     let fatalCount = 0;
     let totalDensity = 0;
+    let totalCompositeDensity = 0;
+    let totalTspr = 0;
+    let totalPor = 0;
+    let totalColumnDensity = 0;
     let totalLoc = 0;
 
     const projectDimSums: Record<QualityDimension, number> = {} as Record<QualityDimension, number>;
@@ -470,6 +566,19 @@ function accumulateProjectMetrics(fileScores: FileQualityScore[]): AccumulatedPr
         fatalCount += countFatalIssues(file.issues);
         totalDensity += file.effectiveDensity;
 
+        const d = file.densityMetrics;
+        if (d) {
+            totalCompositeDensity += d.compositeDensity;
+            totalTspr += d.tspr;
+            totalPor += d.por;
+            totalColumnDensity += d.columnDensity;
+        } else {
+            totalCompositeDensity += file.effectiveDensity;
+            totalTspr += file.effectiveDensity;
+            totalPor += Math.max(0, 1.0 - file.effectiveDensity);
+            totalColumnDensity += 1.0;
+        }
+
         recordDomainModule(domainMap, file);
 
         const fileLoc = Math.max(
@@ -480,7 +589,18 @@ function accumulateProjectMetrics(fileScores: FileQualityScore[]): AccumulatedPr
         accumulateDimensionSums(projectDimSums, file, fileLoc);
     }
 
-    return { domainMap, totalIssues, fatalCount, totalDensity, totalLoc, projectDimSums };
+    return {
+        domainMap,
+        totalIssues,
+        fatalCount,
+        totalDensity,
+        totalCompositeDensity,
+        totalTspr,
+        totalPor,
+        totalColumnDensity,
+        totalLoc,
+        projectDimSums,
+    };
 }
 
 /**
@@ -544,12 +664,25 @@ export function aggregateProjectScore(fileScores: FileQualityScore[]): ProjectQu
     );
     const synthesized = finalizeProjectEightPillars(projectDimensions, projectPillars);
 
+    const count = Math.max(1, fileScores.length);
+    const avgEffective = Math.round((metrics.totalDensity / count) * 100) / 100;
+    const avgComposite = Math.round((metrics.totalCompositeDensity / count) * 100) / 100;
+    const avgTspr = Math.round((metrics.totalTspr / count) * 1000) / 1000;
+    const avgPor = Math.round((metrics.totalPor / count) * 1000) / 1000;
+    const avgCol = Math.round((metrics.totalColumnDensity / count) * 1000) / 1000;
+
     return {
         compositeScore: synthesized.compositeScore,
         grade: resolveQualityGrade(synthesized.compositeScore),
         eightPillars: synthesized,
         tenDimensions: projectDimensions,
-        effectiveCodeDensity: Math.round((metrics.totalDensity / fileScores.length) * 100) / 100,
+        effectiveCodeDensity: avgEffective,
+        densityTensorSummary: {
+            compositeDensity: avgComposite,
+            averageTspr: avgTspr,
+            averagePor: avgPor,
+            averageColumnDensity: avgCol,
+        },
         domains,
         totalFiles: fileScores.length,
         totalIssues: metrics.totalIssues,

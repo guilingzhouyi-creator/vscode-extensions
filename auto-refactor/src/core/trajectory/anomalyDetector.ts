@@ -57,7 +57,7 @@ function calculateDimensionDeltas(
     current: FileRevision,
     previous: FileRevision,
 ): Record<QualityDimension, number> {
-    const dimensionDeltas: Record<QualityDimension, number> = {} as any;
+    const dimensionDeltas = {} as Record<QualityDimension, number>;
     for (const dim of ALL_QUALITY_DIMENSIONS) {
         const prevScore = previous.qualityScore.indices[dim] ?? DEFAULT_QUALITY_SCORE;
         const currScore = current.qualityScore.indices[dim] ?? DEFAULT_QUALITY_SCORE;

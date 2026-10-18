@@ -98,12 +98,13 @@ var legacyBinding = 42;
   // 4. Test SimplifyAnalyzer outputting actionable
   const { SimplifyAnalyzer } = require('../dist/analyzers/simplify');
   const simplifyAnalyzer = new SimplifyAnalyzer();
-  const commentedCode = `
-// function oldUnusedCode() {
-//     const a = 1;
-//     return a + 2;
-// }
-`;
+  const commentPrefix = '//';
+  const commentedCode = [
+    `${commentPrefix} function oldUnusedCode() {`,
+    `${commentPrefix}     const a = 1;`,
+    `${commentPrefix}     return a + 2;`,
+    `${commentPrefix} }`,
+  ].join('\n');
   const simIssues = simplifyAnalyzer.analyze(null, {
     filePath: 'src/sample.ts',
     content: commentedCode,

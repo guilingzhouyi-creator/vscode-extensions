@@ -119,9 +119,7 @@ function checkHollowFacade(
     if (codeLines.length >= minEloc) return false;
 
     // Check if substantive payload keywords or contracts exist
-    if (SUBSTANTIVE_PAYLOAD_RE.test(content)) return false;
-
-    return true;
+    return !SUBSTANTIVE_PAYLOAD_RE.test(content);
 }
 
 /**

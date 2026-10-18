@@ -441,8 +441,7 @@ export class ConstantsAnalyzer implements Analyzer {
         if (isDataOrConfig && SCHEMA_PROPERTY_TOKENS.has(lower)) return true;
         if (isAlgorithm && AST_PARSER_BENIGN_TOKENS.has(lower)) return true;
         if (WEB_AND_DOM_BENIGN_TOKENS.has(lower)) return true;
-        if (/^(?:#[a-zA-Z0-9_-]+|\.[a-zA-Z0-9_-]+)$/.test(lower)) return true;
-        return false;
+        return /^(?:#[a-zA-Z0-9_-]+|\.[a-zA-Z0-9_-]+)$/.test(lower);
     }
 
     private shouldSkipHardcodedString(

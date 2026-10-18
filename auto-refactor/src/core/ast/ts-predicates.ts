@@ -350,8 +350,7 @@ const JSX_ELEMENT_KINDS = new Set<ts.SyntaxKind>([
 
 function isTypeContext(parentNode: ts.Node, grandparent?: ts.Node): boolean {
     if (ts.isTypeNode(parentNode)) return true;
-    if (grandparent && ts.isTypeNode(grandparent)) return true;
-    return false;
+    return Boolean(grandparent && ts.isTypeNode(grandparent));
 }
 
 function isNamedPropertyContext(parentNode: ts.Node, node: ts.Node): boolean {

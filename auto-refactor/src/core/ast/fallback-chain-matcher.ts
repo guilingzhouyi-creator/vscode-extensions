@@ -74,8 +74,7 @@ function isConstantLiteral(expr: ts.Expression): boolean {
         return true;
     }
     if (ts.isArrayLiteralExpression(expr) && expr.elements.length === 0) return true;
-    if (ts.isObjectLiteralExpression(expr) && expr.properties.length === 0) return true;
-    return false;
+    return ts.isObjectLiteralExpression(expr) && expr.properties.length === 0;
 }
 
 /**
@@ -123,8 +122,7 @@ function isCrossGenerationalPair(idA: string, idB: string): boolean {
     const stemB = extractSemanticStem(idB);
 
     if (stemA === stemB) return true;
-    if (stemA.includes(stemB) || stemB.includes(stemA)) return true;
-    return false;
+    return stemA.includes(stemB) || stemB.includes(stemA);
 }
 
 /**

@@ -38,7 +38,12 @@ import {
 import { normalizeEditRanges, decodeContent } from '../ast/utf8';
 import type { IncrementalFileState } from './incremental-state';
 import type { DiffInput } from '../types';
-import type { ReviewDiffHunk, PraxisVerdict, PraxisPluginHooks } from '../praxis/contracts';
+import type {
+    ReviewDiffHunk,
+    PraxisVerdict,
+    PraxisPluginHooks,
+    PraxisEnrichedContext,
+} from '../praxis/contracts';
 
 /** Equal lines of context kept on each side of a change when building review hunks. */
 const DIFF_CONTEXT_LINES = 3;
@@ -267,14 +272,17 @@ function resolvePraxisVerdict(
     );
     let praxisVerdict: PraxisVerdict | undefined;
     if (opts.praxisHooks.thresholdPolicy && hunks.length > 0) {
-        const enriched = opts.praxisHooks.contextEnricher
-            ? opts.praxisHooks.contextEnricher.enrichHunk(opts.filePath || '', hunks[0])
+        const enriched: PraxisEnrichedContext = opts.praxisHooks.contextEnricher
+            ? (opts.praxisHooks.contextEnricher.enrichHunk(
+                  opts.filePath || '',
+                  hunks[0],
+              ) as PraxisEnrichedContext)
             : { suggestedAction: 'auto_fix' as const };
 
         const verdict = opts.praxisHooks.thresholdPolicy.evaluateChange(
             opts.filePath || '',
             hunks[0],
-            enriched as any,
+            enriched,
         );
         if (!(verdict instanceof Promise)) {
             praxisVerdict = verdict;

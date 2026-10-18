@@ -434,16 +434,31 @@ export function auditImportHorizon(
 const MAX_ANCESTOR_SEARCH_DEPTH = 3;
 
 /**
+ * Structural shape of a package.json manifest parsed from disk.
+ */
+export interface RawPackageManifest {
+    name?: string;
+    version?: string;
+    license?: string | { type?: string };
+    licenses?: Array<{ type?: string }>;
+    dependencies?: Record<string, string>;
+    devDependencies?: Record<string, string>;
+    optionalDependencies?: Record<string, string>;
+    peerDependencies?: Record<string, string>;
+    [key: string]: unknown;
+}
+
+/**
  * Safely reads and parses a JSON file, returning null if unreadable or invalid.
  * @param filePath Absolute or relative path to the JSON file
  * @returns Parsed JSON object, or null if reading or parsing failed
  */
-export function readJsonSafely(filePath: string): any | null {
+export function readJsonSafely(filePath: string): RawPackageManifest | null {
     if (!fs.existsSync(filePath)) {
         return null;
     }
     try {
-        return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+        return JSON.parse(fs.readFileSync(filePath, 'utf8')) as RawPackageManifest;
     } catch {
         return null;
     }
@@ -455,7 +470,10 @@ export function readJsonSafely(filePath: string): any | null {
  * @param packageName Target npm package name to resolve
  * @returns Parsed package.json manifest, or null if not found
  */
-export function findAncestorPackageManifest(rootDir: string, packageName: string): any | null {
+export function findAncestorPackageManifest(
+    rootDir: string,
+    packageName: string,
+): RawPackageManifest | null {
     let currentDir = rootDir;
     for (let i = 0; i < MAX_ANCESTOR_SEARCH_DEPTH; i++) {
         const manifest = readJsonSafely(
@@ -478,7 +496,9 @@ export function findAncestorPackageManifest(rootDir: string, packageName: string
  * @param manifest Parsed package.json object or raw metadata
  * @returns Normalized license string, or null if absent
  */
-export function extractLicenseFromManifest(manifest: any): string | null {
+export function extractLicenseFromManifest(
+    manifest: RawPackageManifest | null | undefined,
+): string | null {
     if (!manifest) return null;
     if (typeof manifest.license === 'string') return manifest.license;
     if (typeof manifest.license?.type === 'string') return manifest.license.type;

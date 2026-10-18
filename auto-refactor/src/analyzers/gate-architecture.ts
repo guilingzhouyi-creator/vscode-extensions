@@ -118,9 +118,11 @@ export class GateArchitectureAnalyzer implements Analyzer {
 
         return issues.filter((issue) => {
             const issueFile = issue.location.file;
-            if (issueFile === relPath || issueFile === normPath) return true;
-            if (isManifest && isRepoLevelAnchor(issueFile)) return true;
-            return false;
+            return (
+                issueFile === relPath ||
+                issueFile === normPath ||
+                (isManifest && isRepoLevelAnchor(issueFile))
+            );
         });
     }
 

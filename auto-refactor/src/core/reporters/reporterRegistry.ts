@@ -18,7 +18,13 @@
  */
 
 import type { ScanReport } from '../types';
-import { toAgentReview, toCapp, toPraxisPresentation } from './agent-review-reporter';
+import type { PraxisPresentationOptions } from '../praxis/presentation/presentation-types';
+import {
+    toAgentReview,
+    toCapp,
+    toPraxisPresentation,
+    type AgentReviewReporterOptions,
+} from './agent-review-reporter';
 
 /**
  * Public contract for a pluggable report renderer: a stable, case-insensitive `name` used as
@@ -258,7 +264,7 @@ registerReporter({
 registerReporter({
     name: 'agent',
     format(report: ScanReport, options?: Record<string, unknown>): string {
-        return toAgentReview(report, options as any);
+        return toAgentReview(report, options as AgentReviewReporterOptions | undefined);
     },
 });
 
@@ -272,6 +278,6 @@ registerReporter({
 registerReporter({
     name: 'praxis',
     format(report: ScanReport, options?: Record<string, unknown>): string {
-        return toPraxisPresentation(report, options as any);
+        return toPraxisPresentation(report, options as PraxisPresentationOptions | undefined);
     },
 });

@@ -11,6 +11,8 @@
  *     See docs/02-parsers-and-ast/01-multilang-abstraction.md for architectural specifications.
  */
 
+import type ts from 'typescript';
+
 /** Language-independent node classification used by analyzers (never `ts.SyntaxKind`). */
 export enum NodeKind {
     SourceFile = 'SourceFile',
@@ -97,7 +99,7 @@ export interface NormalizedNode {
 export interface NormalizedAst {
     root: NormalizedNode;
     /** Underlying native source file AST (e.g. ts.SourceFile) when available. */
-    sourceFile?: any;
+    sourceFile?: ts.SourceFile;
 }
 
 /**

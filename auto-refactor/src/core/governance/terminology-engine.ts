@@ -731,8 +731,7 @@ function auditLineAgainstRules(
 
 function isEligibleProseLine(line: string, isDefaultRules: boolean): boolean {
     if (!line || line.trim().length === 0) return false;
-    if (isDefaultRules && !DEFAULT_RULES_FAST_CANDIDATE_RE.test(line)) return false;
-    return true;
+    return !isDefaultRules || DEFAULT_RULES_FAST_CANDIDATE_RE.test(line);
 }
 
 /**

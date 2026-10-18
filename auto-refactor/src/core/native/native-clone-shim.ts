@@ -194,7 +194,8 @@ export function detectCloneBlocksShim(content: string, minCloneLines: number): N
                 lineSpan: minCloneLines,
             });
             break;
-        } else if (prevIdx === undefined) {
+        }
+        if (prevIdx === undefined) {
             blockMap.set(h, i);
         }
     }
