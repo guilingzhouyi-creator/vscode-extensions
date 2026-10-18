@@ -1,12 +1,12 @@
 {
   "schema": "workspace-rule-catalog/v1",
-  "generatedAt": "2026-10-18T05:12:08.179Z",
-  "totalRules": 471,
+  "generatedAt": "2026-10-18T06:48:59.859Z",
+  "totalRules": 473,
   "counts": {
     "autoRefactor": 353,
     "workspaceTiming": 49,
     "webGames": 50,
-    "globalTooling": 19
+    "globalTooling": 21
   },
   "rules": [
     {
@@ -575,6 +575,20 @@
       "family": "CMG",
       "severity": "error",
       "summary": "执行标签区域零执行数字纪律"
+    },
+    {
+      "id": "CMG-STY-007",
+      "project": "global-tooling",
+      "family": "CMG",
+      "severity": "error",
+      "summary": "提交标题动词契约与祈使语态拦截"
+    },
+    {
+      "id": "CMG-STY-008",
+      "project": "global-tooling",
+      "family": "CMG",
+      "severity": "error",
+      "summary": "第一人称主观叙述与非客观人称拦截"
     },
     {
       "id": "CMP-CAL-001",

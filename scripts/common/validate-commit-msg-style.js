@@ -18,6 +18,8 @@
 
 const fs = require('fs');
 const path = require('path');
+const { normalizeText } = require('./commit-tokenizer');
+const { auditCommitStyleGuardrails } = require('./commit-style-arbiter');
 
 const TERMS_FILE = path.join(__dirname, 'commit-msg-forbidden-terms.json');
 
@@ -197,18 +199,24 @@ function checkExecutionSectionNumeric(rawLine, lineNum, rule) {
  * @returns {{ valid: boolean, findings: Array<object> }} Validation result with findings
  */
 function validateCommitMessageContent(content) {
+  const normalized = normalizeText(content);
   const config = loadTermsConfig();
   const rules = config.rules || config.forbiddenRules || [];
   const whitelist = config.whitelist || [];
   const rule6 = rules.find((r) => r.id === 'CMG-STY-006');
 
-  const lines = content.split(/\r?\n/);
+  const lines = normalized.split(/\r?\n/);
   const findings = [];
   let inExecutionSection = false;
 
   const EXECUTION_HEADER_REGEX = /^\s*(?:\[|#{1,4}\s*|\b)(?:Verification|Execution|验证|执行|测试)(?:[\s\/\]:]|$)/i;
   const OTHER_HEADER_REGEX = /^\s*(?:\[|#{1,4}\s*|\b)(?:Project|Why|Added|Changed|Fixed|Removed|Refactor|Docs|Chore|项目|项目归属|动机|背景|新增|变更|修改|修复|删除)(?:[\s\/\]:]|$)/i;
 
+  // 1. Structural style guardrail auditing (CMG-STY-007 imperative mood, CMG-STY-008 zero-POV, CMG-PRJ-001 nomenclature)
+  const guardrailResult = auditCommitStyleGuardrails(normalized);
+  findings.push(...guardrailResult.findings);
+
+  // 2. Lexical & numeric constraint verification
   for (let i = 0; i < lines.length; i++) {
     const rawLine = lines[i];
     if (/^\s*#/.test(rawLine) || !rawLine.trim()) continue;
@@ -223,6 +231,9 @@ function validateCommitMessageContent(content) {
     const sanitizedLine = sanitizeLineForChecking(rawLine, whitelist);
 
     for (const rule of rules) {
+      if (rule.id === 'CMG-STY-007' || rule.id === 'CMG-STY-008' || rule.id === 'CMG-STY-006' || rule.id === 'CMG-PRJ-001') {
+        continue;
+      }
       findings.push(...checkPatternMatch(sanitizedLine, rawLine, i + 1, rule));
       findings.push(...checkAsciiMatch(sanitizedLine, rawLine, i + 1, rule));
     }
@@ -232,7 +243,7 @@ function validateCommitMessageContent(content) {
     }
   }
 
-  return { valid: findings.length === 0, findings };
+  return { valid: findings.length === 0, findings, guardrail: guardrailResult };
 }
 
 /**
@@ -293,6 +304,12 @@ const TEST_CASES = [
   { name: 'Normal Chinese Technical Fact', msg: 'fix(parser): 修复空指针异常\n\n[Why]\n- 防止非法输入导致崩溃。\n\n[Changed]\n- 通过验证配置项的存在性保证系统稳定运行，增加类型守卫。\n- 通过测试用例重现边界情况并修复。\n\n[Verification]\n- 运行 node scripts/test-parallel.js 回归测试。', expectValid: true },
   { name: 'Normal English Technical Fact', msg: 'feat(stream): support passing custom options to worker pool\n\n[Why]\n- Allow configurable buffer sizing。\n\n[Changed]\n- Handle passing options to downstream handlers。\n\n[Verification]\n- Run vitest unit tests across modified worker routines。', expectValid: true },
   { name: 'Valid Technical Fact', msg: 'docs(readme): 更新各子模块状态标注并补充实验性质说明\n\n[Why]\n- 准确说明模块开发阶段。\n\n[Changed]\n- 更新 README.md 中的项目矩阵说明。\n\n[Verification]\n- 运行本地预审脚本。', expectValid: true },
+  { name: 'CAT-07 Chinese Imperative Header Violation', msg: 'feat(core): 修改了分词器实现\n\n[Project: governance]\n[Why]\n对齐规范。\n\n[Verification]\n断言测试成立。', expectRule: 'CMG-STY-007', expectValid: false },
+  { name: 'CAT-07 English Imperative Header Violation', msg: 'feat(core): modified tokenizer implementation\n\n[Project: governance]\n[Why]\nAlign with specs.\n\n[Verification]\nAssert tests pass.', expectRule: 'CMG-STY-007', expectValid: false },
+  { name: 'CAT-08 Chinese First-Person Pronouns Violation', msg: 'feat(core): 重构分词器实现\n\n[Project: governance]\n[Why]\n我们在本次改动中优化了架构。\n\n[Verification]\n断言测试成立。', expectRule: 'CMG-STY-008', expectValid: false },
+  { name: 'CAT-08 English First-Person Pronouns Violation', msg: 'feat(core): refactor tokenizer implementation\n\n[Project: governance]\n[Why]\nWe refactored the tokenizer.\n\n[Verification]\nAssert tests pass.', expectRule: 'CMG-STY-008', expectValid: false },
+  { name: 'CAT-02 Adversarial Zero-Width Evasion Normalization', msg: 'feat(core): 完\u200B美实现分词器\n\n[Project: governance]\n[Why]\n提高稳定性。\n\n[Verification]\n断言测试成立。', expectRule: 'CMG-STY-002', expectValid: false },
+  { name: 'Whitelist Academic Test Oracle Context', msg: 'feat(rules): 引入脆性断言神谕与差分神谕检测器\n\n[Project: auto-refactor]\n[Why]\n学术测试理论中的测试神谕（Test Oracle）用于判定程序行为。\n\n[Verification]\n运行断言神谕检测套件。', expectValid: true },
 ];
 
 function runSingleTestCase(tc) {

@@ -64,15 +64,28 @@
         "九重防御",
         "案卷施工",
         "四阶段案卷",
-        "规则金字塔"
+        "规则金字塔",
+        "神喻",
+        "神谕",
+        "断言神喻",
+        "断言神谕",
+        "测试神喻",
+        "测试神谕",
+        "差分神喻",
+        "差分神谕",
+        "神喻等价",
+        "神谕等价",
+        "神喻机制",
+        "神谕机制"
       ],
       "asciiPatterns": [
         "\\b(flawless|perfect|perfection|ultimate|bulletproof|unbeatable|invincible|god-?tier|peerless|silver\\s*bullet|zero-?bug|industrial-?grade|enterprise-?grade|state-?of-?the-?art|best-?in-?class)\\b",
         "\\b(completely\\s*solved|fully\\s*eliminated|never\\s*fails?|absolutely\\s*(safe|correct|flawless))\\b",
         "\\b100%\\s*(safe|secure|fixed|working|reliable|guaranteed)\\b",
-        "\\b(?:nine-fold|9-fold)\\s*(?:gates?|defense|defences?|guards?)\\b"
+        "\\b(?:nine-fold|9-fold)\\s*(?:gates?|defense|defences?|guards?)\\b",
+        "\\b(?:differential\\s*|test\\s*|assertion\\s*)?oracle(?:s)?\\b"
       ],
-      "reason": "严禁使用绝对化、神话或过度肯定的商业宣扬词汇，技术陈述必须客观严谨。",
+      "reason": "严禁使用绝对化、神话或过度肯定的商业宣扬词汇（包含神喻/神谕/oracle等非技术事实黑话），技术陈述必须客观严谨。",
       "guidance": "请陈述具体的技术解决手段与覆盖用例，例如：'在配置解析前增加非空校验，规避缺少可选字段时的异常'。"
     },
     {
@@ -211,9 +224,42 @@
       "asciiPatterns": [],
       "reason": "提交说明必须明确项目归属元数据，杜绝项目归属缺失或捏造不存在的项目标识。",
       "guidance": "请在正文第一区块添加 [Project / 项目归属]，并填入合法项目标识（workspace-timing | auto-refactor | WebGames | governance）。"
+    },
+    {
+      "id": "CMG-STY-007",
+      "category": "imperative_mood",
+      "severity": "error",
+      "title": "提交标题动词契约与祈使语态拦截",
+      "patterns": [],
+      "asciiPatterns": [],
+      "reason": "提交标题必须使用祈使句（以标准祈使动词开头），严禁使用陈述句、过去式或被动完成态描述。",
+      "guidance": "标题摘要首词应使用标准祈使动词（如 新增、修复、重构、对齐、加固、消除、演进、消融 等）。"
+    },
+    {
+      "id": "CMG-STY-008",
+      "category": "zero_pov",
+      "severity": "error",
+      "title": "第一人称主观叙述与非客观人称拦截",
+      "patterns": [],
+      "asciiPatterns": [],
+      "reason": "Git 提交信息属于长期客观技术档案，必须使用零人称/客观第三人称视角，严禁使用第一人称主观代词。",
+      "guidance": "移除第一人称代词，采用直接陈述客观技术事实的祈使句或无主语句。"
     }
   ],
   "whitelist": [
+    "测试神谕",
+    "断言神谕",
+    "脆性神谕",
+    "差分神谕",
+    "神谕基准",
+    "神谕验证",
+    "测试预言机",
+    "断言预言机",
+    "差分预言机",
+    "test oracle",
+    "brittle oracle",
+    "assertion oracle",
+    "differential oracle",
     "绝对路径",
     "绝对地址",
     "绝对值",
