@@ -414,6 +414,7 @@ async function runSelfAudit(options = {}) {
   const scanReport = await scan({
     root: ROOT,
     include: ['src/**/*.ts', 'scripts/*.js'],
+    parser: 'oxc',
     autoTune: false,
     workers: defaultWorkers,
     logLevel: RUN_LOG_LEVEL_WARN,

@@ -4,6 +4,8 @@ export default defineConfig({
     test: {
         environment: 'node',
         include: ['tests/unit/**/*.test.ts'],
+        fsModuleCache: true,
+        isolate: false,
         coverage: {
             provider: 'v8',
             reporter: ['text', 'html', 'json'],

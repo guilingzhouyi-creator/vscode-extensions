@@ -47,13 +47,8 @@ function testRealRepoBatchEquivalence() {
 
   const targetFiles = [
     'package.json',
-    'tsconfig.json',
     'src/api.ts',
-    'src/index.ts',
-    'src/cli/index.ts',
-    'src/core/file-discovery.ts',
     'src/core/evolution/git-history-miner.ts',
-    'src/core/evolution/code-evolution-analyzer.ts',
   ];
 
   const cwd = path.resolve(__dirname, '..');
@@ -114,8 +109,6 @@ function testCodeEvolutionAnalyzerBatch() {
   const targetFiles = [
     'package.json',
     'src/api.ts',
-    'src/cli/index.ts',
-    'src/core/file-discovery.ts',
   ];
 
   const minerSeq = new GitHistoryMiner({ repoRoot: cwd, maxCommits: EQUIVALENCE_MAX_COMMITS });

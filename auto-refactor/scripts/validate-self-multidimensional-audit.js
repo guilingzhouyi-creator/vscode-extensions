@@ -183,6 +183,44 @@ function countEffectiveLoc(content) {
   return effectiveLoc;
 }
 
+function countAstNodes(filePath, content) {
+  try {
+    const oxc = require('oxc-parser');
+    const parsed = oxc.parseSync(filePath, content);
+    if (parsed && parsed.program) {
+      let count = 0;
+      function walk(node) {
+        if (!node || typeof node !== 'object') return;
+        count++;
+        for (const k in node) {
+          if (k === 'parent') continue;
+          const val = node[k];
+          if (Array.isArray(val)) {
+            for (let i = 0; i < val.length; i++) {
+              const item = val[i];
+              if (item && typeof item === 'object') walk(item);
+            }
+          } else if (val && typeof val === 'object') {
+            walk(val);
+          }
+        }
+      }
+      walk(parsed.program);
+      return count;
+    }
+  } catch (_err) {
+    void _err;
+  }
+  const sourceFile = ts.createSourceFile(filePath, content, ts.ScriptTarget.Latest, true);
+  let nodeCount = 0;
+  function visit(node) {
+    nodeCount++;
+    ts.forEachChild(node, visit);
+  }
+  visit(sourceFile);
+  return nodeCount;
+}
+
 function auditAstDensity(allFiles) {
   console.log('[Gate 3] AST / LOC Syntax Density Guard');
   let totalDensity = 0;
@@ -194,14 +232,7 @@ function auditAstDensity(allFiles) {
     const effectiveLoc = countEffectiveLoc(content);
     if (effectiveLoc < 3) continue;
 
-    const sourceFile = ts.createSourceFile(filePath, content, ts.ScriptTarget.Latest, true);
-    let nodeCount = 0;
-    function visit(node) {
-      nodeCount++;
-      ts.forEachChild(node, visit);
-    }
-    visit(sourceFile);
-
+    const nodeCount = countAstNodes(filePath, content);
     const density = nodeCount / effectiveLoc;
     totalDensity += density;
     densityAudited++;

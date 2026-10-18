@@ -23,7 +23,7 @@ const ROOT = path.join(__dirname, '..');
 
 // ── CLI Arguments ──
 const rawArgs = process.argv.slice(2);
-let concurrency = Math.min(16, Math.max(2, os.cpus().length || 4));
+let concurrency = Math.min(12, Math.max(2, os.cpus().length || 4));
 let bail = false;
 let skipUnit = false;
 let filter = '';
@@ -42,6 +42,17 @@ for (let i = 0; i < rawArgs.length; i++) {
 }
 
 // ── Test Suites Declaration ──
+// Priority set for heavy suites (Longest Processing Time First / LPT scheduling)
+const HIGH_LATENCY_SUITES_PRIORITY = new Set([
+  'validate-triplane-cross-project',
+  'validate-diff',
+  'validate-consumer-runner',
+  'validate-batch-git-history',
+  'validate-symbol-index-pack',
+  'validate-data-flow-pack',
+  'validate-no-empty-scripts',
+]);
+
 // Stage 1: Isolated parallel test suites (no shared daemon or corpus disk state)
 const PARALLEL_SUITES = [
   { name: 'validate-native-operator', script: 'scripts/validate-native-operator.js' },
@@ -95,10 +106,6 @@ const PARALLEL_SUITES = [
   {
     name: 'validate-precision-governance',
     script: 'scripts/validate-precision-governance.js',
-  },
-  {
-    name: 'validate-self-multidimensional-audit',
-    script: 'scripts/validate-self-multidimensional-audit.js',
   },
   { name: 'validate-suite-manifest', script: 'scripts/validate-suite-manifest.js' },
   { name: 'validate-test-runner-harness', script: 'scripts/validate-test-runner-harness.js' },
@@ -372,6 +379,10 @@ const DAEMON_SUITES = [
 const SELF_AUDIT_SUITES = [
   { name: 'validate-self-audit', script: 'scripts/validate-self-audit.js' },
   { name: 'validate-self-refactor', script: 'scripts/validate-self-refactor.js' },
+  {
+    name: 'validate-self-multidimensional-audit',
+    script: 'scripts/validate-self-multidimensional-audit.js',
+  },
 ];
 
 const SEQUENTIAL_SUITES = [...DAEMON_SUITES, ...SELF_AUDIT_SUITES];
@@ -589,39 +600,53 @@ async function main() {
   const shouldRunUnit = !skipUnit && (!filter || filter.includes('unit') || filter.includes('vitest'));
   const vitestPromise = shouldRunUnit ? runVitestUnit(false) : Promise.resolve(null);
 
-  if (parallelList.length > 0) {
-    console.log(
-      `--- [Isolated Suites] Executing ${parallelList.length} Independent Suites in Parallel ---`,
-    );
-    await runAsyncPool(parallelList, concurrency, async (suite) => {
+  if (filter) {
+    if (parallelList.length > 0) {
+      console.log(`--- [Parallel Filtered] Executing ${parallelList.length} Suites ---`);
+      await runAsyncPool(parallelList, concurrency, async (suite) => {
+        const res = await executeSuite(suite);
+        recordResult(suite, res, passed, failed);
+        return res;
+      });
+    }
+    const unitResult = await vitestPromise;
+    if (unitResult) {
+      recordResult({ name: 'vitest-unit', script: 'vitest run' }, unitResult, passed, failed);
+    }
+    if (sequentialList.length > 0 && (!bail || failed.length === 0)) {
+      console.log(`--- [Serial Filtered] Executing ${sequentialList.length} Stateful Suites ---`);
+      await runSequentialSuites(sequentialList, bail, passed, failed);
+    }
+  } else {
+    // 4 Disjoint Lanes Operating Concurrently with zero state collision
+    console.log(`--- [Four-Way Fully Pipelined Concurrent Test Execution] ---`);
+    console.log(`    Lane 1: Isolated Worker Pool (${parallelList.length} suites, ${concurrency} workers)`);
+    console.log(`    Lane 2: Stateful Daemon & Corpus Suites (${DAEMON_SUITES.length} suites)`);
+    console.log(`    Lane 3: Self-Audit & Baseline Radar Suites (${SELF_AUDIT_SUITES.length} suites)`);
+    console.log(`    Lane 4: Vitest In-Memory Unit Suites\n`);
+
+    // Prioritize high-latency suites first (LPT scheduling) so heavy jobs start immediately
+    parallelList.sort((a, b) => {
+      const aPri = HIGH_LATENCY_SUITES_PRIORITY.has(a.name) ? 0 : 1;
+      const bPri = HIGH_LATENCY_SUITES_PRIORITY.has(b.name) ? 0 : 1;
+      return aPri - bPri;
+    });
+
+    const parallelPromise = runAsyncPool(parallelList, concurrency, async (suite) => {
       const res = await executeSuite(suite);
       recordResult(suite, res, passed, failed);
       return res;
     });
-  }
 
-  // Await overlapping vitest result
-  const unitResult = await vitestPromise;
-  if (unitResult) {
-    recordResult({ name: 'vitest-unit', script: 'vitest run' }, unitResult, passed, failed);
-  }
+    const daemonPromise = runSequentialSuites(DAEMON_SUITES, bail, passed, failed);
+    const selfAuditPromise = runSequentialSuites(SELF_AUDIT_SUITES, bail, passed, failed);
+    const unitPromise = vitestPromise.then((unitResult) => {
+      if (unitResult) {
+        recordResult({ name: 'vitest-unit', script: 'vitest run' }, unitResult, passed, failed);
+      }
+    });
 
-  const canRunSequential = (!bail || failed.length === 0);
-  if (canRunSequential) {
-    if (!filter) {
-      console.log(
-        `\n--- [Partitioned Stateful Suites] Executing 2 Disjoint Lanes in Parallel ---`,
-      );
-      await Promise.all([
-        runSequentialSuites(DAEMON_SUITES, bail, passed, failed),
-        runSequentialSuites(SELF_AUDIT_SUITES, bail, passed, failed),
-      ]);
-    } else if (sequentialList.length > 0) {
-      console.log(
-        `\n--- [Serial Suites] Executing ${sequentialList.length} Stateful/Daemon Suites Sequentially ---`,
-      );
-      await runSequentialSuites(sequentialList, bail, passed, failed);
-    }
+    await Promise.all([parallelPromise, daemonPromise, selfAuditPromise, unitPromise]);
   }
 
   const totalTime = ((Date.now() - overallStart) / 1000).toFixed(2);

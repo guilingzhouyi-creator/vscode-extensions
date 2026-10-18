@@ -85,6 +85,7 @@ function writeConfig() {
         workers: 1,
         respectGitignore: false,
         failOnAnalyzerError: false,
+        parser: 'oxc',
       },
       null,
       2,

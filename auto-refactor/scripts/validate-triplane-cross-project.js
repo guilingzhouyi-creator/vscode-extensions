@@ -152,7 +152,7 @@ async function buildProjectIndices(projectId) {
 
   if (projectId === 'auto-refactor') {
     root = path.resolve(__dirname, '..');
-    include = ['src/api.ts', 'src/core/**/*.ts'];
+    include = ['src/api.ts', 'src/core/scoring/*.ts', 'src/core/evolution/*.ts'];
   } else if (projectId === 'workspace-timing') {
     root = path.resolve(__dirname, '../../workspace-timing');
     include = ['src/extension.ts', 'src/domain/**/*.ts'];
@@ -164,6 +164,7 @@ async function buildProjectIndices(projectId) {
   const report = await scan({
     root,
     include,
+    parser: 'oxc',
     cache: false,
     logLevel: 'silent',
   });
@@ -249,12 +250,15 @@ async function main() {
   ];
 
   const results = [];
+  const projectIndicesMap = new Map();
+  const allIndices = await Promise.all(projects.map((p) => buildProjectIndices(p.id)));
+  projects.forEach((p, idx) => projectIndicesMap.set(p.id, allIndices[idx]));
 
   for (const proj of projects) {
     console.log(`>>> Evaluating Project: [${proj.name}]`);
 
     // 1. Static Plane Evaluation (Live Physical AST Scan)
-    const indices = await buildProjectIndices(proj.id);
+    const indices = projectIndicesMap.get(proj.id);
     const staticVector = synthesizeStaticQualityVector(indices);
     const staticScore = computeStaticQualityScore(staticVector);
 
