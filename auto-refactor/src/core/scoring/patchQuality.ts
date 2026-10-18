@@ -17,7 +17,7 @@ import { ALL_PRIMARY_PILLARS } from './eightPillarModel';
 import type { FileQualityScore } from './hierarchicalScorer';
 import { scoreFileQuality } from './hierarchicalScorer';
 import { RULE_GOV_GAM_001, detectDiffScoreGaming } from './antiGaming';
-import { scoreDelta } from './scorer-formulas';
+import { scoreDelta, clampRatio } from './scorer-formulas';
 import {
     extractConstantEntities,
     analyzeConstantTransitions,
@@ -250,21 +250,29 @@ function computePatchDensityMetrics(
     effectiveDensityBefore: number,
     effectiveDensityAfter: number,
 ): PatchDensityMetricsResult {
-    const compositeDensityBefore =
-        beforeDetails.densityMetrics?.compositeDensity ?? effectiveDensityBefore;
-    const compositeDensityAfter =
-        afterDetails.densityMetrics?.compositeDensity ?? effectiveDensityAfter;
+    const compositeDensityBefore = clampRatio(
+        beforeDetails.densityMetrics?.compositeDensity ?? effectiveDensityBefore,
+    );
+    const compositeDensityAfter = clampRatio(
+        afterDetails.densityMetrics?.compositeDensity ?? effectiveDensityAfter,
+    );
     const compositeDensityDelta =
         Math.round((compositeDensityAfter - compositeDensityBefore) * 100) / 100;
 
-    const tsprBefore = beforeDetails.densityMetrics?.tspr ?? effectiveDensityBefore;
-    const tsprAfter = afterDetails.densityMetrics?.tspr ?? effectiveDensityAfter;
+    const tsprBefore = clampRatio(
+        beforeDetails.densityMetrics?.tspr ?? effectiveDensityBefore,
+    );
+    const tsprAfter = clampRatio(
+        afterDetails.densityMetrics?.tspr ?? effectiveDensityAfter,
+    );
     const tsprDelta = Math.round((tsprAfter - tsprBefore) * 1000) / 1000;
 
-    const porBefore =
-        beforeDetails.densityMetrics?.por ?? Math.max(0, 1.0 - effectiveDensityBefore);
-    const porAfter =
-        afterDetails.densityMetrics?.por ?? Math.max(0, 1.0 - effectiveDensityAfter);
+    const porBefore = clampRatio(
+        beforeDetails.densityMetrics?.por ?? Math.max(0, 1.0 - effectiveDensityBefore),
+    );
+    const porAfter = clampRatio(
+        afterDetails.densityMetrics?.por ?? Math.max(0, 1.0 - effectiveDensityAfter),
+    );
     const porDelta = Math.round((porAfter - porBefore) * 1000) / 1000;
 
     return {

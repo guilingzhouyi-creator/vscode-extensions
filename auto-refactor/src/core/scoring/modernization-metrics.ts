@@ -11,7 +11,7 @@
  * Exit Semantics & Design Rationale: Pure deterministic math helpers; strictly zero I/O.
  */
 
-import { SCORE_ROUNDING, PERCENT_SCALE } from './scorer-formulas';
+import { SCORE_ROUNDING, PERCENT_SCALE, safeDivide, clampScore } from './scorer-formulas';
 
 const SCORE_MAX = 100;
 const SCORE_PERFECT_FLOAT = 100.0;
@@ -692,7 +692,7 @@ function computeWeightedMean(
         const scoredEntry = resolveLanguageScoreWeight(keys[i], scores, weights);
         sum += scoredEntry.score * scoredEntry.weight;
     }
-    return sum / totalWeight;
+    return safeDivide(sum, totalWeight, 0);
 }
 
 interface WeightedVarianceContext {
@@ -717,7 +717,7 @@ function computeWeightedVariance(context: WeightedVarianceContext): number {
         const delta = scoredEntry.score - context.mean;
         sum += scoredEntry.weight * delta * delta;
     }
-    return sum / context.totalWeight;
+    return safeDivide(sum, context.totalWeight, 0);
 }
 
 /**
@@ -769,7 +769,6 @@ export function computePolyglotIndex(
 
     const dispersionPenalty = Math.max(0, 1.0 - sigmaS / SCORE_PERFECT_FLOAT);
     const polyglotScore = sMean * dispersionPenalty;
-    const clampedScore = Math.max(0, Math.min(SCORE_MAX, polyglotScore));
-    return Math.round(clampedScore * SCORE_ROUNDING) / SCORE_ROUNDING;
+    return clampScore(polyglotScore);
 }
 export { computePolyglotIndex as calculatePolyglotGeneralizationIndex };

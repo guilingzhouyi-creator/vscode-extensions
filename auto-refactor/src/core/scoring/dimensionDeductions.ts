@@ -132,10 +132,13 @@ export const FAMILY_DIMENSIONS: Record<string, QualityDimension> = {
     DAT: DIMENSION_PERFORMANCE_EFFICIENCY,
     'TST-TAU': DIMENSION_MAINTAINABILITY,
     'TST-DBT': DIMENSION_MAINTAINABILITY,
+    'TST-ORC': DIMENSION_MAINTAINABILITY,
     // Test topology breaches are charged to maintainability by the rule table, so the bare
     // TST catch-all below must not claim them for modernity.
     'TST-TOP': DIMENSION_MAINTAINABILITY,
     TST: DIMENSION_MODERNITY,
+    'NUM-BND': DIMENSION_SEMANTIC_PURITY,
+    NUM: DIMENSION_SEMANTIC_PURITY,
     'DEP-LAZ': DIMENSION_ARCHITECTURE_CONSISTENCY,
     'DEP-RES': DIMENSION_ARCHITECTURE_CONSISTENCY,
     'DEP-INV': DIMENSION_ARCHITECTURE_CONSISTENCY,
@@ -612,18 +615,18 @@ export function applyIssueDeductions(
     const effectiveApply: DeductionApplier =
         combinedMultiplier !== 1.0 || occurrenceIndex > 0
             ? (dim, points, reason, rule, line) => {
-                  const compoundedPoints = calculateCompoundedDeduction(
-                      points,
-                      occurrenceIndex,
-                      alpha,
-                  );
-                  const amplifiedPoints = Math.round(compoundedPoints * combinedMultiplier);
-                  const amplifiedReason =
-                      combinedMultiplier > 1.0
-                          ? `${reason} [Vulnerability x${combinedMultiplier.toFixed(2)}]`
-                          : reason;
-                  apply(dim, amplifiedPoints, amplifiedReason, rule, line);
-              }
+                const compoundedPoints = calculateCompoundedDeduction(
+                    points,
+                    occurrenceIndex,
+                    alpha,
+                );
+                const amplifiedPoints = Math.round(compoundedPoints * combinedMultiplier);
+                const amplifiedReason =
+                    combinedMultiplier > 1.0
+                        ? `${reason} [Vulnerability x${combinedMultiplier.toFixed(2)}]`
+                        : reason;
+                apply(dim, amplifiedPoints, amplifiedReason, rule, line);
+            }
             : apply;
 
     // A single finding can match both a family applier and a rule-table row, and the two

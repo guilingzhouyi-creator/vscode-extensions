@@ -78,6 +78,8 @@ import {
     RULE_TST_TAU_001,
     RULE_TST_DBT_001,
     RULE_TST_TOP_001,
+    RULE_TST_ORC_001,
+    RULE_NUM_BND_001,
     DEDUCTION_TEST_TOPOLOGY_DISCIPLINE,
     DEDUCTION_POLYNOMIAL_TIME,
     DEDUCTION_UNBOUNDED_DATA_QUERY,
@@ -189,7 +191,7 @@ const RULES_DAT_ARCH = [RULE_DAT_LAY_001, RULE_DAT_DEF_001];
 const RULES_DEP_ARCH = [RULE_DEP_LAZ_001, RULE_DEP_RES_001, RULE_DEP_INV_001];
 const RULES_DEP_STD = [RULE_DEP_ORD_001, RULE_DEP_ORD_002, RULE_DEP_WLD_001];
 const RULES_TST_MODERN = [RULE_TST_ILS_001, RULE_TST_SKP_001, RULE_TST_DEN_001];
-const RULES_TST_MAINTAIN = [RULE_TST_TAU_001, RULE_TST_DBT_001];
+const RULES_TST_MAINTAIN = [RULE_TST_TAU_001, RULE_TST_DBT_001, RULE_TST_ORC_001];
 
 /**
  * Probe matching a fragment of the finding message.
@@ -339,6 +341,13 @@ export const DIMENSION_RULES: DimensionRule[] = [
         rationale: ScoringRationales.TYPE_SAFETY_ESCAPE,
     },
     {
+        analyzer: ANALYZER_GOVERNANCE,
+        covers: ruleMatches([RULE_NUM_BND_001], ['unbounded', 'NUM-BND']),
+        dimension: DIMENSION_SEMANTIC_PURITY,
+        points: DEDUCTION_UNBOUNDED_NESTING,
+        rationale: ScoringRationales.UNBOUNDED_NESTING,
+    },
+    {
         analyzer: ANALYZER_HYGIENE,
         covers: ruleMatches([RULE_HYG_DEAD_CODE], ['dead', 'unreachable']),
         dimension: DIMENSION_SEMANTIC_PURITY,
@@ -431,7 +440,7 @@ export const DIMENSION_RULES: DimensionRule[] = [
     },
     {
         analyzer: ANALYZER_TEST_MODERNITY,
-        covers: ruleMatches(RULES_TST_MAINTAIN, ['tautological', 'debt']),
+        covers: ruleMatches(RULES_TST_MAINTAIN, ['tautological', 'debt', 'oracle']),
         dimension: DIMENSION_MAINTAINABILITY,
         points: DEDUCTION_TAUTOLOGICAL_ASSERTION,
         rationale: ScoringRationales.TAUTOLOGICAL_ASSERTION,

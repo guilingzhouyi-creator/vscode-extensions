@@ -351,6 +351,15 @@ export const RULE_TST_DEN_001 = 'TST-DEN-001';
 export const RULE_TST_DBT_001 = 'TST-DBT-001';
 /** Rule id for multi-language test topology discipline and embedded zone contracts. */
 export const RULE_TST_TOP_001 = 'TST-TOP-001';
+/** Rule id for brittle magic assertion oracles asserting exact entity totals or scalar counts. */
+export const RULE_TST_ORC_001 = 'TST-ORC-001';
+/** Rule id for one-sided unbounded numeric conditions without paired upper/lower bounds. */
+export const RULE_NUM_BND_001 = 'NUM-BND-001';
+
+/** Points deducted for brittle magic assertion oracles. */
+export const DEDUCTION_BRITTLE_ORACLE = 15;
+/** Points deducted for unbounded numeric conditions. */
+export const DEDUCTION_UNBOUNDED_CONDITION = 15;
 
 /** Rule id for non-standard in-function dynamic imports. */
 export const RULE_DEP_LAZ_001 = 'DEP-LAZ-001';

@@ -22,6 +22,16 @@ import type {
     QualityWeights,
 } from './scoringTypes';
 import { ALL_QUALITY_DIMENSIONS, DIMENSION_ANALYZERS, DIMENSION_SCALE_MODE } from './scoringTypes';
+export {
+    clamp,
+    clampRatio,
+    clampScore,
+    safeDivide,
+    isWithinCorridor,
+    assertWithinCorridor,
+    sanitizeBound,
+    DEFAULT_CORRIDOR_EPSILON,
+} from './bounded-corridor';
 
 /** Maximum clean score a quality dimension starts at before deductions. */
 export const DIMENSION_MAX_SCORE = 100;

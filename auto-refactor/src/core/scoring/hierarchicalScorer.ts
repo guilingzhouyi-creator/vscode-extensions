@@ -23,6 +23,8 @@ import { ALL_QUALITY_DIMENSIONS } from './scoringTypes';
 // 92 points read as A+ on one surface and A on the other. It also had no NaN case, which
 // graded unmeasured input as F.
 import {
+    clampRatio,
+    clampScore,
     computeSecurityCeiling,
     DIMENSION_MAX_SCORE,
     resolveQualityGrade,
@@ -159,25 +161,23 @@ function computeDimensionIndices(
         const densityPenalty = computeDensityDimensionDeduction(dim, densityResult, isExemptFacade);
         const dimPenalty = riskPenalty + densityPenalty;
         const baseScore = dim === 'codeSecurity' ? securityCeiling : DIMENSION_MAX_SCORE;
-        indices[dim] = Math.max(
-            0,
-            Math.round((baseScore - dimPenalty) * SCORE_ROUNDING) / SCORE_ROUNDING,
-        );
+        indices[dim] = clampScore(baseScore - dimPenalty, baseScore);
     }
     return indices;
 }
 
 function buildFileDensityMetrics(densityResult: EffectiveDensityResult) {
-    const compositeDensity = densityResult.compositeDensity ?? densityResult.effectiveDensity;
+    const rawComposite = densityResult.compositeDensity ?? densityResult.effectiveDensity;
+    const fallbackPor = Math.max(0, 1.0 - densityResult.effectiveDensity);
     return {
-        effectiveDensity: densityResult.effectiveDensity,
-        compositeDensity,
-        tspr: densityResult.tspr ?? densityResult.effectiveDensity,
-        por: densityResult.por ?? Math.max(0, 1.0 - densityResult.effectiveDensity),
-        tokensPerEloc: densityResult.tokensPerEloc ?? 0,
-        columnDensity: densityResult.columnDensity ?? 0,
-        sufr: densityResult.sufr ?? 0,
-        gaussianHealth: densityResult.gaussianHealth ?? 1.0,
+        effectiveDensity: clampRatio(densityResult.effectiveDensity),
+        compositeDensity: clampRatio(rawComposite),
+        tspr: clampRatio(densityResult.tspr ?? densityResult.effectiveDensity),
+        por: clampRatio(densityResult.por ?? fallbackPor),
+        tokensPerEloc: Math.max(0, densityResult.tokensPerEloc ?? 0),
+        columnDensity: clampRatio(densityResult.columnDensity ?? 0),
+        sufr: clampRatio(densityResult.sufr ?? 0),
+        gaussianHealth: clampRatio(densityResult.gaussianHealth ?? 1.0),
     };
 }
 
@@ -218,8 +218,8 @@ export function scoreFileQuality(
         securityCeiling,
     );
 
-    const dataScore = Math.max(0, 100 - riskResult.pillarPenalties.data);
-    const testingScore = Math.max(0, 100 - riskResult.pillarPenalties.testing);
+    const dataScore = clampScore(100 - riskResult.pillarPenalties.data);
+    const testingScore = clampScore(100 - riskResult.pillarPenalties.testing);
 
     // 4. Synthesize 8 pillars with non-linear ceilings
     const eightPillars = synthesizeEightPillars(
@@ -616,8 +616,7 @@ function computeWeightedProjectDimensions(
         number
     >;
     for (const d of ALL_QUALITY_DIMENSIONS) {
-        projectDimensions[d] =
-            Math.round((projectDimSums[d] / safeTotalLoc) * SCORE_ROUNDING) / SCORE_ROUNDING;
+        projectDimensions[d] = clampScore(projectDimSums[d] / safeTotalLoc);
     }
     return projectDimensions;
 }
@@ -640,7 +639,7 @@ function finalizeProjectEightPillars(
     for (const p of ALL_PRIMARY_PILLARS) {
         finalCompositeSum += projectPillars[p] * synthesized.weights[p];
     }
-    synthesized.compositeScore = Math.round(finalCompositeSum * SCORE_ROUNDING) / SCORE_ROUNDING;
+    synthesized.compositeScore = clampScore(finalCompositeSum);
     return synthesized;
 }
 
@@ -665,11 +664,11 @@ export function aggregateProjectScore(fileScores: FileQualityScore[]): ProjectQu
     const synthesized = finalizeProjectEightPillars(projectDimensions, projectPillars);
 
     const count = Math.max(1, fileScores.length);
-    const avgEffective = Math.round((metrics.totalDensity / count) * 100) / 100;
-    const avgComposite = Math.round((metrics.totalCompositeDensity / count) * 100) / 100;
-    const avgTspr = Math.round((metrics.totalTspr / count) * 1000) / 1000;
-    const avgPor = Math.round((metrics.totalPor / count) * 1000) / 1000;
-    const avgCol = Math.round((metrics.totalColumnDensity / count) * 1000) / 1000;
+    const avgEffective = clampRatio(Math.round((metrics.totalDensity / count) * 100) / 100);
+    const avgComposite = clampRatio(Math.round((metrics.totalCompositeDensity / count) * 100) / 100);
+    const avgTspr = clampRatio(Math.round((metrics.totalTspr / count) * 1000) / 1000);
+    const avgPor = clampRatio(Math.round((metrics.totalPor / count) * 1000) / 1000);
+    const avgCol = clampRatio(Math.round((metrics.totalColumnDensity / count) * 1000) / 1000);
 
     return {
         compositeScore: synthesized.compositeScore,
