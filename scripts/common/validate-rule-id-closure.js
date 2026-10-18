@@ -45,6 +45,8 @@ const FIXTURE_ALLOWLIST = new Map([
   ['TC-DOM-001', 'Documented test-case identifier example in validate-skills'],
   ['ADV-CMP-001', 'Documented rule-ID example inside a code comment'],
   ['LINK-ABS-FILE-URI', 'Diagnostic tag emitted by validate-skills for absolute-path links'],
+  ['HIGH-DEBT-UNKNOWN', 'Sentinel tag for unrecognized high technical debt in tech-debt-corridor'],
+  ['DEBT-CORRIDOR-BLOCK', 'Gate blocker tag emitted by validate-commit-msg for debt ratchet breach'],
 ]);
 
 /**

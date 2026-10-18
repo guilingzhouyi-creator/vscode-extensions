@@ -88,7 +88,7 @@ const ALLOWED_SHORT_STEMS = new Set(
 const STANDARD_TECH_ABBREVIATIONS = new Set(
   ('ui db io os vm fs id ip ci cd sdk api cli ast cfg lut doc req res msg btn pkg src ctx fmt cmd ptr str ' +
    'std fps rng pr sh ps md ts js py gd rs 2d 3d 4k ssl ssh tcp udp dns rpc ipc csr soa swar simd cc eloc loc ' +
-   'diff rgb hex fn cb rx tx env app dev fsm npc gm rpg pve pvp hp mp cdc vs prf mcp ssot ir cai e2e wasm zh cn').split(' ')
+   'diff rgb hex fn cb rx tx env app dev fsm npc gm rpg pve pvp hp mp cdc vs prf mcp ssot ir cai e2e wasm zh cn mcts vfs').split(' ')
 );
 
 const IGNORED_BASENAMES = new Set(
