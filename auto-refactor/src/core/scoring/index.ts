@@ -31,3 +31,5 @@ export * from './archetype-weight-tuner';
 export * from './logistic-deduction-curve';
 export * from './topological-churn-evaluator';
 export * from './modernization-formulas';
+export * from './bayesian-beta-solver';
+export * from './technical-debt-ratio';

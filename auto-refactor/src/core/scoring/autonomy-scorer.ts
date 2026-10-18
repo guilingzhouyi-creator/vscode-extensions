@@ -35,6 +35,7 @@ import {
 import { inferFineGrainedFileRole } from '../intelligence/file-role-inference';
 import type { SymbolIndex } from '../intelligence/symbolIndex';
 import { clampScore } from './bounded-corridor';
+import { computeExactBetaCredibleInterval } from './bayesian-beta-solver';
 
 const SCALE_LOC_EXPONENT = 4000;
 const SCALE_FILE_EXPONENT = 8;
@@ -108,26 +109,13 @@ function computeBayesianAutonomyConfidence(
     const kSuccess = pObserved * effectiveSampleSize;
     const alpha = kSuccess + alpha0;
     const beta = effectiveSampleSize - kSuccess + beta0;
-    const posteriorTotal = alpha + beta;
-
-    const posteriorMean = alpha / posteriorTotal;
-    const credibleScore = +(posteriorMean * PERCENT_FACTOR).toFixed(PRECISION_TWO);
-
-    const posteriorVariance =
-        (alpha * beta) / (posteriorTotal * posteriorTotal * (posteriorTotal + 1));
-    const standardError = Math.sqrt(posteriorVariance);
-
-    const z95 = NORMAL_Z95_CRITICAL_VALUE;
-    const margin = +(z95 * standardError * PERCENT_FACTOR).toFixed(PRECISION_TWO);
-
-    const lowerBound = +Math.max(0.0, credibleScore - margin).toFixed(PRECISION_TWO);
-    const upperBound = +Math.min(PERCENT_MAX, credibleScore + margin).toFixed(PRECISION_TWO);
+    const exactInterval = computeExactBetaCredibleInterval(alpha, beta);
 
     return {
         sampleSufficiency,
-        lowerBound,
-        upperBound,
-        credibleScore,
+        lowerBound: exactInterval.lowerBound,
+        upperBound: exactInterval.upperBound,
+        credibleScore: exactInterval.credibleScore,
         isLowConfidence,
     };
 }

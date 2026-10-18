@@ -475,11 +475,12 @@ function buildDomainScores(
 }
 
 /**
- * Computes normalized project-level quality pillar scores across all files.
+ * Computes normalized project-level quality pillar scores using LOC-weighted micro-average across all files.
  */
 function computeProjectPillars(
     fileScores: FileQualityScore[],
     fatalCount: number,
+    totalLoc?: number,
 ): Record<PrimaryQualityPillar, number> {
     const globalPillarSums: Record<PrimaryQualityPillar, number> = {
         architecture: 0,
@@ -492,19 +493,26 @@ function computeProjectPillars(
         extensibility: 0,
     };
 
+    let weightSum = 0;
     for (const file of fileScores) {
+        const fileLoc = Math.max(
+            1,
+            typeof file.loc === 'number' && Number.isFinite(file.loc) ? file.loc : 1,
+        );
+        weightSum += fileLoc;
         for (const p of ALL_PRIMARY_PILLARS) {
-            globalPillarSums[p] += file.eightPillars.pillars[p];
+            globalPillarSums[p] += file.eightPillars.pillars[p] * fileLoc;
         }
     }
 
+    const safeTotalWeight = Math.max(1, totalLoc !== undefined && totalLoc > 0 ? totalLoc : weightSum);
     const projectPillars: Record<PrimaryQualityPillar, number> = {} as Record<
         PrimaryQualityPillar,
         number
     >;
     for (const p of ALL_PRIMARY_PILLARS) {
         projectPillars[p] =
-            Math.round((globalPillarSums[p] / fileScores.length) * SCORE_ROUNDING) / SCORE_ROUNDING;
+            Math.round((globalPillarSums[p] / safeTotalWeight) * SCORE_ROUNDING) / SCORE_ROUNDING;
     }
 
     if (fatalCount > 0) {
@@ -725,7 +733,7 @@ export function aggregateProjectScore(fileScores: FileQualityScore[]): ProjectQu
 
     const metrics = accumulateProjectMetrics(fileScores);
     const domains = buildDomainScores(metrics.domainMap);
-    const projectPillars = computeProjectPillars(fileScores, metrics.fatalCount);
+    const projectPillars = computeProjectPillars(fileScores, metrics.fatalCount, metrics.totalLoc);
     const projectDimensions = computeWeightedProjectDimensions(
         metrics.projectDimSums,
         metrics.totalLoc,

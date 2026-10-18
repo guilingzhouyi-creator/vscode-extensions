@@ -435,14 +435,19 @@ export function computeSecurityCeiling(metric?: FileMetric | null, scaleFactor =
  * @returns Dimension scores mapped in [0, 100].
  */
 /**
- * Normalizes input scale factor to a safe positive number >= 1.
+ * Normalizes input scale factor to a safe positive number using continuous sub-linear
+ * rational smoothing for micro-files (LOC < 100), eliminating discontinuous step cliffs.
  */
-function sanitizeScaleFactor(scaleFactor: number): number {
+export function sanitizeScaleFactor(scaleFactor: number): number {
     const safeScale =
         typeof scaleFactor === 'number' && Number.isFinite(scaleFactor) && scaleFactor > 0
             ? scaleFactor
             : 1;
-    return Math.max(1, safeScale);
+    if (safeScale < 1.0) {
+        // Continuous rational smoothing: safeScale in (0, 1) -> (100 * safeScale + 25) / 125 in (0.2, 1.0)
+        return +( (100 * safeScale + 25) / 125 ).toFixed(4);
+    }
+    return +safeScale.toFixed(4);
 }
 
 /**

@@ -289,6 +289,10 @@ export interface QualityScoreBreakdown {
      */
     polyglotGeneralization?: PolyglotGeneralizationMetrics;
     /**
+     * Optional SQALE technical debt assessment in remediation minutes and technical debt ratio (TDR).
+     */
+    technicalDebt?: import('./technical-debt-ratio').TechnicalDebtAssessment;
+    /**
      * Machine-readable definition of the quantified standard this score was produced under:
      * the composite/coverage/confidence formulas, the per-dimension weights and the grade
      * cut-offs, so a consumer can re-derive the grade instead of trusting the label.

@@ -34,6 +34,7 @@ import {
     applyMetricDeductions,
     type IssueDeductionOptions,
 } from './dimensionDeductions';
+import { evaluateTechnicalDebtAssessment } from './technical-debt-ratio';
 import { ArchetypeWeightTuner } from './archetype-weight-tuner';
 import {
     DIMENSION_MAX_SCORE,
@@ -188,6 +189,7 @@ export class QualityScorer {
         );
         const grade = resolveQualityGrade(compositeScore);
         const confidence = calculateConfidence(metric, coverage);
+        const technicalDebt = evaluateTechnicalDebtAssessment(issues, lines);
 
         return {
             indices: rawScores,
@@ -195,6 +197,7 @@ export class QualityScorer {
             grade,
             confidence,
             weights: { ...effectiveWeights },
+            technicalDebt,
             formulas: {
                 indexMapping:
                     'density dims: index = 100 * H / (H + linearPoints / scaleFactor), H = ' +
@@ -293,6 +296,7 @@ export class QualityScorer {
         // 1.0 and the published confidence collapsed to exactly coverage.
         const confidence = calculateConfidenceFromVolume(totalWeight, coverage, 'project');
         const polyglotGeneralization = this.computePolyglotMetrics(fileQualityScores);
+        const technicalDebt = evaluateTechnicalDebtAssessment(allIssues ?? [], totalWeight);
 
         return {
             indices: rawScores,
@@ -300,6 +304,7 @@ export class QualityScorer {
             grade,
             confidence,
             weights: { ...this.weights },
+            technicalDebt,
             formulas: {
                 indexMapping:
                     'density dims: index = 100 * H / (H + linearPoints / scaleFactor), H = ' +

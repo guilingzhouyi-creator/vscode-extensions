@@ -17,6 +17,7 @@
 
 import type { StaticIssueRisk } from './static-quality-model';
 import type { DynamicIssueRisk } from '../dynamic/dynamic-types';
+import type { TopologicalChurnResult } from './topological-churn-evaluator';
 
 /**
  * Exponent tuning coefficients for risk resonance calculation:
@@ -29,6 +30,8 @@ export interface RiskFusionCoefficients {
     beta: number;
     /** gamma: Historical failure sensitivity exponent (default: 0.8) */
     gamma: number;
+    /** Optional churn impact multiplier M_impact(f) from topological churn analysis */
+    churnImpactMultiplier?: number;
 }
 
 /**
@@ -163,14 +166,14 @@ function classifyFusedRiskLevel(fusedScore: number, isDualConfirmed: boolean): F
  *
  * @param staticRisk - Static finding risk profile.
  * @param dynamicRisk - Optional dynamic execution telemetry risk.
- * @param historicalFactor - Multiplier reflecting churn and defect history.
+ * @param historicalFactor - Multiplier or TopologicalChurnResult reflecting churn and defect history.
  * @param customCoeffs - Optional weight coefficients override.
  * @returns Unified fused risk assessment.
  */
 export function fuseIssueRisks(
     staticRisk: StaticIssueRisk,
     dynamicRisk?: DynamicIssueRisk,
-    historicalFactor = 1.0,
+    historicalFactor: number | TopologicalChurnResult = 1.0,
     customCoeffs: Partial<RiskFusionCoefficients> = {},
 ): FusedIssueRisk {
     const coeffs: RiskFusionCoefficients = {
@@ -178,10 +181,19 @@ export function fuseIssueRisks(
         ...customCoeffs,
     };
 
-    const S = Math.max(0.1, staticRisk.normalizedRisk);
-    const H = Math.max(0.5, Math.min(3.0, historicalFactor));
+    let churnMultiplier = coeffs.churnImpactMultiplier ?? 1.0;
+    let baseH = 1.0;
 
-    const { D, isDualConfirmed, suppressionApplied, rationale } = arbitrateCorroboration(
+    if (typeof historicalFactor === 'number') {
+        baseH = historicalFactor;
+    } else if (historicalFactor && typeof historicalFactor === 'object' && 'impactMultiplier' in historicalFactor) {
+        churnMultiplier = historicalFactor.impactMultiplier;
+    }
+
+    const S = Math.max(0.1, staticRisk.normalizedRisk);
+    const H = Math.max(0.3, Math.min(6.0, baseH * churnMultiplier));
+
+    const { D, isDualConfirmed, suppressionApplied, rationale: baseRationale } = arbitrateCorroboration(
         staticRisk,
         dynamicRisk,
     );
@@ -196,6 +208,13 @@ export function fuseIssueRisks(
 
     const fusedScore = Math.round(Math.min(100.0, rawFused) * 100) / 100;
     const level = classifyFusedRiskLevel(fusedScore, isDualConfirmed);
+
+    let rationale = baseRationale;
+    if (churnMultiplier < 0.9) {
+        rationale += ` Churn relaxation applied for stable code (${churnMultiplier.toFixed(2)}x).`;
+    } else if (churnMultiplier > 1.1) {
+        rationale += ` Churn amplification applied for active hotspot (${churnMultiplier.toFixed(2)}x).`;
+    }
 
     return {
         issueId: staticRisk.issueId,
@@ -224,7 +243,7 @@ export class RiskFusionEngine {
     public evaluateIssue(
         staticRisk: StaticIssueRisk,
         dynamicRisk?: DynamicIssueRisk,
-        historicalFactor = 1.0,
+        historicalFactor: number | TopologicalChurnResult = 1.0,
     ): FusedIssueRisk {
         return fuseIssueRisks(staticRisk, dynamicRisk, historicalFactor, this.defaultCoeffs);
     }

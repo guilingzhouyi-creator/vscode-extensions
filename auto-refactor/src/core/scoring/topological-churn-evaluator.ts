@@ -38,6 +38,7 @@ export interface TopologicalChurnResult {
     churnMultiplier: number;
     impactMultiplier: number; // M_impact(f)
     isFrozenLegacy: boolean;
+    hotspotCategory?: 'red' | 'yellow' | 'green';
     actionableProposal?: {
         action: 'high_centrality_refactor_guard' | 'isolate_churn_hotspot';
         rationale: string;
@@ -162,6 +163,12 @@ export class TopologicalChurnEvaluator {
             churnAnalysis.churn30dCommits,
             impactMultiplier,
         );
+        const hotspotCategory = this.resolveHotspotCategory(
+            impactMultiplier,
+            safeFanIn,
+            churnAnalysis.churn30dCommits,
+            churnAnalysis.isFrozenLegacy,
+        );
 
         return {
             filePath,
@@ -171,7 +178,20 @@ export class TopologicalChurnEvaluator {
             churnMultiplier,
             impactMultiplier,
             isFrozenLegacy: churnAnalysis.isFrozenLegacy,
+            hotspotCategory,
             actionableProposal,
         };
+    }
+
+    private resolveHotspotCategory(
+        impactMultiplier: number,
+        safeFanIn: number,
+        churn30dCommits: number,
+        isFrozen: boolean,
+    ): 'red' | 'yellow' | 'green' {
+        if (isFrozen) return 'green';
+        if (impactMultiplier >= 2.5 || (safeFanIn >= 10 && churn30dCommits >= 3)) return 'red';
+        if (impactMultiplier >= 1.5 || churn30dCommits >= 2) return 'yellow';
+        return 'green';
     }
 }

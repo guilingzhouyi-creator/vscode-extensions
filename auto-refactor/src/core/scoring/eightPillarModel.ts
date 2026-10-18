@@ -104,6 +104,7 @@ export function synthesizeEightPillars(
     testingScoreOverride?: number,
     ceilings: PillarCeilingConstraint[] = [],
     customWeights: Partial<Record<PrimaryQualityPillar, number>> = {},
+    aggregationMode: 'geometric' | 'arithmetic' = 'arithmetic',
 ): EightPillarBreakdown {
     const weights: Record<PrimaryQualityPillar, number> = {
         ...DEFAULT_PILLAR_WEIGHTS,
@@ -150,14 +151,23 @@ export function synthesizeEightPillars(
 
     let totalWeight = 0;
     let weightedSum = 0;
+    let logSum = 0;
     for (const pillar of ALL_PRIMARY_PILLARS) {
         const w = weights[pillar];
         weightedSum += pillars[pillar] * w;
+        const boundedScore = Math.max(15, Math.min(100, pillars[pillar]));
+        logSum += w * Math.log(boundedScore);
         totalWeight += w;
     }
 
-    const compositeScore =
-        totalWeight > 0 ? Math.round((weightedSum / totalWeight) * 100) / 100 : 100.0;
+    let rawScore = 100.0;
+    if (totalWeight > 0) {
+        const scoreVal = aggregationMode === 'geometric'
+            ? Math.exp(logSum / totalWeight)
+            : weightedSum / totalWeight;
+        rawScore = Math.round(scoreVal * 100) / 100;
+    }
+    const compositeScore = rawScore;
 
     return {
         pillars,
