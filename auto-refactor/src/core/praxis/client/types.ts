@@ -30,6 +30,7 @@ import type {
     PraxisDiagnosticCard,
     PraxisPresentationPayload,
 } from '../presentation/presentation-types';
+import type { LayerVFSWorkspace, WorkspaceManager } from '../vfs';
 
 /**
  * Configuration options initializing the Praxis Review Client.
@@ -47,6 +48,8 @@ export interface PraxisClientConfig {
     sliceService?: IPraxisSliceAuditService;
     /** Sparse MoE conditional expert dispatching router */
     sparseRouter?: SparseMoEGateRouter;
+    /** Optional WorkspaceManager instance for zero-copy sandboxing */
+    workspaceManager?: WorkspaceManager;
     /** Whether to enable Sparse MoE gating (defaults to true) */
     enableMoE?: boolean;
     /** Whether to include dual-faced UI presentation payloads (defaults to true) */
@@ -274,4 +277,17 @@ export interface IPraxisReviewClient {
         targetBranch: string,
         hunks: ReviewDiffHunk[],
     ): Promise<PraxisMergeGateVerdict>;
+
+    /**
+     * Creates an instant zero-copy workspace fork for a Praxis task card (< 3ms).
+     */
+    createWorkspace(
+        cardContext?: PraxisCardContext,
+        baseBranch?: string,
+    ): Promise<LayerVFSWorkspace>;
+
+    /**
+     * Resolves the workspace sandbox manager backing this client.
+     */
+    getWorkspaceManager(): WorkspaceManager;
 }

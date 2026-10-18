@@ -53,6 +53,8 @@ import type {
     PraxisWorkspaceReviewOptions,
     PraxisWorkspaceReviewVerdict,
 } from './client/types';
+import type { LayerVFSWorkspace } from './vfs';
+import { WorkspaceManager } from './vfs';
 import {
     buildAgentDirectivesBundle,
     buildDualFacedDiff,
@@ -99,6 +101,7 @@ export class PraxisReviewClient implements IPraxisReviewClient {
     private readonly enableMoE: boolean;
     private readonly includeDualFacedPresentation: boolean;
     private readonly defaultLocale: PraxisLocale;
+    private workspaceManager?: WorkspaceManager;
     public readonly defaultCardContext?: PraxisCardContext;
 
     /**
@@ -112,6 +115,7 @@ export class PraxisReviewClient implements IPraxisReviewClient {
         this.diffService = resolved.diffService ?? defaultPraxisGovernanceService;
         this.sliceService = resolved.sliceService ?? defaultPraxisSliceAuditService;
         this.sparseRouter = resolved.sparseRouter ?? defaultSparseMoEGateRouter;
+        this.workspaceManager = resolved.workspaceManager;
         this.enableMoE = resolved.enableMoE ?? true;
         this.includeDualFacedPresentation = resolved.includeDualFacedPresentation ?? true;
         this.defaultLocale = resolved.defaultLocale ?? 'zh-CN';
@@ -679,6 +683,38 @@ export class PraxisReviewClient implements IPraxisReviewClient {
             }
         }
         return Array.from(fileSet);
+    }
+
+    /**
+     * Resolves the workspace sandbox manager backing this client.
+     *
+     * @returns WorkspaceManager instance.
+     */
+    public getWorkspaceManager(): WorkspaceManager {
+        if (!this.workspaceManager) {
+            this.workspaceManager = new WorkspaceManager();
+        }
+        return this.workspaceManager;
+    }
+
+    /**
+     * Creates an instant zero-copy workspace fork for a Praxis task card (< 3ms).
+     *
+     * @param cardContext - Task card context (defaults to defaultCardContext).
+     * @param baseBranch - Base branch to branch from (defaults to 'main').
+     * @returns Interactive LayerVFSWorkspace handle.
+     */
+    public async createWorkspace(
+        cardContext?: PraxisCardContext,
+        baseBranch?: string,
+    ): Promise<LayerVFSWorkspace> {
+        const effectiveContext = cardContext ??
+            this.defaultCardContext ?? {
+                cardId: `card_${Date.now()}`,
+                cellId: 'default-cell',
+                agentUid: 'praxis-agent',
+            };
+        return this.getWorkspaceManager().createWorkspace(effectiveContext, baseBranch);
     }
 }
 

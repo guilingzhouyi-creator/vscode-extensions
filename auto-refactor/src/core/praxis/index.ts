@@ -25,3 +25,5 @@ export * from './presentation';
 export * from './feedback-adaptive-supervisor';
 export * from './client';
 export * from './praxis-review-client';
+export * from './vfs';
+export * from './mcts';
