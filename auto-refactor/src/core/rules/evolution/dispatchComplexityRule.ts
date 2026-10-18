@@ -12,6 +12,7 @@
 
 import type { AnalyzerContext, Issue } from '../../types';
 import { SEVERITY_WARNING } from '../../types';
+import { isCommentLine } from '../../scanner/text-scanner-utils';
 
 /** Canonical rule ID for switch dispatch complexity. */
 export const ARCH_DISP_RULE_ID = 'ARCH-DISP-001';
@@ -54,10 +55,6 @@ interface ObjectScanState {
     startLine: number;
     depth: number;
     closureCount: number;
-}
-
-function isCommentLine(trimmed: string): boolean {
-    return trimmed.startsWith('//') || trimmed.startsWith('#') || trimmed.startsWith('*');
 }
 
 function stripStringLiterals(line: string): string {

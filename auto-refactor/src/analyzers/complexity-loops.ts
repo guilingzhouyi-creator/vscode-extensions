@@ -13,6 +13,7 @@ import type { NormalizedNode } from '../core/ast/multilang';
 import type { LoopSite } from '../core/intelligence/semanticComplexity';
 import { isBoundedCollection } from '../core/intelligence/semanticComplexity';
 import { calculateLoopStateEntropy } from '../core/intelligence/payload-density';
+import { isCommentLine } from '../core/scanner/text-scanner-utils';
 
 /**
  * Maximum window of lines inside a loop body inspected for allocations and blocking I/O.
@@ -181,15 +182,6 @@ const MUTATION_RE =
     /(?:[=+\-*/%&|^]|\b(?:push|pop|shift|unshift|set|add|delete|clear|splice|return|break|yield|throw)\b)/;
 const SIDE_EFFECT_RE =
     /(?:console\.|fs\.|print\s*\(|write\s*\(|\.write\s*\(|send\s*\(|\.send\s*\(|emit\s*\(|emit_signal\s*\(|\.emit\s*\(|\.set\s*\(|\.delete\s*\(|\.add\s*\(|\.push\s*\(|\b(?:dispose|close|destroy|cleanup|release|cancel|unsubscribe|flush|disconnect|dispatchEvent)\b|\bawait\b|\b[A-Za-z0-9_$]+\s*\()/;
-
-function isCommentLine(trimmed: string): boolean {
-    return (
-        trimmed.startsWith('//') ||
-        trimmed.startsWith('#') ||
-        trimmed.startsWith('/*') ||
-        trimmed.startsWith('*')
-    );
-}
 
 function extractLoopStatementText(trimmed: string): string | null {
     if (!LOOP_HEADER_RE.test(trimmed)) {

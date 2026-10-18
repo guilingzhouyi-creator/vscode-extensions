@@ -22,6 +22,7 @@
 import type { Issue } from '../types';
 import type { CallGraph } from './callGraph';
 import type { LiteralIndex, LiteralOccurrence } from './literalIndex';
+import { stripQuotes } from '../scanner/text-scanner-utils';
 
 /** Canonical rule id for error propagation chain findings. */
 export const ERROR_PROPAGATION_RULE_ID = 'ERR-PRP-001';
@@ -49,23 +50,6 @@ const DEFAULT_MAX_ISSUES = 50;
 const DEFAULT_SEVERITY = 'warning';
 const MAX_CHAIN_HOPS = 32;
 const UNATTRIBUTED = 'unattributed';
-
-/**
- * Strip wrapping quotes from a literal string value.
- *
- * @param value - Literal token from AST.
- * @returns Inner string content.
- */
-function stripQuotes(value: string): string {
-    if (
-        (value.startsWith("'") && value.endsWith("'")) ||
-        (value.startsWith('"') && value.endsWith('"')) ||
-        (value.startsWith('`') && value.endsWith('`'))
-    ) {
-        return value.slice(1, -1);
-    }
-    return value;
-}
 
 /**
  * Decide whether a literal value looks like an error code.

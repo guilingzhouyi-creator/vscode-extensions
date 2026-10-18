@@ -184,6 +184,172 @@ function createWarningMessage(
     );
 }
 
+function buildMappedChangeSets(
+    changeSets: readonly CommitChangeSet[],
+    maxFiles: number,
+): { mappedChangeSets: number[][]; idToFile: string[]; totalUniqueFiles: number } {
+    const fileToId = new Map<string, number>();
+    const idToFile: string[] = [];
+
+    const getFileId = (file: string): number => {
+        let id = fileToId.get(file);
+        if (id === undefined) {
+            id = idToFile.length;
+            fileToId.set(file, id);
+            idToFile.push(file);
+        }
+        return id;
+    };
+
+    const mappedChangeSets: number[][] = [];
+    for (const cs of changeSets) {
+        if (!cs.changedFiles || cs.changedFiles.length > maxFiles) {
+            continue;
+        }
+        const ids: number[] = [];
+        for (const f of cs.changedFiles) {
+            const norm = normalizeEvolutionPath(f);
+            if (norm) {
+                ids.push(getFileId(norm));
+            }
+        }
+        if (ids.length > 0) {
+            mappedChangeSets.push(ids);
+        }
+    }
+    return { mappedChangeSets, idToFile, totalUniqueFiles: fileToId.size };
+}
+
+function buildTemporalCouplingPairs(
+    nativePairs: readonly any[],
+    idToFile: readonly string[],
+    moduleResolver: (file: string) => string,
+): { pairs: TemporalCouplingPair[]; crossModuleWarningCount: number } {
+    const pairs: TemporalCouplingPair[] = [];
+    let crossModuleWarningCount = 0;
+
+    for (const np of nativePairs) {
+        const rawA = idToFile[np.fileA];
+        const rawB = idToFile[np.fileB];
+        const [fileA, fileB] = rawA.localeCompare(rawB) <= 0 ? [rawA, rawB] : [rawB, rawA];
+        const commitsA = fileA === rawA ? np.commitsA : np.commitsB;
+        const commitsB = fileA === rawA ? np.commitsB : np.commitsA;
+
+        const moduleA = moduleResolver(fileA);
+        const moduleB = moduleResolver(fileB);
+        const isCrossModule = moduleA !== moduleB;
+        if (isCrossModule) {
+            crossModuleWarningCount++;
+        }
+
+        const couplingPercentage = +(np.jaccardSimilarity * 100).toFixed(1);
+        const warningLevel = resolveCouplingWarningLevel(isCrossModule, np.jaccardSimilarity);
+        const warningMessage = createWarningMessage(
+            fileA,
+            fileB,
+            moduleA,
+            moduleB,
+            np.sharedCommits,
+            couplingPercentage,
+            isCrossModule,
+        );
+
+        pairs.push({
+            fileA,
+            fileB,
+            sharedCommits: np.sharedCommits,
+            commitsA,
+            commitsB,
+            jaccardSimilarity: np.jaccardSimilarity,
+            couplingPercentage,
+            isCrossModule,
+            moduleA,
+            moduleB,
+            warningLevel,
+            warningMessage,
+        });
+    }
+
+    pairs.sort((a, b) => {
+        if (b.jaccardSimilarity !== a.jaccardSimilarity) {
+            return b.jaccardSimilarity - a.jaccardSimilarity;
+        }
+        if (b.sharedCommits !== a.sharedCommits) {
+            return b.sharedCommits - a.sharedCommits;
+        }
+        return a.fileA.localeCompare(b.fileA);
+    });
+
+    return { pairs, crossModuleWarningCount };
+}
+
+function parseSingleLogChunk(chunk: string): CommitChangeSet | null {
+    const trimmed = chunk.trim();
+    if (!trimmed) {
+        return null;
+    }
+
+    const newlineIdx = trimmed.indexOf('\n');
+    const header = newlineIdx === -1 ? trimmed : trimmed.slice(0, newlineIdx).trim();
+    const fields = header.split(ASCII_FIELD_SEP);
+    if (fields.length < 4) {
+        return null;
+    }
+
+    const commitHash = fields[0].trim();
+    const author = fields[1].trim();
+    const timestampSec = parseInt(fields[2].trim(), 10);
+    const message = fields[3].trim();
+
+    if (!commitHash) {
+        return null;
+    }
+
+    const fileLines = newlineIdx !== -1 ? trimmed.slice(newlineIdx + 1).split(/\r?\n/) : [];
+    const changedFiles: string[] = [];
+    const seenSet = new Set<string>();
+
+    for (const line of fileLines) {
+        const normPath = normalizeEvolutionPath(line);
+        if (normPath && !seenSet.has(normPath)) {
+            seenSet.add(normPath);
+            changedFiles.push(normPath);
+        }
+    }
+
+    return {
+        commitHash,
+        changedFiles,
+        timestamp: Number.isNaN(timestampSec) ? undefined : timestampSec * 1000,
+        author,
+        message,
+    };
+}
+
+function extractUniqueCommitFiles(files: readonly string[], seenSet: Set<string>): string[] {
+    seenSet.clear();
+    const result: string[] = [];
+    for (let i = 0; i < files.length; i++) {
+        const norm = normalizeEvolutionPath(files[i]);
+        if (norm && !seenSet.has(norm)) {
+            seenSet.add(norm);
+            result.push(norm);
+        }
+    }
+    return result;
+}
+
+function recordCoChangePairs(sortedFiles: readonly string[], pairSharedCounts: Map<string, number>): void {
+    const len = sortedFiles.length;
+    for (let i = 0; i < len; i++) {
+        const fileA = sortedFiles[i];
+        for (let j = i + 1; j < len; j++) {
+            const key = `${fileA}${PAIR_DELIMITER}${sortedFiles[j]}`;
+            pairSharedCounts.set(key, (pairSharedCounts.get(key) || 0) + 1);
+        }
+    }
+}
+
 /**
  * Detector for temporal co-change coupling and architectural shotgun surgery.
  */
@@ -218,35 +384,7 @@ export class TemporalCouplingDetector {
         const maxFiles = overrideOptions?.maxFilesPerCommit ?? this.maxFilesPerCommit;
         const moduleResolver = overrideOptions?.resolveModule ?? this.resolveModule;
 
-        const fileToId = new Map<string, number>();
-        const idToFile: string[] = [];
-
-        const getFileId = (file: string): number => {
-            let id = fileToId.get(file);
-            if (id === undefined) {
-                id = idToFile.length;
-                fileToId.set(file, id);
-                idToFile.push(file);
-            }
-            return id;
-        };
-
-        const mappedChangeSets: number[][] = [];
-        for (const cs of changeSets) {
-            if (!cs.changedFiles || cs.changedFiles.length > maxFiles) {
-                continue;
-            }
-            const ids: number[] = [];
-            for (const f of cs.changedFiles) {
-                const norm = normalizeEvolutionPath(f);
-                if (norm) {
-                    ids.push(getFileId(norm));
-                }
-            }
-            if (ids.length > 0) {
-                mappedChangeSets.push(ids);
-            }
-        }
+        const { mappedChangeSets, idToFile, totalUniqueFiles } = buildMappedChangeSets(changeSets, maxFiles);
 
         const nativePairs = nativeCore.computeTemporalCoupling(
             mappedChangeSets,
@@ -254,66 +392,16 @@ export class TemporalCouplingDetector {
             minJaccard,
         );
 
-        const pairs: TemporalCouplingPair[] = [];
-        let crossModuleWarningCount = 0;
-
-        for (const np of nativePairs) {
-            const rawA = idToFile[np.fileA];
-            const rawB = idToFile[np.fileB];
-            const [fileA, fileB] = rawA.localeCompare(rawB) <= 0 ? [rawA, rawB] : [rawB, rawA];
-            const commitsA = fileA === rawA ? np.commitsA : np.commitsB;
-            const commitsB = fileA === rawA ? np.commitsB : np.commitsA;
-
-            const moduleA = moduleResolver(fileA);
-            const moduleB = moduleResolver(fileB);
-            const isCrossModule = moduleA !== moduleB;
-            if (isCrossModule) {
-                crossModuleWarningCount++;
-            }
-
-            const couplingPercentage = +(np.jaccardSimilarity * 100).toFixed(1);
-            const warningLevel = resolveCouplingWarningLevel(isCrossModule, np.jaccardSimilarity);
-            const warningMessage = createWarningMessage(
-                fileA,
-                fileB,
-                moduleA,
-                moduleB,
-                np.sharedCommits,
-                couplingPercentage,
-                isCrossModule,
-            );
-
-            pairs.push({
-                fileA,
-                fileB,
-                sharedCommits: np.sharedCommits,
-                commitsA,
-                commitsB,
-                jaccardSimilarity: np.jaccardSimilarity,
-                couplingPercentage,
-                isCrossModule,
-                moduleA,
-                moduleB,
-                warningLevel,
-                warningMessage,
-            });
-        }
-
-        // Sort descending by Jaccard similarity, then shared commit count
-        pairs.sort((a, b) => {
-            if (b.jaccardSimilarity !== a.jaccardSimilarity) {
-                return b.jaccardSimilarity - a.jaccardSimilarity;
-            }
-            if (b.sharedCommits !== a.sharedCommits) {
-                return b.sharedCommits - a.sharedCommits;
-            }
-            return a.fileA.localeCompare(b.fileA);
-        });
+        const { pairs, crossModuleWarningCount } = buildTemporalCouplingPairs(
+            nativePairs,
+            idToFile,
+            moduleResolver,
+        );
 
         return {
             pairs,
             totalCommitsAnalyzed: changeSets.length,
-            totalFilesAnalyzed: fileToId.size,
+            totalFilesAnalyzed: totalUniqueFiles,
             crossModuleWarningCount,
             isGitAvailable: true,
         };
@@ -331,44 +419,10 @@ export class TemporalCouplingDetector {
         const chunks = rawOutput.split(ASCII_RECORD_SEP);
 
         for (const chunk of chunks) {
-            const trimmed = chunk.trim();
-            if (!trimmed) {
-                continue;
+            const parsed = parseSingleLogChunk(chunk);
+            if (parsed) {
+                changeSets.push(parsed);
             }
-
-            const newlineIdx = trimmed.indexOf('\n');
-            const header = newlineIdx === -1 ? trimmed : trimmed.slice(0, newlineIdx).trim();
-            const fields = header.split(ASCII_FIELD_SEP);
-            if (fields.length < 4) {
-                continue;
-            }
-
-            const commitHash = fields[0].trim();
-            const author = fields[1].trim();
-            const timestampSec = parseInt(fields[2].trim(), 10);
-            const message = fields[3].trim();
-
-            if (!commitHash) {
-                continue;
-            }
-
-            const fileLines = newlineIdx !== -1 ? trimmed.slice(newlineIdx + 1).split(/\r?\n/) : [];
-            const changedFiles: string[] = [];
-
-            for (const line of fileLines) {
-                const normPath = normalizeEvolutionPath(line);
-                if (normPath && !changedFiles.includes(normPath)) {
-                    changedFiles.push(normPath);
-                }
-            }
-
-            changeSets.push({
-                commitHash,
-                changedFiles,
-                timestamp: Number.isNaN(timestampSec) ? undefined : timestampSec * 1000,
-                author,
-                message,
-            });
         }
 
         return changeSets;
@@ -442,14 +496,13 @@ export class TemporalCouplingDetector {
         fileCommitCounts: Map<string, number>,
         pairSharedCounts: Map<string, number>,
     ): void {
+        const seenSet = new Set<string>();
         for (const cs of changeSets) {
             if (!cs.changedFiles || cs.changedFiles.length > maxFilesPerCommit) {
                 continue;
             }
 
-            const uniqueFiles = Array.from(
-                new Set(cs.changedFiles.map(normalizeEvolutionPath)),
-            ).filter(Boolean);
+            const uniqueFiles = extractUniqueCommitFiles(cs.changedFiles, seenSet);
             if (uniqueFiles.length < 2) {
                 if (uniqueFiles.length === 1) {
                     const single = uniqueFiles[0];
@@ -458,21 +511,13 @@ export class TemporalCouplingDetector {
                 continue;
             }
 
-            // Track individual file occurrences
-            for (const file of uniqueFiles) {
+            for (let i = 0; i < uniqueFiles.length; i++) {
+                const file = uniqueFiles[i];
                 fileCommitCounts.set(file, (fileCommitCounts.get(file) || 0) + 1);
             }
 
-            // Track co-changing pairs
             uniqueFiles.sort();
-            for (let i = 0; i < uniqueFiles.length; i++) {
-                const fileA = uniqueFiles[i];
-                for (let j = i + 1; j < uniqueFiles.length; j++) {
-                    const fileB = uniqueFiles[j];
-                    const key = `${fileA}${PAIR_DELIMITER}${fileB}`;
-                    pairSharedCounts.set(key, (pairSharedCounts.get(key) || 0) + 1);
-                }
-            }
+            recordCoChangePairs(uniqueFiles, pairSharedCounts);
         }
     }
 

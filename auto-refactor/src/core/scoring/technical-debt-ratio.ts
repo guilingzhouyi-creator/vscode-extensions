@@ -133,21 +133,34 @@ function initializePillarEffort(): Record<PrimaryQualityPillar, number> {
     return record;
 }
 
+const PILLAR_BY_ANALYZER: Readonly<Record<string, PrimaryQualityPillar>> = Object.freeze({
+    security: 'security',
+    secrets: 'security',
+    architecture: 'architecture',
+    performance: 'performance',
+});
+
+const PILLAR_BY_RULE_PREFIX: Readonly<Record<string, PrimaryQualityPillar>> = Object.freeze({
+    'SEC-': 'security',
+    'ARCH-': 'architecture',
+    'PRF-': 'performance',
+    'GOV-': 'reliability',
+    'HYG-': 'reliability',
+    'NAM-': 'extensibility',
+    'SIM-': 'extensibility',
+});
+
 function resolveTargetPillar(ruleId: string, analyzer?: string): PrimaryQualityPillar {
-    if (ruleId.startsWith('SEC-') || analyzer === 'security' || analyzer === 'secrets') {
-        return 'security';
+    if (analyzer && PILLAR_BY_ANALYZER[analyzer]) {
+        return PILLAR_BY_ANALYZER[analyzer];
     }
-    if (ruleId.startsWith('ARCH-') || analyzer === 'architecture') {
-        return 'architecture';
-    }
-    if (ruleId.startsWith('PRF-') || analyzer === 'performance') {
-        return 'performance';
-    }
-    if (ruleId.startsWith('GOV-') || ruleId.startsWith('HYG-')) {
-        return 'reliability';
-    }
-    if (ruleId.startsWith('NAM-') || ruleId.startsWith('SIM-')) {
-        return 'extensibility';
+    const prefixIdx = ruleId.indexOf('-');
+    if (prefixIdx !== -1) {
+        const prefix = ruleId.slice(0, prefixIdx + 1);
+        const mapped = PILLAR_BY_RULE_PREFIX[prefix];
+        if (mapped) {
+            return mapped;
+        }
     }
     return 'maintainability';
 }

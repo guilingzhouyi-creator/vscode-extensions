@@ -23,6 +23,9 @@ import {
     CODE_CONST_DUPLICATE_LITERAL,
     SEVERITY_WARNING,
 } from '../core/constants';
+import { stripQuotes } from '../core/scanner/text-scanner-utils';
+
+export { stripQuotes };
 
 /** Set of trivial numbers exempt from duplicate constant extraction. */
 export const TRIVIAL_NUMBERS = new Set(['0', '1', '-1']);
@@ -280,41 +283,6 @@ export function isQuoteCharCode(code: number): boolean {
     );
 }
 
-function isStringPrefixCharCode(ch: number): boolean {
-    return (
-        ch === 102 ||
-        ch === 70 ||
-        ch === 114 ||
-        ch === 82 ||
-        ch === 98 ||
-        ch === 66 ||
-        ch === 117 ||
-        ch === 85
-    );
-}
-
-/**
- * Fast strip leading and trailing quote characters without RegExp allocation.
- *
- * @param str - Input string literal text.
- * @returns Unquoted string.
- */
-export function stripQuotes(str: string): string {
-    const len = str.length;
-    if (len === 0) return str;
-    let offset = 0;
-    while (offset < len) {
-        if (isStringPrefixCharCode(str.charCodeAt(offset))) {
-            offset++;
-        } else {
-            break;
-        }
-    }
-    const hasLeadingQuote = offset < len && isQuoteCharCode(str.charCodeAt(offset));
-    const start = hasLeadingQuote ? offset + 1 : 0;
-    const end = len > start && isQuoteCharCode(str.charCodeAt(len - 1)) ? len - 1 : len;
-    return start > 0 || end < len ? str.slice(start, end) : str;
-}
 
 /** Result of resolving a literal duplicate issue. */
 export interface LiteralResolution {

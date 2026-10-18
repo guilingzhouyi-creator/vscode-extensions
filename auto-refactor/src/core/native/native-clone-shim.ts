@@ -620,6 +620,43 @@ export function evaluateBumpyRoadShim(
     };
 }
 
+function buildTriggerLut(group: readonly string[]): { lut: Uint8Array; hasValidTrigger: boolean } {
+    const lut = new Uint8Array(256);
+    let hasValidTrigger = false;
+    for (let i = 0; i < group.length; i++) {
+        const trigger = group[i];
+        if (trigger && trigger.length > 0) {
+            lut[trigger.charCodeAt(0) & 0xff] = 1;
+            hasValidTrigger = true;
+        }
+    }
+    return { lut, hasValidTrigger };
+}
+
+function hasInitialByte(content: string, len: number, lut: Uint8Array): boolean {
+    for (let i = 0; i < len; i++) {
+        if (lut[content.charCodeAt(i) & 0xff] === 1) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function matchesAnyTrigger(content: string, group: readonly string[]): boolean {
+    const validTriggers: string[] = [];
+    for (let i = 0; i < group.length; i++) {
+        const t = group[i];
+        if (t && t.length > 0) {
+            validTriggers.push(t);
+        }
+    }
+    if (validTriggers.length === 0) {
+        return false;
+    }
+    const pattern = validTriggers.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+    return new RegExp(pattern).test(content);
+}
+
 function probeSingleTriggerGroup(
     content: string,
     group: readonly string[],
@@ -629,37 +666,16 @@ function probeSingleTriggerGroup(
         return true;
     }
 
-    const lut = new Uint8Array(256);
-    let hasValidTrigger = false;
-    for (const trigger of group) {
-        if (trigger && trigger.length > 0) {
-            lut[trigger.charCodeAt(0) & 0xff] = 1;
-            hasValidTrigger = true;
-        }
-    }
-
+    const { lut, hasValidTrigger } = buildTriggerLut(group);
     if (!hasValidTrigger) {
         return true;
     }
 
-    let initialByteFound = false;
-    for (let i = 0; i < len; i++) {
-        if (lut[content.charCodeAt(i) & 0xff] === 1) {
-            initialByteFound = true;
-            break;
-        }
-    }
-
-    if (!initialByteFound) {
+    if (!hasInitialByte(content, len, lut)) {
         return false;
     }
 
-    for (const trigger of group) {
-        if (trigger && content.indexOf(trigger) !== -1) {
-            return true;
-        }
-    }
-    return false;
+    return matchesAnyTrigger(content, group);
 }
 
 /**

@@ -975,6 +975,9 @@ export * from './core/intelligence/code-density-analyzer';
 export * from './core/intelligence/file-role-inference';
 export * from './core/intelligence/elastic-budget-matrix';
 export * from './core/intelligence/bumpy-road-analyzer';
+export * from './core/intelligence/main-sequence-evaluator';
+export * from './core/intelligence/compression-distance';
+export * from './core/intelligence/cohesion-modularity-evaluator';
 export * from './core/scheduler';
 
 // ---- Comment Governance & Effective Comment Density (ECD-C) ----

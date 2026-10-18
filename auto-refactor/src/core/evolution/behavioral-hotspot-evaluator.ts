@@ -267,15 +267,17 @@ interface EvolutionModifierState {
     annotations: string[];
 }
 
-function computeEvolutionModifiers(
-    baseMultiplier: number,
+interface ModifierAccumulator {
+    effectiveMultiplier: number;
+    annotations: string[];
+}
+
+function evaluateBurstSpike(
+    acc: ModifierAccumulator,
     input: FileHotspotInput,
     cleanMetrics: { commits30Days: number; defectCount: number },
     maxCap: number,
-): EvolutionModifierState {
-    let effectiveMultiplier = baseMultiplier;
-    const annotations: string[] = [];
-
+): { burstSpike: boolean; churnAcceleration: number } {
     let burstSpike = false;
     let churnAcceleration = 1.0;
     if (typeof input.commits7Days === 'number' && input.commits7Days > 0) {
@@ -285,22 +287,37 @@ function computeEvolutionModifiers(
         churnAcceleration = +(rate7 / rate30).toFixed(2);
         if (churnAcceleration >= 2.0 && safeCommits7 >= 3) {
             burstSpike = true;
-            effectiveMultiplier = +Math.min(maxCap, effectiveMultiplier * 1.25).toFixed(2);
-            annotations.push('[BURST SPIKE: Short-term commit frequency accelerating]');
+            acc.effectiveMultiplier = +Math.min(maxCap, acc.effectiveMultiplier * 1.25).toFixed(2);
+            acc.annotations.push('[BURST SPIKE: Short-term commit frequency accelerating]');
         }
     }
+    return { burstSpike, churnAcceleration };
+}
 
-    let authorDiffusion = false;
+function evaluateAuthorDiffusion(
+    acc: ModifierAccumulator,
+    input: FileHotspotInput,
+    cleanMetrics: { commits30Days: number; defectCount: number },
+    maxCap: number,
+): boolean {
     if (
         typeof input.authorEntropy === 'number' &&
         input.authorEntropy >= 0.75 &&
         cleanMetrics.commits30Days >= 10
     ) {
-        authorDiffusion = true;
-        effectiveMultiplier = +Math.min(maxCap, effectiveMultiplier * 1.15).toFixed(2);
-        annotations.push('[AUTHOR DIFFUSION: Highly fragmented ownership across concurrent contributors]');
+        acc.effectiveMultiplier = +Math.min(maxCap, acc.effectiveMultiplier * 1.15).toFixed(2);
+        acc.annotations.push('[AUTHOR DIFFUSION: Highly fragmented ownership across concurrent contributors]');
+        return true;
     }
+    return false;
+}
 
+function evaluateRapidDecay(
+    acc: ModifierAccumulator,
+    churnAcceleration: number,
+    cleanMetrics: { commits30Days: number; defectCount: number },
+    maxCap: number,
+): { rapidDecay: boolean; decayVelocity: number } {
     let rapidDecay = false;
     let decayVelocity = 1.0;
     if (churnAcceleration > 1.0) {
@@ -308,24 +325,56 @@ function computeEvolutionModifiers(
         decayVelocity = +(churnAcceleration * (1.0 + defectRatio * 0.5)).toFixed(2);
         if (decayVelocity >= 2.0 && cleanMetrics.defectCount >= 2) {
             rapidDecay = true;
-            effectiveMultiplier = +Math.min(maxCap, effectiveMultiplier * 1.15).toFixed(2);
-            annotations.push('[RAPID DECAY: Code health deteriorating rapidly under high churn acceleration and defects]');
+            acc.effectiveMultiplier = +Math.min(maxCap, acc.effectiveMultiplier * 1.15).toFixed(2);
+            acc.annotations.push('[RAPID DECAY: Code health deteriorating rapidly under high churn acceleration and defects]');
         }
     }
+    return { rapidDecay, decayVelocity };
+}
 
-    const authorCount = sanitizeNonNegative(input.activeAuthorsCount);
+function evaluateDeveloperCongestion(
+    acc: ModifierAccumulator,
+    authorCount: number,
+    cleanMetrics: { commits30Days: number; defectCount: number },
+    maxCap: number,
+): { developerCongestion: boolean; coordinationPaths: number } {
     const coordinationPaths = authorCount >= 2 ? (authorCount * (authorCount - 1)) / 2 : 0;
     let developerCongestion = false;
     if (authorCount >= 4 && cleanMetrics.commits30Days >= 8) {
         developerCongestion = true;
-        effectiveMultiplier = +Math.min(maxCap, effectiveMultiplier * 1.15).toFixed(2);
-        annotations.push(
+        acc.effectiveMultiplier = +Math.min(maxCap, acc.effectiveMultiplier * 1.15).toFixed(2);
+        acc.annotations.push(
             `[DEVELOPER CONGESTION: Elevated coordination friction with ${authorCount} active authors and ${coordinationPaths} communication channels]`,
         );
     }
+    return { developerCongestion, coordinationPaths };
+}
+
+function computeEvolutionModifiers(
+    baseMultiplier: number,
+    input: FileHotspotInput,
+    cleanMetrics: { commits30Days: number; defectCount: number },
+    maxCap: number,
+): EvolutionModifierState {
+    const acc: ModifierAccumulator = {
+        effectiveMultiplier: baseMultiplier,
+        annotations: [],
+    };
+
+    const { burstSpike, churnAcceleration } = evaluateBurstSpike(acc, input, cleanMetrics, maxCap);
+    const authorDiffusion = evaluateAuthorDiffusion(acc, input, cleanMetrics, maxCap);
+    const { rapidDecay, decayVelocity } = evaluateRapidDecay(acc, churnAcceleration, cleanMetrics, maxCap);
+
+    const authorCount = sanitizeNonNegative(input.activeAuthorsCount);
+    const { developerCongestion, coordinationPaths } = evaluateDeveloperCongestion(
+        acc,
+        authorCount,
+        cleanMetrics,
+        maxCap,
+    );
 
     return {
-        effectiveMultiplier,
+        effectiveMultiplier: acc.effectiveMultiplier,
         burstSpike,
         churnAcceleration,
         authorDiffusion,
@@ -334,7 +383,7 @@ function computeEvolutionModifiers(
         developerCongestion,
         activeAuthorsCount: authorCount,
         coordinationPaths,
-        annotations,
+        annotations: acc.annotations,
     };
 }
 

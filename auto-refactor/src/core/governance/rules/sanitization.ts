@@ -28,6 +28,7 @@ import {
 import { fileNameEndsWith, isToolOrTestScript } from '../pathScope';
 import type { GovernanceRule, GovernanceViolation, RuleEvaluationContext } from '../types';
 import { CODE_GOV_PROSE_SANITIZATION } from '../../constants/rule-codes';
+import { isCommentLine } from '../../scanner/text-scanner-utils';
 
 /** ASCII code for a space, skipped while advancing past a line's leading whitespace. */
 const CHAR_CODE_SPACE = 32;
@@ -45,28 +46,6 @@ const CHAR_CODE_SLASH = 47;
 const CHAR_CODE_ASTERISK = 42;
 
 /**
- * Checks whether a single source line starts with comment delimiters.
- */
-function isCommentLinePrefix(line: string): boolean {
-    let startIdx = 0;
-    while (
-        startIdx < line.length &&
-        (line.charCodeAt(startIdx) === CHAR_CODE_SPACE ||
-            line.charCodeAt(startIdx) === CHAR_CODE_TAB)
-    ) {
-        startIdx++;
-    }
-    if (startIdx >= line.length) return false;
-    const c0 = line.charCodeAt(startIdx);
-    const c1 = line.charCodeAt(startIdx + 1);
-    return (
-        c0 === CHAR_CODE_HASH ||
-        (c0 === CHAR_CODE_SLASH && (c1 === CHAR_CODE_SLASH || c1 === CHAR_CODE_ASTERISK)) ||
-        c0 === CHAR_CODE_ASTERISK
-    );
-}
-
-/**
  * Checks whether a line references internal jargon governance identifiers.
  */
 function isJargonSelfReference(line: string): boolean {
@@ -82,7 +61,7 @@ function isJargonSelfReference(line: string): boolean {
  * Checks whether a single source line contains temporary task jargon or `WIP` markers in comments.
  */
 function checkCommentLineJargon(line: string, lineIndex: number): GovernanceViolation | null {
-    if (!isCommentLinePrefix(line) || isJargonSelfReference(line)) return null;
+    if (!isCommentLine(line) || isJargonSelfReference(line)) return null;
 
     const match = CONSTRUCTION_JARGON_RE.exec(line);
     if (!match || isVocabularyEnumeration(line, match.index, match[0])) return null;
@@ -158,16 +137,6 @@ function isExemptDiagnosticFile(filePath: string): boolean {
         filePath.includes(TEST_DIR_NAME) ||
         filePath.includes(FIXTURE_DIR_NAME) ||
         filePath.endsWith(MD_EXTENSION)
-    );
-}
-
-function isCommentLine(line: string): boolean {
-    const trimmed = line.trim();
-    return (
-        trimmed.startsWith('*') ||
-        trimmed.startsWith('//') ||
-        trimmed.startsWith('/*') ||
-        trimmed.startsWith('#')
     );
 }
 
@@ -320,7 +289,7 @@ export const ProseTerminologySanitizationRule: GovernanceRule = {
         const commentLines: string[] = [];
         for (let i = 0; i < ctx.lines.length; i++) {
             const line = ctx.lines[i];
-            if (isCommentLine(line) || isCommentLinePrefix(line)) {
+            if (isCommentLine(line)) {
                 commentLines.push(line);
             } else {
                 commentLines.push('');

@@ -17,6 +17,16 @@
  */
 
 import type { Issue } from '../types';
+import {
+    createInitialBatchAccumulator,
+    recordFindingMetrics,
+    computeRuleSuppressionStats,
+    applyNoisyRuleDemotions,
+    resolveBatchClustering,
+    clusterOverlappingFindings,
+} from './finding-arbitration-batch';
+
+export { clusterOverlappingFindings };
 
 /** Prescriptive confidence tier token denoting hard gate blockers. */
 export const TIER_PRESCRIPTIVE = 'prescriptive' as const;
@@ -252,6 +262,64 @@ function normalizePath(rawPath: string): string {
     return rawPath.replace(/\\/g, '/');
 }
 
+function isSecretLeakMatch(issue: Issue): boolean {
+    if (issue.rule === 'ARCH-LEAK-002' || issue.rule === 'SEC-LEAK-001') {
+        return true;
+    }
+    if (issue.rule.startsWith('SEC-') && issue.severity === 'error') {
+        return true;
+    }
+    return SECRET_KEYWORD_PATTERN.test(issue.rule) || SECRET_KEYWORD_PATTERN.test(issue.message);
+}
+
+function isSyntaxOrParserMatch(issue: Issue): boolean {
+    if (issue.rule.startsWith('SYN-') || issue.rule.startsWith('PARSER-')) {
+        return true;
+    }
+    return (
+        SYNTAX_KEYWORD_PATTERN.test(issue.rule) ||
+        SYNTAX_KEYWORD_PATTERN.test(issue.analyzer) ||
+        SYNTAX_KEYWORD_PATTERN.test(issue.message)
+    );
+}
+
+function evaluateComplexityMatch(
+    issue: Issue,
+    threshold: number,
+): { isMatch: boolean; rationale: string } {
+    const isComplexityRule =
+        issue.rule === 'high-complexity' ||
+        issue.rule.startsWith('CPX-') ||
+        COMPLEXITY_KEYWORD_PATTERN.test(issue.rule);
+
+    if (!isComplexityRule) {
+        return { isMatch: false, rationale: '' };
+    }
+
+    const detailComplexity =
+        typeof issue.detail?.complexity === 'number'
+            ? issue.detail.complexity
+            : typeof issue.detail?.cyclomaticComplexity === 'number'
+              ? issue.detail.cyclomaticComplexity
+              : undefined;
+
+    if (detailComplexity !== undefined && detailComplexity >= threshold) {
+        return {
+            isMatch: true,
+            rationale: `Cyclomatic complexity ${detailComplexity} exceeds threshold ${threshold}`,
+        };
+    }
+
+    if (issue.rule === 'high-complexity' || issue.severity === 'error') {
+        return {
+            isMatch: true,
+            rationale: `Hard complexity violation: ${issue.rule}`,
+        };
+    }
+
+    return { isMatch: false, rationale: '' };
+}
+
 /**
  * Evaluates whether an issue represents a Prescriptive (T1) violation.
  *
@@ -279,64 +347,21 @@ function evaluatePrescriptiveMatch(
         };
     }
 
-    // High-risk secret or credential leak
-    if (
-        issue.rule === 'ARCH-LEAK-002' ||
-        issue.rule === 'SEC-LEAK-001' ||
-        (issue.rule.startsWith('SEC-') && issue.severity === 'error') ||
-        SECRET_KEYWORD_PATTERN.test(issue.rule) ||
-        SECRET_KEYWORD_PATTERN.test(issue.message)
-    ) {
+    if (isSecretLeakMatch(issue)) {
         return {
             isMatch: true,
             rationale: `High-risk secret or credential leak detected: ${issue.rule}`,
         };
     }
 
-    // Syntax or parser failure
-    if (
-        issue.rule.startsWith('SYN-') ||
-        issue.rule.startsWith('PARSER-') ||
-        SYNTAX_KEYWORD_PATTERN.test(issue.rule) ||
-        SYNTAX_KEYWORD_PATTERN.test(issue.analyzer) ||
-        SYNTAX_KEYWORD_PATTERN.test(issue.message)
-    ) {
+    if (isSyntaxOrParserMatch(issue)) {
         return {
             isMatch: true,
             rationale: `Syntax or parse error detected: ${issue.rule}`,
         };
     }
 
-    // Cyclomatic complexity hard limit exceeded
-    const isComplexityRule =
-        issue.rule === 'high-complexity' ||
-        issue.rule.startsWith('CPX-') ||
-        COMPLEXITY_KEYWORD_PATTERN.test(issue.rule);
-
-    if (isComplexityRule) {
-        const detailComplexity =
-            typeof issue.detail?.complexity === 'number'
-                ? issue.detail.complexity
-                : typeof issue.detail?.cyclomaticComplexity === 'number'
-                  ? issue.detail.cyclomaticComplexity
-                  : undefined;
-
-        if (detailComplexity !== undefined && detailComplexity >= threshold) {
-            return {
-                isMatch: true,
-                rationale: `Cyclomatic complexity ${detailComplexity} exceeds threshold ${threshold}`,
-            };
-        }
-
-        if (issue.rule === 'high-complexity' || issue.severity === 'error') {
-            return {
-                isMatch: true,
-                rationale: `Hard complexity violation: ${issue.rule}`,
-            };
-        }
-    }
-
-    return { isMatch: false, rationale: '' };
+    return evaluateComplexityMatch(issue, threshold);
 }
 
 /**
@@ -385,9 +410,6 @@ function extractExecutablePatch(issue: Issue): ExecutablePatch | undefined {
 
 const TTL_UNTIL_PATTERN = /\buntil=(\d{4}-\d{2}-\d{2}|\d+)\b/i;
 
-/**
- * Checks if a raw code line matches any custom suppression directives.
- */
 function checkCustomDirectives(
     rawLine: string,
     customDirectives?: string[],
@@ -395,13 +417,13 @@ function checkCustomDirectives(
     if (!customDirectives || customDirectives.length === 0) {
         return null;
     }
-    for (let i = 0; i < customDirectives.length; i++) {
-        if (rawLine.includes(customDirectives[i])) {
-            return {
-                isSuppressed: true,
-                reason: `Suppressed via custom directive: ${customDirectives[i]}`,
-            };
-        }
+    const escaped = customDirectives.map((d) => d.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+    const match = new RegExp(escaped).exec(rawLine);
+    if (match) {
+        return {
+            isSuppressed: true,
+            reason: `Suppressed via custom directive: ${match[0]}`,
+        };
     }
     return null;
 }
@@ -554,105 +576,6 @@ function isLineInRanges(lineNo: number, spans: LineRangeSpan[]): boolean {
     return false;
 }
 
-/**
- * Resolves the primary finding within an overlapping cluster and aggregates secondary findings.
- */
-function resolveClusterPrimary(cluster: ArbitratedFinding[]): {
-    primary: ArbitratedFinding;
-    secondaryCount: number;
-} {
-    if (cluster.length === 1) {
-        return { primary: cluster[0], secondaryCount: 0 };
-    }
-
-    const tierWeight = (t: FindingConfidenceTier) =>
-        t === TIER_PRESCRIPTIVE ? 3 : t === TIER_ACTIONABLE ? 2 : 1;
-
-    let bestIdx = 0;
-    for (let i = 1; i < cluster.length; i++) {
-        const best = cluster[bestIdx];
-        const cand = cluster[i];
-        const wBest = tierWeight(best.tier);
-        const wCand = tierWeight(cand.tier);
-        if (wCand > wBest || (wCand === wBest && cand.confidence > best.confidence)) {
-            bestIdx = i;
-        }
-    }
-
-    const primary = cluster[bestIdx];
-    const secondaries: Issue[] = [];
-    for (let i = 0; i < cluster.length; i++) {
-        if (i !== bestIdx) {
-            secondaries.push(cluster[i].issue);
-        }
-    }
-
-    primary.clusteredFindings = (primary.clusteredFindings || []).concat(secondaries);
-    return { primary, secondaryCount: secondaries.length };
-}
-
-/**
- * Clusters secondary findings sharing an overlapping file location with a primary finding.
- * Primary ranking precedence: Prescriptive > Actionable > Advisory, then confidence.
- *
- * @param candidates - List of active arbitrated findings.
- * @returns Deduplicated primary findings and total clustered secondary count.
- */
-function clusterOverlappingFindings(candidates: ArbitratedFinding[]): {
-    primaries: ArbitratedFinding[];
-    clusteredCount: number;
-} {
-    if (candidates.length <= 1) {
-        return { primaries: candidates, clusteredCount: 0 };
-    }
-
-    const fileMap = new Map<string, ArbitratedFinding[]>();
-    for (let i = 0; i < candidates.length; i++) {
-        const f = candidates[i];
-        const key = f.issue.location.file;
-        let list = fileMap.get(key);
-        if (!list) {
-            list = [];
-            fileMap.set(key, list);
-        }
-        list.push(f);
-    }
-
-    const primaries: ArbitratedFinding[] = [];
-    let clusteredCount = 0;
-
-    for (const fileFindings of fileMap.values()) {
-        if (fileFindings.length === 1) {
-            primaries.push(fileFindings[0]);
-            continue;
-        }
-
-        fileFindings.sort((a, b) => a.issue.location.start.line - b.issue.location.start.line);
-
-        let currentCluster: ArbitratedFinding[] = [fileFindings[0]];
-
-        for (let i = 1; i < fileFindings.length; i++) {
-            const current = fileFindings[i];
-            const prev = currentCluster[currentCluster.length - 1];
-            if (Math.abs(current.issue.location.start.line - prev.issue.location.start.line) <= 1) {
-                currentCluster.push(current);
-            } else {
-                const outcome = resolveClusterPrimary(currentCluster);
-                primaries.push(outcome.primary);
-                clusteredCount += outcome.secondaryCount;
-                currentCluster = [current];
-            }
-        }
-
-        if (currentCluster.length > 0) {
-            const outcome = resolveClusterPrimary(currentCluster);
-            primaries.push(outcome.primary);
-            clusteredCount += outcome.secondaryCount;
-        }
-    }
-
-    return { primaries, clusteredCount };
-}
 
 /**
  * Applies rule lifecycle policy (quarantine, canary, experimental, deprecated)
@@ -710,6 +633,136 @@ function applyRuleLifecyclePolicy(
         confidence: CONFIDENCE_PRESCRIPTIVE,
         mustBlock: true,
         rationale: prescriptive.rationale,
+        isQuarantined: false,
+    };
+}
+
+type InlineSuppressionResult = {
+    isSuppressed: boolean;
+    isExpired?: boolean;
+    expiryDate?: string;
+    reason?: string;
+};
+
+function resolveFileLines(
+    fileContentOrLines?: string | string[],
+    fileContentMap?: Map<string, string>,
+    filePath?: string,
+): string[] | undefined {
+    if (Array.isArray(fileContentOrLines)) {
+        return fileContentOrLines;
+    }
+    if (typeof fileContentOrLines === 'string') {
+        return fileContentOrLines.split('\n');
+    }
+    if (fileContentMap && filePath) {
+        const normPath = normalizePath(filePath);
+        const content = fileContentMap.get(normPath) || fileContentMap.get(filePath);
+        if (content) {
+            return content.split('\n');
+        }
+    }
+    return undefined;
+}
+
+function checkLineDirectiveAt(
+    lines: readonly string[],
+    lineIdx: number,
+    rule: string,
+    tokens?: string[],
+    nowTimestamp?: number,
+): InlineSuppressionResult | null {
+    if (lineIdx < 0 || lineIdx >= lines.length) {
+        return null;
+    }
+    const result = evaluateLineDirective(lines[lineIdx], rule, tokens, nowTimestamp);
+    if (result.isExpired || result.isSuppressed) {
+        return result;
+    }
+    return null;
+}
+
+interface ArbitratedPolicy {
+    tier: FindingConfidenceTier;
+    confidence: number;
+    mustBlock: boolean;
+    patch?: ExecutablePatch;
+    rationale: string;
+    isSuppressionExpired: boolean;
+    isQuarantined: boolean;
+}
+
+function resolveExpiredSuppressionPolicy(
+    issue: Issue,
+    suppression: InlineSuppressionResult,
+): ArbitratedPolicy {
+    return {
+        tier: TIER_PRESCRIPTIVE,
+        confidence: CONFIDENCE_PRESCRIPTIVE,
+        mustBlock: true,
+        rationale: `[SUPPRESSION EXPIRED: Inlined suppression expired on ${suppression.expiryDate}. Immediate remediation required.]`,
+        patch: extractExecutablePatch(issue),
+        isSuppressionExpired: true,
+        isQuarantined: false,
+    };
+}
+
+function resolvePrescriptivePolicy(
+    issue: Issue,
+    prescriptive: { isMatch: boolean; rationale: string },
+    lifecycleState: RuleLifecycleState,
+    actionableConfidenceFloor: number,
+    advisoryConfidenceDefault: number,
+): ArbitratedPolicy {
+    const patch = extractExecutablePatch(issue);
+    const policy = applyRuleLifecyclePolicy(
+        lifecycleState,
+        prescriptive,
+        patch,
+        actionableConfidenceFloor,
+        advisoryConfidenceDefault,
+    );
+    return {
+        tier: policy.tier,
+        confidence: policy.confidence,
+        mustBlock: policy.mustBlock,
+        rationale: policy.rationale,
+        isQuarantined: policy.isQuarantined,
+        patch,
+        isSuppressionExpired: false,
+    };
+}
+
+function resolveActionableOrAdvisoryPolicy(
+    issue: Issue,
+    actionableConfidenceFloor: number,
+    advisoryConfidenceDefault: number,
+): ArbitratedPolicy {
+    const patch = extractExecutablePatch(issue);
+    if (patch) {
+        return {
+            tier: TIER_ACTIONABLE,
+            confidence: Math.max(
+                actionableConfidenceFloor,
+                issue.evidence?.confidence ?? CONFIDENCE_ACTIONABLE_DEFAULT,
+            ),
+            mustBlock: false,
+            rationale: 'Actionable finding with deterministic executable patch payload',
+            patch,
+            isSuppressionExpired: false,
+            isQuarantined: false,
+        };
+    }
+    return {
+        tier: TIER_ADVISORY,
+        confidence: Math.min(
+            CONFIDENCE_ACTIONABLE_FLOOR - 0.01,
+            issue.evidence?.confidence ?? advisoryConfidenceDefault,
+        ),
+        mustBlock: false,
+        rationale: 'Advisory suggestion for architectural evolution and code quality',
+        patch: undefined,
+        isSuppressionExpired: false,
         isQuarantined: false,
     };
 }
@@ -790,12 +843,7 @@ export class FindingConfidenceArbiter {
     public checkInlineSuppression(
         issue: Issue,
         fileContentOrLines?: string | string[],
-    ): {
-        isSuppressed: boolean;
-        isExpired?: boolean;
-        expiryDate?: string;
-        reason?: string;
-    } {
+    ): InlineSuppressionResult {
         if (issue.suppression) {
             return {
                 isSuppressed: true,
@@ -807,50 +855,32 @@ export class FindingConfidenceArbiter {
             return { isSuppressed: false };
         }
 
-        let lines: string[] | undefined;
-        if (Array.isArray(fileContentOrLines)) {
-            lines = fileContentOrLines;
-        } else if (typeof fileContentOrLines === 'string') {
-            lines = fileContentOrLines.split('\n');
-        } else if (this.fileContentMap) {
-            const normPath = normalizePath(issue.location.file);
-            const content =
-                this.fileContentMap.get(normPath) || this.fileContentMap.get(issue.location.file);
-            if (content) {
-                lines = content.split('\n');
-            }
-        }
-
+        const lines = resolveFileLines(fileContentOrLines, this.fileContentMap, issue.location.file);
         if (!lines || lines.length === 0) {
             return { isSuppressed: false };
         }
 
         const targetLine = issue.location.start.line;
-        const lineIdxSame = targetLine - 1;
-        const lineIdxPrev = targetLine - 2;
-
-        if (lineIdxSame >= 0 && lineIdxSame < lines.length) {
-            const sameResult = evaluateLineDirective(
-                lines[lineIdxSame],
-                issue.rule,
-                this.customDirectiveTokens,
-                this.nowTimestamp,
-            );
-            if (sameResult.isExpired || sameResult.isSuppressed) {
-                return sameResult;
-            }
+        const sameResult = checkLineDirectiveAt(
+            lines,
+            targetLine - 1,
+            issue.rule,
+            this.customDirectiveTokens,
+            this.nowTimestamp,
+        );
+        if (sameResult) {
+            return sameResult;
         }
 
-        if (lineIdxPrev >= 0 && lineIdxPrev < lines.length) {
-            const prevResult = evaluateLineDirective(
-                lines[lineIdxPrev],
-                issue.rule,
-                this.customDirectiveTokens,
-                this.nowTimestamp,
-            );
-            if (prevResult.isExpired || prevResult.isSuppressed) {
-                return prevResult;
-            }
+        const prevResult = checkLineDirectiveAt(
+            lines,
+            targetLine - 2,
+            issue.rule,
+            this.customDirectiveTokens,
+            this.nowTimestamp,
+        );
+        if (prevResult) {
+            return prevResult;
         }
 
         return { isSuppressed: false };
@@ -931,82 +961,47 @@ export class FindingConfidenceArbiter {
         const lifecycleState: RuleLifecycleState =
             this.ruleLifecycleMap?.get(issue.rule) || 'active';
 
-        let tier: FindingConfidenceTier = TIER_ADVISORY;
-        let confidence = this.advisoryConfidenceDefault;
-        let mustBlock = false;
-        let patch: ExecutablePatch | undefined;
-        let rationale = '';
-        let isSuppressionExpired = false;
-        let isQuarantined = false;
-
-        if (suppression.isExpired) {
-            isSuppressionExpired = true;
-            tier = TIER_PRESCRIPTIVE;
-            confidence = CONFIDENCE_PRESCRIPTIVE;
-            mustBlock = true;
-            rationale = `[SUPPRESSION EXPIRED: Inlined suppression expired on ${suppression.expiryDate}. Immediate remediation required.]`;
-            patch = extractExecutablePatch(issue);
-        } else if (prescriptive.isMatch) {
-            patch = extractExecutablePatch(issue);
-            const policy = applyRuleLifecyclePolicy(
-                lifecycleState,
-                prescriptive,
-                patch,
-                this.actionableConfidenceFloor,
-                this.advisoryConfidenceDefault,
-            );
-            tier = policy.tier;
-            confidence = policy.confidence;
-            mustBlock = policy.mustBlock;
-            rationale = policy.rationale;
-            isQuarantined = policy.isQuarantined;
-        } else {
-            patch = extractExecutablePatch(issue);
-            if (patch) {
-                tier = TIER_ACTIONABLE;
-                confidence = Math.max(
+        const policy = suppression.isExpired
+            ? resolveExpiredSuppressionPolicy(issue, suppression)
+            : prescriptive.isMatch
+              ? resolvePrescriptivePolicy(
+                    issue,
+                    prescriptive,
+                    lifecycleState,
                     this.actionableConfidenceFloor,
-                    issue.evidence?.confidence ?? CONFIDENCE_ACTIONABLE_DEFAULT,
+                    this.advisoryConfidenceDefault,
+                )
+              : resolveActionableOrAdvisoryPolicy(
+                    issue,
+                    this.actionableConfidenceFloor,
+                    this.advisoryConfidenceDefault,
                 );
-                mustBlock = false;
-                rationale = 'Actionable finding with deterministic executable patch payload';
-            } else {
-                tier = TIER_ADVISORY;
-                confidence = Math.min(
-                    CONFIDENCE_ACTIONABLE_FLOOR - 0.01,
-                    issue.evidence?.confidence ?? this.advisoryConfidenceDefault,
-                );
-                mustBlock = false;
-                rationale = 'Advisory suggestion for architectural evolution and code quality';
-            }
-        }
 
-        let isPrunedBySlice = false;
-        const sliceActive = this.differentialSlice?.enabled ?? false;
-
-        if (sliceActive) {
-            const inSlice = this.isInDifferentialSlice(issue, changedRanges);
-            const pruneNonBlocking = this.differentialSlice?.pruneHistoricalNonBlocking !== false;
-
-            if (!inSlice && !mustBlock && pruneNonBlocking) {
-                isPrunedBySlice = true;
-            }
-        }
+        const inSlice = Boolean(
+            this.differentialSlice?.enabled &&
+            this.isInDifferentialSlice(issue, changedRanges),
+        );
+        const isPrunedBySlice = Boolean(
+            this.differentialSlice?.enabled &&
+            !inSlice &&
+            !policy.mustBlock &&
+            this.differentialSlice?.pruneHistoricalNonBlocking !== false,
+        );
 
         return {
             issue,
-            tier,
-            confidence,
-            mustBlock,
-            executablePatch: patch,
+            tier: policy.tier,
+            confidence: policy.confidence,
+            mustBlock: policy.mustBlock,
+            executablePatch: policy.patch,
             isSuppressed: suppression.isSuppressed,
-            isSuppressionExpired,
+            isSuppressionExpired: policy.isSuppressionExpired,
             suppressionExpiryDate: suppression.expiryDate,
             suppressionReason: suppression.reason,
             isPrunedBySlice,
             ruleLifecycleState: lifecycleState,
-            isQuarantined,
-            rationale,
+            isQuarantined: policy.isQuarantined,
+            rationale: policy.rationale,
         };
     }
 
@@ -1081,160 +1076,4 @@ export class FindingConfidenceArbiter {
             quarantinedRules: autoQuarantinedRules.length > 0 ? autoQuarantinedRules : undefined,
         };
     }
-}
-
-interface IssueBatchAccumulator {
-    findings: ArbitratedFinding[];
-    activeFindings: ArbitratedFinding[];
-    executablePatches: ExecutablePatch[];
-    prescriptiveCount: number;
-    actionableCount: number;
-    advisoryCount: number;
-    suppressedCount: number;
-    expiredSuppressionCount: number;
-    prunedBySliceCount: number;
-    blockingCount: number;
-    quarantinedCount: number;
-    ruleMap: Map<string, { total: number; suppressed: number }>;
-}
-
-function createInitialBatchAccumulator(): IssueBatchAccumulator {
-    return {
-        findings: [],
-        activeFindings: [],
-        executablePatches: [],
-        prescriptiveCount: 0,
-        actionableCount: 0,
-        advisoryCount: 0,
-        suppressedCount: 0,
-        expiredSuppressionCount: 0,
-        prunedBySliceCount: 0,
-        blockingCount: 0,
-        quarantinedCount: 0,
-        ruleMap: new Map(),
-    };
-}
-
-function recordFindingMetrics(
-    result: ArbitratedFinding,
-    acc: IssueBatchAccumulator,
-): void {
-    acc.findings.push(result);
-
-    const ruleStat = acc.ruleMap.get(result.issue.rule) || { total: 0, suppressed: 0 };
-    ruleStat.total++;
-    if (result.isSuppressed) {
-        ruleStat.suppressed++;
-        acc.suppressedCount++;
-    }
-    acc.ruleMap.set(result.issue.rule, ruleStat);
-
-    if (result.isSuppressionExpired) {
-        acc.expiredSuppressionCount++;
-    }
-
-    if (result.isQuarantined) {
-        acc.quarantinedCount++;
-    }
-
-    if (result.tier === TIER_PRESCRIPTIVE) {
-        acc.prescriptiveCount++;
-    } else if (result.tier === TIER_ACTIONABLE) {
-        acc.actionableCount++;
-    } else {
-        acc.advisoryCount++;
-    }
-
-    if (result.isPrunedBySlice) {
-        acc.prunedBySliceCount++;
-    }
-
-    const isActive = !result.isSuppressed && !result.isPrunedBySlice;
-    if (isActive) {
-        acc.activeFindings.push(result);
-        if (result.mustBlock) {
-            acc.blockingCount++;
-        }
-        if (result.executablePatch) {
-            acc.executablePatches.push(result.executablePatch);
-        }
-    }
-}
-
-function computeRuleSuppressionStats(
-    ruleMap: Map<string, { total: number; suppressed: number }>,
-    autoQuarantineThreshold = 0.5,
-): { stats: RuleSuppressionStat[]; noisyRules: string[]; autoQuarantinedRules: string[] } {
-    const stats: RuleSuppressionStat[] = [];
-    const noisyRules: string[] = [];
-    const autoQuarantinedRules: string[] = [];
-
-    for (const [rule, stat] of ruleMap.entries()) {
-        const ratio = stat.total > 0 ? +(stat.suppressed / stat.total).toFixed(2) : 0;
-        const isNoisy = stat.total >= 3 && ratio >= 0.3;
-        stats.push({
-            rule,
-            total: stat.total,
-            suppressed: stat.suppressed,
-            suppressionRatio: ratio,
-            isNoisy,
-        });
-        if (isNoisy) {
-            noisyRules.push(rule);
-        }
-        if (stat.total >= 5 && ratio >= autoQuarantineThreshold) {
-            autoQuarantinedRules.push(rule);
-        }
-    }
-
-    return { stats, noisyRules, autoQuarantinedRules };
-}
-
-function applyNoisyRuleDemotions(
-    acc: IssueBatchAccumulator,
-    noisyRules: string[],
-    autoQuarantinedRules: string[],
-    advisoryDefault: number,
-): void {
-    const noisySet = new Set(noisyRules);
-    const quarantineSet = new Set(autoQuarantinedRules);
-
-    for (let i = 0; i < acc.findings.length; i++) {
-        const f = acc.findings[i];
-        if (f.tier === TIER_PRESCRIPTIVE && noisySet.has(f.issue.rule)) {
-            const isAutoQuarantine = quarantineSet.has(f.issue.rule);
-            f.tier = TIER_ADVISORY;
-            f.confidence = advisoryDefault;
-            if (isAutoQuarantine) {
-                f.isQuarantined = true;
-                f.ruleLifecycleState = 'quarantined';
-                f.rationale +=
-                    ' [TRICORDER DYNAMIC QUARANTINE: Auto-quarantined due to excessive developer suppression ratio >= 50%]';
-                acc.quarantinedCount++;
-            } else {
-                f.rationale +=
-                    ' [Tricorder Feedback: Demoted from Prescriptive to Advisory due to elevated developer suppression ratio >= 30%]';
-            }
-            acc.prescriptiveCount--;
-            acc.advisoryCount++;
-            if (f.mustBlock) {
-                f.mustBlock = false;
-                acc.blockingCount = Math.max(0, acc.blockingCount - 1);
-            }
-        }
-    }
-}
-
-function resolveBatchClustering(
-    enableClustering: boolean,
-    activeFindings: ArbitratedFinding[],
-): { finalActiveFindings: ArbitratedFinding[]; clusteredCount: number } {
-    if (!enableClustering || activeFindings.length <= 1) {
-        return { finalActiveFindings: activeFindings, clusteredCount: 0 };
-    }
-    const outcome = clusterOverlappingFindings(activeFindings);
-    return {
-        finalActiveFindings: outcome.primaries,
-        clusteredCount: outcome.clusteredCount,
-    };
 }

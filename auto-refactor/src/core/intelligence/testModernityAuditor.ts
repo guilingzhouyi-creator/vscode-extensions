@@ -25,6 +25,7 @@ import {
     computeTestModernityMetrics,
     evaluateTestModernityThresholds,
 } from './testModernityMetrics';
+import { isCommentLine } from '../scanner/text-scanner-utils';
 
 /** Permitted test file naming suffixes and directories. */
 const TEST_DIR_NAME = '/tests/';
@@ -158,21 +159,6 @@ function isSkipMarkerLine(line: string): boolean {
         line.startsWith(UNITTEST_SKIP_MARKER) ||
         line.startsWith(DECORATOR_SKIP_MARKER) ||
         line.startsWith(RUST_IGNORE_MARKER)
-    );
-}
-
-/**
- * Checks if a trimmed line is a non-functional comment.
- *
- * @param line - Trimmed line.
- * @returns True if comment.
- */
-function isCommentLine(line: string): boolean {
-    return (
-        line.startsWith('//') ||
-        line.startsWith('#') ||
-        line.startsWith('/*') ||
-        line.startsWith('*')
     );
 }
 

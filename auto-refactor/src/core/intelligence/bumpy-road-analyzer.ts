@@ -178,6 +178,32 @@ export function computeBumpyRoadIndex(peaks: readonly IndentationPeak[]): number
 const CONTROL_FLOW_BRANCH_RE = /\b(if|for|while|catch|switch)\b|\?\s*[^:]+\s*:/;
 const LOGICAL_OP_RE = /&&|\|\|/;
 
+function countBraceDelta(trimmed: string): { opens: number; closes: number } {
+    let opens = 0;
+    let closes = 0;
+    for (let j = 0; j < trimmed.length; j++) {
+        const code = trimmed.charCodeAt(j);
+        if (code === 123) {
+            opens++;
+        } else if (code === 125) {
+            closes++;
+        }
+    }
+    return { opens, closes };
+}
+
+function computeLineBranchCost(trimmed: string, nestingLevel: number): number {
+    let cost = 0;
+    if (CONTROL_FLOW_BRANCH_RE.test(trimmed)) {
+        cost += 1 + nestingLevel;
+    }
+    const logicalMatches = trimmed.match(LOGICAL_OP_RE);
+    if (logicalMatches) {
+        cost += logicalMatches.length;
+    }
+    return cost;
+}
+
 /**
  * Calculates Campbell Cognitive Complexity for a function span using single-pass accumulation.
  * Branching structures receive (1 + nestingLevel) cost; logical operators receive 1 cost.
@@ -206,27 +232,8 @@ export function calculateCognitiveComplexity(
         }
 
         const trimmed = rawLine.trim();
-        // Track block nesting changes via brace counters
-        let opens = 0;
-        let closes = 0;
-        for (let j = 0; j < trimmed.length; j++) {
-            const code = trimmed.charCodeAt(j);
-            if (code === 123) {
-                opens++;
-            } else if (code === 125) {
-                closes++;
-            }
-        }
-
-        if (CONTROL_FLOW_BRANCH_RE.test(trimmed)) {
-            score += 1 + nestingLevel;
-        }
-
-        const logicalMatches = trimmed.match(LOGICAL_OP_RE);
-        if (logicalMatches) {
-            score += logicalMatches.length;
-        }
-
+        score += computeLineBranchCost(trimmed, nestingLevel);
+        const { opens, closes } = countBraceDelta(trimmed);
         nestingLevel = Math.max(0, nestingLevel + opens - closes);
     }
 

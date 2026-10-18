@@ -12,7 +12,7 @@
  */
 
 import * as fs from 'fs';
-import type { ScanConfig, ScanReport, Issue, SuppressionRule } from '../types';
+import type { ScanConfig, ScanReport, Issue, SuppressionRule, FileMetric } from '../types';
 import type { Scanner } from '../analyzer';
 import { summarizeUncertainty } from './uncertaintySummary';
 import type { Logger } from '../logger';
@@ -449,6 +449,67 @@ function matchSuppression(issue: Issue, index: SuppressionIndex): SuppressionRul
     );
 }
 
+async function resolveFileContent(
+    file: string | undefined,
+    fileCache: Map<string, string>,
+): Promise<string> {
+    if (!file) {
+        return '';
+    }
+    const cached = fileCache.get(file);
+    if (cached !== undefined) {
+        return cached;
+    }
+    if (!fs.existsSync(file)) {
+        fileCache.set(file, '');
+        return '';
+    }
+    try {
+        const content = await fs.promises.readFile(file, 'utf8');
+        fileCache.set(file, content);
+        return content;
+    } catch {
+        fileCache.set(file, '');
+        return '';
+    }
+}
+
+function applySingleIssueSuppression(
+    issue: Issue,
+    fileContent: string,
+    arbiter: FindingConfidenceArbiter,
+    index: SuppressionIndex | null,
+): boolean {
+    if (fileContent) {
+        const inlineCheck = arbiter.checkInlineSuppression(issue, fileContent);
+        if (inlineCheck.isSuppressed) {
+            issue.suppression = {
+                reason: inlineCheck.reason || 'Suppressed via inline comment directive',
+                downgraded: false,
+            };
+            return true;
+        }
+    }
+
+    if (!index) {
+        return false;
+    }
+
+    const matchedRule = matchSuppression(issue, index);
+    if (!matchedRule) {
+        return false;
+    }
+
+    issue.suppression = {
+        reason: matchedRule.reason,
+        downgraded: Boolean(matchedRule.downgradeTo),
+    };
+    if (matchedRule.downgradeTo) {
+        issue.severity = matchedRule.downgradeTo;
+    }
+    return true;
+}
+
 /**
  * Applies configured suppression rules to all issues in the report.
  *
@@ -463,41 +524,9 @@ async function applySuppressions(report: ScanReport, suppressions: readonly Supp
     const fileCache = new Map<string, string>();
 
     for (const issue of report.issues) {
-        const file = issue.location?.file;
-        let fileContent = file ? fileCache.get(file) : undefined;
-        if (file && fileContent === undefined && fs.existsSync(file)) {
-            try {
-                fileContent = await fs.promises.readFile(file, 'utf8');
-                fileCache.set(file, fileContent);
-            } catch (readError) {
-                fileContent = '';
-                void readError;
-            }
-        }
-        if (fileContent) {
-            const inlineCheck = arbiter.checkInlineSuppression(issue, fileContent);
-            if (inlineCheck.isSuppressed) {
-                suppressedCount++;
-                issue.suppression = {
-                    reason: inlineCheck.reason || 'Suppressed via inline comment directive',
-                    downgraded: false,
-                };
-                continue;
-            }
-        }
-
-        if (index) {
-            const matchedRule = matchSuppression(issue, index);
-            if (matchedRule) {
-                suppressedCount++;
-                issue.suppression = {
-                    reason: matchedRule.reason,
-                    downgraded: Boolean(matchedRule.downgradeTo),
-                };
-                if (matchedRule.downgradeTo) {
-                    issue.severity = matchedRule.downgradeTo;
-                }
-            }
+        const fileContent = await resolveFileContent(issue.location?.file, fileCache);
+        if (applySingleIssueSuppression(issue, fileContent, arbiter, index)) {
+            suppressedCount++;
         }
     }
     computeSummary(report);
@@ -679,6 +708,16 @@ function shouldRefreshQualityScores(
     );
 }
 
+function buildHotspotInput(metric: FileMetric, defectCount: number): FileHotspotInput {
+    return {
+        filePath: metric.file,
+        commits30Days: 1,
+        eloc: metric.lines,
+        cyclomaticComplexity: Math.max(1, metric.maxNestingDepth * 2),
+        defectCount,
+    };
+}
+
 /**
  * Executes behavioral hotspot evaluation across scanned files, ranking top refactoring hotspots.
  *
@@ -693,15 +732,11 @@ function applyEvolutionPass(context: PostScanPassContext): void {
         const inputs: FileHotspotInput[] = [];
         const issuesByFile = groupIssuesByFile(context.report.issues);
 
-        for (const metric of context.report.fileMetrics) {
-            const fileIssues = issuesByFile.get(metric.file) || [];
-            inputs.push({
-                filePath: metric.file,
-                commits30Days: 1,
-                eloc: metric.lines,
-                cyclomaticComplexity: Math.max(1, metric.maxNestingDepth * 2),
-                defectCount: fileIssues.length,
-            });
+        for (let i = 0; i < context.report.fileMetrics.length; i++) {
+            const metric = context.report.fileMetrics[i];
+            const fileIssues = issuesByFile.get(metric.file);
+            const defectCount = fileIssues ? fileIssues.length : 0;
+            inputs.push(buildHotspotInput(metric, defectCount));
         }
 
         const hotspotResults = evaluator.evaluateBatch(inputs);

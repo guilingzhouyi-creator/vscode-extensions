@@ -21,6 +21,7 @@ export * from './code-evolution-analyzer';
 export * from './behavioral-hotspot-evaluator';
 export * from './temporal-coupling-detector';
 export * from './code-survival-model';
+export * from './git-changeset-miner';
 
 /**
  * Asserts that the supplied candidate object satisfies the CodeEvolutionMetrics contract.

@@ -438,6 +438,34 @@ export function synthesizeRewrite(
     });
 }
 
+function buildBindingsRecord(bindings: Map<string, MetavariableBinding>): Record<string, MetavariableBinding> {
+    const bindingsRecord: Record<string, MetavariableBinding> = {};
+    for (const [key, value] of bindings.entries()) {
+        bindingsRecord[key] = value;
+    }
+    return Object.freeze(bindingsRecord);
+}
+
+function createStructuralMatch(
+    rule: CompiledPatternRule,
+    node: ts.Node,
+    targetSf: ts.SourceFile,
+    bindings: Map<string, MetavariableBinding>,
+): StructuralMatch {
+    const range = computeRange(node, targetSf);
+    const matchedText = targetSf.text.substring(range.start, range.end);
+    const replacementText = synthesizeRewrite(rule.spec.rewrite, bindings);
+    const bindingsRecord = buildBindingsRecord(bindings);
+
+    return {
+        ruleId: rule.spec.id,
+        range,
+        matchedText,
+        bindings: bindingsRecord,
+        replacementText,
+    };
+}
+
 /**
  * Discovers non-overlapping structural matches across target AST.
  *
@@ -454,6 +482,7 @@ export function findMatches(
     maxReplacements: number,
 ): StructuralMatch[] {
     const matches: StructuralMatch[] = [];
+    const scratchBindings = new Map<string, MetavariableBinding>();
 
     function visit(node: ts.Node): void {
         if (matches.length >= maxReplacements) {
@@ -462,25 +491,11 @@ export function findMatches(
 
         for (let i = 0; i < rules.length; i++) {
             const rule = rules[i];
-            const bindings = new Map<string, MetavariableBinding>();
-            const matched = matchNode(rule.patternNode, node, rule.patternSf, targetSf, bindings);
+            scratchBindings.clear();
+            const matched = matchNode(rule.patternNode, node, rule.patternSf, targetSf, scratchBindings);
 
-            if (matched && evaluateConstraints(rule.spec.where, bindings)) {
-                const range = computeRange(node, targetSf);
-                const matchedText = targetSf.text.substring(range.start, range.end);
-                const replacementText = synthesizeRewrite(rule.spec.rewrite, bindings);
-                const bindingsRecord: Record<string, MetavariableBinding> = {};
-                for (const [key, value] of bindings.entries()) {
-                    bindingsRecord[key] = value;
-                }
-
-                matches.push({
-                    ruleId: rule.spec.id,
-                    range,
-                    matchedText,
-                    bindings: Object.freeze(bindingsRecord),
-                    replacementText,
-                });
+            if (matched && evaluateConstraints(rule.spec.where, scratchBindings)) {
+                matches.push(createStructuralMatch(rule, node, targetSf, scratchBindings));
                 return;
             }
         }
