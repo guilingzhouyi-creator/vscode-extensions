@@ -191,13 +191,82 @@ function buildFileDensityMetrics(densityResult: EffectiveDensityResult) {
  * @param moduleName - Optional module grouping identifier.
  * @returns File quality evaluation score breakdown.
  */
+/** Options bundle for single-file quality scoring. */
+export interface ScoreFileQualityOptions {
+    readonly filePath: string;
+    readonly content: string;
+    readonly issues: Issue[];
+    readonly domainName?: string;
+    readonly moduleName?: string;
+}
+
+function normalizeScoreOptions(
+    filePathOrOptions: string | ScoreFileQualityOptions,
+    rawContent?: string,
+    rawIssues?: Issue[],
+    rawDomainName?: string,
+    rawModuleName?: string,
+): ScoreFileQualityOptions {
+    if (typeof filePathOrOptions === 'object' && filePathOrOptions !== null) {
+        return {
+            filePath: filePathOrOptions.filePath,
+            content: filePathOrOptions.content,
+            issues: filePathOrOptions.issues,
+            domainName: filePathOrOptions.domainName ?? 'core',
+            moduleName: filePathOrOptions.moduleName ?? 'root',
+        };
+    }
+    return {
+        filePath: filePathOrOptions,
+        content: rawContent ?? '',
+        issues: rawIssues ?? [],
+        domainName: rawDomainName ?? 'core',
+        moduleName: rawModuleName ?? 'root',
+    };
+}
+
+/**
+ * Evaluates single-file multi-dimensional quality metrics against 8 primary pillars.
+ *
+ * @param options - Options bundle for file quality scoring.
+ * @returns File quality evaluation score breakdown.
+ */
+export function scoreFileQuality(options: ScoreFileQualityOptions): FileQualityScore;
+/**
+ * Evaluates single-file multi-dimensional quality metrics against 8 primary pillars.
+ *
+ * @param filePath - Project relative path of the file.
+ * @param content - Raw text content of the file.
+ * @param issues - Collection of static analysis issues emitted for this file.
+ * @param domainName - Optional domain grouping identifier.
+ * @param moduleName - Optional module grouping identifier.
+ * @returns File quality evaluation score breakdown.
+ */
 export function scoreFileQuality(
     filePath: string,
     content: string,
     issues: Issue[],
-    domainName: string = 'core',
-    moduleName: string = 'root',
+    domainName?: string,
+    moduleName?: string,
+): FileQualityScore;
+export function scoreFileQuality(
+    filePathOrOptions: string | ScoreFileQualityOptions,
+    rawContent?: string,
+    rawIssues?: Issue[],
+    rawDomainName?: string,
+    rawModuleName?: string,
 ): FileQualityScore {
+    const opt = normalizeScoreOptions(
+        filePathOrOptions,
+        rawContent,
+        rawIssues,
+        rawDomainName,
+        rawModuleName,
+    );
+    const { filePath, content, issues } = opt;
+    const domainName = opt.domainName ?? 'core';
+    const moduleName = opt.moduleName ?? 'root';
+
     // 1. Density and anti-gaming
     const densityResult = computeEffectiveCodeDensity(content);
     const gamingResult = detectScoreGaming(filePath, content);

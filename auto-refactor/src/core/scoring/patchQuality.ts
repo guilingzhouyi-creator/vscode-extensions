@@ -165,16 +165,29 @@ function computeSimplificationRewardBonus(newIssues: Issue[]): number {
 }
 
 /**
+ * Context bundle for constructing patch quality diagnostic and evaluation explanations.
+ */
+export interface PatchExplanationContext {
+    readonly metrics: PatchScoreMetrics;
+    readonly relocationAnalysis: ReturnType<typeof analyzeConstantTransitions>;
+    readonly gamingCount: number;
+    readonly introducedCount: number;
+    readonly resolvedCount: number;
+    readonly simplificationRewardBonus: number;
+}
+
+/**
  * Construct diagnostic and evaluation explanations for a patch quality result.
  */
-function buildPatchExplanations(
-    metrics: PatchScoreMetrics,
-    relocationAnalysis: ReturnType<typeof analyzeConstantTransitions>,
-    gamingCount: number,
-    introducedCount: number,
-    resolvedCount: number,
-    simplificationRewardBonus: number,
-): string[] {
+function buildPatchExplanations(ctx: PatchExplanationContext): string[] {
+    const {
+        metrics,
+        relocationAnalysis,
+        gamingCount,
+        introducedCount,
+        resolvedCount,
+        simplificationRewardBonus,
+    } = ctx;
     const scoreLine =
         metrics.deltaScore === null
             ? `Quality score could not be compared: the scan measured no quality dimension ` +
@@ -385,14 +398,14 @@ export function evaluatePatchQuality(params: EvaluatePatchParams): PatchQualityR
         ...patchDensity,
     };
 
-    const explanation = buildPatchExplanations(
+    const explanation = buildPatchExplanations({
         metrics,
         relocationAnalysis,
-        gaming.length,
-        introduced.length,
-        resolved.length,
+        gamingCount: gaming.length,
+        introducedCount: introduced.length,
+        resolvedCount: resolved.length,
         simplificationRewardBonus,
-    );
+    });
 
     return {
         filePath,

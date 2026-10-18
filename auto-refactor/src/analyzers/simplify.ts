@@ -42,10 +42,12 @@ import {
     auditGuardClausePatterns,
 } from './simplify-linecheck';
 import {
-    computeFunctionSlices,
-    generateInvertedConditionSnippet,
     generateParameterObjectSnippet,
-    findTsFunctionAtLine,
+    computeControlFlowNesting,
+    isNormalizedNode,
+    walkNormalizedTree,
+    attachFunctionLengthSlices,
+    attachGuardClauseInversion,
 } from './simplify-slice-helper';
 import { auditOrphanInlining } from './simplify-inlining';
 
@@ -210,143 +212,6 @@ type DocstringQuote = typeof CHAR_DOUBLE_QUOTE | typeof CHAR_SINGLE_QUOTE;
 const PROP_FOR_EACH_CHILD = 'forEachChild';
 const ANONYMOUS_NAME = 'anonymous';
 const ANONYMOUS_SUFFIX = '.<anonymous>';
-
-function isNestingNode(node: NormalizedNode): boolean {
-    return (
-        node.kind === NodeKind.ControlFlow ||
-        (Boolean(node.increasesNesting) && node.kind !== NodeKind.Block)
-    );
-}
-
-function pushNonFunctionChildren(
-    children: NormalizedNode[] | undefined,
-    baseDepth: number,
-    nodeStack: NormalizedNode[],
-    depthStack: number[],
-): void {
-    if (!children) return;
-    for (let i = 0; i < children.length; i++) {
-        const child = children[i];
-        if (!child.functionLike) {
-            nodeStack.push(child);
-            depthStack.push(baseDepth + (isNestingNode(child) ? 1 : 0));
-        }
-    }
-}
-
-function computeControlFlowNesting(rootNode: NormalizedNode): number {
-    const rootChildren = rootNode.children;
-    if (!rootChildren || rootChildren.length === 0) return 0;
-
-    let max = 0;
-    const nodeStack: NormalizedNode[] = [];
-    const depthStack: number[] = [];
-
-    pushNonFunctionChildren(rootChildren, 0, nodeStack, depthStack);
-
-    while (nodeStack.length > 0) {
-        const currentNode = nodeStack.pop()!;
-        const currentDepth = depthStack.pop()!;
-        if (currentDepth > max) max = currentDepth;
-        pushNonFunctionChildren(currentNode.children, currentDepth, nodeStack, depthStack);
-    }
-    return max;
-}
-
-function isNormalizedNode(node: unknown): node is NormalizedNode {
-    return (
-        typeof node === 'object' &&
-        node !== null &&
-        'kind' in node &&
-        typeof (node as { kind: unknown }).kind === 'string'
-    );
-}
-
-function walkNormalizedTree(node: NormalizedNode, visitor: (n: NormalizedNode) => void): void {
-    visitor(node);
-    const children = node.children;
-    if (children) {
-        for (let i = 0; i < children.length; i++) {
-            walkNormalizedTree(children[i], visitor);
-        }
-    }
-}
-
-function findSourceFunction(
-    sf: ts.SourceFile | null | undefined,
-    startLine: number,
-): ReturnType<typeof findTsFunctionAtLine> {
-    return sf ? findTsFunctionAtLine(sf, startLine) : null;
-}
-
-function attachAstEnrichment(
-    sf: ts.SourceFile | null | undefined,
-    startLine: number,
-    enricher: (
-        targetFunction: NonNullable<ReturnType<typeof findTsFunctionAtLine>>,
-        source: ts.SourceFile,
-    ) => void,
-): void {
-    const tsFn = findSourceFunction(sf, startLine);
-    if (!tsFn || !sf) return;
-    enricher(tsFn, sf);
-}
-
-function attachFunctionLengthSlices(
-    issue: Issue,
-    sf: ts.SourceFile | null | undefined,
-    startLine: number,
-): void {
-    attachAstEnrichment(sf, startLine, (targetFunction, source) => {
-        const slices = computeFunctionSlices(targetFunction, source);
-        const best = slices ? (slices.recommendedSlice ?? slices[0]) : null;
-        if (!best) return;
-
-        issue.detail = {
-            ...issue.detail,
-            sliceRange: best.sliceRange,
-            extractSignature: best.extractSignature,
-        };
-        if (issue.actionable) {
-            issue.actionable.templateSnippet = best.templateSnippet;
-            (issue.actionable as unknown as Record<string, unknown>).detail = {
-                sliceRange: best.sliceRange,
-                extractSignature: best.extractSignature,
-                readVariables: best.readVariables,
-                writtenVariables: best.writtenVariables,
-                crossSliceDependencies: best.crossSliceDependencyCount,
-            };
-            issue.actionable.targetArguments = {
-                sliceRange: best.sliceRange,
-                extractSignature: best.extractSignature,
-            };
-        }
-    });
-}
-
-function attachGuardClauseInversion(
-    issue: Issue,
-    sf: ts.SourceFile | null | undefined,
-    startLine: number,
-): void {
-    attachAstEnrichment(sf, startLine, (targetFunction, source) => {
-        const invertedSnippet = generateInvertedConditionSnippet(targetFunction, source);
-        if (!invertedSnippet) return;
-
-        if (issue.actionable) {
-            issue.actionable.templateSnippet = invertedSnippet;
-            (issue.actionable as unknown as Record<string, unknown>).invertedConditionSnippet =
-                invertedSnippet;
-            (issue.actionable as unknown as Record<string, unknown>).detail = {
-                invertedConditionSnippet: invertedSnippet,
-            };
-        }
-        issue.detail = {
-            ...issue.detail,
-            invertedConditionSnippet: invertedSnippet,
-        };
-    });
-}
 
 function hasFunctionKeywords(content: string): boolean {
     return (

@@ -293,13 +293,36 @@ function isLoopHeaderCandidate(
     trimmed: string,
     lineText: string,
     isIndentedLang: boolean,
+    maskedLine?: string,
 ): boolean {
     if (trimmed.charCodeAt(0) === 47 /* '/' */ || trimmed.charCodeAt(0) === 35 /* '#' */)
         return false;
-    if (!LOOP_HEADER_RE.test(lineText)) return false;
+    const testLine = maskedLine !== undefined ? maskedLine : lineText;
+    if (!LOOP_HEADER_RE.test(testLine)) return false;
     if (!isIndentedLang) return true;
     if (trimmed.indexOf(':') === -1) return false;
-    return /^(?:[a-zA-Z0-9_$]+:\s*)?(?:for\s|while\s)/.test(trimmed);
+    return /^(?:[a-zA-Z0-9_$]+:\s*)?(?:for\s|while\s)/.test(testLine.trim());
+}
+
+function resolveContentLines(contentOrLines: string | string[]): string[] {
+    if (Array.isArray(contentOrLines)) return contentOrLines;
+    if (!contentOrLines) return [];
+    return contentOrLines.split('\n');
+}
+
+function getMaskedLine(masked: string[] | undefined, line1Based: number): string | undefined {
+    if (!masked || line1Based > masked.length) return undefined;
+    return masked[line1Based - 1];
+}
+
+function resolveFunctionLineBounds(
+    fnNode: NormalizedNode,
+    maxLines: number,
+): { start: number; end: number } {
+    const start = fnNode.start?.line ?? 1;
+    const rawEnd = fnNode.end?.line ?? maxLines;
+    const end = Math.min(rawEnd, maxLines);
+    return { start, end };
 }
 
 /**
@@ -319,21 +342,17 @@ export function findLoopSitesInFunction(
     contentOrLines: string | string[],
     masked: string[],
 ): LoopSite[] {
-    const lines = Array.isArray(contentOrLines)
-        ? contentOrLines
-        : contentOrLines
-          ? contentOrLines.split('\n')
-          : [];
+    const lines = resolveContentLines(contentOrLines);
     const sites: LoopSite[] = [];
-    const startLine = fnNode.start?.line ?? 1;
-    const endLine = fnNode.end?.line ?? lines.length;
+    const { start: startLine, end: endLine } = resolveFunctionLineBounds(fnNode, lines.length);
     const transientRegex = resolveTransientRegex(filePath);
     const isIndentedLang = filePath.endsWith('.py') || filePath.endsWith('.gd');
 
-    for (let l = startLine; l <= endLine && l <= lines.length; l++) {
+    for (let l = startLine; l <= endLine; l++) {
         const lineText = lines[l - 1] ?? '';
         const trimmed = lineText.trim();
-        if (!isLoopHeaderCandidate(trimmed, lineText, isIndentedLang)) continue;
+        const maskedLine = getMaskedLine(masked, l);
+        if (!isLoopHeaderCandidate(trimmed, lineText, isIndentedLang, maskedLine)) continue;
 
         const scaleVariable = resolveLoopScaleVariable(lineText);
         const body = loopBodyRange(masked, l, endLine, lines);

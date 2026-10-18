@@ -82,7 +82,7 @@ export function computeZeroCostModernUtility(
     const allocEfficiency = Math.max(0, 1.0 - Math.min(1.0, Math.max(0, params.allocRatio)));
     const typeDiscipline = Math.max(0, Math.min(1.0, params.typedRatio));
     const utility = (safeThroughput / denominator) * allocEfficiency * typeDiscipline * SCORE_MAX;
-    return Math.round(Math.min(SCORE_MAX, utility) * SCORE_ROUNDING) / SCORE_ROUNDING;
+    return clampScore(utility);
 }
 export { computeZeroCostModernUtility as calculateZeroCostModernUtility };
 
@@ -174,7 +174,7 @@ export function computeDebounceIndex(
         (safeDebounced + params.omegaWeight * safeLoading) / Math.max(1, params.critical);
     const normalized = Math.min(1.0, Math.max(0, rawProtected));
     const score = Math.pow(normalized, Math.max(0.1, params.exponent)) * SCORE_MAX;
-    return Math.round(score * SCORE_ROUNDING) / SCORE_ROUNDING;
+    return clampScore(score);
 }
 export { computeDebounceIndex as calculateDebounceProtectionIndex };
 
@@ -245,7 +245,7 @@ export function computeFsmDeterminism(
     );
     const guardRatio = Math.min(1.0, Math.max(0, params.states) / Math.max(1, params.total));
     const score = (1.0 - mutationPenalty) * guardRatio * SCORE_MAX;
-    return Math.round(Math.max(0, Math.min(SCORE_MAX, score)) * SCORE_ROUNDING) / SCORE_ROUNDING;
+    return clampScore(score);
 }
 export { computeFsmDeterminism as calculateFsmDeterminismScore };
 
@@ -279,7 +279,7 @@ export function computeLayoutNestingDensity(
     }
     const normalizer = Math.max(1, totalViews) * Math.max(1.0, kappa);
     const score = SCORE_PERFECT_FLOAT * Math.exp(-excessSumSquared / normalizer);
-    return Math.round(Math.max(0, Math.min(SCORE_MAX, score)) * SCORE_ROUNDING) / SCORE_ROUNDING;
+    return clampScore(score);
 }
 export { computeLayoutNestingDensity as calculateLayoutNestingDensityIndex };
 
@@ -314,7 +314,7 @@ export function calculateObserverWeakRefHygiene(
         Math.max(0, uncleanedStrongRefs) / (Math.max(0, totalStrongRefs) + 1),
     );
     const score = coverageRatio * (1.0 - leakPenalty) * SCORE_MAX;
-    return Math.round(Math.max(0, Math.min(SCORE_MAX, score)) * SCORE_ROUNDING) / SCORE_ROUNDING;
+    return clampScore(score);
 }
 
 /**
@@ -348,7 +348,7 @@ export function computeResponsiveIndex(
         0.6 * Math.min(1.0, Math.max(0, anchorDrivenRatio)) +
         0.4 * Math.min(1.0, Math.max(0, fontScalableRatio));
     const score = (1.0 - hardcodedPenalty) * adaptiveFactor * SCORE_MAX;
-    return Math.round(Math.max(0, Math.min(SCORE_MAX, score)) * SCORE_ROUNDING) / SCORE_ROUNDING;
+    return clampScore(score);
 }
 export { computeResponsiveIndex as calculateResponsiveScalabilityIndex };
 
@@ -413,7 +413,7 @@ export function computeUnidirectionalFlow(
         Math.max(0, params.domainCount) * params.domainWeight;
     const locScale = Math.max(1.0, params.locLines / VIEW_LOC_SCALE_FACTOR);
     const score = SCORE_PERFECT_FLOAT * Math.exp(-totalPenalty / locScale);
-    return Math.round(Math.max(0, Math.min(SCORE_MAX, score)) * SCORE_ROUNDING) / SCORE_ROUNDING;
+    return clampScore(score);
 }
 export { computeUnidirectionalFlow as calculateUnidirectionalFlowIntegrity };
 
@@ -439,7 +439,7 @@ export function calculateComponentAdoptionIndex(
     const ratio = kComp / denom;
     const coverage = Math.min(1.0, kComp / Math.max(1, total));
     const score = ratio * coverage * SCORE_PERFECT_FLOAT;
-    return Math.round(Math.max(0, Math.min(SCORE_MAX, score)) * SCORE_ROUNDING) / SCORE_ROUNDING;
+    return clampScore(score);
 }
 
 /**
@@ -462,7 +462,7 @@ export function computeDesignTokenCompliance(
     const denom = token + 2.0 * color + 1.5 * pixel;
     if (denom <= 0) return SCORE_PERFECT_FLOAT;
     const score = (token / denom) * SCORE_PERFECT_FLOAT;
-    return Math.round(Math.max(0, Math.min(SCORE_MAX, score)) * SCORE_ROUNDING) / SCORE_ROUNDING;
+    return clampScore(score);
 }
 export { computeDesignTokenCompliance as calculateDesignTokenComplianceIndex };
 
@@ -486,7 +486,7 @@ export function calculateI18nSymmetryIndex(
     const denom = trCount + 2.5 * rawUi + 0.5 * dyn;
     if (denom <= 0) return SCORE_PERFECT_FLOAT;
     const score = (trCount / denom) * SCORE_PERFECT_FLOAT;
-    return Math.round(Math.max(0, Math.min(SCORE_MAX, score)) * SCORE_ROUNDING) / SCORE_ROUNDING;
+    return clampScore(score);
 }
 
 /**
@@ -506,7 +506,7 @@ export function computePresentationDecoupling(
     const eventBus = Math.max(0, eventBusDirectSubs);
     const views = Math.max(1, viewCount);
     const score = SCORE_PERFECT_FLOAT * Math.exp(-(2.5 * backend + 1.8 * eventBus) / views);
-    return Math.round(Math.max(0, Math.min(SCORE_MAX, score)) * SCORE_ROUNDING) / SCORE_ROUNDING;
+    return clampScore(score);
 }
 export { computePresentationDecoupling as calculatePresentationDecouplingIndex };
 
@@ -587,9 +587,7 @@ export function computeProfileCompositeScore(
         (weightFe * Math.log(boundedFe) + weightBe * Math.log(boundedBe)) / (weightFe + weightBe),
     );
     const rawComposite = geomMean * Math.max(0.1, Math.min(1.0, params.factorBoundary));
-    return (
-        Math.round(Math.max(0, Math.min(SCORE_MAX, rawComposite)) * SCORE_ROUNDING) / SCORE_ROUNDING
-    );
+    return clampScore(rawComposite);
 }
 export { computeProfileCompositeScore as calculateProfileCompositeScore };
 
@@ -750,7 +748,7 @@ export function computePolyglotIndex(
     }
     if (keys.length === 1) {
         const raw = languageScores[keys[0]];
-        return Math.round(extractSafeScore(raw) * SCORE_ROUNDING) / SCORE_ROUNDING;
+        return clampScore(extractSafeScore(raw));
     }
 
     const customWeightSum = computeTotalCustomWeight(keys, languageWeights);

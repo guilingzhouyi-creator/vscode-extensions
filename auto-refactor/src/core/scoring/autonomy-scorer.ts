@@ -34,6 +34,7 @@ import {
 } from '../intelligence/dependency-provenance';
 import { inferFineGrainedFileRole } from '../intelligence/file-role-inference';
 import type { SymbolIndex } from '../intelligence/symbolIndex';
+import { clampScore } from './bounded-corridor';
 
 const SCALE_LOC_EXPONENT = 4000;
 const SCALE_FILE_EXPONENT = 8;
@@ -602,43 +603,41 @@ function recordSdkCall(
     set.add(currentFile);
 }
 
-function recordSingleSpecifier(
-    spec: string,
-    currentFile: string,
-    manifestDeps: Set<string>,
-    state: AutonomyScanState,
-    isCritical: boolean,
-): void {
-    const kind = classifyImportProvenance(spec, currentFile, manifestDeps);
+/**
+ * Attribution context for resolving single or multiple import specifiers.
+ */
+export interface ImportAttributionContext {
+    readonly currentFile: string;
+    readonly manifestDeps: Set<string>;
+    readonly state: AutonomyScanState;
+    readonly isCritical: boolean;
+}
+
+function recordSingleSpecifier(spec: string, ctx: ImportAttributionContext): void {
+    const kind = classifyImportProvenance(spec, ctx.currentFile, ctx.manifestDeps);
     if (kind === KIND_INTERNAL) {
-        state.internalSymbolCalls++;
-        if (isCritical) state.criticalPathInternalCalls++;
+        ctx.state.internalSymbolCalls++;
+        if (ctx.isCritical) ctx.state.criticalPathInternalCalls++;
         return;
     }
     if (kind === KIND_STDLIB) {
-        state.stdlibCalls++;
+        ctx.state.stdlibCalls++;
         return;
     }
     if (kind === KIND_EXTERNAL_SDK) {
         const pkg = spec.startsWith('@')
             ? spec.split('/').slice(0, 2).join('/')
             : spec.split('/')[0].split('.')[0].toLowerCase();
-        recordSdkCall(state, pkg, currentFile, isCritical);
+        recordSdkCall(ctx.state, pkg, ctx.currentFile, ctx.isCritical);
     }
 }
 
 /**
  * Process import specifiers and attribute call weights.
  */
-function processImportSpecifiers(
-    specifiers: string[],
-    currentFile: string,
-    manifestDeps: Set<string>,
-    state: AutonomyScanState,
-    isCritical: boolean,
-): void {
+function processImportSpecifiers(specifiers: string[], ctx: ImportAttributionContext): void {
     for (const spec of specifiers) {
-        recordSingleSpecifier(spec, currentFile, manifestDeps, state, isCritical);
+        recordSingleSpecifier(spec, ctx);
     }
 }
 
@@ -685,7 +684,12 @@ function accumulateFileMetric(
 
     const specifiers = state.currentSpecifiers;
     if (specifiers && specifiers.length > 0) {
-        processImportSpecifiers(specifiers, metric.file, manifestDeps, state, isCritical);
+        processImportSpecifiers(specifiers, {
+            currentFile: metric.file,
+            manifestDeps,
+            state,
+            isCritical,
+        });
     }
 }
 
@@ -702,7 +706,7 @@ function calculateSupplyChainResilience(supplyChain: SupplyChainProfile): number
 
     const penalty = d * 0.5 + Math.sqrt(t) * 0.8 + Math.max(0, depth - 1) * 2.0;
     const resilience = Math.max(MIN_RESILIENCE_SCORE, Math.min(PERCENT_MAX, PERCENT_MAX - penalty));
-    return Math.round(resilience * 10) / 10;
+    return clampScore(resilience);
 }
 
 /**
@@ -937,6 +941,41 @@ function collectExtPackages(
     return pkgs;
 }
 
+/** Context bundle for project autonomy evaluation. */
+export interface AutonomyEvaluationContext {
+    readonly fileMetrics: FileMetric[];
+    readonly issues: Issue[];
+    readonly config: ScanConfig;
+    readonly fileContents?: Map<string, string>;
+    readonly symbolIndex?: SymbolIndex;
+}
+
+function normalizeAutonomyContext(
+    metricsOrContext: FileMetric[] | AutonomyEvaluationContext,
+    rawIssues?: Issue[],
+    rawConfig?: ScanConfig,
+    rawFileContents?: Map<string, string>,
+    rawSymbolIndex?: SymbolIndex,
+): AutonomyEvaluationContext {
+    if (!Array.isArray(metricsOrContext)) {
+        return metricsOrContext;
+    }
+    return {
+        fileMetrics: metricsOrContext,
+        issues: rawIssues ?? [],
+        config: rawConfig ?? ({ root: process.cwd() } as unknown as ScanConfig),
+        fileContents: rawFileContents,
+        symbolIndex: rawSymbolIndex,
+    };
+}
+
+/**
+ * Evaluates in-house code autonomy ratio (CAI 2.0) across six orthogonal dimensions.
+ *
+ * @param context - Bundled options and inputs for autonomy evaluation.
+ * @returns AutonomyEvaluation
+ */
+export function evaluateProjectAutonomy(context: AutonomyEvaluationContext): AutonomyEvaluation;
 /**
  * Evaluates in-house code autonomy ratio (CAI 2.0) across six orthogonal dimensions.
  *
@@ -953,7 +992,23 @@ export function evaluateProjectAutonomy(
     config: ScanConfig,
     fileContents?: Map<string, string>,
     symbolIndex?: SymbolIndex,
+): AutonomyEvaluation;
+export function evaluateProjectAutonomy(
+    metricsOrContext: FileMetric[] | AutonomyEvaluationContext,
+    rawIssues?: Issue[],
+    rawConfig?: ScanConfig,
+    rawFileContents?: Map<string, string>,
+    rawSymbolIndex?: SymbolIndex,
 ): AutonomyEvaluation {
+    const ctx = normalizeAutonomyContext(
+        metricsOrContext,
+        rawIssues,
+        rawConfig,
+        rawFileContents,
+        rawSymbolIndex,
+    );
+    const { fileMetrics, issues, config, fileContents, symbolIndex } = ctx;
+
     const rootDir = config.root || process.cwd();
     const manifestDeps = loadProjectManifestDependencies(rootDir);
     const supplyChain = loadProjectSupplyChainProfile(rootDir, manifestDeps.size);

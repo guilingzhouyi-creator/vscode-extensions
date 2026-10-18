@@ -16,6 +16,9 @@
  */
 
 import * as ts from 'typescript';
+import type { NormalizedNode } from '../core/ast/multilang';
+import { NodeKind } from '../core/ast/multilang';
+import type { Issue } from '../core/types';
 
 /** Recommended line span for an extracted function slice. */
 export interface FunctionSliceRange {
@@ -763,4 +766,206 @@ export function findTsFunctionAtLine(
     walk(sf);
     sfCache.set(targetLine, bestMatch);
     return bestMatch;
+}
+
+/**
+ * Type guard testing whether an AST node conforms to the NormalizedNode multilang schema.
+ *
+ * @param node - Candidate node object from analyzer traversal.
+ * @returns True if node is non-null and possesses normalized kind and children.
+ */
+export function isNormalizedNode(node: unknown): node is NormalizedNode {
+    return (
+        typeof node === 'object' &&
+        node !== null &&
+        'kind' in node &&
+        typeof (node as { kind: unknown }).kind === 'string'
+    );
+}
+
+/**
+ * Recursively visits all nodes in a normalized AST tree in pre-order depth-first sequence.
+ *
+ * @param node - Root normalized node to begin traversal.
+ * @param visitor - Consumer callback invoked for each node.
+ */
+export function walkNormalizedTree(
+    node: NormalizedNode,
+    visitor: (n: NormalizedNode) => void,
+): void {
+    visitor(node);
+    const children = node.children;
+    if (children) {
+        for (let i = 0; i < children.length; i++) {
+            walkNormalizedTree(children[i], visitor);
+        }
+    }
+}
+
+/**
+ * Determines whether a normalized AST node introduces an additional nesting indentation layer.
+ *
+ * @param node - Node to inspect.
+ * @returns True if the node is control flow and not a transparent block container.
+ */
+function isNestingNode(node: NormalizedNode): boolean {
+    return (
+        node.kind === NodeKind.ControlFlow ||
+        (Boolean(node.increasesNesting) && node.kind !== NodeKind.Block)
+    );
+}
+
+/**
+ * Pushes non-function children to the traversal stack for depth calculation.
+ *
+ * @param children - Child normalized nodes.
+ * @param baseDepth - Current nesting depth at the parent.
+ * @param nodeStack - Explicit node evaluation stack.
+ * @param depthStack - Parallel depth stack matching nodeStack.
+ */
+function pushNonFunctionChildren(
+    children: NormalizedNode[] | undefined,
+    baseDepth: number,
+    nodeStack: NormalizedNode[],
+    depthStack: number[],
+): void {
+    if (!children) return;
+    for (let i = 0; i < children.length; i++) {
+        const child = children[i];
+        if (!child.functionLike) {
+            nodeStack.push(child);
+            depthStack.push(baseDepth + (isNestingNode(child) ? 1 : 0));
+        }
+    }
+}
+
+/**
+ * Computes maximum control flow nesting depth within a function node using explicit stack.
+ *
+ * Invariant: Functions declared inside nested scopes are not counted towards the parent nesting depth.
+ *
+ * @param rootNode - Normalized root function node.
+ * @returns Maximum control flow nesting level (0 if no branching).
+ */
+export function computeControlFlowNesting(rootNode: NormalizedNode): number {
+    const rootChildren = rootNode.children;
+    if (!rootChildren || rootChildren.length === 0) return 0;
+
+    let max = 0;
+    const nodeStack: NormalizedNode[] = [];
+    const depthStack: number[] = [];
+
+    pushNonFunctionChildren(rootChildren, 0, nodeStack, depthStack);
+
+    while (nodeStack.length > 0) {
+        const currentNode = nodeStack.pop()!;
+        const currentDepth = depthStack.pop()!;
+        if (currentDepth > max) max = currentDepth;
+        pushNonFunctionChildren(currentNode.children, currentDepth, nodeStack, depthStack);
+    }
+    return max;
+}
+
+/**
+ * Resolves source function node at a given line number in a TypeScript source file.
+ *
+ * @param sf - Optional parsed TypeScript source file.
+ * @param startLine - Target 1-based start line.
+ * @returns Found function-like node or null.
+ */
+export function findSourceFunction(
+    sf: ts.SourceFile | null | undefined,
+    startLine: number,
+): ReturnType<typeof findTsFunctionAtLine> {
+    return sf ? findTsFunctionAtLine(sf, startLine) : null;
+}
+
+/**
+ * Invokes an enricher callback if a matching TypeScript function is found at the given line.
+ *
+ * @param sf - Parsed source file.
+ * @param startLine - 1-based line number of the target function.
+ * @param enricher - Callback that attaches AST slices or annotations.
+ */
+export function attachAstEnrichment(
+    sf: ts.SourceFile | null | undefined,
+    startLine: number,
+    enricher: (
+        targetFunction: NonNullable<ReturnType<typeof findTsFunctionAtLine>>,
+        source: ts.SourceFile,
+    ) => void,
+): void {
+    const tsFn = findSourceFunction(sf, startLine);
+    if (!tsFn || !sf) return;
+    enricher(tsFn, sf);
+}
+
+/**
+ * Computes and attaches optimal function slice boundaries to an issue and its actionable.
+ *
+ * @param issue - Finding to enrich with function extraction candidates.
+ * @param sf - Optional parsed source file.
+ * @param startLine - 1-based start line of the function.
+ */
+export function attachFunctionLengthSlices(
+    issue: Issue,
+    sf: ts.SourceFile | null | undefined,
+    startLine: number,
+): void {
+    attachAstEnrichment(sf, startLine, (targetFunction, source) => {
+        const slices = computeFunctionSlices(targetFunction, source);
+        const best = slices ? (slices.recommendedSlice ?? slices[0]) : null;
+        if (!best) return;
+
+        issue.detail = {
+            ...issue.detail,
+            sliceRange: best.sliceRange,
+            extractSignature: best.extractSignature,
+        };
+        if (issue.actionable) {
+            issue.actionable.templateSnippet = best.templateSnippet;
+            (issue.actionable as unknown as Record<string, unknown>).detail = {
+                sliceRange: best.sliceRange,
+                extractSignature: best.extractSignature,
+                readVariables: best.readVariables,
+                writtenVariables: best.writtenVariables,
+                crossSliceDependencies: best.crossSliceDependencyCount,
+            };
+            issue.actionable.targetArguments = {
+                sliceRange: best.sliceRange,
+                extractSignature: best.extractSignature,
+            };
+        }
+    });
+}
+
+/**
+ * Computes and attaches guard clause condition inversion snippet to an issue and its actionable.
+ *
+ * @param issue - Finding to enrich with inverted condition snippet.
+ * @param sf - Optional parsed source file.
+ * @param startLine - 1-based start line of the target control flow.
+ */
+export function attachGuardClauseInversion(
+    issue: Issue,
+    sf: ts.SourceFile | null | undefined,
+    startLine: number,
+): void {
+    attachAstEnrichment(sf, startLine, (targetFunction, source) => {
+        const invertedSnippet = generateInvertedConditionSnippet(targetFunction, source);
+        if (!invertedSnippet) return;
+
+        if (issue.actionable) {
+            issue.actionable.templateSnippet = invertedSnippet;
+            (issue.actionable as unknown as Record<string, unknown>).invertedConditionSnippet =
+                invertedSnippet;
+            (issue.actionable as unknown as Record<string, unknown>).detail = {
+                invertedConditionSnippet: invertedSnippet,
+            };
+        }
+        issue.detail = {
+            ...issue.detail,
+            invertedConditionSnippet: invertedSnippet,
+        };
+    });
 }
