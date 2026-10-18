@@ -50,6 +50,7 @@ import {
     attachGuardClauseInversion,
 } from './simplify-slice-helper';
 import { auditOrphanInlining } from './simplify-inlining';
+import { auditStructuralPatterns } from './simplify-pattern-helper';
 
 /** Per-analyzer tunables (declared in `defaultAnalyzerOptions().simplify`). */
 export interface SimplifyOptions {
@@ -548,6 +549,7 @@ export class SimplifyAnalyzer implements Analyzer {
         const content = ctx.content || '';
         if (content.includes('?') || content.includes('if')) {
             detectTernaryOpportunities(sourceFile, ctx, opts, issues);
+            auditStructuralPatterns(content, ctx.filePath, issues);
         }
         if (hasFunctionKeywords(content)) {
             this.auditTypeScriptFunctions(sourceFile, ctx, opts, issues);

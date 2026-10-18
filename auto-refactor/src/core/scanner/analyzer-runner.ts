@@ -46,6 +46,7 @@ const TYPEOF_FUNCTION = 'function';
 export type { FileContextBase, ParseState, StreamingOutcome };
 
 import { materializeSourceFile, runLegacyPhase } from './legacy-analyzers';
+import { shouldExecuteAnalyzer } from './trigger-catalog';
 
 /**
  * Host surface the runner needs from the Scanner: the resolved plan plus the cross-file stores
@@ -224,6 +225,9 @@ function buildStreamingEntries(
 ): StreamingEntry[] {
     const entries: StreamingEntry[] = [];
     for (const p of partition.streaming) {
+        if (!shouldExecuteAnalyzer(p.name, base.content)) {
+            continue;
+        }
         entries.push({ analyzer: p.factory(), ctx: makeContext(base, root, p.options) });
     }
     entries.push({ analyzer: metric, ctx: makeContext(base, root, {}) });

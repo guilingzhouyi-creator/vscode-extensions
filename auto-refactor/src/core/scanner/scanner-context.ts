@@ -2,8 +2,8 @@
  * Module: Core Engine — Scanner Execution Context Contract
  * File Path: src/core/scanner/scanner-context.ts
  * Architecture Role: Decoupled interface representing Scanner capabilities for sub-scanners.
- * Dependencies & Triggers: ../types, ../logger, ../analyzerRegistry, ../incrementalState;
- *   implemented by Scanner and consumed by cacheScanner and diffScanner.
+ * Dependencies & Triggers: ../types, ../logger, ../analyzerRegistry, ../incrementalState,
+ *   ./triggerCatalog; implemented by Scanner and consumed by cacheScanner and diffScanner.
  * Responsibilities: Declare configuration, plan, logging, and per-file analyzer execution hooks.
  * Exit Semantics & Design Rationale: Allows cache and diff pipeline extraction without circular
  *   dependencies on the concrete Scanner class definition.
@@ -13,6 +13,11 @@ import type { ScanConfig, ScanReport, Issue, FileMetric } from '../types';
 import type { ResolvedAnalyzer } from '../analyzer-registry';
 import type { IncrementalFileState } from '../diff/incremental-state';
 import type { Logger } from '../logger';
+export {
+    AnalyzerTriggerCatalog,
+    defaultTriggerCatalog,
+    shouldExecuteAnalyzer,
+} from './trigger-catalog';
 
 /** Execution context exposing Scanner state and execution primitives to sub-pipelines. */
 export interface ScannerContext {
@@ -23,6 +28,7 @@ export interface ScannerContext {
         rel: string,
         content: string,
         seed?: IncrementalFileState,
+        activeAnalyzers?: Set<string>,
     ): Promise<{ issues: Issue[]; metric: FileMetric | null }>;
     runInProcess(
         files: string[],

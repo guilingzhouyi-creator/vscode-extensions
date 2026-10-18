@@ -52,6 +52,13 @@ export interface CardRollbackResult {
 }
 
 /**
+ * Handle or proxy to a LayerVFS workspace capable of atomic rollback.
+ */
+export interface RollbackCapableWorkspace {
+    rollback(targetSnapshotId?: string): Promise<boolean>;
+}
+
+/**
  * Extract original old lines carried by delete and context entries in a diff hunk.
  */
 function extractOldLines(lines: ReviewDiffHunk['lines']): string[] {
@@ -322,5 +329,19 @@ export class PraxisRollbackEngine implements IPraxisRollbackGatekeeper {
         }
 
         return { approved: true };
+    }
+
+    /**
+     * Atomically reverts an entire LayerVFS workspace branch to a committed snapshot.
+     *
+     * @param workspace - LayerVFSWorkspace handle or rollback-capable target.
+     * @param targetSnapshotId - Optional target snapshot identifier.
+     * @returns True if rollback succeeded.
+     */
+    async revertWorkspace(
+        workspace: RollbackCapableWorkspace,
+        targetSnapshotId?: string,
+    ): Promise<boolean> {
+        return workspace.rollback(targetSnapshotId);
     }
 }

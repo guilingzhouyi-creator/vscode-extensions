@@ -1,11 +1,13 @@
 /**
  * Module: Core Evolution — Barrel Export & Substantive Facade
  * File Path: src/core/evolution/index.ts
- * Architecture Role: Central facade for git history mining and code evolution quality analysis;
- *   re-exports miner/analyzer, validates evolution metric records, and enforces immutability.
+ * Architecture Role: Central facade for git history mining, code evolution analysis,
+ *   behavioral hotspot evaluation, and temporal coupling detection;
+ *   re-exports miner/evaluators, validates evolution metric records, and enforces immutability.
  * Dependencies & Triggers: Consumed by QualityScorer, test pipelines, and CLI reporters.
  * Responsibilities:
- *   1. Re-export GitHistoryMiner and CodeEvolutionAnalyzer with all core contracts;
+ *   1. Re-export GitHistoryMiner, CodeEvolutionAnalyzer, BehavioralHotspotEvaluator,
+ *      and TemporalCouplingDetector;
  *   2. Validate runtime shapes of CodeEvolutionMetrics;
  *   3. Provide frozen default metrics for fallback or unversioned files.
  * Exit Semantics & Design Rationale: Clean defensive validation throwing TypeError
@@ -16,6 +18,9 @@ import type { CodeEvolutionMetrics } from './code-evolution-analyzer';
 
 export * from './git-history-miner';
 export * from './code-evolution-analyzer';
+export * from './behavioral-hotspot-evaluator';
+export * from './temporal-coupling-detector';
+export * from './code-survival-model';
 
 /**
  * Asserts that the supplied candidate object satisfies the CodeEvolutionMetrics contract.

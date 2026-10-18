@@ -2,8 +2,8 @@
  * Module: Core Engine — Parse+Analyze Stage Selection
  * File Path: src/core/scanner/scan-stage.ts
  * Architecture Role: Execution-strategy layer choosing worker-pool vs in-process analysis.
- * Dependencies & Triggers: ../types, ../analyzerRegistry, ../logger, ./workerScheduler; invoked
- *   by Scanner.scan (and reused by the warm/diff pipelines through the same host surface).
+ * Dependencies & Triggers: ../types, ../analyzerRegistry, ../logger, ./workerScheduler,
+ *   ./triggerCatalog; invoked by Scanner.scan (and reused through the same host surface).
  * Responsibilities: Derive worker descriptors, pick the effective thread count, run the pool
  *   with an in-process fallback, merge index-aligned results, and sort issues deterministically.
  * Exit Semantics & Design Rationale: A worker-pool failure does not abort the scan — it degrades to
@@ -15,6 +15,28 @@ import type { FileMetric, Issue, ScanConfig } from '../types';
 import type { ResolvedAnalyzer, WorkerAnalyzerDesc } from '../analyzer-registry';
 import type { Logger } from '../logger';
 import { AR_TIMING, effectiveWorkers, nowMs, runWorkerPool } from './worker-scheduler';
+import {
+    defaultTriggerCatalog,
+    filterAnalyzersForContent,
+    shouldExecuteAnalyzer,
+} from './trigger-catalog';
+
+export { defaultTriggerCatalog, shouldExecuteAnalyzer };
+
+/**
+ * Short-circuit filter a resolved analyzer plan against file content using the trigger catalog.
+ * Analyzers whose triggers do not appear in content are skipped early.
+ *
+ * @param plan - Resolved analyzer plan.
+ * @param content - File content to inspect for triggers.
+ * @returns Filtered plan with inactive analyzers pruned.
+ */
+export function prefilterPlanForContent(
+    plan: ResolvedAnalyzer[],
+    content: string,
+): ResolvedAnalyzer[] {
+    return filterAnalyzersForContent(plan, content);
+}
 
 /** One file's analyzer output; the array is index-aligned with the dispatched file list. */
 export interface PerFileResult {

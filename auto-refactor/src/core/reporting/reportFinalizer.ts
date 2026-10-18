@@ -34,6 +34,8 @@ import { computeDynamicQualityVector } from '../dynamic/dynamic-quality-scorer';
 import { computeUnifiedQualityScore } from '../scoring/fusion-scorer';
 import type { GovernanceProjectProfile } from '../scoring/fusion-scorer';
 import { evaluateProjectAutonomy } from '../scoring/autonomy-scorer';
+import { FindingConfidenceArbiter } from '../scoring/finding-confidence-arbiter';
+import { BehavioralHotspotEvaluator, type FileHotspotInput } from '../evolution';
 
 export { BASELINE_GRANULARITY_GROUPED, groupCounts };
 
@@ -454,20 +456,47 @@ function matchSuppression(issue: Issue, index: SuppressionIndex): SuppressionRul
  * @param suppressions - Suppression rule collection.
  * @returns Total count of suppressed issues.
  */
-function applySuppressions(report: ScanReport, suppressions: readonly SuppressionRule[]): number {
-    if (suppressions.length === 0) return 0;
-    const index = buildSuppressionIndex(suppressions);
+async function applySuppressions(report: ScanReport, suppressions: readonly SuppressionRule[]): Promise<number> {
+    const arbiter = new FindingConfidenceArbiter();
+    const index = suppressions.length > 0 ? buildSuppressionIndex(suppressions) : null;
     let suppressedCount = 0;
+    const fileCache = new Map<string, string>();
+
     for (const issue of report.issues) {
-        const matchedRule = matchSuppression(issue, index);
-        if (matchedRule) {
-            suppressedCount++;
-            issue.suppression = {
-                reason: matchedRule.reason,
-                downgraded: Boolean(matchedRule.downgradeTo),
-            };
-            if (matchedRule.downgradeTo) {
-                issue.severity = matchedRule.downgradeTo;
+        const file = issue.location?.file;
+        let fileContent = file ? fileCache.get(file) : undefined;
+        if (file && fileContent === undefined && fs.existsSync(file)) {
+            try {
+                fileContent = await fs.promises.readFile(file, 'utf8');
+                fileCache.set(file, fileContent);
+            } catch (readError) {
+                fileContent = '';
+                void readError;
+            }
+        }
+        if (fileContent) {
+            const inlineCheck = arbiter.checkInlineSuppression(issue, fileContent);
+            if (inlineCheck.isSuppressed) {
+                suppressedCount++;
+                issue.suppression = {
+                    reason: inlineCheck.reason || 'Suppressed via inline comment directive',
+                    downgraded: false,
+                };
+                continue;
+            }
+        }
+
+        if (index) {
+            const matchedRule = matchSuppression(issue, index);
+            if (matchedRule) {
+                suppressedCount++;
+                issue.suppression = {
+                    reason: matchedRule.reason,
+                    downgraded: Boolean(matchedRule.downgradeTo),
+                };
+                if (matchedRule.downgradeTo) {
+                    issue.severity = matchedRule.downgradeTo;
+                }
             }
         }
     }
@@ -651,6 +680,49 @@ function shouldRefreshQualityScores(
 }
 
 /**
+ * Executes behavioral hotspot evaluation across scanned files, ranking top refactoring hotspots.
+ *
+ * @param context - Current post-scan execution context.
+ */
+function applyEvolutionPass(context: PostScanPassContext): void {
+    if (context.scope !== POST_SCAN_SCOPE_FULL || !context.report.fileMetrics || context.report.fileMetrics.length === 0) {
+        return;
+    }
+    try {
+        const evaluator = new BehavioralHotspotEvaluator();
+        const inputs: FileHotspotInput[] = [];
+        const issuesByFile = groupIssuesByFile(context.report.issues);
+
+        for (const metric of context.report.fileMetrics) {
+            const fileIssues = issuesByFile.get(metric.file) || [];
+            inputs.push({
+                filePath: metric.file,
+                commits30Days: 1,
+                eloc: metric.lines,
+                cyclomaticComplexity: Math.max(1, metric.maxNestingDepth * 2),
+                defectCount: fileIssues.length,
+            });
+        }
+
+        const hotspotResults = evaluator.evaluateBatch(inputs);
+        const topHotspots = hotspotResults.slice(0, 5);
+
+        if (context.report.triPlaneQuality) {
+            const triPlane = context.report.triPlaneQuality as unknown as Record<string, unknown>;
+            triPlane.hotspots = topHotspots;
+
+            const arbiter = new FindingConfidenceArbiter();
+            const arbitration = arbiter.arbitrate(context.report.issues);
+            if (arbitration.noisyRules && arbitration.noisyRules.length > 0) {
+                triPlane.noisyRules = arbitration.noisyRules;
+            }
+        }
+    } catch (evolutionError) {
+        context.logger.info(`Behavioral hotspot evolution pass degraded: ${String(evolutionError)}`);
+    }
+}
+
+/**
  * Post-scan pipeline enriching and finalizing a raw ScanReport.
  *
  * @param finalizeArguments - Context payload or positional execution arguments.
@@ -716,7 +788,7 @@ export async function finalizeReport(
     applySemanticComplexityPass(passContext);
 
     postScanPasses.push(PASS_SUPPRESSIONS);
-    const suppressedCount = applySuppressions(report, config.suppressions ?? []);
+    const suppressedCount = await applySuppressions(report, config.suppressions ?? []);
     report.summary.suppressedCount = suppressedCount;
     report.summary.postScanPasses = postScanPasses;
     if (warnings.length > 0) report.summary.warnings = warnings;
@@ -724,6 +796,8 @@ export async function finalizeReport(
     if (shouldRefreshQualityScores(report, initialIssueCount, suppressedCount)) {
         refreshQualityScores(report, config, reportScanner);
     }
+
+    applyEvolutionPass(passContext);
 
     await finalizeBaseline({
         report,
