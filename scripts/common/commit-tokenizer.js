@@ -47,6 +47,17 @@ const ENG_WORD_RE = /[a-zA-Z]{2,}/g;
 /** CJK contiguous block pattern */
 const CJK_BLOCK_RE = /[\u4e00-\u9fa5]+/g;
 
+/** High-frequency software engineering verbs with silent trailing 'e' (base form recovery). */
+const SILENT_E_VERBS = Object.freeze(new Set([
+  'updat', 'creat', 'configur', 'initializ', 'migrat', 'releas', 'remov', 'resolv',
+  'pars', 'optimiz', 'integrat', 'refin', 'defin', 'allocat', 'disabl', 'enabl',
+  'generat', 'pipelin', 'combin', 'invok', 'execut', 'validat', 'iterat', 'terminat',
+  'populat', 'isolat', 'aggregat', 'translat', 'mutat', 'activat', 'deactivat',
+  'resiz', 'overrid', 'upgrad', 'downgrad', 'replac', 'clos', 'merg', 'manag',
+  'chang', 'arrang', 'scop', 'notic', 'produc', 'consum', 'resum', 'schedul',
+  'ensur', 'handl', 'cycl', 'cach', 'sav', 'writ', 'hid', 'eras'
+]));
+
 /**
  * Strips zero-width characters and applies Unicode NFKC normalization.
  *
@@ -383,6 +394,9 @@ function analyzeEnglishVerbInflection(verb) {
     if (base.endsWith('mm') || base.endsWith('pp') || base.endsWith('dd') || base.endsWith('tt')) {
       base = base.slice(0, -1);
     }
+    if (SILENT_E_VERBS.has(base)) {
+      base += 'e';
+    }
     return { baseForm: base, tense: 'participle' };
   }
 
@@ -392,13 +406,25 @@ function analyzeEnglishVerbInflection(verb) {
     if (base.endsWith('mm') || base.endsWith('pp') || base.endsWith('dd') || base.endsWith('tt')) {
       base = base.slice(0, -1);
     }
+    if (SILENT_E_VERBS.has(base)) {
+      base += 'e';
+    }
     return { baseForm: base, tense: 'past' };
   }
 
   // Third-person singular (-es, -s)
   if (lower.endsWith('es') && lower.length >= 5) {
-    let base = lower.slice(0, -2);
-    return { baseForm: base, tense: 'third_singular' };
+    // Sibilant stems (-x, -ss, -sh, -ch, -zz) drop 'es' (fixes -> fix, pushes -> push)
+    if (/([xs]|sh|ch|zz)es$/i.test(lower)) {
+      return { baseForm: lower.slice(0, -2), tense: 'third_singular' };
+    }
+    // Silent 'e' verbs + 's' (updates -> update, creates -> create)
+    const baseWithoutS = lower.slice(0, -1);
+    const stemCandidate = lower.slice(0, -2);
+    if (SILENT_E_VERBS.has(stemCandidate)) {
+      return { baseForm: baseWithoutS, tense: 'third_singular' };
+    }
+    return { baseForm: lower.slice(0, -2), tense: 'third_singular' };
   }
   if (lower.endsWith('s') && !lower.endsWith('ss') && lower.length >= 4) {
     let base = lower.slice(0, -1);

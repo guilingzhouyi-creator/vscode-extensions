@@ -143,6 +143,7 @@ function classifyFindingDebtTier(finding) {
  * @param {number} [params.styleScore=100] - Calculated style score
  * @param {string} [params.commitType=''] - Conventional commit type (feat, fix, refactor, etc.)
  * @param {string} [params.logDir] - Custom audit log directory
+ * @param {string} [params.targetFile=''] - Path of commit message file being audited
  * @returns {object} Evaluation verdict with status, corridor metrics, and Agent directives
  */
 function evaluateDebtCorridor({
@@ -150,6 +151,7 @@ function evaluateDebtCorridor({
   styleScore = 100,
   commitType = '',
   logDir = DEFAULT_LOG_DIR,
+  targetFile = '',
 }) {
   const ledger = readDebtLedger(logDir);
   const accumulatedHighDebt = ledger.items.length;
@@ -184,7 +186,14 @@ function evaluateDebtCorridor({
       elasticAllowance: MAX_SINGLE_HIGH_DEBT,
       ceiling: ACCUMULATION_CEILING,
       remainingCredit: 0,
-      agentDirectives: buildAgentDirectives(criticalIssues, currentHighIssues, MODE_FORCED_PAYDOWN, true),
+      agentDirectives: buildAgentDirectives({
+        criticalIssues,
+        highIssues: currentHighIssues,
+        mode: MODE_FORCED_PAYDOWN,
+        isCritical: true,
+        targetFile,
+        totalProjectedDebt,
+      }),
     };
   }
 
@@ -211,7 +220,15 @@ function evaluateDebtCorridor({
       elasticAllowance: MAX_SINGLE_HIGH_DEBT,
       ceiling: ACCUMULATION_CEILING,
       remainingCredit: 0,
-      agentDirectives: buildAgentDirectives(criticalIssues, currentHighIssues, MODE_FORCED_PAYDOWN, false, ledger.items),
+      agentDirectives: buildAgentDirectives({
+        criticalIssues,
+        highIssues: currentHighIssues,
+        mode: MODE_FORCED_PAYDOWN,
+        isCritical: false,
+        unresolvedLedgerItems: ledger.items,
+        targetFile,
+        totalProjectedDebt,
+      }),
     };
   }
 
@@ -228,7 +245,15 @@ function evaluateDebtCorridor({
       elasticAllowance: MAX_SINGLE_HIGH_DEBT,
       ceiling: ACCUMULATION_CEILING,
       remainingCredit,
-      agentDirectives: buildAgentDirectives(criticalIssues, currentHighIssues, MODE_ELASTIC_WARNING, false, ledger.items),
+      agentDirectives: buildAgentDirectives({
+        criticalIssues,
+        highIssues: currentHighIssues,
+        mode: MODE_ELASTIC_WARNING,
+        isCritical: false,
+        unresolvedLedgerItems: ledger.items,
+        targetFile,
+        totalProjectedDebt,
+      }),
     };
   }
 
@@ -289,18 +314,30 @@ function updateDebtLedger({
 }
 
 /**
- * Builds structured actionable directives for Autonomous Agents.
+ * Builds structured actionable directives for Autonomous Agents adhering to the workspace envelope protocol.
  *
- * @param {Array<object>} criticalIssues
- * @param {Array<object>} highIssues
- * @param {string} mode
- * @param {boolean} isCritical
- * @param {Array<object>} [unresolvedLedgerItems=[]]
+ * @param {object} params
+ * @param {Array<object>} params.criticalIssues
+ * @param {Array<object>} params.highIssues
+ * @param {string} params.mode
+ * @param {boolean} params.isCritical
+ * @param {Array<object>} [params.unresolvedLedgerItems=[]]
+ * @param {string} [params.targetFile='']
+ * @param {number} [params.totalProjectedDebt=0]
  * @returns {object} Normalized Agent directive envelope
  */
-function buildAgentDirectives(criticalIssues, highIssues, mode, isCritical, unresolvedLedgerItems = []) {
+function buildAgentDirectives({
+  criticalIssues = [],
+  highIssues = [],
+  mode,
+  isCritical = false,
+  unresolvedLedgerItems = [],
+  targetFile = '',
+  totalProjectedDebt = 0,
+}) {
   const combined = [...criticalIssues, ...highIssues];
   const remediationPriority = Array.from(new Set(combined.map((c) => c.ruleId)));
+  const target = targetFile || '.git/COMMIT_EDITMSG';
 
   const actionableRemediations = combined.map((issue) => ({
     ruleId: issue.ruleId,
@@ -321,12 +358,21 @@ function buildAgentDirectives(criticalIssues, highIssues, mode, isCritical, unre
     : [];
 
   return {
-    mode,
+    targetFiles: [target],
     remediationPriority,
+    verificationCommand: `pwsh -File scripts/ps1/commit-msg-gate.ps1 ${target}`,
+    fastRecheckCommand: `node scripts/common/validate-commit-msg.js ${target}`,
+    verificationTimeBudgetMs: 50,
+    creditEnvelope: {
+      mode,
+      maxCredit: ACCUMULATION_CEILING,
+      currentHighDebt: highIssues.length,
+      accumulatedHighDebt: totalProjectedDebt,
+      remainingCredit: Math.max(0, ACCUMULATION_CEILING - totalProjectedDebt),
+      isFeatLocked: totalProjectedDebt >= ACCUMULATION_CEILING,
+    },
     actionableRemediations,
     paydownInstructions,
-    fastRecheckCommand: 'node scripts/common/validate-commit-msg.js .git/COMMIT_EDITMSG',
-    verificationTimeBudgetMs: 50,
   };
 }
 

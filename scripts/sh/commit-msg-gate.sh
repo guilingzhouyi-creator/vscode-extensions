@@ -388,20 +388,26 @@ if [[ "$IS_AGENT" -eq 1 ]]; then
 fi
 
 if [[ "$IS_AGENT" -eq 1 ]]; then
-    if ! (cd "$ROOT_DIR" && "$NODE_BIN" scripts/common/validate-commit-msg.js "${VALIDATE_ARGS[@]}" >/dev/null 2>&1); then
-        if [[ -f "$ROOT_DIR/.audit-logs/last-failure.json" ]]; then
+    NODE_OUT=""
+    NODE_STATUS=0
+    NODE_OUT=$(cd "$ROOT_DIR" && "$NODE_BIN" scripts/common/validate-commit-msg.js "${VALIDATE_ARGS[@]}" 2>&1) || NODE_STATUS=$?
+
+    if [[ $NODE_STATUS -ne 0 ]]; then
+        if [[ "$NODE_OUT" =~ ^[[:space:]]*\{ ]]; then
+            echo "$NODE_OUT"
+        elif [[ -f "$ROOT_DIR/.audit-logs/last-failure.json" ]]; then
             cat "$ROOT_DIR/.audit-logs/last-failure.json"
+        else
+            echo "$NODE_OUT"
         fi
         exit 1
     fi
-else
-    if ! (cd "$ROOT_DIR" && "$NODE_BIN" scripts/common/validate-commit-msg.js "${VALIDATE_ARGS[@]}"); then
-        print_template_guide
-        exit 1
-    fi
-fi
 
-if [[ "$IS_AGENT" -eq 1 ]]; then
+    if [[ "$NODE_OUT" =~ ^[[:space:]]*\{ ]]; then
+        echo "$NODE_OUT"
+        exit 0
+    fi
+
     cat <<EOF
 {
   "protocolVersion": "1.0.0",
@@ -411,6 +417,11 @@ if [[ "$IS_AGENT" -eq 1 ]]; then
 }
 EOF
     exit 0
+else
+    if ! (cd "$ROOT_DIR" && "$NODE_BIN" scripts/common/validate-commit-msg.js "${VALIDATE_ARGS[@]}"); then
+        print_template_guide
+        exit 1
+    fi
 fi
 
 echo "  ✔ Rule 1: Header 格式与长度 (5~80 字符, 无句号) 合规"

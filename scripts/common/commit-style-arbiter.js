@@ -125,7 +125,8 @@ function checkEnglishVerbImperative(lowerVerb, verb, summary, lineNum) {
 
   // 1. Check explicit past tense list
   if (DISALLOWED_ENGLISH_PAST_TENSE.has(lowerVerb)) {
-    const base = lowerVerb.endsWith('ed') ? lowerVerb.slice(0, -2) : lowerVerb;
+    const inflection = analyzeEnglishVerbInflection(lowerVerb);
+    const base = inflection?.baseForm || (lowerVerb.endsWith('ed') ? lowerVerb.slice(0, -2) : lowerVerb);
     return {
       lineNum,
       rawLine: summary,

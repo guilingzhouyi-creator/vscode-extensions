@@ -281,6 +281,7 @@ function validateCommitMessageContent(content, options = {}) {
     styleScore: guardrailResult.styleScore,
     commitType,
     logDir: options.logDir,
+    targetFile: options.targetFile,
   });
 
   // 4. Centralized telemetry & audit logging (persists both clean passes and intercepted blocks)
@@ -409,32 +410,119 @@ function runSelfTest() {
   console.log(`✔ 全部 ${TEST_CASES.length} 组中英双语风格自检用例验证通过`);
 }
 
+function resolveCommitContent(filePath) {
+  if (filePath === '-') return fs.readFileSync(0, 'utf8');
+  if (!fs.existsSync(filePath)) return null;
+  return fs.readFileSync(filePath, 'utf8');
+}
+
+function buildStyleAgentEnvelope(result, filePath) {
+  const target = filePath === '-' ? '' : filePath;
+  const isClean = result.valid;
+  const summary = isClean
+    ? 'Commit message style and tone verified cleanly.'
+    : result.debtVerdict?.reason || `Style check detected ${result.findings.length} findings.`;
+
+  return {
+    protocolVersion: '1.0.0',
+    status: result.debtVerdict?.status || (isClean ? 'PASS' : 'BLOCK'),
+    gate: 'commit-msg:style',
+    summary,
+    debtCorridor: result.debtVerdict,
+    agentDirectives: result.debtVerdict?.agentDirectives || {
+      targetFiles: target ? [target] : [],
+      remediationPriority: [],
+      verificationCommand: `node scripts/common/validate-commit-msg-style.js ${target}`,
+      fastRecheckCommand: `node scripts/common/validate-commit-msg-style.js ${target}`,
+      creditEnvelope: {
+        mode: 'NORMAL',
+        maxCredit: 2,
+        currentHighDebt: 0,
+        accumulatedHighDebt: 0,
+        remainingCredit: 2,
+        isFeatLocked: false,
+      },
+      actionableRemediations: [],
+      paydownInstructions: [],
+    },
+    findings: result.findings,
+  };
+}
+
 function main() {
   const args = process.argv.slice(2);
   if (args.includes('--test')) {
     runSelfTest();
     process.exit(0);
   }
-  if (args.length === 0) {
-    console.error('用法: node validate-commit-msg-style.js <commit-msg-file-path> 或 --test');
+
+  const isAgentMode = args.includes('--agent') || args.includes('--json');
+  const fileArgs = args.filter((a) => a !== '--agent' && a !== '--json');
+
+  if (fileArgs.length === 0) {
+    if (isAgentMode) {
+      console.log(
+        JSON.stringify(
+          {
+            protocolVersion: '1.0.0',
+            status: 'BLOCK',
+            gate: 'commit-msg:style',
+            summary: '用法错误: 请传入 commit-msg 文件路径或标准输入 (-)',
+            violations: [],
+          },
+          null,
+          2
+        )
+      );
+    } else {
+      console.error('用法: node validate-commit-msg-style.js <commit-msg-file-path> [--agent] 或 --test');
+    }
     process.exit(1);
   }
-  const filePath = args[0];
-  let content = '';
-  if (filePath === '-') {
-    content = fs.readFileSync(0, 'utf8');
-  } else {
-    if (!fs.existsSync(filePath)) {
+
+  const filePath = fileArgs[0];
+  const content = resolveCommitContent(filePath);
+  if (content === null) {
+    if (isAgentMode) {
+      console.log(
+        JSON.stringify(
+          {
+            protocolVersion: '1.0.0',
+            status: 'BLOCK',
+            gate: 'commit-msg:style',
+            summary: `提交信息文件不存在: ${filePath}`,
+            violations: [],
+          },
+          null,
+          2
+        )
+      );
+    } else {
       console.error(`❌ [FAIL] 提交信息文件不存在: ${filePath}`);
-      process.exit(1);
     }
-    content = fs.readFileSync(filePath, 'utf8');
+    process.exit(1);
   }
-  const result = validateCommitMessageContent(content);
-  if (!result.valid) {
+
+  const result = validateCommitMessageContent(content, { targetFile: filePath === '-' ? '' : filePath });
+
+  if (isAgentMode) {
+    console.log(JSON.stringify(buildStyleAgentEnvelope(result, filePath), null, 2));
+    process.exit(result.isPermittedUnderCorridor ? 0 : 1);
+  }
+
+  if (!result.isPermittedUnderCorridor) {
     console.error(formatDiagnosticReport(result.findings));
     process.exit(1);
   }
+
+  if (!result.valid) {
+    console.log('  ⚠️ [DEBT-CORRIDOR] 提交文本包含弹性高危风格技术债 (已在弹性走廊配额内放行):');
+    for (const f of result.findings) {
+      console.log(`     • [${f.ruleId}] 第 ${f.lineNum} 行: ${f.term} -> 推荐: ${f.guidance}`);
+    }
+    process.exit(0);
+  }
+
   console.log('  ✔ Rule 8: 提交文本求真务实与禁词审查合规 (中英双语零临时/零夸大/零贬损/零元叙事口号)');
   process.exit(0);
 }

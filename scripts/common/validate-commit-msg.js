@@ -140,13 +140,13 @@ function validateRuleAntiHallucination(content) {
   return hallucinated;
 }
 
-function validateStyleAndTone(content) {
-  return validateCommitMessageContent(content);
+function validateStyleAndTone(content, options = {}) {
+  return validateCommitMessageContent(content, options);
 }
 
-function validateSingleCommitMessage(content) {
+function validateSingleCommitMessage(content, options = {}) {
   const hallucinatedRules = validateRuleAntiHallucination(content);
-  const styleResult = validateStyleAndTone(content);
+  const styleResult = validateStyleAndTone(content, options);
   const styleFindings = styleResult.findings;
   const isPermittedUnderCorridor = hallucinatedRules.length === 0 && Boolean(styleResult.isPermittedUnderCorridor);
 
@@ -294,6 +294,8 @@ function reportCommitMsgFailure(res, target, isAgentMode) {
   }
 
   if (isAgentMode) {
+    const targetFile = target && target !== STDIN_TOKEN ? target : '';
+    const targetVerification = targetFile || '.git/COMMIT_EDITMSG';
     const envelope = {
       protocolVersion: PROTOCOL_VERSION,
       status: STATUS_BLOCK,
@@ -304,11 +306,12 @@ function reportCommitMsgFailure(res, target, isAgentMode) {
       summary: failureSummary,
       violations,
       debtCorridor: res.debtVerdict,
-      agentDirectives: res.debtVerdict?.agentDirectives || {
+      agentDirectives: {
+        ...(res.debtVerdict?.agentDirectives || {}),
         targetFiles: [target].filter((t) => t && t !== STDIN_TOKEN),
         remediationPriority: Array.from(new Set(violations.map((v) => v.ruleId))),
-        verificationCommand: `node scripts/common/validate-commit-msg.js ${target}`,
-        fastRecheckCommand: `node scripts/common/validate-commit-msg.js ${target}`,
+        verificationCommand: `pwsh -File scripts/ps1/commit-msg-gate.ps1 ${targetVerification}`,
+        fastRecheckCommand: `node scripts/common/validate-commit-msg.js ${targetVerification}`,
       },
     };
     console.log(JSON.stringify(envelope, null, 2));
@@ -334,7 +337,9 @@ function reportCommitMsgFailure(res, target, isAgentMode) {
 }
 
 function handleSingleCommitValidation(target, content, isAgentMode) {
-  const res = validateSingleCommitMessage(content);
+  const targetFile = target && target !== STDIN_TOKEN ? target : '';
+  const targetVerification = targetFile || '.git/COMMIT_EDITMSG';
+  const res = validateSingleCommitMessage(content, { targetFile });
   const commitType = res.guardrail?.parsedStructure?.type || '';
 
   // 1. Blocked: Critical failure or debt ceiling exhausted
@@ -358,7 +363,12 @@ function handleSingleCommitValidation(target, content, isAgentMode) {
             gate: GATE_COMMIT_MSG_RULES,
             summary: `Commit message permitted under elastic corridor with ${highIssues.length} high-risk style debt items.`,
             debtCorridor: res.debtVerdict,
-            agentDirectives: res.debtVerdict?.agentDirectives,
+            agentDirectives: {
+              ...(res.debtVerdict?.agentDirectives || {}),
+              targetFiles: targetFile ? [targetFile] : [],
+              verificationCommand: `pwsh -File scripts/ps1/commit-msg-gate.ps1 ${targetVerification}`,
+              fastRecheckCommand: `node scripts/common/validate-commit-msg.js ${targetVerification}`,
+            },
           },
           null,
           2
@@ -390,6 +400,22 @@ function handleSingleCommitValidation(target, content, isAgentMode) {
           gate: GATE_COMMIT_MSG_RULES,
           summary: SUMMARY_RULES_PASS,
           debtCorridor: res.debtVerdict,
+          agentDirectives: {
+            targetFiles: targetFile ? [targetFile] : [],
+            remediationPriority: [],
+            verificationCommand: `pwsh -File scripts/ps1/commit-msg-gate.ps1 ${targetVerification}`,
+            fastRecheckCommand: `node scripts/common/validate-commit-msg.js ${targetVerification}`,
+            creditEnvelope: {
+              mode: 'NORMAL',
+              maxCredit: 2,
+              currentHighDebt: 0,
+              accumulatedHighDebt: 0,
+              remainingCredit: 2,
+              isFeatLocked: false,
+            },
+            actionableRemediations: [],
+            paydownInstructions: [],
+          },
         },
         null,
         2
@@ -397,7 +423,7 @@ function handleSingleCommitValidation(target, content, isAgentMode) {
     );
   } else {
     console.log('  ✔ Rule 7: 规则 ID 单源目录一致性防虚构校验通过');
-    console.log('  ✔ Rule 8: 提交文本求真务实与禁词审查合规 (零临时/零夸大/零贬损/零元叙事口号)');
+    console.log('  ✔ Rule 8: 提交文本求真务实与禁词审查合规 (中英双语零临时/零夸大/零贬损/零元叙事口号)');
   }
   process.exit(0);
 }

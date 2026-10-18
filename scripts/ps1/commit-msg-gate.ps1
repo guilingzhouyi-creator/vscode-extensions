@@ -343,25 +343,27 @@ $resolvedMsgFile = (Resolve-Path $MsgFile).Path
 $nodeCmd = if ($IsWindows -or $env:OS -match "Windows") { "node.exe" } else { "node" }
 if ($Agent) {
     $outNode = & $nodeCmd (Join-Path $repoRoot "scripts/common/validate-commit-msg.js") $resolvedMsgFile --agent 2>&1
+    $nodeOutputText = ($outNode -join "`n").Trim()
+
     if ($LASTEXITCODE -ne 0) {
-        $lastFailurePath = Join-Path $repoRoot ".audit-logs/last-failure.json"
-        if (Test-Path $lastFailurePath) {
-            Get-Content $lastFailurePath -Raw
+        if ($nodeOutputText -match '^\s*\{') {
+            Write-Output $nodeOutputText
         } else {
-            Write-Output ($outNode -join "`n")
+            $lastFailurePath = Join-Path $repoRoot ".audit-logs/last-failure.json"
+            if (Test-Path $lastFailurePath) {
+                Get-Content $lastFailurePath -Raw
+            } else {
+                Write-Output $nodeOutputText
+            }
         }
         exit 1
     }
-} else {
-    $nodeArgs = @("scripts/common/validate-commit-msg.js", $resolvedMsgFile)
-    $process = Start-Process -FilePath $nodeCmd -ArgumentList $nodeArgs -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
-    if ($process.ExitCode -ne 0) {
-        Show-CommitTemplateGuide
-        exit $process.ExitCode
-    }
-}
 
-if ($Agent) {
+    if ($nodeOutputText -match '^\s*\{') {
+        Write-Output $nodeOutputText
+        exit 0
+    }
+
     Write-Output (@{
         protocolVersion = "1.0.0"
         status = "PASS"
@@ -369,6 +371,13 @@ if ($Agent) {
         summary = "All commit-msg validation rules passed cleanly."
     } | ConvertTo-Json)
     exit 0
+} else {
+    $nodeArgs = @("scripts/common/validate-commit-msg.js", $resolvedMsgFile)
+    $process = Start-Process -FilePath $nodeCmd -ArgumentList $nodeArgs -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
+    if ($process.ExitCode -ne 0) {
+        Show-CommitTemplateGuide
+        exit $process.ExitCode
+    }
 }
 
 Write-Host "  ✔ Rule 1: Header 格式与长度 (5~80 字符, 无句号) 合规" -ForegroundColor Green

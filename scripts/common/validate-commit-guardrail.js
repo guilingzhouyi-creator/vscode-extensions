@@ -497,6 +497,87 @@ function testElasticTechDebtCorridor() {
 }
 
 /**
+ * Validates intelligent base form recovery for software engineering verbs with silent trailing 'e'.
+ */
+function testSilentEVerbRecovery() {
+  const cases = [
+    { input: 'updated', expectedBase: 'update', expectedTense: 'past' },
+    { input: 'updating', expectedBase: 'update', expectedTense: 'participle' },
+    { input: 'updates', expectedBase: 'update', expectedTense: 'third_singular' },
+    { input: 'created', expectedBase: 'create', expectedTense: 'past' },
+    { input: 'creating', expectedBase: 'create', expectedTense: 'participle' },
+    { input: 'creates', expectedBase: 'create', expectedTense: 'third_singular' },
+    { input: 'configured', expectedBase: 'configure', expectedTense: 'past' },
+    { input: 'migrated', expectedBase: 'migrate', expectedTense: 'past' },
+    { input: 'fixes', expectedBase: 'fix', expectedTense: 'third_singular' },
+    { input: 'fixed', expectedBase: 'fix', expectedTense: 'past' },
+  ];
+
+  for (const c of cases) {
+    const res = analyzeEnglishVerbInflection(c.input);
+    assert.ok(res, `analyzeEnglishVerbInflection must recognize ${c.input}`);
+    assert.strictEqual(res.baseForm, c.expectedBase, `Base form of ${c.input} must be ${c.expectedBase}`);
+    assert.strictEqual(res.tense, c.expectedTense, `Tense of ${c.input} must be ${c.expectedTense}`);
+  }
+}
+
+/**
+ * Validates the Agent Directives envelope schema and credit envelope integrity.
+ */
+function testAgentDirectivesEnvelopeProtocol() {
+  const tempLogDir = fs.mkdtempSync(path.join(os.tmpdir(), 'agent-directives-test-'));
+  try {
+    const dummyFindings = [
+      {
+        ruleId: 'CMG-STY-007',
+        category: 'imperative_mood',
+        lineNum: 1,
+        term: 'updated',
+        reason: 'Must use imperative mood',
+        guidance: 'Replace updated with update',
+        isHighDebt: true,
+      },
+    ];
+
+    const verdict = evaluateDebtCorridor({
+      findings: dummyFindings,
+      styleScore: 88,
+      commitType: 'feat',
+      logDir: tempLogDir,
+      targetFile: '.git/COMMIT_EDITMSG',
+    });
+
+    assert.strictEqual(verdict.status, STATUS_PASS_WITH_WARNING);
+    assert.ok(verdict.agentDirectives, 'agentDirectives must be generated');
+    const directives = verdict.agentDirectives;
+
+    // Validate directives envelope schema
+    assert.deepStrictEqual(directives.targetFiles, ['.git/COMMIT_EDITMSG']);
+    assert.deepStrictEqual(directives.remediationPriority, ['CMG-STY-007']);
+    assert.strictEqual(directives.verificationCommand, 'pwsh -File scripts/ps1/commit-msg-gate.ps1 .git/COMMIT_EDITMSG');
+    assert.strictEqual(directives.fastRecheckCommand, 'node scripts/common/validate-commit-msg.js .git/COMMIT_EDITMSG');
+    assert.strictEqual(directives.verificationTimeBudgetMs, 50);
+
+    // Validate credit envelope
+    assert.ok(directives.creditEnvelope, 'creditEnvelope must be present');
+    assert.strictEqual(directives.creditEnvelope.mode, MODE_ELASTIC_WARNING);
+    assert.strictEqual(directives.creditEnvelope.maxCredit, 2);
+    assert.strictEqual(directives.creditEnvelope.currentHighDebt, 1);
+    assert.strictEqual(directives.creditEnvelope.remainingCredit, 1);
+    assert.strictEqual(directives.creditEnvelope.isFeatLocked, false);
+
+    // Validate actionable remediations
+    assert.strictEqual(directives.actionableRemediations.length, 1);
+    assert.strictEqual(directives.actionableRemediations[0].offendingTerm, 'updated');
+    assert.strictEqual(directives.actionableRemediations[0].suggestedFix, 'Replace updated with update');
+  } finally {
+    if (fs.existsSync(tempLogDir)) {
+      fs.rmSync(tempLogDir, { recursive: true, force: true });
+    }
+  }
+}
+
+/**
  * Main verification test runner.
  */
 function runGuardrailVerification() {
@@ -532,7 +613,13 @@ function runGuardrailVerification() {
   testElasticTechDebtCorridor();
   console.log('  ✔ [PASS] 弹性高危技术债容差走廊与清偿棘轮互锁状态机验证通过');
 
-  console.log('🎉 提交信息分词器、双轨持久化与弹性债务走廊体系全部 10 组独立契约测试验证通过！');
+  testSilentEVerbRecovery();
+  console.log('  ✔ [PASS] 软件工程动词静音 e 词根智能还原验证通过');
+
+  testAgentDirectivesEnvelopeProtocol();
+  console.log('  ✔ [PASS] Autonomous Agent 结构化提示信封协议与信用额度包验证通过');
+
+  console.log('🎉 提交信息分词器、双轨持久化与弹性债务走廊体系全部 12 组独立契约测试验证通过！');
 }
 
 if (require.main === module) {
