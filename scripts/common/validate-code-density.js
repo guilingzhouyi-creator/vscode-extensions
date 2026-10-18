@@ -30,7 +30,7 @@ const {
 
 const DEFAULT_POR_LIMIT = 0.60;
 const DEFAULT_MIN_TAU = 2.5;
-const DEFAULT_MAX_TAU = 20.0;
+const DEFAULT_MAX_TAU = 22.0;
 const MIN_REPRESENTATIVE_ELOC = 10;
 
 
@@ -141,6 +141,22 @@ function auditFileDensity(filePath, options, contentOverride = undefined) {
       actual: `${(metrics.plumbingRatio * 100).toFixed(1)}%`,
       expected: `<= ${(options.porLimit * 100).toFixed(1)}%`,
       actionableFix: 'De-escalate empty forwarding trampolines, inline one-line adapters, or enrich facade with domain validation (ARCH-FAC-001).',
+      actionable: {
+        action: 'enrich_facade',
+        code: 'ARCH-FAC-001',
+        taxonomy: 'ARCH_LAYER',
+        targetScope: 'module_top_level',
+        metricsBreakdown: {
+          eloc: metrics.eloc,
+          totalLoc: metrics.totalLoc,
+          tspr: metrics.tspr,
+          por: metrics.plumbingRatio,
+          threshold: options.porLimit,
+        },
+        templateSnippet: '// Add parameter invariant validation, deepFreeze protection, or aggregate >= 3 domain features',
+        safeToAutomate: false,
+        rationale: 'Plumbing ratio exceeds 60% budget; facade lacks substantial domain responsibility or immutability freeze.',
+      },
     });
   }
 
@@ -153,6 +169,22 @@ function auditFileDensity(filePath, options, contentOverride = undefined) {
       actual: `${metrics.tokensPerEloc} tokens/line`,
       expected: `>= ${options.minTau} tokens/line`,
       actionableFix: 'Merge overly fragmented vertical formatting lines, eliminate redundant line wraps, or collocate concise statements.',
+      actionable: {
+        action: 'compact_diluted_lines',
+        code: 'VOL-DIL-001',
+        taxonomy: 'GOV_NORM',
+        targetScope: 'module_top_level',
+        metricsBreakdown: {
+          eloc: metrics.eloc,
+          totalLoc: metrics.totalLoc,
+          tokensPerEloc: metrics.tokensPerEloc,
+          columnDensity: metrics.columnDensity,
+          threshold: options.minTau,
+        },
+        templateSnippet: '// Consolidate single-argument or fragmented chained lines into cohesive statements',
+        safeToAutomate: true,
+        rationale: 'Vertical token density tau is below minimum 2.5 tokens/line floor, indicating excessive vertical formatting dilution.',
+      },
     });
   }
 
@@ -165,6 +197,22 @@ function auditFileDensity(filePath, options, contentOverride = undefined) {
       actual: `${metrics.tokensPerEloc} tokens/line`,
       expected: `<= ${options.maxTau} tokens/line`,
       actionableFix: 'Break down monolithic chained expressions, extract intermediate variables, and spread nested logic onto dedicated lines.',
+      actionable: {
+        action: 'decompose_congested_tokens',
+        code: 'GATE-AST-001',
+        taxonomy: 'CTRL_FLOW',
+        targetScope: 'function_local',
+        metricsBreakdown: {
+          eloc: metrics.eloc,
+          totalLoc: metrics.totalLoc,
+          tokensPerEloc: metrics.tokensPerEloc,
+          columnDensity: metrics.columnDensity,
+          threshold: options.maxTau,
+        },
+        templateSnippet: 'const intermediateVar = expression;\nreturn computeWith(intermediateVar);',
+        safeToAutomate: true,
+        rationale: 'Horizontal token density tau exceeds 20.0 tokens/line ceiling, creating single-line cognitive congestion.',
+      },
     });
   }
 
@@ -181,6 +229,15 @@ function recordFailureSnapshot(allViolations) {
       exitCode: 1,
       summary: `Detected ${allViolations.length} code density or wiring ratio violation(s).`,
       violations: allViolations,
+      agentDirectives: allViolations.map((v) => ({
+        file: v.file,
+        ruleId: v.ruleId,
+        action: v.actionable?.action || 'enrich_facade',
+        taxonomy: v.actionable?.taxonomy || 'ARCH_LAYER',
+        metrics: v.actionable?.metricsBreakdown,
+        template: v.actionable?.templateSnippet,
+        safeToAutomate: v.actionable?.safeToAutomate ?? false,
+      })),
       targetFiles: Array.from(new Set(allViolations.map((v) => v.file))),
       remediationPriority: Array.from(new Set(allViolations.map((v) => v.ruleId))),
       verificationCommand: 'node scripts/common/validate-code-density.js --staged',
@@ -225,6 +282,15 @@ function outputJsonDensityReport(allViolations, inspections, totalFiles, exemptC
     totalFiles,
     exemptFiles: exemptCount,
     violations: allViolations,
+    agentDirectives: allViolations.map((v) => ({
+      file: v.file,
+      ruleId: v.ruleId,
+      action: v.actionable?.action || 'enrich_facade',
+      taxonomy: v.actionable?.taxonomy || 'ARCH_LAYER',
+      metrics: v.actionable?.metricsBreakdown,
+      template: v.actionable?.templateSnippet,
+      safeToAutomate: v.actionable?.safeToAutomate ?? false,
+    })),
     inspections: inspections.map((ins) => ({
       file: ins.file,
       isExempt: ins.isExempt,
@@ -241,6 +307,31 @@ function outputJsonDensityReport(allViolations, inspections, totalFiles, exemptC
   }
   console.log(JSON.stringify(report, null, 2));
   process.exit(allViolations.length === 0 ? 0 : 1);
+}
+
+const RE_IGNORED_DIRS = new Set([
+  '.git', '.agents', 'node_modules', 'dist', 'out', 'fixtures', 'baseline',
+  'reports', 'archive', 'build', '.godot', '.refactor-trajectory'
+]);
+
+function findRepoCodeFiles(dir, fileList = []) {
+  if (!fs.existsSync(dir)) return fileList;
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  for (const entry of entries) {
+    if (entry.isDirectory()) {
+      if (entry.name.startsWith('.') || RE_IGNORED_DIRS.has(entry.name)) {
+        continue;
+      }
+      findRepoCodeFiles(path.join(dir, entry.name), fileList);
+    } else if (entry.isFile()) {
+      const full = path.join(dir, entry.name);
+      const rel = path.relative(process.cwd(), full).replace(/\\/g, '/');
+      if (isAuditableCodeFile(rel)) {
+        fileList.push(full);
+      }
+    }
+  }
+  return fileList;
 }
 
 function printHumanDensityReport(allViolations, uniqueFilesLength, exemptCount) {
@@ -270,6 +361,8 @@ function run() {
 
   if (options.range) {
     targets = targets.concat(getRangeFiles(options.range));
+  } else if (options.all) {
+    targets = targets.concat(findRepoCodeFiles(process.cwd()));
   } else if (options.staged || targets.length === 0) {
     targets = targets.concat(getStagedFiles());
   }

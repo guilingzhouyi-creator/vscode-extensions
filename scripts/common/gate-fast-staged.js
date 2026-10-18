@@ -31,6 +31,8 @@ const RULE_HYG_EOL_001 = 'HYG-EOL-001';
 const RULE_HYG_EMP_001 = 'HYG-EMP-001';
 const RULE_VOL_ELOC_001 = 'VOL-ELOC-001';
 const RULE_VOL_LOC_001 = 'VOL-LOC-001';
+const RULE_VOL_RATIO_001 = 'VOL-RATIO-001';
+const RULE_ARCH_FAC_001 = 'ARCH-FAC-001';
 const RULE_SEC_LEAK_001 = 'SEC-LEAK-001';
 const RULE_SEC_VUL_001 = 'SEC-VUL-001';
 
@@ -97,7 +99,7 @@ const RAW_GATE_SPECS = `1|暂存区零空文件与零纯注释空壳检查通过
 2|换行/编码/EOF/缩进契约 (ps1 CRLF, 其余 LF, 无 BOM, 单 EOF, 无 Tab) 检查通过||
 3|绝对路径与协议防泄漏检查通过|5|❌ [FAIL] Gate 3: 检测到新增代码中包含绝对路径或盘符泄漏:
 4|零黑话与规范命名检查通过||
-5|双轨体积预算 (ELOC<=900, LOC<=1400) 检查通过||
+5|双轨体积预算与代码密度守卫 (ELOC<=900, LOC<=1400, 稀释比<=3.5, 接线比<=65%) 检查通过||
 6|密钥与敏感 Token 防泄漏扫描通过|3|❌ [FAIL] Gate 6: 检测到暂存代码中疑似包含未脱敏的真实密钥或私钥！`;
 
 const GATE_SPECS = Object.freeze(
@@ -121,6 +123,8 @@ EOL_PS1|CRLF|将该 PowerShell 脚本换行符转换为 CRLF
 EOL_LF|LF|将该文件换行符转换为 LF
 VOL_ELOC|ELOC <= 900|消除冗余实现并提取子模块以控制 ELOC <= 900
 VOL_LOC|LOC <= 1400|重构超大文件，按子领域解耦以控制 LOC <= 1400
+VOL_RATIO|垂直行稀释比超标 (totalLoc > eloc * 3.5)|消除空行堆叠或将长篇散文注释移至 Markdown 规范文档
+ARCH_FAC|接线代码占比过高 (wiringRatio > 65%)|消除空心透传跳板或为门面注入实质领域能力/不可变性冻结
 EMPTY_FILE|0 bytes|> 0 bytes with semantic payload|删除该空文件或实现实质代码逻辑
 EMPTY_WS|0 non-whitespace characters|实质内容|删除该虚空文件或填充代码
 PATH_LEAK|相对路径或环境变量动态解析|替换绝对路径或盘符为相对路径或 path.resolve(__dirname, ...)
@@ -240,6 +244,25 @@ function classifyPowerShellLine(line, inBlock) {
   return { isBlank: false, isComment: false, inBlock: false };
 }
 
+const RE_FAST_WIRING = /^(?:import\s+|import\(|from\s+|export\s+(?:\*|type\s+\*|\{[^}]*\}\s*(?:from\s+[^;]+)?;?|default\s+[A-Za-z0-9_$]+;?$)|(?:const|let|var)\s+.*=\s*require\(|module\.exports\s*=|exports\.|source\s+|\.\s+|using\s+|Import-Module\s+|(?:extends\s+|class_name\s+|(?:const|var)\s+\w+\s*=\s*preload\())/;
+
+function isLineEffective(line, state) {
+  if (state.isPowerShell) {
+    const res = classifyPowerShellLine(line, state.inBlock);
+    state.inBlock = res.inBlock;
+    return !res.isBlank && !res.isComment;
+  }
+  if (state.isHash) {
+    const res = classifyHashLine(line, state.inBlock, state.quoteChar);
+    state.inBlock = res.inBlock;
+    state.quoteChar = res.quoteChar;
+    return !res.isBlank && !res.isComment;
+  }
+  const res = classifyCLine(line, state.inBlock);
+  state.inBlock = res.inBlock;
+  return !res.isBlank && !res.isComment;
+}
+
 function calculateEloc(content, ext) {
   const lines = content.split(/\r?\n/);
   if (lines.length > 0 && lines[lines.length - 1] === '') {
@@ -247,28 +270,23 @@ function calculateEloc(content, ext) {
   }
   const totalLoc = lines.length;
   let eloc = 0;
-  const isPowerShell = ext === '.ps1';
-  const isHash = ext === '.gd' || ext === '.py' || ext === '.sh' || ext === '.bash';
-  let inBlock = false;
-  let quoteChar = '';
+  let wiringCount = 0;
+  const state = {
+    isPowerShell: ext === '.ps1',
+    isHash: ext === '.gd' || ext === '.py' || ext === '.sh' || ext === '.bash',
+    inBlock: false,
+    quoteChar: '',
+  };
 
   for (const line of lines) {
-    if (isPowerShell) {
-      const res = classifyPowerShellLine(line, inBlock);
-      inBlock = res.inBlock;
-      if (!res.isBlank && !res.isComment) eloc++;
-    } else if (isHash) {
-      const res = classifyHashLine(line, inBlock, quoteChar);
-      inBlock = res.inBlock;
-      quoteChar = res.quoteChar;
-      if (!res.isBlank && !res.isComment) eloc++;
-    } else {
-      const res = classifyCLine(line, inBlock);
-      inBlock = res.inBlock;
-      if (!res.isBlank && !res.isComment) eloc++;
+    if (isLineEffective(line, state)) {
+      eloc++;
+      if (RE_FAST_WIRING.test(line.trim())) {
+        wiringCount++;
+      }
     }
   }
-  return { totalLoc, eloc };
+  return { totalLoc, eloc, wiringCount };
 }
 
 /**
@@ -605,6 +623,17 @@ function collectIndentWidthWarnings(file, content, warnings) {
   }
 }
 
+function isPlumbingExemptFast(file) {
+  const norm = file.replace(/\\/g, '/').toLowerCase();
+  const base = path.basename(norm);
+  if (base.startsWith('index.')) return true;
+  if (norm.endsWith('.d.ts')) return true;
+  if (base.endsWith('_types.gd') || base.endsWith('_types.ts') || base.endsWith('-types.ts')) return true;
+  if (/(?:\/constants\/|\/tokens\/|\/locales\/|\/i18n\/|\/types\/)/.test(norm)) return true;
+  if (/(?:tests\/|\.test\.|\.spec\.|test_)/i.test(norm)) return true;
+  return false;
+}
+
 function validateFileVolume(file, content, gate5Violations) {
   const norm = file.replace(/\\/g, '/');
   if (
@@ -614,7 +643,7 @@ function validateFileVolume(file, content, gate5Violations) {
     return;
   }
   const ext = path.extname(file).toLowerCase();
-  const { totalLoc, eloc } = calculateEloc(content, ext);
+  const { totalLoc, eloc, wiringCount } = calculateEloc(content, ext);
   if (eloc > MAX_ELOC_BUDGET) {
     const tpl = VIOLATION_TPLS.VOL_ELOC;
     gate5Violations.push(
@@ -638,6 +667,38 @@ function validateFileVolume(file, content, gate5Violations) {
         actual: `LOC = ${totalLoc}`,
         expected: tpl.expected,
         actionableFix: tpl.actionableFix,
+      }),
+    );
+  }
+
+  if (isPlumbingExemptFast(file)) {
+    return;
+  }
+
+  if (totalLoc >= 250 && eloc > 0 && totalLoc > eloc * 3.5) {
+    const actualRatio = (totalLoc / eloc).toFixed(2);
+    gate5Violations.push(
+      createViolation({
+        ruleId: RULE_VOL_RATIO_001,
+        file,
+        message: `垂直行稀释比超标 (LOC: ${totalLoc} > ELOC: ${eloc} * 3.5 = ${Math.round(eloc * 3.5)}, 比例 1:${actualRatio}): ${file}`,
+        actual: `1:${actualRatio}`,
+        expected: '<= 1:3.50',
+        actionableFix: '消除空行堆叠或将长篇散文注释移至 Markdown 规范文档 (VOL-RATIO-001)',
+      }),
+    );
+  }
+
+  if (eloc >= 10 && wiringCount / eloc > 0.65) {
+    const wiringPct = ((wiringCount / eloc) * 100).toFixed(1);
+    gate5Violations.push(
+      createViolation({
+        ruleId: RULE_ARCH_FAC_001,
+        file,
+        message: `接线代码占比超标 (${wiringPct}% > 65.0%, ELOC: ${eloc}): ${file}`,
+        actual: `${wiringPct}%`,
+        expected: '<= 65.0%',
+        actionableFix: '消除空心透传跳板或为门面注入实质领域能力/不可变性冻结 (ARCH-FAC-001)',
       }),
     );
   }

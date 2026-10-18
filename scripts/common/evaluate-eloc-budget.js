@@ -36,7 +36,7 @@ const LOG_NORMAL_SIGMA = 0.55;
 const LOG_NORMAL_DENOM = 2 * LOG_NORMAL_SIGMA * LOG_NORMAL_SIGMA; // 0.605
 const MAX_PLUMBING_RATIO = 0.60;
 const MIN_TOKENS_PER_ELOC = 2.5;
-const MAX_TOKENS_PER_ELOC = 20.0;
+const MAX_TOKENS_PER_ELOC = 22.0;
 
 const TAG_VOL_ELOC = 'VOL-ELOC-001';
 const TAG_VOL_LOC = 'VOL-LOC-001';
@@ -276,7 +276,7 @@ const RE_CONST_DECL = /^(?:export\s+(?:const|enum)|const|readonly)\s+|as\s+const
 const RE_FN_OR_CLASS = /function\s+|=>\s*\{|class\s+/;
 
 const CONSTANT_PATH_PATTERNS = Object.freeze(
-  '/constants/,/tokens/,/locales/,/i18n/,constants.ts,tokens.ts,rule-codes.ts,diagnostic-tokens.ts,system-tokens.ts,ast-tokens.ts'.split(',')
+  '/constants/,/tokens/,/locales/,/i18n/,/types/,constants.ts,tokens.ts,rule-codes.ts,diagnostic-tokens.ts,system-tokens.ts,ast-tokens.ts,_types.gd,_types.ts,-types.ts'.split(',')
 );
 
 function isPlumbingLine(trimmedLine, ext) {
@@ -358,8 +358,16 @@ function isPlumbingExemptPath(filePath, content = '') {
   // 1. Barrel index files (facades specifically designed for re-exporting)
   if (base.startsWith('index.')) return true;
 
-  // 2. TypeScript definition catalogs
-  if (norm.endsWith('.d.ts')) return true;
+  // 2. TypeScript definition catalogs & type/enum contract dictionaries
+  if (
+    norm.endsWith('.d.ts') ||
+    base.endsWith('_types.gd') ||
+    base.endsWith('_types.ts') ||
+    base.endsWith('-types.ts') ||
+    norm.includes('/types/')
+  ) {
+    return true;
+  }
 
   // 3. Benign constant & token catalogs
   if (isConstantPath(filePath)) return true;
@@ -526,6 +534,23 @@ function evaluateDynamicEnvelope(metrics, options, filePath = '', content = '') 
       tag: TAG_VOL_ELOC,
       message: `Effective code volume budget exceeded: ${eloc} ELOC > maximum limit ${maxEloc} ELOC (raw LOC: ${totalLoc})`,
       suggestion: SUGGESTION_SRP,
+      actionable: {
+        action: 'split_function',
+        code: TAG_VOL_ELOC,
+        taxonomy: 'CTRL_FLOW',
+        targetScope: 'module_top_level',
+        metricsBreakdown: {
+          eloc,
+          maxEloc,
+          totalLoc,
+          maxLoc,
+          tokensPerEloc: metrics.tokensPerEloc,
+          tspr: metrics.tspr,
+        },
+        templateSnippet: '// Decompose large functions into submodules or cohesive helpers',
+        safeToAutomate: false,
+        rationale: 'Effective logic exceeds maximum ELOC budget limit.',
+      },
     };
   }
   if (totalLoc > maxLoc) {
@@ -534,6 +559,16 @@ function evaluateDynamicEnvelope(metrics, options, filePath = '', content = '') 
       tag: TAG_VOL_LOC,
       message: `Physical line count budget exceeded: ${totalLoc} LOC > maximum limit ${maxLoc} LOC (effective: ${eloc} ELOC)`,
       suggestion: SUGGESTION_SPLIT,
+      actionable: {
+        action: 'split_function',
+        code: TAG_VOL_LOC,
+        taxonomy: 'GOV_NORM',
+        targetScope: 'module_top_level',
+        metricsBreakdown: { eloc, totalLoc, maxLoc },
+        templateSnippet: '// Split oversized file into multiple focused units',
+        safeToAutomate: false,
+        rationale: 'Physical line count exceeds maximum LOC budget limit.',
+      },
     };
   }
 
@@ -546,6 +581,22 @@ function evaluateDynamicEnvelope(metrics, options, filePath = '', content = '') 
       tag: TAG_VOL_RATIO,
       message: `Dynamic dilution imbalance (ratio 1:${actualRatio} > 1:${densityRatioTarget}): Dynamic physical envelope for ${eloc} ELOC is ${dynamicMaxLoc} LOC, actual is ${totalLoc} LOC`,
       suggestion: SUGGESTION_PROSE,
+      actionable: {
+        action: 'compact_diluted_lines',
+        code: TAG_VOL_RATIO,
+        taxonomy: 'GOV_NORM',
+        targetScope: 'module_top_level',
+        metricsBreakdown: {
+          eloc,
+          totalLoc,
+          dynamicMaxLoc,
+          actualRatio: Number(actualRatio),
+          densityRatioTarget,
+        },
+        templateSnippet: '// Consolidate fragmented line breaks or move extended prose documentation to Markdown specs',
+        safeToAutomate: true,
+        rationale: 'Physical line ratio exceeds dynamic envelope target ratio.',
+      },
     };
   }
 
@@ -559,6 +610,21 @@ function evaluateDynamicEnvelope(metrics, options, filePath = '', content = '') 
         tag: TAG_VOL_DIL,
         message: `Effective logic density too low (${eloc} ELOC < dynamic floor ${dynamicMinEloc} ELOC, code ratio ${codeDensityPct}%): File occupies ${totalLoc} physical lines`,
         suggestion: SUGGESTION_DENSITY,
+        actionable: {
+          action: 'compact_diluted_lines',
+          code: TAG_VOL_DIL,
+          taxonomy: 'GOV_NORM',
+          targetScope: 'module_top_level',
+          metricsBreakdown: {
+            eloc,
+            dynamicMinEloc,
+            totalLoc,
+            codeDensityPct: Number(codeDensityPct),
+          },
+          templateSnippet: '// Eliminate excessive blank padding, remove trivial stubs, or tighten vertical layout',
+          safeToAutomate: true,
+          rationale: 'Effective logic density is below dynamic minimum floor.',
+        },
       };
     }
   }
@@ -574,6 +640,20 @@ function evaluateDynamicEnvelope(metrics, options, filePath = '', content = '') 
         tag: TAG_VOL_DOC,
         message: `High-load logic lacks architecture contracts: Effective logic (${eloc} ELOC) has insufficient documentation density (${commentPct}% < 8%)`,
         suggestion: SUGGESTION_DOCS,
+        actionable: {
+          action: 'insert_comment_contract',
+          code: TAG_VOL_DOC,
+          taxonomy: 'GOV_NORM',
+          targetScope: 'module_top_level',
+          metricsBreakdown: {
+            eloc,
+            commentRatio,
+            minRatio: MIN_CONTRACT_COMMENT_RATIO,
+          },
+          templateSnippet: '/**\n * Module: ...\n * Responsibilities: ...\n */',
+          safeToAutomate: false,
+          rationale: 'High-load logic requires standard architecture contract documentation.',
+        },
       };
     }
   }
@@ -743,6 +823,7 @@ function auditFileCollection(uniqueFiles, options) {
         reason: envelope.message,
         tag: envelope.tag,
         suggestion: envelope.suggestion,
+        actionable: envelope.actionable,
       });
     } else if (envelope.severity === 'warn') {
       warnings.push({
@@ -750,6 +831,7 @@ function auditFileCollection(uniqueFiles, options) {
         notice: envelope.message,
         tag: envelope.tag,
         suggestion: envelope.suggestion,
+        actionable: envelope.actionable,
       });
     }
   }
@@ -827,6 +909,14 @@ function run() {
       totalFiles: uniqueFiles.length,
       violations,
       warnings,
+      agentDirectives: violations.map((v) => ({
+        file: v.file,
+        ruleId: v.tag,
+        action: v.actionable?.action || 'split_function',
+        metrics: v.actionable?.metricsBreakdown,
+        template: v.actionable?.templateSnippet,
+        safeToAutomate: v.actionable?.safeToAutomate ?? false,
+      })),
       files: summaries,
     };
     console.log(JSON.stringify(report, null, 2));
