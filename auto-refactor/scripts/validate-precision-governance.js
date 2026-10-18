@@ -19,7 +19,11 @@
 'use strict';
 
 const assert = require('assert');
-const { computeDynamicHotspotRisk, LossyPrecisionRoundingRule } = require('../dist/api');
+const {
+  computeDynamicHotspotRisk,
+  LossyPrecisionRoundingRule,
+  UnboundedNumericConditionRule,
+} = require('../dist/api');
 const {
   formatCompactRecord,
   serializeNdjsonLine,
@@ -204,6 +208,18 @@ function verifyNumPrecRuleDetection() {
   assert.strictEqual(issuesGood, null, 'Must allow 0.01 precision rounding');
 
   console.log('  ✔ NUM-PREC-001 correctly flags coarse truncation and passes 0.01 precision code.');
+
+  // NUM-BND-001 check
+  const badUnboundedCode = 'if (recursionDepth > 0) { doWork(); }';
+  const goodBoundedCode = 'if (recursionDepth > 0 && recursionDepth <= MAX_DEPTH) { doWork(); }';
+  const checkBnd = (code) => UnboundedNumericConditionRule.checkFile(mockCtx(code));
+  const issuesBnd = checkBnd(badUnboundedCode);
+  assert.ok(issuesBnd && issuesBnd.length > 0, 'Must flag one-sided recursionDepth > 0');
+  assert.strictEqual(issuesBnd[0].ruleId, 'NUM-BND-001');
+  const issuesGoodBnd = checkBnd(goodBoundedCode);
+  assert.strictEqual(issuesGoodBnd, null, 'Must allow bounded condition');
+
+  console.log('  ✔ NUM-BND-001 correctly flags unbounded recursion conditions and passes bounded code.');
 }
 
 /**

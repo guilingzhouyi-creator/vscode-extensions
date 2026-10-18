@@ -771,6 +771,21 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#tst-flt-001',
     }),
     defineRule({
+        id: 'TST-ORC-001',
+        family: RULE_FAMILY_TEST_MODERNITY,
+        analyzer: ANALYZER_TEST_MODERNITY,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            'Brittle magic assertion oracle detected: test asserts exact equality on physical entity' +
+            'totals or float scalars instead of invariant corridor or dynamic relative baseline.',
+        remediation:
+            'Migrate to property-based invariant assertion or bounded corridor evaluation' +
+            '(such as assertWithinCorridor or dynamic range comparison).',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#tst-orc-001',
+    }),
+    defineRule({
         id: 'TST-ILS-001',
         family: RULE_FAMILY_TEST_MODERNITY,
         analyzer: ANALYZER_TEST_MODERNITY,

@@ -468,6 +468,21 @@ export const GOVERNANCE_RULES: readonly RuleDefinition[] = [
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#num-prec-001',
     }),
     defineRule({
+        id: 'NUM-BND-001',
+        family: RULE_FAMILY_NUMERIC,
+        analyzer: ANALYZER_GOVERNANCE,
+        canonical: true,
+        languages: LANGUAGES_TS_JS,
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            'One-sided unbounded numeric parameter or condition exposed in recursion depth,' +
+            'loop bound, or capacity check without bidirectional corridor bound.',
+        remediation:
+            'Enforce both lower and upper bounds with Number.isFinite guard (e.g. clamp(val, min, max))' +
+            'to eliminate DoS and negative overflow risks.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#num-bnd-001',
+    }),
+    defineRule({
         id: 'MOD-BWD-001',
         family: RULE_FAMILY_MODERNITY,
         analyzer: ANALYZER_GOVERNANCE,

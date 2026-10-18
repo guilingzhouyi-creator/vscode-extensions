@@ -18,7 +18,7 @@ import type { GovernanceRule, GovernanceViolation, RuleEvaluationContext } from 
 import { isToolOrTestScript } from '../pathScope';
 import type { NormalizedNode } from '../../ast/multilang';
 import { NodeKind } from '../../ast/multilang';
-import { CODE_NUM_PRECISION_LOSSY } from '../../constants/rule-codes';
+import { CODE_NUM_PRECISION_LOSSY, CODE_NUM_UNBOUNDED_CONDITION } from '../../constants/rule-codes';
 
 /** Default nesting-depth threshold for GOV-LOG-001 when `maxNestingDepth` is not configured. */
 const DEFAULT_MAX_NESTING_DEPTH = 5;
@@ -335,6 +335,80 @@ export const LossyPrecisionRoundingRule: GovernanceRule = {
         for (let i = 0; i < lines.length; i++) {
             const violation = checkPrecisionLine(lines[i], i);
             if (violation) violations.push(violation);
+        }
+
+        return violations.length > 0 ? violations : null;
+    },
+};
+
+const UNBOUNDED_DEPTH_RE =
+    /\bif\s*\(\s*(?:recursionDepth|recursion_depth|callDepth|call_depth)\s*>\s*0\s*\)/;
+const UNBOUNDED_BATCH_RE = /\bif\s*\(\s*(?:batchSize|batch_size)\s*>\s*0\s*\)/;
+const UNBOUNDED_UPPER_BOUND_RE = /MAX_|<=|</;
+const UNBOUNDED_TRIGGER_TEXTS: readonly string[] = [
+    'recursionDepth',
+    'recursion_depth',
+    'callDepth',
+    'batchSize',
+];
+
+function hasUnboundedTriggers(content: string): boolean {
+    return UNBOUNDED_TRIGGER_TEXTS.some(term => content.includes(term));
+}
+
+function auditUnboundedLine(line: string, lineIndex: number): GovernanceViolation | null {
+    const match = UNBOUNDED_DEPTH_RE.exec(line) ?? UNBOUNDED_BATCH_RE.exec(line);
+    if (!match || UNBOUNDED_UPPER_BOUND_RE.test(line)) {
+        return null;
+    }
+    return {
+        ruleId: 'NUM-BND-001',
+        message:
+            `One-sided unbounded condition \`${match[0]}\` detected.` +
+            ' Missing paired upper bound or clamp corridor.',
+        line: lineIndex + 1,
+        column: match.index + 1,
+        suggestion:
+            'Enforce bidirectional bounds (e.g. depth > 0 && depth <= MAX_DEPTH) or use clamp().',
+        fixable: false,
+        customDetail: { matchedExpression: match[0] },
+        actionable: {
+            action: 'apply_guard_clause',
+            code: CODE_NUM_UNBOUNDED_CONDITION,
+            taxonomy: 'CTRL_FLOW',
+            safeToAutomate: false,
+            templateSnippet: 'if (val > 0 && val <= MAX_BOUND)',
+        },
+    };
+}
+
+/**
+ * NUM-BND-001: Unbounded Numeric Condition Governance.
+ * Detects single-sided unbounded conditions on recursion depth, call stack, or batch size
+ * that risk stack overflow, DoS, or unbounded resource consumption.
+ */
+export const UnboundedNumericConditionRule: GovernanceRule = {
+    id: 'NUM-BND-001',
+    name: 'Unbounded Numeric Condition Governance',
+    category: 'code_logic',
+    severity: 'warning',
+    risk: 'medium',
+    textTrigger: UNBOUNDED_TRIGGER_TEXTS,
+    rationale:
+        'Single-sided numeric checks without paired upper bounds risk unbounded recursion, memory exhaustion, and DoS.',
+    isFixable: false,
+    checkFile(ctx: RuleEvaluationContext): GovernanceViolation[] | null {
+        if (isToolOrTestScript(ctx.filePath)) return null;
+        if (!hasUnboundedTriggers(ctx.content)) return null;
+
+        const violations: GovernanceViolation[] = [];
+        const lines = ctx.masked;
+
+        for (let i = 0; i < lines.length; i++) {
+            const violation = auditUnboundedLine(lines[i], i);
+            if (violation) {
+                violations.push(violation);
+            }
         }
 
         return violations.length > 0 ? violations : null;

@@ -52,6 +52,14 @@ const OBSOLETE_CONTRACT_RE =
 const FRAGILE_FLOAT_ASSERT_RE =
     /\b(?:expect\([^)]+\)\.to(?:Be|Equal|toStrictEqual)\s*\(\s*([0-9]+\.[0-9]+)\s*\)|assert(?:\.strictEqual|\.equal)?\s*\([^,)]+,\s*([0-9]+\.[0-9]+)\s*\)|assert(?:\.strictEqual|\.equal)?\s*\(\s*([0-9]+\.[0-9]+)\s*,|assert_true\s*\([^,)]*==\s*([0-9]+\.[0-9]+))/;
 
+/** Pattern identifying entity metrics and physical total counters vulnerable to brittle magic oracles. */
+const BRITTLE_ORACLE_TARGET_RE =
+    /\b(?:totalFiles|filesScanned|scannedFiles|totalRules|rulesCount|totalIssues|issuesCount|rulesRegistered|totalRulesCount|entryCount|testsCount|totalTests)\b/i;
+
+/** Pattern identifying brittle assertions against entity counters with integer literals >= 2. */
+const BRITTLE_ORACLE_ASSERT_RE =
+    /\b(?:expect\s*\([^)]*(?:totalFiles|filesScanned|scannedFiles|totalRules|rulesCount|totalIssues|issuesCount|rulesRegistered|totalRulesCount|entryCount|testsCount|totalTests)[^)]*\)\s*\.to(?:Be|Equal|toStrictEqual)\s*\(\s*([0-9]+)\s*\)|assert(?:\.strictEqual|\.equal)?\s*\([^,)]*(?:totalFiles|filesScanned|scannedFiles|totalRules|rulesCount|totalIssues|issuesCount|rulesRegistered|totalRulesCount|entryCount|testsCount|totalTests)[^,)]*,\s*([0-9]+)\s*\)|assert(?:\.strictEqual|\.equal)?\s*\(\s*([0-9]+)\s*,\s*[^,)]*(?:totalFiles|filesScanned|scannedFiles|totalRules|rulesCount|totalIssues|issuesCount|rulesRegistered|totalRulesCount|entryCount|testsCount|totalTests))/i;
+
 /** Pattern identifying block comment closure. */
 const BLOCK_COMMENT_CLOSE_RE = /\*\//;
 
@@ -72,6 +80,9 @@ const UNKNOWN_TEST_NAME = 'unknown-test';
 
 /** Matcher names for direct equality comparison. */
 const EQUALITY_MATCHERS = new Set(['toBe', 'toEqual', 'toStrictEqual']);
+
+/** Assert call expression names for direct equality comparison. */
+const ASSERT_EQUALITY_CALLS = new Set(['assert.strictEqual', 'assert.equal', 'assert']);
 
 /** Invariant literal strings checked for tautological identity. */
 const INVARIANT_CONSTANTS = new Set(['true', 'false', '1', '0']);
@@ -438,6 +449,23 @@ export class TestModernityAnalyzer implements Analyzer {
             return;
         }
 
+        const brittleOracle = this.checkBrittleOracleAssertion(node, sf);
+        if (brittleOracle) {
+            sites.push({
+                file: ctx.filePath,
+                line,
+                testName,
+                isSkipped: false,
+                isTautological: false,
+                isMockOnly: false,
+                referencesDeprecatedContract: false,
+                isBrittleOracleAssertion: true,
+                brittleOracleLiteral: brittleOracle.literal,
+                brittleOracleTarget: brittleOracle.target,
+            });
+            return;
+        }
+
         if (OBSOLETE_CONTRACT_RE.test(node.getText(sf))) {
             if (currentCase) currentCase.obsoleteCount++;
             sites.push({
@@ -492,6 +520,77 @@ export class TestModernityAnalyzer implements Analyzer {
 
     private checkFragileFloatAssertion(node: ts.CallExpression, sf: ts.SourceFile): string | null {
         return this.checkFragileFloatMatcher(node) ?? this.checkFragileFloatAssertCall(node, sf);
+    }
+
+    private checkBrittleOracleMatcher(
+        node: ts.CallExpression,
+        sf: ts.SourceFile,
+    ): { literal: string; target: string } | null {
+        if (!ts.isPropertyAccessExpression(node.expression)) {
+            return null;
+        }
+        const method = node.expression.name.text;
+        if (!EQUALITY_MATCHERS.has(method) || node.arguments.length === 0) {
+            return null;
+        }
+        const arg = node.arguments[0];
+        if (!ts.isNumericLiteral(arg)) {
+            return null;
+        }
+        const numVal = Number(arg.text);
+        if (isNaN(numVal) || numVal < 2) {
+            return null;
+        }
+        const innerCall = node.expression.expression;
+        if (!ts.isCallExpression(innerCall) || innerCall.arguments.length === 0) {
+            return null;
+        }
+        const targetText = innerCall.arguments[0].getText(sf);
+        if (!BRITTLE_ORACLE_TARGET_RE.test(targetText)) {
+            return null;
+        }
+        return { literal: arg.text, target: targetText };
+    }
+
+    private extractBrittleNumericPair(
+        litNode: ts.Node,
+        targetNode: ts.Node,
+        sf: ts.SourceFile,
+    ): { literal: string; target: string } | null {
+        if (!ts.isNumericLiteral(litNode)) {
+            return null;
+        }
+        const targetText = targetNode.getText(sf);
+        if (!BRITTLE_ORACLE_TARGET_RE.test(targetText)) {
+            return null;
+        }
+        const numVal = Number(litNode.text);
+        if (isNaN(numVal) || numVal < 2) {
+            return null;
+        }
+        return { literal: litNode.text, target: targetText };
+    }
+
+    private checkBrittleOracleAssertCall(
+        node: ts.CallExpression,
+        sf: ts.SourceFile,
+    ): { literal: string; target: string } | null {
+        const text = node.expression.getText(sf);
+        if (!ASSERT_EQUALITY_CALLS.has(text) || node.arguments.length < 2) {
+            return null;
+        }
+        const [first, second] = node.arguments;
+        return (
+            this.extractBrittleNumericPair(second, first, sf) ??
+            this.extractBrittleNumericPair(first, second, sf)
+        );
+    }
+
+    private checkBrittleOracleAssertion(
+        node: ts.CallExpression,
+        sf: ts.SourceFile,
+    ): { literal: string; target: string } | null {
+        return this.checkBrittleOracleMatcher(node, sf) ?? this.checkBrittleOracleAssertCall(node, sf);
     }
 
     private checkDirectAssertTautological(node: ts.CallExpression, sf: ts.SourceFile): boolean {
@@ -601,39 +700,71 @@ export class TestModernityAnalyzer implements Analyzer {
             const fragileFloatLit = floatMatch
                 ? floatMatch.slice(1).find(Boolean) || 'float'
                 : undefined;
+            const brittleMatch = BRITTLE_ORACLE_ASSERT_RE.exec(line);
+            const isBrittleOracle = brittleMatch !== null;
+            const brittleOracleLit = brittleMatch
+                ? brittleMatch.slice(1).find(Boolean) || 'scalar'
+                : undefined;
 
             if (currentCase) {
                 this.updateCaseCounts(line, currentCase, isMockOnly, isTautological, isObsolete);
             }
 
             this.recordSiteIfSmell(
-                ctx.filePath,
-                lineNum,
-                currentTestName,
-                isSkipped,
-                isTautological,
-                isMockOnly,
-                isObsolete,
+                {
+                    filePath: ctx.filePath,
+                    lineNum,
+                    testName: currentTestName,
+                    isSkipped,
+                    isTautological,
+                    isMockOnly,
+                    isObsolete,
+                    isFragileFloat,
+                    fragileFloatLit,
+                    isBrittleOracle,
+                    brittleOracleLit,
+                },
                 sites,
-                isFragileFloat,
-                fragileFloatLit,
             );
         }
     }
 
-    private recordSiteIfSmell(
-        filePath: string,
-        lineNum: number,
-        testName: string,
-        isSkipped: boolean,
-        isTautological: boolean,
-        isMockOnly: boolean,
-        isObsolete: boolean,
-        sites: TestSite[],
-        isFragileFloat: boolean = false,
-        fragileFloatLit?: string,
-    ): void {
-        if (!isSkipped && !isTautological && !isMockOnly && !isObsolete && !isFragileFloat) return;
+    private recordSiteIfSmell(params: {
+        filePath: string;
+        lineNum: number;
+        testName: string;
+        isSkipped: boolean;
+        isTautological: boolean;
+        isMockOnly: boolean;
+        isObsolete: boolean;
+        isFragileFloat?: boolean;
+        fragileFloatLit?: string;
+        isBrittleOracle?: boolean;
+        brittleOracleLit?: string;
+    }, sites: TestSite[]): void {
+        const {
+            filePath,
+            lineNum,
+            testName,
+            isSkipped,
+            isTautological,
+            isMockOnly,
+            isObsolete,
+            isFragileFloat = false,
+            fragileFloatLit,
+            isBrittleOracle = false,
+            brittleOracleLit,
+        } = params;
+        if (
+            !isSkipped &&
+            !isTautological &&
+            !isMockOnly &&
+            !isObsolete &&
+            !isFragileFloat &&
+            !isBrittleOracle
+        ) {
+            return;
+        }
         sites.push({
             file: filePath,
             line: lineNum,
@@ -646,6 +777,8 @@ export class TestModernityAnalyzer implements Analyzer {
             activeContractVersion: isObsolete ? 'V3' : undefined,
             isFragileFloatAssertion: isFragileFloat,
             fragileFloatLiteral: fragileFloatLit,
+            isBrittleOracleAssertion: isBrittleOracle,
+            brittleOracleLiteral: brittleOracleLit,
         });
     }
 

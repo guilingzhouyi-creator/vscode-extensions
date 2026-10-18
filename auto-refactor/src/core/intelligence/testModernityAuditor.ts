@@ -113,6 +113,9 @@ const GENERAL_ASSERTION_PATTERNS: readonly RegExp[] = [
     /self\.assert/,
 ];
 
+const BRITTLE_ORACLE_LINE_RE =
+    /\b(?:expect\s*\([^)]*(?:totalFiles|filesScanned|scannedFiles|totalRules|rulesCount|totalIssues|issuesCount|rulesRegistered|totalRulesCount)[^)]*\)\s*\.to(?:Be|Equal|toStrictEqual)\s*\(\s*([0-9]+)\s*\)|assert(?:\.strictEqual|\.equal)?\s*\([^,)]*(?:totalFiles|filesScanned|scannedFiles|totalRules|rulesCount|totalIssues|issuesCount|rulesRegistered|totalRulesCount)[^,)]*,\s*([0-9]+)\s*\)|assert\s+[^=]*(?:totalFiles|filesScanned|scannedFiles|totalRules|rulesCount|totalIssues|issuesCount|rulesRegistered|totalRulesCount)[^=]*==\s*([0-9]+)|assert_eq\s*\([^,)]*(?:totalFiles|filesScanned|scannedFiles|totalRules|rulesCount|totalIssues|issuesCount|rulesRegistered|totalRulesCount)[^,)]*,\s*([0-9]+)\s*\)|assert_eq!\s*\([^,)]*(?:totalFiles|filesScanned|scannedFiles|totalRules|rulesCount|totalIssues|issuesCount|rulesRegistered|totalRulesCount)[^,)]*,\s*([0-9]+)\s*\))/i;
+
 /**
  * Checks if a trimmed line is a tautological assertion.
  *
@@ -263,6 +266,11 @@ function createTestSite(
         contractVersion: flags.contractVersion,
         activeContractVersion: flags.activeContractVersion,
         testedSymbol: flags.testedSymbol,
+        isFragileFloatAssertion: flags.isFragileFloatAssertion,
+        fragileFloatLiteral: flags.fragileFloatLiteral,
+        isBrittleOracleAssertion: flags.isBrittleOracleAssertion,
+        brittleOracleLiteral: flags.brittleOracleLiteral,
+        brittleOracleTarget: flags.brittleOracleTarget,
     };
 }
 
@@ -379,6 +387,19 @@ class TestSiteCollector {
                     referencesDeprecatedContract: true,
                     contractVersion: 'V1',
                     activeContractVersion: 'V3',
+                }),
+            );
+            return;
+        }
+
+        const brittleMatch = BRITTLE_ORACLE_LINE_RE.exec(trimmed);
+        if (brittleMatch) {
+            this.currentAssertions++;
+            const lit = brittleMatch.slice(1).find(Boolean) || 'scalar';
+            this.sites.push(
+                createTestSite(this.filePath, lineNum, this.currentTestName!, {
+                    isBrittleOracleAssertion: true,
+                    brittleOracleLiteral: lit,
                 }),
             );
             return;

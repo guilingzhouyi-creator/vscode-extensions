@@ -30,6 +30,7 @@ import {
     CODE_TST_SKIPPED,
     CODE_TST_TAUTOLOGICAL,
     CODE_TST_FRAGILE_FLOAT,
+    CODE_TST_BRITTLE_ORACLE,
 } from '../constants/rule-codes';
 
 const KIND_CONDITION = 'condition';
@@ -46,6 +47,7 @@ const RULE_TST_ILS_001 = 'TST-ILS-001';
 const RULE_TST_SKP_001 = 'TST-SKP-001';
 const RULE_TST_TAU_001 = 'TST-TAU-001';
 const RULE_TST_FLT_001 = 'TST-FLT-001';
+const RULE_TST_ORC_001 = 'TST-ORC-001';
 const RULE_TST_DBT_001 = 'TST-DBT-001';
 
 /**
@@ -64,6 +66,9 @@ export interface TestSite {
     testedSymbol?: string;
     isFragileFloatAssertion?: boolean;
     fragileFloatLiteral?: string;
+    isBrittleOracleAssertion?: boolean;
+    brittleOracleLiteral?: string;
+    brittleOracleTarget?: string;
 }
 
 /**
@@ -409,6 +414,74 @@ function createFragileFloatIssue(site: TestSite): Issue {
     };
 }
 
+function createBrittleOracleIssue(site: TestSite): Issue {
+    const oracleLit = site.brittleOracleLiteral ?? 'scalar';
+    const oracleTarget = site.brittleOracleTarget ?? 'entity total';
+    const evidence: SemanticEvidenceStep[] = [
+        {
+            kind: KIND_CONDITION,
+            description: `Brittle oracle assertion against exact literal '${oracleLit}' on '${oracleTarget}' in test '${site.testName}'`,
+            file: site.file,
+            line: site.line,
+            symbol: site.testName,
+        },
+    ];
+
+    const detail: SemanticReviewDetail = {
+        language: 'typescript',
+        module: MODULE_TEST_SUITE,
+        symbol: site.testName,
+        codeDomain: CODE_DOMAIN_TEST_MODERNITY,
+        currentBehavior: `Test asserts exact scalar equality against naked magic literal '${oracleLit}' on entity metric '${oracleTarget}' without corridor or dynamic derivation.`,
+        semanticEvidenceChain: evidence,
+        triggerCondition:
+            'Assertion performs exact equality against a hardcoded physical total or entity count literal',
+        risk: 'Brittle test oracle breaks on normal workspace evolution (file additions, rule expansions) rather than detecting real functional regressions.',
+        blastRadius: [site.file],
+        isDeterministic: true,
+        requiresManualConfirm: false,
+        suggestedFix:
+            'Use invariant corridor assertion (e.g. assertWithinCorridor, >= baseline) or dynamic derivation.',
+        impactedCallers: [],
+        impactedTests: [site.file],
+        verificationMethod:
+            'Assert test resilience across incremental fixture/rule count expansion.',
+        ruleVersion: DEFAULT_RULE_VERSION,
+        configVersion: DEFAULT_CONFIG_VERSION,
+        canAutofix: false,
+    };
+
+    return {
+        id: `${ANALYZER_TEST_MODERNITY}:${RULE_TST_ORC_001}:${site.file}:${site.line}`,
+        analyzer: ANALYZER_TEST_MODERNITY,
+        rule: RULE_TST_ORC_001,
+        severity: SEVERITY_WARNING,
+        message: `Brittle assertion oracle: '${site.testName}' asserts exact scalar literal '${oracleLit}' on '${oracleTarget}' without bounded corridor.`,
+        location: {
+            file: site.file,
+            start: { line: site.line, column: 1 },
+            end: { line: site.line, column: DEFAULT_END_COLUMN },
+        },
+        detail,
+        suggestion: `Replace exact scalar assertion with bounded corridor (e.g. assertWithinCorridor or >= baseline) to guard against fragile breakdown.`,
+        evidence: {
+            confidence: 1.0,
+            requiresRuntime: false,
+        },
+        actionable: {
+            action: 'replace_with_tolerance_assertion',
+            code: CODE_TST_BRITTLE_ORACLE,
+            taxonomy: 'TEST_MODERN',
+            safeToAutomate: false,
+            templateSnippet: `assertWithinCorridor(${oracleTarget}, ${oracleLit}, 5);`,
+            targetArguments: {
+                targetLiteral: oracleLit,
+                targetExpression: oracleTarget,
+            },
+        },
+    };
+}
+
 function createTestDebtIssue(debt: TestDebtTicket): Issue {
     const detail: SemanticReviewDetail = {
         language: 'typescript',
@@ -473,6 +546,9 @@ function evaluateSingleSiteModernity(
     }
     if (site.isFragileFloatAssertion) {
         return createFragileFloatIssue(site);
+    }
+    if (site.isBrittleOracleAssertion) {
+        return createBrittleOracleIssue(site);
     }
     return null;
 }

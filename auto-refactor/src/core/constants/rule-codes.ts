@@ -265,9 +265,13 @@ export const CODE_TST_SKIPPED = 'AR:TST:002';
 export const CODE_TST_TAUTOLOGICAL = 'AR:TST:003';
 /** Agent-actionable diagnostic code for tst:fragile:float. */
 export const CODE_TST_FRAGILE_FLOAT = 'AR:TST:004';
+/** Agent-actionable diagnostic code for tst:brittle:oracle. */
+export const CODE_TST_BRITTLE_ORACLE = 'AR:TST:005';
 
 /** Agent-actionable diagnostic code for num:precision:lossy. */
 export const CODE_NUM_PRECISION_LOSSY = 'AR:NUM:001';
+/** Agent-actionable diagnostic code for num:unbounded:condition. */
+export const CODE_NUM_UNBOUNDED_CONDITION = 'AR:NUM:002';
 
 /** Agent-actionable diagnostic code for gov:sanitization:prose. */
 export const CODE_GOV_PROSE_SANITIZATION = 'AR:GOV:001';

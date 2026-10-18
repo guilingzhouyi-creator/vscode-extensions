@@ -221,7 +221,7 @@ export const CANONICAL_TOPIC_CATALOG: Readonly<Record<string, readonly string[]>
         'TYP',
         'VAG',
     ],
-    NUM: ['PREC'],
+    NUM: ['BND', 'PREC'],
     PRF: ['ALG', 'IO', 'LEAK', 'MEM', 'POL'],
     PROD: ['HYG'],
     PS: ['ALIAS', 'CMDLET', 'DOC', 'ERROR', 'PARAM', 'SAFE', 'SEC', 'TRAP', 'VERB'],
@@ -299,7 +299,7 @@ export const CANONICAL_TOPIC_CATALOG: Readonly<Record<string, readonly string[]>
         'TYPE',
         'VAR',
     ],
-    TST: ['DBT', 'DEN', 'FLT', 'ILS', 'SKP', 'TAU', 'TOP'],
+    TST: ['DBT', 'DEN', 'FLT', 'ILS', 'ORC', 'SKP', 'TAU', 'TOP'],
     UI: ['ENG'],
     VSC: ['I18N', 'MEM', 'PERF', 'UI'],
 });

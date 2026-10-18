@@ -173,6 +173,26 @@ describe('Customer Contract', () => {
   );
   console.log('✔ Mock-only assertions and obsolete contract illusions verified.');
 
+  // 3.5 Brittle Magic Assertion Oracle Detection (TST-ORC-001)
+  console.log('\n3.5 Testing Brittle Magic Assertion Oracle Detection (TST-ORC-001)...');
+  const brittleOracleCode = `
+describe('Catalog Scanner Tests', () => {
+    it('verifies catalog rules count against brittle scalar', () => {
+        const catalog = { totalRules: 338, filesScanned: 50 };
+        expect(catalog.totalRules).toBe(338);
+        assert.strictEqual(catalog.filesScanned, 50);
+    });
+});
+`;
+  const brittleIssues = auditTestSource('tests/catalog.test.ts', brittleOracleCode);
+  const brittleOrcIssues = brittleIssues.filter((i) => i.rule === 'TST-ORC-001');
+  assert.strictEqual(
+    brittleOrcIssues.length >= 1,
+    true,
+    'Brittle entity totals count must trigger TST-ORC-001',
+  );
+  console.log('✔ Brittle magic assertion oracle (TST-ORC-001) verified.');
+
   // 4. Business <-> Test Semantic Mapping & EMTD / CBCR Calculations
   console.log('\n4. Testing Business <-> Test Mapping & 5-Dimensional Metrics (TST-DEN-001)...');
 

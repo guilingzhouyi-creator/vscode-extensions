@@ -26,6 +26,7 @@ import {
     ExcessiveNestingRule,
     VacuousWrapperRule,
     LossyPrecisionRoundingRule,
+    UnboundedNumericConditionRule,
 } from './rules/codeLogic';
 import { TYPE_SYSTEM_GOVERNANCE_RULES } from './rules/typeSystem';
 import {
@@ -81,6 +82,7 @@ export const BUILTIN_GOVERNANCE_RULES: GovernanceRule[] = [
     ExcessiveNestingRule,
     VacuousWrapperRule,
     LossyPrecisionRoundingRule,
+    UnboundedNumericConditionRule,
     // 4. Type System
     ...TYPE_SYSTEM_GOVERNANCE_RULES,
     // 5. Exception Safety
