@@ -16,7 +16,7 @@
 'use strict';
 
 const assert = require('assert');
-const { spawnSync } = require('child_process');
+const { spawn, spawnSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -39,19 +39,26 @@ function writeFiles(root, files) {
 }
 
 /**
- * Run the template runner and capture its verdict.
+ * Run the template runner asynchronously and capture its verdict.
  *
  * @param projectDir - Synthetic project root.
  * @param extraArgs - Additional CLI arguments for the runner.
- * @returns Spawn result with utf8 stdout/stderr and numeric status.
+ * @returns Promise resolving with utf8 stdout/stderr and numeric status.
  */
 function runRunner(projectDir, extraArgs = []) {
-  const result = spawnSync(
-    process.execPath,
-    [RUNNER, '--engine', ROOT, '--root', projectDir, ...extraArgs],
-    { encoding: 'utf8' },
-  );
-  return { status: result.status, stdout: result.stdout || '', stderr: result.stderr || '' };
+  return new Promise((resolve) => {
+    const child = spawn(
+      process.execPath,
+      [RUNNER, '--engine', ROOT, '--root', projectDir, ...extraArgs],
+      { stdio: ['ignore', 'pipe', 'pipe'] },
+    );
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (d) => (stdout += d));
+    child.stderr.on('data', (d) => (stderr += d));
+    child.on('close', (status) => resolve({ status, stdout, stderr }));
+    child.on('error', (err) => resolve({ status: 1, stdout, stderr: String(err) }));
+  });
 }
 
 const CONFIG = {
@@ -66,10 +73,8 @@ const CONFIG = {
   },
 };
 
-function main() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ar-consumer-'));
-  const configPath = path.join(root, '.auto-refactor', 'config.json');
-  const baselinePath = path.join(root, '.auto-refactor', 'baseline.json');
+async function testBlockingAndReportOnly() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ar-consumer-t1-'));
   try {
     writeFiles(root, {
       '.auto-refactor/config.json': JSON.stringify(CONFIG, null, 2),
@@ -77,7 +82,7 @@ function main() {
     });
 
     // 1. Blocking findings without a baseline -> exit 1, report written.
-    const first = runRunner(root, [
+    const first = await runRunner(root, [
       '--fail-on-severity',
       'warning',
       '--out',
@@ -92,11 +97,10 @@ function main() {
     assert.ok(first.stdout.includes('ratchetNew='), 'summary must print ratchet counters');
     console.log('  [PASS] blocking findings exit 1 and the report is written');
 
-    // 1b. `--report-only` hands the verdict to the consumer (exit 0 despite findings), and
-    // `--engine-arg` reaches the engine verbatim (excluding src/ empties the report).
-    const reportOnly = runRunner(root, ['--report-only', '--out', path.join(root, 'report.json')]);
+    // 1b. `--report-only` hands the verdict to the consumer (exit 0 despite findings)
+    const reportOnly = await runRunner(root, ['--report-only', '--out', path.join(root, 'report.json')]);
     assert.strictEqual(reportOnly.status, 0, '--report-only must not gate on findings');
-    const passThrough = runRunner(root, [
+    const passThrough = await runRunner(root, [
       '--report-only',
       '--engine-arg=--exclude',
       '--engine-arg=src',
@@ -111,24 +115,50 @@ function main() {
       '--engine-arg must forward flags verbatim to the engine',
     );
     console.log('  [PASS] --report-only and --engine-arg behave as documented');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+}
+
+async function testBaselineFreezeAndRatchet() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ar-consumer-t2-'));
+  const baselinePath = path.join(root, '.auto-refactor', 'baseline.json');
+  try {
+    writeFiles(root, {
+      '.auto-refactor/config.json': JSON.stringify(CONFIG, null, 2),
+      'src/probe.py': 'def empty_impl():\n    pass\n',
+    });
 
     // 2. Freeze the baseline, then the same tree must pass with zero new findings.
-    const freeze = runRunner(root, ['--update-baseline', '--baseline', baselinePath]);
+    const freeze = await runRunner(root, ['--update-baseline', '--baseline', baselinePath]);
     assert.strictEqual(freeze.status, 0, `baseline freeze must succeed: ${freeze.stderr}`);
     assert.ok(fs.existsSync(baselinePath), 'baseline file must exist after freeze');
     const frozen = JSON.parse(fs.readFileSync(baselinePath, 'utf8'));
     assert.strictEqual(frozen.granularity, 'grouped', 'default freeze must be grouped');
     assert.ok((frozen.groups || []).length > 0, 'grouped baseline must carry group counts');
-    const ratcheted = runRunner(root, ['--fail-on-severity', 'warning']);
+    const ratcheted = await runRunner(root, ['--fail-on-severity', 'warning']);
     assert.strictEqual(ratcheted.status, 0, 'no new findings => exit 0');
     assert.ok(ratcheted.stdout.includes('ratchetNew=0'), 'ratchet must report zero new findings');
     console.log('  [PASS] baseline freeze + ratchet keeps an unchanged tree green');
 
     // 3. A new violation must break the ratchet.
     writeFiles(root, { 'src/regression.py': 'def other_empty():\n    pass\n' });
-    const regression = runRunner(root, ['--fail-on-severity', 'warning']);
+    const regression = await runRunner(root, ['--fail-on-severity', 'warning']);
     assert.strictEqual(regression.status, 1, 'a new violation must fail the ratchet');
     console.log('  [PASS] a new violation breaks the ratchet');
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+}
+
+async function testConfigurationAndDegradation() {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ar-consumer-t3-'));
+  const configPath = path.join(root, '.auto-refactor', 'config.json');
+  try {
+    writeFiles(root, {
+      '.auto-refactor/config.json': JSON.stringify(CONFIG, null, 2),
+      'src/probe.py': 'def empty_impl():\n    pass\n',
+    });
 
     // 4. Missing engine is fail-closed, with an explicit opt-in escape hatch.
     const missing = spawnSync(
@@ -168,7 +198,7 @@ function main() {
         2,
       ),
     );
-    const divergent = runRunner(root, ['--check-threshold-parity']);
+    const divergent = await runRunner(root, ['--check-threshold-parity']);
     assert.strictEqual(divergent.status, 2, 'divergent thresholds must exit 2');
     assert.ok(divergent.stderr.includes('magicNumberMin'), 'divergence must name the key');
     console.log('  [PASS] threshold double-declaration divergence is caught before scanning');
@@ -186,10 +216,16 @@ function main() {
   }
 }
 
-try {
-  main();
+async function main() {
+  await Promise.all([
+    testBlockingAndReportOnly(),
+    testBaselineFreezeAndRatchet(),
+    testConfigurationAndDegradation(),
+  ]);
   console.log('\n ALL CONSUMER RUNNER KEY POINTS PASSED SUCCESSFULLY!');
-} catch (error) {
+}
+
+main().catch((error) => {
   console.error('\n[FAIL]', error && error.message ? error.message : error);
   process.exit(1);
-}
+});

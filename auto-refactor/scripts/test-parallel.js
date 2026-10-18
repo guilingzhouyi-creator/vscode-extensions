@@ -48,8 +48,10 @@ const HIGH_LATENCY_SUITES_PRIORITY = new Set([
   'validate-diff',
   'validate-consumer-runner',
   'validate-batch-git-history',
-  'validate-symbol-index-pack',
-  'validate-data-flow-pack',
+  'validate-context-slice',
+  'validate-data-flow',
+  'validate-call-graph',
+  'validate-symbol-index',
   'validate-no-empty-scripts',
 ]);
 
@@ -217,27 +219,15 @@ const PARALLEL_SUITES = [
   { name: 'validate-slice-audit', script: 'scripts/validate-slice-audit.js' },
   { name: 'validate-trajectory-learning', script: 'scripts/validate-trajectory-learning.js' },
   { name: 'validate-e2e-stress', script: 'scripts/validate-e2e-stress.js' },
-  {
-    name: 'validate-symbol-index-pack',
-    composite: [
-      'scripts/validate-symbol-index.js',
-      'scripts/validate-literal-index.js',
-      'scripts/validate-call-graph.js',
-      'scripts/validate-error-flow.js',
-    ],
-  },
-  {
-    name: 'validate-data-flow-pack',
-    composite: ['scripts/validate-data-flow.js', 'scripts/validate-context-slice.js'],
-  },
-  {
-    name: 'validate-self-norms-pack',
-    composite: [
-      'scripts/validate-self-norms.js',
-      'scripts/validate-scoring-coverage.js',
-      'scripts/validate-diff-score.js',
-    ],
-  },
+  { name: 'validate-symbol-index', script: 'scripts/validate-symbol-index.js' },
+  { name: 'validate-literal-index', script: 'scripts/validate-literal-index.js' },
+  { name: 'validate-call-graph', script: 'scripts/validate-call-graph.js' },
+  { name: 'validate-error-flow', script: 'scripts/validate-error-flow.js' },
+  { name: 'validate-data-flow', script: 'scripts/validate-data-flow.js' },
+  { name: 'validate-context-slice', script: 'scripts/validate-context-slice.js' },
+  { name: 'validate-self-norms', script: 'scripts/validate-self-norms.js' },
+  { name: 'validate-scoring-coverage', script: 'scripts/validate-scoring-coverage.js' },
+  { name: 'validate-diff-score', script: 'scripts/validate-diff-score.js' },
   { name: 'validate-role-inference', script: 'scripts/validate-role-inference.js' },
   {
     name: 'validate-role-aware-deduplication',

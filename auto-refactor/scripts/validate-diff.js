@@ -56,9 +56,9 @@ function baselineBig(lines) {
   return s;
 }
 
-function writeConfig() {
+function writeConfig(targetCfg = CFG) {
   fs.writeFileSync(
-    CFG,
+    targetCfg,
     JSON.stringify(
       {
         format: 'json',
@@ -162,198 +162,208 @@ function daemonStart() {
   }
 }
 
+function setupCorpus(corpusDir, baseContent, smallContent) {
+  rmRetry(corpusDir);
+  fs.mkdirSync(path.join(corpusDir, 'src'), { recursive: true });
+  writeConfig(path.join(corpusDir, 'auto-refactor.config.json'));
+  fs.writeFileSync(path.join(corpusDir, 'src', 'big.ts'), baseContent);
+  fs.writeFileSync(path.join(corpusDir, 'src', 'small.ts'), smallContent);
+}
+
+async function runD1(corpusDir, base) {
+  const bigPath = path.join(corpusDir, 'src', 'big.ts');
+  const cfgPath = path.join(corpusDir, 'auto-refactor.config.json');
+  const edited = base.replace('  const LIMIT0 = 100;', '  const LIMIT0 = 777;');
+  fs.writeFileSync(bigPath, edited);
+  const c = await scan({ root: corpusDir, configFile: cfgPath, format: 'json', logLevel: 'silent' });
+  const d = await scanDiff(
+    [{ kind: 'full', filePath: 'src/big.ts', oldContent: base, newContent: edited }],
+    { root: corpusDir, configFile: cfgPath, format: 'json', logLevel: 'silent', daemon: 'off', cache: false }
+  );
+  return {
+    name: 'D1 full-1-line',
+    ok: JSON.stringify(normalize(c)) === JSON.stringify(normalize(d.report)),
+    extra: `diffFiles=${d.stats.diffFiles} byteEqual=${d.stats.byteEqual} inc=${d.stats.diffIncremental} full=${d.stats.diffFull}`,
+  };
+}
+
+async function runD2(corpusDir, base) {
+  const bigPath = path.join(corpusDir, 'src', 'big.ts');
+  const cfgPath = path.join(corpusDir, 'auto-refactor.config.json');
+  const edited = base.replace('  if (x < -50) return -100;', '  if (x < -50) return -999;');
+  fs.writeFileSync(bigPath, edited);
+  const c = await scan({ root: corpusDir, configFile: cfgPath, format: 'json', logLevel: 'silent' });
+  const edits = computeEditRanges(base, edited);
+  const d = await scanDiff(
+    [{ kind: 'ranges', filePath: 'src/big.ts', newContent: edited, editRanges: edits }],
+    { root: corpusDir, configFile: cfgPath, format: 'json', logLevel: 'silent', daemon: 'off', cache: false }
+  );
+  return {
+    name: 'D2 ranges-1-line',
+    ok: JSON.stringify(normalize(c)) === JSON.stringify(normalize(d.report)),
+    extra: `rangesProvided=${d.stats.rangesProvided} inc=${d.stats.diffIncremental} full=${d.stats.diffFull}`,
+  };
+}
+
+async function runD3(corpusDir, base, small) {
+  const bigPath = path.join(corpusDir, 'src', 'big.ts');
+  const smallPath = path.join(corpusDir, 'src', 'small.ts');
+  const cfgPath = path.join(corpusDir, 'auto-refactor.config.json');
+  const bigEdited = base.replace('  return x + 100;', '  return x + 424242;');
+  const smallEdited = "export const A = 42;\nexport const B = 'changed exported string';\n";
+  fs.writeFileSync(bigPath, bigEdited);
+  fs.writeFileSync(smallPath, smallEdited);
+  const c = await scan({ root: corpusDir, configFile: cfgPath, format: 'json', logLevel: 'silent' });
+  const d = await scanDiff(
+    [
+      { kind: 'full', filePath: 'src/big.ts', oldContent: base, newContent: bigEdited },
+      { kind: 'full', filePath: 'src/small.ts', oldContent: small, newContent: smallEdited },
+    ],
+    { root: corpusDir, configFile: cfgPath, format: 'json', logLevel: 'silent', daemon: 'off', cache: false }
+  );
+  return {
+    name: 'D3 multi-file',
+    ok: JSON.stringify(normalize(c)) === JSON.stringify(normalize(d.report)),
+    extra: `diffFiles=${d.stats.diffFiles} diffIgnored=${d.stats.diffIgnored}`,
+  };
+}
+
+async function runD4(corpusDir, base) {
+  const bigPath = path.join(corpusDir, 'src', 'big.ts');
+  const cfgPath = path.join(corpusDir, 'auto-refactor.config.json');
+  const edited = base.replace('  const LIMIT1 = 101;', '  const LIMIT1 = 555;');
+  fs.writeFileSync(bigPath, edited);
+  const c = await scan({ root: corpusDir, configFile: cfgPath, format: 'json', logLevel: 'silent' });
+  const badEdits = [
+    { startLine: 1, oldEndLine: 1, newEndLine: 1, startByte: 0, oldEndByte: 999999, newEndByte: 999999 },
+  ];
+  const d = await scanDiff(
+    [{ kind: 'ranges', filePath: 'src/big.ts', newContent: edited, editRanges: badEdits }],
+    { root: corpusDir, configFile: cfgPath, format: 'json', logLevel: 'silent', daemon: 'off', cache: false }
+  );
+  return {
+    name: 'D4 out-of-bounds',
+    ok: JSON.stringify(normalize(c)) === JSON.stringify(normalize(d.report)) && d.stats.rangesFallback >= 1,
+    extra: `rangesFallback=${d.stats.rangesFallback}`,
+  };
+}
+
+async function runD5(corpusDir, base) {
+  const bigPath = path.join(corpusDir, 'src', 'big.ts');
+  const cfgPath = path.join(corpusDir, 'auto-refactor.config.json');
+  const edited = base.replace('  const LIMIT0 = 100;', '  const LIMIT0 = 888;');
+  fs.writeFileSync(bigPath, edited);
+  const c = await scan({ root: corpusDir, configFile: cfgPath, format: 'json', logLevel: 'silent' });
+  const d = await scanDiff(
+    [{ kind: 'full', filePath: 'src/big.ts', oldContent: base, newContent: base }],
+    { root: corpusDir, configFile: cfgPath, format: 'json', logLevel: 'silent', daemon: 'off', cache: false }
+  );
+  return {
+    name: 'D5 disk-mismatch',
+    ok: JSON.stringify(normalize(c)) === JSON.stringify(normalize(d.report)),
+    extra: `diffFull=${d.stats.diffFull}`,
+  };
+}
+
+async function runD6(corpusDir, base) {
+  const bigPath = path.join(corpusDir, 'src', 'big.ts');
+  const cfgPath = path.join(corpusDir, 'auto-refactor.config.json');
+  const edited = base.replace('  const LIMIT0 = 100;', '  const LIMIT0 = 777;');
+  fs.writeFileSync(bigPath, edited);
+  const full = await scanDiff(
+    [{ kind: 'full', filePath: 'src/big.ts', oldContent: base, newContent: edited }],
+    { root: corpusDir, configFile: cfgPath, format: 'json', logLevel: 'silent', daemon: 'off', cache: false }
+  );
+  const delta = await scanDiffDelta(
+    [{ kind: 'full', filePath: 'src/big.ts', oldContent: base, newContent: edited }],
+    { root: corpusDir, configFile: cfgPath, format: 'json', logLevel: 'silent', daemon: 'off', cache: false }
+  );
+  const fullById = new Map(full.report.issues.map((x) => [x.id, x]));
+  const subsetOk = delta.report.issues.every((x) => {
+    const f = fullById.get(x.id);
+    return f && JSON.stringify(f) === JSON.stringify(x);
+  });
+  const metricsOk = delta.report.fileMetrics.every((m) =>
+    full.report.fileMetrics.some((f) => JSON.stringify(f) === JSON.stringify(m)),
+  );
+  const orderOk = (() => {
+    const fullOrder = full.report.issues
+      .filter((x) => delta.report.issues.some((d) => d.id === x.id))
+      .map((x) => x.id);
+    return JSON.stringify(fullOrder) === JSON.stringify(delta.report.issues.map((x) => x.id));
+  })();
+  return {
+    name: 'D6 delta-subset',
+    ok: subsetOk && metricsOk && orderOk && delta.report.summary.filesScanned === 1,
+    extra: `subset=${subsetOk} metrics=${metricsOk} order=${orderOk}`,
+  };
+}
+
+let failed = 0;
+const check = (name, ok, extra) => {
+  if (ok) console.log(`PASS ${name}${extra ? `  ${extra}` : ''}`);
+  else {
+    failed++;
+    console.error(`FAIL ${name}${extra ? `  ${extra}` : ''}`);
+  }
+};
+
 async function main() {
   const prevInc = process.env.AR_INCREMENTAL;
   const prevMin = process.env.AR_INCREMENTAL_MIN_LINES;
 
-  rmRetry(CORPUS);
-  rmRetry(CACHE_DIR);
-  fs.mkdirSync(path.join(CORPUS, 'src'), { recursive: true });
-  writeConfig();
-  const base = baselineBig(150);
-  fs.writeFileSync(BIG, base);
-  fs.writeFileSync(SMALL, "export const A = 42;\nexport const B = 'hello world exported';\n");
-  daemonStop();
-
   process.env.AR_INCREMENTAL = '1';
   process.env.AR_INCREMENTAL_MIN_LINES = '1';
 
-  const cold = () => scan({ root: CORPUS, configFile: CFG, format: 'json', logLevel: 'silent' });
-  const fullDiff = (diffs, opts = {}) =>
-    scanDiff(diffs, {
-      root: CORPUS,
-      configFile: CFG,
-      format: 'json',
-      logLevel: 'silent',
-      daemon: 'off',
-      cache: false,
-      ...opts,
-    });
-  const deltaDiff = (diffs, opts = {}) =>
-    scanDiffDelta(diffs, {
-      root: CORPUS,
-      configFile: CFG,
-      format: 'json',
-      logLevel: 'silent',
-      daemon: 'off',
-      cache: false,
-      ...opts,
-    });
+  const base = baselineBig(150);
+  const small = "export const A = 42;\nexport const B = 'hello world exported';\n";
 
-  let failed = 0;
-  const check = (name, ok, extra) => {
-    if (ok) console.log(`PASS ${name}${extra ? `  ${extra}` : ''}`);
-    else {
-      failed++;
-      console.error(`FAIL ${name}${extra ? `  ${extra}` : ''}`);
-    }
-  };
-
-  // ---- D1: kind:'full' ----
-  {
-    fs.writeFileSync(BIG, base);
-    const edited = base.replace('  const LIMIT0 = 100;', '  const LIMIT0 = 777;');
-    fs.writeFileSync(BIG, edited);
-    const c = await cold();
-    const d = await fullDiff([
-      { kind: 'full', filePath: 'src/big.ts', oldContent: base, newContent: edited },
-    ]);
-    check(
-      'D1 full-1-line',
-      JSON.stringify(normalize(c)) === JSON.stringify(normalize(d.report)),
-      `diffFiles=${d.stats.diffFiles} byteEqual=${d.stats.byteEqual} inc=${d.stats.diffIncremental} full=${d.stats.diffFull}`,
-    );
+  const dirs = [1, 2, 3, 4, 5, 6].map((i) => path.join(DEFAULT_TMP_DIR, `ar-diff-corpus-${i}`));
+  for (let i = 0; i < 6; i++) {
+    setupCorpus(dirs[i], base, small);
   }
 
-  // ---- D2: kind:'ranges' (ASCII corpus → UTF-8 byte == UTF-16 offset) ----
-  {
-    fs.writeFileSync(BIG, base);
-    const edited = base.replace('  if (x < -50) return -100;', '  if (x < -50) return -999;');
-    fs.writeFileSync(BIG, edited);
-    const c = await cold();
-    const edits = computeEditRanges(base, edited);
-    const d = await fullDiff([
-      { kind: 'ranges', filePath: 'src/big.ts', newContent: edited, editRanges: edits },
-    ]);
-    check(
-      'D2 ranges-1-line',
-      JSON.stringify(normalize(c)) === JSON.stringify(normalize(d.report)),
-      `rangesProvided=${d.stats.rangesProvided} inc=${d.stats.diffIncremental} full=${d.stats.diffFull}`,
-    );
+  const results = await Promise.all([
+    runD1(dirs[0], base),
+    runD2(dirs[1], base),
+    runD3(dirs[2], base, small),
+    runD4(dirs[3], base),
+    runD5(dirs[4], base),
+    runD6(dirs[5], base),
+  ]);
+
+  for (const r of results) {
+    check(r.name, r.ok, r.extra);
   }
 
-  // ---- D3: multi-file ----
-  {
-    fs.writeFileSync(BIG, base);
-    fs.writeFileSync(SMALL, "export const A = 42;\nexport const B = 'hello world exported';\n");
-    const bigEdited = base.replace('  return x + 100;', '  return x + 424242;');
-    const smallEdited = "export const A = 42;\nexport const B = 'changed exported string';\n";
-    fs.writeFileSync(BIG, bigEdited);
-    fs.writeFileSync(SMALL, smallEdited);
-    const c = await cold();
-    const d = await fullDiff([
-      { kind: 'full', filePath: 'src/big.ts', oldContent: base, newContent: bigEdited },
-      {
-        kind: 'full',
-        filePath: 'src/small.ts',
-        oldContent: "export const A = 42;\nexport const B = 'hello world exported';\n",
-        newContent: smallEdited,
-      },
-    ]);
-    check(
-      'D3 multi-file',
-      JSON.stringify(normalize(c)) === JSON.stringify(normalize(d.report)),
-      `diffFiles=${d.stats.diffFiles} diffIgnored=${d.stats.diffIgnored}`,
-    );
-  }
-
-  // ---- D4: out-of-bounds ranges → full fallback ----
-  {
-    fs.writeFileSync(BIG, base);
-    const edited = base.replace('  const LIMIT1 = 101;', '  const LIMIT1 = 555;');
-    fs.writeFileSync(BIG, edited);
-    const c = await cold();
-    const badEdits = [
-      {
-        startLine: 1,
-        oldEndLine: 1,
-        newEndLine: 1,
-        startByte: 0,
-        oldEndByte: 999999,
-        newEndByte: 999999,
-      },
-    ];
-    const d = await fullDiff([
-      { kind: 'ranges', filePath: 'src/big.ts', newContent: edited, editRanges: badEdits },
-    ]);
-    check(
-      'D4 out-of-bounds',
-      JSON.stringify(normalize(c)) === JSON.stringify(normalize(d.report)) &&
-        d.stats.rangesFallback >= 1,
-      `rangesFallback=${d.stats.rangesFallback}`,
-    );
-  }
-
-  // ---- D5: disk-mismatch (newContent != disk) → full fallback ----
-  {
-    fs.writeFileSync(BIG, base);
-    const edited = base.replace('  const LIMIT0 = 100;', '  const LIMIT0 = 888;');
-    fs.writeFileSync(BIG, edited);
-    const c = await cold();
-    // newContent is stale (differs from disk) → verifyDiskContent forces a full rescan of disk.
-    const d = await fullDiff([
-      { kind: 'full', filePath: 'src/big.ts', oldContent: base, newContent: base },
-    ]);
-    check(
-      'D5 disk-mismatch',
-      JSON.stringify(normalize(c)) === JSON.stringify(normalize(d.report)),
-      `diffFull=${d.stats.diffFull}`,
-    );
-  }
-
-  // ---- D6: delta ⊆ full ----
-  {
-    fs.writeFileSync(BIG, base);
-    fs.writeFileSync(SMALL, "export const A = 42;\nexport const B = 'hello world exported';\n");
-    const edited = base.replace('  const LIMIT0 = 100;', '  const LIMIT0 = 777;');
-    fs.writeFileSync(BIG, edited);
-    const full = await fullDiff([
-      { kind: 'full', filePath: 'src/big.ts', oldContent: base, newContent: edited },
-    ]);
-    const delta = await deltaDiff([
-      { kind: 'full', filePath: 'src/big.ts', oldContent: base, newContent: edited },
-    ]);
-    const fullById = new Map(full.report.issues.map((x) => [x.id, x]));
-    const subsetOk = delta.report.issues.every((x) => {
-      const f = fullById.get(x.id);
-      return f && JSON.stringify(f) === JSON.stringify(x);
-    });
-    const metricsOk = delta.report.fileMetrics.every((m) =>
-      full.report.fileMetrics.some((f) => JSON.stringify(f) === JSON.stringify(m)),
-    );
-    const orderOk = (() => {
-      const fullOrder = full.report.issues
-        .filter((x) => delta.report.issues.some((d) => d.id === x.id))
-        .map((x) => x.id);
-      return JSON.stringify(fullOrder) === JSON.stringify(delta.report.issues.map((x) => x.id));
-    })();
-    check(
-      'D6 delta-subset',
-      subsetOk && metricsOk && orderOk && delta.report.summary.filesScanned === 1,
-      `subset=${subsetOk} metrics=${metricsOk} order=${orderOk}`,
-    );
-  }
+  for (const d of dirs) rmRetry(d);
 
   // ---- D7: daemon round-trip (best-effort) ----
-  {
-    const started = daemonStart();
-    if (!started) {
-      console.log('SKIP D7 daemon-roundtrip (daemon did not start)');
-    } else {
-      try {
-        fs.writeFileSync(BIG, base);
-        // Prime the daemon's L2 + incremental state with a warm scan.
-        await scanDiff([], {
+  setupCorpus(CORPUS, base, small);
+  rmRetry(CACHE_DIR);
+  daemonStop();
+
+  const started = daemonStart();
+  if (!started) {
+    console.log('SKIP D7 daemon-roundtrip (daemon did not start)');
+  } else {
+    try {
+      // Prime the daemon's L2 + incremental state with a warm scan.
+      await scanDiff([], {
+        root: CORPUS,
+        configFile: CFG,
+        format: 'json',
+        logLevel: 'silent',
+        daemon: 'on',
+        cache: true,
+        cacheDir: CACHE_DIR,
+      });
+      const edited = base.replace('  const LIMIT0 = 100;', '  const LIMIT0 = 999;');
+      fs.writeFileSync(BIG, edited);
+      const c = await scan({ root: CORPUS, configFile: CFG, format: 'json', logLevel: 'silent' });
+      const d = await scanDiff(
+        [{ kind: 'full', filePath: 'src/big.ts', oldContent: base, newContent: edited }],
+        {
           root: CORPUS,
           configFile: CFG,
           format: 'json',
@@ -361,35 +371,22 @@ async function main() {
           daemon: 'on',
           cache: true,
           cacheDir: CACHE_DIR,
-        });
-        const edited = base.replace('  const LIMIT0 = 100;', '  const LIMIT0 = 999;');
-        fs.writeFileSync(BIG, edited);
-        const c = await cold();
-        const d = await scanDiff(
-          [{ kind: 'full', filePath: 'src/big.ts', oldContent: base, newContent: edited }],
-          {
-            root: CORPUS,
-            configFile: CFG,
-            format: 'json',
-            logLevel: 'silent',
-            daemon: 'on',
-            cache: true,
-            cacheDir: CACHE_DIR,
-          },
-        );
-        check(
-          'D7 daemon-roundtrip',
-          JSON.stringify(normalize(c)) === JSON.stringify(normalize(d.report)) &&
-            d.stats.daemonUsed === true,
-          `daemonUsed=${d.stats.daemonUsed} diffIncremental=${d.stats.diffIncremental} diffFull=${d.stats.diffFull}`,
-        );
-      } finally {
-        daemonStop();
-      }
+        },
+      );
+      check(
+        'D7 daemon-roundtrip',
+        JSON.stringify(normalize(c)) === JSON.stringify(normalize(d.report)) &&
+          d.stats.daemonUsed === true,
+        `daemonUsed=${d.stats.daemonUsed} diffIncremental=${d.stats.diffIncremental} diffFull=${d.stats.diffFull}`,
+      );
+    } finally {
+      daemonStop();
     }
   }
 
   daemonStop();
+  rmRetry(CORPUS);
+  rmRetry(CACHE_DIR);
 
   if (prevInc === undefined) delete process.env.AR_INCREMENTAL;
   else process.env.AR_INCREMENTAL = prevInc;

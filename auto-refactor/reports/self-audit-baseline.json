@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1792339330407",
-  "timestamp": "2026-10-18T16:02:23.381Z",
+  "snapshotId": "snapshot-v0.4.0-1792340537643",
+  "timestamp": "2026-10-18T16:22:23.600Z",
   "cai": 84.97,
   "polyglotGeneralization": {
     "index": 94.23,
@@ -21,7 +21,7 @@
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
     "filesScanned": 673,
-    "durationMs": 10813
+    "durationMs": 4431
   },
   "metrics": {
     "compositeScore": 98.76,
@@ -35,19 +35,19 @@
       "languageCount": 1
     },
     "effectiveCodeDensity": 0.95,
-    "totalIssues": 6955,
+    "totalIssues": 6961,
     "suppressedIssues": 139,
-    "unsuppressedIssues": 6816,
+    "unsuppressedIssues": 6822,
     "bySeverity": {
       "info": 540,
-      "warning": 6415,
+      "warning": 6421,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
       "high": 1,
       "medium": 4104,
-      "low": 2850
+      "low": 2856
     }
   },
   "eightPillars": {
@@ -142,6 +142,15 @@
       "effectiveDensity": 0.94
     },
     {
+      "filePath": "scripts/validate-diff.js",
+      "domain": "scripts",
+      "totalIssues": 40,
+      "criticalCount": 0,
+      "highCount": 0,
+      "compositeScore": 97.88,
+      "effectiveDensity": 0.96
+    },
+    {
       "filePath": "src/core/scoring/finding-confidence-arbiter.ts",
       "domain": "scoring",
       "totalIssues": 39,
@@ -167,15 +176,6 @@
       "highCount": 0,
       "compositeScore": 98.53,
       "effectiveDensity": 0.94
-    },
-    {
-      "filePath": "src/core/intelligence/symbolIndex.ts",
-      "domain": "intelligence",
-      "totalIssues": 35,
-      "criticalCount": 0,
-      "highCount": 0,
-      "compositeScore": 98.7,
-      "effectiveDensity": 0.92
     }
   ],
   "technicalDebtLedger": {
@@ -183,17 +183,17 @@
       "critical": 0,
       "high": 1,
       "medium": 4104,
-      "low": 2850
+      "low": 2856
     },
     "criticalItems": [],
     "highItems": [
       {
-        "id": "complexity:high-complexity:scripts/test-parallel.js:577",
+        "id": "complexity:high-complexity:scripts/test-parallel.js:567",
         "rule": "high-complexity",
         "tier": "high",
         "severity": "warning",
         "file": "scripts/test-parallel.js",
-        "line": 577,
+        "line": 567,
         "message": "Function \"main\" has cyclomatic complexity 14 (threshold 12)."
       }
     ]
@@ -206,10 +206,10 @@
         "pillars": {
           "architecture": 98.69,
           "maintainability": 98.5,
-          "performance": 99.65,
+          "performance": 99.63,
           "data": 99.83,
           "testing": 100,
-          "reliability": 99.75,
+          "reliability": 99.74,
           "security": 99.89,
           "extensibility": 97.41
         },
@@ -1014,27 +1014,27 @@
   },
   "trajectory": {
     "runEloc": {
-      "processed": 156548,
-      "unique": 127162,
-      "changed": 1812,
-      "semantic": 1450,
+      "processed": 156571,
+      "unique": 127190,
+      "changed": 1092,
+      "semantic": 874,
       "relocated": 0,
       "cosmetic": 0,
       "boilerplate": 0,
-      "added": 906,
+      "added": 546,
       "deleted": 0,
       "modified": 0
     },
     "lifetime": {
       "weekId": "LIFETIME",
       "startMs": 1791102755050,
-      "endMs": 1792339330404,
+      "endMs": 1792340537642,
       "totalRuns": 252,
       "eloc": {
-        "processedTotal": 33698161,
-        "uniqueTotal": 127162,
-        "changedTotal": 277888,
-        "semanticTotal": 222309
+        "processedTotal": 33698184,
+        "uniqueTotal": 127190,
+        "changedTotal": 277168,
+        "semanticTotal": 221733
       },
       "qed": {
         "mean": 0.0001,
