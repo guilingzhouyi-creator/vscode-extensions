@@ -12,7 +12,12 @@
  * Exit Semantics & Design Rationale: Dependency-free, fully deterministic pure JS shim.
  */
 
-import type { NativeCloneBlock, NativeClonePair } from './native-types';
+import type {
+    NativeBumpyRoadResult,
+    NativeCloneBlock,
+    NativeClonePair,
+    NativeTemporalCouplingPair,
+} from './native-types';
 import { bitParallelMyers64Distance } from '../ast/swar';
 import {
     computeSimHash64,
@@ -357,10 +362,7 @@ export function findClonePairsShim(signatures: number[][], threshold: number): N
 /**
  * Pure JavaScript fallback for bit-parallel Myers distance.
  */
-export function computeBitParallelDistanceShim(
-    pattern: Uint32Array,
-    text: Uint32Array,
-): number {
+export function computeBitParallelDistanceShim(pattern: Uint32Array, text: Uint32Array): number {
     return bitParallelMyers64Distance(pattern, text);
 }
 
@@ -375,10 +377,7 @@ export function computeSimHash64Shim(tokens: readonly string[]): string {
 /**
  * Pure JavaScript fallback for SimHash Hamming similarity.
  */
-export function calculateSimHashHammingSimilarityShim(
-    hashA: string,
-    hashB: string,
-): number {
+export function calculateSimHashHammingSimilarityShim(hashA: string, hashB: string): number {
     const parse = (s: string): bigint => {
         const trimmed = s.trim();
         if (trimmed.startsWith('0x') || trimmed.startsWith('0X')) {
@@ -399,4 +398,283 @@ export function calculateTrigramCosineSimilarityShim(
     const vecA = extractTokenTrigrams(tokensA);
     const vecB = extractTokenTrigrams(tokensB);
     return calculateTrigramCosineSimilarity(vecA, vecB);
+}
+
+interface TemporalMiningState {
+    readonly fileCommitCounts: Map<number, number>;
+    readonly pairSharedCounts: Map<string, number>;
+}
+
+function recordChangeset(
+    cs: number[],
+    state: TemporalMiningState,
+): void {
+    if (!Array.isArray(cs) || cs.length === 0) {
+        return;
+    }
+    const unique = Array.from(new Set(cs)).sort((a, b) => a - b);
+    for (const id of unique) {
+        state.fileCommitCounts.set(id, (state.fileCommitCounts.get(id) || 0) + 1);
+    }
+    const len = unique.length;
+    for (let i = 0; i < len; i++) {
+        const fileA = unique[i];
+        for (let j = i + 1; j < len; j++) {
+            const fileB = unique[j];
+            const key = `${fileA}:${fileB}`;
+            state.pairSharedCounts.set(key, (state.pairSharedCounts.get(key) || 0) + 1);
+        }
+    }
+}
+
+function parseAndEvaluateCouplingPair(
+    key: string,
+    shared: number,
+    fileCommitCounts: Map<number, number>,
+    minShared: number,
+    minJaccard: number,
+): NativeTemporalCouplingPair | null {
+    if (shared < minShared) {
+        return null;
+    }
+    const colonIdx = key.indexOf(':');
+    const fileA = Number(key.slice(0, colonIdx));
+    const fileB = Number(key.slice(colonIdx + 1));
+    const commitsA = fileCommitCounts.get(fileA) || 0;
+    const commitsB = fileCommitCounts.get(fileB) || 0;
+    const unionCount = commitsA + commitsB - shared;
+    if (unionCount <= 0) {
+        return null;
+    }
+    const jaccard = shared / unionCount;
+    const roundedJaccard = +jaccard.toFixed(4);
+    if (roundedJaccard < minJaccard) {
+        return null;
+    }
+    return {
+        fileA,
+        fileB,
+        sharedCommits: shared,
+        commitsA,
+        commitsB,
+        jaccardSimilarity: roundedJaccard,
+    };
+}
+
+function compareCouplingPairs(
+    a: NativeTemporalCouplingPair,
+    b: NativeTemporalCouplingPair,
+): number {
+    if (b.jaccardSimilarity !== a.jaccardSimilarity) {
+        return b.jaccardSimilarity - a.jaccardSimilarity;
+    }
+    if (b.sharedCommits !== a.sharedCommits) {
+        return b.sharedCommits - a.sharedCommits;
+    }
+    if (a.fileA !== b.fileA) {
+        return a.fileA - b.fileA;
+    }
+    return a.fileB - b.fileB;
+}
+
+/**
+ * Pure JavaScript fallback for temporal coupling co-change mining.
+ */
+export function computeTemporalCouplingShim(
+    changesets: number[][],
+    minShared: number,
+    minJaccard: number,
+): NativeTemporalCouplingPair[] {
+    if (!Array.isArray(changesets) || changesets.length === 0) {
+        return [];
+    }
+
+    const state: TemporalMiningState = {
+        fileCommitCounts: new Map<number, number>(),
+        pairSharedCounts: new Map<string, number>(),
+    };
+
+    for (const cs of changesets) {
+        recordChangeset(cs, state);
+    }
+
+    const pairs: NativeTemporalCouplingPair[] = [];
+    for (const [key, shared] of state.pairSharedCounts.entries()) {
+        const pair = parseAndEvaluateCouplingPair(
+            key,
+            shared,
+            state.fileCommitCounts,
+            minShared,
+            minJaccard,
+        );
+        if (pair !== null) {
+            pairs.push(pair);
+        }
+    }
+
+    pairs.sort(compareCouplingPairs);
+    return pairs;
+}
+
+const SPACE_INDENT_SIZE = 4;
+const MIN_BUMPY_LINE_SPAN = 20;
+const MIN_BUMPY_SCORE_THRESHOLD = 12.0;
+
+/**
+ * Calculates effective indentation level of a single source line.
+ */
+export function measureLineIndentLevelShim(line: string): number {
+    let spaces = 0;
+    for (let i = 0; i < line.length; i++) {
+        const ch = line.charCodeAt(i);
+        if (ch === 32) {
+            spaces++;
+        } else if (ch === 9) {
+            spaces += SPACE_INDENT_SIZE;
+        } else {
+            break;
+        }
+    }
+    return Math.floor(spaces / SPACE_INDENT_SIZE);
+}
+
+/**
+ * Pure JavaScript fallback for Bumpy Road structural complexity evaluation.
+ */
+export function evaluateBumpyRoadShim(
+    lines: readonly string[],
+    startLine: number,
+    endLine: number,
+): NativeBumpyRoadResult {
+    const totalLines = endLine - startLine + 1;
+    if (!lines || totalLines < MIN_BUMPY_LINE_SPAN || startLine < 1 || endLine > lines.length) {
+        return {
+            bumpyScore: 0.0,
+            isBumpy: false,
+            meanDepth: 0.0,
+            varianceDepth: 0.0,
+            spikesCount: 0,
+        };
+    }
+
+    let nonBlankCount = 0;
+    let depthSum = 0;
+    let baseIndent = -1;
+
+    for (let lineNum = startLine; lineNum <= endLine; lineNum++) {
+        const line = lines[lineNum - 1];
+        if (!line || line.trim().length === 0) {
+            continue;
+        }
+        const depth = measureLineIndentLevelShim(line);
+        if (baseIndent === -1) {
+            baseIndent = depth;
+        }
+        const relativeDepth = Math.max(0, depth - baseIndent);
+        depthSum += relativeDepth;
+        nonBlankCount++;
+    }
+
+    if (nonBlankCount < MIN_BUMPY_LINE_SPAN) {
+        return {
+            bumpyScore: 0.0,
+            isBumpy: false,
+            meanDepth: 0.0,
+            varianceDepth: 0.0,
+            spikesCount: 0,
+        };
+    }
+
+    const meanDepth = depthSum / nonBlankCount;
+    let varianceSum = 0;
+    let spikesCount = 0;
+    let prevDepth = 0;
+
+    for (let lineNum = startLine; lineNum <= endLine; lineNum++) {
+        const line = lines[lineNum - 1];
+        if (!line || line.trim().length === 0) {
+            continue;
+        }
+        const relativeDepth = Math.max(0, measureLineIndentLevelShim(line) - baseIndent);
+        const diffFromMean = relativeDepth - meanDepth;
+        varianceSum += diffFromMean * diffFromMean;
+
+        const delta = Math.abs(relativeDepth - prevDepth);
+        if (delta >= 2) {
+            spikesCount++;
+        }
+        prevDepth = relativeDepth;
+    }
+
+    const varianceDepth = +(varianceSum / nonBlankCount).toFixed(2);
+    const rawScore = spikesCount * varianceDepth * Math.max(1.0, meanDepth);
+    const bumpyScore = +Math.min(100.0, rawScore).toFixed(1);
+    const isBumpy = bumpyScore >= MIN_BUMPY_SCORE_THRESHOLD && spikesCount >= 3;
+
+    return {
+        bumpyScore,
+        isBumpy,
+        meanDepth: +meanDepth.toFixed(2),
+        varianceDepth,
+        spikesCount,
+    };
+}
+
+function probeSingleTriggerGroup(
+    content: string,
+    group: readonly string[],
+    len: number,
+): boolean {
+    if (!group || group.length === 0) {
+        return true;
+    }
+
+    const lut = new Uint8Array(256);
+    let hasValidTrigger = false;
+    for (const trigger of group) {
+        if (trigger && trigger.length > 0) {
+            lut[trigger.charCodeAt(0) & 0xff] = 1;
+            hasValidTrigger = true;
+        }
+    }
+
+    if (!hasValidTrigger) {
+        return true;
+    }
+
+    let initialByteFound = false;
+    for (let i = 0; i < len; i++) {
+        if (lut[content.charCodeAt(i) & 0xff] === 1) {
+            initialByteFound = true;
+            break;
+        }
+    }
+
+    if (!initialByteFound) {
+        return false;
+    }
+
+    for (const trigger of group) {
+        if (trigger && content.indexOf(trigger) !== -1) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
+ * Pure JavaScript fallback for vectorized trigger batch probing.
+ */
+export function batchProbeTriggersShim(
+    content: string,
+    triggerGroups: readonly (readonly string[])[],
+): boolean[] {
+    if (!triggerGroups || triggerGroups.length === 0) {
+        return [];
+    }
+    if (!content) {
+        return triggerGroups.map((g) => !g || g.length === 0);
+    }
+    const len = content.length;
+    return triggerGroups.map((group) => probeSingleTriggerGroup(content, group, len));
 }

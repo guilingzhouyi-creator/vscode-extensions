@@ -96,6 +96,29 @@ export interface NativeClonePair {
 }
 
 /**
+ * Detected temporal coupling pair between two files based on commit co-changes.
+ */
+export interface NativeTemporalCouplingPair {
+    readonly fileA: number;
+    readonly fileB: number;
+    readonly sharedCommits: number;
+    readonly commitsA: number;
+    readonly commitsB: number;
+    readonly jaccardSimilarity: number;
+}
+
+/**
+ * Outcome of native Bumpy Road structural complexity evaluation.
+ */
+export interface NativeBumpyRoadResult {
+    readonly bumpyScore: number;
+    readonly isBumpy: boolean;
+    readonly meanDepth: number;
+    readonly varianceDepth: number;
+    readonly spikesCount: number;
+}
+
+/**
  * Dominator tree analysis result for a control-flow / dataflow graph.
  */
 export interface NativeDominatorTreeResult {
@@ -208,6 +231,29 @@ export interface INativeCore {
         tokensA: readonly string[],
         tokensB: readonly string[],
     ): number;
+
+    /**
+     * Computes pairwise co-change frequencies and Jaccard similarity between files.
+     */
+    computeTemporalCoupling(
+        changesets: number[][],
+        minShared: number,
+        minJaccard: number,
+    ): NativeTemporalCouplingPair[];
+
+    /**
+     * Measures structural irregularity and spatial variance of indentation/nesting depth.
+     */
+    evaluateBumpyRoad(
+        lines: readonly string[],
+        startLine: number,
+        endLine: number,
+    ): NativeBumpyRoadResult;
+
+    /**
+     * Fast vectorized batch probe testing multiple trigger groups against target content.
+     */
+    batchProbeTriggers(content: string, triggerGroups: readonly (readonly string[])[]): boolean[];
 
     /**
      * Inspects active engine status and capabilities.

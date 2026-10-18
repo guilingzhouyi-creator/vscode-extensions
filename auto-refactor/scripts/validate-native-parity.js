@@ -222,7 +222,7 @@ function runAll() {
     () => native.computeDominatorTree('a', GRAPH_NODES, GRAPH_EDGES),
     () => shim.computeDominatorTree('a', GRAPH_NODES, GRAPH_EDGES),
   );
-    compare(
+  compare(
     'solveDataflow',
     () => native.solveDataflow('a', GRAPH_NODES, GRAPH_EDGES, true, { a: ['seed'] }, {}),
     () =>
@@ -244,15 +244,53 @@ function runAll() {
     () => shim.computeBitParallelDistance(pat, txt),
   );
 
-  const sampleTokensA = ['function', 'compute', '(', 'x', ',', 'y', ')', '{', 'return', 'x', '+', 'y', ';', '}'];
-  const sampleTokensB = ['function', 'calculate', '(', 'x', ',', 'y', ')', '{', 'return', 'x', '+', 'y', ';', '}'];
+  const sampleTokensA = [
+    'function',
+    'compute',
+    '(',
+    'x',
+    ',',
+    'y',
+    ')',
+    '{',
+    'return',
+    'x',
+    '+',
+    'y',
+    ';',
+    '}',
+  ];
+  const sampleTokensB = [
+    'function',
+    'calculate',
+    '(',
+    'x',
+    ',',
+    'y',
+    ')',
+    '{',
+    'return',
+    'x',
+    '+',
+    'y',
+    ';',
+    '}',
+  ];
   const hashNativeA = native.computeSimHash64(sampleTokensA);
   const hashShimA = shim.computeSimHash64(sampleTokensA);
   const hashNativeB = native.computeSimHash64(sampleTokensB);
   const hashShimB = shim.computeSimHash64(sampleTokensB);
 
-  compare('computeSimHash64', () => hashNativeA, () => hashShimA);
-  compare('computeSimHash64', () => hashNativeB, () => hashShimB);
+  compare(
+    'computeSimHash64',
+    () => hashNativeA,
+    () => hashShimA,
+  );
+  compare(
+    'computeSimHash64',
+    () => hashNativeB,
+    () => hashShimB,
+  );
 
   compare(
     'calculateSimHashHammingSimilarity',
@@ -264,6 +302,40 @@ function runAll() {
     'calculateTrigramCosineSimilarity',
     () => native.calculateTrigramCosineSimilarity(sampleTokensA, sampleTokensB),
     () => shim.calculateTrigramCosineSimilarity(sampleTokensA, sampleTokensB),
+  );
+
+  // Temporal coupling co-change mining
+  const testChangesets = [[1, 2, 3], [1, 2], [1, 2, 4], [3, 4], [5]];
+  compare(
+    'computeTemporalCoupling',
+    () => native.computeTemporalCoupling(testChangesets, 2, 0.5),
+    () => shim.computeTemporalCoupling(testChangesets, 2, 0.5),
+  );
+  compare(
+    'computeTemporalCoupling (lower threshold)',
+    () => native.computeTemporalCoupling(testChangesets, 1, 0.2),
+    () => shim.computeTemporalCoupling(testChangesets, 1, 0.2),
+  );
+
+  // Bumpy road indentation variance
+  const bumpyLines = [];
+  for (let i = 0; i < 26; i++) {
+    bumpyLines.push(i % 2 === 0 ? '    const even = 1;' : '            const deeply = nested();');
+  }
+  compare(
+    'evaluateBumpyRoad',
+    () => native.evaluateBumpyRoad(bumpyLines, 1, 26),
+    () => shim.evaluateBumpyRoad(bumpyLines, 1, 26),
+  );
+
+  // Vectorized trigger batch probe
+  const testContent =
+    'function processData(items) {\n    for (const item of items) {\n        console.log(item);\n    }\n}';
+  const testGroups = [['for', 'while'], ['secret', 'key'], ['class', 'interface'], ['console'], []];
+  compare(
+    'batchProbeTriggers',
+    () => native.batchProbeTriggers(testContent, testGroups),
+    () => shim.batchProbeTriggers(testContent, testGroups),
   );
 
   console.log('\nALL NATIVE/SHIM PARITY CHECKS PASSED SUCCESSFULLY!');

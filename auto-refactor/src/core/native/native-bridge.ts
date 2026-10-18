@@ -16,6 +16,7 @@
 
 import type {
     INativeCore,
+    NativeBumpyRoadResult,
     NativeCloneBlock,
     NativeClonePair,
     NativeCoreEngineType,
@@ -28,6 +29,7 @@ import type {
     NativeMaskConfig,
     NativeMaskedSource,
     NativePatternMatch,
+    NativeTemporalCouplingPair,
 } from './native-types';
 import { computeLineStartsAndHashes, linesOf, type LineIndex } from '../diff/edit-diff';
 import { histogramDiff } from '../diff/histogram-diff';
@@ -49,6 +51,9 @@ import {
     computeSimHash64Shim,
     calculateSimHashHammingSimilarityShim,
     calculateTrigramCosineSimilarityShim,
+    computeTemporalCouplingShim,
+    evaluateBumpyRoadShim,
+    batchProbeTriggersShim,
     HASH_COEFFS,
 } from './native-clone-shim';
 import { computeDominatorTreeShim, solveDataflowShim } from './native-flow-shim';
@@ -76,6 +81,9 @@ const CAPABILITY_DATAFLOW_SOLVER = 'dataflow-solver';
 const CAPABILITY_BIT_PARALLEL_MYERS = 'bit-parallel-myers';
 const CAPABILITY_SIMHASH_SEMANTIC = 'simhash-semantic';
 const CAPABILITY_TRIGRAM_COSINE = 'trigram-cosine';
+const CAPABILITY_TEMPORAL_COUPLING = 'temporal-coupling';
+const CAPABILITY_BUMPY_ROAD = 'bumpy-road';
+const CAPABILITY_BATCH_TRIGGER_PROBE = 'batch-trigger-probe';
 
 const CAPABILITY_SIMD_HISTOGRAM_DIFF = 'simd-histogram-diff';
 const CAPABILITY_PARALLEL_TARJAN_SCC = 'parallel-tarjan-scc';
@@ -94,6 +102,9 @@ const SHIM_CAPABILITIES: readonly string[] = Object.freeze([
     CAPABILITY_BIT_PARALLEL_MYERS,
     CAPABILITY_SIMHASH_SEMANTIC,
     CAPABILITY_TRIGRAM_COSINE,
+    CAPABILITY_TEMPORAL_COUPLING,
+    CAPABILITY_BUMPY_ROAD,
+    CAPABILITY_BATCH_TRIGGER_PROBE,
 ]);
 
 const NATIVE_CORE_CAPABILITIES: readonly string[] = Object.freeze([
@@ -621,6 +632,38 @@ export class PureJsNativeShim implements INativeCore {
     }
 
     /**
+     * Computes pairwise co-change frequencies and Jaccard similarity between files.
+     */
+    public computeTemporalCoupling(
+        changesets: number[][],
+        minShared: number,
+        minJaccard: number,
+    ): NativeTemporalCouplingPair[] {
+        return computeTemporalCouplingShim(changesets, minShared, minJaccard);
+    }
+
+    /**
+     * Measures structural irregularity and spatial variance of indentation/nesting depth.
+     */
+    public evaluateBumpyRoad(
+        lines: readonly string[],
+        startLine: number,
+        endLine: number,
+    ): NativeBumpyRoadResult {
+        return evaluateBumpyRoadShim(lines, startLine, endLine);
+    }
+
+    /**
+     * Fast vectorized batch probe testing multiple trigger groups against target content.
+     */
+    public batchProbeTriggers(
+        content: string,
+        triggerGroups: readonly (readonly string[])[],
+    ): boolean[] {
+        return batchProbeTriggersShim(content, triggerGroups);
+    }
+
+    /**
      * Finds preceding equal context line count before a cluster start.
      */
     private findPrecedingContextCount(
@@ -806,6 +849,20 @@ interface RawNativeBinding {
         tokensA: readonly string[],
         tokensB: readonly string[],
     ) => number;
+    readonly computeTemporalCoupling?: (
+        changesets: number[][],
+        minShared: number,
+        minJaccard: number,
+    ) => NativeTemporalCouplingPair[];
+    readonly evaluateBumpyRoad?: (
+        lines: readonly string[],
+        startLine: number,
+        endLine: number,
+    ) => NativeBumpyRoadResult;
+    readonly batchProbeTriggers?: (
+        content: string,
+        triggerGroups: readonly (readonly string[])[],
+    ) => boolean[];
     readonly version?: string;
     readonly VERSION?: string;
 }
@@ -849,15 +906,23 @@ function assembleNativeBindingCore(
         computeBitParallelDistance:
             binding.computeBitParallelDistance ||
             ((pattern, text) => jsShim.computeBitParallelDistance(pattern, text)),
-        computeSimHash64:
-            binding.computeSimHash64 ||
-            ((tokens) => jsShim.computeSimHash64(tokens)),
+        computeSimHash64: binding.computeSimHash64 || ((tokens) => jsShim.computeSimHash64(tokens)),
         calculateSimHashHammingSimilarity:
             binding.calculateSimHashHammingSimilarity ||
             ((hashA, hashB) => jsShim.calculateSimHashHammingSimilarity(hashA, hashB)),
         calculateTrigramCosineSimilarity:
             binding.calculateTrigramCosineSimilarity ||
             ((tokensA, tokensB) => jsShim.calculateTrigramCosineSimilarity(tokensA, tokensB)),
+        computeTemporalCoupling:
+            binding.computeTemporalCoupling ||
+            ((changesets, minShared, minJaccard) =>
+                jsShim.computeTemporalCoupling(changesets, minShared, minJaccard)),
+        evaluateBumpyRoad:
+            binding.evaluateBumpyRoad ||
+            ((lines, startLine, endLine) => jsShim.evaluateBumpyRoad(lines, startLine, endLine)),
+        batchProbeTriggers:
+            binding.batchProbeTriggers ||
+            ((content, groups) => jsShim.batchProbeTriggers(content, groups)),
         getStatus: () => ({
             isNativeAvailable: true,
             activeEngine: ENGINE_RUST_NATIVE,
@@ -1069,10 +1134,7 @@ export function solveNativeDataflow(params: NativeDataflowParams): NativeDataflo
  * @param text - Text line/token hashes to compare against.
  * @returns Minimum insert/delete edit distance.
  */
-export function computeNativeBitParallelDistance(
-    pattern: Uint32Array,
-    text: Uint32Array,
-): number {
+export function computeNativeBitParallelDistance(pattern: Uint32Array, text: Uint32Array): number {
     return nativeCore.computeBitParallelDistance(pattern, text);
 }
 
@@ -1093,10 +1155,7 @@ export function computeNativeSimHash64(tokens: readonly string[]): string {
  * @param hashB - Second 64-bit SimHash (hex or decimal string).
  * @returns Similarity score in [0.0, 1.0] rounded to 6 decimal places.
  */
-export function calculateNativeSimHashHammingSimilarity(
-    hashA: string,
-    hashB: string,
-): number {
+export function calculateNativeSimHashHammingSimilarity(hashA: string, hashB: string): number {
     return nativeCore.calculateSimHashHammingSimilarity(hashA, hashB);
 }
 
@@ -1111,6 +1170,38 @@ export function calculateNativeTrigramCosineSimilarity(
     tokensB: readonly string[],
 ): number {
     return nativeCore.calculateTrigramCosineSimilarity(tokensA, tokensB);
+}
+
+/**
+ * Computes pairwise co-change frequencies and Jaccard similarity between files.
+ */
+export function computeNativeTemporalCoupling(
+    changesets: number[][],
+    minShared: number,
+    minJaccard: number,
+): NativeTemporalCouplingPair[] {
+    return nativeCore.computeTemporalCoupling(changesets, minShared, minJaccard);
+}
+
+/**
+ * Measures structural irregularity and spatial variance of indentation/nesting depth.
+ */
+export function evaluateNativeBumpyRoad(
+    lines: readonly string[],
+    startLine: number,
+    endLine: number,
+): NativeBumpyRoadResult {
+    return nativeCore.evaluateBumpyRoad(lines, startLine, endLine);
+}
+
+/**
+ * Fast vectorized batch probe testing multiple trigger groups against target content.
+ */
+export function batchProbeNativeTriggers(
+    content: string,
+    triggerGroups: readonly (readonly string[])[],
+): boolean[] {
+    return nativeCore.batchProbeTriggers(content, triggerGroups);
 }
 
 // ─── Substantive Backwards-Compatibility Aliases ────────────────────────────
