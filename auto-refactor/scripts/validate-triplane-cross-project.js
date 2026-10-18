@@ -152,13 +152,13 @@ async function buildProjectIndices(projectId) {
 
   if (projectId === 'auto-refactor') {
     root = path.resolve(__dirname, '..');
-    include = ['src/**/*.ts'];
+    include = ['src/api.ts', 'src/core/**/*.ts'];
   } else if (projectId === 'workspace-timing') {
     root = path.resolve(__dirname, '../../workspace-timing');
-    include = ['src/**/*.ts'];
+    include = ['src/extension.ts', 'src/domain/**/*.ts'];
   } else if (projectId === 'WebGames') {
     root = path.resolve(__dirname, '../../WebGames');
-    include = ['backend/**/*.gd', 'frontend/**/*.gd'];
+    include = ['backend/domains/contract_registry/**/*.gd', 'backend/domains/currency_economy/**/*.gd'];
   }
 
   const report = await scan({

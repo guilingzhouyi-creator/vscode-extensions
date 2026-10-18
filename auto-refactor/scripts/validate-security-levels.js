@@ -187,6 +187,7 @@ async function runTests() {
         root: TEST_DIR,
         include: ['**/*.ts'],
         securityLevel: 'off',
+        cacheEnabled: false,
       }),
     );
     const resultOff = await scannerOff.scan();
@@ -207,6 +208,7 @@ async function runTests() {
         root: TEST_DIR,
         include: ['**/*.ts'],
         securityLevel: 'basic',
+        cacheEnabled: false,
       }),
     );
     const resultBasic = await scannerBasic.scan();
@@ -247,6 +249,7 @@ async function runTests() {
         root: TEST_DIR,
         include: ['**/*.ts'],
         securityLevel: 'full',
+        cacheEnabled: false,
       }),
     );
     const resultFull = await scannerFull.scan();

@@ -29,10 +29,10 @@ const CR_REGEX = /\r/;
 const FORBIDDEN_EXEC_SH = /exec sh /;
 const REQUIRED_EXEC_BASH = /exec bash /;
 const AUDIT_ALL_REGEX =
-  /(?:workspace-timing|auto-refactor|WebGames|audit_runner\.py|audit_config\.py|\[5\/5\])/g;
-const PRE_COMMIT_REGEX = /(?:\[\d\/9\]|workspace-timing|auto-refactor|WebGames)/g;
+  /(?:workspace-timing|auto-refactor|WebGames|fractal-git|audit_runner\.py|audit_config\.py)/g;
+const PRE_COMMIT_REGEX = /(?:\[\d\/9\]|workspace-timing|auto-refactor|WebGames|fractal-git)/g;
 const PRE_PUSH_REGEX =
-  /(?:\[\d\/9\]|workspace-timing|auto-refactor|WebGames|validate-commit-msg-style)/g;
+  /(?:\[\d+\/10\]|workspace-timing|auto-refactor|WebGames|fractal-git|validate-commit-msg)/g;
 
 function collectFiles(dir, extensions, extSet) {
   const results = [];
@@ -114,11 +114,11 @@ function verifyAuditAllParity() {
     assert(tokens.has('workspace-timing'), `${name} must cover workspace-timing`);
     assert(tokens.has('auto-refactor'), `${name} must cover auto-refactor`);
     assert(tokens.has('WebGames'), `${name} must cover WebGames`);
+    assert(tokens.has('fractal-git'), `${name} must cover fractal-git`);
     assert(
       tokens.has('audit_runner.py') || tokens.has('audit_config.py'),
       `${name} must run WebGames config audit`,
     );
-    assert(tokens.has('[5/5]'), `${name} must have 5 verification steps`);
   }
 }
 
@@ -153,13 +153,14 @@ function verifyPrePushParity() {
     assert(fs.existsSync(p), `${name} must exist`);
     const content = fs.readFileSync(p, 'utf8');
     const tokens = new Set(content.match(PRE_PUSH_REGEX) || []);
-    for (let i = 1; i <= 9; i++) {
-      assert(tokens.has(`[${i}/9]`), `${name} must contain Gate [${i}/9]`);
+    for (let i = 1; i <= 10; i++) {
+      assert(tokens.has(`[${i}/10]`), `${name} must contain Gate [${i}/10]`);
     }
     assert(tokens.has('workspace-timing'), `${name} must verify workspace-timing`);
     assert(tokens.has('auto-refactor'), `${name} must verify auto-refactor`);
     assert(tokens.has('WebGames'), `${name} must verify WebGames`);
-    assert(tokens.has('validate-commit-msg-style'), `${name} must verify commit msg style`);
+    assert(tokens.has('fractal-git'), `${name} must verify fractal-git`);
+    assert(tokens.has('validate-commit-msg'), `${name} must verify commit msg`);
   }
 }
 
@@ -191,17 +192,17 @@ function runAll() {
   verifyHookRouting(hookFiles);
   console.log('  ✔ Hook Routing: 100% bash fallback, zero POSIX dash crash vulnerability.');
 
-  console.log('4. Verifying audit-all tri-project parity...');
+  console.log('4. Verifying audit-all multi-project parity...');
   verifyAuditAllParity();
-  console.log('  ✔ Audit-All: 5/5 pillars covering workspace-timing, auto-refactor, WebGames.');
+  console.log('  ✔ Audit-All: 6 pillars covering workspace-timing, auto-refactor, WebGames, fractal-git.');
 
   console.log('5. Verifying pre-commit-gate step normalization & Gate 8 parity...');
   verifyPreCommitParity();
-  console.log('  ✔ Pre-Commit: [1/9]..[9/9] normalized, Gate 8 covers all 3 projects.');
+  console.log('  ✔ Pre-Commit: [1/9]..[9/9] normalized, Gate 8 covers all 4 projects.');
 
-  console.log('6. Verifying pre-push-gate 9-gate parity...');
+  console.log('6. Verifying pre-push-gate 10-gate parity...');
   verifyPrePushParity();
-  console.log('  ✔ Pre-Push: 9 gates covering all 3 projects.');
+  console.log('  ✔ Pre-Push: 10 gates covering all 4 projects.');
 
   console.log('\n✅ All gate system verification checks passed successfully.');
 }

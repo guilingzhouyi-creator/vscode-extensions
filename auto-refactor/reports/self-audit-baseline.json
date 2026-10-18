@@ -1,10 +1,10 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1792325588472",
-  "timestamp": "2026-10-18T12:13:14.828Z",
-  "cai": 86.25,
+  "snapshotId": "snapshot-v0.4.0-1792336102364",
+  "timestamp": "2026-10-18T15:08:29.212Z",
+  "cai": 86.28,
   "polyglotGeneralization": {
-    "index": 94.85,
-    "meanScore": 94.85,
+    "index": 94.89,
+    "meanScore": 94.89,
     "dispersionPenalty": 1,
     "standardDeviation": 0,
     "languageCount": 1
@@ -20,48 +20,48 @@
   "configDigest": "04a1b8446ff3624c6496a9e8c9b405b03d47eda22fb414a869442bfb51978d19",
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
-    "filesScanned": 670,
-    "durationMs": 4768
+    "filesScanned": 673,
+    "durationMs": 5066
   },
   "metrics": {
-    "compositeScore": 98.8,
+    "compositeScore": 98.84,
     "grade": "A+",
-    "autonomyRate": 86.25,
+    "autonomyRate": 86.28,
     "polyglotGeneralization": {
-      "index": 94.85,
-      "meanScore": 94.85,
+      "index": 94.89,
+      "meanScore": 94.89,
       "dispersionPenalty": 1,
       "standardDeviation": 0,
       "languageCount": 1
     },
     "effectiveCodeDensity": 0.95,
-    "totalIssues": 5522,
+    "totalIssues": 5507,
     "suppressedIssues": 133,
-    "unsuppressedIssues": 5389,
+    "unsuppressedIssues": 5374,
     "bySeverity": {
-      "info": 522,
-      "warning": 5000,
+      "info": 527,
+      "warning": 4980,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
-      "high": 33,
-      "medium": 2742,
-      "low": 2747
+      "high": 1,
+      "medium": 2743,
+      "low": 2763
     }
   },
   "eightPillars": {
     "pillars": {
-      "architecture": 98.57,
-      "maintainability": 96.7,
-      "performance": 99.5,
+      "architecture": 98.56,
+      "maintainability": 96.84,
+      "performance": 99.57,
       "data": 99.73,
       "testing": 100,
-      "reliability": 99.62,
+      "reliability": 99.67,
       "security": 99.85,
-      "extensibility": 96.63
+      "extensibility": 96.65
     },
-    "compositeScore": 98.8,
+    "compositeScore": 98.84,
     "weights": {
       "architecture": 0.15,
       "maintainability": 0.15,
@@ -75,16 +75,16 @@
     "ceilingsApplied": []
   },
   "tenDimensions": {
-    "architectureConsistency": 98.57,
+    "architectureConsistency": 98.56,
     "semanticPurity": 99.46,
     "codeSecurity": 99.85,
-    "performanceEfficiency": 99.5,
-    "standardization": 94.24,
-    "modernity": 99.82,
-    "maintainability": 96.7,
+    "performanceEfficiency": 99.57,
+    "standardization": 94.27,
+    "modernity": 99.83,
+    "maintainability": 96.84,
     "commentQuality": 100,
-    "duplication": 95.65,
-    "techDebtRisk": 99.79
+    "duplication": 95.68,
+    "techDebtRisk": 99.88
   },
   "topHotspots": [
     {
@@ -92,8 +92,8 @@
       "domain": "pattern",
       "totalIssues": 46,
       "criticalCount": 0,
-      "highCount": 5,
-      "compositeScore": 95.97,
+      "highCount": 0,
+      "compositeScore": 96.98,
       "effectiveDensity": 0.92
     },
     {
@@ -106,30 +106,12 @@
       "effectiveDensity": 0.95
     },
     {
-      "filePath": "src/core/scoring/technical-debt-ratio.ts",
-      "domain": "scoring",
-      "totalIssues": 43,
-      "criticalCount": 0,
-      "highCount": 1,
-      "compositeScore": 97.95,
-      "effectiveDensity": 0.93
-    },
-    {
       "filePath": "src/core/evolution/behavioral-hotspot-evaluator.ts",
       "domain": "evolution",
-      "totalIssues": 42,
+      "totalIssues": 40,
       "criticalCount": 0,
-      "highCount": 1,
-      "compositeScore": 96.67,
-      "effectiveDensity": 0.93
-    },
-    {
-      "filePath": "src/core/scoring/finding-confidence-arbiter.ts",
-      "domain": "scoring",
-      "totalIssues": 42,
-      "criticalCount": 0,
-      "highCount": 8,
-      "compositeScore": 94.43,
+      "highCount": 0,
+      "compositeScore": 97.29,
       "effectiveDensity": 0.93
     },
     {
@@ -151,6 +133,15 @@
       "effectiveDensity": 0.93
     },
     {
+      "filePath": "src/core/scoring/finding-confidence-arbiter.ts",
+      "domain": "scoring",
+      "totalIssues": 34,
+      "criticalCount": 0,
+      "highCount": 0,
+      "compositeScore": 96.82,
+      "effectiveDensity": 0.94
+    },
+    {
       "filePath": "scripts/validate-warm.js",
       "domain": "scripts",
       "totalIssues": 33,
@@ -169,320 +160,41 @@
       "effectiveDensity": 0.95
     },
     {
-      "filePath": "src/core/evolution/temporal-coupling-detector.ts",
-      "domain": "evolution",
-      "totalIssues": 32,
+      "filePath": "scripts/bench-warm.js",
+      "domain": "scripts",
+      "totalIssues": 31,
       "criticalCount": 0,
-      "highCount": 5,
-      "compositeScore": 94.92,
-      "effectiveDensity": 0.93
+      "highCount": 0,
+      "compositeScore": 98.81,
+      "effectiveDensity": 0.96
+    },
+    {
+      "filePath": "src/core/logger.ts",
+      "domain": "core",
+      "totalIssues": 31,
+      "criticalCount": 0,
+      "highCount": 0,
+      "compositeScore": 96.72,
+      "effectiveDensity": 0.9
     }
   ],
   "technicalDebtLedger": {
     "summary": {
       "critical": 0,
-      "high": 33,
-      "medium": 2742,
-      "low": 2747
+      "high": 1,
+      "medium": 2743,
+      "low": 2763
     },
     "criticalItems": [],
     "highItems": [
       {
-        "id": "complexity:high-complexity:src/core/evolution/behavioral-hotspot-evaluator.ts:270",
+        "id": "complexity:high-complexity:scripts/test-parallel.js:566",
         "rule": "high-complexity",
         "tier": "high",
         "severity": "warning",
-        "file": "src/core/evolution/behavioral-hotspot-evaluator.ts",
-        "line": 270,
-        "message": "Function \"computeEvolutionModifiers\" has cyclomatic complexity 14 (threshold 12)."
-      },
-      {
-        "id": "complexity:high-complexity:src/core/evolution/temporal-coupling-detector.ts:208",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/evolution/temporal-coupling-detector.ts",
-        "line": 208,
-        "message": "Function \"TemporalCouplingDetector.detectFromChangeSets\" has cyclomatic complexity 18 (threshold 12)."
-      },
-      {
-        "id": "complexity:high-complexity:src/core/evolution/temporal-coupling-detector.ts:325",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/evolution/temporal-coupling-detector.ts",
-        "line": 325,
-        "message": "Function \"TemporalCouplingDetector.parseGitLogOutput\" has cyclomatic complexity 13 (threshold 12)."
-      },
-      {
-        "id": "performance:PRF-ALG-002:src/core/evolution/temporal-coupling-detector.ts:360",
-        "rule": "PRF-ALG-002",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/evolution/temporal-coupling-detector.ts",
-        "line": 360,
-        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
-      },
-      {
-        "id": "complexity:high-complexity:src/core/evolution/temporal-coupling-detector.ts:439",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/evolution/temporal-coupling-detector.ts",
-        "line": 439,
-        "message": "Function \"TemporalCouplingDetector.accumulateCoChanges\" has cyclomatic complexity 12 (threshold 12)."
-      },
-      {
-        "id": "complexity:CPX-SPACE-001:src/core/evolution/temporal-coupling-detector.ts:445",
-        "rule": "CPX-SPACE-001",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/evolution/temporal-coupling-detector.ts",
-        "line": 445,
-        "message": "Unbounded transient allocation: heap memory allocated repeatedly in loop over 'changeSets'."
-      },
-      {
-        "id": "complexity:high-complexity:src/core/intelligence/bumpy-road-analyzer.ts:89",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/intelligence/bumpy-road-analyzer.ts",
-        "line": 89,
-        "message": "Function \"extractIndentationPeaks\" has cyclomatic complexity 16 (threshold 12)."
-      },
-      {
-        "id": "complexity:high-complexity:src/core/intelligence/bumpy-road-analyzer.ts:167",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/intelligence/bumpy-road-analyzer.ts",
-        "line": 167,
-        "message": "Function \"calculateCognitiveComplexity\" has cyclomatic complexity 13 (threshold 12)."
-      },
-      {
-        "id": "complexity:high-complexity:src/core/intelligence/cohesion-modularity-evaluator.ts:135",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/intelligence/cohesion-modularity-evaluator.ts",
-        "line": 135,
-        "message": "Function \"computeNewmanGirvanModularity\" has cyclomatic complexity 17 (threshold 12)."
-      },
-      {
-        "id": "complexity:high-complexity:src/core/intelligence/main-sequence-evaluator.ts:171",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/intelligence/main-sequence-evaluator.ts",
-        "line": 171,
-        "message": "Function \"computePropagationCost\" has cyclomatic complexity 15 (threshold 12)."
-      },
-      {
-        "id": "performance:PRF-ALG-001:src/core/intelligence/main-sequence-evaluator.ts:208",
-        "rule": "PRF-ALG-001",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/intelligence/main-sequence-evaluator.ts",
-        "line": 208,
-        "message": "High algorithmic complexity risk: Found 3 levels of nested loops (potential O(N^3) compute hotspot, threshold 3)"
-      },
-      {
-        "id": "complexity:high-complexity:src/core/native/native-clone-shim.ts:406",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/native/native-clone-shim.ts",
-        "line": 406,
-        "message": "Function \"computeTemporalCouplingShim\" has cyclomatic complexity 19 (threshold 12)."
-      },
-      {
-        "id": "complexity:CPX-SPACE-001:src/core/native/native-clone-shim.ts:418",
-        "rule": "CPX-SPACE-001",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/native/native-clone-shim.ts",
-        "line": 418,
-        "message": "Unbounded transient allocation: heap memory allocated repeatedly in loop over 'changesets'."
-      },
-      {
-        "id": "complexity:high-complexity:src/core/native/native-clone-shim.ts:598",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/native/native-clone-shim.ts",
-        "line": 598,
-        "message": "Function \"batchProbeTriggersShim\" has cyclomatic complexity 17 (threshold 12)."
-      },
-      {
-        "id": "complexity:CPX-SPACE-001:src/core/native/native-clone-shim.ts:612",
-        "rule": "CPX-SPACE-001",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/native/native-clone-shim.ts",
-        "line": 612,
-        "message": "Unbounded transient allocation: heap memory allocated repeatedly in loop over 'triggerGroups'."
-      },
-      {
-        "id": "performance:PRF-ALG-002:src/core/native/native-clone-shim.ts:647",
-        "rule": "PRF-ALG-002",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/native/native-clone-shim.ts",
-        "line": 647,
-        "message": "Nested collection linear lookup anti-pattern: Calling 'indexOf()' inside loop (depth 1) causes O(N*M) polynomial complexity"
-      },
-      {
-        "id": "complexity:high-complexity:src/core/pattern/structural-pattern-engine.ts:305",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/pattern/structural-pattern-engine.ts",
-        "line": 305,
-        "message": "Function \"matchNode\" has cyclomatic complexity 17 (threshold 12)."
-      },
-      {
-        "id": "complexity:CPX-SPACE-001:src/core/pattern/structural-pattern-engine.ts:442",
-        "rule": "CPX-SPACE-001",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/pattern/structural-pattern-engine.ts",
-        "line": 442,
-        "message": "Unbounded transient allocation: heap memory allocated repeatedly in loop over 'rules.length'."
-      },
-      {
-        "id": "complexity:CPX-SPACE-001:src/core/pattern/structural-pattern-engine.ts:442",
-        "rule": "CPX-SPACE-001",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/pattern/structural-pattern-engine.ts",
-        "line": 442,
-        "message": "Unbounded transient allocation: heap memory allocated repeatedly in loop over 'rules.length'."
-      },
-      {
-        "id": "performance:PRF-MEM-001:src/core/pattern/structural-pattern-engine.ts:444",
-        "rule": "PRF-MEM-001",
-        "tier": "high",
-        "severity": "info",
-        "file": "src/core/pattern/structural-pattern-engine.ts",
-        "line": 444,
-        "message": "Transient heap allocation in hot loop: Temporary collection or object repeatedly instantiated inside loop body"
-      },
-      {
-        "id": "performance:PRF-MEM-001:src/core/pattern/structural-pattern-engine.ts:451",
-        "rule": "PRF-MEM-001",
-        "tier": "high",
-        "severity": "info",
-        "file": "src/core/pattern/structural-pattern-engine.ts",
-        "line": 451,
-        "message": "Transient heap allocation in hot loop: Temporary collection or object repeatedly instantiated inside loop body"
-      },
-      {
-        "id": "complexity:CPX-NEST-001:src/core/reporting/reportFinalizer.ts:459",
-        "rule": "CPX-NEST-001",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/reporting/reportFinalizer.ts",
-        "line": 459,
-        "message": "Unbounded control-flow nesting: function 'applySuppressions' has nesting depth 4 exceeding elastic budget 3 for context 'general-business'."
-      },
-      {
-        "id": "complexity:high-complexity:src/core/reporting/reportFinalizer.ts:459",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/reporting/reportFinalizer.ts",
-        "line": 459,
-        "message": "Function \"applySuppressions\" has cyclomatic complexity 14 (threshold 12)."
-      },
-      {
-        "id": "performance:PRF-MEM-001:src/core/reporting/reportFinalizer.ts:697",
-        "rule": "PRF-MEM-001",
-        "tier": "high",
-        "severity": "info",
-        "file": "src/core/reporting/reportFinalizer.ts",
-        "line": 697,
-        "message": "Transient heap allocation in hot loop: Temporary collection or object repeatedly instantiated inside loop body"
-      },
-      {
-        "id": "complexity:high-complexity:src/core/scoring/finding-confidence-arbiter.ts:263",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/scoring/finding-confidence-arbiter.ts",
-        "line": 263,
-        "message": "Function \"evaluatePrescriptiveMatch\" has cyclomatic complexity 25 (exceeds relaxed threshold 18 for shallow structure)."
-      },
-      {
-        "id": "performance:PRF-ALG-002:src/core/scoring/finding-confidence-arbiter.ts:399",
-        "rule": "PRF-ALG-002",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/scoring/finding-confidence-arbiter.ts",
-        "line": 399,
-        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
-      },
-      {
-        "id": "performance:PRF-MEM-001:src/core/scoring/finding-confidence-arbiter.ts:615",
-        "rule": "PRF-MEM-001",
-        "tier": "high",
-        "severity": "info",
-        "file": "src/core/scoring/finding-confidence-arbiter.ts",
-        "line": 615,
-        "message": "Transient heap allocation in hot loop: Temporary collection or object repeatedly instantiated inside loop body"
-      },
-      {
-        "id": "complexity:CPX-NEST-001:src/core/scoring/finding-confidence-arbiter.ts:790",
-        "rule": "CPX-NEST-001",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/scoring/finding-confidence-arbiter.ts",
-        "line": 790,
-        "message": "Unbounded control-flow nesting: function 'FindingConfidenceArbiter.checkInlineSuppression' has nesting depth 4 exceeding elastic budget 3 for context 'general-business'."
-      },
-      {
-        "id": "complexity:high-complexity:src/core/scoring/finding-confidence-arbiter.ts:790",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/scoring/finding-confidence-arbiter.ts",
-        "line": 790,
-        "message": "Function \"FindingConfidenceArbiter.checkInlineSuppression\" has cyclomatic complexity 18 (threshold 12)."
-      },
-      {
-        "id": "complexity:CPX-NEST-002:src/core/scoring/finding-confidence-arbiter.ts:840",
-        "rule": "CPX-NEST-002",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/scoring/finding-confidence-arbiter.ts",
-        "line": 840,
-        "message": "Cognitive jump cost: deep control-flow jump (nesting >= 4) in function 'FindingConfidenceArbiter.checkInlineSuppression' over long span (68 LOC)."
-      },
-      {
-        "id": "complexity:high-complexity:src/core/scoring/finding-confidence-arbiter.ts:919",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/scoring/finding-confidence-arbiter.ts",
-        "line": 919,
-        "message": "Function \"FindingConfidenceArbiter.arbitrateFinding\" has cyclomatic complexity 12 (threshold 12)."
-      },
-      {
-        "id": "complexity:high-complexity:src/core/scoring/finding-confidence-arbiter.ts:1118",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/scoring/finding-confidence-arbiter.ts",
-        "line": 1118,
-        "message": "Function \"recordFindingMetrics\" has cyclomatic complexity 12 (threshold 12)."
-      },
-      {
-        "id": "complexity:high-complexity:src/core/scoring/technical-debt-ratio.ts:136",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/scoring/technical-debt-ratio.ts",
-        "line": 136,
-        "message": "Function \"resolveTargetPillar\" has cyclomatic complexity 12 (threshold 12)."
+        "file": "scripts/test-parallel.js",
+        "line": 566,
+        "message": "Function \"main\" has cyclomatic complexity 14 (threshold 12)."
       }
     ]
   },
@@ -493,19 +205,19 @@
         "compositeScore": 99.24,
         "pillars": {
           "architecture": 98.69,
-          "maintainability": 98.52,
+          "maintainability": 98.51,
           "performance": 99.65,
           "data": 99.83,
           "testing": 100,
           "reliability": 99.75,
           "security": 99.89,
-          "extensibility": 97.62
+          "extensibility": 97.61
         },
         "moduleCount": 1
       },
       {
         "domainName": "analyzers",
-        "compositeScore": 98.8,
+        "compositeScore": 98.81,
         "pillars": {
           "architecture": 98.94,
           "maintainability": 95.77,
@@ -514,7 +226,7 @@
           "testing": 100,
           "reliability": 99.59,
           "security": 99.84,
-          "extensibility": 97.39
+          "extensibility": 97.45
         },
         "moduleCount": 1
       },
@@ -700,16 +412,16 @@
       },
       {
         "domainName": "evolution",
-        "compositeScore": 98.89,
+        "compositeScore": 99.01,
         "pillars": {
-          "architecture": 99.25,
-          "maintainability": 97.07,
-          "performance": 99.6,
-          "data": 99.7,
+          "architecture": 98.88,
+          "maintainability": 97.77,
+          "performance": 100,
+          "data": 99.72,
           "testing": 100,
-          "reliability": 99.52,
+          "reliability": 99.72,
           "security": 99.89,
-          "extensibility": 95.9
+          "extensibility": 95.74
         },
         "moduleCount": 1
       },
@@ -730,7 +442,7 @@
       },
       {
         "domainName": "rules",
-        "compositeScore": 98.94,
+        "compositeScore": 98.95,
         "pillars": {
           "architecture": 98.83,
           "maintainability": 97.47,
@@ -739,7 +451,7 @@
           "testing": 100,
           "reliability": 99.9,
           "security": 99.86,
-          "extensibility": 95.24
+          "extensibility": 95.33
         },
         "moduleCount": 1
       },
@@ -760,16 +472,16 @@
       },
       {
         "domainName": "intelligence",
-        "compositeScore": 98.8,
+        "compositeScore": 98.92,
         "pillars": {
           "architecture": 98.28,
-          "maintainability": 97.35,
-          "performance": 99.84,
+          "maintainability": 98.04,
+          "performance": 99.91,
           "data": 99.85,
           "testing": 100,
-          "reliability": 99.77,
-          "security": 99.88,
-          "extensibility": 95.28
+          "reliability": 99.83,
+          "security": 99.87,
+          "extensibility": 95.32
         },
         "moduleCount": 1
       },
@@ -805,29 +517,29 @@
       },
       {
         "domainName": "native",
-        "compositeScore": 97.51,
+        "compositeScore": 97.8,
         "pillars": {
           "architecture": 96.99,
-          "maintainability": 93.46,
-          "performance": 98.04,
+          "maintainability": 93.92,
+          "performance": 99.4,
           "data": 98.32,
           "testing": 100,
-          "reliability": 97.77,
+          "reliability": 98.17,
           "security": 99.86,
-          "extensibility": 96.46
+          "extensibility": 96.21
         },
         "moduleCount": 1
       },
       {
         "domainName": "pattern",
-        "compositeScore": 98.59,
+        "compositeScore": 98.93,
         "pillars": {
           "architecture": 100,
-          "maintainability": 95.23,
-          "performance": 98.49,
+          "maintainability": 95.59,
+          "performance": 100,
           "data": 100,
           "testing": 100,
-          "reliability": 99.43,
+          "reliability": 100,
           "security": 99.9,
           "extensibility": 96.03
         },
@@ -1045,14 +757,14 @@
       },
       {
         "domainName": "reporting",
-        "compositeScore": 99.3,
+        "compositeScore": 99.42,
         "pillars": {
           "architecture": 99.53,
-          "maintainability": 98.4,
-          "performance": 99.47,
+          "maintainability": 99.06,
+          "performance": 99.53,
           "data": 99.83,
           "testing": 100,
-          "reliability": 99.67,
+          "reliability": 99.83,
           "security": 99.9,
           "extensibility": 97.43
         },
@@ -1105,16 +817,16 @@
       },
       {
         "domainName": "scanner",
-        "compositeScore": 99.21,
+        "compositeScore": 99.15,
         "pillars": {
           "architecture": 100,
-          "maintainability": 97.03,
-          "performance": 99.65,
-          "data": 99.7,
+          "maintainability": 96.63,
+          "performance": 99.67,
+          "data": 99.72,
           "testing": 100,
-          "reliability": 99.61,
+          "reliability": 99.64,
           "security": 99.88,
-          "extensibility": 97.88
+          "extensibility": 97.79
         },
         "moduleCount": 1
       },
@@ -1135,16 +847,16 @@
       },
       {
         "domainName": "scoring",
-        "compositeScore": 98.63,
+        "compositeScore": 98.71,
         "pillars": {
-          "architecture": 98.43,
-          "maintainability": 96.54,
-          "performance": 99.74,
+          "architecture": 98.37,
+          "maintainability": 96.86,
+          "performance": 99.85,
           "data": 99.87,
           "testing": 100,
-          "reliability": 99.76,
+          "reliability": 99.87,
           "security": 99.86,
-          "extensibility": 94.69
+          "extensibility": 94.86
         },
         "moduleCount": 1
       },
@@ -1302,27 +1014,27 @@
   },
   "trajectory": {
     "runEloc": {
-      "processed": 155894,
-      "unique": 126574,
-      "changed": 3553,
-      "semantic": 2842,
+      "processed": 156498,
+      "unique": 127121,
+      "changed": 3802,
+      "semantic": 3042,
       "relocated": 0,
       "cosmetic": 0,
       "boilerplate": 0,
-      "added": 1777,
+      "added": 1901,
       "deleted": 0,
       "modified": 0
     },
     "lifetime": {
       "weekId": "LIFETIME",
       "startMs": 1791102755050,
-      "endMs": 1792325588470,
+      "endMs": 1792336102363,
       "totalRuns": 252,
       "eloc": {
-        "processedTotal": 33697507,
-        "uniqueTotal": 126574,
-        "changedTotal": 279629,
-        "semanticTotal": 223701
+        "processedTotal": 33698111,
+        "uniqueTotal": 127121,
+        "changedTotal": 279878,
+        "semanticTotal": 223901
       },
       "qed": {
         "mean": 0.0001,
@@ -1330,10 +1042,10 @@
         "max": 0.18
       },
       "debt": {
-        "totalAdded": 1615,
+        "totalAdded": 1569,
         "totalResolved": 1739,
         "totalRegressions": 0,
-        "netYield": 0
+        "netYield": 0.01
       },
       "meanCompositeScore": 98.83,
       "gatePassRate": 94.05

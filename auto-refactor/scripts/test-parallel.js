@@ -23,14 +23,17 @@ const ROOT = path.join(__dirname, '..');
 
 // ── CLI Arguments ──
 const rawArgs = process.argv.slice(2);
-let concurrency = Math.min(8, Math.max(2, os.cpus().length || 4));
+let concurrency = Math.min(16, Math.max(2, os.cpus().length || 4));
 let bail = false;
+let skipUnit = false;
 let filter = '';
 
 for (let i = 0; i < rawArgs.length; i++) {
   const arg = rawArgs[i];
   if (arg === '--bail' || arg === '-b') {
     bail = true;
+  } else if (arg === '--skip-unit') {
+    skipUnit = true;
   } else if ((arg === '--concurrency' || arg === '-j') && i + 1 < rawArgs.length) {
     concurrency = Math.max(1, parseInt(rawArgs[++i], 10) || concurrency);
   } else if (!arg.startsWith('-')) {
@@ -350,16 +353,28 @@ const PARALLEL_SUITES = [
     name: 'validate-security-preflight',
     script: 'scripts/validate-security.js',
   },
+  {
+    name: 'validate-diff',
+    script: 'scripts/validate-diff.js',
+  },
 ];
 
-// Stage 2: Stateful / daemon-spawning suites (run sequentially to prevent port/cache races)
-const SEQUENTIAL_SUITES = [
+// Stage 2: Partitioned Stateful Suites.
+// Suites within the same lane run sequentially, but disjoint lanes run in parallel
+// because their state boundaries are completely independent:
+// - Lane A (Corpus & Daemon): .corpus / .rust-corpus / daemon registry
+// - Lane B (Self-Audit Baseline): reports/self-audit-baseline.json
+const DAEMON_SUITES = [
   { name: 'validate-equivalence', script: 'scripts/validate-equivalence.js' },
   { name: 'validate-warm', script: 'scripts/validate-warm.js' },
-  { name: 'validate-diff', script: 'scripts/validate-diff.js' },
+];
+
+const SELF_AUDIT_SUITES = [
   { name: 'validate-self-audit', script: 'scripts/validate-self-audit.js' },
   { name: 'validate-self-refactor', script: 'scripts/validate-self-refactor.js' },
 ];
+
+const SEQUENTIAL_SUITES = [...DAEMON_SUITES, ...SELF_AUDIT_SUITES];
 
 /**
  * Run the vitest unit suite as part of the aggregate gate.
@@ -568,6 +583,12 @@ async function main() {
   const passed = [];
   const failed = [];
 
+  // Launch vitest unit tests in parallel with the isolated scripts pool.
+  // Vitest unit assertions only touch tests/unit and in-memory compiled code,
+  // creating zero disk/daemon collision with scripts/validate-*.js.
+  const shouldRunUnit = !skipUnit && (!filter || filter.includes('unit') || filter.includes('vitest'));
+  const vitestPromise = shouldRunUnit ? runVitestUnit(false) : Promise.resolve(null);
+
   if (parallelList.length > 0) {
     console.log(
       `--- [Isolated Suites] Executing ${parallelList.length} Independent Suites in Parallel ---`,
@@ -579,19 +600,28 @@ async function main() {
     });
   }
 
-  const canRunSequential = sequentialList.length > 0 && (!bail || failed.length === 0);
-  if (canRunSequential) {
-    console.log(
-      `\n--- [Serial Suites] Executing ${sequentialList.length} Stateful/Daemon Suites Sequentially ---`,
-    );
-    await runSequentialSuites(sequentialList, bail, passed, failed);
-  }
-
-  // Vitest unit tests live in tests/unit/ and were previously absent from this engine, so
-  // `npm test` (and therefore `npm run gate`) could pass while every unit assertion failed.
-  const unitResult = await runVitestUnit(bail && failed.length > 0);
+  // Await overlapping vitest result
+  const unitResult = await vitestPromise;
   if (unitResult) {
     recordResult({ name: 'vitest-unit', script: 'vitest run' }, unitResult, passed, failed);
+  }
+
+  const canRunSequential = (!bail || failed.length === 0);
+  if (canRunSequential) {
+    if (!filter) {
+      console.log(
+        `\n--- [Partitioned Stateful Suites] Executing 2 Disjoint Lanes in Parallel ---`,
+      );
+      await Promise.all([
+        runSequentialSuites(DAEMON_SUITES, bail, passed, failed),
+        runSequentialSuites(SELF_AUDIT_SUITES, bail, passed, failed),
+      ]);
+    } else if (sequentialList.length > 0) {
+      console.log(
+        `\n--- [Serial Suites] Executing ${sequentialList.length} Stateful/Daemon Suites Sequentially ---`,
+      );
+      await runSequentialSuites(sequentialList, bail, passed, failed);
+    }
   }
 
   const totalTime = ((Date.now() - overallStart) / 1000).toFixed(2);

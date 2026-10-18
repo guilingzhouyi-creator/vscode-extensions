@@ -18,10 +18,9 @@ const { StdlibAnalyzer } = require('../dist/analyzers/stdlib');
 async function main() {
   console.log('--- Checking Agent-Actionable Diagnostic Contracts ---');
 
-  // 1. Test scan emitting actionable for constants in real code
-
+  // 1. Test scan emitting actionable for constants in sample code
   const report = await scan({
-    files: ['src/core/types.ts'],
+    include: ['samples/sample.ts'],
     config: {
       analyzers: {
         constants: true,
