@@ -288,3 +288,73 @@ pub fn calculate_simhash_hamming_similarity(hash_a: String, hash_b: String) -> f
 pub fn calculate_trigram_cosine_similarity(tokens_a: Vec<String>, tokens_b: Vec<String>) -> f64 {
     ops_clone::calculate_trigram_cosine_similarity(&tokens_a, &tokens_b)
 }
+
+#[napi(object)]
+pub struct NativeTemporalCouplingPair {
+    pub file_a: u32,
+    pub file_b: u32,
+    pub shared_commits: u32,
+    pub commits_a: u32,
+    pub commits_b: u32,
+    pub jaccard_similarity: f64,
+}
+
+impl From<ops_clone::TemporalCouplingPair> for NativeTemporalCouplingPair {
+    fn from(p: ops_clone::TemporalCouplingPair) -> Self {
+        Self {
+            file_a: p.file_a,
+            file_b: p.file_b,
+            shared_commits: p.shared_commits,
+            commits_a: p.commits_a,
+            commits_b: p.commits_b,
+            jaccard_similarity: p.jaccard_similarity,
+        }
+    }
+}
+
+#[napi(js_name = "computeTemporalCoupling")]
+pub fn compute_temporal_coupling(
+    changesets: Vec<Vec<u32>>,
+    min_shared: u32,
+    min_jaccard: f64,
+) -> Vec<NativeTemporalCouplingPair> {
+    ops_clone::compute_temporal_coupling(&changesets, min_shared, min_jaccard)
+        .into_iter()
+        .map(Into::into)
+        .collect()
+}
+
+#[napi(object)]
+pub struct NativeBumpyRoadResult {
+    pub bumpy_score: f64,
+    pub is_bumpy: bool,
+    pub mean_depth: f64,
+    pub variance_depth: f64,
+    pub spikes_count: u32,
+}
+
+impl From<ops_pattern::BumpyRoadResult> for NativeBumpyRoadResult {
+    fn from(r: ops_pattern::BumpyRoadResult) -> Self {
+        Self {
+            bumpy_score: r.bumpy_score,
+            is_bumpy: r.is_bumpy,
+            mean_depth: r.mean_depth,
+            variance_depth: r.variance_depth,
+            spikes_count: r.spikes_count,
+        }
+    }
+}
+
+#[napi(js_name = "evaluateBumpyRoad")]
+pub fn evaluate_bumpy_road(
+    lines: Vec<String>,
+    start_line: u32,
+    end_line: u32,
+) -> NativeBumpyRoadResult {
+    ops_pattern::evaluate_bumpy_road(&lines, start_line, end_line).into()
+}
+
+#[napi(js_name = "batchProbeTriggers")]
+pub fn batch_probe_triggers(content: String, trigger_groups: Vec<Vec<String>>) -> Vec<bool> {
+    ops_pattern::batch_probe_triggers(&content, &trigger_groups)
+}

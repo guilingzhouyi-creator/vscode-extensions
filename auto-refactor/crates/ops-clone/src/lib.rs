@@ -92,6 +92,16 @@ pub struct ClonePair {
     pub similarity: f64,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct TemporalCouplingPair {
+    pub file_a: u32,
+    pub file_b: u32,
+    pub shared_commits: u32,
+    pub commits_a: u32,
+    pub commits_b: u32,
+    pub jaccard_similarity: f64,
+}
+
 /// Compute 32-bit FNV-1a hash of a UTF-16 sequence (matching JS hashString32)
 pub fn compute_string_hash_32(s: &str) -> u32 {
     let mut hash = FNV1A_32_OFFSET_BASIS;
@@ -169,7 +179,10 @@ pub fn calculate_simhash_hamming_similarity(hash_a: u64, hash_b: u64) -> f64 {
 /// Parse hex string or decimal string into u64
 pub fn parse_u64_fingerprint(s: &str) -> u64 {
     let trimmed = s.trim();
-    if let Some(stripped) = trimmed.strip_prefix("0x").or_else(|| trimmed.strip_prefix("0X")) {
+    if let Some(stripped) = trimmed
+        .strip_prefix("0x")
+        .or_else(|| trimmed.strip_prefix("0X"))
+    {
         u64::from_str_radix(stripped, 16).unwrap_or(0)
     } else {
         trimmed
@@ -192,10 +205,7 @@ pub fn extract_token_trigrams(tokens: &[String]) -> HashMap<String, u32> {
 }
 
 /// Calculate cosine similarity between two token arrays using 3-gram feature vectors
-pub fn calculate_trigram_cosine_similarity(
-    tokens_a: &[String],
-    tokens_b: &[String],
-) -> f64 {
+pub fn calculate_trigram_cosine_similarity(tokens_a: &[String], tokens_b: &[String]) -> f64 {
     let map_a = extract_token_trigrams(tokens_a);
     let map_b = extract_token_trigrams(tokens_b);
     if map_a.is_empty() || map_b.is_empty() {
@@ -466,6 +476,92 @@ pub fn find_clone_pairs(signatures: &[Vec<u32>], threshold: f64) -> Vec<ClonePai
     pairs
 }
 
+/// Compute pairwise co-change frequencies and Jaccard similarity between files from commit changesets.
+///
+/// Changesets is a slice of file ID vectors. Each inner vector contains file IDs changed in a commit.
+/// Only file pairs with shared commits >= `min_shared` and Jaccard similarity >= `min_jaccard`
+/// are returned, sorted descending by Jaccard similarity, then descending by shared commits,
+/// then ascending by file_a, then ascending by file_b.
+pub fn compute_temporal_coupling(
+    changesets: &[Vec<u32>],
+    min_shared: u32,
+    min_jaccard: f64,
+) -> Vec<TemporalCouplingPair> {
+    if changesets.is_empty() {
+        return Vec::new();
+    }
+
+    let mut file_commit_counts: HashMap<u32, u32> = HashMap::new();
+    let mut pair_shared_counts: HashMap<(u32, u32), u32> = HashMap::new();
+
+    for cs in changesets {
+        if cs.is_empty() {
+            continue;
+        }
+
+        let mut unique = cs.clone();
+        unique.sort_unstable();
+        unique.dedup();
+
+        if unique.len() == 1 {
+            *file_commit_counts.entry(unique[0]).or_insert(0) += 1;
+            continue;
+        }
+
+        for &file_id in &unique {
+            *file_commit_counts.entry(file_id).or_insert(0) += 1;
+        }
+
+        let len = unique.len();
+        for i in 0..len {
+            let file_a = unique[i];
+            for &file_b in unique.iter().skip(i + 1) {
+                *pair_shared_counts.entry((file_a, file_b)).or_insert(0) += 1;
+            }
+        }
+    }
+
+    let mut pairs = Vec::new();
+    for ((file_a, file_b), shared_commits) in pair_shared_counts {
+        if shared_commits < min_shared {
+            continue;
+        }
+
+        let commits_a = *file_commit_counts.get(&file_a).unwrap_or(&0);
+        let commits_b = *file_commit_counts.get(&file_b).unwrap_or(&0);
+        let union_count = commits_a + commits_b - shared_commits;
+        if union_count == 0 {
+            continue;
+        }
+
+        let jaccard = (shared_commits as f64) / (union_count as f64);
+        let jaccard_rounded = (jaccard * 10000.0).round() / 10000.0;
+        if jaccard_rounded < min_jaccard {
+            continue;
+        }
+
+        pairs.push(TemporalCouplingPair {
+            file_a,
+            file_b,
+            shared_commits,
+            commits_a,
+            commits_b,
+            jaccard_similarity: jaccard_rounded,
+        });
+    }
+
+    pairs.sort_by(|a, b| {
+        b.jaccard_similarity
+            .partial_cmp(&a.jaccard_similarity)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| b.shared_commits.cmp(&a.shared_commits))
+            .then_with(|| a.file_a.cmp(&b.file_a))
+            .then_with(|| a.file_b.cmp(&b.file_b))
+    });
+
+    pairs
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -610,5 +706,40 @@ mod tests {
 
         let trigram_cos_sim = calculate_trigram_cosine_similarity(&tokens_a, &tokens_b);
         assert_eq!(trigram_cos_sim, 0.833333);
+    }
+
+    #[test]
+    fn test_temporal_coupling() {
+        let changesets = vec![
+            vec![1, 2, 3],
+            vec![1, 2],
+            vec![1, 2, 4],
+            vec![3, 4],
+            vec![5],
+        ];
+
+        // 1 & 2 appear together in 3 commits: [1,2,3], [1,2], [1,2,4]
+        // 1 appears in 3 commits.
+        // 2 appears in 3 commits.
+        // union(1, 2) = 3 + 3 - 3 = 3.
+        // Jaccard(1, 2) = 3 / 3 = 1.0.
+        // 1 & 3 appear in 1 commit ([1,2,3]).
+        // 3 appears in 2 commits ([1,2,3], [3,4]).
+        // union(1, 3) = 3 + 2 - 1 = 4. Jaccard = 1/4 = 0.25.
+
+        let pairs = compute_temporal_coupling(&changesets, 2, 0.5);
+        assert_eq!(pairs.len(), 1);
+        assert_eq!(pairs[0].file_a, 1);
+        assert_eq!(pairs[0].file_b, 2);
+        assert_eq!(pairs[0].shared_commits, 3);
+        assert_eq!(pairs[0].commits_a, 3);
+        assert_eq!(pairs[0].commits_b, 3);
+        assert!((pairs[0].jaccard_similarity - 1.0).abs() < 1e-4);
+
+        // With min_shared = 1, min_jaccard = 0.2
+        let all_pairs = compute_temporal_coupling(&changesets, 1, 0.2);
+        assert!(all_pairs.len() >= 3);
+        assert_eq!(all_pairs[0].file_a, 1);
+        assert_eq!(all_pairs[0].file_b, 2);
     }
 }

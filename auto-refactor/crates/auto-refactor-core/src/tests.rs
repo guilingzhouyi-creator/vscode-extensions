@@ -89,7 +89,10 @@ fn mask_source_code_keeps_crlf_line_count_consistent_with_the_shim() {
     // Splitting on '\n' leaves a trailing empty line, and the JS shim behaves the same way;
     // the parity suite is what pins the two together, so this test asserts the shared shape
     // rather than a number chosen here.
-    let out = mask_source_code("const a = 1;\r\nconst b = 2;\r\n".to_string(), create_ts_config());
+    let out = mask_source_code(
+        "const a = 1;\r\nconst b = 2;\r\n".to_string(),
+        create_ts_config(),
+    );
     assert_eq!(out.raw.len(), 3);
     assert_eq!(out.masked.len(), 3);
     assert_eq!(out.non_blank_lines, 2);
@@ -220,20 +223,73 @@ fn bit_parallel_distance_reports_expected_value() {
 
 #[test]
 fn simhash_and_hamming_similarity_match_contract() {
-    let tokens_a: Vec<String> = vec!["function", "add", "(", "a", ")", "{", "return", "a", ";", "}"]
-        .into_iter()
-        .map(String::from)
-        .collect();
-    let tokens_b: Vec<String> = vec!["function", "sum", "(", "a", ")", "{", "return", "a", ";", "}"]
-        .into_iter()
-        .map(String::from)
-        .collect();
+    let tokens_a: Vec<String> = vec![
+        "function", "add", "(", "a", ")", "{", "return", "a", ";", "}",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
+    let tokens_b: Vec<String> = vec![
+        "function", "sum", "(", "a", ")", "{", "return", "a", ";", "}",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
     let ha = compute_simhash_64(tokens_a.clone());
     let hb = compute_simhash_64(tokens_b.clone());
     assert_eq!(ha.len(), 16);
     assert_eq!(hb.len(), 16);
     let sim = calculate_simhash_hamming_similarity(ha, hb);
-    assert!(sim >= 0.8 && sim <= 1.0);
+    assert!((0.8..=1.0).contains(&sim));
     let cos = calculate_trigram_cosine_similarity(tokens_a, tokens_b);
     assert!(cos > 0.0 && cos <= 1.0);
+}
+
+#[test]
+fn fast_pattern_match_finds_occurrences() {
+    let source = "const alpha = 1;\nconst beta = alpha + 2;";
+    let matches = fast_pattern_match(source.to_string(), vec!["alpha".to_string()]);
+    assert_eq!(matches.len(), 2);
+    assert_eq!(matches[0].line, 1);
+    assert_eq!(matches[0].column, 7);
+    assert_eq!(matches[1].line, 2);
+    assert_eq!(matches[1].column, 14);
+}
+
+#[test]
+fn temporal_coupling_reports_pairs_and_jaccard() {
+    let changesets = vec![vec![10, 20], vec![10, 20, 30], vec![20, 30]];
+    let pairs = compute_temporal_coupling(changesets, 2, 0.5);
+    assert_eq!(pairs.len(), 2);
+    // Pair (10, 20) has 2 shared out of union(10: 2, 20: 3) = 3 -> Jaccard = 2/3 = 0.6667
+    // Pair (20, 30) has 2 shared out of union(20: 3, 30: 2) = 3 -> Jaccard = 2/3 = 0.6667
+    assert_eq!(pairs[0].shared_commits, 2);
+    assert!((pairs[0].jaccard_similarity - 0.6667).abs() < 1e-3);
+}
+
+#[test]
+fn bumpy_road_reports_structural_evaluation() {
+    let mut lines = Vec::new();
+    for i in 0..25 {
+        if i % 2 == 0 {
+            lines.push("    let x = 1;".to_string());
+        } else {
+            lines.push("            let deeply = nested();".to_string());
+        }
+    }
+    let res = evaluate_bumpy_road(lines, 1, 25);
+    assert!(res.is_bumpy);
+    assert!(res.spikes_count >= 10);
+}
+
+#[test]
+fn batch_probe_triggers_reports_matches() {
+    let content = "const secret = 'xyz';\nfor (let i = 0; i < 10; i++) {}";
+    let groups = vec![
+        vec!["for".to_string()],
+        vec!["secret".to_string()],
+        vec!["class".to_string()],
+    ];
+    let res = batch_probe_triggers(content.to_string(), groups);
+    assert_eq!(res, vec![true, true, false]);
 }

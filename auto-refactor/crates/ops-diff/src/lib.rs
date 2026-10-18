@@ -114,9 +114,7 @@ fn compute_myers_diff(old: &[&str], new: &[&str], offset: usize) -> Vec<DiffOp> 
         let mut k = -d;
         while k <= d {
             let k_idx = (k + max as isize) as usize;
-            let mut x = if k == -d
-                || (k != d && v[k_idx - 1] < v[k_idx + 1])
-            {
+            let mut x = if k == -d || (k != d && v[k_idx - 1] < v[k_idx + 1]) {
                 v[k_idx + 1]
             } else {
                 v[k_idx - 1] + 1
@@ -166,8 +164,7 @@ fn backtrack(
         let k = curr_x as isize - curr_y as isize;
 
         let prev_k = if k == -(step as isize)
-            || (k != (step as isize)
-                && v[(k - 1 + max) as usize] < v[(k + 1 + max) as usize])
+            || (k != (step as isize) && v[(k - 1 + max) as usize] < v[(k + 1 + max) as usize])
         {
             k + 1
         } else {
