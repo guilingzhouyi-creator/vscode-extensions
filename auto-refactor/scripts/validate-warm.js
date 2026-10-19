@@ -407,9 +407,9 @@ async function main() {
     });
 
   // ---- W1: cold-start empty cache (warm-1st: daemon cold pool + empty cache) ----
+  // ---- W1: cold-start empty cache (warm-1st: daemon cold pool + empty cache) ----
   {
-    const f = await freshScan();
-    const w = await warmScan();
+    const [f, w] = await Promise.all([freshScan(), warmScan()]);
     const eq = JSON.stringify(normalize(f)) === JSON.stringify(normalize(w.report));
     check(
       'W1 cold-start-empty-cache',
@@ -420,8 +420,7 @@ async function main() {
 
   // ---- W2: immediate rescan (warm-2nd: hot pool + hot cache, all cached) ----
   {
-    const f = await freshScan();
-    const w = await warmScan();
+    const [f, w] = await Promise.all([freshScan(), warmScan()]);
     const eq = JSON.stringify(normalize(f)) === JSON.stringify(normalize(w.report));
     check(
       'W2 immediate-rescan',
@@ -447,8 +446,7 @@ async function main() {
       ],
     ];
     for (const [p, c] of mod) fs.writeFileSync(path.join(CORPUS, p), c);
-    const f = await freshScan();
-    const w = await warmScan();
+    const [f, w] = await Promise.all([freshScan(), warmScan()]);
     const eq = JSON.stringify(normalize(f)) === JSON.stringify(normalize(w.report));
     check(
       'W3 partial-change',
@@ -463,8 +461,7 @@ async function main() {
     const files = fs.readdirSync(path.join(CORPUS, 'src')).map((n) => path.join(CORPUS, 'src', n));
     const now = new Date();
     for (const f of files) fs.utimesSync(f, now, now);
-    const f = await freshScan();
-    const w = await warmScan();
+    const [f, w] = await Promise.all([freshScan(), warmScan()]);
     const eq = JSON.stringify(normalize(f)) === JSON.stringify(normalize(w.report));
     check(
       'W4 touch-no-content-change',
@@ -487,8 +484,7 @@ async function main() {
         complexityFail: 9,
       },
     });
-    const f = await freshScan();
-    const w = await warmScan();
+    const [f, w] = await Promise.all([freshScan(), warmScan()]);
     const eq = JSON.stringify(normalize(f)) === JSON.stringify(normalize(w.report));
     check(
       'W5 config-change',
@@ -500,8 +496,7 @@ async function main() {
 
   // ---- W6: parser switch (oxc — cache key distinguishes parser) ----
   {
-    const f = await freshScan({ parser: 'oxc' });
-    const w = await warmScan({ parser: 'oxc' });
+    const [f, w] = await Promise.all([freshScan({ parser: 'oxc' }), warmScan({ parser: 'oxc' })]);
     const eq = JSON.stringify(normalize(f)) === JSON.stringify(normalize(w.report));
     check(
       'W6 parser-switch-oxc',
@@ -530,8 +525,7 @@ async function main() {
         },
       ],
     });
-    const f = await freshScan();
-    const w = await warmScan();
+    const [f, w] = await Promise.all([freshScan(), warmScan()]);
     const eq = JSON.stringify(normalize(f)) === JSON.stringify(normalize(w.report));
     check(
       'W7 custom-analyzer-l2-disabled',
@@ -544,16 +538,18 @@ async function main() {
   // ---- W8: daemon crash → warm degrades to cold (daemon:'auto' never auto-starts) ----
   {
     daemonStop(CORPUS);
-    const f = await freshScan();
-    const w = await scanWarm({
-      root: CORPUS,
-      configFile: CORPUS_CFG,
-      format: 'json',
-      logLevel: 'silent',
-      daemon: 'auto', // probe only — daemon is dead → degrade to cold
-      cache: true,
-      cacheDir: CACHE_DIR,
-    });
+    const [f, w] = await Promise.all([
+      freshScan(),
+      scanWarm({
+        root: CORPUS,
+        configFile: CORPUS_CFG,
+        format: 'json',
+        logLevel: 'silent',
+        daemon: 'auto', // probe only — daemon is dead → degrade to cold
+        cache: true,
+        cacheDir: CACHE_DIR,
+      }),
+    ]);
     const eq = JSON.stringify(normalize(f)) === JSON.stringify(normalize(w.report));
     check(
       'W8 daemon-crash-degrade',
@@ -564,21 +560,23 @@ async function main() {
 
   // ---- W9: rust corpus (rust cache-key path) ----
   {
-    const f = await scan({
-      root: RUST_CORPUS,
-      configFile: RUST_CFG,
-      format: 'json',
-      logLevel: 'silent',
-    });
-    const w = await scanWarm({
-      root: RUST_CORPUS,
-      configFile: RUST_CFG,
-      format: 'json',
-      logLevel: 'silent',
-      daemon: 'on',
-      cache: true,
-      cacheDir: CACHE_DIR_RUST,
-    });
+    const [f, w] = await Promise.all([
+      scan({
+        root: RUST_CORPUS,
+        configFile: RUST_CFG,
+        format: 'json',
+        logLevel: 'silent',
+      }),
+      scanWarm({
+        root: RUST_CORPUS,
+        configFile: RUST_CFG,
+        format: 'json',
+        logLevel: 'silent',
+        daemon: 'on',
+        cache: true,
+        cacheDir: CACHE_DIR_RUST,
+      }),
+    ]);
     const eq = JSON.stringify(normalize(f)) === JSON.stringify(normalize(w.report));
     check(
       'W9 rust-corpus',

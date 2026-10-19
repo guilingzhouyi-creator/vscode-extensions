@@ -27,7 +27,35 @@ const IGNORED_DIRS = new Set([
   '.auto-refactor-cache',
   '.audit-logs',
   'archive',
+  '.corpus',
+  '.rust-corpus',
+  '.equivalence-corpus',
+  '.equivalence-rust-corpus',
+  '.bench-corpus',
+  '.vscode-test',
+  'coverage',
 ]);
+
+const BINARY_EXTS = new Set([
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.ico',
+  '.webp',
+  '.ogg',
+  '.mp3',
+  '.wav',
+  '.wasm',
+  '.zip',
+  '.gz',
+  '.tar',
+  '.vsix',
+  '.bin',
+  '.dat',
+]);
+
+const MAX_CHECK_FILE_SIZE_BYTES = 64 * 1024;
 
 const LOCAL_DECL_RE =
   /(?:^|\s)(?:function|class|interface|type|const|let|var|enum|def|struct|fn)\s+[a-zA-Z0-9_$]+/;
@@ -81,6 +109,10 @@ function inspectFileForEmptiness(fullPath, findings) {
         reason: 'Physical 0-byte file',
         size: 0,
       });
+      return;
+    }
+    const ext = path.extname(fullPath).toLowerCase();
+    if (BINARY_EXTS.has(ext) || stat.size > MAX_CHECK_FILE_SIZE_BYTES) {
       return;
     }
     const content = fs.readFileSync(fullPath, 'utf8');

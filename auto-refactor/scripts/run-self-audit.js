@@ -410,13 +410,15 @@ async function runSelfAudit(options = {}) {
   const snapshot = createAuditSnapshot();
 
   // 2. Execute Full Production Scan over Engine Sources
-  const defaultWorkers = Math.max(1, Math.min(4, os.cpus().length || 4));
+  const defaultWorkers = Math.max(1, Math.min(8, os.cpus().length || 4));
   const scanReport = await scan({
     root: ROOT,
     include: ['src/**/*.ts', 'scripts/*.js'],
     parser: 'oxc',
     autoTune: false,
     workers: defaultWorkers,
+    cache: true,
+    cacheDir: path.join(ROOT, '.auto-refactor-cache', 'self-audit'),
     logLevel: RUN_LOG_LEVEL_WARN,
     ...options.scanOptions,
   });

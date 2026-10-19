@@ -5,8 +5,8 @@
  * Architecture Role: Behavioral lock for the refactor: normalizes scan() reports from the
  *   current dist build and compares them byte-for-byte with committed golden baselines.
  * Dependencies & Triggers: Requires scan from ../dist/api plus node fs/path; reads samples/
- *   (default and custom configs), the generated scripts/.corpus TS corpus, scripts/.rust-corpus
- *   and scripts/baselines; run manually/CI, or with --update to recapture goldens.
+ *   (default and custom configs), the generated scripts/.equivalence-corpus TS corpus,
+ *   scripts/.equivalence-rust-corpus and scripts/baselines; run manually/CI, or with --update to recapture goldens.
  * Responsibilities: Materializes the TS and Rust corpora plus configs (including the
  *   gitignored fixture and the custom no-console analyzer used by samples); runs the scenario
  *   matrix samples-default/custom, corpus-inproc/workers, rust-inproc/workers and three oxc
@@ -24,10 +24,10 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.join(__dirname, '..');
-const CORPUS = path.join(__dirname, '.corpus');
+const CORPUS = path.join(__dirname, '.equivalence-corpus');
 const BASELINES = path.join(__dirname, 'baselines');
 const SAMPLES = path.join(ROOT, 'samples');
-const RUST_CORPUS = path.join(__dirname, '.rust-corpus');
+const RUST_CORPUS = path.join(__dirname, '.equivalence-rust-corpus');
 const UPDATE = process.argv.includes('--update');
 
 // ---- canonical corpus (must match the 26-file corpus that produced baselines) ----
@@ -174,7 +174,7 @@ export function hidden(): number { return 999; }
     respectGitignore: true,
     failOnAnalyzerError: false,
   };
-  w('auto-refactor.config.json', JSON.stringify(config, null, 2));
+  w('auto-refactor.config.json', JSON.stringify(config, null, 2) + '\n');
 }
 
 // ---- Rust corpus (covers the same analyzer scenarios through the Rust adapter) ----
@@ -302,7 +302,7 @@ function writeRustCorpus() {
     respectGitignore: false,
     failOnAnalyzerError: true,
   };
-  w('auto-refactor.config.json', JSON.stringify(config, null, 2));
+  w('auto-refactor.config.json', JSON.stringify(config, null, 2) + '\n');
 }
 
 function normalize(r) {

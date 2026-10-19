@@ -45,6 +45,7 @@ for (let i = 0; i < rawArgs.length; i++) {
 // Priority set for heavy suites (Longest Processing Time First / LPT scheduling)
 const HIGH_LATENCY_SUITES_PRIORITY = new Set([
   'validate-triplane-cross-project',
+  'validate-equivalence',
   'validate-diff',
   'validate-consumer-runner',
   'validate-batch-git-history',
@@ -52,7 +53,6 @@ const HIGH_LATENCY_SUITES_PRIORITY = new Set([
   'validate-data-flow',
   'validate-call-graph',
   'validate-symbol-index',
-  'validate-no-empty-scripts',
 ]);
 
 // Stage 1: Isolated parallel test suites (no shared daemon or corpus disk state)
@@ -354,6 +354,10 @@ const PARALLEL_SUITES = [
     name: 'validate-diff',
     script: 'scripts/validate-diff.js',
   },
+  {
+    name: 'validate-equivalence',
+    script: 'scripts/validate-equivalence.js',
+  },
 ];
 
 // Stage 2: Partitioned Stateful Suites.
@@ -362,7 +366,6 @@ const PARALLEL_SUITES = [
 // - Lane A (Corpus & Daemon): .corpus / .rust-corpus / daemon registry
 // - Lane B (Self-Audit Baseline): reports/self-audit-baseline.json
 const DAEMON_SUITES = [
-  { name: 'validate-equivalence', script: 'scripts/validate-equivalence.js' },
   { name: 'validate-warm', script: 'scripts/validate-warm.js' },
 ];
 
@@ -563,6 +566,38 @@ async function runSequentialSuites(suites, bail, passed, failed) {
   }
 }
 
+/**
+ * Execute the self-audit lane: runs validate-self-audit to generate fresh baseline report,
+ * followed by concurrent execution of the downstream read-only baseline consumer checks.
+ *
+ * @param bail - Stop execution on first failure if true.
+ * @param passed - Array to record passed suite results.
+ * @param failed - Array to record failed suite results.
+ */
+async function runSelfAuditLane(bail, passed, failed) {
+  const auditSuite = { name: 'validate-self-audit', script: 'scripts/validate-self-audit.js' };
+  const auditRes = await executeSuite(auditSuite);
+  recordResult(auditSuite, auditRes, passed, failed);
+  if (!auditRes.ok && bail) {
+    return;
+  }
+
+  const followUpSuites = [
+    { name: 'validate-self-refactor', script: 'scripts/validate-self-refactor.js' },
+    {
+      name: 'validate-self-multidimensional-audit',
+      script: 'scripts/validate-self-multidimensional-audit.js',
+    },
+  ];
+  await Promise.all(
+    followUpSuites.map(async (suite) => {
+      const res = await executeSuite(suite);
+      recordResult(suite, res, passed, failed);
+      return res;
+    }),
+  );
+}
+
 // ── Main Runner ──
 async function main() {
   const overallStart = Date.now();
@@ -629,7 +664,7 @@ async function main() {
     });
 
     const daemonPromise = runSequentialSuites(DAEMON_SUITES, bail, passed, failed);
-    const selfAuditPromise = runSequentialSuites(SELF_AUDIT_SUITES, bail, passed, failed);
+    const selfAuditPromise = runSelfAuditLane(bail, passed, failed);
     const unitPromise = vitestPromise.then((unitResult) => {
       if (unitResult) {
         recordResult({ name: 'vitest-unit', script: 'vitest run' }, unitResult, passed, failed);
