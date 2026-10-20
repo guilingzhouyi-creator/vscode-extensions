@@ -8,7 +8,7 @@ use std::fmt;
 
 use crate::error::{FractalError, FractalResult};
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Oid([u8; 20]);
 
 impl Oid {
@@ -60,14 +60,83 @@ impl Oid {
 }
 
 impl fmt::Debug for Oid {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Oid({})", self.to_hex())
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "Oid({})", self.to_hex())
     }
 }
 
 impl fmt::Display for Oid {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.to_hex())
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(formatter, "{}", self.to_hex())
+    }
+}
+
+impl Serialize for Oid {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        if serializer.is_human_readable() {
+            serializer.serialize_str(&self.to_hex())
+        } else {
+            serializer.serialize_bytes(&self.0)
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for Oid {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct OidVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for OidVisitor {
+            type Value = Oid;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                formatter.write_str("a 40-character hex string or 20 raw bytes for Oid")
+            }
+
+            fn visit_str<E>(self, hex_text: &str) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Oid::from_hex(hex_text).map_err(serde::de::Error::custom)
+            }
+
+            fn visit_bytes<E>(self, byte_slice: &[u8]) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                if byte_slice.len() == 20 {
+                    let mut buffer = [0u8; 20];
+                    buffer.copy_from_slice(byte_slice);
+                    Ok(Oid::from_bytes(buffer))
+                } else {
+                    Err(serde::de::Error::invalid_length(byte_slice.len(), &self))
+                }
+            }
+
+            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where
+                A: serde::de::SeqAccess<'de>,
+            {
+                let mut buffer = [0u8; 20];
+                for (index, byte_slot) in buffer.iter_mut().enumerate() {
+                    *byte_slot = seq
+                        .next_element()?
+                        .ok_or_else(|| serde::de::Error::invalid_length(index, &self))?;
+                }
+                Ok(Oid::from_bytes(buffer))
+            }
+        }
+
+        if deserializer.is_human_readable() {
+            deserializer.deserialize_str(OidVisitor)
+        } else {
+            deserializer.deserialize_bytes(OidVisitor)
+        }
     }
 }
 

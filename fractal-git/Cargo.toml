@@ -83,3 +83,15 @@ path = "tests/rust/test_uac_promotions.rs"
 [[test]]
 name = "test_benchmarks"
 path = "tests/rust/test_benchmarks.rs"
+
+[[test]]
+name = "test_operations"
+path = "tests/rust/test_operations.rs"
+
+[[test]]
+name = "test_algebraic_conflicts"
+path = "tests/rust/test_algebraic_conflicts.rs"
+
+[[test]]
+name = "test_commit_graph"
+path = "tests/rust/test_commit_graph.rs"

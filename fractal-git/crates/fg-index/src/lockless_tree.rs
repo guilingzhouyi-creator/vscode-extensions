@@ -15,6 +15,7 @@ use crate::entry::{IndexStage, VirtualIndexEntry};
 enum TreeNode {
     File(VirtualIndexEntry),
     Directory(BTreeMap<String, TreeNode>),
+    CollapsedSubtree(Oid),
 }
 
 /// Thread-safe in-memory virtual staging index.
@@ -53,6 +54,25 @@ impl InMemoryIndexTree {
         self.entries.insert(
             clean_path.clone(),
             VirtualIndexEntry::new(clean_path, mode, oid),
+        );
+        Ok(())
+    }
+
+    /// Stages a collapsed sparse directory subtree pointing directly to a pre-computed GitTree.
+    /// Aligns with Git's canonical Sparse Index design, eliminating the need to expand out-of-scope
+    /// files when reconstructing monorepo tree structures.
+    pub fn stage_sparse_directory(&mut self, dir_path: &str, tree_oid: Oid) -> FractalResult<()> {
+        let clean_path = dir_path.trim_matches('/').replace('\\', "/");
+        if clean_path.is_empty() {
+            return Err(FractalError::IndexConflict(
+                "Cannot stage empty sparse directory path".into(),
+            ));
+        }
+
+        self.conflicts.remove(&clean_path);
+        self.entries.insert(
+            clean_path.clone(),
+            VirtualIndexEntry::new_sparse_dir(clean_path, tree_oid),
         );
         Ok(())
     }
@@ -204,7 +224,11 @@ impl InMemoryIndexTree {
 
         let segment = segments[0].to_string();
         if segments.len() == 1 {
-            current_dir.insert(segment, TreeNode::File(entry));
+            if entry.is_sparse_dir() {
+                current_dir.insert(segment, TreeNode::CollapsedSubtree(entry.oid));
+            } else {
+                current_dir.insert(segment, TreeNode::File(entry));
+            }
         } else {
             let next_dir = current_dir
                 .entry(segment)
@@ -240,6 +264,13 @@ impl InMemoryIndexTree {
                         FileMode::Directory,
                         name.clone(),
                         subtree_oid,
+                    ));
+                }
+                TreeNode::CollapsedSubtree(tree_oid) => {
+                    entries.push(GitTreeEntry::from_oid(
+                        FileMode::Directory,
+                        name.clone(),
+                        *tree_oid,
                     ));
                 }
             }

@@ -52,7 +52,7 @@ impl CommitMessageGuard {
         // 1. Header length and trailing dot check
         if header.len() < policy.min_header_chars || header.len() > policy.max_header_chars {
             violations.push(format!(
-                "GATE-MSG-001: Header length {} is outside bounds [{}..{}]",
+                "GUARD-MSG-001: Header length {} is outside bounds [{}..{}]",
                 header.len(),
                 policy.min_header_chars,
                 policy.max_header_chars
@@ -60,7 +60,7 @@ impl CommitMessageGuard {
         }
         if policy.disallow_header_period && (header.ends_with('.') || header.ends_with('。')) {
             violations
-                .push("GATE-MSG-001: Header summary must not end with a trailing period".into());
+                .push("GUARD-MSG-001: Header summary must not end with a trailing period".into());
         }
 
         // 2. Conventional Commit header structure parsing
@@ -71,7 +71,7 @@ impl CommitMessageGuard {
             let second_line = lines[1].trim();
             if !second_line.is_empty() {
                 violations.push(
-                    "GATE-MSG-001: Line 2 must be an empty blank line separating header and body"
+                    "GUARD-MSG-001: Line 2 must be an empty blank line separating header and body"
                         .into(),
                 );
             }
@@ -88,7 +88,7 @@ impl CommitMessageGuard {
         if is_production {
             if substantive_chars < policy.min_body_chars {
                 violations.push(format!(
-                    "GATE-MSG-001: Production commit '{}' has only {} substantive chars; \
+                    "GUARD-MSG-001: Production commit '{}' has only {} substantive chars; \
                      minimum required is {}",
                     commit_type, substantive_chars, policy.min_body_chars
                 ));
@@ -101,7 +101,7 @@ impl CommitMessageGuard {
                 if !found {
                     violations.push(format!(
                         concat!(
-                            "GATE-MSG-001: Missing required structured section ",
+                            "GUARD-MSG-001: Missing required structured section ",
                             "[{}] for production commit"
                         ),
                         required_sec
@@ -223,7 +223,7 @@ impl CommitMessageGuard {
             None => {
                 violations.push(
                     concat!(
-                        "GATE-MSG-001: Header missing ':' separator ",
+                        "GUARD-MSG-001: Header missing ':' separator ",
                         "(expected '<type>(<scope>): <summary>')"
                     )
                     .into(),
@@ -243,8 +243,9 @@ impl CommitMessageGuard {
                     .to_string();
                 (parsed_type, Some(parsed_scope))
             } else {
-                violations
-                    .push("GATE-MSG-001: Malformed scope in header (unmatched parentheses)".into());
+                violations.push(
+                    "GUARD-MSG-001: Malformed scope in header (unmatched parentheses)".into(),
+                );
                 (type_and_scope.to_lowercase(), None)
             }
         } else {
@@ -258,7 +259,7 @@ impl CommitMessageGuard {
                 .any(|allowed_type| allowed_type.eq_ignore_ascii_case(&commit_type))
         {
             violations.push(format!(
-                "GATE-MSG-001: Commit type '{}' is not in allowed list: {:?}",
+                "GUARD-MSG-001: Commit type '{}' is not in allowed list: {:?}",
                 commit_type, policy.allowed_types
             ));
         }

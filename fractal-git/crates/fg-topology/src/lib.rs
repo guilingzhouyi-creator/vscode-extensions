@@ -6,6 +6,7 @@
 //!   authorization ledgers.
 
 pub mod authorizer;
+pub mod operation;
 pub mod promotion_ledger;
 pub mod refs;
 pub mod state_machine;
@@ -14,6 +15,7 @@ pub mod verifier;
 pub mod worktree;
 
 pub use authorizer::{HumanUacAuthorizer, StandardNonceAuthorizer};
+pub use operation::{Operation, OperationGraph, OperationMetadata, RepoViewSnapshot};
 pub use promotion_ledger::{PromotionLedgerData, PromotionStagingLedger};
 pub use refs::{DiskRefStore, FractalRef};
 pub use state_machine::{FractalWorkspaceNode, WorktreeState};

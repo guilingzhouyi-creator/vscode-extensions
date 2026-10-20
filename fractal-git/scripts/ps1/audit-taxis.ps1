@@ -48,9 +48,9 @@ if (-not $cargoCmd) {
 }
 
 # -----------------------------------------------------------------------------
-# Stage 1: Crate Topology & Architectural Layering
+# 微 Crate 拓扑与架构分层
 # -----------------------------------------------------------------------------
-Write-Host "`n[1/5] Verifying Micro-Crate DAG Topology & Zero-Alloc Boundary..." -ForegroundColor Gray
+Write-Host "`n[1/5] CRATE-TOPOLOGY-01  微 Crate DAG 拓扑与零分配边界" -ForegroundColor Gray
 $nodeCmd = if (Get-Command node.exe -ErrorAction SilentlyContinue) { "node.exe" } elseif (Get-Command node -ErrorAction SilentlyContinue) { "node" } else { $null }
 
 if ($nodeCmd) {
@@ -81,9 +81,9 @@ if ($nodeCmd) {
 }
 
 # -----------------------------------------------------------------------------
-# Stage 2: Multi-Crate Regression Tests
+# 多 Crate 回归测试套件
 # -----------------------------------------------------------------------------
-Write-Host "`n[2/5] Running Multi-Crate Regression Tests (cargo test)..." -ForegroundColor Gray
+Write-Host "`n[2/5] CRATE-REGRESSION-02  多 Crate 回归测试套件" -ForegroundColor Gray
 $testArgs = if ($Fast) {
     @("test", "--manifest-path", $ManifestPath, "--", "--test-threads=4")
 } else {
@@ -107,9 +107,9 @@ if ($passedTotal -gt 0) {
 
 
 # -----------------------------------------------------------------------------
-# Stage 3: Performance Micro-Benchmarks & TB-REGRESSION Ratchet
+# 性能微基准与耗时棘轮
 # -----------------------------------------------------------------------------
-Write-Host "`n[3/5] Evaluating Micro-Benchmarks & TB-REGRESSION Ratchet..." -ForegroundColor Gray
+Write-Host "`n[3/5] CRATE-BENCHMARK-03  微基准与耗时棘轮" -ForegroundColor Gray
 $benchArgs = @(
     "run",
     "--manifest-path", $ManifestPath,
@@ -128,9 +128,9 @@ if ($pBench.ExitCode -ne 0) {
 Write-Host "  [PASS] Micro-benchmarks passed within 15% tolerance envelope." -ForegroundColor Green
 
 # -----------------------------------------------------------------------------
-# Stage 4: Auto-Refactor Quality Score Envelope Computation
+# 重构质量分数包络计算
 # -----------------------------------------------------------------------------
-Write-Host "`n[4/5] Computing Auto-Refactor Quality Score Envelope..." -ForegroundColor Gray
+Write-Host "`n[4/5] QUALITY-ENVELOPE-04  重构质量分数包络" -ForegroundColor Gray
 $auditReportScript = Join-Path $ProjectRoot "scripts\common\run-audit-report.js"
 $auditReportPath = Join-Path $ProjectRoot "reports\audit-latest.json"
 $compositeScore = $null
@@ -181,9 +181,9 @@ Write-Host "  Quality Envelope: CompositeScore=$(& $fmtScore $compositeScore), C
 
 
 # -----------------------------------------------------------------------------
-# Stage 5: Dogfooding Promotion Gate Verification
+# 自举晋级桥接校验
 # -----------------------------------------------------------------------------
-Write-Host "`n[5/5] Verifying Dogfooding Promotion Gate (taxis promotion request)..." -ForegroundColor Gray
+Write-Host "`n[5/5] PROMOTION-BRIDGE-05  自举晋级桥接校验" -ForegroundColor Gray
 
 if ($null -eq $compositeScore -or $null -eq $caiScore -or $null -eq $ciLower) {
     Write-Host "  [SKIP] Promotion staging skipped: quality envelope is N/A, so no objective score can be attached to the request." -ForegroundColor Yellow

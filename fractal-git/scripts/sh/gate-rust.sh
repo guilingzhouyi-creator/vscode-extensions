@@ -21,26 +21,26 @@ fi
 
 MANIFEST="${PROJECT_ROOT}/Cargo.toml"
 
-# Stage 1: Rustfmt check
+# 格式检查 (rustfmt)
 echo ""
 echo "=== [gate:rust 1/4] Code Formatting Check (rustfmt --check) ==="
 cargo fmt --all --manifest-path "${MANIFEST}" -- --check
 echo "[PASS] rustfmt clean."
 
-# Stage 2: Clippy zero-warning check
+# 静态检查 (clippy -D warnings)
 echo ""
 echo "=== [gate:rust 2/4] Linter & Static Audit (clippy -D warnings) ==="
 cargo clippy --workspace --all-targets --manifest-path "${MANIFEST}" -- -D warnings
 echo "[PASS] clippy clean with zero warnings."
 
-# Stage 3: Zero-Allocation and concurrency boundary scanner
+# 零分配与并发边界扫描
 echo ""
 echo "=== [gate:rust 3/4] Zero-Allocation & Safety Proof Scanner ==="
 if command -v node >/dev/null 2>&1; then
     node "${PROJECT_ROOT}/scripts/common/check-zero-alloc-boundary.js"
 fi
 
-# Stage 4: Unit and integration tests
+# 单元与集成测试
 echo ""
 echo "=== [gate:rust 4/4] Multi-Crate Regression Tests (cargo test) ==="
 cargo test --workspace --manifest-path "${MANIFEST}"

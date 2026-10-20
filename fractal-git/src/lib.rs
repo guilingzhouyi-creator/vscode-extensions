@@ -49,14 +49,17 @@ pub use fg_core::constants;
 pub use fg_core::error::{FractalError, FractalResult};
 pub use fg_core::models::{
     ActorIdentity, AgentCommitMeta, AgentPushContext, AuthorityTier, AutoQualityScoreEnvelope,
-    DiffCoherenceMode, GitSignature, HumanUacProof, Oid, PraxisCardContext, StagedPromotionRequest,
-    StagedPromotionStatus, TaxisPolicy, ValidatedCommitWitness,
+    ChangeId, DiffCoherenceMode, GitSignature, HumanUacProof, Oid, PraxisCardContext,
+    StagedPromotionRequest, StagedPromotionStatus, TaxisPolicy, ValidatedCommitWitness,
 };
 pub use fg_core::traits::{
     GateVerdict, GateVerifier, OdbStore, ReclamationAudit, RefStore, StagedCandidate,
     WorktreeReclaimer,
 };
-pub use fg_object::{FileMode, GitBlob, GitCommit, GitTree, GitTreeEntry};
+pub use fg_object::{
+    FileMode, GitBlob, GitCommit, GitCommitRef, GitTree, GitTreeEntry, GitTreeEntryRef,
+    GitTreeIter, GitTreeRef, SmallParentList,
+};
 
 // Index exports
 pub use fg_index::{ConflictStageSlot, InMemoryIndexTree, IndexStage, VirtualIndexEntry};
@@ -72,8 +75,8 @@ pub use fg_algorithms::math::{
     compute_jeffreys_credible_lower, evaluate_score_envelope, PosteriorScoreEstimate,
 };
 pub use fg_algorithms::merge::{
-    CanonicalConflictEntry, CanonicalMergeResult, ConflictEntry, FastPathMerge, ThreeWayMerge,
-    ThreeWayMergeResult, VirtualMergeBaseSynthesizer,
+    AlgebraicMerge, CanonicalConflictEntry, CanonicalMergeResult, ConflictEntry, FastPathMerge,
+    ThreeWayMerge, ThreeWayMergeResult, VirtualMergeBaseSynthesizer,
 };
 pub use fg_algorithms::synthetic::{
     generate_commit_chain, generate_diamond_dag, generate_monorepo_trees, SyntheticCommitChain,
@@ -91,11 +94,13 @@ pub use fg_pools::worktree_pool::{WorktreeDescriptor, WorktreeMode, WorktreePool
 // Storage exports
 pub use fg_storage::cas_backend::CasBackend;
 pub use fg_storage::cas_bridge::{CasFileDescriptor, CasToGitMaterializer, MaterializeRequest};
+pub use fg_storage::commit_graph::{CommitGraphEntry, CommitGraphReader, CommitGraphWriter};
 pub use fg_storage::loose::{write_loose_object, LooseOdb};
 pub use fg_storage::wal_journal::{WalJournal, WalRecord};
 
 // Topology exports
 pub use fg_topology::authorizer::{HumanUacAuthorizer, StandardNonceAuthorizer};
+pub use fg_topology::operation::{Operation, OperationGraph, OperationMetadata, RepoViewSnapshot};
 pub use fg_topology::promotion_ledger::{PromotionLedgerData, PromotionStagingLedger};
 pub use fg_topology::refs::{DiskRefStore, FractalRef};
 pub use fg_topology::state_machine::{FractalWorkspaceNode, WorktreeState};

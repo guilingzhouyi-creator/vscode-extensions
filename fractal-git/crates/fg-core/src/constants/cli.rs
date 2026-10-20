@@ -25,6 +25,8 @@ impl CliTag {
     pub const OPTIMIZED: &'static str = "[OPTIMIZED]";
     pub const FAIL: &'static str = "[FAIL]";
     pub const ERROR: &'static str = "[ERROR]";
+    pub const INFO: &'static str = "[INFO]";
+    pub const UNDO_OK: &'static str = "[UNDO_OK]";
 }
 
 /// Canonical subcommand names.

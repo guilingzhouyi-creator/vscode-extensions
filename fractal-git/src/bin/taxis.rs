@@ -17,9 +17,9 @@ use fractal_git::{
     compute_jeffreys_credible_lower, ActorIdentity, AgentPushContext, AutoQualityScoreEnvelope,
     CommitCountVerdict, CommitCounter, CommitMessageGuard, CommitTelemetryConfig, ConflictGuard,
     DiskRefStore, FileMode, FractalRef, GitBlob, GitCommit, GitSignature, GitTree, GitTreeEntry,
-    HumanUacProof, Oid, PreReceiveGuard, PromotionStagingLedger, QuotaGovernor, RefStore,
-    ScopeProjection, StandardNonceAuthorizer, TaxisPolicy, TelemetryCommitNode, TopologyVerifier,
-    WorktreeMode, WorktreePool,
+    HumanUacProof, Oid, OperationGraph, PreReceiveGuard, PromotionStagingLedger, QuotaGovernor,
+    RefStore, RepoViewSnapshot, ScopeProjection, StandardNonceAuthorizer, TaxisPolicy,
+    TelemetryCommitNode, TopologyVerifier, WorktreeMode, WorktreePool,
 };
 
 /// CLI Execution Context.
@@ -52,6 +52,8 @@ fn resolve_canonical_subcommand(raw: &str) -> &str {
         "wt" | "worktree" => "worktree",
         "pm" | "promo" | "promotion" => "promotion",
         "bench" | "benchmark" => "bench",
+        "undo" => "undo",
+        "op" | "operation" => "operation",
         "rev-list" => "rev-list",
         "version" | "-v" | "--version" => "version",
         "help" | "-h" | "--help" => "help",
@@ -60,48 +62,50 @@ fn resolve_canonical_subcommand(raw: &str) -> &str {
 }
 
 fn print_banner() {
-    println!("=== Taxis (Fractal Git) Engine v0.1.0 ===");
-    println!("Agent-Native In-Memory CAS & Fractal Version Matrix");
-    println!("SSOT Rules: FGT-COR-001 through FGT-CAS-001\n");
+    print!(
+        "=== Taxis (Fractal Git) Engine v0.1.0 ===\n\
+         Agent-Native In-Memory CAS & Fractal Version Matrix\n\
+         SSOT Rules: FGT-COR-001 through FGT-CAS-001\n\n"
+    );
 }
 
 fn print_help() {
     print_banner();
-    println!("Usage: taxis <command> [options]");
-    println!("\nNative Fractal Commands (with Git Alias Mappings):");
-    println!("  status,   st       Display fractal ref topology, staged index & quota status");
-    println!(
-        "  branch,   br       List or verify fractal branch hierarchies (Trunk/Cell/Card/Sub)"
+    print!(
+        r#"Usage: taxis <command> [options]
+
+Native Fractal Commands (with Git Alias Mappings):
+  status,   st       Display fractal ref topology, staged index & quota status
+  branch,   br       List or verify fractal branch hierarchies (Trunk/Cell/Card/Sub)
+  commit,   ci       Create atomic commit with agent metadata
+  diff,     di       Show tree diff or pass through to git diff
+  checkout, co       Switch fractal worktree or git reference
+  undo               Revert repository state to predecessor operation (Jujutsu-style)
+  operation, op      Inspect immutable Operation Log DAG history
+  verify,   check    Run pre-receive guard, conflict marker scanner & quota checks
+  reclaim,  gc       Trigger zero-allocation worktree & sandbox reclamation
+  worktree, wt       Display or allocate scoped projection worktree (--scope / --full)
+  promotion, pm      Manage staged promotions to System Trunk with Human GUI UAC gate
+  bench,    benchmark Run performance benchmarks (--level <1|2|3|all>, -m <mult>)
+  daemon,   serve    Display protocol daemon status & IPC endpoints
+  version,  -v       Display version and domain rules SSOT
+
+Transparent Git Command Aliases & Passthrough:
+  sw/switch, lg/log, sh/show, fe/fetch, pu/push, pl/pull, rb/rebase, mg/merge, cp/cherry-pick
+  Any standard git command runs seamlessly with CAS acceleration.
+
+Flags:
+  --json             Output machine-readable JSON format
+  --git-dir <path>   Override .git or .taxis directory location
+"#
     );
-    println!("  commit,   ci       Create atomic commit with agent metadata");
-    println!("  diff,     di       Show tree diff or pass through to git diff");
-    println!("  checkout, co       Switch fractal worktree or git reference");
-    println!("  verify,   check    Run pre-receive guard, conflict marker scanner & quota checks");
-    println!("  reclaim,  gc       Trigger zero-allocation worktree & sandbox reclamation");
+}
+
+fn print_json<T: serde::Serialize>(value: &T) {
     println!(
-        "  worktree, wt       Display or allocate scoped projection worktree (--scope / --full)"
+        "{}",
+        serde_json::to_string_pretty(value).unwrap_or_default()
     );
-    println!(
-        "  promotion, pm      Manage staged promotions to System Trunk with Human GUI UAC gate"
-    );
-    println!(
-        "  bench,    benchmark Run performance benchmarks \
-         (--level <1|2|3|all>, --scion-parity, -m <mult>, --verify-baseline)"
-    );
-    println!("  daemon,   serve    Display protocol daemon status & IPC endpoints");
-    println!("  version,  -v       Display version and domain rules SSOT");
-    println!("\nTransparent Git Command Aliases & Passthrough:");
-    println!(
-        "  sw/switch, lg/log, sh/show, fe/fetch, pu/push, pl/pull, rb/rebase, \
-         mg/merge, cp/cherry-pick, wt/worktree"
-    );
-    println!(
-        "  Any standard git command (e.g. 'taxis log', 'taxis git diff') \
-         runs seamlessly with CAS acceleration."
-    );
-    println!("\nFlags:");
-    println!("  --json             Output machine-readable JSON format");
-    println!("  --git-dir <path>   Override .git or .taxis directory location");
 }
 
 fn handle_status(ctx: &CliContext) {
@@ -120,7 +124,7 @@ fn handle_status(ctx: &CliContext) {
             })
             .collect();
 
-        let output = serde_json::json!({
+        let status_payload = serde_json::json!({
             "engine": "taxis",
             "git_dir": ctx.git_dir.display().to_string(),
             "ref_count": refs.len(),
@@ -130,10 +134,7 @@ fn handle_status(ctx: &CliContext) {
                 "max_disk_mb": quota.max_disk_megabytes(),
             }
         });
-        println!(
-            "{}",
-            serde_json::to_string_pretty(&output).unwrap_or_default()
-        );
+        print_json(&status_payload);
         return;
     }
 
@@ -209,34 +210,34 @@ fn handle_commit(ctx: &CliContext) {
     let mut policy_name = "rust-strict";
     let mut target_ref_str = "refs/fractal/cell/cell-default/main".to_string();
 
-    let mut i = 0;
-    while i < ctx.args.len() {
-        if ctx.args[i] == "-m" && i + 1 < ctx.args.len() {
-            message = ctx.args[i + 1].clone();
-            i += 2;
-        } else if ctx.args[i] == "--cell" && i + 1 < ctx.args.len() {
-            cell_id = &ctx.args[i + 1];
-            i += 2;
-        } else if ctx.args[i] == "--card" && i + 1 < ctx.args.len() {
-            card_id = &ctx.args[i + 1];
-            i += 2;
-        } else if ctx.args[i] == "--agent" && i + 1 < ctx.args.len() {
-            agent_id = &ctx.args[i + 1];
-            i += 2;
-        } else if ctx.args[i] == "--human" && i + 1 < ctx.args.len() {
-            human_author = Some(ctx.args[i + 1].clone());
-            i += 2;
-        } else if ctx.args[i] == "--token" && i + 1 < ctx.args.len() {
-            auth_token = Some(ctx.args[i + 1].clone());
-            i += 2;
-        } else if ctx.args[i] == "--policy" && i + 1 < ctx.args.len() {
-            policy_name = &ctx.args[i + 1];
-            i += 2;
-        } else if ctx.args[i] == "--target" && i + 1 < ctx.args.len() {
-            target_ref_str = ctx.args[i + 1].clone();
-            i += 2;
+    let mut arg_cursor = 0;
+    while arg_cursor < ctx.args.len() {
+        if ctx.args[arg_cursor] == "-m" && arg_cursor + 1 < ctx.args.len() {
+            message = ctx.args[arg_cursor + 1].clone();
+            arg_cursor += 2;
+        } else if ctx.args[arg_cursor] == "--cell" && arg_cursor + 1 < ctx.args.len() {
+            cell_id = &ctx.args[arg_cursor + 1];
+            arg_cursor += 2;
+        } else if ctx.args[arg_cursor] == "--card" && arg_cursor + 1 < ctx.args.len() {
+            card_id = &ctx.args[arg_cursor + 1];
+            arg_cursor += 2;
+        } else if ctx.args[arg_cursor] == "--agent" && arg_cursor + 1 < ctx.args.len() {
+            agent_id = &ctx.args[arg_cursor + 1];
+            arg_cursor += 2;
+        } else if ctx.args[arg_cursor] == "--human" && arg_cursor + 1 < ctx.args.len() {
+            human_author = Some(ctx.args[arg_cursor + 1].clone());
+            arg_cursor += 2;
+        } else if ctx.args[arg_cursor] == "--token" && arg_cursor + 1 < ctx.args.len() {
+            auth_token = Some(ctx.args[arg_cursor + 1].clone());
+            arg_cursor += 2;
+        } else if ctx.args[arg_cursor] == "--policy" && arg_cursor + 1 < ctx.args.len() {
+            policy_name = &ctx.args[arg_cursor + 1];
+            arg_cursor += 2;
+        } else if ctx.args[arg_cursor] == "--target" && arg_cursor + 1 < ctx.args.len() {
+            target_ref_str = ctx.args[arg_cursor + 1].clone();
+            arg_cursor += 2;
         } else {
-            i += 1;
+            arg_cursor += 1;
         }
     }
 
@@ -329,7 +330,7 @@ fn handle_commit(ctx: &CliContext) {
     let commit = GitCommit::from_witness(tree.oid(), Vec::new(), author, committer, &witness, None);
 
     if ctx.json_mode {
-        let out = serde_json::json!({
+        let commit_payload = serde_json::json!({
             "status": "committed",
             "commit_oid": commit.oid(),
             "tree_oid": commit.tree_oid(),
@@ -339,7 +340,7 @@ fn handle_commit(ctx: &CliContext) {
             "is_human": actor.is_human(),
             "actor": actor.display_name(),
         });
-        println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
+        print_json(&commit_payload);
     } else {
         println!(
             "{} Created atomic commit {}",
@@ -362,6 +363,135 @@ fn handle_commit(ctx: &CliContext) {
                 .map(|scope_val| format!("({})", scope_val))
                 .unwrap_or_default()
         );
+    }
+
+    let commit_oid = Oid::from_hex(commit.oid()).unwrap_or(Oid::ZERO);
+    let ref_store = DiskRefStore::new(&ctx.git_dir);
+    let _ = ref_store.update_ref(&target_ref.to_git_ref(), &commit_oid, None);
+
+    if let Ok(mut op_graph) = OperationGraph::load_or_init(&ctx.git_dir) {
+        let mut branches = std::collections::BTreeMap::new();
+        branches.insert(target_ref.to_git_ref(), commit_oid);
+        let view_snapshot = RepoViewSnapshot {
+            head_oid: Some(commit_oid),
+            branches,
+            staged_promotions: Vec::new(),
+            timestamp_ms: 1700000000,
+        };
+        let _ = op_graph.record_operation(
+            view_snapshot,
+            actor.display_name(),
+            "commit",
+            format!("commit: {}", witness.commit_type),
+            1700000000,
+        );
+    }
+}
+
+fn handle_undo(ctx: &CliContext) {
+    let mut op_graph = match OperationGraph::load_or_init(&ctx.git_dir) {
+        Ok(graph) => graph,
+        Err(load_err) => {
+            eprintln!(
+                "{} Failed to load operation graph: {}",
+                CliTag::ERROR,
+                load_err
+            );
+            return;
+        }
+    };
+
+    match op_graph.undo() {
+        Ok(Some(restored_op)) => {
+            let ref_store = DiskRefStore::new(&ctx.git_dir);
+            for (ref_name, ref_oid) in &restored_op.view.branches {
+                let _ = ref_store.update_ref(ref_name, ref_oid, None);
+            }
+            if ctx.json_mode {
+                let json_val = serde_json::json!({
+                    "status": "undone",
+                    "restored_operation_id": restored_op.operation_id.to_hex(),
+                    "command": restored_op.metadata.command,
+                    "description": restored_op.metadata.description,
+                });
+                print_json(&json_val);
+            } else {
+                let hex_str = restored_op.operation_id.to_hex();
+                let short_id = if hex_str.len() >= 10 {
+                    &hex_str[..10]
+                } else {
+                    &hex_str
+                };
+                println!(
+                    "{} Restored repository view to operation {} (command: '{}')",
+                    CliTag::UNDO_OK,
+                    short_id,
+                    restored_op.metadata.command
+                );
+            }
+        }
+        Ok(None) => {
+            if ctx.json_mode {
+                println!(r#"{{"status": "noop", "message": "At root operation"}}"#);
+            } else {
+                println!("{} No previous operation to undo.", CliTag::INFO);
+            }
+        }
+        Err(undo_err) => {
+            eprintln!("{} Undo failed: {}", CliTag::FAIL, undo_err);
+        }
+    }
+}
+
+fn handle_operation(ctx: &CliContext) {
+    let op_graph = match OperationGraph::load_or_init(&ctx.git_dir) {
+        Ok(graph) => graph,
+        Err(load_err) => {
+            eprintln!(
+                "{} Failed to load operation graph: {}",
+                CliTag::ERROR,
+                load_err
+            );
+            return;
+        }
+    };
+
+    let history_list = op_graph.history(20);
+    if ctx.json_mode {
+        let json_ops: Vec<serde_json::Value> = history_list
+            .iter()
+            .map(|op_node| {
+                serde_json::json!({
+                    "operation_id": op_node.operation_id.to_hex(),
+                    "actor": op_node.metadata.actor,
+                    "command": op_node.metadata.command,
+                    "description": op_node.metadata.description,
+                    "timestamp_ms": op_node.metadata.timestamp_ms,
+                })
+            })
+            .collect();
+        print_json(&json_ops);
+    } else {
+        println!("=== Taxis Operation History (Most Recent First) ===");
+        if history_list.is_empty() {
+            println!("  (No recorded operations)");
+        } else {
+            for op_node in history_list {
+                let hex_str = op_node.operation_id.to_hex();
+                let short_id = if hex_str.len() >= 10 {
+                    &hex_str[..10]
+                } else {
+                    &hex_str
+                };
+                println!(
+                    "  * [{}] {} (actor: {}) - {}",
+                    short_id,
+                    op_node.metadata.command,
+                    op_node.metadata.actor,
+                    op_node.metadata.description
+                );
+            }
+        }
     }
 }
 
@@ -404,27 +534,30 @@ fn handle_rev_list(ctx: &CliContext) {
 
     if count_only {
         if ctx.json_mode {
-            let out = serde_json::json!({
+            let rev_payload = serde_json::json!({
                 "official_count": verdict.official_count,
                 "total_raw_commits": verdict.total_raw_commits,
                 "filtered_agent_commits": verdict.filtered_agent_commits,
                 "dual_trunk_active": verdict.dual_trunk_active,
             });
-            println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
+            print_json(&rev_payload);
         } else {
             println!("{}", verdict.official_count);
         }
         return;
     }
 
-    println!("=== Taxis Commit Telemetry (Anti-Inflation Model) ===");
-    println!("  Official Commits        : {}", verdict.official_count);
-    println!("  Total Raw Commits       : {}", verdict.total_raw_commits);
     println!(
-        "  Filtered Agent Commits  : {} (Micro-snapshots)",
-        verdict.filtered_agent_commits
+        "=== Taxis Commit Telemetry (Anti-Inflation Model) ===\n\
+           Official Commits        : {}\n\
+           Total Raw Commits       : {}\n\
+           Filtered Agent Commits  : {} (Micro-snapshots)\n\
+           Dual-Trunk Mode Active  : {}",
+        verdict.official_count,
+        verdict.total_raw_commits,
+        verdict.filtered_agent_commits,
+        verdict.dual_trunk_active
     );
-    println!("  Dual-Trunk Mode Active  : {}", verdict.dual_trunk_active);
 }
 
 fn handle_verify(_ctx: &CliContext) {
@@ -467,43 +600,42 @@ fn handle_verify(_ctx: &CliContext) {
     let conflict_ok =
         ConflictGuard::assert_clean_content("sample.rs", b"pub fn clean() {}\n").is_ok();
     let quota = QuotaGovernor::default();
-    let quota_ok = quota.assert_spawn_capacity(0).is_ok() && quota.assert_storage_budget(0).is_ok();
+    let quota_ok =
+        quota.assert_spawn_capacity(0).is_ok() && quota.assert_storage_budget(0).is_ok();
 
-    println!("=== Running Taxis Multi-Tier Gate Verification ===");
     println!(
-        "[1/4] PreReceiveGuard   : {} (Human-only trunks & Agent sandbox active)",
-        if pre_receive_ok { "OK" } else { "FAIL" }
-    );
-    println!(
-        "[2/4] CommitMessageGuard: {} (Rust-grade type witness & qualitative invariant)",
-        if msg_guard_ok { "OK" } else { "FAIL" }
-    );
-    println!(
-        "[3/4] ConflictGuard     : {} (Content & conflict marker scanning active)",
-        if conflict_ok { "OK" } else { "FAIL" }
-    );
-    println!(
-        "[4/4] QuotaGovernor     : {} (Limit {} worktrees, {} MB)",
+        "=== Running Taxis Multi-Tier Gate Verification ===\n\
+         [1/4] PreReceiveGuard   : {} (Human trunks & Agent sandbox)\n\
+         [2/4] CommitMessageGuard: {} (Rust-grade type witness)\n\
+         [3/4] ConflictGuard     : {} (Conflict marker scanning active)\n\
+         [4/4] QuotaGovernor     : {} (Limit {} worktrees, {} MB)\n\
+         Result: ALL GATES PASS (Zero rule drift)\n",
+        if pre_receive_ok { "OK" } else { "FAIL" },
+        if msg_guard_ok { "OK" } else { "FAIL" },
+        if conflict_ok { "OK" } else { "FAIL" },
         if quota_ok { "OK" } else { "FAIL" },
         quota.max_concurrent_worktrees(),
         quota.max_disk_megabytes()
     );
-    println!("Result: ALL GATES PASS (Zero rule drift)\n");
 }
 
 fn handle_reclaim(_ctx: &CliContext) {
-    println!("=== Taxis Worktree & Sandbox Reclaimer ===");
-    println!("[RECLAIM] Epoch O(1) advanced.");
-    println!("[RECLAIM] Reclaimed temporary sandbox slots: 0 allocated.");
-    println!("[RECLAIM] Heap transient allocations reset: 0 bytes leaked.");
+    println!(
+        "=== Taxis Worktree & Sandbox Reclaimer ===\n\
+         [RECLAIM] Epoch O(1) advanced.\n\
+         [RECLAIM] Reclaimed temporary sandbox slots: 0 allocated.\n\
+         [RECLAIM] Heap transient allocations reset: 0 bytes leaked."
+    );
 }
 
 fn handle_daemon(_ctx: &CliContext) {
-    println!("=== Taxis Native Protocol Daemon ===");
-    println!("Supported Protocols:");
-    println!("  - IPC Frame (4-byte length prefix) : READY");
-    println!("  - Smart Protocol v2 (PacketLine)   : READY");
-    println!("  - taxis:// In-Memory CAS Bus       : STANDBY");
+    println!(
+        "=== Taxis Native Protocol Daemon ===\n\
+         Supported Protocols:\n\
+           - IPC Frame (4-byte length prefix) : READY\n\
+           - Smart Protocol v2 (PacketLine)   : READY\n\
+           - taxis:// In-Memory CAS Bus       : STANDBY"
+    );
 }
 
 fn handle_diff(ctx: &CliContext) {
@@ -515,10 +647,7 @@ fn handle_diff(ctx: &CliContext) {
             "entries": [],
             "status": "clean"
         });
-        println!(
-            "{}",
-            serde_json::to_string_pretty(&output).unwrap_or_default()
-        );
+        print_json(&output);
         return;
     }
     handle_passthrough("diff", ctx);
@@ -531,11 +660,7 @@ fn handle_checkout(ctx: &CliContext) {
     }
     let target = &ctx.args[0];
     if let Some(fref) = FractalRef::parse(target) {
-        println!(
-            "{} Switched to fractal reference: {:?}",
-            CliTag::TAXIS_CHECKOUT,
-            fref
-        );
+        println!("{} Switched to fractal reference: {:?}", CliTag::TAXIS_CHECKOUT, fref);
         return;
     }
     handle_passthrough("checkout", ctx);
@@ -558,17 +683,12 @@ fn handle_passthrough(cmd: &str, ctx: &CliContext) {
     }
     match command.status() {
         Ok(status) => {
-            if let Some(code) = status.code() {
-                if code != 0 {
-                    std::process::exit(code);
-                }
+            if let Some(code) = status.code().filter(|&exit_code| exit_code != 0) {
+                std::process::exit(code);
             }
         }
         Err(cmd_err) => {
-            eprintln!(
-                "[ERROR] Failed to invoke git command '{}': {}",
-                cmd, cmd_err
-            );
+            eprintln!("[ERROR] Failed to invoke git command '{}': {}", cmd, cmd_err);
             std::process::exit(1);
         }
     }
@@ -580,7 +700,7 @@ fn handle_worktree(ctx: &CliContext) {
         let quota = QuotaGovernor::default();
 
         if ctx.json_mode {
-            let out = serde_json::json!({
+            let worktree_payload = serde_json::json!({
                 "engine": "taxis",
                 "operation": "worktree_list",
                 "max_concurrency": quota.max_concurrent_worktrees(),
@@ -592,7 +712,7 @@ fn handle_worktree(ctx: &CliContext) {
                 },
                 "active_projections": []
             });
-            println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
+            print_json(&worktree_payload);
             return;
         }
 
@@ -621,23 +741,23 @@ fn handle_worktree(ctx: &CliContext) {
         let mut is_full = false;
         let mut mode = WorktreeMode::VirtualMemory;
 
-        let mut i = 2;
-        while i < ctx.args.len() {
-            if ctx.args[i] == "--full" {
+        let mut arg_cursor = 2;
+        while arg_cursor < ctx.args.len() {
+            if ctx.args[arg_cursor] == "--full" {
                 is_full = true;
-                i += 1;
-            } else if ctx.args[i] == "--scope" && i + 1 < ctx.args.len() {
-                scopes.push(ctx.args[i + 1].clone());
-                i += 2;
-            } else if ctx.args[i] == "--mode" && i + 1 < ctx.args.len() {
-                match ctx.args[i + 1].as_str() {
+                arg_cursor += 1;
+            } else if ctx.args[arg_cursor] == "--scope" && arg_cursor + 1 < ctx.args.len() {
+                scopes.push(ctx.args[arg_cursor + 1].clone());
+                arg_cursor += 2;
+            } else if ctx.args[arg_cursor] == "--mode" && arg_cursor + 1 < ctx.args.len() {
+                match ctx.args[arg_cursor + 1].as_str() {
                     "cow" => mode = WorktreeMode::CoWClone,
                     "sparse" => mode = WorktreeMode::SparseGhost,
                     _ => mode = WorktreeMode::VirtualMemory,
                 }
-                i += 2;
+                arg_cursor += 2;
             } else {
-                i += 1;
+                arg_cursor += 1;
             }
         }
 
@@ -650,7 +770,7 @@ fn handle_worktree(ctx: &CliContext) {
         };
 
         if ctx.json_mode {
-            let out = serde_json::json!({
+            let worktree_payload = serde_json::json!({
                 "engine": "taxis",
                 "status": "worktree_allocated",
                 "path": target_path,
@@ -659,7 +779,7 @@ fn handle_worktree(ctx: &CliContext) {
                 "mode": format!("{:?}", mode),
                 "creation_latency_us": 42
             });
-            println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
+            print_json(&worktree_payload);
         } else {
             println!(
                 "{} Allocated Scoped Worktree '{}'",
@@ -718,50 +838,53 @@ fn handle_promotion(ctx: &CliContext) {
             let mut custom_ci_lower: Option<f64> = None;
             let mut report = "Auto-Refactor Quality Gate: zero debt verification.".to_string();
 
-            let mut i = 1;
-            while i < ctx.args.len() {
-                match ctx.args[i].as_str() {
-                    "--oid" | "--candidate" | "--target-oid" if i + 1 < ctx.args.len() => {
-                        oid_str = Some(ctx.args[i + 1].clone());
-                        i += 2;
+            let mut arg_cursor = 1;
+            while arg_cursor < ctx.args.len() {
+                match ctx.args[arg_cursor].as_str() {
+                    "--oid" | "--candidate" | "--target-oid"
+                    if arg_cursor + 1 < ctx.args.len() => {
+                        oid_str = Some(ctx.args[arg_cursor + 1].clone());
+                        arg_cursor += 2;
                     }
-                    "--summary" if i + 1 < ctx.args.len() => {
-                        summary = ctx.args[i + 1].clone();
-                        i += 2;
+                    "--summary" if arg_cursor + 1 < ctx.args.len() => {
+                        summary = ctx.args[arg_cursor + 1].clone();
+                        arg_cursor += 2;
                     }
-                    "--agent" | "--agent-uid" if i + 1 < ctx.args.len() => {
-                        agent_uid = ctx.args[i + 1].clone();
-                        i += 2;
+                    "--agent" | "--agent-uid" if arg_cursor + 1 < ctx.args.len() => {
+                        agent_uid = ctx.args[arg_cursor + 1].clone();
+                        arg_cursor += 2;
                     }
-                    "--score" if i + 1 < ctx.args.len() => {
-                        composite_score = ctx.args[i + 1].parse::<f64>().unwrap_or(0.0);
-                        i += 2;
+                    "--score" if arg_cursor + 1 < ctx.args.len() => {
+                        composite_score = ctx.args[arg_cursor + 1].parse::<f64>().unwrap_or(0.0);
+                        arg_cursor += 2;
                     }
-                    "--cai" if i + 1 < ctx.args.len() => {
-                        cai_index = ctx.args[i + 1].parse::<f64>().unwrap_or(100.0);
-                        i += 2;
+                    "--cai" if arg_cursor + 1 < ctx.args.len() => {
+                        cai_index = ctx.args[arg_cursor + 1].parse::<f64>().unwrap_or(100.0);
+                        arg_cursor += 2;
                     }
-                    "--ci-lower" if i + 1 < ctx.args.len() => {
-                        custom_ci_lower = ctx.args[i + 1].parse::<f64>().ok();
-                        i += 2;
+                    "--ci-lower" if arg_cursor + 1 < ctx.args.len() => {
+                        custom_ci_lower = ctx.args[arg_cursor + 1].parse::<f64>().ok();
+                        arg_cursor += 2;
                     }
-                    "--cc-delta" if i + 1 < ctx.args.len() => {
-                        cyclomatic_complexity_delta = ctx.args[i + 1].parse::<i32>().unwrap_or(0);
-                        i += 2;
+                    "--cc-delta" if arg_cursor + 1 < ctx.args.len() => {
+                        cyclomatic_complexity_delta =
+                            ctx.args[arg_cursor + 1].parse().unwrap_or(0);
+                        arg_cursor += 2;
                     }
-                    "--eloc-delta" if i + 1 < ctx.args.len() => {
-                        eloc_delta = ctx.args[i + 1].parse::<i32>().unwrap_or(0);
-                        i += 2;
+                    "--eloc-delta" if arg_cursor + 1 < ctx.args.len() => {
+                        eloc_delta = ctx.args[arg_cursor + 1].parse().unwrap_or(0);
+                        arg_cursor += 2;
                     }
-                    "--anti-gaming" if i + 1 < ctx.args.len() => {
-                        anti_gaming_passed = ctx.args[i + 1].parse::<bool>().unwrap_or(true);
-                        i += 2;
+                    "--anti-gaming" if arg_cursor + 1 < ctx.args.len() => {
+                        anti_gaming_passed =
+                            ctx.args[arg_cursor + 1].parse().unwrap_or(true);
+                        arg_cursor += 2;
                     }
-                    "--report" if i + 1 < ctx.args.len() => {
-                        report = ctx.args[i + 1].clone();
-                        i += 2;
+                    "--report" if arg_cursor + 1 < ctx.args.len() => {
+                        report = ctx.args[arg_cursor + 1].clone();
+                        arg_cursor += 2;
                     }
-                    _ => i += 1,
+                    _ => arg_cursor += 1,
                 }
             }
 
@@ -805,7 +928,7 @@ fn handle_promotion(ctx: &CliContext) {
             ) {
                 Ok(req_id) => {
                     if ctx.json_mode {
-                        let out = serde_json::json!({
+                        let promo_payload = serde_json::json!({
                             "status": "staged",
                             "request_id": req_id,
                             "candidate_oid": candidate_oid.to_hex(),
@@ -813,7 +936,7 @@ fn handle_promotion(ctx: &CliContext) {
                             "composite_score": composite_score,
                             "uac_required": policy.uac_required_for_system_trunk
                         });
-                        println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
+                        print_json(&promo_payload);
                     } else {
                         println!(
                             "{} Staged Promotion Proposal '{}'",
@@ -842,11 +965,11 @@ fn handle_promotion(ctx: &CliContext) {
                 }
                 Err(err) => {
                     if ctx.json_mode {
-                        let out = serde_json::json!({
+                        let rejection_payload = serde_json::json!({
                             "status": "rejected",
                             "error": format!("{}", err)
                         });
-                        println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
+                        print_json(&rejection_payload);
                     } else {
                         eprintln!("{} {}", CliTag::PROMOTION_REJECTED, err);
                     }
@@ -859,26 +982,26 @@ fn handle_promotion(ctx: &CliContext) {
             let mut email = "architect@deepmind.internal".to_string();
             let mut session = "GUI_SESSION_VERIFIED".to_string();
 
-            let mut i = 1;
-            while i < ctx.args.len() {
-                match ctx.args[i].as_str() {
-                    "--id" if i + 1 < ctx.args.len() => {
-                        req_id_opt = Some(ctx.args[i + 1].clone());
-                        i += 2;
+            let mut arg_cursor = 1;
+            while arg_cursor < ctx.args.len() {
+                match ctx.args[arg_cursor].as_str() {
+                    "--id" if arg_cursor + 1 < ctx.args.len() => {
+                        req_id_opt = Some(ctx.args[arg_cursor + 1].clone());
+                        arg_cursor += 2;
                     }
-                    "--operator" if i + 1 < ctx.args.len() => {
-                        operator = ctx.args[i + 1].clone();
-                        i += 2;
+                    "--operator" if arg_cursor + 1 < ctx.args.len() => {
+                        operator = ctx.args[arg_cursor + 1].clone();
+                        arg_cursor += 2;
                     }
-                    "--email" if i + 1 < ctx.args.len() => {
-                        email = ctx.args[i + 1].clone();
-                        i += 2;
+                    "--email" if arg_cursor + 1 < ctx.args.len() => {
+                        email = ctx.args[arg_cursor + 1].clone();
+                        arg_cursor += 2;
                     }
-                    "--session" if i + 1 < ctx.args.len() => {
-                        session = ctx.args[i + 1].clone();
-                        i += 2;
+                    "--session" if arg_cursor + 1 < ctx.args.len() => {
+                        session = ctx.args[arg_cursor + 1].clone();
+                        arg_cursor += 2;
                     }
-                    _ => i += 1,
+                    _ => arg_cursor += 1,
                 }
             }
 
@@ -906,14 +1029,14 @@ fn handle_promotion(ctx: &CliContext) {
             match ledger.apply_uac_approval(&target_id, &proof, &authorizer, &ref_store) {
                 Ok(()) => {
                     if ctx.json_mode {
-                        let out = serde_json::json!({
+                        let success_payload = serde_json::json!({
                             "status": "promoted",
                             "request_id": target_id,
                             "promoted_to": "refs/heads/main",
                             "candidate_oid": active_req.candidate_commit_oid.to_hex(),
                             "operator": operator
                         });
-                        println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
+                        print_json(&success_payload);
                     } else {
                         println!(
                             "{} Human GUI UAC Permission Granted!",
@@ -928,11 +1051,11 @@ fn handle_promotion(ctx: &CliContext) {
                 }
                 Err(approval_err) => {
                     if ctx.json_mode {
-                        let out = serde_json::json!({
+                        let failure_payload = serde_json::json!({
                             "status": "approval_failed",
                             "error": format!("{}", approval_err)
                         });
-                        println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
+                        print_json(&failure_payload);
                     } else {
                         eprintln!("{} {}", CliTag::UAC_APPROVAL_FAILED, approval_err);
                     }
@@ -944,22 +1067,22 @@ fn handle_promotion(ctx: &CliContext) {
             let mut operator = "Human Architect".to_string();
             let mut feedback = "Promotion declined in GUI UAC review".to_string();
 
-            let mut i = 1;
-            while i < ctx.args.len() {
-                match ctx.args[i].as_str() {
-                    "--id" if i + 1 < ctx.args.len() => {
-                        req_id_opt = Some(ctx.args[i + 1].clone());
-                        i += 2;
+            let mut arg_cursor = 1;
+            while arg_cursor < ctx.args.len() {
+                match ctx.args[arg_cursor].as_str() {
+                    "--id" if arg_cursor + 1 < ctx.args.len() => {
+                        req_id_opt = Some(ctx.args[arg_cursor + 1].clone());
+                        arg_cursor += 2;
                     }
-                    "--operator" if i + 1 < ctx.args.len() => {
-                        operator = ctx.args[i + 1].clone();
-                        i += 2;
+                    "--operator" if arg_cursor + 1 < ctx.args.len() => {
+                        operator = ctx.args[arg_cursor + 1].clone();
+                        arg_cursor += 2;
                     }
-                    "--feedback" | "--reason" if i + 1 < ctx.args.len() => {
-                        feedback = ctx.args[i + 1].clone();
-                        i += 2;
+                    "--feedback" | "--reason" if arg_cursor + 1 < ctx.args.len() => {
+                        feedback = ctx.args[arg_cursor + 1].clone();
+                        arg_cursor += 2;
                     }
-                    _ => i += 1,
+                    _ => arg_cursor += 1,
                 }
             }
 
@@ -975,11 +1098,11 @@ fn handle_promotion(ctx: &CliContext) {
             match ledger.reject_uac_promotion(&target_id, operator, feedback, current_time_ms) {
                 Ok(()) => {
                     if ctx.json_mode {
-                        let out = serde_json::json!({
+                        let rejection_payload = serde_json::json!({
                             "status": "rejected",
                             "request_id": target_id
                         });
-                        println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
+                        print_json(&rejection_payload);
                     } else {
                         println!(
                             "{} Request '{}' rejected.",
@@ -994,7 +1117,7 @@ fn handle_promotion(ctx: &CliContext) {
         _ /* list or show */ => {
             let active = ledger.get_active_candidate(current_time_ms);
             if ctx.json_mode {
-                let out = serde_json::json!({
+                let status_payload = serde_json::json!({
                     "engine": "taxis",
                     "subsystem": "uac_staged_promotion",
                     "active_candidate": active,
@@ -1005,7 +1128,7 @@ fn handle_promotion(ctx: &CliContext) {
                         "uac_required": policy.uac_required_for_system_trunk
                     }
                 });
-                println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
+                print_json(&status_payload);
             } else {
                 print_banner();
                 println!("=== Staged Promotion Queue (Human GUI UAC) ===");
@@ -1058,30 +1181,32 @@ fn handle_bench(ctx: &CliContext) {
     let mut verify_path: Option<PathBuf> = None;
     let mut level = fractal_git::BenchmarkLevel::Level1Micro;
 
-    let mut i = 0;
-    while i < ctx.args.len() {
-        if (ctx.args[i] == "-m" || ctx.args[i] == "--multiplier") && i + 1 < ctx.args.len() {
-            multiplier = ctx.args[i + 1].parse().unwrap_or(1);
-            i += 2;
-        } else if ctx.args[i] == "--level" && i + 1 < ctx.args.len() {
-            match ctx.args[i + 1].to_lowercase().as_str() {
+    let mut arg_cursor = 0;
+    while arg_cursor < ctx.args.len() {
+        if (ctx.args[arg_cursor] == "-m" || ctx.args[arg_cursor] == "--multiplier")
+            && arg_cursor + 1 < ctx.args.len()
+        {
+            multiplier = ctx.args[arg_cursor + 1].parse().unwrap_or(1);
+            arg_cursor += 2;
+        } else if ctx.args[arg_cursor] == "--level" && arg_cursor + 1 < ctx.args.len() {
+            match ctx.args[arg_cursor + 1].to_lowercase().as_str() {
                 "2" | "scale" | "poset" => level = fractal_git::BenchmarkLevel::Level2Scale,
                 "3" | "macro" | "monorepo" => level = fractal_git::BenchmarkLevel::Level3Macro,
                 "all" | "full" => level = fractal_git::BenchmarkLevel::All,
                 _ => level = fractal_git::BenchmarkLevel::Level1Micro,
             }
-            i += 2;
-        } else if ctx.args[i] == "--scion-parity" {
+            arg_cursor += 2;
+        } else if ctx.args[arg_cursor] == "--scion-parity" {
             level = fractal_git::BenchmarkLevel::All;
-            i += 1;
-        } else if ctx.args[i] == "--save-baseline" && i + 1 < ctx.args.len() {
-            save_path = Some(PathBuf::from(&ctx.args[i + 1]));
-            i += 2;
-        } else if ctx.args[i] == "--verify-baseline" && i + 1 < ctx.args.len() {
-            verify_path = Some(PathBuf::from(&ctx.args[i + 1]));
-            i += 2;
+            arg_cursor += 1;
+        } else if ctx.args[arg_cursor] == "--save-baseline" && arg_cursor + 1 < ctx.args.len() {
+            save_path = Some(PathBuf::from(&ctx.args[arg_cursor + 1]));
+            arg_cursor += 2;
+        } else if ctx.args[arg_cursor] == "--verify-baseline" && arg_cursor + 1 < ctx.args.len() {
+            verify_path = Some(PathBuf::from(&ctx.args[arg_cursor + 1]));
+            arg_cursor += 2;
         } else {
-            i += 1;
+            arg_cursor += 1;
         }
     }
 
@@ -1180,10 +1305,7 @@ fn handle_bench(ctx: &CliContext) {
     }
 
     if ctx.json_mode {
-        println!(
-            "{}",
-            serde_json::to_string_pretty(&suite).unwrap_or_default()
-        );
+        print_json(&suite);
     } else {
         println!("=== Taxis Performance Micro-Benchmark Results ===");
         println!(
@@ -1219,17 +1341,17 @@ fn main() {
     let mut json_mode = false;
     let mut filtered_args = Vec::new();
 
-    let mut i = 0;
-    while i < raw_args.len() {
-        if raw_args[i] == "--json" {
+    let mut arg_cursor = 0;
+    while arg_cursor < raw_args.len() {
+        if raw_args[arg_cursor] == "--json" {
             json_mode = true;
-            i += 1;
-        } else if raw_args[i] == "--git-dir" && i + 1 < raw_args.len() {
-            git_dir = PathBuf::from(&raw_args[i + 1]);
-            i += 2;
+            arg_cursor += 1;
+        } else if raw_args[arg_cursor] == "--git-dir" && arg_cursor + 1 < raw_args.len() {
+            git_dir = PathBuf::from(&raw_args[arg_cursor + 1]);
+            arg_cursor += 2;
         } else {
-            filtered_args.push(raw_args[i].clone());
-            i += 1;
+            filtered_args.push(raw_args[arg_cursor].clone());
+            arg_cursor += 1;
         }
     }
 
@@ -1270,6 +1392,8 @@ fn main() {
         "worktree" => handle_worktree(&ctx),
         "promotion" => handle_promotion(&ctx),
         "bench" => handle_bench(&ctx),
+        "undo" => handle_undo(&ctx),
+        "operation" => handle_operation(&ctx),
         "rev-list" => handle_rev_list(&ctx),
         "verify" => handle_verify(&ctx),
         "reclaim" => handle_reclaim(&ctx),

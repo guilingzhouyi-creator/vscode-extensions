@@ -22,8 +22,8 @@ pub use diff::{
 };
 pub use math::{compute_jeffreys_credible_lower, evaluate_score_envelope, PosteriorScoreEstimate};
 pub use merge::{
-    CanonicalConflictEntry, CanonicalMergeResult, ConflictEntry, FastPathMerge, ThreeWayMerge,
-    ThreeWayMergeResult, VirtualMergeBaseSynthesizer,
+    AlgebraicMerge, CanonicalConflictEntry, CanonicalMergeResult, ConflictEntry, FastPathMerge,
+    ThreeWayMerge, ThreeWayMergeResult, VirtualMergeBaseSynthesizer,
 };
 pub use poset::CorrectedCommitDate;
 pub use synthetic::{

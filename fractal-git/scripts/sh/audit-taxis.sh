@@ -23,7 +23,7 @@ if ! command -v "${CARGO_CMD}" &>/dev/null; then
 fi
 
 echo ""
-echo "[1/5] Verifying Micro-Crate DAG Topology & Zero-Alloc Boundary..."
+echo "[1/5] CRATE-TOPOLOGY-01  微 Crate DAG 拓扑与零分配边界"
 if command -v node &>/dev/null; then
     node "${PROJECT_ROOT}/scripts/common/validate-crate-topology.js"
     node "${PROJECT_ROOT}/scripts/common/check-zero-alloc-boundary.js"
@@ -34,17 +34,17 @@ else
 fi
 
 echo ""
-echo "[2/5] Running Multi-Crate Regression Tests (cargo test)..."
+echo "[2/5] CRATE-REGRESSION-02  多 Crate 回归测试套件"
 "${CARGO_CMD}" test --manifest-path "${MANIFEST_PATH}"
 echo "  [PASS] All 10 test suites (46 unit & integration tests) 100% green."
 
 echo ""
-echo "[3/5] Evaluating Micro-Benchmarks & TB-REGRESSION Ratchet..."
+echo "[3/5] CRATE-BENCHMARK-03  微基准与耗时棘轮"
 "${CARGO_CMD}" run --manifest-path "${MANIFEST_PATH}" --bin taxis -- bench -m 5 --verify-baseline "${BASELINE_PATH}"
 echo "  [PASS] Micro-benchmarks passed within 15% tolerance envelope."
 
 echo ""
-echo "[4/5] Computing Auto-Refactor Quality Score Envelope..."
+echo "[4/5] QUALITY-ENVELOPE-04  重构质量分数包络"
 AUDIT_SCRIPT="${PROJECT_ROOT}/scripts/common/run-audit-report.js"
 REPORT_PATH="${PROJECT_ROOT}/reports/audit-latest.json"
 COMPOSITE_SCORE="92.5"
@@ -81,7 +81,7 @@ fi
 echo "  Quality Envelope: CompositeScore=${COMPOSITE_SCORE}, CAI=${CAI_SCORE}, CI_Lower=${CI_LOWER}, AntiGaming=true"
 
 echo ""
-echo "[5/5] Verifying Dogfooding Promotion Gate (taxis promotion request)..."
+echo "[5/5] PROMOTION-BRIDGE-05  自举晋级桥接校验"
 SAMPLE_OID="1111111111111111111111111111111111111111"
 "${CARGO_CMD}" run --manifest-path "${MANIFEST_PATH}" --bin taxis -- promotion request \
     --candidate "${SAMPLE_OID}" \

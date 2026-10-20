@@ -220,3 +220,48 @@ fn test_first_class_conflict_management() {
     assert_eq!(tree.conflict_count(), 0);
     assert_eq!(tree.entries().get("src/state.rs").unwrap().oid, our_oid);
 }
+
+#[test]
+fn test_sparse_directory_collapsing_and_reconstruction() {
+    let mut index = InMemoryIndexTree::new();
+    let main_oid = Oid::from_bytes([42u8; 20]);
+    let vendor_subtree_oid = Oid::from_bytes([99u8; 20]);
+
+    // Stage local active files
+    index
+        .stage_oid("src/main.rs", FileMode::RegularFile, main_oid)
+        .expect("Stage file succeeds");
+
+    // Stage out-of-scope vendor subtree as a collapsed sparse directory (Git S_IFDIR truncation)
+    index
+        .stage_sparse_directory("vendor", vendor_subtree_oid)
+        .expect("Stage sparse directory succeeds");
+
+    assert_eq!(index.entry_count(), 2);
+    let vendor_entry = index.entries().get("vendor").expect("Vendor entry exists");
+    assert!(vendor_entry.is_sparse_dir());
+    assert_eq!(vendor_entry.oid, vendor_subtree_oid);
+    assert_eq!(vendor_entry.mode, FileMode::Directory);
+
+    let mut created_trees = Vec::new();
+    let root_oid = index
+        .write_tree_with_persister(|built_tree| {
+            created_trees.push(built_tree.clone());
+            Ok(())
+        })
+        .expect("Write tree succeeds");
+
+    assert_ne!(root_oid, Oid::ZERO);
+    // Two trees created: "src" containing "main.rs", and the root tree
+    assert_eq!(created_trees.len(), 2);
+
+    let root_tree = &created_trees[1];
+    let vendor_child = root_tree
+        .entries()
+        .iter()
+        .find(|entry| entry.name == "vendor")
+        .expect("Vendor child in root tree");
+
+    assert_eq!(vendor_child.mode, FileMode::Directory);
+    assert_eq!(vendor_child.oid, vendor_subtree_oid);
+}

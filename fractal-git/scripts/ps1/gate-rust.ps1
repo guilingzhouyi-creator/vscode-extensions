@@ -32,7 +32,7 @@ if (-not $cargoCmd) {
 
 $manifestPath = Join-Path $ProjectRoot "Cargo.toml"
 
-# Stage 1: Rustfmt check
+# 格式检查 (rustfmt)
 Write-Host "`n=== [gate:rust 1/4] Code Formatting Check (rustfmt --check) ===" -ForegroundColor Gray
 $procFmt = Start-Process -FilePath $cargoCmd -ArgumentList @("fmt", "--all", "--manifest-path", $manifestPath, "--", "--check") -WorkingDirectory $ProjectRoot -NoNewWindow -PassThru -Wait
 if ($procFmt.ExitCode -ne 0) {
@@ -41,7 +41,7 @@ if ($procFmt.ExitCode -ne 0) {
 }
 Write-Host "[PASS] rustfmt clean." -ForegroundColor Green
 
-# Stage 2: Clippy zero-warning check
+# 静态检查 (clippy -D warnings)
 Write-Host "`n=== [gate:rust 2/4] Linter & Static Audit (clippy -D warnings) ===" -ForegroundColor Gray
 $procClippy = Start-Process -FilePath $cargoCmd -ArgumentList @("clippy", "--workspace", "--all-targets", "--manifest-path", $manifestPath, "--", "-D", "warnings") -WorkingDirectory $ProjectRoot -NoNewWindow -PassThru -Wait
 if ($procClippy.ExitCode -ne 0) {
@@ -50,7 +50,7 @@ if ($procClippy.ExitCode -ne 0) {
 }
 Write-Host "[PASS] clippy clean with zero warnings." -ForegroundColor Green
 
-# Stage 3: Zero-Allocation and concurrency boundary scanner
+# 零分配与并发边界扫描
 Write-Host "`n=== [gate:rust 3/4] Zero-Allocation & Safety Proof Scanner ===" -ForegroundColor Gray
 $nodeCmd = if (Get-Command node.exe -ErrorAction SilentlyContinue) { "node.exe" } elseif (Get-Command node -ErrorAction SilentlyContinue) { "node" } else { $null }
 $zeroAllocScript = Join-Path $ProjectRoot "scripts\common\check-zero-alloc-boundary.js"
@@ -64,7 +64,7 @@ if (-not $nodeCmd) {
     }
 }
 
-# Stage 4: Unit and integration tests
+# 单元与集成测试
 Write-Host "`n=== [gate:rust 4/4] Multi-Crate Regression Tests (cargo test) ===" -ForegroundColor Gray
 $testArgs = if ($Fast) {
     @("test", "--workspace", "--manifest-path", $manifestPath, "--", "--test-threads=4")

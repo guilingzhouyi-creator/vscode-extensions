@@ -27,16 +27,18 @@ pub struct VirtualIndexEntry {
     pub mode: FileMode,
     pub oid: Oid,
     pub stage: IndexStage,
+    pub is_sparse_dir: bool,
 }
 
 impl VirtualIndexEntry {
-    /// Creates a clean stage-0 entry.
+    /// Creates a clean stage-0 file entry.
     pub fn new(path: impl Into<String>, mode: FileMode, oid: Oid) -> Self {
         Self {
             path: path.into(),
             mode,
             oid,
             stage: IndexStage::Normal,
+            is_sparse_dir: false,
         }
     }
 
@@ -52,11 +54,29 @@ impl VirtualIndexEntry {
             mode,
             oid,
             stage,
+            is_sparse_dir: false,
+        }
+    }
+
+    /// Creates a collapsed sparse directory entry pointing directly to a pre-computed GitTree OID.
+    /// Aligns with Git's canonical Sparse Index `S_IFDIR` truncation design.
+    pub fn new_sparse_dir(path: impl Into<String>, tree_oid: Oid) -> Self {
+        Self {
+            path: path.into(),
+            mode: FileMode::Directory,
+            oid: tree_oid,
+            stage: IndexStage::Normal,
+            is_sparse_dir: true,
         }
     }
 
     /// Checks if this entry represents a clean staged state (Stage 0).
     pub fn is_clean(&self) -> bool {
         self.stage == IndexStage::Normal
+    }
+
+    /// Checks if this entry is a collapsed sparse directory subtree.
+    pub fn is_sparse_dir(&self) -> bool {
+        self.is_sparse_dir
     }
 }

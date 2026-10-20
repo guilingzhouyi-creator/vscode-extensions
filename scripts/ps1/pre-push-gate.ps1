@@ -414,9 +414,7 @@ if ($runAr) {
     $code = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/validate-self-multidimensional-audit.js") -WorkingDirectory $autoRefactorDir -StepId "ENGINE-BASELINE-13" -TimeoutSeconds 60
     if ($code -ne 0) {
         $failed = $true
-    } else {
-        Write-StepVerdict -StepId "ENGINE-BASELINE-13" -Status "PASS" -Detail "质量基线与自审达标"
-    }
+}
 } else {
     Write-StepVerdict -StepId "ENGINE-BASELINE-13" -Status "SKIP" -Detail "auto-refactor 未受影响"
 }
@@ -426,9 +424,7 @@ if ($runWt) {
     $code = Invoke-GateStep -FilePath $npmCmd -ArgumentList @("run", "test:fast") -WorkingDirectory $workspaceTimingDir -StepId "EXTENSION-TESTS-14" -TimeoutSeconds 60
     if ($code -ne 0) {
         $failed = $true
-    } else {
-        Write-StepVerdict -StepId "EXTENSION-TESTS-14" -Status "PASS" -Detail "快速单元测试通过"
-    }
+}
 } else {
     Write-StepVerdict -StepId "EXTENSION-TESTS-14" -Status "SKIP" -Detail "workspace-timing 未受影响"
 }
@@ -438,9 +434,7 @@ if ($runWt) {
     $code = Invoke-GateStep -FilePath $npmCmd -ArgumentList @("run", "review") -WorkingDirectory $workspaceTimingDir -StepId "EXTENSION-REVIEW-15" -TimeoutSeconds 60
     if ($code -ne 0) {
         $failed = $true
-    } else {
-        Write-StepVerdict -StepId "EXTENSION-REVIEW-15" -Status "PASS" -Detail "六层审查门禁通过"
-    }
+}
 } else {
     Write-StepVerdict -StepId "EXTENSION-REVIEW-15" -Status "SKIP" -Detail "workspace-timing 未受影响"
 }
@@ -450,9 +444,7 @@ if ($runAr) {
     $code = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-trajectory-ledger.js") -WorkingDirectory $repoRoot -StepId "LEDGER-CONSTRAINT-16" -TimeoutSeconds 30
     if ($code -ne 0) {
         $failed = $true
-    } else {
-        Write-StepVerdict -StepId "LEDGER-CONSTRAINT-16" -Status "PASS" -Detail "账本物理约束通过"
-    }
+}
 } else {
     Write-StepVerdict -StepId "LEDGER-CONSTRAINT-16" -Status "SKIP" -Detail "账本未受影响"
 }
@@ -483,16 +475,12 @@ if ($runFg) {
         $code = Invoke-GateStep -FilePath "pwsh" -ArgumentList @("-NoProfile", "-File", "fractal-git/scripts/ps1/gate-rust.ps1") -WorkingDirectory $repoRoot -StepId "RUST-TAXIS-19" -TimeoutSeconds 300
         if ($code -ne 0) {
             $failed = $true
-        } else {
-            Write-StepVerdict -StepId "RUST-TAXIS-19" -Status "PASS" -Detail "格式、静态、分配与回归全部通过"
-        }
+}
     } else {
         $code = Invoke-GateStep -FilePath $cargoCmd -ArgumentList @("test", "--manifest-path", "fractal-git/Cargo.toml") -WorkingDirectory $repoRoot -StepId "RUST-TAXIS-19" -TimeoutSeconds 120
         if ($code -ne 0) {
             $failed = $true
-        } else {
-            Write-StepVerdict -StepId "RUST-TAXIS-19" -Status "PASS" -Detail "回归测试套件通过（仅 cargo test）"
-        }
+}
     }
 } else {
     Write-StepVerdict -StepId "RUST-TAXIS-19" -Status "SKIP" -Detail "fractal-git 未受影响"
@@ -508,9 +496,7 @@ if ($range) {
     $code = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-commit-msg.js", "--range", $range) -WorkingDirectory $repoRoot -StepId "COMMIT-HISTORY-21" -TimeoutSeconds 30
     if ($code -ne 0) {
         $failed = $true
-    } else {
-        Write-StepVerdict -StepId "COMMIT-HISTORY-21" -Status "PASS" -Detail "提交历史风格与文本约束合规"
-    }
+}
 } else {
     Write-StepVerdict -StepId "COMMIT-HISTORY-21" -Status "SKIP" -Detail "无上游对比基准"
 }
@@ -521,9 +507,7 @@ if ($range) {
     $code = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/evaluate-change-entropy.js", "--range", $range, "--fail-on-diffusion") -WorkingDirectory $repoRoot -StepId "CHANGE-ENTROPY-22" -TimeoutSeconds 30
     if ($code -ne 0) {
         $failed = $true
-    } else {
-        Write-StepVerdict -StepId "CHANGE-ENTROPY-22" -Status "PASS" -Detail "变更熵在凝聚阈值内"
-    }
+}
 } else {
     Write-StepVerdict -StepId "CHANGE-ENTROPY-22" -Status "SKIP" -Detail "无推送范围"
 }
@@ -532,7 +516,6 @@ $codeFeedback = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/comm
 if ($codeFeedback -ne 0) {
     $failed = $true
 } else {
-    Write-StepVerdict -StepId "FEEDBACK-VOCABULARY-23" -Status "PASS" -Detail "反馈词表为语义步骤标识与四态状态词闭包"
 }
 
 if ($Agent) {
