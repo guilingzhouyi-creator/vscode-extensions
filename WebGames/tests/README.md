@@ -153,7 +153,7 @@ static func _test_stage4_boundary_defense() -> Dictionary:
 
 ```bash
 # 1. 运行全量测试套件（109 套件，快速无头）
-powershell -ExecutionPolicy Bypass -File scripts/ps1/test-run.ps1
+pwsh -File scripts/ps1/test-run.ps1
 # 或 Linux/Git Bash:
 bash scripts/sh/test-run.sh
 
@@ -161,7 +161,7 @@ bash scripts/sh/test-run.sh
 python WebGames/scripts/py/audit_test_coverage.py --strict
 
 # 3. 运行全量 20 项工程质量门禁
-powershell -ExecutionPolicy Bypass -File scripts/ps1/audit-all.ps1
+pwsh -File scripts/ps1/audit-all.ps1
 ```
 
 ---
