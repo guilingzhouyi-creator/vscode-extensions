@@ -35,7 +35,8 @@ pub struct MaterializeRequest {
 pub struct CasToGitMaterializer;
 
 impl CasToGitMaterializer {
-    /// Materializes a snapshot bundle directly into `.git/objects/` and returns the created Commit Oid.
+    /// Materializes a snapshot bundle directly into `.git/objects/`
+    /// and returns the created Commit Oid.
     pub fn materialize(git_dir: &Path, request: MaterializeRequest) -> FractalResult<Oid> {
         let mut index = InMemoryIndexTree::new();
 
@@ -54,7 +55,11 @@ impl CasToGitMaterializer {
         // 3. Assemble and persist canonical GitCommit object
         let commit = GitCommit::new(
             root_tree_oid.to_hex(),
-            request.parent_commit_oids.iter().map(|o| o.to_hex()).collect(),
+            request
+                .parent_commit_oids
+                .iter()
+                .map(|parent_oid| parent_oid.to_hex())
+                .collect(),
             request.author,
             request.committer,
             request.message,

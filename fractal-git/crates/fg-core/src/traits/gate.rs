@@ -1,6 +1,7 @@
 //! Module: fg-core — Quality Gate Verifier Trait
 //! File Path: crates/fg-core/src/traits/gate.rs
-//! Architecture Role: Abstract contract for pre-commit / pre-receive automated quality verification.
+//! Architecture Role: Abstract contract for pre-commit / pre-receive automated
+//!   quality verification.
 
 use crate::error::FractalResult;
 

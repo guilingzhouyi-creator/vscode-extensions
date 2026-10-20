@@ -32,6 +32,9 @@ impl GitSignature {
     }
 
     pub fn to_git_line(&self) -> String {
-        format!("{} <{}> {} {}", self.name, self.email, self.timestamp_sec, self.tz_offset)
+        format!(
+            "{} <{}> {} {}",
+            self.name, self.email, self.timestamp_sec, self.tz_offset
+        )
     }
 }

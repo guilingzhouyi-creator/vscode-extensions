@@ -1,0 +1,58 @@
+{
+  "$schema": "../auto-refactor/config.schema.json",
+  "format": "text",
+  "failOnIssue": false,
+  "commentLevel": "standard",
+  "autoTuneScale": true,
+  "include": [
+    "crates/**/*.rs",
+    "src/**/*.rs",
+    "scripts/**/*.js",
+    "tests/**/*.rs",
+    "ts/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    ".git",
+    "dist",
+    "target",
+    "coverage",
+    ".auto-refactor-cache"
+  ],
+  "thresholds": {
+    "magicNumberMin": 3,
+    "duplicateLiteralThreshold": 4,
+    "hardcodedStringMinLength": 4,
+    "fileLinesWarn": 400,
+    "fileLinesFail": 1400,
+    "effectiveLocWarn": 750,
+    "effectiveLocFail": 900,
+    "fileFunctionsWarn": 20,
+    "complexityWarn": 12,
+    "complexityFail": 20,
+    "blockingIoAllowPatterns": [
+      "scripts/**",
+      "tests/**",
+      "src/bin/**"
+    ],
+    "allocationAllowPatterns": [
+      "scripts/**",
+      "tests/**",
+      "src/bin/**"
+    ]
+  },
+  "analyzers": {
+    "constants": {
+      "enabled": true
+    },
+    "complexity": {
+      "enabled": true
+    },
+    "large-file": {
+      "enabled": true
+    },
+    "governance": {
+      "enabled": true
+    }
+  }
+}

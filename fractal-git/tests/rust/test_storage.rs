@@ -5,7 +5,9 @@ use fractal_git::core::models::{GitSignature, Oid};
 use fractal_git::core::traits::OdbStore;
 use fractal_git::object::FileMode;
 use fractal_git::storage::cas_backend::CasBackend;
-use fractal_git::storage::cas_bridge::{CasFileDescriptor, CasToGitMaterializer, MaterializeRequest};
+use fractal_git::storage::cas_bridge::{
+    CasFileDescriptor, CasToGitMaterializer, MaterializeRequest,
+};
 use fractal_git::storage::loose::LooseOdb;
 use fractal_git::storage::wal_journal::{WalJournal, WalRecord};
 use std::path::{Path, PathBuf};
@@ -58,12 +60,27 @@ fn test_loose_odb_roundtrip() {
     let odb = LooseOdb::new(git_dir);
 
     let payload = b"content for loose storage test";
-    let oid = odb.write_object("blob", payload).expect("Failed to write loose object");
+    let oid = odb
+        .write_object("blob", payload)
+        .expect("Failed to write loose object");
     assert!(odb.has_object(&oid));
+    assert!(odb.cache_len() >= 1);
+    assert!(odb.cache_bytes() > 0);
 
     let read_back = odb.read_object(&oid).expect("Failed to read loose object");
     assert!(read_back.starts_with(b"blob 30\0"));
     assert!(read_back.ends_with(payload));
+
+    // Verify cache hit even if disk file is removed
+    let disk_file = LooseOdb::object_path(git_dir, &oid);
+    std::fs::remove_file(&disk_file).expect("Remove loose file from disk");
+    assert!(!disk_file.exists());
+
+    // Reading from cache still succeeds!
+    let cached_read = odb
+        .read_object(&oid)
+        .expect("Cache hit should return object even if disk file deleted");
+    assert_eq!(cached_read, read_back);
 }
 
 #[test]
@@ -74,9 +91,21 @@ fn test_cas_backend_block_roundtrip() {
     let block = b"immutable chunk bytes from layervfs";
     let oid = cas.put_block(block).expect("Put block should succeed");
     assert!(cas.has_block(&oid));
+    assert_eq!(cas.cache_len(), 1);
+    assert_eq!(cas.cache_bytes(), block.len());
 
     let fetched = cas.get_block(&oid).expect("Get block should succeed");
     assert_eq!(&fetched, block);
+
+    // Verify cache hit even if block file is deleted from disk
+    let disk_block = cas.block_path(&oid);
+    std::fs::remove_file(&disk_block).expect("Remove block file from disk");
+    assert!(!disk_block.exists());
+
+    let cached_block = cas
+        .get_block(&oid)
+        .expect("Get block from cache should succeed");
+    assert_eq!(&cached_block, block);
 }
 
 #[test]

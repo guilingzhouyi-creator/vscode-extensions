@@ -10,6 +10,8 @@
  *   fail-fast structural typing for multi-agent worktree orchestration.
  */
 
+import { GIT_FILE_MODE } from './constants';
+
 /**
  * Task card identity context aligning with Praxis multi-agent execution.
  */
@@ -52,7 +54,7 @@ export interface FractalCommitMeta {
  */
 export interface StagedFileEntry {
     readonly path: string;
-    readonly mode: '100644' | '100755';
+    readonly mode: typeof GIT_FILE_MODE.REGULAR | typeof GIT_FILE_MODE.EXECUTABLE;
     readonly content: Uint8Array | string;
 }
 

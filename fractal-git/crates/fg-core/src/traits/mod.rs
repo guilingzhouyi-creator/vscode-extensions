@@ -3,10 +3,10 @@
 
 pub mod gate;
 pub mod odb;
-pub mod refs;
 pub mod reclaimer;
+pub mod refs;
 
 pub use gate::{GateVerdict, GateVerifier, StagedCandidate};
 pub use odb::OdbStore;
-pub use refs::RefStore;
 pub use reclaimer::{ReclamationAudit, WorktreeReclaimer};
+pub use refs::RefStore;

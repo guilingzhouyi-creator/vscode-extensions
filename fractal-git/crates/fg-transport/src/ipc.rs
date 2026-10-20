@@ -4,18 +4,54 @@
 //!   enabling zero-network-overhead coordination between Praxis and Fractal Git engine.
 
 use fg_core::error::FractalResult;
+use fg_core::models::{HumanUacProof, StagedPromotionRequest};
 use serde::{Deserialize, Serialize};
 
 /// High-speed local IPC command envelope.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(tag = "type", content = "payload")]
 pub enum IpcMessage {
-    Ping { timestamp_ms: i64 },
-    Pong { timestamp_ms: i64 },
-    RequestRefOid { git_ref: String },
-    ResponseRefOid { git_ref: String, oid: Option<String> },
-    TriggerReclamation { workspace_id: String, git_ref: String },
-    ReclamationDone { workspace_id: String, success: bool },
+    Ping {
+        timestamp_ms: i64,
+    },
+    Pong {
+        timestamp_ms: i64,
+    },
+    RequestRefOid {
+        git_ref: String,
+    },
+    ResponseRefOid {
+        git_ref: String,
+        oid: Option<String>,
+    },
+    TriggerReclamation {
+        workspace_id: String,
+        git_ref: String,
+    },
+    ReclamationDone {
+        workspace_id: String,
+        success: bool,
+    },
+    RequestSystemPromotion {
+        request: StagedPromotionRequest,
+    },
+    QueryActivePromotion,
+    ResponseActivePromotion {
+        active: Option<StagedPromotionRequest>,
+    },
+    SubmitHumanUacApproval {
+        request_id: String,
+        proof: HumanUacProof,
+    },
+    SubmitHumanUacRejection {
+        request_id: String,
+        reason: String,
+    },
+    PromotionResult {
+        request_id: String,
+        success: bool,
+        message: String,
+    },
 }
 
 /// Length-prefixed binary frame encoder/decoder.

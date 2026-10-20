@@ -11,6 +11,7 @@ fg-core = { path = "../fg-core" }
 fg-object = { path = "../fg-object" }
 fg-index = { path = "../fg-index" }
 fg-algorithms = { path = "../fg-algorithms" }
+fg-pools = { path = "../fg-pools" }
 flate2 = "1.0"
 sha1 = "0.10"
 serde = { version = "1.0", features = ["derive"] }

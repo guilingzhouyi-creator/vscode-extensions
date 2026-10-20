@@ -139,6 +139,7 @@ name = "fg-algorithms"
 version = "0.1.0"
 dependencies = [
  "fg-core",
+ "fg-object",
  "sha1",
 ]
 
@@ -198,6 +199,7 @@ dependencies = [
  "fg-core",
  "fg-index",
  "fg-object",
+ "fg-pools",
  "flate2",
  "serde",
  "serde_json",
@@ -212,6 +214,8 @@ dependencies = [
  "chrono",
  "fg-core",
  "serde",
+ "serde_json",
+ "sha1",
 ]
 
 [[package]]

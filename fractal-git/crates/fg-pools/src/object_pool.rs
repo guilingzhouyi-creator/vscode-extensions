@@ -34,11 +34,11 @@ impl<T: Resettable> RecyclePool<T> {
     }
 
     /// Releases an item back to the pool, resetting its internal state.
-    pub fn release(&self, mut item: T) {
-        item.reset_state();
+    pub fn release(&self, mut recycled_element: T) {
+        recycled_element.reset_state();
         let mut guard = self.storage.lock();
         if guard.len() < self.capacity {
-            guard.push(item);
+            guard.push(recycled_element);
         }
     }
 }

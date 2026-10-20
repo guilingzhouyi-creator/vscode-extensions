@@ -18,11 +18,12 @@ pub enum FileMode {
 impl FileMode {
     /// Formats mode as an octal string used in Git tree serialization.
     pub fn as_octal_str(&self) -> &'static str {
+        use fg_core::constants::git::*;
         match self {
-            Self::RegularFile => "100644",
-            Self::ExecutableFile => "100755",
-            Self::Directory => "40000",
-            Self::Symlink => "120000",
+            Self::RegularFile => MODE_REGULAR_STR,
+            Self::ExecutableFile => MODE_EXECUTABLE_STR,
+            Self::Directory => MODE_DIRECTORY_STR,
+            Self::Symlink => MODE_SYMLINK_STR,
         }
     }
 }
@@ -78,12 +79,22 @@ impl GitTree {
     /// Builds and sorts a canonical GitTree from entry collection.
     pub fn new(mut entries: Vec<GitTreeEntry>) -> Self {
         // Canonical Git tree sorting: sort by name, comparing directories as if ending with '/'
-        entries.sort_by(|a, b| {
-            let a_suffix = if a.mode == FileMode::Directory { "/" } else { "" };
-            let b_suffix = if b.mode == FileMode::Directory { "/" } else { "" };
-            let a_key = format!("{}{}", a.name, a_suffix);
-            let b_key = format!("{}{}", b.name, b_suffix);
-            a_key.cmp(&b_key)
+        entries.sort_by(|left_entry, right_entry| {
+            let left_is_dir = left_entry.mode == FileMode::Directory;
+            let right_is_dir = right_entry.mode == FileMode::Directory;
+            let left_bytes = left_entry
+                .name
+                .as_bytes()
+                .iter()
+                .copied()
+                .chain(if left_is_dir { Some(b'/') } else { None });
+            let right_bytes = right_entry
+                .name
+                .as_bytes()
+                .iter()
+                .copied()
+                .chain(if right_is_dir { Some(b'/') } else { None });
+            left_bytes.cmp(right_bytes)
         });
 
         let raw_payload = Self::serialize_entries(&entries);
@@ -94,6 +105,11 @@ impl GitTree {
 
     /// Access the 40-character hexadecimal SHA-1 identifier of the tree.
     pub fn oid(&self) -> &str {
+        &self.hex
+    }
+
+    /// Access the 40-character hexadecimal SHA-1 identifier of the tree (explicit getter).
+    pub fn oid_hex(&self) -> &str {
         &self.hex
     }
 

@@ -16,5 +16,9 @@ pub struct ReclamationAudit {
 /// Abstract interface for workspace reclamation engines.
 pub trait WorktreeReclaimer: Send + Sync {
     /// Reclaims physical or virtual resources allocated to target workspace.
-    fn reclaim_workspace(&self, workspace_id: &str, target_ref: &str) -> FractalResult<ReclamationAudit>;
+    fn reclaim_workspace(
+        &self,
+        workspace_id: &str,
+        target_ref: &str,
+    ) -> FractalResult<ReclamationAudit>;
 }

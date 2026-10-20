@@ -7,8 +7,16 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "build:native": "cargo build --release",
+    "gate:topology": "node scripts/common/validate-crate-topology.js",
+    "gate:parity": "node scripts/common/validate-git-parity.js",
+    "gate:bridge": "node scripts/common/validate-gate-bridge.js",
+    "gate:alloc": "node scripts/common/check-zero-alloc-boundary.js",
+    "gate:rust": "node scripts/common/validate-crate-topology.js && cargo test --workspace",
+    "gate": "npm run gate:topology && npm run gate:parity && npm run gate:bridge && npm run gate:alloc && npm test",
+    "audit": "node scripts/common/run-audit-report.js",
+    "review": "npm run audit",
     "test": "npm run test:ts",
-    "test:rust": "cargo test",
+    "test:rust": "cargo test --workspace",
     "test:ts": "node --test dist/tests/ts/*.test.js"
   },
   "keywords": [

@@ -67,3 +67,19 @@ path = "tests/rust/test_storage.rs"
 [[test]]
 name = "test_index"
 path = "tests/rust/test_index.rs"
+
+[[test]]
+name = "test_object_codec"
+path = "tests/rust/test_object_codec.rs"
+
+[[test]]
+name = "test_governance"
+path = "tests/rust/test_governance.rs"
+
+[[test]]
+name = "test_uac_promotions"
+path = "tests/rust/test_uac_promotions.rs"
+
+[[test]]
+name = "test_benchmarks"
+path = "tests/rust/test_benchmarks.rs"

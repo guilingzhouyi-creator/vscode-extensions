@@ -41,7 +41,12 @@ impl VirtualIndexEntry {
     }
 
     /// Creates an entry with an explicit merge stage.
-    pub fn with_stage(path: impl Into<String>, mode: FileMode, oid: Oid, stage: IndexStage) -> Self {
+    pub fn with_stage(
+        path: impl Into<String>,
+        mode: FileMode,
+        oid: Oid,
+        stage: IndexStage,
+    ) -> Self {
         Self {
             path: path.into(),
             mode,

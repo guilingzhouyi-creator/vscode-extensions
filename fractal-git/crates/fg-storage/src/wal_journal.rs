@@ -14,11 +14,28 @@ use std::path::PathBuf;
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "op", content = "data")]
 pub enum WalRecord {
-    BeginTx { tx_id: String, timestamp_ms: i64 },
-    StageFile { tx_id: String, path: String, oid: Oid },
-    UpdateRef { tx_id: String, git_ref: String, new_oid: Oid },
-    CommitTx { tx_id: String, commit_oid: Oid },
-    AbortTx { tx_id: String, reason: String },
+    BeginTx {
+        tx_id: String,
+        timestamp_ms: i64,
+    },
+    StageFile {
+        tx_id: String,
+        path: String,
+        oid: Oid,
+    },
+    UpdateRef {
+        tx_id: String,
+        git_ref: String,
+        new_oid: Oid,
+    },
+    CommitTx {
+        tx_id: String,
+        commit_oid: Oid,
+    },
+    AbortTx {
+        tx_id: String,
+        reason: String,
+    },
 }
 
 /// Append-only WAL journal manager.
@@ -65,11 +82,11 @@ impl WalJournal {
             if trimmed.is_empty() {
                 continue;
             }
-            let record: WalRecord = serde_json::from_str(trimmed).map_err(|e| {
+            let record: WalRecord = serde_json::from_str(trimmed).map_err(|parse_err| {
                 FractalError::IndexConflict(format!(
                     "WAL journal corrupted at line {}: {}",
                     idx + 1,
-                    e
+                    parse_err
                 ))
             })?;
             records.push(record);

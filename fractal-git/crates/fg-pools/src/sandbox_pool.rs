@@ -40,9 +40,9 @@ impl SandboxPool {
     /// Acquires an idle sandbox slot.
     pub fn acquire(&self) -> Option<SandboxSlot> {
         let mut guard = self.free_slots.lock();
-        guard.pop_front().map(|mut s| {
-            s.in_use = true;
-            s
+        guard.pop_front().map(|mut slot| {
+            slot.in_use = true;
+            slot
         })
     }
 

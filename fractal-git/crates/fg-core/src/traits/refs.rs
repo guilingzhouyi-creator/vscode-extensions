@@ -12,7 +12,12 @@ pub trait RefStore: Send + Sync {
     fn get_ref(&self, ref_name: &str) -> FractalResult<Option<Oid>>;
 
     /// Atomically updates a reference with compare-and-swap (CAS) safety.
-    fn update_ref(&self, ref_name: &str, new_oid: &Oid, expected_old: Option<&Oid>) -> FractalResult<()>;
+    fn update_ref(
+        &self,
+        ref_name: &str,
+        new_oid: &Oid,
+        expected_old: Option<&Oid>,
+    ) -> FractalResult<()>;
 
     /// Deletes a reference.
     fn delete_ref(&self, ref_name: &str) -> FractalResult<bool>;

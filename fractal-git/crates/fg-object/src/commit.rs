@@ -1,7 +1,8 @@
 //! Module: fg-object — Canonical Git Commit Codec
 //! File Path: crates/fg-object/src/commit.rs
 //! Architecture Role: Encapsulates pure Git commit object primitives with Dual-Faced
-//!   payload serialization (Human-readable conventional sections + Machine-readable PraxisCardContext).
+//!   payload serialization (Human-readable conventional sections +
+//!   Machine-readable PraxisCardContext).
 
 use fg_core::models::{AgentCommitMeta, GitSignature, Oid};
 use sha1::{Digest, Sha1};
@@ -54,8 +55,32 @@ impl GitCommit {
         }
     }
 
+    /// Constructs a GitCommit strictly from a proven `ValidatedCommitWitness`.
+    pub fn from_witness(
+        tree_oid: impl Into<String>,
+        parent_oids: Vec<String>,
+        author: GitSignature,
+        committer: GitSignature,
+        witness: &fg_core::models::ValidatedCommitWitness,
+        agent_meta: Option<AgentCommitMeta>,
+    ) -> Self {
+        Self::new(
+            tree_oid,
+            parent_oids,
+            author,
+            committer,
+            witness.raw_message.clone(),
+            agent_meta,
+        )
+    }
+
     /// Access the 40-character SHA-1 identifier of this commit.
     pub fn oid(&self) -> &str {
+        &self.oid
+    }
+
+    /// Access the 40-character SHA-1 identifier of this commit (explicit getter).
+    pub fn oid_hex(&self) -> &str {
         &self.oid
     }
 

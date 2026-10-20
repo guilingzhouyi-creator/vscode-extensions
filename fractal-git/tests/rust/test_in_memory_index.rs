@@ -16,7 +16,9 @@ fn test_concurrent_independent_tree_builders() {
             for file_idx in 0..20 {
                 let path = format!("src/module_{}/file_{}.ts", thread_idx, file_idx);
                 let fake_oid = "0123456789abcdef0123456789abcdef01234567";
-                builder.stage_file(&path, FileMode::RegularFile, fake_oid).unwrap();
+                builder
+                    .stage_file(&path, FileMode::RegularFile, fake_oid)
+                    .unwrap();
             }
             // Successfully staged without locking
             builder

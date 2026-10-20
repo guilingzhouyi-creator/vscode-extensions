@@ -25,6 +25,11 @@ impl GitBlob {
         &self.hex
     }
 
+    /// Access the 40-character SHA-1 hexadecimal identifier (explicit getter).
+    pub fn oid_hex(&self) -> &str {
+        &self.hex
+    }
+
     /// Access the raw 20-byte Oid representation.
     pub fn raw_oid(&self) -> &Oid {
         &self.oid
@@ -44,10 +49,10 @@ impl GitBlob {
         raw
     }
 
-    pub fn compute_blob_oid(data: &[u8]) -> Oid {
+    pub fn compute_blob_oid(payload_bytes: &[u8]) -> Oid {
         let mut hasher = Sha1::new();
-        hasher.update(format!("blob {}\0", data.len()).as_bytes());
-        hasher.update(data);
+        hasher.update(format!("blob {}\0", payload_bytes.len()).as_bytes());
+        hasher.update(payload_bytes);
         let hash: [u8; 20] = hasher.finalize().into();
         Oid::from_bytes(hash)
     }

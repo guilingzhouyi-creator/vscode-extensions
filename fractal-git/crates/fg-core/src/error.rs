@@ -28,10 +28,7 @@ pub enum FractalError {
     },
 
     #[error("Gate rejection: score={score}, violations={violations:?}")]
-    GateRejection {
-        score: f64,
-        violations: Vec<String>,
-    },
+    GateRejection { score: f64, violations: Vec<String> },
 
     #[error("Workspace reclamation failure for {workspace_id}: {reason}")]
     ReclamationFailure {
@@ -40,10 +37,7 @@ pub enum FractalError {
     },
 
     #[error("Resource pool exhausted: {pool_name} (capacity: {capacity})")]
-    PoolExhausted {
-        pool_name: String,
-        capacity: usize,
-    },
+    PoolExhausted { pool_name: String, capacity: usize },
 
     #[error("Serialization error: {0}")]
     Json(#[from] serde_json::Error),

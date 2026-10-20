@@ -43,7 +43,9 @@ impl InMemoryIndexTree {
     pub fn stage_oid(&mut self, path: &str, mode: FileMode, oid: Oid) -> FractalResult<()> {
         let clean_path = path.trim_matches('/').replace('\\', "/");
         if clean_path.is_empty() {
-            return Err(FractalError::IndexConflict("Cannot stage empty path".into()));
+            return Err(FractalError::IndexConflict(
+                "Cannot stage empty path".into(),
+            ));
         }
 
         // Clean any lingering conflicts for this path
@@ -104,6 +106,63 @@ impl InMemoryIndexTree {
     /// Access all staged entries.
     pub fn entries(&self) -> &BTreeMap<String, VirtualIndexEntry> {
         &self.entries
+    }
+
+    /// Access all active conflict slots (first-class conflicts).
+    pub fn conflicts(&self) -> &BTreeMap<String, ConflictStageSlot> {
+        &self.conflicts
+    }
+
+    /// Total count of unresolved conflicts.
+    pub fn conflict_count(&self) -> usize {
+        self.conflicts.len()
+    }
+
+    /// Resolves an in-memory conflict slot in favor of a specific entry.
+    pub fn resolve_conflict(&mut self, path: &str, resolved_entry: VirtualIndexEntry) {
+        let clean_path = path.trim_matches('/').replace('\\', "/");
+        self.conflicts.remove(&clean_path);
+        self.entries.insert(clean_path, resolved_entry);
+    }
+
+    /// Extracts a scoped subtree index containing only entries that match
+    /// one of the scope prefixes.
+    pub fn filter_by_scope(&self, scope_prefixes: &[String]) -> Self {
+        if scope_prefixes.is_empty()
+            || scope_prefixes
+                .iter()
+                .any(|scope_prefix| scope_prefix == "*")
+        {
+            return self.clone();
+        }
+        let mut filtered = Self::new();
+        for (path, entry) in &self.entries {
+            let matches = scope_prefixes.iter().any(|prefix| {
+                let prefix_clean = prefix.trim_matches('/').replace('\\', "/");
+                path.starts_with(&prefix_clean)
+            });
+            if matches {
+                filtered.entries.insert(path.clone(), entry.clone());
+            }
+        }
+        filtered
+    }
+
+    /// Grafts this scoped index's modifications onto a parent set of entries.
+    /// Preserves all parent entries outside this index's modified paths, while
+    /// applying this index's additions, modifications, and removals.
+    pub fn graft_onto_parent(&self, parent_entries: &BTreeMap<String, (FileMode, Oid)>) -> Self {
+        let mut combined = Self::new();
+        for (path, (mode, oid)) in parent_entries {
+            combined.entries.insert(
+                path.clone(),
+                VirtualIndexEntry::new(path.clone(), *mode, *oid),
+            );
+        }
+        for (path, entry) in &self.entries {
+            combined.entries.insert(path.clone(), entry.clone());
+        }
+        combined
     }
 
     /// Builds the hierarchical GitTree structures from in-memory entries,
@@ -169,11 +228,19 @@ impl InMemoryIndexTree {
         for (name, node) in current_dir {
             match node {
                 TreeNode::File(file_entry) => {
-                    entries.push(GitTreeEntry::from_oid(file_entry.mode, name.clone(), file_entry.oid));
+                    entries.push(GitTreeEntry::from_oid(
+                        file_entry.mode,
+                        name.clone(),
+                        file_entry.oid,
+                    ));
                 }
                 TreeNode::Directory(child_map) => {
                     let subtree_oid = Self::persist_node_recursive(child_map, persist_tree)?;
-                    entries.push(GitTreeEntry::from_oid(FileMode::Directory, name.clone(), subtree_oid));
+                    entries.push(GitTreeEntry::from_oid(
+                        FileMode::Directory,
+                        name.clone(),
+                        subtree_oid,
+                    ));
                 }
             }
         }

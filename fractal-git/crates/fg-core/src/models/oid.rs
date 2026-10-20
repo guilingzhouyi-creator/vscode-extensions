@@ -1,6 +1,7 @@
 //! Module: fg-core — Atomic Object Identifier (Oid)
 //! File Path: crates/fg-core/src/models/oid.rs
-//! Architecture Role: Pure immutable 40-character hexadecimal and 20-byte binary Git OID representation.
+//! Architecture Role: Pure immutable 40-character hexadecimal and 20-byte binary
+//!   Git OID representation.
 
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -31,8 +32,11 @@ impl Oid {
 
         let mut bytes = [0u8; 20];
         for i in 0..20 {
-            bytes[i] = u8::from_str_radix(&hex[i * 2..i * 2 + 2], 16).map_err(|e| {
-                FractalError::ObjectCodec(format!("Invalid hex byte in OID '{}': {}", hex, e))
+            bytes[i] = u8::from_str_radix(&hex[i * 2..i * 2 + 2], 16).map_err(|parse_err| {
+                FractalError::ObjectCodec(format!(
+                    "Invalid hex byte in OID '{}': {}",
+                    hex, parse_err
+                ))
             })?;
         }
 
@@ -66,3 +70,34 @@ impl fmt::Display for Oid {
         write!(f, "{}", self.to_hex())
     }
 }
+
+use std::collections::{HashMap, HashSet};
+use std::hash::{BuildHasherDefault, Hasher};
+
+/// Lightweight direct-indexing hasher for uniformly distributed 20-byte Oid digests.
+#[derive(Default)]
+pub struct FastOidHasher(u64);
+
+impl Hasher for FastOidHasher {
+    fn finish(&self) -> u64 {
+        self.0
+    }
+
+    fn write(&mut self, bytes: &[u8]) {
+        if bytes.len() >= 8 {
+            let mut arr = [0u8; 8];
+            arr.copy_from_slice(&bytes[..8]);
+            self.0 = u64::from_ne_bytes(arr);
+        } else {
+            for &byte_val in bytes {
+                self.0 = self.0.wrapping_mul(31).wrapping_add(byte_val as u64);
+            }
+        }
+    }
+}
+
+/// Zero-allocation, high-throughput HashSet specialized for 20-byte Oids.
+pub type FastOidSet = HashSet<Oid, BuildHasherDefault<FastOidHasher>>;
+
+/// Zero-allocation, high-throughput HashMap specialized for 20-byte Oids.
+pub type FastOidMap<V> = HashMap<Oid, V, BuildHasherDefault<FastOidHasher>>;

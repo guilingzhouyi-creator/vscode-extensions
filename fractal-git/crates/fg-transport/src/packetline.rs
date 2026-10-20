@@ -33,12 +33,15 @@ impl PacketLine {
         let mut lines = Vec::new();
 
         while bytes.len() >= 4 {
-            let len_str = std::str::from_utf8(&bytes[..4]).map_err(|e| {
-                FractalError::ObjectCodec(format!("Invalid pkt-line hex prefix: {}", e))
+            let len_str = std::str::from_utf8(&bytes[..4]).map_err(|codec_err| {
+                FractalError::ObjectCodec(format!("Invalid pkt-line hex prefix: {}", codec_err))
             })?;
 
-            let len = usize::from_str_radix(len_str, 16).map_err(|e| {
-                FractalError::ObjectCodec(format!("Malformed pkt-line length '{}': {}", len_str, e))
+            let len = usize::from_str_radix(len_str, 16).map_err(|codec_err| {
+                FractalError::ObjectCodec(format!(
+                    "Malformed pkt-line length '{}': {}",
+                    len_str, codec_err
+                ))
             })?;
 
             if len == 0 {
@@ -56,7 +59,9 @@ impl PacketLine {
             }
 
             let payload = std::str::from_utf8(&bytes[4..len])
-                .map_err(|e| FractalError::ObjectCodec(format!("Pkt-line non-UTF8 body: {}", e)))?
+                .map_err(|codec_err| {
+                    FractalError::ObjectCodec(format!("Pkt-line non-UTF8 body: {}", codec_err))
+                })?
                 .trim_end_matches('\n');
 
             lines.push(payload.to_string());
