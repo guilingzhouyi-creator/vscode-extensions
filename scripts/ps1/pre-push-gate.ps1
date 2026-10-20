@@ -57,55 +57,74 @@ if ($Agent) {
     if (Test-Path $staleSnapshot) { Remove-Item -Path $staleSnapshot -Force -ErrorAction SilentlyContinue }
 }
 
-function Get-StepRuleId {
+$script:StepRegistryFile = Join-Path $repoRoot "scripts/common/gate-step-registry.json"
+$script:StepRegistry = $null
+$script:StepIndex = [ordered]@{}
+
+function Initialize-StepRegistry {
     [CmdletBinding()]
-    param([string]$StepName)
-    if ($StepName -like "Gate 1 *") { return "HYG-EMP-001" }
-    if ($StepName -match "Gate 2") { return "GATE-SSOT-001" }
-    if ($StepName -match "Gate 3|auto-refactor") { return "RCFG-RULE-DRIFT" }
-    if ($StepName -match "Gate 4") { return "GATE-BUDGET-001" }
-    if ($StepName -match "Gate 5") { return "GATE-BUDGET-001" }
-    if ($StepName -match "Gate 6") { return "RCFG-MATRIX" }
-    if ($StepName -match "Gate 7") { return "ARCH-CFG-001" }
-    if ($StepName -match "Gate 8") { return "ADV-CFG-001" }
-    if ($StepName -match "Gate 9") { return "GATE-SYS-001" }
-    if ($StepName -match "Gate 10") { return "GATE-MSG-001" }
-    if ($StepName -match "Gate 11") { return "GATE-ENT-001" }
-    return "GATE-SYS-001"
+    param()
+    if ($script:StepRegistry) { return }
+    if (-not (Test-Path $script:StepRegistryFile)) {
+        throw "Gate step registry missing: $($script:StepRegistryFile)"
+    }
+    $script:StepRegistry = Get-Content -Path $script:StepRegistryFile -Raw -Encoding utf8 | ConvertFrom-Json
+    $entry = $script:StepRegistry.entries.'pre-push'
+    if (-not $entry) { throw "Gate step registry declares no 'pre-push' entry." }
+    $ordinal = 0
+    foreach ($step in $entry.steps) {
+        $ordinal++
+        $meta = @{ Id = $step.id; Ordinal = $ordinal; Rule = $step.ruleId; Title = $step.title }
+        $script:StepIndex[$step.id] = $meta
+        $script:StepIndex[$step.title] = $meta
+    }
 }
 
-$script:StepMetaTable = @{
-    'Gate 1 (物理卫生八维全域巡检)' = @{ Id = 'PP-01-01'; Rule = 'HYG-EMP-001' }
-    'Gate 1 (.gitignore 治理)' = @{ Id = 'PP-01-02'; Rule = 'GATE-HYG-001' }
-    'Gate 1 (五维代码密度)' = @{ Id = 'PP-01-03'; Rule = 'VOL-DIL-001' }
-    'Gate 2 (单源规则目录)' = @{ Id = 'PP-02-01'; Rule = 'RCFG-RULE-DRIFT' }
-    'Gate 2 (规则 ID 闭包)' = @{ Id = 'PP-02-02'; Rule = 'RCFG-RULE-DRIFT' }
-    'Gate 2 (文档一致性)' = @{ Id = 'PP-02-03'; Rule = 'RCFG-RULE-DRIFT' }
-    'Gate 2 (规则可达性)' = @{ Id = 'PP-02-04'; Rule = 'RCFG-RULE-DRIFT' }
-    'auto-refactor Rust Gate' = @{ Id = 'PP-03-01'; Rule = 'GATE-SYS-001' }
-    'auto-refactor Build' = @{ Id = 'PP-03-02'; Rule = 'GATE-SYS-001' }
-    'auto-refactor Facade Gate' = @{ Id = 'PP-03-03'; Rule = 'ARCH-FAC-001' }
-    'auto-refactor Self Gate' = @{ Id = 'PP-03-04'; Rule = 'GATE-SYS-001' }
-    'auto-refactor Tests' = @{ Id = 'PP-03-05'; Rule = 'GATE-SYS-001' }
-    'Gate 4 (auto-refactor 质量基线)' = @{ Id = 'PP-04-01'; Rule = 'GATE-BUDGET-001' }
-    'Gate 5 (workspace-timing 快速单元测试)' = @{ Id = 'PP-05-01'; Rule = 'GATE-SYS-001' }
-    'Gate 6 (workspace-timing 审查门禁)' = @{ Id = 'PP-06-01'; Rule = 'RCFG-MATRIX' }
-    'Gate 7 (长期轨迹账本约束)' = @{ Id = 'PP-07-01'; Rule = 'GOV-TRJ-001' }
-    'Gate 8 (WebGames 全域质量门禁)' = @{ Id = 'PP-08-01'; Rule = 'ADV-CFG-001' }
-    'Gate 8 (WebGames 文档 Mermaid 真解析)' = @{ Id = 'PP-08-02'; Rule = 'ADV-CFG-001' }
-    'Gate 9 (fractal-git 9大微 Crate 回归套件)' = @{ Id = 'PP-09-01'; Rule = 'GATE-SYS-001' }
-    'Gate 10 (待推送分支提交历史风格与禁词审查)' = @{ Id = 'PP-10-01'; Rule = 'CMG-STY-001' }
-    'Gate 10 (提交信息词法与债务走廊契约自测)' = @{ Id = 'PP-10-02'; Rule = 'CMG-STY-001' }
-    'Gate 11 (推送集变更熵与跨域扩散审查)' = @{ Id = 'PP-11-01'; Rule = 'GATE-ENT-001' }
-}
-
+# 步骤身份只来自单源登记表：未知标签直接抛错，绝不回落到合成标识。
 function Resolve-StepMeta {
     [CmdletBinding()]
-    param([string]$StepName)
-    if ($script:StepMetaTable.ContainsKey($StepName)) {
-        return $script:StepMetaTable[$StepName]
+    param([string]$StepId)
+    Initialize-StepRegistry
+    if (-not $script:StepIndex.Contains($StepId)) {
+        throw "Unregistered gate step '$StepId'. Declare it in scripts/common/gate-step-registry.json."
     }
-    return @{ Id = 'PP-00-00'; Rule = (Get-StepRuleId -StepName $StepName) }
+    return $script:StepIndex[$StepId]
+}
+
+function Get-StepTotal {
+    [CmdletBinding()]
+    param()
+    Initialize-StepRegistry
+    return $script:StepRegistry.entries.'pre-push'.steps.Count
+}
+
+function Write-StepBanner {
+    [CmdletBinding()]
+    param([string]$StepId)
+    $meta = Resolve-StepMeta -StepId $StepId
+    Write-GateHost "▶ [$($meta.Ordinal)/$(Get-StepTotal)] $($meta.Id)  $($meta.Title)" -ForegroundColor Gray
+}
+
+function Write-StepVerdict {
+    [CmdletBinding()]
+    param([string]$StepId, [string]$Status, [string]$Detail = "")
+    $meta = Resolve-StepMeta -StepId $StepId
+    $glyph = switch ($Status) {
+        'PASS' { '✔' }
+        'BLOCK' { '✖' }
+        'SKIP' { '⚠️' }
+        'WARN' { '⚠️' }
+        default { '·' }
+    }
+    $color = switch ($Status) {
+        'PASS' { 'Green' }
+        'BLOCK' { 'Red' }
+        'SKIP' { 'Yellow' }
+        'WARN' { 'Yellow' }
+        default { 'Gray' }
+    }
+    $suffix = if ($Detail) { "  $Detail" } else { "" }
+    Write-GateHost "  $glyph $Status  $($meta.Id)$suffix" -ForegroundColor $color
 }
 
 function Write-GateHost {
@@ -196,10 +215,11 @@ function Invoke-GateStep {
         [Parameter(Mandatory = $true)]
         [string]$WorkingDirectory,
         [Parameter(Mandatory = $true)]
-        [string]$StepName,
+        [string]$StepId,
         [Parameter(Mandatory = $false)]
         [int]$TimeoutSeconds = 60
     )
+    $meta = Resolve-StepMeta -StepId $StepId
     $logDir = Join-Path $repoRoot ".audit-logs"
     if (-not (Test-Path $logDir)) {
         [void](New-Item -ItemType Directory -Path $logDir -Force)
@@ -209,10 +229,12 @@ function Invoke-GateStep {
     if (Test-Path $stepLog) { Remove-Item -Path $stepLog -Force -ErrorAction SilentlyContinue }
     if (Test-Path $stepErrLog) { Remove-Item -Path $stepErrLog -Force -ErrorAction SilentlyContinue }
 
+    Write-StepBanner -StepId $StepId
+
     $p = Start-Process -FilePath $FilePath -ArgumentList $ArgumentList -WorkingDirectory $WorkingDirectory `
         -RedirectStandardOutput $stepLog -RedirectStandardError $stepErrLog -NoNewWindow -PassThru
 
-    $ok = Wait-ProcessWithTimeout -Process $p -TimeoutSeconds $TimeoutSeconds -ProcessName $StepName -LogFile $stepLog -ErrLogFile $stepErrLog
+    $ok = Wait-ProcessWithTimeout -Process $p -TimeoutSeconds $TimeoutSeconds -ProcessName $meta.Id -LogFile $stepLog -ErrLogFile $stepErrLog
     if (Test-Path $stepErrLog) {
         $errContent = Get-Content -Path $stepErrLog -Raw -ErrorAction SilentlyContinue
         if ($errContent) {
@@ -221,12 +243,12 @@ function Invoke-GateStep {
         Remove-Item -Path $stepErrLog -Force -ErrorAction SilentlyContinue
     }
     if (-not $ok) {
-        if (-not $Agent) { Write-Host "❌ $StepName 执行超时 (已超过 ${TimeoutSeconds} 秒)" -ForegroundColor Red }
+        if (-not $Agent) { Write-Host "  ✖ BLOCK  $($meta.Id) 执行超时 (已超过 ${TimeoutSeconds} 秒)" -ForegroundColor Red }
         return 124
     }
     if ($p.ExitCode -ne 0) {
         if (-not $Agent) {
-            Write-Host "❌ $StepName 失败 (退出码: $($p.ExitCode))" -ForegroundColor Red
+            Write-Host "  ✖ BLOCK  $($meta.Id) 失败 (退出码: $($p.ExitCode))" -ForegroundColor Red
             if (Test-Path $stepLog) {
                 $tail = Get-Content -Path $stepLog -Tail 20 -ErrorAction SilentlyContinue
                 if ($tail) {
@@ -237,20 +259,19 @@ function Invoke-GateStep {
                 }
             }
         }
+        Write-StepVerdict -StepId $StepId -Status "BLOCK" -Detail "退出码 $($p.ExitCode)"
         # 保留现场快照与 Agent-Native Envelope
         try {
             $lastLog = Join-Path $logDir "last-pre-push.log"
             Copy-Item -Path $stepLog -Destination $lastLog -Force -ErrorAction SilentlyContinue
             Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/log-rotator.js", "--truncate", $lastLog -WorkingDirectory $repoRoot -NoNewWindow -Wait -ErrorAction SilentlyContinue
 
-            $ruleId = (Resolve-StepMeta -StepName $StepName).Rule
-            $stepId = (Resolve-StepMeta -StepName $StepName).Id
             $cmdStr = "$FilePath $($ArgumentList -join ' ')"
             $violation = [ordered]@{
-                ruleId = $ruleId
+                ruleId = $meta.Rule
                 severity = "BLOCK"
                 file = $WorkingDirectory
-                message = "Step $StepName failed with exit code $($p.ExitCode)"
+                message = "Step $($meta.Id) failed with exit code $($p.ExitCode)"
                 verificationCommand = $cmdStr
             }
             $envelope = [ordered]@{
@@ -259,16 +280,17 @@ function Invoke-GateStep {
                 recordedAt = (Get-Date).ToString("o")
                 status = "BLOCK"
                 gate = "pre-push"
-                step = $StepName
-                stepId = $stepId
+                step = $meta.Id
+                stepTitle = $meta.Title
+                stepId = $meta.Id
                 failedCommand = $cmdStr
                 exitCode = $p.ExitCode
-                summary = "Step $StepName failed with exit code $($p.ExitCode)"
+                summary = "Step $($meta.Id) ($($meta.Title)) failed with exit code $($p.ExitCode)"
                 logFile = ".audit-logs/last-pre-push.log"
                 violations = @($violation)
                 agentDirectives = [ordered]@{
                     targetFiles = @($WorkingDirectory)
-                    remediationPriority = @($ruleId)
+                    remediationPriority = @($meta.Rule)
                     verificationCommand = $cmdStr
                     fastRecheckCommand = "pwsh -File scripts/ps1/pre-push-gate.ps1 -Agent"
                 }
@@ -277,6 +299,7 @@ function Invoke-GateStep {
             [System.IO.File]::WriteAllText((Join-Path $logDir "last-failure.json"), $snapshotJson, [System.Text.UTF8Encoding]::new($false))
         } catch {}
     } else {
+        Write-StepVerdict -StepId $StepId -Status "PASS" -Detail ""
         # 步骤执行成功，清理临时 step 日志保持目录干净
         if (Test-Path $stepLog) { Remove-Item -Path $stepLog -Force -ErrorAction SilentlyContinue }
     }
@@ -354,174 +377,162 @@ if ($runAll) {
     Write-GateHost "ℹ️  智能影响路由生效: 仅回归受影响项目 [$($activeProj -join ', ')]" -ForegroundColor Green
 }
 
-# --- Gate 1: 全工作区零空文件、物理卫生、.gitignore 治理与五维代码密度守卫 ---
-Write-GateHost "[1/11] 校验全工作区零物理空文件、空白脚本、.gitignore 治理与五维代码密度守卫..." -ForegroundColor Gray
-$code = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-physical-hygiene.js") -WorkingDirectory $repoRoot -StepName "Gate 1 (物理卫生八维全域巡检)" -TimeoutSeconds 30
-$codeGi = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-gitignore-governance.js") -WorkingDirectory $repoRoot -StepName "Gate 1 (.gitignore 治理)" -TimeoutSeconds 30
+# --- 工作区物理卫生与体积守卫 ---
+$code = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-physical-hygiene.js") -WorkingDirectory $repoRoot -StepId "WORKSPACE-PHYSICAL-01" -TimeoutSeconds 30
+$codeGi = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-gitignore-governance.js") -WorkingDirectory $repoRoot -StepId "WORKSPACE-GITIGNORE-02" -TimeoutSeconds 30
 $densityArgs = if ($range) { @("scripts/common/validate-code-density.js", "--range", $range) } else { @("scripts/common/validate-code-density.js") }
-$codeDensity = Invoke-GateStep -FilePath $nodeCmd -ArgumentList $densityArgs -WorkingDirectory $repoRoot -StepName "Gate 1 (五维代码密度)" -TimeoutSeconds 30
+$codeDensity = Invoke-GateStep -FilePath $nodeCmd -ArgumentList $densityArgs -WorkingDirectory $repoRoot -StepId "WORKSPACE-DENSITY-03" -TimeoutSeconds 30
 if ($code -ne 0 -or $codeGi -ne 0 -or $codeDensity -ne 0) {
     $failed = $true
-} else {
-    Write-GateHost "  ✔ 全工作区零空文件、.gitignore 治理与五维代码密度校验通过" -ForegroundColor Green
 }
 
-# --- Gate 2: 规则单源目录一致性同步 ---
-Write-GateHost "[2/11] 校验全工作区单源规则目录同步..." -ForegroundColor Gray
-$code = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/generate-rule-catalog.js", "--check-only") -WorkingDirectory $repoRoot -StepName "Gate 2 (单源规则目录)" -TimeoutSeconds 30
-$codeClosure = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-rule-id-closure.js") -WorkingDirectory $repoRoot -StepName "Gate 2 (规则 ID 闭包)" -TimeoutSeconds 30
-$codeDocs = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-docs-consistency.js") -WorkingDirectory $repoRoot -StepName "Gate 2 (文档一致性)" -TimeoutSeconds 30
-$codeReach = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-rule-reachability.js") -WorkingDirectory $repoRoot -StepName "Gate 2 (规则可达性)" -TimeoutSeconds 60
+# --- 单源规则目录与引用闭包 ---
+$code = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/generate-rule-catalog.js", "--check-only") -WorkingDirectory $repoRoot -StepId "RULE-CATALOG-04" -TimeoutSeconds 30
+$codeClosure = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-rule-id-closure.js") -WorkingDirectory $repoRoot -StepId "RULE-CLOSURE-05" -TimeoutSeconds 30
+$codeDocs = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-docs-consistency.js") -WorkingDirectory $repoRoot -StepId "DOCS-CONSISTENCY-06" -TimeoutSeconds 30
+$codeReach = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-rule-reachability.js") -WorkingDirectory $repoRoot -StepId "RULE-REACHABILITY-07" -TimeoutSeconds 60
 if ($code -ne 0 -or $codeClosure -ne 0 -or $codeDocs -ne 0 -or $codeReach -ne 0) {
     $failed = $true
-} else {
-    Write-GateHost "  ✔ 全工作区单源规则目录同步与规则 ID 闭包校验通过" -ForegroundColor Green
 }
 
-# --- Gate 3: auto-refactor 引擎全量门禁与回归套件 ---
+# --- auto-refactor 引擎全量门禁与回归套件 ---
 if ($runAr) {
-    Write-GateHost "[3/11] 执行 auto-refactor 全量门禁与回归套件 (Rust/Build/Self/Tests)..." -ForegroundColor Gray
-    $codeRust = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/gate-rust.js") -WorkingDirectory $autoRefactorDir -StepName "auto-refactor Rust Gate" -TimeoutSeconds 60
-    $codeBuild = Invoke-GateStep -FilePath $npmCmd -ArgumentList @("run", "build") -WorkingDirectory $autoRefactorDir -StepName "auto-refactor Build" -TimeoutSeconds 90
-    $codeFacade = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/validate-facade-governance.js") -WorkingDirectory $autoRefactorDir -StepName "auto-refactor Facade Gate" -TimeoutSeconds 60
-    $codeSelf = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/gate-self.js") -WorkingDirectory $autoRefactorDir -StepName "auto-refactor Self Gate" -TimeoutSeconds 60
-    $codeTest = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/test-parallel.js") -WorkingDirectory $autoRefactorDir -StepName "auto-refactor Tests" -TimeoutSeconds 180
+    $codeRust = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/gate-rust.js") -WorkingDirectory $autoRefactorDir -StepId "ENGINE-RUST-08" -TimeoutSeconds 60
+    $codeBuild = Invoke-GateStep -FilePath $npmCmd -ArgumentList @("run", "build") -WorkingDirectory $autoRefactorDir -StepId "ENGINE-BUILD-09" -TimeoutSeconds 90
+    $codeFacade = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/validate-facade-governance.js") -WorkingDirectory $autoRefactorDir -StepId "ENGINE-FACADE-10" -TimeoutSeconds 60
+    $codeSelf = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/gate-self.js") -WorkingDirectory $autoRefactorDir -StepId "ENGINE-SELF-11" -TimeoutSeconds 60
+    $codeTest = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/test-parallel.js") -WorkingDirectory $autoRefactorDir -StepId "ENGINE-TESTS-12" -TimeoutSeconds 180
     if ($codeRust -ne 0 -or $codeBuild -ne 0 -or $codeFacade -ne 0 -or $codeSelf -ne 0 -or $codeTest -ne 0) {
-        Write-GateHost "❌ Gate 3: auto-refactor 门禁或测试套件未通过" -ForegroundColor Red
         $failed = $true
-    } else {
-        Write-GateHost "  ✔ auto-refactor 全量门禁与测试套件通过" -ForegroundColor Green
-    }
+}
 } else {
-    Write-GateHost "  ✔ [Gate 3] auto-refactor 未受影响，智能跳过全量门禁" -ForegroundColor Green
+    Write-StepVerdict -StepId "ENGINE-RUST-08" -Status "SKIP" -Detail "auto-refactor 未受影响"
 }
 
-# --- Gate 4: auto-refactor 多维自审与质量基线 ---
+# --- auto-refactor 多维自审与质量基线 ---
 if ($runAr) {
-    Write-GateHost "[4/11] 执行 auto-refactor 质量基线与多维自审 (LOC预算/熵/密度/BIF)..." -ForegroundColor Gray
-    $code = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/validate-self-multidimensional-audit.js") -WorkingDirectory $autoRefactorDir -StepName "Gate 4 (auto-refactor 质量基线)" -TimeoutSeconds 60
+    $code = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/validate-self-multidimensional-audit.js") -WorkingDirectory $autoRefactorDir -StepId "ENGINE-BASELINE-13" -TimeoutSeconds 60
     if ($code -ne 0) {
         $failed = $true
     } else {
-        Write-GateHost "  ✔ auto-refactor 质量基线与自审达标" -ForegroundColor Green
+        Write-StepVerdict -StepId "ENGINE-BASELINE-13" -Status "PASS" -Detail "质量基线与自审达标"
     }
 } else {
-    Write-GateHost "  ✔ [Gate 4] auto-refactor 未受影响，智能跳过质量基线" -ForegroundColor Green
+    Write-StepVerdict -StepId "ENGINE-BASELINE-13" -Status "SKIP" -Detail "auto-refactor 未受影响"
 }
 
-# --- Gate 5: workspace-timing 快速单元测试套件 ---
+# --- workspace-timing 快速单元测试套件 ---
 if ($runWt) {
-    Write-GateHost "[5/11] 执行 workspace-timing 快速单元测试套件..." -ForegroundColor Gray
-    $code = Invoke-GateStep -FilePath $npmCmd -ArgumentList @("run", "test:fast") -WorkingDirectory $workspaceTimingDir -StepName "Gate 5 (workspace-timing 快速单元测试)" -TimeoutSeconds 60
+    $code = Invoke-GateStep -FilePath $npmCmd -ArgumentList @("run", "test:fast") -WorkingDirectory $workspaceTimingDir -StepId "EXTENSION-TESTS-14" -TimeoutSeconds 60
     if ($code -ne 0) {
         $failed = $true
     } else {
-        Write-GateHost "  ✔ workspace-timing 快速单元测试通过" -ForegroundColor Green
+        Write-StepVerdict -StepId "EXTENSION-TESTS-14" -Status "PASS" -Detail "快速单元测试通过"
     }
 } else {
-    Write-GateHost "  ✔ [Gate 5] workspace-timing 未受影响，智能跳过单元测试" -ForegroundColor Green
+    Write-StepVerdict -StepId "EXTENSION-TESTS-14" -Status "SKIP" -Detail "workspace-timing 未受影响"
 }
 
-# --- Gate 6: workspace-timing L0~L5 六层审查门禁 ---
+# --- workspace-timing 六层审查门禁 ---
 if ($runWt) {
-    Write-GateHost "[6/11] 执行 workspace-timing L0~L5 六层审查门禁..." -ForegroundColor Gray
-    $code = Invoke-GateStep -FilePath $npmCmd -ArgumentList @("run", "review") -WorkingDirectory $workspaceTimingDir -StepName "Gate 6 (workspace-timing 审查门禁)" -TimeoutSeconds 60
+    $code = Invoke-GateStep -FilePath $npmCmd -ArgumentList @("run", "review") -WorkingDirectory $workspaceTimingDir -StepId "EXTENSION-REVIEW-15" -TimeoutSeconds 60
     if ($code -ne 0) {
         $failed = $true
     } else {
-        Write-GateHost "  ✔ workspace-timing 审查门禁通过" -ForegroundColor Green
+        Write-StepVerdict -StepId "EXTENSION-REVIEW-15" -Status "PASS" -Detail "六层审查门禁通过"
     }
 } else {
-    Write-GateHost "  ✔ [Gate 6] workspace-timing 未受影响，智能跳过审查门禁" -ForegroundColor Green
+    Write-StepVerdict -StepId "EXTENSION-REVIEW-15" -Status "SKIP" -Detail "workspace-timing 未受影响"
 }
 
-# --- Gate 7: auto-refactor 长期轨迹账本物理约束守卫 ---
+# --- auto-refactor 长期轨迹账本物理约束 ---
 if ($runAr) {
-    Write-GateHost "[7/11] 校验 auto-refactor 长期轨迹账本物理约束 (<350B/条, <=2MB)..." -ForegroundColor Gray
-    $code = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-trajectory-ledger.js") -WorkingDirectory $repoRoot -StepName "Gate 7 (长期轨迹账本约束)" -TimeoutSeconds 30
+    $code = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-trajectory-ledger.js") -WorkingDirectory $repoRoot -StepId "LEDGER-CONSTRAINT-16" -TimeoutSeconds 30
     if ($code -ne 0) {
         $failed = $true
     } else {
-        Write-GateHost "  ✔ auto-refactor 长期轨迹账本物理约束通过" -ForegroundColor Green
+        Write-StepVerdict -StepId "LEDGER-CONSTRAINT-16" -Status "PASS" -Detail "账本物理约束通过"
     }
 } else {
-    Write-GateHost "  ✔ [Gate 7] 长期轨迹账本未受影响，智能跳过" -ForegroundColor Green
+    Write-StepVerdict -StepId "LEDGER-CONSTRAINT-16" -Status "SKIP" -Detail "账本未受影响"
 }
 
-# --- Gate 8: WebGames 配置架构与必需表一致性审查 ---
+# --- WebGames 配置架构与必需表一致性 ---
 if ($runWg) {
-    Write-GateHost "[8/11] 执行 WebGames 全域质量门禁与配置架构审查..." -ForegroundColor Gray
-    $code = Invoke-GateStep -FilePath $pythonCmd -ArgumentList @("WebGames/scripts/py/audit_runner.py", "--diff") -WorkingDirectory $repoRoot -StepName "Gate 8 (WebGames 全域质量门禁)" -TimeoutSeconds 60
+    $code = Invoke-GateStep -FilePath $pythonCmd -ArgumentList @("WebGames/scripts/py/audit_runner.py", "--diff") -WorkingDirectory $repoRoot -StepId "DOMAIN-AUDIT-17" -TimeoutSeconds 60
     # Mermaid 图由真实解析器校验（audit_docs 的字符启发式无法发现语法破损）；
     # 该步骤此前无任何调用方，导致 349 张图的解析能力长期悬空。
     $codeMermaid = if (Get-Command pwsh -ErrorAction SilentlyContinue) {
-        Invoke-GateStep -FilePath "pwsh" -ArgumentList @("-NoProfile", "-File", "WebGames/scripts/ps1/check-mermaid.ps1") -WorkingDirectory $repoRoot -StepName "Gate 8 (WebGames 文档 Mermaid 真解析)" -TimeoutSeconds 120
+        Invoke-GateStep -FilePath "pwsh" -ArgumentList @("-NoProfile", "-File", "WebGames/scripts/ps1/check-mermaid.ps1") -WorkingDirectory $repoRoot -StepId "DOMAIN-MERMAID-18" -TimeoutSeconds 120
     } else {
         Write-GateHost "  ⚠️  未检测到 pwsh，跳过本地 Mermaid 真解析（CI 将严格校验）" -ForegroundColor Yellow
         0
     }
     if ($code -ne 0 -or $codeMermaid -ne 0) {
         $failed = $true
-    } else {
-        Write-GateHost "  ✔ WebGames 全域质量门禁、配置架构与 Mermaid 图语法审查通过" -ForegroundColor Green
-    }
+}
 } else {
-    Write-GateHost "  ✔ [Gate 8] WebGames 未受影响，智能跳过审查" -ForegroundColor Green
+    Write-StepVerdict -StepId "DOMAIN-AUDIT-17" -Status "SKIP" -Detail "WebGames 未受影响"
 }
 
-# --- Gate 9: fractal-git 微 Crate 工业级 Rust 门禁（fmt + clippy -D warnings + zero-alloc + test）---
+# --- fractal-git Rust 门禁 (rustfmt + clippy -D warnings + zero-alloc + test) ---
 if ($runFg) {
-    Write-GateHost "[9/11] 执行 fractal-git 工业级 Rust 门禁 (rustfmt/clippy/zero-alloc/test)..." -ForegroundColor Gray
     if (-not $cargoCmd) {
         Write-GateHost "  ⚠️  未检测到 cargo 命令，跳过本地 fractal-git 编译测试（CI 将严格校验）" -ForegroundColor Yellow
     } elseif (Get-Command pwsh -ErrorAction SilentlyContinue) {
-        $code = Invoke-GateStep -FilePath "pwsh" -ArgumentList @("-NoProfile", "-File", "fractal-git/scripts/ps1/gate-rust.ps1") -WorkingDirectory $repoRoot -StepName "Gate 9 (fractal-git 9大微 Crate 回归套件)" -TimeoutSeconds 300
+        $code = Invoke-GateStep -FilePath "pwsh" -ArgumentList @("-NoProfile", "-File", "fractal-git/scripts/ps1/gate-rust.ps1") -WorkingDirectory $repoRoot -StepId "RUST-TAXIS-19" -TimeoutSeconds 300
         if ($code -ne 0) {
             $failed = $true
         } else {
-            Write-GateHost "  ✔ fractal-git Rust 工业级门禁通过（格式/静态/分配/回归）" -ForegroundColor Green
+            Write-StepVerdict -StepId "RUST-TAXIS-19" -Status "PASS" -Detail "格式、静态、分配与回归全部通过"
         }
     } else {
-        $code = Invoke-GateStep -FilePath $cargoCmd -ArgumentList @("test", "--manifest-path", "fractal-git/Cargo.toml") -WorkingDirectory $repoRoot -StepName "Gate 9 (fractal-git 9大微 Crate 回归套件)" -TimeoutSeconds 120
+        $code = Invoke-GateStep -FilePath $cargoCmd -ArgumentList @("test", "--manifest-path", "fractal-git/Cargo.toml") -WorkingDirectory $repoRoot -StepId "RUST-TAXIS-19" -TimeoutSeconds 120
         if ($code -ne 0) {
             $failed = $true
         } else {
-            Write-GateHost "  ✔ fractal-git 9大微 Crate 回归测试套件通过（未检测到 pwsh，仅执行 cargo test）" -ForegroundColor Green
+            Write-StepVerdict -StepId "RUST-TAXIS-19" -Status "PASS" -Detail "回归测试套件通过（仅 cargo test）"
         }
     }
 } else {
-    Write-GateHost "  ✔ [Gate 9] fractal-git 未受影响，智能跳过回归套件" -ForegroundColor Green
+    Write-StepVerdict -StepId "RUST-TAXIS-19" -Status "SKIP" -Detail "fractal-git 未受影响"
 }
 
-# --- Gate 10: 待推送提交历史风格与禁词审查 (validate-commit-msg-style / validate-commit-msg) ---
+# --- 待推送提交历史风格与禁词审查 ---
 # 提交信息词法、风格仲裁与债务走廊契约自测：基础件一旦回归，下方历史扫描结论即失去依据
-$codeHarness = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-commit-guardrail.js") -WorkingDirectory $repoRoot -StepName "Gate 10 (提交信息词法与债务走廊契约自测)" -TimeoutSeconds 30
+$codeHarness = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-commit-guardrail.js") -WorkingDirectory $repoRoot -StepId "COMMIT-CONTRACT-20" -TimeoutSeconds 30
 if ($codeHarness -ne 0) {
     $failed = $true
 }
 if ($range) {
-    Write-GateHost "[10/11] 审查待推送提交历史风格与文本约束 (流式扫描: $range)..." -ForegroundColor Gray
-    $code = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-commit-msg.js", "--range", $range) -WorkingDirectory $repoRoot -StepName "Gate 10 (待推送分支提交历史风格与禁词审查)" -TimeoutSeconds 30
+    $code = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-commit-msg.js", "--range", $range) -WorkingDirectory $repoRoot -StepId "COMMIT-HISTORY-21" -TimeoutSeconds 30
     if ($code -ne 0) {
         $failed = $true
     } else {
-        Write-GateHost "  ✔ 待推送分支提交历史风格与文本约束校验通过" -ForegroundColor Green
+        Write-StepVerdict -StepId "COMMIT-HISTORY-21" -Status "PASS" -Detail "提交历史风格与文本约束合规"
     }
 } else {
-    Write-GateHost "  ✔ [Gate 10] 首次推送或无上游对比基准，跳过历史扫描" -ForegroundColor Green
+    Write-StepVerdict -StepId "COMMIT-HISTORY-21" -Status "SKIP" -Detail "无上游对比基准"
 }
 
-# --- Gate 11: 推送集变更熵与跨域扩散审查 (GATE-ENT-001) ---
+# --- CHANGE-ENTROPY-22: 推送集变更熵与跨域扩散审查 (GUARD-ENT-001) ---
 if ($range) {
-    Write-GateHost "[11/11] 审查推送集变更熵与跨子系统扩散 (GATE-ENT-001)..." -ForegroundColor Gray
-    $code = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/evaluate-change-entropy.js", "--range", $range, "--fail-on-diffusion") -WorkingDirectory $repoRoot -StepName "Gate 11 (推送集变更熵与跨域扩散审查)" -TimeoutSeconds 30
+    Write-GateHost "[11/11] 审查推送集变更熵与跨子系统扩散 (GUARD-ENT-001)..." -ForegroundColor Gray
+    $code = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/evaluate-change-entropy.js", "--range", $range, "--fail-on-diffusion") -WorkingDirectory $repoRoot -StepId "CHANGE-ENTROPY-22" -TimeoutSeconds 30
     if ($code -ne 0) {
         $failed = $true
     } else {
-        Write-GateHost "  ✔ 推送集变更熵在凝聚阈值内" -ForegroundColor Green
+        Write-StepVerdict -StepId "CHANGE-ENTROPY-22" -Status "PASS" -Detail "变更熵在凝聚阈值内"
     }
 } else {
-    Write-GateHost "  ✔ [Gate 11] 无推送范围，跳过变更熵审查" -ForegroundColor Green
+    Write-StepVerdict -StepId "CHANGE-ENTROPY-22" -Status "SKIP" -Detail "无推送范围"
+}
+
+$codeFeedback = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-gate-feedback.js") -WorkingDirectory $repoRoot -StepId "FEEDBACK-VOCABULARY-23" -TimeoutSeconds 30
+if ($codeFeedback -ne 0) {
+    $failed = $true
+} else {
+    Write-StepVerdict -StepId "FEEDBACK-VOCABULARY-23" -Status "PASS" -Detail "反馈词表为语义步骤标识与四态状态词闭包"
 }
 
 if ($Agent) {

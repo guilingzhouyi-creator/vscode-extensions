@@ -37,7 +37,9 @@ const IGNORED_DIRS = new Set(['node_modules', 'dist', 'out', 'archive']);
 const RULE_ID_PATTERN =
   /(?<![A-Z0-9-])([A-Z]{2,4}(?:-[A-Z0-9]+){2,}|L[0-5](?:-[A-Z0-9]+)+)(?![A-Z0-9-])/g;
 const LAYER_RANGE_PATTERN = /^L\d-L\d$/;
-const STEP_ID_PATTERN = /^(?:PC|PP)-\d{2}-\d{2}$/;
+// Semantic step identifiers always end with a two-digit position suffix, while
+// rule identifiers use a three-digit numeric tail, so the two spaces never overlap.
+const STEP_ID_PATTERN = /^[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*-\d{2}$/;
 const EXTERNAL_PREFIXES = Object.freeze(['UTF-', 'SHA-', 'RFC-', 'CVE-', 'ISO-']);
 
 const FIXTURE_ALLOWLIST = new Map([

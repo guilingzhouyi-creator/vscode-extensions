@@ -1,0 +1,337 @@
+{
+  "schema": "workspace-gate-step-registry/v1",
+  "description": "Single source of truth for gate step identity, display order, and rule attribution. Both the PowerShell and the Bash implementation read this file; nothing may hardcode a step label.",
+  "statusVocabulary": [
+    "PASS",
+    "BLOCK",
+    "SKIP",
+    "WARN"
+  ],
+  "entries": {
+    "pre-commit": {
+      "title": "本地提交前置门禁",
+      "scripts": {
+        "ps1": "scripts/ps1/pre-commit-gate.ps1",
+        "sh": "scripts/sh/pre-commit-gate.sh"
+      },
+      "steps": [
+        {
+          "id": "STAGED-HYGIENE-01",
+          "title": "暂存区流式物理卫生与安全审查",
+          "ruleId": "HYG-EMP-001"
+        },
+        {
+          "id": "RULE-REGISTRY-02",
+          "title": "单源规则注册表元数据一致性",
+          "ruleId": "RCFG-RULE-DRIFT"
+        },
+        {
+          "id": "SKILLS-SPEC-03",
+          "title": "技能集规范与插件同构校验",
+          "ruleId": "GUARD-SSOT-001"
+        },
+        {
+          "id": "EXTENSION-COMPILE-04",
+          "title": "workspace-timing 增量编译",
+          "ruleId": "L0-COMPILE"
+        },
+        {
+          "id": "EXTENSION-TESTS-05",
+          "title": "workspace-timing 增量快速单测",
+          "ruleId": "GUARD-SYS-001"
+        },
+        {
+          "id": "EXTENSION-DOCS-06",
+          "title": "workspace-timing 文档布局与变更日志真实性",
+          "ruleId": "L3-DOC-LAYOUT"
+        },
+        {
+          "id": "ENGINE-COMPILE-07",
+          "title": "auto-refactor 增量编译",
+          "ruleId": "L0-COMPILE"
+        },
+        {
+          "id": "ENGINE-TESTS-08",
+          "title": "auto-refactor 增量影响单元测试",
+          "ruleId": "GUARD-SYS-001"
+        },
+        {
+          "id": "DOMAIN-CONFIG-09",
+          "title": "WebGames 配置架构审查",
+          "ruleId": "ADV-CFG-001"
+        },
+        {
+          "id": "RUST-COMPILE-10",
+          "title": "fractal-git 增量编译与语法校验",
+          "ruleId": "L0-COMPILE"
+        },
+        {
+          "id": "STAGED-SLICE-11",
+          "title": "暂存区 AST 切片复杂度审查",
+          "ruleId": "GUARD-AST-001"
+        },
+        {
+          "id": "STAGED-DENSITY-12",
+          "title": "暂存区代码密度与接线载荷审查",
+          "ruleId": "VOL-DIL-001"
+        },
+        {
+          "id": "STAGED-VOLUME-13",
+          "title": "暂存区双轨体积与动态包络审查",
+          "ruleId": "VOL-ELOC-001"
+        }
+      ]
+    },
+    "commit-msg": {
+      "title": "提交信息词法门禁",
+      "scripts": {
+        "ps1": "scripts/ps1/commit-msg-gate.ps1",
+        "sh": "scripts/sh/commit-msg-gate.sh"
+      },
+      "steps": [
+        {
+          "id": "HEADER-FORM-01",
+          "title": "标题格式与长度",
+          "ruleId": "GUARD-MSG-001"
+        },
+        {
+          "id": "SLANG-GUARD-02",
+          "title": "标题零黑话与空洞词",
+          "ruleId": "CMG-STY-001"
+        },
+        {
+          "id": "BODY-SPLIT-03",
+          "title": "标题与正文空行分割契约",
+          "ruleId": "GUARD-MSG-001"
+        },
+        {
+          "id": "BODY-DENSITY-04",
+          "title": "正文实质字数与信息密度",
+          "ruleId": "GUARD-MSG-001"
+        },
+        {
+          "id": "BODY-SECTIONS-05",
+          "title": "结构化区块完整性",
+          "ruleId": "GUARD-MSG-001"
+        },
+        {
+          "id": "PROJECT-SCOPE-06",
+          "title": "项目归属格式区与合法枚举",
+          "ruleId": "CMG-PRJ-001"
+        },
+        {
+          "id": "BATCH-CODE-07",
+          "title": "正文零批次代号与工期黑话",
+          "ruleId": "CMG-STY-001"
+        },
+        {
+          "id": "RULE-TRUTH-08",
+          "title": "规则标识反虚构",
+          "ruleId": "CMG-STY-002"
+        },
+        {
+          "id": "TEXT-TRUTH-09",
+          "title": "提交文本求真务实与禁词",
+          "ruleId": "CMG-STY-002"
+        }
+      ]
+    },
+    "pre-push": {
+      "title": "本地推送前置全量回归门禁",
+      "scripts": {
+        "ps1": "scripts/ps1/pre-push-gate.ps1",
+        "sh": "scripts/sh/pre-push-gate.sh"
+      },
+      "steps": [
+        {
+          "id": "WORKSPACE-PHYSICAL-01",
+          "title": "物理卫生八维全域巡检",
+          "ruleId": "HYG-EMP-001"
+        },
+        {
+          "id": "WORKSPACE-GITIGNORE-02",
+          "title": ".gitignore 治理",
+          "ruleId": "GUARD-HYG-001"
+        },
+        {
+          "id": "WORKSPACE-DENSITY-03",
+          "title": "五维代码密度",
+          "ruleId": "VOL-DIL-001"
+        },
+        {
+          "id": "RULE-CATALOG-04",
+          "title": "单源规则目录同步",
+          "ruleId": "RCFG-RULE-DRIFT"
+        },
+        {
+          "id": "RULE-CLOSURE-05",
+          "title": "规则标识引用闭包",
+          "ruleId": "RCFG-RULE-DRIFT"
+        },
+        {
+          "id": "DOCS-CONSISTENCY-06",
+          "title": "文档计数与脚本引用一致性",
+          "ruleId": "RCFG-RULE-DRIFT"
+        },
+        {
+          "id": "RULE-REACHABILITY-07",
+          "title": "规则可达性",
+          "ruleId": "RCFG-RULE-DRIFT"
+        },
+        {
+          "id": "ENGINE-RUST-08",
+          "title": "auto-refactor Rust 引擎编译",
+          "ruleId": "GUARD-SYS-001"
+        },
+        {
+          "id": "ENGINE-BUILD-09",
+          "title": "auto-refactor 构建",
+          "ruleId": "GUARD-SYS-001"
+        },
+        {
+          "id": "ENGINE-FACADE-10",
+          "title": "auto-refactor 门面实质承载",
+          "ruleId": "ARCH-FAC-001"
+        },
+        {
+          "id": "ENGINE-SELF-11",
+          "title": "auto-refactor 引擎自审",
+          "ruleId": "GUARD-SYS-001"
+        },
+        {
+          "id": "ENGINE-TESTS-12",
+          "title": "auto-refactor 全量回归套件",
+          "ruleId": "GUARD-SYS-001"
+        },
+        {
+          "id": "ENGINE-BASELINE-13",
+          "title": "auto-refactor 质量基线",
+          "ruleId": "GUARD-BUDGET-001"
+        },
+        {
+          "id": "EXTENSION-TESTS-14",
+          "title": "workspace-timing 快速单元测试",
+          "ruleId": "GUARD-SYS-001"
+        },
+        {
+          "id": "EXTENSION-REVIEW-15",
+          "title": "workspace-timing 六层审查门禁",
+          "ruleId": "RCFG-MATRIX"
+        },
+        {
+          "id": "LEDGER-CONSTRAINT-16",
+          "title": "长期轨迹账本物理约束",
+          "ruleId": "GOV-TRJ-001"
+        },
+        {
+          "id": "DOMAIN-AUDIT-17",
+          "title": "WebGames 全域质量门禁",
+          "ruleId": "ADV-CFG-001"
+        },
+        {
+          "id": "DOMAIN-MERMAID-18",
+          "title": "WebGames 文档 Mermaid 真解析",
+          "ruleId": "ADV-CFG-001"
+        },
+        {
+          "id": "RUST-TAXIS-19",
+          "title": "fractal-git 微 Crate 回归套件",
+          "ruleId": "GUARD-SYS-001"
+        },
+        {
+          "id": "COMMIT-CONTRACT-20",
+          "title": "提交信息词法与债务走廊契约自测",
+          "ruleId": "CMG-STY-001"
+        },
+        {
+          "id": "COMMIT-HISTORY-21",
+          "title": "待推送提交历史风格与禁词审查",
+          "ruleId": "CMG-STY-001"
+        },
+        {
+          "id": "CHANGE-ENTROPY-22",
+          "title": "推送集变更熵与跨域扩散审查",
+          "ruleId": "GUARD-ENT-001"
+        },
+        {
+          "id": "FEEDBACK-VOCABULARY-23",
+          "title": "反馈词表语义化与四态状态词闭包",
+          "ruleId": "GUARD-FBK-001"
+        }
+      ]
+    },
+    "audit-all": {
+      "title": "全工作区统一质量审查",
+      "scripts": {
+        "ps1": "scripts/ps1/audit-all.ps1",
+        "sh": "scripts/sh/audit-all.sh"
+      },
+      "steps": [
+        {
+          "id": "WORKSPACE-AUDIT-01",
+          "title": "全工作区物理卫生与体积审查",
+          "ruleId": "HYG-EMP-001"
+        },
+        {
+          "id": "RULE-AUDIT-02",
+          "title": "单源规则目录与轨迹账本审查",
+          "ruleId": "RCFG-RULE-DRIFT"
+        },
+        {
+          "id": "EXTENSION-AUDIT-03",
+          "title": "workspace-timing 审查",
+          "ruleId": "GUARD-SYS-001"
+        },
+        {
+          "id": "DOMAIN-AUDIT-04",
+          "title": "WebGames 领域配置与架构审查",
+          "ruleId": "ADV-CFG-001"
+        },
+        {
+          "id": "ENGINE-AUDIT-05",
+          "title": "auto-refactor 静态引擎多维自审",
+          "ruleId": "GUARD-SYS-001"
+        },
+        {
+          "id": "RUST-AUDIT-06",
+          "title": "fractal-git 微 Crate 回归套件",
+          "ruleId": "GUARD-SYS-001"
+        }
+      ]
+    },
+    "audit-taxis": {
+      "title": "fractal-git 拓扑与回归审查",
+      "scripts": {
+        "ps1": "fractal-git/scripts/ps1/audit-taxis.ps1",
+        "sh": "fractal-git/scripts/sh/audit-taxis.sh"
+      },
+      "steps": [
+        {
+          "id": "CRATE-TOPOLOGY-01",
+          "title": "微 Crate DAG 拓扑与零分配边界",
+          "ruleId": "FGT-COR-001"
+        },
+        {
+          "id": "CRATE-REGRESSION-02",
+          "title": "多 Crate 回归测试套件",
+          "ruleId": "FGT-GAT-001"
+        },
+        {
+          "id": "CRATE-BENCHMARK-03",
+          "title": "微基准与耗时棘轮",
+          "ruleId": "TB-REGRESSION"
+        },
+        {
+          "id": "QUALITY-ENVELOPE-04",
+          "title": "重构质量分数包络",
+          "ruleId": "FGT-GAT-001"
+        },
+        {
+          "id": "PROMOTION-BRIDGE-05",
+          "title": "自举晋级桥接校验",
+          "ruleId": "FGT-GAT-001"
+        }
+      ]
+    }
+  }
+}

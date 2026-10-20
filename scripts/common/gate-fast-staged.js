@@ -2,13 +2,13 @@
  * Module: Governance Guard — Fast Staged Stream Validator
  * File Path: scripts/common/gate-fast-staged.js
  * Architecture Role: Single-pass, in-memory stream auditor for Git staged changes.
- *   Consolidates Gates 1 through 6 into a single Node.js runtime process:
- *   - Gate 1: Zero 0-byte & whitespace-only empty files
- *   - Gate 2: Line ending contract (.ps1 -> CRLF, others -> LF)
- *   - Gate 3: Absolute path & drive letter leak prevention
- *   - Gate 4: Zero slang & temporary nomenclature
- *   - Gate 5: Dual-scale volume & dynamic envelope budget (ELOC <= 900, LOC <= 1400)
- *   - Gate 6: Secret keys & sensitive token leak prevention
+ *   Consolidates six staged fragments into a single Node.js runtime process:
+ *   - EMPTY-FILE: Zero 0-byte & whitespace-only empty files
+ *   - LINE-ENDING: Line ending contract (.ps1 -> CRLF, others -> LF)
+ *   - PATH-LEAK: Absolute path & drive letter leak prevention
+ *   - NOMENCLATURE: Zero slang & temporary nomenclature
+ *   - VOLUME-BUDGET: Dual-scale volume & dynamic envelope budget (ELOC <= 900, LOC <= 1400)
+ *   - SECRET-LEAK: Secret keys & sensitive token leak prevention
  * Dependencies & Triggers: Consumes Node.js standard libraries (fs, path, child_process);
  *   invoked by pre-commit-gate (ps1/sh), pre-push-gate, and CI hygiene workflows.
  * Responsibilities:
@@ -57,7 +57,7 @@ const ENCODING_UTF8 = 'utf8';
 const GIT_DIFF_COMMAND = 'git diff --cached -U0 --no-color';
 const STDIO_PIPE = Object.freeze(['ignore', 'pipe', 'ignore']);
 const SCRIPT_NAME = 'node scripts/common/gate-fast-staged.js';
-const STEP_NAME = 'Gate 1~6 Fast Staged Stream Review';
+const STEP_NAME = 'STAGED-HYGIENE-01';
 const FLAG_AGENT = '--agent';
 const FLAG_JSON = '--json';
 const FLAG_SHORT_A = '-a';
@@ -121,18 +121,18 @@ const IGNORED_BASENAMES = new Set(
   'index main lib mod api types cli readme changelog license'.split(' ')
 );
 
-const RAW_GATE_SPECS = `1|暂存区零空文件与零纯注释空壳检查通过||
-2|换行/编码/EOF/缩进契约 (ps1 CRLF, 其余 LF, 无 BOM, 单 EOF, 无 Tab) 检查通过||
-3|绝对路径与协议防泄漏检查通过|5|❌ [FAIL] Gate 3: 检测到新增代码中包含绝对路径或盘符泄漏:
-4|零黑话与规范命名检查通过||
-5|双轨体积预算与代码密度守卫 (ELOC<=900, LOC<=1400, 稀释比<=3.5, 接线比<=65%) 检查通过||
-6|密钥与敏感 Token 防泄漏扫描通过|3|❌ [FAIL] Gate 6: 检测到暂存代码中疑似包含未脱敏的真实密钥或私钥！`;
+const RAW_GATE_SPECS = `EMPTY-FILE|暂存区零空文件与零纯注释空壳检查通过||
+LINE-ENDING|换行/编码/EOF/缩进契约 (ps1 CRLF, 其余 LF, 无 BOM, 单 EOF, 无 Tab) 检查通过||
+PATH-LEAK|绝对路径与协议防泄漏检查通过|5|✖ [BLOCK] PATH-LEAK: 检测到新增代码中包含绝对路径或盘符泄漏:
+NOMENCLATURE|零黑话与规范命名检查通过||
+VOLUME-BUDGET|双轨体积预算与代码密度守卫 (ELOC<=900, LOC<=1400, 稀释比<=3.5, 接线比<=65%) 检查通过||
+SECRET-LEAK|密钥与敏感 Token 防泄漏扫描通过|3|✖ [BLOCK] SECRET-LEAK: 检测到暂存代码中疑似包含未脱敏的真实密钥或私钥！`;
 
 const GATE_SPECS = Object.freeze(
   RAW_GATE_SPECS.split('\n').map((row) => {
     const parts = row.split('|');
     return {
-      num: parseInt(parts[0], 10),
+      id: parts[0],
       name: parts[1],
       limit: parts[2] ? parseInt(parts[2], 10) : undefined,
       header: parts[3] || undefined,
@@ -301,13 +301,13 @@ function createViolation({ ruleId, file, message, actual, expected, actionableFi
  * Validates that file name does not contain temporary engineering slang or batch tokens.
  *
  * @param {string} file - Relative path to staged file.
- * @param {Array} gate4Violations - Collector array for Gate 4 findings.
+ * @param {Array} nomenclatureViolations - Collector array for NOMENCLATURE findings.
  */
-function validateFilenameSlang(file, gate4Violations) {
+function validateFilenameSlang(file, nomenclatureViolations) {
   const baseName = path.basename(file);
   if (!isExemptSlangPath(file, baseName) && SLANG_FILENAME_PATTERN.test(baseName)) {
     const tpl = VIOLATION_TPLS.SLANG_NAME;
-    gate4Violations.push(
+    nomenclatureViolations.push(
       createViolation({
         ruleId: RULE_HYG_NAM_001,
         file,
@@ -339,9 +339,9 @@ function isMorphemeValid(seg) {
  *
  * @param {string} file - Relative path of target file.
  * @param {string} stem - Extension-stripped filename stem.
- * @param {Array} gate4Violations - Collector array for Gate 4 findings.
+ * @param {Array} nomenclatureViolations - Collector array for NOMENCLATURE findings.
  */
-function validateFilenameSegments(file, stem, gate4Violations) {
+function validateFilenameSegments(file, stem, nomenclatureViolations) {
   const norm = file.replace(/\\/g, '/');
   const isTest = /(?:tests\/|\.test\.|\.spec\.|test_)/i.test(norm);
   const maxSegments = isTest ? MAX_FILENAME_SEGMENTS_TEST : MAX_FILENAME_SEGMENTS_SRC;
@@ -349,7 +349,7 @@ function validateFilenameSegments(file, stem, gate4Violations) {
   const segments = cleanStem.split(/[-_]+/).filter(Boolean);
   if (segments.length > maxSegments) {
     const tpl = VIOLATION_TPLS.NAME_SEGMENTS;
-    gate4Violations.push(
+    nomenclatureViolations.push(
       createViolation({
         ruleId: RULE_HYG_NAM_001,
         file,
@@ -363,7 +363,7 @@ function validateFilenameSegments(file, stem, gate4Violations) {
   for (const seg of segments) {
     if (!isMorphemeValid(seg)) {
       const tpl = VIOLATION_TPLS.NAME_VOWEL;
-      gate4Violations.push(
+      nomenclatureViolations.push(
         createViolation({
           ruleId: RULE_HYG_NAM_001,
           file,
@@ -381,9 +381,9 @@ function validateFilenameSegments(file, stem, gate4Violations) {
  * Enforces length boundaries (< 3 chars, > 55 chars) and segment complexity on filename stems.
  *
  * @param {string} file - Relative path to staged file.
- * @param {Array} gate4Violations - Collector array for Gate 4 findings.
+ * @param {Array} nomenclatureViolations - Collector array for NOMENCLATURE findings.
  */
-function validateFilenameLength(file, gate4Violations) {
+function validateFilenameLength(file, nomenclatureViolations) {
   const norm = file.replace(/\\/g, '/');
   if (/(?:fixtures\/|testdata\/|\.bench|__mocks__\/|docs\/)/i.test(norm)) return;
   const baseName = path.basename(file);
@@ -394,7 +394,7 @@ function validateFilenameLength(file, gate4Violations) {
   if (IGNORED_BASENAMES.has(lower)) return;
   if (stem.length < MIN_FILENAME_STEM_LENGTH && !ALLOWED_SHORT_STEMS.has(lower)) {
     const tpl = VIOLATION_TPLS.NAME_SHORT;
-    gate4Violations.push(
+    nomenclatureViolations.push(
       createViolation({
         ruleId: RULE_HYG_NAM_001,
         file,
@@ -408,7 +408,7 @@ function validateFilenameLength(file, gate4Violations) {
   }
   if (stem.length > MAX_FILENAME_STEM_LENGTH) {
     const tpl = VIOLATION_TPLS.NAME_LONG;
-    gate4Violations.push(
+    nomenclatureViolations.push(
       createViolation({
         ruleId: RULE_HYG_NAM_001,
         file,
@@ -419,7 +419,7 @@ function validateFilenameLength(file, gate4Violations) {
       }),
     );
   }
-  validateFilenameSegments(file, stem, gate4Violations);
+  validateFilenameSegments(file, stem, nomenclatureViolations);
 }
 
 /**
@@ -427,12 +427,12 @@ function validateFilenameLength(file, gate4Violations) {
  *
  * @param {string} file - Relative file path.
  * @param {Buffer} buffer - Raw file byte buffer.
- * @param {Array} gate2Violations - Collector array for Gate 2 findings.
+ * @param {Array} lineEndingViolations - Collector array for LINE-ENDING findings.
  */
-function validateFileEol(file, buffer, gate2Violations) {
+function validateFileEol(file, buffer, lineEndingViolations) {
   const hasCR = buffer.includes(BYTE_CR);
   if (file.endsWith('.ps1') && !hasCR) {
-    gate2Violations.push(
+    lineEndingViolations.push(
       createViolation({
         ruleId: RULE_HYG_EOL_001,
         file,
@@ -443,7 +443,7 @@ function validateFileEol(file, buffer, gate2Violations) {
       }),
     );
   } else if (hasCR && /\.(?:sh|ts|tsx|js|jsx|mjs|cjs|gd|json|md|py|rs|ya?ml|toml|css|html|svg)$/i.test(file)) {
-    gate2Violations.push(
+    lineEndingViolations.push(
       createViolation({
         ruleId: RULE_HYG_EOL_001,
         file,
@@ -461,7 +461,7 @@ function validateFileEol(file, buffer, gate2Violations) {
  *
  * @param {string} file - Relative file path.
  * @param {string} content - Raw text content of the file.
- * @param {Array} gate5Violations - Collector array for Gate 5 findings.
+ * @param {Array} volumeViolations - Collector array for VOLUME-BUDGET findings.
  */
 /**
  * Rejects UTF-8 BOM prefixes on staged text files.
@@ -608,7 +608,7 @@ function isPlumbingExemptFast(file) {
   return false;
 }
 
-function validateFileVolume(file, content, gate5Violations) {
+function validateFileVolume(file, content, volumeViolations) {
   const norm = file.replace(/\\/g, '/');
   if (
     !/\.(?:ts|gd|js|py|sh|ps1|mjs|cjs)$/i.test(file) ||
@@ -620,7 +620,7 @@ function validateFileVolume(file, content, gate5Violations) {
   const { totalLoc, eloc, wiringCount } = calculateEloc(content, ext);
   if (eloc > MAX_ELOC_BUDGET) {
     const tpl = VIOLATION_TPLS.VOL_ELOC;
-    gate5Violations.push(
+    volumeViolations.push(
       createViolation({
         ruleId: RULE_VOL_ELOC_001,
         file,
@@ -633,7 +633,7 @@ function validateFileVolume(file, content, gate5Violations) {
   }
   if (totalLoc > MAX_LOC_BUDGET) {
     const tpl = VIOLATION_TPLS.VOL_LOC;
-    gate5Violations.push(
+    volumeViolations.push(
       createViolation({
         ruleId: RULE_VOL_LOC_001,
         file,
@@ -651,7 +651,7 @@ function validateFileVolume(file, content, gate5Violations) {
 
   if (totalLoc >= 250 && eloc > 0 && totalLoc > eloc * DENSITY_RATIO_LIMIT) {
     const actualRatio = (totalLoc / eloc).toFixed(2);
-    gate5Violations.push(
+    volumeViolations.push(
       createViolation({
         ruleId: RULE_VOL_RATIO_001,
         file,
@@ -665,7 +665,7 @@ function validateFileVolume(file, content, gate5Violations) {
 
   if (eloc >= 10 && wiringCount / eloc > PLUMBING_RATIO_LIMIT) {
     const wiringPct = ((wiringCount / eloc) * 100).toFixed(1);
-    gate5Violations.push(
+    volumeViolations.push(
       createViolation({
         ruleId: RULE_ARCH_FAC_001,
         file,
@@ -874,9 +874,9 @@ function checkFileStream(repoRoot, stagedFiles, useIndex = true) {
 
   return {
     gate1Violations: collectors.gate1,
-    gate2Violations: collectors.gate2,
-    gate4Violations: collectors.gate4,
-    gate5Violations: collectors.gate5,
+    lineEndingViolations: collectors.gate2,
+    nomenclatureViolations: collectors.gate4,
+    volumeViolations: collectors.gate5,
     warnings: collectors.warnings,
   };
 }
@@ -957,7 +957,7 @@ function checkDiffStream(diffText) {
 
 function logSingleGateResult(spec, items) {
   if (items.length === 0) {
-    console.log(`  ✔ [Gate ${spec.num}] ${spec.name}`);
+    console.log(`  ✔ PASS  ${spec.id}  ${spec.name}`);
     return;
   }
   if (spec.header) {
@@ -966,7 +966,7 @@ function logSingleGateResult(spec, items) {
   const slice = spec.limit && spec.limit > 0 ? items.slice(0, spec.limit) : items;
   for (const v of slice) {
     const loc = v.file ? `${v.file}${v.line ? ':' + v.line : ''} - ` : '';
-    console.error(spec.header ? `   ${loc}${v.message}` : `❌ [FAIL] Gate ${spec.num}: ${v.message}`);
+    console.error(spec.header ? `   ${loc}${v.message}` : `✖ BLOCK  ${spec.id}  ${v.message}`);
   }
 }
 
@@ -1000,10 +1000,10 @@ function runFastStaged() {
   const repoRoot = path.resolve(__dirname, '../..');
   const stagedFiles = getStagedFiles(repoRoot, explicitFiles);
 
-  const { gate1Violations, gate2Violations, gate4Violations, gate5Violations, warnings } =
+  const { gate1Violations, lineEndingViolations, nomenclatureViolations, volumeViolations, warnings } =
     checkFileStream(repoRoot, stagedFiles, useIndex);
 
-  if (stagedFiles.length === 0 && gate1Violations.length === 0 && gate4Violations.length === 0) {
+  if (stagedFiles.length === 0 && gate1Violations.length === 0 && nomenclatureViolations.length === 0) {
     if (isAgentMode) {
       console.log(
         JSON.stringify(
@@ -1028,10 +1028,10 @@ function runFastStaged() {
 
   const allViolations = [
     ...gate1Violations,
-    ...gate2Violations,
+    ...lineEndingViolations,
     ...gate3Violations,
-    ...gate4Violations,
-    ...gate5Violations,
+    ...nomenclatureViolations,
+    ...volumeViolations,
     ...gate6Violations,
   ];
 
@@ -1057,10 +1057,10 @@ function runFastStaged() {
 
     reportHumanViolations([
       gate1Violations,
-      gate2Violations,
+      lineEndingViolations,
       gate3Violations,
-      gate4Violations,
-      gate5Violations,
+      nomenclatureViolations,
+      volumeViolations,
       gate6Violations,
     ]);
     process.exit(1);
@@ -1082,7 +1082,7 @@ function runFastStaged() {
     );
   } else {
     for (const spec of GATE_SPECS) {
-      console.log(`  ✔ [Gate ${spec.num}] ${spec.name}`);
+      console.log(`  ✔ PASS  ${spec.id}  ${spec.name}`);
     }
     if (warnings.length > 0) {
       console.warn(`  ⚠ [WARN] ${warnings.length} 处缩进宽度不符合契约（仅告警，不阻断）`);

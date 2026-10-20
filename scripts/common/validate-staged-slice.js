@@ -1017,7 +1017,7 @@ function analyzeSourceText(
     !changedLines || changedLines.size === 0 || changedLines.size > 20;
   if (noiseRatio > cfg.maxNoiseRatio && totalLines > 60 && checkNoise) {
     findings.push({
-      rule: "GATE-AST-001",
+      rule: "GUARD-AST-001",
       severity: "error",
       message: `代码稀释/注水指数超标 (kappa_noise = ${noiseRatio.toFixed(2)} > ${cfg.maxNoiseRatio})，有效代码行过低 (${eloc}/${totalLines})`,
       line: 1,
@@ -1121,7 +1121,7 @@ function recordSliceFailureSnapshot(allViolations) {
     const { writeFailureSnapshot } = require("./log-rotator");
     writeFailureSnapshot({
       gate: "pre-commit:ast-slice",
-      step: "Gate 9: AST Staged Slice Review",
+      step: "STAGED-SLICE-11",
       failedCommand: "node scripts/common/validate-staged-slice.js",
       exitCode: 1,
       summary: `AST slice review blocked commit due to ${allViolations.length} complexity or nesting violations.`,
@@ -1148,7 +1148,7 @@ function renderSliceViolations(allViolations, isAgentMode) {
       protocolVersion: "1.0.0",
       status: "BLOCK",
       gate: "pre-commit:ast-slice",
-      step: "Gate 9: AST Staged Slice Review",
+      step: "STAGED-SLICE-11",
       failedCommand: "node scripts/common/validate-staged-slice.js",
       exitCode: 1,
       summary: `AST slice review blocked commit due to ${allViolations.length} complexity or nesting violations.`,

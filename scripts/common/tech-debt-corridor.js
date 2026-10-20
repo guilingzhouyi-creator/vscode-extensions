@@ -33,7 +33,7 @@ const MODE_ELASTIC_WARNING = 'ELASTIC_WARNING';
 const MODE_FORCED_PAYDOWN = 'FORCED_PAYDOWN';
 
 const STATUS_PASS = 'PASS';
-const STATUS_PASS_WITH_WARNING = 'PASS_WITH_WARNING';
+const STATUS_WARN = 'WARN';
 const STATUS_BLOCK = 'BLOCK';
 
 /**
@@ -108,7 +108,7 @@ function classifyFindingDebtTier(finding) {
   if (
     ruleId.startsWith('SEC-') ||
     ruleId.startsWith('HYG-EMP') ||
-    ruleId === 'GATE-SSOT-001' ||
+    ruleId === 'GUARD-SSOT-001' ||
     ruleId === 'RCFG-RULE-DRIFT' ||
     cat === 'temporary_phrasing' ||
     cat === 'hyperbolic_absolute' ||
@@ -123,7 +123,7 @@ function classifyFindingDebtTier(finding) {
     finding.isHighDebt ||
     ruleId === 'CMG-STY-007' ||
     ruleId === 'CMG-STY-008' ||
-    ruleId === 'GATE-AST-001' ||
+    ruleId === 'GUARD-AST-001' ||
     ruleId === 'ARCH-ABS-001' ||
     cat === 'imperative_mood' ||
     cat === 'zero_pov'
@@ -236,7 +236,8 @@ function evaluateDebtCorridor({
   if (currentHighCount > 0 || accumulatedHighDebt > 0) {
     const remainingCredit = Math.max(0, ACCUMULATION_CEILING - totalProjectedDebt);
     return {
-      status: STATUS_PASS_WITH_WARNING,
+      status: STATUS_PASS,
+      warning: STATUS_WARN,
       mode: MODE_ELASTIC_WARNING,
       reason: `Permitted under elastic corridor: 1 high-risk debt item introduced (Accumulated: ${totalProjectedDebt}/${ACCUMULATION_CEILING}). Repayment required in subsequent commits.`,
       criticalCount: 0,
@@ -384,7 +385,7 @@ module.exports = {
   MODE_ELASTIC_WARNING,
   MODE_FORCED_PAYDOWN,
   STATUS_PASS,
-  STATUS_PASS_WITH_WARNING,
+  STATUS_WARN,
   STATUS_BLOCK,
   readDebtLedger,
   writeDebtLedger,

@@ -30,7 +30,7 @@ CARGO_BIN=$(command -v cargo 2>/dev/null || echo "")
 if [[ -z "$NODE_BIN" ]]; then
     echo "❌ [BLOCK] 未检测到 Node.js 运行时，提交前门禁无法执行。" >&2
     echo "   修复: 安装 Node.js 20+ 并确保 'node' 在 PATH 中。" >&2
-    echo "   该门禁为 fail-closed：缺少运行时不得静默放行 (GATE-SYS-001)。" >&2
+    echo "   该门禁为 fail-closed：缺少运行时不得静默放行 (GUARD-SYS-001)。" >&2
     exit 1
 fi
 
@@ -39,7 +39,6 @@ if [[ -z "$NPM_BIN" ]]; then
     echo "   修复: 随 Node.js 一并安装 npm，并确保 'npm' 在 PATH 中。" >&2
     exit 1
 fi
-
 
 AGENT_MODE=0
 for arg in "$@"; do
@@ -58,6 +57,60 @@ trap 'rm -f "$STEP_LOG"' EXIT
 
 RUN_ID="$(date -u +%s 2>/dev/null || echo 0)-$$"
 
+STEP_TSV=""
+STEP_TOTAL=0
+
+load_step_registry() {
+    if [[ -n "$STEP_TSV" ]]; then return 0; fi
+    local registry_js="$ROOT_DIR/scripts/common/gate-step-registry.js"
+    if [[ ! -f "$registry_js" ]]; then
+        echo "✖ BLOCK  单源步骤登记表加载器缺失: $registry_js" >&2
+        exit 1
+    fi
+    STEP_TSV=$("$NODE_BIN" "$registry_js" --entry pre-commit --tsv 2>/dev/null) || {
+        echo "✖ BLOCK  单源步骤登记表无法投影 pre-commit 条目" >&2
+        exit 1
+    }
+    STEP_TOTAL=$(grep -c . <<< "$STEP_TSV")
+}
+
+# 输出 "序号<TAB>步骤标识<TAB>规则标识<TAB>标题"；未登记标识返回非零。
+get_step_meta() {
+    local step_id="$1"
+    load_step_registry
+    local row
+    row=$(awk -F'\t' -v id="$step_id" '$2 == id { print; exit }' <<< "$STEP_TSV")
+    if [[ -z "$row" ]]; then
+        echo "✖ BLOCK  未登记的步骤标识 '$step_id'，请在 scripts/common/gate-step-registry.json 声明" >&2
+        return 1
+    fi
+    printf '%s' "$row"
+}
+
+write_step_banner() {
+    local step_id="$1"
+    local row ordinal title
+    row=$(get_step_meta "$step_id") || exit 1
+    ordinal=$(cut -f1 <<< "$row")
+    title=$(cut -f4 <<< "$row")
+    echo "▶ [$ordinal/$STEP_TOTAL] $step_id  $title"
+}
+
+write_step_verdict() {
+    local step_id="$1"
+    local status="$2"
+    local detail="${3:-}"
+    local glyph
+    case "$status" in
+        PASS) glyph="✔" ;;
+        BLOCK) glyph="✖" ;;
+        SKIP) glyph="⚠️" ;;
+        WARN) glyph="⚠️" ;;
+        *) glyph="·" ;;
+    esac
+    echo "  $glyph $status  $step_id  $detail"
+}
+
 record_pre_commit_failure() {
     local step_name="$1"
     local rule_id="$2"
@@ -70,22 +123,10 @@ record_pre_commit_failure() {
         details=$(cat "$STEP_LOG" 2>/dev/null || true)
     fi
 
-    local step_id
-    case "$step_name" in
-        "Gate 1~6: Root Hygiene"*) step_id="PC-01-01" ;;
-        "Gate 7: Rules Registry"*) step_id="PC-03-01" ;;
-        "Gate 7: Skills"*) step_id="PC-03-02" ;;
-        "Gate 8: workspace-timing Compilation"*) step_id="PC-04-01" ;;
-        "Gate 8: workspace-timing Fast Tests"*) step_id="PC-04-01" ;;
-        "Gate 8: workspace-timing Text Layout"*) step_id="PC-04-02" ;;
-        "Gate 8: workspace-timing Layout Build"*) step_id="PC-04-02" ;;
-        "Gate 8: auto-refactor Compilation"*) step_id="PC-04-03" ;;
-        "Gate 8: auto-refactor Impacted Unit Tests"*) step_id="PC-04-03" ;;
-        "Gate 8: WebGames"*) step_id="PC-04-04" ;;
-        "Gate 8: fractal-git Compilation"*) step_id="PC-04-05" ;;
-        "Gate 9: Dual-Scale Volume"*) step_id="PC-05-02" ;;
-        *) step_id="PC-00-00" ;;
-    esac
+    # 步骤身份只来自单源登记表：未登记标识直接阻断，绝不回落到合成标识。
+    local step_meta step_id
+    step_meta=$(get_step_meta "$step_name") || exit 1
+    step_id=$(cut -f2 <<< "$step_meta")
 
     local diag_dir="$ROOT_DIR/.audit-logs"
     mkdir -p "$diag_dir" 2>/dev/null || true
@@ -156,7 +197,7 @@ if [[ -n "$ROOT_CLUTTER" ]]; then
         ACTIONABLE_FIX="Delete root temporary file '$BAD_NAME' or run 'node scripts/common/validate-physical-hygiene.js --fix'."
     fi
     if [[ "$AGENT_MODE" -eq 1 ]]; then
-        record_pre_commit_failure "Gate 1~6: Root Hygiene & Script Radar ($RULE_ID)" \
+        record_pre_commit_failure "STAGED-HYGIENE-01" \
             "$RULE_ID" \
             "$SUMMARY" \
             "$ACTIONABLE_FIX" \
@@ -165,7 +206,7 @@ if [[ -n "$ROOT_CLUTTER" ]]; then
         cat "$ROOT_DIR/.audit-logs/last-failure.json"
         exit 1
     else
-        echo "❌ [FAIL] 根目录检测到散落脚本或未受控临时脏文件: $BAD_NAME ($RULE_ID)"
+        write_step_verdict "STAGED-HYGIENE-01" BLOCK "根目录存在散落脚本或未受控临时脏文件: $BAD_NAME"
         echo "   $ACTIONABLE_FIX"
         exit 1
     fi
@@ -195,7 +236,7 @@ if [[ "$AGENT_MODE" -eq 1 ]]; then
     rm -f "$ROOT_DIR/.audit-logs/last-failure.json" 2>/dev/null || true
 fi
 
-# --- Gate 1~6: 快速暂存区统一流式审查 ([1/9] 零空文件, [2/9] 换行契约, [3/9] 绝对路径, [4/9] 零黑话, [5/9] 双轨体积, [6/9] 密钥防泄漏) ---
+# --- 暂存区流式物理卫生与安全审查 ---
 if [[ "$AGENT_MODE" -eq 1 ]]; then
     if ! "$NODE_BIN" scripts/common/gate-fast-staged.js --agent >/dev/null 2>&1; then
         if [[ -f "$ROOT_DIR/.audit-logs/last-failure.json" ]]; then
@@ -204,19 +245,19 @@ if [[ "$AGENT_MODE" -eq 1 ]]; then
         exit 1
     fi
 else
-    echo "[1-6/9] 执行暂存区内存流式物理卫生与质量安全检查..."
+    write_step_banner "STAGED-HYGIENE-01"
     if ! "$NODE_BIN" scripts/common/gate-fast-staged.js; then
         echo "❌ [FAIL] 暂存区物理卫生与安全审查未通过！"
         FAILED=1
     fi
 fi
 
-# --- Gate 7: 单源规则漂移熔断 ---
+# --- 单源规则漂移熔断 ---
 TOUCHED_RULES=$(echo "$STAGED_FILES" | grep -E "auto-refactor/src/core/rules/|auto-refactor/src/analyzers/" || true)
 if [[ -n "$TOUCHED_RULES" ]]; then
     if [[ "$AGENT_MODE" -eq 1 ]]; then
         if ! (cd auto-refactor && "$NPM_BIN" run validate-rules-registry) >"$STEP_LOG" 2>&1; then
-            record_pre_commit_failure "Gate 7: Rules Registry (RCFG-RULE-DRIFT)" \
+            record_pre_commit_failure "RULE-REGISTRY-02" \
                 "RCFG-RULE-DRIFT" \
                 "Auto-refactor rule registry metadata drift detected." \
                 "Run 'npm run validate-rules-registry' in auto-refactor to inspect and sync rules." \
@@ -226,13 +267,13 @@ if [[ -n "$TOUCHED_RULES" ]]; then
             exit 1
         fi
     else
-        echo "[7/9] 校验单源规则元数据一致性..."
+        write_step_banner "RULE-REGISTRY-02"
         if ! (cd auto-refactor && "$NPM_BIN" run validate-rules-registry) >"$STEP_LOG" 2>&1; then
-            echo "❌ [FAIL] Gate 7: 规则注册表元数据发生漂移 (RCFG-RULE-DRIFT)！"
+            write_step_verdict "RULE-REGISTRY-02" BLOCK "规则注册表元数据发生漂移"
             tail -n 15 "$STEP_LOG" | sed 's/^/   /'
             FAILED=1
         else
-            echo "  ✔ [PASS] 规则元数据单源一致性校验通过"
+            write_step_verdict "RULE-REGISTRY-02" PASS "规则元数据单源一致"
         fi
     fi
 fi
@@ -241,8 +282,8 @@ TOUCHED_SKILLS=$(echo "$STAGED_FILES" | grep -E '^\.agents/(skills|plugins)/' ||
 if [[ -n "$TOUCHED_SKILLS" ]]; then
     if [[ "$AGENT_MODE" -eq 1 ]]; then
         if ! "$NODE_BIN" scripts/common/validate-skills.js >"$STEP_LOG" 2>&1; then
-            record_pre_commit_failure "Gate 7: Skills Specification & Hygiene (GATE-SSOT-001)" \
-                "GATE-SSOT-001" \
+            record_pre_commit_failure "SKILLS-SPEC-03" \
+                "GUARD-SSOT-001" \
                 "Workspace skills specification or plugin isomorphism verification failed." \
                 "Run 'node scripts/common/validate-skills.js' to inspect and fix skill metadata." \
                 "node scripts/common/validate-skills.js" \
@@ -251,20 +292,17 @@ if [[ -n "$TOUCHED_SKILLS" ]]; then
             exit 1
         fi
     else
-        echo "  ▶ 触发工作区技能集规范与插件同构校验..."
+        write_step_banner "SKILLS-SPEC-03"
         if ! "$NODE_BIN" scripts/common/validate-skills.js; then
-            echo "❌ [FAIL] Gate 7: 技能集规范或插件同构校验未通过！"
+            write_step_verdict "SKILLS-SPEC-03" BLOCK "技能集规范或插件同构校验未通过"
             FAILED=1
         else
-            echo "  ✔ [PASS] 技能集规范与插件同构校验通过"
+            write_step_verdict "SKILLS-SPEC-03" PASS "技能集规范与插件同构合规"
         fi
     fi
 fi
 
-# --- Gate 8: 项目增量编译与语法验证 (精准增量触发) ---
-if [[ "$AGENT_MODE" -eq 0 ]]; then
-    echo "[8/9] 检查相关项目增量编译与语法..."
-fi
+# --- 项目增量编译与语法验证 (精准增量触发) ---
 TOUCHED_WT_COMPILE=$(echo "$STAGED_FILES" | grep -E '^workspace-timing/(src/.+\.ts|tsconfig.*\.json)' || true)
 TOUCHED_AR_COMPILE=$(echo "$STAGED_FILES" | grep -E '^auto-refactor/(src/.+\.ts|tsconfig.*\.json)' || true)
 TOUCHED_WG_AUDIT=$(echo "$STAGED_FILES" | grep -E '^WebGames/(config/|scripts/py/audit_config\.py)' || true)
@@ -273,7 +311,7 @@ TOUCHED_FG_COMPILE=$(echo "$STAGED_FILES" | grep -E '^fractal-git/(crates/.+\.rs
 if [[ -n "$TOUCHED_WT_COMPILE" ]]; then
     if [[ "$AGENT_MODE" -eq 1 ]]; then
         if ! (cd workspace-timing && "$NPM_BIN" run compile) >"$STEP_LOG" 2>&1; then
-            record_pre_commit_failure "Gate 8: workspace-timing Compilation (L0-COMPILE)" \
+            record_pre_commit_failure "EXTENSION-COMPILE-04" \
                 "L0-COMPILE" \
                 "TypeScript compilation failed in workspace-timing." \
                 "Run 'npm run compile' in workspace-timing and resolve compiler errors." \
@@ -283,9 +321,9 @@ if [[ -n "$TOUCHED_WT_COMPILE" ]]; then
             exit 1
         fi
     else
-        echo "  ▶ 触发 workspace-timing 增量编译校验..."
+        write_step_banner "EXTENSION-COMPILE-04"
         if ! (cd workspace-timing && "$NPM_BIN" run compile) >"$STEP_LOG" 2>&1; then
-            echo "❌ [FAIL] Gate 8: workspace-timing 编译失败！"
+            write_step_verdict "EXTENSION-COMPILE-04" BLOCK "workspace-timing 编译失败"
             tail -n 15 "$STEP_LOG" | sed 's/^/   /'
             FAILED=1
         fi
@@ -294,8 +332,8 @@ if [[ -n "$TOUCHED_WT_COMPILE" ]]; then
     if [[ "$FAILED" -eq 0 ]]; then
         if [[ "$AGENT_MODE" -eq 1 ]]; then
             if ! (cd workspace-timing && "$NPM_BIN" run test:fast) >"$STEP_LOG" 2>&1; then
-                record_pre_commit_failure "Gate 8: workspace-timing Fast Tests" \
-                    "GATE-SYS-001" \
+                record_pre_commit_failure "EXTENSION-TESTS-05" \
+                    "GUARD-SYS-001" \
                     "Unit tests failed in workspace-timing." \
                     "Run 'npm run test:fast' in workspace-timing and resolve failing tests." \
                     "npm --prefix workspace-timing run test:fast" \
@@ -304,18 +342,18 @@ if [[ -n "$TOUCHED_WT_COMPILE" ]]; then
                 exit 1
             fi
         else
-            echo "  ▶ 触发 workspace-timing 增量快速单测 (npm run test:fast)..."
+            write_step_banner "EXTENSION-TESTS-05"
             if ! (cd workspace-timing && "$NPM_BIN" run test:fast) >"$STEP_LOG" 2>&1; then
-                echo "❌ [FAIL] Gate 8: workspace-timing 快速单测未通过！"
+                write_step_verdict "EXTENSION-TESTS-05" BLOCK "workspace-timing 快速单测未通过"
                 tail -n 15 "$STEP_LOG" | sed 's/^/   /'
                 FAILED=1
             else
-                echo "  ✔ [PASS] workspace-timing 快速单元测试通过 (205 tests)"
+                write_step_verdict "EXTENSION-TESTS-05" PASS "快速单元测试通过"
             fi
         fi
     fi
 elif [[ "$AGENT_MODE" -eq 0 ]] && echo "$STAGED_FILES" | grep -q '^workspace-timing/'; then
-    echo "  ✔ [Gate 8] workspace-timing 仅文档/配置变更，跳过增量编译"
+    write_step_verdict "EXTENSION-COMPILE-04" SKIP "仅文档或配置变更"
 fi
 
 TOUCHED_WT_DOC=$(echo "$STAGED_FILES" | grep -E '^workspace-timing/(CHANGELOG\.md|README\.md|package\.json)' || true)
@@ -327,7 +365,7 @@ if [[ -n "$TOUCHED_WT_DOC" ]]; then
         if ! (cd workspace-timing && "$NPM_BIN" run scripts:build) >"$STEP_LOG" 2>&1; then
             WT_LAYOUT_READY=0
             if [[ "$AGENT_MODE" -eq 1 ]]; then
-                record_pre_commit_failure "Gate 8: workspace-timing Layout Build (L3-DOC-LAYOUT)" \
+                record_pre_commit_failure "EXTENSION-DOCS-06" \
                     "L3-DOC-LAYOUT" \
                     "workspace-timing scripts:build failed; text-layout artifact is unavailable." \
                     "Run 'npm run scripts:build' in workspace-timing and resolve compiler errors." \
@@ -336,7 +374,7 @@ if [[ -n "$TOUCHED_WT_DOC" ]]; then
                 cat "$ROOT_DIR/.audit-logs/last-failure.json"
                 exit 1
             fi
-            echo "❌ [FAIL] Gate 8: workspace-timing 审查脚本构建失败 (npm run scripts:build)！"
+            write_step_verdict "EXTENSION-DOCS-06" BLOCK "审查脚本构建失败"
             tail -n 15 "$STEP_LOG" | sed 's/^/   /'
             FAILED=1
         fi
@@ -344,7 +382,7 @@ if [[ -n "$TOUCHED_WT_DOC" ]]; then
     if [[ "$WT_LAYOUT_READY" -eq 1 ]]; then
         if [[ "$AGENT_MODE" -eq 1 ]]; then
             if ! (cd workspace-timing && "$NODE_BIN" scripts/dist/audit/text-layout.js) >"$STEP_LOG" 2>&1; then
-                record_pre_commit_failure "Gate 8: workspace-timing Text Layout (L3-DOC-LAYOUT)" \
+                record_pre_commit_failure "EXTENSION-DOCS-06" \
                     "L3-DOC-LAYOUT" \
                     "workspace-timing text layout or changelog authenticity check failed." \
                     "Review CHANGELOG.md / README.md to ensure Keep-a-Changelog compliance." \
@@ -354,13 +392,13 @@ if [[ -n "$TOUCHED_WT_DOC" ]]; then
                 exit 1
             fi
         else
-            echo "  ▶ 触发 workspace-timing 文档布局与变更日志真实性门禁 (L3-DOC-LAYOUT)..."
+            write_step_banner "EXTENSION-DOCS-06"
             if ! (cd workspace-timing && "$NODE_BIN" scripts/dist/audit/text-layout.js) >"$STEP_LOG" 2>&1; then
-                echo "❌ [FAIL] Gate 8: workspace-timing 文档文本布局或变更日志真实性核验未通过！"
+                write_step_verdict "EXTENSION-DOCS-06" BLOCK "文档文本布局或变更日志真实性核验未通过"
                 tail -n 15 "$STEP_LOG" | sed 's/^/   /'
                 FAILED=1
             else
-                echo "  ✔ [PASS] workspace-timing 文档布局与变更日志真实性校验通过"
+                write_step_verdict "EXTENSION-DOCS-06" PASS "文档布局与变更日志真实性合规"
             fi
         fi
     fi
@@ -369,7 +407,7 @@ fi
 if [[ -n "$TOUCHED_AR_COMPILE" ]]; then
     if [[ "$AGENT_MODE" -eq 1 ]]; then
         if ! (cd auto-refactor && "$NPM_BIN" run build) >"$STEP_LOG" 2>&1; then
-            record_pre_commit_failure "Gate 8: auto-refactor Compilation (L0-COMPILE)" \
+            record_pre_commit_failure "ENGINE-COMPILE-07" \
                 "L0-COMPILE" \
                 "TypeScript compilation failed in auto-refactor." \
                 "Run 'npm run build' in auto-refactor and resolve compiler errors." \
@@ -379,9 +417,9 @@ if [[ -n "$TOUCHED_AR_COMPILE" ]]; then
             exit 1
         fi
     else
-        echo "  ▶ 触发 auto-refactor 增量编译校验..."
+        write_step_banner "ENGINE-COMPILE-07"
         if ! (cd auto-refactor && "$NPM_BIN" run build) >"$STEP_LOG" 2>&1; then
-            echo "❌ [FAIL] Gate 8: auto-refactor 编译失败！"
+            write_step_verdict "ENGINE-COMPILE-07" BLOCK "auto-refactor 编译失败"
             tail -n 15 "$STEP_LOG" | sed 's/^/   /'
             FAILED=1
         fi
@@ -393,8 +431,8 @@ if [[ -n "$TOUCHED_AR_COMPILE" ]]; then
             AR_REL_FILES=$(echo "$AR_STAGED_TS" | sed 's|^auto-refactor/||' | tr '\n' ' ')
             if [[ "$AGENT_MODE" -eq 1 ]]; then
                 if ! (cd auto-refactor && npx vitest related "$AR_REL_FILES" --run) >"$STEP_LOG" 2>&1; then
-                    record_pre_commit_failure "Gate 8: auto-refactor Impacted Unit Tests" \
-                        "GATE-SYS-001" \
+                    record_pre_commit_failure "ENGINE-TESTS-08" \
+                        "GUARD-SYS-001" \
                         "Impacted unit tests failed in auto-refactor." \
                         "Run 'npx vitest related ... --run' in auto-refactor." \
                         "npx --prefix auto-refactor vitest related \"$AR_REL_FILES\" --run" \
@@ -403,25 +441,25 @@ if [[ -n "$TOUCHED_AR_COMPILE" ]]; then
                     exit 1
                 fi
             else
-                echo "  ▶ 触发 auto-refactor 增量影响单元测试 (vitest related)..."
+                write_step_banner "ENGINE-TESTS-08"
                 if ! (cd auto-refactor && npx vitest related "$AR_REL_FILES" --run) >"$STEP_LOG" 2>&1; then
-                    echo "❌ [FAIL] Gate 8: auto-refactor 增量影响单测未通过！"
+                    write_step_verdict "ENGINE-TESTS-08" BLOCK "auto-refactor 增量影响单测未通过"
                     tail -n 15 "$STEP_LOG" | sed 's/^/   /'
                     FAILED=1
                 else
-                    echo "  ✔ [PASS] auto-refactor 增量影响单测通过"
+                    write_step_verdict "ENGINE-TESTS-08" PASS "增量影响单测通过"
                 fi
             fi
         fi
     fi
 elif [[ "$AGENT_MODE" -eq 0 ]] && echo "$STAGED_FILES" | grep -q '^auto-refactor/'; then
-    echo "  ✔ [Gate 8] auto-refactor 仅文档/配置变更，跳过增量编译"
+    write_step_verdict "ENGINE-COMPILE-07" SKIP "仅文档或配置变更"
 fi
 
 if [[ -n "$TOUCHED_WG_AUDIT" ]]; then
     if [[ "$AGENT_MODE" -eq 1 ]]; then
         if ! "$PYTHON_BIN" WebGames/scripts/py/audit_config.py --strict >"$STEP_LOG" 2>&1; then
-            record_pre_commit_failure "Gate 8: WebGames Config Architecture (ADV-CFG-001)" \
+            record_pre_commit_failure "DOMAIN-CONFIG-09" \
                 "ADV-CFG-001" \
                 "WebGames configuration architecture review failed." \
                 "Run 'python WebGames/scripts/py/audit_config.py --strict' to inspect config issues." \
@@ -431,9 +469,9 @@ if [[ -n "$TOUCHED_WG_AUDIT" ]]; then
             exit 1
         fi
     else
-        echo "  ▶ 触发 WebGames 增量配置架构审查..."
+        write_step_banner "DOMAIN-CONFIG-09"
         if ! "$PYTHON_BIN" WebGames/scripts/py/audit_config.py --strict >"$STEP_LOG" 2>&1; then
-            echo "❌ [FAIL] Gate 8: WebGames 配置架构审查未通过！"
+            write_step_verdict "DOMAIN-CONFIG-09" BLOCK "WebGames 配置架构审查未通过"
             tail -n 15 "$STEP_LOG" | sed 's/^/   /'
             FAILED=1
         fi
@@ -442,12 +480,12 @@ fi
 
 if [[ -n "$TOUCHED_FG_COMPILE" ]]; then
     if [[ "$AGENT_MODE" -eq 0 ]]; then
-        echo "  ▶ 触发 fractal-git 增量编译与语法校验 (cargo check)..."
+        write_step_banner "RUST-COMPILE-10"
     fi
     if [[ -n "$CARGO_BIN" ]]; then
         if [[ "$AGENT_MODE" -eq 1 ]]; then
             if ! "$CARGO_BIN" check --manifest-path fractal-git/Cargo.toml --all-targets >"$STEP_LOG" 2>&1; then
-                record_pre_commit_failure "Gate 8: fractal-git Compilation (L0-COMPILE)" \
+                record_pre_commit_failure "RUST-COMPILE-10" \
                     "L0-COMPILE" \
                     "Cargo check compilation failed in fractal-git." \
                     "Run 'cargo check --manifest-path fractal-git/Cargo.toml --all-targets' and resolve compiler errors." \
@@ -458,11 +496,11 @@ if [[ -n "$TOUCHED_FG_COMPILE" ]]; then
             fi
         else
             if ! "$CARGO_BIN" check --manifest-path fractal-git/Cargo.toml --all-targets >"$STEP_LOG" 2>&1; then
-                echo "❌ [FAIL] Gate 8: fractal-git 增量编译未通过！"
+                write_step_verdict "RUST-COMPILE-10" BLOCK "fractal-git 增量编译未通过"
                 tail -n 15 "$STEP_LOG" | sed 's/^/   /'
                 FAILED=1
             else
-                echo "  ✔ [PASS] fractal-git 增量编译与语法校验通过"
+                write_step_verdict "RUST-COMPILE-10" PASS "增量编译与语法校验通过"
             fi
         fi
     else
@@ -471,10 +509,10 @@ if [[ -n "$TOUCHED_FG_COMPILE" ]]; then
         fi
     fi
 elif [[ "$AGENT_MODE" -eq 0 ]] && echo "$STAGED_FILES" | grep -q '^fractal-git/'; then
-    echo "  ✔ [Gate 8] fractal-git 仅文档/配置变更，跳过增量编译"
+    write_step_verdict "RUST-COMPILE-10" SKIP "仅文档或配置变更"
 fi
 
-# --- Gate 9: 暂存区增量 AST 切片质量与复杂度审查 ---
+# --- 暂存区增量 AST 切片质量与复杂度审查 ---
 TOUCHED_CODE=$(echo "$STAGED_FILES" | grep -E '\.(ts|js)$' | grep -v -E '(\.d\.ts|dist/|out/|fixtures/)' || true)
 if [[ -n "$TOUCHED_CODE" ]]; then
     if [[ "$AGENT_MODE" -eq 1 ]]; then
@@ -485,14 +523,14 @@ if [[ -n "$TOUCHED_CODE" ]]; then
             exit 1
         fi
     else
-        echo "[9/9] 审查暂存区 AST 切片复杂度与代码稀释 (CC<=15 [分发器<=25], Depth<=4, Noise<=4.0)..."
+        write_step_banner "STAGED-SLICE-11"
         if ! "$NODE_BIN" scripts/common/validate-staged-slice.js; then
-            echo "❌ [FAIL] Gate 9: 暂存区 AST 切片审查未通过！"
+            write_step_verdict "STAGED-SLICE-11" BLOCK "暂存区 AST 切片审查未通过"
             FAILED=1
         fi
     fi
 elif [[ "$AGENT_MODE" -eq 0 ]]; then
-    echo "  ✔ [PASS] 无暂存 TS/JS 代码需执行 AST 切片审查"
+    write_step_verdict "STAGED-SLICE-11" SKIP "无暂存 TS/JS 代码"
 fi
 
 TOUCHED_AUDITABLE=$(echo "$STAGED_FILES" | grep -E '\.(ts|js|py|gd|rs|go|sh|ps1)$' | grep -v -E '(\.d\.ts|dist/|out/|fixtures/)' || true)
@@ -505,9 +543,9 @@ if [[ -n "$TOUCHED_AUDITABLE" ]]; then
             exit 1
         fi
     else
-        echo "  ▶ 审查暂存区代码密度与接线载荷 (POR<=60%, tau in [2.5, 20.0])..."
+        write_step_banner "STAGED-DENSITY-12"
         if ! "$NODE_BIN" scripts/common/validate-code-density.js --staged; then
-            echo "❌ [FAIL] Gate 9: 暂存区代码密度与接线载荷审查未通过！"
+            write_step_verdict "STAGED-DENSITY-12" BLOCK "暂存区代码密度与接线载荷审查未通过"
             FAILED=1
         fi
     fi
@@ -516,7 +554,7 @@ fi
 if [[ -n "$TOUCHED_AUDITABLE" ]]; then
     if [[ "$AGENT_MODE" -eq 1 ]]; then
         if ! "$NODE_BIN" scripts/common/evaluate-eloc-budget.js --staged --json >"$STEP_LOG" 2>&1; then
-            record_pre_commit_failure "Gate 9: Dual-Scale Volume Budget (VOL-ELOC-001)" \
+            record_pre_commit_failure "STAGED-VOLUME-13" \
                 "VOL-ELOC-001" \
                 "Staged code exceeds ELOC/LOC budgets or the 1:3 dynamic envelope." \
                 "Run 'node scripts/common/evaluate-eloc-budget.js --staged' and split or densify the offending module." \
@@ -526,9 +564,9 @@ if [[ -n "$TOUCHED_AUDITABLE" ]]; then
             exit 1
         fi
     else
-        echo "  ▶ 审查暂存区双轨体积与 1:3 动态包络 (ELOC<=900, LOC<=1400)..."
+        write_step_banner "STAGED-VOLUME-13"
         if ! "$NODE_BIN" scripts/common/evaluate-eloc-budget.js --staged; then
-            echo "❌ [FAIL] Gate 9: 暂存区双轨体积与动态包络审查未通过！"
+            write_step_verdict "STAGED-VOLUME-13" BLOCK "暂存区双轨体积与动态包络审查未通过"
             FAILED=1
         fi
     fi

@@ -1,13 +1,13 @@
 {
   "schema": "workspace-rule-catalog/v1",
-  "generatedAt": "2026-10-19T05:13:29.343Z",
-  "totalRules": 492,
+  "generatedAt": "2026-10-20T05:28:36.376Z",
+  "totalRules": 494,
   "counts": {
-    "autoRefactor": 353,
+    "autoRefactor": 359,
     "workspaceTiming": 49,
     "webGames": 50,
     "fractalGit": 17,
-    "globalTooling": 23
+    "globalTooling": 19
   },
   "rules": [
     {
@@ -1153,10 +1153,10 @@
     },
     {
       "id": "EXT-DIR-001",
-      "project": "global-tooling",
-      "family": "HYG",
+      "project": "auto-refactor",
+      "family": "EXT",
       "severity": "error",
-      "summary": "File extension and directory classification guard: scripts and configs must reside in dedicated domain subdirectories matching their file extension (ps1, sh, py, common) and never litter the workspace root."
+      "summary": "File extension and directory classification guard: scripts must reside in dedicated domain subdirectories and never litter workspace root."
     },
     {
       "id": "FGT-ALG-001",
@@ -1276,118 +1276,6 @@
       "family": "TRN",
       "severity": "error",
       "summary": "Smart HTTP transport and packet-line streaming framing protocol compliance guard"
-    },
-    {
-      "id": "GATE-AST-001",
-      "project": "auto-refactor",
-      "family": "GATE",
-      "severity": "error",
-      "summary": "Pre-commit gate lacks AST staged slice complexity and nesting budget check (CC <= 15, Depth <= 4)."
-    },
-    {
-      "id": "GATE-BUDGET-001",
-      "project": "auto-refactor",
-      "family": "GATE",
-      "severity": "warning",
-      "summary": "Pre-commit gate runs unconstrained whole-repo test suites without staged-file filtering, risking budget overrun."
-    },
-    {
-      "id": "GATE-ENT-001",
-      "project": "global-tooling",
-      "family": "GATE",
-      "severity": "error",
-      "summary": "Change Shannon entropy and diffusion guard: prevents chaotic cross-domain modifications exceeding cognitive budgets"
-    },
-    {
-      "id": "GATE-ERR-001",
-      "project": "auto-refactor",
-      "family": "GATE",
-      "severity": "error",
-      "summary": "Gate script lacks strict error termination flags, risking silent failures and false-positive gate passes."
-    },
-    {
-      "id": "GATE-FAC-001",
-      "project": "auto-refactor",
-      "family": "GATE",
-      "severity": "error",
-      "summary": "Gate pipeline lacks static validation for facade substantive bearing (ELOC >= 15) and vacuous forwarding elimination."
-    },
-    {
-      "id": "GATE-HOOK-001",
-      "project": "auto-refactor",
-      "family": "GATE",
-      "severity": "warning",
-      "summary": "Repository lacks local left-shift Git hooks; all defect feedback relies solely on remote CI."
-    },
-    {
-      "id": "GATE-HYG-001",
-      "project": "auto-refactor",
-      "family": "GATE",
-      "severity": "error",
-      "summary": "Pre-commit gate does not enforce physical hygiene: lacks zero-byte empty file detection."
-    },
-    {
-      "id": "GATE-ISO-001",
-      "project": "auto-refactor",
-      "family": "GATE",
-      "severity": "warning",
-      "summary": "Dual-tier gate boundary is not isomorphic; remote CI checks are not mirrored in local hooks."
-    },
-    {
-      "id": "GATE-MSG-001",
-      "project": "auto-refactor",
-      "family": "GATE",
-      "severity": "warning",
-      "summary": "Gate system lacks structured commit-msg validation for Conventional Commits and anti-jargon hygiene."
-    },
-    {
-      "id": "GATE-MSG-002",
-      "project": "auto-refactor",
-      "family": "GATE",
-      "severity": "error",
-      "summary": "Commit-msg gate does not enforce bidirectional bilingual style terms constraints (commit-msg-forbidden-terms.json unwired)."
-    },
-    {
-      "id": "GATE-MSG-003",
-      "project": "auto-refactor",
-      "family": "GATE",
-      "severity": "error",
-      "summary": "Monorepo commit message gate lacks [Project] section or whitelist verification."
-    },
-    {
-      "id": "GATE-PAIR-001",
-      "project": "auto-refactor",
-      "family": "GATE",
-      "severity": "warning",
-      "summary": "Dual-platform gate scripts are not paired; missing corresponding .sh or .ps1 gate implementation."
-    },
-    {
-      "id": "GATE-PROC-001",
-      "project": "auto-refactor",
-      "family": "GATE",
-      "severity": "error",
-      "summary": "PowerShell gate script uses interactive prompts without output redirection guard."
-    },
-    {
-      "id": "GATE-ROUTE-001",
-      "project": "auto-refactor",
-      "family": "GATE",
-      "severity": "error",
-      "summary": "Git hook router invokes fragile shell or Windows PS 5.1 directly without cross-platform safety fallback."
-    },
-    {
-      "id": "GATE-SSOT-001",
-      "project": "auto-refactor",
-      "family": "GATE",
-      "severity": "warning",
-      "summary": "Gate system lacks single-source-of-truth rule catalog verification, risking rule drift."
-    },
-    {
-      "id": "GATE-SYS-001",
-      "project": "auto-refactor",
-      "family": "GATE",
-      "severity": "error",
-      "summary": "Repository completely lacks a gate defense system (no Git hooks and no CI pipeline detected)."
     },
     {
       "id": "GDM-BAR-001",
@@ -1852,6 +1740,132 @@
       "summary": "Exported functions, classes, and public methods must specify explicit return types toprotect public API contracts."
     },
     {
+      "id": "GUARD-AST-001",
+      "project": "auto-refactor",
+      "family": "GUARD",
+      "severity": "error",
+      "summary": "Pre-commit gate lacks AST staged slice complexity and nesting budget check (CC <= 15, Depth <= 4)."
+    },
+    {
+      "id": "GUARD-BUDGET-001",
+      "project": "auto-refactor",
+      "family": "GUARD",
+      "severity": "warning",
+      "summary": "Pre-commit gate runs unconstrained whole-repo test suites without staged-file filtering, risking budget overrun."
+    },
+    {
+      "id": "GUARD-ENT-001",
+      "project": "global-tooling",
+      "family": "GUARD",
+      "severity": "error",
+      "summary": "Change Shannon entropy and diffusion guard: prevents chaotic cross-domain modifications exceeding cognitive budgets"
+    },
+    {
+      "id": "GUARD-ERR-001",
+      "project": "auto-refactor",
+      "family": "GUARD",
+      "severity": "error",
+      "summary": "Gate script lacks strict error termination flags, risking silent failures and false-positive gate passes."
+    },
+    {
+      "id": "GUARD-FAC-001",
+      "project": "auto-refactor",
+      "family": "GUARD",
+      "severity": "error",
+      "summary": "Gate pipeline lacks static validation for facade substantive bearing (ELOC >= 15) and vacuous forwarding elimination."
+    },
+    {
+      "id": "GUARD-FBK-001",
+      "project": "global-tooling",
+      "family": "GUARD",
+      "severity": "error",
+      "summary": "Gate feedback vocabulary guard: operator-facing feedback must carry semantic step identifiers from the single-source registry and a closed four-state status vocabulary, never positional labels"
+    },
+    {
+      "id": "GUARD-HOOK-001",
+      "project": "auto-refactor",
+      "family": "GUARD",
+      "severity": "warning",
+      "summary": "Repository lacks local left-shift Git hooks; all defect feedback relies solely on remote CI."
+    },
+    {
+      "id": "GUARD-HYG-001",
+      "project": "auto-refactor",
+      "family": "GUARD",
+      "severity": "error",
+      "summary": "Pre-commit gate does not enforce physical hygiene: lacks zero-byte empty file detection."
+    },
+    {
+      "id": "GUARD-ISO-001",
+      "project": "auto-refactor",
+      "family": "GUARD",
+      "severity": "warning",
+      "summary": "Dual-tier gate boundary is not isomorphic; remote CI checks are not mirrored in local hooks."
+    },
+    {
+      "id": "GUARD-MSG-001",
+      "project": "auto-refactor",
+      "family": "GUARD",
+      "severity": "warning",
+      "summary": "Gate system lacks structured commit-msg validation for Conventional Commits and anti-jargon hygiene."
+    },
+    {
+      "id": "GUARD-MSG-002",
+      "project": "auto-refactor",
+      "family": "GUARD",
+      "severity": "error",
+      "summary": "Commit-msg gate does not enforce bidirectional bilingual style terms constraints (commit-msg-forbidden-terms.json unwired)."
+    },
+    {
+      "id": "GUARD-MSG-003",
+      "project": "auto-refactor",
+      "family": "GUARD",
+      "severity": "error",
+      "summary": "Monorepo commit message gate lacks [Project] section or whitelist verification."
+    },
+    {
+      "id": "GUARD-PAIR-001",
+      "project": "auto-refactor",
+      "family": "GUARD",
+      "severity": "warning",
+      "summary": "Dual-platform gate scripts are not paired; missing corresponding .sh or .ps1 gate implementation."
+    },
+    {
+      "id": "GUARD-PROC-001",
+      "project": "auto-refactor",
+      "family": "GUARD",
+      "severity": "error",
+      "summary": "PowerShell gate script uses interactive prompts without output redirection guard."
+    },
+    {
+      "id": "GUARD-ROUTE-001",
+      "project": "auto-refactor",
+      "family": "GUARD",
+      "severity": "error",
+      "summary": "Git hook router invokes fragile shell or Windows PS 5.1 directly without cross-platform safety fallback."
+    },
+    {
+      "id": "GUARD-SSOT-001",
+      "project": "auto-refactor",
+      "family": "GUARD",
+      "severity": "warning",
+      "summary": "Gate system lacks single-source-of-truth rule catalog verification, risking rule drift."
+    },
+    {
+      "id": "GUARD-STEP-001",
+      "project": "global-tooling",
+      "family": "GUARD",
+      "severity": "error",
+      "summary": "Gate step registry binding guard: every step identifier referenced by a gate script must be declared in the single-source registry with a registered rule attribution"
+    },
+    {
+      "id": "GUARD-SYS-001",
+      "project": "auto-refactor",
+      "family": "GUARD",
+      "severity": "error",
+      "summary": "Repository completely lacks a gate defense system (no Git hooks and no CI pipeline detected)."
+    },
+    {
       "id": "HC-ABS-PATH",
       "project": "workspace-timing",
       "family": "L3",
@@ -1916,10 +1930,10 @@
     },
     {
       "id": "HYG-BOM-001",
-      "project": "global-tooling",
+      "project": "auto-refactor",
       "family": "HYG",
       "severity": "error",
-      "summary": "UTF-8 BOM hygiene guard: all workspace text files must be strictly UTF-8 NO-BOM without 0xEF, 0xBB, 0xBF byte prefix"
+      "summary": "UTF-8 Byte Order Mark (BOM) header prefix presence (files must strictly be UTF-8 NO-BOM)."
     },
     {
       "id": "HYG-CLN-001",
@@ -1930,10 +1944,10 @@
     },
     {
       "id": "HYG-CLT-001",
-      "project": "global-tooling",
+      "project": "auto-refactor",
       "family": "HYG",
       "severity": "error",
-      "summary": "System and transient clutter guard: workspace must remain clean of OS clutter and uncontrolled transient files"
+      "summary": "Uncontrolled transient clutter, log dumps, backup, or OS metadata files lingering in workspace."
     },
     {
       "id": "HYG-DED-001",
@@ -1958,10 +1972,10 @@
     },
     {
       "id": "HYG-EMP-002",
-      "project": "global-tooling",
+      "project": "auto-refactor",
       "family": "HYG",
       "severity": "error",
-      "summary": "Comment-only hollow file guard: files whose stripped content is empty after removing comments are strictly blocked"
+      "summary": "Comment-only hollow file lacking executable implementation logic after stripping comments."
     },
     {
       "id": "HYG-EOL-001",
@@ -1979,10 +1993,10 @@
     },
     {
       "id": "HYG-IND-001",
-      "project": "global-tooling",
+      "project": "auto-refactor",
       "family": "HYG",
-      "severity": "error",
-      "summary": "Pure space indentation guard: non-GDScript and non-Makefile source files must use spaces exclusively without tab characters"
+      "severity": "warning",
+      "summary": "Tab character indentation detected in non-tab language file (pure space indentation contract)."
     },
     {
       "id": "HYG-NAM-001",
@@ -2021,10 +2035,10 @@
     },
     {
       "id": "HYG-TRL-001",
-      "project": "global-tooling",
+      "project": "auto-refactor",
       "family": "HYG",
-      "severity": "error",
-      "summary": "POSIX EOF newline guard: text files must end with exactly one standard newline without trailing blank line buildup"
+      "severity": "warning",
+      "summary": "POSIX EOF newline contract violation (missing terminal newline or trailing blank line accumulation)."
     },
     {
       "id": "HYG-WRAP-001",

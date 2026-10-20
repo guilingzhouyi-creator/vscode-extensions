@@ -3,8 +3,8 @@
  * File Path: scripts/common/validate-commit-msg.js
  * Architecture Role: Single-process consolidated validator for Git commit messages.
  *   Loads rule-catalog and forbidden-terms configurations once in memory and executes:
- *   - Rule 7: Static analysis & review rule ID anti-hallucination / SSOT drift verification
- *   - Rule 8: Technical factual tone, forbidden terms, and anti-execution-log style auditing
+ *   - RULE-TRUTH-08: Static analysis & review rule ID anti-hallucination / SSOT drift verification
+ *   - TEXT-TRUTH-09: Technical factual tone, forbidden terms, and anti-execution-log style auditing
  *   Supports single-file audit, stdin streaming, and batch commit range scanning (--range).
  * Dependencies & Triggers: Consumes rule-catalog.json, commit-msg-forbidden-terms.json,
  *   and validate-commit-msg-style; invoked by commit-msg-gate (ps1/sh), pre-push-gate (ps1/sh),
@@ -42,14 +42,14 @@ const MODULE_DEBT_CORRIDOR = './tech-debt-corridor';
 const PROTOCOL_VERSION = '1.0.0';
 const STATUS_PASS = 'PASS';
 const STATUS_BLOCK = 'BLOCK';
-const STATUS_PASS_WITH_WARNING = 'PASS_WITH_WARNING';
+const STATUS_WARN = 'WARN';
 const SEVERITY_BLOCK = 'BLOCK';
 
 const GATE_COMMIT_MSG_RANGE = 'commit-msg:range';
 const GATE_COMMIT_MSG_RULES = 'commit-msg:rules-7-8';
 const STEP_RULES_VERIFY = 'Commit-Msg Rules 7 & 8 Verification';
 
-const RULE_GATE_SSOT = 'GATE-SSOT-001';
+const RULE_GATE_SSOT = 'GUARD-SSOT-001';
 const RULE_CMG_STY_DEFAULT = 'CMG-STY-001';
 
 const EXPECTED_SSOT_RULE = '在 rule-catalog.json 登记的真实规则 ID';
@@ -148,7 +148,7 @@ function validateStyleAndTone(content, options = {}) {
  * Detects construction-batch and temporary codenames forbidden anywhere in a
  * commit message.
  *
- * Mirrors the ps1/sh implementations of Rule 2. Previously Node only caught
+ * Mirrors the ps1/sh implementations of SLANG-GUARD-02. Previously Node only caught
  * these indirectly through header-format failures, which routed them into the
  * elastic Tier-2 corridor and let `wip` through as a warning.
  *
@@ -194,7 +194,6 @@ function validateSingleCommitMessage(content, options = {}) {
   };
 }
 
-
 function validateCommitRange(range) {
   const root = path.resolve(__dirname, PARENT_DIR_DEPTH_TWO);
   const env = getSafeGitEnv(root);
@@ -232,7 +231,7 @@ function validateCommitRange(range) {
       failedCount++;
       console.error(`\n❌ 提交 ${sha} 包含违规内容:`);
       if (res.hallucinatedRules.length > 0) {
-        console.error(`   • Rule 7 违规 (虚构规则 ID): ${res.hallucinatedRules.join(', ')}`);
+        console.error(`   • RULE-TRUTH-08 违规 (虚构规则 ID): ${res.hallucinatedRules.join(', ')}`);
       }
       if (res.styleFindings.length > 0) {
         console.error(formatDiagnosticReport(res.styleFindings));
@@ -358,7 +357,7 @@ function reportCommitMsgFailure(res, target, isAgentMode) {
   }
 
   if (res.hallucinatedRules.length > 0) {
-    console.error('❌ [FAIL] Rule 7: 提交信息中提及了未在单源注册表中登记的虚构/漂移规则 ID (Rule Anti-Hallucination):');
+    console.error('✖ [FAIL] RULE-TRUTH-08: 提交信息提及未在单源注册表登记的虚构或漂移规则 ID:');
     for (const h of res.hallucinatedRules) {
       console.error(`   • 未知规则 ID: ${h}`);
     }
@@ -366,7 +365,7 @@ function reportCommitMsgFailure(res, target, isAgentMode) {
   }
 
   if ((res.batchFindings || []).length > 0) {
-    console.error('❌ [FAIL] Rule 2: 提交信息包含施工批次或临时标记 (一票否决，不进入弹性走廊):');
+    console.error('✖ [FAIL] SLANG-GUARD-02: 提交信息包含施工批次或临时标记 (一票否决，不进入弹性走廊):');
     for (const f of res.batchFindings) {
       console.error(`   • 第 ${f.lineNum} 行: '${f.term}'`);
     }
@@ -402,7 +401,8 @@ function handleSingleCommitValidation(target, content, isAgentMode) {
         JSON.stringify(
           {
             protocolVersion: PROTOCOL_VERSION,
-            status: STATUS_PASS_WITH_WARNING,
+            status: STATUS_PASS,
+            warning: STATUS_WARN,
             gate: GATE_COMMIT_MSG_RULES,
             summary: `Commit message permitted under elastic corridor with ${highIssues.length} high-risk style debt items.`,
             debtCorridor: res.debtVerdict,
@@ -422,8 +422,8 @@ function handleSingleCommitValidation(target, content, isAgentMode) {
       for (const h of highIssues) {
         console.log(`     • [${h.ruleId}] 第 ${h.lineNum} 行: ${h.term} -> 推荐: ${h.guidance}`);
       }
-      console.log('  ✔ Rule 7: 规则 ID 单源目录一致性防虚构校验通过');
-      console.log('  ✔ Rule 8: 提交文本在弹性走廊配额内放行 (PASS_WITH_WARNING)');
+      
+      
     }
     process.exit(0);
   }
@@ -465,8 +465,8 @@ function handleSingleCommitValidation(target, content, isAgentMode) {
       )
     );
   } else {
-    console.log('  ✔ Rule 7: 规则 ID 单源目录一致性防虚构校验通过');
-    console.log('  ✔ Rule 8: 提交文本求真务实与禁词审查合规 (中英双语零临时/零夸大/零贬损/零元叙事口号)');
+    
+    
   }
   process.exit(0);
 }
@@ -477,7 +477,7 @@ function main() {
 
   if (args.includes(ARG_TEST)) {
     runStyleSelfTest();
-    console.log('✔ 单源规则反虚构 (Rule 7) 与风格禁词 (Rule 8) 联合自检通过');
+    
     process.exit(0);
   }
 

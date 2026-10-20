@@ -26,7 +26,7 @@
 | `common/` | Node.js | `validate-rule-id-closure.js` | audit / ssot（门禁引用规则 ID 与目录登记的双向闭包守卫） | `pre-push-gate`、CI |
 | `common/` | Node.js | `validate-docs-consistency.js` | audit / docs（动态对照 `rule-catalog.json` 真实计数拦截规则总数漂移；含治理文档脚本死链守卫） | `pre-push-gate`、CI |
 | `common/` | Node.js | `validate-rule-reachability.js` | audit / ssot（error 级规则执行入口可达性守卫） | `pre-push-gate`、CI |
-| `common/` | Node.js | `evaluate-change-entropy.js` | audit / entropy（Hassan 变更香农熵与 Kamei 跨域扩散 NF/ND/NS 评估，超阈阻断） | `pre-push-gate` Gate 11、本地 CLI || `common/` | Node.js | `bootstrap-gates.js` | tooling / bootstrap（钩子激活、依赖安装与构建一键引导） | 本地 CLI |
+| `common/` | Node.js | `evaluate-change-entropy.js` | audit / entropy（Hassan 变更香农熵与 Kamei 跨域扩散 NF/ND/NS 评估，超阈阻断） | `pre-push-gate` CHANGE-ENTROPY-22、本地 CLI || `common/` | Node.js | `bootstrap-gates.js` | tooling / bootstrap（钩子激活、依赖安装与构建一键引导） | 本地 CLI |
 | `common/` | Node.js | `test-gate-parity.js` | validate / parity（双实现提交门禁行为差分） | CI、本地 CLI |
 | `common/` | Node.js | `test-gate-selftest.js` | validate / selftest（门禁 PASS/违规/缺依赖三态矩阵） | CI、本地 CLI |
 | `common/` | Node.js | `validate-commit-msg.js` | gate / commit（生产级结构化提交信息格式、区块与有效字数综合调度器） | `commit-msg-gate` |
@@ -196,7 +196,18 @@ Python 版使用 docstring + `if __name__ == "__main__":` 守卫。
 | **推送前置门禁** | `pwsh scripts/ps1/pre-push-gate.ps1` | `pwsh scripts/ps1/pre-push-gate.ps1 -Agent` | `pwsh scripts/ps1/pre-push-gate.ps1 -ViewLog` |
 | **失败快照轮转器** | `node scripts/common/log-rotator.js --view` | `node scripts/common/log-rotator.js --agent` | 自动保留最近一次失败至 `.audit-logs/last-failure.json` |
 
-> 推送门禁现有 11 道 Gate：1 物理卫生/密度/体积 → 2 规则目录/闭包/可达性/文档/轨迹账本 →
-> 3 auto-refactor 门禁 → 4 auto-refactor 质量基线 → 5 workspace-timing 测试 → 6 workspace-timing 审查 →
-> 7 轨迹账本约束 → 8 WebGames 全域（含 Mermaid 真解析） → 9 fractal-git Rust 门禁 →
-> 10 提交信息词法契约自测 + 待推送历史扫描 → 11 推送集变更熵与跨域扩散。
+> 推送门禁现由 `scripts/common/gate-step-registry.json` 单源登记 23 个语义步骤，输出形如
+> `✔ PASS  <步骤标识>  <标题>  <详情>`，状态词闭包为 PASS / BLOCK / SKIP / WARN：
+>
+> | 步骤标识 | 职责 |
+> | :--- | :--- |
+> | `WORKSPACE-PHYSICAL-01` ~ `WORKSPACE-DENSITY-03` | 物理卫生八维、.gitignore 治理、五维代码密度 |
+> | `RULE-CATALOG-04` ~ `RULE-REACHABILITY-07` | 单源目录同步、标识闭包、文档一致性、规则可达性 |
+> | `ENGINE-RUST-08` ~ `ENGINE-BASELINE-13` | auto-refactor 编译、构建、门面承载、自审、回归、质量基线 |
+> | `EXTENSION-TESTS-14` ~ `EXTENSION-REVIEW-15` | workspace-timing 单元测试与六层审查 |
+> | `LEDGER-CONSTRAINT-16` | 长期轨迹账本物理约束 |
+> | `DOMAIN-AUDIT-17` ~ `DOMAIN-MERMAID-18` | WebGames 全域质量与文档 Mermaid 真解析 |
+> | `RUST-TAXIS-19` | fractal-git 微 Crate 回归套件 |
+> | `COMMIT-CONTRACT-20` ~ `COMMIT-HISTORY-21` | 提交信息词法契约自测与待推送历史审查 |
+> | `CHANGE-ENTROPY-22` | 推送集变更熵与跨域扩散 |
+> | `FEEDBACK-VOCABULARY-23` | 反馈词表语义化与四态状态词闭包 |

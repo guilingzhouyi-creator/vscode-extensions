@@ -41,7 +41,7 @@ if (-not $MsgFile -or -not (Test-Path $MsgFile -PathType Leaf)) {
             gate = "commit-msg"
             summary = "提交信息文件不存在或未提供: $MsgFile"
             violations = @(@{
-                ruleId = "GATE-MSG-001"
+                ruleId = "GUARD-MSG-001"
                 severity = "BLOCK"
                 message = "提交信息文件不存在或未提供: $MsgFile"
                 actionableFix = "请传入有效的 Git 提交信息文件路径"
@@ -51,6 +51,54 @@ if (-not $MsgFile -or -not (Test-Path $MsgFile -PathType Leaf)) {
         Write-Host "❌ [FAIL] 提交信息文件不存在或未提供: $MsgFile" -ForegroundColor Red
     }
     exit 1
+}
+
+$script:StepRegistryFile = Join-Path ((Resolve-Path (Join-Path $PSScriptRoot "../..")).Path) "scripts/common/gate-step-registry.json"
+$script:StepRegistry = $null
+$script:StepIndex = [ordered]@{}
+
+function Initialize-StepRegistry {
+    [CmdletBinding()]
+    param()
+    if ($script:StepRegistry) { return }
+    if (-not (Test-Path $script:StepRegistryFile)) {
+        throw "Gate step registry missing: $($script:StepRegistryFile)"
+    }
+    $script:StepRegistry = Get-Content -Path $script:StepRegistryFile -Raw -Encoding utf8 | ConvertFrom-Json
+    $entry = $script:StepRegistry.entries.'commit-msg'
+    if (-not $entry) { throw "Gate step registry declares no 'commit-msg' entry." }
+    $ordinal = 0
+    foreach ($step in $entry.steps) {
+        $ordinal++
+        $script:StepIndex[$step.id] = @{ Id = $step.id; Ordinal = $ordinal; Rule = $step.ruleId; Title = $step.title }
+    }
+}
+
+# 步骤身份只来自单源登记表：未知标识直接抛错，绝不回落到合成标识。
+function Write-StepVerdict {
+    [CmdletBinding()]
+    param([string]$StepId, [string]$Status, [string]$Detail = "")
+    Initialize-StepRegistry
+    if (-not $script:StepIndex.Contains($StepId)) {
+        throw "Unregistered gate step '$StepId'. Declare it in scripts/common/gate-step-registry.json."
+    }
+    $meta = $script:StepIndex[$StepId]
+    $glyph = switch ($Status) {
+        'PASS' { '✔' }
+        'BLOCK' { '✖' }
+        'SKIP' { '⚠️' }
+        'WARN' { '⚠️' }
+        default { '·' }
+    }
+    $color = switch ($Status) {
+        'PASS' { 'Green' }
+        'BLOCK' { 'Red' }
+        'SKIP' { 'Yellow' }
+        'WARN' { 'Yellow' }
+        default { 'Gray' }
+    }
+    $suffix = if ($Detail) { "  $Detail" } else { "" }
+    Write-Host "  $glyph $Status  $($meta.Id)  $($meta.Title)$suffix" -ForegroundColor $color
 }
 
 function Show-CommitTemplateGuide {
@@ -180,7 +228,7 @@ foreach ($l in $rawLines) {
 }
 
 if (-not $cleanLines -or $cleanLines.Count -eq 0 -or [string]::IsNullOrWhiteSpace($cleanLines[0])) {
-    Stop-CommitMsg -RuleId "GATE-MSG-001" -Message "提交信息不能为空！" -Expected "符合 Conventional Commits 格式的提交内容" -ActionableFix "请参考规范填写格式化提交信息"
+    Stop-CommitMsg -RuleId "GUARD-MSG-001" -Message "提交信息不能为空！" -Expected "符合 Conventional Commits 格式的提交内容" -ActionableFix "请参考规范填写格式化提交信息"
 }
 
 $firstLine = $cleanLines[0].Trim()
@@ -188,35 +236,35 @@ if (-not $Agent) {
     Write-Host "提交标题: $firstLine" -ForegroundColor Gray
 }
 
-# --- Rule 1: Header 格式与长度校验 ---
+# --- 标题格式与长度校验 ---
 $headerPattern = '^(feat|fix|refactor|docs|test|chore|style|perf)(\([a-zA-Z0-9_\-\/,@.]+\))?: .{4,80}$'
 if ($firstLine -cnotmatch $headerPattern) {
-    Stop-CommitMsg -RuleId "GATE-MSG-001" -Message "Rule 1: 提交标题不符合生产级格式规范！" -Actual $firstLine -Expected "<type>(<scope>): <简述> (4~80 字符)" -ActionableFix "调整为 feat/fix/refactor/docs/test/chore/style/perf(<scope>): 描述"
+    Stop-CommitMsg -RuleId "GUARD-MSG-001" -Message "[HEADER-FORM-01] 提交标题不符合生产级格式规范！" -Actual $firstLine -Expected "<type>(<scope>): <简述> (4~80 字符)" -ActionableFix "调整为 feat/fix/refactor/docs/test/chore/style/perf(<scope>): 描述"
 }
 
 # 检查标题末尾不得包含句号
 if ($firstLine -match '[.。]$') {
-    Stop-CommitMsg -RuleId "GATE-MSG-001" -Message "Rule 1: 提交标题末尾严禁包含句号（. 或 。）！" -Actual $firstLine -Expected "末尾无句号" -ActionableFix "移除标题末尾句号"
+    Stop-CommitMsg -RuleId "GUARD-MSG-001" -Message "[HEADER-FORM-01] 提交标题末尾严禁包含句号" -Actual $firstLine -Expected "末尾无句号" -ActionableFix "移除标题末尾句号"
 }
 
-# --- Rule 2: 零黑话与空洞泛化词拦截 ---
+# --- 标题零黑话与空洞泛化词拦截 ---
 $forbiddenPattern = '\b(wip|temp|test temp|tmp)\b'
 if ($firstLine -match $forbiddenPattern) {
-    Stop-CommitMsg -RuleId "CMG-STY-001" -Message "Rule 2: 提交标题包含违规黑话/临时性标记 (wip/temp/tmp 等)！" -Actual $firstLine -Expected "零黑话技术描述" -ActionableFix "陈述具体完成的技术特性，严禁使用 wip/temp"
+    Stop-CommitMsg -RuleId "CMG-STY-001" -Message "[SLANG-GUARD-02] 提交标题包含违规黑话或临时性标记" -Actual $firstLine -Expected "零黑话技术描述" -ActionableFix "陈述具体完成的技术特性，严禁使用 wip/temp"
 }
 
 $lazyPattern = '^([a-z]+(\([^\)]+\))?:\s*(update|modify|changes|fix|test|fixes|clean|refactor|todo|修复问题|更新代码|修改代码|新增功能|优化代码|日常更新|代码重构))\s*$'
 if ($firstLine -match $lazyPattern) {
-    Stop-CommitMsg -RuleId "CMG-STY-001" -Message "Rule 2: 提交标题过于空洞敷衍！请明确具体加了什么、改了什么或修了什么。" -Actual $firstLine -Expected "说明具体改动模块与功能" -ActionableFix "明确陈述具体变更逻辑"
+    Stop-CommitMsg -RuleId "CMG-STY-001" -Message "[SLANG-GUARD-02] 提交标题过于空洞，未说明具体改动" -Actual $firstLine -Expected "说明具体改动模块与功能" -ActionableFix "明确陈述具体变更逻辑"
 }
 
 $commitType = ($firstLine -replace '^([a-z]+)(\(.*\))?:.*$', '$1').ToLower()
 
-# --- Rule 3: Header 与 Body 之间必须保留空行 ---
+# --- 标题与正文空行分割契约 ---
 if ($cleanLines.Count -gt 1) {
     $secondLine = $cleanLines[1].Trim()
     if (-not [string]::IsNullOrEmpty($secondLine)) {
-        Stop-CommitMsg -RuleId "GATE-MSG-001" -Message "Rule 3: 标题与正文之间第 2 行必须保留空行（当前直接粘连正文）！" -Expected "第 2 行为独立空行" -ActionableFix "在标题与正文之间插入一个空行"
+        Stop-CommitMsg -RuleId "GUARD-MSG-001" -Message "[BODY-SPLIT-03] 标题与正文之间第 2 行必须保留空行" -Expected "第 2 行为独立空行" -ActionableFix "在标题与正文之间插入一个空行"
     }
 }
 
@@ -245,28 +293,28 @@ if ($cleanLines.Count -gt 2) {
     }
 }
 
-# --- Rule 4: 实质性提交的正文字数底线与信息密度 ---
+# --- 正文字数底线与信息密度 ---
 if ($commitType -in @('feat', 'fix', 'refactor', 'perf')) {
     $minBodyChars = 30
     if ($bodySubstantiveChars -lt $minBodyChars) {
-        Stop-CommitMsg -RuleId "GATE-MSG-001" -Message "Rule 4: 生产级关键提交 ($commitType) 正文实质信息量不足！当前实质字数: $bodySubstantiveChars（区块标题与项目归属不计入）" -Actual "$bodySubstantiveChars 字符" -Expected ">= $minBodyChars 字符" -ActionableFix "补充 [Why], [Changed], [Verification] 的实质技术事实"
+        Stop-CommitMsg -RuleId "GUARD-MSG-001" -Message "[BODY-DENSITY-04] 生产级关键提交 ($commitType) 正文实质信息量不足！当前实质字数: $bodySubstantiveChars（区块标题与项目归属不计入）" -Actual "$bodySubstantiveChars 字符" -Expected ">= $minBodyChars 字符" -ActionableFix "补充 [Why], [Changed], [Verification] 的实质技术事实"
     }
 
-    # --- Rule 5: 结构化区块完整性校验 ---
+    # --- 结构化区块完整性校验 ---
     $hasWhy = $bodyText -match '(?mi)\[(Why|动机|背景).*?\]'
     $hasChange = $bodyText -match '(?mi)\[(Added|Changed|Fixed|Removed|新增|变更|修改|修复|删除).*?\]'
     $hasVerification = $bodyText -match '(?mi)\[(Verification|验证|验证结论).*?\]'
 
     if (-not $hasWhy -or -not $hasChange -or -not $hasVerification) {
-        Stop-CommitMsg -RuleId "GATE-MSG-001" -Message "Rule 5: 关键提交 ($commitType) 结构化区块不完整！必须同时包含 [Why], [Changed/Added/Fixed], [Verification] 区块。" -Expected "[Why], [Changed/Added/Fixed], [Verification]" -ActionableFix "补充标准结构化区块 [Why], [Changed], [Verification]"
+        Stop-CommitMsg -RuleId "GUARD-MSG-001" -Message "[BODY-SECTIONS-05] 关键提交 ($commitType) 结构化区块不完整！必须同时包含 [Why], [Changed/Added/Fixed], [Verification] 区块。" -Expected "[Why], [Changed/Added/Fixed], [Verification]" -ActionableFix "补充标准结构化区块 [Why], [Changed], [Verification]"
     }
 
     if ($commitType -eq 'fix' -and ($bodyText -notmatch '(?mi)\[(Fixed|修复|修复缺陷).*?\]')) {
-        Stop-CommitMsg -RuleId "GATE-MSG-001" -Message "Rule 5: 缺陷修复提交 (fix) 必须显式包含 [Fixed / 修复缺陷] 区块说明具体修复的缺陷与根因！" -Expected "[Fixed / 修复缺陷]" -ActionableFix "补充 [Fixed] 区块明确缺陷现象与根因"
+        Stop-CommitMsg -RuleId "GUARD-MSG-001" -Message "[BODY-SECTIONS-05] 缺陷修复提交 (fix) 必须显式包含 [Fixed / 修复缺陷] 区块说明具体修复的缺陷与根因！" -Expected "[Fixed / 修复缺陷]" -ActionableFix "补充 [Fixed] 区块明确缺陷现象与根因"
     }
 }
 
-# --- Rule 5.1: 项目归属格式区与合法枚举校验 (CMG-PRJ-001) ---
+# --- 项目归属格式区与合法枚举校验 ---
 $foundProjectHeader = $false
 $inProjectSection = $false
 $declaredProjects = @()
@@ -309,11 +357,11 @@ foreach ($bLine in $bodyLines) {
 
 if ($commitType -in @('feat', 'fix', 'refactor', 'perf')) {
     if (-not $foundProjectHeader) {
-        Stop-CommitMsg -RuleId "CMG-PRJ-001" -Message "Rule 5.1 (CMG-PRJ-001): 关键生产级提交 ($commitType) 缺少项目归属格式区！" -Expected "[Project: workspace-timing | auto-refactor | WebGames | fractal-git | governance]" -ActionableFix "在正文首个结构化区块声明 [Project / 项目归属]"
+        Stop-CommitMsg -RuleId "CMG-PRJ-001" -Message "[PROJECT-SCOPE-06] (CMG-PRJ-001) 关键生产级提交 ($commitType) 缺少项目归属格式区！" -Expected "[Project: workspace-timing | auto-refactor | WebGames | fractal-git | governance]" -ActionableFix "在正文首个结构化区块声明 [Project / 项目归属]"
     }
 
     if ($declaredProjects.Count -eq 0) {
-        Stop-CommitMsg -RuleId "CMG-PRJ-001" -Message "Rule 5.1 (CMG-PRJ-001): [Project / 项目归属] 区块未声明任何项目名称！" -Expected "workspace-timing | auto-refactor | WebGames | fractal-git | governance" -ActionableFix "指定合法的项目归属名称"
+        Stop-CommitMsg -RuleId "CMG-PRJ-001" -Message "[PROJECT-SCOPE-06] (CMG-PRJ-001) [Project / 项目归属] 区块未声明任何项目名称！" -Expected "workspace-timing | auto-refactor | WebGames | fractal-git | governance" -ActionableFix "指定合法的项目归属名称"
     }
 }
 
@@ -328,16 +376,16 @@ if ($declaredProjects.Count -gt 0) {
     }
 
     if ($invalidProjects.Count -gt 0) {
-        Stop-CommitMsg -RuleId "CMG-PRJ-001" -Message "Rule 5.1 (CMG-PRJ-001): 声明的项目归属包含未授权/非法的项目标识: $($invalidProjects -join ', ')" -Actual ($invalidProjects -join ', ') -Expected "workspace-timing | auto-refactor | WebGames | fractal-git | governance" -ActionableFix "纠正项目名称为合法枚举之一"
+        Stop-CommitMsg -RuleId "CMG-PRJ-001" -Message "[PROJECT-SCOPE-06] (CMG-PRJ-001) 声明的项目归属包含未授权/非法的项目标识: $($invalidProjects -join ', ')" -Actual ($invalidProjects -join ', ') -Expected "workspace-timing | auto-refactor | WebGames | fractal-git | governance" -ActionableFix "纠正项目名称为合法枚举之一"
     }
 }
 
-# --- Rule 6: 正文零黑话与无批次代号 ---
+# --- 正文零批次代号与工期黑话 ---
 if ($bodyText -match '(?i)\b(phase\d+|st\d+|p\d+|sprint\s*\d+|w[1-9]|pass\s*[1-6])\b') {
-    Stop-CommitMsg -RuleId "CMG-STY-001" -Message "Rule 6: 提交正文包含违规敏捷工期代号/施工批次黑话 (phaseN/stN/pN/sprintN/wN/passN)！" -Expected "纯客观技术事实" -ActionableFix "基于功能特性与交付价值进行纯粹描述，移除工期与批次代号"
+    Stop-CommitMsg -RuleId "CMG-STY-001" -Message "[BATCH-CODE-07] 提交正文包含违规工期代号或批次黑话 (phaseN/stN/pN/sprintN/wN/passN)！" -Expected "纯客观技术事实" -ActionableFix "基于功能特性与交付价值进行纯粹描述，移除工期与批次代号"
 }
 
-# --- Rule 7 & 8: 规则 ID 反虚构与求真务实禁词联合审查 ---
+# --- 规则标识反虚构与文本求真联合审查 ---
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 $resolvedMsgFile = (Resolve-Path $MsgFile).Path
 $nodeCmd = if ($IsWindows -or $env:OS -match "Windows") { "node.exe" } else { "node" }
@@ -380,18 +428,19 @@ if ($Agent) {
     }
 }
 
-Write-Host "  ✔ Rule 1: Header 格式与长度 (5~80 字符, 无句号) 合规" -ForegroundColor Green
-Write-Host "  ✔ Rule 2: 零黑话与空洞词检测通过" -ForegroundColor Green
-Write-Host "  ✔ Rule 3: Header-Body 空行分割契约合规" -ForegroundColor Green
-Write-Host "  ✔ Rule 4: 正文实质字数与信息密度 ($bodySubstantiveChars 字符，区块标题不计入) 达标" -ForegroundColor Green
-Write-Host "  ✔ Rule 5: 生产工程级结构化区块校验通过" -ForegroundColor Green
+Write-StepVerdict -StepId "HEADER-FORM-01" -Status "PASS" -Detail "标题格式与长度合规"
+Write-StepVerdict -StepId "SLANG-GUARD-02" -Status "PASS" -Detail "零黑话与空洞词"
+Write-StepVerdict -StepId "BODY-SPLIT-03" -Status "PASS" -Detail "空行分割契约合规"
+Write-StepVerdict -StepId "BODY-DENSITY-04" -Status "PASS" -Detail "正文实质字数 $bodySubstantiveChars 达标"
+Write-StepVerdict -StepId "BODY-SECTIONS-05" -Status "PASS" -Detail "结构化区块完整"
 if ($declaredProjects.Count -gt 0) {
-    Write-Host "  ✔ Rule 5.1: 项目归属格式区合规 ([Project: $($declaredProjects -join ', ')])" -ForegroundColor Green
+    Write-StepVerdict -StepId "PROJECT-SCOPE-06" -Status "PASS" -Detail "项目归属合规 ([$($declaredProjects -join ', ')])"
 } else {
-    Write-Host "  ✔ Rule 5.1: 项目归属格式区校验通过 (免检/非强制类型)" -ForegroundColor Green
+    Write-StepVerdict -StepId "PROJECT-SCOPE-06" -Status "SKIP" -Detail "免检类型，不强制项目归属"
 }
-Write-Host "  ✔ Rule 6: 正文零施工批次黑话校验通过" -ForegroundColor Green
-Write-Host "  ✔ Rule 7/8: 规则 ID 反虚构与文本求真审查通过（详见上方 Node 校验输出）" -ForegroundColor Green
+Write-StepVerdict -StepId "BATCH-CODE-07" -Status "PASS" -Detail "正文零批次代号"
+Write-StepVerdict -StepId "RULE-TRUTH-08" -Status "PASS" -Detail "规则标识反虚构与文本求真通过"
+Write-StepVerdict -StepId "TEXT-TRUTH-09" -Status "PASS" -Detail "文本求真通过"
 Write-Host "=================================================================" -ForegroundColor Cyan
 Write-Host "✅ Commit-Msg 检查通过" -ForegroundColor Green
 Write-Host "=================================================================" -ForegroundColor Cyan

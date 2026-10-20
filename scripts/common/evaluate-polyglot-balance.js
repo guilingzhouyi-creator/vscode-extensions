@@ -34,22 +34,22 @@ const LANG_CONFIG = {
   gdscript: {
     label: 'GDScript',
     extensions: ['.gd'],
-    defaultFallbackScore: 100.0,
+    defaultFallbackScore: 95.0,
   },
   python: {
     label: 'Python',
     extensions: ['.py'],
-    defaultFallbackScore: 83.0,
+    defaultFallbackScore: 90.0,
   },
   shell: {
     label: 'Shell (PS1 / Bash)',
     extensions: ['.ps1', '.psm1', '.psd1', '.sh', '.bash', '.zsh'],
-    defaultFallbackScore: 100.0,
+    defaultFallbackScore: 87.5,
   },
   rust: {
     label: 'Rust',
     extensions: ['.rs'],
-    defaultFallbackScore: 100.0,
+    defaultFallbackScore: 93.5,
   },
 };
 
@@ -168,22 +168,71 @@ async function samplePythonScore(fastMode = false) {
 }
 
 /**
- * Samples Shell quality score by checking cross-platform isomorphism gate.
+ * Samples GDScript quality score by running auto-refactor scan across WebGames GDScripts,
+ * or using cached/baseline estimation.
  *
- * @returns {number} Score in [0, 100].
+ * @param {boolean} fastMode - Skip full scan and use cached evaluation.
+ * @returns {Promise<number>} Score in [0, 100].
  */
-function sampleShellScore() {
+async function sampleGdscriptScore(fastMode = false) {
+  if (!fs.existsSync(AR_API_PATH)) {
+    return LANG_CONFIG.gdscript.defaultFallbackScore;
+  }
+
+  try {
+    const { scan } = require(AR_API_PATH);
+    const scanResult = await scan({
+      root: REPO_ROOT,
+      include: ['WebGames/**/*.gd'],
+      logLevel: 'error',
+    });
+    if (scanResult.qualityScore && typeof scanResult.qualityScore.compositeScore === 'number') {
+      return Math.round(scanResult.qualityScore.compositeScore * 100) / 100;
+    }
+  } catch (scanErr) {
+    void scanErr;
+  }
+  return LANG_CONFIG.gdscript.defaultFallbackScore;
+}
+
+/**
+ * Samples Shell quality score by executing auto-refactor scan on active ps1/sh scripts
+ * combined with cross-platform isomorphism gate verification.
+ *
+ * @param {boolean} fastMode - Skip full scan and use cached evaluation.
+ * @returns {Promise<number>} Score in [0, 100].
+ */
+async function sampleShellScore(fastMode = false) {
+  if (!fs.existsSync(AR_API_PATH)) {
+    return LANG_CONFIG.shell.defaultFallbackScore;
+  }
+
+  let baseScore = LANG_CONFIG.shell.defaultFallbackScore;
+  try {
+    const { scan } = require(AR_API_PATH);
+    const scanResult = await scan({
+      root: REPO_ROOT,
+      include: ['scripts/**/*.ps1', 'scripts/**/*.sh'],
+      logLevel: 'error',
+    });
+    if (scanResult.qualityScore && typeof scanResult.qualityScore.compositeScore === 'number') {
+      baseScore = Math.round(scanResult.qualityScore.compositeScore * 100) / 100;
+    }
+  } catch (scanErr) {
+    void scanErr;
+  }
+
   const isoScript = path.join(REPO_ROOT, 'scripts/common/validate-script-isomorphism.js');
   if (fs.existsSync(isoScript)) {
     try {
       const { execFileSync } = require('child_process');
       execFileSync(process.execPath, [isoScript], { stdio: 'pipe', encoding: 'utf8' });
-      return 100.0;
     } catch {
-      return 60.0;
+      baseScore = Math.max(15.0, baseScore - 30.0);
     }
   }
-  return LANG_CONFIG.shell.defaultFallbackScore;
+
+  return baseScore;
 }
 
 /**
@@ -277,9 +326,9 @@ async function evaluateWorkspacePolyglotBalance(options = {}) {
 
   const scores = {
     typescript: explicit.typescript ?? sampleTypescriptScore(),
-    gdscript: explicit.gdscript ?? LANG_CONFIG.gdscript.defaultFallbackScore,
+    gdscript: explicit.gdscript ?? (await sampleGdscriptScore(fast)),
     python: explicit.python ?? (await samplePythonScore(fast)),
-    shell: explicit.shell ?? sampleShellScore(),
+    shell: explicit.shell ?? (await sampleShellScore(fast)),
     rust: explicit.rust ?? sampleRustScore(),
   };
 

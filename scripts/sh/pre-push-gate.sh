@@ -59,6 +59,10 @@ fi
 FAILED=0
 RUN_ID="$(date -u +%s 2>/dev/null || echo 0)-$$"
 
+if ! run_gate_step 30 "FEEDBACK-VOCABULARY-23" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-gate-feedback.js; then
+    FAILED=1
+fi
+
 if [[ "$AGENT_MODE" -eq 1 ]]; then
     rm -f "$ROOT_DIR/.audit-logs/last-failure.json" 2>/dev/null || true
 fi
@@ -67,49 +71,60 @@ AUDIT_LOG_DIR="$ROOT_DIR/.audit-logs"
 mkdir -p "$AUDIT_LOG_DIR"
 STEP_LOG="$AUDIT_LOG_DIR/pre-push-step.log"
 
-get_step_rule_id() {
-    local step_name="$1"
-    if [[ "$step_name" =~ "Gate 1" ]]; then echo "HYG-EMP-001"; return; fi
-    if [[ "$step_name" =~ "Gate 2" ]]; then echo "GATE-SSOT-001"; return; fi
-    if [[ "$step_name" =~ Gate\ 3|auto-refactor ]]; then echo "RCFG-RULE-DRIFT"; return; fi
-    if [[ "$step_name" =~ "Gate 4" ]]; then echo "GATE-BUDGET-001"; return; fi
-    if [[ "$step_name" =~ "Gate 5" ]]; then echo "GATE-BUDGET-001"; return; fi
-    if [[ "$step_name" =~ "Gate 6" ]]; then echo "RCFG-MATRIX"; return; fi
-    if [[ "$step_name" =~ "Gate 7" ]]; then echo "ARCH-CFG-001"; return; fi
-    if [[ "$step_name" =~ "Gate 8" ]]; then echo "ADV-CFG-001"; return; fi
-    if [[ "$step_name" =~ "Gate 9" ]]; then echo "GATE-SYS-001"; return; fi
-    if [[ "$step_name" =~ "Gate 10" ]]; then echo "GATE-MSG-001"; return; fi
-    echo "GATE-SYS-001"
+# 步骤身份、显示序号与规则归因只来自单源登记表（scripts/common/gate-step-registry.json）。
+# 未知标识直接阻断，绝不静默回落到合成标识：静默回落会把真实失败归因到错误的规则上。
+STEP_TSV=""
+STEP_TOTAL=0
+
+load_step_registry() {
+    if [[ -n "$STEP_TSV" ]]; then return 0; fi
+    local registry_js="$ROOT_DIR/scripts/common/gate-step-registry.js"
+    if [[ ! -f "$registry_js" ]]; then
+        echo "✖ BLOCK  单源步骤登记表加载器缺失: $registry_js" >&2
+        exit 1
+    fi
+    STEP_TSV=$("$NODE_BIN" "$registry_js" --entry pre-push --tsv 2>/dev/null) || {
+        echo "✖ BLOCK  单源步骤登记表无法投影 pre-push 条目" >&2
+        exit 1
+    }
+    STEP_TOTAL=$(grep -c . <<< "$STEP_TSV")
 }
 
+# 输出 "序号<TAB>规则标识<TAB>标题"；未登记标识返回非零。
 get_step_meta() {
-    local step_name="$1"
-    case "$step_name" in
-        "Gate 1 (物理卫生八维全域巡检)") echo "PP-01-01|HYG-EMP-001" ;;
-        "Gate 1 (.gitignore 治理)") echo "PP-01-02|GATE-HYG-001" ;;
-        "Gate 1 (五维代码密度)") echo "PP-01-03|VOL-DIL-001" ;;
-        "Gate 2 (单源规则目录)") echo "PP-02-01|RCFG-RULE-DRIFT" ;;
-        "Gate 2 (规则 ID 闭包)") echo "PP-02-02|RCFG-RULE-DRIFT" ;;
-        "Gate 2 (文档一致性)") echo "PP-02-03|RCFG-RULE-DRIFT" ;;
-        "Gate 2 (规则可达性)") echo "PP-02-04|RCFG-RULE-DRIFT" ;;
-        "auto-refactor Rust Gate") echo "PP-03-01|GATE-SYS-001" ;;
-        "auto-refactor Build") echo "PP-03-02|GATE-SYS-001" ;;
-        "auto-refactor Facade Gate") echo "PP-03-03|ARCH-FAC-001" ;;
-        "auto-refactor Self Gate") echo "PP-03-04|GATE-SYS-001" ;;
-        "auto-refactor Tests") echo "PP-03-05|GATE-SYS-001" ;;
-        "Gate 4 (auto-refactor 质量基线)") echo "PP-04-01|GATE-BUDGET-001" ;;
-        "Gate 5 (workspace-timing 快速单元测试)") echo "PP-05-01|GATE-SYS-001" ;;
-        "Gate 6 (workspace-timing 审查门禁)") echo "PP-06-01|RCFG-MATRIX" ;;
-        "Gate 7 (长期轨迹账本约束)") echo "PP-07-01|GOV-TRJ-001" ;;
-        "Gate 8 (WebGames 全域质量门禁)") echo "PP-08-01|ADV-CFG-001" ;;
-        "Gate 9 (fractal-git 9大微 Crate 回归套件)") echo "PP-09-01|GATE-SYS-001" ;;
-        "Gate 10 (待推送分支提交历史风格与禁词审查)") echo "PP-10-01|CMG-STY-001" ;;
-        *)
-            local default_rule
-            default_rule=$(get_step_rule_id "$step_name")
-            echo "PP-00-00|$default_rule"
-            ;;
+    local step_id="$1"
+    load_step_registry
+    local row
+    row=$(awk -F'\t' -v id="$step_id" '$2 == id { print; exit }' <<< "$STEP_TSV")
+    if [[ -z "$row" ]]; then
+        echo "✖ BLOCK  未登记的步骤标识 '$step_id'，请在 scripts/common/gate-step-registry.json 声明" >&2
+        return 1
+    fi
+    printf '%s' "$row"
+}
+
+write_step_banner() {
+    local step_id="$1"
+    local row ordinal title
+    row=$(get_step_meta "$step_id") || exit 1
+    ordinal=$(cut -f1 <<< "$row")
+    title=$(cut -f4 <<< "$row")
+    log_gate "▶ [$ordinal/$STEP_TOTAL] $step_id  $title"
+}
+
+write_step_verdict() {
+    local step_id="$1"
+    local status="$2"
+    local detail="${3:-}"
+    local glyph
+    case "$status" in
+        PASS) glyph="✔" ;;
+        BLOCK) glyph="✖" ;;
+        SKIP) glyph="⚠️" ;;
+        WARN) glyph="⚠️" ;;
+        *) glyph="·" ;;
     esac
+    log_gate "  $glyph $status  $step_id  $detail"
 }
 
 log_gate() {
@@ -120,9 +135,17 @@ log_gate() {
 
 run_gate_step() {
     local timeout_sec="$1"
-    local step_name="$2"
+    local step_id="$2"
     local work_dir="$3"
     shift 3
+
+    local row ordinal rule_id title
+    row=$(get_step_meta "$step_id") || exit 1
+    ordinal=$(cut -f1 <<< "$row")
+    rule_id=$(cut -f3 <<< "$row")
+    title=$(cut -f4 <<< "$row")
+
+    write_step_banner "$step_id"
 
     rm -f "$STEP_LOG"
 
@@ -133,21 +156,20 @@ run_gate_step() {
     while kill -0 "$pid" 2>/dev/null; do
         if [[ "$count" -ge "$timeout_sec" ]]; then
             if [[ "$AGENT_MODE" -eq 0 ]]; then
-                echo "⚠️ $step_name 审查执行超时 (${timeout_sec}s，PID: $pid)，强制终止进程树..." >&2
+                echo "⚠️ WARN  $step_id 执行超时 (${timeout_sec}s, PID: $pid)，强制终止进程树..." >&2
             fi
             kill -9 "$pid" 2>/dev/null || true
 
             local timestamp
             timestamp=$(date +"%Y%m%d-%H%M%S")
-            local safe_name
-            safe_name=$(echo "$step_name" | tr ' /' '__' | tr '[:upper:]' '[:lower:]')
-            local diag_file="$AUDIT_LOG_DIR/timeout-prepush-${safe_name}-${timestamp}.log"
+            local diag_file="$AUDIT_LOG_DIR/timeout-prepush-${step_id}-${timestamp}.log"
 
             {
                 echo "================================================================================"
-                echo "⚠️ WATCHDOG TIMEOUT 诊断快照 (Pre-Push Gate Bash)"
+                echo "⚠️ WATCHDOG TIMEOUT 诊断快照 (pre-push / $step_id)"
                 echo "================================================================================"
-                echo "目标模块: $step_name"
+                echo "步骤标识: $step_id"
+                echo "步骤标题: $title"
                 echo "工作目录: $work_dir"
                 echo "进程 PID: $pid"
                 echo "超时阈值: ${timeout_sec} 秒"
@@ -176,7 +198,7 @@ run_gate_step() {
     wait "$pid" || status=$?
     if [[ "$status" -ne 0 ]]; then
         if [[ "$AGENT_MODE" -eq 0 ]]; then
-            echo "❌ $step_name 失败 (退出码: $status)" >&2
+            echo "  ✖ BLOCK  $step_id  失败 (退出码: $status)" >&2
             if [[ -f "$STEP_LOG" ]]; then
                 echo "   --- 错误日志摘要 ---" >&2
                 tail -n 20 "$STEP_LOG" | sed 's/^/   /' >&2
@@ -185,10 +207,6 @@ run_gate_step() {
         local last_log="$AUDIT_LOG_DIR/last-pre-push.log"
         cp "$STEP_LOG" "$last_log" 2>/dev/null || true
         "$NODE_BIN" "$ROOT_DIR/scripts/common/log-rotator.js" --truncate "$last_log" >/dev/null 2>&1 || true
-        local rule_id step_id meta
-        meta=$(get_step_meta "$step_name")
-        step_id="${meta%%|*}"
-        rule_id="${meta##*|}"
         cat <<EOF > "$AUDIT_LOG_DIR/last-failure.json" 2>/dev/null || true
 {
   "protocolVersion": "1.0.0",
@@ -196,18 +214,19 @@ run_gate_step() {
   "recordedAt": "$(date -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || echo 'unknown')",
   "status": "BLOCK",
   "gate": "pre-push",
-  "step": "$step_name",
+  "step": "$step_id",
+  "stepTitle": "$title",
   "stepId": "$step_id",
   "failedCommand": "$*",
   "exitCode": $status,
-  "summary": "Step $step_name failed with exit code $status",
+  "summary": "Step $step_id ($title) failed with exit code $status",
   "logFile": ".audit-logs/last-pre-push.log",
   "violations": [
     {
       "ruleId": "$rule_id",
       "severity": "BLOCK",
       "file": "$work_dir",
-      "message": "Step $step_name failed with exit code $status",
+      "message": "Step $step_id ($title) failed with exit code $status",
       "verificationCommand": "$*"
     }
   ],
@@ -222,6 +241,7 @@ EOF
         return "$status"
     fi
     rm -f "$STEP_LOG" 2>/dev/null || true
+    write_step_verdict "$step_id" PASS ""
     return 0
 }
 
@@ -294,15 +314,14 @@ else
     log_gate "ℹ️  智能影响路由生效: 仅回归受影响项目 [$(IFS=', '; echo "${ACTIVE_PROJ[*]}") ]"
 fi
 
-# --- Gate 1: 全工作区零空文件、物理卫生、.gitignore 治理与五维代码密度守卫 ---
-log_gate "[1/11] 校验全工作区零物理空文件、空白脚本、.gitignore 治理与五维代码密度守卫..."
+# --- 工作区物理卫生与体积守卫 ---
 GATE1_FAIL=0
-run_gate_step 30 "Gate 1 (物理卫生八维全域巡检)" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-physical-hygiene.js || GATE1_FAIL=1
-run_gate_step 30 "Gate 1 (.gitignore 治理)" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-gitignore-governance.js || GATE1_FAIL=1
+run_gate_step 30 "WORKSPACE-PHYSICAL-01" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-physical-hygiene.js || GATE1_FAIL=1
+run_gate_step 30 "WORKSPACE-GITIGNORE-02" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-gitignore-governance.js || GATE1_FAIL=1
 if [[ -n "$RANGE" ]]; then
-    run_gate_step 30 "Gate 1 (五维代码密度)" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-code-density.js --range "$RANGE" || GATE1_FAIL=1
+    run_gate_step 30 "WORKSPACE-DENSITY-03" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-code-density.js --range "$RANGE" || GATE1_FAIL=1
 else
-    run_gate_step 30 "Gate 1 (五维代码密度)" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-code-density.js || GATE1_FAIL=1
+    run_gate_step 30 "WORKSPACE-DENSITY-03" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-code-density.js || GATE1_FAIL=1
 fi
 if [[ "$GATE1_FAIL" -ne 0 ]]; then
     FAILED=1
@@ -310,150 +329,141 @@ else
     log_gate "  ✔ 全工作区零空文件、.gitignore 治理与五维代码密度校验通过"
 fi
 
-# --- Gate 2: 规则单源目录一致性同步 ---
-log_gate "[2/11] 校验全工作区单源规则目录同步..."
-if ! run_gate_step 30 "Gate 2 (单源规则目录)" "$ROOT_DIR" "$NODE_BIN" scripts/common/generate-rule-catalog.js --check-only; then
+# --- 单源规则目录与引用闭包 ---
+if ! run_gate_step 30 "RULE-CATALOG-04" "$ROOT_DIR" "$NODE_BIN" scripts/common/generate-rule-catalog.js --check-only; then
     FAILED=1
-elif ! run_gate_step 30 "Gate 2 (规则 ID 闭包)" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-rule-id-closure.js; then
+elif ! run_gate_step 30 "RULE-CLOSURE-05" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-rule-id-closure.js; then
     FAILED=1
-elif ! run_gate_step 30 "Gate 2 (文档一致性)" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-docs-consistency.js; then
+elif ! run_gate_step 30 "DOCS-CONSISTENCY-06" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-docs-consistency.js; then
     FAILED=1
-elif ! run_gate_step 60 "Gate 2 (规则可达性)" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-rule-reachability.js; then
+elif ! run_gate_step 60 "RULE-REACHABILITY-07" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-rule-reachability.js; then
     FAILED=1
 else
     log_gate "  ✔ 全工作区单源规则目录同步与规则 ID 闭包校验通过"
 fi
 
-# --- Gate 3: auto-refactor 引擎全量门禁与回归套件 ---
+# --- auto-refactor 引擎全量门禁与回归套件 ---
 if [[ "$RUN_AR" -eq 1 ]]; then
-    log_gate "[3/11] 执行 auto-refactor 全量门禁与回归套件 (Rust/Build/Self/Tests)..."
-    AR_FAIL=0
-    run_gate_step 60 "auto-refactor Rust Gate" "$ROOT_DIR/auto-refactor" "$NODE_BIN" scripts/gate-rust.js || AR_FAIL=1
-    run_gate_step 90 "auto-refactor Build" "$ROOT_DIR/auto-refactor" "$NPM_BIN" run build || AR_FAIL=1
-    run_gate_step 60 "auto-refactor Facade Gate" "$ROOT_DIR/auto-refactor" "$NODE_BIN" scripts/validate-facade-governance.js || AR_FAIL=1
-    run_gate_step 60 "auto-refactor Self Gate" "$ROOT_DIR/auto-refactor" "$NODE_BIN" scripts/gate-self.js || AR_FAIL=1
-    run_gate_step 180 "auto-refactor Tests" "$ROOT_DIR/auto-refactor" "$NODE_BIN" scripts/test-parallel.js || AR_FAIL=1
+        AR_FAIL=0
+    run_gate_step 60 "ENGINE-RUST-08" "$ROOT_DIR/auto-refactor" "$NODE_BIN" scripts/gate-rust.js || AR_FAIL=1
+    run_gate_step 90 "ENGINE-BUILD-09" "$ROOT_DIR/auto-refactor" "$NPM_BIN" run build || AR_FAIL=1
+    run_gate_step 60 "ENGINE-FACADE-10" "$ROOT_DIR/auto-refactor" "$NODE_BIN" scripts/validate-facade-governance.js || AR_FAIL=1
+    run_gate_step 60 "ENGINE-SELF-11" "$ROOT_DIR/auto-refactor" "$NODE_BIN" scripts/gate-self.js || AR_FAIL=1
+    run_gate_step 180 "ENGINE-TESTS-12" "$ROOT_DIR/auto-refactor" "$NODE_BIN" scripts/test-parallel.js || AR_FAIL=1
     if [[ "$AR_FAIL" -ne 0 ]]; then
-        log_gate "❌ Gate 3: auto-refactor 门禁或测试套件未通过"
+        write_step_verdict "ENGINE-TESTS-12" BLOCK "auto-refactor 门禁或测试套件未通过"
         FAILED=1
     else
         log_gate "  ✔ auto-refactor 全量门禁与测试套件通过"
     fi
 else
-    log_gate "  ✔ [Gate 3] auto-refactor 未受影响，智能跳过全量门禁"
+    write_step_verdict "ENGINE-RUST-08" SKIP "auto-refactor 未受影响"
 fi
 
-# --- Gate 4: auto-refactor 多维自审与质量基线 ---
+# --- auto-refactor 多维自审与质量基线 ---
 if [[ "$RUN_AR" -eq 1 ]]; then
-    log_gate "[4/11] 执行 auto-refactor 质量基线与多维自审 (LOC预算/熵/密度/BIF)..."
-    if ! run_gate_step 60 "Gate 4 (auto-refactor 质量基线)" "$ROOT_DIR/auto-refactor" "$NODE_BIN" scripts/validate-self-multidimensional-audit.js; then
+        if ! run_gate_step 60 "ENGINE-BASELINE-13" "$ROOT_DIR/auto-refactor" "$NODE_BIN" scripts/validate-self-multidimensional-audit.js; then
         FAILED=1
     else
         log_gate "  ✔ auto-refactor 质量基线与自审达标"
     fi
 else
-    log_gate "  ✔ [Gate 4] auto-refactor 未受影响，智能跳过质量基线"
+    write_step_verdict "ENGINE-BASELINE-13" SKIP "auto-refactor 未受影响"
 fi
 
-# --- Gate 5: workspace-timing 快速单元测试套件 ---
+# --- workspace-timing 快速单元测试套件 ---
 if [[ "$RUN_WT" -eq 1 ]]; then
-    log_gate "[5/11] 执行 workspace-timing 快速单元测试套件..."
-    if ! run_gate_step 60 "Gate 5 (workspace-timing 快速单元测试)" "$ROOT_DIR/workspace-timing" "$NPM_BIN" run test:fast; then
+        if ! run_gate_step 60 "EXTENSION-TESTS-14" "$ROOT_DIR/workspace-timing" "$NPM_BIN" run test:fast; then
         FAILED=1
     else
         log_gate "  ✔ workspace-timing 快速单元测试通过"
     fi
 else
-    log_gate "  ✔ [Gate 5] workspace-timing 未受影响，智能跳过单元测试"
+    write_step_verdict "EXTENSION-TESTS-14" SKIP "workspace-timing 未受影响"
 fi
 
-# --- Gate 6: workspace-timing L0~L5 六层审查门禁 ---
+# --- workspace-timing 六层审查门禁 ---
 if [[ "$RUN_WT" -eq 1 ]]; then
-    log_gate "[6/11] 执行 workspace-timing L0~L5 六层审查门禁..."
-    if ! run_gate_step 60 "Gate 6 (workspace-timing 审查门禁)" "$ROOT_DIR/workspace-timing" "$NPM_BIN" run review; then
+        if ! run_gate_step 60 "EXTENSION-REVIEW-15" "$ROOT_DIR/workspace-timing" "$NPM_BIN" run review; then
         FAILED=1
     else
         log_gate "  ✔ workspace-timing 审查门禁通过"
     fi
 else
-    log_gate "  ✔ [Gate 6] workspace-timing 未受影响，智能跳过审查门禁"
+    write_step_verdict "EXTENSION-REVIEW-15" SKIP "workspace-timing 未受影响"
 fi
 
-# --- Gate 7: auto-refactor 长期轨迹账本物理约束守卫 ---
+# --- auto-refactor 长期轨迹账本物理约束 ---
 if [[ "$RUN_AR" -eq 1 ]]; then
-    log_gate "[7/11] 校验 auto-refactor 长期轨迹账本物理约束 (<350B/条, <=2MB)..."
-    if ! run_gate_step 30 "Gate 7 (长期轨迹账本约束)" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-trajectory-ledger.js; then
+        if ! run_gate_step 30 "LEDGER-CONSTRAINT-16" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-trajectory-ledger.js; then
         FAILED=1
     else
         log_gate "  ✔ auto-refactor 长期轨迹账本物理约束通过"
     fi
 else
-    log_gate "  ✔ [Gate 7] 长期轨迹账本未受影响，智能跳过"
+    write_step_verdict "LEDGER-CONSTRAINT-16" SKIP "账本未受影响"
 fi
 
-# --- Gate 8: WebGames 配置架构与必需表一致性审查 ---
+# --- WebGames 配置架构与必需表一致性 ---
 if [[ "$RUN_WG" -eq 1 ]]; then
-    log_gate "[8/11] 执行 WebGames 全域质量门禁与配置架构审查..."
-    GATE8_FAIL=0
-    run_gate_step 60 "Gate 8 (WebGames 全域质量门禁)" "$ROOT_DIR" "$PYTHON_BIN" WebGames/scripts/py/audit_runner.py --diff || GATE8_FAIL=1
+        GATE8_FAIL=0
+    run_gate_step 60 "DOMAIN-AUDIT-17" "$ROOT_DIR" "$PYTHON_BIN" WebGames/scripts/py/audit_runner.py --diff || GATE8_FAIL=1
     # Mermaid 图由真实解析器校验（audit_docs 的字符启发式无法发现语法破损）；
     # 该步骤此前无任何调用方，导致 349 张图的解析能力长期悬空。
-    run_gate_step 120 "Gate 8 (WebGames 文档 Mermaid 真解析)" "$ROOT_DIR" bash WebGames/scripts/sh/check-mermaid.sh || GATE8_FAIL=1
+    run_gate_step 120 "DOMAIN-MERMAID-18" "$ROOT_DIR" bash WebGames/scripts/sh/check-mermaid.sh || GATE8_FAIL=1
     if [[ "$GATE8_FAIL" -ne 0 ]]; then
         FAILED=1
     else
         log_gate "  ✔ WebGames 全域质量门禁、配置架构与 Mermaid 图语法审查通过"
     fi
 else
-    log_gate "  ✔ [Gate 8] WebGames 配置未受影响，智能跳过审查"
+    write_step_verdict "DOMAIN-AUDIT-17" SKIP "WebGames 未受影响"
 fi
 
-# --- Gate 9: fractal-git 微 Crate 工业级 Rust 门禁（fmt + clippy -D warnings + zero-alloc + test）---
+# --- fractal-git Rust 门禁 (rustfmt + clippy -D warnings + zero-alloc + test) ---
 if [[ "$RUN_FG" -eq 1 ]]; then
-    log_gate "[9/11] 执行 fractal-git 工业级 Rust 门禁 (rustfmt/clippy/zero-alloc/test)..."
-    if [[ -z "$CARGO_BIN" ]]; then
+        if [[ -z "$CARGO_BIN" ]]; then
         log_gate "  ⚠️  未检测到 cargo 命令，跳过本地 fractal-git 编译测试（CI 将严格校验）"
     elif [[ -f "$ROOT_DIR/fractal-git/scripts/sh/gate-rust.sh" ]]; then
-        if ! run_gate_step 300 "Gate 9 (fractal-git 9大微 Crate 回归套件)" "$ROOT_DIR" bash fractal-git/scripts/sh/gate-rust.sh; then
+        if ! run_gate_step 300 "RUST-TAXIS-19" "$ROOT_DIR" bash fractal-git/scripts/sh/gate-rust.sh; then
             FAILED=1
         else
             log_gate "  ✔ fractal-git Rust 工业级门禁通过（格式/静态/分配/回归）"
         fi
     else
-        if ! run_gate_step 120 "Gate 9 (fractal-git 9大微 Crate 回归套件)" "$ROOT_DIR" "$CARGO_BIN" test --manifest-path fractal-git/Cargo.toml; then
+        if ! run_gate_step 120 "RUST-TAXIS-19" "$ROOT_DIR" "$CARGO_BIN" test --manifest-path fractal-git/Cargo.toml; then
             FAILED=1
         else
             log_gate "  ✔ fractal-git 9大微 Crate 回归测试套件通过（未检测到 gate-rust.sh，仅执行 cargo test）"
         fi
     fi
 else
-    log_gate "  ✔ [Gate 9] fractal-git 未受影响，智能跳过回归套件"
+    write_step_verdict "RUST-TAXIS-19" SKIP "fractal-git 未受影响"
 fi
 
-# --- Gate 10: 待推送提交历史风格与禁词审查 (validate-commit-msg-style / validate-commit-msg) ---
+# --- 待推送提交历史风格与禁词审查 ---
 # 提交信息词法、风格仲裁与债务走廊契约自测：基础件一旦回归，下方历史扫描结论即失去依据
-run_gate_step 30 "Gate 10 (提交信息词法与债务走廊契约自测)" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-commit-guardrail.js || FAILED=1
+run_gate_step 30 "COMMIT-CONTRACT-20" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-commit-guardrail.js || FAILED=1
 if [[ -n "$RANGE" ]]; then
-    log_gate "[10/11] 审查待推送提交历史风格与文本约束 (流式扫描: $RANGE)..."
-    if ! run_gate_step 30 "Gate 10 (待推送分支提交历史风格与禁词审查)" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-commit-msg.js --range "$RANGE"; then
+        if ! run_gate_step 30 "COMMIT-HISTORY-21" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-commit-msg.js --range "$RANGE"; then
         FAILED=1
     else
         log_gate "  ✔ 待推送分支提交历史风格与文本约束校验通过"
     fi
 else
-    log_gate "  ✔ [Gate 10] 首次推送或无上游对比基准，跳过历史扫描"
+    write_step_verdict "COMMIT-HISTORY-21" SKIP "无上游对比基准"
 fi
 
-# --- Gate 11: 推送集变更熵与跨域扩散审查 (GATE-ENT-001) ---
+# --- CHANGE-ENTROPY-22: 推送集变更熵与跨域扩散审查 (GUARD-ENT-001) ---
 if [[ -n "$RANGE" ]]; then
-    log_gate "[11/11] 审查推送集变更熵与跨子系统扩散 (GATE-ENT-001)..."
-    if ! run_gate_step 30 "Gate 11 (推送集变更熵与跨域扩散审查)" "$ROOT_DIR" "$NODE_BIN" scripts/common/evaluate-change-entropy.js --range "$RANGE" --fail-on-diffusion; then
+    log_gate "[11/11] 审查推送集变更熵与跨子系统扩散 (GUARD-ENT-001)..."
+    if ! run_gate_step 30 "CHANGE-ENTROPY-22" "$ROOT_DIR" "$NODE_BIN" scripts/common/evaluate-change-entropy.js --range "$RANGE" --fail-on-diffusion; then
         FAILED=1
     else
         log_gate "  ✔ 推送集变更熵在凝聚阈值内"
     fi
 else
-    log_gate "  ✔ [Gate 11] 无推送范围，跳过变更熵审查"
+    write_step_verdict "CHANGE-ENTROPY-22" SKIP "无推送范围"
 fi
 
 if [[ "$AGENT_MODE" -eq 1 ]]; then

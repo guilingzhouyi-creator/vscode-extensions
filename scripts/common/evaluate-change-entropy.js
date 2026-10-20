@@ -5,13 +5,13 @@
  *   Just-In-Time diffusion metrics (NF, ND, NS) across Git change sets to prevent chaotic,
  *   cross-domain code dispersal and enforce cohesive atomic commits.
  * Dependencies & Triggers: Node.js standard libraries (path, child_process);
- *   invoked by pre-push-gate (ps1/sh) Gate 11; optional compiled changeset miner
+ *   invoked by pre-push-gate (ps1/sh) as the CHANGE-ENTROPY step; optional compiled changeset miner
  *   from auto-refactor/dist when present, degrading to git numstat parsing otherwise.
  * Responsibilities:
  *   1. Parse numstat outputs from git diff into file change distributions;
  *   2. Compute discrete Shannon entropy H(C) and normalized entropy H_hat(C) in [0.0, 1.0];
  *   3. Extract Kamei diffusion vectors: Files (NF), Directories (ND), and Subsystems (NS);
- *   4. Flag high-entropy cross-subsystem modifications (GATE-ENT-001) that exceed cognitive budgets;
+ *   4. Flag high-entropy cross-subsystem modifications (GUARD-ENT-001) that exceed cognitive budgets;
  *   5. Output structured JSON for agent and tooling consumption.
  * Exit Semantics & Design Rationale: 0 = PASS, 1 = FAIL when --fail-on-diffusion is set and violated.
  */
@@ -27,7 +27,7 @@ try {
     compiledMiner = null;
 }
 
-const ENTROPY_RULE_ID = 'GATE-ENT-001';
+const ENTROPY_RULE_ID = 'GUARD-ENT-001';
 const DEFAULT_MAX_DIFFUSION_ENTROPY = 0.85;
 const DEFAULT_MIN_FILES_FOR_ENTROPY_CHECK = 8;
 const DEFAULT_MIN_SUBSYSTEMS_FOR_DIFFUSION = 2;

@@ -1,7 +1,7 @@
 {
   "schema": "global-tooling-rules/v1",
-  "generatedAt": "2026-10-17T14:47:38.915Z",
-  "totalRules": 17,
+  "generatedAt": "2026-10-20T05:28:26.482Z",
+  "totalRules": 20,
   "rules": [
     {
       "id": "ARCH-ABS-001",
@@ -16,22 +16,40 @@
       "summary": "Substantive facade payload guard: facade module must satisfy ELOC >= 15 or aggregate >= 3 subdomains with immutability"
     },
     {
-      "id": "GATE-AST-001",
-      "family": "GATE",
+      "id": "EXT-DIR-001",
+      "family": "HYG",
+      "severity": "error",
+      "summary": "File extension and directory classification guard: scripts and configs must reside in dedicated domain subdirectories matching their file extension (ps1, sh, py, common) and never litter the workspace root."
+    },
+    {
+      "id": "GUARD-AST-001",
+      "family": "GUARD",
       "severity": "error",
       "summary": "Pre-commit gate staged AST slice complexity (CC <= 15), nesting depth (Depth <= 4), and noise ratio guard"
     },
     {
-      "id": "GATE-ENT-001",
-      "family": "GATE",
+      "id": "GUARD-ENT-001",
+      "family": "GUARD",
       "severity": "error",
       "summary": "Change Shannon entropy and diffusion guard: prevents chaotic cross-domain modifications exceeding cognitive budgets"
     },
     {
-      "id": "GATE-ISO-001",
-      "family": "GATE",
+      "id": "GUARD-FBK-001",
+      "family": "GUARD",
+      "severity": "error",
+      "summary": "Gate feedback vocabulary guard: operator-facing feedback must carry semantic step identifiers from the single-source registry and a closed four-state status vocabulary, never positional labels"
+    },
+    {
+      "id": "GUARD-ISO-001",
+      "family": "GUARD",
       "severity": "error",
       "summary": "Cross-platform script isomorphism guard: dual ps1/sh parity, strict CRLF/LF line endings, and defensive directives"
+    },
+    {
+      "id": "GUARD-STEP-001",
+      "family": "GUARD",
+      "severity": "error",
+      "summary": "Gate step registry binding guard: every step identifier referenced by a gate script must be declared in the single-source registry with a registered rule attribution"
     },
     {
       "id": "HYG-BOM-001",
@@ -104,12 +122,6 @@
       "family": "VOL",
       "severity": "warning",
       "summary": "Dynamic dilution envelope guard: physical line count must not exceed dynamic ratio 1:3 envelope"
-    },
-    {
-      "id": "EXT-DIR-001",
-      "family": "HYG",
-      "severity": "error",
-      "summary": "File extension and directory classification guard: scripts and configs must reside in dedicated domain subdirectories matching their file extension (ps1, sh, py, common) and never litter the workspace root."
     }
   ]
 }

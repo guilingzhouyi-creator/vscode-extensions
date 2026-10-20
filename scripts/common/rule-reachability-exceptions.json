@@ -1,0 +1,5 @@
+{
+  "schema": "rule-reachability-exceptions/v1",
+  "description": "Exemptions for legacy alias rules preserved in catalog for documentation and skill backward compatibility",
+  "exceptions": []
+}

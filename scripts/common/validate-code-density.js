@@ -191,7 +191,7 @@ function auditFileDensity(filePath, options, contentOverride = undefined) {
   // 3. Horizontal token congestion check (tau <= 20.0 tokens per line)
   if (metrics.tokensPerEloc > options.maxTau) {
     violations.push({
-      ruleId: 'GATE-AST-001',
+      ruleId: 'GUARD-AST-001',
       severity: 'BLOCK',
       message: `Horizontal token congestion detected: tau = ${metrics.tokensPerEloc} tokens/line > ${options.maxTau} tokens/line threshold (ELOC: ${metrics.eloc})`,
       actual: `${metrics.tokensPerEloc} tokens/line`,
@@ -199,7 +199,7 @@ function auditFileDensity(filePath, options, contentOverride = undefined) {
       actionableFix: 'Break down monolithic chained expressions, extract intermediate variables, and spread nested logic onto dedicated lines.',
       actionable: {
         action: 'decompose_congested_tokens',
-        code: 'GATE-AST-001',
+        code: 'GUARD-AST-001',
         taxonomy: 'CTRL_FLOW',
         targetScope: 'function_local',
         metricsBreakdown: {
@@ -224,7 +224,7 @@ function recordFailureSnapshot(allViolations) {
     const { writeFailureSnapshot } = require('./log-rotator');
     writeFailureSnapshot({
       gate: 'pre-commit',
-      step: 'Gate 9: Code Density & Wiring (ARCH-FAC-001 / VOL-DIL-001)',
+      step: 'STAGED-DENSITY-12',
       failedCommand: 'node scripts/common/validate-code-density.js --staged',
       exitCode: 1,
       summary: `Detected ${allViolations.length} code density or wiring ratio violation(s).`,

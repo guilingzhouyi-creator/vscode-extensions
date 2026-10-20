@@ -195,7 +195,7 @@ function validateMarkdownFile(filePath, registeredRules) {
   }
 
   if (raw.includes('\r\n')) {
-    errors.push(`${filePath}: Disallowed CRLF line ending, must be strict LF (GATE-HYG-001)`);
+    errors.push(`${filePath}: Disallowed CRLF line ending, must be strict LF (GUARD-HYG-001)`);
   }
 
   const textWithoutFences = stripCodeFences(raw);

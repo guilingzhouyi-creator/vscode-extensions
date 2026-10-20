@@ -61,7 +61,7 @@ const {
   MODE_ELASTIC_WARNING,
   MODE_FORCED_PAYDOWN,
   STATUS_PASS,
-  STATUS_PASS_WITH_WARNING,
+  STATUS_WARN,
   STATUS_BLOCK,
 } = require('./tech-debt-corridor');
 
@@ -392,7 +392,8 @@ function testCommitGuardrailLogger() {
   const tempLogDir = path.join(os.tmpdir(), `guardrail-logger-test-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`);
   try {
     const samplePayload = {
-      status: 'PASS_WITH_WARNING',
+      status: 'PASS',
+      warning: 'WARN',
       styleScore: 85,
       entropy: 4.5,
       gitRevision: 'test-sha-1234',
@@ -408,7 +409,8 @@ function testCommitGuardrailLogger() {
 
     const latest = readLatestGuardrailSnapshot(tempLogDir);
     assert.ok(latest, 'Latest snapshot must be readable');
-    assert.strictEqual(latest.status, 'PASS_WITH_WARNING');
+    assert.strictEqual(latest.status, 'PASS');
+    assert.strictEqual(latest.warning, 'WARN');
     assert.strictEqual(latest.styleScore, 85);
     assert.strictEqual(latest.gitRevision, 'test-sha-1234');
   } finally {
@@ -453,7 +455,8 @@ function testElasticTechDebtCorridor() {
       commitType: 'feat',
       logDir: tempLogDir,
     });
-    assert.strictEqual(singleHighVerdict.status, STATUS_PASS_WITH_WARNING);
+    assert.strictEqual(singleHighVerdict.status, STATUS_PASS);
+    assert.strictEqual(singleHighVerdict.warning, STATUS_WARN);
     assert.strictEqual(singleHighVerdict.mode, MODE_ELASTIC_WARNING);
     assert.strictEqual(singleHighVerdict.currentHighDebtCount, 1);
     assert.ok(singleHighVerdict.agentDirectives, 'Agent directives must be populated');
@@ -547,7 +550,8 @@ function testAgentDirectivesEnvelopeProtocol() {
       targetFile: '.git/COMMIT_EDITMSG',
     });
 
-    assert.strictEqual(verdict.status, STATUS_PASS_WITH_WARNING);
+    assert.strictEqual(verdict.status, STATUS_PASS);
+    assert.strictEqual(verdict.warning, STATUS_WARN);
     assert.ok(verdict.agentDirectives, 'agentDirectives must be generated');
     const directives = verdict.agentDirectives;
 
