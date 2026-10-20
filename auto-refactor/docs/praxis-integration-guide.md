@@ -252,7 +252,7 @@ export interface AgentActionableDirective {
         preservesPurity: boolean;
         zeroHeapAllocationInLoop: boolean; // ADV-PRF-002
         immutableStateSnapshot: boolean;
-        elocBudgetConstraint: boolean;     // GATE-AST-001
+        elocBudgetConstraint: boolean;     // GUARD-AST-001
         noExternalSideEffects: boolean;
         contractRules: string[];
     };

@@ -77,7 +77,7 @@ export interface AgentImmutableConstraints {
     readonly zeroHeapAllocationInLoop: boolean;
     /** Immutable state snapshot requirement (Object.freeze / deep freeze / defensive copy) */
     readonly immutableStateSnapshot: boolean;
-    /** Strict adherence to ELOC <= 900 and LOC <= 1400 dual-track budget (GATE-AST-001) */
+    /** Strict adherence to ELOC <= 900 and LOC <= 1400 dual-track budget (GUARD-AST-001) */
     readonly elocBudgetConstraint: boolean;
     /** Prohibition against introducing external side effects or unsolicited dependencies */
     readonly noExternalSideEffects: boolean;

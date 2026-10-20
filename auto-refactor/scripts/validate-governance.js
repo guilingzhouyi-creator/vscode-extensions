@@ -249,7 +249,7 @@ export class DriftRuleService {
     `// Standard 3-letter canonical alias forms (registered rules: ARCH-DISP-001, GDM-ONREADY-001):
 // ARCH-DSP-001 and GDM-RDY-001 must not trigger GOV-RUL-001
 // Exempt partner / global gate rule prefixes:
-// GATE-AST-001, CMG-PRJ-001, ADV-PRF-002, WT-REV-001 must not trigger GOV-RUL-001
+// GUARD-AST-001, CMG-PRJ-001, ADV-PRF-002, WT-REV-001 must not trigger GOV-RUL-001
 export class ValidAliasRuleService {
     public run(): void {}
 }
@@ -598,7 +598,7 @@ function verifyModernGovernanceEnhancements(govIssues) {
 
   const exemptPrefixIssues = rulIssues.filter(
     (i) =>
-      i.message?.includes('GATE-AST-001') ||
+      i.message?.includes('GUARD-AST-001') ||
       i.message?.includes('CMG-PRJ-001') ||
       i.message?.includes('ADV-PRF-002') ||
       i.message?.includes('WT-REV-001'),

@@ -663,7 +663,7 @@ function buildContractRulesList(flags: {
     noExternalSideEffects: boolean;
 }): string[] {
     const rules: string[] = [
-        'ELOC <= 900, LOC <= 1400 (GATE-AST-001 dual-track volume budget)',
+        'ELOC <= 900, LOC <= 1400 (GUARD-AST-001 dual-track volume budget)',
         'CC <= 15, Depth <= 4 (AST localized control flow envelope)',
     ];
     if (flags.zeroHeapAllocationInLoop) {

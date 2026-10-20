@@ -9,7 +9,7 @@
  *   imports dist/core/governance, dist/core/preflight, dist/core/scoring, dist/core/praxis.
  * Responsibilities:
  *   1. Verify FileRoleInference, AuditIndex, SparseActivator for gate infrastructure.
- *   2. Verify GATE-MSG-002, GATE-AST-001, GATE-FAC-001, GATE-PROC-001 rule logic.
+ *   2. Verify GUARD-MSG-002, GUARD-AST-001, GUARD-FAC-001, GUARD-PROC-001 rule logic.
  *   3. Verify scoring deduction mappings for gate-architecture, shell-lint, simplify, go-modern.
  *   4. Verify Bayesian Gaussian belief updating and multi-scale confidence clamping [0.60, 1.00].
  *   5. Verify zero analyzer fracture across all 30 built-in analyzers in BUILTIN_FACTORIES.
@@ -193,31 +193,31 @@ console.log('Testing Gate Architecture Enhancement & Quantification Model...');
       `set -euo pipefail\n# 0-byte check\n`,
     );
 
-    // Initial audit should flag GATE-MSG-002, GATE-AST-001, GATE-FAC-001
+    // Initial audit should flag GUARD-MSG-002, GUARD-AST-001, GUARD-FAC-001
     const unhardenedResult = auditGateArchitecture(dir);
     const unhardenedRules = unhardenedResult.issues.map((i) => i.rule);
     assert.ok(
-      unhardenedRules.includes('GATE-MSG-002'),
-      'GATE-MSG-002 must trigger when commit-msg-forbidden-terms is unwired',
+      unhardenedRules.includes('GUARD-MSG-002'),
+      'GUARD-MSG-002 must trigger when commit-msg-forbidden-terms is unwired',
     );
     assert.ok(
-      unhardenedRules.includes('GATE-AST-001'),
-      'GATE-AST-001 must trigger when validate-staged-slice is unwired',
+      unhardenedRules.includes('GUARD-AST-001'),
+      'GUARD-AST-001 must trigger when validate-staged-slice is unwired',
     );
     assert.ok(
-      unhardenedRules.includes('GATE-FAC-001'),
-      'GATE-FAC-001 must trigger when facade discipline check is unwired',
+      unhardenedRules.includes('GUARD-FAC-001'),
+      'GUARD-FAC-001 must trigger when facade discipline check is unwired',
     );
 
-    // Test GATE-PROC-001: bare Read-Host without redirection guard
+    // Test GUARD-PROC-001: bare Read-Host without redirection guard
     fs.writeFileSync(
       path.join(dir, 'scripts', 'ps1', 'interactive-gate.ps1'),
       `$ErrorActionPreference = 'Stop'\nRead-Host "Enter confirmation"\n`,
     );
     const procResult = auditGateArchitecture(dir);
     assert.ok(
-      procResult.issues.some((i) => i.rule === 'GATE-PROC-001'),
-      'GATE-PROC-001 must trigger when Read-Host lacks redirection guard',
+      procResult.issues.some((i) => i.rule === 'GUARD-PROC-001'),
+      'GUARD-PROC-001 must trigger when Read-Host lacks redirection guard',
     );
 
     // Harden the scripts and add bilingual terms dictionary
@@ -247,7 +247,7 @@ console.log('Testing Gate Architecture Enhancement & Quantification Model...');
 
     const hardenedResult = auditGateArchitecture(dir);
     const remainingNewIssues = hardenedResult.issues.filter((i) =>
-      ['GATE-MSG-002', 'GATE-AST-001', 'GATE-FAC-001', 'GATE-PROC-001'].includes(i.rule),
+      ['GUARD-MSG-002', 'GUARD-AST-001', 'GUARD-FAC-001', 'GUARD-PROC-001'].includes(i.rule),
     );
     assert.strictEqual(
       remainingNewIssues.length,
@@ -255,7 +255,7 @@ console.log('Testing Gate Architecture Enhancement & Quantification Model...');
       `Hardened gate scripts must clear all 4 new gate rules, remaining: ${JSON.stringify(remainingNewIssues)}`,
     );
 
-    console.log('  [PASS] 2. Gate governance extended rules (GATE-MSG-002, AST, FAC, PROC)');
+    console.log('  [PASS] 2. Gate governance extended rules (GUARD-MSG-002, AST, FAC, PROC)');
   } finally {
     cleanTempDir(dir);
   }
@@ -289,9 +289,9 @@ console.log('Testing Gate Architecture Enhancement & Quantification Model...');
   assert.ok(goRows.length >= 1, 'go-modern must have deduction rows');
 
   // 3.2 Verify FAMILY_DIMENSIONS routing
-  assert.strictEqual(familyDimensionOf('GATE-SYS-001'), 'architectureConsistency');
-  assert.strictEqual(familyDimensionOf('GATE-ERR-001'), 'maintainability');
-  assert.strictEqual(familyDimensionOf('GATE-MSG-002'), 'standardization');
+  assert.strictEqual(familyDimensionOf('GUARD-SYS-001'), 'architectureConsistency');
+  assert.strictEqual(familyDimensionOf('GUARD-ERR-001'), 'maintainability');
+  assert.strictEqual(familyDimensionOf('GUARD-MSG-002'), 'standardization');
   assert.strictEqual(familyDimensionOf('SH-ERR-001'), 'maintainability');
   assert.strictEqual(familyDimensionOf('SH-001'), 'standardization');
   assert.strictEqual(familyDimensionOf('SIM-BOOL-001'), 'maintainability');
@@ -314,7 +314,7 @@ console.log('Testing Gate Architecture Enhancement & Quantification Model...');
 
   // 3.4 Verify Debt Tier Classification
   const critIssue = {
-    rule: 'GATE-SYS-001',
+    rule: 'GUARD-SYS-001',
     analyzer: 'gate-architecture',
     severity: 'error',
     message: 'crit',

@@ -3,16 +3,16 @@
  * Module: Verification Harness — Gate Project Scope & Topology Adaptive Rules
  * File Path: scripts/validate-gate-project-scope.js
  * Architecture Role: Verifies workspace topology detection, single-project auto-muting
- *   for GATE-MSG-003, monorepo enforcement, dual-platform gate pairing (GATE-PAIR-001),
+ *   for GUARD-MSG-003, monorepo enforcement, dual-platform gate pairing (GUARD-PAIR-001),
  *   and Bash condition syntax validation (SH-COND-001).
  * Dependencies & Triggers: Invoked by npm test / test-parallel; imports dist/core/governance
  *   and dist/analyzers.
  * Responsibilities:
  *   1. Verify detectRepoTopology on Single-Project, Directory Cluster, and Workspaces;
- *   2. Verify GATE-MSG-003 auto-mutes in Single-Project (zero false-positive findings);
- *   3. Verify GATE-MSG-003 strictly triggers in Monorepo without [Project] gate;
- *   4. Verify GATE-MSG-003 passes in Monorepo with compliant [Project] gate;
- *   5. Verify GATE-PAIR-001 detects missing .sh or .ps1 counterparts;
+ *   2. Verify GUARD-MSG-003 auto-mutes in Single-Project (zero false-positive findings);
+ *   3. Verify GUARD-MSG-003 strictly triggers in Monorepo without [Project] gate;
+ *   4. Verify GUARD-MSG-003 passes in Monorepo with compliant [Project] gate;
+ *   5. Verify GUARD-PAIR-001 detects missing .sh or .ps1 counterparts;
  *   6. Verify SH-COND-001 detects invalid condition syntax in single brackets.
  * Exit Semantics & Design Rationale: Exits 0 on all assertions passed;
  *   exits 1 on assertion failure.
@@ -124,7 +124,7 @@ console.log('Testing Workspace Topology Sniffer & Adaptive Gate Governance...');
   }
 })();
 
-// ── Test 4: GATE-MSG-003 Auto-Mutes on Single Project ──
+// ── Test 4: GUARD-MSG-003 Auto-Mutes on Single Project ──
 (function testGateMsg003AutoMutesOnSingleProject() {
   const tempDir = createTempDir('single-mute');
   try {
@@ -154,19 +154,19 @@ console.log('Testing Workspace Topology Sniffer & Adaptive Gate Governance...');
     );
 
     const result = auditGateArchitecture(tempDir);
-    const msg003Issue = result.issues.find((i) => i.rule === 'GATE-MSG-003');
+    const msg003Issue = result.issues.find((i) => i.rule === 'GUARD-MSG-003');
     assert.strictEqual(
       msg003Issue,
       undefined,
-      'GATE-MSG-003 must be auto-muted in single-project repository',
+      'GUARD-MSG-003 must be auto-muted in single-project repository',
     );
-    console.log('  [PASS] 4. GATE-MSG-003 correctly auto-mutes in Single-Project repository');
+    console.log('  [PASS] 4. GUARD-MSG-003 correctly auto-mutes in Single-Project repository');
   } finally {
     cleanTempDir(tempDir);
   }
 })();
 
-// ── Test 5: GATE-MSG-003 Strictly Triggers on Monorepo Lacking [Project] ──
+// ── Test 5: GUARD-MSG-003 Strictly Triggers on Monorepo Lacking [Project] ──
 (function testGateMsg003TriggersOnMonorepo() {
   const tempDir = createTempDir('monorepo-violation');
   try {
@@ -198,22 +198,22 @@ console.log('Testing Workspace Topology Sniffer & Adaptive Gate Governance...');
     );
 
     const result = auditGateArchitecture(tempDir);
-    const msg003Issue = result.issues.find((i) => i.rule === 'GATE-MSG-003');
+    const msg003Issue = result.issues.find((i) => i.rule === 'GUARD-MSG-003');
     assert.notStrictEqual(
       msg003Issue,
       undefined,
-      'GATE-MSG-003 must trigger when Monorepo commit-msg lacks [Project] section check',
+      'GUARD-MSG-003 must trigger when Monorepo commit-msg lacks [Project] section check',
     );
     assert.strictEqual(msg003Issue.severity, 'error');
     assert.strictEqual(msg003Issue.detail.action, 'add_project_scope_gate');
     assert.deepStrictEqual(msg003Issue.detail.detectedSubprojects, ['app1', 'app2']);
-    console.log('  [PASS] 5. GATE-MSG-003 strictly triggers on Monorepo with actionable payload');
+    console.log('  [PASS] 5. GUARD-MSG-003 strictly triggers on Monorepo with actionable payload');
   } finally {
     cleanTempDir(tempDir);
   }
 })();
 
-// ── Test 6: GATE-MSG-003 Passes on Monorepo with [Project] Check ──
+// ── Test 6: GUARD-MSG-003 Passes on Monorepo with [Project] Check ──
 (function testGateMsg003PassesWithProjectCheck() {
   const tempDir = createTempDir('monorepo-pass');
   try {
@@ -244,15 +244,15 @@ console.log('Testing Workspace Topology Sniffer & Adaptive Gate Governance...');
     );
 
     const result = auditGateArchitecture(tempDir);
-    const msg003Issue = result.issues.find((i) => i.rule === 'GATE-MSG-003');
-    assert.strictEqual(msg003Issue, undefined, 'GATE-MSG-003 must pass with [Project] check');
-    console.log('  [PASS] 6. GATE-MSG-003 passes on compliant Monorepo gate infrastructure');
+    const msg003Issue = result.issues.find((i) => i.rule === 'GUARD-MSG-003');
+    assert.strictEqual(msg003Issue, undefined, 'GUARD-MSG-003 must pass with [Project] check');
+    console.log('  [PASS] 6. GUARD-MSG-003 passes on compliant Monorepo gate infrastructure');
   } finally {
     cleanTempDir(tempDir);
   }
 })();
 
-// ── Test 7: GATE-PAIR-001 Dual-Platform Pairing Guard ──
+// ── Test 7: GUARD-PAIR-001 Dual-Platform Pairing Guard ──
 (function testGatePair001() {
   const tempDir = createTempDir('dual-pair');
   try {
@@ -275,13 +275,13 @@ console.log('Testing Workspace Topology Sniffer & Adaptive Gate Governance...');
     fs.writeFileSync(path.join(ciDir, 'ci.yml'), 'name: CI\n');
 
     const result = auditGateArchitecture(tempDir);
-    const pairIssues = result.issues.filter((i) => i.rule === 'GATE-PAIR-001');
-    assert.strictEqual(pairIssues.length >= 1, true, 'GATE-PAIR-001 must flag missing pair');
+    const pairIssues = result.issues.filter((i) => i.rule === 'GUARD-PAIR-001');
+    assert.strictEqual(pairIssues.length >= 1, true, 'GUARD-PAIR-001 must flag missing pair');
     assert.strictEqual(
       pairIssues.some((i) => i.location.file.includes('pre-commit-gate')),
       true,
     );
-    console.log('  [PASS] 7. GATE-PAIR-001 flags missing dual-platform gate script pairing');
+    console.log('  [PASS] 7. GUARD-PAIR-001 flags missing dual-platform gate script pairing');
   } finally {
     cleanTempDir(tempDir);
   }

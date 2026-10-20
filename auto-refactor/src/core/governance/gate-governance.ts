@@ -7,15 +7,15 @@
  * Dependencies & Triggers: Consumes RepoArchetypeContext; invoked by GateArchitectureAnalyzer,
  *   CLI audits, and Agent pre-flight diagnostics.
  * Responsibilities:
- *   1. Scenario A: Emit GATE-SYS-001 or GATE-HOOK-001 with full GateScaffoldPayload;
+ *   1. Scenario A: Emit GUARD-SYS-001 or GUARD-HOOK-001 with full GateScaffoldPayload;
  *   2. Scenario B: Evaluate 7 dimensions:
- *      - GATE-ISO-001: Dual-tier isomorphism between local hooks and remote CI;
- *      - GATE-ROUTE-001: Runtime degradation and execution safety in hook routers;
- *      - GATE-MSG-001: Commit-msg engineering structure and anti-jargon guard;
- *      - GATE-HYG-001: Physical hygiene (0-byte file and line ending enforcement);
- *      - GATE-BUDGET-001: Gate performance tiering (fast staged pre-commit vs full pre-push);
- *      - GATE-ERR-001: Strict error handling flags in gate scripts;
- *      - GATE-SSOT-001: Rule SSOT catalog synchronization.
+ *      - GUARD-ISO-001: Dual-tier isomorphism between local hooks and remote CI;
+ *      - GUARD-ROUTE-001: Runtime degradation and execution safety in hook routers;
+ *      - GUARD-MSG-001: Commit-msg engineering structure and anti-jargon guard;
+ *      - GUARD-HYG-001: Physical hygiene (0-byte file and line ending enforcement);
+ *      - GUARD-BUDGET-001: Gate performance tiering (fast staged pre-commit vs full pre-push);
+ *      - GUARD-ERR-001: Strict error handling flags in gate scripts;
+ *      - GUARD-SSOT-001: Rule SSOT catalog synchronization.
  * Exit Semantics & Design Rationale: Deterministic pure evaluation returning Issue[].
  *   Never throws; attaches structured AgentActionablePayload to all findings.
  */
@@ -148,10 +148,10 @@ function auditMissingGates(context: RepoArchetypeContext, issues: Issue[]): bool
 
     // Both missing: Critical system void
     if (!hasHooks && !hasCi) {
-        const scaffold = generateGateScaffold(context, 'GATE-SYS-001');
+        const scaffold = generateGateScaffold(context, 'GUARD-SYS-001');
         issues.push(
             createGateIssue({
-                ruleId: 'GATE-SYS-001',
+                ruleId: 'GUARD-SYS-001',
                 filePath: resolveManifestTargetFile(context.manifests),
                 line: 1,
                 severity: SEVERITY_ERROR,
@@ -174,10 +174,10 @@ function auditMissingGates(context: RepoArchetypeContext, issues: Issue[]): bool
 
     // CI exists, but local hooks are completely missing
     if (hasCi && !hasHooks) {
-        const scaffold = generateGateScaffold(context, 'GATE-HOOK-001');
+        const scaffold = generateGateScaffold(context, 'GUARD-HOOK-001');
         issues.push(
             createGateIssue({
-                ruleId: 'GATE-HOOK-001',
+                ruleId: 'GUARD-HOOK-001',
                 filePath: context.ci.workflowFiles[0] || REPO_ROOT_DIR,
                 line: 1,
                 severity: SEVERITY_WARNING,
@@ -200,10 +200,10 @@ function auditMissingGates(context: RepoArchetypeContext, issues: Issue[]): bool
 
     // Local hooks exist, but remote CI pipeline is completely missing
     if (hasHooks && !hasCi) {
-        const scaffold = generateGateScaffold(context, 'GATE-ISO-001');
+        const scaffold = generateGateScaffold(context, 'GUARD-ISO-001');
         issues.push(
             createGateIssue({
-                ruleId: 'GATE-ISO-001',
+                ruleId: 'GUARD-ISO-001',
                 filePath: resolveManifestTargetFile(context.manifests),
                 line: 1,
                 severity: SEVERITY_WARNING,
@@ -228,7 +228,7 @@ function auditMissingGates(context: RepoArchetypeContext, issues: Issue[]): bool
 }
 
 /**
- * Dimension 1: GATE-ISO-001: Dual-Tier Isomorphism.
+ * Dimension 1: GUARD-ISO-001: Dual-Tier Isomorphism.
  */
 function auditIsomorphism(context: RepoArchetypeContext, issues: Issue[]): void {
     if (context.ci.workflowFiles.length === 0 || context.hooks.allHookFiles.length === 0) {
@@ -270,7 +270,7 @@ function auditIsomorphism(context: RepoArchetypeContext, issues: Issue[]): void 
         if (inCi && !inLocal) {
             issues.push(
                 createGateIssue({
-                    ruleId: 'GATE-ISO-001',
+                    ruleId: 'GUARD-ISO-001',
                     filePath: context.ci.workflowFiles[0],
                     line: 1,
                     severity: SEVERITY_WARNING,
@@ -298,7 +298,7 @@ function auditIsomorphism(context: RepoArchetypeContext, issues: Issue[]): void 
 }
 
 /**
- * Dimension 2: GATE-ROUTE-001: Hook Runtime Degradation & Safety.
+ * Dimension 2: GUARD-ROUTE-001: Hook Runtime Degradation & Safety.
  */
 function auditRoutingSafety(context: RepoArchetypeContext, issues: Issue[]): void {
     const hookFiles = [
@@ -316,7 +316,7 @@ function auditRoutingSafety(context: RepoArchetypeContext, issues: Issue[]): voi
         if (/\bpowershell(?:\.exe)?\b/i.test(content) && !/\bpwsh\b/i.test(content)) {
             issues.push(
                 createGateIssue({
-                    ruleId: 'GATE-ROUTE-001',
+                    ruleId: 'GUARD-ROUTE-001',
                     filePath: relPath,
                     line: 1,
                     severity: SEVERITY_ERROR,
@@ -344,7 +344,7 @@ function auditRoutingSafety(context: RepoArchetypeContext, issues: Issue[]): voi
         if (/^#!\/bin\/sh\b/m.test(content) && /(?:\[\[|\(\(|\bfunction\b)/.test(content)) {
             issues.push(
                 createGateIssue({
-                    ruleId: 'GATE-ROUTE-001',
+                    ruleId: 'GUARD-ROUTE-001',
                     filePath: relPath,
                     line: 1,
                     severity: SEVERITY_ERROR,
@@ -364,7 +364,7 @@ function auditRoutingSafety(context: RepoArchetypeContext, issues: Issue[]): voi
 }
 
 /**
- * Dimension 3: GATE-MSG-001: Commit Message Engineering Integrity.
+ * Dimension 3: GUARD-MSG-001: Commit Message Engineering Integrity.
  */
 function auditCommitMsgGate(context: RepoArchetypeContext, issues: Issue[]): void {
     if (context.hooks.allHookFiles.length === 0) return;
@@ -372,7 +372,7 @@ function auditCommitMsgGate(context: RepoArchetypeContext, issues: Issue[]): voi
     if (!context.hooks.commitMsg) {
         issues.push(
             createGateIssue({
-                ruleId: 'GATE-MSG-001',
+                ruleId: 'GUARD-MSG-001',
                 filePath: context.hooks.hookDir || '.githooks',
                 line: 1,
                 severity: SEVERITY_WARNING,
@@ -409,7 +409,7 @@ function auditCommitMsgGate(context: RepoArchetypeContext, issues: Issue[]): voi
     if (!hasConventionalCheck) {
         issues.push(
             createGateIssue({
-                ruleId: 'GATE-MSG-001',
+                ruleId: 'GUARD-MSG-001',
                 filePath: relPath,
                 line: 1,
                 severity: SEVERITY_WARNING,
@@ -425,7 +425,7 @@ function auditCommitMsgGate(context: RepoArchetypeContext, issues: Issue[]): voi
         );
     }
 
-    // GATE-MSG-003: Monorepo Project Scope & Whitelist Verification (Adaptive to topology)
+    // GUARD-MSG-003: Monorepo Project Scope & Whitelist Verification (Adaptive to topology)
     // If repository is Single-Project (not a Monorepo), auto-mute: zero findings emitted.
     if (context.topology.isMonorepo) {
         const combinedCommitScripts = [
@@ -443,7 +443,7 @@ function auditCommitMsgGate(context: RepoArchetypeContext, issues: Issue[]): voi
         if (!hasProjectScopeCheck) {
             issues.push(
                 createGateIssue({
-                    ruleId: 'GATE-MSG-003',
+                    ruleId: 'GUARD-MSG-003',
                     filePath: relPath,
                     line: 1,
                     severity: SEVERITY_ERROR,
@@ -471,7 +471,7 @@ function auditCommitMsgGate(context: RepoArchetypeContext, issues: Issue[]): voi
 }
 
 /**
- * Dimension 4: GATE-HYG-001: Physical Hygiene Guard.
+ * Dimension 4: GUARD-HYG-001: Physical Hygiene Guard.
  */
 function auditHygieneGuard(context: RepoArchetypeContext, issues: Issue[]): void {
     if (context.hooks.allHookFiles.length === 0) return;
@@ -491,7 +491,7 @@ function auditHygieneGuard(context: RepoArchetypeContext, issues: Issue[]): void
     if (!hasZeroByteCheck) {
         issues.push(
             createGateIssue({
-                ruleId: 'GATE-HYG-001',
+                ruleId: 'GUARD-HYG-001',
                 filePath: relPath,
                 line: 1,
                 severity: SEVERITY_ERROR,
@@ -520,7 +520,7 @@ function auditHygieneGuard(context: RepoArchetypeContext, issues: Issue[]): void
     if (!hasClutterGuard) {
         issues.push(
             createGateIssue({
-                ruleId: 'GATE-HYG-001',
+                ruleId: 'GUARD-HYG-001',
                 filePath: relPath,
                 line: 1,
                 severity: SEVERITY_WARNING,
@@ -543,7 +543,7 @@ function auditHygieneGuard(context: RepoArchetypeContext, issues: Issue[]): void
 }
 
 /**
- * Dimension 5: GATE-BUDGET-001: Performance Tiering & Budget.
+ * Dimension 5: GUARD-BUDGET-001: Performance Tiering & Budget.
  */
 function auditBudgetTiering(context: RepoArchetypeContext, issues: Issue[]): void {
     const preCommit = context.hooks.preCommit;
@@ -568,7 +568,7 @@ function auditBudgetTiering(context: RepoArchetypeContext, issues: Issue[]): voi
     if (!hasStagedFiltering && runsHeavyweightUnstaged) {
         issues.push(
             createGateIssue({
-                ruleId: 'GATE-BUDGET-001',
+                ruleId: 'GUARD-BUDGET-001',
                 filePath: relPath,
                 line: 1,
                 severity: SEVERITY_WARNING,
@@ -608,7 +608,7 @@ function auditShellStrictMode(
     if (!/set\s+-[a-z]*e/m.test(script.content)) {
         issues.push(
             createGateIssue({
-                ruleId: 'GATE-ERR-001',
+                ruleId: 'GUARD-ERR-001',
                 filePath: relPath,
                 line: 1,
                 severity: SEVERITY_ERROR,
@@ -648,7 +648,7 @@ function auditPowerShellStrictMode(
     if (!/\$ErrorActionPreference\s*=\s*['"]?Stop['"]?/i.test(script.content)) {
         issues.push(
             createGateIssue({
-                ruleId: 'GATE-ERR-001',
+                ruleId: 'GUARD-ERR-001',
                 filePath: relPath,
                 line: 1,
                 severity: SEVERITY_ERROR,
@@ -673,7 +673,7 @@ function auditPowerShellStrictMode(
 }
 
 /**
- * Dimension 6: GATE-ERR-001: Strict Error Discipline in Gate Scripts.
+ * Dimension 6: GUARD-ERR-001: Strict Error Discipline in Gate Scripts.
  */
 function auditStrictErrorDiscipline(context: RepoArchetypeContext, issues: Issue[]): void {
     // Check all discovered gate scripts and hook files
@@ -695,7 +695,7 @@ function auditStrictErrorDiscipline(context: RepoArchetypeContext, issues: Issue
 }
 
 /**
- * Dimension 7: GATE-SSOT-001: Rule SSOT Catalog Synchronization.
+ * Dimension 7: GUARD-SSOT-001: Rule SSOT Catalog Synchronization.
  */
 function auditSsotSync(context: RepoArchetypeContext, issues: Issue[]): void {
     // If gate scripts check rule codes or catalog, check if catalog file exists
@@ -714,7 +714,7 @@ function auditSsotSync(context: RepoArchetypeContext, issues: Issue[]): void {
         if (!catalogExists) {
             issues.push(
                 createGateIssue({
-                    ruleId: 'GATE-SSOT-001',
+                    ruleId: 'GUARD-SSOT-001',
                     filePath: 'scripts',
                     line: 1,
                     severity: SEVERITY_WARNING,
@@ -736,7 +736,7 @@ function auditSsotSync(context: RepoArchetypeContext, issues: Issue[]): void {
 }
 
 /**
- * Dimension 8: GATE-MSG-002: Commit Message Style Constraints & Bilingual Terms Guard.
+ * Dimension 8: GUARD-MSG-002: Commit Message Style Constraints & Bilingual Terms Guard.
  */
 function auditCommitMsgStyle(context: RepoArchetypeContext, issues: Issue[]): void {
     if (context.hooks.allHookFiles.length === 0) return;
@@ -757,7 +757,7 @@ function auditCommitMsgStyle(context: RepoArchetypeContext, issues: Issue[]): vo
     if (!wiresStyleCheck) {
         issues.push(
             createGateIssue({
-                ruleId: 'GATE-MSG-002',
+                ruleId: 'GUARD-MSG-002',
                 filePath: relHookPath,
                 line: 1,
                 severity: SEVERITY_WARNING,
@@ -789,7 +789,7 @@ function auditCommitMsgStyle(context: RepoArchetypeContext, issues: Issue[]): vo
         if (!hasEnglish || !hasChinese) {
             issues.push(
                 createGateIssue({
-                    ruleId: 'GATE-MSG-002',
+                    ruleId: 'GUARD-MSG-002',
                     filePath: 'scripts/common/commit-msg-forbidden-terms.json',
                     line: 1,
                     severity: SEVERITY_WARNING,
@@ -811,7 +811,7 @@ function auditCommitMsgStyle(context: RepoArchetypeContext, issues: Issue[]): vo
 }
 
 /**
- * Dimension 9: GATE-AST-001: AST Staged Slice Complexity & Nesting Guard.
+ * Dimension 9: GUARD-AST-001: AST Staged Slice Complexity & Nesting Guard.
  */
 function auditAstSliceGuard(context: RepoArchetypeContext, issues: Issue[]): void {
     if (context.hooks.allHookFiles.length === 0) return;
@@ -834,7 +834,7 @@ function auditAstSliceGuard(context: RepoArchetypeContext, issues: Issue[]): voi
     if (!hasAstSliceCheck) {
         issues.push(
             createGateIssue({
-                ruleId: 'GATE-AST-001',
+                ruleId: 'GUARD-AST-001',
                 filePath: relPath,
                 line: 1,
                 severity: SEVERITY_ERROR,
@@ -854,7 +854,7 @@ function auditAstSliceGuard(context: RepoArchetypeContext, issues: Issue[]): voi
 }
 
 /**
- * Dimension 10: GATE-FAC-001: Facade Substantive Bearing & Vacuous Forwarding Elimination.
+ * Dimension 10: GUARD-FAC-001: Facade Substantive Bearing & Vacuous Forwarding Elimination.
  */
 function auditFacadeDisciplineGuard(context: RepoArchetypeContext, issues: Issue[]): void {
     const combinedScripts = [
@@ -872,7 +872,7 @@ function auditFacadeDisciplineGuard(context: RepoArchetypeContext, issues: Issue
     if (!hasFacadeCheck) {
         issues.push(
             createGateIssue({
-                ruleId: 'GATE-FAC-001',
+                ruleId: 'GUARD-FAC-001',
                 filePath: context.hooks.prePush
                     ? path
                           .relative(context.root, context.hooks.prePush.filePath)
@@ -897,7 +897,7 @@ function auditFacadeDisciplineGuard(context: RepoArchetypeContext, issues: Issue
 }
 
 /**
- * Dimension 11: GATE-PROC-001: PowerShell Terminal Non-Interactive & Output Redirection Guard.
+ * Dimension 11: GUARD-PROC-001: PowerShell Terminal Non-Interactive & Output Redirection Guard.
  */
 function auditProcessInteractiveSafety(context: RepoArchetypeContext, issues: Issue[]): void {
     const ps1Scripts = Object.entries(context.gateScripts.contents).filter(([f]) =>
@@ -912,7 +912,7 @@ function auditProcessInteractiveSafety(context: RepoArchetypeContext, issues: Is
             if (!hasRedirectGuard) {
                 issues.push(
                     createGateIssue({
-                        ruleId: 'GATE-PROC-001',
+                        ruleId: 'GUARD-PROC-001',
                         filePath: relPath,
                         line: 1,
                         severity: SEVERITY_ERROR,
@@ -935,7 +935,7 @@ function auditProcessInteractiveSafety(context: RepoArchetypeContext, issues: Is
 }
 
 /**
- * Dimension 12: GATE-PAIR-001: Dual-Platform Gate Script Isomorphic Pairing Guard.
+ * Dimension 12: GUARD-PAIR-001: Dual-Platform Gate Script Isomorphic Pairing Guard.
  */
 function auditDualPlatformPairing(context: RepoArchetypeContext, issues: Issue[]): void {
     const isCoreGateScript = (f: string) =>
@@ -958,7 +958,7 @@ function auditDualPlatformPairing(context: RepoArchetypeContext, issues: Issue[]
         if (!ps1Bases.has(base)) {
             issues.push(
                 createGateIssue({
-                    ruleId: 'GATE-PAIR-001',
+                    ruleId: 'GUARD-PAIR-001',
                     filePath: `scripts/sh/${base}.sh`,
                     line: 1,
                     severity: SEVERITY_WARNING,
@@ -977,7 +977,7 @@ function auditDualPlatformPairing(context: RepoArchetypeContext, issues: Issue[]
         if (!shBases.has(base)) {
             issues.push(
                 createGateIssue({
-                    ruleId: 'GATE-PAIR-001',
+                    ruleId: 'GUARD-PAIR-001',
                     filePath: `scripts/ps1/${base}.ps1`,
                     line: 1,
                     severity: SEVERITY_WARNING,
@@ -1028,7 +1028,7 @@ export function auditGateArchitecture(
 
     const hasLocalGates = context.hooks.allHookFiles.length > 0;
     const hasCiPipelines = context.ci.workflowFiles.length > 0;
-    const isIsomorphic = !issues.some((i) => i.rule === 'GATE-ISO-001');
+    const isIsomorphic = !issues.some((i) => i.rule === 'GUARD-ISO-001');
 
     return {
         context,

@@ -670,7 +670,7 @@ export const DIMENSION_RULES: DimensionRule[] = [
     {
         analyzer: ANALYZER_GATE_ARCHITECTURE,
         covers: ruleMatches(
-            ['GATE-SYS-001', 'GATE-HOOK-001', 'GATE-ISO-001', 'GATE-FAC-001', 'GATE-PAIR-001'],
+            ['GUARD-SYS-001', 'GUARD-HOOK-001', 'GUARD-ISO-001', 'GUARD-FAC-001', 'GUARD-PAIR-001'],
             ['system', 'hook', 'isolate', 'facade', 'pair'],
         ),
         dimension: DIMENSION_ARCHITECTURE_CONSISTENCY,
@@ -680,7 +680,7 @@ export const DIMENSION_RULES: DimensionRule[] = [
     {
         analyzer: ANALYZER_GATE_ARCHITECTURE,
         covers: ruleMatches(
-            ['GATE-ERR-001', 'GATE-ROUTE-001', 'GATE-BUDGET-001', 'GATE-AST-001', 'GATE-PROC-001'],
+            ['GUARD-ERR-001', 'GUARD-ROUTE-001', 'GUARD-BUDGET-001', 'GUARD-AST-001', 'GUARD-PROC-001'],
             ['error', 'route', 'budget', 'ast', 'interactive'],
         ),
         dimension: DIMENSION_MAINTAINABILITY,
@@ -690,7 +690,7 @@ export const DIMENSION_RULES: DimensionRule[] = [
     {
         analyzer: ANALYZER_GATE_ARCHITECTURE,
         covers: ruleMatches(
-            ['GATE-MSG-001', 'GATE-MSG-002', 'GATE-MSG-003', 'GATE-SSOT-001', 'GATE-HYG-001'],
+            ['GUARD-MSG-001', 'GUARD-MSG-002', 'GUARD-MSG-003', 'GUARD-SSOT-001', 'GUARD-HYG-001'],
             ['msg', 'message', 'ssot', 'catalog', 'hygiene'],
         ),
         dimension: DIMENSION_STANDARDIZATION,

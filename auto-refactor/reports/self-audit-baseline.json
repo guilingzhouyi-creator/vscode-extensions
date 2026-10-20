@@ -1,10 +1,10 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1792460073319",
-  "timestamp": "2026-10-20T01:34:42.449Z",
+  "snapshotId": "snapshot-v0.4.0-1792474826145",
+  "timestamp": "2026-10-20T05:40:35.444Z",
   "cai": 85.86,
   "polyglotGeneralization": {
-    "index": 94.17,
-    "meanScore": 94.17,
+    "index": 94.19,
+    "meanScore": 94.19,
     "dispersionPenalty": 1,
     "standardDeviation": 0,
     "languageCount": 1
@@ -16,52 +16,52 @@
     "languageAdapterVersion": "adapters-v1.0",
     "scoringVersion": "scoring-v1.0"
   },
-  "rulesDigest": "81c8f426b1bfaf07e985f084d02df0e95b03a92583b0666fe2bb64d5cc0db612",
+  "rulesDigest": "0934b7fa16cc0808772bdb5f734fa88a38c0a1ed5a7d2702c4629f0569ef4c44",
   "configDigest": "04a1b8446ff3624c6496a9e8c9b405b03d47eda22fb414a869442bfb51978d19",
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
     "filesScanned": 677,
-    "durationMs": 5117
+    "durationMs": 5093
   },
   "metrics": {
-    "compositeScore": 98.72,
+    "compositeScore": 98.73,
     "grade": "A+",
     "autonomyRate": 85.86,
     "polyglotGeneralization": {
-      "index": 94.17,
-      "meanScore": 94.17,
+      "index": 94.19,
+      "meanScore": 94.19,
       "dispersionPenalty": 1,
       "standardDeviation": 0,
       "languageCount": 1
     },
     "effectiveCodeDensity": 0.95,
-    "totalIssues": 7076,
+    "totalIssues": 7053,
     "suppressedIssues": 140,
-    "unsuppressedIssues": 6936,
+    "unsuppressedIssues": 6913,
     "bySeverity": {
-      "info": 558,
-      "warning": 6518,
+      "info": 559,
+      "warning": 6494,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
-      "high": 18,
-      "medium": 4162,
-      "low": 2896
+      "high": 15,
+      "medium": 4140,
+      "low": 2898
     }
   },
   "eightPillars": {
     "pillars": {
       "architecture": 98.56,
-      "maintainability": 96.64,
+      "maintainability": 96.67,
       "performance": 99.56,
       "data": 99.73,
       "testing": 100,
-      "reliability": 99.64,
+      "reliability": 99.65,
       "security": 99.85,
-      "extensibility": 95.87
+      "extensibility": 95.89
     },
-    "compositeScore": 98.72,
+    "compositeScore": 98.73,
     "weights": {
       "architecture": 0.15,
       "maintainability": 0.15,
@@ -81,10 +81,10 @@
     "performanceEfficiency": 99.56,
     "standardization": 93.95,
     "modernity": 99.82,
-    "maintainability": 96.64,
+    "maintainability": 96.67,
     "commentQuality": 100,
-    "duplication": 93.66,
-    "techDebtRisk": 99.82
+    "duplication": 93.72,
+    "techDebtRisk": 99.84
   },
   "topHotspots": [
     {
@@ -181,12 +181,30 @@
   "technicalDebtLedger": {
     "summary": {
       "critical": 0,
-      "high": 18,
-      "medium": 4162,
-      "low": 2896
+      "high": 15,
+      "medium": 4140,
+      "low": 2898
     },
     "criticalItems": [],
     "highItems": [
+      {
+        "id": "performance:PRF-ALG-002:scripts/validate-gate-system.js:141",
+        "rule": "PRF-ALG-002",
+        "tier": "high",
+        "severity": "warning",
+        "file": "scripts/validate-gate-system.js",
+        "line": 141,
+        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
+      },
+      {
+        "id": "performance:PRF-ALG-002:scripts/validate-gate-system.js:165",
+        "rule": "PRF-ALG-002",
+        "tier": "high",
+        "severity": "warning",
+        "file": "scripts/validate-gate-system.js",
+        "line": 165,
+        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
+      },
       {
         "id": "complexity:CPX-NEST-001:scripts/validate-project-neutrality.js:72",
         "rule": "CPX-NEST-001",
@@ -251,22 +269,13 @@
         "message": "Function \"RustAdapter.isToleratedContext\" has cyclomatic complexity 15 (threshold 12)."
       },
       {
-        "id": "complexity:CPX-NEST-001:src/core/ast/rust-adapter.ts:428",
-        "rule": "CPX-NEST-001",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/ast/rust-adapter.ts",
-        "line": 428,
-        "message": "Unbounded control-flow nesting: function 'RustAdapter.isTestItemContext' has nesting depth 6 exceeding elastic budget 5 for context 'ast-parser'."
-      },
-      {
-        "id": "performance:PRF-ALG-002:src/core/ast/rust-adapter.ts:439",
+        "id": "performance:PRF-ALG-002:src/core/ast/rust-adapter.ts:435",
         "rule": "PRF-ALG-002",
         "tier": "high",
         "severity": "warning",
         "file": "src/core/ast/rust-adapter.ts",
-        "line": 439,
-        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 2) causes O(N*M) polynomial complexity"
+        "line": 435,
+        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
       },
       {
         "id": "complexity:high-complexity:src/core/diff/constant-entity-extractor.ts:67",
@@ -278,40 +287,22 @@
         "message": "Function \"tryParseConstantEntity\" has cyclomatic complexity 13 (threshold 12)."
       },
       {
-        "id": "performance:PRF-IO-001:src/core/governance/rule-catalog-ssot.ts:82",
+        "id": "performance:PRF-IO-001:src/core/governance/rule-catalog-ssot.ts:100",
         "rule": "PRF-IO-001",
         "tier": "high",
         "severity": "warning",
         "file": "src/core/governance/rule-catalog-ssot.ts",
-        "line": 82,
+        "line": 100,
         "message": "Synchronous I/O blocking risk: Invoking synchronous blocking API 'fs.readFileSync' inside critical execution stream"
       },
       {
-        "id": "complexity:CPX-NEST-001:src/core/governance/rules/exceptionSafety.ts:306",
-        "rule": "CPX-NEST-001",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/governance/rules/exceptionSafety.ts",
-        "line": 306,
-        "message": "Unbounded control-flow nesting: function 'checkFile' has nesting depth 6 exceeding elastic budget 5 for context 'ast-parser'."
-      },
-      {
-        "id": "complexity:high-complexity:src/core/governance/rules/exceptionSafety.ts:306",
+        "id": "complexity:high-complexity:src/core/governance/rules/exceptionSafety.ts:343",
         "rule": "high-complexity",
         "tier": "high",
         "severity": "warning",
         "file": "src/core/governance/rules/exceptionSafety.ts",
-        "line": 306,
-        "message": "Function \"checkFile\" has cyclomatic complexity 18 (threshold 12)."
-      },
-      {
-        "id": "performance:PRF-ALG-002:src/core/governance/rules/exceptionSafety.ts:326",
-        "rule": "PRF-ALG-002",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/governance/rules/exceptionSafety.ts",
-        "line": 326,
-        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
+        "line": 343,
+        "message": "Function \"checkFile\" has cyclomatic complexity 12 (threshold 12)."
       },
       {
         "id": "complexity:high-complexity:src/core/intelligence/dependency-provenance.ts:734",
@@ -323,31 +314,13 @@
         "message": "Function \"isRelativeOrInternalPrefix\" has cyclomatic complexity 15 (threshold 12)."
       },
       {
-        "id": "complexity:CPX-NEST-001:src/core/scoring/autonomy-scorer.ts:692",
-        "rule": "CPX-NEST-001",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/scoring/autonomy-scorer.ts",
-        "line": 692,
-        "message": "Unbounded control-flow nesting: function 'applySymbolIndexReferences' has nesting depth 4 exceeding elastic budget 3 for context 'general-business'."
-      },
-      {
-        "id": "complexity:high-complexity:src/core/scoring/autonomy-scorer.ts:692",
+        "id": "complexity:high-complexity:src/core/scoring/autonomy-scorer.ts:720",
         "rule": "high-complexity",
         "tier": "high",
         "severity": "warning",
         "file": "src/core/scoring/autonomy-scorer.ts",
-        "line": 692,
-        "message": "Function \"applySymbolIndexReferences\" has cyclomatic complexity 17 (threshold 12)."
-      },
-      {
-        "id": "complexity:CPX-NEST-002:src/core/scoring/autonomy-scorer.ts:740",
-        "rule": "CPX-NEST-002",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/scoring/autonomy-scorer.ts",
-        "line": 740,
-        "message": "Cognitive jump cost: deep control-flow jump (nesting >= 4) in function 'applySymbolIndexReferences' over long span (77 LOC)."
+        "line": 720,
+        "message": "Function \"applySymbolIndexReferences\" has cyclomatic complexity 13 (threshold 12)."
       }
     ]
   },
@@ -359,12 +332,12 @@
         "pillars": {
           "architecture": 98.69,
           "maintainability": 98.38,
-          "performance": 99.63,
+          "performance": 99.61,
           "data": 99.83,
           "testing": 100,
           "reliability": 99.74,
           "security": 99.89,
-          "extensibility": 97.4
+          "extensibility": 97.39
         },
         "moduleCount": 1
       },
@@ -445,14 +418,14 @@
       },
       {
         "domainName": "ast",
-        "compositeScore": 98.78,
+        "compositeScore": 98.8,
         "pillars": {
           "architecture": 99.49,
-          "maintainability": 95.95,
+          "maintainability": 96.07,
           "performance": 99.75,
           "data": 99.82,
           "testing": 100,
-          "reliability": 99.7,
+          "reliability": 99.73,
           "security": 99.87,
           "extensibility": 95.66
         },
@@ -595,22 +568,22 @@
       },
       {
         "domainName": "rules",
-        "compositeScore": 98.79,
+        "compositeScore": 98.84,
         "pillars": {
           "architecture": 98.83,
           "maintainability": 96.97,
-          "performance": 99.8,
+          "performance": 100,
           "data": 99.9,
           "testing": 100,
-          "reliability": 99.8,
+          "reliability": 99.85,
           "security": 99.86,
-          "extensibility": 94.96
+          "extensibility": 95.08
         },
         "moduleCount": 1
       },
       {
         "domainName": "guidance",
-        "compositeScore": 99.25,
+        "compositeScore": 99.39,
         "pillars": {
           "architecture": 100,
           "maintainability": 97,
@@ -619,7 +592,7 @@
           "testing": 100,
           "reliability": 100,
           "security": 99.8,
-          "extensibility": 97.17
+          "extensibility": 98.59
         },
         "moduleCount": 1
       },
@@ -895,7 +868,7 @@
       },
       {
         "domainName": "reporters",
-        "compositeScore": 99.17,
+        "compositeScore": 99.23,
         "pillars": {
           "architecture": 99,
           "maintainability": 99,
@@ -904,7 +877,7 @@
           "testing": 100,
           "reliability": 99.5,
           "security": 99.85,
-          "extensibility": 95.84
+          "extensibility": 96.47
         },
         "moduleCount": 1
       },
@@ -1000,16 +973,16 @@
       },
       {
         "domainName": "scoring",
-        "compositeScore": 98.58,
+        "compositeScore": 98.61,
         "pillars": {
           "architecture": 98.41,
-          "maintainability": 96.65,
+          "maintainability": 96.79,
           "performance": 99.86,
           "data": 99.88,
           "testing": 100,
-          "reliability": 99.81,
+          "reliability": 99.85,
           "security": 99.87,
-          "extensibility": 93.88
+          "extensibility": 93.95
         },
         "moduleCount": 1
       },
@@ -1167,27 +1140,27 @@
   },
   "trajectory": {
     "runEloc": {
-      "processed": 158081,
-      "unique": 128287,
-      "changed": 10060,
-      "semantic": 8048,
+      "processed": 158137,
+      "unique": 128330,
+      "changed": 3462,
+      "semantic": 2770,
       "relocated": 0,
       "cosmetic": 0,
       "boilerplate": 0,
-      "added": 5030,
+      "added": 1731,
       "deleted": 0,
       "modified": 0
     },
     "lifetime": {
       "weekId": "LIFETIME",
       "startMs": 1791102755050,
-      "endMs": 1792460073309,
+      "endMs": 1792474826140,
       "totalRuns": 309,
       "eloc": {
-        "processedTotal": 42658520,
-        "uniqueTotal": 128287,
-        "changedTotal": 483440,
-        "semanticTotal": 386751
+        "processedTotal": 42658576,
+        "uniqueTotal": 128330,
+        "changedTotal": 476842,
+        "semanticTotal": 381473
       },
       "qed": {
         "mean": 0.0001,

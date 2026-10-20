@@ -5,20 +5,20 @@
  *   concatenated into RULE_REGISTRY single source of truth.
  * Dependencies & Triggers: core rule types, defineRule(); consumed by ../registry.ts.
  * Responsibilities: Declare identity, severity, summary, remediation, and doc anchors for
- *   all 13 canonical GATE-* rules:
- *   - GATE-SYS-001: Missing gate system (no hooks and no CI);
- *   - GATE-HOOK-001: Missing local left-shift Git hooks;
- *   - GATE-ISO-001: Dual-tier isomorphism between local gates and remote CI;
- *   - GATE-ROUTE-001: Hook runtime routing safety and degradation guard;
- *   - GATE-MSG-001: Commit-msg engineering structure and anti-jargon guard;
- *   - GATE-MSG-002: Commit-msg objective style and bidirectional bilingual term constraints;
- *   - GATE-HYG-001: Physical hygiene guard (0-byte file and line ending enforcement);
- *   - GATE-BUDGET-001: Gate performance tiering (fast staged pre-commit vs full pre-push);
- *   - GATE-ERR-001: Strict error handling discipline in gate scripts;
- *   - GATE-SSOT-001: Rule SSOT catalog synchronization;
- *   - GATE-AST-001: Pre-commit AST staged slice complexity and nesting budget guard;
- *   - GATE-FAC-001: Gate pipeline facade substantive bearing and vacuous forwarding elimination;
- *   - GATE-PROC-001: PowerShell gate script non-interactive execution safety guard.
+ *   all 16 canonical GUARD-* rules:
+ *   - GUARD-SYS-001: Missing gate system (no hooks and no CI);
+ *   - GUARD-HOOK-001: Missing local left-shift Git hooks;
+ *   - GUARD-ISO-001: Dual-tier isomorphism between local gates and remote CI;
+ *   - GUARD-ROUTE-001: Hook runtime routing safety and degradation guard;
+ *   - GUARD-MSG-001: Commit-msg engineering structure and anti-jargon guard;
+ *   - GUARD-MSG-002: Commit-msg objective style and bidirectional bilingual term constraints;
+ *   - GUARD-HYG-001: Physical hygiene guard (0-byte file and line ending enforcement);
+ *   - GUARD-BUDGET-001: Gate performance tiering (fast staged pre-commit vs full pre-push);
+ *   - GUARD-ERR-001: Strict error handling discipline in gate scripts;
+ *   - GUARD-SSOT-001: Rule SSOT catalog synchronization;
+ *   - GUARD-AST-001: Pre-commit AST staged slice complexity and nesting budget guard;
+ *   - GUARD-FAC-001: Gate pipeline facade substantive bearing and vacuous forwarding elimination;
+ *   - GUARD-PROC-001: PowerShell gate script non-interactive execution safety guard.
  * Exit Semantics & Design Rationale: Pure metadata; zero runtime execution logic.
  */
 
@@ -37,7 +37,7 @@ import { ANALYZER_GATE_ARCHITECTURE } from '../../scoring/dimensionLiterals';
  */
 export const GATE_GOVERNANCE_RULES: readonly RuleDefinition[] = [
     defineRule({
-        id: 'GATE-SYS-001',
+        id: 'GUARD-SYS-001',
         family: RULE_FAMILY_GATE,
         analyzer: ANALYZER_GATE_ARCHITECTURE,
         canonical: true,
@@ -50,7 +50,7 @@ export const GATE_GOVERNANCE_RULES: readonly RuleDefinition[] = [
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gate-sys-001',
     }),
     defineRule({
-        id: 'GATE-HOOK-001',
+        id: 'GUARD-HOOK-001',
         family: RULE_FAMILY_GATE,
         analyzer: ANALYZER_GATE_ARCHITECTURE,
         canonical: true,
@@ -63,7 +63,7 @@ export const GATE_GOVERNANCE_RULES: readonly RuleDefinition[] = [
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gate-hook-001',
     }),
     defineRule({
-        id: 'GATE-ISO-001',
+        id: 'GUARD-ISO-001',
         family: RULE_FAMILY_GATE,
         analyzer: ANALYZER_GATE_ARCHITECTURE,
         canonical: true,
@@ -76,7 +76,7 @@ export const GATE_GOVERNANCE_RULES: readonly RuleDefinition[] = [
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gate-iso-001',
     }),
     defineRule({
-        id: 'GATE-ROUTE-001',
+        id: 'GUARD-ROUTE-001',
         family: RULE_FAMILY_GATE,
         analyzer: ANALYZER_GATE_ARCHITECTURE,
         canonical: true,
@@ -89,7 +89,7 @@ export const GATE_GOVERNANCE_RULES: readonly RuleDefinition[] = [
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gate-route-001',
     }),
     defineRule({
-        id: 'GATE-MSG-001',
+        id: 'GUARD-MSG-001',
         family: RULE_FAMILY_GATE,
         analyzer: ANALYZER_GATE_ARCHITECTURE,
         canonical: true,
@@ -102,7 +102,7 @@ export const GATE_GOVERNANCE_RULES: readonly RuleDefinition[] = [
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gate-msg-001',
     }),
     defineRule({
-        id: 'GATE-HYG-001',
+        id: 'GUARD-HYG-001',
         family: RULE_FAMILY_GATE,
         analyzer: ANALYZER_GATE_ARCHITECTURE,
         canonical: true,
@@ -115,7 +115,7 @@ export const GATE_GOVERNANCE_RULES: readonly RuleDefinition[] = [
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gate-hyg-001',
     }),
     defineRule({
-        id: 'GATE-BUDGET-001',
+        id: 'GUARD-BUDGET-001',
         family: RULE_FAMILY_GATE,
         analyzer: ANALYZER_GATE_ARCHITECTURE,
         canonical: true,
@@ -128,7 +128,7 @@ export const GATE_GOVERNANCE_RULES: readonly RuleDefinition[] = [
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gate-budget-001',
     }),
     defineRule({
-        id: 'GATE-ERR-001',
+        id: 'GUARD-ERR-001',
         family: RULE_FAMILY_GATE,
         analyzer: ANALYZER_GATE_ARCHITECTURE,
         canonical: true,
@@ -141,7 +141,7 @@ export const GATE_GOVERNANCE_RULES: readonly RuleDefinition[] = [
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gate-err-001',
     }),
     defineRule({
-        id: 'GATE-SSOT-001',
+        id: 'GUARD-SSOT-001',
         family: RULE_FAMILY_GATE,
         analyzer: ANALYZER_GATE_ARCHITECTURE,
         canonical: true,
@@ -153,7 +153,7 @@ export const GATE_GOVERNANCE_RULES: readonly RuleDefinition[] = [
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gate-ssot-001',
     }),
     defineRule({
-        id: 'GATE-MSG-002',
+        id: 'GUARD-MSG-002',
         family: RULE_FAMILY_GATE,
         analyzer: ANALYZER_GATE_ARCHITECTURE,
         canonical: true,
@@ -166,7 +166,7 @@ export const GATE_GOVERNANCE_RULES: readonly RuleDefinition[] = [
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gate-msg-002',
     }),
     defineRule({
-        id: 'GATE-AST-001',
+        id: 'GUARD-AST-001',
         family: RULE_FAMILY_GATE,
         analyzer: ANALYZER_GATE_ARCHITECTURE,
         canonical: true,
@@ -179,7 +179,7 @@ export const GATE_GOVERNANCE_RULES: readonly RuleDefinition[] = [
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gate-ast-001',
     }),
     defineRule({
-        id: 'GATE-FAC-001',
+        id: 'GUARD-FAC-001',
         family: RULE_FAMILY_GATE,
         analyzer: ANALYZER_GATE_ARCHITECTURE,
         canonical: true,
@@ -192,7 +192,7 @@ export const GATE_GOVERNANCE_RULES: readonly RuleDefinition[] = [
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gate-fac-001',
     }),
     defineRule({
-        id: 'GATE-PROC-001',
+        id: 'GUARD-PROC-001',
         family: RULE_FAMILY_GATE,
         analyzer: ANALYZER_GATE_ARCHITECTURE,
         canonical: true,
@@ -205,7 +205,7 @@ export const GATE_GOVERNANCE_RULES: readonly RuleDefinition[] = [
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gate-proc-001',
     }),
     defineRule({
-        id: 'GATE-MSG-003',
+        id: 'GUARD-MSG-003',
         family: RULE_FAMILY_GATE,
         analyzer: ANALYZER_GATE_ARCHITECTURE,
         canonical: true,
@@ -217,7 +217,7 @@ export const GATE_GOVERNANCE_RULES: readonly RuleDefinition[] = [
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gate-msg-003',
     }),
     defineRule({
-        id: 'GATE-PAIR-001',
+        id: 'GUARD-PAIR-001',
         family: RULE_FAMILY_GATE,
         analyzer: ANALYZER_GATE_ARCHITECTURE,
         canonical: true,

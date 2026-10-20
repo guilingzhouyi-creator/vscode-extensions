@@ -7,10 +7,10 @@
  * Dependencies & Triggers: Core types (Analyzer, AnalyzerContext, Issue), gate-governance
  *   evaluator; triggered when declarative 'gate-architecture' analyzer is enabled.
  * Responsibilities:
- *   1. Evaluate missing gates (GATE-SYS-001, GATE-HOOK-001) with AgentActionablePayload;
+ *   1. Evaluate missing gates (GUARD-SYS-001, GUARD-HOOK-001) with AgentActionablePayload;
  *   2. Evaluate 7 existing gate quality dimensions:
- *      GATE-ISO-001, GATE-ROUTE-001, GATE-MSG-001, GATE-HYG-001,
- *      GATE-BUDGET-001, GATE-ERR-001, GATE-SSOT-001;
+ *      GUARD-ISO-001, GUARD-ROUTE-001, GUARD-MSG-001, GUARD-HYG-001,
+ *      GUARD-BUDGET-001, GUARD-ERR-001, GUARD-SSOT-001;
  *   3. Cache whole-repo evaluation per scan session to prevent redundant re-audits.
  * Exit Semantics & Design Rationale: Deterministic and idempotent; returns Issue[] and
  *   never throws. Attaches structured scaffolding instructions for automated remediation.

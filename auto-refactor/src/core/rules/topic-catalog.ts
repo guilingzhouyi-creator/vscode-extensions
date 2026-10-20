@@ -142,7 +142,7 @@ export const CANONICAL_TOPIC_CATALOG: Readonly<Record<string, readonly string[]>
     DOC: ['DUP', 'FEN', 'LNK', 'TRM'],
     ERR: ['FLT', 'MSG', 'PRP'],
     EXT: ['DIR'],
-    GATE: [
+    GUARD: [
         'AST',
         'BUDGET',
         'ERR',

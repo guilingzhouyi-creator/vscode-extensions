@@ -437,7 +437,7 @@ fn compute() {
 
   // Rule catalog SSOT validation and drift detection
   assert.strictEqual(isRegisteredWorkspaceRule('FGT-GAT-001'), true);
-  assert.strictEqual(isRegisteredWorkspaceRule('GATE-MSG-001'), true);
+  assert.strictEqual(isRegisteredWorkspaceRule('GUARD-MSG-001'), true);
   assert.strictEqual(isRegisteredWorkspaceRule('L3-CONFLICT'), false);
 
   const cleanText = 'Complies with FGT-GAT-001 and UTF-8 under SHA-256.';

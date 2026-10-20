@@ -5,13 +5,13 @@
  *   gate scaffolding (Tier 1 Local Left-Shift Gate + Tier 2 Remote CI Gate) tailored
  *   to repository archetypes (Node, Rust, Python, Go, Godot, Polyglot, Generic).
  * Dependencies & Triggers: Consumes RepoArchetypeContext; invoked when gate-governance
- *   evaluator emits GATE-SYS-001 or GATE-HOOK-001, providing actionable payloads for Agents.
+ *   evaluator emits GUARD-SYS-001 or GUARD-HOOK-001, providing actionable payloads for Agents.
  * Responsibilities:
  *   1. Generate cross-platform router hooks (.githooks/pre-commit, commit-msg, pre-push)
- *      with robust pwsh -> bash fallback (GATE-ROUTE-001 safe);
- *   2. Generate physical hygiene and staged-slice checkers (GATE-HYG-001 safe);
- *   3. Generate engineering-grade commit-msg validation (GATE-MSG-001 safe);
- *   4. Generate archetype-tailored regression runners and CI workflows (GATE-ISO-001 safe).
+ *      with robust pwsh -> bash fallback (GUARD-ROUTE-001 safe);
+ *   2. Generate physical hygiene and staged-slice checkers (GUARD-HYG-001 safe);
+ *   3. Generate engineering-grade commit-msg validation (GUARD-MSG-001 safe);
+ *   4. Generate archetype-tailored regression runners and CI workflows (GUARD-ISO-001 safe).
  * Exit Semantics & Design Rationale: Deterministic string template generation.
  *   Emits AgentActionablePayload with safeToAutomate=true for zero-drift automation.
  */
@@ -38,7 +38,7 @@ const SCRIPT_PRE_PUSH_GATE = 'pre-push-gate';
 const FILE_CI_WORKFLOW = '.github/workflows/ci.yml';
 const CMD_PYTEST = 'pytest';
 const DIR_GITHOOKS = '.githooks';
-const DEFAULT_GATE_CODE = 'GATE-SYS-001';
+const DEFAULT_GATE_CODE = 'GUARD-SYS-001';
 
 /** Specific gate scaffolding actionable payload. */
 export interface GateScaffoldPayload extends AgentActionablePayload {
@@ -121,7 +121,7 @@ if [ -z "$STAGED_FILES" ]; then
     ${SH_EXIT} 0
 fi
 
-# 2. Gate: Zero 0-byte physical empty files (GATE-HYG-001)
+# 2. Gate: Zero 0-byte physical empty files (GUARD-HYG-001)
 EMPTY_COUNT=0
 ${SH_WHILE} IFS= read -r FILE; do
     if [ -f "$FILE" ] && [ ! -s "$FILE" ]; then
@@ -486,7 +486,7 @@ function buildScaffoldInstallScripts(): GateScaffoldPayload['suggestedStructure'
  * Generate complete 2-tier gate scaffolding and Agent Actionable Payload.
  *
  * @param context - Repository archetype context.
- * @param code - Standardized rule code (default GATE-SYS-001).
+ * @param code - Standardized rule code (default GUARD-SYS-001).
  * @returns Fully populated GateScaffoldPayload.
  */
 export function generateGateScaffold(

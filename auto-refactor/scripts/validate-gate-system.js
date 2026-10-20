@@ -125,6 +125,11 @@ function verifyAuditAllParity() {
 function verifyPreCommitParity() {
   const preCommitPs = path.join(ROOT_DIR, 'scripts/ps1/pre-commit-gate.ps1');
   const preCommitSh = path.join(ROOT_DIR, 'scripts/sh/pre-commit-gate.sh');
+  const registryPath = path.join(ROOT_DIR, 'scripts/common/gate-step-registry.json');
+  assert(fs.existsSync(registryPath), 'gate-step-registry.json must exist');
+  const registry = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
+  const registeredSteps = (registry.entries && registry.entries['pre-commit'] && registry.entries['pre-commit'].steps) || [];
+  assert(registeredSteps.length > 0, 'pre-commit entry in registry must declare steps');
 
   for (const [name, p] of [
     ['pre-commit-gate.ps1', preCommitPs],
@@ -132,19 +137,23 @@ function verifyPreCommitParity() {
   ]) {
     assert(fs.existsSync(p), `${name} must exist`);
     const content = fs.readFileSync(p, 'utf8');
-    const tokens = new Set(content.match(PRE_COMMIT_REGEX) || []);
-    for (let i = 1; i <= 9; i++) {
-      assert(tokens.has(`[${i}/9]`), `${name} must contain step [${i}/9]`);
+    for (const step of registeredSteps) {
+      assert(content.includes(step.id), `${name} must reference registered step ${step.id}`);
     }
-    assert(tokens.has('workspace-timing'), `${name} Gate 8 must verify workspace-timing`);
-    assert(tokens.has('auto-refactor'), `${name} Gate 8 must verify auto-refactor`);
-    assert(tokens.has('WebGames'), `${name} Gate 8 must verify WebGames`);
+    assert(content.includes('workspace-timing'), `${name} must verify workspace-timing`);
+    assert(content.includes('auto-refactor'), `${name} must verify auto-refactor`);
+    assert(content.includes('WebGames'), `${name} must verify WebGames`);
   }
 }
 
 function verifyPrePushParity() {
   const prePushPs = path.join(ROOT_DIR, 'scripts/ps1/pre-push-gate.ps1');
   const prePushSh = path.join(ROOT_DIR, 'scripts/sh/pre-push-gate.sh');
+  const registryPath = path.join(ROOT_DIR, 'scripts/common/gate-step-registry.json');
+  assert(fs.existsSync(registryPath), 'gate-step-registry.json must exist');
+  const registry = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
+  const registeredSteps = (registry.entries && registry.entries['pre-push'] && registry.entries['pre-push'].steps) || [];
+  assert(registeredSteps.length > 0, 'pre-push entry in registry must declare steps');
 
   for (const [name, p] of [
     ['pre-push-gate.ps1', prePushPs],
@@ -152,15 +161,14 @@ function verifyPrePushParity() {
   ]) {
     assert(fs.existsSync(p), `${name} must exist`);
     const content = fs.readFileSync(p, 'utf8');
-    const tokens = new Set(content.match(PRE_PUSH_REGEX) || []);
-    for (let i = 1; i <= 11; i++) {
-      assert(tokens.has(`[${i}/11]`), `${name} must contain Gate [${i}/11]`);
+    for (const step of registeredSteps) {
+      assert(content.includes(step.id), `${name} must reference registered step ${step.id}`);
     }
-    assert(tokens.has('workspace-timing'), `${name} must verify workspace-timing`);
-    assert(tokens.has('auto-refactor'), `${name} must verify auto-refactor`);
-    assert(tokens.has('WebGames'), `${name} must verify WebGames`);
-    assert(tokens.has('fractal-git'), `${name} must verify fractal-git`);
-    assert(tokens.has('validate-commit-msg'), `${name} must verify commit msg`);
+    assert(content.includes('workspace-timing'), `${name} must verify workspace-timing`);
+    assert(content.includes('auto-refactor'), `${name} must verify auto-refactor`);
+    assert(content.includes('WebGames'), `${name} must verify WebGames`);
+    assert(content.includes('fractal-git'), `${name} must verify fractal-git`);
+    assert(content.includes('validate-commit-msg'), `${name} must verify commit msg`);
   }
 }
 

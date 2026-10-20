@@ -8,9 +8,9 @@
  *   generateGateScaffold) and GateArchitectureAnalyzer.
  * Responsibilities:
  *   1. Test archetype inference across Node, Rust, Python, Go, Godot, Polyglot;
- *   2. Test GATE-SYS-001 (critical missing gate) and scaffold payload;
- *   3. Test GATE-HOOK-001 (missing local left-shift hooks);
- *   4. Test 7 existing gate quality dimensions (GATE-ISO-001 through GATE-SSOT-001);
+ *   2. Test GUARD-SYS-001 (critical missing gate) and scaffold payload;
+ *   3. Test GUARD-HOOK-001 (missing local left-shift hooks);
+ *   4. Test 7 existing gate quality dimensions (GUARD-ISO-001 through GUARD-SSOT-001);
  *   5. Dogfood audit against workspace root;
  *   6. Strict project neutrality verification (zero hardcoded workspace names).
  * Exit Semantics & Design Rationale: Exits 0 on all tests passing, exits 1 on failure.
@@ -91,7 +91,7 @@ console.log('Testing Gate Architecture Governance & Archetype Scaffolding...');
   }
 })();
 
-// ── Test 2: Scenario A - Completely Missing Gate System (GATE-SYS-001) ──
+// ── Test 2: Scenario A - Completely Missing Gate System (GUARD-SYS-001) ──
 (function testMissingGateSystem() {
   const dir = createTempDir('missing-sys');
   try {
@@ -104,11 +104,11 @@ console.log('Testing Gate Architecture Governance & Archetype Scaffolding...');
     assert.strictEqual(result.passed, false);
     assert.strictEqual(result.issues.length, 1);
     const issue = result.issues[0];
-    assert.strictEqual(issue.rule, 'GATE-SYS-001');
+    assert.strictEqual(issue.rule, 'GUARD-SYS-001');
     assert.strictEqual(issue.severity, 'error');
     assert.ok(issue.actionable, 'Expected actionable payload');
     assert.strictEqual(issue.actionable.action, 'scaffold_gate_system');
-    assert.strictEqual(issue.actionable.code, 'GATE-SYS-001');
+    assert.strictEqual(issue.actionable.code, 'GUARD-SYS-001');
     assert.strictEqual(issue.actionable.safeToAutomate, true);
 
     const scaffold = issue.actionable;
@@ -118,14 +118,14 @@ console.log('Testing Gate Architecture Governance & Archetype Scaffolding...');
     assert.ok(scaffold.suggestedStructure.ciWorkflow);
 
     console.log(
-      '  [PASS] 2. GATE-SYS-001: Missing gate system emits full cross-platform scaffold payload',
+      '  [PASS] 2. GUARD-SYS-001: Missing gate system emits full cross-platform scaffold payload',
     );
   } finally {
     cleanTempDir(dir);
   }
 })();
 
-// ── Test 3: Scenario A - Missing Local Hooks (GATE-HOOK-001) ──
+// ── Test 3: Scenario A - Missing Local Hooks (GUARD-HOOK-001) ──
 (function testMissingLocalHooks() {
   const dir = createTempDir('missing-hook');
   try {
@@ -138,21 +138,21 @@ console.log('Testing Gate Architecture Governance & Archetype Scaffolding...');
 
     const result = auditGateArchitecture(dir);
     assert.strictEqual(result.passed, false);
-    const hookIssue = result.issues.find((i) => i.rule === 'GATE-HOOK-001');
-    assert.ok(hookIssue, 'Expected GATE-HOOK-001 issue');
+    const hookIssue = result.issues.find((i) => i.rule === 'GUARD-HOOK-001');
+    assert.ok(hookIssue, 'Expected GUARD-HOOK-001 issue');
     assert.strictEqual(hookIssue.severity, 'warning');
     assert.ok(hookIssue.actionable);
-    assert.strictEqual(hookIssue.actionable.code, 'GATE-HOOK-001');
+    assert.strictEqual(hookIssue.actionable.code, 'GUARD-HOOK-001');
 
     console.log(
-      '  [PASS] 3. GATE-HOOK-001: Missing local left-shift Git hooks flagged with warning',
+      '  [PASS] 3. GUARD-HOOK-001: Missing local left-shift Git hooks flagged with warning',
     );
   } finally {
     cleanTempDir(dir);
   }
 })();
 
-// ── Test 4: Scenario B - Hook Runtime Degradation & Safety (GATE-ROUTE-001) ──
+// ── Test 4: Scenario B - Hook Runtime Degradation & Safety (GUARD-ROUTE-001) ──
 (function testRoutingSafety() {
   const dir = createTempDir('fragile-route');
   try {
@@ -164,19 +164,19 @@ console.log('Testing Gate Architecture Governance & Archetype Scaffolding...');
     );
     const result = auditGateArchitecture(dir);
 
-    const routeIssue = result.issues.find((i) => i.rule === 'GATE-ROUTE-001');
-    assert.ok(routeIssue, 'Expected GATE-ROUTE-001 issue for powershell.exe bare invocation');
+    const routeIssue = result.issues.find((i) => i.rule === 'GUARD-ROUTE-001');
+    assert.ok(routeIssue, 'Expected GUARD-ROUTE-001 issue for powershell.exe bare invocation');
     assert.strictEqual(routeIssue.severity, 'error');
 
     console.log(
-      '  [PASS] 4. GATE-ROUTE-001: Fragile hook routing (powershell.exe) detected and blocked',
+      '  [PASS] 4. GUARD-ROUTE-001: Fragile hook routing (powershell.exe) detected and blocked',
     );
   } finally {
     cleanTempDir(dir);
   }
 })();
 
-// ── Test 5: Scenario B - Physical Hygiene Guard (GATE-HYG-001) ──
+// ── Test 5: Scenario B - Physical Hygiene Guard (GUARD-HYG-001) ──
 (function testHygieneGuard() {
   const dir = createTempDir('no-hygiene');
   try {
@@ -188,17 +188,17 @@ console.log('Testing Gate Architecture Governance & Archetype Scaffolding...');
     );
     const result = auditGateArchitecture(dir);
 
-    const hygIssue = result.issues.find((i) => i.rule === 'GATE-HYG-001');
-    assert.ok(hygIssue, 'Expected GATE-HYG-001 for missing 0-byte check');
+    const hygIssue = result.issues.find((i) => i.rule === 'GUARD-HYG-001');
+    assert.ok(hygIssue, 'Expected GUARD-HYG-001 for missing 0-byte check');
     assert.strictEqual(hygIssue.severity, 'error');
 
-    console.log('  [PASS] 5. GATE-HYG-001: Pre-commit lacking zero-byte empty file check flagged');
+    console.log('  [PASS] 5. GUARD-HYG-001: Pre-commit lacking zero-byte empty file check flagged');
   } finally {
     cleanTempDir(dir);
   }
 })();
 
-// ── Test 6: Scenario B - Commit-Msg Integrity (GATE-MSG-001) ──
+// ── Test 6: Scenario B - Commit-Msg Integrity (GUARD-MSG-001) ──
 (function testCommitMsgGate() {
   const dir = createTempDir('no-commit-msg');
   try {
@@ -209,17 +209,17 @@ console.log('Testing Gate Architecture Governance & Archetype Scaffolding...');
     );
     const result = auditGateArchitecture(dir);
 
-    const msgIssue = result.issues.find((i) => i.rule === 'GATE-MSG-001');
-    assert.ok(msgIssue, 'Expected GATE-MSG-001 for missing commit-msg hook');
+    const msgIssue = result.issues.find((i) => i.rule === 'GUARD-MSG-001');
+    assert.ok(msgIssue, 'Expected GUARD-MSG-001 for missing commit-msg hook');
     assert.strictEqual(msgIssue.severity, 'warning');
 
-    console.log('  [PASS] 6. GATE-MSG-001: Missing commit-msg hook flagged');
+    console.log('  [PASS] 6. GUARD-MSG-001: Missing commit-msg hook flagged');
   } finally {
     cleanTempDir(dir);
   }
 })();
 
-// ── Test 7: Scenario B - Strict Error Discipline (GATE-ERR-001) ──
+// ── Test 7: Scenario B - Strict Error Discipline (GUARD-ERR-001) ──
 (function testStrictErrorDiscipline() {
   const dir = createTempDir('loose-error');
   try {
@@ -236,17 +236,17 @@ console.log('Testing Gate Architecture Governance & Archetype Scaffolding...');
     );
 
     const result = auditGateArchitecture(dir);
-    const errIssue = result.issues.find((i) => i.rule === 'GATE-ERR-001');
-    assert.ok(errIssue, 'Expected GATE-ERR-001 for script lacking set -euo pipefail');
+    const errIssue = result.issues.find((i) => i.rule === 'GUARD-ERR-001');
+    assert.ok(errIssue, 'Expected GUARD-ERR-001 for script lacking set -euo pipefail');
     assert.strictEqual(errIssue.severity, 'error');
 
-    console.log('  [PASS] 7. GATE-ERR-001: Gate script without strict error flags blocked');
+    console.log('  [PASS] 7. GUARD-ERR-001: Gate script without strict error flags blocked');
   } finally {
     cleanTempDir(dir);
   }
 })();
 
-// ── Test 8: Scenario B - Dual-Tier Isomorphism (GATE-ISO-001) ──
+// ── Test 8: Scenario B - Dual-Tier Isomorphism (GUARD-ISO-001) ──
 (function testIsomorphism() {
   const dir = createTempDir('non-isomorphic');
   try {
@@ -272,8 +272,8 @@ console.log('Testing Gate Architecture Governance & Archetype Scaffolding...');
     );
 
     const result = auditGateArchitecture(dir);
-    const isoIssue = result.issues.find((i) => i.rule === 'GATE-ISO-001');
-    assert.ok(isoIssue, 'Expected GATE-ISO-001 for unmirrored CI lint check');
+    const isoIssue = result.issues.find((i) => i.rule === 'GUARD-ISO-001');
+    assert.ok(isoIssue, 'Expected GUARD-ISO-001 for unmirrored CI lint check');
     assert.strictEqual(isoIssue.severity, 'warning');
 
     // Subtest: Hooks exist, but CI workflow is missing completely
@@ -293,16 +293,16 @@ console.log('Testing Gate Architecture Governance & Archetype Scaffolding...');
         '#!/usr/bin/env bash\nset -euo pipefail\nnpm test\n',
       );
       const resultNoCi = auditGateArchitecture(dirNoCi);
-      const isoNoCiIssue = resultNoCi.issues.find((i) => i.rule === 'GATE-ISO-001');
-      assert.ok(isoNoCiIssue, 'Expected GATE-ISO-001 when CI workflow is missing completely');
+      const isoNoCiIssue = resultNoCi.issues.find((i) => i.rule === 'GUARD-ISO-001');
+      assert.ok(isoNoCiIssue, 'Expected GUARD-ISO-001 when CI workflow is missing completely');
       assert.strictEqual(isoNoCiIssue.severity, 'warning');
       assert.ok(isoNoCiIssue.actionable, 'Expected actionable payload for missing CI');
-      assert.strictEqual(isoNoCiIssue.actionable.code, 'GATE-ISO-001');
+      assert.strictEqual(isoNoCiIssue.actionable.code, 'GUARD-ISO-001');
     } finally {
       cleanTempDir(dirNoCi);
     }
 
-    console.log('  [PASS] 8. GATE-ISO-001: Discrepancy between CI and local hooks identified');
+    console.log('  [PASS] 8. GUARD-ISO-001: Discrepancy between CI and local hooks identified');
   } finally {
     cleanTempDir(dir);
   }
@@ -373,12 +373,12 @@ console.log('Testing Gate Architecture Governance & Archetype Scaffolding...');
 
   // Verify no critical gate system missing errors
   const criticalSysIssue = result.issues.find(
-    (i) => i.rule === 'GATE-SYS-001' || i.rule === 'GATE-HOOK-001',
+    (i) => i.rule === 'GUARD-SYS-001' || i.rule === 'GUARD-HOOK-001',
   );
   assert.strictEqual(
     criticalSysIssue,
     undefined,
-    'Workspace must not trigger GATE-SYS-001 or GATE-HOOK-001',
+    'Workspace must not trigger GUARD-SYS-001 or GUARD-HOOK-001',
   );
 
   console.log(
