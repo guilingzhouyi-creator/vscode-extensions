@@ -40,15 +40,15 @@ const {
 
 async function main() {
   console.log('================================================================');
-  console.log('🧪 Verifying Trajectory Learning & Architecture Modernization (16 Gates)');
+  console.log('🧪 Verifying Trajectory Learning & Architecture Modernization (16 cases)');
   console.log('================================================================');
 
   const extractor = new TrajectoryRecipeExtractor();
   const detector = new RegressionTrajectoryDetector();
   const service = createPraxisTrajectoryLearningService(extractor, detector);
 
-  // Gate 1: Monolithic to Extract-Method (REC-SPLIT)
-  console.log('\n[Gate 1] Verifying Bad->Good decomposition into extract-method recipe...');
+  // CASE-01: Monolithic to Extract-Method (REC-SPLIT)
+  console.log('\n[CASE-01] Verifying Bad->Good decomposition into extract-method recipe...');
   const beforeMonolith = `
 function processBatchOrder(orders: any[], config: any) {
     let total = 0;
@@ -100,8 +100,8 @@ function processBatchOrder(orders: any[], config: any) {
   assert.strictEqual(recipe1.operations[0].opKind, 'split-function');
   console.log(`  ✔ Synthesized Recipe: ${recipe1.recipeId} (${recipe1.name})`);
 
-  // Gate 2: Long Parameter List to Parameter Object Pattern (REC-PARAM)
-  console.log('\n[Gate 2] Verifying parameter list consolidation into parameter-object recipe...');
+  // CASE-02: Long Parameter List to Parameter Object Pattern (REC-PARAM)
+  console.log('\n[CASE-02] Verifying parameter list consolidation into parameter-object recipe...');
   const beforeParams = `
 function renderChart(containerId: string, width: number, height: number, theme: string, showLegend: boolean, animate: boolean, palette: string[]) {
     return true;
@@ -128,8 +128,8 @@ function renderChart(containerId: string, options: ChartOptions) { return true; 
   assert.strictEqual(recipe2.operations[0].opKind, 'introduce-parameter-object');
   console.log(`  ✔ Synthesized Recipe: ${recipe2.recipeId} (${recipe2.name})`);
 
-  // Gate 3: Switch Cascade to Strategy Dispatch Pattern (REC-STRAT)
-  console.log('\n[Gate 3] Verifying conditional cascade to strategy-dispatch recipe...');
+  // CASE-03: Switch Cascade to Strategy Dispatch Pattern (REC-STRAT)
+  console.log('\n[CASE-03] Verifying conditional cascade to strategy-dispatch recipe...');
   const beforeSwitch = `
 function handleEvent(type: string, data: any) {
     switch (type) {
@@ -165,8 +165,8 @@ function handleEvent(type: string, data: any) {
   assert.strictEqual(recipe3.operations[0].opKind, 'extract-strategy');
   console.log(`  ✔ Synthesized Recipe: ${recipe3.recipeId} (${recipe3.name})`);
 
-  // Gate 4: Object Pool & Reset State Lifecycle Pattern (REC-POOL)
-  console.log('\n[Gate 4] Verifying object-pool-lifecycle pattern (REC-POOL)...');
+  // CASE-04: Object Pool & Reset State Lifecycle Pattern (REC-POOL)
+  console.log('\n[CASE-04] Verifying object-pool-lifecycle pattern (REC-POOL)...');
   const beforePool = `
 class CombatParticleEffect {
     var position: Vector2
@@ -212,8 +212,8 @@ class CombatParticleEffect {
   assert.strictEqual(recipePool.operations[1].opKind, 'inject-reset-state');
   console.log(`  ✔ Synthesized Recipe: ${recipePool.recipeId} (${recipePool.name})`);
 
-  // Gate 5: CAS Reentrancy State Guard Pattern (REC-CAS)
-  console.log('\n[Gate 5] Verifying cas-reentrancy-guard pattern (REC-CAS)...');
+  // CASE-05: CAS Reentrancy State Guard Pattern (REC-CAS)
+  console.log('\n[CASE-05] Verifying cas-reentrancy-guard pattern (REC-CAS)...');
   const beforeCas = `
 class BattleEngine {
     func execute_turn() -> void:
@@ -247,8 +247,8 @@ class BattleEngine {
   assert.strictEqual(recipeCas.operations[0].opKind, 'inject-cas-guard');
   console.log(`  ✔ Synthesized Recipe: ${recipeCas.recipeId} (${recipeCas.name})`);
 
-  // Gate 6: Config Cache Invalidation Pattern (REC-HOTCFG)
-  console.log('\n[Gate 6] Verifying config-cache-invalidation pattern (REC-HOTCFG)...');
+  // CASE-06: Config Cache Invalidation Pattern (REC-HOTCFG)
+  console.log('\n[CASE-06] Verifying config-cache-invalidation pattern (REC-HOTCFG)...');
   const beforeCfg = `
 class CombatEvaluator {
     func evaluate_stats(item_id: String) -> Dictionary:
@@ -288,8 +288,8 @@ class CombatEvaluator {
   assert.strictEqual(recipeHotCfg.operations[0].opKind, 'inject-cache-invalidation');
   console.log(`  ✔ Synthesized Recipe: ${recipeHotCfg.recipeId} (${recipeHotCfg.name})`);
 
-  // Gate 7: Data Clump to Context DTO Aggregation Pattern (REC-DTO)
-  console.log('\n[Gate 7] Verifying dto-context-aggregation pattern (REC-DTO)...');
+  // CASE-07: Data Clump to Context DTO Aggregation Pattern (REC-DTO)
+  console.log('\n[CASE-07] Verifying dto-context-aggregation pattern (REC-DTO)...');
   const beforeDto = `
 class HudMutationManager {
     func apply_mutation(source_id: String, target_id: String, channel_type: int, delta_amount: float, timestamp: int, extra_flags: Dictionary) -> bool:
@@ -323,8 +323,8 @@ class HudMutationManager {
   assert.strictEqual(recipeDto.operations[0].opKind, 'introduce-dto-context');
   console.log(`  ✔ Synthesized Recipe: ${recipeDto.recipeId} (${recipeDto.name})`);
 
-  // Gate 8: Dynamic Hook Decoupling Pattern (REC-HOOK)
-  console.log('\n[Gate 8] Verifying hook-decoupling pattern (REC-HOOK)...');
+  // CASE-08: Dynamic Hook Decoupling Pattern (REC-HOOK)
+  console.log('\n[CASE-08] Verifying hook-decoupling pattern (REC-HOOK)...');
   const beforeHook = `
 class GameSessionFlow {
     func advance_flow(step: int) -> void:
@@ -357,8 +357,8 @@ class GameSessionFlow {
   assert.strictEqual(recipeHook.operations[0].opKind, 'inject-hook-dispatch');
   console.log(`  ✔ Synthesized Recipe: ${recipeHook.recipeId} (${recipeHook.name})`);
 
-  // Gate 9: Shim Elimination & Obsolete Bridge Purge (REC-PURGE)
-  console.log('\n[Gate 9] Verifying shim-elimination pattern (REC-PURGE)...');
+  // CASE-09: Shim Elimination & Obsolete Bridge Purge (REC-PURGE)
+  console.log('\n[CASE-09] Verifying shim-elimination pattern (REC-PURGE)...');
   const beforeShim = `
 class HudMutationManager {
     func apply_mutation_context(context: HudMutationContextDTO) -> bool:
@@ -390,8 +390,8 @@ class HudMutationManager {
   assert.strictEqual(recipeShim.operations[0].opKind, 'remove-stale-shim');
   console.log(`  ✔ Synthesized Recipe: ${recipeShim.recipeId} (${recipeShim.name})`);
 
-  // Gate 10: Direct Modern Migration Pattern (REC-DIRECT)
-  console.log('\n[Gate 10] Verifying direct-modern-migration pattern (REC-DIRECT)...');
+  // CASE-10: Direct Modern Migration Pattern (REC-DIRECT)
+  console.log('\n[CASE-10] Verifying direct-modern-migration pattern (REC-DIRECT)...');
   const beforeDirectCaller = `
 func on_battle_damaged(actor: Actor, target: Target, amount: float):
     mutation_mgr.apply_mutation(actor.id, target.id, 1, amount, Time.get_ticks_msec(), {})
@@ -417,8 +417,8 @@ func on_battle_damaged(actor: Actor, target: Target, amount: float):
   assert.strictEqual(recipeDirect.operations[0].opKind, 'bypass-shim-to-direct');
   console.log(`  ✔ Synthesized Recipe: ${recipeDirect.recipeId} (${recipeDirect.name})`);
 
-  // Gate 11: Deprecation Lifecycle & Sunset Metadata Governance (REC-DEPR)
-  console.log('\n[Gate 11] Verifying deprecation-lifecycle pattern (REC-DEPR)...');
+  // CASE-11: Deprecation Lifecycle & Sunset Metadata Governance (REC-DEPR)
+  console.log('\n[CASE-11] Verifying deprecation-lifecycle pattern (REC-DEPR)...');
   const beforeUnannotated = `
 function calculateTaxLegacy(amount: number, state: string): number {
     return amount * 0.05;
@@ -448,8 +448,8 @@ function calculateTaxLegacy(amount: number, state: string): number {
   assert.strictEqual(recipeDepr.operations[0].opKind, 'inject-deprecated-annotation');
   console.log(`  ✔ Synthesized Recipe: ${recipeDepr.recipeId} (${recipeDepr.name})`);
 
-  // Gate 12: Zero-Cost Modern Abstraction & Direct View (REC-ZCOST)
-  console.log('\n[Gate 12] Verifying zero-cost-modernization pattern (REC-ZCOST)...');
+  // CASE-12: Zero-Cost Modern Abstraction & Direct View (REC-ZCOST)
+  console.log('\n[CASE-12] Verifying zero-cost-modernization pattern (REC-ZCOST)...');
   const beforeBoxing = `
 function evaluateContext(rawInput: any): any {
     var boxed = { "source": rawInput.source, "value": rawInput.val };
@@ -477,8 +477,8 @@ function evaluateContext(rawInput: TypedContextView): any {
   assert.strictEqual(recipeZcost.operations[0].opKind, 'introduce-zero-cost-view');
   console.log(`  ✔ Synthesized Recipe: ${recipeZcost.recipeId} (${recipeZcost.name})`);
 
-  // Gate 13: Mathematical Scoring Formulas (All 17 Formulas)
-  console.log('\n[Gate 13] Verifying mathematical scoring formulas...');
+  // CASE-13: Mathematical Scoring Formulas (All 17 Formulas)
+  console.log('\n[CASE-13] Verifying mathematical scoring formulas...');
   const bScore = { compositeScore: 60, dimensions: {} };
   const aScore = { compositeScore: 90, dimensions: {} };
   assert.strictEqual(calculateTrajectoryQualityVelocity(bScore, aScore, 0.0), 30.0);
@@ -521,8 +521,8 @@ function evaluateContext(rawInput: TypedContextView): any {
   assert.strictEqual(calculateModernConstructAdoptionRate(90, 10), 0.9);
   console.log('  ✔ All 17 Mathematical Formulas verified with 100% precision');
 
-  // Gate 14: Precondition Matching on All Learned Patterns
-  console.log('\n[Gate 14] Verifying recipe precondition matching across all patterns...');
+  // CASE-14: Precondition Matching on All Learned Patterns
+  console.log('\n[CASE-14] Verifying recipe precondition matching across all patterns...');
   [
     recipe1,
     recipe2,
@@ -549,8 +549,8 @@ function evaluateContext(rawInput: TypedContextView): any {
   assert(shimRecs.some((r) => r.category === 'shim-elimination'));
   console.log(`  ✔ Precondition matching passed for shim-elimination (${shimRecs.length} matches)`);
 
-  // Gate 15: Cyclic Flip-Flop Detection (GOV-TRJ-001)
-  console.log('\n[Gate 15] Verifying cyclic oscillation & flip-flop detection (GOV-TRJ-001)...');
+  // CASE-15: Cyclic Flip-Flop Detection (GOV-TRJ-001)
+  console.log('\n[CASE-15] Verifying cyclic oscillation & flip-flop detection (GOV-TRJ-001)...');
   const revisions = [
     {
       revisionId: 'rev-001',
@@ -628,8 +628,8 @@ function evaluateContext(rawInput: TypedContextView): any {
   assert(multiStepIssues[0].message.includes('Multi-step cyclic oscillation (cycle length: 3)'));
   console.log(`  ✔ Multi-step 3-cycle oscillation intercepted: ${multiStepIssues[0].message}`);
 
-  // Gate 16: Praxis Facade SPI & Performance Benchmark
-  console.log('\n[Gate 16] Verifying Praxis trajectory learning facade & latency benchmark...');
+  // CASE-16: Praxis Facade SPI & Performance Benchmark
+  console.log('\n[CASE-16] Verifying Praxis trajectory learning facade & latency benchmark...');
   const verdict = await service.learnFromTrajectory({ ...poolInput, churnRatio: 0.4 });
   assert.strictEqual(verdict.hasBadToGoodImprovement, true);
   assert(verdict.qualityDelta > 0 && verdict.qualityVelocity > 0);

@@ -11,7 +11,7 @@
  *     2. Assert EOL contract (CRLF for .ps1, LF for .sh/.js/.json).
  *     3. Assert Git hooks routing robustness (exec bash fallback, zero exec sh).
  *     4. Assert audit-all tri-project parity (workspace-timing, auto-refactor, WebGames).
- *     5. Assert pre-commit-gate 9-step normalization and Gate 8 tri-project verification.
+ *     5. Assert pre-commit-gate 9-step normalization and CASE-08 tri-project verification.
  *     6. Assert pre-push-gate 8-gate coverage.
  * Exit Semantics & Design Rationale: Exits 0 on all assertions passed; exits 1 on failure.
  */
@@ -204,9 +204,9 @@ function runAll() {
   verifyAuditAllParity();
   console.log('  ✔ Audit-All: 6 pillars covering workspace-timing, auto-refactor, WebGames, fractal-git.');
 
-  console.log('5. Verifying pre-commit-gate step normalization & Gate 8 parity...');
+  console.log('5. Verifying pre-commit-gate step normalization & CASE-08 parity...');
   verifyPreCommitParity();
-  console.log('  ✔ Pre-Commit: [1/9]..[9/9] normalized, Gate 8 covers all 4 projects.');
+  console.log('  ✔ Pre-Commit: [1/9]..[9/9] normalized, CASE-08 covers all 4 projects.');
 
   console.log('6. Verifying pre-push-gate 10-gate parity...');
   verifyPrePushParity();

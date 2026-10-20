@@ -7,17 +7,17 @@
  * Dependencies & Triggers: `npm run audit:self` or `npm test`; imports dist scoring modules,
  *   TypeScript compiler API, and scans src/**\/*.ts.
  * Responsibilities:
- *   1. Gate 1 (Dual-Scale Volume Guard): Strict assertion that 0 files in src/
+ *   1. CASE-01 (Dual-Scale Volume Guard): Strict assertion that 0 files in src/
  *      exceed 800 ELOC or 1200 LOC.
- *   2. Gate 2 (Shannon Entropy Guard): Information entropy verification across all source files
- *   3. Gate 3 (AST / LOC Density Guard): Validates AST node-to-LOC syntax
+ *   2. CASE-02 (Shannon Entropy Guard): Information entropy verification across all source files
+ *   3. CASE-03 (AST / LOC Density Guard): Validates AST node-to-LOC syntax
  *      density within [0.5, 40.0].
- *   4. Gate 4 (Boundary Interoperability Guard): Unidirectional layer decoupling; ensures zero
+ *   4. CASE-04 (Boundary Interoperability Guard): Unidirectional layer decoupling; ensures zero
  *      reverse imports from src/core/ to cli/ or api (BIF = 100.0%).
- *   5. Gate 5 (Profile Scoring Precision Guard): Validates mass preservation,
+ *   5. CASE-05 (Profile Scoring Precision Guard): Validates mass preservation,
  *      finite reproducibility, and domain-specific bias asymmetry for frontend, backend,
  *      and composite review profiles.
- *   6. Gate 6 (Ten-Dimensional Trajectory Fidelity Guard): Asserts that .refactor-trajectory
+ *   6. CASE-06 (Ten-Dimensional Trajectory Fidelity Guard): Asserts that .refactor-trajectory
  *      and reports/self-audit-baseline.json record full 10-dimensional dynamic scores with zero
  *      mock padding, reactive dimension count in credible interval [4, 8] (eliminating fake 100
  *      illusions), and vector consistency between baseline and trajectory.
@@ -68,7 +68,7 @@ function calculateShannonEntropy(str) {
 
 function auditFileVolumeBudget(allFiles) {
   console.log(
-    `[Gate 1] Dual-Scale Volume & Bidirectional Dynamic Envelope Guard (Max <= ${MAX_ELOC_BUDGET} ELOC, <= ${MAX_PHYSICAL_LOC_BUDGET} LOC, Ratio ~ 1:${TARGET_DENSITY_RATIO})`,
+    `[CASE-01] Dual-Scale Volume & Bidirectional Dynamic Envelope Guard (Max <= ${MAX_ELOC_BUDGET} ELOC, <= ${MAX_PHYSICAL_LOC_BUDGET} LOC, Ratio ~ 1:${TARGET_DENSITY_RATIO})`,
   );
   const fileStats = [];
   const overBudgetFiles = [];
@@ -125,7 +125,7 @@ function auditFileVolumeBudget(allFiles) {
 }
 
 function auditShannonEntropy(allFiles) {
-  console.log('[Gate 2] Shannon Information Entropy Guard');
+  console.log('[CASE-02] Shannon Information Entropy Guard');
   let totalEntropy = 0;
   let auditedCount = 0;
   const lowEntropyFiles = [];
@@ -222,7 +222,7 @@ function countAstNodes(filePath, content) {
 }
 
 function auditAstDensity(allFiles) {
-  console.log('[Gate 3] AST / LOC Syntax Density Guard');
+  console.log('[CASE-03] AST / LOC Syntax Density Guard');
   let totalDensity = 0;
   let densityAudited = 0;
   const outlierDensityFiles = [];
@@ -269,7 +269,7 @@ const FORBIDDEN_BOUNDARY_TARGETS = new Set(['../cli', '../../cli', '../../api', 
 const FORBIDDEN_CLI_REGEX = /\/cli(?:\/|$)/;
 
 function auditBoundaryInteroperability(allFiles) {
-  console.log('[Gate 4] Boundary Interoperability Guard (BIF)');
+  console.log('[CASE-04] Boundary Interoperability Guard (BIF)');
   const coreFiles = allFiles.filter((f) => f.includes(path.sep + 'core' + path.sep));
   const boundaryViolations = [];
 
@@ -357,7 +357,7 @@ function verifyDomainBiasAsymmetry(tuner) {
 }
 
 function auditProfileScoringPrecision() {
-  console.log('[Gate 5] Profile Scoring Precision & Bias Asymmetry Guard');
+  console.log('[CASE-05] Profile Scoring Precision & Bias Asymmetry Guard');
   const { ArchetypeWeightTuner } = require('../dist/core/scoring/archetype-weight-tuner');
   const { QualityScorer } = require('../dist/core/scoring/qualityScorer');
   const {
@@ -528,7 +528,7 @@ function checkCompositeParity(latestRun, baseline) {
 }
 
 function auditTenDimensionalFidelity() {
-  console.log('[Gate 6] Ten-Dimensional Trajectory & Score Fidelity Guard');
+  console.log('[CASE-06] Ten-Dimensional Trajectory & Score Fidelity Guard');
   const trajectoryFile = path.join(ROOT, '.refactor-trajectory', 'active-runs.ndjson');
   if (!fs.existsSync(trajectoryFile)) {
     console.error(`  ❌ [FAIL] Trajectory file not found at ${trajectoryFile}`);

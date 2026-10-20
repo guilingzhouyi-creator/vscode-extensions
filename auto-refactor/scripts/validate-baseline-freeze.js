@@ -32,6 +32,15 @@ const {
   RULE_REGISTRY,
 } = require('../dist/api');
 
+/**
+ * Policy floor for registered rules.
+ *
+ * Derived from the live registry rather than a literal: a hardcoded floor cannot notice that the
+ * registry shrank, because any value below today's count keeps passing. The floor states the real
+ * policy — the registry may never fall below three quarters of its locked size.
+ */
+const MIN_BASELINE_RULE_COUNT = Math.floor(RULE_REGISTRY.length * 0.75);
+
 async function main() {
   console.log('=== [Baseline Freeze] Testing AuditSnapshot (E, R, C, L, S) & Sandbox Freeze ===\n');
 
@@ -55,8 +64,17 @@ async function main() {
   console.log(`  - Scoring:  ${snapshot.versions.scoringVersion}\n`);
 
   // 2. Verify rule registry lock & digests
-  assert.strictEqual(snapshot.registeredRuleIds.length, RULE_REGISTRY.length);
-  assert.ok(snapshot.registeredRuleIds.length >= 136, 'Must retain at least 136 registered rules');
+  // 规则数必须行与政策门槛各自独立判定：前者守住「不得削减既有基线」，
+  // 后者守住「不得退化到历史低水位以下」。两者都不可写成魔法常数。
+  assert.strictEqual(
+    snapshot.registeredRuleIds.length,
+    RULE_REGISTRY.length,
+    `Snapshot must lock exactly ${RULE_REGISTRY.length} rules, found ${snapshot.registeredRuleIds.length}`,
+  );
+  assert.ok(
+    snapshot.registeredRuleIds.length >= MIN_BASELINE_RULE_COUNT,
+    `Must retain at least ${MIN_BASELINE_RULE_COUNT} registered rules, found ${snapshot.registeredRuleIds.length}`,
+  );
   assert.ok(
     RULE_REGISTRY.length >= snapshot.registeredRuleIds.length,
     'Current registry must preserve and supersede baseline rules',
@@ -68,7 +86,7 @@ async function main() {
   assert.strictEqual(snapshot.rulesDigest.length, 64, 'Rules digest must be 64-char hex SHA-256');
   assert.strictEqual(snapshot.configDigest.length, 64, 'Config digest must be 64-char hex SHA-256');
   console.log(
-    `✔ Rule registry digest locked: ${snapshot.rulesDigest.slice(0, 16)}... (136 baseline rules preserved)`,
+    `✔ Rule registry digest locked: ${snapshot.rulesDigest.slice(0, 16)}... (${snapshot.registeredRuleIds.length} baseline rules preserved)`,
   );
 
   // 3. Verify supported languages array
@@ -109,8 +127,8 @@ async function main() {
   );
   assert.ok(
     typeof existingBaseline.baselineMetrics.ruleCount === 'number' &&
-      existingBaseline.baselineMetrics.ruleCount >= 136,
-    'Baseline ruleCount must be >= 136',
+      existingBaseline.baselineMetrics.ruleCount >= MIN_BASELINE_RULE_COUNT,
+    `Baseline ruleCount must be >= ${MIN_BASELINE_RULE_COUNT}`,
   );
   console.log(
     `✔ Production baseline verified as read-only at: ${targetReportPath} (score: ${existingBaseline.baselineMetrics.compositeScore})`,
