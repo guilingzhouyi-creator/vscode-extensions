@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1792477201006",
-  "timestamp": "2026-10-20T06:20:09.475Z",
+  "snapshotId": "snapshot-v0.4.0-1792501866918",
+  "timestamp": "2026-10-20T13:11:14.696Z",
   "cai": 85.86,
   "polyglotGeneralization": {
     "index": 94.19,
@@ -16,12 +16,12 @@
     "languageAdapterVersion": "adapters-v1.0",
     "scoringVersion": "scoring-v1.0"
   },
-  "rulesDigest": "0934b7fa16cc0808772bdb5f734fa88a38c0a1ed5a7d2702c4629f0569ef4c44",
+  "rulesDigest": "50f8230346423270271f45348678e06c3979b971995cb659c73e0a417047b3c7",
   "configDigest": "04a1b8446ff3624c6496a9e8c9b405b03d47eda22fb414a869442bfb51978d19",
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
     "filesScanned": 677,
-    "durationMs": 5117
+    "durationMs": 4274
   },
   "metrics": {
     "compositeScore": 98.73,
@@ -35,31 +35,31 @@
       "languageCount": 1
     },
     "effectiveCodeDensity": 0.95,
-    "totalIssues": 7053,
-    "suppressedIssues": 140,
-    "unsuppressedIssues": 6913,
+    "totalIssues": 7055,
+    "suppressedIssues": 139,
+    "unsuppressedIssues": 6916,
     "bySeverity": {
-      "info": 559,
-      "warning": 6494,
+      "info": 564,
+      "warning": 6491,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
       "high": 15,
-      "medium": 4140,
-      "low": 2898
+      "medium": 4135,
+      "low": 2905
     }
   },
   "eightPillars": {
     "pillars": {
       "architecture": 98.56,
-      "maintainability": 96.67,
-      "performance": 99.56,
+      "maintainability": 96.66,
+      "performance": 99.55,
       "data": 99.73,
       "testing": 100,
       "reliability": 99.65,
       "security": 99.85,
-      "extensibility": 95.89
+      "extensibility": 95.9
     },
     "compositeScore": 98.73,
     "weights": {
@@ -78,12 +78,12 @@
     "architectureConsistency": 98.56,
     "semanticPurity": 99.46,
     "codeSecurity": 99.85,
-    "performanceEfficiency": 99.56,
-    "standardization": 93.95,
+    "performanceEfficiency": 99.55,
+    "standardization": 93.96,
     "modernity": 99.82,
-    "maintainability": 96.67,
+    "maintainability": 96.66,
     "commentQuality": 100,
-    "duplication": 93.72,
+    "duplication": 93.73,
     "techDebtRisk": 99.84
   },
   "topHotspots": [
@@ -182,8 +182,8 @@
     "summary": {
       "critical": 0,
       "high": 15,
-      "medium": 4140,
-      "low": 2898
+      "medium": 4135,
+      "low": 2905
     },
     "criticalItems": [],
     "highItems": [
@@ -197,12 +197,12 @@
         "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
       },
       {
-        "id": "performance:PRF-ALG-002:scripts/validate-gate-system.js:165",
+        "id": "performance:PRF-ALG-002:scripts/validate-gate-system.js:166",
         "rule": "PRF-ALG-002",
         "tier": "high",
         "severity": "warning",
         "file": "scripts/validate-gate-system.js",
-        "line": 165,
+        "line": 166,
         "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
       },
       {
@@ -233,22 +233,22 @@
         "message": "Function \"ConstantsAnalyzer.buildHardcodedStringIssue\" has cyclomatic complexity 13 (threshold 12)."
       },
       {
-        "id": "complexity:high-complexity:src/analyzers/naming-polyglot-helper.ts:313",
+        "id": "complexity:high-complexity:src/analyzers/naming-polyglot-helper.ts:316",
         "rule": "high-complexity",
         "tier": "high",
         "severity": "warning",
         "file": "src/analyzers/naming-polyglot-helper.ts",
-        "line": 313,
+        "line": 316,
         "message": "Function \"auditRustVariable\" has cyclomatic complexity 14 (threshold 12)."
       },
       {
-        "id": "complexity:high-complexity:src/analyzers/naming-polyglot-helper.ts:403",
+        "id": "complexity:high-complexity:src/analyzers/naming-polyglot-helper.ts:450",
         "rule": "high-complexity",
         "tier": "high",
         "severity": "warning",
         "file": "src/analyzers/naming-polyglot-helper.ts",
-        "line": 403,
-        "message": "Function \"anonymous\" has cyclomatic complexity 24 (threshold 12)."
+        "line": 450,
+        "message": "Function \"anonymous\" has cyclomatic complexity 21 (threshold 12)."
       },
       {
         "id": "complexity:high-complexity:src/core/ast/python-adapter-helpers.ts:246",
@@ -332,7 +332,7 @@
         "pillars": {
           "architecture": 98.69,
           "maintainability": 98.38,
-          "performance": 99.61,
+          "performance": 99.59,
           "data": 99.83,
           "testing": 100,
           "reliability": 99.74,
@@ -343,16 +343,16 @@
       },
       {
         "domainName": "analyzers",
-        "compositeScore": 98.72,
+        "compositeScore": 98.71,
         "pillars": {
           "architecture": 98.94,
-          "maintainability": 95.49,
+          "maintainability": 95.44,
           "performance": 99.66,
           "data": 99.65,
           "testing": 100,
           "reliability": 99.55,
           "security": 99.84,
-          "extensibility": 96.99
+          "extensibility": 97
         },
         "moduleCount": 1
       },
@@ -916,13 +916,13 @@
         "compositeScore": 98.93,
         "pillars": {
           "architecture": 97.83,
-          "maintainability": 96.85,
+          "maintainability": 96.81,
           "performance": 100,
           "data": 100,
           "testing": 100,
           "reliability": 100,
           "security": 99.88,
-          "extensibility": 97.37
+          "extensibility": 97.5
         },
         "moduleCount": 1
       },
@@ -1140,27 +1140,27 @@
   },
   "trajectory": {
     "runEloc": {
-      "processed": 158145,
-      "unique": 128338,
-      "changed": 0,
-      "semantic": 0,
+      "processed": 158298,
+      "unique": 128454,
+      "changed": 6535,
+      "semantic": 5228,
       "relocated": 0,
       "cosmetic": 0,
       "boilerplate": 0,
-      "added": 0,
+      "added": 3268,
       "deleted": 0,
       "modified": 0
     },
     "lifetime": {
       "weekId": "LIFETIME",
       "startMs": 1791102755050,
-      "endMs": 1792477201002,
-      "totalRuns": 309,
+      "endMs": 1792501866915,
+      "totalRuns": 324,
       "eloc": {
-        "processedTotal": 42658584,
-        "uniqueTotal": 128338,
-        "changedTotal": 473380,
-        "semanticTotal": 378703
+        "processedTotal": 45065058,
+        "uniqueTotal": 128454,
+        "changedTotal": 509892,
+        "semanticTotal": 407910
       },
       "qed": {
         "mean": 0.0001,
@@ -1168,13 +1168,13 @@
         "max": 0.18
       },
       "debt": {
-        "totalAdded": 1718,
-        "totalResolved": 1755,
+        "totalAdded": 1585,
+        "totalResolved": 1784,
         "totalRegressions": 0,
         "netYield": 0
       },
-      "meanCompositeScore": 98.82,
-      "gatePassRate": 95.15
+      "meanCompositeScore": 98.81,
+      "gatePassRate": 95.37
     },
     "isFirstBaseline": false
   }
