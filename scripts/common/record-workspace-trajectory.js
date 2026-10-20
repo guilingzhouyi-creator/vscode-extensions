@@ -139,26 +139,29 @@ function extractCanonicalVector(baseline) {
   });
 }
 
+/**
+ * Resolves the four-tier ELOC counters from a baseline snapshot.
+ *
+ * Only the real `trajectory.runEloc` block may supply these counters. When it is absent the
+ * counters are reported as unavailable rather than estimated: a per-file average would silently
+ * diverge from the real density and the ledger would look authoritative while being fabricated.
+ *
+ * @param {object|null} baseline - Parsed self-audit baseline.
+ * @returns {{proc: number|null, uniq: number|null, chg: number|null, sem: number|null, available: boolean}}
+ *   Counters plus an availability flag; every counter is null when unavailable.
+ */
 function resolveElocCounters(baseline) {
-  let proc = 0;
-  let uniq = 0;
-  let chg = 0;
-  let sem = 0;
-
-  if (baseline) {
-    if (baseline.trajectory?.runEloc) {
-      proc = Number(baseline.trajectory.runEloc.processed) || 0;
-      uniq = Number(baseline.trajectory.runEloc.unique) || 0;
-      chg = Number(baseline.trajectory.runEloc.changed) || 0;
-      sem = Number(baseline.trajectory.runEloc.semantic) || 0;
-    } else if (baseline.scope?.filesScanned) {
-      const count = Number(baseline.scope.filesScanned);
-      proc = Math.round(count * 202.05);
-      uniq = Math.round(count * 163.89);
-    }
+  const runEloc = baseline?.trajectory?.runEloc;
+  if (!runEloc) {
+    return { proc: null, uniq: null, chg: null, sem: null, available: false };
   }
-
-  return { proc, uniq, chg, sem };
+  return {
+    proc: Number(runEloc.processed) || 0,
+    uniq: Number(runEloc.unique) || 0,
+    chg: Number(runEloc.changed) || 0,
+    sem: Number(runEloc.semantic) || 0,
+    available: true,
+  };
 }
 
 function extractDebtCounters(baseline) {
@@ -285,7 +288,7 @@ function main() {
       ? prevRecord.score.aft
       : scoreVal;
   const scoreAft = scoreVal;
-  const qedVal = computeQedYield(scoreBef, scoreAft, eloc.chg, eloc.sem);
+  const qedVal = eloc.available ? computeQedYield(scoreBef, scoreAft, eloc.chg, eloc.sem) : 0;
 
   const record = {
     t: Date.now(),
@@ -293,14 +296,19 @@ function main() {
     id: runId,
     mod: 'workspace',
     agent: 'audit-all',
-    eloc: {
-      proc: eloc.proc,
-      uniq: eloc.uniq,
-      chg: eloc.chg,
-      sem: eloc.sem,
-      reloc: 0,
-      cosm: 0,
-    },
+    // 四层 ELOC 计数缺席时整块省略：写入 null 或 0 都会被下游当成真实测量值。
+    ...(eloc.available
+      ? {
+        eloc: {
+          proc: eloc.proc,
+          uniq: eloc.uniq,
+          chg: eloc.chg,
+          sem: eloc.sem,
+          reloc: 0,
+          cosm: 0,
+        },
+      }
+      : { elocUnavailable: true }),
     score: {
       bef: scoreBef,
       aft: scoreAft,

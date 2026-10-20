@@ -227,14 +227,19 @@ function validateCommitRange(range) {
     }
 
     const res = validateSingleCommitMessage(msg);
-    if (!res.valid) {
+    if (!res.isPermittedUnderCorridor) {
       failedCount++;
-      console.error(`\n❌ 提交 ${sha} 包含违规内容:`);
+      console.error(`\n❌ 提交 ${sha} 包含刚性违规内容:`);
       if (res.hallucinatedRules.length > 0) {
         console.error(`   • RULE-TRUTH-08 违规 (虚构规则 ID): ${res.hallucinatedRules.join(', ')}`);
       }
       if (res.styleFindings.length > 0) {
         console.error(formatDiagnosticReport(res.styleFindings));
+      }
+    } else if (!res.valid) {
+      console.warn(`\n⚠️  提交 ${sha} 包含弹性技术债 (已在弹性走廊配额内放行):`);
+      for (const f of res.styleFindings) {
+        console.warn(`   • [${f.ruleId}] 第 ${f.lineNum} 行: ${f.term} -> 建议: ${f.guidance || '陈述客观技术事实'}`);
       }
     }
   }

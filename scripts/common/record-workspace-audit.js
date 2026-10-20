@@ -65,6 +65,11 @@ const STATUS_EXCELLENT = '✔ 优秀';
 const STATUS_GOOD = '▲ 良好';
 const STATUS_LAGGING = '✖ 滞后';
 
+/** Suffix appended to the rule-catalog count cell in the subsystem table. */
+const CATALOG_RULE_NOTE_SUFFIX = '规则/SSOT';
+/** Placeholder rendered when an upstream count is absent, so the gap stays visible. */
+const COUNT_UNAVAILABLE = 'N/A';
+
 const RAW_DIMENSIONS = [
   ' 1.|architectureConsistency|架构一致|架构一致 (Architecture Consistency)|分层边界解耦',
   ' 2.|semanticPurity|语义纯度|语义纯度 (Semantic Purity)|纯函数数据流',
@@ -174,6 +179,28 @@ function getGradeFromScore(score) {
  * @param {object} data - Normalized audit snapshot payload.
  * @returns {string} Markdown text.
  */
+/**
+ * Formats the rule-catalog count cell for the subsystem table.
+ *
+ * The count must never fall back to a baked-in number: a stale literal renders an authoritative
+ * looking figure that silently disagrees with `rule-catalog.json`. When the upstream snapshot
+ * omits the count the cell says N/A, so the gap stays visible instead of being papered over.
+ *
+ * @param {object} data - Normalized audit snapshot payload.
+ * @returns {string} Count cell text including its unit suffix.
+ */
+function formatCatalogRuleNote(data) {
+  const raw = Number(data.catalogRuleCount);
+  const rendered = Number.isFinite(raw) && raw > 0 ? String(raw) : COUNT_UNAVAILABLE;
+  return `${rendered}${CATALOG_RULE_NOTE_SUFFIX}`;
+}
+
+/**
+ * Build standardized Markdown subsystem rows from audit snapshot data.
+ *
+ * @param {object} data - Normalized audit snapshot payload.
+ * @returns {string[]} Markdown table rows.
+ */
 function renderSubsystemsTableRows(data) {
   const passBadge = (status) => (status === STATUS_PASS ? BADGE_PASS : BADGE_FAIL);
   return SUBSYSTEM_DEFINITIONS.map((s) => {
@@ -181,7 +208,7 @@ function renderSubsystemsTableRows(data) {
     const score = Number(data.projectScores?.[s.key] ?? SCORE_MAX);
     const scoreStr = score.toFixed(1);
     const bar = getProgressBar(score, PROGRESS_BAR_BLOCKS);
-    const note = s.key === 'rulesCatalog' ? `${data.catalogRuleCount || 468}${s.note}` : s.note;
+    const note = s.key === 'rulesCatalog' ? formatCatalogRuleNote(data) : s.note;
     return `| ${s.num} | ${s.name} | ${passBadge(status)} | ${scoreStr} | \`[${bar}]\` | ${note} |`;
   });
 }
@@ -319,6 +346,9 @@ function recordAuditRun(inputPayload) {
     polyglotBreakdown: inputPayload.polyglotBreakdown || null,
     totalDebt: inputPayload.totalDebt != null ? Number(inputPayload.totalDebt) : null,
     catalogRuleCount: inputPayload.catalogRuleCount ? Number(inputPayload.catalogRuleCount) : null,
+    // 一致性判定必须一并落盘：只存目录条数会让「两侧不等」这一事实在快照中消失。
+    catalogCountConsistent:
+      inputPayload.catalogCountConsistent != null ? Boolean(inputPayload.catalogCountConsistent) : null,
     projects: inputPayload.projects || {},
     projectScores: inputPayload.projectScores || {},
     tenDimensions: inputPayload.tenDimensions || inputPayload.qualityVector || null,

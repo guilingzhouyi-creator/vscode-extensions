@@ -423,7 +423,9 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF" "$LOG_FG"
   if (codeLedger === 0) rulesPassedCount += 1;
 
   let scoreRules = SCORE_FLOOR;
-  if (statusRules === "PASS" && catalogRuleCount >= 400) {
+  // 目录零漂移判定以 generate-rule-catalog.js --check-only 为唯一权威。
+  const catalogCountConsistent = codeCatalog === 0;
+  if (statusRules === "PASS" && catalogCountConsistent) {
     scoreRules = 100.0;
   } else {
     scoreRules = Math.max(SCORE_FLOOR, Number((100.0 * (rulesPassedCount / 7.0)).toFixed(1)));
@@ -592,6 +594,7 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF" "$LOG_FG"
     polyglotBreakdown: polyglotBreakdown,
     totalDebt: totalDebt != null ? Number(totalDebt) : null,
     catalogRuleCount: catalogRuleCount || null,
+    catalogCountConsistent,
     projects: {
       hygiene: statusHygiene,
       rulesCatalog: statusRules,

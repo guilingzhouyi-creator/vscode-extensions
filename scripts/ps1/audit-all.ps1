@@ -509,7 +509,11 @@ if ($codeReach -eq 0) { $rulesPassedCount += 1 }
 if ($codeDocs -eq 0) { $rulesPassedCount += 1 }
 if ($codeLedger -eq 0) { $rulesPassedCount += 1 }
 
-$scoreRules = if ($statusRules -eq "PASS" -and $catalogRuleCount -ge 400) {
+# 目录零漂移判定以 generate-rule-catalog.js --check-only 为唯一权威：它按全部来源
+# （四份 JSON 快照 + 编译期注册表 + workspace-timing 配置）重算全量规则并与磁盘逐条比对。
+# 仅对 rule-sources 目录求和会系统性少算，纯下界门槛则无法发现规则被系统性删除。
+$catalogCountConsistent = ($codeCatalog -eq 0)
+$scoreRules = if ($statusRules -eq "PASS" -and $catalogCountConsistent) {
     100.0
 } else {
     [math]::Max($SCORE_FLOOR, [math]::Round(100.0 * ($rulesPassedCount / 7.0), 1))
@@ -752,6 +756,7 @@ $summary = [ordered]@{
     polyglotBreakdown = $polyglotBreakdown
     totalDebt = if ($null -ne $totalDebt) { [int]$totalDebt } else { $null }
     catalogRuleCount = $catalogRuleCount
+    catalogCountConsistent = $catalogCountConsistent
     projects = [ordered]@{
         hygiene = $statusHygiene
         rulesCatalog = $statusRules
