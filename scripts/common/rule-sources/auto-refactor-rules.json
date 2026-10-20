@@ -1,8 +1,8 @@
 {
   "schema": "auto-refactor-rules-registry-snapshot/v1",
-  "generatedAt": "2026-10-17T14:47:32.212Z",
+  "generatedAt": "2026-10-20T09:04:19.010Z",
   "source": "auto-refactor/dist/core/rules/registry.js",
-  "totalRules": 351,
+  "totalRules": 362,
   "rules": [
     {
       "id": "analyzer-error",
@@ -599,94 +599,10 @@
       "summary": "Expensive deep copy (.duplicate(true)) or blocking serialization/IO executed inside a loop."
     },
     {
-      "id": "GUARD-AST-001",
-      "family": "GUARD",
+      "id": "EXT-DIR-001",
+      "family": "EXT",
       "severity": "error",
-      "summary": "Pre-commit gate lacks AST staged slice complexity and nesting budget check (CC <= 15, Depth <= 4)."
-    },
-    {
-      "id": "GUARD-BUDGET-001",
-      "family": "GUARD",
-      "severity": "warning",
-      "summary": "Pre-commit gate runs unconstrained whole-repo test suites without staged-file filtering, risking budget overrun."
-    },
-    {
-      "id": "GUARD-ERR-001",
-      "family": "GUARD",
-      "severity": "error",
-      "summary": "Gate script lacks strict error termination flags, risking silent failures and false-positive gate passes."
-    },
-    {
-      "id": "GUARD-FAC-001",
-      "family": "GUARD",
-      "severity": "error",
-      "summary": "Gate pipeline lacks static validation for facade substantive bearing (ELOC >= 15) and vacuous forwarding elimination."
-    },
-    {
-      "id": "GUARD-HOOK-001",
-      "family": "GUARD",
-      "severity": "warning",
-      "summary": "Repository lacks local left-shift Git hooks; all defect feedback relies solely on remote CI."
-    },
-    {
-      "id": "GUARD-HYG-001",
-      "family": "GUARD",
-      "severity": "error",
-      "summary": "Pre-commit gate does not enforce physical hygiene: lacks zero-byte empty file detection."
-    },
-    {
-      "id": "GUARD-ISO-001",
-      "family": "GUARD",
-      "severity": "warning",
-      "summary": "Dual-tier gate boundary is not isomorphic; remote CI checks are not mirrored in local hooks."
-    },
-    {
-      "id": "GUARD-MSG-001",
-      "family": "GUARD",
-      "severity": "warning",
-      "summary": "Gate system lacks structured commit-msg validation for Conventional Commits and anti-jargon hygiene."
-    },
-    {
-      "id": "GUARD-MSG-002",
-      "family": "GUARD",
-      "severity": "error",
-      "summary": "Commit-msg gate does not enforce bidirectional bilingual style terms constraints (commit-msg-forbidden-terms.json unwired)."
-    },
-    {
-      "id": "GUARD-MSG-003",
-      "family": "GUARD",
-      "severity": "error",
-      "summary": "Monorepo commit message gate lacks [Project] section or whitelist verification."
-    },
-    {
-      "id": "GUARD-PAIR-001",
-      "family": "GUARD",
-      "severity": "warning",
-      "summary": "Dual-platform gate scripts are not paired; missing corresponding .sh or .ps1 gate implementation."
-    },
-    {
-      "id": "GUARD-PROC-001",
-      "family": "GUARD",
-      "severity": "error",
-      "summary": "PowerShell gate script uses interactive prompts without output redirection guard."
-    },
-    {
-      "id": "GUARD-ROUTE-001",
-      "family": "GUARD",
-      "severity": "error",
-      "summary": "Git hook router invokes fragile shell or Windows PS 5.1 directly without cross-platform safety fallback."
-    },
-    {
-      "id": "GUARD-SSOT-001",
-      "family": "GUARD",
-      "severity": "warning",
-      "summary": "Gate system lacks single-source-of-truth rule catalog verification, risking rule drift."
-    },
-    {
-      "id": "GUARD-SYS-001",
-      "family": "GUARD",
-      "severity": "error",
-      "summary": "Repository completely lacks a gate defense system (no Git hooks and no CI pipeline detected)."
+      "summary": "File extension and directory classification guard: scripts must reside in dedicated domain subdirectories and never litter workspace root."
     },
     {
       "id": "GDM-BAR-001",
@@ -1079,6 +995,96 @@
       "summary": "Exported functions, classes, and public methods must specify explicit return types toprotect public API contracts."
     },
     {
+      "id": "GUARD-AST-001",
+      "family": "GUARD",
+      "severity": "error",
+      "summary": "Pre-commit gate lacks AST staged slice complexity and nesting budget check (CC <= 15, Depth <= 4)."
+    },
+    {
+      "id": "GUARD-BUDGET-001",
+      "family": "GUARD",
+      "severity": "warning",
+      "summary": "Pre-commit gate runs unconstrained whole-repo test suites without staged-file filtering, risking budget overrun."
+    },
+    {
+      "id": "GUARD-ERR-001",
+      "family": "GUARD",
+      "severity": "error",
+      "summary": "Gate script lacks strict error termination flags, risking silent failures and false-positive gate passes."
+    },
+    {
+      "id": "GUARD-FAC-001",
+      "family": "GUARD",
+      "severity": "error",
+      "summary": "Gate pipeline lacks static validation for facade substantive bearing (ELOC >= 15) and vacuous forwarding elimination."
+    },
+    {
+      "id": "GUARD-HOOK-001",
+      "family": "GUARD",
+      "severity": "warning",
+      "summary": "Repository lacks local left-shift Git hooks; all defect feedback relies solely on remote CI."
+    },
+    {
+      "id": "GUARD-HYG-001",
+      "family": "GUARD",
+      "severity": "error",
+      "summary": "Pre-commit gate does not enforce physical hygiene: lacks zero-byte empty file detection."
+    },
+    {
+      "id": "GUARD-ISO-001",
+      "family": "GUARD",
+      "severity": "warning",
+      "summary": "Dual-tier gate boundary is not isomorphic; remote CI checks are not mirrored in local hooks."
+    },
+    {
+      "id": "GUARD-MSG-001",
+      "family": "GUARD",
+      "severity": "warning",
+      "summary": "Gate system lacks structured commit-msg validation for Conventional Commits and anti-jargon hygiene."
+    },
+    {
+      "id": "GUARD-MSG-002",
+      "family": "GUARD",
+      "severity": "error",
+      "summary": "Commit-msg gate does not enforce bidirectional bilingual style terms constraints (commit-msg-forbidden-terms.json unwired)."
+    },
+    {
+      "id": "GUARD-MSG-003",
+      "family": "GUARD",
+      "severity": "error",
+      "summary": "Monorepo commit message gate lacks [Project] section or whitelist verification."
+    },
+    {
+      "id": "GUARD-PAIR-001",
+      "family": "GUARD",
+      "severity": "warning",
+      "summary": "Dual-platform gate scripts are not paired; missing corresponding .sh or .ps1 gate implementation."
+    },
+    {
+      "id": "GUARD-PROC-001",
+      "family": "GUARD",
+      "severity": "error",
+      "summary": "PowerShell gate script uses interactive prompts without output redirection guard."
+    },
+    {
+      "id": "GUARD-ROUTE-001",
+      "family": "GUARD",
+      "severity": "error",
+      "summary": "Git hook router invokes fragile shell or Windows PS 5.1 directly without cross-platform safety fallback."
+    },
+    {
+      "id": "GUARD-SSOT-001",
+      "family": "GUARD",
+      "severity": "warning",
+      "summary": "Gate system lacks single-source-of-truth rule catalog verification, risking rule drift."
+    },
+    {
+      "id": "GUARD-SYS-001",
+      "family": "GUARD",
+      "severity": "error",
+      "summary": "Repository completely lacks a gate defense system (no Git hooks and no CI pipeline detected)."
+    },
+    {
       "id": "high-algorithmic-complexity",
       "family": "PRF",
       "severity": "warning",
@@ -1103,10 +1109,22 @@
       "summary": "Local variable or parameter shadows Python built-in name."
     },
     {
+      "id": "HYG-BOM-001",
+      "family": "HYG",
+      "severity": "error",
+      "summary": "UTF-8 Byte Order Mark (BOM) header prefix presence (files must strictly be UTF-8 NO-BOM)."
+    },
+    {
       "id": "HYG-CLN-001",
       "family": "HYG",
       "severity": "warning",
       "summary": "Duplicated code clone detected across multiple lines based on rolling polynomial hash."
+    },
+    {
+      "id": "HYG-CLT-001",
+      "family": "HYG",
+      "severity": "error",
+      "summary": "Uncontrolled transient clutter, log dumps, backup, or OS metadata files lingering in workspace."
     },
     {
       "id": "HYG-DED-001",
@@ -1121,6 +1139,12 @@
       "summary": "Zero-byte empty file, blank comment-only file, or hollow shell file lacking AST semantic payload."
     },
     {
+      "id": "HYG-EMP-002",
+      "family": "HYG",
+      "severity": "error",
+      "summary": "Comment-only hollow file lacking executable implementation logic after stripping comments."
+    },
+    {
       "id": "HYG-EOL-001",
       "family": "HYG",
       "severity": "error",
@@ -1131,6 +1155,12 @@
       "family": "HYG",
       "severity": "warning",
       "summary": "Exception variable in except clause is not named exc."
+    },
+    {
+      "id": "HYG-IND-001",
+      "family": "HYG",
+      "severity": "warning",
+      "summary": "Tab character indentation detected in non-tab language file (pure space indentation contract)."
     },
     {
       "id": "HYG-NAM-001",
@@ -1161,6 +1191,12 @@
       "family": "HYG",
       "severity": "error",
       "summary": "Unannotated compiler or linter suppression directive (@ts-ignore, @ts-nocheck, eslint-disable, # noqa) without approved exemption."
+    },
+    {
+      "id": "HYG-TRL-001",
+      "family": "HYG",
+      "severity": "warning",
+      "summary": "POSIX EOF newline contract violation (missing terminal newline or trailing blank line accumulation)."
     },
     {
       "id": "HYG-WRAP-001",
@@ -1329,6 +1365,12 @@
       "family": "CONST",
       "severity": "warning",
       "summary": "Redundant constant nesting: indirect constant aliases, deep constant objects, or pseudo-constants in nested scopes."
+    },
+    {
+      "id": "NUM-BND-001",
+      "family": "NUM",
+      "severity": "warning",
+      "summary": "One-sided unbounded numeric parameter or condition exposed in recursion depth,loop bound, or capacity check without bidirectional corridor bound."
     },
     {
       "id": "NUM-PREC-001",
@@ -1565,6 +1607,12 @@
       "summary": "Single-branch early exit in if-let should migrate to let-else."
     },
     {
+      "id": "RSM-EXP-001",
+      "family": "RSM",
+      "severity": "info",
+      "summary": "Naked expect() call in production code risks unclassified panic."
+    },
+    {
       "id": "RSM-EXTERN-001",
       "family": "RSM",
       "severity": "warning",
@@ -1593,6 +1641,18 @@
       "family": "RSM",
       "severity": "warning",
       "summary": "Deprecated #[macro_use] textual macro import detected."
+    },
+    {
+      "id": "RSM-PNC-001",
+      "family": "RSM",
+      "severity": "error",
+      "summary": "Production code contains naked crash macro (panic!, todo!, unimplemented!, unreachable!)."
+    },
+    {
+      "id": "RSM-SAF-001",
+      "family": "RSM",
+      "severity": "warning",
+      "summary": "Unsafe block or function lacks preceding // SAFETY: invariant proof comment."
     },
     {
       "id": "RSM-STR-001",
@@ -1983,6 +2043,12 @@
       "family": "TST",
       "severity": "warning",
       "summary": "Test completeness illusion: tests solely verify mock configurations or bind todeprecated business contracts."
+    },
+    {
+      "id": "TST-ORC-001",
+      "family": "TST",
+      "severity": "warning",
+      "summary": "Brittle magic assertion oracle detected: test asserts exact equality on physical entitytotals or float scalars instead of invariant corridor or dynamic relative baseline."
     },
     {
       "id": "TST-SKP-001",

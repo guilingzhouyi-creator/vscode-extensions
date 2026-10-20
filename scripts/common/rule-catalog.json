@@ -1,13 +1,13 @@
 {
   "schema": "workspace-rule-catalog/v1",
-  "generatedAt": "2026-10-20T05:28:36.376Z",
-  "totalRules": 494,
+  "generatedAt": "2026-10-20T12:47:55.045Z",
+  "totalRules": 502,
   "counts": {
-    "autoRefactor": 359,
+    "autoRefactor": 362,
     "workspaceTiming": 49,
     "webGames": 50,
     "fractalGit": 17,
-    "globalTooling": 19
+    "globalTooling": 24
   },
   "rules": [
     {
@@ -1754,6 +1754,27 @@
       "summary": "Pre-commit gate runs unconstrained whole-repo test suites without staged-file filtering, risking budget overrun."
     },
     {
+      "id": "GUARD-CHAIN-001",
+      "project": "global-tooling",
+      "family": "GUARD",
+      "severity": "error",
+      "summary": "PowerShell block-chain guard: an else/elseif/catch/finally continuation must attach to a block that can legally accept it; a duplicated else branch parses with zero errors and only fails at run time on the branch that reaches it"
+    },
+    {
+      "id": "GUARD-COUNT-001",
+      "project": "global-tooling",
+      "family": "GUARD",
+      "severity": "error",
+      "summary": "Hardcoded scale count guard: an operator-facing success message must render its count from the measured data rather than embedding a literal, because a literal is a second source of truth that expires silently while the check keeps passing"
+    },
+    {
+      "id": "GUARD-DOC-001",
+      "project": "global-tooling",
+      "family": "GUARD",
+      "severity": "error",
+      "summary": "Governance documentation scale figures must be rendered from their single source of truth; a hand-written count that no live source produces is rejected."
+    },
+    {
       "id": "GUARD-ENT-001",
       "project": "global-tooling",
       "family": "GUARD",
@@ -1824,6 +1845,13 @@
       "summary": "Monorepo commit message gate lacks [Project] section or whitelist verification."
     },
     {
+      "id": "GUARD-ORD-001",
+      "project": "global-tooling",
+      "family": "GUARD",
+      "severity": "error",
+      "summary": "Gate entry-point ordering guard: every helper a gate runner calls must be defined above the call site, because Bash and PowerShell resolve commands at execution time and an earlier call aborts the runner with a resolution error"
+    },
+    {
       "id": "GUARD-PAIR-001",
       "project": "auto-refactor",
       "family": "GUARD",
@@ -1843,6 +1871,13 @@
       "family": "GUARD",
       "severity": "error",
       "summary": "Git hook router invokes fragile shell or Windows PS 5.1 directly without cross-platform safety fallback."
+    },
+    {
+      "id": "GUARD-SHELL-001",
+      "project": "global-tooling",
+      "family": "GUARD",
+      "severity": "error",
+      "summary": "Linux command surface parity guard: every command promised by AGENTS.md must resolve to a working GNU binary or a declared PowerShell fallback on the current host."
     },
     {
       "id": "GUARD-SSOT-001",
@@ -2713,6 +2748,13 @@
       "summary": "Single-branch early exit in if-let should migrate to let-else."
     },
     {
+      "id": "RSM-EXP-001",
+      "project": "auto-refactor",
+      "family": "RSM",
+      "severity": "info",
+      "summary": "Naked expect() call in production code risks unclassified panic."
+    },
+    {
       "id": "RSM-EXTERN-001",
       "project": "auto-refactor",
       "family": "RSM",
@@ -2746,6 +2788,20 @@
       "family": "RSM",
       "severity": "warning",
       "summary": "Deprecated #[macro_use] textual macro import detected."
+    },
+    {
+      "id": "RSM-PNC-001",
+      "project": "auto-refactor",
+      "family": "RSM",
+      "severity": "error",
+      "summary": "Production code contains naked crash macro (panic!, todo!, unimplemented!, unreachable!)."
+    },
+    {
+      "id": "RSM-SAF-001",
+      "project": "auto-refactor",
+      "family": "RSM",
+      "severity": "warning",
+      "summary": "Unsafe block or function lacks preceding // SAFETY: invariant proof comment."
     },
     {
       "id": "RSM-STR-001",

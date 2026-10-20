@@ -184,10 +184,10 @@ function main() {
   if (argv.includes('--audit')) {
     const result = auditRegistry();
     if (result.valid) {
-      console.log(`PASS gate step registry: ${listEntryIds().length} entries, ${[...new Set(listEntryIds().map((id) => getEntry(id).steps.length))].reduce((a, b) => a + b, 0)} steps.`);
+      console.log(`PASS 步骤登记表一致: ${listEntryIds().length} entries, ${[...new Set(listEntryIds().map((id) => getEntry(id).steps.length))].reduce((a, b) => a + b, 0)} steps.`);
       process.exit(0);
     }
-    console.error('BLOCK gate step registry:');
+    console.error('BLOCK 步骤登记表存在未登记或未使用的标识:');
     for (const error of result.errors) console.error(`  - ${error}`);
     process.exit(1);
   }

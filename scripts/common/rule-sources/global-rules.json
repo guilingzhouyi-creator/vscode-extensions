@@ -1,7 +1,7 @@
 {
   "schema": "global-tooling-rules/v1",
-  "generatedAt": "2026-10-20T05:28:26.482Z",
-  "totalRules": 20,
+  "generatedAt": "2026-10-20T09:55:42.500Z",
+  "totalRules": 25,
   "rules": [
     {
       "id": "ARCH-ABS-001",
@@ -28,6 +28,18 @@
       "summary": "Pre-commit gate staged AST slice complexity (CC <= 15), nesting depth (Depth <= 4), and noise ratio guard"
     },
     {
+      "id": "GUARD-CHAIN-001",
+      "family": "GUARD",
+      "severity": "error",
+      "summary": "PowerShell block-chain guard: an else/elseif/catch/finally continuation must attach to a block that can legally accept it; a duplicated else branch parses with zero errors and only fails at run time on the branch that reaches it"
+    },
+    {
+      "id": "GUARD-COUNT-001",
+      "family": "GUARD",
+      "severity": "error",
+      "summary": "Hardcoded scale count guard: an operator-facing success message must render its count from the measured data rather than embedding a literal, because a literal is a second source of truth that expires silently while the check keeps passing"
+    },
+    {
       "id": "GUARD-ENT-001",
       "family": "GUARD",
       "severity": "error",
@@ -44,6 +56,12 @@
       "family": "GUARD",
       "severity": "error",
       "summary": "Cross-platform script isomorphism guard: dual ps1/sh parity, strict CRLF/LF line endings, and defensive directives"
+    },
+    {
+      "id": "GUARD-ORD-001",
+      "family": "GUARD",
+      "severity": "error",
+      "summary": "Gate entry-point ordering guard: every helper a gate runner calls must be defined above the call site, because Bash and PowerShell resolve commands at execution time and an earlier call aborts the runner with a resolution error"
     },
     {
       "id": "GUARD-STEP-001",
@@ -122,6 +140,18 @@
       "family": "VOL",
       "severity": "warning",
       "summary": "Dynamic dilution envelope guard: physical line count must not exceed dynamic ratio 1:3 envelope"
+    },
+    {
+      "id": "GUARD-DOC-001",
+      "family": "GUARD",
+      "severity": "error",
+      "summary": "Governance documentation scale figures must be rendered from their single source of truth; a hand-written count that no live source produces is rejected."
+    },
+    {
+      "id": "GUARD-SHELL-001",
+      "family": "GUARD",
+      "severity": "error",
+      "summary": "Linux command surface parity guard: every command promised by AGENTS.md must resolve to a working GNU binary or a declared PowerShell fallback on the current host."
     }
   ]
 }

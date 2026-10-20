@@ -257,6 +257,41 @@
           "id": "FEEDBACK-VOCABULARY-23",
           "title": "反馈词表语义化与四态状态词闭包",
           "ruleId": "GUARD-FBK-001"
+        },
+        {
+          "id": "GATE-ORDERING-24",
+          "ruleId": "GUARD-ORD-001",
+          "title": "门禁助手定义先于调用与判定词表闭包"
+        },
+        {
+          "id": "GATE-PROOF-25",
+          "ruleId": "GUARD-ORD-001",
+          "title": "门禁守卫检出能力自证"
+        },
+        {
+          "id": "GATE-COVERAGE-26",
+          "ruleId": "GUARD-STEP-001",
+          "title": "步骤判定覆盖与横幅唯一性"
+        },
+        {
+          "id": "GATE-COUNT-27",
+          "ruleId": "GUARD-COUNT-001",
+          "title": "面向操作者的规模计数真实性"
+        },
+        {
+          "id": "GATE-CHAIN-28",
+          "ruleId": "GUARD-CHAIN-001",
+          "title": "PowerShell 块链分支合法性"
+        },
+        {
+          "id": "DOC-METRICS-29",
+          "ruleId": "GUARD-DOC-001",
+          "title": "治理文档规模数字真源渲染"
+        },
+        {
+          "id": "SHELL-PARITY-30",
+          "ruleId": "GUARD-SHELL-001",
+          "title": "Linux 命令面与 AGENTS.md 承诺一致性"
         }
       ]
     },
