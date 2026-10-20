@@ -3,4 +3,4 @@
 
 pub mod dag_walk;
 
-pub use dag_walk::DagWalker;
+pub use dag_walk::{DagWalker, FastOidHasher, FastOidSet};

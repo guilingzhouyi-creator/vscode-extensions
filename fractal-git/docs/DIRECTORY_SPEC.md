@@ -20,6 +20,7 @@
 | **`crates/fg-transport/`** | 自托管传输协议栈 | 内部 Agent 零拷贝本地 IPC（`IpcMessage`, `IpcCodec` 4 字节帧协议）与标准 Git Smart Protocol v2（`PacketLine` 4 字节 Hex 流式编解码、`ls-refs`, `fetch` 协商）。 | `fg-core`, `fg-object`, `fg-topology` | 严禁侵入存储物理层与代码审查逻辑 |
 | **`crates/fg-gate/`** | 预审门禁与风控守卫 | 协议层门禁拦截：`PreReceiveGuard` 身份与分支越权拦截（禁止直接推入 Trunk、禁止 `--force` 强推）、微秒级物理卫生与冲突标记守卫（`ConflictGuard` 扫描 `<<<<<<<`, `=======`）、以及从 pools 剥离并归位的并发工作树与磁盘配额守卫（`QuotaGovernor`）。 | `fg-core`, `fg-object`, `fg-topology` | 严禁依赖传输层实现细节或物理存储底层 |
 | **`src/lib.rs` (根)** | 统一门面 (Facade) | 工作区根 Rust 门面（`ARCH-FAC-001`），统摄并平铺导出全量 9 个微 Crate，提供高人机工学的一站式 SDK 接口。 | 全量 `crates/fg-*` | — |
+| **`src/bin/taxis.rs`** | 原生 CLI 与 Git 兼容引擎 | Taxis 原生命令行二进制入口（支持 `st/ci/br/di/co/check/gc/serve` 简写别名、JSON 机器格式输出及标准 `git <cmd>` 原生透明加速路由）。 | 全量 `crates/fg-*`, `serde_json` | 严禁反向被微 Crate 依赖 |
 | **`ts/`** | TypeScript 编排与客户端 | 工业化五层分工：`client/` (Praxis Agent SDK 客户端)、`vfs/` (LayerVFS 虚拟文件系统适配器)、`tui/` (一体两面终端渲染器)、`orchestration/` (多 Agent 打擂提拔器)、`cli/` (终端命令)。 | 顶层契约与原生桥 | 严禁在门面外泄露低级指针 |
 | **`scripts/`** | 工程构建与自测脚本 | 跨平台工程构建（`build.ps1` CRLF / `build.sh` LF `set -euo pipefail`）、自测流水线与门禁检查脚本。 | 外部编译器工具链 | 严禁硬编码绝对路径或 Windows 盘符 |
 | **`tests/`** | 双轨集成与基准测试 | Rust 7 大微 Crate 集成测试套件（`tests/rust/`）与 TypeScript 仿真测试（`tests/ts/`）。 | 被测项目各模块 | 严禁生产代码反向依赖测试夹具 |
@@ -123,3 +124,7 @@ flowchart TD
 ### 3.6 场景 F：新增安全策略与配额风控（如 内存配额, 网络频控）
 - **归属位置**：`crates/fg-gate/src/<governor_name>.rs`
 - **契约要求**：必须集中在 `fg-gate`，严禁与 `fg-pools` 混淆。
+
+### 3.7 场景 G：新增 CLI 命令与 Git 别名映射（如 taxis switch, taxis cherry-pick）
+- **归属位置**：`src/bin/taxis.rs`
+- **契约要求**：必须在 `resolve_canonical_subcommand` 中注册标准别名，优先走分形 CAS 原生处理器，未拦截的标准 Git 命令经由 `handle_passthrough` 自动透明转交系统 `git`，并维持跨平台沙箱配置防御与 `--json` 机器格式输出支持。

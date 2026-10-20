@@ -52,7 +52,7 @@ Git 规范对 Tree 对象的二进制编码有严苛的要求：
 1. **模式与名字**：`<mode_octal> <filename>\0<20_bytes_binary_oid>`；
 2. **官方字典序排列**：普通文件与目录混排时，目录必须**作为附带 `/` 的形式参与比较**（例如 `dir_b/` 必须排在 `dir_b.txt` 之后）。
 
-在 [`src/index/tree_builder.rs`](file:///c:/CODE_game-development/vscode-extensions/fractal-git/src/index/tree_builder.rs) 中，我们实现了高效的递归组装器：
+在 [`../crates/fg-index/src/lockless_tree.rs`](../crates/fg-index/src/lockless_tree.rs) 中，我们实现了高效的递归组装器：
 
 ```rust
 // 核心递归树节点枚举

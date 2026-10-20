@@ -26,8 +26,19 @@ import {
     reclaimWorkspacePure,
     writeLooseObjectToDisk,
 } from './native-binding';
+import {
+    BENCHMARK_METRICS,
+    CLI_TAGS,
+    FGT_RULES,
+    FRACTAL_REF,
+    GIT_FILE_MODE,
+    GIT_OBJ_TYPE,
+    isRegisteredFgtRule,
+    isValidBenchmarkMetric,
+} from './constants';
 
 export type * from './contracts';
+export * from './constants';
 export * from './orchestration/workspace-manager';
 export * from './orchestration/tournament-runner';
 export * from './cli/commands';
@@ -97,6 +108,7 @@ export function createFractalGitEngine(gitDir: string): Readonly<FractalGitEngin
     return Object.freeze(engine);
 }
 
+
 /**
  * Root facade immutable descriptor object satisfying ARCH-FAC-001.
  */
@@ -105,4 +117,14 @@ export const FractalGit = Object.freeze({
     verifyPreReviewZone,
     computeGitBlobOid,
     writeLooseObjectToDisk,
+    constants: Object.freeze({
+        GIT_OBJ_TYPE,
+        GIT_FILE_MODE,
+        FRACTAL_REF,
+        FGT_RULES,
+        BENCHMARK_METRICS,
+        CLI_TAGS,
+        isRegisteredFgtRule,
+        isValidBenchmarkMetric,
+    }),
 });

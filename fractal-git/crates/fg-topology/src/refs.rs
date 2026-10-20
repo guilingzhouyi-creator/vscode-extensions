@@ -13,14 +13,19 @@ use fg_core::traits::RefStore;
 /// Enumeration of all valid reference types in the Fractal Git namespace.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum FractalRef {
+    /// System Trunk: Standard Git ecosystem root branch (e.g. `refs/heads/main`).
+    /// In Dual-Trunk mode, System Trunk strictly ONLY accepts verified promotions
+    /// from Integration Trunk!
+    SystemTrunk { branch: String },
+    /// Integration Trunk: Self-similar fractal integration trunk
+    /// (`refs/fractal/trunk` or `refs/fractal/integration`).
     Trunk,
-    CellMain {
-        cell_id: String,
-    },
-    CardWorktree {
-        cell_id: String,
-        card_id: String,
-    },
+    /// Cell Main integration line (`refs/fractal/cell/{cell_id}/main`).
+    CellMain { cell_id: String },
+    /// Card Worktree / local integration line (`refs/fractal/cell/{cell_id}/card/{card_id}`).
+    CardWorktree { cell_id: String, card_id: String },
+    /// Ephemeral SubAgent Worktree
+    /// (`refs/fractal/cell/{cell_id}/card/{card_id}/sub/{subagent_id}`).
     SubAgentWorktree {
         cell_id: String,
         card_id: String,
@@ -31,32 +36,51 @@ pub enum FractalRef {
 impl FractalRef {
     /// Formats the reference into its standard Git ref path string.
     pub fn to_git_ref(&self) -> String {
+        use fg_core::constants::{git::REF_HEADS_PREFIX, refs::*};
         match self {
-            Self::Trunk => "refs/fractal/trunk".to_string(),
-            Self::CellMain { cell_id } => format!("refs/fractal/cell/{}/main", cell_id),
+            Self::SystemTrunk { branch } => format!("{}{}", REF_HEADS_PREFIX, branch),
+            Self::Trunk => REF_FRACTAL_TRUNK.to_string(),
+            Self::CellMain { cell_id } => format!("{}cell/{}/main", REF_FRACTAL_PREFIX, cell_id),
             Self::CardWorktree { cell_id, card_id } => {
-                format!("refs/fractal/cell/{}/card/{}", cell_id, card_id)
+                format!("{}cell/{}/card/{}", REF_FRACTAL_PREFIX, cell_id, card_id)
             }
             Self::SubAgentWorktree {
                 cell_id,
                 card_id,
                 subagent_id,
             } => format!(
-                "refs/fractal/cell/{}/card/{}/sub/{}",
-                cell_id, card_id, subagent_id
+                "{}cell/{}/card/{}/sub/{}",
+                REF_FRACTAL_PREFIX, cell_id, card_id, subagent_id
             ),
         }
     }
 
-    /// Parses a string into a strongly-typed FractalRef if it belongs to the fractal namespace.
+    /// Parses a string into a strongly-typed FractalRef if it belongs to the fractal
+    /// namespace or standard system heads.
     pub fn parse(ref_str: &str) -> Option<Self> {
         let parts: Vec<&str> = ref_str.split('/').collect();
+        if parts.is_empty() {
+            return None;
+        }
+
+        // Standard Git System Heads: refs/heads/{branch} or plain "main" / "master"
+        if parts.len() == 3 && parts[0] == "refs" && parts[1] == "heads" {
+            return Some(Self::SystemTrunk {
+                branch: parts[2].to_string(),
+            });
+        }
+        if parts.len() == 1 && (parts[0] == "main" || parts[0] == "master") {
+            return Some(Self::SystemTrunk {
+                branch: parts[0].to_string(),
+            });
+        }
+
         if parts.len() < 3 || parts[0] != "refs" || parts[1] != "fractal" {
             return None;
         }
 
         match parts[2] {
-            "trunk" => Some(Self::Trunk),
+            "trunk" | "integration" => Some(Self::Trunk),
             "cell" if parts.len() == 5 && parts[4] == "main" => Some(Self::CellMain {
                 cell_id: parts[3].to_string(),
             }),
@@ -98,9 +122,9 @@ impl FractalRef {
             fs::create_dir_all(parent)?;
         }
 
-        let temp_path = path.with_extension("tmp");
-        fs::write(&temp_path, format!("{}\n", new_oid.to_hex()))?;
-        fs::rename(&temp_path, &path)?;
+        let staging_path = path.with_extension("tmp");
+        fs::write(&staging_path, format!("{}\n", new_oid.to_hex()))?;
+        fs::rename(&staging_path, &path)?;
         Ok(())
     }
 
@@ -127,6 +151,39 @@ impl DiskRefStore {
             git_dir: git_dir.into(),
         }
     }
+
+    /// Recursively lists all loose references discovered on disk under `.git/refs/`.
+    pub fn list_all(&self) -> FractalResult<Vec<(String, Oid)>> {
+        let refs_dir = self.git_dir.join("refs");
+        if !refs_dir.exists() {
+            return Ok(Vec::new());
+        }
+
+        let mut results = Vec::new();
+        Self::scan_dir(&refs_dir, &self.git_dir, &mut results)?;
+        Ok(results)
+    }
+
+    fn scan_dir(dir: &Path, git_dir: &Path, results: &mut Vec<(String, Oid)>) -> FractalResult<()> {
+        if let Ok(entries) = fs::read_dir(dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    Self::scan_dir(&path, git_dir, results)?;
+                } else if path.is_file() {
+                    if let Ok(rel) = path.strip_prefix(git_dir) {
+                        let ref_name = rel.to_string_lossy().replace('\\', "/");
+                        if let Ok(content) = fs::read_to_string(&path) {
+                            if let Ok(oid) = Oid::from_hex(content.trim()) {
+                                results.push((ref_name, oid));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
 }
 
 impl RefStore for DiskRefStore {
@@ -140,7 +197,12 @@ impl RefStore for DiskRefStore {
         Ok(Some(oid))
     }
 
-    fn update_ref(&self, ref_name: &str, new_oid: &Oid, expected_old: Option<&Oid>) -> FractalResult<()> {
+    fn update_ref(
+        &self,
+        ref_name: &str,
+        new_oid: &Oid,
+        expected_old: Option<&Oid>,
+    ) -> FractalResult<()> {
         let path = self.git_dir.join(ref_name);
         if let Some(expected) = expected_old {
             let current = self.get_ref(ref_name)?;
@@ -155,9 +217,9 @@ impl RefStore for DiskRefStore {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent)?;
         }
-        let temp_path = path.with_extension("tmp");
-        fs::write(&temp_path, format!("{}\n", new_oid.to_hex()))?;
-        fs::rename(&temp_path, &path)?;
+        let staging_path = path.with_extension("tmp");
+        fs::write(&staging_path, format!("{}\n", new_oid.to_hex()))?;
+        fs::rename(&staging_path, &path)?;
         Ok(())
     }
 

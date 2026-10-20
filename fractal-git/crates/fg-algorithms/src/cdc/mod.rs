@@ -3,4 +3,7 @@
 
 pub mod fast_cdc;
 
-pub use fast_cdc::{ChunkDescriptor, FastCdcChunker, DEFAULT_AVG_CHUNK, DEFAULT_MAX_CHUNK, DEFAULT_MIN_CHUNK};
+pub use fast_cdc::{
+    ChunkDescriptor, FastCdcChunker, FastCdcIter, DEFAULT_AVG_CHUNK, DEFAULT_MAX_CHUNK,
+    DEFAULT_MIN_CHUNK, GEAR_TABLE,
+};

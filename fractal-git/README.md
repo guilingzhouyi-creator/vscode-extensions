@@ -21,49 +21,54 @@
 
 ```
 fractal-git/
-├── Cargo.toml                       // Rust 核心 Crate 配置 (flate2, sha1, parking_lot, dashmap, serde)
-├── package.json                     // TypeScript 工程包配置 (双轨构建与测试脚本)
+├── Cargo.toml                       // Rust 统一工作区配置 (9 大微 Crate Workspace)
+├── package.json                     // TypeScript 工程包配置 (双轨构建与门禁脚本)
 ├── tsconfig.json                    // TypeScript 严格类型编译器配置
 ├── README.md                        // 项目总览、六字段契约与一级路由表
 │
 ├── docs/                            // 【全局技术文档库】
 │   ├── README.md                    // 文档全宗导航与关键指标
 │   ├── ARCHITECTURE.md              // 顶层架构规范与 Mermaid 拓扑
-│   ├── DIRECTORY_SPEC.md            // 全域目录职责矩阵、单向依赖流与后续扩展路由指南
+│   ├── DIRECTORY_SPEC.md            // 全域目录职责矩阵、单向依赖流与架构扩展路由指南
 │   ├── 01-architecture-principles.md
 │   ├── 02-ecosystem-survey-and-lessons.md
 │   ├── 03-pre-review-zone-and-auto-gating.md
-│   └── 04-lockless-in-memory-engine.md
+│   ├── 04-lockless-in-memory-engine.md
+│   ├── 05-advanced-algorithms-and-poset-mathematics.md
+│   └── 06-anthropic-scion-benchmark-and-parity-spec.md
 │
-├── src/                             // 【Rust 高性能版本内核 Core Engine】
-│   ├── lib.rs                       // Rust 内核统一导出与宏定义
-│   ├── error.rs                     // 全域强类型错误体系
-│   ├── object/                      // ① 原生 Git 对象模型 (Plumbing 算子: blob, tree, commit)
-│   ├── index/                       // ② 无锁内存虚拟索引 (消融 index.lock: entry, tree_builder)
-│   ├── fractal/                     // ③ 自相似分形拓扑与生命周期状态机 (refs, topology, state_machine)
-│   ├── cas/                         // ④ 内容寻址存储与变长切块 (FastCDC chunker, materializer)
-│   ├── server/                      // ⑤ 自托管协议与通信服务端 (ipc, smart_protocol v2)
-│   ├── gate/                        // ⑥ Rust 侧内生预审门禁拦截 (pre_receive, conflict_guard)
-│   └── reclaimer/                   // ⑦ 本地工作树物理按需回收引擎 (cleaner, quota)
+├── crates/                          // 【9 大微 Crate 内核矩阵 (L1~L3 分层解耦)】
+│   ├── fg-core/                     // L1: 基础对象模型、OID 哈希、UAC 权限与 Trait 抽象
+│   ├── fg-object/                   // L1: Git 底层对象二进制序列化 (Blob / Tree / Commit)
+│   ├── fg-index/                    // L1: 无锁内存虚拟树索引 (消融 index.lock 锁争用)
+│   ├── fg-algorithms/               // L1: 顶会级数学算法库 (CCD v2, SWAR Diff, FastCDC, 3-Way Merge)
+│   ├── fg-pools/                    // L2: 高承压资源池 (BufferPool, WorktreePool, LRU 缓存)
+│   ├── fg-storage/                  // L2: CAS 内容寻址存储、Loose ODB 与 WAL Journal
+│   ├── fg-topology/                 // L3: 分形引用拓扑 (refs/fractal/...)、状态机与提拔账本
+│   ├── fg-transport/                // L3: Smart Protocol v2 (Packet-line) 与 Agent 本地 IPC
+│   └── fg-gate/                     // L3: 协议层身份认证、越权阻断、冲突扫描与配额控制
+│
+├── src/                             // 【Rust 顶层统一门面与 CLI 入口】
+│   ├── lib.rs                       // Rust 内核统一导出门面 (统摄导出 9 大微 Crate)
+│   ├── bin/                         // 原生命令行二进制入口 (taxis.rs 支持全量 Git 兼容命令)
+│   └── bench.rs                     // TB-REGRESSION 微基准性能测试套件
 │
 ├── ts/                              // 【TypeScript 上层编排与应用层】
 │   ├── index.ts                     // TS 统一公共门面 (ARCH-FAC-001, ELOC >= 15)
-│   ├── contracts.ts                 // 语义接口契约 (PraxisCardContext, DTOs)
+│   ├── client/                      // Praxis Agent SDK 客户端
+│   ├── vfs/                         // LayerVFS 虚拟文件系统适配器
 │   ├── native-binding.ts            // 跨语言安全桥接与 Pure-TS 回退
 │   ├── gate-bridge.ts               // 对接 Auto 审查系统的互锁门禁桥
-│   ├── orchestration/               // ⑧ 智能体工作树调度编排 (workspace-manager, tournament-runner)
-│   └── cli/                         // ⑨ 开发者 CLI 命令与诊断工具 (status, graph, reclaim)
+│   └── orchestration/               // 智能体工作树调度编排 (workspace-manager, tournament-runner)
 │
-├── scripts/                         // ⑩ 跨平台构建与门禁维护脚本
+├── scripts/                         // 跨平台构建与门禁维护脚本 (ps1 CRLF / sh LF)
 │   ├── README.md                    // 脚本职责与调用契约
-│   ├── build.ps1                    // Windows PowerShell 构建与本地验证
-│   └── build.sh                     // Linux / WSL Bash 构建与测试
+│   ├── build.ps1 / build.sh         // 跨平台全量构建与自测脚本
+│   └── ps1/audit-taxis.ps1          // Taxis 5 级质量与性能门禁总督
 │
-└── tests/                           // ⑪ 双轨确定性测试套件
+└── tests/                           // 双轨确定性测试套件
     ├── README.md                    // 测试架构与分类准则
-    ├── test_object_codec.rs         // Rust 原生对象编解码与拓扑测试
-    ├── rust/                        // Rust 深度单元与子系统回归测试
-    └── ts/                          // TypeScript 端到端生命周期与编排测试
+    └── rust/                        // 9 大微 Crate 单元、集成与微基准测试套件
 ```
 
 ---
@@ -72,22 +77,26 @@ fractal-git/
 
 | 目录/模块 | 负责什么 | 严禁做什么 |
 | :--- | :--- | :--- |
-| `src/object/` | Git 对象二进制序列化、zlib 压缩与 Loose Object 存储 | 严禁包含业务状态机、拓扑逻辑或网络传输 |
-| `src/index/` | 内存树构建，消融 `.git/index.lock` | 严禁依赖上层服务或物理工作区操作 |
-| `src/fractal/` | 四层拓扑断言与状态转移（Sub $\to$ Card $\to$ Cell $\to$ Trunk） | 严禁绕过层级直接跨级合入 |
-| `src/cas/` | FastCDC 变长分块与 LayerVFS 优胜快照原子物化 | 严禁在分块层引入网络协议 |
-| `src/server/` | Git Smart Protocol v2 (Packet-line) 与 Agent 本地 IPC | 严禁绕过 `pre-receive` 门禁直接写引用 |
-| `src/gate/` | 协议层身份认证、越权阻断与微秒级物理卫生扫描 | 严禁执行高开销外部阻塞网络调用 |
-| `src/reclaimer/` | 临时工作树物理目录卸载删除与磁盘配额守卫 | 严禁删除永久 Git Commit DAG 对象 |
+| `crates/fg-core/` | 基础 OID、身份凭证、UAC 权限模型与核心 Trait 契约 | 严禁包含复杂 I/O 操作或网络通信 |
+| `crates/fg-object/` | Git 对象二进制序列化、zlib 压缩与解压 | 严禁包含拓扑状态机或业务门禁规则 |
+| `crates/fg-index/` | 内存树递归组装与虚拟暂存，消融 `.git/index.lock` | 严禁依赖上层服务或物理工作区阻塞 I/O |
+| `crates/fg-algorithms/` | 算法层：CCD v2 偏序剪枝、SWAR 文本差分、FastCDC 分块与三方合并 | 严禁在密集循环体内触发瞬态堆分配 |
+| `crates/fg-pools/` | 线程本地 FreeList 缓冲池、工作树复用池与 LRU 缓存 | 严禁无限膨胀无上限占用内存 |
+| `crates/fg-storage/` | CAS 内容寻址存储与 Loose ODB 原子落盘 | 严禁非原子直接覆盖写对象 |
+| `crates/fg-topology/` | 四层拓扑断言（Sub $\to$ Card $\to$ Cell $\to$ Trunk）与提拔账本 | 严禁越级跨层直接合入 |
+| `crates/fg-transport/` | Git Smart Protocol v2 (Packet-line) 与 Agent 本地 IPC | 严禁绕过 `pre-receive` 门禁直接写引用 |
+| `crates/fg-gate/` | 协议层身份认证、越权阻断、冲突标记扫描与并发配额控制 | 严禁执行高开销外部阻塞网络调用 |
+| `src/lib.rs` | 统一顶层门面，一站式导出 9 大微 Crate 核心抽象与 API | 严禁退化为空包透传跳板（需包含实质承载契约） |
+| `src/bin/` | 原生 CLI 二进制入口（`taxis` 命令），支持 Git 兼容操作 | 严禁反向被底层微 Crate 依赖 |
 | `ts/orchestration/` | 多任务卡调度、MCTS 打擂评分与胜出提拔 | 严禁侵入底层 Git 二进制打解包逻辑 |
-| `ts/cli/` | 开发者终端交互、ASCII 拓扑可视化与诊断命令 | 严禁直接侵入底层调度状态机 |
 
 ---
 
-## 四、 后续扩展路径指引
+## 四、 架构扩展路径指引
 
 扩展放置规则收敛至 [`docs/DIRECTORY_SPEC.md`](docs/DIRECTORY_SPEC.md)：
-- **新增通信协议** $\to$ `src/server/<protocol>.rs`
-- **新增门禁规则** $\to$ 微秒级置于 `src/gate/`，深度语义置于 `ts/gate-bridge.ts` 调用 Auto 规则库
-- **新增存储后端** $\to$ `src/cas/backends/`
-- **新增 CLI 子命令** $\to$ `ts/cli/commands.ts`
+- **新增核心算法** $\to$ `crates/fg-algorithms/src/<domain>/`
+- **新增通信协议** $\to$ `crates/fg-transport/src/<protocol>.rs`
+- **新增门禁规则** $\to$ 微秒级置于 `crates/fg-gate/`，深度语义置于 `ts/gate-bridge.ts` 调用 Auto 规则库
+- **新增存储后端** $\to$ `crates/fg-storage/src/`
+- **新增 CLI 子命令** $\to$ `src/bin/taxis.rs`

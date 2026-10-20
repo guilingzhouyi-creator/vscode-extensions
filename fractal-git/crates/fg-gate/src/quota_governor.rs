@@ -62,4 +62,19 @@ impl QuotaGovernor {
             Ok(())
         }
     }
+
+    /// Returns the maximum allowed concurrent worktrees.
+    pub fn max_concurrent_worktrees(&self) -> usize {
+        self.max_worktrees
+    }
+
+    /// Returns the maximum disk budget in bytes.
+    pub fn max_disk_bytes(&self) -> u64 {
+        self.max_disk_bytes
+    }
+
+    /// Returns the maximum disk budget in megabytes.
+    pub fn max_disk_megabytes(&self) -> u64 {
+        self.max_disk_bytes / (1024 * 1024)
+    }
 }

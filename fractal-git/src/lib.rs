@@ -16,15 +16,15 @@
 //! - `FGT-GAT-001`: Fractal Git domain gate guard (fg-gate)
 //! - `FGT-CAS-001`: LayerVFS CAS snapshot materializer bridge guard (fg-storage/cas_bridge)
 
-pub use fg_core as core;
-pub use fg_object as object;
-pub use fg_index as index;
 pub use fg_algorithms as algorithms;
+pub use fg_core as core;
+pub use fg_gate as gate;
+pub use fg_index as index;
+pub use fg_object as object;
 pub use fg_pools as pools;
 pub use fg_storage as storage;
 pub use fg_topology as fractal;
 pub use fg_transport as server;
-pub use fg_gate as gate;
 
 // Backwards-compatible modular namespaces
 pub mod cas {
@@ -45,8 +45,13 @@ pub mod reclaimer {
 }
 
 // Flat primary exports
+pub use fg_core::constants;
 pub use fg_core::error::{FractalError, FractalResult};
-pub use fg_core::models::{AgentCommitMeta, GitSignature, Oid, PraxisCardContext};
+pub use fg_core::models::{
+    ActorIdentity, AgentCommitMeta, AgentPushContext, AuthorityTier, AutoQualityScoreEnvelope,
+    DiffCoherenceMode, GitSignature, HumanUacProof, Oid, PraxisCardContext, StagedPromotionRequest,
+    StagedPromotionStatus, TaxisPolicy, ValidatedCommitWitness,
+};
 pub use fg_core::traits::{
     GateVerdict, GateVerifier, OdbStore, ReclamationAudit, RefStore, StagedCandidate,
     WorktreeReclaimer,
@@ -59,15 +64,29 @@ pub type InMemoryTreeBuilder = InMemoryIndexTree; // Compatibility alias
 
 // Algorithm exports
 pub use fg_algorithms::cdc::{ChunkDescriptor, FastCdcChunker};
-pub use fg_algorithms::diff::{ChangeKind, DiffEntry, PatchGenerator, PatchHunk, PatchLine, TreeDiff, UnifiedPatch};
-pub use fg_algorithms::merge::{ConflictEntry, ThreeWayMerge, ThreeWayMergeResult};
-pub use fg_algorithms::traverse::DagWalker;
+pub use fg_algorithms::diff::{
+    ChangeKind, DiffEntry, PatchGenerator, PatchHunk, PatchLine, TreeDiff, TreeDiffState,
+    UnifiedPatch,
+};
+pub use fg_algorithms::math::{
+    compute_jeffreys_credible_lower, evaluate_score_envelope, PosteriorScoreEstimate,
+};
+pub use fg_algorithms::merge::{
+    CanonicalConflictEntry, CanonicalMergeResult, ConflictEntry, FastPathMerge, ThreeWayMerge,
+    ThreeWayMergeResult, VirtualMergeBaseSynthesizer,
+};
+pub use fg_algorithms::synthetic::{
+    generate_commit_chain, generate_diamond_dag, generate_monorepo_trees, SyntheticCommitChain,
+    SyntheticDag, SyntheticMonorepo,
+};
+pub use fg_algorithms::traverse::{DagWalker, FastOidHasher, FastOidSet};
 
 // Pool exports
-pub use fg_pools::buffer_pool::PageBufferPool;
+pub use fg_pools::buffer_pool::{BufferSizeClass, PageBufferPool};
+pub use fg_pools::lru_cache::ByteLruCache;
 pub use fg_pools::object_pool::{RecyclePool, Resettable};
 pub use fg_pools::sandbox_pool::{SandboxPool, SandboxSlot};
-pub use fg_pools::worktree_pool::{WorktreeDescriptor, WorktreePool};
+pub use fg_pools::worktree_pool::{WorktreeDescriptor, WorktreeMode, WorktreePool};
 
 // Storage exports
 pub use fg_storage::cas_backend::CasBackend;
@@ -76,10 +95,15 @@ pub use fg_storage::loose::{write_loose_object, LooseOdb};
 pub use fg_storage::wal_journal::{WalJournal, WalRecord};
 
 // Topology exports
+pub use fg_topology::authorizer::{HumanUacAuthorizer, StandardNonceAuthorizer};
+pub use fg_topology::promotion_ledger::{PromotionLedgerData, PromotionStagingLedger};
 pub use fg_topology::refs::{DiskRefStore, FractalRef};
 pub use fg_topology::state_machine::{FractalWorkspaceNode, WorktreeState};
+pub use fg_topology::telemetry::{
+    CommitCountVerdict, CommitCounter, CommitTelemetryConfig, TelemetryCommitNode,
+};
 pub use fg_topology::verifier::TopologyVerifier;
-pub use fg_topology::worktree::{FractalWorktree, PathJail};
+pub use fg_topology::worktree::{FractalWorktree, PathJail, ScopeProjection};
 
 // Transport exports
 pub use fg_transport::ipc::{IpcCodec, IpcMessage};
@@ -87,7 +111,12 @@ pub use fg_transport::packetline::{PacketLine, PKT_DELIM, PKT_FLUSH};
 pub use fg_transport::smart_protocol::ProtocolV2Handler;
 
 // Gate & Policy exports
+pub use fg_gate::commit_guard::CommitMessageGuard;
 pub use fg_gate::conflict_guard::ConflictGuard;
-pub use fg_gate::pre_receive::{AgentPushContext, PreReceiveGuard};
+pub use fg_gate::pre_receive::PreReceiveGuard;
 pub use fg_gate::quota_governor::QuotaGovernor;
 pub type WorkspaceQuotaGuard = QuotaGovernor; // Compatibility alias
+
+// Benchmark & Performance Ratchet exports
+pub mod bench;
+pub use bench::{BaselineComparisonVerdict, BenchmarkLevel, BenchmarkMetric, TaxisBenchmarkSuite};

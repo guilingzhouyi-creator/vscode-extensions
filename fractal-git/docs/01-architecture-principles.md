@@ -1,7 +1,7 @@
 # 01. 分形 Git 架构第一性原理与自相似拓扑规范
 
 > **所属模块**：`fractal-git/docs/`  
-> **关联真源指针**：[`docs/agent-native-system-blueprint.md`](file:///c:/CODE_game-development/vscode-extensions/docs/agent-native-system-blueprint.md) §4.2~§4.3、[`fractal-git/src/fractal/topology.rs`](file:///c:/CODE_game-development/vscode-extensions/fractal-git/src/fractal/topology.rs)
+> **关联真源指针**：[`../../docs/agent-native-system-blueprint.md`](../../docs/agent-native-system-blueprint.md) §4.2~§4.3、[`../crates/fg-topology/src/verifier.rs`](../crates/fg-topology/src/verifier.rs)
 
 ---
 
@@ -54,7 +54,7 @@ $$\text{FractalNode} = \langle \text{BaselineRef}, \text{PreReviewZone}, \text{G
 ```
 
 ### 2.1 拓扑合法性状态转移断言
-在 [`src/fractal/topology.rs`](file:///c:/CODE_game-development/vscode-extensions/fractal-git/src/fractal/topology.rs) 中，以下规则作为内核级的刚性断言执行：
+在 [`../crates/fg-topology/src/verifier.rs`](../crates/fg-topology/src/verifier.rs) 中，以下规则作为内核级的刚性断言执行：
 
 1. **SubAgent 归属单向封闭律**：
    $$\text{TargetRef}(SubAgent) \equiv refs/fractal/cell/\langle cellId\rangle/card/\langle parentCardId\rangle$$

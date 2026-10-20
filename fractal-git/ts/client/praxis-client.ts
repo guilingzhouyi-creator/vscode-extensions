@@ -6,7 +6,9 @@
  */
 
 import type { FractalRefDescriptor, MaterializeCommitResult, StagedFileEntry } from "../contracts";
+import { GIT_FILE_MODE } from "../constants";
 import { materializeCommitPure } from "../native-binding";
+import { verifyPreReviewZone } from "../gate-bridge";
 
 export interface AgentWorktreeHandle {
     worktreeId: string;
@@ -47,30 +49,27 @@ export class PraxisGitClient {
             stageFile: (path: string, content: Uint8Array | string, executable: boolean = false) => {
                 stagedFiles.push({
                     path,
-                    mode: executable ? "100755" : "100644",
+                    mode: executable ? GIT_FILE_MODE.EXECUTABLE : GIT_FILE_MODE.REGULAR,
                     content,
                 });
             },
             submitForPreReview: (): MaterializeCommitResult => {
+                const verdict = verifyPreReviewZone(stagedFiles);
                 return materializeCommitPure(this.gitDir, {
                     targetRef: ref,
                     parentCommitOids: [],
                     files: stagedFiles,
                     message: `feat(subagent): atomic task commit\n\n[Project: fractal-git]`,
-                    author: {
-                        name: `${cellId}:${subagentId}`,
-                        email: `${subagentId}@${cellId}.praxis.local`,
-                        timestampSec: Math.floor(Date.now() / 1000),
-                        tzOffset: "+0000",
-                    },
+                    authorName: `${cellId}:${subagentId}`,
+                    authorEmail: `${subagentId}@${cellId}.praxis.local`,
                     agentMeta: {
                         cardContext: {
                             cardId,
                             cellId,
                             agentUid: subagentId,
                         },
-                        qualityScore: 100.0,
-                        gateStatus: "approved",
+                        qualityScore: verdict.score,
+                        gateStatus: verdict.passed ? "approved" : "rejected",
                         timestampMs: Date.now(),
                     },
                 });

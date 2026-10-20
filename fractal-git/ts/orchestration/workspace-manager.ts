@@ -4,8 +4,10 @@
  * Architecture Role: Manages allocation and lifecycle routing of fractal workspaces
  *   bound to individual PraxisCardContext instances.
  * Dependencies & Triggers: Consumed by agent runners and the tournament coordinator.
- * Responsibilities: Track active workspace records, allocate unique branches, and coordinate cleanup.
- * Exit Semantics & Design Rationale: CC <= 15 and Depth <= 4; isolates agent failures to ephemeral nodes.
+ * Responsibilities: Track active workspace records, allocate unique branches,
+ *   and coordinate cleanup.
+ * Exit Semantics & Design Rationale: CC <= 15 and Depth <= 4; isolates agent failures
+ *   to ephemeral nodes.
  */
 
 import type {

@@ -1,0 +1,56 @@
+{
+  "engine": "taxis",
+  "version": "0.1.0",
+  "timestamp_ms": 1700000000000,
+  "metrics": [
+    {
+      "name": "canonical_tree_diff_streaming",
+      "iterations": 500,
+      "total_duration_us": 5566,
+      "avg_latency_ns": 11133,
+      "ops_per_sec": 89819.82143819498
+    },
+    {
+      "name": "myers_diff_swar_tokens",
+      "iterations": 500,
+      "total_duration_us": 6750,
+      "avg_latency_ns": 13500,
+      "ops_per_sec": 74074.07407407407
+    },
+    {
+      "name": "dag_generation_cutoff_o1",
+      "iterations": 2500,
+      "total_duration_us": 34,
+      "avg_latency_ns": 13,
+      "ops_per_sec": 72674418.60465115
+    },
+    {
+      "name": "corrected_commit_date_cutoff_o1",
+      "iterations": 2500,
+      "total_duration_us": 32,
+      "avg_latency_ns": 12,
+      "ops_per_sec": 77881619.9376947
+    },
+    {
+      "name": "bloom_filter_path_query",
+      "iterations": 5000,
+      "total_duration_us": 806,
+      "avg_latency_ns": 161,
+      "ops_per_sec": 6199628.02231866
+    },
+    {
+      "name": "buffer_pool_thread_local_freelist",
+      "iterations": 10000,
+      "total_duration_us": 982,
+      "avg_latency_ns": 98,
+      "ops_per_sec": 10175010.175010175
+    },
+    {
+      "name": "byte_lru_cache_budget_eviction",
+      "iterations": 5000,
+      "total_duration_us": 6254,
+      "avg_latency_ns": 1250,
+      "ops_per_sec": 799449.9784148505
+    }
+  ]
+}

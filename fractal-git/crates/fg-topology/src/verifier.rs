@@ -4,14 +4,15 @@
 //!   validating that SubAgents only merge into their parent Card, Cards into Cell Main,
 //!   and Cell Mains into System Trunk, preventing cross-tier leakage.
 
-use fg_core::error::{FractalError, FractalResult};
 use crate::refs::FractalRef;
+use fg_core::error::{FractalError, FractalResult};
 
 /// Verifier for legal topological branch promotions.
 pub struct TopologyVerifier;
 
 impl TopologyVerifier {
-    /// Validates whether merging `source` into `target` is mathematically and architecturally legal.
+    /// Validates whether merging `source` into `target` is mathematically
+    /// and architecturally legal.
     pub fn assert_legal_merge(source: &FractalRef, target: &FractalRef) -> FractalResult<()> {
         match (source, target) {
             // Level 1: SubAgent can only merge into its direct parent Card worktree
@@ -32,7 +33,8 @@ impl TopologyVerifier {
                     Err(FractalError::TopologyBreach {
                         source_ref: source.to_git_ref(),
                         target_ref: target.to_git_ref(),
-                        reason: "SubAgent can only merge into its exact parent Card worktree".into(),
+                        reason: "SubAgent can only merge into its exact parent Card worktree"
+                            .into(),
                     })
                 }
             }
@@ -55,15 +57,50 @@ impl TopologyVerifier {
                 }
             }
 
-            // Level 3: Cell integration main can only merge into System Trunk
+            // Level 3: Cell integration main can only merge into Integration Trunk
             (FractalRef::CellMain { .. }, FractalRef::Trunk) => Ok(()),
 
+            // Level 4 (Dual-Trunk Iron Invariant):
+            // System Trunk strictly ONLY accepts promotions from Integration Trunk!
+            (FractalRef::Trunk, FractalRef::SystemTrunk { .. }) => Ok(()),
+
             // All other promotions are illegal cross-tier or reverse merges
-            _ => Err(FractalError::TopologyBreach {
-                source_ref: source.to_git_ref(),
-                target_ref: target.to_git_ref(),
-                reason: "Illegal cross-tier or reverse branch merge detected in fractal hierarchy".into(),
-            }),
+            _ => {
+                let reason = if matches!(target, FractalRef::SystemTrunk { .. }) {
+                    "Direct merge into System Trunk forbidden; strictly only ingests \
+                     verified promotions from Integration Trunk"
+                        .to_string()
+                } else {
+                    "Illegal cross-tier or reverse branch merge detected in fractal hierarchy"
+                        .to_string()
+                };
+                Err(FractalError::TopologyBreach {
+                    source_ref: source.to_git_ref(),
+                    target_ref: target.to_git_ref(),
+                    reason,
+                })
+            }
         }
+    }
+
+    /// Asserts that a list of modified file paths strictly falls within the
+    /// worktree's ScopeProjection. Rejects any promotion containing changes outside the
+    /// delegated region.
+    pub fn assert_scope_compliance(
+        worktree: &crate::worktree::FractalWorktree,
+        modified_paths: &[String],
+    ) -> FractalResult<()> {
+        for path in modified_paths {
+            if !worktree.projection.contains_path(path) {
+                return Err(FractalError::TopologyBreach {
+                    source_ref: path.clone(),
+                    target_ref: format!("Scope({:?})", worktree.projection.scopes),
+                    reason:
+                        "Scope violation: modified file falls outside worktree delegated region"
+                            .into(),
+                });
+            }
+        }
+        Ok(())
     }
 }

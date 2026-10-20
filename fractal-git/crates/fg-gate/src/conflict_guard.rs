@@ -14,7 +14,10 @@ impl ConflictGuard {
         if content.is_empty() {
             return Err(FractalError::GateRejection {
                 score: 0.0,
-                violations: vec![format!("HYG-EMP-001: Zero-byte empty file at {}", file_path)],
+                violations: vec![format!(
+                    "HYG-EMP-001: Zero-byte empty file at {}",
+                    file_path
+                )],
             });
         }
 
@@ -23,7 +26,10 @@ impl ConflictGuard {
             if text.trim().is_empty() {
                 return Err(FractalError::GateRejection {
                     score: 0.0,
-                    violations: vec![format!("HYG-EMP-002: Pure-whitespace empty file at {}", file_path)],
+                    violations: vec![format!(
+                        "HYG-EMP-002: Pure-whitespace empty file at {}",
+                        file_path
+                    )],
                 });
             }
 
@@ -31,7 +37,9 @@ impl ConflictGuard {
                 return Err(FractalError::GateRejection {
                     score: 20.0,
                     violations: vec![format!(
-                        "L3-CONFLICT: Unresolved Git conflict marker detected in {}",
+                        "{}: {} in {}",
+                        fg_core::constants::rules::RULE_FGT_GAT_001,
+                        fg_core::constants::errors::MSG_UNRESOLVED_CONFLICT_MARKER,
                         file_path
                     )],
                 });
@@ -47,11 +55,15 @@ impl GateVerifier for ConflictGuard {
         let mut violations = Vec::new();
 
         for candidate in candidates {
-            if let Err(e) = Self::assert_clean_content(&candidate.path, &candidate.payload) {
-                if let FractalError::GateRejection { violations: v, .. } = e {
-                    violations.extend(v);
+            if let Err(gate_err) = Self::assert_clean_content(&candidate.path, &candidate.payload) {
+                if let FractalError::GateRejection {
+                    violations: err_violations,
+                    ..
+                } = gate_err
+                {
+                    violations.extend(err_violations);
                 } else {
-                    violations.push(format!("{}: {}", candidate.path, e));
+                    violations.push(format!("{}: {}", candidate.path, gate_err));
                 }
             }
         }

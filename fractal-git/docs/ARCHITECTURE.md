@@ -66,7 +66,7 @@ stateDiagram-v2
 | [Project: fractal-git]                                           |
 | [Why] Resolves domain requirement card-101                       |
 | [Changed] Added AST-verified parsing logic                       |
-| [Verification] 100% test pass, quality score 100.0               |
+| [Verification] Verified AST invariant assertion with zero cycle  |
 |                                                                  |
 | Praxis-Agent-Meta: {"card_id":"...","score":100.0,...}           |
 +------------------------------------------------------------------+

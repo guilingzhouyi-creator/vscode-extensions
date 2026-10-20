@@ -2,10 +2,12 @@
  * Module: Fractal Git — Tournament Runner (MCTS Selection Engine)
  * File Path: ts/orchestration/tournament-runner.ts
  * Architecture Role: Evaluates parallel SubAgent exploration candidates, ranking quality
- *   scores through Auto gating and picking the single winning variant for upstream materialization.
+ *   scores through Auto gating and picking winning variants for upstream materialization.
  * Dependencies & Triggers: Consumed when multi-agent rollouts finish exploring variant solutions.
- * Responsibilities: Run gate checks across candidates, select highest-scoring branch, discard losers.
- * Exit Semantics & Design Rationale: CC <= 15 and Depth <= 4; ensures zero trash commits in Git history.
+ * Responsibilities: Run gate checks across candidates, select highest-scoring branch,
+ *   and discard lower-quality variants.
+ * Exit Semantics & Design Rationale: CC <= 15 and Depth <= 4; ensures zero unverified commits
+ *   in Git history.
  */
 
 import type { StagedFileEntry } from '../contracts';

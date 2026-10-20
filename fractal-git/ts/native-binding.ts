@@ -4,7 +4,8 @@
  * Architecture Role: Provides cross-language bridge to the Rust native kernel, with a robust
  *   in-process TypeScript fallback engine ensuring 100% byte parity and uninterrupted operation.
  * Dependencies & Triggers: Consumed by the primary fractal git facade.
- * Responsibilities: Expose low-level Git loose object encoding, SHA-1 hashing, and ref manipulation.
+ * Responsibilities: Expose low-level Git loose object encoding, SHA-1 hashing,
+ *   and ref manipulation.
  * Exit Semantics & Design Rationale: Gracefully switches between native dynamic library and pure-TS
  *   shim; satisfies CC <= 15 and Depth <= 4.
  */

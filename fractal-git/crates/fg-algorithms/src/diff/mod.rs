@@ -4,5 +4,5 @@
 pub mod patch;
 pub mod tree_diff;
 
-pub use patch::{PatchGenerator, PatchHunk, PatchLine, UnifiedPatch};
-pub use tree_diff::{ChangeKind, DiffEntry, TreeDiff};
+pub use patch::{MyersScratch, PatchGenerator, PatchHunk, PatchLine, UnifiedPatch};
+pub use tree_diff::{ChangeKind, DiffEntry, TreeDiff, TreeDiffState};
