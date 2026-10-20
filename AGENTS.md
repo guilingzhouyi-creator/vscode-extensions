@@ -13,9 +13,8 @@
 | **模块导出与门面** | $\text{ELOC}\ge 15$ 或不可变冻结；零 $\le 3$ 行透传跳板 (`ARCH-ABS-001`) | [facade-discipline](.agents/skills/facade-discipline/SKILL.md) | `node auto-refactor/scripts/validate-facade-governance.js` |
 | **注释与架构契约** | 六字段 JSDoc 首部；零幽灵空分支；零批次代号；$\text{ECR}\ge 0.75$ | [complexity-budget](.agents/skills/complexity-budget/SKILL.md) | `node auto-refactor/scripts/validate-comment-governance.js` |
 | **终端命令面与 Linux 兼容** | 别名优先级、GNU 实体可执行性实测、包装器零 `[Parameter()]` (`GUARD-SHELL-001`) | [linux-parity.ps1](scripts/ps1/lib/linux-parity.ps1) · [validate-shell-parity.js](scripts/common/validate-shell-parity.js) · [gate-governance](.agents/skills/gate-governance/SKILL.md) | `node scripts/common/validate-shell-parity.js` |
-| **门禁脚本与跨平台调用** | 子进程工作目录显式隔离；`pwsh` 7+ 优先；Bash `set -euo pipefail` 平铺捕获 | [gate-governance](.agents/skills/gate-governance/SKILL.md) · [scripts/README.md](scripts/README.md) | `pwsh -File scripts/ps1/pre-commit-gate.ps1` |
+| **门禁脚本与调用契约** | 子进程工作目录显式隔离；`pwsh` 7+ 优先；Bash `set -euo pipefail` 平铺捕获；助手先定义于调用点 (`GUARD-ORD-001`) | [gate-governance](.agents/skills/gate-governance/SKILL.md) · [scripts/README.md](scripts/README.md) | `pwsh -File scripts/ps1/pre-commit-gate.ps1` |
 | **门禁反馈与步骤登记** | 只用语义步骤标识；状态词闭包 PASS/BLOCK/SKIP/WARN (`GUARD-FBK-001`/`GUARD-STEP-001`) | [gate-step-registry.json](scripts/common/gate-step-registry.json) · [validate-gate-feedback.js](scripts/common/validate-gate-feedback.js) | `node scripts/common/validate-gate-feedback.js` |
-| **门禁助手定义顺序** | 助手须定义于调用点之前，否则解析期中止整条门禁 (`GUARD-ORD-001`) | [validate-gate-ordering.js](scripts/common/validate-gate-ordering.js) | `node scripts/common/validate-gate-ordering.js` |
 | **文档规模数字口径** | 计数由真源渲染进 `METRICS:BEGIN/END`；块外裸字面量须等于活真值 (`GUARD-DOC-001`) | [doc-metrics.json](scripts/common/doc-metrics.json) · [sync-doc-metrics.js](scripts/common/sync-doc-metrics.js) | `node scripts/common/sync-doc-metrics.js` |
 | **`workspace-timing/`** | 五层解耦；RingBuffer+Journal 崩溃安全；UI 100% 双语字典；审查规则单源 `review-rules.json`；`declaration: false` | [README](workspace-timing/README.md) · [workspace-timing-dev](.agents/skills/workspace-timing-dev/SKILL.md) | `cd workspace-timing && npm run test:fast` |
 | **`auto-refactor/`** | <!-- METRICS:BEGIN analyzer-count -->**30 个**<!-- METRICS:END analyzer-count -->分析器与 <!-- METRICS:BEGIN rule-auto-refactor -->**362 条规则**<!-- METRICS:END rule-auto-refactor -->（SSOT <!-- METRICS:BEGIN rule-total -->**502 条规则**<!-- METRICS:END rule-total -->中一支）；Rust 与 TS 100% 字节等价；关键路径禁 `*Sync` I/O（`PRF-IO-001`）；形参 $\ge 4$ 用参数对象（`SIM-ARGS-001`） | [DOCS.md](auto-refactor/DOCS.md) · [auto-refactor-dev](.agents/skills/auto-refactor-dev/SKILL.md) | `cd auto-refactor && npm test` |
@@ -39,7 +38,7 @@
 
 | 公理 | 裁定 | 真源 |
 | :--- | :--- | :--- |
-| **物理卫生八维** | 零空文件/空壳；`.ps1` CRLF 其余 LF；UTF-8 无 BOM；单 EOF 换行；纯空格缩进；零空目录/脏文件；`kebab-case`；后缀即领域 | [gate-governance](.agents/skills/gate-governance/SKILL.md) |
+| **物理卫生八维** | 零空文件/空壳；`.ps1` CRLF 其余 LF；UTF-8 无 BOM；单 EOF 换行；纯空格缩进（TS 4 空格、其余 2 空格）；零空目录/脏文件；全局 `kebab-case`（WebGames `config/**` 与 `.gd` 用 `snake_case`）；后缀即领域 | [validate-physical-hygiene.js](scripts/common/validate-physical-hygiene.js) · [gate-governance](.agents/skills/gate-governance/SKILL.md) |
 | **复杂度与体积** | $\text{CC}\le 15$ 为导出 API 刚性基线（私有纯函数弹性 20~25）；$\text{Depth}\le 4$、$\text{Noise}\le 4.0$；$\text{ELOC}\le 900$ 第一红线、$\text{LOC}\le 1400$ 兜底；循环与调度平铺并卫语句提前返回 | [complexity-budget](.agents/skills/complexity-budget/SKILL.md) |
 | **注释契约** | 核心模块首行六字段 JSDoc；复杂算法声明退化阈值与前置不变式；零幽灵假分支、零冲刺代号、零机械复述 | [complexity-budget](.agents/skills/complexity-budget/SKILL.md) |
 | **门面实质承载** | $\text{ELOC}\ge 15$、聚合 $\ge 3$ 子领域或含不可变冻结；合法包络内高内聚模块禁止机械碎片化 | [facade-discipline](.agents/skills/facade-discipline/SKILL.md) |
