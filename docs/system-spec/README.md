@@ -12,6 +12,7 @@
 | [quality-scoring-model.md](./quality-scoring-model.md) | **十维工程质量量化评分模型** | 详细阐述 10 大质量维度定义、双曲密度衰减曲线、加权几何平均、Jeffreys 先验置信度、技术债穿透机制与防刷分数学公理 | `auto-refactor/src/core/scoring/` |
 | [script-governance-architecture.md](./script-governance-architecture.md) | **仓库级脚本工程治理体系** | 详细阐述语言域 × 职能域正交矩阵、PowerShell / Bash / Node.js 规范契约、同构双实现机制、Tier 1 内存流式门禁与性能短路模型 | `scripts/`、`scripts/README.md` |
 | [agent-native-system-blueprint.md](../agent-native-system-blueprint.md) | **Agent-Native 顶层自治蓝图** | Cell 平权自治体系、一体两面三层拓扑 Diff 引擎、R1~R5 记忆提纯管线与分形 Git 门禁 | `AGENTS.md` |
+| [fractal-git/docs/README.md](../../fractal-git/docs/README.md) | **Taxis 分形 Git 高性能版本控制内核** | 9 大微 Crate 架构、偏序集同态 CCD v2、Kirsch-Mitzenmacher 双哈希布隆过滤器、SWAR 差分、Anthropic Scion 对标基准与三阶递进压测规范 | `fractal-git/`、`fractal-git/docs/` |
 
 ---
 
