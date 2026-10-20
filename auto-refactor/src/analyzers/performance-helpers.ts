@@ -63,7 +63,7 @@ export const LOOP_KEYWORD_RE =
  * General transient allocations in loop: temporary buffers, arrays, slices (PRF-MEM-001).
  */
 export const TRANSIENT_ALLOC_RE =
-    /(?:\bnew\s+(?:Array|Object|Map|Set|RegExp|Buffer)\b|\bBuffer\.alloc\b|\[\s*\]|\{\s*\}|\bVec::new\b|\bHashMap::new\b|\bvec!\s*\[|\bArray\(\)|\bDictionary\(\)|\blist\(\)|\bdict\(\)|\.new\(|\.duplicate\()/;
+    /(?:\bnew\s+(?:Array|Object|Map|Set|RegExp|Buffer)\b|\bBuffer\.alloc\b|\[\s*\]|\{\s*\}|\bVec::new\b|\bHashMap::new\b|\bHashSet::new\b|\bBTreeMap::new\b|\bvec!\s*\[|\bString::(?:from|new)\b|\bformat!\s*\(|\bBox::new\b|\.to_string\(\)|\.to_owned\(\)|\.to_vec\(\)|\bArray\(\)|\bDictionary\(\)|\blist\(\)|\bdict\(\)|\.new\(|\.duplicate\()/;
 
 /**
  * High-pressure class instantiations and deep copies violating object pooling contracts

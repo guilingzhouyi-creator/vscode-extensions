@@ -219,7 +219,7 @@ async function main() {
     true,
     'Should trigger L3A escalation flag',
   );
-  console.log('✔ Praxis Diff Governance end-to-end performance blocking gate verified.');
+  console.log('✔ Praxis Diff 治理端到端性能阻断校验通过。');
 
   // Clean diff should pass cleanly
   const cleanDiff = {

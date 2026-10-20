@@ -7,7 +7,7 @@
  * Dependencies & Triggers: ../dist/api scan/scanWarm plus spawned
  *   `node dist/index.js daemon|scan` processes; triggered by `npm run bench-warm`,
  *   which forwards optional --parser=... and --workers=... flags.
- * Responsibilities: Rebuild a fresh 1001-file corpus at C:/tmp/ar-warm-corpus from
+ * Responsibilities: Rebuild a fresh 1001-file corpus at <system temp>/ar-warm-corpus from
  *   three TS templates; measure S1 cold scan, S2 daemon cold pool, S3/S4 hot pool
  *   plus hot cache, S5 mixed 10% edit, and S6 CLI respawn over the hot disk cache;
  *   append each run to scripts/bench-history.json under the benchWarm partition
@@ -22,10 +22,11 @@ const { scan, scanWarm } = require('../dist/api');
 const { spawnSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
 const ROOT = path.join(__dirname, '..');
 const CLI = path.join(ROOT, 'dist', 'index.js');
-const CORPUS = 'C:/tmp/ar-warm-corpus';
+const CORPUS = path.join(os.tmpdir(), 'ar-warm-corpus');
 const CACHE_DIR = path.join(CORPUS, '.auto-refactor-cache');
 const HISTORY_FILE = path.join(__dirname, 'bench-history.json');
 const FILES = 1001;
@@ -72,7 +73,7 @@ function rmRetry(p) {
     fs.rmSync(p, { recursive: true, force: true });
   } catch {
     try {
-      fs.renameSync(p, path.join('C:/tmp', `ar-stale-${path.basename(p)}-${Date.now()}`));
+      fs.renameSync(p, path.join(os.tmpdir(), `ar-stale-${path.basename(p)}-${Date.now()}`));
     } catch {
       /* ignore */
     }

@@ -15,7 +15,7 @@ const assert = require('assert');
 const { evaluateCompositeGate } = require('../dist/core/praxis/composite-quality-gate');
 
 function runTests() {
-  console.log('🧪 Running Composite Quality Gate Validation Suite...');
+  console.log('🧪 运行复合质量审查校验套件...');
 
   const baseCounters = {
     processed: 2000,

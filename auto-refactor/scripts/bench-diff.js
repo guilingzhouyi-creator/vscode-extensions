@@ -22,10 +22,11 @@ const { computeEditRanges } = require('../dist/core/diff/edit-diff');
 const { normalizeEditRanges } = require('../dist/core/ast/utf8');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
 const LINES = parseInt(process.argv[2], 10) || 1500;
 const ROOT = path.join(__dirname, '.bench-diff-corpus');
-const CACHE = 'C:/tmp/ar-bench-diff-cache';
+const CACHE = path.join(os.tmpdir(), 'ar-bench-diff-cache');
 const CFG = path.join(ROOT, 'auto-refactor.config.json');
 const BIG = path.join(ROOT, 'src', 'big.ts');
 

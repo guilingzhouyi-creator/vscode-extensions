@@ -189,7 +189,7 @@ export class InvoiceService {
     true,
     'Should trigger L3A escalation flag for N+1 database hazard',
   );
-  console.log('✔ Praxis Diff Governance end-to-end data architecture gate verified.');
+  console.log('✔ Praxis Diff 治理端到端数据架构校验通过。');
 
   // Clean data access diff
   const cleanDataDiff = {

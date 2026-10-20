@@ -144,6 +144,7 @@ function verifyPreCommitParity() {
     assert(content.includes('auto-refactor'), `${name} must verify auto-refactor`);
     assert(content.includes('WebGames'), `${name} must verify WebGames`);
   }
+  return registeredSteps.length;
 }
 
 function verifyPrePushParity() {
@@ -170,6 +171,7 @@ function verifyPrePushParity() {
     assert(content.includes('fractal-git'), `${name} must verify fractal-git`);
     assert(content.includes('validate-commit-msg'), `${name} must verify commit msg`);
   }
+  return registeredSteps.length;
 }
 
 function runAll() {
@@ -205,12 +207,12 @@ function runAll() {
   console.log('  ✔ Audit-All: 6 pillars covering workspace-timing, auto-refactor, WebGames, fractal-git.');
 
   console.log('5. Verifying pre-commit-gate step normalization & CASE-08 parity...');
-  verifyPreCommitParity();
-  console.log('  ✔ Pre-Commit: [1/9]..[9/9] normalized, CASE-08 covers all 4 projects.');
+  const preCommitSteps = verifyPreCommitParity();
+  console.log(`  ✔ Pre-Commit: [1/${preCommitSteps}]..[${preCommitSteps}/${preCommitSteps}] normalized, CASE-08 covers all 4 projects.`);
 
-  console.log('6. Verifying pre-push-gate 10-gate parity...');
-  verifyPrePushParity();
-  console.log('  ✔ Pre-Push: 10 gates covering all 4 projects.');
+  console.log('6. Verifying pre-push-gate step parity...');
+  const prePushSteps = verifyPrePushParity();
+  console.log(`  ✔ Pre-Push: ${prePushSteps} gates covering all 4 projects.`);
 
   console.log('\n✅ All gate system verification checks passed successfully.');
 }

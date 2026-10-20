@@ -178,6 +178,14 @@ export const ANALYZER_MODERN_LANGUAGE_RULES: readonly RuleDefinition[] = [
         remediation: 'Migrate if let ... else { return/break; } to let-else syntax (Rust 1.65+).',
     }),
     defineRuleCompact({
+        id: 'RSM-EXP-001',
+        analyzer: ANALYZER_RUST_MODERN,
+        languages: [LANGUAGE_RUST],
+        defaultSeverity: SEVERITY_INFO,
+        summary: 'Naked expect() call in production code risks unclassified panic.',
+        remediation: 'Propagate with ? or classify error using context() or map_err().',
+    }),
+    defineRuleCompact({
         id: 'RSM-EXTERN-001',
         analyzer: ANALYZER_RUST_MODERN,
         languages: [LANGUAGE_RUST],
@@ -212,6 +220,23 @@ export const ANALYZER_MODERN_LANGUAGE_RULES: readonly RuleDefinition[] = [
         languages: [LANGUAGE_RUST],
         summary: 'Deprecated #[macro_use] textual macro import detected.',
         remediation: 'Explicitly import macros via use statements to maintain provenance traceability.',
+    }),
+    defineRuleCompact({
+        id: 'RSM-PNC-001',
+        analyzer: ANALYZER_RUST_MODERN,
+        languages: [LANGUAGE_RUST],
+        defaultSeverity: SEVERITY_ERROR,
+        summary:
+            'Production code contains naked crash macro (panic!, todo!, unimplemented!, unreachable!).',
+        remediation: 'Return a strongly-typed Result error instead of crashing the process.',
+    }),
+    defineRuleCompact({
+        id: 'RSM-SAF-001',
+        analyzer: ANALYZER_RUST_MODERN,
+        languages: [LANGUAGE_RUST],
+        summary: 'Unsafe block or function lacks preceding // SAFETY: invariant proof comment.',
+        remediation:
+            'Document validity, pointer bounds, and lifetime invariants with a // SAFETY: comment.',
     }),
     defineRuleCompact({
         id: 'RSM-STR-001',

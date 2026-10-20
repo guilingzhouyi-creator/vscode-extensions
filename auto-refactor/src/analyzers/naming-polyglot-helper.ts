@@ -74,6 +74,9 @@ const RUST_CONST_RE =
     /^\s*(?:pub(?:\s*\([^)]*\))?\s+)?(?:const|static)\s+(?:mut\s+)?([a-zA-Z_][a-zA-Z0-9_]*)\s*:/;
 const RUST_LET_RE =
     /^\s*let\s+(?:mut\s+)?([a-zA-Z_][a-zA-Z0-9_]*)\s*(?::[^=]+)?\s*=/;
+const RUST_FOR_RE = /^\s*for\s+([a-zA-Z_][a-zA-Z0-9_]*)\s+in\b/;
+const RUST_TUPLE_LET_RE =
+    /^\s*let\s+(?:mut\s+)?\(([a-zA-Z0-9_,\s]+)\)\s*(?::[^=]+)?\s*=/;
 const GDSCRIPT_FUNC_RE = /^\s*(?:static\s+)?func\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/;
 
 const GO_EXEMPT_NAMES = new Set([
@@ -380,6 +383,50 @@ function auditRustVariable(
     }
 }
 
+function auditRustLineVariables(
+    line: string,
+    lineIdx: number,
+    inTestScope: boolean,
+    pCtx: PolyglotNamingContext,
+): void {
+    const letMatch = RUST_LET_RE.exec(line);
+    if (letMatch) {
+        auditRustVariable(letMatch[1], lineIdx, inTestScope, pCtx);
+    }
+
+    const forMatch = RUST_FOR_RE.exec(line);
+    if (forMatch) {
+        auditRustVariable(forMatch[1], lineIdx, inTestScope, pCtx);
+    }
+
+    const tupleMatch = RUST_TUPLE_LET_RE.exec(line);
+    if (tupleMatch) {
+        const tupleMembers = tupleMatch[1].split(',');
+        for (const member of tupleMembers) {
+            const cleaned = member.trim().replace(/^mut\s+/, '');
+            if (cleaned) {
+                auditRustVariable(cleaned, lineIdx, inTestScope, pCtx);
+            }
+        }
+    }
+}
+
+function auditRustLineDeclarations(
+    line: string,
+    lineIdx: number,
+    pCtx: PolyglotNamingContext,
+): void {
+    const typeMatch = RUST_TYPE_RE.exec(line);
+    if (typeMatch) {
+        auditRustType(typeMatch[1], lineIdx, pCtx);
+    }
+
+    const constMatch = RUST_CONST_RE.exec(line);
+    if (constMatch) {
+        auditRustConstant(constMatch[1], lineIdx, pCtx);
+    }
+}
+
 type PolyglotLineAuditor = (line: string, lineIndex: number) => void;
 
 function createPolyglotLineAuditor(
@@ -445,21 +492,10 @@ function createPolyglotLineAuditor(
             const inTestScope = testFunctionDepth >= 0 || testModuleDepth >= 0;
 
             if (!inTestScope) {
-                const typeMatch = RUST_TYPE_RE.exec(line);
-                if (typeMatch) {
-                    auditRustType(typeMatch[1], i, pCtx);
-                }
-
-                const constMatch = RUST_CONST_RE.exec(line);
-                if (constMatch) {
-                    auditRustConstant(constMatch[1], i, pCtx);
-                }
+                auditRustLineDeclarations(line, i, pCtx);
             }
 
-            const letMatch = RUST_LET_RE.exec(line);
-            if (letMatch) {
-                auditRustVariable(letMatch[1], i, inTestScope, pCtx);
-            }
+            auditRustLineVariables(line, i, inTestScope, pCtx);
 
             braceDepth += openBraces - closeBraces;
             if (braceDepth < 0) braceDepth = 0;

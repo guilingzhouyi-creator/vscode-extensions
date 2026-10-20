@@ -6,11 +6,12 @@
  * Dependencies & Triggers: core types + declarative modern metapack; enabled when a config declares
  *     `analyzers.rust-modern`; specialized packs are default-off, so registering it cannot change
  *     an existing gate result.
- * Responsibilities: Report eleven modernization findings on `.rs` files: RSM-CAST-001 (naked
+ * Responsibilities: Report fourteen modernization findings on `.rs` files: RSM-CAST-001 (naked
  *     numeric `as` cast), RSM-CLONE-001 (needless `.clone()`), RSM-ELSE-001 (`if let` early exit
- *     simplifiable to `let-else`), RSM-EXTERN-001 (`extern crate`), RSM-FIND-001 (manual `for`
- *     search simplifiable to `.find()`), RSM-FORMAT-001 (positional `{}` capture), RSM-LOCK-001
- *     (sync lock held across `.await`), RSM-MACRO-001 (`#[macro_use]`), RSM-STR-001 (`&String`
+ *     simplifiable to `let-else`), RSM-EXP-001 (naked `.expect()`), RSM-EXTERN-001 (`extern crate`),
+ *     RSM-FIND-001 (manual `for` search simplifiable to `.find()`), RSM-FORMAT-001 (positional `{}` capture),
+ *     RSM-LOCK-001 (sync lock held across `.await`), RSM-MACRO-001 (`#[macro_use]`), RSM-PNC-001
+ *     (production crash macro), RSM-SAF-001 (undocumented `unsafe`), RSM-STR-001 (`&String`
  *     parameter), RSM-TRY-001 (`try!`), and RSM-UNWRAP-001 (`.unwrap()`).
  * Exit Semantics & Design Rationale: Built on DeclarativeModernAnalyzer over masked source with raw
  *     string blanking, never throws and returns [] for every other language. Rust's comment syntax
@@ -21,7 +22,7 @@
 
 import type { Analyzer, AnalyzerContext, Issue, AgentActionType } from '../core/types';
 
-import { SEVERITY_WARNING, SEVERITY_INFO } from '../core/types';
+import { SEVERITY_WARNING, SEVERITY_INFO, SEVERITY_ERROR } from '../core/types';
 import { ANALYZER_RUST_MODERN } from '../core/scoring/dimensionLiterals';
 import type { SourceMaskConfig } from '../core/policy/source-mask';
 import {
@@ -101,6 +102,18 @@ const STD_LOCK_RE =
 /** `.await` expression. */
 const AWAIT_RE = /\.await\b/;
 
+/** `panic!`, `todo!`, `unimplemented!`, or `unreachable!` crash macro. */
+const CRASH_MACRO_RE = /\b(?:panic|todo|unimplemented|unreachable)!\s*\(/;
+
+/** `.expect(...)` call. */
+const EXPECT_CALL_RE = /\.expect\s*\(/;
+
+/** `unsafe` block or function signature. */
+const UNSAFE_KEYWORD_RE = /\bunsafe\s*(?:\{|\bfn\b)/;
+
+/** `// SAFETY:` invariant proof comment. */
+const SAFETY_PROOF_COMMENT_RE = /\/\/\s*SAFETY:\s*\S+/;
+
 const MAX_MULTILINE_FORMAT_SPAN_LINES = 10;
 const MAX_LET_ELSE_SPAN_LINES = 25;
 const MAX_FOR_FIND_SPAN_LINES = 6;
@@ -118,6 +131,9 @@ const SNIPPET_INLINE_FORMAT = 'format!("{var}")';
 const SNIPPET_LET_ELSE = 'let $1 = $2 else { return $3; };';
 const SNIPPET_ITER_FIND = '$1.iter().find(|$2| $3)';
 const SNIPPET_DROP_GUARD = 'drop($guard);';
+const SNIPPET_CRASH_REPLACE = 'return Err(FractalError::...);';
+const SNIPPET_MAP_ERR = '$1.map_err(...)?';
+const SNIPPET_SAFETY_PROOF = '// SAFETY: $1';
 
 /** State for tracking function signature parameter lists across lines. */
 interface FnSigState {
@@ -359,6 +375,58 @@ function scanAsyncLockIssues(
     }
 }
 
+/** Declarative rule for unsafe blocks/functions lacking // SAFETY: proof. */
+const RULE_UNSAFE_SAFETY: DeclarativeLineRule = Object.freeze({
+    rule: 'RSM-SAF-001',
+    severity: SEVERITY_WARNING,
+    message:
+        'Unsafe block or function lacks documented `// SAFETY:` invariant proof.',
+    suggestion:
+        'Document validity, lifetime, and bounds invariants with a preceding `// SAFETY:` comment.',
+    actionable: {
+        action: 'apply_guard_clause' as AgentActionType,
+        codeId: '014',
+        templateSnippet: SNIPPET_SAFETY_PROOF,
+    },
+});
+
+/**
+ * Scan source lines for unsafe blocks/functions lacking preceding `// SAFETY:` proof comments.
+ */
+function scanUnsafeSafetyProofs(
+    file: string,
+    raw: readonly string[],
+    masked: readonly string[],
+    delegate: DeclarativeModernAnalyzer,
+    issues: Issue[],
+): void {
+    if (RUST_TEST_FILE_RE.test(file)) {
+        return;
+    }
+    for (let i = 0; i < masked.length; i += 1) {
+        if (!UNSAFE_KEYWORD_RE.test(masked[i])) {
+            continue;
+        }
+        let hasProof = false;
+        for (let offset = -2; offset <= 1; offset += 1) {
+            const checkIdx = i + offset;
+            if (checkIdx >= 0 && checkIdx < raw.length) {
+                if (SAFETY_PROOF_COMMENT_RE.test(raw[checkIdx])) {
+                    hasProof = true;
+                    break;
+                }
+            }
+        }
+        if (!hasProof) {
+            issues.push(
+                delegate.emitIssue(RULE_UNSAFE_SAFETY, file, i + 1, {
+                    line: raw[i].trim(),
+                }),
+            );
+        }
+    }
+}
+
 /**
  * Rust modernization analyzer backed by DeclarativeModernAnalyzer.
  */
@@ -512,7 +580,38 @@ export class RustModernAnalyzer implements Analyzer {
                     templateSnippet: SNIPPET_ITER_FIND,
                 },
             },
+            {
+                rule: 'RSM-EXP-001',
+                severity: SEVERITY_INFO,
+                pattern: EXPECT_CALL_RE,
+                condition: (ctx) => !isTestScopeOrFile(ctx),
+                message:
+                    '`.expect()` panics if unfulfilled; prefer strong-typed error propagation in production.',
+                suggestion:
+                    'Propagate with `?` or map to a strongly-typed error using `.context(...)` or `.map_err(...)`.',
+                actionable: {
+                    action: 'apply_guard_clause',
+                    codeId: '012',
+                    templateSnippet: SNIPPET_MAP_ERR,
+                },
+            },
+            {
+                rule: 'RSM-PNC-001',
+                severity: SEVERITY_ERROR,
+                pattern: CRASH_MACRO_RE,
+                condition: (ctx) => !isTestScopeOrFile(ctx),
+                message:
+                    'Naked crash macro (`panic!`, `todo!`, `unimplemented!`, or `unreachable!`) in production code.',
+                suggestion:
+                    'Return a strongly-typed `Result` error with domain classification instead of crashing the process.',
+                actionable: {
+                    action: 'apply_guard_clause',
+                    codeId: '013',
+                    templateSnippet: SNIPPET_CRASH_REPLACE,
+                },
+            },
             RULE_LOCK_AWAIT,
+            RULE_UNSAFE_SAFETY,
         ];
 
         this.delegate = new DeclarativeModernAnalyzer({
@@ -522,6 +621,7 @@ export class RustModernAnalyzer implements Analyzer {
             rules,
             multiLineScanner: (raw, masked, file, issues) => {
                 scanAsyncLockIssues(file, raw, masked, this.delegate, issues);
+                scanUnsafeSafetyProofs(file, raw, masked, this.delegate, issues);
             },
         });
     }
