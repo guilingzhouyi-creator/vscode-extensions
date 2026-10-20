@@ -583,47 +583,37 @@ function testAgentDirectivesEnvelopeProtocol() {
 
 /**
  * Main verification test runner.
+ *
+ * The suite size is derived from the table below rather than asserted as a constant: a hardcoded
+ * total silently expires the moment a case is added or removed, and the success line keeps
+ * claiming a number that no longer matches what ran.
  */
 function runGuardrailVerification() {
   console.log('🚀 启动提交信息分词器与护栏仲裁器独立回归测试...');
 
-  testNormalizationAndEvasion();
-  console.log('  ✔ [PASS] 文本归一化与对抗性零宽隐形字符消融验证通过');
+  const suites = [
+    [testNormalizationAndEvasion, '文本归一化与对抗性零宽隐形字符消融验证通过'],
+    [testPrefixTrieOperations, '前缀树 Trie 构建与最长前缀 O(L) 匹配验证通过'],
+    [testCommitStructureParsing, 'Conventional Commit 规范头部与结构化区块解析验证通过'],
+    [testImperativeMoodGuardrail, 'CMG-STY-007 标题祈使动词契约与中英过去/进行/三单态拦截验证通过'],
+    [testZeroPOVGuardrail, 'CMG-STY-008 零人称客观叙述与代词反重复误报验证通过'],
+    [testAcademicTestOracleContext, '学术测试神谕（Test Oracle）上下文正向解耦验证通过'],
+    [testEntropyAndHealthScoring, '香农信息熵 H(T) 与风格健康分 StyleHealthScore 评定验证通过'],
+    [testMultilineCodeBlockMasking, '跨行 Markdown 代码块预屏蔽与正文词法隔离验证通过'],
+    [testCommitGuardrailLogger, '集中归一化双轨持久化 (.audit-logs/) 与快照生成验证通过'],
+    [testElasticTechDebtCorridor, '弹性高危技术债容差走廊与清偿棘轮互锁状态机验证通过'],
+    [testSilentEVerbRecovery, '软件工程动词静音 e 词根智能还原验证通过'],
+    [testAgentDirectivesEnvelopeProtocol, 'Autonomous Agent 结构化提示信封协议与信用额度包验证通过'],
+  ];
 
-  testPrefixTrieOperations();
-  console.log('  ✔ [PASS] 前缀树 Trie 构建与最长前缀 O(L) 匹配验证通过');
+  let executed = 0;
+  for (const [runSuite, label] of suites) {
+    runSuite();
+    executed += 1;
+    console.log(`  ✔ PASS ${label}`);
+  }
 
-  testCommitStructureParsing();
-  console.log('  ✔ [PASS] Conventional Commit 规范头部与结构化区块解析验证通过');
-
-  testImperativeMoodGuardrail();
-  console.log('  ✔ [PASS] CMG-STY-007 标题祈使动词契约与中英过去/进行/三单态拦截验证通过');
-
-  testZeroPOVGuardrail();
-  console.log('  ✔ [PASS] CMG-STY-008 零人称客观叙述与代词反重复误报验证通过');
-
-  testAcademicTestOracleContext();
-  console.log('  ✔ [PASS] 学术测试神谕（Test Oracle）上下文正向解耦验证通过');
-
-  testEntropyAndHealthScoring();
-  console.log('  ✔ [PASS] 香农信息熵 H(T) 与风格健康分 StyleHealthScore 评定验证通过');
-
-  testMultilineCodeBlockMasking();
-  console.log('  ✔ [PASS] 跨行 Markdown 代码块预屏蔽与正文词法隔离验证通过');
-
-  testCommitGuardrailLogger();
-  console.log('  ✔ [PASS] 集中归一化双轨持久化 (.audit-logs/) 与快照生成验证通过');
-
-  testElasticTechDebtCorridor();
-  console.log('  ✔ [PASS] 弹性高危技术债容差走廊与清偿棘轮互锁状态机验证通过');
-
-  testSilentEVerbRecovery();
-  console.log('  ✔ [PASS] 软件工程动词静音 e 词根智能还原验证通过');
-
-  testAgentDirectivesEnvelopeProtocol();
-  console.log('  ✔ [PASS] Autonomous Agent 结构化提示信封协议与信用额度包验证通过');
-
-  console.log('🎉 提交信息分词器、双轨持久化与弹性债务走廊体系全部 12 组独立契约测试验证通过！');
+  console.log(`🎉 提交信息分词器、双轨持久化与弹性债务走廊体系全部 ${executed} 组独立契约测试验证通过！`);
 }
 
 if (require.main === module) {
@@ -631,7 +621,7 @@ if (require.main === module) {
     runGuardrailVerification();
     process.exit(0);
   } catch (err) {
-    console.error('❌ [FAIL] 提交护栏独立验证失败:', err.message);
+    console.error('✖ BLOCK 提交护栏独立验证失败:', err.message);
     if (err.stack) console.error(err.stack);
     process.exit(1);
   }

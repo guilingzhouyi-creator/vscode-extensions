@@ -137,7 +137,7 @@ function main() {
 
   const ledgerDir = resolveLedgerDir();
   if (!fs.existsSync(ledgerDir)) {
-    console.log(`  ℹ Trajectory directory not initialized yet (${ledgerDir}), gate passes.`);
+    console.log(`  ℹ 轨迹目录尚未初始化 (${ledgerDir})，本项检查按通过处理。`);
     process.exit(0);
   }
 
@@ -160,11 +160,11 @@ function main() {
   );
 
   if (violations > 0) {
-    console.error(`❌ [FAIL] Trajectory ledger bounds gate failed with ${violations} violations!`);
+    console.error(`✖ BLOCK 轨迹账本物理边界检查未通过，共 ${violations} 处违规:`);
     process.exit(1);
   }
 
-  console.log('🎉 [PASS] Trajectory ledger physical bounds gate passed cleanly.');
+  console.log('🎉 ✔ PASS 轨迹账本物理边界检查通过。');
   process.exit(0);
 }
 

@@ -220,7 +220,7 @@ function renderDimensionTableRows(dimensions) {
     const parsed = Number(rawVal);
     const numStr = d.num.trim().replace('.', '');
     if (rawVal == null || isNaN(parsed) || parsed <= 0) {
-      rows.push(`| ${numStr} | ${d.labelEn} | N/A | [N/A] | \`[${' '.repeat(PROGRESS_BAR_BLOCKS)}]\` | ${d.desc} |`);
+      rows.push(`| ${numStr} | ${d.labelEn} | N/A | N/A | \`[${' '.repeat(PROGRESS_BAR_BLOCKS)}]\` | ${d.desc} |`);
     } else {
       const scoreStr = parsed.toFixed(1);
       const gradeTag = getGradeTag(parsed);

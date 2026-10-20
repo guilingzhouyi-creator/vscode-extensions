@@ -21,7 +21,7 @@ const fs = require('fs');
 const MOD_PATH = 'path';
 const MOD_CHILD_PROCESS = 'child_process';
 const path = require(MOD_PATH);
-const { execSync } = require(MOD_CHILD_PROCESS);
+const { execFileSync } = require(MOD_CHILD_PROCESS);
 
 const ENCODING_UTF8 = 'utf8';
 const STDIN_TOKEN = '-';
@@ -200,7 +200,8 @@ function validateCommitRange(range) {
 
   let rawLog = '';
   try {
-    rawLog = execSync(`git log --no-merges --format="%x1e%H%x1f%B" ${range}`, {
+    // Argument array: the range is one argv element and cannot be parsed as shell syntax.
+    rawLog = execFileSync('git', ['log', '--no-merges', '--format=%x1e%H%x1f%B', range], {
       cwd: root,
       env,
       encoding: ENCODING_UTF8,
@@ -280,7 +281,7 @@ function buildCommitMsgViolations(res, target) {
 function handleRangeMode(range, isAgentMode) {
   const res = validateCommitRange(range);
   if (!res.passed) {
-    if (res.failure) console.error(`❌ [FAIL] ${res.failure}`);
+    if (res.failure) console.error(`✖ BLOCK ${res.failure}`);
     process.exit(1);
   }
 
@@ -306,7 +307,7 @@ function handleRangeMode(range, isAgentMode) {
 function readCommitContent(target) {
   if (target === STDIN_TOKEN) return fs.readFileSync(0, ENCODING_UTF8);
   if (!fs.existsSync(target)) {
-    console.error(`❌ [FAIL] 提交信息文件不存在: ${target}`);
+    console.error(`✖ BLOCK 提交信息文件不存在: ${target}`);
     process.exit(1);
   }
   return fs.readFileSync(target, ENCODING_UTF8);
@@ -362,7 +363,7 @@ function reportCommitMsgFailure(res, target, isAgentMode) {
   }
 
   if (res.hallucinatedRules.length > 0) {
-    console.error('✖ [FAIL] RULE-TRUTH-08: 提交信息提及未在单源注册表登记的虚构或漂移规则 ID:');
+    console.error('✖ BLOCK RULE-TRUTH-08: 提交信息提及未在单源注册表登记的虚构或漂移规则 ID:');
     for (const h of res.hallucinatedRules) {
       console.error(`   • 未知规则 ID: ${h}`);
     }
@@ -370,7 +371,7 @@ function reportCommitMsgFailure(res, target, isAgentMode) {
   }
 
   if ((res.batchFindings || []).length > 0) {
-    console.error('✖ [FAIL] SLANG-GUARD-02: 提交信息包含施工批次或临时标记 (一票否决，不进入弹性走廊):');
+    console.error('✖ BLOCK SLANG-GUARD-02: 提交信息包含施工批次或临时标记 (一票否决，不进入弹性走廊):');
     for (const f of res.batchFindings) {
       console.error(`   • 第 ${f.lineNum} 行: '${f.term}'`);
     }

@@ -345,7 +345,7 @@ function findRepoCodeFiles(dir, fileList = []) {
 function printHumanDensityReport(allViolations, uniqueFilesLength, exemptCount) {
   if (allViolations.length > 0) {
     recordFailureSnapshot(allViolations);
-    console.error(`\n❌ [FAIL] 检测到 ${allViolations.length} 项代码密度与接线超标违规:`);
+    console.error(`\n✖ BLOCK 检测到 ${allViolations.length} 项代码密度与接线超标违规:`);
     for (const v of allViolations) {
       console.error(`   - ${v.file} [${v.ruleId}]: ${v.message}`);
       console.error(`     👉 修复指引: ${v.actionableFix}`);
@@ -355,7 +355,7 @@ function printHumanDensityReport(allViolations, uniqueFilesLength, exemptCount) 
   }
 
   console.log(
-    `  ✔ [PASS] 100% 文件符合五维代码密度与接线载荷约束 (扫描: ${uniqueFilesLength} 文件, 合法豁免: ${exemptCount} 文件, 违规: 0)`,
+    `  ✔ PASS 100% 文件符合五维代码密度与接线载荷约束 (扫描: ${uniqueFilesLength} 文件, 合法豁免: ${exemptCount} 文件, 违规: 0)`,
   );
   process.exit(0);
 }
@@ -368,11 +368,23 @@ function run() {
   let targets = [...options.files];
 
   if (options.range) {
-    targets = targets.concat(getRangeFiles(options.range));
+    try {
+      targets = targets.concat(getRangeFiles(options.range, undefined, { strict: true }));
+    } catch (err) {
+      // Fail closed: an unresolvable range examined nothing, so PASS would be a false clean bill.
+      process.stderr.write(`✖ BLOCK ${err.message}\n`);
+      process.exit(1);
+    }
   } else if (options.all) {
     targets = targets.concat(findRepoCodeFiles(process.cwd()));
   } else if (options.staged || targets.length === 0) {
-    targets = targets.concat(getStagedFiles());
+    try {
+      targets = targets.concat(getStagedFiles(undefined, undefined, { strict: true }));
+    } catch (err) {
+      // Fail closed: an unreadable index examined nothing, so PASS would be a false clean bill.
+      process.stderr.write(`✖ BLOCK ${err.message}\n`);
+      process.exit(1);
+    }
   }
 
   const uniqueFiles = Array.from(new Set(targets)).filter(
@@ -399,7 +411,7 @@ function run() {
       );
       process.exit(0);
     }
-    console.log('  ✔ [PASS] 无代码文件需要执行五维代码密度审查');
+    console.log('  ✔ PASS 无代码文件需要执行五维代码密度审查');
     process.exit(0);
   }
 

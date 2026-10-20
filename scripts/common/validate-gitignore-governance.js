@@ -300,11 +300,11 @@ function main() {
   }
 
   if (result.passed) {
-    console.log(`[PASS] Gitignore Governance: Audited ${result.fileCount} .gitignore files across monorepo. All constraints met.`);
+    console.log(`✔ PASS Gitignore Governance: Audited ${result.fileCount} .gitignore files across monorepo. All constraints met.`);
     process.exit(0);
   }
 
-  console.error(`[FAIL] Gitignore Governance: Detected ${result.violations.length} violation(s):`);
+  console.error(`✖ BLOCK Gitignore Governance: Detected ${result.violations.length} violation(s):`);
   for (const violation of result.violations) {
     console.error(`  - ${violation}`);
   }

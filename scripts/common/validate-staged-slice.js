@@ -14,8 +14,8 @@
 
 const fs = require("fs");
 const path = require("path");
-const { execSync } = require("child_process");
-const { getSafeGitEnv, readStagedBuffersBatch } = require("./git-env");
+const { execSync, execFileSync } = require("child_process");
+const { getSafeGitEnv, readStagedBuffersBatch, getStagedFiles: queryStagedFiles } = require("./git-env");
 
 let ts;
 const REPO_ROOT = path.resolve(__dirname, "../..");
@@ -346,12 +346,14 @@ function getStagedHunkMap(explicitFiles) {
     });
     parseGitDiffHunks(raw, map);
   } catch (gitErr) {
-    // Best-effort diff hunk parsing: ignore git failure and use fallback file list
-    void gitErr;
+    // Hunk diff is an optimisation; the filename fallback below still covers the index.
+    // That fallback must not swallow its own failure: an unreadable repo is not an empty one.
   }
 
   if (map.size === 0) {
-    for (const file of getStagedFilesFallback()) {
+    // Shared provider: one index-enumeration implementation and one failure policy for all gates.
+    const stagedList = getStagedFilesSafe();
+    for (const file of stagedList) {
       map.set(path.resolve(REPO_ROOT, file), { changedLines: null, isNew: false });
     }
   }
@@ -360,42 +362,30 @@ function getStagedHunkMap(explicitFiles) {
 }
 
 /**
- * Fallback: Reads staged filenames without fine-grained hunk diff line mapping.
- *
- * @returns {string[]}
- */
-function getStagedFilesFallback() {
-  try {
-    const raw = execSync("git diff --cached --name-only --diff-filter=ACM", {
-      cwd: REPO_ROOT,
-      encoding: "utf8",
-      stdio: ["pipe", "pipe", "ignore"],
-      env: getGitEnv(),
-    });
-    return raw
-      .split("\n")
-      .map((s) => s.trim())
-      .filter(
-        (f) =>
-          f.length > 0 &&
-          (f.endsWith(".ts") || f.endsWith(".js")) &&
-          !f.endsWith(".d.ts") &&
-          !f.includes("dist/") &&
-          !f.includes("out/") &&
-          !f.includes("fixtures/") &&
-          fs.existsSync(f),
-      );
-  } catch {
-    return [];
-  }
-}
-
-/**
  * Retrieves list of staged source file paths.
  *
  * @param {string[]} explicitFiles - Explicit CLI targets
  * @returns {string[]}
  */
+/**
+ * Lists staged TS/JS sources through the shared Git provider.
+ *
+ * The extension filter stays here because it is a slice-gate concern; enumeration and error
+ * policy belong to git-env so every gate blocks identically when the index is unreadable.
+ *
+ * @returns {string[]} Repo-relative staged source paths.
+ */
+function getStagedFilesSafe() {
+  return queryStagedFiles(REPO_ROOT, undefined, { strict: true }).filter(
+    (f) => (f.endsWith(".ts") || f.endsWith(".js"))
+      && !f.endsWith(".d.ts")
+      && !f.includes("dist/")
+      && !f.includes("out/")
+      && !f.includes("fixtures/")
+      && fs.existsSync(path.resolve(REPO_ROOT, f)),
+  );
+}
+
 function getStagedFiles(explicitFiles) {
   const map = getStagedHunkMap(explicitFiles);
   return Array.from(map.keys());
@@ -934,7 +924,8 @@ function analyzeFunction(node, sourceFile, cfg) {
 function readStagedContentSafe(filePath) {
   const rel = path.relative(REPO_ROOT, filePath).replace(/\\/g, "/");
   try {
-    return execSync(`git show :${rel}`, {
+    // Argument array: a staged filename containing shell metacharacters stays a single path.
+    return execFileSync("git", ["show", `:${rel}`], {
       cwd: REPO_ROOT,
       encoding: "utf8",
       stdio: ["pipe", "pipe", "ignore"],
@@ -1052,6 +1043,30 @@ function analyzeFile(filePath, overrides = {}, changedLines = null, prefetched =
  *
  * @param {boolean} isAgentMode - Autonomous Agent format flag.
  */
+/**
+ * Reads the staged hunk map, blocking when the repository cannot be enumerated.
+ *
+ * An unreadable index and an empty index both yield no files, but only the second is a legitimate
+ * pass. Treating the first as empty would report a clean review that never happened.
+ *
+ * @param {string[]} explicitFiles - Explicit CLI targets.
+ * @param {boolean} isAgentMode - Autonomous Agent format flag.
+ * @returns {Map<string, { changedLines: Set<number>|null, isNew: boolean }>} Mapped staged files.
+ */
+function readStagedHunkMapOrBlock(explicitFiles, isAgentMode) {
+  try {
+    return getStagedHunkMap(explicitFiles);
+  } catch (err) {
+    if (isAgentMode) {
+      console.log(JSON.stringify({ protocolVersion: "1.0.0", status: "BLOCK", gate: "pre-commit:ast-slice", summary: err.message }, null, 2));
+    } else {
+      console.error(`  ✖ [BLOCK] ${err.message}`);
+      console.error("  👉 修复指引: 确认当前目录是完整 Git 仓库（git status 可用），或显式传入文件路径跳过索引枚举。");
+    }
+    process.exit(1);
+  }
+}
+
 function handleEmptyHunkMap(isAgentMode) {
   if (isAgentMode) {
     console.log(
@@ -1067,7 +1082,7 @@ function handleEmptyHunkMap(isAgentMode) {
       ),
     );
   } else {
-    console.log("  ✔ [PASS] 暂存区无 TS/JS 源码需执行 AST 切片审查");
+    console.log("  ✔ PASS 暂存区无 TS/JS 源码需执行 AST 切片审查");
   }
   process.exit(0);
 }
@@ -1175,7 +1190,7 @@ function renderSliceViolations(allViolations, isAgentMode) {
   }
 
   for (const [rel, violations] of fileGroups) {
-    console.error(`  ❌ [FAIL] ${rel}:`);
+    console.error(`  ✖ BLOCK ${rel}:`);
     for (const v of violations) {
       console.error(
         `     - L${v.line} [${v.ruleId}] ${v.message}${v.actionableFix ? " → 建议: " + v.actionableFix : ""}`,
@@ -1210,7 +1225,7 @@ function renderSliceSuccess(isAgentMode) {
     );
   } else {
     console.log(
-      `  ✔ [PASS] 暂存区 AST 切片审查通过（圈复杂度 <= 15 [私有 <= 18, 分发器 <= 25], 嵌套 <= 4, 噪声比 <= 4.0）`,
+      `  ✔ PASS 暂存区 AST 切片审查通过（圈复杂度 <= 15 [私有 <= 18, 分发器 <= 25], 嵌套 <= 4, 噪声比 <= 4.0）`,
     );
   }
   process.exit(0);
@@ -1219,7 +1234,7 @@ function renderSliceSuccess(isAgentMode) {
 function run() {
   const { flags, explicitFiles } = parseCliFlags(process.argv.slice(2));
   const isAgentMode = Boolean(flags.agentMode);
-  const hunkMap = getStagedHunkMap(explicitFiles);
+  const hunkMap = readStagedHunkMapOrBlock(explicitFiles, isAgentMode);
 
   if (hunkMap.size === 0) {
     handleEmptyHunkMap(isAgentMode);

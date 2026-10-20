@@ -498,7 +498,7 @@ function main() {
         )
       );
     } else {
-      console.error(`❌ [FAIL] 提交信息文件不存在: ${filePath}`);
+      console.error(`✖ BLOCK 提交信息文件不存在: ${filePath}`);
     }
     process.exit(1);
   }

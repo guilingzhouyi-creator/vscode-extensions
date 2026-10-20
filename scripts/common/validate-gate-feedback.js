@@ -30,9 +30,12 @@ const SCAN_TARGETS = Object.freeze([
   'fractal-git/scripts',
   'WebGames/scripts/ps1',
   'WebGames/scripts/sh',
+  // CI carries operator-facing step comments. Leaving it out let positional labels survive a
+  // semantics migration that covered every first-party script.
+  '.github/workflows',
 ]);
 
-const SCAN_EXTENSIONS = new Set(['.js', '.ps1', '.sh', '.py']);
+const SCAN_EXTENSIONS = new Set(['.js', '.ps1', '.sh', '.py', '.yml', '.yaml']);
 const IGNORED_DIRS = new Set(['node_modules', 'dist', 'out', '__pycache__', 'archive', 'fixtures']);
 
 /** Positional labels that must never reach operator-facing feedback. */
@@ -42,14 +45,35 @@ const ORDINAL_LABEL_PATTERNS = Object.freeze([
   { id: 'ORDINAL-STAGE', pattern: /\bStage\s+\d+\s*:/ },
 ]);
 
-/** Status synonyms that collapse into the four-state vocabulary. */
+/**
+ * Verdict synonyms banned everywhere, not only inside entry points.
+ *
+ * The closed vocabulary has exactly four members. A validator that prints `✖ BLOCK` above its
+ * detail lines and `[FAIL]` in the detail body emits two different words for one state, which is
+ * how readers learn to treat the vocabulary as decorative. The distinction that matters is not
+ * "entry point vs validator" but "verdict vs prose": only these bracketed forms are banned, and
+ * plain diagnostic prose is still free.
+ */
 const STATUS_SYNONYMS = Object.freeze([
   { id: 'STATUS-OK', pattern: /\[OK\]/ },
   { id: 'STATUS-PASS-WITH-WARNING', pattern: /(?<![A-Z_])PASS_WITH_WARNING(?![A-Z_])/ },
+  { id: 'STATUS-FAIL-BRACKET', pattern: /\[FAIL\]/ },
+  { id: 'STATUS-FAILED-BRACKET', pattern: /\[FAILED\]/ },
+  { id: 'STATUS-ERROR-BRACKET', pattern: /\[ERROR\]/ },
+  { id: 'STATUS-NA-BRACKET', pattern: /\[N\/A\]/ },
+  { id: 'STATUS-DONE-BRACKET', pattern: /\[DONE\]/ },
+  { id: 'STATUS-SUCCESS-BRACKET', pattern: /\[SUCCESS\]/ },
+  { id: 'STATUS-INFO-BRACKET', pattern: /\[INFO\]/ },
 ]);
 
-/** Lines that legitimately mention a pattern (documentation of the ban itself). */
-const ALLOW_MARKERS = Object.freeze(['validate-gate-feedback.js', 'gate-step-registry.json']);
+/**
+ * Lines that legitimately mention a pattern.
+ *
+ * `test-gate-guards.js` must contain violating samples to prove the guards reject them, so its
+ * fixtures are evidence rather than offences. Exempting the file by identity (not by pattern
+ * shape) keeps the exemption visible and impossible to widen by accident.
+ */
+const ALLOW_MARKERS = Object.freeze(['validate-gate-feedback.js', 'gate-step-registry.json', 'test-gate-guards.js']);
 
 /**
  * Recursively collects scannable gate files.
@@ -81,10 +105,11 @@ function collectFiles(dir, acc = []) {
 function auditFile(file) {
   const rel = path.relative(REPO_ROOT, file).replace(/\\/g, '/');
   if (ALLOW_MARKERS.some((marker) => rel.endsWith(marker))) return [];
+  const patterns = [...ORDINAL_LABEL_PATTERNS, ...STATUS_SYNONYMS];
   const findings = [];
   const lines = fs.readFileSync(file, 'utf8').split(/\r?\n/);
   lines.forEach((line, index) => {
-    for (const { id, pattern } of [...ORDINAL_LABEL_PATTERNS, ...STATUS_SYNONYMS]) {
+    for (const { id, pattern } of patterns) {
       if (pattern.test(line)) {
         findings.push({ type: id, file: rel, line: index + 1, detail: line.trim().slice(0, 120) });
       }

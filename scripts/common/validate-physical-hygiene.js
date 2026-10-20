@@ -510,11 +510,11 @@ class PhysicalHygieneAuditor {
     }
 
     if (evaluation.totalViolations === 0) {
-      console.log('\n✔ [PASS] 全工作区物理卫生八维刚性公理 100% 全部合规\n');
+      console.log('\n✔ PASS 全工作区物理卫生八维刚性公理 100% 全部合规\n');
       process.exit(0);
     }
 
-    console.log(`\n❌ [FAIL] 检测到 ${evaluation.totalViolations} 处物理卫生违规，可运行 node scripts/common/validate-physical-hygiene.js --fix 进行自动自愈\n`);
+    console.log(`\n✖ BLOCK 检测到 ${evaluation.totalViolations} 处物理卫生违规，可运行 node scripts/common/validate-physical-hygiene.js --fix 进行自动自愈\n`);
     for (const [dim, list] of Object.entries(this.violations)) {
       if (list.length === 0) continue;
       console.log(`  [${dim}] 发现 ${list.length} 处违规:`);

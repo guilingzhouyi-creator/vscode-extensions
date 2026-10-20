@@ -122,7 +122,7 @@ function main() {
   try {
     unreachable = runAudit();
   } catch (err) {
-    console.error(`[FAIL] Rule reachability audit could not run: ${err.message}`);
+    console.error(`✖ BLOCK Rule reachability audit could not run: ${err.message}`);
     process.exit(1);
   }
 
@@ -151,7 +151,7 @@ function main() {
     process.exit(0);
   }
 
-  console.error(`[FAIL] Rule reachability: ${unreachable.length} error rule(s) without implementation references:`);
+  console.error(`✖ BLOCK Rule reachability: ${unreachable.length} error rule(s) without implementation references:`);
   for (const rule of unreachable) {
     console.error(`  - ${rule.id} (${rule.project}/${rule.family})`);
   }

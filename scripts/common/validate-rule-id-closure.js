@@ -142,7 +142,7 @@ function main() {
   try {
     result = runClosureAudit();
   } catch (err) {
-    console.error(`[FAIL] Rule ID closure audit could not run: ${err.message}`);
+    console.error(`✖ BLOCK Rule ID closure audit could not run: ${err.message}`);
     process.exit(1);
   }
 
@@ -175,7 +175,7 @@ function main() {
   }
 
   console.error(
-    `[FAIL] Rule ID closure: ${result.unregistered.length} unregistered identifier(s) referenced by gate assets.`,
+    `✖ BLOCK Rule ID closure: ${result.unregistered.length} unregistered identifier(s) referenced by gate assets.`,
   );
   for (const item of result.unregistered) {
     console.error(`  - ${item.id} <= ${item.files.join(', ')}`);

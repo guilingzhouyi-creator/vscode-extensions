@@ -53,7 +53,18 @@ const SEVERITY_PASS = 'pass';
 const SUGGESTION_SRP = 'Decompose module into cohesive submodules following Single Responsibility Principle';
 const SUGGESTION_SPLIT = 'Split file to reduce cognitive load and formatting bloat';
 const SUGGESTION_PROSE = 'Remove redundant blank lines or move extended prose documentation to Markdown specs';
-const SUGGESTION_DENSITY = 'Code density is below 33%; eliminate excessive blank padding or redundant boilerplate';
+/**
+ * Density advice is assembled per finding rather than stored as a constant: the actual floor is
+ * derived from DYNAMIC_MIN_PHYSICAL_LOC and the caller-supplied density target, so a fixed
+ * percentage in a shared string would disagree with the number that triggered the finding.
+ *
+ * @param {number} codeDensityPct - Observed ELOC/totalLoc ratio as a percentage.
+ * @returns {string} Operator-facing remediation hint carrying the observed value.
+ */
+function suggestDensity(codeDensityPct) {
+  return `Effective code density is ${codeDensityPct}%; eliminate excessive blank padding `
+    + 'or move long prose blocks into a Markdown specification';
+}
 const SUGGESTION_DOCS = 'Add required type contracts, state machine invariants, or JSDoc specification for complex logic';
 
 const CONSTANT_MAX_ELOC = 1800;
@@ -609,7 +620,7 @@ function evaluateDynamicEnvelope(metrics, options, filePath = '', content = '') 
         severity: SEVERITY_WARN,
         tag: TAG_VOL_DIL,
         message: `Effective logic density too low (${eloc} ELOC < dynamic floor ${dynamicMinEloc} ELOC, code ratio ${codeDensityPct}%): File occupies ${totalLoc} physical lines`,
-        suggestion: SUGGESTION_DENSITY,
+        suggestion: suggestDensity(codeDensityPct),
         actionable: {
           action: 'compact_diluted_lines',
           code: TAG_VOL_DIL,
@@ -638,7 +649,7 @@ function evaluateDynamicEnvelope(metrics, options, filePath = '', content = '') 
       return {
         severity: SEVERITY_WARN,
         tag: TAG_VOL_DOC,
-        message: `High-load logic lacks architecture contracts: Effective logic (${eloc} ELOC) has insufficient documentation density (${commentPct}% < 8%)`,
+        message: `High-load logic lacks architecture contracts: Effective logic (${eloc} ELOC) has insufficient documentation density (${commentPct}% < ${(MIN_CONTRACT_COMMENT_RATIO * 100).toFixed(0)}%)`,
         suggestion: SUGGESTION_DOCS,
         actionable: {
           action: 'insert_comment_contract',
@@ -665,10 +676,11 @@ function evaluateDynamicEnvelope(metrics, options, filePath = '', content = '') 
  * Retrieves staged files from git index.
  *
  * @returns {string[]}
+ * @throws {Error} When the index cannot be read; the CLI turns this into a blocking failure.
  */
 function getStagedFiles() {
   const root = path.resolve(__dirname, '..', '..');
-  return queryStagedFiles(root).filter((f) => fs.existsSync(f));
+  return queryStagedFiles(root, undefined, { strict: true }).filter((f) => fs.existsSync(f));
 }
 
 /**
@@ -885,7 +897,7 @@ function handleEmptyTargets(options, note) {
     );
     process.exit(0);
   }
-  console.log(`  ✔ [PASS] 双轨体积与 ELOC 预算检查：${note}`);
+  console.log(`  ✔ PASS 双轨体积与 ELOC 预算检查：${note}`);
   process.exit(0);
 }
 
@@ -997,7 +1009,7 @@ function printHumanAuditSummary(summaries, warnings, violations) {
   }
 
   if (violations.length > 0) {
-    console.error(`\n❌ [FAIL] ${violations.length} file(s) exceeded dual-scale code volume budget:`);
+    console.error(`\n✖ BLOCK ${violations.length} file(s) exceeded dual-scale code volume budget:`);
     for (const v of violations) {
       console.error(`   - ${v.file} [${v.tag}]: ${v.reason}`);
       if (v.suggestion) console.error(`     👉 Suggestion: ${v.suggestion}`);
@@ -1009,7 +1021,7 @@ function printHumanAuditSummary(summaries, warnings, violations) {
   summaries.sort((a, b) => b.eloc - a.eloc);
   const top = summaries[0];
   console.log(
-    `  ✔ [PASS] 100% 文件符合双轨体积与动态包络约束 (最高观测: ${top.relPath} -> ${top.eloc} ELOC / ${top.totalLoc} LOC, 密度: ${top.density}%, 稀释比: 1:${top.dilutionRatio})`,
+    `  ✔ PASS 100% 文件符合双轨体积与动态包络约束 (最高观测: ${top.relPath} -> ${top.eloc} ELOC / ${top.totalLoc} LOC, 密度: ${top.density}%, 稀释比: 1:${top.dilutionRatio})`,
   );
   console.log(
     `     📊 [DENSITY] 语义载荷与列密度监控: TSPR ${(top.tspr * 100).toFixed(1)}%, τ = ${top.tokensPerEloc} tokens/line, ρ_col = ${top.columnDensity}`,
@@ -1030,7 +1042,7 @@ function run() {
 
   if (options.unknownArgs.length > 0) {
     console.error(
-      `❌ [FAIL] 无法识别的命令行参数: ${options.unknownArgs.join(', ')}\n` +
+      `✖ BLOCK 无法识别的命令行参数: ${options.unknownArgs.join(', ')}\n` +
         '   未知参数会导致目标文件集合为空，从而产生假绿结果，故此处直接阻断 (VOL-ELOC-001)。\n' +
         `\n${USAGE_TEXT}`,
     );
@@ -1041,7 +1053,13 @@ function run() {
   if (options.all) {
     targets = targets.concat(findRepoCodeFiles(process.cwd()));
   } else if (options.staged || targets.length === 0) {
-    targets = targets.concat(getStagedFiles());
+    try {
+      targets = targets.concat(getStagedFiles());
+    } catch (err) {
+      // Fail closed: an unreadable index examined nothing, so the empty-target PASS would be false.
+      console.error(`✖ BLOCK ${err.message}`);
+      process.exit(1);
+    }
   }
 
   // Remove duplicates and apply ignore filters

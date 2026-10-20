@@ -70,6 +70,24 @@ const WEBGAMES_REQUIRED_ISOMORPHIC_PAIRS = [
 ];
 
 /**
+ * Known script pairings that must maintain strict isomorphic behavior in fractal-git scripts.
+ */
+const FRACTAL_GIT_ISOMORPHIC_PAIRS = [
+  'audit-taxis',
+  'build',
+  'gate-rust',
+];
+
+/**
+ * Key parameter flags that must be supported identically across fractal-git dual implementations.
+ */
+const FRACTAL_GIT_FLAG_ALIGNMENTS = {
+  'audit-taxis': ['Fast'],
+  'gate-rust': ['Fast'],
+  build: ['Fast', 'SkipRust'],
+};
+
+/**
  * Multi-domain script evaluation definitions.
  */
 const SCRIPT_DOMAINS = [
@@ -79,6 +97,7 @@ const SCRIPT_DOMAINS = [
     shDir: path.join(REPO_ROOT, 'scripts', 'sh'),
     pairs: REQUIRED_ISOMORPHIC_PAIRS,
     flags: REQUIRED_FLAG_ALIGNMENTS,
+    requireErrexit: true,
   },
   {
     name: 'WebGames',
@@ -86,6 +105,18 @@ const SCRIPT_DOMAINS = [
     shDir: path.join(REPO_ROOT, 'WebGames', 'scripts', 'sh'),
     pairs: WEBGAMES_REQUIRED_ISOMORPHIC_PAIRS,
     flags: {},
+    // WebGames/scripts/README.md states the policy: `set -uo pipefail` with failure carried by
+    // explicit exit codes, not by an implicit abort. Encoding the documented policy keeps the
+    // guard meaningful instead of permanently red on an intentional design.
+    requireErrexit: false,
+  },
+  {
+    name: 'fractal-git',
+    ps1Dir: path.join(REPO_ROOT, 'fractal-git', 'scripts', 'ps1'),
+    shDir: path.join(REPO_ROOT, 'fractal-git', 'scripts', 'sh'),
+    pairs: FRACTAL_GIT_ISOMORPHIC_PAIRS,
+    flags: FRACTAL_GIT_FLAG_ALIGNMENTS,
+    requireErrexit: true,
   },
 ];
 
@@ -97,14 +128,19 @@ const SCRIPT_DOMAINS = [
  * @returns {string|null} Error reason or null if clean.
  */
 function auditLineEnding(filePath, expectedEnding) {
-  const buf = fs.readFileSync(filePath);
-  const content = buf.toString('utf8');
-  const hasCRLF = content.includes('\r\n');
+  const content = fs.readFileSync(filePath, 'utf8');
+  const crlfCount = (content.match(/\r\n/g) || []).length;
+  const lfCount = (content.match(/\n/g) || []).length;
 
-  if (expectedEnding === 'CRLF' && !hasCRLF) {
+  // `content.includes('\r\n')` accepted a file with one CRLF among thousands of LF lines.
+  // A line-ending contract is about every line, so uniformity is what gets checked.
+  if (crlfCount > 0 && crlfCount !== lfCount) {
+    return `Mixed line endings on disk (${crlfCount} CRLF of ${lfCount} line breaks)`;
+  }
+  if (expectedEnding === 'CRLF' && crlfCount === 0) {
     return 'Expected CRLF line endings on disk, found LF';
   }
-  if (expectedEnding === 'LF' && hasCRLF) {
+  if (expectedEnding === 'LF' && crlfCount > 0) {
     return 'Expected LF line endings on disk, found CRLF';
   }
   return null;
@@ -124,22 +160,44 @@ function auditPs1Directives(content) {
   if (!content.includes('ErrorActionPreference')) {
     missing.push("Missing '$ErrorActionPreference = Stop'");
   }
+  // Without these two switches PowerShell keeps legacy native-argument munging and lets a failing
+  // native command continue, which is the same class of silent-success defect as `|| true`.
+  if (!content.includes('$PSNativeCommandUseErrorActionPreference')) {
+    missing.push("Missing '$PSNativeCommandUseErrorActionPreference = $true'");
+  }
+  if (!content.includes('$PSNativeCommandArgumentPassing')) {
+    missing.push("Missing \"$PSNativeCommandArgumentPassing = 'Standard'\"");
+  }
   return missing;
 }
 
 /**
  * Audit Bash defensive execution directives.
  *
+ * `pipefail` is required everywhere. `errexit` is required only where the domain demands it:
+ * WebGames scripts deliberately run without `set -e` and drive failure through explicit exit
+ * codes, a policy stated in WebGames/scripts/README.md. Treating that documented design as a
+ * defect would train readers to ignore the guard, so the policy is encoded instead of inferred.
+ *
  * @param {string} content - Script text.
+ * @param {boolean} requireErrexit - Whether `-e` must appear in the `set` options.
  * @returns {string[]} Missing directive list.
  */
-function auditShDirectives(content) {
+function auditShDirectives(content, requireErrexit = true) {
   const missing = [];
   if (!content.startsWith('#!/usr/bin/env bash') && !content.startsWith('#!/bin/bash')) {
     missing.push('Missing Bash shebang');
   }
   if (!content.includes('pipefail')) {
     missing.push("Missing 'pipefail' in defensive options");
+  }
+  if (requireErrexit) {
+    const setLine = /^set\s+([^\n]*)$/m.exec(content);
+    const options = setLine ? setLine[1] : '';
+    const firstFlagGroup = (options.split(/\s+/)[0] || '').replace(/^-/, '');
+    if (!firstFlagGroup.includes('e')) {
+      missing.push("Missing 'errexit' ('set -e') in defensive options");
+    }
   }
   return missing;
 }
@@ -207,7 +265,7 @@ function auditFlagAlignment(baseName, ps1Content, shContent, flagAlignments = RE
  * @param {Array<{ pair: string, reason: string }>} findings
  */
 function validateDomain(domain, findings) {
-  const { name, ps1Dir, shDir, pairs, flags } = domain;
+  const { name, ps1Dir, shDir, pairs, flags, requireErrexit = true } = domain;
   if (!fs.existsSync(ps1Dir) || !fs.existsSync(shDir)) {
     findings.push({ pair: name, reason: `PS1 or SH scripts directory missing: ${ps1Dir}` });
     return;
@@ -242,7 +300,7 @@ function validateDomain(domain, findings) {
     for (const dirErr of auditPs1Directives(ps1Content)) {
       findings.push({ pair: `${name}/${scriptName}.ps1`, reason: dirErr });
     }
-    for (const dirErr of auditShDirectives(shContent)) {
+    for (const dirErr of auditShDirectives(shContent, requireErrexit)) {
       findings.push({ pair: `${name}/${scriptName}.sh`, reason: dirErr });
     }
     for (const flagErr of auditFlagAlignment(scriptName, ps1Content, shContent, flags)) {
@@ -271,7 +329,7 @@ function run() {
   const findings = validateIsomorphism();
 
   if (findings.length > 0) {
-    console.error(`\n❌ [FAIL] 发现 ${findings.length} 处跨平台同构脚本或防御契约违规:`);
+    console.error(`\n✖ BLOCK 发现 ${findings.length} 处跨平台同构脚本或防御契约违规:`);
     for (const f of findings) {
       console.error(`  - [${f.pair}] ${f.reason}`);
     }
@@ -280,7 +338,7 @@ function run() {
 
   const totalPairs = SCRIPT_DOMAINS.reduce((sum, d) => sum + d.pairs.length, 0);
   const perDomain = SCRIPT_DOMAINS.map((d) => `${d.name} ${d.pairs.length} 对`).join(', ');
-  console.log(`  ✔ [PASS] 跨平台同构脚本与防御契约校验通过 (${totalPairs} 对同构脚本全部合规: ${perDomain})`);
+  console.log(`  ✔ PASS 跨平台同构脚本与防御契约校验通过 (${totalPairs} 对同构脚本全部合规: ${perDomain})`);
   process.exit(0);
 }
 
@@ -292,6 +350,8 @@ module.exports = {
   REQUIRED_ISOMORPHIC_PAIRS,
   REQUIRED_FLAG_ALIGNMENTS,
   WEBGAMES_REQUIRED_ISOMORPHIC_PAIRS,
+  FRACTAL_GIT_ISOMORPHIC_PAIRS,
+  FRACTAL_GIT_FLAG_ALIGNMENTS,
   SCRIPT_DOMAINS,
   auditLineEnding,
   auditPs1Directives,

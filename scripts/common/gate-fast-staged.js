@@ -70,9 +70,16 @@ const MAX_LOC_BUDGET = 1400;
  * validate-code-density DEFAULT_POR_LIMIT. Keeping the numbers identical here
  * prevents a file from passing this fast pre-screen and then failing the
  * downstream volume gates for the same measurement.
+ *
+ * Operator-facing text below interpolates these constants rather than repeating the
+ * figures. A literal in the message would silently disagree with the enforced value the
+ * next time either number changes, and the person reading the failure would fix the
+ * wrong thing.
  */
 const DENSITY_RATIO_LIMIT = 3.0;
 const PLUMBING_RATIO_LIMIT = 0.6;
+const DENSITY_RATIO_LABEL = DENSITY_RATIO_LIMIT.toFixed(1);
+const PLUMBING_RATIO_LABEL = `${(PLUMBING_RATIO_LIMIT * 100).toFixed(0)}%`;
 
 const MIN_FILENAME_STEM_LENGTH = 3;
 const MAX_FILENAME_STEM_LENGTH = 55;
@@ -125,7 +132,7 @@ const RAW_GATE_SPECS = `EMPTY-FILE|暂存区零空文件与零纯注释空壳检
 LINE-ENDING|换行/编码/EOF/缩进契约 (ps1 CRLF, 其余 LF, 无 BOM, 单 EOF, 无 Tab) 检查通过||
 PATH-LEAK|绝对路径与协议防泄漏检查通过|5|✖ [BLOCK] PATH-LEAK: 检测到新增代码中包含绝对路径或盘符泄漏:
 NOMENCLATURE|零黑话与规范命名检查通过||
-VOLUME-BUDGET|双轨体积预算与代码密度守卫 (ELOC<=900, LOC<=1400, 稀释比<=3.5, 接线比<=65%) 检查通过||
+VOLUME-BUDGET|双轨体积预算与代码密度守卫 (ELOC<=${MAX_ELOC_BUDGET}, LOC<=${MAX_LOC_BUDGET}, 稀释比<=${DENSITY_RATIO_LABEL}, 接线比<=${PLUMBING_RATIO_LABEL}) 检查通过||
 SECRET-LEAK|密钥与敏感 Token 防泄漏扫描通过|3|✖ [BLOCK] SECRET-LEAK: 检测到暂存代码中疑似包含未脱敏的真实密钥或私钥！`;
 
 const GATE_SPECS = Object.freeze(
@@ -147,10 +154,10 @@ NAME_SHORT|>= 3 chars|重命名文件以提供具有领域语义的描述名称
 NAME_LONG|<= 55 chars|通过划分清晰子目录解耦超长文件名
 EOL_PS1|CRLF|将该 PowerShell 脚本换行符转换为 CRLF
 EOL_LF|LF|将该文件换行符转换为 LF
-VOL_ELOC|ELOC <= 900|消除冗余实现并提取子模块以控制 ELOC <= 900
-VOL_LOC|LOC <= 1400|重构超大文件，按子领域解耦以控制 LOC <= 1400
-VOL_RATIO|垂直行稀释比超标 (totalLoc > eloc * 3.5)|消除空行堆叠或将长篇散文注释移至 Markdown 规范文档
-ARCH_FAC|接线代码占比过高 (wiringRatio > 65%)|消除空心透传跳板或为门面注入实质领域能力/不可变性冻结
+VOL_ELOC|ELOC <= ${MAX_ELOC_BUDGET}|消除冗余实现并提取子模块以控制 ELOC <= ${MAX_ELOC_BUDGET}
+VOL_LOC|LOC <= ${MAX_LOC_BUDGET}|重构超大文件，按子领域解耦以控制 LOC <= ${MAX_LOC_BUDGET}
+VOL_RATIO|垂直行稀释比超标 (totalLoc > eloc * ${DENSITY_RATIO_LABEL})|消除空行堆叠或将长篇散文注释移至 Markdown 规范文档
+ARCH_FAC|接线代码占比过高 (wiringRatio > ${PLUMBING_RATIO_LABEL})|消除空心透传跳板或为门面注入实质领域能力/不可变性冻结
 EMPTY_FILE|0 bytes|> 0 bytes with semantic payload|删除该空文件或实现实质代码逻辑
 EMPTY_WS|0 non-whitespace characters|实质内容|删除该虚空文件或填充代码
 PATH_LEAK|相对路径或环境变量动态解析|替换绝对路径或盘符为相对路径或 path.resolve(__dirname, ...)
@@ -176,7 +183,9 @@ const VIOLATION_TPLS = Object.freeze(
 );
 
 function getStagedFiles(repoRoot, explicitFiles = []) {
-  return queryStagedFiles(repoRoot, explicitFiles);
+  // Strict on the index read only: when the caller supplied explicit files there is nothing to
+  // enumerate, and queryStagedFiles returns them before touching Git.
+  return queryStagedFiles(repoRoot, explicitFiles, { strict: true });
 }
 
 function getStagedDiff(repoRoot, range = '') {
@@ -998,7 +1007,15 @@ function parseRunArgs(args) {
 function runFastStaged() {
   const { isAgentMode, range, explicitFiles, useIndex } = parseRunArgs(process.argv.slice(2));
   const repoRoot = path.resolve(__dirname, '../..');
-  const stagedFiles = getStagedFiles(repoRoot, explicitFiles);
+
+  let stagedFiles;
+  try {
+    stagedFiles = getStagedFiles(repoRoot, explicitFiles);
+  } catch (err) {
+    // Fail closed: an unreadable index examined nothing, so the empty-staging PASS below would lie.
+    console.error(`✖ BLOCK  STAGED-HYGIENE-01  ${err.message}`);
+    process.exit(1);
+  }
 
   const { gate1Violations, lineEndingViolations, nomenclatureViolations, volumeViolations, warnings } =
     checkFileStream(repoRoot, stagedFiles, useIndex);
