@@ -111,7 +111,7 @@ function main() {
   if (!ensureDependencies('workspace-timing', ['--ignore-scripts'])) process.exit(1);
   if (!ensureAutoRefactorBuild()) process.exit(1);
 
-  console.log('\n✔ Gate bootstrap complete. Run `npm run gate:precommit` before committing.');
+  console.log('\n✔ 门禁钩子激活完成。提交前可运行 `npm run gate:precommit` 预审。');
 }
 
 if (require.main === module) {

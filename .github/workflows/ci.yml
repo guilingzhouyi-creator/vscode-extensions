@@ -356,7 +356,7 @@ jobs:
           if bash scripts/sh/commit-msg-gate.sh "$MSG_TEMP" >/dev/null 2>&1; then
             echo "::error::commit-msg-gate 未拦截缺少正文的 feat 提交"; exit 1
           fi
-          # 5.1 Rule 5.1 (CMG-PRJ-001) 项目归属格式区自检
+          # PROJECT-SCOPE-06 (CMG-PRJ-001) 项目归属格式区自检
           # 5.1.1 缺少项目归属格式区应 exit 1
           printf "%s\n" \
             "feat(ci): 缺少项目归属格式区" \
@@ -389,7 +389,7 @@ jobs:
           if bash scripts/sh/commit-msg-gate.sh "$MSG_TEMP" >/dev/null 2>&1; then
             echo "::error::commit-msg-gate 未拦截非法项目名称"; exit 1
           fi
-          # 6. Rule 7 规则 ID 反虚构自检 (未知规则 ID 应 exit 1)
+          # RULE-TRUTH-08 (CMG-STY-002) 规则标识反虚构自检：未登记 ID 必须阻断
           printf "%s\n" \
             "feat(ci): 测试虚构规则拦截" \
             "" \
@@ -407,7 +407,7 @@ jobs:
           if bash scripts/sh/commit-msg-gate.sh "$MSG_TEMP" >/dev/null 2>&1; then
             echo "::error::commit-msg-gate 未拦截虚构规则 ID"; exit 1
           fi
-          # 7. Rule 8 风格与文本约束自检 (validate-commit-msg-style --test 与四类阻断)
+          # TEXT-TRUTH-09 (CMG-STY-002) 风格与文本约束自检
           node scripts/common/validate-commit-msg-style.js --test
           # 7.1 验证风格元叙事口号拦截 (CAT-04)
           printf "%s\n" \
@@ -477,14 +477,22 @@ jobs:
           node scripts/common/generate-rule-catalog.js --check-only
           # 8.0 规则 ID 闭包：门禁引用的规则必须全部登记
           node scripts/common/validate-rule-id-closure.js
-          # 8.0.1 文档一致性、规则可达性与双实现行为差分
+          # 8.0.1 文档一致性、文档规模数字真源渲染、规则可达性与双实现行为差分
+          node scripts/common/sync-doc-metrics.js
           node scripts/common/validate-docs-consistency.js
           node scripts/common/validate-rule-reachability.js
           node scripts/common/test-gate-parity.js
           node scripts/common/test-gate-selftest.js
+          # 8.0.2 门禁助手定义顺序与判定词表闭包，并证明各守卫确实能检出缺陷
+          node scripts/common/validate-gate-ordering.js
+          node scripts/common/validate-hardcoded-counts.js
+          node scripts/common/validate-block-chains.js
+          node scripts/common/validate-gate-verdicts.js
+          node scripts/common/validate-gate-feedback.js
+          node scripts/common/test-gate-guards.js
           # 8.1 平台级零空文件与跳板物理卫生自检
           node scripts/common/validate-physical-hygiene.js
-          # 8.2 跨平台同构脚本与防御契约（24 对 PS1/SH 参数与守卫对齐）
+          # 8.2 跨平台同构脚本与防御契约（27 对 PS1/SH 参数与守卫对齐）
           node scripts/common/validate-script-isomorphism.js
           # 8.3 .gitignore 治理与受控文件洁净度
           node scripts/common/validate-gitignore-governance.js
@@ -502,7 +510,7 @@ jobs:
           # 11. WebGames 配置架构与规范审查
           python3 WebGames/scripts/py/audit_config.py --strict
           # 11.1 WebGames 文档 Mermaid 真解析（audit_docs 的字符启发式发现不了语法破损）
-          npm install --prefix WebGames/scripts/js --no-audit --no-fund --silent
+          npm ci --prefix WebGames/scripts/js --no-audit --no-fund --silent
           node WebGames/scripts/js/validate-mermaid.mjs
           # 12. 工作区统一轨迹记录与边界自检
           node scripts/common/record-workspace-trajectory.js

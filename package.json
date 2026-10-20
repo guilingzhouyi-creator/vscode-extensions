@@ -11,9 +11,16 @@
     "gate:rules": "node scripts/common/generate-rule-catalog.js --check-only",
     "gate:closure": "node scripts/common/validate-rule-id-closure.js",
     "gate:docs": "node scripts/common/validate-docs-consistency.js",
+    "gate:docmetrics": "node scripts/common/sync-doc-metrics.js",
+    "gate:docmetrics:write": "node scripts/common/sync-doc-metrics.js --write",
     "gate:reach": "node scripts/common/validate-rule-reachability.js",
     "gate:parity": "node scripts/common/test-gate-parity.js",
     "gate:selftest": "node scripts/common/test-gate-selftest.js",
-    "gate:bootstrap": "node scripts/common/bootstrap-gates.js"
+    "gate:guards": "node scripts/common/test-gate-guards.js",
+    "gate:ordering": "node scripts/common/validate-gate-ordering.js",
+    "gate:bootstrap": "node scripts/common/bootstrap-gates.js",
+    "gate:verdicts": "node scripts/common/validate-gate-verdicts.js",
+    "gate:counts": "node scripts/common/validate-hardcoded-counts.js",
+    "gate:chains": "node scripts/common/validate-block-chains.js"
   }
 }

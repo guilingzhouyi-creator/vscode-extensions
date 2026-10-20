@@ -237,7 +237,7 @@ for EXT in "${EXTS[@]}"; do
 
   VSIX="$OUT_DIR/$EXT-$PKG_VER.vsix"
   echo "  vsce package → $EXT-$PKG_VER.vsix ..."
-  (cd "$DIR" && npx --yes @vscode/vsce package -o "$VSIX")
+  (cd "$DIR" && npx --yes @vscode/vsce@4.0.0 package -o "$VSIX")
 
   # ─── 校验展示资产 (post 模式) ───
   if [[ -f "$ROOT/scripts/sh/check-display-assets.sh" ]]; then

@@ -13,6 +13,8 @@
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+$PSNativeCommandUseErrorActionPreference = $true
+$PSNativeCommandArgumentPassing = 'Standard'
 
 function Get-DisplayWidth {
     [CmdletBinding()]

@@ -23,6 +23,8 @@ param(
 Set-StrictMode -Version Latest
 
 $ErrorActionPreference = 'Stop'
+$PSNativeCommandUseErrorActionPreference = $true
+$PSNativeCommandArgumentPassing = 'Standard'
 
 # ─── 根目录解析：本脚本位于 <根>/scripts/ps1/，上溯两级 ───
 # 不变量自检：脚本被移动到新目录（如 scripts/ 重构为 scripts/ps1/）时，

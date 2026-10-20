@@ -148,7 +148,7 @@ bash "$ROOT/scripts/sh/check-display-assets.sh" "$EXT" pre || exit 1
 echo "【$EXT】步骤 4/6: vsce package → dist/$EXT/$EXT-$TARGET_VER.vsix ..."
 mkdir -p "$OUT_DIR"
 VSIX="$OUT_DIR/$EXT-$TARGET_VER.vsix"
-(cd "$EXT_DIR" && npx --yes @vscode/vsce package -o "$VSIX") || { echo "::error::vsce package 失败" >&2; exit 1; }
+(cd "$EXT_DIR" && npx --yes @vscode/vsce@4.0.0 package -o "$VSIX") || { echo "::error::vsce package 失败" >&2; exit 1; }
 [[ -f "$VSIX" ]] || { echo "::error::产物缺失: $VSIX" >&2; exit 1; }
 
 # SHA256 校验和（与 release.yml 同构）

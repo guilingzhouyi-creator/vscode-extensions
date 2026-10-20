@@ -18,7 +18,7 @@ echo "================================================================="
 
 GIT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || true)
 if [[ -z "$GIT_ROOT" ]]; then
-    echo "❌ [FAIL] 当前目录不在 Git 仓库内！"
+    echo "✖ BLOCK 当前目录不在 Git 仓库内！"
     exit 1
 fi
 cd "$GIT_ROOT" || exit 1

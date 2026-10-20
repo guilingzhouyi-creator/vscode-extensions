@@ -14,6 +14,8 @@ param()
 Set-StrictMode -Version Latest
 
 $ErrorActionPreference = 'Stop'
+$PSNativeCommandUseErrorActionPreference = $true
+$PSNativeCommandArgumentPassing = 'Standard'
 
 Write-Host "=================================================================" -ForegroundColor Cyan
 Write-Host "🔧 正在激活仓库级 Git 本地提交门禁 (.githooks)..." -ForegroundColor Cyan
@@ -22,7 +24,7 @@ Write-Host "=================================================================" -
 # 检查当前目录是否为 Git 仓库根目录
 $gitRoot = git rev-parse --show-toplevel 2>$null
 if (-not $gitRoot) {
-    Write-Host "❌ [FAIL] 当前目录不在 Git 仓库内！" -ForegroundColor Red
+    Write-Host "✖ BLOCK 当前目录不在 Git 仓库内！" -ForegroundColor Red
     exit 1
 }
 
@@ -37,14 +39,14 @@ foreach ($hook in $requiredHooks) {
     }
 }
 if ($missingHooks.Count -gt 0) {
-    Write-Host "❌ [FAIL] .githooks 缺少必需入口: $($missingHooks -join ', ')" -ForegroundColor Red
+    Write-Host "✖ BLOCK .githooks 缺少必需入口: $($missingHooks -join ', ')" -ForegroundColor Red
     exit 1
 }
 
 # 配置 core.hooksPath
 git config core.hooksPath .githooks
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "❌ [FAIL] 写入 core.hooksPath 失败。" -ForegroundColor Red
+    Write-Host "✖ BLOCK 写入 core.hooksPath 失败。" -ForegroundColor Red
     exit 1
 }
 

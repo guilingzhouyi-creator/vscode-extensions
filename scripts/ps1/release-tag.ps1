@@ -28,6 +28,8 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+$PSNativeCommandUseErrorActionPreference = $true
+$PSNativeCommandArgumentPassing = 'Standard'
 
 if (-not $env:GIT_CONFIG_GLOBAL) { $env:GIT_CONFIG_GLOBAL = 'NUL' }
 if (-not $env:GIT_CONFIG_SYSTEM) { $env:GIT_CONFIG_SYSTEM = 'NUL' }
@@ -187,7 +189,7 @@ if (-not (Test-Path $outDir)) {
     New-Item -ItemType Directory -Path $outDir -Force | Out-Null
 }
 $vsixPath = Join-Path $outDir "$Ext-$targetVer.vsix"
-& npx --yes @vscode/vsce package --cwd $extDir -o $vsixPath
+& npx --yes @vscode/vsce@4.0.0 package --cwd $extDir -o $vsixPath
 if ($LASTEXITCODE -ne 0 -or -not (Test-Path $vsixPath)) {
     Write-Error "::error::vsce package 失败"
     exit 1
