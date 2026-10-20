@@ -1,0 +1,201 @@
+{
+  "schema": "workspace-doc-metrics/v1",
+  "description": "Single source of truth for every scale metric rendered into governance documents. Each entry declares how the value is derived and how it is rendered inside a METRICS region; no document may hardcode the value.",
+  "scan": {
+    "skipDirectories": [
+      "node_modules",
+      ".git",
+      "out",
+      "dist",
+      "bin",
+      "obj",
+      "target",
+      ".venv",
+      ".audit-logs",
+      "archive"
+    ],
+    "skipPaths": [
+      "WebGames/docs",
+      ".agents/plugins"
+    ],
+    "note": "WebGames/docs holds 936 game design dossiers unrelated to engineering governance; scanning it would fire this gate on every narrative edit. .agents/plugins is a gitignored derived bundle mirrored from .agents/skills by sync-skills.js, so a correction written there would be silently reverted and never committed."
+  },
+  "metrics": [
+    {
+      "id": "rule-total",
+      "title": "全仓规则 SSOT 总数",
+      "source": "scripts/common/rule-catalog.json#totalRules",
+      "template": "全工作区 SSOT 单源收录 **{value} 条规则**",
+      "inline": "**{value} 条规则**"
+    },
+    {
+      "id": "rule-auto-refactor",
+      "title": "auto-refactor 项目规则口径",
+      "source": "scripts/common/rule-catalog.json#counts.autoRefactor",
+      "template": "auto-refactor 项目 **{value} 条规则**",
+      "inline": "**{value} 条规则**"
+    },
+    {
+      "id": "rule-auto-refactor-canonical",
+      "title": "auto-refactor 规范命名规则",
+      "source": "scripts/common/rule-catalog.json canonical id split",
+      "template": "**{value} 条规范命名规则**",
+      "inline": "**{value} 条**"
+    },
+    {
+      "id": "rule-auto-refactor-legacy",
+      "title": "auto-refactor 历史别名规则",
+      "source": "scripts/common/rule-catalog.json legacy id split",
+      "template": "**{value} 条历史别名规则**",
+      "inline": "**{value} 条**"
+    },
+    {
+      "id": "rule-webgames",
+      "title": "WebGames 项目规则口径",
+      "source": "scripts/common/rule-catalog.json#counts.webGames",
+      "template": "WebGames 项目 **{value} 条规则**",
+      "inline": "**{value} 条规则**"
+    },
+    {
+      "id": "rule-workspace-timing",
+      "title": "workspace-timing 项目规则口径",
+      "source": "scripts/common/rule-catalog.json#counts.workspaceTiming",
+      "template": "workspace-timing 项目 **{value} 条规则**",
+      "inline": "**{value} 条规则**"
+    },
+    {
+      "id": "rule-fractal-git",
+      "title": "fractal-git 项目规则口径",
+      "source": "scripts/common/rule-catalog.json#counts.fractalGit",
+      "template": "fractal-git 项目 **{value} 条规则**",
+      "inline": "**{value} 条规则**"
+    },
+    {
+      "id": "rule-global-tooling",
+      "title": "全局工具链规则口径",
+      "source": "scripts/common/rule-catalog.json#counts.globalTooling",
+      "template": "全局工具链 **{value} 条规则**",
+      "inline": "**{value} 条规则**"
+    },
+    {
+      "id": "step-pre-commit",
+      "title": "提交前置门禁步骤数",
+      "source": "scripts/common/gate-step-registry.json#entries.pre-commit",
+      "template": "提交前置门禁 **{value} 个语义步骤**",
+      "inline": "**{value} 个语义步骤**"
+    },
+    {
+      "id": "step-pre-push",
+      "title": "推送前置门禁步骤数",
+      "source": "scripts/common/gate-step-registry.json#entries.pre-push",
+      "template": "推送前置门禁 **{value} 个语义步骤**",
+      "inline": "**{value} 个语义步骤**"
+    },
+    {
+      "id": "step-commit-msg",
+      "title": "提交信息门禁步骤数",
+      "source": "scripts/common/gate-step-registry.json#entries.commit-msg",
+      "template": "提交信息门禁 **{value} 个语义步骤**",
+      "inline": "**{value} 个语义步骤**"
+    },
+    {
+      "id": "step-audit-all",
+      "title": "全工作区审查步骤数",
+      "source": "scripts/common/gate-step-registry.json#entries.audit-all",
+      "template": "全工作区审查 **{value} 个语义步骤**",
+      "inline": "**{value} 个语义步骤**"
+    },
+    {
+      "id": "step-audit-taxis",
+      "title": "fractal-git 审查步骤数",
+      "source": "scripts/common/gate-step-registry.json#entries.audit-taxis",
+      "template": "fractal-git 审查 **{value} 个语义步骤**",
+      "inline": "**{value} 个语义步骤**"
+    },
+    {
+      "id": "step-total",
+      "title": "门禁语义步骤总数",
+      "source": "scripts/common/gate-step-registry.json#all entries",
+      "template": "单源登记 **{value} 个语义步骤**",
+      "inline": "**{value} 个语义步骤**"
+    },
+    {
+      "id": "iso-pairs",
+      "title": "跨平台同构脚本对数",
+      "source": "filesystem: scripts|WebGames|fractal-git ps1<->sh basename intersection",
+      "template": "**{value} 对跨平台同构脚本**",
+      "inline": "**{value} 对跨平台同构脚本**"
+    },
+    {
+      "id": "iso-pairs-root",
+      "title": "根脚本库同构脚本对数",
+      "source": "filesystem: scripts/ps1 <-> scripts/sh",
+      "template": "**{value} 对同构脚本**",
+      "inline": "**{value} 对同构脚本**"
+    },
+    {
+      "id": "wg-docs-md-all",
+      "title": "WebGames 文档库 Markdown 总数（含归档）",
+      "source": "filesystem: WebGames/docs/**/*.md",
+      "template": "**{value} 份 md**",
+      "inline": "**{value} 份 md**"
+    },
+    {
+      "id": "wg-docs-md-active",
+      "title": "WebGames 活跃文档 Markdown 数（不含归档）",
+      "source": "filesystem: WebGames/docs/**/*.md excluding 归档库",
+      "template": "**{value} 份活跃 md**",
+      "inline": "**{value} 份活跃 md**"
+    },
+    {
+      "id": "skill-count",
+      "title": "研发技能数",
+      "source": "filesystem: .agents/skills/* directory count",
+      "template": "全工作区 **{value} 项研发技能**",
+      "inline": "**{value} 项**"
+    },
+    {
+      "id": "skill-doc-count",
+      "title": "技能集 Markdown 文档数",
+      "source": "filesystem: .agents/skills/**/*.md count",
+      "template": "**{value} 篇技能文档**",
+      "inline": "**{value} 篇**"
+    },
+    {
+      "id": "analyzer-count",
+      "title": "内置分析器数",
+      "source": "auto-refactor/src/core/router/sparseRuleRouter.ts#ALL_BUILTIN_ANALYZERS",
+      "template": "**{value} 个内置分析器**",
+      "inline": "**{value} 个**"
+    },
+    {
+      "id": "script-inventory",
+      "title": "scripts 库物理脚本数",
+      "source": "filesystem: scripts/{common,ps1,sh}/*.{js,json,ps1,sh}",
+      "template": "脚本库共 **{value} 份受控脚本**",
+      "inline": "**{value} 份**"
+    }
+  ],
+  "inventoryAnnotations": {
+    "common/eloc-budget-baseline.json": {
+      "lang": "JSON",
+      "role": "data / complexity（双轨体积棘轮基线快照：每份受控源码的 ELOC/LOC 历史最低值，grow-only）",
+      "callers": "`evaluate-eloc-budget`"
+    },
+    "common/gate-step-registry.js": {
+      "lang": "Node.js",
+      "role": "gate / registry（步骤登记表的加载、结构校验与 TSV 投影；Bash 门禁无 JSON 解析器时经此读取步骤身份）",
+      "callers": "`pre-push-gate`、`audit-all`、`validate-gate-verdicts`"
+    },
+    "common/gate-step-registry.json": {
+      "lang": "JSON",
+      "role": "data / ssot（门禁入口、步骤身份、显示顺序与规则归属的单源登记表）",
+      "callers": "门禁双实现、`validate-gate-verdicts`、`validate-gate-ordering`"
+    },
+    "common/rule-reachability-exceptions.json": {
+      "lang": "JSON",
+      "role": "data / ssot（error 级规则执行入口可达性的显式豁免清单，逐条写明豁免理由）",
+      "callers": "`validate-rule-reachability`"
+    }
+  }
+}
