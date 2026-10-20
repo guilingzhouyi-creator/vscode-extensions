@@ -207,6 +207,24 @@ function evaluateCargoTestResult(testResult, violations) {
 }
 
 /**
+ * Computes objective gate score bounded by composite code quality and check pass ratio.
+ *
+ * @param {boolean} isOverallPass - Whether all hard gate barriers passed cleanly.
+ * @param {number} finalCompositeScore - Deep AST quality score or Bayesian fallback.
+ * @param {number} passChecks - Number of passed checks.
+ * @param {number} totalChecks - Total checks evaluated.
+ * @returns {number} Objective gate score in [15.0, 100.0].
+ */
+function computeGateScore(isOverallPass, finalCompositeScore, passChecks, totalChecks) {
+  if (totalChecks <= 0) return 15.0;
+  const ratio = passChecks / totalChecks;
+  if (isOverallPass) {
+    return Number(finalCompositeScore.toFixed(2));
+  }
+  return Math.max(15.0, Number((finalCompositeScore * ratio).toFixed(2)));
+}
+
+/**
  * Main execution orchestrator.
  */
 async function main() {
@@ -259,7 +277,7 @@ async function main() {
         warning: warnings.length,
         error: violations.length,
       },
-      gateScore: isOverallPass ? 100.0 : Math.max(15.0, Number((100.0 * (passChecks / totalChecks)).toFixed(1))),
+      gateScore: computeGateScore(isOverallPass, finalCompositeScore, passChecks, totalChecks),
       compositeScore: finalCompositeScore,
       caiIndex: finalCaiIndex,
       bayesianConfidence: {

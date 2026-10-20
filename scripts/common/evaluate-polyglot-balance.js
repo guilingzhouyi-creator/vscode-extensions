@@ -196,6 +196,12 @@ function sampleRustScore() {
   if (fs.existsSync(fgReportPath)) {
     try {
       const data = JSON.parse(fs.readFileSync(fgReportPath, 'utf8'));
+      if (typeof data.summary?.compositeScore === 'number' && data.summary.compositeScore > 0) {
+        return Math.min(100, Math.max(0, data.summary.compositeScore));
+      }
+      if (typeof data.qualityEnvelope?.composite_score === 'number' && data.qualityEnvelope.composite_score > 0) {
+        return Math.min(100, Math.max(0, data.qualityEnvelope.composite_score));
+      }
       if (typeof data.summary?.bayesianConfidence?.credibleScore === 'number') {
         return Math.min(100, Math.max(0, data.summary.bayesianConfidence.credibleScore));
       }

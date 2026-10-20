@@ -466,14 +466,19 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF" "$LOG_FG"
     const fgReportPath = path.join(repoRoot, "fractal-git", "reports", "audit-latest.json");
     if (fs.existsSync(fgReportPath)) {
       const fgData = JSON.parse(fs.readFileSync(fgReportPath, "utf8"));
-      if (fgData && fgData.summary && fgData.summary.checks > 0) {
-        const totalChecksFg = Number(fgData.summary.checks);
-        const passChecksFg = fgData.summary.byStatus && fgData.summary.byStatus.PASS ? Number(fgData.summary.byStatus.PASS) : 0;
-        const warnCountFg = fgData.summary.bySeverity && fgData.summary.bySeverity.warning ? Number(fgData.summary.bySeverity.warning) : 0;
-        const errCountFg = fgData.summary.bySeverity && fgData.summary.bySeverity.error ? Number(fgData.summary.bySeverity.error) : 0;
-        if (totalChecksFg > 0) {
-          const ratioFg = passChecksFg / totalChecksFg;
-          const rawFg = (100.0 * ratioFg) - (warnCountFg * 0.035) - (errCountFg * 5.0);
+      if (fgData && fgData.summary) {
+        if (typeof fgData.summary.compositeScore === "number" && fgData.summary.compositeScore > 0) {
+          baseFg = Number(fgData.summary.compositeScore.toFixed(2));
+        } else if (fgData.qualityEnvelope && typeof fgData.qualityEnvelope.composite_score === "number") {
+          baseFg = Number(fgData.qualityEnvelope.composite_score.toFixed(2));
+        } else if (fgData.summary.checks > 0) {
+          const totalChecksFg = Number(fgData.summary.checks);
+          const passChecksFg = fgData.summary.byStatus && fgData.summary.byStatus.PASS ? Number(fgData.summary.byStatus.PASS) : 0;
+          const warnCountFg = fgData.summary.bySeverity && fgData.summary.bySeverity.warning ? Number(fgData.summary.bySeverity.warning) : 0;
+          const errCountFg = fgData.summary.bySeverity && fgData.summary.bySeverity.error ? Number(fgData.summary.bySeverity.error) : 0;
+          const credibleFg = fgData.summary.bayesianConfidence && fgData.summary.bayesianConfidence.credibleScore;
+          const baselineScore = typeof credibleFg === "number" ? credibleFg : (100.0 * (passChecksFg / totalChecksFg));
+          const rawFg = baselineScore - (warnCountFg * 0.035) - (errCountFg * 5.0);
           baseFg = Math.max(SCORE_FLOOR, Number(rawFg.toFixed(1)));
         }
       }
@@ -483,7 +488,7 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF" "$LOG_FG"
   }
 
   if (baseFg === null) {
-    baseFg = statusFg === "PASS" ? 100.0 : SCORE_FLOOR;
+    baseFg = statusFg === "PASS" ? 90.0 : SCORE_FLOOR;
   }
   const scoreFg = statusFg === "PASS" ? baseFg : Math.max(SCORE_FLOOR, Number((baseFg - 60.0).toFixed(1)));
 

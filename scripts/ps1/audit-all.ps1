@@ -584,23 +584,41 @@ try {
         $fgData = Get-Content -Path $fgReportPath -Raw -Encoding utf8 | ConvertFrom-Json
         $fgSummary = if ($null -ne $fgData) { Get-SafeProp $fgData "summary" } else { $null }
         if ($null -ne $fgSummary) {
-            $rawChecksFg = Get-SafeProp $fgSummary "checks"
-            if ($null -ne $rawChecksFg -and [double]$rawChecksFg -gt 0) {
-                $totalChecksFg = [double]$rawChecksFg
-                $byStatusFg = Get-SafeProp $fgSummary "byStatus"
-                $rawPassFg = if ($null -ne $byStatusFg) { Get-SafeProp $byStatusFg "PASS" } else { $null }
-                $passChecksFg = if ($null -ne $rawPassFg) { [double]$rawPassFg } else { 0.0 }
+            # 优先读取真实 AST 深度自审综合质量得分 (compositeScore)
+            $rawCompositeFg = Get-SafeProp $fgSummary "compositeScore"
+            if ($null -ne $rawCompositeFg -and [double]$rawCompositeFg -gt 0) {
+                $baseFg = [double]$rawCompositeFg
+            } else {
+                $qualityEnvFg = Get-SafeProp $fgData "qualityEnvelope"
+                $rawEnvScoreFg = if ($null -ne $qualityEnvFg) { Get-SafeProp $qualityEnvFg "composite_score" } else { $null }
+                if ($null -ne $rawEnvScoreFg -and [double]$rawEnvScoreFg -gt 0) {
+                    $baseFg = [double]$rawEnvScoreFg
+                }
+            }
 
-                $bySevFg = Get-SafeProp $fgSummary "bySeverity"
-                $rawWarnFg = if ($null -ne $bySevFg) { Get-SafeProp $bySevFg "warning" } else { $null }
-                $warnCountFg = if ($null -ne $rawWarnFg) { [double]$rawWarnFg } else { 0.0 }
+            # 若未完成 AST 扫描，退化到基于客观 checks 与贝叶斯后验均值
+            if ($null -eq $baseFg) {
+                $rawChecksFg = Get-SafeProp $fgSummary "checks"
+                if ($null -ne $rawChecksFg -and [double]$rawChecksFg -gt 0) {
+                    $totalChecksFg = [double]$rawChecksFg
+                    $byStatusFg = Get-SafeProp $fgSummary "byStatus"
+                    $rawPassFg = if ($null -ne $byStatusFg) { Get-SafeProp $byStatusFg "PASS" } else { $null }
+                    $passChecksFg = if ($null -ne $rawPassFg) { [double]$rawPassFg } else { 0.0 }
 
-                $rawErrFg = if ($null -ne $bySevFg) { Get-SafeProp $bySevFg "error" } else { $null }
-                $errCountFg = if ($null -ne $rawErrFg) { [double]$rawErrFg } else { 0.0 }
+                    $bySevFg = Get-SafeProp $fgSummary "bySeverity"
+                    $rawWarnFg = if ($null -ne $bySevFg) { Get-SafeProp $bySevFg "warning" } else { $null }
+                    $warnCountFg = if ($null -ne $rawWarnFg) { [double]$rawWarnFg } else { 0.0 }
 
-                $ratioFg = $passChecksFg / $totalChecksFg
-                $rawFg = (100.0 * $ratioFg) - ($warnCountFg * 0.035) - ($errCountFg * 5.0)
-                $baseFg = [math]::Max($SCORE_FLOOR, [math]::Round($rawFg, 1))
+                    $rawErrFg = if ($null -ne $bySevFg) { Get-SafeProp $bySevFg "error" } else { $null }
+                    $errCountFg = if ($null -ne $rawErrFg) { [double]$rawErrFg } else { 0.0 }
+
+                    $bayesFg = Get-SafeProp $fgSummary "bayesianConfidence"
+                    $credibleFg = if ($null -ne $bayesFg) { Get-SafeProp $bayesFg "credibleScore" } else { $null }
+                    $baselineScore = if ($null -ne $credibleFg) { [double]$credibleFg } else { 100.0 * ($passChecksFg / $totalChecksFg) }
+
+                    $rawFg = $baselineScore - ($warnCountFg * 0.035) - ($errCountFg * 5.0)
+                    $baseFg = [math]::Max($SCORE_FLOOR, [math]::Round($rawFg, 1))
+                }
             }
         }
     }
@@ -609,18 +627,14 @@ try {
 }
 
 if ($null -eq $baseFg) {
-    # 基于静态检查与测试执行状态客观加权回退
-    $baseFg = if ($statusFg -eq "PASS") {
-        100.0
-    } else {
-        $fgChecksPassed = 0
-        if ($resFgTopo.ExitCode -eq 0) { $fgChecksPassed += 1 }
-        if ($resFgParity.ExitCode -eq 0) { $fgChecksPassed += 1 }
-        if ($resFgBridge.ExitCode -eq 0) { $fgChecksPassed += 1 }
-        if ($resFgAlloc.ExitCode -eq 0) { $fgChecksPassed += 1 }
-        if ($null -ne $procFg -and $procFg.ExitCode -eq 0) { $fgChecksPassed += 1 }
-        [math]::Max($SCORE_FLOOR, [math]::Round(100.0 * ($fgChecksPassed / 5.0), 1))
-    }
+    # 静态检查与测试执行状态客观加权回退（基于通过项比例衰减，杜绝盲目硬编码 100.0）
+    $fgChecksPassed = 0
+    if ($resFgTopo.ExitCode -eq 0) { $fgChecksPassed += 1 }
+    if ($resFgParity.ExitCode -eq 0) { $fgChecksPassed += 1 }
+    if ($resFgBridge.ExitCode -eq 0) { $fgChecksPassed += 1 }
+    if ($resFgAlloc.ExitCode -eq 0) { $fgChecksPassed += 1 }
+    if ($null -ne $procFg -and $procFg.ExitCode -eq 0) { $fgChecksPassed += 1 }
+    $baseFg = [math]::Max($SCORE_FLOOR, [math]::Round(90.0 * ($fgChecksPassed / 5.0), 1))
 }
 
 $scoreFg = if ($statusFg -eq "PASS") {
