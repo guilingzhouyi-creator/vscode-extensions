@@ -64,6 +64,61 @@ function resolveCodeDomain(
     return DOMAIN_MODULE_CONSTANTS;
 }
 
+/** Parsed declaration parts of a constant line. */
+interface ConstantDeclarationMatch {
+    isExported: boolean;
+    name: string;
+    rawValue: string;
+}
+
+/**
+ * Apply a successful regex match to the declaration parts.
+ *
+ * @param match - Regex match with export flag, name and raw value groups.
+ * @returns Normalized declaration parts.
+ */
+function toDeclarationMatch(match: RegExpMatchArray): ConstantDeclarationMatch {
+    return {
+        isExported: Boolean(match[1]),
+        name: match[2],
+        rawValue: match[3].trim().replace(/;$/, ''),
+    };
+}
+
+/**
+ * Match a constant declaration against the language-specific pattern for a file.
+ *
+ * Contract: TypeScript/JavaScript files first try the generic `const` pattern and only fall
+ * back to the Rust pattern when the line carries a `const`/`static` keyword, which covers
+ * declaration files that embed Rust snippets.
+ *
+ * @param trimmed - Trimmed source line.
+ * @param filePath - Owning file path used to select the language.
+ * @returns Parsed declaration parts, or null when the line declares no constant.
+ */
+function matchConstantDeclaration(
+    trimmed: string,
+    filePath: string,
+): ConstantDeclarationMatch | null {
+    const isRust = filePath.endsWith('.rs');
+    const isGo = filePath.endsWith('.go');
+
+    if (isRust) {
+        const rustMatch = trimmed.match(RUST_CONST_DECL_RE);
+        return rustMatch ? toDeclarationMatch(rustMatch) : null;
+    }
+    if (isGo) {
+        const goMatch = trimmed.match(GO_CONST_DECL_RE);
+        return goMatch ? toDeclarationMatch(goMatch) : null;
+    }
+
+    const tsMatch = trimmed.match(TS_CONST_DECL_RE);
+    if (tsMatch) return toDeclarationMatch(tsMatch);
+    if (!trimmed.includes('const ') && !trimmed.includes('static ')) return null;
+    const fallbackMatch = trimmed.match(RUST_CONST_DECL_RE);
+    return fallbackMatch ? toDeclarationMatch(fallbackMatch) : null;
+}
+
 function tryParseConstantEntity(
     trimmed: string,
     line: string,
@@ -74,44 +129,10 @@ function tryParseConstantEntity(
     filePath: string,
     currentScope: string | null,
 ): ConstantEntity | null {
-    const isRust = filePath.endsWith('.rs');
-    const isGo = filePath.endsWith('.go');
-    let match: RegExpMatchArray | null = null;
-    let isExported = false;
-    let name = '';
-    let rawValue = '';
+    const declaration = matchConstantDeclaration(trimmed, filePath);
+    if (!declaration) return null;
 
-    if (isRust) {
-        match = trimmed.match(RUST_CONST_DECL_RE);
-        if (match) {
-            isExported = Boolean(match[1]);
-            name = match[2];
-            rawValue = match[3].trim().replace(/;$/, '');
-        }
-    } else if (isGo) {
-        match = trimmed.match(GO_CONST_DECL_RE);
-        if (match) {
-            isExported = Boolean(match[1]);
-            name = match[2];
-            rawValue = match[3].trim().replace(/;$/, '');
-        }
-    } else {
-        match = trimmed.match(TS_CONST_DECL_RE);
-        if (match) {
-            isExported = Boolean(match[1]);
-            name = match[2];
-            rawValue = match[3].trim().replace(/;$/, '');
-        } else if (trimmed.includes('const ') || trimmed.includes('static ')) {
-            match = trimmed.match(RUST_CONST_DECL_RE);
-            if (match) {
-                isExported = Boolean(match[1]);
-                name = match[2];
-                rawValue = match[3].trim().replace(/;$/, '');
-            }
-        }
-    }
-
-    if (!match) return null;
+    const { isExported, name, rawValue } = declaration;
     if (COMPLEX_INITIALIZER_RE.test(rawValue)) return null;
 
     const codeDomain = resolveCodeDomain(scopeStack, pastImports, lineIndex, line);

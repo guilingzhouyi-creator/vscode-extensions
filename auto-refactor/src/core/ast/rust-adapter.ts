@@ -145,6 +145,14 @@ const CONST_BOUND_PARENTS: ReadonlySet<string> = new Set([
     'static_item',
     'enum_variant',
 ]);
+/** Ancestor types that terminate an upward context probe: literals never leak past them. */
+const ANCESTOR_PROBE_STOP_TYPES: ReadonlySet<string> = new Set([TYPE_FUNCTION_ITEM, 'block']);
+/** Maximum ancestor hops when resolving a const-bound literal. */
+const CONST_PROBE_DEPTH = 6;
+/** Maximum ancestor hops when resolving a tolerated literal context. */
+const TOLERATED_PROBE_DEPTH = 4;
+/** Test marker text carried by `#[test]` / `#[cfg(test)]` attribute items. */
+const RUST_TEST_MARKER_RE = /test/;
 
 /**
  * Rust LanguageAdapter translating a tree-sitter-rust CST into the shared normalized AST.
@@ -375,15 +383,7 @@ export class RustAdapter implements LanguageAdapter {
      * @returns `true` for literals under `const` / `static` items or enum variants.
      */
     private isConstBound(_syntaxNode: TreeSitterNode, parent: TreeSitterNode | undefined): boolean {
-        let curr: TreeSitterNode | undefined | null = parent;
-        let depth = 0;
-        while (curr && depth < 6) {
-            if (CONST_BOUND_PARENTS.has(curr.type)) return true;
-            if (curr.type === TYPE_FUNCTION_ITEM || curr.type === 'block') break;
-            curr = curr.parent;
-            depth++;
-        }
-        return false;
+        return this.hasAncestorIn(parent, CONST_BOUND_PARENTS, CONST_PROBE_DEPTH);
     }
 
     /**
@@ -400,22 +400,35 @@ export class RustAdapter implements LanguageAdapter {
     ): boolean {
         if (!parent) return false;
         if (this.isTestItemContext(parent)) return true;
-        if (syntaxNode.type === TYPE_INTEGER_LITERAL || syntaxNode.type === TYPE_FLOAT_LITERAL) {
-            let curr: TreeSitterNode | undefined | null = parent;
-            let depth = 0;
-            while (curr && depth < 4) {
-                if (NUMERIC_TOLERATED_PARENTS.has(curr.type)) return true;
-                if (curr.type === TYPE_FUNCTION_ITEM || curr.type === 'block') break;
-                curr = curr.parent;
-                depth++;
-            }
-            return false;
-        }
-        let curr: TreeSitterNode | undefined | null = parent;
+        const isNumeric =
+            syntaxNode.type === TYPE_INTEGER_LITERAL || syntaxNode.type === TYPE_FLOAT_LITERAL;
+        const toleratedSet = isNumeric ? NUMERIC_TOLERATED_PARENTS : STRING_TOLERATED_PARENTS;
+        return this.hasAncestorIn(parent, toleratedSet, TOLERATED_PROBE_DEPTH);
+    }
+
+    /**
+     * Walk the raw parent chain looking for a tolerated ancestor type.
+     *
+     * Contract: the probe stops on the first ancestor whose type belongs to
+     * `ANCESTOR_PROBE_STOP_TYPES` (function item or block), so a literal inside a nested function
+     * never inherits tolerance from an enclosing item. Depth is capped to keep the walk bounded on
+     * pathological trees.
+     *
+     * @param start - first ancestor to inspect; `undefined` yields `false`.
+     * @param toleratedTypes - ancestor types that grant tolerance.
+     * @param maxDepth - maximum number of parent hops.
+     * @returns `true` when a tolerated ancestor is found before the stop types or depth cap.
+     */
+    private hasAncestorIn(
+        start: TreeSitterNode | undefined,
+        toleratedTypes: ReadonlySet<string>,
+        maxDepth: number,
+    ): boolean {
+        let curr: TreeSitterNode | undefined | null = start;
         let depth = 0;
-        while (curr && depth < 4) {
-            if (STRING_TOLERATED_PARENTS.has(curr.type)) return true;
-            if (curr.type === TYPE_FUNCTION_ITEM || curr.type === 'block') break;
+        while (curr && depth < maxDepth) {
+            if (toleratedTypes.has(curr.type)) return true;
+            if (ANCESTOR_PROBE_STOP_TYPES.has(curr.type)) break;
             curr = curr.parent;
             depth++;
         }
@@ -432,7 +445,7 @@ export class RustAdapter implements LanguageAdapter {
             const child = children[i];
             if (child.type !== 'attribute_item') continue;
             const txt = child.text;
-            if (txt && (txt.includes('test') || txt.includes('cfg(test)'))) {
+            if (txt && RUST_TEST_MARKER_RE.test(txt)) {
                 return true;
             }
         }

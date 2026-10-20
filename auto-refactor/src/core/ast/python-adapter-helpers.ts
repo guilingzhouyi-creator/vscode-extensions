@@ -243,6 +243,25 @@ const SYSTEM_ARG_NAME_PATTERN =
 const SYSTEM_CALL_NAME_PATTERN =
     /^(?:print|log|info|warn|warning|error|debug|trace|fatal|critical|write|exception|exit|assert|format|compile|match|search|findall|sub|split|startswith|endswith|replace|get|getenv|join|append|extend|add|add_argument|add_parser|add_subparsers|set_defaults|open|update|loads|dumps|load|dump|read_text|write_text|mkdir|exists|glob|rglob|run|popen|check_output|encode|decode|strip|lstrip|rstrip|lower|upper|auditfinding|finding|violation|issue|diagnostic)$/i;
 
+/**
+ * Report whether the enclosing call is a known system/IO/logging API.
+ *
+ * @param ancestor - Node whose parent chain should contain the `call`.
+ * @returns `true` when the nearest `call` ancestor resolves to a tolerated callee.
+ */
+function isSystemCallAncestor(ancestor: TreeSitterNode | null | undefined): boolean {
+    if (!ancestor || ancestor.type !== 'call') return false;
+    const fnName = callNameOf(ancestor);
+    return Boolean(fnName && SYSTEM_CALL_NAME_PATTERN.test(fnName));
+}
+
+/**
+ * Report whether a keyword argument carries a CLI flag or a system-level parameter name.
+ *
+ * @param sn - Literal node under inspection.
+ * @param parent - Raw `keyword_argument` node.
+ * @returns `true` for `--flag` values and for parameters of known system APIs.
+ */
 function isKeywordArgumentTolerated(sn: TreeSitterNode, parent: TreeSitterNode): boolean {
     if (parent.type !== 'keyword_argument') return false;
     const raw = sn.text ? sn.text.replace(/^['"]|['"]$/g, '') : '';
@@ -250,12 +269,7 @@ function isKeywordArgumentTolerated(sn: TreeSitterNode, parent: TreeSitterNode):
     const argName = parent.childForFieldName ? parent.childForFieldName('name') : null;
     const nameText = argName?.text || parent.namedChildren?.[0]?.text;
     if (nameText && SYSTEM_ARG_NAME_PATTERN.test(nameText)) return true;
-    const callNode = parent.parent?.parent;
-    if (callNode && callNode.type === 'call') {
-        const fnName = callNameOf(callNode);
-        if (fnName && SYSTEM_CALL_NAME_PATTERN.test(fnName)) return true;
-    }
-    return false;
+    return isSystemCallAncestor(parent.parent?.parent);
 }
 
 function isComparisonTolerated(sn: TreeSitterNode, parent: TreeSitterNode): boolean {
@@ -268,12 +282,7 @@ function isArgumentListTolerated(sn: TreeSitterNode, parent: TreeSitterNode): bo
     if (parent.type !== 'argument_list') return false;
     const text = sn.text ? sn.text.replace(/^['"]|['"]$/g, '') : '';
     if (text && CLI_FLAG_PATTERN.test(text)) return true;
-    const callNode = parent.parent;
-    if (callNode && callNode.type === 'call') {
-        const fnName = callNameOf(callNode);
-        return Boolean(fnName && SYSTEM_CALL_NAME_PATTERN.test(fnName));
-    }
-    return false;
+    return isSystemCallAncestor(parent.parent);
 }
 
 /**
@@ -281,6 +290,7 @@ function isArgumentListTolerated(sn: TreeSitterNode, parent: TreeSitterNode): bo
  *
  * @param sn - Literal node to classify.
  * @param parent - Raw parent; undefined means the literal has no parent context.
+ * @param ctx - Optional map context carrying the enclosing test-function scope.
  * @returns `true` for docstrings/bare expressions, decorator arguments, subscript indices,
  *     keyword arguments, CLI flags, standard comparisons, and dictionary keys.
  */

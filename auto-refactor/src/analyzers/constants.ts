@@ -110,6 +110,38 @@ function isAlgorithmContext(role: string, filePath: string): boolean {
     return filePath.includes('/ast/') || filePath.includes('\\ast\\');
 }
 
+/** Canonical rule catalog location referenced by drift diagnostics. */
+const RULE_CATALOG_REFERENCE = 'scripts/common/rule-catalog.json';
+
+/**
+ * Build the diagnostic message for a hardcoded string literal, preferring the most specific
+ * finding: unregistered rule ID drift outranks a terminal status badge, which outranks the
+ * generic extraction advice.
+ *
+ * @param fallbackMessage - Message produced by the literal classifier.
+ * @param driftedRules - Unregistered rule IDs found inside the literal.
+ * @param isBadge - Whether the literal is a terminal status badge.
+ * @param inner - Literal text with surrounding quotes removed.
+ * @returns The diagnostic message to attach to the issue.
+ */
+function resolveHardcodedStringMessage(
+    fallbackMessage: string,
+    driftedRules: readonly string[],
+    isBadge: boolean,
+    inner: string,
+): string {
+    if (driftedRules.length > 0) {
+        return (
+            `String literal contains unregistered rule ID \`${driftedRules.join(', ')}\`. ` +
+            `Rule ID must be registered in ${RULE_CATALOG_REFERENCE}.`
+        );
+    }
+    if (isBadge) {
+        return `Terminal status badge \`${inner}\` should be centralized in constants module.`;
+    }
+    return fallbackMessage;
+}
+
 /**
  * Detect inline literals that should be promoted to named constants.
  */
@@ -494,11 +526,7 @@ export class ConstantsAnalyzer implements Analyzer {
 
         const driftedRules = findUnregisteredRuleDrift(inner);
         const isBadge = isTerminalStatusBadge(inner);
-        const message = driftedRules.length > 0
-            ? `String literal contains unregistered rule ID \`${driftedRules.join(', ')}\`. Rule ID must be registered in scripts/common/rule-catalog.json.`
-            : isBadge
-            ? `Terminal status badge \`${inner}\` should be centralized in constants module.`
-            : res.message;
+        const message = resolveHardcodedStringMessage(res.message, driftedRules, isBadge, inner);
 
         return {
             id: `constants:${res.rule}:${ctx.filePath}:${lit.node.start?.line ?? 1}`,

@@ -41,21 +41,19 @@ import {
     type FileImportProfile,
 } from '../intelligence/import-profiler';
 import { inferFineGrainedFileRole } from '../intelligence/file-role-inference';
-import type { SymbolIndex } from '../intelligence/symbolIndex';
+import type { SymbolIndex, SymbolReference } from '../intelligence/symbolIndex';
 import { clampScore } from './bounded-corridor';
 import { computeExactBetaCredibleInterval } from './bayesian-beta-solver';
 
 const SCALE_LOC_EXPONENT = 4000;
 const SCALE_FILE_EXPONENT = 8;
 const PRECISION_THREE = 3;
-const PRECISION_TWO = 2;
 const PERCENT_MAX = 100.0;
 const PERCENT_FACTOR = 100;
 const MIN_EFFECTIVE_SAMPLE_SIZE = 2;
 const CONFIDENCE_LOW_THRESHOLD = 0.45;
 const PRIOR_JEFFREYS_ALPHA = 0.5;
 const PRIOR_JEFFREYS_BETA = 0.5;
-const NORMAL_Z95_CRITICAL_VALUE = 1.95996;
 
 const GRADE_L5_THRESHOLD = 95.0;
 const GRADE_L4_THRESHOLD = 85.0;
@@ -96,7 +94,6 @@ const TEST_HARNESS_PACKAGES: ReadonlySet<string> = new Set([
 function isTestOrFixtureFile(filePath: string): boolean {
     return TEST_FILE_OR_FIXTURE_PATTERN.test(filePath.replace(/\\/g, '/'));
 }
-
 
 function isProductionExternalSdk(
     specOrPkg: string,
@@ -709,6 +706,126 @@ function processBoundImportRef(
 }
 
 /**
+ * Per-scan memo tables shared while classifying symbol references.
+ */
+interface ReferenceScanCaches {
+    criticalByFile: Map<string, boolean>;
+    inventoryByFile: Map<string, ProjectManifestInventory>;
+}
+
+/**
+ * Immutable inputs the reference classifier needs for every call site.
+ */
+interface ReferenceScanInputs {
+    symbolIndex: SymbolIndex;
+    fileToExtPackages: Map<string, string[]>;
+    fileToImportProfiles?: Map<string, FileImportProfile>;
+    rootDir: string;
+    manifestDeps?: Set<string>;
+}
+
+/**
+ * Resolve (and memoize) whether a file sits on a critical execution path.
+ *
+ * @param file - File owning the reference.
+ * @param caches - Per-scan memo tables.
+ * @returns `true` when the file is production code on a critical path.
+ */
+function isCriticalFile(file: string, caches: ReferenceScanCaches): boolean {
+    const cached = caches.criticalByFile.get(file);
+    if (cached !== undefined) return cached;
+    const isCritical = !isTestOrFixtureFile(file) && CRITICAL_PATH_PATTERN.test(file);
+    caches.criticalByFile.set(file, isCritical);
+    return isCritical;
+}
+
+/**
+ * Resolve (and memoize) the nearest manifest inventory for a file.
+ *
+ * @param file - File owning the reference.
+ * @param caches - Per-scan memo tables.
+ * @param rootDir - Scan root used for the nearest-manifest walk.
+ * @returns The nearest manifest inventory.
+ */
+function resolveReferenceInventory(
+    file: string,
+    caches: ReferenceScanCaches,
+    rootDir: string,
+): ProjectManifestInventory {
+    const cached = caches.inventoryByFile.get(file);
+    if (cached !== undefined) return cached;
+    const resolved = findNearestManifestInventory(file, rootDir);
+    caches.inventoryByFile.set(file, resolved);
+    return resolved;
+}
+
+/**
+ * Count a reference that resolves to an in-project declaration.
+ *
+ * @param ref - Indexed call reference.
+ * @param isCritical - Whether the referencing file is on a critical path.
+ * @param symbolIndex - Materialized project symbol index.
+ * @param state - Autonomy evaluation state to update.
+ * @returns `true` when the reference was internal and has been counted.
+ */
+function countInternalReference(
+    ref: SymbolReference,
+    isCritical: boolean,
+    symbolIndex: SymbolIndex,
+    state: AutonomyScanState,
+): boolean {
+    if (!symbolIndex.hasDefinition(ref.name)) return false;
+    state.internalSymbolCalls++;
+    if (isCritical) state.criticalPathInternalCalls++;
+    return true;
+}
+
+/**
+ * Count a reference that is not backed by an in-project declaration: import-bound packages,
+ * common standard-library symbols, or the file's external SDK packages.
+ *
+ * Contract: a file with no declared external package degrades to a stdlib call rather than an
+ * external SDK call, so supply-chain metrics never inflate on unresolved references.
+ *
+ * @param ref - Indexed call reference.
+ * @param isCritical - Whether the referencing file is on a critical path.
+ * @param inputs - Immutable scan inputs.
+ * @param caches - Per-scan memo tables.
+ * @param state - Autonomy evaluation state to update.
+ */
+function countExternalReference(
+    ref: SymbolReference,
+    isCritical: boolean,
+    inputs: ReferenceScanInputs,
+    caches: ReferenceScanCaches,
+    state: AutonomyScanState,
+): void {
+    const fileInv = resolveReferenceInventory(ref.file, caches, inputs.rootDir);
+    const effectiveDeps =
+        fileInv.allDependencies.size > 0 ? fileInv.allDependencies : inputs.manifestDeps;
+
+    const profile = inputs.fileToImportProfiles?.get(ref.file);
+    const boundPkg = profile?.symbolToPackageMap.get(ref.name);
+    if (boundPkg) {
+        processBoundImportRef(boundPkg, ref.file, isCritical, effectiveDeps, fileInv, state);
+        return;
+    }
+
+    if (COMMON_STDLIB_SYMBOLS.has(ref.name)) {
+        state.stdlibCalls++;
+        return;
+    }
+
+    const extPkgs = inputs.fileToExtPackages.get(ref.file);
+    if (!extPkgs || extPkgs.length === 0) {
+        state.stdlibCalls++;
+        return;
+    }
+    const chosen = selectBalancedSdk(extPkgs, ref.name);
+    recordSdkCall(state, chosen, ref.file, isCritical);
+}
+
+/**
  * Overwrites call metrics with true AST call references from the indexed symbol graph
  * and local file import binding profiles.
  *
@@ -736,48 +853,22 @@ function applySymbolIndexReferences(
     state.sdkCallCounts.clear();
     state.sdkFileSets.clear();
 
-    const criticalByFile = new Map<string, boolean>();
-    const inventoryByFile = new Map<string, ProjectManifestInventory>();
+    const caches: ReferenceScanCaches = {
+        criticalByFile: new Map<string, boolean>(),
+        inventoryByFile: new Map<string, ProjectManifestInventory>(),
+    };
+    const inputs: ReferenceScanInputs = {
+        symbolIndex,
+        fileToExtPackages,
+        fileToImportProfiles,
+        rootDir,
+        manifestDeps,
+    };
 
     for (const ref of refs) {
-        let isCritical = criticalByFile.get(ref.file);
-        if (isCritical === undefined) {
-            isCritical = !isTestOrFixtureFile(ref.file) && CRITICAL_PATH_PATTERN.test(ref.file);
-            criticalByFile.set(ref.file, isCritical);
-        }
-        if (symbolIndex.hasDefinition(ref.name)) {
-            state.internalSymbolCalls++;
-            if (isCritical) state.criticalPathInternalCalls++;
-            continue;
-        }
-
-        let fileInv = inventoryByFile.get(ref.file);
-        if (fileInv === undefined) {
-            fileInv = findNearestManifestInventory(ref.file, rootDir);
-            inventoryByFile.set(ref.file, fileInv);
-        }
-        const effectiveDeps =
-            fileInv.allDependencies.size > 0 ? fileInv.allDependencies : manifestDeps;
-
-        const profile = fileToImportProfiles?.get(ref.file);
-        const boundPkg = profile?.symbolToPackageMap.get(ref.name);
-        if (boundPkg) {
-            processBoundImportRef(boundPkg, ref.file, isCritical, effectiveDeps, fileInv, state);
-            continue;
-        }
-
-        if (COMMON_STDLIB_SYMBOLS.has(ref.name)) {
-            state.stdlibCalls++;
-            continue;
-        }
-
-        const extPkgs = fileToExtPackages.get(ref.file);
-        if (extPkgs && extPkgs.length > 0) {
-            const chosen = selectBalancedSdk(extPkgs, ref.name);
-            recordSdkCall(state, chosen, ref.file, isCritical);
-        } else {
-            state.stdlibCalls++;
-        }
+        const isCritical = isCriticalFile(ref.file, caches);
+        if (countInternalReference(ref, isCritical, symbolIndex, state)) continue;
+        countExternalReference(ref, isCritical, inputs, caches, state);
     }
 }
 

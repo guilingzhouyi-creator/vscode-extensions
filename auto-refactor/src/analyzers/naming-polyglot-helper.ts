@@ -72,11 +72,9 @@ const RUST_TYPE_RE =
     /^\s*(?:pub(?:\s*\([^)]*\))?\s+)?(?:struct|enum|trait)\s+([a-zA-Z_][a-zA-Z0-9_]*)/;
 const RUST_CONST_RE =
     /^\s*(?:pub(?:\s*\([^)]*\))?\s+)?(?:const|static)\s+(?:mut\s+)?([a-zA-Z_][a-zA-Z0-9_]*)\s*:/;
-const RUST_LET_RE =
-    /^\s*let\s+(?:mut\s+)?([a-zA-Z_][a-zA-Z0-9_]*)\s*(?::[^=]+)?\s*=/;
+const RUST_LET_RE = /^\s*let\s+(?:mut\s+)?([a-zA-Z_][a-zA-Z0-9_]*)\s*(?::[^=]+)?\s*=/;
 const RUST_FOR_RE = /^\s*for\s+([a-zA-Z_][a-zA-Z0-9_]*)\s+in\b/;
-const RUST_TUPLE_LET_RE =
-    /^\s*let\s+(?:mut\s+)?\(([a-zA-Z0-9_,\s]+)\)\s*(?::[^=]+)?\s*=/;
+const RUST_TUPLE_LET_RE = /^\s*let\s+(?:mut\s+)?\(([a-zA-Z0-9_,\s]+)\)\s*(?::[^=]+)?\s*=/;
 const GDSCRIPT_FUNC_RE = /^\s*(?:static\s+)?func\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/;
 
 const GO_EXEMPT_NAMES = new Set([
@@ -243,11 +241,7 @@ function auditExtractedFunction(
     );
 }
 
-function auditRustType(
-    typeName: string,
-    lineIdx: number,
-    pCtx: PolyglotNamingContext,
-): void {
+function auditRustType(typeName: string, lineIdx: number, pCtx: PolyglotNamingContext): void {
     if (pCtx.opts.checkTypes !== false && !/^[A-Z][a-zA-Z0-9]*$/.test(typeName)) {
         pCtx.issues.push(
             pCtx.mkIssue({
@@ -276,11 +270,7 @@ function auditRustType(
     }
 }
 
-function auditRustConstant(
-    constName: string,
-    lineIdx: number,
-    pCtx: PolyglotNamingContext,
-): void {
+function auditRustConstant(constName: string, lineIdx: number, pCtx: PolyglotNamingContext): void {
     if (pCtx.opts.checkGlobals !== false && !/^[A-Z][A-Z0-9_]*$/.test(constName)) {
         pCtx.issues.push(
             pCtx.mkIssue({
@@ -313,6 +303,32 @@ function auditRustConstant(
     }
 }
 
+/** Single-letter identifiers that carry conventional loop or discard meaning. */
+const TOLERATED_SINGLE_LETTERS: ReadonlySet<string> = new Set(['_', 'i', 'j', 'k']);
+/** Pattern matching exactly one ASCII letter. */
+const SINGLE_LETTER_RE = /^[a-zA-Z]$/;
+
+/**
+ * Resolve whether a one-character name is an untolerated single letter.
+ *
+ * @param varName - Candidate identifier.
+ * @returns `true` only for single ASCII letters outside the `_`/`i`/`j`/`k` allowlist.
+ */
+function isUntoleratedSingleLetter(varName: string): boolean {
+    if (varName.length !== 1 || !SINGLE_LETTER_RE.test(varName)) return false;
+    return !TOLERATED_SINGLE_LETTERS.has(varName);
+}
+
+/**
+ * Resolve the vague-name blacklist for the current run, preferring the caller override.
+ *
+ * @param pCtx - Polyglot naming execution context.
+ * @returns The configured blacklist, or the shared default when unset.
+ */
+function resolveVagueBlacklist(pCtx: PolyglotNamingContext): ReadonlySet<string> {
+    return pCtx.opts.vagueBlacklist ? new Set(pCtx.opts.vagueBlacklist) : DEFAULT_VAGUE_BLACKLIST;
+}
+
 function auditRustVariable(
     varName: string,
     lineIdx: number,
@@ -321,49 +337,36 @@ function auditRustVariable(
 ): void {
     if (inTest) return;
 
-    if (pCtx.opts.checkSingleLetters !== false) {
-        if (
-            varName.length === 1 &&
-            /^[a-zA-Z]$/.test(varName) &&
-            varName !== '_' &&
-            varName !== 'i' &&
-            varName !== 'j' &&
-            varName !== 'k'
-        ) {
-            pCtx.issues.push(
-                pCtx.mkIssue({
-                    line: lineIdx + 1,
-                    column: 1,
-                    rule: 'NAM-SGL-001',
-                    message: `Single-letter variable name '${varName}' hurts code readability.`,
-                    severity: SEVERITY_WARNING,
-                    detail: { name: varName },
-                    suggestion:
-                        `Rename '${varName}' to descriptive identifier; only 'i','j','k','_' tolerated.`,
-                }),
-            );
-        }
+    if (pCtx.opts.checkSingleLetters !== false && isUntoleratedSingleLetter(varName)) {
+        pCtx.issues.push(
+            pCtx.mkIssue({
+                line: lineIdx + 1,
+                column: 1,
+                rule: 'NAM-SGL-001',
+                message: `Single-letter variable name '${varName}' hurts code readability.`,
+                severity: SEVERITY_WARNING,
+                detail: { name: varName },
+                suggestion: `Rename '${varName}' to descriptive identifier; only 'i','j','k','_' tolerated.`,
+            }),
+        );
     }
 
-    if (pCtx.opts.checkVagueNames !== false) {
-        const vagueSet = pCtx.opts.vagueBlacklist
-            ? new Set(pCtx.opts.vagueBlacklist)
-            : DEFAULT_VAGUE_BLACKLIST;
-        if (vagueSet.has(varName.toLowerCase())) {
-            pCtx.issues.push(
-                pCtx.mkIssue({
-                    line: lineIdx + 1,
-                    column: 1,
-                    rule: 'NAM-VAG-001',
-                    message:
-                        `Identifier '${varName}' is vague and uninformative; ` +
-                        'lacks domain context.',
-                    severity: SEVERITY_WARNING,
-                    detail: { name: varName },
-                    suggestion: `Replace '${varName}' with a domain-qualified identifier.`,
-                }),
-            );
-        }
+    const vagueCheckEnabled = pCtx.opts.checkVagueNames !== false;
+    const isVague = vagueCheckEnabled && resolveVagueBlacklist(pCtx).has(varName.toLowerCase());
+    if (isVague) {
+        pCtx.issues.push(
+            pCtx.mkIssue({
+                line: lineIdx + 1,
+                column: 1,
+                rule: 'NAM-VAG-001',
+                message:
+                    `Identifier '${varName}' is vague and uninformative; ` +
+                    'lacks domain context.',
+                severity: SEVERITY_WARNING,
+                detail: { name: varName },
+                suggestion: `Replace '${varName}' with a domain-qualified identifier.`,
+            }),
+        );
     }
 
     if (pCtx.opts.checkJargon !== false && hasTransientJargon(varName)) {
@@ -373,8 +376,7 @@ function auditRustVariable(
                 column: 1,
                 rule: 'NAM-JRG-002',
                 message:
-                    `Variable identifier '${varName}' contains ` +
-                    'transient construction jargon.',
+                    `Variable identifier '${varName}' contains ` + 'transient construction jargon.',
                 severity: SEVERITY_WARNING,
                 detail: { name: varName },
                 suggestion: 'Replace transient process markers with semantic domain naming.',
@@ -429,6 +431,150 @@ function auditRustLineDeclarations(
 
 type PolyglotLineAuditor = (line: string, lineIndex: number) => void;
 
+/** Rust attribute marking an entire inline test module. */
+const RUST_TEST_MODULE_ATTR = '#[cfg(test)]';
+/** Rust attributes marking the next `fn` as a test function. */
+const RUST_TEST_FN_ATTRS: readonly string[] = Object.freeze([
+    '#[test]',
+    '#[tokio::test]',
+    '#[rstest]',
+]);
+/** Attribute prefix excluded from "real code line" detection so markers survive. */
+const RUST_ATTR_PREFIX = '#[';
+/** Line comment marker stripped before counting braces. */
+const RUST_LINE_COMMENT = '//';
+/** Brace counters; `String#match` with a global regex ignores `lastIndex`. */
+const RUST_OPEN_BRACE_RE = /\{/g;
+const RUST_CLOSE_BRACE_RE = /\}/g;
+
+/**
+ * Mutable brace/test-scope state threaded across Rust source lines.
+ */
+interface RustLineScanState {
+    isNextFnTest: boolean;
+    braceDepth: number;
+    testFunctionDepth: number;
+    testModuleDepth: number;
+}
+
+/**
+ * Tests whether a line starts with any prefix from a frozen list.
+ *
+ * @param line - Trimmed source line.
+ * @param prefixes - Frozen prefix table.
+ * @returns `true` on the first matching prefix.
+ */
+function startsWithAnyPrefix(line: string, prefixes: readonly string[]): boolean {
+    for (let i = 0; i < prefixes.length; i++) {
+        if (line.startsWith(prefixes[i])) return true;
+    }
+    return false;
+}
+
+/**
+ * Apply a test-scope attribute line to the scan state.
+ *
+ * @param trimmed - Trimmed source line.
+ * @param state - Rust scan state to mutate.
+ * @returns `true` when the line is an attribute and must not be audited as code.
+ */
+function applyRustTestAttribute(trimmed: string, state: RustLineScanState): boolean {
+    if (trimmed.startsWith(RUST_TEST_MODULE_ATTR)) {
+        state.testModuleDepth = state.braceDepth;
+        return true;
+    }
+    if (startsWithAnyPrefix(trimmed, RUST_TEST_FN_ATTRS)) {
+        state.isNextFnTest = true;
+        return true;
+    }
+    return false;
+}
+
+/**
+ * Audit or classify a Rust function declaration line.
+ *
+ * @param line - Raw source line, used for the anchored `fn` pattern.
+ * @param lineIndex - Zero-based line index for diagnostics.
+ * @param trimmed - Trimmed source line, used for the "real code" reset heuristic.
+ * @param state - Rust scan state to mutate.
+ * @param pCtx - Polyglot naming execution context.
+ */
+function handleRustFunctionLine(
+    line: string,
+    lineIndex: number,
+    trimmed: string,
+    state: RustLineScanState,
+    pCtx: PolyglotNamingContext,
+): void {
+    const fnMatch = RUST_FN_RE.exec(line);
+    if (!fnMatch) {
+        const isCodeLine =
+            trimmed.length > 0 &&
+            !trimmed.startsWith(RUST_LINE_COMMENT) &&
+            !trimmed.startsWith(RUST_ATTR_PREFIX);
+        if (isCodeLine) state.isNextFnTest = false;
+        return;
+    }
+
+    const isTest =
+        state.testModuleDepth >= 0 || state.isNextFnTest || isRustFunctionExempt(fnMatch[1]);
+    state.isNextFnTest = false;
+    if (isTest) {
+        state.testFunctionDepth = state.braceDepth;
+        return;
+    }
+    auditExtractedFunction({ fnName: fnMatch[1], lineIdx: lineIndex, isSnake: true }, pCtx);
+}
+
+/**
+ * Advance brace depth and close any test scopes that the line ended.
+ *
+ * @param trimmed - Trimmed source line.
+ * @param state - Rust scan state to mutate.
+ */
+function advanceRustBraceDepth(trimmed: string, state: RustLineScanState): void {
+    const codeOnly = trimmed.split(RUST_LINE_COMMENT)[0];
+    const openBraces = (codeOnly.match(RUST_OPEN_BRACE_RE) || []).length;
+    const closeBraces = (codeOnly.match(RUST_CLOSE_BRACE_RE) || []).length;
+
+    state.braceDepth += openBraces - closeBraces;
+    if (state.braceDepth < 0) state.braceDepth = 0;
+    if (state.testFunctionDepth >= 0 && state.braceDepth <= state.testFunctionDepth) {
+        state.testFunctionDepth = -1;
+    }
+    if (state.testModuleDepth >= 0 && state.braceDepth <= state.testModuleDepth) {
+        state.testModuleDepth = -1;
+    }
+}
+
+/**
+ * Audit one Rust source line: attributes first, then declarations and variables.
+ *
+ * @param line - Raw source line.
+ * @param lineIndex - Zero-based line index for diagnostics.
+ * @param state - Rust scan state to mutate.
+ * @param pCtx - Polyglot naming execution context.
+ */
+function scanRustLine(
+    line: string,
+    lineIndex: number,
+    state: RustLineScanState,
+    pCtx: PolyglotNamingContext,
+): void {
+    const trimmed = line.trim();
+    if (applyRustTestAttribute(trimmed, state)) return;
+
+    handleRustFunctionLine(line, lineIndex, trimmed, state, pCtx);
+
+    const inTestScope = state.testFunctionDepth >= 0 || state.testModuleDepth >= 0;
+    if (!inTestScope) {
+        auditRustLineDeclarations(line, lineIndex, pCtx);
+    }
+    auditRustLineVariables(line, lineIndex, inTestScope, pCtx);
+
+    advanceRustBraceDepth(trimmed, state);
+}
+
 function createPolyglotLineAuditor(
     ext: string,
     pCtx: PolyglotNamingContext,
@@ -442,70 +588,13 @@ function createPolyglotLineAuditor(
         };
     }
     if (ext === '.rs') {
-        let isNextFnTest = false;
-        let braceDepth = 0;
-        let testFunctionDepth = -1;
-        let testModuleDepth = -1;
-
-        return (line, i) => {
-            const trimmed = line.trim();
-            const codeOnly = trimmed.split('//')[0];
-            const openBraces = (codeOnly.match(/\{/g) || []).length;
-            const closeBraces = (codeOnly.match(/\}/g) || []).length;
-
-            if (trimmed.startsWith('#[cfg(test)]')) {
-                testModuleDepth = braceDepth;
-                return;
-            }
-            if (
-                trimmed.startsWith('#[test]') ||
-                trimmed.startsWith('#[tokio::test]') ||
-                trimmed.startsWith('#[rstest]')
-            ) {
-                isNextFnTest = true;
-                return;
-            }
-
-            const fnMatch = RUST_FN_RE.exec(line);
-            if (fnMatch) {
-                const isTest =
-                    testModuleDepth >= 0 ||
-                    isNextFnTest ||
-                    isRustFunctionExempt(fnMatch[1]);
-                isNextFnTest = false;
-                if (isTest) {
-                    testFunctionDepth = braceDepth;
-                } else {
-                    auditExtractedFunction(
-                        { fnName: fnMatch[1], lineIdx: i, isSnake: true },
-                        pCtx,
-                    );
-                }
-            } else if (
-                trimmed.length > 0 &&
-                !trimmed.startsWith('//') &&
-                !trimmed.startsWith('#[')
-            ) {
-                isNextFnTest = false;
-            }
-
-            const inTestScope = testFunctionDepth >= 0 || testModuleDepth >= 0;
-
-            if (!inTestScope) {
-                auditRustLineDeclarations(line, i, pCtx);
-            }
-
-            auditRustLineVariables(line, i, inTestScope, pCtx);
-
-            braceDepth += openBraces - closeBraces;
-            if (braceDepth < 0) braceDepth = 0;
-            if (testFunctionDepth >= 0 && braceDepth <= testFunctionDepth) {
-                testFunctionDepth = -1;
-            }
-            if (testModuleDepth >= 0 && braceDepth <= testModuleDepth) {
-                testModuleDepth = -1;
-            }
+        const state: RustLineScanState = {
+            isNextFnTest: false,
+            braceDepth: 0,
+            testFunctionDepth: -1,
+            testModuleDepth: -1,
         };
+        return (line, i) => scanRustLine(line, i, state, pCtx);
     }
     if (ext === '.gd') {
         return (line, i) => {

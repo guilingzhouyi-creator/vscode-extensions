@@ -228,7 +228,8 @@ function checkJsTsCatchLine(
 function isJsTsCatchCandidateLine(line: string): boolean {
     if (!line.includes(TOKEN_CATCH) || !CATCH_KEYWORD_RE.test(line)) return false;
     const trimmed = line.trim();
-    if (trimmed.startsWith('//') || trimmed.startsWith('*') || trimmed.startsWith('/*')) return false;
+    if (trimmed.startsWith('//') || trimmed.startsWith('*') || trimmed.startsWith('/*'))
+        return false;
     if (trimmed.startsWith("'") || trimmed.startsWith('"') || trimmed.startsWith('`')) return false;
     return true;
 }
@@ -283,6 +284,15 @@ export const SwallowedExceptionRule: GovernanceRule = {
 const KEYWORD_UNWRAP = 'unwrap';
 const RUST_TEST_ATTR_RE = /#\[.*(?:test|cfg\(test\)).*\]/;
 
+/**
+ * Mutable Rust test-scope tracking state for the naked-unwrap scan.
+ */
+interface UnwrapScanState {
+    inTestScope: boolean;
+    testScopeDepth: number;
+    pendingTestFn: boolean;
+}
+
 function isNakedUnwrapCandidate(line: string): boolean {
     if (!line.includes(KEYWORD_UNWRAP) || !UNWRAP_RE.test(line)) return false;
     return !line.trim().startsWith('//');
@@ -326,6 +336,49 @@ function checkRustTestDeclaration(
 }
 
 /**
+ * Advances the Rust test-scope state machine by one line.
+ *
+ * @param line - Masked source line.
+ * @param state - Current test-scope state; mutated in place.
+ * @returns Nothing.
+ */
+function advanceUnwrapScanState(line: string, state: UnwrapScanState): void {
+    const trimmed = line.trim();
+
+    if (!state.inTestScope) {
+        const decl = checkRustTestDeclaration(trimmed, state.pendingTestFn);
+        state.pendingTestFn = decl.pendingTestFn;
+        if (decl.inTestScope) state.inTestScope = true;
+    }
+
+    if (!state.inTestScope) return;
+
+    const bal = updateTestScopeBalance(line, state.testScopeDepth);
+    state.inTestScope = bal.inTestScope;
+    state.testScopeDepth = bal.newDepth;
+    if (!state.inTestScope) state.pendingTestFn = false;
+}
+
+/**
+ * Build the GOV-EXC-002 violation record for one naked `.unwrap()` line.
+ *
+ * @param line - Masked source line containing the call.
+ * @param lineIndex - Zero-based line index.
+ * @returns The violation record.
+ */
+function buildNakedUnwrapViolation(line: string, lineIndex: number): GovernanceViolation {
+    return {
+        ruleId: 'GOV-EXC-002',
+        message: 'Naked `.unwrap()` invocation in production code may trigger unhandled panics.',
+        line: lineIndex + 1,
+        column: line.search(UNWRAP_RE) + 1,
+        suggestion:
+            'Handle with `?` error propagation, `.expect("reason")`, or `match` / `if let`.',
+        fixable: false,
+    };
+}
+
+/**
  * GOV-EXC-002: Naked Unwrap in Production Code.
  * Flags `.unwrap()` in Rust production code. Exempts inline test modules and test functions.
  */
@@ -349,40 +402,19 @@ export const NakedUnwrapRule: GovernanceRule = {
 
         const violations: GovernanceViolation[] = [];
         const lines = ctx.masked;
-        let inTestScope = false;
-        let testScopeDepth = 0;
-        let pendingTestFn = false;
+        const state: UnwrapScanState = {
+            inTestScope: false,
+            testScopeDepth: 0,
+            pendingTestFn: false,
+        };
 
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
-            const trimmed = line.trim();
-            if (trimmed.startsWith('//')) continue;
-
-            if (!inTestScope) {
-                const decl = checkRustTestDeclaration(trimmed, pendingTestFn);
-                pendingTestFn = decl.pendingTestFn;
-                if (decl.inTestScope) inTestScope = true;
-            }
-
-            if (inTestScope) {
-                const bal = updateTestScopeBalance(line, testScopeDepth);
-                inTestScope = bal.inTestScope;
-                testScopeDepth = bal.newDepth;
-                if (!inTestScope) pendingTestFn = false;
-                continue;
-            }
-
+            if (line.trim().startsWith('//')) continue;
+            advanceUnwrapScanState(line, state);
+            if (state.inTestScope) continue;
             if (!isNakedUnwrapCandidate(line)) continue;
-            violations.push({
-                ruleId: 'GOV-EXC-002',
-                message:
-                    'Naked `.unwrap()` invocation in production code may trigger unhandled panics.',
-                line: i + 1,
-                column: line.search(UNWRAP_RE) + 1,
-                suggestion:
-                    'Handle with `?` error propagation, `.expect("reason")`, or `match` / `if let`.',
-                fixable: false,
-            });
+            violations.push(buildNakedUnwrapViolation(line, i));
         }
 
         return violations.length > 0 ? violations : null;

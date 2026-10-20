@@ -204,6 +204,21 @@ const CHAR_CODE_DOT = 46;
 const CHAR_CODE_SLASH = 47;
 const CHAR_CODE_HASH = 35;
 
+/** Leading character codes marking a relative or hash-rooted specifier. */
+const RELATIVE_PREFIX_CHARS: ReadonlySet<number> = new Set([
+    CHAR_CODE_DOT,
+    CHAR_CODE_SLASH,
+    CHAR_CODE_HASH,
+]);
+/** Bundler-style internal path aliases resolved inside the same project. */
+const INTERNAL_PATH_PREFIXES: readonly string[] = Object.freeze(['@/', '~/']);
+/** Engine resource URI schemes that never resolve to an external package. */
+const ENGINE_RESOURCE_PREFIXES: readonly string[] = Object.freeze(['res://', 'uid://', 'user://']);
+/** Rust in-crate scope roots; a bare root or a `root::` path is internal. */
+const RUST_SCOPE_ROOTS: readonly string[] = Object.freeze(['crate', 'super', 'self']);
+/** Rust path separator used after a scope root. */
+const RUST_SCOPE_SEPARATOR = '::';
+
 const SHALLOW_DEPTH_RANK = 1;
 const MODERATE_DEPTH_RANK = 2;
 const DEEP_DEPTH_RANK = 3;
@@ -731,36 +746,49 @@ function isDeclaredDependency(firstSegment: string, manifestDeps?: Set<string>):
     return manifestDeps.has(firstSegment) || manifestDeps.has(normalized);
 }
 
-function isRelativeOrInternalPrefix(trimmed: string): boolean {
-    const firstChar = trimmed.charCodeAt(0);
-    if (
-        firstChar === CHAR_CODE_DOT ||
-        firstChar === CHAR_CODE_SLASH ||
-        firstChar === CHAR_CODE_HASH
-    ) {
-        return true;
-    }
-    if (trimmed.startsWith('@/') || trimmed.startsWith('~/')) {
-        return true;
-    }
-    if (
-        trimmed.startsWith('res://') ||
-        trimmed.startsWith('uid://') ||
-        trimmed.startsWith('user://')
-    ) {
-        return true;
-    }
-    if (
-        trimmed === 'crate' ||
-        trimmed.startsWith('crate::') ||
-        trimmed === 'super' ||
-        trimmed.startsWith('super::') ||
-        trimmed === 'self' ||
-        trimmed.startsWith('self::')
-    ) {
-        return true;
+/**
+ * Tests whether a specifier starts with any prefix from a frozen list.
+ *
+ * @param trimmed - Already-trimmed module specifier.
+ * @param prefixes - Frozen prefix table.
+ * @returns `true` on the first matching prefix.
+ */
+function startsWithAny(trimmed: string, prefixes: readonly string[]): boolean {
+    for (let i = 0; i < prefixes.length; i++) {
+        if (trimmed.startsWith(prefixes[i])) return true;
     }
     return false;
+}
+
+/**
+ * Tests whether a Rust specifier names an in-crate scope, either bare or `root::`-qualified.
+ *
+ * @param trimmed - Already-trimmed module specifier.
+ * @returns `true` for `crate`, `super`, `self` and their `::` descendants.
+ */
+function isRustScopeRoot(trimmed: string): boolean {
+    for (let i = 0; i < RUST_SCOPE_ROOTS.length; i++) {
+        const root = RUST_SCOPE_ROOTS[i];
+        if (trimmed === root || trimmed.startsWith(root + RUST_SCOPE_SEPARATOR)) return true;
+    }
+    return false;
+}
+
+/**
+ * Resolve whether a specifier is relative, engine-resource, or in-project internal.
+ *
+ * Contract: classification is purely lexical — no filesystem probing — so the result is
+ * deterministic for a given specifier and safe to cache at call sites.
+ *
+ * @param trimmed - Already-trimmed module specifier.
+ * @returns `true` when the specifier never resolves to an external package.
+ */
+function isRelativeOrInternalPrefix(trimmed: string): boolean {
+    if (trimmed.length === 0) return false;
+    if (RELATIVE_PREFIX_CHARS.has(trimmed.charCodeAt(0))) return true;
+    if (startsWithAny(trimmed, INTERNAL_PATH_PREFIXES)) return true;
+    if (startsWithAny(trimmed, ENGINE_RESOURCE_PREFIXES)) return true;
+    return isRustScopeRoot(trimmed);
 }
 
 function matchesPathAlias(trimmed: string, pathAliases?: Set<string>): boolean {

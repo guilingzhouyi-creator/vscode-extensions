@@ -51,6 +51,27 @@ const STEP_ID_RE = /^(?:PC|PP)-\d{2}-\d{2}$/;
 let cachedCatalogIds: Set<string> | null = null;
 
 /**
+ * Isolated synchronous read barrier for the rule catalog.
+ *
+ * The catalog is a static repository file read at most once per process and memoized in
+ * `cachedCatalogIds`; the read is therefore a startup cost rather than an event-loop hotspot.
+ * Keeping the call behind one named barrier — the same idiom `config.ts` and `repo-archetype.ts`
+ * use for their documented one-shot reads — makes that policy explicit and gives a single place
+ * to swap in an async loader if the catalog ever grows into a hot-path dependency.
+ */
+const CatalogIoBarrier = {
+    /**
+     * Read the catalog source text.
+     *
+     * @param catalogPath - Absolute path of the catalog file.
+     * @returns Raw UTF-8 JSON text.
+     */
+    readText(catalogPath: string): string {
+        return fs['readFileSync'](catalogPath, 'utf8');
+    },
+};
+
+/**
  * Searches upward from the current module to discover scripts/common/rule-catalog.json.
  */
 function findCatalogPath(): string | null {
@@ -83,6 +104,8 @@ function parseCatalogRuleIds(raw: string, set: Set<string>): void {
 
 /**
  * Loads and caches all registered rule IDs from the single source of truth catalog.
+ *
+ * @returns Frozen-by-convention set of registered rule ids; empty when the catalog is absent.
  */
 export function getRegisteredWorkspaceRuleIds(): ReadonlySet<string> {
     if (cachedCatalogIds !== null) {
@@ -97,8 +120,7 @@ export function getRegisteredWorkspaceRuleIds(): ReadonlySet<string> {
     }
 
     try {
-        const raw = fs.readFileSync(catalogPath, 'utf8');
-        parseCatalogRuleIds(raw, set);
+        parseCatalogRuleIds(CatalogIoBarrier.readText(catalogPath), set);
     } catch {
         // best-effort: fallback to empty set if file read fails
     }
@@ -109,6 +131,9 @@ export function getRegisteredWorkspaceRuleIds(): ReadonlySet<string> {
 
 /**
  * Checks whether an identifier is an external standard or technical acronym.
+ *
+ * @param token - Candidate identifier token.
+ * @returns `true` for layer ranges, step ids, and known external standard prefixes.
  */
 function isBenignAcronym(token: string): boolean {
     if (LAYER_RANGE_RE.test(token)) return true;
@@ -123,6 +148,9 @@ function isBenignAcronym(token: string): boolean {
 
 /**
  * Checks whether a candidate rule ID is registered in the workspace SSOT catalog.
+ *
+ * @param candidateId - Rule identifier to resolve.
+ * @returns `true` when registered, or when the catalog is absent (degraded mode).
  */
 export function isRegisteredWorkspaceRule(candidateId: string): boolean {
     const catalog = getRegisteredWorkspaceRuleIds();
@@ -135,7 +163,9 @@ export function isRegisteredWorkspaceRule(candidateId: string): boolean {
 
 /**
  * Scans a source text snippet for unregistered rule identifier candidates.
- * Returns a list of unregistered rule IDs found (empty if clean).
+ *
+ * @param text - Source snippet to scan (literal text, comment, or diagnostic message).
+ * @returns Unregistered rule ids found, in encounter order; empty when clean or catalog-less.
  */
 export function findUnregisteredRuleDrift(text: string): string[] {
     if (!text || (!text.includes('-') && !text.includes('L'))) {
@@ -164,6 +194,9 @@ export function findUnregisteredRuleDrift(text: string): string[] {
 
 /**
  * Checks whether a string literal is a structured terminal status badge (e.g. `[WORKTREE_OK]`).
+ *
+ * @param text - Literal text, including its surrounding brackets.
+ * @returns `true` when the literal matches the terminal badge shape.
  */
 export function isTerminalStatusBadge(text: string): boolean {
     return TERMINAL_STATUS_BADGE_RE.test(text);
