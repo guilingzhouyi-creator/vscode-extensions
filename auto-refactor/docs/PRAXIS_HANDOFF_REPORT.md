@@ -19,7 +19,7 @@
 | **专册 03** | [Praxis 团队联调操作手册与交付验收矩阵](./06-praxis-delivery/03-praxis-integration-runbook-and-acceptance.md) | 基于 `createPraxisClient` 的双载荷接入范例、11 组 `SEMANTIC_OVERLAP_GROUPS` 并查集去重规范与 **157/157 自动化门禁矩阵** |
 | **专册 04** | [Praxis-LayerVFS 瞬时工作区对接手册与联调规范](./06-praxis-delivery/04-praxis-layervfs-integration-guide.md) | LayerVFS CAS 内容寻址、FastCDC 动态分块、SQLite WAL 单文件存储、零拷贝分叉 (`< 3ms`)、物理投影与 MCTS 多智能体打擂裁判规范 |
 | **专册 05** | [LayerVFS 虚拟分叉与 MCTS 探索树架构规范](./01-architecture/06-layervfs-virtual-storage-and-mcts.md) | LayerVFS 核心算法拓扑、Gear Hash 滚动切块、UCT 探索树评估模型与沙箱生命周期隔离规范 |
-| **规范 01** | [配置模式与多格式报告契约](./05-specs-and-benchmarks/01-config-and-reports.md) | `auto-refactor.config.json` Schema、30 分析器与 338 规则阈值默认值、`.refactor-trajectory/` 紧凑账本规范 (< 350B, *Ms) |
+| **规范 01** | [配置模式与多格式报告契约](./05-specs-and-benchmarks/01-config-and-reports.md) | `auto-refactor.config.json` Schema、30 分析器与 362 规则阈值默认值、`.refactor-trajectory/` 紧凑账本规范 (< 350B, *Ms) |
 | **规范 02** | [全维性能基准与原生算子加速台账](./05-specs-and-benchmarks/02-performance-benchmarks.md) | SWAR 64-bit 扫描 (6,448 MB/s)、BPM 差分 (17.8 µs)、增量子树复用 (17.8x)、6 大原生 Rust 算子加速比与 157/157 套件防劣化护栏 |
 | **规范 03** | [规范文件头与有效注释密度 (ECD-C) 规范](./05-specs-and-benchmarks/03-comment-and-header-standard.md) | 六字段标准模块头 (`CMT-HDR-001`)、ECD-C 模型与真实注释规则字典 (`CMT-HDR-001`, `CMT-BAN-001`, `CMT-DEAD-001`, `CMT-MOJI-001`, `HYG-STB-002`) |
 | **规范 05** | [外部工程接入与基线棘轮指南](./05-specs-and-benchmarks/05-consumer-integration.md) | Baseline 1.2.0 单向收紧棘轮机制、零高危债务防线 (`critical = 0, high = 0`) 及多端工程差异化配置 |
@@ -29,13 +29,13 @@
 
 ## 2. 核心交付成果与系统特征
 
-### 2.1 统计基准：30 分析器、338 规则、157 套测试套件
+### 2.1 统计基准：30 分析器、362 规则、157 套测试套件
 
 | 指标维度 | 交付指标 | 验证命令与真源 |
 | :--- | :---: | :--- |
 | **内置分析器规模** | **30 个** | [`config.ts`](../src/core/config/config.ts) `BUILTIN_ANALYZERS` 数组 |
-| **注册规则总数** | **338 条** | [`scripts/validate-rules-registry.js`](../scripts/validate-rules-registry.js) 100% 闭环通过 |
-| **规则字典覆盖率** | **338 / 338 (100%)** | 每一个注册规则在文档与规则表中均有定义行（工作区 SSOT 收录 473 条） |
+| **注册规则总数** | **362 条** | [`scripts/validate-rules-registry.js`](../scripts/validate-rules-registry.js) 100% 闭环通过 |
+| **规则字典覆盖率** | **362 / 362 (100%)** | 每一个注册规则在文档与规则表中均有定义行（工作区 SSOT 收录 500 条） |
 | **自动化测试套件** | **157 / 157 全量 PASS** | 151 套独立并行验证套件 + 5 套串行/状态套件 + 单元套件 (`npm test`) |
 | **高危技术债基线** | **0 项 (Critical = 0, High = 0)** | 零高危债务刚性防线，违者 CI Fail-Closed 阻断 |
 

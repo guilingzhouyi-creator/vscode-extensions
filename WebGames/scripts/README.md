@@ -83,7 +83,7 @@ PowerShell 用 `<# .SYNOPSIS / .DESCRIPTION / .EXAMPLE #>` 注释块（DESCRIPTI
 
 ## 五、文档库审查工作流（audit-docs）
 
-面向 `docs/` 全库（**707 份 md**，随文档库持续增长；实时清单以 `--manifest` 为准）的四域静态审查：**命名**（文件/文件夹/序号族，模式声明在
+面向 `docs/` 全库（<!-- METRICS:BEGIN wg-docs-md-all -->**936 份 md**<!-- METRICS:END wg-docs-md-all -->，含归档案卷；活跃案卷 <!-- METRICS:BEGIN wg-docs-md-active -->**146 份活跃 md**<!-- METRICS:END wg-docs-md-active -->，实时清单以 `--manifest` 为准）的四域静态审查：**命名**（文件/文件夹/序号族，模式声明在
 `audit_docs.py` 头部 `NAMING_RULES`，为单一事实源；`docs/` 根稳定命名族含 `README.md`、`卡拉尔世界引擎开发路线图.md`、`后端代码注释规范.md`）、**布局**（H1/围栏/表格列数/表前空行/行尾空白）、
 **链接**（file:/// 绝对路径、死链、锚点失效——含跨文件锚点索引与候选标题提示）、
 **图表**（mermaid 节点标签未引号特殊字符，渲染必败类），以及**短期施工区细则规范**（PHASE-TITLE-FORMAT 标题格式、PHASE-STAGE-STD 四段式核心结构、PHASE-CODE-SANITY 代码块健康度）。
@@ -110,7 +110,7 @@ bash scripts/sh/audit-docs.sh --self-test     # 引擎夹具自测（临时目�
 **基线棘轮**：基线按（规则 × 文件）计数记录已接受存量；门禁只阻断新增违规，实现
 「存量只许消化、不许增长」的增量约束。**Agent 行为契约**（改前/改中/改后 SOP 与禁止行为）
 见 `docs/README.md`；性能上引擎单趟装载 + 单趟审查（fix 模式跳过冗余预检），
-全库 703 份亚秒级完成，`--time` 可复核。
+全库 <!-- METRICS:BEGIN wg-docs-md-all -->**936 份 md**<!-- METRICS:END wg-docs-md-all -->亚秒级完成，`--time` 可复核。
 
 修复域仅限六类（mermaid 引号包裹 / file:/// 转相对链接 / 行尾空白 / `<br>` 统一 / 标题空格 / 表前空行）；
 改名、死链重定向、锚点改写等需内容决策的发现**只报不修**，由 Agent 依据 JSON 的

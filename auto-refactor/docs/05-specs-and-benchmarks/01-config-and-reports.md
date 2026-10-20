@@ -11,7 +11,7 @@
 
 $$\text{FinalConfig} = \text{BuiltInDefaults} \;\triangleleft\; \text{ConfigFile (`auto-refactor.config.json` / `ar.config.json`)} \;\triangleleft\; \text{CLI / ScanOptions Overrides}$$
 
-- **内置默认层 (`BuiltInDefaults`)**：内置 30 大分析器与 325 条注册规则的默认安全阈值与开关配置。
+- **内置默认层 (`BuiltInDefaults`)**：内置 30 大分析器与 362 条注册规则的默认安全阈值与开关配置。
 - **项目配置层 (`ConfigFile`)**：项目根目录下的 `auto-refactor.config.json`、`ar.config.json` 或由 `--config` 指定的文件。若 JSON 语法损坏（如尾随逗号、括号失配），引擎通过 [`Logger.warn`](../../src/core/logger.ts) 显式警告并回退至安全默认值，绝不静默吞没错误。
 - **命令行与 API 覆盖层 (`CLI / Overrides`)**：通过 CLI 参数（如 `--fail-on-severity`, `--analyzers`, `--format`）或编程式 [`ScanOptions`](../../src/api.ts) 传入的即时参数，具备最高优先级。
 
@@ -19,7 +19,7 @@ $$\text{FinalConfig} = \text{BuiltInDefaults} \;\triangleleft\; \text{ConfigFile
 
 ## 2. 核心配置项字典 (`auto-refactor.config.json`)
 
-系统全量内置 **30 个多语言分析器** 与 **325 条全量规则**，支持声明式 JSON 配置：
+系统全量内置 **30 个多语言分析器** 与 **362 条全量规则**，支持声明式 JSON 配置：
 
 | 配置键 | 类型 | 默认值 | 核心职责说明 |
 | :--- | :--- | :---: | :--- |

@@ -191,6 +191,6 @@ export class DomainBoundaryListener implements AstNodeListener {
 
 ## 6. 关联文档导航
 
-- [01. 四层规则金字塔、30 个内置分析器与 325 条全量规则字典](./01-builtin-rules.md)
+- [01. 四层规则金字塔、30 个内置分析器与 362 条全量规则字典](./01-builtin-rules.md)
 - [04. 跨语言泛化审查与项目中立性规范](../05-specs-and-benchmarks/04-cross-language-generalization.md)
 - [07. 三平面质量量化模型与代码自治度 (CAI) 规范](../05-specs-and-benchmarks/07-quantified-quality-standard.md)

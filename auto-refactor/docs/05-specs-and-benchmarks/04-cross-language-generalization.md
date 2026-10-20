@@ -103,7 +103,7 @@ flowchart TD
 
 ## 5. 关联文档导航
 
-- [01. 四层规则金字塔、30 个内置分析器与 325 条全量规则字典](../04-analyzers-and-rules/01-builtin-rules.md)
+- [01. 四层规则金字塔、30 个内置分析器与 362 条全量规则字典](../04-analyzers-and-rules/01-builtin-rules.md)
 - [02. 自定义分析器插件与语义模式扩展规范](../04-analyzers-and-rules/02-custom-analyzer-plugin.md)
 - [06. 多语言现代化规则包与常量单源治理](./06-modernization-program.md)
 - [07. 三平面质量量化模型与代码自治度 (CAI) 规范](./07-quantified-quality-standard.md)

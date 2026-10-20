@@ -35,7 +35,7 @@ flowchart TD
   end
 
   subgraph L3["L3. 四层规则金字塔与内置分析器矩阵 (Rule Pyramid & 30 Analyzers)"]
-    REG["src/core/rules/registry.ts (325 条单一真源规则注册表)"]
+    REG["src/core/rules/registry.ts (362 条单一真源规则注册表)"]
     STAGES["src/core/router/sparseRuleRouter.ts (4 阶执行阶段: Stage 0~3)"]
     ANALYZERS["src/analyzers/*.ts (30 个内置分析器模块)"]
   end
@@ -64,7 +64,7 @@ flowchart TD
 
 - **L1 原生算子层**：基于 Rust 2021 Edition 构建的 6 Crate 工作区，通过 N-API (`crates/auto-refactor-core/`) 暴露底层高性能差分、支配树、数据流求解、词法脱敏与克隆检测算子；同时在 TypeScript 侧提供 100% 字节等价的纯 JS Shim，保证任何环境零编译即可运行。
 - **L2 语义拓扑层**：屏蔽 TypeScript、JavaScript、Python、Rust、Go、Shell、GDScript 等语言的具体 AST 差异，构建统一的 `NormalizedNode` 语法树与跨模块语义拓扑图（`SemanticGraph`）。
-- **L3 规则分析层**：维护由单一真源注册表（`src/core/rules/registry.ts`）严格看守的 338 条内置规则（323 条规范命名规则 + 15 条历史兼容别名规则，全工作区 SSOT 单源收录 473 条）与 30 个内置分析器，划分为 4 个离散执行阶段。
+- **L3 规则分析层**：维护由单一真源注册表（`src/core/rules/registry.ts`）严格看守的 362 条内置规则（347 条规范命名规则 + 15 条历史兼容别名规则，全工作区 SSOT 单源收录 500 条）与 30 个内置分析器，划分为 4 个离散执行阶段。
 - **L4 调度路由层**：集成 Cedar 稀疏混合专家门控（Sparse MoE Router）、双轨并发管道（`DualTrackPipeline`）与负载总督（`LoadGovernor`），以 `< 15ms` 极速返回前台推测性结论，并在后台异步执行全图闭包分析与资源熔断保护。
 - **L5 质量度量层**：基于 10 大战略支柱执行倒数饱和曲线转换与加权几何平均，结合运行时动态遥测与 Git 演化轨迹进行动态调权。
 - **L6 交付与 VFS 编排层**：对外暴露 CLI、进程内 TypeScript API、NDJSON IPC 守护进程接口、LayerVFS 虚拟分叉与沙箱投影执行器，以及面向自主智能体协同的 Praxis 治理门面与统一开发者 SDK。
@@ -85,7 +85,7 @@ flowchart TD
 ### 2.1 单一真源规则注册表 (`RULE_REGISTRY`)
 
 系统内所有可触发规则均由 [`src/core/rules/registry.ts`](../../src/core/rules/registry.ts) 统一管理：
-- **338 条注册规则**：包含 323 条规范命名规则（如 `CONST-LAY-001`、`GOV-SLC-001`、`GOV-AGN-001`、`HYG-DED-001`）与 15 条向后兼容的历史别名规则（如 `import-cycle`、`clean-layer-violation`）。
+- **362 条注册规则**：包含 347 条规范命名规则（如 `CONST-LAY-001`、`GOV-SLC-001`、`GOV-AGN-001`、`HYG-DED-001`）与 15 条向后兼容的历史别名规则（如 `import-cycle`、`clean-layer-violation`）。
 - **30 个标准规则族系**：由 `CANONICAL_TOPIC_CATALOG` 建立映射，确保无规则名称漂移（Zero Rule Drift）。
 - **门禁严格约束**：通过 `node scripts/validate-rules-registry.js` 门禁断言文档、分析器工厂与注册表 100% 覆盖对齐。
 

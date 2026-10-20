@@ -16,7 +16,7 @@ flowchart TD
     DIFF["原始补丁与代码输入 (DiffInput / AST Slice)"] --> CORE["auto-refactor 核心差分与语法分析底座"]
     
     subgraph MachinePlane["【底层机器平面】100% 完整性保真 (Machine Fidelity)"]
-        AST_COMPLETE["完整差分 AST 语法证据<br/>(保留全量行号/列号/338 规则全集)"]
+        AST_COMPLETE["完整差分 AST 语法证据<br/>(保留全量行号/列号/362 规则全集)"]
         CAPP["CAPP 紧凑指令流 (Compact Agent Prompt)"]
     end
     
