@@ -11,9 +11,13 @@
  *     2. Assert EOL contract (CRLF for .ps1, LF for .sh/.js/.json).
  *     3. Assert Git hooks routing robustness (exec bash fallback, zero exec sh).
  *     4. Assert audit-all tri-project parity (workspace-timing, auto-refactor, WebGames).
- *     5. Assert pre-commit-gate 9-step normalization and CASE-08 tri-project verification.
- *     6. Assert pre-push-gate 8-gate coverage.
- * Exit Semantics & Design Rationale: Exits 0 on all assertions passed; exits 1 on failure.
+ *     5. Assert every registry-declared gate entry (pre-commit, commit-msg, pre-push, audit-all,
+ *        audit-taxis) references each of its registered steps in both the PowerShell and the
+ *        Bash implementation, and still covers the project tokens that entry owns.
+ * Exit Semantics & Design Rationale: Exits 0 on all assertions passed; exits 1 on failure. The
+ *     step registry is read once and drives both step identity and implementation paths, so a
+ *     relocated script or an unregistered step surfaces as a failing assertion instead of an
+ *     unverified gate.
  */
 'use strict';
 
@@ -30,9 +34,8 @@ const FORBIDDEN_EXEC_SH = /exec sh /;
 const REQUIRED_EXEC_BASH = /exec bash /;
 const AUDIT_ALL_REGEX =
   /(?:workspace-timing|auto-refactor|WebGames|fractal-git|audit_runner\.py|audit_config\.py)/g;
-const PRE_COMMIT_REGEX = /(?:\[\d\/9\]|workspace-timing|auto-refactor|WebGames|fractal-git)/g;
-const PRE_PUSH_REGEX =
-  /(?:\[\d+\/11\]|workspace-timing|auto-refactor|WebGames|fractal-git|validate-commit-msg)/g;
+/** Uppercase step identifiers as they appear in gate entry scripts (e.g. `STAGED-HYGIENE-01`). */
+const STEP_REFERENCE_RE = /\b[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)+\b/g;
 
 function collectFiles(dir, extensions, extSet) {
   const results = [];
@@ -122,56 +125,150 @@ function verifyAuditAllParity() {
   }
 }
 
-function verifyPreCommitParity() {
-  const preCommitPs = path.join(ROOT_DIR, 'scripts/ps1/pre-commit-gate.ps1');
-  const preCommitSh = path.join(ROOT_DIR, 'scripts/sh/pre-commit-gate.sh');
-  const registryPath = path.join(ROOT_DIR, 'scripts/common/gate-step-registry.json');
-  assert(fs.existsSync(registryPath), 'gate-step-registry.json must exist');
-  const registry = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
-  const registeredSteps = (registry.entries && registry.entries['pre-commit'] && registry.entries['pre-commit'].steps) || [];
-  assert(registeredSteps.length > 0, 'pre-commit entry in registry must declare steps');
+/**
+ * Project tokens every gate entry script must verify, keyed by gate entry id.
+ *
+ * Contract: the token list is the executable statement of "which projects does this gate own".
+ * A gate that silently drops a project would otherwise keep passing step-parity checks, so each
+ * entry declares its required tokens here and the check fails when one disappears from either
+ * the PowerShell or the Bash implementation.
+ */
+const REQUIRED_PROJECT_TOKENS = Object.freeze({
+  'pre-commit': ['workspace-timing', 'auto-refactor', 'WebGames', 'fractal-git'],
+  'commit-msg': [
+    'workspace-timing',
+    'auto-refactor',
+    'WebGames',
+    'fractal-git',
+    'validate-commit-msg',
+  ],
+  'pre-push': [
+    'workspace-timing',
+    'auto-refactor',
+    'WebGames',
+    'fractal-git',
+    'validate-commit-msg',
+  ],
+  'audit-all': ['workspace-timing', 'auto-refactor', 'WebGames', 'fractal-git', 'audit_runner.py'],
+  'audit-taxis': ['fractal-git', 'cargo'],
+});
 
-  for (const [name, p] of [
-    ['pre-commit-gate.ps1', preCommitPs],
-    ['pre-commit-gate.sh', preCommitSh],
-  ]) {
-    assert(fs.existsSync(p), `${name} must exist`);
-    const content = fs.readFileSync(p, 'utf8');
-    for (const step of registeredSteps) {
-      assert(content.includes(step.id), `${name} must reference registered step ${step.id}`);
-    }
-    assert(content.includes('workspace-timing'), `${name} must verify workspace-timing`);
-    assert(content.includes('auto-refactor'), `${name} must verify auto-refactor`);
-    assert(content.includes('WebGames'), `${name} must verify WebGames`);
-  }
-  return registeredSteps.length;
+/** Path of the single-source gate step registry. */
+const STEP_REGISTRY_PATH = path.join(ROOT_DIR, 'scripts/common/gate-step-registry.json');
+
+/**
+ * Load the single-source gate step registry.
+ *
+ * @returns Parsed registry document with an `entries` map.
+ */
+function loadStepRegistry() {
+  assert(fs.existsSync(STEP_REGISTRY_PATH), 'gate-step-registry.json must exist');
+  return JSON.parse(fs.readFileSync(STEP_REGISTRY_PATH, 'utf8'));
 }
 
-function verifyPrePushParity() {
-  const prePushPs = path.join(ROOT_DIR, 'scripts/ps1/pre-push-gate.ps1');
-  const prePushSh = path.join(ROOT_DIR, 'scripts/sh/pre-push-gate.sh');
-  const registryPath = path.join(ROOT_DIR, 'scripts/common/gate-step-registry.json');
-  assert(fs.existsSync(registryPath), 'gate-step-registry.json must exist');
-  const registry = JSON.parse(fs.readFileSync(registryPath, 'utf8'));
-  const registeredSteps = (registry.entries && registry.entries['pre-push'] && registry.entries['pre-push'].steps) || [];
-  assert(registeredSteps.length > 0, 'pre-push entry in registry must declare steps');
-
-  for (const [name, p] of [
-    ['pre-push-gate.ps1', prePushPs],
-    ['pre-push-gate.sh', prePushSh],
-  ]) {
-    assert(fs.existsSync(p), `${name} must exist`);
-    const content = fs.readFileSync(p, 'utf8');
-    for (const step of registeredSteps) {
-      assert(content.includes(step.id), `${name} must reference registered step ${step.id}`);
-    }
-    assert(content.includes('workspace-timing'), `${name} must verify workspace-timing`);
-    assert(content.includes('auto-refactor'), `${name} must verify auto-refactor`);
-    assert(content.includes('WebGames'), `${name} must verify WebGames`);
-    assert(content.includes('fractal-git'), `${name} must verify fractal-git`);
-    assert(content.includes('validate-commit-msg'), `${name} must verify commit msg`);
+/**
+ * Resolve the PowerShell and Bash implementations declared for one gate entry.
+ *
+ * Contract: implementation paths come from the registry rather than being hardcoded here, so a
+ * relocated or renamed gate script is caught as a missing file instead of silently going
+ * unverified.
+ *
+ * @param entryId - Gate entry key.
+ * @param entry - Registry entry record.
+ * @returns Ordered `[name, absolutePath]` pairs for the declared implementations.
+ */
+function resolveGateScripts(entryId, entry) {
+  const scripts = (entry && entry.scripts) || {};
+  const pairs = [];
+  for (const [kind, relative] of Object.entries(scripts)) {
+    pairs.push([`${entryId} (${kind}): ${relative}`, path.join(ROOT_DIR, relative)]);
   }
-  return registeredSteps.length;
+  assert(pairs.length > 0, `${entryId} entry must declare its implementation scripts`);
+  return pairs;
+}
+
+/**
+ * Collect the project tokens present in a script in one pass.
+ *
+ * Contract: the alternation is bounded by `[A-Za-z0-9_-]` on both sides, so `workspace-timing`
+ * matches inside `workspace-timing/README.md` while a longer identifier that merely contains the
+ * token does not. Matching once keeps the check linear in the script size instead of rescanning
+ * the file per required token.
+ *
+ * @param content - Script source text.
+ * @param requiredTokens - Project tokens the entry must verify.
+ * @returns Set of required tokens actually present in the script.
+ */
+function collectPresentTokens(content, requiredTokens) {
+  if (requiredTokens.length === 0) return new Set();
+  const alternation = requiredTokens
+    .map((token) => token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .join('|');
+  const tokenRe = new RegExp(`(?<![A-Za-z0-9_-])(${alternation})(?![A-Za-z0-9_-])`, 'g');
+  return new Set(content.match(tokenRe) || []);
+}
+
+/**
+ * Assert one gate entry script references every registered step and every required project token.
+ *
+ * @param name - Human-readable file name for diagnostics.
+ * @param content - Script source text.
+ * @param steps - Registered step records that must be referenced.
+ * @param requiredTokens - Project tokens the entry must verify.
+ */
+function assertScriptCoversGateContract(name, content, steps, requiredTokens) {
+  const referenced = new Set(content.match(STEP_REFERENCE_RE) || []);
+  for (const step of steps) {
+    assert(referenced.has(step.id), `${name} must reference registered step ${step.id}`);
+  }
+
+  const presentTokens = collectPresentTokens(content, requiredTokens);
+  for (const token of requiredTokens) {
+    assert(presentTokens.has(token), `${name} must verify ${token}`);
+  }
+}
+
+/**
+ * Verify one gate entry: both implementations exist, reference every registered step, and cover
+ * every project token the entry owns.
+ *
+ * Contract: the step registry is the single source of truth for both step identity and
+ * implementation paths, so a step added to the registry without a matching reference — or a
+ * script moved away from its declared location — fails here rather than silently skipping a gate.
+ * Step ids and project tokens are each collected once into a set, keeping the check linear in the
+ * script size instead of rescanning the file once per required token.
+ *
+ * @param entryId - Gate entry key declared in the registry.
+ * @param registry - Parsed step registry document.
+ * @returns The number of registered steps that were verified.
+ */
+function verifyGateParity(entryId, registry) {
+  const entry = registry.entries && registry.entries[entryId];
+  assert(entry, `${entryId} must be declared in gate-step-registry.json`);
+
+  const steps = entry.steps || [];
+  assert(steps.length > 0, `${entryId} entry in registry must declare steps`);
+
+  const requiredTokens = REQUIRED_PROJECT_TOKENS[entryId] || [];
+  for (const [name, filePath] of resolveGateScripts(entryId, entry)) {
+    assert(fs.existsSync(filePath), `${name} must exist`);
+    assertScriptCoversGateContract(name, fs.readFileSync(filePath, 'utf8'), steps, requiredTokens);
+  }
+  return steps.length;
+}
+
+/**
+ * Verify every gate entry declared in the registry.
+ *
+ * @param registry - Parsed step registry document.
+ * @returns Per-entry verified step counts, keyed by entry id.
+ */
+function verifyAllGateEntries(registry) {
+  const verified = new Map();
+  for (const entryId of Object.keys(registry.entries || {})) {
+    verified.set(entryId, verifyGateParity(entryId, registry));
+  }
+  return verified;
 }
 
 function runAll() {
@@ -204,15 +301,18 @@ function runAll() {
 
   console.log('4. Verifying audit-all multi-project parity...');
   verifyAuditAllParity();
-  console.log('  ✔ Audit-All: 6 pillars covering workspace-timing, auto-refactor, WebGames, fractal-git.');
+  console.log(
+    '  ✔ Audit-All: 6 pillars covering workspace-timing, auto-refactor, WebGames, fractal-git.',
+  );
 
-  console.log('5. Verifying pre-commit-gate step normalization & CASE-08 parity...');
-  const preCommitSteps = verifyPreCommitParity();
-  console.log(`  ✔ Pre-Commit: [1/${preCommitSteps}]..[${preCommitSteps}/${preCommitSteps}] normalized, CASE-08 covers all 4 projects.`);
-
-  console.log('6. Verifying pre-push-gate step parity...');
-  const prePushSteps = verifyPrePushParity();
-  console.log(`  ✔ Pre-Push: ${prePushSteps} gates covering all 4 projects.`);
+  const registry = loadStepRegistry();
+  console.log('5. Verifying every gate entry against the step registry...');
+  const verifiedEntries = verifyAllGateEntries(registry);
+  for (const [entryId, stepCount] of verifiedEntries) {
+    console.log(
+      `  ✔ ${entryId}: ${stepCount} registered steps referenced by both implementations.`,
+    );
+  }
 
   console.log('\n✅ All gate system verification checks passed successfully.');
 }

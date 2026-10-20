@@ -55,7 +55,8 @@ function walk(dir, out = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      if (entry.name === 'node_modules' || entry.name === '.git' || entry.name.startsWith('.')) continue;
+      if (entry.name === 'node_modules' || entry.name === '.git' || entry.name.startsWith('.'))
+        continue;
       walk(full, out);
     } else if (entry.name !== SELF && !entry.name.endsWith('.tmp')) {
       out.push(full);
@@ -65,73 +66,68 @@ function walk(dir, out = []) {
 }
 
 /**
- * Assert the engine repository carries no consumer-project coupling.
+ * Read a file as UTF-8, treating a vanished file as absent rather than fatal.
  *
- * @returns Nothing; throws on the first violation.
+ * @param file - Absolute path to read.
+ * @returns File contents, or null when the file disappeared between walk and read.
  */
-function run() {
-  const coreRe = new RegExp(`\\b(?:${CORE_CONSUMER_IDENTIFIERS.join('|')})\\b`, 'i');
-  const legacyRe = new RegExp(`\\b(?:${LEGACY_FORBIDDEN_IDENTIFIERS.join('|')})\\b`, 'i');
+function readTextOrNull(file) {
+  try {
+    return fs.readFileSync(file, 'utf8');
+  } catch (err) {
+    if (err && err.code === 'ENOENT') return null;
+    throw err;
+  }
+}
+
+/**
+ * Append every line of one file that matches the resolved pattern.
+ *
+ * @param file - Absolute path of the file to scan.
+ * @param dir - Directory name the file was discovered under.
+ * @param resolvePattern - Callback returning the pattern to apply for the file.
+ * @param offenders - Accumulator for `relative/path:line` locations.
+ */
+function collectFileOffenders(file, dir, resolvePattern, offenders) {
+  const content = readTextOrNull(file);
+  if (content === null) return;
+
+  const pattern = resolvePattern(dir, file);
+  const lines = content.split('\n');
+  const relative = path.relative(ROOT, file);
+  for (let index = 0; index < lines.length; index++) {
+    if (pattern.test(lines[index])) {
+      offenders.push(`${relative}:${index + 1}`);
+    }
+  }
+}
+
+/**
+ * Collect line-level matches of one pattern across every file in the given directories.
+ *
+ * Contract: files are read once and scanned line by line, so the reported locations stay
+ * stable regardless of how many patterns a caller runs. A missing file is skipped silently
+ * because the walk and the read are not atomic on a live working tree.
+ *
+ * @param dirs - Directory names relative to the engine root.
+ * @param resolvePattern - Callback returning the pattern to apply for a file.
+ * @returns Offending `relative/path:line` locations in walk order.
+ */
+function collectOffenders(dirs, resolvePattern) {
   const offenders = [];
-
-  // 1. Verify engine core (src, presets, templates) strictly carries ZERO consumer identifiers
-  for (const dir of CORE_DIRS) {
+  for (const dir of dirs) {
     for (const file of walk(path.join(ROOT, dir))) {
-      let content;
-      try {
-        content = fs.readFileSync(file, 'utf8');
-      } catch (err) {
-        if (err && err.code === 'ENOENT') continue;
-        throw err;
-      }
-      const lines = content.split('\n');
-      lines.forEach((line, index) => {
-        if (coreRe.test(line)) {
-          offenders.push(`${path.relative(ROOT, file)}:${index + 1}`);
-        }
-      });
+      collectFileOffenders(file, dir, resolvePattern, offenders);
     }
   }
-  assert.deepStrictEqual(
-    offenders,
-    [],
-    `engine core (src/presets/templates) must stay strictly project-agnostic; consumer identifier found at: ${offenders.join(', ')}`,
-  );
-  console.log('  [PASS] engine core (src/presets/templates) is 100% project-agnostic');
+  return offenders;
+}
 
-  // 2. Verify scripts and documentation: zero legacy forbidden tokens, and active consumer names
-  // allowed only inside explicit integration test harnesses and consumer specs.
-  const scriptAndDocOffenders = [];
-  for (const dir of ['scripts', 'docs']) {
-    for (const file of walk(path.join(ROOT, dir))) {
-      const base = path.basename(file);
-      const isIntegration =
-        (dir === 'scripts' && INTEGRATION_HARNESSES.has(base)) ||
-        (dir === 'docs' && INTEGRATION_DOCS.has(base));
-
-      const re = isIntegration ? legacyRe : coreRe;
-      let content;
-      try {
-        content = fs.readFileSync(file, 'utf8');
-      } catch (err) {
-        if (err && err.code === 'ENOENT') continue;
-        throw err;
-      }
-      const lines = content.split('\n');
-      lines.forEach((line, index) => {
-        if (re.test(line)) {
-          scriptAndDocOffenders.push(`${path.relative(ROOT, file)}:${index + 1}`);
-        }
-      });
-    }
-  }
-  assert.deepStrictEqual(
-    scriptAndDocOffenders,
-    [],
-    `scripts and docs carry unauthorized consumer coupling at: ${scriptAndDocOffenders.join(', ')}`,
-  );
-  console.log('  [PASS] scripts and docs observe strict consumer boundary constraints');
-
+/**
+ * Assert every shipped preset is language-scoped: no suppressions, no file-scoped policy, and
+ * include globs anchored with the double-star prefix.
+ */
+function verifyPresetsLanguageScoped() {
   const presetDir = path.join(ROOT, 'presets');
   const presets = fs.readdirSync(presetDir).filter((name) => name.endsWith('.json'));
   assert.ok(presets.length > 0, 'at least one language-scoped preset must ship');
@@ -156,7 +152,12 @@ function run() {
   console.log(
     '  [PASS] shipped presets are language-scoped (no suppressions, **/-anchored includes)',
   );
+}
 
+/**
+ * Assert project conventions are declared options rather than engine literals.
+ */
+function verifyConventionsAreOptions() {
   const commentsSrc = fs.readFileSync(path.join(ROOT, 'src/analyzers/comments.ts'), 'utf8');
   const hygieneSrc = fs.readFileSync(path.join(ROOT, 'src/analyzers/hygiene.ts'), 'utf8');
   assert.ok(
@@ -168,6 +169,44 @@ function run() {
     'project jargon vocabulary must be inflowed via hygiene.options.jargonPatterns',
   );
   console.log('  [PASS] project conventions are declared options, not engine literals');
+}
+
+/**
+ * Assert the engine repository carries no consumer-project coupling.
+ *
+ * @returns Nothing; throws on the first violation.
+ */
+function run() {
+  const coreRe = new RegExp(`\\b(?:${CORE_CONSUMER_IDENTIFIERS.join('|')})\\b`, 'i');
+  const legacyRe = new RegExp(`\\b(?:${LEGACY_FORBIDDEN_IDENTIFIERS.join('|')})\\b`, 'i');
+
+  // 1. Verify engine core (src, presets, templates) strictly carries ZERO consumer identifiers
+  const coreOffenders = collectOffenders(CORE_DIRS, () => coreRe);
+  assert.deepStrictEqual(
+    coreOffenders,
+    [],
+    `engine core (src/presets/templates) must stay strictly project-agnostic; consumer identifier found at: ${coreOffenders.join(', ')}`,
+  );
+  console.log('  [PASS] engine core (src/presets/templates) is 100% project-agnostic');
+
+  // 2. Verify scripts and documentation: zero legacy forbidden tokens, and active consumer names
+  // allowed only inside explicit integration test harnesses and consumer specs.
+  const scriptAndDocOffenders = collectOffenders(['scripts', 'docs'], (dir, file) => {
+    const base = path.basename(file);
+    const isIntegration =
+      (dir === 'scripts' && INTEGRATION_HARNESSES.has(base)) ||
+      (dir === 'docs' && INTEGRATION_DOCS.has(base));
+    return isIntegration ? legacyRe : coreRe;
+  });
+  assert.deepStrictEqual(
+    scriptAndDocOffenders,
+    [],
+    `scripts and docs carry unauthorized consumer coupling at: ${scriptAndDocOffenders.join(', ')}`,
+  );
+  console.log('  [PASS] scripts and docs observe strict consumer boundary constraints');
+
+  verifyPresetsLanguageScoped();
+  verifyConventionsAreOptions();
 }
 
 try {
