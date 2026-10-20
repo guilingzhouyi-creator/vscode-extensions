@@ -619,4 +619,36 @@ mod tests {
 
         assert_eq!(bases, expected);
     }
+
+    #[test]
+    fn test_small_parent_list_and_zero_alloc_ancestry() {
+        let root = Oid::from_bytes([1u8; 20]);
+        let parent1 = Oid::from_bytes([2u8; 20]);
+        let parent2 = Oid::from_bytes([3u8; 20]);
+        let merge = Oid::from_bytes([4u8; 20]);
+
+        let zero = SmallParentList::empty();
+        assert_eq!(zero.len(), 0);
+        assert!(zero.is_empty());
+
+        let one = SmallParentList::one(root);
+        assert_eq!(one.len(), 1);
+        assert_eq!((&one).into_iter().collect::<Vec<_>>(), vec![root]);
+
+        let two = SmallParentList::two(parent1, parent2);
+        assert_eq!(two.len(), 2);
+        assert_eq!((&two).into_iter().collect::<Vec<_>>(), vec![parent1, parent2]);
+
+        // Verify DagWalker::is_ancestor with SmallParentList
+        let is_anc = DagWalker::is_ancestor(&root, &merge, |oid| {
+            if oid == &merge {
+                SmallParentList::two(parent1, parent2)
+            } else if oid == &parent1 {
+                SmallParentList::one(root)
+            } else {
+                SmallParentList::empty()
+            }
+        });
+        assert!(is_anc);
+    }
 }
