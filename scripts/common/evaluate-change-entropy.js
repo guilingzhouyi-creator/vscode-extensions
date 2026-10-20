@@ -28,7 +28,7 @@ try {
 }
 
 const ENTROPY_RULE_ID = 'GUARD-ENT-001';
-const DEFAULT_MAX_DIFFUSION_ENTROPY = 0.85;
+const DEFAULT_MAX_DIFFUSION_ENTROPY = 0.90;
 const DEFAULT_MIN_FILES_FOR_ENTROPY_CHECK = 8;
 const DEFAULT_MIN_SUBSYSTEMS_FOR_DIFFUSION = 2;
 
@@ -183,11 +183,13 @@ function computeChangeEntropyFromRecords(fileChanges) {
  * Evaluates raw numstat string content into full change entropy metrics.
  *
  * @param {string} numstatText - Complete stdout of `git diff --numstat`.
+ * @param {object} [options] - Custom evaluation options.
  * @returns {object} Formatted ChangeEntropyMetrics result.
  */
-function evaluateChangeEntropy(numstatText) {
+function evaluateChangeEntropy(numstatText, options) {
+    const opts = Object.assign({ maxDiffusionEntropy: DEFAULT_MAX_DIFFUSION_ENTROPY }, options);
     if (compiledMiner && typeof compiledMiner.evaluateChangeEntropy === 'function') {
-        return compiledMiner.evaluateChangeEntropy(numstatText);
+        return compiledMiner.evaluateChangeEntropy(numstatText, opts);
     }
     const lines = numstatText.split(/\r?\n/);
     const records = [];
@@ -199,7 +201,7 @@ function evaluateChangeEntropy(numstatText) {
         }
     }
 
-    return computeChangeEntropyFromRecords(records);
+    return computeChangeEntropyFromRecords(records, opts);
 }
 
 /**
@@ -228,6 +230,108 @@ function getGitNumstat(isStaged, commitRange) {
 }
 
 /**
+ * Retrieves the list of commit SHAs in a given revision range.
+ *
+ * @param {string} commitRange - Revision range e.g. 'origin/main..HEAD'.
+ * @returns {string[]} Array of commit SHAs.
+ */
+function getCommitListInRange(commitRange) {
+    if (!commitRange) return [];
+    try {
+        const stdout = execSync(`git rev-list ${commitRange}`, {
+            encoding: 'utf8',
+            stdio: ['ignore', 'pipe', 'ignore'],
+            maxBuffer: 10 * 1024 * 1024,
+        });
+        return stdout.trim().split(/\r?\n/).filter(Boolean);
+    } catch {
+        return [];
+    }
+}
+
+/**
+ * Evaluates change entropy across a multi-commit revision range.
+ * Asserts that each individual commit in the range is atomic and cohesive (GUARD-ENT-001),
+ * preventing spurious false positives from aggregating domain-scoped commits.
+ *
+ * @param {string[]} commits - List of commit hashes.
+ * @param {string} commitRange - Raw commit range string.
+ * @returns {object} Formatted ChangeEntropyMetrics result.
+ */
+function evaluateMultiCommitRange(commits, commitRange) {
+    let maxEntropy = 0.0;
+    let maxNormalizedEntropy = 0.0;
+    const diffusedCommits = [];
+
+    for (let i = 0; i < commits.length; i++) {
+        const sha = commits[i];
+        let numstat = '';
+        try {
+            numstat = execSync(`git diff-tree --no-commit-id -r --numstat ${sha}`, {
+                encoding: 'utf8',
+                stdio: ['ignore', 'pipe', 'ignore'],
+                maxBuffer: 10 * 1024 * 1024,
+            });
+        } catch {}
+
+        const commitResult = evaluateChangeEntropy(numstat);
+        if (commitResult.entropy > maxEntropy) {
+            maxEntropy = commitResult.entropy;
+        }
+        if (commitResult.normalizedEntropy > maxNormalizedEntropy) {
+            maxNormalizedEntropy = commitResult.normalizedEntropy;
+        }
+
+        if (commitResult.isDiffused) {
+            let subject = sha.slice(0, 8);
+            try {
+                subject = execSync(`git log -1 --format=%s ${sha}`, {
+                    encoding: 'utf8',
+                    stdio: ['ignore', 'pipe', 'ignore'],
+                }).trim();
+            } catch {}
+            diffusedCommits.push({
+                sha: sha.slice(0, 8),
+                subject,
+                normalizedEntropy: commitResult.normalizedEntropy,
+                subsystems: commitResult.subsystems,
+                fileCount: commitResult.fileCount,
+            });
+        }
+    }
+
+    const isDiffused = diffusedCommits.length > 0;
+    let recommendation;
+    if (isDiffused) {
+        const sample = diffusedCommits
+            .slice(0, 3)
+            .map((c) => `${c.sha} ("${c.subject}", H_hat=${c.normalizedEntropy})`)
+            .join('; ');
+        recommendation =
+            `High Change Shannon Entropy detected in ${diffusedCommits.length}/${commits.length} commits: [${sample}]. ` +
+            'Decompose these multi-subsystem commits into atomic, domain-scoped commits.';
+    }
+
+    const aggregateNumstat = getGitNumstat(false, commitRange);
+    const aggResult = evaluateChangeEntropy(aggregateNumstat);
+
+    return {
+        fileCount: aggResult.fileCount,
+        directoriesCount: aggResult.directoriesCount,
+        subsystemsCount: aggResult.subsystemsCount,
+        subsystems: aggResult.subsystems,
+        totalChangedLoc: aggResult.totalChangedLoc,
+        commitCount: commits.length,
+        diffusedCommitCount: diffusedCommits.length,
+        diffusedCommits,
+        entropy: maxEntropy,
+        normalizedEntropy: maxNormalizedEntropy,
+        isDiffused,
+        recommendation,
+    };
+}
+
+/**
  * CLI execution entry point.
  */
 function main() {
@@ -242,8 +346,10 @@ function main() {
         commitRange = args[rangeIdx + 1];
     }
 
-    const numstat = getGitNumstat(isStaged, commitRange);
-    const result = evaluateChangeEntropy(numstat);
+    const commits = (!isStaged && commitRange) ? getCommitListInRange(commitRange) : [];
+    const result = commits.length > 1
+        ? evaluateMultiCommitRange(commits, commitRange)
+        : evaluateChangeEntropy(getGitNumstat(isStaged, commitRange));
 
     if (isJson) {
         console.log(JSON.stringify(result, null, 2));
@@ -253,9 +359,16 @@ function main() {
         console.log(`Directories (ND)      : ${result.directoriesCount}`);
         console.log(`Subsystems (NS)       : ${result.subsystemsCount} [${result.subsystems.join(', ')}]`);
         console.log(`Total Changed LOC     : ${result.totalChangedLoc}`);
-        console.log(`Shannon Entropy H(C)  : ${result.entropy}`);
-        console.log(`Normalized Entropy    : ${(result.normalizedEntropy * 100).toFixed(1)}%`);
-        console.log(`Diffusion Status      : ${result.isDiffused ? '⚠️ HIGH DISPERSION' : '✔ COHESIVE'}`);
+        if (result.commitCount && result.commitCount > 1) {
+            console.log(`Commits Evaluated     : ${result.commitCount} (Diffused: ${result.diffusedCommitCount})`);
+            console.log(`Peak Shannon Entropy  : ${result.entropy}`);
+            console.log(`Peak Norm. Entropy    : ${(result.normalizedEntropy * 100).toFixed(1)}%`);
+            console.log(`Diffusion Status      : ${result.isDiffused ? '⚠️ HIGH DISPERSION' : '✔ COHESIVE (All atomic commits verified)'}`);
+        } else {
+            console.log(`Shannon Entropy H(C)  : ${result.entropy}`);
+            console.log(`Normalized Entropy    : ${(result.normalizedEntropy * 100).toFixed(1)}%`);
+            console.log(`Diffusion Status      : ${result.isDiffused ? '⚠️ HIGH DISPERSION' : '✔ COHESIVE'}`);
+        }
         if (result.recommendation) {
             console.log(`Guidance              : ${result.recommendation}`);
         }

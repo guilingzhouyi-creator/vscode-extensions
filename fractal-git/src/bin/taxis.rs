@@ -353,20 +353,31 @@ fn handle_commit(ctx: &CliContext) {
     let _ = ref_store.update_ref(&target_ref.to_git_ref(), &commit_oid, None);
 
     if let Ok(mut op_graph) = OperationGraph::load_or_init(&ctx.git_dir) {
+        let current_time_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|dur| dur.as_millis() as i64)
+            .unwrap_or(0);
+
         let mut branches = std::collections::BTreeMap::new();
+        if let Ok(all_refs) = ref_store.list_all() {
+            for (name, oid) in all_refs {
+                branches.insert(name, oid);
+            }
+        }
         branches.insert(target_ref.to_git_ref(), commit_oid);
+
         let view_snapshot = RepoViewSnapshot {
             head_oid: Some(commit_oid),
             branches,
             staged_promotions: Vec::new(),
-            timestamp_ms: 1700000000,
+            timestamp_ms: current_time_ms,
         };
         let _ = op_graph.record_operation(
             view_snapshot,
             actor.display_name(),
             "commit",
             format!("commit: {}", witness.commit_type),
-            1700000000,
+            current_time_ms,
         );
     }
 }

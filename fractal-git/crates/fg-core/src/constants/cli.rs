@@ -47,6 +47,8 @@ impl Subcommand {
     pub const PROMOTION: &'static str = "promotion";
     pub const BENCH: &'static str = "bench";
     pub const DAEMON: &'static str = "daemon";
+    pub const UNDO: &'static str = "undo";
+    pub const OPERATION: &'static str = "operation";
     pub const REV_LIST: &'static str = "rev-list";
     pub const VERSION: &'static str = "version";
     pub const HELP: &'static str = "help";
