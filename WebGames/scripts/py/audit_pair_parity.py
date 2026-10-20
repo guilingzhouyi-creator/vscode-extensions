@@ -123,7 +123,7 @@ def check_pair(sh_file: Path, ps1_file: Path, violations: list, hints: list) -> 
 
 
 def check_line_endings(violations: list, hints: list) -> None:
-    """全域 74 份脚本物理换行符门禁（ps1 恒为 CRLF，其余 sh/py/mjs 恒为 LF）。"""
+    """全域脚本物理换行符门禁（ps1 恒为 CRLF，其余 sh/py/mjs 恒为 LF）。"""
     repo_root = ROOT.parent
     ps1_files = sorted(list((ROOT / "scripts" / "ps1").glob("*.ps1")) + list((repo_root / "scripts" / "ps1").glob("*.ps1")))
     sh_files = sorted(list((ROOT / "scripts" / "sh").glob("*.sh")) + list((repo_root / "scripts" / "sh").glob("*.sh")))
@@ -145,9 +145,11 @@ def check_line_endings(violations: list, hints: list) -> None:
         if b"\r" in b:
             violations.append(f"[换行符违规] {f.relative_to(repo_root)} 包含 CR/CRLF（必须为纯 LF）")
 
+    total = len(ps1_files) + len(sh_files) + len(py_files) + sum(1 for f in mjs_files if f.exists())
     hints.append(
         f"物理换行符门禁: {len(ps1_files)} 份 ps1(CRLF) + {len(sh_files) + len(py_files) + len(mjs_files)} 份 非ps1(LF) 100% 合规"
     )
+    return total
 
 
 def main() -> int:
@@ -166,7 +168,7 @@ def main() -> int:
         if not (SH_DIR / (ps1_file.stem + ".sh")).exists():
             violations.append(f"[孤儿 ps1] {ps1_file.name} 无对应 sh 实现")
 
-    check_line_endings(violations, hints)
+    checked_files = check_line_endings(violations, hints)
 
     print("=" * 80)
     print("🪞 sh/ps1 同构双实现参数面一致性与物理换行符校验（T3）")
@@ -179,7 +181,7 @@ def main() -> int:
     if violations:
         print(f"【审查结论】未通过（同构参数面缺失/多余或换行符违规 {len(violations)} 项，请同步双实现与换行符）")
         return 1
-    print("【审查结论】通过（全部同构对参数面一致且 74 份脚本换行符 100% 物理合规）")
+    print(f"【审查结论】通过（全部同构对参数面一致，{checked_files} 份脚本换行符 100% 物理合规）")
     return 0
 
 

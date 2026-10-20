@@ -149,14 +149,14 @@ function runTopologyValidation() {
   }
 
   if (violations.length > 0) {
-    console.error(`\n[FAIL] Found ${violations.length} topology violation(s):`);
+    console.error(`\n✖ BLOCK Found ${violations.length} topology violation(s):`);
     for (const v of violations) {
       console.error(`  - ${v}`);
     }
     process.exit(1);
   }
 
-  console.log('[PASS] Micro-crate unidirectional DAG layering is 100% compliant with DIRECTORY_SPEC.md.');
+  console.log('✔ PASS Micro-crate unidirectional DAG layering is 100% compliant with DIRECTORY_SPEC.md.');
   process.exit(0);
 }
 

@@ -15,6 +15,9 @@ param(
     [switch]$Uninstall
 )
 Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+$PSNativeCommandUseErrorActionPreference = $true
+$PSNativeCommandArgumentPassing = 'Standard'
 
 $ErrorActionPreference = "Stop"
 

@@ -117,14 +117,14 @@ function runGitParityValidation() {
   }
 
   if (violations.length > 0) {
-    console.error(`\n[FAIL] Found ${violations.length} Git plumbing parity violation(s):`);
+    console.error(`\n✖ BLOCK Found ${violations.length} Git plumbing parity violation(s):`);
     for (const v of violations) {
       console.error(`  - ${v}`);
     }
     process.exit(1);
   }
 
-  console.log('[PASS] Git plumbing binary codec and sorting invariants are 100% equivalent with standard Git.');
+  console.log('✔ PASS Git plumbing binary codec and sorting invariants are 100% equivalent with standard Git.');
   process.exit(0);
 }
 

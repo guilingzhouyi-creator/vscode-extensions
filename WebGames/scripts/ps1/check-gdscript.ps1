@@ -18,6 +18,9 @@ param(
   [switch]$PerFile
 )
 Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+$PSNativeCommandUseErrorActionPreference = $true
+$PSNativeCommandArgumentPassing = 'Standard'
 $ErrorActionPreference = "Stop"
 
 # 初始化外部命令退出码，防止 StrictMode Latest 下未定义变量检索异常

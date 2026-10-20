@@ -12,6 +12,9 @@
 [CmdletBinding()]
 param()
 Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+$PSNativeCommandUseErrorActionPreference = $true
+$PSNativeCommandArgumentPassing = 'Standard'
 $ErrorActionPreference = "Stop"
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -27,7 +30,7 @@ if (-not $nodeCmd) {
 $mermaidModule = Join-Path $RootDir "scripts\js\node_modules\mermaid"
 if (-not (Test-Path $mermaidModule)) {
   Write-Host "【check-mermaid】scripts/js 依赖未安装，无法执行 Mermaid 真解析（fail-closed）" -ForegroundColor Red
-  Write-Host "  修复: npm install --prefix WebGames/scripts/js" -ForegroundColor Yellow
+  Write-Host "  修复: npm ci --prefix WebGames/scripts/js" -ForegroundColor Yellow
   exit 1
 }
 

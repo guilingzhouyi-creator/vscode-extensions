@@ -16,6 +16,9 @@ param(
   [string]$GodotBin = $env:GODOT_BIN
 )
 Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+$PSNativeCommandUseErrorActionPreference = $true
+$PSNativeCommandArgumentPassing = 'Standard'
 $ErrorActionPreference = "Continue"
 
 # Git 沙箱环境加固：隔离全局配置，防止受限沙箱权限异常

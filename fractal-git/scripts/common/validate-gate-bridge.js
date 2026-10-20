@@ -122,13 +122,13 @@ function runGateBridgeValidation() {
  */
 function concludeValidation(violations) {
   if (violations.length > 0) {
-    console.error(`\n[FAIL] Found ${violations.length} gate-bridge violation(s):`);
+    console.error(`\n✖ BLOCK Found ${violations.length} gate-bridge violation(s):`);
     for (const v of violations) {
       console.error(`  - ${v}`);
     }
     process.exit(1);
   }
-  console.log('[PASS] Gate bridge verification logic is 100% compliant with SSOT rule registry and latency budget.');
+  console.log('✔ PASS Gate bridge verification logic is 100% compliant with SSOT rule registry and latency budget.');
   process.exit(0);
 }
 

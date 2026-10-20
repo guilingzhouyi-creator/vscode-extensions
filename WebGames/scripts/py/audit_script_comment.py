@@ -3,8 +3,8 @@
 # 模块归属: 工程效能与质量门禁 (Tooling · 脚本库规范门禁)
 # 文件路径: WebGames/scripts/py/audit_script_comment.py
 # 架构定位: 脚本库全域题头与严格规范化守卫 (Script Header & Strictness Guard)
-# 依赖与触发: 触发方: audit_runner / 本地 CLI | 上游: 全域 74 份活动脚本 | 下游: 门禁报告 | 运行时: Python 3.10+
-# 职责说明: 扫描全域 74 份脚本，强力断言后端六字段题头、文件真实路径匹配、78 字符等宽线、零批次黑话、PowerShell 三件套、Bash 安全选项与 Python 强类型契约
+# 依赖与触发: 触发方: audit_runner / 本地 CLI | 上游: 全域活动脚本库 | 下游: 门禁报告 | 运行时: Python 3.10+
+# 职责说明: 扫描全域脚本，强力断言后端六字段题头、文件真实路径匹配、78 字符等宽线、零批次黑话、PowerShell 三件套、Bash 安全选项与 Python 强类型契约
 # 退出语义与设计依据: 退出码: 0=全域脚本合规, 1=存在违规 | 设计依据: 脚本库严格工程化标准契约与 AGENTS.md
 # ------------------------------------------------------------------------------
 # 用法示例:
@@ -14,7 +14,7 @@
 # ==============================================================================
 """audit_script_comment.py — 脚本库全域头注释与质量门禁审查引擎。
 
-覆盖全域 74 份活动脚本（sh/ps1/py/mjs），全方位实施泛化静态代码审查：
+覆盖全域活动脚本（sh/ps1/py/mjs），全方位实施泛化静态代码审查：
 1. 后端六字段标准与非空校验（模块归属/文件路径/架构定位/依赖与触发/职责说明/退出语义与设计依据）；
 2. 文件路径真实性对齐断言（声明路径与仓库相对物理路径 100% 一致）；
 3. 78 字符等宽集中分隔线；
@@ -38,7 +38,7 @@ ensure_utf8_stdout()
 
 ROOT = resolve_repo_root()
 
-# 全域扫描目标目录（覆盖 WebGames 与根目录脚本库全域 74 份文件）
+# 全域扫描目标目录（WebGames 与仓库根目录脚本库）
 SCAN_ROOTS = [
     ROOT / "scripts",
     ROOT.parent / "scripts",
@@ -61,7 +61,7 @@ PS1_EA_RE = re.compile(r"\$ErrorActionPreference\s*=\s*['\"](Stop|Continue)['\"]
 
 
 def iter_targets() -> Generator[Path, None, None]:
-    """遍历全域 74 份活动脚本文件。"""
+    """遍历全域活动脚本文件。"""
     seen: set[Path] = set()
     for base in SCAN_ROOTS:
         if not base.is_dir():
@@ -458,7 +458,7 @@ def main() -> int:
         return 1 if all_violations else 0
 
     print("=" * 78)
-    print("📜 全域 74 份活动脚本库全维度严格工程化审查")
+    print("📜 全域活动脚本库全维度严格工程化审查")
     print(f"  • 扫描脚本总数: {total_files} 份")
     print(f"  • 发现违规项: {len(all_violations)} 处")
     print("-" * 78)

@@ -16,6 +16,9 @@ param(
   [string]$GodotBin = $env:GODOT_BIN
 )
 Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+$PSNativeCommandUseErrorActionPreference = $true
+$PSNativeCommandArgumentPassing = 'Standard'
 $ErrorActionPreference = "Stop"
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path

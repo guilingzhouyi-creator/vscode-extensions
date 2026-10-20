@@ -199,14 +199,14 @@ function runZeroAllocBoundaryCheck() {
   }
 
   if (violations.length > 0) {
-    console.error(`\n[FAIL] Found ${violations.length} boundary violation(s):`);
+    console.error(`\n✖ BLOCK Found ${violations.length} boundary violation(s):`);
     for (const v of violations) {
       console.error(`  - ${v}`);
     }
     process.exit(1);
   }
 
-  console.log('[PASS] All production micro-crates satisfy zero transient heap allocation and safety proof contracts.');
+  console.log('✔ PASS All production micro-crates satisfy zero transient heap allocation and safety proof contracts.');
   process.exit(0);
 }
 

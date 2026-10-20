@@ -15,6 +15,8 @@ $ErrorActionPreference = 'Stop'
 
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+$PSNativeCommandUseErrorActionPreference = $true
+$PSNativeCommandArgumentPassing = 'Standard'
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ScriptsParent = Split-Path -Parent $ScriptDir
@@ -26,8 +28,9 @@ Write-Host "=================================================================" -
 
 $cargoCmd = if (Get-Command cargo.exe -ErrorAction SilentlyContinue) { "cargo.exe" } elseif (Get-Command cargo -ErrorAction SilentlyContinue) { "cargo" } else { $null }
 if (-not $cargoCmd) {
-    Write-Warning "cargo command not found on PATH. Native Rust gate skipped."
-    exit 0
+    # 缺少原生工具链时不得静默放行：未执行审查与审查通过必须可区分 (GUARD-SYS-001)。
+    Write-Warning "BLOCK  cargo 工具链缺失，Rust 质量门禁无法执行。"
+    exit 1
 }
 
 $manifestPath = Join-Path $ProjectRoot "Cargo.toml"
@@ -36,19 +39,19 @@ $manifestPath = Join-Path $ProjectRoot "Cargo.toml"
 Write-Host "`n=== [gate:rust 1/4] Code Formatting Check (rustfmt --check) ===" -ForegroundColor Gray
 $procFmt = Start-Process -FilePath $cargoCmd -ArgumentList @("fmt", "--all", "--manifest-path", $manifestPath, "--", "--check") -WorkingDirectory $ProjectRoot -NoNewWindow -PassThru -Wait
 if ($procFmt.ExitCode -ne 0) {
-    Write-Error "[FAIL] rustfmt check failed. Run 'cargo fmt --all' to fix formatting."
+    Write-Error "✖ BLOCK rustfmt check failed. Run 'cargo fmt --all' to fix formatting."
     exit 1
 }
-Write-Host "[PASS] rustfmt clean." -ForegroundColor Green
+Write-Host "✔ PASS rustfmt clean." -ForegroundColor Green
 
 # 静态检查 (clippy -D warnings)
 Write-Host "`n=== [gate:rust 2/4] Linter & Static Audit (clippy -D warnings) ===" -ForegroundColor Gray
 $procClippy = Start-Process -FilePath $cargoCmd -ArgumentList @("clippy", "--workspace", "--all-targets", "--manifest-path", $manifestPath, "--", "-D", "warnings") -WorkingDirectory $ProjectRoot -NoNewWindow -PassThru -Wait
 if ($procClippy.ExitCode -ne 0) {
-    Write-Error "[FAIL] cargo clippy reported warnings or errors."
+    Write-Error "✖ BLOCK cargo clippy reported warnings or errors."
     exit 1
 }
-Write-Host "[PASS] clippy clean with zero warnings." -ForegroundColor Green
+Write-Host "✔ PASS clippy clean with zero warnings." -ForegroundColor Green
 
 # 零分配与并发边界扫描
 Write-Host "`n=== [gate:rust 3/4] Zero-Allocation & Safety Proof Scanner ===" -ForegroundColor Gray
@@ -59,7 +62,7 @@ if (-not $nodeCmd) {
 } elseif (Test-Path $zeroAllocScript) {
     $procAlloc = Start-Process -FilePath $nodeCmd -ArgumentList $zeroAllocScript -WorkingDirectory $ProjectRoot -NoNewWindow -PassThru -Wait
     if ($procAlloc.ExitCode -ne 0) {
-        Write-Error "[FAIL] Zero-allocation or safety proof audit failed."
+        Write-Error "✖ BLOCK Zero-allocation or safety proof audit failed."
         exit 1
     }
 }
@@ -73,10 +76,10 @@ $testArgs = if ($Fast) {
 }
 $procTest = Start-Process -FilePath $cargoCmd -ArgumentList $testArgs -WorkingDirectory $ProjectRoot -NoNewWindow -PassThru -Wait
 if ($procTest.ExitCode -ne 0) {
-    Write-Error "[FAIL] Cargo test suite regression detected."
+    Write-Error "✖ BLOCK Cargo test suite regression detected."
     exit 1
 }
-Write-Host "[PASS] All micro-crate unit and integration tests passed." -ForegroundColor Green
+Write-Host "✔ PASS All micro-crate unit and integration tests passed." -ForegroundColor Green
 
 Write-Host "`n=== ALL FRACTAL GIT RUST GATE STAGES PASSED SUCCESSFULLY ===" -ForegroundColor Green
 exit 0

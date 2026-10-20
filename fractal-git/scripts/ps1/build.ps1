@@ -16,6 +16,8 @@ $ErrorActionPreference = 'Stop'
 
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+$PSNativeCommandUseErrorActionPreference = $true
+$PSNativeCommandArgumentPassing = 'Standard'
 
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ScriptsParent = Split-Path -Parent $ScriptDir
@@ -31,25 +33,25 @@ Write-Host "Project Root: $ProjectRoot"
 $nodeCmd = if (Get-Command node.exe -ErrorAction SilentlyContinue) { "node.exe" } elseif (Get-Command node -ErrorAction SilentlyContinue) { "node" } else { $null }
 $topologyScript = Join-Path $ProjectRoot "scripts\common\validate-crate-topology.js"
 if ($nodeCmd -and (Test-Path $topologyScript)) {
-    Write-Host "[1/4] Validating Micro-Crate DAG Topology..." -ForegroundColor Gray
+    Write-Host "Validating Micro-Crate DAG Topology..." -ForegroundColor Gray
     $proc = Start-Process -FilePath $nodeCmd -ArgumentList $topologyScript -WorkingDirectory $ProjectRoot -NoNewWindow -PassThru -Wait
     if ($proc.ExitCode -ne 0) { exit $proc.ExitCode }
 } else {
-    Write-Host "[1/4] Node.js not detected on PATH, skipped topology script." -ForegroundColor Yellow
+    Write-Host "Node.js not detected on PATH, skipped topology script." -ForegroundColor Yellow
 }
 
 # 2. Git plumbing byte parity validation
 $parityScript = Join-Path $ProjectRoot "scripts\common\validate-git-parity.js"
 if ($nodeCmd -and (Test-Path $parityScript)) {
-    Write-Host "[2/4] Validating Git Plumbing Byte Parity..." -ForegroundColor Gray
+    Write-Host "Validating Git Plumbing Byte Parity..." -ForegroundColor Gray
     $proc = Start-Process -FilePath $nodeCmd -ArgumentList $parityScript -WorkingDirectory $ProjectRoot -NoNewWindow -PassThru -Wait
     if ($proc.ExitCode -ne 0) { exit $proc.ExitCode }
 } else {
-    Write-Host "[2/4] Node.js not detected on PATH, skipped parity script." -ForegroundColor Yellow
+    Write-Host "Node.js not detected on PATH, skipped parity script." -ForegroundColor Yellow
 }
 
 # 3. TypeScript compilation
-Write-Host "[3/4] Compiling TypeScript Facade..." -ForegroundColor Gray
+Write-Host "Compiling TypeScript Facade..." -ForegroundColor Gray
 $tscPath = Join-Path $RepoRoot "auto-refactor\node_modules\typescript\bin\tsc"
 $tsConfig = Join-Path $ProjectRoot "tsconfig.json"
 if ($nodeCmd -and (Test-Path $tscPath)) {
@@ -62,7 +64,7 @@ if ($nodeCmd -and (Test-Path $tscPath)) {
 
 # 4. Native Rust Cargo check/build
 if (-not $SkipRust) {
-    Write-Host "[4/4] Verifying Native Rust Micro-Crate Kernel..." -ForegroundColor Gray
+    Write-Host "Verifying Native Rust Micro-Crate Kernel..." -ForegroundColor Gray
     $cargoCmd = if (Get-Command cargo.exe -ErrorAction SilentlyContinue) { "cargo.exe" } elseif (Get-Command cargo -ErrorAction SilentlyContinue) { "cargo" } else { $null }
     if ($cargoCmd) {
         $manifestPath = Join-Path $ProjectRoot "Cargo.toml"

@@ -142,6 +142,6 @@ if [ "$FAILS" -ne 0 ]; then
   exit 1
 fi
 rm -f "$LOG"
-echo "【check-gdscript】检查 $CHECKED 个 .gd，失败 0 个（scope=$SCOPE）"
+echo "【check-gdscript】检查 $CHECKED 个 .gd，失败 $FAILS 个（scope=$SCOPE）"
 echo "【check-gdscript】通过"
 exit 0

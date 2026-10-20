@@ -15,6 +15,9 @@ param(
   [switch]$Full
 )
 Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+$PSNativeCommandUseErrorActionPreference = $true
+$PSNativeCommandArgumentPassing = 'Standard'
 $ErrorActionPreference = "Stop"
 
 # 六刻度判定纯函数（入参小时 0~23，返回刻度名；与 timestamp.sh resolve_period_by_hour 逐小时一致）

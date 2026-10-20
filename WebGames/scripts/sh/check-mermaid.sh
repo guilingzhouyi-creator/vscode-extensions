@@ -24,7 +24,7 @@ if ! command -v node >/dev/null 2>&1; then
 fi
 if [ ! -d "$ROOT_DIR/scripts/js/node_modules/mermaid" ]; then
   echo "【check-mermaid】scripts/js 依赖未安装，无法执行 Mermaid 真解析（fail-closed）" >&2
-  echo "  修复: npm install --prefix WebGames/scripts/js" >&2
+  echo "  修复: npm ci --prefix WebGames/scripts/js" >&2
   exit 1
 fi
 
