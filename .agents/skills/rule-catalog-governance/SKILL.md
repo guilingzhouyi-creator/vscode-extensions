@@ -56,7 +56,7 @@ description: >-
 1. **`autoRefactor` (338 条)**：涵盖 30 个内置分析器与四层金字塔体系，通用多语言代码重构、AST 语法树、Rust 双轨算子与架构质量模型；
 2. **`workspaceTiming` (49 条)**：涵盖 VS Code 扩展审查体系的 L0~L5 六层刚性防线（编译、存储崩溃安全、时间守恒、i18n、性能与 UI 对比度）；
 3. **`webGames` (29 条)**：涵盖 Godot 游戏工程的文档治理（`DOC-`、`LINK-`）、高性能脚本契约（`ADV-`）与配置架构审查规则；
-4. **`globalTooling` (12 条)**：涵盖提交规范与禁词风格拦截（`CMG-STY-001`~`006`, `CMG-PRJ-001`）以及平台脚本工程化、AST 切片隔离与门面实质承载守卫（`GATE-AST-001`, `GATE-ISO-001`, `ARCH-ABS-001`, `ARCH-FAC-001` 等）。
+4. **`globalTooling` (12 条)**：涵盖提交规范与禁词风格拦截（`CMG-STY-001`~`006`, `CMG-PRJ-001`）以及平台脚本工程化、AST 切片隔离与门面实质承载守卫（`GUARD-AST-001`, `GUARD-ISO-001`, `ARCH-ABS-001`, `ARCH-FAC-001` 等）。
 
 ---
 
@@ -150,7 +150,7 @@ node scripts/common/generate-rule-catalog.js --check-only
 # 3. 本地验证提交说明中的规则 ID 是否真实存在
 node scripts/common/validate-commit-msg.js <path-to-commit-msg-file>
 
-# 4. 运行 pre-commit 门禁中的规则一致性校验 (Gate 7)
+# 4. 运行 pre-commit 门禁中的规则一致性校验 (SKILLS-SPEC-03)
 pwsh -File scripts/ps1/pre-commit-gate.ps1
 
 # 5. 执行全工作区快速审查中枢核验

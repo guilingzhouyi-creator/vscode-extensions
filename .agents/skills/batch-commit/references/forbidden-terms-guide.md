@@ -47,5 +47,5 @@
 
 ## 四、 单源规则反虚构契约 (`RCFG-RULE-DRIFT`)
 
-- 提交信息正文中提及的所有规则 ID（如 `GATE-AST-001`、`ARCH-FAC-001`、`ADV-PRF-002`），必须在 `scripts/common/rule-catalog.json` 中真实登记；
+- 提交信息正文中提及的所有规则 ID（如 `GUARD-AST-001`、`ARCH-FAC-001`、`ADV-PRF-002`），必须在 `scripts/common/rule-catalog.json` 中真实登记；
 - 若需引入全新规则，必须先在 `scripts/common/rule-catalog.json` 中完成元数据注册，随后方可在代码、检查器与提交信息中引用。

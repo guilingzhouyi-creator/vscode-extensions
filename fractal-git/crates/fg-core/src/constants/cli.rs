@@ -2,6 +2,9 @@
 //! File Path: crates/fg-core/src/constants/cli.rs
 //! Architecture Role: Standardized constants for CLI status badges, subcommands,
 //!   and options flags, unifying terminal reporting and machine integration.
+//! Dependencies & Triggers: Utilized by Taxis CLI binary and integration test suites.
+//! Responsibilities: Centralizes strongly-typed CLI tags and string constants.
+//! Exit Semantics & Design Rationale: Eliminates magic strings and enforces single-source tags.
 
 /// Strongly-typed terminal status badge constants.
 pub struct CliTag;

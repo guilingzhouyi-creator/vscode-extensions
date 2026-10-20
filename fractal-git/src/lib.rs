@@ -3,6 +3,9 @@
 //! Architecture Role: Central unified facade for the Fractal Git high-performance kernel,
 //!   orchestrating fg-core, fg-object, fg-index, fg-algorithms, fg-pools, fg-storage, fg-topology,
 //!   fg-transport, and fg-gate micro-crates into an ergonomic, unified public API.
+//! Dependencies & Triggers: Depended upon by Taxis CLI binary and integration test suites.
+//! Responsibilities: Unified root API facade, backward-compatible namespaces, and rule catalog.
+//! Exit Semantics & Design Rationale: Provides single import point for all 9 micro-crates.
 //!
 //! ### Domain Governance Rules (SSOT):
 //! - `FGT-COR-001`: Core data model and error contract guard (fg-core)

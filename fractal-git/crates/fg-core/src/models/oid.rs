@@ -2,6 +2,10 @@
 //! File Path: crates/fg-core/src/models/oid.rs
 //! Architecture Role: Pure immutable 40-character hexadecimal and 20-byte binary
 //!   Git OID representation.
+//! Dependencies & Triggers: Fundamental value object used by all Taxis crates and CLI.
+//! Responsibilities: Hex encoding/decoding, Serde serialization, and byte array encapsulation.
+//! Exit Semantics & Design Rationale: Provides compact copyable representation with zero
+//!   heap allocations and strict hex validation.
 
 use serde::{Deserialize, Serialize};
 use std::fmt;

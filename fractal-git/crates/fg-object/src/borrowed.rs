@@ -3,6 +3,10 @@
 //! Architecture Role: High-throughput zero-copy borrowed Git object views (GitCommitRef,
 //!   GitTreeRef, GitTreeIter) aligned with gitoxide's memory-efficiency principles.
 //!   Eliminates heap allocation when reading and parsing objects in hot DAG traversal paths.
+//! Dependencies & Triggers: Borrowed byte slices from CAS storage, object cache, or packs.
+//! Responsibilities: Zero-copy commit and tree parsing, inline small parent list optimization.
+//! Exit Semantics & Design Rationale: Parses borrowed byte slices with sub-microsecond latency,
+//!   returning explicit errors on truncated or malformed binary streams.
 
 use fg_core::error::{FractalError, FractalResult};
 use fg_core::models::{AgentCommitMeta, Oid};

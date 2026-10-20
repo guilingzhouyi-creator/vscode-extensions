@@ -4,6 +4,9 @@
 //!   tree & text difference calculation, three-way merge reconciliation,
 //!   commit graph DAG traversal, Bayesian quality scoring models, and synthetic
 //!   benchmark topology generators.
+//! Dependencies & Triggers: Upstream of fg-storage, fg-topology, and Taxis CLI.
+//! Responsibilities: High-performance algorithmic engine exports and algebraic conflict operators.
+//! Exit Semantics & Design Rationale: Zero-allocation and cache-friendly computational primitives.
 
 pub mod bloom;
 pub mod cdc;

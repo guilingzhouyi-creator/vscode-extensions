@@ -1,5 +1,9 @@
 //! Module: fg-core — Domain Models Facade
 //! File Path: crates/fg-core/src/models/mod.rs
+//! Architecture Role: Domain entities, invariants, and fundamental value objects for Taxis.
+//! Dependencies & Triggers: Depended upon across all Taxis micro-crates and CLI binary.
+//! Responsibilities: Central re-export point for OID, ChangeId, generation numbers, and policy.
+//! Exit Semantics & Design Rationale: Exposes core immutable domain abstractions without cycles.
 
 pub mod bloom;
 pub mod change_id;

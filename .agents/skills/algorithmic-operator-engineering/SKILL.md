@@ -66,7 +66,7 @@ description: >-
 | 泛化算子原语 (Generalized Primitive) | TypeScript / Node.js V8 (`auto-refactor` / `workspace-timing`) | Rust N-API 原生层 (`auto-refactor/native`) | GDScript 4.7 纯逻辑引擎 (`WebGames`) | 工作区统一门禁与契约映射 (`rule-catalog.json`) |
 | :--- | :--- | :--- | :--- | :--- |
 | **零堆分配平坦竞技场 (Flat Arena / SoA)** | `Int32Array` / `Float64Array` / `Uint32Array` | `Vec<u32>` / `&[u8]` 零拷贝切片 | `PackedInt32Array` / `PackedFloat64Array` | `CPX-SPACE-001` / `ADV-PRF-002` |
-| **无分支查表分发 (Branchless 256-LUT)** | 模块级静态 `Uint8Array(256)` + `charCodeAt` | `static [u8; 256]` + `as usize` 索引 | 预加载常量 `PackedByteArray` 查表 | `GATE-AST-001` ($\text{CC}\le 15, \text{Depth}\le 4$) |
+| **无分支查表分发 (Branchless 256-LUT)** | 模块级静态 `Uint8Array(256)` + `charCodeAt` | `static [u8; 256]` + `as usize` 索引 | 预加载常量 `PackedByteArray` 查表 | `GUARD-AST-001` ($\text{CC}\le 15, \text{Depth}\le 4$) |
 | **位并行与集合代数 (Bitset / SWAR)** | `Uint32Array` 位集 ($32\text{-bit}$ 步进) | `u64` / `u128` SWAR 寄存器并行 | `int` ($64\text{-bit}$ 有符号位掩码运算) | `ALGORITHMIC_PROOF` 契约注释 |
 | **时代戳 $O(1)$ 状态复位 (Epoch Reset)** | `visitedEpoch: Int32Array` + `epoch++` | `visited_epoch: Vec<u32>` + `wrapping_add` | 成员 `PackedInt32Array` + `_epoch += 1` + `reset_state()` | `ADV-PRF-002` (禁止帧循环 `clear/fill`) |
 | **定长环形缓冲轨迹记忆 (RingBuffer Trajectory)** | 预分配固定容量数组 + 双指针位回环游标 | `VecDeque` 预分配或定长数组轮询 | 定长 32 槽位数组 + `cursor = (cursor + 1) % N` 覆盖 | `PRF-MEM-001` / `ADV-PRF-002` |
@@ -84,7 +84,7 @@ description: >-
    - Rust N-API 算子与纯 TS Shim 必须通过 `validate-native-parity.js` 与 `validate-equivalence.js` 双轨等价校验。
 2. **微基准量化证明 (`bench-hot-paths.js` / `TB-REGRESSION`)**：
    - 优化前后必须运行 `node auto-refactor/scripts/bench-hot-paths.js`（或对应子项目基准），以客观耗时（`hrtime.bigint`）与堆内存增量证明实质收益，严禁无基准支撑的盲目复杂化。
-3. **复杂度与注释契约守卫 (`GATE-AST-001` / `CPX-SPACE-001` / `ADV-PRF-002`)**：
+3. **复杂度与注释契约守卫 (`GUARD-AST-001` / `CPX-SPACE-001` / `ADV-PRF-002`)**：
    - 算子内部通过拆解 $\text{CC} \le 15$、$\text{Depth} \le 4$ 的无副作用纯函数保持平铺；
    - 循环体内保持零瞬态堆分配；在模块头六字段 JSDoc 中显式记录位掩码布局、前置等长不变式与退化降级阈值（`ALGORITHMIC_PROOF` / `INVARIANT_BOUNDARY`）。
 

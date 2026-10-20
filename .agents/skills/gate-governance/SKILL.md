@@ -23,7 +23,7 @@ description: >-
   3. **缩进契约守卫**：TypeScript 源码保持 4 空格缩进，其余源码与配置文件保持 2 空格缩进；
   4. **密钥与敏感信息守卫**：拦截硬编码 Token、API 密钥与绝对路径；
   5. **单文件双轨体积与 1:3 动态包络**：看守有效代码行 $\text{ELOC} \le 900$ 与物理行 $\text{LOC} \le 1400$ 预算、1:3 动态反推包络及 $\text{ELOC} \ge 600$ 高负荷契约注释密度 $\ge 8\%$；
-  6. **AST 切片局部复杂度守卫 (`GATE-AST-001`)**：暂存区生产代码切片受单函数圈复杂度 $\text{CC} \le 15$（分发器与探针弹性包络 20~25）、控制流嵌套深度 $\text{Depth} \le 4$、单行噪声比 $\text{Noise} \le 4.0$ 刚性约束。
+  6. **AST 切片局部复杂度守卫 (`GUARD-AST-001`)**：暂存区生产代码切片受单函数圈复杂度 $\text{CC} \le 15$（分发器与探针弹性包络 20~25）、控制流嵌套深度 $\text{Depth} \le 4$、单行噪声比 $\text{Noise} \le 4.0$ 刚性约束。
 - **`commit-msg`（单进程统一提交信息流式检验）**：
   由 `validate-commit-msg.js` 驱动，毫秒级流式完成提交说明各项合规校验：
   1. **Conventional Commits 格式**：`<type>(<scope>): <祈使句中文摘要标题>`（长度 5~80 字符，结尾不加句号）；
@@ -36,7 +36,7 @@ description: >-
 
 ### 2. 第二层：远端主干看守 (Tier 2 Remote CI Gate)
 - 远端 CI 流水线（`.github/workflows/`）完整镜像本地 Tier 1 全套判定（Hygiene + AST Slice + Style + Test + Audit）；
-- 阻断任何由于本地 `--no-verify` 绕过提交的问题代码合入主干（触发 `GATE-ISO-001` 熔断）；
+- 阻断任何由于本地 `--no-verify` 绕过提交的问题代码合入主干（触发 `GUARD-ISO-001` 熔断）；
 - 远端 CI 步骤中如需动态生成多行文件，统一使用 `printf "%s\n"` 语法，杜绝 `echo` 平台差异行为。
 
 ---

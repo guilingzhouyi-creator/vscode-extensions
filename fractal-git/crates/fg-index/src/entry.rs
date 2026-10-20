@@ -2,6 +2,10 @@
 //! File Path: crates/fg-index/src/entry.rs
 //! Architecture Role: Canonical Git index stage representation (Stage 0 normal, Stage 1 base,
 //!   Stage 2 ours, Stage 3 theirs) and staged file entry descriptors.
+//! Dependencies & Triggers: Utilized by lockless staging tree, merge engine, and worktree slots.
+//! Responsibilities: Index entry representation, stage slot tagging, and file mode encapsulation.
+//! Exit Semantics & Design Rationale: Mirror official Git index binary conventions with zero
+//!   unnecessary allocations.
 
 use fg_core::models::Oid;
 use fg_object::FileMode;

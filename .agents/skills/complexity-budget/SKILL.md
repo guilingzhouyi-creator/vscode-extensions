@@ -23,7 +23,7 @@ description: >-
 
 ---
 
-## 二、 AST 局部切片刚性预算与弹性包络 (`GATE-AST-001`)
+## 二、 AST 局部切片刚性预算与弹性包络 (`GUARD-AST-001`)
 
 工作区暂存区生产代码与工程脚本均受 AST 局部切片守卫管束，以单个函数/方法为最小审计切片，实行指标一票否决：
 
@@ -138,7 +138,7 @@ node scripts/common/evaluate-eloc-budget.js
 # 2. 验证注释语义加权与有效注释密度模型 (ECR)
 node auto-refactor/scripts/validate-comment-governance.js
 
-# 3. 验证暂存区 AST 局部切片守卫与物理行数（Gate 5 与 Gate 9）
+# 3. 验证暂存区 AST 局部切片守卫与物理行数（STAGED-SLICE-11 与 STAGED-VOLUME-13）
 pwsh -File scripts/ps1/pre-commit-gate.ps1
 ```
 

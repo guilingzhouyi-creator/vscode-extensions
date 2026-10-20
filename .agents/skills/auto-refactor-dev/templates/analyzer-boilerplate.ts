@@ -19,7 +19,7 @@ export class ExampleCustomAnalyzer implements Analyzer {
         ast.walk((node) => {
             if (node.kind === 'FunctionDeclaration' && node.text.includes('deprecatedOp')) {
                 findings.push({
-                    ruleId: 'GATE-AST-001',
+                    ruleId: 'GUARD-AST-001',
                     file,
                     line: node.startLine,
                     column: node.startColumn,

@@ -2,6 +2,10 @@
 //! File Path: crates/fg-index/src/lockless_tree.rs
 //! Architecture Role: Pure in-memory staging tree index eliminating `.git/index.lock` contention.
 //!   Maintains sorted flat paths, detects unmerged conflicts, and constructs nested Git Trees.
+//! Dependencies & Triggers: Utilized by CLI staging commands, worktrees, and merge operators.
+//! Responsibilities: Sparse directory collapsing, conflict stage tracking, and tree creation.
+//! Exit Semantics & Design Rationale: Enables non-blocking concurrent writes with $O(\log N)$
+//!   path navigation and sparse cone collapsing.
 
 use std::collections::BTreeMap;
 

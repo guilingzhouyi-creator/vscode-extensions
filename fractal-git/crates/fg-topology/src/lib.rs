@@ -4,6 +4,9 @@
 //!   merge assertions, worktree lifecycle state machine transitions, Path Jail
 //!   sandboxes, anti-inflation commit telemetry, and staged promotion UAC
 //!   authorization ledgers.
+//! Dependencies & Triggers: Upstream of Taxis CLI and test suites.
+//! Responsibilities: Central facade for refs, promotion ledger, worktrees, and operation DAG.
+//! Exit Semantics & Design Rationale: Exposes high-level state machine interfaces cleanly.
 
 pub mod authorizer;
 pub mod operation;

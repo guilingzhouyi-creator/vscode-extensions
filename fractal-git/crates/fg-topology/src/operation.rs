@@ -3,6 +3,11 @@
 //! Architecture Role: Implements Jujutsu-style immutable Operation Log DAG, recording complete
 //!   repository views and predecessor graphs across transactions, powering instantaneous
 //!   `taxis undo` and time-travel rollback for multi-agent workflows.
+//! Dependencies & Triggers: Utilized by CLI commands (undo, op) and transaction boundaries.
+//! Responsibilities: Operation graph persistence, topological DAG ordering,
+//!   and repository view snapshots.
+//! Exit Semantics & Design Rationale: Guarantees zero-data-loss time-travel without destructive
+//!   git reflog mutations or lost commit states.
 
 use fg_core::error::{FractalError, FractalResult};
 use fg_core::models::Oid;

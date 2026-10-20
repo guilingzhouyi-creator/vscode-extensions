@@ -88,7 +88,7 @@ description: >-
 所有技能文档与伴生资源均受工作区全局刚性公理管束：
 1. **严格换行符**：Markdown（`.md`）、JSON（`.json`）、TypeScript/JavaScript（`.ts`/`.js`）及 Bash（`.sh`）磁盘文件必须严格保持 **LF 换行**；严禁写入 CRLF；
 2. **零空文件**：严禁创建或保留 0 字节物理空文件或纯空白字符文件（`HYG-EMP-001`）；
-3. **单源规则反虚构 (`RCFG-RULE-DRIFT`)**：技能正文中提及的所有大写规则 ID（如 `ARCH-FAC-001`、`ADV-PRF-002`、`GATE-AST-001`）必须在 `scripts/common/rule-catalog.json` 中真实登记；
+3. **单源规则反虚构 (`RCFG-RULE-DRIFT`)**：技能正文中提及的所有大写规则 ID（如 `ARCH-FAC-001`、`ADV-PRF-002`、`GUARD-AST-001`）必须在 `scripts/common/rule-catalog.json` 中真实登记；
 4. **相对链接卫生 (`LINK-ABS-FILE-URI`)**：所有超链接必须为有效的相对路径，严禁使用 Windows 盘符绝对路径或 `file:///` URI；目标物理文件必须真实存在；
 5. **零黑话与零敏捷代号**：严禁使用 `Phase_{NN}`、`ST{NN}`、`p[0-9]+` 等敏捷施工临时代号，一律采用客观技术主题命名；
 6. **单文件双轨体积与契约注释密度**：技能模板与伴生代码文件同样受 $\text{ELOC} \le 900, \text{LOC} \le 1400$ 双轨体积红线与 1:3 动态反推包络约束；高负荷代码（$\text{ELOC} \ge 600$）契约注释密度必须达到 8% 及以上；

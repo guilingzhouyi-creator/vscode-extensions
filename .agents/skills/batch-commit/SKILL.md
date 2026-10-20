@@ -104,7 +104,7 @@ git add path/to/contract.ts path/to/storage.ts
 | **`CMG-STY-006`** | **执行标签零执行数字** | `通过146套测试`, `耗时50.8s`, `419个文件`, `覆盖率98%` | 执行标签区域严禁堆砌数字量词，必须提炼为纯逻辑质性断言（例如“断言边界输入下算法正确回退；断言全量源码文件合规且无空文件”） |
 
 - **严禁敏捷冲刺期过程性代号**：正文中绝对严禁出现 `W1~W9`、`Pass 1..6`、`Sprint 3`、`phase\d+`、`st\d+` 等短期过程代号，所有描述必须转换为恒定技术事实；
-- **单源规则反虚构 (`RCFG-RULE-DRIFT`)**：正文中引用的所有规则 ID（如 `GATE-AST-001`、`ARCH-FAC-001`）必须在 `scripts/common/rule-catalog.json` 中真实存在，严禁凭空捏造。
+- **单源规则反虚构 (`RCFG-RULE-DRIFT`)**：正文中引用的所有规则 ID（如 `GUARD-AST-001`、`ARCH-FAC-001`）必须在 `scripts/common/rule-catalog.json` 中真实存在，严禁凭空捏造。
 
 #### 5. 离线预审验证
 ```powershell
@@ -120,7 +120,7 @@ pwsh -File scripts/ps1/pre-commit-gate.ps1
 *检查项目：零空文件、换行契约（ps1 CRLF，其余 LF）、TypeScript 4 空格缩进/其余 2 空格、敏感信息防泄漏、单文件双轨体积预算（ELOC<=900, LOC<=1400）、1:3 动态反推包络、高负荷注释密度 >= 8% 及 AST 切片局部复杂度（CC<=15, Depth<=4, Noise<=4.0）。*
 
 #### 暂存区 AST 切片复杂度阻断自愈指引 (AST Complexity Remediation)
-若预审触发 `GATE-AST-001`（`CC > 15`）或控制流嵌套超标（`Depth > 4`）：
+若预审触发 `GUARD-AST-001`（`CC > 15`）或控制流嵌套超标（`Depth > 4`）：
 1. **卫语句提前返回 (Guard Clauses)**：将深层嵌套的 `if-else` 或循环内分支改写为逆向断言提前 `return` 或 `continue`，压平控制流；
 2. **纯判定提取 (Pure Predicate Extraction)**：将复杂的组合条件表达式或路径判定拆分为无副作用的纯函数（如 `isTargetExtension`、`matchRulePattern`）；
 3. **重新暂存与二次预审**：重构后执行 `git add <file>`，重新运行 `pre-commit-gate.ps1`，直至绿色通过。

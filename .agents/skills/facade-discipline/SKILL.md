@@ -159,7 +159,7 @@ import { RealService } from './real-service';
 # 1. 验证门面实质承载与跳板清零守卫 (ARCH-FAC-001 & ARCH-ABS-001)
 node auto-refactor/scripts/validate-facade-governance.js
 
-# 2. 验证暂存区预审门禁 (Gate 2 架构纪律)
+# 2. 验证暂存区预审门禁 (RULE-REGISTRY-02 架构纪律)
 pwsh -File scripts/ps1/pre-commit-gate.ps1
 ```
 

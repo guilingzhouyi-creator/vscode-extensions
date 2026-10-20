@@ -3,6 +3,9 @@
 //! Architecture Role: Standalone native binary for the Taxis (Fractal Git) engine,
 //!   providing dual-faced human/machine inspection, Git alias mappings, and pre-receive
 //!   gate verification.
+//! Dependencies & Triggers: Invoked by developers, Agent sub-processes, and Git hook bridges.
+//! Responsibilities: CLI argument dispatch, human/JSON output formatting, and repo transactions.
+//! Exit Semantics & Design Rationale: Zero-cost CLI dispatcher with instant command execution.
 //!
 //! ### Domain Governance Rules (SSOT):
 //! - `FGT-COR-001`: Core data model and error contract guard
@@ -813,66 +816,36 @@ fn handle_promotion(ctx: &CliContext) {
 
     match action {
         "request" | "stage" => {
-            let mut oid_str = None;
-            let mut summary = "Autonomous Agent PR promotion proposal".to_string();
-            let mut agent_uid = "agent-sub-001".to_string();
-            let mut composite_score = 0.0;
-            let mut cai_index = 100.0;
-            let mut cyclomatic_complexity_delta = 0;
-            let mut eloc_delta = 0;
-            let mut anti_gaming_passed = true;
-            let mut custom_ci_lower: Option<f64> = None;
-            let mut report = "Auto-Refactor Quality Gate: zero debt verification.".to_string();
-
-            let mut arg_cursor = 1;
-            while arg_cursor < ctx.args.len() {
-                match ctx.args[arg_cursor].as_str() {
-                    "--oid" | "--candidate" | "--target-oid"
-                    if arg_cursor + 1 < ctx.args.len() => {
-                        oid_str = Some(ctx.args[arg_cursor + 1].clone());
-                        arg_cursor += 2;
-                    }
-                    "--summary" if arg_cursor + 1 < ctx.args.len() => {
-                        summary = ctx.args[arg_cursor + 1].clone();
-                        arg_cursor += 2;
-                    }
-                    "--agent" | "--agent-uid" if arg_cursor + 1 < ctx.args.len() => {
-                        agent_uid = ctx.args[arg_cursor + 1].clone();
-                        arg_cursor += 2;
-                    }
-                    "--score" if arg_cursor + 1 < ctx.args.len() => {
-                        composite_score = ctx.args[arg_cursor + 1].parse::<f64>().unwrap_or(0.0);
-                        arg_cursor += 2;
-                    }
-                    "--cai" if arg_cursor + 1 < ctx.args.len() => {
-                        cai_index = ctx.args[arg_cursor + 1].parse::<f64>().unwrap_or(100.0);
-                        arg_cursor += 2;
-                    }
-                    "--ci-lower" if arg_cursor + 1 < ctx.args.len() => {
-                        custom_ci_lower = ctx.args[arg_cursor + 1].parse::<f64>().ok();
-                        arg_cursor += 2;
-                    }
-                    "--cc-delta" if arg_cursor + 1 < ctx.args.len() => {
-                        cyclomatic_complexity_delta =
-                            ctx.args[arg_cursor + 1].parse().unwrap_or(0);
-                        arg_cursor += 2;
-                    }
-                    "--eloc-delta" if arg_cursor + 1 < ctx.args.len() => {
-                        eloc_delta = ctx.args[arg_cursor + 1].parse().unwrap_or(0);
-                        arg_cursor += 2;
-                    }
-                    "--anti-gaming" if arg_cursor + 1 < ctx.args.len() => {
-                        anti_gaming_passed =
-                            ctx.args[arg_cursor + 1].parse().unwrap_or(true);
-                        arg_cursor += 2;
-                    }
-                    "--report" if arg_cursor + 1 < ctx.args.len() => {
-                        report = ctx.args[arg_cursor + 1].clone();
-                        arg_cursor += 2;
-                    }
-                    _ => arg_cursor += 1,
-                }
-            }
+            let oid_str = find_arg_value(
+                &ctx.args,
+                &["--oid", "--candidate", "--target-oid"],
+            ).map(|val| val.to_string());
+            let summary = find_arg_value(&ctx.args, &["--summary"])
+                .unwrap_or("Autonomous Agent PR promotion proposal")
+                .to_string();
+            let agent_uid = find_arg_value(&ctx.args, &["--agent", "--agent-uid"])
+                .unwrap_or("agent-sub-001")
+                .to_string();
+            let composite_score = find_arg_value(&ctx.args, &["--score"])
+                .and_then(|val| val.parse::<f64>().ok())
+                .unwrap_or(0.0);
+            let cai_index = find_arg_value(&ctx.args, &["--cai"])
+                .and_then(|val| val.parse::<f64>().ok())
+                .unwrap_or(100.0);
+            let custom_ci_lower = find_arg_value(&ctx.args, &["--ci-lower"])
+                .and_then(|val| val.parse::<f64>().ok());
+            let cyclomatic_complexity_delta = find_arg_value(&ctx.args, &["--cc-delta"])
+                .and_then(|val| val.parse::<i32>().ok())
+                .unwrap_or(0);
+            let eloc_delta = find_arg_value(&ctx.args, &["--eloc-delta"])
+                .and_then(|val| val.parse::<i32>().ok())
+                .unwrap_or(0);
+            let anti_gaming_passed = find_arg_value(&ctx.args, &["--anti-gaming"])
+                .and_then(|val| val.parse::<bool>().ok())
+                .unwrap_or(true);
+            let report = find_arg_value(&ctx.args, &["--report"])
+                .unwrap_or("Auto-Refactor Quality Gate: zero debt verification.")
+                .to_string();
 
             let candidate_oid = match oid_str {
                 Some(ref hex_str) => match Oid::from_hex(hex_str) {
@@ -963,33 +936,16 @@ fn handle_promotion(ctx: &CliContext) {
             }
         }
         "authorize-gui-bridge" | "approve" => {
-            let mut req_id_opt = None;
-            let mut operator = "Human Architect (GUI Click)".to_string();
-            let mut email = "architect@deepmind.internal".to_string();
-            let mut session = "GUI_SESSION_VERIFIED".to_string();
-
-            let mut arg_cursor = 1;
-            while arg_cursor < ctx.args.len() {
-                match ctx.args[arg_cursor].as_str() {
-                    "--id" if arg_cursor + 1 < ctx.args.len() => {
-                        req_id_opt = Some(ctx.args[arg_cursor + 1].clone());
-                        arg_cursor += 2;
-                    }
-                    "--operator" if arg_cursor + 1 < ctx.args.len() => {
-                        operator = ctx.args[arg_cursor + 1].clone();
-                        arg_cursor += 2;
-                    }
-                    "--email" if arg_cursor + 1 < ctx.args.len() => {
-                        email = ctx.args[arg_cursor + 1].clone();
-                        arg_cursor += 2;
-                    }
-                    "--session" if arg_cursor + 1 < ctx.args.len() => {
-                        session = ctx.args[arg_cursor + 1].clone();
-                        arg_cursor += 2;
-                    }
-                    _ => arg_cursor += 1,
-                }
-            }
+            let req_id_opt = find_arg_value(&ctx.args, &["--id"]).map(|val| val.to_string());
+            let operator = find_arg_value(&ctx.args, &["--operator"])
+                .unwrap_or("Human Architect (GUI Click)")
+                .to_string();
+            let email = find_arg_value(&ctx.args, &["--email"])
+                .unwrap_or("architect@deepmind.internal")
+                .to_string();
+            let session = find_arg_value(&ctx.args, &["--session"])
+                .unwrap_or("GUI_SESSION_VERIFIED")
+                .to_string();
 
             let active_req = match ledger.get_active_candidate(current_time_ms) {
                 Some(cand) => cand.clone(),
@@ -1049,28 +1005,13 @@ fn handle_promotion(ctx: &CliContext) {
             }
         }
         "reject" => {
-            let mut req_id_opt = None;
-            let mut operator = "Human Architect".to_string();
-            let mut feedback = "Promotion declined in GUI UAC review".to_string();
-
-            let mut arg_cursor = 1;
-            while arg_cursor < ctx.args.len() {
-                match ctx.args[arg_cursor].as_str() {
-                    "--id" if arg_cursor + 1 < ctx.args.len() => {
-                        req_id_opt = Some(ctx.args[arg_cursor + 1].clone());
-                        arg_cursor += 2;
-                    }
-                    "--operator" if arg_cursor + 1 < ctx.args.len() => {
-                        operator = ctx.args[arg_cursor + 1].clone();
-                        arg_cursor += 2;
-                    }
-                    "--feedback" | "--reason" if arg_cursor + 1 < ctx.args.len() => {
-                        feedback = ctx.args[arg_cursor + 1].clone();
-                        arg_cursor += 2;
-                    }
-                    _ => arg_cursor += 1,
-                }
-            }
+            let req_id_opt = find_arg_value(&ctx.args, &["--id"]).map(|val| val.to_string());
+            let operator = find_arg_value(&ctx.args, &["--operator"])
+                .unwrap_or("Human Architect")
+                .to_string();
+            let feedback = find_arg_value(&ctx.args, &["--feedback", "--reason"])
+                .unwrap_or("Promotion declined in GUI UAC review")
+                .to_string();
 
             let active_req = match ledger.get_active_candidate(current_time_ms) {
                 Some(cand) => cand.clone(),
@@ -1162,39 +1103,23 @@ fn handle_promotion(ctx: &CliContext) {
 }
 
 fn handle_bench(ctx: &CliContext) {
-    let mut multiplier = 1;
-    let mut save_path: Option<PathBuf> = None;
-    let mut verify_path: Option<PathBuf> = None;
-    let mut level = fractal_git::BenchmarkLevel::Level1Micro;
-
-    let mut arg_cursor = 0;
-    while arg_cursor < ctx.args.len() {
-        if (ctx.args[arg_cursor] == "-m" || ctx.args[arg_cursor] == "--multiplier")
-            && arg_cursor + 1 < ctx.args.len()
-        {
-            multiplier = ctx.args[arg_cursor + 1].parse().unwrap_or(1);
-            arg_cursor += 2;
-        } else if ctx.args[arg_cursor] == "--level" && arg_cursor + 1 < ctx.args.len() {
-            match ctx.args[arg_cursor + 1].to_lowercase().as_str() {
-                "2" | "scale" | "poset" => level = fractal_git::BenchmarkLevel::Level2Scale,
-                "3" | "macro" | "monorepo" => level = fractal_git::BenchmarkLevel::Level3Macro,
-                "all" | "full" => level = fractal_git::BenchmarkLevel::All,
-                _ => level = fractal_git::BenchmarkLevel::Level1Micro,
-            }
-            arg_cursor += 2;
-        } else if ctx.args[arg_cursor] == "--scion-parity" {
-            level = fractal_git::BenchmarkLevel::All;
-            arg_cursor += 1;
-        } else if ctx.args[arg_cursor] == "--save-baseline" && arg_cursor + 1 < ctx.args.len() {
-            save_path = Some(PathBuf::from(&ctx.args[arg_cursor + 1]));
-            arg_cursor += 2;
-        } else if ctx.args[arg_cursor] == "--verify-baseline" && arg_cursor + 1 < ctx.args.len() {
-            verify_path = Some(PathBuf::from(&ctx.args[arg_cursor + 1]));
-            arg_cursor += 2;
-        } else {
-            arg_cursor += 1;
+    let multiplier = find_arg_value(&ctx.args, &["-m", "--multiplier"])
+        .and_then(|val| val.parse::<usize>().ok())
+        .unwrap_or(1);
+    let level = if ctx.args.iter().any(|arg| arg == "--scion-parity") {
+        fractal_git::BenchmarkLevel::All
+    } else if let Some(level_str) = find_arg_value(&ctx.args, &["--level"]) {
+        match level_str.to_lowercase().as_str() {
+            "2" | "scale" | "poset" => fractal_git::BenchmarkLevel::Level2Scale,
+            "3" | "macro" | "monorepo" => fractal_git::BenchmarkLevel::Level3Macro,
+            "all" | "full" => fractal_git::BenchmarkLevel::All,
+            _ => fractal_git::BenchmarkLevel::Level1Micro,
         }
-    }
+    } else {
+        fractal_git::BenchmarkLevel::Level1Micro
+    };
+    let save_path = find_arg_value(&ctx.args, &["--save-baseline"]).map(PathBuf::from);
+    let verify_path = find_arg_value(&ctx.args, &["--verify-baseline"]).map(PathBuf::from);
 
     let suite = fractal_git::bench::TaxisBenchmarkSuite::run_suite(level, multiplier);
 

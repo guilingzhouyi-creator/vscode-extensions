@@ -1,5 +1,9 @@
-//! Unit Test: fg-topology Operation DAG & Time-Travel Undo
+//! Module: test_operations — fg-topology Operation DAG & Time-Travel Undo Test Suite
 //! File Path: tests/rust/test_operations.rs
+//! Architecture Role: Integration and unit verification for Jujutsu-style operation logging.
+//! Dependencies & Triggers: Executed via `cargo test --test test_operations`.
+//! Responsibilities: Tests operation creation, SHA-1 IDs, undo rollbacks, and disk persistence.
+//! Exit Semantics & Design Rationale: Verifies zero data loss during repo state mutations.
 
 use fractal_git::core::models::Oid;
 use fractal_git::fractal::operation::{OperationGraph, RepoViewSnapshot};

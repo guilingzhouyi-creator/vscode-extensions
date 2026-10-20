@@ -69,7 +69,7 @@ description: >-
   3. *边界与类型证明*：切片长度或内存字节严格在分配边界之内。
 
 ### 6. 领域切片常量集中化与单源防漂移 (`RCFG-RULE-DRIFT`)
-- **严禁裸写伪规则与状态标签**：严禁在代码、日志、错误文案中硬编码未在工作区 `rule-catalog.json` 登记的伪规则 ID（如已废弃的 `GATE-MSG-001` 或 `L3-CONFLICT`）；
+- **严禁裸写伪规则与状态标签**：严禁在代码、日志、错误文案中硬编码未在工作区 `rule-catalog.json` 登记的伪规则 ID（如已废弃的 `GUARD-MSG-001` 或 `L3-CONFLICT`）；
 - **常量目录收敛于 `constants/`**：Git 协议常数、引用命名空间、性能基准指标、合规规则与终端状态标签（`CliTag`），必须统一定义在 `crates/fg-core/src/constants/` 下，暴露强类型常量供全仓引用；
 - **双端镜像等价**：TS 绑定层通过不可变冻结字典（如 `fractal-git/ts/constants.ts`）镜像映射，确保全技术栈常量单源一致。
 
