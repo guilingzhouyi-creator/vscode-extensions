@@ -38,14 +38,160 @@ impl PartialOrd for QueueItem {
     }
 }
 
+/// Compact stack-allocated parent container eliminating heap allocation
+/// for commits with up to 2 parents (covering 99.9% of all Git commits).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SmallParentList {
+    Zero,
+    One(Oid),
+    Two(Oid, Oid),
+    Many(Vec<Oid>),
+}
+
+impl SmallParentList {
+    pub const fn empty() -> Self {
+        Self::Zero
+    }
+
+    pub const fn one(parent: Oid) -> Self {
+        Self::One(parent)
+    }
+
+    pub const fn two(first: Oid, second: Oid) -> Self {
+        Self::Two(first, second)
+    }
+
+    pub fn from_slice(slice: &[Oid]) -> Self {
+        match slice.len() {
+            0 => Self::Zero,
+            1 => Self::One(slice[0]),
+            2 => Self::Two(slice[0], slice[1]),
+            _ => Self::Many(slice.to_vec()),
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        match self {
+            Self::Zero => 0,
+            Self::One(_) => 1,
+            Self::Two(_, _) => 2,
+            Self::Many(entries) => entries.len(),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
+impl From<Vec<Oid>> for SmallParentList {
+    fn from(entries: Vec<Oid>) -> Self {
+        match entries.len() {
+            0 => Self::Zero,
+            1 => Self::One(entries[0]),
+            2 => Self::Two(entries[0], entries[1]),
+            _ => Self::Many(entries),
+        }
+    }
+}
+
+pub struct SmallParentIter<'a> {
+    list: &'a SmallParentList,
+    index: usize,
+}
+
+impl<'a> Iterator for SmallParentIter<'a> {
+    type Item = Oid;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let item = match self.list {
+            SmallParentList::Zero => None,
+            SmallParentList::One(parent) => {
+                if self.index == 0 {
+                    Some(*parent)
+                } else {
+                    None
+                }
+            }
+            SmallParentList::Two(first, second) => match self.index {
+                0 => Some(*first),
+                1 => Some(*second),
+                _ => None,
+            },
+            SmallParentList::Many(entries) => entries.get(self.index).copied(),
+        };
+        if item.is_some() {
+            self.index += 1;
+        }
+        item
+    }
+}
+
+impl<'a> IntoIterator for &'a SmallParentList {
+    type Item = Oid;
+    type IntoIter = SmallParentIter<'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        SmallParentIter {
+            list: self,
+            index: 0,
+        }
+    }
+}
+
+pub struct SmallParentIntoIter {
+    list: SmallParentList,
+    index: usize,
+}
+
+impl Iterator for SmallParentIntoIter {
+    type Item = Oid;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let item = match &self.list {
+            SmallParentList::Zero => None,
+            SmallParentList::One(parent) => {
+                if self.index == 0 {
+                    Some(*parent)
+                } else {
+                    None
+                }
+            }
+            SmallParentList::Two(first, second) => match self.index {
+                0 => Some(*first),
+                1 => Some(*second),
+                _ => None,
+            },
+            SmallParentList::Many(entries) => entries.get(self.index).copied(),
+        };
+        if item.is_some() {
+            self.index += 1;
+        }
+        item
+    }
+}
+
+impl IntoIterator for SmallParentList {
+    type Item = Oid;
+    type IntoIter = SmallParentIntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        SmallParentIntoIter {
+            list: self,
+            index: 0,
+        }
+    }
+}
+
 /// Traversal engine for directed acyclic graphs of Git commits.
 pub struct DagWalker;
 
 impl DagWalker {
     /// Determines whether `ancestor` is an ancestor of `descendant` given a parent lookup function.
-    pub fn is_ancestor<F>(ancestor: &Oid, descendant: &Oid, mut get_parents: F) -> bool
+    pub fn is_ancestor<F, I>(ancestor: &Oid, descendant: &Oid, mut get_parents: F) -> bool
     where
-        F: FnMut(&Oid) -> Vec<Oid>,
+        F: FnMut(&Oid) -> I,
+        I: IntoIterator<Item = Oid>,
     {
         if ancestor == descendant {
             return true;
@@ -205,9 +351,10 @@ impl DagWalker {
     }
 
     /// Performs breadth-first topological walk from start commit down to root.
-    pub fn walk_ancestors<F>(start: &Oid, mut get_parents: F) -> Vec<Oid>
+    pub fn walk_ancestors<F, I>(start: &Oid, mut get_parents: F) -> Vec<Oid>
     where
-        F: FnMut(&Oid) -> Vec<Oid>,
+        F: FnMut(&Oid) -> I,
+        I: IntoIterator<Item = Oid>,
     {
         let mut order = Vec::new();
         let mut visited: FastOidSet = FastOidSet::default();

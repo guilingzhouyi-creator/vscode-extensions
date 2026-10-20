@@ -2,6 +2,9 @@
 //! File Path: crates/fg-transport/src/lib.rs
 //! Architecture Role: Communication transport subsystem for Fractal Git, containing
 //!   standard Git pkt-line wire protocol, Smart Protocol v2 handler, and local Agent IPC.
+//! Dependencies & Triggers: Consumed by Taxis CLI daemon and local Agent IPC runners.
+//! Responsibilities: Wire packet-line codecs, Git Smart Protocol v2 framing, and IPC messages.
+//! Exit Semantics & Design Rationale: Stream-based framing with deterministic error boundaries.
 
 pub mod ipc;
 pub mod packetline;

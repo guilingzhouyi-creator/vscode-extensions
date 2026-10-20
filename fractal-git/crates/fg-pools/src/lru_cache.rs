@@ -14,14 +14,25 @@
 //!   - Thread-safe interior mutability powered by parking_lot Mutex.
 
 use parking_lot::Mutex;
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use std::hash::Hash;
+
+struct LruNode<K, V> {
+    key: K,
+    value: V,
+    size_bytes: usize,
+    prev_index: Option<usize>,
+    next_index: Option<usize>,
+}
 
 struct LruInner<K, V> {
     max_bytes: usize,
     current_bytes: usize,
-    entries: HashMap<K, (V, usize)>,
-    order: VecDeque<K>,
+    entries: HashMap<K, usize>,
+    nodes: Vec<Option<LruNode<K, V>>>,
+    free_slots: Vec<usize>,
+    head_index: Option<usize>,
+    tail_index: Option<usize>,
 }
 
 impl<K: Hash + Eq + Clone, V> LruInner<K, V> {
@@ -30,49 +41,144 @@ impl<K: Hash + Eq + Clone, V> LruInner<K, V> {
             max_bytes,
             current_bytes: 0,
             entries: HashMap::new(),
-            order: VecDeque::new(),
+            nodes: Vec::new(),
+            free_slots: Vec::new(),
+            head_index: None,
+            tail_index: None,
+        }
+    }
+
+    fn detach_node(&mut self, slot_index: usize) {
+        let (prev_opt, next_opt) = match self.nodes.get(slot_index).and_then(|slot| slot.as_ref()) {
+            Some(node) => (node.prev_index, node.next_index),
+            None => return,
+        };
+
+        if let Some(prev_idx) = prev_opt {
+            if let Some(Some(ref mut prev_node)) = self.nodes.get_mut(prev_idx) {
+                prev_node.next_index = next_opt;
+            }
+        } else {
+            self.head_index = next_opt;
+        }
+
+        if let Some(next_idx) = next_opt {
+            if let Some(Some(ref mut next_node)) = self.nodes.get_mut(next_idx) {
+                next_node.prev_index = prev_opt;
+            }
+        } else {
+            self.tail_index = prev_opt;
+        }
+
+        if let Some(Some(ref mut current_node)) = self.nodes.get_mut(slot_index) {
+            current_node.prev_index = None;
+            current_node.next_index = None;
+        }
+    }
+
+    fn attach_to_tail(&mut self, slot_index: usize) {
+        if let Some(old_tail) = self.tail_index {
+            if let Some(Some(ref mut tail_node)) = self.nodes.get_mut(old_tail) {
+                tail_node.next_index = Some(slot_index);
+            }
+            if let Some(Some(ref mut current_node)) = self.nodes.get_mut(slot_index) {
+                current_node.prev_index = Some(old_tail);
+                current_node.next_index = None;
+            }
+            self.tail_index = Some(slot_index);
+        } else {
+            self.head_index = Some(slot_index);
+            self.tail_index = Some(slot_index);
+            if let Some(Some(ref mut current_node)) = self.nodes.get_mut(slot_index) {
+                current_node.prev_index = None;
+                current_node.next_index = None;
+            }
+        }
+    }
+
+    fn promote_to_mru(&mut self, slot_index: usize) {
+        if self.tail_index == Some(slot_index) {
+            return;
+        }
+        self.detach_node(slot_index);
+        self.attach_to_tail(slot_index);
+    }
+
+    fn pop_lru_node(&mut self) -> Option<(K, usize)> {
+        let oldest_idx = self.head_index?;
+        self.detach_node(oldest_idx);
+        let node = self.nodes.get_mut(oldest_idx)?.take()?;
+        self.free_slots.push(oldest_idx);
+        Some((node.key, node.size_bytes))
+    }
+
+    fn allocate_slot(&mut self) -> usize {
+        if let Some(recycled) = self.free_slots.pop() {
+            recycled
+        } else {
+            let new_slot = self.nodes.len();
+            self.nodes.push(None);
+            new_slot
         }
     }
 
     fn get(&mut self, key: &K) -> Option<&V> {
-        if self.entries.contains_key(key) {
-            // Move key to back (MRU)
-            if let Some(pos) = self.order.iter().position(|cached_key| cached_key == key) {
-                self.order.remove(pos);
-                self.order.push_back(key.clone());
-            }
-            self.entries.get(key).map(|(value_ref, _)| value_ref)
+        if let Some(&slot_index) = self.entries.get(key) {
+            self.promote_to_mru(slot_index);
+            self.nodes.get(slot_index)?.as_ref().map(|node| &node.value)
         } else {
             None
         }
     }
 
     fn insert(&mut self, key: K, value: V, size_bytes: usize) {
-        // If key already exists, deduct its previous size
-        if let Some((_, old_size)) = self.entries.remove(&key) {
+        if let Some(&slot_index) = self.entries.get(&key) {
+            let old_size = if let Some(Some(ref mut node)) = self.nodes.get_mut(slot_index) {
+                let previous = node.size_bytes;
+                node.value = value;
+                node.size_bytes = size_bytes;
+                previous
+            } else {
+                0
+            };
             self.current_bytes = self.current_bytes.saturating_sub(old_size);
-            if let Some(pos) = self.order.iter().position(|cached_key| cached_key == &key) {
-                self.order.remove(pos);
-            }
-        }
-
-        // Evict LRU items while over budget
-        while self.current_bytes + size_bytes > self.max_bytes && !self.order.is_empty() {
-            if let Some(lru_key) = self.order.pop_front() {
-                if let Some((_, evicted_size)) = self.entries.remove(&lru_key) {
+            self.promote_to_mru(slot_index);
+        } else {
+            while self.current_bytes + size_bytes > self.max_bytes && self.head_index.is_some() {
+                if let Some((lru_key, evicted_size)) = self.pop_lru_node() {
+                    self.entries.remove(&lru_key);
                     self.current_bytes = self.current_bytes.saturating_sub(evicted_size);
                 }
             }
+
+            let slot = self.allocate_slot();
+            self.nodes[slot] = Some(LruNode {
+                key: key.clone(),
+                value,
+                size_bytes,
+                prev_index: None,
+                next_index: None,
+            });
+            self.attach_to_tail(slot);
+            self.entries.insert(key, slot);
         }
 
         self.current_bytes += size_bytes;
-        self.entries.insert(key.clone(), (value, size_bytes));
-        self.order.push_back(key);
+
+        while self.current_bytes > self.max_bytes && self.head_index.is_some() {
+            if let Some((lru_key, evicted_size)) = self.pop_lru_node() {
+                self.entries.remove(&lru_key);
+                self.current_bytes = self.current_bytes.saturating_sub(evicted_size);
+            }
+        }
     }
 
     fn clear(&mut self) {
         self.entries.clear();
-        self.order.clear();
+        self.nodes.clear();
+        self.free_slots.clear();
+        self.head_index = None;
+        self.tail_index = None;
         self.current_bytes = 0;
     }
 }

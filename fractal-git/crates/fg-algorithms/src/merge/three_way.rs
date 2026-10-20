@@ -15,7 +15,7 @@
 
 use fg_core::models::Oid;
 use fg_object::{FileMode, GitTree, GitTreeEntry};
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 /// Fast-path resolution for canonical tree OIDs during three-way merge.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -115,30 +115,58 @@ impl ThreeWayMerge {
         let mut merged = BTreeMap::new();
         let mut conflicts = Vec::new();
 
-        // Collect all distinct paths across all three trees
-        let all_paths: BTreeSet<&String> = base
-            .keys()
-            .chain(ours.keys())
-            .chain(theirs.keys())
-            .collect();
+        // High-performance 3-way zipper: zero BTreeSet intermediate allocation, O(N) single pass
+        let mut base_iter = base.iter().peekable();
+        let mut ours_iter = ours.iter().peekable();
+        let mut theirs_iter = theirs.iter().peekable();
 
-        for path in all_paths {
-            let base_oid = base.get(path);
-            let ours_oid = ours.get(path);
-            let theirs_oid = theirs.get(path);
+        while base_iter.peek().is_some()
+            || ours_iter.peek().is_some()
+            || theirs_iter.peek().is_some()
+        {
+            let next_path: &String = match [
+                base_iter.peek().map(|(path_key, _)| *path_key),
+                ours_iter.peek().map(|(path_key, _)| *path_key),
+                theirs_iter.peek().map(|(path_key, _)| *path_key),
+            ]
+            .into_iter()
+            .flatten()
+            .min() {
+                Some(active_path) => active_path,
+                None => break,
+            };
+
+            let base_oid = if base_iter.peek().map(|(path_key, _)| *path_key) == Some(next_path) {
+                base_iter.next().map(|(_, entry_oid)| entry_oid)
+            } else {
+                None
+            };
+
+            let ours_oid = if ours_iter.peek().map(|(path_key, _)| *path_key) == Some(next_path) {
+                ours_iter.next().map(|(_, entry_oid)| entry_oid)
+            } else {
+                None
+            };
+
+            let theirs_oid =
+                if theirs_iter.peek().map(|(path_key, _)| *path_key) == Some(next_path) {
+                    theirs_iter.next().map(|(_, entry_oid)| entry_oid)
+                } else {
+                    None
+                };
 
             match (base_oid, ours_oid, theirs_oid) {
                 // Case 1: Identical in both branches
                 (_, Some(&o_oid), Some(&t_oid)) if o_oid == t_oid => {
-                    merged.insert(path.clone(), o_oid);
+                    merged.insert(next_path.clone(), o_oid);
                 }
                 // Case 2: Unchanged in ours, changed or added in theirs
                 (base_val, ours_val, Some(&t_oid)) if ours_val == base_val => {
-                    merged.insert(path.clone(), t_oid);
+                    merged.insert(next_path.clone(), t_oid);
                 }
                 // Case 3: Unchanged in theirs, changed or added in ours
                 (base_val, Some(&o_oid), theirs_val) if theirs_val == base_val => {
-                    merged.insert(path.clone(), o_oid);
+                    merged.insert(next_path.clone(), o_oid);
                 }
                 // Case 4: Deleted in theirs, unchanged in ours
                 (Some(_), Some(_), None) if ours_oid == base_oid => {
@@ -151,7 +179,7 @@ impl ThreeWayMerge {
                 // Case 6: Concurrent conflicting change or delete-modify conflict
                 _ => {
                     conflicts.push(ConflictEntry {
-                        path: path.clone(),
+                        path: next_path.clone(),
                         base_oid: base_oid.copied(),
                         ours_oid: ours_oid.copied(),
                         theirs_oid: theirs_oid.copied(),

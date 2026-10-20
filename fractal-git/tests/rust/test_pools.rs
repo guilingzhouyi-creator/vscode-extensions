@@ -104,6 +104,18 @@ fn test_buffer_pool_size_classes_and_thread_local() {
     let large_buf = pool.acquire_sized(BufferSizeClass::Large);
     assert!(large_buf.capacity() >= 1024 * 1024);
     pool.release_sized(large_buf, BufferSizeClass::Large);
+
+    // 4. Test RAII PooledBuffer auto-recycling on drop
+    {
+        let mut guard = pool.acquire_guard_sized(BufferSizeClass::Small);
+        guard.extend_from_slice(b"temporary payload in RAII guard");
+        assert_eq!(guard.len(), 31);
+        // guard automatically dropped and returned to pool here
+    }
+    let recycled_guard_buf = pool.acquire_sized(BufferSizeClass::Small);
+    assert!(recycled_guard_buf.is_empty(), "recycled buffer should be cleared");
+    assert!(recycled_guard_buf.capacity() >= 4096);
+    pool.release_sized(recycled_guard_buf, BufferSizeClass::Small);
 }
 
 #[test]

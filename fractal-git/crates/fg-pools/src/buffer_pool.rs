@@ -14,6 +14,7 @@
 
 use parking_lot::Mutex;
 use std::cell::RefCell;
+use std::mem::ManuallyDrop;
 
 pub const DEFAULT_PAGE_SIZE: usize = 64 * 1024; // 64 KB
 const THREAD_CACHE_MAX: usize = 8;
@@ -115,6 +116,17 @@ impl PageBufferPool {
         shared_hit.unwrap_or_else(|| Vec::with_capacity(class.bytes()))
     }
 
+    /// Acquires a standard page-sized buffer wrapped in an RAII recycling guard.
+    pub fn acquire_guard(&self) -> PooledBuffer<'_> {
+        self.acquire_guard_sized(BufferSizeClass::Page)
+    }
+
+    /// Acquires a sized buffer wrapped in an RAII recycling guard.
+    pub fn acquire_guard_sized(&self, class: BufferSizeClass) -> PooledBuffer<'_> {
+        let raw_buf = self.acquire_sized(class);
+        PooledBuffer::new(self, raw_buf, class)
+    }
+
     /// Releases a buffer back into its designated size class.
     pub fn release_sized(&self, mut buf: Vec<u8>, class: BufferSizeClass) {
         buf.clear();
@@ -167,5 +179,59 @@ impl PageBufferPool {
                 }
             }
         }
+    }
+}
+
+/// RAII guard providing scoped, exclusive access to a pooled byte buffer.
+/// Automatically recycles the buffer back into its originating pool on scope exit / drop.
+pub struct PooledBuffer<'a> {
+    pool: &'a PageBufferPool,
+    buffer: ManuallyDrop<Vec<u8>>,
+    class: BufferSizeClass,
+}
+
+impl<'a> PooledBuffer<'a> {
+    /// Constructs a new RAII guard wrapping the raw vector.
+    pub fn new(pool: &'a PageBufferPool, buffer: Vec<u8>, class: BufferSizeClass) -> Self {
+        Self {
+            pool,
+            buffer: ManuallyDrop::new(buffer),
+            class,
+        }
+    }
+
+    /// Detaches the buffer from the pool, preventing recycling on drop.
+    pub fn take(mut self) -> Vec<u8> {
+        // SAFETY: buffer ownership is transferred to caller; mem::forget prevents drop
+        let raw_vec = unsafe { ManuallyDrop::take(&mut self.buffer) };
+        std::mem::forget(self);
+        raw_vec
+    }
+
+    /// Size class associated with this pooled buffer.
+    pub fn class(&self) -> BufferSizeClass {
+        self.class
+    }
+}
+
+impl<'a> std::ops::Deref for PooledBuffer<'a> {
+    type Target = Vec<u8>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.buffer
+    }
+}
+
+impl<'a> std::ops::DerefMut for PooledBuffer<'a> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.buffer
+    }
+}
+
+impl<'a> Drop for PooledBuffer<'a> {
+    fn drop(&mut self) {
+        // SAFETY: buffer is extracted exactly once on drop to be recycled into pool
+        let reusable_buf = unsafe { ManuallyDrop::take(&mut self.buffer) };
+        self.pool.release_sized(reusable_buf, self.class);
     }
 }

@@ -3,6 +3,9 @@
 //! Architecture Role: Protocol-level verification and resource governance subsystem,
 //!   containing pre-receive authorization guards, conflict marker verifiers,
 //!   and compile-time strictness commit message guards.
+//! Dependencies & Triggers: Consumed by Taxis CLI pre-receive, promotion, and check commands.
+//! Responsibilities: Commit message governance, conflict marker detection, and pre-receive policy.
+//! Exit Semantics & Design Rationale: Fail-closed verification preventing policy-violating commits.
 
 pub mod commit_guard;
 pub mod conflict_guard;

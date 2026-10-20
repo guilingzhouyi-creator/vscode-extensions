@@ -1,8 +1,11 @@
-//! Crate: fg-core (Fractal Git Core Domain)
+//! Module: fg-core — Fractal Git Core Domain Foundation
 //! File Path: crates/fg-core/src/lib.rs
 //! Architecture Role: Root foundation crate defining atomic models, global error types,
 //!   and dependency-inversion trait abstractions (OdbStore, RefStore,
 //!   GateVerifier, WorktreeReclaimer).
+//! Dependencies & Triggers: Depended upon by all Taxis micro-crates and CLI binary.
+//! Responsibilities: Core atomic domain models, zero-panic error classification, and trait contracts.
+//! Exit Semantics & Design Rationale: Standardizes fundamental types with zero circular dependencies.
 
 pub mod constants;
 pub mod error;

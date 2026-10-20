@@ -16,10 +16,18 @@ use fg_object::{FileMode, GitTree, GitTreeEntry};
 use crate::conflict_stage::ConflictStageSlot;
 use crate::entry::{IndexStage, VirtualIndexEntry};
 
-enum TreeNode {
-    File(VirtualIndexEntry),
-    Directory(BTreeMap<String, TreeNode>),
-    CollapsedSubtree(Oid),
+struct DirectoryFrame {
+    dir_name: String,
+    entries: Vec<GitTreeEntry>,
+}
+
+impl DirectoryFrame {
+    fn new(dir_name: impl Into<String>) -> Self {
+        Self {
+            dir_name: dir_name.into(),
+            entries: Vec::new(),
+        }
+    }
 }
 
 /// Thread-safe in-memory virtual staging index.
@@ -208,80 +216,83 @@ impl InMemoryIndexTree {
             return Ok(*empty_tree.raw_oid());
         }
 
-        let mut root_node = BTreeMap::new();
+        // Prefix-Stack Tree Builder: O(TreeDepth) memory space, zero intermediate BTreeMap trees
+        let mut dir_stack: Vec<DirectoryFrame> = vec![DirectoryFrame::new("")];
+
         for (path, entry) in &self.entries {
-            let segments: Vec<&str> = path.split('/').collect();
-            Self::insert_recursive(&mut root_node, &segments, entry.clone());
-        }
+            let is_sparse = entry.is_sparse_dir();
+            let mut segments: Vec<&str> = path.split('/').collect();
+            let entry_name = segments.pop().unwrap_or(path.as_str());
+            let dir_segments = segments;
 
-        Self::persist_node_recursive(&root_node, &mut persist_tree)
-    }
-
-    fn insert_recursive(
-        current_dir: &mut BTreeMap<String, TreeNode>,
-        segments: &[&str],
-        entry: VirtualIndexEntry,
-    ) {
-        if segments.is_empty() {
-            return;
-        }
-
-        let segment = segments[0].to_string();
-        if segments.len() == 1 {
-            if entry.is_sparse_dir() {
-                current_dir.insert(segment, TreeNode::CollapsedSubtree(entry.oid));
-            } else {
-                current_dir.insert(segment, TreeNode::File(entry));
+            // Compute longest common prefix depth with currently active directory stack
+            let mut common_depth = 0;
+            while common_depth < dir_segments.len()
+                && common_depth + 1 < dir_stack.len()
+                && dir_stack[common_depth + 1].dir_name == dir_segments[common_depth]
+            {
+                common_depth += 1;
             }
-        } else {
-            let next_dir = current_dir
-                .entry(segment)
-                .or_insert_with(|| TreeNode::Directory(BTreeMap::new()));
 
-            if let TreeNode::Directory(ref mut child_map) = next_dir {
-                Self::insert_recursive(child_map, &segments[1..], entry);
-            }
-        }
-    }
-
-    fn persist_node_recursive<F>(
-        current_dir: &BTreeMap<String, TreeNode>,
-        persist_tree: &mut F,
-    ) -> FractalResult<Oid>
-    where
-        F: FnMut(&GitTree) -> FractalResult<()>,
-    {
-        let mut entries = Vec::new();
-
-        for (name, node) in current_dir {
-            match node {
-                TreeNode::File(file_entry) => {
-                    entries.push(GitTreeEntry::from_oid(
-                        file_entry.mode,
-                        name.clone(),
-                        file_entry.oid,
-                    ));
+            // Pop and persist completed subdirectories down to common prefix
+            while dir_stack.len() > common_depth + 1 {
+                if let Some(completed_frame) = dir_stack.pop() {
+                    let subtree = GitTree::new(completed_frame.entries);
+                    persist_tree(&subtree)?;
+                    let subtree_oid = *subtree.raw_oid();
+                    if let Some(parent_frame) = dir_stack.last_mut() {
+                        parent_frame.entries.push(GitTreeEntry::from_oid(
+                            FileMode::Directory,
+                            completed_frame.dir_name,
+                            subtree_oid,
+                        ));
+                    }
                 }
-                TreeNode::Directory(child_map) => {
-                    let subtree_oid = Self::persist_node_recursive(child_map, persist_tree)?;
-                    entries.push(GitTreeEntry::from_oid(
+            }
+
+            // Push newly opened subdirectories onto stack
+            for segment in &dir_segments[common_depth..] {
+                dir_stack.push(DirectoryFrame::new(*segment));
+            }
+
+            // Insert entry into the current top directory
+            let mode = if is_sparse {
+                FileMode::Directory
+            } else {
+                entry.mode
+            };
+
+            if let Some(current_frame) = dir_stack.last_mut() {
+                current_frame.entries.push(GitTreeEntry::from_oid(
+                    mode,
+                    entry_name.to_string(),
+                    entry.oid,
+                ));
+            }
+        }
+
+        // Flush remaining directory frames back down to root
+        while dir_stack.len() > 1 {
+            if let Some(completed_frame) = dir_stack.pop() {
+                let subtree = GitTree::new(completed_frame.entries);
+                persist_tree(&subtree)?;
+                let subtree_oid = *subtree.raw_oid();
+                if let Some(parent_frame) = dir_stack.last_mut() {
+                    parent_frame.entries.push(GitTreeEntry::from_oid(
                         FileMode::Directory,
-                        name.clone(),
+                        completed_frame.dir_name,
                         subtree_oid,
                     ));
                 }
-                TreeNode::CollapsedSubtree(tree_oid) => {
-                    entries.push(GitTreeEntry::from_oid(
-                        FileMode::Directory,
-                        name.clone(),
-                        *tree_oid,
-                    ));
-                }
             }
         }
 
-        let tree = GitTree::new(entries);
-        persist_tree(&tree)?;
-        Ok(*tree.raw_oid())
+        let root_frame = match dir_stack.pop() {
+            Some(frame) => frame,
+            None => return Ok(Oid::ZERO),
+        };
+        let root_tree = GitTree::new(root_frame.entries);
+        persist_tree(&root_tree)?;
+        Ok(*root_tree.raw_oid())
     }
 }

@@ -91,7 +91,11 @@ impl LooseOdb {
         }
 
         // Compress raw object payload with zlib default compression
-        let mut encoder = ZlibEncoder::new(Vec::new(), Compression::default());
+        let initial_comp_cap = (raw_payload.len() / 2 + 64).max(256);
+        let mut encoder = ZlibEncoder::new(
+            Vec::with_capacity(initial_comp_cap),
+            Compression::default(),
+        );
         encoder.write_all(raw_payload)?;
         let compressed = encoder.finish()?;
 
@@ -131,8 +135,9 @@ impl OdbStore for LooseOdb {
         }
 
         let compressed_bytes = fs::read(&path)?;
+        let estimated_decomp_cap = (compressed_bytes.len() * 3).max(4096);
         let mut decoder = ZlibDecoder::new(&compressed_bytes[..]);
-        let mut uncompressed = Vec::new();
+        let mut uncompressed = Vec::with_capacity(estimated_decomp_cap);
         decoder.read_to_end(&mut uncompressed)?;
 
         if let Some(ref cache) = self.cache {

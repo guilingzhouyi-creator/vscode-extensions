@@ -148,7 +148,11 @@ impl FastCdcChunker {
     fn make_chunk(input_bytes: &[u8], offset: usize, length: usize) -> ChunkDescriptor {
         let slice = &input_bytes[offset..offset + length];
         let mut hasher = Sha1::new();
-        hasher.update(format!("blob {}\0", length).as_bytes());
+
+        // Stack-allocated Git blob header to ensure loop zero-heap allocation (FGT-PRF-001)
+        let mut header_buffer = [0u8; 32];
+        let header_len = Self::write_blob_header(&mut header_buffer, length);
+        hasher.update(&header_buffer[..header_len]);
         hasher.update(slice);
         let hash: [u8; 20] = hasher.finalize().into();
         let oid = Oid::from_bytes(hash);
@@ -158,6 +162,31 @@ impl FastCdcChunker {
             length,
             oid,
         }
+    }
+
+    #[inline]
+    fn write_blob_header(buf: &mut [u8; 32], length: usize) -> usize {
+        buf[..5].copy_from_slice(b"blob ");
+        let mut cursor = 5;
+        if length == 0 {
+            buf[cursor] = b'0';
+            cursor += 1;
+        } else {
+            let mut digits = [0u8; 20];
+            let mut digit_count = 0;
+            let mut remaining = length;
+            while remaining > 0 {
+                digits[digit_count] = b'0' + (remaining % 10) as u8;
+                remaining /= 10;
+                digit_count += 1;
+            }
+            for idx in (0..digit_count).rev() {
+                buf[cursor] = digits[idx];
+                cursor += 1;
+            }
+        }
+        buf[cursor] = 0;
+        cursor + 1
     }
 }
 
