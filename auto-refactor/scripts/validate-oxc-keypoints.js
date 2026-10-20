@@ -9,11 +9,12 @@
  * Responsibilities: Writes a temp fixture directory named .t04-keypoints- plus the process
  *   id, holding src/widget.ts, src/dep.ts, src/other.ts plus a generated config; scans it
  *   twice with parser:'oxc' and AR_FASTPATH=0 then 1 and compares the normalized JSON
- *   byte-for-byte; checks (1) a string-literal type alias yields three hardcoded-string hits,
- *   (2) a decorator numeric argument joins the duplicate-literal group, (3) `as const` object
- *   literals keep their string and numeric findings, (4) re-export sources are materialized as
- *   hardcoded-string, (5) StaticBlock function count and maxNestingDepth match the TS Block
- *   wrap; prints PASS/FAIL per key point; always removes the temp directory before exiting.
+ *   byte-for-byte; checks (1) a string-literal type alias yields zero hardcoded-string hits
+ *   because type positions are tolerated, (2) a decorator numeric argument joins the
+ *   duplicate-literal group, (3) `as const` object literals suppress their findings while a
+ *   plain object literal still reports, (4) re-export sources are tolerated instead of being
+ *   reported as hardcoded-string, (5) StaticBlock function count and maxNestingDepth match the
+ *   TS Block wrap; prints PASS/FAIL per key point; always removes the temp directory on exit.
  * Exit Semantics & Design Rationale: Exits 0 only when every key point passes, 1 otherwise or
  *   when main() rejects. Comparing fast-path on versus off isolates adapter mapping regressions
  *   without a second parser implementation or checked-in golden files.
@@ -57,6 +58,7 @@ ${'export'} class Widget {
 
 export * from './dep';
 export { extra } from './other';
+const PLAIN_CFG = { mode: 'plain-mode-value', retries: 7 };
 `;
 
 const CONFIG = {
@@ -169,9 +171,9 @@ const KEYPOINT_SPECS = [
         .map((v) => lookup.hsAt(2, v))
         .filter(Boolean).length;
       return {
-        pass: n1 === 3,
-        passMsg: '① type Role string literals → 3 hardcoded-string (line 2)',
-        failMsg: `① type Role hardcoded-string count=${n1}`,
+        pass: n1 === 0,
+        passMsg: '① type Role string literals → 0 hardcoded-string (type position tolerated)',
+        failMsg: `① type Role hardcoded-string count=${n1} (expected 0)`,
       };
     },
   },
@@ -187,12 +189,14 @@ const KEYPOINT_SPECS = [
   },
   {
     evaluate: (lookup) => {
-      const hs = lookup.hsAt(21, "'strict'");
-      const mn = lookup.mnAt(21, 3);
+      const asConstHs = lookup.hsAt(21, "'strict'");
+      const asConstMn = lookup.mnAt(21, 3);
+      const plainHs = lookup.hsAt(28, "'plain-mode-value'");
+      const plainMn = lookup.mnAt(28, 7);
       return {
-        pass: hs === 1 && mn === 1,
-        passMsg: "③ as const → 'strict' hardcoded-string + 3 magic-number (line 21)",
-        failMsg: `③ as const literals missing (strict=${hs}, 3=${mn})`,
+        pass: asConstHs === 0 && asConstMn === 0 && plainHs === 1 && plainMn === 1,
+        passMsg: '③ as const suppresses (0/0) while a plain object literal still reports (1/1)',
+        failMsg: `③ as const=${asConstHs}/${asConstMn} expected 0/0; plain=${plainHs}/${plainMn} expected 1/1`,
       };
     },
   },
@@ -201,9 +205,9 @@ const KEYPOINT_SPECS = [
       const dep = lookup.hsAt(26, "'./dep'");
       const other = lookup.hsAt(27, "'./other'");
       return {
-        pass: dep === 1 && other === 1,
-        passMsg: '④ export * / export {x} from → hardcoded-string (lines 26,27)',
-        failMsg: `④ export sources (dep=${dep}, other=${other})`,
+        pass: dep === 0 && other === 0,
+        passMsg: '④ export * / export {x} from → tolerated, no hardcoded-string (lines 26,27)',
+        failMsg: `④ export sources (dep=${dep}, other=${other}) expected 0/0`,
       };
     },
   },

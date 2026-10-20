@@ -130,6 +130,13 @@ export class OxcProjector implements NodeProjector {
     private readonly subtreeCache = new Map<OxcNode, NormalizedNode>();
     /** Mode B: raw subtree node -> its non-skippable RAW children (built once by buildSubtree). */
     private readonly rawChildrenCache = new Map<OxcNode, OxcNode[]>();
+    /**
+     * Raw child -> raw parent. oxc nodes carry no `parent` pointer, but the const-bound predicate
+     * needs three ancestors to match the TypeScript adapter's `isEnclosedInConstDeclaration`.
+     * The map is filled as child sequences are collected, so a projected literal can recover its
+     * great-grandparent even though the engine only threads two levels.
+     */
+    private readonly parentOf = new WeakMap<OxcNode, OxcNode>();
 
     /**
      * Wrap one raw oxc program in a lazy projector; no normalized tree is built here.\n     *
@@ -331,8 +338,27 @@ export class OxcProjector implements NodeProjector {
         parentRaw?: OxcNode,
         grandparentRaw?: OxcNode,
     ): void {
-        targetNode.isConstBound = oxcIsConstBoundOf(rawNode, parentRaw, grandparentRaw);
+        targetNode.isConstBound = oxcIsConstBoundOf(
+            rawNode,
+            parentRaw,
+            grandparentRaw,
+            this.greatGrandparentOf(grandparentRaw),
+        );
         targetNode.tolerated = oxcIsToleratedOf(rawNode, parentRaw, this.ctx, grandparentRaw);
+    }
+
+    /**
+     * Recover the third ancestor the engine does not thread.
+     *
+     * The engine hands `project()` only the parent and grandparent; the `parentOf` index built
+     * while collecting child sequences supplies the great-grandparent so const-bound detection
+     * can reach `Object.freeze(...)` / `new Map(...)` exactly like the TypeScript adapter.
+     *
+     * @param grandparentRaw - Raw grandparent threaded by the engine.
+     * @returns The raw great-grandparent, or undefined when the chain is shorter.
+     */
+    private greatGrandparentOf(grandparentRaw: OxcNode | undefined): OxcNode | undefined {
+        return grandparentRaw ? this.parentOf.get(grandparentRaw) : undefined;
     }
 
     private applyProjectedMetadata(
@@ -353,6 +379,7 @@ export class OxcProjector implements NodeProjector {
         const outStatements: OxcNode[] = [];
         if (Array.isArray(rawProgramNode.body)) {
             for (const stmt of rawProgramNode.body) {
+                this.parentOf.set(stmt, rawProgramNode);
                 if (
                     (stmt.type === NODE_KIND_EXPORT_NAMED_DECLARATION ||
                         stmt.type === NODE_KIND_EXPORT_DEFAULT_DECLARATION) &&
@@ -360,6 +387,7 @@ export class OxcProjector implements NodeProjector {
                 ) {
                     stmt.declaration[PROP_EXPORTED] = true;
                     stmt.declaration[PROP_EXPORT_START] = stmt.start;
+                    this.parentOf.set(stmt.declaration, stmt);
                     outStatements.push(stmt.declaration);
                 } else {
                     outStatements.push(stmt);
@@ -413,16 +441,32 @@ export class OxcProjector implements NodeProjector {
         outNodes: OxcNode[],
         childValue: unknown,
         isMethodSource: boolean,
+        parentRawNode: OxcNode,
     ): void {
         if (Array.isArray(childValue)) {
             for (const rawChildNode of childValue) {
+                this.indexParent(rawChildNode, parentRawNode);
                 this.pushRaw(outNodes, rawChildNode, isMethodSource);
             }
         } else if (
             typeof childValue === TYPEOF_OBJECT &&
             typeof (childValue as OxcNode).type === TYPEOF_STRING
         ) {
+            this.indexParent(childValue as OxcNode, parentRawNode);
             this.pushRaw(outNodes, childValue as OxcNode, isMethodSource);
+        }
+    }
+
+    /**
+     * Record the raw parent of a child node for later ancestry recovery.
+     *
+     * @param childNode - Raw child node; non-object entries are ignored.
+     * @param parentRawNode - Raw node that owns the child.
+     * @returns Nothing.
+     */
+    private indexParent(childNode: unknown, parentRawNode: OxcNode): void {
+        if (childNode && typeof childNode === TYPEOF_OBJECT) {
+            this.parentOf.set(childNode as OxcNode, parentRawNode);
         }
     }
 
@@ -440,14 +484,17 @@ export class OxcProjector implements NodeProjector {
             }
             const propValue = rawNode[metaKey];
             if (propValue != null) {
-                this.collectNodeValue(outNodes, propValue, isMethodSource);
+                this.collectNodeValue(outNodes, propValue, isMethodSource, rawNode);
             }
         }
     }
 
     private tryHandleRawExport(outNodes: OxcNode[], rawExportNode: OxcNode): boolean {
         if (rawExportNode.type === AST_NODE_EXPORT_ALL_DECLARATION) {
-            if (rawExportNode.source) outNodes.push(rawExportNode.source);
+            if (rawExportNode.source) {
+                this.parentOf.set(rawExportNode.source, rawExportNode);
+                outNodes.push(rawExportNode.source);
+            }
             return true;
         }
         if (
@@ -457,6 +504,7 @@ export class OxcProjector implements NodeProjector {
             if (rawExportNode.declaration) {
                 rawExportNode.declaration[PROP_EXPORTED] = true;
                 rawExportNode.declaration[PROP_EXPORT_START] = rawExportNode.start;
+                this.parentOf.set(rawExportNode.declaration, rawExportNode);
                 outNodes.push(rawExportNode.declaration);
             }
             return true;

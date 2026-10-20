@@ -430,12 +430,32 @@ export class TsNodeProjector implements NodeProjector {
         fnLike: boolean,
     ): void {
         if (isLiteral && this.policy.needLiterals) {
-            node.isConstBound = isConstBoundOf(astNode, parentRaw, grandparentRaw);
+            node.isConstBound = isConstBoundOf(
+                astNode,
+                parentRaw,
+                grandparentRaw,
+                this.greatGrandparentOf(grandparentRaw),
+            );
             node.tolerated = isToleratedOf(astNode, parentRaw, this.sf, grandparentRaw);
         }
         if (this.policy.needComplexity && fnLike) {
             node.children = this.projectSubtree(astNode, parentRaw, grandparentRaw);
         }
+    }
+
+    /**
+     * Recover the third ancestor the engine does not thread.
+     *
+     * `isConstBoundOf` inspects parent, grandparent and great-grandparent so that a literal
+     * inside `Object.freeze({ k: 'v' })` or `new Map([[k, 'v']])` counts as const-bound. The
+     * engine only threads two levels, so the third is read from the parent pointer that
+     * `createSourceFile({ setParentNodes: true })` maintains.
+     *
+     * @param grandparentRaw - Raw grandparent threaded by the engine.
+     * @returns The raw great-grandparent, or undefined when the chain is shorter.
+     */
+    private greatGrandparentOf(grandparentRaw: ts.Node | undefined): ts.Node | undefined {
+        return grandparentRaw ? grandparentRaw.parent : undefined;
     }
 
     /**
@@ -519,7 +539,12 @@ export class TsNodeProjector implements NodeProjector {
         node.text = astNode.getText(this.sf);
         node.start = posOf(astNode.getStart(this.sf), this.sf);
         node.end = posOf(astNode.getEnd(), this.sf);
-        node.isConstBound = isConstBoundOf(astNode, parentRaw, grandparentRaw);
+        node.isConstBound = isConstBoundOf(
+            astNode,
+            parentRaw,
+            grandparentRaw,
+            this.greatGrandparentOf(grandparentRaw),
+        );
         node.tolerated = isToleratedOf(astNode, parentRaw, this.sf, grandparentRaw);
     }
 

@@ -60,6 +60,8 @@ export const NODE_KIND_ASSIGNMENT_EXPRESSION = 'AssignmentExpression';
 export const NODE_KIND_MEMBER_EXPRESSION = 'MemberExpression';
 /** oxc node type of a named export declaration. */
 export const NODE_KIND_EXPORT_NAMED_DECLARATION = 'ExportNamedDeclaration';
+/** oxc node type of a star re-export declaration (`export * from`). */
+export const NODE_KIND_EXPORT_ALL_DECLARATION = 'ExportAllDeclaration';
 /** oxc node type of a default export declaration. */
 export const NODE_KIND_EXPORT_DEFAULT_DECLARATION = 'ExportDefaultDeclaration';
 /** oxc node type of a call expression. */

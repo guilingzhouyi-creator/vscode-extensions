@@ -2,7 +2,7 @@
  * Module: Core Engine — TypeScript AST Utilities & ts-free Helper Re-export Surface
  * File Path: src/utils/ast.ts
  * Architecture Role: Shared TypeScript-compiler utility layer below the language adapter;
- *   the single definition site of function-like node classification and parent-pointer-free
+ *   the single definition site of function-like node classification and parent-pointer-bearing
  *   SourceFile creation, plus the compatibility re-export surface for extracted helpers.
  * Dependencies & Triggers: `typescript` (hard top-level import); Position / IssueLocation
  *   types from ../core/types and NormalizedNode from ../core/ast/multilang; imported by
@@ -10,14 +10,14 @@
  *   when a legacy analyzer needs a real SourceFile on the typescript parser path.
  * Responsibilities: Detect function-like node kinds (declaration, expression, arrow,
  *   method, constructor, getter, setter); create SourceFiles with ScriptTarget.Latest and
- *   setParentNodes:false; map byte offsets to 1-based Position / IssueLocation values;
+ *   setParentNodes:true; map byte offsets to 1-based Position / IssueLocation values;
  *   re-export countLineStats and locN so existing import sites keep compiling.
  * Exit Semantics & Design Rationale: All helpers are synchronous and side-effect-free;
  *   createSourceFile tolerates syntactically invalid text (the compiler keeps diagnostics in
- *   the tree) while getPos/loc assume valid offsets and nodes. Parent pointers are skipped
- *   because profiling measured ~15-20% faster parsing and analyzers thread the parent
- *   context they need explicitly; the separate ts-free modules keep `typescript` out of the
- *   worker hot path.
+ *   the tree) while getPos/loc assume valid offsets and nodes. Parent pointers are ON because
+ *   `naming`, `simplify-inlining` and `naming-candidate-helper` resolve enclosing declarations
+ *   through `node.parent`; a pointer-free tree silently drops whole rule families. The separate
+ *   ts-free modules keep `typescript` out of the worker hot path.
  */
 import * as ts from 'typescript';
 import type { Position, IssueLocation } from '../core/types';
@@ -57,26 +57,29 @@ export function isFunctionLike(node: ts.Node | undefined): boolean {
 }
 
 /**
- * Create a TypeScript SourceFile WITHOUT parent pointers (setParentNodes: false).
+ * Create a TypeScript SourceFile WITH parent pointers (`setParentNodes: true`).
  *
- * Skipping parent pointers is a deliberate, measured performance choice: profiling showed it
- * cuts parse time by ~15-20% on large codebases. Everything we need (line/column, text,
- * children, kind) is available from the node itself plus the SourceFile, so analyzers thread
- * any required context (parent/grandparent, enclosing class) explicitly through their traversal.
+ * Parent pointers are required, not optional: several analyzers walk `node.parent` to resolve
+ * the enclosing declaration (`naming` decides whether a `let` sits at module scope,
+ * `simplify-inlining` finds the sole call site's enclosing function, `naming-candidate-helper`
+ * walks up looking for an `export` modifier). A pointer-free tree makes those walks terminate
+ * immediately and the rules silently under-report — measured on this repository as 92 lost
+ * `NAM-GLB-001`/`NAM-GLB-002` findings and 13 lost `SIM-INL-001` findings. The parse cost is
+ * 5.4% on the repository corpus (283ms -> 298ms for 498 files), a fair price for not losing
+ * whole rule families.
  *
  * @param fileName - Logical file name recorded on the resulting SourceFile; it is also what
  *   issue locations report, so callers should pass the repository-relative POSIX path.
  * @param content - Raw source text; syntactically invalid input is tolerated because the
  *   compiler keeps diagnostics inside the returned tree rather than throwing during parse.
- * @returns A `ScriptTarget.Latest` SourceFile with parent pointers disabled; traversals must
- *   thread parent context explicitly because `node.parent` is always undefined.
+ * @returns A `ScriptTarget.Latest` SourceFile whose nodes expose `parent` chains.
  */
 export function createSourceFile(fileName: string, content: string): ts.SourceFile {
     return ts.createSourceFile(
         fileName,
         content,
         ts.ScriptTarget.Latest,
-        /* setParentNodes */ false,
+        /* setParentNodes */ true,
     );
 }
 

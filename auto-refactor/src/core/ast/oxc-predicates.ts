@@ -24,6 +24,8 @@ import {
     NODE_KIND_ASSIGNMENT_EXPRESSION,
     NODE_KIND_MEMBER_EXPRESSION,
     NODE_KIND_CALL_EXPRESSION,
+    NODE_KIND_EXPORT_NAMED_DECLARATION,
+    NODE_KIND_EXPORT_ALL_DECLARATION,
     TYPEOF_NUMBER,
     TYPEOF_STRING,
     FN_TYPES,
@@ -44,7 +46,6 @@ const NODE_TEMPLATE_LITERAL = 'TemplateLiteral';
 const NODE_BLOCK_STATEMENT = 'BlockStatement';
 const NODE_LOGICAL_EXPR = 'LogicalExpression';
 const NODE_TS_AS_EXPR = 'TSAsExpression';
-const NODE_ARRAY_EXPR = 'ArrayExpression';
 const NODE_IMPORT_DECL = 'ImportDeclaration';
 const NODE_TS_IMPORT_EQUALS = 'TSImportEqualsDeclaration';
 const NODE_THROW_STMT = 'ThrowStatement';
@@ -55,11 +56,19 @@ const NODE_JSX_ATTRIBUTE = 'JSXAttribute';
 const NODE_JSX_ELEMENT = 'JSXElement';
 const NODE_JSX_OPENING_ELEMENT = 'JSXOpeningElement';
 const NODE_TS_ENUM_MEMBER = 'TSEnumMember';
+const NODE_TS_TYPE_REFERENCE = 'TSTypeReference';
 const KIND_CONST = 'const';
+const KEYWORD_CONST = 'const';
 const KEY_ARGUMENTS = 'arguments';
 const OP_PLUS = '+';
 const OP_ASSIGN = '=';
 const CHAR_SPACE = ' ';
+
+/** Freeze helpers that turn their argument into a const-bound literal container. */
+const FREEZE_CALLEE_NAMES: ReadonlySet<string> = new Set(['freeze', 'deepFreeze']);
+
+/** Collection constructors whose literal arguments the TypeScript adapter treats as const-bound. */
+const CONST_COLLECTION_CTORS: ReadonlySet<string> = new Set(['Set', 'Map']);
 
 const DECL_KIND_MAP: ReadonlyMap<string, NodeKind> = new Map<string, NodeKind>([
     [NODE_PROGRAM, NodeKind.SourceFile],
@@ -106,17 +115,12 @@ function getOxcLiteralKind(node: OxcNode): NodeKind | undefined {
 const RAW_COMMON_CONTROL_FLOW =
     'IfStatement ForStatement ForInStatement ForOfStatement WhileStatement DoWhileStatement SwitchStatement CatchClause';
 const RAW_EXTRA_STMT_FLOW = 'SwitchCase TryStatement';
-const RAW_CALLABLE_OR_CAST_TYPES = 'NewExpression CallExpression TSAsExpression';
 const RAW_OXC_TYPE_EXTRA = 'TSLiteralType TSTypeReference TSTypeAnnotation';
 
 const STATEMENT_CONTROL_FLOW_TYPES: ReadonlySet<string> = new Set([
     ...RAW_COMMON_CONTROL_FLOW.split(CHAR_SPACE),
     ...RAW_EXTRA_STMT_FLOW.split(CHAR_SPACE),
 ]);
-
-const CALLABLE_OR_CAST_TYPES: ReadonlySet<string> = new Set(
-    RAW_CALLABLE_OR_CAST_TYPES.split(CHAR_SPACE),
-);
 
 const OXC_TYPE_EXTRA: ReadonlySet<string> = new Set(RAW_OXC_TYPE_EXTRA.split(CHAR_SPACE));
 
@@ -264,17 +268,106 @@ const LOGGING_AND_OUTPUT_CALLEES =
     /\b(?:console|logger|logging|log)\.(?:log|info|warn|error|debug|trace|dir)\b|\bprocess\.(?:stdout|stderr)\.write\b|\bchalk\.\w+\b/;
 
 /**
+ * Check whether an oxc node is a freeze helper call.
+ *
+ * Matches `freeze(x)`, `deepFreeze(x)` and `Object.freeze(x)` — the three spellings the
+ * TypeScript adapter's `isFreezeCall` accepts.
+ *
+ * @param node - Candidate raw oxc node.
+ * @returns True when the node is a call whose callee is a freeze helper.
+ */
+function isOxcFreezeCall(node: OxcNode | undefined): boolean {
+    if (!node || node.type !== NODE_KIND_CALL_EXPRESSION) return false;
+    const callee = node.callee;
+    if (!callee) return false;
+    if (callee.type === NODE_IDENTIFIER) {
+        return typeof callee.name === TYPEOF_STRING && FREEZE_CALLEE_NAMES.has(callee.name);
+    }
+    return (
+        callee.type === NODE_KIND_MEMBER_EXPRESSION &&
+        Boolean(callee.object) &&
+        callee.object.name === 'Object' &&
+        Boolean(callee.property) &&
+        callee.property.name === 'freeze'
+    );
+}
+
+/**
+ * Check whether an oxc node is a `new Set(...)` or `new Map(...)` construction.
+ *
+ * @param node - Candidate raw oxc node.
+ * @returns True when the node is a const-collection construction.
+ */
+function isOxcConstCollectionNew(node: OxcNode | undefined): boolean {
+    if (!node || node.type !== NODE_NEW_EXPR) return false;
+    const callee = node.callee;
+    return Boolean(
+        callee &&
+        callee.type === NODE_IDENTIFIER &&
+        typeof callee.name === TYPEOF_STRING &&
+        CONST_COLLECTION_CTORS.has(callee.name),
+    );
+}
+
+/**
+ * Check whether an oxc node is a `as const` assertion.
+ *
+ * @param node - Candidate raw oxc node.
+ * @returns True when the node is a `TSAsExpression` whose annotation is the `const` keyword.
+ */
+function isOxcAsConst(node: OxcNode | undefined): boolean {
+    if (!node || node.type !== NODE_TS_AS_EXPR) return false;
+    const annotation = node.typeAnnotation;
+    return Boolean(
+        annotation &&
+        annotation.type === NODE_TS_TYPE_REFERENCE &&
+        annotation.typeName &&
+        annotation.typeName.name === KEYWORD_CONST,
+    );
+}
+
+/**
+ * Mirror of the TypeScript adapter's `isEnclosedInConstDeclaration` over an oxc ancestor chain.
+ *
+ * The TypeScript adapter inspects `parent`, `grandparent` and `greatGrandparent`, so the oxc
+ * chain must be walked to the same depth: a literal inside `Object.freeze({ k: 'v' })` sits at
+ * Literal <- Property <- ObjectExpression <- CallExpression(freeze), and the freeze call is only
+ * reachable as the great-grandparent.
+ *
+ * @param chain - Ancestors ordered nearest-first; entries may be undefined near the root.
+ * @returns True when any ancestor is `as const`, a freeze call, or a Set/Map construction.
+ */
+function isOxcEnclosedInConstDeclaration(chain: readonly (OxcNode | undefined)[]): boolean {
+    for (const ancestor of chain) {
+        if (!ancestor) continue;
+        if (isOxcAsConst(ancestor)) return true;
+        if (isOxcFreezeCall(ancestor)) return true;
+        if (isOxcConstCollectionNew(ancestor)) return true;
+    }
+    return false;
+}
+
+/**
  * Check whether a literal value is bound to a const declaration or enum member.
+ *
+ * The `as const` / freeze-call / Set-Map checks are delegated to
+ * `isOxcEnclosedInConstDeclaration`, which mirrors the TypeScript adapter exactly. An earlier
+ * version treated ANY `TSAsExpression` ancestor as const-bound and ANY array literal inside a
+ * call as const-bound; both were oxc-only heuristics with no TypeScript counterpart, so a
+ * runtime `require('./x') as typeof import('./x')` and a plain `fn(['a'])` argument were
+ * suppressed under oxc but reported under TypeScript.
  *
  * @param node - Raw literal oxc node.
  * @param parent - Raw parent oxc node.
  * @param grandparent - Raw grandparent oxc node.
+ * @param greatGrandparent - Raw great-grandparent oxc node, when the engine threaded one.
  * @returns True if literal is bound to a const declaration or enum member.
  */
 export function isOxcConstBound(
     node: OxcNode,
     parent: OxcNode | undefined,
     grandparent: OxcNode | undefined,
+    greatGrandparent?: OxcNode | undefined,
 ): boolean {
     const isConstVar =
         parent?.type === NODE_VARIABLE_DECLARATOR &&
@@ -282,17 +375,8 @@ export function isOxcConstBound(
         grandparent?.type === NODE_VARIABLE_DECL &&
         grandparent.kind === KIND_CONST;
     if (isConstVar) return true;
-    if (
-        parent?.type === NODE_TS_ENUM_MEMBER ||
-        parent?.type === NODE_TS_AS_EXPR ||
-        grandparent?.type === NODE_TS_AS_EXPR
-    ) {
-        return true;
-    }
-    return (
-        parent?.type === NODE_ARRAY_EXPR &&
-        Boolean(grandparent?.type && CALLABLE_OR_CAST_TYPES.has(grandparent.type))
-    );
+    if (parent?.type === NODE_TS_ENUM_MEMBER) return true;
+    return isOxcEnclosedInConstDeclaration([parent, grandparent, greatGrandparent]);
 }
 
 function isOxcToleratedCallArg(node: OxcNode, parentNode: OxcNode, ctx?: Ctx): boolean {
@@ -333,6 +417,53 @@ function isOxcCallTolerated(caller: OxcNode, argumentNode: OxcNode, ctx: Ctx): b
     );
 }
 
+/**
+ * Check whether a literal sits in a TypeScript type position.
+ *
+ * oxc exposes no `isTypeNode` predicate, so the shared `TYPE_SKIP_TYPES` table stands in for
+ * `ts.isTypeNode`: a literal typed by `TSLiteralType` (union members, property signatures,
+ * type aliases) or wrapped one level deeper in a type container must not be reported as a
+ * hardcoded runtime string. The grandparent is consulted for the same reason the TypeScript
+ * adapter does — a literal one level below the type container is still type-only syntax.
+ *
+ * @param parentType - `type` tag of the literal's raw parent node.
+ * @param grandparent - Raw grandparent node, when the engine threaded one.
+ * @returns True when the parent (or grandparent) is a type-position node.
+ */
+function isOxcTypePosition(parentType: string, grandparent?: OxcNode): boolean {
+    if (TYPE_SKIP_TYPES.has(parentType)) return true;
+    return Boolean(grandparent && TYPE_SKIP_TYPES.has(grandparent.type));
+}
+
+/**
+ * Check whether the literal's parent node makes a string literal tolerated on its own.
+ *
+ * These are the syntactic slots where a string is a name, a module specifier, or a label
+ * rather than runtime data: imports/exports, thrown error text, property keys, member access
+ * properties, JSX attribute names, and switch discriminants.
+ *
+ * @param parentNode - Raw parent oxc node of the string literal.
+ * @param node - Raw string literal node.
+ * @returns True when the parent slot tolerates the string outright.
+ */
+function isOxcDirectStringTolerated(parentNode: OxcNode, node: OxcNode): boolean {
+    const parentType = parentNode.type;
+    if (
+        parentType === NODE_IMPORT_DECL ||
+        parentType === NODE_TS_IMPORT_EQUALS ||
+        parentType === NODE_KIND_EXPORT_NAMED_DECLARATION ||
+        parentType === NODE_KIND_EXPORT_ALL_DECLARATION ||
+        parentType === NODE_THROW_STMT ||
+        parentType === NODE_KIND_MEMBER_EXPRESSION
+    ) {
+        return true;
+    }
+    if (parentType === NODE_KIND_PROPERTY) return parentNode.key === node;
+    if (parentType === NODE_JSX_ATTRIBUTE) return parentNode.name === node;
+    if (parentType === NODE_SWITCH_CASE) return parentNode.test === node;
+    return false;
+}
+
 /** Check whether a string literal appears in a tolerated AST context. */
 function isOxcStringTolerated(
     node: OxcNode,
@@ -340,16 +471,9 @@ function isOxcStringTolerated(
     ctx: Ctx,
     grandparent?: OxcNode,
 ): boolean {
+    if (isOxcDirectStringTolerated(parentNode, node)) return true;
+    if (isOxcTypePosition(parentNode.type, grandparent)) return true;
     const parentType = parentNode.type;
-    const isDirectStringTolerated =
-        parentType === NODE_IMPORT_DECL ||
-        parentType === NODE_TS_IMPORT_EQUALS ||
-        parentType === NODE_THROW_STMT ||
-        (parentType === NODE_KIND_PROPERTY && parentNode.key === node) ||
-        parentType === NODE_KIND_MEMBER_EXPRESSION ||
-        (parentType === NODE_JSX_ATTRIBUTE && parentNode.name === node) ||
-        (parentType === NODE_SWITCH_CASE && parentNode.test === node);
-    if (isDirectStringTolerated) return true;
     if (parentType === NODE_JSX_ELEMENT || parentType === NODE_JSX_OPENING_ELEMENT) return false;
     if (isOxcCallTolerated(parentNode, node, ctx)) return true;
     if (grandparent && parentType === NODE_BINARY_EXPR && parentNode.operator === OP_PLUS) {

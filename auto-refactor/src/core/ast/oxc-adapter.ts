@@ -127,6 +127,7 @@ interface NodeHierarchyContext {
     readonly rawNode: OxcNode;
     readonly parent?: OxcNode;
     readonly grandparent?: OxcNode;
+    readonly greatGrandparent?: OxcNode;
     readonly isLiteral: boolean;
     readonly ctx: Ctx;
 }
@@ -134,6 +135,7 @@ interface NodeHierarchyContext {
 interface ChildDispatchConfig {
     readonly oxcParent: OxcNode;
     readonly oxcGrandparent?: OxcNode;
+    readonly oxcGreatGrandparent?: OxcNode;
     readonly inlineFnValue: boolean;
 }
 
@@ -141,6 +143,7 @@ interface ChildTraversalOptions {
     readonly targetNode: NormalizedNode;
     readonly rawNode: OxcNode;
     readonly oxcParent?: OxcNode;
+    readonly oxcGrandparent?: OxcNode;
     readonly isMethodSource: boolean;
 }
 
@@ -313,7 +316,8 @@ export class OxcAdapter implements LanguageAdapter {
     }
 
     private applyNodeHierarchy(context: NodeHierarchyContext): void {
-        const { targetNode, rawNode, parent, grandparent, isLiteral, ctx } = context;
+        const { targetNode, rawNode, parent, grandparent, greatGrandparent, isLiteral, ctx } =
+            context;
         const isTopLevel =
             Boolean(parent) && parent!.type === KIND_PROGRAM && TOP_LEVEL_DECL.has(rawNode.type);
         targetNode.topLevel = isTopLevel;
@@ -321,7 +325,12 @@ export class OxcAdapter implements LanguageAdapter {
             isTopLevel &&
             (Boolean(rawNode[PROP_EXPORTED]) || rawNode.type === KIND_TS_EXPORT_ASSIGNMENT);
         if (isLiteral) {
-            targetNode.isConstBound = oxcIsConstBoundOf(rawNode, parent, grandparent);
+            targetNode.isConstBound = oxcIsConstBoundOf(
+                rawNode,
+                parent,
+                grandparent,
+                greatGrandparent,
+            );
             targetNode.tolerated = oxcIsToleratedOf(rawNode, parent, ctx, grandparent);
         }
     }
@@ -369,7 +378,7 @@ export class OxcAdapter implements LanguageAdapter {
     }
 
     private traverseOxcChildren(options: ChildTraversalOptions, parseContext: ParseContext): void {
-        const { targetNode, rawNode, oxcParent, isMethodSource } = options;
+        const { targetNode, rawNode, oxcParent, oxcGrandparent, isMethodSource } = options;
         for (const propKey of Object.keys(rawNode)) {
             if (OXC_META_KEYS.has(propKey) || propKey === PROP_EXPORTED) continue;
             const propertyValue = rawNode[propKey];
@@ -377,6 +386,7 @@ export class OxcAdapter implements LanguageAdapter {
             const dispatchConfig: ChildDispatchConfig = {
                 oxcParent: rawNode,
                 oxcGrandparent: oxcParent,
+                oxcGreatGrandparent: oxcGrandparent,
                 inlineFnValue: isMethodSource,
             };
             if (Array.isArray(propertyValue)) {
@@ -394,7 +404,12 @@ export class OxcAdapter implements LanguageAdapter {
 
     private mapNode(
         rawNode: OxcNode,
-        hierarchy: { parent?: OxcNode; grandparent?: OxcNode; exportWrapper?: OxcNode },
+        hierarchy: {
+            parent?: OxcNode;
+            grandparent?: OxcNode;
+            greatGrandparent?: OxcNode;
+            exportWrapper?: OxcNode;
+        },
         parseContext: ParseContext,
     ): NormalizedNode {
         const rawType = rawNode.type;
@@ -430,6 +445,7 @@ export class OxcAdapter implements LanguageAdapter {
             rawNode,
             parent: hierarchy.parent,
             grandparent: hierarchy.grandparent,
+            greatGrandparent: hierarchy.greatGrandparent,
             isLiteral,
             ctx: parseContext.ctx,
         };
@@ -443,6 +459,7 @@ export class OxcAdapter implements LanguageAdapter {
             targetNode,
             rawNode,
             oxcParent: hierarchy.parent,
+            oxcGrandparent: hierarchy.grandparent,
             isMethodSource,
         };
         this.traverseOxcChildren(traversalOptions, parseContext);
@@ -453,12 +470,13 @@ export class OxcAdapter implements LanguageAdapter {
     pushMethodFunctionValue(
         targetNode: NormalizedNode,
         oxcChildNode: OxcNode,
-        oxcParent: OxcNode,
+        config: ChildDispatchConfig,
         parseContext: ParseContext,
     ): void {
         const dispatchConfig: ChildDispatchConfig = {
             oxcParent: oxcChildNode,
-            oxcGrandparent: oxcParent,
+            oxcGrandparent: config.oxcParent,
+            oxcGreatGrandparent: config.oxcGrandparent,
             inlineFnValue: false,
         };
         for (const propKey of Object.keys(oxcChildNode)) {
@@ -490,7 +508,11 @@ export class OxcAdapter implements LanguageAdapter {
         }
         const child = this.mapNode(
             oxcChildNode,
-            { parent: config.oxcParent, grandparent: config.oxcGrandparent },
+            {
+                parent: config.oxcParent,
+                grandparent: config.oxcGrandparent,
+                greatGrandparent: config.oxcGreatGrandparent,
+            },
             parseContext,
         );
         targetNode.children!.push(child);
@@ -505,6 +527,7 @@ export class OxcAdapter implements LanguageAdapter {
         const hierarchy = {
             parent: config.oxcParent,
             grandparent: config.oxcGrandparent,
+            greatGrandparent: config.oxcGreatGrandparent,
             exportWrapper: oxcChildNode,
         };
         if (oxcChildNode.type === KIND_EXPORT_ALL_DECLARATION) {
@@ -537,7 +560,7 @@ export class OxcAdapter implements LanguageAdapter {
         parseContext: ParseContext,
     ): boolean {
         if (config.inlineFnValue && oxcChildNode.type === NODE_KIND_FUNCTION_EXPRESSION) {
-            this.pushMethodFunctionValue(targetNode, oxcChildNode, config.oxcParent, parseContext);
+            this.pushMethodFunctionValue(targetNode, oxcChildNode, config, parseContext);
             return true;
         }
         if (TYPE_SKIP_TYPES.has(oxcChildNode.type)) {
@@ -582,7 +605,11 @@ export class OxcAdapter implements LanguageAdapter {
                 isString: kind === NodeKind.StringLiteral,
                 branchWeight: 0,
                 isConstBound: false,
-                tolerated: kind === NodeKind.NumericLiteral,
+                // Every literal reached here sits inside a type annotation, which the TypeScript
+                // adapter tolerates wholesale via `ts.isTypeNode`. Marking only numerics as
+                // tolerated made type-level unions (`type X = 'a' | 'b'`) surface as hardcoded
+                // runtime strings under oxc while the TS path reported none.
+                tolerated: true,
                 children: [],
             });
         }
