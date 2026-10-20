@@ -228,7 +228,9 @@ function checkJsTsCatchLine(
 function isJsTsCatchCandidateLine(line: string): boolean {
     if (!line.includes(TOKEN_CATCH) || !CATCH_KEYWORD_RE.test(line)) return false;
     const trimmed = line.trim();
-    return !trimmed.startsWith('//') && !trimmed.startsWith('*');
+    if (trimmed.startsWith('//') || trimmed.startsWith('*') || trimmed.startsWith('/*')) return false;
+    if (trimmed.startsWith("'") || trimmed.startsWith('"') || trimmed.startsWith('`')) return false;
+    return true;
 }
 
 /**
@@ -279,6 +281,7 @@ export const SwallowedExceptionRule: GovernanceRule = {
 };
 
 const KEYWORD_UNWRAP = 'unwrap';
+const RUST_TEST_ATTR_RE = /#\[.*(?:test|cfg\(test\)).*\]/;
 
 function isNakedUnwrapCandidate(line: string): boolean {
     if (!line.includes(KEYWORD_UNWRAP) || !UNWRAP_RE.test(line)) return false;
@@ -286,8 +289,45 @@ function isNakedUnwrapCandidate(line: string): boolean {
 }
 
 /**
+ * Updates test scope brace balance for a line and returns whether test scope remains active.
+ */
+function updateTestScopeBalance(
+    line: string,
+    currentDepth: number,
+): { inTestScope: boolean; newDepth: number } {
+    let depth = currentDepth;
+    for (let c = 0; c < line.length; c++) {
+        if (line[c] === '{') {
+            depth++;
+        } else if (line[c] === '}') {
+            depth--;
+            if (depth <= 0) {
+                return { inTestScope: false, newDepth: 0 };
+            }
+        }
+    }
+    return { inTestScope: true, newDepth: depth };
+}
+
+/**
+ * Inspects line for test attributes or pending test function declarations.
+ */
+function checkRustTestDeclaration(
+    trimmed: string,
+    pendingTestFn: boolean,
+): { inTestScope: boolean; pendingTestFn: boolean } {
+    if (RUST_TEST_ATTR_RE.test(trimmed)) {
+        return { inTestScope: trimmed.includes('cfg(test)'), pendingTestFn: true };
+    }
+    if (pendingTestFn && (trimmed.startsWith('fn ') || trimmed.includes(' fn '))) {
+        return { inTestScope: true, pendingTestFn: false };
+    }
+    return { inTestScope: false, pendingTestFn };
+}
+
+/**
  * GOV-EXC-002: Naked Unwrap in Production Code.
- * Flags `.unwrap()` in Rust production code.
+ * Flags `.unwrap()` in Rust production code. Exempts inline test modules and test functions.
  */
 export const NakedUnwrapRule: GovernanceRule = {
     id: 'GOV-EXC-002',
@@ -309,9 +349,29 @@ export const NakedUnwrapRule: GovernanceRule = {
 
         const violations: GovernanceViolation[] = [];
         const lines = ctx.masked;
+        let inTestScope = false;
+        let testScopeDepth = 0;
+        let pendingTestFn = false;
 
         for (let i = 0; i < lines.length; i++) {
             const line = lines[i];
+            const trimmed = line.trim();
+            if (trimmed.startsWith('//')) continue;
+
+            if (!inTestScope) {
+                const decl = checkRustTestDeclaration(trimmed, pendingTestFn);
+                pendingTestFn = decl.pendingTestFn;
+                if (decl.inTestScope) inTestScope = true;
+            }
+
+            if (inTestScope) {
+                const bal = updateTestScopeBalance(line, testScopeDepth);
+                inTestScope = bal.inTestScope;
+                testScopeDepth = bal.newDepth;
+                if (!inTestScope) pendingTestFn = false;
+                continue;
+            }
+
             if (!isNakedUnwrapCandidate(line)) continue;
             violations.push({
                 ruleId: 'GOV-EXC-002',

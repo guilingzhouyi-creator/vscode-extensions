@@ -94,6 +94,11 @@ function testBilingualTerminologyDetection() {
   assert(tempEnFindings.length >= 1, 'Should detect temporary phrasing in English');
   assert(tempEnFindings.some((f) => f.term === 'hacky'));
 
+  const tempBatchEn = 'Testing with temp fix for pass 1 in w1.';
+  const tempBatchFindings = auditTerminologyProse(tempBatchEn);
+  assert(tempBatchFindings.length >= 2, 'Should detect agile passes and temporary markers in English');
+  assert(tempBatchFindings.some((f) => f.category === 'temporary'));
+
   // Category 2: Hyperbolic Affirmative
   const hypAffZh = '本系统实现工业级极致性能，零缺陷且绝对化安全。';
   const hypAffZhFindings = auditTerminologyProse(hypAffZh);

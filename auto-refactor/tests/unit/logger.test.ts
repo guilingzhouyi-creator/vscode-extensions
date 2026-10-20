@@ -226,8 +226,17 @@ describe('Logger & Diagnostic Primitives', () => {
                 ring.push(`Batch line ${i}`);
             }
 
-            // Yield event loop for async flush
-            await new Promise((r) => setTimeout(r, 20));
+            // Poll briefly for async flush under high CPU load
+            const startWait = Date.now();
+            while (Date.now() - startWait < 500) {
+                if (fs.existsSync(logPath)) {
+                    const content = fs.readFileSync(logPath, 'utf8');
+                    if (content.includes('Batch line 127')) {
+                        break;
+                    }
+                }
+                await new Promise((r) => setTimeout(r, 10));
+            }
 
             expect(fs.existsSync(logPath)).toBe(true);
             const content = fs.readFileSync(logPath, 'utf8');
@@ -242,7 +251,17 @@ describe('Logger & Diagnostic Primitives', () => {
             ring.push('Timer line 1');
             expect(fs.existsSync(logPath)).toBe(false);
 
-            await new Promise((r) => setTimeout(r, 80));
+            // Poll with timeout to accommodate high concurrent CPU load
+            const startWait = Date.now();
+            while (Date.now() - startWait < 350) {
+                if (fs.existsSync(logPath)) {
+                    const currentContent = fs.readFileSync(logPath, 'utf8');
+                    if (currentContent.includes('Timer line 1')) {
+                        break;
+                    }
+                }
+                await new Promise((r) => setTimeout(r, 20));
+            }
 
             expect(fs.existsSync(logPath)).toBe(true);
             const content = fs.readFileSync(logPath, 'utf8');

@@ -23,6 +23,7 @@ import {
     RULE_FAMILY_SECURITY,
     RULE_FAMILY_SIMPLIFY,
     RULE_FAMILY_PYTHON_MODERN,
+    RULE_FAMILY_EXTENSION,
     LANGUAGE_PYTHON,
 } from '../types';
 import {
@@ -36,6 +37,7 @@ import {
     RULE_CMT_HDR_004,
 } from '../../scoring/dimensionLiterals';
 import { REMEDIATION_STANDARD_AND_ABOVE, ANALYZER_MODERN_RULES } from './analyzers-modern';
+import { ANALYZER_HYGIENE_RULES } from './analyzers-hygiene';
 
 /**
  * Analyzer rule table: every rule whose owner is a built-in analyzer pack.
@@ -320,166 +322,7 @@ export const ANALYZER_RULES: readonly RuleDefinition[] = [
             'Unify error taxonomy with named error types and transform errors at boundary layers.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#err-prp-001',
     }),
-    defineRule({
-        id: 'HYG-BLT-001',
-        family: RULE_FAMILY_HYGIENE,
-        analyzer: ANALYZER_HYGIENE,
-        canonical: true,
-        languages: [LANGUAGE_PYTHON],
-        defaultSeverity: SEVERITY_WARNING,
-        summary: 'Local variable or parameter shadows Python built-in name.',
-        remediation:
-            'Rename variable with domain qualifiers to avoid obscuring built-in semantics.',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#hyg-blt-001',
-    }),
-    defineRule({
-        id: 'HYG-CLN-001',
-        family: RULE_FAMILY_HYGIENE,
-        analyzer: ANALYZER_HYGIENE,
-        canonical: true,
-        languages: ALL_LANGUAGES,
-        defaultSeverity: SEVERITY_WARNING,
-        summary:
-            'Duplicated code clone detected across multiple lines based on rolling polynomial hash.',
-        remediation: 'Extract duplicate code into shared helper functions or utilities.',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#hyg-cln-001',
-    }),
-    defineRule({
-        id: 'HYG-DED-001',
-        family: RULE_FAMILY_HYGIENE,
-        analyzer: ANALYZER_HYGIENE,
-        canonical: true,
-        languages: ALL_LANGUAGES,
-        defaultSeverity: SEVERITY_WARNING,
-        summary:
-            'Unreachable dead code detected after terminating control flow (return, throw, break, raise).',
-        remediation: 'Remove dead code and clean up redundant branches.',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#hyg-ded-001',
-    }),
-    defineRule({
-        id: 'HYG-EMP-001',
-        family: RULE_FAMILY_HYGIENE,
-        analyzer: ANALYZER_HYGIENE,
-        canonical: true,
-        languages: ALL_LANGUAGES,
-        defaultSeverity: SEVERITY_ERROR,
-        summary:
-            'Zero-byte empty file, blank comment-only file, or hollow shell file lacking AST semantic payload.',
-        remediation:
-            'Implement full business logic and exports for the file, or delete the empty file.',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#hyg-emp-001',
-    }),
-    defineRule({
-        id: 'HYG-EOL-001',
-        family: RULE_FAMILY_HYGIENE,
-        analyzer: ANALYZER_HYGIENE,
-        canonical: true,
-        languages: ALL_LANGUAGES,
-        defaultSeverity: SEVERITY_ERROR,
-        summary:
-            'Physical line endings contract violation (PowerShell scripts must be CRLF, other source files must be LF).',
-        remediation:
-            'Convert file line endings to match the workspace physical hygiene contract (.ps1 CRLF, others LF).',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#hyg-eol-001',
-    }),
-    defineRule({
-        id: 'HYG-EXC-001',
-        family: RULE_FAMILY_HYGIENE,
-        analyzer: ANALYZER_HYGIENE,
-        canonical: true,
-        languages: [LANGUAGE_PYTHON],
-        defaultSeverity: SEVERITY_WARNING,
-        summary: 'Exception variable in except clause is not named exc.',
-        remediation: 'Standardize exception variable name to exc.',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#hyg-exc-001',
-    }),
-    defineRule({
-        id: 'HYG-NAM-001',
-        family: RULE_FAMILY_HYGIENE,
-        analyzer: ANALYZER_HYGIENE,
-        canonical: true,
-        languages: ALL_LANGUAGES,
-        defaultSeverity: SEVERITY_WARNING,
-        summary:
-            'File naming convention distortion (kebab-case for TS/JS, snake_case for GDScript/Python/Rust).',
-        remediation: 'Rename file to align with target language engineering conventions.',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#hyg-nam-001',
-    }),
-    defineRule({
-        id: 'HYG-SGL-001',
-        family: RULE_FAMILY_HYGIENE,
-        analyzer: ANALYZER_HYGIENE,
-        canonical: true,
-        languages: [LANGUAGE_PYTHON],
-        defaultSeverity: SEVERITY_WARNING,
-        summary:
-            'Single-letter variable name in business logic (only loop indices i/j/k and discard _ allowed).',
-        remediation: 'Use descriptive identifier communicating variable purpose.',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#hyg-sgl-001',
-    }),
-    defineRule({
-        id: 'HYG-STB-001',
-        family: RULE_FAMILY_HYGIENE,
-        analyzer: ANALYZER_HYGIENE,
-        canonical: true,
-        languages: ALL_LANGUAGES,
-        defaultSeverity: SEVERITY_WARNING,
-        summary:
-            'Temporary stub markers (`TODO`, `FIXME`, `XXX`, `HACK`) lingering in code or comments.',
-        remediation: 'Resolve pending task and remove temporary stub markers.',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#hyg-stb-001',
-    }),
-    defineRule({
-        id: 'HYG-STB-002',
-        family: RULE_FAMILY_HYGIENE,
-        analyzer: ANALYZER_HYGIENE,
-        canonical: true,
-        languages: ALL_LANGUAGES,
-        defaultSeverity: SEVERITY_WARNING,
-        summary:
-            'Temporary construction phase jargon (`pXX`, `phaseXX`, `stXX`, `wip`) leaking into code or comments.',
-        remediation: 'Replace temporary construction jargon with enduring domain terms.',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#hyg-stb-002',
-    }),
-    defineRule({
-        id: 'HYG-SUP-001',
-        family: RULE_FAMILY_HYGIENE,
-        analyzer: ANALYZER_HYGIENE,
-        canonical: true,
-        languages: ALL_LANGUAGES,
-        defaultSeverity: SEVERITY_ERROR,
-        summary:
-            'Unannotated compiler or linter suppression directive (@ts-ignore, @ts-nocheck, eslint-disable, # noqa) without approved exemption.',
-        remediation:
-            'Address the underlying type or lint error directly instead of silencing it with suppression comments, or register an approved exemption.',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#hyg-sup-001',
-    }),
-    defineRule({
-        id: 'HYG-WRAP-001',
-        family: RULE_FAMILY_HYGIENE,
-        analyzer: ANALYZER_HYGIENE,
-        canonical: true,
-        languages: ALL_LANGUAGES,
-        defaultSeverity: SEVERITY_WARNING,
-        summary:
-            'Vacuous passthrough wrapper functions forwarding arguments directly without added value degrade effective code density.',
-        remediation:
-            'Call the target directly, or add validation, transformations, or logging to the wrapper.',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#hyg-wrap-001',
-    }),
-    defineRule({
-        id: 'HYG-WRAP-002',
-        family: RULE_FAMILY_HYGIENE,
-        analyzer: ANALYZER_HYGIENE,
-        canonical: true,
-        languages: ALL_LANGUAGES,
-        defaultSeverity: SEVERITY_INFO,
-        summary:
-            'Redundant zero-argument forwarding wrappers trivially delegating to inner targets without validation, transformation, or abstraction.',
-        remediation:
-            'Expose delegate directly if polymorphism is not required, or add guard logic and transformation.',
-        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#hyg-wrap-002',
-    }),
+    ...ANALYZER_HYGIENE_RULES,
     defineRule({
         id: 'PRF-ALG-001',
         family: 'PRF',

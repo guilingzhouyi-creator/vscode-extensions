@@ -151,6 +151,20 @@ if [ "$EOL_ERROR" -gt 0 ]; then
     ${SH_EXIT} 1
 fi
 
+# 4. Gate: Uncontrolled clutter and transient files (HYG-CLT-001)
+CLUTTER_COUNT=0
+${SH_WHILE} IFS= read -r FILE; do
+    if [[ "$FILE" =~ \\.(log|tmp|bak|actual\\.json)$ ]] || [[ "$(basename "$FILE")" =~ ^(Thumbs\\.db|\\.DS_Store|desktop\\.ini)$ ]]; then
+        echo "[GATE ERROR] Uncontrolled transient clutter file detected: $FILE" >&2
+        CLUTTER_COUNT=$((CLUTTER_COUNT + 1))
+    fi
+done <<< "$STAGED_FILES"
+
+if [ "$CLUTTER_COUNT" -gt 0 ]; then
+    echo "[GATE BLOCK] Commit blocked: Found $CLUTTER_COUNT transient clutter files. Remove them." >&2
+    ${SH_EXIT} 1
+fi
+
 echo "[GATE] Pre-Commit Physical Hygiene verification passed. [PASS]"
 ${SH_EXIT} 0
 `;
@@ -195,6 +209,20 @@ foreach ($file in $stagedFiles) {
 
 if ($emptyCount -gt 0) {
     Write-Error "[GATE BLOCK] Commit blocked: Found $emptyCount empty files. Remove or populate them."
+    ${SH_EXIT} 1
+}
+
+$clutterCount = 0
+foreach ($file in $stagedFiles) {
+    $lower = $file.ToLowerInvariant()
+    $base = [System.IO.Path]::GetFileName($lower)
+    if ($lower.EndsWith('.log') -or $lower.EndsWith('.tmp') -or $lower.EndsWith('.bak') -or $lower.EndsWith('.actual.json') -or $base -eq 'thumbs.db' -or $base -eq '.ds_store' -or $base -eq 'desktop.ini') {
+        Write-Error "[GATE ERROR] Uncontrolled transient clutter file detected: $file"
+        $clutterCount++
+    }
+}
+if ($clutterCount -gt 0) {
+    Write-Error "[GATE BLOCK] Commit blocked: Found $clutterCount transient clutter files. Remove them."
     ${SH_EXIT} 1
 }
 

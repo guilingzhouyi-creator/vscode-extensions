@@ -709,10 +709,15 @@ export function classifyFileProvenance(filePath: string, headerClues?: string): 
 }
 
 function isStandardLibraryImport(firstSegment: string, trimmed: string): boolean {
+    const cleanSpec = trimmed.startsWith(NODE_CORE_PREFIX)
+        ? trimmed.slice(NODE_CORE_PREFIX.length)
+        : trimmed;
+    const cleanFirst = cleanSpec.split('/')[0].split('.')[0].split('::')[0].toLowerCase();
+
     if (trimmed.startsWith(NODE_CORE_PREFIX)) return true;
-    if (NODE_CORE_MODULES.has(firstSegment) || NODE_CORE_MODULES.has(trimmed)) return true;
-    if (PYTHON_STDLIB_MODULES.has(firstSegment) || PYTHON_STDLIB_MODULES.has(trimmed)) return true;
-    if (RUST_CORE_CRATES.has(firstSegment) || GO_CORE_PACKAGES.has(firstSegment)) return true;
+    if (NODE_CORE_MODULES.has(cleanFirst) || NODE_CORE_MODULES.has(cleanSpec)) return true;
+    if (PYTHON_STDLIB_MODULES.has(cleanFirst) || PYTHON_STDLIB_MODULES.has(cleanSpec)) return true;
+    if (RUST_CORE_CRATES.has(cleanFirst) || GO_CORE_PACKAGES.has(cleanFirst)) return true;
     return (
         trimmed.startsWith(GODOT_GLOBAL_SCOPE_PREFIX) ||
         trimmed === GODOT_ENGINE_IDENTIFIER ||
@@ -735,7 +740,27 @@ function isRelativeOrInternalPrefix(trimmed: string): boolean {
     ) {
         return true;
     }
-    return trimmed.startsWith('@/') || trimmed.startsWith('~/');
+    if (trimmed.startsWith('@/') || trimmed.startsWith('~/')) {
+        return true;
+    }
+    if (
+        trimmed.startsWith('res://') ||
+        trimmed.startsWith('uid://') ||
+        trimmed.startsWith('user://')
+    ) {
+        return true;
+    }
+    if (
+        trimmed === 'crate' ||
+        trimmed.startsWith('crate::') ||
+        trimmed === 'super' ||
+        trimmed.startsWith('super::') ||
+        trimmed === 'self' ||
+        trimmed.startsWith('self::')
+    ) {
+        return true;
+    }
+    return false;
 }
 
 function matchesPathAlias(trimmed: string, pathAliases?: Set<string>): boolean {
@@ -770,7 +795,10 @@ export function classifyImportProvenance(
         return INTERNAL_IMPORT_ORIGIN;
     }
 
-    const firstSegment = trimmed.split('/')[0].split('.')[0].toLowerCase();
+    const cleanSpec = trimmed.startsWith(NODE_CORE_PREFIX)
+        ? trimmed.slice(NODE_CORE_PREFIX.length)
+        : trimmed;
+    const firstSegment = cleanSpec.split('/')[0].split('.')[0].split('::')[0].toLowerCase();
     if (isStandardLibraryImport(firstSegment, trimmed)) return STDLIB_IMPORT_ORIGIN;
     if (isDeclaredDependency(firstSegment, manifestDeps)) return SDK_IMPORT_ORIGIN;
     if (trimmed.startsWith('@')) return SDK_IMPORT_ORIGIN;

@@ -188,7 +188,8 @@ fn match_multi_patterns(source_text: &str, patterns: &[String], results: &mut Ve
         let mut col = 0;
 
         while col < line_len {
-            // ripgrep SWAR 8-byte block skip: fast forward if next 8 bytes contain zero candidate needle-bytes
+            // ripgrep SWAR 8-byte block skip: fast forward if next 8 bytes contain
+            // zero candidate needle-bytes
             if col + 8 <= line_len
                 && !needle_mask[line_bytes[col] as usize]
                 && !needle_mask[line_bytes[col + 1] as usize]
@@ -365,10 +366,8 @@ pub fn evaluate_bumpy_road(lines: &[String], start_line: u32, end_line: u32) -> 
             continue;
         }
         let depth = measure_line_indent_level(line) as i32;
-        if base_indent.is_none() {
-            base_indent = Some(depth);
-        }
-        let rel_depth = (depth - base_indent.unwrap()).max(0);
+        let base = *base_indent.get_or_insert(depth);
+        let rel_depth = (depth - base).max(0);
         depth_sum += rel_depth as i64;
         non_blank_count += 1;
     }
@@ -606,7 +605,13 @@ mod tests {
 
     #[test]
     fn test_batch_probe_triggers() {
-        let content = "function processData(items) {\n    for (const item of items) {\n        console.log(item);\n    }\n}";
+        let content = concat!(
+            "function processData(items) {\n",
+            "    for (const item of items) {\n",
+            "        console.log(item);\n",
+            "    }\n",
+            "}"
+        );
         let groups = vec![
             vec!["for".to_string(), "while".to_string()], // loops: matches
             vec!["password".to_string(), "api_key".to_string()], // secrets: no match

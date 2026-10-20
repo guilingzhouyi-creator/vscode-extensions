@@ -107,17 +107,23 @@
 | `ERR-FLT-001` | <a id="err-flt-001"></a>`hygiene` | `ERR` | `warning` | `all` | 异步调用或 Promise 对象未被 await、return、void 或挂载 .catch() 异常处理（浮动 Promise）。 | 显式 await 异步调用，或者 return 向上传播，或者通过 void 明确声明忽略，或挂载 .catch() 闭环错误。 |
 | `ERR-MSG-001` | <a id="err-msg-001"></a>`hygiene` | `ERR` | `warning` | `all` | 抛出的异常消息为空白、无具体排错上下文或仅含单字泛化模糊词（ESR 诊断质量规范）。 | 补充完备排错诊断信息（包含错误实体标识符、期望值与实际值、具体根因指引）。 |
 | `ERR-PRP-001` | <a id="err-prp-001"></a>`hygiene` | `ERR` | `warning` | `all` | 错误码跨声明重复抛出（分类法冲突）或沿调用链向上传播过多跳数。 | 统一错误分类法，使用具名错误类型并在边界层显式捕获转换。 |
+| `EXT-DIR-001` | <a id="ext-dir-001"></a>`hygiene` | `EXT` | `error` | `all` | 扩展名即领域架构契约违规：可执行脚本平铺散落在工作区根目录，未按扩展名收敛至对应专用子目录。 | 将根目录平铺散落的脚本文件移入对应的扩展名专属目录（如 scripts/ps1/, scripts/sh/, scripts/common/）。 |
 | `HYG-BLT-001` | <a id="hyg-blt-001"></a>`hygiene` | `HYG` | `warning` | `python` | 局部变量/参数遮蔽 Python 内建名（docstring 示例与类体协议字段豁免）。 | 重命名绑定（加领域限定词），避免掩盖内建语义。 |
+| `HYG-BOM-001` | <a id="hyg-bom-001"></a>`hygiene` | `HYG` | `error` | `all` | 文件包含 UTF-8 BOM 头前缀（0xEF, 0xBB, 0xBF），违背全仓 UTF-8 NO-BOM 格式契约。 | 重新以 UTF-8 无 BOM (NO-BOM) 格式保存文件以剥离 BOM 头字节。 |
 | `HYG-CLN-001` | <a id="hyg-cln-001"></a>`hygiene` | `HYG` | `warning` | `all` | 抽象提炼共享通用函数或工具类。 | 基于 32-bit 滚动多项式哈希检测到连续多行代码完全重复 (Copy-Paste)。 |
+| `HYG-CLT-001` | <a id="hyg-clt-001"></a>`hygiene` | `HYG` | `error` | `all` | 源码或工作区中遗留未受控的临时脏文件、日志转储或系统元数据文件（*.log, *.tmp, *.bak, *.actual.json, Thumbs.db, .DS_Store）。 | 删除临时脏文件，并在 .gitignore 中配置相应忽略规则防止再次提交。 |
 | `HYG-DED-001` | <a id="hyg-ded-001"></a>`hygiene` | `HYG` | `warning` | `all` | 清理冗余死代码，重构控制流分支。 | 终结控制流 (`return/throw/break/raise/exit`) 之后存在不可达死代码。 |
 | `HYG-EMP-001` | <a id="hyg-emp-001"></a>`hygiene` | `HYG` | `error` | `all` | 源码、脚本或配置目录中存在物理 0 字节、仅含空白注释或缺乏有效 AST 语义载荷的虚空占位文件。 | 完善该文件的实际业务实现与导出定义，或直接从仓库中物理删除无效的占位文件。 |
+| `HYG-EMP-002` | <a id="hyg-emp-002"></a>`hygiene` | `HYG` | `error` | `all` | 纯注释空壳文件：文件剥离所有单行与多行注释后，有效执行代码为 0 行。 | 补充实质性业务逻辑实现与导出定义，或清理虚空占位文件。 |
 | `HYG-EOL-001` | <a id="hyg-eol-001"></a>`hygiene` | `HYG` | `error` | `all` | 文件末尾换行符格式违背全域工程契约（TS/JS/JSON/MD 强制 LF，PowerShell 强制 CRLF）。 | 按照文件类型统一行尾换行符，TS/JS/JSON/MD 统一转换为 LF，PowerShell 脚本统一转换为 CRLF。 |
 | `HYG-EXC-001` | <a id="hyg-exc-001"></a>`hygiene` | `HYG` | `warning` | `python` | except 变量命名不是 exc。 | 统一命名为 exc，让错误处理读起来一致。 |
+| `HYG-IND-001` | <a id="hyg-ind-001"></a>`hygiene` | `HYG` | `warning` | `all` | 非 GDScript、非 Makefile 文件中检测到 Tab 制表符缩进，违背纯空格缩进契约。 | 将 Tab 制表符缩进转换为纯空格缩进（TS/JS 4 空格，其余源码与配置 2 空格）。 |
 | `HYG-NAM-001` | <a id="hyg-nam-001"></a>`hygiene` | `HYG` | `warning` | `all` | 对齐各语言官方主流工程命名契约。 | 命名风格失真 (TS/JS 源码非 kebab-case，GDScript/Python/Rust 非 snake_case)。 |
 | `HYG-SGL-001` | <a id="hyg-sgl-001"></a>`hygiene` | `HYG` | `warning` | `python` | 单字母绑定（仅 i/j/k/_ 放行）。 | 使用描述性命名。 |
 | `HYG-STB-001` | <a id="hyg-stb-001"></a>`hygiene` | `HYG` | `warning` | `all` | 闭环开发任务，清理临时桩。 | 代码或注释中残留 `TODO`, `FIXME`, `XXX`, `HACK` 等临时未决桩标记。 |
 | `HYG-STB-002` | <a id="hyg-stb-002"></a>`hygiene` | `HYG` | `warning` | `all` | 使用中立、长效的业务领域术语替换临时工单代号。 | 全域代码与注释中泄漏临时施工工单黑话 (`pXX`, `phaseXX`, `stXX`, `wip`)。词汇表可用 `hygiene.options.jargonPatterns`（正则源数组）替换为**项目自有**词表，避免项目词被误判或被整条规则静音。 |
 | `HYG-SUP-001` | <a id="hyg-sup-001"></a>`hygiene` | `HYG` | `warning` | `all` | 源码中滥用编译器或 Linter 消音指令（如 @ts-ignore, @ts-nocheck, eslint-disable），破坏静态类型与规则防御。 | 修复底层类型错误或静态分析违规，严禁裸消音；确有必要应采用受控且附带工单上下文的特化压制。 |
+| `HYG-TRL-001` | <a id="hyg-trl-001"></a>`hygiene` | `HYG` | `warning` | `all` | POSIX EOF 单换行契约违规：文件末尾缺少标准换行符，或末尾堆叠 >= 2 个多余连续空行。 | 确保文件末尾有且仅有 1 个标准换行符，消除末尾堆叠空行。 |
 | `HYG-WRAP-001` | <a id="hyg-wrap-001"></a>`hygiene` | `HYG` | `warning` | `all` | Vacuous passthrough wrapper functions forwarding arguments directly without added value degrade effective code density. | 直接调用被封装的目标方法，或在封装层补充必要的数据校验、状态转换与上下文日志。 |
 | `HYG-WRAP-002` | <a id="hyg-wrap-002"></a>`hygiene` | `HYG` | `info` | `all` | Redundant zero-argument forwarding wrappers trivially delegating to inner targets without validation, transformation, or abstraction. | 若无多态或抽象解耦必要，直接暴露被委托方或内联调用；若确需封装，请补充守卫逻辑、状态转换或上下文日志。 |
 | `SEC-LEAK-001` | <a id="sec-leak-001"></a>`security` | `SEC` | `warning` | `all` | 日志/异常中输出敏感数据（密码、令牌、个人标识）。 | 脱敏后再记录，或只记录标识符与哈希。 |

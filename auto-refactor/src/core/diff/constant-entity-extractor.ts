@@ -25,16 +25,20 @@ interface ScopeFrame {
     isFunction: boolean;
 }
 
-const CONST_DECL_RE =
+const TS_CONST_DECL_RE =
     /^(?:(export)\s+)?(?:const|static\s+readonly)\s+([A-Za-z0-9_$]+)\s*(?::\s*[^=]+)?\s*=\s*([^;,\n]+)/;
+const RUST_CONST_DECL_RE =
+    /^(?:(pub(?:\s*\([^)]+\))?)\s+)?(?:const|static(?:\s+mut)?)\s+([A-Za-z0-9_$]+)\s*(?::\s*[^=]+)?\s*=\s*([^;,\n]+)/;
+const GO_CONST_DECL_RE =
+    /^(?:(export)\s+)?const\s+([A-Za-z0-9_$]+)(?:\s+[\w*&[\]]+)?\s*=\s*([^;,\n]+)/;
 const IMPORT_LINE_RE = /^(?:import[\s{]|require\(|export\s+(?:\*|\{)|from\s|use\s)/;
 const COMMENT_LINE_RE = /^(\/\/|#)/;
 const BLOCK_COMMENT_END_RE = /\*\//;
 const HEADER_COMMENT_RE = /^(\/\/|\/\*|\*)/;
 const COMPLEX_INITIALIZER_RE = /^[{(\s]|^(?:function\b|=>)/;
 const SCOPE_DECL_RE =
-    /(?:function\s+([A-Za-z0-9_$]+)|(?:class|interface|struct)\s+([A-Za-z0-9_$]+)|(?:const|let|var)\s+([A-Za-z0-9_$]+)\s*=\s*(?:async\s*)?\([^)]*\)\s*=>)/;
-const CLASS_LIKE_RE = /^(?:class|interface|struct)\b/;
+    /(?:(?:function|fn)\s+([A-Za-z0-9_$]+)|(?:class|interface|struct|impl|enum|mod)\s+([A-Za-z0-9_$]+)|(?:const|let|var)\s+([A-Za-z0-9_$]+)\s*=\s*(?:async\s*)?\([^)]*\)\s*=>)/;
+const CLASS_LIKE_RE = /^(?:class|interface|struct|impl|enum|mod)\b/;
 
 const DOMAIN_FUNCTION_LOCAL: CodeDomainKind = 'function_local';
 const DOMAIN_CLASS_DECLARATIONS: CodeDomainKind = 'class_declarations';
@@ -70,20 +74,53 @@ function tryParseConstantEntity(
     filePath: string,
     currentScope: string | null,
 ): ConstantEntity | null {
-    const match = trimmed.match(CONST_DECL_RE);
-    if (!match) return null;
+    const isRust = filePath.endsWith('.rs');
+    const isGo = filePath.endsWith('.go');
+    let match: RegExpMatchArray | null = null;
+    let isExported = false;
+    let name = '';
+    let rawValue = '';
 
-    const rawValue = match[3].trim().replace(/;$/, '');
+    if (isRust) {
+        match = trimmed.match(RUST_CONST_DECL_RE);
+        if (match) {
+            isExported = Boolean(match[1]);
+            name = match[2];
+            rawValue = match[3].trim().replace(/;$/, '');
+        }
+    } else if (isGo) {
+        match = trimmed.match(GO_CONST_DECL_RE);
+        if (match) {
+            isExported = Boolean(match[1]);
+            name = match[2];
+            rawValue = match[3].trim().replace(/;$/, '');
+        }
+    } else {
+        match = trimmed.match(TS_CONST_DECL_RE);
+        if (match) {
+            isExported = Boolean(match[1]);
+            name = match[2];
+            rawValue = match[3].trim().replace(/;$/, '');
+        } else if (trimmed.includes('const ') || trimmed.includes('static ')) {
+            match = trimmed.match(RUST_CONST_DECL_RE);
+            if (match) {
+                isExported = Boolean(match[1]);
+                name = match[2];
+                rawValue = match[3].trim().replace(/;$/, '');
+            }
+        }
+    }
+
+    if (!match) return null;
     if (COMPLEX_INITIALIZER_RE.test(rawValue)) return null;
 
     const codeDomain = resolveCodeDomain(scopeStack, pastImports, lineIndex, line);
-    const name = match[2];
     const identity: ConstantSymbolIdentity = {
         name,
         filePath,
         codeDomain,
         enclosingScope: currentScope,
-        isExported: Boolean(match[1]),
+        isExported,
         line: lineNo,
         column: line.indexOf(name) + 1,
     };

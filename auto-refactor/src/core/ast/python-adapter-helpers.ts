@@ -89,6 +89,8 @@ export const CONSTANT_NAME_RE = /^[A-Z][A-Z0-9_]*$/;
 export interface MapContext {
     /** True inside a module-level constant assignment (literal values are const-bound). */
     constBound: boolean;
+    /** True inside a unit test or self-assertion function. */
+    isTestFunction?: boolean;
 }
 
 /**
@@ -235,24 +237,77 @@ export function isAtomLiteral(sn: TreeSitterNode): boolean {
     return sn.type === PY_TRUE || sn.type === PY_FALSE || sn.type === PY_NONE;
 }
 
+const CLI_FLAG_PATTERN = /^--?[a-zA-Z0-9_.-]+$/;
+const SYSTEM_ARG_NAME_PATTERN =
+    /^(?:encoding|mode|errors|action|default|dest|help|type|format|sep|end|file|flush|shell|cwd|env|stdout|stderr|check|timeout|nargs|const|choices|metavar|required|prefix|suffix|dir|delete|rule_id|severity|message|suggestion|desc|description|file_path|line)$/i;
+const SYSTEM_CALL_NAME_PATTERN =
+    /^(?:print|log|info|warn|warning|error|debug|trace|fatal|critical|write|exception|exit|assert|format|compile|match|search|findall|sub|split|startswith|endswith|replace|get|getenv|join|append|extend|add|add_argument|add_parser|add_subparsers|set_defaults|open|update|loads|dumps|load|dump|read_text|write_text|mkdir|exists|glob|rglob|run|popen|check_output|encode|decode|strip|lstrip|rstrip|lower|upper|auditfinding|finding|violation|issue|diagnostic)$/i;
+
+function isKeywordArgumentTolerated(sn: TreeSitterNode, parent: TreeSitterNode): boolean {
+    if (parent.type !== 'keyword_argument') return false;
+    const raw = sn.text ? sn.text.replace(/^['"]|['"]$/g, '') : '';
+    if (raw && CLI_FLAG_PATTERN.test(raw)) return true;
+    const argName = parent.childForFieldName ? parent.childForFieldName('name') : null;
+    const nameText = argName?.text || parent.namedChildren?.[0]?.text;
+    if (nameText && SYSTEM_ARG_NAME_PATTERN.test(nameText)) return true;
+    const callNode = parent.parent?.parent;
+    if (callNode && callNode.type === 'call') {
+        const fnName = callNameOf(callNode);
+        if (fnName && SYSTEM_CALL_NAME_PATTERN.test(fnName)) return true;
+    }
+    return false;
+}
+
+function isComparisonTolerated(sn: TreeSitterNode, parent: TreeSitterNode): boolean {
+    if (parent.type !== 'comparison_operator') return false;
+    const text = sn.text ? sn.text.replace(/^['"]|['"]$/g, '') : '';
+    return text === '__main__' || text === '';
+}
+
+function isArgumentListTolerated(sn: TreeSitterNode, parent: TreeSitterNode): boolean {
+    if (parent.type !== 'argument_list') return false;
+    const text = sn.text ? sn.text.replace(/^['"]|['"]$/g, '') : '';
+    if (text && CLI_FLAG_PATTERN.test(text)) return true;
+    const callNode = parent.parent;
+    if (callNode && callNode.type === 'call') {
+        const fnName = callNameOf(callNode);
+        return Boolean(fnName && SYSTEM_CALL_NAME_PATTERN.test(fnName));
+    }
+    return false;
+}
+
 /**
  * Resolve whether a literal sits in a tolerated context.
  *
  * @param sn - Literal node to classify.
  * @param parent - Raw parent; undefined means the literal has no parent context.
  * @returns `true` for docstrings/bare expressions, decorator arguments, subscript indices,
- *     and dictionary keys.
+ *     keyword arguments, CLI flags, standard comparisons, and dictionary keys.
  */
-export function isToleratedOf(sn: TreeSitterNode, parent?: TreeSitterNode): boolean {
+export function isToleratedOf(
+    sn: TreeSitterNode,
+    parent?: TreeSitterNode,
+    ctx?: MapContext,
+): boolean {
+    if (ctx?.isTestFunction) return true;
     if (!parent) return false;
     if (parent.type === PY_EXPR_STMT) return true;
     if (parent.type === PY_DECORATOR) return true;
     if (parent.type === PY_SUBSCRIPT) return true;
+    if (isKeywordArgumentTolerated(sn, parent)) return true;
+    if (isComparisonTolerated(sn, parent)) return true;
     if (parent.type === PY_PAIR) {
         const key = parent.childForFieldName ? parent.childForFieldName(FIELD_KEY) : null;
         return Boolean(key && key.startIndex === sn.startIndex);
     }
-    return false;
+    if (parent.type === 'binary_operator') {
+        const op = parent.children?.find((c) => c.type === '/' || c.text === '/');
+        if (op) return true;
+    }
+    if (parent.type === 'interpolation' || parent.type === 'format_specifier') {
+        return true;
+    }
+    return isArgumentListTolerated(sn, parent);
 }
 
 /** Static lookup table mapping AST node types to normalized kinds. */

@@ -132,8 +132,21 @@ const FIXTURES = {
   ].join('\n'),
 
   'src/clean-module/polyglot_sample.rs': [
+    'pub struct bad_rust_struct {}',
+    'pub const bad_rust_const: u32 = 1;',
+    'pub const fn valid_const_fn() -> u32 { 42 }',
     'pub fn banana_apple() {}',
-    'pub fn parse_data() {}',
+    'pub fn parse_data() {',
+    '    let x = 20;',
+    '    let _ = 30;',
+    '    let mut i = 0;',
+    '    let data = 40;',
+    '}',
+    '#[test]',
+    'fn test_my_feature() {',
+    '    let x = 99;',
+    '    let data = 100;',
+    '}',
   ].join('\n'),
 };
 
@@ -380,6 +393,70 @@ function verifyAdaptiveNamingRules(byRule) {
   console.log('  [PASS] NAM-LEN-002 flags verb-noun contract across TS, Python, Go, and Rust');
 }
 
+function verifyRustPolyglotNaming(byRule) {
+  const typIssues = byRule('NAM-TYP-001');
+  assert.ok(
+    typIssues.some(
+      (i) => i.location.file.endsWith('.rs') && i.detail && i.detail.name === 'bad_rust_struct',
+    ),
+    'Rust bad_rust_struct should trigger NAM-TYP-001',
+  );
+
+  const glbIssues = byRule('NAM-GLB-001');
+  assert.ok(
+    glbIssues.some(
+      (i) => i.location.file.endsWith('.rs') && i.detail && i.detail.name === 'bad_rust_const',
+    ),
+    'Rust bad_rust_const should trigger NAM-GLB-001',
+  );
+  assert.ok(
+    !glbIssues.some(
+      (i) => i.location.file.endsWith('.rs') && i.detail && i.detail.name === 'fn',
+    ),
+    'const fn should not trigger NAM-GLB-001 on keyword fn',
+  );
+
+  const sglIssues = byRule('NAM-SGL-001');
+  assert.ok(
+    sglIssues.some(
+      (i) => i.location.file.endsWith('.rs') && i.detail && i.detail.name === 'x',
+    ),
+    'Rust single-letter variable x should trigger NAM-SGL-001',
+  );
+  assert.ok(
+    !sglIssues.some(
+      (i) => i.location.file.endsWith('.rs') && i.detail && i.detail.name === '_',
+    ),
+    'Rust wildcard _ should be exempt from NAM-SGL-001',
+  );
+  assert.ok(
+    !sglIssues.some(
+      (i) => i.location.file.endsWith('.rs') && i.detail && i.detail.name === 'i',
+    ),
+    'Rust loop index i should be exempt from NAM-SGL-001',
+  );
+  assert.strictEqual(
+    sglIssues.filter((i) => i.location.file.endsWith('.rs')).length,
+    1,
+    'Only non-test variable x should trigger NAM-SGL-001; test x must be exempted',
+  );
+
+  const vagIssues = byRule('NAM-VAG-001');
+  assert.ok(
+    vagIssues.some(
+      (i) => i.location.file.endsWith('.rs') && i.detail && i.detail.name === 'data',
+    ),
+    'Rust variable data should trigger NAM-VAG-001',
+  );
+  assert.strictEqual(
+    vagIssues.filter((i) => i.location.file.endsWith('.rs')).length,
+    1,
+    'Only non-test variable data should trigger NAM-VAG-001; test data must be exempted',
+  );
+
+  console.log('  [PASS] NAM-TYP-001, NAM-GLB-001, NAM-SGL-001, NAM-VAG-001 verified for Rust');
+}
+
 async function run() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ar-naming-'));
   try {
@@ -403,6 +480,7 @@ async function run() {
     verifyJargonRules(byRule);
     verifyFunctionLengthRules(byRule);
     verifyAdaptiveNamingRules(byRule);
+    verifyRustPolyglotNaming(byRule);
 
     console.log('\n ALL NAMING SUITE VERIFICATION CHECKS PASSED SUCCESSFULLY!\n');
   } finally {

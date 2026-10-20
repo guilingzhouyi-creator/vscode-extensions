@@ -20,6 +20,10 @@ import type { DiagnosticDescriptor } from './types';
 
 /** Risk tier for hygiene findings that render as Medium severity. */
 const RISK_MEDIUM = 'Medium';
+/** Risk tier for hygiene findings that render as High severity. */
+const RISK_HIGH = 'High';
+/** Risk tier for hygiene findings that render as Low severity. */
+const RISK_LOW = 'Low';
 
 /**
  * Hygiene-rule diagnostic descriptor catalog.
@@ -180,5 +184,83 @@ export const HygieneMessages = {
         rationale:
             'Opaque error messages lacking diagnostic specificity increase triage time and obscure failure causes in production logs.',
         risk: RISK_MEDIUM,
+    }),
+
+    // HYG-EMP-002
+    /**
+     * Build the HYG-EMP-002 descriptor for comment-only hollow files lacking semantic code.
+     */
+    COMMENT_HOLLOW_FILE: (file: string): DiagnosticDescriptor => ({
+        message: `Comment-only hollow file detected: '${file}' contains zero executable statements after stripping comments`,
+        suggestion:
+            'Provide substantive implementation logic or eliminate hollow placeholder files to prevent structural clutter',
+        rationale:
+            'Hollow shells bloat repository structure, increase cognitive overhead, and bypass semantic validation.',
+        risk: RISK_HIGH,
+    }),
+
+    // HYG-BOM-001
+    /**
+     * Build the HYG-BOM-001 descriptor for UTF-8 Byte Order Mark presence.
+     */
+    UTF8_BOM_DETECTED: (file: string): DiagnosticDescriptor => ({
+        message: `UTF-8 Byte Order Mark (BOM) detected in '${file}': file must be strictly encoded as UTF-8 NO-BOM`,
+        suggestion:
+            'Re-save file as UTF-8 NO-BOM to strip 0xEF, 0xBB, 0xBF byte prefix',
+        rationale:
+            'BOM byte sequences corrupt shebang execution on POSIX systems and break multi-platform compiler toolchains.',
+        risk: RISK_HIGH,
+    }),
+
+    // HYG-TRL-001
+    /**
+     * Build the HYG-TRL-001 descriptor for missing EOF newline or trailing blank line accumulation.
+     */
+    TRAILING_NEWLINE_VIOLATION: (file: string, reason: string): DiagnosticDescriptor => ({
+        message: `POSIX EOF newline contract violation in '${file}': ${reason}`,
+        suggestion:
+            'Ensure file ends with exactly one newline character without trailing blank line buildup',
+        rationale:
+            'Missing EOF newlines cause concatenated git diff artifacts; excess blank lines degrade file hygiene.',
+        risk: RISK_LOW,
+    }),
+
+    // HYG-IND-001
+    /**
+     * Build the HYG-IND-001 descriptor for tab character indentation in non-tab languages.
+     */
+    TAB_INDENTATION_DETECTED: (file: string, line: number): DiagnosticDescriptor => ({
+        message: `Tab character indentation detected in '${file}' at line ${line}: must use pure spaces`,
+        suggestion:
+            'Replace tab characters with standard space indentation (4 spaces for TS/JS, 2 spaces for JSON/configs)',
+        rationale:
+            'Mixing tabs and spaces causes visual rendering misalignment across developer editors and git diff viewers.',
+        risk: RISK_LOW,
+    }),
+
+    // HYG-CLT-001
+    /**
+     * Build the HYG-CLT-001 descriptor for uncontrolled transient or system clutter files.
+     */
+    UNCONTROLLED_CLUTTER: (file: string): DiagnosticDescriptor => ({
+        message: `Uncontrolled transient or system clutter file detected: '${file}'`,
+        suggestion:
+            'Remove temporary clutter file and ensure matching ignore rules are configured in .gitignore',
+        rationale:
+            'Temporary artifacts, logs, and OS metadata files pollute git history and trigger false-positive security scans.',
+        risk: RISK_HIGH,
+    }),
+
+    // EXT-DIR-001
+    /**
+     * Build the EXT-DIR-001 descriptor for extension-to-directory classification violation or root script pollution.
+     */
+    ROOT_SCRIPT_POLLUTION: (file: string): DiagnosticDescriptor => ({
+        message: `Root directory script pollution detected: '${file}' must not reside flatly in workspace root`,
+        suggestion:
+            'Move executable script into dedicated domain subdirectory matching its extension or domain role',
+        rationale:
+            'Flatly littering executable scripts across workspace root obscures architecture boundaries and breaks execution context isolation.',
+        risk: RISK_HIGH,
     }),
 } as const;

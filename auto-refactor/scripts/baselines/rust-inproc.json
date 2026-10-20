@@ -1,14 +1,14 @@
 {
   "filesScanned": 4,
-  "issuesTotal": 15,
+  "issuesTotal": 14,
   "byAnalyzer": {
-    "constants": 13,
+    "constants": 12,
     "large-file": 1,
     "complexity": 1
   },
   "bySeverity": {
     "info": 0,
-    "warning": 15,
+    "warning": 14,
     "error": 0
   },
   "issues": [
@@ -152,29 +152,6 @@
           44
         ],
         "suggestedName": "CONST_2"
-      }
-    },
-    {
-      "id": "constants:hardcoded-string:src/legacy.rs:11",
-      "analyzer": "constants",
-      "rule": "hardcoded-string",
-      "severity": "warning",
-      "message": "Hardcoded string should be extracted into a named constant.",
-      "location": {
-        "file": "src/legacy.rs",
-        "start": {
-          "line": 11,
-          "column": 16
-        },
-        "end": {
-          "line": 11,
-          "column": 29
-        }
-      },
-      "detail": {
-        "value": "\"legacy name\"",
-        "length": 11,
-        "suggestedName": "LEGACYNAME_TEXT"
       }
     },
     {

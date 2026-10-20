@@ -23,7 +23,6 @@ import {
     DEDUCTION_BANNED_JARGON,
     DEDUCTION_DEPRECATED_FEATURE,
     DEDUCTION_TYPE_SAFETY_ESCAPE,
-    DEDUCTION_UNREACHABLE_DEAD_CODE,
     DEDUCTION_UNUSED_BINDING,
     DEDUCTION_NAMING_VIOLATION,
     DEDUCTION_SUBSTANDARD_COMMENT,
@@ -38,7 +37,6 @@ import {
     ANALYZER_COMPLEXITY,
     ANALYZER_COMMENTS,
     ANALYZER_CONSTANTS,
-    ANALYZER_HYGIENE,
     ANALYZER_DEPENDENCY_GRAPH,
     ANALYZER_DATA_ARCHITECTURE,
     ANALYZER_ARCHITECTURE,
@@ -121,8 +119,6 @@ import {
     DEDUCTION_UNLOCALIZED_TEXT,
     DEDUCTION_POOL_CONTRACT_BREACH,
     DEDUCTION_HOST_LIFECYCLE_BREACH,
-    DEDUCTION_DUPLICATE_CODE_BLOCK,
-    DEDUCTION_VACUOUS_WRAPPER,
     DEDUCTION_UNNECESSARY_ABSTRACTION,
     DEDUCTION_DOCUMENT_DUPLICATION,
     DEDUCTION_MEANINGLESS_COMMENT,
@@ -132,8 +128,6 @@ import {
     DEDUCTION_DISTRIBUTED_REDUNDANCY,
     RULE_NAM_DEC_001,
     DEDUCTION_NAMING_DECOUPLING,
-    RULE_HYG_EMP_001,
-    DEDUCTION_EMPTY_FILE_PLACEHOLDER,
     DEDUCTION_GATE_ARCHITECTURE,
     DEDUCTION_GATE_RELIABILITY,
     DEDUCTION_GATE_STANDARDIZATION,
@@ -145,12 +139,9 @@ import {
     DEDUCTION_GO_MODERNITY,
 } from './dimensionLiterals';
 import { FRONTEND_DIMENSION_RULES, type DimensionRule } from './dimension-rule-table-frontend';
+import { HYGIENE_DIMENSION_RULES } from './dimension-rule-table-hygiene';
 export type { DimensionRule };
 
-/** Hygiene rule flagging naming drift (kebab-case / snake_case violations). */
-const RULE_HYG_NAMING = 'HYG-NAM-001';
-/** Hygiene rule flagging statements after a terminal statement. */
-const RULE_HYG_DEAD_CODE = 'HYG-DED-001';
 /** Governance rule flagging deprecated constructs (`var` in TS/JS, bare `pass`). */
 const RULE_GOV_DEPRECATED = 'GOV-STD-002';
 /**
@@ -237,15 +228,7 @@ const anyFinding = (): boolean => true;
  * The quantified standard's deduction table: which rule deducts what, and by how much.
  */
 export const DIMENSION_RULES: DimensionRule[] = [
-    // Standardization — naming drift (hygiene) and oversized files, whose single rule reports
-    // the line count in its message.
-    {
-        analyzer: ANALYZER_HYGIENE,
-        covers: ruleMatches([RULE_HYG_NAMING], ['naming']),
-        dimension: DIMENSION_STANDARDIZATION,
-        points: DEDUCTION_NAMING_VIOLATION,
-        rationale: ScoringRationales.NAMING_CONVENTION_VIOLATION,
-    },
+    // Standardization — oversized files, whose single rule reports the line count in its message.
     {
         analyzer: ANALYZER_LARGE_FILE,
         covers: messageHas(FRAGMENT_LINES),
@@ -346,43 +329,6 @@ export const DIMENSION_RULES: DimensionRule[] = [
         dimension: DIMENSION_SEMANTIC_PURITY,
         points: DEDUCTION_UNBOUNDED_NESTING,
         rationale: ScoringRationales.UNBOUNDED_NESTING,
-    },
-    {
-        analyzer: ANALYZER_HYGIENE,
-        covers: ruleMatches([RULE_HYG_DEAD_CODE], ['dead', 'unreachable']),
-        dimension: DIMENSION_SEMANTIC_PURITY,
-        points: DEDUCTION_UNREACHABLE_DEAD_CODE,
-        rationale: ScoringRationales.UNREACHABLE_DEAD_CODE,
-    },
-    {
-        // HYG-CLN-001 flags a repeated code block inside one file. It had no row of its own,
-        // so it fell through to the hygiene catch-all (or to nothing at all) and never
-        // reached the duplication axis it describes.
-        analyzer: ANALYZER_HYGIENE,
-        covers: ruleMatches(['HYG-CLN-001'], ['clone', 'duplicat', 'extract']),
-        dimension: DIMENSION_DUPLICATION,
-        points: DEDUCTION_DUPLICATE_CODE_BLOCK,
-        rationale: ScoringRationales.DUPLICATE_CODE_BLOCK,
-    },
-    {
-        // HYG-WRAP-001/002 are vacuous forwarding wrappers: a function whose whole body is
-        // `return other(...)`. They are structural noise rather than a hygiene naming issue,
-        // so they belong on the purity axis.
-        analyzer: ANALYZER_HYGIENE,
-        covers: ruleMatches(
-            ['HYG-WRAP-001', 'HYG-WRAP-002'],
-            ['wrapper', 'passthrough', 'forward'],
-        ),
-        dimension: DIMENSION_SEMANTIC_PURITY,
-        points: DEDUCTION_VACUOUS_WRAPPER,
-        rationale: ScoringRationales.VACUOUS_WRAPPER,
-    },
-    {
-        analyzer: ANALYZER_HYGIENE,
-        covers: ruleMatches([RULE_HYG_EMP_001], ['empty', '0-byte', 'vacuous']),
-        dimension: DIMENSION_STANDARDIZATION,
-        points: DEDUCTION_EMPTY_FILE_PLACEHOLDER,
-        rationale: ScoringRationales.EMPTY_FILE_PLACEHOLDER,
     },
     {
         analyzer: ANALYZER_DEPENDENCY_GRAPH,
@@ -847,6 +793,7 @@ export const DIMENSION_RULES: DimensionRule[] = [
         rationale: ScoringRationales.GO_MODERNITY,
     },
 
+    ...HYGIENE_DIMENSION_RULES,
     ...FRONTEND_DIMENSION_RULES,
 ];
 

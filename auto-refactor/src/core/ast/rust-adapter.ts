@@ -129,6 +129,8 @@ const RUST_NODE_KIND_MAP: ReadonlyMap<string, NodeKind> = new Map<string, NodeKi
 const NUMERIC_TOLERATED_PARENTS: ReadonlySet<string> = new Set([
     'index_expression',
     'tuple_index_expression',
+    'array_type',
+    'array_expression',
 ]);
 const STRING_TOLERATED_PARENTS: ReadonlySet<string> = new Set([
     'macro_invocation',
@@ -365,12 +367,23 @@ export class RustAdapter implements LanguageAdapter {
     /**
      * Resolve whether a literal is const-bound.
      *
+     * Traverses the parent ancestor chain up to 6 levels to detect const/static declarations,
+     * including arithmetic or binary expressions inside const initializers (e.g. 1024 * 4).
+     *
      * @param _syntaxNode - literal node to classify.
      * @param parent - raw parent; `undefined` means the literal has no parent context.
      * @returns `true` for literals under `const` / `static` items or enum variants.
      */
     private isConstBound(_syntaxNode: TreeSitterNode, parent: TreeSitterNode | undefined): boolean {
-        return parent ? CONST_BOUND_PARENTS.has(parent.type) : false;
+        let curr: TreeSitterNode | undefined | null = parent;
+        let depth = 0;
+        while (curr && depth < 6) {
+            if (CONST_BOUND_PARENTS.has(curr.type)) return true;
+            if (curr.type === TYPE_FUNCTION_ITEM || curr.type === 'block') break;
+            curr = curr.parent;
+            depth++;
+        }
+        return false;
     }
 
     /**
@@ -378,18 +391,69 @@ export class RustAdapter implements LanguageAdapter {
      *
      * @param syntaxNode - literal node to classify.
      * @param parent - raw parent; `undefined` means the literal has no parent context.
-     * @returns `true` for index/tuple indices and macro/attribute/use contexts where the
-     * constants analyzer must not report the literal.
+     * @returns `true` for index/tuple indices, array types, and macro/attribute/use contexts
+     * where the constants analyzer must not report the literal.
      */
     private isToleratedContext(
         syntaxNode: TreeSitterNode,
         parent: TreeSitterNode | undefined,
     ): boolean {
         if (!parent) return false;
+        if (this.isTestItemContext(parent)) return true;
         if (syntaxNode.type === TYPE_INTEGER_LITERAL || syntaxNode.type === TYPE_FLOAT_LITERAL) {
-            return NUMERIC_TOLERATED_PARENTS.has(parent.type);
+            let curr: TreeSitterNode | undefined | null = parent;
+            let depth = 0;
+            while (curr && depth < 4) {
+                if (NUMERIC_TOLERATED_PARENTS.has(curr.type)) return true;
+                if (curr.type === TYPE_FUNCTION_ITEM || curr.type === 'block') break;
+                curr = curr.parent;
+                depth++;
+            }
+            return false;
         }
-        return STRING_TOLERATED_PARENTS.has(parent.type);
+        let curr: TreeSitterNode | undefined | null = parent;
+        let depth = 0;
+        while (curr && depth < 4) {
+            if (STRING_TOLERATED_PARENTS.has(curr.type)) return true;
+            if (curr.type === TYPE_FUNCTION_ITEM || curr.type === 'block') break;
+            curr = curr.parent;
+            depth++;
+        }
+        return false;
+    }
+
+    /**
+     * Inspect named children of a node for #[test] or #[cfg(test)] attributes.
+     */
+    private hasTestAttribute(itemNode: TreeSitterNode): boolean {
+        const children = itemNode.namedChildren;
+        if (!children) return false;
+        for (let i = 0; i < children.length; i++) {
+            const child = children[i];
+            if (child.type !== 'attribute_item') continue;
+            const txt = child.text;
+            if (txt && (txt.includes('test') || txt.includes('cfg(test)'))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Check if a node is contained within a `#[test]` function or `#[cfg(test)]` module.
+     */
+    private isTestItemContext(node: TreeSitterNode): boolean {
+        let curr: TreeSitterNode | null | undefined = node;
+        let depth = 0;
+        while (curr && depth < 8) {
+            const isTargetItem = curr.type === 'mod_item' || curr.type === TYPE_FUNCTION_ITEM;
+            if (isTargetItem && this.hasTestAttribute(curr)) {
+                return true;
+            }
+            curr = curr.parent;
+            depth++;
+        }
+        return false;
     }
 }
 

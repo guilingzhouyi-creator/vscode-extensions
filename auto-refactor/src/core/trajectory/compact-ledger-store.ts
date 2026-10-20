@@ -55,12 +55,20 @@ export function formatCompactRecord(params: {
     const { runId, revision, module, agent, timestamp, counters, metrics, gatePass, gateCode } =
         params;
 
-    // Round scoreVector values to 2 decimal places to maintain 0.01 precision within compact budget
+    // 0.01 precision is required downstream: the self-audit baseline compares
+    // trajectory vectors against stored values at two decimals.
     const compactVector = metrics.scoreVector.map((v: number) => Math.round(v * 100) / 100);
     const boundedId = runId.length > 12 ? runId.slice(-12) : runId;
     const boundedRev = revision.slice(0, 8);
     const boundedMod = module.length > 12 ? module.slice(0, 12) : module;
     const boundedAgent = agent.length > 12 ? agent.slice(0, 12) : agent;
+
+    // The compact ledger enforces a hard 350B per-record budget. `code` is
+    // redundant when the gate passed ('PASS' duplicates pass:true), so it is
+    // omitted in that case to reclaim bytes without losing information.
+    const gate = gatePass
+        ? { pass: true }
+        : { pass: false, code: gateCode ?? 'REJECT_QUALITY_REGRESSION' };
 
     return {
         t: timestamp ?? Date.now(),
@@ -87,10 +95,7 @@ export function formatCompactRecord(params: {
             res: metrics.debtDelta.resolvedDebtPoints,
             reg: metrics.debtDelta.regressionFindingsCount,
         },
-        gate: {
-            pass: gatePass,
-            code: gateCode ?? (gatePass ? 'PASS' : 'REJECT_QUALITY_REGRESSION'),
-        },
+        gate,
     };
 }
 

@@ -12,11 +12,19 @@
  *   matrix samples-default/custom, corpus-inproc/workers, rust-inproc/workers and three oxc
  *   parser runs compared against the shared TS goldens; normalizes reports to
  *   id/analyzer/rule/severity/message/location/detail plus metrics, sorted by id/file; writes
- *   a per-scenario .actual.json file next to the script on mismatch; honors --update capture.
+ *   a per-scenario <name>.actual.json under .audit-logs/equivalence-mismatch/ on mismatch
+ *   (never inside scripts/, where it would trip the physical hygiene clutter gate); honors
+ *   --update capture.
  * Exit Semantics & Design Rationale: Exits 1 if any scenario is missing a baseline or differs
  *   from it, 0 only when all match; --update captures then skips comparison. Byte-identical
  *   output is the oracle because the refactor must be behavior-preserving while the legacy
  *   mixed build used for capture is no longer runnable in the current tree.
+ *
+ * Baseline intentionality: corpus-inproc.json is byte-identical to corpus-workers.json
+ *   (likewise rust-inproc.json to rust-workers.json) BY DESIGN. The pairs are the
+ *   parallelism-invariance oracle: the same corpus scanned with workers=1 and workers=4
+ *   must produce identical reports, so a divergence would surface as a scenario failure
+ *   rather than a silent concurrency defect. Do not collapse the pairs.
  */
 
 const { scan } = require('../dist/api');
@@ -28,6 +36,7 @@ const CORPUS = path.join(__dirname, '.equivalence-corpus');
 const BASELINES = path.join(__dirname, 'baselines');
 const SAMPLES = path.join(ROOT, 'samples');
 const RUST_CORPUS = path.join(__dirname, '.equivalence-rust-corpus');
+const ACTUAL_DIR = path.join(ROOT, '.audit-logs', 'equivalence-mismatch');
 const UPDATE = process.argv.includes('--update');
 
 // ---- canonical corpus (must match the 26-file corpus that produced baselines) ----
@@ -434,7 +443,11 @@ async function main() {
       );
     } else {
       failed++;
-      const actual = path.join(__dirname, `.${s.name}.actual.json`);
+      // Diff artifacts go to .audit-logs/, never beside the script: a file dropped inside
+      // auto-refactor/scripts/ would be re-detected by the physical hygiene gate as
+      // .actual.json clutter, coupling an equivalence mismatch to an unrelated gate failure.
+      fs.mkdirSync(ACTUAL_DIR, { recursive: true });
+      const actual = path.join(ACTUAL_DIR, `${s.name}.actual.json`);
       fs.writeFileSync(actual, json);
       console.error(`FAIL ${s.name} — differs from baseline. Inspect: ${actual}`);
     }

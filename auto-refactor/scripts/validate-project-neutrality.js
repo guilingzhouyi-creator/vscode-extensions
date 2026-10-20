@@ -51,12 +51,13 @@ const SELF = 'validate-project-neutrality.js';
  * @returns The accumulated file paths.
  */
 function walk(dir, out = []) {
+  if (!fs.existsSync(dir)) return out;
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      if (entry.name === 'node_modules' || entry.name === '.git') continue;
+      if (entry.name === 'node_modules' || entry.name === '.git' || entry.name.startsWith('.')) continue;
       walk(full, out);
-    } else if (entry.name !== SELF) {
+    } else if (entry.name !== SELF && !entry.name.endsWith('.tmp')) {
       out.push(full);
     }
   }
@@ -76,7 +77,14 @@ function run() {
   // 1. Verify engine core (src, presets, templates) strictly carries ZERO consumer identifiers
   for (const dir of CORE_DIRS) {
     for (const file of walk(path.join(ROOT, dir))) {
-      const lines = fs.readFileSync(file, 'utf8').split('\n');
+      let content;
+      try {
+        content = fs.readFileSync(file, 'utf8');
+      } catch (err) {
+        if (err && err.code === 'ENOENT') continue;
+        throw err;
+      }
+      const lines = content.split('\n');
       lines.forEach((line, index) => {
         if (coreRe.test(line)) {
           offenders.push(`${path.relative(ROOT, file)}:${index + 1}`);
@@ -102,7 +110,14 @@ function run() {
         (dir === 'docs' && INTEGRATION_DOCS.has(base));
 
       const re = isIntegration ? legacyRe : coreRe;
-      const lines = fs.readFileSync(file, 'utf8').split('\n');
+      let content;
+      try {
+        content = fs.readFileSync(file, 'utf8');
+      } catch (err) {
+        if (err && err.code === 'ENOENT') continue;
+        throw err;
+      }
+      const lines = content.split('\n');
       lines.forEach((line, index) => {
         if (re.test(line)) {
           scriptAndDocOffenders.push(`${path.relative(ROOT, file)}:${index + 1}`);

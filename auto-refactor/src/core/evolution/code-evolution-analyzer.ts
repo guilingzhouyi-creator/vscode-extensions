@@ -150,7 +150,8 @@ export class CodeEvolutionAnalyzer {
         const debtVelocityScore = this.calculateDebtVelocity(profile.recentCommits);
 
         // 5. Composite Vulnerability Multiplier V_evo(f)
-        // V_evo = 1.0 + w1*Bug + w2*Entropy + w3*Decay - w4*Velocity
+        // V_evo = 1.0 + weight_bug*Bug + weight_entropy*Entropy
+        //         + weight_decay*Decay - weight_velocity*Velocity
         const rawMultiplier =
             1.0 +
             this.weightBugProne * bugProneScore +

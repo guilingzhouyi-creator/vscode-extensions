@@ -25,6 +25,7 @@ import type { GovernanceRule, GovernanceViolation, RuleEvaluationContext } from 
 import { isToolOrTestScript } from '../pathScope';
 import { getRule, RULE_REGISTRY } from '../../rules/registry';
 import { canonicalRuleId, toCanonicalRuleId, areAliasForms } from '../../rules/aliases';
+import { isRegisteredWorkspaceRule } from '../rule-catalog-ssot';
 
 const IF_TRUE_RE = /^\s*if\s+(.+?)\s*:\s*return\s+true\s*$/i;
 const ELSE_FALSE_RE = /^\s*else\s*:\s*return\s+false\s*$/i;
@@ -52,7 +53,8 @@ const JS_TS_LANGUAGES: ReadonlySet<string> = new Set(['typescript', 'javascript'
 /** GDScript pass keyword set library. */
 const GDSCRIPT_PASS_KEYWORDS: ReadonlySet<string> = new Set(['pass']);
 
-const CANDIDATE_RULE_RE = /\b([A-Z][A-Z0-9]{1,5}(?:-[A-Z0-9]{2,10}){1,3}-\d{3})\b/g;
+const CANDIDATE_RULE_RE =
+    /(?<![A-Za-z0-9_])([A-Z][A-Z0-9]{1,5}(?:-[A-Z0-9_]{2,10}){1,3}-\d{3}|L[0-5]-[A-Z0-9_]+)(?![A-Za-z0-9_])/g;
 
 const EXEMPT_RULE_CATALOG_RE =
     /(?:standardization|registry|dimensionLiterals|rule-catalog|builtin-rules|DOCS|dictionaries|def-use-chain|src\/core\/types)/i;
@@ -88,6 +90,7 @@ const RULE_INTEGRITY_SKIP_IDENTIFIERS: ReadonlySet<string> = new Set([
 const EXEMPT_RULE_FAMILY_PREFIXES: ReadonlySet<string> = new Set([
     'ADV',
     'WT',
+    'FGT',
     'GATE',
     'CMG',
     'RCFG',
@@ -347,7 +350,7 @@ function getRegisteredCanonicalForms(): Set<string> {
 
 /**
  * Checks whether candidateId matches a registered rule directly, via legacy alias,
- * or through canonical 3-letter alias equivalence.
+ * through canonical 3-letter alias equivalence, or in the workspace-wide SSOT catalog.
  */
 function isRegisteredOrAliasRule(candidateId: string): boolean {
     if (getRule(candidateId)) return true;
@@ -365,10 +368,14 @@ function isRegisteredOrAliasRule(candidateId: string): boolean {
         }
     }
 
+    if (isRegisteredWorkspaceRule(candidateId)) {
+        return true;
+    }
+
     return false;
 }
 
-const RULE_SUFFIX_RE = /-\d{3}\b/;
+const RULE_SUFFIX_RE = /(?:-\d{3}\b|L[0-5]-)/;
 
 /**
  * Evaluates candidate rule identifiers on a single source line against the rule registry.
@@ -385,8 +392,8 @@ function inspectRuleCatalogLine(
     let match: RegExpExecArray | null;
     while ((match = CANDIDATE_RULE_RE.exec(line)) !== null) {
         const candidateId = match[1];
-        if (isExemptRuleFamily(candidateId)) continue;
         if (isRegisteredOrAliasRule(candidateId)) continue;
+        if (isExemptRuleFamily(candidateId)) continue;
 
         violations.push({
             ruleId: 'GOV-RUL-001',

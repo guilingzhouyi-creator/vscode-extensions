@@ -57,20 +57,36 @@ function isJargonSelfReference(line: string): boolean {
     );
 }
 
+const CHINESE_CONSTRUCTION_JARGON_RE =
+    /(?:临时方案|临时代码|临时处理|临时绕过|临时修复|先这样|待处理|后续再看|占位代码|打补丁|草率|先顶着|应急处理)/;
+
 /**
  * Checks whether a single source line contains temporary task jargon or `WIP` markers in comments.
  */
 function checkCommentLineJargon(line: string, lineIndex: number): GovernanceViolation | null {
     if (!isCommentLine(line) || isJargonSelfReference(line)) return null;
 
-    const match = CONSTRUCTION_JARGON_RE.exec(line);
-    if (!match || isVocabularyEnumeration(line, match.index, match[0])) return null;
+    let match = CONSTRUCTION_JARGON_RE.exec(line);
+    let matchedText = match ? match[0] : '';
+    let matchIdx = match ? match.index : -1;
+
+    if (!match) {
+        const zhMatch = CHINESE_CONSTRUCTION_JARGON_RE.exec(line);
+        if (zhMatch) {
+            matchedText = zhMatch[0];
+            matchIdx = zhMatch.index;
+        }
+    }
+
+    if (!matchedText || matchIdx < 0 || isVocabularyEnumeration(line, matchIdx, matchedText)) {
+        return null;
+    }
 
     return {
         ruleId: 'GOV-SAN-001',
-        message: `Comment contains temporary batch jargon / WIP marker \`${match[0]}\`. Replace with canonical architectural description.`,
+        message: `Comment contains temporary batch jargon / WIP marker \`${matchedText}\`. Replace with canonical architectural description.`,
         line: lineIndex + 1,
-        column: (match.index ?? line.indexOf(match[0])) + 1,
+        column: matchIdx + 1,
         suggestion: 'Remove temporary phase/task tags and use standard domain terminology.',
         fixable: false,
     };
@@ -98,7 +114,10 @@ export const LexicalHygieneRule: GovernanceRule = {
             return null;
         }
 
-        if (!CONSTRUCTION_JARGON_RE.test(ctx.content)) {
+        if (
+            !CONSTRUCTION_JARGON_RE.test(ctx.content) &&
+            !CHINESE_CONSTRUCTION_JARGON_RE.test(ctx.content)
+        ) {
             return null;
         }
 
@@ -300,7 +319,12 @@ export const ProseTerminologySanitizationRule: GovernanceRule = {
         if (!commentContent.trim()) return null;
 
         const findings = auditTerminologyProse(commentContent, {
-            allowedCategories: ['hyperbolic_affirmative', 'hyperbolic_negative', 'meta_narrative'],
+            allowedCategories: [
+                'temporary',
+                'hyperbolic_affirmative',
+                'hyperbolic_negative',
+                'meta_narrative',
+            ],
         });
 
         if (findings.length === 0) return null;

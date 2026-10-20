@@ -277,6 +277,11 @@ const CONVENTIONAL_TOKENS = new Set([
     'assert',
     '1===1',
     '1==1',
+    // Version control & protocol vocabulary
+    'blob',
+    'tree',
+    'commit',
+    'tag',
 ]);
 
 /** Command-line switches such as `--root` / `-v` are interface vocabulary, not configuration. */
@@ -289,7 +294,8 @@ const CLI_FLAG_RE = /^--?[A-Za-z][A-Za-z0-9-]*$/;
  * one into a constant only moves the literal, and every analyzer that emits one would need the
  * same constant. Treated as vocabulary, exactly like an encoding name.
  */
-const RULE_ID_RE = /^[A-Z]{2,4}-[A-Z0-9]{2,6}-\d{3}$/;
+const RULE_ID_RE = /^[A-Z]{2,6}-[A-Z0-9_]{2,12}(?:-[0-9A-Z_]+)?$/;
+const ENUM_TAG_RE = /^[A-Z][A-Z0-9_]{2,40}$/;
 
 /**
  * Test-framework symbols are the assertion vocabulary of the test runner, not payload.
@@ -341,6 +347,9 @@ const FILE_EXTENSION_RE = /^\.[A-Za-z0-9]{1,6}$/;
 /** Locale tags (`en`, `zh-cn`) are standard identifiers rather than project values. */
 const LOCALE_TAG_RE = /^[a-z]{2}(?:-[A-Za-z]{2})?$/;
 
+/** Timezone offset strings (`+0000`, `-0500`) are standard protocol vocabulary. */
+const TIMEZONE_OFFSET_RE = /^[+-]\d{4}$/;
+
 /**
  * Checks whether a literal string matches conventional vocabulary or standard tokens.
  *
@@ -358,11 +367,13 @@ export function isConventionalVocabulary(raw: string, lowered: string): boolean 
     }
     return (
         RULE_ID_RE.test(raw) ||
+        ENUM_TAG_RE.test(raw) ||
         TEST_PROBE_RE.test(raw) ||
         CLI_FLAG_RE.test(raw) ||
         MIME_TYPE_RE.test(lowered) ||
         FILE_EXTENSION_RE.test(raw) ||
-        LOCALE_TAG_RE.test(raw)
+        LOCALE_TAG_RE.test(raw) ||
+        TIMEZONE_OFFSET_RE.test(raw)
     );
 }
 

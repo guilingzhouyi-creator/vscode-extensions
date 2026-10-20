@@ -112,11 +112,6 @@ pub fn compute_string_hash_32(s: &str) -> u32 {
     hash
 }
 
-#[inline]
-pub fn hash_string_32(s: &str) -> u32 {
-    compute_string_hash_32(s)
-}
-
 const FNV_OFFSET_BASIS_64: u64 = 0xcbf29ce484222325;
 const FNV_PRIME_64: u64 = 0x100000001b3;
 
@@ -409,11 +404,11 @@ pub fn find_clone_pairs(signatures: &[Vec<u32>], threshold: f64) -> Vec<ClonePai
 
     // 1. Group file indices into LSH buckets per band
     let mut candidates: HashSet<(u32, u32)> = HashSet::new();
+    let mut buckets: HashMap<u32, Vec<u32>> = HashMap::new();
 
     for band in 0..num_bands {
         let start = band * rows_per_band;
         let end = start + rows_per_band;
-        let mut buckets: HashMap<u32, Vec<u32>> = HashMap::new();
 
         for (file_idx, sig) in signatures.iter().enumerate() {
             if sig.len() < end {
@@ -438,6 +433,7 @@ pub fn find_clone_pairs(signatures: &[Vec<u32>], threshold: f64) -> Vec<ClonePai
                 }
             }
         }
+        buckets.clear();
     }
 
     // 2. Verify candidate pairs against similarity threshold
@@ -476,9 +472,11 @@ pub fn find_clone_pairs(signatures: &[Vec<u32>], threshold: f64) -> Vec<ClonePai
     pairs
 }
 
-/// Compute pairwise co-change frequencies and Jaccard similarity between files from commit changesets.
+/// Compute pairwise co-change frequencies and Jaccard similarity between files
+/// from commit changesets.
 ///
-/// Changesets is a slice of file ID vectors. Each inner vector contains file IDs changed in a commit.
+/// Changesets is a slice of file ID vectors.
+/// Each inner vector contains file IDs changed in a commit.
 /// Only file pairs with shared commits >= `min_shared` and Jaccard similarity >= `min_jaccard`
 /// are returned, sorted descending by Jaccard similarity, then descending by shared commits,
 /// then ascending by file_a, then ascending by file_b.
@@ -490,7 +488,18 @@ pub fn compute_temporal_coupling(
     if changesets.is_empty() {
         return Vec::new();
     }
+    let (file_commit_counts, pair_shared_counts) = accumulate_changeset_frequencies(changesets);
+    filter_and_sort_temporal_pairs(
+        &file_commit_counts,
+        pair_shared_counts,
+        min_shared,
+        min_jaccard,
+    )
+}
 
+fn accumulate_changeset_frequencies(
+    changesets: &[Vec<u32>],
+) -> (HashMap<u32, u32>, HashMap<(u32, u32), u32>) {
     let mut file_commit_counts: HashMap<u32, u32> = HashMap::new();
     let mut pair_shared_counts: HashMap<(u32, u32), u32> = HashMap::new();
 
@@ -521,6 +530,15 @@ pub fn compute_temporal_coupling(
         }
     }
 
+    (file_commit_counts, pair_shared_counts)
+}
+
+fn filter_and_sort_temporal_pairs(
+    file_commit_counts: &HashMap<u32, u32>,
+    pair_shared_counts: HashMap<(u32, u32), u32>,
+    min_shared: u32,
+    min_jaccard: f64,
+) -> Vec<TemporalCouplingPair> {
     let mut pairs = Vec::new();
     for ((file_a, file_b), shared_commits) in pair_shared_counts {
         if shared_commits < min_shared {

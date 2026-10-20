@@ -510,6 +510,35 @@ function auditHygieneGuard(context: RepoArchetypeContext, issues: Issue[]): void
                 },
             }),
         );
+        return;
+    }
+
+    // Extended hygiene: Check whether gate enforces clutter file and root anti-pollution defense
+    const hasClutterGuard =
+        /(?:validate-physical-hygiene|physical-hygiene|clutter|\.actual\.json|\.tmp|\.bak|desktop\.ini|thumbs\.db|\.ds_store|root-script)/i.test(content);
+
+    if (!hasClutterGuard) {
+        issues.push(
+            createGateIssue({
+                ruleId: 'GATE-HYG-001',
+                filePath: relPath,
+                line: 1,
+                severity: SEVERITY_WARNING,
+                risk: RISK_HIGH,
+                category: CATEGORY_HYGIENE,
+                message:
+                    'Pre-commit gate does not enforce extended physical hygiene: lacks transient clutter (.log/.tmp/.bak) and root script pollution guards.',
+                remediation:
+                    'Integrate physical hygiene verification into pre-commit gate to intercept transient clutter and root directory script pollution.',
+                rationale:
+                    'Transient log dumps, OS metadata, and scattered root scripts pollute repository history and break execution boundary isolation.',
+                extraDetail: {
+                    action: 'add_extended_hygiene_check',
+                    targetHook: 'pre-commit',
+                    safeToAutomate: true,
+                },
+            }),
+        );
     }
 }
 

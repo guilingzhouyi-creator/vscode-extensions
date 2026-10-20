@@ -22,7 +22,8 @@ const SNAKE_CASE_RE = /^[a-z0-9]+(_[a-z0-9]+)*$/;
 const KEBAB_OR_CAMEL_RE = /^[a-z0-9]+(-[a-z0-9]+)*$|^[a-z][a-zA-Z0-9]*$/;
 const PASCAL_CASE_RE = /^[A-Z][a-zA-Z0-9]*$/;
 const PATH_DECL_TAG_RE = /文件路径|@file/;
-const HEADER_KEYWORD_RE = /\/\*\*|职责|Responsibilities|Overview|模块归属|\/\/\s*={10,}|#\s*={10,}/;
+const HEADER_KEYWORD_RE =
+    /\/\*\*|\/\/!|职责|Responsibilities|Overview|模块归属|Module:|模块|\/\/\s*={10,}|#\s*={10,}/;
 
 /**
  * Validates snake_case file naming convention.

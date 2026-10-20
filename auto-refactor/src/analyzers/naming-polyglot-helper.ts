@@ -15,6 +15,7 @@
 import type { AnalyzerContext, Issue, Severity } from '../core/types';
 import { SEVERITY_WARNING } from '../core/types';
 import { auditFunctionSemantics, hasTransientJargon } from './naming-path-helper';
+import { DEFAULT_VAGUE_BLACKLIST } from './naming-ast-helper';
 import type { NamingOptions } from './naming';
 
 /**
@@ -63,8 +64,16 @@ const EXAMPLE_PREFIX = 'Example';
 const CAMEL_TO_SNAKE_PATTERN = '$1_$2';
 
 const GO_FUNC_RE = /^func\s+(?:\([^)]+\)\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*(?:\[[^\]]*\])?\s*\(/;
-const RUST_FN_RE =
-    /^\s*(?:pub(?:\s*\([^)]*\))?\s+)?(?:async\s+)?(?:unsafe\s+)?(?:extern(?:\s*"[^"]*")?\s+)?fn\s+([a-zA-Z_][a-zA-Z0-9_]*)/;
+const RUST_FN_PREFIX = '^\\s*(?:pub(?:\\s*\\([^)]*\\))?\\s+)?(?:const\\s+)?';
+const RUST_FN_SUFFIX =
+    '(?:async\\s+)?(?:unsafe\\s+)?(?:extern(?:\\s*"[^"]*")?\\s+)?fn\\s+([a-zA-Z_][a-zA-Z0-9_]*)';
+const RUST_FN_RE = new RegExp(RUST_FN_PREFIX + RUST_FN_SUFFIX);
+const RUST_TYPE_RE =
+    /^\s*(?:pub(?:\s*\([^)]*\))?\s+)?(?:struct|enum|trait)\s+([a-zA-Z_][a-zA-Z0-9_]*)/;
+const RUST_CONST_RE =
+    /^\s*(?:pub(?:\s*\([^)]*\))?\s+)?(?:const|static)\s+(?:mut\s+)?([a-zA-Z_][a-zA-Z0-9_]*)\s*:/;
+const RUST_LET_RE =
+    /^\s*let\s+(?:mut\s+)?([a-zA-Z_][a-zA-Z0-9_]*)\s*(?::[^=]+)?\s*=/;
 const GDSCRIPT_FUNC_RE = /^\s*(?:static\s+)?func\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/;
 
 const GO_EXEMPT_NAMES = new Set([
@@ -159,7 +168,9 @@ function auditFunctionLengthBounds(
                 line: lineIdx + 1,
                 column: 1,
                 rule: 'NAM-LEN-002',
-                message: `Function name '${fnName}' is too short (< ${minLen} characters); lacks description.`,
+                message:
+                    `Function name '${fnName}' is too short (< ${minLen} characters); ` +
+                    'lacks description.',
                 severity: SEVERITY_WARNING,
                 detail: { name: fnName, length: fnName.length, minLen },
                 suggestion: `Rename '${fnName}' to a descriptive phrase with >= ${minLen} characters.`,
@@ -174,7 +185,9 @@ function auditFunctionLengthBounds(
                 line: lineIdx + 1,
                 column: 1,
                 rule: 'NAM-LEN-002',
-                message: `Function name '${fnName}' is too long (> ${maxLen} characters); decompose responsibilities.`,
+                message:
+                    `Function name '${fnName}' is too long (> ${maxLen} characters); ` +
+                    'decompose responsibilities.',
                 severity: SEVERITY_WARNING,
                 detail: { name: fnName, length: fnName.length, maxLen },
                 suggestion: `Refactor '${fnName}' into a concise identifier with <= ${maxLen} characters.`,
@@ -227,6 +240,146 @@ function auditExtractedFunction(
     );
 }
 
+function auditRustType(
+    typeName: string,
+    lineIdx: number,
+    pCtx: PolyglotNamingContext,
+): void {
+    if (pCtx.opts.checkTypes !== false && !/^[A-Z][a-zA-Z0-9]*$/.test(typeName)) {
+        pCtx.issues.push(
+            pCtx.mkIssue({
+                line: lineIdx + 1,
+                column: 1,
+                rule: 'NAM-TYP-001',
+                message: `Type or struct definition '${typeName}' should follow PascalCase.`,
+                severity: SEVERITY_WARNING,
+                detail: { name: typeName },
+                suggestion: `Rename '${typeName}' to PascalCase naming convention.`,
+            }),
+        );
+    }
+    if (pCtx.opts.checkJargon !== false && hasTransientJargon(typeName)) {
+        pCtx.issues.push(
+            pCtx.mkIssue({
+                line: lineIdx + 1,
+                column: 1,
+                rule: 'NAM-JRG-002',
+                message: `Type identifier '${typeName}' contains transient construction jargon.`,
+                severity: SEVERITY_WARNING,
+                detail: { name: typeName },
+                suggestion: 'Replace transient process markers with semantic domain naming.',
+            }),
+        );
+    }
+}
+
+function auditRustConstant(
+    constName: string,
+    lineIdx: number,
+    pCtx: PolyglotNamingContext,
+): void {
+    if (pCtx.opts.checkGlobals !== false && !/^[A-Z][A-Z0-9_]*$/.test(constName)) {
+        pCtx.issues.push(
+            pCtx.mkIssue({
+                line: lineIdx + 1,
+                column: 1,
+                rule: 'NAM-GLB-001',
+                message:
+                    `Top-level constant or static '${constName}' ` +
+                    'should follow UPPER_SNAKE_CASE.',
+                severity: SEVERITY_WARNING,
+                detail: { name: constName },
+                suggestion: `Rename '${constName}' to an uppercase snake_case constant.`,
+            }),
+        );
+    }
+    if (pCtx.opts.checkJargon !== false && hasTransientJargon(constName)) {
+        pCtx.issues.push(
+            pCtx.mkIssue({
+                line: lineIdx + 1,
+                column: 1,
+                rule: 'NAM-JRG-002',
+                message:
+                    `Constant identifier '${constName}' contains ` +
+                    'transient construction jargon.',
+                severity: SEVERITY_WARNING,
+                detail: { name: constName },
+                suggestion: 'Replace transient process markers with semantic domain naming.',
+            }),
+        );
+    }
+}
+
+function auditRustVariable(
+    varName: string,
+    lineIdx: number,
+    inTest: boolean,
+    pCtx: PolyglotNamingContext,
+): void {
+    if (inTest) return;
+
+    if (pCtx.opts.checkSingleLetters !== false) {
+        if (
+            varName.length === 1 &&
+            /^[a-zA-Z]$/.test(varName) &&
+            varName !== '_' &&
+            varName !== 'i' &&
+            varName !== 'j' &&
+            varName !== 'k'
+        ) {
+            pCtx.issues.push(
+                pCtx.mkIssue({
+                    line: lineIdx + 1,
+                    column: 1,
+                    rule: 'NAM-SGL-001',
+                    message: `Single-letter variable name '${varName}' hurts code readability.`,
+                    severity: SEVERITY_WARNING,
+                    detail: { name: varName },
+                    suggestion:
+                        `Rename '${varName}' to descriptive identifier; only 'i','j','k','_' tolerated.`,
+                }),
+            );
+        }
+    }
+
+    if (pCtx.opts.checkVagueNames !== false) {
+        const vagueSet = pCtx.opts.vagueBlacklist
+            ? new Set(pCtx.opts.vagueBlacklist)
+            : DEFAULT_VAGUE_BLACKLIST;
+        if (vagueSet.has(varName.toLowerCase())) {
+            pCtx.issues.push(
+                pCtx.mkIssue({
+                    line: lineIdx + 1,
+                    column: 1,
+                    rule: 'NAM-VAG-001',
+                    message:
+                        `Identifier '${varName}' is vague and uninformative; ` +
+                        'lacks domain context.',
+                    severity: SEVERITY_WARNING,
+                    detail: { name: varName },
+                    suggestion: `Replace '${varName}' with a domain-qualified identifier.`,
+                }),
+            );
+        }
+    }
+
+    if (pCtx.opts.checkJargon !== false && hasTransientJargon(varName)) {
+        pCtx.issues.push(
+            pCtx.mkIssue({
+                line: lineIdx + 1,
+                column: 1,
+                rule: 'NAM-JRG-002',
+                message:
+                    `Variable identifier '${varName}' contains ` +
+                    'transient construction jargon.',
+                severity: SEVERITY_WARNING,
+                detail: { name: varName },
+                suggestion: 'Replace transient process markers with semantic domain naming.',
+            }),
+        );
+    }
+}
+
 type PolyglotLineAuditor = (line: string, lineIndex: number) => void;
 
 function createPolyglotLineAuditor(
@@ -243,8 +396,20 @@ function createPolyglotLineAuditor(
     }
     if (ext === '.rs') {
         let isNextFnTest = false;
+        let braceDepth = 0;
+        let testFunctionDepth = -1;
+        let testModuleDepth = -1;
+
         return (line, i) => {
             const trimmed = line.trim();
+            const codeOnly = trimmed.split('//')[0];
+            const openBraces = (codeOnly.match(/\{/g) || []).length;
+            const closeBraces = (codeOnly.match(/\}/g) || []).length;
+
+            if (trimmed.startsWith('#[cfg(test)]')) {
+                testModuleDepth = braceDepth;
+                return;
+            }
             if (
                 trimmed.startsWith('#[test]') ||
                 trimmed.startsWith('#[tokio::test]') ||
@@ -253,12 +418,21 @@ function createPolyglotLineAuditor(
                 isNextFnTest = true;
                 return;
             }
-            const match = RUST_FN_RE.exec(line);
-            if (match) {
-                const isTest = isNextFnTest || isRustFunctionExempt(match[1]);
+
+            const fnMatch = RUST_FN_RE.exec(line);
+            if (fnMatch) {
+                const isTest =
+                    testModuleDepth >= 0 ||
+                    isNextFnTest ||
+                    isRustFunctionExempt(fnMatch[1]);
                 isNextFnTest = false;
-                if (!isTest) {
-                    auditExtractedFunction({ fnName: match[1], lineIdx: i, isSnake: true }, pCtx);
+                if (isTest) {
+                    testFunctionDepth = braceDepth;
+                } else {
+                    auditExtractedFunction(
+                        { fnName: fnMatch[1], lineIdx: i, isSnake: true },
+                        pCtx,
+                    );
                 }
             } else if (
                 trimmed.length > 0 &&
@@ -266,6 +440,34 @@ function createPolyglotLineAuditor(
                 !trimmed.startsWith('#[')
             ) {
                 isNextFnTest = false;
+            }
+
+            const inTestScope = testFunctionDepth >= 0 || testModuleDepth >= 0;
+
+            if (!inTestScope) {
+                const typeMatch = RUST_TYPE_RE.exec(line);
+                if (typeMatch) {
+                    auditRustType(typeMatch[1], i, pCtx);
+                }
+
+                const constMatch = RUST_CONST_RE.exec(line);
+                if (constMatch) {
+                    auditRustConstant(constMatch[1], i, pCtx);
+                }
+            }
+
+            const letMatch = RUST_LET_RE.exec(line);
+            if (letMatch) {
+                auditRustVariable(letMatch[1], i, inTestScope, pCtx);
+            }
+
+            braceDepth += openBraces - closeBraces;
+            if (braceDepth < 0) braceDepth = 0;
+            if (testFunctionDepth >= 0 && braceDepth <= testFunctionDepth) {
+                testFunctionDepth = -1;
+            }
+            if (testModuleDepth >= 0 && braceDepth <= testModuleDepth) {
+                testModuleDepth = -1;
             }
         };
     }

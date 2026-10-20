@@ -1,14 +1,14 @@
 {
   "filesScanned": 3,
-  "issuesTotal": 37,
+  "issuesTotal": 32,
   "byAnalyzer": {
-    "constants": 34,
+    "constants": 29,
     "large-file": 1,
     "complexity": 2
   },
   "bySeverity": {
     "info": 0,
-    "warning": 37,
+    "warning": 32,
     "error": 0
   },
   "issues": [
@@ -325,29 +325,6 @@
       }
     },
     {
-      "id": "constants:hardcoded-string:analyzers/noConsole.js:8",
-      "analyzer": "constants",
-      "rule": "hardcoded-string",
-      "severity": "warning",
-      "message": "Hardcoded string should be extracted into a named constant.",
-      "location": {
-        "file": "analyzers/noConsole.js",
-        "start": {
-          "line": 8,
-          "column": 20
-        },
-        "end": {
-          "line": 8,
-          "column": 32
-        }
-      },
-      "detail": {
-        "value": "'typescript'",
-        "length": 10,
-        "suggestedName": "TYPESCRIPT_TEXT"
-      }
-    },
-    {
       "id": "constants:hardcoded-string:run-from-script.js:18",
       "analyzer": "constants",
       "rule": "hardcoded-string",
@@ -440,29 +417,6 @@
       }
     },
     {
-      "id": "constants:hardcoded-string:run-from-script.js:25",
-      "analyzer": "constants",
-      "rule": "hardcoded-string",
-      "severity": "warning",
-      "message": "Hardcoded string should be extracted into a named constant.",
-      "location": {
-        "file": "run-from-script.js",
-        "start": {
-          "line": 25,
-          "column": 13
-        },
-        "end": {
-          "line": 25,
-          "column": 19
-        }
-      },
-      "detail": {
-        "value": "'json'",
-        "length": 4,
-        "suggestedName": "JSON_TEXT"
-      }
-    },
-    {
       "id": "constants:hardcoded-string:run-from-script.js:28",
       "analyzer": "constants",
       "rule": "hardcoded-string",
@@ -506,75 +460,6 @@
         "value": "'guest'",
         "length": 5,
         "suggestedName": "GUEST_TEXT"
-      }
-    },
-    {
-      "id": "constants:hardcoded-string:sample.ts:53",
-      "analyzer": "constants",
-      "rule": "hardcoded-string",
-      "severity": "warning",
-      "message": "Hardcoded string should be extracted into a named constant.",
-      "location": {
-        "file": "sample.ts",
-        "start": {
-          "line": 53,
-          "column": 41
-        },
-        "end": {
-          "line": 53,
-          "column": 59
-        }
-      },
-      "detail": {
-        "value": "'admin must be CN'",
-        "length": 16,
-        "suggestedName": "ADMINMUSTBECN_TEXT"
-      }
-    },
-    {
-      "id": "constants:hardcoded-string:sample.ts:55",
-      "analyzer": "constants",
-      "rule": "hardcoded-string",
-      "severity": "warning",
-      "message": "Hardcoded string should be extracted into a named constant.",
-      "location": {
-        "file": "sample.ts",
-        "start": {
-          "line": 55,
-          "column": 33
-        },
-        "end": {
-          "line": 55,
-          "column": 49
-        }
-      },
-      "detail": {
-        "value": "'user too young'",
-        "length": 14,
-        "suggestedName": "USERTOOYOUNG_TEXT"
-      }
-    },
-    {
-      "id": "constants:hardcoded-string:sample.ts:57",
-      "analyzer": "constants",
-      "rule": "hardcoded-string",
-      "severity": "warning",
-      "message": "Hardcoded string should be extracted into a named constant.",
-      "location": {
-        "file": "sample.ts",
-        "start": {
-          "line": 57,
-          "column": 17
-        },
-        "end": {
-          "line": 57,
-          "column": 31
-        }
-      },
-      "detail": {
-        "value": "'unknown role'",
-        "length": 12,
-        "suggestedName": "UNKNOWNROLE_TEXT"
       }
     },
     {

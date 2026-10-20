@@ -237,6 +237,31 @@ export const ScoringRationales = {
      */
     EMPTY_FILE_PLACEHOLDER: (msg: string) =>
         `Source directory contains empty or vacuous file placeholders: ${msg}`,
+    /**
+     * Format the rationale for a comment-only hollow file lacking executable code.
+     */
+    COMMENT_HOLLOW_FILE: (msg: string) =>
+        `Hollow source file lacks executable implementation after stripping comments: ${msg}`,
+    /**
+     * Format the rationale for physical encoding, BOM, or POSIX EOF newline violations.
+     */
+    PHYSICAL_HYGIENE_ENCODING: (msg: string) =>
+        `File encoding, BOM, or EOF newlines violate physical hygiene contract: ${msg}`,
+    /**
+     * Format the rationale for tab character indentation in space-indented files.
+     */
+    PHYSICAL_HYGIENE_INDENT: (msg: string) =>
+        `Indentation contract violation (pure space indentation required): ${msg}`,
+    /**
+     * Format the rationale for uncontrolled transient or system clutter files.
+     */
+    UNCONTROLLED_CLUTTER_FILE: (msg: string) =>
+        `Uncontrolled transient clutter or temporary artifact detected in repository: ${msg}`,
+    /**
+     * Format the rationale for root script pollution or extension directory drift.
+     */
+    DIRECTORY_CLASSIFICATION_POLLUTION: (msg: string) =>
+        `Workspace file extension or directory classification violation: ${msg}`,
 
     // 6. Modernity
     /**

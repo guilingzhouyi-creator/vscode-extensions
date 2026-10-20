@@ -90,8 +90,14 @@ function resolvePythonNodeName(
 }
 
 function resolveChildMapContext(ctx: MapContext, sn: TreeSitterNode): MapContext {
+    const fnLike = sn.type === 'function_definition';
+    const name = fnLike ? nameOf(sn) : null;
+    const isTestFn =
+        ctx.isTestFunction ||
+        Boolean(name && /^(?:test_|_assert_|assert_|selftest|_test)/i.test(name));
     return {
         constBound: ctx.constBound || (sn.type === PY_ASSIGNMENT && isConstTarget(sn)),
+        isTestFunction: isTestFn,
     };
 }
 
@@ -231,7 +237,7 @@ export class PythonAdapter implements LanguageAdapter {
 
         if (isLiteral) {
             node.isConstBound = ctx.constBound || parent?.type === PY_ASSIGNMENT;
-            node.tolerated = isToleratedOf(sn, parent);
+            node.tolerated = isToleratedOf(sn, parent, ctx);
         }
 
         const childCtx = resolveChildMapContext(ctx, sn);

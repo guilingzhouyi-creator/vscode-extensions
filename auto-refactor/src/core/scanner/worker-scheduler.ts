@@ -63,7 +63,7 @@ const WORKER_SCRIPT_FILE = 'worker.js';
 const WORKER_TERMINATION_GRACE_PERIOD_MS = 500;
 
 const DEFAULT_AUTO_WORKER_MIN = 4;
-const DEFAULT_AUTO_WORKER_MAX = 8;
+const DEFAULT_AUTO_WORKER_MAX = 16;
 const DEFAULT_FALLBACK_CPUS = 8;
 
 /** Scale factor turning a 0-1 elapsed-time ratio into a whole percentage (AR-TIMING). */

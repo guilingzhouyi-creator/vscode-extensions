@@ -43,6 +43,16 @@ const { evaluatePatchQuality } = require('../dist/core/scoring/patchQuality');
 
 const { detectDiffScoreGaming } = require('../dist/core/scoring/antiGaming');
 
+const {
+  isAlreadyInConstantLibrary,
+} = require('../dist/core/architecture/constant-library-auditor');
+
+const {
+  findUnregisteredRuleDrift,
+  isTerminalStatusBadge,
+  isRegisteredWorkspaceRule,
+} = require('../dist/core/governance/rule-catalog-ssot');
+
 console.log('=== Running Constant Governance & Position Tracking Test Suite ===\n');
 
 // -------------------------------------------------------------
@@ -393,5 +403,56 @@ console.log('Test 8: Cross-File Ownership & Anti-Drift Guard...');
   assert.ok(driftIssues[0].message.includes('DEFAULT_TIMEOUT'));
 }
 console.log('  PASS: Ownership and Drift guards enforce clean cross-file boundaries.\n');
+
+// -------------------------------------------------------------
+// Test 9: Polyglot (Rust) Constant Extraction & SSOT Rule Drift Guard
+// -------------------------------------------------------------
+console.log('Test 9: Rust Constant Extraction & SSOT Rule Drift Guard...');
+{
+  const rustCode = `
+pub const LEASE_TTL_SECS: u64 = 3600;
+pub(crate) const DEFAULT_SYSTEM_BRANCH: &'static str = "main";
+const INTERNAL_RETRIES: usize = 3;
+pub struct CliTag;
+impl CliTag {
+    pub const WORKTREE_OK: &'static str = "[WORKTREE_OK]";
+}
+fn compute() {
+    const LOCAL_BUF: usize = 64;
+}
+`;
+  const entities = extractConstantEntities(rustCode, 'crates/fg-core/src/constants/git.rs');
+  assert.ok(entities.length >= 5, 'Must extract Rust constants across pub/pub(crate)/const/impl');
+  const byName = new Map(entities.map((e) => [e.identity.name, e]));
+  assert.strictEqual(byName.get('LEASE_TTL_SECS')?.identity.isExported, true);
+  assert.strictEqual(byName.get('LEASE_TTL_SECS')?.fingerprint.inferredType, 'number');
+  assert.strictEqual(byName.get('DEFAULT_SYSTEM_BRANCH')?.identity.isExported, true);
+  assert.strictEqual(byName.get('WORKTREE_OK')?.identity.isExported, true);
+  assert.strictEqual(byName.get('LOCAL_BUF')?.identity.codeDomain, 'function_local');
+
+  // Constant Library recognition on Rust modules
+  assert.strictEqual(isAlreadyInConstantLibrary('crates/fg-core/src/constants/mod.rs'), true);
+  assert.strictEqual(isAlreadyInConstantLibrary('src/constants.rs'), true);
+  assert.strictEqual(isAlreadyInConstantLibrary('crates/fg-gate/src/commit_guard.rs'), false);
+
+  // Rule catalog SSOT validation and drift detection
+  assert.strictEqual(isRegisteredWorkspaceRule('FGT-GAT-001'), true);
+  assert.strictEqual(isRegisteredWorkspaceRule('GATE-MSG-001'), true);
+  assert.strictEqual(isRegisteredWorkspaceRule('L3-CONFLICT'), false);
+
+  const cleanText = 'Complies with FGT-GAT-001 and UTF-8 under SHA-256.';
+  assert.strictEqual(findUnregisteredRuleDrift(cleanText).length, 0);
+
+  const driftText = 'Encountered L3-CONFLICT and FAKE-RULE-999 during verify.';
+  const drifted = findUnregisteredRuleDrift(driftText);
+  assert.ok(drifted.includes('L3-CONFLICT'));
+  assert.ok(drifted.includes('FAKE-RULE-999'));
+
+  // Terminal status badge identification
+  assert.strictEqual(isTerminalStatusBadge('[WORKTREE_OK]'), true);
+  assert.strictEqual(isTerminalStatusBadge('[UAC_PROMOTION_STAGED]'), true);
+  assert.strictEqual(isTerminalStatusBadge('[plain]'), false);
+}
+console.log('  PASS: Rust constants, library topology, and rule drift guards verified.\n');
 
 console.log('=== All Constant Governance & Position Tracking Tests Passed! ===\n');

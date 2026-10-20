@@ -776,3 +776,29 @@ export const DEDUCTION_TAUTOLOGICAL_LOOP = 10;
 
 /** Analyzer identifier for token and payload density. */
 export const ANALYZER_TOKEN_DENSITY = 'token-density';
+
+/** Rule id for comment-only hollow files lacking semantic executable payload. */
+export const RULE_HYG_EMP_002 = 'HYG-EMP-002';
+/** Rule id for UTF-8 Byte Order Mark (BOM) byte prefix presence. */
+export const RULE_HYG_BOM_001 = 'HYG-BOM-001';
+/** Rule id for POSIX EOF newline contract missing or trailing blank buildup. */
+export const RULE_HYG_TRL_001 = 'HYG-TRL-001';
+/** Rule id for tab character indentation in non-tab language files. */
+export const RULE_HYG_IND_001 = 'HYG-IND-001';
+/** Rule id for uncontrolled transient, build residual, or system clutter files. */
+export const RULE_HYG_CLT_001 = 'HYG-CLT-001';
+/** Rule id for extension-to-directory classification violation or root script pollution. */
+export const RULE_EXT_DIR_001 = 'EXT-DIR-001';
+
+/** Points deducted for comment-only hollow files lacking AST semantic code. */
+export const DEDUCTION_COMMENT_HOLLOW_FILE = 10;
+/** Points deducted for UTF-8 BOM encoding corruption. */
+export const DEDUCTION_UTF8_BOM = 5;
+/** Points deducted for POSIX EOF newline violations or excess trailing blanks. */
+export const DEDUCTION_TRAILING_NEWLINE = 5;
+/** Points deducted for tab indentation mixing in space-indented languages. */
+export const DEDUCTION_TAB_INDENTATION = 5;
+/** Points deducted for uncontrolled clutter, log dumps, or transient files. */
+export const DEDUCTION_UNCONTROLLED_CLUTTER = 10;
+/** Points deducted for root script pollution or extension directory drift. */
+export const DEDUCTION_ROOT_SCRIPT_POLLUTION = 15;

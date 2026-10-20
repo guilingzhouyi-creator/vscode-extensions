@@ -4,14 +4,15 @@
  * Architecture Role: Single source of truth (SSOT) utility predicates for polyglot text scanning.
  * Dependencies & Triggers: Consumed across analyzers, intelligence rules, and reporting pipelines.
  * Responsibilities:
- *   1. Determine whether a trimmed or untrimmed source line represents a comment in polyglot sources.
+ *   1. Determine whether a trimmed or untrimmed source line represents a comment in sources.
  *   2. Normalize and strip enclosing quotation marks (single, double, or template backticks).
- * Exit Semantics & Design Rationale: Pure string functions with zero side effects and zero allocations
- *   on non-matching strings, avoiding redundant regex engines or ad-hoc duplicate logic.
+ * Exit Semantics & Design Rationale: Pure string functions with zero side effects and zero
+ *   allocations on non-matching strings, avoiding redundant regex engines or duplicated logic.
  */
 
 /**
- * Checks whether a line of source code starts with comment delimiters across C-family, Shell, and Python/GDScript.
+ * Checks whether a line of source code starts with comment delimiters across C-family, Shell,
+ * and Python/GDScript.
  *
  * @param line - Raw or trimmed line string.
  * @returns True if the line starts with //, /*, *, or #.

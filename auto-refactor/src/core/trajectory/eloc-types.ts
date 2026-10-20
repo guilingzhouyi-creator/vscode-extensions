@@ -172,11 +172,12 @@ export interface CompactTrajectoryRecord {
         res: number;
         reg: number;
     };
-    /** Composite gate verdict. */
+    /** Composite gate verdict. `code` is omitted when the gate passed. */
     gate: {
         pass: boolean;
-        code: string;
+        code?: string;
     };
+
 }
 
 /**

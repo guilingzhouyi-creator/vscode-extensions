@@ -410,7 +410,7 @@ async function runSelfAudit(options = {}) {
   const snapshot = createAuditSnapshot();
 
   // 2. Execute Full Production Scan over Engine Sources
-  const defaultWorkers = Math.max(1, Math.min(8, os.cpus().length || 4));
+  const defaultWorkers = Math.max(1, Math.min(16, os.cpus().length || 4));
   const scanReport = await scan({
     root: ROOT,
     include: ['src/**/*.ts', 'scripts/*.js'],

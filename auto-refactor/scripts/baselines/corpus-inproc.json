@@ -1,15 +1,15 @@
 {
   "filesScanned": 26,
-  "issuesTotal": 63,
+  "issuesTotal": 55,
   "byAnalyzer": {
     "large-file": 5,
-    "constants": 45,
+    "constants": 37,
     "no-console": 5,
     "complexity": 8
   },
   "bySeverity": {
     "info": 0,
-    "warning": 59,
+    "warning": 51,
     "error": 4
   },
   "issues": [
@@ -969,190 +969,6 @@
         "value": "'inner'",
         "length": 5,
         "suggestedName": "INNER_TEXT"
-      }
-    },
-    {
-      "id": "constants:hardcoded-string:src/unit_hardStr_0.ts:4",
-      "analyzer": "constants",
-      "rule": "hardcoded-string",
-      "severity": "warning",
-      "message": "Hardcoded string should be extracted into a named constant.",
-      "location": {
-        "file": "src/unit_hardStr_0.ts",
-        "start": {
-          "line": 4,
-          "column": 10
-        },
-        "end": {
-          "line": 4,
-          "column": 24
-        }
-      },
-      "detail": {
-        "value": "'hello world '",
-        "length": 12,
-        "suggestedName": "HELLOWORLD_TEXT"
-      }
-    },
-    {
-      "id": "constants:hardcoded-string:src/unit_hardStr_0.ts:7",
-      "analyzer": "constants",
-      "rule": "hardcoded-string",
-      "severity": "warning",
-      "message": "Hardcoded string should be extracted into a named constant.",
-      "location": {
-        "file": "src/unit_hardStr_0.ts",
-        "start": {
-          "line": 7,
-          "column": 10
-        },
-        "end": {
-          "line": 7,
-          "column": 23
-        }
-      },
-      "detail": {
-        "value": "'hello world'",
-        "length": 11,
-        "suggestedName": "HELLOWORLD_TEXT"
-      }
-    },
-    {
-      "id": "constants:hardcoded-string:src/unit_hardStr_1.ts:4",
-      "analyzer": "constants",
-      "rule": "hardcoded-string",
-      "severity": "warning",
-      "message": "Hardcoded string should be extracted into a named constant.",
-      "location": {
-        "file": "src/unit_hardStr_1.ts",
-        "start": {
-          "line": 4,
-          "column": 10
-        },
-        "end": {
-          "line": 4,
-          "column": 24
-        }
-      },
-      "detail": {
-        "value": "'hello world '",
-        "length": 12,
-        "suggestedName": "HELLOWORLD_TEXT"
-      }
-    },
-    {
-      "id": "constants:hardcoded-string:src/unit_hardStr_1.ts:7",
-      "analyzer": "constants",
-      "rule": "hardcoded-string",
-      "severity": "warning",
-      "message": "Hardcoded string should be extracted into a named constant.",
-      "location": {
-        "file": "src/unit_hardStr_1.ts",
-        "start": {
-          "line": 7,
-          "column": 10
-        },
-        "end": {
-          "line": 7,
-          "column": 23
-        }
-      },
-      "detail": {
-        "value": "'hello world'",
-        "length": 11,
-        "suggestedName": "HELLOWORLD_TEXT"
-      }
-    },
-    {
-      "id": "constants:hardcoded-string:src/unit_hardStr_2.ts:4",
-      "analyzer": "constants",
-      "rule": "hardcoded-string",
-      "severity": "warning",
-      "message": "Hardcoded string should be extracted into a named constant.",
-      "location": {
-        "file": "src/unit_hardStr_2.ts",
-        "start": {
-          "line": 4,
-          "column": 10
-        },
-        "end": {
-          "line": 4,
-          "column": 24
-        }
-      },
-      "detail": {
-        "value": "'hello world '",
-        "length": 12,
-        "suggestedName": "HELLOWORLD_TEXT"
-      }
-    },
-    {
-      "id": "constants:hardcoded-string:src/unit_hardStr_2.ts:7",
-      "analyzer": "constants",
-      "rule": "hardcoded-string",
-      "severity": "warning",
-      "message": "Hardcoded string should be extracted into a named constant.",
-      "location": {
-        "file": "src/unit_hardStr_2.ts",
-        "start": {
-          "line": 7,
-          "column": 10
-        },
-        "end": {
-          "line": 7,
-          "column": 23
-        }
-      },
-      "detail": {
-        "value": "'hello world'",
-        "length": 11,
-        "suggestedName": "HELLOWORLD_TEXT"
-      }
-    },
-    {
-      "id": "constants:hardcoded-string:src/unit_hardStr_3.ts:4",
-      "analyzer": "constants",
-      "rule": "hardcoded-string",
-      "severity": "warning",
-      "message": "Hardcoded string should be extracted into a named constant.",
-      "location": {
-        "file": "src/unit_hardStr_3.ts",
-        "start": {
-          "line": 4,
-          "column": 10
-        },
-        "end": {
-          "line": 4,
-          "column": 24
-        }
-      },
-      "detail": {
-        "value": "'hello world '",
-        "length": 12,
-        "suggestedName": "HELLOWORLD_TEXT"
-      }
-    },
-    {
-      "id": "constants:hardcoded-string:src/unit_hardStr_3.ts:7",
-      "analyzer": "constants",
-      "rule": "hardcoded-string",
-      "severity": "warning",
-      "message": "Hardcoded string should be extracted into a named constant.",
-      "location": {
-        "file": "src/unit_hardStr_3.ts",
-        "start": {
-          "line": 7,
-          "column": 10
-        },
-        "end": {
-          "line": 7,
-          "column": 23
-        }
-      },
-      "detail": {
-        "value": "'hello world'",
-        "length": 11,
-        "suggestedName": "HELLOWORLD_TEXT"
       }
     },
     {

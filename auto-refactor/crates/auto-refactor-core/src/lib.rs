@@ -18,13 +18,13 @@ pub struct NativeDiffHunk {
 }
 
 impl From<ops_diff::DiffHunk> for NativeDiffHunk {
-    fn from(h: ops_diff::DiffHunk) -> Self {
+    fn from(hunk: ops_diff::DiffHunk) -> Self {
         Self {
-            old_start: h.old_start,
-            old_lines: h.old_lines,
-            new_start: h.new_start,
-            new_lines: h.new_lines,
-            lines: h.lines,
+            old_start: hunk.old_start,
+            old_lines: hunk.old_lines,
+            new_start: hunk.new_start,
+            new_lines: hunk.new_lines,
+            lines: hunk.lines,
         }
     }
 }
@@ -38,12 +38,12 @@ pub struct NativeGraphAnalysis {
 }
 
 impl From<ops_graph::GraphAnalysis> for NativeGraphAnalysis {
-    fn from(g: ops_graph::GraphAnalysis) -> Self {
+    fn from(analysis: ops_graph::GraphAnalysis) -> Self {
         Self {
-            cycles: g.cycles,
-            topological_order: g.topological_order,
-            strongly_connected_components: g.strongly_connected_components,
-            is_acyclic: g.is_acyclic,
+            cycles: analysis.cycles,
+            topological_order: analysis.topological_order,
+            strongly_connected_components: analysis.strongly_connected_components,
+            is_acyclic: analysis.is_acyclic,
         }
     }
 }
@@ -57,12 +57,12 @@ pub struct NativePatternMatch {
 }
 
 impl From<ops_pattern::PatternMatch> for NativePatternMatch {
-    fn from(p: ops_pattern::PatternMatch) -> Self {
+    fn from(matched: ops_pattern::PatternMatch) -> Self {
         Self {
-            pattern: p.pattern,
-            line: p.line,
-            column: p.column,
-            match_text: p.match_text,
+            pattern: matched.pattern,
+            line: matched.line,
+            column: matched.column,
+            match_text: matched.match_text,
         }
     }
 }
@@ -86,28 +86,32 @@ pub struct NativeMaskedSource {
 }
 
 impl From<NativeMaskConfig> for ops_mask::MaskConfig {
-    fn from(c: NativeMaskConfig) -> Self {
-        let block_comment = match (c.block_comment_open, c.block_comment_close) {
-            (Some(o), Some(cl)) if !o.is_empty() && !cl.is_empty() => Some((o, cl)),
+    fn from(config: NativeMaskConfig) -> Self {
+        let block_comment = match (config.block_comment_open, config.block_comment_close) {
+            (Some(open_delim), Some(close_delim))
+                if !open_delim.is_empty() && !close_delim.is_empty() =>
+            {
+                Some((open_delim, close_delim))
+            }
             _ => None,
         };
         Self {
-            line_comment: c.line_comment,
+            line_comment: config.line_comment,
             block_comment,
-            quote_chars: c.quote_chars,
-            multiline_templates: c.multiline_templates.unwrap_or(false),
-            regex_literals: c.regex_literals.unwrap_or(false),
+            quote_chars: config.quote_chars,
+            multiline_templates: config.multiline_templates.unwrap_or(false),
+            regex_literals: config.regex_literals.unwrap_or(false),
         }
     }
 }
 
 impl From<ops_mask::MaskResult> for NativeMaskedSource {
-    fn from(r: ops_mask::MaskResult) -> Self {
+    fn from(result: ops_mask::MaskResult) -> Self {
         Self {
-            raw: r.raw,
-            masked: r.masked,
-            lines: r.lines,
-            non_blank_lines: r.non_blank_lines,
+            raw: result.raw,
+            masked: result.masked,
+            lines: result.lines,
+            non_blank_lines: result.non_blank_lines,
         }
     }
 }
@@ -147,11 +151,11 @@ pub struct NativeCloneBlock {
 }
 
 impl From<ops_clone::CloneBlock> for NativeCloneBlock {
-    fn from(b: ops_clone::CloneBlock) -> Self {
+    fn from(block: ops_clone::CloneBlock) -> Self {
         Self {
-            start_line: b.start_line,
-            original_line: b.original_line,
-            line_span: b.line_span,
+            start_line: block.start_line,
+            original_line: block.original_line,
+            line_span: block.line_span,
         }
     }
 }
@@ -164,11 +168,11 @@ pub struct NativeClonePair {
 }
 
 impl From<ops_clone::ClonePair> for NativeClonePair {
-    fn from(p: ops_clone::ClonePair) -> Self {
+    fn from(pair: ops_clone::ClonePair) -> Self {
         Self {
-            file_a: p.file_a,
-            file_b: p.file_b,
-            similarity: p.similarity,
+            file_a: pair.file_a,
+            file_b: pair.file_b,
+            similarity: pair.similarity,
         }
     }
 }
@@ -188,8 +192,8 @@ pub fn detect_clone_blocks(content: String, min_clone_lines: u32) -> Vec<NativeC
 
 #[napi(js_name = "computeMinHash")]
 pub fn compute_minhash(content: String, num_perm: Option<u32>) -> Vec<u32> {
-    let k = num_perm.unwrap_or(64) as usize;
-    ops_clone::compute_minhash(&content, k)
+    let num_permutations = num_perm.unwrap_or(64) as usize;
+    ops_clone::compute_minhash(&content, num_permutations)
 }
 
 #[napi]
@@ -211,14 +215,18 @@ pub struct NativeDominatorTreeResult {
 }
 
 impl From<ops_graph::DominatorTreeResult> for NativeDominatorTreeResult {
-    fn from(r: ops_graph::DominatorTreeResult) -> Self {
+    fn from(result: ops_graph::DominatorTreeResult) -> Self {
         Self {
-            entry: r.entry,
-            reachable_nodes: r.reachable_nodes,
-            idom: r.idom,
-            dominance_frontiers: r.dominance_frontiers,
-            loop_headers: r.loop_headers,
-            back_edges: r.back_edges.into_iter().map(|(u, v)| vec![u, v]).collect(),
+            entry: result.entry,
+            reachable_nodes: result.reachable_nodes,
+            idom: result.idom,
+            dominance_frontiers: result.dominance_frontiers,
+            loop_headers: result.loop_headers,
+            back_edges: result
+                .back_edges
+                .into_iter()
+                .map(|(src_node, dst_node)| vec![src_node, dst_node])
+                .collect(),
         }
     }
 }
@@ -231,11 +239,11 @@ pub struct NativeDataflowResult {
 }
 
 impl From<ops_graph::DataflowResult> for NativeDataflowResult {
-    fn from(r: ops_graph::DataflowResult) -> Self {
+    fn from(result: ops_graph::DataflowResult) -> Self {
         Self {
-            in_sets: r.in_sets,
-            out_sets: r.out_sets,
-            iterations: r.iterations as u32,
+            in_sets: result.in_sets,
+            out_sets: result.out_sets,
+            iterations: result.iterations as u32,
         }
     }
 }
@@ -279,9 +287,9 @@ pub fn compute_simhash_64(tokens: Vec<String>) -> String {
 
 #[napi(js_name = "calculateSimHashHammingSimilarity")]
 pub fn calculate_simhash_hamming_similarity(hash_a: String, hash_b: String) -> f64 {
-    let a = ops_clone::parse_u64_fingerprint(&hash_a);
-    let b = ops_clone::parse_u64_fingerprint(&hash_b);
-    ops_clone::calculate_simhash_hamming_similarity(a, b)
+    let fingerprint_a = ops_clone::parse_u64_fingerprint(&hash_a);
+    let fingerprint_b = ops_clone::parse_u64_fingerprint(&hash_b);
+    ops_clone::calculate_simhash_hamming_similarity(fingerprint_a, fingerprint_b)
 }
 
 #[napi(js_name = "calculateTrigramCosineSimilarity")]
@@ -300,14 +308,14 @@ pub struct NativeTemporalCouplingPair {
 }
 
 impl From<ops_clone::TemporalCouplingPair> for NativeTemporalCouplingPair {
-    fn from(p: ops_clone::TemporalCouplingPair) -> Self {
+    fn from(pair: ops_clone::TemporalCouplingPair) -> Self {
         Self {
-            file_a: p.file_a,
-            file_b: p.file_b,
-            shared_commits: p.shared_commits,
-            commits_a: p.commits_a,
-            commits_b: p.commits_b,
-            jaccard_similarity: p.jaccard_similarity,
+            file_a: pair.file_a,
+            file_b: pair.file_b,
+            shared_commits: pair.shared_commits,
+            commits_a: pair.commits_a,
+            commits_b: pair.commits_b,
+            jaccard_similarity: pair.jaccard_similarity,
         }
     }
 }
@@ -334,13 +342,13 @@ pub struct NativeBumpyRoadResult {
 }
 
 impl From<ops_pattern::BumpyRoadResult> for NativeBumpyRoadResult {
-    fn from(r: ops_pattern::BumpyRoadResult) -> Self {
+    fn from(result: ops_pattern::BumpyRoadResult) -> Self {
         Self {
-            bumpy_score: r.bumpy_score,
-            is_bumpy: r.is_bumpy,
-            mean_depth: r.mean_depth,
-            variance_depth: r.variance_depth,
-            spikes_count: r.spikes_count,
+            bumpy_score: result.bumpy_score,
+            is_bumpy: result.is_bumpy,
+            mean_depth: result.mean_depth,
+            variance_depth: result.variance_depth,
+            spikes_count: result.spikes_count,
         }
     }
 }

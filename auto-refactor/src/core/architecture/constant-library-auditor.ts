@@ -74,10 +74,11 @@ const CONSTANT_MODULE_MAPPINGS: readonly PrefixModuleMapping[] = Object.freeze([
 ]);
 
 /** Directory segment markers identifying an existing constant library structure. */
-const CONSTANT_LIB_DIR_PATTERN = /\/(?:constants|tokens|dictionary|dictionaries)\//;
+const CONSTANT_LIB_DIR_PATTERN = /(?:^|\/)(?:constants|tokens|dictionary|dictionaries)(?:\/|$)/;
 
-/** File suffix patterns identifying an existing constant library module. */
-const CONSTANT_LIB_FILE_PATTERN = /(?:constants|tokens|dictionary)\.[tj]s$/;
+/** File suffix patterns identifying an existing constant library module across TS, Rust, Python, GDScript. */
+const CONSTANT_LIB_FILE_PATTERN =
+    /(?:constants|tokens|dictionary)(?:[\\/](?:mod|[a-z0-9_-]+))?\.(?:[tj]s|rs|py|gd)$/i;
 
 function matchesAnyPrefix(target: string, prefixes: readonly string[]): boolean {
     for (const prefix of prefixes) {

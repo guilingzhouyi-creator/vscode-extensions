@@ -8,7 +8,7 @@
  *     `node scripts/bench-fastpath.js [--check] [--oxc] [--iters=N]
  *     [--corpus=light|heavy]`
  *     on a built dist; reads testdata/fixtures, spawns worker scans, and generates
- *     1001-file corpora under C:/tmp/ar-fp-bench.
+ *     1001-file corpora under a temporary benchmark directory.
  * Responsibilities: In --check mode compare normalized issue+fileMetric output of
  *     AR_FASTPATH=0/1 scans under the ModeA and ModeB configs for the ts or oxc parser;
  *     otherwise build the light/heavy corpora, report strictly interleaved workers=4 wall
@@ -19,6 +19,7 @@
  */
 
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 
@@ -26,7 +27,7 @@ const ROOT = path.join(__dirname, '..');
 process.env.NODE_PATH = path.join(ROOT, 'node_modules');
 require('module').Module._initPaths();
 
-const BENCH_ROOT = 'C:/tmp/ar-fp-bench';
+const BENCH_ROOT = path.join(os.tmpdir(), 'ar-fp-bench');
 const LIGHT = path.join(BENCH_ROOT, 'light');
 const HEAVY = path.join(BENCH_ROOT, 'heavy');
 
@@ -119,7 +120,7 @@ async function scanOnce(scan, root, configFile, fast) {
 }
 
 // ---------------------------------------------------------------------------
-// default: dual-corpus w4 A/B benchmark
+// default: dual-corpus multi-worker A/B benchmark
 // ---------------------------------------------------------------------------
 
 function writeBenchConfig(dir) {
@@ -210,7 +211,7 @@ function buildCorpus(dir, gen, count) {
     fs.rmSync(dir, { recursive: true, force: true });
   } catch {
     try {
-      fs.renameSync(dir, path.join('C:/tmp', `ar-stale-${path.basename(dir)}-${Date.now()}`));
+      fs.renameSync(dir, path.join(os.tmpdir(), `ar-stale-${path.basename(dir)}-${Date.now()}`));
     } catch {
       /* ignore */
     }

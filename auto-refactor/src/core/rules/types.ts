@@ -71,7 +71,11 @@ export type RuleFamily =
     | 'UI'
     | 'PROD'
     | 'ENG'
-    | 'CST';
+    | 'CST'
+    | 'EXT';
+
+/** Canonical rule-family prefix for file extension and directory classification rules. */
+export const RULE_FAMILY_EXTENSION = 'EXT';
 
 /** Canonical rule-family prefix for forward evolution and modernization governance rules. */
 export const RULE_FAMILY_MODERNITY = 'MOD';

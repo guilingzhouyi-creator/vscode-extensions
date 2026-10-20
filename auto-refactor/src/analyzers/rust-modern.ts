@@ -30,6 +30,7 @@ import {
     type LineScanContext,
 } from './declarative-modern-pack';
 
+
 /** Extension the pack accepts; the content-only path sees every language. */
 const SOURCE_EXTENSION = '.rs';
 
@@ -281,6 +282,30 @@ function resolveAsyncFnScope(
     return bodyStart !== -1 ? { bodyStart, bodyEnd: lines.length - 1 } : null;
 }
 
+const RUST_TEST_FILE_RE = /(?:[\\/]tests[\\/]|[\\/]test_[^\\/]+\.rs$|_test\.rs$)/i;
+const RUST_TEST_ATTR_RE = /#\[.*(?:test|cfg\(test\)).*\]/;
+
+/**
+ * Determine whether the line is located inside a test file or a `#[test]` / `#[cfg(test)]` block.
+ */
+function isTestScopeOrFile(ctx: LineScanContext): boolean {
+    if (RUST_TEST_FILE_RE.test(ctx.file)) {
+        return true;
+    }
+    let depth = 0;
+    for (let i = ctx.lineIndex; i >= 0; i -= 1) {
+        const line = ctx.allRawLines[i];
+        for (let c = line.length - 1; c >= 0; c -= 1) {
+            if (line[c] === '}') depth += 1;
+            else if (line[c] === '{' && depth > 0) depth -= 1;
+        }
+        if (RUST_TEST_ATTR_RE.test(line)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 /** Declarative rule for synchronous lock guard held across await point. */
 const RULE_LOCK_AWAIT: DeclarativeLineRule = Object.freeze({
     rule: 'RSM-LOCK-001',
@@ -404,6 +429,7 @@ export class RustModernAnalyzer implements Analyzer {
                 rule: 'RSM-UNWRAP-001',
                 severity: SEVERITY_INFO,
                 pattern: UNWRAP_RE,
+                condition: (ctx) => !isTestScopeOrFile(ctx),
                 message:
                     '`.unwrap()` panics on `None`/`Err` and hides the failure from the caller.',
                 suggestion:
@@ -418,6 +444,7 @@ export class RustModernAnalyzer implements Analyzer {
                 rule: 'RSM-CAST-001',
                 severity: SEVERITY_INFO,
                 pattern: NUMERIC_CAST_RE,
+                condition: (ctx) => !isTestScopeOrFile(ctx),
                 message: 'Naked `as` numeric cast can silently truncate or wrap on overflow.',
                 suggestion:
                     'Use `TryFrom`/`try_into()` for fallible casts, or `From`/`from()` for lossless conversions.',

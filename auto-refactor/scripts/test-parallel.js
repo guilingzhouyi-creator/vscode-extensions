@@ -23,7 +23,7 @@ const ROOT = path.join(__dirname, '..');
 
 // ── CLI Arguments ──
 const rawArgs = process.argv.slice(2);
-let concurrency = Math.min(12, Math.max(2, os.cpus().length || 4));
+let concurrency = Math.min(16, Math.max(2, os.cpus().length || 4));
 let bail = false;
 let skipUnit = false;
 let filter = '';
@@ -598,6 +598,55 @@ async function runSelfAuditLane(bail, passed, failed) {
   );
 }
 
+async function runFilteredSuites(parallelList, sequentialList, vitestPromise, passed, failed) {
+  if (parallelList.length > 0) {
+    console.log(`--- [Parallel Filtered] Executing ${parallelList.length} Suites ---`);
+    await runAsyncPool(parallelList, concurrency, async (suite) => {
+      const res = await executeSuite(suite);
+      recordResult(suite, res, passed, failed);
+      return res;
+    });
+  }
+  const unitResult = await vitestPromise;
+  if (unitResult) {
+    recordResult({ name: 'vitest-unit', script: 'vitest run' }, unitResult, passed, failed);
+  }
+  if (sequentialList.length > 0 && (!bail || failed.length === 0)) {
+    console.log(`--- [Serial Filtered] Executing ${sequentialList.length} Stateful Suites ---`);
+    await runSequentialSuites(sequentialList, bail, passed, failed);
+  }
+}
+
+async function runFourLaneConcurrentPipeline(parallelList, vitestPromise, passed, failed) {
+  console.log(`--- [Four-Way Fully Pipelined Concurrent Test Execution] ---`);
+  console.log(`    Lane 1: Isolated Worker Pool (${parallelList.length} suites, ${concurrency} workers)`);
+  console.log(`    Lane 2: Stateful Daemon & Corpus Suites (${DAEMON_SUITES.length} suites)`);
+  console.log(`    Lane 3: Self-Audit & Baseline Radar Suites (${SELF_AUDIT_SUITES.length} suites)`);
+  console.log(`    Lane 4: Vitest In-Memory Unit Suites\n`);
+
+  parallelList.sort((a, b) => {
+    const aPri = HIGH_LATENCY_SUITES_PRIORITY.has(a.name) ? 0 : 1;
+    const bPri = HIGH_LATENCY_SUITES_PRIORITY.has(b.name) ? 0 : 1;
+    return aPri - bPri;
+  });
+
+  const parallelPromise = runAsyncPool(parallelList, concurrency, async (suite) => {
+    const res = await executeSuite(suite);
+    recordResult(suite, res, passed, failed);
+    return res;
+  });
+
+  const daemonPromise = runSequentialSuites(DAEMON_SUITES, bail, passed, failed);
+  const selfAuditPromise = runSelfAuditLane(bail, passed, failed);
+  const unitPromise = vitestPromise.then((unitResult) => {
+    if (unitResult) {
+      recordResult({ name: 'vitest-unit', script: 'vitest run' }, unitResult, passed, failed);
+    }
+  });
+
+  await Promise.all([parallelPromise, daemonPromise, selfAuditPromise, unitPromise]);
+}
+
 // ── Main Runner ──
 async function main() {
   const overallStart = Date.now();
@@ -619,59 +668,13 @@ async function main() {
   const passed = [];
   const failed = [];
 
-  // Launch vitest unit tests in parallel with the isolated scripts pool.
-  // Vitest unit assertions only touch tests/unit and in-memory compiled code,
-  // creating zero disk/daemon collision with scripts/validate-*.js.
   const shouldRunUnit = !skipUnit && (!filter || filter.includes('unit') || filter.includes('vitest'));
   const vitestPromise = shouldRunUnit ? runVitestUnit(false) : Promise.resolve(null);
 
   if (filter) {
-    if (parallelList.length > 0) {
-      console.log(`--- [Parallel Filtered] Executing ${parallelList.length} Suites ---`);
-      await runAsyncPool(parallelList, concurrency, async (suite) => {
-        const res = await executeSuite(suite);
-        recordResult(suite, res, passed, failed);
-        return res;
-      });
-    }
-    const unitResult = await vitestPromise;
-    if (unitResult) {
-      recordResult({ name: 'vitest-unit', script: 'vitest run' }, unitResult, passed, failed);
-    }
-    if (sequentialList.length > 0 && (!bail || failed.length === 0)) {
-      console.log(`--- [Serial Filtered] Executing ${sequentialList.length} Stateful Suites ---`);
-      await runSequentialSuites(sequentialList, bail, passed, failed);
-    }
+    await runFilteredSuites(parallelList, sequentialList, vitestPromise, passed, failed);
   } else {
-    // 4 Disjoint Lanes Operating Concurrently with zero state collision
-    console.log(`--- [Four-Way Fully Pipelined Concurrent Test Execution] ---`);
-    console.log(`    Lane 1: Isolated Worker Pool (${parallelList.length} suites, ${concurrency} workers)`);
-    console.log(`    Lane 2: Stateful Daemon & Corpus Suites (${DAEMON_SUITES.length} suites)`);
-    console.log(`    Lane 3: Self-Audit & Baseline Radar Suites (${SELF_AUDIT_SUITES.length} suites)`);
-    console.log(`    Lane 4: Vitest In-Memory Unit Suites\n`);
-
-    // Prioritize high-latency suites first (LPT scheduling) so heavy jobs start immediately
-    parallelList.sort((a, b) => {
-      const aPri = HIGH_LATENCY_SUITES_PRIORITY.has(a.name) ? 0 : 1;
-      const bPri = HIGH_LATENCY_SUITES_PRIORITY.has(b.name) ? 0 : 1;
-      return aPri - bPri;
-    });
-
-    const parallelPromise = runAsyncPool(parallelList, concurrency, async (suite) => {
-      const res = await executeSuite(suite);
-      recordResult(suite, res, passed, failed);
-      return res;
-    });
-
-    const daemonPromise = runSequentialSuites(DAEMON_SUITES, bail, passed, failed);
-    const selfAuditPromise = runSelfAuditLane(bail, passed, failed);
-    const unitPromise = vitestPromise.then((unitResult) => {
-      if (unitResult) {
-        recordResult({ name: 'vitest-unit', script: 'vitest run' }, unitResult, passed, failed);
-      }
-    });
-
-    await Promise.all([parallelPromise, daemonPromise, selfAuditPromise, unitPromise]);
+    await runFourLaneConcurrentPipeline(parallelList, vitestPromise, passed, failed);
   }
 
   const totalTime = ((Date.now() - overallStart) / 1000).toFixed(2);

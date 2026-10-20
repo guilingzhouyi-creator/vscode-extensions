@@ -4,7 +4,7 @@
  * File Path: scripts/validate-warm.js
  * Architecture Role: End-to-end regression gate comparing the warm path (daemon + two-level
  *                     cache via scanWarm) with the fresh path (scan, no daemon, no cache)
- *                     across scenarios W1-W9; documented in docs/01-architecture/
+ *                     across canonical cache-equivalence scenarios; documented in docs/01-architecture/
  *                     02-pipeline-and-caching.md Part D.
  * Dependencies & Triggers: Run manually via `node scripts/validate-warm.js` or from CI after
  *                     `npm run build`; imports scan/scanWarm from ../dist/api plus
@@ -150,7 +150,7 @@ module.exports = { compute };
   w('.gitignore', 'ignored/\n');
 }
 
-// Built-ins-only config (W1-W6/W8). W5 overwrites thresholds; W7 adds the custom analyzer.
+// Base configuration for standard warm-cache scenarios. Overrides are passed per test scenario.
 function baseConfig(overrides = {}) {
   return {
     $schema: './config.schema.json',
@@ -406,30 +406,57 @@ async function main() {
       ...opts,
     });
 
-  // ---- W1: cold-start empty cache (warm-1st: daemon cold pool + empty cache) ----
-  // ---- W1: cold-start empty cache (warm-1st: daemon cold pool + empty cache) ----
+  // ---- Scenario: rust corpus (rust cache-key path, runs concurrently with core scenarios) ----
+  const rustPromise = (async () => {
+    const [f, w] = await Promise.all([
+      scan({
+        root: RUST_CORPUS,
+        configFile: RUST_CFG,
+        format: 'json',
+        logLevel: 'silent',
+      }),
+      scanWarm({
+        root: RUST_CORPUS,
+        configFile: RUST_CFG,
+        format: 'json',
+        logLevel: 'silent',
+        daemon: 'on',
+        cache: true,
+        cacheDir: CACHE_DIR_RUST,
+      }),
+    ]);
+    const eq = JSON.stringify(normalize(f)) === JSON.stringify(normalize(w.report));
+    check(
+      'scenario-rust-corpus',
+      eq && w.stats.daemonUsed === true,
+      `cacheHit=${w.stats.cacheHit} analyzed=${w.stats.analyzed}`,
+    );
+    daemonStop(RUST_CORPUS);
+  })();
+
+  // ---- Scenario: cold-start empty cache (warm-1st: daemon cold pool + empty cache) ----
   {
     const [f, w] = await Promise.all([freshScan(), warmScan()]);
     const eq = JSON.stringify(normalize(f)) === JSON.stringify(normalize(w.report));
     check(
-      'W1 cold-start-empty-cache',
+      'scenario-cold-start-empty-cache',
       eq && w.stats.daemonUsed === true,
       `warm analyzed=${w.stats.analyzed} daemonUsed=${w.stats.daemonUsed}`,
     );
   }
 
-  // ---- W2: immediate rescan (warm-2nd: hot pool + hot cache, all cached) ----
+  // ---- Scenario: immediate rescan (warm-2nd: hot pool + hot cache, all cached) ----
   {
     const [f, w] = await Promise.all([freshScan(), warmScan()]);
     const eq = JSON.stringify(normalize(f)) === JSON.stringify(normalize(w.report));
     check(
-      'W2 immediate-rescan',
+      'scenario-immediate-rescan',
       eq && w.stats.daemonUsed === true && w.stats.cacheHit > 0,
       `cacheHit=${w.stats.cacheHit}/${w.stats.cacheTotal} analyzed=${w.stats.analyzed}`,
     );
   }
 
-  // ---- W3: partial change (modify 3 files) ----
+  // ---- Scenario: partial change (modify 3 files) ----
   {
     const mod = [
       [
@@ -449,14 +476,14 @@ async function main() {
     const [f, w] = await Promise.all([freshScan(), warmScan()]);
     const eq = JSON.stringify(normalize(f)) === JSON.stringify(normalize(w.report));
     check(
-      'W3 partial-change',
+      'scenario-partial-change',
       eq && w.stats.daemonUsed === true,
       `cacheHit=${w.stats.cacheHit} analyzed=${w.stats.analyzed}`,
     );
-    writeCorpus(); // restore original content for W4+
+    writeCorpus(); // restore original content for subsequent scenarios
   }
 
-  // ---- W4: touch without content change (L1 miss -> L2 hit fallback) ----
+  // ---- Scenario: touch without content change (L1 miss -> L2 hit fallback) ----
   {
     const files = fs.readdirSync(path.join(CORPUS, 'src')).map((n) => path.join(CORPUS, 'src', n));
     const now = new Date();
@@ -464,13 +491,13 @@ async function main() {
     const [f, w] = await Promise.all([freshScan(), warmScan()]);
     const eq = JSON.stringify(normalize(f)) === JSON.stringify(normalize(w.report));
     check(
-      'W4 touch-no-content-change',
+      'scenario-touch-no-content-change',
       eq && w.stats.daemonUsed === true,
       `cacheHit=${w.stats.cacheHit} analyzed=${w.stats.analyzed}`,
     );
   }
 
-  // ---- W5: config change (new thresholds → fpHash changes → full invalidation) ----
+  // ---- Scenario: config change (new thresholds → fpHash changes → full invalidation) ----
   {
     writeConfig({
       thresholds: {
@@ -487,25 +514,25 @@ async function main() {
     const [f, w] = await Promise.all([freshScan(), warmScan()]);
     const eq = JSON.stringify(normalize(f)) === JSON.stringify(normalize(w.report));
     check(
-      'W5 config-change',
+      'scenario-config-change',
       eq && w.stats.daemonUsed === true,
       `cacheHit=${w.stats.cacheHit} analyzed=${w.stats.analyzed}`,
     );
     writeConfig(); // restore
   }
 
-  // ---- W6: parser switch (oxc — cache key distinguishes parser) ----
+  // ---- Scenario: parser switch (oxc — cache key distinguishes parser) ----
   {
     const [f, w] = await Promise.all([freshScan({ parser: 'oxc' }), warmScan({ parser: 'oxc' })]);
     const eq = JSON.stringify(normalize(f)) === JSON.stringify(normalize(w.report));
     check(
-      'W6 parser-switch-oxc',
+      'scenario-parser-switch-oxc',
       eq && w.stats.daemonUsed === true,
       `cacheHit=${w.stats.cacheHit} analyzed=${w.stats.analyzed}`,
     );
   }
 
-  // ---- W7: customAnalyzer (L2 disabled by default; output still byte-equal) ----
+  // ---- Scenario: custom analyzer (L2 disabled by default; output still byte-equal) ----
   {
     writeConfig({
       analyzers: {
@@ -528,14 +555,14 @@ async function main() {
     const [f, w] = await Promise.all([freshScan(), warmScan()]);
     const eq = JSON.stringify(normalize(f)) === JSON.stringify(normalize(w.report));
     check(
-      'W7 custom-analyzer-l2-disabled',
+      'scenario-custom-analyzer-l2-disabled',
       eq && w.stats.daemonUsed === true,
       `cacheHit=${w.stats.cacheHit} analyzed=${w.stats.analyzed}`,
     );
     writeConfig(); // restore
   }
 
-  // ---- W8: daemon crash → warm degrades to cold (daemon:'auto' never auto-starts) ----
+  // ---- Scenario: daemon crash → warm degrades to cold (daemon:'auto' never auto-starts) ----
   {
     daemonStop(CORPUS);
     const [f, w] = await Promise.all([
@@ -552,41 +579,16 @@ async function main() {
     ]);
     const eq = JSON.stringify(normalize(f)) === JSON.stringify(normalize(w.report));
     check(
-      'W8 daemon-crash-degrade',
+      'scenario-daemon-crash-degrade',
       eq && w.stats.daemonUsed === false,
       `daemonUsed=${w.stats.daemonUsed} cacheHit=${w.stats.cacheHit} analyzed=${w.stats.analyzed}`,
     );
   }
 
-  // ---- W9: rust corpus (rust cache-key path) ----
-  {
-    const [f, w] = await Promise.all([
-      scan({
-        root: RUST_CORPUS,
-        configFile: RUST_CFG,
-        format: 'json',
-        logLevel: 'silent',
-      }),
-      scanWarm({
-        root: RUST_CORPUS,
-        configFile: RUST_CFG,
-        format: 'json',
-        logLevel: 'silent',
-        daemon: 'on',
-        cache: true,
-        cacheDir: CACHE_DIR_RUST,
-      }),
-    ]);
-    const eq = JSON.stringify(normalize(f)) === JSON.stringify(normalize(w.report));
-    check(
-      'W9 rust-corpus',
-      eq && w.stats.daemonUsed === true,
-      `cacheHit=${w.stats.cacheHit} analyzed=${w.stats.analyzed}`,
-    );
-  }
+  // Await background Rust corpus scenario
+  await rustPromise;
 
   daemonStop(CORPUS);
-  daemonStop(RUST_CORPUS);
 
   console.log(failed ? `\n${failed} scenario(s) FAILED` : '\nALL WARM SCENARIOS PASS');
   process.exit(failed ? 1 : 0);

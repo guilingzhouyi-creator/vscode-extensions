@@ -1,10 +1,10 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1792383923384",
-  "timestamp": "2026-10-19T04:25:30.417Z",
-  "cai": 84.96,
+  "snapshotId": "snapshot-v0.4.0-1792460073319",
+  "timestamp": "2026-10-20T01:34:42.449Z",
+  "cai": 85.86,
   "polyglotGeneralization": {
-    "index": 94.23,
-    "meanScore": 94.23,
+    "index": 94.17,
+    "meanScore": 94.17,
     "dispersionPenalty": 1,
     "standardDeviation": 0,
     "languageCount": 1
@@ -16,52 +16,52 @@
     "languageAdapterVersion": "adapters-v1.0",
     "scoringVersion": "scoring-v1.0"
   },
-  "rulesDigest": "6243e6a988974c1192d94860e4ad307d1c45b0d811395e845b0f478a3a9ab22e",
+  "rulesDigest": "81c8f426b1bfaf07e985f084d02df0e95b03a92583b0666fe2bb64d5cc0db612",
   "configDigest": "04a1b8446ff3624c6496a9e8c9b405b03d47eda22fb414a869442bfb51978d19",
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
-    "filesScanned": 673,
-    "durationMs": 4428
+    "filesScanned": 677,
+    "durationMs": 5117
   },
   "metrics": {
-    "compositeScore": 98.76,
+    "compositeScore": 98.72,
     "grade": "A+",
-    "autonomyRate": 84.96,
+    "autonomyRate": 85.86,
     "polyglotGeneralization": {
-      "index": 94.23,
-      "meanScore": 94.23,
+      "index": 94.17,
+      "meanScore": 94.17,
       "dispersionPenalty": 1,
       "standardDeviation": 0,
       "languageCount": 1
     },
     "effectiveCodeDensity": 0.95,
-    "totalIssues": 6964,
+    "totalIssues": 7076,
     "suppressedIssues": 140,
-    "unsuppressedIssues": 6824,
+    "unsuppressedIssues": 6936,
     "bySeverity": {
-      "info": 540,
-      "warning": 6424,
+      "info": 558,
+      "warning": 6518,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
-      "high": 1,
-      "medium": 4105,
-      "low": 2858
+      "high": 18,
+      "medium": 4162,
+      "low": 2896
     }
   },
   "eightPillars": {
     "pillars": {
       "architecture": 98.56,
-      "maintainability": 96.82,
-      "performance": 99.57,
+      "maintainability": 96.64,
+      "performance": 99.56,
       "data": 99.73,
       "testing": 100,
-      "reliability": 99.67,
+      "reliability": 99.64,
       "security": 99.85,
-      "extensibility": 95.91
+      "extensibility": 95.87
     },
-    "compositeScore": 98.76,
+    "compositeScore": 98.72,
     "weights": {
       "architecture": 0.15,
       "maintainability": 0.15,
@@ -78,13 +78,13 @@
     "architectureConsistency": 98.56,
     "semanticPurity": 99.46,
     "codeSecurity": 99.85,
-    "performanceEfficiency": 99.57,
+    "performanceEfficiency": 99.56,
     "standardization": 93.95,
-    "modernity": 99.83,
-    "maintainability": 96.82,
+    "modernity": 99.82,
+    "maintainability": 96.64,
     "commentQuality": 100,
-    "duplication": 93.78,
-    "techDebtRisk": 99.87
+    "duplication": 93.66,
+    "techDebtRisk": 99.82
   },
   "topHotspots": [
     {
@@ -169,32 +169,185 @@
       "effectiveDensity": 0.95
     },
     {
-      "filePath": "src/core/scoring/technical-debt-ratio.ts",
-      "domain": "scoring",
+      "filePath": "src/core/ast/python-adapter-helpers.ts",
+      "domain": "ast",
       "totalIssues": 37,
       "criticalCount": 0,
-      "highCount": 0,
-      "compositeScore": 98.53,
+      "highCount": 1,
+      "compositeScore": 97.71,
       "effectiveDensity": 0.94
     }
   ],
   "technicalDebtLedger": {
     "summary": {
       "critical": 0,
-      "high": 1,
-      "medium": 4105,
-      "low": 2858
+      "high": 18,
+      "medium": 4162,
+      "low": 2896
     },
     "criticalItems": [],
     "highItems": [
       {
-        "id": "complexity:high-complexity:scripts/test-parallel.js:602",
+        "id": "complexity:CPX-NEST-001:scripts/validate-project-neutrality.js:72",
+        "rule": "CPX-NEST-001",
+        "tier": "high",
+        "severity": "warning",
+        "file": "scripts/validate-project-neutrality.js",
+        "line": 72,
+        "message": "Unbounded control-flow nesting: function 'run' has nesting depth 5 exceeding elastic budget 3 for context 'general-business'."
+      },
+      {
+        "id": "complexity:high-complexity:scripts/validate-project-neutrality.js:72",
         "rule": "high-complexity",
         "tier": "high",
         "severity": "warning",
-        "file": "scripts/test-parallel.js",
-        "line": 602,
-        "message": "Function \"main\" has cyclomatic complexity 14 (threshold 12)."
+        "file": "scripts/validate-project-neutrality.js",
+        "line": 72,
+        "message": "Function \"run\" has cyclomatic complexity 18 (threshold 12)."
+      },
+      {
+        "id": "complexity:high-complexity:src/analyzers/constants.ts:476",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/constants.ts",
+        "line": 476,
+        "message": "Function \"ConstantsAnalyzer.buildHardcodedStringIssue\" has cyclomatic complexity 13 (threshold 12)."
+      },
+      {
+        "id": "complexity:high-complexity:src/analyzers/naming-polyglot-helper.ts:313",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/naming-polyglot-helper.ts",
+        "line": 313,
+        "message": "Function \"auditRustVariable\" has cyclomatic complexity 14 (threshold 12)."
+      },
+      {
+        "id": "complexity:high-complexity:src/analyzers/naming-polyglot-helper.ts:403",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/analyzers/naming-polyglot-helper.ts",
+        "line": 403,
+        "message": "Function \"anonymous\" has cyclomatic complexity 24 (threshold 12)."
+      },
+      {
+        "id": "complexity:high-complexity:src/core/ast/python-adapter-helpers.ts:246",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/ast/python-adapter-helpers.ts",
+        "line": 246,
+        "message": "Function \"isKeywordArgumentTolerated\" has cyclomatic complexity 13 (threshold 12)."
+      },
+      {
+        "id": "complexity:high-complexity:src/core/ast/rust-adapter.ts:397",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/ast/rust-adapter.ts",
+        "line": 397,
+        "message": "Function \"RustAdapter.isToleratedContext\" has cyclomatic complexity 15 (threshold 12)."
+      },
+      {
+        "id": "complexity:CPX-NEST-001:src/core/ast/rust-adapter.ts:428",
+        "rule": "CPX-NEST-001",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/ast/rust-adapter.ts",
+        "line": 428,
+        "message": "Unbounded control-flow nesting: function 'RustAdapter.isTestItemContext' has nesting depth 6 exceeding elastic budget 5 for context 'ast-parser'."
+      },
+      {
+        "id": "performance:PRF-ALG-002:src/core/ast/rust-adapter.ts:439",
+        "rule": "PRF-ALG-002",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/ast/rust-adapter.ts",
+        "line": 439,
+        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 2) causes O(N*M) polynomial complexity"
+      },
+      {
+        "id": "complexity:high-complexity:src/core/diff/constant-entity-extractor.ts:67",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/diff/constant-entity-extractor.ts",
+        "line": 67,
+        "message": "Function \"tryParseConstantEntity\" has cyclomatic complexity 13 (threshold 12)."
+      },
+      {
+        "id": "performance:PRF-IO-001:src/core/governance/rule-catalog-ssot.ts:82",
+        "rule": "PRF-IO-001",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/governance/rule-catalog-ssot.ts",
+        "line": 82,
+        "message": "Synchronous I/O blocking risk: Invoking synchronous blocking API 'fs.readFileSync' inside critical execution stream"
+      },
+      {
+        "id": "complexity:CPX-NEST-001:src/core/governance/rules/exceptionSafety.ts:306",
+        "rule": "CPX-NEST-001",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/governance/rules/exceptionSafety.ts",
+        "line": 306,
+        "message": "Unbounded control-flow nesting: function 'checkFile' has nesting depth 6 exceeding elastic budget 5 for context 'ast-parser'."
+      },
+      {
+        "id": "complexity:high-complexity:src/core/governance/rules/exceptionSafety.ts:306",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/governance/rules/exceptionSafety.ts",
+        "line": 306,
+        "message": "Function \"checkFile\" has cyclomatic complexity 18 (threshold 12)."
+      },
+      {
+        "id": "performance:PRF-ALG-002:src/core/governance/rules/exceptionSafety.ts:326",
+        "rule": "PRF-ALG-002",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/governance/rules/exceptionSafety.ts",
+        "line": 326,
+        "message": "Nested collection linear lookup anti-pattern: Calling 'includes()' inside loop (depth 1) causes O(N*M) polynomial complexity"
+      },
+      {
+        "id": "complexity:high-complexity:src/core/intelligence/dependency-provenance.ts:734",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/intelligence/dependency-provenance.ts",
+        "line": 734,
+        "message": "Function \"isRelativeOrInternalPrefix\" has cyclomatic complexity 15 (threshold 12)."
+      },
+      {
+        "id": "complexity:CPX-NEST-001:src/core/scoring/autonomy-scorer.ts:692",
+        "rule": "CPX-NEST-001",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/scoring/autonomy-scorer.ts",
+        "line": 692,
+        "message": "Unbounded control-flow nesting: function 'applySymbolIndexReferences' has nesting depth 4 exceeding elastic budget 3 for context 'general-business'."
+      },
+      {
+        "id": "complexity:high-complexity:src/core/scoring/autonomy-scorer.ts:692",
+        "rule": "high-complexity",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/scoring/autonomy-scorer.ts",
+        "line": 692,
+        "message": "Function \"applySymbolIndexReferences\" has cyclomatic complexity 17 (threshold 12)."
+      },
+      {
+        "id": "complexity:CPX-NEST-002:src/core/scoring/autonomy-scorer.ts:740",
+        "rule": "CPX-NEST-002",
+        "tier": "high",
+        "severity": "warning",
+        "file": "src/core/scoring/autonomy-scorer.ts",
+        "line": 740,
+        "message": "Cognitive jump cost: deep control-flow jump (nesting >= 4) in function 'applySymbolIndexReferences' over long span (77 LOC)."
       }
     ]
   },
@@ -202,10 +355,10 @@
     "domains": [
       {
         "domainName": "scripts",
-        "compositeScore": 99.21,
+        "compositeScore": 99.19,
         "pillars": {
           "architecture": 98.69,
-          "maintainability": 98.49,
+          "maintainability": 98.38,
           "performance": 99.63,
           "data": 99.83,
           "testing": 100,
@@ -217,16 +370,16 @@
       },
       {
         "domainName": "analyzers",
-        "compositeScore": 98.78,
+        "compositeScore": 98.72,
         "pillars": {
           "architecture": 98.94,
-          "maintainability": 95.76,
+          "maintainability": 95.49,
           "performance": 99.66,
           "data": 99.65,
           "testing": 100,
-          "reliability": 99.59,
+          "reliability": 99.55,
           "security": 99.84,
-          "extensibility": 97.19
+          "extensibility": 96.99
         },
         "moduleCount": 1
       },
@@ -277,10 +430,10 @@
       },
       {
         "domainName": "architecture",
-        "compositeScore": 99.06,
+        "compositeScore": 99.03,
         "pillars": {
           "architecture": 99.12,
-          "maintainability": 97.99,
+          "maintainability": 97.79,
           "performance": 99.8,
           "data": 99.9,
           "testing": 100,
@@ -292,16 +445,16 @@
       },
       {
         "domainName": "ast",
-        "compositeScore": 98.91,
+        "compositeScore": 98.78,
         "pillars": {
           "architecture": 99.49,
-          "maintainability": 96.43,
-          "performance": 99.88,
+          "maintainability": 95.95,
+          "performance": 99.75,
           "data": 99.82,
           "testing": 100,
-          "reliability": 99.79,
+          "reliability": 99.7,
           "security": 99.87,
-          "extensibility": 95.94
+          "extensibility": 95.66
         },
         "moduleCount": 1
       },
@@ -382,16 +535,16 @@
       },
       {
         "domainName": "diff",
-        "compositeScore": 98.92,
+        "compositeScore": 98.86,
         "pillars": {
           "architecture": 99.29,
-          "maintainability": 96.13,
+          "maintainability": 95.88,
           "performance": 100,
           "data": 99.57,
           "testing": 100,
-          "reliability": 99.57,
+          "reliability": 99.51,
           "security": 99.87,
-          "extensibility": 97.07
+          "extensibility": 96.87
         },
         "moduleCount": 1
       },
@@ -427,31 +580,31 @@
       },
       {
         "domainName": "governance",
-        "compositeScore": 99.26,
+        "compositeScore": 99.2,
         "pillars": {
-          "architecture": 99.55,
-          "maintainability": 97.73,
-          "performance": 99.98,
-          "data": 99.91,
+          "architecture": 99.57,
+          "maintainability": 97.74,
+          "performance": 99.55,
+          "data": 99.82,
           "testing": 100,
-          "reliability": 99.91,
+          "reliability": 99.82,
           "security": 99.88,
-          "extensibility": 97.02
+          "extensibility": 97.17
         },
         "moduleCount": 1
       },
       {
         "domainName": "rules",
-        "compositeScore": 98.91,
+        "compositeScore": 98.79,
         "pillars": {
           "architecture": 98.83,
-          "maintainability": 97.47,
-          "performance": 100,
+          "maintainability": 96.97,
+          "performance": 99.8,
           "data": 99.9,
           "testing": 100,
-          "reliability": 99.9,
+          "reliability": 99.8,
           "security": 99.86,
-          "extensibility": 94.98
+          "extensibility": 94.96
         },
         "moduleCount": 1
       },
@@ -472,16 +625,16 @@
       },
       {
         "domainName": "intelligence",
-        "compositeScore": 98.83,
+        "compositeScore": 98.81,
         "pillars": {
-          "architecture": 98.28,
-          "maintainability": 98.04,
+          "architecture": 98.31,
+          "maintainability": 97.9,
           "performance": 99.91,
-          "data": 99.85,
+          "data": 99.86,
           "testing": 100,
-          "reliability": 99.83,
-          "security": 99.87,
-          "extensibility": 94.37
+          "reliability": 99.82,
+          "security": 99.88,
+          "extensibility": 94.4
         },
         "moduleCount": 1
       },
@@ -502,15 +655,15 @@
       },
       {
         "domainName": "messages",
-        "compositeScore": 99.39,
+        "compositeScore": 99.34,
         "pillars": {
-          "architecture": 97.91,
-          "maintainability": 99.77,
+          "architecture": 97.83,
+          "maintainability": 99.57,
           "performance": 100,
           "data": 100,
           "testing": 100,
           "reliability": 100,
-          "security": 99.94,
+          "security": 99.93,
           "extensibility": 97.4
         },
         "moduleCount": 1
@@ -787,16 +940,16 @@
       },
       {
         "domainName": "entries",
-        "compositeScore": 98.92,
+        "compositeScore": 98.93,
         "pillars": {
-          "architecture": 97.9,
-          "maintainability": 96.84,
+          "architecture": 97.83,
+          "maintainability": 96.85,
           "performance": 100,
           "data": 100,
           "testing": 100,
           "reliability": 100,
-          "security": 99.87,
-          "extensibility": 97.23
+          "security": 99.88,
+          "extensibility": 97.37
         },
         "moduleCount": 1
       },
@@ -817,10 +970,10 @@
       },
       {
         "domainName": "scanner",
-        "compositeScore": 99.1,
+        "compositeScore": 99.19,
         "pillars": {
           "architecture": 100,
-          "maintainability": 96.63,
+          "maintainability": 97.26,
           "performance": 99.67,
           "data": 99.72,
           "testing": 100,
@@ -847,16 +1000,16 @@
       },
       {
         "domainName": "scoring",
-        "compositeScore": 98.6,
+        "compositeScore": 98.58,
         "pillars": {
-          "architecture": 98.37,
-          "maintainability": 96.86,
-          "performance": 99.85,
-          "data": 99.87,
+          "architecture": 98.41,
+          "maintainability": 96.65,
+          "performance": 99.86,
+          "data": 99.88,
           "testing": 100,
-          "reliability": 99.87,
-          "security": 99.86,
-          "extensibility": 93.75
+          "reliability": 99.81,
+          "security": 99.87,
+          "extensibility": 93.88
         },
         "moduleCount": 1
       },
@@ -922,16 +1075,16 @@
       },
       {
         "domainName": "trajectory",
-        "compositeScore": 99.1,
+        "compositeScore": 99.06,
         "pillars": {
           "architecture": 99.11,
-          "maintainability": 98.9,
+          "maintainability": 98.62,
           "performance": 99.51,
           "data": 99.85,
           "testing": 100,
           "reliability": 99.85,
           "security": 99.89,
-          "extensibility": 95.14
+          "extensibility": 95.15
         },
         "moduleCount": 1
       },
@@ -1014,27 +1167,27 @@
   },
   "trajectory": {
     "runEloc": {
-      "processed": 156625,
-      "unique": 127218,
-      "changed": 836,
-      "semantic": 669,
+      "processed": 158081,
+      "unique": 128287,
+      "changed": 10060,
+      "semantic": 8048,
       "relocated": 0,
       "cosmetic": 0,
       "boilerplate": 0,
-      "added": 418,
+      "added": 5030,
       "deleted": 0,
       "modified": 0
     },
     "lifetime": {
       "weekId": "LIFETIME",
       "startMs": 1791102755050,
-      "endMs": 1792383923381,
-      "totalRuns": 267,
+      "endMs": 1792460073309,
+      "totalRuns": 309,
       "eloc": {
-        "processedTotal": 36047165,
-        "uniqueTotal": 127218,
-        "changedTotal": 287137,
-        "semanticTotal": 229707
+        "processedTotal": 42658520,
+        "uniqueTotal": 128287,
+        "changedTotal": 483440,
+        "semanticTotal": 386751
       },
       "qed": {
         "mean": 0.0001,
@@ -1042,13 +1195,13 @@
         "max": 0.18
       },
       "debt": {
-        "totalAdded": 1570,
-        "totalResolved": 1739,
+        "totalAdded": 1718,
+        "totalResolved": 1755,
         "totalRegressions": 0,
         "netYield": 0
       },
-      "meanCompositeScore": 98.83,
-      "gatePassRate": 94.38
+      "meanCompositeScore": 98.82,
+      "gatePassRate": 95.15
     },
     "isFirstBaseline": false
   }

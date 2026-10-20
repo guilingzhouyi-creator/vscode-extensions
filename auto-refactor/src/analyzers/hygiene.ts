@@ -64,6 +64,33 @@ const STUB_WORD_TOKENS = Buffer.from(ENCODED_STUB_TOKEN_LIST, ENCODING_BASE64)
 const UNRESOLVED_MARKER_PATTERN = new RegExp(`\\b(?:${STUB_WORD_TOKENS.join('|')})\\b`, 'i');
 const TERMINAL_STMT_RE = /^\s*(?:return\b|throw\s+|break;|continue;|raise\s+|exit\b)/;
 
+const ROOT_SCRIPT_EXTENSIONS: ReadonlySet<string> = new Set([
+    '.js',
+    '.ts',
+    '.mjs',
+    '.cjs',
+    '.py',
+    '.sh',
+    '.ps1',
+    '.bat',
+    '.cmd',
+]);
+
+const EXEMPT_ROOT_BASENAMES: ReadonlySet<string> = new Set([
+    'index.ts',
+    'index.js',
+    'main.ts',
+    'main.js',
+    'app.ts',
+    'app.js',
+    'cli.ts',
+    'cli.js',
+    'api.ts',
+    'api.js',
+    'mod.ts',
+    'mod.js',
+]);
+
 const SUPPRESSION_DIRECTIVE_RE =
     /^\s*(?:\/\/|\/\*|#|\*)\s*(?:@ts-(?:ignore|expect-error|nocheck)|eslint-disable|biome-ignore|#\s*noqa)\b/i;
 const VAGUE_THROW_RE =
@@ -261,7 +288,165 @@ function reportEolMismatch(
     );
 }
 
+function auditFileBom(context: FileBasicsContext): void {
+    if (context.content.charCodeAt(0) === 0xfeff) {
+        const desc = HygieneMessages.UTF8_BOM_DETECTED(context.file);
+        context.issues.push(
+            context.makeIssue({
+                ctx: context.ctx,
+                lineIdx: 0,
+                rule: 'HYG-BOM-001',
+                message: desc.message,
+                severity: SEVERITY_ERROR,
+                detail: { file: context.file, hasBom: true },
+                suggestion: desc.suggestion,
+            }),
+        );
+    }
+}
+
+function auditTrailingNewline(context: FileBasicsContext): void {
+    const content = context.content;
+    const len = content.length;
+    if (len === 0) return;
+
+    if (!content.endsWith('\n')) {
+        const desc = HygieneMessages.TRAILING_NEWLINE_VIOLATION(
+            context.file,
+            'Missing final EOF newline character',
+        );
+        context.issues.push(
+            context.makeIssue({
+                ctx: context.ctx,
+                lineIdx: 0,
+                rule: 'HYG-TRL-001',
+                message: desc.message,
+                severity: SEVERITY_WARNING,
+                detail: { file: context.file, missingEof: true },
+                suggestion: desc.suggestion,
+            }),
+        );
+        return;
+    }
+
+    if (content.endsWith('\r\n\r\n') || (!content.includes('\r\n') && content.endsWith('\n\n'))) {
+        const desc = HygieneMessages.TRAILING_NEWLINE_VIOLATION(
+            context.file,
+            'Excess trailing blank lines at end of file',
+        );
+        context.issues.push(
+            context.makeIssue({
+                ctx: context.ctx,
+                lineIdx: 0,
+                rule: 'HYG-TRL-001',
+                message: desc.message,
+                severity: SEVERITY_WARNING,
+                detail: { file: context.file, excessTrailingBlanks: true },
+                suggestion: desc.suggestion,
+            }),
+        );
+    }
+}
+
+const RE_HOLLOW_SKIP_EXT = /\.(?:md|json|ya?ml)$/i;
+const RE_BLOCK_COMMENT_END = /\*\//;
+const RE_DOCSTRING_START = /^(?:"""|''')/;
+
+function checkHollowCommentLine(
+    line: string,
+    inBlockComment: boolean,
+): { isComment: boolean; nextInBlock: boolean } {
+    if (inBlockComment) {
+        return { isComment: true, nextInBlock: !RE_BLOCK_COMMENT_END.test(line) };
+    }
+    if (line.startsWith('/*')) {
+        return { isComment: true, nextInBlock: !RE_BLOCK_COMMENT_END.test(line) };
+    }
+    if (line.startsWith('//') || line.startsWith('#')) {
+        return { isComment: true, nextInBlock: false };
+    }
+    if (RE_DOCSTRING_START.test(line)) {
+        const quote = line.slice(0, 3);
+        return { isComment: true, nextInBlock: !line.slice(3).includes(quote) };
+    }
+    return { isComment: false, nextInBlock: false };
+}
+
+function isHollowCommentOnlyFile(content: string, filePath: string): boolean {
+    if (filePath.endsWith('.d.ts') || RE_HOLLOW_SKIP_EXT.test(filePath)) {
+        return false;
+    }
+    const lines = content.split('\n');
+    let inBlockComment = false;
+
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (line.length === 0) continue;
+
+        const check = checkHollowCommentLine(line, inBlockComment);
+        inBlockComment = check.nextInBlock;
+        if (!check.isComment) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+function auditCommentOnlyShell(context: FileBasicsContext): boolean {
+    if (isHollowCommentOnlyFile(context.content, context.file)) {
+        const desc = HygieneMessages.COMMENT_HOLLOW_FILE(context.file);
+        context.issues.push(
+            context.makeIssue({
+                ctx: context.ctx,
+                lineIdx: 0,
+                rule: 'HYG-EMP-002',
+                message: desc.message,
+                severity: SEVERITY_ERROR,
+                detail: { file: context.file, hollow: true },
+                suggestion: desc.suggestion,
+            }),
+        );
+        return true;
+    }
+    return false;
+}
+
+function auditClutterFile(context: FileBasicsContext): boolean {
+    const baseName = path.basename(context.file);
+    const lowerBase = baseName.toLowerCase();
+    const isClutter =
+        lowerBase.endsWith('.log') ||
+        lowerBase.endsWith('.tmp') ||
+        lowerBase.endsWith('.bak') ||
+        lowerBase.endsWith('.actual.json') ||
+        lowerBase === 'thumbs.db' ||
+        lowerBase === '.ds_store' ||
+        lowerBase === 'desktop.ini';
+
+    if (isClutter) {
+        const desc = HygieneMessages.UNCONTROLLED_CLUTTER(context.file);
+        context.issues.push(
+            context.makeIssue({
+                ctx: context.ctx,
+                lineIdx: 0,
+                rule: 'HYG-CLT-001',
+                message: desc.message,
+                severity: SEVERITY_ERROR,
+                detail: { file: context.file, baseName },
+                suggestion: desc.suggestion,
+            }),
+        );
+        return true;
+    }
+    return false;
+}
+
 function auditFileBasics(context: FileBasicsContext): boolean {
+    if (auditClutterFile(context)) {
+        return true;
+    }
+
     const len = context.content.length;
     const trimmed = context.content.trim();
     if (len === 0 || trimmed.length === 0) {
@@ -275,6 +460,13 @@ function auditFileBasics(context: FileBasicsContext): boolean {
                 detail: { file: context.file, length: len },
             }),
         );
+        return true;
+    }
+
+    auditFileBom(context);
+    auditTrailingNewline(context);
+
+    if (auditCommentOnlyShell(context)) {
         return true;
     }
 
@@ -381,6 +573,8 @@ export class HygieneAnalyzer implements Analyzer {
         const ext = path.extname(baseName);
         const nameWithoutExt = baseName.slice(0, baseName.length - ext.length);
 
+        this.auditDirectoryConventions(file, baseName, ext, ctx, issues);
+
         if (isExemptFileName(nameWithoutExt)) {
             return;
         }
@@ -407,6 +601,49 @@ export class HygieneAnalyzer implements Analyzer {
         }
     }
 
+    private auditDirectoryConventions(
+        file: string,
+        baseName: string,
+        ext: string,
+        ctx: AnalyzerContext,
+        issues: Issue[],
+    ): void {
+        const normalized = file.replace(/^\.\//, '');
+        if (normalized.includes('/')) {
+            return;
+        }
+
+        const lowerExt = ext.toLowerCase();
+        if (!ROOT_SCRIPT_EXTENSIONS.has(lowerExt)) {
+            return;
+        }
+
+        const lowerBase = baseName.toLowerCase();
+        if (this.isExemptRootScript(baseName, lowerBase)) {
+            return;
+        }
+
+        const desc = HygieneMessages.ROOT_SCRIPT_POLLUTION(file);
+        issues.push(
+            this.makeHygieneIssue({
+                ctx,
+                lineIdx: 0,
+                rule: 'EXT-DIR-001',
+                message: desc.message,
+                severity: SEVERITY_ERROR,
+                detail: { file, baseName, rootScript: true },
+                suggestion: desc.suggestion,
+            }),
+        );
+    }
+
+    private isExemptRootScript(baseName: string, lowerBase: string): boolean {
+        if (baseName.startsWith('.')) return true;
+        if (lowerBase.includes('config') || lowerBase.includes('.conf.')) return true;
+        if (lowerBase.endsWith('.d.ts')) return true;
+        return EXEMPT_ROOT_BASENAMES.has(lowerBase);
+    }
+
     private auditLineHygiene(params: {
         content: string;
         len: number;
@@ -423,11 +660,21 @@ export class HygieneAnalyzer implements Analyzer {
         let lineStart = 0;
         let lineIdx = 0;
         const deadState = { hadTerminalStmt: false, lastTerminalIndent: 0 };
+        const tabReportState = { count: 0 };
 
         while (lineStart < params.len) {
             const { lineText, nextStart } = this.extractLine(params.content, lineStart, params.len);
             const trimmed = lineText.trim();
             const indent = this.calculateIndent(lineText);
+
+            this.auditTabIndentation({
+                file: params.file,
+                lineText,
+                lineIdx,
+                ctx: params.ctx,
+                issues: params.issues,
+                reportedState: tabReportState,
+            });
 
             if (params.checkDead) {
                 this.auditDeadCode({
@@ -453,6 +700,36 @@ export class HygieneAnalyzer implements Analyzer {
 
             lineIdx++;
             lineStart = nextStart;
+        }
+    }
+
+    private auditTabIndentation(params: {
+        file: string;
+        lineText: string;
+        lineIdx: number;
+        ctx: AnalyzerContext;
+        issues: Issue[];
+        reportedState: { count: number };
+    }): void {
+        if (params.reportedState.count >= 3) return;
+        const lowerFile = params.file.toLowerCase();
+        if (lowerFile.endsWith('.gd') || lowerFile.includes('makefile') || lowerFile.endsWith('.mk')) {
+            return;
+        }
+        if (/^\s*\t/.test(params.lineText)) {
+            const desc = HygieneMessages.TAB_INDENTATION_DETECTED(params.file, params.lineIdx + 1);
+            params.issues.push(
+                this.makeHygieneIssue({
+                    ctx: params.ctx,
+                    lineIdx: params.lineIdx,
+                    rule: 'HYG-IND-001',
+                    message: desc.message,
+                    severity: SEVERITY_WARNING,
+                    detail: { file: params.file, line: params.lineIdx + 1 },
+                    suggestion: desc.suggestion,
+                }),
+            );
+            params.reportedState.count++;
         }
     }
 

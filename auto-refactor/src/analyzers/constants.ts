@@ -27,6 +27,10 @@ import { runStreaming } from '../core/ast/traverse';
 import { classifyLiteral } from '../core/governance/semanticLiterals';
 import { maskedLinesOfPath } from '../core/policy/source-mask';
 import { scanNearLiteralClusters } from '../core/intelligence/near-literal-cluster';
+import {
+    findUnregisteredRuleDrift,
+    isTerminalStatusBadge,
+} from '../core/governance/rule-catalog-ssot';
 import { checkConstantLayoutAndScope } from '../core/governance/constant-layout-guard';
 import { extractConstantEntities } from '../core/diff/constant-relocation-detector';
 import { inspectConstantLibraryTopology } from '../core/architecture/constant-library-auditor';
@@ -78,11 +82,12 @@ const RE_TEST_FILE_EXT = /\.(?:test|spec)\.[a-z0-9]+$/i;
 const RE_STYLE_FILE_EXT = /\.(?:css|scss|less|sass)\b/i;
 
 /** Regular expression identifying diagnostic or logging message prefixes. */
-const RE_DIAGNOSTIC_LOG_PREFIX = /^(?:error|failed|warning|info|debug|trace|fatal|assert):/i;
+const RE_DIAGNOSTIC_LOG_PREFIX =
+    /^(?:error|failed|warning|info|debug|trace|fatal|assert|[A-Z0-9]+-[A-Z0-9]+-[0-9]+):/i;
 
 /** Regular expression identifying diagnostic or logging invocation parent contexts. */
 const RE_DIAGNOSTIC_CALL_PARENT =
-    /(?:log(?:ger\b|ging\b|\()|console\.|print\(|new\s+error|raise\s+|reject\(|exit\(|warn(?:ing)?\(|echo\s+|write-host\b)/;
+    /(?:log(?:ger\b|ging\b|\()|console\.|print\(|new\s+error|raise\s+|reject\(|exit\(|warn(?:ing)?\(|echo\s+|write-host\b|panic!|bail!|anyhow!|eprintln!|println!|tracing::|violations\.push|push_violation|findings\.append|issues\.append|auditfinding|finding\(|violation\(|diagnostic\()/i;
 
 /** Regular expression stripping enclosing quotes from string literals. */
 const RE_OUTER_QUOTES = /^['"`]|['"`]$/g;
@@ -425,6 +430,9 @@ export class ConstantsAnalyzer implements Analyzer {
     private isDiagnosticOrLogMessage(lit: LiteralRecord): boolean {
         const text = lit.value;
         const inner = stripQuotes(text);
+        const drifted = findUnregisteredRuleDrift(inner);
+        if (drifted.length > 0) return false;
+        if (isTerminalStatusBadge(inner)) return false;
         if (inner.startsWith('[') && inner.includes(']')) return true;
         if (RE_DIAGNOSTIC_LOG_PREFIX.test(inner)) return true;
         const parentText = lit.parent?.text?.toLowerCase();
@@ -460,6 +468,8 @@ export class ConstantsAnalyzer implements Analyzer {
         if (inner.length < minLen || inner.trim().length === 0) return true;
         const lower = inner.toLowerCase();
         if (this.isHardcodedContextAllowed(lower, isTest, isDataOrConfig, isAlgorithm)) return true;
+        const classification = classifyLiteral(text, false);
+        if (classification.isReasonable) return true;
         return ignoreSet.has(text) || ignoreSet.has(inner);
     }
 
@@ -482,14 +492,26 @@ export class ConstantsAnalyzer implements Analyzer {
             suggestedNameFallback: this.suggestName(inner, STR_KIND),
         });
 
+        const driftedRules = findUnregisteredRuleDrift(inner);
+        const isBadge = isTerminalStatusBadge(inner);
+        const message = driftedRules.length > 0
+            ? `String literal contains unregistered rule ID \`${driftedRules.join(', ')}\`. Rule ID must be registered in scripts/common/rule-catalog.json.`
+            : isBadge
+            ? `Terminal status badge \`${inner}\` should be centralized in constants module.`
+            : res.message;
+
         return {
             id: `constants:${res.rule}:${ctx.filePath}:${lit.node.start?.line ?? 1}`,
             analyzer: ANALYZER_CONSTANTS,
             rule: res.rule,
             severity: SEVERITY_WARNING,
-            message: res.message,
+            message,
             location: locN(lit.node, ctx.filePath),
-            detail: res.detail,
+            detail: {
+                ...res.detail,
+                ...(driftedRules.length > 0 ? { driftedRules } : {}),
+                ...(isBadge ? { terminalBadge: inner } : {}),
+            },
             suggestion: formatConstantDeclarationSuggestion(
                 ctx.filePath,
                 res.suggested,

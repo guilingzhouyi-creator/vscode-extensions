@@ -1,7 +1,7 @@
 /**
  * Module: Core Preflight — Sparse Analyzer & Rule Activation Engine
  * File Path: src/core/preflight/sparse-activator.ts
- * Architecture Role: Computes dynamic affinity score A(r,f) = w1*I + w2*R + w3*D + w4*H + w5*S
+ * Architecture Role: Computes dynamic affinity score `A(r,f)` via indicator weighted sum
  *   to prune unnecessary analyzers and rules prior to execution.
  * Dependencies & Triggers: Consumes audit-index and scope-decision; called by preflight
  *   controller and scanner schedulers.
@@ -18,11 +18,11 @@ import type { AuditScopeDecision } from './scope-decision';
 
 /** Dynamic activation affinity score weights */
 export interface ActivationWeights {
-    readonly changeIndicator: number; // w1 (default 0.35)
-    readonly fileRisk: number; // w2 (default 0.20)
-    readonly dependencyProximity: number; // w3 (default 0.20)
-    readonly historyFindings: number; // w4 (default 0.15)
-    readonly scopeAffinity: number; // w5 (default 0.10)
+    readonly changeIndicator: number; // weight: change indicator (default 0.35)
+    readonly fileRisk: number; // weight: file risk (default 0.20)
+    readonly dependencyProximity: number; // weight: dependency proximity (default 0.20)
+    readonly historyFindings: number; // weight: history findings (default 0.15)
+    readonly scopeAffinity: number; // weight: scope affinity (default 0.10)
 }
 
 /** Default canonical activation weights (sum = 1.0) */

@@ -32,7 +32,7 @@ const AUDIT_ALL_REGEX =
   /(?:workspace-timing|auto-refactor|WebGames|fractal-git|audit_runner\.py|audit_config\.py)/g;
 const PRE_COMMIT_REGEX = /(?:\[\d\/9\]|workspace-timing|auto-refactor|WebGames|fractal-git)/g;
 const PRE_PUSH_REGEX =
-  /(?:\[\d+\/10\]|workspace-timing|auto-refactor|WebGames|fractal-git|validate-commit-msg)/g;
+  /(?:\[\d+\/11\]|workspace-timing|auto-refactor|WebGames|fractal-git|validate-commit-msg)/g;
 
 function collectFiles(dir, extensions, extSet) {
   const results = [];
@@ -153,8 +153,8 @@ function verifyPrePushParity() {
     assert(fs.existsSync(p), `${name} must exist`);
     const content = fs.readFileSync(p, 'utf8');
     const tokens = new Set(content.match(PRE_PUSH_REGEX) || []);
-    for (let i = 1; i <= 10; i++) {
-      assert(tokens.has(`[${i}/10]`), `${name} must contain Gate [${i}/10]`);
+    for (let i = 1; i <= 11; i++) {
+      assert(tokens.has(`[${i}/11]`), `${name} must contain Gate [${i}/11]`);
     }
     assert(tokens.has('workspace-timing'), `${name} must verify workspace-timing`);
     assert(tokens.has('auto-refactor'), `${name} must verify auto-refactor`);

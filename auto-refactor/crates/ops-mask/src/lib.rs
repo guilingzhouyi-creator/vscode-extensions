@@ -845,7 +845,10 @@ mod tests {
 
     #[test]
     fn test_rust_raw_string_literals_single_line() {
-        let code = "let s = r#\"hello try!()\"#; let next = 10;\nlet s2 = r\"hello\"; let s3 = r##\"nested \"quote\" and \"# hash\"##;";
+        let code = concat!(
+            "let s = r#\"hello try!()\"#; let next = 10;\n",
+            "let s2 = r\"hello\"; let s3 = r##\"nested \"quote\" and \"# hash\"##;"
+        );
         let res = mask_source_code(code, &rust_config());
         assert_eq!(res.lines, 2);
         assert_eq!(res.masked[0], "let s =                  ; let next = 10;");

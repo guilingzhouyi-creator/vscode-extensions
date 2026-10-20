@@ -61,6 +61,21 @@ export const DEFAULT_TERMINOLOGY_RULES: readonly TerminologyRule[] = Object.free
         title: 'Temporary or Casual Language Constraint',
         patterns: [
             '临时方案',
+            '临时代码',
+            '临时处理',
+            '临时绕过',
+            '临时修复',
+            '临时逻辑',
+            '临时调整',
+            '临时规避',
+            '临时注释',
+            '过渡方案',
+            '应急处理',
+            '先顶着',
+            '待重写',
+            '待优化',
+            '待补充',
+            '待完善',
             '暂存',
             '凑合',
             '随便',
@@ -76,6 +91,10 @@ export const DEFAULT_TERMINOLOGY_RULES: readonly TerminologyRule[] = Object.free
         asciiPatterns: [
             '\\b(wip|quick\\s*fix|quick-and-dirty|hack|hacky|hacks|band-?aid|for\\s*now|tentative|provisional|ad-?hoc|stopgap|patchy|half-?baked|casual\\s*commit)\\b',
             '\\b((?:just|stub|dummy|temporary|wip)\\s*a?\\s*placeholders?|placeholders?\\s*(?:implementation|for\\s*now|only|code))\\b',
+            '\\b(temp\\s*(?:fix|code|logic|patch|workaround|solution|hack|impl)|temporary\\s*(?:fix|code|logic|patch|workaround|solution|hack))\\b',
+            '\\b(w[1-9]|w[0-9]{2,}|w1-w9)\\b',
+            '\\b(pass[\\s_]*[1-6]|sprint[\\s_]*[0-9]+|batch[\\s_]*[0-9]+)\\b',
+            '\\b(p[0-9]{2,}|phase[\\s_]*[0-9]+|st[0-9]+)\\b',
         ],
         reason: 'Technical documentation and comments must convey enduring facts rather than casual or unfinished markers.',
         guidance: 'State concrete technical boundaries and scopes instead of tentative phrasing.',
@@ -238,13 +257,30 @@ export const DEFAULT_TECHNICAL_WHITELIST: readonly string[] = Object.freeze([
     'pass arguments',
     'pass through',
     'pass-through',
+    '临时工作树',
+    'temporary worktree',
+    '临时沙箱',
+    'temporary sandbox',
+    '临时快照',
+    'temporary snapshot',
+    '临时配置',
+    'temporary config',
 ]);
 
 /** Matches transient batch milestones and work-in-progress markers */
-export const CONSTRUCTION_JARGON_RE = /\b(p[0-9]+|phase[\s_]*[0-9]+|st[\s_]*[0-9]+|wip)\b/i;
+export const CONSTRUCTION_JARGON_RE =
+    /\b(p[0-9]+|phase[\s_]*[0-9]+|st[\s_]*[0-9]+|wip|w[1-9]|w[0-9]{2,}|w1-w9|pass[\s_]*[1-6]|batch[\s_]*[0-9]+|temp\s*(?:fix|code|logic|patch|workaround|hack))\b/i;
 
 const ASCII_CORE_ROOT_PATTERNS: readonly string[] = Object.freeze([
     'wip',
+    'temp',
+    'tmp',
+    'phase',
+    'sprint',
+    'w[1-9]',
+    'w1-w9',
+    'pass[\\s_]*[1-6]',
+    'batch[\\s_]*[0-9]+',
     'quick[-\\s]*(?:fix|and[-\\s]*dirty)',
     'hack(?:s|y)?',
     'band-?aid',

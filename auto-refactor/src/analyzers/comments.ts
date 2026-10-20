@@ -92,8 +92,9 @@ const GENERIC_DIRECTIVE_RE =
  *
  * A bare `includes('async')` matched the string literal in
  * `export type TransferType = 'direct' | 'async' | 'event'` and reported a type alias as an
- * asynchronous routine. The keyword form requires `async` to be followed by an identifier, a `(` or
- * a `*`, so occurrences inside a literal, a property key (`{ async: true }`) or prose cannot match.
+ * asynchronous routine. The keyword form requires `async` to be followed by an identifier,
+ * a `(` or a `*`, so occurrences inside a literal, a property key (`{ async: true }`) or
+ * prose cannot match.
  */
 const ASYNC_DECLARATION_RE = /\basync\b\s*(?=[A-Za-z_$(*])/;
 
@@ -181,6 +182,7 @@ const SINGLE_QUOTE = "'";
  * extractCommentBody.
  */
 const COMMENT_MARKERS: readonly string[] = Object.freeze(['//', '/*', '*/', '#', '*']);
+const RUST_COMMENT_MARKERS: readonly string[] = Object.freeze(['//', '/*', '*/', '*']);
 const URL_OR_INLINE_CODE_RE = /https?:\/\/\S+|`[^`]{20,}`/;
 const HEADER_COMMENT_PREFIX_RE = /^\s*(\/\/|\/\*|\*|#|##|""")/;
 
@@ -373,6 +375,7 @@ export class CommentAnalyzer implements Analyzer {
         const shortLines: number[] = [];
         const longLines: number[] = [];
 
+        const isRust = state.file.endsWith('.rs');
         for (let i = 0; i < lineCount; i++) {
             let line = lines[i];
             if (line.endsWith('\r')) line = line.slice(0, -1);
@@ -383,7 +386,7 @@ export class CommentAnalyzer implements Analyzer {
             const tripleResult = this.updateTripleQuoteState(trimmed, line, inTriple);
             inTriple = tripleResult.inTriple;
 
-            if (!this.isCommentLine(trimmed, tripleResult.insideTriple)) {
+            if (!this.isCommentLine(trimmed, tripleResult.insideTriple, isRust)) {
                 continue;
             }
 
@@ -398,7 +401,7 @@ export class CommentAnalyzer implements Analyzer {
                 shouldCheckTerminology,
             };
 
-            this.scanCommentLine(lineScanCtx, state);
+            this.scanCommentLine(lineScanCtx, state, isRust);
         }
 
         this.auditSeparators(shortLines, longLines, state);
@@ -441,7 +444,13 @@ export class CommentAnalyzer implements Analyzer {
         return { inTriple: null, insideTriple: false };
     }
 
-    private isCommentLine(trimmed: string, insideTriple: boolean): boolean {
+    private isCommentLine(trimmed: string, insideTriple: boolean, isRust = false): boolean {
+        if (trimmed.startsWith('#[') || trimmed.startsWith('#![')) {
+            return false;
+        }
+        if (isRust && trimmed.startsWith('#')) {
+            return false;
+        }
         return (
             insideTriple ||
             trimmed.startsWith('//') ||
@@ -453,9 +462,9 @@ export class CommentAnalyzer implements Analyzer {
         );
     }
 
-    private scanCommentLine(lineCtx: LineScanContext, state: FileAuditState): void {
+    private scanCommentLine(lineCtx: LineScanContext, state: FileAuditState, isRust: boolean): void {
         if (state.level === AUDIT_LEVEL.BASIC) return;
-        const body = this.extractCommentBody(lineCtx.trimmed);
+        const body = this.extractCommentBody(lineCtx.trimmed, isRust);
         this.checkCommentWidth(lineCtx, body, state);
         this.recordSeparatorLine(body, lineCtx.lineIdx + 1, lineCtx.shortLines, lineCtx.longLines);
         this.auditBannerSmallFile(lineCtx, body, state);
@@ -569,16 +578,18 @@ export class CommentAnalyzer implements Analyzer {
      * @returns The text that follows the comment marker (`//`, `#`, `/*`, `*`), or the input
      *     unchanged when no marker is present (e.g. Python docstring bodies).
      */
-    private extractCommentBody(trimmed: string): string {
-        for (const marker of COMMENT_MARKERS) {
+    private extractCommentBody(trimmed: string, isRust = false): string {
+        const markers = isRust ? RUST_COMMENT_MARKERS : COMMENT_MARKERS;
+        for (const marker of markers) {
             if (trimmed.startsWith(marker)) return trimmed.slice(marker.length).trim();
         }
         return trimmed;
     }
 
     private auditFileHeader(content: string, len: number, state: FileAuditState): void {
+        const isRust = state.file.endsWith('.rs');
         const { headerText, hasAnyHeaderComment, headerStartLine, firstCodeLine } =
-            this.extractHeaderText(content, len);
+            this.extractHeaderText(content, len, isRust);
 
         if (!hasAnyHeaderComment) {
             const desc = CommentMessages.MISSING_FILE_HEADER(state.file);
@@ -616,6 +627,7 @@ export class CommentAnalyzer implements Analyzer {
     private extractHeaderText(
         content: string,
         len: number,
+        isRust = false,
     ): {
         headerText: string;
         hasAnyHeaderComment: boolean;
@@ -632,10 +644,15 @@ export class CommentAnalyzer implements Analyzer {
         const inspectLine = (start: number, end: number, lineNo: number): void => {
             const lineEnd = this.trimCarriageReturn(content, start, end);
             const trimmed = content.slice(start, lineEnd).trim();
-            if (!trimmed || trimmed.startsWith('#!') || /^#\s*-\*-\s*coding/i.test(trimmed)) {
+            if (
+                !trimmed ||
+                trimmed.startsWith('#!') ||
+                (isRust && trimmed.startsWith('#')) ||
+                /^#\s*-\*-\s*coding/i.test(trimmed)
+            ) {
                 return;
             }
-            if (this.isHeaderCommentLine(trimmed)) {
+            if (this.isHeaderCommentLine(trimmed, isRust)) {
                 if (headerStartLine === 0) headerStartLine = lineNo;
                 hasAnyHeaderComment = true;
             } else if (firstCodeLine === 0 && headerStartLine === 0) {
@@ -672,13 +689,19 @@ export class CommentAnalyzer implements Analyzer {
         return end;
     }
 
-    private checkHeaderSlice(content: string, start: number, end: number): boolean {
+    private checkHeaderSlice(content: string, start: number, end: number, isRust = false): boolean {
         const lineEnd = this.trimCarriageReturn(content, start, end);
-        return this.isHeaderCommentLine(content.slice(start, lineEnd).trim());
+        return this.isHeaderCommentLine(content.slice(start, lineEnd).trim(), isRust);
     }
 
-    private isHeaderCommentLine(trimmed: string): boolean {
-        return !trimmed.startsWith('#!') && HEADER_COMMENT_PREFIX_RE.test(trimmed);
+    private isHeaderCommentLine(trimmed: string, isRust = false): boolean {
+        if (trimmed.startsWith('#!') || trimmed.startsWith('#[')) {
+            return false;
+        }
+        if (isRust && trimmed.startsWith('#')) {
+            return false;
+        }
+        return HEADER_COMMENT_PREFIX_RE.test(trimmed);
     }
 
     private auditSixFields(headerText: string, state: FileAuditState): void {

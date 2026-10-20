@@ -99,7 +99,7 @@ describe('LayerVFS MCTS — Multi-Agent Exploration Tournament', () => {
                         '    try {',
                         '        // TODO: fix this later',
                         '        return Boolean(order.items.length);',
-                        '    } catch (e) {}',
+                        '    } catch (e) { /* intentional empty catch for defect test */ }',
                         '    return false;',
                         '}',
                         'module.exports = { processOrder };',
