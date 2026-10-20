@@ -57,60 +57,18 @@ trap 'rm -f "$STEP_LOG"' EXIT
 
 RUN_ID="$(date -u +%s 2>/dev/null || echo 0)-$$"
 
-STEP_TSV=""
-STEP_TOTAL=0
+# 步骤身份、四态判定与超时诊断由共享运行时库提供，禁止在各门禁内复制实现。
+GATE_ROOT_DIR="$ROOT_DIR"
+GATE_NODE_BIN="$NODE_BIN"
+GATE_SUPPRESS="$AGENT_MODE"
+# shellcheck source=scripts/sh/lib/gate-runtime.sh
+. "$ROOT_DIR/scripts/sh/lib/gate-runtime.sh"
+gate_init pre-commit
 
-load_step_registry() {
-    if [[ -n "$STEP_TSV" ]]; then return 0; fi
-    local registry_js="$ROOT_DIR/scripts/common/gate-step-registry.js"
-    if [[ ! -f "$registry_js" ]]; then
-        echo "✖ BLOCK  单源步骤登记表加载器缺失: $registry_js" >&2
-        exit 1
-    fi
-    STEP_TSV=$("$NODE_BIN" "$registry_js" --entry pre-commit --tsv 2>/dev/null) || {
-        echo "✖ BLOCK  单源步骤登记表无法投影 pre-commit 条目" >&2
-        exit 1
-    }
-    STEP_TOTAL=$(grep -c . <<< "$STEP_TSV")
+# 兼容既有调用点：门禁正文统一使用 log_gate 作为抑制式输出别名。
+log_gate() {
+    gate_log "$@"
 }
-
-# 输出 "序号<TAB>步骤标识<TAB>规则标识<TAB>标题"；未登记标识返回非零。
-get_step_meta() {
-    local step_id="$1"
-    load_step_registry
-    local row
-    row=$(awk -F'\t' -v id="$step_id" '$2 == id { print; exit }' <<< "$STEP_TSV")
-    if [[ -z "$row" ]]; then
-        echo "✖ BLOCK  未登记的步骤标识 '$step_id'，请在 scripts/common/gate-step-registry.json 声明" >&2
-        return 1
-    fi
-    printf '%s' "$row"
-}
-
-write_step_banner() {
-    local step_id="$1"
-    local row ordinal title
-    row=$(get_step_meta "$step_id") || exit 1
-    ordinal=$(cut -f1 <<< "$row")
-    title=$(cut -f4 <<< "$row")
-    echo "▶ [$ordinal/$STEP_TOTAL] $step_id  $title"
-}
-
-write_step_verdict() {
-    local step_id="$1"
-    local status="$2"
-    local detail="${3:-}"
-    local glyph
-    case "$status" in
-        PASS) glyph="✔" ;;
-        BLOCK) glyph="✖" ;;
-        SKIP) glyph="⚠️" ;;
-        WARN) glyph="⚠️" ;;
-        *) glyph="·" ;;
-    esac
-    echo "  $glyph $status  $step_id  $detail"
-}
-
 record_pre_commit_failure() {
     local step_name="$1"
     local rule_id="$2"
@@ -213,7 +171,13 @@ if [[ -n "$ROOT_CLUTTER" ]]; then
 fi
 
 # 获取当前暂存区中的文件列表（新增、修改、重命名）
-STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null || true)
+# 暂存区不可读时不得回落为空列表：那会让"git 失败"与"暂存区为空"变成同一个 PASS。
+STAGED_STATUS=0
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null) || STAGED_STATUS=$?
+if [[ "${STAGED_STATUS}" -ne 0 ]]; then
+    echo "✖ BLOCK  无法读取 Git 暂存区 (git diff --cached 退出码 ${STAGED_STATUS})，pre-commit 不得在未审查的情况下放行。" >&2
+    exit 1
+fi
 
 if [[ -z "$STAGED_FILES" ]]; then
     if [[ "$AGENT_MODE" -eq 1 ]]; then
@@ -247,8 +211,10 @@ if [[ "$AGENT_MODE" -eq 1 ]]; then
 else
     write_step_banner "STAGED-HYGIENE-01"
     if ! "$NODE_BIN" scripts/common/gate-fast-staged.js; then
-        echo "❌ [FAIL] 暂存区物理卫生与安全审查未通过！"
+        write_step_verdict "STAGED-HYGIENE-01" BLOCK "暂存区物理卫生与安全审查未通过"
         FAILED=1
+    else
+        write_step_verdict "STAGED-HYGIENE-01" PASS "暂存区物理卫生与安全审查通过"
     fi
 fi
 
@@ -326,6 +292,8 @@ if [[ -n "$TOUCHED_WT_COMPILE" ]]; then
             write_step_verdict "EXTENSION-COMPILE-04" BLOCK "workspace-timing 编译失败"
             tail -n 15 "$STEP_LOG" | sed 's/^/   /'
             FAILED=1
+        else
+            write_step_verdict "EXTENSION-COMPILE-04" PASS "workspace-timing 增量编译通过"
         fi
     fi
 
@@ -422,6 +390,8 @@ if [[ -n "$TOUCHED_AR_COMPILE" ]]; then
             write_step_verdict "ENGINE-COMPILE-07" BLOCK "auto-refactor 编译失败"
             tail -n 15 "$STEP_LOG" | sed 's/^/   /'
             FAILED=1
+        else
+            write_step_verdict "ENGINE-COMPILE-07" PASS "auto-refactor 增量编译通过"
         fi
     fi
 
@@ -474,6 +444,8 @@ if [[ -n "$TOUCHED_WG_AUDIT" ]]; then
             write_step_verdict "DOMAIN-CONFIG-09" BLOCK "WebGames 配置架构审查未通过"
             tail -n 15 "$STEP_LOG" | sed 's/^/   /'
             FAILED=1
+        else
+            write_step_verdict "DOMAIN-CONFIG-09" PASS "WebGames 配置架构审查通过"
         fi
     fi
 fi
@@ -527,6 +499,8 @@ if [[ -n "$TOUCHED_CODE" ]]; then
         if ! "$NODE_BIN" scripts/common/validate-staged-slice.js; then
             write_step_verdict "STAGED-SLICE-11" BLOCK "暂存区 AST 切片审查未通过"
             FAILED=1
+        else
+            write_step_verdict "STAGED-SLICE-11" PASS "暂存区 AST 切片复杂度合规"
         fi
     fi
 elif [[ "$AGENT_MODE" -eq 0 ]]; then
@@ -547,6 +521,8 @@ if [[ -n "$TOUCHED_AUDITABLE" ]]; then
         if ! "$NODE_BIN" scripts/common/validate-code-density.js --staged; then
             write_step_verdict "STAGED-DENSITY-12" BLOCK "暂存区代码密度与接线载荷审查未通过"
             FAILED=1
+        else
+            write_step_verdict "STAGED-DENSITY-12" PASS "暂存区代码密度与接线载荷合规"
         fi
     fi
 fi
@@ -568,6 +544,8 @@ if [[ -n "$TOUCHED_AUDITABLE" ]]; then
         if ! "$NODE_BIN" scripts/common/evaluate-eloc-budget.js --staged; then
             write_step_verdict "STAGED-VOLUME-13" BLOCK "暂存区双轨体积与动态包络审查未通过"
             FAILED=1
+        else
+            write_step_verdict "STAGED-VOLUME-13" PASS "暂存区双轨体积与动态包络合规"
         fi
     fi
 fi

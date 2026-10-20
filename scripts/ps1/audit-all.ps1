@@ -25,6 +25,8 @@ $ErrorActionPreference = 'Stop'
 
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+$PSNativeCommandUseErrorActionPreference = $true
+$PSNativeCommandArgumentPassing = 'Standard'
 $PSDefaultParameterValues['Get-Content:Encoding'] = 'utf8'
 $PSDefaultParameterValues['Set-Content:Encoding'] = 'utf8'
 
@@ -34,72 +36,11 @@ $PSDefaultParameterValues['Set-Content:Encoding'] = 'utf8'
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 
-function Wait-ProcessWithTimeout {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory = $true)]
-        [System.Diagnostics.Process]$Process,
-        [Parameter(Mandatory = $true)]
-        [int]$TimeoutSeconds,
-        [Parameter(Mandatory = $false)]
-        [string]$ProcessName = "Process",
-        [Parameter(Mandatory = $false)]
-        [string[]]$LogFiles = @()
-    )
-    $hasExited = $Process.WaitForExit($TimeoutSeconds * 1000)
-    if (-not $hasExited) {
-        $pidNum = $Process.Id
-        try {
-            Write-Warning "⚠️ $ProcessName 审查执行超时 (${TimeoutSeconds}s，PID: $pidNum)，强制终止进程树..."
-            $Process.Kill($true)
-        } catch {
-            # 容错处理：进程若在捕获瞬间已退出
-        }
-
-        try {
-            $diagDir = Join-Path $repoRoot ".audit-logs"
-            if (-not (Test-Path $diagDir)) {
-                [void](New-Item -ItemType Directory -Path $diagDir -Force)
-            }
-            $safeName = $ProcessName.Replace(" ", "_").ToLower()
-            $timestamp = (Get-Date).ToString("yyyyMMdd-HHmmss")
-            $diagFile = Join-Path $diagDir "timeout-$safeName-$timestamp.log"
-
-            $diagLines = [System.Collections.Generic.List[string]]::new()
-            $diagLines.Add("================================================================================")
-            $diagLines.Add("⚠️ WATCHDOG TIMEOUT 诊断快照")
-            $diagLines.Add("================================================================================")
-            $diagLines.Add("目标模块: $ProcessName")
-            $diagLines.Add("进程 PID: $pidNum")
-            $diagLines.Add("超时阈值: ${TimeoutSeconds} 秒")
-            $diagLines.Add("触发时间: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff zzz')")
-            $diagLines.Add("处置措施: 看门狗已触发 Process.Kill(`$true) 级联终止进程树")
-            $diagLines.Add("--------------------------------------------------------------------------------")
-            $diagLines.Add("【最后捕获的标准输出与错误日志】:")
-            foreach ($lf in $LogFiles) {
-                if (Test-Path $lf) {
-                    $diagLines.Add("--- 来源日志: $lf ---")
-                    $tailContent = Get-Content -Path $lf -Encoding utf8 -Tail 100 -ErrorAction SilentlyContinue
-                    if ($tailContent) {
-                        $diagLines.AddRange($tailContent)
-                    } else {
-                        $diagLines.Add("(日志内容为空或未捕获到输出)")
-                    }
-                }
-            }
-            $diagLines.Add("================================================================================")
-            [System.IO.File]::WriteAllLines($diagFile, $diagLines, [System.Text.UTF8Encoding]::new($false))
-            Write-Host "💡 超时诊断快照已落盘至: $diagFile" -ForegroundColor Yellow
-            Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/log-rotator.js", "--prune" -WorkingDirectory $repoRoot -NoNewWindow -Wait -ErrorAction SilentlyContinue
-        } catch {
-            # 诊断快照落盘失败不阻断异常主流程
-        }
-
-        return $false
-    }
-    $Process.WaitForExit()
-    return $true
-}
+# 步骤身份、四态判定与超时诊断由共享运行时库提供，禁止在各门禁内复制实现。
+$script:GateRepoRoot = $repoRoot
+$script:GateEntryId = 'audit-all'
+$script:GateSuppressOutput = ([bool]$Json -or [bool]$Agent)
+. (Join-Path $PSScriptRoot "lib/gate-runtime.ps1")
 
 if (-not $env:GIT_CONFIG_GLOBAL) { $env:GIT_CONFIG_GLOBAL = 'NUL' }
 if (-not $env:GIT_CONFIG_SYSTEM) { $env:GIT_CONFIG_SYSTEM = 'NUL' }
@@ -112,9 +53,9 @@ $pythonCmd = if (Get-Command python3.12 -ErrorAction SilentlyContinue) { "python
 $cargoCmd = if (Get-Command cargo.exe -ErrorAction SilentlyContinue) { "cargo.exe" } elseif (Get-Command cargo -ErrorAction SilentlyContinue) { "cargo" } else { $null }
 
 if (-not $Json -and -not $Agent) {
-    Write-Host "=================================================================" -ForegroundColor Cyan
-    Write-Host "🌐 全工作区跨项目统一审查中枢 (Unified Workspace Review Engine)" -ForegroundColor Cyan
-    Write-Host "=================================================================" -ForegroundColor Cyan
+    Write-GateHost "=================================================================" -ForegroundColor Cyan
+    Write-GateHost "🌐 全工作区跨项目统一审查中枢 (Unified Workspace Review Engine)" -ForegroundColor Cyan
+    Write-GateHost "=================================================================" -ForegroundColor Cyan
 }
 
 $startTime = [System.Diagnostics.Stopwatch]::StartNew()
@@ -123,14 +64,31 @@ $failed = $false
 $transientDir = [System.IO.Path]::GetTempPath()
 $randSuffix = [System.Guid]::NewGuid().ToString().Substring(0, 8)
 $logHygieneOut = Join-Path $transientDir "audit-hygiene-$randSuffix.json"
+$logIsoOut = Join-Path $transientDir "audit-check-isoout-$randSuffix.out.log"
+$logGiOut = Join-Path $transientDir "audit-check-giout-$randSuffix.out.log"
+$logDensityOut = Join-Path $transientDir "audit-check-densityout-$randSuffix.out.log"
+$logElocOut = Join-Path $transientDir "audit-check-elocout-$randSuffix.out.log"
+$logFeedbackOut = Join-Path $transientDir "audit-check-feedbackout-$randSuffix.out.log"
+$logOrderingOut = Join-Path $transientDir "audit-check-orderingout-$randSuffix.out.log"
+$logSkillsOut = Join-Path $transientDir "audit-check-skillsout-$randSuffix.out.log"
+$logClosureOut = Join-Path $transientDir "audit-check-closureout-$randSuffix.out.log"
+$logReachOut = Join-Path $transientDir "audit-check-reachout-$randSuffix.out.log"
+$logDocsOut = Join-Path $transientDir "audit-check-docsout-$randSuffix.out.log"
+$logLedgerOut = Join-Path $transientDir "audit-check-ledgerout-$randSuffix.out.log"
+$logCatalogOut = Join-Path $transientDir "audit-check-catalogout-$randSuffix.out.log"
+$logFgTopoOut = Join-Path $transientDir "audit-check-fgtopoout-$randSuffix.out.log"
+$logFgParityOut = Join-Path $transientDir "audit-check-fgparityout-$randSuffix.out.log"
+$logFgBridgeOut = Join-Path $transientDir "audit-check-fgbridgeout-$randSuffix.out.log"
+$logFgAllocOut = Join-Path $transientDir "audit-check-fgallocout-$randSuffix.out.log"
+$logFgReportOut = Join-Path $transientDir "audit-check-fgreport-$randSuffix.out.log"
 
 # 1. 物理卫生八维刚性公理与全域巡检
-if (-not $Json -and -not $Agent) { Write-Host "▶ [1/6] WORKSPACE-AUDIT-01  全工作区物理卫生、同构脚本、.gitignore、代码密度与体积" -ForegroundColor Gray }
+Write-StepBanner -StepId "WORKSPACE-AUDIT-01"
 $res = Start-Process -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-physical-hygiene.js", "--json") -WorkingDirectory $repoRoot -RedirectStandardOutput $logHygieneOut -NoNewWindow -PassThru -Wait
-$resIso = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-script-isomorphism.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
-$resGi = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-gitignore-governance.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
-$resDensity = Start-Process -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-code-density.js", "--all") -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
-$resEloc = Start-Process -FilePath $nodeCmd -ArgumentList @("scripts/common/evaluate-eloc-budget.js", "--all") -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
+$resIso = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-script-isomorphism.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logIsoOut -NoNewWindow -PassThru -Wait
+$resGi = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-gitignore-governance.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logGiOut -NoNewWindow -PassThru -Wait
+$resDensity = Start-Process -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-code-density.js", "--all") -WorkingDirectory $repoRoot -RedirectStandardOutput $logDensityOut -NoNewWindow -PassThru -Wait
+$resEloc = Start-Process -FilePath $nodeCmd -ArgumentList @("scripts/common/evaluate-eloc-budget.js", "--all") -WorkingDirectory $repoRoot -RedirectStandardOutput $logElocOut -NoNewWindow -PassThru -Wait
 $codeHygiene = $res.ExitCode
 $codeIso = $resIso.ExitCode
 $codeGi = $resGi.ExitCode
@@ -157,22 +115,24 @@ if ($codeHygiene -ne 0 -or $codeIso -ne 0 -or $codeGi -ne 0 -or $codeDensity -ne
 }
 
 # 2. 单源规则注册表与目录一致性及技能集规范
-if (-not $Json -and -not $Agent) { Write-Host "▶ [2/6] RULE-AUDIT-02  单源规则目录、闭包与可达性、文档一致性与轨迹账本" -ForegroundColor Gray }
-$res = Start-Process -FilePath $nodeCmd -ArgumentList @("scripts/common/generate-rule-catalog.js", "--check-only") -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
-$resFeedback = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-gate-feedback.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
-$resSkills = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-skills.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
-$resClosure = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-rule-id-closure.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
-$resReach = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-rule-reachability.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
-$resDocs = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-docs-consistency.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
-$resLedger = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-trajectory-ledger.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
+Write-StepBanner -StepId "RULE-AUDIT-02"
+$res = Start-Process -FilePath $nodeCmd -ArgumentList @("scripts/common/generate-rule-catalog.js", "--check-only") -WorkingDirectory $repoRoot -RedirectStandardOutput $logCatalogOut -NoNewWindow -PassThru -Wait
+$resFeedback = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-gate-feedback.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logFeedbackOut -NoNewWindow -PassThru -Wait
+$resOrdering = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-gate-ordering.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logOrderingOut -NoNewWindow -PassThru -Wait
+$resSkills = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-skills.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logSkillsOut -NoNewWindow -PassThru -Wait
+$resClosure = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-rule-id-closure.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logClosureOut -NoNewWindow -PassThru -Wait
+$resReach = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-rule-reachability.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logReachOut -NoNewWindow -PassThru -Wait
+$resDocs = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-docs-consistency.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logDocsOut -NoNewWindow -PassThru -Wait
+$resLedger = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-trajectory-ledger.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logLedgerOut -NoNewWindow -PassThru -Wait
 $codeCatalog = $res.ExitCode
 $codeFeedback = $resFeedback.ExitCode
+$codeOrdering = $resOrdering.ExitCode
 $codeSkills = $resSkills.ExitCode
 $codeClosure = $resClosure.ExitCode
 $codeReach = $resReach.ExitCode
 $codeDocs = $resDocs.ExitCode
 $codeLedger = $resLedger.ExitCode
-if ($codeCatalog -ne 0 -or $codeSkills -ne 0 -or $codeFeedback -ne 0 -or $codeClosure -ne 0 -or $codeReach -ne 0 -or $codeDocs -ne 0 -or $codeLedger -ne 0) {
+if ($codeCatalog -ne 0 -or $codeSkills -ne 0 -or $codeFeedback -ne 0 -or $codeOrdering -ne 0 -or $codeClosure -ne 0 -or $codeReach -ne 0 -or $codeDocs -ne 0 -or $codeLedger -ne 0) {
     $statusRules = "FAIL"
     $failed = $true
 } else {
@@ -185,10 +145,10 @@ $autoRefactorDir = Join-Path $repoRoot "auto-refactor"
 $fractalGitDir = Join-Path $repoRoot "fractal-git"
 
 if (-not $Json -and -not $Agent) {
-    Write-Host "▶ [3/6] EXTENSION-AUDIT-03  并行调度 workspace-timing 审查" -ForegroundColor Gray
-    Write-Host "▶ [4/6] DOMAIN-AUDIT-04  并行调度 WebGames 领域配置与架构审查" -ForegroundColor Gray
-    Write-Host "▶ [5/6] ENGINE-AUDIT-05  并行调度 auto-refactor 静态引擎多维自审" -ForegroundColor Gray
-    Write-Host "▶ [6/6] RUST-AUDIT-06  并行调度 fractal-git 微 Crate 回归套件" -ForegroundColor Gray
+    Write-StepBanner -StepId "EXTENSION-AUDIT-03"
+    Write-StepBanner -StepId "DOMAIN-AUDIT-04"
+    Write-StepBanner -StepId "ENGINE-AUDIT-05"
+    Write-StepBanner -StepId "RUST-AUDIT-06"
 }
 
 $logWtOut = Join-Path $transientDir "audit-wt-$randSuffix.out.log"
@@ -213,10 +173,10 @@ $procAr = if ($Fast) {
 } else {
     Start-Process -FilePath $nodeCmd -ArgumentList @("scripts/test-parallel.js") -WorkingDirectory $autoRefactorDir -RedirectStandardOutput $logArOut -RedirectStandardError $logArErr -PassThru
 }
-$resFgTopo = Start-Process -FilePath $nodeCmd -ArgumentList "fractal-git/scripts/common/validate-crate-topology.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
-$resFgParity = Start-Process -FilePath $nodeCmd -ArgumentList "fractal-git/scripts/common/validate-git-parity.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
-$resFgBridge = Start-Process -FilePath $nodeCmd -ArgumentList "fractal-git/scripts/common/validate-gate-bridge.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
-$resFgAlloc = Start-Process -FilePath $nodeCmd -ArgumentList "fractal-git/scripts/common/check-zero-alloc-boundary.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
+$resFgTopo = Start-Process -FilePath $nodeCmd -ArgumentList "fractal-git/scripts/common/validate-crate-topology.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logFgTopoOut -NoNewWindow -PassThru -Wait
+$resFgParity = Start-Process -FilePath $nodeCmd -ArgumentList "fractal-git/scripts/common/validate-git-parity.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logFgParityOut -NoNewWindow -PassThru -Wait
+$resFgBridge = Start-Process -FilePath $nodeCmd -ArgumentList "fractal-git/scripts/common/validate-gate-bridge.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logFgBridgeOut -NoNewWindow -PassThru -Wait
+$resFgAlloc = Start-Process -FilePath $nodeCmd -ArgumentList "fractal-git/scripts/common/check-zero-alloc-boundary.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logFgAllocOut -NoNewWindow -PassThru -Wait
 
 $staticFgClean = ($resFgTopo.ExitCode -eq 0 -and $resFgParity.ExitCode -eq 0 -and $resFgBridge.ExitCode -eq 0 -and $resFgAlloc.ExitCode -eq 0)
 
@@ -259,7 +219,8 @@ $statusFg = if (-not $staticFgClean) {
 
 if ($nodeCmd -and (Test-Path "fractal-git/scripts/common/run-audit-report.js")) {
     $reportArgs = if ($Fast) { @("fractal-git/scripts/common/run-audit-report.js", "--fast") } else { @("fractal-git/scripts/common/run-audit-report.js") }
-    Start-Process -FilePath $nodeCmd -ArgumentList $reportArgs -WorkingDirectory $repoRoot -NoNewWindow -Wait -ErrorAction SilentlyContinue
+    $null = Start-Process -FilePath $nodeCmd -ArgumentList $reportArgs -WorkingDirectory $repoRoot -RedirectStandardOutput $logFgReportOut -NoNewWindow -PassThru -Wait 
+    if (-not $Json -and -not $Agent -and (Test-Path $logFgReportOut)) { Get-Content $logFgReportOut -Encoding utf8 | Write-GateHost }
 }
 
 
@@ -274,7 +235,7 @@ if (-not $Fast -and $statusAr -eq "PASS") {
 if ($statusWt -ne "PASS") {
     $failed = $true
     if (-not $Json) {
-        Write-Host "❌ workspace-timing 审查未通过:" -ForegroundColor Red
+        Write-GateHost "❌ workspace-timing 审查未通过:" -ForegroundColor Red
         foreach ($logFile in @($logWtOut, $logWtErr)) {
             if (Test-Path $logFile) {
                 Get-Content $logFile -Encoding utf8 | Select-Object -Last 15 | ForEach-Object { Write-Host "   $_" -ForegroundColor DarkRed }
@@ -285,7 +246,7 @@ if ($statusWt -ne "PASS") {
 if ($statusWg -ne "PASS") {
     $failed = $true
     if (-not $Json) {
-        Write-Host "❌ WebGames 审查未通过:" -ForegroundColor Red
+        Write-GateHost "❌ WebGames 审查未通过:" -ForegroundColor Red
         foreach ($logFile in @($logWgOut, $logWgErr)) {
             if (Test-Path $logFile) {
                 Get-Content $logFile -Encoding utf8 | Select-Object -Last 15 | ForEach-Object { Write-Host "   $_" -ForegroundColor DarkRed }
@@ -296,7 +257,7 @@ if ($statusWg -ne "PASS") {
 if ($statusAr -ne "PASS") {
     $failed = $true
     if (-not $Json) {
-        Write-Host "❌ auto-refactor 审查未通过:" -ForegroundColor Red
+        Write-GateHost "❌ auto-refactor 审查未通过:" -ForegroundColor Red
         foreach ($logFile in @($logArOut, $logArErr, $logArSelfOut, $logArSelfErr)) {
             if (Test-Path $logFile) {
                 Get-Content $logFile -Encoding utf8 | Select-Object -Last 15 | ForEach-Object { Write-Host "   $_" -ForegroundColor DarkRed }
@@ -307,7 +268,7 @@ if ($statusAr -ne "PASS") {
 if ($statusFg -ne "PASS") {
     $failed = $true
     if (-not $Json) {
-        Write-Host "❌ fractal-git 审查未通过:" -ForegroundColor Red
+        Write-GateHost "❌ fractal-git 审查未通过:" -ForegroundColor Red
         foreach ($logFile in @($logFgOut, $logFgErr)) {
             if (Test-Path $logFile) {
                 Get-Content $logFile -Encoding utf8 | Select-Object -Last 15 | ForEach-Object { Write-Host "   $_" -ForegroundColor DarkRed }
@@ -339,7 +300,7 @@ if ($failed) {
             if (Test-Path $logFgOut) { Copy-Item -Path $logFgOut -Destination (Join-Path $diagDir "fail-fractal-git-$timestamp.out.log") -Force -ErrorAction SilentlyContinue }
             if (Test-Path $logFgErr) { Copy-Item -Path $logFgErr -Destination (Join-Path $diagDir "fail-fractal-git-$timestamp.err.log") -Force -ErrorAction SilentlyContinue }
         }
-        Write-Host "💡 失败审查完整日志已保留至: .audit-logs/" -ForegroundColor Yellow
+        Write-GateHost "💡 失败审查完整日志已保留至: .audit-logs/" -ForegroundColor Yellow
         Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/log-rotator.js", "--prune" -WorkingDirectory $repoRoot -NoNewWindow -Wait -ErrorAction SilentlyContinue
     } catch {
         # 归档日志失败不阻断异常主流程
@@ -350,6 +311,14 @@ Remove-Item -Path $logArOut, $logArErr, $logArSelfOut, $logArSelfErr, $logWtOut,
 
 $startTime.Stop()
 $elapsedSec = [math]::Round($startTime.Elapsed.TotalSeconds, 2)
+
+# 判定输出：干净运行必须与跳过运行可区分，步骤身份来自单源登记表。
+Write-StepVerdict -StepId "WORKSPACE-AUDIT-01" -Status $(if ($statusHygiene -eq "PASS") { "PASS" } else { "BLOCK" })
+Write-StepVerdict -StepId "RULE-AUDIT-02" -Status $(if ($statusRules -eq "PASS") { "PASS" } else { "BLOCK" })
+Write-StepVerdict -StepId "EXTENSION-AUDIT-03" -Status $(if ($statusWt -eq "PASS") { "PASS" } else { "BLOCK" })
+Write-StepVerdict -StepId "DOMAIN-AUDIT-04" -Status $(if ($statusWg -eq "PASS") { "PASS" } else { "BLOCK" })
+Write-StepVerdict -StepId "ENGINE-AUDIT-05" -Status $(if ($statusAr -eq "PASS") { "PASS" } else { "BLOCK" })
+Write-StepVerdict -StepId "RUST-AUDIT-06" -Status $(if ($statusFg -eq "PASS") { "PASS" } else { "BLOCK" })
 
 $exitCode = if ($failed) { 1 } else { 0 }
 $globalStatus = if ($failed) { "❌ 存在违规异常" } else { "✅ 全域健康达标" }
@@ -460,7 +429,7 @@ $polyglotBreakdown = $null
 try {
     $polyglotScript = Join-Path $repoRoot "scripts\common\evaluate-polyglot-balance.js"
     if (-not $nodeCmd) {
-        Write-Host "  ℹ️  [SKIP] 未检测到 node 运行时，语言均衡指数不参与计算" -ForegroundColor Yellow
+        Write-GateHost "  ℹ️  [SKIP] 未检测到 node 运行时，语言均衡指数不参与计算" -ForegroundColor Yellow
     } elseif (Test-Path $polyglotScript) {
         $pArgs = @($polyglotScript, "--json")
         if ($Fast) { $pArgs += "--fast" }
@@ -833,22 +802,22 @@ if ($Agent) {
     exit $exitCode
 }
 
-Write-Host ""
+Write-GateHost ""
 $targetWidth = 71
-Write-Host ("┌" + ("─" * $targetWidth) + "┐") -ForegroundColor Cyan
+Write-GateHost ("┌" + ("─" * $targetWidth) + "┐") -ForegroundColor Cyan
 $titleText = "全工作区统一工程审查与质量全景看板"
 $titlePad = [math]::Floor(($targetWidth - (Get-DisplayWidth $titleText)) / 2)
-Write-Host (Format-DashboardRow ((" " * $titlePad) + $titleText) $targetWidth) -ForegroundColor Cyan
-Write-Host ("├" + ("─" * $targetWidth) + "┤") -ForegroundColor Cyan
+Write-GateHost (Format-DashboardRow ((" " * $titlePad) + $titleText) $targetWidth) -ForegroundColor Cyan
+Write-GateHost ("├" + ("─" * $targetWidth) + "┤") -ForegroundColor Cyan
 
 $summaryText = "综合健康分: {0} ({1})" -f $wsHealthStr, $wsGrade
 if ($autonomyRate) { $summaryText += " | 自研率: {0}%" -f $autonomyRate }
 if ($null -ne $polyglotIndex) { $summaryText += " | 语言均衡: {0}" -f $polyglotIndex }
-Write-Host (Format-DashboardRow (" " + $summaryText) $targetWidth) -ForegroundColor White
+Write-GateHost (Format-DashboardRow (" " + $summaryText) $targetWidth) -ForegroundColor White
 
 $sepTitle1 = "─ [全工作区六大核心子系统基石得分] "
 $sep1 = "├" + $sepTitle1 + ("─" * ($targetWidth - (Get-DisplayWidth $sepTitle1))) + "┤"
-Write-Host $sep1 -ForegroundColor Cyan
+Write-GateHost $sep1 -ForegroundColor Cyan
 
 $sysDefinitions = @(
     @{ num = " 1."; name = "工作区物理卫生";   score = $scoreHygiene; note = "(零空文件/同构)" },
@@ -871,12 +840,12 @@ foreach ($sys in $sysDefinitions) {
     $col4 = $paddedScore
     $col5 = " " + $sys.note
     $rowContent = $col1 + $col2 + $col3 + " " + $col4 + $col5
-    Write-Host (Format-DashboardRow $rowContent $targetWidth) -ForegroundColor $lineColor
+    Write-GateHost (Format-DashboardRow $rowContent $targetWidth) -ForegroundColor $lineColor
 }
 
 $sepTitle2 = "─ [auto-refactor 静态引擎十维工程质量全景指数] "
 $sep2 = "├" + $sepTitle2 + ("─" * ($targetWidth - (Get-DisplayWidth $sepTitle2))) + "┤"
-Write-Host $sep2 -ForegroundColor Cyan
+Write-GateHost $sep2 -ForegroundColor Cyan
 
 if ($baseline -and $tenDimensions -and $null -ne $compositeScore) {
     foreach ($d in $dimDefinitions) {
@@ -898,7 +867,7 @@ if ($baseline -and $tenDimensions -and $null -ne $compositeScore) {
         if ($isNotEvaluated) {
             $bar = " " * 20
             $paddedScore = "   N/A"
-            $gradeTag = "[N/A]"
+            $gradeTag = ""
             $lineColor = "DarkGray"
         } else {
             $score = $parsedScore
@@ -914,20 +883,20 @@ if ($baseline -and $tenDimensions -and $null -ne $compositeScore) {
         $col4 = $paddedScore
         $col5 = " " + $gradeTag + " " + $d.desc
         $rowContent = $col1 + $col2 + $col3 + " " + $col4 + $col5
-        Write-Host (Format-DashboardRow $rowContent $targetWidth) -ForegroundColor $lineColor
+        Write-GateHost (Format-DashboardRow $rowContent $targetWidth) -ForegroundColor $lineColor
     }
 } else {
-    Write-Host (Format-DashboardRow " [离线基线快照未就绪 - 优雅降级模式]" $targetWidth) -ForegroundColor Yellow
+    Write-GateHost (Format-DashboardRow " [离线基线快照未就绪 - 优雅降级模式]" $targetWidth) -ForegroundColor Yellow
 }
 
-Write-Host ("├" + ("─" * $targetWidth) + "┤") -ForegroundColor Cyan
+Write-GateHost ("├" + ("─" * $targetWidth) + "┤") -ForegroundColor Cyan
 $bottomSummary = " 耗时: {0}s" -f $elapsedSec
 if ($null -ne $totalDebt) { $bottomSummary += "  |  技术债: {0}项" -f $totalDebt }
 $bottomSummary += "  |  全局状态: {0}" -f $globalStatus
-Write-Host (Format-DashboardRow $bottomSummary $targetWidth) -ForegroundColor $globalColor
-Write-Host ("└" + ("─" * $targetWidth) + "┘") -ForegroundColor Cyan
-Write-Host "💡 统一审查快照已落盘至: .audit-logs/audit-latest.json | audit-latest.md" -ForegroundColor Gray
-Write-Host "💡 质量历史轨迹已追加至: .audit-logs/audit-history.jsonl" -ForegroundColor Gray
+Write-GateHost (Format-DashboardRow $bottomSummary $targetWidth) -ForegroundColor $globalColor
+Write-GateHost ("└" + ("─" * $targetWidth) + "┘") -ForegroundColor Cyan
+Write-GateHost "💡 统一审查快照已落盘至: .audit-logs/audit-latest.json | audit-latest.md" -ForegroundColor Gray
+Write-GateHost "💡 质量历史轨迹已追加至: .audit-logs/audit-history.jsonl" -ForegroundColor Gray
 
 if ($env:GITHUB_STEP_SUMMARY) {
     try {
@@ -1006,9 +975,9 @@ if ($CommitLedger) { $trajArg += "--commit-ledger" }
 Start-Process -FilePath $nodeCmd -ArgumentList $trajArg -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait | Out-Null
 
 if ($failed) {
-    Write-Host "❌ 审查中枢检测到未通过项，请排查修复对应项目" -ForegroundColor Red
+    Write-GateHost "❌ 审查中枢检测到未通过项，请排查修复对应项目" -ForegroundColor Red
     exit 1
 } else {
-    Write-Host "✅ 全工作区审查完成，所有项目健康合规" -ForegroundColor Green
+    Write-GateHost "✅ 全工作区审查完成，所有项目健康合规" -ForegroundColor Green
     exit 0
 }

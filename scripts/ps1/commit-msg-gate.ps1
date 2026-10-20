@@ -22,10 +22,18 @@ $ErrorActionPreference = 'Stop'
 
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+$PSNativeCommandUseErrorActionPreference = $true
+$PSNativeCommandArgumentPassing = 'Standard'
 $PSDefaultParameterValues['Get-Content:Encoding'] = 'utf8'
 $PSDefaultParameterValues['Set-Content:Encoding'] = 'utf8'
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+
+# 步骤身份、四态判定与超时诊断由共享运行时库提供，禁止在各门禁内复制实现。
+$script:GateRepoRoot = $repoRoot
+$script:GateEntryId = 'commit-msg'
+$script:GateSuppressOutput = [bool]$Agent
+. (Join-Path $PSScriptRoot "lib/gate-runtime.ps1")
 $nodeCmd = if ($IsWindows -or $env:OS -match "Windows") { "node.exe" } else { "node" }
 
 if ($ViewLog) {
@@ -48,59 +56,13 @@ if (-not $MsgFile -or -not (Test-Path $MsgFile -PathType Leaf)) {
             })
         } | ConvertTo-Json -Depth 5)
     } else {
-        Write-Host "❌ [FAIL] 提交信息文件不存在或未提供: $MsgFile" -ForegroundColor Red
+        Write-Host "❌ BLOCK  提交信息文件不存在或未提供: $MsgFile" -ForegroundColor Red
     }
     exit 1
 }
 
-$script:StepRegistryFile = Join-Path ((Resolve-Path (Join-Path $PSScriptRoot "../..")).Path) "scripts/common/gate-step-registry.json"
-$script:StepRegistry = $null
-$script:StepIndex = [ordered]@{}
-
-function Initialize-StepRegistry {
-    [CmdletBinding()]
-    param()
-    if ($script:StepRegistry) { return }
-    if (-not (Test-Path $script:StepRegistryFile)) {
-        throw "Gate step registry missing: $($script:StepRegistryFile)"
-    }
-    $script:StepRegistry = Get-Content -Path $script:StepRegistryFile -Raw -Encoding utf8 | ConvertFrom-Json
-    $entry = $script:StepRegistry.entries.'commit-msg'
-    if (-not $entry) { throw "Gate step registry declares no 'commit-msg' entry." }
-    $ordinal = 0
-    foreach ($step in $entry.steps) {
-        $ordinal++
-        $script:StepIndex[$step.id] = @{ Id = $step.id; Ordinal = $ordinal; Rule = $step.ruleId; Title = $step.title }
-    }
-}
 
 # 步骤身份只来自单源登记表：未知标识直接抛错，绝不回落到合成标识。
-function Write-StepVerdict {
-    [CmdletBinding()]
-    param([string]$StepId, [string]$Status, [string]$Detail = "")
-    Initialize-StepRegistry
-    if (-not $script:StepIndex.Contains($StepId)) {
-        throw "Unregistered gate step '$StepId'. Declare it in scripts/common/gate-step-registry.json."
-    }
-    $meta = $script:StepIndex[$StepId]
-    $glyph = switch ($Status) {
-        'PASS' { '✔' }
-        'BLOCK' { '✖' }
-        'SKIP' { '⚠️' }
-        'WARN' { '⚠️' }
-        default { '·' }
-    }
-    $color = switch ($Status) {
-        'PASS' { 'Green' }
-        'BLOCK' { 'Red' }
-        'SKIP' { 'Yellow' }
-        'WARN' { 'Yellow' }
-        default { 'Gray' }
-    }
-    $suffix = if ($Detail) { "  $Detail" } else { "" }
-    Write-Host "  $glyph $Status  $($meta.Id)  $($meta.Title)$suffix" -ForegroundColor $color
-}
-
 function Show-CommitTemplateGuide {
     [CmdletBinding()]
     param()
@@ -140,6 +102,14 @@ function Stop-CommitMsg {
         [string]$Expected = "",
         [string]$ActionableFix = ""
     )
+
+    # 失败判定必须绑定到登记的步骤身份：裸文本让操作者无从知道是哪一步阻断。
+    $stepMatch = [regex]::Match($Message, '\[([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*-\d{2})\]')
+    if ($stepMatch.Success) {
+        $failedStepId = $stepMatch.Groups[1].Value
+        Write-StepBanner -StepId $failedStepId
+        Write-StepVerdict -StepId $failedStepId -Status "BLOCK" -Detail $Message
+    }
 
     $diagDir = Join-Path $repoRoot ".audit-logs"
     if (-not (Test-Path $diagDir)) { [void](New-Item -ItemType Directory -Path $diagDir -Force) }
@@ -202,7 +172,7 @@ function Stop-CommitMsg {
         exit 1
     }
 
-    Write-Host "❌ [FAIL] ${RuleId}: $Message" -ForegroundColor Red
+    Write-Host "❌ BLOCK  ${RuleId}: $Message" -ForegroundColor Red
     if ($ActionableFix) {
         Write-Host "   💡 建议: $ActionableFix" -ForegroundColor Yellow
     }

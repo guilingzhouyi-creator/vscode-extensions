@@ -22,10 +22,18 @@ $ErrorActionPreference = 'Stop'
 
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+$PSNativeCommandUseErrorActionPreference = $true
+$PSNativeCommandArgumentPassing = 'Standard'
 $PSDefaultParameterValues['Get-Content:Encoding'] = 'utf8'
 $PSDefaultParameterValues['Set-Content:Encoding'] = 'utf8'
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "../..")).Path
+
+# 步骤身份、四态判定与超时诊断由共享运行时库提供，禁止在各门禁内复制实现。
+$script:GateRepoRoot = $repoRoot
+$script:GateEntryId = 'pre-commit'
+$script:GateSuppressOutput = [bool]$Agent
+. (Join-Path $PSScriptRoot "lib/gate-runtime.ps1")
 
 <#
 .SYNOPSIS
@@ -80,16 +88,16 @@ $pythonCmd = if (Get-Command python3.12 -ErrorAction SilentlyContinue) { "python
 $cargoCmd = if (Get-Command cargo -ErrorAction SilentlyContinue) { "cargo" } else { $null }
 
 if (-not $nodeCmd) {
-    Write-Host "❌ [BLOCK] 未检测到 Node.js 运行时，提交前门禁无法执行。" -ForegroundColor Red
-    Write-Host "   探测顺序: PATH -> `$env:NODE_HOME -> Program Files\nodejs -> LOCALAPPDATA\Programs\nodejs" -ForegroundColor Yellow
-    Write-Host "   修复: 安装 Node.js 20+ 加入 PATH，或设置 `$env:NODE_HOME 指向安装目录。" -ForegroundColor Yellow
-    Write-Host "   该门禁为 fail-closed：缺少运行时不得静默放行 (GUARD-SYS-001)。" -ForegroundColor Yellow
+    Write-GateHost "❌ [BLOCK] 未检测到 Node.js 运行时，提交前门禁无法执行。" -ForegroundColor Red
+    Write-GateHost "   探测顺序: PATH -> `$env:NODE_HOME -> Program Files\nodejs -> LOCALAPPDATA\Programs\nodejs" -ForegroundColor Yellow
+    Write-GateHost "   修复: 安装 Node.js 20+ 加入 PATH，或设置 `$env:NODE_HOME 指向安装目录。" -ForegroundColor Yellow
+    Write-GateHost "   该门禁为 fail-closed：缺少运行时不得静默放行 (GUARD-SYS-001)。" -ForegroundColor Yellow
     exit 1
 }
 
 if (-not $npmCmd) {
-    Write-Host "❌ [BLOCK] 未检测到 npm 包管理器，提交前门禁无法执行增量编译校验。" -ForegroundColor Red
-    Write-Host "   修复: 随 Node.js 一并安装 npm，并确保其与 node 同目录或在 PATH 中。" -ForegroundColor Yellow
+    Write-GateHost "❌ [BLOCK] 未检测到 npm 包管理器，提交前门禁无法执行增量编译校验。" -ForegroundColor Red
+    Write-GateHost "   修复: 随 Node.js 一并安装 npm，并确保其与 node 同目录或在 PATH 中。" -ForegroundColor Yellow
     exit 1
 }
 
@@ -106,74 +114,8 @@ if (-not $env:XDG_CONFIG_HOME) { $env:XDG_CONFIG_HOME = (Get-Location).Path }
 
 $runId = [Guid]::NewGuid().ToString('N').Substring(0, 12)
 
-$script:StepRegistryFile = Join-Path $repoRoot "scripts/common/gate-step-registry.json"
-$script:StepRegistry = $null
-$script:StepIndex = [ordered]@{}
-
-function Initialize-StepRegistry {
-    [CmdletBinding()]
-    param()
-    if ($script:StepRegistry) { return }
-    if (-not (Test-Path $script:StepRegistryFile)) {
-        throw "Gate step registry missing: $($script:StepRegistryFile)"
-    }
-    $script:StepRegistry = Get-Content -Path $script:StepRegistryFile -Raw -Encoding utf8 | ConvertFrom-Json
-    $entry = $script:StepRegistry.entries.'pre-commit'
-    if (-not $entry) { throw "Gate step registry declares no 'pre-commit' entry." }
-    $ordinal = 0
-    foreach ($step in $entry.steps) {
-        $ordinal++
-        $script:StepIndex[$step.id] = @{ Id = $step.id; Ordinal = $ordinal; Rule = $step.ruleId; Title = $step.title }
-    }
-}
 
 # 步骤身份只来自单源登记表：未知标识直接抛错，绝不回落到合成标识。
-function Resolve-StepMeta {
-    [CmdletBinding()]
-    param([string]$StepId)
-    Initialize-StepRegistry
-    if (-not $script:StepIndex.Contains($StepId)) {
-        throw "Unregistered gate step '$StepId'. Declare it in scripts/common/gate-step-registry.json."
-    }
-    return $script:StepIndex[$StepId]
-}
-
-function Get-StepTotal {
-    [CmdletBinding()]
-    param()
-    Initialize-StepRegistry
-    return $script:StepRegistry.entries.'pre-commit'.steps.Count
-}
-
-function Write-StepBanner {
-    [CmdletBinding()]
-    param([string]$StepId)
-    $meta = Resolve-StepMeta -StepId $StepId
-    Write-Host "▶ [$($meta.Ordinal)/$(Get-StepTotal)] $($meta.Id)  $($meta.Title)" -ForegroundColor Gray
-}
-
-function Write-StepVerdict {
-    [CmdletBinding()]
-    param([string]$StepId, [string]$Status, [string]$Detail = "")
-    $meta = Resolve-StepMeta -StepId $StepId
-    $glyph = switch ($Status) {
-        'PASS' { '✔' }
-        'BLOCK' { '✖' }
-        'SKIP' { '⚠️' }
-        'WARN' { '⚠️' }
-        default { '·' }
-    }
-    $color = switch ($Status) {
-        'PASS' { 'Green' }
-        'BLOCK' { 'Red' }
-        'SKIP' { 'Yellow' }
-        'WARN' { 'Yellow' }
-        default { 'Gray' }
-    }
-    $suffix = if ($Detail) { "  $Detail" } else { "" }
-    Write-Host "  $glyph $Status  $($meta.Id)$suffix" -ForegroundColor $color
-}
-
 function Write-PreCommitFailure {
     [CmdletBinding()]
     param(
@@ -252,18 +194,49 @@ function Write-PreCommitFailure {
     return $snapshotJson
 }
 
-function Invoke-ChildCommand {
+<#
+.SYNOPSIS
+    启动子进程并把双流收进临时文件，超出预算即级联终止。
+.DESCRIPTION
+    早期实现执行 scriptblock，无法把工作目录与命令行安全交给子进程，因此没有任何超时上限：
+    一次挂起的 npm 或 vitest 会让提交无限阻塞。这里改为显式 FilePath + ArgumentList，
+    并复用共享运行时的看门狗，超时按退出码 124 上报。
+.PARAMETER Output
+    返回对象携带标准输出与标准错误的合并行，供失败信封记录详情。
+#>
+function Invoke-ChildProcess {
     [CmdletBinding()]
     param(
-        [string]$WorkingDir,
-        [scriptblock]$Action
+        [Parameter(Mandatory = $true)][string]$FilePath,
+        [string[]]$ArgumentList = @(),
+        [Parameter(Mandatory = $true)][string]$WorkingDirectory,
+        [int]$TimeoutSeconds = 180
     )
-    Push-Location $WorkingDir
+
+    $stdoutFile = Join-Path ([System.IO.Path]::GetTempPath()) "gate-child-$([guid]::NewGuid().ToString('N')).out"
+    $stderrFile = Join-Path ([System.IO.Path]::GetTempPath()) "gate-child-$([guid]::NewGuid().ToString('N')).err"
+    $lines = @()
+    $exitCode = 0
     try {
-        & $Action
+        $proc = Start-Process -FilePath $FilePath -ArgumentList $ArgumentList -WorkingDirectory $WorkingDirectory `
+            -RedirectStandardOutput $stdoutFile -RedirectStandardError $stderrFile -NoNewWindow -PassThru
+        $ok = Wait-ProcessWithTimeout -Process $proc -TimeoutSeconds $TimeoutSeconds `
+            -ProcessName ([System.IO.Path]::GetFileName($FilePath)) -LogFiles @($stdoutFile, $stderrFile) -DiagPrefix "timeout-child"
+        if (-not $ok) {
+            $exitCode = 124
+        } else {
+            $exitCode = $proc.ExitCode
+        }
+        foreach ($file in @($stdoutFile, $stderrFile)) {
+            if (Test-Path $file) {
+                $content = Get-Content -Path $file -Encoding utf8 -ErrorAction SilentlyContinue
+                if ($content) { $lines += $content }
+            }
+        }
     } finally {
-        Pop-Location
+        Remove-Item -Path $stdoutFile, $stderrFile -Force -ErrorAction SilentlyContinue
     }
+    return [PSCustomObject]@{ ExitCode = $exitCode; Output = $lines }
 }
 
 <#
@@ -292,7 +265,7 @@ function Start-GateProcess {
     }
 
     try { $proc.Kill($true) } catch { }
-    Write-Host "  ⏱️  [TIMEOUT] '$FilePath' exceeded ${TimeoutSeconds}s and was terminated." -ForegroundColor Yellow
+    Write-GateHost "  ⏱️  [TIMEOUT] '$FilePath' exceeded ${TimeoutSeconds}s and was terminated." -ForegroundColor Yellow
     return [PSCustomObject]@{ ExitCode = 124; Id = $proc.Id }
 }
 
@@ -328,26 +301,27 @@ if ($rootClutter) {
         exit 1
     } else {
         Write-StepVerdict -StepId "STAGED-HYGIENE-01" -Status "BLOCK" -Detail "根目录存在散落脚本或未受控临时脏文件: $badFile"
-        Write-Host "   $actionableFix" -ForegroundColor Yellow
+        Write-GateHost "   $actionableFix" -ForegroundColor Yellow
         exit 1
     }
 }
 
 # 获取暂存区文件列表
-$stagedFiles = @(git diff --cached --name-only "--diff-filter=ACM" 2>$null)
+$stagedFiles = @()
+try { $stagedFiles = @(git diff --cached --name-only "--diff-filter=ACM" 2>$null) } catch { $stagedFiles = @() }
 if (-not $stagedFiles -or $stagedFiles.Count -eq 0 -or ($stagedFiles.Count -eq 1 -and [string]::IsNullOrWhiteSpace($stagedFiles[0]))) {
     if ($Agent) {
         Write-Output '{"protocolVersion":"1.0.0","status":"PASS","gate":"pre-commit","summary":"No staged files to check."}'
         exit 0
     }
-    Write-Host "ℹ️  暂存区无文件变更，跳过 pre-commit 检查。" -ForegroundColor Yellow
+    Write-GateHost "ℹ️  暂存区无文件变更，跳过 pre-commit 检查。" -ForegroundColor Yellow
     exit 0
 }
 
 if (-not $Agent) {
-    Write-Host "=================================================================" -ForegroundColor Cyan
-    Write-Host "🔒 执行本地 Pre-Commit 质量安全与物理卫生检查 (PowerShell 版)" -ForegroundColor Cyan
-    Write-Host "=================================================================" -ForegroundColor Cyan
+    Write-GateHost "=================================================================" -ForegroundColor Cyan
+    Write-GateHost "🔒 执行本地 Pre-Commit 质量安全与物理卫生检查 (PowerShell 版)" -ForegroundColor Cyan
+    Write-GateHost "=================================================================" -ForegroundColor Cyan
 }
 
 $failed = $false
@@ -375,6 +349,8 @@ if ($Agent) {
     if ($resFast.ExitCode -ne 0) {
         Write-StepVerdict -StepId "STAGED-HYGIENE-01" -Status "BLOCK" -Detail "暂存区物理卫生与安全审查未通过"
         $failed = $true
+    } else {
+        Write-StepVerdict -StepId "STAGED-HYGIENE-01" -Status "PASS" -Detail "暂存区物理卫生与安全审查通过"
     }
 }
 
@@ -383,8 +359,9 @@ $touchesRules = $stagedFiles | Where-Object { $_ -match "auto-refactor/src/core/
 if ($touchesRules) {
     if (-not $Agent) { Write-StepBanner -StepId "RULE-REGISTRY-02" }
     if ($Agent) {
-        $out = Invoke-ChildCommand -WorkingDir (Join-Path $repoRoot "auto-refactor") -Action { & $npmCmd run validate-rules-registry 2>&1 }
-        if ($LASTEXITCODE -ne 0) {
+        $childRes = Invoke-ChildProcess -FilePath $npmCmd -ArgumentList @("run", "validate-rules-registry") -WorkingDirectory (Join-Path $repoRoot "auto-refactor") -TimeoutSeconds 120
+        $out = $childRes.Output
+        if ($childRes.ExitCode -ne 0) {
             $json = Write-PreCommitFailure `
                 -StepId "RULE-REGISTRY-02" `
                 -RuleId "RCFG-RULE-DRIFT" `
@@ -436,7 +413,7 @@ if ($touchesSkills) {
 }
 
 # --- 项目增量编译与语法验证 (精准增量触发) ---
-if (-not $Agent) { Write-StepBanner -StepId "EXTENSION-COMPILE-04" }
+# 横幅由各步骤自身的触发分支渲染：入口处再打印一次会让同一标识出现两条横幅。
 $hasWtCompile = $stagedFiles | Where-Object { $_ -match "^workspace-timing/(src/.+\.ts|tsconfig.*\.json)" }
 $hasArCompile = $stagedFiles | Where-Object { $_ -match "^auto-refactor/(src/.+\.ts|tsconfig.*\.json)" }
 $hasWgAudit = $stagedFiles | Where-Object { $_ -match "^WebGames/(config/|scripts/py/audit_config\.py)" }
@@ -445,8 +422,9 @@ $hasFgCompile = $stagedFiles | Where-Object { $_ -match "^fractal-git/(crates/.+
 if ($hasWtCompile) {
     if (-not $Agent) { Write-StepBanner -StepId "EXTENSION-COMPILE-04" }
     if ($Agent) {
-        $out = Invoke-ChildCommand -WorkingDir (Join-Path $repoRoot "workspace-timing") -Action { & $npmCmd run compile 2>&1 }
-        if ($LASTEXITCODE -ne 0) {
+        $childRes = Invoke-ChildProcess -FilePath $npmCmd -ArgumentList @("run", "compile") -WorkingDirectory (Join-Path $repoRoot "workspace-timing") -TimeoutSeconds 120
+        $out = $childRes.Output
+        if ($childRes.ExitCode -ne 0) {
             $json = Write-PreCommitFailure `
                 -StepId "EXTENSION-COMPILE-04" `
                 -RuleId "L0-COMPILE" `
@@ -463,14 +441,17 @@ if ($hasWtCompile) {
         if ($process.ExitCode -ne 0) {
             Write-StepVerdict -StepId "EXTENSION-COMPILE-04" -Status "BLOCK" -Detail "workspace-timing 编译失败"
             $failed = $true
+        } else {
+            Write-StepVerdict -StepId "EXTENSION-COMPILE-04" -Status "PASS" -Detail "workspace-timing 增量编译通过"
         }
     }
 
     if (-not $failed) {
         if (-not $Agent) { Write-StepBanner -StepId "EXTENSION-TESTS-05" }
         if ($Agent) {
-            $outFast = Invoke-ChildCommand -WorkingDir (Join-Path $repoRoot "workspace-timing") -Action { & $npmCmd run test:fast 2>&1 }
-            if ($LASTEXITCODE -ne 0) {
+            $childFast = Invoke-ChildProcess -FilePath $npmCmd -ArgumentList @("run", "test:fast") -WorkingDirectory (Join-Path $repoRoot "workspace-timing") -TimeoutSeconds 120
+            $outFast = $childFast.Output
+            if ($childFast.ExitCode -ne 0) {
                 $json = Write-PreCommitFailure `
                     -StepId "EXTENSION-TESTS-05" `
                     -RuleId "GUARD-SYS-001" `
@@ -500,16 +481,20 @@ $hasWtDoc = $stagedFiles | Where-Object { $_ -match "^workspace-timing/(CHANGELO
 if ($hasWtDoc) {
     if (-not $Agent) { Write-StepBanner -StepId "EXTENSION-DOCS-06" }
     if ($Agent) {
-        $out = Invoke-ChildCommand -WorkingDir (Join-Path $repoRoot "workspace-timing") -Action {
-            $buildLog = @()
-            if (-not (Test-Path "scripts/dist/audit/text-layout.js")) {
-                $buildLog = & $npmCmd run scripts:build 2>&1
-                if ($LASTEXITCODE -ne 0) { return $buildLog }
-            }
-            $runLog = & $nodeCmd "scripts/dist/audit/text-layout.js" 2>&1
-            return @($buildLog) + @($runLog)
+        $wtLayoutDir = Join-Path $repoRoot "workspace-timing"
+        $out = @()
+        $layoutExit = 0
+        if (-not (Test-Path (Join-Path $wtLayoutDir "scripts/dist/audit/text-layout.js"))) {
+            $buildRes = Invoke-ChildProcess -FilePath $npmCmd -ArgumentList @("run", "scripts:build") -WorkingDirectory $wtLayoutDir -TimeoutSeconds 120
+            $out += $buildRes.Output
+            $layoutExit = $buildRes.ExitCode
         }
-        if ($LASTEXITCODE -ne 0) {
+        if ($layoutExit -eq 0) {
+            $runRes = Invoke-ChildProcess -FilePath $nodeCmd -ArgumentList @("scripts/dist/audit/text-layout.js") -WorkingDirectory $wtLayoutDir -TimeoutSeconds 60
+            $out += $runRes.Output
+            $layoutExit = $runRes.ExitCode
+        }
+        if ($layoutExit -ne 0) {
             $json = Write-PreCommitFailure `
                 -StepId "EXTENSION-DOCS-06" `
                 -RuleId "L3-DOC-LAYOUT" `
@@ -526,7 +511,7 @@ if ($hasWtDoc) {
         $wtLayoutArtifact = Join-Path $wtLayoutDir "scripts/dist/audit/text-layout.js"
         $wtLayoutReady = $true
         if (-not (Test-Path $wtLayoutArtifact)) {
-            Write-Host "  ▶ 构建 workspace-timing 审查脚本产物 (npm run scripts:build)..." -ForegroundColor Cyan
+            Write-GateHost "  ▶ 构建 workspace-timing 审查脚本产物 (npm run scripts:build)..." -ForegroundColor Cyan
             $buildProc = Start-GateProcess -FilePath $npmCmd -ArgumentList "run", "scripts:build" -WorkingDirectory $wtLayoutDir
             if ($buildProc.ExitCode -ne 0) {
                 Write-StepVerdict -StepId "EXTENSION-DOCS-06" -Status "BLOCK" -Detail "审查脚本构建失败"
@@ -549,8 +534,9 @@ if ($hasWtDoc) {
 if ($hasArCompile) {
     if (-not $Agent) { Write-StepBanner -StepId "ENGINE-COMPILE-07" }
     if ($Agent) {
-        $out = Invoke-ChildCommand -WorkingDir (Join-Path $repoRoot "auto-refactor") -Action { & $npmCmd run build 2>&1 }
-        if ($LASTEXITCODE -ne 0) {
+        $childBuild = Invoke-ChildProcess -FilePath $npmCmd -ArgumentList @("run", "build") -WorkingDirectory (Join-Path $repoRoot "auto-refactor") -TimeoutSeconds 180
+        $out = $childBuild.Output
+        if ($childBuild.ExitCode -ne 0) {
             $json = Write-PreCommitFailure `
                 -StepId "ENGINE-COMPILE-07" `
                 -RuleId "L0-COMPILE" `
@@ -567,6 +553,8 @@ if ($hasArCompile) {
         if ($process.ExitCode -ne 0) {
             Write-StepVerdict -StepId "ENGINE-COMPILE-07" -Status "BLOCK" -Detail "auto-refactor 编译失败"
             $failed = $true
+        } else {
+            Write-StepVerdict -StepId "ENGINE-COMPILE-07" -Status "PASS" -Detail "auto-refactor 增量编译通过"
         }
     }
 
@@ -577,10 +565,10 @@ if ($hasArCompile) {
             if (-not $Agent) { Write-StepBanner -StepId "ENGINE-TESTS-08" }
             $npxCmd = if ($IsWindows -or $env:OS -match "Windows") { "npx.cmd" } else { "npx" }
             if ($Agent) {
-                $outVitest = Invoke-ChildCommand -WorkingDir (Join-Path $repoRoot "auto-refactor") -Action {
-                    & $npxCmd vitest related $arRelArgs --run 2>&1
-                }
-                if ($LASTEXITCODE -ne 0) {
+                $vitestArgs = @("vitest", "related") + $arRelArgs + @("--run")
+                $childVitest = Invoke-ChildProcess -FilePath $npxCmd -ArgumentList $vitestArgs -WorkingDirectory (Join-Path $repoRoot "auto-refactor") -TimeoutSeconds 180
+                $outVitest = $childVitest.Output
+                if ($childVitest.ExitCode -ne 0) {
                     $json = Write-PreCommitFailure `
                         -StepId "ENGINE-TESTS-08" `
                         -RuleId "GUARD-SYS-001" `
@@ -629,6 +617,8 @@ if ($hasWgAudit) {
         if ($process.ExitCode -ne 0) {
             Write-StepVerdict -StepId "DOMAIN-CONFIG-09" -Status "BLOCK" -Detail "WebGames 配置架构审查未通过"
             $failed = $true
+        } else {
+            Write-StepVerdict -StepId "DOMAIN-CONFIG-09" -Status "PASS" -Detail "WebGames 配置架构审查通过"
         }
     }
 }
@@ -662,7 +652,7 @@ if ($hasFgCompile) {
         }
     } else {
         if (-not $Agent) {
-            Write-Host "  ⚠️ 未检测到 cargo 命令，跳过 fractal-git 本地编译校验（将在 CI 门禁中强制验证）" -ForegroundColor Yellow
+            Write-GateHost "  ⚠️ 未检测到 cargo 命令，跳过 fractal-git 本地编译校验（将在 CI 门禁中强制验证）" -ForegroundColor Yellow
         }
     }
 } elseif (-not $Agent -and ($stagedFiles | Where-Object { $_ -match "^fractal-git/" })) {
@@ -689,6 +679,8 @@ if ($touchedCode) {
         if ($process.ExitCode -ne 0) {
             Write-StepVerdict -StepId "STAGED-SLICE-11" -Status "BLOCK" -Detail "暂存区 AST 切片审查未通过"
             $failed = $true
+        } else {
+            Write-StepVerdict -StepId "STAGED-SLICE-11" -Status "PASS" -Detail "暂存区 AST 切片复杂度合规"
         }
     }
 } elseif (-not $Agent) {
@@ -714,6 +706,8 @@ if ($touchedAuditable) {
         if ($resDensity.ExitCode -ne 0) {
             Write-StepVerdict -StepId "STAGED-DENSITY-12" -Status "BLOCK" -Detail "暂存区代码密度与接线载荷审查未通过"
             $failed = $true
+        } else {
+            Write-StepVerdict -StepId "STAGED-DENSITY-12" -Status "PASS" -Detail "暂存区代码密度与接线载荷合规"
         }
     }
 }
@@ -739,6 +733,8 @@ if ($touchedAuditable) {
         if ($resEloc.ExitCode -ne 0) {
             Write-StepVerdict -StepId "STAGED-VOLUME-13" -Status "BLOCK" -Detail "暂存区双轨体积与动态包络审查未通过"
             $failed = $true
+        } else {
+            Write-StepVerdict -StepId "STAGED-VOLUME-13" -Status "PASS" -Detail "暂存区双轨体积与动态包络合规"
         }
     }
 }
@@ -748,7 +744,7 @@ if ($Agent) {
     exit 0
 }
 
-Write-Host "=================================================================" -ForegroundColor Cyan
+Write-GateHost "=================================================================" -ForegroundColor Cyan
 if ($failed) {
     try {
         $diagDir = Join-Path $repoRoot ".audit-logs"
@@ -764,14 +760,14 @@ if ($failed) {
         [System.IO.File]::WriteAllLines($failLog, $diagLines, [System.Text.UTF8Encoding]::new($false))
     } catch {}
 
-    Write-Host "❌ 【门禁结论】Pre-Commit 检查未通过，已阻断提交！请根据上方提示修复后重试。" -ForegroundColor Red
-    Write-Host "💡 失败诊断快照已保留至: .audit-logs/last-pre-commit.log" -ForegroundColor Yellow
-    Write-Host "   (可运行 pwsh -File scripts/ps1/pre-commit-gate.ps1 -ViewLog 快速查看)" -ForegroundColor Yellow
-    Write-Host "   (Agent 消费模式: pwsh -File scripts/ps1/pre-commit-gate.ps1 -Agent)" -ForegroundColor Yellow
-    Write-Host "=================================================================" -ForegroundColor Cyan
+    Write-GateHost "❌ 【门禁结论】Pre-Commit 检查未通过，已阻断提交！请根据上方提示修复后重试。" -ForegroundColor Red
+    Write-GateHost "💡 失败诊断快照已保留至: .audit-logs/last-pre-commit.log" -ForegroundColor Yellow
+    Write-GateHost "   (可运行 pwsh -File scripts/ps1/pre-commit-gate.ps1 -ViewLog 快速查看)" -ForegroundColor Yellow
+    Write-GateHost "   (Agent 消费模式: pwsh -File scripts/ps1/pre-commit-gate.ps1 -Agent)" -ForegroundColor Yellow
+    Write-GateHost "=================================================================" -ForegroundColor Cyan
     exit 1
 } else {
-    Write-Host "✅ Pre-Commit 检查通过" -ForegroundColor Green
-    Write-Host "=================================================================" -ForegroundColor Cyan
+    Write-GateHost "✅ Pre-Commit 检查通过" -ForegroundColor Green
+    Write-GateHost "=================================================================" -ForegroundColor Cyan
     exit 0
 }

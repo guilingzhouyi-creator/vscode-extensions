@@ -15,6 +15,10 @@ set -euo pipefail
 NODE_BIN=$(command -v node 2>/dev/null || command -v node.exe 2>/dev/null || echo "node")
 ROOT_DIR=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
 
+# 步骤身份、四态判定与超时诊断由共享运行时库提供，禁止在各门禁内复制实现。
+GATE_ROOT_DIR="$ROOT_DIR"
+GATE_NODE_BIN="${NODE_BIN:-node}"
+
 IS_AGENT=0
 MSG_FILE=""
 
@@ -33,6 +37,11 @@ for arg in "$@"; do
             ;;
     esac
 done
+
+GATE_SUPPRESS="$IS_AGENT"
+# shellcheck source=scripts/sh/lib/gate-runtime.sh
+. "$ROOT_DIR/scripts/sh/lib/gate-runtime.sh"
+gate_init commit-msg
 
 if [[ -z "$MSG_FILE" ]]; then
     if [[ "$IS_AGENT" -eq 1 ]]; then
@@ -75,7 +84,7 @@ if [[ ! -f "$MSG_FILE" ]]; then
 EOF
         exit 1
     fi
-    echo "❌ [FAIL] 提交信息文件不存在: $MSG_FILE"
+    echo "❌ BLOCK  提交信息文件不存在: $MSG_FILE"
     exit 1
 fi
 
@@ -111,6 +120,14 @@ fail_commit_msg() {
     local actual="${3:-}"
     local expected="${4:-}"
     local actionable_fix="${5:-}"
+
+    # 失败判定必须绑定到登记的步骤身份：裸文本让操作者无从知道是哪一步阻断。
+    local failed_step_id
+    if [[ "$message" =~ \[([A-Z][A-Z0-9]*(-[A-Z0-9]+)*-[0-9]{2})\] ]]; then
+        failed_step_id="${BASH_REMATCH[1]}"
+        write_step_banner "$failed_step_id"
+        write_step_verdict "$failed_step_id" BLOCK "$message"
+    fi
 
     DIAG_DIR="$ROOT_DIR/.audit-logs"
     mkdir -p "$DIAG_DIR" 2>/dev/null || true
@@ -167,7 +184,7 @@ EOF
         exit 1
     fi
 
-    echo "❌ [FAIL] ${rule_id}: $message"
+    echo "❌ BLOCK  ${rule_id}: $message"
     if [[ -n "$actionable_fix" ]]; then
         echo "   💡 建议: $actionable_fix"
     fi
@@ -424,20 +441,29 @@ else
     fi
 fi
 
-echo "  ✔ PASS  HEADER-FORM-01  标题格式与长度  标题格式与长度合规"
-echo "  ✔ PASS  SLANG-GUARD-02  标题零黑话与空洞词  零黑话与空洞词"
-echo "  ✔ PASS  BODY-SPLIT-03  标题与正文空行分割契约  空行分割契约合规"
-echo "  ✔ PASS  BODY-DENSITY-04  正文实质字数与信息密度  正文实质字数 $BODY_SUBSTANTIVE_CHARS 达标"
-echo "  ✔ PASS  BODY-SECTIONS-05  结构化区块完整性  结构化区块完整"
+write_step_banner "HEADER-FORM-01"
+write_step_verdict "HEADER-FORM-01" PASS "标题格式与长度合规"
+write_step_banner "SLANG-GUARD-02"
+write_step_verdict "SLANG-GUARD-02" PASS "零黑话与空洞词"
+write_step_banner "BODY-SPLIT-03"
+write_step_verdict "BODY-SPLIT-03" PASS "空行分割契约合规"
+write_step_banner "BODY-DENSITY-04"
+write_step_verdict "BODY-DENSITY-04" PASS "正文实质字数 $BODY_SUBSTANTIVE_CHARS 达标"
+write_step_banner "BODY-SECTIONS-05"
+write_step_verdict "BODY-SECTIONS-05" PASS "结构化区块完整"
+write_step_banner "PROJECT-SCOPE-06"
 if [[ ${#DECLARED_PROJECTS[@]} -gt 0 ]]; then
     PROJ_STR=$(IFS=', '; echo "${DECLARED_PROJECTS[*]}")
-    echo "  ✔ PASS  PROJECT-SCOPE-06  项目归属格式区与合法枚举  项目归属合规 ([Project: $PROJ_STR])"
+    write_step_verdict "PROJECT-SCOPE-06" PASS "项目归属合规 ([Project: $PROJ_STR])"
 else
-    echo "  ⚠️ SKIP  PROJECT-SCOPE-06  项目归属格式区与合法枚举  免检类型，不强制项目归属"
+    write_step_verdict "PROJECT-SCOPE-06" SKIP "免检类型，不强制项目归属"
 fi
-echo "  ✔ PASS  BATCH-CODE-07  正文零批次代号与工期黑话  正文零批次代号"
-echo "  ✔ PASS  RULE-TRUTH-08  规则标识反虚构  规则标识反虚构"
-echo "  ✔ PASS  TEXT-TRUTH-09  提交文本求真务实与禁词  文本求真务实与禁词合规"
+write_step_banner "BATCH-CODE-07"
+write_step_verdict "BATCH-CODE-07" PASS "正文零批次代号"
+write_step_banner "RULE-TRUTH-08"
+write_step_verdict "RULE-TRUTH-08" PASS "规则标识反虚构"
+write_step_banner "TEXT-TRUTH-09"
+write_step_verdict "TEXT-TRUTH-09" PASS "文本求真务实与禁词合规"
 echo "================================================================="
 echo "✅ Commit-Msg 检查通过"
 echo "================================================================="

@@ -60,8 +60,16 @@ fi
 FAILED=0
 START_TIME=$("$NODE_BIN" -e 'process.stdout.write(Date.now().toString())')
 
+# 步骤身份与四态判定由共享运行时库提供，禁止在本 Runner 内复制实现。
+GATE_ROOT_DIR="$ROOT_DIR"
+GATE_NODE_BIN="$NODE_BIN"
+GATE_SUPPRESS=$([[ "$JSON_MODE" -eq 1 || "$AGENT_MODE" -eq 1 ]] && echo 1 || echo 0)
+# shellcheck source=scripts/sh/lib/gate-runtime.sh
+. "$ROOT_DIR/scripts/sh/lib/gate-runtime.sh"
+gate_init audit-all
+
 # 1. 物理卫生八维刚性公理与全域巡检
-if [[ "$JSON_MODE" -eq 0 && "$AGENT_MODE" -eq 0 ]]; then echo "▶ [1/6] WORKSPACE-AUDIT-01  全工作区物理卫生、同构脚本、.gitignore、代码密度与体积"; fi
+write_step_banner "WORKSPACE-AUDIT-01"
 LOG_HYGIENE=$(mktemp)
 CODE_HYGIENE=0
 "$NODE_BIN" scripts/common/validate-physical-hygiene.js --json >"$LOG_HYGIENE" 2>&1 || CODE_HYGIENE=$?
@@ -75,17 +83,21 @@ CODE_ELOC=0
 "$NODE_BIN" scripts/common/evaluate-eloc-budget.js --all >/dev/null 2>&1 || CODE_ELOC=$?
 if [[ "$CODE_HYGIENE" -ne 0 || "$CODE_ISO" -ne 0 || "$CODE_GI" -ne 0 || "$CODE_DENSITY" -ne 0 || "$CODE_ELOC" -ne 0 ]]; then
     STATUS_HYGIENE="FAIL"
+    write_step_verdict "WORKSPACE-AUDIT-01" BLOCK "物理卫生、同构脚本、.gitignore、代码密度或体积审查未通过"
     FAILED=1
 else
     STATUS_HYGIENE="PASS"
+    write_step_verdict "WORKSPACE-AUDIT-01" PASS "物理卫生八维、同构脚本、.gitignore、代码密度与体积合规"
 fi
 
 # 2. 单源规则注册表与目录一致性及技能集规范
-if [[ "$JSON_MODE" -eq 0 && "$AGENT_MODE" -eq 0 ]]; then echo "▶ [2/6] RULE-AUDIT-02  单源规则目录、闭包与可达性、文档一致性与轨迹账本"; fi
+write_step_banner "RULE-AUDIT-02"
 CODE_CATALOG=0
 "$NODE_BIN" scripts/common/generate-rule-catalog.js --check-only >/dev/null 2>&1 || CODE_CATALOG=$?
 CODE_FEEDBACK=0
 "$NODE_BIN" scripts/common/validate-gate-feedback.js >/dev/null 2>&1 || CODE_FEEDBACK=$?
+CODE_ORDERING=0
+"$NODE_BIN" scripts/common/validate-gate-ordering.js >/dev/null 2>&1 || CODE_ORDERING=$?
 CODE_SKILLS=0
 "$NODE_BIN" scripts/common/validate-skills.js >/dev/null 2>&1 || CODE_SKILLS=$?
 CODE_CLOSURE=0
@@ -96,11 +108,13 @@ CODE_DOCS=0
 "$NODE_BIN" scripts/common/validate-docs-consistency.js >/dev/null 2>&1 || CODE_DOCS=$?
 CODE_LEDGER=0
 "$NODE_BIN" scripts/common/validate-trajectory-ledger.js >/dev/null 2>&1 || CODE_LEDGER=$?
-if [[ "$CODE_CATALOG" -ne 0 || "$CODE_FEEDBACK" -ne 0 || "$CODE_SKILLS" -ne 0 || "$CODE_CLOSURE" -ne 0 || "$CODE_REACH" -ne 0 || "$CODE_DOCS" -ne 0 || "$CODE_LEDGER" -ne 0 ]]; then
+if [[ "$CODE_CATALOG" -ne 0 || "$CODE_FEEDBACK" -ne 0 || "$CODE_ORDERING" -ne 0 || "$CODE_SKILLS" -ne 0 || "$CODE_CLOSURE" -ne 0 || "$CODE_REACH" -ne 0 || "$CODE_DOCS" -ne 0 || "$CODE_LEDGER" -ne 0 ]]; then
     STATUS_RULES="FAIL"
+    write_step_verdict "RULE-AUDIT-02" BLOCK "规则目录同步、闭包、可达性、文档一致性、技能集或轨迹账本审查未通过"
     FAILED=1
 else
     STATUS_RULES="PASS"
+    write_step_verdict "RULE-AUDIT-02" PASS "单源规则目录、闭包、可达性、文档一致性、技能集与轨迹账本合规"
 fi
 
 LOG_WT=$(mktemp)
@@ -161,12 +175,10 @@ wait_with_timeout() {
 }
 
 # 3~6. 并行并发调度 workspace-timing、WebGames、auto-refactor 与 fractal-git 四大项目审查
-if [[ "$JSON_MODE" -eq 0 && "$AGENT_MODE" -eq 0 ]]; then
-    echo "▶ [3/6] EXTENSION-AUDIT-03  并行调度 workspace-timing 审查"
-    echo "▶ [4/6] DOMAIN-AUDIT-04  并行调度 WebGames 领域配置与架构审查"
-    echo "▶ [5/6] ENGINE-AUDIT-05  并行调度 auto-refactor 静态引擎多维自审"
-    echo "▶ [6/6] RUST-AUDIT-06  并行调度 fractal-git 微 Crate 回归套件"
-fi
+write_step_banner "EXTENSION-AUDIT-03"
+write_step_banner "DOMAIN-AUDIT-04"
+write_step_banner "ENGINE-AUDIT-05"
+write_step_banner "RUST-AUDIT-06"
 
 # 并发拉起四大项目审查任务 (后台异步派发)
 (cd workspace-timing && "$NPM_BIN" run review) >"$LOG_WT" 2>&1 &
@@ -209,7 +221,10 @@ CODE_WT=0
 wait_with_timeout "$PID_WT" "$TIMEOUT_WT" "workspace-timing" "$LOG_WT" || CODE_WT=$?
 if [[ "$CODE_WT" -ne 0 ]]; then
     STATUS_WT="FAIL"
+    write_step_verdict "EXTENSION-AUDIT-03" BLOCK "workspace-timing 审查门禁未通过"
     FAILED=1
+else
+    write_step_verdict "EXTENSION-AUDIT-03" PASS "workspace-timing 审查门禁通过"
 fi
 
 STATUS_WG="PASS"
@@ -217,7 +232,10 @@ CODE_WG=0
 wait_with_timeout "$PID_WG" "$TIMEOUT_WG" "WebGames" "$LOG_WG" || CODE_WG=$?
 if [[ "$CODE_WG" -ne 0 ]]; then
     STATUS_WG="FAIL"
+    write_step_verdict "DOMAIN-AUDIT-04" BLOCK "WebGames 领域配置与架构审查未通过"
     FAILED=1
+else
+    write_step_verdict "DOMAIN-AUDIT-04" PASS "WebGames 领域配置与架构审查通过"
 fi
 
 STATUS_AR="PASS"
@@ -250,6 +268,13 @@ if [[ -n "$PID_FG" ]]; then
     fi
 fi
 
+# 判定在 cargo 套件与静态校验都完成后渲染：缺一不可。
+if [[ "$STATUS_FG" == "PASS" ]]; then
+    write_step_verdict "RUST-AUDIT-06" PASS "fractal-git 微 Crate 回归套件与静态校验通过"
+else
+    write_step_verdict "RUST-AUDIT-06" BLOCK "fractal-git 微 Crate 回归套件或静态校验未通过"
+fi
+
 if command -v "$NODE_BIN" &>/dev/null && [[ -f "fractal-git/scripts/common/run-audit-report.js" ]]; then
     "$NODE_BIN" fractal-git/scripts/common/run-audit-report.js >>"$LOG_FG" 2>&1 || true
 fi
@@ -263,6 +288,13 @@ if [[ "$FAST_MODE" -eq 0 && "$STATUS_AR" == "PASS" ]]; then
         FAILED=1
         cat "$LOG_AR_SELF" >> "$LOG_AR"
     fi
+fi
+
+# 判定必须在所有影响该步骤的检查之后渲染：gate-self 与并行套件同属 ENGINE-AUDIT-05。
+if [[ "$STATUS_AR" == "PASS" ]]; then
+    write_step_verdict "ENGINE-AUDIT-05" PASS "auto-refactor 静态引擎多维自审通过"
+else
+    write_step_verdict "ENGINE-AUDIT-05" BLOCK "auto-refactor 静态引擎多维自审未通过"
 fi
 
 # 日志输出与清理：子进程失败后回显末尾 15 行日志
@@ -330,6 +362,10 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF" "$LOG_FG"
   const codeGi = Number(process.argv[17] || 0);
   const statusFg = process.argv[18] || "PASS";
   const codeFeedback = Number(process.argv[19] || 0);
+  const codeClosure = Number(process.argv[20] || 0);
+  const codeReach = Number(process.argv[21] || 0);
+  const codeDocs = Number(process.argv[22] || 0);
+  const codeLedger = Number(process.argv[23] || 0);
   const baselineFile = path.join(rootDir, "auto-refactor", "reports", "self-audit-baseline.json");
   const wtReportFile = path.join(rootDir, "workspace-timing", "reports", "review", "report-latest.json");
   const summaryFile = process.env.GITHUB_STEP_SUMMARY;
@@ -782,7 +818,7 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF" "$LOG_FG"
       const isNotEvaluated = rawScore == null || isNaN(parsedScore) || parsedScore <= 0;
       let bar = " ".repeat(20);
       let scoreStr = "   N/A";
-      let gradeTag = "[N/A]";
+      let gradeTag = "";
       if (!isNotEvaluated) {
         bar = makeBar(parsedScore, 20);
         scoreStr = (Number.isInteger(parsedScore) ? parsedScore.toFixed(1) : String(Math.round(parsedScore * 100) / 100)).padStart(6);
@@ -852,7 +888,7 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF" "$LOG_FG"
       fs.appendFileSync(summaryFile, md, "utf8");
     } catch (_) {}
   }
-' "$START_TIME" "$FAILED" "$JSON_MODE" "$STATUS_HYGIENE" "$STATUS_RULES" "$STATUS_AR" "$STATUS_WT" "$STATUS_WG" "$ROOT_DIR" "$CODE_HYGIENE" "$CODE_ISO" "$CODE_CATALOG" "$CODE_SKILLS" "$FAST_MODE" "$AGENT_MODE" "$LOG_HYGIENE" "$CODE_GI" "$STATUS_FG" "$CODE_FEEDBACK"
+' "$START_TIME" "$FAILED" "$JSON_MODE" "$STATUS_HYGIENE" "$STATUS_RULES" "$STATUS_AR" "$STATUS_WT" "$STATUS_WG" "$ROOT_DIR" "$CODE_HYGIENE" "$CODE_ISO" "$CODE_CATALOG" "$CODE_SKILLS" "$FAST_MODE" "$AGENT_MODE" "$LOG_HYGIENE" "$CODE_GI" "$STATUS_FG" "$CODE_FEEDBACK" "$CODE_CLOSURE" "$CODE_REACH" "$CODE_DOCS" "$CODE_LEDGER"
 
 if [[ "$JSON_MODE" -eq 1 || "$AGENT_MODE" -eq 1 ]]; then
     exit "$FAILED"

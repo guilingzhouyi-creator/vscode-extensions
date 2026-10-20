@@ -22,10 +22,18 @@ $ErrorActionPreference = 'Stop'
 
 [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+$PSNativeCommandUseErrorActionPreference = $true
+$PSNativeCommandArgumentPassing = 'Standard'
 $PSDefaultParameterValues['Get-Content:Encoding'] = 'utf8'
 $PSDefaultParameterValues['Set-Content:Encoding'] = 'utf8'
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "../..")).Path
+
+# 步骤身份、四态判定与超时诊断由共享运行时库提供，禁止在各门禁内复制实现。
+$script:GateRepoRoot = $repoRoot
+$script:GateEntryId = 'pre-push'
+$script:GateSuppressOutput = [bool]$Agent
+. (Join-Path $PSScriptRoot "lib/gate-runtime.ps1")
 $npmCmd = if ($IsWindows -or $env:OS -match "Windows") { "npm.cmd" } else { "npm" }
 $nodeCmd = if ($IsWindows -or $env:OS -match "Windows") { "node.exe" } else { "node" }
 $pythonCmd = if (Get-Command python3.12 -ErrorAction SilentlyContinue) { "python3.12" } elseif (Get-Command python -ErrorAction SilentlyContinue) { "python" } elseif (Get-Command python3 -ErrorAction SilentlyContinue) { "python3" } else { "py" }
@@ -42,9 +50,9 @@ if (-not $env:GIT_CONFIG_NOSYSTEM) { $env:GIT_CONFIG_NOSYSTEM = '1' }
 if (-not $env:XDG_CONFIG_HOME) { $env:XDG_CONFIG_HOME = (Get-Location).Path }
 
 if (-not $Agent) {
-    Write-Host "=================================================================" -ForegroundColor Cyan
-    Write-Host "🔒 执行本地 Pre-Push 推送前回归检查 (PowerShell 版)" -ForegroundColor Cyan
-    Write-Host "=================================================================" -ForegroundColor Cyan
+    Write-GateHost "=================================================================" -ForegroundColor Cyan
+    Write-GateHost "🔒 执行本地 Pre-Push 推送前回归检查 (PowerShell 版)" -ForegroundColor Cyan
+    Write-GateHost "=================================================================" -ForegroundColor Cyan
 }
 
 $failed = $false
@@ -57,154 +65,8 @@ if ($Agent) {
     if (Test-Path $staleSnapshot) { Remove-Item -Path $staleSnapshot -Force -ErrorAction SilentlyContinue }
 }
 
-$script:StepRegistryFile = Join-Path $repoRoot "scripts/common/gate-step-registry.json"
-$script:StepRegistry = $null
-$script:StepIndex = [ordered]@{}
-
-function Initialize-StepRegistry {
-    [CmdletBinding()]
-    param()
-    if ($script:StepRegistry) { return }
-    if (-not (Test-Path $script:StepRegistryFile)) {
-        throw "Gate step registry missing: $($script:StepRegistryFile)"
-    }
-    $script:StepRegistry = Get-Content -Path $script:StepRegistryFile -Raw -Encoding utf8 | ConvertFrom-Json
-    $entry = $script:StepRegistry.entries.'pre-push'
-    if (-not $entry) { throw "Gate step registry declares no 'pre-push' entry." }
-    $ordinal = 0
-    foreach ($step in $entry.steps) {
-        $ordinal++
-        $meta = @{ Id = $step.id; Ordinal = $ordinal; Rule = $step.ruleId; Title = $step.title }
-        $script:StepIndex[$step.id] = $meta
-        $script:StepIndex[$step.title] = $meta
-    }
-}
 
 # 步骤身份只来自单源登记表：未知标签直接抛错，绝不回落到合成标识。
-function Resolve-StepMeta {
-    [CmdletBinding()]
-    param([string]$StepId)
-    Initialize-StepRegistry
-    if (-not $script:StepIndex.Contains($StepId)) {
-        throw "Unregistered gate step '$StepId'. Declare it in scripts/common/gate-step-registry.json."
-    }
-    return $script:StepIndex[$StepId]
-}
-
-function Get-StepTotal {
-    [CmdletBinding()]
-    param()
-    Initialize-StepRegistry
-    return $script:StepRegistry.entries.'pre-push'.steps.Count
-}
-
-function Write-StepBanner {
-    [CmdletBinding()]
-    param([string]$StepId)
-    $meta = Resolve-StepMeta -StepId $StepId
-    Write-GateHost "▶ [$($meta.Ordinal)/$(Get-StepTotal)] $($meta.Id)  $($meta.Title)" -ForegroundColor Gray
-}
-
-function Write-StepVerdict {
-    [CmdletBinding()]
-    param([string]$StepId, [string]$Status, [string]$Detail = "")
-    $meta = Resolve-StepMeta -StepId $StepId
-    $glyph = switch ($Status) {
-        'PASS' { '✔' }
-        'BLOCK' { '✖' }
-        'SKIP' { '⚠️' }
-        'WARN' { '⚠️' }
-        default { '·' }
-    }
-    $color = switch ($Status) {
-        'PASS' { 'Green' }
-        'BLOCK' { 'Red' }
-        'SKIP' { 'Yellow' }
-        'WARN' { 'Yellow' }
-        default { 'Gray' }
-    }
-    $suffix = if ($Detail) { "  $Detail" } else { "" }
-    Write-GateHost "  $glyph $Status  $($meta.Id)$suffix" -ForegroundColor $color
-}
-
-function Write-GateHost {
-    [CmdletBinding()]
-    param([string]$Message, [string]$ForegroundColor = "Gray")
-    if (-not $Agent) {
-        Write-Host $Message -ForegroundColor $ForegroundColor
-    }
-}
-
-function Wait-ProcessWithTimeout {
-    [CmdletBinding()]
-    param(
-        [Parameter(Mandatory = $true)]
-        [System.Diagnostics.Process]$Process,
-        [Parameter(Mandatory = $true)]
-        [int]$TimeoutSeconds,
-        [Parameter(Mandatory = $false)]
-        [string]$ProcessName = "Process",
-        [Parameter(Mandatory = $false)]
-        [string]$LogFile = "",
-        [Parameter(Mandatory = $false)]
-        [string]$ErrLogFile = ""
-    )
-    $hasExited = $Process.WaitForExit($TimeoutSeconds * 1000)
-    if (-not $hasExited) {
-        $pidNum = $Process.Id
-        try {
-            Write-Warning "⚠️ $ProcessName 审查执行超时 (${TimeoutSeconds}s，PID: $pidNum)，强制终止进程树..."
-            $Process.Kill($true)
-        } catch {}
-
-        try {
-            $diagDir = Join-Path $repoRoot ".audit-logs"
-            if (-not (Test-Path $diagDir)) {
-                [void](New-Item -ItemType Directory -Path $diagDir -Force)
-            }
-            $safeName = $ProcessName.Replace(" ", "_").Replace("/", "_").ToLower()
-            $timestamp = (Get-Date).ToString("yyyyMMdd-HHmmss")
-            $diagFile = Join-Path $diagDir "timeout-prepush-$safeName-$timestamp.log"
-
-            $diagLines = [System.Collections.Generic.List[string]]::new()
-            $diagLines.Add("================================================================================")
-            $diagLines.Add("⚠️ WATCHDOG TIMEOUT 诊断快照 (Pre-Push Gate)")
-            $diagLines.Add("================================================================================")
-            $diagLines.Add("目标模块: $ProcessName")
-            $diagLines.Add("进程 PID: $pidNum")
-            $diagLines.Add("超时阈值: ${TimeoutSeconds} 秒")
-            $diagLines.Add("触发时间: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff zzz')")
-            $diagLines.Add("处置措施: 看门狗已触发 Process.Kill(`$true) 级联终止进程树")
-            $diagLines.Add("--------------------------------------------------------------------------------")
-            $diagLines.Add("【最后捕获的标准输出与错误日志】:")
-            if ($LogFile -and (Test-Path $LogFile)) {
-                $diagLines.Add("--- 来源标准输出: $LogFile ---")
-                $tailContent = Get-Content -Path $LogFile -Encoding utf8 -Tail 100 -ErrorAction SilentlyContinue
-                if ($tailContent) {
-                    $diagLines.AddRange($tailContent)
-                } else {
-                    $diagLines.Add("(标准输出为空或未捕获到输出)")
-                }
-            }
-            if ($ErrLogFile -and (Test-Path $ErrLogFile)) {
-                $diagLines.Add("--- 来源标准错误: $ErrLogFile ---")
-                $tailErr = Get-Content -Path $ErrLogFile -Encoding utf8 -Tail 100 -ErrorAction SilentlyContinue
-                if ($tailErr) {
-                    $diagLines.AddRange($tailErr)
-                }
-            }
-            $diagLines.Add("================================================================================")
-            [System.IO.File]::WriteAllLines($diagFile, $diagLines, [System.Text.UTF8Encoding]::new($false))
-            Write-Host "💡 超时诊断快照已落盘至: $diagFile" -ForegroundColor Yellow
-            Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/log-rotator.js", "--prune" -WorkingDirectory $repoRoot -NoNewWindow -Wait -ErrorAction SilentlyContinue
-        } catch {}
-
-        return $false
-    }
-    $Process.WaitForExit()
-    return $true
-}
-
 function Invoke-GateStep {
     [CmdletBinding()]
     param(
@@ -234,7 +96,7 @@ function Invoke-GateStep {
     $p = Start-Process -FilePath $FilePath -ArgumentList $ArgumentList -WorkingDirectory $WorkingDirectory `
         -RedirectStandardOutput $stepLog -RedirectStandardError $stepErrLog -NoNewWindow -PassThru
 
-    $ok = Wait-ProcessWithTimeout -Process $p -TimeoutSeconds $TimeoutSeconds -ProcessName $meta.Id -LogFile $stepLog -ErrLogFile $stepErrLog
+    $ok = Wait-ProcessWithTimeout -Process $p -TimeoutSeconds $TimeoutSeconds -ProcessName $meta.Id -LogFiles @($stepLog, $stepErrLog) -DiagPrefix "timeout-prepush"
     if (Test-Path $stepErrLog) {
         $errContent = Get-Content -Path $stepErrLog -Raw -ErrorAction SilentlyContinue
         if ($errContent) {
@@ -248,13 +110,13 @@ function Invoke-GateStep {
     }
     if ($p.ExitCode -ne 0) {
         if (-not $Agent) {
-            Write-Host "  ✖ BLOCK  $($meta.Id) 失败 (退出码: $($p.ExitCode))" -ForegroundColor Red
+            Write-GateHost "  ✖ BLOCK  $($meta.Id) 失败 (退出码: $($p.ExitCode))" -ForegroundColor Red
             if (Test-Path $stepLog) {
                 $tail = Get-Content -Path $stepLog -Tail 20 -ErrorAction SilentlyContinue
                 if ($tail) {
-                    Write-Host "   --- 错误日志摘要 ---" -ForegroundColor DarkRed
+                    Write-GateHost "   --- 错误日志摘要 ---" -ForegroundColor DarkRed
                     foreach ($line in $tail) {
-                        Write-Host "   $line" -ForegroundColor DarkRed
+                        Write-GateHost "   $line" -ForegroundColor DarkRed
                     }
                 }
             }
@@ -312,21 +174,22 @@ if ($PushedSha -match '^[0-9a-f]{7,40}$') {
     if ($RemoteSha -match '^[0-9a-f]{7,40}$' -and $RemoteSha -notmatch '^0+$') {
         $range = "$RemoteSha..$PushedSha"
     } else {
-        $mergeBase = git merge-base $PushedSha origin/main 2>$null
-        $range = if ($LASTEXITCODE -eq 0 -and $mergeBase) { "$mergeBase..$PushedSha" } else { "$PushedSha~1..$PushedSha" }
+        # 严格模式下 git 失败会终止脚本，因此用 try 显式降级到单提交范围。
+        $mergeBase = $null
+        try { $mergeBase = git merge-base $PushedSha origin/main 2>$null } catch { $mergeBase = $null }
+        $range = if ($mergeBase) { "$mergeBase..$PushedSha" } else { "$PushedSha~1..$PushedSha" }
     }
 }
 if (-not $range) {
-    try {
-        git rev-parse --verify '@{u}' 2>$null | Out-Null
-        if ($LASTEXITCODE -eq 0) { $range = '@{u}..HEAD' }
-    } catch {}
+    # 无上游分支是常态（新分支、浅克隆），不是错误：显式捕获后按无范围处理。
+    $hasUpstream = $false
+    try { git rev-parse --verify '@{u}' 2>$null | Out-Null; $hasUpstream = $true } catch { $hasUpstream = $false }
+    if ($hasUpstream) { $range = '@{u}..HEAD' }
 }
 if (-not $range) {
-    try {
-        git rev-parse --verify origin/main 2>$null | Out-Null
-        if ($LASTEXITCODE -eq 0) { $range = "origin/main..HEAD" }
-    } catch {}
+    $hasOriginMain = $false
+    try { git rev-parse --verify origin/main 2>$null | Out-Null; $hasOriginMain = $true } catch { $hasOriginMain = $false }
+    if ($hasOriginMain) { $range = "origin/main..HEAD" }
 }
 
 $touchedAr = $false
@@ -336,7 +199,8 @@ $touchedFg = $false
 $touchedShared = $false
 
 if ($range) {
-    $changedFiles = @(git diff --name-only $range 2>$null)
+    $changedFiles = @()
+    try { $changedFiles = @(git diff --name-only $range 2>$null) } catch { $changedFiles = @() }
     foreach ($f in $changedFiles) {
         if ([string]::IsNullOrWhiteSpace($f)) { continue }
         if ($f -match "^auto-refactor/") {
@@ -502,8 +366,8 @@ if ($range) {
 }
 
 # --- CHANGE-ENTROPY-22: 推送集变更熵与跨域扩散审查 (GUARD-ENT-001) ---
+# 横幅由 Invoke-GateStep 统一渲染：调用点再打印一次会让同一标识出现两条横幅。
 if ($range) {
-    Write-GateHost "[11/11] 审查推送集变更熵与跨子系统扩散 (GUARD-ENT-001)..." -ForegroundColor Gray
     $code = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/evaluate-change-entropy.js", "--range", $range, "--fail-on-diffusion") -WorkingDirectory $repoRoot -StepId "CHANGE-ENTROPY-22" -TimeoutSeconds 30
     if ($code -ne 0) {
         $failed = $true
@@ -515,7 +379,43 @@ if ($range) {
 $codeFeedback = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-gate-feedback.js") -WorkingDirectory $repoRoot -StepId "FEEDBACK-VOCABULARY-23" -TimeoutSeconds 30
 if ($codeFeedback -ne 0) {
     $failed = $true
-} else {
+}
+
+# --- GATE-ORDERING-24: 门禁助手定义先于调用与判定词表闭包 (GUARD-ORD-001) ---
+# 该守卫读取步骤登记表枚举入口脚本，故置于末位：新增入口会自动纳入审查。
+$codeOrdering = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-gate-ordering.js") -WorkingDirectory $repoRoot -StepId "GATE-ORDERING-24" -TimeoutSeconds 30
+if ($codeOrdering -ne 0) {
+    $failed = $true
+}
+# 守卫的检出能力必须自证：仅靠干净代码上的退出码无法区分「探测器工作」与「探测器从不触发」。
+$codeGuardProof = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/test-gate-guards.js") -WorkingDirectory $repoRoot -StepId "GATE-PROOF-25" -TimeoutSeconds 60
+if ($codeGuardProof -ne 0) {
+    $failed = $true
+}
+# 步骤判定覆盖守卫：登记表中的每个步骤都必须在两个平台可达且能呈现终态判定。
+$codeCoverage = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-gate-verdicts.js") -WorkingDirectory $repoRoot -StepId "GATE-COVERAGE-26" -TimeoutSeconds 30
+if ($codeCoverage -ne 0) {
+    $failed = $true
+}
+# 规模计数真实性：成功信息里的数字必须来自实测，写死的常量会静默过期。
+$codeCounts = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-hardcoded-counts.js") -WorkingDirectory $repoRoot -StepId "GATE-COUNT-27" -TimeoutSeconds 30
+if ($codeCounts -ne 0) {
+    $failed = $true
+}
+# 块链分支合法性：重复的 else 分支解析器不报错，只在运行时于该行失败。
+$codeChains = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-block-chains.js") -WorkingDirectory $repoRoot -StepId "GATE-CHAIN-28" -TimeoutSeconds 30
+if ($codeChains -ne 0) {
+    $failed = $true
+}
+# 文档规模数字真源渲染：治理文档里的规则数、步骤数、技能数必须与真源一致，禁止手写过期字面量。
+$codeDocMetrics = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/sync-doc-metrics.js") -WorkingDirectory $repoRoot -StepId "DOC-METRICS-29" -TimeoutSeconds 30
+if ($codeDocMetrics -ne 0) {
+    $failed = $true
+}
+# Linux 命令面契约：AGENTS.md 承诺的每个命令都必须真实可绑定，且兼容层同时具备 GNU 与降级两条路径。
+$codeParity = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-shell-parity.js") -WorkingDirectory $repoRoot -StepId "SHELL-PARITY-30" -TimeoutSeconds 60
+if ($codeParity -ne 0) {
+    $failed = $true
 }
 
 if ($Agent) {

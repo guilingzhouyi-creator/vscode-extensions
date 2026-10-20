@@ -59,150 +59,60 @@ fi
 FAILED=0
 RUN_ID="$(date -u +%s 2>/dev/null || echo 0)-$$"
 
-if ! run_gate_step 30 "FEEDBACK-VOCABULARY-23" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-gate-feedback.js; then
-    FAILED=1
-fi
-
 if [[ "$AGENT_MODE" -eq 1 ]]; then
     rm -f "$ROOT_DIR/.audit-logs/last-failure.json" 2>/dev/null || true
 fi
 
 AUDIT_LOG_DIR="$ROOT_DIR/.audit-logs"
 mkdir -p "$AUDIT_LOG_DIR"
-STEP_LOG="$AUDIT_LOG_DIR/pre-push-step.log"
+# 步骤日志必须按进程隔离：两个并发门禁共用同一路径会让 rm 失败并吞掉真实诊断输出。
+STEP_LOG="$AUDIT_LOG_DIR/pre-push-step-$$.log"
 
 # 步骤身份、显示序号与规则归因只来自单源登记表（scripts/common/gate-step-registry.json）。
 # 未知标识直接阻断，绝不静默回落到合成标识：静默回落会把真实失败归因到错误的规则上。
-STEP_TSV=""
-STEP_TOTAL=0
+# 步骤身份、四态判定与超时诊断由共享运行时库提供，禁止在各门禁内复制实现。
+GATE_ROOT_DIR="$ROOT_DIR"
+GATE_NODE_BIN="$NODE_BIN"
+GATE_SUPPRESS="$AGENT_MODE"
+# shellcheck source=scripts/sh/lib/gate-runtime.sh
+. "$ROOT_DIR/scripts/sh/lib/gate-runtime.sh"
+gate_init pre-push
 
-load_step_registry() {
-    if [[ -n "$STEP_TSV" ]]; then return 0; fi
-    local registry_js="$ROOT_DIR/scripts/common/gate-step-registry.js"
-    if [[ ! -f "$registry_js" ]]; then
-        echo "✖ BLOCK  单源步骤登记表加载器缺失: $registry_js" >&2
-        exit 1
-    fi
-    STEP_TSV=$("$NODE_BIN" "$registry_js" --entry pre-push --tsv 2>/dev/null) || {
-        echo "✖ BLOCK  单源步骤登记表无法投影 pre-push 条目" >&2
-        exit 1
-    }
-    STEP_TOTAL=$(grep -c . <<< "$STEP_TSV")
-}
-
-# 输出 "序号<TAB>规则标识<TAB>标题"；未登记标识返回非零。
-get_step_meta() {
-    local step_id="$1"
-    load_step_registry
-    local row
-    row=$(awk -F'\t' -v id="$step_id" '$2 == id { print; exit }' <<< "$STEP_TSV")
-    if [[ -z "$row" ]]; then
-        echo "✖ BLOCK  未登记的步骤标识 '$step_id'，请在 scripts/common/gate-step-registry.json 声明" >&2
-        return 1
-    fi
-    printf '%s' "$row"
-}
-
-write_step_banner() {
-    local step_id="$1"
-    local row ordinal title
-    row=$(get_step_meta "$step_id") || exit 1
-    ordinal=$(cut -f1 <<< "$row")
-    title=$(cut -f4 <<< "$row")
-    log_gate "▶ [$ordinal/$STEP_TOTAL] $step_id  $title"
-}
-
-write_step_verdict() {
-    local step_id="$1"
-    local status="$2"
-    local detail="${3:-}"
-    local glyph
-    case "$status" in
-        PASS) glyph="✔" ;;
-        BLOCK) glyph="✖" ;;
-        SKIP) glyph="⚠️" ;;
-        WARN) glyph="⚠️" ;;
-        *) glyph="·" ;;
-    esac
-    log_gate "  $glyph $status  $step_id  $detail"
-}
-
+# 兼容既有调用点：门禁正文统一使用 log_gate 作为抑制式输出别名。
 log_gate() {
-    if [[ "$AGENT_MODE" -eq 0 ]]; then
-        echo "$@"
-    fi
+    gate_log "$@"
 }
-
 run_gate_step() {
     local timeout_sec="$1"
     local step_id="$2"
     local work_dir="$3"
     shift 3
 
-    local row ordinal rule_id title
+    local row rule_id title
     row=$(get_step_meta "$step_id") || exit 1
-    ordinal=$(cut -f1 <<< "$row")
     rule_id=$(cut -f3 <<< "$row")
     title=$(cut -f4 <<< "$row")
 
     write_step_banner "$step_id"
 
-    rm -f "$STEP_LOG"
+    rm -f "$STEP_LOG" 2>/dev/null || true
 
     (cd "$work_dir" && "$@") > "$STEP_LOG" 2>&1 &
     local pid=$!
 
-    local count=0
-    while kill -0 "$pid" 2>/dev/null; do
-        if [[ "$count" -ge "$timeout_sec" ]]; then
-            if [[ "$AGENT_MODE" -eq 0 ]]; then
-                echo "⚠️ WARN  $step_id 执行超时 (${timeout_sec}s, PID: $pid)，强制终止进程树..." >&2
-            fi
-            kill -9 "$pid" 2>/dev/null || true
-
-            local timestamp
-            timestamp=$(date +"%Y%m%d-%H%M%S")
-            local diag_file="$AUDIT_LOG_DIR/timeout-prepush-${step_id}-${timestamp}.log"
-
-            {
-                echo "================================================================================"
-                echo "⚠️ WATCHDOG TIMEOUT 诊断快照 (pre-push / $step_id)"
-                echo "================================================================================"
-                echo "步骤标识: $step_id"
-                echo "步骤标题: $title"
-                echo "工作目录: $work_dir"
-                echo "进程 PID: $pid"
-                echo "超时阈值: ${timeout_sec} 秒"
-                echo "触发时间: $(date)"
-                echo "处置措施: 看门狗已触发 kill -9 终止进程"
-                echo "--------------------------------------------------------------------------------"
-                echo "【最后捕获的标准输出与错误日志】:"
-                if [[ -f "$STEP_LOG" ]]; then
-                    tail -n 100 "$STEP_LOG"
-                else
-                    echo "(日志文件不存在或未捕获到输出)"
-                fi
-                echo "================================================================================"
-            } > "$diag_file"
-            if [[ "$AGENT_MODE" -eq 0 ]]; then
-                echo "💡 超时诊断快照已落盘至: $diag_file" >&2
-            fi
-            "$NODE_BIN" "$ROOT_DIR/scripts/common/log-rotator.js" --prune >/dev/null 2>&1 || true
-            return 124
-        fi
-        sleep 1
-        count=$((count + 1))
-    done
-
     local status=0
-    wait "$pid" || status=$?
+    wait_with_timeout "$pid" "$timeout_sec" "$step_id" "$STEP_LOG" "timeout-prepush" || status=$?
     if [[ "$status" -ne 0 ]]; then
-        if [[ "$AGENT_MODE" -eq 0 ]]; then
-            echo "  ✖ BLOCK  $step_id  失败 (退出码: $status)" >&2
-            if [[ -f "$STEP_LOG" ]]; then
-                echo "   --- 错误日志摘要 ---" >&2
-                tail -n 20 "$STEP_LOG" | sed 's/^/   /' >&2
+        if [[ "$status" -eq 124 ]]; then
+            write_step_verdict "$step_id" BLOCK "执行超时（阈值 ${timeout_sec}s）"
+        else
+            if [[ "$AGENT_MODE" -eq 0 ]]; then
+                if [[ -f "$STEP_LOG" ]]; then
+                    printf '   --- 错误日志摘要 ---\n' >&2
+                    tail -n 20 "$STEP_LOG" | sed 's/^/   /' >&2
+                fi
             fi
+            write_step_verdict "$step_id" BLOCK "退出码 $status"
         fi
         local last_log="$AUDIT_LOG_DIR/last-pre-push.log"
         cp "$STEP_LOG" "$last_log" 2>/dev/null || true
@@ -272,7 +182,14 @@ TOUCHED_SHARED=0
 PROJECT_COUNT=0
 
 if [[ -n "$RANGE" ]]; then
-    CHANGED_FILES=$(git diff --name-only "$RANGE" 2>/dev/null || true)
+    # 范围不可枚举时必须阻断：静默回落成空列表会让影响域分析把"git 失败"读成"无变更"，
+    # 进而以 RUN_ALL 掩盖掉一次没有真正执行的差分。
+    CHANGED_STATUS=0
+    CHANGED_FILES=$(git diff --name-only "$RANGE" 2>/dev/null) || CHANGED_STATUS=$?
+    if [[ "${CHANGED_STATUS}" -ne 0 ]]; then
+        echo "✖ BLOCK  无法枚举推送范围 '$RANGE' 的变更文件 (退出码 ${CHANGED_STATUS})。" >&2
+        exit 1
+    fi
     if [[ -n "$CHANGED_FILES" ]]; then
         while IFS= read -r f; do
             [[ -z "$f" ]] && continue
@@ -344,17 +261,25 @@ fi
 
 # --- auto-refactor 引擎全量门禁与回归套件 ---
 if [[ "$RUN_AR" -eq 1 ]]; then
-        AR_FAIL=0
-    run_gate_step 60 "ENGINE-RUST-08" "$ROOT_DIR/auto-refactor" "$NODE_BIN" scripts/gate-rust.js || AR_FAIL=1
-    run_gate_step 90 "ENGINE-BUILD-09" "$ROOT_DIR/auto-refactor" "$NPM_BIN" run build || AR_FAIL=1
-    run_gate_step 60 "ENGINE-FACADE-10" "$ROOT_DIR/auto-refactor" "$NODE_BIN" scripts/validate-facade-governance.js || AR_FAIL=1
-    run_gate_step 60 "ENGINE-SELF-11" "$ROOT_DIR/auto-refactor" "$NODE_BIN" scripts/gate-self.js || AR_FAIL=1
-    run_gate_step 180 "ENGINE-TESTS-12" "$ROOT_DIR/auto-refactor" "$NODE_BIN" scripts/test-parallel.js || AR_FAIL=1
+    # 每个步骤由 run_gate_step 自行产出 PASS/BLOCK：聚合判定会让「哪一步失败」丢失。
+    AR_STEPS=(
+        "60|ENGINE-RUST-08|scripts/gate-rust.js"
+        "90|ENGINE-BUILD-09|run build"
+        "60|ENGINE-FACADE-10|scripts/validate-facade-governance.js"
+        "60|ENGINE-SELF-11|scripts/gate-self.js"
+        "180|ENGINE-TESTS-12|scripts/test-parallel.js"
+    )
+    AR_FAIL=0
+    for spec in "${AR_STEPS[@]}"; do
+        IFS='|' read -r ar_to ar_id ar_cmd <<< "$spec"
+        if [[ "$ar_cmd" == "run build" ]]; then
+            run_gate_step "$ar_to" "$ar_id" "$ROOT_DIR/auto-refactor" "$NPM_BIN" run build || AR_FAIL=1
+        else
+            run_gate_step "$ar_to" "$ar_id" "$ROOT_DIR/auto-refactor" "$NODE_BIN" "$ar_cmd" || AR_FAIL=1
+        fi
+    done
     if [[ "$AR_FAIL" -ne 0 ]]; then
-        write_step_verdict "ENGINE-TESTS-12" BLOCK "auto-refactor 门禁或测试套件未通过"
         FAILED=1
-    else
-        log_gate "  ✔ auto-refactor 全量门禁与测试套件通过"
     fi
 else
     write_step_verdict "ENGINE-RUST-08" SKIP "auto-refactor 未受影响"
@@ -410,11 +335,14 @@ if [[ "$RUN_WG" -eq 1 ]]; then
     run_gate_step 60 "DOMAIN-AUDIT-17" "$ROOT_DIR" "$PYTHON_BIN" WebGames/scripts/py/audit_runner.py --diff || GATE8_FAIL=1
     # Mermaid 图由真实解析器校验（audit_docs 的字符启发式无法发现语法破损）；
     # 该步骤此前无任何调用方，导致 349 张图的解析能力长期悬空。
-    run_gate_step 120 "DOMAIN-MERMAID-18" "$ROOT_DIR" bash WebGames/scripts/sh/check-mermaid.sh || GATE8_FAIL=1
+    if [[ -f "$ROOT_DIR/WebGames/scripts/sh/check-mermaid.sh" ]]; then
+        run_gate_step 120 "DOMAIN-MERMAID-18" "$ROOT_DIR" bash WebGames/scripts/sh/check-mermaid.sh || GATE8_FAIL=1
+    else
+        write_step_verdict "DOMAIN-MERMAID-18" BLOCK "WebGames/scripts/sh/check-mermaid.sh 缺失，Mermaid 真解析无法执行"
+        GATE8_FAIL=1
+    fi
     if [[ "$GATE8_FAIL" -ne 0 ]]; then
         FAILED=1
-    else
-        log_gate "  ✔ WebGames 全域质量门禁、配置架构与 Mermaid 图语法审查通过"
     fi
 else
     write_step_verdict "DOMAIN-AUDIT-17" SKIP "WebGames 未受影响"
@@ -422,8 +350,9 @@ fi
 
 # --- fractal-git Rust 门禁 (rustfmt + clippy -D warnings + zero-alloc + test) ---
 if [[ "$RUN_FG" -eq 1 ]]; then
-        if [[ -z "$CARGO_BIN" ]]; then
-        log_gate "  ⚠️  未检测到 cargo 命令，跳过本地 fractal-git 编译测试（CI 将严格校验）"
+    if [[ -z "$CARGO_BIN" ]]; then
+        # 缺少原生工具链时不得静默放行：未执行审查与审查通过必须可区分 (GUARD-SYS-001)。
+        write_step_verdict "RUST-TAXIS-19" BLOCK "未检测到 cargo 工具链，fractal-git 回归套件无法执行"
     elif [[ -f "$ROOT_DIR/fractal-git/scripts/sh/gate-rust.sh" ]]; then
         if ! run_gate_step 300 "RUST-TAXIS-19" "$ROOT_DIR" bash fractal-git/scripts/sh/gate-rust.sh; then
             FAILED=1
@@ -443,7 +372,9 @@ fi
 
 # --- 待推送提交历史风格与禁词审查 ---
 # 提交信息词法、风格仲裁与债务走廊契约自测：基础件一旦回归，下方历史扫描结论即失去依据
-run_gate_step 30 "COMMIT-CONTRACT-20" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-commit-guardrail.js || FAILED=1
+if ! run_gate_step 30 "COMMIT-CONTRACT-20" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-commit-guardrail.js; then
+    FAILED=1
+fi
 if [[ -n "$RANGE" ]]; then
         if ! run_gate_step 30 "COMMIT-HISTORY-21" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-commit-msg.js --range "$RANGE"; then
         FAILED=1
@@ -456,7 +387,6 @@ fi
 
 # --- CHANGE-ENTROPY-22: 推送集变更熵与跨域扩散审查 (GUARD-ENT-001) ---
 if [[ -n "$RANGE" ]]; then
-    log_gate "[11/11] 审查推送集变更熵与跨子系统扩散 (GUARD-ENT-001)..."
     if ! run_gate_step 30 "CHANGE-ENTROPY-22" "$ROOT_DIR" "$NODE_BIN" scripts/common/evaluate-change-entropy.js --range "$RANGE" --fail-on-diffusion; then
         FAILED=1
     else
@@ -464,6 +394,51 @@ if [[ -n "$RANGE" ]]; then
     fi
 else
     write_step_verdict "CHANGE-ENTROPY-22" SKIP "无推送范围"
+fi
+
+# --- FEEDBACK-VOCABULARY-23: 反馈词表语义化与四态状态词闭包 (GUARD-FBK-001) ---
+# 该步骤扫描全部门禁脚本，故置于末位：此前的步骤若引入新的词元，必须在本步被拦截。
+if ! run_gate_step 30 "FEEDBACK-VOCABULARY-23" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-gate-feedback.js; then
+    FAILED=1
+else
+    log_gate "  ✔ 门禁反馈词表为语义步骤标识与四态状态词闭包"
+fi
+
+# --- GATE-ORDERING-24: 门禁助手定义先于调用与判定词表闭包 (GUARD-ORD-001) ---
+# 该守卫读取步骤登记表枚举入口脚本，故置于末位：新增入口会自动纳入审查。
+if ! run_gate_step 30 "GATE-ORDERING-24" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-gate-ordering.js; then
+    FAILED=1
+else
+    log_gate "  ✔ 门禁助手定义顺序与判定词表闭包通过"
+fi
+
+# 守卫的检出能力必须自证：仅靠干净代码上的退出码无法区分「探测器工作」与「探测器从不触发」。
+if ! run_gate_step 60 "GATE-PROOF-25" "$ROOT_DIR" "$NODE_BIN" scripts/common/test-gate-guards.js; then
+    FAILED=1
+fi
+
+# 步骤判定覆盖守卫：登记表中的每个步骤都必须在两个平台可达且能呈现终态判定。
+if ! run_gate_step 30 "GATE-COVERAGE-26" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-gate-verdicts.js; then
+    FAILED=1
+fi
+
+# 规模计数真实性：成功信息里的数字必须来自实测，写死的常量会静默过期。
+if ! run_gate_step 30 "GATE-COUNT-27" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-hardcoded-counts.js; then
+    FAILED=1
+fi
+
+# 块链分支合法性：重复的 else 分支解析器不报错，只在运行时于该行失败。
+if ! run_gate_step 30 "GATE-CHAIN-28" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-block-chains.js; then
+    FAILED=1
+fi
+
+# 文档规模数字真源渲染：治理文档里的规则数、步骤数、技能数必须与真源一致，禁止手写过期字面量。
+if ! run_gate_step 30 "DOC-METRICS-29" "$ROOT_DIR" "$NODE_BIN" scripts/common/sync-doc-metrics.js; then
+    FAILED=1
+fi
+# Linux 命令面契约：AGENTS.md 承诺的每个命令都必须真实可绑定，且兼容层同时具备 GNU 与降级两条路径。
+if ! run_gate_step 60 "SHELL-PARITY-30" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-shell-parity.js; then
+    FAILED=1
 fi
 
 if [[ "$AGENT_MODE" -eq 1 ]]; then
