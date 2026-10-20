@@ -18,7 +18,8 @@
 'use strict';
 
 const path = require('path');
-const { execSync } = require('child_process');
+const { execFileSync } = require('child_process');
+const { GitRangeError } = require('./git-env');
 
 let compiledMiner = null;
 try {
@@ -212,14 +213,15 @@ function evaluateChangeEntropy(numstatText, options) {
  * @returns {string} Git diff numstat output.
  */
 function getGitNumstat(isStaged, commitRange) {
+    const args = ['diff', '--numstat'];
+    if (isStaged) {
+        args.push('--cached');
+    } else if (commitRange) {
+        // Single argv element: metacharacters in the range never reach a shell parser.
+        args.push(commitRange);
+    }
     try {
-        let cmd = 'git diff --numstat';
-        if (isStaged) {
-            cmd += ' --cached';
-        } else if (commitRange) {
-            cmd += ` ${commitRange}`;
-        }
-        return execSync(cmd, {
+        return execFileSync('git', args, {
             encoding: 'utf8',
             stdio: ['ignore', 'pipe', 'pipe'],
             maxBuffer: 10 * 1024 * 1024,
@@ -234,18 +236,20 @@ function getGitNumstat(isStaged, commitRange) {
  *
  * @param {string} commitRange - Revision range e.g. 'origin/main..HEAD'.
  * @returns {string[]} Array of commit SHAs.
+ * @throws {GitRangeError} When the range cannot be resolved; an unresolvable range must not be
+ *   indistinguishable from a range containing no commits.
  */
 function getCommitListInRange(commitRange) {
     if (!commitRange) return [];
     try {
-        const stdout = execSync(`git rev-list ${commitRange}`, {
+        const stdout = execFileSync('git', ['rev-list', commitRange], {
             encoding: 'utf8',
             stdio: ['ignore', 'pipe', 'ignore'],
             maxBuffer: 10 * 1024 * 1024,
         });
         return stdout.trim().split(/\r?\n/).filter(Boolean);
-    } catch {
-        return [];
+    } catch (err) {
+        throw new GitRangeError(commitRange, err);
     }
 }
 
@@ -262,17 +266,25 @@ function evaluateMultiCommitRange(commits, commitRange) {
     let maxEntropy = 0.0;
     let maxNormalizedEntropy = 0.0;
     const diffusedCommits = [];
+    const unreadableCommits = [];
 
     for (let i = 0; i < commits.length; i++) {
         const sha = commits[i];
-        let numstat = '';
+        let numstat;
         try {
-            numstat = execSync(`git diff-tree --no-commit-id -r --numstat ${sha}`, {
+            // Argument array: a SHA can never be parsed as shell syntax.
+            numstat = execFileSync('git', ['diff-tree', '--no-commit-id', '-r', '--numstat', sha], {
                 encoding: 'utf8',
                 stdio: ['ignore', 'pipe', 'ignore'],
                 maxBuffer: 10 * 1024 * 1024,
             });
-        } catch {}
+        } catch {
+            // A commit whose diff cannot be read contributes no measurable entropy. Recording it
+            // keeps the run honest: silently scoring it as zero would understate diffusion and let
+            // a genuinely dispersed push pass the GUARD-ENT-001 threshold.
+            unreadableCommits.push(sha.slice(0, 8));
+            continue;
+        }
 
         const commitResult = evaluateChangeEntropy(numstat);
         if (commitResult.entropy > maxEntropy) {
@@ -285,11 +297,13 @@ function evaluateMultiCommitRange(commits, commitRange) {
         if (commitResult.isDiffused) {
             let subject = sha.slice(0, 8);
             try {
-                subject = execSync(`git log -1 --format=%s ${sha}`, {
+                subject = execFileSync('git', ['log', '-1', '--format=%s', sha], {
                     encoding: 'utf8',
                     stdio: ['ignore', 'pipe', 'ignore'],
                 }).trim();
-            } catch {}
+            } catch {
+                // Subject is cosmetic: the SHA already identifies the commit in the report.
+            }
             diffusedCommits.push({
                 sha: sha.slice(0, 8),
                 subject,
@@ -324,6 +338,7 @@ function evaluateMultiCommitRange(commits, commitRange) {
         commitCount: commits.length,
         diffusedCommitCount: diffusedCommits.length,
         diffusedCommits,
+        unreadableCommits,
         entropy: maxEntropy,
         normalizedEntropy: maxNormalizedEntropy,
         isDiffused,
@@ -346,7 +361,16 @@ function main() {
         commitRange = args[rangeIdx + 1];
     }
 
-    const commits = (!isStaged && commitRange) ? getCommitListInRange(commitRange) : [];
+    let commits;
+    try {
+        commits = (!isStaged && commitRange) ? getCommitListInRange(commitRange) : [];
+    } catch (err) {
+        // Fail closed: an unresolvable range means nothing was examined, so reporting PASS would
+        // claim a clean push that never happened.
+        process.stderr.write(`✖ BLOCK ${err.message}\n`);
+        process.exit(1);
+    }
+
     const result = commits.length > 1
         ? evaluateMultiCommitRange(commits, commitRange)
         : evaluateChangeEntropy(getGitNumstat(isStaged, commitRange));
@@ -369,12 +393,17 @@ function main() {
             console.log(`Normalized Entropy    : ${(result.normalizedEntropy * 100).toFixed(1)}%`);
             console.log(`Diffusion Status      : ${result.isDiffused ? '⚠️ HIGH DISPERSION' : '✔ COHESIVE'}`);
         }
+        if (result.unreadableCommits && result.unreadableCommits.length > 0) {
+            console.log(`Unmeasured Commits    : ${result.unreadableCommits.length} [${result.unreadableCommits.join(', ')}]`);
+            console.log('                        These commits could not be read; their diffusion is unknown.');
+        }
         if (result.recommendation) {
             console.log(`Guidance              : ${result.recommendation}`);
         }
     }
 
-    if (failOnDiffusion && result.isDiffused) {
+    if (failOnDiffusion && (result.isDiffused
+        || (result.unreadableCommits && result.unreadableCommits.length > 0))) {
         process.exit(1);
     }
     process.exit(0);

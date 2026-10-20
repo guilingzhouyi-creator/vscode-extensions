@@ -13,16 +13,61 @@
  *   3. Resolve file paths modified across arbitrary revision ranges (e.g. '@{u}..HEAD');
  *   4. Safely extract staged buffer contents via git-show with fallback to working tree disk read;
  *   5. Enforce substantive utility discipline with immutable object exports.
- * Exit Semantics & Design Rationale: Library module exporting deterministic pure functions;
- *   throws no unhandled exceptions and safely falls back on Git execution failures.
+ * Exit Semantics & Design Rationale: Library module. Every Git invocation uses an argument array
+ *   (execFileSync) rather than an interpolated command string, so a path or revision containing
+ *   shell metacharacters is passed through as data and can never be parsed as syntax.
+ *   Resolution failures return an empty result by default; callers that gate on the outcome pass
+ *   { strict: true } to receive a GitRangeError instead, because "git could not resolve the range"
+ *   must never be indistinguishable from "the range contains no changes".
  */
 'use strict';
 
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
+const { execFileSync } = require('child_process');
 
 const DEFAULT_REPO_ROOT = path.resolve(__dirname, '..', '..');
+
+const GIT_BIN = 'git';
+
+/**
+ * Raised when Git cannot resolve an explicitly requested revision range.
+ *
+ * Distinct from an empty result on purpose: a gate that receives zero files because the range
+ * does not resolve would otherwise report success without having examined anything.
+ */
+class GitRangeError extends Error {
+  /**
+   * @param {string} range - Revision range that failed to resolve.
+   * @param {Error} cause - Underlying spawn or exit error.
+   */
+  constructor(range, cause) {
+    super(`Unable to resolve Git revision range '${range}': ${cause.message.split('\n')[0]}`);
+    this.name = 'GitRangeError';
+    this.range = range;
+    this.cause = cause;
+  }
+}
+
+/**
+ * Runs Git with an argument array and a sanitized environment.
+ *
+ * @param {string[]} args - Git subcommand and arguments, passed verbatim.
+ * @param {Record<string, unknown>} options - Node spawn options merged over the safe defaults.
+ * @returns {Buffer|string} Command output in the requested encoding.
+ */
+function runGit(args, options) {
+  const opts = options || {};
+  const root = opts.cwd || DEFAULT_REPO_ROOT;
+  return execFileSync(GIT_BIN, args, {
+    encoding: opts.encoding,
+    input: opts.input,
+    stdio: opts.stdio || ['ignore', 'pipe', 'ignore'],
+    maxBuffer: opts.maxBuffer || 10 * 1024 * 1024,
+    cwd: root,
+    env: getSafeGitEnv(root),
+  });
+}
 
 /**
  * Constructs an isolated, sanitized Git environment object preventing global config permission
@@ -43,14 +88,35 @@ function getSafeGitEnv(repoRoot) {
 }
 
 /**
+ * Raised when Git cannot enumerate the staging area.
+ *
+ * Distinct from an empty index on purpose: a gate that receives zero files because the repository
+ * is unreadable would otherwise report "nothing to check" and pass, which is the failure mode this
+ * type exists to prevent.
+ */
+class GitIndexError extends Error {
+  /**
+   * @param {Error} cause - Underlying spawn or exit error.
+   */
+  constructor(cause) {
+    super(`Unable to enumerate the Git staging area: ${cause.message.split('\n')[0]}`);
+    this.name = 'GitIndexError';
+    this.cause = cause;
+  }
+}
+
+/**
  * Retrieves the list of staged files from Git index, or returns explicit files from CLI arguments.
  *
  * @param {string} [repoRoot] - Repository root directory.
  * @param {string[]} [explicitArgs] - Optional command line argument list.
+ * @param {{strict?: boolean}} [options] - strict: raise GitIndexError instead of returning [].
  * @returns {string[]} Array of normalized relative or absolute staged file paths.
+ * @throws {GitIndexError} When strict is set and Git cannot read the index.
  */
-function getStagedFiles(repoRoot, explicitArgs) {
+function getStagedFiles(repoRoot, explicitArgs, options) {
   const root = repoRoot || DEFAULT_REPO_ROOT;
+  const strict = Boolean(options && options.strict);
   if (Array.isArray(explicitArgs)) {
     const explicitFiles = explicitArgs.filter((a) => a && !a.startsWith('-'));
     if (explicitFiles.length > 0) {
@@ -59,17 +125,16 @@ function getStagedFiles(repoRoot, explicitArgs) {
   }
 
   try {
-    const raw = execSync('git diff --cached --name-only --diff-filter=ACMR', {
+    const raw = runGit(['diff', '--cached', '--name-only', '--diff-filter=ACMR'], {
       cwd: root,
-      env: getSafeGitEnv(root),
       encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
     });
     return raw
       .split(/\r?\n/)
       .map((s) => s.trim())
       .filter(Boolean);
-  } catch {
+  } catch (err) {
+    if (strict) throw new GitIndexError(err);
     return [];
   }
 }
@@ -79,24 +144,27 @@ function getStagedFiles(repoRoot, explicitArgs) {
  *
  * @param {string} range - Git revision range (e.g. '@{u}..HEAD' or 'origin/main..HEAD').
  * @param {string} [repoRoot] - Repository root directory.
+ * @param {{strict?: boolean}} [options] - strict: raise GitRangeError instead of returning [].
  * @returns {string[]} Array of changed file paths.
+ * @throws {GitRangeError} When strict is set and Git cannot resolve the range.
  */
-function getRangeFiles(range, repoRoot) {
+function getRangeFiles(range, repoRoot, options) {
   if (!range) return [];
   const root = repoRoot || DEFAULT_REPO_ROOT;
+  const strict = Boolean(options && options.strict);
 
   try {
-    const raw = execSync(`git diff --name-only --diff-filter=ACMR ${range}`, {
+    // The range is a single argv element: ';', '|', '$()' and backticks inside it stay literal.
+    const raw = runGit(['diff', '--name-only', '--diff-filter=ACMR', range], {
       cwd: root,
-      env: getSafeGitEnv(root),
       encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
     });
     return raw
       .split(/\r?\n/)
       .map((s) => s.trim())
       .filter(Boolean);
-  } catch {
+  } catch (err) {
+    if (strict) throw new GitRangeError(range, err);
     return [];
   }
 }
@@ -111,14 +179,13 @@ function getRangeFiles(range, repoRoot) {
  */
 function readStagedContentSafe(repoRoot, relPath) {
   const root = repoRoot || DEFAULT_REPO_ROOT;
+  if (typeof relPath !== 'string' || relPath.length === 0) return '';
   const gitPath = relPath.replace(/\\/g, '/');
 
   try {
-    return execSync(`git show ":${gitPath}"`, {
+    return runGit(['show', `:${gitPath}`], {
       cwd: root,
-      env: getSafeGitEnv(root),
       encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'ignore'],
       maxBuffer: 10 * 1024 * 1024,
     });
   } catch {
@@ -140,13 +207,12 @@ function readStagedContentSafe(repoRoot, relPath) {
  */
 function readStagedBufferSafe(repoRoot, relPath) {
   const root = repoRoot || DEFAULT_REPO_ROOT;
+  if (typeof relPath !== 'string' || relPath.length === 0) return null;
   const gitPath = relPath.replace(/\\/g, '/');
 
   try {
-    return execSync(`git show ":${gitPath}"`, {
+    return runGit(['show', `:${gitPath}`], {
       cwd: root,
-      env: getSafeGitEnv(root),
-      stdio: ['ignore', 'pipe', 'ignore'],
       maxBuffer: 32 * 1024 * 1024,
     });
   } catch {
@@ -184,9 +250,8 @@ function readStagedBuffersBatch(repoRoot, relPaths) {
 
   let raw;
   try {
-    raw = execSync('git cat-file --batch --buffer', {
+    raw = runGit(['cat-file', '--batch', '--buffer'], {
       cwd: root,
-      env: getSafeGitEnv(root),
       input: request,
       stdio: ['pipe', 'pipe', 'ignore'],
       maxBuffer: 256 * 1024 * 1024,
@@ -217,6 +282,8 @@ function readStagedBuffersBatch(repoRoot, relPaths) {
 
 module.exports = Object.freeze({
   DEFAULT_REPO_ROOT,
+  GitRangeError,
+  GitIndexError,
   getSafeGitEnv,
   getStagedFiles,
   getRangeFiles,
