@@ -33,4 +33,4 @@ pub use synthetic::{
     generate_commit_chain, generate_diamond_dag, generate_monorepo_trees, SyntheticCommitChain,
     SyntheticDag, SyntheticMonorepo,
 };
-pub use traverse::{DagWalker, FastOidHasher, FastOidSet};
+pub use traverse::{DagWalker, FastOidHasher, FastOidSet, SmallParentList};
