@@ -21,20 +21,26 @@
 | `common/` | Node.js | `validate-staged-slice.js` | gate / complexity（平台级增量 AST 切片圈复杂度/嵌套/噪声比审查器） | `pre-commit-gate`、CI |
 | `common/` | Node.js | `validate-code-density.js` | gate / density（多维代码密度、接线率 POR<=60% 与列密度审查器） | `pre-commit-gate`、`pre-push-gate`、CI |
 | `common/` | Node.js | `validate-gitignore-governance.js` | audit / hygiene（全仓 .gitignore 换行、安全底线守卫与防误伤断言门禁） | `pre-push-gate`、`audit-all` |
-| `common/` | Node.js | `evaluate-eloc-budget.js` | audit / complexity（双轨体积 ELOC<=900/LOC<=1400 与 1:3 动态包络评估器） | `pre-commit-gate`、本地 CLI |
+| `common/` | Node.js | `evaluate-eloc-budget.js` | audit / complexity（双轨体积 ELOC<=900/LOC<=1400 与 1:3 动态包络；`--all` 全仓扫描 + `eloc-budget-baseline.json` grow-only 棘轮；未识别参数直接 exit 2） | `pre-commit-gate`、`pre-push-gate`、CI |
 | `common/` | Node.js | `generate-rule-catalog.js` | audit / ssot（全工作区规则单源目录聚合与零漂移核验器；默认只读，`--write` 显式重生成） | 本地 CLI、`pre-push` 门禁、CI |
 | `common/` | Node.js | `validate-rule-id-closure.js` | audit / ssot（门禁引用规则 ID 与目录登记的双向闭包守卫） | `pre-push-gate`、CI |
-| `common/` | Node.js | `validate-docs-consistency.js` | audit / docs（治理文档硬编码计数与脚本死链守卫） | `pre-push-gate`、CI |
+| `common/` | Node.js | `validate-docs-consistency.js` | audit / docs（动态对照 `rule-catalog.json` 真实计数拦截规则总数漂移；含治理文档脚本死链守卫） | `pre-push-gate`、CI |
 | `common/` | Node.js | `validate-rule-reachability.js` | audit / ssot（error 级规则执行入口可达性守卫） | `pre-push-gate`、CI |
-| `common/` | Node.js | `bootstrap-gates.js` | tooling / bootstrap（钩子激活、依赖安装与构建一键引导） | 本地 CLI |
+| `common/` | Node.js | `evaluate-change-entropy.js` | audit / entropy（Hassan 变更香农熵与 Kamei 跨域扩散 NF/ND/NS 评估，超阈阻断） | `pre-push-gate` Gate 11、本地 CLI || `common/` | Node.js | `bootstrap-gates.js` | tooling / bootstrap（钩子激活、依赖安装与构建一键引导） | 本地 CLI |
 | `common/` | Node.js | `test-gate-parity.js` | validate / parity（双实现提交门禁行为差分） | CI、本地 CLI |
 | `common/` | Node.js | `test-gate-selftest.js` | validate / selftest（门禁 PASS/违规/缺依赖三态矩阵） | CI、本地 CLI |
 | `common/` | Node.js | `validate-commit-msg.js` | gate / commit（生产级结构化提交信息格式、区块与有效字数综合调度器） | `commit-msg-gate` |
 | `common/` | Node.js | `validate-commit-msg-style.js` | gate / style（提交信息文本风格与四维禁词核验器） | `commit-msg-gate`、`pre-push-gate`、CI |
-| `common/` | Node.js | `git-env.js` | tooling / git（Git 运行环境隔离、暂存与提交范围文件检索 SSOT 工具） | 门禁与体积审查脚本集 |
+| `common/` | Node.js | `commit-tokenizer.js` | gate / style-lexical（零依赖提交信息分词器：零宽字符剥离、NFKC 归一、前缀 Trie 与结构解析） | `validate-commit-msg-style`、`validate-commit-guardrail` |
+| `common/` | Node.js | `commit-style-arbiter.js` | gate / style-lexical（祈使语态、客观叙述与学术白名单仲裁器） | `validate-commit-msg-style` |
+| `common/` | Node.js | `tech-debt-corridor.js` | gate / debt（弹性高危技术债容差走廊与清偿棘轮状态机） | `validate-commit-msg`、`validate-commit-msg-style` |
+| `common/` | Node.js | `commit-guardrail-logger.js` | telemetry / commit（提交护栏快照原子落盘与历史账本 FIFO 轮转） | `validate-commit-msg`、`validate-commit-msg-style` |
+| `common/` | Node.js | `validate-commit-guardrail.js` | validate / commit-lexical（分词器、风格仲裁与债务走廊 12 组契约自测；基础件回归即阻断） | `pre-push-gate` || `common/` | Node.js | `git-env.js` | tooling / git（Git 运行环境隔离、暂存与提交范围文件检索 SSOT 工具） | 门禁与体积审查脚本集 |
 | `common/` | Node.js | `record-workspace-trajectory.js` | telemetry / ledger（全工作区审查轨迹账本记录与版本增量追加工具） | `audit-all` |
 | `common/` | Node.js | `validate-trajectory-ledger.js` | audit / ledger（全工作区演化轨迹账本哈希单调性与完整性校验器） | 本地 CLI、CI |
-| `common/` | Node.js | `log-rotator.js` | tooling / hygiene（门禁失败快照保留、尾部截断 <=100KB 与 FIFO <=2MB 轮转清理管理器） | `pre-commit-gate`、`commit-msg-gate`、`pre-push-gate`、`audit-all` |
+| `common/` | Node.js | `record-workspace-audit.js` | telemetry / audit（统一审查结论汇总落盘与跨项目得分聚合） | `audit-all` |
+| `common/` | Node.js | `evaluate-polyglot-balance.js` | audit / balance（异构多语言均衡指数与离散度惩罚度量） | `audit-all` |
+| `common/` | Node.js | `analyze-commit-terminology.js` | audit / terminology（历史提交术语频次与新兴黑话风险诊断，落盘 `.audit-logs/`） | 本地 CLI（诊断报告，不参与门禁裁决） || `common/` | Node.js | `log-rotator.js` | tooling / hygiene（门禁失败快照保留、尾部截断 <=100KB 与 FIFO <=2MB 轮转清理管理器） | `pre-commit-gate`、`commit-msg-gate`、`pre-push-gate`、`audit-all` |
 | `common/` | JSON | `commit-msg-forbidden-terms.json` | data / ssot（提交信息四维禁词与白名单单源字典） | `validate-commit-msg-style` |
 | `common/` | JSON | `rule-catalog.json` | data / ssot（全工作区规则事实真源聚合目录） | 静态审查与门禁工具链 |
 | `sh/` | Bash | `pre-commit-gate.sh` | gate（本地提交物理卫生与多项前置检查，含 AST 切片） | `.githooks/pre-commit`、本地 CLI |
@@ -189,3 +195,8 @@ Python 版使用 docstring + `if __name__ == "__main__":` 守卫。
 | **提交信息门禁** | `pwsh scripts/ps1/commit-msg-gate.ps1 <msg>` | `pwsh scripts/ps1/commit-msg-gate.ps1 <msg> -Agent` | `pwsh scripts/ps1/commit-msg-gate.ps1 -ViewLog` |
 | **推送前置门禁** | `pwsh scripts/ps1/pre-push-gate.ps1` | `pwsh scripts/ps1/pre-push-gate.ps1 -Agent` | `pwsh scripts/ps1/pre-push-gate.ps1 -ViewLog` |
 | **失败快照轮转器** | `node scripts/common/log-rotator.js --view` | `node scripts/common/log-rotator.js --agent` | 自动保留最近一次失败至 `.audit-logs/last-failure.json` |
+
+> 推送门禁现有 11 道 Gate：1 物理卫生/密度/体积 → 2 规则目录/闭包/可达性/文档/轨迹账本 →
+> 3 auto-refactor 门禁 → 4 auto-refactor 质量基线 → 5 workspace-timing 测试 → 6 workspace-timing 审查 →
+> 7 轨迹账本约束 → 8 WebGames 全域（含 Mermaid 真解析） → 9 fractal-git Rust 门禁 →
+> 10 提交信息词法契约自测 + 待推送历史扫描 → 11 推送集变更熵与跨域扩散。

@@ -144,21 +144,56 @@ function validateStyleAndTone(content, options = {}) {
   return validateCommitMessageContent(content, options);
 }
 
+/**
+ * Detects construction-batch and temporary codenames forbidden anywhere in a
+ * commit message.
+ *
+ * Mirrors the ps1/sh implementations of Rule 2. Previously Node only caught
+ * these indirectly through header-format failures, which routed them into the
+ * elastic Tier-2 corridor and let `wip` through as a warning.
+ *
+ * @param {string} content - Raw commit message.
+ * @returns {Array<{ lineNum: number, term: string, category: string }>} Findings.
+ */
+function validateBatchCodename(content) {
+  const pattern = /\b(?:p[0-9]+|phase[0-9]+|st[0-9]+|wip|temp|new|v[0-9]+)\b/gi;
+  const findings = [];
+  const lines = content.split(/\r?\n/);
+
+  for (let i = 0; i < lines.length; i++) {
+    // Version-like tokens such as `v2` inside a semver (`1.2.3`) are legitimate;
+    // only bare standalone markers are rejected.
+    const scrubbed = lines[i].replace(/\b\d+\.\d+\.\d+\b/g, '');
+    let match;
+    const localPattern = new RegExp(pattern.source, 'gi');
+    while ((match = localPattern.exec(scrubbed)) !== null) {
+      findings.push({ lineNum: i + 1, term: match[0], category: 'batch_codename' });
+    }
+  }
+
+  return findings;
+}
+
 function validateSingleCommitMessage(content, options = {}) {
   const hallucinatedRules = validateRuleAntiHallucination(content);
+  const batchFindings = validateBatchCodename(content);
   const styleResult = validateStyleAndTone(content, options);
-  const styleFindings = styleResult.findings;
-  const isPermittedUnderCorridor = hallucinatedRules.length === 0 && Boolean(styleResult.isPermittedUnderCorridor);
+  const styleFindings = [...batchFindings, ...styleResult.findings];
+  const hasCriticalBatch = batchFindings.length > 0;
+  const isPermittedUnderCorridor =
+    !hasCriticalBatch && hallucinatedRules.length === 0 && Boolean(styleResult.isPermittedUnderCorridor);
 
   return {
-    valid: hallucinatedRules.length === 0 && styleResult.valid,
+    valid: hallucinatedRules.length === 0 && !hasCriticalBatch && styleResult.valid,
     isPermittedUnderCorridor,
     hallucinatedRules,
+    batchFindings,
     styleFindings,
     guardrail: styleResult.guardrail,
     debtVerdict: styleResult.debtVerdict,
   };
 }
+
 
 function validateCommitRange(range) {
   const root = path.resolve(__dirname, PARENT_DIR_DEPTH_TWO);
@@ -328,6 +363,14 @@ function reportCommitMsgFailure(res, target, isAgentMode) {
       console.error(`   • 未知规则 ID: ${h}`);
     }
     console.error('   提示: 请检查规则拼写，或先在规则注册表 / review-rules.json 中登记该规则后重新生成目录。');
+  }
+
+  if ((res.batchFindings || []).length > 0) {
+    console.error('❌ [FAIL] Rule 2: 提交信息包含施工批次或临时标记 (一票否决，不进入弹性走廊):');
+    for (const f of res.batchFindings) {
+      console.error(`   • 第 ${f.lineNum} 行: '${f.term}'`);
+    }
+    console.error('   提示: 移除 pN / phaseN / stN / wip / temp / new / vN 等过程性代号，改用客观技术描述。');
   }
 
   if (res.styleFindings.length > 0) {

@@ -26,6 +26,9 @@ const WHITELIST_TERMS = new Set([
   'IEEE-754',
 ]);
 
+/** Populated when the plugin bundle is absent so the skip reason reaches the log. */
+let pluginBundleSkipReason = null;
+
 /**
  * Remove fenced code blocks from markdown content to avoid false-positive link/rule checks.
  *
@@ -210,8 +213,17 @@ function validateMarkdownFile(filePath, registeredRules) {
  */
 function validatePluginBundle(repoRoot) {
   const pluginDir = path.join(repoRoot, '.agents/plugins/workspace-governance');
-  if (!fs.existsSync(pluginDir)) return [];
   const errors = [];
+  if (!fs.existsSync(pluginDir)) {
+    // The bundle is a derived artefact produced by sync-skills.js and is
+    // gitignored, so it legitimately does not exist in a fresh clone. Record a
+    // visible SKIP instead of silently returning so the parity contract cannot
+    // be mistaken for "verified" when it was never evaluated.
+    pluginBundleSkipReason =
+      'plugin bundle not materialised (derived artefact, gitignored); byte-parity check skipped';
+    return errors;
+  }
+
   const pluginJsonPath = path.join(pluginDir, 'plugin.json');
   if (!fs.existsSync(pluginJsonPath)) {
     errors.push(`${pluginDir}: Missing plugin.json`);
@@ -303,10 +315,17 @@ function main() {
   const pluginBundlePresent = fs.existsSync(path.join(repoRoot, '.agents/plugins/workspace-governance'));
   const parityNote = pluginBundlePresent
     ? 'with plugin parity'
-    : 'plugin parity skipped (bundle absent)';
+    : `plugin parity skipped (${pluginBundleSkipReason ?? 'bundle absent'})`;
+  if (!pluginBundlePresent) {
+    process.stdout.write(
+      `\n⚠️  [SKIP] Plugin byte-parity not evaluated: ${pluginBundleSkipReason ?? 'bundle absent'}\n` +
+        '     Run \'node scripts/common/sync-skills.js\' to materialise the bundle before publishing.\n',
+    );
+  }
   process.stdout.write(`\n✔ [PASS] All ${skillFolders.length} skills (${allMdFiles.length} markdown documents) verified successfully ${parityNote}.\n`);
   return 0;
 }
+
 
 if (require.main === module) {
   process.exit(main());

@@ -1,7 +1,7 @@
 {
   "schema": "fractal-git-rules/v1",
-  "generatedAt": "2026-10-18T14:15:00.000Z",
-  "totalRules": 10,
+  "generatedAt": "2026-10-19T18:00:00.000Z",
+  "totalRules": 17,
   "rules": [
     {
       "id": "FGT-COR-001",
@@ -62,6 +62,48 @@
       "family": "CAS",
       "severity": "error",
       "summary": "LayerVFS CAS snapshot materializer bridge: Fixed-time O(1) page cache mapping and atomic tree commit"
+    },
+    {
+      "id": "FGT-DEP-001",
+      "family": "DEP",
+      "severity": "error",
+      "summary": "Micro-crate DAG single-direction dependency guard: Zero circular dependency and strict L1->L2->L3 layer isolation"
+    },
+    {
+      "id": "FGT-PRF-001",
+      "family": "PRF",
+      "severity": "error",
+      "summary": "Zero transient heap allocation guard in hot loops: Prohibit string/vec/clone allocation in critical paths (ADV-PRF-002)"
+    },
+    {
+      "id": "FGT-LCK-001",
+      "family": "LCK",
+      "severity": "error",
+      "summary": "Lock-free in-memory index concurrency guard: Prohibit blocking standard Mutex in virtual staging tree"
+    },
+    {
+      "id": "FGT-SAF-001",
+      "family": "SAF",
+      "severity": "error",
+      "summary": "Documented unsafe block safety proof guard: Prohibit bare undocumented unsafe blocks in Rust crates"
+    },
+    {
+      "id": "FGT-ERR-001",
+      "family": "ERR",
+      "severity": "error",
+      "summary": "Zero unwrap and expect panic guard: Enforce strong-typed Result propagation across production crates"
+    },
+    {
+      "id": "FGT-FAC-001",
+      "family": "FAC",
+      "severity": "error",
+      "summary": "Facade substantial burden and immutable freeze guard: Enforce ARCH-FAC-001 with ELOC budget and Object.freeze"
+    },
+    {
+      "id": "FGT-BRG-001",
+      "family": "BRG",
+      "severity": "error",
+      "summary": "Pre-review zone gate bridge verification guard: Strict rule catalog closure and sub-10ms AST slice check"
     }
   ]
 }

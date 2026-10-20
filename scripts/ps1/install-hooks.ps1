@@ -26,10 +26,42 @@ if (-not $gitRoot) {
     exit 1
 }
 
+# 校验 hook 文件完整性
+$hooksDir = Join-Path $gitRoot '.githooks'
+$requiredHooks = @('pre-commit', 'commit-msg', 'pre-push')
+$missingHooks = @()
+foreach ($hook in $requiredHooks) {
+    $hookPath = Join-Path $hooksDir $hook
+    if (-not (Test-Path -Path $hookPath -PathType Leaf)) {
+        $missingHooks += $hook
+    }
+}
+if ($missingHooks.Count -gt 0) {
+    Write-Host "❌ [FAIL] .githooks 缺少必需入口: $($missingHooks -join ', ')" -ForegroundColor Red
+    exit 1
+}
+
 # 配置 core.hooksPath
 git config core.hooksPath .githooks
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "❌ [FAIL] 写入 core.hooksPath 失败。" -ForegroundColor Red
+    exit 1
+}
 
-Write-Host "✅ 已配置 git config core.hooksPath = .githooks" -ForegroundColor Green
+# 赋予可执行位。Windows 文件系统不携带 POSIX 执行位，必须通过索引 chmod 记录，
+# 否则 WSL / Git Bash 环境下 hook 会因缺少执行位而静默失效。
+Push-Location $gitRoot
+try {
+    foreach ($hook in $requiredHooks) {
+        git update-index --chmod=+x ".githooks/$hook" 2>$null | Out-Null
+    }
+} finally {
+    Pop-Location
+}
+
+$effectiveHooksPath = (git config --get core.hooksPath) -join ''
+Write-Host "✅ 已配置 git config core.hooksPath = $effectiveHooksPath" -ForegroundColor Green
+Write-Host "✅ 已为 $($requiredHooks -join ', ') 设置索引可执行位 (git update-index --chmod=+x)" -ForegroundColor Green
 Write-Host "✅ Pre-Commit 门禁 (.githooks/pre-commit -> pwsh / bash 双运行期路由)" -ForegroundColor Green
 Write-Host "✅ Commit-Msg 门禁 (.githooks/commit-msg -> pwsh / bash 双运行期路由)" -ForegroundColor Green
 Write-Host "✅ Pre-Push 门禁 (.githooks/pre-push -> pwsh / bash 双运行期路由)" -ForegroundColor Green

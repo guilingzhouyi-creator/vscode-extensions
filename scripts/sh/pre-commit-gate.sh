@@ -22,10 +22,24 @@ export GIT_CONFIG_SYSTEM="${GIT_CONFIG_SYSTEM:-NUL}"
 export GIT_CONFIG_NOSYSTEM="${GIT_CONFIG_NOSYSTEM:-1}"
 export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$ROOT_DIR}"
 
-NODE_BIN=$(command -v node 2>/dev/null || command -v node.exe 2>/dev/null || echo "node")
-NPM_BIN=$(command -v npm 2>/dev/null || command -v npm.cmd 2>/dev/null || echo "npm")
+NODE_BIN=$(command -v node 2>/dev/null || command -v node.exe 2>/dev/null || echo "")
+NPM_BIN=$(command -v npm 2>/dev/null || command -v npm.cmd 2>/dev/null || echo "")
 PYTHON_BIN=$(command -v python3.12 2>/dev/null || command -v python3 2>/dev/null || command -v python 2>/dev/null || command -v py 2>/dev/null || echo "python3")
 CARGO_BIN=$(command -v cargo 2>/dev/null || echo "")
+
+if [[ -z "$NODE_BIN" ]]; then
+    echo "❌ [BLOCK] 未检测到 Node.js 运行时，提交前门禁无法执行。" >&2
+    echo "   修复: 安装 Node.js 20+ 并确保 'node' 在 PATH 中。" >&2
+    echo "   该门禁为 fail-closed：缺少运行时不得静默放行 (GATE-SYS-001)。" >&2
+    exit 1
+fi
+
+if [[ -z "$NPM_BIN" ]]; then
+    echo "❌ [BLOCK] 未检测到 npm 包管理器，提交前门禁无法执行增量编译校验。" >&2
+    echo "   修复: 随 Node.js 一并安装 npm，并确保 'npm' 在 PATH 中。" >&2
+    exit 1
+fi
+
 
 AGENT_MODE=0
 for arg in "$@"; do
@@ -42,17 +56,7 @@ done
 STEP_LOG=$(mktemp)
 trap 'rm -f "$STEP_LOG"' EXIT
 
-# 获取当前暂存区中的文件列表（新增、修改、重命名）
-STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null || true)
-
-if [[ -z "$STAGED_FILES" ]]; then
-    if [[ "$AGENT_MODE" -eq 1 ]]; then
-        echo '{"protocolVersion":"1.0.0","status":"PASS","gate":"pre-commit","summary":"No staged files to check."}'
-        exit 0
-    fi
-    echo "ℹ️  暂存区无文件变更，跳过 pre-commit 检查。"
-    exit 0
-fi
+RUN_ID="$(date -u +%s 2>/dev/null || echo 0)-$$"
 
 record_pre_commit_failure() {
     local step_name="$1"
@@ -68,6 +72,7 @@ record_pre_commit_failure() {
 
     local step_id
     case "$step_name" in
+        "Gate 1~6: Root Hygiene"*) step_id="PC-01-01" ;;
         "Gate 7: Rules Registry"*) step_id="PC-03-01" ;;
         "Gate 7: Skills"*) step_id="PC-03-02" ;;
         "Gate 8: workspace-timing Compilation"*) step_id="PC-04-01" ;;
@@ -132,6 +137,52 @@ record_pre_commit_failure() {
 EOF
 }
 
+# 根目录物理防污染与散落脚本前置雷达
+ROOT_CLUTTER=$(find "$ROOT_DIR" -maxdepth 1 -type f \( -name "*.log" -o -name "*.tmp" -o -name "*.bak" -o -name "*.actual.json" -o -name "*.js" -o -name "*.ts" -o -name "*.py" -o -name "*.sh" -o -name "*.ps1" -o -name "*.bat" -o -name "*.cmd" \) ! -name ".*" 2>/dev/null || true)
+if [[ -n "$ROOT_CLUTTER" ]]; then
+    FIRST_BAD=$(echo "$ROOT_CLUTTER" | head -n 1)
+    BAD_NAME=$(basename "$FIRST_BAD")
+    IS_SCRIPT=0
+    case "$BAD_NAME" in
+        *.js|*.ts|*.py|*.sh|*.ps1|*.bat|*.cmd) IS_SCRIPT=1 ;;
+    esac
+    if [[ "$IS_SCRIPT" -eq 1 ]]; then
+        RULE_ID="EXT-DIR-001"
+        SUMMARY="Root directory contains loose code script '$BAD_NAME', violating Extension-is-Domain rule (EXT-DIR-001)."
+        ACTIONABLE_FIX="Move '$BAD_NAME' into scripts/common/, scripts/ps1/, scripts/sh/, or <project>/scripts/py/."
+    else
+        RULE_ID="HYG-CLT-001"
+        SUMMARY="Transient log or clutter file '$BAD_NAME' detected in repository root (HYG-CLT-001)."
+        ACTIONABLE_FIX="Delete root temporary file '$BAD_NAME' or run 'node scripts/common/validate-physical-hygiene.js --fix'."
+    fi
+    if [[ "$AGENT_MODE" -eq 1 ]]; then
+        record_pre_commit_failure "Gate 1~6: Root Hygiene & Script Radar ($RULE_ID)" \
+            "$RULE_ID" \
+            "$SUMMARY" \
+            "$ACTIONABLE_FIX" \
+            "node scripts/common/validate-physical-hygiene.js" \
+            "$BAD_NAME"
+        cat "$ROOT_DIR/.audit-logs/last-failure.json"
+        exit 1
+    else
+        echo "❌ [FAIL] 根目录检测到散落脚本或未受控临时脏文件: $BAD_NAME ($RULE_ID)"
+        echo "   $ACTIONABLE_FIX"
+        exit 1
+    fi
+fi
+
+# 获取当前暂存区中的文件列表（新增、修改、重命名）
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM 2>/dev/null || true)
+
+if [[ -z "$STAGED_FILES" ]]; then
+    if [[ "$AGENT_MODE" -eq 1 ]]; then
+        echo '{"protocolVersion":"1.0.0","status":"PASS","gate":"pre-commit","summary":"No staged files to check."}'
+        exit 0
+    fi
+    echo "ℹ️  暂存区无文件变更，跳过 pre-commit 检查。"
+    exit 0
+fi
+
 if [[ "$AGENT_MODE" -eq 0 ]]; then
     echo "================================================================="
     echo "🔒 执行本地 Pre-Commit 质量安全与物理卫生检查"
@@ -139,7 +190,6 @@ if [[ "$AGENT_MODE" -eq 0 ]]; then
 fi
 
 FAILED=0
-RUN_ID="$(date -u +%s 2>/dev/null || echo 0)-$$"
 
 if [[ "$AGENT_MODE" -eq 1 ]]; then
     rm -f "$ROOT_DIR/.audit-logs/last-failure.json" 2>/dev/null || true

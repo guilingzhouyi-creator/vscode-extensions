@@ -5,7 +5,8 @@
  *   Just-In-Time diffusion metrics (NF, ND, NS) across Git change sets to prevent chaotic,
  *   cross-domain code dispersal and enforce cohesive atomic commits.
  * Dependencies & Triggers: Node.js standard libraries (path, child_process);
- *   invoked by commit-msg-gate (ps1/sh), pre-commit-gate, and CI workflows.
+ *   invoked by pre-push-gate (ps1/sh) Gate 11; optional compiled changeset miner
+ *   from auto-refactor/dist when present, degrading to git numstat parsing otherwise.
  * Responsibilities:
  *   1. Parse numstat outputs from git diff into file change distributions;
  *   2. Compute discrete Shannon entropy H(C) and normalized entropy H_hat(C) in [0.0, 1.0];

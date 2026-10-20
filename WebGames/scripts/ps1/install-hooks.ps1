@@ -70,12 +70,10 @@ $HookContent = @"
 echo "【Git Hook】正在执行 WebGames 提交前安全审查..."
 if command -v pwsh >/dev/null 2>&1; then
     pwsh -NoProfile -File "WebGames/scripts/ps1/audit-all.ps1"
-elif command -v powershell >/dev/null 2>&1; then
-    powershell -NoProfile -File "WebGames/scripts/ps1/audit-all.ps1"
 elif [ -f "WebGames/scripts/sh/audit-all.sh" ]; then
     bash "WebGames/scripts/sh/audit-all.sh"
 else
-    echo "未找到 PowerShell 或 Bash，跳过门禁。"
+    echo "未找到跨平台 pwsh 或 Bash，跳过门禁。"
     exit 0
 fi
 

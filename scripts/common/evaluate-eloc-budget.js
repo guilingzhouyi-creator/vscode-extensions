@@ -725,8 +725,34 @@ const OPTION_KEY_MAP = Object.freeze(
   Object.fromEntries(OPTION_MAP_RAW.split('\n').map((l) => l.split(':')))
 );
 
+const USAGE_TEXT = [
+  'Usage: node scripts/common/evaluate-eloc-budget.js [options] [files...]',
+  '',
+  'Target selection (pick one; defaults to staged files):',
+  '  --staged                 Evaluate files staged in the Git index',
+  '  --all                    Evaluate every auditable source file in the repository',
+  '  <files...>               Evaluate explicit paths',
+  '',
+  'Volume overrides:',
+  '  --max-eloc <n>           Hard ELOC ceiling (default 900)',
+  '  --max-loc <n>            Hard physical-LOC ceiling (default 1400)',
+  '  --warn-eloc <n>          ELOC warning line (default 750)',
+  '  --warn-loc <n>           LOC warning line (default 1100)',
+  '  --density-ratio <n>      Target LOC:ELOC dilution ratio (default 3.0)',
+  '',
+  'Output:',
+  '  --json                   Emit machine-readable JSON',
+  '  --help, -h               Print this message',
+].join('\n');
+
 /**
  * Parses CLI options and targets using flat control flow.
+ *
+ * Unknown flags are collected instead of being silently dropped: a typo such as
+ * `--stage` must never degrade the gate into an empty-target green pass.
+ *
+ * @param {string[]} args - Raw process arguments.
+ * @returns {object} Parsed option bag including `unknownArgs` and `help`.
  */
 function parseArgs(args) {
   const projCfg = findProjectVolumeConfig();
@@ -738,7 +764,10 @@ function parseArgs(args) {
     densityRatio:
       typeof projCfg?.densityRatio === 'number' ? projCfg.densityRatio : DEFAULT_TARGET_DENSITY_RATIO,
     staged: false,
+    all: false,
     json: false,
+    help: false,
+    unknownArgs: [],
     files: [],
   };
 
@@ -749,22 +778,37 @@ function parseArgs(args) {
       options.staged = true;
       continue;
     }
+    if (arg === '--all') {
+      options.all = true;
+      continue;
+    }
     if (arg === '--json') {
       options.json = true;
       continue;
     }
+    if (arg === '--help' || arg === '-h') {
+      options.help = true;
+      continue;
+    }
     const targetKey = OPTION_KEY_MAP[arg];
-    if (targetKey && i < args.length) {
+    if (targetKey) {
+      if (i >= args.length) {
+        options.unknownArgs.push(`${arg} (missing value)`);
+        continue;
+      }
       applyNumericOption(options, targetKey, args[i++]);
       continue;
     }
-    if (!arg.startsWith('--')) {
-      options.files.push(arg);
+    if (arg.startsWith('-')) {
+      options.unknownArgs.push(arg);
+      continue;
     }
+    options.files.push(arg);
   }
 
   return options;
 }
+
 
 const RE_IGNORED_PATHS = /\/(?:dist|out|node_modules|fixtures|baseline|reports|archive)\/|corpus/;
 const AUDITABLE_EXTENSIONS = new Set('.ts,.js,.mjs,.cjs,.gd,.py,.sh,.ps1'.split(','));
@@ -781,7 +825,48 @@ function isAuditableCodeFile(file) {
   return AUDITABLE_EXTENSIONS.has(ext);
 }
 
-function handleEmptyTargets(options) {
+const RE_IGNORED_DIR_NAMES = new Set([
+  '.git', '.agents', 'node_modules', 'dist', 'out', 'fixtures', 'baseline',
+  'reports', 'archive', 'build', '.godot', '.refactor-trajectory',
+]);
+
+/**
+ * Recursively enumerates auditable source files for `--all` mode.
+ *
+ * Uses the same directory-pruning set as validate-code-density.js so both
+ * volume gates observe an identical target universe.
+ *
+ * @param {string} dir - Directory to walk.
+ * @param {string[]} [fileList] - Accumulator.
+ * @returns {string[]} Absolute file paths.
+ */
+function findRepoCodeFiles(dir, fileList = []) {
+  if (!fs.existsSync(dir)) return fileList;
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (entry.isDirectory()) {
+      if (entry.name.startsWith('.') || RE_IGNORED_DIR_NAMES.has(entry.name)) {
+        continue;
+      }
+      findRepoCodeFiles(path.join(dir, entry.name), fileList);
+      continue;
+    }
+    if (!entry.isFile()) continue;
+    const full = path.join(dir, entry.name);
+    const rel = path.relative(process.cwd(), full).replace(/\\/g, '/');
+    if (isAuditableCodeFile(rel)) {
+      fileList.push(full);
+    }
+  }
+  return fileList;
+}
+
+/**
+ * Reports a target-selection outcome.
+ *
+ * @param {object} options - Parsed CLI options.
+ * @param {string} note - Human-readable context for the empty result.
+ */
+function handleEmptyTargets(options, note) {
   if (options.json) {
     console.log(
       JSON.stringify(
@@ -789,6 +874,7 @@ function handleEmptyTargets(options) {
           protocolVersion: '1.0.0',
           status: 'PASS',
           totalFiles: 0,
+          note,
           violations: [],
           warnings: [],
           files: [],
@@ -799,11 +885,59 @@ function handleEmptyTargets(options) {
     );
     process.exit(0);
   }
-  console.log('  ✔ [PASS] 无代码文件需要执行双轨体积与 ELOC 预算检查');
+  console.log(`  ✔ [PASS] 双轨体积与 ELOC 预算检查：${note}`);
   process.exit(0);
 }
 
-function auditFileCollection(uniqueFiles, options) {
+
+const DEFAULT_BASELINE_REL = 'scripts/common/eloc-budget-baseline.json';
+
+/**
+ * Loads the frozen volume baseline.
+ *
+ * The baseline records files that already exceeded the envelope before the
+ * full-repository scan existed. Entries freeze the current measured ELOC so the
+ * gate can block growth without pretending the debt is absent.
+ *
+ * @param {string} repoRoot - Repository root used to resolve the baseline.
+ * @returns {Map<string, number>} relPath -> frozen ELOC.
+ */
+function loadVolumeBaseline(repoRoot) {
+  const baselinePath = path.join(repoRoot, DEFAULT_BASELINE_REL);
+  if (!fs.existsSync(baselinePath)) return new Map();
+  try {
+    const parsed = JSON.parse(fs.readFileSync(baselinePath, 'utf8'));
+    const entries = Array.isArray(parsed?.frozenOverBudget) ? parsed.frozenOverBudget : [];
+    return new Map(entries.map((e) => [e.file, Number(e.eloc)]));
+  } catch {
+    return new Map();
+  }
+}
+
+/**
+ * Applies the ratchet to a violation produced by the absolute envelope.
+ *
+ * @param {object} violation - Candidate violation record.
+ * @param {number} eloc - Measured effective LOC.
+ * @param {Map<string, number>} baseline - Frozen ELOC map.
+ * @returns {{ suppression: string|null, excess: number }} Ratchet outcome.
+ */
+function applyVolumeRatchet(violation, eloc, baseline) {
+  const frozen = baseline.get(violation.file);
+  if (frozen === undefined) {
+    return { suppression: null, excess: 0 };
+  }
+  if (eloc <= frozen) {
+    return {
+      suppression:
+        `frozen at ${frozen} ELOC in eloc-budget-baseline.json; grow-only debt, not a new regression`,
+      excess: 0,
+    };
+  }
+  return { suppression: null, excess: eloc - frozen };
+}
+
+function auditFileCollection(uniqueFiles, options, baseline = new Map()) {
   const violations = [];
   const warnings = [];
   const summaries = [];
@@ -818,9 +952,22 @@ function auditFileCollection(uniqueFiles, options) {
     summaries.push({ relPath, ...metrics, envelope });
 
     if (envelope.severity === 'error') {
+      const ratchet = applyVolumeRatchet({ file: relPath }, metrics.eloc, baseline);
+      if (ratchet.suppression) {
+        warnings.push({
+          file: relPath,
+          notice: `${envelope.message} (${ratchet.suppression})`,
+          tag: envelope.tag,
+          suggestion: envelope.suggestion,
+          actionable: envelope.actionable,
+        });
+        continue;
+      }
       violations.push({
         file: relPath,
-        reason: envelope.message,
+        reason: ratchet.excess > 0
+          ? `${envelope.message} — exceeded its frozen baseline by ${ratchet.excess} ELOC`
+          : envelope.message,
         tag: envelope.tag,
         suggestion: envelope.suggestion,
         actionable: envelope.actionable,
@@ -838,6 +985,7 @@ function auditFileCollection(uniqueFiles, options) {
 
   return { violations, warnings, summaries };
 }
+
 
 function printHumanAuditSummary(summaries, warnings, violations) {
   if (warnings.length > 0) {
@@ -874,11 +1022,26 @@ function printHumanAuditSummary(summaries, warnings, violations) {
  */
 function run() {
   const options = parseArgs(process.argv.slice(2));
-  let targets = options.files;
 
-  if (options.staged || targets.length === 0) {
-    const staged = getStagedFiles();
-    targets = targets.concat(staged);
+  if (options.help) {
+    console.log(USAGE_TEXT);
+    process.exit(0);
+  }
+
+  if (options.unknownArgs.length > 0) {
+    console.error(
+      `❌ [FAIL] 无法识别的命令行参数: ${options.unknownArgs.join(', ')}\n` +
+        '   未知参数会导致目标文件集合为空，从而产生假绿结果，故此处直接阻断 (VOL-ELOC-001)。\n' +
+        `\n${USAGE_TEXT}`,
+    );
+    process.exit(2);
+  }
+
+  let targets = [...options.files];
+  if (options.all) {
+    targets = targets.concat(findRepoCodeFiles(process.cwd()));
+  } else if (options.staged || targets.length === 0) {
+    targets = targets.concat(getStagedFiles());
   }
 
   // Remove duplicates and apply ignore filters
@@ -887,9 +1050,13 @@ function run() {
   );
 
   if (uniqueFiles.length === 0) {
-    handleEmptyTargets(options);
+    const note = options.all
+      ? '全仓未发现可审计的源码文件'
+      : '暂存区与显式入参中无可审计的源码文件';
+    handleEmptyTargets(options, note);
     return;
   }
+
 
   if (!options.json) {
     console.log(
@@ -897,7 +1064,9 @@ function run() {
     );
   }
 
-  const { violations, warnings, summaries } = auditFileCollection(uniqueFiles, options);
+  const baseline = loadVolumeBaseline(path.resolve(__dirname, '../..'));
+  const { violations, warnings, summaries } = auditFileCollection(uniqueFiles, options, baseline);
+
 
   if (options.json) {
     const report = {

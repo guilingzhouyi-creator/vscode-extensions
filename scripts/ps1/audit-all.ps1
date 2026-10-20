@@ -28,88 +28,9 @@ $OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 $PSDefaultParameterValues['Get-Content:Encoding'] = 'utf8'
 $PSDefaultParameterValues['Set-Content:Encoding'] = 'utf8'
 
-function Get-DisplayWidth {
-    [CmdletBinding()]
-    param(
-        [string]$Text = ''
-    )
-    if ([string]::IsNullOrEmpty($Text)) { return 0 }
-    $w = 0
-    foreach ($ch in $Text.ToCharArray()) {
-        $code = [int]$ch
-        if ($code -ge 0x2500 -and $code -le 0x259F) {
-            $w += 1
-        } elseif (($code -ge 0x2E80 -and $code -le 0x9FFF) -or
-                  ($code -ge 0xF900 -and $code -le 0xFAFF) -or
-                  ($code -ge 0xFF01 -and $code -le 0xFF60) -or
-                  ($code -ge 0xFFE0 -and $code -le 0xFFE6) -or
-                  ($code -eq 0x2705 -or $code -eq 0x274C)) {
-            $w += 2
-        } else {
-            $w += 1
-        }
-    }
-    return $w
-}
-
-function Format-AlignedCell {
-    [CmdletBinding()]
-    param(
-        [string]$Text = '',
-        [int]$Width = 0,
-        [string]$Align = 'Left'
-    )
-    $dw = Get-DisplayWidth $Text
-    $pad = [math]::Max(0, $Width - $dw)
-    if ($Align -eq 'Right') {
-        return (" " * $pad) + $Text
-    } elseif ($Align -eq 'Center') {
-        $left = [math]::Floor($pad / 2)
-        $right = $pad - $left
-        return (" " * $left) + $Text + (" " * $right)
-    } else {
-        return $Text + (" " * $pad)
-    }
-}
-
-function Format-DashboardRow {
-    [CmdletBinding()]
-    param(
-        [string]$Content = '',
-        [int]$TargetWidth = 71
-    )
-    $dw = Get-DisplayWidth $Content
-    $pad = [math]::Max(0, $TargetWidth - $dw)
-    return "│" + $Content + (" " * $pad) + "│"
-}
-
-function Get-ProgressBar {
-    [CmdletBinding()]
-    param([double]$Score)
-    $filled = [math]::Round(($Score / 100.0) * 20)
-    if ($filled -lt 0) { $filled = 0 } elseif ($filled -gt 20) { $filled = 20 }
-    $empty = 20 - $filled
-    return ("█" * $filled) + ("░" * $empty)
-}
-
-function Get-GradeTag {
-    [CmdletBinding()]
-    param([double]$Score)
-    if ($Score -ge 95.0) { return "[A+]" }
-    if ($Score -ge 90.0) { return "[A ]" }
-    if ($Score -ge 85.0) { return "[B+]" }
-    if ($Score -ge 80.0) { return "[B ]" }
-    if ($Score -ge 75.0) { return "[C+]" }
-    if ($Score -ge 70.0) { return "[C ]" }
-    if ($Score -ge 60.0) { return "[D ]" }
-    return "[F ]"
-}
-
-function Get-GradeFromScore {
-    [CmdletBinding()]
-    param([double]$Score)
-    return (Get-GradeTag $Score).Replace("[", "").Replace("]", "").Trim()
-}
+# 控制台渲染纯函数（宽字符宽度 / 对齐 / 进度条 / 等级标签）外置为共享库，
+# 使审查编排与本文件体积预算解耦，双平台渲染逻辑可独立演进。
+. (Join-Path $PSScriptRoot "lib/console-dashboard.ps1")
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 
@@ -204,13 +125,17 @@ $randSuffix = [System.Guid]::NewGuid().ToString().Substring(0, 8)
 $logHygieneOut = Join-Path $transientDir "audit-hygiene-$randSuffix.json"
 
 # 1. 物理卫生八维刚性公理与全域巡检
-if (-not $Json -and -not $Agent) { Write-Host "▶ [1/5] 检查全工作区物理卫生、同构脚本、.gitignore 治理与零空文件..." -ForegroundColor Gray }
+if (-not $Json -and -not $Agent) { Write-Host "▶ [1/6] 检查全工作区物理卫生、同构脚本、.gitignore 治理、代码密度与双轨体积..." -ForegroundColor Gray }
 $res = Start-Process -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-physical-hygiene.js", "--json") -WorkingDirectory $repoRoot -RedirectStandardOutput $logHygieneOut -NoNewWindow -PassThru -Wait
 $resIso = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-script-isomorphism.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
 $resGi = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-gitignore-governance.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
+$resDensity = Start-Process -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-code-density.js", "--all") -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
+$resEloc = Start-Process -FilePath $nodeCmd -ArgumentList @("scripts/common/evaluate-eloc-budget.js", "--all") -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
 $codeHygiene = $res.ExitCode
 $codeIso = $resIso.ExitCode
 $codeGi = $resGi.ExitCode
+$codeDensity = $resDensity.ExitCode
+$codeEloc = $resEloc.ExitCode
 
 $rawHygieneScore = $null
 try {
@@ -224,7 +149,7 @@ try {
     $rawHygieneScore = $null
 }
 
-if ($codeHygiene -ne 0 -or $codeIso -ne 0 -or $codeGi -ne 0) {
+if ($codeHygiene -ne 0 -or $codeIso -ne 0 -or $codeGi -ne 0 -or $codeDensity -ne 0 -or $codeEloc -ne 0) {
     $statusHygiene = "FAIL"
     $failed = $true
 } else {
@@ -232,12 +157,20 @@ if ($codeHygiene -ne 0 -or $codeIso -ne 0 -or $codeGi -ne 0) {
 }
 
 # 2. 单源规则注册表与目录一致性及技能集规范
-if (-not $Json -and -not $Agent) { Write-Host "▶ [2/5] 聚合与校验全工作区单源规则目录与技能集规范..." -ForegroundColor Gray }
+if (-not $Json -and -not $Agent) { Write-Host "▶ [2/6] 聚合与校验单源规则目录、规则闭包与可达性、文档一致性与轨迹账本..." -ForegroundColor Gray }
 $res = Start-Process -FilePath $nodeCmd -ArgumentList @("scripts/common/generate-rule-catalog.js", "--check-only") -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
 $resSkills = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-skills.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
+$resClosure = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-rule-id-closure.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
+$resReach = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-rule-reachability.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
+$resDocs = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-docs-consistency.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
+$resLedger = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-trajectory-ledger.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
 $codeCatalog = $res.ExitCode
 $codeSkills = $resSkills.ExitCode
-if ($codeCatalog -ne 0 -or $codeSkills -ne 0) {
+$codeClosure = $resClosure.ExitCode
+$codeReach = $resReach.ExitCode
+$codeDocs = $resDocs.ExitCode
+$codeLedger = $resLedger.ExitCode
+if ($codeCatalog -ne 0 -or $codeSkills -ne 0 -or $codeClosure -ne 0 -or $codeReach -ne 0 -or $codeDocs -ne 0 -or $codeLedger -ne 0) {
     $statusRules = "FAIL"
     $failed = $true
 } else {
@@ -278,6 +211,13 @@ $procAr = if ($Fast) {
 } else {
     Start-Process -FilePath $nodeCmd -ArgumentList @("scripts/test-parallel.js") -WorkingDirectory $autoRefactorDir -RedirectStandardOutput $logArOut -RedirectStandardError $logArErr -PassThru
 }
+$resFgTopo = Start-Process -FilePath $nodeCmd -ArgumentList "fractal-git/scripts/common/validate-crate-topology.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
+$resFgParity = Start-Process -FilePath $nodeCmd -ArgumentList "fractal-git/scripts/common/validate-git-parity.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
+$resFgBridge = Start-Process -FilePath $nodeCmd -ArgumentList "fractal-git/scripts/common/validate-gate-bridge.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
+$resFgAlloc = Start-Process -FilePath $nodeCmd -ArgumentList "fractal-git/scripts/common/check-zero-alloc-boundary.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
+
+$staticFgClean = ($resFgTopo.ExitCode -eq 0 -and $resFgParity.ExitCode -eq 0 -and $resFgBridge.ExitCode -eq 0 -and $resFgAlloc.ExitCode -eq 0)
+
 $procFg = if ($cargoCmd) {
     if ($Fast) {
         Start-Process -FilePath $cargoCmd -ArgumentList @("check", "--manifest-path", "fractal-git/Cargo.toml", "--all-targets") -WorkingDirectory $repoRoot -RedirectStandardOutput $logFgOut -RedirectStandardError $logFgErr -PassThru
@@ -305,13 +245,21 @@ $fgClean = if ($procFg) {
 $statusWt = if ($wtClean -and $procWt.ExitCode -eq 0) { "PASS" } else { "FAIL" }
 $statusWg = if ($wgClean -and $procWg.ExitCode -eq 0) { "PASS" } else { "FAIL" }
 $statusAr = if ($arClean -and $procAr.ExitCode -eq 0) { "PASS" } else { "FAIL" }
-$statusFg = if ($null -eq $procFg) {
+$statusFg = if (-not $staticFgClean) {
+    "FAIL"
+} elseif ($null -eq $procFg) {
     "PASS"
 } elseif ($fgClean -and $procFg.ExitCode -eq 0) {
     "PASS"
 } else {
     "FAIL"
 }
+
+if ($nodeCmd -and (Test-Path "fractal-git/scripts/common/run-audit-report.js")) {
+    $reportArgs = if ($Fast) { @("fractal-git/scripts/common/run-audit-report.js", "--fast") } else { @("fractal-git/scripts/common/run-audit-report.js") }
+    Start-Process -FilePath $nodeCmd -ArgumentList $reportArgs -WorkingDirectory $repoRoot -NoNewWindow -Wait -ErrorAction SilentlyContinue
+}
+
 
 if (-not $Fast -and $statusAr -eq "PASS") {
     $procGateSelf = Start-Process -FilePath $nodeCmd -ArgumentList @("scripts/gate-self.js") -WorkingDirectory $autoRefactorDir -RedirectStandardOutput $logArSelfOut -RedirectStandardError $logArSelfErr -PassThru
@@ -628,16 +576,68 @@ $scoreWg = if ($statusWg -eq "PASS") {
     [math]::Max($SCORE_FLOOR, [math]::Round($baseWg - 60.0, 1))
 }
 
-# 6. fractal-git 质量基线得分（基于 cargo test 9 大微 Crate 回归达标判定）
-$scoreFg = if ($statusFg -eq "PASS") { 100.0 } else { $SCORE_FLOOR }
+# 6. fractal-git 质量基线得分（基于 audit-latest.json 真实 checks/pass/warn 连续客观计算，消融阶跃硬编码）
+$baseFg = $null
+$fgReportPath = Join-Path $repoRoot "fractal-git\reports\audit-latest.json"
+try {
+    if (Test-Path $fgReportPath) {
+        $fgData = Get-Content -Path $fgReportPath -Raw -Encoding utf8 | ConvertFrom-Json
+        $fgSummary = if ($null -ne $fgData) { Get-SafeProp $fgData "summary" } else { $null }
+        if ($null -ne $fgSummary) {
+            $rawChecksFg = Get-SafeProp $fgSummary "checks"
+            if ($null -ne $rawChecksFg -and [double]$rawChecksFg -gt 0) {
+                $totalChecksFg = [double]$rawChecksFg
+                $byStatusFg = Get-SafeProp $fgSummary "byStatus"
+                $rawPassFg = if ($null -ne $byStatusFg) { Get-SafeProp $byStatusFg "PASS" } else { $null }
+                $passChecksFg = if ($null -ne $rawPassFg) { [double]$rawPassFg } else { 0.0 }
+
+                $bySevFg = Get-SafeProp $fgSummary "bySeverity"
+                $rawWarnFg = if ($null -ne $bySevFg) { Get-SafeProp $bySevFg "warning" } else { $null }
+                $warnCountFg = if ($null -ne $rawWarnFg) { [double]$rawWarnFg } else { 0.0 }
+
+                $rawErrFg = if ($null -ne $bySevFg) { Get-SafeProp $bySevFg "error" } else { $null }
+                $errCountFg = if ($null -ne $rawErrFg) { [double]$rawErrFg } else { 0.0 }
+
+                $ratioFg = $passChecksFg / $totalChecksFg
+                $rawFg = (100.0 * $ratioFg) - ($warnCountFg * 0.035) - ($errCountFg * 5.0)
+                $baseFg = [math]::Max($SCORE_FLOOR, [math]::Round($rawFg, 1))
+            }
+        }
+    }
+} catch {
+    $baseFg = $null
+}
+
+if ($null -eq $baseFg) {
+    # 基于静态检查与测试执行状态客观加权回退
+    $baseFg = if ($statusFg -eq "PASS") {
+        100.0
+    } else {
+        $fgChecksPassed = 0
+        if ($resFgTopo.ExitCode -eq 0) { $fgChecksPassed += 1 }
+        if ($resFgParity.ExitCode -eq 0) { $fgChecksPassed += 1 }
+        if ($resFgBridge.ExitCode -eq 0) { $fgChecksPassed += 1 }
+        if ($resFgAlloc.ExitCode -eq 0) { $fgChecksPassed += 1 }
+        if ($null -ne $procFg -and $procFg.ExitCode -eq 0) { $fgChecksPassed += 1 }
+        [math]::Max($SCORE_FLOOR, [math]::Round(100.0 * ($fgChecksPassed / 5.0), 1))
+    }
+}
+
+$scoreFg = if ($statusFg -eq "PASS") {
+    $baseFg
+} else {
+    [math]::Max($SCORE_FLOOR, [math]::Round($baseFg - 60.0, 1))
+}
 
 $polyglotBreakdown = $null
 try {
     $polyglotScript = Join-Path $repoRoot "scripts\common\evaluate-polyglot-balance.js"
-    if (Test-Path $polyglotScript) {
+    if (-not $nodeCmd) {
+        Write-Host "  ℹ️  [SKIP] 未检测到 node 运行时，语言均衡指数不参与计算" -ForegroundColor Yellow
+    } elseif (Test-Path $polyglotScript) {
         $pArgs = @($polyglotScript, "--json")
         if ($Fast) { $pArgs += "--fast" }
-        $polyglotRaw = & node @pArgs 2>$null
+        $polyglotRaw = & $nodeCmd @pArgs 2>$null
         if ($LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($polyglotRaw)) {
             $polyglotJson = $polyglotRaw | ConvertFrom-Json
             if ($null -ne $polyglotJson.polyglotIndex) {

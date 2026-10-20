@@ -15,7 +15,7 @@
 const fs = require("fs");
 const path = require("path");
 const { execSync } = require("child_process");
-const { getSafeGitEnv } = require("./git-env");
+const { getSafeGitEnv, readStagedBuffersBatch } = require("./git-env");
 
 let ts;
 const REPO_ROOT = path.resolve(__dirname, "../..");
@@ -945,6 +945,38 @@ function readStagedContentSafe(filePath) {
   }
 }
 
+/**
+ * Reads every staged blob under review in a single Git process.
+ *
+ * Without this, each reviewed file costs its own `git show` spawn, which
+ * dominates wall time once a commit touches more than a handful of modules.
+ *
+ * @param {string[]} filePaths - Absolute or repo-relative paths.
+ * @returns {Map<string, string>} Absolute path -> staged text content.
+ */
+function prefetchStagedContents(filePaths) {
+  const result = new Map();
+  if (!Array.isArray(filePaths) || filePaths.length === 0) return result;
+
+  const relByPath = new Map();
+  for (const p of filePaths) {
+    relByPath.set(p, path.relative(REPO_ROOT, p).replace(/\\/g, "/"));
+  }
+
+  let buffers;
+  try {
+    buffers = readStagedBuffersBatch(REPO_ROOT, [...relByPath.values()]);
+  } catch {
+    return result;
+  }
+
+  for (const [absPath, rel] of relByPath.entries()) {
+    const buf = buffers.get(rel);
+    if (buf) result.set(absPath, buf.toString("utf8"));
+  }
+  return result;
+}
+
 function isFunctionInChangedLines(node, sourceFile, changedLines) {
   if (!changedLines || changedLines.size === 0) return true;
   const { line: startLine } = sourceFile.getLineAndCharacterOfPosition(
@@ -1009,8 +1041,9 @@ function analyzeSourceText(
   return findings;
 }
 
-function analyzeFile(filePath, overrides = {}, changedLines = null) {
-  const content = readStagedContentSafe(filePath);
+function analyzeFile(filePath, overrides = {}, changedLines = null, prefetched = null) {
+  const cached = prefetched && prefetched.get(filePath);
+  const content = cached !== undefined ? cached : readStagedContentSafe(filePath);
   return analyzeSourceText(content, filePath, overrides, changedLines);
 }
 
@@ -1048,9 +1081,10 @@ function handleEmptyHunkMap(isAgentMode) {
  */
 function collectHunkSliceViolations(hunkMap, flags) {
   const allViolations = [];
+  const prefetched = prefetchStagedContents([...hunkMap.keys()]);
   for (const [file, info] of hunkMap.entries()) {
     const rel = path.relative(process.cwd(), file).replace(/\\/g, "/");
-    const findings = analyzeFile(file, flags, info.changedLines);
+    const findings = analyzeFile(file, flags, info.changedLines, prefetched);
     if (findings.length === 0) {
       continue;
     }

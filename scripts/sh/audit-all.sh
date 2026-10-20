@@ -61,7 +61,7 @@ FAILED=0
 START_TIME=$("$NODE_BIN" -e 'process.stdout.write(Date.now().toString())')
 
 # 1. 物理卫生八维刚性公理与全域巡检
-if [[ "$JSON_MODE" -eq 0 && "$AGENT_MODE" -eq 0 ]]; then echo "▶ [1/5] 检查全工作区物理卫生、同构脚本、.gitignore 治理与零空文件..."; fi
+if [[ "$JSON_MODE" -eq 0 && "$AGENT_MODE" -eq 0 ]]; then echo "▶ [1/6] 检查全工作区物理卫生、同构脚本、.gitignore 治理、代码密度与双轨体积..."; fi
 LOG_HYGIENE=$(mktemp)
 CODE_HYGIENE=0
 "$NODE_BIN" scripts/common/validate-physical-hygiene.js --json >"$LOG_HYGIENE" 2>&1 || CODE_HYGIENE=$?
@@ -69,7 +69,11 @@ CODE_ISO=0
 "$NODE_BIN" scripts/common/validate-script-isomorphism.js >/dev/null 2>&1 || CODE_ISO=$?
 CODE_GI=0
 "$NODE_BIN" scripts/common/validate-gitignore-governance.js >/dev/null 2>&1 || CODE_GI=$?
-if [[ "$CODE_HYGIENE" -ne 0 || "$CODE_ISO" -ne 0 || "$CODE_GI" -ne 0 ]]; then
+CODE_DENSITY=0
+"$NODE_BIN" scripts/common/validate-code-density.js --all >/dev/null 2>&1 || CODE_DENSITY=$?
+CODE_ELOC=0
+"$NODE_BIN" scripts/common/evaluate-eloc-budget.js --all >/dev/null 2>&1 || CODE_ELOC=$?
+if [[ "$CODE_HYGIENE" -ne 0 || "$CODE_ISO" -ne 0 || "$CODE_GI" -ne 0 || "$CODE_DENSITY" -ne 0 || "$CODE_ELOC" -ne 0 ]]; then
     STATUS_HYGIENE="FAIL"
     FAILED=1
 else
@@ -77,12 +81,20 @@ else
 fi
 
 # 2. 单源规则注册表与目录一致性及技能集规范
-if [[ "$JSON_MODE" -eq 0 && "$AGENT_MODE" -eq 0 ]]; then echo "▶ [2/5] 聚合与校验全工作区单源规则目录与技能集规范..."; fi
+if [[ "$JSON_MODE" -eq 0 && "$AGENT_MODE" -eq 0 ]]; then echo "▶ [2/6] 聚合与校验单源规则目录、规则闭包与可达性、文档一致性与轨迹账本..."; fi
 CODE_CATALOG=0
 "$NODE_BIN" scripts/common/generate-rule-catalog.js --check-only >/dev/null 2>&1 || CODE_CATALOG=$?
 CODE_SKILLS=0
 "$NODE_BIN" scripts/common/validate-skills.js >/dev/null 2>&1 || CODE_SKILLS=$?
-if [[ "$CODE_CATALOG" -ne 0 || "$CODE_SKILLS" -ne 0 ]]; then
+CODE_CLOSURE=0
+"$NODE_BIN" scripts/common/validate-rule-id-closure.js >/dev/null 2>&1 || CODE_CLOSURE=$?
+CODE_REACH=0
+"$NODE_BIN" scripts/common/validate-rule-reachability.js >/dev/null 2>&1 || CODE_REACH=$?
+CODE_DOCS=0
+"$NODE_BIN" scripts/common/validate-docs-consistency.js >/dev/null 2>&1 || CODE_DOCS=$?
+CODE_LEDGER=0
+"$NODE_BIN" scripts/common/validate-trajectory-ledger.js >/dev/null 2>&1 || CODE_LEDGER=$?
+if [[ "$CODE_CATALOG" -ne 0 || "$CODE_SKILLS" -ne 0 || "$CODE_CLOSURE" -ne 0 || "$CODE_REACH" -ne 0 || "$CODE_DOCS" -ne 0 || "$CODE_LEDGER" -ne 0 ]]; then
     STATUS_RULES="FAIL"
     FAILED=1
 else
@@ -216,6 +228,18 @@ fi
 
 STATUS_FG="PASS"
 CODE_FG=0
+
+CODE_FG_STATIC=0
+"$NODE_BIN" fractal-git/scripts/common/validate-crate-topology.js >>"$LOG_FG" 2>&1 || CODE_FG_STATIC=$?
+"$NODE_BIN" fractal-git/scripts/common/validate-git-parity.js >>"$LOG_FG" 2>&1 || CODE_FG_STATIC=$?
+"$NODE_BIN" fractal-git/scripts/common/validate-gate-bridge.js >>"$LOG_FG" 2>&1 || CODE_FG_STATIC=$?
+"$NODE_BIN" fractal-git/scripts/common/check-zero-alloc-boundary.js >>"$LOG_FG" 2>&1 || CODE_FG_STATIC=$?
+
+if [[ "$CODE_FG_STATIC" -ne 0 ]]; then
+    STATUS_FG="FAIL"
+    FAILED=1
+fi
+
 if [[ -n "$PID_FG" ]]; then
     wait_with_timeout "$PID_FG" "$TIMEOUT_FG" "fractal-git" "$LOG_FG" || CODE_FG=$?
     if [[ "$CODE_FG" -ne 0 ]]; then
@@ -223,6 +247,11 @@ if [[ -n "$PID_FG" ]]; then
         FAILED=1
     fi
 fi
+
+if command -v "$NODE_BIN" &>/dev/null && [[ -f "fractal-git/scripts/common/run-audit-report.js" ]]; then
+    "$NODE_BIN" fractal-git/scripts/common/run-audit-report.js >>"$LOG_FG" 2>&1 || true
+fi
+
 
 if [[ "$FAST_MODE" -eq 0 && "$STATUS_AR" == "PASS" ]]; then
     CODE_GATE_SELF=0
@@ -430,7 +459,34 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF" "$LOG_FG"
     baseWg = statusWg === "PASS" ? 100.0 : SCORE_FLOOR;
   }
   const scoreWg = statusWg === "PASS" ? baseWg : Math.max(SCORE_FLOOR, Number((baseWg - 60.0).toFixed(1)));
-  const scoreFg = statusFg === "PASS" ? 100.0 : SCORE_FLOOR;
+
+  // 6. fractal-git 质量基线得分（基于 audit-latest.json 真实 checks/pass/warn 连续客观计算，消融阶跃硬编码）
+  let baseFg = null;
+  try {
+    const fgReportPath = path.join(repoRoot, "fractal-git", "reports", "audit-latest.json");
+    if (fs.existsSync(fgReportPath)) {
+      const fgData = JSON.parse(fs.readFileSync(fgReportPath, "utf8"));
+      if (fgData && fgData.summary && fgData.summary.checks > 0) {
+        const totalChecksFg = Number(fgData.summary.checks);
+        const passChecksFg = fgData.summary.byStatus && fgData.summary.byStatus.PASS ? Number(fgData.summary.byStatus.PASS) : 0;
+        const warnCountFg = fgData.summary.bySeverity && fgData.summary.bySeverity.warning ? Number(fgData.summary.bySeverity.warning) : 0;
+        const errCountFg = fgData.summary.bySeverity && fgData.summary.bySeverity.error ? Number(fgData.summary.bySeverity.error) : 0;
+        if (totalChecksFg > 0) {
+          const ratioFg = passChecksFg / totalChecksFg;
+          const rawFg = (100.0 * ratioFg) - (warnCountFg * 0.035) - (errCountFg * 5.0);
+          baseFg = Math.max(SCORE_FLOOR, Number(rawFg.toFixed(1)));
+        }
+      }
+    }
+  } catch (_) {
+    baseFg = null;
+  }
+
+  if (baseFg === null) {
+    baseFg = statusFg === "PASS" ? 100.0 : SCORE_FLOOR;
+  }
+  const scoreFg = statusFg === "PASS" ? baseFg : Math.max(SCORE_FLOOR, Number((baseFg - 60.0).toFixed(1)));
+
 
   let polyglotIndex = null;
   let polyglotBreakdown = null;

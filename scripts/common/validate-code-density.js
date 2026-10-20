@@ -21,7 +21,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
-const { getRangeFiles, getStagedFiles, readStagedContentSafe } = require('./git-env');
+const { getRangeFiles, getStagedFiles, readStagedContentSafe, readStagedBuffersBatch } = require('./git-env');
 const {
   evaluateCodeMetrics,
   isPlumbingExemptPath,
@@ -253,9 +253,17 @@ function collectDensityInspections(uniqueFiles, options) {
   const allViolations = [];
   const inspections = [];
   let exemptCount = 0;
+  // One batch read replaces one `git show` spawn per staged file.
+  const stagedByFile = options.staged
+    ? readStagedBuffersBatch(process.cwd(), uniqueFiles)
+    : new Map();
 
   for (const file of uniqueFiles) {
-    const stagedContent = options.staged ? readStagedContentSafe(process.cwd(), file) : undefined;
+    let stagedContent;
+    if (options.staged) {
+      const buf = stagedByFile.get(file);
+      stagedContent = buf ? buf.toString('utf8') : readStagedContentSafe(process.cwd(), file);
+    }
     const result = auditFileDensity(file, options, stagedContent);
     inspections.push(result);
     if (result.isExempt) {

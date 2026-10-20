@@ -158,6 +158,63 @@ function readStagedBufferSafe(repoRoot, relPath) {
   }
 }
 
+/**
+ * Reads many staged blobs in a single Git process.
+ *
+ * The per-file `git show ":path"` helper spawns one process per file, which
+ * dominates runtime once a commit touches dozens of files. `git cat-file
+ * --batch` accepts `<rev>:<path>` lines on stdin and streams
+ * `<oid> <type> <size>\n<content>\n` for each, so N files cost one spawn.
+ *
+ * Paths absent from the index are reported as failures and left out of the
+ * result map; callers fall back to the working tree for those, exactly as the
+ * single-file helper does.
+ *
+ * @param {string} repoRoot - Repository root directory.
+ * @param {string[]} relPaths - Repository-relative paths.
+ * @returns {Map<string, Buffer>} relPath -> staged bytes, only for hits.
+ */
+function readStagedBuffersBatch(repoRoot, relPaths) {
+  const root = repoRoot || DEFAULT_REPO_ROOT;
+  const results = new Map();
+  const targets = Array.isArray(relPaths) ? relPaths.filter(Boolean) : [];
+  if (targets.length === 0) return results;
+
+  const request = targets.map((p) => `:${p.replace(/\\/g, '/')}`).join('\n') + '\n';
+
+  let raw;
+  try {
+    raw = execSync('git cat-file --batch --buffer', {
+      cwd: root,
+      env: getSafeGitEnv(root),
+      input: request,
+      stdio: ['pipe', 'pipe', 'ignore'],
+      maxBuffer: 256 * 1024 * 1024,
+    });
+  } catch {
+    return results;
+  }
+
+  let offset = 0;
+  for (const relPath of targets) {
+    const headerEnd = raw.indexOf(0x0a, offset);
+    if (headerEnd === -1) break;
+    const header = raw.subarray(offset, headerEnd).toString('utf8');
+    offset = headerEnd + 1;
+
+    // Missing objects answer with "<spec> missing" and carry no payload.
+    const parts = header.trim().split(' ');
+    if (parts.length < 3) continue;
+    const size = Number(parts[2]);
+    if (!Number.isFinite(size) || size < 0) continue;
+
+    results.set(relPath, raw.subarray(offset, offset + size));
+    offset += size + 1; // trailing newline after each object body
+  }
+
+  return results;
+}
+
 module.exports = Object.freeze({
   DEFAULT_REPO_ROOT,
   getSafeGitEnv,
@@ -165,4 +222,5 @@ module.exports = Object.freeze({
   getRangeFiles,
   readStagedContentSafe,
   readStagedBufferSafe,
+  readStagedBuffersBatch,
 });

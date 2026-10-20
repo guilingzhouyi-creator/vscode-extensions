@@ -1,13 +1,13 @@
 {
   "schema": "workspace-rule-catalog/v1",
-  "generatedAt": "2026-10-18T14:14:44.884Z",
-  "totalRules": 484,
+  "generatedAt": "2026-10-19T05:13:29.343Z",
+  "totalRules": 492,
   "counts": {
     "autoRefactor": 353,
     "workspaceTiming": 49,
     "webGames": 50,
-    "fractalGit": 10,
-    "globalTooling": 22
+    "fractalGit": 17,
+    "globalTooling": 23
   },
   "rules": [
     {
@@ -1152,11 +1152,25 @@
       "summary": "Expensive deep copy (.duplicate(true)) or blocking serialization/IO executed inside a loop."
     },
     {
+      "id": "EXT-DIR-001",
+      "project": "global-tooling",
+      "family": "HYG",
+      "severity": "error",
+      "summary": "File extension and directory classification guard: scripts and configs must reside in dedicated domain subdirectories matching their file extension (ps1, sh, py, common) and never litter the workspace root."
+    },
+    {
       "id": "FGT-ALG-001",
       "project": "fractal-git",
       "family": "ALG",
       "severity": "error",
       "summary": "Myers diff, 3-way merge, and FastCDC chunking algorithm boundary and determinism guard"
+    },
+    {
+      "id": "FGT-BRG-001",
+      "project": "fractal-git",
+      "family": "BRG",
+      "severity": "error",
+      "summary": "Pre-review zone gate bridge verification guard: Strict rule catalog closure and sub-10ms AST slice check"
     },
     {
       "id": "FGT-CAS-001",
@@ -1173,6 +1187,27 @@
       "summary": "Core data model and error contract guard: Zero-panic Result propagation and immutable OID hashing semantics"
     },
     {
+      "id": "FGT-DEP-001",
+      "project": "fractal-git",
+      "family": "DEP",
+      "severity": "error",
+      "summary": "Micro-crate DAG single-direction dependency guard: Zero circular dependency and strict L1->L2->L3 layer isolation"
+    },
+    {
+      "id": "FGT-ERR-001",
+      "project": "fractal-git",
+      "family": "ERR",
+      "severity": "error",
+      "summary": "Zero unwrap and expect panic guard: Enforce strong-typed Result propagation across production crates"
+    },
+    {
+      "id": "FGT-FAC-001",
+      "project": "fractal-git",
+      "family": "FAC",
+      "severity": "error",
+      "summary": "Facade substantial burden and immutable freeze guard: Enforce ARCH-FAC-001 with ELOC budget and Object.freeze"
+    },
+    {
       "id": "FGT-GAT-001",
       "project": "fractal-git",
       "family": "GAT",
@@ -1187,6 +1222,13 @@
       "summary": "Lockless in-memory git index concurrency guard: Conflict stage resolution and lock-free slot allocation"
     },
     {
+      "id": "FGT-LCK-001",
+      "project": "fractal-git",
+      "family": "LCK",
+      "severity": "error",
+      "summary": "Lock-free in-memory index concurrency guard: Prohibit blocking standard Mutex in virtual staging tree"
+    },
+    {
       "id": "FGT-OBJ-001",
       "project": "fractal-git",
       "family": "OBJ",
@@ -1199,6 +1241,20 @@
       "family": "POL",
       "severity": "error",
       "summary": "Resource recycling pool bounded governor: Zero unbounded transient memory allocations and lifecycle reclamation"
+    },
+    {
+      "id": "FGT-PRF-001",
+      "project": "fractal-git",
+      "family": "PRF",
+      "severity": "error",
+      "summary": "Zero transient heap allocation guard in hot loops: Prohibit string/vec/clone allocation in critical paths (ADV-PRF-002)"
+    },
+    {
+      "id": "FGT-SAF-001",
+      "project": "fractal-git",
+      "family": "SAF",
+      "severity": "error",
+      "summary": "Documented unsafe block safety proof guard: Prohibit bare undocumented unsafe blocks in Rust crates"
     },
     {
       "id": "FGT-STO-001",

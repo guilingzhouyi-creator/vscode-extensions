@@ -31,7 +31,7 @@ const FIXTURE_DIR = path.join(REPO_ROOT, '.audit-logs', 'selftest');
  * @returns {number} Exit status, or -1 when spawn failed.
  */
 function runNode(args) {
-  const result = spawnSync('node', args, { cwd: REPO_ROOT, stdio: 'ignore' });
+  const result = spawnSync(process.execPath, args, { cwd: REPO_ROOT, stdio: 'ignore' });
   if (result.error) return -1;
   return result.status === null ? -1 : result.status;
 }

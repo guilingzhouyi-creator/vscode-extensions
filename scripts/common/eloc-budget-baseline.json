@@ -1,0 +1,26 @@
+{
+  "schema": "eloc-budget-baseline/v1",
+  "rationale": "Grow-only ratchet for files that exceeded the dual-scale volume envelope before the full-repository scan existed. Each entry freezes the measured ELOC at ratification time: a file at or below its frozen value is reported as a warning, while any growth beyond it blocks the gate. Removing or lowering an entry requires shrinking the file; raising an entry is a regression and must be justified in review.",
+  "frozenOverBudget": [
+    {
+      "file": "WebGames/scripts/py/audit_gd.py",
+      "eloc": 671,
+      "maxEloc": 630
+    },
+    {
+      "file": "WebGames/scripts/py/audit_runner.py",
+      "eloc": 720,
+      "maxEloc": 630
+    },
+    {
+      "file": "WebGames/scripts/py/audit_sdk_sync.py",
+      "eloc": 667,
+      "maxEloc": 630
+    },
+    {
+      "file": "WebGames/scripts/py/sync_mod_sdk.py",
+      "eloc": 664,
+      "maxEloc": 630
+    }
+  ]
+}

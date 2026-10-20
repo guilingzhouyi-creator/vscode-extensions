@@ -87,35 +87,67 @@ function runGate(command, args, file) {
 }
 
 /**
- * Materializes fixtures and compares both implementations.
+ * Evaluates execution results against fixture expectation and verifies cross-implementation parity.
  *
- * @returns {number} Process exit code.
+ * @param {object} fixture - Test fixture definition.
+ * @param {boolean} hasPwsh - Whether pwsh runtime is available.
+ * @returns {boolean} True if the fixture passed parity check, false otherwise.
  */
-function main() {
-  fs.mkdirSync(FIXTURE_DIR, { recursive: true });
-  const hasPwsh = isAvailable('pwsh', ['-v']);
-  const hasBash = isAvailable('bash', ['--version']);
+function evaluateFixture(fixture, hasPwsh) {
+  const file = path.join(FIXTURE_DIR, `${fixture.name}.txt`);
+  fs.writeFileSync(file, fixture.content, 'utf8');
+  const shStatus = runGate('bash', ['scripts/sh/commit-msg-gate.sh'], file);
+  const psStatus = hasPwsh ? runGate('pwsh', ['-File', 'scripts/ps1/commit-msg-gate.ps1'], file) : null;
+  const shOk = shStatus === fixture.expect;
+  const psOk = psStatus === null || psStatus === fixture.expect;
+  const parity = psStatus === null || shStatus === psStatus;
+  const passed = shOk && psOk && parity;
+  const pwshTag = psStatus === null ? '' : ` pwsh=${psStatus}`;
+  console.log(`${fixture.name}: bash=${shStatus}${pwshTag} expect=${fixture.expect} ${passed ? 'PASS' : 'FAIL'}`);
+  return passed;
+}
+
+/**
+ * Validates availability of required execution environments.
+ *
+ * @param {boolean} hasBash - Whether bash is available.
+ * @param {boolean} hasPwsh - Whether pwsh is available.
+ * @param {boolean} requireParity - Whether strict parity was requested.
+ */
+function assertPrerequisites(hasBash, hasPwsh, requireParity) {
   if (!hasBash) {
     console.error('FAIL bash is required for parity testing');
     process.exit(1);
   }
   if (!hasPwsh) {
-    console.log('SKIP PowerShell implementation unavailable; bash-only execution is not a parity test');
+    console.log(
+      'SKIP PowerShell implementation unavailable: only the bash expectations can be checked, parity is NOT verified',
+    );
+    if (requireParity) {
+      fs.rmSync(FIXTURE_DIR, { recursive: true, force: true });
+      console.error('FAIL --require-parity was requested but pwsh is unavailable; parity unverified');
+      process.exit(1);
+    }
   }
+}
+
+/**
+ * Materializes fixtures and compares both implementations.
+ *
+ * @returns {number} Process exit code.
+ */
+function main() {
+  const requireParity = process.argv.includes('--require-parity');
+  fs.mkdirSync(FIXTURE_DIR, { recursive: true });
+  const hasPwsh = isAvailable('pwsh', ['-v']);
+  const hasBash = isAvailable('bash', ['--version']);
+  assertPrerequisites(hasBash, hasPwsh, requireParity);
 
   let failures = 0;
   for (const fixture of FIXTURES) {
-    const file = path.join(FIXTURE_DIR, `${fixture.name}.txt`);
-    fs.writeFileSync(file, fixture.content, 'utf8');
-    const shStatus = runGate('bash', ['scripts/sh/commit-msg-gate.sh'], file);
-    const psStatus = hasPwsh ? runGate('pwsh', ['-File', 'scripts/ps1/commit-msg-gate.ps1'], file) : null;
-    const shOk = shStatus === fixture.expect;
-    const psOk = psStatus === null || psStatus === fixture.expect;
-    const parity = psStatus === null || shStatus === psStatus;
-    if (!shOk || !psOk || !parity) failures += 1;
-    console.log(
-      `${fixture.name}: bash=${shStatus}${psStatus === null ? '' : ` pwsh=${psStatus}`} expect=${fixture.expect} ${!shOk || !psOk || !parity ? 'FAIL' : 'PASS'}`,
-    );
+    if (!evaluateFixture(fixture, hasPwsh)) {
+      failures += 1;
+    }
   }
 
   fs.rmSync(FIXTURE_DIR, { recursive: true, force: true });
@@ -123,9 +155,16 @@ function main() {
     console.error(`FAIL ${failures} parity case(s) diverged or returned an unexpected verdict`);
     process.exit(1);
   }
+  if (!hasPwsh) {
+    console.log(
+      `NO-PARITY ${FIXTURES.length} bash cases match expectations, but cross-implementation parity was not evaluated`,
+    );
+    process.exit(0);
+  }
   console.log(`PASS ${FIXTURES.length} parity cases agree across implementations`);
   process.exit(0);
 }
+
 
 if (require.main === module) {
   main();

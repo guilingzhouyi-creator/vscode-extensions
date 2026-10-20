@@ -26,6 +26,8 @@ const COUNT_SCAN_FILES = Object.freeze([
   'AGENTS.md',
   'scripts/README.md',
   'docs/system-spec/script-governance-architecture.md',
+  'auto-refactor/DOCS.md',
+  'WebGames/scripts/README.md',
 ]);
 
 const COUNT_SCAN_GLOBS = Object.freeze([
@@ -62,13 +64,37 @@ function collectMarkdown(dir) {
 }
 
 /**
- * Scans a file for stale hardcoded rule counts.
+ * Loads the authoritative rule totals from the single-source catalog.
+ *
+ * @returns {{ total: number, byProject: Record<string, number> }|null} Catalog totals.
+ */
+function loadCatalogTotals() {
+  const catalogPath = path.join(REPO_ROOT, 'scripts/common/rule-catalog.json');
+  if (!fs.existsSync(catalogPath)) return null;
+  try {
+    const catalog = JSON.parse(fs.readFileSync(catalogPath, 'utf8'));
+    const byProject = {};
+    for (const rule of catalog.rules) {
+      byProject[rule.project] = (byProject[rule.project] || 0) + 1;
+    }
+    return { total: catalog.totalRules, byProject };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Scans a file for hardcoded rule counts that disagree with the catalog.
+ *
+ * Replaces a fixed blacklist of historical numbers (428/464/468/470), which let
+ * 359, 338 and 473 drift indefinitely because they were never listed.
  *
  * @param {string} file - Absolute file path.
  * @param {Array<object>} violations - Collector array.
+ * @param {object|null} totals - Authoritative totals from the catalog.
  * @returns {void}
  */
-function scanCounts(file, violations) {
+function scanCounts(file, violations, totals) {
   const lines = fs.readFileSync(file, 'utf8').split('\n');
   lines.forEach((line, index) => {
     if (STALE_COUNT_PATTERN.test(line)) {
@@ -78,9 +104,32 @@ function scanCounts(file, violations) {
         line: index + 1,
         detail: 'Hardcoded rule count detected; reference rule-catalog.json instead.',
       });
+      return;
     }
+    if (!totals) return;
+
+    // Only totals are checked. Subset claims such as "29 条工程规则" describe a
+    // category, not the catalog total, and must not be flagged. Prose is matched
+    // only when a totality marker precedes the number.
+    const countPattern =
+      /(?:全量|总计|共|内置|注册|收录|SSOT|全工作区|workspace[-\s]?wide|total|built-?in|registered)\D{0,12}?(\d{2,4})\s*(?:条|规则|rules?\b)/gi;
+    let match;
+    while ((match = countPattern.exec(line)) !== null) {
+      const claimed = Number(match[1]);
+      const isKnownTotal = claimed === totals.total || Object.values(totals.byProject).includes(claimed);
+      if (!isKnownTotal) {
+        violations.push({
+          type: 'RULE_COUNT_DRIFT',
+          file: path.relative(REPO_ROOT, file).replace(/\\/g, '/'),
+          line: index + 1,
+          detail: `Claims ${claimed} rules as a total, but rule-catalog.json has ${totals.total}.`,
+        });
+      }
+    }
+
   });
 }
+
 
 /**
  * Scans a file for backticked script references that do not exist.
@@ -115,12 +164,13 @@ function scanScriptReferences(file, violations) {
  */
 function runAudit() {
   const violations = [];
+  const totals = loadCatalogTotals();
   const countFiles = [
     ...COUNT_SCAN_FILES.map((rel) => path.join(REPO_ROOT, rel)),
     ...COUNT_SCAN_GLOBS.flatMap((rel) => collectMarkdown(path.join(REPO_ROOT, rel))),
   ];
   for (const file of countFiles) {
-    if (fs.existsSync(file)) scanCounts(file, violations);
+    if (fs.existsSync(file)) scanCounts(file, violations, totals);
   }
   for (const rel of PATH_SCAN_FILES) {
     const file = path.join(REPO_ROOT, rel);
@@ -128,6 +178,7 @@ function runAudit() {
   }
   return violations;
 }
+
 
 /**
  * Command line entry point.

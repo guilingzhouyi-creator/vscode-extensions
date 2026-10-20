@@ -26,10 +26,73 @@ $PSDefaultParameterValues['Get-Content:Encoding'] = 'utf8'
 $PSDefaultParameterValues['Set-Content:Encoding'] = 'utf8'
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "../..")).Path
-$nodeCmd = if ($IsWindows -or $env:OS -match "Windows") { "node.exe" } else { "node" }
-$npmCmd = if ($IsWindows -or $env:OS -match "Windows") { "npm.cmd" } else { "npm" }
+
+<#
+.SYNOPSIS
+    Resolves a trusted absolute path for a runtime executable.
+.DESCRIPTION
+    Probes PATH first, then a deterministic list of trusted absolute install
+    roots, so a machine with the runtime installed but not exported to PATH
+    still runs the gate. Returns $null when every candidate fails, letting the
+    caller fail closed with actionable guidance.
+.PARAMETER Name
+    Base executable name without extension (for example 'node').
+.PARAMETER TrustedRoots
+    Ordered absolute directories that may contain the executable.
+#>
+function Resolve-TrustedRuntime {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)][string]$Name,
+        [string[]]$TrustedRoots = @()
+    )
+
+    $extensions = @('.exe', '.cmd', '.bat', '')
+    foreach ($ext in $extensions) {
+        $onPath = Get-Command "$Name$ext" -ErrorAction SilentlyContinue
+        if ($onPath) { return $onPath.Source }
+    }
+
+    foreach ($root in $TrustedRoots) {
+        if ([string]::IsNullOrWhiteSpace($root)) { continue }
+        foreach ($ext in $extensions) {
+            $probe = Join-Path $root "$Name$ext"
+            if (Test-Path -Path $probe -PathType Leaf) { return $probe }
+        }
+    }
+
+    return $null
+}
+
+$nodeTrustedRoots = @(
+    $env:NODE_HOME,
+    (Join-Path $env:ProgramFiles 'nodejs'),
+    (Join-Path ${env:ProgramFiles(x86)} 'nodejs'),
+    (Join-Path $env:LOCALAPPDATA 'Programs\nodejs')
+) | Where-Object { $_ }
+
+$nodeCmd = Resolve-TrustedRuntime -Name 'node' -TrustedRoots $nodeTrustedRoots
+$npmCmd = if ($nodeCmd) {
+    $npmRoot = Split-Path -Parent $nodeCmd
+    Resolve-TrustedRuntime -Name 'npm' -TrustedRoots @($npmRoot)
+} else { $null }
 $pythonCmd = if (Get-Command python3.12 -ErrorAction SilentlyContinue) { "python3.12" } elseif (Get-Command python -ErrorAction SilentlyContinue) { "python" } elseif (Get-Command python3 -ErrorAction SilentlyContinue) { "python3" } else { "py" }
 $cargoCmd = if (Get-Command cargo -ErrorAction SilentlyContinue) { "cargo" } else { $null }
+
+if (-not $nodeCmd) {
+    Write-Host "❌ [BLOCK] 未检测到 Node.js 运行时，提交前门禁无法执行。" -ForegroundColor Red
+    Write-Host "   探测顺序: PATH -> `$env:NODE_HOME -> Program Files\nodejs -> LOCALAPPDATA\Programs\nodejs" -ForegroundColor Yellow
+    Write-Host "   修复: 安装 Node.js 20+ 加入 PATH，或设置 `$env:NODE_HOME 指向安装目录。" -ForegroundColor Yellow
+    Write-Host "   该门禁为 fail-closed：缺少运行时不得静默放行 (GATE-SYS-001)。" -ForegroundColor Yellow
+    exit 1
+}
+
+if (-not $npmCmd) {
+    Write-Host "❌ [BLOCK] 未检测到 npm 包管理器，提交前门禁无法执行增量编译校验。" -ForegroundColor Red
+    Write-Host "   修复: 随 Node.js 一并安装 npm，并确保其与 node 同目录或在 PATH 中。" -ForegroundColor Yellow
+    exit 1
+}
+
 
 if ($ViewLog) {
     & $nodeCmd (Join-Path $repoRoot "scripts/common/log-rotator.js") --view
@@ -41,16 +104,7 @@ if (-not $env:GIT_CONFIG_SYSTEM) { $env:GIT_CONFIG_SYSTEM = 'NUL' }
 if (-not $env:GIT_CONFIG_NOSYSTEM) { $env:GIT_CONFIG_NOSYSTEM = '1' }
 if (-not $env:XDG_CONFIG_HOME) { $env:XDG_CONFIG_HOME = (Get-Location).Path }
 
-# 获取暂存区文件列表
-$stagedFiles = @(git diff --cached --name-only "--diff-filter=ACM" 2>$null)
-if (-not $stagedFiles -or $stagedFiles.Count -eq 0 -or ($stagedFiles.Count -eq 1 -and [string]::IsNullOrWhiteSpace($stagedFiles[0]))) {
-    if ($Agent) {
-        Write-Output '{"protocolVersion":"1.0.0","status":"PASS","gate":"pre-commit","summary":"No staged files to check."}'
-        exit 0
-    }
-    Write-Host "ℹ️  暂存区无文件变更，跳过 pre-commit 检查。" -ForegroundColor Yellow
-    exit 0
-}
+$runId = [Guid]::NewGuid().ToString('N').Substring(0, 12)
 
 function Write-PreCommitFailure {
     [CmdletBinding()]
@@ -67,6 +121,7 @@ function Write-PreCommitFailure {
 
     if (-not $StepId) {
         $StepId = switch -Wildcard ($StepName) {
+            'Gate 1~6: Root Hygiene*' { 'PC-01-01' }
             'Gate 7: Rules Registry*' { 'PC-03-01' }
             'Gate 7: Skills*' { 'PC-03-02' }
             'Gate 8: workspace-timing Compilation*' { 'PC-04-01' }
@@ -81,6 +136,7 @@ function Write-PreCommitFailure {
             default { 'PC-00-00' }
         }
     }
+
 
     $diagDir = Join-Path $repoRoot ".audit-logs"
     if (-not (Test-Path $diagDir)) { [void](New-Item -ItemType Directory -Path $diagDir -Force) }
@@ -155,6 +211,85 @@ function Invoke-ChildCommand {
     }
 }
 
+<#
+.SYNOPSIS
+    Launches a child gate process with a bounded wait.
+.DESCRIPTION
+    Replaces bare `Start-Process -PassThru -Wait`. A hung `npm run compile` or
+    test runner previously blocked the commit indefinitely; here the process is
+    killed once the budget expires and reported as a gate failure.
+.EXITCODE
+    Returns a process-like object whose ExitCode is 124 on timeout.
+#>
+function Start-GateProcess {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)][string]$FilePath,
+        [string[]]$ArgumentList = @(),
+        [Parameter(Mandatory = $true)][string]$WorkingDirectory,
+        [int]$TimeoutSeconds = 180
+    )
+
+    $proc = Start-Process -FilePath $FilePath -ArgumentList $ArgumentList -WorkingDirectory $WorkingDirectory -NoNewWindow -PassThru
+    $exited = $proc.WaitForExit($TimeoutSeconds * 1000)
+    if ($exited) {
+        return $proc
+    }
+
+    try { $proc.Kill($true) } catch { }
+    Write-Host "  ⏱️  [TIMEOUT] '$FilePath' exceeded ${TimeoutSeconds}s and was terminated." -ForegroundColor Yellow
+    return [PSCustomObject]@{ ExitCode = 124; Id = $proc.Id }
+}
+
+
+# 根目录物理防污染与散落脚本前置雷达 (<3ms)
+$rootClutter = Get-ChildItem -Path $repoRoot -File -Depth 0 | Where-Object {
+    ($_.Name -match '\.(log|tmp|bak|actual\.json)$') -or
+    ($_.Name -notmatch '^\.' -and $_.Extension -match '^\.(js|ts|py|sh|ps1|bat|cmd)$')
+}
+if ($rootClutter) {
+    $badFile = $rootClutter[0].Name
+    $isScript = $rootClutter[0].Extension -match '^\.(js|ts|py|sh|ps1|bat|cmd)$'
+    $ruleId = if ($isScript) { "EXT-DIR-001" } else { "HYG-CLT-001" }
+    $summary = if ($isScript) {
+        "Root directory contains loose code script '$badFile', violating Extension-is-Domain rule (EXT-DIR-001)."
+    } else {
+        "Transient log or clutter file '$badFile' detected in repository root (HYG-CLT-001)."
+    }
+    $actionableFix = if ($isScript) {
+        "Move '$badFile' into scripts/common/, scripts/ps1/, scripts/sh/, or <project>/scripts/py/."
+    } else {
+        "Delete root temporary file '$badFile' or run 'node scripts/common/validate-physical-hygiene.js --fix'."
+    }
+    if ($Agent) {
+        $json = Write-PreCommitFailure `
+            -StepName "Gate 1~6: Root Hygiene & Script Radar ($ruleId)" `
+            -RuleId $ruleId `
+            -Summary $summary `
+            -ActionableFix $actionableFix `
+            -VerifyCmd "node scripts/common/validate-physical-hygiene.js" `
+            -TargetFiles @($badFile) `
+            -StepId "PC-01-01"
+        Write-Output $json
+        exit 1
+    } else {
+        Write-Host "❌ [FAIL] 根目录检测到散落脚本或未受控临时脏文件: $badFile ($ruleId)" -ForegroundColor Red
+        Write-Host "   $actionableFix" -ForegroundColor Yellow
+        exit 1
+    }
+}
+
+# 获取暂存区文件列表
+$stagedFiles = @(git diff --cached --name-only "--diff-filter=ACM" 2>$null)
+if (-not $stagedFiles -or $stagedFiles.Count -eq 0 -or ($stagedFiles.Count -eq 1 -and [string]::IsNullOrWhiteSpace($stagedFiles[0]))) {
+    if ($Agent) {
+        Write-Output '{"protocolVersion":"1.0.0","status":"PASS","gate":"pre-commit","summary":"No staged files to check."}'
+        exit 0
+    }
+    Write-Host "ℹ️  暂存区无文件变更，跳过 pre-commit 检查。" -ForegroundColor Yellow
+    exit 0
+}
+
 if (-not $Agent) {
     Write-Host "=================================================================" -ForegroundColor Cyan
     Write-Host "🔒 执行本地 Pre-Commit 质量安全与物理卫生检查 (PowerShell 版)" -ForegroundColor Cyan
@@ -162,7 +297,6 @@ if (-not $Agent) {
 }
 
 $failed = $false
-$runId = [Guid]::NewGuid().ToString('N').Substring(0, 12)
 
 if ($Agent) {
     $staleSnapshot = Join-Path $repoRoot ".audit-logs/last-failure.json"
@@ -183,7 +317,7 @@ if ($Agent) {
     }
 } else {
     Write-Host "[1-6/9] 执行暂存区内存流式物理卫生与质量安全检查..." -ForegroundColor Gray
-    $resFast = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/gate-fast-staged.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
+    $resFast = Start-GateProcess -FilePath $nodeCmd -ArgumentList "scripts/common/gate-fast-staged.js" -WorkingDirectory $repoRoot
     if ($resFast.ExitCode -ne 0) {
         Write-Host "❌ [FAIL] 暂存区物理卫生与安全审查未通过！" -ForegroundColor Red
         $failed = $true
@@ -209,7 +343,7 @@ if ($touchesRules) {
             exit 1
         }
     } else {
-        $res = Start-Process -FilePath $npmCmd -ArgumentList "run", "validate-rules-registry" -WorkingDirectory (Join-Path $repoRoot "auto-refactor") -NoNewWindow -PassThru -Wait
+        $res = Start-GateProcess -FilePath $npmCmd -ArgumentList "run", "validate-rules-registry" -WorkingDirectory (Join-Path $repoRoot "auto-refactor")
         if ($res.ExitCode -ne 0) {
             Write-Host "❌ [FAIL] Gate 7: 规则注册表元数据发生漂移 (RCFG-RULE-DRIFT)！" -ForegroundColor Red
             $failed = $true
@@ -237,7 +371,7 @@ if ($touchesSkills) {
             exit 1
         }
     } else {
-        $resSkills = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-skills.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
+        $resSkills = Start-GateProcess -FilePath $nodeCmd -ArgumentList "scripts/common/validate-skills.js" -WorkingDirectory $repoRoot
         if ($resSkills.ExitCode -ne 0) {
             Write-Host "❌ [FAIL] Gate 7: 技能集规范或插件同构校验未通过！" -ForegroundColor Red
             $failed = $true
@@ -271,7 +405,7 @@ if ($hasWtCompile) {
             exit 1
         }
     } else {
-        $process = Start-Process -FilePath $npmCmd -ArgumentList "run", "compile" -WorkingDirectory (Join-Path $repoRoot "workspace-timing") -NoNewWindow -PassThru -Wait
+        $process = Start-GateProcess -FilePath $npmCmd -ArgumentList "run", "compile" -WorkingDirectory (Join-Path $repoRoot "workspace-timing")
         if ($process.ExitCode -ne 0) {
             Write-Host "❌ [FAIL] Gate 8: workspace-timing 编译失败！" -ForegroundColor Red
             $failed = $true
@@ -295,7 +429,7 @@ if ($hasWtCompile) {
                 exit 1
             }
         } else {
-            $pFast = Start-Process -FilePath $npmCmd -ArgumentList "run", "test:fast" -WorkingDirectory (Join-Path $repoRoot "workspace-timing") -NoNewWindow -PassThru -Wait
+            $pFast = Start-GateProcess -FilePath $npmCmd -ArgumentList "run", "test:fast" -WorkingDirectory (Join-Path $repoRoot "workspace-timing")
             if ($pFast.ExitCode -ne 0) {
                 Write-Host "❌ [FAIL] Gate 8: workspace-timing 快速单测未通过！" -ForegroundColor Red
                 $failed = $true
@@ -339,7 +473,7 @@ if ($hasWtDoc) {
         $wtLayoutReady = $true
         if (-not (Test-Path $wtLayoutArtifact)) {
             Write-Host "  ▶ 构建 workspace-timing 审查脚本产物 (npm run scripts:build)..." -ForegroundColor Cyan
-            $buildProc = Start-Process -FilePath $npmCmd -ArgumentList "run", "scripts:build" -WorkingDirectory $wtLayoutDir -NoNewWindow -PassThru -Wait
+            $buildProc = Start-GateProcess -FilePath $npmCmd -ArgumentList "run", "scripts:build" -WorkingDirectory $wtLayoutDir
             if ($buildProc.ExitCode -ne 0) {
                 Write-Host "❌ [FAIL] Gate 8: workspace-timing 审查脚本构建失败 (npm run scripts:build)！" -ForegroundColor Red
                 $failed = $true
@@ -347,7 +481,7 @@ if ($hasWtDoc) {
             }
         }
         if ($wtLayoutReady) {
-            $docProc = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/dist/audit/text-layout.js" -WorkingDirectory $wtLayoutDir -NoNewWindow -PassThru -Wait
+            $docProc = Start-GateProcess -FilePath $nodeCmd -ArgumentList "scripts/dist/audit/text-layout.js" -WorkingDirectory $wtLayoutDir
             if ($docProc.ExitCode -ne 0) {
                 Write-Host "❌ [FAIL] Gate 8: workspace-timing 文档文本布局或变更日志真实性核验未通过！" -ForegroundColor Red
                 $failed = $true
@@ -375,7 +509,7 @@ if ($hasArCompile) {
             exit 1
         }
     } else {
-        $process = Start-Process -FilePath $npmCmd -ArgumentList "run", "build" -WorkingDirectory (Join-Path $repoRoot "auto-refactor") -NoNewWindow -PassThru -Wait
+        $process = Start-GateProcess -FilePath $npmCmd -ArgumentList "run", "build" -WorkingDirectory (Join-Path $repoRoot "auto-refactor")
         if ($process.ExitCode -ne 0) {
             Write-Host "❌ [FAIL] Gate 8: auto-refactor 编译失败！" -ForegroundColor Red
             $failed = $true
@@ -406,7 +540,7 @@ if ($hasArCompile) {
                 }
             } else {
                 $vArgs = @("vitest", "related") + $arRelArgs + @("--run")
-                $pVitest = Start-Process -FilePath $npxCmd -ArgumentList $vArgs -WorkingDirectory (Join-Path $repoRoot "auto-refactor") -NoNewWindow -PassThru -Wait
+                $pVitest = Start-GateProcess -FilePath $npxCmd -ArgumentList $vArgs -WorkingDirectory (Join-Path $repoRoot "auto-refactor")
                 if ($pVitest.ExitCode -ne 0) {
                     Write-Host "❌ [FAIL] Gate 8: auto-refactor 增量影响单测未通过！" -ForegroundColor Red
                     $failed = $true
@@ -437,7 +571,7 @@ if ($hasWgAudit) {
             exit 1
         }
     } else {
-        $process = Start-Process -FilePath $pythonCmd -ArgumentList "WebGames/scripts/py/audit_config.py", "--strict" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
+        $process = Start-GateProcess -FilePath $pythonCmd -ArgumentList "WebGames/scripts/py/audit_config.py", "--strict" -WorkingDirectory $repoRoot
         if ($process.ExitCode -ne 0) {
             Write-Host "❌ [FAIL] Gate 8: WebGames 配置架构审查未通过！" -ForegroundColor Red
             $failed = $true
@@ -464,7 +598,7 @@ if ($hasFgCompile) {
                 exit 1
             }
         } else {
-            $process = Start-Process -FilePath $cargoCmd -ArgumentList "check", "--manifest-path", $fgToml, "--all-targets" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
+            $process = Start-GateProcess -FilePath $cargoCmd -ArgumentList "check", "--manifest-path", $fgToml, "--all-targets" -WorkingDirectory $repoRoot
             if ($process.ExitCode -ne 0) {
                 Write-Host "❌ [FAIL] Gate 8: fractal-git 增量编译未通过！" -ForegroundColor Red
                 $failed = $true
@@ -497,7 +631,7 @@ if ($touchedCode) {
             exit 1
         }
     } else {
-        $process = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-staged-slice.js" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
+        $process = Start-GateProcess -FilePath $nodeCmd -ArgumentList "scripts/common/validate-staged-slice.js" -WorkingDirectory $repoRoot
         if ($process.ExitCode -ne 0) {
             Write-Host "❌ [FAIL] Gate 9: 暂存区 AST 切片审查未通过！" -ForegroundColor Red
             $failed = $true
@@ -522,7 +656,7 @@ if ($touchedAuditable) {
             exit 1
         }
     } else {
-        $resDensity = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-code-density.js", "--staged" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
+        $resDensity = Start-GateProcess -FilePath $nodeCmd -ArgumentList "scripts/common/validate-code-density.js", "--staged" -WorkingDirectory $repoRoot
         if ($resDensity.ExitCode -ne 0) {
             Write-Host "❌ [FAIL] Gate 9: 暂存区代码密度与接线载荷审查未通过！" -ForegroundColor Red
             $failed = $true
@@ -547,7 +681,7 @@ if ($touchedAuditable) {
             exit 1
         }
     } else {
-        $resEloc = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/evaluate-eloc-budget.js", "--staged" -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait
+        $resEloc = Start-GateProcess -FilePath $nodeCmd -ArgumentList "scripts/common/evaluate-eloc-budget.js", "--staged" -WorkingDirectory $repoRoot
         if ($resEloc.ExitCode -ne 0) {
             Write-Host "❌ [FAIL] Gate 9: 暂存区双轨体积与动态包络审查未通过！" -ForegroundColor Red
             $failed = $true

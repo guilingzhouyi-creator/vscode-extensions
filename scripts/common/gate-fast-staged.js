@@ -24,11 +24,22 @@
 const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
-const { getSafeGitEnv, getStagedFiles: queryStagedFiles, readStagedBufferSafe } = require('./git-env');
+const { getSafeGitEnv, getStagedFiles: queryStagedFiles, readStagedBufferSafe, readStagedBuffersBatch } = require('./git-env');
+const {
+  evaluateCodeMetrics,
+  classifyCStyleLine,
+  classifyHashStyleLine,
+  classifyPowerShellLine,
+} = require('./evaluate-eloc-budget');
+
+/** Hash-comment languages; mirrors the SSOT classifier's extension set. */
+const HASH_STYLE_EXTS = new Set(['.gd', '.py', '.sh', '.bash']);
 
 const RULE_HYG_NAM_001 = 'HYG-NAM-001';
 const RULE_HYG_EOL_001 = 'HYG-EOL-001';
 const RULE_HYG_EMP_001 = 'HYG-EMP-001';
+const RULE_HYG_CLT_001 = 'HYG-CLT-001';
+const RULE_EXT_DIR_001 = 'EXT-DIR-001';
 const RULE_VOL_ELOC_001 = 'VOL-ELOC-001';
 const RULE_VOL_LOC_001 = 'VOL-LOC-001';
 const RULE_VOL_RATIO_001 = 'VOL-RATIO-001';
@@ -54,6 +65,15 @@ const RE_EXEMPT_SLANG = /WebGames\/docs\/(?:路线图|归档库)\//;
 
 const MAX_ELOC_BUDGET = 900;
 const MAX_LOC_BUDGET = 1400;
+/**
+ * Shared with evaluate-eloc-budget DEFAULT_TARGET_DENSITY_RATIO and
+ * validate-code-density DEFAULT_POR_LIMIT. Keeping the numbers identical here
+ * prevents a file from passing this fast pre-screen and then failing the
+ * downstream volume gates for the same measurement.
+ */
+const DENSITY_RATIO_LIMIT = 3.0;
+const PLUMBING_RATIO_LIMIT = 0.6;
+
 const MIN_FILENAME_STEM_LENGTH = 3;
 const MAX_FILENAME_STEM_LENGTH = 55;
 const MAX_PATH_LEAK_DISPLAY = 5;
@@ -80,6 +100,12 @@ const ABS_PATH_PATTERN = /(?:\b[A-Za-z]:[\\/][a-zA-Z0-9_-]+|file:\/\/\/)/;
 const ABS_PATH_WHITELIST_PATTERN = /(?:node_modules|\.gemini|file:\/\/)/;
 
 const SLANG_FILENAME_PATTERN = /(?:^|[-_.])(?:temp|wip|new|st\d+|p\d+)(?:[-_.]|$)/i;
+
+const ROOT_DISALLOWED_SCRIPT_EXTS = new Set([
+  '.js', '.ts', '.py', '.sh', '.ps1', '.bat', '.cmd',
+]);
+const CLUTTER_FILE_PATTERN =
+  /^(?:Thumbs\.db|desktop\.ini|\.DS_Store|.*\.tmp|.*\.bak|.*\.orig|.*\.swp|.*\.actual\.json|.*\.log)$/i;
 
 const ALLOWED_SHORT_STEMS = new Set(
   'ui en zh db io ci os vm fs re id ip gm'.split(' ')
@@ -128,7 +154,9 @@ ARCH_FAC|接线代码占比过高 (wiringRatio > 65%)|消除空心透传跳板�
 EMPTY_FILE|0 bytes|> 0 bytes with semantic payload|删除该空文件或实现实质代码逻辑
 EMPTY_WS|0 non-whitespace characters|实质内容|删除该虚空文件或填充代码
 PATH_LEAK|相对路径或环境变量动态解析|替换绝对路径或盘符为相对路径或 path.resolve(__dirname, ...)
-SECRET_LEAK|暂存代码包含疑似未脱敏的密钥或私钥|敏感凭证特征串|环境变量或模拟密钥|立即移除真实密钥并配置环境变量注入，严禁提交凭证到版本库`;
+SECRET_LEAK|暂存代码包含疑似未脱敏的密钥或私钥|敏感凭证特征串|环境变量或模拟密钥|立即移除真实密钥并配置环境变量注入，严禁提交凭证到版本库
+ROOT_SCRIPT|工作区根目录严禁平铺散落代码脚本|scripts/ 规范子目录|将脚本移动至 scripts/common/, scripts/ps1/, scripts/sh/ 或项目 scripts/py/ 并保持根目录整洁 (EXT-DIR-001)
+ROOT_CLUTTER|检测到根目录或工作区临时脏文件/日志|工作区洁净无临时脏污|删除临时文件或日志 (HYG-CLT-001)`;
 
 const VIOLATION_TPLS = Object.freeze(
   RAW_VIOLATION_TPLS.split('\n').reduce((acc, row) => {
@@ -170,124 +198,74 @@ function isExemptSlangPath(filePath, baseName) {
   return RE_EXEMPT_SLANG.test(norm) || /^fe_\d{2}/.test(baseName);
 }
 
-function classifyCLine(line, inBlockComment) {
-  const trimmed = line.trim();
-  if (trimmed.length === 0) {
-    return { isBlank: true, isComment: false, inBlock: inBlockComment };
-  }
-  if (inBlockComment) {
-    const endIdx = trimmed.indexOf('*/');
-    if (endIdx === -1) {
-      return { isBlank: false, isComment: true, inBlock: true };
-    }
-    const rest = trimmed.slice(endIdx + 2).trim();
-    return { isBlank: false, isComment: rest.length === 0, inBlock: false };
-  }
-  if (trimmed.startsWith('/*')) {
-    const endIdx = trimmed.indexOf('*/', 2);
-    if (endIdx === -1) {
-      return { isBlank: false, isComment: true, inBlock: true };
-    }
-    const rest = trimmed.slice(endIdx + 2).trim();
-    return { isBlank: false, isComment: rest.length === 0, inBlock: false };
-  }
-  if (trimmed.startsWith('//') || (trimmed.startsWith('*') && !trimmed.startsWith('*='))) {
-    return { isBlank: false, isComment: true, inBlock: false };
-  }
-  return { isBlank: false, isComment: false, inBlock: false };
-}
-
-function classifyHashLine(line, inTripleQuote, quoteChar) {
-  const trimmed = line.trim();
-  if (trimmed.length === 0) {
-    return { isBlank: true, isComment: false, inBlock: inTripleQuote, quoteChar };
-  }
-  if (inTripleQuote) {
-    const endIdx = trimmed.indexOf(quoteChar);
-    if (endIdx === -1) {
-      return { isBlank: false, isComment: true, inBlock: true, quoteChar };
-    }
-    const rest = trimmed.slice(endIdx + 3).trim();
-    return { isBlank: false, isComment: rest.length === 0, inBlock: false, quoteChar: '' };
-  }
-  if (trimmed.startsWith('"""') || trimmed.startsWith("'''")) {
-    const currentQuote = trimmed.slice(0, 3);
-    const endIdx = trimmed.indexOf(currentQuote, 3);
-    if (endIdx === -1) {
-      return { isBlank: false, isComment: true, inBlock: true, quoteChar: currentQuote };
-    }
-    const rest = trimmed.slice(endIdx + 3).trim();
-    return { isBlank: false, isComment: rest.length === 0, inBlock: false, quoteChar: '' };
-  }
-  if (trimmed.startsWith('#') || trimmed.startsWith(';')) {
-    return { isBlank: false, isComment: true, inBlock: false, quoteChar: '' };
-  }
-  return { isBlank: false, isComment: false, inBlock: false, quoteChar: '' };
-}
-
-function classifyPowerShellLine(line, inBlock) {
-  const trimmed = line.trim();
-  if (trimmed.length === 0) return { isBlank: true, isComment: false, inBlock };
-  if (inBlock) {
-    const endIdx = trimmed.indexOf('#>');
-    if (endIdx === -1) return { isBlank: false, isComment: true, inBlock: true };
-    const rest = trimmed.slice(endIdx + 2).trim();
-    return { isBlank: false, isComment: rest.length === 0, inBlock: false };
-  }
-  if (trimmed.startsWith('<#')) {
-    const endIdx = trimmed.indexOf('#>', 2);
-    if (endIdx === -1) return { isBlank: false, isComment: true, inBlock: true };
-    const rest = trimmed.slice(endIdx + 2).trim();
-    return { isBlank: false, isComment: rest.length === 0, inBlock: false };
-  }
-  if (trimmed.startsWith('#')) return { isBlank: false, isComment: true, inBlock: false };
-  return { isBlank: false, isComment: false, inBlock: false };
-}
-
 const RE_FAST_WIRING = /^(?:import\s+|import\(|from\s+|export\s+(?:\*|type\s+\*|\{[^}]*\}\s*(?:from\s+[^;]+)?;?|default\s+[A-Za-z0-9_$]+;?$)|(?:const|let|var)\s+.*=\s*require\(|module\.exports\s*=|exports\.|source\s+|\.\s+|using\s+|Import-Module\s+|(?:extends\s+|class_name\s+|(?:const|var)\s+\w+\s*=\s*preload\())/;
 
-function isLineEffective(line, state) {
-  if (state.isPowerShell) {
-    const res = classifyPowerShellLine(line, state.inBlock);
-    state.inBlock = res.inBlock;
-    return !res.isBlank && !res.isComment;
-  }
-  if (state.isHash) {
-    const res = classifyHashLine(line, state.inBlock, state.quoteChar);
-    state.inBlock = res.inBlock;
-    state.quoteChar = res.quoteChar;
-    return !res.isBlank && !res.isComment;
-  }
-  const res = classifyCLine(line, state.inBlock);
-  state.inBlock = res.inBlock;
-  return !res.isBlank && !res.isComment;
-}
-
+/**
+ * Measures ELOC, physical LOC, and wiring-line count for staged content.
+ *
+ * Line classification is delegated to evaluate-eloc-budget.js, which is the
+ * declared single source of truth for ELOC semantics. Only the wiring-line
+ * tally is local, because the fast staged gate is its sole consumer.
+ *
+ * @param {string} content - File content.
+ * @param {string} ext - Lowercase file extension.
+ * @returns {{ totalLoc: number, eloc: number, wiringCount: number }} Volume metrics.
+ */
 function calculateEloc(content, ext) {
   const lines = content.split(/\r?\n/);
   if (lines.length > 0 && lines[lines.length - 1] === '') {
     lines.pop();
   }
-  const totalLoc = lines.length;
-  let eloc = 0;
-  let wiringCount = 0;
-  const state = {
-    isPowerShell: ext === '.ps1',
-    isHash: ext === '.gd' || ext === '.py' || ext === '.sh' || ext === '.bash',
-    inBlock: false,
-    quoteChar: '',
-  };
 
-  for (const line of lines) {
-    if (isLineEffective(line, state)) {
-      eloc++;
-      if (RE_FAST_WIRING.test(line.trim())) {
-        wiringCount++;
-      }
+  const { eloc, totalLoc } = evaluateCodeMetrics(content, ext, '');
+  let wiringCount = 0;
+  const effective = collectEffectiveLines(lines, ext);
+  for (const line of effective) {
+    if (RE_FAST_WIRING.test(line)) {
+      wiringCount++;
     }
   }
   return { totalLoc, eloc, wiringCount };
 }
+
+/**
+ * Returns the trimmed text of every semantically effective line.
+ *
+ * Runs the SSOT classifiers directly so the wiring tally observes exactly the
+ * same line set that produced ELOC.
+ *
+ * @param {string[]} lines - Physical lines.
+ * @param {string} ext - Lowercase file extension.
+ * @returns {string[]} Trimmed effective lines.
+ */
+function collectEffectiveLines(lines, ext) {
+  const isPowerShell = ext === '.ps1';
+  const isHash = HASH_STYLE_EXTS.has(ext);
+  const result = [];
+  let inBlock = false;
+  let quoteChar = '';
+
+  for (const line of lines) {
+    if (isPowerShell) {
+      const res = classifyPowerShellLine(line, inBlock);
+      inBlock = res.inBlock;
+      if (!res.isBlank && !res.isComment) result.push(line.trim());
+      continue;
+    }
+    if (isHash) {
+      const res = classifyHashStyleLine(line, inBlock, quoteChar);
+      inBlock = res.inBlock;
+      quoteChar = res.quoteChar;
+      if (!res.isBlank && !res.isComment) result.push(line.trim());
+      continue;
+    }
+    const res = classifyCStyleLine(line, inBlock);
+    inBlock = res.inBlock;
+    if (!res.isBlank && !res.isComment) result.push(line.trim());
+  }
+  return result;
+}
+
 
 /**
  * Constructs a structured violation payload adhering to the Agent Directives Protocol.
@@ -453,32 +431,28 @@ function validateFilenameLength(file, gate4Violations) {
  */
 function validateFileEol(file, buffer, gate2Violations) {
   const hasCR = buffer.includes(BYTE_CR);
-  if (file.endsWith('.ps1')) {
-    if (!hasCR) {
-      gate2Violations.push(
-        createViolation({
-          ruleId: RULE_HYG_EOL_001,
-          file,
-          message: `PowerShell 脚本必须使用 CRLF 换行符: ${file}`,
-          actual: EOL_LF,
-          expected: EOL_CRLF,
-          actionableFix: VIOLATION_TPLS.EOL_PS1.actionableFix,
-        }),
-      );
-    }
-  } else if (/\.(?:sh|ts|tsx|js|jsx|mjs|cjs|gd|json|md|py|rs|ya?ml|toml|css|html|svg)$/i.test(file)) {
-    if (hasCR) {
-      gate2Violations.push(
-        createViolation({
-          ruleId: RULE_HYG_EOL_001,
-          file,
-          message: `代码/文档必须使用 LF 换行符，检测到 CRLF: ${file}`,
-          actual: EOL_CRLF,
-          expected: EOL_LF,
-          actionableFix: VIOLATION_TPLS.EOL_LF.actionableFix,
-        }),
-      );
-    }
+  if (file.endsWith('.ps1') && !hasCR) {
+    gate2Violations.push(
+      createViolation({
+        ruleId: RULE_HYG_EOL_001,
+        file,
+        message: `PowerShell 脚本必须使用 CRLF 换行符: ${file}`,
+        actual: EOL_LF,
+        expected: EOL_CRLF,
+        actionableFix: VIOLATION_TPLS.EOL_PS1.actionableFix,
+      }),
+    );
+  } else if (hasCR && /\.(?:sh|ts|tsx|js|jsx|mjs|cjs|gd|json|md|py|rs|ya?ml|toml|css|html|svg)$/i.test(file)) {
+    gate2Violations.push(
+      createViolation({
+        ruleId: RULE_HYG_EOL_001,
+        file,
+        message: `代码/文档必须使用 LF 换行符，检测到 CRLF: ${file}`,
+        actual: EOL_CRLF,
+        expected: EOL_LF,
+        actionableFix: VIOLATION_TPLS.EOL_LF.actionableFix,
+      }),
+    );
   }
 }
 
@@ -675,32 +649,85 @@ function validateFileVolume(file, content, gate5Violations) {
     return;
   }
 
-  if (totalLoc >= 250 && eloc > 0 && totalLoc > eloc * 3.5) {
+  if (totalLoc >= 250 && eloc > 0 && totalLoc > eloc * DENSITY_RATIO_LIMIT) {
     const actualRatio = (totalLoc / eloc).toFixed(2);
     gate5Violations.push(
       createViolation({
         ruleId: RULE_VOL_RATIO_001,
         file,
-        message: `垂直行稀释比超标 (LOC: ${totalLoc} > ELOC: ${eloc} * 3.5 = ${Math.round(eloc * 3.5)}, 比例 1:${actualRatio}): ${file}`,
+        message: `垂直行稀释比超标 (LOC: ${totalLoc} > ELOC: ${eloc} * ${DENSITY_RATIO_LIMIT} = ${Math.round(eloc * DENSITY_RATIO_LIMIT)}, 比例 1:${actualRatio}): ${file}`,
         actual: `1:${actualRatio}`,
-        expected: '<= 1:3.50',
+        expected: `<= 1:${DENSITY_RATIO_LIMIT.toFixed(2)}`,
         actionableFix: '消除空行堆叠或将长篇散文注释移至 Markdown 规范文档 (VOL-RATIO-001)',
       }),
     );
   }
 
-  if (eloc >= 10 && wiringCount / eloc > 0.65) {
+  if (eloc >= 10 && wiringCount / eloc > PLUMBING_RATIO_LIMIT) {
     const wiringPct = ((wiringCount / eloc) * 100).toFixed(1);
     gate5Violations.push(
       createViolation({
         ruleId: RULE_ARCH_FAC_001,
         file,
-        message: `接线代码占比超标 (${wiringPct}% > 65.0%, ELOC: ${eloc}): ${file}`,
+        message: `接线代码占比超标 (${wiringPct}% > ${(PLUMBING_RATIO_LIMIT * 100).toFixed(1)}%, ELOC: ${eloc}): ${file}`,
         actual: `${wiringPct}%`,
-        expected: '<= 65.0%',
+        expected: `<= ${(PLUMBING_RATIO_LIMIT * 100).toFixed(1)}%`,
         actionableFix: '消除空心透传跳板或为门面注入实质领域能力/不可变性冻结 (ARCH-FAC-001)',
       }),
     );
+  }
+}
+
+
+function hasViolationForFile(violations, file, ruleId) {
+  return violations.some((v) => v.file === file && v.ruleId === ruleId);
+}
+
+/**
+ * Rapidly audits the root directory for uncontrolled transient clutter or loose scripts.
+ *
+ * @param {string} repoRoot - Absolute repository root.
+ * @param {object} collectors - Bucket collectors for gate violations.
+ */
+function validateRootDirectoryHygiene(repoRoot, collectors) {
+  let entries;
+  try {
+    entries = fs.readdirSync(repoRoot, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const ent of entries) {
+    if (!ent.isFile()) continue;
+    const name = ent.name;
+    if (CLUTTER_FILE_PATTERN.test(name)) {
+      if (!hasViolationForFile(collectors.gate1, name, RULE_HYG_CLT_001)) {
+        const tpl = VIOLATION_TPLS.ROOT_CLUTTER;
+        collectors.gate1.push(
+          createViolation({
+            ruleId: RULE_HYG_CLT_001,
+            file: name,
+            message: `工作区根目录存在未清理的临时日志/脏文件: ${name}`,
+            actual: name,
+            expected: tpl.expected,
+            actionableFix: tpl.actionableFix,
+          }),
+        );
+      }
+    } else if (!name.startsWith('.') && ROOT_DISALLOWED_SCRIPT_EXTS.has(path.extname(name).toLowerCase())) {
+      if (!hasViolationForFile(collectors.gate4, name, RULE_EXT_DIR_001)) {
+        const tpl = VIOLATION_TPLS.ROOT_SCRIPT;
+        collectors.gate4.push(
+          createViolation({
+            ruleId: RULE_EXT_DIR_001,
+            file: name,
+            message: `工作区根目录检测到散落代码脚本: ${name}，违反扩展名即领域架构契约 (EXT-DIR-001)`,
+            actual: name,
+            expected: tpl.expected,
+            actionableFix: tpl.actionableFix,
+          }),
+        );
+      }
+    }
   }
 }
 
@@ -711,13 +738,56 @@ function validateFileVolume(file, content, gate5Violations) {
  * @param {string} file - Relative file path.
  * @param {object} collectors - Bucket collectors for gate violations.
  */
-function inspectStagedFile(repoRoot, file, collectors, useIndex) {
+function inspectStagedFile(repoRoot, file, collectors, useIndex, prefetched = null) {
+  const normFile = file.replace(/\\/g, '/');
+  const baseName = path.basename(normFile);
+  const isRootFile = !normFile.includes('/');
+
+  if (CLUTTER_FILE_PATTERN.test(baseName)) {
+    if (!hasViolationForFile(collectors.gate1, file, RULE_HYG_CLT_001)) {
+      const tpl = VIOLATION_TPLS.ROOT_CLUTTER;
+      collectors.gate1.push(
+        createViolation({
+          ruleId: RULE_HYG_CLT_001,
+          file,
+          message: `暂存区包含临时脏文件/日志: ${file}`,
+          actual: baseName,
+          expected: tpl.expected,
+          actionableFix: tpl.actionableFix,
+        }),
+      );
+    }
+    return;
+  }
+
+  if (isRootFile && !baseName.startsWith('.') && ROOT_DISALLOWED_SCRIPT_EXTS.has(path.extname(baseName).toLowerCase())) {
+    if (!hasViolationForFile(collectors.gate4, file, RULE_EXT_DIR_001)) {
+      const tpl = VIOLATION_TPLS.ROOT_SCRIPT;
+      collectors.gate4.push(
+        createViolation({
+          ruleId: RULE_EXT_DIR_001,
+          file,
+          message: `根目录严禁平铺散落代码脚本 (${file})，违反扩展名即领域架构契约 (EXT-DIR-001)`,
+          actual: file,
+          expected: tpl.expected,
+          actionableFix: tpl.actionableFix,
+        }),
+      );
+    }
+  }
+
   validateFilenameSlang(file, collectors.gate4);
   validateFilenameLength(file, collectors.gate4);
 
   let buffer;
   try {
-    buffer = useIndex ? readStagedBufferSafe(repoRoot, file) : fs.readFileSync(path.resolve(repoRoot, file));
+    if (!useIndex) {
+      buffer = fs.readFileSync(path.resolve(repoRoot, file));
+    } else if (prefetched && prefetched.has(file)) {
+      buffer = prefetched.get(file);
+    } else {
+      buffer = readStagedBufferSafe(repoRoot, file);
+    }
   } catch {
     return;
   }
@@ -792,8 +862,14 @@ function checkFileStream(repoRoot, stagedFiles, useIndex = true) {
     warnings: [],
   };
 
+  validateRootDirectoryHygiene(repoRoot, collectors);
+
+  // One `git cat-file --batch` covers every staged blob; the per-file fallback
+  // inside inspectStagedFile then only runs for paths missing from the index.
+  const prefetched = useIndex ? readStagedBuffersBatch(repoRoot, stagedFiles) : new Map();
+
   for (const file of stagedFiles) {
-    inspectStagedFile(repoRoot, file, collectors, useIndex);
+    inspectStagedFile(repoRoot, file, collectors, useIndex, prefetched);
   }
 
   return {
@@ -924,7 +1000,10 @@ function runFastStaged() {
   const repoRoot = path.resolve(__dirname, '../..');
   const stagedFiles = getStagedFiles(repoRoot, explicitFiles);
 
-  if (stagedFiles.length === 0) {
+  const { gate1Violations, gate2Violations, gate4Violations, gate5Violations, warnings } =
+    checkFileStream(repoRoot, stagedFiles, useIndex);
+
+  if (stagedFiles.length === 0 && gate1Violations.length === 0 && gate4Violations.length === 0) {
     if (isAgentMode) {
       console.log(
         JSON.stringify(
@@ -943,9 +1022,6 @@ function runFastStaged() {
     }
     process.exit(0);
   }
-
-  const { gate1Violations, gate2Violations, gate4Violations, gate5Violations, warnings } =
-    checkFileStream(repoRoot, stagedFiles, useIndex);
 
   const diffText = getStagedDiff(repoRoot, range);
   const { gate3Violations, gate6Violations } = checkDiffStream(diffText);

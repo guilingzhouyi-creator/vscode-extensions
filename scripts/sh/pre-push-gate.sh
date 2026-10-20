@@ -295,7 +295,7 @@ else
 fi
 
 # --- Gate 1: 全工作区零空文件、物理卫生、.gitignore 治理与五维代码密度守卫 ---
-log_gate "[1/10] 校验全工作区零物理空文件、空白脚本、.gitignore 治理与五维代码密度守卫..."
+log_gate "[1/11] 校验全工作区零物理空文件、空白脚本、.gitignore 治理与五维代码密度守卫..."
 GATE1_FAIL=0
 run_gate_step 30 "Gate 1 (物理卫生八维全域巡检)" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-physical-hygiene.js || GATE1_FAIL=1
 run_gate_step 30 "Gate 1 (.gitignore 治理)" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-gitignore-governance.js || GATE1_FAIL=1
@@ -311,7 +311,7 @@ else
 fi
 
 # --- Gate 2: 规则单源目录一致性同步 ---
-log_gate "[2/10] 校验全工作区单源规则目录同步..."
+log_gate "[2/11] 校验全工作区单源规则目录同步..."
 if ! run_gate_step 30 "Gate 2 (单源规则目录)" "$ROOT_DIR" "$NODE_BIN" scripts/common/generate-rule-catalog.js --check-only; then
     FAILED=1
 elif ! run_gate_step 30 "Gate 2 (规则 ID 闭包)" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-rule-id-closure.js; then
@@ -326,7 +326,7 @@ fi
 
 # --- Gate 3: auto-refactor 引擎全量门禁与回归套件 ---
 if [[ "$RUN_AR" -eq 1 ]]; then
-    log_gate "[3/10] 执行 auto-refactor 全量门禁与回归套件 (Rust/Build/Self/Tests)..."
+    log_gate "[3/11] 执行 auto-refactor 全量门禁与回归套件 (Rust/Build/Self/Tests)..."
     AR_FAIL=0
     run_gate_step 60 "auto-refactor Rust Gate" "$ROOT_DIR/auto-refactor" "$NODE_BIN" scripts/gate-rust.js || AR_FAIL=1
     run_gate_step 90 "auto-refactor Build" "$ROOT_DIR/auto-refactor" "$NPM_BIN" run build || AR_FAIL=1
@@ -345,7 +345,7 @@ fi
 
 # --- Gate 4: auto-refactor 多维自审与质量基线 ---
 if [[ "$RUN_AR" -eq 1 ]]; then
-    log_gate "[4/10] 执行 auto-refactor 质量基线与多维自审 (LOC预算/熵/密度/BIF)..."
+    log_gate "[4/11] 执行 auto-refactor 质量基线与多维自审 (LOC预算/熵/密度/BIF)..."
     if ! run_gate_step 60 "Gate 4 (auto-refactor 质量基线)" "$ROOT_DIR/auto-refactor" "$NODE_BIN" scripts/validate-self-multidimensional-audit.js; then
         FAILED=1
     else
@@ -357,7 +357,7 @@ fi
 
 # --- Gate 5: workspace-timing 快速单元测试套件 ---
 if [[ "$RUN_WT" -eq 1 ]]; then
-    log_gate "[5/10] 执行 workspace-timing 快速单元测试套件..."
+    log_gate "[5/11] 执行 workspace-timing 快速单元测试套件..."
     if ! run_gate_step 60 "Gate 5 (workspace-timing 快速单元测试)" "$ROOT_DIR/workspace-timing" "$NPM_BIN" run test:fast; then
         FAILED=1
     else
@@ -369,7 +369,7 @@ fi
 
 # --- Gate 6: workspace-timing L0~L5 六层审查门禁 ---
 if [[ "$RUN_WT" -eq 1 ]]; then
-    log_gate "[6/10] 执行 workspace-timing L0~L5 六层审查门禁..."
+    log_gate "[6/11] 执行 workspace-timing L0~L5 六层审查门禁..."
     if ! run_gate_step 60 "Gate 6 (workspace-timing 审查门禁)" "$ROOT_DIR/workspace-timing" "$NPM_BIN" run review; then
         FAILED=1
     else
@@ -381,7 +381,7 @@ fi
 
 # --- Gate 7: auto-refactor 长期轨迹账本物理约束守卫 ---
 if [[ "$RUN_AR" -eq 1 ]]; then
-    log_gate "[7/10] 校验 auto-refactor 长期轨迹账本物理约束 (<350B/条, <=2MB)..."
+    log_gate "[7/11] 校验 auto-refactor 长期轨迹账本物理约束 (<350B/条, <=2MB)..."
     if ! run_gate_step 30 "Gate 7 (长期轨迹账本约束)" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-trajectory-ledger.js; then
         FAILED=1
     else
@@ -393,26 +393,37 @@ fi
 
 # --- Gate 8: WebGames 配置架构与必需表一致性审查 ---
 if [[ "$RUN_WG" -eq 1 ]]; then
-    log_gate "[8/10] 执行 WebGames 全域质量门禁与配置架构审查..."
-    if ! run_gate_step 60 "Gate 8 (WebGames 全域质量门禁)" "$ROOT_DIR" "$PYTHON_BIN" WebGames/scripts/py/audit_runner.py --diff; then
+    log_gate "[8/11] 执行 WebGames 全域质量门禁与配置架构审查..."
+    GATE8_FAIL=0
+    run_gate_step 60 "Gate 8 (WebGames 全域质量门禁)" "$ROOT_DIR" "$PYTHON_BIN" WebGames/scripts/py/audit_runner.py --diff || GATE8_FAIL=1
+    # Mermaid 图由真实解析器校验（audit_docs 的字符启发式无法发现语法破损）；
+    # 该步骤此前无任何调用方，导致 349 张图的解析能力长期悬空。
+    run_gate_step 120 "Gate 8 (WebGames 文档 Mermaid 真解析)" "$ROOT_DIR" bash WebGames/scripts/sh/check-mermaid.sh || GATE8_FAIL=1
+    if [[ "$GATE8_FAIL" -ne 0 ]]; then
         FAILED=1
     else
-        log_gate "  ✔ WebGames 全域质量门禁与配置架构审查通过"
+        log_gate "  ✔ WebGames 全域质量门禁、配置架构与 Mermaid 图语法审查通过"
     fi
 else
     log_gate "  ✔ [Gate 8] WebGames 配置未受影响，智能跳过审查"
 fi
 
-# --- Gate 9: fractal-git 9大微 Crate 回归测试套件 ---
+# --- Gate 9: fractal-git 微 Crate 工业级 Rust 门禁（fmt + clippy -D warnings + zero-alloc + test）---
 if [[ "$RUN_FG" -eq 1 ]]; then
-    log_gate "[9/10] 执行 fractal-git 9大微 Crate 回归测试套件 (cargo test)..."
+    log_gate "[9/11] 执行 fractal-git 工业级 Rust 门禁 (rustfmt/clippy/zero-alloc/test)..."
     if [[ -z "$CARGO_BIN" ]]; then
         log_gate "  ⚠️  未检测到 cargo 命令，跳过本地 fractal-git 编译测试（CI 将严格校验）"
+    elif [[ -f "$ROOT_DIR/fractal-git/scripts/sh/gate-rust.sh" ]]; then
+        if ! run_gate_step 300 "Gate 9 (fractal-git 9大微 Crate 回归套件)" "$ROOT_DIR" bash fractal-git/scripts/sh/gate-rust.sh; then
+            FAILED=1
+        else
+            log_gate "  ✔ fractal-git Rust 工业级门禁通过（格式/静态/分配/回归）"
+        fi
     else
         if ! run_gate_step 120 "Gate 9 (fractal-git 9大微 Crate 回归套件)" "$ROOT_DIR" "$CARGO_BIN" test --manifest-path fractal-git/Cargo.toml; then
             FAILED=1
         else
-            log_gate "  ✔ fractal-git 9大微 Crate 回归测试套件通过"
+            log_gate "  ✔ fractal-git 9大微 Crate 回归测试套件通过（未检测到 gate-rust.sh，仅执行 cargo test）"
         fi
     fi
 else
@@ -420,8 +431,10 @@ else
 fi
 
 # --- Gate 10: 待推送提交历史风格与禁词审查 (validate-commit-msg-style / validate-commit-msg) ---
+# 提交信息词法、风格仲裁与债务走廊契约自测：基础件一旦回归，下方历史扫描结论即失去依据
+run_gate_step 30 "Gate 10 (提交信息词法与债务走廊契约自测)" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-commit-guardrail.js || FAILED=1
 if [[ -n "$RANGE" ]]; then
-    log_gate "[10/10] 审查待推送提交历史风格与文本约束 (流式扫描: $RANGE)..."
+    log_gate "[10/11] 审查待推送提交历史风格与文本约束 (流式扫描: $RANGE)..."
     if ! run_gate_step 30 "Gate 10 (待推送分支提交历史风格与禁词审查)" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-commit-msg.js --range "$RANGE"; then
         FAILED=1
     else
@@ -429,6 +442,18 @@ if [[ -n "$RANGE" ]]; then
     fi
 else
     log_gate "  ✔ [Gate 10] 首次推送或无上游对比基准，跳过历史扫描"
+fi
+
+# --- Gate 11: 推送集变更熵与跨域扩散审查 (GATE-ENT-001) ---
+if [[ -n "$RANGE" ]]; then
+    log_gate "[11/11] 审查推送集变更熵与跨子系统扩散 (GATE-ENT-001)..."
+    if ! run_gate_step 30 "Gate 11 (推送集变更熵与跨域扩散审查)" "$ROOT_DIR" "$NODE_BIN" scripts/common/evaluate-change-entropy.js --range "$RANGE" --fail-on-diffusion; then
+        FAILED=1
+    else
+        log_gate "  ✔ 推送集变更熵在凝聚阈值内"
+    fi
+else
+    log_gate "  ✔ [Gate 11] 无推送范围，跳过变更熵审查"
 fi
 
 if [[ "$AGENT_MODE" -eq 1 ]]; then

@@ -64,7 +64,12 @@ const LOCAL_DECL_RE =
 const REEXPORT_RE =
   /^(?:export\s+\*\s+from|export\s*\{[^}]*\}\s*from|module\.exports\s*=)\s*['"](\.\/[^'"]+)['"]/;
 
-const OS_CLUTTER_RE = /^(?:Thumbs\.db|desktop\.ini|\.DS_Store|.*\.tmp|.*\.bak|.*\.orig|.*\.swp)$/i;
+const OS_CLUTTER_RE =
+  /^(?:Thumbs\.db|desktop\.ini|\.DS_Store|.*\.tmp|.*\.bak|.*\.orig|.*\.swp|.*\.actual\.json|.*\.log)$/i;
+
+const ROOT_DISALLOWED_SCRIPT_EXTS = new Set([
+  '.js', '.ts', '.py', '.sh', '.ps1', '.bat', '.cmd',
+]);
 
 function isExemptPath(relPath) {
   const norm = relPath.replace(/\\/g, '/');
@@ -168,6 +173,20 @@ class PhysicalHygieneAuditor {
       }
       return true;
     }
+
+    const isRootFile = !relPath.includes('/') && !relPath.includes('\\');
+    if (isRootFile) {
+      const ext = path.extname(baseName).toLowerCase();
+      if (!baseName.startsWith('.') && ROOT_DISALLOWED_SCRIPT_EXTS.has(ext)) {
+        this.violations.osClutter.push({
+          path: relPath,
+          ruleId: 'EXT-DIR-001',
+          issue: `Root directory contains loose code script '${baseName}', violating Extension-is-Domain rule (EXT-DIR-001)`,
+        });
+        return true;
+      }
+    }
+
     return false;
   }
 
@@ -420,44 +439,52 @@ class PhysicalHygieneAuditor {
     };
   }
 
-  run() {
-    this.scanDir(this.root);
-    const evaluation = this.computeScore();
+  emitJson(evaluation) {
+    const output = {
+      protocolVersion: '1.0.0',
+      timestamp: new Date().toISOString(),
+      score: evaluation.score,
+      totalViolations: evaluation.totalViolations,
+      scannedFiles: this.totalScannedFiles,
+      scannedDirs: this.totalScannedDirs,
+      fixedCount: this.fixedCount,
+      dimensions: evaluation.dimensions,
+      violations: this.violations,
+    };
+    console.log(JSON.stringify(output, null, 2));
+    process.exit(evaluation.totalViolations === 0 ? 0 : 1);
+  }
 
-    if (this.options.json) {
-      const output = {
-        protocolVersion: '1.0.0',
-        timestamp: new Date().toISOString(),
-        score: evaluation.score,
+  emitAgent(evaluation) {
+    const directives = [];
+    if (evaluation.totalViolations > 0) {
+      directives.push('run --fix to self-heal physical hygiene issues (BOM, EOL, formatting, clutter)');
+      for (const item of this.violations.osClutter) {
+        if (item.ruleId === 'EXT-DIR-001') {
+          directives.push(`move root script '${item.path}' to scripts/common/, scripts/ps1/, scripts/sh/, or <project>/scripts/py/ per EXT-DIR-001`);
+        } else if (item.path && (item.path.endsWith('.log') || item.path.includes('.log'))) {
+          directives.push(`remove transient log file '${item.path}' or archive under archive/ (HYG-CLT-001)`);
+        }
+      }
+    }
+    const envelope = {
+      header: {
+        standard: 'Antigravity-Agent-Native-v1',
+        type: 'physical_hygiene_envelope',
+      },
+      payload: {
+        overallScore: evaluation.score,
         totalViolations: evaluation.totalViolations,
-        scannedFiles: this.totalScannedFiles,
-        scannedDirs: this.totalScannedDirs,
-        fixedCount: this.fixedCount,
         dimensions: evaluation.dimensions,
-        violations: this.violations,
-      };
-      console.log(JSON.stringify(output, null, 2));
-      process.exit(evaluation.totalViolations === 0 ? 0 : 1);
-    }
+        actionRequired: evaluation.totalViolations > 0,
+        directives,
+      },
+    };
+    console.log(JSON.stringify(envelope, null, 2));
+    process.exit(evaluation.totalViolations === 0 ? 0 : 1);
+  }
 
-    if (this.options.agent) {
-      const envelope = {
-        header: {
-          standard: 'Antigravity-Agent-Native-v1',
-          type: 'physical_hygiene_envelope',
-        },
-        payload: {
-          overallScore: evaluation.score,
-          totalViolations: evaluation.totalViolations,
-          dimensions: evaluation.dimensions,
-          actionRequired: evaluation.totalViolations > 0,
-          directives: evaluation.totalViolations > 0 ? ['run --fix to self-heal physical hygiene issues'] : [],
-        },
-      };
-      console.log(JSON.stringify(envelope, null, 2));
-      process.exit(evaluation.totalViolations === 0 ? 0 : 1);
-    }
-
+  emitHuman(evaluation) {
     console.log('=== 全工作区物理卫生八维全域巡检看板 (Physical Hygiene Matrix) ===');
     console.log(`受检物理文件: ${this.totalScannedFiles} | 受检目录: ${this.totalScannedDirs} | 综合得分: ${evaluation.score} / 100.0`);
 
@@ -469,11 +496,11 @@ class PhysicalHygieneAuditor {
       posixEof: '[HYG-TRL-001] D5 POSIX单EOF换行契约',
       pureSpacesIndent: '[HYG-IND-001] D6 纯空格无制表符缩进',
       emptyDirs: '[HYG-DIR-001] D7 零残留物理空目录',
-      osClutter: '[HYG-CLT-001] D8 零系统/临时脏文件',
+      osClutter: '[HYG-CLT-001/EXT-DIR-001] D8 零脏文件与根目录整洁',
     };
 
     for (const [dim, info] of Object.entries(evaluation.dimensions)) {
-      const label = (dimLabels[dim] || dim).padEnd(35, ' ');
+      const label = (dimLabels[dim] || dim).padEnd(38, ' ');
       const status = info.violationsCount === 0 ? '✔ PASS' : `✖ ${info.violationsCount} issues`;
       console.log(`  ${label} : ${status.padStart(14, ' ')} | 得分: ${info.score.toFixed(1)}`);
     }
@@ -485,10 +512,34 @@ class PhysicalHygieneAuditor {
     if (evaluation.totalViolations === 0) {
       console.log('\n✔ [PASS] 全工作区物理卫生八维刚性公理 100% 全部合规\n');
       process.exit(0);
-    } else {
-      console.log(`\n❌ [FAIL] 检测到 ${evaluation.totalViolations} 处物理卫生违规，可运行 node scripts/common/validate-physical-hygiene.js --fix 进行自动自愈\n`);
-      process.exit(1);
     }
+
+    console.log(`\n❌ [FAIL] 检测到 ${evaluation.totalViolations} 处物理卫生违规，可运行 node scripts/common/validate-physical-hygiene.js --fix 进行自动自愈\n`);
+    for (const [dim, list] of Object.entries(this.violations)) {
+      if (list.length === 0) continue;
+      console.log(`  [${dim}] 发现 ${list.length} 处违规:`);
+      for (const item of list.slice(0, 10)) {
+        console.log(`    - [${item.ruleId}] ${item.path}: ${item.issue}`);
+      }
+      if (list.length > 10) {
+        console.log(`    ... 其余 ${list.length - 10} 项已省略`);
+      }
+    }
+    process.exit(1);
+  }
+
+  run() {
+    this.scanDir(this.root);
+    const evaluation = this.computeScore();
+    if (this.options.json) {
+      this.emitJson(evaluation);
+      return;
+    }
+    if (this.options.agent) {
+      this.emitAgent(evaluation);
+      return;
+    }
+    this.emitHuman(evaluation);
   }
 }
 

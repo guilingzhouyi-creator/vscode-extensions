@@ -187,6 +187,39 @@ function sampleShellScore() {
 }
 
 /**
+ * Samples Rust quality score by reading fractal-git audit report or evaluating crate boundaries.
+ *
+ * @returns {number} Score in [0, 100].
+ */
+function sampleRustScore() {
+  const fgReportPath = path.join(REPO_ROOT, 'fractal-git/reports/audit-latest.json');
+  if (fs.existsSync(fgReportPath)) {
+    try {
+      const data = JSON.parse(fs.readFileSync(fgReportPath, 'utf8'));
+      if (typeof data.summary?.bayesianConfidence?.credibleScore === 'number') {
+        return Math.min(100, Math.max(0, data.summary.bayesianConfidence.credibleScore));
+      }
+    } catch {
+      // Fallback to static gate evaluation
+    }
+  }
+
+  const allocScript = path.join(REPO_ROOT, 'fractal-git/scripts/common/check-zero-alloc-boundary.js');
+  if (fs.existsSync(allocScript)) {
+    try {
+      const { execFileSync } = require('child_process');
+      execFileSync(process.execPath, [allocScript], { stdio: 'pipe', encoding: 'utf8' });
+      return 100.0;
+    } catch {
+      return 70.0;
+    }
+  }
+
+  return LANG_CONFIG.rust.defaultFallbackScore;
+}
+
+
+/**
  * Computes weighted mean across active languages.
  *
  * @param {string[]} languages - Language keys.
@@ -241,7 +274,7 @@ async function evaluateWorkspacePolyglotBalance(options = {}) {
     gdscript: explicit.gdscript ?? LANG_CONFIG.gdscript.defaultFallbackScore,
     python: explicit.python ?? (await samplePythonScore(fast)),
     shell: explicit.shell ?? sampleShellScore(),
-    rust: explicit.rust ?? LANG_CONFIG.rust.defaultFallbackScore,
+    rust: explicit.rust ?? sampleRustScore(),
   };
 
   const activeLanguages = Object.keys(LANG_CONFIG).filter(

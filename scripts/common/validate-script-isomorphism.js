@@ -145,7 +145,39 @@ function auditShDirectives(content) {
 }
 
 /**
+ * Normalizes a CLI flag to a comparable key by lowercasing and stripping separators.
+ *
+ * @param {string} token - Raw flag token without leading dashes.
+ * @returns {string} Normalized key.
+ */
+function normalizeFlagKey(token) {
+  return token.toLowerCase().replace(/-/g, '');
+}
+
+/**
+ * Extracts the set of long/short option names declared by a Bash script.
+ *
+ * @param {string} shContent - Bash script content.
+ * @returns {Set<string>} Normalized option keys (e.g. `--view-log` -> `viewlog`).
+ */
+function collectShOptionKeys(shContent) {
+  const keys = new Set();
+  const pattern = /(?<![A-Za-z0-9_-])--?([A-Za-z][A-Za-z0-9-]*)/g;
+  let match = pattern.exec(shContent);
+  while (match !== null) {
+    keys.add(normalizeFlagKey(match[1]));
+    match = pattern.exec(shContent);
+  }
+  return keys;
+}
+
+/**
  * Audit parameter flag parity between dual implementations.
+ *
+ * Flags are compared by normalized name (`HotSync` == `--hot-sync` == `--hotsync`) so that
+ * kebab-case and camelCase spellings of the same option are treated as aligned. A blanket
+ * `"$@"` passthrough is deliberately NOT accepted: it would let any wrapper script satisfy
+ * every declared flag without implementing it.
  *
  * @param {string} baseName - Base name of script pair.
  * @param {string} ps1Content - PowerShell script content.
@@ -155,16 +187,12 @@ function auditShDirectives(content) {
  */
 function auditFlagAlignment(baseName, ps1Content, shContent, flagAlignments = REQUIRED_FLAG_ALIGNMENTS) {
   const requiredFlags = flagAlignments[baseName] || [];
+  const shOptionKeys = collectShOptionKeys(shContent);
   const errors = [];
 
   for (const flag of requiredFlags) {
-    const ps1Has = ps1Content.includes(flag);
-    const kebab = flag.replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase();
-    const shHas =
-      shContent.includes(`-${flag}`) ||
-      shContent.includes(`--${flag.toLowerCase()}`) ||
-      shContent.includes(`--${kebab}`) ||
-      shContent.includes('"$@"');
+    const ps1Has = new RegExp(`\\[switch\\]\\$${flag}\\b`).test(ps1Content) || ps1Content.includes(flag);
+    const shHas = shOptionKeys.has(normalizeFlagKey(flag));
     if (!ps1Has || !shHas) {
       errors.push(`Flag '${flag}' alignment missing (ps1: ${ps1Has}, sh: ${shHas})`);
     }
@@ -251,7 +279,8 @@ function run() {
   }
 
   const totalPairs = SCRIPT_DOMAINS.reduce((sum, d) => sum + d.pairs.length, 0);
-  console.log(`  ✔ [PASS] 跨平台同构脚本与防御契约校验通过 (${totalPairs} 对同构脚本全部合规: scripts 9 对, WebGames 15 对)`);
+  const perDomain = SCRIPT_DOMAINS.map((d) => `${d.name} ${d.pairs.length} 对`).join(', ');
+  console.log(`  ✔ [PASS] 跨平台同构脚本与防御契约校验通过 (${totalPairs} 对同构脚本全部合规: ${perDomain})`);
   process.exit(0);
 }
 
@@ -267,6 +296,8 @@ module.exports = {
   auditLineEnding,
   auditPs1Directives,
   auditShDirectives,
+  normalizeFlagKey,
+  collectShOptionKeys,
   auditFlagAlignment,
   validateDomain,
   validateIsomorphism,

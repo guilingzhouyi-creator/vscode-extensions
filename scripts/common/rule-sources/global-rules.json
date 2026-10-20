@@ -104,6 +104,12 @@
       "family": "VOL",
       "severity": "warning",
       "summary": "Dynamic dilution envelope guard: physical line count must not exceed dynamic ratio 1:3 envelope"
+    },
+    {
+      "id": "EXT-DIR-001",
+      "family": "HYG",
+      "severity": "error",
+      "summary": "File extension and directory classification guard: scripts and configs must reside in dedicated domain subdirectories matching their file extension (ps1, sh, py, common) and never litter the workspace root."
     }
   ]
 }
