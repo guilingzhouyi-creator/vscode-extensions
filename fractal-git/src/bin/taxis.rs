@@ -108,6 +108,15 @@ fn print_json<T: serde::Serialize>(value: &T) {
     );
 }
 
+fn find_arg_value<'a>(args: &'a [String], flags: &[&str]) -> Option<&'a str> {
+    for index in 0..args.len().saturating_sub(1) {
+        if flags.contains(&args[index].as_str()) {
+            return Some(args[index + 1].as_str());
+        }
+    }
+    None
+}
+
 fn handle_status(ctx: &CliContext) {
     let ref_store = DiskRefStore::new(&ctx.git_dir);
     let refs = ref_store.list_all().unwrap_or_default();
@@ -201,57 +210,28 @@ fn handle_branch(ctx: &CliContext) {
 }
 
 fn handle_commit(ctx: &CliContext) {
-    let mut message = String::new();
-    let mut cell_id = "cell-default";
-    let mut card_id = "card-000";
-    let mut agent_id = "agent-primary";
-    let mut human_author: Option<String> = None;
-    let mut auth_token: Option<String> = None;
-    let mut policy_name = "rust-strict";
-    let mut target_ref_str = "refs/fractal/cell/cell-default/main".to_string();
+    let cell_id = find_arg_value(&ctx.args, &["--cell"]).unwrap_or("cell-default");
+    let card_id = find_arg_value(&ctx.args, &["--card"]).unwrap_or("card-000");
+    let agent_id = find_arg_value(&ctx.args, &["--agent"]).unwrap_or("agent-primary");
+    let human_author = find_arg_value(&ctx.args, &["--human"]).map(String::from);
+    let auth_token = find_arg_value(&ctx.args, &["--token"]).map(String::from);
+    let policy_name = find_arg_value(&ctx.args, &["--policy"]).unwrap_or("rust-strict");
+    let target_ref_str =
+        find_arg_value(&ctx.args, &["--target"]).unwrap_or("refs/fractal/cell/cell-default/main");
 
-    let mut arg_cursor = 0;
-    while arg_cursor < ctx.args.len() {
-        if ctx.args[arg_cursor] == "-m" && arg_cursor + 1 < ctx.args.len() {
-            message = ctx.args[arg_cursor + 1].clone();
-            arg_cursor += 2;
-        } else if ctx.args[arg_cursor] == "--cell" && arg_cursor + 1 < ctx.args.len() {
-            cell_id = &ctx.args[arg_cursor + 1];
-            arg_cursor += 2;
-        } else if ctx.args[arg_cursor] == "--card" && arg_cursor + 1 < ctx.args.len() {
-            card_id = &ctx.args[arg_cursor + 1];
-            arg_cursor += 2;
-        } else if ctx.args[arg_cursor] == "--agent" && arg_cursor + 1 < ctx.args.len() {
-            agent_id = &ctx.args[arg_cursor + 1];
-            arg_cursor += 2;
-        } else if ctx.args[arg_cursor] == "--human" && arg_cursor + 1 < ctx.args.len() {
-            human_author = Some(ctx.args[arg_cursor + 1].clone());
-            arg_cursor += 2;
-        } else if ctx.args[arg_cursor] == "--token" && arg_cursor + 1 < ctx.args.len() {
-            auth_token = Some(ctx.args[arg_cursor + 1].clone());
-            arg_cursor += 2;
-        } else if ctx.args[arg_cursor] == "--policy" && arg_cursor + 1 < ctx.args.len() {
-            policy_name = &ctx.args[arg_cursor + 1];
-            arg_cursor += 2;
-        } else if ctx.args[arg_cursor] == "--target" && arg_cursor + 1 < ctx.args.len() {
-            target_ref_str = ctx.args[arg_cursor + 1].clone();
-            arg_cursor += 2;
-        } else {
-            arg_cursor += 1;
-        }
-    }
-
-    if message.is_empty() {
-        message = format!(
-            concat!(
-                "feat(core): taxis atomic commit\n\n",
-                "[Why]\nRoutine checkpoint for task {}.\n\n",
-                "[Changed]\n- Updated working tree state\n\n",
-                "[Verification]\nAssert state consistency."
-            ),
-            card_id
-        );
-    }
+    let message = find_arg_value(&ctx.args, &["-m"])
+        .map(String::from)
+        .unwrap_or_else(|| {
+            format!(
+                concat!(
+                    "feat(core): taxis atomic commit\n\n",
+                    "[Why]\nRoutine checkpoint for task {}.\n\n",
+                    "[Changed]\n- Updated working tree state\n\n",
+                    "[Verification]\nAssert state consistency."
+                ),
+                card_id
+            )
+        });
 
     let policy = match policy_name {
         "conventional" | "conventional-semantic" => TaxisPolicy::conventional_semantic(),
@@ -277,7 +257,7 @@ fn handle_commit(ctx: &CliContext) {
         }),
     };
 
-    let target_ref = FractalRef::parse(&target_ref_str).unwrap_or(FractalRef::CellMain {
+    let target_ref = FractalRef::parse(target_ref_str).unwrap_or(FractalRef::CellMain {
         cell_id: cell_id.into(),
     });
 
@@ -600,8 +580,7 @@ fn handle_verify(_ctx: &CliContext) {
     let conflict_ok =
         ConflictGuard::assert_clean_content("sample.rs", b"pub fn clean() {}\n").is_ok();
     let quota = QuotaGovernor::default();
-    let quota_ok =
-        quota.assert_spawn_capacity(0).is_ok() && quota.assert_storage_budget(0).is_ok();
+    let quota_ok = quota.assert_spawn_capacity(0).is_ok() && quota.assert_storage_budget(0).is_ok();
 
     println!(
         "=== Running Taxis Multi-Tier Gate Verification ===\n\
@@ -660,7 +639,11 @@ fn handle_checkout(ctx: &CliContext) {
     }
     let target = &ctx.args[0];
     if let Some(fref) = FractalRef::parse(target) {
-        println!("{} Switched to fractal reference: {:?}", CliTag::TAXIS_CHECKOUT, fref);
+        println!(
+            "{} Switched to fractal reference: {:?}",
+            CliTag::TAXIS_CHECKOUT,
+            fref
+        );
         return;
     }
     handle_passthrough("checkout", ctx);
@@ -688,7 +671,10 @@ fn handle_passthrough(cmd: &str, ctx: &CliContext) {
             }
         }
         Err(cmd_err) => {
-            eprintln!("[ERROR] Failed to invoke git command '{}': {}", cmd, cmd_err);
+            eprintln!(
+                "[ERROR] Failed to invoke git command '{}': {}",
+                cmd, cmd_err
+            );
             std::process::exit(1);
         }
     }
