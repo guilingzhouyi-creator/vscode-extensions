@@ -14,7 +14,14 @@
 | `sh/` | Bash | `audit-all.sh` | audit / review（全工作区跨项目统一审查中枢） | 本地 CLI、CI |
 | `ps1/` | PowerShell | `audit-all.ps1` | audit / review（audit-all.sh 同构双实现） | 本地 CLI（Windows） |
 | `common/` | Node.js | `validate-physical-hygiene.js` | audit / hygiene（全工作区物理卫生八维刚性公理守卫） | `pre-push-gate`、`audit-all`、CI |
-| `common/` | Node.js | `validate-script-isomorphism.js` | audit / isomorphism（跨平台同构脚本 ps1/sh 结构对应性、换行与防御契约守卫） | `audit-all`、CI |
+| `common/` | Node.js | `validate-gate-feedback.js` | gate / feedback（面向操作者的反馈词表：语义步骤标识与 PASS/BLOCK/SKIP/WARN 四态闭包；入口脚本额外禁用 `[FAIL]`/`[N/A]` 等判定同义词） | `pre-push-gate`、`audit-all`、CI |
+| `common/` | Node.js | `validate-gate-ordering.js` | gate / ordering（门禁入口脚本的助手定义顺序与判定词表守卫；Bash 与 PowerShell 均在执行期解析命令，定义前调用会以解析错误中止整条门禁） | `pre-push-gate`、`audit-all`、CI |
+| `common/` | Node.js | `validate-gate-verdicts.js` | gate / verdicts（步骤判定覆盖守卫：登记表中每个步骤都必须在两个平台可达且能呈现终态判定，同一步骤不得出现两条横幅） | `pre-push-gate`、CI |
+| `common/` | Node.js | `validate-hardcoded-counts.js` | gate / counts（面向操作者的输出语句不得写死规模计数，须由实测数据插值渲染；内置反向探针自检，探针失效即自身阻断） | `pre-push-gate`、CI |
+| `common/` | Node.js | `validate-block-chains.js` | gate / chains（PowerShell 块链分支合法性：`else`/`elseif`/`catch`/`finally` 必须挂在可接受它的块之后；重复的 `else` 解析器零报错，只在运行时于该行失败） | `pre-push-gate`、CI |
+| `common/` | Node.js | `test-gate-guards.js` | validate / guards（负向自证：逐项证明顺序、词表、同构守卫确实能检出各自缺陷类别） | `pre-push-gate`、CI |
+| `common/` | Node.js | `validate-script-isomorphism.js` | audit / isomorphism（<!-- METRICS:BEGIN iso-pairs -->**27 对跨平台同构脚本**<!-- METRICS:END iso-pairs -->结构对应性、逐行换行一致性、`set -e`/pipefail 与 PowerShell 原生命令开关守卫；WebGames 按已文档化策略豁免 errexit） | `audit-all`、CI |
+| `common/` | Node.js | `validate-shell-parity.js` | audit / parity（Linux 命令面守卫：断言 AGENTS.md 承诺的每个命令都真实可绑定、兼容层同时具备 GNU 与 PowerShell 降级两条路径，并回报当前宿主解析出的模式 `gnu` / `native`） | `pre-push-gate`、CI |
 | `common/` | Node.js | `validate-skills.js` | audit / skills（全工作区研发技能规范、死链与镜像等价性守卫） | `pre-commit-gate`、`audit-all` |
 | `common/` | Node.js | `sync-skills.js` | tooling / skills（根目录技能集与 workspace-governance 插件双向同步工具） | 本地 CLI |
 | `common/` | Node.js | `gate-fast-staged.js` | gate / fast-staged（暂存区文件单遍内存流式前置 6 大门禁判定，<90ms） | `pre-commit-gate` |
@@ -25,8 +32,10 @@
 | `common/` | Node.js | `generate-rule-catalog.js` | audit / ssot（全工作区规则单源目录聚合与零漂移核验器；默认只读，`--write` 显式重生成） | 本地 CLI、`pre-push` 门禁、CI |
 | `common/` | Node.js | `validate-rule-id-closure.js` | audit / ssot（门禁引用规则 ID 与目录登记的双向闭包守卫） | `pre-push-gate`、CI |
 | `common/` | Node.js | `validate-docs-consistency.js` | audit / docs（动态对照 `rule-catalog.json` 真实计数拦截规则总数漂移；含治理文档脚本死链守卫） | `pre-push-gate`、CI |
+| `common/` | Node.js | `sync-doc-metrics.js` | audit / metrics（文档规模数字的单源渲染与零漂移守卫：`METRICS:BEGIN/END` 区域由真源求值渲染，`--write` 就地校正，内置反向探针自证检出能力） | `pre-push-gate`、CI、本地 CLI |
 | `common/` | Node.js | `validate-rule-reachability.js` | audit / ssot（error 级规则执行入口可达性守卫） | `pre-push-gate`、CI |
-| `common/` | Node.js | `evaluate-change-entropy.js` | audit / entropy（Hassan 变更香农熵与 Kamei 跨域扩散 NF/ND/NS 评估，超阈阻断） | `pre-push-gate` CHANGE-ENTROPY-22、本地 CLI || `common/` | Node.js | `bootstrap-gates.js` | tooling / bootstrap（钩子激活、依赖安装与构建一键引导） | 本地 CLI |
+| `common/` | Node.js | `evaluate-change-entropy.js` | audit / entropy（Hassan 变更香农熵与 Kamei 跨域扩散 NF/ND/NS 评估，超阈阻断） | `pre-push-gate` CHANGE-ENTROPY-22、本地 CLI |
+| `common/` | Node.js | `bootstrap-gates.js` | tooling / bootstrap（钩子激活、依赖安装与构建一键引导） | 本地 CLI |
 | `common/` | Node.js | `test-gate-parity.js` | validate / parity（双实现提交门禁行为差分） | CI、本地 CLI |
 | `common/` | Node.js | `test-gate-selftest.js` | validate / selftest（门禁 PASS/违规/缺依赖三态矩阵） | CI、本地 CLI |
 | `common/` | Node.js | `validate-commit-msg.js` | gate / commit（生产级结构化提交信息格式、区块与有效字数综合调度器） | `commit-msg-gate` |
@@ -35,13 +44,20 @@
 | `common/` | Node.js | `commit-style-arbiter.js` | gate / style-lexical（祈使语态、客观叙述与学术白名单仲裁器） | `validate-commit-msg-style` |
 | `common/` | Node.js | `tech-debt-corridor.js` | gate / debt（弹性高危技术债容差走廊与清偿棘轮状态机） | `validate-commit-msg`、`validate-commit-msg-style` |
 | `common/` | Node.js | `commit-guardrail-logger.js` | telemetry / commit（提交护栏快照原子落盘与历史账本 FIFO 轮转） | `validate-commit-msg`、`validate-commit-msg-style` |
-| `common/` | Node.js | `validate-commit-guardrail.js` | validate / commit-lexical（分词器、风格仲裁与债务走廊 12 组契约自测；基础件回归即阻断） | `pre-push-gate` || `common/` | Node.js | `git-env.js` | tooling / git（Git 运行环境隔离、暂存与提交范围文件检索 SSOT 工具） | 门禁与体积审查脚本集 |
+| `common/` | Node.js | `validate-commit-guardrail.js` | validate / commit-lexical（分词器、风格仲裁与债务走廊 12 组契约自测；基础件回归即阻断） | `pre-push-gate` |
+| `common/` | Node.js | `git-env.js` | tooling / git（Git 运行环境隔离、暂存与提交范围文件检索 SSOT 工具） | 门禁与体积审查脚本集 |
 | `common/` | Node.js | `record-workspace-trajectory.js` | telemetry / ledger（全工作区审查轨迹账本记录与版本增量追加工具） | `audit-all` |
 | `common/` | Node.js | `validate-trajectory-ledger.js` | audit / ledger（全工作区演化轨迹账本哈希单调性与完整性校验器） | 本地 CLI、CI |
 | `common/` | Node.js | `record-workspace-audit.js` | telemetry / audit（统一审查结论汇总落盘与跨项目得分聚合） | `audit-all` |
 | `common/` | Node.js | `evaluate-polyglot-balance.js` | audit / balance（异构多语言均衡指数与离散度惩罚度量） | `audit-all` |
-| `common/` | Node.js | `analyze-commit-terminology.js` | audit / terminology（历史提交术语频次与新兴黑话风险诊断，落盘 `.audit-logs/`） | 本地 CLI（诊断报告，不参与门禁裁决） || `common/` | Node.js | `log-rotator.js` | tooling / hygiene（门禁失败快照保留、尾部截断 <=100KB 与 FIFO <=2MB 轮转清理管理器） | `pre-commit-gate`、`commit-msg-gate`、`pre-push-gate`、`audit-all` |
+| `common/` | Node.js | `analyze-commit-terminology.js` | audit / terminology（历史提交术语频次与新兴黑话风险诊断，落盘 `.audit-logs/`） | 本地 CLI（诊断报告，不参与门禁裁决） |
+| `common/` | Node.js | `log-rotator.js` | tooling / hygiene（门禁失败快照保留、尾部截断 <=100KB 与 FIFO <=2MB 轮转清理管理器） | `pre-commit-gate`、`commit-msg-gate`、`pre-push-gate`、`audit-all` |
 | `common/` | JSON | `commit-msg-forbidden-terms.json` | data / ssot（提交信息四维禁词与白名单单源字典） | `validate-commit-msg-style` |
+| `common/` | JSON | `doc-metrics.json` | data / ssot（治理文档规模指标的真源映射、渲染模板与脚本库语义登记表） | `sync-doc-metrics` |
+| `common/` | JSON | `eloc-budget-baseline.json` | data / complexity（双轨体积棘轮基线快照：每份受控源码的 ELOC/LOC 历史最低值，grow-only） | `evaluate-eloc-budget` |
+| `common/` | Node.js | `gate-step-registry.js` | gate / registry（步骤登记表的加载、结构校验与 TSV 投影；Bash 门禁无 JSON 解析器时经此读取步骤身份） | `pre-push-gate`、`audit-all`、`validate-gate-verdicts` |
+| `common/` | JSON | `gate-step-registry.json` | data / ssot（门禁入口、步骤身份、显示顺序与规则归属的单源登记表） | 门禁双实现、`validate-gate-verdicts`、`validate-gate-ordering` |
+| `common/` | JSON | `rule-reachability-exceptions.json` | data / ssot（error 级规则执行入口可达性的显式豁免清单，逐条写明豁免理由） | `validate-rule-reachability` |
 | `common/` | JSON | `rule-catalog.json` | data / ssot（全工作区规则事实真源聚合目录） | 静态审查与门禁工具链 |
 | `sh/` | Bash | `pre-commit-gate.sh` | gate（本地提交物理卫生与多项前置检查，含 AST 切片） | `.githooks/pre-commit`、本地 CLI |
 | `ps1/` | PowerShell | `pre-commit-gate.ps1` | gate（pre-commit-gate.sh 同构双实现） | 本地 CLI（Windows） |
@@ -63,6 +79,21 @@
 
 > 职能域语义：`gate`=协作门禁（CNB 流水线触发）、`release`=发布流程、
 > `package`=本地打包、`ci`=CI 辅助校验、`validate`=脚本自测/回归用例。
+
+### 文档规模数字的渲染约定
+
+上表中被引用的规模数字（同构脚本对数、门禁步骤数等）与各治理文档中的规则总数、技能数、分析器数，一律不在散文里手写。真源声明收口于 [`common/doc-metrics.json`](common/doc-metrics.json)，由 [`common/sync-doc-metrics.js`](common/sync-doc-metrics.js) 渲染：
+
+```markdown
+<!-- METRICS:BEGIN rule-total -->
+<由脚本渲染的单行内容>
+<!-- METRICS:END rule-total -->
+```
+
+- `node scripts/common/sync-doc-metrics.js` 只读比对，任一块与真源不一致即阻断；
+- `node scripts/common/sync-doc-metrics.js --write` 就地重写块体，块外文本永不被改动；
+- 代码围栏与行内代码中的同名标记是语法示例，不参与渲染；
+- 记录某一提交时点结论的历史段落须加 `<!-- METRICS:IGNORE-HISTORICAL commit=<hash> -->` 才豁免。
 
 ---
 
@@ -196,7 +227,7 @@ Python 版使用 docstring + `if __name__ == "__main__":` 守卫。
 | **推送前置门禁** | `pwsh scripts/ps1/pre-push-gate.ps1` | `pwsh scripts/ps1/pre-push-gate.ps1 -Agent` | `pwsh scripts/ps1/pre-push-gate.ps1 -ViewLog` |
 | **失败快照轮转器** | `node scripts/common/log-rotator.js --view` | `node scripts/common/log-rotator.js --agent` | 自动保留最近一次失败至 `.audit-logs/last-failure.json` |
 
-> 推送门禁现由 `scripts/common/gate-step-registry.json` 单源登记 23 个语义步骤，输出形如
+> 推送门禁现由 `scripts/common/gate-step-registry.json` 单源登记 <!-- METRICS:BEGIN step-pre-push -->**30 个语义步骤**<!-- METRICS:END step-pre-push -->，输出形如
 > `✔ PASS  <步骤标识>  <标题>  <详情>`，状态词闭包为 PASS / BLOCK / SKIP / WARN：
 >
 > | 步骤标识 | 职责 |
@@ -211,3 +242,6 @@ Python 版使用 docstring + `if __name__ == "__main__":` 守卫。
 > | `COMMIT-CONTRACT-20` ~ `COMMIT-HISTORY-21` | 提交信息词法契约自测与待推送历史审查 |
 > | `CHANGE-ENTROPY-22` | 推送集变更熵与跨域扩散 |
 > | `FEEDBACK-VOCABULARY-23` | 反馈词表语义化与四态状态词闭包 |
+> | `GATE-ORDERING-24` ~ `GATE-PROOF-25` | 门禁助手定义顺序与守卫检出能力自证 |
+> | `GATE-COVERAGE-26` ~ `GATE-COUNT-27` | 步骤判定覆盖与面向操作者的规模计数真实性 |
+> | `GATE-CHAIN-28` | PowerShell 块链分支合法性 |

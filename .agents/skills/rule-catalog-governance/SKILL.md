@@ -114,9 +114,9 @@ $$\text{Family (3 字母)} - \text{Topic (3 字母)} - \text{Sequence (3 位数�
 ## 七、 三项目规则纳管与规范注册 SOP
 
 向工作区新增或调整规则时，必须依项目标准流程注册，严禁未注册先引用：
-1. **`auto-refactor` (338 规则体系)**：在 `src/core/rules/entries/` 定义规则对象；在 `dimensionRuleTable.ts` 绑定权重（遵守 `MAX_AXES_PER_FINDING <= 4`）；在 `tests/rules/` 编写专属测试；若涉原生算子保证 Rust 与 TS 100% 等价；
+1. **`auto-refactor` (362 规则体系)**：在 `src/core/rules/entries/` 定义规则对象；在 `dimensionRuleTable.ts` 绑定权重（遵守 `MAX_AXES_PER_FINDING <= 4`）；在 `tests/rules/` 编写专属测试；若涉原生算子保证 Rust 与 TS 100% 等价；
 2. **`workspace-timing` (49 规则体系)**：在 `scripts/config/review-rules.json` 中使用 `L0~L5` 六层体系前缀登记；
-3. **`WebGames` (29 规则体系)**：在 `scripts/config/docs_governance_rules.json` 或 `scripts/py/audit_docs.py` 中登记规则元数据；
+3. **`WebGames` (50 规则体系)**：在 `scripts/config/docs_governance_rules.json` 或 `scripts/py/audit_docs.py` 中登记规则元数据；
 4. **全仓同步触发与 `--check-only` 零漂移断言**：新增或修改规则后必须运行 `node scripts/common/generate-rule-catalog.js` 同步真源；在门禁与 CI 中运行 `node scripts/common/generate-rule-catalog.js --check-only` 阻断规则漂移。
 
 ---
@@ -130,7 +130,19 @@ $$\text{Family (3 字母)} - \text{Topic (3 字母)} - \text{Sequence (3 位数�
 
 ---
 
-## 九、 客观度量求真与技术债务防反弹
+## 九、 文档规模数字真源渲染 (`GUARD-DOC-001`)
+
+规则数、门禁步骤数、技能数、分析器数与脚本库规模随代码演进，任何写在散文里的字面量都会在下一次新增后静默过期。因此规模数字一律由脚本渲染：
+
+1. **真源声明**：`scripts/common/doc-metrics.json` 为每个指标声明求值来源与渲染模板，指标 id 与求值器一一对应，未声明的指标直接失败而非跳过；
+2. **区域渲染**：文档中形如 `<!-- METRICS:BEGIN rule-total -->…<!-- METRICS:END rule-total -->` 的区域由 `sync-doc-metrics.js --write` 就地重写，区域外文本永不被改动；
+3. **口径强制**：每个模板自带口径前缀（`全工作区 SSOT 单源收录 …` / `auto-refactor 项目 …`），避免「362 条」与「501 条」被读成互相矛盾；
+4. **历史快照豁免**：记录某一提交时点结论的段落须加 `<!-- METRICS:IGNORE-HISTORICAL commit=<hash> -->`，缺提交号的豁免一律拒绝；
+5. **块外裸数字**：`validate-docs-consistency.js` 从目录实时推导合法取值集合，块外出现的任何其他规模数字即阻断——判据是真源差量而非历史黑名单。
+
+---
+
+## 十、 客观度量求真与技术债务防反弹
 
 - **客观统计零注水**：所有度量、自研率（CAI）与符号分析必须从 0 客观统计，基于 AST 真实符号索引追踪，严禁人工加分与注水；
 - **统计模型委托**：度量置信度区间估算统一遵循经典贝叶斯后验模型，具体数学推导与参数约定收口至 [telemetry-statistical-modeling](../telemetry-statistical-modeling/SKILL.md)；
@@ -138,7 +150,7 @@ $$\text{Family (3 字母)} - \text{Topic (3 字母)} - \text{Sequence (3 位数�
 
 ---
 
-## 十、 常用命令与校验工具
+## 十一、 常用命令与校验工具
 
 ```powershell
 # 1. 扫描三大项目并全量生成单源规则目录 (SSOT)
@@ -150,9 +162,13 @@ node scripts/common/generate-rule-catalog.js --check-only
 # 3. 本地验证提交说明中的规则 ID 是否真实存在
 node scripts/common/validate-commit-msg.js <path-to-commit-msg-file>
 
-# 4. 运行 pre-commit 门禁中的规则一致性校验 (SKILLS-SPEC-03)
+# 4. 渲染文档规模数字区域（显式写入），或只读比对漂移
+node scripts/common/sync-doc-metrics.js --write
+node scripts/common/sync-doc-metrics.js
+
+# 5. 运行 pre-commit 门禁中的规则一致性校验 (SKILLS-SPEC-03)
 pwsh -File scripts/ps1/pre-commit-gate.ps1
 
-# 5. 执行全工作区快速审查中枢核验
+# 6. 执行全工作区快速审查中枢核验
 pwsh -File scripts/ps1/audit-all.ps1 -Fast
 ```

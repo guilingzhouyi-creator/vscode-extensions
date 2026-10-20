@@ -2,7 +2,7 @@
 name: test-benchmark-engineering
 description: >-
   测试工程化、确定性隔离与性能基准回归守卫规范。指导 Agent 落实跨项目零孤儿用例管理、
-  固定时钟与伪随机数隔离、耗时回归棘轮 (TB-REGRESSION) 与 auto-refactor 338 规则自测防护。
+  固定时钟与伪随机数隔离、耗时回归棘轮 (TB-REGRESSION) 与 auto-refactor 362 规则自测防护。
 ---
 
 # test-benchmark-engineering — 测试工程化、确定性隔离与基准回归工作流
@@ -40,7 +40,7 @@ description: >-
 
 工作区对测试用例实行严格的**全量纳管、零孤儿用例**原则：
 
-1. **`auto-refactor` (338 规则自测全纳管)**：
+1. **`auto-refactor` (362 规则自测全纳管)**：
    - 规则自测用例位于 `auto-refactor/tests/rules/`；
    - 必须在 `auto-refactor/scripts/test-parallel.js` 或并行自测清单中注册；
    - 保证 155/155 套测试套件并发/串行绿色通过，0 挂起，纯 TS shim 与 Rust 算子 100% 字节等价。

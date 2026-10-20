@@ -193,6 +193,7 @@ fresh JavaScript module generation」。
 同一取证会话应得「授权根放行、`scripts/` 拒绝、`docs/` 拒绝」三行结果。其余 V1–V10
 结论不受该代际问题影响（离线矩阵直接调用磁盘上的现行实现）。
 
+<!-- METRICS:IGNORE-HISTORICAL commit=c711798 本段落记录该提交时点的全量审查结论，数字为该时点真实值，不随现行真源变动 -->
 V9 结论（提交 `c711798` 时点的全量审查）：综合健康分 99.34（A+），技术债 5536 项，
 五项基石得分 物理卫生 99.5 / 单源规则目录 100.0（468 规则）/ auto-refactor 99.09 /
 workspace-timing 98.1 / WebGames 100.0。唯一未通过项是

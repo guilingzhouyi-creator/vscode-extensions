@@ -6,7 +6,7 @@
 
 ---
 
-## 一、同构脚本清单（9 对同构脚本）
+## 一、同构脚本清单（<!-- METRICS:BEGIN iso-pairs-root -->**9 对同构脚本**<!-- METRICS:END iso-pairs-root -->）
 
 | 脚本名 | 对应 PowerShell 脚本 | 职能域 | 核心职责 | 调用方 |
 | :--- | :--- | :--- | :--- | :--- |
