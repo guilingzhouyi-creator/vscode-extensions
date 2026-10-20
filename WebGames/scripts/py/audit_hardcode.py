@@ -21,12 +21,20 @@ from audit_common import ensure_utf8_stdout, resolve_repo_root
 ensure_utf8_stdout()
 
 ROOT = resolve_repo_root()
-NUM_RE = re.compile(r"(?<![0-9a-zA-Z_.])(\d{4,})(?![0-9a-zA-Z_])")   # ≥4 位整数
+
+# 判定阈值集中声明：数值语义写在此处，正则只负责模式结构，调节阈值无需改动正则本体。
+# 4 位以上整数才可能承载业务含义（ID、数值配置、阈值），1~3 位多为循环与索引基元。
+MIN_MAGIC_INTEGER_DIGITS = 4
+# 8 字符以上字面量才可能承载玩家可见文案，更短的多为键名或标识符。
+MIN_BUSINESS_STRING_LENGTH = 8
+# 报告尾部列出的优先复核文件数，把人工注意力收敛到最集中的文件。
+TOP_N = 10
+
+NUM_RE = re.compile(rf"(?<![0-9a-zA-Z_.])(\d{{{MIN_MAGIC_INTEGER_DIGITS},}})(?![0-9a-zA-Z_])")
 DEC_RE = re.compile(r"(?<![0-9a-zA-Z_.])(\d+\.\d+)(?![0-9a-zA-Z_])")  # 小数
-STRING_RE = re.compile(r'"[^"\n]{8,}"')
+STRING_RE = re.compile(rf'"[^"\n]{{{MIN_BUSINESS_STRING_LENGTH},}}"')
 DEBUG_RE = re.compile(r"\bprint\s*\(")
 TODO_RE = re.compile(r"\b(TODO|FIXME|HACK)\b")
-TOP_N = 10
 
 
 def strip_comment(line: str) -> str:
