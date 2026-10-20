@@ -2,13 +2,13 @@
 name: auto-refactor-dev
 description: >-
   auto-refactor 静态分析重构引擎、Rust+TS 双轨内核与 Praxis 客户端 SDK 开发规范。指导 Agent 在
-  auto-refactor 项目中维护 30 内置分析器与 338 条规则体系，看守 Rust 与 TS 100% 字节等价、
+  auto-refactor 项目中维护 30 内置分析器与 353 条规则体系，看守 Rust 与 TS 100% 字节等价、
   四阶段流水线拓扑、一体两面 Diff 引擎、名义量纲烙印与高精度暂存落盘规范。
 ---
 
 # auto-refactor-dev — 静态重构引擎与双轨算子开发规范
 
-本技能规范了 `auto-refactor/` 静态代码分析与治理引擎的核心架构原则、双轨算子等价性约束、30 个内置分析器的四阶段流水线拓扑（Stage 0~3）、338 条规则治理体系（155/155 套测试）、Praxis 客户端 SDK 与表现层语义聚合引擎、一体两面三层拓扑 Diff 引擎、高精度时间戳规范、暂存分流原子落盘以及 12 项热路径与内存治理范式。
+本技能规范了 `auto-refactor/` 静态代码分析与治理引擎的核心架构原则、双轨算子等价性约束、30 个内置分析器的四阶段流水线拓扑（Stage 0~3）、353 条规则治理体系（155/155 套测试）、Praxis 客户端 SDK 与表现层语义聚合引擎、一体两面三层拓扑 Diff 引擎、高精度时间戳规范、暂存分流原子落盘以及 12 项热路径与内存治理范式。
 
 ---
 
@@ -16,7 +16,7 @@ description: >-
 
 在以下任一场景中，必须激活本技能：
 1. **新增或修改静态代码分析器**（30 个内置分析器，位于 `src/analyzers/*.ts`）；
-2. **注册或调整规则元数据**（338 条内置规则，位于 `src/core/rules/` 与 `src/core/scoring/dimensionRuleTable.ts`）；
+2. **注册或调整规则元数据**（353 条内置规则，位于 `src/core/rules/` 与 `src/core/scoring/dimensionRuleTable.ts`）；
 3. **开发 Rust N-API 原生算子或更新纯 TS Shim 回退实现**（`crates/` 与 `src/core/native/`）；
 4. **调用或扩展 Praxis 审查客户端 SDK**（`IPraxisReviewClient`、`createPraxisClient`、`src/core/praxis/`）；
 5. **维护一体两面三层拓扑 Diff 引擎或 AgentDirectives 协议**（`diff-topology.ts`、`agent-directives.ts`）；
@@ -30,7 +30,7 @@ description: >-
 `auto-refactor` 采用 TypeScript 调度编排与 Rust N-API 原生算子内核结合的双轨架构：
 - **L1 原生算子层**：`crates/auto-refactor-core` 与 `crates/ops-{diff,graph,pattern,mask,clone}`；
 - **L2 语法与语义层**：`NormalizedNode` 统一语法树与 `SemanticGraph` 跨语言（8 种语言）图底座；
-- **L3 规则与分析器**：30 个内置分析器与 338 条规则金字塔治理体系；
+- **L3 规则与分析器**：30 个内置分析器与 353 条规则金字塔治理体系；
 - **L4 调度与快轨**：Sparse MoE 变更熵密门禁路由器与 `<10ms` AST 切片快轨；
 - **L5 质量度量平面**：静态（10 支柱）+ 动态证据 + 演化（CAI 指数）；
 - **L6 Praxis 交付层**：统一客户端 SDK、多 Agent 冲突仲裁、轨迹配方学习与级联回滚。
@@ -60,7 +60,7 @@ description: >-
 - **快速短路熔断 (Fail-Fast Early Triage)**：Stage 0/1 在不消耗 AST 资源前即可短路拦截空文件、密钥泄露或巨石文件；仅当单文件 AST 完备时才进入 Stage 3 跨模块图分析；
 - **增量执行与内存常驻控制**：Sparse MoE 路由器按文件变更熵与角色按需激活分析器（增量耗时 `<100ms`），杜绝冷启动全量实例化占满 V8 堆内存。
 
-### 3. 四层规则金字塔与扣分预算 (338 条内置规则)
+### 3. 四层规则金字塔与扣分预算 (353 条内置规则)
 - **四层金字塔**：Layer 1（通用基础）$\to$ Layer 2（工程架构）$\to$ Layer 3（语言进阶）$\to$ Layer 4（演化自治 CAI / ROI）；
 - **单源登记**：遵循 `FAMILY-TOPIC-NNN` 规范，必须在 `src/core/rules/`、`src/core/scoring/dimensionRuleTable.ts` 及全局 `scripts/common/rule-catalog.json` 同步注册；
 - **单 Finding 扣分预算**：单个 Finding 扣分维度严格受限 $\text{AxesPerFinding} \le 4$；
@@ -174,5 +174,6 @@ node scripts/bench-hot-paths.js  # 4. 热路径微基准（mask-source / governa
 - [praxis-client-and-diff-topology.md](references/praxis-client-and-diff-topology.md)：Praxis 客户端 SDK、表现层语义聚合与一体两面三层拓扑 Diff 规范指南；
 - [concurrency-memory-paradigms.md](references/concurrency-memory-paradigms.md)：高并发调度、热路径字符扫描、图算法降阶与 12 项内存治理工程范式；
 - [type-level-engineering-and-caching.md](references/type-level-engineering-and-caching.md)：现代 TypeScript 高级类型学工程与全域开销规避规范；
+- [rust-engineering](../rust-engineering/SKILL.md)：Rust 工业级高级编程风格、零成本抽象与强制系统工程规范；
 - [analyzer-boilerplate.ts](templates/analyzer-boilerplate.ts)：自定义静态分析器标准化样板；
 - [validate-suite-boilerplate.js](templates/validate-suite-boilerplate.js)：规则专项回归测试套件脚手架。

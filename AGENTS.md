@@ -14,15 +14,17 @@
 | **代码注释与架构契约** | 六字段 JSDoc 头部；零幽灵空分支；零敏捷冲刺代号；$\text{ECR}\ge 0.75$ | [rule-catalog.json](scripts/common/rule-catalog.json) | [complexity-budget](.agents/skills/complexity-budget/SKILL.md) | `node auto-refactor/scripts/validate-comment-governance.js` |
 | **门禁脚本与跨平台调用** | 子进程工作目录显式隔离；pwsh 7+ 优先；`set -euo pipefail` 平铺捕获 | [gate-governance](.agents/skills/gate-governance/SKILL.md)<br/>[scripts/README.md](scripts/README.md) | [gate-governance](.agents/skills/gate-governance/SKILL.md) | `pwsh -File scripts/ps1/pre-commit-gate.ps1` |
 | **`workspace-timing/` 研发** | 五层解耦；RingBuffer+Journal 崩溃安全；UI 100% 双语字典 | [workspace-timing/README.md](workspace-timing/README.md) | [workspace-timing-dev](.agents/skills/workspace-timing-dev/SKILL.md) | `cd workspace-timing && npm run test:fast` |
-| **`auto-refactor/` 研发** | 30 分析器与 338 规则自测全通过 (155/155 套测试)；Rust 与 TS 100% 等价；Praxis 客户端 SDK | [auto-refactor/DOCS.md](auto-refactor/DOCS.md) | [auto-refactor-dev](.agents/skills/auto-refactor-dev/SKILL.md) | `cd auto-refactor && npm test` |
+| **`auto-refactor/` 研发** | 30 分析器与 353 规则自测全通过 (163/163 套测试)；Rust 与 TS 100% 等价；Praxis 客户端 SDK | [auto-refactor/DOCS.md](auto-refactor/DOCS.md) | [auto-refactor-dev](.agents/skills/auto-refactor-dev/SKILL.md) | `cd auto-refactor && npm test` |
 | **`WebGames/` 研发** | 全域配置驱动；循环内零堆分配 (`ADV-PRF-002`)；先四阶段方案后编码 | [WebGames/docs/README.md](WebGames/docs/README.md)<br/>[WebGames/config/README.md](WebGames/config/README.md) | [webgames-workflow](.agents/skills/webgames-workflow/SKILL.md) | `cd WebGames && pwsh scripts/ps1/audit-all.ps1` |
-| **`fractal-git/` 研发** | 9 大微 Crate 矩阵全自测通过；CAS 快照物化；零瞬态堆分配复用池 | [fractal-git/README.md](fractal-git/README.md)<br/>[fractal-git/docs/README.md](fractal-git/docs/README.md) | [algorithmic-operator-engineering](.agents/skills/algorithmic-operator-engineering/SKILL.md) | `cargo test --manifest-path fractal-git/Cargo.toml` |
+| **`fractal-git/` 研发** | 9 大微 Crate 矩阵分层；Type-State 编译期状态机；无锁并发 CAS (`FGT-LCK-001`)；热路径零瞬态堆分配与复用池 (`FGT-PRF-001`)；强类型 `thiserror` 错误拓扑 (`FGT-ERR-001`)；`unsafe` 严格 `// SAFETY:` 证明 (`FGT-SAF-001`)；常量 SSOT 集中化；Rustdoc 四要素；Clippy `-D warnings` 零警告全绿 | [fractal-git/README.md](fractal-git/README.md)<br/>[rust-engineering](.agents/skills/rust-engineering/SKILL.md) | [rust-engineering](.agents/skills/rust-engineering/SKILL.md) | `pwsh -File fractal-git/scripts/ps1/audit-taxis.ps1` |
+| **Rust 工业级工程与高级编程风格** | Type-State 编译期状态转移；零生产 `unwrap`/`panic` (`FGT-ERR-001`)；循环零瞬态堆分配 (`FGT-PRF-001`)；`unsafe` 强制 `// SAFETY:` 证明 (`FGT-SAF-001`)；无锁 CAS (`FGT-LCK-001`)；常量集中化与 SSOT 零漂移 (`RCFG-RULE-DRIFT`)；Clippy 零容忍 | [rust-engineering](.agents/skills/rust-engineering/SKILL.md)<br/>[rule-catalog.json](scripts/common/rule-catalog.json) | [rust-engineering](.agents/skills/rust-engineering/SKILL.md) | `cargo test --manifest-path fractal-git/Cargo.toml`<br/>`cargo clippy --all-targets -- -D warnings` |
 | **度量评估与统计建模** | 零注水纯客观统计；主流统计学 Jeffreys Beta 后验模型 | [auto-refactor/DOCS.md](auto-refactor/DOCS.md) | [telemetry-statistical-modeling](.agents/skills/telemetry-statistical-modeling/SKILL.md) | `node auto-refactor/scripts/validate-autonomy-scorer.js` |
 | **算法与算子第一性原理突破** | 五步降维协议（零工预筛、CSR/SoA 表示反转、256-LUT/SWAR 位并行、单趟磁带融合、时代戳 $O(1)$ 复位）；100% 差分基准等价 | [auto-refactor/DOCS.md](auto-refactor/DOCS.md) | [algorithmic-operator-engineering](.agents/skills/algorithmic-operator-engineering/SKILL.md) | `node auto-refactor/scripts/bench-hot-paths.js` |
 | **测试工程与性能基准** | 确定性时钟/RNG 隔离；零孤儿用例；TB-REGRESSION 耗时预算 | [auto-refactor/DOCS.md](auto-refactor/DOCS.md) | [test-benchmark-engineering](.agents/skills/test-benchmark-engineering/SKILL.md) | `cd auto-refactor && npm test` |
 | **产品交付与发布日志** | 面向真实用户；零工程重构黑话；Keep-a-Changelog 规范； | [workspace-timing/README.md](workspace-timing/README.md) | [product-release-docs](.agents/skills/product-release-docs/SKILL.md) | `bash scripts/sh/check-display-assets.sh` |
 | **扩展打包发布与热同步** | 产物自动轮转；`-HotSync` 注册表自愈；SemVer 干净树；资产健全 | [scripts/README.md](scripts/README.md) | [release-package-workflow](.agents/skills/release-package-workflow/SKILL.md) | `pwsh -File scripts/ps1/package.ps1 -HotSync` |
 | **单源规则目录与元治理** | 规则 SSOT 零漂移（计数以 `rule-catalog.json` 为准）；规则 ID 双向闭包 (`RCFG-RULE-DRIFT` / `RCFG-COUNTS-001`)；三大项目与全局门禁对齐 | [rule-catalog.json](scripts/common/rule-catalog.json)<br/>[rule-catalog-governance](.agents/skills/rule-catalog-governance/SKILL.md) | [rule-catalog-governance](.agents/skills/rule-catalog-governance/SKILL.md) | `node scripts/common/generate-rule-catalog.js --check-only`<br/>`node scripts/common/validate-rule-id-closure.js` |
+| **本地代理与开发网络** | 统一端口 `832x`（Clash `8329`, Studio `8321`, 中继 `34010`）；免 TUN 内核劫持；日志落盘 | [ports.json](file:///C:/Users/guiling/AppData/Local/AntigravityProxyPair/setup/ports.json)<br/>[AGENTS.md](file:///C:/Users/guiling/AppData/Local/AntigravityProxyPair/setup/AGENTS.md) | — | `pwsh -File "$env:LOCALAPPDATA\AntigravityProxyPair\setup\verify-chain.ps1"` |
 | **全工作区统一质量审查** | 5 大支柱 100% 绿色通行；零规则漂移 (`RCFG-RULE-DRIFT`) | [scripts/README.md](scripts/README.md)<br/>[rule-catalog.json](scripts/common/rule-catalog.json) | [gate-governance](.agents/skills/gate-governance/SKILL.md) | `pwsh -File scripts/ps1/audit-all.ps1` |
 | **顶层蓝图与历史全宗** | Cell 平权自治体系；一体两面 Diff；归档案卷元数据规范 | [agent-native-system-blueprint.md](docs/agent-native-system-blueprint.md)<br/>[deliverables/README.md](archive/deliverables/README.md) | [docs-archive-governance](.agents/skills/docs-archive-governance/SKILL.md) | — |
 | **技能集结构与同构治理** | 物理四件套结构；JIT 渐进披露；根目录与插件 100% 字节等价 | [validate-skills.js](scripts/common/validate-skills.js)<br/>[sync-skills.js](scripts/common/sync-skills.js) | [skill-governance](.agents/skills/skill-governance/SKILL.md) | `node scripts/common/validate-skills.js` |
@@ -41,7 +43,8 @@
 - **纯空格缩进契约（`HYG-IND-001`）**：非 GDScript、非 Makefile 文件严禁出现 Tab 制表符；TypeScript 保持 4 空格缩进，其余源码与配置文件保持 2 空格纯空格缩进；
 - **零残留物理空目录（`HYG-DIR-001`）**：活跃源码树与工具目录严禁遗留 0 文件的空文件夹；
 - **零系统与临时脏文件（`HYG-CLT-001`）**：严禁提交或在工作区遗留 `Thumbs.db`、`.DS_Store`、`desktop.ini`、`*.tmp`、`*.bak` 或未受控临时脏文件；
-- **文件命名契约（`NAM-FIL-001` / `NAM-DIR-001`）**：全局遵循 `kebab-case`（*例外*：WebGames 的 `config/**/*.json` 与 `.gd` 脚本保持 `snake_case` 对齐领域惯例）；严禁包含空格、大写驼峰或施工批次黑话代号。
+- **文件命名契约（`NAM-FIL-001` / `NAM-DIR-001`）**：全局遵循 `kebab-case`（*例外*：WebGames 的 `config/**/*.json` 与 `.gd` 脚本保持 `snake_case` 对齐领域惯例）；严禁包含空格、大写驼峰或施工批次黑话代号；
+- **文件后缀与职能域分类契约（`EXT-DIR-001`）**：脚本与配置文件严格依照**“扩展名即领域（Extension is Domain）”**物理分层归拢：PowerShell（`.ps1`）仅存归于 `scripts/ps1/`，Bash（`.sh`）仅存归于 `scripts/sh/`，Python（`.py`）仅存归于各项目 `scripts/py/`，跨平台 Node 纯逻辑脚本（`.js`）仅存归于 `scripts/common/`；规则真源与配置字典（`.json`）严格收敛于 `config/` 或 `rule-sources/`，严禁平铺混杂；严禁在工作区根目录平铺散落各类代码脚本（`.js`, `.py`, `.sh`, `.ps1`）或临时探针。
 
 ### 2. 代码复杂度、体积与注释契约三轨预算
 - **AST 切片预算（`GATE-AST-001`）**：暂存区生产代码与工具脚本受 AST 局部切片守卫约束：单函数圈复杂度基准 $\text{CC} \le 15$；引入函数爆炸半径感知（Blast Radius），未导出的文件私有局部纯函数（无循环且 $\text{Depth} \le 3$）享 $\text{CC} \le 18 \sim 20$ 低爆炸半径弹性包络，对外导出公共 API 严格执行 $\text{CC} \le 15$ 刚性基线；无循环且 $\text{Depth} \le 2$ 的平铺分发器/状态映射器与探针模块享 $\text{CC} \le 20 \sim 25$ 弹性包络；控制流嵌套深度 $\text{Depth} \le 4$、单行噪声比 $\text{Noise} \le 4.0$；循环体与调度逻辑须平铺控制流并采用卫语句提前返回；
@@ -68,7 +71,9 @@
 
 ### 5. 执行环境与子进程契约
 - **工作目录显式隔离**：父级脚本跨目录调用子项目时，必须显式传递 `-WorkingDirectory (Join-Path $repoRoot "<subproject>")`（PowerShell）或 `(cd "<subproject>" && ...)`（Bash），杜绝工具配置文件解析与相对路径发生跨目录漂移；
-- **平台与非阻塞守卫**：全局与项目级脚本必须带非交互守卫；Git 钩子优先路由至跨平台 `pwsh`（PowerShell 7+），严禁回退至 PS 5.1；Bash 脚本必须声明 `set -euo pipefail` 且预期允许失败指令必须通过 `STATUS=0; cmd || STATUS=$?` 平铺捕获（详见 [gate-governance](.agents/skills/gate-governance/SKILL.md)）。
+- **平台与非阻塞守卫**：全局与项目级脚本必须带非交互守卫；Git 钩子优先路由至跨平台 `pwsh`（PowerShell 7+），严禁回退至 PS 5.1；Bash 脚本必须声明 `set -euo pipefail` 且预期允许失败指令必须通过 `STATUS=0; cmd || STATUS=$?` 平铺捕获（详见 [gate-governance](.agents/skills/gate-governance/SKILL.md)）；
+- **终端命令与 Linux 平替公理**：全仓严禁 Agent 编写又臭又长、充斥 `Get-ChildItem -Recurse | Where-Object | ForEach-Object` 或 `Select-String` 捕获的蹩脚 PowerShell 管道；本机环境已全量装配现代化跨平台 CLI 工具链（`rg` 替代 grep，`fd` 替代 find，`bat` 替代 cat，`sd` 替代 sed，`jq` 解析 JSON，`which` 与 `touch` 垫片）。必须优先编写简洁紧凑的 Linux 等价原生命令或直接调用 `scripts/common/*.js`、`scripts/sh/*.sh`；
+- **PowerShell 脚本 Linux 语义开关与编码约定**：编写 `.ps1` 脚本时必须在头部显式声明 `$PSNativeCommandUseErrorActionPreference = $true`（等价于 `set -e`，原生程序失败立即阻断）与 `$PSNativeCommandArgumentPassing = 'Standard'`（原生参数原样传递，消除转义歧义）；全仓 PowerShell 输出锁定 UTF-8，杜绝 936 控制台乱码。
 
 ### 6. SubAgent 委托与多智能体调度公理
 - **严禁裸调用原生 SubAgent**：在当前会话或任何新开会话中，当接收到 SubAgent 委托或并行施工指令时，严禁直接调用未经约束的原生 `self` 或擅自跨级切换高开销模型；SubAgent 在模型上必须与主会话保持同构一致，通过 `Model: "inherit"` 继承主会话配置（当前主会话为 Gemini 3.8 Flash，思考强度 effort=High），完整保留高强度深度推理能力并锁定 Flash 算力成本；必须依据任务所属领域（`vs-extension`, `cli-engine`, `game-engine`, `infra-tool`, `workspace-meta`, `skill-governance`）与姿态（`construct`, `review`, `refactor`, `explore`, `guardian`），通过 [subagent-catalog.json](.agents/subagents/subagent-catalog.json) 匹配或运行 `node .agents/skills/subagent-orchestration/scripts/synthesize-subagent.js` 合成出对应专员；
@@ -77,6 +82,15 @@
 - **物理沙箱防冲突（Path Jail 与独占文件集）**：SubAgent 严禁触碰所属领域授权路径之外的任何文件；并行重构/施工（`construct`/`refactor`）时，每个 SubAgent 必须绑定完全正交、互不重叠的独占文件列表（Zero-Intersection Path Jail），严禁跨专员并发写入同一文件；跨项目并行写推荐使用 `Workspace: "branch"` 隔离；
 - **主 Agent 独立交叉复审闭环（Cross-Review Closed-Loop）**：主 Agent 履行总架构师复核职责，绝不盲从 SubAgent 汇报；SubAgent 完成施工交割后，主 Agent 必须独立进行沙箱隔离审计、构建与静态规则核查、AST 复杂度切片校验、门面治理检查、自审棘轮基线（`gate-self.js`）以及全量测试套件的交叉复审，确认测试、静态规则与门禁三轨 100% 通过后方可交付。
 
+### 7. 工业级 Rust 编程风格与系统工程强制契约（Rust Engineering Discipline）
+- **零生产运行时 Panic 与强类型错误分类哲学（`FGT-ERR-001` / `FGT-COR-001`）**：生产逻辑与对外 API 严禁使用裸 `unwrap()`、`expect()`、`panic!()`、`todo!()` 或 `unimplemented!()`；领域错误必须统一使用 `thiserror::Error` 显式派生强类型枚举分类表达，严禁随意将错误擦除为 `Box<dyn Error>` 或 `String`；向上传播严格使用 `?` 运算符；跨 FFI、C ABI、N-API 原生导出与守护进程调用边界，必须通过 `std::panic::catch_unwind` 构筑故障隔离墙，严禁未受控 Panic 穿透外部边界引发进程崩溃；
+- **类型状态模式与编译期守卫（Type-State Pattern & Zero-Cost Abstraction）**：领域实体生命周期与关键状态机（如工作区初始化、提案晋级状态流转、CAS 事务提交）必须采用 Rust 类型状态模式（泛型标量类型参数 + 不可变状态转移所有权消耗 `self -> State<Next>`），把非法状态流转提前至编译期彻底阻断，产物利用 `PhantomData` 完全擦除状态开销，实现绝对安全的零成本抽象；
+- **内存布局、缓存亲和与循环零瞬态堆分配（`FGT-PRF-001` / `FGT-POL-001` / `ADV-PRF-002`）**：遍历、扫描与热路径循环内严禁瞬态堆分配（严禁循环内 `Vec::new()`, `String::from()`, `clone()`）；公共函数优先使用 `&str` / `&[u8]` 借用切片；容器初始化必须使用 `with_capacity()` 前置预留；跨高频事务的临时缓冲区统一由复用池借用（`BufferPool` / `WorktreePool`），离开作用域经由 `buffer.clear()` 原位复位；结构体字段按字节对齐从大到小紧凑排列消除编译器 Padding 内存空洞；
+- **并发无锁控制与不可变快照（`FGT-LCK-001` / `FGT-IDX-001` / `FGT-CAS-001`）**：严禁在暂存区和内存索引树并发路径长时间持有粗粒度阻塞 `Mutex`；并发读写优先基于无锁原子（`AtomicU64`, `AtomicPtr`）、CAS（Compare-And-Swap）物化与只读不可变快照无锁并发访问；
+- **`unsafe` 最小化与形式化安全证明（`FGT-SAF-001`）**：`unsafe` 作用域必须严格收敛到最小单语句范围；**每个** `unsafe` 块首行必须紧跟结构化 `// SAFETY:` 注释，详尽证明有效性（指针非空且对齐）、生命周期（解引用期间绝无释放或并发修改）与边界（切片长度在合法范围之内）三大不变式；
+- **领域切片常量集中化与单源防漂移（`RCFG-RULE-DRIFT`）**：严禁在代码、日志、错误文案中硬编码裸状态标签或未在工作区 `rule-catalog.json` 登记的伪规则 ID；所有 Git 协议常数、引用前缀、性能基准指标与终端输出标签（`CliTag`），必须集中收敛于 `constants/` 模块声明为 `pub const`；
+- **Rustdoc 四要素与 Clippy 零警告一票否决（`FGT-GAT-001`）**：对外公共 API（`pub fn`, `pub struct`, `pub enum`）必须具备规范的 Rustdoc（必须详述参数语义；若返回 Result 必附 `# Errors`；若含 panic 边界必附 `# Panics`；若 unsafe 必附 `# Safety`；必附 `# Examples`）；门禁强制通过 `cargo clippy --all-targets -- -D warnings`，严禁泛滥使用 `#[allow(...)]` 隐瞒代码坏味道。
+
 ---
 
 ## 三、 四大研发项目专属核心约束速查
@@ -84,9 +98,9 @@
 | 项目 | 核心专属约束与架构红线 | 专属构建/测试命令 | 权威真源指针 |
 | :--- | :--- | :--- | :--- |
 | **`workspace-timing/`**<br/>*(VS Code 扩展)* | ① UI 文本 100% 接入双语字典（zh-CN/en），严禁硬编码未翻译文案与内部技术黑话；<br/>② 审查规则单源登记于 `workspace-timing/scripts/config/review-rules.json`；<br/>③ `tsconfig.json` 保持 `declaration: false` 极速构建。 | `npm run compile`<br/>`npm run test:fast`<br/>`npm run review` | [workspace-timing/README.md](workspace-timing/README.md)<br/>[architecture.md](workspace-timing/docs/architecture.md) |
-| **`auto-refactor/`**<br/>*(Node CLI 引擎)* | ① 30 分析器与 338 条内置规则全量自测 (155/155 套测试)，零孤儿用例；<br/>② Rust 原生算子内核与 pure-TS shim 100% 字节等价；<br/>③ 时间戳强制携带 `*Ms` 物理量纲，紧凑账本遵循 `compactStagingPath` 暂存与原子落盘；Praxis 客户端 SDK 与拓扑差分协议对齐；<br/>④ 单分析器扣分遵循 `MAX_AXES_PER_FINDING <= 4`；受 `validate-project-neutrality.js` 项目中立性守卫管束；<br/>⑤ 严禁在 IPC 守护进程与事件循环关键路径中使用 `*Sync` 同步阻塞 I/O（`GOV-PRF-004` / `PRF-IO-001`）；<br/>⑥ 函数形参 $\ge 4$ 个时强制采用强类型参数对象封装（`SIM-ARGS-001`）。 | `npm run gate`<br/>`npm run build`<br/>`npm test` | [auto-refactor/DOCS.md](auto-refactor/DOCS.md)<br/>[auto-refactor/package.json](auto-refactor/package.json) |
+| **`auto-refactor/`**<br/>*(Node CLI 引擎)* | ① 30 分析器与 353 条内置规则全量自测 (163/163 套测试)，零孤儿用例；<br/>② Rust 原生算子内核与 pure-TS shim 100% 字节等价；<br/>③ 时间戳强制携带 `*Ms` 物理量纲，紧凑账本遵循 `compactStagingPath` 暂存与原子落盘；Praxis 客户端 SDK 与拓扑差分协议对齐；<br/>④ 单分析器扣分遵循 `MAX_AXES_PER_FINDING <= 4`；受 `validate-project-neutrality.js` 项目中立性守卫管束；<br/>⑤ 严禁在 IPC 守护进程与事件循环关键路径中使用 `*Sync` 同步阻塞 I/O（`GOV-PRF-004` / `PRF-IO-001`）；<br/>⑥ 函数形参 $\ge 4$ 个时强制采用强类型参数对象封装（`SIM-ARGS-001`）。 | `npm run gate`<br/>`npm run build`<br/>`npm test` | [auto-refactor/DOCS.md](auto-refactor/DOCS.md)<br/>[auto-refactor/package.json](auto-refactor/package.json) |
 | **`WebGames/`**<br/>*(Godot 引擎)* | ① 统一经 `GameConfig.get_*` 读取配置，严禁根目录平铺配置；<br/>② 视图零业务计算，数据一律经 `apply_snapshot()` 注入；<br/>③ 高承压对象池循环内零瞬态堆分配（`ADV-PRF-002`），必须实现 `reset_state()`；<br/>④ 改动必须先立四阶段方案细则（严格仅 4 份文件），获批后方可编码；<br/>⑤ 异步派发器必须具备互斥保护与单任务防重入调度机制；必须提供同步 `pump()` 与 `flush()`/`teardown()` 并在测试用例结束前显式排空，严禁残留孤儿 `WorkerThreadPool` 任务导致无头进程退出挂起阻塞。 | `check-gdscript.sh`<br/>`test-run.sh`<br/>`audit-all.sh` | [WebGames/docs/README.md](WebGames/docs/README.md)<br/>[路线图总索引.md](WebGames/docs/路线图/路线图总索引.md) |
-| **`fractal-git/`**<br/>*(Git 引擎内核)* | ① 9 大微 Crate 分层解耦（L1 核心/L2 资源池与存储/L3 拓扑门禁与协议）；<br/>② 循环内零堆分配复用池（Buffer/Object/Sandbox/Worktree）；<br/>③ CAS 快照物化与无锁内存树并发安全；<br/>④ 100% 差分等价性与全套单元测试通过。 | `cargo check`<br/>`cargo test` | [fractal-git/README.md](fractal-git/README.md)<br/>[fractal-git/docs/README.md](fractal-git/docs/README.md) |
+| **`fractal-git/`**<br/>*(Git 引擎内核)* | ① 9 大微 Crate 分层解耦（L1 核心/L2 资源池与存储/L3 拓扑门禁与协议）；<br/>② Type-State 编译期状态转移，生产路径零 unwrap/panic (`FGT-ERR-001`)；<br/>③ 热路径与复用池循环内零堆分配 (`FGT-PRF-001` / `FGT-POL-001`)；<br/>④ CAS 快照物化与无锁内存树并发安全 (`FGT-LCK-001`)；<br/>⑤ unsafe 块最小化且 100% 具备 `// SAFETY:` 证明 (`FGT-SAF-001`)；<br/>⑥ 领域常量 SSOT 集中化，Clippy 零警告全绿 (`FGT-GAT-001`)；<br/>⑦ 100% 差分等价性与全套单元测试通过。 | `cargo check`<br/>`cargo test` | [fractal-git/README.md](fractal-git/README.md)<br/>[rust-engineering](.agents/skills/rust-engineering/SKILL.md) |
 
 ---
 
@@ -103,7 +117,8 @@
 9. **客观求实红线**：提交信息严禁夹带敷衍（`CMG-STY-001`）、夸大（`CMG-STY-002`）、贬损（`CMG-STY-003`）或元叙事口号（`CMG-STY-004`）；`[Verification]` 严禁程序化流水账（`CMG-STY-005`）与执行数字统计流水账（`CMG-STY-006`）；
 10. **度量求真红线**：严禁在评分算法与自研度量中注入虚假倍率或固定加分；严禁使用伪造的统计误差区间；
 11. **SubAgent 违规委派红线**：严禁在未装配 Path Jail 物理禁区、未注入资深工程规范或脱离主会话同构模型约束的情况下直接委派未经约束的原生 SubAgent（`self`）；审查类姿态严禁挂载写入权限；并行施工专员严禁触碰重叠文件；SubAgent 仅凭测试通过而未闭环静态规则自检即交割者一票否决；SubAgent 交割后必须由主 Agent 开展全量独立交叉复审（违者一票否决）；
-12. **零高危技术债与防反弹红线**：全工作区 High/Critical Debt 历史性归零（0 项），新增改动与重构严禁引入新的 High/Critical 技术债务反弹，必须保持 0 项刚性基线（违者一票否决）。
+12. **零高危技术债与防反弹红线**：全工作区 High/Critical Debt 历史性归零（0 项），新增改动与重构严禁引入新的 High/Critical 技术债务反弹，必须保持 0 项刚性基线（违者一票否决）；
+13. **Rust 工业级规范红线**：严禁在生产级运行时 Rust 代码中无理由使用 `unwrap()`/`expect()`/`panic!()`（违者触发 `FGT-ERR-001` 阻断）；严禁裸写未经 `// SAFETY:` 充分证明的 `unsafe` 代码块（违者触发 `FGT-SAF-001` 阻断）；严禁在热路径循环体内执行瞬态堆分配（违者触发 `FGT-PRF-001` 阻断）；严禁绕过或关闭 Clippy 警告（`cargo clippy` 必须保持 `-D warnings` 零警告绿色通行，违者一票否决）。
 
 ---
 

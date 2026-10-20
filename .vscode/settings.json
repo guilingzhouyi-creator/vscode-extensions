@@ -69,7 +69,7 @@
     "workbench.iconTheme": "vscode-icons",
     "editor.semanticHighlighting.enabled": true,
     // 默认终端集成与 PowerShell 契约
-    "terminal.integrated.defaultProfile.windows": "PowerShell",
+    "terminal.integrated.defaultProfile.windows": "PowerShell 7",
     // Codex / OpenAI 插件 API 代理与脱敏环境变量映射
     "codex.apiKey": "${env:CODEX_API_KEY}",
     "codex.apiBaseUrl": "${env:CODEX_BASE_URL}",

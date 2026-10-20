@@ -111,4 +111,5 @@ node scripts/common/evaluate-eloc-budget.js
 ## 七、 关联深水区参考与算子样板
 
 - [bit-parallel-lut-and-dod-patterns.md](references/bit-parallel-lut-and-dod-patterns.md)：无分支 256-LUT、位并行代数、CSR 扁平图、单趟特征磁带与时代戳 $O(1)$ 复位深度实现图谱（TS / Rust / GDScript）；
-- [branchless-lut-and-epoch-operator.ts](templates/branchless-lut-and-epoch-operator.ts)：集成 256 项 `Uint8Array` LUT、CSR 扁平图与 `Int32Array` 时代戳 $O(1)$ 遍历的标准算子样板。
+- [branchless-lut-and-epoch-operator.ts](templates/branchless-lut-and-epoch-operator.ts)：集成 256 项 `Uint8Array` LUT、CSR 扁平图与 `Int32Array` 时代戳 $O(1)$ 遍历的标准算子样板；
+- [rust-engineering](../rust-engineering/SKILL.md)：Rust 工业级高级编程风格、零成本抽象与强制系统工程规范。

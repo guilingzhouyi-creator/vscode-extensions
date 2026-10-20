@@ -78,6 +78,8 @@ description: >-
 ### 2. PowerShell 7+ 优先与编码安全
 - **pwsh 优先原则**：统一路由至跨平台 `pwsh`（PowerShell 7+），严禁裸调 `powershell.exe`（Windows PS 5.1 解析无 BOM UTF-8 会发生乱码）；非 Windows 环境下优雅回退至 Bash；
 - **严格安全指令**：脚本开头必须显式声明 `$ErrorActionPreference = 'Stop'` 与 `Set-StrictMode -Version Latest`；
+- **Linux 语义开关注入**：脚本前言必须显式声明 `$PSNativeCommandUseErrorActionPreference = $true`（原生程序非 0 退出触发异常阻断）与 `$PSNativeCommandArgumentPassing = 'Standard'`（原生参数原样传递，杜绝参数裂解与转义异常）；输出锁定 UTF-8；
+- **Linux 现代平替工具优先**：全仓禁止编写冗长脆弱的 `Get-ChildItem -Recurse | Where-Object | ForEach-Object` 或 `Select-String` 管道，必须优先调用已配置的现代化 Linux 等价工具链（`rg` 替代 grep、`fd` 替代 find、`bat` 替代 cat、`sd` 替代 sed、`jq` 解析 JSON、`which` 与 `touch` 垫片）或直接调用 `scripts/common/*.js`、`scripts/sh/*.sh`；
 - **换行符契约**：PowerShell 脚本（`.ps1`）在磁盘必须严格保持 CRLF 换行；
 - **沙箱隔离与环境自愈**：在 Windows 沙箱或自动化子进程中执行 Git 相关命令时，若遭遇用户级 `.gitconfig` 访问受限，统一前置声明 `$env:GIT_CONFIG_GLOBAL="NUL"; $env:GIT_CONFIG_SYSTEM="NUL"` 屏蔽外部全局文件依赖。
 

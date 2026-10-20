@@ -2,13 +2,13 @@
 name: skill-governance
 description: >-
   工作区技能集工程化结构、生命周期与同构分发治理规范。指导 Agent 遵循 JIT 渐进式披露原则，
-  规范维护 24 项研发技能的四件套物理布局（SKILL.md、references、templates、scripts）、
+  规范维护 26 项研发技能的四件套物理布局（SKILL.md、references、templates、scripts）、
   YAML Frontmatter 语法契约、双目录（.agents/skills 与插件包）100% 字节等价性同步与自动化门禁验证。
 ---
 
 # skill-governance — 技能集工程化结构与生命周期治理规范
 
-本技能确立了全工作区 24 项研发技能集（Skills）的标准物理架构、YAML 元数据契约、JIT 渐进式披露（Progressive Disclosure）与防 Token 膨胀原则、根目录与插件包双副本 100% 字节等价同步机制以及自动化校验门禁标准。
+本技能确立了全工作区 26 项研发技能集（Skills）的标准物理架构、YAML 元数据契约、JIT 渐进式披露（Progressive Disclosure）与防 Token 膨胀原则、根目录与插件包双副本 100% 字节等价同步机制以及自动化校验门禁标准。
 
 ---
 
@@ -25,13 +25,13 @@ description: >-
 
 ## 二、 三层泛化技能拓扑与标准物理架构（Generalization + Unification）
 
-为同时实现**跨领域高度泛化复用**与**全工作区刚性契约单源统一**，24 项研发技能按职责解耦为三层正交拓扑（严禁在领域技能中重复抄写通用方法论，彻底杜绝 Token 堆积与多处统计数字硬编码漂移）：
+为同时实现**跨领域高度泛化复用**与**全工作区刚性契约单源统一**，26 项研发技能按职责解耦为三层正交拓扑（严禁在领域技能中重复抄写通用方法论，彻底杜绝 Token 堆积与多处统计数字硬编码漂移）：
 
 | 拓扑层级 | 技能数量与定位 | 包含技能集 | 泛化与统一机制 |
 | :--- | :--- | :--- | :--- |
-| **Layer 1: 通用工程与算法突破层**<br/>*(Universal Methodology)* | **12 项** — 跨语言、跨项目通用认知与算子原语 | `algorithmic-operator-engineering`, `code-simplification`, `complexity-budget`, `constraint-driven-development`, `context-engineering`, `debugging-and-error-recovery`, `doubt-driven-development`, `facade-discipline`, `interview-me`, `spec-driven-development`, `telemetry-statistical-modeling`, `test-driven-development` | 仅定义恒定不变的工程/数学/算法公理；通过映射表桥接不同语言栈，零项目特定硬编码 |
+| **Layer 1: 通用工程与算法突破层**<br/>*(Universal Methodology)* | **13 项** — 跨语言、跨项目通用认知、交互物理学与算子原语 | `algorithmic-operator-engineering`, `code-simplification`, `complexity-budget`, `constraint-driven-development`, `context-engineering`, `debugging-and-error-recovery`, `doubt-driven-development`, `facade-discipline`, `interaction-design-physics`, `interview-me`, `spec-driven-development`, `telemetry-statistical-modeling`, `test-driven-development` | 仅定义恒定不变的工程/数学/算法公理；通过映射表桥接不同语言栈，零项目特定硬编码 |
 | **Layer 2: 工作区统一治理底座层**<br/>*(Workspace Unified Governance)* | **9 项** — 全仓同构门禁、单源目录与多智能体协同 | `batch-commit`, `docs-archive-governance`, `gate-governance`, `product-release-docs`, `release-package-workflow`, `rule-catalog-governance`, `skill-governance`, `subagent-orchestration`, `test-benchmark-engineering` | 唯一绑定 `AGENTS.md`、`rule-catalog.json` 与 `subagent-catalog.json` 动态真源 (SSOT) |
-| **Layer 3: 子项目领域适配器层**<br/>*(Domain Adapters)* | **3 项** — 三大受控项目专属架构红线与适配器 | `auto-refactor-dev` (Node/Rust), `workspace-timing-dev` (VS Code), `webgames-workflow` (Godot 4.7 GDScript) | 仅声明子项目专有拓扑与领域边界，通用复杂度/算子/门面能力一律通过指针委托至 Layer 1/2 |
+| **Layer 3: 子项目领域适配器层**<br/>*(Domain Adapters)* | **4 项** — 四大受控项目专属架构红线与系统工程规范 | `auto-refactor-dev` (Node/Rust), `workspace-timing-dev` (VS Code), `webgames-workflow` (Godot 4.7 GDScript), `rust-engineering` (Rust 9大微 Crate / Taxis / 系统内核) | 声明子项目与技术栈专有拓扑、生命周期与领域边界，通用复杂度/算子/门面能力通过指针委托至 Layer 1/2 |
 
 每个技能必须作为一个高内聚的自包含工程单元存在，位于 `.agents/skills/<skill-name>/` 下，标准“四件套”目录结构如下：
 
