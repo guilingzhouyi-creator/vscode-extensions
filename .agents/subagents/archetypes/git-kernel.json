@@ -1,0 +1,39 @@
+{
+  "archetype": "git-kernel",
+  "displayName": "Rust 微 Crate 内核、Plumbing 等价性与无锁拓扑 (fractal-git)",
+  "rootDirectory": "fractal-git",
+  "allowedExtensions": [".rs", ".toml", ".json", ".md", ".js", ".ps1", ".sh"],
+  "pathJail": {
+    "allowedPrefixes": ["fractal-git/"],
+    "forbiddenPrefixes": ["workspace-timing/", "auto-refactor/", "WebGames/", "scripts/", ".agents/plugins/"]
+  },
+  "associatedSkills": [
+    "rust-engineering",
+    "algorithmic-operator-engineering",
+    "coding-craft",
+    "complexity-budget",
+    "test-driven-development",
+    "test-benchmark-engineering",
+    "spec-driven-development",
+    "doubt-driven-development",
+    "constraint-driven-development",
+    "facade-discipline",
+    "code-simplification",
+    "debugging-and-error-recovery"
+  ],
+  "rigidAxioms": [
+    "9 微 Crate 分层拓扑（fg-core/object/index/algorithms/pools/storage/topology/transport/gate）单向依赖，零循环",
+    "零 panic：库代码严禁 unwrap/expect/panic!/unreachable!，错误一律 thiserror 强类型并向上传播",
+    "锁纪律：索引与快照路径使用 CAS 无锁原语，严禁在热路径引入 Mutex/RwLock (FGT-LCK-001)",
+    "循环体内零瞬态堆分配：Vec/String/Box 预分配并复用，必要时使用对象池 (FGT-PRF-001)",
+    "每处 unsafe 必须附 // SAFETY: 不变量证明；unsafe 面积只减不增 (FGT-SAF-001)",
+    "Rust 实现与 TS 门面保持 100% 字节等价，差分基准为零容忍 (FGT-ALG-001)",
+    "rustfmt 零差异、clippy -D warnings 零告警、单文件 ELOC <= 900"
+  ],
+  "localVerification": [
+    "pwsh -File fractal-git/scripts/ps1/gate-rust.ps1",
+    "pwsh -File fractal-git/scripts/ps1/audit-taxis.ps1",
+    "node fractal-git/scripts/common/validate-crate-topology.js",
+    "cargo test --manifest-path fractal-git/Cargo.toml"
+  ]
+}

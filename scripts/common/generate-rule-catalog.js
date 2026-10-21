@@ -98,17 +98,13 @@ function readRuleSource(file, label) {
 
 function mapRuleEntry(r) {
   if (!r || !r.id) return null;
-  const canonical = typeof r.canonical === 'boolean' ? r.canonical : ruleIdPattern().test(r.id);
-  const entry = {
+  return {
     id: r.id,
     project: 'auto-refactor',
     family: r.family || 'general',
     severity: r.defaultSeverity || r.severity || 'error',
     summary: r.summary || '',
-    canonical,
   };
-  if (!canonical) entry.legacyReason = r.legacyReason || legacyReasonFallback();
-  return entry;
 }
 
 function collectAutoRefactorRules() {
@@ -124,19 +120,33 @@ function collectAutoRefactorRules() {
     }
   }
 
-  return readRuleSource(AUTO_REFACTOR_SOURCE, 'auto-refactor rules registry snapshot').map((r) => {
-    const canonical = typeof r.canonical === 'boolean' ? r.canonical : ruleIdPattern().test(r.id);
-    const entry = {
-      id: r.id,
-      project: 'auto-refactor',
-      family: r.family || 'general',
-      severity: r.severity || 'error',
-      summary: r.summary || '',
-      canonical,
-    };
-    if (!canonical) entry.legacyReason = r.legacyReason || legacyReasonFallback();
-    return entry;
-  });
+  return readRuleSource(AUTO_REFACTOR_SOURCE, 'auto-refactor rules registry snapshot').map((r) => ({
+    id: r.id,
+    project: 'auto-refactor',
+    family: r.family || 'general',
+    severity: r.severity || 'error',
+    summary: r.summary || '',
+  }));
+}
+
+/**
+ * Stamps the canonical verdict and, when non-canonical, the reason onto one catalog entry.
+ *
+ * Applied to every project's rules rather than only auto-refactor's, because non-canonical ids exist
+ * everywhere: the wildcard containers `ARF-*` and `L1-*` are workspace-timing's, the two-segment
+ * `L0-COMPILE` family is that too, and fractal-git's `FGT-` namespace form is canonical by a
+ * different pattern. A single stamping point is what makes the field's presence uniform and lets the
+ * closure guard assert it without special cases per project.
+ *
+ * @param {object} rule - Catalog entry with at least `id`.
+ * @returns {object} The same entry with `canonical` and, if needed, `legacyReason`.
+ */
+function withCanonicalVerdict(rule) {
+  if (/[*]/.test(rule.id)) {
+    return { ...rule, canonical: false, legacyReason: 'wildcard-container-not-a-detectable-rule' };
+  }
+  if (ruleIdPattern().test(rule.id)) return { ...rule, canonical: true };
+  return { ...rule, canonical: false, legacyReason: legacyReasonFallback() };
 }
 
 /**
@@ -323,7 +333,9 @@ function generate(checkOnly = false) {
     }
   }
 
-  const generatedRules = Array.from(ruleMap.values()).sort((a, b) => a.id.localeCompare(b.id));
+  const generatedRules = Array.from(ruleMap.values())
+    .map(withCanonicalVerdict)
+    .sort((a, b) => a.id.localeCompare(b.id));
   const counts = buildProjectCounts(generatedRules);
   assertCatalogIntegrity(generatedRules, counts);
 

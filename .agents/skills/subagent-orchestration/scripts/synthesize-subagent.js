@@ -72,6 +72,8 @@ function resolveIntent(intent) {
 
   if (/skill|技能|skills/.test(text)) {
     archKey = 'skill-governance';
+  } else if (/fractal-git|\bfg\b|微\s*crate|plumbing|cargo|\bunsafe\b|\bcas\b|对象池|索引拓扑/.test(text)) {
+    archKey = 'git-kernel';
   } else if (/workspace-timing|timing|\bwt\b|vscode|扩展|插件|时钟|计时|双语|webview|i18n/.test(text)) {
     archKey = 'vs-extension';
   } else if (/auto-refactor|\bar\b|cli|分析器|静态分析|rust|算子|praxis|cai|diff|n-api/.test(text)) {

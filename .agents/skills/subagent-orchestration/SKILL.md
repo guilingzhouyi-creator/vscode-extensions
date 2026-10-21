@@ -51,6 +51,7 @@ description: >-
 | **`infra-tool`** | `scripts/` (全仓跨平台门禁与打包脚本) | `gate-governance`, `release-package-workflow` | `pwsh -File scripts/ps1/audit-all.ps1 -Fast` |
 | **`workspace-meta`** | 全仓顶层元治理、单源规则总目录、物理卫生 | `rule-catalog-governance`, `complexity-budget` | `node scripts/common/generate-rule-catalog.js` |
 | **`skill-governance`** | `.agents/skills/`, 插件包 `skills/` | `skill-governance`, `rule-catalog-governance` | `node scripts/common/validate-skills.js && node scripts/common/sync-skills.js --check` |
+| **`git-kernel`** | `fractal-git/` (Rust 9 微 Crate 内核与 TS 门面) | `rust-engineering`, `algorithmic-operator-engineering` | `pwsh -File fractal-git/scripts/ps1/audit-taxis.ps1 && cargo test --manifest-path fractal-git/Cargo.toml` |
 
 | 作业姿态 (`posture`) | 姿态意图与权限控制 | 核心行为准则 | 推荐工具开关 |
 | :--- | :--- | :--- | :--- |
@@ -118,13 +119,14 @@ node .agents/skills/subagent-orchestration/scripts/synthesize-subagent.js --pres
 node .agents/skills/subagent-orchestration/scripts/synthesize-subagent.js --all
 ```
 
-常用预置别名速查矩阵（<!-- METRICS:BEGIN subagent-preset-count -->**23 条**<!-- METRICS:END subagent-preset-count -->预置）。单源真源为 `.agents/subagents/agents/*.md`（已入库），由 `sync-agents-mirror.js` 单向镜像至 gitignored 的 `.agents/plugins/workspace-governance/agents/`；反向书写会在干净 clone 上丢失：
+常用预置别名速查矩阵（<!-- METRICS:BEGIN subagent-preset-count -->**27 条**<!-- METRICS:END subagent-preset-count -->预置）。单源真源为 `.agents/subagents/agents/*.md`（已入库），由 `sync-agents-mirror.js` 单向镜像至 gitignored 的 `.agents/plugins/workspace-governance/agents/`；反向书写会在干净 clone 上丢失：
 * **`vs-extension`**：`wt-construct` / `wt-review` / `wt-refactor` / `wt-explore`
 * **`cli-engine`**：`ar-construct` / `ar-review` / `ar-refactor` / `ar-explore`
 * **`game-engine`**：`wg-construct` / `wg-review` / `wg-refactor` / `wg-explore`
 * **`infra-tool`**：`infra-construct` / `infra-review` / `infra-refactor` / `infra-explore` / `infra-guardian`
 * **`workspace-meta`**：`workspace-review` / `workspace-refactor` / `workspace-guardian`
 * **`skill-governance`**：`skill-construct` / `skill-review` / `skill-refactor`
+* **`git-kernel`**：`fg-construct` / `fg-review` / `fg-refactor` / `fg-explore`
 
 ### 步骤 2：注册定义动态 SubAgent (`define_subagent`)
 使用脚本输出的 `defineArgs` 调用 `define_subagent` 工具：

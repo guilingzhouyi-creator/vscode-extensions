@@ -441,6 +441,11 @@ if ! run_gate_step 60 "SHELL-PARITY-30" "$ROOT_DIR" "$NODE_BIN" scripts/common/v
     FAILED=1
 fi
 
+# 专员注册表：预置与已入库的单源模板必须 1:1，插件镜像被 gitignore 后仍是派生副本而非真源。
+if ! run_gate_step 60 "SUBAGENT-CATALOG-31" "$ROOT_DIR" "$NODE_BIN" .agents/skills/subagent-orchestration/scripts/validate-subagent-catalog.js; then
+    FAILED=1
+fi
+
 if [[ "$AGENT_MODE" -eq 1 ]]; then
     if [[ "$FAILED" -ne 0 ]]; then
         if [[ -f "$AUDIT_LOG_DIR/last-failure.json" ]]; then

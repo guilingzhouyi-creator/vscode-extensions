@@ -93,9 +93,66 @@ function collectReferences(file, references) {
 }
 
 /**
+ * Lists the non-canonical entries that fail to state why they are non-canonical.
+ *
+ * Pure over the rule list so the self-probe can drive it with a synthetic catalog; a guard that can
+ * only be exercised against the real catalog cannot distinguish "corpus is clean" from "detector
+ * never fires", which is exactly the failure this repository has paid for before.
+ *
+ * @param {Array<object>} rules - Catalog rule entries.
+ * @returns {string[]} Ids missing a usable `legacyReason`.
+ */
+function findMissingLegacyReasons(rules) {
+  return rules
+    .filter((rule) => rule.canonical === false)
+    .filter((rule) => typeof rule.legacyReason !== 'string' || rule.legacyReason.trim() === '')
+    .map((rule) => rule.id);
+}
+
+/**
+ * Proves the legacy-reason detector still discriminates before trusting a green run.
+ *
+ * @returns {string[]} Probe failures; empty when the detector behaves as specified.
+ */
+function runSelfProbes() {
+  const failures = [];
+  const expect = (label, actual, wanted) => {
+    if (actual !== wanted) failures.push(`probe "${label}": expected ${wanted}, got ${actual}`);
+  };
+  expect(
+    'canonical-entry-without-reason-is-fine',
+    findMissingLegacyReasons([{ id: 'GUARD-ORD-001', canonical: true }]).length,
+    0,
+  );
+  expect(
+    'non-canonical-without-reason-blocks',
+    findMissingLegacyReasons([{ id: 'high-complexity', canonical: false }]).join(','),
+    'high-complexity',
+  );
+  expect(
+    'non-canonical-blank-reason-blocks',
+    findMissingLegacyReasons([{ id: 'high-complexity', canonical: false, legacyReason: '   ' }]).length,
+    1,
+  );
+  expect(
+    'non-canonical-with-reason-passes',
+    findMissingLegacyReasons([
+      { id: 'high-complexity', canonical: false, legacyReason: 'id-not-canonical' },
+    ]).length,
+    0,
+  );
+  return failures;
+}
+
+/**
  * Loads registered rule identifiers from the SSOT catalog.
  *
- * @returns {Set<string>} Registered rule IDs.
+ * Also asserts that every non-canonical entry states why it is non-canonical. The catalog records
+ * this because 17 historical and wildcard ids are real identities that cannot satisfy the canonical
+ * pattern; without the reason a reader cannot tell a deliberate historical name from a typo, and
+ * the next person to "fix" the id would break every suppression comment that names it.
+ *
+ * @returns {{ids: Set<string>, missingReason: string[]}} Registered ids and entries lacking a reason.
  */
 function loadRegisteredIds() {
   if (!fs.existsSync(CATALOG_FILE)) {
@@ -105,13 +162,16 @@ function loadRegisteredIds() {
   if (!Array.isArray(catalog.rules) || catalog.rules.length === 0) {
     throw new Error('Rule catalog contains no rules');
   }
-  return new Set(catalog.rules.map((rule) => rule.id));
+  return {
+    ids: new Set(catalog.rules.map((rule) => rule.id)),
+    missingReason: findMissingLegacyReasons(catalog.rules),
+  };
 }
 
 /**
- * Runs the closure audit and returns unregistered references.
+ * Runs the closure audit and returns unregistered references and missing legacy reasons.
  *
- * @returns {{totalReferenced: number, unregistered: Array<object>}} Audit result.
+ * @returns {{totalReferenced: number, unregistered: Array<object>, missingReason: string[]}} Audit result.
  */
 function runClosureAudit() {
   const references = new Map();
@@ -124,11 +184,11 @@ function runClosureAudit() {
   const registered = loadRegisteredIds();
   const unregistered = [];
   for (const [id, files] of references.entries()) {
-    if (registered.has(id) || FIXTURE_ALLOWLIST.has(id)) continue;
+    if (registered.ids.has(id) || FIXTURE_ALLOWLIST.has(id)) continue;
     unregistered.push({ id, files: [...files] });
   }
 
-  return { totalReferenced: references.size, unregistered };
+  return { totalReferenced: references.size, unregistered, missingReason: registered.missingReason };
 }
 
 /**
@@ -138,6 +198,13 @@ function runClosureAudit() {
  */
 function main() {
   const isAgent = process.argv.includes('--agent') || process.argv.includes('--json');
+  const probeFailures = runSelfProbes();
+  if (probeFailures.length > 0) {
+    console.error('✖ BLOCK Rule ID closure: built-in probes no longer discriminate.');
+    for (const failure of probeFailures) console.error(`  - ${failure}`);
+    process.exit(1);
+  }
+
   let result;
   try {
     result = runClosureAudit();
@@ -146,7 +213,7 @@ function main() {
     process.exit(1);
   }
 
-  const passed = result.unregistered.length === 0;
+  const passed = result.unregistered.length === 0 && result.missingReason.length === 0;
   if (isAgent) {
     console.log(
       JSON.stringify(
@@ -156,9 +223,11 @@ function main() {
           gate: 'rule-id-closure',
           totalReferenced: result.totalReferenced,
           unregistered: result.unregistered,
+          missingLegacyReason: result.missingReason,
           summary: passed
             ? 'All referenced rule identifiers are registered in the SSOT catalog.'
-            : `${result.unregistered.length} referenced rule identifiers are not registered.`,
+            : `${result.unregistered.length} referenced rule identifiers are not registered; ` +
+              `${result.missingReason.length} non-canonical entries lack a legacy reason.`,
         },
         null,
         2,
@@ -174,11 +243,19 @@ function main() {
     process.exit(0);
   }
 
-  console.error(
-    `✖ BLOCK Rule ID closure: ${result.unregistered.length} unregistered identifier(s) referenced by gate assets.`,
-  );
-  for (const item of result.unregistered) {
-    console.error(`  - ${item.id} <= ${item.files.join(', ')}`);
+  if (result.unregistered.length > 0) {
+    console.error(
+      `✖ BLOCK Rule ID closure: ${result.unregistered.length} unregistered identifier(s) referenced by gate assets.`,
+    );
+    for (const item of result.unregistered) {
+      console.error(`  - ${item.id} <= ${item.files.join(', ')}`);
+    }
+  }
+  if (result.missingReason.length > 0) {
+    console.error(
+      `✖ BLOCK Rule ID closure: ${result.missingReason.length} non-canonical entr(ies) omit their legacy reason.`,
+    );
+    for (const id of result.missingReason) console.error(`  - ${id}`);
   }
   process.exit(1);
 }
@@ -190,5 +267,7 @@ if (require.main === module) {
 module.exports = Object.freeze({
   runClosureAudit,
   loadRegisteredIds,
+  findMissingLegacyReasons,
+  runSelfProbes,
   RULE_ID_PATTERN,
 });

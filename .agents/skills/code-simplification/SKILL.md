@@ -27,7 +27,7 @@ description: >-
 
 ### 1. 单行透传跳板的内联消除
 当存在类似 `export * from './internal/impl';` 的空壳文件，且其仅对单一内部模块做简单重新导出时，直接将调用方引用重定向至目标模块，彻底移除中间跳板文件。
-详见：[trampoline-and-indirection-inlining.md](references/trampoline-and-indirection-inlining.md)；跳板识别判据与三步消融操作法见 [anti-trampoline-refactoring.md](references/anti-trampoline-refactoring.md)。
+详见：[trampoline-and-indirection-inlining.md](references/trampoline-and-indirection-inlining.md)。该文档先给跳板文件与多余间接层的**识别判据**（单行转发文件、纯委托包装、单实现接口、参数原样传递的适配器），再给**三步消融操作法**（全局引用检索 → 重定向导入路径 → 物理安全移除）与消融后的验收判据。
 
 ### 2. 循环内瞬态堆分配优化
 高频触发逻辑中，将循环体内部反复创建的临时对象、临时闭包或数组提升至循环外复用，大幅减轻垃圾回收负担。

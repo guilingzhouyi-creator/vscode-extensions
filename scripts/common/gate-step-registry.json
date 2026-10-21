@@ -292,6 +292,11 @@
           "id": "SHELL-PARITY-30",
           "ruleId": "GUARD-SHELL-001",
           "title": "Linux 命令面与 AGENTS.md 承诺一致性"
+        },
+        {
+          "id": "SUBAGENT-CATALOG-31",
+          "ruleId": "RCFG-RULE-DRIFT",
+          "title": "SubAgent 注册表与专员模板同构性"
         }
       ]
     },

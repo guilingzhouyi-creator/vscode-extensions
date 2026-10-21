@@ -232,6 +232,13 @@
       "inline": "**{value} 条**"
     },
     {
+      "id": "subagent-archetype-count",
+      "title": "SubAgent 领域原型数",
+      "source": ".agents/subagents/subagent-catalog.json#archetypes",
+      "template": "**{value} 个领域原型**",
+      "inline": "**{value} 个**"
+    },
+    {
       "id": "ws-test-case-count",
       "title": "workspace-timing 单元测试用例数",
       "source": "filesystem: workspace-timing/{src,test}/**/*.{ts,js} count of it(",

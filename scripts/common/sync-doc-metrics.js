@@ -275,6 +275,20 @@ function countSubagentPresets() {
 }
 
 /**
+ * Counts the domain archetypes declared in the orchestration catalog.
+ *
+ * Each archetype is one Path Jail boundary, so this figure is the width of the dispatch matrix a
+ * natural-language request can be routed into; it has to grow with the catalog, not with memory.
+ *
+ * @returns {number} Archetype count, or -1 when the catalog is unreadable.
+ */
+function countSubagentArchetypes() {
+  const catalog = readJson(path.join(REPO_ROOT, '.agents/subagents/subagent-catalog.json'));
+  if (!catalog || !catalog.archetypes) return -1;
+  return Object.keys(catalog.archetypes).length;
+}
+
+/**
  * Counts `it(` cases across the extension's source and test trees.
  *
  * A published case count that nobody recomputes decays silently: 156 stayed in six documents while
@@ -374,6 +388,7 @@ function buildResolvers() {
     'rule-family-count-all': () => countRuleFamilies(''),
     'rule-family-pym': () => countFamilyRules('PYM'),
     'subagent-preset-count': () => countSubagentPresets(),
+    'subagent-archetype-count': () => countSubagentArchetypes(),
     'ws-test-case-count': () => countWorkspaceTimingCases(),
     'wg-test-suite-count': () => countWebGamesSuites(),
   };
@@ -815,6 +830,7 @@ module.exports = Object.freeze({
   countRuleFamilies,
   countFamilyRules,
   countSubagentPresets,
+  countSubagentArchetypes,
   countWorkspaceTimingCases,
   countWebGamesSuites,
 });

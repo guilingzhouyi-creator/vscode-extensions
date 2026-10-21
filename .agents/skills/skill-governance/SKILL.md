@@ -8,7 +8,7 @@ description: >-
 
 # skill-governance — 技能集工程化结构与生命周期治理规范
 
-本技能确立了全工作区 <!-- METRICS:BEGIN skill-count -->**27 项**<!-- METRICS:END skill-count -->研发技能集（Skills）的标准物理架构、YAML 元数据契约、JIT 渐进式披露（Progressive Disclosure）与防 Token 膨胀原则、根目录与插件包双副本 100% 字节等价同步机制以及自动化校验门禁标准。这些技能共含 <!-- METRICS:BEGIN skill-doc-count -->**103 篇**<!-- METRICS:END skill-doc-count -->技能文档，全部纳入同一份门禁检查。
+本技能确立了全工作区 <!-- METRICS:BEGIN skill-count -->**27 项**<!-- METRICS:END skill-count -->研发技能集（Skills）的标准物理架构、YAML 元数据契约、JIT 渐进式披露（Progressive Disclosure）与防 Token 膨胀原则、根目录与插件包双副本 100% 字节等价同步机制以及自动化校验门禁标准。这些技能共含 <!-- METRICS:BEGIN skill-doc-count -->**102 篇**<!-- METRICS:END skill-doc-count -->技能文档，全部纳入同一份门禁检查。
 
 ---
 

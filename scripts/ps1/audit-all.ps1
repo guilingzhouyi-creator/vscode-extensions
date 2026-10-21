@@ -75,6 +75,7 @@ $logClosureOut = Join-Path $transientDir "audit-check-closureout-$randSuffix.out
 $logReachOut = Join-Path $transientDir "audit-check-reachout-$randSuffix.out.log"
 $logDocsOut = Join-Path $transientDir "audit-check-docsout-$randSuffix.out.log"
 $logLedgerOut = Join-Path $transientDir "audit-check-ledgerout-$randSuffix.out.log"
+$logSubagentOut = Join-Path $transientDir "audit-check-subagentout-$randSuffix.out.log"
 $logCatalogOut = Join-Path $transientDir "audit-check-catalogout-$randSuffix.out.log"
 $logFgTopoOut = Join-Path $transientDir "audit-check-fgtopoout-$randSuffix.out.log"
 $logFgParityOut = Join-Path $transientDir "audit-check-fgparityout-$randSuffix.out.log"
@@ -124,6 +125,7 @@ $resClosure = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/val
 $resReach = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-rule-reachability.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logReachOut -NoNewWindow -PassThru -Wait
 $resDocs = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-docs-consistency.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logDocsOut -NoNewWindow -PassThru -Wait
 $resLedger = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-trajectory-ledger.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logLedgerOut -NoNewWindow -PassThru -Wait
+$resSubagent = Start-Process -FilePath $nodeCmd -ArgumentList @(".agents/skills/subagent-orchestration/scripts/validate-subagent-catalog.js") -WorkingDirectory $repoRoot -RedirectStandardOutput $logSubagentOut -NoNewWindow -PassThru -Wait
 $codeCatalog = $res.ExitCode
 $codeFeedback = $resFeedback.ExitCode
 $codeOrdering = $resOrdering.ExitCode
@@ -132,7 +134,8 @@ $codeClosure = $resClosure.ExitCode
 $codeReach = $resReach.ExitCode
 $codeDocs = $resDocs.ExitCode
 $codeLedger = $resLedger.ExitCode
-if ($codeCatalog -ne 0 -or $codeSkills -ne 0 -or $codeFeedback -ne 0 -or $codeOrdering -ne 0 -or $codeClosure -ne 0 -or $codeReach -ne 0 -or $codeDocs -ne 0 -or $codeLedger -ne 0) {
+$codeSubagent = $resSubagent.ExitCode
+if ($codeCatalog -ne 0 -or $codeSkills -ne 0 -or $codeFeedback -ne 0 -or $codeOrdering -ne 0 -or $codeClosure -ne 0 -or $codeReach -ne 0 -or $codeDocs -ne 0 -or $codeLedger -ne 0 -or $codeSubagent -ne 0) {
     $statusRules = "FAIL"
     $failed = $true
 } else {

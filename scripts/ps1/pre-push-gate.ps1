@@ -417,6 +417,11 @@ $codeParity = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common
 if ($codeParity -ne 0) {
     $failed = $true
 }
+# 专员注册表：预置与已入库的单源模板必须 1:1，插件镜像被 gitignore 后仍是派生副本而非真源。
+$codeSubagent = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @(".agents/skills/subagent-orchestration/scripts/validate-subagent-catalog.js") -WorkingDirectory $repoRoot -StepId "SUBAGENT-CATALOG-31" -TimeoutSeconds 60
+if ($codeSubagent -ne 0) {
+    $failed = $true
+}
 
 if ($Agent) {
     if ($failed) {

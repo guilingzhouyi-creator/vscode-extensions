@@ -33,7 +33,7 @@
 | **全工作区统一审查** | <!-- METRICS:BEGIN pillar-count -->**6 大支柱**<!-- METRICS:END pillar-count --> 100% 绿色通行 | [scripts/README.md](scripts/README.md) · [gate-governance](.agents/skills/gate-governance/SKILL.md) | `pwsh -File scripts/ps1/audit-all.ps1` |
 | **顶层蓝图与历史全宗** | Cell 平权自治；一体两面 Diff；归档元数据规范 | [blueprint](docs/agent-native-system-blueprint.md) · [docs-archive-governance](.agents/skills/docs-archive-governance/SKILL.md) | — |
 | **技能集与同构治理** | 物理四件套；JIT 渐进披露；双目录 100% 字节等价 | [validate-skills.js](scripts/common/validate-skills.js) · [sync-skills.js](scripts/common/sync-skills.js) · [skill-governance](.agents/skills/skill-governance/SKILL.md) | `node scripts/common/validate-skills.js` |
-| **SubAgent 泛化调度** | (Archetype $\otimes$ Posture) 正交派生；`inherit` 同构继承；独占 Path Jail | [subagent-catalog.json](.agents/subagents/subagent-catalog.json) · [subagent-orchestration](.agents/skills/subagent-orchestration/SKILL.md) | `node .agents/skills/subagent-orchestration/scripts/validate-subagent-catalog.js` |
+| **SubAgent 泛化调度** | (Archetype $\otimes$ Posture) 正交派生；`inherit` 同构继承；独占 Path Jail；<!-- METRICS:BEGIN subagent-archetype-count -->**7 个**<!-- METRICS:END subagent-archetype-count -->领域原型 × 5 姿态派生 <!-- METRICS:BEGIN subagent-preset-count -->**27 条**<!-- METRICS:END subagent-preset-count -->预置 | [subagent-catalog.json](.agents/subagents/subagent-catalog.json) · [subagent-orchestration](.agents/skills/subagent-orchestration/SKILL.md) | `node .agents/skills/subagent-orchestration/scripts/validate-subagent-catalog.js` |
 | **界面工程与交互物理** | 语义明度阶梯；单闭合边框；二阶阻尼谐振子；感知幂律遮罩 | [interaction-design-physics](.agents/skills/interaction-design-physics/SKILL.md) | — |
 
 ---

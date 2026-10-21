@@ -8,7 +8,8 @@
     "game-engine": "./archetypes/game-engine.json",
     "infra-tool": "./archetypes/infra-tool.json",
     "workspace-meta": "./archetypes/workspace-meta.json",
-    "skill-governance": "./archetypes/skill-governance.json"
+    "skill-governance": "./archetypes/skill-governance.json",
+    "git-kernel": "./archetypes/git-kernel.json"
   },
   "postures": {
     "construct": "./postures/construct.json",
@@ -227,6 +228,38 @@
       "model": "inherit",
       "workspaceMode": "inherit",
       "dshMode": "wg-refactor"
+    },
+    "fg-construct": {
+      "archetype": "git-kernel",
+      "posture": "construct",
+      "description": "fractal-git Crate 拓扑演进、Plumbing 协议实现与 Rust 增量编码专员",
+      "model": "inherit",
+      "workspaceMode": "inherit",
+      "dshMode": "wg-construct"
+    },
+    "fg-review": {
+      "archetype": "git-kernel",
+      "posture": "review",
+      "description": "fractal-git 零 panic、unsafe 面积、无锁正确性与 Rust/TS 等价性审查专员",
+      "model": "inherit",
+      "workspaceMode": "inherit",
+      "dshMode": "wg-review"
+    },
+    "fg-refactor": {
+      "archetype": "git-kernel",
+      "posture": "refactor",
+      "description": "fractal-git 循环瞬态分配消除、CAS 热路径与超大模块解耦专员",
+      "model": "inherit",
+      "workspaceMode": "inherit",
+      "dshMode": "wg-refactor"
+    },
+    "fg-explore": {
+      "archetype": "git-kernel",
+      "posture": "explore",
+      "description": "fractal-git 对象/索引/存储拓扑、Plumbing 语义与门禁桥接探索调查专员",
+      "model": "inherit",
+      "workspaceMode": "inherit",
+      "dshMode": "wg-explore"
     }
   }
 }
