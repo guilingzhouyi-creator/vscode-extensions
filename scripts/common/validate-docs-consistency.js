@@ -35,12 +35,6 @@ const CATALOG_FILE = path.join(REPO_ROOT, 'scripts/common/rule-catalog.json');
 const REGISTRY_FILE = path.join(REPO_ROOT, 'scripts/common/gate-step-registry.json');
 const METRICS_FILE = path.join(REPO_ROOT, 'scripts/common/doc-metrics.json');
 
-const PATH_SCAN_FILES = Object.freeze([
-  'AGENTS.md',
-  'scripts/README.md',
-  'docs/system-spec/script-governance-architecture.md',
-]);
-
 const SKIP_DIRECTORIES = Object.freeze([
   'node_modules',
   '.git',
@@ -67,6 +61,17 @@ const SKIP_PATHS = Object.freeze(['WebGames/docs', '.agents/plugins']);
 const JSON_SCAN_PATHS = Object.freeze(['.agents/subagents']);
 
 const HISTORICAL_MARKER = /<!--\s*METRICS:IGNORE-HISTORICAL\b[^>]*commit=[0-9a-f]{7,40}/;
+
+/**
+ * Roots that own an independent `scripts/` tree.
+ *
+ * Documents abbreviate: a skill note writes `scripts/test-parallel.js` meaning
+ * `auto-refactor/scripts/test-parallel.js`, because the surrounding prose already established the
+ * project. Resolving only against the repository root flagged twenty-one such references as dead —
+ * all of them true statements. Accepting any project root is the loosest reading the authors can
+ * plausibly have meant, and it still catches a reference that resolves nowhere at all.
+ */
+const PROJECT_SCRIPT_ROOTS = Object.freeze(['auto-refactor', 'workspace-timing', 'WebGames', 'fractal-git']);
 
 /**
  * Plan marker: a figure that is a target, not a measurement.
@@ -597,6 +602,17 @@ function scanCounts(file, violations, detectors) {
 }
 
 /**
+ * Reports whether a backticked script reference points at a real file under any accepted reading.
+ *
+ * @param {string} ref - Reference text without the backticks.
+ * @returns {boolean} True when the root or one project supplies the file.
+ */
+function resolvesScriptReference(ref) {
+  if (fs.existsSync(path.join(REPO_ROOT, ref))) return true;
+  return PROJECT_SCRIPT_ROOTS.some((owner) => fs.existsSync(path.join(REPO_ROOT, owner, ref)));
+}
+
+/**
  * Scans a file for backticked script references that do not exist.
  *
  * @param {string} file - Absolute file path.
@@ -610,16 +626,74 @@ function scanScriptReferences(file, violations) {
     SCRIPT_REFERENCE_PATTERN.lastIndex = 0;
     while ((match = SCRIPT_REFERENCE_PATTERN.exec(line)) !== null) {
       const rel = match[1];
-      if (!fs.existsSync(path.join(REPO_ROOT, rel))) {
-        violations.push({
-          type: 'DEAD_SCRIPT_REFERENCE',
-          file: path.relative(REPO_ROOT, file).replace(/\\/g, '/'),
-          line: index + 1,
-          detail: rel,
-        });
-      }
+      if (resolvesScriptReference(rel)) continue;
+      violations.push({
+        type: 'DEAD_SCRIPT_REFERENCE',
+        file: path.relative(REPO_ROOT, file).replace(/\\/g, '/'),
+        line: index + 1,
+        detail: rel,
+      });
     }
   });
+}
+
+/**
+ * Command invocations inside fenced blocks that name a `scripts/...` path.
+ *
+ * Backticks are not where runnable instructions live — commands live in fences, written as
+ * `node scripts/common/x.js`. Those lines were never verified, so a renamed script could leave a
+ * copy-pasteable command pointing at nothing while every guard stayed green. Matching only inside
+ * fenced ranges keeps prose mentions and illustrative pseudo-commands out of scope.
+ */
+const FENCED_COMMAND_REFERENCE = /(?:^|\s)(?:node|bash|sh|pwsh|\.\/)?\s*(scripts\/[A-Za-z0-9_./-]+\.(?:js|ps1|sh))/g;
+
+/**
+ * Collects the character ranges occupied by fenced code blocks.
+ *
+ * @param {string} text - Document body.
+ * @returns {Array<[number, number]>} Half-open ranges between an opening and closing fence.
+ */
+function collectFenceRanges(text) {
+  const ranges = [];
+  const fence = /^[ \t]*(`{3,}|~{3,})[^\n]*$/gm;
+  let open = null;
+  let match;
+  while ((match = fence.exec(text)) !== null) {
+    if (open === null) {
+      open = { marker: match[1][0], start: match.index + match[0].length };
+      continue;
+    }
+    if (match[1][0] !== open.marker) continue;
+    ranges.push([open.start, match.index]);
+    open = null;
+  }
+  if (open !== null) ranges.push([open.start, text.length]);
+  return ranges;
+}
+
+/**
+ * Scans the fenced blocks of one document for commands naming a missing script.
+ *
+ * @param {string} file - Absolute file path.
+ * @param {Array<object>} violations - Collector array.
+ * @returns {void}
+ */
+function scanFencedCommands(file, violations) {
+  const text = fs.readFileSync(file, 'utf8');
+  const rel = path.relative(REPO_ROOT, file).replace(/\\/g, '/');
+  for (const [start, end] of collectFenceRanges(text)) {
+    const body = text.slice(start, end);
+    for (const hit of body.matchAll(FENCED_COMMAND_REFERENCE)) {
+      const ref = hit[1];
+      if (resolvesScriptReference(ref)) continue;
+      violations.push({
+        type: 'DEAD_FENCED_COMMAND',
+        file: rel,
+        line: text.slice(0, start + hit.index).split('\n').length,
+        detail: ref,
+      });
+    }
+  }
 }
 
 /**
@@ -630,10 +704,12 @@ function scanScriptReferences(file, violations) {
 function runAudit() {
   const violations = [];
   const detectors = buildClaimDetectors();
-  for (const file of collectDocuments()) scanCounts(file, violations, detectors);
-  for (const rel of PATH_SCAN_FILES) {
-    const file = path.join(REPO_ROOT, rel);
-    if (fs.existsSync(file)) scanScriptReferences(file, violations);
+  const documents = collectDocuments();
+  for (const file of documents) scanCounts(file, violations, detectors);
+  for (const file of documents) {
+    if (!file.endsWith('.md')) continue;
+    scanScriptReferences(file, violations);
+    scanFencedCommands(file, violations);
   }
   return violations;
 }

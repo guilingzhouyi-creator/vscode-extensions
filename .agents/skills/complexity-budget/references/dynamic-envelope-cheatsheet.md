@@ -1,6 +1,6 @@
 # 代码复杂度切片与双轨 1:3 动态包络速查表
 
-本速查表严格依据 `scripts/common/evaluate-eloc-budget.js` 与 `scripts/common/check-ast-budgets.js` 的单源规则实现。
+本速查表严格依据 `scripts/common/evaluate-eloc-budget.js` 与 `scripts/common/validate-code-density.js` 的单源规则实现。
 
 ---
 

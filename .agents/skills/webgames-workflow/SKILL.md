@@ -65,6 +65,8 @@ description: >-
    - **单向静态 AST 萃取管线**：`sync_mod_sdk.py` 基于 AST 静态分析，从核心数据实体与求解器中自动化提取纯净公共契约，生成并同步至 `WebGames/mods/core_sdk/`；
    - **双向零漂移门禁看守**：`audit_sdk_sync.py` 严格校验 Core 与 `mods/core_sdk/` 保持 100% 差分等价；MOD 开发者严格且仅面向 `core_sdk` 编程，严禁直连或穿透调用底层求解器私有状态。
 
+**MOD SDK 契约入口**：面向 MOD 作者的公开规范集中在 `WebGames/mod_sdk/docs/`，共五份——[SPECIFICATION.md](../../../WebGames/mod_sdk/docs/SPECIFICATION.md)（契约总纲）、[AGENT_INTERACTION.md](../../../WebGames/mod_sdk/docs/AGENT_INTERACTION.md)（智能体交互协议）、[COMPANION_PROTOCOL.md](../../../WebGames/mod_sdk/docs/COMPANION_PROTOCOL.md)（同伴协议）、[TOTAL_CONVERSION_SPEC.md](../../../WebGames/mod_sdk/docs/TOTAL_CONVERSION_SPEC.md)（全量转换规范）、[ART_AND_ASSETS_GUIDE.md](../../../WebGames/mod_sdk/docs/ART_AND_ASSETS_GUIDE.md)（美术与资产工单）。改动 `mods/core_sdk/` 前必须先读总纲。
+
 ---
 
 ## 四、 前端可视化表现层边界（HUD 结构化切片流与强类型 Tabs 控制器）

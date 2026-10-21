@@ -77,7 +77,7 @@
 | `ps1/` | PowerShell | `release-tag.ps1` | release（release-tag.sh 同构双实现） | 本地 CLI（Windows） |
 | `sh/` | Bash | `version-bump.sh` | release（全工作区版本号一致性递增工具） | 本地 CLI |
 | `ps1/` | PowerShell | `version-bump.ps1` | release（version-bump.sh 同构双实现） | 本地 CLI（Windows） |
-| `py/` | Python | （预留，暂无脚本） | — | — |
+| `py/` | Python | （预留，暂无脚本） | — | 规范见 [`py/README.md`](py/README.md) |
 
 > 职能域语义：`gate`=协作门禁（CNB 流水线触发）、`release`=发布流程、
 > `package`=本地打包、`ci`=CI 辅助校验、`validate`=脚本自测/回归用例。

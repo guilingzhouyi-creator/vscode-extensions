@@ -2,7 +2,7 @@
 
 - 适用范围：仓库根目录级门禁（`pre-commit` / `commit-msg` / `pre-push` / `audit-all` / CI）
 - 执行频率：每季度一次；重大门禁变更后追加一次
-- 产出：审计报告（沿用 `.workbuddy/reports/root-gate-system-audit-<date>.md` 模板）
+- 产出：审计结论并入统一审查快照 `.audit-logs/audit-latest.md`（由 `record-workspace-audit.js` 按统一模板渲染）
 
 ---
 
@@ -70,4 +70,4 @@
 1. 第二、三节全部检查通过；
 2. 第四节抽查无未修复的绕过路径；
 3. 新增问题均已录入改造计划表并指派；
-4. 审计报告归档至 `.workbuddy/reports/`，并在提交信息中声明 `[Project: governance]`。
+4. 审计结论随统一审查快照落盘至 `.audit-logs/`（运行期产物，不入库），并在提交信息中声明 `[Project: governance]`。

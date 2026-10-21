@@ -18,7 +18,7 @@ description: >-
 2. **重构多级持久化存储、崩溃安全双写与日志回放逻辑**（`StorageCoordinator.ts`、`HistoryFolder.ts`、RingBuffer、Journal）；
 3. **新增或调整仪表板 Webview UI 或状态栏控制器**（`dashboard.html`、`StatusBarManager.ts`）；
 4. **新增用户界面提示、命令文案或设置选项**（双语字典严格覆盖）；
-5. **维护内部审查规则与全仓门禁对接**（`workspace-timing/scripts/config/review-rules.json`、`scripts/review.js`）。
+5. **维护内部审查规则与全仓门禁对接**（`workspace-timing/scripts/config/review-rules.json`，经 `npm run review` 调用 `scripts/dist/review/run-review.js`）。
 
 ---
 

@@ -128,6 +128,8 @@ node .agents/skills/subagent-orchestration/scripts/synthesize-subagent.js --all
 * **`skill-governance`**：`skill-construct` / `skill-review` / `skill-refactor`
 * **`git-kernel`**：`fg-construct` / `fg-review` / `fg-refactor` / `fg-explore`
 
+DSH 四模式（`wg-construct` / `wg-refactor` / `wg-review` / `wg-explore`）是上述预置的执行体，其挂载、Jail 守卫与投放验证见 [.agents/dsh/README.md](../../dsh/README.md)。
+
 ### 步骤 2：注册定义动态 SubAgent (`define_subagent`)
 使用脚本输出的 `defineArgs` 调用 `define_subagent` 工具：
 ```typescript

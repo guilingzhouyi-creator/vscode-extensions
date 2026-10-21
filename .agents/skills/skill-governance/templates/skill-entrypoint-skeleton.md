@@ -42,6 +42,6 @@ description: >-
 # 1. 运行领域专属单元测试
 npm run test:fast
 
-# 2. 运行领域静态审查
-node scripts/review.js
+# 2. 运行领域静态审查（示例：workspace-timing 的审查入口）
+cd workspace-timing && npm run review
 ```
