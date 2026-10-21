@@ -353,6 +353,102 @@ check(
   ).length === 0,
 );
 
+// --- 度量覆盖 / 扫描域单源 / 测试套件量词 ---
+// 这三个守卫在 audit-all 缺席期间无任何负向证明，其「PASS」只等于「没在干净语料上报错」。
+const COVERAGE = require('./validate-metric-coverage');
+
+check(
+  'metric coverage guard self-probes all match',
+  COVERAGE.runSelfProbes().length === 0,
+  COVERAGE.runSelfProbes().join('; '),
+);
+check(
+  'metric coverage guard flags an inventory row the README omits',
+  COVERAGE.findMissingInventoryRows(
+    [
+      { dir: 'common', file: 'a.js' },
+      { dir: 'common', file: 'b.js' },
+    ],
+    COVERAGE.parseInventoryTable('| `common/` | Node.js | `a.js` | role | caller |'),
+  ).length === 1,
+);
+check(
+  'metric coverage guard flags a guard that keeps a private scan scope',
+  COVERAGE.findPrivateScopes([{ file: 'x.js', body: "const SKIP_DIRS = new Set(['dist']);" }]).length === 1,
+);
+check(
+  'metric coverage guard accepts a config-derived scan scope',
+  COVERAGE.findPrivateScopes([{ file: 'y.js', body: 'const scope = resolveScanScope(config);' }]).length === 0,
+);
+
+// 「套」量词曾四处在文档里漂移而无人发现：探测器集合里没有任何一条认得「N 套测试」。
+const suiteLanes = METRICS.countTestSuiteLanes();
+check(
+  'docs consistency guard rejects a stale suite count',
+  DOCS_CONSISTENCY.scanTextForClaims('全量 155 套测试全部通过。', claimDetectors).length === 1,
+);
+check(
+  'docs consistency guard accepts the live suite total and each lane',
+  DOCS_CONSISTENCY.scanTextForClaims(`全量 ${suiteLanes.total} 套测试全部通过。`, claimDetectors).length === 0 &&
+    DOCS_CONSISTENCY.scanTextForClaims(`含 ${suiteLanes.parallel} 个并行套件。`, claimDetectors).length === 0 &&
+    DOCS_CONSISTENCY.scanTextForClaims(`含 ${suiteLanes.serialSum} 套串行套件。`, claimDetectors).length === 0,
+);
+check(
+  'docs consistency guard leaves an unrelated quantifier alone',
+  DOCS_CONSISTENCY.scanTextForClaims('这一套方案覆盖 3 个阶段。', claimDetectors).length === 0,
+);
+
+// --- 锚点 / 可达性 / 族契约 / 提交历史冻结 / SubAgent 目录 ---
+const ANCHORS = require('./validate-doc-anchors');
+const REACHABILITY = require('./validate-doc-reachability');
+const FAMILY = require('./validate-family-contract');
+const HISTORY = require('./validate-commit-history-baseline');
+const SUBAGENT = require('../../.agents/skills/subagent-orchestration/scripts/validate-subagent-catalog');
+
+check('doc anchors guard self-probes all match', ANCHORS.runSelfProbes('「SubAgent 调度」公理').length === 0);
+check(
+  'doc anchors guard rejects a positional reference',
+  ANCHORS.findPositional('依据公理 6 执行').length === 1 &&
+    ANCHORS.findPositional('详见 AGENTS.md §3').length === 1,
+);
+check(
+  'doc anchors guard rejects an anchor that names no row',
+  ANCHORS.findDanglingAnchors('见「不存在的条目」公理', '「SubAgent 调度」公理').length === 1,
+);
+check('doc reachability guard self-probes all match', REACHABILITY.runSelfProbes().length === 0);
+check('family contract guard self-probes all match', FAMILY.runSelfProbes().length === 0);
+check('commit history guard self-probes all match', HISTORY.runSelfProbes().length === 0);
+check('subagent catalog guard self-probes all match', SUBAGENT.runSelfProbes().length === 0);
+
+// --- 门面承载（auto-refactor 项目内守卫，无 runSelfProbes 导出，按其纯函数驱动）---
+const FACADE_DIST = path.join(__dirname, '../../auto-refactor/dist/core/architecture/facade-governance-evaluator.js');
+check('facade governance evaluator is built', fs.existsSync(FACADE_DIST));
+if (fs.existsSync(FACADE_DIST)) {
+  const { auditFacadeGovernance } = require(FACADE_DIST);
+  // A three-line pure re-export is the shape ARCH-ABS-001 exists to block.
+  const trampoline = auditFacadeGovernance(
+    'src/trampoline.ts',
+    'export { a } from "./a";\nexport { b } from "./b";\nexport { c } from "./c";\n',
+  );
+  check(
+    'facade governance flags a three-line pure re-export',
+    trampoline.trampolineCount >= 1,
+    JSON.stringify(trampoline).slice(0, 160),
+  );
+  const substantive = auditFacadeGovernance(
+    'src/substantive.ts',
+    Array.from({ length: 20 }, (_, i) => `export function f${i}() { return ${i}; }`).join('\n'),
+  );
+  check('facade governance accepts a substantive facade', substantive.trampolineCount === 0);
+}
+
+// --- 命令面契约（无 runSelfProbes 导出，按其纯函数驱动）---
+const SHELL_PARITY = require('./validate-shell-parity');
+check(
+  'shell parity guard exposes a command registry',
+  typeof SHELL_PARITY === 'object' && SHELL_PARITY !== null,
+);
+
 const failures = results.filter((r) => !r.ok).length;if (failures > 0) {
   console.error(`FAIL ${failures} guard assertion(s) did not hold`);
   process.exit(1);

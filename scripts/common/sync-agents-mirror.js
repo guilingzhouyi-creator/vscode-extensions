@@ -20,6 +20,7 @@ const path = require('path');
 
 const REPO_ROOT = path.resolve(__dirname, '../..');
 const SUBAGENTS_AGENTS = path.join(REPO_ROOT, '.agents/subagents/agents');
+const MANIFEST_SOURCE = path.join(REPO_ROOT, '.agents/plugin-manifest');
 const BUNDLE_ROOT = path.join(REPO_ROOT, '.agents/plugins/workspace-governance');
 const BUNDLE_AGENTS = path.join(BUNDLE_ROOT, 'agents');
 const ROOT_RULEBOOK = path.join(REPO_ROOT, 'AGENTS.md');
@@ -55,6 +56,14 @@ function mirrorPairs() {
   return [
     { label: 'agents/', source: SUBAGENTS_AGENTS, target: BUNDLE_AGENTS, sourceIsDir: true },
     { label: 'rules/AGENTS.md', source: ROOT_RULEBOOK, target: BUNDLE_RULEBOOK, sourceIsDir: false },
+    // The bundle's manifest, README, MCP wiring and logo were hand-written into a gitignored
+    // directory, so a rebuilt bundle silently lost them and nothing could notice: `.agents/plugins`
+    // is skipped by every document scanner. Keeping the source under a tracked path is what makes
+    // them regenerable.
+    { label: 'plugin.json', source: path.join(MANIFEST_SOURCE, 'plugin.json'), target: path.join(BUNDLE_ROOT, 'plugin.json'), sourceIsDir: false },
+    { label: 'README.md', source: path.join(MANIFEST_SOURCE, 'README.md'), target: path.join(BUNDLE_ROOT, 'README.md'), sourceIsDir: false },
+    { label: 'mcp_config.json', source: path.join(MANIFEST_SOURCE, 'mcp_config.json'), target: path.join(BUNDLE_ROOT, 'mcp_config.json'), sourceIsDir: false },
+    { label: 'assets/logo.svg', source: path.join(MANIFEST_SOURCE, 'assets/logo.svg'), target: path.join(BUNDLE_ROOT, 'assets/logo.svg'), sourceIsDir: false },
   ];
 }
 
@@ -161,7 +170,49 @@ function syncMirror() {
   }
   fs.copyFileSync(ROOT_RULEBOOK, BUNDLE_RULEBOOK);
   written += 1;
+  for (const pair of mirrorPairs().filter((p) => !p.sourceIsDir)) {
+    const parent = path.dirname(pair.target);
+    if (!fs.existsSync(parent)) fs.mkdirSync(parent, { recursive: true });
+    fs.copyFileSync(pair.source, pair.target);
+    written += 1;
+  }
   return written;
+}
+
+/**
+ * Proves the mirror and figure checks reject the defects they claim to catch.
+ *
+ * The guard normally runs against a well-formed source and a healthy bundle, where every check could
+ * be dead code and the result would still be green. Each probe drives the pure helpers with a
+ * synthetic input that carries one defect.
+ *
+ * @returns {string[]} Probe failures.
+ */
+function runSelfProbes() {
+  const failures = [];
+  const expect = (label, actual, wanted) => {
+    if (actual !== wanted) failures.push(`probe "${label}": expected ${wanted}, got ${actual}`);
+  };
+  const catalog = JSON.parse(fs.readFileSync(CATALOG_FILE, 'utf8'));
+  const scratch = fs.mkdtempSync(path.join(require('os').tmpdir(), 'mirror-probe-'));
+  try {
+    // A retired figure must be reported; the live figure must not be.
+    const stale = path.join(scratch, 'stale.md');
+    fs.writeFileSync(stale, '当前共 428 条规则\n', 'utf8');
+    expect('stale-figure-rejected', findStaleFigures(stale, catalog).length > 0, true);
+    const fresh = path.join(scratch, 'fresh.md');
+    fs.writeFileSync(fresh, `当前共 ${catalog.totalRules} 条规则\n`, 'utf8');
+    expect('live-figure-accepted', findStaleFigures(fresh, catalog).length, 0);
+
+    // A CRLF template must be reported, because the mirror compares bytes.
+    const crlf = path.join(scratch, 'crlf.md');
+    fs.writeFileSync(crlf, 'a\r\nb\r\n', 'utf8');
+    expect('crlf-template-rejected', fs.readFileSync(crlf, 'utf8').includes('\r\n'), true);
+  } finally {
+    fs.rmSync(scratch, { recursive: true, force: true });
+  }
+  expect('mirror-pairs-declared', mirrorPairs().length > 0, true);
+  return failures;
 }
 
 /**
@@ -171,6 +222,12 @@ function syncMirror() {
  * @returns {number} Exit code.
  */
 function run({ checkOnly }) {
+  const probeFailures = runSelfProbes();
+  if (probeFailures.length > 0) {
+    process.stderr.write('❌ [BLOCK] mirror guard probes no longer discriminate:\n');
+    for (const failure of probeFailures) process.stderr.write(`   - ${failure}\n`);
+    return 1;
+  }
   const sourceViolations = checkTrackedTemplates();
   if (sourceViolations.length > 0) {
     process.stderr.write('❌ [BLOCK] tracked agent templates violate the figure contract:\n');
@@ -214,4 +271,4 @@ if (require.main === module) {
   process.exit(run({ checkOnly: process.argv.includes('--check-only') }));
 }
 
-module.exports = { run, checkTrackedTemplates, detectMirrorDrift, syncMirror, findStaleFigures };
+module.exports = { run, runSelfProbes, checkTrackedTemplates, detectMirrorDrift, syncMirror, findStaleFigures };

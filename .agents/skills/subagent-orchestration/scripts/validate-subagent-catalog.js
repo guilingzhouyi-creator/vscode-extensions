@@ -332,7 +332,67 @@ function detectOrphanConfigs(catalog, errors) {
   }
 }
 
+/**
+ * Proves each validator rejects the defect class it claims to catch.
+ *
+ * Every check below normally runs against a well-formed catalog, so a green run is equally
+ * consistent with the check being dead code. Each probe feeds one synthetic defect and asserts the
+ * corresponding validator reports it.
+ *
+ * @returns {string[]} Probe failures.
+ */
+function runSelfProbes() {
+  const failures = [];
+  const expect = (label, actual, wanted) => {
+    if (actual !== wanted) failures.push(`probe "${label}": expected ${wanted}, got ${actual}`);
+  };
+
+  let errors = [];
+  validateDefaultModel({ defaultModel: 'gpt-4' }, errors);
+  expect('non-inherited-model-rejected', errors.length, 1);
+  errors = [];
+  validateDefaultModel({ defaultModel: 'inherit' }, errors);
+  expect('inherited-model-accepted', errors.length, 0);
+
+  errors = [];
+  validateArchetypePathJail('probe', { pathJail: {} }, errors);
+  expect('missing-path-jail-rejected', errors.length, 2);
+  errors = [];
+  validateArchetypePathJail('probe', { pathJail: { allowedPrefixes: ['a/'], forbiddenPrefixes: [] } }, errors);
+  expect('complete-path-jail-accepted', errors.length, 0);
+
+  errors = [];
+  validateArchetypeArrays('probe', { rigidAxioms: [], localVerification: [] }, errors);
+  expect('empty-archetype-arrays-rejected', errors.length, 2);
+  errors = [];
+  validateArchetypeArrays('probe', { rigidAxioms: ['x'], localVerification: ['y'] }, errors);
+  expect('populated-archetype-arrays-accepted', errors.length, 0);
+
+  errors = [];
+  validateArchetypeSkills('probe', { associatedSkills: ['definitely-not-a-skill'] }, errors);
+  expect('absent-skill-rejected', errors.length, 1);
+
+  // The shipped catalog must still satisfy every validator: a probe suite that only proved
+  // rejection would also pass if the validators rejected everything.
+  const catalog = JSON.parse(fs.readFileSync(CATALOG_PATH, 'utf8'));
+  const liveErrors = [];
+  validateDefaultModel(catalog, liveErrors);
+  validateArchetypes(catalog, liveErrors);
+  validatePostures(catalog, liveErrors);
+  validatePresets(catalog, liveErrors);
+  validateDshModes(catalog, liveErrors);
+  expect('shipped-catalog-accepted', liveErrors.length, 0);
+  return failures;
+}
+
 function validate() {
+  const probeFailures = runSelfProbes();
+  if (probeFailures.length > 0) {
+    console.error('❌ [FAIL] SubAgent 校验器自证失败（探针不再具备区分能力）:');
+    for (const failure of probeFailures) console.error(`   - ${failure}`);
+    process.exit(1);
+  }
+
   console.log('▶ [SubAgent 验证] 检查全工作区通用 SubAgent 注册表与配置完整性...');
 
   if (!fs.existsSync(CATALOG_PATH)) {
@@ -370,4 +430,4 @@ if (require.main === module) {
   validate();
 }
 
-module.exports = { validate };
+module.exports = { validate, runSelfProbes };

@@ -81,6 +81,8 @@ $logMetricCoverageOut = Join-Path $transientDir "audit-check-metriccoverage-$ran
 $logFamilyContractOut = Join-Path $transientDir "audit-check-familycontract-$randSuffix.out.log"
 $logDocReachOut = Join-Path $transientDir "audit-check-docreach-$randSuffix.out.log"
 $logCommitHistoryOut = Join-Path $transientDir "audit-check-commithistory-$randSuffix.out.log"
+$logGateProofOut = Join-Path $transientDir "audit-check-gateproof-$randSuffix.out.log"
+$logDocMetricsOut = Join-Path $transientDir "audit-check-docmetrics-$randSuffix.out.log"
 $logCatalogOut = Join-Path $transientDir "audit-check-catalogout-$randSuffix.out.log"
 $logFgTopoOut = Join-Path $transientDir "audit-check-fgtopoout-$randSuffix.out.log"
 $logFgParityOut = Join-Path $transientDir "audit-check-fgparityout-$randSuffix.out.log"
@@ -136,6 +138,10 @@ $resMetricCoverage = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/com
 $resFamilyContract = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-family-contract.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logFamilyContractOut -NoNewWindow -PassThru -Wait
 $resDocReach = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-doc-reachability.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logDocReachOut -NoNewWindow -PassThru -Wait
 $resCommitHistory = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-commit-history-baseline.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logCommitHistoryOut -NoNewWindow -PassThru -Wait
+# 守卫自证：全量审查若从不运行反向探针，「36 个守卫全部 PASS」与「36 个守卫全是死代码」不可区分。
+$resGateProof = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/test-gate-guards.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logGateProofOut -NoNewWindow -PassThru -Wait
+# 文档数字：审查必须自己校验 METRICS 区域，否则数字漂移只能靠推送门禁兜底。
+$resDocMetrics = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/sync-doc-metrics.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logDocMetricsOut -NoNewWindow -PassThru -Wait
 $codeCatalog = $res.ExitCode
 $codeFeedback = $resFeedback.ExitCode
 $codeOrdering = $resOrdering.ExitCode
@@ -150,7 +156,9 @@ $codeMetricCoverage = $resMetricCoverage.ExitCode
 $codeFamilyContract = $resFamilyContract.ExitCode
 $codeDocReach = $resDocReach.ExitCode
 $codeCommitHistory = $resCommitHistory.ExitCode
-if ($codeCatalog -ne 0 -or $codeSkills -ne 0 -or $codeFeedback -ne 0 -or $codeOrdering -ne 0 -or $codeClosure -ne 0 -or $codeReach -ne 0 -or $codeDocs -ne 0 -or $codeLedger -ne 0 -or $codeSubagent -ne 0 -or $codeDocAnchors -ne 0 -or $codeMetricCoverage -ne 0 -or $codeFamilyContract -ne 0 -or $codeDocReach -ne 0 -or $codeCommitHistory -ne 0) {
+$codeGateProof = $resGateProof.ExitCode
+$codeDocMetrics = $resDocMetrics.ExitCode
+if ($codeCatalog -ne 0 -or $codeSkills -ne 0 -or $codeFeedback -ne 0 -or $codeOrdering -ne 0 -or $codeClosure -ne 0 -or $codeReach -ne 0 -or $codeDocs -ne 0 -or $codeLedger -ne 0 -or $codeSubagent -ne 0 -or $codeDocAnchors -ne 0 -or $codeMetricCoverage -ne 0 -or $codeFamilyContract -ne 0 -or $codeDocReach -ne 0 -or $codeCommitHistory -ne 0 -or $codeGateProof -ne 0 -or $codeDocMetrics -ne 0) {
     $statusRules = "FAIL"
     $failed = $true
 } else {
