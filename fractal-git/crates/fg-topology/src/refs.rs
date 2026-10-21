@@ -176,24 +176,30 @@ impl DiskRefStore {
     }
 
     fn scan_dir(dir: &Path, git_dir: &Path, results: &mut Vec<(String, Oid)>) -> FractalResult<()> {
-        if let Ok(entries) = fs::read_dir(dir) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if path.is_dir() {
-                    Self::scan_dir(&path, git_dir, results)?;
-                } else if path.is_file() {
-                    if let Ok(rel) = path.strip_prefix(git_dir) {
-                        let ref_name = rel.to_string_lossy().replace('\\', "/");
-                        if let Ok(content) = fs::read_to_string(&path) {
-                            if let Ok(oid) = Oid::from_hex(content.trim()) {
-                                results.push((ref_name, oid));
-                            }
-                        }
-                    }
+        let entries = match fs::read_dir(dir) {
+            Ok(iter) => iter,
+            Err(_) => return Ok(()),
+        };
+
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                Self::scan_dir(&path, git_dir, results)?;
+            } else if path.is_file() {
+                if let Some(discovered) = Self::try_read_ref_file(&path, git_dir) {
+                    results.push(discovered);
                 }
             }
         }
         Ok(())
+    }
+
+    fn try_read_ref_file(path: &Path, git_dir: &Path) -> Option<(String, Oid)> {
+        let rel = path.strip_prefix(git_dir).ok()?;
+        let ref_name = rel.to_string_lossy().replace('\\', "/");
+        let content = fs::read_to_string(path).ok()?;
+        let oid = Oid::from_hex(content.trim()).ok()?;
+        Some((ref_name, oid))
     }
 }
 

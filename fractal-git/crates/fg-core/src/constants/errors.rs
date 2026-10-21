@@ -1,7 +1,7 @@
 //! Module: fg-core — Standardized Diagnostic & Error Phrase Constants
 //! File Path: crates/fg-core/src/constants/errors.rs
 //! Architecture Role: Canonical diagnostic and error message formats across Fractal Git,
-//!   preventing ad-hoc string variations and supporting unified telemetry assertions.
+//!   preventing arbitrary string variations and supporting unified telemetry assertions.
 
 /// Error diagnostic prefix for PreReceive human authority breaches.
 pub const ERR_AUTHORITY_BREACH_PREFIX: &str = "AUTHORITY_BREACH";

@@ -5,6 +5,9 @@
 
 export * from "./vfs-adapter";
 
+/**
+ * Immutable facade metadata descriptor for the Fractal Git VFS driver.
+ */
 export const FRACTAL_VFS_FACADE_INFO = Object.freeze({
     subsystem: "fractal-git",
     tier: "vfs",

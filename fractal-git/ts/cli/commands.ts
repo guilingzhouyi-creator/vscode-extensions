@@ -4,7 +4,7 @@
  * Architecture Role: Provides developer-facing CLI commands (`status`, `graph`, `reclaim`)
  *   with Dual-Faced output (human-friendly text and machine-parseable JSON).
  * Dependencies & Triggers: Consumed when CLI commands are executed.
- * Responsibilities: Query fractal refs on disk, format status trees, and trigger manual reclamation.
+ * Responsibilities: Query fractal refs on disk, format status trees, and trigger reclamation.
  * Exit Semantics & Design Rationale: CC <= 15 and Depth <= 4; non-blocking read-only inspection.
  */
 

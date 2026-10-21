@@ -8,9 +8,9 @@
  * Responsibilities:
  *   1. Verify that all emitted violation codes are registered in rule-catalog.json (FGT-BRG-001);
  *   2. Assert zero rule hallucinations (rejection of legacy mock strings like L3-CONFLICT);
- *   3. Enforce deterministic detection of empty files (HYG-EMP-001) and conflict markers (HYG-MRK-001);
+ *   3. Enforce detection of empty files (HYG-EMP-001) and conflict markers (HYG-MRK-001);
  *   4. Benchmark execution latency verifying that the audit completes in under 10ms.
- * Exit Semantics & Design Rationale: Exits 0 on clean verification, 1 on invalid rules or slow audit;
+ * Exit Semantics & Design Rationale: Exits 0 on clean check, 1 on invalid rules or slow run;
  *   adheres to CC <= 15, Depth <= 4, and zero-compromise quality models.
  */
 'use strict';

@@ -10,6 +10,9 @@ import { GIT_FILE_MODE } from "../constants";
 import { materializeCommitPure } from "../native-binding";
 import { verifyPreReviewZone } from "../gate-bridge";
 
+/**
+ * Ergonomic worktree handle for an autonomous agent performing isolated mutations.
+ */
 export interface AgentWorktreeHandle {
     worktreeId: string;
     fractalRef: FractalRefDescriptor;
@@ -17,6 +20,9 @@ export interface AgentWorktreeHandle {
     submitForPreReview(): MaterializeCommitResult;
 }
 
+/**
+ * High-level Praxis Git client facilitating transactional operations for agent sandboxes.
+ */
 export class PraxisGitClient {
     private readonly gitDir: string;
 

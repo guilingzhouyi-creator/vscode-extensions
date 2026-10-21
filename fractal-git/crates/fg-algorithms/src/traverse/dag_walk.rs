@@ -121,21 +121,26 @@ impl DagWalker {
                 return true;
             }
 
-            if let Some((_, parents)) = get_node(&item.oid) {
-                for parent in parents {
-                    if &parent == ancestor {
-                        return true;
-                    }
+            let parents = match get_node(&item.oid) {
+                Some((_, parents)) => parents,
+                None => continue,
+            };
 
-                    if visited.insert(parent) {
-                        if let Some((p_gen, _)) = get_node(&parent) {
-                            if p_gen >= ancestor_gen {
-                                heap.push(QueueItem {
-                                    gen: p_gen,
-                                    oid: parent,
-                                });
-                            }
-                        }
+            for parent in parents {
+                if &parent == ancestor {
+                    return true;
+                }
+
+                if !visited.insert(parent) {
+                    continue;
+                }
+
+                if let Some((p_gen, _)) = get_node(&parent) {
+                    if p_gen >= ancestor_gen {
+                        heap.push(QueueItem {
+                            gen: p_gen,
+                            oid: parent,
+                        });
                     }
                 }
             }
@@ -186,21 +191,26 @@ impl DagWalker {
                 return true;
             }
 
-            if let Some((_, parents)) = get_node(&item.oid) {
-                for parent in parents {
-                    if &parent == ancestor {
-                        return true;
-                    }
+            let parents = match get_node(&item.oid) {
+                Some((_, parents)) => parents,
+                None => continue,
+            };
 
-                    if visited.insert(parent) {
-                        if let Some((p_ccd, _)) = get_node(&parent) {
-                            if p_ccd.0 >= ancestor_ccd.0 {
-                                heap.push(QueueItem {
-                                    gen: p_ccd.0,
-                                    oid: parent,
-                                });
-                            }
-                        }
+            for parent in parents {
+                if &parent == ancestor {
+                    return true;
+                }
+
+                if !visited.insert(parent) {
+                    continue;
+                }
+
+                if let Some((p_ccd, _)) = get_node(&parent) {
+                    if p_ccd.0 >= ancestor_ccd.0 {
+                        heap.push(QueueItem {
+                            gen: p_ccd.0,
+                            oid: parent,
+                        });
                     }
                 }
             }

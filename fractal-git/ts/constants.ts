@@ -118,7 +118,7 @@ export function isRegisteredFgtRule(ruleId: string): boolean {
     if (!ruleId || typeof ruleId !== 'string') {
         return false;
     }
-    return Object.values(FGT_RULES).includes(ruleId as any);
+    return (Object.values(FGT_RULES) as readonly string[]).includes(ruleId);
 }
 
 /**
@@ -128,5 +128,5 @@ export function isValidBenchmarkMetric(metricName: string): boolean {
     if (!metricName || typeof metricName !== 'string') {
         return false;
     }
-    return Object.values(BENCHMARK_METRICS).includes(metricName as any);
+    return (Object.values(BENCHMARK_METRICS) as readonly string[]).includes(metricName);
 }

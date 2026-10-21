@@ -1,5 +1,14 @@
-//! Module: Staged Promotion Subcommand Handler
-//! Architecture: Promotion of agent proposals to System Trunk with Human UAC Gate verification.
+//! Module: taxis_cmd::promotion — Staged Promotion & Human UAC Bridge
+//! File Path: src/bin/taxis_cmd/promotion.rs
+//! Architecture Role: Dispatches promotion subcommand requests, bridging autonomous agent
+//!   staging proposals to the System Trunk through the Human UAC physical click gate.
+//! Dependencies & Triggers: Invoked when `taxis promotion` is dispatched.
+//! Responsibilities: Proposal staging, human UAC nonce authorization, proposal rejection, queue listing.
+//! Exit Semantics & Design Rationale: Enforces zero-compromise promotion gates with 1-hour leases.
+//!
+//! ### Domain Governance Rules (SSOT):
+//! - `FGT-COR-001`: Core data model and error contract guard
+//! - `FGT-GAT-001`: Fractal Git domain gate guard
 
 use fractal_git::constants::cli::CliTag;
 use fractal_git::{
@@ -47,62 +56,53 @@ pub fn handle_promotion(ctx: &CliContext) {
     }
 }
 
-fn handle_stage_request(
-    ctx: &CliContext,
-    ledger: &mut PromotionStagingLedger,
-    policy: &TaxisPolicy,
-    current_time_ms: i64,
-) {
-    let oid_str = find_arg_value(&ctx.args, &["--oid", "--candidate", "--target-oid"])
-        .map(|val| val.to_string());
-    let summary = find_arg_value(&ctx.args, &["--summary"])
-        .unwrap_or("Autonomous Agent PR promotion proposal")
-        .to_string();
-    let agent_uid = find_arg_value(&ctx.args, &["--agent", "--agent-uid"])
-        .unwrap_or("agent-sub-001")
-        .to_string();
-    let composite_score = find_arg_value(&ctx.args, &["--score"])
-        .and_then(|val| val.parse::<f64>().ok())
-        .unwrap_or(0.0);
-    let cai_index = find_arg_value(&ctx.args, &["--cai"])
-        .and_then(|val| val.parse::<f64>().ok())
-        .unwrap_or(100.0);
-    let custom_ci_lower = find_arg_value(&ctx.args, &["--ci-lower"])
-        .and_then(|val| val.parse::<f64>().ok());
-    let cyclomatic_complexity_delta = find_arg_value(&ctx.args, &["--cc-delta"])
-        .and_then(|val| val.parse::<i32>().ok())
-        .unwrap_or(0);
-    let eloc_delta = find_arg_value(&ctx.args, &["--eloc-delta"])
-        .and_then(|val| val.parse::<i32>().ok())
-        .unwrap_or(0);
-    let anti_gaming_passed = find_arg_value(&ctx.args, &["--anti-gaming"])
-        .and_then(|val| val.parse::<bool>().ok())
-        .unwrap_or(true);
-    let report = find_arg_value(&ctx.args, &["--report"])
-        .unwrap_or("Auto-Refactor Quality Gate: zero debt verification.")
-        .to_string();
-
-    let candidate_oid = match oid_str {
-        Some(ref hex_str) => match Oid::from_hex(hex_str) {
-            Ok(parsed_oid) => parsed_oid,
+/// Parses candidate commit OID from arguments or falls back to current trunk head.
+fn resolve_candidate_oid(ctx: &CliContext) -> Option<Oid> {
+    if let Some(hex_str) = find_arg_value(&ctx.args, &["--oid", "--candidate", "--target-oid"]) {
+        match Oid::from_hex(hex_str) {
+            Ok(parsed_oid) => Some(parsed_oid),
             Err(hex_err) => {
                 eprintln!("Invalid candidate OID '{}': {}", hex_str, hex_err);
-                return;
-            }
-        },
-        None => {
-            let ref_store = DiskRefStore::new(&ctx.git_dir);
-            match ref_store.get_ref("refs/fractal/trunk") {
-                Ok(Some(trunk_oid)) => trunk_oid,
-                _ => Oid::from_bytes([0xaa; 20]),
+                None
             }
         }
-    };
+    } else {
+        let ref_store = DiskRefStore::new(&ctx.git_dir);
+        let oid = match ref_store.get_ref("refs/fractal/trunk") {
+            Ok(Some(trunk_oid)) => trunk_oid,
+            _ => Oid::from_bytes([0xaa; 20]),
+        };
+        Some(oid)
+    }
+}
+
+/// Parses the Auto Quality score envelope from CLI arguments.
+fn parse_auto_score(args: &[String]) -> AutoQualityScoreEnvelope {
+    let composite_score = find_arg_value(args, &["--score"])
+        .and_then(|val| val.parse::<f64>().ok())
+        .unwrap_or(0.0);
+    let cai_index = find_arg_value(args, &["--cai"])
+        .and_then(|val| val.parse::<f64>().ok())
+        .unwrap_or(100.0);
+    let custom_ci_lower = find_arg_value(args, &["--ci-lower"])
+        .and_then(|val| val.parse::<f64>().ok());
+    let cyclomatic_complexity_delta = find_arg_value(args, &["--cc-delta"])
+        .and_then(|val| val.parse::<i32>().ok())
+        .unwrap_or(0);
+    let eloc_delta = find_arg_value(args, &["--eloc-delta"])
+        .and_then(|val| val.parse::<i32>().ok())
+        .unwrap_or(0);
+    let anti_gaming_passed = find_arg_value(args, &["--anti-gaming"])
+        .and_then(|val| val.parse::<bool>().ok())
+        .unwrap_or(true);
+    let report = find_arg_value(args, &["--report"])
+        .unwrap_or("Auto-Refactor Quality Gate: zero debt verification.")
+        .to_string();
 
     let ci_lower = custom_ci_lower
         .unwrap_or_else(|| compute_jeffreys_credible_lower(composite_score));
 
-    let auto_score = AutoQualityScoreEnvelope {
+    AutoQualityScoreEnvelope {
         composite_score,
         cai_index,
         cyclomatic_complexity_delta,
@@ -110,7 +110,32 @@ fn handle_stage_request(
         credible_interval_lower: ci_lower,
         anti_gaming_passed,
         summary_report: report,
+    }
+}
+
+/// Handles staging a promotion candidate with quality envelope and TTL lease.
+fn handle_stage_request(
+    ctx: &CliContext,
+    ledger: &mut PromotionStagingLedger,
+    policy: &TaxisPolicy,
+    current_time_ms: i64,
+) {
+    let candidate_oid = match resolve_candidate_oid(ctx) {
+        Some(oid) => oid,
+        None => return,
     };
+
+    let summary = find_arg_value(&ctx.args, &["--summary"])
+        .unwrap_or("Autonomous Agent PR promotion proposal")
+        .to_string();
+    let agent_uid = find_arg_value(&ctx.args, &["--agent", "--agent-uid"])
+        .unwrap_or("agent-sub-001")
+        .to_string();
+    let auto_score = parse_auto_score(&ctx.args);
+    let composite_score = auto_score.composite_score;
+    let cai_index = auto_score.cai_index;
+    let cc_delta = auto_score.cyclomatic_complexity_delta;
+    let anti_gaming = auto_score.anti_gaming_passed;
 
     match ledger.stage_promotion(
         candidate_oid,
@@ -145,8 +170,8 @@ fn handle_stage_request(
                     ),
                     composite_score,
                     cai_index,
-                    cyclomatic_complexity_delta,
-                    if anti_gaming_passed { "PASS" } else { "FAIL" }
+                    cc_delta,
+                    if anti_gaming { "PASS" } else { "FAIL" }
                 );
                 println!(
                     "  Lease Expiry      : 1 Hour (TTL = {}s)",
@@ -171,6 +196,7 @@ fn handle_stage_request(
     }
 }
 
+/// Handles approval of an active staged proposal with cryptographic proof.
 fn handle_uac_approval(
     ctx: &CliContext,
     ledger: &mut PromotionStagingLedger,
@@ -245,6 +271,7 @@ fn handle_uac_approval(
     }
 }
 
+/// Handles human operator rejection of an active staged proposal with feedback.
 fn handle_uac_rejection(
     ctx: &CliContext,
     ledger: &mut PromotionStagingLedger,
@@ -287,6 +314,7 @@ fn handle_uac_rejection(
     }
 }
 
+/// Lists active staged promotion candidates awaiting human UAC authorization.
 fn handle_uac_list(
     ctx: &CliContext,
     ledger: &mut PromotionStagingLedger,
@@ -319,8 +347,10 @@ fn handle_uac_list(
             "  Score Ratchet Δ    : +{:.1} points",
             policy.replacement_score_baseline_delta
         );
-        println!("  Minimum Auto Score : {:.1}/100
-", policy.minimum_promotion_score);
+        println!(
+            "  Minimum Auto Score : {:.1}/100",
+            policy.minimum_promotion_score
+        );
 
         match active {
             Some(cand) => {

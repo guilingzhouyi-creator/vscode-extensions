@@ -17,16 +17,14 @@ use std::path::PathBuf;
 
 #[path = "taxis_cmd/mod.rs"]
 mod taxis_cmd;
-use taxis_cmd::common::{find_arg_value, print_json, CliContext};
-use taxis_cmd::{bench, promotion};
+use taxis_cmd::common::{print_json, CliContext};
+use taxis_cmd::{bench, commit, promotion, worktree};
 
 use fractal_git::constants::cli::CliTag;
 use fractal_git::{
     ActorIdentity, AgentPushContext, CommitCountVerdict, CommitCounter, CommitMessageGuard,
-    CommitTelemetryConfig, ConflictGuard, DiskRefStore, FileMode, FractalRef, GitBlob, GitCommit,
-    GitSignature, GitTree, GitTreeEntry, Oid, OperationGraph, PreReceiveGuard, QuotaGovernor,
-    RefStore, RepoViewSnapshot, ScopeProjection, TaxisPolicy, TelemetryCommitNode,
-    TopologyVerifier, WorktreeMode, WorktreePool,
+    CommitTelemetryConfig, ConflictGuard, DiskRefStore, FractalRef, Oid, OperationGraph,
+    PreReceiveGuard, QuotaGovernor, RefStore, TaxisPolicy, TelemetryCommitNode, TopologyVerifier,
 };
 
 fn resolve_canonical_subcommand(raw: &str) -> &str {
@@ -106,6 +104,7 @@ Flags:
     );
 }
 
+/// Dispatches repository status inspection, displaying fractal references and resource quotas.
 fn handle_status(ctx: &CliContext) {
     let ref_store = DiskRefStore::new(&ctx.git_dir);
     let refs = ref_store.list_all().unwrap_or_default();
@@ -164,6 +163,7 @@ fn handle_status(ctx: &CliContext) {
     );
 }
 
+/// Dispatches fractal branch topology verification and reference queries.
 fn handle_branch(ctx: &CliContext) {
     if ctx.args.len() >= 3 && ctx.args[0] == "verify" {
         let src = &ctx.args[1];
@@ -198,176 +198,12 @@ fn handle_branch(ctx: &CliContext) {
     handle_status(ctx);
 }
 
+/// Dispatches atomic commit creation with governance and identity checks.
 fn handle_commit(ctx: &CliContext) {
-    let cell_id = find_arg_value(&ctx.args, &["--cell"]).unwrap_or("cell-default");
-    let card_id = find_arg_value(&ctx.args, &["--card"]).unwrap_or("card-000");
-    let agent_id = find_arg_value(&ctx.args, &["--agent"]).unwrap_or("agent-primary");
-    let human_author = find_arg_value(&ctx.args, &["--human"]).map(String::from);
-    let auth_token = find_arg_value(&ctx.args, &["--token"]).map(String::from);
-    let policy_name = find_arg_value(&ctx.args, &["--policy"]).unwrap_or("rust-strict");
-    let target_ref_str =
-        find_arg_value(&ctx.args, &["--target"]).unwrap_or("refs/fractal/cell/cell-default/main");
-
-    let message = find_arg_value(&ctx.args, &["-m"])
-        .map(String::from)
-        .unwrap_or_else(|| {
-            format!(
-                concat!(
-                    "feat(core): taxis atomic commit\n\n",
-                    "[Why]\nRoutine checkpoint for task {}.\n\n",
-                    "[Changed]\n- Updated working tree state\n\n",
-                    "[Verification]\nAssert state consistency."
-                ),
-                card_id
-            )
-        });
-
-    let policy = match policy_name {
-        "conventional" | "conventional-semantic" => TaxisPolicy::conventional_semantic(),
-        "native" | "git-native" => TaxisPolicy::git_native(),
-        _ => TaxisPolicy::rust_strict(),
-    };
-
-    // Determine Actor Identity (Human vs Agent)
-    let actor = match human_author {
-        Some(ref human_name) => ActorIdentity::human(
-            human_name,
-            format!(
-                "{}@company.internal",
-                human_name.to_lowercase().replace(' ', ".")
-            ),
-            auth_token,
-        ),
-        None => ActorIdentity::agent(AgentPushContext {
-            agent_uid: agent_id.into(),
-            cell_id: cell_id.into(),
-            role: "worker".into(),
-            is_force_push: false,
-        }),
-    };
-
-    let target_ref = FractalRef::parse(target_ref_str).unwrap_or(FractalRef::CellMain {
-        cell_id: cell_id.into(),
-    });
-
-    // 1. Human Control Boundary Check
-    if let Err(auth_err) = PreReceiveGuard::assert_actor_authorized(&target_ref, &actor, &policy) {
-        eprintln!(
-            "{} Push to '{}' rejected: {}",
-            CliTag::AUTHORITY_BREACH,
-            target_ref.to_git_ref(),
-            auth_err
-        );
-        std::process::exit(1);
-    }
-
-    // 2. Rust-Grade Commit Message & Diff Borrow Check
-    let touched_files = vec!["README.md".to_string()];
-    let witness =
-        match CommitMessageGuard::parse_and_verify(&message, &policy, Some(&touched_files)) {
-            Ok(commit_witness) => commit_witness,
-            Err(gov_err) => {
-                eprintln!(
-                    "{} Commit message rejected by Taxis policy '{}':",
-                    CliTag::COMMIT_GOVERNANCE_FAIL,
-                    policy.name
-                );
-                eprintln!("  {}", gov_err);
-                std::process::exit(1);
-            }
-        };
-
-    let author = if let Some(ref human_name) = human_author {
-        GitSignature::new(
-            human_name,
-            format!(
-                "{}@company.internal",
-                human_name.to_lowercase().replace(' ', ".")
-            ),
-            1700000000,
-        )
-    } else {
-        GitSignature::for_agent(agent_id, cell_id, 1700000000)
-    };
-    let committer = author.clone();
-
-    // Fabricate root tree
-    let empty_blob = GitBlob::from_bytes(b"# Taxis Initial Staging\n".to_vec());
-    let entry = GitTreeEntry::new(FileMode::RegularFile, "README.md", empty_blob.oid());
-    let tree = GitTree::new(vec![entry]);
-
-    let commit = GitCommit::from_witness(tree.oid(), Vec::new(), author, committer, &witness, None);
-
-    if ctx.json_mode {
-        let commit_payload = serde_json::json!({
-            "status": "committed",
-            "commit_oid": commit.oid(),
-            "tree_oid": commit.tree_oid(),
-            "policy": policy.name,
-            "commit_type": witness.commit_type,
-            "scope": witness.scope,
-            "is_human": actor.is_human(),
-            "actor": actor.display_name(),
-        });
-        print_json(&commit_payload);
-    } else {
-        println!(
-            "{} Created atomic commit {}",
-            CliTag::COMMIT_OK,
-            commit.oid()
-        );
-        println!("  Tree   : {}", commit.tree_oid());
-        println!("  Policy : {} (Rust-Grade Strict)", policy.name);
-        println!(
-            "  Actor  : {} (Human: {})",
-            actor.display_name(),
-            actor.is_human()
-        );
-        println!(
-            "  Type   : {}{}",
-            witness.commit_type,
-            witness
-                .scope
-                .as_ref()
-                .map(|scope_val| format!("({})", scope_val))
-                .unwrap_or_default()
-        );
-    }
-
-    let commit_oid = Oid::from_hex(commit.oid()).unwrap_or(Oid::ZERO);
-    let ref_store = DiskRefStore::new(&ctx.git_dir);
-    let _ = ref_store.update_ref(&target_ref.to_git_ref(), &commit_oid, None);
-
-    if let Ok(mut op_graph) = OperationGraph::load_or_init(&ctx.git_dir) {
-        let current_time_ms = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|dur| dur.as_millis() as i64)
-            .unwrap_or(0);
-
-        let mut branches = std::collections::BTreeMap::new();
-        if let Ok(all_refs) = ref_store.list_all() {
-            for (name, oid) in all_refs {
-                branches.insert(name, oid);
-            }
-        }
-        branches.insert(target_ref.to_git_ref(), commit_oid);
-
-        let view_snapshot = RepoViewSnapshot {
-            head_oid: Some(commit_oid),
-            branches,
-            staged_promotions: Vec::new(),
-            timestamp_ms: current_time_ms,
-        };
-        let _ = op_graph.record_operation(
-            view_snapshot,
-            actor.display_name(),
-            "commit",
-            format!("commit: {}", witness.commit_type),
-            current_time_ms,
-        );
-    }
+    commit::handle_commit(ctx);
 }
 
+/// Dispatches time-travel undo operation, restoring branch heads to previous snapshot.
 fn handle_undo(ctx: &CliContext) {
     let mut op_graph = match OperationGraph::load_or_init(&ctx.git_dir) {
         Ok(graph) => graph,
@@ -423,6 +259,7 @@ fn handle_undo(ctx: &CliContext) {
     }
 }
 
+/// Displays recorded operation log or outputs JSON array of historical operations.
 fn handle_operation(ctx: &CliContext) {
     let op_graph = match OperationGraph::load_or_init(&ctx.git_dir) {
         Ok(graph) => graph,
@@ -475,6 +312,7 @@ fn handle_operation(ctx: &CliContext) {
     }
 }
 
+/// Computes official commit counts using anti-inflation telemetry filters.
 fn handle_rev_list(ctx: &CliContext) {
     let mut count_only = false;
     let mut all_transient = false;
@@ -540,6 +378,7 @@ fn handle_rev_list(ctx: &CliContext) {
     );
 }
 
+/// Runs multi-tier gate verification across authority, message, conflict, and quota checks.
 fn handle_verify(_ctx: &CliContext) {
     let agent_ctx = AgentPushContext {
         agent_uid: "agent-verifier".into(),
@@ -598,6 +437,7 @@ fn handle_verify(_ctx: &CliContext) {
     );
 }
 
+/// Advances worktree reclamation epoch and cleans transient sandbox allocations.
 fn handle_reclaim(_ctx: &CliContext) {
     println!(
         "=== Taxis Worktree & Sandbox Reclaimer ===\n\
@@ -607,6 +447,7 @@ fn handle_reclaim(_ctx: &CliContext) {
     );
 }
 
+/// Prints protocol daemon readiness and smart Git transport connection status.
 fn handle_daemon(_ctx: &CliContext) {
     println!(
         "=== Taxis Native Protocol Daemon ===\n\
@@ -617,6 +458,7 @@ fn handle_daemon(_ctx: &CliContext) {
     );
 }
 
+/// Dispatches diff inspection or delegates to host Git for working tree diffs.
 fn handle_diff(ctx: &CliContext) {
     if ctx.json_mode {
         let output = serde_json::json!({
@@ -632,6 +474,7 @@ fn handle_diff(ctx: &CliContext) {
     handle_passthrough("diff", ctx);
 }
 
+/// Dispatches switching to fractal reference branches or falls back to host Git checkout.
 fn handle_checkout(ctx: &CliContext) {
     if ctx.args.is_empty() {
         eprintln!("[ERROR] Expected branch, commit, or fractal ref to checkout.");
@@ -649,6 +492,7 @@ fn handle_checkout(ctx: &CliContext) {
     handle_passthrough("checkout", ctx);
 }
 
+/// Proxies unrecognized commands transparently to the underlying Git binary.
 fn handle_passthrough(cmd: &str, ctx: &CliContext) {
     let mut command = std::process::Command::new("git");
     command.arg(cmd);
@@ -680,116 +524,12 @@ fn handle_passthrough(cmd: &str, ctx: &CliContext) {
     }
 }
 
+/// Dispatches worktree subcommands (list, add, or falls back to passthrough).
 fn handle_worktree(ctx: &CliContext) {
-    if ctx.args.is_empty() || ctx.args[0] == "list" {
-        let pool = WorktreePool::new(64);
-        let quota = QuotaGovernor::default();
-
-        if ctx.json_mode {
-            let worktree_payload = serde_json::json!({
-                "engine": "taxis",
-                "operation": "worktree_list",
-                "max_concurrency": quota.max_concurrent_worktrees(),
-                "available_slots": pool.available_count(),
-                "system_trunk": {
-                    "ref": "refs/heads/main",
-                    "projection": "full",
-                    "mode": "PhysicalHost"
-                },
-                "active_projections": []
-            });
-            print_json(&worktree_payload);
-            return;
-        }
-
-        print_banner();
-        println!("=== Taxis Scoped Worktree Matrix ===");
-        println!("  System Trunk (L0) : refs/heads/main [Projection: Full Universe (100%)]");
-        println!("  Integration Trunk : refs/fractal/trunk [Dual-Trunk Mode Active]");
-        println!(
-            "  Active Allocations: 0 (Available Slots: {})",
-            pool.available_count()
-        );
-        println!("  Worktree Strategy : Scoped Subtree Projection (Default: Non-Full)");
-        return;
-    }
-
-    if ctx.args[0] == "add" {
-        if ctx.args.len() < 2 {
-            eprintln!(
-                "[ERROR] Usage: taxis worktree add <path> [--scope <prefix...>] \
-                 [--full] [--mode <virtual|cow|sparse>]"
-            );
-            return;
-        }
-        let target_path = &ctx.args[1];
-        let mut scopes = Vec::new();
-        let mut is_full = false;
-        let mut mode = WorktreeMode::VirtualMemory;
-
-        let mut arg_cursor = 2;
-        while arg_cursor < ctx.args.len() {
-            if ctx.args[arg_cursor] == "--full" {
-                is_full = true;
-                arg_cursor += 1;
-            } else if ctx.args[arg_cursor] == "--scope" && arg_cursor + 1 < ctx.args.len() {
-                scopes.push(ctx.args[arg_cursor + 1].clone());
-                arg_cursor += 2;
-            } else if ctx.args[arg_cursor] == "--mode" && arg_cursor + 1 < ctx.args.len() {
-                match ctx.args[arg_cursor + 1].as_str() {
-                    "cow" => mode = WorktreeMode::CoWClone,
-                    "sparse" => mode = WorktreeMode::SparseGhost,
-                    _ => mode = WorktreeMode::VirtualMemory,
-                }
-                arg_cursor += 2;
-            } else {
-                arg_cursor += 1;
-            }
-        }
-
-        let projection = if is_full {
-            ScopeProjection::full()
-        } else if scopes.is_empty() {
-            ScopeProjection::scoped(vec![target_path.clone()])
-        } else {
-            ScopeProjection::scoped(scopes.clone())
-        };
-
-        if ctx.json_mode {
-            let worktree_payload = serde_json::json!({
-                "engine": "taxis",
-                "status": "worktree_allocated",
-                "path": target_path,
-                "is_full_universe": projection.is_full,
-                "scopes": projection.scopes,
-                "mode": format!("{:?}", mode),
-                "creation_latency_us": 42
-            });
-            print_json(&worktree_payload);
-        } else {
-            println!(
-                "{} Allocated Scoped Worktree '{}'",
-                CliTag::WORKTREE_OK,
-                target_path
-            );
-            println!("  Projection Mode : {:?}", mode);
-            println!(
-                "  Full Universe   : {}",
-                if projection.is_full {
-                    "YES (--full)"
-                } else {
-                    "NO (Scoped Subtree)"
-                }
-            );
-            println!("  Scoped Envelopes: {:?}", projection.scopes);
-            println!("  Creation Latency: <100µs (Zero Disk Lock, LayerVFS Backed)");
-        }
-        return;
-    }
-
-    handle_passthrough("worktree", ctx);
+    worktree::handle_worktree(ctx);
 }
 
+/// Parses global CLI flags (--json, --git-dir) and separates subcommand arguments.
 fn parse_cli_args(raw_args: &[String]) -> (PathBuf, bool, Vec<String>) {
     let mut git_dir = PathBuf::from(".git");
     let mut json_mode = false;
@@ -811,6 +551,7 @@ fn parse_cli_args(raw_args: &[String]) -> (PathBuf, bool, Vec<String>) {
     (git_dir, json_mode, filtered_args)
 }
 
+/// Normalizes subcommand aliases and handles transparent `taxis git ...` prefix.
 fn extract_effective_subcommand(filtered_args: &[String]) -> (&str, Vec<String>) {
     if filtered_args[0] == "git" {
         if filtered_args.len() > 1 {
@@ -829,6 +570,7 @@ fn extract_effective_subcommand(filtered_args: &[String]) -> (&str, Vec<String>)
     }
 }
 
+/// Routes effective canonical subcommand to designated handler function.
 fn dispatch_command(effective_subcommand: &str, ctx: &CliContext) {
     match effective_subcommand {
         "status" => handle_status(ctx),

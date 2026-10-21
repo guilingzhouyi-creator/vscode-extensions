@@ -5,6 +5,9 @@
  *   and structured JSON models for autonomous AI agent inspection.
  */
 
+/**
+ * Hierarchical tree node representation for ASCII and structural rendering.
+ */
 export interface RenderNode {
     id: string;
     label: string;
@@ -12,6 +15,9 @@ export interface RenderNode {
     children?: RenderNode[];
 }
 
+/**
+ * Terminal UI tree renderer producing structured visual representations of DAG nodes.
+ */
 export class TreeRenderer {
     /**
      * Renders a hierarchical tree into an ASCII representation.

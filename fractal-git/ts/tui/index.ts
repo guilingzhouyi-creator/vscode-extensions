@@ -5,6 +5,9 @@
 
 export * from "./tree-renderer";
 
+/**
+ * Immutable facade metadata descriptor for the Fractal Git TUI visualizer.
+ */
 export const FRACTAL_TUI_FACADE_INFO = Object.freeze({
     subsystem: "fractal-git",
     tier: "tui",

@@ -10,7 +10,7 @@
  *   2. Assert strict adherence to L1 -> L2 -> L3 architectural layer boundaries;
  *   3. Detect cyclic references or illegal cross-boundary dependencies (FGT-DEP-001);
  *   4. Emit structured technical facts and exit non-zero on violation.
- * Exit Semantics & Design Rationale: Exits 0 on clean DAG topology verification, 1 on layer violation;
+ * Exit Semantics & Design Rationale: Exits 0 on clean DAG verification, 1 on layer breach;
  *   adheres to CC <= 15, Depth <= 4, and zero-black-box execution.
  */
 'use strict';

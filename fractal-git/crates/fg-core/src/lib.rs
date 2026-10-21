@@ -4,8 +4,10 @@
 //!   and dependency-inversion trait abstractions (OdbStore, RefStore,
 //!   GateVerifier, WorktreeReclaimer).
 //! Dependencies & Triggers: Depended upon by all Taxis micro-crates and CLI binary.
-//! Responsibilities: Core atomic domain models, zero-panic error classification, and trait contracts.
-//! Exit Semantics & Design Rationale: Standardizes fundamental types with zero circular dependencies.
+//! Responsibilities: Core atomic domain models, zero-panic error classification,
+//!   and trait contracts.
+//! Exit Semantics & Design Rationale: Standardizes fundamental types with
+//!   zero circular dependencies.
 
 pub mod constants;
 pub mod error;

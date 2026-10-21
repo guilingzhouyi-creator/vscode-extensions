@@ -1,5 +1,14 @@
-//! Module: Benchmark Subcommand Handler
-//! Architecture: Executes Taxis performance micro/macro benchmark suites and regression ratchets.
+//! Module: taxis_cmd::bench — Benchmark Subcommand Dispatcher
+//! File Path: src/bin/taxis_cmd/bench.rs
+//! Architecture Role: Executes Taxis performance micro/macro benchmark suites,
+//!   persists results, and validates regression ratchets against frozen baselines.
+//! Dependencies & Triggers: Invoked when `taxis bench` is dispatched.
+//! Responsibilities: Benchmark execution, ratchet comparison, baseline persistence.
+//! Exit Semantics & Design Rationale: Exits 0 on passing ratchet, exits 1 on regression.
+//!
+//! ### Domain Governance Rules (SSOT):
+//! - `FGT-COR-001`: Core data model and error contract guard
+//! - `FGT-PRF-001`: Zero transient heap allocations on fast paths
 
 use std::env;
 use std::path::{Path, PathBuf};
@@ -33,6 +42,7 @@ pub fn handle_bench(ctx: &CliContext) {
     render_bench_results(ctx, &suite);
 }
 
+/// Parses CLI benchmark level from flags (--level 2, --scion-parity, etc.).
 fn parse_bench_level(args: &[String]) -> BenchmarkLevel {
     if args.iter().any(|arg| arg == "--scion-parity") {
         return BenchmarkLevel::All;
@@ -45,6 +55,7 @@ fn parse_bench_level(args: &[String]) -> BenchmarkLevel {
     }
 }
 
+/// Saves current benchmark metrics JSON into the designated target file.
 fn save_bench_baseline(save_file: &Path, suite: &TaxisBenchmarkSuite) {
     if let Some(parent) = save_file.parent() {
         let _ = std::fs::create_dir_all(parent);
@@ -61,10 +72,11 @@ fn save_bench_baseline(save_file: &Path, suite: &TaxisBenchmarkSuite) {
     println!("Saved performance baseline to {}", save_file.display());
 }
 
+/// Resolves baseline file path with fallback to workspace root paths.
 fn resolve_baseline_file(verify_arg: &Path) -> Option<PathBuf> {
     let verify_str = verify_arg.to_string_lossy().to_string();
     let trimmed = verify_str
-        .trim_matches(|char_val: char| char_val == '"' || char_val == '\'' || char_val.is_whitespace())
+        .trim_matches(|c: char| c == '"' || c == '\'' || c.is_whitespace())
         .to_string();
     let normalized = trimmed.replace('/', std::path::MAIN_SEPARATOR_STR);
     let final_path = PathBuf::from(&trimmed);
@@ -95,6 +107,7 @@ fn resolve_baseline_file(verify_arg: &Path) -> Option<PathBuf> {
     None
 }
 
+/// Loads a baseline suite from disk or falls back to the embedded compile-time frozen baseline.
 fn load_baseline(final_path: Option<&Path>) -> TaxisBenchmarkSuite {
     if let Some(path) = final_path {
         let content = std::fs::read_to_string(path).unwrap_or_default();
@@ -127,6 +140,7 @@ fn load_baseline(final_path: Option<&Path>) -> TaxisBenchmarkSuite {
     }
 }
 
+/// Verifies benchmark suite metrics against baseline within the 15% hardware tolerance allowance.
 fn verify_bench_baseline(verify_arg: &Path, suite: &TaxisBenchmarkSuite) {
     let resolved = resolve_baseline_file(verify_arg);
     let baseline = load_baseline(resolved.as_deref());
@@ -146,6 +160,7 @@ fn verify_bench_baseline(verify_arg: &Path, suite: &TaxisBenchmarkSuite) {
     }
 }
 
+/// Formats benchmark execution results as text table or JSON.
 fn render_bench_results(ctx: &CliContext, suite: &TaxisBenchmarkSuite) {
     if ctx.json_mode {
         print_json(suite);

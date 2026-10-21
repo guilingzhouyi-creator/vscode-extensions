@@ -4,10 +4,10 @@
  * Architecture Role: Primary quality auditor synthesizing micro-crate static invariant checks,
  *   multi-crate test regression telemetry, and genuine deep AST analysis via auto-refactor SDK.
  * Dependencies & Triggers: Consumed by audit-all.ps1/sh, audit-taxis.ps1/sh, and CI pipelines;
- *   invokes validate-crate-topology, check-zero-alloc-boundary, validate-git-parity, validate-gate-bridge,
- *   and dynamically requires auto-refactor/dist/api.js.
+ *   invokes validate-crate-topology, check-zero-alloc-boundary, validate-git-parity,
+ *   validate-gate-bridge, and dynamically requires auto-refactor/dist/api.js.
  * Responsibilities:
- *   1. Execute static micro-crate DAG topology, Git parity, gate-bridge, and zero-allocation checks;
+ *   1. Execute static micro-crate DAG topology, Git parity, and zero-allocation checks;
  *   2. Run Cargo multi-crate test suite and parse ok/failed assertions deterministically;
  *   3. Invoke auto-refactor programmatic AST scanner to compute genuine Tri-Plane and CAI scores;
  *   4. Persist structured, mathematically proven findings into reports/audit-latest.json.
@@ -57,7 +57,7 @@ function runStaticChecker(relativeScript) {
  * Runs Cargo multi-crate tests and parses test count output.
  *
  * @param {boolean} fastMode - Skip full execution in fast check mode.
- * @returns {{ totalTests: number, passedTests: number, failedTests: number, isClean: boolean, output: string }} Metrics.
+ * @returns {object} Test run outcome metrics including counts and output text.
  */
 function runCargoTests(fastMode) {
   const cargoCmd = process.platform === 'win32' ? 'cargo.exe' : 'cargo';

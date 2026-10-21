@@ -7,6 +7,9 @@
 
 import type { StagedFileEntry } from "../contracts";
 
+/**
+ * Virtual file system node representing an in-memory file snapshot.
+ */
 export interface VirtualFileNode {
     readonly path: string;
     readonly content: Uint8Array | string;
@@ -14,11 +17,17 @@ export interface VirtualFileNode {
     readonly version: number;
 }
 
+/**
+ * Configuration defining the active scope projection boundaries for a worktree.
+ */
 export interface ScopeProjectionConfig {
     readonly scopes: string[];
     readonly isFull: boolean;
 }
 
+/**
+ * Adapter integrating in-memory virtual inodes into candidate staging trees.
+ */
 export class LayerVfsAdapter {
     private readonly virtualFiles: Map<string, VirtualFileNode> = new Map();
 

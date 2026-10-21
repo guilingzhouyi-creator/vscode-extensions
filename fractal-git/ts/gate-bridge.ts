@@ -4,7 +4,8 @@
  * Architecture Role: Bridges Fractal Git staging areas with the Auto code review gate,
  *   performing pre-commit AST slice checks and topological risk calculations.
  * Dependencies & Triggers: Triggered when an agent attempts to advance an in-pre-review workspace.
- * Responsibilities: Run deterministic AST and hygiene checks, calculate quality scores, and enforce pass/fail gates.
+ * Responsibilities: Run deterministic AST and hygiene checks, compute scores,
+ *   and enforce pass/fail gates.
  * Exit Semantics & Design Rationale: Enforces "tests passing != gate passing" axiom; rejects
  *   flawed code in under 10ms; adheres to CC <= 15 and Depth <= 4.
  */
@@ -14,7 +15,7 @@ import type { GateAuditVerdict, StagedFileEntry } from './contracts';
 /** Regular expression detecting unresolved Git conflict markers in source content. */
 const RE_CONFLICT_MARKERS = /^(?:<{7}|={7}|>{7})/m;
 
-/** Regular expression detecting transient heap allocations inside iteration loops (TS/JS and Rust). */
+/** Regular expression detecting transient heap allocations inside loops (TS/JS and Rust). */
 const RE_LOOP_ALLOC_TS = /for\s*\([^)]*\)\s*\{[^}]*new\s+(?:Array|Object|Map|Set)/s;
 const RE_LOOP_ALLOC_RS = /(?:for|while|loop)\s+[^{]*\{[^}]*\b(?:Vec::new|\.to_string\(\)|\.to_owned\(\)|format!\()/s;
 

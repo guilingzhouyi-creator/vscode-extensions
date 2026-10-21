@@ -1,14 +1,14 @@
 /**
  * Module: Fractal Git — Performance Baseline Ratchet Validator
  * File Path: fractal-git/scripts/common/validate-perf-baseline.js
- * Architecture Role: Enforces TB-REGRESSION monotonicity by comparing current micro-benchmark timings
+ * Architecture Role: Enforces TB-REGRESSION monotonicity by comparing micro-benchmarks
  *   against frozen baselines/taxis-perf.baseline.json with a 15% hardware tolerance allowance.
  * Dependencies & Triggers: Invoked by npm run gate, audit-taxis.ps1/sh, and CI regression checks.
  * Responsibilities:
  *   1. Execute `taxis bench -m 5 --verify-baseline <baseline-path>` across core hot paths;
  *   2. Assert zero regressions beyond the 15% tolerance threshold;
  *   3. Propagate child process exit codes and display benchmark output.
- * Exit Semantics & Design Rationale: Exits 0 on performance ratchet passing, 1 on TB-REGRESSION violation.
+ * Exit Semantics & Design Rationale: Exits 0 on ratchet passing, 1 on TB-REGRESSION violation.
  */
 'use strict';
 
