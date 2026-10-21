@@ -482,7 +482,7 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF" "$LOG_FG"
       }
     } catch (_) {}
   }
-  if (baseAr === null) baseAr = 98.7;
+  if (baseAr === null) baseAr = statusAr === "PASS" ? 95.0 : SCORE_FLOOR;
   const scoreAr = statusAr === "PASS" ? baseAr : Math.max(SCORE_FLOOR, Number((baseAr - 60.0).toFixed(1)));
 
   // 4. workspace-timing 审查门禁得分（优先读取真实 AST compositeScore，消除假满分 100.0）
@@ -519,7 +519,7 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF" "$LOG_FG"
   }
 
   if (baseWt === null) {
-    baseWt = statusWt === "PASS" ? 99.5 : SCORE_FLOOR;
+    baseWt = statusWt === "PASS" ? 95.0 : SCORE_FLOOR;
   }
   const scoreWt = statusWt === "PASS" ? baseWt : Math.max(SCORE_FLOOR, Number((baseWt - 60.0).toFixed(1)));
 
@@ -527,9 +527,9 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF" "$LOG_FG"
   let baseWg = null;
   const gdScore = (polyglotBreakdown && polyglotBreakdown.gdscript && typeof polyglotBreakdown.gdscript.score === "number")
     ? polyglotBreakdown.gdscript.score
-    : 95.2;
+    : 90.0;
 
-  let configScore = 100.0;
+  let configScore = statusWg === "PASS" ? 90.0 : SCORE_FLOOR;
   try {
     const wgReportPath = path.join(repoRoot, "WebGames", "reports", "audit-latest.json");
     if (fs.existsSync(wgReportPath)) {
@@ -547,7 +547,7 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF" "$LOG_FG"
       }
     }
   } catch (_) {
-    configScore = 100.0;
+    configScore = statusWg === "PASS" ? 90.0 : SCORE_FLOOR;
   }
 
   baseWg = Number(((0.8 * gdScore) + (0.2 * configScore)).toFixed(1));
@@ -588,8 +588,11 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF" "$LOG_FG"
 
   // polyglot evaluated earlier before cornerstone scores
 
-  // 全工作区综合健康分（六大核心子系统基石分平权加权各占 1/6：(Hygiene + Rules + AR + WT + WG + FG) / 6.0）
-  const workspaceHealthScore = Number(((scoreHygiene + scoreRules + scoreAr + scoreWt + scoreWg + scoreFg) / 6.0).toFixed(2));
+  // 全工作区综合健康分（分层加权：基础设施基石层 20% + 核心生产工程层 80%，附带极低分短板熔断阻尼）
+  const rawWeighted = (0.10 * scoreHygiene) + (0.10 * scoreRules) + (0.25 * scoreAr) + (0.20 * scoreWt) + (0.20 * scoreWg) + (0.15 * scoreFg);
+  const minCorner = Math.min(scoreHygiene, scoreRules, scoreAr, scoreWt, scoreWg, scoreFg);
+  const damping = minCorner < 70.0 ? Math.max(0.5, minCorner / 70.0) : 1.0;
+  const workspaceHealthScore = Number((rawWeighted * damping).toFixed(2));
   const wsHealthStr = workspaceHealthScore % 1 === 0 ? workspaceHealthScore.toFixed(1) : String(workspaceHealthScore);
 
   function getGradeTag(score) {

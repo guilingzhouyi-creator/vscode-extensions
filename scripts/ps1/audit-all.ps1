@@ -505,7 +505,9 @@ if ($null -ne $compositeScore) {
         $baseAr = $null
     }
 }
-if ($null -eq $baseAr) { $baseAr = 98.7 }
+if ($null -eq $baseAr) {
+    $baseAr = if ($statusAr -eq "PASS") { 95.0 } else { $SCORE_FLOOR }
+}
 $scoreAr = if ($statusAr -eq "PASS") {
     $baseAr
 } else {
@@ -559,7 +561,7 @@ if ($null -eq $baseWt) {
 }
 
 if ($null -eq $baseWt) {
-    $baseWt = if ($statusWt -eq "PASS") { 99.5 } else { $SCORE_FLOOR }
+    $baseWt = if ($statusWt -eq "PASS") { 95.0 } else { $SCORE_FLOOR }
 }
 
 $scoreWt = if ($statusWt -eq "PASS") {
@@ -573,10 +575,10 @@ $baseWg = $null
 $gdScore = if ($null -ne $polyglotBreakdown -and $null -ne $polyglotBreakdown.gdscript) {
     [double]$polyglotBreakdown.gdscript.score
 } else {
-    95.2
+    90.0
 }
 
-$configScore = 100.0
+$configScore = if ($statusWg -eq "PASS") { 90.0 } else { $SCORE_FLOOR }
 $wgReportPath = Join-Path $repoRoot "WebGames\reports\audit-latest.json"
 try {
     if (Test-Path $wgReportPath) {
@@ -604,7 +606,7 @@ try {
         }
     }
 } catch {
-    $configScore = 100.0
+    $configScore = if ($statusWg -eq "PASS") { 90.0 } else { $SCORE_FLOOR }
 }
 
 # 综合得分：GDScript 核心游戏代码占 80% 权重，领域配置驱动表占 20% 权重
@@ -685,11 +687,11 @@ $scoreFg = if ($statusFg -eq "PASS") {
 
 # polyglot evaluated earlier before cornerstone scores
 
-# 全工作区综合健康分（六大核心子系统基石分平权加权各占 1/6：(Hygiene + Rules + AR + WT + WG + FG) / 6.0）
-$workspaceHealthScore = [math]::Round(
-    ($scoreHygiene + $scoreRules + $scoreAr + $scoreWt + $scoreWg + $scoreFg) / 6.0,
-    2
-)
+# 全工作区综合健康分（分层加权：基础设施基石层 20% + 核心生产工程层 80%，附带极低分短板熔断阻尼）
+$rawWeighted = (0.10 * $scoreHygiene) + (0.10 * $scoreRules) + (0.25 * $scoreAr) + (0.20 * $scoreWt) + (0.20 * $scoreWg) + (0.15 * $scoreFg)
+$minCorner = [math]::Min($scoreHygiene, [math]::Min($scoreRules, [math]::Min($scoreAr, [math]::Min($scoreWt, [math]::Min($scoreWg, $scoreFg)))))
+$damping = if ($minCorner -lt 70.0) { [math]::Max(0.5, $minCorner / 70.0) } else { 1.0 }
+$workspaceHealthScore = [math]::Round($rawWeighted * $damping, 2)
 $wsHealthStr = if ($workspaceHealthScore % 1 -eq 0) { $workspaceHealthScore.ToString("0.0") } else { $workspaceHealthScore.ToString("0.##") }
 $wsGrade = (Get-GradeFromScore $workspaceHealthScore).Trim()
 
