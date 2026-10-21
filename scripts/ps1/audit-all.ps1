@@ -487,6 +487,10 @@ $SCORE_FLOOR = 15.0
 # 门禁失败时的统一扣分幅度。与 SCORE_FLOOR 配合，使「失败」表现为相对劣化而非归零。
 $DEGRADE_PENALTY = 60.0
 
+# 物理卫生子项降级权重，取值理由见下方各基石得分段的契约说明。
+$ISO_MISSING_PENALTY = 20.0
+$GITIGNORE_MISSING_PENALTY = 10.0
+
 # 1. 物理卫生基石得分（基于八维物理卫生矩阵连续客观计算与同构/.gitignore治理守卫）
 #
 # 降级权重按「缺陷能否被后续门禁自动捕获」区分，而非按严重度直觉：
@@ -664,6 +668,14 @@ $scoreWg = if ($statusWg -eq "PASS") {
 }
 
 # 6. fractal-git 质量基线得分（基于 audit-latest.json 真实 checks/pass/warn 连续客观计算，消融阶跃硬编码）
+#
+# 三级降级链，取第一个可用来源，缺数据只降级不抛错：
+#   ① summary.compositeScore —— Rust 侧 AST 自审的权威综合分；
+#   ② qualityEnvelope.composite_score —— 旧版报告字段（下划线命名），仅在 ① 缺失时兜底；
+#   ③ checks / bySeverity 折算 —— 未完成 AST 扫描时，用通过比例减权警告与错误；
+#      其中若存在 bayesianConfidence.credibleScore 则优先取它，因为小样本下
+#      通过比例的方差极大（4/5 与 40/50 不可等同），贝叶斯后验均值才能给出可比值。
+# 三级都不可用时，回落到五个门禁的实际通过数折算，保证看板永远有数可渲染。
 $baseFg = $null
 $fgReportPath = Join-Path $repoRoot "fractal-git\reports\audit-latest.json"
 try {
