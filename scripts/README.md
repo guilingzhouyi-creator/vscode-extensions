@@ -5,7 +5,7 @@
 > 项目内私有脚本（如 `auto-refactor/scripts/*.js` 的 validate/bench 系列）不在此库，
 > 保留在各项目内部，由各自 `package.json` 引用。
 >
-> 本库当前收录 <!-- METRICS:BEGIN script-inventory -->**69 份**<!-- METRICS:END script-inventory -->受控脚本，逐项列于下表。
+> 本库当前收录 <!-- METRICS:BEGIN script-inventory -->**71 份**<!-- METRICS:END script-inventory -->受控脚本，逐项列于下表。
 
 ---
 
@@ -26,6 +26,7 @@
 | `common/` | Node.js | `validate-shell-parity.js` | audit / parity（Linux 命令面守卫：断言 AGENTS.md 承诺的每个命令都真实可绑定、兼容层同时具备 GNU 与 PowerShell 降级两条路径，并回报当前宿主解析出的模式 `gnu` / `native`） | `pre-push-gate`、CI |
 | `common/` | Node.js | `validate-skills.js` | audit / skills（全工作区研发技能规范、死链与镜像等价性守卫） | `pre-commit-gate`、`audit-all` |
 | `common/` | Node.js | `sync-skills.js` | tooling / skills（根目录技能集与 workspace-governance 插件双向同步工具） | 本地 CLI |
+| `common/` | Node.js | `sync-agents-mirror.js` | tooling / agents（SubAgent 定义模板与 AGENTS.md 单向镜像到插件包，并核验字节等价与计数滞后） | `sync-skills`、`pre-push-gate` |
 | `common/` | Node.js | `gate-fast-staged.js` | gate / fast-staged（暂存区文件单遍内存流式前置 6 大门禁判定，<90ms） | `pre-commit-gate` |
 | `common/` | Node.js | `validate-staged-slice.js` | gate / complexity（平台级增量 AST 切片圈复杂度/嵌套/噪声比审查器） | `pre-commit-gate`、CI |
 | `common/` | Node.js | `validate-code-density.js` | gate / density（多维代码密度、接线率 POR<=60% 与列密度审查器） | `pre-commit-gate`、`pre-push-gate`、CI |
@@ -36,12 +37,18 @@
 | `common/` | Node.js | `validate-docs-consistency.js` | audit / docs（动态对照 `rule-catalog.json` 真实计数拦截规则总数漂移；含治理文档脚本死链守卫） | `pre-push-gate`、CI |
 | `common/` | Node.js | `sync-doc-metrics.js` | audit / metrics（文档规模数字的单源渲染与零漂移守卫：`METRICS:BEGIN/END` 区域由真源求值渲染，`--write` 就地校正，内置反向探针自证检出能力） | `pre-push-gate`、CI、本地 CLI |
 | `common/` | Node.js | `validate-rule-reachability.js` | audit / ssot（error 级规则执行入口可达性守卫） | `pre-push-gate`、CI |
+| `common/` | Node.js | `validate-doc-anchors.js` | audit / docs（跨文档引用按名解析：禁止 `§N`/`公理 N`/`SOP 第 N 步` 等随行号漂移的位置引用） | `pre-push-gate`、`audit-all`、CI |
+| `common/` | Node.js | `validate-doc-reachability.js` | audit / docs（规范文档入链可达性：每份规范文档必须被其他文档按文件名、路径或 slug 命名） | `pre-push-gate`、`audit-all`、CI |
+| `common/` | Node.js | `validate-family-contract.js` | audit / ssot（规则族三源一致：`family` 必须是分类法中的主题、`layer` 必须落在六层域内，目录与映射表族集合双向相等） | `pre-push-gate`、`audit-all`、CI |
+| `common/` | Node.js | `validate-metric-coverage.js` | audit / docs（`doc-metrics.json` 声明集与文档实际渲染集相等；声明未渲染与标记未声明双向阻断） | `pre-push-gate`、`audit-all`、CI |
 | `common/` | Node.js | `evaluate-change-entropy.js` | audit / entropy（Hassan 变更香农熵与 Kamei 跨域扩散 NF/ND/NS 评估，超阈阻断） | `pre-push-gate` CHANGE-ENTROPY-22、本地 CLI |
 | `common/` | Node.js | `bootstrap-gates.js` | tooling / bootstrap（钩子激活、依赖安装与构建一键引导） | 本地 CLI |
 | `common/` | Node.js | `test-gate-parity.js` | validate / parity（双实现提交门禁行为差分） | CI、本地 CLI |
 | `common/` | Node.js | `test-gate-selftest.js` | validate / selftest（门禁 PASS/违规/缺依赖三态矩阵） | CI、本地 CLI |
 | `common/` | Node.js | `validate-commit-msg.js` | gate / commit（生产级结构化提交信息格式、区块与有效字数综合调度器） | `commit-msg-gate` |
 | `common/` | Node.js | `validate-commit-msg-style.js` | gate / style（提交信息文本风格与四维禁词核验器） | `commit-msg-gate`、`pre-push-gate`、CI |
+| `common/` | Node.js | `validate-commit-history-baseline.js` | gate / commit-history（待推送提交按冻结清单逐条核验：清单记录的规则对命中提交只报告不阻断，未记录的规则照常生效） | `pre-push-gate` COMMIT-HISTORY-BASELINE-36、CI |
+| `common/` | JSON | `commit-history-baseline.json` | data / ssot（冻结提交基线与逐提交依据规则清单，`ratifiedAt` 为时间边界） | `validate-commit-history-baseline` |
 | `common/` | Node.js | `commit-tokenizer.js` | gate / style-lexical（零依赖提交信息分词器：零宽字符剥离、NFKC 归一、前缀 Trie 与结构解析） | `validate-commit-msg-style`、`validate-commit-guardrail` |
 | `common/` | Node.js | `commit-style-arbiter.js` | gate / style-lexical（祈使语态、客观叙述与学术白名单仲裁器） | `validate-commit-msg-style` |
 | `common/` | Node.js | `tech-debt-corridor.js` | gate / debt（弹性高危技术债容差走廊与清偿棘轮状态机） | `validate-commit-msg`、`validate-commit-msg-style` |
@@ -231,7 +238,7 @@ Python 版使用 docstring + `if __name__ == "__main__":` 守卫。
 | **推送前置门禁** | `pwsh scripts/ps1/pre-push-gate.ps1` | `pwsh scripts/ps1/pre-push-gate.ps1 -Agent` | `pwsh scripts/ps1/pre-push-gate.ps1 -ViewLog` |
 | **失败快照轮转器** | `node scripts/common/log-rotator.js --view` | `node scripts/common/log-rotator.js --agent` | 自动保留最近一次失败至 `.audit-logs/last-failure.json` |
 
-> 各入口的语义步骤数均由 `scripts/common/gate-step-registry.json` 单源登记：提交前置 <!-- METRICS:BEGIN step-pre-commit -->**13 个语义步骤**<!-- METRICS:END step-pre-commit -->、提交信息 <!-- METRICS:BEGIN step-commit-msg -->**9 个语义步骤**<!-- METRICS:END step-commit-msg -->、推送前置 <!-- METRICS:BEGIN step-pre-push -->**35 个语义步骤**<!-- METRICS:END step-pre-push -->、全工作区审查 <!-- METRICS:BEGIN step-audit-all -->**6 个语义步骤**<!-- METRICS:END step-audit-all -->、fractal-git 审查 <!-- METRICS:BEGIN step-audit-taxis -->**5 个语义步骤**<!-- METRICS:END step-audit-taxis -->，合计 <!-- METRICS:BEGIN step-total -->**68 个语义步骤**<!-- METRICS:END step-total -->。
+> 各入口的语义步骤数均由 `scripts/common/gate-step-registry.json` 单源登记：提交前置 <!-- METRICS:BEGIN step-pre-commit -->**13 个语义步骤**<!-- METRICS:END step-pre-commit -->、提交信息 <!-- METRICS:BEGIN step-commit-msg -->**9 个语义步骤**<!-- METRICS:END step-commit-msg -->、推送前置 <!-- METRICS:BEGIN step-pre-push -->**36 个语义步骤**<!-- METRICS:END step-pre-push -->、全工作区审查 <!-- METRICS:BEGIN step-audit-all -->**6 个语义步骤**<!-- METRICS:END step-audit-all -->、fractal-git 审查 <!-- METRICS:BEGIN step-audit-taxis -->**5 个语义步骤**<!-- METRICS:END step-audit-taxis -->，合计 <!-- METRICS:BEGIN step-total -->**69 个语义步骤**<!-- METRICS:END step-total -->。
 >
 > 推送门禁的输出形如
 > `✔ PASS  <步骤标识>  <标题>  <详情>`，状态词闭包为 PASS / BLOCK / SKIP / WARN：
