@@ -21,7 +21,20 @@ const fs = require('fs');
 const path = require('path');
 
 const UTF8 = 'utf8';
-const DEFAULT_LOG_DIR = path.resolve(__dirname, '..', '..', '.audit-logs');
+
+/**
+ * Environment variable that redirects the ledger directory.
+ *
+ * The corridor is a stateful machine: every permitted high-tier finding appends to the ledger and
+ * three accumulated entries trigger forced paydown. Harnesses that drive the gate as a child
+ * process therefore cannot exercise the corridor against the developer's real ledger without
+ * poisoning it. An explicit override keeps the default production path intact while letting a
+ * harness point at a throwaway directory.
+ */
+const LOG_DIR_ENV = 'GOVERNANCE_AUDIT_LOG_DIR';
+const DEFAULT_LOG_DIR = process.env[LOG_DIR_ENV]
+  ? path.resolve(process.env[LOG_DIR_ENV])
+  : path.resolve(__dirname, '..', '..', '.audit-logs');
 const DEBT_LEDGER_NAME = 'tech-debt-ledger.json';
 
 const CRITICAL_DEBT_LIMIT = 0;

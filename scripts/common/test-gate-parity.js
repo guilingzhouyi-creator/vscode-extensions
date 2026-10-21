@@ -11,7 +11,9 @@
  *   3. Report per-case verdicts and fail on any cross-platform divergence;
  *   4. Skip the PowerShell side explicitly when pwsh is unavailable;
  *   5. Compare the pre-commit and pre-push entry points on a no-argument run, where both must
- *      agree that an empty staging area is a pass.
+ *      agree that an empty staging area is a pass;
+ *   6. Point every spawned gate at a throwaway ledger directory, so the stateful debt corridor is
+ *      exercised without writing into the developer's own ledger.
  * Exit Semantics & Design Rationale: 0 = all comparable cases agree, 1 = divergence or
  *   execution failure. Structural isomorphism cannot detect semantic drift, so this
  *   harness asserts observable behavior instead of source shape.
@@ -25,6 +27,22 @@ const { spawnSync } = require('child_process');
 
 const REPO_ROOT = path.resolve(__dirname, '../..');
 const FIXTURE_DIR = path.join(REPO_ROOT, '.audit-logs', 'parity');
+
+/**
+ * Throwaway ledger directory for the gates spawned below.
+ *
+ * The debt corridor is a stateful machine: a permitted high-tier finding appends to
+ * `.audit-logs/tech-debt-ledger.json`, and `ACCUMULATION_CEILING = 2` turns the third entry into a
+ * forced-paydown block. Driving the gate as a child process against the real ledger therefore makes
+ * the corridor case pass twice and fail on every run after that, and leaves the developer owing
+ * debt they never incurred. `GOVERNANCE_AUDIT_LOG_DIR` exists for exactly this redirect.
+ */
+const ISOLATED_LOG_DIR = fs.mkdtempSync(path.join(require('os').tmpdir(), 'gate-parity-ledger-'));
+
+const GATE_ENV = Object.freeze({
+  ...process.env,
+  GOVERNANCE_AUDIT_LOG_DIR: ISOLATED_LOG_DIR,
+});
 
 const FIXTURES = Object.freeze([
   {
@@ -47,12 +65,15 @@ const FIXTURES = Object.freeze([
   },
   {
     name: 'forbidden-term-under-corridor',
-    // A single High-tier style term is deliberately permitted once by the elastic debt corridor
-    // (MAX_SINGLE_HIGH_DEBT = 1) and recorded in the ledger. Expecting a block here would test
-    // the absence of the corridor rather than the gate's behaviour, so the expectation is 0.
+    // Exactly one High-tier finding, drawn from the elastic tier itself: `zero_pov` and
+    // `imperative_mood` are the only dictionary categories the corridor permits
+    // (ELASTIC_DICTIONARY_CATEGORIES), so MAX_SINGLE_HIGH_DEBT = 1 lets this message through and
+    // records one debt entry. Any other severity-error rule is critical and blocks outright, which
+    // would test the critical tier instead of the corridor. The harness runs both implementations
+    // against a throwaway ledger directory, so the entry lands there rather than in the real one.
     expect: 0,
     content:
-      'fix(gate): 修复空指针分支的判定顺序\n\n[Project / 项目归属]\n- governance\n\n[Why / 动机背景]\n- 现有判定在空指针分支上缺少保护，构造边界输入时会抛出异常并中断门禁流程。\n\n[Fixed / 修复缺陷]\n- 这是“临时”方案，先补显式判空与早返回。\n\n[Verification / 验证结论]\n- 以空输入复核，门禁给出结构化阻断而非异常中断。\n',
+      'fix(gate): 修复空指针分支的判定顺序\n\n[Project / 项目归属]\n- governance\n\n[Why / 动机背景]\n- 现有判定在空指针分支上缺少保护，构造边界输入时会抛出异常并中断门禁流程。\n\n[Fixed / 修复缺陷]\n- 我们补充了显式判空与早返回，避免异常穿透。\n\n[Verification / 验证结论]\n- 以空输入复核，门禁给出结构化阻断而非异常中断。\n',
   },
   {
     name: 'missing-project',
@@ -114,6 +135,7 @@ function runGate(command, args, file) {
   const result = spawnSync(command, [...args, file], {
     cwd: REPO_ROOT,
     stdio: 'ignore',
+    env: GATE_ENV,
   });
   if (result.error) return -1;
   return result.status === null ? -1 : result.status;
@@ -144,6 +166,18 @@ function evaluateFixture(fixture, hasPwsh) {
 }
 
 /**
+ * Removes every scratch artefact this harness created.
+ *
+ * Both the fixture directory and the isolated ledger directory must go: leaving the ledger behind
+ * would leak one debt entry per corridor case into the temp tree, and leaving fixtures would make a
+ * later run read a stale message.
+ */
+function cleanup() {
+  fs.rmSync(FIXTURE_DIR, { recursive: true, force: true });
+  fs.rmSync(ISOLATED_LOG_DIR, { recursive: true, force: true });
+}
+
+/**
  * Validates availability of required execution environments.
  *
  * @param {boolean} hasBash - Whether bash is available.
@@ -160,7 +194,7 @@ function assertPrerequisites(hasBash, hasPwsh, requireParity) {
       'SKIP PowerShell implementation unavailable: only the bash expectations can be checked, parity is NOT verified',
     );
     if (requireParity) {
-      fs.rmSync(FIXTURE_DIR, { recursive: true, force: true });
+      cleanup();
       console.error('FAIL --require-parity was requested but pwsh is unavailable; parity unverified');
       process.exit(1);
     }
@@ -181,13 +215,17 @@ function assertPrerequisites(hasBash, hasPwsh, requireParity) {
  * @returns {boolean} True when the verdicts agree.
  */
 function compareEntryPoints(label, shScript, psScript, hasPwsh) {
-  const shResult = spawnSync(POSIX_SHELL, [shScript], { cwd: REPO_ROOT, stdio: 'ignore' });
+  const shResult = spawnSync(POSIX_SHELL, [shScript], { cwd: REPO_ROOT, stdio: 'ignore', env: GATE_ENV });
   const shStatus = shResult.error ? -1 : shResult.status;
   if (!hasPwsh) {
     console.log(`${label}: bash=${shStatus} pwsh=SKIP SKIP`);
     return true;
   }
-  const psResult = spawnSync('pwsh', ['-NoProfile', '-File', psScript], { cwd: REPO_ROOT, stdio: 'ignore' });
+  const psResult = spawnSync('pwsh', ['-NoProfile', '-File', psScript], {
+    cwd: REPO_ROOT,
+    stdio: 'ignore',
+    env: GATE_ENV,
+  });
   const psStatus = psResult.error ? -1 : psResult.status;
   const agree = shStatus === psStatus;
   console.log(`${label}: bash=${shStatus} pwsh=${psStatus} ${agree ? 'PASS' : 'FAIL'}`);
@@ -221,7 +259,7 @@ function main() {
     if (!compareEntryPoints(label, shScript, psScript, hasPwsh)) failures += 1;
   }
 
-  fs.rmSync(FIXTURE_DIR, { recursive: true, force: true });
+  cleanup();
   if (failures > 0) {
     console.error(`FAIL ${failures} parity case(s) diverged or returned an unexpected verdict`);
     process.exit(1);
