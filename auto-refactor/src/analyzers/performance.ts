@@ -114,6 +114,42 @@ const PRF_ACTIONABLE_MAP: Record<
     },
 };
 
+/** One physical source line as produced by `extractNextLine`, minus the cursor. */
+interface ScannedLine {
+    readonly lineText: string;
+    readonly trimmed: string;
+}
+
+/**
+ * Per-file invariants threaded through every stage of one line-oriented audit pass.
+ *
+ * Bundling them gives each stage a single handle instead of five positional arguments. The
+ * object holds references to the caller's mutable `scanState`, `loopStack` and `issues`, so
+ * every stage still mutates the same instances and the pass stays behaviourally identical.
+ */
+interface ScanPassContext {
+    readonly ctx: AnalyzerContext;
+    readonly scanConfig: PerformanceScanConfig;
+    readonly scanState: LineScanState;
+    readonly loopStack: LoopScope[];
+    readonly issues: Issue[];
+}
+
+/**
+ * Rule id, finding text, severity and payload for one emitted performance issue.
+ *
+ * `rule` and `message` are both strings and were previously adjacent positional arguments,
+ * so swapping them produced a wrong id without any compile error; naming them removes that
+ * class of mistake.
+ */
+interface PerformanceFinding {
+    readonly rule: string;
+    readonly message: string;
+    readonly severity: 'info' | 'warning' | 'error';
+    readonly detail: Record<string, any>;
+    readonly suggestion?: string;
+}
+
 /**
  * Detect performance hazards in one source file with a single line-oriented pass: nested loops
  * (PRF-ALG-001), transient allocations inside loops (PRF-MEM-001) and blocking synchronous I/O
@@ -155,6 +191,7 @@ export class PerformanceAnalyzer implements Analyzer {
         let lineIdx = 0;
         const scanState: LineScanState = { inAsyncFunction: false, inBlockComment: false };
         const loopStack: LoopScope[] = [];
+        const pass: ScanPassContext = { ctx, scanConfig, scanState, loopStack, issues };
 
         while (lineStart < len) {
             const nextLine = extractNextLine(content, len, lineStart);
@@ -165,7 +202,7 @@ export class PerformanceAnalyzer implements Analyzer {
                 continue;
             }
 
-            this.scanLineContent(nextLine, lineIdx, ctx, scanConfig, scanState, loopStack, issues);
+            this.scanLineContent(pass, nextLine, lineIdx);
 
             lineIdx++;
         }
@@ -189,105 +226,49 @@ export class PerformanceAnalyzer implements Analyzer {
         return issues;
     }
 
-    private scanLineContent(
-        nextLine: { lineText: string; trimmed: string },
-        lineIdx: number,
-        ctx: AnalyzerContext,
-        scanConfig: PerformanceScanConfig,
-        scanState: LineScanState,
-        loopStack: LoopScope[],
-        issues: Issue[],
-    ): void {
+    private scanLineContent(pass: ScanPassContext, nextLine: ScannedLine, lineIdx: number): void {
+        const { scanConfig, scanState, loopStack } = pass;
         updateIndentLoops(nextLine.lineText, scanConfig.isIndentBased, loopStack);
         if (this.isAsyncDeclaration(nextLine.trimmed)) {
             scanState.inAsyncFunction = true;
         }
 
-        this.checkLoopNesting(
-            nextLine.trimmed,
-            nextLine.lineText,
-            scanConfig.maxNesting,
-            lineIdx,
-            ctx,
-            loopStack,
-            issues,
-        );
-
-        this.auditAllocations(nextLine.trimmed, lineIdx, ctx, scanConfig, loopStack, issues);
-        this.auditLinearLookups(nextLine.trimmed, lineIdx, ctx, scanConfig, loopStack, issues);
-        this.auditIo(
-            nextLine.trimmed,
-            nextLine.lineText,
-            lineIdx,
-            scanConfig,
-            scanState,
-            ctx,
-            issues,
-        );
-        this.auditBraces(nextLine.trimmed, scanConfig, loopStack);
+        this.checkLoopNesting(pass, nextLine, lineIdx);
+        this.auditAllocations(pass, nextLine.trimmed, lineIdx);
+        this.auditLinearLookups(pass, nextLine.trimmed, lineIdx);
+        this.auditIo(pass, nextLine, lineIdx);
+        this.auditBraces(pass, nextLine.trimmed);
     }
 
-    private auditAllocations(
-        trimmed: string,
-        lineIdx: number,
-        ctx: AnalyzerContext,
-        scanConfig: PerformanceScanConfig,
-        loopStack: LoopScope[],
-        issues: Issue[],
-    ): void {
+    private auditAllocations(pass: ScanPassContext, trimmed: string, lineIdx: number): void {
+        const { scanConfig, loopStack } = pass;
         if (
             loopStack.length > 0 &&
             scanConfig.checkAlloc &&
             !scanConfig.allocAllowlisted &&
             !LOOP_KEYWORD_RE.test(trimmed)
         ) {
-            this.checkTransientAllocation(trimmed, lineIdx, ctx, loopStack.length, issues);
+            this.checkTransientAllocation(pass, trimmed, lineIdx);
         }
     }
 
-    private auditLinearLookups(
-        trimmed: string,
-        lineIdx: number,
-        ctx: AnalyzerContext,
-        scanConfig: PerformanceScanConfig,
-        loopStack: LoopScope[],
-        issues: Issue[],
-    ): void {
-        if (
-            loopStack.length > 0 &&
-            scanConfig.checkLinearLookups &&
-            !LOOP_KEYWORD_RE.test(trimmed)
-        ) {
-            this.checkLinearCollectionLookup(trimmed, lineIdx, ctx, loopStack.length, issues);
+    private auditLinearLookups(pass: ScanPassContext, trimmed: string, lineIdx: number): void {
+        const { scanConfig, loopStack } = pass;
+        const { checkLinearLookups } = scanConfig;
+        if (loopStack.length > 0 && checkLinearLookups && !LOOP_KEYWORD_RE.test(trimmed)) {
+            this.checkLinearCollectionLookup(pass, trimmed, lineIdx);
         }
     }
 
-    private auditIo(
-        trimmed: string,
-        lineText: string,
-        lineIdx: number,
-        scanConfig: PerformanceScanConfig,
-        scanState: LineScanState,
-        ctx: AnalyzerContext,
-        issues: Issue[],
-    ): void {
+    private auditIo(pass: ScanPassContext, nextLine: ScannedLine, lineIdx: number): void {
+        const { scanConfig } = pass;
         if (scanConfig.checkIO && !scanConfig.syncIoAllowlisted) {
-            this.checkBlockingIo(
-                trimmed,
-                lineText,
-                lineIdx,
-                scanState.inAsyncFunction,
-                ctx,
-                issues,
-            );
+            this.checkBlockingIo(pass, nextLine, lineIdx);
         }
     }
 
-    private auditBraces(
-        trimmed: string,
-        scanConfig: PerformanceScanConfig,
-        loopStack: LoopScope[],
-    ): void {
+    private auditBraces(pass: ScanPassContext, trimmed: string): void {
+        const { scanConfig, loopStack } = pass;
         if (scanConfig.isIndentBased) return;
         updateBraceLoops(trimmed, loopStack);
         if (
@@ -306,15 +287,9 @@ export class PerformanceAnalyzer implements Analyzer {
         );
     }
 
-    checkLoopNesting(
-        trimmed: string,
-        lineText: string,
-        maxNesting: number,
-        lineIdx: number,
-        ctx: AnalyzerContext,
-        loopStack: LoopScope[],
-        issues: Issue[],
-    ): void {
+    private checkLoopNesting(pass: ScanPassContext, nextLine: ScannedLine, lineIdx: number): void {
+        const { scanConfig, loopStack } = pass;
+        const { trimmed, lineText } = nextLine;
         if (!LOOP_KEYWORD_RE.test(trimmed)) return;
 
         const indent = calculateIndent(lineText);
@@ -325,114 +300,102 @@ export class PerformanceAnalyzer implements Analyzer {
             usesBrace: trimmed.includes('{'),
         });
 
-        if (currentDepth >= maxNesting) {
-            const desc = PerformanceMessages.NESTED_LOOP_COMPLEXITY(currentDepth, maxNesting);
-            issues.push(
-                this.mkIssue(
-                    ctx,
-                    lineIdx,
-                    RULE_PRF_ALG_001,
-                    desc.message,
-                    currentDepth >= LOOP_DEPTH_ERROR_THRESHOLD ? SEVERITY_ERROR : SEVERITY_WARNING,
-                    { loopDepth: currentDepth, threshold: maxNesting },
-                    desc.suggestion,
-                ),
+        if (currentDepth >= scanConfig.maxNesting) {
+            const desc = PerformanceMessages.NESTED_LOOP_COMPLEXITY(
+                currentDepth,
+                scanConfig.maxNesting,
+            );
+            const severity =
+                currentDepth >= LOOP_DEPTH_ERROR_THRESHOLD ? SEVERITY_ERROR : SEVERITY_WARNING;
+            pass.issues.push(
+                this.mkIssue(pass.ctx, lineIdx, {
+                    rule: RULE_PRF_ALG_001,
+                    message: desc.message,
+                    severity,
+                    detail: { loopDepth: currentDepth, threshold: scanConfig.maxNesting },
+                    suggestion: desc.suggestion,
+                }),
             );
         }
     }
 
-    checkTransientAllocation(
+    private checkTransientAllocation(
+        pass: ScanPassContext,
         trimmed: string,
         lineIdx: number,
-        ctx: AnalyzerContext,
-        loopDepth: number,
-        issues: Issue[],
     ): void {
         if (/^\s*throw\b|\bthrow\s+new\b/.test(trimmed)) return;
         const isHighRisk = HIGH_RISK_OBJECT_ALLOC_RE.test(trimmed);
         const isGeneralAlloc = TRANSIENT_ALLOC_RE.test(trimmed);
         if (!isHighRisk && !isGeneralAlloc) return;
 
+        const loopDepth = pass.loopStack.length;
         if (isHighRisk) {
             const poolDesc = PerformanceMessages.HIGH_PRESSURE_OBJECT_ALLOCATION(loopDepth);
-            issues.push(
-                this.mkIssue(
-                    ctx,
-                    lineIdx,
-                    RULE_PRF_MEM_002,
-                    poolDesc.message,
-                    SEVERITY_WARNING,
-                    { loopDepth },
-                    poolDesc.suggestion,
-                ),
+            pass.issues.push(
+                this.mkIssue(pass.ctx, lineIdx, {
+                    rule: RULE_PRF_MEM_002,
+                    message: poolDesc.message,
+                    severity: SEVERITY_WARNING,
+                    detail: { loopDepth },
+                    suggestion: poolDesc.suggestion,
+                }),
             );
         }
         if (isGeneralAlloc) {
             const desc = PerformanceMessages.TRANSIENT_LOOP_ALLOCATION(loopDepth);
-            issues.push(
-                this.mkIssue(
-                    ctx,
-                    lineIdx,
-                    RULE_PRF_MEM_001,
-                    desc.message,
-                    SEVERITY_INFO,
-                    { loopDepth },
-                    desc.suggestion,
-                ),
+            pass.issues.push(
+                this.mkIssue(pass.ctx, lineIdx, {
+                    rule: RULE_PRF_MEM_001,
+                    message: desc.message,
+                    severity: SEVERITY_INFO,
+                    detail: { loopDepth },
+                    suggestion: desc.suggestion,
+                }),
             );
         }
     }
 
-    checkBlockingIo(
-        trimmed: string,
-        lineText: string,
-        lineIdx: number,
-        inAsyncFunction: boolean,
-        ctx: AnalyzerContext,
-        issues: Issue[],
-    ): void {
+    private checkBlockingIo(pass: ScanPassContext, nextLine: ScannedLine, lineIdx: number): void {
+        const { trimmed, lineText } = nextLine;
+        const inAsyncFunction = pass.scanState.inAsyncFunction;
         for (const io of BLOCKING_IO_PATTERNS) {
             if (!io.pattern.test(trimmed)) continue;
 
             const isCriticalContext =
                 inAsyncFunction || /(_process|_physics_process|tick|render)/.test(lineText);
             const desc = PerformanceMessages.BLOCKING_SYNC_IO(io.name, inAsyncFunction);
-            issues.push(
-                this.mkIssue(
-                    ctx,
-                    lineIdx,
-                    RULE_PRF_IO_001,
-                    desc.message,
-                    isCriticalContext ? SEVERITY_ERROR : SEVERITY_WARNING,
-                    { api: io.name, inAsync: inAsyncFunction },
-                    desc.suggestion,
-                ),
+            pass.issues.push(
+                this.mkIssue(pass.ctx, lineIdx, {
+                    rule: RULE_PRF_IO_001,
+                    message: desc.message,
+                    severity: isCriticalContext ? SEVERITY_ERROR : SEVERITY_WARNING,
+                    detail: { api: io.name, inAsync: inAsyncFunction },
+                    suggestion: desc.suggestion,
+                }),
             );
             break;
         }
     }
 
-    checkLinearCollectionLookup(
+    private checkLinearCollectionLookup(
+        pass: ScanPassContext,
         trimmed: string,
         lineIdx: number,
-        ctx: AnalyzerContext,
-        loopDepth: number,
-        issues: Issue[],
     ): void {
         const methodName = extractLinearLookupMethod(trimmed);
         if (!methodName) return;
 
+        const loopDepth = pass.loopStack.length;
         const desc = PerformanceMessages.LINEAR_COLLECTION_LOOKUP_IN_LOOP(methodName, loopDepth);
-        issues.push(
-            this.mkIssue(
-                ctx,
-                lineIdx,
-                RULE_PRF_ALG_002,
-                desc.message,
-                SEVERITY_WARNING,
-                { loopDepth, methodName },
-                desc.suggestion,
-            ),
+        pass.issues.push(
+            this.mkIssue(pass.ctx, lineIdx, {
+                rule: RULE_PRF_ALG_002,
+                message: desc.message,
+                severity: SEVERITY_WARNING,
+                detail: { loopDepth, methodName },
+                suggestion: desc.suggestion,
+            }),
         );
     }
 
@@ -454,26 +417,16 @@ export class PerformanceAnalyzer implements Analyzer {
      * Build a normalized Issue at a 1-based line for one performance rule.
      *
      * Centralizes id/location shaping so every rule emits the same schema; the caller supplies
-     * the severity and rule-specific payload.
+     * the severity and rule-specific payload in one finding descriptor, which keeps the two
+     * adjacent string fields (`rule`, `message`) from being swapped positionally.
      *
      * @param ctx - Scan context providing the normalized file path.
      * @param lineIdx - 0-based content line index; stored as the 1-based issue line.
-     * @param rule - Rule id such as PRF-ALG-001.
-     * @param message - Human-readable finding text.
-     * @param severity - Issue severity chosen by the rule.
-     * @param detail - Rule-specific structured payload for machine consumers.
-     * @param suggestion - Optional remediation hint surfaced in text output.
+     * @param finding - Rule id, finding text, severity and rule-specific payload for one issue.
      * @returns The issue ready to append to the analyzer result array.
      */
-    private mkIssue(
-        ctx: AnalyzerContext,
-        lineIdx: number,
-        rule: string,
-        message: string,
-        severity: 'info' | 'warning' | 'error',
-        detail: Record<string, any>,
-        suggestion?: string,
-    ): Issue {
+    private mkIssue(ctx: AnalyzerContext, lineIdx: number, finding: PerformanceFinding): Issue {
+        const { rule, message, severity, detail, suggestion } = finding;
         const line = lineIdx + 1;
         const file = ctx.filePath.replace(/\\/g, '/');
         const mapped = PRF_ACTIONABLE_MAP[rule];

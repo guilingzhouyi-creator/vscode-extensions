@@ -374,13 +374,17 @@ export class NamingAnalyzer implements Analyzer {
         );
     }
 
-    /** Predicate determining whether an AST node represents an object or class member. */
+    /**
+     * Predicate determining whether an AST node represents a class member.
+     *
+     * Object-literal property assignments are deliberately excluded. A key such as
+     * `business_domain_module` is a protocol identifier owned by an external data contract
+     * (serialized payloads, rule tables, schema keys); renaming it to camelCase would change
+     * the produced data rather than improve readability, so camelCase governance must not
+     * reach into literal keys.
+     */
     private isMemberDecl(node: ts.Node): boolean {
-        return (
-            ts.isMethodDeclaration(node) ||
-            ts.isPropertyDeclaration(node) ||
-            ts.isPropertyAssignment(node)
-        );
+        return ts.isMethodDeclaration(node) || ts.isPropertyDeclaration(node);
     }
 
     /** Predicate determining whether an AST node represents a function structure. */
@@ -554,8 +558,7 @@ export class NamingAnalyzer implements Analyzer {
 
     private checkMemberDeclaration(node: ts.Node, aCtx: AstNamingContext): void {
         if (aCtx.opts.checkMembers === false) return;
-        const member = node as
-            ts.MethodDeclaration | ts.PropertyDeclaration | ts.PropertyAssignment;
+        const member = node as ts.MethodDeclaration | ts.PropertyDeclaration;
         if (!member.name || !ts.isIdentifier(member.name)) return;
 
         const memberName = member.name.text;
@@ -577,9 +580,9 @@ export class NamingAnalyzer implements Analyzer {
             checkSymbolJargonHelper(memberName, pos, aCtx);
         }
 
-        // Property keys describe a data shape rather than a namespace, so length- and
-        // prefix-based decoupling proposals cannot be satisfied for them; only methods are
-        // registered, and they are exempt from prefix clustering by declaration kind.
+        // Only methods are registered for decoupling: a class method set shares an inherited
+        // verb prefix by construction, so clustering it would propose splitting a cohesive
+        // class into sibling modules.
         if (ts.isMethodDeclaration(member)) {
             this.checkDecouplingSymbol(memberName, KIND_METHOD, pos, aCtx);
         }

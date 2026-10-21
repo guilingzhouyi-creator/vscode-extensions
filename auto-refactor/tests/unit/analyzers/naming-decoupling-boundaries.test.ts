@@ -169,6 +169,26 @@ describe('NAM-DEC-001 evidence shape', () => {
     });
 });
 
+describe('NAM-MBR-001 protocol keys', () => {
+    it('does not require camelCase for object-literal keys owned by a data contract', () => {
+        const source = [
+            'export const taxonomy = {',
+            '    business_domain_module: 0,',
+            '    shared_capability_module: 0,',
+            '    rule_policy_module: 0,',
+            '};',
+        ].join('\n');
+
+        expect(findingsFor(source, 'NAM-MBR-001')).toEqual([]);
+    });
+
+    it('still requires camelCase for genuine class members', () => {
+        const source = ['export class Holder {', '    bad_member_name = 1;', '}'].join('\n');
+
+        expect(findingsFor(source, 'NAM-MBR-001')).toEqual(['bad_member_name']);
+    });
+});
+
 describe('NAM-SGL-001 allow-list scope', () => {
     /**
      * Runs the analyzer with an explicit single-letter allow-list.

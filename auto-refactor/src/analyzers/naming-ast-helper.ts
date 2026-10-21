@@ -304,9 +304,15 @@ export function checkCollectionNamingHelper(
         return;
     }
     if (init.expression.text !== 'Map') return;
-    if (/(By[A-Z0-9]|To[A-Z0-9]|Map|Dict|Mapping)/.test(name) || /(To|By|Map|Dict)$/i.test(name)) {
-        return;
-    }
+
+    // A leading `by` already names the key relation (`byFile`, `byId`), and it is the
+    // conventional form for lookup tables; matching it only in capitalised position made
+    // the rule report tables whose name stated the relation more precisely than a suffix.
+    const relationPattern =
+        /(By[A-Z0-9]|To[A-Z0-9]|Map|Dict|Mapping)/.test(name) ||
+        /^(by|to)[A-Z0-9]/.test(name) ||
+        /(To|By|Map|Dict)$/i.test(name);
+    if (relationPattern) return;
 
     pushAstFinding(aCtx, {
         line: pos.line + 1,
