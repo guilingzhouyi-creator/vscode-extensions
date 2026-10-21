@@ -15,53 +15,55 @@
 use std::env;
 use std::path::PathBuf;
 
+#[path = "taxis_cmd/mod.rs"]
+mod taxis_cmd;
+use taxis_cmd::common::{find_arg_value, print_json, CliContext};
+use taxis_cmd::{bench, promotion};
+
 use fractal_git::constants::cli::CliTag;
 use fractal_git::{
-    compute_jeffreys_credible_lower, ActorIdentity, AgentPushContext, AutoQualityScoreEnvelope,
-    CommitCountVerdict, CommitCounter, CommitMessageGuard, CommitTelemetryConfig, ConflictGuard,
-    DiskRefStore, FileMode, FractalRef, GitBlob, GitCommit, GitSignature, GitTree, GitTreeEntry,
-    HumanUacProof, Oid, OperationGraph, PreReceiveGuard, PromotionStagingLedger, QuotaGovernor,
-    RefStore, RepoViewSnapshot, ScopeProjection, StandardNonceAuthorizer, TaxisPolicy,
-    TelemetryCommitNode, TopologyVerifier, WorktreeMode, WorktreePool,
+    ActorIdentity, AgentPushContext, CommitCountVerdict, CommitCounter, CommitMessageGuard,
+    CommitTelemetryConfig, ConflictGuard, DiskRefStore, FileMode, FractalRef, GitBlob, GitCommit,
+    GitSignature, GitTree, GitTreeEntry, Oid, OperationGraph, PreReceiveGuard, QuotaGovernor,
+    RefStore, RepoViewSnapshot, ScopeProjection, TaxisPolicy, TelemetryCommitNode,
+    TopologyVerifier, WorktreeMode, WorktreePool,
 };
 
-/// CLI Execution Context.
-#[derive(Debug)]
-struct CliContext {
-    git_dir: PathBuf,
-    json_mode: bool,
-    args: Vec<String>,
-}
-
 fn resolve_canonical_subcommand(raw: &str) -> &str {
-    match raw {
-        "st" | "status" => "status",
-        "ci" | "commit" => "commit",
-        "br" | "branch" => "branch",
-        "di" | "diff" => "diff",
-        "co" | "checkout" => "checkout",
-        "sw" | "switch" => "switch",
-        "gate" | "check" | "verify" => "verify",
-        "gc" | "clean" | "reclaim" => "reclaim",
-        "serve" | "daemon" => "daemon",
-        "lg" | "log" => "log",
-        "sh" | "show" => "show",
-        "fe" | "fetch" => "fetch",
-        "pu" | "push" => "push",
-        "pl" | "pull" => "pull",
-        "rb" | "rebase" => "rebase",
-        "mg" | "merge" => "merge",
-        "cp" | "cherry-pick" => "cherry-pick",
-        "wt" | "worktree" => "worktree",
-        "pm" | "promo" | "promotion" => "promotion",
-        "bench" | "benchmark" => "bench",
-        "undo" => "undo",
-        "op" | "operation" => "operation",
-        "rev-list" => "rev-list",
-        "version" | "-v" | "--version" => "version",
-        "help" | "-h" | "--help" => "help",
-        other => other,
+    const ALIASES: &[(&[&str], &str)] = &[
+        (&["st", "status"], "status"),
+        (&["ci", "commit"], "commit"),
+        (&["br", "branch"], "branch"),
+        (&["di", "diff"], "diff"),
+        (&["co", "checkout"], "checkout"),
+        (&["sw", "switch"], "switch"),
+        (&["gate", "check", "verify"], "verify"),
+        (&["gc", "clean", "reclaim"], "reclaim"),
+        (&["serve", "daemon"], "daemon"),
+        (&["lg", "log"], "log"),
+        (&["sh", "show"], "show"),
+        (&["fe", "fetch"], "fetch"),
+        (&["pu", "push"], "push"),
+        (&["pl", "pull"], "pull"),
+        (&["rb", "rebase"], "rebase"),
+        (&["mg", "merge"], "merge"),
+        (&["cp", "cherry-pick"], "cherry-pick"),
+        (&["wt", "worktree"], "worktree"),
+        (&["pm", "promo", "promotion"], "promotion"),
+        (&["bench", "benchmark"], "bench"),
+        (&["undo"], "undo"),
+        (&["op", "operation"], "operation"),
+        (&["rev-list"], "rev-list"),
+        (&["version", "-v", "--version"], "version"),
+        (&["help", "-h", "--help"], "help"),
+    ];
+
+    for (aliases, target) in ALIASES {
+        if aliases.contains(&raw) {
+            return target;
+        }
     }
+    raw
 }
 
 fn print_banner() {
@@ -102,22 +104,6 @@ Flags:
   --git-dir <path>   Override .git or .taxis directory location
 "#
     );
-}
-
-fn print_json<T: serde::Serialize>(value: &T) {
-    println!(
-        "{}",
-        serde_json::to_string_pretty(value).unwrap_or_default()
-    );
-}
-
-fn find_arg_value<'a>(args: &'a [String], flags: &[&str]) -> Option<&'a str> {
-    for index in 0..args.len().saturating_sub(1) {
-        if flags.contains(&args[index].as_str()) {
-            return Some(args[index + 1].as_str());
-        }
-    }
-    None
 }
 
 fn handle_status(ctx: &CliContext) {
@@ -804,461 +790,7 @@ fn handle_worktree(ctx: &CliContext) {
     handle_passthrough("worktree", ctx);
 }
 
-fn handle_promotion(ctx: &CliContext) {
-    let current_time_ms = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|dur| dur.as_millis() as i64)
-        .unwrap_or(0);
-
-    let mut ledger = match PromotionStagingLedger::load_or_init(&ctx.git_dir) {
-        Ok(loaded_ledger) => loaded_ledger,
-        Err(load_err) => {
-            eprintln!("Error loading staged promotion ledger: {}", load_err);
-            return;
-        }
-    };
-    let policy = TaxisPolicy::default();
-
-    let action = ctx
-        .args
-        .first()
-        .map(|action_str| action_str.as_str())
-        .unwrap_or("list");
-
-    match action {
-        "request" | "stage" => {
-            let oid_str = find_arg_value(
-                &ctx.args,
-                &["--oid", "--candidate", "--target-oid"],
-            ).map(|val| val.to_string());
-            let summary = find_arg_value(&ctx.args, &["--summary"])
-                .unwrap_or("Autonomous Agent PR promotion proposal")
-                .to_string();
-            let agent_uid = find_arg_value(&ctx.args, &["--agent", "--agent-uid"])
-                .unwrap_or("agent-sub-001")
-                .to_string();
-            let composite_score = find_arg_value(&ctx.args, &["--score"])
-                .and_then(|val| val.parse::<f64>().ok())
-                .unwrap_or(0.0);
-            let cai_index = find_arg_value(&ctx.args, &["--cai"])
-                .and_then(|val| val.parse::<f64>().ok())
-                .unwrap_or(100.0);
-            let custom_ci_lower = find_arg_value(&ctx.args, &["--ci-lower"])
-                .and_then(|val| val.parse::<f64>().ok());
-            let cyclomatic_complexity_delta = find_arg_value(&ctx.args, &["--cc-delta"])
-                .and_then(|val| val.parse::<i32>().ok())
-                .unwrap_or(0);
-            let eloc_delta = find_arg_value(&ctx.args, &["--eloc-delta"])
-                .and_then(|val| val.parse::<i32>().ok())
-                .unwrap_or(0);
-            let anti_gaming_passed = find_arg_value(&ctx.args, &["--anti-gaming"])
-                .and_then(|val| val.parse::<bool>().ok())
-                .unwrap_or(true);
-            let report = find_arg_value(&ctx.args, &["--report"])
-                .unwrap_or("Auto-Refactor Quality Gate: zero debt verification.")
-                .to_string();
-
-            let candidate_oid = match oid_str {
-                Some(ref hex_str) => match Oid::from_hex(hex_str) {
-                    Ok(parsed_oid) => parsed_oid,
-                    Err(hex_err) => {
-                        eprintln!("Invalid candidate OID '{}': {}", hex_str, hex_err);
-                        return;
-                    }
-                },
-                None => {
-                    let ref_store = DiskRefStore::new(&ctx.git_dir);
-                    match ref_store.get_ref("refs/fractal/trunk") {
-                        Ok(Some(trunk_oid)) => trunk_oid,
-                        _ => Oid::from_bytes([0xaa; 20]),
-                    }
-                }
-            };
-
-            let ci_lower = custom_ci_lower
-                .unwrap_or_else(|| compute_jeffreys_credible_lower(composite_score));
-
-            let auto_score = AutoQualityScoreEnvelope {
-                composite_score,
-                cai_index,
-                cyclomatic_complexity_delta,
-                eloc_delta,
-                credible_interval_lower: ci_lower,
-                anti_gaming_passed,
-                summary_report: report,
-            };
-
-            match ledger.stage_promotion(
-                candidate_oid,
-                auto_score,
-                summary,
-                agent_uid,
-                &policy,
-                current_time_ms,
-            ) {
-                Ok(req_id) => {
-                    if ctx.json_mode {
-                        let promo_payload = serde_json::json!({
-                            "status": "staged",
-                            "request_id": req_id,
-                            "candidate_oid": candidate_oid.to_hex(),
-                            "ttl_seconds": policy.staged_promotion_ttl_seconds,
-                            "composite_score": composite_score,
-                            "uac_required": policy.uac_required_for_system_trunk
-                        });
-                        print_json(&promo_payload);
-                    } else {
-                        println!(
-                            "{} Staged Promotion Proposal '{}'",
-                            CliTag::UAC_PROMOTION_STAGED,
-                            req_id
-                        );
-                        println!("  Candidate OID     : {}", candidate_oid.to_hex());
-                        println!(
-                            concat!(
-                                "  Auto Score        : {:.1}/100 ",
-                                "(CAI: {:.1}%, CC Δ: {}, Anti-Gaming: {})"
-                            ),
-                            composite_score,
-                            cai_index,
-                            cyclomatic_complexity_delta,
-                            if anti_gaming_passed { "PASS" } else { "FAIL" }
-                        );
-                        println!(
-                            "  Lease Expiry      : 1 Hour (TTL = {}s)",
-                            policy.staged_promotion_ttl_seconds
-                        );
-                        println!(
-                            "  Promotion Gate    : Awaiting Human Physical Click in GUI UAC Modal"
-                        );
-                    }
-                }
-                Err(err) => {
-                    if ctx.json_mode {
-                        let rejection_payload = serde_json::json!({
-                            "status": "rejected",
-                            "error": format!("{}", err)
-                        });
-                        print_json(&rejection_payload);
-                    } else {
-                        eprintln!("{} {}", CliTag::PROMOTION_REJECTED, err);
-                    }
-                }
-            }
-        }
-        "authorize-gui-bridge" | "approve" => {
-            let req_id_opt = find_arg_value(&ctx.args, &["--id"]).map(|val| val.to_string());
-            let operator = find_arg_value(&ctx.args, &["--operator"])
-                .unwrap_or("Human Architect (GUI Click)")
-                .to_string();
-            let email = find_arg_value(&ctx.args, &["--email"])
-                .unwrap_or("architect@deepmind.internal")
-                .to_string();
-            let session = find_arg_value(&ctx.args, &["--session"])
-                .unwrap_or("GUI_SESSION_VERIFIED")
-                .to_string();
-
-            let active_req = match ledger.get_active_candidate(current_time_ms) {
-                Some(cand) => cand.clone(),
-                None => {
-                    eprintln!("No active staged promotion awaiting human UAC approval.");
-                    return;
-                }
-            };
-
-            let target_id = req_id_opt.unwrap_or(active_req.request_id.clone());
-            let proof = HumanUacProof {
-                request_id: target_id.clone(),
-                signed_nonce: active_req.challenge_nonce,
-                operator_name: operator.clone(),
-                operator_email: email,
-                gui_session_token: session,
-                timestamp_ms: current_time_ms,
-            };
-
-            let authorizer = StandardNonceAuthorizer::new();
-            let ref_store = DiskRefStore::new(&ctx.git_dir);
-
-            match ledger.apply_uac_approval(&target_id, &proof, &authorizer, &ref_store) {
-                Ok(()) => {
-                    if ctx.json_mode {
-                        let success_payload = serde_json::json!({
-                            "status": "promoted",
-                            "request_id": target_id,
-                            "promoted_to": "refs/heads/main",
-                            "candidate_oid": active_req.candidate_commit_oid.to_hex(),
-                            "operator": operator
-                        });
-                        print_json(&success_payload);
-                    } else {
-                        println!(
-                            "{} Human GUI UAC Permission Granted!",
-                            CliTag::HUMAN_UAC_VERIFIED
-                        );
-                        println!("  Request ID   : {}", target_id);
-                        println!("  Operator     : {}", operator);
-                        println!("  Target Trunk : refs/heads/main (System Trunk)");
-                        println!("  Candidate OID: {}", active_req.candidate_commit_oid.to_hex());
-                        println!("  Result       : Merged into System Trunk atomically.");
-                    }
-                }
-                Err(approval_err) => {
-                    if ctx.json_mode {
-                        let failure_payload = serde_json::json!({
-                            "status": "approval_failed",
-                            "error": format!("{}", approval_err)
-                        });
-                        print_json(&failure_payload);
-                    } else {
-                        eprintln!("{} {}", CliTag::UAC_APPROVAL_FAILED, approval_err);
-                    }
-                }
-            }
-        }
-        "reject" => {
-            let req_id_opt = find_arg_value(&ctx.args, &["--id"]).map(|val| val.to_string());
-            let operator = find_arg_value(&ctx.args, &["--operator"])
-                .unwrap_or("Human Architect")
-                .to_string();
-            let feedback = find_arg_value(&ctx.args, &["--feedback", "--reason"])
-                .unwrap_or("Promotion declined in GUI UAC review")
-                .to_string();
-
-            let active_req = match ledger.get_active_candidate(current_time_ms) {
-                Some(cand) => cand.clone(),
-                None => {
-                    eprintln!("No active staged promotion awaiting human UAC approval.");
-                    return;
-                }
-            };
-            let target_id = req_id_opt.unwrap_or(active_req.request_id);
-
-            match ledger.reject_uac_promotion(&target_id, operator, feedback, current_time_ms) {
-                Ok(()) => {
-                    if ctx.json_mode {
-                        let rejection_payload = serde_json::json!({
-                            "status": "rejected",
-                            "request_id": target_id
-                        });
-                        print_json(&rejection_payload);
-                    } else {
-                        println!(
-                            "{} Request '{}' rejected.",
-                            CliTag::UAC_PROMOTION_REJECTED,
-                            target_id
-                        );
-                    }
-                }
-                Err(reject_err) => eprintln!("{} {}", CliTag::UAC_REJECT_FAILED, reject_err),
-            }
-        }
-        _ /* list or show */ => {
-            let active = ledger.get_active_candidate(current_time_ms);
-            if ctx.json_mode {
-                let status_payload = serde_json::json!({
-                    "engine": "taxis",
-                    "subsystem": "uac_staged_promotion",
-                    "active_candidate": active,
-                    "policy": {
-                        "ttl_seconds": policy.staged_promotion_ttl_seconds,
-                        "score_ratchet_delta": policy.replacement_score_baseline_delta,
-                        "min_score": policy.minimum_promotion_score,
-                        "uac_required": policy.uac_required_for_system_trunk
-                    }
-                });
-                print_json(&status_payload);
-            } else {
-                print_banner();
-                println!("=== Staged Promotion Queue (Human GUI UAC) ===");
-                println!("Policy Guardrails:");
-                println!("  Human UAC Required : {}", policy.uac_required_for_system_trunk);
-                println!(
-                    "  Staged Lease TTL   : {}s (1 Hour)",
-                    policy.staged_promotion_ttl_seconds
-                );
-                println!(
-                    "  Score Ratchet Δ    : +{:.1} points",
-                    policy.replacement_score_baseline_delta
-                );
-                println!("  Minimum Auto Score : {:.1}/100\n", policy.minimum_promotion_score);
-
-                match active {
-                    Some(cand) => {
-                        let remaining_sec = (cand.expires_at_ms - current_time_ms).max(0) / 1000;
-                        println!("Active Candidate Awaiting Human UAC:");
-                        println!("  Request ID     : {}", cand.request_id);
-                        println!("  Candidate OID  : {}", cand.candidate_commit_oid.to_hex());
-                        println!("  Proposing Agent: {}", cand.agent_uid);
-                        println!(
-                            "  Auto Score     : {:.1}/100 (CAI: {:.1}%, CC Δ: {}, Anti-Gaming: {})",
-                            cand.auto_score.composite_score,
-                            cand.auto_score.cai_index,
-                            cand.auto_score.cyclomatic_complexity_delta,
-                            if cand.auto_score.anti_gaming_passed { "PASS" } else { "FAIL" }
-                        );
-                        println!(
-                            "  Lease Time Left: {}m {}s",
-                            remaining_sec / 60,
-                            remaining_sec % 60
-                        );
-                        println!("  Summary        : {}", cand.summary);
-                        println!("  Status         : {:?}", cand.status);
-                    }
-                    None => {
-                        println!("No active candidate currently awaiting human UAC approval.");
-                    }
-                }
-            }
-        }
-    }
-}
-
-fn handle_bench(ctx: &CliContext) {
-    let multiplier = find_arg_value(&ctx.args, &["-m", "--multiplier"])
-        .and_then(|val| val.parse::<usize>().ok())
-        .unwrap_or(1);
-    let level = if ctx.args.iter().any(|arg| arg == "--scion-parity") {
-        fractal_git::BenchmarkLevel::All
-    } else if let Some(level_str) = find_arg_value(&ctx.args, &["--level"]) {
-        match level_str.to_lowercase().as_str() {
-            "2" | "scale" | "poset" => fractal_git::BenchmarkLevel::Level2Scale,
-            "3" | "macro" | "monorepo" => fractal_git::BenchmarkLevel::Level3Macro,
-            "all" | "full" => fractal_git::BenchmarkLevel::All,
-            _ => fractal_git::BenchmarkLevel::Level1Micro,
-        }
-    } else {
-        fractal_git::BenchmarkLevel::Level1Micro
-    };
-    let save_path = find_arg_value(&ctx.args, &["--save-baseline"]).map(PathBuf::from);
-    let verify_path = find_arg_value(&ctx.args, &["--verify-baseline"]).map(PathBuf::from);
-
-    let suite = fractal_git::bench::TaxisBenchmarkSuite::run_suite(level, multiplier);
-
-    if let Some(save_file) = save_path {
-        if let Some(parent) = save_file.parent() {
-            let _ = std::fs::create_dir_all(parent);
-        }
-        let json = serde_json::to_string_pretty(&suite).unwrap_or_default();
-        if let Err(io_err) = std::fs::write(&save_file, json) {
-            eprintln!(
-                "Failed to save baseline to {}: {}",
-                save_file.display(),
-                io_err
-            );
-            std::process::exit(1);
-        }
-        println!("Saved performance baseline to {}", save_file.display());
-    }
-
-    if let Some(verify_arg) = verify_path {
-        let verify_str = verify_arg.to_string_lossy().to_string();
-        let trimmed = verify_str
-            .trim_matches(|char_val: char| {
-                char_val == '"' || char_val == '\'' || char_val.is_whitespace()
-            })
-            .to_string();
-        let normalized = trimmed.replace('/', std::path::MAIN_SEPARATOR_STR);
-        let mut final_path = PathBuf::from(&trimmed);
-
-        if !final_path.exists() {
-            let norm_path = PathBuf::from(&normalized);
-            if norm_path.exists() {
-                final_path = norm_path;
-            } else if let Ok(cwd) = env::current_dir() {
-                let candidates = [
-                    cwd.join(&trimmed),
-                    cwd.join(&normalized),
-                    cwd.join("fractal-git").join(&trimmed),
-                    cwd.join("fractal-git").join(&normalized),
-                ];
-                for cand in &candidates {
-                    if cand.exists() {
-                        final_path = cand.clone();
-                        break;
-                    }
-                }
-            }
-        }
-
-        let baseline: fractal_git::bench::TaxisBenchmarkSuite = if final_path.exists() {
-            let content = std::fs::read_to_string(&final_path).unwrap_or_default();
-            match serde_json::from_str(&content) {
-                Ok(parsed_baseline) => parsed_baseline,
-                Err(parse_err) => {
-                    eprintln!(
-                        "Failed to parse baseline {}: {}",
-                        final_path.display(),
-                        parse_err
-                    );
-                    std::process::exit(1);
-                }
-            }
-        } else {
-            const EMBEDDED_BASELINE: &str =
-                include_str!("../../baselines/taxis-perf.baseline.json");
-            match serde_json::from_str(EMBEDDED_BASELINE) {
-                Ok(parsed_baseline) => {
-                    println!(
-                        "{} Resolved benchmark baseline via embedded compile-time freeze.",
-                        CliTag::HERMETIC_BASELINE
-                    );
-                    parsed_baseline
-                }
-                Err(parse_err) => {
-                    eprintln!("Failed to parse embedded baseline: {}", parse_err);
-                    std::process::exit(1);
-                }
-            }
-        };
-
-        let verdict = suite.compare_with_baseline(&baseline, 15.0);
-        if !verdict.passed {
-            eprintln!("TB-REGRESSION: Performance benchmark regressed beyond 15% tolerance!");
-            for reg in verdict.regressions {
-                eprintln!("  {} {}", CliTag::FAIL, reg);
-            }
-            std::process::exit(1);
-        } else {
-            println!("TB-REGRESSION: Performance ratchet passed (within 15% tolerance).");
-            for imp in verdict.improvements {
-                println!("  {} {}", CliTag::OPTIMIZED, imp);
-            }
-        }
-    }
-
-    if ctx.json_mode {
-        print_json(&suite);
-    } else {
-        println!("=== Taxis Performance Micro-Benchmark Results ===");
-        println!(
-            "{:<36} {:>8} {:>14} {:>16}",
-            "Benchmark Metric", "Iters", "Avg Latency", "Throughput"
-        );
-        println!("{}", "-".repeat(78));
-        for metric in &suite.metrics {
-            let latency_str = if metric.avg_latency_ns < 1000 {
-                format!("{} ns", metric.avg_latency_ns)
-            } else if metric.avg_latency_ns < 1_000_000 {
-                format!("{:.2} us", metric.avg_latency_ns as f64 / 1000.0)
-            } else {
-                format!("{:.2} ms", metric.avg_latency_ns as f64 / 1_000_000.0)
-            };
-            println!(
-                "{:<36} {:>8} {:>14} {:>14.0} op/s",
-                metric.name, metric.iterations, latency_str, metric.ops_per_sec
-            );
-        }
-        println!("{}", "-".repeat(78));
-    }
-}
-
-fn main() {
-    let raw_args: Vec<String> = env::args().skip(1).collect();
-    if raw_args.is_empty() {
-        print_help();
-        return;
-    }
-
+fn parse_cli_args(raw_args: &[String]) -> (PathBuf, bool, Vec<String>) {
     let mut git_dir = PathBuf::from(".git");
     let mut json_mode = false;
     let mut filtered_args = Vec::new();
@@ -1276,55 +808,71 @@ fn main() {
             arg_cursor += 1;
         }
     }
+    (git_dir, json_mode, filtered_args)
+}
 
+fn extract_effective_subcommand(filtered_args: &[String]) -> (&str, Vec<String>) {
+    if filtered_args[0] == "git" {
+        if filtered_args.len() > 1 {
+            (
+                resolve_canonical_subcommand(&filtered_args[1]),
+                filtered_args[2..].to_vec(),
+            )
+        } else {
+            ("help", Vec::new())
+        }
+    } else {
+        (
+            resolve_canonical_subcommand(&filtered_args[0]),
+            filtered_args[1..].to_vec(),
+        )
+    }
+}
+
+fn dispatch_command(effective_subcommand: &str, ctx: &CliContext) {
+    match effective_subcommand {
+        "status" => handle_status(ctx),
+        "branch" => handle_branch(ctx),
+        "commit" => handle_commit(ctx),
+        "diff" => handle_diff(ctx),
+        "checkout" => handle_checkout(ctx),
+        "worktree" => handle_worktree(ctx),
+        "promotion" => promotion::handle_promotion(ctx),
+        "bench" => bench::handle_bench(ctx),
+        "undo" => handle_undo(ctx),
+        "operation" => handle_operation(ctx),
+        "rev-list" => handle_rev_list(ctx),
+        "verify" => handle_verify(ctx),
+        "reclaim" => handle_reclaim(ctx),
+        "daemon" => handle_daemon(ctx),
+        "version" => {
+            print_banner();
+            println!("Version: 0.1.0 (Rust Stable, 9 Micro-Crates)");
+        }
+        "help" => print_help(),
+        other => handle_passthrough(other, ctx),
+    }
+}
+
+fn main() {
+    let raw_args: Vec<String> = env::args().skip(1).collect();
+    if raw_args.is_empty() {
+        print_help();
+        return;
+    }
+
+    let (git_dir, json_mode, filtered_args) = parse_cli_args(&raw_args);
     if filtered_args.is_empty() {
         print_help();
         return;
     }
 
-    // Handle "taxis git <args...>" prefix transparently
-    let effective_subcommand = if filtered_args[0] == "git" {
-        if filtered_args.len() > 1 {
-            resolve_canonical_subcommand(&filtered_args[1])
-        } else {
-            "help"
-        }
-    } else {
-        resolve_canonical_subcommand(&filtered_args[0])
-    };
-
-    let sub_args = if filtered_args[0] == "git" && filtered_args.len() > 1 {
-        filtered_args[2..].to_vec()
-    } else {
-        filtered_args[1..].to_vec()
-    };
-
+    let (effective_subcommand, sub_args) = extract_effective_subcommand(&filtered_args);
     let ctx = CliContext {
         git_dir,
         json_mode,
         args: sub_args,
     };
 
-    match effective_subcommand {
-        "status" => handle_status(&ctx),
-        "branch" => handle_branch(&ctx),
-        "commit" => handle_commit(&ctx),
-        "diff" => handle_diff(&ctx),
-        "checkout" => handle_checkout(&ctx),
-        "worktree" => handle_worktree(&ctx),
-        "promotion" => handle_promotion(&ctx),
-        "bench" => handle_bench(&ctx),
-        "undo" => handle_undo(&ctx),
-        "operation" => handle_operation(&ctx),
-        "rev-list" => handle_rev_list(&ctx),
-        "verify" => handle_verify(&ctx),
-        "reclaim" => handle_reclaim(&ctx),
-        "daemon" => handle_daemon(&ctx),
-        "version" => {
-            print_banner();
-            println!("Version: 0.1.0 (Rust Stable, 9 Micro-Crates)");
-        }
-        "help" => print_help(),
-        other => handle_passthrough(other, &ctx),
-    }
+    dispatch_command(effective_subcommand, &ctx);
 }
