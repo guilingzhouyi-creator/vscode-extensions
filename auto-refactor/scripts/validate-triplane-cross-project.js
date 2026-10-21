@@ -268,7 +268,7 @@ async function main() {
     const dynamicScore = computeDynamicQualityScore(dynamicVector);
 
     // 3. Adaptive Weighting & Cross-Plane Fusion
-    const weights = resolveAdaptiveFusionWeights(proj.profile, true);
+    const weights = resolveAdaptiveFusionWeights(proj.profile, true, true);
     const unified = computeUnifiedQualityScore(staticVector, dynamicVector, 95.0, proj.profile);
 
     // 4. Cross-Plane Risk Resonance
@@ -321,7 +321,7 @@ async function main() {
     console.log(`  Static Plane Q_s  : ${staticScore.toFixed(2)}/100`);
     console.log(
       `    Vector: A=${staticVector.A} M=${staticVector.M} P=${staticVector.P} ` +
-        `D=${staticVector.D} T=${staticVector.T} R=${staticVector.R} E=${staticVector.E}`,
+        `D=${staticVector.D} T=${staticVector.T} R=${staticVector.R} S=${staticVector.S} E=${staticVector.E}`,
     );
     console.log(`  Dynamic Plane Q_d : ${dynamicScore.toFixed(2)}/100`);
     console.log(

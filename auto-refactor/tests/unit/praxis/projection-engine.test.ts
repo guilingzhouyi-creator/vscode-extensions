@@ -133,4 +133,64 @@ describe('LayerVFS — Physical Projection Engine & Sandbox Runner', () => {
 
         await sandbox.close();
     });
+
+    it('leverages sparse hardlink overlay and instant bootstrap for dependencies', async () => {
+        const baseDir = path.join(tempDir, 'host-base-repo');
+        fs.mkdirSync(path.join(baseDir, 'src'), { recursive: true });
+        fs.mkdirSync(path.join(baseDir, 'node_modules', 'shared-lib'), { recursive: true });
+
+        fs.writeFileSync(
+            path.join(baseDir, 'src', 'index.ts'),
+            'export const hostVersion = "1.0.0";\n',
+        );
+        fs.writeFileSync(
+            path.join(baseDir, 'node_modules', 'shared-lib', 'index.js'),
+            'module.exports = { value: 42 };\n',
+        );
+
+        const testWorkspace = await manager.createWorkspace({
+            cardId: 'CARD-SPARSE-TEST',
+            cellId: 'cell-sparse',
+            agentUid: 'agent-sparse',
+        });
+
+        await testWorkspace.putFile(
+            'src/index.ts',
+            'export const hostVersion = "1.0.0";\n',
+        );
+
+        const sandbox = await projectWorkspace(testWorkspace, {
+            targetDir: path.join(tempDir, 'sandbox-sparse'),
+            baseDir,
+            useSparseLinks: true,
+            instantBootstrap: true,
+            cleanOnClose: true,
+        });
+
+        // 1. Verify file exists in sandbox
+        const projectedFile = path.join(sandbox.projectedPath, 'src', 'index.ts');
+        expect(fs.existsSync(projectedFile)).toBe(true);
+
+        // 2. Verify hardlink sharing (same inode on filesystem)
+        const hostStat = fs.statSync(path.join(baseDir, 'src', 'index.ts'));
+        const sandboxStat = fs.statSync(projectedFile);
+        expect(sandboxStat.ino).toBe(hostStat.ino);
+
+        // 3. Verify instant bootstrap mounted node_modules
+        const sandboxPkg = path.join(
+            sandbox.projectedPath,
+            'node_modules',
+            'shared-lib',
+            'index.js',
+        );
+        expect(fs.existsSync(sandboxPkg)).toBe(true);
+        expect(fs.readFileSync(sandboxPkg, 'utf8')).toContain('value: 42');
+
+        // 4. Close sandbox and ensure host files are NOT affected
+        await sandbox.close();
+        expect(fs.existsSync(sandbox.projectedPath)).toBe(false);
+        const hostModulePath = path.join(baseDir, 'node_modules', 'shared-lib', 'index.js');
+        expect(fs.existsSync(hostModulePath)).toBe(true);
+        expect(fs.existsSync(path.join(baseDir, 'src', 'index.ts'))).toBe(true);
+    });
 });

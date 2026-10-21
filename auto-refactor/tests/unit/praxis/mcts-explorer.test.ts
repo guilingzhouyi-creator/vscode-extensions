@@ -164,4 +164,51 @@ describe('LayerVFS MCTS — Multi-Agent Exploration Tournament', () => {
         expect(verdict.winningDeltas).toEqual([]);
         expect(verdict.leaderboard).toEqual([]);
     });
+
+    it('evaluates candidate strategy using localizedEdits partial AST reconstruction', async () => {
+        const cardContext: PraxisCardContext = {
+            cardId: 'TASK-MCTS-LOCALIZED',
+            cellId: 'cell-localized',
+            agentUid: 'agent-localized',
+        };
+
+        const store = manager.getStore();
+        const initialOrderFile = await store.getFile('main', 'src/order.js');
+        const initialStr = Buffer.from(initialOrderFile!.content).toString('utf8');
+
+        // Locate target offset for replacement
+        const targetOld = 'function processOrder(order) {';
+        const targetOffset = initialStr.indexOf(targetOld);
+
+        const candidateWithEdits: CandidateStrategy = {
+            strategyId: 'strategy-localized-fast',
+            label: 'Fast Localized Guard Refactor',
+            fileModifications: new Map(),
+            localizedEdits: new Map([
+                [
+                    'src/order.js',
+                    [
+                        {
+                            offset: targetOffset,
+                            length: targetOld.length,
+                            replacement: 'function processOrder(order: OrderDto) {',
+                        },
+                    ],
+                ],
+            ]),
+        };
+
+        const verdict = await explorer.explore(cardContext, [candidateWithEdits]);
+        expect(verdict.candidatesEvaluated).toBe(1);
+        expect(verdict.winningStrategy?.strategyId).toBe('strategy-localized-fast');
+        expect(verdict.winningDeltas.length).toBe(1);
+        expect(verdict.winningDeltas[0].path).toBe('src/order.js');
+        expect(verdict.winningDeltas[0].status).toBe('modified');
+        expect(verdict.winningDeltas[0].newHash).not.toBeNull();
+        expect(verdict.winningDeltas[0].oldHash).not.toBe(verdict.winningDeltas[0].newHash);
+
+        const newBytes = await store.getContent(verdict.winningDeltas[0].newHash!);
+        expect(newBytes).not.toBeNull();
+        expect(Buffer.from(newBytes!).toString('utf8')).toContain('processOrder(order: OrderDto)');
+    });
 });

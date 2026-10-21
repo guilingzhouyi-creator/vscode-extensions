@@ -15,13 +15,15 @@
 import { createHash } from 'node:crypto';
 import type {
     CASObject,
+    ChunkDescriptor,
+    FileEditOp,
     IPraxisVFSStorage,
     VfsFileEntry,
     WorkspaceHandle,
     WorkspaceSnapshot,
 } from './vfs-contracts';
 import { VfsError } from './vfs-contracts';
-import { FastCDC } from './fast-cdc';
+import { FastCDC, hashBuffer } from './fast-cdc';
 import { SqliteBackend } from './sqlite-backend';
 import type { PraxisCardContext } from '../contracts';
 
@@ -205,6 +207,197 @@ export class CasStore {
 
         branch.entries.set(normPath, entry);
         return entry;
+    }
+
+    /**
+     * Applies ordered, non-overlapping range edits to an existing file in the workspace branch,
+     * re-chunking only the localized affected window while reusing untouched left and right
+     * extents.
+     *
+     * @param branchName - Target workspace branch.
+     * @param filePath - Virtual file path.
+     * @param edits - Sequence of range replacements.
+     * @returns Updated VfsFileEntry.
+     */
+    public async applyEdits(
+        branchName: string,
+        filePath: string,
+        edits: readonly FileEditOp[],
+    ): Promise<VfsFileEntry> {
+        const branch = this.getBranchOrThrow(branchName);
+        const normalizedPath = filePath.replace(/\\/g, '/').replace(/^\/+/, '');
+        const existing = branch.entries.get(normalizedPath);
+        if (!existing || !existing.contentHash) {
+            throw new VfsError(
+                `File '${normalizedPath}' not found for applyEdits`,
+                'ERR_NOT_FOUND',
+                normalizedPath,
+            );
+        }
+
+        if (edits.length === 0) {
+            return existing;
+        }
+
+        const originalCas = await this.storage.getObject(existing.contentHash);
+        if (!originalCas) {
+            throw new VfsError(
+                `Corrupted CAS object for '${normalizedPath}'`,
+                'ERR_CORRUPTED_CHUNK',
+                normalizedPath,
+            );
+        }
+
+        const originalBytes = await this.getContent(existing.contentHash);
+        if (!originalBytes) {
+            throw new VfsError(
+                `Missing content payload for '${normalizedPath}'`,
+                'ERR_CORRUPTED_CHUNK',
+                normalizedPath,
+            );
+        }
+
+        let currentBytes = originalBytes;
+        let currentChunks = originalCas.chunks;
+
+        for (const edit of edits) {
+            const replacementBytes = toUint8Array(edit.replacement);
+            const singleEditResult = await this.applySingleEdit(
+                currentBytes,
+                currentChunks,
+                edit.offset,
+                edit.length,
+                replacementBytes,
+            );
+            currentBytes = singleEditResult.bytes;
+            currentChunks = singleEditResult.chunks;
+        }
+
+        const newContentHash = hashBuffer(currentBytes);
+        const newCasObject: CASObject = {
+            contentHash: newContentHash,
+            byteLength: currentBytes.byteLength,
+            chunks: currentChunks,
+            createdAtMs: Date.now(),
+        };
+
+        await this.storage.putObject(newCasObject);
+
+        const newEntry: VfsFileEntry = {
+            path: normalizedPath,
+            type: 'file',
+            contentHash: newContentHash,
+            size: currentBytes.byteLength,
+            mode: existing.mode,
+            mtimeMs: Date.now(),
+        };
+
+        branch.entries.set(normalizedPath, newEntry);
+        return newEntry;
+    }
+
+    /**
+     * Reconstructs FastCDC chunk descriptors for a single localized edit operation.
+     * Reuses untouched left and right chunk descriptors without re-evaluating unmodified bytes.
+     *
+     * @param sourceBytes - Full source bytes before this edit.
+     * @param sourceChunks - Pre-existing FastCDC chunk descriptors.
+     * @param offset - Start offset of range replacement.
+     * @param length - Length of range replacement.
+     * @param replacement - New replacement byte payload.
+     * @returns Object containing new total byte buffer and updated chunk descriptors.
+     */
+    private async applySingleEdit(
+        sourceBytes: Uint8Array,
+        sourceChunks: ChunkDescriptor[],
+        offset: number,
+        length: number,
+        replacement: Uint8Array,
+    ): Promise<{ bytes: Uint8Array; chunks: ChunkDescriptor[] }> {
+        const editEnd = offset + length;
+        if (editEnd > sourceBytes.byteLength) {
+            throw new VfsError(
+                `Edit range [${offset}, ${editEnd}) exceeds byte length ${sourceBytes.byteLength}`,
+                'ERR_INVALID_PATH',
+            );
+        }
+
+        if (sourceChunks.length === 0) {
+            const { casObject, chunkData } = this.cdc.buildCASObject(replacement);
+            for (const [chunkHash, chunkBytes] of chunkData.entries()) {
+                this.putL1(chunkHash, chunkBytes);
+                await this.storage.putChunk(chunkHash, chunkBytes);
+            }
+            return { bytes: replacement, chunks: casObject.chunks };
+        }
+
+        let firstImpactedIndex = 0;
+        for (let chunkIndex = 0; chunkIndex < sourceChunks.length; chunkIndex++) {
+            if (sourceChunks[chunkIndex].offset + sourceChunks[chunkIndex].length > offset) {
+                firstImpactedIndex = chunkIndex;
+                break;
+            }
+        }
+
+        let lastImpactedIndex = sourceChunks.length - 1;
+        for (let chunkIndex = 0; chunkIndex < sourceChunks.length; chunkIndex++) {
+            if (sourceChunks[chunkIndex].offset >= editEnd) {
+                lastImpactedIndex = Math.max(0, chunkIndex - 1);
+                break;
+            }
+        }
+
+        const leftChunks = sourceChunks.slice(0, firstImpactedIndex);
+        const rightChunks =
+            lastImpactedIndex + 1 < sourceChunks.length
+                ? sourceChunks.slice(lastImpactedIndex + 1)
+                : [];
+
+        const windowStart = sourceChunks[firstImpactedIndex].offset;
+        const windowEnd =
+            sourceChunks[lastImpactedIndex].offset + sourceChunks[lastImpactedIndex].length;
+
+        const prefix = sourceBytes.subarray(windowStart, offset);
+        const suffix = sourceBytes.subarray(editEnd, windowEnd);
+
+        const localWindowBuffer = new Uint8Array(
+            prefix.byteLength + replacement.byteLength + suffix.byteLength,
+        );
+        localWindowBuffer.set(prefix, 0);
+        localWindowBuffer.set(replacement, prefix.byteLength);
+        localWindowBuffer.set(suffix, prefix.byteLength + replacement.byteLength);
+
+        const { casObject: localCasObject, chunkData: localChunkData } =
+            this.cdc.buildCASObject(localWindowBuffer);
+        for (const [chunkHash, chunkBytes] of localChunkData.entries()) {
+            this.putL1(chunkHash, chunkBytes);
+            await this.storage.putChunk(chunkHash, chunkBytes);
+        }
+
+        const reconstructedBytes = new Uint8Array(
+            sourceBytes.byteLength - length + replacement.byteLength,
+        );
+        reconstructedBytes.set(sourceBytes.subarray(0, offset), 0);
+        reconstructedBytes.set(replacement, offset);
+        reconstructedBytes.set(sourceBytes.subarray(editEnd), offset + replacement.byteLength);
+
+        const reconstructedChunks: ChunkDescriptor[] = [...leftChunks];
+        for (const chunkDescriptor of localCasObject.chunks) {
+            reconstructedChunks.push({
+                ...chunkDescriptor,
+                offset: chunkDescriptor.offset + windowStart,
+            });
+        }
+
+        const netDelta = replacement.byteLength - length;
+        for (const chunkDescriptor of rightChunks) {
+            reconstructedChunks.push({
+                ...chunkDescriptor,
+                offset: chunkDescriptor.offset + netDelta,
+            });
+        }
+
+        return { bytes: reconstructedBytes, chunks: reconstructedChunks };
     }
 
     /**

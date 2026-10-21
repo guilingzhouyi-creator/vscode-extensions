@@ -23,9 +23,12 @@ import { GuidanceMessages } from '../messages';
 import type {
     AgentTopologyLayer,
     AgentImmutableConstraints,
+    AgentCodeDensityConstraintSpec,
     AgentVerificationDirective,
     AgentClarificationRequest,
 } from '../reporters/agent-directives-types';
+import { inferFineGrainedFileRole } from '../intelligence/file-role-inference';
+import { getRoleBudget } from '../intelligence/elastic-budget-matrix';
 
 /** Maximum number of memory rule hits rendered as frequent violations in the guidance prompt. */
 const MAX_MEMORY_RULE_HITS = 5;
@@ -661,9 +664,17 @@ function buildContractRulesList(flags: {
     preservesPurity: boolean;
     immutableStateSnapshot: boolean;
     noExternalSideEffects: boolean;
+    densitySpec?: AgentCodeDensityConstraintSpec;
 }): string[] {
+    const density = flags.densitySpec;
+    const elocLimit = density ? density.maxEloc : 900;
+    const locLimit = density ? density.maxLoc : 1400;
+    const roleSuffix = density?.role ? ` [Role: ${density.role}]` : '';
+
     const rules: string[] = [
-        'ELOC <= 900, LOC <= 1400 (GUARD-AST-001 dual-track volume budget)',
+        `ELOC <= ${elocLimit}, LOC <= ${locLimit} (VOL-ELOC-001 / VOL-LOC-001 dual-track volume budget)${roleSuffix}`,
+        'Token density tau in [2.5, 22.0] (VOL-DIL-001 / GUARD-AST-001)',
+        'Plumbing overhead ratio POR <= 0.60, TSPR >= 0.40 (ARCH-FAC-001)',
         'CC <= 15, Depth <= 4 (AST localized control flow envelope)',
     ];
     if (flags.zeroHeapAllocationInLoop) {
@@ -700,6 +711,7 @@ export function generateImmutableConstraints(
 ): AgentImmutableConstraints {
     const rule = (issue.rule || '').toUpperCase();
     const msg = (issue.message || '').toLowerCase();
+    const filePath = issue.location?.file;
 
     const preservesPurity = isPurityRequired(layer, msg);
     const zeroHeapAllocationInLoop = isZeroHeapRequired(rule, layer, msg);
@@ -708,11 +720,26 @@ export function generateImmutableConstraints(
     const noExternalSideEffects =
         layer === LAYER_L1_CONTRACT || layer === LAYER_L2_OPERATOR || layer === LAYER_L5_GOVERNANCE;
 
+    let densitySpec: AgentCodeDensityConstraintSpec | undefined = undefined;
+    if (filePath && filePath !== DEFAULT_UNKNOWN_BASENAME) {
+        const roleResult = inferFineGrainedFileRole(filePath);
+        const roleBudget = getRoleBudget(roleResult.role);
+        densitySpec = {
+            role: roleResult.role,
+            maxEloc: roleBudget.effectiveLocFail,
+            maxLoc: roleBudget.physicalLinesFail,
+            minTau: 2.5,
+            maxTau: 22.0,
+            maxPor: 0.60,
+        };
+    }
+
     const contractRules = buildContractRulesList({
         zeroHeapAllocationInLoop,
         preservesPurity,
         immutableStateSnapshot,
         noExternalSideEffects,
+        densitySpec,
     });
 
     return {
@@ -720,6 +747,7 @@ export function generateImmutableConstraints(
         zeroHeapAllocationInLoop,
         immutableStateSnapshot,
         elocBudgetConstraint,
+        densitySpec,
         noExternalSideEffects,
         contractRules,
     };

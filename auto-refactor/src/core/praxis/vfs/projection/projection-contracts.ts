@@ -33,6 +33,12 @@ export interface ProjectionOptions {
     env?: Record<string, string>;
     /** Max command execution timeout in milliseconds (defaults to 30000) */
     timeoutMs?: number;
+    /** Base directory on host to link immutable files from, enabling zero-copy sparse overlay */
+    baseDir?: string;
+    /** Whether to use hardlinks for unmodified files instead of copying (defaults to true) */
+    useSparseLinks?: boolean;
+    /** Whether to mount node_modules from baseDir for instant bootstrap (defaults to true) */
+    instantBootstrap?: boolean;
 }
 
 /**

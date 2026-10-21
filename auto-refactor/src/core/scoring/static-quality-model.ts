@@ -31,12 +31,13 @@ import { mapRuleToPrimaryPillar, REACH_FACTORS } from './riskWeightModel';
  * - D: Data Architecture (types, DTO schemas, parameter clumps)
  * - T: Test Quality (assertion density, modern test semantics)
  * - R: Reliability (error flow, exception guards, resource release)
+ * - S: Security Quality (vulnerability defense, safe input handling, secrets hygiene)
  * - E: Extensibility (modularity, literal policy, configuration decoupling)
  */
-export type StaticQualityAxis = 'A' | 'M' | 'P' | 'D' | 'T' | 'R' | 'E';
+export type StaticQualityAxis = 'A' | 'M' | 'P' | 'D' | 'T' | 'R' | 'S' | 'E';
 
 /**
- * Ordered enumeration of all seven static quality axes in canonical sequence.
+ * Ordered enumeration of all eight static quality axes in canonical sequence.
  */
 export const ALL_STATIC_QUALITY_AXES: readonly StaticQualityAxis[] = [
     'A',
@@ -45,6 +46,7 @@ export const ALL_STATIC_QUALITY_AXES: readonly StaticQualityAxis[] = [
     'D',
     'T',
     'R',
+    'S',
     'E',
 ] as const;
 
@@ -58,11 +60,12 @@ export const STATIC_AXIS_NAMES: Readonly<Record<StaticQualityAxis, string>> = {
     D: 'dataArchitecture',
     T: 'testQuality',
     R: 'reliability',
+    S: 'securityQuality',
     E: 'extensibility',
 };
 
 /**
- * Seven-dimensional static quality vector Q_s = (A, M, P, D, T, R, E).
+ * Eight-dimensional static quality vector Q_s = (A, M, P, D, T, R, S, E).
  * Each dimension is scaled between 0.0 and 100.0.
  */
 export interface StaticQualityVector {
@@ -78,21 +81,25 @@ export interface StaticQualityVector {
     T: number;
     /** R: Reliability */
     R: number;
+    /** S: Security Quality */
+    S: number;
     /** E: Extensibility */
     E: number;
 }
 
 /**
- * Balanced default weights for the static quality vector (sum = 1.0).
+ * Balanced default weights for the static quality vector, aligned with the eight primary
+ * pillars (sum = 1.0).
  */
 export const DEFAULT_STATIC_WEIGHTS: Readonly<Record<StaticQualityAxis, number>> = {
-    A: 0.18,
-    M: 0.18,
-    P: 0.16,
-    D: 0.12,
-    T: 0.12,
-    R: 0.12,
-    E: 0.12,
+    A: 0.15,
+    M: 0.15,
+    P: 0.15,
+    D: 0.10,
+    T: 0.15,
+    R: 0.10,
+    S: 0.10,
+    E: 0.10,
 };
 
 /**
@@ -146,8 +153,9 @@ export function pillarToStaticAxis(pillar: PrimaryQualityPillar): StaticQualityA
         case 'testing':
             return 'T';
         case 'reliability':
-        case 'security':
             return 'R';
+        case 'security':
+            return 'S';
         case 'extensibility':
             return 'E';
         default:
@@ -267,6 +275,9 @@ export function synthesizeStaticQualityVector(
         overrides.R ??
         Math.min(100.0, Math.max(0.0, (indices.semanticPurity + indices.techDebtRisk) / 2));
 
+    // S: Security Quality maps to codeSecurity
+    const S = overrides.S ?? indices.codeSecurity;
+
     // E: Extensibility synthesizes standardization, comment quality, and duplication
     const E =
         overrides.E ??
@@ -285,6 +296,7 @@ export function synthesizeStaticQualityVector(
         D: Math.round(D * 100) / 100,
         T: Math.round(T * 100) / 100,
         R: Math.round(R * 100) / 100,
+        S: Math.round(S * 100) / 100,
         E: Math.round(E * 100) / 100,
     };
 }
@@ -342,6 +354,7 @@ export function computeStaticVectorDelta(
         D: Math.round((after.D - before.D) * 100) / 100,
         T: Math.round((after.T - before.T) * 100) / 100,
         R: Math.round((after.R - before.R) * 100) / 100,
+        S: Math.round((after.S - before.S) * 100) / 100,
         E: Math.round((after.E - before.E) * 100) / 100,
     };
 

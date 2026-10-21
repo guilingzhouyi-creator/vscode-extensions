@@ -13,7 +13,7 @@
 
 import type { PraxisCardContext } from '../contracts';
 import type { BranchDelta, CasStore } from './cas-store';
-import type { VfsFileEntry, WorkspaceHandle, WorkspaceSnapshot } from './vfs-contracts';
+import type { FileEditOp, VfsFileEntry, WorkspaceHandle, WorkspaceSnapshot } from './vfs-contracts';
 
 /**
  * High-level object representing an isolated workspace sandbox assigned to an agent/card.
@@ -26,6 +26,7 @@ export interface LayerVFSWorkspace {
     readonly createdAtMs: number;
 
     putFile(filePath: string, content: Uint8Array | string, mode?: number): Promise<VfsFileEntry>;
+    applyEdits(filePath: string, edits: readonly FileEditOp[]): Promise<VfsFileEntry>;
     getFile(filePath: string): Promise<{ entry: VfsFileEntry; content: Uint8Array } | null>;
     hasFile(filePath: string): boolean;
     deleteFile(filePath: string): boolean;
@@ -93,6 +94,15 @@ export class ManagedWorkspace implements LayerVFSWorkspace {
         return this.delegate
             .getStore()
             .putFile(this.record.handle.branchId, filePath, content, mode);
+    }
+
+    public async applyEdits(
+        filePath: string,
+        edits: readonly FileEditOp[],
+    ): Promise<VfsFileEntry> {
+        return this.delegate
+            .getStore()
+            .applyEdits(this.record.handle.branchId, filePath, edits);
     }
 
     public async getFile(

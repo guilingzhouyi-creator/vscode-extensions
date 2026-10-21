@@ -179,6 +179,7 @@ export function parseBenchmarkJson(
     return {
         timestamp,
         environment,
+        isObserved: true,
         latency: parseLatency((telemetryPayload.latency ?? {}) as Record<string, number>),
         throughput: parseThroughput((telemetryPayload.throughput ?? {}) as Record<string, number>),
         memory: parseMemory((telemetryPayload.memory ?? {}) as Record<string, number>),
@@ -257,6 +258,7 @@ export function createDefaultFallbackEvidence(): DynamicEvidenceDTO {
     return {
         timestamp: Date.now(),
         environment: UNOBSERVED_DEFAULT_ENV,
+        isObserved: false,
         latency: createLatencyMetric(
             FALLBACK_CONFIG.medianLatencyMs,
             FALLBACK_CONFIG.tail95LatencyMs,

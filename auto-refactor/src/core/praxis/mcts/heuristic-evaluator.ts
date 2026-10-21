@@ -13,7 +13,7 @@
  */
 
 import type { CandidateStrategy, HeuristicScore } from './mcts-contracts';
-import { projectWorkspace } from '../vfs/projection';
+import { projectWorkspace, type ProjectedSandbox } from '../vfs/projection';
 import type { LayerVFSWorkspace } from '../vfs/workspace-manager';
 
 /**
@@ -62,20 +62,25 @@ async function runVerificationCommand(
     if (!strategy.verificationCommand) {
         return true;
     }
-    let sandbox = null;
+    let projectedSandbox: ProjectedSandbox | null = null;
     try {
-        sandbox = await projectWorkspace(workspace, { cleanOnClose: true });
-        const execResult = await sandbox.runCommand(
+        projectedSandbox = await projectWorkspace(workspace, {
+            cleanOnClose: true,
+            baseDir: strategy.baseDir,
+            useSparseLinks: Boolean(strategy.baseDir),
+            instantBootstrap: true,
+        });
+        const executionResult = await projectedSandbox.runCommand(
             strategy.verificationCommand.command,
             strategy.verificationCommand.args,
             { timeoutMs: strategy.verificationCommand.timeoutMs ?? 15000 },
         );
-        return execResult.success;
+        return executionResult.success;
     } catch {
         return false;
     } finally {
-        if (sandbox) {
-            await sandbox.close();
+        if (projectedSandbox) {
+            await projectedSandbox.close();
         }
     }
 }
@@ -87,21 +92,47 @@ function computeScoreBreakdown(
     testsPassed: boolean,
     complexityDelta: number,
     violationCount: number,
+    originalViolationCount = 0,
 ): { compositeScore: number; caiScore: number; breakdown: HeuristicScore['breakdown'] } {
-    const testWeight = testsPassed ? 25.0 : -40.0;
+    if (!testsPassed) {
+        return {
+            compositeScore: 20.0,
+            caiScore: 0.0,
+            breakdown: {
+                testWeight: -40.0,
+                complexityWeight: 0.0,
+                ruleWeight: -Math.min(20.0, violationCount * 5.0),
+                caiWeight: 0.0,
+            },
+        };
+    }
+
+    const testWeight = 25.0;
     const complexityWeight =
         complexityDelta < 0
-            ? Math.min(20.0, Math.abs(complexityDelta) * 4.0)
+            ? Math.min(25.0, Math.abs(complexityDelta) * 5.0)
             : -Math.min(25.0, complexityDelta * 5.0);
-    const ruleWeight = -Math.min(25.0, violationCount * 5.0);
-    const caiWeight = testsPassed && violationCount === 0 ? 15.0 : 5.0;
 
-    let rawScore = 60.0 + testWeight + complexityWeight + ruleWeight + caiWeight;
-    if (!testsPassed) {
-        rawScore = Math.min(rawScore, 25.0);
-    }
+    const netDefectGain =
+        originalViolationCount > 0
+            ? (originalViolationCount - violationCount) / originalViolationCount
+            : violationCount === 0
+              ? 1.0
+              : -0.5;
+
+    const rulePenalty = Math.min(25.0, violationCount * 5.0);
+    const ruleWeight = Math.round((Math.max(0, netDefectGain) * 10.0 - rulePenalty) * 10) / 10;
+
+    // CAI (Code Autonomy Index): objective assessment of structural cleanliness & net improvement
+    const cleanRatio = 1.0 / (1.0 + violationCount);
+    const cpxGain = complexityDelta < 0 ? Math.min(1.0, Math.abs(complexityDelta) / 4.0) : 0.0;
+    const rawCai = 0.5 * cleanRatio + 0.3 * Math.max(0, netDefectGain) + 0.2 * cpxGain;
+    const caiScore = Math.max(0.0, Math.min(1.0, Math.round(rawCai * 100) / 100));
+    const caiWeight = Math.round(caiScore * 15.0 * 10) / 10;
+
+    const baseScore = 50.0;
+    const rawScore = baseScore + testWeight + complexityWeight + ruleWeight + caiWeight;
     const compositeScore = Math.max(0.0, Math.min(100.0, Math.round(rawScore * 10) / 10));
-    const caiScore = Math.max(0.0, Math.min(1.0, Math.round((compositeScore / 100) * 100) / 100));
 
     return {
         compositeScore,
@@ -127,6 +158,7 @@ export async function evaluateCandidateStrategy(
 
     let complexityDelta = 0;
     let violationCount = 0;
+    let originalViolationCount = 0;
 
     for (const [filePath, modifiedContent] of strategy.fileModifications.entries()) {
         const modStr =
@@ -137,10 +169,14 @@ export async function evaluateCandidateStrategy(
         violationCount += countCodeDefects(modStr);
         const newCpx = estimateComplexity(modStr);
         const originalFile = await workspace.getFile(filePath);
+        const origStr = originalFile
+            ? Buffer.from(originalFile.content).toString('utf8')
+            : modStr;
         const origCpx = originalFile
-            ? estimateComplexity(Buffer.from(originalFile.content).toString('utf8'))
+            ? estimateComplexity(origStr)
             : newCpx;
 
+        originalViolationCount += countCodeDefects(origStr);
         complexityDelta += newCpx - origCpx;
     }
 
@@ -148,6 +184,7 @@ export async function evaluateCandidateStrategy(
         testsPassed,
         complexityDelta,
         violationCount,
+        originalViolationCount,
     );
 
     return {

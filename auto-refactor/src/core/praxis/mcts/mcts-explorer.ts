@@ -85,20 +85,28 @@ export class MctsExplorer {
                 cardId: `${cardContext.cardId}_${strategy.strategyId}`,
             };
 
-            const ws = await this.manager.createWorkspace(specificCardContext, base);
+            const candidateWorkspace = await this.manager.createWorkspace(
+                specificCardContext,
+                base,
+            );
 
             // Apply candidate modifications
+            if (strategy.localizedEdits) {
+                for (const [filePath, edits] of strategy.localizedEdits.entries()) {
+                    await candidateWorkspace.applyEdits(filePath, edits);
+                }
+            }
             for (const [filePath, content] of strategy.fileModifications.entries()) {
-                await ws.putFile(filePath, content);
+                await candidateWorkspace.putFile(filePath, content);
             }
 
-            const score = await evaluateCandidateStrategy(strategy, ws);
+            const score = await evaluateCandidateStrategy(strategy, candidateWorkspace);
             const uctValue = this.computeUct(score.compositeScore, 1, candidates.length);
 
             nodes.push({
                 nodeId: randomUUID(),
                 strategy,
-                workspace: ws,
+                workspace: candidateWorkspace,
                 score,
                 visits: 1,
                 uctValue,
@@ -107,7 +115,11 @@ export class MctsExplorer {
         }
 
         // 2. Rank nodes by composite score descending
-        nodes.sort((a, b) => (b.score?.compositeScore ?? 0) - (a.score?.compositeScore ?? 0));
+        nodes.sort((nodeA, nodeB) => {
+            const scoreA = nodeA.score?.compositeScore ?? 0;
+            const scoreB = nodeB.score?.compositeScore ?? 0;
+            return scoreB - scoreA;
+        });
 
         // 3. Promote winning node, discard all losers
         const winner = nodes[0];

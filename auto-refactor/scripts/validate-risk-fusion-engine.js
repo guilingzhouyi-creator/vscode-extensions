@@ -139,6 +139,7 @@ async function main() {
   const frameworkWeights = resolveAdaptiveFusionWeights(
     { domain: 'core_framework', stage: 'production' },
     true,
+    true,
   );
   assert.strictEqual(frameworkWeights.Ws, 0.55);
   assert.strictEqual(frameworkWeights.Wd, 0.3);
@@ -147,21 +148,28 @@ async function main() {
   const algorithmWeights = resolveAdaptiveFusionWeights(
     { domain: 'algorithm_lib', stage: 'production' },
     true,
+    true,
   );
   assert.strictEqual(algorithmWeights.Ws, 0.35);
   assert.strictEqual(algorithmWeights.Wd, 0.5);
   assert.strictEqual(algorithmWeights.Wf, 0.15);
 
-  const missingTelemetryWeights = resolveAdaptiveFusionWeights({ domain: 'core_framework' }, false);
+  const pureStaticWeights = resolveAdaptiveFusionWeights({ domain: 'core_framework' }, false, false);
+  assert.strictEqual(pureStaticWeights.Wd, 0.0);
+  assert.strictEqual(pureStaticWeights.Wf, 0.0);
+  assert.strictEqual(pureStaticWeights.Ws, 1.0);
+
+  const missingTelemetryWeights = resolveAdaptiveFusionWeights({ domain: 'core_framework' }, false, true);
   assert.strictEqual(missingTelemetryWeights.Wd, 0.0);
-  assert.strictEqual(missingTelemetryWeights.Ws, 0.85);
+  assert.strictEqual(missingTelemetryWeights.Ws, 0.79);
+  assert.strictEqual(missingTelemetryWeights.Wf, 0.21);
   console.log(
-    '✔ Adaptive weights correctly tilt across core_framework, algorithm_lib, and missing telemetry.',
+    '✔ Adaptive weights correctly tilt across core_framework, algorithm_lib, and unobserved planes.',
   );
 
   // 5. Total Unified Quality Score Q_total = W_s*Q_s + W_d*Q_d + W_f*Q_f
   console.log('5. Testing Total Unified Quality Score Calculation...');
-  const staticVector = { A: 90.0, M: 85.0, P: 95.0, D: 90.0, T: 80.0, R: 85.0, E: 90.0 };
+  const staticVector = { A: 90.0, M: 85.0, P: 95.0, D: 90.0, T: 80.0, R: 85.0, S: 95.0, E: 90.0 };
   const dynamicVector = { L: 95.0, T: 90.0, M: 95.0, C: 92.0, E: 85.0 };
 
   const assessment = computeUnifiedQualityScore(staticVector, dynamicVector, 100.0, {

@@ -68,6 +68,31 @@ export interface AgentRuleContract {
 }
 
 /**
+ * Structured code density, volume, and plumbing budget specification for Agent guidance.
+ */
+export interface AgentCodeDensityConstraintSpec {
+    /** Target file architectural role (FineGrainedFileRole) */
+    readonly role?: string;
+    /** Effective lines of code ceiling (VOL-ELOC-001) */
+    readonly maxEloc: number;
+    /** Physical raw line count ceiling (VOL-LOC-001) */
+    readonly maxLoc: number;
+    /** Minimum token column density tau floor (VOL-DIL-001) */
+    readonly minTau: number;
+    /** Maximum token column density tau ceiling (GUARD-AST-001) */
+    readonly maxTau: number;
+    /** Maximum plumbing overhead ratio ceiling (ARCH-FAC-001) */
+    readonly maxPor: number;
+    /** Current measured code metrics if target source is available */
+    readonly currentMetrics?: {
+        readonly eloc: number;
+        readonly loc: number;
+        readonly tokensPerEloc?: number;
+        readonly plumbingRatio?: number;
+    };
+}
+
+/**
  * Immutable engineering constraints that must NOT be violated during remediation.
  */
 export interface AgentImmutableConstraints {
@@ -77,8 +102,10 @@ export interface AgentImmutableConstraints {
     readonly zeroHeapAllocationInLoop: boolean;
     /** Immutable state snapshot requirement (Object.freeze / deep freeze / defensive copy) */
     readonly immutableStateSnapshot: boolean;
-    /** Strict adherence to ELOC <= 900 and LOC <= 1400 dual-track budget (GUARD-AST-001) */
+    /** Strict adherence to ELOC <= 900 and LOC <= 1400 dual-track budget (VOL-ELOC-001 / VOL-LOC-001) */
     readonly elocBudgetConstraint: boolean;
+    /** Structured code density, volume, and plumbing constraint specification */
+    readonly densitySpec?: AgentCodeDensityConstraintSpec;
     /** Prohibition against introducing external side effects or unsolicited dependencies */
     readonly noExternalSideEffects: boolean;
     /** List of explicit invariant rules and constraints to enforce */

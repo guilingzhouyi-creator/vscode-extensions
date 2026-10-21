@@ -52,6 +52,10 @@ class DefaultProjectedSandbox implements ProjectedSandbox {
     private readonly cleanOnClose: boolean;
     private readonly defaultTimeoutMs: number;
     private readonly defaultEnv?: Record<string, string>;
+    private readonly baseDir?: string;
+    private readonly useSparseLinks: boolean;
+    private readonly instantBootstrap: boolean;
+    private readonly mountedJunctions = new Set<string>();
     private isClosed = false;
 
     constructor(
@@ -66,6 +70,9 @@ class DefaultProjectedSandbox implements ProjectedSandbox {
         this.cleanOnClose = options.cleanOnClose ?? true;
         this.defaultTimeoutMs = options.timeoutMs ?? DEFAULT_SANDBOX_TIMEOUT_MS;
         this.defaultEnv = options.env;
+        this.baseDir = options.baseDir ? path.resolve(options.baseDir) : undefined;
+        this.useSparseLinks = options.useSparseLinks ?? true;
+        this.instantBootstrap = options.instantBootstrap ?? true;
     }
 
     public async syncToPhysical(): Promise<number> {
@@ -76,17 +83,53 @@ class DefaultProjectedSandbox implements ProjectedSandbox {
         for (const entry of entries) {
             const destPath = path.join(this.projectedPath, entry.path);
             const parentDir = path.dirname(destPath);
-
             await fs.promises.mkdir(parentDir, { recursive: true });
-            const fileData = await this.workspace.getFile(entry.path);
 
-            if (fileData) {
-                await fs.promises.writeFile(destPath, fileData.content, { mode: entry.mode });
-                materializedCount++;
+            let linked = false;
+            if (this.useSparseLinks && this.baseDir) {
+                const hostSourcePath = path.join(this.baseDir, entry.path);
+                try {
+                    const sourceFileStat = await fs.promises.stat(hostSourcePath);
+                    if (sourceFileStat.isFile() && sourceFileStat.size === entry.size) {
+                        await fs.promises.link(hostSourcePath, destPath);
+                        linked = true;
+                        materializedCount++;
+                    }
+                } catch {
+                    // Best-effort hardlink: ignore errors and fallback to writing bytes from VFS
+                }
+            }
+
+            if (!linked) {
+                const fileData = await this.workspace.getFile(entry.path);
+                if (fileData) {
+                    await fs.promises.writeFile(destPath, fileData.content, { mode: entry.mode });
+                    materializedCount++;
+                }
             }
         }
 
+        // Instant Bootstrap: mount shared node_modules if available in baseDir
+        if (this.instantBootstrap && this.baseDir) {
+            await this.mountInstantDependencies();
+        }
+
         return materializedCount;
+    }
+
+    private async mountInstantDependencies(): Promise<void> {
+        if (!this.baseDir) return;
+        const hostNodeModules = path.join(this.baseDir, 'node_modules');
+        const sandboxNodeModules = path.join(this.projectedPath, 'node_modules');
+        try {
+            const nodeModulesStat = await fs.promises.stat(hostNodeModules);
+            if (nodeModulesStat.isDirectory()) {
+                await fs.promises.symlink(hostNodeModules, sandboxNodeModules, 'junction');
+                this.mountedJunctions.add(sandboxNodeModules);
+            }
+        } catch {
+            /* ignore if host node_modules not present */
+        }
     }
 
     public async syncFromPhysical(): Promise<BranchDelta[]> {
@@ -163,6 +206,19 @@ class DefaultProjectedSandbox implements ProjectedSandbox {
         this.isClosed = true;
 
         if (this.cleanOnClose) {
+            for (const junctionPath of this.mountedJunctions) {
+                try {
+                    await fs.promises.unlink(junctionPath);
+                } catch {
+                    try {
+                        await fs.promises.rmdir(junctionPath);
+                    } catch {
+                        /* ignore transient junction unmount */
+                    }
+                }
+            }
+            this.mountedJunctions.clear();
+
             try {
                 await fs.promises.rm(this.projectedPath, { recursive: true, force: true });
             } catch {

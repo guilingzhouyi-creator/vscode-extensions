@@ -15,6 +15,7 @@
 
 import { randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
+import * as zlib from 'node:zlib';
 import type {
     CASObject,
     ChunkDescriptor,
@@ -142,6 +143,8 @@ export class SqliteBackend implements IPraxisVFSStorage {
                 data BLOB NOT NULL,
                 byte_length INTEGER NOT NULL,
                 ref_count INTEGER NOT NULL DEFAULT 1,
+                base_hash TEXT,
+                encoding TEXT NOT NULL DEFAULT 'RAW',
                 created_at_ms INTEGER NOT NULL
             );
 
@@ -174,17 +177,33 @@ export class SqliteBackend implements IPraxisVFSStorage {
                 PRIMARY KEY (snapshot_id, path)
             );
         `);
+
+        // Backward compatibility: ensure delta compression columns exist on legacy tables
+        try {
+            this.db.exec('ALTER TABLE cas_chunks ADD COLUMN base_hash TEXT;');
+        } catch {
+            // Expected error if column already exists in upgraded table; safely ignored
+        }
+        try {
+            this.db.exec("ALTER TABLE cas_chunks ADD COLUMN encoding TEXT NOT NULL DEFAULT 'RAW';");
+        } catch {
+            // Expected error if column already exists in upgraded table; safely ignored
+        }
     }
 
     private prepareHotStatements(): void {
         if (!this.db) return;
         this.stmtInsertChunk = this.db.prepare(`
-            INSERT INTO cas_chunks (chunk_hash, data, byte_length, ref_count, created_at_ms)
-            VALUES (?, ?, ?, 1, ?)
+            INSERT INTO cas_chunks (
+                chunk_hash, data, byte_length, ref_count, base_hash, encoding, created_at_ms
+            )
+            VALUES (?, ?, ?, 1, ?, ?, ?)
             ON CONFLICT(chunk_hash) DO UPDATE SET ref_count = ref_count + 1;
         `);
 
-        this.stmtGetChunk = this.db.prepare('SELECT data FROM cas_chunks WHERE chunk_hash = ?;');
+        this.stmtGetChunk = this.db.prepare(
+            'SELECT data, base_hash, encoding FROM cas_chunks WHERE chunk_hash = ?;',
+        );
         this.stmtHasChunk = this.db.prepare(
             'SELECT 1 FROM cas_chunks WHERE chunk_hash = ? LIMIT 1;',
         );
@@ -226,22 +245,86 @@ export class SqliteBackend implements IPraxisVFSStorage {
         return this.db;
     }
 
-    public async putChunk(chunkHash: string, chunkBytes: Uint8Array): Promise<boolean> {
+    public async putChunk(
+        chunkHash: string,
+        chunkBytes: Uint8Array,
+        baseHash?: string,
+    ): Promise<boolean> {
         this.assertOpen();
         const exists = Boolean(this.stmtHasChunk?.get(chunkHash));
         if (exists) {
             return false;
         }
 
-        const now = Date.now();
-        this.stmtInsertChunk?.run(chunkHash, chunkBytes, chunkBytes.length, now);
+        let storeBytes: Uint8Array = chunkBytes;
+        let encoding = 'RAW';
+        let recordedBaseHash: string | null = null;
+
+        if (baseHash) {
+            const baseChunk = await this.getChunk(baseHash);
+            if (baseChunk) {
+                try {
+                    const compressedBytes = zlib.deflateSync(chunkBytes, {
+                        dictionary: Buffer.from(baseChunk),
+                    });
+                    if (compressedBytes.length < chunkBytes.length * 0.85) {
+                        storeBytes = compressedBytes;
+                        encoding = 'PREFIX_DELTA';
+                        recordedBaseHash = baseHash;
+                    }
+                } catch {
+                    // Best-effort delta compression: ignore and fallback to uncompressed chunk
+                }
+            }
+        }
+
+        if (encoding === 'RAW') {
+            try {
+                const standaloneCompressedBytes = zlib.deflateSync(chunkBytes);
+                if (standaloneCompressedBytes.length < chunkBytes.length * 0.9) {
+                    storeBytes = standaloneCompressedBytes;
+                    encoding = 'ZLIB_FULL';
+                }
+            } catch {
+                // Best-effort zlib compression: ignore and store raw bytes
+            }
+        }
+
+        const createdAtMs = Date.now();
+        this.stmtInsertChunk?.run(
+            chunkHash,
+            storeBytes,
+            chunkBytes.length,
+            recordedBaseHash,
+            encoding,
+            createdAtMs,
+        );
         return true;
     }
 
     public async getChunk(chunkHash: string): Promise<Uint8Array | null> {
         this.assertOpen();
-        const row = this.stmtGetChunk?.get(chunkHash) as { data: Uint8Array } | undefined;
-        return !row || !row.data ? null : row.data;
+        const chunkRow = this.stmtGetChunk?.get(chunkHash) as
+            | { data: Uint8Array; base_hash: string | null; encoding: string }
+            | undefined;
+        if (!chunkRow || !chunkRow.data) return null;
+
+        if (chunkRow.encoding === 'PREFIX_DELTA' && chunkRow.base_hash) {
+            const baseChunk = await this.getChunk(chunkRow.base_hash);
+            if (!baseChunk) {
+                throw new VfsError(
+                    `Missing base chunk ${chunkRow.base_hash} for delta chunk ${chunkHash}`,
+                    'ERR_CORRUPTED_CHUNK',
+                );
+            }
+            return zlib.inflateSync(chunkRow.data, { dictionary: Buffer.from(baseChunk) });
+        }
+
+        if (chunkRow.encoding === 'ZLIB_FULL') {
+            return zlib.inflateSync(chunkRow.data);
+        }
+
+        return chunkRow.data;
     }
 
     public async hasChunk(chunkHash: string): Promise<boolean> {

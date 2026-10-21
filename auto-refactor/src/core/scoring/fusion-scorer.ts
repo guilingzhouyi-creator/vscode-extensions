@@ -71,67 +71,80 @@ export interface UnifiedQualityAssessment {
 /**
  * Resolves context-adaptive tri-plane weights W = f(Stage, Scale, Domain, Risk).
  *
+ * Ground-truth Invariant: An unobserved plane MUST receive zero weight (W_i = 0),
+ * and the remaining observed planes are re-normalized to sum to 1.0.
+ * Fabricating a non-zero weight for an unmeasured plane is prohibited by AGENTS.md.
+ *
  * @param profile - Contextual project profile parameters.
  * @param hasDynamicEvidence - Whether genuine dynamic telemetry was ingested.
- * @returns Normalized FusionWeights summing to 1.0.
+ * @param hasHistoricalEvidence - Whether genuine historical reliability feedback was ingested.
+ * @returns Normalized FusionWeights summing to 1.0 (or Ws=1.0 when only static is observed).
  */
 export function resolveAdaptiveFusionWeights(
     profile: GovernanceProjectProfile = {},
     hasDynamicEvidence = true,
+    hasHistoricalEvidence = false,
 ): FusionWeights {
-    if (!hasDynamicEvidence) {
-        // When dynamic telemetry is absent, static carries primary burden
-        return { Ws: 0.85, Wd: 0.0, Wf: 0.15 };
+    if (!hasDynamicEvidence && !hasHistoricalEvidence) {
+        // Pure static observation: 100% ground-truth weight on static analysis plane
+        return { Ws: 1.0, Wd: 0.0, Wf: 0.0 };
     }
 
     const domain = profile.domain ?? 'core_framework';
     const stage = profile.stage ?? 'production';
 
-    let Ws = 0.5;
-    let Wd = 0.35;
-    let Wf = 0.15;
+    let rawWs = 0.5;
+    let rawWd = 0.35;
+    let rawWf = 0.15;
 
     // Domain adjustments
     switch (domain) {
         case 'core_framework':
-            Ws = 0.55;
-            Wd = 0.3;
-            Wf = 0.15;
+            rawWs = 0.55;
+            rawWd = 0.3;
+            rawWf = 0.15;
             break;
         case 'algorithm_lib':
-            Ws = 0.35;
-            Wd = 0.5;
-            Wf = 0.15;
+            rawWs = 0.35;
+            rawWd = 0.5;
+            rawWf = 0.15;
             break;
         case 'business_app':
-            Ws = 0.4;
-            Wd = 0.35;
-            Wf = 0.25;
+            rawWs = 0.4;
+            rawWd = 0.35;
+            rawWf = 0.25;
             break;
         case 'cli_tool':
-            Ws = 0.6;
-            Wd = 0.25;
-            Wf = 0.15;
+            rawWs = 0.6;
+            rawWd = 0.25;
+            rawWf = 0.15;
             break;
     }
 
     // Stage adjustments
     if (stage === 'prototype') {
-        Ws = 0.7;
-        Wd = 0.2;
-        Wf = 0.1;
+        rawWs = 0.7;
+        rawWd = 0.2;
+        rawWf = 0.1;
     } else if (stage === 'industrial_infrastructure') {
-        Ws = 0.45;
-        Wd = 0.4;
-        Wf = 0.15;
+        rawWs = 0.45;
+        rawWd = 0.4;
+        rawWf = 0.15;
     }
 
-    // Normalize so sum == 1.0
-    const sum = Ws + Wd + Wf;
+    const effectiveWs = rawWs;
+    const effectiveWd = hasDynamicEvidence ? rawWd : 0.0;
+    const effectiveWf = hasHistoricalEvidence ? rawWf : 0.0;
+
+    const sum = effectiveWs + effectiveWd + effectiveWf;
+    if (sum <= 0) {
+        return { Ws: 1.0, Wd: 0.0, Wf: 0.0 };
+    }
+
     return {
-        Ws: Math.round((Ws / sum) * 100) / 100,
-        Wd: Math.round((Wd / sum) * 100) / 100,
-        Wf: Math.round((Wf / sum) * 100) / 100,
+        Ws: Math.round((effectiveWs / sum) * 100) / 100,
+        Wd: Math.round((effectiveWd / sum) * 100) / 100,
+        Wf: Math.round((effectiveWf / sum) * 100) / 100,
     };
 }
 
@@ -139,35 +152,43 @@ export function resolveAdaptiveFusionWeights(
  * Computes the unified tri-plane quality score:
  * Q_total = W_s * Q_s + W_d * Q_d + W_f * Q_f
  *
+ * When dynamic or historical data is absent, its weight drops to 0.0 and the active
+ * planes are strictly renormalized, eliminating unearned score inflation.
+ *
  * @param staticVector - 7-axis Static Quality Vector.
  * @param dynamicVector - Optional 5-axis Dynamic Quality Vector.
- * @param historicalScore - Historical reliability / zero-incident score (default: 100.0).
+ * @param historicalScore - Optional historical reliability / incident score.
  * @param profile - Contextual project profile for adaptive weighting.
  * @returns Fully explained UnifiedQualityAssessment.
  */
 export function computeUnifiedQualityScore(
     staticVector: StaticQualityVector,
     dynamicVector?: DynamicQualityVector,
-    historicalScore = 100.0,
+    historicalScore?: number | null,
     profile: GovernanceProjectProfile = {},
 ): UnifiedQualityAssessment {
     const hasDynamic = dynamicVector !== undefined;
-    const weights = resolveAdaptiveFusionWeights(profile, hasDynamic);
+    const hasHistorical = typeof historicalScore === 'number' && Number.isFinite(historicalScore);
+    const weights = resolveAdaptiveFusionWeights(profile, hasDynamic, hasHistorical);
 
     const staticScore = computeStaticQualityScore(staticVector);
-    const dynamicScore = dynamicVector ? computeDynamicQualityScore(dynamicVector) : staticScore;
-    const feedbackScore = Math.max(0.0, Math.min(100.0, historicalScore));
+    const dynamicScore = hasDynamic ? computeDynamicQualityScore(dynamicVector!) : staticScore;
+    const feedbackScore = hasHistorical ? Math.max(0.0, Math.min(100.0, historicalScore!)) : staticScore;
 
     const totalRaw =
-        weights.Ws * staticScore + weights.Wd * dynamicScore + weights.Wf * feedbackScore;
+        weights.Ws * staticScore +
+        (weights.Wd > 0 ? weights.Wd * dynamicScore : 0.0) +
+        (weights.Wf > 0 ? weights.Wf * feedbackScore : 0.0);
 
     const totalScore = Math.round(totalRaw * SCORE_ROUNDING) / SCORE_ROUNDING;
 
+    const dynLabel = hasDynamic ? `${dynamicScore} (${(weights.Wd * 100).toFixed(0)}%)` : 'unobserved';
+    const histLabel = hasHistorical ? `${feedbackScore} (${(weights.Wf * 100).toFixed(0)}%)` : 'unobserved';
     const explanation =
         `Unified quality synthesized: Q_total=${totalScore} ` +
         `[Static (${(weights.Ws * 100).toFixed(0)}%): ${staticScore}, ` +
-        `Dynamic (${(weights.Wd * 100).toFixed(0)}%): ${dynamicScore}, ` +
-        `Feedback (${(weights.Wf * 100).toFixed(0)}%): ${feedbackScore}]`;
+        `Dynamic: ${dynLabel}, ` +
+        `Feedback: ${histLabel}]`;
 
     return {
         totalScore,

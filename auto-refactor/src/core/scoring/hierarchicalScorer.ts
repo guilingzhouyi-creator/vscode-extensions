@@ -149,6 +149,23 @@ function computeDensityDimensionDeduction(
     return 0;
 }
 
+/**
+ * Detects whether a path belongs to test, benchmark, or specification suites.
+ */
+function isTestFilePath(filePath: string): boolean {
+    const lower = filePath.toLowerCase().replace(/\\/g, '/');
+    return (
+        lower.includes('.test.') ||
+        lower.includes('.spec.') ||
+        lower.includes('/__tests__/') ||
+        lower.includes('/tests/') ||
+        lower.includes('/test/') ||
+        lower.startsWith('test_') ||
+        lower.endsWith('_test.py') ||
+        lower.endsWith('_test.gd')
+    );
+}
+
 function computeDimensionIndices(
     riskResult: ReturnType<typeof computeRiskWeightedPenalties>,
     densityResult: EffectiveDensityResult,
@@ -287,14 +304,21 @@ export function scoreFileQuality(
         securityCeiling,
     );
 
-    const dataScore = clampScore(100 - riskResult.pillarPenalties.data);
-    const testingScore = clampScore(100 - riskResult.pillarPenalties.testing);
+    const isTest = isTestFilePath(filePath);
+    const dataScoreOverride =
+        riskResult.pillarPenalties.data > 0
+            ? clampScore(100 - riskResult.pillarPenalties.data)
+            : undefined;
+    const testingScoreOverride =
+        isTest || riskResult.pillarPenalties.testing > 0
+            ? clampScore(100 - riskResult.pillarPenalties.testing)
+            : undefined;
 
     // 4. Synthesize 8 pillars with non-linear ceilings
     const eightPillars = synthesizeEightPillars(
         indices,
-        dataScore,
-        testingScore,
+        dataScoreOverride,
+        testingScoreOverride,
         riskResult.ceilings,
     );
 
@@ -475,12 +499,14 @@ function buildDomainScores(
 }
 
 /**
- * Computes normalized project-level quality pillar scores using LOC-weighted micro-average across all files.
+ * Computes normalized project-level quality pillar scores using log-smoothed LOC weighting.
+ *
+ * The weight `w_i = ln(LOC_i + 10)` keeps a very large boilerplate or dictionary file from
+ * drowning out a small core algorithmic module in the project-level average.
  */
 function computeProjectPillars(
     fileScores: FileQualityScore[],
     fatalCount: number,
-    totalLoc?: number,
 ): Record<PrimaryQualityPillar, number> {
     const globalPillarSums: Record<PrimaryQualityPillar, number> = {
         architecture: 0,
@@ -499,13 +525,14 @@ function computeProjectPillars(
             1,
             typeof file.loc === 'number' && Number.isFinite(file.loc) ? file.loc : 1,
         );
-        weightSum += fileLoc;
+        const fileWeight = Math.log(fileLoc + 10);
+        weightSum += fileWeight;
         for (const p of ALL_PRIMARY_PILLARS) {
-            globalPillarSums[p] += file.eightPillars.pillars[p] * fileLoc;
+            globalPillarSums[p] += file.eightPillars.pillars[p] * fileWeight;
         }
     }
 
-    const safeTotalWeight = Math.max(1, totalLoc !== undefined && totalLoc > 0 ? totalLoc : weightSum);
+    const safeTotalWeight = Math.max(1, weightSum);
     const projectPillars: Record<PrimaryQualityPillar, number> = {} as Record<
         PrimaryQualityPillar,
         number
@@ -571,6 +598,7 @@ interface AccumulatedProjectMetrics {
     readonly totalPor: number;
     readonly totalColumnDensity: number;
     readonly totalLoc: number;
+    readonly totalDimWeight: number;
     readonly projectDimSums: Record<QualityDimension, number>;
 }
 
@@ -604,18 +632,18 @@ function recordDomainModule(
 }
 
 /**
- * Adds file dimension scores into weighted project dimension sums.
+ * Adds file dimension scores into log-smoothed weighted project dimension sums.
  */
 function accumulateDimensionSums(
     projectDimSums: Record<QualityDimension, number>,
     file: FileQualityScore,
-    fileLoc: number,
+    fileWeight: number,
 ): void {
     const fDims = file.tenDimensions;
     for (const d of ALL_QUALITY_DIMENSIONS) {
         const fallback = d === 'codeSecurity' ? DEFAULT_SECURITY_CEILING : DIMENSION_MAX_SCORE;
         const dimScore = fDims?.[d] ?? fallback;
-        projectDimSums[d] += dimScore * fileLoc;
+        projectDimSums[d] += dimScore * fileWeight;
     }
 }
 
@@ -632,6 +660,7 @@ function accumulateProjectMetrics(fileScores: FileQualityScore[]): AccumulatedPr
     let totalPor = 0;
     let totalColumnDensity = 0;
     let totalLoc = 0;
+    let totalDimWeight = 0;
 
     const projectDimSums: Record<QualityDimension, number> = {} as Record<QualityDimension, number>;
     for (const d of ALL_QUALITY_DIMENSIONS) {
@@ -662,8 +691,10 @@ function accumulateProjectMetrics(fileScores: FileQualityScore[]): AccumulatedPr
             1,
             typeof file.loc === 'number' && Number.isFinite(file.loc) ? file.loc : 1,
         );
+        const fileWeight = Math.log(fileLoc + 10);
         totalLoc += fileLoc;
-        accumulateDimensionSums(projectDimSums, file, fileLoc);
+        totalDimWeight += fileWeight;
+        accumulateDimensionSums(projectDimSums, file, fileWeight);
     }
 
     return {
@@ -676,30 +707,31 @@ function accumulateProjectMetrics(fileScores: FileQualityScore[]): AccumulatedPr
         totalPor,
         totalColumnDensity,
         totalLoc,
+        totalDimWeight,
         projectDimSums,
     };
 }
 
 /**
- * Computes LOC-weighted ten-dimension project scores.
+ * Computes log-smoothed ten-dimension project scores.
  */
 function computeWeightedProjectDimensions(
     projectDimSums: Record<QualityDimension, number>,
-    totalLoc: number,
+    totalDimWeight: number,
 ): Record<QualityDimension, number> {
-    const safeTotalLoc = Math.max(1, totalLoc);
+    const safeTotalWeight = Math.max(1, totalDimWeight);
     const projectDimensions: Record<QualityDimension, number> = {} as Record<
         QualityDimension,
         number
     >;
     for (const d of ALL_QUALITY_DIMENSIONS) {
-        projectDimensions[d] = clampScore(projectDimSums[d] / safeTotalLoc);
+        projectDimensions[d] = clampScore(projectDimSums[d] / safeTotalWeight);
     }
     return projectDimensions;
 }
 
 /**
- * Finalizes synthesized eight pillars with primary weights and composite score.
+ * Finalizes synthesized eight pillars with primary weights and a geometric-mean composite.
  */
 function finalizeProjectEightPillars(
     projectDimensions: Record<QualityDimension, number>,
@@ -710,13 +742,24 @@ function finalizeProjectEightPillars(
         projectPillars.data,
         projectPillars.testing,
         [],
+        {},
+        'geometric',
     );
     synthesized.pillars = projectPillars;
-    let finalCompositeSum = 0;
+    let totalWeight = 0;
+    let logSum = 0;
     for (const p of ALL_PRIMARY_PILLARS) {
-        finalCompositeSum += projectPillars[p] * synthesized.weights[p];
+        const w = synthesized.weights[p];
+        const boundedScore = Math.max(15, Math.min(100, projectPillars[p]));
+        logSum += w * Math.log(boundedScore);
+        totalWeight += w;
     }
-    synthesized.compositeScore = clampScore(finalCompositeSum);
+    synthesized.compositeScore =
+        totalWeight > 0
+            ? clampScore(
+                  Math.round(Math.exp(logSum / totalWeight) * SCORE_ROUNDING) / SCORE_ROUNDING,
+              )
+            : 100.0;
     return synthesized;
 }
 
@@ -733,10 +776,10 @@ export function aggregateProjectScore(fileScores: FileQualityScore[]): ProjectQu
 
     const metrics = accumulateProjectMetrics(fileScores);
     const domains = buildDomainScores(metrics.domainMap);
-    const projectPillars = computeProjectPillars(fileScores, metrics.fatalCount, metrics.totalLoc);
+    const projectPillars = computeProjectPillars(fileScores, metrics.fatalCount);
     const projectDimensions = computeWeightedProjectDimensions(
         metrics.projectDimSums,
-        metrics.totalLoc,
+        metrics.totalDimWeight,
     );
     const synthesized = finalizeProjectEightPillars(projectDimensions, projectPillars);
 

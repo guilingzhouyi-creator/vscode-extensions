@@ -51,6 +51,7 @@ import { evaluateCompositeGate, type GateStage } from './core/praxis/composite-q
 import { CacheStore } from './core/cache';
 import { daemonCommand } from './cli/daemonCmd';
 import { selfTestCommand } from './cli/selfTestCmd';
+import { analyzeCodeDensity } from './core/intelligence/code-density-analyzer';
 
 /** Decimal radix used when parsing numeric CLI arguments such as `--line`. */
 const DECIMAL_RADIX = 10;
@@ -311,21 +312,12 @@ async function handleTrajectoryCommand(args: string[]): Promise<void> {
     printFileTrajectory(rawTarget);
 }
 
-function countLinesEloc(content: string): { loc: number; eloc: number } {
-    const lines = content.split('\n');
-    let eloc = 0;
-    for (const sourceLine of lines) {
-        const trimmedLine = sourceLine.trim();
-        if (
-            trimmedLine.length > 0 &&
-            !trimmedLine.startsWith('//') &&
-            !trimmedLine.startsWith('#') &&
-            !trimmedLine.startsWith('*')
-        ) {
-            eloc++;
-        }
-    }
-    return { loc: lines.length, eloc };
+function countLinesEloc(content: string, filePath?: string): { loc: number; eloc: number } {
+    const metrics = analyzeCodeDensity(content, filePath);
+    return {
+        loc: metrics.physicalLines,
+        eloc: Math.round(metrics.effectiveCodeLines),
+    };
 }
 
 async function processDirectoryEntries(
@@ -348,7 +340,7 @@ async function processDirectoryEntries(
         files++;
         try {
             const content = await fs.promises.readFile(full, 'utf8');
-            const counts = countLinesEloc(content);
+            const counts = countLinesEloc(content, full);
             loc += counts.loc;
             eloc += counts.eloc;
         } catch {

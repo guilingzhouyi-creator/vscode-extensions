@@ -115,6 +115,18 @@ export interface VfsFileEntry {
 }
 
 /**
+ * Single range replacement or insertion operation for applyEdits.
+ */
+export interface FileEditOp {
+    /** Starting byte offset where replacement begins */
+    readonly offset: number;
+    /** Number of original bytes to replace (0 for pure insertion) */
+    readonly length: number;
+    /** Replacement payload */
+    readonly replacement: Uint8Array | string;
+}
+
+/**
  * Snapshot of a workspace state at a point in time.
  */
 export interface WorkspaceSnapshot {
@@ -157,10 +169,10 @@ export interface WorkspaceHandle {
  */
 export interface IPraxisVFSStorage {
     /**
-     * Store raw chunk payload under content hash address.
+     * Store raw chunk payload under content hash address with optional base hash for delta compression.
      * Idempotent: duplicate chunks return true immediately without writing.
      */
-    putChunk(chunkHash: string, data: Uint8Array): Promise<boolean>;
+    putChunk(chunkHash: string, data: Uint8Array, baseHash?: string): Promise<boolean>;
 
     /**
      * Retrieve raw chunk payload by content hash.

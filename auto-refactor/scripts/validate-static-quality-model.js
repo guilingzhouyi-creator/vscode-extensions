@@ -3,12 +3,12 @@
  * Module: Verification Harness — Static Analysis Plane (SAP) Quality Model
  * File Path: scripts/validate-static-quality-model.js
  * Architecture Role: Automated verification suite asserting the mathematical correctness
- *   of the Static Analysis Plane (SAP) quality vector Q_s = (A, M, P, D, T, R, E), the static
+ *   of the Static Analysis Plane (SAP) quality vector Q_s = (A, M, P, D, T, R, S, E), the static
  *   issue risk confidence formula S_i = P_i * C_i * I_i, and vector space delta calculations.
  * Dependencies & Triggers: `npm test` or `node scripts/validate-static-quality-model.js`;
  *   imports dist/api.
  * Responsibilities:
- *   1. Validate seven-axis vector synthesis from fine-grained indicators.
+ *   1. Validate eight-axis vector synthesis from fine-grained indicators.
  *   2. Validate S_i = P_i * C_i * I_i with reach-aware blast radius and confidence.
  *   3. Validate static vector deltas, Euclidean distance, and cosine similarity.
  * Exit Semantics & Design Rationale: Exits 0 on all tests passing, 1 on any assertion error.
@@ -33,22 +33,23 @@ async function main() {
   );
 
   // 1. Static Quality Axis Definitions & Completeness
-  console.log('1. Testing Seven Static Quality Axes...');
-  assert.strictEqual(ALL_STATIC_QUALITY_AXES.length, 7);
-  assert.deepStrictEqual([...ALL_STATIC_QUALITY_AXES], ['A', 'M', 'P', 'D', 'T', 'R', 'E']);
+  console.log('1. Testing Eight Static Quality Axes...');
+  assert.strictEqual(ALL_STATIC_QUALITY_AXES.length, 8);
+  assert.deepStrictEqual([...ALL_STATIC_QUALITY_AXES], ['A', 'M', 'P', 'D', 'T', 'R', 'S', 'E']);
   assert.strictEqual(STATIC_AXIS_NAMES.A, 'architectureQuality');
   assert.strictEqual(STATIC_AXIS_NAMES.M, 'maintainability');
   assert.strictEqual(STATIC_AXIS_NAMES.P, 'algorithmAndPerformance');
   assert.strictEqual(STATIC_AXIS_NAMES.D, 'dataArchitecture');
   assert.strictEqual(STATIC_AXIS_NAMES.T, 'testQuality');
   assert.strictEqual(STATIC_AXIS_NAMES.R, 'reliability');
+  assert.strictEqual(STATIC_AXIS_NAMES.S, 'securityQuality');
   assert.strictEqual(STATIC_AXIS_NAMES.E, 'extensibility');
 
   const weightSum = Object.values(DEFAULT_STATIC_WEIGHTS).reduce((acc, w) => acc + w, 0);
   assert.ok(Math.abs(weightSum - 1.0) < 1e-6, `Default weights must sum to 1.0 (got ${weightSum})`);
-  console.log('✔ Seven static quality axes and default weights verified.');
+  console.log('✔ Eight static quality axes and default weights verified.');
 
-  // 2. Vector Synthesis Q_s = (A, M, P, D, T, R, E)
+  // 2. Vector Synthesis Q_s = (A, M, P, D, T, R, S, E)
   console.log('2. Testing Static Quality Vector Synthesis...');
   const fineGrainedIndices = {
     architectureConsistency: 92.0,
@@ -77,10 +78,11 @@ async function main() {
   );
   assert.strictEqual(vector.T, 82.0); // modernity
   assert.strictEqual(vector.R, 85.0); // (90 + 80) / 2
+  assert.strictEqual(vector.S, 100.0); // codeSecurity
   assert.strictEqual(vector.E, 90.0); // (85 + 90 + 95) / 3
 
   const score = computeStaticQualityScore(vector);
-  assert.strictEqual(score, 89.54);
+  assert.strictEqual(score, 90.3);
   console.log(`✔ Static quality vector synthesized: score=${score}, Q_s=${JSON.stringify(vector)}`);
 
   // Vector with explicit overrides
@@ -188,6 +190,7 @@ async function main() {
     D: 75.0,
     T: 60.0,
     R: 70.0,
+    S: 80.0,
     E: 70.0,
   };
 
@@ -198,6 +201,7 @@ async function main() {
     D: 85.0,
     T: 80.0,
     R: 85.0,
+    S: 95.0,
     E: 80.0,
   };
 
@@ -205,6 +209,7 @@ async function main() {
   assert.strictEqual(delta.deltaVector.A, 15.0);
   assert.strictEqual(delta.deltaVector.M, 25.0);
   assert.strictEqual(delta.deltaVector.P, 15.0);
+  assert.strictEqual(delta.deltaVector.S, 15.0);
   assert.ok(delta.scalarDelta > 0, `Scalar delta must be positive (got ${delta.scalarDelta})`);
   assert.ok(
     delta.euclideanDistance > 0,
@@ -226,7 +231,7 @@ async function main() {
   assert.strictEqual(pillarToStaticAxis('data'), 'D');
   assert.strictEqual(pillarToStaticAxis('testing'), 'T');
   assert.strictEqual(pillarToStaticAxis('reliability'), 'R');
-  assert.strictEqual(pillarToStaticAxis('security'), 'R');
+  assert.strictEqual(pillarToStaticAxis('security'), 'S');
   assert.strictEqual(pillarToStaticAxis('extensibility'), 'E');
   console.log('✔ Pillar to static axis mappings verified.');
 

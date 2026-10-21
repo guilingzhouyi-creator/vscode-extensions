@@ -29,7 +29,7 @@ import type { WorkspaceManagerOptions } from './workspace-manager';
 import { WorkspaceManager } from './workspace-manager';
 
 export type * from './vfs-contracts';
-export type { CasStoreOptions } from './cas-store';
+export type { BranchDelta, CasStoreOptions } from './cas-store';
 export type { FastCDCOptions } from './fast-cdc';
 export type { LayerVFSWorkspace, WorkspaceManagerOptions } from './workspace-manager';
 
@@ -104,6 +104,7 @@ export const LayerVFSManifest = Object.freeze({
         'zero-copy-workspace-forking',
         'atomic-snapshot-rollback',
         'diff-content-addressed',
+        'apply-edits-localized-reconstruction',
     ]),
     defaults: Object.freeze({
         minChunkSizeBytes: DEFAULT_MIN_CHUNK_SIZE,

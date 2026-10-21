@@ -13,7 +13,7 @@
  */
 
 import type { PraxisCardContext } from '../contracts';
-import type { BranchDelta } from '../vfs/cas-store';
+import type { BranchDelta, FileEditOp } from '../vfs';
 import type { LayerVFSWorkspace } from '../vfs/workspace-manager';
 
 /**
@@ -28,6 +28,10 @@ export interface CandidateStrategy {
     description?: string;
     /** Map of file path to updated content */
     fileModifications: Map<string, string | Uint8Array>;
+    /** Optional localized edits for high-performance partial AST reconstruction */
+    localizedEdits?: Map<string, readonly FileEditOp[]>;
+    /** Optional base directory on host to enable sparse link overlay and instant bootstrap */
+    baseDir?: string;
     /** Optional test or verification command to run in sandbox */
     verificationCommand?: {
         command: string;

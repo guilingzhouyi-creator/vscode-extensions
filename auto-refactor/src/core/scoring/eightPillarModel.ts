@@ -104,7 +104,7 @@ export function synthesizeEightPillars(
     testingScoreOverride?: number,
     ceilings: PillarCeilingConstraint[] = [],
     customWeights: Partial<Record<PrimaryQualityPillar, number>> = {},
-    aggregationMode: 'geometric' | 'arithmetic' = 'arithmetic',
+    aggregationMode: 'geometric' | 'arithmetic' = 'geometric',
 ): EightPillarBreakdown {
     const weights: Record<PrimaryQualityPillar, number> = {
         ...DEFAULT_PILLAR_WEIGHTS,

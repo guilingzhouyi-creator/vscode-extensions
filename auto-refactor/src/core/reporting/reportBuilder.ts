@@ -73,8 +73,6 @@ const DOMAIN_CORE_FRAMEWORK = 'core_framework';
 const DOMAIN_ALGORITHM_LIB = 'algorithm_lib';
 const DOMAIN_BUSINESS_APP = 'business_app';
 
-const DEFAULT_PERFECT_SCORE = 100.0;
-
 /**
  * Scanner collaborators the report builder needs: the effective config plus the per-instance
  * scorers and cross-file stores filled during the scan.
@@ -347,13 +345,14 @@ export function buildScanReport(params: BuildScanReportContext): ScanReport {
     );
     const staticVector = synthesizeStaticQualityVector(projectQualityScore.indices);
     const dynamicTelemetry = cfg.telemetryData;
-    const dynamicVector = dynamicTelemetry
-        ? computeDynamicQualityVector(dynamicTelemetry)
-        : undefined;
+    const dynamicVector =
+        dynamicTelemetry && dynamicTelemetry.isObserved !== false
+            ? computeDynamicQualityVector(dynamicTelemetry)
+            : undefined;
     const triPlaneQuality = computeUnifiedQualityScore(
         staticVector,
         dynamicVector,
-        DEFAULT_PERFECT_SCORE,
+        undefined,
         resolveGovernanceProfile(cfg),
     );
     const autonomy = evaluateProjectAutonomy(

@@ -75,9 +75,6 @@ const DEFAULT_BASELINE_GRANULARITY = 'id';
 /** Delimiter separating symbol hierarchies. */
 const SYMBOL_DOT_PREFIX = '.';
 
-/** Baseline maximum score scalar for unified quality calculation. */
-const SCORE_MAX_BASELINE = 100.0;
-
 /** Governance maturity tier classifications. */
 const TIER_INDUSTRIAL = 'industrial';
 const TIER_DEMO = 'demo';
@@ -666,13 +663,14 @@ function refreshQualityScores(
 
     const staticVector = synthesizeStaticQualityVector(projectQualityScore.indices);
     const dynamicTelemetry = config.telemetryData;
-    const dynamicVector = dynamicTelemetry
-        ? computeDynamicQualityVector(dynamicTelemetry)
-        : undefined;
+    const dynamicVector =
+        dynamicTelemetry && dynamicTelemetry.isObserved !== false
+            ? computeDynamicQualityVector(dynamicTelemetry)
+            : undefined;
     report.triPlaneQuality = computeUnifiedQualityScore(
         staticVector,
         dynamicVector,
-        SCORE_MAX_BASELINE,
+        undefined,
         resolveGovernanceProfile(config),
     );
     report.autonomy = evaluateProjectAutonomy(

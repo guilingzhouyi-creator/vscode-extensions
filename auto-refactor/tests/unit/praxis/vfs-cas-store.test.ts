@@ -121,6 +121,24 @@ describe('LayerVFS — FastCDC & CAS Storage Engine', () => {
             await backend.close();
         });
 
+        it('persists prefix delta chunk against base accurately', async () => {
+            const backend = createSqliteBackend(':memory:');
+            const baseStr = 'repeated stable code tokens '.repeat(50);
+            const targetStr = baseStr + 'MODIFIED_LOCAL_EDIT_TOKEN';
+
+            const baseHash = 'base0000base0000base0000base0000base0000base0000base0000base0000';
+            const targetHash = 'targ0000targ0000targ0000targ0000targ0000targ0000targ0000targ0000';
+
+            await backend.putChunk(baseHash, Buffer.from(baseStr));
+            await backend.putChunk(targetHash, Buffer.from(targetStr), baseHash);
+
+            const readBack = await backend.getChunk(targetHash);
+            expect(readBack).not.toBeNull();
+            expect(Buffer.from(readBack!).toString()).toBe(targetStr);
+
+            await backend.close();
+        });
+
         it('persists snapshots with file entries atomically', async () => {
             const backend = createSqliteBackend(':memory:');
             const entries = [
@@ -252,6 +270,39 @@ describe('LayerVFS — FastCDC & CAS Storage Engine', () => {
 
             expect(() => store.listFiles('scratch-branch')).toThrowError(/ERR_NOT_FOUND/);
             expect(() => store.discardBranch('main')).toThrowError(/ERR_BRANCH_LOCKED/);
+
+            await store.close();
+        });
+
+        it('reconstructs file via applyEdits with extent pointer reuse', async () => {
+            const store = new CasStore();
+            const lines: string[] = [];
+            for (let i = 0; i < 1000; i++) {
+                lines.push(`const item_${i} = { id: ${i}, value: "long_stable_token_${i}" };\n`);
+            }
+            const fullContent = lines.join('');
+            const entry = await store.putFile('main', 'big-file.ts', fullContent);
+
+            // Locate a position in the middle
+            const targetLine = lines[500];
+            const targetOffset = lines.slice(0, 500).join('').length;
+
+            const updatedEntry = await store.applyEdits('main', 'big-file.ts', [
+                {
+                    offset: targetOffset,
+                    length: targetLine.length,
+                    replacement: 'const item_500 = { id: 500, value: "MUTATED_VALUE" };\n',
+                },
+            ]);
+
+            expect(updatedEntry.contentHash).not.toBe(entry.contentHash);
+
+            const fileData = await store.getFile('main', 'big-file.ts');
+            expect(fileData).not.toBeNull();
+            const readString = Buffer.from(fileData!.content).toString('utf8');
+            expect(readString).toContain('const item_500 = { id: 500, value: "MUTATED_VALUE" };\n');
+            expect(readString).toContain('const item_0 =');
+            expect(readString).toContain('const item_999 =');
 
             await store.close();
         });

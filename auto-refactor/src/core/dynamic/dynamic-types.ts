@@ -187,6 +187,8 @@ export interface DynamicEvidenceDTO {
     timestamp: number;
     /** Host environment identifier (e.g. production, ci_benchmark, load_test) */
     environment?: string;
+    /** Whether genuine dynamic telemetry was observed (false if synthetic/fallback) */
+    isObserved?: boolean;
     /** Latency measurements */
     latency?: Partial<LatencyMetric>;
     /** Throughput measurements */
