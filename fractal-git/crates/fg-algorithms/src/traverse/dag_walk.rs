@@ -308,6 +308,26 @@ impl DagWalker {
             return vec![*commit_b];
         }
 
+        let candidate_bases =
+            Self::collect_candidate_merge_bases(commit_a, commit_b, ccd_a, ccd_b, &mut get_node);
+
+        if candidate_bases.len() <= 1 {
+            return candidate_bases;
+        }
+
+        Self::prune_redundant_merge_bases(&candidate_bases, get_node)
+    }
+
+    fn collect_candidate_merge_bases<F>(
+        commit_a: &Oid,
+        commit_b: &Oid,
+        ccd_a: CorrectedCommitDate,
+        ccd_b: CorrectedCommitDate,
+        mut get_node: F,
+    ) -> Vec<Oid>
+    where
+        F: FnMut(&Oid) -> Option<(CorrectedCommitDate, Vec<Oid>)>,
+    {
         const FLAG_A: u8 = 1 << 0;
         const FLAG_B: u8 = 1 << 1;
         const FLAG_COMMON: u8 = FLAG_A | FLAG_B;
@@ -379,10 +399,13 @@ impl DagWalker {
             }
         }
 
-        if candidate_bases.len() <= 1 {
-            return candidate_bases;
-        }
+        candidate_bases
+    }
 
+    fn prune_redundant_merge_bases<F>(candidate_bases: &[Oid], mut get_node: F) -> Vec<Oid>
+    where
+        F: FnMut(&Oid) -> Option<(CorrectedCommitDate, Vec<Oid>)>,
+    {
         // Post-filter: eliminate any candidate that is an ancestor of another candidate
         let mut final_bases = Vec::new();
         for (i, cand) in candidate_bases.iter().enumerate() {
