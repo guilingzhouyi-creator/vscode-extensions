@@ -19,11 +19,13 @@
  *   keys unreachable, avoiding explicit invalidation.
  */
 import * as crypto from 'crypto';
-import * as fs from 'fs';
 import * as path from 'path';
 import type { ScanConfig, ParserKind } from './types';
 import { TOOL_VERSION } from './config/config';
 import { policyFromAnalyzers, fastPathEnabled, FAST_PATH_ANALYZERS } from './ast/traverse';
+// Blocking reads of compiled modules are funneled through the sanctioned barrier so the fingerprint
+// does not add a new direct `fs.*Sync` call site on the hot path (PRF-IO-001).
+import { SyncIoBarrier } from './cache-persistence';
 
 /** Canonical tool version identity string. */
 export { TOOL_VERSION };
@@ -46,9 +48,18 @@ export { TOOL_VERSION };
 /** Cache format/serialization version — bump when the JSONL layout or key schema changes. */
 export const CACHE_FORMAT_VERSION = 1;
 
-/** Analyzer implementation versions (informational; bump when analyzer logic changes). */
+/**
+ * Analyzer implementation versions.
+ *
+ * Historically the only guard against stale results after an analyzer rewrite, which required a
+ * manual bump that silently drifted: the constants analyzer's literal classification was reworked
+ * without bumping `constants`, so a warm scan served 1160 phantom `hardcoded-string` findings from
+ * cache entries produced by the previous implementation. Versions are now informational —
+ * `computeEngineDigest` fingerprints the analyzer and adapter module bytes, making any
+ * implementation change invalidate the cache without human discipline.
+ */
 export const ANALYZER_VERSIONS: Record<string, number> = {
-    constants: 1,
+    constants: 2,
     'large-file': 1,
     complexity: 1,
     governance: 1,
@@ -65,6 +76,103 @@ export const ADAPTER_VERSIONS: Record<string, number> = {
 
 /** Decimal radix for parsing the Node.js major version out of `process.versions.node`. */
 const DECIMAL_RADIX = 10;
+
+/**
+ * Engine subtrees whose compiled bytes determine analysis output.
+ *
+ * `analyzers` holds the rule implementations; `core/ast` the projections that decide which nodes
+ * each analyzer ever sees. Both must participate in the fingerprint: a projection change alters
+ * findings without touching any analyzer file.
+ */
+const ENGINE_DIGEST_ROOTS = ['analyzers', path.join('core', 'ast')];
+
+/**
+ * Compiled-engine directory.
+ *
+ * Resolved as `<repoRoot>/dist` so the digest works from both execution surfaces: compiled
+ * (`<dist>/core`) and source-with-on-the-fly-transform (`<src>/core`). Anchoring on `__dirname`
+ * alone made the digest report `unavailable` under the TypeScript test lane, silently disabling
+ * invalidation exactly where the unit contract is verified.
+ */
+const ENGINE_DIST_ROOT = path.join(__dirname, '..', '..', 'dist');
+
+/** Extension of compiled engine modules. */
+const ENGINE_MODULE_EXTENSION = '.js';
+
+/** Cache of the engine digest for the process lifetime (compiled bytes do not change at runtime). */
+let engineDigestCache: string | null = null;
+
+/**
+ * Hashes the compiled bytes of every analyzer and AST-projection module.
+ *
+ * The fingerprint contract requires that any implementation change makes old cache keys
+ * unreachable. Relying on manual `ANALYZER_VERSIONS` bumps breaks that contract in practice: the
+ * constants analyzer was refactored without a bump, and warm scans kept serving 1160 phantom
+ * `hardcoded-string` findings from entries produced by the previous implementation. Digesting the
+ * compiled modules removes the human step from the loop.
+ *
+ * @returns SHA-256 hex digest over sorted module paths and their contents, or `'unavailable'` when
+ *          the compiled tree cannot be read (callers still get a stable, non-colliding value).
+ */
+export function computeEngineDigest(): string {
+    if (engineDigestCache !== null) return engineDigestCache;
+    const moduleFiles: string[] = [];
+    for (const rootName of ENGINE_DIGEST_ROOTS) {
+        const rootDir = path.join(ENGINE_DIST_ROOT, rootName);
+        collectEngineModules(rootDir, moduleFiles);
+    }
+    if (moduleFiles.length === 0) {
+        engineDigestCache = 'unavailable';
+        return engineDigestCache;
+    }
+    moduleFiles.sort();
+    const hash = crypto.createHash('sha256');
+    for (const moduleFile of moduleFiles) {
+        hash.update(path.relative(ENGINE_DIST_ROOT, moduleFile));
+        hash.update(NULL_BYTE_DELIMITER);
+        hash.update(readEngineModule(moduleFile));
+        hash.update(NULL_BYTE_DELIMITER);
+    }
+    engineDigestCache = hash.digest('hex');
+    return engineDigestCache;
+}
+
+/**
+ * Recursively collects compiled engine modules beneath one subtree.
+ *
+ * @param dir - Directory to walk.
+ * @param out - Accumulator receiving absolute module paths.
+ */
+function collectEngineModules(dir: string, out: string[]): void {
+    let entries: import('fs').Dirent[];
+    try {
+        entries = SyncIoBarrier.readDir(dir);
+    } catch {
+        return;
+    }
+    for (const entry of entries) {
+        const entryPath = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+            collectEngineModules(entryPath, out);
+        } else if (entry.name.endsWith(ENGINE_MODULE_EXTENSION)) {
+            out.push(entryPath);
+        }
+    }
+}
+
+/**
+ * Reads one compiled engine module, substituting a constant marker when it is unreadable.
+ *
+ * @param moduleFile - Absolute path of the compiled module.
+ * @returns Module bytes, or a fixed marker so the digest stays deterministic.
+ */
+function readEngineModule(moduleFile: string): Buffer | string {
+    try {
+        return SyncIoBarrier.readBytes(moduleFile);
+    } catch {
+        return 'unreadable';
+    }
+}
 
 /** Adapter id for TypeScript/JavaScript-family files; also the default ParserKind. */
 const TYPESCRIPT_ADAPTER_ID = 'typescript';
@@ -243,8 +351,7 @@ function collectCustomDescs(context: CustomAnalyzerCollectorContext): void {
 
 function readCustomModuleBuffer(modulePath: string): Buffer | null {
     try {
-        const read = fs.readFileSync;
-        return read(modulePath);
+        return SyncIoBarrier.readBytes(modulePath);
     } catch {
         return null;
     }
@@ -346,6 +453,11 @@ export interface FingerprintPayload {
      * invalidates cached results that embedded the previous LANG-UNSUPPORTED severity.
      */
     unsupportedLanguage: 'error' | 'warning' | 'off';
+    /**
+     * SHA-256 over the compiled analyzer and AST-projection modules. Renders `ANALYZER_VERSIONS`
+     * informational: an implementation change invalidates the cache without a manual bump.
+     */
+    engineDigest: string;
 }
 
 /**
@@ -434,6 +546,7 @@ export function buildFingerprintPayload(
         customHash: parsed.customHash,
         fileExt,
         unsupportedLanguage: config.unsupportedLanguage ?? DEFAULT_UNSUPPORTED_SEVERITY,
+        engineDigest: computeEngineDigest(),
     };
 }
 
@@ -494,6 +607,7 @@ export function buildPoolFingerprint(
         })),
         thresholds: config.thresholds as Record<string, any>,
         customHash: computeCustomHash(resolved),
+        engineDigest: computeEngineDigest(),
     };
     return computeSha256Hex(getCanonicalJson(payload));
 }

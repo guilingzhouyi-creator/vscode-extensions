@@ -122,7 +122,7 @@ $$\text{L2Key} = \texttt{"v1:"} + \text{fpHash} + \texttt{":"} + \text{contentHa
 2. **`fpHash`**：对经过严格字典序排列、剔除所有多余空白的规范化指纹载荷（`FingerprintPayload`）计算 SHA-256：
    $$\text{fpHash} = \operatorname{sha256Hex}\big(\operatorname{canonicalJson}(\text{FingerprintPayload})\big)$$
 
-### 3.2 `FingerprintPayload` 十大构成因子
+### 3.2 `FingerprintPayload` 十一大构成因子
 
 ```typescript
 export interface FingerprintPayload {
@@ -145,9 +145,13 @@ export interface FingerprintPayload {
   thresholds: Record<string, any>;          // 8. 全局复杂度与度量阈值字典
   customHash: string | null;                // 9. 自定义插件源码 SHA-256 (cacheCustom)
   fileExt: string;                          // 10. 文件扩展名 (如 '.ts', '.rs')
-  unsupportedLanguage: 'error' | 'warning' | 'off'; // 守卫等级
+  unsupportedLanguage: 'error' | 'warning' | 'off'; // 11. 守卫等级
+  engineDigest: string;                     // 12. 分析器与 AST 投影编译产物 SHA-256
 }
 ```
+
+> [!IMPORTANT]
+> **`engineDigest` 是失效公理的机器执行者**。它对本仓 `dist/analyzers` 与 `dist/core/ast` 下的全部编译模块按相对路径排序后计算 SHA-256，因此分析器或投影层任何实现改动都会直接改变指纹，**无需人工递增 `ANALYZER_VERSIONS`**。该表已降级为纯信息性字段：此前常量分析器的字面量分类逻辑被重构却忘记递增版本号，热扫描因而持续返回上一实现产出的陈旧 `hardcoded-string` 结论。契约由 `tests/unit/core/cache-key-engine-digest.test.ts` 看守。
 
 ### 3.3 零命令隐式失效与后处理解耦公理
 

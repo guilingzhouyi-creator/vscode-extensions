@@ -46,6 +46,7 @@ export interface L2EntryRecord {
 }
 
 const syncFsReadText = fs.readFileSync.bind(fs);
+const syncFsReadBytes = fs.readFileSync.bind(fs);
 const syncFsWriteText = fs.writeFileSync.bind(fs);
 const syncFsAppendText = fs.appendFileSync.bind(fs);
 const syncFsMkdir = fs.mkdirSync.bind(fs);
@@ -53,12 +54,15 @@ const syncFsStat = fs.statSync.bind(fs);
 const syncFsExists = fs.existsSync.bind(fs);
 const syncFsRm = fs.rmSync.bind(fs);
 const syncFsRename = fs.renameSync.bind(fs);
+const syncFsReaddir = fs.readdirSync.bind(fs);
 
 /**
  * Synchronous I/O barrier isolating blocking filesystem primitives.
  */
 export const SyncIoBarrier = {
     readText: (filePath: string): string => syncFsReadText(filePath, ENCODING_UTF8),
+    readBytes: (filePath: string): Buffer => syncFsReadBytes(filePath),
+    readDir: (dirPath: string): fs.Dirent[] => syncFsReaddir(dirPath, { withFileTypes: true }),
     writeText: (filePath: string, data: string): void =>
         syncFsWriteText(filePath, data, ENCODING_UTF8),
     appendText: (filePath: string, data: string): void =>
