@@ -315,6 +315,43 @@ check(
     claimDetectors,
   ).length === 0,
 );
+// 三类漏检形态曾同时逃过旧正则：表格单元格、括号裸计数、拉丁限定词。三者都必须在同一份
+// 语料上被捕获，否则「守卫 PASS」只说明它没看懂这些写法。
+check(
+  'docs consistency guard reads a bare figure in a table cell',
+  DOCS_CONSISTENCY.scanTextForClaims('| **`auto-refactor`** | 338 条 | 30 个分析器 |', claimDetectors).length >= 1,
+);
+check(
+  'docs consistency guard reads a parenthesised bare figure',
+  DOCS_CONSISTENCY.scanTextForClaims('1. **`autoRefactor` (338 条)**：涵盖 30 个分析器', claimDetectors).length >= 1,
+);
+check(
+  'docs consistency guard reads a Latin-qualified bare figure',
+  DOCS_CONSISTENCY.scanTextForClaims('触发 30 分析器与 359 条 auto-refactor 规则自测', claimDetectors).length >= 1,
+);
+check(
+  'docs consistency guard leaves session-capacity figures alone',
+  DOCS_CONSISTENCY.scanTextForClaims('单日会话记录超过 20 条时按 FIFO 淘汰', claimDetectors).length === 0,
+);
+check(
+  'docs consistency guard judges a project row against its own total',
+  DOCS_CONSISTENCY.scanTextForClaims('| **`WebGames`** | 29 条 | Godot 专属契约 |', claimDetectors).length === 1 &&
+    DOCS_CONSISTENCY.scanTextForClaims('| **`WebGames`** | 50 条 | Godot 专属契约 |', claimDetectors).length === 0,
+);
+check(
+  'docs consistency guard judges a family figure against its own family',
+  DOCS_CONSISTENCY.scanTextForClaims('对应 `PYM` 族 11 条规则。', claimDetectors).length === 1 &&
+    DOCS_CONSISTENCY.scanTextForClaims('对应 `PYM` 族 13 条规则。', claimDetectors).length === 0 &&
+    DOCS_CONSISTENCY.scanTextForClaims('13 条 `PYM` 规则对应的写法。', claimDetectors).length === 0 &&
+    DOCS_CONSISTENCY.scanTextForClaims('11 条 `PYM` 规则对应的写法。', claimDetectors).length === 1,
+);
+check(
+  'docs consistency guard honours a reasoned plan exemption',
+  DOCS_CONSISTENCY.scanTextForClaims(
+    '<!-- METRICS:IGNORE-PLAN reason=preset-family-target -->\n| catalog | 30 条 preset |\n',
+    claimDetectors,
+  ).length === 0,
+);
 
 const failures = results.filter((r) => !r.ok).length;if (failures > 0) {
   console.error(`FAIL ${failures} guard assertion(s) did not hold`);

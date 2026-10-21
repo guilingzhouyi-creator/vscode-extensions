@@ -11,7 +11,10 @@
  *   2. Honour `METRICS:IGNORE-HISTORICAL commit=<hash>` exemptions for dated historical snapshots;
  *   3. Verify every backticked scripts/** path in core documents exists on disk;
  *   4. Emit line-accurate diagnostics with human and JSON output;
- *   5. Fail closed when a scanned document is unreadable.
+ *   5. Fail closed when a scanned document is unreadable;
+ *   6. Cover figures written without the word 规则 after them (table cells, parentheses and
+ *      Latin-qualified prose) whenever the same line talks about rules or analyzers, and read the
+ *      `.agents/subagents/**` JSON corpus so subagent presets cannot quote retired totals.
  * Exit Semantics & Design Rationale: 0 = documents quote only live figures and reference only
  *   existing scripts, 1 = drift detected. The previous implementation matched a fixed blacklist of
  *   historical numbers (428/464/468/470), which is exactly the failure mode it was meant to prevent:
@@ -53,7 +56,28 @@ const SKIP_DIRECTORIES = Object.freeze([
 
 const SKIP_PATHS = Object.freeze(['WebGames/docs', '.agents/plugins']);
 
+/**
+ * Directories whose JSON files are scanned alongside Markdown.
+ *
+ * Subagent archetypes and postures restate catalog totals inside `rigidAxioms` strings. Those files
+ * are not Markdown, so a Markdown-only walk left four retired figures (428 and 335) alive in the
+ * files every subagent prompt is built from — the numbers reached the model without ever passing a
+ * guard. Adding the tree here is what closes that gap.
+ */
+const JSON_SCAN_PATHS = Object.freeze(['.agents/subagents']);
+
 const HISTORICAL_MARKER = /<!--\s*METRICS:IGNORE-HISTORICAL\b[^>]*commit=[0-9a-f]{7,40}/;
+
+/**
+ * Plan marker: a figure that is a target, not a measurement.
+ *
+ * `.agents/dsh/plan/` specifies what the preset family should grow into ("30 条 preset" while 23
+ * exist today). A forward-looking specification is not stale drift, and forcing authors to delete
+ * their roadmap to satisfy a guard would be the wrong trade. The exemption is therefore explicit and
+ * must state its reason, which keeps it from becoming a silent blanket like the commit-less
+ * historical marker this guard already refuses.
+ */
+const PLAN_MARKER = /<!--\s*METRICS:IGNORE-PLAN\b[^>]*reason=/;
 const CANONICAL_RULE_ID = /^[A-Z][A-Z0-9]{1,5}(?:-[A-Z0-9]{2,10}){1,3}-\d{3}$/;
 const SCRIPT_REFERENCE_PATTERN = /`(scripts\/[A-Za-z0-9_./-]+\.(?:js|ps1|sh|json|md))`/g;
 const METRICS_REGION = /<!--\s*METRICS:BEGIN\s+[a-z0-9-]+\s*-->[\s\S]*?<!--\s*METRICS:END\s+[a-z0-9-]+\s*-->/g;
@@ -85,12 +109,154 @@ const CATEGORY_QUALIFIERS = Object.freeze([
 const GROUP_COUNTERS = '组|个|项|类|种|套';
 
 /**
+ * A figure followed by 条 that is *not* already covered by the 规则-anchored pattern.
+ *
+ * The original pattern demanded the word 规则 right after the number, which silently excluded the
+ * three shapes rule totals actually take in this repository: a table cell (`| 338 条 |`), a
+ * parenthesised gloss (`**autoRefactor (338 条)**`) and a Latin-qualified phrase
+ * (`359 条 auto-refactor 规则`). All three survived while the guard reported PASS.
+ *
+ * The two lookaheads keep this pattern disjoint from the main one: a figure whose 条 is followed by
+ * a group counter counts containers, and a figure whose 条 is followed by up to six qualifier
+ * characters and then 规则 is already judged (and possibly exempted) by the main pattern.
+ */
+const BARE_RULE_FIGURE = /(\d{2,4})\s*条(?!\s*(?:组|个|项|类|种|套))(?![\u4e00-\u9fa5A-Za-z]{0,6}规则)/g;
+
+/** A line that is talking about rules or analyzers, so an unqualified 条 figure is a rule total. */
+const RULE_CONTEXT = /(规则|分析器|rule)/i;
+
+/** A rule-family prefix such as `ARCH-` or `FAMILY-TOPIC-NNN`, which only appears in rule prose. */
+const RULE_PREFIX = /\b[A-Z]{2,7}-/;
+
+/** A project name; combined with a rule prefix it makes a bare figure a per-project rule total. */
+const PROJECT_NAME = /auto-?refactor|web-?games|workspace-?timing|global-?tooling|全局工具链|fractal-?git/i;
+
+/**
+ * Pyramid layers as a complete partition of the auto-refactor catalog.
+ *
+ * The layer table in `01-builtin-rules.md` quoted 51 / 102 / 144 / 41 — four figures that summed to
+ * the retired total 338 and left 24 rules unassigned. Owning the partition here rather than in prose
+ * makes the four layer totals derivable, and `assertLayerPartition` fails closed if a new family is
+ * ever added without being placed, so the table cannot silently fall out of step again.
+ */
+const LAYER_FAMILIES = Object.freeze({
+  'layer-1': Object.freeze(['SEC', 'HYG', 'ERR', 'CMT', 'DOC', 'SIM']),
+  'layer-2': Object.freeze(['TSM', 'MOD', 'PYM', 'RSM', 'GOM', 'GDM', 'SH', 'PS', 'STDLIB', 'UI', 'PROD']),
+  'layer-3': Object.freeze([
+    'ARCH',
+    'GOV',
+    'DAT',
+    'PRF',
+    'DEP',
+    'NAM',
+    'CONST',
+    'CPX',
+    'CMP',
+    'NUM',
+    'GUARD',
+    'ENG',
+    'EXT',
+    'BIG',
+  ]),
+  'layer-4': Object.freeze(['VSC', 'TST']),
+});
+
+/** Structural shapes that make an unqualified 条 figure a rule total even without the word 规则. */
+const RULE_STRUCTURE =
+  /\|\s*\d{2,4}\s*条\s*\||[（(]\s*\d{2,4}\s*条\s*[）)]|\d{2,4}\s*条\s*[A-Za-z][A-Za-z0-9_-]*\s*(?:规则|自测)/;
+
+/**
+ * Families counted by the nine modernization analyzers.
+ *
+ * `06-modernization-program.md` states a per-analyzer figure and a total. Both are derived from the
+ * catalog, so adding a rule to a pack cannot leave the table quoting the previous total.
+ */
+const MODERNIZATION_PACKS = Object.freeze(['TSM', 'PYM', 'RSM', 'GDM', 'GOM', 'UI', 'STDLIB', 'SIM', 'CPX']);
+
+/**
+ * Spellings a project row may use in prose, mapped to the catalog's `project` value.
+ *
+ * The rule-catalog uses one spelling per project while documents freely mix casing and hyphenation;
+ * without this map a correct row such as `` | **`autoRefactor`** | 362 条 | `` would be treated as
+ * naming an unknown project and skipped, hiding real drift.
+ */
+const PROJECT_ALIASES = Object.freeze({
+  autoRefactor: 'auto-refactor',
+  autoRefactorDev: 'auto-refactor',
+  webGames: 'WebGames',
+  workspaceTiming: 'workspace-timing',
+  globalTooling: 'global-tooling',
+  fractalGit: 'fractal-git',
+});
+
+/**
+ * Decides whether an unqualified 条 figure on this line is a claim about the catalog.
+ *
+ * Requiring the word 规则 was too narrow; requiring only 条 would flag session-capacity prose such
+ * as "单日 20 条配额" and train readers to ignore the guard. A line therefore qualifies when it
+ * either names rules/analyzers outright, places the figure in one of the three structural slots a
+ * rule total occupies, or pairs a project name with a rule-family prefix.
+ *
+ * @param {string} line - Document line.
+ * @returns {boolean} True when an unqualified figure here is a rule-count claim.
+ */
+function isRuleCountContext(line) {
+  return RULE_CONTEXT.test(line) || RULE_STRUCTURE.test(line) || (PROJECT_NAME.test(line) && RULE_PREFIX.test(line));
+}
+
+/**
+ * Groups auto-refactor rules by family.
+ *
+ * Family is the key, not the ID prefix: one CPX rule carries the legacy kebab-case id
+ * `high-complexity` and therefore no prefix at all, so a prefix tally would report 12 for an
+ * analyzer that actually emits 13. The family field is what the analyzer owns.
+ *
+ * @param {Array<object>} autoRefactorRules - Catalog entries belonging to auto-refactor.
+ * @returns {Map<string, number>} Rule count per family.
+ */
+function groupRuleCounts(autoRefactorRules) {
+  const byFamily = new Map();
+  for (const rule of autoRefactorRules) {
+    byFamily.set(rule.family, (byFamily.get(rule.family) || 0) + 1);
+  }
+  return byFamily;
+}
+
+/**
+ * Resolves the four pyramid layer totals and the modernization pack total from family counts.
+ *
+ * Layer totals use `family` because the layer table's own family list is the claim being checked. The
+ * pack total also sums families, which is what an analyzer actually emits: one CPX rule carries a
+ * legacy kebab-case id with no `CPX-` prefix, and dropping it would make the analyzer's own row
+ * understate its rule count.
+ *
+ * @param {Map<string, number>} byFamily - Rule count per family.
+ * @returns {{layers: Map<string, number>, familyLayer: Map<string, string>, packTotal: number,
+ *   unplaced: string[]}} Layer totals, family-to-layer index, pack sum and any unplaced family.
+ */
+function resolveLayerTotals(byFamily) {
+  const layers = new Map();
+  const familyLayer = new Map();
+  for (const [layer, families] of Object.entries(LAYER_FAMILIES)) {
+    let total = 0;
+    for (const family of families) {
+      total += byFamily.get(family) || 0;
+      familyLayer.set(family, layer);
+    }
+    layers.set(layer, total);
+  }
+  const unplaced = [...byFamily.keys()].filter((family) => !familyLayer.has(family));
+  const packTotal = MODERNIZATION_PACKS.reduce((sum, family) => sum + (byFamily.get(family) || 0), 0);
+  return { layers, familyLayer, packTotal, unplaced };
+}
+
+/**
  * Builds the claim patterns together with the set of figures each pattern may legitimately quote.
  *
  * A pattern is only meaningful when its legal set is non-empty; an unreadable catalog therefore
  * disables that claim class instead of flagging every number in the repository.
  *
- * @returns {Array<{id: string, pattern: RegExp, legal: Set<number>}>} Claim detectors.
+ * @returns {Array<object>} Claim detectors.
  */
 function buildClaimDetectors() {
   const legalRules = new Set();
@@ -98,6 +264,11 @@ function buildClaimDetectors() {
   const legalSkills = new Set();
   const legalAnalyzers = new Set();
   const legalPairs = new Set();
+  let byFamily = new Map();
+  let byProject = new Map();
+  let layers = new Map();
+  let familyLayer = new Map();
+  let packTotal = 0;
 
   if (fs.existsSync(CATALOG_FILE)) {
     const catalog = JSON.parse(fs.readFileSync(CATALOG_FILE, 'utf8'));
@@ -109,6 +280,18 @@ function buildClaimDetectors() {
     const canonical = autoRefactor.filter((rule) => CANONICAL_RULE_ID.test(rule.id)).length;
     legalRules.add(canonical);
     legalRules.add(autoRefactor.length - canonical);
+
+    byFamily = groupRuleCounts(autoRefactor);
+    byProject = new Map();
+    for (const rule of catalog.rules || []) {
+      byProject.set(rule.project, (byProject.get(rule.project) || 0) + 1);
+    }
+    const resolved = resolveLayerTotals(byFamily);
+    layers = resolved.layers;
+    familyLayer = resolved.familyLayer;
+    packTotal = resolved.packTotal;
+    for (const value of layers.values()) legalRules.add(value);
+    legalRules.add(packTotal);
   }
   if (fs.existsSync(REGISTRY_FILE)) {
     const registry = JSON.parse(fs.readFileSync(REGISTRY_FILE, 'utf8'));
@@ -136,7 +319,7 @@ function buildClaimDetectors() {
     }
   }
 
-  return [
+  const detectors = [
     {
       id: 'rule-count',
       pattern: /(\d{2,4})\s*([组个项类种套])?\s*(?:条)?\s*([\u4e00-\u9fa5A-Za-z]{0,6}?)规则/g,
@@ -144,15 +327,70 @@ function buildClaimDetectors() {
       counterGroup: 2,
       qualifierGroup: 3,
     },
+    {
+      id: 'project-row',
+      pattern: /\|\s*\*\*`([a-zA-Z][a-zA-Z-]*)`\*\*\s*\|\s*(\d{1,4})\s*条/g,
+      numberGroup: 2,
+      legalFor: (match) => singleValue(byProject.get(match[1]) ?? byProject.get(PROJECT_ALIASES[match[1]] ?? '')),
+    },
+    {
+      id: 'family-row',
+      pattern: /`([A-Z]{2,7})-\*`\s*\|\s*(\d{1,4})\s*条/g,
+      numberGroup: 2,
+      legalFor: (match) => singleValue(byFamily.get(match[1])),
+    },
+    {
+      id: 'family-count-after',
+      pattern: /`([A-Z]{2,7})`\s*族?\s*(\d{1,4})\s*条/g,
+      numberGroup: 2,
+      legalFor: (match) => singleValue(byFamily.get(match[1])),
+    },
+    {
+      id: 'family-count-before',
+      pattern: /(\d{1,4})\s*条\s*`([A-Z]{2,7})`/g,
+      numberGroup: 1,
+      legalFor: (match) => singleValue(byFamily.get(match[2])),
+    },
+    {
+      id: 'layer-row',
+      pattern: /\|\s*\*\*Layer\s*(\d)[^*]*\*\*\s*\|\s*(\d{1,4})\s*条/g,
+      numberGroup: 2,
+      legalFor: (match) => singleValue(layers.get(`layer-${match[1]}`)),
+    },
+    {
+      id: 'pack-total',
+      pattern: /(\d{1,4})\s*条受控现代化规则/g,
+      legalFor: () => singleValue(packTotal),
+    },
+    {
+      id: 'rule-count-bare',
+      pattern: BARE_RULE_FIGURE,
+      legal: legalRules,
+      contextTest: isRuleCountContext,
+    },
     { id: 'skill-count', pattern: /(\d{1,3})\s*项(?:研发)?技能/g, legal: legalSkills },
     { id: 'step-count', pattern: /(\d{1,3})\s*个语义步骤/g, legal: legalSteps },
     { id: 'iso-pairs', pattern: /(\d{1,3})\s*对(?:跨平台)?同构脚本/g, legal: legalPairs },
     { id: 'analyzer-count', pattern: /(\d{1,3})\s*个内置分析器/g, legal: legalAnalyzers },
-  ].filter((detector) => detector.legal.size > 0);
+  ];
+  return detectors.filter((detector) => detector.legalFor || (detector.legal && detector.legal.size > 0));
 }
 
 /**
- * Recursively collects Markdown files in scope.
+ * Wraps one derived figure as a legal set, or an empty set when the lookup missed.
+ *
+ * An empty set means the claim cannot be judged (the row names something the catalog does not
+ * know), so the caller skips it rather than flagging every figure on the line.
+ *
+ * @param {number|undefined} value - Derived figure.
+ * @returns {Set<number>} Single-element set, or empty.
+ */
+function singleValue(value) {
+  return Number.isInteger(value) ? new Set([value]) : new Set();
+}
+
+/**
+ * Recursively collects Markdown files in scope, plus the JSON corpus under `JSON_SCAN_PATHS`.
  *
  * @returns {string[]} Absolute file paths.
  */
@@ -173,7 +411,29 @@ function collectDocuments() {
     }
   };
   walk(REPO_ROOT);
+  for (const rel of JSON_SCAN_PATHS) {
+    const abs = path.join(REPO_ROOT, rel);
+    if (fs.existsSync(abs)) walkJson(abs, files);
+  }
   return files;
+}
+
+/**
+ * Collects JSON files below a subagent tree.
+ *
+ * The tree is two levels deep (archetypes/, postures/, schemas/), so a shallow read would miss every
+ * file that actually carries a catalog total.
+ *
+ * @param {string} dir - Absolute directory.
+ * @param {string[]} files - Collector array.
+ * @returns {void}
+ */
+function walkJson(dir, files) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) walkJson(full, files);
+    else if (entry.name.endsWith('.json')) files.push(full);
+  }
 }
 
 /**
@@ -200,7 +460,7 @@ function blankMetricRegions(text) {
  */
 function isHistoricallyExempt(lines, index) {
   for (let cursor = index; cursor >= 0; cursor -= 1) {
-    if (HISTORICAL_MARKER.test(lines[cursor])) return true;
+    if (HISTORICAL_MARKER.test(lines[cursor]) || PLAN_MARKER.test(lines[cursor])) return true;
     if (lines[cursor].trim() === '') return false;
   }
   return false;
@@ -234,6 +494,22 @@ function isRangeMember(line, index) {
 }
 
 /**
+ * Returns the legal figure set a detector applies to one match.
+ *
+ * A detector either carries a fixed set (the workspace-wide claims) or derives a set per row (a
+ * project row, a family row, a layer row), because those rows assert a narrower figure that only the
+ * catalog knows. A derived empty set means the row names something the catalog does not contain, so
+ * the claim is unjudgeable and skipped instead of being reported.
+ *
+ * @param {object} detector - Claim detector.
+ * @param {RegExpExecArray} match - Current match.
+ * @returns {Set<number>} Legal figures for this match.
+ */
+function legalSetFor(detector, match) {
+  return detector.legalFor ? detector.legalFor(match) : detector.legal;
+}
+
+/**
  * Scans a document body for scale figures that no live source produces.
  *
  * Extracted from `scanCounts` so the guard's own negative probes can drive the exact same matcher
@@ -246,22 +522,57 @@ function isRangeMember(line, index) {
 function scanTextForClaims(text, detectors) {
   const lines = blankMetricRegions(text).split('\n');
   const found = [];
+  const rowDetectors = detectors.filter((detector) => detector.legalFor);
+  const genericDetectors = detectors.filter((detector) => !detector.legalFor);
   lines.forEach((line, index) => {
     if (isHistoricallyExempt(lines, index)) return;
-    for (const detector of detectors) {
-      detector.pattern.lastIndex = 0;
-      let match;
-      while ((match = detector.pattern.exec(line)) !== null) {
-        const claimed = Number(match[1]);
-        if (detector.legal.has(claimed)) continue;
-        if (detector.counterGroup && match[detector.counterGroup]) continue;
-        if (detector.qualifierGroup && isCategoryClaim(match[detector.qualifierGroup])) continue;
-        if (isRangeMember(line, match.index)) continue;
-        found.push({ line: index + 1, claim: detector.id, claimed });
+    // Row-shaped claims (project row, family row, layer row, pack total) assert a narrower figure
+    // than the workspace total, so they own every number they recognise — including the correct
+    // ones. Without that ownership a valid row ("`TSM-*` | 11 条" where 11 really is the family
+    // count) would be judged a second time against the workspace set and reported as drift.
+    const rowOwned = new Set();
+    for (const detector of rowDetectors) {
+      for (const claim of matchClaims(detector, line, index)) {
+        rowOwned.add(claim.claimed);
+        if (!claim.legal.includes(claim.claimed)) found.push(claim);
+      }
+    }
+    for (const detector of genericDetectors) {
+      if (detector.contextTest && !detector.contextTest(line)) continue;
+      for (const claim of matchClaims(detector, line, index)) {
+        if (rowOwned.has(claim.claimed)) continue;
+        if (!claim.legal.includes(claim.claimed)) found.push(claim);
       }
     }
   });
   return found;
+}
+
+/**
+ * Collects every figure one detector recognises on one line, with the set it was judged against.
+ *
+ * Returning the legal set alongside the figure — rather than filtering here — is what lets the
+ * caller decide whether a row already owns the number before the generic detectors see it.
+ *
+ * @param {object} detector - Claim detector.
+ * @param {string} line - Document line.
+ * @param {number} index - Zero-based line index.
+ * @returns {Array<{line: number, claim: string, claimed: number, legal: number[]}>} Judged figures.
+ */
+function matchClaims(detector, line, index) {
+  const claims = [];
+  detector.pattern.lastIndex = 0;
+  let match;
+  while ((match = detector.pattern.exec(line)) !== null) {
+    const claimed = Number(detector.numberGroup ? match[detector.numberGroup] : match[1]);
+    const legal = legalSetFor(detector, match);
+    if (legal.size === 0) continue;
+    if (detector.counterGroup && match[detector.counterGroup]) continue;
+    if (detector.qualifierGroup && isCategoryClaim(match[detector.qualifierGroup])) continue;
+    if (isRangeMember(line, match.index)) continue;
+    claims.push({ line: index + 1, claim: detector.id, claimed, legal: [...legal].sort((a, b) => a - b) });
+  }
+  return claims;
 }
 
 /**
@@ -280,7 +591,7 @@ function scanCounts(file, violations, detectors) {
       claim: claim.claim,
       file: relative,
       line: claim.line,
-      detail: `Claims ${claim.claimed} for ${claim.claim}; live sources produce ${[...detectors.find((d) => d.id === claim.claim).legal].sort((a, b) => a - b).join('/')}.`,
+      detail: `Claims ${claim.claimed} for ${claim.claim}; live sources produce ${claim.legal.join('/')}.`,
     });
   }
 }

@@ -154,6 +154,152 @@ function splitCanonicalRules(rules) {
 }
 
 /**
+ * Counts the suites declared in one array literal of the parallel test runner.
+ *
+ * Counting `script:` occurrences rather than `{ name:` keeps a suite whose declaration spans
+ * several lines (name on one line, script on the next) from being silently dropped — that
+ * undercount is exactly how the published total drifted to 155 while the runner executed 163.
+ *
+ * @param {string} source - Runner source text.
+ * @param {string} marker - Declaration opening the array literal.
+ * @returns {number} Number of suites, or -1 when the marker is absent.
+ */
+function countRunnerSuites(source, marker) {
+  const start = source.indexOf(marker);
+  if (start < 0) return -1;
+  const end = source.indexOf('\n];', start);
+  if (end < 0) return -1;
+  return (source.slice(start, end).match(/\bscript: /g) || []).length;
+}
+
+/**
+ * Counts the test suites the aggregate gate actually runs.
+ *
+ * The runner has three declared lanes plus the vitest CLI, which is not a script file and so can
+ * never appear in any lane. Adding it explicitly is what makes this figure the executable total
+ * rather than the sum of the lanes.
+ *
+ * @returns {number} Suite count, or -1 when the runner is unreadable.
+ */
+function countTestSuites() {
+  const runner = path.join(REPO_ROOT, 'auto-refactor/scripts/test-parallel.js');
+  if (!fs.existsSync(runner)) return -1;
+  const source = fs.readFileSync(runner, 'utf8');
+  const lanes = [
+    countRunnerSuites(source, 'const PARALLEL_SUITES = ['),
+    countRunnerSuites(source, 'const DAEMON_SUITES = ['),
+    countRunnerSuites(source, 'const SELF_AUDIT_SUITES = ['),
+  ];
+  if (lanes.some((value) => value < 0)) return -1;
+  return lanes.reduce((sum, value) => sum + value, 0) + 1;
+}
+
+/**
+ * Counts the keys of one frozen object literal in the topic catalog.
+ *
+ * The catalog uses a four-space indent for its entries, which distinguishes a real key from the
+ * nested array items underneath it. A looser pattern would count the topic strings too and inflate
+ * the glossary by an order of magnitude.
+ *
+ * @param {string} source - Topic catalog source text.
+ * @param {string} marker - Declaration opening the object literal.
+ * @returns {number} Entry count, or -1 when the marker is absent.
+ */
+function countCatalogKeys(source, marker) {
+  const start = source.indexOf(marker);
+  if (start < 0) return -1;
+  const end = source.indexOf('\n});', start);
+  if (end < 0) return -1;
+  return (source.slice(start, end).match(/^ {4}[A-Za-z0-9_'-]+:/gm) || []).length;
+}
+
+/**
+ * Reads the topic catalog once and derives both of its published sizes.
+ *
+ * @returns {{glossary: number, topics: number}} Glossary entries and canonical family count.
+ */
+function countTopicCatalog() {
+  const file = path.join(REPO_ROOT, 'auto-refactor/src/core/rules/topic-catalog.ts');
+  if (!fs.existsSync(file)) return { glossary: -1, topics: -1 };
+  const source = fs.readFileSync(file, 'utf8');
+  return {
+    glossary: countCatalogKeys(source, 'export const CANONICAL_3LETTER_GLOSSARY'),
+    topics: countCatalogKeys(source, 'export const CANONICAL_TOPIC_CATALOG'),
+  };
+}
+
+/**
+ * Counts distinct rule families in the catalog, optionally narrowed to one project.
+ *
+ * The `family` field is the authority, not the id prefix: `high-complexity` belongs to `CPX` while
+ * carrying no `CPX-` prefix, so splitting ids would report one family fewer than the catalog holds.
+ *
+ * @param {string} project - Project name, or an empty string for the whole workspace.
+ * @returns {number} Family count, or -1 when the catalog is unreadable.
+ */
+function countRuleFamilies(project) {
+  const catalog = readJson(CATALOG_FILE);
+  if (!catalog || !Array.isArray(catalog.rules)) return -1;
+  const scoped = project ? catalog.rules.filter((rule) => rule.project === project) : catalog.rules;
+  return new Set(scoped.map((rule) => rule.family)).size;
+}
+
+/**
+ * Counts the SubAgent presets declared in the orchestration catalog.
+ *
+ * @returns {number} Preset count, or -1 when the catalog is unreadable.
+ */
+function countSubagentPresets() {
+  const catalog = readJson(path.join(REPO_ROOT, '.agents/subagents/subagent-catalog.json'));
+  if (!catalog || !catalog.presets) return -1;
+  return Object.keys(catalog.presets).length;
+}
+
+/**
+ * Counts `it(` cases across the extension's source and test trees.
+ *
+ * A published case count that nobody recomputes decays silently: 156 stayed in six documents while
+ * the suite grew to 205. Counting the assertion sites is the only figure that cannot be forgotten.
+ *
+ * @returns {number} Case count, or -1 when neither tree exists.
+ */
+function countWorkspaceTimingCases() {
+  const roots = ['workspace-timing/src', 'workspace-timing/test'].map((rel) => path.join(REPO_ROOT, rel));
+  const present = roots.filter((dir) => fs.existsSync(dir));
+  if (present.length === 0) return -1;
+  let total = 0;
+  const walk = (dir) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        if (entry.name === 'node_modules' || entry.name === 'out') continue;
+        walk(full);
+        continue;
+      }
+      if (!/\.(ts|js)$/.test(entry.name)) continue;
+      total += (fs.readFileSync(full, 'utf8').match(/\bit\(/g) || []).length;
+    }
+  };
+  for (const dir of present) walk(dir);
+  return total;
+}
+
+/**
+ * Counts the engine test suites the Godot registry preloads.
+ *
+ * Disk holds more `test_*.gd` files than the registry wires up, and the registry is what the runner
+ * executes, so the preload count is the figure a green run can actually claim.
+ *
+ * @returns {number} Registered suite count, or -1 when the registry is absent.
+ */
+function countWebGamesSuites() {
+  const registry = path.join(REPO_ROOT, 'WebGames/tests/test_registry.gd');
+  if (!fs.existsSync(registry)) return -1;
+  const source = fs.readFileSync(registry, 'utf8');
+  return (source.match(/^const \w+ = preload\("res:\/\/tests\//gm) || []).length;
+}
+
+/**
  * Builds the metric resolver table.
  *
  * Each entry is an explicit resolver rather than a generic path interpreter: an undeclared metric id
@@ -201,6 +347,13 @@ function buildResolvers() {
     'skill-doc-count': () => countMarkdownFiles(SKILL_ROOT),
     'analyzer-count': () => countBuiltinAnalyzers(),
     'script-inventory': () => countScriptInventory(),
+    'test-suite-count': () => countTestSuites(),
+    'glossary-count': () => countTopicCatalog().glossary,
+    'topic-count': () => countTopicCatalog().topics,
+    'rule-family-count': () => countRuleFamilies('auto-refactor'),
+    'subagent-preset-count': () => countSubagentPresets(),
+    'ws-test-case-count': () => countWorkspaceTimingCases(),
+    'wg-test-suite-count': () => countWebGamesSuites(),
   };
 }
 
@@ -635,4 +788,10 @@ module.exports = Object.freeze({
   countIsomorphicPairs,
   countScriptInventory,
   countBuiltinAnalyzers,
+  countTestSuites,
+  countTopicCatalog,
+  countRuleFamilies,
+  countSubagentPresets,
+  countWorkspaceTimingCases,
+  countWebGamesSuites,
 });

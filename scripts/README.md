@@ -93,7 +93,9 @@
 - `node scripts/common/sync-doc-metrics.js` 只读比对，任一块与真源不一致即阻断；
 - `node scripts/common/sync-doc-metrics.js --write` 就地重写块体，块外文本永不被改动；
 - 代码围栏与行内代码中的同名标记是语法示例，不参与渲染；
-- 记录某一提交时点结论的历史段落须加 `<!-- METRICS:IGNORE-HISTORICAL commit=<hash> -->` 才豁免。
+- 记录某一提交时点结论的历史段落须加 `<!-- METRICS:IGNORE-HISTORICAL commit=<hash> -->` 才豁免；
+- 记录**目标规格**（尚未落地的计划数字）的段落须加 `<!-- METRICS:IGNORE-PLAN reason=<理由> -->`，与历史豁免并列但语义不同——前者是「还没到」，后者是「已经过去」；
+- 新增指标必须同时在 `doc-metrics.json` 声明与 `sync-doc-metrics.js` 的 `buildResolvers()` 注册求值器，缺一侧即 `UNRESOLVED_METRIC` 阻断，杜绝文档声明了没人计算的数字。
 
 ---
 

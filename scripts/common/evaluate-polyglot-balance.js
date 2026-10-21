@@ -124,17 +124,39 @@ function surveyWorkspaceLanguageVolume(rootDir) {
  * @returns {number} Score in [0, 100].
  */
 function sampleTypescriptScore() {
+  let arScore = null;
   try {
     if (fs.existsSync(BASELINE_PATH)) {
       const raw = fs.readFileSync(BASELINE_PATH, 'utf8');
       const data = JSON.parse(raw);
       if (typeof data.metrics?.compositeScore === 'number') {
-        return Math.min(100, Math.max(0, data.metrics.compositeScore));
+        arScore = Math.min(100, Math.max(0, data.metrics.compositeScore));
       }
     }
   } catch {
     // Ignore and return fallback
   }
+
+  // Cross-project TypeScript evidence: incorporate workspace-timing if available
+  let wtScore = null;
+  try {
+    const wtCachePath = path.join(REPO_ROOT, 'workspace-timing/reports/.refactor-cache/report.json');
+    if (fs.existsSync(wtCachePath)) {
+      const wtData = JSON.parse(fs.readFileSync(wtCachePath, 'utf8'));
+      if (typeof wtData.qualityScore?.compositeScore === 'number') {
+        wtScore = Math.min(100, Math.max(0, wtData.qualityScore.compositeScore));
+      }
+    }
+  } catch {
+    // Ignore
+  }
+
+  if (arScore !== null && wtScore !== null) {
+    // Weighted blend: 75% auto-refactor (large core engine), 25% workspace-timing (client extension)
+    return Math.round((arScore * 0.75 + wtScore * 0.25) * 100) / 100;
+  }
+  if (arScore !== null) return arScore;
+  if (wtScore !== null) return wtScore;
   return LANG_CONFIG.typescript.defaultFallbackScore;
 }
 
@@ -264,7 +286,7 @@ function sampleRustScore() {
     try {
       const { execFileSync } = require('child_process');
       execFileSync(process.execPath, [allocScript], { stdio: 'pipe', encoding: 'utf8' });
-      return 100.0;
+      return LANG_CONFIG.rust.defaultFallbackScore;
     } catch {
       return 70.0;
     }
@@ -338,10 +360,10 @@ async function evaluateWorkspacePolyglotBalance(options = {}) {
 
   if (activeLanguages.length === 0) {
     return {
-      polyglotIndex: 100.0,
-      weightedMean: 100.0,
+      polyglotIndex: 0.0,
+      weightedMean: 0.0,
       standardDeviation: 0.0,
-      dispersionPenalty: 1.0,
+      dispersionPenalty: 0.0,
       activeLanguageCount: 0,
       breakdown: {},
     };

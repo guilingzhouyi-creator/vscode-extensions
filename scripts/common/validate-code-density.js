@@ -318,7 +318,7 @@ function outputJsonDensityReport(allViolations, inspections, totalFiles, exemptC
 }
 
 const RE_IGNORED_DIRS = new Set([
-  '.git', '.agents', 'node_modules', 'dist', 'out', 'fixtures', 'baseline',
+  '.git', '.agents', 'node_modules', 'dist', 'out', 'target', 'fixtures', 'baseline',
   'reports', 'archive', 'build', '.godot', '.refactor-trajectory'
 ]);
 

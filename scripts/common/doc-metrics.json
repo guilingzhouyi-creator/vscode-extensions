@@ -174,6 +174,55 @@
       "source": "filesystem: scripts/{common,ps1,sh}/*.{js,json,ps1,sh}",
       "template": "脚本库共 **{value} 份受控脚本**",
       "inline": "**{value} 份**"
+    },
+    {
+      "id": "test-suite-count",
+      "title": "auto-refactor 全量测试套件数",
+      "source": "auto-refactor/scripts/test-parallel.js#PARALLEL_SUITES + DAEMON_SUITES + SELF_AUDIT_SUITES + vitest",
+      "template": "**{value} 套测试套件**",
+      "inline": "**{value} 套**"
+    },
+    {
+      "id": "glossary-count",
+      "title": "权威三字母词典条目数",
+      "source": "auto-refactor/src/core/rules/topic-catalog.ts#CANONICAL_3LETTER_GLOSSARY",
+      "template": "**{value} 项权威词典**",
+      "inline": "**{value} 项**"
+    },
+    {
+      "id": "topic-count",
+      "title": "规范主题目录族数",
+      "source": "auto-refactor/src/core/rules/topic-catalog.ts#CANONICAL_TOPIC_CATALOG",
+      "template": "**{value} 个规范主题族**",
+      "inline": "**{value} 个**"
+    },
+    {
+      "id": "rule-family-count",
+      "title": "auto-refactor 受控规则族数",
+      "source": "scripts/common/rule-catalog.json family field, project=auto-refactor",
+      "template": "auto-refactor 受控 **{value} 个规则族**",
+      "inline": "**{value} 个规则族**"
+    },
+    {
+      "id": "subagent-preset-count",
+      "title": "SubAgent preset 数",
+      "source": ".agents/subagents/subagent-catalog.json#presets",
+      "template": "**{value} 条 SubAgent preset**",
+      "inline": "**{value} 条**"
+    },
+    {
+      "id": "ws-test-case-count",
+      "title": "workspace-timing 单元测试用例数",
+      "source": "filesystem: workspace-timing/{src,test}/**/*.{ts,js} count of it(",
+      "template": "**{value} 项单元测试用例**",
+      "inline": "**{value} 项**"
+    },
+    {
+      "id": "wg-test-suite-count",
+      "title": "WebGames 注册测试套件数",
+      "source": "WebGames/tests/test_registry.gd preload declarations",
+      "template": "**{value} 套注册测试套件**",
+      "inline": "**{value} 套**"
     }
   ],
   "inventoryAnnotations": {
