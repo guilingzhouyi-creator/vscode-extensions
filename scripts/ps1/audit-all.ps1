@@ -436,10 +436,6 @@ $dimDefinitions = @(
 
 # 预先采样多语言均衡指数与各语言栈真实质量分（为 WebGames 等领域得分提供 AST 真实度量）
 $polyglotIndex = $null
-# polyglot evaluated earlier before cornerstone scores
-
-# 预先采样多语言均衡指数与各语言栈真实质量分（为 WebGames 等领域得分提供 AST 真实度量）
-$polyglotIndex = $null
 $polyglotBreakdown = $null
 try {
     $polyglotScript = Join-Path $repoRoot "scripts\common\evaluate-polyglot-balance.js"
@@ -461,13 +457,47 @@ try {
     # Non-blocking evaluator failure
 }
 
+# ── 综合健康分计算契约 ────────────────────────────────────────────────────
+# 计分模型分三层：基石归一化 → 短板熔断 → 分层加权。任一层变更都必须同步本契约，
+# 否则看板上的数字将失去可解释性，且后续维护者无法反推权重来源。
+#
+# 1. 基石层：六个子系统各自产出 [SCORE_FLOOR, 100.0] 区间的归一化得分。
+#    SCORE_FLOOR 是「完全失效」的地板值而非零分。归零会让加权和无法区分
+#    「一个子系统全挂」与「两个子系统半挂」，保留地板才能维持相对差距的可加性。
+#
+# 2. 熔断层：取六基石最小值 minCorner，低于 70.0 时按 minCorner/70.0 线性压缩总分，
+#    压缩系数下限 0.5 防止单一子系统彻底归零。该层保证任一子系统严重劣化都会
+#    拖低总分，不会被其余五项高分掩盖。
+#
+# 3. 加权层：基础设施与生产工程分开计权，权重向量固定为
+#    卫生 0.10 + 规则 0.10 + auto-refactor 0.25 + workspace-timing 0.20
+#    + WebGames 0.20 + fractal-git 0.15 = 1.00。
+#    权重反映「该子系统劣化时的影响半径」，不是代码行数占比；新增子系统必须
+#    同时调整向量使总和精确为 1.00。
+#
+# 4. 降级路径：子系统门禁未通过时，其基石得分在基线上扣 DEGRADE_PENALTY 并夹到地板，
+#    与降级前的原始分保持单调关系，避免「失败即归零」掩盖剩余质量。
+#
+# 5. 数据来源优先级（由高到低）：真实 AST 综合分 → 报告 checks 比例折算 → 门禁状态回退值。
+#    任一环节缺数据都只降级不抛错，保证看板始终可渲染。
+# ────────────────────────────────────────────────────────────────────────
 # 计算各子系统归一化得分 [0.0 ~ 100.0]（纯客观连续度量，杜绝静态硬编码常数与断崖断层）
 $SCORE_FLOOR = 15.0
 
+# 门禁失败时的统一扣分幅度。与 SCORE_FLOOR 配合，使「失败」表现为相对劣化而非归零。
+$DEGRADE_PENALTY = 60.0
+
 # 1. 物理卫生基石得分（基于八维物理卫生矩阵连续客观计算与同构/.gitignore治理守卫）
+#
+# 降级权重按「缺陷能否被后续门禁自动捕获」区分，而非按严重度直觉：
+#   - 同构缺失 (ISO_MISSING_PENALTY = 20.0)：双平台脚本不一致时，一端通过不代表另一端通过，
+#     缺陷会以「本地绿、CI 红」的形式漏出，故扣分最重。
+#   - .gitignore 治理缺失 (GITIGNORE_MISSING_PENALTY = 10.0)：脏产物可被人工识别并清理，
+#     影响面局限在仓库卫生，不污染门禁判定，故扣分较轻。
+# 两项均夹到 SCORE_FLOOR，保证重复劣化不会把得分推到负值而破坏加权求和。
 $baseHygiene = if ($null -ne $rawHygieneScore) { $rawHygieneScore } else { if ($codeHygiene -eq 0) { 100.0 } else { 50.0 } }
-if ($codeIso -ne 0) { $baseHygiene = [math]::Max($SCORE_FLOOR, $baseHygiene - 20.0) }
-if ($codeGi -ne 0) { $baseHygiene = [math]::Max($SCORE_FLOOR, $baseHygiene - 10.0) }
+if ($codeIso -ne 0) { $baseHygiene = [math]::Max($SCORE_FLOOR, $baseHygiene - $ISO_MISSING_PENALTY) }
+if ($codeGi -ne 0) { $baseHygiene = [math]::Max($SCORE_FLOOR, $baseHygiene - $GITIGNORE_MISSING_PENALTY) }
 $scoreHygiene = [math]::Max($SCORE_FLOOR, [math]::Round($baseHygiene, 1))
 
 # 2. 单源规则目录基石得分（基于 SSOT 规则目录一致性、反馈词表、闭包、可达性与技能集规范动态判定）
@@ -484,14 +514,11 @@ try {
     $catalogRuleCount = 0
 }
 
-$rulesPassedCount = 0
-if ($codeCatalog -eq 0) { $rulesPassedCount += 1 }
-if ($codeFeedback -eq 0) { $rulesPassedCount += 1 }
-if ($codeSkills -eq 0) { $rulesPassedCount += 1 }
-if ($codeClosure -eq 0) { $rulesPassedCount += 1 }
-if ($codeReach -eq 0) { $rulesPassedCount += 1 }
-if ($codeDocs -eq 0) { $rulesPassedCount += 1 }
-if ($codeLedger -eq 0) { $rulesPassedCount += 1 }
+# 规则步骤得分按「通过项 / 总项」比例折算。分母由下方的退出码集合现场测量，
+# 不得写成字面量：新增一项检查而分母不变，会让满分永远不可达且无人察觉。
+$ruleStepCodes = @($codeCatalog, $codeFeedback, $codeSkills, $codeClosure, $codeReach, $codeDocs, $codeLedger)
+$ruleStepTotal = $ruleStepCodes.Count
+$rulesPassedCount = @($ruleStepCodes | Where-Object { $_ -eq 0 }).Count
 
 # 目录零漂移判定以 generate-rule-catalog.js --check-only 为唯一权威：它按全部来源
 # （四份 JSON 快照 + 编译期注册表 + workspace-timing 配置）重算全量规则并与磁盘逐条比对。
@@ -500,7 +527,7 @@ $catalogCountConsistent = ($codeCatalog -eq 0)
 $scoreRules = if ($statusRules -eq "PASS" -and $catalogCountConsistent) {
     100.0
 } else {
-    [math]::Max($SCORE_FLOOR, [math]::Round(100.0 * ($rulesPassedCount / 7.0), 1))
+    [math]::Max($SCORE_FLOOR, [math]::Round(100.0 * ($rulesPassedCount / [math]::Max(1, $ruleStepTotal)), 1))
 }
 
 # 3. auto-refactor 质量基线得分（基于自审综合基线动态读取，门禁失败动态连续衰减）
@@ -526,7 +553,7 @@ if ($null -eq $baseAr) {
 $scoreAr = if ($statusAr -eq "PASS") {
     $baseAr
 } else {
-    [math]::Max($SCORE_FLOOR, [math]::Round($baseAr - 60.0, 1))
+    [math]::Max($SCORE_FLOOR, [math]::Round($baseAr - $DEGRADE_PENALTY, 1))
 }
 
 # 4. workspace-timing 审查门禁得分（优先读取真实 AST compositeScore，消除假满分 100.0）
@@ -582,7 +609,7 @@ if ($null -eq $baseWt) {
 $scoreWt = if ($statusWt -eq "PASS") {
     $baseWt
 } else {
-    [math]::Max($SCORE_FLOOR, [math]::Round($baseWt - 60.0, 1))
+    [math]::Max($SCORE_FLOOR, [math]::Round($baseWt - $DEGRADE_PENALTY, 1))
 }
 
 # 5. WebGames 配置架构与游戏源码得分（加权融合配置表与 663 个 GDScript 真实 AST 质量，消融假满分）
@@ -624,13 +651,16 @@ try {
     $configScore = if ($statusWg -eq "PASS") { 90.0 } else { $SCORE_FLOOR }
 }
 
-# 综合得分：GDScript 核心游戏代码占 80% 权重，领域配置驱动表占 20% 权重
+# 综合得分：GDScript 核心游戏代码占 80% 权重，领域配置驱动表占 20% 权重。
+# 该比例反映「游戏能否运行」与「配置是否规范」的影响力差异：配置表错误可由
+# 校验脚本单点定位，而核心逻辑缺陷会直接表现为可玩性崩溃，故核心代码权重更高。
+# 两项权重之和必须为 1.0，调整时须同步修改本契约。
 $baseWg = [math]::Round((0.8 * $gdScore) + (0.2 * $configScore), 1)
 
 $scoreWg = if ($statusWg -eq "PASS") {
     $baseWg
 } else {
-    [math]::Max($SCORE_FLOOR, [math]::Round($baseWg - 60.0, 1))
+    [math]::Max($SCORE_FLOOR, [math]::Round($baseWg - $DEGRADE_PENALTY, 1))
 }
 
 # 6. fractal-git 质量基线得分（基于 audit-latest.json 真实 checks/pass/warn 连续客观计算，消融阶跃硬编码）
@@ -697,10 +727,8 @@ if ($null -eq $baseFg) {
 $scoreFg = if ($statusFg -eq "PASS") {
     $baseFg
 } else {
-    [math]::Max($SCORE_FLOOR, [math]::Round($baseFg - 60.0, 1))
+    [math]::Max($SCORE_FLOOR, [math]::Round($baseFg - $DEGRADE_PENALTY, 1))
 }
-
-# polyglot evaluated earlier before cornerstone scores
 
 # 全工作区综合健康分（分层加权：基础设施基石层 20% + 核心生产工程层 80%，附带极低分短板熔断阻尼）
 $rawWeighted = (0.10 * $scoreHygiene) + (0.10 * $scoreRules) + (0.25 * $scoreAr) + (0.20 * $scoreWt) + (0.20 * $scoreWg) + (0.15 * $scoreFg)

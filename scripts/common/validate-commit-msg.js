@@ -396,13 +396,22 @@ function handleSingleCommitValidation(target, content, isAgentMode) {
     return;
   }
 
-  // 2. Elastic Warning Corridor: Permitted with temporary High Debt
+  // 2. Permitted with findings: only high-tier findings enter the elastic corridor and ledger.
   if (!res.valid) {
     const { updateDebtLedger } = require(MODULE_DEBT_CORRIDOR);
     const highIssues = res.styleFindings.filter((f) => f.isHighDebt);
-    updateDebtLedger({ newHighIssues: highIssues });
+    // Writing an empty batch still materialises the ledger file on disk, so medium-tier findings
+    // must not reach the writer: they carry no paydown obligation.
+    if (highIssues.length > 0) {
+      updateDebtLedger({ newHighIssues: highIssues });
+    }
 
     if (isAgentMode) {
+      // The summary must state which tier the findings occupy: medium-tier findings are permitted
+      // without ledger entry, so reporting them as high-risk debt would misdirect remediation.
+      const summaryText = highIssues.length > 0
+        ? `Commit message permitted under elastic corridor with ${highIssues.length} high-risk style debt items.`
+        : `Commit message permitted with ${res.styleFindings.length} medium-tier style findings; no debt recorded.`;
       console.log(
         JSON.stringify(
           {
@@ -410,7 +419,7 @@ function handleSingleCommitValidation(target, content, isAgentMode) {
             status: STATUS_PASS,
             warning: STATUS_WARN,
             gate: GATE_COMMIT_MSG_RULES,
-            summary: `Commit message permitted under elastic corridor with ${highIssues.length} high-risk style debt items.`,
+            summary: summaryText,
             debtCorridor: res.debtVerdict,
             agentDirectives: {
               ...(res.debtVerdict?.agentDirectives || {}),
@@ -423,13 +432,19 @@ function handleSingleCommitValidation(target, content, isAgentMode) {
           2
         )
       );
-    } else {
+    } else if (highIssues.length > 0) {
       console.log('  ⚠️ [DEBT-CORRIDOR] 提交信息包含弹性高危风格技术债 (已在弹性走廊配额内放行，已记入账本，后续提交请优先清偿):');
       for (const h of highIssues) {
         console.log(`     • [${h.ruleId}] 第 ${h.lineNum} 行: ${h.term} -> 推荐: ${h.guidance}`);
       }
-      
-      
+    } else {
+      // Medium-tier findings still permit the commit, but they are not corridor debt: the ledger
+      // records nothing and no paydown is owed. Rendering the high-debt banner here produced an
+      // empty bullet list that claimed debt while the ledger stayed empty.
+      console.log('  ⚠️ [STYLE-NOTICE] 提交信息命中中危风格项 (不记入技术债账本，无需清偿):');
+      for (const f of res.styleFindings) {
+        console.log(`     • [${f.ruleId}] 第 ${f.lineNum} 行: ${f.term} -> 推荐: ${f.guidance}`);
+      }
     }
     process.exit(0);
   }
