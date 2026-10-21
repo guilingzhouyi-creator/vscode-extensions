@@ -52,7 +52,11 @@ export class PraxisGitClient {
         return {
             worktreeId,
             fractalRef: ref,
-            stageFile: (path: string, content: Uint8Array | string, executable: boolean = false) => {
+            stageFile: (
+                path: string,
+                content: Uint8Array | string,
+                executable: boolean = false
+            ) => {
                 stagedFiles.push({
                     path,
                     mode: executable ? GIT_FILE_MODE.EXECUTABLE : GIT_FILE_MODE.REGULAR,

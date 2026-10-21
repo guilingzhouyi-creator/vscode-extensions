@@ -34,7 +34,11 @@ export class LayerVfsAdapter {
     /**
      * Writes or updates an in-memory virtual file node.
      */
-    public writeVirtualFile(path: string, content: Uint8Array | string, executable: boolean = false): void {
+    public writeVirtualFile(
+        path: string,
+        content: Uint8Array | string,
+        executable: boolean = false
+    ): void {
         const existing = this.virtualFiles.get(path);
         const version = existing ? existing.version + 1 : 1;
         this.virtualFiles.set(path, {

@@ -80,8 +80,10 @@ export class FractalGitEngine {
     public materializeCommit(req: MaterializeCommitRequest): MaterializeCommitResult {
         const gateVerdict = this.verifyPreReview(req.files);
         if (!gateVerdict.passed) {
+            const reasons = gateVerdict.violations.join('; ');
             throw new Error(
-                `Fractal Git materialization rejected by Auto gate (score: ${gateVerdict.score}): ${gateVerdict.violations.join('; ')}`,
+                `Fractal Git materialization rejected by Auto gate ` +
+                `(score: ${gateVerdict.score}): ${reasons}`,
             );
         }
         return materializeCommitPure(this.gitDir, req);

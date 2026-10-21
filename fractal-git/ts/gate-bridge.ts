@@ -17,7 +17,8 @@ const RE_CONFLICT_MARKERS = /^(?:<{7}|={7}|>{7})/m;
 
 /** Regular expression detecting transient heap allocations inside loops (TS/JS and Rust). */
 const RE_LOOP_ALLOC_TS = /for\s*\([^)]*\)\s*\{[^}]*new\s+(?:Array|Object|Map|Set)/s;
-const RE_LOOP_ALLOC_RS = /(?:for|while|loop)\s+[^{]*\{[^}]*\b(?:Vec::new|\.to_string\(\)|\.to_owned\(\)|format!\()/s;
+const RE_LOOP_ALLOC_RS =
+    /(?:for|while|loop)\s+[^{]*\{[^}]*\b(?:Vec::new|\.to_string\(\)|\.to_owned\(\)|format!\()/s;
 
 /** Regular expression detecting unwrap/expect panic patterns in production Rust code. */
 const RE_UNWRAP_RS = /(?:\.unwrap\(\)|\.expect\()/;
@@ -40,18 +41,24 @@ function auditSingleFile(file: StagedFileEntry, violations: string[]): void {
     }
 
     // 2. Unresolved Git merge conflict markers (FGT-GAT-001)
-    if (RE_CONFLICT_MARKERS.test(text) || text.includes('<<<<<<<') || text.includes('=======') || text.includes('>>>>>>>')) {
+    const hasMarkers = RE_CONFLICT_MARKERS.test(text) ||
+        text.includes('<<<<<<<') || text.includes('=======') || text.includes('>>>>>>>');
+    if (hasMarkers) {
         violations.push(`FGT-GAT-001: Unresolved Git conflict marker detected in ${file.path}`);
     }
 
     // 3. Transient heap allocations in hot loop iterations (FGT-PRF-001)
     if (RE_LOOP_ALLOC_TS.test(text) || RE_LOOP_ALLOC_RS.test(text)) {
-        violations.push(`FGT-PRF-001: Transient heap allocation detected inside loop in ${file.path}`);
+        violations.push(
+            `FGT-PRF-001: Transient heap allocation detected inside loop in ${file.path}`
+        );
     }
 
     // 4. Naked unwrap or expect panic risks in production Rust files (FGT-ERR-001)
     if (file.path.endsWith('.rs') && !file.path.includes('tests/') && RE_UNWRAP_RS.test(text)) {
-        violations.push(`FGT-ERR-001: Unsafe unwrap/expect call detected in production Rust file ${file.path}`);
+        violations.push(
+            `FGT-ERR-001: Unsafe unwrap/expect call detected in production Rust file ${file.path}`
+        );
     }
 }
 

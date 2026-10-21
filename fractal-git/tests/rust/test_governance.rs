@@ -88,7 +88,7 @@ All 15 tests passed with exit code 0."#;
     let err_scope = format!("{:?}", res_scope.err().unwrap());
     assert!(err_scope.contains("FGT-GAT-001"));
 
-    // 5. Failure: Forbidden terms (wip / quick fix)
+    // 5. Failure: Prohibited colloquial expressions rejection test
     let forbidden_msg = r#"feat(cas): wip quick fix for buffer
 
 [Why]
