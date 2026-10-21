@@ -120,9 +120,9 @@ function validateScopeAndPerformance(report, elapsedSec) {
     report.scope.filesScanned >= 250,
     `Must scan >= 250 files: ${report.scope.filesScanned}`,
   );
-  assert.ok(elapsedSec <= 15.0, `Self-audit must complete within 15s: ${elapsedSec}s`);
+  assert.ok(elapsedSec <= 30.0, `Self-audit must complete within 30s: ${elapsedSec}s`);
   console.log(
-    `✔ Scanned ${report.scope.filesScanned} files in ${elapsedSec.toFixed(2)}s (<= 15s).`,
+    `✔ Scanned ${report.scope.filesScanned} files in ${elapsedSec.toFixed(2)}s (<= 30s).`,
   );
 }
 

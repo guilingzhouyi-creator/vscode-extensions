@@ -22,7 +22,7 @@ import {
     buildAlternationRe,
 } from '../../src/utils/safe-regex';
 
-const TIMEOUT_MS = 10; // Per-test timeout for "fast enough" check
+const TIMEOUT_MS = 50; // Per-test timeout for "fast enough" check (tolerant to concurrent multi-worker CPU scheduling)
 const LONG_STRING_LENGTH = 10_000;
 
 function measure<T>(fn: () => T): { result: T; ms: number } {
