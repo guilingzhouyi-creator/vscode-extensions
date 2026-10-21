@@ -76,6 +76,10 @@ $logReachOut = Join-Path $transientDir "audit-check-reachout-$randSuffix.out.log
 $logDocsOut = Join-Path $transientDir "audit-check-docsout-$randSuffix.out.log"
 $logLedgerOut = Join-Path $transientDir "audit-check-ledgerout-$randSuffix.out.log"
 $logSubagentOut = Join-Path $transientDir "audit-check-subagentout-$randSuffix.out.log"
+$logDocAnchorsOut = Join-Path $transientDir "audit-check-docanchors-$randSuffix.out.log"
+$logMetricCoverageOut = Join-Path $transientDir "audit-check-metriccoverage-$randSuffix.out.log"
+$logFamilyContractOut = Join-Path $transientDir "audit-check-familycontract-$randSuffix.out.log"
+$logDocReachOut = Join-Path $transientDir "audit-check-docreach-$randSuffix.out.log"
 $logCatalogOut = Join-Path $transientDir "audit-check-catalogout-$randSuffix.out.log"
 $logFgTopoOut = Join-Path $transientDir "audit-check-fgtopoout-$randSuffix.out.log"
 $logFgParityOut = Join-Path $transientDir "audit-check-fgparityout-$randSuffix.out.log"
@@ -126,6 +130,10 @@ $resReach = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/valid
 $resDocs = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-docs-consistency.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logDocsOut -NoNewWindow -PassThru -Wait
 $resLedger = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-trajectory-ledger.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logLedgerOut -NoNewWindow -PassThru -Wait
 $resSubagent = Start-Process -FilePath $nodeCmd -ArgumentList @(".agents/skills/subagent-orchestration/scripts/validate-subagent-catalog.js") -WorkingDirectory $repoRoot -RedirectStandardOutput $logSubagentOut -NoNewWindow -PassThru -Wait
+$resDocAnchors = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-doc-anchors.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logDocAnchorsOut -NoNewWindow -PassThru -Wait
+$resMetricCoverage = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-metric-coverage.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logMetricCoverageOut -NoNewWindow -PassThru -Wait
+$resFamilyContract = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-family-contract.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logFamilyContractOut -NoNewWindow -PassThru -Wait
+$resDocReach = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-doc-reachability.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logDocReachOut -NoNewWindow -PassThru -Wait
 $codeCatalog = $res.ExitCode
 $codeFeedback = $resFeedback.ExitCode
 $codeOrdering = $resOrdering.ExitCode
@@ -135,7 +143,13 @@ $codeReach = $resReach.ExitCode
 $codeDocs = $resDocs.ExitCode
 $codeLedger = $resLedger.ExitCode
 $codeSubagent = $resSubagent.ExitCode
-if ($codeCatalog -ne 0 -or $codeSkills -ne 0 -or $codeFeedback -ne 0 -or $codeOrdering -ne 0 -or $codeClosure -ne 0 -or $codeReach -ne 0 -or $codeDocs -ne 0 -or $codeLedger -ne 0 -or $codeSubagent -ne 0) {
+$codeDocAnchors = $resDocAnchors.ExitCode
+$codeMetricCoverage = $resMetricCoverage.ExitCode
+$codeFamilyContract = $resFamilyContract.ExitCode
+$codeDocReach = $resDocReach.ExitCode
+if ($codeCatalog -ne 0 -or $codeSkills -ne 0 -or $codeFeedback -ne 0 -or $codeOrdering -ne 0 -or $codeClosure -ne 0 -or $codeReach -ne 0 -or $codeDocs -ne 0 -or $codeLedger -ne 0 
+    -or $codeSubagent -ne 0 -or $codeDocAnchors -ne 0 -or $codeMetricCoverage -ne 0 -or $codeFamilyContract -ne 0
+    -or $codeDocReach -ne 0) {
     $statusRules = "FAIL"
     $failed = $true
 } else {

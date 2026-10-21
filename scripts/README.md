@@ -5,7 +5,7 @@
 > 项目内私有脚本（如 `auto-refactor/scripts/*.js` 的 validate/bench 系列）不在此库，
 > 保留在各项目内部，由各自 `package.json` 引用。
 >
-> 本库当前收录 <!-- METRICS:BEGIN script-inventory -->**65 份**<!-- METRICS:END script-inventory -->受控脚本，逐项列于下表。
+> 本库当前收录 <!-- METRICS:BEGIN script-inventory -->**69 份**<!-- METRICS:END script-inventory -->受控脚本，逐项列于下表。
 
 ---
 
@@ -231,7 +231,7 @@ Python 版使用 docstring + `if __name__ == "__main__":` 守卫。
 | **推送前置门禁** | `pwsh scripts/ps1/pre-push-gate.ps1` | `pwsh scripts/ps1/pre-push-gate.ps1 -Agent` | `pwsh scripts/ps1/pre-push-gate.ps1 -ViewLog` |
 | **失败快照轮转器** | `node scripts/common/log-rotator.js --view` | `node scripts/common/log-rotator.js --agent` | 自动保留最近一次失败至 `.audit-logs/last-failure.json` |
 
-> 各入口的语义步骤数均由 `scripts/common/gate-step-registry.json` 单源登记：提交前置 <!-- METRICS:BEGIN step-pre-commit -->**13 个语义步骤**<!-- METRICS:END step-pre-commit -->、提交信息 <!-- METRICS:BEGIN step-commit-msg -->**9 个语义步骤**<!-- METRICS:END step-commit-msg -->、推送前置 <!-- METRICS:BEGIN step-pre-push -->**31 个语义步骤**<!-- METRICS:END step-pre-push -->、全工作区审查 <!-- METRICS:BEGIN step-audit-all -->**6 个语义步骤**<!-- METRICS:END step-audit-all -->、fractal-git 审查 <!-- METRICS:BEGIN step-audit-taxis -->**5 个语义步骤**<!-- METRICS:END step-audit-taxis -->，合计 <!-- METRICS:BEGIN step-total -->**64 个语义步骤**<!-- METRICS:END step-total -->。
+> 各入口的语义步骤数均由 `scripts/common/gate-step-registry.json` 单源登记：提交前置 <!-- METRICS:BEGIN step-pre-commit -->**13 个语义步骤**<!-- METRICS:END step-pre-commit -->、提交信息 <!-- METRICS:BEGIN step-commit-msg -->**9 个语义步骤**<!-- METRICS:END step-commit-msg -->、推送前置 <!-- METRICS:BEGIN step-pre-push -->**35 个语义步骤**<!-- METRICS:END step-pre-push -->、全工作区审查 <!-- METRICS:BEGIN step-audit-all -->**6 个语义步骤**<!-- METRICS:END step-audit-all -->、fractal-git 审查 <!-- METRICS:BEGIN step-audit-taxis -->**5 个语义步骤**<!-- METRICS:END step-audit-taxis -->，合计 <!-- METRICS:BEGIN step-total -->**68 个语义步骤**<!-- METRICS:END step-total -->。
 >
 > 推送门禁的输出形如
 > `✔ PASS  <步骤标识>  <标题>  <详情>`，状态词闭包为 PASS / BLOCK / SKIP / WARN：
@@ -254,3 +254,7 @@ Python 版使用 docstring + `if __name__ == "__main__":` 守卫。
 > | `DOC-METRICS-29` | 治理文档规模数字由真源渲染 |
 > | `SHELL-PARITY-30` | Linux 命令面与 AGENTS.md 承诺一致性 |
 > | `SUBAGENT-CATALOG-31` | SubAgent 预置与单源专员模板一一对应 |
+> | `DOC-ANCHORS-32` | 跨文档引用按名解析，不按行序编号 |
+> | `METRIC-COVERAGE-33` | 文档指标声明集与渲染集相等 |
+> | `FAMILY-CONTRACT-34` | 规则族三源一致且层值在六层内 |
+> | `DOC-REACH-35` | 规范文档至少被另一份文档指名 |

@@ -446,6 +446,26 @@ if ! run_gate_step 60 "SUBAGENT-CATALOG-31" "$ROOT_DIR" "$NODE_BIN" .agents/skil
     FAILED=1
 fi
 
+# 跨文档引用：按名指到具体条目，按序号引用的地方会在行序变化后静默指错。
+if ! run_gate_step 60 "DOC-ANCHORS-32" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-doc-anchors.js; then
+    FAILED=1
+fi
+
+# 指标覆盖：声明了却没人渲染的指标是空头承诺，渲染了却没声明的区域无法再生成。
+if ! run_gate_step 60 "METRIC-COVERAGE-33" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-metric-coverage.js; then
+    FAILED=1
+fi
+
+# 规则族契约：族名必须在分类学中有行、层值必须在六层内，三份登记必须逐族相等。
+if ! run_gate_step 60 "FAMILY-CONTRACT-34" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-family-contract.js; then
+    FAILED=1
+fi
+
+# 文档可达性：规范文档必须至少被另一份文档指名，否则读者顺着索引永远走不到。
+if ! run_gate_step 60 "DOC-REACH-35" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-doc-reachability.js; then
+    FAILED=1
+fi
+
 if [[ "$AGENT_MODE" -eq 1 ]]; then
     if [[ "$FAILED" -ne 0 ]]; then
         if [[ -f "$AUDIT_LOG_DIR/last-failure.json" ]]; then

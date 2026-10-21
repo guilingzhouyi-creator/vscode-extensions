@@ -297,6 +297,26 @@
           "id": "SUBAGENT-CATALOG-31",
           "ruleId": "RCFG-RULE-DRIFT",
           "title": "SubAgent 注册表与专员模板同构性"
+        },
+        {
+          "id": "DOC-ANCHORS-32",
+          "ruleId": "GUARD-DOC-001",
+          "title": "跨文档引用按名解析而非按位置"
+        },
+        {
+          "id": "METRIC-COVERAGE-33",
+          "ruleId": "GUARD-DOC-001",
+          "title": "文档指标声明集与渲染集相等"
+        },
+        {
+          "id": "FAMILY-CONTRACT-34",
+          "ruleId": "RCFG-RULE-DRIFT",
+          "title": "规则族三源一致与层值合法性"
+        },
+        {
+          "id": "DOC-REACH-35",
+          "ruleId": "GUARD-DOC-001",
+          "title": "规范文档具备入链可达性"
         }
       ]
     },

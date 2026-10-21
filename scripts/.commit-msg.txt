@@ -1,0 +1,17 @@
+feat(governance): 扩充单源门禁步骤登记并集成文档指标与规则族校验
+
+[Project]
+- governance
+
+[Why]
+- 随着文档规模指标、规则族权威映射与文档可达性守卫的建立，门禁中枢需同步扩展语义步骤登记与同构执行流。
+
+[Added]
+- 在 gate-step-registry 登记 DOC-ANCHORS、METRIC-COVERAGE、FAMILY-CONTRACT 与 DOC-REACH 语义步骤。
+- 新增 validate-metric-coverage、validate-family-contract 与 validate-doc-reachability 校验脚本。
+
+[Changed]
+- 在 audit-all 与 pre-push-gate 的双端实现中集成新增校验脚本并保持同构判定。
+
+[Verification]
+- 执行 node scripts/common/validate-shell-parity.js 验证跨平台命令面一致通过。

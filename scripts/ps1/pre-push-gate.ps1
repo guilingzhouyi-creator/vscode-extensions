@@ -422,6 +422,26 @@ $codeSubagent = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @(".agents/skil
 if ($codeSubagent -ne 0) {
     $failed = $true
 }
+# 跨文档引用：按名指到具体条目，按序号引用的地方会在行序变化后静默指错。
+$codeDOCANCHORS32 = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-doc-anchors.js") -WorkingDirectory $repoRoot -StepId "DOC-ANCHORS-32" -TimeoutSeconds 60
+if ($codeDOCANCHORS32 -ne 0) {
+    $failed = $true
+}
+# 指标覆盖：声明了却没人渲染的指标是空头承诺，渲染了却没声明的区域无法再生成。
+$codeMETRICCOVERAGE33 = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-metric-coverage.js") -WorkingDirectory $repoRoot -StepId "METRIC-COVERAGE-33" -TimeoutSeconds 60
+if ($codeMETRICCOVERAGE33 -ne 0) {
+    $failed = $true
+}
+# 规则族契约：族名必须在分类学中有行、层值必须在六层内，三份登记必须逐族相等。
+$codeFAMILYCONTRACT34 = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-family-contract.js") -WorkingDirectory $repoRoot -StepId "FAMILY-CONTRACT-34" -TimeoutSeconds 60
+if ($codeFAMILYCONTRACT34 -ne 0) {
+    $failed = $true
+}
+# 文档可达性：规范文档必须至少被另一份文档指名，否则读者顺着索引永远走不到。
+$codeDOCREACH35 = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-doc-reachability.js") -WorkingDirectory $repoRoot -StepId "DOC-REACH-35" -TimeoutSeconds 60
+if ($codeDOCREACH35 -ne 0) {
+    $failed = $true
+}
 
 if ($Agent) {
     if ($failed) {
