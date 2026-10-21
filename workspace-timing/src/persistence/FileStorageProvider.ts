@@ -90,7 +90,7 @@ export class FileStorageProvider implements IStorageProvider {
                 // ignore: 目录已存在无需重新创建
             }
 
-            // 原子落盘：先写入同目录暂存文件（stagingUri）再 rename 覆盖，避免断电留下半截残缺 JSON
+            // 原子落盘：先写入同目录中转文件（stagingUri）再 rename 覆盖，避免断电留下半截残缺 JSON
             // 契约不变量：若直接覆盖目标文件，写入中断将破坏完整性；原子 rename 确保文件状态在磁盘上全有或全无
             const stagingUri = target.with({ path: `${target.path}.tmp` });
             await vscode.workspace.fs.writeFile(stagingUri, bytes);
