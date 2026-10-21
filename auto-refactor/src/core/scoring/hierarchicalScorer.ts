@@ -34,6 +34,42 @@ import {
 /** Default fallback security ceiling for unmeasured scopes. */
 export const DEFAULT_SECURITY_CEILING = computeSecurityCeiling();
 
+const DEFAULT_DOMAIN_NAME = 'core';
+const DEFAULT_MODULE_NAME = 'root';
+const SEVERITY_ERROR = 'error';
+const SYNTHESIS_MODE_GEOMETRIC = 'geometric';
+const LOC_SCALE_DIVISOR = 100;
+const LOC_LOG_SMOOTH_BIAS = 10;
+const FATAL_ARCH_CEILING = 45;
+const DENSITY_MIN_LOC = 15;
+const POR_THRESHOLD = 0.60;
+const POR_RANGE = 0.40;
+const COMPOSITE_DENSITY_THRESHOLD = 0.35;
+const PENALTY_MAINTAINABILITY_DENSITY = 15;
+const PENALTY_ARCH_POR_MAX = 15;
+const PENALTY_PERF_DENSITY_MAX = 10;
+const DEFAULT_PROJECT_COMPOSITE = 100.0;
+const RATIO_SCALE_HUNDRED = 100;
+const RATIO_SCALE_THOUSAND = 1000;
+const BOUNDED_SCORE_MIN = 15;
+
+const TEST_PATH_INFIX_TEST = '.test.';
+const TEST_PATH_INFIX_SPEC = '.spec.';
+const TEST_PATH_DIR_TESTS = '/tests/';
+const TEST_PATH_DIR_TEST = '/test/';
+const TEST_PATH_DIR_DUNDER = '/__tests__/';
+const TEST_PATH_PREFIX_TEST = 'test_';
+const TEST_PATH_SUFFIX_PY = '_test.py';
+const TEST_PATH_SUFFIX_GD = '_test.gd';
+
+const DIMENSION_MAINTAINABILITY = 'maintainability';
+const DIMENSION_ARCH_CONSISTENCY = 'architectureConsistency';
+const DIMENSION_PERF_EFFICIENCY = 'performanceEfficiency';
+const DIMENSION_CODE_SECURITY = 'codeSecurity';
+const FILE_SUFFIX_INDEX_TS = 'index.ts';
+const FILE_SUFFIX_DTS = '.d.ts';
+const PREFIX_RULE_ARCH = 'ARCH-';
+
 /**
  * Scored function-level quality record.
  */
@@ -115,34 +151,35 @@ export interface ProjectQualityScore {
 }
 
 /**
- * Calculates additional dimension deductions stemming from 5D code density, wiring, and fragmentation.
+ * Calculates dimension deductions stemming from 5D code density, wiring, and fragmentation.
  */
-function computeDensityDimensionDeduction(
+function computeDensityDeduction(
     dim: QualityDimension,
     densityResult: EffectiveDensityResult,
     isExemptFacade: boolean,
 ): number {
-    if (densityResult.totalLoc < 15) {
+    if (densityResult.totalLoc < DENSITY_MIN_LOC) {
         return 0;
     }
-    if (dim === 'maintainability') {
-        if (densityResult.isLowDensity) {
-            return 15;
+    if (dim === DIMENSION_MAINTAINABILITY) {
+        return densityResult.isLowDensity ? PENALTY_MAINTAINABILITY_DENSITY : 0;
+    }
+    if (dim === DIMENSION_ARCH_CONSISTENCY) {
+        if (!isExemptFacade && typeof densityResult.por === 'number' && densityResult.por > POR_THRESHOLD) {
+            return Math.round(PENALTY_ARCH_POR_MAX * ((densityResult.por - POR_THRESHOLD) / POR_RANGE));
         }
         return 0;
     }
-    if (dim === 'architectureConsistency') {
-        if (!isExemptFacade && typeof densityResult.por === 'number' && densityResult.por > 0.60) {
-            return Math.round(15 * ((densityResult.por - 0.60) / 0.40));
-        }
-        return 0;
-    }
-    if (dim === 'performanceEfficiency') {
+    if (dim === DIMENSION_PERF_EFFICIENCY) {
         if (
             typeof densityResult.compositeDensity === 'number' &&
-            densityResult.compositeDensity < 0.35
+            densityResult.compositeDensity < COMPOSITE_DENSITY_THRESHOLD
         ) {
-            return Math.round(10 * ((0.35 - densityResult.compositeDensity) / 0.35));
+            return Math.round(
+                PENALTY_PERF_DENSITY_MAX *
+                    ((COMPOSITE_DENSITY_THRESHOLD - densityResult.compositeDensity) /
+                        COMPOSITE_DENSITY_THRESHOLD),
+            );
         }
         return 0;
     }
@@ -155,14 +192,14 @@ function computeDensityDimensionDeduction(
 function isTestFilePath(filePath: string): boolean {
     const lower = filePath.toLowerCase().replace(/\\/g, '/');
     return (
-        lower.includes('.test.') ||
-        lower.includes('.spec.') ||
-        lower.includes('/__tests__/') ||
-        lower.includes('/tests/') ||
-        lower.includes('/test/') ||
-        lower.startsWith('test_') ||
-        lower.endsWith('_test.py') ||
-        lower.endsWith('_test.gd')
+        lower.includes(TEST_PATH_INFIX_TEST) ||
+        lower.includes(TEST_PATH_INFIX_SPEC) ||
+        lower.includes(TEST_PATH_DIR_DUNDER) ||
+        lower.includes(TEST_PATH_DIR_TESTS) ||
+        lower.includes(TEST_PATH_DIR_TEST) ||
+        lower.startsWith(TEST_PATH_PREFIX_TEST) ||
+        lower.endsWith(TEST_PATH_SUFFIX_PY) ||
+        lower.endsWith(TEST_PATH_SUFFIX_GD)
     );
 }
 
@@ -175,9 +212,9 @@ function computeDimensionIndices(
     const indices: Record<QualityDimension, number> = {} as Record<QualityDimension, number>;
     for (const dim of ALL_QUALITY_DIMENSIONS) {
         const riskPenalty = riskResult.dimensionPenalties?.[dim] ?? 0;
-        const densityPenalty = computeDensityDimensionDeduction(dim, densityResult, isExemptFacade);
+        const densityPenalty = computeDensityDeduction(dim, densityResult, isExemptFacade);
         const dimPenalty = riskPenalty + densityPenalty;
-        const baseScore = dim === 'codeSecurity' ? securityCeiling : DIMENSION_MAX_SCORE;
+        const baseScore = dim === DIMENSION_CODE_SECURITY ? securityCeiling : DIMENSION_MAX_SCORE;
         indices[dim] = clampScore(baseScore - dimPenalty, baseScore);
     }
     return indices;
@@ -198,16 +235,6 @@ function buildFileDensityMetrics(densityResult: EffectiveDensityResult) {
     };
 }
 
-/**
- * Evaluates file-level quality.
- *
- * @param filePath - Path of the file being evaluated.
- * @param content - Full source content of the file.
- * @param issues - Detected issues within the file.
- * @param domainName - Optional domain grouping identifier.
- * @param moduleName - Optional module grouping identifier.
- * @returns File quality evaluation score breakdown.
- */
 /** Options bundle for single-file quality scoring. */
 export interface ScoreFileQualityOptions {
     readonly filePath: string;
@@ -217,72 +244,58 @@ export interface ScoreFileQualityOptions {
     readonly moduleName?: string;
 }
 
+/** Optional domain and module scope specifiers. */
+export interface FileScopeOptions {
+    readonly domainName?: string;
+    readonly moduleName?: string;
+}
+
+function resolveScopeSpecifiers(
+    third?: string | FileScopeOptions,
+    fourth?: string,
+): { domainName: string; moduleName: string } {
+    if (!third) {
+        return { domainName: DEFAULT_DOMAIN_NAME, moduleName: DEFAULT_MODULE_NAME };
+    }
+    if (typeof third === 'string') {
+        return {
+            domainName: third,
+            moduleName: fourth || DEFAULT_MODULE_NAME,
+        };
+    }
+    return {
+        domainName: third.domainName || DEFAULT_DOMAIN_NAME,
+        moduleName: third.moduleName || DEFAULT_MODULE_NAME,
+    };
+}
+
 function normalizeScoreOptions(
     filePathOrOptions: string | ScoreFileQualityOptions,
-    rawContent?: string,
-    rawIssues?: Issue[],
-    rawDomainName?: string,
-    rawModuleName?: string,
+    ...rest: [string?, Issue[]?, (string | FileScopeOptions)?, string?]
 ): ScoreFileQualityOptions {
     if (typeof filePathOrOptions === 'object' && filePathOrOptions !== null) {
         return {
             filePath: filePathOrOptions.filePath,
             content: filePathOrOptions.content,
             issues: filePathOrOptions.issues,
-            domainName: filePathOrOptions.domainName ?? 'core',
-            moduleName: filePathOrOptions.moduleName ?? 'root',
+            domainName: filePathOrOptions.domainName || DEFAULT_DOMAIN_NAME,
+            moduleName: filePathOrOptions.moduleName || DEFAULT_MODULE_NAME,
         };
     }
+    const scope = resolveScopeSpecifiers(rest[2], rest[3]);
     return {
         filePath: filePathOrOptions,
-        content: rawContent ?? '',
-        issues: rawIssues ?? [],
-        domainName: rawDomainName ?? 'core',
-        moduleName: rawModuleName ?? 'root',
+        content: rest[0] || '',
+        issues: rest[1] || [],
+        domainName: scope.domainName,
+        moduleName: scope.moduleName,
     };
 }
 
-/**
- * Evaluates single-file multi-dimensional quality metrics against 8 primary pillars.
- *
- * @param options - Options bundle for file quality scoring.
- * @returns File quality evaluation score breakdown.
- */
-export function scoreFileQuality(options: ScoreFileQualityOptions): FileQualityScore;
-/**
- * Evaluates single-file multi-dimensional quality metrics against 8 primary pillars.
- *
- * @param filePath - Project relative path of the file.
- * @param content - Raw text content of the file.
- * @param issues - Collection of static analysis issues emitted for this file.
- * @param domainName - Optional domain grouping identifier.
- * @param moduleName - Optional module grouping identifier.
- * @returns File quality evaluation score breakdown.
- */
-export function scoreFileQuality(
-    filePath: string,
-    content: string,
-    issues: Issue[],
-    domainName?: string,
-    moduleName?: string,
-): FileQualityScore;
-export function scoreFileQuality(
-    filePathOrOptions: string | ScoreFileQualityOptions,
-    rawContent?: string,
-    rawIssues?: Issue[],
-    rawDomainName?: string,
-    rawModuleName?: string,
-): FileQualityScore {
-    const opt = normalizeScoreOptions(
-        filePathOrOptions,
-        rawContent,
-        rawIssues,
-        rawDomainName,
-        rawModuleName,
-    );
+function evaluateFileQuality(opt: ScoreFileQualityOptions): FileQualityScore {
     const { filePath, content, issues } = opt;
-    const domainName = opt.domainName ?? 'core';
-    const moduleName = opt.moduleName ?? 'root';
+    const domainName = opt.domainName ?? DEFAULT_DOMAIN_NAME;
+    const moduleName = opt.moduleName ?? DEFAULT_MODULE_NAME;
 
     // 1. Density and anti-gaming
     const densityResult = computeEffectiveCodeDensity(content);
@@ -292,11 +305,11 @@ export function scoreFileQuality(
     // 2. Risk penalty and ceilings
     const riskResult = computeRiskWeightedPenalties(allIssues);
     const loc = Math.max(1, content ? content.split('\n').length : 1);
-    const scaleFactor = Math.max(1, loc / 100);
+    const scaleFactor = Math.max(1, loc / LOC_SCALE_DIVISOR);
     const securityCeiling = computeSecurityCeiling(null, scaleFactor);
 
     // 3. Base dimension indices
-    const isExemptFacade = filePath.endsWith('index.ts') || filePath.endsWith('.d.ts');
+    const isExemptFacade = filePath.endsWith(FILE_SUFFIX_INDEX_TS) || filePath.endsWith(FILE_SUFFIX_DTS);
     const indices = computeDimensionIndices(
         riskResult,
         densityResult,
@@ -307,11 +320,11 @@ export function scoreFileQuality(
     const isTest = isTestFilePath(filePath);
     const dataScoreOverride =
         riskResult.pillarPenalties.data > 0
-            ? clampScore(100 - riskResult.pillarPenalties.data)
+            ? clampScore(DIMENSION_MAX_SCORE - riskResult.pillarPenalties.data)
             : undefined;
     const testingScoreOverride =
         isTest || riskResult.pillarPenalties.testing > 0
-            ? clampScore(100 - riskResult.pillarPenalties.testing)
+            ? clampScore(DIMENSION_MAX_SCORE - riskResult.pillarPenalties.testing)
             : undefined;
 
     // 4. Synthesize 8 pillars with non-linear ceilings
@@ -340,6 +353,43 @@ export function scoreFileQuality(
 }
 
 /**
+ * Evaluates single-file multi-dimensional quality metrics against 8 primary pillars.
+ *
+ * @param options - Options bundle for file quality scoring.
+ * @returns File quality evaluation score breakdown.
+ */
+export function scoreFileQuality(options: ScoreFileQualityOptions): FileQualityScore;
+/**
+ * Evaluates single-file multi-dimensional quality metrics against 8 primary pillars.
+ *
+ * @param filePath - Project relative path of the file.
+ * @param content - Raw text content of the file.
+ * @param issues - Collection of static analysis issues emitted for this file.
+ * @param scope - Optional domain and module scope specifiers.
+ * @returns File quality evaluation score breakdown.
+ */
+export function scoreFileQuality(
+    filePath: string,
+    content: string,
+    issues?: Issue[],
+    scope?: FileScopeOptions,
+): FileQualityScore;
+/**
+ * Evaluates single-file multi-dimensional quality metrics against 8 primary pillars.
+ *
+ * @param optionsOrPath - File path string or options bundle.
+ * @param rest - Legacy positional arguments [content, issues, scope].
+ * @returns File quality evaluation score breakdown.
+ */
+export function scoreFileQuality(
+    optionsOrPath: ScoreFileQualityOptions | string,
+    ...rest: [string?, Issue[]?, (string | FileScopeOptions)?, string?]
+): FileQualityScore {
+    const opt = normalizeScoreOptions(optionsOrPath, ...rest);
+    return evaluateFileQuality(opt);
+}
+
+/**
  * Retrieves or initializes the module map for a given domain without per-loop allocations.
  */
 function getOrCreateDomainModuleMap(
@@ -354,25 +404,32 @@ function getOrCreateDomainModuleMap(
     return moduleMap;
 }
 
-/**
- * Aggregates file scores within a single module into a ModuleQualityScore.
- */
-function buildModuleScores(modMap: Map<string, FileQualityScore[]>): ModuleQualityScore[] {
-    const modules: ModuleQualityScore[] = [];
-    for (const [moduleName, files] of modMap.entries()) {
-        const count = files.length;
-        let sumComposite = 0;
-        const pillarSums: Record<PrimaryQualityPillar, number> = {
-            architecture: 0,
-            maintainability: 0,
-            performance: 0,
-            data: 0,
-            testing: 0,
-            reliability: 0,
-            security: 0,
-            extensibility: 0,
-        };
-        const dimSums: Record<QualityDimension, number> = {
+function initPillarSums(): Record<PrimaryQualityPillar, number> {
+    return {
+        architecture: 0,
+        maintainability: 0,
+        performance: 0,
+        data: 0,
+        testing: 0,
+        reliability: 0,
+        security: 0,
+        extensibility: 0,
+    };
+}
+
+interface ScoreAccumulator {
+    count: number;
+    sumComposite: number;
+    pillarSums: Record<PrimaryQualityPillar, number>;
+    dimSums: Record<QualityDimension, number>;
+}
+
+function initScoreAccumulator(): ScoreAccumulator {
+    return {
+        count: 0,
+        sumComposite: 0,
+        pillarSums: initPillarSums(),
+        dimSums: {
             architectureConsistency: 0,
             semanticPurity: 0,
             codeSecurity: 0,
@@ -383,43 +440,66 @@ function buildModuleScores(modMap: Map<string, FileQualityScore[]>): ModuleQuali
             commentQuality: 0,
             duplication: 0,
             techDebtRisk: 0,
-        };
+        },
+    };
+}
 
-        for (let i = 0; i < count; i++) {
+function accumulateScoreItem(
+    acc: ScoreAccumulator,
+    composite: number,
+    pillars: Record<PrimaryQualityPillar, number>,
+    dimensions?: Record<QualityDimension, number>,
+): void {
+    acc.count++;
+    acc.sumComposite += composite;
+    for (const p of ALL_PRIMARY_PILLARS) {
+        acc.pillarSums[p] += pillars[p];
+    }
+    for (const d of ALL_QUALITY_DIMENSIONS) {
+        const fallback = d === DIMENSION_CODE_SECURITY ? DEFAULT_SECURITY_CEILING : DIMENSION_MAX_SCORE;
+        acc.dimSums[d] += dimensions?.[d] ?? fallback;
+    }
+}
+
+function finalizeAverageScores(acc: ScoreAccumulator): {
+    compositeScore: number;
+    pillars: Record<PrimaryQualityPillar, number>;
+    tenDimensions: Record<QualityDimension, number>;
+} {
+    const count = Math.max(1, acc.count);
+    const pillars: Record<PrimaryQualityPillar, number> = {} as Record<PrimaryQualityPillar, number>;
+    for (const p of ALL_PRIMARY_PILLARS) {
+        pillars[p] = Math.round((acc.pillarSums[p] / count) * SCORE_ROUNDING) / SCORE_ROUNDING;
+    }
+    const tenDimensions: Record<QualityDimension, number> = {} as Record<QualityDimension, number>;
+    for (const d of ALL_QUALITY_DIMENSIONS) {
+        tenDimensions[d] = Math.round((acc.dimSums[d] / count) * SCORE_ROUNDING) / SCORE_ROUNDING;
+    }
+    return {
+        compositeScore: Math.round((acc.sumComposite / count) * SCORE_ROUNDING) / SCORE_ROUNDING,
+        pillars,
+        tenDimensions,
+    };
+}
+
+/**
+ * Aggregates file scores within a single module into a ModuleQualityScore.
+ */
+function buildModuleScores(modMap: Map<string, FileQualityScore[]>): ModuleQualityScore[] {
+    const modules: ModuleQualityScore[] = [];
+    for (const [moduleName, files] of modMap.entries()) {
+        const acc = initScoreAccumulator();
+        for (let i = 0; i < files.length; i++) {
             const f = files[i];
-            sumComposite += f.compositeScore;
-            for (const p of ALL_PRIMARY_PILLARS) {
-                pillarSums[p] += f.eightPillars.pillars[p];
-            }
-            for (const d of ALL_QUALITY_DIMENSIONS) {
-                const fallback =
-                    d === 'codeSecurity' ? DEFAULT_SECURITY_CEILING : DIMENSION_MAX_SCORE;
-                dimSums[d] += f.tenDimensions?.[d] ?? fallback;
-            }
+            accumulateScoreItem(acc, f.compositeScore, f.eightPillars.pillars, f.tenDimensions);
         }
-
-        const pillars: Record<PrimaryQualityPillar, number> = {} as Record<
-            PrimaryQualityPillar,
-            number
-        >;
-        for (const p of ALL_PRIMARY_PILLARS) {
-            pillars[p] = Math.round((pillarSums[p] / count) * SCORE_ROUNDING) / SCORE_ROUNDING;
-        }
-
-        const tenDimensions: Record<QualityDimension, number> = {} as Record<
-            QualityDimension,
-            number
-        >;
-        for (const d of ALL_QUALITY_DIMENSIONS) {
-            tenDimensions[d] = Math.round((dimSums[d] / count) * SCORE_ROUNDING) / SCORE_ROUNDING;
-        }
-
+        const averages = finalizeAverageScores(acc);
         modules.push({
             moduleName,
-            fileCount: count,
-            compositeScore: Math.round((sumComposite / count) * SCORE_ROUNDING) / SCORE_ROUNDING,
-            pillars,
-            tenDimensions,
+            fileCount: files.length,
+            compositeScore: averages.compositeScore,
+            pillars: averages.pillars,
+            tenDimensions: averages.tenDimensions,
             files,
         });
     }
@@ -435,63 +515,17 @@ function buildDomainScores(
     const domains: DomainQualityScore[] = [];
     for (const [domainName, modMap] of domainMap.entries()) {
         const modules = buildModuleScores(modMap);
-        const mCount = modules.length;
-        let sumComposite = 0;
-        const pillarSums: Record<PrimaryQualityPillar, number> = {
-            architecture: 0,
-            maintainability: 0,
-            performance: 0,
-            data: 0,
-            testing: 0,
-            reliability: 0,
-            security: 0,
-            extensibility: 0,
-        };
-        const dimSums: Record<QualityDimension, number> = {
-            architectureConsistency: 0,
-            semanticPurity: 0,
-            codeSecurity: 0,
-            performanceEfficiency: 0,
-            standardization: 0,
-            modernity: 0,
-            maintainability: 0,
-            commentQuality: 0,
-            duplication: 0,
-            techDebtRisk: 0,
-        };
-
-        for (let i = 0; i < mCount; i++) {
+        const acc = initScoreAccumulator();
+        for (let i = 0; i < modules.length; i++) {
             const m = modules[i];
-            sumComposite += m.compositeScore;
-            for (const p of ALL_PRIMARY_PILLARS) {
-                pillarSums[p] += m.pillars[p];
-            }
-            for (const d of ALL_QUALITY_DIMENSIONS) {
-                const fallback =
-                    d === 'codeSecurity' ? DEFAULT_SECURITY_CEILING : DIMENSION_MAX_SCORE;
-                dimSums[d] += m.tenDimensions?.[d] ?? fallback;
-            }
+            accumulateScoreItem(acc, m.compositeScore, m.pillars, m.tenDimensions);
         }
-
-        const domainPillars: Record<PrimaryQualityPillar, number> = {} as Record<
-            PrimaryQualityPillar,
-            number
-        >;
-        for (const p of ALL_PRIMARY_PILLARS) {
-            domainPillars[p] =
-                Math.round((pillarSums[p] / mCount) * SCORE_ROUNDING) / SCORE_ROUNDING;
-        }
-
-        const domainDims: Record<QualityDimension, number> = {} as Record<QualityDimension, number>;
-        for (const d of ALL_QUALITY_DIMENSIONS) {
-            domainDims[d] = Math.round((dimSums[d] / mCount) * SCORE_ROUNDING) / SCORE_ROUNDING;
-        }
-
+        const averages = finalizeAverageScores(acc);
         domains.push({
             domainName,
-            compositeScore: Math.round((sumComposite / mCount) * SCORE_ROUNDING) / SCORE_ROUNDING,
-            pillars: domainPillars,
-            tenDimensions: domainDims,
+            compositeScore: averages.compositeScore,
+            pillars: averages.pillars,
+            tenDimensions: averages.tenDimensions,
             modules,
         });
     }
@@ -508,16 +542,7 @@ function computeProjectPillars(
     fileScores: FileQualityScore[],
     fatalCount: number,
 ): Record<PrimaryQualityPillar, number> {
-    const globalPillarSums: Record<PrimaryQualityPillar, number> = {
-        architecture: 0,
-        maintainability: 0,
-        performance: 0,
-        data: 0,
-        testing: 0,
-        reliability: 0,
-        security: 0,
-        extensibility: 0,
-    };
+    const globalPillarSums = initPillarSums();
 
     let weightSum = 0;
     for (const file of fileScores) {
@@ -525,7 +550,7 @@ function computeProjectPillars(
             1,
             typeof file.loc === 'number' && Number.isFinite(file.loc) ? file.loc : 1,
         );
-        const fileWeight = Math.log(fileLoc + 10);
+        const fileWeight = Math.log(fileLoc + LOC_LOG_SMOOTH_BIAS);
         weightSum += fileWeight;
         for (const p of ALL_PRIMARY_PILLARS) {
             globalPillarSums[p] += file.eightPillars.pillars[p] * fileWeight;
@@ -544,10 +569,10 @@ function computeProjectPillars(
 
     if (fatalCount > 0) {
         const hasFatalArch = fileScores.some((f) =>
-            f.issues.some((i) => i.severity === 'error' && i.rule.startsWith('ARCH-')),
+            f.issues.some((i) => i.severity === SEVERITY_ERROR && i.rule.startsWith(PREFIX_RULE_ARCH)),
         );
-        if (hasFatalArch && projectPillars.architecture > 45) {
-            projectPillars.architecture = 45;
+        if (hasFatalArch && projectPillars.architecture > FATAL_ARCH_CEILING) {
+            projectPillars.architecture = FATAL_ARCH_CEILING;
         }
     }
 
@@ -563,7 +588,7 @@ function createEmptyProjectScore(): ProjectQualityScore {
         number
     >;
     for (const d of ALL_QUALITY_DIMENSIONS) {
-        emptyDimensions[d] = d === 'codeSecurity' ? DEFAULT_SECURITY_CEILING : DIMENSION_MAX_SCORE;
+        emptyDimensions[d] = d === DIMENSION_CODE_SECURITY ? DEFAULT_SECURITY_CEILING : DIMENSION_MAX_SCORE;
     }
     const emptyPillars = synthesizeEightPillars(emptyDimensions);
     return {
@@ -608,7 +633,7 @@ interface AccumulatedProjectMetrics {
 function countFatalIssues(issues: FileQualityScore['issues']): number {
     let count = 0;
     for (let i = 0; i < issues.length; i++) {
-        if (issues[i].severity === 'error') {
+        if (issues[i].severity === SEVERITY_ERROR) {
             count++;
         }
     }
@@ -641,7 +666,7 @@ function accumulateDimensionSums(
 ): void {
     const fDims = file.tenDimensions;
     for (const d of ALL_QUALITY_DIMENSIONS) {
-        const fallback = d === 'codeSecurity' ? DEFAULT_SECURITY_CEILING : DIMENSION_MAX_SCORE;
+        const fallback = d === DIMENSION_CODE_SECURITY ? DEFAULT_SECURITY_CEILING : DIMENSION_MAX_SCORE;
         const dimScore = fDims?.[d] ?? fallback;
         projectDimSums[d] += dimScore * fileWeight;
     }
@@ -691,7 +716,7 @@ function accumulateProjectMetrics(fileScores: FileQualityScore[]): AccumulatedPr
             1,
             typeof file.loc === 'number' && Number.isFinite(file.loc) ? file.loc : 1,
         );
-        const fileWeight = Math.log(fileLoc + 10);
+        const fileWeight = Math.log(fileLoc + LOC_LOG_SMOOTH_BIAS);
         totalLoc += fileLoc;
         totalDimWeight += fileWeight;
         accumulateDimensionSums(projectDimSums, file, fileWeight);
@@ -743,14 +768,14 @@ function finalizeProjectEightPillars(
         projectPillars.testing,
         [],
         {},
-        'geometric',
+        SYNTHESIS_MODE_GEOMETRIC,
     );
     synthesized.pillars = projectPillars;
     let totalWeight = 0;
     let logSum = 0;
     for (const p of ALL_PRIMARY_PILLARS) {
         const w = synthesized.weights[p];
-        const boundedScore = Math.max(15, Math.min(100, projectPillars[p]));
+        const boundedScore = Math.max(BOUNDED_SCORE_MIN, Math.min(DIMENSION_MAX_SCORE, projectPillars[p]));
         logSum += w * Math.log(boundedScore);
         totalWeight += w;
     }
@@ -759,7 +784,7 @@ function finalizeProjectEightPillars(
             ? clampScore(
                   Math.round(Math.exp(logSum / totalWeight) * SCORE_ROUNDING) / SCORE_ROUNDING,
               )
-            : 100.0;
+            : DEFAULT_PROJECT_COMPOSITE;
     return synthesized;
 }
 
@@ -784,11 +809,11 @@ export function aggregateProjectScore(fileScores: FileQualityScore[]): ProjectQu
     const synthesized = finalizeProjectEightPillars(projectDimensions, projectPillars);
 
     const count = Math.max(1, fileScores.length);
-    const avgEffective = clampRatio(Math.round((metrics.totalDensity / count) * 100) / 100);
-    const avgComposite = clampRatio(Math.round((metrics.totalCompositeDensity / count) * 100) / 100);
-    const avgTspr = clampRatio(Math.round((metrics.totalTspr / count) * 1000) / 1000);
-    const avgPor = clampRatio(Math.round((metrics.totalPor / count) * 1000) / 1000);
-    const avgCol = clampRatio(Math.round((metrics.totalColumnDensity / count) * 1000) / 1000);
+    const avgEffective = clampRatio(Math.round((metrics.totalDensity / count) * RATIO_SCALE_HUNDRED) / RATIO_SCALE_HUNDRED);
+    const avgComposite = clampRatio(Math.round((metrics.totalCompositeDensity / count) * RATIO_SCALE_HUNDRED) / RATIO_SCALE_HUNDRED);
+    const avgTspr = clampRatio(Math.round((metrics.totalTspr / count) * RATIO_SCALE_THOUSAND) / RATIO_SCALE_THOUSAND);
+    const avgPor = clampRatio(Math.round((metrics.totalPor / count) * RATIO_SCALE_THOUSAND) / RATIO_SCALE_THOUSAND);
+    const avgCol = clampRatio(Math.round((metrics.totalColumnDensity / count) * RATIO_SCALE_THOUSAND) / RATIO_SCALE_THOUSAND);
 
     return {
         compositeScore: synthesized.compositeScore,

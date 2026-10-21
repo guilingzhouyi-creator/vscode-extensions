@@ -1,10 +1,10 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1792586361671",
-  "timestamp": "2026-10-21T12:39:31.031Z",
+  "snapshotId": "snapshot-v0.4.0-1792587743378",
+  "timestamp": "2026-10-21T13:02:32.079Z",
   "cai": 85.88,
   "polyglotGeneralization": {
-    "index": 94.28,
-    "meanScore": 94.28,
+    "index": 94.31,
+    "meanScore": 94.31,
     "dispersionPenalty": 1,
     "standardDeviation": 0,
     "languageCount": 1
@@ -21,47 +21,47 @@
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
     "filesScanned": 677,
-    "durationMs": 5606
+    "durationMs": 4735
   },
   "metrics": {
-    "compositeScore": 98.69,
+    "compositeScore": 98.7,
     "grade": "A+",
     "autonomyRate": 85.88,
     "polyglotGeneralization": {
-      "index": 94.28,
-      "meanScore": 94.28,
+      "index": 94.31,
+      "meanScore": 94.31,
       "dispersionPenalty": 1,
       "standardDeviation": 0,
       "languageCount": 1
     },
     "effectiveCodeDensity": 0.95,
-    "totalIssues": 6975,
+    "totalIssues": 6828,
     "suppressedIssues": 139,
-    "unsuppressedIssues": 6836,
+    "unsuppressedIssues": 6689,
     "bySeverity": {
-      "info": 567,
-      "warning": 6408,
+      "info": 561,
+      "warning": 6267,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
       "high": 0,
-      "medium": 4057,
-      "low": 2918
+      "medium": 3918,
+      "low": 2910
     }
   },
   "eightPillars": {
     "pillars": {
       "architecture": 98.86,
-      "maintainability": 97.69,
+      "maintainability": 97.72,
       "performance": 99.66,
-      "data": 96.99,
+      "data": 97.04,
       "testing": 99.85,
       "reliability": 99.75,
       "security": 99.88,
-      "extensibility": 96.24
+      "extensibility": 96.28
     },
-    "compositeScore": 98.69,
+    "compositeScore": 98.7,
     "weights": {
       "architecture": 0.15,
       "maintainability": 0.15,
@@ -79,23 +79,14 @@
     "semanticPurity": 99.59,
     "codeSecurity": 99.88,
     "performanceEfficiency": 99.66,
-    "standardization": 94.34,
+    "standardization": 94.35,
     "modernity": 99.85,
-    "maintainability": 97.69,
+    "maintainability": 97.72,
     "commentQuality": 100,
-    "duplication": 94.39,
+    "duplication": 94.5,
     "techDebtRisk": 99.91
   },
   "topHotspots": [
-    {
-      "filePath": "src/api.ts",
-      "domain": "src",
-      "totalIssues": 102,
-      "criticalCount": 0,
-      "highCount": 0,
-      "compositeScore": 96.14,
-      "effectiveDensity": 0.96
-    },
     {
       "filePath": "src/core/types.ts",
       "domain": "core",
@@ -104,15 +95,6 @@
       "highCount": 0,
       "compositeScore": 97.94,
       "effectiveDensity": 0.97
-    },
-    {
-      "filePath": "src/core/scoring/hierarchicalScorer.ts",
-      "domain": "scoring",
-      "totalIssues": 48,
-      "criticalCount": 0,
-      "highCount": 0,
-      "compositeScore": 94.15,
-      "effectiveDensity": 0.95
     },
     {
       "filePath": "src/core/evolution/behavioral-hotspot-evaluator.ts",
@@ -176,14 +158,32 @@
       "highCount": 0,
       "compositeScore": 97.27,
       "effectiveDensity": 0.94
+    },
+    {
+      "filePath": "scripts/validate-warm.js",
+      "domain": "scripts",
+      "totalIssues": 35,
+      "criticalCount": 0,
+      "highCount": 0,
+      "compositeScore": 96.45,
+      "effectiveDensity": 0.94
+    },
+    {
+      "filePath": "src/core/ast/python-adapter-helpers.ts",
+      "domain": "ast",
+      "totalIssues": 35,
+      "criticalCount": 0,
+      "highCount": 0,
+      "compositeScore": 97.75,
+      "effectiveDensity": 0.94
     }
   ],
   "technicalDebtLedger": {
     "summary": {
       "critical": 0,
       "high": 0,
-      "medium": 4057,
-      "low": 2918
+      "medium": 3918,
+      "low": 2910
     },
     "criticalItems": [],
     "highItems": []
@@ -222,16 +222,16 @@
       },
       {
         "domainName": "src",
-        "compositeScore": 97.83,
+        "compositeScore": 99.52,
         "pillars": {
           "architecture": 100,
-          "maintainability": 95.25,
+          "maintainability": 97,
           "performance": 100,
-          "data": 91.9,
+          "data": 100,
           "testing": 100,
           "reliability": 100,
           "security": 99.8,
-          "extensibility": 94.6
+          "extensibility": 100
         },
         "moduleCount": 1
       },
@@ -837,16 +837,16 @@
       },
       {
         "domainName": "scoring",
-        "compositeScore": 98.05,
+        "compositeScore": 98.18,
         "pillars": {
-          "architecture": 98.41,
-          "maintainability": 96.89,
+          "architecture": 98.44,
+          "maintainability": 97.17,
           "performance": 99.86,
-          "data": 94.57,
+          "data": 95,
           "testing": 99.93,
           "reliability": 99.88,
           "security": 99.87,
-          "extensibility": 94.03
+          "extensibility": 94.36
         },
         "moduleCount": 1
       },
@@ -1004,27 +1004,27 @@
   },
   "trajectory": {
     "runEloc": {
-      "processed": 158990,
+      "processed": 159030,
       "unique": 129213,
-      "changed": 639,
-      "semantic": 511,
+      "changed": 711,
+      "semantic": 569,
       "relocated": 0,
       "cosmetic": 0,
       "boilerplate": 0,
-      "added": 320,
+      "added": 356,
       "deleted": 0,
       "modified": 0
     },
     "lifetime": {
       "weekId": "LIFETIME",
       "startMs": 1791102755050,
-      "endMs": 1792586361665,
+      "endMs": 1792587743373,
       "totalRuns": 353,
       "eloc": {
-        "processedTotal": 49723819,
+        "processedTotal": 49728659,
         "uniqueTotal": 129213,
-        "changedTotal": 549121,
-        "semanticTotal": 439295
+        "changedTotal": 541041,
+        "semanticTotal": 432830
       },
       "qed": {
         "mean": 0.0001,
@@ -1032,8 +1032,8 @@
         "max": 0.18
       },
       "debt": {
-        "totalAdded": 2247,
-        "totalResolved": 2537,
+        "totalAdded": 2244,
+        "totalResolved": 2676,
         "totalRegressions": 0,
         "netYield": 0.01
       },

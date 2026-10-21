@@ -321,20 +321,20 @@ export function evaluatePatchQuality(params: EvaluatePatchParams): PatchQualityR
         moduleName = 'root',
     } = params;
 
-    const beforeDetails = scoreFileQuality(
+    const beforeDetails = scoreFileQuality({
         filePath,
-        beforeContent,
-        existingIssues,
+        content: beforeContent,
+        issues: existingIssues,
         domainName,
         moduleName,
-    );
-    const afterDetails = scoreFileQuality(
+    });
+    const afterDetails = scoreFileQuality({
         filePath,
-        afterContent,
-        newIssues,
+        content: afterContent,
+        issues: newIssues,
         domainName,
         moduleName,
-    );
+    });
 
     const beforeEntities = extractConstantEntities(beforeContent, filePath);
     const afterEntities = extractConstantEntities(afterContent, filePath);

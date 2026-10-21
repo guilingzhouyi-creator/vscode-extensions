@@ -274,16 +274,27 @@ function runLazyEnsureDaemon(root: string): Promise<boolean> {
     return ensureDaemon(root);
 }
 
+/** Parameter encapsulation for lazy diff-daemon warm scans (SIM-ARGS-001). */
+interface DiffWarmScanParams {
+    root: string;
+    config: ScanConfig;
+    diffs: DiffInput[];
+    options: WarmScanDiffOptions;
+    logger?: Logger;
+}
+
 /** Lazy diff-daemon access (keeps the default scan() module graph daemon-free). */
 function runLazyWarmScanDiff(
-    root: string,
-    config: ScanConfig,
-    diffs: DiffInput[],
-    options: WarmScanDiffOptions,
-    logger?: Logger,
+    params: DiffWarmScanParams,
 ): Promise<{ report: ScanReport | DiffDeltaReport; stats: DiffStats } | null> {
     const { tryWarmScanDiff } = loadDaemonModule<DaemonClientModuleExports>(MODULE_DAEMON_CLIENT);
-    return tryWarmScanDiff(root, config, diffs, options, logger);
+    return tryWarmScanDiff(
+        params.root,
+        params.config,
+        params.diffs,
+        params.options,
+        params.logger,
+    );
 }
 
 
@@ -490,15 +501,21 @@ async function runDiff(
         const mode = options.daemon || DAEMON_MODE_AUTO;
         if (mode !== DAEMON_MODE_OFF) {
             if (mode === DAEMON_MODE_ON) await runLazyEnsureDaemon(config.root);
-            const warm = await runLazyWarmScanDiff(config.root, config, norm, {
-                cache: options.cache !== false,
-                cacheDir: options.cacheDir,
-                cacheCustom: options.cacheCustom,
-                workers: options.workers,
-                parser: options.parser,
-                verifyDiskContent: options.verifyDiskContent !== false,
-                delta,
-            }, logger);
+            const warm = await runLazyWarmScanDiff({
+                root: config.root,
+                config,
+                diffs: norm,
+                options: {
+                    cache: options.cache !== false,
+                    cacheDir: options.cacheDir,
+                    cacheCustom: options.cacheCustom,
+                    workers: options.workers,
+                    parser: options.parser,
+                    verifyDiskContent: options.verifyDiskContent !== false,
+                    delta,
+                },
+                logger,
+            });
             if (warm) {
                 // Incremental reports never carry cross-file passes (partial file set); they still
                 // get reasoned suppressions and baseline annotations, exactly like a full scan.
