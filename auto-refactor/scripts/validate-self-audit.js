@@ -217,6 +217,8 @@ function validateDebtLedger(report) {
   assert.ok(typeof tiers.high === 'number');
   assert.ok(typeof tiers.medium === 'number');
   assert.ok(typeof tiers.low === 'number');
+  assert.strictEqual(tiers.critical, 0, 'Critical technical debt must remain strictly 0');
+  assert.strictEqual(tiers.high, 0, 'High technical debt must remain strictly 0');
   assert.strictEqual(
     tiers.critical + tiers.high + tiers.medium + tiers.low,
     report.metrics.totalIssues,

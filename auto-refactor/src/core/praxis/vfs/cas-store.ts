@@ -296,6 +296,40 @@ export class CasStore {
         return newEntry;
     }
 
+    private async applyEmptySourceEdit(
+        replacement: Uint8Array,
+    ): Promise<{ bytes: Uint8Array; chunks: ChunkDescriptor[] }> {
+        const { casObject, chunkData } = this.cdc.buildCASObject(replacement);
+        for (const [chunkHash, chunkBytes] of chunkData.entries()) {
+            this.putL1(chunkHash, chunkBytes);
+            await this.storage.putChunk(chunkHash, chunkBytes);
+        }
+        return { bytes: replacement, chunks: casObject.chunks };
+    }
+
+    private findImpactedChunkRange(
+        sourceChunks: ChunkDescriptor[],
+        offset: number,
+        editEnd: number,
+    ): { firstIndex: number; lastIndex: number } {
+        let firstIndex = 0;
+        for (let chunkIndex = 0; chunkIndex < sourceChunks.length; chunkIndex++) {
+            if (sourceChunks[chunkIndex].offset + sourceChunks[chunkIndex].length > offset) {
+                firstIndex = chunkIndex;
+                break;
+            }
+        }
+
+        let lastIndex = sourceChunks.length - 1;
+        for (let chunkIndex = 0; chunkIndex < sourceChunks.length; chunkIndex++) {
+            if (sourceChunks[chunkIndex].offset >= editEnd) {
+                lastIndex = Math.max(0, chunkIndex - 1);
+                break;
+            }
+        }
+        return { firstIndex, lastIndex };
+    }
+
     /**
      * Reconstructs FastCDC chunk descriptors for a single localized edit operation.
      * Reuses untouched left and right chunk descriptors without re-evaluating unmodified bytes.
@@ -323,29 +357,11 @@ export class CasStore {
         }
 
         if (sourceChunks.length === 0) {
-            const { casObject, chunkData } = this.cdc.buildCASObject(replacement);
-            for (const [chunkHash, chunkBytes] of chunkData.entries()) {
-                this.putL1(chunkHash, chunkBytes);
-                await this.storage.putChunk(chunkHash, chunkBytes);
-            }
-            return { bytes: replacement, chunks: casObject.chunks };
+            return this.applyEmptySourceEdit(replacement);
         }
 
-        let firstImpactedIndex = 0;
-        for (let chunkIndex = 0; chunkIndex < sourceChunks.length; chunkIndex++) {
-            if (sourceChunks[chunkIndex].offset + sourceChunks[chunkIndex].length > offset) {
-                firstImpactedIndex = chunkIndex;
-                break;
-            }
-        }
-
-        let lastImpactedIndex = sourceChunks.length - 1;
-        for (let chunkIndex = 0; chunkIndex < sourceChunks.length; chunkIndex++) {
-            if (sourceChunks[chunkIndex].offset >= editEnd) {
-                lastImpactedIndex = Math.max(0, chunkIndex - 1);
-                break;
-            }
-        }
+        const { firstIndex: firstImpactedIndex, lastIndex: lastImpactedIndex } =
+            this.findImpactedChunkRange(sourceChunks, offset, editEnd);
 
         const leftChunks = sourceChunks.slice(0, firstImpactedIndex);
         const rightChunks =

@@ -245,6 +245,36 @@ export class SqliteBackend implements IPraxisVFSStorage {
         return this.db;
     }
 
+    private tryDeltaCompress(
+        chunkBytes: Uint8Array,
+        baseChunk: Uint8Array,
+        baseHash: string,
+    ): { storeBytes: Uint8Array; encoding: string; baseHash: string } | null {
+        try {
+            const compressedBytes = zlib.deflateSync(chunkBytes, {
+                dictionary: Buffer.from(baseChunk),
+            });
+            if (compressedBytes.length < chunkBytes.length * 0.85) {
+                return { storeBytes: compressedBytes, encoding: 'PREFIX_DELTA', baseHash };
+            }
+        } catch {
+            // Best-effort delta compression: ignore and fallback
+        }
+        return null;
+    }
+
+    private tryStandaloneCompress(chunkBytes: Uint8Array): Uint8Array | null {
+        try {
+            const standaloneCompressedBytes = zlib.deflateSync(chunkBytes);
+            if (standaloneCompressedBytes.length < chunkBytes.length * 0.9) {
+                return standaloneCompressedBytes;
+            }
+        } catch {
+            // Best-effort zlib compression: ignore and fallback
+        }
+        return null;
+    }
+
     public async putChunk(
         chunkHash: string,
         chunkBytes: Uint8Array,
@@ -263,30 +293,20 @@ export class SqliteBackend implements IPraxisVFSStorage {
         if (baseHash) {
             const baseChunk = await this.getChunk(baseHash);
             if (baseChunk) {
-                try {
-                    const compressedBytes = zlib.deflateSync(chunkBytes, {
-                        dictionary: Buffer.from(baseChunk),
-                    });
-                    if (compressedBytes.length < chunkBytes.length * 0.85) {
-                        storeBytes = compressedBytes;
-                        encoding = 'PREFIX_DELTA';
-                        recordedBaseHash = baseHash;
-                    }
-                } catch {
-                    // Best-effort delta compression: ignore and fallback to uncompressed chunk
+                const deltaResult = this.tryDeltaCompress(chunkBytes, baseChunk, baseHash);
+                if (deltaResult) {
+                    storeBytes = deltaResult.storeBytes;
+                    encoding = deltaResult.encoding;
+                    recordedBaseHash = deltaResult.baseHash;
                 }
             }
         }
 
         if (encoding === 'RAW') {
-            try {
-                const standaloneCompressedBytes = zlib.deflateSync(chunkBytes);
-                if (standaloneCompressedBytes.length < chunkBytes.length * 0.9) {
-                    storeBytes = standaloneCompressedBytes;
-                    encoding = 'ZLIB_FULL';
-                }
-            } catch {
-                // Best-effort zlib compression: ignore and store raw bytes
+            const compressedBytes = this.tryStandaloneCompress(chunkBytes);
+            if (compressedBytes) {
+                storeBytes = compressedBytes;
+                encoding = 'ZLIB_FULL';
             }
         }
 

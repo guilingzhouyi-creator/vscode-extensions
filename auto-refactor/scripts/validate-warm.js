@@ -436,7 +436,8 @@ async function main() {
 
   // ---- Scenario: cold-start empty cache (warm-1st: daemon cold pool + empty cache) ----
   {
-    let [f, w] = await Promise.all([freshScan(), warmScan()]);
+    const f = await freshScan();
+    let w = await warmScan();
     if (!w.stats.daemonUsed) {
       // Under high parallel test contention (16+ workers), give daemon handshake one fast retry
       await new Promise((r) => setTimeout(r, 100));
@@ -452,7 +453,8 @@ async function main() {
 
   // ---- Scenario: immediate rescan (warm-2nd: hot pool + hot cache, all cached) ----
   {
-    const [f, w] = await Promise.all([freshScan(), warmScan()]);
+    const f = await freshScan();
+    const w = await warmScan();
     const eq = JSON.stringify(normalize(f)) === JSON.stringify(normalize(w.report));
     check(
       'scenario-immediate-rescan',

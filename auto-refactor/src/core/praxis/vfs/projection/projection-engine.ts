@@ -75,37 +75,45 @@ class DefaultProjectedSandbox implements ProjectedSandbox {
         this.instantBootstrap = options.instantBootstrap ?? true;
     }
 
+    private async trySparseLink(entryPath: string, entrySize: number, destPath: string): Promise<boolean> {
+        if (!this.useSparseLinks || !this.baseDir) return false;
+        const hostSourcePath = path.join(this.baseDir, entryPath);
+        try {
+            const sourceFileStat = await fs.promises.stat(hostSourcePath);
+            if (sourceFileStat.isFile() && sourceFileStat.size === entrySize) {
+                await fs.promises.link(hostSourcePath, destPath);
+                return true;
+            }
+        } catch {
+            // Best-effort hardlink fallback to standard VFS byte extraction
+        }
+        return false;
+    }
+
+    private async materializeEntry(entry: { path: string; size: number; mode: number }): Promise<boolean> {
+        const destPath = path.join(this.projectedPath, entry.path);
+        const parentDir = path.dirname(destPath);
+        await fs.promises.mkdir(parentDir, { recursive: true });
+
+        const linked = await this.trySparseLink(entry.path, entry.size, destPath);
+        if (linked) return true;
+
+        const fileData = await this.workspace.getFile(entry.path);
+        if (!fileData) return false;
+
+        await fs.promises.writeFile(destPath, fileData.content, { mode: entry.mode });
+        return true;
+    }
+
     public async syncToPhysical(): Promise<number> {
         this.assertNotClosed();
         const entries = this.workspace.listFiles();
         let materializedCount = 0;
 
         for (const entry of entries) {
-            const destPath = path.join(this.projectedPath, entry.path);
-            const parentDir = path.dirname(destPath);
-            await fs.promises.mkdir(parentDir, { recursive: true });
-
-            let linked = false;
-            if (this.useSparseLinks && this.baseDir) {
-                const hostSourcePath = path.join(this.baseDir, entry.path);
-                try {
-                    const sourceFileStat = await fs.promises.stat(hostSourcePath);
-                    if (sourceFileStat.isFile() && sourceFileStat.size === entry.size) {
-                        await fs.promises.link(hostSourcePath, destPath);
-                        linked = true;
-                        materializedCount++;
-                    }
-                } catch {
-                    // Best-effort hardlink: ignore errors and fallback to writing bytes from VFS
-                }
-            }
-
-            if (!linked) {
-                const fileData = await this.workspace.getFile(entry.path);
-                if (fileData) {
-                    await fs.promises.writeFile(destPath, fileData.content, { mode: entry.mode });
-                    materializedCount++;
-                }
+            const materialized = await this.materializeEntry(entry);
+            if (materialized) {
+                materializedCount++;
             }
         }
 
@@ -201,29 +209,33 @@ class DefaultProjectedSandbox implements ProjectedSandbox {
         }
     }
 
+    private async safeUnmountJunction(junctionPath: string): Promise<void> {
+        try {
+            await fs.promises.unlink(junctionPath);
+        } catch {
+            try {
+                await fs.promises.rmdir(junctionPath);
+            } catch {
+                /* ignore transient junction unmount errors */
+            }
+        }
+    }
+
     public async close(): Promise<void> {
         if (this.isClosed) return;
         this.isClosed = true;
 
-        if (this.cleanOnClose) {
-            for (const junctionPath of this.mountedJunctions) {
-                try {
-                    await fs.promises.unlink(junctionPath);
-                } catch {
-                    try {
-                        await fs.promises.rmdir(junctionPath);
-                    } catch {
-                        /* ignore transient junction unmount */
-                    }
-                }
-            }
-            this.mountedJunctions.clear();
+        if (!this.cleanOnClose) return;
 
-            try {
-                await fs.promises.rm(this.projectedPath, { recursive: true, force: true });
-            } catch {
-                /* ignore transient cleanup errors */
-            }
+        for (const junctionPath of this.mountedJunctions) {
+            await this.safeUnmountJunction(junctionPath);
+        }
+        this.mountedJunctions.clear();
+
+        try {
+            await fs.promises.rm(this.projectedPath, { recursive: true, force: true });
+        } catch {
+            /* ignore transient cleanup errors */
         }
     }
 }

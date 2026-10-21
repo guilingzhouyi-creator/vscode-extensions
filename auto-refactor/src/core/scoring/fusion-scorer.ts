@@ -68,6 +68,30 @@ export interface UnifiedQualityAssessment {
     explanation: string;
 }
 
+const DOMAIN_WEIGHT_MAP: Readonly<Record<string, readonly [number, number, number]>> = Object.freeze({
+    core_framework: [0.55, 0.3, 0.15],
+    algorithm_lib: [0.35, 0.5, 0.15],
+    business_app: [0.4, 0.35, 0.25],
+    cli_tool: [0.6, 0.25, 0.15],
+});
+
+const STAGE_WEIGHT_MAP: Readonly<Record<string, readonly [number, number, number]>> = Object.freeze({
+    prototype: [0.7, 0.2, 0.1],
+    industrial_infrastructure: [0.45, 0.4, 0.15],
+});
+
+const DEFAULT_FUSION_WEIGHTS: readonly [number, number, number] = [0.5, 0.35, 0.15];
+
+/** Resolves raw tri-plane weights from static configuration lookup table. */
+function resolveRawTriplaneWeights(domain: string, stage: string): [number, number, number] {
+    const stageOverride = STAGE_WEIGHT_MAP[stage];
+    if (stageOverride) {
+        return [stageOverride[0], stageOverride[1], stageOverride[2]];
+    }
+    const domainDefault = DOMAIN_WEIGHT_MAP[domain] ?? DEFAULT_FUSION_WEIGHTS;
+    return [domainDefault[0], domainDefault[1], domainDefault[2]];
+}
+
 /**
  * Resolves context-adaptive tri-plane weights W = f(Stage, Scale, Domain, Risk).
  *
@@ -92,45 +116,7 @@ export function resolveAdaptiveFusionWeights(
 
     const domain = profile.domain ?? 'core_framework';
     const stage = profile.stage ?? 'production';
-
-    let rawWs = 0.5;
-    let rawWd = 0.35;
-    let rawWf = 0.15;
-
-    // Domain adjustments
-    switch (domain) {
-        case 'core_framework':
-            rawWs = 0.55;
-            rawWd = 0.3;
-            rawWf = 0.15;
-            break;
-        case 'algorithm_lib':
-            rawWs = 0.35;
-            rawWd = 0.5;
-            rawWf = 0.15;
-            break;
-        case 'business_app':
-            rawWs = 0.4;
-            rawWd = 0.35;
-            rawWf = 0.25;
-            break;
-        case 'cli_tool':
-            rawWs = 0.6;
-            rawWd = 0.25;
-            rawWf = 0.15;
-            break;
-    }
-
-    // Stage adjustments
-    if (stage === 'prototype') {
-        rawWs = 0.7;
-        rawWd = 0.2;
-        rawWf = 0.1;
-    } else if (stage === 'industrial_infrastructure') {
-        rawWs = 0.45;
-        rawWd = 0.4;
-        rawWf = 0.15;
-    }
+    const [rawWs, rawWd, rawWf] = resolveRawTriplaneWeights(domain, stage);
 
     const effectiveWs = rawWs;
     const effectiveWd = hasDynamicEvidence ? rawWd : 0.0;

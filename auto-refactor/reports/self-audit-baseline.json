@@ -1,10 +1,10 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1792582834143",
-  "timestamp": "2026-10-21T11:40:49.054Z",
+  "snapshotId": "snapshot-v0.4.0-1792586361671",
+  "timestamp": "2026-10-21T12:39:31.031Z",
   "cai": 85.88,
   "polyglotGeneralization": {
-    "index": 94.26,
-    "meanScore": 94.26,
+    "index": 94.28,
+    "meanScore": 94.28,
     "dispersionPenalty": 1,
     "standardDeviation": 0,
     "languageCount": 1
@@ -21,47 +21,47 @@
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
     "filesScanned": 677,
-    "durationMs": 10080
+    "durationMs": 5606
   },
   "metrics": {
-    "compositeScore": 98.68,
+    "compositeScore": 98.69,
     "grade": "A+",
     "autonomyRate": 85.88,
     "polyglotGeneralization": {
-      "index": 94.26,
-      "meanScore": 94.26,
+      "index": 94.28,
+      "meanScore": 94.28,
       "dispersionPenalty": 1,
       "standardDeviation": 0,
       "languageCount": 1
     },
     "effectiveCodeDensity": 0.95,
-    "totalIssues": 6976,
+    "totalIssues": 6975,
     "suppressedIssues": 139,
-    "unsuppressedIssues": 6837,
+    "unsuppressedIssues": 6836,
     "bySeverity": {
       "info": 567,
-      "warning": 6409,
+      "warning": 6408,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
-      "high": 5,
-      "medium": 4059,
-      "low": 2912
+      "high": 0,
+      "medium": 4057,
+      "low": 2918
     }
   },
   "eightPillars": {
     "pillars": {
       "architecture": 98.86,
-      "maintainability": 97.67,
+      "maintainability": 97.69,
       "performance": 99.66,
       "data": 96.99,
       "testing": 99.85,
-      "reliability": 99.74,
+      "reliability": 99.75,
       "security": 99.88,
       "extensibility": 96.24
     },
-    "compositeScore": 98.68,
+    "compositeScore": 98.69,
     "weights": {
       "architecture": 0.15,
       "maintainability": 0.15,
@@ -79,12 +79,12 @@
     "semanticPurity": 99.59,
     "codeSecurity": 99.88,
     "performanceEfficiency": 99.66,
-    "standardization": 94.35,
+    "standardization": 94.34,
     "modernity": 99.85,
-    "maintainability": 97.67,
+    "maintainability": 97.69,
     "commentQuality": 100,
     "duplication": 94.39,
-    "techDebtRisk": 99.9
+    "techDebtRisk": 99.91
   },
   "topHotspots": [
     {
@@ -181,58 +181,12 @@
   "technicalDebtLedger": {
     "summary": {
       "critical": 0,
-      "high": 5,
-      "medium": 4059,
-      "low": 2912
+      "high": 0,
+      "medium": 4057,
+      "low": 2918
     },
     "criticalItems": [],
-    "highItems": [
-      {
-        "id": "complexity:high-complexity:src/core/praxis/vfs/cas-store.ts:310",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/praxis/vfs/cas-store.ts",
-        "line": 310,
-        "message": "Function \"CasStore.applySingleEdit\" has cyclomatic complexity 12 (threshold 12)."
-      },
-      {
-        "id": "complexity:CPX-NEST-001:src/core/praxis/vfs/projection/projection-engine.ts:78",
-        "rule": "CPX-NEST-001",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/praxis/vfs/projection/projection-engine.ts",
-        "line": 78,
-        "message": "Unbounded control-flow nesting: function 'DefaultProjectedSandbox.syncToPhysical' has nesting depth 4 exceeding elastic budget 3 for context 'general-business'."
-      },
-      {
-        "id": "complexity:CPX-NEST-001:src/core/praxis/vfs/projection/projection-engine.ts:204",
-        "rule": "CPX-NEST-001",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/praxis/vfs/projection/projection-engine.ts",
-        "line": 204,
-        "message": "Unbounded control-flow nesting: function 'DefaultProjectedSandbox.close' has nesting depth 6 exceeding elastic budget 3 for context 'general-business'."
-      },
-      {
-        "id": "complexity:CPX-NEST-001:src/core/praxis/vfs/sqlite-backend.ts:248",
-        "rule": "CPX-NEST-001",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/praxis/vfs/sqlite-backend.ts",
-        "line": 248,
-        "message": "Unbounded control-flow nesting: function 'SqliteBackend.putChunk' has nesting depth 4 exceeding elastic budget 3 for context 'general-business'."
-      },
-      {
-        "id": "complexity:high-complexity:src/core/scoring/fusion-scorer.ts:83",
-        "rule": "high-complexity",
-        "tier": "high",
-        "severity": "warning",
-        "file": "src/core/scoring/fusion-scorer.ts",
-        "line": 83,
-        "message": "Function \"resolveAdaptiveFusionWeights\" has cyclomatic complexity 15 (threshold 12)."
-      }
-    ]
+    "highItems": []
   },
   "hierarchicalBreakdown": {
     "domains": [
@@ -718,14 +672,14 @@
       },
       {
         "domainName": "vfs",
-        "compositeScore": 98.91,
+        "compositeScore": 99.07,
         "pillars": {
           "architecture": 100,
-          "maintainability": 97.26,
+          "maintainability": 98.11,
           "performance": 100,
           "data": 97.47,
           "testing": 100,
-          "reliability": 99.79,
+          "reliability": 100,
           "security": 99.9,
           "extensibility": 96.32
         },
@@ -733,16 +687,16 @@
       },
       {
         "domainName": "projection",
-        "compositeScore": 99.36,
+        "compositeScore": 99.52,
         "pillars": {
           "architecture": 100,
-          "maintainability": 98.19,
+          "maintainability": 99.25,
           "performance": 100,
           "data": 98.18,
           "testing": 100,
-          "reliability": 99.74,
+          "reliability": 100,
           "security": 99.94,
-          "extensibility": 98.53
+          "extensibility": 98.28
         },
         "moduleCount": 1
       },
@@ -883,14 +837,14 @@
       },
       {
         "domainName": "scoring",
-        "compositeScore": 98.03,
+        "compositeScore": 98.05,
         "pillars": {
           "architecture": 98.41,
-          "maintainability": 96.81,
+          "maintainability": 96.89,
           "performance": 99.86,
-          "data": 94.54,
+          "data": 94.57,
           "testing": 99.93,
-          "reliability": 99.85,
+          "reliability": 99.88,
           "security": 99.87,
           "extensibility": 94.03
         },
@@ -1050,27 +1004,27 @@
   },
   "trajectory": {
     "runEloc": {
-      "processed": 158961,
+      "processed": 158990,
       "unique": 129213,
-      "changed": 616,
-      "semantic": 493,
+      "changed": 639,
+      "semantic": 511,
       "relocated": 0,
       "cosmetic": 0,
       "boilerplate": 0,
-      "added": 308,
+      "added": 320,
       "deleted": 0,
       "modified": 0
     },
     "lifetime": {
       "weekId": "LIFETIME",
       "startMs": 1791102755050,
-      "endMs": 1792582834140,
+      "endMs": 1792586361665,
       "totalRuns": 353,
       "eloc": {
-        "processedTotal": 49719562,
+        "processedTotal": 49723819,
         "uniqueTotal": 129213,
-        "changedTotal": 560960,
-        "semanticTotal": 448767
+        "changedTotal": 549121,
+        "semanticTotal": 439295
       },
       "qed": {
         "mean": 0.0001,
@@ -1079,7 +1033,7 @@
       },
       "debt": {
         "totalAdded": 2247,
-        "totalResolved": 2520,
+        "totalResolved": 2537,
         "totalRegressions": 0,
         "netYield": 0.01
       },
