@@ -442,6 +442,11 @@ $codeDOCREACH35 = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/co
 if ($codeDOCREACH35 -ne 0) {
     $failed = $true
 }
+# 提交历史冻结清单：允许规则收紧后不追溯阻断已写就的历史，但清单本身必须无法用作自我豁免。
+$codeCHB36 = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-commit-history-baseline.js") -WorkingDirectory $repoRoot -StepId "COMMIT-HISTORY-BASELINE-36" -TimeoutSeconds 60
+if ($codeCHB36 -ne 0) {
+    $failed = $true
+}
 
 if ($Agent) {
     if ($failed) {

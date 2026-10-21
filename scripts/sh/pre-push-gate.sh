@@ -466,6 +466,11 @@ if ! run_gate_step 60 "DOC-REACH-35" "$ROOT_DIR" "$NODE_BIN" scripts/common/vali
     FAILED=1
 fi
 
+# 提交历史冻结清单：允许规则收紧后不追溯阻断已写就的历史，但清单本身必须无法用作自我豁免。
+if ! run_gate_step 60 "COMMIT-HISTORY-BASELINE-36" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-commit-history-baseline.js; then
+    FAILED=1
+fi
+
 if [[ "$AGENT_MODE" -eq 1 ]]; then
     if [[ "$FAILED" -ne 0 ]]; then
         if [[ -f "$AUDIT_LOG_DIR/last-failure.json" ]]; then

@@ -118,13 +118,15 @@ CODE_FAMILY_CONTRACT=0
 "$NODE_BIN" scripts/common/validate-family-contract.js >/dev/null 2>&1 || CODE_FAMILY_CONTRACT=$?
 CODE_DOC_REACH=0
 "$NODE_BIN" scripts/common/validate-doc-reachability.js >/dev/null 2>&1 || CODE_DOC_REACH=$?
-if [[ "$CODE_CATALOG" -ne 0 || "$CODE_FEEDBACK" -ne 0 || "$CODE_ORDERING" -ne 0 || "$CODE_SKILLS" -ne 0 || "$CODE_CLOSURE" -ne 0 || "$CODE_REACH" -ne 0 || "$CODE_DOCS" -ne 0 || "$CODE_LEDGER" -ne 0 || "$CODE_SUBAGENT" -ne 0 || "$CODE_DOC_ANCHORS" -ne 0 || "$CODE_METRIC_COVERAGE" -ne 0 || "$CODE_FAMILY_CONTRACT" -ne 0 || "$CODE_DOC_REACH" -ne 0 ]]; then
+CODE_COMMIT_HISTORY=0
+"$NODE_BIN" scripts/common/validate-commit-history-baseline.js >/dev/null 2>&1 || CODE_COMMIT_HISTORY=$?
+if [[ "$CODE_CATALOG" -ne 0 || "$CODE_FEEDBACK" -ne 0 || "$CODE_ORDERING" -ne 0 || "$CODE_SKILLS" -ne 0 || "$CODE_CLOSURE" -ne 0 || "$CODE_REACH" -ne 0 || "$CODE_DOCS" -ne 0 || "$CODE_LEDGER" -ne 0 || "$CODE_SUBAGENT" -ne 0 || "$CODE_DOC_ANCHORS" -ne 0 || "$CODE_METRIC_COVERAGE" -ne 0 || "$CODE_FAMILY_CONTRACT" -ne 0 || "$CODE_DOC_REACH" -ne 0 || "$CODE_COMMIT_HISTORY" -ne 0 ]]; then
     STATUS_RULES="FAIL"
     write_step_verdict "RULE-AUDIT-02" BLOCK "规则目录同步、闭包、可达性、文档一致性、技能集或轨迹账本审查未通过"
     FAILED=1
 else
     STATUS_RULES="PASS"
-    write_step_verdict "RULE-AUDIT-02" PASS "单源规则目录、闭包、可达性、文档一致性、引用锚点、指标覆盖、规则族契约与文档可达性合规"
+    write_step_verdict "RULE-AUDIT-02" PASS "单源规则目录、闭包、可达性、文档一致性、引用锚点、指标覆盖、规则族契约、文档可达性与提交历史冻结清单合规"
 fi
 
 LOG_WT=$(mktemp)

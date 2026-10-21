@@ -258,3 +258,4 @@ Python 版使用 docstring + `if __name__ == "__main__":` 守卫。
 > | `METRIC-COVERAGE-33` | 文档指标声明集与渲染集相等 |
 > | `FAMILY-CONTRACT-34` | 规则族三源一致且层值在六层内 |
 > | `DOC-REACH-35` | 规范文档至少被另一份文档指名 |
+> | `COMMIT-HISTORY-BASELINE-36` | 提交历史冻结清单只能覆盖早于其生效时刻的提交 |

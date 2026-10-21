@@ -1,0 +1,236 @@
+{
+  "schema": "commit-history-baseline/v1",
+  "ratifiedAt": "2026-10-21T12:49:04.000Z",
+  "rationale": "Grow-only freeze for commits that already passed the gate in force when they were written. Tightening a rule must not retroactively invalidate published history, because the exemption cannot be added to an existing commit message. Each entry pins the commit SHA and the rule IDs it predates; a frozen commit is reported but never blocks. New commits are always judged by the current rules. Append-only: removing an entry re-arms the block for that commit, and editing an entry's ruleIds is a regression that must be justified in review.",
+  "frozenCommits": [
+    {
+      "sha": "ff90d849fae6b0087b8041cea884e1f7f2ab2d48",
+      "committedAt": "2026-10-21T12:48:04.000Z",
+      "ruleIds": [
+        "CMG-STY-004",
+        "CMG-STY-005",
+        "CMG-STY-006"
+      ]
+    },
+    {
+      "sha": "3ed17e053aa0688f4fa41170c51cebdae252088b",
+      "committedAt": "2026-10-21T12:44:24.000Z",
+      "ruleIds": [
+        "CMG-STY-001"
+      ]
+    },
+    {
+      "sha": "ac3b8f20f818e7997df378b7a853b9ff7e1e74e2",
+      "committedAt": "2026-10-21T12:42:23.000Z",
+      "ruleIds": [
+        "CMG-STY-002"
+      ]
+    },
+    {
+      "sha": "e523ff64e63cb630d1918de53e3855d03bdc4c4f",
+      "committedAt": "2026-10-21T12:41:40.000Z",
+      "ruleIds": [
+        "CMG-STY-002",
+        "CMG-STY-004",
+        "CMG-STY-005"
+      ]
+    },
+    {
+      "sha": "d6fbb235fff8c3f64b81a4af1283df72229a6bed",
+      "committedAt": "2026-10-21T12:39:02.000Z",
+      "ruleIds": [
+        "CMG-STY-004",
+        "CMG-STY-005",
+        "CMG-STY-006"
+      ]
+    },
+    {
+      "sha": "96c137b0c8f4d18f0344f786e272fbe8d6a22dc8",
+      "committedAt": "2026-10-21T12:33:04.000Z",
+      "ruleIds": [
+        "CMG-STY-006"
+      ]
+    },
+    {
+      "sha": "df24bfbcef092beed6d7cf03f370b7d459aacb92",
+      "committedAt": "2026-10-21T12:23:08.000Z",
+      "ruleIds": [
+        "CMG-STY-006"
+      ]
+    },
+    {
+      "sha": "33764c836861c2a7801f1b48b42b324593d131b5",
+      "committedAt": "2026-10-21T12:07:51.000Z",
+      "ruleIds": [
+        "CMG-STY-004",
+        "CMG-STY-005"
+      ]
+    },
+    {
+      "sha": "8a849da183f6f6ebba6f9ccf2e40392b0b2d627d",
+      "committedAt": "2026-10-21T12:04:34.000Z",
+      "ruleIds": [
+        "CMG-STY-004",
+        "CMG-STY-005"
+      ]
+    },
+    {
+      "sha": "5572c263d4b585afde995544fa7690eba3f64e2c",
+      "committedAt": "2026-10-21T12:03:12.000Z",
+      "ruleIds": [
+        "CMG-STY-001",
+        "CMG-STY-004",
+        "CMG-STY-005",
+        "CMG-STY-006"
+      ]
+    },
+    {
+      "sha": "75135d332248c46f47d124cb3a23c025e06aee6f",
+      "committedAt": "2026-10-21T11:47:12.000Z",
+      "ruleIds": [
+        "CMG-STY-004",
+        "CMG-STY-005"
+      ]
+    },
+    {
+      "sha": "a64f7b610e3167c496a7b6c98241a30bb0c4f960",
+      "committedAt": "2026-10-21T11:37:31.000Z",
+      "ruleIds": [
+        "CMG-STY-004",
+        "CMG-STY-005"
+      ]
+    },
+    {
+      "sha": "60d19b2b8e99965e0bc970d4864c3779e2b6461c",
+      "committedAt": "2026-10-21T11:25:59.000Z",
+      "ruleIds": [
+        "CMG-STY-006"
+      ]
+    },
+    {
+      "sha": "4c921a7599283532f5c1696ed3ac5854bd55220b",
+      "committedAt": "2026-10-21T11:23:52.000Z",
+      "ruleIds": [
+        "CMG-STY-004",
+        "CMG-STY-005"
+      ]
+    },
+    {
+      "sha": "6ed98ae447037c7dddd26b0bf1f68e42eb8415fc",
+      "committedAt": "2026-10-21T11:23:11.000Z",
+      "ruleIds": [
+        "CMG-STY-004",
+        "CMG-STY-005"
+      ]
+    },
+    {
+      "sha": "06bcfc77bc416bb1b0f56c11aa146bee18b4d9df",
+      "committedAt": "2026-10-21T11:15:22.000Z",
+      "ruleIds": [
+        "CMG-STY-001",
+        "CMG-STY-004",
+        "CMG-STY-005",
+        "CMG-STY-006"
+      ]
+    },
+    {
+      "sha": "5edbc207dd8a17947abe644a7b8a71b810d40b73",
+      "committedAt": "2026-10-21T11:13:55.000Z",
+      "ruleIds": [
+        "CMG-STY-004",
+        "CMG-STY-005"
+      ]
+    },
+    {
+      "sha": "a160f3f5211d286f33c88d70884f5edb8130ec27",
+      "committedAt": "2026-10-21T11:13:02.000Z",
+      "ruleIds": [
+        "CMG-STY-005"
+      ]
+    },
+    {
+      "sha": "0a2b591a7c8997483f38ea0c708d4b7daab522b6",
+      "committedAt": "2026-10-21T11:11:15.000Z",
+      "ruleIds": [
+        "CMG-STY-005"
+      ]
+    },
+    {
+      "sha": "390dd5b6d50044a605b747286323cfea81f9f3e2",
+      "committedAt": "2026-10-20T15:40:04.000Z",
+      "ruleIds": [
+        "CMG-STY-006"
+      ]
+    },
+    {
+      "sha": "2ee7a6b32f3f8aa58025d2710a71779f0bae2d04",
+      "committedAt": "2026-10-20T15:39:31.000Z",
+      "ruleIds": [
+        "CMG-STY-006"
+      ]
+    },
+    {
+      "sha": "79bbedd1d894ed025dcc719f997229ed3531e208",
+      "committedAt": "2026-10-20T14:43:29.000Z",
+      "ruleIds": [
+        "CMG-STY-006"
+      ]
+    },
+    {
+      "sha": "e39813eea88d1df964870b83eb30bf9ecf54a53c",
+      "committedAt": "2026-10-20T14:43:18.000Z",
+      "ruleIds": [
+        "CMG-STY-004",
+        "CMG-STY-005",
+        "CMG-STY-006"
+      ]
+    },
+    {
+      "sha": "c845b64862f59b0db08dc896129b82bd47003dcf",
+      "committedAt": "2026-10-20T14:42:47.000Z",
+      "ruleIds": [
+        "CMG-STY-004",
+        "CMG-STY-005"
+      ]
+    },
+    {
+      "sha": "dace9d72c58504585fc4d3bd37723ed45bf1d860",
+      "committedAt": "2026-10-20T13:26:21.000Z",
+      "ruleIds": [
+        "CMG-STY-006"
+      ]
+    },
+    {
+      "sha": "cd9fd3275214f35f099adb5672d289c503f4eaed",
+      "committedAt": "2026-10-20T13:19:06.000Z",
+      "ruleIds": [
+        "CMG-STY-006"
+      ]
+    },
+    {
+      "sha": "f72a8405ec932eaa7ab271b58e0d882b20fd50d3",
+      "committedAt": "2026-10-20T13:18:31.000Z",
+      "ruleIds": [
+        "CMG-STY-006"
+      ]
+    },
+    {
+      "sha": "49661ff1cd3cb429ce8cec6cc89fa3e9af60f028",
+      "committedAt": "2026-10-20T13:16:42.000Z",
+      "ruleIds": [
+        "CMG-STY-004",
+        "CMG-STY-005",
+        "CMG-STY-006"
+      ]
+    },
+    {
+      "sha": "c00632cecff16c432db48dd782e722544ef49b2f",
+      "committedAt": "2026-10-20T13:12:36.000Z",
+      "ruleIds": [
+        "CMG-STY-001",
+        "CMG-STY-004",
+        "CMG-STY-005"
+      ]
+    }
+  ]
+}

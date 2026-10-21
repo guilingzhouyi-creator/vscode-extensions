@@ -60,6 +60,15 @@ const DISALLOWED_LEADING_PREFIXES = [
 
 /** First-person pronouns (Zero-POV violation) */
 const FIRST_PERSON_PRONOUNS_ZH = ['我', '我们', '本Agent', '笔者', '团队', '俺', '咱', '本人'];
+
+/**
+ * Compounds where 我 is a bound morpheme rather than a first-person narrator.
+ *
+ * 自我豁免 / 自举 / 自身 are ordinary engineering vocabulary. Scanning the bare character
+ * flagged all of them, so the pronoun pass masks these compounds first. Sorted longest-first
+ * so 自我 takes precedence over any shorter overlap.
+ */
+const BOUND_WO_COMPOUNDS = ['自我', '自举', '自身', '自省'].sort((a, b) => b.length - a.length);
 const FIRST_PERSON_PRONOUNS_EN_RE = /\b(?:i|we|my|our|me|us)\b/i;
 
 /** Controlled project nomenclature mapping: [misnomer, canonical] */
@@ -263,7 +272,12 @@ function checkZeroPOV(line, lineNum, rawDisplayLine = '') {
   const displayLine = (rawDisplayLine || line).trim();
 
   // Mask inline code blocks and URLs
-  const sanitized = line.replace(/`[^`]+`/g, ' ').replace(/https?:\/\/[^\s]+/g, ' ');
+  let sanitized = line.replace(/`[^`]+`/g, ' ').replace(/https?:\/\/[^\s]+/g, ' ');
+
+  // Mask bound-morpheme compounds before scanning for the bare pronoun.
+  for (const compound of BOUND_WO_COMPOUNDS) {
+    sanitized = sanitized.split(compound).join(' __BOUND_MORPHEME__ ');
+  }
 
   // Chinese first-person pronouns: sort by length descending to match longest first
   const sortedZhPronouns = [...FIRST_PERSON_PRONOUNS_ZH].sort((a, b) => b.length - a.length);

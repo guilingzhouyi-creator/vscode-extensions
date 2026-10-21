@@ -317,6 +317,11 @@
           "id": "DOC-REACH-35",
           "ruleId": "GUARD-DOC-001",
           "title": "规范文档具备入链可达性"
+        },
+        {
+          "id": "COMMIT-HISTORY-BASELINE-36",
+          "title": "提交历史冻结清单合规",
+          "ruleId": "GUARD-MSG-002"
         }
       ]
     },

@@ -80,6 +80,7 @@ $logDocAnchorsOut = Join-Path $transientDir "audit-check-docanchors-$randSuffix.
 $logMetricCoverageOut = Join-Path $transientDir "audit-check-metriccoverage-$randSuffix.out.log"
 $logFamilyContractOut = Join-Path $transientDir "audit-check-familycontract-$randSuffix.out.log"
 $logDocReachOut = Join-Path $transientDir "audit-check-docreach-$randSuffix.out.log"
+$logCommitHistoryOut = Join-Path $transientDir "audit-check-commithistory-$randSuffix.out.log"
 $logCatalogOut = Join-Path $transientDir "audit-check-catalogout-$randSuffix.out.log"
 $logFgTopoOut = Join-Path $transientDir "audit-check-fgtopoout-$randSuffix.out.log"
 $logFgParityOut = Join-Path $transientDir "audit-check-fgparityout-$randSuffix.out.log"
@@ -134,6 +135,7 @@ $resDocAnchors = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/
 $resMetricCoverage = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-metric-coverage.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logMetricCoverageOut -NoNewWindow -PassThru -Wait
 $resFamilyContract = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-family-contract.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logFamilyContractOut -NoNewWindow -PassThru -Wait
 $resDocReach = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-doc-reachability.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logDocReachOut -NoNewWindow -PassThru -Wait
+$resCommitHistory = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-commit-history-baseline.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logCommitHistoryOut -NoNewWindow -PassThru -Wait
 $codeCatalog = $res.ExitCode
 $codeFeedback = $resFeedback.ExitCode
 $codeOrdering = $resOrdering.ExitCode
@@ -147,7 +149,8 @@ $codeDocAnchors = $resDocAnchors.ExitCode
 $codeMetricCoverage = $resMetricCoverage.ExitCode
 $codeFamilyContract = $resFamilyContract.ExitCode
 $codeDocReach = $resDocReach.ExitCode
-if ($codeCatalog -ne 0 -or $codeSkills -ne 0 -or $codeFeedback -ne 0 -or $codeOrdering -ne 0 -or $codeClosure -ne 0 -or $codeReach -ne 0 -or $codeDocs -ne 0 -or $codeLedger -ne 0 -or $codeSubagent -ne 0 -or $codeDocAnchors -ne 0 -or $codeMetricCoverage -ne 0 -or $codeFamilyContract -ne 0 -or $codeDocReach -ne 0) {
+$codeCommitHistory = $resCommitHistory.ExitCode
+if ($codeCatalog -ne 0 -or $codeSkills -ne 0 -or $codeFeedback -ne 0 -or $codeOrdering -ne 0 -or $codeClosure -ne 0 -or $codeReach -ne 0 -or $codeDocs -ne 0 -or $codeLedger -ne 0 -or $codeSubagent -ne 0 -or $codeDocAnchors -ne 0 -or $codeMetricCoverage -ne 0 -or $codeFamilyContract -ne 0 -or $codeDocReach -ne 0 -or $codeCommitHistory -ne 0) {
     $statusRules = "FAIL"
     $failed = $true
 } else {

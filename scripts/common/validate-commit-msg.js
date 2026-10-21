@@ -39,6 +39,8 @@ const MODULE_STYLE = './validate-commit-msg-style';
 const MODULE_LOG_ROTATOR = './log-rotator';
 const MODULE_DEBT_CORRIDOR = './tech-debt-corridor';
 
+const FILE_COMMIT_HISTORY_BASELINE = 'commit-history-baseline.json';
+
 const PROTOCOL_VERSION = '1.0.0';
 const STATUS_PASS = 'PASS';
 const STATUS_BLOCK = 'BLOCK';
@@ -194,6 +196,31 @@ function validateSingleCommitMessage(content, options = {}) {
   };
 }
 
+/**
+ * Loads the commit-history freeze ledger keyed by commit SHA.
+ *
+ * Each entry records the rule IDs a commit predates. The ledger exists because a published
+ * commit message is immutable: the previous `[Baseline: exempt]` marker could only be added by
+ * rewriting history, so tightening any rule retroactively bricked every earlier commit and
+ * blocked the push outright.
+ *
+ * @returns {Map<string, Set<string>>} commit SHA -> frozen rule IDs.
+ */
+function loadCommitHistoryBaseline() {
+  const baselinePath = path.join(__dirname, FILE_COMMIT_HISTORY_BASELINE);
+  if (!fs.existsSync(baselinePath)) return new Map();
+  try {
+    const parsed = JSON.parse(fs.readFileSync(baselinePath, ENCODING_UTF8));
+    const entries = Array.isArray(parsed?.frozenCommits) ? parsed.frozenCommits : [];
+    return new Map(entries.map((entry) => [entry.sha, new Set(entry.ruleIds || [])]));
+  } catch (parseErr) {
+    // A malformed ledger must not silently masquerade as "no frozen commits": that would
+    // re-arm every retroactive block while printing a clean-looking run.
+    console.error(`WARN commit-history baseline unreadable (${baselinePath}): ${parseErr.message}`);
+    return new Map();
+  }
+}
+
 function validateCommitRange(range) {
   const root = path.resolve(__dirname, PARENT_DIR_DEPTH_TWO);
   const env = getSafeGitEnv(root);
@@ -215,6 +242,8 @@ function validateCommitRange(range) {
   if (records.length === 0) return { passed: true, total: 0 };
 
   let failedCount = 0;
+  let frozenCount = 0;
+  const historyBaseline = loadCommitHistoryBaseline();
   const unitSepPattern = /^([^\x1f]+)\x1f([\s\S]*)$/;
 
   for (const record of records) {
@@ -223,11 +252,20 @@ function validateCommitRange(range) {
     const sha = match[1].trim();
     const msg = match[2];
 
-    if (/\[(?:Baseline|Legacy|Pre-flight):\s*(?:exempt|verified|passed)\]/i.test(msg)) {
-      continue;
+    const res = validateSingleCommitMessage(msg);
+
+    // A frozen commit predates the given rules: report it, never block on it. Only findings
+    // whose rule ID is absent from the freeze entry are treated as live violations, so a frozen
+    // commit that violates a genuinely new rule still fails.
+    const frozenRules = historyBaseline.get(sha);
+    if (frozenRules) {
+      const liveFindings = res.styleFindings.filter((f) => !frozenRules.has(f.ruleId));
+      if (liveFindings.length === 0) {
+        frozenCount++;
+        continue;
+      }
     }
 
-    const res = validateSingleCommitMessage(msg);
     if (!res.isPermittedUnderCorridor) {
       failedCount++;
       console.error(`\n❌ 提交 ${sha} 包含刚性违规内容:`);
@@ -245,7 +283,7 @@ function validateCommitRange(range) {
     }
   }
 
-  return { passed: failedCount === 0, total: records.length, failedCount };
+  return { passed: failedCount === 0, total: records.length, failedCount, frozenCount };
 }
 
 function buildCommitMsgViolations(res, target) {
@@ -299,7 +337,10 @@ function handleRangeMode(range, isAgentMode) {
       ),
     );
   } else {
-    console.log(`  ✔ 待推送分支提交历史风格审查通过 (流式验证 ${res.total} 笔提交，零违规)`);
+    const frozenNote = res.frozenCount > 0
+      ? `，其中 ${res.frozenCount} 笔按冻结清单放行（写入时该规则尚未收紧）`
+      : '';
+    console.log(`  ✔ 待推送分支提交历史风格审查通过 (流式验证 ${res.total} 笔提交${frozenNote})`);
   }
   process.exit(0);
 }

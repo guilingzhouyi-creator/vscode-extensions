@@ -378,6 +378,7 @@ const TEST_CASES = [
   { name: 'Valid Technical Fact', msg: 'docs(readme): 更新各子模块状态标注并补充实验性质说明\n\n[Why]\n- 准确说明模块开发阶段。\n\n[Changed]\n- 更新 README.md 中的项目矩阵说明。\n\n[Verification]\n- 运行本地预审脚本。', expectValid: true },
   { name: 'CAT-07 Chinese Imperative Header Violation', msg: 'feat(core): 修改了分词器实现\n\n[Project: governance]\n[Why]\n对齐规范。\n\n[Verification]\n断言测试成立。', expectRule: 'CMG-STY-007', expectValid: false },
   { name: 'CAT-07 English Imperative Header Violation', msg: 'feat(core): modified tokenizer implementation\n\n[Project: governance]\n[Why]\nAlign with specs.\n\n[Verification]\nAssert tests pass.', expectRule: 'CMG-STY-007', expectValid: false },
+  { name: 'CAT-08 Whitelist Bound Morpheme (自我/自举/自身)', msg: 'fix(gate): 阻断自我豁免路径\n\n[Project: governance]\n[Why]\n- 自举流程需要客观描述，自身状态保持一致。\n\n[Verification]\n- 断言成立。', expectValid: true },
   { name: 'CAT-08 Chinese First-Person Pronouns Violation', msg: 'feat(core): 重构分词器实现\n\n[Project: governance]\n[Why]\n我们在本次改动中优化了架构。\n\n[Verification]\n断言测试成立。', expectRule: 'CMG-STY-008', expectValid: false },
   { name: 'CAT-08 English First-Person Pronouns Violation', msg: 'feat(core): refactor tokenizer implementation\n\n[Project: governance]\n[Why]\nWe refactored the tokenizer.\n\n[Verification]\nAssert tests pass.', expectRule: 'CMG-STY-008', expectValid: false },
   { name: 'CAT-02 Adversarial Zero-Width Evasion Normalization', msg: 'feat(core): 完\u200B美实现分词器\n\n[Project: governance]\n[Why]\n提高稳定性。\n\n[Verification]\n断言测试成立。', expectRule: 'CMG-STY-002', expectValid: false },
