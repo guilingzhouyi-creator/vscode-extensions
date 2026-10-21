@@ -3,7 +3,8 @@
 //! Architecture Role: Dispatches promotion subcommand requests, bridging autonomous agent
 //!   staging proposals to the System Trunk through the Human UAC physical click gate.
 //! Dependencies & Triggers: Invoked when `taxis promotion` is dispatched.
-//! Responsibilities: Proposal staging, human UAC nonce authorization, proposal rejection, queue listing.
+//! Responsibilities: Proposal staging, human UAC nonce authorization,
+//!   proposal rejection, queue listing.
 //! Exit Semantics & Design Rationale: Enforces zero-compromise promotion gates with 1-hour leases.
 //!
 //! ### Domain Governance Rules (SSOT):

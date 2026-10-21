@@ -21,6 +21,22 @@ export interface DiscoveredFractalRef {
 }
 
 /**
+ * Derives the reference hierarchy tier based on the canonical ref path.
+ */
+function parseFractalTier(refName: string): 'trunk' | 'cell' | 'card' | 'sub' {
+    if (refName.includes('/card/') && refName.includes('/sub/')) {
+        return 'sub';
+    }
+    if (refName.includes('/card/')) {
+        return 'card';
+    }
+    if (refName.includes('/cell/')) {
+        return 'cell';
+    }
+    return 'trunk';
+}
+
+/**
  * Scans `.git/refs/fractal/` and discovers all registered fractal refs on disk.
  */
 export function scanFractalRefs(gitDir: string): DiscoveredFractalRef[] {
@@ -36,20 +52,13 @@ export function scanFractalRefs(gitDir: string): DiscoveredFractalRef[] {
             const fullPath = path.join(currentDir, entry.name);
             if (entry.isDirectory()) {
                 traverse(fullPath);
-            } else if (entry.isFile()) {
+                continue;
+            }
+            if (entry.isFile()) {
                 const rel = path.relative(path.join(gitDir, 'refs'), fullPath).replace(/\\/g, '/');
                 const refName = `refs/${rel}`;
                 const commitOid = fs.readFileSync(fullPath, 'utf8').trim();
-
-                let tier: 'trunk' | 'cell' | 'card' | 'sub' = 'trunk';
-                if (refName.includes('/card/') && refName.includes('/sub/')) {
-                    tier = 'sub';
-                } else if (refName.includes('/card/')) {
-                    tier = 'card';
-                } else if (refName.includes('/cell/')) {
-                    tier = 'cell';
-                }
-
+                const tier = parseFractalTier(refName);
                 results.push({ refName, commitOid, tier });
             }
         }
