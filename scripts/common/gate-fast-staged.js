@@ -17,7 +17,9 @@
  *   3. Enforce dual-scale ELOC/LOC volume budgets across staged source files;
  *   4. Emit structured diagnostic console logs and fail-closed exit codes.
  * Exit Semantics & Design Rationale: Exits 0 on clean check, 1 on any violation.
- *   Employs single-pass in-memory stream parsing to achieve <90ms pre-commit execution.
+ *   Employs single-pass in-memory stream parsing: the judgement itself measures ~1 ms, while the
+ *   end-to-end command costs ~160 ms because a Node process needs ~80 ms to start. Quoting only the
+ *   smaller figure would describe a budget the caller never experiences, so both are stated.
  */
 'use strict';
 
