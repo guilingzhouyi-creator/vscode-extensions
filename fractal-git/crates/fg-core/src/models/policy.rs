@@ -167,7 +167,7 @@ impl TaxisPolicy {
         }
     }
 
-    /// Native Git Policy: 100% permissive fallback, accepting any commit message.
+    /// Native Git Policy: fully permissive fallback, accepting any commit message.
     pub fn git_native() -> Self {
         Self {
             name: "git-native".into(),

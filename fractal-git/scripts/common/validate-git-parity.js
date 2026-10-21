@@ -2,7 +2,7 @@
  * Module: Fractal Git — Git Plumbing Specification & Byte Parity Validator
  * File Path: fractal-git/scripts/common/validate-git-parity.js
  * Architecture Role: Validates that Fractal Git's object model, SHA-1 hashing, and canonical
- *   tree binary serialization match standard Git (gix / git-core) 100% byte-for-byte.
+ *   tree binary serialization match standard Git (gix / git-core) byte-for-byte.
  * Dependencies & Triggers: Consumes ts/native-binding.ts algorithms and child_process git command;
  *   invoked by CI, pre-commit-gate, and audit-all.ps1.
  * Responsibilities:
@@ -10,7 +10,7 @@
  *   2. Validate tree entry binary sorting rules (directory trailing slash in sort comparison);
  *   3. Cross-validate computed OIDs against git hash-object when git CLI is present (FGT-OBJ-001);
  *   4. Emit structured technical facts and exit non-zero on any hash or sorting divergence.
- * Exit Semantics & Design Rationale: Exits 0 on 100% parity proof, 1 on divergence;
+ * Exit Semantics & Design Rationale: Exits 0 on verified parity proof, 1 on divergence;
  *   adheres to CC <= 15, Depth <= 4, and zero false claims.
  */
 'use strict';

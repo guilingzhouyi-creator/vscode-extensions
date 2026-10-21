@@ -6,7 +6,7 @@
 //! ### Domain Governance Rules (SSOT):
 //! - `FGT-COR-001`: Core data model and immutable error contract guard
 //! - `FGT-FAC-001`: Facade substantial burden (ELOC >= 15) and validation invariant guard
-//! - `RCFG-RULE-DRIFT`: 100% adherence to single source of truth rule catalog
+//! - `RCFG-RULE-DRIFT`: Full adherence to single source of truth rule catalog
 
 pub mod cli;
 pub mod errors;

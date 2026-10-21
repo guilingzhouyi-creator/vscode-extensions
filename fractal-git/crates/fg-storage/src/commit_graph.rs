@@ -5,7 +5,7 @@
 //!   search, and instant topological ordering.
 //! Dependencies & Triggers: Utilized by loose/pack storage layers, DAG walker, and Taxis CLI.
 //! Responsibilities: Generation number indexing, binary serialization, and integrity verification.
-//! Exit Semantics & Design Rationale: 100% interoperable with Git `commit-graph.c` chunk layout
+//! Exit Semantics & Design Rationale: fully interoperable with Git `commit-graph.c` chunk layout
 //!   (CGPH magic, OIDF, OIDL, and CDAT chunks) eliminating commit object traversal latency.
 
 use fg_core::error::{FractalError, FractalResult};

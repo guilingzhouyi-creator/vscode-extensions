@@ -5,7 +5,7 @@
 //! Dependencies & Triggers: Tests fg-algorithms algebraic merge and fg-core ChangeId.
 //! Responsibilities: Mathematical property testing, conflict associativity, and serialization.
 //! Exit Semantics & Design Rationale: Asserts zero dirty working tree markers
-//!   and 100% deterministic identity tracking across multi-agent commit evolution.
+//!   and deterministic identity tracking across multi-agent commit evolution.
 
 use fg_algorithms::merge::AlgebraicMerge;
 use fg_core::models::{ChangeId, Oid};

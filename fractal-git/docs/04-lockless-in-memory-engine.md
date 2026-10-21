@@ -1,7 +1,7 @@
 # 04. 无锁内存虚拟索引与 CAS 原子物化内核
 
 > **所属模块**：`fractal-git/docs/`  
-> **核心议题**：阐述彻底消融原生 Git `.git/index.lock` 锁争用的无锁内存虚拟索引实现，以及 LayerVFS CAS 块到 Git Commit 的微秒级原子物化流水线。
+> **核心议题**：阐述消除原生 Git `.git/index.lock` 锁争用的无锁内存虚拟索引实现，以及 LayerVFS CAS 块到 Git Commit 的微秒级原子物化流水线。
 
 ---
 
@@ -30,7 +30,7 @@ flowchart TD
   end
 
   subgraph REF_UPDATE["原子引用推进 (refs/fractal/...)"]
-    REF_ATOMIC["临时文件写入 + 原子 Rename 替换<br/>完全绕过 index.lock"]
+    REF_ATOMIC["过渡文件写入 + 原子 Rename 替换<br/>完全绕过 index.lock"]
   end
 
   A1 --> OBJ_BLOB
@@ -95,7 +95,7 @@ sequenceDiagram
   Codec->>ODB: 写入 GitCommit 对象
   
   Mat->>Ref: update_oid(git_dir, commit_oid)
-  Note over Ref: 临时文件原子 rename 推进指针，耗时 <1ms
+  Note over Ref: 过渡文件原子 rename 推进指针，耗时 <1ms
   
   Mat-->>VFS: 返回物化成功结果 (commit_oid, tree_oid)
 ```

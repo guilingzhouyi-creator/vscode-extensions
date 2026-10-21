@@ -1,7 +1,7 @@
-# Anthropic Scion 架构解构与 Taxis 工业级五维基准压测规范
+# Anthropic Scion 架构解构与 Taxis 五维基准压测规范
 
 > **案卷编号**：`06-anthropic-scion-benchmark-and-parity-spec`  
-> **核心议题**：深度复盘 2026 年 10 月 Anthropic 官方自研版本控制系统 **Scion**（与审查系统 **Antique**）在 AI 智能体（Claude）日均 30,000+ 次高频合并冲击下的技术选择与架构取舍；确立 Taxis (`fractal-git`) 在正式版本发布时对标工业级高压场景的五维量化基准测试体系与进阶测试演进路线。
+> **核心议题**：深度复盘 2026 年 10 月 Anthropic 官方自研版本控制系统 **Scion**（与审查系统 **Antique**）在 AI 智能体（Claude）日均 30,000+ 次高频合并冲击下的技术选择与架构取舍；确立 Taxis (`fractal-git`) 在正式版本发布时对标高压生产场景的五维量化基准测试体系与进阶测试演进路线。
 
 ---
 
@@ -22,7 +22,7 @@ flowchart LR
 - **CI 与沙箱检出极值**：CI 流水线、研究实验与 Agent 沙箱每日执行约 **2,500 万次**代码检出（Checkouts）。若沿用 Git 分布式克隆，每天需耗费 **600 PB** 内网带宽。
 
 ### 2. 传统 Git 哲学的失效
-Git 诞生于 2005 年，其核心假定是“人类开发者处于离线网络环境，每个节点都必须具备全量历史克隆与本地完整打包”。但智能体与 CI 集群处于 **100% 永久在线** 状态，客户端维持全量历史在物理上造成了数以百倍计的算力与存储浪费。
+Git 诞生于 2005 年，其核心假定是“人类开发者处于离线网络环境，每个节点都必须具备全量历史克隆与本地完整打包”。但智能体与 CI 集群处于 **持续在线** 状态，客户端维持全量历史在物理上造成了数以百倍计的算力与存储浪费。
 
 ---
 
@@ -76,12 +76,12 @@ flowchart TD
 | **工作区与检出机制** | 客户端 `scion-daemon` + 远程虚拟文件流 | **LayerVFS 内存只读下层 + COW 独占写层**（`WorktreePool` 毫秒级复用，零瞬态堆分配） | 两者异曲同工，均识别出“智能体无需全量克隆”的核心规律；Taxis 更侧重本地无盘轻量化操作。 |
 | **合并与分支拓扑** | 服务端无锁变更集 + Spanner 锁分支 | **In-Core 3-way Tree Merge + 拓扑裁决器**（77.8M op/s CCD v2 偏序验证，虚基底递归合成） | Scion 将合并上移至云端；Taxis 将合并下沉至纯代数内存算子，单节点吞吐远超传统 Git。 |
 | **路径历史回溯过滤** | 服务端异步派生数据生成服务（Derived Data Engine） | **256-bit Murmur3/XXH3 Kirsch-Mitzenmacher 路径 Bloom 过滤器**（161 ns 探测，620万 op/s） | Taxis 在本地二进制中内嵌概率数据结构，99%+ 历史提交可在寄存器级别直接旁路跳过。 |
-| **协议与生态兼容度** | 专有协议与专有客户端，与 Git 彻底绝裂 | **双向兼容**：原生 Git 40-byte SHA-1 / PacketLine 协议 + Taxis 自相似分形命名空间 | Taxis 既可作为智能体极速内核，又可随时与现有 GitHub / Git 基础设施无损互通。 |
-| **权限与审查机制** | 配套自研审查系统 **Antique**（独立平台服务） | **原生内置 UAC 暂存晋升账本 + Auto 审查系统质量信封**（1h 租约防覆写，人类单向确认） | Scion 将审查剥离为外置系统；Taxis 将 UAC 权限与质量棘轮作为一等公民内置于状态机。 |
+| **协议与生态兼容度** | 专有协议与专有客户端，与原生 Git 协议分道 | **双向兼容**：原生 Git 40-byte SHA-1 / PacketLine 协议 + Taxis 自相似分形命名空间 | Taxis 既可作为智能体极速内核，又可随时与现有 GitHub / Git 基础设施无损互通。 |
+| **权限与审查机制** | 配套自研审查系统 **Antique**（独立平台服务） | **原生内置 UAC 阶段晋升账本 + Auto 审查系统质量信封**（1h 租约防覆写，人类单向确认） | Scion 将审查剥离为外置系统；Taxis 将 UAC 权限与质量棘轮作为一等公民内置于状态机。 |
 
 ---
 
-## 四、 Taxis 工业级五维基准压测规范 (Taxis-Benchmark-v1)
+## 四、 Taxis 五维基准压测规范 (Taxis-Benchmark-v1)
 
 后续 Taxis 正式版本完成后，将在 `taxis bench --scion-parity` 命令中固化以下五维基准测试：
 
@@ -91,9 +91,9 @@ graph TD
     B2["维度二：高并发合入吞吐 (Concurrent Merge)<br/>• 3-Way 内存树合并: >= 80,000 op/s<br/>• CCD 偏序剪枝: >= 5,000 万次/秒"]
     B3["维度三：历史穿透与路径 Bloom (Path Traversal)<br/>• 单次 Bloom 探测: <= 200 ns<br/>• 树解包绕过率: >= 99.0%"]
     B4["维度四：内存脚印与零分配 (Resource Footprint)<br/>• 10,000 次提交物理常驻: <= 64 MB<br/>• 热路径堆分配: 0 次"]
-    B5["维度五：离线自闭环与网络弹性 (Offline Resilience)<br/>• 断网操作完备度: 100%<br/>• 恢复后 UAC Nonce 同步: <= 10 ms"]
+    B5["维度五：离线自闭环与网络弹性 (Offline Resilience)<br/>• 断网操作完备度: 完备<br/>• 恢复后 UAC Nonce 同步: <= 10 ms"]
 
-    B1 --> Suite["Taxis 工业级五维对标基准 (Taxis-Benchmark-v1)"]
+    B1 --> Suite["Taxis 五维对标基准 (Taxis-Benchmark-v1)"]
     B2 --> Suite
     B3 --> Suite
     B4 --> Suite
@@ -128,9 +128,9 @@ graph TD
   - `heap_allocs_per_op`: 核心热路径单次堆分配次数为 **0 次**。
 
 ### 5. 维度五：离线自闭环与网络弹性（Offline Autonomy & Resilience）
-- **基准场景**：物理拔除外网连接，模拟 10 个子智能体在沙箱内完成派生、修改、预审与 UAC 暂存；
+- **基准场景**：物理拔除外网连接，模拟 10 个子智能体在沙箱内完成派生、修改、预审与 UAC 提案保存；
 - **刚性指标**：
-  - `offline_functional_completeness`: 离线功能通过率 **100%**（对比 Scion 的 0%）；
+  - `offline_functional_completeness`: 离线功能通过率达到设计基准（对比 Scion 的 0%）；
   - `uac_promotion_lease_resolution`: 网络恢复后与系统主树 Nonce CAS 幂等同步耗时 $\le 10 \text{ ms}$。
 
 ---
@@ -142,10 +142,10 @@ graph TD
 1. **第一阶梯（当前已完成）**：
    - 建立五维指标标准与理论公理；
    - 落地 Corrected Commit Date v2、Kirsch-Mitzenmacher 256-Bit Bloom Filter 与 SWAR 64 位前缀并行修剪；
-   - 固化 `taxis bench -m 5` 与 `baselines/taxis-perf.baseline.json`（7 项微基准全部达标）；
+   - 固化 `taxis bench -m 5` 与 `baselines/taxis-perf.baseline.json`（7 项微基准达到性能指标）；
 2. **第二阶梯（Taxis 核心特性完善期）**：
    - 落地 `InCoreVirtualMergeBase` 虚拟基底树递归合并，消融复杂 DAG 合并冲突；
-   - 落地 `FirstClassConflict` 首等冲突树结构，实现冲突在 LayerVFS 中的暂存与再变基；
+   - 落地 `FirstClassConflict` 首等冲突树结构，实现冲突在 LayerVFS 中的阶段保存与再变基；
    - 编写合成的大型 Monorepo 模拟器（包含 10 万虚拟文件与 1 万提交），实测第一与第三维度指标；
 3. **第三阶梯（极限高压与发布对标期）**：
    - 将测试从微基准（Micro-Benchmark）逐步升级至端到端宏观压测（Macro-Benchmark）；

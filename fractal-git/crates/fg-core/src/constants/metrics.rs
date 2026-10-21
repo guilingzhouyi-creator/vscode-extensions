@@ -1,7 +1,7 @@
 //! Module: fg-core — High-Precision Performance Benchmark Metric Constants
 //! File Path: crates/fg-core/src/constants/metrics.rs
 //! Architecture Role: Single source of truth for all micro-benchmark metric keys,
-//!   ensuring 100% strict matching between `src/bench.rs`, `tests/rust/test_benchmarks.rs`,
+//!   ensuring strict matching between `src/bench.rs`, `tests/rust/test_benchmarks.rs`,
 //!   and `baselines/taxis-perf.baseline.json`.
 
 /// Canonical Tree Diff streaming with O(1) subtree short-circuiting.

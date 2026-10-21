@@ -2,7 +2,7 @@
  * Module: Fractal Git — Native Binding & Fallback Bridge
  * File Path: ts/native-binding.ts
  * Architecture Role: Provides cross-language bridge to the Rust native kernel, with a robust
- *   in-process TypeScript fallback engine ensuring 100% byte parity and uninterrupted operation.
+ *   in-process TypeScript fallback engine ensuring byte parity and uninterrupted operation.
  * Dependencies & Triggers: Consumed by the primary fractal git facade.
  * Responsibilities: Expose low-level Git loose object encoding, SHA-1 hashing,
  *   and ref manipulation.

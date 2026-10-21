@@ -6,13 +6,13 @@
 
 ---
 
-## 1. 工业级微 Crate 与子系统矩阵 (Subsystem Matrix)
+## 1. 微 Crate 与子系统矩阵 (Subsystem Matrix)
 
 | 目录路径 | 角色定位 | 核心职责与设计边界 | 允许依赖 | 严禁反向依赖 |
 | :--- | :---: | :--- | :--- | :--- |
 | **`crates/fg-core/`** | 领域核心基石 | 纯原子数据模型（`Oid`, `GitSignature`, `PraxisCardContext`, `AgentCommitMeta`）与核心抽象 Trait（`OdbStore`, `RefStore`, `GateVerifier`, `WorktreeReclaimer`）。零业务依赖。 | 基础错误与序列化库 | 严禁依赖任何具体存储、算法或上层 Crate |
 | **`crates/fg-object/`** | Git 原生对象模型 | 纯 Git 对象编解码（`GitBlob`, `GitTree`, `GitCommit`, `FileMode`）与规范二进制排序（目录尾斜杠规则）。纯数学与数据算子。 | `fg-core`, `sha1`, `flate2` | 严禁依赖拓扑、网络、存储引擎或进程调用 |
-| **`crates/fg-index/`** | 暂存区与无锁虚拟树 | 彻底消融 `.git/index.lock` 的无锁内存暂存区索引（`InMemoryIndexTree`）、规范四阶段冲突槽（`Stage 0..3`、`ConflictStageSlot`）与目录树生成回调。 | `fg-core`, `fg-object` | 严禁依赖底层物理 I/O、网络传输或业务调度 |
+| **`crates/fg-index/`** | 索引区与无锁虚拟树 | 消除 `.git/index.lock` 锁争用的无锁内存索引（`InMemoryIndexTree`）、规范四阶段冲突槽（`Stage 0..3`、`ConflictStageSlot`）与目录树生成回调。 | `fg-core`, `fg-object` | 严禁依赖底层物理 I/O、网络传输或业务调度 |
 | **`crates/fg-algorithms/`** | 纯算法与数学算子库 | 对标 `git/xdiff`：FastCDC 变长分块滚动哈希、三方合并（`ThreeWayMerge`，快进检测与冲突判定）、内存树差分（`TreeDiff`）、Unified Diff 补丁生成（`PatchGenerator`）、DAG 拓扑排序与祖先可达性剪枝（`DagWalker`）。 | `fg-core`, `sha1` | 严禁包含物理文件读写或业务状态 |
 | **`crates/fg-pools/`** | 资源池与分配管控 | 纯粹践行 `ADV-PRF-002` 循环内零堆分配：树节点与 AST 对象复用池（`RecyclePool`）、64KB 压缩页面缓冲池（`PageBufferPool`）、预热虚拟工作区沙箱槽位池（`SandboxPool`, `WorktreePool`）。 | `fg-core`, `fg-object`, `parking_lot` | 严禁侵入策略守卫、业务调度或传输协议 |
 | **`crates/fg-storage/`** | 真实不可变存储底座 | 松散对象存储（`LooseOdb` 原子写入 `.git/objects/`）、不可变 CAS 块后端（`CasBackend`）、崩溃安全事务预写日志（`WalJournal`）、LayerVFS 快照向 Git 对象的原子物化器（`CasToGitMaterializer`）。 | `fg-core`, `fg-object`, `fg-index`, `fg-algorithms` | 严禁依赖传输层协议或 CLI 交互 |
@@ -22,7 +22,7 @@
 | **`src/lib.rs` (根)** | 统一门面 (Facade) | 工作区根 Rust 门面（`ARCH-FAC-001`），统摄并平铺导出全量 9 个微 Crate，提供高人机工学的一站式 SDK 接口。 | 全量 `crates/fg-*` | — |
 | **`src/bin/taxis.rs`** | 原生 CLI 与 Git 兼容引擎 | Taxis 原生命令行二进制入口（支持 `st/ci/br/di/co/check/gc/serve` 简写别名、JSON 机器格式输出及标准 `git <cmd>` 原生透明加速路由）。 | 全量 `crates/fg-*`, `serde_json` | 严禁反向被微 Crate 依赖 |
 | **`ts/`** | TypeScript 编排与客户端 | 工业化五层分工：`client/` (Praxis Agent SDK 客户端)、`vfs/` (LayerVFS 虚拟文件系统适配器)、`tui/` (一体两面终端渲染器)、`orchestration/` (多 Agent 打擂提拔器)、`cli/` (终端命令)。 | 顶层契约与原生桥 | 严禁在门面外泄露低级指针 |
-| **`scripts/`** | 工程构建与自测脚本 | 跨平台工程构建（`build.ps1` CRLF / `build.sh` LF `set -euo pipefail`）、自测流水线与门禁检查脚本。 | 外部编译器工具链 | 严禁硬编码绝对路径或 Windows 盘符 |
+| **`scripts/`** | 工程构建与自测脚本 | 跨平台工程构建（`build.ps1` CRLF / `build.sh` LF `set -euo pipefail`）、自测流水线与门禁检查脚本。 | 外部编译器工具链 | 严禁硬编码规范化完整路径或 Windows 盘符 |
 | **`tests/`** | 双轨集成与基准测试 | Rust 7 大微 Crate 集成测试套件（`tests/rust/`）与 TypeScript 仿真测试（`tests/ts/`）。 | 被测项目各模块 | 严禁生产代码反向依赖测试夹具 |
 
 ---
@@ -60,7 +60,7 @@ flowchart TD
     POOLS["fg-pools (RecyclePool / PageBuffer / SandboxPool)"]
   end
 
-  subgraph LAYER_LEAF["L1: 暂存索引、纯算法、对象模型与领域核心 (Plumbing)"]
+  subgraph LAYER_LEAF["L1: 内存索引、纯算法、对象模型与领域核心 (Plumbing)"]
     INDEX["fg-index (InMemoryIndexTree / ConflictStageSlot)"]
     ALGO["fg-algorithms (FastCDC / ThreeWayMerge / TreeDiff / Patch / DAG Walk)"]
     OBJECT["fg-object (Blob / Tree / Commit / FileMode)"]
@@ -105,7 +105,7 @@ flowchart TD
 - **归属位置**：`crates/fg-algorithms/src/<category>/<algorithm_name>.rs`
 - **契约要求**：必须为纯数学无状态函数，输入为只读切片或结构化引用，严禁包含任何文件系统 I/O 或全局锁。
 
-### 3.2 场景 B：新增内存索引策略（如 冲突自动暂存, 目录压缩树）
+### 3.2 场景 B：新增内存索引策略（如 冲突自动保留, 目录压缩树）
 - **归属位置**：`crates/fg-index/src/<strategy_name>.rs`
 - **契约要求**：必须保持无锁可变性，在内存中维护纯数据结构，通过回调输出给存储层，严禁耦合直接文件读写。
 

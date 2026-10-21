@@ -3,7 +3,7 @@
 //! Architecture Role: Implements the anti-gaming commit counting metric. When Dual-Trunk
 //!   mode is active, official commit count strictly counts promotions into Integration Trunk
 //!   and System Trunk, filtering out internal ephemeral agent micro-commits. When inactive,
-//!   100% native Git DAG traversal is used.
+//!   native Git DAG traversal is used.
 
 use crate::refs::FractalRef;
 use fg_core::error::FractalResult;

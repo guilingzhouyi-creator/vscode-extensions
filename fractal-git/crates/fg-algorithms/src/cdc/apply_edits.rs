@@ -46,7 +46,7 @@ impl<'a> EditOp<'a> {
 /// * `edits` - Ordered, non-overlapping edit operations.
 ///
 /// # Returns
-/// Updated vector of `ChunkDescriptor` reflecting applied edits with 100% boundary integrity.
+/// Updated vector of `ChunkDescriptor` reflecting applied edits with full boundary integrity.
 pub fn apply_edits(
     chunker: &FastCdcChunker,
     original_bytes: &[u8],

@@ -388,7 +388,7 @@ fn test_path_bloom_filter_accuracy_and_history_walk() {
     assert!(bloom1.may_contain("src/lib.rs"));
     assert!(bloom1.may_contain("Cargo.toml"));
 
-    // Negative checks (100% certainty)
+    // Negative checks (definite negative)
     assert!(!bloom1.may_contain("docs/README.md"));
     assert!(!bloom1.may_contain("tests/test.rs"));
 

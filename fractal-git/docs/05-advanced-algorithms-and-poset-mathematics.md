@@ -24,7 +24,7 @@ flowchart TD
 
 ### 1. 经典拓扑深度（Topological Level）的失效
 传统 Git 生成数 v1 定义为从根节点至目标节点的拓扑深度 $L(v) = 1 + \max_{p \in \text{parents}(v)} L(p)$。
-其缺陷在于：当一个长期演化的特性分支变基（Rebase）或打补丁回合入主干时，老分支的物理时间戳极早但拓扑深度极高，造成“时间与深度”严重倒挂，无法利用单一标量对时钟排序的优先队列实现单调剪枝。
+其缺陷在于：当一个长期演化的特性分支变基（Rebase）或移植提交（Cherry-pick）回合入主干时，老分支的物理时间戳极早但拓扑深度极高，造成“时间与深度”严重倒挂，无法利用单一标量对时钟排序的优先队列实现单调剪枝。
 
 ### 2. 校正提交日期（Corrected Commit Date, CCD v2）公理
 为每个提交节点 $v \in V$ 关联物理时间戳 $\tau(v) \in \mathbb{N}$。定义递推函数 $\Phi: V \to \mathbb{N}$：
@@ -35,7 +35,7 @@ $$\Phi(v) = \begin{cases} \tau(v), & \text{if } \text{parents}(v) = \emptyset \\
 - **定理**：若 $u$ 是 $v$ 的真祖先（即 $v \to^* u, u \ne v$），则必有：
   $$\Phi(u) < \Phi(v)$$
 - **$O(1)$ 负向快速排除公理**：
-  $$\boxed{\Phi(u) \ge \Phi(v) \land u \ne v \implies u \text{ 绝不可能是 } v \text{ 的祖先}}$$
+  $$\boxed{\Phi(u) \ge \Phi(v) \land u \ne v \implies u \text{ 不可能是 } v \text{ 的祖先}}$$
 - **落地验证**：在 [`../crates/fg-core/src/models/generation.rs`](../crates/fg-core/src/models/generation.rs) 与 [`../crates/fg-algorithms/src/traverse/dag_walk.rs`](../crates/fg-algorithms/src/traverse/dag_walk.rs) 中实现 `is_ancestor_with_ccd`。实测单次判定仅耗时 **12 ns**，极限吞吐达 **7,780 万次/秒**。
 
 ---

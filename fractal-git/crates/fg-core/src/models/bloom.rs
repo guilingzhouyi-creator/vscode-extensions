@@ -8,7 +8,7 @@
 //! Exit Semantics & Design Rationale:
 //!   - Fixed 256-bit (32-byte) bitset layout fits in CPU registers, enabling
 //!     zero-heap fast queries.
-//!   - If may_contain(path) returns false, path was 100% NOT modified in the commit
+//!   - If may_contain(path) returns false, path was definitely not modified in the commit
 //!     (true negative).
 //!   - False positive rate < 0.25% for commits with <= 15 changed paths.
 
@@ -64,7 +64,7 @@ impl PathBloomFilter {
     }
 
     /// Fast test for path membership.
-    /// Returns false if path is definitely NOT present (100% certainty).
+    /// Returns false if path is definitely NOT present (definite negative).
     /// Returns true if path MAY be present (with < 0.5% false positive probability).
     #[inline]
     pub fn may_contain(&self, path: &str) -> bool {

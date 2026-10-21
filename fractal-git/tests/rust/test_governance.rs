@@ -242,7 +242,7 @@ fn test_anti_inflation_commit_telemetry() {
     assert!(verdict_dual.dual_trunk_active);
 
     // Under Native Git mode:
-    // All 54 commits are counted (100% native Git compatible)
+    // All 54 commits are counted (native Git compatible)
     let verdict_native: CommitCountVerdict =
         CommitCounter::count_commits(Some(promotion_2_oid), &config_native, resolver).unwrap();
     assert_eq!(
