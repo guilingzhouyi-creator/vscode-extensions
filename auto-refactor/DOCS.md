@@ -95,7 +95,7 @@
 
 | 命令 | 覆盖范围 | 门禁契约 |
 | :--- | :--- | :--- |
-| `npm run gate` | `gate:rust` $\rightarrow$ `build` $\rightarrow$ `format:check` $\rightarrow$ `lint` $\rightarrow$ `gate:comments` $\rightarrow$ `gate:self` $\rightarrow$ `npm test` | 提交前唯一闭环入口，157 套并行与串行套件任一环失败即阻断 |
+| `npm run gate` | `gate:rust` $\rightarrow$ `build` $\rightarrow$ `format:check` $\rightarrow$ `lint` $\rightarrow$ `gate:comments` $\rightarrow$ `gate:self` $\rightarrow$ `npm test` | 提交前唯一闭环入口，163 套并行与串行套件任一环失败即阻断 |
 | `npm run gate:rust` | `cargo clippy -- -D warnings` + `cargo fmt --check` + `cargo test`（全 6 个 Crate） | Rust 原生算子库零告警、全测试通过 |
 | `npm run gate:self` | 引擎自扫基线棘轮（error 级） | `newBlocking(error)` 必须恒为 `0` |
 | `npm run gate:self:slice` | AST 语义切片增量自审 (`scripts/gate-self-slice.js`) | 毫秒级局部语法树突变自检 |
