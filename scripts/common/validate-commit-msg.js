@@ -396,15 +396,12 @@ function handleSingleCommitValidation(target, content, isAgentMode) {
     return;
   }
 
-  // 2. Permitted with findings: only high-tier findings enter the elastic corridor and ledger.
+  // 2. Permitted with findings: the ledger writer itself ignores empty batches, so medium-tier
+  //    findings cannot fabricate debt. Only high-tier findings are reported as corridor debt.
   if (!res.valid) {
     const { updateDebtLedger } = require(MODULE_DEBT_CORRIDOR);
     const highIssues = res.styleFindings.filter((f) => f.isHighDebt);
-    // Writing an empty batch still materialises the ledger file on disk, so medium-tier findings
-    // must not reach the writer: they carry no paydown obligation.
-    if (highIssues.length > 0) {
-      updateDebtLedger({ newHighIssues: highIssues });
-    }
+    updateDebtLedger({ newHighIssues: highIssues });
 
     if (isAgentMode) {
       // The summary must state which tier the findings occupy: medium-tier findings are permitted

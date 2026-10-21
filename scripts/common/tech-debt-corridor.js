@@ -289,6 +289,7 @@ function updateDebtLedger({
   logDir = DEFAULT_LOG_DIR,
 }) {
   const ledger = readDebtLedger(logDir);
+  const previousLength = ledger.items.length;
 
   // If this commit is clean and is refactoring/fixing, decrement accumulated debt
   if (isCleanCommit && ledger.items.length > 0) {
@@ -308,6 +309,12 @@ function updateDebtLedger({
       introducedAt: new Date().toISOString(),
       commitHash: commitHash || '',
     });
+  }
+
+  // A no-op update must not touch the disk: writeDebtLedger materialises the directory and file,
+  // so an empty batch would fabricate a ledger artifact claiming debt state that does not exist.
+  if (ledger.items.length === previousLength) {
+    return ledger.items.length;
   }
 
   writeDebtLedger(ledger, logDir);
