@@ -11,6 +11,7 @@
  */
 
 import type { Issue } from '../types';
+import { SEVERITY_ERROR } from '../types';
 import type { EightPillarBreakdown, PrimaryQualityPillar } from './eightPillarModel';
 import { ALL_PRIMARY_PILLARS, synthesizeEightPillars } from './eightPillarModel';
 import { computeRiskWeightedPenalties } from './riskWeightModel';
@@ -36,7 +37,6 @@ export const DEFAULT_SECURITY_CEILING = computeSecurityCeiling();
 
 const DEFAULT_DOMAIN_NAME = 'core';
 const DEFAULT_MODULE_NAME = 'root';
-const SEVERITY_ERROR = 'error';
 const SYNTHESIS_MODE_GEOMETRIC = 'geometric';
 const LOC_SCALE_DIVISOR = 100;
 const LOC_LOG_SMOOTH_BIAS = 10;
