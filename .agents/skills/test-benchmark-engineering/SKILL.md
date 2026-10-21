@@ -43,8 +43,8 @@ description: >-
 1. **`auto-refactor` (362 规则自测全纳管)**：
    - 规则自测用例位于 `auto-refactor/tests/rules/`；
    - 必须在 `auto-refactor/scripts/test-parallel.js` 或并行自测清单中注册；
-   - 保证 155/155 套测试套件并发/串行绿色通过，0 挂起，纯 TS shim 与 Rust 算子 100% 字节等价。
-2. **`workspace-timing` (156 单元测试全纳管)**：
+   - 保证 <!-- METRICS:BEGIN test-suite-count -->**163 套**<!-- METRICS:END test-suite-count -->测试套件并发/串行绿色通过，0 挂起，纯 TS shim 与 Rust 算子 100% 字节等价。
+2. **`workspace-timing` (<!-- METRICS:BEGIN ws-test-case-count -->**205 项**<!-- METRICS:END ws-test-case-count -->单元测试全纳管)**：
    - 单元测试位于 `workspace-timing/src/test/`；
    - 必须通过 `npm run test:fast` 极速套件与 `npm run review` 全量覆盖；
    - 必须覆盖跨午夜/跨周双轨守恒、RingBuffer 满载清退与 StorageCoordinator 级联兜底边界。
@@ -78,10 +78,10 @@ description: >-
 ## 五、 常用测试运行与验证命令矩阵
 
 ```bash
-# 1. auto-refactor 全量测试套件 (155/155 通过) 与热路径基准
+# 1. auto-refactor 全量测试套件与热路径基准
 cd auto-refactor && npm test && node scripts/bench-hot-paths.js
 
-# 2. workspace-timing 极速单元测试 (156 项用例通过)
+# 2. workspace-timing 极速单元测试
 cd workspace-timing && npm run test:fast
 
 # 3. auto-refactor 规则自审棘轮基线看守
@@ -92,8 +92,8 @@ pwsh -File scripts/ps1/audit-all.ps1 -Fast
 ```
 
 **质性断言标准**：
-- auto-refactor 155/155 套测试绿色通过，0 孤儿用例；
-- workspace-timing 156 项单元测试 100% 通过；
+- auto-refactor <!-- METRICS:BEGIN test-suite-count -->**163 套**<!-- METRICS:END test-suite-count -->测试绿色通过，0 孤儿用例；
+- workspace-timing <!-- METRICS:BEGIN ws-test-case-count -->**205 项**<!-- METRICS:END ws-test-case-count -->单元测试 100% 通过；
 - 测试过程零未决异步句柄挂起，环境沙箱自动清理干净；
 - 全工作区 High/Critical 技术债务保持 0 项基线，严禁引入技术债务反弹。
 

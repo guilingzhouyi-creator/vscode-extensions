@@ -48,7 +48,7 @@ description: >-
 ### 1. 路径特征探测与精准映射
 通过 `git diff --cached --name-only` 提取暂存区文件路径向量，精确映射至四大受控域：
 - **`workspace-timing/**`** $\rightarrow$ 路由至 VS Code 扩展套件：触发快速增量编译（`npm run compile`）、单元测试（`npm run test:fast`）与双语字典审查（`npm run review`）；
-- **`auto-refactor/**`** $\rightarrow$ 路由至 CLI 引擎套件：触发 30 分析器与 359 条 auto-refactor 规则自测（`npm test`，套件总数由运行期汇总输出）、Rust/TS 双轨内核等价性校验与项目中立性守卫（`npm run gate`）；
+- **`auto-refactor/**`** $\rightarrow$ 路由至 CLI 引擎套件：触发 30 分析器与 362 条 auto-refactor 规则自测（`npm test`，套件总数由运行期汇总输出）、Rust/TS 双轨内核等价性校验与项目中立性守卫（`npm run gate`）；
 - **`WebGames/**`** $\rightarrow$ 路由至 Godot 引擎套件：触发 GDScript 语法审查（`check-gdscript.sh`）、无头回归套件（`test-run.ps1`）与配置同构审计；
 - **`scripts/**` / `.github/**` / `AGENTS.md` / `.agents/skills/**` / 根目录配置** $\rightarrow$ 标记为 `governance` 域：触发工作区单源规则目录一致性、技能集规范性核验与全宗审计（`audit-all.ps1`，内置 `validate-skills.js`）。
 
@@ -81,6 +81,7 @@ description: >-
 - **Linux 语义开关注入**：脚本前言必须显式声明 `$PSNativeCommandUseErrorActionPreference = $true`（原生程序非 0 退出触发异常阻断）与 `$PSNativeCommandArgumentPassing = 'Standard'`（原生参数原样传递，杜绝参数裂解与转义异常）；输出锁定 UTF-8；
 - **Linux 现代平替工具优先**：全仓禁止编写冗长脆弱的 `Get-ChildItem -Recurse | Where-Object | ForEach-Object` 或 `Select-String` 管道，必须优先调用已配置的现代化 Linux 等价工具链（`rg` 替代 grep、`fd` 替代 find、`bat` 替代 cat、`sd` 替代 sed、`jq` 解析 JSON、`which` 与 `touch` 垫片）或直接调用 `scripts/common/*.js`、`scripts/sh/*.sh`；
 - **换行符契约**：PowerShell 脚本（`.ps1`）在磁盘必须严格保持 CRLF 换行；
+- **Linux 命令面兼容层**：Windows 宿主上的 GNU 语义对齐（别名优先级、可执行性哨兵与降级判据、语义映射表、包装器形态禁令）由 `scripts/ps1/lib/linux-parity.ps1` 单源装配，完整契约见 [linux-command-surface.md](references/linux-command-surface.md)；
 - **沙箱隔离与环境自愈**：在 Windows 沙箱或自动化子进程中执行 Git 相关命令时，若遭遇用户级 `.gitconfig` 访问受限，统一前置声明 `$env:GIT_CONFIG_GLOBAL="NUL"; $env:GIT_CONFIG_SYSTEM="NUL"` 屏蔽外部全局文件依赖。
 
 ### 3. Bash 严格错误标志与平铺退出码
@@ -141,3 +142,19 @@ flowchart LR
    - 双轨体积评估：`node scripts/common/evaluate-eloc-budget.js`
    - MOD SDK 双向同步核验：`python WebGames/scripts/py/audit_sdk_sync.py`
    - 全工作区快速统一审查：`pwsh -File scripts/ps1/audit-all.ps1 -Fast`
+
+---
+
+## 七、 参考资源与门禁脚手架
+
+深水区协议与开箱即用骨架按需加载（JIT），未涉及对应子任务时无需读取：
+
+| 资源 | 用途 |
+| :--- | :--- |
+| [cross-platform-subprocesses.md](references/cross-platform-subprocesses.md) | 跨目录子进程的工作目录显式绑定、错误平铺捕获与平台环境兼容契约 |
+| [linux-command-surface.md](references/linux-command-surface.md) | Linux 命令面兼容层：别名优先级、GNU 可执行性哨兵、选择性降级、语义映射与包装器形态禁令 |
+| [gate-script-skeleton.ps1](templates/gate-script-skeleton.ps1) | PowerShell 门禁脚本骨架：`$PSNativeCommandUseErrorActionPreference`、UTF-8 锁定与语义步骤登记 |
+| [gate-script-skeleton.sh](templates/gate-script-skeleton.sh) | Bash 同构骨架：`set -euo pipefail`、平铺错误捕获与同构步骤标识 |
+
+> [!IMPORTANT]
+> 两份骨架的语义步骤标识必须与 `scripts/common/gate-step-registry.json` 登记项逐字一致（`GUARD-STEP-001`），否则 `validate-gate-feedback.js` 直接阻断。

@@ -9,8 +9,12 @@
 | 作业场景 | 一票否决指标 | 真源 / 技能指针 | 本地预审 |
 | :--- | :--- | :--- | :--- |
 | **Git 提交与分批** | 必填 `[Project]`；实质字数 $\ge 30$；零黑话；跨层改动分批原子提交 | [禁词表](scripts/common/commit-msg-forbidden-terms.json) · [batch-commit](.agents/skills/batch-commit/SKILL.md) | `pwsh -File scripts/ps1/commit-msg-gate.ps1 <msg-file>` |
-| **代码编写与体积** | $\text{CC}\le 15$、$\text{Depth}\le 4$、$\text{Noise}\le 4.0$；$\text{ELOC}\le 900$、$\text{LOC}\le 1400$ | [evaluate-eloc-budget.js](scripts/common/evaluate-eloc-budget.js) · [complexity-budget](.agents/skills/complexity-budget/SKILL.md) | `node scripts/common/evaluate-eloc-budget.js` |
+| **代码编写、体积与密度** | $\text{CC}\le 15$、$\text{Depth}\le 4$、$\text{Noise}\le 4.0$；$\text{ELOC}\le 900$、$\text{LOC}\le 1400$；$\tau\in[2.5,22.0]$、$\text{POR}\le 0.60$ | [evaluate-eloc-budget.js](scripts/common/evaluate-eloc-budget.js) · [validate-code-density.js](scripts/common/validate-code-density.js) · [complexity-budget](.agents/skills/complexity-budget/SKILL.md) | `node scripts/common/evaluate-eloc-budget.js` · `node scripts/common/validate-code-density.js` |
+| **编程工艺与写法约束** | 命名即契约；失败语义单一且显式；联合类型穷尽；导出面最小；依赖单向向下 | [coding-craft](.agents/skills/coding-craft/SKILL.md) · [rule-family-map.md](.agents/skills/coding-craft/references/rule-family-map.md) | `node scripts/common/validate-skills.js` |
 | **模块导出与门面** | $\text{ELOC}\ge 15$ 或不可变冻结；零 $\le 3$ 行透传跳板 (`ARCH-ABS-001`) | [facade-discipline](.agents/skills/facade-discipline/SKILL.md) | `node auto-refactor/scripts/validate-facade-governance.js` |
+| **代码精简与跳板消融** | 行为 100% 等价；≤ 3 行纯转发文件物理内联；零机械碎片化 | [code-simplification](.agents/skills/code-simplification/SKILL.md) | `node scripts/common/evaluate-eloc-budget.js` |
+| **需求澄清与规格先行** | 单点质询消除歧义；接口契约与验收标准先立后码 | [interview-me](.agents/skills/interview-me/SKILL.md) · [spec-driven-development](.agents/skills/spec-driven-development/SKILL.md) | — |
+| **测试驱动与故障排查** | 红-绿-重构闭环；SSCCE 最小复现；两次受挫即停反思 | [test-driven-development](.agents/skills/test-driven-development/SKILL.md) · [debugging-and-error-recovery](.agents/skills/debugging-and-error-recovery/SKILL.md) | `cd auto-refactor && npm test` |
 | **注释与架构契约** | 六字段 JSDoc 首部；零幽灵空分支；零批次代号；$\text{ECR}\ge 0.75$ | [complexity-budget](.agents/skills/complexity-budget/SKILL.md) | `node auto-refactor/scripts/validate-comment-governance.js` |
 | **终端命令面与 Linux 兼容** | 别名优先级、GNU 实体可执行性实测、包装器零 `[Parameter()]` (`GUARD-SHELL-001`) | [linux-parity.ps1](scripts/ps1/lib/linux-parity.ps1) · [validate-shell-parity.js](scripts/common/validate-shell-parity.js) · [gate-governance](.agents/skills/gate-governance/SKILL.md) | `node scripts/common/validate-shell-parity.js` |
 | **门禁脚本与调用契约** | 子进程工作目录显式隔离；`pwsh` 7+ 优先；Bash `set -euo pipefail` 平铺捕获；助手先定义于调用点 (`GUARD-ORD-001`) | [gate-governance](.agents/skills/gate-governance/SKILL.md) · [scripts/README.md](scripts/README.md) | `pwsh -File scripts/ps1/pre-commit-gate.ps1` |
@@ -39,7 +43,7 @@
 | 公理 | 裁定 | 真源 |
 | :--- | :--- | :--- |
 | **物理卫生八维** | 零空文件/空壳；`.ps1` CRLF 其余 LF；UTF-8 无 BOM；单 EOF 换行；纯空格缩进（TS 4 空格、其余 2 空格）；零空目录/脏文件；全局 `kebab-case`（WebGames `config/**` 与 `.gd` 用 `snake_case`）；后缀即领域 | [validate-physical-hygiene.js](scripts/common/validate-physical-hygiene.js) · [gate-governance](.agents/skills/gate-governance/SKILL.md) |
-| **复杂度与体积** | $\text{CC}\le 15$ 为导出 API 刚性基线（私有纯函数弹性 20~25）；$\text{Depth}\le 4$、$\text{Noise}\le 4.0$；$\text{ELOC}\le 900$ 第一红线、$\text{LOC}\le 1400$ 兜底；循环与调度平铺并卫语句提前返回 | [complexity-budget](.agents/skills/complexity-budget/SKILL.md) |
+| **复杂度与体积密度** | $\text{CC}\le 15$ 为导出 API 刚性基线（私有纯函数弹性 20~25）；$\text{Depth}\le 4$、$\text{Noise}\le 4.0$；$\text{ELOC}\le 900$ 第一红线、$\text{LOC}\le 1400$ 兜底；$\tau\in[2.5,22.0]$ 防稀释拥挤；$\text{POR}\le 0.60$（$\text{TSPR}\ge 0.40$）防空门面；循环与调度平铺并卫语句提前返回 | [complexity-budget](.agents/skills/complexity-budget/SKILL.md) · [validate-code-density.js](scripts/common/validate-code-density.js) |
 | **注释契约** | 核心模块首行六字段 JSDoc；复杂算法声明退化阈值与前置不变式；零幽灵假分支、零冲刺代号、零机械复述 | [complexity-budget](.agents/skills/complexity-budget/SKILL.md) |
 | **门面实质承载** | $\text{ELOC}\ge 15$、聚合 $\ge 3$ 子领域或含不可变冻结；合法包络内高内聚模块禁止机械碎片化 | [facade-discipline](.agents/skills/facade-discipline/SKILL.md) |
 | **度量求真** | 严禁倍数放大、基数注水、保底伪造、写死置信区间、固定加分；外部依赖须经 AST 真实符号索引追踪 | [telemetry-statistical-modeling](.agents/skills/telemetry-statistical-modeling/SKILL.md) |
@@ -55,15 +59,11 @@
 
 ## 三、 终端命令面契约（PowerShell ↔ GNU）
 
-命令面由 [linux-parity.ps1](scripts/ps1/lib/linux-parity.ps1) 单源装配，交互会话与 Agent 子进程共用同一语义；命令全集即该库的 GNU 绑定表与现代化工具登记表，**禁止另立别名、垫片或本地包装**。守卫 [validate-shell-parity.js](scripts/common/validate-shell-parity.js) 断言文档承诺的每个命令真实可绑定、双路径齐备、模式与实测一致。
+命令面由 [linux-parity.ps1](scripts/ps1/lib/linux-parity.ps1) 单源装配，交互会话与 Agent 子进程共用同一语义，禁止另立别名、垫片或本地包装。守卫 [validate-shell-parity.js](scripts/common/validate-shell-parity.js) 断言文档承诺的每个命令真实可绑定。完整契约（双登记表、降级清单、语义映射全表、包装器禁令、沙箱自愈、自检断言）见 [linux-command-surface.md](.agents/skills/gate-governance/references/linux-command-surface.md)。
 
-- **别名优先级**：`别名 > 函数 > cmdlet > 外部程序`。PATH 垫片必被内建别名遮蔽（`grep.cmd`、`ls.cmd` 无效）；一律先 `Remove-Item -LiteralPath "Alias:<name>" -Force` 再定义同名函数——`sort`/`diff`/`where`/`tee`/`sleep`/`select` 为只读别名，缺 `-Force` 直接失败。
-- **可执行性优先**：目录存在不等于可用。`Test-LinuxParityGnuExecutable` 实测 `true.exe` 哨兵；受限宿主 MSYS2 在 `NtCreateDirectoryObject` 失败（`0xC0000022`）即降级为 PowerShell 原生实现。`sed`/`awk`/`cut`/`tr` 等流编辑器与列工具**故意不降级**——部分模拟会静默产出与 GNU 不同的文本，宁可缺失也不给错结果。`$env:LINUX_PARITY_GNU_ROOT='<path>'` 为钉死语义，设无效路径即可确定性复现降级。
-- **语义映射**：`2>/dev/null` → `2>$null`；`export FOO=1`、`command -v`、`test -f`（返回布尔）由兼容层提供；`date +%s` → `[DateTimeOffset]::UtcNow.ToUnixTimeSeconds()`；退出码取 `$LASTEXITCODE`（`$?` 是布尔）；`<` 为保留运算符，输入重定向改写为管道；here-doc 用 `@"..."@`；`&&`/`||` 自 PS7 原生可用。
-- **包装器形态**：管道判定必须用 `$MyInvocation.ExpectingInput`，严禁 `if ($input)`（非管道调用会阻塞等待 stdin，使 `grep pattern file` 永久挂起）；函数体内**不得出现 `[Parameter()]`**——一旦声明即升级为高级函数并注入 `-Verbose`/`-ErrorAction`，`-v`/`-e`/`-i`/`-f` 被前缀匹配吞掉，`sed -i`、`grep -f` 在绑定阶段报歧义。
-- **禁用清单**：`Get-ChildItem -Recurse | Where-Object | ForEach-Object` 长管道、`Select-String` 冒充 grep、直接调用系统目录下的原生 find 程序（语义与 GNU 完全不同）、依赖 `mkdir -p` 的侥幸解析。
-- **子进程与沙箱**：跨目录调用显式传 `-WorkingDirectory (Join-Path $repoRoot "<sub>")` 或 `(cd "<sub>" && ...)`；Git 钩子路由 `pwsh` 7+，严禁回退 PS 5.1；受限宿主由 `Test-LinuxParityRestrictedHost` 以真实读取探测，Git 用户级配置被拒时前置 `$env:GIT_CONFIG_GLOBAL='NUL'; $env:GIT_CONFIG_SYSTEM='NUL'`。
-- **PowerShell 编码**：`.ps1` 头部声明 `$PSNativeCommandUseErrorActionPreference = $true`（等价 `set -e`）与 `$PSNativeCommandArgumentPassing = 'Standard'`；全仓输出锁定 UTF-8，杜绝 936 乱码。
+- **别名优先级**：`别名 > 函数 > cmdlet > 外部程序`。PATH 垫片必被内建别名遮蔽（`grep.cmd` 无效）；移除 `sort`/`diff`/`where`/`tee`/`sleep`/`select` 等只读别名须带 `-Force`，否则同名函数定义静默不生效。
+- **可执行性优先**：目录存在不等于可用。`Test-LinuxParityGnuExecutable` 实测 `true.exe` 哨兵，受限宿主 MSYS2 崩溃（`0xC0000022`）即降级；`sed`/`awk`/`cut`/`tr` **故意不降级**——部分模拟会静默产出与 GNU 不同的文本。`$env:LINUX_PARITY_GNU_ROOT='<path>'` 钉死语义，无效路径即确定性复现降级。
+- **语义映射与包装器**：`2>/dev/null` → `2>$null`；退出码取 `$LASTEXITCODE`（`$?` 是布尔）。包装器须用 `$MyInvocation.ExpectingInput` 判管道，且体内**不得出现 `[Parameter()]`**——否则升级为高级函数，`-v`/`-e`/`-i`/`-f` 被通用参数前缀匹配吞掉。
 
 ---
 

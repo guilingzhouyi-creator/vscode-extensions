@@ -111,7 +111,7 @@ description: >-
 ### 1. 门禁分流调度与对应指令
 当修改触及 `workspace-timing/**` 路径时，门禁系统触发三阶递进校验：
 1. **增量极速编译**：`npm run compile`（严格基于 `tsconfig.json` 的 `isolatedModules` 与无 `declaration` 快速发射）；
-2. **单元测试与回归套件**：`npm run test:fast`（执行 156 项单元测试，重点看守会话折叠、跨日/跨周切分、双轨时长守恒与崩溃回放）；
+2. **单元测试与回归套件**：`npm run test:fast`（执行 <!-- METRICS:BEGIN ws-test-case-count -->**205 项**<!-- METRICS:END ws-test-case-count -->单元测试，重点看守会话折叠、跨日/跨周切分、双轨时长守恒与崩溃回放）；
 3. **专有规则审查门禁**：`npm run review`（执行 `scripts/dist/review/run-review.js` 检查 L0~L5 六层共 49 条规则）。
 
 ### 2. 49 条审查规则单一真源对齐 (SSOT)
@@ -140,7 +140,7 @@ cd workspace-timing
 # 1. 极速增量编译 TypeScript
 npm run compile
 
-# 2. 运行快速单元测试套件（156 项用例，包含折叠/聚合/i18n/双轨工时契约）
+# 2. 运行快速单元测试套件（含折叠/聚合/i18n/双轨工时契约）
 npm run test:fast
 
 # 3. 运行扩展 L0~L5 六层权重审查门禁（49 规则看守）

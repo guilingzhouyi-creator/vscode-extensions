@@ -149,3 +149,6 @@ pwsh -File WebGames/scripts/ps1/audit-all.ps1
 - [tab_view_controller_skeleton.gd](templates/tab_view_controller_skeleton.gd)：强类型 Tabs 视图控制器标准样板；
 - [godot-architecture-non-web.md](references/godot-architecture-non-web.md)：Godot 4.7 引擎纯逻辑架构与非 Web 游戏技术栈规范指南；
 - [object-pooling-adv-prf-002.md](references/object-pooling-adv-prf-002.md)：对象池零瞬态分配深度指引。
+
+> [!IMPORTANT]
+> GDScript 编码品味的唯一硬性标准是项目内的 [GD老练风格硬性规范标准.md](../../../WebGames/docs/模板/GD老练风格硬性规范标准.md)。写任何 `.gd` 文件前先按该标准自查命名、缩进、类型标注与注释语言；本技能只规定架构与配置驱动契约，不重复其风格条目。

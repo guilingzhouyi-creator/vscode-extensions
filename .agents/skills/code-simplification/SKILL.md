@@ -27,7 +27,7 @@ description: >-
 
 ### 1. 单行透传跳板的内联消除
 当存在类似 `export * from './internal/impl';` 的空壳文件，且其仅对单一内部模块做简单重新导出时，直接将调用方引用重定向至目标模块，彻底移除中间跳板文件。
-详见：[trampoline-and-indirection-inlining.md](references/trampoline-and-indirection-inlining.md)。
+详见：[trampoline-and-indirection-inlining.md](references/trampoline-and-indirection-inlining.md)；跳板识别判据与三步消融操作法见 [anti-trampoline-refactoring.md](references/anti-trampoline-refactoring.md)。
 
 ### 2. 循环内瞬态堆分配优化
 高频触发逻辑中，将循环体内部反复创建的临时对象、临时闭包或数组提升至循环外复用，大幅减轻垃圾回收负担。
@@ -52,4 +52,4 @@ description: >-
 ## 三、 重构前后质性对比与验证
 
 在完成任何精简重构后，必须填写并核验等价性对照矩阵：
-参考模板：[simplification-matrix-template.md](templates/simplification-matrix-template.md)。
+参考模板：[simplification-matrix-template.md](templates/simplification-matrix-template.md)（空白骨架）与 [simplification-before-after-matrix.md](templates/simplification-before-after-matrix.md)（含 ELOC、CC、Depth 度量对比的填毕范例）。

@@ -37,6 +37,7 @@ description: >-
 详见：
 - [design-interview-question-bank.md](references/design-interview-question-bank.md)
 - [reverse-smart-questioning-protocol.md](references/reverse-smart-questioning-protocol.md)
+- [extension-design-questions.md](references/extension-design-questions.md) — VS Code 宿主特化维度：侵入性、存储作用域、扫描规模
 - [interview-decision-record.md](templates/interview-decision-record.md)
 
 ---

@@ -8,7 +8,7 @@ description: >-
 
 # auto-refactor-dev — 静态重构引擎与双轨算子开发规范
 
-本技能规范了 `auto-refactor/` 静态代码分析与治理引擎的核心架构原则、双轨算子等价性约束、30 个内置分析器的四阶段流水线拓扑（Stage 0~3）、362 条规则治理体系（155/155 套测试）、Praxis 客户端 SDK 与表现层语义聚合引擎、一体两面三层拓扑 Diff 引擎、高精度时间戳规范、暂存分流原子落盘以及 12 项热路径与内存治理范式。
+本技能规范了 `auto-refactor/` 静态代码分析与治理引擎的核心架构原则、双轨算子等价性约束、30 个内置分析器的四阶段流水线拓扑（Stage 0~3）、362 条规则治理体系（<!-- METRICS:BEGIN test-suite-count -->**163 套**<!-- METRICS:END test-suite-count -->测试）、Praxis 客户端 SDK 与表现层语义聚合引擎、一体两面三层拓扑 Diff 引擎、高精度时间戳规范、暂存分流原子落盘以及 12 项热路径与内存治理范式。
 
 ---
 
@@ -162,7 +162,7 @@ description: >-
 cd auto-refactor
 npm run build                    # 1. 编译 TypeScript 源码至 dist/
 npm run gate                     # 2. 本地轻量快速门禁（语法、命名、跳板与中立性检查）
-npm test                         # 3. 运行全量自测套件（155/155 套专项校验并发/串行执行）
+npm test                         # 3. 运行全量自测套件（专项校验并发/串行执行）
 node scripts/bench-hot-paths.js  # 4. 热路径微基准（mask-source / governance-scan / cmp-rules）
 ```
 

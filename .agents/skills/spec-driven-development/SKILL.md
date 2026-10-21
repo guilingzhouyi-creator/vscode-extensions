@@ -41,10 +41,10 @@ description: >-
 - 每个模块拥有稳定、小写的唯一 `module-id`；
 - 依赖关系单向流动，严禁循环依赖；
 - 明确自底向上的构建与验证顺序。
-详见指南：[capability-mapping.md](references/capability-mapping.md)。
+详见指南：[capability-mapping.md](references/capability-mapping.md)；VS Code 扩展的五层能力拓扑范例见 [extension-capability-mapping.md](references/extension-capability-mapping.md)。
 
 ### 阶段 1：编制规格说明书 (Feature Spec)
-依据模板 [feature-spec-template.md](templates/feature-spec-template.md) 编写 `SPEC.md`。规格书必须明确包含：
+依据模板 [feature-spec-template.md](templates/feature-spec-template.md) 编写 `SPEC.md`；需要 VS Code 扩展专属字段（激活事件、贡献点、配置作用域）时改用 [extension-feature-spec-template.md](templates/extension-feature-spec-template.md)。规格书必须明确包含：
 1. **问题定义与业务目标**：解决什么问题，明确非目标（Out of Scope）；
 2. **架构角色与分层位置**：在系统中的层级归属，遵循单向依赖；
 3. **核心数据模型与接口契约**：明确输入输出数据类型与前置条件；

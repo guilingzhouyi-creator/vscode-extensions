@@ -65,6 +65,20 @@ description: >-
 - **坚决杜绝机械物理碎片化**：处于合法双轨包络内（$\text{ELOC} \le 900, \text{LOC} \le 1400$）且高内聚的模块，严禁单纯为了压低数字而机械切碎为多个 50 行孤立文件，破坏领域封装；
 - **重构治理重心转向**：模块治理第一优先级永远是**根除循环内瞬态堆分配（`CPX-SPACE-001`）**与平铺控制流，而非浅层代码行搬移。
 
+### 4. 多维有效代码密度张量与接线守卫 (`scripts/common/validate-code-density.js`)
+为防范机械拆行造成的排版虚胖或接线空门面，工作区建立五维有效代码密度审计模型：
+1. **有效 Token 列密度双向包络 ($\tau = \text{tokens} / \text{ELOC}$)**：
+   - **下限防稀释 (`VOL-DIL-001`)**：$\tau \ge 2.5$，禁止将单一参数、孤立标点或空闭合符号过度碎裂折行；
+   - **上限防拥挤 (`GUARD-AST-001`)**：$\tau \le 22.0$，禁止单行堆砌长链式调用或复杂多层三元表达式；
+2. **接线开销比与有效载荷比 (`ARCH-FAC-001`)**：
+   - **接线开销上限**：$\text{POR} \le 0.60$（Plumbing Overhead Ratio，导入/导出/转接代码占比）；
+   - **Token 有效载荷下限**：$\text{TSPR} \ge 0.40$（Token Stream Payload Ratio，业务语义 Token 占比）；接线开销超过 60% 必须内联消融或注入实质领域编排与深度不可变冻结；
+3. **Auto 引擎 9 分类物理行光谱加权模型**：
+   - 核心逻辑 `EFFECTIVE_CODE` (1.0)、模板 `TEMPLATE_DSL` (0.3)、数据/配置/脚手架 (0.2)、闭合符号 (0.1)、注释/空行 (0.0)；
+4. **细粒度文件角色弹性包络**：
+   - 算法计算内核（`algorithm_computation`）享弹性预算 $\text{ELOC} \le 1100, \text{LOC} \le 1500, \text{CC} \le 20$；规则元数据注册表（`rules_registry`）享 $\text{ELOC} \le 2000, \text{LOC} \le 3000$；公共工具库（`shared_library`）收敛至 $\text{ELOC} \le 450, \text{LOC} \le 600$；
+5. **豁免契约**：聚合导出 `index.*`、类型目录 `*.d.ts` 与纯常量字典 `constants.*` 自动豁免接线比检查。
+
 ---
 
 ## 五、 模块头部六字段 JSDoc 契约规范
@@ -140,11 +154,15 @@ node auto-refactor/scripts/validate-comment-governance.js
 
 # 3. 验证暂存区 AST 局部切片守卫与物理行数（STAGED-SLICE-11 与 STAGED-VOLUME-13）
 pwsh -File scripts/ps1/pre-commit-gate.ps1
+
+# 4. 验证 Token 列密度 tau 与接线开销比 POR (VOL-DIL-001 / ARCH-FAC-001)
+node scripts/common/validate-code-density.js --all
 ```
 
 **质性断言标准**：
 - 控制台输出全绿通过，没有任何函数超出 CC $\le 15$（或弹性包络 $\le 25$）、Depth $\le 4$、Noise $\le 4.0$ 红线；
 - 暂存区所有改动文件均严格位于 1:3 双向动态包络安全带内；
+- 源码文件 Token 密度满足 $\tau \in [2.5, 22.0]$，接线开销比 $\text{POR} \le 0.60$（$\text{TSPR} \ge 0.40$）；
 - 头部六字段 JSDoc 契约完整，无注水式注释与敏捷过程代号；
 - 复杂核心算法显式声明降级边界与前置等长不变式；
 - 循环体与热路径零瞬态堆分配，无 `CPX-SPACE-001` 违规；

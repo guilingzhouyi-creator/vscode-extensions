@@ -1,9 +1,9 @@
 ---
 name: rust-engineering
 description: >-
-  Rust 工业级高级编程风格、零成本抽象与强制系统工程规范。指导 Agent 在 fractal-git (Taxis) 及 auto-refactor 原生内核中
-  贯彻 Type-State 编译期状态机、零瞬态堆分配复用池 (FGT-PRF-001)、强类型 thiserror 错误拓扑 (FGT-ERR-001)、
-  无锁并发与 CAS (FGT-LCK-001)、// SAFETY: 不变式证明 (FGT-SAF-001)、领域常量集中化及 Clippy 零容忍门禁。
+  Rust 工业级高级编程风格、零成本抽象与强制系统工程规范。指导 Agent 在 fractal-git 与 auto-refactor
+  原生内核中贯彻 Type-State 状态机、零瞬态堆分配 (FGT-PRF-001)、thiserror 错误拓扑、
+  无锁 CAS (FGT-LCK-001)、// SAFETY: 证明 (FGT-SAF-001) 与 Clippy 零容忍门禁。
 ---
 
 # rust-engineering — Rust 工业级高级编程风格与系统工程规范
@@ -123,4 +123,5 @@ pwsh -File scripts/ps1/audit-all.ps1
 
 - [rust-advanced-patterns.md](references/rust-advanced-patterns.md)：Type-State 模式、无锁原子 CAS 内存序、BCE 边界检查消除与 FFI 异常隔离深水区实践图谱；
 - [type-state-zero-alloc-pattern.rs](templates/type-state-zero-alloc-pattern.rs)：工业级 Rust 样板代码（含 Type-State 编译期流转、强类型 `thiserror` 枚举、`// SAFETY:` 形式证明与 `BufferPool` 零分配注入）；
+- [validate-rust-conformance.js](scripts/validate-rust-conformance.js)：伴生静态校验器，扫描生产 Rust 源码断言零 panic、`unsafe` 必须带 `// SAFETY:` 证明、常量集中于 SSOT，可直接接入本地预审；
 - [algorithmic-operator-engineering](../algorithmic-operator-engineering/SKILL.md)：跨语言算法第一性原理突破与五步降维协议。

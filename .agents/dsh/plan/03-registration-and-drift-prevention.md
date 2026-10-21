@@ -8,6 +8,7 @@
 
 ## 一、必须对齐的三处既有资产
 
+<!-- METRICS:IGNORE-PLAN reason=preset-family-target -->
 | 资产 | 现状 | 断链后果 | 本阶段动作 |
 | :--- | :--- | :--- | :--- |
 | `.agents/plugins/workspace-governance/plugin.json` | 声明 name / displayName / version / logo / suggestedPrompts，未提及模式 | 用户在 DSH 中看不到模式族与治理套件的隶属关系 | 增补模式族条目，保持既有字段与 logo 引用不动 |

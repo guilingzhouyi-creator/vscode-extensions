@@ -5,7 +5,7 @@
 ## 快速开始
 
 ```bash
-# 运行全域单元测试（109 个测试套件，断言数以 test-run.sh 输出为准）
+# 运行全域单元测试（套件数以 tests/test_registry.gd 注册项为准，断言数以 test-run.sh 输出为准）
 bash scripts/sh/test-run.sh
 
 # 等价于
@@ -196,7 +196,7 @@ DeterministicRNG.reseed_global(seed)           # 整局复现开关
 |---|---|
 | backend .gd / 行数 | 302 / 约 26,759 行（全域 .gd 513 / 约 62,603 行，随新卷增长） |
 | 领域数 | 47 |
-| 测试项 | 770（CLI 与 UI 共用同一注册表，109 个测试套件 / 覆盖 47 领域；实时以 `tests/reports/test_latest.json` 为准） |
+| 测试项 | 770（CLI 与 UI 共用同一注册表，<!-- METRICS:BEGIN wg-test-suite-count -->**130 套**<!-- METRICS:END wg-test-suite-count -->注册测试套件 / 覆盖 47 领域；实时以 `tests/reports/test_latest.json` 为准） |
 | 配置表 | 123（含 65 张必需表，`audit_config.py` 口径） |
 | 配置调用点 | 862（`backend/` + `frontend/` 内 `GameConfig.get_*` 与 `GameConfig.msg`；表缺失 0；`GameConfig.get_value` 违禁调用 0） |
 | 函数 / 参数类型注解 | 100% / 100% |

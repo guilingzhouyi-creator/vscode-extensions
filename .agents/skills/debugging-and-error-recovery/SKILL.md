@@ -51,6 +51,7 @@ description: >-
 软件系统在不同层级均存在典型的高发故障模式：
 详见：
 - [software-failure-modes.md](references/software-failure-modes.md)
+- [vscode-extension-failure-modes.md](references/vscode-extension-failure-modes.md) — 扩展激活期、Webview IPC、状态栏刷新等宿主特化断点
 - [root-cause-analysis-template.md](templates/root-cause-analysis-template.md)
 
 ---
