@@ -7,26 +7,26 @@
 
 ## 1. 四层规则金字塔与双轨文案架构
 
-`auto-refactor` 将全部 **362 条内置规则**（含 **347 条规范化 `FAMILY-TOPIC-NNN` 规则**与 **15 条向后兼容别名规则**）统一收拢于 `src/core/rules/registry.ts` 单一真源注册表中，并由 `npm run validate-rules-registry` 门禁在每次构建时强制校验「发射集 = 注册集 = 文档覆盖集（362/362）」。在工作区全域单源规则目录快照（`scripts/common/rule-catalog.json`）中，活跃规则规模保持 **500 条全仓 SSOT 活跃规则**。
+`auto-refactor` 将全部 **362 条内置规则**（含 **347 条规范化 `FAMILY-TOPIC-NNN` 规则**与 **15 条向后兼容别名规则**）统一收拢于 `src/core/rules/registry.ts` 单一真源注册表中，并由 `npm run validate-rules-registry` 门禁在每次构建时强制校验「发射集 = 注册集 = 文档覆盖集（362/362）」。在工作区全域单源规则目录快照（`scripts/common/rule-catalog.json`）中，活跃规则规模保持 **502 条全仓 SSOT 活跃规则**。
 
 ### 1.1 四层规则金字塔拓扑
 
 | 金字塔层级 | 规则数量 | 包含规则族前缀 | 核心守护边界 |
 | :--- | :---: | :--- | :--- |
-| **Layer 1：全域安全与卫生底线** | 51 条 | `SEC` / `HYG` / `ERR` / `CMT` / `DOC` / `SIM` | 凭证防泄露、注入防御、错误吞没拦截、代码物理卫生、注释质量 (ECD-C) 与文档结构完整性 |
-| **Layer 2：语言族现代化与标准库** | 102 条 | `TSM` / `MOD` / `PYM` / `RSM` / `GOM` / `GDM` / `SH` / `PS` (`SHL`) / `STDLIB` (`STD`) / `UI` / `PROD` | TypeScript、Python、Rust、Go、GDScript、Shell、PowerShell 现代语法惯用法、标准库手写轮子替换与前端工程现代化 |
-| **Layer 3：架构拓扑、治理、数据与性能** | 144 条 | `ARCH` / `GOV` / `DAT` / `PRF` / `DEP` / `NAM` / `CONST` / `CPX` / `GATE` / `CMP` / `NUM` | 分层单向依赖、架构防腐、多 Agent 协作防冲突 (`GOV-AGN-001`)、切片破坏防范 (`GOV-SLC-001`)、轨迹回归检验 (`GOV-TRJ-001`)、N+1 数据库查询阻断与热循环零分配 |
-| **Layer 4：领域专精、测试现代性与历史兼容** | 41 条 | `GDM` (`gdscript-game`) / `VSC` / `TST` / `SEC` (`client-exposure`) + 15 条 Legacy Aliases | Godot 4 游戏引擎运行态契约、VS Code 扩展清单与事件规范、测试有效覆盖深度与历史规则平滑迁移过渡窗口 |
+| **Layer 1：全域安全与卫生底线** | 68 条 | `SEC` / `HYG` / `ERR` / `CMT` / `DOC` / `SIM` | 凭证防泄露、注入防御、错误吞没拦截、代码物理卫生、注释质量 (ECD-C) 与文档结构完整性 |
+| **Layer 2：语言族现代化与标准库** | 112 条 | `TSM` / `MOD` / `PYM` / `RSM` / `GOM` / `GDM` / `SH` / `PS` (`SHL`) / `STDLIB` (`STD`) / `UI` / `PROD` | TypeScript、Python、Rust、Go、GDScript、Shell、PowerShell 现代语法惯用法、标准库手写轮子替换与前端工程现代化 |
+| **Layer 3：架构拓扑、治理、数据与性能** | 166 条 | `ARCH` / `GOV` / `DAT` / `PRF` / `DEP` / `NAM` / `CONST` / `CPX` / `GATE` / `CMP` / `NUM` / `GUARD` / `ENG` / `EXT` / `BIG` | 分层单向依赖、架构防腐、多 Agent 协作防冲突 (`GOV-AGN-001`)、切片破坏防范 (`GOV-SLC-001`)、轨迹回归检验 (`GOV-TRJ-001`)、N+1 数据库查询阻断与热循环零分配 |
+| **Layer 4：领域专精、测试现代性与历史兼容** | 16 条 | `VSC` / `TST` + 15 条 Legacy Aliases | Godot 4 游戏引擎运行态契约、VS Code 扩展清单与事件规范、测试有效覆盖深度与历史规则平滑迁移过渡窗口 |
 
 ### 1.2 双轨文案分层契约（Dual-Track Wording Architecture）
 
-- **机读/执行轨（Machine & Agent Track）**：位于 `src/core/messages/`、`src/core/rules/entries/` 与 `src/core/guidance/`，底层规则注册表（`RULE_REGISTRY`）与内核诊断统一为 **100% 国际工业英文标准**（涵盖所有 `summary` 与 `remediation` 规范元数据），输出高 Token 密度、确定性的 SARIF 2.1.0 诊断载荷与 CAPP 智能体修复提示词，并作为工作区单源规则目录（`scripts/common/rule-catalog.json`，473 条全仓 SSOT）的唯一真源底座。
+- **机读/执行轨（Machine & Agent Track）**：位于 `src/core/messages/`、`src/core/rules/entries/` 与 `src/core/guidance/`，底层规则注册表（`RULE_REGISTRY`）与内核诊断统一为 **100% 国际工业英文标准**（涵盖所有 `summary` 与 `remediation` 规范元数据），输出高 Token 密度、确定性的 SARIF 2.1.0 诊断载荷与 CAPP 智能体修复提示词，并作为工作区单源规则目录（`scripts/common/rule-catalog.json`，502 条全仓 SSOT）的唯一真源底座。
 - **人读/呈现轨（Human & Presentation Track）**：由 **Praxis 表现层**（`src/core/praxis/presentation/`）与 `PraxisI18nProvider` 独占承载，采用模块化领域分包双语字典（`zh-cn/` 与 `en/`），面向人类工程师与 IDE 富文本诊断卡片（`PraxisDiagnosticCard`）提供完整、专业、细粒度的人机可读本地化转译与交互式修复指引。
 
 ### 1.3 标准 3-3-3 命名拓扑公理、权威三字母映射与三阶双轨别名等价网络
 
 规则标识符严格遵循 `FAMILY-TOPIC-NNN` 三段式结构（`RULE_ID_PATTERN`），其中：
-- **`FAMILY`**：规则族前缀（2~6 位大写字母，对应 30 个受控领域族）；
+- **`FAMILY`**：规则族前缀（2~6 位大写字母，对应 <!-- METRICS:BEGIN rule-family-count -->**33 个规则族**<!-- METRICS:END rule-family-count -->）；
 - **`TOPIC`**：领域主题码（标准 3 位大写字母，存量历史包含部分 4~9 位扩展主题码），单源登记于 `src/core/rules/topic-catalog.ts` 的 `CANONICAL_TOPIC_CATALOG` 词典中；
 - **`NNN`**：三位定长十进制整数序列（`001` ~ `999`）。
 

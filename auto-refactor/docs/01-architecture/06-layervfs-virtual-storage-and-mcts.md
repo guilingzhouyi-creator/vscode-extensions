@@ -206,4 +206,4 @@ LayerVFS 与 MCTS 体系拥有独立完备的自动化测试套件：
 - `tests/praxis-mcts.test.ts`：MCTS 树构建、UCT 选择逻辑、沙箱投影执行与最优路径剪枝断言；
 - `tests/praxis-client.test.ts`：Praxis 客户端 SDK 对接 LayerVFS 的端到端协同验证。
 
-全量测试纳入 `npm test` 矩阵（157/157 独立测试套件 100% 绿色通行）。
+全量测试纳入 `npm test` 矩阵（<!-- METRICS:BEGIN test-suite-count -->**163 套**<!-- METRICS:END test-suite-count -->独立测试套件 100% 绿色通行）。

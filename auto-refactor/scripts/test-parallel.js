@@ -636,7 +636,6 @@ async function runFourLaneConcurrentPipeline(parallelList, vitestPromise, passed
     return res;
   });
 
-  const daemonPromise = runSequentialSuites(DAEMON_SUITES, bail, passed, failed);
   const selfAuditPromise = runSelfAuditLane(bail, passed, failed);
   const unitPromise = vitestPromise.then((unitResult) => {
     if (unitResult) {
@@ -644,7 +643,11 @@ async function runFourLaneConcurrentPipeline(parallelList, vitestPromise, passed
     }
   });
 
-  await Promise.all([parallelPromise, daemonPromise, selfAuditPromise, unitPromise]);
+  await Promise.all([parallelPromise, selfAuditPromise, unitPromise]);
+
+  if (!bail || failed.length === 0) {
+    await runSequentialSuites(DAEMON_SUITES, bail, passed, failed);
+  }
 }
 
 // ── Main Runner ──

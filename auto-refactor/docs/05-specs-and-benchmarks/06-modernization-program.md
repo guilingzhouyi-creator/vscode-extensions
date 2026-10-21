@@ -5,21 +5,21 @@
 
 ---
 
-## 1. 现代化规则体系架构概览（共 9 个分析器、102 条现代化规则）
+## 1. 现代化规则体系架构概览（共 9 个分析器、108 条现代化规则）
 
-为了消除存量工程中陈旧语法范式引发的性能瓶颈、内存泄漏与安全隐患，`auto-refactor` 将现代化演进机制深度整合于**流水线 Stage 2（单文件语法 AST 与语言现代化）**中。整个体系由 **9 个现代化分析器**组成，涵盖 **102 条受控现代化规则**：
+为了消除存量工程中陈旧语法范式引发的性能瓶颈、内存泄漏与安全隐患，`auto-refactor` 将现代化演进机制深度整合于**流水线 Stage 2（单文件语法 AST 与语言现代化）**中。整个体系由 **9 个现代化分析器**组成，涵盖 **108 条受控现代化规则**：
 
 | 分析器名称 | 规则族前缀 | 规则数量 | 核心重构与现代化演进目标 |
 | :--- | :--- | :---: | :--- |
 | **`ts-modern`** | `TSM-*` | 11 条 | 淘汰 `var` 声明，禁止裸 `any` 断言，推荐 Optional Chaining (`?.`) 与 Nullish Coalescing (`??`)，规范 Promise 与正则构造 |
 | **`python-modern`** | `PYM-*` | 13 条 | 推荐 `pathlib.Path` 替代 `os.path` 字符串拼接 (`PYM-PATH-001`)，PEP 604 联合类型 (`X \| None`)，f-string 与 `@dataclass(slots=True)` |
-| **`rust-modern`** | `RSM-*` | 11 条 | 拦截跨 await 持锁死锁、裸 `as` 数值截断、推荐 `let-else` 语法、迭代器惯用法优化与 `?` 错误传播 |
-| **`gdscript-modern`** | `GDM-*` | 21 条 | Godot 4.x 强类型注解契约、信号 `Callable` 强类型连接、`@onready` / `@export` / `@rpc` 注解规范化与对象池契约 |
+| **`rust-modern`** | `RSM-*` | 14 条 | 拦截跨 await 持锁死锁、裸 `as` 数值截断、推荐 `let-else` 语法、迭代器惯用法优化与 `?` 错误传播 |
+| **`gdscript-modern`** | `GDM-*` | 25 条 | Godot 4.x 强类型注解契约、信号 `Callable` 强类型连接、`@onready` / `@export` / `@rpc` 注解规范化与对象池契约 |
 | **`go-modern`** | `GOM-*` | 5 条 | 拦截未纳管 Goroutine 泄漏（强制 `context.Context`），循环变量捕获闭包陷阱修复，错误包装链 (`%w`) 与 `time.Duration` 安全 |
-| **`frontend`** | `UI-*` | 4 条 | 表现层工程现代化：淘汰废弃框架生命周期钩子，消除跨层业务单例侵入，规范组件响应式订阅与解绑 |
+| **`frontend`** | `UI-*` | 8 条 | 表现层工程现代化：淘汰废弃框架生命周期钩子，消除跨层业务单例侵入，规范组件响应式订阅与解绑 |
 | **`stdlib`** | `STDLIB-*` | 6 条 | 现代标准库手写轮子替换：原生 `Array.prototype.flat/flatMap`、`Object.entries`、`Promise.allSettled` 代替第三方低效垫片 |
-| **`simplify`** | `SIM-*` | 11 条 | 控制流简化：前置卫语句拍平金字塔嵌套 (`SIM-GUARD-001`, `SIM-FLAT-002`)，单行三元折叠 (`SIM-TRN-001`)，参数聚合对象提炼 |
-| **`complexity`** | `CPX-*` | 12 条 | 分支收敛与认知复杂度度量：函数认知复杂度上限控制，嵌套循环/深层 switch 查表化，多返回值收口与异常统一传播 |
+| **`simplify`** | `SIM-*` | 13 条 | 控制流简化：前置卫语句拍平金字塔嵌套 (`SIM-GUARD-001`, `SIM-FLAT-002`)，单行三元折叠 (`SIM-TRN-001`)，参数聚合对象提炼 |
+| **`complexity`** | `CPX-*` | 13 条 | 分支收敛与认知复杂度度量：函数认知复杂度上限控制，嵌套循环/深层 switch 查表化，多返回值收口与异常统一传播 |
 
 ---
 

@@ -61,7 +61,7 @@
 | 文档路径 | 核心主题 | 状态 |
 | :--- | :--- | :---: |
 | [docs/05-specs-and-benchmarks/01-config-and-reports.md](./docs/05-specs-and-benchmarks/01-config-and-reports.md) | `auto-refactor.config.json` 配置模式、抑制策略、JSON / SARIF 2.1.0 / Text 报告与退出码 | ✅ 已对齐 |
-| [docs/05-specs-and-benchmarks/02-performance-benchmarks.md](./docs/05-specs-and-benchmarks/02-performance-benchmarks.md) | 六大核心算子基准性能台账、热路径消融评测与 157/157 测试套件防劣化回归护栏 | ✅ 已对齐 |
+| [docs/05-specs-and-benchmarks/02-performance-benchmarks.md](./docs/05-specs-and-benchmarks/02-performance-benchmarks.md) | 六大核心算子基准性能台账、热路径消融评测与 <!-- METRICS:BEGIN test-suite-count -->**163 套**<!-- METRICS:END test-suite-count -->测试套件防劣化回归护栏 | ✅ 已对齐 |
 | [docs/05-specs-and-benchmarks/03-comment-and-header-standard.md](./docs/05-specs-and-benchmarks/03-comment-and-header-standard.md) | 六字段模块文件头契约、有效注释密度 (ECD-C) 算法与 `gate:comments` 棘轮 | ✅ 已对齐 |
 | [docs/05-specs-and-benchmarks/04-cross-language-generalization.md](./docs/05-specs-and-benchmarks/04-cross-language-generalization.md) | 项目中立性护栏 (`validate-project-neutrality`) 与文件语义角色推导 (`file-role-inference.ts`) | ✅ 已对齐 |
 | [docs/05-specs-and-benchmarks/05-consumer-integration.md](./docs/05-specs-and-benchmarks/05-consumer-integration.md) | `baseline.json` 1.2.0 信用消耗语义、单向棘轮与兄弟工程 (`workspace-timing` / `WebGames`) 接入 | ✅ 已对齐 |
@@ -75,7 +75,7 @@
 | [docs/PRAXIS_HANDOFF_REPORT.md](./docs/PRAXIS_HANDOFF_REPORT.md) | **Praxis 团队对接交付总报告（Executive Handoff Report）** | ✅ 已交付 |
 | [docs/06-praxis-delivery/01-praxis-architecture-and-spi-contracts.md](./docs/06-praxis-delivery/01-praxis-architecture-and-spi-contracts.md) | Praxis 对接架构全景、核心数据契约（`PraxisCardContext` / `ReviewDiffHunk`）与核心 SPI 扩展插槽手册 | ✅ 已交付 |
 | [docs/06-praxis-delivery/02-praxis-six-governance-services-api.md](./docs/06-praxis-delivery/02-praxis-six-governance-services-api.md) | Praxis 治理服务门面、工作区管理器与统一客户端 SDK (`PraxisReviewClient`) API 手册 | ✅ 已交付 |
-| [docs/06-praxis-delivery/03-praxis-integration-runbook-and-acceptance.md](./docs/06-praxis-delivery/03-praxis-integration-runbook-and-acceptance.md) | Praxis 团队端到端 TypeScript 联调代码范例、异常降级 SLA 与 157/157 自动化验收矩阵 | ✅ 已交付 |
+| [docs/06-praxis-delivery/03-praxis-integration-runbook-and-acceptance.md](./docs/06-praxis-delivery/03-praxis-integration-runbook-and-acceptance.md) | Praxis 团队端到端 TypeScript 联调代码范例、异常降级 SLA 与 <!-- METRICS:BEGIN test-suite-count -->**163 套**<!-- METRICS:END test-suite-count -->自动化验收矩阵 | ✅ 已交付 |
 | [docs/06-praxis-delivery/04-praxis-layervfs-integration-guide.md](./docs/06-praxis-delivery/04-praxis-layervfs-integration-guide.md) | LayerVFS 虚拟工作区集成实战指南、FastCDC 切块、CAS 零拷贝分叉、沙箱投影执行与 MCTS 重构锦标赛对接手册 | ✅ 已交付 |
 | [docs/praxis-integration-guide.md](./docs/praxis-integration-guide.md) | **Praxis 统一客户端 SDK (IPraxisReviewClient)、一体两面三层拓扑 Diff 与面向 Agent 结构化指令集成手册** | ✅ 已交付 |
 

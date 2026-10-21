@@ -1,6 +1,6 @@
 # 📚 auto-refactor 分层技术文档与 Praxis 交付中心 | Documentation Hub
 
-> **当前文档基线**：`auto-refactor` v0.4.0（对齐 TypeScript + Rust N-API 六算子核、八语言语义 IR、30 内置分析器与 362 规则体系、157/157 测试套件、LayerVFS 虚拟分叉与 MCTS 探索树、三平面质量度量与 Praxis 统一开发者 SDK 门面）。  
+> **当前文档基线**：`auto-refactor` v0.4.0（对齐 TypeScript + Rust N-API 六算子核、八语言语义 IR、30 内置分析器与 362 规则体系、<!-- METRICS:BEGIN test-suite-count -->**163 套**<!-- METRICS:END test-suite-count -->测试套件、LayerVFS 虚拟分叉与 MCTS 探索树、三平面质量度量与 Praxis 统一开发者 SDK 门面）。  
 > **历史文档封存位置**：全量历史技术文档已完整封存至 [`archive/auto-refactor/docs-snapshot-20261018/`](../../archive/auto-refactor/docs-snapshot-20261018/)、[`archive/auto-refactor/docs-snapshot-20261010/`](../../archive/auto-refactor/docs-snapshot-20261010/) 与 [`archive/auto-refactor/docs-snapshot-20260928/`](../../archive/auto-refactor/docs-snapshot-20260928/)。
 
 ---
@@ -26,12 +26,12 @@
 * [03-praxis-integration-guide.md](./03-incremental-and-diff/03-praxis-integration-guide.md)：`CircularDiffBuffer` 环形缓冲、`Uint8Array` R4 二进制冷存淘汰与 `SemanticPraxisContextEnricher` 作用域富集指南。
 
 ### 🔍 L4. 四层规则金字塔与内置分析器矩阵 (`04-analyzers-and-rules/`)
-* [01-builtin-rules.md](./04-analyzers-and-rules/01-builtin-rules.md)：四层规则金字塔、30 个内置分析器包、机读英文 + 人读中文双轨文案契约，以及 **362 条全量内置规则权威字典（362/362 门禁覆盖，全工作区 SSOT 单源收录 500 条）**。
+* [01-builtin-rules.md](./04-analyzers-and-rules/01-builtin-rules.md)：四层规则金字塔、30 个内置分析器包、机读英文 + 人读中文双轨文案契约，以及 **362 条全量内置规则权威字典（362/362 门禁覆盖，全工作区 SSOT 单源收录 502 条）**。
 * [02-custom-analyzer-plugin.md](./04-analyzers-and-rules/02-custom-analyzer-plugin.md)：声明式 `PatternKernel` 与编程式 `Analyzer` 插件开发规范、`cacheCustom` 安全隔离及评分表接入流程。
 
 ### 📊 L5. 配置契约、三平面质量度量与性能基准 (`05-specs-and-benchmarks/`)
 * [01-config-and-reports.md](./05-specs-and-benchmarks/01-config-and-reports.md)：`auto-refactor.config.json` 完整 Schema、30 分析器与 362 规则默认阈值、`.refactor-trajectory/` 紧凑账本规范 (< 350B, *Ms) 与 JSON/SARIF/Text 报告契约。
-* [02-performance-benchmarks.md](./05-specs-and-benchmarks/02-performance-benchmarks.md)：6 大核心算子性能基准台账（SWAR 6,448 MB/s, BPM 17.8 µs）、157/157 测试套件全量自测与防劣化回归护栏。
+* [02-performance-benchmarks.md](./05-specs-and-benchmarks/02-performance-benchmarks.md)：6 大核心算子性能基准台账（SWAR 6,448 MB/s, BPM 17.8 µs）、<!-- METRICS:BEGIN test-suite-count -->**163 套**<!-- METRICS:END test-suite-count -->测试套件全量自测与防劣化回归护栏。
 * [03-comment-and-header-standard.md](./05-specs-and-benchmarks/03-comment-and-header-standard.md)：规范六字段模块头契约 (`CMT-HDR-001`)、有效注释密度 (ECD-C) 算法模型与真实注释规则字典。
 * [04-cross-language-generalization.md](./05-specs-and-benchmarks/04-cross-language-generalization.md)：项目中立性不变量 (`validate-project-neutrality`) 与文件语义角色自动推导 (`file-role-inference.ts`)。
 * [05-consumer-integration.md](./05-specs-and-benchmarks/05-consumer-integration.md)：`baseline.json` 1.2.0 信用消耗语义、零高危债务防线 (`critical = 0, high = 0`) 以及 `workspace-timing` / `WebGames` 差异化接入范式。
@@ -39,10 +39,10 @@
 * [07-quantified-quality-standard.md](./05-specs-and-benchmarks/07-quantified-quality-standard.md)：10 细粒度维度到 8 战略支柱映射、双曲饱和衰减、安全动态天花板、三平面风险共振 ($S^{1.0} \cdot D^{1.2} \cdot H^{0.8}$) 与 **CAI 2.0 纯客观 6 维自研率**（Jeffreys Beta 后验）。
 
 ### 🤝 L6. 对接 Praxis 团队专属交付专层 (`06-praxis-delivery/`)
-* [PRAXIS_HANDOFF_REPORT.md](./PRAXIS_HANDOFF_REPORT.md)：**Praxis 团队对接交付总报告（Executive Handoff）**（30 分析器、362 规则体系、157/157 测试套件、LayerVFS 虚拟分叉与 MCTS 探索树）。
+* [PRAXIS_HANDOFF_REPORT.md](./PRAXIS_HANDOFF_REPORT.md)：**Praxis 团队对接交付总报告（Executive Handoff）**（30 分析器、362 规则体系、163 套测试套件、LayerVFS 虚拟分叉与 MCTS 探索树）。
 * [01-praxis-architecture-and-spi-contracts.md](./06-praxis-delivery/01-praxis-architecture-and-spi-contracts.md)：`PraxisCardContext`、`ReviewDiffHunk` 数据模型，底层差分 AST 完备性与表现层去重双层解耦公理，以及**核心 SPI 扩展插槽**（含表现层与 LayerVFS 存储 SPI）。
 * [02-praxis-six-governance-services-api.md](./06-praxis-delivery/02-praxis-six-governance-services-api.md)：核心治理服务与统一开发者 SDK 门面 [`PraxisReviewClient`](../src/core/praxis/praxis-review-client.ts) (`createPraxisClient`) API 完整手册，含虚拟工作区分叉与沙箱投影接口。
-* [03-praxis-integration-runbook-and-acceptance.md](./06-praxis-delivery/03-praxis-integration-runbook-and-acceptance.md)：端到端 TypeScript 联调代码范例、11 组 `SEMANTIC_OVERLAP_GROUPS` 并查集去重消费规范与 **157/157 自动化验收矩阵**。
+* [03-praxis-integration-runbook-and-acceptance.md](./06-praxis-delivery/03-praxis-integration-runbook-and-acceptance.md)：端到端 TypeScript 联调代码范例、11 组 `SEMANTIC_OVERLAP_GROUPS` 并查集去重消费规范与 <!-- METRICS:BEGIN test-suite-count -->**163 套**<!-- METRICS:END test-suite-count -->自动化验收矩阵。
 * [04-praxis-layervfs-integration-guide.md](./06-praxis-delivery/04-praxis-layervfs-integration-guide.md)：LayerVFS 虚拟工作区集成实战指南、FastCDC 切块、CAS 零拷贝分叉、沙箱投影执行与 MCTS 重构锦标赛对接手册。
 * [praxis-integration-guide.md](./praxis-integration-guide.md)：**Praxis 统一客户端 SDK (IPraxisReviewClient)、一体两面三层拓扑 Diff 与面向 Agent 结构化指令集成手册**。
 
