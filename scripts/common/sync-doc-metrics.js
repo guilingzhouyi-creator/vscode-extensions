@@ -333,6 +333,7 @@ function buildResolvers() {
     'step-audit-all': () => stepCount('audit-all'),
     'step-audit-taxis': () => stepCount('audit-taxis'),
     'step-total': () => Object.keys(entries).reduce((sum, name) => sum + stepCount(name), 0),
+    'pillar-count': () => stepCount('audit-all'),
     'iso-pairs': () =>
       ISO_DOMAIN_ROOTS.reduce((sum, root) => sum + countIsomorphicPairs(root), 0),
     'iso-pairs-root': () => countIsomorphicPairs(''),

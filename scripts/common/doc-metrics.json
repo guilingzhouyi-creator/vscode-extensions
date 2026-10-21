@@ -113,6 +113,13 @@
       "inline": "**{value} 个语义步骤**"
     },
     {
+      "id": "pillar-count",
+      "title": "全工作区审查子系统数",
+      "source": "scripts/common/gate-step-registry.json#entries.audit-all steps",
+      "template": "**{value} 大支柱**",
+      "inline": "**{value} 大支柱**"
+    },
+    {
       "id": "step-total",
       "title": "门禁语义步骤总数",
       "source": "scripts/common/gate-step-registry.json#all entries",

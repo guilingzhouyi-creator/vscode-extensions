@@ -10,7 +10,7 @@
 
 | 脚本名 | 对应 PowerShell 脚本 | 职能域 | 核心职责 | 调用方 |
 | :--- | :--- | :--- | :--- | :--- |
-| `audit-all.sh` | `scripts/ps1/audit-all.ps1` | audit / review | 全工作区跨项目统一质量审查中枢（五大支柱 100% 绿色通行） | 本地 CLI、CI |
+| `audit-all.sh` | `scripts/ps1/audit-all.ps1` | audit / review | 全工作区跨项目统一质量审查中枢（<!-- METRICS:BEGIN pillar-count -->**6 大支柱**<!-- METRICS:END pillar-count --> 100% 绿色通行） | 本地 CLI、CI |
 | `check-display-assets.sh` | `scripts/ps1/check-display-assets.ps1` | ci / package | VS Code 扩展打包资产健全性校验（图标、展示图与 README） | `package.sh`、CI |
 | `commit-msg-gate.sh` | `scripts/ps1/commit-msg-gate.ps1` | gate / commit | 生产工程级结构化提交信息格式、区块、反虚构与风格求实 8 项门禁 | `.githooks/commit-msg`、本地 CLI |
 | `install-hooks.sh` | `scripts/ps1/install-hooks.ps1` | tooling / git | 一键激活与初始化仓库级 Git 钩子（pre-commit, commit-msg, pre-push） | 本地 CLI |
