@@ -1,6 +1,6 @@
 {
   "schema": "workspace-rule-catalog/v1",
-  "generatedAt": "2026-10-21T12:04:37.498Z",
+  "generatedAt": "2026-10-21T12:18:07.841Z",
   "totalRules": 502,
   "counts": {
     "autoRefactor": 362,
@@ -162,210 +162,241 @@
       "project": "auto-refactor",
       "family": "ENG",
       "severity": "info",
-      "summary": "Analyzer threw an unhandled exception on a single file (escalates to error if failOnAnalyzerError is set)."
+      "summary": "Analyzer threw an unhandled exception on a single file (escalates to error if failOnAnalyzerError is set).",
+      "canonical": false,
+      "legacyReason": "id-not-canonical"
     },
     {
       "id": "ARCH-ABS-001",
       "project": "auto-refactor",
       "family": "ARCH",
       "severity": "warning",
-      "summary": "Over-abstraction and redundant indirection: introducing cross-layer forwardingtrampolines, inverted dependencies, or cycles for trivial commonalities."
+      "summary": "Over-abstraction and redundant indirection: introducing cross-layer forwardingtrampolines, inverted dependencies, or cycles for trivial commonalities.",
+      "canonical": true
     },
     {
       "id": "ARCH-BLR-001",
       "project": "auto-refactor",
       "family": "ARCH",
       "severity": "warning",
-      "summary": "File boundary imbalance: multiple high-complexity functions in a single file lacksemantic cohesion, abnormally aggregating responsibilities."
+      "summary": "File boundary imbalance: multiple high-complexity functions in a single file lacksemantic cohesion, abnormally aggregating responsibilities.",
+      "canonical": true
     },
     {
       "id": "ARCH-BND-001",
       "project": "auto-refactor",
       "family": "ARCH",
       "severity": "warning",
-      "summary": "Cross-domain internal penetration: bypassing public export facade contracts to directly access private internal implementations."
+      "summary": "Cross-domain internal penetration: bypassing public export facade contracts to directly access private internal implementations.",
+      "canonical": true
     },
     {
       "id": "ARCH-CFG-001",
       "project": "auto-refactor",
       "family": "ARCH",
       "severity": "info",
-      "summary": "Environment configuration leak: pure domain models directly read environment variables or disk configuration files."
+      "summary": "Environment configuration leak: pure domain models directly read environment variables or disk configuration files.",
+      "canonical": true
     },
     {
       "id": "ARCH-CFG-002",
       "project": "auto-refactor",
       "family": "ARCH",
       "severity": "warning",
-      "summary": "Declared configuration property is never referenced in decisions, control flow, orcalculations across the codebase (dead configuration)."
+      "summary": "Declared configuration property is never referenced in decisions, control flow, orcalculations across the codebase (dead configuration).",
+      "canonical": true
     },
     {
       "id": "ARCH-CFG-003",
       "project": "auto-refactor",
       "family": "ARCH",
       "severity": "warning",
-      "summary": "Duplicate configuration entries declared across multiple locations, violating single source of truth."
+      "summary": "Duplicate configuration entries declared across multiple locations, violating single source of truth.",
+      "canonical": true
     },
     {
       "id": "ARCH-CFG-004",
       "project": "auto-refactor",
       "family": "ARCH",
       "severity": "warning",
-      "summary": "Implicit configuration scatter: business code directly reads environment variables or tuning constants."
+      "summary": "Implicit configuration scatter: business code directly reads environment variables or tuning constants.",
+      "canonical": true
     },
     {
       "id": "ARCH-CFG-005",
       "project": "auto-refactor",
       "family": "ARCH",
       "severity": "warning",
-      "summary": "Unstructured configuration access: accessing configuration in an unstructured,arbitrary manner across layers without a centralized registry."
+      "summary": "Unstructured configuration access: accessing configuration in an unstructured,arbitrary manner across layers without a centralized registry.",
+      "canonical": true
     },
     {
       "id": "ARCH-CFG-006",
       "project": "auto-refactor",
       "family": "ARCH",
       "severity": "warning",
-      "summary": "Configuration tightly coupled with domain logic: domain models directly bind tospecific config file formats or disk parsers."
+      "summary": "Configuration tightly coupled with domain logic: domain models directly bind tospecific config file formats or disk parsers.",
+      "canonical": true
     },
     {
       "id": "ARCH-CFG-007",
       "project": "auto-refactor",
       "family": "ARCH",
       "severity": "info",
-      "summary": "Configuration over-abstraction: simple static configuration introduces excessiveunnecessary indirection and forwarding layers."
+      "summary": "Configuration over-abstraction: simple static configuration introduces excessiveunnecessary indirection and forwarding layers.",
+      "canonical": true
     },
     {
       "id": "ARCH-CFG-008",
       "project": "auto-refactor",
       "family": "ARCH",
       "severity": "warning",
-      "summary": "Flat configuration sprawl antipattern: large volume of configuration files sprawledacross root directory without domain isomorphic hierarchy."
+      "summary": "Flat configuration sprawl antipattern: large volume of configuration files sprawledacross root directory without domain isomorphic hierarchy.",
+      "canonical": true
     },
     {
       "id": "ARCH-CFG-009",
       "project": "auto-refactor",
       "family": "ARCH",
       "severity": "warning",
-      "summary": "Configuration sub-table routing contract breach: unregistered sub-table detached fromcore routing contract, lacking dot-notation routing."
+      "summary": "Configuration sub-table routing contract breach: unregistered sub-table detached fromcore routing contract, lacking dot-notation routing.",
+      "canonical": true
     },
     {
       "id": "ARCH-DEC-002",
       "project": "auto-refactor",
       "family": "ARCH",
       "severity": "warning",
-      "summary": "Polyglot AST parsing and adapter logic must be decoupled into independent adaptermodules; analyzer core must not mix AST construction details."
+      "summary": "Polyglot AST parsing and adapter logic must be decoupled into independent adaptermodules; analyzer core must not mix AST construction details.",
+      "canonical": true
     },
     {
       "id": "ARCH-DIR-001",
       "project": "auto-refactor",
       "family": "ARCH",
       "severity": "warning",
-      "summary": "Core reverse flow: domain layer inversely depends on outer application, infrastructure, or interface layers."
+      "summary": "Core reverse flow: domain layer inversely depends on outer application, infrastructure, or interface layers.",
+      "canonical": true
     },
     {
       "id": "ARCH-DIR-002",
       "project": "auto-refactor",
       "family": "ARCH",
       "severity": "warning",
-      "summary": "Layer bypass: interface layer controllers bypass application services to directly couple with infrastructure implementations."
+      "summary": "Layer bypass: interface layer controllers bypass application services to directly couple with infrastructure implementations.",
+      "canonical": true
     },
     {
       "id": "ARCH-DIR-003",
       "project": "auto-refactor",
       "family": "ARCH",
       "severity": "error",
-      "summary": "Formal layering illusion: directory structure appears separated, but call graphs and data flows violate layer boundaries."
+      "summary": "Formal layering illusion: directory structure appears separated, but call graphs and data flows violate layer boundaries.",
+      "canonical": true
     },
     {
       "id": "ARCH-DISP-001",
       "project": "auto-refactor",
       "family": "ARCH",
       "severity": "warning",
-      "summary": "Monolithic dispatchers with excessive branches (> 8) tightly couple domain logic, violating the Open-Closed Principle."
+      "summary": "Monolithic dispatchers with excessive branches (> 8) tightly couple domain logic, violating the Open-Closed Principle.",
+      "canonical": true
     },
     {
       "id": "ARCH-DSP-002",
       "project": "auto-refactor",
       "family": "ARCH",
       "severity": "warning",
-      "summary": "Dispatcher closure fragmentation: Object literal defines excessive inline function closures (>= 15), causing closure explosion and function inflation."
+      "summary": "Dispatcher closure fragmentation: Object literal defines excessive inline function closures (>= 15), causing closure explosion and function inflation.",
+      "canonical": true
     },
     {
       "id": "ARCH-FAC-001",
       "project": "auto-refactor",
       "family": "ARCH",
       "severity": "warning",
-      "summary": "Hollow facade payload and insufficient density: facade module lacks substantive domainorchestration, schema validation, or immutability contracts."
+      "summary": "Hollow facade payload and insufficient density: facade module lacks substantive domainorchestration, schema validation, or immutability contracts.",
+      "canonical": true
     },
     {
       "id": "ARCH-GLB-001",
       "project": "auto-refactor",
       "family": "ARCH",
       "severity": "warning",
-      "summary": "Implicit global mutable state: modules are tightly coupled via top-level global variables or static singletons."
+      "summary": "Implicit global mutable state: modules are tightly coupled via top-level global variables or static singletons.",
+      "canonical": true
     },
     {
       "id": "ARCH-HDL-001",
       "project": "auto-refactor",
       "family": "ARCH",
       "severity": "error",
-      "summary": "Headless architecture breach: core business logic or calculation modules directly bind to UI/IDE view frameworks."
+      "summary": "Headless architecture breach: core business logic or calculation modules directly bind to UI/IDE view frameworks.",
+      "canonical": true
     },
     {
       "id": "ARCH-LEAK-001",
       "project": "auto-refactor",
       "family": "ARCH",
       "severity": "warning",
-      "summary": "Responsibility leak: pure domain models directly reference or leak external frameworks (Express, Vue, Godot, ORM)."
+      "summary": "Responsibility leak: pure domain models directly reference or leak external frameworks (Express, Vue, Godot, ORM).",
+      "canonical": true
     },
     {
       "id": "ARCH-LEAK-002",
       "project": "auto-refactor",
       "family": "ARCH",
       "severity": "warning",
-      "summary": "Layer boundary breach: outer implementations are directly referenced by inner layers (Clean/DDD inverted hierarchy)."
+      "summary": "Layer boundary breach: outer implementations are directly referenced by inner layers (Clean/DDD inverted hierarchy).",
+      "canonical": true
     },
     {
       "id": "ARCH-PLM-001",
       "project": "auto-refactor",
       "family": "ARCH",
       "severity": "warning",
-      "summary": "Plumbing overhead ratio (POR) exceeds threshold; wiring code dominates logic payload."
+      "summary": "Plumbing overhead ratio (POR) exceeds threshold; wiring code dominates logic payload.",
+      "canonical": true
     },
     {
       "id": "ARCH-ROL-001",
       "project": "auto-refactor",
       "family": "ARCH",
       "severity": "warning",
-      "summary": "File entity role imbalance and pseudo-shared library: file carries excessive mutablestate or coupled logic but is heavily imported as a shared library."
+      "summary": "File entity role imbalance and pseudo-shared library: file carries excessive mutablestate or coupled logic but is heavily imported as a shared library.",
+      "canonical": true
     },
     {
       "id": "ARCH-ROL-002",
       "project": "auto-refactor",
       "family": "ARCH",
       "severity": "warning",
-      "summary": "Business module harboring unbounded common capabilities: domain module internally hostsand exports general infrastructure or utilities."
+      "summary": "Business module harboring unbounded common capabilities: domain module internally hostsand exports general infrastructure or utilities.",
+      "canonical": true
     },
     {
       "id": "ARCH-SKL-001",
       "project": "auto-refactor",
       "family": "ARCH",
       "severity": "info",
-      "summary": "Strategy skeleton candidate: detected complex workflows sharing isomorphicpre-validation and post-execution teardown steps."
+      "summary": "Strategy skeleton candidate: detected complex workflows sharing isomorphicpre-validation and post-execution teardown steps.",
+      "canonical": true
     },
     {
       "id": "ARCH-TMP-001",
       "project": "auto-refactor",
       "family": "ARCH",
       "severity": "warning",
-      "summary": "Monolithic template renderer coupling: oversized function concatenates deep HTML/SVG/DSL templates without subcomponent decomposition."
+      "summary": "Monolithic template renderer coupling: oversized function concatenates deep HTML/SVG/DSL templates without subcomponent decomposition.",
+      "canonical": true
     },
     {
       "id": "ARCH-UTL-001",
       "project": "auto-refactor",
       "family": "ARCH",
       "severity": "warning",
-      "summary": "Kitchen-sink utility antipattern: detected utils/common dumping ground file accumulatingheterogeneous unstructured logic."
+      "summary": "Kitchen-sink utility antipattern: detected utils/common dumping ground file accumulatingheterogeneous unstructured logic.",
+      "canonical": true
     },
     {
       "project": "workspace-timing",
@@ -527,7 +558,9 @@
       "project": "auto-refactor",
       "family": "ARCH",
       "severity": "error",
-      "summary": "Layering boundary breach in incremental pipeline (clean-layer semantics)."
+      "summary": "Layering boundary breach in incremental pipeline (clean-layer semantics).",
+      "canonical": false,
+      "legacyReason": "id-not-canonical"
     },
     {
       "id": "CMG-PRJ-001",
@@ -597,413 +630,473 @@
       "project": "auto-refactor",
       "family": "CMP",
       "severity": "warning",
-      "summary": "Deeply nested inline callback chains create callback hell, complicate exceptionpropagation, and mask race conditions."
+      "summary": "Deeply nested inline callback chains create callback hell, complicate exceptionpropagation, and mask race conditions.",
+      "canonical": true
     },
     {
       "id": "CMP-DEN-001",
       "project": "auto-refactor",
       "family": "CMP",
       "severity": "warning",
-      "summary": "Dense syntactic packing of bitwise, arithmetic and conditional operators without namingor spacing exceeds human cognitive chunking capacity."
+      "summary": "Dense syntactic packing of bitwise, arithmetic and conditional operators without namingor spacing exceeds human cognitive chunking capacity.",
+      "canonical": true
     },
     {
       "id": "CMP-EXP-001",
       "project": "auto-refactor",
       "family": "CMP",
       "severity": "warning",
-      "summary": "Giant expressions with deeply nested ternaries or unbounded logical chains createcognitive overload and obscure branching logic."
+      "summary": "Giant expressions with deeply nested ternaries or unbounded logical chains createcognitive overload and obscure branching logic.",
+      "canonical": true
     },
     {
       "id": "CMP-LIN-001",
       "project": "auto-refactor",
       "family": "CMP",
       "severity": "warning",
-      "summary": "Cramming multiple distinct statements or side-effects onto a single line impairs stacktraces, debug stepping, and code readability."
+      "summary": "Cramming multiple distinct statements or side-effects onto a single line impairs stacktraces, debug stepping, and code readability.",
+      "canonical": true
     },
     {
       "id": "CMT-BAN-001",
       "project": "auto-refactor",
       "family": "CMT",
       "severity": "warning",
-      "summary": "Banner divider (═) used in small file (< 150 lines)."
+      "summary": "Banner divider (═) used in small file (< 150 lines).",
+      "canonical": true
     },
     {
       "id": "CMT-CON-001",
       "project": "auto-refactor",
       "family": "CMT",
       "severity": "warning",
-      "summary": "Async exported function lacks concurrency scheduling assumptions, reentrancy, or idempotence contract."
+      "summary": "Async exported function lacks concurrency scheduling assumptions, reentrancy, or idempotence contract.",
+      "canonical": true
     },
     {
       "id": "CMT-DOC-001",
       "project": "auto-refactor",
       "family": "CMT",
       "severity": "warning",
-      "summary": "Public exported symbol lacks Docstring/JSDoc description, parameters, or return type documentation."
+      "summary": "Public exported symbol lacks Docstring/JSDoc description, parameters, or return type documentation.",
+      "canonical": true
     },
     {
       "id": "CMT-DOC-002",
       "project": "auto-refactor",
       "family": "CMT",
       "severity": "warning",
-      "summary": "Tautological redundant comment merely repeating symbol or function name."
+      "summary": "Tautological redundant comment merely repeating symbol or function name.",
+      "canonical": true
     },
     {
       "id": "CMT-HDR-001",
       "project": "auto-refactor",
       "family": "CMT",
       "severity": "warning",
-      "summary": "Source file missing top-level file header comment explaining responsibility and design intent."
+      "summary": "Source file missing top-level file header comment explaining responsibility and design intent.",
+      "canonical": true
     },
     {
       "id": "CMT-HDR-002",
       "project": "auto-refactor",
       "family": "CMT",
       "severity": "warning",
-      "summary": "Standard strict six-field file header missing one of six mandatory fields (Module, File Path, Architecture Role, Dependencies & Triggers, Responsibilities, Exit Semantics & Design Rationale)."
+      "summary": "Standard strict six-field file header missing one of six mandatory fields (Module, File Path, Architecture Role, Dependencies & Triggers, Responsibilities, Exit Semantics & Design Rationale).",
+      "canonical": true
     },
     {
       "id": "CMT-HDR-003",
       "project": "auto-refactor",
       "family": "CMT",
       "severity": "warning",
-      "summary": "File header declared path does not match actual physical file path."
+      "summary": "File header declared path does not match actual physical file path.",
+      "canonical": true
     },
     {
       "id": "CMT-HDR-004",
       "project": "auto-refactor",
       "family": "CMT",
       "severity": "warning",
-      "summary": "File layout order violation: top-level six-field module header comment must precede all non-directive code statements."
+      "summary": "File layout order violation: top-level six-field module header comment must precede all non-directive code statements.",
+      "canonical": true
     },
     {
       "id": "CMT-INT-001",
       "project": "auto-refactor",
       "family": "CMT",
       "severity": "warning",
-      "summary": "Documented contract (pure, side-effect free, thread-safe) contradicts actual AST data flow or side effects."
+      "summary": "Documented contract (pure, side-effect free, thread-safe) contradicts actual AST data flow or side effects.",
+      "canonical": true
     },
     {
       "id": "CMT-LNG-001",
       "project": "auto-refactor",
       "family": "CMT",
       "severity": "warning",
-      "summary": "Comment language deviates from dominant project or domain standard."
+      "summary": "Comment language deviates from dominant project or domain standard.",
+      "canonical": true
     },
     {
       "id": "CMT-LNG-002",
       "project": "auto-refactor",
       "family": "CMT",
       "severity": "warning",
-      "summary": "Unordered interleaving of languages in comments within a single file."
+      "summary": "Unordered interleaving of languages in comments within a single file.",
+      "canonical": true
     },
     {
       "id": "CMT-MOJI-001",
       "project": "auto-refactor",
       "family": "CMT",
       "severity": "warning",
-      "summary": "Encoding corruption detected (U+FFFD replacement characters, UTF-8 decoded as Latin-1, or Windows-1252 mojibake)."
+      "summary": "Encoding corruption detected (U+FFFD replacement characters, UTF-8 decoded as Latin-1, or Windows-1252 mojibake).",
+      "canonical": true
     },
     {
       "id": "CMT-SEP-001",
       "project": "auto-refactor",
       "family": "CMT",
       "severity": "warning",
-      "summary": "Inconsistent section separator styles mixed in same file (short ── title ── vs long ──── title)."
+      "summary": "Inconsistent section separator styles mixed in same file (short ── title ── vs long ──── title).",
+      "canonical": true
     },
     {
       "id": "CMT-TRM-001",
       "project": "auto-refactor",
       "family": "CMT",
       "severity": "warning",
-      "summary": "Comment or docstring contains non-factual terminology, casual phrasing, hyperbolic assertions, or emotional slurs."
+      "summary": "Comment or docstring contains non-factual terminology, casual phrasing, hyperbolic assertions, or emotional slurs.",
+      "canonical": true
     },
     {
       "id": "CMT-VMD-001",
       "project": "auto-refactor",
       "family": "CMT",
       "severity": "warning",
-      "summary": "Low semantic comment density or verbatim line-by-line translation without explaining intent."
+      "summary": "Low semantic comment density or verbatim line-by-line translation without explaining intent.",
+      "canonical": true
     },
     {
       "id": "CMT-WID-001",
       "project": "auto-refactor",
       "family": "CMT",
       "severity": "warning",
-      "summary": "Comment or docstring physical line length exceeds 100 columns."
+      "summary": "Comment or docstring physical line length exceeds 100 columns.",
+      "canonical": true
     },
     {
       "id": "CONST-CLU-001",
       "project": "auto-refactor",
       "family": "CONST",
       "severity": "warning",
-      "summary": "Multiple homogeneous unextracted literals (status codes, protocols, paths, events) in the same call scope should be clustered and extracted together."
+      "summary": "Multiple homogeneous unextracted literals (status codes, protocols, paths, events) in the same call scope should be clustered and extracted together.",
+      "canonical": true
     },
     {
       "id": "CONST-DRF-001",
       "project": "auto-refactor",
       "family": "CONST",
       "severity": "warning",
-      "summary": "Homogeneous semantic constants across files have naming splits or minor value drifts, violating single source of truth (SSOT)."
+      "summary": "Homogeneous semantic constants across files have naming splits or minor value drifts, violating single source of truth (SSOT).",
+      "canonical": true
     },
     {
       "id": "CONST-LAY-001",
       "project": "auto-refactor",
       "family": "CONST",
       "severity": "warning",
-      "summary": "Module-level constants must be placed in the primary declaration section immediately following imports, not scattered within functions or business logic."
+      "summary": "Module-level constants must be placed in the primary declaration section immediately following imports, not scattered within functions or business logic.",
+      "canonical": true
     },
     {
       "id": "CONST-LAY-002",
       "project": "auto-refactor",
       "family": "CONST",
       "severity": "warning",
-      "summary": "Type definitions, interfaces, and contract shapes must be declared before core functions and business logic classes."
+      "summary": "Type definitions, interfaces, and contract shapes must be declared before core functions and business logic classes.",
+      "canonical": true
     },
     {
       "id": "CONST-LIB-001",
       "project": "auto-refactor",
       "family": "CONST",
       "severity": "warning",
-      "summary": "Large volumes of constants are scattered across business files without a structured, tiered constant library."
+      "summary": "Large volumes of constants are scattered across business files without a structured, tiered constant library.",
+      "canonical": true
     },
     {
       "id": "CONST-OWN-001",
       "project": "auto-refactor",
       "family": "CONST",
       "severity": "warning",
-      "summary": "Shared constant ownership is misclassified; avoid dumping constants into kitchen-sink files or hiding them in private modules."
+      "summary": "Shared constant ownership is misclassified; avoid dumping constants into kitchen-sink files or hiding them in private modules.",
+      "canonical": true
     },
     {
       "id": "CONST-SCP-001",
       "project": "auto-refactor",
       "family": "CONST",
       "severity": "warning",
-      "summary": "Local invariants, lazily initialized values, or short-lived resources must not be needlessly hoisted to module scope."
+      "summary": "Local invariants, lazily initialized values, or short-lived resources must not be needlessly hoisted to module scope.",
+      "canonical": true
     },
     {
       "id": "CONST-SCP-002",
       "project": "auto-refactor",
       "family": "CONST",
       "severity": "info",
-      "summary": "Multiple identical local literals in a function should be consolidated as local constants at the function header."
+      "summary": "Multiple identical local literals in a function should be consolidated as local constants at the function header.",
+      "canonical": true
     },
     {
       "id": "CPX-AMP-001",
       "project": "auto-refactor",
       "family": "CPX",
       "severity": "warning",
-      "summary": "Complexity amplification trap: blocking I/O or serialization implicitly nested initeration or hot call chains."
+      "summary": "Complexity amplification trap: blocking I/O or serialization implicitly nested initeration or hot call chains.",
+      "canonical": true
     },
     {
       "id": "CPX-BUD-001",
       "project": "auto-refactor",
       "family": "CPX",
       "severity": "warning",
-      "summary": "Elastic complexity budget exceeded based on comprehensive language, role, scope, and clarity metrics."
+      "summary": "Elastic complexity budget exceeded based on comprehensive language, role, scope, and clarity metrics.",
+      "canonical": true
     },
     {
       "id": "CPX-HOP-001",
       "project": "auto-refactor",
       "family": "CPX",
       "severity": "warning",
-      "summary": "Artificial splitting gaming: artificially deflating complexity by generatingexcessive single-line pass-through forwarding functions."
+      "summary": "Artificial splitting gaming: artificially deflating complexity by generatingexcessive single-line pass-through forwarding functions.",
+      "canonical": true
     },
     {
       "id": "CPX-JST-001",
       "project": "auto-refactor",
       "family": "CPX",
       "severity": "warning",
-      "summary": "Uncontrolled complexity without architectural justification: high complexityoriginates from chaotic nesting and responsibility piling."
+      "summary": "Uncontrolled complexity without architectural justification: high complexityoriginates from chaotic nesting and responsibility piling.",
+      "canonical": true
     },
     {
       "id": "CPX-NEST-001",
       "project": "auto-refactor",
       "family": "CPX",
       "severity": "warning",
-      "summary": "Uncontrolled deep control flow nesting: control flow nesting level exceeds elasticbudget for context type (business > 3, state machine > 5)."
+      "summary": "Uncontrolled deep control flow nesting: control flow nesting level exceeds elasticbudget for context type (business > 3, state machine > 5).",
+      "canonical": true
     },
     {
       "id": "CPX-NEST-002",
       "project": "auto-refactor",
       "family": "CPX",
       "severity": "warning",
-      "summary": "Deep long-span control flow escape: unstructured control flow escape(return/break/throw) executed in deep nesting (>= 4) far from function header."
+      "summary": "Deep long-span control flow escape: unstructured control flow escape(return/break/throw) executed in deep nesting (>= 4) far from function header.",
+      "canonical": true
     },
     {
       "id": "CPX-REC-001",
       "project": "auto-refactor",
       "family": "CPX",
       "severity": "error",
-      "summary": "Recursive or mutually recursive call chain without guaranteed termination guards across functions/files."
+      "summary": "Recursive or mutually recursive call chain without guaranteed termination guards across functions/files.",
+      "canonical": true
     },
     {
       "id": "CPX-RED-001",
       "project": "auto-refactor",
       "family": "CPX",
       "severity": "warning",
-      "summary": "Distributed redundant complexity: highly similar algorithms, calculations, orvalidations scattered across multiple files creating latent complexity."
+      "summary": "Distributed redundant complexity: highly similar algorithms, calculations, orvalidations scattered across multiple files creating latent complexity.",
+      "canonical": true
     },
     {
       "id": "CPX-SPACE-001",
       "project": "auto-refactor",
       "family": "CPX",
       "severity": "warning",
-      "summary": "Unbounded transient memory allocation and repeated full materialization inside hot loops."
+      "summary": "Unbounded transient memory allocation and repeated full materialization inside hot loops.",
+      "canonical": true
     },
     {
       "id": "CPX-STM-001",
       "project": "auto-refactor",
       "family": "CPX",
       "severity": "info",
-      "summary": "State machine dispatch structure standard: single branch within state machinebranches exceeds 30 LOC, degrading dispatch skeleton clarity."
+      "summary": "State machine dispatch structure standard: single branch within state machinebranches exceeds 30 LOC, degrading dispatch skeleton clarity.",
+      "canonical": true
     },
     {
       "id": "CPX-TIME-001",
       "project": "auto-refactor",
       "family": "CPX",
       "severity": "warning",
-      "summary": "Unbounded polynomial time complexity across function/file boundaries: nestediteration call chains incur prohibitive overhead."
+      "summary": "Unbounded polynomial time complexity across function/file boundaries: nestediteration call chains incur prohibitive overhead.",
+      "canonical": true
     },
     {
       "id": "CPX-TRV-001",
       "project": "auto-refactor",
       "family": "CPX",
       "severity": "warning",
-      "summary": "Tautological loop traversal detected with zero or negligible state mutation entropy delta."
+      "summary": "Tautological loop traversal detected with zero or negligible state mutation entropy delta.",
+      "canonical": true
     },
     {
       "id": "DAT-DEF-001",
       "project": "auto-refactor",
       "family": "DAT",
       "severity": "info",
-      "summary": "Redundant defensive validations within trusted internal domain boundaries."
+      "summary": "Redundant defensive validations within trusted internal domain boundaries.",
+      "canonical": true
     },
     {
       "id": "DAT-LAY-001",
       "project": "auto-refactor",
       "family": "DAT",
       "severity": "warning",
-      "summary": "Data access abstraction leak: business core directly manipulates persistence drivers or storage details."
+      "summary": "Data access abstraction leak: business core directly manipulates persistence drivers or storage details.",
+      "canonical": true
     },
     {
       "id": "DAT-NPL-001",
       "project": "auto-refactor",
       "family": "DAT",
       "severity": "error",
-      "summary": "N+1 query pattern and repeated storage calls within iteration or mapping contexts."
+      "summary": "N+1 query pattern and repeated storage calls within iteration or mapping contexts.",
+      "canonical": true
     },
     {
       "id": "DAT-QRY-001",
       "project": "auto-refactor",
       "family": "DAT",
       "severity": "warning",
-      "summary": "Unbounded data retrieval or full-table in-memory filtering in online request paths."
+      "summary": "Unbounded data retrieval or full-table in-memory filtering in online request paths.",
+      "canonical": true
     },
     {
       "id": "DAT-RES-001",
       "project": "auto-refactor",
       "family": "DAT",
       "severity": "warning",
-      "summary": "Resource registry bidirectional mapping inconsistency or dangling asset: resourcecenter contains empty paths or dangling references."
+      "summary": "Resource registry bidirectional mapping inconsistency or dangling asset: resourcecenter contains empty paths or dangling references.",
+      "canonical": true
     },
     {
       "id": "DAT-SER-001",
       "project": "auto-refactor",
       "family": "DAT",
       "severity": "info",
-      "summary": "Repeated serialization and deserialization cycles across internal call chains."
+      "summary": "Repeated serialization and deserialization cycles across internal call chains.",
+      "canonical": true
     },
     {
       "id": "DEP-DEV-001",
       "project": "auto-refactor",
       "family": "DEP",
       "severity": "warning",
-      "summary": "Development-only dependency imported in production code: devDependencies package imported without type-only qualifier."
+      "summary": "Development-only dependency imported in production code: devDependencies package imported without type-only qualifier.",
+      "canonical": true
     },
     {
       "id": "DEP-INV-001",
       "project": "auto-refactor",
       "family": "DEP",
       "severity": "error",
-      "summary": "Dependency inversion violation: lower-level infrastructure or common modulesinversely depend on high-level business modules."
+      "summary": "Dependency inversion violation: lower-level infrastructure or common modulesinversely depend on high-level business modules.",
+      "canonical": true
     },
     {
       "id": "DEP-LAZ-001",
       "project": "auto-refactor",
       "family": "DEP",
       "severity": "warning",
-      "summary": "Function-scoped lazy import without audit declaration or documented rationale."
+      "summary": "Function-scoped lazy import without audit declaration or documented rationale.",
+      "canonical": true
     },
     {
       "id": "DEP-LIC-001",
       "project": "auto-refactor",
       "family": "DEP",
       "severity": "warning",
-      "summary": "High-risk restrictive or viral copyleft license (AGPL/GPL) dependency introduced in proprietary/commercial domain."
+      "summary": "High-risk restrictive or viral copyleft license (AGPL/GPL) dependency introduced in proprietary/commercial domain.",
+      "canonical": true
     },
     {
       "id": "DEP-OBS-001",
       "project": "auto-refactor",
       "family": "DEP",
       "severity": "warning",
-      "summary": "Deprecated or unmaintained package imported: third-party library is officially unmaintained or superseded by standard capabilities."
+      "summary": "Deprecated or unmaintained package imported: third-party library is officially unmaintained or superseded by standard capabilities.",
+      "canonical": true
     },
     {
       "id": "DEP-ORD-001",
       "project": "auto-refactor",
       "family": "DEP",
       "severity": "info",
-      "summary": "File layout and import grouping do not conform to modern polyglot engineering standards."
+      "summary": "File layout and import grouping do not conform to modern polyglot engineering standards.",
+      "canonical": true
     },
     {
       "id": "DEP-ORD-002",
       "project": "auto-refactor",
       "family": "DEP",
       "severity": "warning",
-      "summary": "File layout order violation: top-level import statement declared after contract types, constants, or business logic statements."
+      "summary": "File layout order violation: top-level import statement declared after contract types, constants, or business logic statements.",
+      "canonical": true
     },
     {
       "id": "DEP-PHANTOM-001",
       "project": "auto-refactor",
       "family": "DEP",
       "severity": "warning",
-      "summary": "Import of undeclared external package (phantom dependency) not listed in project manifests (package.json, pyproject.toml, Cargo.toml)."
+      "summary": "Import of undeclared external package (phantom dependency) not listed in project manifests (package.json, pyproject.toml, Cargo.toml).",
+      "canonical": true
     },
     {
       "id": "DEP-PIN-001",
       "project": "auto-refactor",
       "family": "DEP",
       "severity": "warning",
-      "summary": "Unpinned or wildcard dependency version: external package declared with floating wildcard (*, latest, open range) in project manifest."
+      "summary": "Unpinned or wildcard dependency version: external package declared with floating wildcard (*, latest, open range) in project manifest.",
+      "canonical": true
     },
     {
       "id": "DEP-RES-001",
       "project": "auto-refactor",
       "family": "DEP",
       "severity": "warning",
-      "summary": "Scattered hardcoded unmanaged external URLs, file paths, or connection strings in business logic."
+      "summary": "Scattered hardcoded unmanaged external URLs, file paths, or connection strings in business logic.",
+      "canonical": true
     },
     {
       "id": "DEP-VULN-001",
       "project": "auto-refactor",
       "family": "DEP",
       "severity": "error",
-      "summary": "Import of known-malicious, compromised, or severely vulnerable third-party package identified in supply chain integrity registry."
+      "summary": "Import of known-malicious, compromised, or severely vulnerable third-party package identified in supply chain integrity registry.",
+      "canonical": true
     },
     {
       "id": "DEP-WLD-001",
       "project": "auto-refactor",
       "family": "DEP",
       "severity": "warning",
-      "summary": "Wildcard import impairs explicit dependency tracking and tree-shaking optimization."
+      "summary": "Wildcard import impairs explicit dependency tracking and tree-shaking optimization.",
+      "canonical": true
     },
     {
       "id": "disallowed-import",
       "project": "auto-refactor",
       "family": "DEP",
       "severity": "error",
-      "summary": "Declarative import boundary violation: cross-group dependency or unauthorized external package import."
+      "summary": "Declarative import boundary violation: cross-group dependency or unauthorized external package import.",
+      "canonical": false,
+      "legacyReason": "id-not-canonical"
     },
     {
       "project": "workspace-timing",
@@ -1082,21 +1175,24 @@
       "project": "auto-refactor",
       "family": "DOC",
       "severity": "warning",
-      "summary": "Duplicate content lines (>= 24 chars) detected in documentation."
+      "summary": "Duplicate content lines (>= 24 chars) detected in documentation.",
+      "canonical": true
     },
     {
       "id": "DOC-FEN-001",
       "project": "auto-refactor",
       "family": "DOC",
       "severity": "error",
-      "summary": "Unclosed Markdown code fence detected."
+      "summary": "Unclosed Markdown code fence detected.",
+      "canonical": true
     },
     {
       "id": "DOC-LNK-001",
       "project": "auto-refactor",
       "family": "DOC",
       "severity": "warning",
-      "summary": "Backtick path or relative link points to non-existent file."
+      "summary": "Backtick path or relative link points to non-existent file.",
+      "canonical": true
     },
     {
       "project": "workspace-timing",
@@ -1127,49 +1223,58 @@
       "project": "auto-refactor",
       "family": "DOC",
       "severity": "warning",
-      "summary": "Documentation prose contains promotional slogans, hyperbolic claims, or unstandardized milestone jargon."
+      "summary": "Documentation prose contains promotional slogans, hyperbolic claims, or unstandardized milestone jargon.",
+      "canonical": true
     },
     {
       "id": "duplicate-literal",
       "project": "auto-refactor",
       "family": "CONST",
       "severity": "warning",
-      "summary": "Identical literal frequency exceeds threshold in the same file (default >= 3 occurrences)."
+      "summary": "Identical literal frequency exceeds threshold in the same file (default >= 3 occurrences).",
+      "canonical": false,
+      "legacyReason": "id-not-canonical"
     },
     {
       "id": "ERR-FLT-001",
       "project": "auto-refactor",
       "family": "ERR",
       "severity": "warning",
-      "summary": "Unhandled floating promise: asynchronous operation executed without await, return, void, or .catch() error handler."
+      "summary": "Unhandled floating promise: asynchronous operation executed without await, return, void, or .catch() error handler.",
+      "canonical": true
     },
     {
       "id": "ERR-MSG-001",
       "project": "auto-refactor",
       "family": "ERR",
       "severity": "warning",
-      "summary": "Vague or empty error diagnostic message: thrown error lacks actionable diagnostic context, root cause details, or troubleshooting hints."
+      "summary": "Vague or empty error diagnostic message: thrown error lacks actionable diagnostic context, root cause details, or troubleshooting hints.",
+      "canonical": true
     },
     {
       "id": "ERR-PRP-001",
       "project": "auto-refactor",
       "family": "ERR",
       "severity": "warning",
-      "summary": "Error code re-thrown across declarations or propagating through excessive call stack hops."
+      "summary": "Error code re-thrown across declarations or propagating through excessive call stack hops.",
+      "canonical": true
     },
     {
       "id": "expensive-loop-operation",
       "project": "auto-refactor",
       "family": "PRF",
       "severity": "error",
-      "summary": "Expensive deep copy (.duplicate(true)) or blocking serialization/IO executed inside a loop."
+      "summary": "Expensive deep copy (.duplicate(true)) or blocking serialization/IO executed inside a loop.",
+      "canonical": false,
+      "legacyReason": "id-not-canonical"
     },
     {
       "id": "EXT-DIR-001",
       "project": "auto-refactor",
       "family": "EXT",
       "severity": "error",
-      "summary": "File extension and directory classification guard: scripts must reside in dedicated domain subdirectories and never litter workspace root."
+      "summary": "File extension and directory classification guard: scripts must reside in dedicated domain subdirectories and never litter workspace root.",
+      "canonical": true
     },
     {
       "id": "FGT-ALG-001",
@@ -1312,287 +1417,328 @@
       "project": "auto-refactor",
       "family": "GDM",
       "severity": "warning",
-      "summary": "Presentation layer directly manipulates bare ProgressBar instance, bypassing KStatusBar standard animations."
+      "summary": "Presentation layer directly manipulates bare ProgressBar instance, bypassing KStatusBar standard animations.",
+      "canonical": true
     },
     {
       "id": "GDM-BND-001",
       "project": "auto-refactor",
       "family": "GDM",
       "severity": "warning",
-      "summary": "Presentation view directly couples with backend domain singletons or cross-layer global EventBus subscriptions."
+      "summary": "Presentation view directly couples with backend domain singletons or cross-layer global EventBus subscriptions.",
+      "canonical": true
     },
     {
       "id": "GDM-CONNECT-001",
       "project": "auto-refactor",
       "family": "GDM",
       "severity": "warning",
-      "summary": "Legacy Godot 3 signal connect signature passing method name as a string."
+      "summary": "Legacy Godot 3 signal connect signature passing method name as a string.",
+      "canonical": true
     },
     {
       "id": "GDM-DEB-001",
       "project": "auto-refactor",
       "family": "GDM",
       "severity": "warning",
-      "summary": "High-frequency UI button directly connected to signal without debounce mechanism or loading state lock."
+      "summary": "High-frequency UI button directly connected to signal without debounce mechanism or loading state lock.",
+      "canonical": true
     },
     {
       "id": "GDM-EXPORT-001",
       "project": "auto-refactor",
       "family": "GDM",
       "severity": "warning",
-      "summary": "Legacy Godot 3 export statement detected."
+      "summary": "Legacy Godot 3 export statement detected.",
+      "canonical": true
     },
     {
       "id": "GDM-EXT-001",
       "project": "auto-refactor",
       "family": "GDM",
       "severity": "warning",
-      "summary": "Presentation main view controller does not inherit from BaseScreen or BaseModal base class."
+      "summary": "Presentation main view controller does not inherit from BaseScreen or BaseModal base class.",
+      "canonical": true
     },
     {
       "id": "GDM-FSM-001",
       "project": "auto-refactor",
       "family": "GDM",
       "severity": "warning",
-      "summary": "FSM private state variable mutated directly in-place, bypassing transition guards and lifecycle hooks."
+      "summary": "FSM private state variable mutated directly in-place, bypassing transition guards and lifecycle hooks.",
+      "canonical": true
     },
     {
       "id": "GDM-I18N-001",
       "project": "auto-refactor",
       "family": "GDM",
       "severity": "warning",
-      "summary": "Presentation UI text hardcodes raw strings without UIIntermediary or i18n translation key binding."
+      "summary": "Presentation UI text hardcodes raw strings without UIIntermediary or i18n translation key binding.",
+      "canonical": true
     },
     {
       "id": "GDM-ISO-001",
       "project": "auto-refactor",
       "family": "GDM",
       "severity": "error",
-      "summary": "Headless domain logic layer directly references view layer or SceneTree nodes, breaking decoupled architecture."
+      "summary": "Headless domain logic layer directly references view layer or SceneTree nodes, breaking decoupled architecture.",
+      "canonical": true
     },
     {
       "id": "GDM-LOC-001",
       "project": "auto-refactor",
       "family": "GDM",
       "severity": "warning",
-      "summary": "Presentation view script line count exceeds physical budget limit (LOC <= 450 lines)."
+      "summary": "Presentation view script line count exceeds physical budget limit (LOC <= 450 lines).",
+      "canonical": true
     },
     {
       "id": "GDM-NOD-001",
       "project": "auto-refactor",
       "family": "GDM",
       "severity": "warning",
-      "summary": "View script contains drifting relative node paths (e.g., get_parent(), find_child(), or multi-tier indices)."
+      "summary": "View script contains drifting relative node paths (e.g., get_parent(), find_child(), or multi-tier indices).",
+      "canonical": true
     },
     {
       "id": "GDM-ONREADY-001",
       "project": "auto-refactor",
       "family": "GDM",
       "severity": "warning",
-      "summary": "Legacy onready keyword detected."
+      "summary": "Legacy onready keyword detected.",
+      "canonical": true
     },
     {
       "id": "GDM-POL-001",
       "project": "auto-refactor",
       "family": "GDM",
       "severity": "error",
-      "summary": "Pooled object does not implement or invoke reset_state contract upon acquisition or release."
+      "summary": "Pooled object does not implement or invoke reset_state contract upon acquisition or release.",
+      "canonical": true
     },
     {
       "id": "GDM-POOL-001",
       "project": "auto-refactor",
       "family": "GDM",
       "severity": "warning",
-      "summary": "Deprecated Pool*Array type detected."
+      "summary": "Deprecated Pool*Array type detected.",
+      "canonical": true
     },
     {
       "id": "GDM-POOL-002",
       "project": "auto-refactor",
       "family": "GDM",
       "severity": "warning",
-      "summary": "Object pool reset_state does not invoke super.reset_state(), violating inheritance contract."
+      "summary": "Object pool reset_state does not invoke super.reset_state(), violating inheritance contract.",
+      "canonical": true
     },
     {
       "id": "GDM-PRF-001",
       "project": "auto-refactor",
       "family": "GDM",
       "severity": "error",
-      "summary": "Transient heap allocation in loop or high-frequency execution path risks frame rate drops."
+      "summary": "Transient heap allocation in loop or high-frequency execution path risks frame rate drops.",
+      "canonical": true
     },
     {
       "id": "GDM-RES-001",
       "project": "auto-refactor",
       "family": "GDM",
       "severity": "warning",
-      "summary": "UI layout script hardcodes fixed resolutions or absolute pixel dimensions, breaking responsive multi-screen layout."
+      "summary": "UI layout script hardcodes fixed resolutions or absolute pixel dimensions, breaking responsive multi-screen layout.",
+      "canonical": true
     },
     {
       "id": "GDM-RPC-001",
       "project": "auto-refactor",
       "family": "GDM",
       "severity": "warning",
-      "summary": "Legacy remote/master/puppet/slave function modifiers detected."
+      "summary": "Legacy remote/master/puppet/slave function modifiers detected.",
+      "canonical": true
     },
     {
       "id": "GDM-SIG-001",
       "project": "auto-refactor",
       "family": "GDM",
       "severity": "warning",
-      "summary": "Signal connection lacks corresponding disconnect logic, causing dangling lifecycle leaks."
+      "summary": "Signal connection lacks corresponding disconnect logic, causing dangling lifecycle leaks.",
+      "canonical": true
     },
     {
       "id": "GDM-TOK-001",
       "project": "auto-refactor",
       "family": "GDM",
       "severity": "warning",
-      "summary": "Presentation view hardcodes Color(...) literals or raw hex codes, breaking DesignTokens single source of truth."
+      "summary": "Presentation view hardcodes Color(...) literals or raw hex codes, breaking DesignTokens single source of truth.",
+      "canonical": true
     },
     {
       "id": "GDM-TOOL-001",
       "project": "auto-refactor",
       "family": "GDM",
       "severity": "warning",
-      "summary": "Bare tool keyword detected."
+      "summary": "Bare tool keyword detected.",
+      "canonical": true
     },
     {
       "id": "GDM-UNI-001",
       "project": "auto-refactor",
       "family": "GDM",
       "severity": "warning",
-      "summary": "Presentation view mutates read-only Snapshot DTO properties in-place, violating CQRS unidirectional data flow."
+      "summary": "Presentation view mutates read-only Snapshot DTO properties in-place, violating CQRS unidirectional data flow.",
+      "canonical": true
     },
     {
       "id": "GDM-VRT-001",
       "project": "auto-refactor",
       "family": "GDM",
       "severity": "warning",
-      "summary": "Large list instances created all-at-once without KVirtualList virtualization and object pool reuse."
+      "summary": "Large list instances created all-at-once without KVirtualList virtualization and object pool reuse.",
+      "canonical": true
     },
     {
       "id": "GDM-WEAK-001",
       "project": "auto-refactor",
       "family": "GDM",
       "severity": "warning",
-      "summary": "Dynamic observer or global manager holds strong reference to Node instance without weakref, risking memory leaks."
+      "summary": "Dynamic observer or global manager holds strong reference to Node instance without weakref, risking memory leaks.",
+      "canonical": true
     },
     {
       "id": "GDM-YIELD-001",
       "project": "auto-refactor",
       "family": "GDM",
       "severity": "warning",
-      "summary": "Legacy Godot 3 yield coroutine syntax detected."
+      "summary": "Legacy Godot 3 yield coroutine syntax detected.",
+      "canonical": true
     },
     {
       "id": "GOM-CTX-001",
       "project": "auto-refactor",
       "family": "GOM",
       "severity": "warning",
-      "summary": "context.Context is not the first parameter of the function."
+      "summary": "context.Context is not the first parameter of the function.",
+      "canonical": true
     },
     {
       "id": "GOM-ERR-001",
       "project": "auto-refactor",
       "family": "GOM",
       "severity": "warning",
-      "summary": "Error return value silently discarded with blank identifier (_)."
+      "summary": "Error return value silently discarded with blank identifier (_).",
+      "canonical": true
     },
     {
       "id": "GOM-STYLE-001",
       "project": "auto-refactor",
       "family": "GOM",
       "severity": "info",
-      "summary": "Method receiver naming does not adhere to Go conventions."
+      "summary": "Method receiver naming does not adhere to Go conventions.",
+      "canonical": true
     },
     {
       "id": "GOM-STYLE-002",
       "project": "auto-refactor",
       "family": "GOM",
       "severity": "info",
-      "summary": "Error variable is not prefixed with err."
+      "summary": "Error variable is not prefixed with err.",
+      "canonical": true
     },
     {
       "id": "GOM-STYLE-003",
       "project": "auto-refactor",
       "family": "GOM",
       "severity": "info",
-      "summary": "Exported package comment or package name does not conform to Go conventions."
+      "summary": "Exported package comment or package name does not conform to Go conventions.",
+      "canonical": true
     },
     {
       "id": "GOV-AGN-001",
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "error",
-      "summary": "Concurrent modifications by multiple agents produce architectural boundary breaches,cross-module dependency cycles, or contract incompatibilities."
+      "summary": "Concurrent modifications by multiple agents produce architectural boundary breaches,cross-module dependency cycles, or contract incompatibilities.",
+      "canonical": true
     },
     {
       "id": "GOV-ARC-001",
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "warning",
-      "summary": "Historical dossier nomenclature leaks into production sources, tests, or commit headersoutside the archived directory white-list."
+      "summary": "Historical dossier nomenclature leaks into production sources, tests, or commit headersoutside the archived directory white-list.",
+      "canonical": true
     },
     {
       "id": "GOV-BLS-001",
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "warning",
-      "summary": "Cross-tier monolithic change blast radius breaches atomic staging boundaries acrossdocs, contracts, config, domains, and tooling."
+      "summary": "Cross-tier monolithic change blast radius breaches atomic staging boundaries acrossdocs, contracts, config, domains, and tooling.",
+      "canonical": true
     },
     {
       "id": "GOV-DAT-001",
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "info",
-      "summary": "Functions declaring excessive discrete scalar parameters (>= 5) exhibit Data Clumpssmell; parameters should be aggregated into a named Context or Options interface."
+      "summary": "Functions declaring excessive discrete scalar parameters (>= 5) exhibit Data Clumpssmell; parameters should be aggregated into a named Context or Options interface.",
+      "canonical": true
     },
     {
       "id": "GOV-DBG-001",
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "warning",
-      "summary": "Debug and console print statements clutter standard outputs, leak diagnostics, and candegrade I/O throughput."
+      "summary": "Debug and console print statements clutter standard outputs, leak diagnostics, and candegrade I/O throughput.",
+      "canonical": true
     },
     {
       "id": "GOV-EXC-001",
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "error",
-      "summary": "Empty catch blocks silently swallow exceptions, causing silent data corruption ormasking critical failures. A catch whose body carries an explicit rationale marker(best-effort / ignore / intentional / expected) is treated as a documented decisioninstead of a silent swallow."
+      "summary": "Empty catch blocks silently swallow exceptions, causing silent data corruption ormasking critical failures. A catch whose body carries an explicit rationale marker(best-effort / ignore / intentional / expected) is treated as a documented decisioninstead of a silent swallow.",
+      "canonical": true
     },
     {
       "id": "GOV-EXC-002",
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "warning",
-      "summary": "Naked `.unwrap()` causes unrecoverable process panics in production upon Err or None."
+      "summary": "Naked `.unwrap()` causes unrecoverable process panics in production upon Err or None.",
+      "canonical": true
     },
     {
       "id": "GOV-EXC-003",
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "error",
-      "summary": "Pseudo-catch blocks containing only dummy non-handling statements (void 0, deadassignment) silently swallow exceptions without logging or documented rationale."
+      "summary": "Pseudo-catch blocks containing only dummy non-handling statements (void 0, deadassignment) silently swallow exceptions without logging or documented rationale.",
+      "canonical": true
     },
     {
       "id": "GOV-FIL-001",
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "warning",
-      "summary": "Inconsistent file naming causes cross-platform casing issues and impairs modular discovery."
+      "summary": "Inconsistent file naming causes cross-platform casing issues and impairs modular discovery.",
+      "canonical": true
     },
     {
       "id": "GOV-FIL-002",
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "info",
-      "summary": "Substantial production modules must declare their architectural role and responsibility boundary."
+      "summary": "Substantial production modules must declare their architectural role and responsibility boundary.",
+      "canonical": true
     },
     {
       "id": "GOV-GAM-001",
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "warning",
-      "summary": "Anti-gaming violation: artificial function splitting, tautological test padding, orempty boilerplate gaming quality metrics."
+      "summary": "Anti-gaming violation: artificial function splitting, tautological test padding, orempty boilerplate gaming quality metrics.",
+      "canonical": true
     },
     {
       "id": "GOV-HOK-001",
@@ -1606,182 +1752,208 @@
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "warning",
-      "summary": "Deeply nested control flows (> 5 levels) create high cognitive load and increase defect risk."
+      "summary": "Deeply nested control flows (> 5 levels) create high cognitive load and increase defect risk.",
+      "canonical": true
     },
     {
       "id": "GOV-LOG-002",
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "info",
-      "summary": "Vacuous wrapper methods that purely forward calls without validation or translation addunnecessary indirection."
+      "summary": "Vacuous wrapper methods that purely forward calls without validation or translation addunnecessary indirection.",
+      "canonical": true
     },
     {
       "id": "GOV-MNT-001",
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "warning",
-      "summary": "Deep class inheritance hierarchies (> 2 levels) introduce fragile base class problems;composition is preferred."
+      "summary": "Deep class inheritance hierarchies (> 2 levels) introduce fragile base class problems;composition is preferred.",
+      "canonical": true
     },
     {
       "id": "GOV-MNT-002",
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "error",
-      "summary": "Domain layer must remain clean and portable; importing UI or CLI presentation frameworksintroduces severe coupling."
+      "summary": "Domain layer must remain clean and portable; importing UI or CLI presentation frameworksintroduces severe coupling.",
+      "canonical": true
     },
     {
       "id": "GOV-MSG-001",
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "warning",
-      "summary": "Underlying diagnostic messages and remediations must use standard English centrallymanaged by constant dictionaries, prohibiting hardcoded non-ASCII or inline stringsat emitter sites."
+      "summary": "Underlying diagnostic messages and remediations must use standard English centrallymanaged by constant dictionaries, prohibiting hardcoded non-ASCII or inline stringsat emitter sites.",
+      "canonical": true
     },
     {
       "id": "GOV-PRF-001",
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "warning",
-      "summary": "Performing invariant I/O, regex construction, or repetitive configuration lookups inloops incurs severe CPU/throughput penalties."
+      "summary": "Performing invariant I/O, regex construction, or repetitive configuration lookups inloops incurs severe CPU/throughput penalties.",
+      "canonical": true
     },
     {
       "id": "GOV-PRF-002",
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "info",
-      "summary": "Calling linear search (.find / .indexOf / .includes) inside a loop scales at O(N*M);pre-indexing in Map/Set optimizes to O(N)."
+      "summary": "Calling linear search (.find / .indexOf / .includes) inside a loop scales at O(N*M);pre-indexing in Map/Set optimizes to O(N).",
+      "canonical": true
     },
     {
       "id": "GOV-PRF-003",
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "error",
-      "summary": "Numeric timer delays bypass centralized clamping; a literal of <=0 triggers a ~1ms busyloop (CPU/IO hotspot)."
+      "summary": "Numeric timer delays bypass centralized clamping; a literal of <=0 triggers a ~1ms busyloop (CPU/IO hotspot).",
+      "canonical": true
     },
     {
       "id": "GOV-PRF-004",
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "warning",
-      "summary": "Sync fs calls block the host event loop (UI jank in IDE extensions, request stalls on servers)."
+      "summary": "Sync fs calls block the host event loop (UI jank in IDE extensions, request stalls on servers).",
+      "canonical": true
     },
     {
       "id": "GOV-PRF-005",
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "info",
-      "summary": "Calling array linear lookups (.includes / .indexOf) inside loops creates quadraticO(N*M) overhead; pre-indexing into a Set hoisted outside the loop optimizesmembership tests to O(1)."
+      "summary": "Calling array linear lookups (.includes / .indexOf) inside loops creates quadraticO(N*M) overhead; pre-indexing into a Set hoisted outside the loop optimizesmembership tests to O(1).",
+      "canonical": true
     },
     {
       "id": "GOV-RTC-002",
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "warning",
-      "summary": "Baseline debt entries must track physical file rename operations without artificialinflation or false positive churn. Monotonic downward ratchets must remap priorbaselines to new paths upon refactoring."
+      "summary": "Baseline debt entries must track physical file rename operations without artificialinflation or false positive churn. Monotonic downward ratchets must remap priorbaselines to new paths upon refactoring.",
+      "canonical": true
     },
     {
       "id": "GOV-RUL-001",
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "error",
-      "summary": "Static review rule identifier drift or hallucination: mentioned rule ID is notregistered in the single-source rule catalog."
+      "summary": "Static review rule identifier drift or hallucination: mentioned rule ID is notregistered in the single-source rule catalog.",
+      "canonical": true
     },
     {
       "id": "GOV-SAN-001",
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "warning",
-      "summary": "Transient task tags and batch jargon (pXX/phaseXX/stXX/wip) compromise architecturallongevity and create documentation drift."
+      "summary": "Transient task tags and batch jargon (pXX/phaseXX/stXX/wip) compromise architecturallongevity and create documentation drift.",
+      "canonical": true
     },
     {
       "id": "GOV-SAN-002",
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "warning",
-      "summary": "Objective technical language guard: text contains promotional rhetoric, absolute claims,emotional disparagement, or process buzzwords."
+      "summary": "Objective technical language guard: text contains promotional rhetoric, absolute claims,emotional disparagement, or process buzzwords.",
+      "canonical": true
     },
     {
       "id": "GOV-SLC-001",
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "error",
-      "summary": "AST slice mutation introduces breaking signature drift or uncontained side-effectspropagating across external call chains."
+      "summary": "AST slice mutation introduces breaking signature drift or uncontained side-effectspropagating across external call chains.",
+      "canonical": true
     },
     {
       "id": "GOV-STD-001",
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "warning",
-      "summary": "Redundant if-then-else returning boolean literals increases cyclomatic complexity and mental overhead."
+      "summary": "Redundant if-then-else returning boolean literals increases cyclomatic complexity and mental overhead.",
+      "canonical": true
     },
     {
       "id": "GOV-STD-002",
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "warning",
-      "summary": "Legacy constructs (e.g. `var` in modern TS/JS, dead `pass` in GDScript) violate language idiomatic standards."
+      "summary": "Legacy constructs (e.g. `var` in modern TS/JS, dead `pass` in GDScript) violate language idiomatic standards.",
+      "canonical": true
     },
     {
       "id": "GOV-TRJ-001",
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "error",
-      "summary": "Historical trajectory exhibits cyclic regressions, flip-flop oscillations, orre-introduces previously eliminated architectural anti-patterns."
+      "summary": "Historical trajectory exhibits cyclic regressions, flip-flop oscillations, orre-introduces previously eliminated architectural anti-patterns.",
+      "canonical": true
     },
     {
       "id": "GOV-TYP-001",
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "warning",
-      "summary": "Implicit loose typing hides type errors at runtime and weakens static safety guarantees."
+      "summary": "Implicit loose typing hides type errors at runtime and weakens static safety guarantees.",
+      "canonical": true
     },
     {
       "id": "GOV-TYP-002",
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "warning",
-      "summary": "Unannotated function signatures compromise API boundaries and allow unintended type drift."
+      "summary": "Unannotated function signatures compromise API boundaries and allow unintended type drift.",
+      "canonical": true
     },
     {
       "id": "GOV-TYP-003",
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "warning",
-      "summary": "Naked `any` bypasses the entire compiler type checker, leaking type instability."
+      "summary": "Naked `any` bypasses the entire compiler type checker, leaking type instability.",
+      "canonical": true
     },
     {
       "id": "GOV-TYP-004",
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "warning",
-      "summary": "Passing or assigning `undefined as any` or `null as any` indicates an InterfaceSegregation Principle (ISP) violation."
+      "summary": "Passing or assigning `undefined as any` or `null as any` indicates an InterfaceSegregation Principle (ISP) violation.",
+      "canonical": true
     },
     {
       "id": "GOV-TYP-005",
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "warning",
-      "summary": "Accessing properties via `(expr as any).prop` bypasses compiler type safety andindicates missing type narrowing guards."
+      "summary": "Accessing properties via `(expr as any).prop` bypasses compiler type safety andindicates missing type narrowing guards.",
+      "canonical": true
     },
     {
       "id": "GOV-TYP-006",
       "project": "auto-refactor",
       "family": "GOV",
       "severity": "warning",
-      "summary": "Exported functions, classes, and public methods must specify explicit return types toprotect public API contracts."
+      "summary": "Exported functions, classes, and public methods must specify explicit return types toprotect public API contracts.",
+      "canonical": true
     },
     {
       "id": "GUARD-AST-001",
       "project": "auto-refactor",
       "family": "GUARD",
       "severity": "error",
-      "summary": "Pre-commit gate lacks AST staged slice complexity and nesting budget check (CC <= 15, Depth <= 4)."
+      "summary": "Pre-commit gate lacks AST staged slice complexity and nesting budget check (CC <= 15, Depth <= 4).",
+      "canonical": true
     },
     {
       "id": "GUARD-BUDGET-001",
       "project": "auto-refactor",
       "family": "GUARD",
       "severity": "warning",
-      "summary": "Pre-commit gate runs unconstrained whole-repo test suites without staged-file filtering, risking budget overrun."
+      "summary": "Pre-commit gate runs unconstrained whole-repo test suites without staged-file filtering, risking budget overrun.",
+      "canonical": true
     },
     {
       "id": "GUARD-CHAIN-001",
@@ -1816,14 +1988,16 @@
       "project": "auto-refactor",
       "family": "GUARD",
       "severity": "error",
-      "summary": "Gate script lacks strict error termination flags, risking silent failures and false-positive gate passes."
+      "summary": "Gate script lacks strict error termination flags, risking silent failures and false-positive gate passes.",
+      "canonical": true
     },
     {
       "id": "GUARD-FAC-001",
       "project": "auto-refactor",
       "family": "GUARD",
       "severity": "error",
-      "summary": "Gate pipeline lacks static validation for facade substantive bearing (ELOC >= 15) and vacuous forwarding elimination."
+      "summary": "Gate pipeline lacks static validation for facade substantive bearing (ELOC >= 15) and vacuous forwarding elimination.",
+      "canonical": true
     },
     {
       "id": "GUARD-FBK-001",
@@ -1837,42 +2011,48 @@
       "project": "auto-refactor",
       "family": "GUARD",
       "severity": "warning",
-      "summary": "Repository lacks local left-shift Git hooks; all defect feedback relies solely on remote CI."
+      "summary": "Repository lacks local left-shift Git hooks; all defect feedback relies solely on remote CI.",
+      "canonical": true
     },
     {
       "id": "GUARD-HYG-001",
       "project": "auto-refactor",
       "family": "GUARD",
       "severity": "error",
-      "summary": "Pre-commit gate does not enforce physical hygiene: lacks zero-byte empty file detection."
+      "summary": "Pre-commit gate does not enforce physical hygiene: lacks zero-byte empty file detection.",
+      "canonical": true
     },
     {
       "id": "GUARD-ISO-001",
       "project": "auto-refactor",
       "family": "GUARD",
       "severity": "warning",
-      "summary": "Dual-tier gate boundary is not isomorphic; remote CI checks are not mirrored in local hooks."
+      "summary": "Dual-tier gate boundary is not isomorphic; remote CI checks are not mirrored in local hooks.",
+      "canonical": true
     },
     {
       "id": "GUARD-MSG-001",
       "project": "auto-refactor",
       "family": "GUARD",
       "severity": "warning",
-      "summary": "Gate system lacks structured commit-msg validation for Conventional Commits and anti-jargon hygiene."
+      "summary": "Gate system lacks structured commit-msg validation for Conventional Commits and anti-jargon hygiene.",
+      "canonical": true
     },
     {
       "id": "GUARD-MSG-002",
       "project": "auto-refactor",
       "family": "GUARD",
       "severity": "error",
-      "summary": "Commit-msg gate does not enforce bidirectional bilingual style terms constraints (commit-msg-forbidden-terms.json unwired)."
+      "summary": "Commit-msg gate does not enforce bidirectional bilingual style terms constraints (commit-msg-forbidden-terms.json unwired).",
+      "canonical": true
     },
     {
       "id": "GUARD-MSG-003",
       "project": "auto-refactor",
       "family": "GUARD",
       "severity": "error",
-      "summary": "Monorepo commit message gate lacks [Project] section or whitelist verification."
+      "summary": "Monorepo commit message gate lacks [Project] section or whitelist verification.",
+      "canonical": true
     },
     {
       "id": "GUARD-ORD-001",
@@ -1886,21 +2066,24 @@
       "project": "auto-refactor",
       "family": "GUARD",
       "severity": "warning",
-      "summary": "Dual-platform gate scripts are not paired; missing corresponding .sh or .ps1 gate implementation."
+      "summary": "Dual-platform gate scripts are not paired; missing corresponding .sh or .ps1 gate implementation.",
+      "canonical": true
     },
     {
       "id": "GUARD-PROC-001",
       "project": "auto-refactor",
       "family": "GUARD",
       "severity": "error",
-      "summary": "PowerShell gate script uses interactive prompts without output redirection guard."
+      "summary": "PowerShell gate script uses interactive prompts without output redirection guard.",
+      "canonical": true
     },
     {
       "id": "GUARD-ROUTE-001",
       "project": "auto-refactor",
       "family": "GUARD",
       "severity": "error",
-      "summary": "Git hook router invokes fragile shell or Windows PS 5.1 directly without cross-platform safety fallback."
+      "summary": "Git hook router invokes fragile shell or Windows PS 5.1 directly without cross-platform safety fallback.",
+      "canonical": true
     },
     {
       "id": "GUARD-SHELL-001",
@@ -1914,7 +2097,8 @@
       "project": "auto-refactor",
       "family": "GUARD",
       "severity": "warning",
-      "summary": "Gate system lacks single-source-of-truth rule catalog verification, risking rule drift."
+      "summary": "Gate system lacks single-source-of-truth rule catalog verification, risking rule drift.",
+      "canonical": true
     },
     {
       "id": "GUARD-STEP-001",
@@ -1928,7 +2112,8 @@
       "project": "auto-refactor",
       "family": "GUARD",
       "severity": "error",
-      "summary": "Repository completely lacks a gate defense system (no Git hooks and no CI pipeline detected)."
+      "summary": "Repository completely lacks a gate defense system (no Git hooks and no CI pipeline detected).",
+      "canonical": true
     },
     {
       "project": "workspace-timing",
@@ -1975,56 +2160,67 @@
       "project": "auto-refactor",
       "family": "PRF",
       "severity": "warning",
-      "summary": "Multiple nested loops create potential O(N^2)/O(N^3) complexity hotspots or implicit linear searches."
+      "summary": "Multiple nested loops create potential O(N^2)/O(N^3) complexity hotspots or implicit linear searches.",
+      "canonical": false,
+      "legacyReason": "id-not-canonical"
     },
     {
       "id": "high-complexity",
       "project": "auto-refactor",
       "family": "CPX",
       "severity": "warning",
-      "summary": "Function cyclomatic complexity exceeds threshold."
+      "summary": "Function cyclomatic complexity exceeds threshold.",
+      "canonical": false,
+      "legacyReason": "id-not-canonical"
     },
     {
       "id": "high-entropy-token",
       "project": "auto-refactor",
       "family": "SEC",
       "severity": "warning",
-      "summary": "High-entropy string detected, suspected of being a secret credential or API token."
+      "summary": "High-entropy string detected, suspected of being a secret credential or API token.",
+      "canonical": false,
+      "legacyReason": "id-not-canonical"
     },
     {
       "id": "HYG-BLT-001",
       "project": "auto-refactor",
       "family": "HYG",
       "severity": "warning",
-      "summary": "Local variable or parameter shadows Python built-in name."
+      "summary": "Local variable or parameter shadows Python built-in name.",
+      "canonical": true
     },
     {
       "id": "HYG-BOM-001",
       "project": "auto-refactor",
       "family": "HYG",
       "severity": "error",
-      "summary": "UTF-8 Byte Order Mark (BOM) header prefix presence (files must strictly be UTF-8 NO-BOM)."
+      "summary": "UTF-8 Byte Order Mark (BOM) header prefix presence (files must strictly be UTF-8 NO-BOM).",
+      "canonical": true
     },
     {
       "id": "HYG-CLN-001",
       "project": "auto-refactor",
       "family": "HYG",
       "severity": "warning",
-      "summary": "Duplicated code clone detected across multiple lines based on rolling polynomial hash."
+      "summary": "Duplicated code clone detected across multiple lines based on rolling polynomial hash.",
+      "canonical": true
     },
     {
       "id": "HYG-CLT-001",
       "project": "auto-refactor",
       "family": "HYG",
       "severity": "error",
-      "summary": "Uncontrolled transient clutter, log dumps, backup, or OS metadata files lingering in workspace."
+      "summary": "Uncontrolled transient clutter, log dumps, backup, or OS metadata files lingering in workspace.",
+      "canonical": true
     },
     {
       "id": "HYG-DED-001",
       "project": "auto-refactor",
       "family": "HYG",
       "severity": "warning",
-      "summary": "Unreachable dead code detected after terminating control flow (return, throw, break, raise)."
+      "summary": "Unreachable dead code detected after terminating control flow (return, throw, break, raise).",
+      "canonical": true
     },
     {
       "id": "HYG-DIR-001",
@@ -2038,98 +2234,113 @@
       "project": "auto-refactor",
       "family": "HYG",
       "severity": "error",
-      "summary": "Zero-byte empty file, blank comment-only file, or hollow shell file lacking AST semantic payload."
+      "summary": "Zero-byte empty file, blank comment-only file, or hollow shell file lacking AST semantic payload.",
+      "canonical": true
     },
     {
       "id": "HYG-EMP-002",
       "project": "auto-refactor",
       "family": "HYG",
       "severity": "error",
-      "summary": "Comment-only hollow file lacking executable implementation logic after stripping comments."
+      "summary": "Comment-only hollow file lacking executable implementation logic after stripping comments.",
+      "canonical": true
     },
     {
       "id": "HYG-EOL-001",
       "project": "auto-refactor",
       "family": "HYG",
       "severity": "error",
-      "summary": "Physical line endings contract violation (PowerShell scripts must be CRLF, other source files must be LF)."
+      "summary": "Physical line endings contract violation (PowerShell scripts must be CRLF, other source files must be LF).",
+      "canonical": true
     },
     {
       "id": "HYG-EXC-001",
       "project": "auto-refactor",
       "family": "HYG",
       "severity": "warning",
-      "summary": "Exception variable in except clause is not named exc."
+      "summary": "Exception variable in except clause is not named exc.",
+      "canonical": true
     },
     {
       "id": "HYG-IND-001",
       "project": "auto-refactor",
       "family": "HYG",
       "severity": "warning",
-      "summary": "Tab character indentation detected in non-tab language file (pure space indentation contract)."
+      "summary": "Tab character indentation detected in non-tab language file (pure space indentation contract).",
+      "canonical": true
     },
     {
       "id": "HYG-NAM-001",
       "project": "auto-refactor",
       "family": "HYG",
       "severity": "warning",
-      "summary": "File naming convention distortion (kebab-case for TS/JS, snake_case for GDScript/Python/Rust)."
+      "summary": "File naming convention distortion (kebab-case for TS/JS, snake_case for GDScript/Python/Rust).",
+      "canonical": true
     },
     {
       "id": "HYG-SGL-001",
       "project": "auto-refactor",
       "family": "HYG",
       "severity": "warning",
-      "summary": "Single-letter variable name in business logic (only loop indices i/j/k and discard _ allowed)."
+      "summary": "Single-letter variable name in business logic (only loop indices i/j/k and discard _ allowed).",
+      "canonical": true
     },
     {
       "id": "HYG-STB-001",
       "project": "auto-refactor",
       "family": "HYG",
       "severity": "warning",
-      "summary": "Temporary stub markers (`TODO`, `FIXME`, `XXX`, `HACK`) lingering in code or comments."
+      "summary": "Temporary stub markers (`TODO`, `FIXME`, `XXX`, `HACK`) lingering in code or comments.",
+      "canonical": true
     },
     {
       "id": "HYG-STB-002",
       "project": "auto-refactor",
       "family": "HYG",
       "severity": "warning",
-      "summary": "Temporary construction phase jargon (`pXX`, `phaseXX`, `stXX`, `wip`) leaking into code or comments."
+      "summary": "Temporary construction phase jargon (`pXX`, `phaseXX`, `stXX`, `wip`) leaking into code or comments.",
+      "canonical": true
     },
     {
       "id": "HYG-SUP-001",
       "project": "auto-refactor",
       "family": "HYG",
       "severity": "error",
-      "summary": "Unannotated compiler or linter suppression directive (@ts-ignore, @ts-nocheck, eslint-disable, # noqa) without approved exemption."
+      "summary": "Unannotated compiler or linter suppression directive (@ts-ignore, @ts-nocheck, eslint-disable, # noqa) without approved exemption.",
+      "canonical": true
     },
     {
       "id": "HYG-TRL-001",
       "project": "auto-refactor",
       "family": "HYG",
       "severity": "warning",
-      "summary": "POSIX EOF newline contract violation (missing terminal newline or trailing blank line accumulation)."
+      "summary": "POSIX EOF newline contract violation (missing terminal newline or trailing blank line accumulation).",
+      "canonical": true
     },
     {
       "id": "HYG-WRAP-001",
       "project": "auto-refactor",
       "family": "HYG",
       "severity": "warning",
-      "summary": "Vacuous passthrough wrapper functions forwarding arguments directly without added value degrade effective code density."
+      "summary": "Vacuous passthrough wrapper functions forwarding arguments directly without added value degrade effective code density.",
+      "canonical": true
     },
     {
       "id": "HYG-WRAP-002",
       "project": "auto-refactor",
       "family": "HYG",
       "severity": "info",
-      "summary": "Redundant zero-argument forwarding wrappers trivially delegating to inner targets without validation, transformation, or abstraction."
+      "summary": "Redundant zero-argument forwarding wrappers trivially delegating to inner targets without validation, transformation, or abstraction.",
+      "canonical": true
     },
     {
       "id": "import-cycle",
       "project": "auto-refactor",
       "family": "DEP",
       "severity": "error",
-      "summary": "Module-level cyclic dependency detected (covering Python relative imports and package resolution)."
+      "summary": "Module-level cyclic dependency detected (covering Python relative imports and package resolution).",
+      "canonical": false,
+      "legacyReason": "id-not-canonical"
     },
     {
       "project": "workspace-timing",
@@ -2232,7 +2443,9 @@
       "project": "auto-refactor",
       "family": "BIG",
       "severity": "warning",
-      "summary": "File physical line count or function count exceeds architecture threshold."
+      "summary": "File physical line count or function count exceeds architecture threshold.",
+      "canonical": false,
+      "legacyReason": "id-not-canonical"
     },
     {
       "project": "workspace-timing",
@@ -2263,196 +2476,226 @@
       "project": "auto-refactor",
       "family": "PRF",
       "severity": "warning",
-      "summary": "Transient heap allocation inside a loop (ADV-PRF-002), violating the zero-transient-allocation contract."
+      "summary": "Transient heap allocation inside a loop (ADV-PRF-002), violating the zero-transient-allocation contract.",
+      "canonical": false,
+      "legacyReason": "id-not-canonical"
     },
     {
       "id": "MOD-BWD-001",
       "project": "auto-refactor",
       "family": "MOD",
       "severity": "warning",
-      "summary": "Backward compatibility shim, redundant legacy alias, or outdated parameter forwarding detected."
+      "summary": "Backward compatibility shim, redundant legacy alias, or outdated parameter forwarding detected.",
+      "canonical": true
     },
     {
       "id": "MOD-DEP-001",
       "project": "auto-refactor",
       "family": "MOD",
       "severity": "warning",
-      "summary": "Invocation or access of deprecated symbol detected in internal production source code."
+      "summary": "Invocation or access of deprecated symbol detected in internal production source code.",
+      "canonical": true
     },
     {
       "id": "MOD-FLB-001",
       "project": "auto-refactor",
       "family": "MOD",
       "severity": "warning",
-      "summary": "Cross-generational fallback chain or redundant fallback cascade detected in non-perimeter source code."
+      "summary": "Cross-generational fallback chain or redundant fallback cascade detected in non-perimeter source code.",
+      "canonical": true
     },
     {
       "id": "NAM-ABR-001",
       "project": "auto-refactor",
       "family": "NAM",
       "severity": "warning",
-      "summary": "Identifier contains cryptic, incomplete, or non-standard abbreviations harming code readability."
+      "summary": "Identifier contains cryptic, incomplete, or non-standard abbreviations harming code readability.",
+      "canonical": true
     },
     {
       "id": "NAM-COL-001",
       "project": "auto-refactor",
       "family": "NAM",
       "severity": "info",
-      "summary": "Collections (Array/Set) should use plural nouns or List suffixes; mappings (Map/Dict) should express key-to-value relationships."
+      "summary": "Collections (Array/Set) should use plural nouns or List suffixes; mappings (Map/Dict) should express key-to-value relationships.",
+      "canonical": true
     },
     {
       "id": "NAM-DEC-001",
       "project": "auto-refactor",
       "family": "NAM",
       "severity": "warning",
-      "summary": "Identifier length inflation (30-40+ characters) or multiple symbols sharing long prefixes indicates insufficient modular decomposition."
+      "summary": "Identifier length inflation (30-40+ characters) or multiple symbols sharing long prefixes indicates insufficient modular decomposition.",
+      "canonical": true
     },
     {
       "id": "NAM-DIR-001",
       "project": "auto-refactor",
       "family": "NAM",
       "severity": "warning",
-      "summary": "Source directory names must be lowercase kebab-case or single words; CamelCase, spaces, and temporary phase words are prohibited."
+      "summary": "Source directory names must be lowercase kebab-case or single words; CamelCase, spaces, and temporary phase words are prohibited.",
+      "canonical": true
     },
     {
       "id": "NAM-FIL-001",
       "project": "auto-refactor",
       "family": "NAM",
       "severity": "warning",
-      "summary": "File names must follow target language conventions (kebab-case for TS/JS, snake_case for Python/Rust/GDScript) and contain no temporary construction jargon."
+      "summary": "File names must follow target language conventions (kebab-case for TS/JS, snake_case for Python/Rust/GDScript) and contain no temporary construction jargon.",
+      "canonical": true
     },
     {
       "id": "NAM-GLB-001",
       "project": "auto-refactor",
       "family": "NAM",
       "severity": "warning",
-      "summary": "Module-level immutable constants must adhere to UPPER_SNAKE_CASE naming conventions."
+      "summary": "Module-level immutable constants must adhere to UPPER_SNAKE_CASE naming conventions.",
+      "canonical": true
     },
     {
       "id": "NAM-GLB-002",
       "project": "auto-refactor",
       "family": "NAM",
       "severity": "warning",
-      "summary": "Mutable let or var declarations at module scope are prohibited (avoid implicit global shared mutable state)."
+      "summary": "Mutable let or var declarations at module scope are prohibited (avoid implicit global shared mutable state).",
+      "canonical": true
     },
     {
       "id": "NAM-JRG-002",
       "project": "auto-refactor",
       "family": "NAM",
       "severity": "warning",
-      "summary": "Engineering assets and test suites must not contain construction phase or temporary jargon markers (phase numbers, temporary tokens, `wip` markers)."
+      "summary": "Engineering assets and test suites must not contain construction phase or temporary jargon markers (phase numbers, temporary tokens, `wip` markers).",
+      "canonical": true
     },
     {
       "id": "NAM-LEN-001",
       "project": "auto-refactor",
       "family": "NAM",
       "severity": "warning",
-      "summary": "Variable identifier length is outside acceptable bounds (excessively short or excessively long)."
+      "summary": "Variable identifier length is outside acceptable bounds (excessively short or excessively long).",
+      "canonical": true
     },
     {
       "id": "NAM-LEN-002",
       "project": "auto-refactor",
       "family": "NAM",
       "severity": "warning",
-      "summary": "Function or method identifier length is too short to communicate its operational responsibility."
+      "summary": "Function or method identifier length is too short to communicate its operational responsibility.",
+      "canonical": true
     },
     {
       "id": "NAM-MBR-001",
       "project": "auto-refactor",
       "family": "NAM",
       "severity": "warning",
-      "summary": "Class properties, object fields, and methods must follow camelCase naming conventions."
+      "summary": "Class properties, object fields, and methods must follow camelCase naming conventions.",
+      "canonical": true
     },
     {
       "id": "NAM-RES-001",
       "project": "auto-refactor",
       "family": "NAM",
       "severity": "warning",
-      "summary": "Structured resource repositories (constants, strings, rules, configs) are overly broad and bloated, requiring decomposition by domain."
+      "summary": "Structured resource repositories (constants, strings, rules, configs) are overly broad and bloated, requiring decomposition by domain.",
+      "canonical": true
     },
     {
       "id": "NAM-RES-002",
       "project": "auto-refactor",
       "family": "NAM",
       "severity": "info",
-      "summary": "Over-fragmentation in structured resource repositories where tiny files use 3-level deep names; consolidate into parent domain."
+      "summary": "Over-fragmentation in structured resource repositories where tiny files use 3-level deep names; consolidate into parent domain.",
+      "canonical": true
     },
     {
       "id": "NAM-RES-003",
       "project": "auto-refactor",
       "family": "NAM",
       "severity": "warning",
-      "summary": "Resource repository naming depth exceeds limit (maximum 3 tiers: base type + functional domain + optional subdomain)."
+      "summary": "Resource repository naming depth exceeds limit (maximum 3 tiers: base type + functional domain + optional subdomain).",
+      "canonical": true
     },
     {
       "id": "NAM-RES-004",
       "project": "auto-refactor",
       "family": "NAM",
       "severity": "warning",
-      "summary": "Resource repository file name has excessive descriptive word stacking, creating maintenance burden."
+      "summary": "Resource repository file name has excessive descriptive word stacking, creating maintenance burden.",
+      "canonical": true
     },
     {
       "id": "NAM-RES-005",
       "project": "auto-refactor",
       "family": "NAM",
       "severity": "warning",
-      "summary": "Resource repository file responsibility mismatch (declared as pure constant library but contains substantial executable functions/classes)."
+      "summary": "Resource repository file responsibility mismatch (declared as pure constant library but contains substantial executable functions/classes).",
+      "canonical": true
     },
     {
       "id": "NAM-SGL-001",
       "project": "auto-refactor",
       "family": "NAM",
       "severity": "warning",
-      "summary": "Single-letter variable names in business logic are prohibited (exemptions: loop counters and discard symbols)."
+      "summary": "Single-letter variable names in business logic are prohibited (exemptions: loop counters and discard symbols).",
+      "canonical": true
     },
     {
       "id": "NAM-TYP-001",
       "project": "auto-refactor",
       "family": "NAM",
       "severity": "warning",
-      "summary": "Type definitions, interfaces, and class declarations must follow PascalCase naming conventions."
+      "summary": "Type definitions, interfaces, and class declarations must follow PascalCase naming conventions.",
+      "canonical": true
     },
     {
       "id": "NAM-VAG-001",
       "project": "auto-refactor",
       "family": "NAM",
       "severity": "warning",
-      "summary": "Vague or meaningless generic variable names (such as bare data, res, ret, tmp, item) are prohibited."
+      "summary": "Vague or meaningless generic variable names (such as bare data, res, ret, tmp, item) are prohibited.",
+      "canonical": true
     },
     {
       "id": "nested-constant",
       "project": "auto-refactor",
       "family": "CONST",
       "severity": "warning",
-      "summary": "Redundant constant nesting: indirect constant aliases, deep constant objects, or pseudo-constants in nested scopes."
+      "summary": "Redundant constant nesting: indirect constant aliases, deep constant objects, or pseudo-constants in nested scopes.",
+      "canonical": false,
+      "legacyReason": "id-not-canonical"
     },
     {
       "id": "NUM-BND-001",
       "project": "auto-refactor",
       "family": "NUM",
       "severity": "warning",
-      "summary": "One-sided unbounded numeric parameter or condition exposed in recursion depth,loop bound, or capacity check without bidirectional corridor bound."
+      "summary": "One-sided unbounded numeric parameter or condition exposed in recursion depth,loop bound, or capacity check without bidirectional corridor bound.",
+      "canonical": true
     },
     {
       "id": "NUM-PREC-001",
       "project": "auto-refactor",
       "family": "NUM",
       "severity": "warning",
-      "summary": "Lossy precision rounding or mismatched scaling detected in mathematical calculationpath, risking IEEE 754 drift."
+      "summary": "Lossy precision rounding or mismatched scaling detected in mathematical calculationpath, risking IEEE 754 drift.",
+      "canonical": true
     },
     {
       "id": "PRF-ALG-001",
       "project": "auto-refactor",
       "family": "PRF",
       "severity": "warning",
-      "summary": "Deep nested loops (>= 3 levels) detected, creating potential O(N^3) computational hotspots."
+      "summary": "Deep nested loops (>= 3 levels) detected, creating potential O(N^3) computational hotspots.",
+      "canonical": true
     },
     {
       "id": "PRF-ALG-002",
       "project": "auto-refactor",
       "family": "PRF",
       "severity": "warning",
-      "summary": "Linear collection scan antipattern in loop: performing linear searches(find/includes/has/in list) inside loops degrading complexity to O(N*M)."
+      "summary": "Linear collection scan antipattern in loop: performing linear searches(find/includes/has/in list) inside loops degrading complexity to O(N*M).",
+      "canonical": true
     },
     {
       "id": "PRF-DUP-001",
@@ -2466,231 +2709,264 @@
       "project": "auto-refactor",
       "family": "PRF",
       "severity": "warning",
-      "summary": "Synchronous blocking I/O invoked inside async context or high-frequency frame loop."
+      "summary": "Synchronous blocking I/O invoked inside async context or high-frequency frame loop.",
+      "canonical": true
     },
     {
       "id": "PRF-LEAK-001",
       "project": "auto-refactor",
       "family": "PRF",
       "severity": "warning",
-      "summary": "Unbounded collection growth inside loop or timer, risking O(t) or O(n) memory leaks."
+      "summary": "Unbounded collection growth inside loop or timer, risking O(t) or O(n) memory leaks.",
+      "canonical": true
     },
     {
       "id": "PRF-MEM-001",
       "project": "auto-refactor",
       "family": "PRF",
       "severity": "warning",
-      "summary": "Transient heap allocation inside high-frequency loop (new Array, new Object, .duplicate(true))."
+      "summary": "Transient heap allocation inside high-frequency loop (new Array, new Object, .duplicate(true)).",
+      "canonical": true
     },
     {
       "id": "PRF-MEM-002",
       "project": "auto-refactor",
       "family": "PRF",
       "severity": "warning",
-      "summary": "Transient heap allocation in high-load hot paths; object pooling required (ADV-PRF-002)."
+      "summary": "Transient heap allocation in high-load hot paths; object pooling required (ADV-PRF-002).",
+      "canonical": true
     },
     {
       "id": "PRF-POL-001",
       "project": "auto-refactor",
       "family": "PRF",
       "severity": "warning",
-      "summary": "Hot path expensive resources lack reuse pooling: frequent allocation of heavy objects,buffers, or connections in loops or hot calls."
+      "summary": "Hot path expensive resources lack reuse pooling: frequent allocation of heavy objects,buffers, or connections in loops or hot calls.",
+      "canonical": true
     },
     {
       "id": "PRF-POL-002",
       "project": "auto-refactor",
       "family": "PRF",
       "severity": "error",
-      "summary": "Resource pool lacks state reset contract or capacity ceiling: missing reset_statecontract or unbounded growth causes data corruption and leaks."
+      "summary": "Resource pool lacks state reset contract or capacity ceiling: missing reset_statecontract or unbounded growth causes data corruption and leaks.",
+      "canonical": true
     },
     {
       "id": "PRF-POL-003",
       "project": "auto-refactor",
       "family": "PRF",
       "severity": "warning",
-      "summary": "Negative-return excessive pooling: introducing pooling overhead for tiny, lightweightvalue objects or cold paths."
+      "summary": "Negative-return excessive pooling: introducing pooling overhead for tiny, lightweightvalue objects or cold paths.",
+      "canonical": true
     },
     {
       "id": "PRF-POL-004",
       "project": "auto-refactor",
       "family": "PRF",
       "severity": "warning",
-      "summary": "Streaming chunk loading lacks ring buffer reuse: repeated instantiation of temporarybuffers during streaming I/O or chunked reading."
+      "summary": "Streaming chunk loading lacks ring buffer reuse: repeated instantiation of temporarybuffers during streaming I/O or chunked reading.",
+      "canonical": true
     },
     {
       "id": "PROD-HYG-001",
       "project": "auto-refactor",
       "family": "PROD",
       "severity": "error",
-      "summary": "Production build output must not contain console debug statements, TODO markers, or local absolute paths"
+      "summary": "Production build output must not contain console debug statements, TODO markers, or local absolute paths",
+      "canonical": true
     },
     {
       "id": "PROD-HYG-002",
       "project": "auto-refactor",
       "family": "PROD",
       "severity": "error",
-      "summary": "Production build must not expose source map files or sourceMappingURL directives to clients"
+      "summary": "Production build must not expose source map files or sourceMappingURL directives to clients",
+      "canonical": true
     },
     {
       "id": "PROD-HYG-003",
       "project": "auto-refactor",
       "family": "PROD",
       "severity": "error",
-      "summary": "Sensitive backend environment variable references must not leak into client-facing bundles"
+      "summary": "Sensitive backend environment variable references must not leak into client-facing bundles",
+      "canonical": true
     },
     {
       "id": "PS-ALIAS-001",
       "project": "auto-refactor",
       "family": "PS",
       "severity": "info",
-      "summary": "PowerShell script uses deprecated command alias."
+      "summary": "PowerShell script uses deprecated command alias.",
+      "canonical": true
     },
     {
       "id": "PS-CMDLET-001",
       "project": "auto-refactor",
       "family": "PS",
       "severity": "info",
-      "summary": "Function name does not conform to standard Verb-Noun naming convention."
+      "summary": "Function name does not conform to standard Verb-Noun naming convention.",
+      "canonical": true
     },
     {
       "id": "PS-DOC-001",
       "project": "auto-refactor",
       "family": "PS",
       "severity": "warning",
-      "summary": "PowerShell script or function lacks standard documentation comment header."
+      "summary": "PowerShell script or function lacks standard documentation comment header.",
+      "canonical": true
     },
     {
       "id": "PS-ERROR-001",
       "project": "auto-refactor",
       "family": "PS",
       "severity": "warning",
-      "summary": "Empty catch block or unhandled error detected in PowerShell script."
+      "summary": "Empty catch block or unhandled error detected in PowerShell script.",
+      "canonical": true
     },
     {
       "id": "PS-PARAM-001",
       "project": "auto-refactor",
       "family": "PS",
       "severity": "info",
-      "summary": "Param block lacks [CmdletBinding()] or parameters lack explicit types."
+      "summary": "Param block lacks [CmdletBinding()] or parameters lack explicit types.",
+      "canonical": true
     },
     {
       "id": "PS-SAFE-001",
       "project": "auto-refactor",
       "family": "PS",
       "severity": "error",
-      "summary": "Interactive input cmdlet used without non-interactive terminal guard."
+      "summary": "Interactive input cmdlet used without non-interactive terminal guard.",
+      "canonical": true
     },
     {
       "id": "PS-SEC-001",
       "project": "auto-refactor",
       "family": "PS",
       "severity": "error",
-      "summary": "Dynamic Invoke-Expression (iex) with variable input risks code injection."
+      "summary": "Dynamic Invoke-Expression (iex) with variable input risks code injection.",
+      "canonical": true
     },
     {
       "id": "PS-TRAP-001",
       "project": "auto-refactor",
       "family": "PS",
       "severity": "warning",
-      "summary": "Critical system handle created without try-finally resource disposal."
+      "summary": "Critical system handle created without try-finally resource disposal.",
+      "canonical": true
     },
     {
       "id": "PS-VERB-001",
       "project": "auto-refactor",
       "family": "PS",
       "severity": "info",
-      "summary": "Unapproved PowerShell verb used in function name."
+      "summary": "Unapproved PowerShell verb used in function name.",
+      "canonical": true
     },
     {
       "id": "PYM-ABC-001",
       "project": "auto-refactor",
       "family": "PYM",
       "severity": "error",
-      "summary": "Importing abstract collections from typing instead of collections.abc."
+      "summary": "Importing abstract collections from typing instead of collections.abc.",
+      "canonical": true
     },
     {
       "id": "PYM-ASYNC-001",
       "project": "auto-refactor",
       "family": "PYM",
       "severity": "error",
-      "summary": "Blocking call or un-awaited synchronous call executed inside async function."
+      "summary": "Blocking call or un-awaited synchronous call executed inside async function.",
+      "canonical": true
     },
     {
       "id": "PYM-DATETIME-001",
       "project": "auto-refactor",
       "family": "PYM",
       "severity": "error",
-      "summary": "Legacy timezone.utc usage detected."
+      "summary": "Legacy timezone.utc usage detected.",
+      "canonical": true
     },
     {
       "id": "PYM-DEFAULT-001",
       "project": "auto-refactor",
       "family": "PYM",
       "severity": "warning",
-      "summary": "Mutable default argument (=[], ={}, =set()) detected in function signature."
+      "summary": "Mutable default argument (=[], ={}, =set()) detected in function signature.",
+      "canonical": true
     },
     {
       "id": "PYM-FSTRING-001",
       "project": "auto-refactor",
       "family": "PYM",
       "severity": "warning",
-      "summary": "Legacy % string formatting detected."
+      "summary": "Legacy % string formatting detected.",
+      "canonical": true
     },
     {
       "id": "PYM-GENERIC-001",
       "project": "auto-refactor",
       "family": "PYM",
       "severity": "error",
-      "summary": "Legacy container generics from typing (List, Dict, Set, Tuple) detected."
+      "summary": "Legacy container generics from typing (List, Dict, Set, Tuple) detected.",
+      "canonical": true
     },
     {
       "id": "PYM-IMPORT-001",
       "project": "auto-refactor",
       "family": "PYM",
       "severity": "warning",
-      "summary": "Module-level imports not grouped into 3 sections or not sorted alphabetically."
+      "summary": "Module-level imports not grouped into 3 sections or not sorted alphabetically.",
+      "canonical": true
     },
     {
       "id": "PYM-OPEN-001",
       "project": "auto-refactor",
       "family": "PYM",
       "severity": "warning",
-      "summary": "open() call not managed within a with statement block."
+      "summary": "open() call not managed within a with statement block.",
+      "canonical": true
     },
     {
       "id": "PYM-PATH-001",
       "project": "auto-refactor",
       "family": "PYM",
       "severity": "warning",
-      "summary": "Legacy os.path usage detected."
+      "summary": "Legacy os.path usage detected.",
+      "canonical": true
     },
     {
       "id": "PYM-RAISE-001",
       "project": "auto-refactor",
       "family": "PYM",
       "severity": "warning",
-      "summary": "Exception raised inside except block without from clause, losing exception chain."
+      "summary": "Exception raised inside except block without from clause, losing exception chain.",
+      "canonical": true
     },
     {
       "id": "PYM-SHADOW-001",
       "project": "auto-refactor",
       "family": "PYM",
       "severity": "warning",
-      "summary": "Variable or parameter shadows a Python core built-in identifier."
+      "summary": "Variable or parameter shadows a Python core built-in identifier.",
+      "canonical": true
     },
     {
       "id": "PYM-SLOTS-001",
       "project": "auto-refactor",
       "family": "PYM",
       "severity": "warning",
-      "summary": "Non-inheriting @dataclass does not declare slots=True."
+      "summary": "Non-inheriting @dataclass does not declare slots=True.",
+      "canonical": true
     },
     {
       "id": "PYM-UNION-001",
       "project": "auto-refactor",
       "family": "PYM",
       "severity": "error",
-      "summary": "Legacy Optional[...] or Union[...] used in type annotation or alias."
+      "summary": "Legacy Optional[...] or Union[...] used in type annotation or alias.",
+      "canonical": true
     },
     {
       "id": "RCFG-COUNTS-001",
@@ -2791,98 +3067,112 @@
       "project": "auto-refactor",
       "family": "RSM",
       "severity": "info",
-      "summary": "Naked numeric as cast can cause silent truncation or wrapping."
+      "summary": "Naked numeric as cast can cause silent truncation or wrapping.",
+      "canonical": true
     },
     {
       "id": "RSM-CLONE-001",
       "project": "auto-refactor",
       "family": "RSM",
       "severity": "warning",
-      "summary": "clone() result is used solely for comparison or length check."
+      "summary": "clone() result is used solely for comparison or length check.",
+      "canonical": true
     },
     {
       "id": "RSM-ELSE-001",
       "project": "auto-refactor",
       "family": "RSM",
       "severity": "warning",
-      "summary": "Single-branch early exit in if-let should migrate to let-else."
+      "summary": "Single-branch early exit in if-let should migrate to let-else.",
+      "canonical": true
     },
     {
       "id": "RSM-EXP-001",
       "project": "auto-refactor",
       "family": "RSM",
       "severity": "info",
-      "summary": "Naked expect() call in production code risks unclassified panic."
+      "summary": "Naked expect() call in production code risks unclassified panic.",
+      "canonical": true
     },
     {
       "id": "RSM-EXTERN-001",
       "project": "auto-refactor",
       "family": "RSM",
       "severity": "warning",
-      "summary": "Obsolete extern crate declaration detected."
+      "summary": "Obsolete extern crate declaration detected.",
+      "canonical": true
     },
     {
       "id": "RSM-FIND-001",
       "project": "auto-refactor",
       "family": "RSM",
       "severity": "info",
-      "summary": "Manual for loop search with early return detected."
+      "summary": "Manual for loop search with early return detected.",
+      "canonical": true
     },
     {
       "id": "RSM-FORMAT-001",
       "project": "auto-refactor",
       "family": "RSM",
       "severity": "warning",
-      "summary": "Format macro uses positional argument {}."
+      "summary": "Format macro uses positional argument {}.",
+      "canonical": true
     },
     {
       "id": "RSM-LOCK-001",
       "project": "auto-refactor",
       "family": "RSM",
       "severity": "warning",
-      "summary": "std::sync lock guard held across .await in async function."
+      "summary": "std::sync lock guard held across .await in async function.",
+      "canonical": true
     },
     {
       "id": "RSM-MACRO-001",
       "project": "auto-refactor",
       "family": "RSM",
       "severity": "warning",
-      "summary": "Deprecated #[macro_use] textual macro import detected."
+      "summary": "Deprecated #[macro_use] textual macro import detected.",
+      "canonical": true
     },
     {
       "id": "RSM-PNC-001",
       "project": "auto-refactor",
       "family": "RSM",
       "severity": "error",
-      "summary": "Production code contains naked crash macro (panic!, todo!, unimplemented!, unreachable!)."
+      "summary": "Production code contains naked crash macro (panic!, todo!, unimplemented!, unreachable!).",
+      "canonical": true
     },
     {
       "id": "RSM-SAF-001",
       "project": "auto-refactor",
       "family": "RSM",
       "severity": "warning",
-      "summary": "Unsafe block or function lacks preceding // SAFETY: invariant proof comment."
+      "summary": "Unsafe block or function lacks preceding // SAFETY: invariant proof comment.",
+      "canonical": true
     },
     {
       "id": "RSM-STR-001",
       "project": "auto-refactor",
       "family": "RSM",
       "severity": "warning",
-      "summary": "Function signature accepts &String parameter."
+      "summary": "Function signature accepts &String parameter.",
+      "canonical": true
     },
     {
       "id": "RSM-TRY-001",
       "project": "auto-refactor",
       "family": "RSM",
       "severity": "warning",
-      "summary": "Deprecated try! macro detected in Rust codebase."
+      "summary": "Deprecated try! macro detected in Rust codebase.",
+      "canonical": true
     },
     {
       "id": "RSM-UNWRAP-001",
       "project": "auto-refactor",
       "family": "RSM",
       "severity": "warning",
-      "summary": "Naked unwrap() called on fallible Result or Option."
+      "summary": "Naked unwrap() called on fallible Result or Option.",
+      "canonical": true
     },
     {
       "project": "workspace-timing",
@@ -2921,217 +3211,249 @@
       "project": "auto-refactor",
       "family": "SEC",
       "severity": "error",
-      "summary": "Internal, administrative, or unauthenticated backend endpoints must not be exposed in client code"
+      "summary": "Internal, administrative, or unauthenticated backend endpoints must not be exposed in client code",
+      "canonical": true
     },
     {
       "id": "SEC-EXP-002",
       "project": "auto-refactor",
       "family": "SEC",
       "severity": "error",
-      "summary": "Visual hiding (display:none) or UI disabling must not be used as sole authorization mechanism"
+      "summary": "Visual hiding (display:none) or UI disabling must not be used as sole authorization mechanism",
+      "canonical": true
     },
     {
       "id": "SEC-EXP-003",
       "project": "auto-refactor",
       "family": "SEC",
       "severity": "warning",
-      "summary": "Disabled feature flags must not bundle full implementation logic to client bundles"
+      "summary": "Disabled feature flags must not bundle full implementation logic to client bundles",
+      "canonical": true
     },
     {
       "id": "SEC-EXP-004",
       "project": "auto-refactor",
       "family": "SEC",
       "severity": "error",
-      "summary": "Unreleased, experimental, or test preview routes must not be packaged into production routes"
+      "summary": "Unreleased, experimental, or test preview routes must not be packaged into production routes",
+      "canonical": true
     },
     {
       "id": "SEC-EXP-005",
       "project": "auto-refactor",
       "family": "SEC",
       "severity": "error",
-      "summary": "Cross-window message handlers performing sensitive actions must verify event.userActivation or validate event.origin"
+      "summary": "Cross-window message handlers performing sensitive actions must verify event.userActivation or validate event.origin",
+      "canonical": true
     },
     {
       "id": "SEC-LEAK-001",
       "project": "auto-refactor",
       "family": "SEC",
       "severity": "warning",
-      "summary": "Sensitive data (passwords, tokens, PII) logged or exposed in exceptions."
+      "summary": "Sensitive data (passwords, tokens, PII) logged or exposed in exceptions.",
+      "canonical": true
     },
     {
       "id": "SEC-VUL-001",
       "project": "auto-refactor",
       "family": "SEC",
       "severity": "error",
-      "summary": "Arbitrary dynamic code execution detected (eval, exec, Function constructor)."
+      "summary": "Arbitrary dynamic code execution detected (eval, exec, Function constructor).",
+      "canonical": true
     },
     {
       "id": "SEC-VUL-002",
       "project": "auto-refactor",
       "family": "SEC",
       "severity": "error",
-      "summary": "Command injection: concatenating external input into shell/subprocess execution."
+      "summary": "Command injection: concatenating external input into shell/subprocess execution.",
+      "canonical": true
     },
     {
       "id": "SEC-VUL-003",
       "project": "auto-refactor",
       "family": "SEC",
       "severity": "warning",
-      "summary": "Prototype pollution: writing externally controlled keys to object prototypes."
+      "summary": "Prototype pollution: writing externally controlled keys to object prototypes.",
+      "canonical": true
     },
     {
       "id": "SEC-VUL-004",
       "project": "auto-refactor",
       "family": "SEC",
       "severity": "warning",
-      "summary": "Insecure pseudo-random number generator (Math.random) used in security-sensitive context."
+      "summary": "Insecure pseudo-random number generator (Math.random) used in security-sensitive context.",
+      "canonical": true
     },
     {
       "id": "SEC-VUL-005",
       "project": "auto-refactor",
       "family": "SEC",
       "severity": "warning",
-      "summary": "Weak hash algorithm (MD5/SHA-1) used for integrity or password hashing."
+      "summary": "Weak hash algorithm (MD5/SHA-1) used for integrity or password hashing.",
+      "canonical": true
     },
     {
       "id": "SEC-VUL-006",
       "project": "auto-refactor",
       "family": "SEC",
       "severity": "warning",
-      "summary": "Path traversal: concatenating external input directly into file paths."
+      "summary": "Path traversal: concatenating external input directly into file paths.",
+      "canonical": true
     },
     {
       "id": "secret-detected",
       "project": "auto-refactor",
       "family": "SEC",
       "severity": "error",
-      "summary": "Suspected hardcoded credential detected based on pattern matching."
+      "summary": "Suspected hardcoded credential detected based on pattern matching.",
+      "canonical": false,
+      "legacyReason": "id-not-canonical"
     },
     {
       "id": "SH-ARRAY-001",
       "project": "auto-refactor",
       "family": "SH",
       "severity": "info",
-      "summary": "Using $* instead of \"$@\" breaks argument word splitting."
+      "summary": "Using $* instead of \"$@\" breaks argument word splitting.",
+      "canonical": true
     },
     {
       "id": "SH-CMD-001",
       "project": "auto-refactor",
       "family": "SH",
       "severity": "info",
-      "summary": "Deprecated backtick command substitution syntax detected."
+      "summary": "Deprecated backtick command substitution syntax detected.",
+      "canonical": true
     },
     {
       "id": "SH-COND-001",
       "project": "auto-refactor",
       "family": "SH",
       "severity": "warning",
-      "summary": "Bash script uses fragile single bracket syntax [ ... ] with compound conditions or regex."
+      "summary": "Bash script uses fragile single bracket syntax [ ... ] with compound conditions or regex.",
+      "canonical": true
     },
     {
       "id": "SH-DEPR-001",
       "project": "auto-refactor",
       "family": "SH",
       "severity": "info",
-      "summary": "Using single bracket [ or legacy test syntax in Bash scripts."
+      "summary": "Using single bracket [ or legacy test syntax in Bash scripts.",
+      "canonical": true
     },
     {
       "id": "SH-DOC-001",
       "project": "auto-refactor",
       "family": "SH",
       "severity": "warning",
-      "summary": "Shell script lacks standard module documentation contract header."
+      "summary": "Shell script lacks standard module documentation contract header.",
+      "canonical": true
     },
     {
       "id": "SH-ECHO-001",
       "project": "auto-refactor",
       "family": "SH",
       "severity": "info",
-      "summary": "Non-portable echo -e or echo -n flag used."
+      "summary": "Non-portable echo -e or echo -n flag used.",
+      "canonical": true
     },
     {
       "id": "SH-EOL-001",
       "project": "auto-refactor",
       "family": "SH",
       "severity": "error",
-      "summary": "Shell script contains CRLF line endings; execution fails on POSIX platforms."
+      "summary": "Shell script contains CRLF line endings; execution fails on POSIX platforms.",
+      "canonical": true
     },
     {
       "id": "SH-ERR-001",
       "project": "auto-refactor",
       "family": "SH",
       "severity": "warning",
-      "summary": "Critical command execution lacks exit code validation."
+      "summary": "Critical command execution lacks exit code validation.",
+      "canonical": true
     },
     {
       "id": "SH-EXIT-001",
       "project": "auto-refactor",
       "family": "SH",
       "severity": "warning",
-      "summary": "Command expected to return non-zero exit codes executed bare under set -e."
+      "summary": "Command expected to return non-zero exit codes executed bare under set -e.",
+      "canonical": true
     },
     {
       "id": "SH-INIT-001",
       "project": "auto-refactor",
       "family": "SH",
       "severity": "warning",
-      "summary": "Shell script header does not declare strict mode (set -euo pipefail)."
+      "summary": "Shell script header does not declare strict mode (set -euo pipefail).",
+      "canonical": true
     },
     {
       "id": "SH-QUOTE-001",
       "project": "auto-refactor",
       "family": "SH",
       "severity": "warning",
-      "summary": "Unquoted parameter expansion risks unexpected word splitting and globbing."
+      "summary": "Unquoted parameter expansion risks unexpected word splitting and globbing.",
+      "canonical": true
     },
     {
       "id": "SH-READ-001",
       "project": "auto-refactor",
       "family": "SH",
       "severity": "info",
-      "summary": "read command lacks -r flag, allowing backslashes to be mangled."
+      "summary": "read command lacks -r flag, allowing backslashes to be mangled.",
+      "canonical": true
     },
     {
       "id": "SH-SAFE-001",
       "project": "auto-refactor",
       "family": "SH",
       "severity": "error",
-      "summary": "Interactive read command lacks timeout or TTY detection guard."
+      "summary": "Interactive read command lacks timeout or TTY detection guard.",
+      "canonical": true
     },
     {
       "id": "SH-SEC-001",
       "project": "auto-refactor",
       "family": "SH",
       "severity": "error",
-      "summary": "Dynamic eval execution with variable expansion risks command injection."
+      "summary": "Dynamic eval execution with variable expansion risks command injection.",
+      "canonical": true
     },
     {
       "id": "SH-TRAP-001",
       "project": "auto-refactor",
       "family": "SH",
       "severity": "error",
-      "summary": "Temporary resource created without registering EXIT cleanup trap."
+      "summary": "Temporary resource created without registering EXIT cleanup trap.",
+      "canonical": true
     },
     {
       "id": "SIM-ARGS-001",
       "project": "auto-refactor",
       "family": "SIM",
       "severity": "warning",
-      "summary": "Function signature parameter count exceeds threshold (> 4 parameters); refactoring with a ParameterObject recommended."
+      "summary": "Function signature parameter count exceeds threshold (> 4 parameters); refactoring with a ParameterObject recommended.",
+      "canonical": true
     },
     {
       "id": "SIM-ARGS-002",
       "project": "auto-refactor",
       "family": "SIM",
       "severity": "warning",
-      "summary": "Minimum parameter count threshold breached: public handler, listener, or solver function declares 0 parameters, risking implicit coupling with mutable global state."
+      "summary": "Minimum parameter count threshold breached: public handler, listener, or solver function declares 0 parameters, risking implicit coupling with mutable global state.",
+      "canonical": true
     },
     {
       "id": "SIM-BOOL-001",
       "project": "auto-refactor",
       "family": "SIM",
       "severity": "info",
-      "summary": "Redundant explicit comparison against boolean literal."
+      "summary": "Redundant explicit comparison against boolean literal.",
+      "canonical": true
     },
     {
       "id": "SIM-CMP-001",
@@ -3145,7 +3467,8 @@
       "project": "auto-refactor",
       "family": "SIM",
       "severity": "warning",
-      "summary": "Consecutive lines of commented-out code detected."
+      "summary": "Consecutive lines of commented-out code detected.",
+      "canonical": true
     },
     {
       "id": "SIM-DED-001",
@@ -3159,35 +3482,40 @@
       "project": "auto-refactor",
       "family": "SIM",
       "severity": "info",
-      "summary": "Redundant else branch after early termination statement (return, throw, break)."
+      "summary": "Redundant else branch after early termination statement (return, throw, break).",
+      "canonical": true
     },
     {
       "id": "SIM-EMPTY-001",
       "project": "auto-refactor",
       "family": "SIM",
       "severity": "warning",
-      "summary": "Empty function body containing only pass, ellipsis (...), or empty block."
+      "summary": "Empty function body containing only pass, ellipsis (...), or empty block.",
+      "canonical": true
     },
     {
       "id": "SIM-FLAT-002",
       "project": "auto-refactor",
       "family": "SIM",
       "severity": "warning",
-      "summary": "Deeply nested branching logic exceeds nesting threshold (depth <= 3)."
+      "summary": "Deeply nested branching logic exceeds nesting threshold (depth <= 3).",
+      "canonical": true
     },
     {
       "id": "SIM-GUARD-001",
       "project": "auto-refactor",
       "family": "SIM",
       "severity": "info",
-      "summary": "Inverted precondition check causes excessive nested indentation."
+      "summary": "Inverted precondition check causes excessive nested indentation.",
+      "canonical": true
     },
     {
       "id": "SIM-IMM-001",
       "project": "auto-refactor",
       "family": "SIM",
       "severity": "info",
-      "summary": "Eliminate uninitialized mutable let bindings by folding if-else into immutable const ternary."
+      "summary": "Eliminate uninitialized mutable let bindings by folding if-else into immutable const ternary.",
+      "canonical": true
     },
     {
       "id": "SIM-INH-001",
@@ -3201,28 +3529,32 @@
       "project": "auto-refactor",
       "family": "SIM",
       "severity": "info",
-      "summary": "Single-use orphan function has high vector similarity with parent; inlining utility exceeds threshold."
+      "summary": "Single-use orphan function has high vector similarity with parent; inlining utility exceeds threshold.",
+      "canonical": true
     },
     {
       "id": "SIM-LONG-001",
       "project": "auto-refactor",
       "family": "SIM",
       "severity": "warning",
-      "summary": "Function physical line count exceeds maximum threshold (default 60 lines)."
+      "summary": "Function physical line count exceeds maximum threshold (default 60 lines).",
+      "canonical": true
     },
     {
       "id": "SIM-PRNT-001",
       "project": "auto-refactor",
       "family": "SIM",
       "severity": "warning",
-      "summary": "Raw debug print statements leaking into production outputs."
+      "summary": "Raw debug print statements leaking into production outputs.",
+      "canonical": true
     },
     {
       "id": "SIM-TRN-001",
       "project": "auto-refactor",
       "family": "SIM",
       "severity": "info",
-      "summary": "Redundant if-else branch can be simplified into a single-line ternary expression."
+      "summary": "Redundant if-else branch can be simplified into a single-line ternary expression.",
+      "canonical": true
     },
     {
       "id": "SIM-WRP-001",
@@ -3236,42 +3568,48 @@
       "project": "auto-refactor",
       "family": "STDLIB",
       "severity": "error",
-      "summary": "Prohibit implicit heap escape and dynamic reallocation in bare-metal and no_std runtime environments."
+      "summary": "Prohibit implicit heap escape and dynamic reallocation in bare-metal and no_std runtime environments.",
+      "canonical": true
     },
     {
       "id": "STDLIB-CONST-001",
       "project": "auto-refactor",
       "family": "STDLIB",
       "severity": "warning",
-      "summary": "Cryptographic and hash comparisons must prevent timing leakages via constant-time execution."
+      "summary": "Cryptographic and hash comparisons must prevent timing leakages via constant-time execution.",
+      "canonical": true
     },
     {
       "id": "STDLIB-PANIC-001",
       "project": "auto-refactor",
       "family": "STDLIB",
       "severity": "warning",
-      "summary": "Public APIs in standard library and runtime must not escape naked panic, unwrap, or abort; return Result/Option or bounded error."
+      "summary": "Public APIs in standard library and runtime must not escape naked panic, unwrap, or abort; return Result/Option or bounded error.",
+      "canonical": true
     },
     {
       "id": "STDLIB-PORT-001",
       "project": "auto-refactor",
       "family": "STDLIB",
       "severity": "warning",
-      "summary": "Conditional platform compilation #[cfg(...)] requires fallback blocks for unsupported targets."
+      "summary": "Conditional platform compilation #[cfg(...)] requires fallback blocks for unsupported targets.",
+      "canonical": true
     },
     {
       "id": "STDLIB-RECURSION-001",
       "project": "auto-refactor",
       "family": "STDLIB",
       "severity": "warning",
-      "summary": "Unbounded deep recursion in core algorithms must include explicit stack depth guards."
+      "summary": "Unbounded deep recursion in core algorithms must include explicit stack depth guards.",
+      "canonical": true
     },
     {
       "id": "STDLIB-UNSAFE-001",
       "project": "auto-refactor",
       "family": "STDLIB",
       "severity": "error",
-      "summary": "Low-level unsafe blocks in Rust/C++ require mandatory // SAFETY: contract proof comments."
+      "summary": "Low-level unsafe blocks in Rust/C++ require mandatory // SAFETY: contract proof comments.",
+      "canonical": true
     },
     {
       "project": "workspace-timing",
@@ -3294,203 +3632,234 @@
       "project": "auto-refactor",
       "family": "TSM",
       "severity": "warning",
-      "summary": "Explicit any disables type checking for this expression."
+      "summary": "Explicit any disables type checking for this expression.",
+      "canonical": true
     },
     {
       "id": "TSM-ARGS-001",
       "project": "auto-refactor",
       "family": "TSM",
       "severity": "warning",
-      "summary": "Legacy arguments object detected."
+      "summary": "Legacy arguments object detected.",
+      "canonical": true
     },
     {
       "id": "TSM-CTOR-001",
       "project": "auto-refactor",
       "family": "TSM",
       "severity": "warning",
-      "summary": "Invoking Array/Object/String/Number/Boolean wrapper constructors with new."
+      "summary": "Invoking Array/Object/String/Number/Boolean wrapper constructors with new.",
+      "canonical": true
     },
     {
       "id": "TSM-DISP-001",
       "project": "auto-refactor",
       "family": "TSM",
       "severity": "warning",
-      "summary": "VS Code event listener or Disposable not registered in subscriptions container."
+      "summary": "VS Code event listener or Disposable not registered in subscriptions container.",
+      "canonical": true
     },
     {
       "id": "TSM-INCLUDES-001",
       "project": "auto-refactor",
       "family": "TSM",
       "severity": "warning",
-      "summary": "Using indexOf comparison with -1 or 0 to test collection membership."
+      "summary": "Using indexOf comparison with -1 or 0 to test collection membership.",
+      "canonical": true
     },
     {
       "id": "TSM-REPLACE-001",
       "project": "auto-refactor",
       "family": "TSM",
       "severity": "warning",
-      "summary": "String.prototype.replace() with string pattern only replaces the first match."
+      "summary": "String.prototype.replace() with string pattern only replaces the first match.",
+      "canonical": true
     },
     {
       "id": "TSM-REQUIRE-001",
       "project": "auto-refactor",
       "family": "TSM",
       "severity": "warning",
-      "summary": "CommonJS require() call mixed inside ECMAScript module (ESM)."
+      "summary": "CommonJS require() call mixed inside ECMAScript module (ESM).",
+      "canonical": true
     },
     {
       "id": "TSM-SPREAD-001",
       "project": "auto-refactor",
       "family": "TSM",
       "severity": "warning",
-      "summary": "Using Object.assign({}, ...) for shallow object copying."
+      "summary": "Using Object.assign({}, ...) for shallow object copying.",
+      "canonical": true
     },
     {
       "id": "TSM-SUBSTR-001",
       "project": "auto-refactor",
       "family": "TSM",
       "severity": "warning",
-      "summary": "Deprecated String.prototype.substr() method detected."
+      "summary": "Deprecated String.prototype.substr() method detected.",
+      "canonical": true
     },
     {
       "id": "TSM-TYPE-001",
       "project": "auto-refactor",
       "family": "TSM",
       "severity": "warning",
-      "summary": "Named import used exclusively in type positions."
+      "summary": "Named import used exclusively in type positions.",
+      "canonical": true
     },
     {
       "id": "TSM-VAR-001",
       "project": "auto-refactor",
       "family": "TSM",
       "severity": "warning",
-      "summary": "Legacy var declaration detected (function scoped with hoisting side-effects)."
+      "summary": "Legacy var declaration detected (function scoped with hoisting side-effects).",
+      "canonical": true
     },
     {
       "id": "TST-DBT-001",
       "project": "auto-refactor",
       "family": "TST",
       "severity": "info",
-      "summary": "Lagging test technical debt without registered milestone convergence plan or assigned owner."
+      "summary": "Lagging test technical debt without registered milestone convergence plan or assigned owner.",
+      "canonical": true
     },
     {
       "id": "TST-DEN-001",
       "project": "auto-refactor",
       "family": "TST",
       "severity": "info",
-      "summary": "Effective Modern Test Density (EMTD) or Current Business Coverage Ratio (CBCR) belowthreshold in critical business modules."
+      "summary": "Effective Modern Test Density (EMTD) or Current Business Coverage Ratio (CBCR) belowthreshold in critical business modules.",
+      "canonical": true
     },
     {
       "id": "TST-FLT-001",
       "project": "auto-refactor",
       "family": "TST",
       "severity": "warning",
-      "summary": "Fragile floating-point assertion: test directly asserts equality on raw floatliterals without tolerance or formula derivation."
+      "summary": "Fragile floating-point assertion: test directly asserts equality on raw floatliterals without tolerance or formula derivation.",
+      "canonical": true
     },
     {
       "id": "TST-ILS-001",
       "project": "auto-refactor",
       "family": "TST",
       "severity": "warning",
-      "summary": "Test completeness illusion: tests solely verify mock configurations or bind todeprecated business contracts."
+      "summary": "Test completeness illusion: tests solely verify mock configurations or bind todeprecated business contracts.",
+      "canonical": true
     },
     {
       "id": "TST-ORC-001",
       "project": "auto-refactor",
       "family": "TST",
       "severity": "warning",
-      "summary": "Brittle magic assertion oracle detected: test asserts exact equality on physical entitytotals or float scalars instead of invariant corridor or dynamic relative baseline."
+      "summary": "Brittle magic assertion oracle detected: test asserts exact equality on physical entitytotals or float scalars instead of invariant corridor or dynamic relative baseline.",
+      "canonical": true
     },
     {
       "id": "TST-SKP-001",
       "project": "auto-refactor",
       "family": "TST",
       "severity": "warning",
-      "summary": "Skipped, quarantined, or disabled test cases lingering indefinitely in core business domains."
+      "summary": "Skipped, quarantined, or disabled test cases lingering indefinitely in core business domains.",
+      "canonical": true
     },
     {
       "id": "TST-TAU-001",
       "project": "auto-refactor",
       "family": "TST",
       "severity": "warning",
-      "summary": "Ineffective test lacking substantive business assertions or containing tautological assertions."
+      "summary": "Ineffective test lacking substantive business assertions or containing tautological assertions.",
+      "canonical": true
     },
     {
       "id": "TST-TOP-001",
       "project": "auto-refactor",
       "family": "TST",
       "severity": "warning",
-      "summary": "Polyglot test topology dual-track discipline: embedding test code blocks inTS/GDScript production files is strictly prohibited."
+      "summary": "Polyglot test topology dual-track discipline: embedding test code blocks inTS/GDScript production files is strictly prohibited.",
+      "canonical": true
     },
     {
       "id": "UI-ENG-001",
       "project": "auto-refactor",
       "family": "UI",
       "severity": "warning",
-      "summary": "HTML semantic structure and accessibility attributes must be present on interactive elements"
+      "summary": "HTML semantic structure and accessibility attributes must be present on interactive elements",
+      "canonical": true
     },
     {
       "id": "UI-ENG-002",
       "project": "auto-refactor",
       "family": "UI",
       "severity": "warning",
-      "summary": "DOM hierarchy nesting depth must not exceed 12 and CSS animations must avoid reflow properties"
+      "summary": "DOM hierarchy nesting depth must not exceed 12 and CSS animations must avoid reflow properties",
+      "canonical": true
     },
     {
       "id": "UI-ENG-003",
       "project": "auto-refactor",
       "family": "UI",
       "severity": "warning",
-      "summary": "Component must not exceed 10 props or duplicate complex DOM subtrees without reuse"
+      "summary": "Component must not exceed 10 props or duplicate complex DOM subtrees without reuse",
+      "canonical": true
     },
     {
       "id": "UI-ENG-004",
       "project": "auto-refactor",
       "family": "UI",
       "severity": "info",
-      "summary": "Frontend hooks must start with \"use\" and event handler callbacks must start with \"on\" or \"handle\""
+      "summary": "Frontend hooks must start with \"use\" and event handler callbacks must start with \"on\" or \"handle\"",
+      "canonical": true
     },
     {
       "id": "UI-ENG-005",
       "project": "auto-refactor",
       "family": "UI",
       "severity": "warning",
-      "summary": "Keyboard Enter handlers for input/textarea must guard against CJK IME composition state"
+      "summary": "Keyboard Enter handlers for input/textarea must guard against CJK IME composition state",
+      "canonical": true
     },
     {
       "id": "UI-ENG-006",
       "project": "auto-refactor",
       "family": "UI",
       "severity": "warning",
-      "summary": "Dynamic numeric counters, timestamps, or metrics must enable font-variant-numeric: tabular-nums"
+      "summary": "Dynamic numeric counters, timestamps, or metrics must enable font-variant-numeric: tabular-nums",
+      "canonical": true
     },
     {
       "id": "UI-ENG-007",
       "project": "auto-refactor",
       "family": "UI",
       "severity": "warning",
-      "summary": "Interactive controls inside bordered containers must avoid nested borders (single closed border rule)"
+      "summary": "Interactive controls inside bordered containers must avoid nested borders (single closed border rule)",
+      "canonical": true
     },
     {
       "id": "UI-ENG-008",
       "project": "auto-refactor",
       "family": "UI",
       "severity": "warning",
-      "summary": "Local components, cards, or webview containers must use @container queries instead of viewport @media, and CJK text containers must configure text-wrap: balance or overflow-wrap: break-word to prevent character squashing"
+      "summary": "Local components, cards, or webview containers must use @container queries instead of viewport @media, and CJK text containers must configure text-wrap: balance or overflow-wrap: break-word to prevent character squashing",
+      "canonical": true
     },
     {
       "id": "unused-export",
       "project": "auto-refactor",
       "family": "DEP",
       "severity": "warning",
-      "summary": "Exported symbol has zero external references across the workspace (TS/JS scope)."
+      "summary": "Exported symbol has zero external references across the workspace (TS/JS scope).",
+      "canonical": false,
+      "legacyReason": "id-not-canonical"
     },
     {
       "id": "unused-module",
       "project": "auto-refactor",
       "family": "DEP",
       "severity": "warning",
-      "summary": "Module is never imported by any other file (outside entry whitelist)."
+      "summary": "Module is never imported by any other file (outside entry whitelist).",
+      "canonical": false,
+      "legacyReason": "id-not-canonical"
     },
     {
       "id": "UUID-REENTRANT-001",
@@ -3539,56 +3908,64 @@
       "project": "auto-refactor",
       "family": "VSC",
       "severity": "warning",
-      "summary": "User-visible notification message hardcodes string literal without localization."
+      "summary": "User-visible notification message hardcodes string literal without localization.",
+      "canonical": true
     },
     {
       "id": "VSC-MEM-001",
       "project": "auto-refactor",
       "family": "VSC",
       "severity": "error",
-      "summary": "VS Code Disposable resource created without being pushed to context.subscriptions."
+      "summary": "VS Code Disposable resource created without being pushed to context.subscriptions.",
+      "canonical": true
     },
     {
       "id": "VSC-PERF-001",
       "project": "auto-refactor",
       "family": "VSC",
       "severity": "warning",
-      "summary": "Synchronous file I/O executed on Extension Host main thread blocks editor UI."
+      "summary": "Synchronous file I/O executed on Extension Host main thread blocks editor UI.",
+      "canonical": true
     },
     {
       "id": "VSC-PERF-002",
       "project": "auto-refactor",
       "family": "VSC",
       "severity": "warning",
-      "summary": "Webview CSS transition directly animates geometry layout property triggering browser reflow."
+      "summary": "Webview CSS transition directly animates geometry layout property triggering browser reflow.",
+      "canonical": true
     },
     {
       "id": "VSC-UI-001",
       "project": "auto-refactor",
       "family": "VSC",
       "severity": "warning",
-      "summary": "Webview collection list rendering lacks bounded density or folding controls (>5 items)."
+      "summary": "Webview collection list rendering lacks bounded density or folding controls (>5 items).",
+      "canonical": true
     },
     {
       "id": "VSC-UI-002",
       "project": "auto-refactor",
       "family": "VSC",
       "severity": "error",
-      "summary": "Webview UI contains hardcoded monochrome colors instead of theme CSS variables."
+      "summary": "Webview UI contains hardcoded monochrome colors instead of theme CSS variables.",
+      "canonical": true
     },
     {
       "id": "VSC-UI-003",
       "project": "auto-refactor",
       "family": "VSC",
       "severity": "warning",
-      "summary": "Webview interactive form control lacks accessible label binding (WCAG 4.1.2)."
+      "summary": "Webview interactive form control lacks accessible label binding (WCAG 4.1.2).",
+      "canonical": true
     },
     {
       "id": "VSC-UI-004",
       "project": "auto-refactor",
       "family": "VSC",
       "severity": "warning",
-      "summary": "Webview interactive state style changes must not dynamically modify border width triggering layout jitter."
+      "summary": "Webview interactive state style changes must not dynamically modify border width triggering layout jitter.",
+      "canonical": true
     }
   ]
 }

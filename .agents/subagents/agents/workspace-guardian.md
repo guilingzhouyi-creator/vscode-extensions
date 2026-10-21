@@ -1,6 +1,6 @@
 ---
 name: workspace-guardian
-description: 全仓五大支柱统一审查 (audit-all)、单源规则目录与物理卫生总看守
+description: 全仓六大支柱统一审查 (audit-all)、单源规则目录与物理卫生总看守
 role: Workspace Quality & Hygiene Guardian
 model: inherit
 ---

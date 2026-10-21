@@ -118,7 +118,7 @@ node .agents/skills/subagent-orchestration/scripts/synthesize-subagent.js --pres
 node .agents/skills/subagent-orchestration/scripts/synthesize-subagent.js --all
 ```
 
-常用预置别名速查矩阵（23 个预置）。单源真源为 `.agents/subagents/agents/*.md`（已入库），由 `sync-agents-mirror.js` 单向镜像至 gitignored 的 `.agents/plugins/workspace-governance/agents/`；反向书写会在干净 clone 上丢失：
+常用预置别名速查矩阵（<!-- METRICS:BEGIN subagent-preset-count -->**23 条**<!-- METRICS:END subagent-preset-count -->预置）。单源真源为 `.agents/subagents/agents/*.md`（已入库），由 `sync-agents-mirror.js` 单向镜像至 gitignored 的 `.agents/plugins/workspace-governance/agents/`；反向书写会在干净 clone 上丢失：
 * **`vs-extension`**：`wt-construct` / `wt-review` / `wt-refactor` / `wt-explore`
 * **`cli-engine`**：`ar-construct` / `ar-review` / `ar-refactor` / `ar-explore`
 * **`game-engine`**：`wg-construct` / `wg-review` / `wg-refactor` / `wg-explore`
@@ -170,9 +170,9 @@ SubAgent 汇报任务完成并返回消息后，主 Agent **绝对不能盲目�
    - 全仓刚性看守：严禁引入任何 High/Critical 技术债务反弹，历史性清零（0 项）红线一票否决；
 7. **⑦ 受影响领域自动化回归测试 (Domain Test Suite Regression)**：
    - `auto-refactor`：`cd auto-refactor && npm test`（<!-- METRICS:BEGIN test-suite-count -->**163 套**<!-- METRICS:END test-suite-count -->测试并发/串行绿色通过，TS/Rust 100% 字节等价）；
-   - `workspace-timing`：`cd workspace-timing && npm run test:fast`（156 用例绿色通过）；
+   - `workspace-timing`：`cd workspace-timing && npm run test:fast`（<!-- METRICS:BEGIN ws-test-case-count -->**205 项**<!-- METRICS:END ws-test-case-count -->用例绿色通过）；
    - `WebGames`：`cd WebGames && pwsh scripts/ps1/audit-all.ps1`；
-8. **⑧ 工作区五大支柱统一审查 (Workspace Five-Pillar Unified Audit)**：执行 `pwsh -File scripts/ps1/audit-all.ps1 -Fast`，全工作区五大基石（架构、质量、门禁、类型、卫生）综合评分必须 $\ge 98$ 分，全绿通行。
+8. **⑧ 工作区全量统一审查 (Workspace Unified Audit)**：执行 `pwsh -File scripts/ps1/audit-all.ps1 -Fast`，<!-- METRICS:BEGIN pillar-count -->**6 大支柱**<!-- METRICS:END pillar-count -->（物理卫生、单源规则、auto-refactor、workspace-timing、WebGames、fractal-git）综合评分必须 $\ge 98$ 分，全绿通行。
 
 ---
 

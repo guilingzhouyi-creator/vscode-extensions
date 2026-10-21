@@ -43,7 +43,6 @@ const SCRIPT_EXTENSIONS = Object.freeze(['.js', '.json', '.ps1', '.sh']);
 const REGION_PATTERN =
   /<!--\s*METRICS:BEGIN\s+([a-z0-9-]+)\s*-->([\s\S]*?)<!--\s*METRICS:END\s+([a-z0-9-]+)\s*-->/g;
 const HISTORICAL_MARKER = /<!--\s*METRICS:IGNORE-HISTORICAL\b[^>]*commit=[0-9a-f]{7,40}/;
-const CANONICAL_RULE_ID = /^[A-Z][A-Z0-9]{1,5}(?:-[A-Z0-9]{2,10}){1,3}-\d{3}$/;
 const ANALYZER_ID = /ANALYZER_[A-Z0-9_]+/g;
 const NEWLINE = '\n';
 
@@ -144,12 +143,17 @@ function countBuiltinAnalyzers() {
 /**
  * Splits the auto-refactor rules into canonical and legacy id families.
  *
+ * The split reads the catalog's own `canonical` column instead of re-testing the id against a local
+ * regex copy. That column is derived by the consolidator from the engine's `RULE_ID_PATTERN`
+ * declaration, so this figure and the engine's verdict cannot disagree; a second regex here would
+ * be one more place to forget when the pattern is widened.
+ *
  * @param {Array<object>} rules - Catalog rule entries.
  * @returns {{canonical: number, legacy: number}} Counts by id shape.
  */
 function splitCanonicalRules(rules) {
   const autoRefactor = rules.filter((rule) => rule.project === 'auto-refactor');
-  const canonical = autoRefactor.filter((rule) => CANONICAL_RULE_ID.test(rule.id)).length;
+  const canonical = autoRefactor.filter((rule) => rule.canonical !== false).length;
   return { canonical, legacy: autoRefactor.length - canonical };
 }
 
@@ -242,6 +246,21 @@ function countRuleFamilies(project) {
   if (!catalog || !Array.isArray(catalog.rules)) return -1;
   const scoped = project ? catalog.rules.filter((rule) => rule.project === project) : catalog.rules;
   return new Set(scoped.map((rule) => rule.family)).size;
+}
+
+/**
+ * Counts the rules carrying one family name, across every project.
+ *
+ * A reader of a language-idiom reference needs the size of that family alone; deriving it from the
+ * catalog keeps the count correct when a rule is added, instead of asking an author to remember.
+ *
+ * @param {string} family - Family key such as `PYM`.
+ * @returns {number} Matching rule count, or -1 when the catalog is unreadable.
+ */
+function countFamilyRules(family) {
+  const catalog = readJson(CATALOG_FILE);
+  if (!catalog || !Array.isArray(catalog.rules)) return -1;
+  return catalog.rules.filter((rule) => rule.family === family).length;
 }
 
 /**
@@ -352,6 +371,8 @@ function buildResolvers() {
     'glossary-count': () => countTopicCatalog().glossary,
     'topic-count': () => countTopicCatalog().topics,
     'rule-family-count': () => countRuleFamilies('auto-refactor'),
+    'rule-family-count-all': () => countRuleFamilies(''),
+    'rule-family-pym': () => countFamilyRules('PYM'),
     'subagent-preset-count': () => countSubagentPresets(),
     'ws-test-case-count': () => countWorkspaceTimingCases(),
     'wg-test-suite-count': () => countWebGamesSuites(),
@@ -792,6 +813,7 @@ module.exports = Object.freeze({
   countTestSuites,
   countTopicCatalog,
   countRuleFamilies,
+  countFamilyRules,
   countSubagentPresets,
   countWorkspaceTimingCases,
   countWebGamesSuites,

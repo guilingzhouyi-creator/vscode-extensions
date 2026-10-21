@@ -78,7 +78,7 @@ function resolveIntent(intent) {
     archKey = 'cli-engine';
   } else if (/webgames|\bwg\b|godot|gdscript|游戏|卡拉尔/.test(text)) {
     archKey = 'game-engine';
-  } else if (/(?:全仓|工作区).*(?:门禁|统一审查|audit-all)|单源规则|规则目录|元治理|元数据|五大支柱|顶层蓝图/.test(text)) {
+  } else if (/(?:全仓|工作区).*(?:门禁|统一审查|audit-all)|单源规则|规则目录|元治理|元数据|(?:五大|六大|全量)支柱|顶层蓝图/.test(text)) {
     archKey = 'workspace-meta';
   } else if (/infra|scripts|脚本|门禁|发布|package|powershell|pwsh|bash|流水线|\bci\b|hook/.test(text)) {
     archKey = 'infra-tool';

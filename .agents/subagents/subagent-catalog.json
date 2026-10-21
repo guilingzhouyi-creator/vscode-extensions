@@ -183,7 +183,7 @@
     "workspace-review": {
       "archetype": "workspace-meta",
       "posture": "review",
-      "description": "全工作区跨项目统一审查、单源规则目录与五大支柱一致性审查专员",
+      "description": "全工作区跨项目统一审查、单源规则目录与六大支柱一致性审查专员",
       "model": "inherit",
       "workspaceMode": "inherit",
       "dshMode": "wg-review"
@@ -199,7 +199,7 @@
     "workspace-guardian": {
       "archetype": "workspace-meta",
       "posture": "guardian",
-      "description": "全仓五大支柱统一审查 (audit-all)、单源规则目录与物理卫生总看守",
+      "description": "全仓六大支柱统一审查 (audit-all)、单源规则目录与物理卫生总看守",
       "model": "inherit",
       "workspaceMode": "inherit",
       "dshMode": "wg-refactor"

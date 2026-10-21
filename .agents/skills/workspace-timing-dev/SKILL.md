@@ -112,7 +112,7 @@ description: >-
 当修改触及 `workspace-timing/**` 路径时，门禁系统触发三阶递进校验：
 1. **增量极速编译**：`npm run compile`（严格基于 `tsconfig.json` 的 `isolatedModules` 与无 `declaration` 快速发射）；
 2. **单元测试与回归套件**：`npm run test:fast`（执行 <!-- METRICS:BEGIN ws-test-case-count -->**205 项**<!-- METRICS:END ws-test-case-count -->单元测试，重点看守会话折叠、跨日/跨周切分、双轨时长守恒与崩溃回放）；
-3. **专有规则审查门禁**：`npm run review`（执行 `scripts/dist/review/run-review.js` 检查 L0~L5 六层共 49 条规则）。
+3. **专有规则审查门禁**：`npm run review`（执行 `scripts/dist/review/run-review.js` 按 `review-rules.json` 登记的 checker 全量执行，规则总数见 `rule-workspace-timing` 指标）。
 
 ### 2. 49 条审查规则单一真源对齐 (SSOT)
 - 审查规则单一真源登记于 `workspace-timing/scripts/config/review-rules.json`，并自动聚合至全仓 `scripts/common/rule-catalog.json`；

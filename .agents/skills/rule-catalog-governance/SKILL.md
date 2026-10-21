@@ -53,7 +53,7 @@ description: >-
   ```
 
 ### 规则分布矩阵
-1. **`autoRefactor` (362 条)**：涵盖 30 个内置分析器与四层金字塔体系，通用多语言代码重构、AST 语法树、Rust 双轨算子与架构质量模型；
+1. **`autoRefactor` (<!-- METRICS:BEGIN rule-auto-refactor -->**362 条规则**<!-- METRICS:END rule-auto-refactor -->)**：涵盖 <!-- METRICS:BEGIN analyzer-count -->**30 个**<!-- METRICS:END analyzer-count -->与四层金字塔体系，通用多语言代码重构、AST 语法树、Rust 双轨算子与架构质量模型；
 2. **`workspaceTiming` (49 条)**：11 个主题族分治 VS Code 扩展审查（编译、测试、lint、分层依赖、硬编码、脚本库、文档发布、审查配置、资源拓扑、测试预算、重构门槛），每条规则另带 `layer` 字段标注其所属的 `L0`~`L5` 执行层；
 3. **`webGames` (50 条)**：涵盖 Godot 游戏工程的资产与艺术工单规格（`ART-`）、运行时治理（`GOV-`）、高性能脚本契约（`ADV-`）与资源配置审查规则（`RES-`）；
 4. **`globalTooling` (24 条)**：涵盖提交规范与禁词风格拦截（`CMG-STY-001`~`008`, `CMG-PRJ-001`）以及平台脚本工程化、门禁反馈状态闭包与双轨代码行预算（`GUARD-CHAIN-001`, `GUARD-ORD-001`, `GUARD-STEP-001`, `GUARD-FBK-001`, `VOL-ELOC-001`, `VOL-LOC-001` 等）；
@@ -68,7 +68,7 @@ $$\text{Family (3 字母)} - \text{Topic (3 字母)} - \text{Sequence (3 位数�
 - **Family**：核心分析器或业务治理域（如 `ARCH`、`PRF`、`SIM`、`SEC`、`NAM`，少数平台脚本为 2 字母如 `SH`, `PS`, `UI`）；
 - **Topic**：权威 3 字母大写缩写（如 `FAC` 门面、`MEM` 内存、`TOK` 凭证、`ARG` 参数）；
 - **Sequence**：3 位定长递增数字，自 `001` 起始单调递增（全仓仅 5 项历史规则因双生背景从 `002` 起始：`ARCH-DEC-002`, `ARCH-DSP-002`, `GOV-RTC-002`, `NAM-JRG-002`, `SIM-FLAT-002`）；
-- **权威三字母词典**：在 `auto-refactor/src/core/rules/topic-catalog.ts` 中单源收录 <!-- METRICS:BEGIN glossary-count -->**109 项**<!-- METRICS:END glossary-count -->映射，通过 `normalizeTopicCode` 与 `toCanonicalRuleId` 强制将 4+ 字母历史形归一化为标准 3 字母。
+- **权威三字母词典**：在 `auto-refactor/src/core/rules/topic-catalog.ts` 中单源收录 <!-- METRICS:BEGIN glossary-count -->**109 项**<!-- METRICS:END glossary-count -->映射，通过 `normalizeTopicCode` 与 `toCanonicalRuleId` 强制将 4+ 字母历史形归一化为标准 3 字母；该目录同时登记 <!-- METRICS:BEGIN topic-count -->**32 个**<!-- METRICS:END topic-count -->规范主题族，是 Topic 段的取值来源。
 
 ---
 
@@ -107,8 +107,8 @@ $$\text{Family (3 字母)} - \text{Topic (3 字母)} - \text{Sequence (3 位数�
 | **`auto-refactor`** | 362 条 | 30 个分析器覆盖的 <!-- METRICS:BEGIN rule-family-count -->**33 个规则族**<!-- METRICS:END rule-family-count -->：`ARCH`, `BIG`, `CMP`, `CMT`, `CONST`, `CPX`, `DAT`, `DEP`, `DOC`, `ENG`, `ERR`, `EXT`, `GDM`, `GOM`, `GOV`, `GUARD`, `HYG`, `MOD`, `NAM`, `NUM`, `PRF`, `PROD`, `PS`, `PYM`, `RSM`, `SEC`, `SH`, `SIM`, `STDLIB`, `TSM`, `TST`, `UI`, `VSC` 及 15 条 Legacy 别名 | 通用多语言代码重构、AST 语法树、Rust 双轨算子、复杂度与架构质量模型 |
 | **`workspace-timing`** | 49 条 | 11 个主题族：`ARF`, `BLD`, `DOC`, `HC`, `LAY`, `LINT`, `RCFG`, `RES`, `SCR`, `TB`, `TST`；执行层由每条规则的 `layer` 字段（`L0`~`L5`）表达，不作族名前缀 | VS Code 扩展生命周期、分层存储安全、i18n 对齐、时间守恒与状态栏治理 |
 | **`WebGames`** | 50 条 | Godot 专属契约：`ADV-`（高性能脚本与引擎约束）、`ART-`（艺术工单与资产规格）、`GOV-`、`PRF-`、`RES-`、`UUID-`、`SIM-` | Godot 4 游戏逻辑、节点树信号契约、文档双语归档与配置单源治理 |
-| **`global-tooling`** | 24 条 | 通用门禁与治理族：`CMG-`（提交说明规范）、`GUARD-`（平台脚本与 AST 隔离守卫）、`HYG-`、`RCFG-`、`VOL-` | 跨平台工作区门禁、提交说明防虚构、沙箱隔离与双轨代码行预算 |
-| **`fractal-git`** | 17 条 | `FGT-` 项目命名空间下的主题族（ID 第二段即族名）：`ALG`, `BRG`, `CAS`, `COR`, `DEP`, `ERR`, `FAC`, `GAT`, `IDX`, `LCK`, `OBJ`, `POL`, `PRF`, `SAF`, `STO`, `TOP`, `TRN` | 9 微 Crate 拓扑、锁纪律与 CAS 正确性、unsafe 面积控制、Plumbing 语义等价 |
+| **`global-tooling`** | <!-- METRICS:BEGIN rule-global-tooling -->**24 条规则**<!-- METRICS:END rule-global-tooling --> | 通用门禁与治理族：`CMG-`（提交说明规范）、`GUARD-`（平台脚本与 AST 隔离守卫）、`HYG-`、`RCFG-`、`VOL-` | 跨平台工作区门禁、提交说明防虚构、沙箱隔离与双轨代码行预算 |
+| **`fractal-git`** | <!-- METRICS:BEGIN rule-fractal-git -->**17 条规则**<!-- METRICS:END rule-fractal-git --> | `FGT-` 项目命名空间下的主题族（ID 第二段即族名）：`ALG`, `BRG`, `CAS`, `COR`, `DEP`, `ERR`, `FAC`, `GAT`, `IDX`, `LCK`, `OBJ`, `POL`, `PRF`, `SAF`, `STO`, `TOP`, `TRN` | 9 微 Crate 拓扑、锁纪律与 CAS 正确性、unsafe 面积控制、Plumbing 语义等价 |
 
 ---
 

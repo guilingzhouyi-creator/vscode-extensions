@@ -211,6 +211,20 @@
       "inline": "**{value} 个规则族**"
     },
     {
+      "id": "rule-family-count-all",
+      "title": "全工作区规则族数",
+      "source": "scripts/common/rule-catalog.json family field, all projects",
+      "template": "**{value} 个规则族**",
+      "inline": "**{value} 个规则族**"
+    },
+    {
+      "id": "rule-family-pym",
+      "title": "PYM 族规则数",
+      "source": "scripts/common/rule-catalog.json family field, family=PYM",
+      "template": "**{value} 条规则**",
+      "inline": "**{value} 条**"
+    },
+    {
       "id": "subagent-preset-count",
       "title": "SubAgent preset 数",
       "source": ".agents/subagents/subagent-catalog.json#presets",

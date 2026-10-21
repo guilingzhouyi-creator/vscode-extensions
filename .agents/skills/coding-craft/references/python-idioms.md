@@ -1,6 +1,6 @@
 # Python 现代惯用法
 
-> 对应 `PYM` 族 13 条规则。工作区内 59 个 `.py` 文件集中在 `WebGames/scripts` 与 `mod_sdk`，属项目工具链；写法仍须与规则一致。
+> 对应 `PYM` 族 <!-- METRICS:BEGIN rule-family-pym -->**13 条**<!-- METRICS:END rule-family-pym -->规则。工作区内的 `.py` 文件集中在 `WebGames/scripts` 与 `mod_sdk`，属项目工具链，文件数随实现增长故不作规模真值；写法仍须与规则一致。
 
 ---
 

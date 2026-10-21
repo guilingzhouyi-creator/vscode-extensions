@@ -33,6 +33,50 @@ const PROJECT_COUNT_KEYS = Object.freeze({
   'global-tooling': 'globalTooling',
 });
 
+/** Tracked declaration the canonical-id pattern and legacy reason are read from. */
+const RULE_TYPES_SOURCE = path.join(ROOT, 'auto-refactor/src/core/rules/types.ts');
+
+/**
+ * Reads one exported `const NAME = <literal>;` declaration out of the rule-types source.
+ *
+ * The canonical-id regex and the legacy-reason string are owned by the engine. Copying either one
+ * into this consolidator would let the two drift apart silently: a widened pattern in the engine
+ * would keep 15 historical ids marked non-canonical here, and the catalog would report a defect the
+ * engine no longer has. Reading the declaration keeps one definition of "canonical".
+ *
+ * @param {string} name - Exported constant name.
+ * @returns {string} Raw text of the literal, without surrounding quotes or slashes.
+ */
+function readTypesLiteral(name) {
+  if (!fs.existsSync(RULE_TYPES_SOURCE)) {
+    throw new Error(`cannot derive '${name}': ${path.relative(ROOT, RULE_TYPES_SOURCE)} is missing`);
+  }
+  const source = fs.readFileSync(RULE_TYPES_SOURCE, 'utf8');
+  const declaration = new RegExp(`^export const ${name} = \\/(.+)\\/([a-z]*);`, 'm').exec(source);
+  if (declaration) return String.raw`${declaration[1]}`;
+  const verbatim = new RegExp(`^export const ${name} = '([^']+)';`, 'm').exec(source);
+  if (verbatim) return verbatim[1];
+  throw new Error(`cannot derive '${name}': no exported literal declaration in the rule-types source`);
+}
+
+/** @type {RegExp|null} */
+let cachedRuleIdPattern = null;
+
+/**
+ * Returns the engine's canonical rule-id pattern, derived from its single declaration.
+ *
+ * @returns {RegExp} Non-global pattern, safe to reuse across calls.
+ */
+function ruleIdPattern() {
+  if (cachedRuleIdPattern === null) cachedRuleIdPattern = new RegExp(readTypesLiteral('RULE_ID_PATTERN'));
+  return cachedRuleIdPattern;
+}
+
+/** Returns the fallback legacy reason, read lazily so importing this module never throws. */
+function legacyReasonFallback() {
+  return readTypesLiteral('LEGACY_REASON_ID_NOT_CANONICAL');
+}
+
 /**
  * Loads a committed rule source catalog and rejects empty or missing sources.
  *
@@ -54,13 +98,17 @@ function readRuleSource(file, label) {
 
 function mapRuleEntry(r) {
   if (!r || !r.id) return null;
-  return {
+  const canonical = typeof r.canonical === 'boolean' ? r.canonical : ruleIdPattern().test(r.id);
+  const entry = {
     id: r.id,
     project: 'auto-refactor',
     family: r.family || 'general',
     severity: r.defaultSeverity || r.severity || 'error',
     summary: r.summary || '',
+    canonical,
   };
+  if (!canonical) entry.legacyReason = r.legacyReason || legacyReasonFallback();
+  return entry;
 }
 
 function collectAutoRefactorRules() {
@@ -76,13 +124,19 @@ function collectAutoRefactorRules() {
     }
   }
 
-  return readRuleSource(AUTO_REFACTOR_SOURCE, 'auto-refactor rules registry snapshot').map((r) => ({
-    id: r.id,
-    project: 'auto-refactor',
-    family: r.family || 'general',
-    severity: r.severity || 'error',
-    summary: r.summary || '',
-  }));
+  return readRuleSource(AUTO_REFACTOR_SOURCE, 'auto-refactor rules registry snapshot').map((r) => {
+    const canonical = typeof r.canonical === 'boolean' ? r.canonical : ruleIdPattern().test(r.id);
+    const entry = {
+      id: r.id,
+      project: 'auto-refactor',
+      family: r.family || 'general',
+      severity: r.severity || 'error',
+      summary: r.summary || '',
+      canonical,
+    };
+    if (!canonical) entry.legacyReason = r.legacyReason || legacyReasonFallback();
+    return entry;
+  });
 }
 
 /**

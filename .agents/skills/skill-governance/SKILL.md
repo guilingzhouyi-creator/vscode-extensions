@@ -2,13 +2,13 @@
 name: skill-governance
 description: >-
   工作区技能集工程化结构、生命周期与同构分发治理规范。指导 Agent 遵循 JIT 渐进式披露原则，
-  规范维护 27 项研发技能的四件套物理布局（SKILL.md、references、templates、scripts）、
+  规范维护全工作区研发技能的四件套物理布局（SKILL.md、references、templates、scripts）、
   YAML Frontmatter 语法契约、双目录（.agents/skills 与插件包）100% 字节等价性同步与自动化门禁验证。
 ---
 
 # skill-governance — 技能集工程化结构与生命周期治理规范
 
-本技能确立了全工作区 27 项研发技能集（Skills）的标准物理架构、YAML 元数据契约、JIT 渐进式披露（Progressive Disclosure）与防 Token 膨胀原则、根目录与插件包双副本 100% 字节等价同步机制以及自动化校验门禁标准。
+本技能确立了全工作区 <!-- METRICS:BEGIN skill-count -->**27 项**<!-- METRICS:END skill-count -->研发技能集（Skills）的标准物理架构、YAML 元数据契约、JIT 渐进式披露（Progressive Disclosure）与防 Token 膨胀原则、根目录与插件包双副本 100% 字节等价同步机制以及自动化校验门禁标准。这些技能共含 <!-- METRICS:BEGIN skill-doc-count -->**103 篇**<!-- METRICS:END skill-doc-count -->技能文档，全部纳入同一份门禁检查。
 
 ---
 
@@ -25,7 +25,7 @@ description: >-
 
 ## 二、 三层泛化技能拓扑与标准物理架构（Generalization + Unification）
 
-为同时实现**跨领域高度泛化复用**与**全工作区刚性契约单源统一**，27 项研发技能按职责解耦为三层正交拓扑（严禁在领域技能中重复抄写通用方法论，彻底杜绝 Token 堆积与多处统计数字硬编码漂移）：
+为同时实现**跨领域高度泛化复用**与**全工作区刚性契约单源统一**，<!-- METRICS:BEGIN skill-count -->**27 项**<!-- METRICS:END skill-count -->研发技能按职责解耦为三层正交拓扑（严禁在领域技能中重复抄写通用方法论，彻底杜绝 Token 堆积与多处统计数字硬编码漂移）：
 
 | 拓扑层级 | 技能数量与定位 | 包含技能集 | 泛化与统一机制 |
 | :--- | :--- | :--- | :--- |
