@@ -85,6 +85,11 @@ export const DEFAULT_VAGUE_BLACKLIST = new Set(DEFAULT_VAGUE_WORDS.split(' '));
 
 /**
  * Allowed single-letter loop indices and coordinates.
+ *
+ * This set is the tolerance granted by default, and it applies only inside loop scope: a
+ * loop index is the one place a bare letter carries unambiguous meaning. An explicit
+ * `singleLetterAllowed` option replaces this list and is honoured in every scope, so a
+ * caller can widen tolerance where its domain has established short conventions.
  */
 export const DEFAULT_SINGLE_LETTER_ALLOWED = new Set([
     'i',
@@ -261,8 +266,13 @@ export function checkSingleLetterHelper(
 ): void {
     if (aCtx.opts.checkSingleLetters === false) return;
     if (name.length !== 1 || !/^[a-zA-Z]$/.test(name)) return;
+
+    // An explicitly configured allow-list is a deliberate caller decision and applies in
+    // every scope; the built-in default is a loop-index tolerance and applies only in loops.
+    const isExplicitAllowList = aCtx.opts.singleLetterAllowed !== undefined;
     const singleAllowed = aCtx.singleAllowed ?? DEFAULT_SINGLE_LETTER_ALLOWED;
-    if (name === '_' || (inLoop && singleAllowed.has(name))) return;
+    const isAllowed = isExplicitAllowList ? singleAllowed.has(name) : inLoop && singleAllowed.has(name);
+    if (name === '_' || isAllowed) return;
 
     pushAstFinding(aCtx, {
         line: pos.line + 1,
@@ -343,6 +353,7 @@ export function auditDecouplingClustersHelper(
                 severity: SEVERITY_WARNING,
                 detail: {
                     symbol: finding.symbol,
+                    kind: finding.kind,
                     length: finding.length,
                     segments: finding.segments,
                     suggestedDomainDirectory: finding.suggestedDomainDirectory,

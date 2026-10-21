@@ -407,6 +407,25 @@ function checkFileNameLength(target: FileNamingTarget, pCtx: PathNamingContext):
 }
 
 /**
+ * Splits a camelCase or PascalCase stem into its constituent words.
+ *
+ * Without this split, `daemonCmd` counts as a single word segment, so a camelCase file name
+ * is reported twice: once for violating kebab-case and again for having too few words. The
+ * second report is an artifact of the missing split rather than an independent defect.
+ *
+ * @param stem - File stem containing no separator, or a hyphen-delimited fragment of one.
+ * @returns Lowercase word segments, preserving original order.
+ */
+function splitCamelStem(stem: string): string[] {
+    return stem
+        .replace(/([A-Z]+)([A-Z][a-z0-9])/g, '$1-$2')
+        .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+        .split('-')
+        .map((s) => s.trim().toLowerCase())
+        .filter((s) => s.length > 0);
+}
+
+/**
  * Splits a file base stem into discrete lowercase word segments.
  *
  * @param nameWithoutExt - File stem without extension.
@@ -419,6 +438,7 @@ export function splitFileNameSegments(nameWithoutExt: string, ext: string): stri
     const separator = isSnake ? '_' : '-';
     return cleaned
         .split(separator)
+        .flatMap((fragment) => (isSnake ? [fragment] : splitCamelStem(fragment)))
         .map((s) => s.trim().toLowerCase())
         .filter((s) => s.length > 0);
 }
@@ -576,7 +596,7 @@ function auditDirectoryName(pCtx: PathNamingContext): void {
 }
 
 const APPROVED_ACTION_VERBS_LIST =
-    'abort accumulate add advance aggregate align allocate allows analyze append apply arbitrate as assemble assert attach audit backtrack batch bench benchmark bind broadcast build calculate can cancel capitalize categorize check clamp classify clean cleanup clear clone close collect commit compile compose compress compute construct contains convert copy count create debounce decode decompress deduce define delete dequeue derive deserialize destroy detach detect diff dispatch dispose do does drain drop dump emit encode enqueue enrich ensure escape estimate evaluate evict examine execute exists extract fast fetch filter finalize find flatten flush format forward freeze from generate get group guard handle has hash index infer ingest init initialize inspect install instantiate intercept introduce introduces invert invoke is isolate iterate lint load lock log lookup loop make map mask match matches measure merge mk mock mount must needs normalize notify obtain open pack parse partition patch pause peek perform persist pipe poll pop populate precompute print probe process produce project propagate prune publish pull push put query queue read receive reclaim record redirect reduce refresh register reload remove render rename replace report reset resolve resume retrieve retry revert review rotate route run safe sanitize save scan schedule score search seed seek select send serialize set setup shift should solve sort spawn split stage start stop store strip subscribe sum supports swap sync synthesize tag test throttle to trace track transform transpile traverse trigger trim truncate try tune unbind unescape uninstall unlock unmount unpack unregister unshift unstage unwrap unzip update validate verify visit walk warm was were will wrap write zip';
+    'abort accumulate acquire activate add adjust advance aggregate align allocate allows analyze append apply arbitrate as assemble assert assign attach attribute audit backtrack batch bench benchmark bind boost broadcast build calculate calibrate call can cancel capitalize cascade categorize check chunk clamp classify clean cleanup clear clone close coalesce collect commit compact compare compile compose compress compute connect construct consume contains converge convert copy count create debounce decide decode decompress deduce deduplicate define delete dequeue derive deserialize destroy detach detect diff discard dispatch dispose do does drain drop dump elect emit encode enforce enqueue enrich ensure escape estimate evaluate evict examine execute exists expand explore export extract fast fetch filter finalize find finish flatten flush fork format forward freeze from fuse generate get glob grid group guard handle has hash identify indent index infer ingest init initialize insert inspect install instantiate intercept introduce introduces intersect invalidate invert invoke is isolate iterate learn lint list load loc lock log lookup loop make map mark mask match matches materialize measure merge mine mk mock mount must needs normalize notify obtain open orchestrate pack parse partition pass patch pause peek perform persist ping pipe poll pop populate precompute prefilter prepare pregroup preload print probe process produce project propagate prune publish pull pump push put query queue read receive reclaim reconcile record redirect reduce refill refine refresh register release reload remap remove render rename replace report reset resolve resume retrieve retry revert review rewrite rollback rotate round route rss rule run safe sample sanitize save scale scan schedule score search seed seek select send serialize set setup shift should skip sleep solve sort spawn split stage start step stop store stream strip submit subscribe suggest sum summarize supports sweep swap sync synthesize tag terminate test throttle to tokenize touch trace track transform transpile traverse trigger trim truncate try tune turn unbind unescape uninstall unlock unmount unpack unregister unshift unstage unwrap unzip update validate vector verify visit wake walk warm was were will wrap write yield zip';
 
 /** Standard engineering action verbs initiating descriptive function identifiers. */
 export const APPROVED_ACTION_VERBS: ReadonlySet<string> = new Set(

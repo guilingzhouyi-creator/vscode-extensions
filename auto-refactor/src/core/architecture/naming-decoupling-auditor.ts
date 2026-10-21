@@ -30,6 +30,33 @@ const CLUST_MIN_SYMS = 4;
 const CLUST_MIN_PFX_CHARS = 12;
 const CLUST_MIN_PFX_SEGS = 2;
 
+/**
+ * Function and method names are governed by NAM-LEN-002, whose ceiling is 50 characters.
+ * Reusing the 32-character value threshold here would mark names as architecturally
+ * inflated while NAM-LEN-002 simultaneously certifies them as within budget, so the
+ * decoupling thresholds deliberately sit above the length ceiling and only fire on
+ * identifiers that already violate it.
+ */
+const FUNC_WARN_CHARS = 50;
+const FUNC_ERROR_CHARS = 60;
+const FUNC_WARN_SEGS = 8;
+const FUNC_ERROR_SEGS = 10;
+
+/**
+ * Declaration kinds whose shared prefix indicates a missing namespace. Methods are
+ * excluded: sibling methods of one class necessarily share a verb prefix, and moving
+ * them into sibling modules would destroy the encapsulation the rule aims to improve.
+ * Object-literal and class property keys are excluded for the same reason — they form a
+ * data shape, not a namespace.
+ */
+const CLUSTER_ELIGIBLE_KINDS: ReadonlySet<SymbolDeclarationKind> = new Set<SymbolDeclarationKind>([
+    'type',
+    'class',
+    'interface',
+    'function',
+    'constant',
+]);
+
 const ACTION_DECOMPOSE_MODULE = 'decompose_module' as const;
 const SEVERITY_WARNING = 'warning' as const;
 const SEVERITY_ERROR = 'error' as const;
@@ -41,6 +68,8 @@ const KIND_TYPE = 'type' as const;
 const KIND_CLASS = 'class' as const;
 const KIND_INTERFACE = 'interface' as const;
 const KIND_CONSTANT = 'constant' as const;
+const KIND_FUNCTION = 'function' as const;
+const KIND_METHOD = 'method' as const;
 
 const FALLBACK_DOMAIN_PREFIX_LENGTH = 10;
 const LONG_SEGMENT_THRESHOLD = 5;
@@ -67,6 +96,10 @@ export interface NamingDecouplingConfig {
     readonly typeErrorSegments: number;
     readonly valueWarningLength: number;
     readonly valueErrorLength: number;
+    readonly functionWarningLength: number;
+    readonly functionErrorLength: number;
+    readonly functionWarningSegments: number;
+    readonly functionErrorSegments: number;
     readonly constantWarningLength?: number;
     readonly constantErrorLength?: number;
     readonly constantWarningSegments?: number;
@@ -84,6 +117,10 @@ export const DEFAULT_NAMING_DECOUPLING_CONFIG: NamingDecouplingConfig = {
     typeErrorSegments: TYPE_ERROR_SEGS,
     valueWarningLength: VAL_WARN_CHARS,
     valueErrorLength: VAL_ERROR_CHARS,
+    functionWarningLength: FUNC_WARN_CHARS,
+    functionErrorLength: FUNC_ERROR_CHARS,
+    functionWarningSegments: FUNC_WARN_SEGS,
+    functionErrorSegments: FUNC_ERROR_SEGS,
     constantWarningLength: CONST_WARN_CHARS,
     constantErrorLength: CONST_ERROR_CHARS,
     constantWarningSegments: CONST_WARN_SEGS,
@@ -127,6 +164,28 @@ export interface SymbolEntry {
     readonly kind: SymbolDeclarationKind;
     readonly line: number;
     readonly column: number;
+    /**
+     * Whether the declaration lives directly in the module scope. Nested declarations are
+     * local to a function body and cannot be relocated into a sibling directory, so they are
+     * never eligible for prefix clustering. Callers that do not track scope omit this field,
+     * which preserves the module-level reading rather than silently disabling the rule.
+     */
+    readonly topLevel?: boolean;
+}
+
+/**
+ * Determines whether a symbol may participate in prefix clustering.
+ *
+ * Clustering proposes moving symbols into a sibling directory. That is only coherent for
+ * declarations that own module-scope names: object-literal and class property keys describe
+ * a data shape, method sets share an inherited verb prefix by construction, and anything
+ * nested inside a function body is not addressable from another module.
+ *
+ * @param entry - Symbol descriptor under evaluation.
+ * @returns True when the entry is eligible for cluster analysis.
+ */
+function isClusterEligible(entry: SymbolEntry): boolean {
+    return entry.topLevel !== false && CLUSTER_ELIGIBLE_KINDS.has(entry.kind);
 }
 
 /**
@@ -221,6 +280,10 @@ function isTypeSymbol(kind: SymbolDeclarationKind): boolean {
     return kind === KIND_TYPE || kind === KIND_CLASS || kind === KIND_INTERFACE;
 }
 
+function isFunctionSymbol(kind: SymbolDeclarationKind): boolean {
+    return kind === KIND_FUNCTION || kind === KIND_METHOD;
+}
+
 interface ViolationVerdict {
     readonly severity: typeof SEVERITY_WARNING | typeof SEVERITY_ERROR;
     readonly reason: typeof REASON_EXCESSIVE_LENGTH | typeof REASON_EXCESSIVE_SEGMENTS;
@@ -266,6 +329,19 @@ function evaluateTypeThreshold(
     });
 }
 
+function evaluateFunctionThreshold(
+    len: number,
+    segmentCount: number,
+    config: NamingDecouplingConfig,
+): ViolationVerdict | null {
+    return evaluateMetricBounds(len, segmentCount, {
+        errorLength: config.functionErrorLength,
+        errorSegments: config.functionErrorSegments,
+        warningLength: config.functionWarningLength,
+        warningSegments: config.functionWarningSegments,
+    });
+}
+
 function evaluateConstantThreshold(
     len: number,
     segmentCount: number,
@@ -296,6 +372,7 @@ interface ThresholdEvaluationContext {
     readonly len: number;
     readonly segmentCount: number;
     readonly isType: boolean;
+    readonly isFunction: boolean;
     readonly isConstant: boolean;
     readonly config: NamingDecouplingConfig;
 }
@@ -303,6 +380,9 @@ interface ThresholdEvaluationContext {
 function evaluateThresholdViolation(context: ThresholdEvaluationContext): ViolationVerdict | null {
     if (context.isType) {
         return evaluateTypeThreshold(context.len, context.segmentCount, context.config);
+    }
+    if (context.isFunction) {
+        return evaluateFunctionThreshold(context.len, context.segmentCount, context.config);
     }
     if (context.isConstant) {
         return evaluateConstantThreshold(context.len, context.segmentCount, context.config);
@@ -443,6 +523,7 @@ export class NamingDecouplingAuditor {
             len,
             segmentCount: segments.length,
             isType,
+            isFunction: isFunctionSymbol(kind),
             isConstant,
             config: this.config,
         });
@@ -473,8 +554,13 @@ export class NamingDecouplingAuditor {
             return [];
         }
 
+        const eligibleSymbols = symbols.filter(isClusterEligible);
+        if (eligibleSymbols.length < this.config.clusterMinSymbols) {
+            return [];
+        }
+
         const prefixMap = new Map<string, SymbolEntry[]>();
-        for (const entry of symbols) {
+        for (const entry of eligibleSymbols) {
             const prefixKey = extractPrefixKey(
                 entry,
                 this.config.clusterMinPrefixSegments,

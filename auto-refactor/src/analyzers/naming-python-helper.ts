@@ -17,7 +17,7 @@ import type {
     SymbolDeclarationKind,
     SymbolEntry,
 } from '../core/architecture/naming-decoupling-auditor';
-import { auditFunctionSemantics } from './naming-path-helper';
+import { auditFunctionSemantics, isExemptFunctionName } from './naming-path-helper';
 
 /** Structured diagnostic payload for Python naming findings. */
 export interface PythonFindingInput {
@@ -37,6 +37,7 @@ export type DecouplingChecker = (
     kind: SymbolDeclarationKind,
     loc: { line: number; character: number },
     symbols?: SymbolEntry[],
+    topLevel?: boolean,
 ) => void;
 
 /**
@@ -87,7 +88,12 @@ const KIND_FUNCTION: SymbolDeclarationKind = 'function';
  * @param lineIdx - 0-indexed line number.
  * @param pCtx - Python naming traversal context.
  */
-export function auditPythonClass(line: string, lineIdx: number, pCtx: PythonNamingContext): void {
+export function auditPythonClass(
+    line: string,
+    lineIdx: number,
+    pCtx: PythonNamingContext,
+    topLevel = true,
+): void {
     const classMatch = /^class\s+([A-Za-z0-9_]+)/.exec(line);
     if (!classMatch) return;
     const className = classMatch[1];
@@ -113,7 +119,13 @@ export function auditPythonClass(line: string, lineIdx: number, pCtx: PythonNami
             }),
         );
     }
-    pCtx.checkDecouplingSymbol(className, KIND_TYPE, { line: lineIdx, character: 0 }, pCtx.symbols);
+    pCtx.checkDecouplingSymbol(
+        className,
+        KIND_TYPE,
+        { line: lineIdx, character: 0 },
+        pCtx.symbols,
+        topLevel,
+    );
 }
 
 /**
@@ -127,6 +139,7 @@ export function auditPythonAssignment(
     line: string,
     lineIdx: number,
     pCtx: PythonNamingContext,
+    topLevel = false,
 ): void {
     const assignMatch = /^([A-Za-z_][A-Za-z0-9_]*)\s*[:=]/.exec(line);
     if (!assignMatch) return;
@@ -170,6 +183,7 @@ export function auditPythonAssignment(
         isUpper ? KIND_CONSTANT : KIND_VARIABLE,
         { line: lineIdx, character: 0 },
         pCtx.symbols,
+        topLevel,
     );
 }
 
@@ -180,6 +194,7 @@ function checkPythonFunctionLength(
 ): boolean {
     const isSpecialMethod = /^__[a-zA-Z0-9_]+__$/.test(fnName);
     if (pCtx.opts.checkLengths === false || isSpecialMethod) return false;
+    if (isExemptFunctionName(fnName)) return false;
 
     const minLen = pCtx.opts.minFunctionLength ?? MIN_PYTHON_FUNCTION_LENGTH;
     const maxLen = pCtx.opts.maxFunctionLength ?? MAX_PYTHON_FUNCTION_LENGTH;
@@ -224,6 +239,7 @@ export function auditPythonFunction(
     line: string,
     lineIdx: number,
     pCtx: PythonNamingContext,
+    topLevel = true,
 ): void {
     const fnMatch = /^def\s+([A-Za-z0-9_]+)\s*\(/.exec(line);
     if (!fnMatch) return;
@@ -265,6 +281,7 @@ export function auditPythonFunction(
         KIND_FUNCTION,
         { line: lineIdx, character: 0 },
         pCtx.symbols,
+        topLevel,
     );
 }
 
@@ -293,6 +310,7 @@ function auditPythonDecouplingClusters(
                 message: finding.message,
                 detail: {
                     symbol: finding.symbol,
+                    kind: finding.kind,
                     length: finding.length,
                     segments: finding.segments,
                     suggestedDomainDirectory: finding.suggestedDomainDirectory,
@@ -322,11 +340,13 @@ export function auditPythonSourceHelper(
     const scopedCtx: PythonNamingContext = { ...pCtx, symbols };
 
     for (let i = 0; i < lines.length; i++) {
-        const line = lines[i].trim();
+        const raw = lines[i];
+        const line = raw.trim();
         if (line.startsWith('#') || !line) continue;
-        auditPythonClass(line, i, scopedCtx);
-        auditPythonFunction(line, i, scopedCtx);
-        auditPythonAssignment(line, i, scopedCtx);
+        const topLevel = raw.length === line.length;
+        auditPythonClass(line, i, scopedCtx, topLevel);
+        auditPythonFunction(line, i, scopedCtx, topLevel);
+        auditPythonAssignment(line, i, scopedCtx, topLevel);
     }
 
     if (pCtx.opts.checkDecoupling !== false && symbols.length >= MIN_CLUSTER_SYMBOLS) {

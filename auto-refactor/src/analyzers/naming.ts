@@ -132,7 +132,7 @@ const CATALOG_PATH_RE = /(?:literals|constants|dictionar(?:y|ies)|tokens|rule-?t
 const KIND_CONSTANT: SymbolDeclarationKind = 'constant';
 const KIND_VARIABLE: SymbolDeclarationKind = 'variable';
 const KIND_TYPE: SymbolDeclarationKind = 'type';
-const KIND_MEMBER: SymbolDeclarationKind = 'member';
+const KIND_METHOD: SymbolDeclarationKind = 'method';
 const KIND_FUNCTION: SymbolDeclarationKind = 'function';
 
 const MAX_STATEMENT_PREVIEW_LENGTH = 40;
@@ -311,12 +311,17 @@ export class NamingAnalyzer implements Analyzer {
 
     /**
      * Records discovered symbol and evaluates architectural decoupling boundaries.
+     *
+     * `topLevel` is threaded into the symbol registry because prefix clustering only
+     * proposes relocating module-scope declarations; a nested binding cannot be addressed
+     * from a sibling module, so proposing a domain directory for it is not actionable.
      */
     private checkDecouplingSymbol(
         name: string,
         kind: SymbolDeclarationKind,
         pos: { line: number; character: number },
         aCtx: AstNamingContext,
+        topLevel = false,
     ): void {
         if (aCtx.symbols) {
             aCtx.symbols.push({
@@ -324,6 +329,7 @@ export class NamingAnalyzer implements Analyzer {
                 kind,
                 line: pos.line + 1,
                 column: pos.character + 1,
+                topLevel,
             });
         }
         if (aCtx.opts.checkDecoupling === false || isCatalogOrLiteralsPath(aCtx.ctx.filePath)) {
@@ -345,6 +351,7 @@ export class NamingAnalyzer implements Analyzer {
                     severity: SEVERITY_WARNING,
                     detail: {
                         symbol: finding.symbol,
+                        kind: finding.kind,
                         length: finding.length,
                         segments: finding.segments,
                         suggestedDomainDirectory: finding.suggestedDomainDirectory,
@@ -442,6 +449,7 @@ export class NamingAnalyzer implements Analyzer {
                 scope.isConst ? KIND_CONSTANT : KIND_VARIABLE,
                 pos,
                 aCtx,
+                scope.isTopLevel,
             );
             return;
         }
@@ -515,7 +523,12 @@ export class NamingAnalyzer implements Analyzer {
         if (aCtx.opts.checkJargon !== false) {
             checkSymbolJargonHelper(typeName, pos, aCtx);
         }
-        this.checkDecouplingSymbol(typeName, KIND_TYPE, pos, aCtx);
+        const declarationKind: SymbolDeclarationKind = ts.isClassDeclaration(node)
+            ? 'class'
+            : ts.isInterfaceDeclaration(node)
+              ? 'interface'
+              : KIND_TYPE;
+        this.checkDecouplingSymbol(typeName, declarationKind, pos, aCtx, node.parent === aCtx.sf);
     }
 
     private auditMemberCamelCase(
@@ -563,7 +576,13 @@ export class NamingAnalyzer implements Analyzer {
         if (aCtx.opts.checkJargon !== false) {
             checkSymbolJargonHelper(memberName, pos, aCtx);
         }
-        this.checkDecouplingSymbol(memberName, KIND_MEMBER, pos, aCtx);
+
+        // Property keys describe a data shape rather than a namespace, so length- and
+        // prefix-based decoupling proposals cannot be satisfied for them; only methods are
+        // registered, and they are exempt from prefix clustering by declaration kind.
+        if (ts.isMethodDeclaration(member)) {
+            this.checkDecouplingSymbol(memberName, KIND_METHOD, pos, aCtx);
+        }
     }
 
     /** Audits an individual parameter of a function or method. */
@@ -598,7 +617,7 @@ export class NamingAnalyzer implements Analyzer {
             if (aCtx.opts.checkJargon !== false) {
                 checkSymbolJargonHelper(node.name.text, pos, aCtx);
             }
-            this.checkDecouplingSymbol(node.name.text, KIND_FUNCTION, pos, aCtx);
+            this.checkDecouplingSymbol(node.name.text, KIND_FUNCTION, pos, aCtx, node.parent === aCtx.sf);
         }
         const isArrow = ts.isArrowFunction(node) || ts.isFunctionExpression(node);
         const isExemptVague = isSimpleArrowFunction(node, aCtx.sf);

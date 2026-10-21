@@ -17,7 +17,7 @@
 import * as ts from 'typescript';
 import type { AgentActionablePayload, AnalyzerContext, Severity } from '../core/types';
 import type { DiagnosticDescriptor } from '../core/messages/types';
-import { auditFunctionSemantics } from './naming-path-helper';
+import { auditFunctionSemantics, isExemptFunctionName } from './naming-path-helper';
 
 /** Candidate naming proposal derived by the inference pipeline. */
 export interface NamingCandidate {
@@ -168,14 +168,14 @@ const RISK_LOW = 'Low';
  * Diagnostic message catalog for length and abbreviation rules.
  */
 export const NamingMessages = {
-    FUNCTION_NAME_TOO_SHORT: (name: string): DiagnosticDescriptor => ({
-        message: `Function or method name '${name}' is too short (< 3 characters); lacks semantic description.`,
-        suggestion: `Rename '${name}' to a descriptive verb-noun phrase with at least 3 characters.`,
+    FUNCTION_NAME_TOO_SHORT: (name: string, minLength: number): DiagnosticDescriptor => ({
+        message: `Function or method name '${name}' is too short (< ${minLength} characters); lacks semantic description.`,
+        suggestion: `Rename '${name}' to a descriptive verb-noun phrase with at least ${minLength} characters.`,
         rationale: 'Short function names obscure behavior and hinder code searchability.',
         risk: RISK_LOW,
     }),
-    FUNCTION_NAME_TOO_LONG: (name: string): DiagnosticDescriptor => ({
-        message: `Function or method name '${name}' is excessively long (>= ${MAX_FUNCTION_NAME_LENGTH} characters); consider simplifying or decomposing.`,
+    FUNCTION_NAME_TOO_LONG: (name: string, maxLength: number): DiagnosticDescriptor => ({
+        message: `Function or method name '${name}' is excessively long (>= ${maxLength} characters); consider simplifying or decomposing.`,
         suggestion: `Refactor '${name}' to reduce verbosity or decompose responsibilities into smaller procedures.`,
         rationale:
             'Overly long function names indicate procedural clutter and responsibility bloat.',
@@ -942,14 +942,22 @@ function checkAndEmitAbbreviation(target: NamingAuditTarget, context: NamingAudi
  */
 export function auditFunctionName(target: NamingAuditTarget, context: NamingAuditContext): void {
     const opts = context.opts ?? {};
+    const isAccessor = ts.isGetAccessor(target.node) || ts.isSetAccessor(target.node);
+    if (isExemptFunctionName(target.name, isAccessor)) {
+        // Exempt names are canonical vocabulary (`run`, `get`, `next`, `toString`); their
+        // brevity carries meaning rather than obscuring it, so neither the length bounds
+        // nor the semantic contract apply.
+        return;
+    }
+
     if (opts.checkLengths !== false) {
         const minLen = opts.minFunctionLength ?? MIN_FUNCTION_NAME_LENGTH;
         const maxLen = opts.maxFunctionLength ?? MAX_FUNCTION_NAME_LENGTH;
         if (target.name.length < minLen || target.name.length >= maxLen) {
             const isShort = target.name.length < minLen;
             const desc = isShort
-                ? NamingMessages.FUNCTION_NAME_TOO_SHORT(target.name)
-                : NamingMessages.FUNCTION_NAME_TOO_LONG(target.name);
+                ? NamingMessages.FUNCTION_NAME_TOO_SHORT(target.name, minLen)
+                : NamingMessages.FUNCTION_NAME_TOO_LONG(target.name, maxLen);
             emitNamingIssue(
                 target,
                 {
@@ -966,7 +974,6 @@ export function auditFunctionName(target: NamingAuditTarget, context: NamingAudi
 
     const cleanName = target.name.replace(/^[_#]+/, '');
     const tokens = getIdentifierTokens(cleanName);
-    const isAccessor = ts.isGetAccessor(target.node) || ts.isSetAccessor(target.node);
     const finding = auditFunctionSemantics(target.name, tokens, opts, isAccessor);
     if (finding) {
         emitNamingIssue(
