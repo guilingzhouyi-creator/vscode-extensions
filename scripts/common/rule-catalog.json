@@ -1,6 +1,6 @@
 {
   "schema": "workspace-rule-catalog/v1",
-  "generatedAt": "2026-10-20T12:47:55.045Z",
+  "generatedAt": "2026-10-21T12:04:37.498Z",
   "totalRules": 502,
   "counts": {
     "autoRefactor": 362,
@@ -368,10 +368,11 @@
       "summary": "Kitchen-sink utility antipattern: detected utils/common dumping ground file accumulatingheterogeneous unstructured logic."
     },
     {
-      "id": "ARF-*",
       "project": "workspace-timing",
-      "family": "L5",
+      "family": "ARF",
+      "layer": "L5",
       "severity": "error",
+      "id": "ARF-*",
       "summary": "auto-refactor 结构审查（经适配层隔离，工具不可用时优雅降级） (ARF-*)"
     },
     {
@@ -1005,66 +1006,75 @@
       "summary": "Declarative import boundary violation: cross-group dependency or unauthorized external package import."
     },
     {
-      "id": "DOC-CL-001",
       "project": "workspace-timing",
-      "family": "L3",
+      "family": "DOC",
+      "layer": "L3",
       "severity": "error",
+      "id": "DOC-CL-001",
       "summary": "文档文本布局契约：CHANGELOG keep-a-changelog 结构/版本同步/列表风格 + README 必需节/路线图版本同步 (DOC-CL-001)"
     },
     {
-      "id": "DOC-CL-002",
       "project": "workspace-timing",
-      "family": "L3",
+      "family": "DOC",
+      "layer": "L3",
       "severity": "error",
+      "id": "DOC-CL-002",
       "summary": "文档文本布局契约：CHANGELOG keep-a-changelog 结构/版本同步/列表风格 + README 必需节/路线图版本同步 (DOC-CL-002)"
     },
     {
-      "id": "DOC-CL-003",
       "project": "workspace-timing",
-      "family": "L3",
+      "family": "DOC",
+      "layer": "L3",
       "severity": "error",
+      "id": "DOC-CL-003",
       "summary": "文档文本布局契约：CHANGELOG keep-a-changelog 结构/版本同步/列表风格 + README 必需节/路线图版本同步 (DOC-CL-003)"
     },
     {
-      "id": "DOC-CL-004",
       "project": "workspace-timing",
-      "family": "L3",
+      "family": "DOC",
+      "layer": "L3",
       "severity": "error",
+      "id": "DOC-CL-004",
       "summary": "文档文本布局契约：CHANGELOG keep-a-changelog 结构/版本同步/列表风格 + README 必需节/路线图版本同步 (DOC-CL-004)"
     },
     {
-      "id": "DOC-CL-005",
       "project": "workspace-timing",
-      "family": "L3",
+      "family": "DOC",
+      "layer": "L3",
       "severity": "error",
+      "id": "DOC-CL-005",
       "summary": "文档文本布局契约：CHANGELOG keep-a-changelog 结构/版本同步/列表风格 + README 必需节/路线图版本同步 (DOC-CL-005)"
     },
     {
-      "id": "DOC-CL-006",
       "project": "workspace-timing",
-      "family": "L3",
+      "family": "DOC",
+      "layer": "L3",
       "severity": "error",
+      "id": "DOC-CL-006",
       "summary": "文档文本布局契约：CHANGELOG keep-a-changelog 结构/版本同步/列表风格 + README 必需节/路线图版本同步 (DOC-CL-006)"
     },
     {
-      "id": "DOC-CL-007",
       "project": "workspace-timing",
-      "family": "L3",
+      "family": "DOC",
+      "layer": "L3",
       "severity": "error",
+      "id": "DOC-CL-007",
       "summary": "文档文本布局契约：CHANGELOG keep-a-changelog 结构/版本同步/列表风格 + README 必需节/路线图版本同步 (DOC-CL-007)"
     },
     {
-      "id": "DOC-CL-008",
       "project": "workspace-timing",
-      "family": "L3",
+      "family": "DOC",
+      "layer": "L3",
       "severity": "error",
+      "id": "DOC-CL-008",
       "summary": "文档文本布局契约：CHANGELOG keep-a-changelog 结构/版本同步/列表风格 + README 必需节/路线图版本同步 (DOC-CL-008)"
     },
     {
-      "id": "DOC-CL-009",
       "project": "workspace-timing",
-      "family": "L3",
+      "family": "DOC",
+      "layer": "L3",
       "severity": "error",
+      "id": "DOC-CL-009",
       "summary": "文档文本布局契约：CHANGELOG keep-a-changelog 结构/版本同步/列表风格 + README 必需节/路线图版本同步 (DOC-CL-009)"
     },
     {
@@ -1089,24 +1099,27 @@
       "summary": "Backtick path or relative link points to non-existent file."
     },
     {
-      "id": "DOC-RD-001",
       "project": "workspace-timing",
-      "family": "L3",
+      "family": "DOC",
+      "layer": "L3",
       "severity": "error",
+      "id": "DOC-RD-001",
       "summary": "文档文本布局契约：CHANGELOG keep-a-changelog 结构/版本同步/列表风格 + README 必需节/路线图版本同步 (DOC-RD-001)"
     },
     {
-      "id": "DOC-RD-002",
       "project": "workspace-timing",
-      "family": "L3",
+      "family": "DOC",
+      "layer": "L3",
       "severity": "error",
+      "id": "DOC-RD-002",
       "summary": "文档文本布局契约：CHANGELOG keep-a-changelog 结构/版本同步/列表风格 + README 必需节/路线图版本同步 (DOC-RD-002)"
     },
     {
-      "id": "DOC-RD-003",
       "project": "workspace-timing",
-      "family": "L3",
+      "family": "DOC",
+      "layer": "L3",
       "severity": "error",
+      "id": "DOC-RD-003",
       "summary": "文档文本布局契约：CHANGELOG keep-a-changelog 结构/版本同步/列表风格 + README 必需节/路线图版本同步 (DOC-RD-003)"
     },
     {
@@ -1161,6 +1174,7 @@
     {
       "id": "FGT-ALG-001",
       "project": "fractal-git",
+      "namespace": "FGT",
       "family": "ALG",
       "severity": "error",
       "summary": "Myers diff, 3-way merge, and FastCDC chunking algorithm boundary and determinism guard"
@@ -1168,6 +1182,7 @@
     {
       "id": "FGT-BRG-001",
       "project": "fractal-git",
+      "namespace": "FGT",
       "family": "BRG",
       "severity": "error",
       "summary": "Pre-review zone gate bridge verification guard: Strict rule catalog closure and sub-10ms AST slice check"
@@ -1175,6 +1190,7 @@
     {
       "id": "FGT-CAS-001",
       "project": "fractal-git",
+      "namespace": "FGT",
       "family": "CAS",
       "severity": "error",
       "summary": "LayerVFS CAS snapshot materializer bridge: Fixed-time O(1) page cache mapping and atomic tree commit"
@@ -1182,6 +1198,7 @@
     {
       "id": "FGT-COR-001",
       "project": "fractal-git",
+      "namespace": "FGT",
       "family": "COR",
       "severity": "error",
       "summary": "Core data model and error contract guard: Zero-panic Result propagation and immutable OID hashing semantics"
@@ -1189,6 +1206,7 @@
     {
       "id": "FGT-DEP-001",
       "project": "fractal-git",
+      "namespace": "FGT",
       "family": "DEP",
       "severity": "error",
       "summary": "Micro-crate DAG single-direction dependency guard: Zero circular dependency and strict L1->L2->L3 layer isolation"
@@ -1196,6 +1214,7 @@
     {
       "id": "FGT-ERR-001",
       "project": "fractal-git",
+      "namespace": "FGT",
       "family": "ERR",
       "severity": "error",
       "summary": "Zero unwrap and expect panic guard: Enforce strong-typed Result propagation across production crates"
@@ -1203,6 +1222,7 @@
     {
       "id": "FGT-FAC-001",
       "project": "fractal-git",
+      "namespace": "FGT",
       "family": "FAC",
       "severity": "error",
       "summary": "Facade substantial burden and immutable freeze guard: Enforce ARCH-FAC-001 with ELOC budget and Object.freeze"
@@ -1210,6 +1230,7 @@
     {
       "id": "FGT-GAT-001",
       "project": "fractal-git",
+      "namespace": "FGT",
       "family": "GAT",
       "severity": "error",
       "summary": "Fractal Git domain gate guard: AST complexity constraints (CC <= 15), non-blocking I/O, and platform portability"
@@ -1217,6 +1238,7 @@
     {
       "id": "FGT-IDX-001",
       "project": "fractal-git",
+      "namespace": "FGT",
       "family": "IDX",
       "severity": "error",
       "summary": "Lockless in-memory git index concurrency guard: Conflict stage resolution and lock-free slot allocation"
@@ -1224,6 +1246,7 @@
     {
       "id": "FGT-LCK-001",
       "project": "fractal-git",
+      "namespace": "FGT",
       "family": "LCK",
       "severity": "error",
       "summary": "Lock-free in-memory index concurrency guard: Prohibit blocking standard Mutex in virtual staging tree"
@@ -1231,6 +1254,7 @@
     {
       "id": "FGT-OBJ-001",
       "project": "fractal-git",
+      "namespace": "FGT",
       "family": "OBJ",
       "severity": "error",
       "summary": "Git object model serialization guard: Strict standard loose/pack object header format and SHA-1/SHA-256 dual compatibility"
@@ -1238,6 +1262,7 @@
     {
       "id": "FGT-POL-001",
       "project": "fractal-git",
+      "namespace": "FGT",
       "family": "POL",
       "severity": "error",
       "summary": "Resource recycling pool bounded governor: Zero unbounded transient memory allocations and lifecycle reclamation"
@@ -1245,6 +1270,7 @@
     {
       "id": "FGT-PRF-001",
       "project": "fractal-git",
+      "namespace": "FGT",
       "family": "PRF",
       "severity": "error",
       "summary": "Zero transient heap allocation guard in hot loops: Prohibit string/vec/clone allocation in critical paths (ADV-PRF-002)"
@@ -1252,6 +1278,7 @@
     {
       "id": "FGT-SAF-001",
       "project": "fractal-git",
+      "namespace": "FGT",
       "family": "SAF",
       "severity": "error",
       "summary": "Documented unsafe block safety proof guard: Prohibit bare undocumented unsafe blocks in Rust crates"
@@ -1259,6 +1286,7 @@
     {
       "id": "FGT-STO-001",
       "project": "fractal-git",
+      "namespace": "FGT",
       "family": "STO",
       "severity": "error",
       "summary": "Storage layer crash safety: Append-only WAL journal consistency, loose ODB integrity, and CAS block deduplication"
@@ -1266,6 +1294,7 @@
     {
       "id": "FGT-TOP-001",
       "project": "fractal-git",
+      "namespace": "FGT",
       "family": "TOP",
       "severity": "error",
       "summary": "DAG topology traversal guard: Cycle detection, ancestor generation indexing, and branch divergence safety"
@@ -1273,6 +1302,7 @@
     {
       "id": "FGT-TRN-001",
       "project": "fractal-git",
+      "namespace": "FGT",
       "family": "TRN",
       "severity": "error",
       "summary": "Smart HTTP transport and packet-line streaming framing protocol compliance guard"
@@ -1901,38 +1931,43 @@
       "summary": "Repository completely lacks a gate defense system (no Git hooks and no CI pipeline detected)."
     },
     {
-      "id": "HC-ABS-PATH",
       "project": "workspace-timing",
-      "family": "L3",
+      "family": "HC",
+      "layer": "L3",
       "severity": "error",
+      "id": "HC-ABS-PATH",
       "summary": "硬编码专项审查：绝对路径/UI串/密钥/魔法值分类判定 (HC-ABS-PATH)"
     },
     {
-      "id": "HC-CJK-LITERAL",
       "project": "workspace-timing",
-      "family": "L3",
+      "family": "HC",
+      "layer": "L3",
       "severity": "error",
+      "id": "HC-CJK-LITERAL",
       "summary": "硬编码专项审查：绝对路径/UI串/密钥/魔法值分类判定 (HC-CJK-LITERAL)"
     },
     {
-      "id": "HC-MAGIC-NUM",
       "project": "workspace-timing",
-      "family": "L3",
+      "family": "HC",
+      "layer": "L3",
       "severity": "error",
+      "id": "HC-MAGIC-NUM",
       "summary": "硬编码专项审查：绝对路径/UI串/密钥/魔法值分类判定 (HC-MAGIC-NUM)"
     },
     {
-      "id": "HC-SECRET",
       "project": "workspace-timing",
-      "family": "L3",
+      "family": "HC",
+      "layer": "L3",
       "severity": "error",
+      "id": "HC-SECRET",
       "summary": "硬编码专项审查：绝对路径/UI串/密钥/魔法值分类判定 (HC-SECRET)"
     },
     {
-      "id": "HC-UI-STRING",
       "project": "workspace-timing",
-      "family": "L3",
+      "family": "HC",
+      "layer": "L3",
       "severity": "error",
+      "id": "HC-UI-STRING",
       "summary": "硬编码专项审查：绝对路径/UI串/密钥/魔法值分类判定 (HC-UI-STRING)"
     },
     {
@@ -2097,87 +2132,99 @@
       "summary": "Module-level cyclic dependency detected (covering Python relative imports and package resolution)."
     },
     {
-      "id": "L0-COMPILE",
       "project": "workspace-timing",
-      "family": "L0",
+      "family": "BLD",
+      "layer": "L0",
       "severity": "error",
+      "id": "L0-COMPILE",
       "summary": "TypeScript 编译零错误（tsc）"
     },
     {
-      "id": "L0-TEST",
       "project": "workspace-timing",
-      "family": "L0",
+      "family": "TST",
+      "layer": "L0",
       "severity": "error",
+      "id": "L0-TEST",
       "summary": "单元测试全绿（mocha 全量）"
     },
     {
-      "id": "L1-*",
       "project": "workspace-timing",
-      "family": "L1",
+      "family": "LINT",
+      "layer": "L1",
       "severity": "error",
+      "id": "L1-*",
       "summary": "代码质量（eslint 全量：命名/未用/错误处理等规则族） (L1-*)"
     },
     {
-      "id": "L1-LINT",
       "project": "workspace-timing",
-      "family": "L1",
+      "family": "LINT",
+      "layer": "L1",
       "severity": "error",
+      "id": "L1-LINT",
       "summary": "代码质量（eslint 全量：命名/未用/错误处理等规则族）"
     },
     {
-      "id": "L2-LAYERS",
       "project": "workspace-timing",
-      "family": "L2",
+      "family": "LAY",
+      "layer": "L2",
       "severity": "error",
+      "id": "L2-LAYERS",
       "summary": "分层依赖边界与循环依赖（依赖矩阵由本文件 layers 节声明）"
     },
     {
-      "id": "L3-DOC-LAYOUT",
       "project": "workspace-timing",
-      "family": "L3",
+      "family": "DOC",
+      "layer": "L3",
       "severity": "error",
+      "id": "L3-DOC-LAYOUT",
       "summary": "文档文本布局契约：CHANGELOG keep-a-changelog 结构/版本同步/列表风格 + README 必需节/路线图版本同步"
     },
     {
-      "id": "L3-HARDCODE",
       "project": "workspace-timing",
-      "family": "L3",
+      "family": "HC",
+      "layer": "L3",
       "severity": "error",
+      "id": "L3-HARDCODE",
       "summary": "硬编码专项审查：绝对路径/UI串/密钥/魔法值分类判定"
     },
     {
-      "id": "L3-RESOURCE-TOPO",
       "project": "workspace-timing",
-      "family": "L3",
+      "family": "RES",
+      "layer": "L3",
       "severity": "error",
+      "id": "L3-RESOURCE-TOPO",
       "summary": "结构化资源命名拓扑与智能拆分审查：8维综合评判/动态规模自适应/防自指性膨胀"
     },
     {
-      "id": "L3-REVIEW-CONFIG",
       "project": "workspace-timing",
-      "family": "L3",
+      "family": "RCFG",
+      "layer": "L3",
       "severity": "error",
+      "id": "L3-REVIEW-CONFIG",
       "summary": "审查配置治理与元审查：配置schema/规则声明↔实施双向核对/glob有效性/工具配置健康"
     },
     {
-      "id": "L3-SCRIPT-STANDARD",
       "project": "workspace-timing",
-      "family": "L3",
+      "family": "SCR",
+      "layer": "L3",
       "severity": "error",
+      "id": "L3-SCRIPT-STANDARD",
       "summary": "脚本库标准：命名/头契约/注册表完备性（孤儿与悬空双向阻断）"
     },
     {
-      "id": "L4-TEST-BUDGET",
       "project": "workspace-timing",
-      "family": "L4",
+      "family": "TB",
+      "layer": "L4",
       "severity": "error",
+      "id": "L4-TEST-BUDGET",
       "summary": "测试套件时长预算回归（基线棘轮）"
     },
     {
-      "id": "L5-REFACTOR",
       "project": "workspace-timing",
-      "family": "L5",
+      "family": "ARF",
+      "layer": "L5",
       "severity": "error",
+      "id": "L5-REFACTOR",
       "summary": "auto-refactor 结构审查（经适配层隔离，工具不可用时优雅降级）"
     },
     {
@@ -2188,24 +2235,27 @@
       "summary": "File physical line count or function count exceeds architecture threshold."
     },
     {
-      "id": "LAY-CYCLE",
       "project": "workspace-timing",
-      "family": "L2",
+      "family": "LAY",
+      "layer": "L2",
       "severity": "error",
+      "id": "LAY-CYCLE",
       "summary": "分层依赖边界与循环依赖（依赖矩阵由本文件 layers 节声明） (LAY-CYCLE)"
     },
     {
-      "id": "LAY-IMPORT",
       "project": "workspace-timing",
-      "family": "L2",
+      "family": "LAY",
+      "layer": "L2",
       "severity": "error",
+      "id": "LAY-IMPORT",
       "summary": "分层依赖边界与循环依赖（依赖矩阵由本文件 layers 节声明） (LAY-IMPORT)"
     },
     {
-      "id": "LAY-UNRESOLVED",
       "project": "workspace-timing",
-      "family": "L2",
+      "family": "LAY",
+      "layer": "L2",
       "severity": "error",
+      "id": "LAY-UNRESOLVED",
       "summary": "分层依赖边界与循环依赖（依赖矩阵由本文件 layers 节声明） (LAY-UNRESOLVED)"
     },
     {
@@ -2650,38 +2700,43 @@
       "summary": "Rule catalog counter coherence guard: totalRules must equal rules.length and the sum of deduplicated per-project counts"
     },
     {
-      "id": "RCFG-GLOBS",
       "project": "workspace-timing",
-      "family": "L3",
+      "family": "RCFG",
+      "layer": "L3",
       "severity": "error",
+      "id": "RCFG-GLOBS",
       "summary": "审查配置治理与元审查：配置schema/规则声明↔实施双向核对/glob有效性/工具配置健康 (RCFG-GLOBS)"
     },
     {
-      "id": "RCFG-MATRIX",
       "project": "workspace-timing",
-      "family": "L3",
+      "family": "RCFG",
+      "layer": "L3",
       "severity": "error",
+      "id": "RCFG-MATRIX",
       "summary": "审查配置治理与元审查：配置schema/规则声明↔实施双向核对/glob有效性/工具配置健康 (RCFG-MATRIX)"
     },
     {
-      "id": "RCFG-RULE-DRIFT",
       "project": "workspace-timing",
-      "family": "L3",
+      "family": "RCFG",
+      "layer": "L3",
       "severity": "error",
+      "id": "RCFG-RULE-DRIFT",
       "summary": "审查配置治理与元审查：配置schema/规则声明↔实施双向核对/glob有效性/工具配置健康 (RCFG-RULE-DRIFT)"
     },
     {
-      "id": "RCFG-SCHEMA",
       "project": "workspace-timing",
-      "family": "L3",
+      "family": "RCFG",
+      "layer": "L3",
       "severity": "error",
+      "id": "RCFG-SCHEMA",
       "summary": "审查配置治理与元审查：配置schema/规则声明↔实施双向核对/glob有效性/工具配置健康 (RCFG-SCHEMA)"
     },
     {
-      "id": "RCFG-TOOL-PATH",
       "project": "workspace-timing",
-      "family": "L3",
+      "family": "RCFG",
+      "layer": "L3",
       "severity": "error",
+      "id": "RCFG-TOOL-PATH",
       "summary": "审查配置治理与元审查：配置schema/规则声明↔实施双向核对/glob有效性/工具配置健康 (RCFG-TOOL-PATH)"
     },
     {
@@ -2692,38 +2747,43 @@
       "summary": "WebGames domain gate rule (source: WebGames/docs/归档库/03_短期施工档案卷/第10期_95到104/Phase_98_十阶段全链路资源内存优化与审查系统能力内化施工细则/KALAR-DEV-2026-ST94-003_阶段3_审查系统能力内化与全域通用规则演进.md) [documentation-defined; not enforced]"
     },
     {
-      "id": "RES-TOPO-NAMING-DEPTH",
       "project": "workspace-timing",
-      "family": "L3",
+      "family": "RES",
+      "layer": "L3",
       "severity": "error",
+      "id": "RES-TOPO-NAMING-DEPTH",
       "summary": "结构化资源命名拓扑与智能拆分审查：8维综合评判/动态规模自适应/防自指性膨胀 (RES-TOPO-NAMING-DEPTH)"
     },
     {
-      "id": "RES-TOPO-OVER-DESCRIPTIVE",
       "project": "workspace-timing",
-      "family": "L3",
+      "family": "RES",
+      "layer": "L3",
       "severity": "error",
+      "id": "RES-TOPO-OVER-DESCRIPTIVE",
       "summary": "结构化资源命名拓扑与智能拆分审查：8维综合评判/动态规模自适应/防自指性膨胀 (RES-TOPO-OVER-DESCRIPTIVE)"
     },
     {
-      "id": "RES-TOPO-OVER-GENERIC",
       "project": "workspace-timing",
-      "family": "L3",
+      "family": "RES",
+      "layer": "L3",
       "severity": "error",
+      "id": "RES-TOPO-OVER-GENERIC",
       "summary": "结构化资源命名拓扑与智能拆分审查：8维综合评判/动态规模自适应/防自指性膨胀 (RES-TOPO-OVER-GENERIC)"
     },
     {
-      "id": "RES-TOPO-OVER-SPECIALIZED",
       "project": "workspace-timing",
-      "family": "L3",
+      "family": "RES",
+      "layer": "L3",
       "severity": "error",
+      "id": "RES-TOPO-OVER-SPECIALIZED",
       "summary": "结构化资源命名拓扑与智能拆分审查：8维综合评判/动态规模自适应/防自指性膨胀 (RES-TOPO-OVER-SPECIALIZED)"
     },
     {
-      "id": "RES-TOPO-RESP-MISMATCH",
       "project": "workspace-timing",
-      "family": "L3",
+      "family": "RES",
+      "layer": "L3",
       "severity": "error",
+      "id": "RES-TOPO-RESP-MISMATCH",
       "summary": "结构化资源命名拓扑与智能拆分审查：8维综合评判/动态规模自适应/防自指性膨胀 (RES-TOPO-RESP-MISMATCH)"
     },
     {
@@ -2825,31 +2885,35 @@
       "summary": "Naked unwrap() called on fallible Result or Option."
     },
     {
-      "id": "SCR-DANGLING",
       "project": "workspace-timing",
-      "family": "L3",
+      "family": "SCR",
+      "layer": "L3",
       "severity": "error",
+      "id": "SCR-DANGLING",
       "summary": "脚本库标准：命名/头契约/注册表完备性（孤儿与悬空双向阻断） (SCR-DANGLING)"
     },
     {
-      "id": "SCR-HEADER",
       "project": "workspace-timing",
-      "family": "L3",
+      "family": "SCR",
+      "layer": "L3",
       "severity": "error",
+      "id": "SCR-HEADER",
       "summary": "脚本库标准：命名/头契约/注册表完备性（孤儿与悬空双向阻断） (SCR-HEADER)"
     },
     {
-      "id": "SCR-NAMING",
       "project": "workspace-timing",
-      "family": "L3",
+      "family": "SCR",
+      "layer": "L3",
       "severity": "error",
+      "id": "SCR-NAMING",
       "summary": "脚本库标准：命名/头契约/注册表完备性（孤儿与悬空双向阻断） (SCR-NAMING)"
     },
     {
-      "id": "SCR-ORPHAN",
       "project": "workspace-timing",
-      "family": "L3",
+      "family": "SCR",
+      "layer": "L3",
       "severity": "error",
+      "id": "SCR-ORPHAN",
       "summary": "脚本库标准：命名/头契约/注册表完备性（孤儿与悬空双向阻断） (SCR-ORPHAN)"
     },
     {
@@ -3210,17 +3274,19 @@
       "summary": "Low-level unsafe blocks in Rust/C++ require mandatory // SAFETY: contract proof comments."
     },
     {
-      "id": "TB-NO-BASELINE",
       "project": "workspace-timing",
-      "family": "L4",
+      "family": "TB",
+      "layer": "L4",
       "severity": "error",
+      "id": "TB-NO-BASELINE",
       "summary": "测试套件时长预算回归（基线棘轮） (TB-NO-BASELINE)"
     },
     {
-      "id": "TB-REGRESSION",
       "project": "workspace-timing",
-      "family": "L4",
+      "family": "TB",
+      "layer": "L4",
       "severity": "error",
+      "id": "TB-REGRESSION",
       "summary": "测试套件时长预算回归（基线棘轮） (TB-REGRESSION)"
     },
     {

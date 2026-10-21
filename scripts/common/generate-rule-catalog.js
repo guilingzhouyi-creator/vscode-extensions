@@ -85,25 +85,38 @@ function collectAutoRefactorRules() {
   }));
 }
 
+/**
+ * Projects one checker and its child rules into catalog entries.
+ *
+ * The theme family comes from `checker.family` and the execution layer from `checker.layer`; these
+ * are orthogonal axes and must not be collapsed. Before this split, `family` was assigned
+ * `checker.layer`, which made the column mean a theme in four projects and a layer in the fifth, so
+ * no cross-project family aggregate could be compared. A checker without a declared family aborts
+ * the run rather than falling back to a layer: a silent fallback is what produced that ambiguity.
+ *
+ * @param {object} checker - One entry of `review-rules.json#checkers`.
+ * @param {Array<object>} rules - Collector for emitted catalog entries.
+ * @returns {void}
+ */
 function processCheckerRules(checker, rules) {
+  if (!checker.family) {
+    throw new Error(
+      `workspace-timing checker '${checker.id}' declares no theme family; ` +
+        'add one to workspace-timing/scripts/config/review-rules.json rather than deriving it from layer',
+    );
+  }
+  const base = {
+    project: 'workspace-timing',
+    family: checker.family,
+    layer: checker.layer,
+    severity: 'error',
+  };
   if (checker.id) {
-    rules.push({
-      id: checker.id,
-      project: 'workspace-timing',
-      family: checker.layer || 'L0-L5',
-      severity: 'error',
-      summary: checker.title || '',
-    });
+    rules.push({ ...base, id: checker.id, summary: checker.title || '' });
   }
   for (const rid of checker.ruleIds || []) {
     if (!rid || rid === checker.id) continue;
-    rules.push({
-      id: rid,
-      project: 'workspace-timing',
-      family: checker.layer || 'L0-L5',
-      severity: 'error',
-      summary: `${checker.title} (${rid})`,
-    });
+    rules.push({ ...base, id: rid, summary: `${checker.title} (${rid})` });
   }
 }
 
@@ -135,14 +148,32 @@ function collectWebGamesRules() {
   }));
 }
 
+/**
+ * Projects fractal-git rules, whose ids carry a project namespace segment.
+ *
+ * `FGT-ALG-001` reads as [namespace]-[family]-[topic]-[sequence]: `FGT` names the project, `ALG`
+ * names the theme. Treating `FGT` as the family would collapse 17 rules into one bucket and hide
+ * the whole kernel taxonomy, so the second segment is the family and the namespace is asserted
+ * rather than assumed.
+ *
+ * @param {Array<object>} entries - Source rule entries.
+ * @returns {Array<object>} Catalog entries.
+ */
 function collectFractalGitRules() {
-  return readRuleSource(FRACTAL_GIT_SOURCE, 'fractal-git rule catalog').map((r) => ({
-    id: r.id,
-    project: 'fractal-git',
-    family: r.family || r.id.split('-')[1] || 'FGT',
-    severity: r.severity || 'error',
-    summary: r.summary || '',
-  }));
+  return readRuleSource(FRACTAL_GIT_SOURCE, 'fractal-git rule catalog').map((r) => {
+    const segments = r.id.split('-');
+    if (segments.length < 3 || segments[0] !== 'FGT') {
+      throw new Error(`fractal-git rule '${r.id}' does not follow [NS]-[FAMILY]-[TOPIC]-[SEQ]`);
+    }
+    return {
+      id: r.id,
+      project: 'fractal-git',
+      namespace: segments[0],
+      family: r.family || segments[1],
+      severity: r.severity || 'error',
+      summary: r.summary || '',
+    };
+  });
 }
 
 function collectCommitMsgRules() {

@@ -16,6 +16,7 @@
     {
       "id": "L0-COMPILE",
       "layer": "L0",
+      "family": "BLD",
       "title": "TypeScript 编译零错误（tsc）",
       "checker": "build/compile.ts",
       "stage": 1,
@@ -29,6 +30,7 @@
     {
       "id": "L1-LINT",
       "layer": "L1",
+      "family": "LINT",
       "title": "代码质量（eslint 全量：命名/未用/错误处理等规则族）",
       "checker": "audit/code-quality.ts",
       "stage": 1,
@@ -42,6 +44,7 @@
     {
       "id": "L2-LAYERS",
       "layer": "L2",
+      "family": "LAY",
       "title": "分层依赖边界与循环依赖（依赖矩阵由本文件 layers 节声明）",
       "checker": "audit/layer-boundary.ts",
       "stage": 1,
@@ -57,6 +60,7 @@
     {
       "id": "L3-HARDCODE",
       "layer": "L3",
+      "family": "HC",
       "title": "硬编码专项审查：绝对路径/UI串/密钥/魔法值分类判定",
       "checker": "audit/hardcode.ts",
       "stage": 1,
@@ -74,6 +78,7 @@
     {
       "id": "L3-SCRIPT-STANDARD",
       "layer": "L3",
+      "family": "SCR",
       "title": "脚本库标准：命名/头契约/注册表完备性（孤儿与悬空双向阻断）",
       "checker": "audit/script-standard.ts",
       "stage": 1,
@@ -90,6 +95,7 @@
     {
       "id": "L3-DOC-LAYOUT",
       "layer": "L3",
+      "family": "DOC",
       "title": "文档文本布局契约：CHANGELOG keep-a-changelog 结构/版本同步/列表风格 + README 必需节/路线图版本同步",
       "checker": "audit/text-layout.ts",
       "stage": 1,
@@ -114,6 +120,7 @@
     {
       "id": "L3-REVIEW-CONFIG",
       "layer": "L3",
+      "family": "RCFG",
       "title": "审查配置治理与元审查：配置schema/规则声明↔实施双向核对/glob有效性/工具配置健康",
       "checker": "audit/review-config.ts",
       "stage": 1,
@@ -131,6 +138,7 @@
     {
       "id": "L3-RESOURCE-TOPO",
       "layer": "L3",
+      "family": "RES",
       "title": "结构化资源命名拓扑与智能拆分审查：8维综合评判/动态规模自适应/防自指性膨胀",
       "checker": "audit/resource-topology.ts",
       "stage": 1,
@@ -148,6 +156,7 @@
     {
       "id": "L0-TEST",
       "layer": "L0",
+      "family": "TST",
       "title": "单元测试全绿（mocha 全量）",
       "checker": "test/unit.ts",
       "stage": 2,
@@ -161,6 +170,7 @@
     {
       "id": "L4-TEST-BUDGET",
       "layer": "L4",
+      "family": "TB",
       "title": "测试套件时长预算回归（基线棘轮）",
       "checker": "benchmark/test-budget.ts",
       "stage": 2,
@@ -177,6 +187,7 @@
     {
       "id": "L5-REFACTOR",
       "layer": "L5",
+      "family": "ARF",
       "title": "auto-refactor 结构审查（经适配层隔离，工具不可用时优雅降级）",
       "checker": "tooling/refactor-adapter.ts",
       "stage": 1,
@@ -346,10 +357,10 @@
     "languageMultipliers": {
       "cpp": 2.5,
       "c": 2.5,
-      "rust": 2.0,
+      "rust": 2,
       "go": 1.6,
-      "typescript": 1.0,
-      "javascript": 1.0,
+      "typescript": 1,
+      "javascript": 1,
       "gdscript": 0.9,
       "python": 0.85
     },
