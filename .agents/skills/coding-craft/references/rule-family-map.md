@@ -30,6 +30,7 @@
 准则：代码围栏必须闭合、相对链接必须存活、正文零宣传口号与批次代号、跨文档零重复段落。
 
 - **error**：`DOC-FEN-001`
+- **error**（workspace-timing）：`DOC-CL-001`、`DOC-CL-002`、`DOC-CL-003`、`DOC-CL-004`、`DOC-CL-005`、`DOC-CL-006`、`DOC-CL-007`、`DOC-CL-008`、`DOC-CL-009`、`DOC-RD-001`、`DOC-RD-002`、`DOC-RD-003`、`L3-DOC-LAYOUT`
 - warning / info：`DOC-DUP-001`、`DOC-LNK-001`、`DOC-TRM-001`
 
 ### `ART` — WebGames 艺术工单与资产规格
@@ -45,6 +46,7 @@
 
 准则：结构化资源仓必须可枚举、可回收；宿主关停路径须释放句柄并幂等。
 
+- **error**（workspace-timing）：`L3-RESOURCE-TOPO`、`RES-TOPO-NAMING-DEPTH`、`RES-TOPO-OVER-DESCRIPTIVE`、`RES-TOPO-OVER-GENERIC`、`RES-TOPO-OVER-SPECIALIZED`、`RES-TOPO-RESP-MISMATCH`
 - warning / info：`RES-SHUT-001`
 
 ---
@@ -175,6 +177,18 @@
   `PRF-DUP-001`、`PRF-IO-001`、`PRF-LEAK-001`、`PRF-MEM-001`、`PRF-MEM-002`、`PRF-POL-001`、
   `PRF-POL-003`、`PRF-POL-004`
 
+### `LAY` — 分层与依赖（layer: L2）
+
+准则：分层单向、零循环、导入必须可解析。
+
+- **error**（workspace-timing）：`L2-LAYERS`、`LAY-CYCLE`、`LAY-IMPORT`、`LAY-UNRESOLVED`
+
+### `HC` — 硬编码专项（layer: L3）
+
+准则：禁绝对路径、禁 CJK 字面量入代码、禁魔数、禁密钥，UI 串必须走字典。
+
+- **error**（workspace-timing）：`HC-ABS-PATH`、`HC-CJK-LITERAL`、`HC-MAGIC-NUM`、`HC-SECRET`、`HC-UI-STRING`、`L3-HARDCODE`
+
 ---
 
 ## 测试、界面与平台
@@ -183,6 +197,7 @@
 
 准则：确定性时钟与 RNG、零跳过用例、零孤儿用例、耗时回归棘轮、测试拓扑与源码同构。
 
+- **error**（workspace-timing）：`L0-TEST`
 - warning / info：`TST-DBT-001`、`TST-DEN-001`、`TST-FLT-001`、`TST-ILS-001`、`TST-ORC-001`、`TST-SKP-001`、
   `TST-TAU-001`、`TST-TOP-001`
 
@@ -282,6 +297,24 @@
 
 - **error**：`EXT-DIR-001`
 
+### `BLD` — 编译基线（layer: L0）
+
+准则：代码必须可编译，禁止以跳过换取绿色。
+
+- **error**（workspace-timing）：`L0-COMPILE`
+
+### `LINT` — 静态检查基线（layer: L1）
+
+准则：Lint 与格式检查零告警，禁止以忽略标记掩盖。
+
+- **error**（workspace-timing）：`L1-*`、`L1-LINT`
+
+### `TB` — 测试预算与棘轮（layer: L4）
+
+准则：测试耗时预算、基线必须存在、超预算即回退。
+
+- **error**（workspace-timing）：`L4-TEST-BUDGET`、`TB-NO-BASELINE`、`TB-REGRESSION`
+
 ---
 
 ## 治理与门禁
@@ -330,48 +363,19 @@
 准则：规则 ID 双向闭包、计数口径与真源一致、表现层与底层诊断去重。
 
 - **error**：`RCFG-COUNTS-001`
+- **error**（workspace-timing）：`L3-REVIEW-CONFIG`、`RCFG-GLOBS`、`RCFG-MATRIX`、`RCFG-RULE-DRIFT`、`RCFG-SCHEMA`、`RCFG-TOOL-PATH`
 
-### `L0` — 编译与测试基线
+### `SCR` — 脚本库标准（layer: L3）
 
-准则：代码必须可编译、既有测试必须全绿，禁止以跳过换取绿色。
+准则：脚本命名、头契约与注册表双向完备：既无孤儿也无悬空。
 
-- **error**：`L0-COMPILE`、`L0-TEST`
+- **error**（workspace-timing）：`L3-SCRIPT-STANDARD`、`SCR-DANGLING`、`SCR-HEADER`、`SCR-NAMING`、`SCR-ORPHAN`
 
-### `L1` — 静态检查基线
-
-准则：Lint 与格式检查零告警，禁止以忽略标记掩盖。
-
-- **error**：`L1-*`、`L1-LINT`
-
-### `L2` — 分层与依赖
-
-准则：分层单向、零循环、导入必须可解析。
-
-- **error**：`L2-LAYERS`、`LAY-CYCLE`、`LAY-IMPORT`、`LAY-UNRESOLVED`
-
-### `L3` — 硬编码与资源拓扑
-
-准则：禁绝对路径、禁 CJK 字面量入代码、禁魔数、禁密钥、资源命名与职责一致。
-
-- **error**：`DOC-CL-001`、`DOC-CL-002`、`DOC-CL-003`、`DOC-CL-004`、`DOC-CL-005`、`DOC-CL-006`、`DOC-CL-007`、
-  `DOC-CL-008`、`DOC-CL-009`、`DOC-RD-001`、`DOC-RD-002`、`DOC-RD-003`、`HC-ABS-PATH`、`HC-CJK-LITERAL`、
-  `HC-MAGIC-NUM`、`HC-SECRET`、`HC-UI-STRING`、`L3-DOC-LAYOUT`、`L3-HARDCODE`、`L3-RESOURCE-TOPO`、
-  `L3-REVIEW-CONFIG`、`L3-SCRIPT-STANDARD`、`RCFG-GLOBS`、`RCFG-MATRIX`、`RCFG-RULE-DRIFT`、
-  `RCFG-SCHEMA`、`RCFG-TOOL-PATH`、`RES-TOPO-NAMING-DEPTH`、`RES-TOPO-OVER-DESCRIPTIVE`、
-  `RES-TOPO-OVER-GENERIC`、`RES-TOPO-OVER-SPECIALIZED`、`RES-TOPO-RESP-MISMATCH`、`SCR-DANGLING`、
-  `SCR-HEADER`、`SCR-NAMING`、`SCR-ORPHAN`
-
-### `L4` — 测试预算与棘轮
-
-准则：测试耗时预算、基线必须存在、超预算即回退。
-
-- **error**：`L4-TEST-BUDGET`、`TB-NO-BASELINE`、`TB-REGRESSION`
-
-### `L5` — 重构门槛
+### `ARF` — 重构门槛（layer: L5）
 
 准则：重构必须有净收益与等价性证明，禁止表面搬移。
 
-- **error**：`ARF-*`、`L5-REFACTOR`
+- **error**（workspace-timing）：`ARF-*`、`L5-REFACTOR`
 
 ---
 

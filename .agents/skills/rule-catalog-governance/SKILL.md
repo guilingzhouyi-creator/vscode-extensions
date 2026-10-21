@@ -54,7 +54,7 @@ description: >-
 
 ### 规则分布矩阵
 1. **`autoRefactor` (362 条)**：涵盖 30 个内置分析器与四层金字塔体系，通用多语言代码重构、AST 语法树、Rust 双轨算子与架构质量模型；
-2. **`workspaceTiming` (49 条)**：涵盖 VS Code 扩展审查体系的 L0~L5 六层刚性防线（编译、存储崩溃安全、时间守恒、i18n、性能与 UI 对比度）；
+2. **`workspaceTiming` (49 条)**：11 个主题族分治 VS Code 扩展审查（编译、测试、lint、分层依赖、硬编码、脚本库、文档发布、审查配置、资源拓扑、测试预算、重构门槛），每条规则另带 `layer` 字段标注其所属的 `L0`~`L5` 执行层；
 3. **`webGames` (50 条)**：涵盖 Godot 游戏工程的资产与艺术工单规格（`ART-`）、运行时治理（`GOV-`）、高性能脚本契约（`ADV-`）与资源配置审查规则（`RES-`）；
 4. **`globalTooling` (24 条)**：涵盖提交规范与禁词风格拦截（`CMG-STY-001`~`008`, `CMG-PRJ-001`）以及平台脚本工程化、门禁反馈状态闭包与双轨代码行预算（`GUARD-CHAIN-001`, `GUARD-ORD-001`, `GUARD-STEP-001`, `GUARD-FBK-001`, `VOL-ELOC-001`, `VOL-LOC-001` 等）；
 
@@ -105,7 +105,7 @@ $$\text{Family (3 字母)} - \text{Topic (3 字母)} - \text{Sequence (3 位数�
 | 项目领域 (`Project`) | 规则规模 | 权威合法规则族前缀 / 命名空间 | 治理范围与职责边界 |
 | :--- | :---: | :--- | :--- |
 | **`auto-refactor`** | 362 条 | 30 个分析器覆盖的 <!-- METRICS:BEGIN rule-family-count -->**33 个规则族**<!-- METRICS:END rule-family-count -->：`ARCH`, `BIG`, `CMP`, `CMT`, `CONST`, `CPX`, `DAT`, `DEP`, `DOC`, `ENG`, `ERR`, `EXT`, `GDM`, `GOM`, `GOV`, `GUARD`, `HYG`, `MOD`, `NAM`, `NUM`, `PRF`, `PROD`, `PS`, `PYM`, `RSM`, `SEC`, `SH`, `SIM`, `STDLIB`, `TSM`, `TST`, `UI`, `VSC` 及 15 条 Legacy 别名 | 通用多语言代码重构、AST 语法树、Rust 双轨算子、复杂度与架构质量模型 |
-| **`workspace-timing`** | 49 条 | L0~L5 六层审查体系：`L0-`, `L1-`, `L2-`, `L3-`, `L4-`, `L5-`；扩展专属族：`ARF-`, `DOC-`, `HC-`, `LAY-`, `RCFG-`, `RES-`, `SCR-`, `TB-` | VS Code 扩展生命周期、分层存储安全、i18n 对齐、时间守恒与状态栏治理 |
+| **`workspace-timing`** | 49 条 | 11 个主题族：`ARF`, `BLD`, `DOC`, `HC`, `LAY`, `LINT`, `RCFG`, `RES`, `SCR`, `TB`, `TST`；执行层由每条规则的 `layer` 字段（`L0`~`L5`）表达，不作族名前缀 | VS Code 扩展生命周期、分层存储安全、i18n 对齐、时间守恒与状态栏治理 |
 | **`WebGames`** | 50 条 | Godot 专属契约：`ADV-`（高性能脚本与引擎约束）、`ART-`（艺术工单与资产规格）、`GOV-`、`PRF-`、`RES-`、`UUID-`、`SIM-` | Godot 4 游戏逻辑、节点树信号契约、文档双语归档与配置单源治理 |
 | **`global-tooling`** | 24 条 | 通用门禁与治理族：`CMG-`（提交说明规范）、`GUARD-`（平台脚本与 AST 隔离守卫）、`HYG-`、`RCFG-`、`VOL-` | 跨平台工作区门禁、提交说明防虚构、沙箱隔离与双轨代码行预算 |
 | **`fractal-git`** | 17 条 | `FGT-` 项目命名空间下的主题族（ID 第二段即族名）：`ALG`, `BRG`, `CAS`, `COR`, `DEP`, `ERR`, `FAC`, `GAT`, `IDX`, `LCK`, `OBJ`, `POL`, `PRF`, `SAF`, `STO`, `TOP`, `TRN` | 9 微 Crate 拓扑、锁纪律与 CAS 正确性、unsafe 面积控制、Plumbing 语义等价 |
@@ -116,7 +116,7 @@ $$\text{Family (3 字母)} - \text{Topic (3 字母)} - \text{Sequence (3 位数�
 
 向工作区新增或调整规则时，必须依项目标准流程注册，严禁未注册先引用：
 1. **`auto-refactor` (362 规则体系)**：在 `src/core/rules/entries/` 定义规则对象；在 `dimensionRuleTable.ts` 绑定权重（遵守 `MAX_AXES_PER_FINDING <= 4`）；在 `tests/rules/` 编写专属测试；若涉原生算子保证 Rust 与 TS 100% 等价；
-2. **`workspace-timing` (49 规则体系)**：在 `scripts/config/review-rules.json` 中使用 `L0~L5` 六层体系前缀登记；
+2. **`workspace-timing` (49 规则体系)**：在 `scripts/config/review-rules.json` 中为每个 checker 声明 `family`（主题族）与 `layer`（`L0`~`L5` 执行层）两个字段，二者都必须存在：`generate-rule-catalog.js` 缺 `family` 即抛错，杜绝以层号冒充族名；
 3. **`WebGames` (50 规则体系)**：在 `scripts/config/docs_governance_rules.json` 或 `scripts/py/audit_docs.py` 中登记规则元数据；
 4. **全仓同步触发与 `--check-only` 零漂移断言**：新增或修改规则后必须运行 `node scripts/common/generate-rule-catalog.js` 同步真源；在门禁与 CI 中运行 `node scripts/common/generate-rule-catalog.js --check-only` 阻断规则漂移。
 

@@ -96,6 +96,7 @@ const RAW_SUBSYSTEMS = [
   '3|auto-refactor|autoRefactor|CLI静态引擎质量基线',
   '4|workspace-timing|workspaceTiming|VSCode扩展审查门禁',
   '5|WebGames配置架构|webGames|卡拉尔领域配置审查',
+  '6|fractal-git|fractalGit|9微Crate/Rust回归套件',
 ].join('\n');
 
 const SUBSYSTEM_DEFINITIONS = Object.freeze(
@@ -106,7 +107,7 @@ const SUBSYSTEM_DEFINITIONS = Object.freeze(
 );
 
 const MD_TITLE = '# 🌐 全工作区跨项目统一审查与十维质量全景看板';
-const MD_SUBSYS_HEADER = '### 📊 全工作区五大核心子系统基石得分';
+const MD_SUBSYS_HEADER = '### 📊 全工作区六大核心子系统基石得分';
 const MD_SUBSYS_TABLE_HDR_1 = '| 序号 | 核心子系统 | 判定结果 | 归一化得分 | 进度可视化 | 覆盖说明 |';
 const MD_SUBSYS_TABLE_HDR_2 = '| :---: | :--- | :---: | :---: | :--- | :--- |';
 const MD_POLY_HEADER = '### 🌐 多语言技术栈质量均衡与离散度分布';

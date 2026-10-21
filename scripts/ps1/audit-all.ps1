@@ -911,7 +911,7 @@ if ($env:GITHUB_STEP_SUMMARY) {
         if ($null -ne $totalDebt) { $summaryMeta += " &nbsp;|&nbsp; **技术债总量**: **{0} 项**" -f $totalDebt }
         [void]$md.AppendLine($summaryMeta)
         [void]$md.AppendLine()
-        [void]$md.AppendLine("### 📊 全工作区五大核心子系统基石得分")
+        [void]$md.AppendLine("### 📊 全工作区六大核心子系统基石得分")
         [void]$md.AppendLine()
         [void]$md.AppendLine("| 序号 | 核心子系统 | 判定结果 | 归一化得分 | 进度可视化 | 覆盖说明 |")
         [void]$md.AppendLine("| :---: | :--- | :---: | :---: | :--- | :--- |")
@@ -920,12 +920,14 @@ if ($env:GITHUB_STEP_SUMMARY) {
         $badgeAr      = if ($statusAr -eq "PASS") { "✅ PASS" } else { "❌ FAIL" }
         $badgeWt      = if ($statusWt -eq "PASS") { "✅ PASS" } else { "❌ FAIL" }
         $badgeWg      = if ($statusWg -eq "PASS") { "✅ PASS" } else { "❌ FAIL" }
+        $badgeFg      = if ($statusFg -eq "PASS") { "✅ PASS" } else { "❌ FAIL" }
 
         [void]$md.AppendLine(("| 1 | 工作区物理卫生 | {0} | {1:F1} | `[{2}]` | 全仓零空文件/同构契约 |" -f $badgeHygiene, $scoreHygiene, (Get-ProgressBar $scoreHygiene)))
         [void]$md.AppendLine(("| 2 | 单源规则目录 | {0} | {1:F1} | `[{2}]` | {3}规则/SSOT一致性 |" -f $badgeRules, $scoreRules, (Get-ProgressBar $scoreRules), $catalogRuleCount))
         [void]$md.AppendLine(("| 3 | auto-refactor | {0} | {1:F1} | `[{2}]` | CLI静态引擎质量基线 |" -f $badgeAr, $scoreAr, (Get-ProgressBar $scoreAr)))
         [void]$md.AppendLine(("| 4 | workspace-timing | {0} | {1:F1} | `[{2}]` | VSCode扩展审查门禁 |" -f $badgeWt, $scoreWt, (Get-ProgressBar $scoreWt)))
         [void]$md.AppendLine(("| 5 | WebGames配置架构 | {0} | {1:F1} | `[{2}]` | 卡拉尔领域配置审查 |" -f $badgeWg, $scoreWg, (Get-ProgressBar $scoreWg)))
+        [void]$md.AppendLine(("| 6 | fractal-git | {0} | {1:F1} | `[{2}]` | 9微Crate/Rust回归套件 |" -f $badgeFg, $scoreFg, (Get-ProgressBar $scoreFg)))
         [void]$md.AppendLine()
         [void]$md.AppendLine(("> **耗时**: {0}s &nbsp;|&nbsp; **全局状态**: {1}" -f $elapsedSec, $globalStatus))
         [void]$md.AppendLine()
