@@ -147,9 +147,7 @@ $codeDocAnchors = $resDocAnchors.ExitCode
 $codeMetricCoverage = $resMetricCoverage.ExitCode
 $codeFamilyContract = $resFamilyContract.ExitCode
 $codeDocReach = $resDocReach.ExitCode
-if ($codeCatalog -ne 0 -or $codeSkills -ne 0 -or $codeFeedback -ne 0 -or $codeOrdering -ne 0 -or $codeClosure -ne 0 -or $codeReach -ne 0 -or $codeDocs -ne 0 -or $codeLedger -ne 0 
-    -or $codeSubagent -ne 0 -or $codeDocAnchors -ne 0 -or $codeMetricCoverage -ne 0 -or $codeFamilyContract -ne 0
-    -or $codeDocReach -ne 0) {
+if ($codeCatalog -ne 0 -or $codeSkills -ne 0 -or $codeFeedback -ne 0 -or $codeOrdering -ne 0 -or $codeClosure -ne 0 -or $codeReach -ne 0 -or $codeDocs -ne 0 -or $codeLedger -ne 0 -or $codeSubagent -ne 0 -or $codeDocAnchors -ne 0 -or $codeMetricCoverage -ne 0 -or $codeFamilyContract -ne 0 -or $codeDocReach -ne 0) {
     $statusRules = "FAIL"
     $failed = $true
 } else {
