@@ -96,7 +96,7 @@ description: >-
 # 1. 运行 auto-refactor 核心算子热路径微基准 (mask-source / governance-scan / cmp-rules)
 node auto-refactor/scripts/bench-hot-paths.js
 
-# 2. 验证 Rust 原生算子与纯 TS Shim 100% 字节等价及全量 155 套测试
+# 2. 验证 Rust 原生算子与纯 TS Shim 100% 字节等价及全量 163 套测试
 cd auto-refactor && npm run build && npm test
 
 # 3. 验证 WebGames 静态提取与 ADV-PRF-002 零瞬态分配门禁

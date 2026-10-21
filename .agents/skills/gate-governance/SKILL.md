@@ -1,7 +1,7 @@
 ---
 name: gate-governance
 description: >-
-  通用双层门禁架构与跨平台脚本工程治理规范。指导 Agent 落实 Tier 1 本地左移流式判定（<90ms）、
+  通用双层门禁架构与跨平台脚本工程治理规范。指导 Agent 落实 Tier 1 本地左移流式判定（内存判定约 1 ms、端到端约 160 ms）、
   Tier 2 远端同构防御、受影响项目智能分流（auto-refactor 362 规则自测）、子进程工作目录隔离与零黑话纪律。
 ---
 
@@ -16,7 +16,7 @@ description: >-
 门禁系统严禁依赖单层防线，必须实施端到端双层纵深防御，确保本地极速反馈与远端主干看守 100% 规则同构：
 
 ### 1. 第一层：本地左移防御 (Tier 1 Local Shift-Left Gates)
-- **`pre-commit`（内存单遍流式判定，耗时 <90ms）**：
+- **`pre-commit`（内存单遍流式判定，内存判定约 1 ms / 端到端约 160 ms）**：
   核心由 `gate-fast-staged.js` 驱动，在单一 Node.js 进程内单遍流式读取暂存区文件，直接在内存中完成 6 大门禁判定：
   1. **物理空文件守卫**：一票否决 0 字节物理空文件与纯空白字符虚空文件；
   2. **换行契约守卫**：PowerShell 脚本（`.ps1`）在磁盘必须严格保持 CRLF 换行；Bash（`.sh`）、GDScript（`.gd`）、TypeScript/JavaScript（`.ts`/`.js`）、Markdown（`.md`）与 JSON（`.json`）严格保持 LF 换行；

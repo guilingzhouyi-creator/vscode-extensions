@@ -60,7 +60,7 @@ description: >-
 
 ### 1. 单用例耗时上限与热路径微基准
 - 纯逻辑单元测试单项耗时应严格控制在 $10\text{ms}$ 以内；
-- 内存流式预审门禁全量判定耗时控制在 $100\text{ms}$ 级（如 `gate-fast-staged.js < 90ms`）；
+- 内存流式预审门禁的判定本身耗时控制在 $\text{1 ms}$ 级，端到端（含 Node 启动约 $80\text{ms}$）约 $160\text{ms}$；两个口径必须同时给出，只报小口径会描述一个调用方从未体验过的预算；
 - `auto-refactor` 热路径微基准（`node auto-refactor/scripts/bench-hot-paths.js`）专门看守 `mask-source`、`governance-scan` 与 `cmp-rules` 吞吐表现。
 
 ### 2. 基准耗时棘轮与阻断 (`TB-REGRESSION`)
