@@ -57,6 +57,8 @@ const {
   evaluateDebtCorridor,
   updateDebtLedger,
   readDebtLedger,
+  CRITICAL_RULE_IDS,
+  ELASTIC_RULE_IDS,
   MODE_NORMAL,
   MODE_ELASTIC_WARNING,
   MODE_FORCED_PAYDOWN,
@@ -66,6 +68,30 @@ const {
 } = require('./tech-debt-corridor');
 
 const { validateCommitMessageContent } = require('./validate-commit-msg-style');
+const FORBIDDEN_TERMS_PATH = path.join(__dirname, 'commit-msg-forbidden-terms.json');
+
+/**
+ * Dictionary categories permitted inside the elastic corridor rather than the hard-zero tier.
+ *
+ * Mirrors `ELASTIC_DICTIONARY_CATEGORIES` in the corridor module. The assertion below fails if the
+ * two copies diverge, so the mirror cannot silently degrade a hard-zero rule.
+ */
+const ELASTIC_DICTIONARY_CATEGORIES = new Set(['imperative_mood', 'zero_pov']);
+
+/**
+ * Reads the zero-tolerance rows of the single-source forbidden-term dictionary.
+ *
+ * The corridor classifier now derives its tiers from this same file, so the assertion below
+ * verifies the derivation rather than a hand-written second table.
+ *
+ * @returns {Array<{ id: string, category: string }>} Rules carrying `error` severity.
+ */
+function readZeroToleranceRuleRows() {
+  const dictionary = JSON.parse(fs.readFileSync(FORBIDDEN_TERMS_PATH, 'utf8'));
+  return (dictionary.rules || [])
+    .filter((rule) => (rule.severity || 'error') === 'error')
+    .map((rule) => ({ id: rule.id, category: rule.category }));
+}
 
 /**
  * Validates text normalization and adversarial evasion stripping.
@@ -421,6 +447,82 @@ function testCommitGuardrailLogger() {
 }
 
 /**
+ * Validates that zero-tolerance commit-message rules actually reach the critical tier.
+ *
+ * The corridor previously matched category strings that no producer emitted, so CMG-STY-001
+ * through CMG-STY-004 fell into the medium tier and surfaced as an empty elastic-corridor
+ * warning instead of blocking. This suite pins the dictionary-derived tier mirror, then drives
+ * real messages through the full content validator so the degradation cannot reappear unnoticed.
+ */
+function testZeroToleranceTierBinding() {
+  const zeroToleranceRows = readZeroToleranceRuleRows();
+  assert.ok(zeroToleranceRows.length > 0, 'Forbidden-term dictionary must declare zero-tolerance rows');
+
+  const expectedCritical = zeroToleranceRows.filter(
+    (row) => !ELASTIC_DICTIONARY_CATEGORIES.has(row.category)
+  );
+  const expectedElastic = zeroToleranceRows.filter((row) =>
+    ELASTIC_DICTIONARY_CATEGORIES.has(row.category)
+  );
+  assert.ok(expectedCritical.length > 0, 'Dictionary must declare hard-zero rows');
+
+  for (const row of expectedCritical) {
+    assert.ok(
+      CRITICAL_RULE_IDS.includes(row.id),
+      `Zero-tolerance rule ${row.id} must be mirrored in CRITICAL_RULE_IDS`
+    );
+    assert.ok(
+      !ELASTIC_RULE_IDS.includes(row.id),
+      `Zero-tolerance rule ${row.id} must not also live in the elastic corridor`
+    );
+  }
+  for (const row of expectedElastic) {
+    assert.ok(
+      ELASTIC_RULE_IDS.includes(row.id),
+      `Wording-shape rule ${row.id} must be mirrored in ELASTIC_RULE_IDS`
+    );
+  }
+
+  // Rule-ID-only classification: a finding stripped of its category still blocks.
+  const isolatedLogDir = fs.mkdtempSync(path.join(os.tmpdir(), 'critical-tier-'));
+  try {
+    const onlyIdVerdict = evaluateDebtCorridor({
+      findings: [{ ruleId: 'CMG-STY-001' }],
+      commitType: 'refactor',
+      logDir: isolatedLogDir,
+    });
+    assert.strictEqual(onlyIdVerdict.status, STATUS_BLOCK);
+    assert.strictEqual(onlyIdVerdict.criticalCount, 1);
+    assert.strictEqual(onlyIdVerdict.mode, MODE_FORCED_PAYDOWN);
+  } finally {
+    if (fs.existsSync(isolatedLogDir)) {
+      fs.rmSync(isolatedLogDir, { recursive: true, force: true });
+    }
+  }
+
+  // End-to-end: every zero-tolerance family must block, not enter the elastic corridor.
+  const blockingMessages = [
+    'fix(core): 临时修复空指针\n\n[Project: governance]\n[Why]\n- 说明动机。\n\n[Fixed]\n- 补充空值校验。\n\n[Verification]\n- 断言空输入路径返回默认值。',
+    'feat(core): 彻底解决所有并发崩溃\n\n[Project: governance]\n[Why]\n- 说明动机。\n\n[Added]\n- 新增并发守卫。\n\n[Verification]\n- 断言并发写入串行化。',
+    'refactor(core): 重构一团糟的模块代码\n\n[Project: governance]\n[Why]\n- 说明动机。\n\n[Changed]\n- 调整模块边界。\n\n[Verification]\n- 断言模块依赖单向。',
+    'docs(readme): 调整整体文案语调为低调中肯的表述\n\n[Project: governance]\n[Why]\n- 说明动机。\n\n[Changed]\n- 调整说明段落。\n\n[Verification]\n- 断言章节链接可达。',
+  ];
+
+  for (const message of blockingMessages) {
+    const result = validateCommitMessageContent(message, {
+      skipLog: true,
+      logDir: isolatedLogDir,
+    });
+    assert.strictEqual(
+      result.debtVerdict.status,
+      STATUS_BLOCK,
+      `Zero-tolerance message must block, not enter the corridor: ${message.split('\n')[0]}`
+    );
+    assert.strictEqual(result.isPermittedUnderCorridor, false);
+  }
+}
+
+/**
  * Validates the elastic technical debt corridor and accumulation ratchet state machine.
  */
 function testElasticTechDebtCorridor() {
@@ -601,6 +703,7 @@ function runGuardrailVerification() {
     [testEntropyAndHealthScoring, '香农信息熵 H(T) 与风格健康分 StyleHealthScore 评定验证通过'],
     [testMultilineCodeBlockMasking, '跨行 Markdown 代码块预屏蔽与正文词法隔离验证通过'],
     [testCommitGuardrailLogger, '集中归一化双轨持久化 (.audit-logs/) 与快照生成验证通过'],
+    [testZeroToleranceTierBinding, '零容忍提交规则硬阻断 tier 绑定与类别名镜像验证通过'],
     [testElasticTechDebtCorridor, '弹性高危技术债容差走廊与清偿棘轮互锁状态机验证通过'],
     [testSilentEVerbRecovery, '软件工程动词静音 e 词根智能还原验证通过'],
     [testAgentDirectivesEnvelopeProtocol, 'Autonomous Agent 结构化提示信封协议与信用额度包验证通过'],

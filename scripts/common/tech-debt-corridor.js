@@ -36,6 +36,70 @@ const STATUS_PASS = 'PASS';
 const STATUS_WARN = 'WARN';
 const STATUS_BLOCK = 'BLOCK';
 
+const FORBIDDEN_TERMS_FILE = 'commit-msg-forbidden-terms.json';
+
+/** Static critical rules outside the commit-message dictionary (secret, hygiene, SSOT drift). */
+const STATIC_CRITICAL_RULE_IDS = ['GUARD-SSOT-001', 'RCFG-RULE-DRIFT'];
+const STATIC_CRITICAL_RULE_PREFIXES = ['SEC-', 'HYG-EMP'];
+
+/** Static elastic rules outside the commit-message dictionary (AST and facade absences). */
+const STATIC_ELASTIC_RULE_IDS = ['GUARD-AST-001', 'ARCH-ABS-001'];
+
+/**
+ * Dictionary categories that stay inside the elastic corridor instead of the hard-zero tier.
+ *
+ * These two families describe *wording shape* (imperative mood in the header, zero point-of-view
+ * in the body) rather than factual dishonesty. A commit that names the wrong verb still records
+ * the real change, so it is permitted under a recorded debt entry. Every other `severity: error`
+ * row in the dictionary blocks outright.
+ */
+const ELASTIC_DICTIONARY_CATEGORIES = new Set(['imperative_mood', 'zero_pov']);
+
+/**
+ * Reads the single-source forbidden-term dictionary and derives tier membership by rule ID.
+ *
+ * The corridor previously matched hard-coded category strings that no producer emitted
+ * (`temporary_phrasing`, `hyperbolic_absolute`, ...), so all four honesty rules fell into the
+ * medium tier and printed an empty elastic-corridor warning instead of blocking. Deriving the
+ * tiers from the dictionary removes the second copy of that knowledge: a renamed or newly added
+ * `severity: error` row becomes critical automatically, and the mirror can no longer drift.
+ *
+ * @returns {{ criticalRuleIds: string[], elasticRuleIds: string[] }} Rule IDs per tier.
+ */
+function loadDictionaryTiers() {
+  const criticalRuleIds = [];
+  const elasticRuleIds = [];
+  let rules = [];
+  try {
+    const dictionary = JSON.parse(
+      fs.readFileSync(path.join(__dirname, FORBIDDEN_TERMS_FILE), 'utf8')
+    );
+    rules = Array.isArray(dictionary.rules) ? dictionary.rules : [];
+  } catch {
+    // A missing or malformed dictionary must not silently downgrade the tier; callers fall back
+    // to the static lists, and validate-commit-guardrail.js fails on the unreadable source.
+    rules = [];
+  }
+  for (const rule of rules) {
+    if (!rule || typeof rule.id !== 'string') continue;
+    if ((rule.severity || 'error') !== 'error') continue;
+    if (ELASTIC_DICTIONARY_CATEGORIES.has(rule.category)) {
+      elasticRuleIds.push(rule.id);
+    } else {
+      criticalRuleIds.push(rule.id);
+    }
+  }
+  return { criticalRuleIds, elasticRuleIds };
+}
+
+const DICTIONARY_TIERS = loadDictionaryTiers();
+
+/** Rule IDs that hard-block a commit regardless of the elastic corridor allowance. */
+const CRITICAL_RULE_IDS = [...STATIC_CRITICAL_RULE_IDS, ...DICTIONARY_TIERS.criticalRuleIds];
+
+/** Rule IDs permitted inside the elastic corridor and recorded in the debt ledger. */
+const ELASTIC_RULE_IDS = [...STATIC_ELASTIC_RULE_IDS, ...DICTIONARY_TIERS.elasticRuleIds];
+
 /**
  * Ensures target audit log directory exists.
  *
@@ -96,6 +160,9 @@ function writeDebtLedger(ledgerData, logDir = DEFAULT_LOG_DIR) {
 /**
  * Classifies an individual finding into its debt severity tier.
  *
+ * Tier membership is resolved by rule ID against the single-source forbidden-term dictionary
+ * (see `loadDictionaryTiers`), so a rule cannot be downgraded by a category-name mismatch.
+ *
  * @param {object} finding - Lint or style finding
  * @returns {'critical' | 'high' | 'medium' | 'low'}
  */
@@ -106,28 +173,21 @@ function classifyFindingDebtTier(finding) {
 
   // Tier 1: Critical (hard zero tolerance)
   if (
-    ruleId.startsWith('SEC-') ||
-    ruleId.startsWith('HYG-EMP') ||
-    ruleId === 'GUARD-SSOT-001' ||
-    ruleId === 'RCFG-RULE-DRIFT' ||
-    cat === 'temporary_phrasing' ||
-    cat === 'hyperbolic_absolute' ||
-    cat === 'derogatory_negative' ||
-    cat === 'meta_slogans'
+    CRITICAL_RULE_IDS.includes(ruleId) ||
+    STATIC_CRITICAL_RULE_PREFIXES.some((prefix) => ruleId.startsWith(prefix)) ||
+    cat === 'temporary' ||
+    cat === 'hyperbolic_affirmative' ||
+    cat === 'hyperbolic_negative' ||
+    cat === 'meta_narrative' ||
+    cat === 'procedural_boilerplate' ||
+    cat === 'execution_numeric_forbidden' ||
+    cat === 'project_governance'
   ) {
     return 'critical';
   }
 
   // Tier 2: High (elastic corridor)
-  if (
-    finding.isHighDebt ||
-    ruleId === 'CMG-STY-007' ||
-    ruleId === 'CMG-STY-008' ||
-    ruleId === 'GUARD-AST-001' ||
-    ruleId === 'ARCH-ABS-001' ||
-    cat === 'imperative_mood' ||
-    cat === 'zero_pov'
-  ) {
+  if (ELASTIC_RULE_IDS.includes(ruleId) || finding.isHighDebt || cat === 'imperative_mood' || cat === 'zero_pov') {
     return 'high';
   }
 
@@ -394,6 +454,8 @@ module.exports = {
   STATUS_PASS,
   STATUS_WARN,
   STATUS_BLOCK,
+  CRITICAL_RULE_IDS,
+  ELASTIC_RULE_IDS,
   readDebtLedger,
   writeDebtLedger,
   classifyFindingDebtTier,
