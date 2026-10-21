@@ -5,7 +5,10 @@
 
 use fg_core::error::{FractalError, FractalResult};
 
+/// Canonical Git wire protocol flush packet (`0000`).
 pub const PKT_FLUSH: &[u8] = b"0000";
+
+/// Canonical Git wire protocol delimiter packet (`0001`).
 pub const PKT_DELIM: &[u8] = b"0001";
 
 /// Packet-line encoder and decoder for standard Git wire protocol.

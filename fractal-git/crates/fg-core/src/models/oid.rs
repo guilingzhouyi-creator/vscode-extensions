@@ -12,6 +12,7 @@ use std::fmt;
 
 use crate::error::{FractalError, FractalResult};
 
+/// Compact 20-byte cryptographic object identifier representing standard Git SHA-1 hashes.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Oid([u8; 20]);
 

@@ -12,7 +12,7 @@ pub const REF_FRACTAL_TRUNK: &str = "refs/fractal/trunk";
 /// Canonical path for the standard Git system trunk (Layer 0).
 pub const REF_SYSTEM_TRUNK: &str = "refs/heads/main";
 
-/// Alternative legacy integration trunk name.
+/// Historical integration trunk reference name for backward compatibility.
 pub const REF_FRACTAL_INTEGRATION: &str = "refs/fractal/integration";
 
 /// Path segment identifying cell namespace.

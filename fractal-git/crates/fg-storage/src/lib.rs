@@ -9,12 +9,17 @@
 pub mod cas_backend;
 pub mod cas_bridge;
 pub mod commit_graph;
+pub mod delta_codec;
 pub mod loose;
 pub mod wal_journal;
 
 pub use cas_backend::CasBackend;
 pub use cas_bridge::{CasFileDescriptor, CasToGitMaterializer, MaterializeRequest};
 pub use commit_graph::{CommitGraphEntry, CommitGraphReader, CommitGraphWriter};
+pub use delta_codec::{
+    apply_delta_program, decode_block_payload, generate_delta_program, select_block_encoding,
+    DeltaOp, EncodedBlock, MAX_DELTA_CHAIN_DEPTH,
+};
 pub use loose::{write_loose_object, LooseOdb};
 pub use wal_journal::{WalJournal, WalRecord};
 

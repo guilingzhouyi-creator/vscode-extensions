@@ -4,6 +4,7 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Canonical Git identity signature representing author or committer metadata.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GitSignature {
     pub name: String,
@@ -13,6 +14,7 @@ pub struct GitSignature {
 }
 
 impl GitSignature {
+    /// Constructs a standard Git signature with designated name, email, and UTC epoch timestamp.
     pub fn new(name: impl Into<String>, email: impl Into<String>, timestamp_sec: i64) -> Self {
         Self {
             name: name.into(),
@@ -22,6 +24,7 @@ impl GitSignature {
         }
     }
 
+    /// Constructs an autonomous agent signature scoped to its containing cell.
     pub fn for_agent(agent_uid: &str, cell_id: &str, timestamp_sec: i64) -> Self {
         Self {
             name: format!("{}:{}", cell_id, agent_uid),
@@ -31,6 +34,7 @@ impl GitSignature {
         }
     }
 
+    /// Serializes the signature into standard Git identity line format: `name <email> time tz`.
     pub fn to_git_line(&self) -> String {
         format!(
             "{} <{}> {} {}",

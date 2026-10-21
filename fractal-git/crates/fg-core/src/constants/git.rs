@@ -42,7 +42,7 @@ pub const REF_TAGS_PREFIX: &str = "refs/tags/";
 /// Default branch name for System Trunk in modern Git repositories.
 pub const DEFAULT_SYSTEM_BRANCH: &str = "main";
 
-/// Alternative legacy branch name for System Trunk.
+/// Historical master branch name fallback for standard Git interop.
 pub const LEGACY_SYSTEM_BRANCH: &str = "master";
 
 /// Default Git directory name.

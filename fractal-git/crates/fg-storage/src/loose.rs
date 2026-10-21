@@ -14,7 +14,7 @@ use std::path::{Path, PathBuf};
 use fg_core::error::{FractalError, FractalResult};
 use fg_core::models::Oid;
 use fg_core::traits::OdbStore;
-use fg_pools::ByteLruCache;
+use fg_pools::{BufferSizeClass, ByteLruCache, PageBufferPool};
 
 /// Default in-memory object cache capacity for LooseOdb (32 MiB).
 pub const DEFAULT_ODB_CACHE_BYTES: usize = 32 * 1024 * 1024;
@@ -23,6 +23,7 @@ pub const DEFAULT_ODB_CACHE_BYTES: usize = 32 * 1024 * 1024;
 pub struct LooseOdb {
     git_dir: PathBuf,
     cache: Option<ByteLruCache<Oid, Vec<u8>>>,
+    pool: PageBufferPool,
 }
 
 impl LooseOdb {
@@ -41,6 +42,7 @@ impl LooseOdb {
             } else {
                 None
             },
+            pool: PageBufferPool::default(),
         }
     }
 
@@ -49,6 +51,7 @@ impl LooseOdb {
         Self {
             git_dir: git_dir.into(),
             cache: None,
+            pool: PageBufferPool::default(),
         }
     }
 
@@ -72,7 +75,11 @@ impl LooseOdb {
     pub fn object_path(git_dir: &Path, oid: &Oid) -> PathBuf {
         let hex = oid.to_hex();
         let (dir_name, file_name) = hex.split_at(2);
-        git_dir.join("objects").join(dir_name).join(file_name)
+        let mut path = git_dir.to_path_buf();
+        path.push("objects");
+        path.push(dir_name);
+        path.push(file_name);
+        path
     }
 
     /// Directly writes a raw loose object payload atomically.
@@ -92,10 +99,8 @@ impl LooseOdb {
 
         // Compress raw object payload with zlib default compression
         let initial_comp_cap = (raw_payload.len() / 2 + 64).max(256);
-        let mut encoder = ZlibEncoder::new(
-            Vec::with_capacity(initial_comp_cap),
-            Compression::default(),
-        );
+        let mut encoder =
+            ZlibEncoder::new(Vec::with_capacity(initial_comp_cap), Compression::default());
         encoder.write_all(raw_payload)?;
         let compressed = encoder.finish()?;
 
@@ -135,10 +140,11 @@ impl OdbStore for LooseOdb {
         }
 
         let compressed_bytes = fs::read(&path)?;
-        let estimated_decomp_cap = (compressed_bytes.len() * 3).max(4096);
         let mut decoder = ZlibDecoder::new(&compressed_bytes[..]);
-        let mut uncompressed = Vec::with_capacity(estimated_decomp_cap);
-        decoder.read_to_end(&mut uncompressed)?;
+        let mut pooled_buffer = self.pool.acquire_guard_sized(BufferSizeClass::Page);
+        pooled_buffer.clear();
+        decoder.read_to_end(&mut pooled_buffer)?;
+        let uncompressed = pooled_buffer.take();
 
         if let Some(ref cache) = self.cache {
             let size = uncompressed.len();
@@ -149,21 +155,22 @@ impl OdbStore for LooseOdb {
     }
 
     fn write_object(&self, object_type: &str, payload: &[u8]) -> FractalResult<Oid> {
-        let header = format!("{} {}\0", object_type, payload.len());
-        let mut raw = Vec::with_capacity(header.len() + payload.len());
-        raw.extend_from_slice(header.as_bytes());
-        raw.extend_from_slice(payload);
+        let mut pooled_buffer = self.pool.acquire_guard_sized(BufferSizeClass::Page);
+        pooled_buffer.clear();
+        use std::io::Write;
+        write!(pooled_buffer, "{} {}\0", object_type, payload.len())?;
+        pooled_buffer.extend_from_slice(payload);
 
         let mut hasher = Sha1::new();
-        hasher.update(&raw);
+        hasher.update(&pooled_buffer);
         let hash: [u8; 20] = hasher.finalize().into();
         let oid = Oid::from_bytes(hash);
 
-        Self::write_loose_object_raw(&self.git_dir, &oid, &raw)?;
+        Self::write_loose_object_raw(&self.git_dir, &oid, &pooled_buffer)?;
 
         if let Some(ref cache) = self.cache {
-            let size = raw.len();
-            cache.insert(oid, raw, size);
+            let size = pooled_buffer.len();
+            cache.insert(oid, pooled_buffer.take(), size);
         }
 
         Ok(oid)

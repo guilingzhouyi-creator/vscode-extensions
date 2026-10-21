@@ -50,6 +50,59 @@ impl CommitMessageGuard {
         let mut violations = Vec::new();
 
         // 1. Header length and trailing dot check
+        Self::validate_header_bounds(header, policy, &mut violations);
+
+        // 2. Conventional Commit header structure parsing
+        let (commit_type, scope, summary) = Self::parse_header(header, &mut violations, policy);
+
+        // 3. Body sections & substantive character count
+        let (sections, substantive_chars) = Self::parse_sections(&lines[1..]);
+        let is_production = policy
+            .production_types
+            .iter()
+            .any(|prod_type| prod_type.eq_ignore_ascii_case(&commit_type));
+
+        // 4. Blank line, production sections, and project tag checks
+        Self::validate_body_spacing_and_trailers(
+            &lines,
+            policy,
+            is_production,
+            &commit_type,
+            substantive_chars,
+            &sections,
+            &mut violations,
+        );
+
+        // 5. Anti-inflation forbidden terms and verification telemetry check
+        Self::validate_anti_inflation_telemetry(raw_message, policy, &sections, &mut violations);
+
+        // 6. Semantic Diff Borrow Check (Diff-to-Scope coherence)
+        Self::validate_diff_coherence(
+            policy,
+            touched_paths,
+            is_production,
+            scope.as_deref(),
+            &mut violations,
+        );
+
+        if !violations.is_empty() {
+            return Err(FractalError::GateRejection {
+                score: 0.0,
+                violations,
+            });
+        }
+
+        Ok(ValidatedCommitWitness::new(
+            commit_type,
+            scope,
+            summary,
+            substantive_chars,
+            sections,
+            raw_message,
+        ))
+    }
+
+    fn validate_header_bounds(header: &str, policy: &TaxisPolicy, violations: &mut Vec<String>) {
         if header.len() < policy.min_header_chars || header.len() > policy.max_header_chars {
             violations.push(format!(
                 "GUARD-MSG-001: Header length {} is outside bounds [{}..{}]",
@@ -62,29 +115,24 @@ impl CommitMessageGuard {
             violations
                 .push("GUARD-MSG-001: Header summary must not end with a trailing period".into());
         }
+    }
 
-        // 2. Conventional Commit header structure parsing
-        let (commit_type, scope, summary) = Self::parse_header(header, &mut violations, policy);
-
-        // 3. Blank line check between header and body
-        if policy.require_blank_line && lines.len() > 1 {
-            let second_line = lines[1].trim();
-            if !second_line.is_empty() {
-                violations.push(
-                    "GUARD-MSG-001: Line 2 must be an empty blank line separating header and body"
-                        .into(),
-                );
-            }
+    fn validate_body_spacing_and_trailers(
+        lines: &[&str],
+        policy: &TaxisPolicy,
+        is_production: bool,
+        commit_type: &str,
+        substantive_chars: usize,
+        sections: &HashMap<String, String>,
+        violations: &mut Vec<String>,
+    ) {
+        if policy.require_blank_line && lines.len() > 1 && !lines[1].trim().is_empty() {
+            violations.push(
+                "GUARD-MSG-001: Line 2 must be an empty blank line separating header and body"
+                    .into(),
+            );
         }
 
-        // 4. Parse structured body sections and compute substantive character count
-        let (sections, substantive_chars) = Self::parse_sections(&lines[1..]);
-
-        // 5. Production type checks (Why, Changed, Verification, min body length)
-        let is_production = policy
-            .production_types
-            .iter()
-            .any(|prod_type| prod_type.eq_ignore_ascii_case(&commit_type));
         if is_production {
             if substantive_chars < policy.min_body_chars {
                 violations.push(format!(
@@ -110,7 +158,6 @@ impl CommitMessageGuard {
             }
         }
 
-        // 6. Project tag check if configured
         if policy.require_project_tag {
             let found_project = sections
                 .iter()
@@ -134,10 +181,16 @@ impl CommitMessageGuard {
                 }
             }
         }
+    }
 
-        // 7. Forbidden terms filter (Anti-slang / Anti-hype)
+    fn validate_anti_inflation_telemetry(
+        raw_message: &str,
+        policy: &TaxisPolicy,
+        sections: &HashMap<String, String>,
+        violations: &mut Vec<String>,
+    ) {
+        let lower_msg = raw_message.to_lowercase();
         for forbidden in &policy.forbidden_terms {
-            let lower_msg = raw_message.to_lowercase();
             let lower_term = forbidden.to_lowercase();
             if lower_msg.contains(&lower_term) {
                 violations.push(format!(
@@ -147,7 +200,6 @@ impl CommitMessageGuard {
             }
         }
 
-        // 8. Qualitative Verification Check (No raw execution telemetry numbers)
         if policy.qualitative_verification_only {
             if let Some((_, ver_content)) = sections.iter().find(|(sec_key, _)| {
                 sec_key.to_lowercase().contains("verification") || sec_key.contains("验证")
@@ -161,56 +213,49 @@ impl CommitMessageGuard {
                 }
             }
         }
+    }
 
-        // 9. Semantic Diff Borrow Check (Diff-to-Scope coherence)
-        if policy.diff_coherence == DiffCoherenceMode::Strict {
-            if let Some(paths) = touched_paths {
-                if is_production && paths.is_empty() {
-                    violations.push(
-                        concat!(
-                            "FGT-GAT-001: Semantic dangling pointer; ",
-                            "production commit touches zero files"
-                        )
-                        .into(),
-                    );
-                }
+    fn validate_diff_coherence(
+        policy: &TaxisPolicy,
+        touched_paths: Option<&[String]>,
+        is_production: bool,
+        scope: Option<&str>,
+        violations: &mut Vec<String>,
+    ) {
+        if policy.diff_coherence != DiffCoherenceMode::Strict {
+            return;
+        }
+        let Some(paths) = touched_paths else {
+            return;
+        };
 
-                if let Some(ref sc) = scope {
-                    let norm_scope = sc.to_lowercase();
-                    // Each touched path should have affinity to the declared scope
-                    for path in paths {
-                        let norm_path = path.to_lowercase();
-                        let is_broad_scope = norm_scope.contains("root")
-                            || norm_scope.contains("all")
-                            || norm_scope.contains("core");
-                        if !norm_path.contains(&norm_scope) && !is_broad_scope {
-                            violations.push(format!(
-                                "FGT-GAT-001: Out-of-scope mutation: path '{}' \
-                                 does not match declared scope '{}'",
-                                path, sc
-                            ));
-                            break;
-                        }
-                    }
+        if is_production && paths.is_empty() {
+            violations.push(
+                concat!(
+                    "FGT-GAT-001: Semantic dangling pointer; ",
+                    "production commit touches zero files"
+                )
+                .into(),
+            );
+        }
+
+        if let Some(sc) = scope {
+            let norm_scope = sc.to_lowercase();
+            let is_broad_scope = norm_scope.contains("root")
+                || norm_scope.contains("all")
+                || norm_scope.contains("core");
+            for path in paths {
+                let norm_path = path.to_lowercase();
+                if !norm_path.contains(&norm_scope) && !is_broad_scope {
+                    violations.push(format!(
+                        "FGT-GAT-001: Out-of-scope mutation: path '{}' \
+                         does not match declared scope '{}'",
+                        path, sc
+                    ));
+                    break;
                 }
             }
         }
-
-        if !violations.is_empty() {
-            return Err(FractalError::GateRejection {
-                score: 0.0,
-                violations,
-            });
-        }
-
-        Ok(ValidatedCommitWitness::new(
-            commit_type,
-            scope,
-            summary,
-            substantive_chars,
-            sections,
-            raw_message,
-        ))
     }
 
     fn parse_header(

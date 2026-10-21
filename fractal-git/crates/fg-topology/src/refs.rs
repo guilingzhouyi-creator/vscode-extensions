@@ -55,15 +55,7 @@ impl FractalRef {
         }
     }
 
-    /// Parses a string into a strongly-typed FractalRef if it belongs to the fractal
-    /// namespace or standard system heads.
-    pub fn parse(ref_str: &str) -> Option<Self> {
-        let parts: Vec<&str> = ref_str.split('/').collect();
-        if parts.is_empty() {
-            return None;
-        }
-
-        // Standard Git System Heads: refs/heads/{branch} or plain "main" / "master"
+    fn parse_system_trunk_ref(parts: &[&str]) -> Option<Self> {
         if parts.len() == 3 && parts[0] == "refs" && parts[1] == "heads" {
             return Some(Self::SystemTrunk {
                 branch: parts[2].to_string(),
@@ -74,6 +66,37 @@ impl FractalRef {
                 branch: parts[0].to_string(),
             });
         }
+        None
+    }
+
+    fn parse_fractal_cell_ref(parts: &[&str]) -> Option<Self> {
+        if parts.len() == 5 && parts[4] == "main" {
+            Some(Self::CellMain {
+                cell_id: parts[3].to_string(),
+            })
+        } else if parts.len() == 6 && parts[4] == "card" {
+            Some(Self::CardWorktree {
+                cell_id: parts[3].to_string(),
+                card_id: parts[5].to_string(),
+            })
+        } else if parts.len() == 8 && parts[4] == "card" && parts[6] == "sub" {
+            Some(Self::SubAgentWorktree {
+                cell_id: parts[3].to_string(),
+                card_id: parts[5].to_string(),
+                subagent_id: parts[7].to_string(),
+            })
+        } else {
+            None
+        }
+    }
+
+    /// Parses a string into a strongly-typed FractalRef if it belongs to the fractal
+    /// namespace or standard system heads.
+    pub fn parse(ref_str: &str) -> Option<Self> {
+        let parts: Vec<&str> = ref_str.split('/').collect();
+        if let Some(sys) = Self::parse_system_trunk_ref(&parts) {
+            return Some(sys);
+        }
 
         if parts.len() < 3 || parts[0] != "refs" || parts[1] != "fractal" {
             return None;
@@ -81,20 +104,7 @@ impl FractalRef {
 
         match parts[2] {
             "trunk" | "integration" => Some(Self::Trunk),
-            "cell" if parts.len() == 5 && parts[4] == "main" => Some(Self::CellMain {
-                cell_id: parts[3].to_string(),
-            }),
-            "cell" if parts.len() == 6 && parts[4] == "card" => Some(Self::CardWorktree {
-                cell_id: parts[3].to_string(),
-                card_id: parts[5].to_string(),
-            }),
-            "cell" if parts.len() == 8 && parts[4] == "card" && parts[6] == "sub" => {
-                Some(Self::SubAgentWorktree {
-                    cell_id: parts[3].to_string(),
-                    card_id: parts[5].to_string(),
-                    subagent_id: parts[7].to_string(),
-                })
-            }
+            "cell" => Self::parse_fractal_cell_ref(&parts),
             _ => None,
         }
     }
@@ -146,6 +156,7 @@ pub struct DiskRefStore {
 }
 
 impl DiskRefStore {
+    /// Constructs a filesystem-backed Git reference store targeting the given repository path.
     pub fn new(git_dir: impl Into<PathBuf>) -> Self {
         Self {
             git_dir: git_dir.into(),

@@ -39,6 +39,7 @@ pub struct TreeDiffState {
 }
 
 impl TreeDiffState {
+    /// Creates a pre-allocated reusable diff state buffer.
     pub fn new() -> Self {
         Self {
             path_stack: String::with_capacity(256),
@@ -46,11 +47,13 @@ impl TreeDiffState {
         }
     }
 
+    /// Resets internal scratch buffers for another tree diff traversal.
     pub fn clear(&mut self) {
         self.path_stack.clear();
         self.changes.clear();
     }
 
+    /// Extracts accumulated diff entries, replacing the internal buffer with fresh capacity.
     pub fn take_changes(&mut self) -> Vec<DiffEntry> {
         self.path_stack.clear();
         let cap = self.changes.capacity().max(64);
@@ -62,7 +65,7 @@ impl TreeDiffState {
 pub struct TreeDiff;
 
 impl TreeDiff {
-    /// Compares two path-to-Oid maps (legacy backward-compatible flat map mode).
+    /// Compares two path-to-Oid maps (backward-compatible flat-map traversal mode).
     pub fn compare(
         old_tree: &BTreeMap<String, Oid>,
         new_tree: &BTreeMap<String, Oid>,
@@ -128,6 +131,7 @@ impl TreeDiff {
         changes
     }
 
+    #[inline(always)]
     fn process_matching_entry<F>(
         old_entry: &fg_object::GitTreeEntry,
         new_entry: &fg_object::GitTreeEntry,
@@ -159,6 +163,7 @@ impl TreeDiff {
         state.path_stack.truncate(prev_len);
     }
 
+    #[inline(always)]
     fn handle_entry_pair<F>(
         old_entry: &fg_object::GitTreeEntry,
         new_entry: &fg_object::GitTreeEntry,
@@ -231,6 +236,7 @@ impl TreeDiff {
         }
     }
 
+    #[inline(always)]
     fn push_path_component(stack: &mut String, component: &str) {
         if !stack.is_empty() {
             stack.push('/');

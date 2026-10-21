@@ -126,15 +126,21 @@ impl GitTree {
     /// Returns the raw Git loose object format: `tree <size>\0<entries>`
     pub fn to_raw_object(&self) -> Vec<u8> {
         let payload = Self::serialize_entries(&self.entries);
-        let header = format!("tree {}\0", payload.len());
-        let mut raw = Vec::with_capacity(header.len() + payload.len());
-        raw.extend_from_slice(header.as_bytes());
+        let mut header_buf = [0u8; 32];
+        let header_len = {
+            use std::io::Write;
+            let mut cursor = std::io::Cursor::new(&mut header_buf[..]);
+            let _ = write!(cursor, "tree {}\0", payload.len());
+            cursor.position() as usize
+        };
+        let mut raw = Vec::with_capacity(header_len + payload.len());
+        raw.extend_from_slice(&header_buf[..header_len]);
         raw.extend_from_slice(&payload);
         raw
     }
 
     fn serialize_entries(entries: &[GitTreeEntry]) -> Vec<u8> {
-        let mut buf = Vec::new();
+        let mut buf = Vec::with_capacity(entries.len() * 40);
         for entry in entries {
             buf.extend_from_slice(entry.mode.as_octal_str().as_bytes());
             buf.push(b' ');
@@ -146,8 +152,15 @@ impl GitTree {
     }
 
     fn compute_tree_oid(payload: &[u8]) -> Oid {
+        let mut header_buf = [0u8; 32];
+        let header_len = {
+            use std::io::Write;
+            let mut cursor = std::io::Cursor::new(&mut header_buf[..]);
+            let _ = write!(cursor, "tree {}\0", payload.len());
+            cursor.position() as usize
+        };
         let mut hasher = Sha1::new();
-        hasher.update(format!("tree {}\0", payload.len()).as_bytes());
+        hasher.update(&header_buf[..header_len]);
         hasher.update(payload);
         let hash: [u8; 20] = hasher.finalize().into();
         Oid::from_bytes(hash)

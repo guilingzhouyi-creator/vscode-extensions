@@ -221,6 +221,7 @@ impl<K: Hash + Eq + Clone, V: Clone> ByteLruCache<K, V> {
         self.inner.lock().entries.len()
     }
 
+    /// Returns true if the cache contains zero elements.
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }

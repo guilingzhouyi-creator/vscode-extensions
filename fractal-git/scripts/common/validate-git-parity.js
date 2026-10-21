@@ -88,8 +88,9 @@ function runGitParityValidation() {
         if (gitOutput !== computed) {
           violations.push(`FGT-OBJ-001: Mismatch with git hash-object on ${vector.label}: git returned ${gitOutput}, engine got ${computed}`);
         }
-      } catch (_err) {
-        // Fall back gracefully if git command fails in sandbox
+      } catch (err) {
+        // [SANDBOX_FALLBACK]: ignore execution failures in restricted sandbox environments
+        void err;
       }
     }
   }

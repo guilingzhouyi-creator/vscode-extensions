@@ -19,6 +19,14 @@ pub enum PatchLine {
     Deletion(String),
 }
 
+/// Borrowed line slice in a diff hunk, eliminating heap string allocations.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PatchLineRef<'a> {
+    Context(&'a str),
+    Addition(&'a str),
+    Deletion(&'a str),
+}
+
 /// A contiguous hunk of line differences.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PatchHunk {
@@ -29,11 +37,28 @@ pub struct PatchHunk {
     pub lines: Vec<PatchLine>,
 }
 
+/// A contiguous hunk of borrowed line differences.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PatchHunkRef<'a> {
+    pub old_start: usize,
+    pub old_count: usize,
+    pub new_start: usize,
+    pub new_count: usize,
+    pub lines: Vec<PatchLineRef<'a>>,
+}
+
 /// A complete unified diff patch for a file.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UnifiedPatch {
     pub file_path: String,
     pub hunks: Vec<PatchHunk>,
+}
+
+/// A complete unified diff patch with zero-copy borrowed slices.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UnifiedPatchRef<'a> {
+    pub file_path: &'a str,
+    pub hunks: Vec<PatchHunkRef<'a>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -52,6 +77,7 @@ pub struct MyersScratch {
 }
 
 impl MyersScratch {
+    /// Constructs a pre-allocated scratch buffer for Myers edit graph explorations.
     pub fn new() -> Self {
         Self {
             v_diagonals: Vec::with_capacity(256),
@@ -60,6 +86,7 @@ impl MyersScratch {
         }
     }
 
+    /// Resets all scratch diagonal buffers without deallocating reserved heap capacity.
     pub fn clear(&mut self) {
         self.v_diagonals.clear();
         self.next_v_diagonals.clear();
@@ -73,31 +100,82 @@ pub struct PatchGenerator;
 impl PatchGenerator {
     /// Generates a unified patch comparing old and new text with Myers shortest edit script.
     pub fn generate_patch(file_path: &str, old_text: &str, new_text: &str) -> UnifiedPatch {
-        let old_lines: Vec<&str> = old_text.lines().collect();
-        let new_lines: Vec<&str> = new_text.lines().collect();
+        let mut scratch = MyersScratch::new();
+        Self::generate_patch_with_scratch(file_path, old_text, new_text, &mut scratch)
+    }
+
+    /// Generates a unified patch reusing an external MyersScratch buffer to avoid allocations.
+    pub fn generate_patch_with_scratch(
+        file_path: &str,
+        old_text: &str,
+        new_text: &str,
+        scratch: &mut MyersScratch,
+    ) -> UnifiedPatch {
+        let patch_ref = Self::generate_patch_ref(file_path, old_text, new_text, scratch);
+        UnifiedPatch {
+            file_path: patch_ref.file_path.to_string(),
+            hunks: patch_ref
+                .hunks
+                .into_iter()
+                .map(|hunk_item| PatchHunk {
+                    old_start: hunk_item.old_start,
+                    old_count: hunk_item.old_count,
+                    new_start: hunk_item.new_start,
+                    new_count: hunk_item.new_count,
+                    lines: hunk_item
+                        .lines
+                        .into_iter()
+                        .map(|line_ref| match line_ref {
+                            PatchLineRef::Context(text_slice) => {
+                                PatchLine::Context(text_slice.to_string())
+                            }
+                            PatchLineRef::Addition(text_slice) => {
+                                PatchLine::Addition(text_slice.to_string())
+                            }
+                            PatchLineRef::Deletion(text_slice) => {
+                                PatchLine::Deletion(text_slice.to_string())
+                            }
+                        })
+                        .collect(),
+                })
+                .collect(),
+        }
+    }
+
+    /// Generates a unified patch with zero string copying, borrowing line slices
+    /// directly from input text buffers.
+    pub fn generate_patch_ref<'a>(
+        file_path: &'a str,
+        old_text: &'a str,
+        new_text: &'a str,
+        scratch: &mut MyersScratch,
+    ) -> UnifiedPatchRef<'a> {
+        let old_lines: Vec<&'a str> = old_text.lines().collect();
+        let new_lines: Vec<&'a str> = new_text.lines().collect();
 
         if old_lines.is_empty() && new_lines.is_empty() {
-            return UnifiedPatch {
-                file_path: file_path.to_string(),
+            return UnifiedPatchRef {
+                file_path,
                 hunks: Vec::new(),
             };
         }
 
         // Fast-path: Identical content short-circuit
         if old_text == new_text {
-            let hunk_lines: Vec<PatchLine> = old_lines
+            let hunk_lines: Vec<PatchLineRef<'a>> = old_lines
                 .iter()
-                .map(|line_slice| PatchLine::Context(line_slice.to_string()))
+                .copied()
+                .map(PatchLineRef::Context)
                 .collect();
-            let hunk = PatchHunk {
+            let hunk = PatchHunkRef {
                 old_start: 1,
                 old_count: old_lines.len(),
                 new_start: 1,
                 new_count: new_lines.len(),
                 lines: hunk_lines,
             };
-            return UnifiedPatch {
-                file_path: file_path.to_string(),
+            return UnifiedPatchRef {
+                file_path,
                 hunks: vec![hunk],
             };
         }
@@ -120,14 +198,15 @@ impl PatchGenerator {
         let mid_old_hashes = &old_hashes[prefix_len..old_hashes.len() - suffix_len];
         let mid_new_hashes = &new_hashes[prefix_len..new_hashes.len() - suffix_len];
 
-        // 3. Myers Diff on middle slice (with threshold protection)
-        let mid_edits = Self::compute_myers_middle(mid_old_hashes, mid_new_hashes);
+        // 3. Myers Diff on middle slice (reusing external scratch buffer)
+        let mid_edits =
+            Self::compute_myers_middle_with_scratch(mid_old_hashes, mid_new_hashes, scratch);
 
-        // 4. Reconstruct full patch lines
+        // 4. Reconstruct full patch lines borrowing from original text
         let mut hunk_lines = Vec::with_capacity(old_lines.len() + new_lines.len());
 
         for line in &old_lines[..prefix_len] {
-            hunk_lines.push(PatchLine::Context(line.to_string()));
+            hunk_lines.push(PatchLineRef::Context(line));
         }
 
         let mut old_mid_idx = prefix_len;
@@ -136,26 +215,26 @@ impl PatchGenerator {
         for edit in mid_edits {
             match edit {
                 EditOp::Context => {
-                    hunk_lines.push(PatchLine::Context(old_lines[old_mid_idx].to_string()));
+                    hunk_lines.push(PatchLineRef::Context(old_lines[old_mid_idx]));
                     old_mid_idx += 1;
                     new_mid_idx += 1;
                 }
                 EditOp::Deletion => {
-                    hunk_lines.push(PatchLine::Deletion(old_lines[old_mid_idx].to_string()));
+                    hunk_lines.push(PatchLineRef::Deletion(old_lines[old_mid_idx]));
                     old_mid_idx += 1;
                 }
                 EditOp::Addition => {
-                    hunk_lines.push(PatchLine::Addition(new_lines[new_mid_idx].to_string()));
+                    hunk_lines.push(PatchLineRef::Addition(new_lines[new_mid_idx]));
                     new_mid_idx += 1;
                 }
             }
         }
 
         for line in &old_lines[old_lines.len() - suffix_len..] {
-            hunk_lines.push(PatchLine::Context(line.to_string()));
+            hunk_lines.push(PatchLineRef::Context(line));
         }
 
-        let hunk = PatchHunk {
+        let hunk = PatchHunkRef {
             old_start: 1,
             old_count: old_lines.len(),
             new_start: 1,
@@ -163,8 +242,8 @@ impl PatchGenerator {
             lines: hunk_lines,
         };
 
-        UnifiedPatch {
-            file_path: file_path.to_string(),
+        UnifiedPatchRef {
+            file_path,
             hunks: vec![hunk],
         }
     }
@@ -200,11 +279,6 @@ impl PatchGenerator {
         } else {
             v_diagonals[idx - 1] + 1
         }
-    }
-
-    fn compute_myers_middle(old: &[u64], new: &[u64]) -> Vec<EditOp> {
-        let mut scratch = MyersScratch::new();
-        Self::compute_myers_middle_with_scratch(old, new, &mut scratch)
     }
 
     fn compute_myers_middle_with_scratch(
@@ -458,5 +532,34 @@ impl PatchGenerator {
             i += 1;
         }
         i
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_patch_ref_zero_copy_and_scratch_reuse() {
+        let old_text = "line 1\nline 2\nline 3\n";
+        let new_text = "line 1\nline 2 modified\nline 3\nline 4\n";
+        let mut scratch = MyersScratch::new();
+
+        let patch_ref =
+            PatchGenerator::generate_patch_ref("test.txt", old_text, new_text, &mut scratch);
+        assert_eq!(patch_ref.file_path, "test.txt");
+        assert_eq!(patch_ref.hunks.len(), 1);
+
+        let owned_patch = PatchGenerator::generate_patch_with_scratch(
+            "test.txt",
+            old_text,
+            new_text,
+            &mut scratch,
+        );
+        assert_eq!(owned_patch.hunks.len(), 1);
+        assert_eq!(
+            owned_patch.hunks[0].lines.len(),
+            patch_ref.hunks[0].lines.len()
+        );
     }
 }

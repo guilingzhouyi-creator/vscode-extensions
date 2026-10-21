@@ -15,9 +15,14 @@
 use fg_core::models::Oid;
 use sha1::{Digest, Sha1};
 
-pub const DEFAULT_MIN_CHUNK: usize = 1024 * 4; // 4 KB
-pub const DEFAULT_AVG_CHUNK: usize = 1024 * 16; // 16 KB
-pub const DEFAULT_MAX_CHUNK: usize = 1024 * 64; // 64 KB
+/// Default minimum chunk size threshold (4 KiB) below which no boundary check is performed.
+pub const DEFAULT_MIN_CHUNK: usize = 1024 * 4;
+
+/// Default target average chunk size (16 KiB) governing FastCDC boundary probability masks.
+pub const DEFAULT_AVG_CHUNK: usize = 1024 * 16;
+
+/// Default maximum chunk size boundary (64 KiB) enforcing hard cutoff to cap chunk latency.
+pub const DEFAULT_MAX_CHUNK: usize = 1024 * 64;
 
 /// Compile-time generation of the 256-entry 64-bit Gear Hash lookup table using SplitMix64.
 /// Produces ideal entropy diffusion across byte values without runtime initialization overhead.

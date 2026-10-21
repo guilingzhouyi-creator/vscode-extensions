@@ -5,8 +5,11 @@
 
 use fg_core::error::{FractalError, FractalResult};
 
+/// Default upper bound for simultaneously allocated worktree slots across subagents.
 pub const DEFAULT_MAX_CONCURRENT_WORKTREES: usize = 64;
-pub const DEFAULT_MAX_WORKSPACE_DISK_BYTES: u64 = 10 * 1024 * 1024 * 1024; // 10 GB
+
+/// Default cumulative disk quota limit (10 GiB) allocated for active workspace storage.
+pub const DEFAULT_MAX_WORKSPACE_DISK_BYTES: u64 = 10 * 1024 * 1024 * 1024;
 
 /// Policy governor enforcing active worktree concurrency and disk consumption budgets.
 #[derive(Debug, Clone)]

@@ -66,7 +66,8 @@ pub use fg_object::{
 
 // Index exports
 pub use fg_index::{ConflictStageSlot, InMemoryIndexTree, IndexStage, VirtualIndexEntry};
-pub type InMemoryTreeBuilder = InMemoryIndexTree; // Compatibility alias
+/// Backward-compatibility type alias mapping `InMemoryTreeBuilder` to [`InMemoryIndexTree`].
+pub type InMemoryTreeBuilder = InMemoryIndexTree;
 
 // Algorithm exports
 pub use fg_algorithms::cdc::{ChunkDescriptor, FastCdcChunker};
@@ -123,7 +124,8 @@ pub use fg_gate::commit_guard::CommitMessageGuard;
 pub use fg_gate::conflict_guard::ConflictGuard;
 pub use fg_gate::pre_receive::PreReceiveGuard;
 pub use fg_gate::quota_governor::QuotaGovernor;
-pub type WorkspaceQuotaGuard = QuotaGovernor; // Compatibility alias
+/// Backward-compatibility type alias mapping `WorkspaceQuotaGuard` to [`QuotaGovernor`].
+pub type WorkspaceQuotaGuard = QuotaGovernor;
 
 // Benchmark & Performance Ratchet exports
 pub mod bench;

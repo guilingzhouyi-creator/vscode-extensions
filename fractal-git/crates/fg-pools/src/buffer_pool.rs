@@ -16,7 +16,8 @@ use parking_lot::Mutex;
 use std::cell::RefCell;
 use std::mem::ManuallyDrop;
 
-pub const DEFAULT_PAGE_SIZE: usize = 64 * 1024; // 64 KB
+/// Default page size (64 KiB) aligned with filesystem page clustering and zlib blocks.
+pub const DEFAULT_PAGE_SIZE: usize = 64 * 1024;
 const THREAD_CACHE_MAX: usize = 8;
 
 thread_local! {
@@ -40,6 +41,7 @@ pub enum BufferSizeClass {
 }
 
 impl BufferSizeClass {
+    /// Returns the capacity threshold in bytes for this size class.
     pub fn bytes(&self) -> usize {
         *self as usize
     }
@@ -225,6 +227,22 @@ impl<'a> std::ops::Deref for PooledBuffer<'a> {
 impl<'a> std::ops::DerefMut for PooledBuffer<'a> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.buffer
+    }
+}
+
+impl<'a> AsRef<[u8]> for PooledBuffer<'a> {
+    fn as_ref(&self) -> &[u8] {
+        &self.buffer
+    }
+}
+
+impl<'a> std::io::Write for PooledBuffer<'a> {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        self.buffer.write(buf)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.buffer.flush()
     }
 }
 

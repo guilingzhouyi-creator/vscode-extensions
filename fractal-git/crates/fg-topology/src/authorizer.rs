@@ -38,6 +38,7 @@ impl Default for StandardNonceAuthorizer {
 }
 
 impl StandardNonceAuthorizer {
+    /// Constructs a standard nonce authorizer with an empty audit log.
     pub fn new() -> Self {
         Self {
             audit_log: Mutex::new(Vec::new()),

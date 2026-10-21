@@ -113,7 +113,10 @@ fn test_buffer_pool_size_classes_and_thread_local() {
         // guard automatically dropped and returned to pool here
     }
     let recycled_guard_buf = pool.acquire_sized(BufferSizeClass::Small);
-    assert!(recycled_guard_buf.is_empty(), "recycled buffer should be cleared");
+    assert!(
+        recycled_guard_buf.is_empty(),
+        "recycled buffer should be cleared"
+    );
     assert!(recycled_guard_buf.capacity() >= 4096);
     pool.release_sized(recycled_guard_buf, BufferSizeClass::Small);
 }

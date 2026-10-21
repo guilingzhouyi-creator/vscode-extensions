@@ -131,7 +131,8 @@ impl ThreeWayMerge {
             ]
             .into_iter()
             .flatten()
-            .min() {
+            .min()
+            {
                 Some(active_path) => active_path,
                 None => break,
             };
@@ -148,12 +149,12 @@ impl ThreeWayMerge {
                 None
             };
 
-            let theirs_oid =
-                if theirs_iter.peek().map(|(path_key, _)| *path_key) == Some(next_path) {
-                    theirs_iter.next().map(|(_, entry_oid)| entry_oid)
-                } else {
-                    None
-                };
+            let theirs_oid = if theirs_iter.peek().map(|(path_key, _)| *path_key) == Some(next_path)
+            {
+                theirs_iter.next().map(|(_, entry_oid)| entry_oid)
+            } else {
+                None
+            };
 
             match (base_oid, ours_oid, theirs_oid) {
                 // Case 1: Identical in both branches
@@ -308,10 +309,10 @@ where
         theirs: Option<&GitTree>,
         out_entries: &mut Vec<GitTreeEntry>,
     ) {
-        let empty_entries = [];
-        let base_entries = base.map(|tree| tree.entries()).unwrap_or(&empty_entries);
-        let ours_entries = ours.map(|tree| tree.entries()).unwrap_or(&empty_entries);
-        let theirs_entries = theirs.map(|tree| tree.entries()).unwrap_or(&empty_entries);
+        const EMPTY_ENTRIES: &[GitTreeEntry] = &[];
+        let base_entries = base.map(|tree| tree.entries()).unwrap_or(EMPTY_ENTRIES);
+        let ours_entries = ours.map(|tree| tree.entries()).unwrap_or(EMPTY_ENTRIES);
+        let theirs_entries = theirs.map(|tree| tree.entries()).unwrap_or(EMPTY_ENTRIES);
 
         let mut base_index = 0;
         let mut ours_index = 0;
@@ -321,100 +322,145 @@ where
             || ours_index < ours_entries.len()
             || theirs_index < theirs_entries.len()
         {
-            let mut min_name = "";
-            if base_index < base_entries.len() {
-                min_name = &base_entries[base_index].name;
-            }
-            if ours_index < ours_entries.len()
-                && (min_name.is_empty() || ours_entries[ours_index].name.as_str() < min_name)
-            {
-                min_name = &ours_entries[ours_index].name;
-            }
-            if theirs_index < theirs_entries.len()
-                && (min_name.is_empty() || theirs_entries[theirs_index].name.as_str() < min_name)
-            {
-                min_name = &theirs_entries[theirs_index].name;
-            }
+            let min_name = Self::next_min_name(
+                base_entries,
+                base_index,
+                ours_entries,
+                ours_index,
+                theirs_entries,
+                theirs_index,
+            );
 
-            let base_entry =
-                if base_index < base_entries.len() && base_entries[base_index].name == min_name {
-                    let entry = &base_entries[base_index];
-                    base_index += 1;
-                    Some(entry)
-                } else {
-                    None
-                };
+            let base_entry = Self::advance_matching_entry(base_entries, &mut base_index, min_name);
+            let ours_entry = Self::advance_matching_entry(ours_entries, &mut ours_index, min_name);
+            let theirs_entry =
+                Self::advance_matching_entry(theirs_entries, &mut theirs_index, min_name);
 
-            let ours_entry =
-                if ours_index < ours_entries.len() && ours_entries[ours_index].name == min_name {
-                    let entry = &ours_entries[ours_index];
-                    ours_index += 1;
-                    Some(entry)
-                } else {
-                    None
-                };
+            self.resolve_three_way_entry(
+                prefix,
+                min_name,
+                base_entry,
+                ours_entry,
+                theirs_entry,
+                out_entries,
+            );
+        }
+    }
 
-            let theirs_entry = if theirs_index < theirs_entries.len()
-                && theirs_entries[theirs_index].name == min_name
-            {
-                let entry = &theirs_entries[theirs_index];
-                theirs_index += 1;
-                Some(entry)
-            } else {
-                None
-            };
+    fn next_min_name<'e>(
+        base_entries: &'e [GitTreeEntry],
+        base_index: usize,
+        ours_entries: &'e [GitTreeEntry],
+        ours_index: usize,
+        theirs_entries: &'e [GitTreeEntry],
+        theirs_index: usize,
+    ) -> &'e str {
+        let mut min_name = "";
+        if base_index < base_entries.len() {
+            min_name = &base_entries[base_index].name;
+        }
+        if ours_index < ours_entries.len()
+            && (min_name.is_empty() || ours_entries[ours_index].name.as_str() < min_name)
+        {
+            min_name = &ours_entries[ours_index].name;
+        }
+        if theirs_index < theirs_entries.len()
+            && (min_name.is_empty() || theirs_entries[theirs_index].name.as_str() < min_name)
+        {
+            min_name = &theirs_entries[theirs_index].name;
+        }
+        min_name
+    }
 
-            match (base_entry, ours_entry, theirs_entry) {
-                (_, Some(ours_item), Some(theirs_item))
-                    if ours_item.oid == theirs_item.oid && ours_item.mode == theirs_item.mode =>
-                {
-                    out_entries.push(ours_item.clone());
-                }
-                (base_item, ours_item, Some(theirs_item))
-                    if Self::entries_match(ours_item, base_item) =>
-                {
-                    out_entries.push(theirs_item.clone());
-                }
-                (base_item, Some(ours_item), theirs_item)
-                    if Self::entries_match(theirs_item, base_item) =>
-                {
-                    out_entries.push(ours_item.clone());
-                }
-                (Some(base_item), Some(ours_item), None)
-                    if ours_item.oid == base_item.oid && ours_item.mode == base_item.mode => {}
-                (Some(base_item), None, Some(theirs_item))
-                    if theirs_item.oid == base_item.oid && theirs_item.mode == base_item.mode => {}
-                (base_item, Some(ours_item), Some(theirs_item))
-                    if ours_item.mode == FileMode::Directory
-                        && theirs_item.mode == FileMode::Directory =>
-                {
-                    self.merge_subdirectory_entry(
-                        prefix,
-                        min_name,
-                        base_item,
-                        ours_item,
-                        theirs_item,
-                        out_entries,
-                    );
-                }
-                _ => {
-                    let conflict_path = if prefix.is_empty() {
-                        min_name.to_string()
-                    } else {
-                        format!("{}/{}", prefix, min_name)
-                    };
-                    self.out_conflicts.push(CanonicalConflictEntry {
-                        path: conflict_path,
-                        mode_base: base_entry.map(|entry| entry.mode),
-                        oid_base: base_entry.map(|entry| entry.oid),
-                        mode_ours: ours_entry.map(|entry| entry.mode),
-                        oid_ours: ours_entry.map(|entry| entry.oid),
-                        mode_theirs: theirs_entry.map(|entry| entry.mode),
-                        oid_theirs: theirs_entry.map(|entry| entry.oid),
-                    });
-                }
+    #[inline]
+    fn advance_matching_entry<'e>(
+        entries: &'e [GitTreeEntry],
+        index: &mut usize,
+        target_name: &str,
+    ) -> Option<&'e GitTreeEntry> {
+        if *index < entries.len() && entries[*index].name == target_name {
+            let entry = &entries[*index];
+            *index += 1;
+            Some(entry)
+        } else {
+            None
+        }
+    }
+
+    fn resolve_three_way_entry(
+        &mut self,
+        prefix: &str,
+        min_name: &str,
+        base_entry: Option<&GitTreeEntry>,
+        ours_entry: Option<&GitTreeEntry>,
+        theirs_entry: Option<&GitTreeEntry>,
+        out_entries: &mut Vec<GitTreeEntry>,
+    ) {
+        // Fast path 1: identical modifications on both sides
+        if let (Some(ours_item), Some(theirs_item)) = (ours_entry, theirs_entry) {
+            if ours_item.oid == theirs_item.oid && ours_item.mode == theirs_item.mode {
+                out_entries.push(ours_item.clone());
+                return;
             }
         }
+
+        // Fast path 2: ours matches base => accept theirs (modification or deletion)
+        if Self::entries_match(ours_entry, base_entry) {
+            if let Some(theirs_item) = theirs_entry {
+                out_entries.push(theirs_item.clone());
+            }
+            return;
+        }
+
+        // Fast path 3: theirs matches base => accept ours (modification or deletion)
+        if Self::entries_match(theirs_entry, base_entry) {
+            if let Some(ours_item) = ours_entry {
+                out_entries.push(ours_item.clone());
+            }
+            return;
+        }
+
+        // Fast path 4: both sides are directories => recursively merge subdirectory
+        if let (Some(ours_item), Some(theirs_item)) = (ours_entry, theirs_entry) {
+            if ours_item.mode == FileMode::Directory && theirs_item.mode == FileMode::Directory {
+                self.merge_subdirectory_entry(
+                    prefix,
+                    min_name,
+                    base_entry,
+                    ours_item,
+                    theirs_item,
+                    out_entries,
+                );
+                return;
+            }
+        }
+
+        // Divergent modifications => conflict
+        self.record_conflict(prefix, min_name, base_entry, ours_entry, theirs_entry);
+    }
+
+    fn record_conflict(
+        &mut self,
+        prefix: &str,
+        min_name: &str,
+        base_entry: Option<&GitTreeEntry>,
+        ours_entry: Option<&GitTreeEntry>,
+        theirs_entry: Option<&GitTreeEntry>,
+    ) {
+        let conflict_path = if prefix.is_empty() {
+            min_name.to_string()
+        } else {
+            format!("{}/{}", prefix, min_name)
+        };
+        self.out_conflicts.push(CanonicalConflictEntry {
+            path: conflict_path,
+            mode_base: base_entry.map(|entry| entry.mode),
+            oid_base: base_entry.map(|entry| entry.oid),
+            mode_ours: ours_entry.map(|entry| entry.mode),
+            oid_ours: ours_entry.map(|entry| entry.oid),
+            mode_theirs: theirs_entry.map(|entry| entry.mode),
+            oid_theirs: theirs_entry.map(|entry| entry.oid),
+        });
     }
 
     fn merge_subdirectory_entry(

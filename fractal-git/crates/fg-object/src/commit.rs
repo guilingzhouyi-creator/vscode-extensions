@@ -129,9 +129,15 @@ impl GitCommit {
             &self.message,
             &self.agent_meta,
         );
-        let header = format!("commit {}\0", payload.len());
-        let mut raw = Vec::with_capacity(header.len() + payload.len());
-        raw.extend_from_slice(header.as_bytes());
+        let mut header_buf = [0u8; 32];
+        let header_len = {
+            use std::io::Write;
+            let mut cursor = std::io::Cursor::new(&mut header_buf[..]);
+            let _ = write!(cursor, "commit {}\0", payload.len());
+            cursor.position() as usize
+        };
+        let mut raw = Vec::with_capacity(header_len + payload.len());
+        raw.extend_from_slice(&header_buf[..header_len]);
         raw.extend_from_slice(&payload);
         raw
     }
@@ -144,34 +150,37 @@ impl GitCommit {
         message: &str,
         agent_meta: &Option<AgentCommitMeta>,
     ) -> Vec<u8> {
-        let mut lines = Vec::new();
-        lines.push(format!("tree {}", tree_oid));
+        let mut bytes = Vec::with_capacity(256 + message.len());
+        use std::io::Write;
+        let _ = writeln!(bytes, "tree {}", tree_oid);
         for parent in parent_oids {
-            lines.push(format!("parent {}", parent));
+            let _ = writeln!(bytes, "parent {}", parent);
         }
-        lines.push(format!("author {}", author.to_git_line()));
-        lines.push(format!("committer {}", committer.to_git_line()));
-        lines.push("".to_string());
+        let _ = writeln!(bytes, "author {}", author.to_git_line());
+        let _ = writeln!(bytes, "committer {}", committer.to_git_line());
+        bytes.push(b'\n');
 
-        // Body: Human message + embedded Dual-Faced machine JSON trailer
-        let mut body = message.to_string();
+        bytes.extend_from_slice(message.as_bytes());
         if let Some(meta) = agent_meta {
             if let Ok(json_str) = serde_json::to_string(meta) {
-                body.push_str("\n\nPraxis-Agent-Meta: ");
-                body.push_str(&json_str);
+                bytes.extend_from_slice(b"\n\nPraxis-Agent-Meta: ");
+                bytes.extend_from_slice(json_str.as_bytes());
             }
         }
-        lines.push(body);
-
-        let content = lines.join("\n");
-        let mut bytes = content.into_bytes();
         bytes.push(b'\n');
         bytes
     }
 
     fn compute_commit_oid(payload: &[u8]) -> Oid {
+        let mut header_buf = [0u8; 32];
+        let header_len = {
+            use std::io::Write;
+            let mut cursor = std::io::Cursor::new(&mut header_buf[..]);
+            let _ = write!(cursor, "commit {}\0", payload.len());
+            cursor.position() as usize
+        };
         let mut hasher = Sha1::new();
-        hasher.update(format!("commit {}\0", payload.len()).as_bytes());
+        hasher.update(&header_buf[..header_len]);
         hasher.update(payload);
         let hash: [u8; 20] = hasher.finalize().into();
         Oid::from_bytes(hash)

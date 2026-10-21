@@ -4,8 +4,10 @@
 
 use thiserror::Error;
 
+/// Unified Result alias for fallible domain operations across Fractal Git micro-crates.
 pub type FractalResult<T> = Result<T, FractalError>;
 
+/// Strongly-typed domain error enumeration representing all recoverable failure modes.
 #[derive(Debug, Error)]
 pub enum FractalError {
     #[error("I/O failure: {0}")]

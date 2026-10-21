@@ -171,3 +171,40 @@ fn test_cas_materializer_integration() {
     let odb = LooseOdb::new(git_dir);
     assert!(odb.has_object(&commit_oid));
 }
+
+#[test]
+fn test_cas_backend_prefix_delta_roundtrip() {
+    let dir = TestDir::new("cas_delta");
+    let cas = CasBackend::new(dir.path());
+
+    let mut base_data = Vec::new();
+    for i in 0..50 {
+        base_data.extend_from_slice(
+            format!("const ITEM_{} = \"Stable common tokens for testing\";\n", i).as_bytes(),
+        );
+    }
+
+    let mut modified_data = base_data.clone();
+    modified_data.splice(100..120, b"let modified_variable = 999;\n".iter().cloned());
+
+    // 1. Put base block
+    let base_oid = cas.put_block(&base_data).expect("Base block put");
+
+    // 2. Put modified block with base reference
+    let mod_oid = cas
+        .put_block_with_base(&modified_data, Some(&base_oid))
+        .expect("Delta block put");
+
+    assert!(cas.has_block(&mod_oid));
+
+    // 3. Read back and verify exact byte reconstruction
+    let read_back = cas.get_block(&mod_oid).expect("Delta block read");
+    assert_eq!(read_back, modified_data);
+
+    // 4. Verify physical .pfx file was created for compressed delta
+    let pfx_file = cas.pfx_block_path(&mod_oid);
+    assert!(
+        pfx_file.exists(),
+        "Expected .pfx file for delta compressed block"
+    );
+}

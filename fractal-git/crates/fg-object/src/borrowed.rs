@@ -39,6 +39,38 @@ impl SmallParentList {
         }
     }
 
+    /// Creates an empty small parent list (alias for new).
+    pub const fn empty() -> Self {
+        Self::new()
+    }
+
+    /// Creates a parent list with a single parent.
+    pub const fn one(parent: Oid) -> Self {
+        Self {
+            inline_parents: [parent, Oid::ZERO],
+            count: 1,
+            extra_parents: None,
+        }
+    }
+
+    /// Creates a parent list with two parents.
+    pub const fn two(first: Oid, second: Oid) -> Self {
+        Self {
+            inline_parents: [first, second],
+            count: 2,
+            extra_parents: None,
+        }
+    }
+
+    /// Creates a small parent list from a borrowed slice.
+    pub fn from_slice(slice: &[Oid]) -> Self {
+        let mut list = Self::new();
+        for &oid in slice {
+            list.push(oid);
+        }
+        list
+    }
+
     /// Appends a parent commit OID to the list.
     pub fn push(&mut self, parent_oid: Oid) {
         if self.count < 2 {
@@ -82,6 +114,88 @@ impl SmallParentList {
     #[inline(always)]
     pub fn first(&self) -> Option<&Oid> {
         self.as_slice().first()
+    }
+}
+
+impl From<Vec<Oid>> for SmallParentList {
+    fn from(entries: Vec<Oid>) -> Self {
+        match entries.len() {
+            0 => Self::new(),
+            1 => Self::one(entries[0]),
+            2 => Self::two(entries[0], entries[1]),
+            _ => {
+                let mut list = Self::two(entries[0], entries[1]);
+                for &oid in &entries[2..] {
+                    list.push(oid);
+                }
+                list
+            }
+        }
+    }
+}
+
+impl From<&[Oid]> for SmallParentList {
+    fn from(slice: &[Oid]) -> Self {
+        Self::from_slice(slice)
+    }
+}
+
+impl FromIterator<Oid> for SmallParentList {
+    fn from_iter<I: IntoIterator<Item = Oid>>(iter: I) -> Self {
+        let mut list = Self::new();
+        for oid in iter {
+            list.push(oid);
+        }
+        list
+    }
+}
+
+impl std::ops::Deref for SmallParentList {
+    type Target = [Oid];
+
+    fn deref(&self) -> &Self::Target {
+        self.as_slice()
+    }
+}
+
+impl<'a> IntoIterator for &'a SmallParentList {
+    type Item = Oid;
+    type IntoIter = std::iter::Copied<std::slice::Iter<'a, Oid>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.as_slice().iter().copied()
+    }
+}
+
+/// Owned iterator over parent commit OIDs in [`SmallParentList`].
+pub struct SmallParentIntoIter {
+    list: SmallParentList,
+    index: usize,
+}
+
+impl Iterator for SmallParentIntoIter {
+    type Item = Oid;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index < self.list.len() {
+            let parent_oid = self.list.as_slice()[self.index];
+            self.index += 1;
+            Some(parent_oid)
+        } else {
+            None
+        }
+    }
+}
+
+impl IntoIterator for SmallParentList {
+    type Item = Oid;
+    type IntoIter = SmallParentIntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        SmallParentIntoIter {
+            list: self,
+            index: 0,
+        }
     }
 }
 

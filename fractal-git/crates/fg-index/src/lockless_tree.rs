@@ -197,6 +197,99 @@ impl InMemoryIndexTree {
         combined
     }
 
+    fn pop_and_persist_down_to<F>(
+        dir_stack: &mut Vec<DirectoryFrame>,
+        target_len: usize,
+        persist_tree: &mut F,
+    ) -> FractalResult<()>
+    where
+        F: FnMut(&GitTree) -> FractalResult<()>,
+    {
+        while dir_stack.len() > target_len {
+            if let Some(completed_frame) = dir_stack.pop() {
+                let subtree = GitTree::new(completed_frame.entries);
+                persist_tree(&subtree)?;
+                let subtree_oid = *subtree.raw_oid();
+                if let Some(parent_frame) = dir_stack.last_mut() {
+                    parent_frame.entries.push(GitTreeEntry::from_oid(
+                        FileMode::Directory,
+                        completed_frame.dir_name,
+                        subtree_oid,
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn resolve_directory_branch<'a>(
+        dir_path_opt: Option<&'a str>,
+        dir_stack: &[DirectoryFrame],
+    ) -> (usize, Option<(&'a str, std::str::Split<'a, char>)>) {
+        let Some(dir_path) = dir_path_opt else {
+            return (0, None);
+        };
+        let mut common_depth = 0;
+        let mut dir_parts = dir_path.split('/');
+        while let Some(part) = dir_parts.next() {
+            if common_depth + 1 < dir_stack.len() && dir_stack[common_depth + 1].dir_name == part {
+                common_depth += 1;
+            } else {
+                return (common_depth, Some((part, dir_parts)));
+            }
+        }
+        (common_depth, None)
+    }
+
+    fn push_mismatch_branches<'a>(
+        dir_stack: &mut Vec<DirectoryFrame>,
+        mismatch_branch: Option<(&'a str, std::str::Split<'a, char>)>,
+    ) {
+        if let Some((first_segment, remaining_segments)) = mismatch_branch {
+            dir_stack.push(DirectoryFrame::new(first_segment));
+            for segment in remaining_segments {
+                dir_stack.push(DirectoryFrame::new(segment));
+            }
+        }
+    }
+
+    fn append_entry_to_tree<F>(
+        dir_stack: &mut Vec<DirectoryFrame>,
+        path: &str,
+        entry: &VirtualIndexEntry,
+        persist_tree: &mut F,
+    ) -> FractalResult<()>
+    where
+        F: FnMut(&GitTree) -> FractalResult<()>,
+    {
+        let is_sparse = entry.is_sparse_dir();
+        let (dir_path_opt, entry_name) = match path.rfind('/') {
+            Some(slash_idx) => (Some(&path[..slash_idx]), &path[slash_idx + 1..]),
+            None => (None, path),
+        };
+
+        let (common_depth, mismatch_branch) =
+            Self::resolve_directory_branch(dir_path_opt, dir_stack);
+
+        Self::pop_and_persist_down_to(dir_stack, common_depth + 1, persist_tree)?;
+        Self::push_mismatch_branches(dir_stack, mismatch_branch);
+
+        let mode = if is_sparse {
+            FileMode::Directory
+        } else {
+            entry.mode
+        };
+
+        if let Some(current_frame) = dir_stack.last_mut() {
+            current_frame.entries.push(GitTreeEntry::from_oid(
+                mode,
+                entry_name.to_string(),
+                entry.oid,
+            ));
+        }
+        Ok(())
+    }
+
     /// Builds the hierarchical GitTree structures from in-memory entries,
     /// passing each constructed GitTree to a persistence callback.
     pub fn write_tree_with_persister<F>(&self, mut persist_tree: F) -> FractalResult<Oid>
@@ -220,72 +313,10 @@ impl InMemoryIndexTree {
         let mut dir_stack: Vec<DirectoryFrame> = vec![DirectoryFrame::new("")];
 
         for (path, entry) in &self.entries {
-            let is_sparse = entry.is_sparse_dir();
-            let mut segments: Vec<&str> = path.split('/').collect();
-            let entry_name = segments.pop().unwrap_or(path.as_str());
-            let dir_segments = segments;
-
-            // Compute longest common prefix depth with currently active directory stack
-            let mut common_depth = 0;
-            while common_depth < dir_segments.len()
-                && common_depth + 1 < dir_stack.len()
-                && dir_stack[common_depth + 1].dir_name == dir_segments[common_depth]
-            {
-                common_depth += 1;
-            }
-
-            // Pop and persist completed subdirectories down to common prefix
-            while dir_stack.len() > common_depth + 1 {
-                if let Some(completed_frame) = dir_stack.pop() {
-                    let subtree = GitTree::new(completed_frame.entries);
-                    persist_tree(&subtree)?;
-                    let subtree_oid = *subtree.raw_oid();
-                    if let Some(parent_frame) = dir_stack.last_mut() {
-                        parent_frame.entries.push(GitTreeEntry::from_oid(
-                            FileMode::Directory,
-                            completed_frame.dir_name,
-                            subtree_oid,
-                        ));
-                    }
-                }
-            }
-
-            // Push newly opened subdirectories onto stack
-            for segment in &dir_segments[common_depth..] {
-                dir_stack.push(DirectoryFrame::new(*segment));
-            }
-
-            // Insert entry into the current top directory
-            let mode = if is_sparse {
-                FileMode::Directory
-            } else {
-                entry.mode
-            };
-
-            if let Some(current_frame) = dir_stack.last_mut() {
-                current_frame.entries.push(GitTreeEntry::from_oid(
-                    mode,
-                    entry_name.to_string(),
-                    entry.oid,
-                ));
-            }
+            Self::append_entry_to_tree(&mut dir_stack, path, entry, &mut persist_tree)?;
         }
 
-        // Flush remaining directory frames back down to root
-        while dir_stack.len() > 1 {
-            if let Some(completed_frame) = dir_stack.pop() {
-                let subtree = GitTree::new(completed_frame.entries);
-                persist_tree(&subtree)?;
-                let subtree_oid = *subtree.raw_oid();
-                if let Some(parent_frame) = dir_stack.last_mut() {
-                    parent_frame.entries.push(GitTreeEntry::from_oid(
-                        FileMode::Directory,
-                        completed_frame.dir_name,
-                        subtree_oid,
-                    ));
-                }
-            }
-        }
+        Self::pop_and_persist_down_to(&mut dir_stack, 1, &mut persist_tree)?;
 
         let root_frame = match dir_stack.pop() {
             Some(frame) => frame,

@@ -18,10 +18,10 @@ pub mod synthetic;
 pub mod traverse;
 
 pub use bloom::PathBloomFilter;
-pub use cdc::{ChunkDescriptor, FastCdcChunker, FastCdcIter, GEAR_TABLE};
+pub use cdc::{apply_edits, ChunkDescriptor, EditOp, FastCdcChunker, FastCdcIter, GEAR_TABLE};
 pub use diff::{
-    ChangeKind, DiffEntry, MyersScratch, PatchGenerator, PatchHunk, PatchLine, TreeDiff,
-    TreeDiffState, UnifiedPatch,
+    ChangeKind, DiffEntry, MyersScratch, PatchGenerator, PatchHunk, PatchHunkRef, PatchLine,
+    PatchLineRef, TreeDiff, TreeDiffState, UnifiedPatch, UnifiedPatchRef,
 };
 pub use math::{compute_jeffreys_credible_lower, evaluate_score_envelope, PosteriorScoreEstimate};
 pub use merge::{

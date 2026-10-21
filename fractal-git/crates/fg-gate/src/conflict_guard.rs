@@ -6,6 +6,7 @@
 use fg_core::error::{FractalError, FractalResult};
 use fg_core::traits::{GateVerdict, GateVerifier, StagedCandidate};
 
+/// Content hygiene and conflict marker scanning guard for staged candidate files.
 pub struct ConflictGuard;
 
 impl ConflictGuard {

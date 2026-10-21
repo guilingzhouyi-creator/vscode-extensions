@@ -60,8 +60,8 @@ impl WalJournal {
             .append(true)
             .open(&self.journal_path)?;
 
-        let serialized = serde_json::to_string(record)?;
-        writeln!(file, "{}", serialized)?;
+        serde_json::to_writer(&mut file, record)?;
+        writeln!(file)?;
         file.sync_all()?;
         Ok(())
     }

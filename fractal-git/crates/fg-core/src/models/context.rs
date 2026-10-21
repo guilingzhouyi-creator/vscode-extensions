@@ -4,6 +4,7 @@
 
 use serde::{Deserialize, Serialize};
 
+/// Execution context associating an autonomous commit with its originating Praxis task card.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PraxisCardContext {
     pub card_id: String,
@@ -12,6 +13,7 @@ pub struct PraxisCardContext {
     pub role: Option<String>,
 }
 
+/// Dual-faced agent metadata serialized into commit trailers for machine verification.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AgentCommitMeta {
     pub card_context: PraxisCardContext,
