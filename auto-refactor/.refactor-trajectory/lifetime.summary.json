@@ -1,13 +1,13 @@
 {
   "weekId": "LIFETIME",
   "startMs": 1791102755050,
-  "endMs": 1792582393125,
+  "endMs": 1792582552313,
   "totalRuns": 352,
   "eloc": {
-    "processedTotal": 49558945,
+    "processedTotal": 49559777,
     "uniqueTotal": 129213,
-    "changedTotal": 562755,
-    "semanticTotal": 450203
+    "changedTotal": 559764,
+    "semanticTotal": 447810
   },
   "qed": {
     "mean": 0.0001,
