@@ -23,12 +23,13 @@
 const fs = require('fs');
 const path = require('path');
 
+const { resolveScanScope } = require('./sync-doc-metrics');
+
 const REPO_ROOT = path.resolve(__dirname, '../..');
 const RULES_FILE = path.join(REPO_ROOT, 'AGENTS.md');
+const CONFIG_FILE = path.join(__dirname, 'doc-metrics.json');
 const SCAN_ROOTS = Object.freeze(['docs', '.agents/skills', '.agents/dsh', '.agents/subagents', 'scripts']);
 const SCAN_FILES = Object.freeze(['AGENTS.md', 'README.md']);
-const SKIP_DIRS = new Set(['node_modules', '.git', 'archive', 'dist', 'out', 'bin', 'obj', '.audit-logs', 'plugins']);
-const SKIP_PATHS = Object.freeze(['WebGames/docs', 'archives']);
 
 /**
  * A reference that identifies a rule by how many rows precede it.
@@ -52,17 +53,19 @@ const NAMED = /「([^」\n]{2,40})」(?:公理|行|节)/g;
 /**
  * Collects Markdown files beneath the scan roots.
  *
+ * @param {{skipDirectories: string[], skipPaths: string[]}} scope - Scan scope from `doc-metrics.json`.
  * @returns {string[]} Absolute paths.
  */
-function collectDocuments() {
+function collectDocuments(scope) {
+  const skipDirs = new Set(scope.skipDirectories);
   const files = [];
   const walk = (dir) => {
     if (!fs.existsSync(dir)) return;
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      if (SKIP_DIRS.has(entry.name)) continue;
+      if (skipDirs.has(entry.name)) continue;
       const full = path.join(dir, entry.name);
       const rel = path.relative(REPO_ROOT, full).replace(/\\/g, '/');
-      if (SKIP_PATHS.some((p) => rel === p || rel.startsWith(`${p}/`))) continue;
+      if (scope.skipPaths.some((p) => rel === p || rel.startsWith(`${p}/`))) continue;
       if (entry.isDirectory()) walk(full);
       else if (entry.name.endsWith('.md')) files.push(full);
     }
@@ -109,12 +112,13 @@ function findDanglingAnchors(text, authority) {
 /**
  * Runs the audit across the corpus.
  *
+ * @param {{skipDirectories: string[], skipPaths: string[]}} scope - Scan scope from `doc-metrics.json`.
  * @returns {Array<object>} Violations.
  */
-function runAudit() {
+function runAudit(scope) {
   const authority = fs.readFileSync(RULES_FILE, 'utf8');
   const violations = [];
-  for (const file of collectDocuments()) {
+  for (const file of collectDocuments(scope)) {
     const text = fs.readFileSync(file, 'utf8');
     const rel = path.relative(REPO_ROOT, file).replace(/\\/g, '/');
     for (const hit of findPositional(text)) {
@@ -174,8 +178,10 @@ function main() {
     for (const failure of probeFailures) console.error(`  - ${failure}`);
     process.exit(1);
   }
+  const config = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
+  const scope = resolveScanScope(config);
 
-  const violations = runAudit();
+  const violations = runAudit(scope);
   const passed = violations.length === 0;
   if (isAgent) {
     console.log(

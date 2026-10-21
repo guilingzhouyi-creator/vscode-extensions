@@ -35,20 +35,7 @@ const CATALOG_FILE = path.join(REPO_ROOT, 'scripts/common/rule-catalog.json');
 const REGISTRY_FILE = path.join(REPO_ROOT, 'scripts/common/gate-step-registry.json');
 const METRICS_FILE = path.join(REPO_ROOT, 'scripts/common/doc-metrics.json');
 
-const SKIP_DIRECTORIES = Object.freeze([
-  'node_modules',
-  '.git',
-  'out',
-  'dist',
-  'bin',
-  'obj',
-  'target',
-  '.venv',
-  '.audit-logs',
-  'archive',
-]);
-
-const SKIP_PATHS = Object.freeze(['WebGames/docs', '.agents/plugins']);
+const { resolveScanScope } = require('./sync-doc-metrics');
 
 /**
  * Directories whose JSON files are scanned alongside Markdown.
@@ -59,6 +46,16 @@ const SKIP_PATHS = Object.freeze(['WebGames/docs', '.agents/plugins']);
  * guard. Adding the tree here is what closes that gap.
  */
 const JSON_SCAN_PATHS = Object.freeze(['.agents/subagents']);
+
+/**
+ * Paths whose numbers are quoted as examples of what *not* to write.
+ *
+ * `batch-commit` documents the forbidden-term dictionary by quoting violating commit messages:
+ * 「通过146套测试」 appears there as the specimen the rule rejects. Judging those figures against
+ * the live suite count would force the guide to track the number it exists to warn about, and the
+ * only way to satisfy the guard would be to delete the example.
+ */
+const QUOTED_COUNTEREXAMPLE_PATHS = Object.freeze(['.agents/skills/batch-commit/']);
 
 const HISTORICAL_MARKER = /<!--\s*METRICS:IGNORE-HISTORICAL\b[^>]*commit=[0-9a-f]{7,40}/;
 
@@ -256,6 +253,43 @@ function resolveLayerTotals(byFamily) {
 }
 
 /**
+ * Fills the legal-figure sets that come from `doc-metrics.json` and the metrics resolvers.
+ *
+ * Extracted from `buildClaimDetectors` to keep that function inside the cyclomatic budget: the four
+ * independent lookups plus the two narrower-claim expansions pushed it past the limit without adding
+ * any decision the caller needs to see.
+ *
+ * @param {Set<number>} legalSkills - Skill-count set to fill.
+ * @param {Set<number>} legalAnalyzers - Analyzer-count set to fill.
+ * @param {Set<number>} legalPairs - Isomorphic-pair set to fill.
+ * @param {Set<number>} legalSuites - Test-suite set to fill.
+ * @returns {void}
+ */
+function collectMetricLegalSets(legalSkills, legalAnalyzers, legalPairs, legalSuites) {
+  const metrics = JSON.parse(fs.readFileSync(METRICS_FILE, 'utf8'));
+  const { resolveMetrics, countIsomorphicPairs, countTestSuiteLanes } = require('./sync-doc-metrics');
+  for (const [id, value] of resolveMetrics(metrics).values) {
+    if (id === 'skill-count') legalSkills.add(value);
+    if (id === 'analyzer-count') legalAnalyzers.add(value);
+    if (id === 'iso-pairs') legalPairs.add(value);
+    if (id === 'test-suite-count') legalSuites.add(value);
+  }
+  // Every lane count and the lane sum are correct figures on their own: a sentence that names one
+  // lane is making a narrower claim, not a wrong one. Judging those against the total alone would
+  // reject correct prose and, worse, teach the author to delete the breakdown.
+  const lanes = countTestSuiteLanes();
+  for (const value of [lanes.parallel, lanes.daemon, lanes.selfAudit, lanes.laneSum, lanes.serialSum]) {
+    if (value > 0) legalSuites.add(value);
+  }
+  // A per-domain sentence ("根脚本库 9 对同构脚本") is a legitimate narrower claim; each domain
+  // count is therefore legal on its own, while the workspace total stays the sum.
+  for (const root of ['', 'WebGames', 'fractal-git']) {
+    const domainPairs = countIsomorphicPairs(root);
+    if (domainPairs > 0) legalPairs.add(domainPairs);
+  }
+}
+
+/**
  * Builds the claim patterns together with the set of figures each pattern may legitimately quote.
  *
  * A pattern is only meaningful when its legal set is non-empty; an unreadable catalog therefore
@@ -264,39 +298,31 @@ function resolveLayerTotals(byFamily) {
  * @returns {Array<object>} Claim detectors.
  */
 function buildClaimDetectors() {
+  const figures = buildLegalFigures();
+  return detectorTable(figures).filter(
+    (detector) => detector.legalFor || (detector.legal && detector.legal.size > 0),
+  );
+}
+
+/**
+ * Collects every figure the workspace can currently vouch for.
+ *
+ * Each set is derived from a live source rather than a literal, so adding a rule or a suite cannot
+ * leave a stale allowance behind. An unreadable source leaves its set empty, which disables that
+ * claim class instead of flagging every number in the repository.
+ *
+ * @returns {object} Legal-figure sets plus the per-row lookup maps.
+ */
+function buildLegalFigures() {
   const legalRules = new Set();
   const legalSteps = new Set();
   const legalSkills = new Set();
   const legalAnalyzers = new Set();
   const legalPairs = new Set();
-  let byFamily = new Map();
-  let byProject = new Map();
-  let layers = new Map();
-  let familyLayer = new Map();
-  let packTotal = 0;
-
+  const legalSuites = new Set();
+  const figures = { legalRules, legalSteps, legalSkills, legalAnalyzers, legalPairs, legalSuites };
   if (fs.existsSync(CATALOG_FILE)) {
-    const catalog = JSON.parse(fs.readFileSync(CATALOG_FILE, 'utf8'));
-    legalRules.add(catalog.totalRules);
-    for (const value of Object.values(catalog.counts || {})) legalRules.add(value);
-    // A canonical/legacy split is a legitimate narrower claim about the same catalog, so both
-    // halves are legal figures on their own while the sum stays the project total.
-    const autoRefactor = (catalog.rules || []).filter((rule) => rule.project === 'auto-refactor');
-    const canonical = autoRefactor.filter((rule) => CANONICAL_RULE_ID.test(rule.id)).length;
-    legalRules.add(canonical);
-    legalRules.add(autoRefactor.length - canonical);
-
-    byFamily = groupRuleCounts(autoRefactor);
-    byProject = new Map();
-    for (const rule of catalog.rules || []) {
-      byProject.set(rule.project, (byProject.get(rule.project) || 0) + 1);
-    }
-    const resolved = resolveLayerTotals(byFamily);
-    layers = resolved.layers;
-    familyLayer = resolved.familyLayer;
-    packTotal = resolved.packTotal;
-    for (const value of layers.values()) legalRules.add(value);
-    legalRules.add(packTotal);
+    collectCatalogFigures(figures, JSON.parse(fs.readFileSync(CATALOG_FILE, 'utf8')));
   }
   if (fs.existsSync(REGISTRY_FILE)) {
     const registry = JSON.parse(fs.readFileSync(REGISTRY_FILE, 'utf8'));
@@ -309,22 +335,54 @@ function buildClaimDetectors() {
     legalSteps.add(total);
   }
   if (fs.existsSync(METRICS_FILE)) {
-    const metrics = JSON.parse(fs.readFileSync(METRICS_FILE, 'utf8'));
-    const { resolveMetrics, countIsomorphicPairs } = require('./sync-doc-metrics');
-    for (const [id, value] of resolveMetrics(metrics).values) {
-      if (id === 'skill-count') legalSkills.add(value);
-      if (id === 'analyzer-count') legalAnalyzers.add(value);
-      if (id === 'iso-pairs') legalPairs.add(value);
-    }
-    // A per-domain sentence ("根脚本库 9 对同构脚本") is a legitimate narrower claim; each domain
-    // count is therefore legal on its own, while the workspace total stays the sum.
-    for (const root of ['', 'WebGames', 'fractal-git']) {
-      const domainPairs = countIsomorphicPairs(root);
-      if (domainPairs > 0) legalPairs.add(domainPairs);
-    }
+    collectMetricLegalSets(legalSkills, legalAnalyzers, legalPairs, legalSuites);
   }
+  return figures;
+}
 
-  const detectors = [
+/**
+ * Fills the rule-family, project and layer lookup maps from the rule catalog.
+ *
+ * @param {object} figures - Mutable legal-figure bundle from `buildLegalFigures`.
+ * @param {object} catalog - Parsed `rule-catalog.json`.
+ * @returns {void}
+ */
+function collectCatalogFigures(figures, catalog) {
+  figures.legalRules.add(catalog.totalRules);
+  for (const value of Object.values(catalog.counts || {})) figures.legalRules.add(value);
+  // A canonical/legacy split is a legitimate narrower claim about the same catalog, so both halves
+  // are legal figures on their own while the sum stays the project total.
+  const autoRefactor = (catalog.rules || []).filter((rule) => rule.project === 'auto-refactor');
+  const canonical = autoRefactor.filter((rule) => CANONICAL_RULE_ID.test(rule.id)).length;
+  figures.legalRules.add(canonical);
+  figures.legalRules.add(autoRefactor.length - canonical);
+
+  figures.byFamily = groupRuleCounts(autoRefactor);
+  figures.byProject = new Map();
+  for (const rule of catalog.rules || []) {
+    figures.byProject.set(rule.project, (figures.byProject.get(rule.project) || 0) + 1);
+  }
+  const resolved = resolveLayerTotals(figures.byFamily);
+  figures.layers = resolved.layers;
+  figures.familyLayer = resolved.familyLayer;
+  figures.packTotal = resolved.packTotal;
+  for (const value of figures.layers.values()) figures.legalRules.add(value);
+  figures.legalRules.add(figures.packTotal);
+}
+
+/**
+ * Declares every claim pattern together with the set each may legitimately quote.
+ *
+ * Kept as one declarative table so adding a claim class is a data edit rather than another branch:
+ * the previous shape interleaved four source reads with the table and outgrew the cyclomatic budget.
+ *
+ * @param {object} figures - Legal-figure bundle from `buildLegalFigures`.
+ * @returns {Array<object>} Claim detectors.
+ */
+function detectorTable(figures) {
+  const { legalRules, legalSteps, legalSkills, legalAnalyzers, legalPairs, legalSuites } = figures;
+  const { byFamily, byProject, layers, packTotal } = figures;
+  return [
     {
       id: 'rule-count',
       pattern: /(\d{2,4})\s*([组个项类种套])?\s*(?:条)?\s*([\u4e00-\u9fa5A-Za-z]{0,6}?)规则/g,
@@ -377,8 +435,15 @@ function buildClaimDetectors() {
     { id: 'step-count', pattern: /(\d{1,3})\s*个语义步骤/g, legal: legalSteps },
     { id: 'iso-pairs', pattern: /(\d{1,3})\s*对(?:跨平台)?同构脚本/g, legal: legalPairs },
     { id: 'analyzer-count', pattern: /(\d{1,3})\s*个内置分析器/g, legal: legalAnalyzers },
+    {
+      id: 'test-suite',
+      // The suite count is stated three legitimate ways: the executable total, one lane on its own,
+      // and the additive decomposition of the lanes. All three figures are legal; a fourth value is
+      // a stale claim. The lookahead keeps the quantifier out of unrelated uses such as 「一套方案」.
+      pattern: /(\d{1,3})\s*套(?=测试|并行|串行|vitest|套件)/g,
+      legal: legalSuites,
+    },
   ];
-  return detectors.filter((detector) => detector.legalFor || (detector.legal && detector.legal.size > 0));
 }
 
 /**
@@ -397,11 +462,15 @@ function singleValue(value) {
 /**
  * Recursively collects Markdown files in scope, plus the JSON corpus under `JSON_SCAN_PATHS`.
  *
+ * The scan scope comes from `doc-metrics.json` rather than a local copy: four guards walk this same
+ * corpus, and the copies had already diverged once.
+ *
  * @returns {string[]} Absolute file paths.
  */
 function collectDocuments() {
-  const skipDirs = new Set(SKIP_DIRECTORIES);
-  const skipPaths = new Set(SKIP_PATHS);
+  const scope = resolveScanScope(JSON.parse(fs.readFileSync(METRICS_FILE, 'utf8')));
+  const skipDirs = new Set(scope.skipDirectories);
+  const skipPaths = new Set(scope.skipPaths);
   const files = [];
   const walk = (dir) => {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -590,6 +659,7 @@ function matchClaims(detector, line, index) {
  */
 function scanCounts(file, violations, detectors) {
   const relative = path.relative(REPO_ROOT, file).replace(/\\/g, '/');
+  if (QUOTED_COUNTEREXAMPLE_PATHS.some((prefix) => relative.startsWith(prefix))) return;
   for (const claim of scanTextForClaims(fs.readFileSync(file, 'utf8'), detectors)) {
     violations.push({
       type: 'RULE_COUNT_DRIFT',

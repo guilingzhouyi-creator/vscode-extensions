@@ -25,9 +25,11 @@
 const fs = require('fs');
 const path = require('path');
 
+const { resolveScanScope } = require('./sync-doc-metrics');
+
 const REPO_ROOT = path.resolve(__dirname, '../..');
+const CONFIG_FILE = path.join(__dirname, 'doc-metrics.json');
 const SCAN_ROOTS = Object.freeze(['docs', '.agents/skills', '.agents/subagents', 'fractal-git/docs']);
-const SKIP_DIRS = new Set(['node_modules', '.git', 'archive', 'dist', 'out', 'bin', 'obj', '.audit-logs', 'plugins']);
 
 /**
  * Documents with no inbound link by design, each with the reason it is exempt.
@@ -47,15 +49,19 @@ const EXEMPT = Object.freeze({
  * Collects Markdown files under the given roots.
  *
  * @param {string[]} roots - Repository-relative directories.
+ * @param {{skipDirectories: string[], skipPaths: string[]}} scope - Scan scope from `doc-metrics.json`.
  * @returns {string[]} Absolute paths.
  */
-function collect(roots) {
+function collect(roots, scope) {
+  const skipDirs = new Set(scope.skipDirectories);
   const files = [];
   const walk = (dir) => {
     if (!fs.existsSync(dir)) return;
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      if (SKIP_DIRS.has(entry.name)) continue;
+      if (skipDirs.has(entry.name)) continue;
       const full = path.join(dir, entry.name);
+      const rel = path.relative(REPO_ROOT, full).replace(/\\/g, '/');
+      if (scope.skipPaths.some((p) => rel === p || rel.startsWith(`${p}/`))) continue;
       if (entry.isDirectory()) walk(full);
       else if (entry.name.endsWith('.md')) files.push(full);
     }
@@ -133,8 +139,10 @@ function main() {
     process.exit(1);
   }
 
-  const targets = collect(SCAN_ROOTS).map((file) => path.relative(REPO_ROOT, file).replace(/\\/g, '/'));
-  const corpus = collect(['docs', '.agents', 'fractal-git/docs', 'scripts', '']).map((file) => ({
+  const config = JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8'));
+  const scope = resolveScanScope(config);
+  const targets = collect(SCAN_ROOTS, scope).map((file) => path.relative(REPO_ROOT, file).replace(/\\/g, '/'));
+  const corpus = collect(['docs', '.agents', 'fractal-git/docs', 'scripts', ''], scope).map((file) => ({
     rel: path.relative(REPO_ROOT, file).replace(/\\/g, '/'),
     body: fs.readFileSync(file, 'utf8'),
   }));

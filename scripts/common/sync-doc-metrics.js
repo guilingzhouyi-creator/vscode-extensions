@@ -79,6 +79,37 @@ function countMarkdownFiles(dir) {
 }
 
 /**
+ * Counts all Markdown files below a directory and, separately, those inside one archive subtree.
+ *
+ * The two WebGames figures (`wg-docs-md-all` and `wg-docs-md-active`) used to be resolved by three
+ * full walks of the same 936-file tree: one for the total, one for the total again, and one for the
+ * archive. Folding them into a single pass halves the work and, more importantly, makes the two
+ * numbers come from one observation of the tree — two separate walks can disagree if the tree
+ * changes between them, which silently produces a negative "active" count.
+ *
+ * @param {string} dir - Absolute directory path.
+ * @param {string} archiveName - Directory name marking the archived subtree.
+ * @returns {{all: number, archived: number}} Counts from one traversal.
+ */
+function countMarkdownWithArchive(dir, archiveName) {
+  const counts = { all: 0, archived: 0 };
+  const walk = (current, insideArchive) => {
+    if (!fs.existsSync(current)) return;
+    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+      const full = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        walk(full, insideArchive || entry.name === archiveName);
+      } else if (entry.name.endsWith('.md')) {
+        counts.all += 1;
+        if (insideArchive) counts.archived += 1;
+      }
+    }
+  };
+  walk(dir, false);
+  return counts;
+}
+
+/**
  * Intersects `.ps1` and `.sh` basenames inside one domain's scripts tree.
  *
  * @param {string} domainRoot - Repository-relative domain root ('' for the root scripts library).
@@ -102,24 +133,56 @@ function countIsomorphicPairs(domainRoot) {
 }
 
 /**
- * Counts the controlled script files in the root scripts library.
+ * Enumerates the controlled script files in the root scripts library.
  *
  * Only the top level of `common/`, `ps1/` and `sh/` is inventoried, matching the README matrix;
- * `common/rule-sources/` holds rule dictionaries and is described separately.
+ * `common/rule-sources/` holds rule dictionaries and is described separately. Exported as a list
+ * rather than a bare count because the README table must name every one of these files: a count
+ * alone lets the table drift while the total still reads correctly.
+ *
+ * @returns {Array<{dir: string, file: string}>} One entry per inventoried file.
+ */
+function listScriptInventory() {
+  const entries = [];
+  for (const dir of SCRIPT_DIRS) {
+    const abs = path.join(REPO_ROOT, 'scripts', dir);
+    if (!fs.existsSync(abs)) continue;
+    for (const entry of fs.readdirSync(abs, { withFileTypes: true })) {
+      if (!entry.isFile()) continue;
+      if (!SCRIPT_EXTENSIONS.includes(path.extname(entry.name))) continue;
+      entries.push({ dir, file: entry.name });
+    }
+  }
+  return entries;
+}
+
+/**
+ * Counts the controlled script files in the root scripts library.
  *
  * @returns {number} File count.
  */
 function countScriptInventory() {
-  let total = 0;
-  for (const dir of SCRIPT_DIRS) {
-    const abs = path.join(REPO_ROOT, 'scripts', dir);
-    if (!fs.existsSync(abs)) continue;
-    total += fs
-      .readdirSync(abs, { withFileTypes: true })
-      .filter((entry) => entry.isFile())
-      .filter((entry) => SCRIPT_EXTENSIONS.includes(path.extname(entry.name))).length;
-  }
-  return total;
+  return listScriptInventory().length;
+}
+
+/**
+ * Resolves the documentation scan scope from the single source of truth.
+ *
+ * Four guards walk the same Markdown corpus and each used to carry its own copy of the skip list.
+ * Those copies drifted: three of them omitted `target` and `.venv` while keeping a bare `plugins`
+ * entry that only worked because no directory is named that at the repository root, so one Rust
+ * build artefact (`fractal-git/target/doc/...`) was being audited as governance prose. Reading the
+ * one declaration is what makes the four walks provably identical.
+ *
+ * @param {object} config - Parsed `doc-metrics.json`.
+ * @returns {{skipDirectories: string[], skipPaths: string[]}} Frozen scope lists.
+ */
+function resolveScanScope(config) {
+  const scan = (config && config.scan) || {};
+  return Object.freeze({
+    skipDirectories: Object.freeze([...(scan.skipDirectories || [])]),
+    skipPaths: Object.freeze([...(scan.skipPaths || [])]),
+  });
 }
 
 /**
@@ -177,25 +240,51 @@ function countRunnerSuites(source, marker) {
 }
 
 /**
- * Counts the test suites the aggregate gate actually runs.
+ * Counts the test suites the aggregate gate actually runs, split by lane.
  *
  * The runner has three declared lanes plus the vitest CLI, which is not a script file and so can
- * never appear in any lane. Adding it explicitly is what makes this figure the executable total
+ * never appear in any lane. Adding it explicitly is what makes the total the executable figure
  * rather than the sum of the lanes.
+ *
+ * The per-lane breakdown is exported because documents legitimately restate a lane on its own
+ * ("158 个并行套件") and legitimately restate the sum ("163 套测试"). Judging either against the
+ * other's figure would either reject a correct sentence or accept a stale one, so the guard needs
+ * both the parts and the whole.
+ *
+ * @returns {{parallel: number, daemon: number, selfAudit: number, vitest: number, laneSum: number,
+ *   serialSum: number, total: number}} Lane counts and the executable total; every field is -1 when
+ *   the runner is unreadable. `serialSum` exists because documents legitimately group the two
+ *   non-parallel lanes ("4 套串行/守护进程套件" = daemon + self-audit), which is a correct narrower
+ *   claim that no single lane count can justify.
+ */
+function countTestSuiteLanes() {
+  const runner = path.join(REPO_ROOT, 'auto-refactor/scripts/test-parallel.js');
+  const unreadable = { parallel: -1, daemon: -1, selfAudit: -1, vitest: 1, laneSum: -1, serialSum: -1, total: -1 };
+  if (!fs.existsSync(runner)) return unreadable;
+  const source = fs.readFileSync(runner, 'utf8');
+  const parallel = countRunnerSuites(source, 'const PARALLEL_SUITES = [');
+  const daemon = countRunnerSuites(source, 'const DAEMON_SUITES = [');
+  const selfAudit = countRunnerSuites(source, 'const SELF_AUDIT_SUITES = [');
+  if ([parallel, daemon, selfAudit].some((value) => value < 0)) return unreadable;
+  const laneSum = parallel + daemon + selfAudit;
+  return {
+    parallel,
+    daemon,
+    selfAudit,
+    vitest: 1,
+    laneSum,
+    serialSum: daemon + selfAudit,
+    total: laneSum + 1,
+  };
+}
+
+/**
+ * Counts the test suites the aggregate gate actually runs.
  *
  * @returns {number} Suite count, or -1 when the runner is unreadable.
  */
 function countTestSuites() {
-  const runner = path.join(REPO_ROOT, 'auto-refactor/scripts/test-parallel.js');
-  if (!fs.existsSync(runner)) return -1;
-  const source = fs.readFileSync(runner, 'utf8');
-  const lanes = [
-    countRunnerSuites(source, 'const PARALLEL_SUITES = ['),
-    countRunnerSuites(source, 'const DAEMON_SUITES = ['),
-    countRunnerSuites(source, 'const SELF_AUDIT_SUITES = ['),
-  ];
-  if (lanes.some((value) => value < 0)) return -1;
-  return lanes.reduce((sum, value) => sum + value, 0) + 1;
+  return countTestSuiteLanes().total;
 }
 
 /**
@@ -333,6 +422,27 @@ function countWebGamesSuites() {
 }
 
 /**
+ * Counts the WebGames documentation tree once and memoizes the result.
+ *
+ * Two metrics read this tree (`wg-docs-md-all` and `wg-docs-md-active`), and each resolver is called
+ * independently by `resolveMetrics`. Without the memo the tree is walked three times per run — twice
+ * for the total and once for the archive — which measured 132 ms of the 250 ms total. The memo also
+ * guarantees the two figures come from the same observation, so "active" can never come out negative
+ * because the tree changed between two walks.
+ *
+ * @returns {{all: number, archived: number}} Markdown counts for the tree.
+ */
+const webGamesDocs = (() => {
+  let cached = null;
+  return () => {
+    if (cached === null) {
+      cached = countMarkdownWithArchive(path.join(REPO_ROOT, 'WebGames/docs'), '归档库');
+    }
+    return cached;
+  };
+})();
+
+/**
  * Builds the metric resolver table.
  *
  * Each entry is an explicit resolver rather than a generic path interpreter: an undeclared metric id
@@ -370,10 +480,8 @@ function buildResolvers() {
     'iso-pairs': () =>
       ISO_DOMAIN_ROOTS.reduce((sum, root) => sum + countIsomorphicPairs(root), 0),
     'iso-pairs-root': () => countIsomorphicPairs(''),
-    'wg-docs-md-all': () => countMarkdownFiles(path.join(REPO_ROOT, 'WebGames/docs')),
-    'wg-docs-md-active': () =>
-      countMarkdownFiles(path.join(REPO_ROOT, 'WebGames/docs')) -
-      countMarkdownFiles(path.join(REPO_ROOT, 'WebGames/docs/归档库')),
+    'wg-docs-md-all': () => webGamesDocs().all,
+    'wg-docs-md-active': () => webGamesDocs().all - webGamesDocs().archived,
     'skill-count': () =>
       fs.existsSync(SKILL_ROOT)
         ? fs.readdirSync(SKILL_ROOT, { withFileTypes: true }).filter((e) => e.isDirectory()).length
@@ -619,16 +727,16 @@ function isHistoricallyExempt(text, offset) {
  * @returns {string[]} Absolute file paths.
  */
 function collectDocuments(config) {
-  const scan = config.scan || {};
-  const skipDirs = new Set(scan.skipDirectories || []);
-  const skipPaths = new Set(scan.skipPaths || []);
+  const { skipDirectories, skipPaths } = resolveScanScope(config);
+  const skipDirs = new Set(skipDirectories);
+  const skipPathSet = new Set(skipPaths);
   const files = [];
   const walk = (dir) => {
     for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
       if (skipDirs.has(entry.name)) continue;
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) {
-        if (skipPaths.has(path.relative(REPO_ROOT, full).replace(/\\/g, '/'))) continue;
+        if (skipPathSet.has(path.relative(REPO_ROOT, full).replace(/\\/g, '/'))) continue;
         walk(full);
       } else if (entry.name.endsWith('.md')) {
         files.push(full);
@@ -824,8 +932,11 @@ module.exports = Object.freeze({
   runSelfProbes,
   countIsomorphicPairs,
   countScriptInventory,
+  listScriptInventory,
+  resolveScanScope,
   countBuiltinAnalyzers,
   countTestSuites,
+  countTestSuiteLanes,
   countTopicCatalog,
   countRuleFamilies,
   countFamilyRules,
