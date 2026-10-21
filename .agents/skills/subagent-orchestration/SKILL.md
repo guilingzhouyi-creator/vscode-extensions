@@ -118,7 +118,7 @@ node .agents/skills/subagent-orchestration/scripts/synthesize-subagent.js --pres
 node .agents/skills/subagent-orchestration/scripts/synthesize-subagent.js --all
 ```
 
-常用预置别名速查矩阵（23 个预置，与 `.agents/plugins/workspace-governance/agents/*.md` 保持 1:1 严格同构）：
+常用预置别名速查矩阵（23 个预置）。单源真源为 `.agents/subagents/agents/*.md`（已入库），由 `sync-agents-mirror.js` 单向镜像至 gitignored 的 `.agents/plugins/workspace-governance/agents/`；反向书写会在干净 clone 上丢失：
 * **`vs-extension`**：`wt-construct` / `wt-review` / `wt-refactor` / `wt-explore`
 * **`cli-engine`**：`ar-construct` / `ar-review` / `ar-refactor` / `ar-explore`
 * **`game-engine`**：`wg-construct` / `wg-review` / `wg-refactor` / `wg-explore`

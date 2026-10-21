@@ -117,12 +117,19 @@ function main() {
   const repoRoot = path.resolve(__dirname, '../..');
   const srcDir = path.join(repoRoot, '.agents/skills');
   const destDir = path.join(repoRoot, '.agents/plugins/workspace-governance/skills');
-  const isCheckMode = process.argv.includes('--check');
+  const isCheckMode = process.argv.includes('--check') || process.argv.includes('--check-only');
 
   if (!fs.existsSync(srcDir)) {
     process.stderr.write(`[sync-skills] Source directory not found: ${srcDir}\n`);
     return 1;
   }
+
+  // Agent definitions and the rulebook mirror live in the same derived bundle and drift for the
+  // same reason (nobody remembers the second copy). Delegating keeps one heal command for the
+  // operator instead of two that must both be run in the right order.
+  const agentMirror = require('./sync-agents-mirror');
+  const agentCode = agentMirror.run({ checkOnly: isCheckMode });
+  if (agentCode !== 0) return agentCode;
 
   if (isCheckMode) {
     if (!fs.existsSync(destDir)) {

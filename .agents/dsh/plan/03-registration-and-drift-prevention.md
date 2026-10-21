@@ -2,7 +2,7 @@
 # 阶段三细则：配置对齐、单源登记与防漂移
 
 > 本文件为「工作区治理模式族」落地细则的第三阶段，解决「模式族落地后与既有治理资产断链」的问题。
-> 上游依据：`AGENTS.md` §一「技能集结构与同构治理」「通用 SubAgent 泛化调度」两行路由、§四红线 5 与红线 11。
+> 上游依据：`AGENTS.md` §一「技能集与同构治理」「SubAgent 泛化调度」两行路由、§二「规则元治理」与「SubAgent 调度」公理。
 
 ---
 
@@ -13,13 +13,13 @@
 | :--- | :--- | :--- | :--- |
 | `.agents/plugins/workspace-governance/plugin.json` | 声明 name / displayName / version / logo / suggestedPrompts，未提及模式 | 用户在 DSH 中看不到模式族与治理套件的隶属关系 | 增补模式族条目，保持既有字段与 logo 引用不动 |
 | `.agents/plugins/workspace-governance/README.md` | 95 行，声称打包 12 技能 / 5 agents / MCP config | 文档与 DSH 实际可加载物不一致（DSH bundles 只认 npm 包） | 补一节说明「哪些资产在 DSH 中真正生效、哪些是 Antigravity 侧资产」 |
-| `.agents/subagents/subagent-catalog.json` | 30 条 preset（archetype × posture），`model: "inherit"` | 30 条 catalog 与 DSH 4 模式无对应关系，公理 6 无执行体 | 建立「模式 × 姿态」调用约定映射，不改动既有 30 条条目字段 |
+| `.agents/subagents/subagent-catalog.json` | 23 条 preset（archetype × posture），`model: "inherit"` | preset 目录与 DSH 4 模式无对应关系，「SubAgent 调度」公理无执行体 | 建立「模式 × 姿态」调用约定映射，不改动既有条目字段 |
 
 **关键立场**：DSH 的 `plugin_manager` / bundles 只接受 npm 包，`.agents/plugins/*` 在当前机制下**不被 DSH 加载**。因此文档必须诚实区分「DSH 运行时资产」与「工作区治理文档资产」，禁止在 README 中暗示插件已被 DSH 装载。
 
 ## 二、模式 × 姿态调用约定
 
-公理 6 要求依据 `(Archetype ⊗ Posture)` 合成专员。落地后的调用路径为：
+AGENTS.md §二 的「SubAgent 调度」公理要求依据 `(Archetype ⊗ Posture)` 合成专员。落地后的调用路径为：
 
 ```
 主 Agent（wg-construct）→ 选定 archetype（6 选 1）
@@ -49,7 +49,7 @@
 ## 五、验收标准
 
 - [ ] `plugin.json` 为合法 JSON 且原有字段逐字节保留；
-- [ ] README 明确区分「DSH 运行时生效」与「工作区文档资产」，无夸大表述（遵守 §四红线 9）；
+- [ ] README 明确区分「DSH 运行时生效」与「工作区文档资产」，无夸大表述（遵守 §二「交付完整性」公理）；
 - [ ] 模式 × 姿态约定表与 `subagent-catalog.json` 的 archetype / posture 词表逐项同名；
 - [ ] `--check-only` 与阶段四挂载实测在最终交付前各跑一次且全绿。
 

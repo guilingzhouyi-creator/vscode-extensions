@@ -14,7 +14,7 @@
 | `wg-review` | 治理·审查 | 12 | review | 只读 fs，**编辑器组与终端裁除** | `read` |
 | `wg-explore` | 治理·探索 | 13 | explore | 只读 fs，**编辑器组、终端、计划模式、委派裁除** | `read` |
 
-四个模式覆盖 [AGENTS.md](../../../AGENTS.md) 公理 6 的五种姿态：`guardian` 由
+四个模式覆盖 [AGENTS.md](../../../AGENTS.md) §二 的「SubAgent 调度」行所列五种姿态：`guardian` 由
 `wg-refactor` 的写姿态承载（守护面需调度门禁工具链，只读姿态无法执行脚本），
 不单设第五个高度同构的模式。
 
@@ -136,11 +136,11 @@ fresh JavaScript module generation」。
 - **宿主级工具可见**：profile 安装的其他 bundle（Agent Teams、任务看板）的工具
   会出现在预设会话中，属宿主组合的正常行为，非本模式族的工具面。
 - **模型同构**：四个模式均不声明 `modelSelectionSettings`，使子专员严格继承主
-  会话模型配置（AGENTS.md 公理 6）。
+  会话模型配置（AGENTS.md §二「SubAgent 调度」行的 `inherit` 同构继承）。
 - **治理面写入由主会话承担**：`wg-construct` 的授权根只到三大受控项目与 `.agents`，
   刻意不含工作区根 `AGENTS.md`、`docs/`、`.github/`、`scripts/`、`archive/`。
   理由是最小权限：治理总规、门禁脚本与 CI 拓扑属于「可改写自身规则」的高危面，
-  不应交给受限执行者。红线 1 要求重命名时做全仓五维引用闭环，若引用点落在上述
+  不应交给受限执行者。AGENTS.md §二「路径与引用」公理要求重命名时做全仓五维引用闭环，若引用点落在上述
   路径，该部分由**主会话（非 `wg-*` 模式）**执行；`denyRoots` 里的 `scripts`、
   `archive` 同理（含 `scripts/common/rule-catalog.json` 元治理）。
 - **重构模式的自检外置**：`wg-refactor` 保留 `tool-bash` / `tool-pwsh` 声明行但
@@ -185,7 +185,7 @@ fresh JavaScript module generation」。
 仍执行旧代际代码（同一取证会话得到与改动前**逐字相同**的拒绝行为），根因是宿主在
 启动时构建**不可变的运行时模块解析映射**，进程内不会重新解析。故守卫逻辑变更的
 作业流程为：改 `guard-plugin.js` → `--deploy` → 重启 DSH → 以 `mode: wg-*` 的
-取证会话复核。拒绝文案不含任何版本、代际或施工批次代号（红线 4），判定代际只能
+取证会话复核。拒绝文案不含任何版本、代际或施工批次代号（AGENTS.md §二「注释契约」公理），判定代际只能
 依赖行为差异，不依赖文案里的标记。
 
 **待复核对项**：V11 是唯一的运行态未闭环项。当前运行态仍执行修复前的守卫代际，
@@ -200,7 +200,7 @@ workspace-timing 98.1 / WebGames 100.0。唯一未通过项是
 `node scripts/common/validate-physical-hygiene.js` 的 `HYG-TRL-001`（POSIX 单 EOF
 换行）：受检 3327 个文件中命中 9 处，全部位于 **`scratch/`** ——该目录被
 `.gitignore:91` 整体忽略、`git ls-files scratch` 为 0 项，属本机临时草稿，不在本
-改动的交付面内，故未代为修改（红线 11：不得触碰授权面之外的他人文件）。
+改动的交付面内，故未代为修改（AGENTS.md §二「SubAgent 调度」公理：不得触碰授权面之外的他人文件）。
 早前记录的 `.vscode/workspace-timing.journal` 零字节违规在该时点已不复存在
 （该运行期日志已增长到 262972 字节），由它连带触发的 auto-refactor
 `validate-no-empty-scripts` 失败亦随之消失。与本改动直接相关的检查在该次审查中

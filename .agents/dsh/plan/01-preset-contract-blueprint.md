@@ -2,7 +2,7 @@
 # 阶段一细则：Preset 契约与仓库内单源蓝图
 
 > 本文件为「工作区治理模式族」落地细则的第一阶段，定义 Agent Preset 的物理契约、单源目录结构与命名规范。
-> 上游依据：`AGENTS.md` §二公理 6、§五 SOP 第 2 步；`.agents/subagents/subagent-catalog.json`（archetypes 6 × postures 5）。
+> 上游依据：`AGENTS.md` §二 的「SubAgent 调度」公理、§四 第 3 条「分流」；`.agents/subagents/subagent-catalog.json`（archetypes 6 × postures 5）。
 > 本阶段不产出可执行代码，仅冻结契约；契约冻结后方可进入阶段二。
 
 ---

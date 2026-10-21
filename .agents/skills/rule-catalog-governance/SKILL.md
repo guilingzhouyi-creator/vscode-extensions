@@ -55,8 +55,8 @@ description: >-
 ### 规则分布矩阵
 1. **`autoRefactor` (362 条)**：涵盖 30 个内置分析器与四层金字塔体系，通用多语言代码重构、AST 语法树、Rust 双轨算子与架构质量模型；
 2. **`workspaceTiming` (49 条)**：涵盖 VS Code 扩展审查体系的 L0~L5 六层刚性防线（编译、存储崩溃安全、时间守恒、i18n、性能与 UI 对比度）；
-3. **`webGames` (50 条)**：涵盖 Godot 游戏工程的文档治理（`DOC-`、`LINK-`）、高性能脚本契约（`ADV-`）与配置架构审查规则；
-4. **`globalTooling` (24 条)**：涵盖提交规范与禁词风格拦截（`CMG-STY-001`~`006`, `CMG-PRJ-001`）以及平台脚本工程化、AST 切片隔离与门面实质承载守卫（`GUARD-AST-001`, `GUARD-ISO-001`, `ARCH-ABS-001`, `ARCH-FAC-001` 等）。
+3. **`webGames` (50 条)**：涵盖 Godot 游戏工程的资产与艺术工单规格（`ART-`）、运行时治理（`GOV-`）、高性能脚本契约（`ADV-`）与资源配置审查规则（`RES-`）；
+4. **`globalTooling` (24 条)**：涵盖提交规范与禁词风格拦截（`CMG-STY-001`~`008`, `CMG-PRJ-001`）以及平台脚本工程化、门禁反馈状态闭包与双轨代码行预算（`GUARD-CHAIN-001`, `GUARD-ORD-001`, `GUARD-STEP-001`, `GUARD-FBK-001`, `VOL-ELOC-001`, `VOL-LOC-001` 等）；
 
 ---
 
@@ -100,14 +100,15 @@ $$\text{Family (3 字母)} - \text{Topic (3 字母)} - \text{Sequence (3 位数�
 
 ## 六、 跨项目规则族前缀命名空间规范
 
-严格划分四大项目域的规则族前缀边界，杜绝跨项目命名踩踏与误杀：
+严格划分五大项目域的规则族前缀边界，杜绝跨项目命名踩踏与误杀：
 
 | 项目领域 (`Project`) | 规则规模 | 权威合法规则族前缀 / 命名空间 | 治理范围与职责边界 |
 | :--- | :---: | :--- | :--- |
-| **`auto-refactor`** | 362 条 | 30 个分析器覆盖的 <!-- METRICS:BEGIN rule-family-count -->**33 个规则族**<!-- METRICS:END rule-family-count -->：`ARCH`, `BIG`, `CMP`, `CMT`, `CONST`, `CPX`, `DAT`, `DEP`, `DOC`, `ERR`, `GATE`, `GDM`, `GOM`, `GOV`, `HYG`, `NAM`, `NUM`, `PRF`, `PROD`, `PS`, `PYM`, `RSM`, `SEC`, `SH`, `SIM`, `STDLIB`, `TSM`, `TST`, `UI`, `VSC` 及 15 条 Legacy 别名 | 通用多语言代码重构、AST 语法树、Rust 双轨算子、复杂度与架构质量模型 |
+| **`auto-refactor`** | 362 条 | 30 个分析器覆盖的 <!-- METRICS:BEGIN rule-family-count -->**33 个规则族**<!-- METRICS:END rule-family-count -->：`ARCH`, `BIG`, `CMP`, `CMT`, `CONST`, `CPX`, `DAT`, `DEP`, `DOC`, `ENG`, `ERR`, `EXT`, `GDM`, `GOM`, `GOV`, `GUARD`, `HYG`, `MOD`, `NAM`, `NUM`, `PRF`, `PROD`, `PS`, `PYM`, `RSM`, `SEC`, `SH`, `SIM`, `STDLIB`, `TSM`, `TST`, `UI`, `VSC` 及 15 条 Legacy 别名 | 通用多语言代码重构、AST 语法树、Rust 双轨算子、复杂度与架构质量模型 |
 | **`workspace-timing`** | 49 条 | L0~L5 六层审查体系：`L0-`, `L1-`, `L2-`, `L3-`, `L4-`, `L5-`；扩展专属族：`ARF-`, `DOC-`, `HC-`, `LAY-`, `RCFG-`, `RES-`, `SCR-`, `TB-` | VS Code 扩展生命周期、分层存储安全、i18n 对齐、时间守恒与状态栏治理 |
-| **`WebGames`** | 50 条 | Godot 专属契约：`ADV-`（高性能脚本与引擎约束）、`DOC-`、`LINK-`（文档与跨卷链接）、`PRF-`、`RES-`、`UUID-`、`SIM-` | Godot 4 游戏逻辑、节点树信号契约、文档双语归档与配置单源治理 |
-| **`global-tooling`** | 24 条 | 通用门禁与治理族：`CMG-`（提交说明规范）、`GATE-`（平台脚本与 AST 隔离守卫）、`VOL-`、`ARCH-`（`ARCH-ABS-001`, `ARCH-FAC-001`） | 跨平台工作区门禁、提交说明防虚构、沙箱隔离、代码行预算与门面实质承载 |
+| **`WebGames`** | 50 条 | Godot 专属契约：`ADV-`（高性能脚本与引擎约束）、`ART-`（艺术工单与资产规格）、`GOV-`、`PRF-`、`RES-`、`UUID-`、`SIM-` | Godot 4 游戏逻辑、节点树信号契约、文档双语归档与配置单源治理 |
+| **`global-tooling`** | 24 条 | 通用门禁与治理族：`CMG-`（提交说明规范）、`GUARD-`（平台脚本与 AST 隔离守卫）、`HYG-`、`RCFG-`、`VOL-` | 跨平台工作区门禁、提交说明防虚构、沙箱隔离与双轨代码行预算 |
+| **`fractal-git`** | 17 条 | `FGT-` 项目命名空间下的主题族（ID 第二段即族名）：`ALG`, `BRG`, `CAS`, `COR`, `DEP`, `ERR`, `FAC`, `GAT`, `IDX`, `LCK`, `OBJ`, `POL`, `PRF`, `SAF`, `STO`, `TOP`, `TRN` | 9 微 Crate 拓扑、锁纪律与 CAS 正确性、unsafe 面积控制、Plumbing 语义等价 |
 
 ---
 

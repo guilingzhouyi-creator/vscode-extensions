@@ -352,8 +352,19 @@ function validatePluginBundle(repoRoot) {
   }
 
   const rulesAgentsMd = path.join(pluginDir, 'rules/AGENTS.md');
+  const rootAgentsMd = path.join(repoRoot, 'AGENTS.md');
   if (!fs.existsSync(rulesAgentsMd)) {
     errors.push(`${pluginDir}: Missing plugin rules/AGENTS.md mirror`);
+  } else if (fs.existsSync(rootAgentsMd)) {
+    // Existence alone was fail-open: a commit that only touched the root rulebook left the
+    // bundle serving the previous contract while this guard still reported PASS. Comparing the
+    // bytes is what makes the mirror a claim rather than a file listing.
+    if (!fs.readFileSync(rulesAgentsMd).equals(fs.readFileSync(rootAgentsMd))) {
+      errors.push(
+        'MIRROR_DRIFT: plugin rules/AGENTS.md differs from root AGENTS.md ' +
+          '(run `node scripts/common/sync-agents-mirror.js`)',
+      );
+    }
   }
 
   const pluginSkillsDir = path.join(pluginDir, 'skills');
@@ -365,6 +376,18 @@ function validatePluginBundle(repoRoot) {
     if (totalDrift > 0) {
       errors.push(`Plugin skills drift detected (${totalDrift} items out of sync). Run 'node scripts/common/sync-skills.js' to heal.`);
     }
+  }
+
+  // Agent definitions and their figure contract live behind the same derived bundle, so the same
+  // byte-parity obligation applies. Delegated to the mirror module to keep one implementation.
+  const agentMirror = require('./sync-agents-mirror');
+  errors.push(...agentMirror.checkTrackedTemplates());
+  const agentDrift = agentMirror.detectMirrorDrift();
+  if (!agentDrift.missingBundle && agentDrift.drift.length > 0) {
+    errors.push(
+      `Agent definition mirror drift (${agentDrift.drift.length} items): ${agentDrift.drift.join('; ')} ` +
+        "— run 'node scripts/common/sync-agents-mirror.js' to heal.",
+    );
   }
 
   return errors;

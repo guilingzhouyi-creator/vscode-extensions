@@ -30,6 +30,9 @@ const SUBAGENTS_ROOT = path.join(REPO_ROOT, '.agents/subagents');
 const CATALOG_PATH = path.join(SUBAGENTS_ROOT, 'subagent-catalog.json');
 const SKILLS_ROOT = path.join(REPO_ROOT, '.agents/skills');
 const PLUGIN_AGENTS_DIR = path.join(REPO_ROOT, '.agents/plugins/workspace-governance/agents');
+const TRACKED_AGENTS_DIR = path.join(REPO_ROOT, '.agents/subagents/agents');
+
+let pluginAgentsSkipReason = null;
 
 function validateDefaultModel(catalog, errors) {
   if (catalog.defaultModel !== 'inherit' && catalog.defaultModel !== 'flash') {
@@ -222,9 +225,65 @@ function validateDshModes(catalog, errors) {
   }
 }
 
+/**
+ * Asserts the tracked agent templates stay in 1:1 correspondence with the preset registry.
+ *
+ * The plugin bundle is gitignored, so it cannot be the only home of a preset definition: a clean
+ * clone would then have presets pointing at nothing, and every figure inside them would be
+ * unmaintained. This check runs against `.agents/subagents/agents/`, which is tracked.
+ *
+ * @param {object} catalog - Parsed subagent catalog.
+ * @param {string[]} errors - Collector for violation messages.
+ */
+function validateTrackedAgentTemplates(catalog, errors) {
+  if (!fs.existsSync(TRACKED_AGENTS_DIR)) {
+    errors.push(`缺少单源专员模板目录: ${path.relative(REPO_ROOT, TRACKED_AGENTS_DIR)}`);
+    return;
+  }
+  const presetKeys = new Set(Object.keys(catalog.presets || {}));
+  const stems = new Set(
+    fs.readdirSync(TRACKED_AGENTS_DIR)
+      .filter((f) => f.endsWith('.md'))
+      .map((f) => path.basename(f, '.md')),
+  );
+  for (const preset of presetKeys) {
+    if (!stems.has(preset)) {
+      errors.push(`预置专员 [${preset}] 缺少单源模板: .agents/subagents/agents/${preset}.md`);
+    }
+  }
+  for (const stem of stems) {
+    if (!presetKeys.has(stem)) {
+      errors.push(`单源模板目录存在未登记的孤儿模板: agents/${stem}.md`);
+    }
+  }
+  for (const stem of stems) {
+    const content = fs.readFileSync(path.join(TRACKED_AGENTS_DIR, `${stem}.md`), 'utf8');
+    if (content.includes('\r\n')) errors.push(`单源专员模板含非法 CRLF 换行: agents/${stem}.md`);
+    if (!content.startsWith('---\n')) errors.push(`单源专员模板缺少 YAML frontmatter: agents/${stem}.md`);
+  }
+
+  // Templates restate catalog totals inside their rigid-axiom lists, and those strings reach the
+  // model verbatim on every dispatch. A retired figure here is not a stale comment: it is a false
+  // premise the SubAgent is told to reason from. Delegated so the legality set stays single-source.
+  try {
+    const { findStaleFigures } = require(path.join(REPO_ROOT, 'scripts/common/sync-agents-mirror.js'));
+    const catalogFigures = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'scripts/common/rule-catalog.json'), 'utf8'));
+    for (const stem of stems) {
+      errors.push(...findStaleFigures(path.join(TRACKED_AGENTS_DIR, `${stem}.md`), catalogFigures));
+    }
+  } catch (err) {
+    errors.push(`无法校验单源模板规模数字: ${err.message}`);
+  }
+}
+
 function validatePluginAgentsParity(catalog, errors) {
   if (!fs.existsSync(PLUGIN_AGENTS_DIR)) {
-    errors.push(`插件 agents 目录不存在: ${PLUGIN_AGENTS_DIR}`);
+    // The bundle is a derived, gitignored artefact (`.gitignore:82`), so a clean clone and CI
+    // legitimately have no agents/ directory. Failing here made the guard unfixable off a
+    // developer machine; a visible SKIP keeps the parity contract from being mistaken for
+    // "verified" while still allowing the tracked templates to be checked on their own.
+    pluginAgentsSkipReason =
+      'plugin agents bundle not materialised (derived artefact, gitignored); preset/agent 1:1 parity skipped';
     return;
   }
   const presetKeys = new Set(Object.keys(catalog.presets || {}));
@@ -289,6 +348,7 @@ function validate() {
   const postKeys = validatePostures(catalog, errors);
   const presets = validatePresets(catalog, errors);
   validateDshModes(catalog, errors);
+  validateTrackedAgentTemplates(catalog, errors);
   validatePluginAgentsParity(catalog, errors);
   detectOrphanConfigs(catalog, errors);
 
@@ -299,7 +359,10 @@ function validate() {
   }
 
   const modeCount = Object.keys(catalog.dshModes || {}).length;
-  console.log(`  ✔ [PASS] SubAgent 体系校验通过: ${archKeys.length} 领域原型, ${postKeys.length} 姿态, ${presets.length} 预置与插件专员 1:1 全量合规 (模型同构继承 inherit / flash), ${modeCount} 个 DSH 治理模式姿态一致`);
+  if (pluginAgentsSkipReason) {
+    console.log(`  ⚠️  [SKIP] ${pluginAgentsSkipReason}`);
+  }
+  console.log(`  ✔ [PASS] SubAgent 体系校验通过: ${archKeys.length} 领域原型, ${postKeys.length} 姿态, ${presets.length} 预置与单源模板 1:1 合规 (模型同构继承 inherit / flash), ${modeCount} 个 DSH 治理模式姿态一致`);
   process.exit(0);
 }
 
