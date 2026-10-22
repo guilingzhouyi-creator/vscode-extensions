@@ -1,7 +1,7 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1792593513193",
-  "timestamp": "2026-10-21T14:38:43.305Z",
-  "cai": 85.89,
+  "snapshotId": "snapshot-v0.4.0-1792648892648",
+  "timestamp": "2026-10-22T06:01:43.632Z",
+  "cai": 85.88,
   "polyglotGeneralization": {
     "index": 95.82,
     "meanScore": 95.82,
@@ -16,17 +16,17 @@
     "languageAdapterVersion": "adapters-v1.0",
     "scoringVersion": "scoring-v1.0"
   },
-  "rulesDigest": "50f8230346423270271f45348678e06c3979b971995cb659c73e0a417047b3c7",
+  "rulesDigest": "f1aee8f75a280daceee8c76e82eb69601be75a00a1207cd260bf4cb234fcbe6c",
   "configDigest": "04a1b8446ff3624c6496a9e8c9b405b03d47eda22fb414a869442bfb51978d19",
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
     "filesScanned": 677,
-    "durationMs": 6302
+    "durationMs": 6801
   },
   "metrics": {
     "compositeScore": 98.98,
     "grade": "A+",
-    "autonomyRate": 85.89,
+    "autonomyRate": 85.88,
     "polyglotGeneralization": {
       "index": 95.82,
       "meanScore": 95.82,
@@ -785,7 +785,7 @@
           "data": 97.44,
           "testing": 99.81,
           "reliability": 100,
-          "security": 99.88,
+          "security": 99.87,
           "extensibility": 97.83
         },
         "moduleCount": 1
@@ -1004,27 +1004,27 @@
   },
   "trajectory": {
     "runEloc": {
-      "processed": 159116,
+      "processed": 159136,
       "unique": 129240,
-      "changed": 469,
-      "semantic": 375,
+      "changed": 2243,
+      "semantic": 1794,
       "relocated": 0,
       "cosmetic": 0,
       "boilerplate": 0,
-      "added": 235,
+      "added": 1122,
       "deleted": 0,
       "modified": 0
     },
     "lifetime": {
       "weekId": "LIFETIME",
       "startMs": 1791102755050,
-      "endMs": 1792593513188,
+      "endMs": 1792648892644,
       "totalRuns": 353,
       "eloc": {
-        "processedTotal": 49742752,
+        "processedTotal": 49744408,
         "uniqueTotal": 129240,
-        "changedTotal": 511408,
-        "semanticTotal": 409126
+        "changedTotal": 507638,
+        "semanticTotal": 406109
       },
       "qed": {
         "mean": 0.0001,
