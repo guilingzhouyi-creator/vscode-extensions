@@ -552,8 +552,8 @@ jobs:
               let md = "## 🌐 全工作区跨项目统一审查与十维质量看板\n\n";
               md += "### 📊 本作业实际执行结果\n\n";
               md += "| 作业 | 判定 |\n| :--- | :---: |\n";
-              md += `| Repo hygiene (scripts & packaging) | ${jobStatus === "success" ? "✅ PASS" : "❌ " + jobStatus.toUpperCase()} |\n\n`;
-              md += "> 本看板仅反映 hygiene 作业内实际执行的检查。扩展构建与 auto-refactor 门禁由独立作业承担，未执行项不再标注为 PASS。\n\n";
+              md += `| Repo hygiene (scripts & packaging) | ${jobStatus === "success" ? "🟢 达标" : "🔴 阻断 (" + jobStatus.toUpperCase() + ")"} |\n\n`;
+              md += "> 本看板仅反映 hygiene 作业内实际执行的检查。扩展构建与 auto-refactor 门禁由独立作业承担，未执行项不再标注为达标。\n\n";
 
               md += "### 🎯 全工作区十维工程质量看板\n\n";
               if (tenDims) {

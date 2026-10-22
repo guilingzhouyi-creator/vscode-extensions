@@ -99,7 +99,7 @@ scripts/
     STATUS=0
     npm test || STATUS=$?
     if [ "$STATUS" -ne 0 ]; then
-        echo "❌ [FAIL] 测试未通过"
+        echo "✖ BLOCK  测试未通过" >&2
         exit 1
     fi
     ```
