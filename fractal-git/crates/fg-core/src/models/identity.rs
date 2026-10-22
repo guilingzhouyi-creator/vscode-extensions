@@ -30,17 +30,50 @@ pub enum ActorIdentity {
 }
 
 impl ActorIdentity {
-    /// Creates a human identity with optional token.
+    /// Creates a human identity from a verified authority proof.
+    ///
+    /// The token is mandatory and non-blank: an identity that claims human authority without
+    /// any credential would let `--human <name>` alone satisfy the dual-trunk boundary, which
+    /// is exactly the boundary this type exists to enforce.
     pub fn human(
         username: impl Into<String>,
         email: impl Into<String>,
-        token: Option<String>,
+        token: impl Into<String>,
     ) -> Self {
         Self::Human {
             username: username.into(),
             email: email.into(),
-            authority_token: token,
+            authority_token: Some(token.into()),
         }
+    }
+
+    /// Creates a human identity whose authority claim carries no credential.
+    ///
+    /// Reserved for gate self-tests and policy simulation. Callers on a production path must
+    /// use [`ActorIdentity::human`] instead.
+    pub fn unverified_human(username: impl Into<String>, email: impl Into<String>) -> Self {
+        Self::Human {
+            username: username.into(),
+            email: email.into(),
+            authority_token: None,
+        }
+    }
+
+    /// Returns the presented authority token, if any.
+    pub fn authority_token(&self) -> Option<&str> {
+        match self {
+            Self::Human {
+                authority_token, ..
+            } => authority_token.as_deref(),
+            Self::Agent(_) => None,
+        }
+    }
+
+    /// Checks whether this identity carries a non-blank authority credential.
+    pub fn has_authority_credential(&self) -> bool {
+        self.authority_token()
+            .map(|token| !token.trim().is_empty())
+            .unwrap_or(false)
     }
 
     /// Creates an agent identity from standard push context.

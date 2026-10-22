@@ -62,7 +62,7 @@ impl HumanUacAuthorizer for StandardNonceAuthorizer {
     ) -> FractalResult<bool> {
         // 1. Request ID match
         if proof.request_id != request.request_id {
-            return Err(FractalError::IndexConflict(format!(
+            return Err(FractalError::AuthProofInvalid(format!(
                 "UAC request ID mismatch: expected {}, got {}",
                 request.request_id, proof.request_id
             )));
@@ -70,22 +70,29 @@ impl HumanUacAuthorizer for StandardNonceAuthorizer {
 
         // 2. Nonce equality check
         if proof.signed_nonce != request.challenge_nonce {
-            return Err(FractalError::IndexConflict(
+            return Err(FractalError::AuthProofInvalid(
                 "UAC challenge nonce mismatch: proof contains invalid cryptographic nonce".into(),
             ));
         }
 
         // 3. Lease expiry check (1-hour window)
         if request.is_expired(proof.timestamp_ms) {
-            return Err(FractalError::IndexConflict(
+            return Err(FractalError::LeaseExpired(
                 "UAC approval rejected: lease expired (exceeded 1-hour window)".into(),
             ));
         }
 
         // 4. Operator presence check
         if proof.operator_name.trim().is_empty() {
-            return Err(FractalError::IndexConflict(
+            return Err(FractalError::AuthProofInvalid(
                 "UAC approval rejected: operator name cannot be empty".into(),
+            ));
+        }
+
+        // 5. GUI session attribution check: an anonymous session cannot witness a click
+        if proof.gui_session_token.trim().is_empty() {
+            return Err(FractalError::AuthProofInvalid(
+                "UAC approval rejected: GUI session token cannot be empty".into(),
             ));
         }
 

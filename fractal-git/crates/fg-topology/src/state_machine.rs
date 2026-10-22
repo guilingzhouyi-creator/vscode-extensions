@@ -61,7 +61,7 @@ impl FractalWorkspaceNode {
     /// Moves state to `InPreReview`.
     pub fn enter_pre_review(&mut self) -> FractalResult<()> {
         if self.state != WorktreeState::Spawned && self.state != WorktreeState::InPreReview {
-            return Err(FractalError::IndexConflict(format!(
+            return Err(FractalError::StateTransition(format!(
                 "Cannot enter pre-review from state {:?}",
                 self.state
             )));
@@ -74,7 +74,7 @@ impl FractalWorkspaceNode {
     /// Moves state to `GateApproved` upon satisfying Auto and role gates.
     pub fn approve_gate(&mut self) -> FractalResult<()> {
         if self.state != WorktreeState::InPreReview {
-            return Err(FractalError::IndexConflict(format!(
+            return Err(FractalError::StateTransition(format!(
                 "Cannot approve gate when workspace is in state {:?}",
                 self.state
             )));
@@ -87,7 +87,7 @@ impl FractalWorkspaceNode {
     /// Moves state to `Materialized` after committing to Git ODB.
     pub fn record_materialization(&mut self, commit_oid: Oid) -> FractalResult<()> {
         if self.state != WorktreeState::GateApproved {
-            return Err(FractalError::IndexConflict(format!(
+            return Err(FractalError::StateTransition(format!(
                 "Cannot materialize commit when workspace is not GateApproved (current: {:?})",
                 self.state
             )));
@@ -101,7 +101,7 @@ impl FractalWorkspaceNode {
     /// Marks physical resources as reclaimed.
     pub fn mark_reclaimed(&mut self) -> FractalResult<()> {
         if self.state != WorktreeState::Materialized && self.state != WorktreeState::Spawned {
-            return Err(FractalError::IndexConflict(format!(
+            return Err(FractalError::StateTransition(format!(
                 "Cannot reclaim unmaterialized workspace unless abandoned (current: {:?})",
                 self.state
             )));

@@ -1,9 +1,9 @@
 //! Unit Test: fg-storage (LooseOdb, CasBackend, WalJournal, CasToGitMaterializer)
 //! File Path: tests/rust/test_storage.rs
 
-use fractal_git::core::models::{GitSignature, Oid};
+use fractal_git::core::models::FileMode;
+use fractal_git::core::models::{GitSignature, ObjectKind, Oid};
 use fractal_git::core::traits::OdbStore;
-use fractal_git::object::FileMode;
 use fractal_git::storage::cas_backend::CasBackend;
 use fractal_git::storage::cas_bridge::{
     CasFileDescriptor, CasToGitMaterializer, MaterializeRequest,
@@ -89,7 +89,9 @@ fn test_cas_backend_block_roundtrip() {
     let cas = CasBackend::new(dir.path());
 
     let block = b"immutable chunk bytes from layervfs";
-    let oid = cas.put_block(block).expect("Put block should succeed");
+    let oid = cas
+        .put_block(ObjectKind::Blob, block)
+        .expect("Put block should succeed");
     assert!(cas.has_block(&oid));
     assert_eq!(cas.cache_len(), 1);
     assert_eq!(cas.cache_bytes(), block.len());
@@ -188,11 +190,13 @@ fn test_cas_backend_prefix_delta_roundtrip() {
     modified_data.splice(100..120, b"let modified_variable = 999;\n".iter().cloned());
 
     // 1. Put base block
-    let base_oid = cas.put_block(&base_data).expect("Base block put");
+    let base_oid = cas
+        .put_block(ObjectKind::Blob, &base_data)
+        .expect("Base block put");
 
     // 2. Put modified block with base reference
     let mod_oid = cas
-        .put_block_with_base(&modified_data, Some(&base_oid))
+        .put_block_with_base(ObjectKind::Blob, &modified_data, Some(&base_oid))
         .expect("Delta block put");
 
     assert!(cas.has_block(&mod_oid));

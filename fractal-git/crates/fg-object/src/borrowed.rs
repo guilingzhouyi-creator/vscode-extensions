@@ -9,10 +9,8 @@
 //!   returning explicit errors on truncated or malformed binary streams.
 
 use fg_core::error::{FractalError, FractalResult};
-use fg_core::models::{AgentCommitMeta, Oid};
+use fg_core::models::{AgentCommitMeta, FileMode, Oid};
 use std::str;
-
-use crate::tree::FileMode;
 
 /// Inline parent list storing up to 2 parent OIDs with zero heap allocation.
 /// Falls back to dynamic vector only for octopus merges with 3+ parents.
@@ -349,17 +347,9 @@ impl<'a> Iterator for GitTreeIter<'a> {
         };
 
         let mode_bytes = &self.remaining_bytes[..space_idx];
-        let mode = match mode_bytes {
-            b"100644" => FileMode::RegularFile,
-            b"100755" => FileMode::ExecutableFile,
-            b"40000" | b"040000" => FileMode::Directory,
-            b"120000" => FileMode::Symlink,
-            other => {
-                return Some(Err(FractalError::ObjectCodec(format!(
-                    "Unsupported file mode in tree entry: {:?}",
-                    String::from_utf8_lossy(other)
-                ))));
-            }
+        let mode = match FileMode::from_octal_bytes(mode_bytes) {
+            Ok(parsed_mode) => parsed_mode,
+            Err(mode_err) => return Some(Err(mode_err)),
         };
 
         let after_space = &self.remaining_bytes[space_idx + 1..];
@@ -439,7 +429,7 @@ impl<'a> GitTreeRef<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::tree::{FileMode, GitTree, GitTreeEntry};
+    use crate::tree::{GitTree, GitTreeEntry};
 
     #[test]
     fn test_small_parent_list_inline_and_extra() {
@@ -505,12 +495,12 @@ mod tests {
         let entry_one = GitTreeEntry::new(
             FileMode::RegularFile,
             "README.md",
-            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            Oid::from_hex("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa").expect("hex"),
         );
         let entry_two = GitTreeEntry::new(
             FileMode::Directory,
             "src",
-            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            Oid::from_hex("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb").expect("hex"),
         );
         let tree = GitTree::new(vec![entry_one, entry_two]);
         let raw_object = tree.to_raw_object();

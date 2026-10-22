@@ -20,7 +20,7 @@ pub mod worktree;
 pub use authorizer::{HumanUacAuthorizer, StandardNonceAuthorizer};
 pub use operation::{Operation, OperationGraph, OperationMetadata, RepoViewSnapshot};
 pub use promotion_ledger::{PromotionLedgerData, PromotionStagingLedger};
-pub use refs::{DiskRefStore, FractalRef};
+pub use refs::{DiskRefStore, FractalRef, HeadState};
 pub use state_machine::{FractalWorkspaceNode, WorktreeState};
 pub use telemetry::{
     CommitCountVerdict, CommitCounter, CommitTelemetryConfig, TelemetryCommitNode,

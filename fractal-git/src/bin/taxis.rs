@@ -15,16 +15,17 @@
 use std::env;
 use std::path::PathBuf;
 
-#[path = "taxis_cmd/mod.rs"]
 mod taxis_cmd;
-use taxis_cmd::common::{print_json, CliContext};
-use taxis_cmd::{bench, commit, promotion, worktree};
+use taxis_cmd::common::{fail_io, print_json, reject, CliContext};
+use taxis_cmd::{bench, commit, doctor, git_bridge, init, promotion, relocate, worktree};
 
+use fg_native::RepoDocument;
 use fractal_git::constants::cli::CliTag;
 use fractal_git::{
-    ActorIdentity, AgentPushContext, CommitCountVerdict, CommitCounter, CommitMessageGuard,
-    CommitTelemetryConfig, ConflictGuard, DiskRefStore, FractalRef, Oid, OperationGraph,
-    PreReceiveGuard, QuotaGovernor, RefStore, TaxisPolicy, TelemetryCommitNode, TopologyVerifier,
+    ActorIdentity, AgentPushContext, CommitCounter, CommitMessageGuard, CommitTelemetryConfig,
+    ConflictGuard, DiskRefStore, FractalRef, HeadState, IpcCodec, IpcMessage, Oid, OperationGraph,
+    PacketLine, PreReceiveGuard, QuotaGovernor, RefStore, TaxisPolicy, TelemetryCommitNode,
+    TopologyVerifier,
 };
 
 fn resolve_canonical_subcommand(raw: &str) -> &str {
@@ -36,6 +37,9 @@ fn resolve_canonical_subcommand(raw: &str) -> &str {
         (&["co", "checkout"], "checkout"),
         (&["sw", "switch"], "switch"),
         (&["gate", "check", "verify"], "verify"),
+        (&["init"], "init"),
+        (&["doctor"], "doctor"),
+        (&["relocate"], "relocate"),
         (&["gc", "clean", "reclaim"], "reclaim"),
         (&["serve", "daemon"], "daemon"),
         (&["lg", "log"], "log"),
@@ -78,6 +82,9 @@ fn print_help() {
         r#"Usage: taxis <command> [options]
 
 Native Fractal Commands (with Git Alias Mappings):
+  init               Create a Taxis-native repository (--dev | --release)
+  doctor             Inspect repository layout, guard file & section integrity
+  relocate           Move a repository between the workspace and the store layout
   status,   st       Display fractal ref topology, staged index & quota status
   branch,   br       List or verify fractal branch hierarchies (Trunk/Cell/Card/Sub)
   commit,   ci       Create atomic commit with agent metadata
@@ -104,10 +111,48 @@ Flags:
     );
 }
 
-/// Dispatches repository status inspection, displaying fractal references and resource quotas.
+/// Renders the resolved `HEAD` position as a machine-readable object.
+fn head_json(head: &HeadState) -> serde_json::Value {
+    match head {
+        HeadState::Absent => serde_json::json!({ "kind": "absent" }),
+        HeadState::Detached(oid) => serde_json::json!({
+            "kind": "detached",
+            "oid": oid.to_hex(),
+        }),
+        HeadState::Symbolic { name, target } => serde_json::json!({
+            "kind": "symbolic",
+            "branch": name,
+            "oid": target.map(|oid| oid.to_hex()),
+        }),
+    }
+}
+
+/// Prints the resolved `HEAD` position in the human-readable status block.
+fn print_head(head: &HeadState) {
+    match head {
+        HeadState::Absent => println!("HEAD: (absent)"),
+        HeadState::Detached(oid) => println!("HEAD: detached at {}", oid.to_hex()),
+        HeadState::Symbolic { name, target } => match target {
+            Some(oid) => println!("HEAD: {} -> {}", name, oid.to_hex()),
+            None => println!("HEAD: {} (unborn)", name),
+        },
+    }
+}
+
+/// Dispatches repository status inspection, displaying the current head, references, and quotas.
+///
+/// A refused reference scan terminates with `EXIT_REJECTED` instead of printing an empty list, so
+/// a permission failure can never be mistaken for a repository that genuinely has no references.
 fn handle_status(ctx: &CliContext) {
     let ref_store = DiskRefStore::new(&ctx.git_dir);
-    let refs = ref_store.list_all().unwrap_or_default();
+    let refs = match ref_store.list_all() {
+        Ok(listed_refs) => listed_refs,
+        Err(scan_err) => fail_io("scan repository references", scan_err),
+    };
+    let head = match ref_store.head() {
+        Ok(head_state) => head_state,
+        Err(head_err) => fail_io("resolve repository HEAD", head_err),
+    };
     let quota = QuotaGovernor::default();
 
     if ctx.json_mode {
@@ -124,6 +169,7 @@ fn handle_status(ctx: &CliContext) {
         let status_payload = serde_json::json!({
             "engine": "taxis",
             "git_dir": ctx.git_dir.display().to_string(),
+            "head": head_json(&head),
             "ref_count": refs.len(),
             "refs": json_refs,
             "quota": {
@@ -137,6 +183,7 @@ fn handle_status(ctx: &CliContext) {
 
     print_banner();
     println!("Repository: {}", ctx.git_dir.display());
+    print_head(&head);
     println!("Discovered Fractal References ({}):", refs.len());
 
     if refs.is_empty() {
@@ -180,27 +227,21 @@ fn handle_branch(ctx: &CliContext) {
                         src,
                         dst
                     ),
-                    Err(merge_err) => eprintln!(
-                        "{} Merge rejected by TopologyVerifier: {}",
+                    Err(merge_err) => reject(
                         CliTag::VERIFY_FAIL,
-                        merge_err
+                        format!("Merge rejected by TopologyVerifier: {}", merge_err),
                     ),
                 }
             }
-            _ => eprintln!(
-                "{} Invalid fractal ref format. Expected refs/fractal/{{cell}}/{{card}}/...",
-                CliTag::ERROR
+            _ => reject(
+                CliTag::ERROR,
+                "Invalid fractal ref format. Expected refs/fractal/{cell}/{card}/...",
             ),
         }
         return;
     }
 
     handle_status(ctx);
-}
-
-/// Dispatches atomic commit creation with governance and identity checks.
-fn handle_commit(ctx: &CliContext) {
-    commit::handle_commit(ctx);
 }
 
 /// Dispatches time-travel undo operation, restoring branch heads to previous snapshot.
@@ -226,13 +267,13 @@ fn handle_undo(ctx: &CliContext) {
             if ctx.json_mode {
                 let json_val = serde_json::json!({
                     "status": "undone",
-                    "restored_operation_id": restored_op.operation_id.to_hex(),
+                    "restored_operation_id": restored_op.op_id.to_hex(),
                     "command": restored_op.metadata.command,
                     "description": restored_op.metadata.description,
                 });
                 print_json(&json_val);
             } else {
-                let hex_str = restored_op.operation_id.to_hex();
+                let hex_str = restored_op.op_id.to_hex();
                 let short_id = if hex_str.len() >= 10 {
                     &hex_str[..10]
                 } else {
@@ -279,7 +320,7 @@ fn handle_operation(ctx: &CliContext) {
             .iter()
             .map(|op_node| {
                 serde_json::json!({
-                    "operation_id": op_node.operation_id.to_hex(),
+                    "operation_id": op_node.op_id.to_hex(),
                     "actor": op_node.metadata.actor,
                     "command": op_node.metadata.command,
                     "description": op_node.metadata.description,
@@ -294,7 +335,7 @@ fn handle_operation(ctx: &CliContext) {
             println!("  (No recorded operations)");
         } else {
             for op_node in history_list {
-                let hex_str = op_node.operation_id.to_hex();
+                let hex_str = op_node.op_id.to_hex();
                 let short_id = if hex_str.len() >= 10 {
                     &hex_str[..10]
                 } else {
@@ -313,6 +354,10 @@ fn handle_operation(ctx: &CliContext) {
 }
 
 /// Computes official commit counts using anti-inflation telemetry filters.
+///
+/// The DAG is read from the host repository through the git bridge. An empty or unreadable
+/// repository is reported as such instead of collapsing to a fixed count, because a synthetic
+/// count is indistinguishable from a real one once printed.
 fn handle_rev_list(ctx: &CliContext) {
     let mut count_only = false;
     let mut all_transient = false;
@@ -332,23 +377,32 @@ fn handle_rev_list(ctx: &CliContext) {
         },
     };
 
-    // Simulate current repo state with anti-inflation filtering
-    let head = Some(Oid::from_bytes([42; 20]));
-    let verdict = CommitCounter::count_commits(head, &config, |oid| {
-        Ok(Some(TelemetryCommitNode {
-            oid: *oid,
-            parent_oids: Vec::new(),
-            is_human_signed: true,
-            is_promotion_merge: true,
-            is_agent_micro_commit: false,
-        }))
-    })
-    .unwrap_or(CommitCountVerdict {
-        official_count: 0,
-        total_raw_commits: 0,
-        filtered_agent_commits: 0,
-        dual_trunk_active: config.dual_trunk_enabled,
-    });
+    let work_root = git_bridge::resolve_work_root(&ctx.git_dir);
+    let head = match git_bridge::resolve_revision(&work_root, "HEAD") {
+        Ok(Some(head_oid)) => head_oid,
+        Ok(None) => reject(
+            CliTag::ERROR,
+            format!(
+                "no HEAD revision under '{}'; nothing to count",
+                work_root.display()
+            ),
+        ),
+        Err(resolve_err) => reject(CliTag::ERROR, resolve_err),
+    };
+
+    let nodes = match git_bridge::read_commit_nodes(&work_root, "HEAD") {
+        Ok(parsed_nodes) => parsed_nodes,
+        Err(read_err) => reject(CliTag::ERROR, read_err),
+    };
+    let node_index: std::collections::HashMap<Oid, TelemetryCommitNode> =
+        nodes.into_iter().map(|node| (node.oid, node)).collect();
+
+    let verdict = match CommitCounter::count_commits(Some(head), &config, |oid| {
+        Ok(node_index.get(oid).cloned())
+    }) {
+        Ok(count_verdict) => count_verdict,
+        Err(count_err) => reject(CliTag::ERROR, count_err),
+    };
 
     if count_only {
         if ctx.json_mode {
@@ -379,7 +433,11 @@ fn handle_rev_list(ctx: &CliContext) {
 }
 
 /// Runs multi-tier gate verification across authority, message, conflict, and quota checks.
-fn handle_verify(_ctx: &CliContext) {
+///
+/// The verdict is the conjunction of four independently probed tiers, and the verdict decides the
+/// exit status. `--json` renders the same four tier results instead of the banner, so a machine
+/// reader sees exactly the evidence a human reader does rather than a bare boolean.
+fn handle_verify(ctx: &CliContext) {
     let agent_ctx = AgentPushContext {
         agent_uid: "agent-verifier".into(),
         cell_id: "cell-core".into(),
@@ -387,7 +445,11 @@ fn handle_verify(_ctx: &CliContext) {
         is_force_push: false,
     };
     let agent_actor = ActorIdentity::agent(agent_ctx);
-    let human_actor = ActorIdentity::human("Supervisor", "supervisor@internal", None);
+    let human_actor = ActorIdentity::human(
+        "Supervisor",
+        "supervisor@internal",
+        "gate-selftest-credential",
+    );
     let policy = TaxisPolicy::rust_strict();
 
     let trunk_ref = FractalRef::Trunk;
@@ -397,16 +459,20 @@ fn handle_verify(_ctx: &CliContext) {
         subagent_id: "agent-verifier".into(),
     };
 
-    // 1. Verify PreReceiveGuard: Agent blocked on Trunk, Human allowed, Agent allowed on SubAgent
+    // Tier 1: an agent is blocked on the trunk, a credentialed human is allowed, an agent is
+    // allowed inside its own sandbox, and an uncredentialed human claim is refused.
     let agent_blocked =
         PreReceiveGuard::assert_actor_authorized(&trunk_ref, &agent_actor, &policy).is_err();
     let human_allowed =
         PreReceiveGuard::assert_actor_authorized(&trunk_ref, &human_actor, &policy).is_ok();
     let subagent_allowed =
         PreReceiveGuard::assert_actor_authorized(&subagent_ref, &agent_actor, &policy).is_ok();
-    let pre_receive_ok = agent_blocked && human_allowed && subagent_allowed;
+    let unverified_human = ActorIdentity::unverified_human("Supervisor", "supervisor@internal");
+    let credential_ok =
+        PreReceiveGuard::assert_actor_authorized(&trunk_ref, &unverified_human, &policy).is_err();
+    let pre_receive_ok = agent_blocked && human_allowed && subagent_allowed && credential_ok;
 
-    // 2. Verify CommitMessageGuard: Valid semantic format passes, raw telemetry blocked
+    // Tier 2: a semantically structured message passes the message guard.
     let valid_msg = concat!(
         "feat(core): verify taxis commit guard\n\n",
         "[Why]\nSystem integrity audit.\n\n",
@@ -415,58 +481,263 @@ fn handle_verify(_ctx: &CliContext) {
     );
     let msg_guard_ok = CommitMessageGuard::parse_and_verify(valid_msg, &policy, None).is_ok();
 
-    // 3. Conflict & Quota Guards
+    // Tiers 3 and 4: clean content carries no conflict markers, and a fresh quota accepts work.
     let conflict_ok =
         ConflictGuard::assert_clean_content("sample.rs", b"pub fn clean() {}\n").is_ok();
     let quota = QuotaGovernor::default();
     let quota_ok = quota.assert_spawn_capacity(0).is_ok() && quota.assert_storage_budget(0).is_ok();
+
+    let all_gates_passed = pre_receive_ok && msg_guard_ok && conflict_ok && quota_ok;
+    report_verify(
+        ctx,
+        &quota,
+        all_gates_passed,
+        pre_receive_ok,
+        msg_guard_ok,
+        conflict_ok,
+        quota_ok,
+    );
+
+    if !all_gates_passed {
+        std::process::exit(1);
+    }
+}
+
+/// Prints the four gate tier results in the requested format.
+fn report_verify(
+    ctx: &CliContext,
+    quota: &QuotaGovernor,
+    all_gates_passed: bool,
+    pre_receive_ok: bool,
+    msg_guard_ok: bool,
+    conflict_ok: bool,
+    quota_ok: bool,
+) {
+    let tier_state = |passed: bool| if passed { "PASS" } else { "FAIL" };
+
+    if ctx.json_mode {
+        let verify_payload = serde_json::json!({
+            "engine": "taxis",
+            "operation": "verify",
+            "all_gates_passed": all_gates_passed,
+            "tiers": {
+                "pre_receive": tier_state(pre_receive_ok),
+                "commit_message": tier_state(msg_guard_ok),
+                "conflict": tier_state(conflict_ok),
+                "quota": tier_state(quota_ok),
+            },
+            "quota": {
+                "max_worktrees": quota.max_concurrent_worktrees(),
+                "max_disk_mb": quota.max_disk_megabytes(),
+            },
+        });
+        print_json(&verify_payload);
+        return;
+    }
 
     println!(
         "=== Running Taxis Multi-Tier Gate Verification ===\n\
          [1/4] PreReceiveGuard   : {} (Human trunks & Agent sandbox)\n\
          [2/4] CommitMessageGuard: {} (Rust-grade type witness)\n\
          [3/4] ConflictGuard     : {} (Conflict marker scanning active)\n\
-         [4/4] QuotaGovernor     : {} (Limit {} worktrees, {} MB)\n\
-         Result: ALL GATES PASS (Zero rule drift)\n",
-        if pre_receive_ok { "OK" } else { "FAIL" },
-        if msg_guard_ok { "OK" } else { "FAIL" },
-        if conflict_ok { "OK" } else { "FAIL" },
-        if quota_ok { "OK" } else { "FAIL" },
+         [4/4] QuotaGovernor     : {} (Limit {} worktrees, {} MB)",
+        tier_state(pre_receive_ok),
+        tier_state(msg_guard_ok),
+        tier_state(conflict_ok),
+        tier_state(quota_ok),
         quota.max_concurrent_worktrees(),
-        quota.max_disk_megabytes()
+        quota.max_disk_megabytes(),
     );
+    if all_gates_passed {
+        println!("Result: ALL GATES PASS (Zero rule drift)");
+    } else {
+        println!("Result: GATE VERIFICATION FAILED (see per-tier verdicts above)");
+    }
 }
 
-/// Advances worktree reclamation epoch and cleans transient sandbox allocations.
-fn handle_reclaim(_ctx: &CliContext) {
+/// Reclaims worktree directories registered in the repository container's `WKTR` section.
+///
+/// The reported figures are the measured outcome of deleting the registered envelopes; an empty
+/// registry reports zero reclaimed rather than asserting a fixed success. Records that could not be
+/// removed are written back so a retry has something to act on.
+///
+/// A repository whose container has never been created holds no registry at all, which is the same
+/// situation as an empty one: there is nothing to reclaim and nothing to rewrite. Reporting that as
+/// a success keeps `reclaim` usable from an uninitialized checkout, where failing would demand an
+/// `init` step whose only effect is to create a container with no records.
+fn handle_reclaim(ctx: &CliContext) {
+    let container_path = fg_native::container_path(&ctx.git_dir);
+    if !container_path.is_file() {
+        report_reclaim(ctx, 0, &[], 0);
+        return;
+    }
+    let mut document = match RepoDocument::load(&container_path) {
+        Ok(loaded) => loaded,
+        Err(load_err) => fail_io(
+            format!("load repository container '{}'", container_path.display()),
+            load_err,
+        ),
+    };
+
+    let registered: Vec<fg_native::WorktreeRecord> = document.wktr.records().to_vec();
+    let mut reclaimed = 0usize;
+    let mut failed: Vec<String> = Vec::new();
+    let mut survivors: Vec<fg_native::WorktreeRecord> = Vec::new();
+
+    for record in registered {
+        if record.path.is_empty() {
+            continue;
+        }
+        let target = PathBuf::from(&record.path);
+        match std::fs::remove_dir_all(&target) {
+            Ok(()) => reclaimed += 1,
+            Err(remove_err) if remove_err.kind() == std::io::ErrorKind::NotFound => {
+                reclaimed += 1;
+            }
+            Err(remove_err) => {
+                failed.push(format!("{}: {}", record.path, remove_err));
+                survivors.push(record);
+            }
+        }
+    }
+
+    document.wktr = fg_native::WktrSection::new();
+    for survivor in survivors.iter() {
+        if let Err(upsert_err) = document.wktr.upsert(survivor.clone()) {
+            fail_io("rewrite worktree registry", upsert_err);
+        }
+    }
+    if let Err(save_err) = document.save_atomic(&container_path) {
+        fail_io(
+            format!(
+                "publish repository container '{}'",
+                container_path.display()
+            ),
+            save_err,
+        );
+    }
+
+    let retained = survivors.len();
+    report_reclaim(ctx, reclaimed, &failed, retained);
+    if !failed.is_empty() {
+        std::process::exit(1);
+    }
+}
+
+/// Prints the reclamation outcome in the format the caller asked for.
+///
+/// The failure list carries the reason each directory survived, so an operator can tell a locked
+/// file from a permissions problem without re-running the command.
+fn report_reclaim(ctx: &CliContext, reclaimed: usize, failures: &[String], retained: usize) {
+    if ctx.json_mode {
+        let reclaim_payload = serde_json::json!({
+            "engine": "taxis",
+            "operation": "reclaim",
+            "reclaimed_worktrees": reclaimed,
+            "retained_worktrees": retained,
+            "failures": failures,
+        });
+        print_json(&reclaim_payload);
+        return;
+    }
+
+    println!("=== Taxis Worktree & Sandbox Reclaimer ===");
+    println!("[RECLAIM] Reclaimed worktree directories: {}", reclaimed);
+    println!("[RECLAIM] Retained after failure      : {}", retained);
+    for failure in failures {
+        eprintln!("[RECLAIM] Retained '{}'", failure);
+    }
+}
+
+/// Reports the live status of the in-process IPC codec and protocol handlers.
+///
+/// Each line reflects an actual round-trip through the transport crate rather than a fixed
+/// literal, so a regression in the codec surfaces here instead of printing READY regardless.
+fn handle_daemon(ctx: &CliContext) {
+    let ipc_round_trip_ok = probe_ipc_round_trip();
+    let packetline_ok = probe_packetline_framing();
+
+    if ctx.json_mode {
+        let daemon_payload = serde_json::json!({
+            "engine": "taxis",
+            "operation": "daemon",
+            "ipc_frame_codec": if ipc_round_trip_ok { "READY" } else { "FAIL" },
+            "smart_protocol_v2": if packetline_ok { "READY" } else { "FAIL" },
+            "cas_bus": "STANDBY"
+        });
+        print_json(&daemon_payload);
+        if !(ipc_round_trip_ok && packetline_ok) {
+            std::process::exit(1);
+        }
+        return;
+    }
+
+    println!("=== Taxis Native Protocol Daemon ===");
+    println!("Supported Protocols:");
     println!(
-        "=== Taxis Worktree & Sandbox Reclaimer ===\n\
-         [RECLAIM] Epoch O(1) advanced.\n\
-         [RECLAIM] Reclaimed temporary sandbox slots: 0 allocated.\n\
-         [RECLAIM] Heap transient allocations reset: 0 bytes leaked."
+        "  - IPC Frame (4-byte length prefix) : {}",
+        if ipc_round_trip_ok { "READY" } else { "FAIL" }
     );
-}
-
-/// Prints protocol daemon readiness and smart Git transport connection status.
-fn handle_daemon(_ctx: &CliContext) {
     println!(
-        "=== Taxis Native Protocol Daemon ===\n\
-         Supported Protocols:\n\
-           - IPC Frame (4-byte length prefix) : READY\n\
-           - Smart Protocol v2 (PacketLine)   : READY\n\
-           - taxis:// In-Memory CAS Bus       : STANDBY"
+        "  - Smart Protocol v2 (PacketLine)   : {}",
+        if packetline_ok { "READY" } else { "FAIL" }
     );
+    println!("  - taxis:// In-Memory CAS Bus       : STANDBY");
+
+    if !(ipc_round_trip_ok && packetline_ok) {
+        std::process::exit(1);
+    }
 }
 
-/// Dispatches diff inspection or delegates to host Git for working tree diffs.
+/// Encodes and decodes a probe IPC frame, confirming the codec round-trips.
+fn probe_ipc_round_trip() -> bool {
+    let probe = IpcMessage::Ping { timestamp_ms: 0 };
+    match IpcCodec::encode(&probe) {
+        Ok(frame) => match IpcCodec::decode(&frame) {
+            Ok(Some((decoded, consumed))) => decoded == probe && consumed == frame.len(),
+            _ => false,
+        },
+        Err(_) => false,
+    }
+}
+
+/// Encodes and decodes a probe packet-line frame, confirming the framing round-trips.
+fn probe_packetline_framing() -> bool {
+    let frame = PacketLine::encode_line("probe");
+    match PacketLine::decode(&frame) {
+        Ok(lines) => lines.len() == 1 && lines[0] == "probe",
+        Err(_) => false,
+    }
+}
+
+/// Reports the working tree status as structured JSON, or delegates to host Git for text diffs.
 fn handle_diff(ctx: &CliContext) {
     if ctx.json_mode {
+        let work_root = git_bridge::resolve_work_root(&ctx.git_dir);
+        let entries = match git_bridge::read_status_entries(&work_root) {
+            Ok(status_entries) => status_entries,
+            Err(status_err) => reject(CliTag::ERROR, status_err),
+        };
+
+        let json_entries: Vec<serde_json::Value> = entries
+            .iter()
+            .map(|entry| {
+                serde_json::json!({
+                    "code": entry.code,
+                    "path": entry.path,
+                    "classification": entry.classification(),
+                })
+            })
+            .collect();
+        let status = if entries.is_empty() { "clean" } else { "dirty" };
+
         let output = serde_json::json!({
             "engine": "taxis",
             "operation": "diff",
             "git_dir": ctx.git_dir.display().to_string(),
-            "entries": [],
-            "status": "clean"
+            "status": status,
+            "entry_count": json_entries.len(),
+            "entries": json_entries
         });
         print_json(&output);
         return;
@@ -477,8 +748,10 @@ fn handle_diff(ctx: &CliContext) {
 /// Dispatches switching to fractal reference branches or falls back to host Git checkout.
 fn handle_checkout(ctx: &CliContext) {
     if ctx.args.is_empty() {
-        eprintln!("[ERROR] Expected branch, commit, or fractal ref to checkout.");
-        return;
+        reject(
+            CliTag::ERROR,
+            "Expected branch, commit, or fractal ref to checkout.",
+        );
     }
     let target = &ctx.args[0];
     if let Some(fref) = FractalRef::parse(target) {
@@ -522,11 +795,6 @@ fn handle_passthrough(cmd: &str, ctx: &CliContext) {
             std::process::exit(1);
         }
     }
-}
-
-/// Dispatches worktree subcommands (list, add, or falls back to passthrough).
-fn handle_worktree(ctx: &CliContext) {
-    worktree::handle_worktree(ctx);
 }
 
 /// Parses global CLI flags (--json, --git-dir) and separates subcommand arguments.
@@ -573,12 +841,15 @@ fn extract_effective_subcommand(filtered_args: &[String]) -> (&str, Vec<String>)
 /// Routes effective canonical subcommand to designated handler function.
 fn dispatch_command(effective_subcommand: &str, ctx: &CliContext) {
     match effective_subcommand {
+        "init" => init::handle_init(ctx),
+        "doctor" => doctor::handle_doctor(ctx),
+        "relocate" => relocate::handle_relocate(ctx),
         "status" => handle_status(ctx),
         "branch" => handle_branch(ctx),
-        "commit" => handle_commit(ctx),
+        "commit" => commit::handle_commit(ctx),
         "diff" => handle_diff(ctx),
         "checkout" => handle_checkout(ctx),
-        "worktree" => handle_worktree(ctx),
+        "worktree" => worktree::handle_worktree(ctx),
         "promotion" => promotion::handle_promotion(ctx),
         "bench" => bench::handle_bench(ctx),
         "undo" => handle_undo(ctx),
@@ -589,7 +860,7 @@ fn dispatch_command(effective_subcommand: &str, ctx: &CliContext) {
         "daemon" => handle_daemon(ctx),
         "version" => {
             print_banner();
-            println!("Version: 0.1.0 (Rust Stable, 9 Micro-Crates)");
+            println!("Version: 0.1.0 (Rust Stable, 10 Micro-Crates)");
         }
         "help" => print_help(),
         other => handle_passthrough(other, ctx),

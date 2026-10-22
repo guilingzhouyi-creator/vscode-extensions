@@ -1,11 +1,16 @@
 //! Module: Fractal Git Engine (Workspace Facade)
 //! File Path: src/lib.rs
 //! Architecture Role: Central unified facade for the Fractal Git high-performance kernel,
-//!   orchestrating fg-core, fg-object, fg-index, fg-algorithms, fg-pools, fg-storage, fg-topology,
-//!   fg-transport, and fg-gate micro-crates into an ergonomic, unified public API.
-//! Dependencies & Triggers: Depended upon by Taxis CLI binary and integration test suites.
-//! Responsibilities: Unified root API facade, backward-compatible namespaces, and rule catalog.
-//! Exit Semantics & Design Rationale: Provides single import point for all 9 micro-crates.
+//!   orchestrating fg-core, fg-object, fg-index, fg-algorithms, fg-pools, fg-native, fg-storage,
+//!   fg-topology, fg-transport, and fg-gate micro-crates into one ergonomic public API.
+//! Dependencies & Triggers: Depended upon by the Taxis CLI binary and integration test suites.
+//! Responsibilities: Unified root API facade and rule catalog.
+//! Exit Semantics & Design Rationale:
+//!   - `FileMode` and `IndexStage` are re-exported from `fg-core`, not from `fg-object` or
+//!     `fg-index`. They are domain value objects shared by every layer, so the facade must expose
+//!     exactly one path to each.
+//!   - No compatibility aliases are kept for renamed types. An alias keeps the old name alive at
+//!     every call site, which is precisely what a rename is meant to remove.
 //!
 //! ### Domain Governance Rules (SSOT):
 //! - `FGT-COR-001`: Core data model and error contract guard (fg-core)
@@ -52,22 +57,21 @@ pub use fg_core::constants;
 pub use fg_core::error::{FractalError, FractalResult};
 pub use fg_core::models::{
     ActorIdentity, AgentCommitMeta, AgentPushContext, AuthorityTier, AutoQualityScoreEnvelope,
-    ChangeId, DiffCoherenceMode, GitSignature, HumanUacProof, Oid, PraxisCardContext,
-    StagedPromotionRequest, StagedPromotionStatus, TaxisPolicy, ValidatedCommitWitness,
+    ChangeId, DiffCoherenceMode, FileMode, GitSignature, HumanUacProof, IndexStage, Oid,
+    PraxisCardContext, StagedPromotionRequest, StagedPromotionStatus, TaxisPolicy,
+    ValidatedCommitWitness,
 };
 pub use fg_core::traits::{
     GateVerdict, GateVerifier, OdbStore, ReclamationAudit, RefStore, StagedCandidate,
     WorktreeReclaimer,
 };
 pub use fg_object::{
-    FileMode, GitBlob, GitCommit, GitCommitRef, GitTree, GitTreeEntry, GitTreeEntryRef,
-    GitTreeIter, GitTreeRef, SmallParentList,
+    GitBlob, GitCommit, GitCommitRef, GitTag, GitTree, GitTreeEntry, GitTreeEntryRef, GitTreeIter,
+    GitTreeRef, SmallParentList, TagCodecError,
 };
 
 // Index exports
-pub use fg_index::{ConflictStageSlot, InMemoryIndexTree, IndexStage, VirtualIndexEntry};
-/// Backward-compatibility type alias mapping `InMemoryTreeBuilder` to [`InMemoryIndexTree`].
-pub type InMemoryTreeBuilder = InMemoryIndexTree;
+pub use fg_index::{ConflictStageSlot, InMemoryIndexTree, StagingEntry};
 
 // Algorithm exports
 pub use fg_algorithms::cdc::{ChunkDescriptor, FastCdcChunker};
@@ -99,6 +103,10 @@ pub use fg_pools::worktree_pool::{WorktreeDescriptor, WorktreeMode, WorktreePool
 pub use fg_storage::cas_backend::CasBackend;
 pub use fg_storage::cas_bridge::{CasFileDescriptor, CasToGitMaterializer, MaterializeRequest};
 pub use fg_storage::commit_graph::{CommitGraphEntry, CommitGraphReader, CommitGraphWriter};
+pub use fg_storage::commit_materializer::{
+    materialize_commit, serialize_commit_payload, serialize_tree_payload,
+    CommitMaterializationRequest, MaterializedCommit,
+};
 pub use fg_storage::loose::{write_loose_object, LooseOdb};
 pub use fg_storage::wal_journal::{WalJournal, WalRecord};
 
@@ -106,7 +114,7 @@ pub use fg_storage::wal_journal::{WalJournal, WalRecord};
 pub use fg_topology::authorizer::{HumanUacAuthorizer, StandardNonceAuthorizer};
 pub use fg_topology::operation::{Operation, OperationGraph, OperationMetadata, RepoViewSnapshot};
 pub use fg_topology::promotion_ledger::{PromotionLedgerData, PromotionStagingLedger};
-pub use fg_topology::refs::{DiskRefStore, FractalRef};
+pub use fg_topology::refs::{DiskRefStore, FractalRef, HeadState};
 pub use fg_topology::state_machine::{FractalWorkspaceNode, WorktreeState};
 pub use fg_topology::telemetry::{
     CommitCountVerdict, CommitCounter, CommitTelemetryConfig, TelemetryCommitNode,
@@ -124,8 +132,6 @@ pub use fg_gate::commit_guard::CommitMessageGuard;
 pub use fg_gate::conflict_guard::ConflictGuard;
 pub use fg_gate::pre_receive::PreReceiveGuard;
 pub use fg_gate::quota_governor::QuotaGovernor;
-/// Backward-compatibility type alias mapping `WorkspaceQuotaGuard` to [`QuotaGovernor`].
-pub type WorkspaceQuotaGuard = QuotaGovernor;
 
 // Benchmark & Performance Ratchet exports
 pub mod bench;

@@ -1,9 +1,9 @@
 //! Unit Test: fg-index (InMemoryIndexTree, ConflictStageSlot, IndexStage)
 //! File Path: tests/rust/test_index.rs
 
+use fractal_git::core::models::FileMode;
 use fractal_git::core::models::Oid;
 use fractal_git::index::{ConflictStageSlot, InMemoryIndexTree, IndexStage};
-use fractal_git::object::FileMode;
 
 #[test]
 fn test_in_memory_index_tree_clean_workflow() {
@@ -24,7 +24,7 @@ fn test_in_memory_index_tree_clean_workflow() {
     let mut built_trees = Vec::new();
     let root_oid = index
         .write_tree_with_persister(|tree| {
-            built_trees.push(*tree.raw_oid());
+            built_trees.push(*tree.oid());
             Ok(())
         })
         .expect("Tree build should succeed");
@@ -89,19 +89,19 @@ fn test_conflict_stage_slot_resolution() {
     let ours_oid = Oid::from_bytes([2u8; 20]);
     let theirs_oid = Oid::from_bytes([3u8; 20]);
 
-    slot.record_stage(&fractal_git::index::VirtualIndexEntry::with_stage(
+    slot.record_stage(&fractal_git::index::StagingEntry::with_stage(
         "src/main.rs",
         FileMode::RegularFile,
         base_oid,
         IndexStage::Base,
     ));
-    slot.record_stage(&fractal_git::index::VirtualIndexEntry::with_stage(
+    slot.record_stage(&fractal_git::index::StagingEntry::with_stage(
         "src/main.rs",
         FileMode::RegularFile,
         ours_oid,
         IndexStage::Ours,
     ));
-    slot.record_stage(&fractal_git::index::VirtualIndexEntry::with_stage(
+    slot.record_stage(&fractal_git::index::StagingEntry::with_stage(
         "src/main.rs",
         FileMode::RegularFile,
         theirs_oid,
@@ -208,9 +208,9 @@ fn test_first_class_conflict_management() {
     assert!(tree.conflicts().contains_key("src/state.rs"));
 
     let slot = tree.conflicts().get("src/state.rs").unwrap();
-    assert_eq!(slot.base.unwrap().1, base_oid);
-    assert_eq!(slot.ours.unwrap().1, our_oid);
-    assert_eq!(slot.theirs.unwrap().1, their_oid);
+    assert_eq!(slot.base.as_ref().map(|entry| entry.oid), Some(base_oid));
+    assert_eq!(slot.ours.as_ref().map(|entry| entry.oid), Some(our_oid));
+    assert_eq!(slot.theirs.as_ref().map(|entry| entry.oid), Some(their_oid));
 
     // Resolve conflict using Ours
     let resolved = slot.resolve_ours().unwrap();
@@ -238,8 +238,14 @@ fn test_sparse_directory_collapsing_and_reconstruction() {
         .expect("Stage sparse directory succeeds");
 
     assert_eq!(index.entry_count(), 2);
-    let vendor_entry = index.entries().get("vendor").expect("Vendor entry exists");
-    assert!(vendor_entry.is_sparse_dir());
+    // The map key is the address form (no trailing separator); the entry keeps the trailing `/`
+    // that marks it collapsed.
+    let vendor_entry = index
+        .entries()
+        .get("vendor")
+        .expect("collapsed vendor entry exists");
+    assert_eq!(vendor_entry.path, "vendor/");
+    assert!(vendor_entry.is_sparse_directory());
     assert_eq!(vendor_entry.oid, vendor_subtree_oid);
     assert_eq!(vendor_entry.mode, FileMode::Directory);
 

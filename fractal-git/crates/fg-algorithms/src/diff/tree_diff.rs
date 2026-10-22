@@ -10,8 +10,9 @@
 //!   stream. Identical tree hashes terminate recursive descent in $O(1)$ time, guaranteeing
 //!   microsecond latency on massive trees.
 
+use fg_core::models::FileMode;
 use fg_core::models::Oid;
-use fg_object::{FileMode, GitTree};
+use fg_object::GitTree;
 use std::collections::BTreeMap;
 
 /// Type of change detected for a path in a tree diff.
@@ -201,7 +202,7 @@ impl TreeDiff {
     {
         // 1. O(1) Short-Circuit: Identical Subtree Hash
         if let (Some(old_tree_ref), Some(new_tree_ref)) = (old_tree, new_tree) {
-            if old_tree_ref.raw_oid() == new_tree_ref.raw_oid() {
+            if old_tree_ref.oid() == new_tree_ref.oid() {
                 return;
             }
         }

@@ -13,5 +13,9 @@
 pub mod bench;
 pub mod commit;
 pub mod common;
+pub mod doctor;
+pub mod git_bridge;
+pub mod init;
 pub mod promotion;
+pub mod relocate;
 pub mod worktree;

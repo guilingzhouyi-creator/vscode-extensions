@@ -13,8 +13,8 @@
 //!   - Deterministic ConflictEntry reporting prevents silent data loss during divergent
 //!     parallel edits.
 
-use fg_core::models::Oid;
-use fg_object::{FileMode, GitTree, GitTreeEntry};
+use fg_core::models::{FileMode, Oid};
+use fg_object::{GitTree, GitTreeEntry};
 use std::collections::BTreeMap;
 
 /// Fast-path resolution for canonical tree OIDs during three-way merge.
@@ -247,9 +247,9 @@ impl ThreeWayMerge {
     where
         F: FnMut(&Oid) -> Option<GitTree>,
     {
-        let base_oid = base.map(|tree| *tree.raw_oid()).unwrap_or(Oid::ZERO);
-        let ours_oid = ours.map(|tree| *tree.raw_oid()).unwrap_or(Oid::ZERO);
-        let theirs_oid = theirs.map(|tree| *tree.raw_oid()).unwrap_or(Oid::ZERO);
+        let base_oid = base.map(|tree| *tree.oid()).unwrap_or(Oid::ZERO);
+        let ours_oid = ours.map(|tree| *tree.oid()).unwrap_or(Oid::ZERO);
+        let theirs_oid = theirs.map(|tree| *tree.oid()).unwrap_or(Oid::ZERO);
 
         // O(1) Fast-Path evaluation
         if let Some(fast_path) = Self::evaluate_tree_fast_paths(&base_oid, &ours_oid, &theirs_oid) {
@@ -490,10 +490,10 @@ where
             &mut sub_entries,
         );
         let merged_sub_tree = GitTree::new(sub_entries);
-        out_entries.push(GitTreeEntry::from_oid(
+        out_entries.push(GitTreeEntry::new(
             FileMode::Directory,
             name,
-            *merged_sub_tree.raw_oid(),
+            *merged_sub_tree.oid(),
         ));
     }
 
@@ -516,26 +516,26 @@ mod tests {
 
     #[test]
     fn test_canonical_tree_merge_clean_disjoint() {
-        let base_entries = vec![GitTreeEntry::from_oid(
+        let base_entries = vec![GitTreeEntry::new(
             FileMode::RegularFile,
             "common.rs",
             Oid::from_bytes([1u8; 20]),
         )];
         let ours_entries = vec![
-            GitTreeEntry::from_oid(
+            GitTreeEntry::new(
                 FileMode::RegularFile,
                 "common.rs",
                 Oid::from_bytes([1u8; 20]),
             ),
-            GitTreeEntry::from_oid(FileMode::RegularFile, "ours.rs", Oid::from_bytes([2u8; 20])),
+            GitTreeEntry::new(FileMode::RegularFile, "ours.rs", Oid::from_bytes([2u8; 20])),
         ];
         let theirs_entries = vec![
-            GitTreeEntry::from_oid(
+            GitTreeEntry::new(
                 FileMode::RegularFile,
                 "common.rs",
                 Oid::from_bytes([1u8; 20]),
             ),
-            GitTreeEntry::from_oid(
+            GitTreeEntry::new(
                 FileMode::RegularFile,
                 "theirs.rs",
                 Oid::from_bytes([3u8; 20]),
@@ -567,17 +567,17 @@ mod tests {
 
     #[test]
     fn test_canonical_tree_merge_conflict() {
-        let base_entries = vec![GitTreeEntry::from_oid(
+        let base_entries = vec![GitTreeEntry::new(
             FileMode::RegularFile,
             "target.rs",
             Oid::from_bytes([1u8; 20]),
         )];
-        let ours_entries = vec![GitTreeEntry::from_oid(
+        let ours_entries = vec![GitTreeEntry::new(
             FileMode::RegularFile,
             "target.rs",
             Oid::from_bytes([2u8; 20]),
         )];
-        let theirs_entries = vec![GitTreeEntry::from_oid(
+        let theirs_entries = vec![GitTreeEntry::new(
             FileMode::RegularFile,
             "target.rs",
             Oid::from_bytes([3u8; 20]),

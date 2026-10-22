@@ -1,0 +1,17 @@
+[package]
+name = "fg-native"
+version = "0.1.0"
+edition = "2021"
+description = "Taxis native binary repository container (TAXC): sectioned, CRC32C-verified, mmap-friendly."
+authors = ["Google DeepMind Advanced Agentic Coding Pair"]
+license = "MIT"
+
+[dependencies]
+fg-core = { path = "../fg-core" }
+getrandom = { version = "0.4", default-features = false }
+sha1 = "0.10"
+thiserror = "1.0"
+
+[[test]]
+name = "test_native_container"
+path = "tests/rust/test_native_container.rs"

@@ -145,11 +145,13 @@ impl CommitGraphWriter {
             };
             buffer.extend_from_slice(&second_parent_pos.to_be_bytes());
 
-            // 8 bytes: Generation (top 30 bits) and Unix timestamp (lower 34 bits)
-            let generation_val = (entry.generation.min(0x3fff_ffff) as u64) << 34;
-            let timestamp_val = entry.timestamp_sec & 0x0000_0003_ffff_ffff;
-            let packed_metadata = generation_val | timestamp_val;
-            buffer.extend_from_slice(&packed_metadata.to_be_bytes());
+            // 4 bytes: Generation number (topological depth, capped by the format's 30 usable bits)
+            let generation_word = entry.generation.min(0x3fff_ffff);
+            buffer.extend_from_slice(&generation_word.to_be_bytes());
+
+            // 4 bytes: Commit time as a Unix timestamp
+            let timestamp_word = (entry.timestamp_sec & 0xffff_ffff) as u32;
+            buffer.extend_from_slice(&timestamp_word.to_be_bytes());
         }
 
         // 6. Trailing SHA-1 Checksum (20 bytes)
@@ -179,6 +181,12 @@ impl CommitGraphWriter {
 }
 
 /// Zero-copy reader & validator for Git Commit-Graph (`CGPH`) files.
+///
+/// A graph may be written as a chain: each file lists only its own commits, and a parent that lives
+/// in an earlier file is recorded by position in that earlier file. The parent position therefore is
+/// not always usable as an index into this file's own table, so [`Self::base_graph_count`] reports
+/// whether a chain exists and [`Self::get_entry`] omits parents whose position lies outside the
+/// local table instead of reading an unrelated slot.
 #[derive(Debug, Clone)]
 pub struct CommitGraphReader {
     binary_buffer: Vec<u8>,
@@ -186,6 +194,7 @@ pub struct CommitGraphReader {
     oidl_offset: usize,
     cdat_offset: usize,
     num_commits: usize,
+    base_graph_count: u8,
 }
 
 impl CommitGraphReader {
@@ -236,6 +245,7 @@ impl CommitGraphReader {
         }
 
         let chunk_count = raw_bytes[6] as usize;
+        let base_graph_count_byte = raw_bytes[7];
         let mut oidf_offset = None;
         let mut oidl_offset = None;
         let mut cdat_offset = None;
@@ -284,12 +294,43 @@ impl CommitGraphReader {
             oidl_offset: oidl_off,
             cdat_offset: cdat_off,
             num_commits,
+            base_graph_count: base_graph_count_byte,
         })
     }
 
     /// Total number of commits indexed inside this commit-graph.
     pub fn num_commits(&self) -> usize {
         self.num_commits
+    }
+
+    /// Number of earlier graph files this one chains onto.
+    ///
+    /// A non-zero value means some parent positions index an earlier file's table rather than this
+    /// one's, so a caller walking parents must consult the earlier file for those positions.
+    pub fn base_graph_count(&self) -> u8 {
+        self.base_graph_count
+    }
+
+    /// Reports whether a parent position addresses a slot in this file's own table.
+    fn is_local_position(&self, position: u32) -> bool {
+        position != NO_PARENT_MARKER && (position as usize) < self.num_commits
+    }
+
+    /// Reads the object id at a parent position when it is local to this file.
+    fn local_parent_oid(&self, position: u32) -> Option<Oid> {
+        if !self.is_local_position(position) {
+            return None;
+        }
+        let parent_off = self
+            .oidl_offset
+            .checked_add((position as usize).checked_mul(20)?)?;
+        let slice_end = parent_off.checked_add(20)?;
+        let bytes: [u8; 20] = self
+            .binary_buffer
+            .get(parent_off..slice_end)?
+            .try_into()
+            .ok()?;
+        Some(Oid::from_bytes(bytes))
     }
 
     /// Fast O(1) + O(log N) lookup finding commit position inside the graph.
@@ -366,29 +407,24 @@ impl CommitGraphReader {
             .ok()?;
         let parent_2_pos = u32::from_be_bytes(parent_2_bytes);
 
-        let packed_meta_bytes: [u8; 8] = self.binary_buffer[cdat_off + 28..cdat_off + 36]
+        // Git records generation and commit time as two separate 32-bit words, not one packed
+        // 64-bit value: generation occupies bytes 28..32 and commit time occupies bytes 32..36.
+        let generation_bytes: [u8; 4] = self.binary_buffer[cdat_off + 28..cdat_off + 32]
             .try_into()
             .ok()?;
-        let packed_meta = u64::from_be_bytes(packed_meta_bytes);
-        let generation = ((packed_meta >> 34) & 0x3fff_ffff) as u32;
-        let timestamp_sec = packed_meta & 0x0000_0003_ffff_ffff;
+        let generation = u32::from_be_bytes(generation_bytes) & 0x3fff_ffff;
+
+        let time_bytes: [u8; 4] = self.binary_buffer[cdat_off + 32..cdat_off + 36]
+            .try_into()
+            .ok()?;
+        let timestamp_sec = u32::from_be_bytes(time_bytes) as u64;
 
         let mut parent_oids = Vec::new();
-        if parent_1_pos != NO_PARENT_MARKER {
-            let parent_off = self.oidl_offset + (parent_1_pos as usize) * 20;
-            if parent_off + 20 <= self.binary_buffer.len() {
-                if let Ok(bytes) = self.binary_buffer[parent_off..parent_off + 20].try_into() {
-                    parent_oids.push(Oid::from_bytes(bytes));
-                }
-            }
+        if let Some(parent_oid) = self.local_parent_oid(parent_1_pos) {
+            parent_oids.push(parent_oid);
         }
-        if parent_2_pos != NO_PARENT_MARKER {
-            let parent_off = self.oidl_offset + (parent_2_pos as usize) * 20;
-            if parent_off + 20 <= self.binary_buffer.len() {
-                if let Ok(bytes) = self.binary_buffer[parent_off..parent_off + 20].try_into() {
-                    parent_oids.push(Oid::from_bytes(bytes));
-                }
-            }
+        if let Some(parent_oid) = self.local_parent_oid(parent_2_pos) {
+            parent_oids.push(parent_oid);
         }
 
         Some(CommitGraphEntry {

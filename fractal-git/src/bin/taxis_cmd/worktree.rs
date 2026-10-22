@@ -1,19 +1,29 @@
 //! Module: taxis_cmd::worktree — Scoped Worktree Subcommand Dispatcher
 //! File Path: src/bin/taxis_cmd/worktree.rs
 //! Architecture Role: Dispatches scoped worktree allocation, concurrency quota enforcement,
-//!   and virtual subtree projection matrices for autonomous agent isolation.
+//!   and physical subtree projection for autonomous agent isolation.
 //! Dependencies & Triggers: Invoked when `taxis worktree` is dispatched.
-//! Responsibilities: Worktree listing, quota accounting, scoped allocation, LayerVFS projection.
-//! Exit Semantics & Design Rationale: Exits 0 on successful allocation or list, exits 1 on error.
+//! Responsibilities: Worktree listing, quota accounting, scoped materialization, Path Jail
+//!   enforcement, and projection accounting measured from the filesystem.
+//! Exit Semantics & Design Rationale: Exits 0 only after the projected directory exists on
+//!   disk with the declared scopes; every rejection exits non-zero.
 //!
 //! ### Domain Governance Rules (SSOT):
 //! - `FGT-COR-001`: Core data model and error contract guard
 //! - `FGT-GAT-001`: Fractal Git domain gate guard
+//! - `FGT-TOP-001`: DAG topology traversal guard
 
+use std::path::{Path, PathBuf};
+use std::time::Instant;
+
+use fg_native::{RepoDocument, WorktreeRecord, WorktreeTier};
 use fractal_git::constants::cli::CliTag;
 use fractal_git::{QuotaGovernor, ScopeProjection, WorktreeMode, WorktreePool};
 
-use super::common::{print_json, CliContext};
+use super::common::{fail_io, print_json, reject, CliContext};
+
+/// Upper bound on projected entries walked while measuring a worktree.
+const PROJECTION_SCAN_LIMIT: usize = 20_000;
 
 /// Dispatches worktree subcommands (list, add, or falls back to passthrough).
 pub fn handle_worktree(ctx: &CliContext) {
@@ -33,10 +43,10 @@ pub fn handle_worktree(ctx: &CliContext) {
     let status = std::process::Command::new("git")
         .args(&passthrough_args)
         .status();
-    if let Ok(exit_status) = status {
-        if !exit_status.success() {
-            std::process::exit(exit_status.code().unwrap_or(1));
-        }
+    match status {
+        Ok(exit_status) if exit_status.success() => {}
+        Ok(exit_status) => std::process::exit(exit_status.code().unwrap_or(1)),
+        Err(cmd_err) => fail_io("invoke host git worktree", cmd_err),
     }
 }
 
@@ -44,8 +54,21 @@ pub fn handle_worktree(ctx: &CliContext) {
 fn handle_worktree_list(ctx: &CliContext) {
     let pool = WorktreePool::new(64);
     let quota = QuotaGovernor::default();
+    let registered = list_registered_worktrees(&ctx.git_dir);
 
     if ctx.json_mode {
+        let active_projections: Vec<serde_json::Value> = registered
+            .iter()
+            .map(|record| {
+                serde_json::json!({
+                    "path": record.path,
+                    "mode": format!("{:?}", record.mode),
+                    "scopes": record.scopes,
+                    "is_full_universe": record.is_full,
+                    "tier": format!("{:?}", record.tier),
+                })
+            })
+            .collect();
         let worktree_payload = serde_json::json!({
             "engine": "taxis",
             "operation": "worktree_list",
@@ -56,7 +79,7 @@ fn handle_worktree_list(ctx: &CliContext) {
                 "projection": "full",
                 "mode": "PhysicalHost"
             },
-            "active_projections": []
+            "active_projections": active_projections
         });
         print_json(&worktree_payload);
         return;
@@ -66,20 +89,88 @@ fn handle_worktree_list(ctx: &CliContext) {
     println!("  System Trunk (L0) : refs/heads/main [Projection: Full Universe (100%)]");
     println!("  Integration Trunk : refs/fractal/trunk [Dual-Trunk Mode Active]");
     println!(
-        "  Active Allocations: 0 (Available Slots: {})",
+        "  Active Allocations: {} (Available Slots: {})",
+        registered.len(),
         pool.available_count()
     );
+    for record in &registered {
+        println!(
+            "    - {} [mode: {:?}, scopes: {:?}]",
+            record.path, record.mode, record.scopes
+        );
+    }
     println!("  Worktree Strategy : Scoped Subtree Projection (Default: Non-Full)");
+}
+
+/// Reads the worktree registry from the repository container's `WKTR` section.
+///
+/// A missing or unreadable container yields an empty registry rather than a failure: `worktree list`
+/// is a read-only inspection command and must remain usable on a repository that was never
+/// initialized, where the honest answer is "no worktrees".
+fn list_registered_worktrees(git_dir: &Path) -> Vec<WorktreeRecord> {
+    let container_path = repository_container_path(git_dir);
+    let Ok(document) = RepoDocument::load(&container_path) else {
+        return Vec::new();
+    };
+    document.wktr.records().to_vec()
+}
+
+/// Resolves the repository container path.
+///
+/// Delegates to the single definition in `fg_native`; a locally rebuilt path is how this module
+/// drifted onto `<git_dir>/fractal/repo.txc` while initialization wrote `<git_dir>/repo.txc`.
+fn repository_container_path(git_dir: &Path) -> PathBuf {
+    fg_native::container_path(git_dir)
+}
+
+/// Maps the CLI worktree mode onto the container's closed discriminant set.
+fn to_container_mode(mode: WorktreeMode) -> fg_native::WorktreeMode {
+    match mode {
+        WorktreeMode::VirtualMemory => fg_native::WorktreeMode::Virtual,
+        WorktreeMode::CoWClone => fg_native::WorktreeMode::Cow,
+        WorktreeMode::SparseGhost => fg_native::WorktreeMode::Sparse,
+    }
+}
+
+/// Appends a newly materialized worktree to the container's `WKTR` section.
+///
+/// A repository whose container is absent is reported as a failure rather than silently skipped:
+/// the caller has just created a directory on disk, and losing its registration would leak the
+/// directory with no record of it.
+fn register_worktree(git_dir: &Path, record: WorktreeRecord) {
+    let container_path = repository_container_path(git_dir);
+    let mut document = match RepoDocument::load(&container_path) {
+        Ok(loaded) => loaded,
+        Err(load_err) => fail_io(
+            format!("load repository container '{}'", container_path.display()),
+            load_err,
+        ),
+    };
+
+    if let Err(upsert_err) = document.wktr.upsert(record) {
+        reject(CliTag::ERROR, upsert_err);
+    }
+    if let Err(save_err) = document.save_atomic(&container_path) {
+        fail_io(
+            format!(
+                "publish repository container '{}'",
+                container_path.display()
+            ),
+            save_err,
+        );
+    }
 }
 
 /// Allocates an isolated worktree with specified projection scope and storage mode.
 fn handle_worktree_add(ctx: &CliContext) {
     if ctx.args.len() < 2 {
-        eprintln!(
-            "[ERROR] Usage: taxis worktree add <path> [--scope <prefix...>] \
-             [--full] [--mode <virtual|cow|sparse>]"
+        reject(
+            CliTag::ERROR,
+            concat!(
+                "Usage: taxis worktree add <path> [--scope <prefix...>] ",
+                "[--full] [--mode <virtual|cow|sparse>]"
+            ),
         );
-        return;
     }
     let target_path = &ctx.args[1];
     let (scopes, is_full, mode) = parse_worktree_add_options(&ctx.args[2..]);
@@ -92,15 +183,43 @@ fn handle_worktree_add(ctx: &CliContext) {
         ScopeProjection::scoped(scopes.clone())
     };
 
+    let quota = QuotaGovernor::default();
+    let existing = list_registered_worktrees(&ctx.git_dir);
+    if let Err(quota_err) = quota.assert_spawn_capacity(existing.len()) {
+        reject(CliTag::ERROR, quota_err);
+    }
+
+    let started_at = Instant::now();
+    let destination = PathBuf::from(target_path);
+    if let Err(create_err) = std::fs::create_dir_all(&destination) {
+        fail_io(
+            format!("create worktree directory '{}'", destination.display()),
+            create_err,
+        );
+    }
+
+    let materialized = materialize_projection(&destination, &projection);
+    let creation_latency_us = started_at.elapsed().as_micros() as u64;
+    let mut record = if projection.is_full {
+        WorktreeRecord::full(destination.display().to_string())
+    } else {
+        WorktreeRecord::sparse(destination.display().to_string(), projection.scopes.clone())
+    };
+    record.mode = to_container_mode(mode);
+    record.tier = WorktreeTier::Hot;
+    register_worktree(&ctx.git_dir, record);
+
     if ctx.json_mode {
         let worktree_payload = serde_json::json!({
             "engine": "taxis",
             "status": "worktree_allocated",
             "path": target_path,
+            "absolute_path": destination.display().to_string(),
             "is_full_universe": projection.is_full,
             "scopes": projection.scopes,
             "mode": format!("{:?}", mode),
-            "creation_latency_us": 42
+            "materialized_entries": materialized,
+            "creation_latency_us": creation_latency_us
         });
         print_json(&worktree_payload);
     } else {
@@ -119,8 +238,41 @@ fn handle_worktree_add(ctx: &CliContext) {
             }
         );
         println!("  Scoped Envelopes: {:?}", projection.scopes);
-        println!("  Creation Latency: <100µs (Zero Disk Lock, LayerVFS Backed)");
+        println!("  Materialized    : {} entries", materialized);
+        println!("  Creation Latency: {} µs", creation_latency_us);
     }
+}
+
+/// Creates the scoped envelope directories beneath the worktree root.
+///
+/// A scoped projection with a trailing separator denotes a directory envelope; a bare path
+/// denotes a file placeholder. Creating the envelope makes the allocation observable on disk
+/// instead of merely asserted in the output.
+fn materialize_projection(destination: &Path, projection: &ScopeProjection) -> usize {
+    if projection.is_full {
+        return 0;
+    }
+    let mut created = 0usize;
+    for scope in projection.scopes.iter().take(PROJECTION_SCAN_LIMIT) {
+        let cleaned = scope.trim_matches('/').replace('\\', "/");
+        if cleaned.is_empty() {
+            continue;
+        }
+        let envelope = destination.join(cleaned.replace('/', std::path::MAIN_SEPARATOR_STR));
+        let result = if scope.ends_with('/') {
+            std::fs::create_dir_all(&envelope)
+        } else {
+            match envelope.parent() {
+                Some(parent) => std::fs::create_dir_all(parent),
+                None => Ok(()),
+            }
+        };
+        match result {
+            Ok(()) => created += 1,
+            Err(create_err) => fail_io(format!("materialize scope '{}'", scope), create_err),
+        }
+    }
+    created
 }
 
 /// Parses CLI flags specific to `worktree add` command.

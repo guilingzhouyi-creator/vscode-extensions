@@ -5,7 +5,10 @@
 //! Dependencies & Triggers: Invoked when `taxis promotion` is dispatched.
 //! Responsibilities: Proposal staging, human UAC nonce authorization,
 //!   proposal rejection, queue listing.
-//! Exit Semantics & Design Rationale: Enforces zero-compromise promotion gates with 1-hour leases.
+//! Exit Semantics & Design Rationale: Every rejection terminates with a non-zero status.
+//!   The CLI never synthesizes an operator identity or a challenge nonce on the caller's
+//!   behalf: both must arrive from the GUI session out of band, otherwise the "physical
+//!   click" gate degenerates into a self-signed rubber stamp.
 //!
 //! ### Domain Governance Rules (SSOT):
 //! - `FGT-COR-001`: Core data model and error contract guard
@@ -17,7 +20,10 @@ use fractal_git::{
     PromotionStagingLedger, RefStore, StandardNonceAuthorizer, TaxisPolicy,
 };
 
-use super::common::{find_arg_value, print_json, CliContext};
+use super::common::{find_arg_value, print_json, reject, CliContext};
+
+/// Byte length of the GUI challenge nonce carried by a UAC proof.
+const NONCE_BYTES: usize = 32;
 
 /// Dispatches promotion subcommand requests (stage, approve, reject, list).
 pub fn handle_promotion(ctx: &CliContext) {
@@ -28,10 +34,10 @@ pub fn handle_promotion(ctx: &CliContext) {
 
     let mut ledger = match PromotionStagingLedger::load_or_init(&ctx.git_dir) {
         Ok(loaded_ledger) => loaded_ledger,
-        Err(load_err) => {
-            eprintln!("Error loading staged promotion ledger: {}", load_err);
-            return;
-        }
+        Err(load_err) => reject(
+            CliTag::ERROR,
+            format!("cannot load staged promotion ledger: {}", load_err),
+        ),
     };
     let policy = TaxisPolicy::default();
 
@@ -57,23 +63,32 @@ pub fn handle_promotion(ctx: &CliContext) {
     }
 }
 
-/// Parses candidate commit OID from arguments or falls back to current trunk head.
-fn resolve_candidate_oid(ctx: &CliContext) -> Option<Oid> {
+/// Parses candidate commit OID from arguments or falls back to the integration trunk head.
+fn resolve_candidate_oid(ctx: &CliContext) -> Oid {
     if let Some(hex_str) = find_arg_value(&ctx.args, &["--oid", "--candidate", "--target-oid"]) {
-        match Oid::from_hex(hex_str) {
-            Ok(parsed_oid) => Some(parsed_oid),
-            Err(hex_err) => {
-                eprintln!("Invalid candidate OID '{}': {}", hex_str, hex_err);
-                None
-            }
-        }
-    } else {
-        let ref_store = DiskRefStore::new(&ctx.git_dir);
-        let oid = match ref_store.get_ref("refs/fractal/trunk") {
-            Ok(Some(trunk_oid)) => trunk_oid,
-            _ => Oid::from_bytes([0xaa; 20]),
+        return match Oid::from_hex(hex_str) {
+            Ok(parsed_oid) => parsed_oid,
+            Err(hex_err) => reject(
+                CliTag::ERROR,
+                format!("invalid candidate OID '{}': {}", hex_str, hex_err),
+            ),
         };
-        Some(oid)
+    }
+
+    let ref_store = DiskRefStore::new(&ctx.git_dir);
+    match ref_store.get_ref(fractal_git::constants::refs::REF_FRACTAL_TRUNK) {
+        Ok(Some(trunk_oid)) => trunk_oid,
+        Ok(None) => reject(
+            CliTag::ERROR,
+            concat!(
+                "no candidate supplied and integration trunk is absent; ",
+                "pass --candidate <40-hex-oid>"
+            ),
+        ),
+        Err(read_err) => reject(
+            CliTag::ERROR,
+            format!("cannot read integration trunk reference: {}", read_err),
+        ),
     }
 }
 
@@ -85,8 +100,8 @@ fn parse_auto_score(args: &[String]) -> AutoQualityScoreEnvelope {
     let cai_index = find_arg_value(args, &["--cai"])
         .and_then(|val| val.parse::<f64>().ok())
         .unwrap_or(100.0);
-    let custom_ci_lower = find_arg_value(args, &["--ci-lower"])
-        .and_then(|val| val.parse::<f64>().ok());
+    let custom_ci_lower =
+        find_arg_value(args, &["--ci-lower"]).and_then(|val| val.parse::<f64>().ok());
     let cyclomatic_complexity_delta = find_arg_value(args, &["--cc-delta"])
         .and_then(|val| val.parse::<i32>().ok())
         .unwrap_or(0);
@@ -100,8 +115,8 @@ fn parse_auto_score(args: &[String]) -> AutoQualityScoreEnvelope {
         .unwrap_or("Auto-Refactor Quality Gate: zero debt verification.")
         .to_string();
 
-    let ci_lower = custom_ci_lower
-        .unwrap_or_else(|| compute_jeffreys_credible_lower(composite_score));
+    let ci_lower =
+        custom_ci_lower.unwrap_or_else(|| compute_jeffreys_credible_lower(composite_score));
 
     AutoQualityScoreEnvelope {
         composite_score,
@@ -121,10 +136,7 @@ fn handle_stage_request(
     policy: &TaxisPolicy,
     current_time_ms: i64,
 ) {
-    let candidate_oid = match resolve_candidate_oid(ctx) {
-        Some(oid) => oid,
-        None => return,
-    };
+    let candidate_oid = resolve_candidate_oid(ctx);
 
     let summary = find_arg_value(&ctx.args, &["--summary"])
         .unwrap_or("Autonomous Agent PR promotion proposal")
@@ -178,9 +190,7 @@ fn handle_stage_request(
                     "  Lease Expiry      : 1 Hour (TTL = {}s)",
                     policy.staged_promotion_ttl_seconds
                 );
-                println!(
-                    "  Promotion Gate    : Awaiting Human Physical Click in GUI UAC Modal"
-                );
+                println!("  Promotion Gate    : Awaiting Human Physical Click in GUI UAC Modal");
             }
         }
         Err(err) => {
@@ -190,42 +200,103 @@ fn handle_stage_request(
                     "error": format!("{}", err)
                 });
                 print_json(&rejection_payload);
-            } else {
-                eprintln!("{} {}", CliTag::PROMOTION_REJECTED, err);
             }
+            reject(CliTag::PROMOTION_REJECTED, err);
         }
     }
 }
 
-/// Handles approval of an active staged proposal with cryptographic proof.
+/// Decodes the GUI challenge nonce supplied by the human operator out of band.
+fn parse_challenge_nonce(raw_nonce: Option<&str>) -> [u8; NONCE_BYTES] {
+    let hex_nonce = match raw_nonce {
+        Some(value) => value,
+        None => reject(
+            CliTag::UAC_APPROVAL_FAILED,
+            concat!(
+                "missing --nonce; the challenge nonce must be read from the GUI UAC modal ",
+                "and is never inferred from the ledger"
+            ),
+        ),
+    };
+
+    if hex_nonce.len() != NONCE_BYTES * 2 {
+        reject(
+            CliTag::UAC_APPROVAL_FAILED,
+            format!(
+                "challenge nonce must be {} hex characters, received {}",
+                NONCE_BYTES * 2,
+                hex_nonce.len()
+            ),
+        );
+    }
+
+    let mut nonce = [0u8; NONCE_BYTES];
+    for (byte_index, pair) in hex_nonce.as_bytes().as_chunks::<2>().0.iter().enumerate() {
+        let pair_text = match std::str::from_utf8(pair) {
+            Ok(text) => text,
+            Err(utf_err) => reject(
+                CliTag::UAC_APPROVAL_FAILED,
+                format!("challenge nonce is not valid hex: {}", utf_err),
+            ),
+        };
+        nonce[byte_index] = match u8::from_str_radix(pair_text, 16) {
+            Ok(byte_val) => byte_val,
+            Err(radix_err) => reject(
+                CliTag::UAC_APPROVAL_FAILED,
+                format!("challenge nonce is not valid hex: {}", radix_err),
+            ),
+        };
+    }
+    nonce
+}
+
+/// Requires an operator identity flag, refusing to fabricate one.
+fn require_operator_flag(ctx: &CliContext, tag: &str) -> String {
+    match find_arg_value(&ctx.args, &["--operator"]) {
+        Some(operator) if !operator.trim().is_empty() => operator.to_string(),
+        _ => reject(
+            tag,
+            "--operator is required; the CLI never synthesizes a human identity",
+        ),
+    }
+}
+
+/// Handles approval of an active staged proposal with an externally supplied proof.
 fn handle_uac_approval(
     ctx: &CliContext,
     ledger: &mut PromotionStagingLedger,
     current_time_ms: i64,
 ) {
     let req_id_opt = find_arg_value(&ctx.args, &["--id"]).map(|val| val.to_string());
-    let operator = find_arg_value(&ctx.args, &["--operator"])
-        .unwrap_or("Human Architect (GUI Click)")
-        .to_string();
-    let email = find_arg_value(&ctx.args, &["--email"])
-        .unwrap_or("architect@deepmind.internal")
-        .to_string();
-    let session = find_arg_value(&ctx.args, &["--session"])
-        .unwrap_or("GUI_SESSION_VERIFIED")
-        .to_string();
+    let operator = require_operator_flag(ctx, CliTag::UAC_APPROVAL_FAILED);
+    let email = match find_arg_value(&ctx.args, &["--email"]) {
+        Some(email_value) if !email_value.trim().is_empty() => email_value.to_string(),
+        _ => reject(
+            CliTag::UAC_APPROVAL_FAILED,
+            "--email is required to attribute the promotion audit entry",
+        ),
+    };
+    let session = match find_arg_value(&ctx.args, &["--session"]) {
+        Some(session_value) if !session_value.trim().is_empty() => session_value.to_string(),
+        _ => reject(
+            CliTag::UAC_APPROVAL_FAILED,
+            "--session is required; an unattributed session cannot prove a GUI click",
+        ),
+    };
+    let signed_nonce = parse_challenge_nonce(find_arg_value(&ctx.args, &["--nonce"]));
 
     let active_req = match ledger.get_active_candidate(current_time_ms) {
         Some(cand) => cand.clone(),
-        None => {
-            eprintln!("No active staged promotion awaiting human UAC approval.");
-            return;
-        }
+        None => reject(
+            CliTag::UAC_APPROVAL_FAILED,
+            "no active staged promotion awaiting human UAC approval",
+        ),
     };
 
     let target_id = req_id_opt.unwrap_or(active_req.request_id.clone());
     let proof = HumanUacProof {
         request_id: target_id.clone(),
-        signed_nonce: active_req.challenge_nonce,
+        signed_nonce,
         operator_name: operator.clone(),
         operator_email: email,
         gui_session_token: session,
@@ -254,7 +325,10 @@ fn handle_uac_approval(
                 println!("  Request ID   : {}", target_id);
                 println!("  Operator     : {}", operator);
                 println!("  Target Trunk : refs/heads/main (System Trunk)");
-                println!("  Candidate OID: {}", active_req.candidate_commit_oid.to_hex());
+                println!(
+                    "  Candidate OID: {}",
+                    active_req.candidate_commit_oid.to_hex()
+                );
                 println!("  Result       : Merged into System Trunk atomically.");
             }
         }
@@ -265,9 +339,8 @@ fn handle_uac_approval(
                     "error": format!("{}", approval_err)
                 });
                 print_json(&failure_payload);
-            } else {
-                eprintln!("{} {}", CliTag::UAC_APPROVAL_FAILED, approval_err);
             }
+            reject(CliTag::UAC_APPROVAL_FAILED, approval_err);
         }
     }
 }
@@ -279,19 +352,17 @@ fn handle_uac_rejection(
     current_time_ms: i64,
 ) {
     let req_id_opt = find_arg_value(&ctx.args, &["--id"]).map(|val| val.to_string());
-    let operator = find_arg_value(&ctx.args, &["--operator"])
-        .unwrap_or("Human Architect")
-        .to_string();
+    let operator = require_operator_flag(ctx, CliTag::UAC_REJECT_FAILED);
     let feedback = find_arg_value(&ctx.args, &["--feedback", "--reason"])
         .unwrap_or("Promotion declined in GUI UAC review")
         .to_string();
 
     let active_req = match ledger.get_active_candidate(current_time_ms) {
         Some(cand) => cand.clone(),
-        None => {
-            eprintln!("No active staged promotion awaiting human UAC approval.");
-            return;
-        }
+        None => reject(
+            CliTag::UAC_REJECT_FAILED,
+            "no active staged promotion awaiting human UAC approval",
+        ),
     };
     let target_id = req_id_opt.unwrap_or(active_req.request_id);
 
@@ -311,7 +382,7 @@ fn handle_uac_rejection(
                 );
             }
         }
-        Err(reject_err) => eprintln!("{} {}", CliTag::UAC_REJECT_FAILED, reject_err),
+        Err(reject_err) => reject(CliTag::UAC_REJECT_FAILED, reject_err),
     }
 }
 
@@ -339,7 +410,10 @@ fn handle_uac_list(
     } else {
         println!("=== Staged Promotion Queue (Human GUI UAC) ===");
         println!("Policy Guardrails:");
-        println!("  Human UAC Required : {}", policy.uac_required_for_system_trunk);
+        println!(
+            "  Human UAC Required : {}",
+            policy.uac_required_for_system_trunk
+        );
         println!(
             "  Staged Lease TTL   : {}s (1 Hour)",
             policy.staged_promotion_ttl_seconds
@@ -365,7 +439,11 @@ fn handle_uac_list(
                     cand.auto_score.composite_score,
                     cand.auto_score.cai_index,
                     cand.auto_score.cyclomatic_complexity_delta,
-                    if cand.auto_score.anti_gaming_passed { "PASS" } else { "FAIL" }
+                    if cand.auto_score.anti_gaming_passed {
+                        "PASS"
+                    } else {
+                        "FAIL"
+                    }
                 );
                 println!(
                     "  Lease Time Left: {}m {}s",

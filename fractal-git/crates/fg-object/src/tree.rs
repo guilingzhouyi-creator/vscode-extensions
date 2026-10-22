@@ -2,68 +2,61 @@
 //! File Path: crates/fg-object/src/tree.rs
 //! Architecture Role: Pure Git tree object primitives, encoding and sorting entries
 //!   strictly according to Git's canonical binary specification (`<mode> <name>\0<20-byte-sha1>`).
+//! Dependencies & Triggers: Consumed by fg-index tree assembly, fg-storage materialization, and
+//!   every command that resolves a revision to a directory listing.
+//! Responsibilities: Canonical tree sorting, binary serialization, and object-id computation.
+//! Exit Semantics & Design Rationale:
+//!   - The file mode is [`fg_core::models::FileMode`], not a local copy: the index, the native
+//!     container, and the tree codec must agree on the same five values, and a second enum would
+//!     let one layer accept a mode the others reject.
+//!   - Entries are sorted with a directory treated as if its name ended in `/`, which is Git's
+//!     documented rule; sorting by plain name produces a different object id for the same content.
 
-use fg_core::models::Oid;
-use sha1::{Digest, Sha1};
-
-/// Git Tree file mode enumeration.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FileMode {
-    RegularFile = 0o100644,
-    ExecutableFile = 0o100755,
-    Directory = 0o040000,
-    Symlink = 0o120000,
-}
-
-impl FileMode {
-    /// Formats mode as an octal string used in Git tree serialization.
-    pub fn as_octal_str(&self) -> &'static str {
-        use fg_core::constants::git::*;
-        match self {
-            Self::RegularFile => MODE_REGULAR_STR,
-            Self::ExecutableFile => MODE_EXECUTABLE_STR,
-            Self::Directory => MODE_DIRECTORY_STR,
-            Self::Symlink => MODE_SYMLINK_STR,
-        }
-    }
-}
+use fg_core::models::{compute_object_oid, raw_object, FileMode, ObjectKind, Oid};
 
 /// A single entry within a Git Tree.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct GitTreeEntry {
+    /// Kind of object this entry names.
     pub mode: FileMode,
+    /// Entry name relative to the containing tree; never contains a separator.
     pub name: String,
-    pub oid_hex: String,
+    /// Object this entry points at.
     pub oid: Oid,
 }
 
 impl GitTreeEntry {
-    /// Creates a tree entry from mode, filename, and 40-character hex string or Oid.
-    pub fn new(mode: FileMode, name: impl Into<String>, oid_hex: impl Into<String>) -> Self {
-        let hex = oid_hex.into();
-        let oid = Oid::from_hex(&hex).unwrap_or(Oid::ZERO);
+    /// Creates a tree entry from a mode, name, and typed object id.
+    pub fn new(mode: FileMode, name: impl Into<String>, oid: Oid) -> Self {
         Self {
             mode,
             name: name.into(),
-            oid_hex: hex,
             oid,
         }
     }
 
-    /// Creates a tree entry from mode, filename, and typed Oid.
-    pub fn from_oid(mode: FileMode, name: impl Into<String>, oid: Oid) -> Self {
-        let oid_hex = oid.to_hex();
-        Self {
+    /// Creates a tree entry from a mode, name, and 40-character hexadecimal object id.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`fg_core::error::FractalError::ObjectCodec`] when the hex text is not a valid
+    /// 40-character object id. The previous signature silently substituted the all-zero id, which
+    /// turned a typo into a dangling tree entry that no integrity check could detect.
+    pub fn from_hex(
+        mode: FileMode,
+        name: impl Into<String>,
+        oid_hex: &str,
+    ) -> fg_core::error::FractalResult<Self> {
+        Ok(Self {
             mode,
             name: name.into(),
-            oid_hex,
-            oid,
-        }
+            oid: Oid::from_hex(oid_hex)?,
+        })
     }
 
-    /// Access raw 20-byte binary slice.
-    pub fn binary_oid(&self) -> [u8; 20] {
-        *self.oid.as_bytes()
+    /// Returns the 40-character lowercase hexadecimal object id.
+    pub fn oid_hex(&self) -> String {
+        self.oid.to_hex()
     }
 }
 
@@ -72,16 +65,14 @@ impl GitTreeEntry {
 pub struct GitTree {
     entries: Vec<GitTreeEntry>,
     oid: Oid,
-    hex: String,
 }
 
 impl GitTree {
-    /// Builds and sorts a canonical GitTree from entry collection.
+    /// Builds and sorts a canonical GitTree from an entry collection.
     pub fn new(mut entries: Vec<GitTreeEntry>) -> Self {
-        // Canonical Git tree sorting: sort by name, comparing directories as if ending with '/'
         entries.sort_by(|left_entry, right_entry| {
-            let left_is_dir = left_entry.mode == FileMode::Directory;
-            let right_is_dir = right_entry.mode == FileMode::Directory;
+            let left_is_dir = left_entry.mode.is_tree();
+            let right_is_dir = right_entry.mode.is_tree();
             let left_bytes = left_entry
                 .name
                 .as_bytes()
@@ -99,44 +90,27 @@ impl GitTree {
 
         let raw_payload = Self::serialize_entries(&entries);
         let oid = Self::compute_tree_oid(&raw_payload);
-        let hex = oid.to_hex();
-        Self { entries, oid, hex }
+        Self { entries, oid }
     }
 
-    /// Access the 40-character hexadecimal SHA-1 identifier of the tree.
-    pub fn oid(&self) -> &str {
-        &self.hex
-    }
-
-    /// Access the 40-character hexadecimal SHA-1 identifier of the tree (explicit getter).
-    pub fn oid_hex(&self) -> &str {
-        &self.hex
-    }
-
-    /// Access the typed 20-byte Oid.
-    pub fn raw_oid(&self) -> &Oid {
+    /// Returns the typed 20-byte object id of this tree.
+    pub const fn oid(&self) -> &Oid {
         &self.oid
     }
 
-    /// Access the ordered slice of entries.
+    /// Returns the 40-character lowercase hexadecimal object id of this tree.
+    pub fn oid_hex(&self) -> String {
+        self.oid.to_hex()
+    }
+
+    /// Returns the ordered slice of entries.
     pub fn entries(&self) -> &[GitTreeEntry] {
         &self.entries
     }
 
     /// Returns the raw Git loose object format: `tree <size>\0<entries>`
     pub fn to_raw_object(&self) -> Vec<u8> {
-        let payload = Self::serialize_entries(&self.entries);
-        let mut header_buf = [0u8; 32];
-        let header_len = {
-            use std::io::Write;
-            let mut cursor = std::io::Cursor::new(&mut header_buf[..]);
-            let _ = write!(cursor, "tree {}\0", payload.len());
-            cursor.position() as usize
-        };
-        let mut raw = Vec::with_capacity(header_len + payload.len());
-        raw.extend_from_slice(&header_buf[..header_len]);
-        raw.extend_from_slice(&payload);
-        raw
+        raw_object(ObjectKind::Tree, &Self::serialize_entries(&self.entries))
     }
 
     fn serialize_entries(entries: &[GitTreeEntry]) -> Vec<u8> {
@@ -152,17 +126,6 @@ impl GitTree {
     }
 
     fn compute_tree_oid(payload: &[u8]) -> Oid {
-        let mut header_buf = [0u8; 32];
-        let header_len = {
-            use std::io::Write;
-            let mut cursor = std::io::Cursor::new(&mut header_buf[..]);
-            let _ = write!(cursor, "tree {}\0", payload.len());
-            cursor.position() as usize
-        };
-        let mut hasher = Sha1::new();
-        hasher.update(&header_buf[..header_len]);
-        hasher.update(payload);
-        let hash: [u8; 20] = hasher.finalize().into();
-        Oid::from_bytes(hash)
+        compute_object_oid(ObjectKind::Tree, payload)
     }
 }

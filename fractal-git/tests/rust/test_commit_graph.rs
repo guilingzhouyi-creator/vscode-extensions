@@ -9,6 +9,7 @@
 
 use fg_core::models::Oid;
 use fg_storage::commit_graph::{CommitGraphEntry, CommitGraphReader, CommitGraphWriter};
+use sha1::{Digest, Sha1};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -170,4 +171,101 @@ fn test_commit_graph_disk_persistence_and_checksum_tamper() {
         corrupted_result.is_err(),
         "Corrupted commit-graph must fail checksum verification"
     );
+}
+
+/// Builds the bytes of a graph whose header declares `base_graph_count` earlier files.
+///
+/// Git writes chained graphs by declaring the number of earlier files in header byte 7; the payload
+/// of the base files themselves is not needed to prove how a reader treats a chained graph, so only
+/// the header word is varied.
+fn chained_graph_bytes(base_graph_count: u8, num_commits: usize) -> Vec<u8> {
+    let chunk_table_size = 8 + 4 * 12;
+    let oidf_offset = chunk_table_size;
+    let oidl_offset = oidf_offset + 256 * 4;
+    let cdat_offset = oidl_offset + num_commits * 20;
+    let file_end = cdat_offset + num_commits * 36;
+
+    let mut buffer = Vec::new();
+    buffer.extend_from_slice(b"CGPH");
+    buffer.push(1);
+    buffer.push(1);
+    buffer.push(3);
+    buffer.push(base_graph_count);
+    buffer.extend_from_slice(b"OIDF");
+    buffer.extend_from_slice(&(oidf_offset as u64).to_be_bytes());
+    buffer.extend_from_slice(b"OIDL");
+    buffer.extend_from_slice(&(oidl_offset as u64).to_be_bytes());
+    buffer.extend_from_slice(b"CDAT");
+    buffer.extend_from_slice(&(cdat_offset as u64).to_be_bytes());
+    buffer.extend_from_slice(&[0u8; 4]);
+    buffer.extend_from_slice(&(file_end as u64).to_be_bytes());
+
+    for fanout_byte in 0..=255u32 {
+        let count = if num_commits == 0 {
+            0
+        } else if fanout_byte >= 0x11 {
+            num_commits as u32
+        } else {
+            0
+        };
+        buffer.extend_from_slice(&count.to_be_bytes());
+    }
+
+    for index in 0..num_commits {
+        let mut oid_bytes = [0u8; 20];
+        oid_bytes[0] = 0x11;
+        oid_bytes[19] = index as u8;
+        buffer.extend_from_slice(&oid_bytes);
+    }
+
+    for index in 0..num_commits {
+        buffer.extend_from_slice(&[0x33u8; 20]);
+        // Parent positions are deliberately outside this file's table, modelling a chained graph.
+        buffer.extend_from_slice(&(0x9000_0000u32 + index as u32).to_be_bytes());
+        // A second parent is recorded as the format's explicit absent marker.
+        buffer.extend_from_slice(&0x7000_0000u32.to_be_bytes());
+        buffer.extend_from_slice(&(7u32 + index as u32).to_be_bytes());
+        buffer.extend_from_slice(&(1_700_000_000u32 + index as u32).to_be_bytes());
+    }
+
+    let mut hasher = Sha1::new();
+    hasher.update(&buffer);
+    let checksum: [u8; 20] = hasher.finalize().into();
+    buffer.extend_from_slice(&checksum);
+    buffer
+}
+
+/// Generation and commit time are two separate words, so both survive a round trip intact.
+#[test]
+fn generation_and_commit_time_are_read_as_separate_words() {
+    let bytes = chained_graph_bytes(0, 3);
+    let reader = CommitGraphReader::from_bytes(bytes).expect("chained graph must parse");
+    assert_eq!(reader.num_commits(), 3);
+    assert_eq!(reader.base_graph_count(), 0);
+
+    for position in 0..3usize {
+        let entry = reader.get_entry(position).expect("entry must decode");
+        assert_eq!(entry.generation, 7 + position as u32);
+        assert_eq!(entry.timestamp_sec, 1_700_000_000 + position as u64);
+    }
+}
+
+/// A parent position outside the local table is reported as absent, never as an unrelated commit.
+#[test]
+fn a_parent_position_outside_the_local_table_is_omitted() {
+    let bytes = chained_graph_bytes(0, 2);
+    let reader = CommitGraphReader::from_bytes(bytes).expect("chained graph must parse");
+    let entry = reader.get_entry(0).expect("entry must decode");
+    assert!(
+        entry.parent_oids.is_empty(),
+        "an out-of-range parent position must not resolve to a local commit"
+    );
+}
+
+/// A chained graph reports how many earlier files it depends on.
+#[test]
+fn a_chained_graph_reports_its_base_graph_count() {
+    let bytes = chained_graph_bytes(1, 2);
+    let reader = CommitGraphReader::from_bytes(bytes).expect("chained graph must parse");
+    assert_eq!(reader.base_graph_count(), 1);
 }

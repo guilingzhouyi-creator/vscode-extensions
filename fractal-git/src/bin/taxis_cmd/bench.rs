@@ -17,7 +17,7 @@ use fractal_git::bench::TaxisBenchmarkSuite;
 use fractal_git::constants::cli::CliTag;
 use fractal_git::BenchmarkLevel;
 
-use super::common::{find_arg_value, print_json, CliContext};
+use super::common::{fail_io, find_arg_value, print_json, CliContext};
 
 /// Dispatches benchmark suite execution, baseline persistence, and regression verification.
 pub fn handle_bench(ctx: &CliContext) {
@@ -58,16 +58,22 @@ fn parse_bench_level(args: &[String]) -> BenchmarkLevel {
 /// Saves current benchmark metrics JSON into the designated target file.
 fn save_bench_baseline(save_file: &Path, suite: &TaxisBenchmarkSuite) {
     if let Some(parent) = save_file.parent() {
-        let _ = std::fs::create_dir_all(parent);
+        if let Err(create_err) = std::fs::create_dir_all(parent) {
+            fail_io(
+                format!("create baseline directory '{}'", parent.display()),
+                create_err,
+            );
+        }
     }
-    let json = serde_json::to_string_pretty(suite).unwrap_or_default();
-    if let Err(io_err) = std::fs::write(save_file, json) {
-        eprintln!(
-            "Failed to save baseline to {}: {}",
-            save_file.display(),
-            io_err
+    let json = match serde_json::to_string_pretty(suite) {
+        Ok(serialized) => serialized,
+        Err(json_err) => fail_io("serialize benchmark baseline", json_err),
+    };
+    if let Err(write_err) = std::fs::write(save_file, json) {
+        fail_io(
+            format!("save baseline to '{}'", save_file.display()),
+            write_err,
         );
-        std::process::exit(1);
     }
     println!("Saved performance baseline to {}", save_file.display());
 }
@@ -110,17 +116,13 @@ fn resolve_baseline_file(verify_arg: &Path) -> Option<PathBuf> {
 /// Loads a baseline suite from disk or falls back to the embedded compile-time frozen baseline.
 fn load_baseline(final_path: Option<&Path>) -> TaxisBenchmarkSuite {
     if let Some(path) = final_path {
-        let content = std::fs::read_to_string(path).unwrap_or_default();
+        let content = match std::fs::read_to_string(path) {
+            Ok(read_content) => read_content,
+            Err(read_err) => fail_io(format!("read baseline '{}'", path.display()), read_err),
+        };
         match serde_json::from_str(&content) {
             Ok(parsed_baseline) => parsed_baseline,
-            Err(parse_err) => {
-                eprintln!(
-                    "Failed to parse baseline {}: {}",
-                    path.display(),
-                    parse_err
-                );
-                std::process::exit(1);
-            }
+            Err(parse_err) => fail_io(format!("parse baseline '{}'", path.display()), parse_err),
         }
     } else {
         const EMBEDDED_BASELINE: &str = include_str!("../../../baselines/taxis-perf.baseline.json");
@@ -132,10 +134,7 @@ fn load_baseline(final_path: Option<&Path>) -> TaxisBenchmarkSuite {
                 );
                 parsed_baseline
             }
-            Err(parse_err) => {
-                eprintln!("Failed to parse embedded baseline: {}", parse_err);
-                std::process::exit(1);
-            }
+            Err(parse_err) => fail_io("parse embedded baseline", parse_err),
         }
     }
 }

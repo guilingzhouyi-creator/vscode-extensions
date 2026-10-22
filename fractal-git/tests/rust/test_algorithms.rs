@@ -6,8 +6,9 @@ use fractal_git::algorithms::diff::patch::{PatchGenerator, PatchLine};
 use fractal_git::algorithms::diff::{ChangeKind, TreeDiff, TreeDiffState};
 use fractal_git::algorithms::merge::{FastPathMerge, ThreeWayMerge, ThreeWayMergeResult};
 use fractal_git::algorithms::traverse::DagWalker;
+use fractal_git::core::models::FileMode;
 use fractal_git::core::models::{CorrectedCommitDate, Oid, PathBloomFilter};
-use fractal_git::object::{FileMode, GitTree, GitTreeEntry};
+use fractal_git::object::{GitTree, GitTreeEntry};
 use std::collections::BTreeMap;
 
 #[test]
@@ -194,26 +195,26 @@ fn test_canonical_tree_diff_hierarchical_short_circuit() {
     let sub_entry = GitTreeEntry::new(
         FileMode::RegularFile,
         "lib.rs",
-        "1111111111111111111111111111111111111111",
+        Oid::from_hex("1111111111111111111111111111111111111111").expect("hex"),
     );
     let common_subtree = GitTree::new(vec![sub_entry]);
-    let common_sub_oid = *common_subtree.raw_oid();
+    let common_sub_oid = *common_subtree.oid();
 
     // Construct root trees with identical subtree "src"
     let root_old_entries = vec![
-        GitTreeEntry::from_oid(FileMode::Directory, "src", common_sub_oid),
+        GitTreeEntry::new(FileMode::Directory, "src", common_sub_oid),
         GitTreeEntry::new(
             FileMode::RegularFile,
             "README.md",
-            "2222222222222222222222222222222222222222",
+            Oid::from_hex("2222222222222222222222222222222222222222").expect("hex"),
         ),
     ];
     let root_new_entries = vec![
-        GitTreeEntry::from_oid(FileMode::Directory, "src", common_sub_oid), // IDENTICAL SUBTREE!
+        GitTreeEntry::new(FileMode::Directory, "src", common_sub_oid), // IDENTICAL SUBTREE!
         GitTreeEntry::new(
             FileMode::RegularFile,
             "README.md",
-            "3333333333333333333333333333333333333333",
+            Oid::from_hex("3333333333333333333333333333333333333333").expect("hex"),
         ), // MODIFIED
     ];
 

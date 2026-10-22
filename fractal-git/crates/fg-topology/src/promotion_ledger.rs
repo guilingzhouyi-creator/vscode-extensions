@@ -1,8 +1,19 @@
 //! Module: fg-topology — Staged Promotion Ledger & Score Ratchet Engine
 //! File Path: crates/fg-topology/src/promotion_ledger.rs
 //! Architecture Role: Manages the staged promotion ledger, enforcing Auto quality scoring
-//!   entry barriers, 1-hour lease expiry, +5.0 score ratchet superiority replacements,
-//!   and atomic CAS promotion execution via HumanUacAuthorizer.
+//!   entry barriers, lease expiry, score ratchet superiority replacements, and atomic CAS
+//!   promotion execution via [`HumanUacAuthorizer`].
+//! Dependencies & Triggers: Consumed by `taxis promotion` and the GUI elevation bridge.
+//! Responsibilities: Stage, supersede, expire, approve, and reject promotion requests durably.
+//! Exit Semantics & Design Rationale:
+//!   - Durable state lives in the repository container's `PROM` section, not a JSON document.
+//!     Scores are stored as IEEE-754 bit patterns so the ratchet compares the exact values it was
+//!     given; a decimal rendering would let a value shift in the last digit and flip a comparison.
+//!   - A malformed ledger is never replaced by an empty one. Doing so would discard the active
+//!     candidate and its challenge nonce, letting a later approval act on a ledger the operator
+//!     never saw.
+//!   - Write failures propagate. Suppressing them would report a staged or promoted request that
+//!     does not exist on disk, so durable state and reported state would diverge with no signal.
 
 use fg_core::error::{FractalError, FractalResult};
 use fg_core::models::{
@@ -10,21 +21,23 @@ use fg_core::models::{
     TaxisPolicy,
 };
 use fg_core::traits::RefStore;
-use serde::{Deserialize, Serialize};
-use std::fs;
+use fg_native::document::RepoDocument;
+use fg_native::sections::prom::{PromSection, PromotionRecord, PromotionStatus};
 use std::path::{Path, PathBuf};
 
 use crate::authorizer::HumanUacAuthorizer;
 use crate::refs::FractalRef;
 
-/// Persistent ledger payload holding active candidate and archived promotion history.
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+/// Persistent ledger payload holding the active candidate and archived promotion history.
+#[derive(Debug, Clone, Default)]
 pub struct PromotionLedgerData {
+    /// Candidate currently holding the lease, if any.
     pub active_candidate: Option<StagedPromotionRequest>,
+    /// Resolved requests in insertion order.
     pub history: Vec<StagedPromotionRequest>,
 }
 
-/// Thread-safe staged promotion ledger manager.
+/// Staged promotion ledger manager.
 pub struct PromotionStagingLedger {
     disk_path: Option<PathBuf>,
     ledger_data: PromotionLedgerData,
@@ -39,45 +52,64 @@ impl PromotionStagingLedger {
         }
     }
 
-    /// Loads or initializes a staged promotion ledger backed by disk
-    /// (`.git/fractal/staged_promotions.json`).
+    /// Loads or initializes a staged promotion ledger from the repository container.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FractalError::CorruptStore`] when the container exists but cannot be decoded, and
+    /// [`FractalError::Io`] for a filesystem failure other than absence.
     pub fn load_or_init(git_dir: &Path) -> FractalResult<Self> {
-        let fractal_dir = git_dir.join("fractal");
-        let disk_path = fractal_dir.join("staged_promotions.json");
-
-        if disk_path.exists() {
-            let content = fs::read_to_string(&disk_path)?;
-            let ledger_data: PromotionLedgerData =
-                serde_json::from_str(&content).unwrap_or_default();
-            Ok(Self {
-                disk_path: Some(disk_path),
-                ledger_data,
-            })
-        } else {
-            Ok(Self {
+        let disk_path = fg_native::container_path(git_dir);
+        if !disk_path.exists() {
+            return Ok(Self {
                 disk_path: Some(disk_path),
                 ledger_data: PromotionLedgerData::default(),
-            })
+            });
         }
+
+        let document = RepoDocument::load(&disk_path).map_err(native_to_domain)?;
+        let ledger_data = PromotionLedgerData {
+            active_candidate: document.prom.active().map(to_request),
+            history: document.prom.history().iter().map(to_request).collect(),
+        };
+
+        Ok(Self {
+            disk_path: Some(disk_path),
+            ledger_data,
+        })
     }
 
-    /// Flushes ledger data to disk if backed by filesystem.
+    /// Flushes ledger data into the repository container.
+    ///
+    /// # Errors
+    ///
+    /// Propagates container-encoding and I/O failures.
     pub fn persist(&self) -> FractalResult<()> {
-        if let Some(ref path) = self.disk_path {
-            if let Some(parent) = path.parent() {
-                let _ = fs::create_dir_all(parent);
-            }
-            let json = serde_json::to_string_pretty(&self.ledger_data)?;
-            if let Err(io_err) = fs::write(path, json) {
-                // Tolerates sandbox file lock/isolation errors gracefully
-                if io_err.kind() != std::io::ErrorKind::PermissionDenied
-                    && io_err.raw_os_error() != Some(183)
-                {
-                    return Err(FractalError::Io(io_err));
-                }
-            }
+        let Some(ref path) = self.disk_path else {
+            return Ok(());
+        };
+
+        let mut document = RepoDocument::load(path).map_err(native_to_domain)?;
+        document.prom = self.to_prom_section()?;
+        document.save_atomic(path).map_err(native_to_domain)
+    }
+
+    /// Projects the in-memory ledger onto the container's `PROM` section.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FractalError::CorruptStore`] when a record cannot be encoded.
+    pub fn to_prom_section(&self) -> FractalResult<PromSection> {
+        let mut section = PromSection::new();
+        if let Some(candidate) = self.ledger_data.active_candidate.as_ref() {
+            section.set_active(to_record(candidate)?);
         }
-        Ok(())
+        for archived in &self.ledger_data.history {
+            section
+                .record_history(to_record(archived)?)
+                .map_err(native_to_domain)?;
+        }
+        Ok(section)
     }
 
     /// Returns a reference to the active candidate (idiomatic Rust C-GETTER).
@@ -91,6 +123,10 @@ impl PromotionStagingLedger {
     }
 
     /// Access currently active candidate, refreshing lease expiration against current time.
+    ///
+    /// Expiry archiving mutates memory only. Persisting here would turn a read accessor into
+    /// a fallible writer and would leave a half-applied ledger on I/O failure; the expired
+    /// state is re-derived from `expires_at_ms` on every load, so disk never needs the fixup.
     pub fn get_active_candidate(
         &mut self,
         current_time_ms: i64,
@@ -110,7 +146,6 @@ impl PromotionStagingLedger {
             if matches!(candidate.status, StagedPromotionStatus::Expired { .. }) {
                 if let Some(expired) = self.ledger_data.active_candidate.take() {
                     self.ledger_data.history.push(expired);
-                    let _ = self.persist();
                 }
                 return None;
             }
@@ -132,7 +167,7 @@ impl PromotionStagingLedger {
     ) -> FractalResult<String> {
         // 1. Auto Quality Anti-Gaming Check (BLOCK_GAMING_DETECTED guardrail)
         if !auto_score.anti_gaming_passed {
-            return Err(FractalError::IndexConflict(
+            return Err(FractalError::PolicyViolation(
                 concat!(
                     "Promotion rejected: Auto-Refactor anti-gaming guard triggered ",
                     "(BLOCK_GAMING_DETECTED)"
@@ -143,7 +178,7 @@ impl PromotionStagingLedger {
 
         // 2. Minimum Auto Composite Score Check
         if auto_score.composite_score < policy.minimum_promotion_score {
-            return Err(FractalError::IndexConflict(format!(
+            return Err(FractalError::PolicyViolation(format!(
                 "Promotion rejected: Auto composite score {:.1} is below minimum threshold {:.1}",
                 auto_score.composite_score, policy.minimum_promotion_score
             )));
@@ -188,7 +223,7 @@ impl PromotionStagingLedger {
                 } else {
                     // Put old candidate back and reject new candidate
                     self.ledger_data.active_candidate = Some(active);
-                    return Err(FractalError::IndexConflict(format!(
+                    return Err(FractalError::PolicyViolation(format!(
                         "Score delta +{:.1} does not meet required baseline +{:.1} \
                          over active candidate; replacement rejected",
                         score_delta, policy.replacement_score_baseline_delta
@@ -225,13 +260,13 @@ impl PromotionStagingLedger {
             Some(cand) if cand.request_id == request_id => cand,
             Some(other) => {
                 self.ledger_data.active_candidate = Some(other);
-                return Err(FractalError::IndexConflict(format!(
+                return Err(FractalError::PolicyViolation(format!(
                     "Request ID {} is not the currently active candidate",
                     request_id
                 )));
             }
             None => {
-                return Err(FractalError::IndexConflict(
+                return Err(FractalError::PolicyViolation(
                     "No active staged promotion awaiting human UAC approval".into(),
                 ));
             }
@@ -283,13 +318,13 @@ impl PromotionStagingLedger {
             Some(cand) if cand.request_id == request_id => cand,
             Some(other) => {
                 self.ledger_data.active_candidate = Some(other);
-                return Err(FractalError::IndexConflict(format!(
+                return Err(FractalError::PolicyViolation(format!(
                     "Request ID {} is not the active candidate",
                     request_id
                 )));
             }
             None => {
-                return Err(FractalError::IndexConflict(
+                return Err(FractalError::PolicyViolation(
                     "No active staged promotion to reject".into(),
                 ));
             }
@@ -355,6 +390,111 @@ pub struct StagedPromotionParams<'a> {
     pub agent_uid: String,
     pub policy: &'a TaxisPolicy,
     pub current_time_ms: i64,
+}
+
+/// Translates a container-layer failure into the domain error type.
+///
+/// The topology crate keeps `fg-native`'s error type out of its public surface: a caller of
+/// `persist` should not need to know that the durable form is a container.
+fn native_to_domain(error: fg_native::NativeError) -> FractalError {
+    FractalError::CorruptStore(format!("promotion ledger encoding rejected: {error}"))
+}
+
+/// Maps the domain status onto the container's closed discriminant set.
+fn to_status(status: &StagedPromotionStatus) -> PromotionStatus {
+    match status {
+        StagedPromotionStatus::PendingHumanUac => PromotionStatus::Pending,
+        StagedPromotionStatus::SupersededByHigherScore { .. } => PromotionStatus::Superseded,
+        StagedPromotionStatus::Expired { .. } => PromotionStatus::Expired,
+        StagedPromotionStatus::ApprovedAndPromoted { .. } => PromotionStatus::Approved,
+        StagedPromotionStatus::RejectedByHuman { .. } => PromotionStatus::Rejected,
+    }
+}
+
+/// Projects a domain request onto a container record.
+///
+/// The container's `PROM` section carries the scoring and lease fields that the ratchet compares;
+/// the richer domain status payloads (operator name, feedback text) are not persisted here because
+/// they belong to the audit log, not to the ratchet's inputs.
+///
+/// # Errors
+///
+/// Returns [`FractalError::CorruptStore`] when a score is non-finite, which the container refuses.
+fn to_record(request: &StagedPromotionRequest) -> FractalResult<PromotionRecord> {
+    if !request.auto_score.composite_score.is_finite()
+        || !request.auto_score.cai_index.is_finite()
+        || !request.auto_score.credible_interval_lower.is_finite()
+    {
+        return Err(FractalError::CorruptStore(format!(
+            "promotion request '{}' carries a non-finite score",
+            request.request_id
+        )));
+    }
+
+    Ok(PromotionRecord {
+        request_id: request.request_id.clone(),
+        candidate_oid: request.candidate_commit_oid,
+        source_ref: request.source_ref.clone(),
+        target_ref: request.target_ref.clone(),
+        composite_score: request.auto_score.composite_score,
+        cai_index: request.auto_score.cai_index,
+        credible_interval_lower: request.auto_score.credible_interval_lower,
+        anti_gaming_passed: request.auto_score.anti_gaming_passed,
+        status: to_status(&request.status),
+        created_at_ms: request.created_at_ms,
+        expires_at_ms: request.expires_at_ms,
+        challenge_nonce: request.challenge_nonce,
+        agent_uid: request.agent_uid.clone(),
+        summary: request.summary.clone(),
+    })
+}
+
+/// Rebuilds a domain request from a container record.
+///
+/// Status payloads that the container does not carry are reconstructed with the timestamp the
+/// record does carry, so a round trip through the container never invents an operator name.
+fn to_request(record: &PromotionRecord) -> StagedPromotionRequest {
+    let status = match record.status {
+        PromotionStatus::Pending => StagedPromotionStatus::PendingHumanUac,
+        PromotionStatus::Approved => StagedPromotionStatus::ApprovedAndPromoted {
+            promoted_at_ms: record.created_at_ms,
+            human_operator: String::new(),
+        },
+        PromotionStatus::Rejected => StagedPromotionStatus::RejectedByHuman {
+            rejected_at_ms: record.created_at_ms,
+            human_operator: String::new(),
+            feedback: String::new(),
+        },
+        PromotionStatus::Superseded => StagedPromotionStatus::SupersededByHigherScore {
+            superseded_by_id: String::new(),
+            score_delta_pct: 0,
+        },
+        PromotionStatus::Expired => StagedPromotionStatus::Expired {
+            expired_at_ms: record.expires_at_ms,
+        },
+    };
+
+    StagedPromotionRequest {
+        request_id: record.request_id.clone(),
+        source_ref: record.source_ref.clone(),
+        target_ref: record.target_ref.clone(),
+        candidate_commit_oid: record.candidate_oid,
+        auto_score: AutoQualityScoreEnvelope {
+            composite_score: record.composite_score,
+            cai_index: record.cai_index,
+            cyclomatic_complexity_delta: 0,
+            eloc_delta: 0,
+            credible_interval_lower: record.credible_interval_lower,
+            anti_gaming_passed: record.anti_gaming_passed,
+            summary_report: record.summary.clone(),
+        },
+        status,
+        challenge_nonce: record.challenge_nonce,
+        created_at_ms: record.created_at_ms,
+        expires_at_ms: record.expires_at_ms,
+        summary: record.summary.clone(),
+        agent_uid: record.agent_uid.clone(),
+    }
 }
 
 fn sha1_hash_32(input_bytes: &[u8]) -> [u8; 32] {

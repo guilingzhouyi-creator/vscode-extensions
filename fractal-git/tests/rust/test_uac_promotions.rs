@@ -64,9 +64,26 @@ fn sample_auto_score(score: f64, anti_gaming: bool) -> AutoQualityScoreEnvelope 
     }
 }
 
+/// Publishes a repository container into a test directory and returns the directory.
+///
+/// The ledger stores its state as a section of the repository container, so a container has to
+/// exist before anything can be staged. The path comes from `fg_native::container_path` rather
+/// than a locally rebuilt join: the ledger and the initializer must agree on where the container
+/// lives, and a fixture that spells the path out itself can pass while the two disagree.
+fn init_repository(prefix: &str) -> TestDir {
+    let directory = TestDir::new(prefix);
+    let container_path = fg_native::container_path(directory.path());
+    let document = fg_native::RepoDocument::for_new_repository(fg_native::LayoutMode::Dev)
+        .expect("Build repository document");
+    document
+        .publish_new(&container_path)
+        .expect("Publish repository container");
+    directory
+}
+
 #[test]
 fn test_scenario_1_staged_promotion_leaves_system_trunk_unchanged_with_1h_lease() {
-    let tmp = TestDir::new("scenario_1");
+    let tmp = init_repository("scenario_1");
     let git_dir = tmp.path().to_path_buf();
     let mut ledger = PromotionStagingLedger::load_or_init(&git_dir).unwrap();
     let ref_store = DiskRefStore::new(&git_dir);
@@ -269,7 +286,7 @@ fn test_scenario_4_1_hour_lease_expiry_lifecycle() {
 
 #[test]
 fn test_scenario_5_cryptographic_nonce_verification_and_atomic_cas_merge() {
-    let tmp = TestDir::new("scenario_5");
+    let tmp = init_repository("scenario_5");
     let git_dir = tmp.path().to_path_buf();
     let mut ledger = PromotionStagingLedger::load_or_init(&git_dir).unwrap();
     let ref_store = DiskRefStore::new(&git_dir);

@@ -1,21 +1,55 @@
-//! Module: fg-index — Lockless In-Memory Tree Index
+//! Module: fg-index — Lockless In-Memory Index
 //! File Path: crates/fg-index/src/lockless_tree.rs
-//! Architecture Role: Pure in-memory staging tree index eliminating `.git/index.lock` contention.
-//!   Maintains sorted flat paths, detects unmerged conflicts, and constructs nested Git Trees.
+//! Architecture Role: In-memory staging index that eliminates `.git/index.lock` contention.
+//!   Maintains sorted flat paths, tracks unmerged conflicts, and reconstructs nested Git trees.
 //! Dependencies & Triggers: Utilized by CLI staging commands, worktrees, and merge operators.
 //! Responsibilities: Sparse directory collapsing, conflict stage tracking, and tree creation.
-//! Exit Semantics & Design Rationale: Enables non-blocking concurrent writes with $O(\log N)$
-//!   path navigation and sparse cone collapsing.
+//! Exit Semantics & Design Rationale:
+//!   - Paths are normalized through one function, [`normalize_path`], so that every mutating entry
+//!     point agrees on what a path is. Normalizing inconsistently is how a sparse-directory entry
+//!     loses the trailing `/` that defines it.
+//!   - The tree is rebuilt with a prefix stack rather than by materializing one map per directory:
+//!     memory stays proportional to tree depth instead of tree size.
+//!   - There is exactly one public type name, [`InMemoryIndexTree`]. A second alias for the same
+//!     type splits call sites and hides which name is authoritative.
 
 use std::collections::BTreeMap;
 
 use fg_core::error::{FractalError, FractalResult};
-use fg_core::models::Oid;
-use fg_object::{FileMode, GitTree, GitTreeEntry};
+use fg_core::models::{FileMode, IndexStage, Oid};
+use fg_object::{GitTree, GitTreeEntry};
 
 use crate::conflict_stage::ConflictStageSlot;
-use crate::entry::{IndexStage, VirtualIndexEntry};
+use crate::entry::StagingEntry;
 
+/// Normalizes a worktree path to `/`-separated form with no leading or trailing separator.
+///
+/// # Errors
+///
+/// Returns [`FractalError::IndexConflict`] naming `field` when the normalized path is empty.
+fn normalize_path(path: &str, field: &'static str) -> FractalResult<String> {
+    let normalized = path.trim_matches('/').replace('\\', "/");
+    if normalized.is_empty() {
+        return Err(FractalError::IndexConflict(format!(
+            "Cannot stage empty {field} path"
+        )));
+    }
+    Ok(normalized)
+}
+
+/// Derives the display path of a sparse directory from its normalized index key.
+///
+/// The index key never carries a trailing separator, because a key is an address and `vendor/`
+/// and `vendor` must resolve to the same slot. The display path does carry it, because the
+/// trailing `/` is what marks the subtree as collapsed. Keeping the two forms in one place stops
+/// them from drifting apart at the three call sites that stage, remove, and resolve entries.
+fn sparse_display_path(index_key: &str) -> String {
+    let mut display_path = index_key.to_owned();
+    display_path.push('/');
+    display_path
+}
+
+/// One directory frame in the prefix-stack tree builder.
 struct DirectoryFrame {
     dir_name: String,
     entries: Vec<GitTreeEntry>,
@@ -30,15 +64,15 @@ impl DirectoryFrame {
     }
 }
 
-/// Thread-safe in-memory virtual staging index.
+/// In-memory staging index keyed by path.
 #[derive(Debug, Default, Clone)]
 pub struct InMemoryIndexTree {
-    entries: BTreeMap<String, VirtualIndexEntry>,
+    entries: BTreeMap<String, StagingEntry>,
     conflicts: BTreeMap<String, ConflictStageSlot>,
 }
 
 impl InMemoryIndexTree {
-    /// Constructs a clean empty in-memory index tree.
+    /// Constructs an empty index.
     pub fn new() -> Self {
         Self {
             entries: BTreeMap::new(),
@@ -46,50 +80,55 @@ impl InMemoryIndexTree {
         }
     }
 
-    /// Stages a file into clean Stage-0 index.
+    /// Stages a file from a 40-character hexadecimal object id into the resolved stage.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FractalError::ObjectCodec`] when the hex text is not a valid object id, and
+    /// [`FractalError::IndexConflict`] when the path normalizes to nothing.
     pub fn stage_file(&mut self, path: &str, mode: FileMode, oid_hex: &str) -> FractalResult<()> {
         let oid = Oid::from_hex(oid_hex)?;
         self.stage_oid(path, mode, oid)
     }
 
-    /// Stages a file with a typed Oid into clean Stage-0 index.
+    /// Stages a file from a typed object id into the resolved stage.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FractalError::IndexConflict`] when the path normalizes to nothing.
     pub fn stage_oid(&mut self, path: &str, mode: FileMode, oid: Oid) -> FractalResult<()> {
-        let clean_path = path.trim_matches('/').replace('\\', "/");
-        if clean_path.is_empty() {
-            return Err(FractalError::IndexConflict(
-                "Cannot stage empty path".into(),
-            ));
-        }
-
-        // Clean any lingering conflicts for this path
+        let clean_path = normalize_path(path, "file")?;
         self.conflicts.remove(&clean_path);
-        self.entries.insert(
-            clean_path.clone(),
-            VirtualIndexEntry::new(clean_path, mode, oid),
-        );
+        self.entries
+            .insert(clean_path.clone(), StagingEntry::new(clean_path, mode, oid));
         Ok(())
     }
 
-    /// Stages a collapsed sparse directory subtree pointing directly to a pre-computed GitTree.
-    /// Aligns with Git's canonical Sparse Index design, eliminating the need to expand out-of-scope
-    /// files when reconstructing monorepo tree structures.
+    /// Stages a collapsed sparse-checkout subtree pointing at a pre-computed tree object.
+    ///
+    /// The entry's display path keeps a trailing `/`, which is what marks the entry as collapsed.
+    /// Stripping that slash would make the entry indistinguishable from an ordinary directory and
+    /// force the tree builder to expand it. The map key drops it, so the sparse entry and any
+    /// later `stage_oid("vendor", ...)` address the same slot instead of coexisting.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FractalError::IndexConflict`] when the path normalizes to nothing.
     pub fn stage_sparse_directory(&mut self, dir_path: &str, tree_oid: Oid) -> FractalResult<()> {
-        let clean_path = dir_path.trim_matches('/').replace('\\', "/");
-        if clean_path.is_empty() {
-            return Err(FractalError::IndexConflict(
-                "Cannot stage empty sparse directory path".into(),
-            ));
-        }
-
+        let clean_path = normalize_path(dir_path, "sparse directory")?;
         self.conflicts.remove(&clean_path);
         self.entries.insert(
             clean_path.clone(),
-            VirtualIndexEntry::new_sparse_dir(clean_path, tree_oid),
+            StagingEntry::new_sparse_directory(sparse_display_path(&clean_path), tree_oid),
         );
         Ok(())
     }
 
-    /// Records a multi-stage conflict entry (Stage 1..3).
+    /// Records a multi-stage conflict entry.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FractalError::IndexConflict`] when the path normalizes to nothing.
     pub fn stage_conflict(
         &mut self,
         path: &str,
@@ -97,12 +136,12 @@ impl InMemoryIndexTree {
         oid: Oid,
         stage: IndexStage,
     ) -> FractalResult<()> {
-        let clean_path = path.trim_matches('/').replace('\\', "/");
-        if stage == IndexStage::Normal {
+        let clean_path = normalize_path(path, "conflict")?;
+        if stage.is_resolved() {
             return self.stage_oid(&clean_path, mode, oid);
         }
 
-        let entry = VirtualIndexEntry::with_stage(clean_path.clone(), mode, oid, stage);
+        let entry = StagingEntry::with_stage(clean_path.clone(), mode, oid, stage);
         let slot = self
             .conflicts
             .entry(clean_path.clone())
@@ -111,12 +150,12 @@ impl InMemoryIndexTree {
         Ok(())
     }
 
-    /// Checks if there are unresolved conflict stages.
+    /// Reports whether any conflict stage remains unresolved.
     pub fn has_conflicts(&self) -> bool {
         !self.conflicts.is_empty()
     }
 
-    /// Removes a staged path from the index.
+    /// Removes a staged path and any conflict slot for it, reporting whether either existed.
     pub fn remove_file(&mut self, path: &str) -> bool {
         let clean_path = path.trim_matches('/').replace('\\', "/");
         let removed_entry = self.entries.remove(&clean_path).is_some();
@@ -130,66 +169,73 @@ impl InMemoryIndexTree {
         self.conflicts.clear();
     }
 
-    /// Total count of staged clean entries.
+    /// Returns the number of resolved staged entries.
     pub fn entry_count(&self) -> usize {
         self.entries.len()
     }
 
-    /// Access all staged entries.
-    pub fn entries(&self) -> &BTreeMap<String, VirtualIndexEntry> {
+    /// Returns all resolved staged entries.
+    ///
+    /// The map key is the path with any trailing separator stripped, so `stage_oid`, `remove_file`
+    /// and `resolve_conflict` all address the same slot for a sparse directory and for the
+    /// directory it collapses. The authoritative spelling of a path is [`StagingEntry::path`],
+    /// which is the only field the tree builder reads.
+    pub const fn entries(&self) -> &BTreeMap<String, StagingEntry> {
         &self.entries
     }
 
-    /// Access all active conflict slots (first-class conflicts).
-    pub fn conflicts(&self) -> &BTreeMap<String, ConflictStageSlot> {
+    /// Returns all active conflict slots.
+    pub const fn conflicts(&self) -> &BTreeMap<String, ConflictStageSlot> {
         &self.conflicts
     }
 
-    /// Total count of unresolved conflicts.
+    /// Returns the number of unresolved conflicts.
     pub fn conflict_count(&self) -> usize {
         self.conflicts.len()
     }
 
-    /// Resolves an in-memory conflict slot in favor of a specific entry.
-    pub fn resolve_conflict(&mut self, path: &str, resolved_entry: VirtualIndexEntry) {
+    /// Resolves a conflict slot in favor of a specific entry.
+    pub fn resolve_conflict(&mut self, path: &str, resolved_entry: StagingEntry) {
         let clean_path = path.trim_matches('/').replace('\\', "/");
         self.conflicts.remove(&clean_path);
         self.entries.insert(clean_path, resolved_entry);
     }
 
-    /// Extracts a scoped subtree index containing only entries that match
-    /// one of the scope prefixes.
+    /// Returns a scoped copy holding only entries under one of the given prefixes.
+    ///
+    /// An empty scope list, or a list containing `*`, means "everything".
     pub fn filter_by_scope(&self, scope_prefixes: &[String]) -> Self {
-        if scope_prefixes.is_empty()
+        let selects_all = scope_prefixes.is_empty()
             || scope_prefixes
                 .iter()
-                .any(|scope_prefix| scope_prefix == "*")
-        {
+                .any(|scope_prefix| scope_prefix == "*");
+        if selects_all {
             return self.clone();
         }
+
         let mut filtered = Self::new();
         for (path, entry) in &self.entries {
-            let matches = scope_prefixes.iter().any(|prefix| {
+            let in_scope = scope_prefixes.iter().any(|prefix| {
                 let prefix_clean = prefix.trim_matches('/').replace('\\', "/");
                 path.starts_with(&prefix_clean)
             });
-            if matches {
+            if in_scope {
                 filtered.entries.insert(path.clone(), entry.clone());
             }
         }
         filtered
     }
 
-    /// Grafts this scoped index's modifications onto a parent set of entries.
-    /// Preserves all parent entries outside this index's modified paths, while
-    /// applying this index's additions, modifications, and removals.
+    /// Grafts this index's modifications onto a parent entry set.
+    ///
+    /// Parent entries outside this index's paths are preserved, so a scoped index can be applied
+    /// without materializing the whole repository.
     pub fn graft_onto_parent(&self, parent_entries: &BTreeMap<String, (FileMode, Oid)>) -> Self {
         let mut combined = Self::new();
         for (path, (mode, oid)) in parent_entries {
-            combined.entries.insert(
-                path.clone(),
-                VirtualIndexEntry::new(path.clone(), *mode, *oid),
-            );
+            combined
+                .entries
+                .insert(path.clone(), StagingEntry::new(path.clone(), *mode, *oid));
         }
         for (path, entry) in &self.entries {
             combined.entries.insert(path.clone(), entry.clone());
@@ -197,6 +243,7 @@ impl InMemoryIndexTree {
         combined
     }
 
+    /// Pops directory frames down to `target_len`, persisting each completed subtree.
     fn pop_and_persist_down_to<F>(
         dir_stack: &mut Vec<DirectoryFrame>,
         target_len: usize,
@@ -209,9 +256,9 @@ impl InMemoryIndexTree {
             if let Some(completed_frame) = dir_stack.pop() {
                 let subtree = GitTree::new(completed_frame.entries);
                 persist_tree(&subtree)?;
-                let subtree_oid = *subtree.raw_oid();
+                let subtree_oid = *subtree.oid();
                 if let Some(parent_frame) = dir_stack.last_mut() {
-                    parent_frame.entries.push(GitTreeEntry::from_oid(
+                    parent_frame.entries.push(GitTreeEntry::new(
                         FileMode::Directory,
                         completed_frame.dir_name,
                         subtree_oid,
@@ -222,6 +269,7 @@ impl InMemoryIndexTree {
         Ok(())
     }
 
+    /// Finds how much of `dir_path` the current stack already represents, plus the remainder.
     fn resolve_directory_branch<'a>(
         dir_path_opt: Option<&'a str>,
         dir_stack: &[DirectoryFrame],
@@ -241,6 +289,7 @@ impl InMemoryIndexTree {
         (common_depth, None)
     }
 
+    /// Pushes frames for the part of a path the stack does not yet represent.
     fn push_mismatch_branches<'a>(
         dir_stack: &mut Vec<DirectoryFrame>,
         mismatch_branch: Option<(&'a str, std::str::Split<'a, char>)>,
@@ -253,16 +302,16 @@ impl InMemoryIndexTree {
         }
     }
 
+    /// Appends one staged entry into the frame that currently represents its parent directory.
     fn append_entry_to_tree<F>(
         dir_stack: &mut Vec<DirectoryFrame>,
         path: &str,
-        entry: &VirtualIndexEntry,
+        entry: &StagingEntry,
         persist_tree: &mut F,
     ) -> FractalResult<()>
     where
         F: FnMut(&GitTree) -> FractalResult<()>,
     {
-        let is_sparse = entry.is_sparse_dir();
         let (dir_path_opt, entry_name) = match path.rfind('/') {
             Some(slash_idx) => (Some(&path[..slash_idx]), &path[slash_idx + 1..]),
             None => (None, path),
@@ -274,24 +323,26 @@ impl InMemoryIndexTree {
         Self::pop_and_persist_down_to(dir_stack, common_depth + 1, persist_tree)?;
         Self::push_mismatch_branches(dir_stack, mismatch_branch);
 
-        let mode = if is_sparse {
+        let mode = if entry.is_sparse_directory() {
             FileMode::Directory
         } else {
             entry.mode
         };
 
         if let Some(current_frame) = dir_stack.last_mut() {
-            current_frame.entries.push(GitTreeEntry::from_oid(
-                mode,
-                entry_name.to_string(),
-                entry.oid,
-            ));
+            current_frame
+                .entries
+                .push(GitTreeEntry::new(mode, entry_name.to_owned(), entry.oid));
         }
         Ok(())
     }
 
-    /// Builds the hierarchical GitTree structures from in-memory entries,
-    /// passing each constructed GitTree to a persistence callback.
+    /// Builds the hierarchical Git trees from the staged entries, handing each to a persister.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FractalError::IndexConflict`] when any conflict stage is still unresolved, and
+    /// propagates persister failures.
     pub fn write_tree_with_persister<F>(&self, mut persist_tree: F) -> FractalResult<Oid>
     where
         F: FnMut(&GitTree) -> FractalResult<()>,
@@ -306,10 +357,9 @@ impl InMemoryIndexTree {
         if self.entries.is_empty() {
             let empty_tree = GitTree::new(Vec::new());
             persist_tree(&empty_tree)?;
-            return Ok(*empty_tree.raw_oid());
+            return Ok(*empty_tree.oid());
         }
 
-        // Prefix-Stack Tree Builder: O(TreeDepth) memory space, zero intermediate BTreeMap trees
         let mut dir_stack: Vec<DirectoryFrame> = vec![DirectoryFrame::new("")];
 
         for (path, entry) in &self.entries {
@@ -324,6 +374,184 @@ impl InMemoryIndexTree {
         };
         let root_tree = GitTree::new(root_frame.entries);
         persist_tree(&root_tree)?;
-        Ok(*root_tree.raw_oid())
+        Ok(*root_tree.oid())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use fg_core::models::{FileMode, IndexStage, Oid};
+    use fg_object::GitTree;
+
+    use super::InMemoryIndexTree;
+
+    fn oid_from(seed: u8) -> Oid {
+        let mut raw = [0u8; 20];
+        raw[0] = seed;
+        Oid::from_bytes(raw)
+    }
+
+    fn collect_trees(index: &InMemoryIndexTree) -> Vec<GitTree> {
+        let mut collected = Vec::new();
+        index
+            .write_tree_with_persister(|tree| {
+                collected.push(tree.clone());
+                Ok(())
+            })
+            .expect("tree build");
+        collected
+    }
+
+    #[test]
+    fn stage_file_normalizes_separators_and_slashes() {
+        let mut index = InMemoryIndexTree::new();
+        index
+            .stage_oid("/src\\main.rs/", FileMode::RegularFile, oid_from(1))
+            .expect("stage");
+        assert!(index.entries().contains_key("src/main.rs"));
+    }
+
+    #[test]
+    fn stage_rejects_empty_path() {
+        let mut index = InMemoryIndexTree::new();
+        assert!(index
+            .stage_oid("///", FileMode::RegularFile, oid_from(1))
+            .is_err());
+        assert!(index.stage_sparse_directory("", oid_from(1)).is_err());
+    }
+
+    #[test]
+    fn sparse_directory_keeps_its_collapsed_marker() {
+        // The trailing slash is what marks the entry as collapsed; stripping it silently expands
+        // the subtree on the next tree build.
+        let mut index = InMemoryIndexTree::new();
+        index
+            .stage_sparse_directory("vendor", oid_from(2))
+            .expect("stage sparse");
+
+        let stored = index.entries().get("vendor").expect("stored");
+        assert_eq!(stored.path, "vendor/");
+        assert!(stored.is_sparse_directory());
+    }
+
+    #[test]
+    fn sparse_directory_projects_onto_a_directory_tree_entry() {
+        let mut index = InMemoryIndexTree::new();
+        index
+            .stage_sparse_directory("vendor", oid_from(2))
+            .expect("stage sparse");
+
+        let trees = collect_trees(&index);
+        let root = trees.last().expect("root tree");
+        let entry = root
+            .entries()
+            .iter()
+            .find(|candidate| candidate.name == "vendor")
+            .expect("vendor entry");
+        assert_eq!(entry.mode, FileMode::Directory);
+        assert_eq!(entry.oid, oid_from(2));
+    }
+
+    #[test]
+    fn nested_paths_build_one_tree_per_directory() {
+        let mut index = InMemoryIndexTree::new();
+        index
+            .stage_oid("src/lib.rs", FileMode::RegularFile, oid_from(1))
+            .expect("stage");
+        index
+            .stage_oid("src/deep/mod.rs", FileMode::RegularFile, oid_from(2))
+            .expect("stage");
+        index
+            .stage_oid("README.md", FileMode::RegularFile, oid_from(3))
+            .expect("stage");
+
+        let trees = collect_trees(&index);
+        // deep, src, root
+        assert_eq!(trees.len(), 3);
+        let root = trees.last().expect("root");
+        let names: Vec<&str> = root.entries().iter().map(|e| e.name.as_str()).collect();
+        assert_eq!(names, vec!["README.md", "src"]);
+    }
+
+    #[test]
+    fn conflict_stages_block_tree_construction() {
+        let mut index = InMemoryIndexTree::new();
+        index
+            .stage_conflict(
+                "a.txt",
+                FileMode::RegularFile,
+                oid_from(1),
+                IndexStage::Ours,
+            )
+            .expect("stage conflict");
+        assert!(index.has_conflicts());
+        assert!(index.write_tree_with_persister(|_| Ok(())).is_err());
+    }
+
+    #[test]
+    fn staging_a_resolved_entry_clears_its_conflict_slot() {
+        let mut index = InMemoryIndexTree::new();
+        index
+            .stage_conflict(
+                "a.txt",
+                FileMode::RegularFile,
+                oid_from(1),
+                IndexStage::Ours,
+            )
+            .expect("stage conflict");
+        index
+            .stage_oid("a.txt", FileMode::RegularFile, oid_from(9))
+            .expect("stage resolved");
+
+        assert!(!index.has_conflicts());
+        assert_eq!(
+            index.entries().get("a.txt").map(|entry| entry.oid),
+            Some(oid_from(9))
+        );
+    }
+
+    #[test]
+    fn filter_by_scope_selects_prefixes_and_wildcard() {
+        let mut index = InMemoryIndexTree::new();
+        index
+            .stage_oid("src/a.rs", FileMode::RegularFile, oid_from(1))
+            .expect("stage");
+        index
+            .stage_oid("docs/b.md", FileMode::RegularFile, oid_from(2))
+            .expect("stage");
+
+        let scoped = index.filter_by_scope(&["src".to_owned()]);
+        assert_eq!(scoped.entry_count(), 1);
+        assert!(scoped.entries().contains_key("src/a.rs"));
+
+        let all = index.filter_by_scope(&["*".to_owned()]);
+        assert_eq!(all.entry_count(), 2);
+    }
+
+    #[test]
+    fn graft_preserves_parent_entries_outside_scope() {
+        let mut index = InMemoryIndexTree::new();
+        index
+            .stage_oid("src/a.rs", FileMode::RegularFile, oid_from(9))
+            .expect("stage");
+
+        let mut parent = std::collections::BTreeMap::new();
+        parent.insert("docs/b.md".to_owned(), (FileMode::RegularFile, oid_from(2)));
+        parent.insert("src/a.rs".to_owned(), (FileMode::RegularFile, oid_from(1)));
+
+        let combined = index.graft_onto_parent(&parent);
+        assert_eq!(combined.entry_count(), 2);
+        assert_eq!(
+            combined.entries().get("src/a.rs").map(|entry| entry.oid),
+            Some(oid_from(9))
+        );
+        assert!(combined.entries().contains_key("docs/b.md"));
+    }
+
+    #[test]
+    fn empty_index_produces_the_empty_tree() {
+        let index = InMemoryIndexTree::new();
+        let oid = index.write_tree_with_persister(|_| Ok(())).expect("build");
+        assert_eq!(oid.to_hex(), "4b825dc642cb6eb9a060e54bf8d69288fbee4904");
     }
 }

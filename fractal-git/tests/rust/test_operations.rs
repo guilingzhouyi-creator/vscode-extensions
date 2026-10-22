@@ -141,7 +141,7 @@ fn test_operation_graph_time_travel_undo() {
     // Perform time-travel undo
     let restored_op = graph.undo().expect("Undo succeeds").expect("Has parent");
     assert_eq!(graph.current_head, Some(op_init_id));
-    assert_eq!(restored_op.operation_id, op_init_id);
+    assert_eq!(restored_op.op_id, op_init_id);
     assert_eq!(restored_op.view.head_oid, Some(oid_initial));
 
     // Second undo at root should return None
@@ -154,6 +154,23 @@ fn test_operation_graph_time_travel_undo() {
 fn test_operation_graph_disk_persistence_roundtrip() {
     let dir = TestDir::new("persist");
     let git_dir = dir.path().join(".git");
+
+    // The operation log is a section of the repository container, so a container must exist before
+    // anything can be persisted. `load_or_init` returns an empty graph when the file is absent, and
+    // `persist_to_disk` refuses to invent one: an operation log without a repository has nowhere to
+    // record which repository it belongs to.
+    //
+    // The path comes from `fg_native::container_path`, never from a locally rebuilt join. This
+    // fixture previously spelled out `<git_dir>/fractal/repo.txc` and passed only because it
+    // matched a reader that had itself drifted away from the writer; once the writer and reader were
+    // reconciled onto one definition, a hand-built path here would silently reintroduce the split.
+    let container_path = fg_native::container_path(&git_dir);
+    std::fs::create_dir_all(&git_dir).expect("Create repository directory");
+    let document = fg_native::RepoDocument::for_new_repository(fg_native::LayoutMode::Dev)
+        .expect("Build repository document");
+    document
+        .publish_new(&container_path)
+        .expect("Publish repository container");
 
     let op_id = {
         let mut graph = OperationGraph::load_or_init(&git_dir).expect("Init graph");
@@ -174,4 +191,27 @@ fn test_operation_graph_disk_persistence_roundtrip() {
     let op = reloaded.operations.get(&op_id).expect("Op persists");
     assert_eq!(op.metadata.command, "stage-promotion");
     assert_eq!(op.view.staged_promotions, vec!["prop-001".to_string()]);
+}
+
+#[test]
+fn test_operation_graph_refuses_to_persist_without_a_container() {
+    let dir = TestDir::new("no-container");
+    let git_dir = dir.path().join(".git");
+
+    // An empty graph loads without a container, because nothing has been recorded yet.
+    let mut graph = OperationGraph::load_or_init(&git_dir).expect("Init graph");
+    let view = RepoViewSnapshot {
+        head_oid: None,
+        branches: BTreeMap::new(),
+        staged_promotions: Vec::new(),
+        timestamp_ms: 1,
+    };
+
+    // Recording does not. `taxis init` creates the container that gives the section a home, and
+    // silently creating one here would leave a repository whose identity nobody chose.
+    let recorded = graph.record_operation(view, "Agent", "noop", "no container", 1);
+    assert!(
+        recorded.is_err(),
+        "recording without a container must be refused, got {recorded:?}"
+    );
 }

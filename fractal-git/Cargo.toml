@@ -5,6 +5,7 @@ members = [
     "crates/fg-index",
     "crates/fg-algorithms",
     "crates/fg-pools",
+    "crates/fg-native",
     "crates/fg-storage",
     "crates/fg-topology",
     "crates/fg-transport",
@@ -29,6 +30,7 @@ fg-object = { path = "crates/fg-object" }
 fg-index = { path = "crates/fg-index" }
 fg-algorithms = { path = "crates/fg-algorithms" }
 fg-pools = { path = "crates/fg-pools" }
+fg-native = { path = "crates/fg-native" }
 fg-storage = { path = "crates/fg-storage" }
 fg-topology = { path = "crates/fg-topology" }
 fg-transport = { path = "crates/fg-transport" }
@@ -89,9 +91,25 @@ name = "test_operations"
 path = "tests/rust/test_operations.rs"
 
 [[test]]
+name = "test_relocate"
+path = "tests/rust/test_relocate.rs"
+
+[[test]]
+name = "test_refs"
+path = "tests/rust/test_refs.rs"
+
+[[test]]
+name = "test_tag_codec"
+path = "tests/rust/test_tag_codec.rs"
+
+[[test]]
 name = "test_algebraic_conflicts"
 path = "tests/rust/test_algebraic_conflicts.rs"
 
 [[test]]
 name = "test_commit_graph"
 path = "tests/rust/test_commit_graph.rs"
+
+[[test]]
+name = "test_commit_materializer"
+path = "tests/rust/test_commit_materializer.rs"

@@ -172,6 +172,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "fg-native"
+version = "0.1.0"
+dependencies = [
+ "fg-core",
+ "getrandom",
+ "sha1",
+ "thiserror",
+]
+
+[[package]]
 name = "fg-object"
 version = "0.1.0"
 dependencies = [
@@ -213,6 +223,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "fg-core",
+ "fg-native",
  "serde",
  "serde_json",
  "sha1",
@@ -255,6 +266,7 @@ dependencies = [
  "fg-core",
  "fg-gate",
  "fg-index",
+ "fg-native",
  "fg-object",
  "fg-pools",
  "fg-storage",

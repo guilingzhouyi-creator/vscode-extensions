@@ -11,8 +11,8 @@
 //!   - Accurately models sparse changes (e.g. 3 files mutated in 1 out of 50 packages).
 //!   - Provides an O(1) in-memory lookup closure to simulate content-addressable storage.
 
-use fg_core::models::Oid;
-use fg_object::{FileMode, GitTree, GitTreeEntry};
+use fg_core::models::{FileMode, Oid};
+use fg_object::{GitTree, GitTreeEntry};
 
 /// Result of generating synthetic monorepo trees.
 #[derive(Debug, Clone)]
@@ -37,12 +37,12 @@ impl SyntheticMonorepo {
     /// Performs an in-memory tree lookup given a tree OID.
     /// Simulates O(1) / O(N) object store lookup without disk I/O.
     pub fn lookup_tree(&self, oid: &Oid) -> Option<GitTree> {
-        if *oid == *self.mod_subtree.raw_oid() {
+        if *oid == *self.mod_subtree.oid() {
             Some(self.mod_subtree.clone())
         } else {
             self.base_subtrees
                 .iter()
-                .find(|subtree| *subtree.raw_oid() == *oid)
+                .find(|subtree| *subtree.oid() == *oid)
                 .cloned()
         }
     }
@@ -76,27 +76,19 @@ pub fn generate_monorepo_trees(
             let mut oid_bytes = [0u8; 20];
             oid_bytes[0..2].copy_from_slice(&(dir_idx as u16).to_le_bytes());
             oid_bytes[2..4].copy_from_slice(&(file_idx as u16).to_le_bytes());
-            entries.push(GitTreeEntry::from_oid(
+            entries.push(GitTreeEntry::new(
                 FileMode::RegularFile,
                 format!("f_{}.rs", file_idx),
                 Oid::from_bytes(oid_bytes),
             ));
         }
         let tree = GitTree::new(entries);
-        let sub_oid = *tree.raw_oid();
+        let sub_oid = *tree.oid();
         base_subtrees.push(tree);
 
         let dir_name = format!("pkg_{}", dir_idx);
-        base_root_entries.push(GitTreeEntry::from_oid(
-            FileMode::Directory,
-            &dir_name,
-            sub_oid,
-        ));
-        mod_root_entries.push(GitTreeEntry::from_oid(
-            FileMode::Directory,
-            &dir_name,
-            sub_oid,
-        ));
+        base_root_entries.push(GitTreeEntry::new(FileMode::Directory, &dir_name, sub_oid));
+        mod_root_entries.push(GitTreeEntry::new(FileMode::Directory, &dir_name, sub_oid));
     }
 
     let mut mod_entries = Vec::with_capacity(files_per_dir);
@@ -107,7 +99,7 @@ pub fn generate_monorepo_trees(
         if file_idx < mutated_count {
             oid_bytes[19] = 0xff;
         }
-        mod_entries.push(GitTreeEntry::from_oid(
+        mod_entries.push(GitTreeEntry::new(
             FileMode::RegularFile,
             format!("f_{}.rs", file_idx),
             Oid::from_bytes(oid_bytes),
@@ -116,7 +108,7 @@ pub fn generate_monorepo_trees(
     let mod_subtree = GitTree::new(mod_entries);
     let mod_name = format!("pkg_{}", target_mod_idx);
     mod_root_entries[target_mod_idx] =
-        GitTreeEntry::from_oid(FileMode::Directory, &mod_name, *mod_subtree.raw_oid());
+        GitTreeEntry::new(FileMode::Directory, &mod_name, *mod_subtree.oid());
 
     let base_root = GitTree::new(base_root_entries);
     let mod_root = GitTree::new(mod_root_entries);
@@ -141,12 +133,12 @@ mod tests {
         let monorepo = generate_monorepo_trees(10, 20, 3, 2);
         assert_eq!(monorepo.base_subtrees.len(), 10);
         assert_eq!(monorepo.total_file_count, 200);
-        assert_ne!(monorepo.base_root.raw_oid(), monorepo.mod_root.raw_oid());
+        assert_ne!(monorepo.base_root.oid(), monorepo.mod_root.oid());
 
-        let lookup_mod = monorepo.lookup_tree(monorepo.mod_subtree.raw_oid());
+        let lookup_mod = monorepo.lookup_tree(monorepo.mod_subtree.oid());
         assert_eq!(
-            lookup_mod.as_ref().map(|tree| tree.raw_oid()),
-            Some(monorepo.mod_subtree.raw_oid())
+            lookup_mod.as_ref().map(|tree| tree.oid()),
+            Some(monorepo.mod_subtree.oid())
         );
     }
 }

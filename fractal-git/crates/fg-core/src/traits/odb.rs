@@ -8,7 +8,12 @@ use crate::models::Oid;
 
 /// Abstract interface for Git Object Database (ODB) backends.
 pub trait OdbStore: Send + Sync {
-    /// Reads raw uncompressed object payload for a given OID.
+    /// Reads the raw, uncompressed object exactly as it is stored on disk.
+    ///
+    /// The bytes include the canonical header — `"<type> <size>\0"` — followed by the payload, which
+    /// is the same ordering Git hashes to derive the object id. Callers that only want the payload
+    /// split the header off instead of re-deriving it, because the header states the type the
+    /// object id was computed with and a caller cannot recover that from the bytes alone.
     fn read_object(&self, oid: &Oid) -> FractalResult<Vec<u8>>;
 
     /// Atomically persists a raw loose object payload and returns its canonical OID.

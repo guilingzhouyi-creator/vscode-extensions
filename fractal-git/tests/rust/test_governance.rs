@@ -117,11 +117,8 @@ fn test_human_control_boundary() {
     };
     let agent_actor = ActorIdentity::agent(agent_ctx);
 
-    let human_actor = ActorIdentity::human(
-        "Lead Architect",
-        "architect@company.com",
-        Some("AUTH-TOKEN-123".into()),
-    );
+    let human_actor =
+        ActorIdentity::human("Lead Architect", "architect@company.com", "AUTH-TOKEN-123");
 
     let system_trunk = FractalRef::SystemTrunk {
         branch: "main".into(),
@@ -149,6 +146,22 @@ fn test_human_control_boundary() {
     assert!(PreReceiveGuard::assert_actor_authorized(&system_trunk, &human_actor, &policy).is_ok());
     assert!(
         PreReceiveGuard::assert_actor_authorized(&integration_trunk, &human_actor, &policy).is_ok()
+    );
+
+    // A human claim with no credential must not satisfy the dual-trunk boundary
+    let unverified_actor =
+        ActorIdentity::unverified_human("Lead Architect", "architect@company.com");
+    let res_unverified =
+        PreReceiveGuard::assert_actor_authorized(&system_trunk, &unverified_actor, &policy);
+    assert!(res_unverified.is_err());
+    let err_unverified = format!("{:?}", res_unverified.err().unwrap());
+    assert!(err_unverified.contains("carries no credential"));
+
+    // A blank credential is equivalent to no credential
+    let blank_token_actor = ActorIdentity::human("Lead Architect", "architect@company.com", "   ");
+    assert!(
+        PreReceiveGuard::assert_actor_authorized(&system_trunk, &blank_token_actor, &policy)
+            .is_err()
     );
 
     // Agent actor pushing to its own Cell Main is allowed

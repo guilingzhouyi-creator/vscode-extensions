@@ -18,10 +18,10 @@ use fg_algorithms::synthetic::{
 use fg_algorithms::traverse::DagWalker;
 use fg_core::constants::metrics::*;
 use fg_core::models::{
-    AutoQualityScoreEnvelope, CorrectedCommitDate, Oid, PathBloomFilter, TaxisPolicy,
+    AutoQualityScoreEnvelope, CorrectedCommitDate, FileMode, Oid, PathBloomFilter, TaxisPolicy,
 };
 use fg_index::InMemoryIndexTree;
-use fg_object::tree::{FileMode, GitTree, GitTreeEntry};
+use fg_object::tree::{GitTree, GitTreeEntry};
 use fg_pools::buffer_pool::{BufferSizeClass, PageBufferPool};
 use fg_pools::lru_cache::ByteLruCache;
 use fg_topology::PromotionStagingLedger;
@@ -115,7 +115,7 @@ impl TaxisBenchmarkSuite {
             .map(|i| {
                 let mut hash = [0u8; 20];
                 hash[0] = (i % 250) as u8;
-                GitTreeEntry::from_oid(
+                GitTreeEntry::new(
                     FileMode::RegularFile,
                     format!("file_{}.rs", i),
                     Oid::from_bytes(hash),
@@ -123,50 +123,50 @@ impl TaxisBenchmarkSuite {
             })
             .collect();
         let common_tree = GitTree::new(common_entries);
-        let common_sub_oid = *common_tree.raw_oid();
+        let common_sub_oid = *common_tree.oid();
 
         // Modified subtree with 1 file changed
         let mut mod_entries: Vec<GitTreeEntry> = (0..50)
             .map(|i| {
                 let mut hash = [0u8; 20];
                 hash[0] = (i % 250) as u8;
-                GitTreeEntry::from_oid(
+                GitTreeEntry::new(
                     FileMode::RegularFile,
                     format!("file_{}.rs", i),
                     Oid::from_bytes(hash),
                 )
             })
             .collect();
-        mod_entries[0] = GitTreeEntry::from_oid(
+        mod_entries[0] = GitTreeEntry::new(
             FileMode::RegularFile,
             "file_0.rs",
             Oid::from_bytes([99u8; 20]),
         );
         let mod_tree = GitTree::new(mod_entries);
-        let mod_sub_oid = *mod_tree.raw_oid();
+        let mod_sub_oid = *mod_tree.oid();
 
         // 10 subtrees in root: 9 identical, 1 modified
         let mut old_roots = Vec::new();
         let mut new_roots = Vec::new();
         for i in 0..9 {
             let name = format!("dir_{}", i);
-            old_roots.push(GitTreeEntry::from_oid(
+            old_roots.push(GitTreeEntry::new(
                 FileMode::Directory,
                 &name,
                 common_sub_oid,
             ));
-            new_roots.push(GitTreeEntry::from_oid(
+            new_roots.push(GitTreeEntry::new(
                 FileMode::Directory,
                 &name,
                 common_sub_oid,
             ));
         }
-        old_roots.push(GitTreeEntry::from_oid(
+        old_roots.push(GitTreeEntry::new(
             FileMode::Directory,
             "dir_mod",
             common_sub_oid,
         ));
-        new_roots.push(GitTreeEntry::from_oid(
+        new_roots.push(GitTreeEntry::new(
             FileMode::Directory,
             "dir_mod",
             mod_sub_oid,

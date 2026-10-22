@@ -23,6 +23,10 @@ impl PreReceiveGuard {
 
     /// Asserts whether `actor` (Human or Agent) holds legal authority to advance `target_ref`
     /// according to the repository's `TaxisPolicy`.
+    ///
+    /// Human authority over a dual trunk requires a present, non-blank credential. The
+    /// identity variant alone is a claim, not a proof: without this check any caller able to
+    /// pass `--human <name>` would satisfy the very boundary the policy declares.
     pub fn assert_actor_authorized(
         target_ref: &FractalRef,
         actor: &ActorIdentity,
@@ -43,30 +47,40 @@ impl PreReceiveGuard {
         if policy.human_controlled_trunks {
             match target_ref {
                 FractalRef::SystemTrunk { branch } => {
-                    if let ActorIdentity::Agent(ctx) = actor {
-                        return Err(FractalError::TopologyBreach {
-                            source_ref: format!("{}:{}", ctx.cell_id, ctx.agent_uid),
-                            target_ref: format!(
-                                "{}{}",
-                                fg_core::constants::git::REF_HEADS_PREFIX,
-                                branch
-                            ),
-                            reason: "Human Control Breach: System Trunk is strictly \
-                                     human-controlled; agent direct promotion is forbidden"
-                                .into(),
-                        });
+                    match actor {
+                        ActorIdentity::Agent(ctx) => {
+                            return Err(FractalError::TopologyBreach {
+                                source_ref: format!("{}:{}", ctx.cell_id, ctx.agent_uid),
+                                target_ref: format!(
+                                    "{}{}",
+                                    fg_core::constants::git::REF_HEADS_PREFIX,
+                                    branch
+                                ),
+                                reason: "Human Control Breach: System Trunk is strictly \
+                                         human-controlled; agent direct promotion is forbidden"
+                                    .into(),
+                            });
+                        }
+                        ActorIdentity::Human { .. } => {
+                            Self::assert_human_credential_present(target_ref, actor)?;
+                        }
                     }
                     return Ok(());
                 }
                 FractalRef::Trunk => {
-                    if let ActorIdentity::Agent(ctx) = actor {
-                        return Err(FractalError::TopologyBreach {
-                            source_ref: format!("{}:{}", ctx.cell_id, ctx.agent_uid),
-                            target_ref: fg_core::constants::refs::REF_FRACTAL_TRUNK.into(),
-                            reason: "Human Control Breach: Integration Trunk is strictly \
-                                     human-controlled; promotions require human sign-off"
-                                .into(),
-                        });
+                    match actor {
+                        ActorIdentity::Agent(ctx) => {
+                            return Err(FractalError::TopologyBreach {
+                                source_ref: format!("{}:{}", ctx.cell_id, ctx.agent_uid),
+                                target_ref: fg_core::constants::refs::REF_FRACTAL_TRUNK.into(),
+                                reason: "Human Control Breach: Integration Trunk is strictly \
+                                         human-controlled; promotions require human sign-off"
+                                    .into(),
+                            });
+                        }
+                        ActorIdentity::Human { .. } => {
+                            Self::assert_human_credential_present(target_ref, actor)?;
+                        }
                     }
                     return Ok(());
                 }
@@ -115,5 +129,22 @@ impl PreReceiveGuard {
         }
 
         Ok(())
+    }
+
+    /// Rejects a human authority claim that carries no credential.
+    fn assert_human_credential_present(
+        target_ref: &FractalRef,
+        actor: &ActorIdentity,
+    ) -> FractalResult<()> {
+        if actor.has_authority_credential() {
+            return Ok(());
+        }
+        Err(FractalError::TopologyBreach {
+            source_ref: actor.display_name(),
+            target_ref: target_ref.to_git_ref(),
+            reason: "Human Control Breach: human authority claim carries no credential; \
+                     pass a verified --token for dual trunk writes"
+                .into(),
+        })
     }
 }

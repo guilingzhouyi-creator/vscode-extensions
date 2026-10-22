@@ -3,34 +3,41 @@
 //! Architecture Role: Encapsulates pure Git commit object primitives with Dual-Faced
 //!   payload serialization (Human-readable conventional sections +
 //!   Machine-readable PraxisCardContext).
+//! Dependencies & Triggers: Consumed by the commit materializer, the walker, and every command
+//!   that resolves history.
+//! Responsibilities: Serialize a commit payload in Git's exact byte layout and expose its fields.
+//! Exit Semantics & Design Rationale:
+//!   - Parent and tree ids are held as typed [`Oid`] values rather than hex strings. Storing the
+//!     hex text alongside the typed value gives two sources for one fact, and they can disagree.
+//!   - `oid()` returns the typed value object; `oid_hex()` is the display projection. There is no
+//!     third `raw_oid` spelling.
 
-use fg_core::models::{AgentCommitMeta, GitSignature, Oid};
-use sha1::{Digest, Sha1};
+use fg_core::models::{
+    compute_object_oid, raw_object, AgentCommitMeta, GitSignature, ObjectKind, Oid,
+};
 
 /// Pure Git Commit representation.
 #[derive(Debug, Clone, PartialEq)]
 pub struct GitCommit {
-    tree_oid: String,
-    parent_oids: Vec<String>,
+    tree_oid: Oid,
+    parent_oids: Vec<Oid>,
     author: GitSignature,
     committer: GitSignature,
     message: String,
     agent_meta: Option<AgentCommitMeta>,
-    oid: String,
-    raw_oid: Oid,
+    oid: Oid,
 }
 
 impl GitCommit {
-    /// Constructs and computes OID for a new GitCommit.
+    /// Constructs and computes the object id for a new commit.
     pub fn new(
-        tree_oid: impl Into<String>,
-        parent_oids: Vec<String>,
+        tree_oid: Oid,
+        parent_oids: Vec<Oid>,
         author: GitSignature,
         committer: GitSignature,
         message: impl Into<String>,
         agent_meta: Option<AgentCommitMeta>,
     ) -> Self {
-        let tree_oid = tree_oid.into();
         let message = message.into();
         let payload = Self::serialize_commit_payload(
             &tree_oid,
@@ -40,8 +47,7 @@ impl GitCommit {
             &message,
             &agent_meta,
         );
-        let raw_oid = Self::compute_commit_oid(&payload);
-        let oid = raw_oid.to_hex();
+        let oid = Self::compute_commit_oid(&payload);
 
         Self {
             tree_oid,
@@ -51,14 +57,13 @@ impl GitCommit {
             message,
             agent_meta,
             oid,
-            raw_oid,
         }
     }
 
-    /// Constructs a GitCommit strictly from a proven `ValidatedCommitWitness`.
+    /// Constructs a commit strictly from a proven [`fg_core::models::ValidatedCommitWitness`].
     pub fn from_witness(
-        tree_oid: impl Into<String>,
-        parent_oids: Vec<String>,
+        tree_oid: Oid,
+        parent_oids: Vec<Oid>,
         author: GitSignature,
         committer: GitSignature,
         witness: &fg_core::models::ValidatedCommitWitness,
@@ -74,47 +79,42 @@ impl GitCommit {
         )
     }
 
-    /// Access the 40-character SHA-1 identifier of this commit.
-    pub fn oid(&self) -> &str {
+    /// Returns the typed 20-byte object id of this commit.
+    pub const fn oid(&self) -> &Oid {
         &self.oid
     }
 
-    /// Access the 40-character SHA-1 identifier of this commit (explicit getter).
-    pub fn oid_hex(&self) -> &str {
-        &self.oid
+    /// Returns the 40-character lowercase hexadecimal object id of this commit.
+    pub fn oid_hex(&self) -> String {
+        self.oid.to_hex()
     }
 
-    /// Access the typed 20-byte Oid.
-    pub fn raw_oid(&self) -> &Oid {
-        &self.raw_oid
-    }
-
-    /// Access tree OID hex string.
-    pub fn tree_oid(&self) -> &str {
+    /// Returns the root tree object id.
+    pub const fn tree_oid(&self) -> &Oid {
         &self.tree_oid
     }
 
-    /// Access parent commit OID hex strings.
-    pub fn parent_oids(&self) -> &[String] {
+    /// Returns the parent commit object ids in order.
+    pub fn parent_oids(&self) -> &[Oid] {
         &self.parent_oids
     }
 
-    /// Access author signature.
-    pub fn author(&self) -> &GitSignature {
+    /// Returns the author signature.
+    pub const fn author(&self) -> &GitSignature {
         &self.author
     }
 
-    /// Access committer signature.
-    pub fn committer(&self) -> &GitSignature {
+    /// Returns the committer signature.
+    pub const fn committer(&self) -> &GitSignature {
         &self.committer
     }
 
-    /// Access commit message.
+    /// Returns the commit message.
     pub fn message(&self) -> &str {
         &self.message
     }
 
-    /// Access structured agent metadata if available.
+    /// Returns structured agent metadata when present.
     pub fn agent_meta(&self) -> Option<&AgentCommitMeta> {
         self.agent_meta.as_ref()
     }
@@ -129,22 +129,17 @@ impl GitCommit {
             &self.message,
             &self.agent_meta,
         );
-        let mut header_buf = [0u8; 32];
-        let header_len = {
-            use std::io::Write;
-            let mut cursor = std::io::Cursor::new(&mut header_buf[..]);
-            let _ = write!(cursor, "commit {}\0", payload.len());
-            cursor.position() as usize
-        };
-        let mut raw = Vec::with_capacity(header_len + payload.len());
-        raw.extend_from_slice(&header_buf[..header_len]);
-        raw.extend_from_slice(&payload);
-        raw
+        raw_object(ObjectKind::Commit, &payload)
     }
 
+    /// Renders the commit payload in Git's canonical header order.
+    ///
+    /// The header order (`tree`, then each `parent`, then `author`, then `committer`, then a blank
+    /// line) is part of the object identity: reordering headers changes the object id even though
+    /// the parsed fields are identical.
     fn serialize_commit_payload(
-        tree_oid: &str,
-        parent_oids: &[String],
+        tree_oid: &Oid,
+        parent_oids: &[Oid],
         author: &GitSignature,
         committer: &GitSignature,
         message: &str,
@@ -152,9 +147,9 @@ impl GitCommit {
     ) -> Vec<u8> {
         let mut bytes = Vec::with_capacity(256 + message.len());
         use std::io::Write;
-        let _ = writeln!(bytes, "tree {}", tree_oid);
+        let _ = writeln!(bytes, "tree {}", tree_oid.to_hex());
         for parent in parent_oids {
-            let _ = writeln!(bytes, "parent {}", parent);
+            let _ = writeln!(bytes, "parent {}", parent.to_hex());
         }
         let _ = writeln!(bytes, "author {}", author.to_git_line());
         let _ = writeln!(bytes, "committer {}", committer.to_git_line());
@@ -172,17 +167,6 @@ impl GitCommit {
     }
 
     fn compute_commit_oid(payload: &[u8]) -> Oid {
-        let mut header_buf = [0u8; 32];
-        let header_len = {
-            use std::io::Write;
-            let mut cursor = std::io::Cursor::new(&mut header_buf[..]);
-            let _ = write!(cursor, "commit {}\0", payload.len());
-            cursor.position() as usize
-        };
-        let mut hasher = Sha1::new();
-        hasher.update(&header_buf[..header_len]);
-        hasher.update(payload);
-        let hash: [u8; 20] = hasher.finalize().into();
-        Oid::from_bytes(hash)
+        compute_object_oid(ObjectKind::Commit, payload)
     }
 }
