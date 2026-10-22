@@ -480,6 +480,73 @@ check(
   STRUCTURE.controlledProjects().includes('governance') &&
     STRUCTURE.controlledProjects().includes('fractal-git'),
 );
+// The codename vocabulary used to exist twice: the contract carried sprint/pass/w markers, while
+// validate-commit-msg carried wip/temp/new/vN. Both registered as CMG-STY-001, so the pair claimed
+// to be one rule while disagreeing on most inputs. These assertions pin the single vocabulary and
+// the two false positives that the duplicate produced.
+const CODENAME_CASES = [
+  ['phase2', '本 phase2 内补齐判空与早返回，避免异常穿透到调用方。', true],
+  ['sprint 3', '本 Sprint 3 内补齐判空与早返回，避免异常穿透到调用方。', true],
+  ['st7', '本 st7 内补齐判空与早返回，避免异常穿透到调用方。', true],
+  ['p4', '本 p4 内补齐判空与早返回，避免异常穿透到调用方。', true],
+  ['w3', '本 w3 内补齐判空与早返回，避免异常穿透到调用方。', true],
+  ['pass 2', '本 pass 2 内补齐判空与早返回，避免异常穿透到调用方。', true],
+  ['new analyzer', '新增 new analyzer 注册分支，避免未注册分析器被静默忽略。', false],
+  ['v2 版本', '升级协议到 v2 版本，避免旧客户端解析失败。', false],
+];
+const codenameBody = (why) =>
+  `fix(gate): 修复空指针分支的判定顺序\n\n[Project / 项目归属]\n- governance\n\n[Why / 动机背景]\n- ${why}\n\n[Fixed / 修复缺陷]\n- 修复空指针分支缺少保护导致异常穿透到调用方的缺陷，根因是判定顺序先解引用后判空。\n\n[Verification / 验证结论]\n- 以空输入复核，门禁给出结构化阻断而非异常中断。\n`;
+const codenameMismatches = CODENAME_CASES.filter(([, why, expectBlocked]) => {
+  const blocked = STRUCTURE.verifyStructure(codenameBody(why)).some((f) => f.step === STRUCTURE.STEP.batch);
+  return blocked !== expectBlocked;
+}).map(([label]) => label);
+check(
+  'commit structure contract owns the only codename vocabulary',
+  codenameMismatches.length === 0,
+  `mismatched: ${codenameMismatches.join(', ')}`,
+);
+check(
+  'codename finding carries the line and token so callers need no second pattern',
+  (() => {
+    const finding = STRUCTURE.verifyStructure(codenameBody('本 phase2 内补齐判空与早返回。')).find(
+      (f) => f.step === STRUCTURE.STEP.batch,
+    );
+    return Boolean(finding) && finding.token === 'phase2' && finding.line > 0;
+  })(),
+);
+check(
+  'validate-commit-msg projects the contract codename finding without a second vocabulary',
+  (() => {
+    const { validateSingleCommitMessage } = require('./validate-commit-msg');
+    const flagged = validateSingleCommitMessage(codenameBody('本 phase2 内补齐判空与早返回。')).batchFindings;
+    const legit = validateSingleCommitMessage(codenameBody('新增 new analyzer 注册分支，避免未注册分析器被静默忽略。')).batchFindings;
+    return flagged.length === 1 && flagged[0].term === 'phase2' && legit.length === 0;
+  })(),
+);
+// A step constant the module never emits is worse than no constant: a caller filtering on it matches
+// nothing and reports a clean run. `slang` was exactly that — the dictionary owns SLANG-GUARD-02.
+check(
+  'every structure-contract step constant is reachable from verifyStructure',
+  (() => {
+    const produced = new Set();
+    const probeMessages = [
+      'fix(gate): abc',
+      'update(gate): 修复空指针分支的判定顺序',
+      'fix(gate): 修复空指针分支的判定顺序',
+      'fix(gate): 修复空指针分支的判定顺序。',
+      // A non-blank second line is the only way to reach BODY-SPLIT-03.
+      'fix(gate): 修复空指针分支的判定顺序\n[Project / 项目归属]\n- governance\n',
+      codenameBody('本 phase2 内补齐判空与早返回。'),
+      `fix(gate): 修复空指针分支的判定顺序\n\n[Project / 项目归属]\n- unknown\n\n[Why / 动机背景]\n- 现有判定在空指针分支上缺少保护，构造边界输入时会抛出异常并中断门禁流程。\n`,
+    ];
+    for (const message of probeMessages) {
+      for (const finding of STRUCTURE.verifyStructure(message)) produced.add(finding.step);
+    }
+    const declared = Object.values(STRUCTURE.STEP);
+    const unreachable = declared.filter((step) => !produced.has(step));
+    return unreachable.length === 0;
+  })(),
+);
 
 // --- 门面承载（auto-refactor 项目内守卫，无 runSelfProbes 导出，按其纯函数驱动）---
 const FACADE_DIST = path.join(__dirname, '../../auto-refactor/dist/core/architecture/facade-governance-evaluator.js');

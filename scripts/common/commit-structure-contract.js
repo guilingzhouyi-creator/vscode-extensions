@@ -1,7 +1,7 @@
 /**
  * Module: Commit Message Structural Contract Verifier
  * File Path: scripts/common/commit-structure-contract.js
- * Architecture Role: Single implementation of the seven structural commit-message checks that used
+ * Architecture Role: Single implementation of the six structural commit-message checks that used
  *   to live only inside the PowerShell and Bash entry points. The entry points now delegate here, so
  *   the same rules apply whether a message arrives through the hook, through `--range` on push, or
  *   through a CI invocation that never touches a shell script.
@@ -17,9 +17,13 @@
  *   6. Reject construction-batch codenames in the body;
  *   7. Report each finding with the step id the registry declares, so a caller can attribute it.
  * Exit Semantics & Design Rationale: Pure functions returning findings; the caller decides exit
- *   status. The seven checks were previously duplicated as native code in two shells, which meant a
+ *   status. The six checks were previously duplicated as native code in two shells, which meant a
  *   fix had to be written twice and verified twice — and the Bash copy had already drifted. One
  *   implementation removes that class of divergence rather than policing it.
+ *   The seventh registered step, `SLANG-GUARD-02`, is intentionally not here: it is a dictionary
+ *   lookup over `commit-msg-forbidden-terms.json` with whitelist and code-block masking, which is a
+ *   different mechanism from a structural predicate. Codename detection lives here; slang detection
+ *   lives in `validate-commit-msg-style.js`.
  *
  * @module commit-structure-contract
  */
@@ -37,10 +41,15 @@ const MIN_BODY_SUBSTANTIVE = 30;
 const HEADER_MIN = 4;
 const HEADER_MAX = 80;
 
-/** Step identifiers exactly as registered in `gate-step-registry.json`. */
+/**
+ * Step identifiers this module can report, exactly as registered in `gate-step-registry.json`.
+ *
+ * `SLANG-GUARD-02` is deliberately absent: it is a dictionary check owned by
+ * `validate-commit-msg-style.js`, and a constant here would advertise a step this module never
+ * produces — a caller filtering on it would silently match nothing.
+ */
 const STEP = Object.freeze({
   header: 'HEADER-FORM-01',
-  slang: 'SLANG-GUARD-02',
   split: 'BODY-SPLIT-03',
   density: 'BODY-DENSITY-04',
   sections: 'BODY-SECTIONS-05',
@@ -193,12 +202,13 @@ function collectProjects(body) {
  *
  * @param {string} content - Raw commit message.
  * @param {{ projects?: string[] }} [options] - Overrides for testing.
- * @returns {Array<{step: string, ruleId: string, message: string, detail: string}>} Findings.
+ * @returns {Array<{step: string, ruleId: string, message: string, detail: string, line?: number, token?: string}>} Findings.
  */
 function verifyStructure(content, options = {}) {
   const { lines, header, body, type } = parseMessage(content);
   const findings = [];
-  const add = (step, ruleId, message, detail) => findings.push({ step, ruleId, message, detail });
+  const add = (step, ruleId, message, detail, extra) =>
+    findings.push({ step, ruleId, message, detail, ...(extra || {}) });
 
   if (header === '') {
     add(STEP.header, 'GUARD-MSG-001', '提交标题为空', 'header is empty');
@@ -268,10 +278,19 @@ function verifyStructure(content, options = {}) {
       );
     }
   }
-  // 7. Batch codenames.
-  const batch = BATCH_CODE.exec(body);
-  if (batch) {
-    add(STEP.batch, 'CMG-STY-001', `正文包含批次代号: ${batch[0]}`, 'describe the technical fact instead');
+  // 7. Batch codenames. The line number is reported so a caller that prints it does not have to
+  // re-scan with a second copy of the pattern — that copy is how the two vocabularies drifted.
+  const batchLines = [];
+  body.split(/\r?\n/).forEach((line, index) => {
+    const hit = BATCH_CODE.exec(line);
+    if (hit) batchLines.push({ line: index + 3, token: hit[0] });
+  });
+  if (batchLines.length > 0) {
+    const first = batchLines[0];
+    add(STEP.batch, 'CMG-STY-001', `正文包含批次代号: ${first.token}`, 'describe the technical fact instead', {
+      line: first.line,
+      token: first.token,
+    });
   }
   return findings;
 }

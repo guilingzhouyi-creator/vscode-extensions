@@ -81,7 +81,10 @@ const {
   formatDiagnosticReport,
   runSelfTest: runStyleSelfTest,
 } = require(MODULE_STYLE);
-const { verifyStructure } = require(MODULE_STRUCTURE);
+const { verifyStructure, STEP: STRUCTURE_STEP } = require(MODULE_STRUCTURE);
+
+/** The structure-contract step that owns codename detection. */
+const STEP_BATCH_CODE = STRUCTURE_STEP.batch;
 
 const CATALOG_FILE = path.join(__dirname, FILE_RULE_CATALOG);
 const TERMS_FILE = path.join(__dirname, FILE_FORBIDDEN_TERMS);
@@ -149,33 +152,29 @@ function validateStyleAndTone(content, options = {}) {
 }
 
 /**
- * Detects construction-batch and temporary codenames forbidden anywhere in a
- * commit message.
+ * Projects the structure contract's `BATCH-CODE-07` finding into the legacy shape the callers print.
  *
- * Mirrors the ps1/sh implementations of SLANG-GUARD-02. Previously Node only caught
- * these indirectly through header-format failures, which routed them into the
- * elastic Tier-2 corridor and let `wip` through as a warning.
+ * This used to be a second detector with its own vocabulary (`wip|temp|new|v\d+`), while the
+ * contract carried `sprint\s*\d+|pass\s*[1-6]|w[1-9]`. Both were registered under `CMG-STY-001`, so
+ * the pair claimed to be one rule while disagreeing on seven of nine samples: `wip` blocked here and
+ * passed there, `sprint 3` blocked there and passed here.
+ *
+ * The extra vocabulary was also rejecting honest prose. `new analyzer` and `v2 版本` are ordinary
+ * technical English, and `temp`/`wip` are already covered by the dictionary's `CMG-STY-001` entries
+ * with whitelist protection that a bare regex cannot offer — `temp file` is a whitelisted technical
+ * term, yet the old scanner blocked it anyway.
  *
  * @param {string} content - Raw commit message.
  * @returns {Array<{ lineNum: number, term: string, category: string }>} Findings.
  */
 function validateBatchCodename(content) {
-  const pattern = /\b(?:p[0-9]+|phase[0-9]+|st[0-9]+|wip|temp|new|v[0-9]+)\b/gi;
-  const findings = [];
-  const lines = content.split(/\r?\n/);
-
-  for (let i = 0; i < lines.length; i++) {
-    // Version-like tokens such as `v2` inside a semver (`1.2.3`) are legitimate;
-    // only bare standalone markers are rejected.
-    const scrubbed = lines[i].replace(/\b\d+\.\d+\.\d+\b/g, '');
-    let match;
-    const localPattern = new RegExp(pattern.source, 'gi');
-    while ((match = localPattern.exec(scrubbed)) !== null) {
-      findings.push({ lineNum: i + 1, term: match[0], category: 'batch_codename' });
-    }
-  }
-
-  return findings;
+  return verifyStructure(content)
+    .filter((finding) => finding.step === STEP_BATCH_CODE)
+    .map((finding) => ({
+      lineNum: finding.line || 0,
+      term: finding.token || '',
+      category: 'batch_codename',
+    }));
 }
 
 function validateSingleCommitMessage(content, options = {}) {
