@@ -22,7 +22,7 @@ model: inherit
 - **禁止直接改动**：`workspace-timing/`, `auto-refactor/`, `WebGames/`, `scripts/`, `.agents/plugins/`
 
 ## 核心研发契约与刚性红线
-1. **9 微 Crate 单向依赖**：分层拓扑零循环，跨层调用必须经门面而不直连内部模块；
+1. **10 微 Crate 单向依赖**：分层拓扑零循环，跨层调用必须经门面而不直连内部模块；
 2. **零 panic (`FGT-ERR-001`)**：库代码严禁 `unwrap`/`expect`/`panic!`/`unreachable!`，错误一律 `thiserror` 强类型并向上传播；
 3. **unsafe 最小化 (`FGT-SAF-001`)**：每处 `unsafe` 必须附 `// SAFETY:` 不变量证明，面积只减不增；
 4. **Rust 与 TS 字节等价 (`FGT-ALG-001`)**：原生算子与 TS 门面的差分基准零容忍；
@@ -31,5 +31,5 @@ model: inherit
 ## 强制离线验证命令
 ```powershell
 pwsh -File fractal-git/scripts/ps1/gate-rust.ps1
-cargo test --manifest-path fractal-git/Cargo.toml
+cargo test --workspace --manifest-path fractal-git/Cargo.toml
 ```

@@ -8,7 +8,7 @@ description: >-
 
 # rust-engineering — Rust 工业级高级编程风格与系统工程规范
 
-本技能确立了全工作区 Rust 代码库（包括 `fractal-git` 9 大微 Crate 矩阵与 `auto-refactor` 原生内核 `ops-clone`）的高级编程范式、内存安全契约、零瞬态堆分配复用池与工业级门禁标准。指导 Agent 突破语法级编写思维，内化资深系统级软件工程师的高级工程风格与防线意识。
+本技能确立了全工作区 Rust 代码库（包括 `fractal-git` 10 大微 Crate 矩阵与 `auto-refactor` 原生内核 `ops-clone`）的高级编程范式、内存安全契约、零瞬态堆分配复用池与工业级门禁标准。指导 Agent 突破语法级编写思维，内化资深系统级软件工程师的高级工程风格与防线意识。
 
 ---
 

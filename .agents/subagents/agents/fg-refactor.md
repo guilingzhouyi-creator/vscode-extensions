@@ -29,6 +29,6 @@ model: inherit
 
 ## 强制离线验证命令
 ```powershell
-cargo test --manifest-path fractal-git/Cargo.toml
+cargo test --workspace --manifest-path fractal-git/Cargo.toml
 node fractal-git/scripts/common/check-zero-alloc-boundary.js
 ```

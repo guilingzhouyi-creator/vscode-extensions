@@ -51,7 +51,7 @@ description: >-
 | **`infra-tool`** | `scripts/` (全仓跨平台门禁与打包脚本) | `gate-governance`, `release-package-workflow` | `pwsh -File scripts/ps1/audit-all.ps1 -Fast` |
 | **`workspace-meta`** | 全仓顶层元治理、单源规则总目录、物理卫生 | `rule-catalog-governance`, `complexity-budget` | `node scripts/common/generate-rule-catalog.js` |
 | **`skill-governance`** | `.agents/skills/`, 插件包 `skills/` | `skill-governance`, `rule-catalog-governance` | `node scripts/common/validate-skills.js && node scripts/common/sync-skills.js --check` |
-| **`git-kernel`** | `fractal-git/` (Rust 9 微 Crate 内核与 TS 门面) | `rust-engineering`, `algorithmic-operator-engineering` | `pwsh -File fractal-git/scripts/ps1/audit-taxis.ps1 && cargo test --manifest-path fractal-git/Cargo.toml` |
+| **`git-kernel`** | `fractal-git/` (Rust 10 微 Crate 内核与 TS 门面) | `rust-engineering`, `algorithmic-operator-engineering` | `pwsh -File fractal-git/scripts/ps1/audit-taxis.ps1 && cargo test --workspace --manifest-path fractal-git/Cargo.toml` |
 
 | 作业姿态 (`posture`) | 姿态意图与权限控制 | 核心行为准则 | 推荐工具开关 |
 | :--- | :--- | :--- | :--- |

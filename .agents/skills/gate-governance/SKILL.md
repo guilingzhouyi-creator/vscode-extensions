@@ -122,6 +122,15 @@ flowchart LR
 5. **第五维：聚合门禁脚本与本地 Git 钩子 (`scripts/ps1/`, `scripts/sh/`)**：
    同步更新 `audit-all.ps1/sh`、`pre-commit-gate.ps1` 中的受控调用链。
 
+### 7. 破坏性文件操作溯源守卫 (Destructive Operand Provenance)
+
+递归删除的安全前提不是「逻辑正确」，而是「收到的路径就是作者意图的路径」。路径一旦经由变量传入，源码通常不再说明它从哪来。因此该族约束是**来源约束**，由 [`validate-destructive-ops.js`](../../../scripts/common/validate-destructive-ops.js) 在 `DESTRUCTIVE-OPS-38` 步骤静态执行：
+
+1. **操作数溯源 (`GUARD-DESTR-001`)**：递归删除的操作数不得是文件系统根、工作目录或其祖先、家目录/用户配置目录，也不得经由任意长度的赋值链、循环别名（`foreach ($x in ...)`、`for x in ...`、`for (const x of ...)`、`.forEach((x)`）间接派生自这些表达式。检出为**污点分析**而非「操作数必须是字面量」——后者会对每处合法 fixture 清理误报，而误报二十次的守卫一定会被关掉；
+2. **只读自动变量遮蔽 (`GUARD-VAR-001`)**：禁止对 `$HOME`/`$PSHOME`/`$PID`/`$Host`/`$Error`/`$ExecutionContext`/`$ShellId`/`$PSVersionTable`/`$IsWindows`/`$IsLinux`/`$IsMacOS`/`$PSCulture`/`$PSUICulture`/`$PSEdition` 赋值。写入必然抛错，而抛错被忽略后该名字**保持原值**，后续每次读取都静默指向另一个对象。该清单经 `Set-Variable -ErrorAction Stop` 逐一实测得出；可写的形似名（`$PROFILE`/`$PWD`/`$INPUT`/`$ARGS`/`$MATCHES`/`$LASTEXITCODE`）与类型受限名（`$OutputEncoding`/`$MyInvocation`/`$PSBoundParameters`）按实测排除，误报会直接阻断正确写法；
+3. **运行时同名守卫**：命令面兼容层的 `rm` 在 GNU 与降级两条绑定路径上都必须前置 `Test-LinuxParityRemovalTarget`，拒绝时写 stderr 并置 `$LASTEXITCODE = 1`。**静默跳过不可接受**：残留目录会成为下次运行的「有效输入」。守卫只在降级分支安装而 GNU 分支裸转发，等于守卫从未被调用——「守卫存在」与「守卫生效」必须分别实测（`(Get-Command rm).Definition` 含守卫符号）；
+4. **清理钩子的前置断言**：退出钩子内不得直接删除脚本作用域变量，应经 `-MessageData` 显式传参并断言目标以 `[System.IO.Path]::GetTempPath()` 为前缀；作用域捕获失败时变量退化为 `$null`，删除动作随即作用于任意路径。
+
 ---
 
 ## 五、 零黑话纪律与技术事实守则

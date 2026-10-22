@@ -30,7 +30,7 @@ if (Test-Path $fastGateScript) {
   Write-Host "⚡ 执行暂存区流式 6 项快速判定..." -ForegroundColor Cyan
   & node $fastGateScript
   if ($LASTEXITCODE -ne 0) {
-    Write-Host "❌ [FAIL] 暂存区流式审查未通过" -ForegroundColor Red
+    Write-Host "✖ BLOCK  暂存区流式审查未通过" -ForegroundColor Red
     exit 1
   }
 }
@@ -47,15 +47,15 @@ if (Test-Path $targetProject) {
   # 有界等待：无界 -Wait 会让挂起的测试永久阻塞调用方。
   if (-not $proc.WaitForExit(180000)) {
     try { $proc.Kill($true) } catch { }
-    Write-Host "⏱️ [TIMEOUT] 子项目测试超过 180s 已终止" -ForegroundColor Yellow
+    Write-Host "▲ WARN  子项目测试超过 180s 已终止" -ForegroundColor Yellow
     exit 124
   }
 
   if ($proc.ExitCode -ne 0) {
-    Write-Host "❌ [FAIL] 子项目测试失败" -ForegroundColor Red
+    Write-Host "✖ BLOCK  子项目测试失败" -ForegroundColor Red
     exit $proc.ExitCode
   }
 }
 
-Write-Host "✅ [PASS] 全部检查通过" -ForegroundColor Green
+Write-Host "✔ 全部检查通过" -ForegroundColor Green
 exit 0

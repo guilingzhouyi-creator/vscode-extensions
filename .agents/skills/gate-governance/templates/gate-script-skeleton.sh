@@ -20,7 +20,7 @@ if [[ -f "$FAST_GATE" ]]; then
   STATUS=0
   node "$FAST_GATE" || STATUS=$?
   if [[ "$STATUS" -ne 0 ]]; then
-    echo "❌ [FAIL] 暂存区流式审查未通过" >&2
+    echo "✖ BLOCK  暂存区流式审查未通过" >&2
     exit "$STATUS"
   fi
 fi
@@ -32,10 +32,10 @@ if [[ -d "$SUBPROJECT" ]]; then
   STATUS=0
   (cd "$SUBPROJECT" && npm test) || STATUS=$?
   if [[ "$STATUS" -ne 0 ]]; then
-    echo "❌ [FAIL] 子项目测试失败" >&2
+    echo "✖ BLOCK  子项目测试失败" >&2
     exit "$STATUS"
   fi
 fi
 
-echo "✅ [PASS] 全部检查通过"
+echo "✔ 全部检查通过"
 exit 0
