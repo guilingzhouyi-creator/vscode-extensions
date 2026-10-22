@@ -39,7 +39,7 @@ for (const p of candidatePaths) {
 
 if (!ts) {
   console.error(
-    '❌ [BLOCK] TypeScript runtime is required for AST slice review but was not resolvable.\n' +
+    '✖ BLOCK  TypeScript runtime is required for AST slice review but was not resolvable.\n' +
       '   Remediation: npm ci --prefix auto-refactor (or npm install --prefix workspace-timing).\n' +
       '   Fail-closed policy: a skipped complexity gate is treated as a failed complexity gate.',
   );
@@ -1060,7 +1060,7 @@ function readStagedHunkMapOrBlock(explicitFiles, isAgentMode) {
     if (isAgentMode) {
       console.log(JSON.stringify({ protocolVersion: "1.0.0", status: "BLOCK", gate: "pre-commit:ast-slice", summary: err.message }, null, 2));
     } else {
-      console.error(`  ✖ [BLOCK] ${err.message}`);
+      console.error(`  ✖ BLOCK  ${err.message}`);
       console.error("  👉 修复指引: 确认当前目录是完整 Git 仓库（git status 可用），或显式传入文件路径跳过索引枚举。");
     }
     process.exit(1);
@@ -1082,7 +1082,7 @@ function handleEmptyHunkMap(isAgentMode) {
       ),
     );
   } else {
-    console.log("  ✔ PASS 暂存区无 TS/JS 源码需执行 AST 切片审查");
+    console.log("  ✔ 暂存区无 TS/JS 源码需执行 AST 切片审查");
   }
   process.exit(0);
 }
@@ -1225,7 +1225,7 @@ function renderSliceSuccess(isAgentMode) {
     );
   } else {
     console.log(
-      `  ✔ PASS 暂存区 AST 切片审查通过（圈复杂度 <= 15 [私有 <= 18, 分发器 <= 25], 嵌套 <= 4, 噪声比 <= 4.0）`,
+      `  ✔ 暂存区 AST 切片审查通过（圈复杂度 <= 15 [私有 <= 18, 分发器 <= 25], 嵌套 <= 4, 噪声比 <= 4.0）`,
     );
   }
   process.exit(0);

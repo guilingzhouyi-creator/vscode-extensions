@@ -84,7 +84,7 @@ if [[ ! -f "$MSG_FILE" ]]; then
 EOF
         exit 1
     fi
-    echo "❌ BLOCK  提交信息文件不存在: $MSG_FILE"
+    echo "✖ BLOCK  提交信息文件不存在: $MSG_FILE"
     exit 1
 fi
 
@@ -184,7 +184,7 @@ EOF
         exit 1
     fi
 
-    echo "❌ BLOCK  ${rule_id}: $message"
+    echo "✖ BLOCK  ${rule_id}: $message"
     if [[ -n "$actionable_fix" ]]; then
         echo "   💡 建议: $actionable_fix"
     fi
@@ -282,6 +282,6 @@ write_step_banner "RULE-TRUTH-08"
 write_step_verdict "RULE-TRUTH-08" PASS "规则标识反虚构"
 write_step_banner "TEXT-TRUTH-09"
 write_step_verdict "TEXT-TRUTH-09" PASS "文本求真务实与禁词合规"
-echo "✅ Commit-Msg 检查通过"
+echo "✔ Commit-Msg 检查通过"
 echo "================================================================="
 exit 0

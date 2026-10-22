@@ -254,7 +254,10 @@ elif ! run_gate_step 30 "RULE-CLOSURE-05" "$ROOT_DIR" "$NODE_BIN" scripts/common
 elif ! run_gate_step 30 "DOCS-CONSISTENCY-06" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-docs-consistency.js; then
     FAILED=1
 elif ! run_gate_step 60 "RULE-REACHABILITY-07" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-rule-reachability.js; then
+    FAILED=1
 elif ! run_gate_step 30 "RULE-SOURCE-37" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-rule-source-consistency.js; then
+    FAILED=1
+elif ! run_gate_step 60 "DESTRUCTIVE-OPS-38" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-destructive-ops.js; then
     FAILED=1
 else
     log_gate "  ✔ 全工作区单源规则目录同步与规则 ID 闭包校验通过"
@@ -364,7 +367,7 @@ if [[ "$RUN_FG" -eq 1 ]]; then
         if ! run_gate_step 120 "RUST-TAXIS-19" "$ROOT_DIR" "$CARGO_BIN" test --workspace --manifest-path fractal-git/Cargo.toml; then
             FAILED=1
         else
-            log_gate "  ✔ fractal-git 9大微 Crate 回归测试套件通过（未检测到 gate-rust.sh，仅执行 cargo test）"
+            log_gate "  ✔ fractal-git 10大微 Crate 回归测试套件通过（未检测到 gate-rust.sh，仅执行 cargo test）"
         fi
     fi
 else
@@ -486,7 +489,7 @@ fi
 
 echo "================================================================="
 if [[ "$FAILED" -ne 0 ]]; then
-    echo "❌ Pre-Push 检查未通过，已阻止推送至远程分支"
+    echo "✖ Pre-Push 检查未通过，已阻止推送至远程分支"
     echo "   请在本地修复上述失败项后重试推送。"
     echo "💡 失败诊断快照已保留至: .audit-logs/last-pre-push.log"
     echo "   (可运行 bash scripts/sh/pre-push-gate.sh --view-log 快速查看)"
@@ -494,7 +497,7 @@ if [[ "$FAILED" -ne 0 ]]; then
     echo "================================================================="
     exit 1
 else
-    echo "✅ Pre-Push 检查通过，允许推送至远程"
+    echo "✔ Pre-Push 检查通过，允许推送至远程"
     echo "================================================================="
     exit 0
 fi

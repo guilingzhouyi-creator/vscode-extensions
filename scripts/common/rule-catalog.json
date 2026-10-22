@@ -1,13 +1,13 @@
 {
   "schema": "workspace-rule-catalog/v1",
-  "generatedAt": "2026-10-22T05:33:53.647Z",
-  "totalRules": 503,
+  "generatedAt": "2026-10-22T11:27:36.963Z",
+  "totalRules": 505,
   "counts": {
     "autoRefactor": 363,
     "workspaceTiming": 49,
     "webGames": 50,
     "fractalGit": 17,
-    "globalTooling": 24
+    "globalTooling": 26
   },
   "rules": [
     {
@@ -2063,6 +2063,14 @@
       "canonical": true
     },
     {
+      "id": "GUARD-DESTR-001",
+      "project": "global-tooling",
+      "family": "GUARD",
+      "severity": "error",
+      "summary": "Destructive operand provenance guard: a recursive delete may not name a filesystem root, an ancestor directory, a home or profile directory, or an operand derived from any of those through assignments or loop aliases, because the source then never states which path is being destroyed.",
+      "canonical": true
+    },
+    {
       "id": "GUARD-DOC-001",
       "project": "global-tooling",
       "family": "GUARD",
@@ -2212,6 +2220,14 @@
       "family": "GUARD",
       "severity": "error",
       "summary": "Repository completely lacks a gate defense system (no Git hooks and no CI pipeline detected).",
+      "canonical": true
+    },
+    {
+      "id": "GUARD-VAR-001",
+      "project": "global-tooling",
+      "family": "GUARD",
+      "severity": "error",
+      "summary": "Read-only automatic variable shadowing guard: assigning to $HOME, $PSHOME, $PID, $Host, $Error, $ExecutionContext, $ShellId, $PSVersionTable, $IsWindows, $IsLinux, $IsMacOS, $PSCulture, $PSUICulture or $PSEdition throws, so the name keeps its previous value and every later read silently addresses a different object than the author intended.",
       "canonical": true
     },
     {

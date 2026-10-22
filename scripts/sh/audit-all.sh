@@ -82,7 +82,7 @@ CODE_DENSITY=0
 CODE_ELOC=0
 "$NODE_BIN" scripts/common/evaluate-eloc-budget.js --all >/dev/null 2>&1 || CODE_ELOC=$?
 if [[ "$CODE_HYGIENE" -ne 0 || "$CODE_ISO" -ne 0 || "$CODE_GI" -ne 0 || "$CODE_DENSITY" -ne 0 || "$CODE_ELOC" -ne 0 ]]; then
-    STATUS_HYGIENE="FAIL"
+    STATUS_HYGIENE="BLOCK"
     write_step_verdict "WORKSPACE-AUDIT-01" BLOCK "物理卫生、同构脚本、.gitignore、代码密度或体积审查未通过"
     FAILED=1
 else
@@ -122,13 +122,22 @@ CODE_DOC_REACH=0
 "$NODE_BIN" scripts/common/validate-doc-reachability.js >/dev/null 2>&1 || CODE_DOC_REACH=$?
 CODE_COMMIT_HISTORY=0
 "$NODE_BIN" scripts/common/validate-commit-history-baseline.js >/dev/null 2>&1 || CODE_COMMIT_HISTORY=$?
+CODE_DESTRUCTIVE=0
+"$NODE_BIN" scripts/common/validate-destructive-ops.js >/dev/null 2>&1 || CODE_DESTRUCTIVE=$?
+# 推送门禁已覆盖的三道守卫必须在全量审查中同样执行，否则同一工作树在两个入口得到不同判定。
+CODE_CHAINS=0
+"$NODE_BIN" scripts/common/validate-block-chains.js >/dev/null 2>&1 || CODE_CHAINS=$?
+CODE_COUNTS=0
+"$NODE_BIN" scripts/common/validate-hardcoded-counts.js >/dev/null 2>&1 || CODE_COUNTS=$?
+CODE_PARITY=0
+"$NODE_BIN" scripts/common/validate-shell-parity.js >/dev/null 2>&1 || CODE_PARITY=$?
 CODE_GATE_PROOF=0
 "$NODE_BIN" scripts/common/test-gate-guards.js >/dev/null 2>&1 || CODE_GATE_PROOF=$?
 CODE_DOC_METRICS=0
 "$NODE_BIN" scripts/common/sync-doc-metrics.js >/dev/null 2>&1 || CODE_DOC_METRICS=$?
-if [[ "$CODE_CATALOG" -ne 0 || "$CODE_FEEDBACK" -ne 0 || "$CODE_ORDERING" -ne 0 || "$CODE_SKILLS" -ne 0 || "$CODE_CLOSURE" -ne 0 || "$CODE_REACH" -ne 0 || "$CODE_RULE_SOURCE" -ne 0 || "$CODE_DOCS" -ne 0 || "$CODE_LEDGER" -ne 0 || "$CODE_SUBAGENT" -ne 0 || "$CODE_DOC_ANCHORS" -ne 0 || "$CODE_METRIC_COVERAGE" -ne 0 || "$CODE_FAMILY_CONTRACT" -ne 0 || "$CODE_DOC_REACH" -ne 0 || "$CODE_COMMIT_HISTORY" -ne 0 || "$CODE_GATE_PROOF" -ne 0 || "$CODE_DOC_METRICS" -ne 0 ]]; then
-    STATUS_RULES="FAIL"
-    write_step_verdict "RULE-AUDIT-02" BLOCK "规则目录同步、闭包、可达性、规则源一致性、文档一致性、技能集或轨迹账本审查未通过"
+if [[ "$CODE_CATALOG" -ne 0 || "$CODE_FEEDBACK" -ne 0 || "$CODE_ORDERING" -ne 0 || "$CODE_SKILLS" -ne 0 || "$CODE_CLOSURE" -ne 0 || "$CODE_REACH" -ne 0 || "$CODE_RULE_SOURCE" -ne 0 || "$CODE_DOCS" -ne 0 || "$CODE_LEDGER" -ne 0 || "$CODE_SUBAGENT" -ne 0 || "$CODE_DOC_ANCHORS" -ne 0 || "$CODE_METRIC_COVERAGE" -ne 0 || "$CODE_FAMILY_CONTRACT" -ne 0 || "$CODE_DOC_REACH" -ne 0 || "$CODE_COMMIT_HISTORY" -ne 0 || "$CODE_DESTRUCTIVE" -ne 0 || "$CODE_CHAINS" -ne 0 || "$CODE_COUNTS" -ne 0 || "$CODE_PARITY" -ne 0 || "$CODE_GATE_PROOF" -ne 0 || "$CODE_DOC_METRICS" -ne 0 ]]; then
+    STATUS_RULES="BLOCK"
+    write_step_verdict "RULE-AUDIT-02" BLOCK "规则目录同步、闭包、可达性、规则源一致性、文档一致性、技能集、轨迹账本或破坏性操作溯源审查未通过"
     FAILED=1
 else
     STATUS_RULES="PASS"
@@ -238,7 +247,7 @@ STATUS_WT="PASS"
 CODE_WT=0
 wait_with_timeout "$PID_WT" "$TIMEOUT_WT" "workspace-timing" "$LOG_WT" || CODE_WT=$?
 if [[ "$CODE_WT" -ne 0 ]]; then
-    STATUS_WT="FAIL"
+    STATUS_WT="BLOCK"
     write_step_verdict "EXTENSION-AUDIT-03" BLOCK "workspace-timing 审查门禁未通过"
     FAILED=1
 else
@@ -249,7 +258,7 @@ STATUS_WG="PASS"
 CODE_WG=0
 wait_with_timeout "$PID_WG" "$TIMEOUT_WG" "WebGames" "$LOG_WG" || CODE_WG=$?
 if [[ "$CODE_WG" -ne 0 ]]; then
-    STATUS_WG="FAIL"
+    STATUS_WG="BLOCK"
     write_step_verdict "DOMAIN-AUDIT-04" BLOCK "WebGames 领域配置与架构审查未通过"
     FAILED=1
 else
@@ -260,7 +269,7 @@ STATUS_AR="PASS"
 CODE_AR=0
 wait_with_timeout "$PID_AR" "$TIMEOUT_AR" "auto-refactor" "$LOG_AR" || CODE_AR=$?
 if [[ "$CODE_AR" -ne 0 ]]; then
-    STATUS_AR="FAIL"
+    STATUS_AR="BLOCK"
     FAILED=1
 fi
 
@@ -274,14 +283,14 @@ CODE_FG_STATIC=0
 "$NODE_BIN" fractal-git/scripts/common/check-zero-alloc-boundary.js >>"$LOG_FG" 2>&1 || CODE_FG_STATIC=$?
 
 if [[ "$CODE_FG_STATIC" -ne 0 ]]; then
-    STATUS_FG="FAIL"
+    STATUS_FG="BLOCK"
     FAILED=1
 fi
 
 if [[ -n "$PID_FG" ]]; then
     wait_with_timeout "$PID_FG" "$TIMEOUT_FG" "fractal-git" "$LOG_FG" || CODE_FG=$?
     if [[ "$CODE_FG" -ne 0 ]]; then
-        STATUS_FG="FAIL"
+        STATUS_FG="BLOCK"
         FAILED=1
     fi
 fi
@@ -302,7 +311,7 @@ if [[ "$FAST_MODE" -eq 0 && "$STATUS_AR" == "PASS" ]]; then
     CODE_GATE_SELF=0
     (cd auto-refactor && "$NODE_BIN" scripts/gate-self.js) >"$LOG_AR_SELF" 2>&1 || CODE_GATE_SELF=$?
     if [[ "$CODE_GATE_SELF" -ne 0 ]]; then
-        STATUS_AR="FAIL"
+        STATUS_AR="BLOCK"
         FAILED=1
         cat "$LOG_AR_SELF" >> "$LOG_AR"
     fi
@@ -318,28 +327,28 @@ fi
 # 日志输出与清理：子进程失败后回显末尾 15 行日志
 if [[ "$STATUS_WT" != "PASS" ]]; then
     if [[ "$JSON_MODE" -eq 0 && "$AGENT_MODE" -eq 0 && -s "$LOG_WT" ]]; then
-        echo "❌ workspace-timing 审查未通过:"
+        echo "✖ BLOCK  workspace-timing 审查未通过:"
         tail -n 15 "$LOG_WT" | sed 's/^/   /'
     fi
 fi
 
 if [[ "$STATUS_WG" != "PASS" ]]; then
     if [[ "$JSON_MODE" -eq 0 && "$AGENT_MODE" -eq 0 && -s "$LOG_WG" ]]; then
-        echo "❌ WebGames 审查未通过:"
+        echo "✖ BLOCK  WebGames 审查未通过:"
         tail -n 15 "$LOG_WG" | sed 's/^/   /'
     fi
 fi
 
 if [[ "$STATUS_AR" != "PASS" ]]; then
     if [[ "$JSON_MODE" -eq 0 && "$AGENT_MODE" -eq 0 && -s "$LOG_AR" ]]; then
-        echo "❌ auto-refactor 审查未通过:"
+        echo "✖ BLOCK  auto-refactor 审查未通过:"
         tail -n 15 "$LOG_AR" | sed 's/^/   /'
     fi
 fi
 
 if [[ "$STATUS_FG" != "PASS" ]]; then
     if [[ "$JSON_MODE" -eq 0 && "$AGENT_MODE" -eq 0 && -s "$LOG_FG" ]]; then
-        echo "❌ fractal-git 审查未通过:"
+        echo "✖ BLOCK  fractal-git 审查未通过:"
         tail -n 15 "$LOG_FG" | sed 's/^/   /'
     fi
 fi
@@ -640,7 +649,7 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF" "$LOG_FG"
       } catch (_) { return "00000000"; }
     })(),
     fastMode: process.argv[14] === "1",
-    status: failed ? "FAIL" : "PASS",
+    status: failed ? "BLOCK" : "PASS",
     exitCode: failed ? 1 : 0,
     elapsedSeconds: Number(elapsedSec),
     workspaceHealthScore,
@@ -703,7 +712,7 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF" "$LOG_FG"
     const envelope = {
       protocolVersion: "1.0.0",
       recordedAt: new Date().toISOString(),
-      status: failed ? "FAIL" : "PASS",
+      status: failed ? "BLOCK" : "PASS",
       gate: "audit-all",
       exitCode: failed ? 1 : 0,
       summary: failed
@@ -802,7 +811,7 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF" "$LOG_FG"
     { num: " 3.", name: "auto-refactor",    score: scoreAr,      note: "(CLI静态引擎基线)" },
     { num: " 4.", name: "workspace-timing", score: scoreWt,      note: "(VSCode扩展门禁)" },
     { num: " 5.", name: "WebGames配置架构", score: scoreWg,      note: "(卡拉尔领域配置)" },
-    { num: " 6.", name: "fractal-git",      score: scoreFg,      note: "(9微Crate/Rust)" }
+    { num: " 6.", name: "fractal-git",      score: scoreFg,      note: "(10微Crate/Rust)" }
   ];
 
   for (const sys of sysDefinitions) {
@@ -859,7 +868,7 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF" "$LOG_FG"
 
   console.log(borderMid);
 
-  const globalStatus = failed ? "❌ 存在违规异常" : "✅ 全域健康达标";
+  const globalStatus = failed ? "🔴 存在违规异常" : "🟢 全域健康达标";
   const bottomSummary = ` 耗时: ${elapsedSec}s${totalDebt !== null ? `  |  技术债: ${totalDebt}项` : ""}  |  全局状态: ${globalStatus}`;
   console.log(formatDashboardRow(bottomSummary, targetWidth));
   console.log(borderBot);
@@ -867,7 +876,7 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF" "$LOG_FG"
   console.log("💡 质量历史轨迹已追加至: .audit-logs/audit-history.jsonl");
 
   if (summaryFile) {
-    const passBadge = (s) => (s === "PASS" ? "✅ PASS" : "❌ FAIL");
+    const passBadge = (s) => (s === "PASS" ? "🟢 达标" : "🔴 阻断");
     let md = "## 🌐 全工作区跨项目统一审查与十维质量全景看板\n\n";
     const gStr = ` (Grade: **${wsGrade}**)`;
     const aStr = autonomyRate ? ` &nbsp;|&nbsp; **自研率**: **${autonomyRate}%**` : "";
@@ -882,7 +891,7 @@ rm -f "$LOG_AR" "$LOG_WT" "$LOG_WG" "$LOG_AR_SELF" "$LOG_FG"
     md += `| 3 | auto-refactor | ${passBadge(statusAr)} | ${scoreAr.toFixed(1)} | \`[${makeBar(scoreAr, 20)}]\` | CLI静态引擎质量基线 |\n`;
     md += `| 4 | workspace-timing | ${passBadge(statusWt)} | ${scoreWt.toFixed(1)} | \`[${makeBar(scoreWt, 20)}]\` | VSCode扩展审查门禁 |\n`;
     md += `| 5 | WebGames配置架构 | ${passBadge(statusWg)} | ${scoreWg.toFixed(1)} | \`[${makeBar(scoreWg, 20)}]\` | 卡拉尔领域配置审查 |\n`;
-    md += `| 6 | fractal-git | ${passBadge(statusFg)} | ${scoreFg.toFixed(1)} | \`[${makeBar(scoreFg, 20)}]\` | 9微Crate/Rust回归套件 |\n\n`;
+    md += `| 6 | fractal-git | ${passBadge(statusFg)} | ${scoreFg.toFixed(1)} | \`[${makeBar(scoreFg, 20)}]\` | 10微Crate/Rust回归套件 |\n\n`;
     md += `> **耗时**: ${elapsedSec}s &nbsp;|&nbsp; **全局状态**: ${globalStatus}\n\n`;
 
     md += "### 🎯 auto-refactor 静态引擎十维工程质量全景指数\n\n";
@@ -922,9 +931,9 @@ TRAJ_ARGS=()
 "$NODE_BIN" scripts/common/record-workspace-trajectory.js ${TRAJ_ARGS[@]+"${TRAJ_ARGS[@]}"} >/dev/null 2>&1 || true
 
 if [[ "$FAILED" -ne 0 ]]; then
-    echo "❌ 审查中枢检测到未通过项，请排查修复对应项目"
+    echo "✖ BLOCK  审查中枢检测到未通过项，请排查修复对应项目"
     exit 1
 else
-    echo "✅ 全工作区审查完成，所有项目健康合规"
+    echo "✔ 全工作区审查完成，所有项目健康合规"
     exit 0
 fi

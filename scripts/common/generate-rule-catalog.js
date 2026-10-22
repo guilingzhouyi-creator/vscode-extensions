@@ -341,7 +341,7 @@ function generate(checkOnly = false) {
 
   if (checkOnly) {
     if (!fs.existsSync(OUTPUT_FILE)) {
-      console.error(`❌ [DRIFT] Rule catalog file missing on disk: ${OUTPUT_FILE}`);
+      console.error(`✖ BLOCK  Rule catalog file missing on disk: ${OUTPUT_FILE}`);
       process.exit(1);
     }
     const existing = JSON.parse(fs.readFileSync(OUTPUT_FILE, 'utf8'));
@@ -352,7 +352,7 @@ function generate(checkOnly = false) {
     const existingCountSum = Object.values(existing.counts || {}).reduce((sum, value) => sum + value, 0);
 
     if (missingOnDisk.length > 0 || orphanOnDisk.length > 0) {
-      console.error(`❌ [RCFG-RULE-DRIFT] Detected rule catalog drift between registry and disk!`);
+      console.error(`✖ BLOCK  [RCFG-RULE-DRIFT] Detected rule catalog drift between registry and disk!`);
       if (missingOnDisk.length > 0) console.error(`   Missing on disk: ${missingOnDisk.join(', ')}`);
       if (orphanOnDisk.length > 0) console.error(`   Orphan on disk: ${orphanOnDisk.join(', ')}`);
       process.exit(1);
@@ -360,12 +360,12 @@ function generate(checkOnly = false) {
 
     if (existing.totalRules !== existing.rules.length || existingCountSum !== existing.totalRules) {
       console.error(
-        `❌ [RCFG-COUNTS-001] Catalog counters are inconsistent: totalRules=${existing.totalRules}, rules=${existing.rules.length}, countsSum=${existingCountSum}. Run with --write to regenerate.`,
+        `✖ BLOCK  [RCFG-COUNTS-001] Catalog counters are inconsistent: totalRules=${existing.totalRules}, rules=${existing.rules.length}, countsSum=${existingCountSum}. Run with --write to regenerate.`,
       );
       process.exit(1);
     }
 
-    console.log(`✅ [PASS] Rule catalog is in 100% zero-drift parity with registry (${generatedRules.length} rules).`);
+    console.log(`✔ Rule catalog is in 100% zero-drift parity with registry (${generatedRules.length} rules).`);
     return;
   }
 
@@ -379,7 +379,7 @@ function generate(checkOnly = false) {
 
   fs.mkdirSync(path.dirname(OUTPUT_FILE), { recursive: true });
   fs.writeFileSync(OUTPUT_FILE, JSON.stringify(catalog, null, 2) + '\n', 'utf8');
-  console.log(`✅ Rule catalog generated successfully with ${catalog.totalRules} rules -> ${path.relative(ROOT, OUTPUT_FILE)}`);
+  console.log(`✔ Rule catalog generated successfully with ${catalog.totalRules} rules -> ${path.relative(ROOT, OUTPUT_FILE)}`);
 }
 
 if (require.main === module) {

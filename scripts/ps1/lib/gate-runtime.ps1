@@ -10,6 +10,8 @@
 #           使步骤身份、状态词表与超时处置在全部门禁中只有一份实现
 # 退出语义与设计依据: 无独立退出码（点源库，仅在被调用时抛出）
 #   设计依据: 步骤身份必须单源；四处复制同一份登记表解析器会让序号与规则归因在任一处漂移
+#   呈现依据: 协议层状态词恒为 PASS/BLOCK/SKIP/WARN，终端只在异常态写出该词；
+#             通过态由单列宽勾号承载，避免连续数十步的重复大写词淹没真正的异常
 # ------------------------------------------------------------------------------
 # 用法示例:
 #   $script:GateRepoRoot = $repoRoot
@@ -35,6 +37,63 @@ if (-not (Test-Path variable:script:GateSuppressOutput)) { $script:GateSuppressO
 
 # 默认登记表条目：各门禁在引导段声明自身条目，调用点无需反复传入同一条目名。
 if (-not (Test-Path variable:script:GateEntryId)) { $script:GateEntryId = '' }
+
+<#
+.SYNOPSIS
+    Resolves the cargo executable through trusted absolute locations before PATH.
+.DESCRIPTION
+    Every Rust gate used to re-derive its own answer with `Get-Command cargo`. That lookup fails
+    whenever the rustup shim directory is absent from PATH even though a complete toolchain is
+    installed under `.rustup\toolchains\<host>\bin`, so the gate reported "cargo missing" and
+    blocked a machine that could build perfectly well. Probing the toolchain root directly is
+    also the safer order: a `cargo.exe` placed in the working directory is never chosen over the
+    installed toolchain.
+
+    Candidate order, most specific first:
+      1. `$env:TAXIS_CARGO_BIN` - an explicit override for hosts with an unusual install root;
+      2. `%USERPROFILE%\.cargo\bin\cargo.exe` - the rustup shim, when present;
+      3. `%USERPROFILE%\.rustup\toolchains\stable-<host>\bin\cargo.exe` - the toolchain itself;
+      4. any `cargo` on PATH, last because it is the only unverified candidate.
+.PARAMETER Required
+    When set, a missing executable throws instead of returning $null. A gate that cannot run
+    without Rust must use this, so absence surfaces as a hard failure rather than a silent skip.
+.OUTPUTS
+    System.String - absolute path or bare command name; $null when nothing was found and
+    `-Required` was not passed.
+#>
+function Resolve-GateCargoCommand {
+    [CmdletBinding()]
+    param([switch]$Required)
+
+    $override = $env:TAXIS_CARGO_BIN
+    if ($override -and (Test-Path -LiteralPath $override -PathType Leaf)) { return $override }
+
+    $homeRoot = [Environment]::GetFolderPath('UserProfile')
+    if ($homeRoot) {
+        $shim = Join-Path $homeRoot ".cargo/bin/cargo.exe"
+        if (Test-Path -LiteralPath $shim -PathType Leaf) { return $shim }
+
+        $toolchains = Join-Path $homeRoot ".rustup/toolchains"
+        if (Test-Path -LiteralPath $toolchains -PathType Container) {
+            $hosts = @(Get-ChildItem -LiteralPath $toolchains -Directory -ErrorAction SilentlyContinue)
+            # 稳定版优先：同一台机器上可能并存 nightly 与 stable，门禁只承诺在稳定版上可复现。
+            $preferred = @($hosts | Where-Object { $_.Name -like "stable-*" })
+            $ordered = @($preferred) + @($hosts | Where-Object { $_.Name -notlike "stable-*" })
+            foreach ($hostDir in $ordered) {
+                $candidate = Join-Path $hostDir.FullName "bin/cargo.exe"
+                if (Test-Path -LiteralPath $candidate -PathType Leaf) { return $candidate }
+            }
+        }
+    }
+
+    $onPath = Get-Command cargo.exe -CommandType Application -ErrorAction SilentlyContinue
+    if ($onPath) { return $onPath.Source }
+
+    if ($Required) {
+        throw "cargo was not found through TAXIS_CARGO_BIN, %USERPROFILE%\.cargo\bin, the rustup toolchain root, or PATH."
+    }
+    return $null
+}
 
 function Write-GateHost {
     [CmdletBinding()]
@@ -119,22 +178,22 @@ function Write-StepVerdict {
         [string]$Detail = ""
     )
     $meta = Resolve-StepMeta -EntryId $EntryId -StepId $StepId
-    $glyph = switch ($Status) {
-        'PASS' { '✔' }
-        'BLOCK' { '✖' }
-        'SKIP' { '⚠️' }
-        'WARN' { '⚠️' }
-        default { '·' }
+    # 四态投影（一体两面）：协议层状态词恒为 PASS/BLOCK/SKIP/WARN，调用点入参不得改写；
+    # 呈现层只在 PASS 时隐去大写词，因为绿色勾号已完整表达「通过」，
+    # 再叠一个 PASS 会让连续 30 余步的通过流退化成机械打卡。
+    # 异常态保留大写词：读者扫视时必须一眼分辨出哪一步没有通过。
+    $projection = switch ($Status) {
+        'PASS' { @{ Glyph = '✔'; Label = ''; Color = 'Green' } }
+        'BLOCK' { @{ Glyph = '✖'; Label = 'BLOCK'; Color = 'Red' } }
+        'SKIP' { @{ Glyph = '↷'; Label = 'SKIP'; Color = 'Yellow' } }
+        'WARN' { @{ Glyph = '▲'; Label = 'WARN'; Color = 'Yellow' } }
+        default { @{ Glyph = '·'; Label = $Status; Color = 'Gray' } }
     }
-    $color = switch ($Status) {
-        'PASS' { 'Green' }
-        'BLOCK' { 'Red' }
-        'SKIP' { 'Yellow' }
-        'WARN' { 'Yellow' }
-        default { 'Gray' }
-    }
+    $glyph = $projection.Glyph
+    $color = $projection.Color
+    $label = if ($projection.Label) { " $($projection.Label) " } else { ' ' }
     $suffix = if ($Detail) { "  $Detail" } else { "" }
-    Write-GateHost "  $glyph $Status  $($meta.Id)$suffix" -ForegroundColor $color
+    Write-GateHost "  $glyph$label $($meta.Id)$suffix" -ForegroundColor $color
 }
 
 <#

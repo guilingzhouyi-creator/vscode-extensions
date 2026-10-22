@@ -224,13 +224,13 @@ function runSelfProbes() {
 function run({ checkOnly }) {
   const probeFailures = runSelfProbes();
   if (probeFailures.length > 0) {
-    process.stderr.write('❌ [BLOCK] mirror guard probes no longer discriminate:\n');
+    process.stderr.write('✖ BLOCK  mirror guard probes no longer discriminate:\n');
     for (const failure of probeFailures) process.stderr.write(`   - ${failure}\n`);
     return 1;
   }
   const sourceViolations = checkTrackedTemplates();
   if (sourceViolations.length > 0) {
-    process.stderr.write('❌ [BLOCK] tracked agent templates violate the figure contract:\n');
+    process.stderr.write('✖ BLOCK  tracked agent templates violate the figure contract:\n');
     for (const v of sourceViolations) process.stderr.write(`   - ${v}\n`);
     return 1;
   }
@@ -245,12 +245,12 @@ function run({ checkOnly }) {
   }
 
   if (before.drift.length === 0) {
-    process.stdout.write('✔ [PASS] Agent definition mirror verified: templates and rulebook are byte-identical.\n');
+    process.stdout.write('✔ Agent definition mirror verified: templates and rulebook are byte-identical.\n');
     return 0;
   }
 
   if (checkOnly) {
-    process.stderr.write(`❌ [BLOCK] agent mirror drift (${before.drift.length} item(s)):\n`);
+    process.stderr.write(`✖ BLOCK  agent mirror drift (${before.drift.length} item(s)):\n`);
     for (const d of before.drift) process.stderr.write(`   - ${d}\n`);
     process.stderr.write('   → run `node scripts/common/sync-agents-mirror.js` to heal.\n');
     return 1;
@@ -259,11 +259,11 @@ function run({ checkOnly }) {
   const written = syncMirror();
   const after = detectMirrorDrift();
   if (after.drift.length > 0) {
-    process.stderr.write(`❌ [BLOCK] mirror still inconsistent after writing ${written} file(s):\n`);
+    process.stderr.write(`✖ BLOCK  mirror still inconsistent after writing ${written} file(s):\n`);
     for (const d of after.drift) process.stderr.write(`   - ${d}\n`);
     return 1;
   }
-  process.stdout.write(`✔ [PASS] Agent definition mirror healed (${written} file(s) written).\n`);
+  process.stdout.write(`✔ Agent definition mirror healed (${written} file(s) written).\n`);
   return 0;
 }
 

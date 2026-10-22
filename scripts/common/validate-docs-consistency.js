@@ -935,7 +935,7 @@ function main() {
   }
 
   if (passed) {
-    console.log('  PASS Documentation consistency: counts and script references are aligned.');
+    console.log('  ✔  Documentation consistency: counts and script references are aligned.');
     process.exit(0);
   }
 

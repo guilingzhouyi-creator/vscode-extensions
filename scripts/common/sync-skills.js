@@ -145,12 +145,12 @@ function main() {
       if (diff.extra.length > 0) process.stderr.write(`  - Extra in plugin: ${diff.extra.join(', ')}\n`);
       return 1;
     }
-    process.stdout.write(`✔ [PASS] Skills parity verified: root and plugin skills are 100% identical.\n`);
+    process.stdout.write(`✔ Skills parity verified: root and plugin skills are 100% identical.\n`);
     return 0;
   }
 
   const updated = syncDirectories(srcDir, destDir);
-  process.stdout.write(`✔ [PASS] Synced skills to plugin bundle (${updated} files copied/updated).\n`);
+  process.stdout.write(`✔ Synced skills to plugin bundle (${updated} files copied/updated).\n`);
   return 0;
 }
 

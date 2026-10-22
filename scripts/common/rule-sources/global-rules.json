@@ -1,7 +1,7 @@
 {
   "schema": "global-tooling-rules/v1",
-  "generatedAt": "2026-10-20T09:55:42.500Z",
-  "totalRules": 25,
+  "generatedAt": "2026-10-22T11:27:31.751Z",
+  "totalRules": 27,
   "rules": [
     {
       "id": "ARCH-ABS-001",
@@ -152,6 +152,18 @@
       "family": "GUARD",
       "severity": "error",
       "summary": "Linux command surface parity guard: every command promised by AGENTS.md must resolve to a working GNU binary or a declared PowerShell fallback on the current host."
+    },
+    {
+      "id": "GUARD-DESTR-001",
+      "family": "GUARD",
+      "severity": "error",
+      "summary": "Destructive operand provenance guard: a recursive delete may not name a filesystem root, an ancestor directory, a home or profile directory, or an operand derived from any of those through assignments or loop aliases, because the source then never states which path is being destroyed."
+    },
+    {
+      "id": "GUARD-VAR-001",
+      "family": "GUARD",
+      "severity": "error",
+      "summary": "Read-only automatic variable shadowing guard: assigning to $HOME, $PSHOME, $PID, $Host, $Error, $ExecutionContext, $ShellId, $PSVersionTable, $IsWindows, $IsLinux, $IsMacOS, $PSCulture, $PSUICulture or $PSEdition throws, so the name keeps its previous value and every later read silently addresses a different object than the author intended."
     }
   ]
 }

@@ -338,7 +338,7 @@ function run() {
 
   const totalPairs = SCRIPT_DOMAINS.reduce((sum, d) => sum + d.pairs.length, 0);
   const perDomain = SCRIPT_DOMAINS.map((d) => `${d.name} ${d.pairs.length} 对`).join(', ');
-  console.log(`  ✔ PASS 跨平台同构脚本与防御契约校验通过 (${totalPairs} 对同构脚本全部合规: ${perDomain})`);
+  console.log(`  ✔ 跨平台同构脚本与防御契约校验通过 (${totalPairs} 对同构脚本全部合规: ${perDomain})`);
   process.exit(0);
 }
 

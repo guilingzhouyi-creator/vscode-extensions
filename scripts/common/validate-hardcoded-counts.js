@@ -187,7 +187,7 @@ function main() {
   }
 
   if (passed) {
-    console.log('  ✔ PASS  hardcoded-counts  面向操作者的计数均来自实测数据');
+    console.log('  ✔  hardcoded-counts  面向操作者的计数均来自实测数据');
     process.exit(0);
   }
 

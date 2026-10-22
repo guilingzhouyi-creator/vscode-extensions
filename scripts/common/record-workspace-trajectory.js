@@ -256,7 +256,7 @@ function main() {
   const args = process.argv.slice(2);
   const isFailed = args.includes('--fail') || args.includes('--failed');
   const commitLedger = args.includes('--commit-ledger');
-  const gateCode = isFailed ? 'FAIL' : 'PASS';
+  const gateCode = isFailed ? 'BLOCK' : 'PASS';
   const gatePass = !isFailed;
 
   const trackedLedgerDir = resolveLedgerDir(root);

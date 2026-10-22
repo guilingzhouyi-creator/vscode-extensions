@@ -167,7 +167,7 @@ function main() {
   }
 
   if (passed) {
-    console.log('  ✔ PASS  gate-ordering  门禁助手定义先于调用且判定词表闭包');
+    console.log('  ✔  gate-ordering  门禁助手定义先于调用且判定词表闭包');
     process.exit(0);
   }
 

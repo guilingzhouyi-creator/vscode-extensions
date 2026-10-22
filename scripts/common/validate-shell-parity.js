@@ -219,7 +219,7 @@ function main() {
     return 1;
   }
 
-  console.log(`PASS  shell-parity  mode=${mode}, documented commands bindable`);
+  console.log(`  ✔  shell-parity  mode=${mode}, documented commands bindable`);
   return 0;
 }
 

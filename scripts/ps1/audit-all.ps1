@@ -50,7 +50,7 @@ if (-not $env:XDG_CONFIG_HOME) { $env:XDG_CONFIG_HOME = (Get-Location).Path }
 $nodeCmd = if ($IsWindows -or $env:OS -match "Windows") { "node.exe" } else { "node" }
 $npmCmd = if ($IsWindows -or $env:OS -match "Windows") { "npm.cmd" } else { "npm" }
 $pythonCmd = if (Get-Command python3.12 -ErrorAction SilentlyContinue) { "python3.12" } elseif (Get-Command python -ErrorAction SilentlyContinue) { "python" } elseif (Get-Command python3 -ErrorAction SilentlyContinue) { "python3" } else { "py" }
-$cargoCmd = if (Get-Command cargo.exe -ErrorAction SilentlyContinue) { "cargo.exe" } elseif (Get-Command cargo -ErrorAction SilentlyContinue) { "cargo" } else { $null }
+$cargoCmd = Resolve-GateCargoCommand
 
 if (-not $Json -and -not $Agent) {
     Write-GateHost "=================================================================" -ForegroundColor Cyan
@@ -82,6 +82,10 @@ $logMetricCoverageOut = Join-Path $transientDir "audit-check-metriccoverage-$ran
 $logFamilyContractOut = Join-Path $transientDir "audit-check-familycontract-$randSuffix.out.log"
 $logDocReachOut = Join-Path $transientDir "audit-check-docreach-$randSuffix.out.log"
 $logCommitHistoryOut = Join-Path $transientDir "audit-check-commithistory-$randSuffix.out.log"
+$logDestructiveOut = Join-Path $transientDir "audit-check-destructive-$randSuffix.out.log"
+$logChainsOut = Join-Path $transientDir "audit-check-chainsout-$randSuffix.out.log"
+$logCountsOut = Join-Path $transientDir "audit-check-countsout-$randSuffix.out.log"
+$logParityOut = Join-Path $transientDir "audit-check-parityout-$randSuffix.out.log"
 $logGateProofOut = Join-Path $transientDir "audit-check-gateproof-$randSuffix.out.log"
 $logDocMetricsOut = Join-Path $transientDir "audit-check-docmetrics-$randSuffix.out.log"
 $logCatalogOut = Join-Path $transientDir "audit-check-catalogout-$randSuffix.out.log"
@@ -117,7 +121,7 @@ try {
 }
 
 if ($codeHygiene -ne 0 -or $codeIso -ne 0 -or $codeGi -ne 0 -or $codeDensity -ne 0 -or $codeEloc -ne 0) {
-    $statusHygiene = "FAIL"
+    $statusHygiene = "BLOCK"
     $failed = $true
 } else {
     $statusHygiene = "PASS"
@@ -140,6 +144,12 @@ $resMetricCoverage = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/com
 $resFamilyContract = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-family-contract.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logFamilyContractOut -NoNewWindow -PassThru -Wait
 $resDocReach = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-doc-reachability.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logDocReachOut -NoNewWindow -PassThru -Wait
 $resCommitHistory = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-commit-history-baseline.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logCommitHistoryOut -NoNewWindow -PassThru -Wait
+# 破坏性删除溯源：与推送门禁同源同规则，避免「推送拦截、审查放行」的双重结论。
+$resDestructive = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-destructive-ops.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logDestructiveOut -NoNewWindow -PassThru -Wait
+# 推送门禁已覆盖的三道守卫必须在全量审查中同样执行，否则同一工作树在两个入口得到不同判定。
+$resChains = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-block-chains.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logChainsOut -NoNewWindow -PassThru -Wait
+$resCounts = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-hardcoded-counts.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logCountsOut -NoNewWindow -PassThru -Wait
+$resParity = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/validate-shell-parity.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logParityOut -NoNewWindow -PassThru -Wait
 # 守卫自证：全量审查若从不运行反向探针，「36 个守卫全部 PASS」与「36 个守卫全是死代码」不可区分。
 $resGateProof = Start-Process -FilePath $nodeCmd -ArgumentList "scripts/common/test-gate-guards.js" -WorkingDirectory $repoRoot -RedirectStandardOutput $logGateProofOut -NoNewWindow -PassThru -Wait
 # 文档数字：审查必须自己校验 METRICS 区域，否则数字漂移只能靠推送门禁兜底。
@@ -159,10 +169,14 @@ $codeMetricCoverage = $resMetricCoverage.ExitCode
 $codeFamilyContract = $resFamilyContract.ExitCode
 $codeDocReach = $resDocReach.ExitCode
 $codeCommitHistory = $resCommitHistory.ExitCode
+$codeDestructive = $resDestructive.ExitCode
+$codeChains = $resChains.ExitCode
+$codeCounts = $resCounts.ExitCode
+$codeParity = $resParity.ExitCode
 $codeGateProof = $resGateProof.ExitCode
 $codeDocMetrics = $resDocMetrics.ExitCode
-if ($codeCatalog -ne 0 -or $codeSkills -ne 0 -or $codeFeedback -ne 0 -or $codeOrdering -ne 0 -or $codeClosure -ne 0 -or $codeReach -ne 0 -or $codeRuleSource -ne 0 -or $codeDocs -ne 0 -or $codeLedger -ne 0 -or $codeSubagent -ne 0 -or $codeDocAnchors -ne 0 -or $codeMetricCoverage -ne 0 -or $codeFamilyContract -ne 0 -or $codeDocReach -ne 0 -or $codeCommitHistory -ne 0 -or $codeGateProof -ne 0 -or $codeDocMetrics -ne 0) {
-    $statusRules = "FAIL"
+if ($codeCatalog -ne 0 -or $codeSkills -ne 0 -or $codeFeedback -ne 0 -or $codeOrdering -ne 0 -or $codeClosure -ne 0 -or $codeReach -ne 0 -or $codeRuleSource -ne 0 -or $codeDocs -ne 0 -or $codeLedger -ne 0 -or $codeSubagent -ne 0 -or $codeDocAnchors -ne 0 -or $codeMetricCoverage -ne 0 -or $codeFamilyContract -ne 0 -or $codeDocReach -ne 0 -or $codeCommitHistory -ne 0 -or $codeDestructive -ne 0 -or $codeChains -ne 0 -or $codeCounts -ne 0 -or $codeParity -ne 0 -or $codeGateProof -ne 0 -or $codeDocMetrics -ne 0) {
+    $statusRules = "BLOCK"
     $failed = $true
 } else {
     $statusRules = "PASS"
@@ -233,17 +247,17 @@ $fgClean = if ($procFg) {
     $true
 }
 
-$statusWt = if ($wtClean -and $procWt.ExitCode -eq 0) { "PASS" } else { "FAIL" }
-$statusWg = if ($wgClean -and $procWg.ExitCode -eq 0) { "PASS" } else { "FAIL" }
-$statusAr = if ($arClean -and $procAr.ExitCode -eq 0) { "PASS" } else { "FAIL" }
+$statusWt = if ($wtClean -and $procWt.ExitCode -eq 0) { "PASS" } else { "BLOCK" }
+$statusWg = if ($wgClean -and $procWg.ExitCode -eq 0) { "PASS" } else { "BLOCK" }
+$statusAr = if ($arClean -and $procAr.ExitCode -eq 0) { "PASS" } else { "BLOCK" }
 $statusFg = if (-not $staticFgClean) {
-    "FAIL"
+    "BLOCK"
 } elseif ($null -eq $procFg) {
     "PASS"
 } elseif ($fgClean -and $procFg.ExitCode -eq 0) {
     "PASS"
 } else {
-    "FAIL"
+    "BLOCK"
 }
 
 if ($nodeCmd -and (Test-Path "fractal-git/scripts/common/run-audit-report.js")) {
@@ -257,14 +271,14 @@ if (-not $Fast -and $statusAr -eq "PASS") {
     $procGateSelf = Start-Process -FilePath $nodeCmd -ArgumentList @("scripts/gate-self.js") -WorkingDirectory $autoRefactorDir -RedirectStandardOutput $logArSelfOut -RedirectStandardError $logArSelfErr -PassThru
     $gateSelfClean = Wait-ProcessWithTimeout -Process $procGateSelf -TimeoutSeconds 60 -ProcessName "auto-refactor gate-self" -LogFiles @($logArSelfOut, $logArSelfErr)
     if (-not $gateSelfClean -or $procGateSelf.ExitCode -ne 0) {
-        $statusAr = "FAIL"
+        $statusAr = "BLOCK"
     }
 }
 
 if ($statusWt -ne "PASS") {
     $failed = $true
     if (-not $Json) {
-        Write-GateHost "❌ workspace-timing 审查未通过:" -ForegroundColor Red
+        Write-GateHost "✖ BLOCK  workspace-timing 审查未通过:" -ForegroundColor Red
         foreach ($logFile in @($logWtOut, $logWtErr)) {
             if (Test-Path $logFile) {
                 Get-Content $logFile -Encoding utf8 | Select-Object -Last 15 | ForEach-Object { Write-Host "   $_" -ForegroundColor DarkRed }
@@ -275,7 +289,7 @@ if ($statusWt -ne "PASS") {
 if ($statusWg -ne "PASS") {
     $failed = $true
     if (-not $Json) {
-        Write-GateHost "❌ WebGames 审查未通过:" -ForegroundColor Red
+        Write-GateHost "✖ BLOCK  WebGames 审查未通过:" -ForegroundColor Red
         foreach ($logFile in @($logWgOut, $logWgErr)) {
             if (Test-Path $logFile) {
                 Get-Content $logFile -Encoding utf8 | Select-Object -Last 15 | ForEach-Object { Write-Host "   $_" -ForegroundColor DarkRed }
@@ -286,7 +300,7 @@ if ($statusWg -ne "PASS") {
 if ($statusAr -ne "PASS") {
     $failed = $true
     if (-not $Json) {
-        Write-GateHost "❌ auto-refactor 审查未通过:" -ForegroundColor Red
+        Write-GateHost "✖ BLOCK  auto-refactor 审查未通过:" -ForegroundColor Red
         foreach ($logFile in @($logArOut, $logArErr, $logArSelfOut, $logArSelfErr)) {
             if (Test-Path $logFile) {
                 Get-Content $logFile -Encoding utf8 | Select-Object -Last 15 | ForEach-Object { Write-Host "   $_" -ForegroundColor DarkRed }
@@ -297,7 +311,7 @@ if ($statusAr -ne "PASS") {
 if ($statusFg -ne "PASS") {
     $failed = $true
     if (-not $Json) {
-        Write-GateHost "❌ fractal-git 审查未通过:" -ForegroundColor Red
+        Write-GateHost "✖ BLOCK  fractal-git 审查未通过:" -ForegroundColor Red
         foreach ($logFile in @($logFgOut, $logFgErr)) {
             if (Test-Path $logFile) {
                 Get-Content $logFile -Encoding utf8 | Select-Object -Last 15 | ForEach-Object { Write-Host "   $_" -ForegroundColor DarkRed }
@@ -350,7 +364,7 @@ Write-StepVerdict -StepId "ENGINE-AUDIT-05" -Status $(if ($statusAr -eq "PASS") 
 Write-StepVerdict -StepId "RUST-AUDIT-06" -Status $(if ($statusFg -eq "PASS") { "PASS" } else { "BLOCK" })
 
 $exitCode = if ($failed) { 1 } else { 0 }
-$globalStatus = if ($failed) { "❌ 存在违规异常" } else { "✅ 全域健康达标" }
+$globalStatus = if ($failed) { "🔴 存在违规异常" } else { "🟢 全域健康达标" }
 $globalColor = if ($failed) { "Red" } else { "Green" }
 
 function Get-SafeProp {
@@ -785,7 +799,7 @@ $summary = [ordered]@{
     timestamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
     gitRevision = (git rev-parse --short HEAD 2>$null)
     fastMode = [bool]$Fast
-    status = if ($failed) { "FAIL" } else { "PASS" }
+    status = if ($failed) { "BLOCK" } else { "PASS" }
     exitCode = $exitCode
     elapsedSeconds = $elapsedSec
     workspaceHealthScore = $workspaceHealthScore
@@ -851,7 +865,7 @@ if ($Agent) {
     $envelope = [ordered]@{
         protocolVersion = "1.0.0"
         recordedAt = (Get-Date).ToString("o")
-        status = if ($failed) { "FAIL" } else { "PASS" }
+        status = if ($failed) { "BLOCK" } else { "PASS" }
         gate = "audit-all"
         exitCode = $exitCode
         summary = if ($failed) {
@@ -896,7 +910,7 @@ $sysDefinitions = @(
     @{ num = " 3."; name = "auto-refactor";    score = $scoreAr;      note = "(CLI静态引擎基线)" },
     @{ num = " 4."; name = "workspace-timing"; score = $scoreWt;      note = "(VSCode扩展门禁)" },
     @{ num = " 5."; name = "WebGames配置架构"; score = $scoreWg;      note = "(卡拉尔领域配置)" },
-    @{ num = " 6."; name = "fractal-git";      score = $scoreFg;      note = "(9微Crate/Rust)" }
+    @{ num = " 6."; name = "fractal-git";      score = $scoreFg;      note = "(10微Crate/Rust)" }
 )
 
 foreach ($sys in $sysDefinitions) {
@@ -984,19 +998,19 @@ if ($env:GITHUB_STEP_SUMMARY) {
         [void]$md.AppendLine()
         [void]$md.AppendLine("| 序号 | 核心子系统 | 判定结果 | 归一化得分 | 进度可视化 | 覆盖说明 |")
         [void]$md.AppendLine("| :---: | :--- | :---: | :---: | :--- | :--- |")
-        $badgeHygiene = if ($statusHygiene -eq "PASS") { "✅ PASS" } else { "❌ FAIL" }
-        $badgeRules   = if ($statusRules -eq "PASS") { "✅ PASS" } else { "❌ FAIL" }
-        $badgeAr      = if ($statusAr -eq "PASS") { "✅ PASS" } else { "❌ FAIL" }
-        $badgeWt      = if ($statusWt -eq "PASS") { "✅ PASS" } else { "❌ FAIL" }
-        $badgeWg      = if ($statusWg -eq "PASS") { "✅ PASS" } else { "❌ FAIL" }
-        $badgeFg      = if ($statusFg -eq "PASS") { "✅ PASS" } else { "❌ FAIL" }
+        $badgeHygiene = if ($statusHygiene -eq "PASS") { "🟢 达标" } else { "🔴 阻断" }
+        $badgeRules   = if ($statusRules -eq "PASS") { "🟢 达标" } else { "🔴 阻断" }
+        $badgeAr      = if ($statusAr -eq "PASS") { "🟢 达标" } else { "🔴 阻断" }
+        $badgeWt      = if ($statusWt -eq "PASS") { "🟢 达标" } else { "🔴 阻断" }
+        $badgeWg      = if ($statusWg -eq "PASS") { "🟢 达标" } else { "🔴 阻断" }
+        $badgeFg      = if ($statusFg -eq "PASS") { "🟢 达标" } else { "🔴 阻断" }
 
         [void]$md.AppendLine(("| 1 | 工作区物理卫生 | {0} | {1:F1} | `[{2}]` | 全仓零空文件/同构契约 |" -f $badgeHygiene, $scoreHygiene, (Get-ProgressBar $scoreHygiene)))
         [void]$md.AppendLine(("| 2 | 单源规则目录 | {0} | {1:F1} | `[{2}]` | {3}规则/SSOT一致性 |" -f $badgeRules, $scoreRules, (Get-ProgressBar $scoreRules), $catalogRuleCount))
         [void]$md.AppendLine(("| 3 | auto-refactor | {0} | {1:F1} | `[{2}]` | CLI静态引擎质量基线 |" -f $badgeAr, $scoreAr, (Get-ProgressBar $scoreAr)))
         [void]$md.AppendLine(("| 4 | workspace-timing | {0} | {1:F1} | `[{2}]` | VSCode扩展审查门禁 |" -f $badgeWt, $scoreWt, (Get-ProgressBar $scoreWt)))
         [void]$md.AppendLine(("| 5 | WebGames配置架构 | {0} | {1:F1} | `[{2}]` | 卡拉尔领域配置审查 |" -f $badgeWg, $scoreWg, (Get-ProgressBar $scoreWg)))
-        [void]$md.AppendLine(("| 6 | fractal-git | {0} | {1:F1} | `[{2}]` | 9微Crate/Rust回归套件 |" -f $badgeFg, $scoreFg, (Get-ProgressBar $scoreFg)))
+        [void]$md.AppendLine(("| 6 | fractal-git | {0} | {1:F1} | `[{2}]` | 10微Crate/Rust回归套件 |" -f $badgeFg, $scoreFg, (Get-ProgressBar $scoreFg)))
         [void]$md.AppendLine()
         [void]$md.AppendLine(("> **耗时**: {0}s &nbsp;|&nbsp; **全局状态**: {1}" -f $elapsedSec, $globalStatus))
         [void]$md.AppendLine()
@@ -1048,9 +1062,9 @@ if ($CommitLedger) { $trajArg += "--commit-ledger" }
 Start-Process -FilePath $nodeCmd -ArgumentList $trajArg -WorkingDirectory $repoRoot -NoNewWindow -PassThru -Wait | Out-Null
 
 if ($failed) {
-    Write-GateHost "❌ 审查中枢检测到未通过项，请排查修复对应项目" -ForegroundColor Red
+    Write-GateHost "✖ BLOCK  审查中枢检测到未通过项，请排查修复对应项目" -ForegroundColor Red
     exit 1
 } else {
-    Write-GateHost "✅ 全工作区审查完成，所有项目健康合规" -ForegroundColor Green
+    Write-GateHost "✔ 全工作区审查完成，所有项目健康合规" -ForegroundColor Green
     exit 0
 }

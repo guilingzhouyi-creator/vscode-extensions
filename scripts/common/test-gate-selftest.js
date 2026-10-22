@@ -169,15 +169,15 @@ function main() {
     const status = runNode(testCase.args, testCase.env);
     const ok = status === testCase.expect;
     if (!ok) failures += 1;
-    console.log(`${ok ? 'PASS' : 'FAIL'} ${testCase.name}: exit=${status} expect=${testCase.expect}`);
+    console.log(`${ok ? '✔ PASS' : '✖ BLOCK'} ${testCase.name}: exit=${status} expect=${testCase.expect}`);
   }
 
   fs.rmSync(FIXTURE_DIR, { recursive: true, force: true });
   if (failures > 0) {
-    console.error(`FAIL ${failures} self-test case(s) returned an unexpected verdict`);
+    console.error(`✖ BLOCK  ${failures} self-test case(s) returned an unexpected verdict`);
     process.exit(1);
   }
-  console.log('PASS 门禁自测矩阵与预期结果完全一致');
+  console.log('✔ PASS  门禁自测矩阵与预期结果完全一致');
   process.exit(0);
 }
 

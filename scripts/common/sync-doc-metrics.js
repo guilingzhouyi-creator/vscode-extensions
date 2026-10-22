@@ -904,7 +904,7 @@ function main() {
   }
 
   if (passed) {
-    console.log(`  PASS Documentation metrics: ${values.size} metric(s) match their source of truth.`);
+    console.log(`  ✔  Documentation metrics: ${values.size} metric(s) match their source of truth.`);
     process.exit(0);
   }
 

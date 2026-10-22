@@ -328,7 +328,7 @@ function main() {
   }
 
   if (passed) {
-    console.log('  ✔ PASS  block-chains  PowerShell 块链分支均挂在可接受它的块之后');
+    console.log('  ✔  block-chains  PowerShell 块链分支均挂在可接受它的块之后');
     process.exit(0);
   }
 

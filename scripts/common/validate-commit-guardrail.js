@@ -713,7 +713,7 @@ function runGuardrailVerification() {
   for (const [runSuite, label] of suites) {
     runSuite();
     executed += 1;
-    console.log(`  ✔ PASS ${label}`);
+    console.log(`  ✔ ${label}`);
   }
 
   console.log(`🎉 提交信息分词器、双轨持久化与弹性债务走廊体系全部 ${executed} 组独立契约测试验证通过！`);

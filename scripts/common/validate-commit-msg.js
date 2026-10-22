@@ -424,7 +424,7 @@ function reportCommitMsgFailure(res, target, isAgentMode) {
   }
 
   if (res.debtVerdict?.reason) {
-    console.error(`❌ [DEBT-CORRIDOR-BLOCK] ${res.debtVerdict.reason}`);
+    console.error(`✖ [DEBT-CORRIDOR-BLOCK] ${res.debtVerdict.reason}`);
   }
 
   if (res.hallucinatedRules.length > 0) {

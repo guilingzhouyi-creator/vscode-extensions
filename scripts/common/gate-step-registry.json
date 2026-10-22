@@ -327,6 +327,11 @@
           "id": "RULE-SOURCE-37",
           "title": "规则源跨目录严重级一致性",
           "ruleId": "RCFG-RULE-DRIFT"
+        },
+        {
+          "id": "DESTRUCTIVE-OPS-38",
+          "title": "破坏性删除目标溯源与只读自动变量遮蔽",
+          "ruleId": "GUARD-DESTR-001"
         }
       ]
     },

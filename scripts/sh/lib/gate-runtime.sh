@@ -11,6 +11,8 @@
 #           使步骤身份、状态词表与超时处置在全部门禁中只有一份实现
 # 退出语义与设计依据: 无独立退出码（点源库，未登记步骤标识直接返回非零）
 #   设计依据: 步骤身份必须单源；五处复制同一份登记表解析器会让序号与规则归因在任一处漂移
+#   呈现依据: 协议层状态词恒为 PASS/BLOCK/SKIP/WARN，终端只在异常态写出该词；
+#             通过态由单列宽勾号承载，避免连续数十步的重复大写词淹没真正的异常
 # ------------------------------------------------------------------------------
 # 用法示例:
 #   GATE_SUPPRESS=0
@@ -98,11 +100,15 @@ write_step_verdict() {
     local status="$2"
     local detail="${3:-}"
     local glyph
+    # 四态投影（一体两面）：协议层状态词恒为 PASS/BLOCK/SKIP/WARN，调用点入参不得改写；
+    # 呈现层只在 PASS 时隐去大写词，因为绿色勾号已完整表达「通过」。
+    # 异常态保留大写词：读者扫视时必须一眼分辨出哪一步没有通过。
+    local label=""
     case "${status}" in
-        PASS) glyph="✔" ;;
-        BLOCK) glyph="✖" ;;
-        SKIP) glyph="⚠️" ;;
-        WARN) glyph="⚠️" ;;
+        PASS) glyph="✔" ; label="" ;;
+        BLOCK) glyph="✖" ; label=" BLOCK " ;;
+        SKIP) glyph="↷" ; label=" SKIP  " ;;
+        WARN) glyph="▲" ; label=" WARN  " ;;
         *)
             echo "✖ BLOCK  write_step_verdict 收到四态闭包外状态 '${status}' (步骤 ${step_id})" >&2
             return 1
@@ -110,9 +116,9 @@ write_step_verdict() {
     esac
     get_step_meta "${step_id}" >/dev/null || return 1
     if [[ -n "${detail}" ]]; then
-        gate_log "  ${glyph} ${status}  ${step_id}  ${detail}"
+        gate_log "  ${glyph}${label} ${step_id}  ${detail}"
     else
-        gate_log "  ${glyph} ${status}  ${step_id}"
+        gate_log "  ${glyph}${label} ${step_id}"
     fi
 }
 

@@ -132,10 +132,10 @@ const IGNORED_BASENAMES = new Set(
 
 const RAW_GATE_SPECS = `EMPTY-FILE|暂存区零空文件与零纯注释空壳检查通过||
 LINE-ENDING|换行/编码/EOF/缩进契约 (ps1 CRLF, 其余 LF, 无 BOM, 单 EOF, 无 Tab) 检查通过||
-PATH-LEAK|绝对路径与协议防泄漏检查通过|5|✖ [BLOCK] PATH-LEAK: 检测到新增代码中包含绝对路径或盘符泄漏:
+PATH-LEAK|绝对路径与协议防泄漏检查通过|5|✖ BLOCK  PATH-LEAK: 检测到新增代码中包含绝对路径或盘符泄漏:
 NOMENCLATURE|零黑话与规范命名检查通过||
 VOLUME-BUDGET|双轨体积预算与代码密度守卫 (ELOC<=${MAX_ELOC_BUDGET}, LOC<=${MAX_LOC_BUDGET}, 稀释比<=${DENSITY_RATIO_LABEL}, 接线比<=${PLUMBING_RATIO_LABEL}) 检查通过||
-SECRET-LEAK|密钥与敏感 Token 防泄漏扫描通过|3|✖ [BLOCK] SECRET-LEAK: 检测到暂存代码中疑似包含未脱敏的真实密钥或私钥！`;
+SECRET-LEAK|密钥与敏感 Token 防泄漏扫描通过|3|✖ BLOCK  SECRET-LEAK: 检测到暂存代码中疑似包含未脱敏的真实密钥或私钥！`;
 
 const GATE_SPECS = Object.freeze(
   RAW_GATE_SPECS.split('\n').map((row) => {
@@ -968,7 +968,7 @@ function checkDiffStream(diffText) {
 
 function logSingleGateResult(spec, items) {
   if (items.length === 0) {
-    console.log(`  ✔ PASS  ${spec.id}  ${spec.name}`);
+    console.log(`  ✔  ${spec.id}  ${spec.name}`);
     return;
   }
   if (spec.header) {
@@ -1101,7 +1101,7 @@ function runFastStaged() {
     );
   } else {
     for (const spec of GATE_SPECS) {
-      console.log(`  ✔ PASS  ${spec.id}  ${spec.name}`);
+      console.log(`  ✔  ${spec.id}  ${spec.name}`);
     }
     if (warnings.length > 0) {
       console.warn(`  ⚠ [WARN] ${warnings.length} 处缩进宽度不符合契约（仅告警，不阻断）`);

@@ -28,14 +28,14 @@ PYTHON_BIN=$(command -v python3.12 2>/dev/null || command -v python3 2>/dev/null
 CARGO_BIN=$(command -v cargo 2>/dev/null || echo "")
 
 if [[ -z "$NODE_BIN" ]]; then
-    echo "❌ [BLOCK] 未检测到 Node.js 运行时，提交前门禁无法执行。" >&2
+    echo "✖ BLOCK  未检测到 Node.js 运行时，提交前门禁无法执行。" >&2
     echo "   修复: 安装 Node.js 20+ 并确保 'node' 在 PATH 中。" >&2
     echo "   该门禁为 fail-closed：缺少运行时不得静默放行 (GUARD-SYS-001)。" >&2
     exit 1
 fi
 
 if [[ -z "$NPM_BIN" ]]; then
-    echo "❌ [BLOCK] 未检测到 npm 包管理器，提交前门禁无法执行增量编译校验。" >&2
+    echo "✖ BLOCK  未检测到 npm 包管理器，提交前门禁无法执行增量编译校验。" >&2
     echo "   修复: 随 Node.js 一并安装 npm，并确保 'npm' 在 PATH 中。" >&2
     exit 1
 fi
@@ -456,18 +456,18 @@ if [[ -n "$TOUCHED_FG_COMPILE" ]]; then
     fi
     if [[ -n "$CARGO_BIN" ]]; then
         if [[ "$AGENT_MODE" -eq 1 ]]; then
-            if ! "$CARGO_BIN" check --manifest-path fractal-git/Cargo.toml --all-targets >"$STEP_LOG" 2>&1; then
+            if ! "$CARGO_BIN" check --workspace --manifest-path fractal-git/Cargo.toml --all-targets >"$STEP_LOG" 2>&1; then
                 record_pre_commit_failure "RUST-COMPILE-10" \
                     "L0-COMPILE" \
                     "Cargo check compilation failed in fractal-git." \
-                    "Run 'cargo check --manifest-path fractal-git/Cargo.toml --all-targets' and resolve compiler errors." \
-                    "cargo check --manifest-path fractal-git/Cargo.toml --all-targets" \
+                    "Run 'cargo check --workspace --manifest-path fractal-git/Cargo.toml --all-targets' and resolve compiler errors." \
+                    "cargo check --workspace --manifest-path fractal-git/Cargo.toml --all-targets" \
                     "fractal-git/Cargo.toml"
                 cat "$ROOT_DIR/.audit-logs/last-failure.json"
                 exit 1
             fi
         else
-            if ! "$CARGO_BIN" check --manifest-path fractal-git/Cargo.toml --all-targets >"$STEP_LOG" 2>&1; then
+            if ! "$CARGO_BIN" check --workspace --manifest-path fractal-git/Cargo.toml --all-targets >"$STEP_LOG" 2>&1; then
                 write_step_verdict "RUST-COMPILE-10" BLOCK "fractal-git 增量编译未通过"
                 tail -n 15 "$STEP_LOG" | sed 's/^/   /'
                 FAILED=1
@@ -569,14 +569,14 @@ if [[ "$FAILED" -ne 0 ]]; then
         echo "================================================================="
     } > "$FAIL_LOG" 2>/dev/null || true
 
-    echo "❌ 【门禁结论】Pre-Commit 检查未通过，已阻断提交！请根据上方提示修复后重试。"
+    echo "✖ 【门禁结论】Pre-Commit 检查未通过，已阻断提交！请根据上方提示修复后重试。"
     echo "💡 失败诊断快照已保留至: .audit-logs/last-pre-commit.log"
     echo "   (可运行 bash scripts/sh/pre-commit-gate.sh --view-log 快速查看)"
     echo "   (Agent 消费模式: bash scripts/sh/pre-commit-gate.sh --agent)"
     echo "================================================================="
     exit 1
 else
-    echo "✅ Pre-Commit 检查通过"
+    echo "✔ Pre-Commit 检查通过"
     echo "================================================================="
     exit 0
 fi

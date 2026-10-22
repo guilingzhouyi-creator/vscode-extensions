@@ -35,11 +35,13 @@ const COMMIT_REV_LEN = 8;
 const RECENT_HISTORY_LIMIT = 15;
 
 const STATUS_PASS = 'PASS';
-const STATUS_FAIL = 'FAIL';
-const BADGE_PASS = '✅ PASS';
-const BADGE_FAIL = '❌ FAIL';
-const BADGE_GLOBAL_HEALTHY = '✅ 全域健康达标';
-const BADGE_GLOBAL_ANOMALY = '❌ 存在违规异常';
+// 四态闭包只有 PASS/BLOCK/SKIP/WARN：门禁的终态失败一律称 BLOCK，
+// 落盘快照若写入 FAIL 会让下游读者以为存在第二种失败语义。
+const STATUS_BLOCK = 'BLOCK';
+const BADGE_PASS = '🟢 达标';
+const BADGE_BLOCK = '🔴 阻断';
+const BADGE_GLOBAL_HEALTHY = '🟢 全域健康达标';
+const BADGE_GLOBAL_ANOMALY = '🔴 存在违规异常';
 
 const CHAR_FILLED = '█';
 const CHAR_EMPTY = '░';
@@ -203,9 +205,9 @@ function formatCatalogRuleNote(data) {
  * @returns {string[]} Markdown table rows.
  */
 function renderSubsystemsTableRows(data) {
-  const passBadge = (status) => (status === STATUS_PASS ? BADGE_PASS : BADGE_FAIL);
+  const passBadge = (status) => (status === STATUS_PASS ? BADGE_PASS : BADGE_BLOCK);
   return SUBSYSTEM_DEFINITIONS.map((s) => {
-    const status = data.projects?.[s.key] || (data.status === STATUS_PASS ? STATUS_PASS : STATUS_FAIL);
+    const status = data.projects?.[s.key] || (data.status === STATUS_PASS ? STATUS_PASS : STATUS_BLOCK);
     const score = Number(data.projectScores?.[s.key] ?? SCORE_MAX);
     const scoreStr = score.toFixed(1);
     const bar = getProgressBar(score, PROGRESS_BAR_BLOCKS);
@@ -337,7 +339,7 @@ function recordAuditRun(inputPayload) {
     recordedAt: nowIso,
     gitRevision: gitRev,
     fastMode: Boolean(inputPayload.fastMode),
-    status: inputPayload.status || (inputPayload.exitCode === 0 ? STATUS_PASS : STATUS_FAIL),
+    status: inputPayload.status || (inputPayload.exitCode === 0 ? STATUS_PASS : STATUS_BLOCK),
     exitCode: Number(inputPayload.exitCode ?? 0),
     elapsedSeconds: Number(inputPayload.elapsedSeconds ?? 0),
     workspaceHealthScore: Number(healthScore.toFixed(2)),
@@ -396,7 +398,7 @@ function displayLatestAudit() {
     console.log(renderMarkdownDashboard(data));
     process.exit(0);
   } catch (err) {
-    console.error(`❌ Parse snapshot error: ${err.message}`);
+    console.error(`✖ Parse snapshot error: ${err.message}`);
     process.exit(1);
   }
 }
@@ -423,7 +425,7 @@ function displayHistoryLedger() {
       const timeStr = (e.t || '').replace('T', ' ').slice(0, 19);
       const revStr = (e.rev || DEFAULT_GIT_REV).padEnd(8);
       const modeStr = e.fast ? CLI_MODE_FAST : CLI_MODE_FULL;
-      const statusBadge = e.status === STATUS_PASS ? BADGE_PASS : BADGE_FAIL;
+      const statusBadge = e.status === STATUS_PASS ? BADGE_PASS : BADGE_BLOCK;
       const scoreStr = Number(e.score || 0).toFixed(2).padStart(6);
       const gradeStr = (e.grade || 'A+').padEnd(4);
       const elapsedStr = `${Number(e.elapsed || 0).toFixed(1)}s`.padStart(5);
@@ -432,7 +434,7 @@ function displayHistoryLedger() {
     console.log(`${CLI_LEDGER_BORDER}\n`);
     process.exit(0);
   } catch (err) {
-    console.error(`❌ Read history ledger error: ${err.message}`);
+    console.error(`✖ Read history ledger error: ${err.message}`);
     process.exit(1);
   }
 }

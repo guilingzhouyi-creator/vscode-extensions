@@ -164,7 +164,7 @@ function main() {
     process.exit(1);
   }
 
-  console.log('🎉 ✔ PASS 轨迹账本物理边界检查通过。');
+  console.log('  ✔  轨迹账本物理边界检查通过。');
   process.exit(0);
 }
 

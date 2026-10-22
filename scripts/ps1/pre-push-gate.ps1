@@ -37,7 +37,7 @@ $script:GateSuppressOutput = [bool]$Agent
 $npmCmd = if ($IsWindows -or $env:OS -match "Windows") { "npm.cmd" } else { "npm" }
 $nodeCmd = if ($IsWindows -or $env:OS -match "Windows") { "node.exe" } else { "node" }
 $pythonCmd = if (Get-Command python3.12 -ErrorAction SilentlyContinue) { "python3.12" } elseif (Get-Command python -ErrorAction SilentlyContinue) { "python" } elseif (Get-Command python3 -ErrorAction SilentlyContinue) { "python3" } else { "py" }
-$cargoCmd = if (Get-Command cargo -ErrorAction SilentlyContinue) { "cargo" } else { $null }
+$cargoCmd = Resolve-GateCargoCommand
 
 if ($ViewLog) {
     & $nodeCmd (Join-Path $repoRoot "scripts/common/log-rotator.js") --view
@@ -256,7 +256,10 @@ $codeClosure = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/commo
 $codeDocs = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-docs-consistency.js") -WorkingDirectory $repoRoot -StepId "DOCS-CONSISTENCY-06" -TimeoutSeconds 30
 $codeReach = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-rule-reachability.js") -WorkingDirectory $repoRoot -StepId "RULE-REACHABILITY-07" -TimeoutSeconds 60
 $codeSource = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-rule-source-consistency.js") -WorkingDirectory $repoRoot -StepId "RULE-SOURCE-37" -TimeoutSeconds 30
-if ($code -ne 0 -or $codeClosure -ne 0 -or $codeDocs -ne 0 -or $codeReach -ne 0 -or $codeSource -ne 0) {
+# 破坏性删除溯源：事故形态是「变量名与只读自动变量同名 -> 赋值抛错被忽略 -> 删除作用于用户目录」，
+# 两条链路任一处被拦截都不会发生，故静态审查同时覆盖操作数溯源与自动变量遮蔽。
+$codeDestructive = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-destructive-ops.js") -WorkingDirectory $repoRoot -StepId "DESTRUCTIVE-OPS-38" -TimeoutSeconds 60
+if ($code -ne 0 -or $codeClosure -ne 0 -or $codeDocs -ne 0 -or $codeReach -ne 0 -or $codeSource -ne 0 -or $codeDestructive -ne 0) {
     $failed = $true
 }
 
@@ -464,7 +467,7 @@ if ($Agent) {
 
 Write-GateHost "=================================================================" -ForegroundColor Cyan
 if ($failed) {
-    Write-GateHost "❌ Pre-Push 检查未通过，已阻止推送至远程分支" -ForegroundColor Red
+    Write-GateHost "✖ Pre-Push 检查未通过，已阻止推送至远程分支" -ForegroundColor Red
     Write-GateHost "   请在本地修复上述失败项后重试推送。" -ForegroundColor Red
     Write-GateHost "💡 失败诊断快照已保留至: .audit-logs/last-pre-push.log" -ForegroundColor Yellow
     Write-GateHost "   (可运行 pwsh -File scripts/ps1/pre-push-gate.ps1 -ViewLog 快速查看)" -ForegroundColor Yellow
@@ -472,7 +475,7 @@ if ($failed) {
     Write-GateHost "=================================================================" -ForegroundColor Cyan
     exit 1
 } else {
-    Write-GateHost "✅ Pre-Push 检查通过，允许推送至远程" -ForegroundColor Green
+    Write-GateHost "✔ Pre-Push 检查通过，允许推送至远程" -ForegroundColor Green
     Write-GateHost "=================================================================" -ForegroundColor Cyan
     exit 0
 }

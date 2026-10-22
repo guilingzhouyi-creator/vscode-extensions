@@ -897,7 +897,7 @@ function handleEmptyTargets(options, note) {
     );
     process.exit(0);
   }
-  console.log(`  ✔ PASS 双轨体积与 ELOC 预算检查：${note}`);
+  console.log(`  ✔ 双轨体积与 ELOC 预算检查：${note}`);
   process.exit(0);
 }
 
@@ -1021,7 +1021,7 @@ function printHumanAuditSummary(summaries, warnings, violations) {
   summaries.sort((a, b) => b.eloc - a.eloc);
   const top = summaries[0];
   console.log(
-    `  ✔ PASS 100% 文件符合双轨体积与动态包络约束 (最高观测: ${top.relPath} -> ${top.eloc} ELOC / ${top.totalLoc} LOC, 密度: ${top.density}%, 稀释比: 1:${top.dilutionRatio})`,
+    `  ✔ 100% 文件符合双轨体积与动态包络约束 (最高观测: ${top.relPath} -> ${top.eloc} ELOC / ${top.totalLoc} LOC, 密度: ${top.density}%, 稀释比: 1:${top.dilutionRatio})`,
   );
   console.log(
     `     📊 [DENSITY] 语义载荷与列密度监控: TSPR ${(top.tspr * 100).toFixed(1)}%, τ = ${top.tokensPerEloc} tokens/line, ρ_col = ${top.columnDensity}`,
@@ -1089,7 +1089,7 @@ function run() {
   if (options.json) {
     const report = {
       protocolVersion: '1.0.0',
-      status: violations.length === 0 ? 'PASS' : 'FAIL',
+      status: violations.length === 0 ? 'PASS' : 'BLOCK',
       maxEloc: options.maxEloc,
       maxLoc: options.maxLoc,
       targetDensityRatio: options.densityRatio,

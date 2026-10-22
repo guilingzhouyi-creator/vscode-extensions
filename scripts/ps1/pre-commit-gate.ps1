@@ -85,10 +85,10 @@ $npmCmd = if ($nodeCmd) {
     Resolve-TrustedRuntime -Name 'npm' -TrustedRoots @($npmRoot)
 } else { $null }
 $pythonCmd = if (Get-Command python3.12 -ErrorAction SilentlyContinue) { "python3.12" } elseif (Get-Command python -ErrorAction SilentlyContinue) { "python" } elseif (Get-Command python3 -ErrorAction SilentlyContinue) { "python3" } else { "py" }
-$cargoCmd = if (Get-Command cargo -ErrorAction SilentlyContinue) { "cargo" } else { $null }
+$cargoCmd = Resolve-GateCargoCommand
 
 if (-not $nodeCmd) {
-    Write-GateHost "❌ [BLOCK] 未检测到 Node.js 运行时，提交前门禁无法执行。" -ForegroundColor Red
+    Write-GateHost "✖ BLOCK  未检测到 Node.js 运行时，提交前门禁无法执行。" -ForegroundColor Red
     Write-GateHost "   探测顺序: PATH -> `$env:NODE_HOME -> Program Files\nodejs -> LOCALAPPDATA\Programs\nodejs" -ForegroundColor Yellow
     Write-GateHost "   修复: 安装 Node.js 20+ 加入 PATH，或设置 `$env:NODE_HOME 指向安装目录。" -ForegroundColor Yellow
     Write-GateHost "   该门禁为 fail-closed：缺少运行时不得静默放行 (GUARD-SYS-001)。" -ForegroundColor Yellow
@@ -96,7 +96,7 @@ if (-not $nodeCmd) {
 }
 
 if (-not $npmCmd) {
-    Write-GateHost "❌ [BLOCK] 未检测到 npm 包管理器，提交前门禁无法执行增量编译校验。" -ForegroundColor Red
+    Write-GateHost "✖ BLOCK  未检测到 npm 包管理器，提交前门禁无法执行增量编译校验。" -ForegroundColor Red
     Write-GateHost "   修复: 随 Node.js 一并安装 npm，并确保其与 node 同目录或在 PATH 中。" -ForegroundColor Yellow
     exit 1
 }
@@ -628,21 +628,21 @@ if ($hasFgCompile) {
     if ($cargoCmd) {
         $fgToml = Join-Path $repoRoot "fractal-git/Cargo.toml"
         if ($Agent) {
-            $out = & $cargoCmd check --manifest-path $fgToml --all-targets 2>&1
+            $out = & $cargoCmd check --workspace --manifest-path $fgToml --all-targets 2>&1
             if ($LASTEXITCODE -ne 0) {
                 $json = Write-PreCommitFailure `
                     -StepId "RUST-COMPILE-10" `
                     -RuleId "L0-COMPILE" `
                     -Summary "Cargo check compilation failed in fractal-git." `
-                    -ActionableFix "Run 'cargo check --manifest-path fractal-git/Cargo.toml --all-targets' and resolve compiler errors." `
-                    -VerifyCmd "cargo check --manifest-path fractal-git/Cargo.toml --all-targets" `
+                    -ActionableFix "Run 'cargo check --workspace --manifest-path fractal-git/Cargo.toml --all-targets' and resolve compiler errors." `
+                    -VerifyCmd "cargo check --workspace --manifest-path fractal-git/Cargo.toml --all-targets" `
                     -TargetFiles @("fractal-git/Cargo.toml") `
                     -Details ($out -join "`n")
                 Write-Output $json
                 exit 1
             }
         } else {
-            $process = Start-GateProcess -FilePath $cargoCmd -ArgumentList "check", "--manifest-path", $fgToml, "--all-targets" -WorkingDirectory $repoRoot
+            $process = Start-GateProcess -FilePath $cargoCmd -ArgumentList "check", "--workspace", "--manifest-path", $fgToml, "--all-targets" -WorkingDirectory $repoRoot
             if ($process.ExitCode -ne 0) {
                 Write-StepVerdict -StepId "RUST-COMPILE-10" -Status "BLOCK" -Detail "fractal-git 增量编译未通过"
                 $failed = $true
@@ -760,14 +760,14 @@ if ($failed) {
         [System.IO.File]::WriteAllLines($failLog, $diagLines, [System.Text.UTF8Encoding]::new($false))
     } catch {}
 
-    Write-GateHost "❌ 【门禁结论】Pre-Commit 检查未通过，已阻断提交！请根据上方提示修复后重试。" -ForegroundColor Red
+    Write-GateHost "✖ 【门禁结论】Pre-Commit 检查未通过，已阻断提交！请根据上方提示修复后重试。" -ForegroundColor Red
     Write-GateHost "💡 失败诊断快照已保留至: .audit-logs/last-pre-commit.log" -ForegroundColor Yellow
     Write-GateHost "   (可运行 pwsh -File scripts/ps1/pre-commit-gate.ps1 -ViewLog 快速查看)" -ForegroundColor Yellow
     Write-GateHost "   (Agent 消费模式: pwsh -File scripts/ps1/pre-commit-gate.ps1 -Agent)" -ForegroundColor Yellow
     Write-GateHost "=================================================================" -ForegroundColor Cyan
     exit 1
 } else {
-    Write-GateHost "✅ Pre-Commit 检查通过" -ForegroundColor Green
+    Write-GateHost "✔ Pre-Commit 检查通过" -ForegroundColor Green
     Write-GateHost "=================================================================" -ForegroundColor Cyan
     exit 0
 }

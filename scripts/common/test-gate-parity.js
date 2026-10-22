@@ -249,7 +249,7 @@ function evaluateFixture(fixture, hasPwsh) {
   const pwshTag = psStatus === null ? '' : ` pwsh=${psStatus}`;
   const stepTag = fixture.step ? ` step=${fixture.step}` : '';
   console.log(
-    `${fixture.name}: bash=${shStatus}${pwshTag} expect=${fixture.expect}${stepTag} ${passed ? 'PASS' : 'FAIL'}`,
+    `${fixture.name}: bash=${shStatus}${pwshTag} expect=${fixture.expect}${stepTag} ${passed ? '✔ PASS' : '✖ BLOCK'}`,
   );
   if (!passed && fixture.step) {
     console.log(`  bash steps=[${sh.steps.join(',')}] pwsh steps=[${ps === null ? '' : ps.steps.join(',')}]`);
@@ -280,7 +280,7 @@ function cleanup() {
  */
 function assertPrerequisites(hasBash, hasPwsh, requireParity) {
   if (!hasBash) {
-    console.error('FAIL 未找到可用的 POSIX shell（Git Bash 或 bash）；Windows 上 PATH 里的 bash 常是 WSL 存根，无法执行仓库脚本');
+    console.error('✖ BLOCK  未找到可用的 POSIX shell（Git Bash 或 bash）；Windows 上 PATH 里的 bash 常是 WSL 存根，无法执行仓库脚本');
     process.exit(1);
   }
   if (!hasPwsh) {
@@ -289,7 +289,7 @@ function assertPrerequisites(hasBash, hasPwsh, requireParity) {
     );
     if (requireParity) {
       cleanup();
-      console.error('FAIL --require-parity was requested but pwsh is unavailable; parity unverified');
+      console.error('✖ BLOCK  --require-parity was requested but pwsh is unavailable; parity unverified');
       process.exit(1);
     }
   }
@@ -322,7 +322,7 @@ function compareEntryPoints(label, shScript, psScript, hasPwsh) {
   });
   const psStatus = psResult.error ? -1 : psResult.status;
   const agree = shStatus === psStatus;
-  console.log(`${label}: bash=${shStatus} pwsh=${psStatus} ${agree ? 'PASS' : 'FAIL'}`);
+  console.log(`${label}: bash=${shStatus} pwsh=${psStatus} ${agree ? '✔ PASS' : '✖ BLOCK'}`);
   return agree;
 }
 
@@ -355,7 +355,7 @@ function main() {
 
   cleanup();
   if (failures > 0) {
-    console.error(`FAIL ${failures} parity case(s) diverged or returned an unexpected verdict`);
+    console.error(`✖ BLOCK  ${failures} parity case(s) diverged or returned an unexpected verdict`);
     process.exit(1);
   }
   if (!hasPwsh) {
@@ -364,7 +364,7 @@ function main() {
     );
     process.exit(0);
   }
-  console.log(`PASS ${FIXTURES.length} parity cases agree across implementations`);
+  console.log(`✔ PASS  ${FIXTURES.length} parity cases agree across implementations`);
   process.exit(0);
 }
 

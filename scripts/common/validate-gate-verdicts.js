@@ -205,7 +205,7 @@ function main() {
     }
 
     if (passed) {
-        console.log('  ✔ PASS  gate-verdict-coverage  每个登记步骤在两个平台均可呈现终态判定');
+        console.log('  ✔  gate-verdict-coverage  每个登记步骤在两个平台均可呈现终态判定');
         process.exit(0);
     }
 

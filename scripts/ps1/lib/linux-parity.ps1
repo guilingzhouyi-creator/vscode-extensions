@@ -155,6 +155,78 @@ function New-LinuxParityGnuCommand {
     }.GetNewClosure()
 }
 
+function New-LinuxParityGuardedRmCommand {
+    <#
+    .SYNOPSIS
+        Builds the guarded `rm` binding: every operand is checked before any binary runs.
+    .DESCRIPTION
+        The guard must sit in front of *both* resolution paths, not only the fallback. An
+        earlier revision placed it inside the PowerShell fallback branch, which is only
+        reached when the GNU coreutils are unavailable. On a host where Git for Windows is
+        installed the GNU path is taken, so `rm` bound straight to rm.exe and the guard never
+        ran. That is the shape of the incident this function exists to prevent: a guard that
+        is correct but unreachable is indistinguishable from no guard at all.
+
+        When a GNU binary is available it is invoked with the caller's original argument
+        vector, so option parsing, exit codes and diagnostics stay exactly GNU's. The guard
+        only decides whether the call is allowed to start.
+    .PARAMETER Executable
+        Absolute path of the GNU rm binary, or $null to use the PowerShell implementation.
+    .OUTPUTS
+        System.Management.Automation.ScriptBlock. Closure capturing the executable path.
+    #>
+    [CmdletBinding()]
+    param([AllowNull()][string]$Executable)
+
+    $exe = $Executable
+    return {
+        $recurse = $false
+        $operands = @()
+        $passthrough = @()
+        foreach ($a in $args) {
+            $passthrough += [string]$a
+            if ([string]$a -match '^-[a-zA-Z]*[rR]') { $recurse = $true; continue }
+            if ([string]$a -like '-*') { continue }
+            $operands += [string]$a
+        }
+
+        if ($operands.Count -eq 0) {
+            # 无操作数时 GNU rm 自行报错并返回非零，交给实体处理以保持诊断一致。
+            if ($exe) { & $exe @passthrough; $global:LASTEXITCODE = $LASTEXITCODE; return }
+            Write-Error 'rm: missing operand' -ErrorAction Continue
+            $global:LASTEXITCODE = 1
+            return
+        }
+
+        $cwdFull = (Get-Location).ProviderPath
+        $stagingRoots = @([System.IO.Path]::GetTempPath())
+        $refused = 0
+        foreach ($p in $operands) {
+            $verdict = Test-LinuxParityRemovalTarget -Operand $p -WorkingRoot $cwdFull -StagingRoots $stagingRoots -Recurse:$recurse
+            if ($verdict.Allowed) { continue }
+            $refused += 1
+            [Console]::Error.WriteLine(("rm: refusing to remove '{0}': {1}" -f $p, $verdict.Reason))
+        }
+
+        if ($refused -gt 0) {
+            # 拒绝即失败：静默跳过会让调用方以为删除成功，而实际残留的目录
+            # 会在下一次运行中被当作有效输入，把一次明确的拒绝变成后续的隐蔽错误。
+            $global:LASTEXITCODE = 1
+            return
+        }
+
+        if ($exe) {
+            if ($MyInvocation.ExpectingInput) { $input | & $exe @passthrough } else { & $exe @passthrough }
+            $global:LASTEXITCODE = $LASTEXITCODE
+            return
+        }
+        foreach ($p in $operands) {
+            Remove-Item -LiteralPath $p -Recurse:$recurse -Force -ErrorAction SilentlyContinue
+        }
+        $global:LASTEXITCODE = 0
+    }.GetNewClosure()
+}
+
 function Register-LinuxParityCommand {
     <#
     .SYNOPSIS
@@ -619,12 +691,25 @@ function Initialize-LinuxParity {
         }
     }
 
+    # rm 是全表中唯一需要前置守卫的命令：它的破坏不可撤销，而它的操作数经常来自
+    # 变量拼装。GNU 绑定成功后必须立刻替换成守卫版本，否则守卫只存在于降级分支，
+    # 在装有 Git for Windows 的宿主上永远不会被执行。
+    if ($gnuExecutable -and $script:LinuxParityRegistered.Contains('rm')) {
+        $rmExe = Join-Path $script:LinuxParityGnuRoot $script:LinuxParityGnuCommands['rm']
+        Set-Item -Path 'function:global:rm' -Value (New-LinuxParityGuardedRmCommand -Executable $rmExe) -Force
+    }
+
     if (-not $gnuExecutable -and $script:LinuxParityMissing.Count -gt 0) {
         $fallbackBound = Register-LinuxParityFallback -Names @($script:LinuxParityMissing)
         foreach ($name in $fallbackBound) {
             [void]$script:LinuxParityRegistered.Add($name)
             [void]$script:LinuxParityMissing.Remove($name)
         }
+    }
+
+    # 降级路径同样换成守卫版本：两条路径共用一个守卫，语义才不可能分叉。
+    if (-not $gnuExecutable -and $script:LinuxParityRegistered.Contains('rm')) {
+        Set-Item -Path 'function:global:rm' -Value (New-LinuxParityGuardedRmCommand -Executable $null) -Force
     }
 
     foreach ($name in $script:LinuxParityModernCommands.Keys) {
@@ -676,6 +761,155 @@ function Initialize-LinuxParity {
 #     Portable 的机器），用 PowerShell 7 原生命令实现同一语义。降级只在 GNU 实体
 #     缺失时启用，且每项都声明其能力边界——宁可缺失也不静默给出错误结果。
 # ------------------------------------------------------------------------------
+function ConvertTo-LinuxParityCanonicalPath {
+    <#
+    .SYNOPSIS
+        Normalises a path to one comparable form: absolute, backslash-separated, no trailing
+        separator.
+    .DESCRIPTION
+        Two spellings of the same directory must compare equal before containment is decided.
+        Callers write <root>/work/project, <root>\work\project\ and ./dist, while GetFullPath returns
+        one canonical form. Comparing the raw spellings would reject a legitimate operand, and a
+        guard that rejects legitimate work is a guard that gets bypassed -- so normalisation
+        happens here, once, instead of at each comparison.
+    .PARAMETER Path
+        Path to normalise. Relative paths are resolved against the process working directory.
+    .OUTPUTS
+        System.String. Absolute path with backslash separators and no trailing separator.
+    #>
+    [CmdletBinding()]
+    param([Parameter(Mandatory = $true)][AllowEmptyString()][string]$Path)
+
+    if ([string]::IsNullOrWhiteSpace($Path)) { return '' }
+    $full = [System.IO.Path]::GetFullPath($Path)
+    $trimmed = $full.TrimEnd([System.IO.Path]::DirectorySeparatorChar, [System.IO.Path]::AltDirectorySeparatorChar)
+    # 盘符根修剪后只剩 'C:'，必须补回分隔符，否则它会被当作相对路径前缀参与比较。
+    if ($trimmed -match '^[A-Za-z]:$') { return $trimmed + [System.IO.Path]::DirectorySeparatorChar }
+    if ($trimmed -eq '') { return [string][System.IO.Path]::DirectorySeparatorChar }
+    return $trimmed
+}
+
+function Test-LinuxParityRemovalTarget {
+    <#
+    .SYNOPSIS
+        Decides whether one rm operand may be removed, before anything is touched.
+    .DESCRIPTION
+        A recursive delete is safe only when the operand resolves to a path the caller can be
+        shown to own: something inside the current working tree, or inside a declared staging
+        root. Everything else is refused with a reason rather than attempted.
+
+        The rule exists because the dangerous operand is always the one that arrived through a
+        variable. A mis-joined or mis-named path reaches Remove-Item -Recurse -Force looking
+        exactly like a correct one, and -Force makes the mistake succeed silently. Refusing an
+        operand that resolves outside the working and staging trees converts that silent success
+        into a named error.
+
+        Paths are compared after GetFullPath normalisation, so dot-dot segments and mixed
+        separators cannot smuggle an operand past the check. Wildcards are refused outright: a
+        glob can expand to any number of paths after this check has already approved it.
+    .PARAMETER Operand
+        The raw operand as the caller wrote it.
+    .PARAMETER WorkingRoot
+        Absolute path of the current working directory; the containment boundary for relative
+        operands.
+    .PARAMETER StagingRoots
+        Additional absolute roots that are legitimate removal targets, such as the temp directory.
+    .PARAMETER Recurse
+        Whether the caller asked for a recursive removal. Non-recursive removals skip the
+        containment check: a single file outside the working tree is a normal cleanup, and a
+        non-recursive removal of a directory fails loudly instead of destroying a tree.
+    .OUTPUTS
+        PSCustomObject with Allowed (Boolean) and Reason (String).
+    #>
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)][AllowEmptyString()][string]$Operand,
+        [Parameter(Mandatory = $true)][string]$WorkingRoot,
+        [string[]]$StagingRoots = @(),
+        [switch]$Recurse
+    )
+
+    $verdict = [pscustomobject]@{ Allowed = $false; Reason = '' }
+    if ([string]::IsNullOrWhiteSpace($Operand)) {
+        $verdict.Reason = 'the operand is empty, so the shell decides what it receives'
+        return $verdict
+    }
+
+    $trimmed = $Operand.Trim()
+    if ($trimmed -match '[*?]') {
+        $verdict.Reason = 'the operand contains a wildcard, which expands after this check'
+        return $verdict
+    }
+
+    # 家目录别名不经 GetFullPath 展开，必须先显式归一，否则会被当作普通相对目录。
+    $expanded = $trimmed
+    if ($expanded -eq '~' -or $expanded.StartsWith('~/') -or $expanded.StartsWith('~\')) {
+        $expanded = Join-Path $HOME $expanded.Substring(1).TrimStart('/', '\')
+    }
+
+    try {
+        $resolved = [System.IO.Path]::GetFullPath($expanded, $WorkingRoot)
+    } catch {
+        $verdict.Reason = "the operand cannot be resolved to an absolute path: $($_.Exception.Message)"
+        return $verdict
+    }
+
+    $candidate = ConvertTo-LinuxParityCanonicalPath -Path $resolved
+    if ($candidate -eq '') {
+        $verdict.Reason = 'the operand resolves to a filesystem root'
+        return $verdict
+    }
+
+    $separator = [System.IO.Path]::DirectorySeparatorChar
+    $boundary = ConvertTo-LinuxParityCanonicalPath -Path $WorkingRoot
+
+    # 盘符根：GetPathRoot 对任意绝对路径都返回根，直接比字符串而不是再走 GetFullPath。
+    $rootOfCandidate = [System.IO.Path]::GetPathRoot($resolved)
+    if ($rootOfCandidate -and $rootOfCandidate.TrimEnd($separator) -eq $candidate.TrimEnd($separator)) {
+        $verdict.Reason = 'the operand resolves to a filesystem root'
+        return $verdict
+    }
+
+    # 工作目录本身与它的祖先在任何模式下都不是合法删除目标。
+    if ($candidate -eq $boundary) {
+        $verdict.Reason = 'the operand resolves to the current working directory itself'
+        return $verdict
+    }
+    if ($boundary.StartsWith($candidate + $separator, [System.StringComparison]::OrdinalIgnoreCase)) {
+        $verdict.Reason = 'the operand is an ancestor of the current working directory'
+        return $verdict
+    }
+
+    # 家目录、用户配置与安装目录：同样在两种模式下都拒绝。
+    # 这里逐项比较原始值而非 GetFullPath 结果，因为裸盘符（C:）在 GetFullPath 下是
+    # 驱动器相对路径，会解析成进程当前目录，从而把工作目录误判成受保护目录。
+    foreach ($protected in @($HOME, $env:USERPROFILE, $env:HOMEPATH, $PSHOME, $PROFILE)) {
+        if ([string]::IsNullOrWhiteSpace($protected)) { continue }
+        $protectedCanonical = ConvertTo-LinuxParityCanonicalPath -Path $protected
+        if ($protectedCanonical -eq $candidate) {
+            $verdict.Reason = "the operand resolves to a home, profile or installation directory ($protected)"
+            return $verdict
+        }
+    }
+
+    if (-not $Recurse) {
+        $verdict.Allowed = $true
+        return $verdict
+    }
+
+    $containers = @($boundary) + @($StagingRoots | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+        ForEach-Object { ConvertTo-LinuxParityCanonicalPath -Path $_ })
+    foreach ($container in $containers) {
+        if ($candidate.StartsWith($container + $separator, [System.StringComparison]::OrdinalIgnoreCase)) {
+            $verdict.Allowed = $true
+            return $verdict
+        }
+    }
+
+    $verdict.Reason = 'the operand resolves outside the working tree and outside every staging root'
+    return $verdict
+}
+
 function Get-LinuxParityFallbackCommand {
     <#
     .SYNOPSIS
@@ -872,7 +1106,21 @@ function Get-LinuxParityFallbackCommand {
                     if ([string]$a -like '-*') { continue }
                     $operands += [string]$a
                 }
+                if ($operands.Count -eq 0) {
+                    Write-Error 'rm: missing operand' -ErrorAction Continue
+                    return
+                }
+                # 递归删除先过守卫：操作数必须落在当前工作树或临时目录树内。
+                # 缺少这道断言时，任何拼装错误的路径都会直接落到用户主目录或盘符根，
+                # 而 -Force 会让它静默成功——这正是本包装器被加固的原因。
+                $cwdFull = (Get-Location).ProviderPath
+                $stagingRoots = @([System.IO.Path]::GetTempPath())
                 foreach ($p in $operands) {
+                    $verdict = Test-LinuxParityRemovalTarget -Operand $p -WorkingRoot $cwdFull -StagingRoots $stagingRoots -Recurse:$recurse
+                    if (-not $verdict.Allowed) {
+                        Write-Error ("rm: refusing to remove '{0}': {1}" -f $p, $verdict.Reason) -ErrorAction Continue
+                        continue
+                    }
                     Remove-Item -LiteralPath $p -Recurse:$recurse -Force:$force -ErrorAction SilentlyContinue
                 }
             }

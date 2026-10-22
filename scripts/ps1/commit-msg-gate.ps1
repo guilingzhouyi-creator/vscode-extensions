@@ -56,7 +56,7 @@ if (-not $MsgFile -or -not (Test-Path $MsgFile -PathType Leaf)) {
             })
         } | ConvertTo-Json -Depth 5)
     } else {
-        Write-Host "❌ BLOCK  提交信息文件不存在或未提供: $MsgFile" -ForegroundColor Red
+        Write-Host "✖ BLOCK  提交信息文件不存在或未提供: $MsgFile" -ForegroundColor Red
     }
     exit 1
 }
@@ -172,7 +172,7 @@ function Stop-CommitMsg {
         exit 1
     }
 
-    Write-Host "❌ BLOCK  ${RuleId}: $Message" -ForegroundColor Red
+    Write-Host "✖ BLOCK  ${RuleId}: $Message" -ForegroundColor Red
     if ($ActionableFix) {
         Write-Host "   💡 建议: $ActionableFix" -ForegroundColor Yellow
     }
@@ -281,6 +281,6 @@ Write-StepVerdict -StepId "BATCH-CODE-07" -Status "PASS" -Detail "正文零批�
 Write-StepVerdict -StepId "RULE-TRUTH-08" -Status "PASS" -Detail "规则标识反虚构与文本求真通过"
 Write-StepVerdict -StepId "TEXT-TRUTH-09" -Status "PASS" -Detail "文本求真通过"
 Write-Host "=================================================================" -ForegroundColor Cyan
-Write-Host "✅ Commit-Msg 检查通过" -ForegroundColor Green
+Write-Host "✔ Commit-Msg 检查通过" -ForegroundColor Green
 Write-Host "=================================================================" -ForegroundColor Cyan
 exit 0

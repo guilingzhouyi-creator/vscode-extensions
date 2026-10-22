@@ -281,7 +281,7 @@ function collectDensityInspections(uniqueFiles, options) {
 function outputJsonDensityReport(allViolations, inspections, totalFiles, exemptCount) {
   const report = {
     protocolVersion: '1.0.0',
-    status: allViolations.length === 0 ? 'PASS' : 'FAIL',
+    status: allViolations.length === 0 ? 'PASS' : 'BLOCK',
     gate: 'validate-code-density',
     summary:
       allViolations.length === 0
@@ -355,7 +355,7 @@ function printHumanDensityReport(allViolations, uniqueFilesLength, exemptCount) 
   }
 
   console.log(
-    `  ✔ PASS 100% 文件符合五维代码密度与接线载荷约束 (扫描: ${uniqueFilesLength} 文件, 合法豁免: ${exemptCount} 文件, 违规: 0)`,
+    `  ✔ 100% 文件符合五维代码密度与接线载荷约束 (扫描: ${uniqueFilesLength} 文件, 合法豁免: ${exemptCount} 文件, 违规: 0)`,
   );
   process.exit(0);
 }
@@ -411,7 +411,7 @@ function run() {
       );
       process.exit(0);
     }
-    console.log('  ✔ PASS 无代码文件需要执行五维代码密度审查');
+    console.log('  ✔ 无代码文件需要执行五维代码密度审查');
     process.exit(0);
   }
 

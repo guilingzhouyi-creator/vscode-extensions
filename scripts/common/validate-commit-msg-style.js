@@ -524,7 +524,7 @@ function main() {
     process.exit(0);
   }
 
-  console.log('  ✔ PASS  TEXT-TRUTH-09  提交文本求真务实与禁词审查合规');
+  console.log('  ✔  TEXT-TRUTH-09  提交文本求真务实与禁词审查合规');
   process.exit(0);
 }
 

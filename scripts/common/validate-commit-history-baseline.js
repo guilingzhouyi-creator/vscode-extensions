@@ -289,7 +289,7 @@ function main() {
   }
 
   if (!fs.existsSync(LEDGER)) {
-    console.log('  ✔ PASS  未使用提交历史冻结清单');
+    console.log('  ✔  未使用提交历史冻结清单');
     return 0;
   }
 
@@ -315,7 +315,7 @@ function main() {
   }
 
   console.log(
-    `  ✔ PASS  提交历史冻结清单合规 (${entries.length} 笔提交，全部早于生效时刻 ` +
+    `  ✔  提交历史冻结清单合规 (${entries.length} 笔提交，全部早于生效时刻 ` +
       `${new Date(ratifiedAtMs).toISOString()})`
   );
   return 0;

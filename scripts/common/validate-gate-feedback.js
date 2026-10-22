@@ -56,6 +56,9 @@ const ORDINAL_LABEL_PATTERNS = Object.freeze([
  */
 const STATUS_SYNONYMS = Object.freeze([
   { id: 'STATUS-OK', pattern: /\[OK\]/ },
+  // 方括号形式的 PASS 是闭包成员的一种旧拼法：它读起来像状态词，却让「是否通过」
+  // 取决于读者认不认括号，而不是取决于勾号。禁掉它，模板污染才不会复发。
+  { id: 'STATUS-PASS-BRACKET', pattern: /\[PASS\]/ },
   { id: 'STATUS-PASS-WITH-WARNING', pattern: /(?<![A-Z_])PASS_WITH_WARNING(?![A-Z_])/ },
   { id: 'STATUS-FAIL-BRACKET', pattern: /\[FAIL\]/ },
   { id: 'STATUS-FAILED-BRACKET', pattern: /\[FAILED\]/ },
@@ -212,7 +215,7 @@ function main() {
   }
 
   if (passed) {
-    console.log('  ✔ PASS  gate-feedback-vocabulary  反馈词表为语义步骤标识与四态状态词闭包');
+    console.log('  ✔  gate-feedback-vocabulary  反馈词表为语义步骤标识与四态状态词闭包');
     process.exit(0);
   }
 

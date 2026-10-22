@@ -532,7 +532,7 @@ function main() {
   allErrors.push(...runSelfProbes());
 
   if (allErrors.length > 0) {
-    process.stderr.write(`\n❌ [REJECT] Skills validation detected ${allErrors.length} violation(s):\n`);
+    process.stderr.write(`\n✖ BLOCK  Skills validation detected ${allErrors.length} violation(s):\n`);
     for (const err of allErrors) {
       process.stderr.write(`  - ${err}\n`);
     }
@@ -549,7 +549,7 @@ function main() {
         '     Run \'node scripts/common/sync-skills.js\' to materialise the bundle before publishing.\n',
     );
   }
-  process.stdout.write(`\n✔ [PASS] All ${skillFolders.length} skills (${allMdFiles.length} markdown documents) verified successfully ${parityNote}.\n`);
+  process.stdout.write(`\n✔ All ${skillFolders.length} skills (${allMdFiles.length} markdown documents) verified successfully ${parityNote}.\n`);
   return 0;
 }
 

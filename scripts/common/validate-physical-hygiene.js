@@ -501,16 +501,18 @@ class PhysicalHygieneAuditor {
 
     for (const [dim, info] of Object.entries(evaluation.dimensions)) {
       const label = (dimLabels[dim] || dim).padEnd(38, ' ');
-      const status = info.violationsCount === 0 ? '✔ PASS' : `✖ ${info.violationsCount} issues`;
+      // 呈现层用「达标 / 违规」表达维度结论：八行同列的重复 PASS 只是噪音，
+      // 而得分列已经给出连续量，状态列只需回答「有没有问题」。
+      const status = info.violationsCount === 0 ? '✔ 达标' : `✖ ${info.violationsCount} 项违规`;
       console.log(`  ${label} : ${status.padStart(14, ' ')} | 得分: ${info.score.toFixed(1)}`);
     }
 
     if (this.options.fix && this.fixedCount > 0) {
-      console.log(`\n🛠 [SELF-HEALED] 成功自动自愈 ${this.fixedCount} 处物理卫生瑕疵`);
+      console.log(`\n✔ 成功自动自愈 ${this.fixedCount} 处物理卫生瑕疵`);
     }
 
     if (evaluation.totalViolations === 0) {
-      console.log('\n✔ PASS 全工作区物理卫生八维刚性公理 100% 全部合规\n');
+      console.log('\n✔ 全工作区物理卫生八维刚性公理 100% 全部合规\n');
       process.exit(0);
     }
 

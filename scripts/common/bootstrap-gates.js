@@ -36,14 +36,14 @@ function runStep(command, args, label) {
   console.log(`\n▶ ${label}`);
   const result = spawnSync(command, args, { cwd: REPO_ROOT, stdio: 'inherit', shell: false });
   if (result.error) {
-    console.error(`  FAIL ${label}: ${result.error.message}`);
+    console.error(`  ✖ BLOCK  ${label}: ${result.error.message}`);
     return false;
   }
   if (result.status !== 0) {
-    console.error(`  FAIL ${label} (exit ${result.status})`);
+    console.error(`  ✖ BLOCK  ${label} (exit ${result.status})`);
     return false;
   }
-  console.log(`  PASS ${label}`);
+  console.log(`  ✔ PASS  ${label}`);
   return true;
 }
 
@@ -103,7 +103,7 @@ function ensureAutoRefactorBuild() {
 function main() {
   const installer = resolveHookInstaller();
   if (!installer) {
-    console.error('FAIL No hook installer found under scripts/ps1 or scripts/sh');
+    console.error('✖ BLOCK  No hook installer found under scripts/ps1 or scripts/sh');
     process.exit(1);
   }
   if (!runStep(installer.command, installer.args, 'Activate Git hooks')) process.exit(1);

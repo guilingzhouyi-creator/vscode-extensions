@@ -64,7 +64,7 @@ const results = [];
  */
 function check(name, ok, detail = '') {
   results.push({ name, ok });
-  console.log(`${ok ? 'PASS' : 'FAIL'} ${name}${detail ? `: ${detail}` : ''}`);
+  console.log(`${ok ? '✔ PASS' : '✖ BLOCK'} ${name}${detail ? `: ${detail}` : ''}`);
 }
 
 // ---------------------------------------------------------------- ordering: early call
@@ -97,6 +97,7 @@ const orderedFindings = ORDERING.findEarlyCalls(orderedLines, ORDERING.collectDe
 check('ordering guard accepts a correctly ordered script', orderedFindings.length === 0, `findings=${orderedFindings.length}`);
 
 // -------------------------------------------------------------- ordering: non-closed token
+// 反例必须真的携带一个四态闭包之外的判定词：守卫若「没报错」，这一行就是它失效的唯一证据。
 const tokenLines = ['echo "❌ [FAIL] 构建失败"'];
 const tokenFindings = ORDERING.findStatusTokens(tokenLines);
 check('ordering guard flags a non-closed status token', tokenFindings.length === 1, `findings=${tokenFindings.length}`);
@@ -577,6 +578,68 @@ check(
   typeof SHELL_PARITY === 'object' && SHELL_PARITY !== null,
 );
 
+// --- 破坏性删除溯源：事故形态必须在静态阶段被拦下 ---
+// 该守卫守的是「来源」而不是「逻辑」：一次递归删除只有在它收到的路径就是作者意图的路径时才安全。
+// 下面逐跳复现真实事故链（家目录 -> 拼接 -> 循环别名 -> 删除），任一跳漏检即等于守卫失效。
+const DESTRUCTIVE = require('./validate-destructive-ops');
+check(
+  'destructive guard self-probes all fire',
+  DESTRUCTIVE.runSelfProbes().length === 0,
+  DESTRUCTIVE.runSelfProbes().join('; '),
+);
+
+const incidentBindings = DESTRUCTIVE.collectBindings([
+  '$probe = Join-Path $HOME "Low"',
+  '$staging = Join-Path $probe "case"',
+  'foreach ($d in @($staging)) { }',
+]);
+check(
+  'destructive guard traces a home-rooted path through two assignments',
+  DESTRUCTIVE.taintChain('$staging', incidentBindings).length > 0,
+  DESTRUCTIVE.taintChain('$staging', incidentBindings).join(' -> '),
+);
+check(
+  'destructive guard traces the loop alias the delete actually named',
+  DESTRUCTIVE.taintChain('$d', incidentBindings).length > 0,
+);
+check(
+  'destructive guard accepts a scratch path built from the system staging root',
+  DESTRUCTIVE.taintChain('$dir', DESTRUCTIVE.collectBindings(['$dir = fs.mkdtempSync("x-")'])).length === 0,
+);
+
+const incidentFile = path.join(makeScratch('gate-guard-destructive-'), 'incident.ps1');
+fs.writeFileSync(incidentFile, [
+  '$probe = Join-Path $HOME "Low"',
+  '$staging = Join-Path $probe "case"',
+  'Remove-Item -Path $staging -Recurse -Force',
+  'Remove-Item -LiteralPath "C:\\" -Recurse -Force',
+  '$home = "x"',
+  '',
+].join('\n'));
+const incidentFindings = DESTRUCTIVE.auditFile(incidentFile);
+check(
+  'destructive guard rejects the home-rooted delete and the drive root',
+  incidentFindings.filter((f) => f.type === 'GUARD-DESTR-001').length === 2,
+  incidentFindings.map((f) => f.type).join(','),
+);
+check(
+  'destructive guard rejects a write to a read-only automatic variable',
+  incidentFindings.some((f) => f.type === 'GUARD-VAR-001'),
+);
+
+const cleanFile = path.join(makeScratch('gate-guard-destructive-clean-'), 'clean.ps1');
+fs.writeFileSync(cleanFile, [
+  '$OutputEncoding = [System.Text.UTF8Encoding]::new($false)',
+  '$staging = Join-Path ([System.IO.Path]::GetTempPath()) "audit-case"',
+  'Remove-Item -Path $staging -Recurse -Force',
+  '',
+].join('\n'));
+check(
+  'destructive guard accepts a staging-rooted delete and a type-constrained assignment',
+  DESTRUCTIVE.auditFile(cleanFile).length === 0,
+  JSON.stringify(DESTRUCTIVE.auditFile(cleanFile)),
+);
+
 // --- 变异覆盖：文档里每个规则数字改坏后必须被拦下 ---
 // 「干净语料退出 0」无法区分「守卫在检测」与「守卫从不触发」。这里把仓库内每处规则数字
 // 逐一替换成退役值，再问真实探测器是否捕获；捕获不到的站点就是未被看守的存量债。
@@ -636,8 +699,8 @@ check(
 );
 
 const failures = results.filter((r) => !r.ok).length;if (failures > 0) {
-  console.error(`FAIL ${failures} guard assertion(s) did not hold`);
+  console.error(`✖ BLOCK  ${failures} guard assertion(s) did not hold`);
   process.exit(1);
 }
-console.log(`PASS 全部门禁守卫的检出能力已由 ${results.length} 项断言证明`);
+console.log(`✔ PASS  全部门禁守卫的检出能力已由 ${results.length} 项断言证明`);
 process.exit(0);
