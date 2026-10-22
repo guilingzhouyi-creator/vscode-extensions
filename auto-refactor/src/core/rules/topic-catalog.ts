@@ -144,6 +144,7 @@ export const CANONICAL_TOPIC_CATALOG: Readonly<Record<string, readonly string[]>
     EXT: ['DIR'],
     GUARD: [
         'AST',
+        'BASE',
         'BUDGET',
         'ERR',
         'FAC',
@@ -347,6 +348,7 @@ export const CANONICAL_3LETTER_GLOSSARY: TopicGlossary = Object.freeze({
     ARRAY: 'ARR',
     ASSERT: 'AST',
     ASYNC: 'ASY',
+    BASE: 'BAS',
     BIND: 'BND',
     BOOL: 'BOL',
     BUDGET: 'BDG',

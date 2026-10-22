@@ -1,4 +1,4 @@
-# 01. 四层规则金字塔、30 个内置分析器与 362 条全量规则字典 (347 规范 + 15 历史别名)
+# 01. 四层规则金字塔、30 个内置分析器与 363 条全量规则字典 (348 规范 + 15 历史别名)
 
 > **所属层级**：L4 规则引擎与内置分析器 (`docs/04-analyzers-and-rules/`)  
 > **对应代码真源**：`src/core/rules/registry.ts`、`src/core/rules/entries/*.ts`、`src/core/analyzer-registry.ts`、`src/analyzers/*.ts`
@@ -7,7 +7,7 @@
 
 ## 1. 四层规则金字塔与双轨文案架构
 
-`auto-refactor` 将全部 **362 条内置规则**（含 **347 条规范化 `FAMILY-TOPIC-NNN` 规则**与 **15 条向后兼容别名规则**）统一收拢于 `src/core/rules/registry.ts` 单一真源注册表中，并由 `npm run validate-rules-registry` 门禁在每次构建时强制校验「发射集 = 注册集 = 文档覆盖集（362/362）」。在工作区全域单源规则目录快照（`scripts/common/rule-catalog.json`）中，活跃规则规模保持 **502 条全仓 SSOT 活跃规则**。
+`auto-refactor` 将全部 **363 条内置规则**（含 **348 条规范化 `FAMILY-TOPIC-NNN` 规则**与 **15 条向后兼容别名规则**）统一收拢于 `src/core/rules/registry.ts` 单一真源注册表中，并由 `npm run validate-rules-registry` 门禁在每次构建时强制校验「发射集 = 注册集 = 文档覆盖集（363/363）」。在工作区全域单源规则目录快照（`scripts/common/rule-catalog.json`）中，活跃规则规模保持 **503 条全仓 SSOT 活跃规则**。
 
 ### 1.1 四层规则金字塔拓扑
 
@@ -15,12 +15,12 @@
 | :--- | :---: | :--- | :--- |
 | **Layer 1：全域安全与卫生底线** | 68 条 | `SEC` / `HYG` / `ERR` / `CMT` / `DOC` / `SIM` | 凭证防泄露、注入防御、错误吞没拦截、代码物理卫生、注释质量 (ECD-C) 与文档结构完整性 |
 | **Layer 2：语言族现代化与标准库** | 112 条 | `TSM` / `MOD` / `PYM` / `RSM` / `GOM` / `GDM` / `SH` / `PS` (`SHL`) / `STDLIB` (`STD`) / `UI` / `PROD` | TypeScript、Python、Rust、Go、GDScript、Shell、PowerShell 现代语法惯用法、标准库手写轮子替换与前端工程现代化 |
-| **Layer 3：架构拓扑、治理、数据与性能** | 166 条 | `ARCH` / `GOV` / `DAT` / `PRF` / `DEP` / `NAM` / `CONST` / `CPX` / `GATE` / `CMP` / `NUM` / `GUARD` / `ENG` / `EXT` / `BIG` | 分层单向依赖、架构防腐、多 Agent 协作防冲突 (`GOV-AGN-001`)、切片破坏防范 (`GOV-SLC-001`)、轨迹回归检验 (`GOV-TRJ-001`)、N+1 数据库查询阻断与热循环零分配 |
+| **Layer 3：架构拓扑、治理、数据与性能** | 167 条 | `ARCH` / `GOV` / `DAT` / `PRF` / `DEP` / `NAM` / `CONST` / `CPX` / `GATE` / `CMP` / `NUM` / `GUARD` / `ENG` / `EXT` / `BIG` | 分层单向依赖、架构防腐、多 Agent 协作防冲突 (`GOV-AGN-001`)、切片破坏防范 (`GOV-SLC-001`)、轨迹回归检验 (`GOV-TRJ-001`)、N+1 数据库查询阻断与热循环零分配 |
 | **Layer 4：领域专精、测试现代性与历史兼容** | 16 条 | `VSC` / `TST` + 15 条 Legacy Aliases | Godot 4 游戏引擎运行态契约、VS Code 扩展清单与事件规范、测试有效覆盖深度与历史规则平滑迁移过渡窗口 |
 
 ### 1.2 双轨文案分层契约（Dual-Track Wording Architecture）
 
-- **机读/执行轨（Machine & Agent Track）**：位于 `src/core/messages/`、`src/core/rules/entries/` 与 `src/core/guidance/`，底层规则注册表（`RULE_REGISTRY`）与内核诊断统一为 **100% 国际工业英文标准**（涵盖所有 `summary` 与 `remediation` 规范元数据），输出高 Token 密度、确定性的 SARIF 2.1.0 诊断载荷与 CAPP 智能体修复提示词，并作为工作区单源规则目录（`scripts/common/rule-catalog.json`，502 条全仓 SSOT）的唯一真源底座。
+- **机读/执行轨（Machine & Agent Track）**：位于 `src/core/messages/`、`src/core/rules/entries/` 与 `src/core/guidance/`，底层规则注册表（`RULE_REGISTRY`）与内核诊断统一为 **100% 国际工业英文标准**（涵盖所有 `summary` 与 `remediation` 规范元数据），输出高 Token 密度、确定性的 SARIF 2.1.0 诊断载荷与 CAPP 智能体修复提示词，并作为工作区单源规则目录（`scripts/common/rule-catalog.json`，503 条全仓 SSOT）的唯一真源底座。
 - **人读/呈现轨（Human & Presentation Track）**：由 **Praxis 表现层**（`src/core/praxis/presentation/`）与 `PraxisI18nProvider` 独占承载，采用模块化领域分包双语字典（`zh-cn/` 与 `en/`），面向人类工程师与 IDE 富文本诊断卡片（`PraxisDiagnosticCard`）提供完整、专业、细粒度的人机可读本地化转译与交互式修复指引。
 
 ### 1.3 标准 3-3-3 命名拓扑公理、权威三字母映射与三阶双轨别名等价网络
@@ -78,7 +78,7 @@
 
 ---
 
-## 3. 全量 362 条内置规则权威字典（由门禁自动核验）
+## 3. 全量 363 条内置规则权威字典（由门禁自动核验）
 
 ### Layer 1 — 全域安全、密钥与卫生底线层 (Universal Safety & Hygiene)
 
@@ -117,13 +117,13 @@
 | `HYG-EMP-002` | <a id="hyg-emp-002"></a>`hygiene` | `HYG` | `error` | `all` | 纯注释空壳文件：文件剥离所有单行与多行注释后，有效执行代码为 0 行。 | 补充实质性业务逻辑实现与导出定义，或清理虚空占位文件。 |
 | `HYG-EOL-001` | <a id="hyg-eol-001"></a>`hygiene` | `HYG` | `error` | `all` | 文件末尾换行符格式违背全域工程契约（TS/JS/JSON/MD 强制 LF，PowerShell 强制 CRLF）。 | 按照文件类型统一行尾换行符，TS/JS/JSON/MD 统一转换为 LF，PowerShell 脚本统一转换为 CRLF。 |
 | `HYG-EXC-001` | <a id="hyg-exc-001"></a>`hygiene` | `HYG` | `warning` | `python` | except 变量命名不是 exc。 | 统一命名为 exc，让错误处理读起来一致。 |
-| `HYG-IND-001` | <a id="hyg-ind-001"></a>`hygiene` | `HYG` | `warning` | `all` | 非 GDScript、非 Makefile 文件中检测到 Tab 制表符缩进，违背纯空格缩进契约。 | 将 Tab 制表符缩进转换为纯空格缩进（TS/JS 4 空格，其余源码与配置 2 空格）。 |
+| `HYG-IND-001` | <a id="hyg-ind-001"></a>`hygiene` | `HYG` | `error` | `all` | 非 GDScript、非 Makefile 文件中检测到 Tab 制表符缩进，违背纯空格缩进契约。 | 将 Tab 制表符缩进转换为纯空格缩进（TS/JS 4 空格，其余源码与配置 2 空格）。 |
 | `HYG-NAM-001` | <a id="hyg-nam-001"></a>`hygiene` | `HYG` | `warning` | `all` | 对齐各语言官方主流工程命名契约。 | 命名风格失真 (TS/JS 源码非 kebab-case，GDScript/Python/Rust 非 snake_case)。 |
 | `HYG-SGL-001` | <a id="hyg-sgl-001"></a>`hygiene` | `HYG` | `warning` | `python` | 单字母绑定（仅 i/j/k/_ 放行）。 | 使用描述性命名。 |
 | `HYG-STB-001` | <a id="hyg-stb-001"></a>`hygiene` | `HYG` | `warning` | `all` | 闭环开发任务，清理临时桩。 | 代码或注释中残留 `TODO`, `FIXME`, `XXX`, `HACK` 等临时未决桩标记。 |
 | `HYG-STB-002` | <a id="hyg-stb-002"></a>`hygiene` | `HYG` | `warning` | `all` | 使用中立、长效的业务领域术语替换临时工单代号。 | 全域代码与注释中泄漏临时施工工单黑话 (`pXX`, `phaseXX`, `stXX`, `wip`)。词汇表可用 `hygiene.options.jargonPatterns`（正则源数组）替换为**项目自有**词表，避免项目词被误判或被整条规则静音。 |
-| `HYG-SUP-001` | <a id="hyg-sup-001"></a>`hygiene` | `HYG` | `warning` | `all` | 源码中滥用编译器或 Linter 消音指令（如 @ts-ignore, @ts-nocheck, eslint-disable），破坏静态类型与规则防御。 | 修复底层类型错误或静态分析违规，严禁裸消音；确有必要应采用受控且附带工单上下文的特化压制。 |
-| `HYG-TRL-001` | <a id="hyg-trl-001"></a>`hygiene` | `HYG` | `warning` | `all` | POSIX EOF 单换行契约违规：文件末尾缺少标准换行符，或末尾堆叠 >= 2 个多余连续空行。 | 确保文件末尾有且仅有 1 个标准换行符，消除末尾堆叠空行。 |
+| `HYG-SUP-001` | <a id="hyg-sup-001"></a>`hygiene` | `HYG` | `error` | `all` | 源码中滥用编译器或 Linter 消音指令（如 @ts-ignore, @ts-nocheck, eslint-disable），破坏静态类型与规则防御。 | 修复底层类型错误或静态分析违规，严禁裸消音；确有必要应采用受控且附带工单上下文的特化压制。 |
+| `HYG-TRL-001` | <a id="hyg-trl-001"></a>`hygiene` | `HYG` | `error` | `all` | POSIX EOF 单换行契约违规：文件末尾缺少标准换行符，或末尾堆叠 >= 2 个多余连续空行。 | 确保文件末尾有且仅有 1 个标准换行符，消除末尾堆叠空行。 |
 | `HYG-WRAP-001` | <a id="hyg-wrap-001"></a>`hygiene` | `HYG` | `warning` | `all` | Vacuous passthrough wrapper functions forwarding arguments directly without added value degrade effective code density. | 直接调用被封装的目标方法，或在封装层补充必要的数据校验、状态转换与上下文日志。 |
 | `HYG-WRAP-002` | <a id="hyg-wrap-002"></a>`hygiene` | `HYG` | `info` | `all` | Redundant zero-argument forwarding wrappers trivially delegating to inner targets without validation, transformation, or abstraction. | 若无多态或抽象解耦必要，直接暴露被委托方或内联调用；若确需封装，请补充守卫逻辑、状态转换或上下文日志。 |
 | `SEC-LEAK-001` | <a id="sec-leak-001"></a>`security` | `SEC` | `warning` | `all` | 日志/异常中输出敏感数据（密码、令牌、个人标识）。 | 脱敏后再记录，或只记录标识符与哈希。 |
@@ -188,7 +188,7 @@
 | `PS-DOC-001` | <a id="ps-doc-001"></a>`shell-lint` | `PS` | `warning` | `powershell` | PowerShell 脚本缺少标准帮助文档注释块（.SYNOPSIS / .DESCRIPTION）。 | 在脚本头部编写标准帮助注释块（<# .SYNOPSIS ... #>）。 |
 | `PS-ERROR-001` | <a id="ps-error-001"></a>`shell-lint` | `PS` | `warning` | `powershell` | PowerShell 中存在空 catch 或未捕获的错误。 | 补充错误捕获处理与告警日志。 |
 | `PS-PARAM-001` | <a id="ps-param-001"></a>`shell-lint` | `PS` | `info` | `powershell` | 参数块缺失 [CmdletBinding()] 或参数未声明强类型。 | 添加 [CmdletBinding()] 并为参数声明类型。 |
-| `PS-SAFE-001` | <a id="ps-safe-001"></a>`shell-lint` | `PS` | `warning` | `powershell` | 非交互式或无终端环境下裸用 Read-Host 阻塞执行。 | 增加交互式宿主守卫（$Host.UI）或改用参数传递输入。 |
+| `PS-SAFE-001` | <a id="ps-safe-001"></a>`shell-lint` | `PS` | `error` | `powershell` | 非交互式或无终端环境下裸用 Read-Host 阻塞执行。 | 增加交互式宿主守卫（$Host.UI）或改用参数传递输入。 |
 | `PS-SEC-001` | <a id="ps-sec-001"></a>`shell-lint` | `PS` | `error` | `powershell` | 使用 Invoke-Expression (iex) 动态执行不可信变量，存在代码注入隐患。 | 避免使用 Invoke-Expression，改用参数化 Cmdlet 或 call operator (&)。 |
 | `PS-TRAP-001` | <a id="ps-trap-001"></a>`shell-lint` | `PS` | `warning` | `powershell` | 申请受控系统资源（FileStream/Mutex 等）后缺少 try-finally 释放保护。 | 使用 try/finally 块或 Dispose() 确保异常路径下资源可靠释放。 |
 | `PS-VERB-001` | <a id="ps-verb-001"></a>`shell-lint` | `PS` | `info` | `powershell` | 使用了未批准的 PowerShell 动词。 | 改用 Get-Verb 批准的标准动词。 |
@@ -231,9 +231,9 @@
 | `SH-INIT-001` | <a id="sh-init-001"></a>`shell-lint` | `SH` | `warning` | `shell` | Shell 脚本头部未声明 set -euo pipefail 严格模式。 | 在脚本开头声明 set -euo pipefail 提升鲁棒性。 |
 | `SH-QUOTE-001` | <a id="sh-quote-001"></a>`shell-lint` | `SH` | `warning` | `shell` | 参数展开未加双引号保护存在单词拆分与通配隐患。 | 对变量引用使用 "$var" 进行双引号保护。 |
 | `SH-READ-001` | <a id="sh-read-001"></a>`shell-lint` | `SH` | `info` | `shell` | read 命令未携带 -r 参数导致反斜杠被转义篡改。 | 使用 read -r 读取原始输入文本。 |
-| `SH-SAFE-001` | <a id="sh-safe-001"></a>`shell-lint` | `SH` | `warning` | `shell` | read 命令缺少超时 (-t) 或终端守护，CI 环境下易导致死锁。 | 为交互式读取添加超时或增加 [ -t 0 ] 终端判断。 |
+| `SH-SAFE-001` | <a id="sh-safe-001"></a>`shell-lint` | `SH` | `error` | `shell` | read 命令缺少超时 (-t) 或终端守护，CI 环境下易导致死锁。 | 为交互式读取添加超时或增加 [ -t 0 ] 终端判断。 |
 | `SH-SEC-001` | <a id="sh-sec-001"></a>`shell-lint` | `SH` | `error` | `shell` | 使用 eval 拼接变量执行动态指令，存在任意命令注入高危漏洞。 | 消除 eval 动态拼接，改用函数、数组或直接参数化调用。 |
-| `SH-TRAP-001` | <a id="sh-trap-001"></a>`shell-lint` | `SH` | `warning` | `shell` | 创建临时文件/目录后缺少 EXIT 陷阱清理，导致磁盘垃圾残留。 | 声明 trap 'rm -rf "$tmp"' EXIT 确保退出时清理临时文件。 |
+| `SH-TRAP-001` | <a id="sh-trap-001"></a>`shell-lint` | `SH` | `error` | `shell` | 创建临时文件/目录后缺少 EXIT 陷阱清理，导致磁盘垃圾残留。 | 声明 trap 'rm -rf "$tmp"' EXIT 确保退出时清理临时文件。 |
 | `STDLIB-ALLOC-001` | <a id="stdlib-alloc-001"></a>`stdlib` | `STDLIB` | `error` | `all` | 裸机与 no_std 系统运行环境下隐式堆逃逸与动态重分配静态拦截。 | 在 no_std / core 作用域下使用固定容量栈缓冲、借用切片或预分配内存池，避免裸调 Box::new / malloc。 |
 | `STDLIB-CONST-001` | <a id="stdlib-const-001"></a>`stdlib` | `STDLIB` | `warning` | `all` | 标准库密码学与哈希敏感比较严禁分支时间泄漏，强制常量时间恒定延迟比对。 | 使用恒定时间累加比对（如 constant_time_eq / subtle::ConstantTimeEq），严禁在字节不匹配时提前 return false。 |
 | `STDLIB-PANIC-001` | <a id="stdlib-panic-001"></a>`stdlib` | `STDLIB` | `warning` | `all` | 系统标准库公开接口严禁逃逸裸 panic/unwrap/abort，强制 Result/Option 或有界 error 返回。 | 对可能失败的公开 API 采用 Result<T, E> 或显式 error code 表达错误，内部调用使用 match 或 ? 操作符解包。 |
@@ -264,7 +264,7 @@
 
 | 规则 ID | 所属分析器 | 规则族 | 默认级别 | 适用语言 | 规则中文摘要 (`summary`) | 修复与重构指引 (`remediation`) |
 | :--- | :--- | :--- | :---: | :--- | :--- | :--- |
-| `ARCH-ABS-001` | <a id="arch-abs-001"></a>`architecture` | `ARCH` | `warning` | `all` | 过度抽象与非必要间接层：为少量共性引入跨层深层转发跳板、跨域依赖反转或循环依赖。 | 消除负收益间接跳板与人为抽象，容许领域隔离的局部正当实现。 |
+| `ARCH-ABS-001` | <a id="arch-abs-001"></a>`architecture` | `ARCH` | `error` | `all` | 过度抽象与非必要间接层：为少量共性引入跨层深层转发跳板、跨域依赖反转或循环依赖。 | 消除负收益间接跳板与人为抽象，容许领域隔离的局部正当实现。 |
 | `ARCH-BLR-001` | <a id="arch-blr-001"></a>`architecture` | `ARCH` | `warning` | `all` | 文件边界失衡：单文件内多个高复杂度函数缺乏语义关联，职责异常聚合。 | 按语义与状态边界将文件拆分为高内聚的独立领域模块。 |
 | `ARCH-BND-001` | <a id="arch-bnd-001"></a>`architecture` | `ARCH` | `warning` | `all` | 跨业务域内部穿透：绕过公共导出 Facade 契约直接访问非公开内部实现。 | 通过模块顶层公共导出 API 访问，禁止直接引用 /internal/ 或 /private/。 |
 | `ARCH-CFG-001` | <a id="arch-cfg-001"></a>`architecture` | `ARCH` | `info` | `all` | 环境配置泄漏：纯领域业务模型内部直接读取环境变量或底层磁盘配置。 | 将环境配置提升到应用装配层解析，并以强类型参数注入领域对象。 |
@@ -282,7 +282,7 @@
 | `ARCH-DIR-003` | <a id="arch-dir-003"></a>`architecture` | `ARCH` | `error` | `all` | 形式分层假象：目录结构表面隔离，但调用关系与数据流发生逆向越层。 | 调整调用依赖流向，由内层领域定义契约接口并交由基础设施层实现。 |
 | `ARCH-DISP-001` | <a id="arch-disp-001"></a>`architecture` | `ARCH` | `warning` | `all` | Monolithic dispatchers with excessive branches (> 8) tightly couple domain logic, violating the Open-Closed Principle. | 重构为基于字典/Map 的查表分发 (Table-Driven) 或策略模式 (Strategy Pattern)，解耦各分支业务逻辑。 |
 | `ARCH-DSP-002` | <a id="arch-dsp-002"></a>`architecture` | `ARCH` | `warning` | `all` | Dispatcher closure fragmentation: Object literal defines excessive inline function closures (>= 15), causing closure explosion and function inflation. | 重构为按职责正交划分的 switch 分发函数（单函数圈复杂度 <= 10）或顶层具名处理函数，消除闭包碎片化。 |
-| `ARCH-FAC-001` | <a id="arch-fac-001"></a>`architecture` | `ARCH` | `warning` | `all` | 门面层实质性承载缺失：门面/网关模块缺乏领域编排、模式自验或不可变性冻结，退化为无意义转发层。 | 实现实质性编排、不可变冻结与模式自验，或消除空壳转发门面包装。 |
+| `ARCH-FAC-001` | <a id="arch-fac-001"></a>`architecture` | `ARCH` | `error` | `all` | 门面层实质性承载缺失：门面/网关模块缺乏领域编排、模式自验或不可变性冻结，退化为无意义转发层。 | 实现实质性编排、不可变冻结与模式自验，或消除空壳转发门面包装。 |
 | `ARCH-GLB-001` | <a id="arch-glb-001"></a>`architecture` | `ARCH` | `warning` | `all` | 隐式全局可变状态：模块间通过顶层全局变量或单例产生隐式强耦合。 | 重构为依赖注入或按需创建实例，消除共享可变静态单例。 |
 | `ARCH-HDL-001` | <a id="arch-hdl-001"></a>`architecture` | `ARCH` | `error` | `all` | 无头架构违规：核心业务逻辑或计算模块直接绑定 UI/IDE 视图框架。 | 解除核心计算与展示框架依赖，保持无头独立执行与测试能力。 |
 | `ARCH-LEAK-001` | <a id="arch-leak-001"></a>`architecture` | `ARCH` | `warning` | `all` | 领域模型使用 POJO/原生实体，隔离外部框架专有类型。 | 职责泄漏：纯领域模型直接引用或泄漏外部框架库 (Express/Vue/Godot/ORM)。 |
@@ -336,19 +336,20 @@
 | `DEP-VULN-001` | <a id="dep-vuln-001"></a>`dependency-layout` | `DEP` | `error` | `all` | 严重供应链安全漏洞与投毒包导入：直接导入供应链安全完整性注册表通报的恶意篡改或严重漏洞第三方包。 | 立即阻断并剔除受污染包依赖，升级至官方已校验修复安全版本或替换为受信同等功能组件。 |
 | `DEP-WLD-001` | <a id="dep-wld-001"></a>`dependency-layout` | `DEP` | `warning` | `all` | 使用通配符导入破坏显式依赖跟踪与树摇优化。 | 改用显式具名导入 (Named Imports)，明确模块依赖面。 |
 | `GUARD-AST-001` | <a id="gate-ast-001"></a>`gate-architecture` | `GATE` | `error` | `all` | 预提交门禁缺少暂存区 AST 局部切片复杂度与嵌套深度刚性预算检查（CC <= 15, Depth <= 4）。 | 在 pre-commit 钩子中配置 validate-staged-slice 切片看守，阻断超标改动。 |
+| `GUARD-BASE-001` | <a id="gate-base-001"></a>`gate-architecture` | `GATE` | `error` | `all` | 多维自审（体积预算、反向分层耦合、规范化平衡）跌破冻结基线时缺少单调棘轮看守。 | 恢复跌破的维度，或以书面理由登记一次经批准的基线更新。 |
 | `GUARD-BUDGET-001` | <a id="gate-budget-001"></a>`gate-architecture` | `GATE` | `warning` | `all` | 预提交门禁运行无界全量回归耗时超标，未实施暂存区分层过滤。 | 实施分层门禁：预提交专注增量暂存切片审查（< 2s），全量回归递延至预推送。 |
 | `GUARD-ERR-001` | <a id="gate-err-001"></a>`gate-architecture` | `GATE` | `error` | `all` | 门禁执行脚本缺失严格错误终止控制标志，存在命令静默失败隐患。 | Shell 脚本声明 set -euo pipefail，PowerShell 声明 $ErrorActionPreference = 'Stop'。 |
 | `GUARD-FAC-001` | <a id="gate-fac-001"></a>`gate-architecture` | `GATE` | `error` | `all` | 门禁流水线缺少门面层实质承载（ELOC >= 15）与空包跳板静态审查。 | 接入 validate-facade-discipline 看守，强制门面层实质承载并消除虚空转发层。 |
 | `GUARD-HOOK-001` | <a id="gate-hook-001"></a>`gate-architecture` | `GATE` | `warning` | `all` | 仓库缺失本地左移 Git Hooks 拦截防线，缺陷反馈过度后置。 | 配置 .githooks 或 .husky 激活本地左移防御，提交前拦截低级卫生与回归缺陷。 |
 | `GUARD-HYG-001` | <a id="gate-hyg-001"></a>`gate-architecture` | `GATE` | `error` | `all` | 预提交门禁缺少 0 字节物理空文件与换行符卫生看守。 | 在 pre-commit 门禁中加入零空文件与换行符契约（CRLF/LF）检查。 |
-| `GUARD-ISO-001` | <a id="gate-iso-001"></a>`gate-architecture` | `GATE` | `warning` | `all` | 双层门禁边界不同构，远端 CI 关键检查未在本地钩子中对等镜像。 | 确保本地门禁脚本镜像覆盖远端 CI 关键步骤，实现双层防御同构性。 |
-| `GUARD-MSG-001` | <a id="gate-msg-001"></a>`gate-architecture` | `GATE` | `warning` | `all` | 门禁系统缺少提交信息 Conventional 规范与零黑话结构化正文校验。 | 配置 commit-msg 门禁校验 Conventional 格式、结构化正文区块与零临时黑话。 |
+| `GUARD-ISO-001` | <a id="gate-iso-001"></a>`gate-architecture` | `GATE` | `error` | `all` | 双层门禁边界不同构，远端 CI 关键检查未在本地钩子中对等镜像。 | 确保本地门禁脚本镜像覆盖远端 CI 关键步骤，实现双层防御同构性。 |
+| `GUARD-MSG-001` | <a id="gate-msg-001"></a>`gate-architecture` | `GATE` | `error` | `all` | 门禁系统缺少提交信息 Conventional 规范与零黑话结构化正文校验。 | 配置 commit-msg 门禁校验 Conventional 格式、结构化正文区块与零临时黑话。 |
 | `GUARD-MSG-002` | <a id="gate-msg-002"></a>`gate-architecture` | `GATE` | `error` | `all` | 提交信息门禁未接入单源词汇约束表（commit-msg-forbidden-terms.json）。 | 接入双语词表看守，阻断敷衍用语、过度肯定/否定及元风格标语。 |
 | `GUARD-MSG-003` | <a id="gate-msg-003"></a>`gate-architecture` | `GATE` | `error` | `all` | 多项目工作区提交信息门禁缺少所属项目格式区校验（[Project: <subproject>]），或单项目未自适应静默。 | 在 commit-msg 门禁中基于工作区拓扑探针配置自适应多项目格式区守卫，单项目自动静默，多项目强制校验。 |
 | `GUARD-PAIR-001` | <a id="gate-pair-001"></a>`gate-architecture` | `GATE` | `warning` | `all` | 跨平台门禁脚本缺少双平台镜像配对实现（.ps1 与 .sh 未成对出现）。 | 为关键门禁脚本提供对称的 PowerShell (pwsh) 与 Bash 双平台镜像实现，杜绝跨平台单点盲区。 |
 | `GUARD-PROC-001` | <a id="gate-proc-001"></a>`gate-architecture` | `GATE` | `error` | `all` | PowerShell 门禁脚本使用交互式提示而缺少输出重定向非交互守卫。 | 增加 [Environment]::UserInteractive -and -not [Console]::IsOutputRedirected 守卫，杜绝子进程死锁。 |
 | `GUARD-ROUTE-001` | <a id="gate-route-001"></a>`gate-architecture` | `GATE` | `error` | `all` | Git 钩子直接裸调脆弱环境或 Windows PS 5.1，缺少跨平台路由保护。 | 采用跨平台 pwsh 优先并优雅降级至 bash 的双执行器路由，禁止裸调 powershell.exe。 |
-| `GUARD-SSOT-001` | <a id="gate-ssot-001"></a>`gate-architecture` | `GATE` | `warning` | `all` | 门禁引用规则目录校验但缺少单源注册表文件或未登记对应规则。 | 建立并维护单一真源规则目录（如 rule-catalog.json），门禁依据单源校验。 |
+| `GUARD-SSOT-001` | <a id="gate-ssot-001"></a>`gate-architecture` | `GATE` | `error` | `all` | 门禁引用规则目录校验但缺少单源注册表文件或未登记对应规则。 | 建立并维护单一真源规则目录（如 rule-catalog.json），门禁依据单源校验。 |
 | `GUARD-SYS-001` | <a id="gate-sys-001"></a>`gate-architecture` | `GATE` | `error` | `all` | 仓库完全缺失门禁防御系统（无任何本地 Git 钩子且无远端 CI 流水线）。 | 接入标准化双层门禁脚手架（pre-commit, commit-msg, pre-push 及 CI 工作流）。 |
 | `GOV-AGN-001` | <a id="gov-agn-001"></a>`governance` | `GOV` | `error` | `all` | Concurrent modifications by multiple agents produce architectural boundary breaches, cross-module dependency cycles, or contract incompatibilities. | 协调并行 Agent 的架构边界与修改职责，消解跨模块并发循环依赖并维护单向分层契约。 |
 | `GOV-ARC-001` | <a id="gov-arc-001"></a>`governance` | `GOV` | `warning` | `all` | Historical dossier nomenclature leaks into production sources, tests, or commit headers outside the archived directory white-list. | 历史施工批次代号仅在归档白名单目录中受物理豁免，面向用户的文档、代码与提交信息统一使用纯粹产品特性与功能价值表述。 |

@@ -2,7 +2,7 @@
   "schema": "auto-refactor-rules-registry-snapshot/v1",
   "generatedAt": "2026-10-20T09:04:19.010Z",
   "source": "auto-refactor/dist/core/rules/registry.js",
-  "totalRules": 362,
+  "totalRules": 363,
   "rules": [
     {
       "id": "analyzer-error",
@@ -13,7 +13,7 @@
     {
       "id": "ARCH-ABS-001",
       "family": "ARCH",
-      "severity": "warning",
+      "severity": "error",
       "summary": "Over-abstraction and redundant indirection: introducing cross-layer forwardingtrampolines, inverted dependencies, or cycles for trivial commonalities."
     },
     {
@@ -121,7 +121,7 @@
     {
       "id": "ARCH-FAC-001",
       "family": "ARCH",
-      "severity": "warning",
+      "severity": "error",
       "summary": "Hollow facade payload and insufficient density: facade module lacks substantive domainorchestration, schema validation, or immutability contracts."
     },
     {
@@ -1001,6 +1001,12 @@
       "summary": "Pre-commit gate lacks AST staged slice complexity and nesting budget check (CC <= 15, Depth <= 4)."
     },
     {
+      "id": "GUARD-BASE-001",
+      "family": "GUARD",
+      "severity": "error",
+      "summary": "Quality baseline ratchet guard: the multidimensional self-audit (volume budget, reverse layer coupling, standardization balance) must not regress below its frozen baseline."
+    },
+    {
       "id": "GUARD-BUDGET-001",
       "family": "GUARD",
       "severity": "warning",
@@ -1033,13 +1039,13 @@
     {
       "id": "GUARD-ISO-001",
       "family": "GUARD",
-      "severity": "warning",
+      "severity": "error",
       "summary": "Dual-tier gate boundary is not isomorphic; remote CI checks are not mirrored in local hooks."
     },
     {
       "id": "GUARD-MSG-001",
       "family": "GUARD",
-      "severity": "warning",
+      "severity": "error",
       "summary": "Gate system lacks structured commit-msg validation for Conventional Commits and anti-jargon hygiene."
     },
     {
@@ -1075,7 +1081,7 @@
     {
       "id": "GUARD-SSOT-001",
       "family": "GUARD",
-      "severity": "warning",
+      "severity": "error",
       "summary": "Gate system lacks single-source-of-truth rule catalog verification, risking rule drift."
     },
     {
@@ -1159,7 +1165,7 @@
     {
       "id": "HYG-IND-001",
       "family": "HYG",
-      "severity": "warning",
+      "severity": "error",
       "summary": "Tab character indentation detected in non-tab language file (pure space indentation contract)."
     },
     {
@@ -1195,7 +1201,7 @@
     {
       "id": "HYG-TRL-001",
       "family": "HYG",
-      "severity": "warning",
+      "severity": "error",
       "summary": "POSIX EOF newline contract violation (missing terminal newline or trailing blank line accumulation)."
     },
     {

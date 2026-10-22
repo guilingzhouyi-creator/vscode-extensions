@@ -1,9 +1,9 @@
 {
   "schema": "workspace-rule-catalog/v1",
-  "generatedAt": "2026-10-21T12:31:30.448Z",
-  "totalRules": 502,
+  "generatedAt": "2026-10-22T05:33:53.647Z",
+  "totalRules": 503,
   "counts": {
-    "autoRefactor": 362,
+    "autoRefactor": 363,
     "workspaceTiming": 49,
     "webGames": 50,
     "fractalGit": 17,
@@ -191,7 +191,7 @@
       "id": "ARCH-ABS-001",
       "project": "auto-refactor",
       "family": "ARCH",
-      "severity": "warning",
+      "severity": "error",
       "summary": "Over-abstraction and redundant indirection: introducing cross-layer forwardingtrampolines, inverted dependencies, or cycles for trivial commonalities.",
       "canonical": true
     },
@@ -335,7 +335,7 @@
       "id": "ARCH-FAC-001",
       "project": "auto-refactor",
       "family": "ARCH",
-      "severity": "warning",
+      "severity": "error",
       "summary": "Hollow facade payload and insufficient density: facade module lacks substantive domainorchestration, schema validation, or immutability contracts.",
       "canonical": true
     },
@@ -2031,6 +2031,14 @@
       "canonical": true
     },
     {
+      "id": "GUARD-BASE-001",
+      "project": "auto-refactor",
+      "family": "GUARD",
+      "severity": "error",
+      "summary": "Quality baseline ratchet guard: the multidimensional self-audit (volume budget, reverse layer coupling, standardization balance) must not regress below its frozen baseline.",
+      "canonical": true
+    },
+    {
       "id": "GUARD-BUDGET-001",
       "project": "auto-refactor",
       "family": "GUARD",
@@ -2114,7 +2122,7 @@
       "id": "GUARD-ISO-001",
       "project": "auto-refactor",
       "family": "GUARD",
-      "severity": "warning",
+      "severity": "error",
       "summary": "Dual-tier gate boundary is not isomorphic; remote CI checks are not mirrored in local hooks.",
       "canonical": true
     },
@@ -2122,7 +2130,7 @@
       "id": "GUARD-MSG-001",
       "project": "auto-refactor",
       "family": "GUARD",
-      "severity": "warning",
+      "severity": "error",
       "summary": "Gate system lacks structured commit-msg validation for Conventional Commits and anti-jargon hygiene.",
       "canonical": true
     },
@@ -2186,7 +2194,7 @@
       "id": "GUARD-SSOT-001",
       "project": "auto-refactor",
       "family": "GUARD",
-      "severity": "warning",
+      "severity": "error",
       "summary": "Gate system lacks single-source-of-truth rule catalog verification, risking rule drift.",
       "canonical": true
     },
@@ -2367,7 +2375,7 @@
       "id": "HYG-IND-001",
       "project": "auto-refactor",
       "family": "HYG",
-      "severity": "warning",
+      "severity": "error",
       "summary": "Tab character indentation detected in non-tab language file (pure space indentation contract).",
       "canonical": true
     },
@@ -2415,7 +2423,7 @@
       "id": "HYG-TRL-001",
       "project": "auto-refactor",
       "family": "HYG",
-      "severity": "warning",
+      "severity": "error",
       "summary": "POSIX EOF newline contract violation (missing terminal newline or trailing blank line accumulation).",
       "canonical": true
     },
@@ -4044,8 +4052,8 @@
       "id": "VOL-DIL-001",
       "project": "global-tooling",
       "family": "VOL",
-      "severity": "warning",
-      "summary": "Logic density floor guard: effective code density must not fall below 33% of total file lines",
+      "severity": "error",
+      "summary": "Vertical logic dilution guard: token density tau must not fall below 2.5 tokens per effective line (tau < 2.5 signals excessive line fragmentation).",
       "canonical": true
     },
     {

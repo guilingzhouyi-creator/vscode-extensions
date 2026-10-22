@@ -114,8 +114,8 @@
     {
       "id": "VOL-DIL-001",
       "family": "VOL",
-      "severity": "warning",
-      "summary": "Logic density floor guard: effective code density must not fall below 33% of total file lines"
+      "severity": "error",
+      "summary": "Vertical logic dilution guard: token density tau must not fall below 2.5 tokens per effective line (tau < 2.5 signals excessive line fragmentation)."
     },
     {
       "id": "VOL-DOC-001",

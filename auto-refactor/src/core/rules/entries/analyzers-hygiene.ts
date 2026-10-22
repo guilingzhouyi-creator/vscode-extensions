@@ -219,7 +219,7 @@ export const ANALYZER_HYGIENE_RULES: readonly RuleDefinition[] = [
         analyzer: ANALYZER_HYGIENE,
         canonical: true,
         languages: ALL_LANGUAGES,
-        defaultSeverity: SEVERITY_WARNING,
+        defaultSeverity: SEVERITY_ERROR,
         summary:
             'POSIX EOF newline contract violation (missing terminal newline or trailing blank line accumulation).',
         remediation:
@@ -232,7 +232,7 @@ export const ANALYZER_HYGIENE_RULES: readonly RuleDefinition[] = [
         analyzer: ANALYZER_HYGIENE,
         canonical: true,
         languages: ALL_LANGUAGES,
-        defaultSeverity: SEVERITY_WARNING,
+        defaultSeverity: SEVERITY_ERROR,
         summary:
             'Tab character indentation detected in non-tab language file (pure space indentation contract).',
         remediation:

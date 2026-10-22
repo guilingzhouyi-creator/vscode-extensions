@@ -93,8 +93,11 @@ function definePerformanceRule(
  * Modern architecture rule definitions covering complexity, data, and performance.
  */
 export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
-    defineArchitectureRule(
+    defineLanguageAgnosticRule(
         'ARCH-ABS-001',
+        RULE_FAMILY_ARCHITECTURE,
+        ANALYZER_ARCHITECTURE,
+        SEVERITY_ERROR,
         'Over-abstraction and redundant indirection: introducing cross-layer forwarding' +
             'trampolines, inverted dependencies, or cycles for trivial commonalities.',
         'Eliminate negative-return trampolines and artificial abstractions; allow legitimate' +
@@ -231,8 +234,14 @@ export const ANALYZER_MODERN_ARCHITECTURE_RULES: readonly RuleDefinition[] = [
             'adapters; analyzers must only interact with NormalizedNode interfaces.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#arch-dec-002',
     }),
-    defineArchitectureRule(
+    // Explicit severity: the sibling ARCH-ABS-001 trampoline check already reports at error, and
+    // ENGINE-FACADE-10 blocks on this rule, so a warning declaration contradicted both. The shared
+    // defineArchitectureRule helper stays at warning for the seven rules that legitimately are.
+    defineLanguageAgnosticRule(
         'ARCH-FAC-001',
+        RULE_FAMILY_ARCHITECTURE,
+        ANALYZER_ARCHITECTURE,
+        SEVERITY_ERROR,
         'Hollow facade payload and insufficient density: facade module lacks substantive domain' +
             'orchestration, schema validation, or immutability contracts.',
         'Implement substantive orchestration, immutability freezing, and schema validation or' +

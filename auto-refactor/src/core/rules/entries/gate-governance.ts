@@ -68,7 +68,7 @@ export const GATE_GOVERNANCE_RULES: readonly RuleDefinition[] = [
         analyzer: ANALYZER_GATE_ARCHITECTURE,
         canonical: true,
         languages: ALL_LANGUAGES,
-        defaultSeverity: SEVERITY_WARNING,
+        defaultSeverity: SEVERITY_ERROR,
         summary:
             'Dual-tier gate boundary is not isomorphic; remote CI checks are not mirrored in local hooks.',
         remediation:
@@ -94,7 +94,7 @@ export const GATE_GOVERNANCE_RULES: readonly RuleDefinition[] = [
         analyzer: ANALYZER_GATE_ARCHITECTURE,
         canonical: true,
         languages: ALL_LANGUAGES,
-        defaultSeverity: SEVERITY_WARNING,
+        defaultSeverity: SEVERITY_ERROR,
         summary:
             'Gate system lacks structured commit-msg validation for Conventional Commits and anti-jargon hygiene.',
         remediation:
@@ -141,12 +141,25 @@ export const GATE_GOVERNANCE_RULES: readonly RuleDefinition[] = [
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gate-err-001',
     }),
     defineRule({
+        id: 'GUARD-BASE-001',
+        family: RULE_FAMILY_GATE,
+        analyzer: ANALYZER_GATE_ARCHITECTURE,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_ERROR,
+        summary:
+            'Quality baseline ratchet guard: the multidimensional self-audit (volume budget, reverse layer coupling, standardization balance) must not regress below its frozen baseline.',
+        remediation:
+            'Restore the dimension that regressed, or record an approved baseline update with a documented rationale.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gate-base-001',
+    }),
+    defineRule({
         id: 'GUARD-SSOT-001',
         family: RULE_FAMILY_GATE,
         analyzer: ANALYZER_GATE_ARCHITECTURE,
         canonical: true,
         languages: ALL_LANGUAGES,
-        defaultSeverity: SEVERITY_WARNING,
+        defaultSeverity: SEVERITY_ERROR,
         summary:
             'Gate system lacks single-source-of-truth rule catalog verification, risking rule drift.',
         remediation: 'Synchronize gate rule validation with a centralized single-source catalog.',
