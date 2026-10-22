@@ -104,6 +104,8 @@ CODE_CLOSURE=0
 "$NODE_BIN" scripts/common/validate-rule-id-closure.js >/dev/null 2>&1 || CODE_CLOSURE=$?
 CODE_REACH=0
 "$NODE_BIN" scripts/common/validate-rule-reachability.js >/dev/null 2>&1 || CODE_REACH=$?
+CODE_RULE_SOURCE=0
+"$NODE_BIN" scripts/common/validate-rule-source-consistency.js >/dev/null 2>&1 || CODE_RULE_SOURCE=$?
 CODE_DOCS=0
 "$NODE_BIN" scripts/common/validate-docs-consistency.js >/dev/null 2>&1 || CODE_DOCS=$?
 CODE_LEDGER=0
@@ -124,9 +126,9 @@ CODE_GATE_PROOF=0
 "$NODE_BIN" scripts/common/test-gate-guards.js >/dev/null 2>&1 || CODE_GATE_PROOF=$?
 CODE_DOC_METRICS=0
 "$NODE_BIN" scripts/common/sync-doc-metrics.js >/dev/null 2>&1 || CODE_DOC_METRICS=$?
-if [[ "$CODE_CATALOG" -ne 0 || "$CODE_FEEDBACK" -ne 0 || "$CODE_ORDERING" -ne 0 || "$CODE_SKILLS" -ne 0 || "$CODE_CLOSURE" -ne 0 || "$CODE_REACH" -ne 0 || "$CODE_DOCS" -ne 0 || "$CODE_LEDGER" -ne 0 || "$CODE_SUBAGENT" -ne 0 || "$CODE_DOC_ANCHORS" -ne 0 || "$CODE_METRIC_COVERAGE" -ne 0 || "$CODE_FAMILY_CONTRACT" -ne 0 || "$CODE_DOC_REACH" -ne 0 || "$CODE_COMMIT_HISTORY" -ne 0 || "$CODE_GATE_PROOF" -ne 0 || "$CODE_DOC_METRICS" -ne 0 ]]; then
+if [[ "$CODE_CATALOG" -ne 0 || "$CODE_FEEDBACK" -ne 0 || "$CODE_ORDERING" -ne 0 || "$CODE_SKILLS" -ne 0 || "$CODE_CLOSURE" -ne 0 || "$CODE_REACH" -ne 0 || "$CODE_RULE_SOURCE" -ne 0 || "$CODE_DOCS" -ne 0 || "$CODE_LEDGER" -ne 0 || "$CODE_SUBAGENT" -ne 0 || "$CODE_DOC_ANCHORS" -ne 0 || "$CODE_METRIC_COVERAGE" -ne 0 || "$CODE_FAMILY_CONTRACT" -ne 0 || "$CODE_DOC_REACH" -ne 0 || "$CODE_COMMIT_HISTORY" -ne 0 || "$CODE_GATE_PROOF" -ne 0 || "$CODE_DOC_METRICS" -ne 0 ]]; then
     STATUS_RULES="FAIL"
-    write_step_verdict "RULE-AUDIT-02" BLOCK "规则目录同步、闭包、可达性、文档一致性、技能集或轨迹账本审查未通过"
+    write_step_verdict "RULE-AUDIT-02" BLOCK "规则目录同步、闭包、可达性、规则源一致性、文档一致性、技能集或轨迹账本审查未通过"
     FAILED=1
 else
     STATUS_RULES="PASS"
@@ -217,9 +219,9 @@ fi
 
 if [[ -n "$CARGO_BIN" ]]; then
     if [[ "$FAST_MODE" -eq 1 ]]; then
-        ("$CARGO_BIN" check --manifest-path fractal-git/Cargo.toml --all-targets) >"$LOG_FG" 2>&1 &
+        ("$CARGO_BIN" check --workspace --manifest-path fractal-git/Cargo.toml --all-targets) >"$LOG_FG" 2>&1 &
     else
-        ("$CARGO_BIN" test --manifest-path fractal-git/Cargo.toml) >"$LOG_FG" 2>&1 &
+        ("$CARGO_BIN" test --workspace --manifest-path fractal-git/Cargo.toml) >"$LOG_FG" 2>&1 &
     fi
     PID_FG=$!
 else
