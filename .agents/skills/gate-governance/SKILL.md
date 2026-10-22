@@ -2,7 +2,7 @@
 name: gate-governance
 description: >-
   通用双层门禁架构与跨平台脚本工程治理规范。指导 Agent 落实 Tier 1 本地左移流式判定（内存判定约 1 ms、端到端约 160 ms）、
-  Tier 2 远端同构防御、受影响项目智能分流（auto-refactor 362 规则自测）、子进程工作目录隔离与零黑话纪律。
+  Tier 2 远端同构防御、受影响项目智能分流（auto-refactor 363 规则自测）、子进程工作目录隔离与零黑话纪律。
 ---
 
 # gate-governance — 通用双层门禁架构与跨平台脚本工程治理
@@ -32,7 +32,7 @@ description: >-
   4. **6 类禁词风格与零黑话拦截**：严格拦截临时敷衍（`CMG-STY-001`）、过度夸大（`CMG-STY-002`）、过度贬损（`CMG-STY-003`）、风格元叙事（`CMG-STY-004`）、程序化流水账（`CMG-STY-005`）与执行数字量词（`CMG-STY-006`）；拦截任何施工批次代号；
   5. **单源规则反虚构 (`RCFG-RULE-DRIFT`)**：提交信息中引用的所有规则 ID 必须在 `scripts/common/rule-catalog.json` 中真实登记。
 - **`pre-push`（全域双重回归与基线看守）**：
-  结合智能分流调度执行受影响项目的全量单元测试、跨模块静态审查、零高危技术债务防线与质量基线 Ratchet。
+  结合智能分流调度执行受影响项目的全量单元测试、跨模块静态审查、零高危技术债务防线与质量基线 Ratchet（`GUARD-BASE-001`：多维自审的体量预算、逆向层耦合与前后端标准化均衡不得跌破冻结基线）。
 
 ### 2. 第二层：远端主干看守 (Tier 2 Remote CI Gate)
 - 远端 CI 流水线（`.github/workflows/`）完整镜像本地 Tier 1 全套判定（Hygiene + AST Slice + Style + Test + Audit）；
@@ -48,7 +48,7 @@ description: >-
 ### 1. 路径特征探测与精准映射
 通过 `git diff --cached --name-only` 提取暂存区文件路径向量，精确映射至四大受控域：
 - **`workspace-timing/**`** $\rightarrow$ 路由至 VS Code 扩展套件：触发快速增量编译（`npm run compile`）、单元测试（`npm run test:fast`）与双语字典审查（`npm run review`）；
-- **`auto-refactor/**`** $\rightarrow$ 路由至 CLI 引擎套件：触发 <!-- METRICS:BEGIN analyzer-count -->**30 个**<!-- METRICS:END analyzer-count -->与 <!-- METRICS:BEGIN rule-auto-refactor -->**362 条规则**<!-- METRICS:END rule-auto-refactor -->的 auto-refactor 规则自测（`npm test`，套件总数由运行期汇总输出）、Rust/TS 双轨内核等价性校验与项目中立性守卫（`npm run gate`）；
+- **`auto-refactor/**`** $\rightarrow$ 路由至 CLI 引擎套件：触发 <!-- METRICS:BEGIN analyzer-count -->**30 个**<!-- METRICS:END analyzer-count -->与 <!-- METRICS:BEGIN rule-auto-refactor -->**363 条规则**<!-- METRICS:END rule-auto-refactor -->的 auto-refactor 规则自测（`npm test`，套件总数由运行期汇总输出）、Rust/TS 双轨内核等价性校验与项目中立性守卫（`npm run gate`）；
 - **`WebGames/**`** $\rightarrow$ 路由至 Godot 引擎套件：触发 GDScript 语法审查（`check-gdscript.sh`）、无头回归套件（`test-run.ps1`）与配置同构审计；
 - **`scripts/**` / `.github/**` / `AGENTS.md` / `.agents/skills/**` / 根目录配置** $\rightarrow$ 标记为 `governance` 域：触发工作区单源规则目录一致性、技能集规范性核验与全宗审计（`audit-all.ps1`，内置 `validate-skills.js`）。
 

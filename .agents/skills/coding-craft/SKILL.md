@@ -3,7 +3,7 @@ name: coding-craft
 description: >-
   通用编程工艺与高级工程师写法约束：命名即契约、失败语义显式化、类型收窄与穷尽、
   接口最小暴露、单向依赖、可测性设计与多语言惯用法。回答「写这段代码该遵守什么」，
-  并以规则族指针表把 502 条 SSOT 规则接入写作现场。
+  并以规则族指针表把 503 条 SSOT 规则接入写作现场。
 ---
 
 # coding-craft — 通用编程工艺与写法约束
@@ -177,7 +177,7 @@ function describe(state: State): string {
 
 七域准则覆盖不到的规则族（安全、数据访问、构建洁净度、门禁、治理等），统一收口至一份按族编排的指针表：
 
-**→ [rule-family-map.md](references/rule-family-map.md)**：<!-- METRICS:BEGIN rule-family-count-all -->**61 个规则族**<!-- METRICS:END rule-family-count-all -->、<!-- METRICS:BEGIN rule-total -->**502 条规则**<!-- METRICS:END rule-total -->的「一句话准则 + 全量 ID」，`error` 级加粗。
+**→ [rule-family-map.md](references/rule-family-map.md)**：<!-- METRICS:BEGIN rule-family-count-all -->**61 个规则族**<!-- METRICS:END rule-family-count-all -->、<!-- METRICS:BEGIN rule-total -->**503 条规则**<!-- METRICS:END rule-total -->的「一句话准则 + 全量 ID」，`error` 级加粗。
 
 使用方式：写某个域之前先查该族准则；评审时用规则 ID 定位 SSOT 正文，而不是凭印象描述问题。
 
