@@ -200,205 +200,28 @@ if [[ "$IS_AGENT" -ne 1 ]]; then
     echo "================================================================="
 fi
 
-# 读取所有行并过滤掉以 # 开头的注释行
-mapfile -t RAW_LINES < "$MSG_FILE"
-CLEAN_LINES=()
-for line in "${RAW_LINES[@]}"; do
-    trimmed="${line%"${line##*[![:space:]]}"}"
-    [[ "$trimmed" =~ ^[[:space:]]*# ]] && continue
-    CLEAN_LINES+=("$trimmed")
-done
-TOTAL_LINES=${#CLEAN_LINES[@]}
+# --- 结构契约校验（单一实现：scripts/common/commit-structure-contract.js）---
+# 七项结构判定原先在本文件与 PowerShell 版本各写一份。本文件那一份已经漂移：
+# [[ =~ ]] 的字符类在 C.UTF-8 下按字节匹配，全角句号与中文标题都被误判。
+# 现在只调度一次 Node，两个平台看到的是同一套规则与同一个步骤归属。
+ROOT_DIR=$(git rev-parse --show-toplevel 2>/dev/null || (cd "$(dirname "$0")/../.." && pwd))
+RESOLVED_MSG_FILE=$(realpath "$MSG_FILE" 2>/dev/null || readlink -f "$MSG_FILE" 2>/dev/null || echo "$MSG_FILE")
+STRUCTURE_SCRIPT="$ROOT_DIR/scripts/common/validate-commit-msg.js"
 
-if [[ "$TOTAL_LINES" -eq 0 || -z "${CLEAN_LINES[0]}" ]]; then
-    fail_commit_msg "GUARD-MSG-001" "提交信息不能为空！" "" "符合 Conventional Commits 格式的提交内容" "请参考规范填写格式化提交信息"
+if [[ "${IS_AGENT:-0}" -ne 1 ]]; then
+    PREVIEW=$(grep -vE '^[[:space:]]*#' "$RESOLVED_MSG_FILE" | head -n 1)
+    echo "提交标题: ${PREVIEW%$'\r'}"
 fi
 
-FIRST_LINE="${CLEAN_LINES[0]}"
-if [[ "$IS_AGENT" -ne 1 ]]; then
-    echo "提交标题: $FIRST_LINE"
-fi
-
-# --- 标题格式与长度校验 ---
-HEADER_PATTERN="^(feat|fix|refactor|docs|test|chore|style|perf)(\([a-zA-Z0-9_\-\/,@.]+\))?: .{4,80}$"
-if ! echo "$FIRST_LINE" | grep -E "$HEADER_PATTERN" >/dev/null 2>&1; then
-    fail_commit_msg "GUARD-MSG-001" "[HEADER-FORM-01] 提交标题不符合生产级格式规范！" "$FIRST_LINE" "<type>(<scope>): <简述> (4~80 字符)" "调整为 feat/fix/refactor/docs/test/chore/style/perf(<scope>): 描述"
-fi
-
-# 检查标题末尾不得有句号
-if [[ "$FIRST_LINE" =~ [.。]$ ]]; then
-    fail_commit_msg "GUARD-MSG-001" "[HEADER-FORM-01] 提交标题末尾严禁包含句号" "$FIRST_LINE" "末尾无句号" "移除标题末尾句号"
-fi
-
-# --- 标题零黑话与空洞泛化词拦截 ---
-FORBIDDEN_WORDS="\b(wip|temp|test temp|tmp)\b"
-if echo "$FIRST_LINE" | grep -iE "$FORBIDDEN_WORDS" >/dev/null 2>&1; then
-    fail_commit_msg "CMG-STY-001" "[SLANG-GUARD-02] 提交标题包含违规黑话或临时性标记" "$FIRST_LINE" "零黑话技术描述" "陈述具体完成的技术特性，严禁使用 wip/temp"
-fi
-
-LAZY_WORDS="^([a-z]+(\([^\)]+\))?:\s*(update|modify|changes|fix|test|fixes|clean|refactor|todo|修复问题|更新代码|修改代码|新增功能|优化代码|日常更新|代码重构))\s*$"
-if echo "$FIRST_LINE" | grep -iE "$LAZY_WORDS" >/dev/null 2>&1; then
-    fail_commit_msg "CMG-STY-001" "[SLANG-GUARD-02] 提交标题过于空洞，未说明具体改动" "$FIRST_LINE" "说明具体改动模块与功能" "明确陈述具体变更逻辑"
-fi
-
-# 提取提交类型
-COMMIT_TYPE=$(echo "$FIRST_LINE" | sed -E 's/^([a-z]+)(\(.*\))?:.*$/\1/')
-
-# --- 标题与正文空行分割契约 ---
-if [[ "$TOTAL_LINES" -gt 1 ]]; then
-    SECOND_LINE="${CLEAN_LINES[1]}"
-    if [[ -n "$SECOND_LINE" ]]; then
-        fail_commit_msg "GUARD-MSG-001" "[BODY-SPLIT-03] 标题与正文之间第 2 行必须保留空行" "$SECOND_LINE" "第 2 行为独立空行" "在标题与正文之间插入一个空行"
-    fi
-fi
-
-# --- 统计正文内容（第 3 行及之后）---
-BODY_TEXT=""
-BODY_CHAR_COUNT=0
-BODY_SUBSTANTIVE_CHARS=0
-IN_PROJECT_BLOCK=0
-if [[ "$TOTAL_LINES" -gt 2 ]]; then
-    for ((i=2; i<TOTAL_LINES; i++)); do
-        line="${CLEAN_LINES[$i]}"
-        BODY_TEXT="${BODY_TEXT}${line}"$'\n'
-        # 统计非空白字符（参数展开，避免循环内子进程）
-        non_ws_line="${line//[[:space:]]/}"
-        BODY_CHAR_COUNT=$((BODY_CHAR_COUNT + ${#non_ws_line}))
-
-        trimmed_body_line="${line#"${line%%[![:space:]]*}"}"
-        trimmed_body_line="${trimmed_body_line%"${trimmed_body_line##*[![:space:]]}"}"
-        if echo "$trimmed_body_line" | grep -qE '^\[[^]]+\]([[:space:]]*:.*)?[[:space:]]*$'; then
-            if echo "$trimmed_body_line" | grep -qiE '^\[(Project|项目|项目归属)'; then
-                IN_PROJECT_BLOCK=1
-            else
-                IN_PROJECT_BLOCK=0
-            fi
-            continue
-        fi
-        if [[ "$IN_PROJECT_BLOCK" -eq 1 ]]; then
-            if [[ -z "$trimmed_body_line" ]] || [[ "$trimmed_body_line" =~ ^- ]]; then
-                continue
-            fi
-            IN_PROJECT_BLOCK=0
-        fi
-        BODY_SUBSTANTIVE_CHARS=$((BODY_SUBSTANTIVE_CHARS + ${#non_ws_line}))
-    done
-fi
-
-# --- 正文字数底线与信息密度 ---
-if [[ "$COMMIT_TYPE" =~ ^(feat|fix|refactor|perf)$ ]]; then
-    MIN_BODY_CHARS=30
-    if [[ "$BODY_SUBSTANTIVE_CHARS" -lt "$MIN_BODY_CHARS" ]]; then
-        fail_commit_msg "GUARD-MSG-001" "[BODY-DENSITY-04] 生产级关键提交 ($COMMIT_TYPE) 正文实质信息量不足！当前实质字数: $BODY_SUBSTANTIVE_CHARS（区块标题与项目归属不计入）" "$BODY_SUBSTANTIVE_CHARS 字符" ">= $MIN_BODY_CHARS 字符" "补充 [Why], [Changed], [Verification] 的实质技术事实"
-    fi
-
-    # --- 结构化区块完整性校验 ---
-    HAS_WHY=0
-    HAS_CHANGE=0
-    HAS_VERIFICATION=0
-    echo "$BODY_TEXT" | grep -iE '\[(Why|动机|背景).*?\]' >/dev/null 2>&1 && HAS_WHY=1 || true
-    echo "$BODY_TEXT" | grep -iE '\[(Added|Changed|Fixed|Removed|新增|变更|修改|修复|删除).*?\]' >/dev/null 2>&1 && HAS_CHANGE=1 || true
-    echo "$BODY_TEXT" | grep -iE '\[(Verification|验证|验证结论).*?\]' >/dev/null 2>&1 && HAS_VERIFICATION=1 || true
-
-    if [[ "$HAS_WHY" -eq 0 || "$HAS_CHANGE" -eq 0 || "$HAS_VERIFICATION" -eq 0 ]]; then
-        fail_commit_msg "GUARD-MSG-001" "[BODY-SECTIONS-05] 关键提交 ($COMMIT_TYPE) 结构化区块不完整！必须同时包含 [Why], [Changed/Added/Fixed], [Verification] 区块。" "" "[Why], [Changed/Added/Fixed], [Verification]" "补充标准结构化区块 [Why], [Changed], [Verification]"
-    fi
-
-    if [[ "$COMMIT_TYPE" == "fix" ]] && ! echo "$BODY_TEXT" | grep -iE '\[(Fixed|修复|修复缺陷).*?\]' >/dev/null 2>&1; then
-        fail_commit_msg "GUARD-MSG-001" "[BODY-SECTIONS-05] 缺陷修复提交 (fix) 必须显式包含 [Fixed / 修复缺陷] 区块说明具体修复的缺陷与根因！" "" "[Fixed / 修复缺陷]" "补充 [Fixed] 区块明确缺陷现象与根因"
-    fi
-fi
-
-# --- 项目归属格式区与合法枚举校验 ---
-FOUND_PROJECT_HEADER=false
-IN_PROJECT_SECTION=false
-DECLARED_PROJECTS=()
-PROJECT_HEADER_REGEX='^\[[[:space:]]*([pP][rR][oO][jJ][eE][cC][tT]([[:space:]]*/[[:space:]]*(项目|项目归属))?|项目归属|项目)([[:space:]]*:[[:space:]]*([^]]*))?\]([[:space:]]*:[[:space:]]*(.*))?$'
-
-for ((i=2; i<TOTAL_LINES; i++)); do
-    cur_line="${CLEAN_LINES[$i]}"
-    trimmed_line="${cur_line#"${cur_line%%[![:space:]]*}"}"
-    trimmed_line="${trimmed_line%"${trimmed_line##*[![:space:]]}"}"
-    if [[ "$trimmed_line" =~ $PROJECT_HEADER_REGEX ]]; then
-        FOUND_PROJECT_HEADER=true
-        IN_PROJECT_SECTION=true
-        inline_val="${BASH_REMATCH[4]}"
-        if [[ -z "$inline_val" ]]; then
-            inline_val="${BASH_REMATCH[6]}"
-        fi
-        if [[ -n "$inline_val" ]]; then
-            IFS=',，、' read -ra parts <<< "$inline_val"
-            for p in "${parts[@]}"; do
-                p_clean="${p#"${p%%[![:space:]]*}"}"
-                p_clean="${p_clean#-}"
-                p_clean="${p_clean#"${p_clean%%[![:space:]]*}"}"
-                p_clean="${p_clean%%(*}"
-                p_clean="${p_clean%%（*}"
-                p_clean="${p_clean%"${p_clean##*[![:space:]]}"}"
-                p_clean="${p_clean%%[[:space:]]*}"
-                if [[ -n "$p_clean" ]]; then
-                    DECLARED_PROJECTS+=("$p_clean")
-                fi
-            done
-        fi
-    elif [[ "$IN_PROJECT_SECTION" == true ]]; then
-        if [[ -z "$trimmed_line" ]]; then
-            continue
-        elif [[ "$trimmed_line" =~ ^\[.*\] ]]; then
-            IN_PROJECT_SECTION=false
-        elif [[ "$trimmed_line" =~ ^-[[:space:]]*(.*) ]]; then
-            item_val="${BASH_REMATCH[1]}"
-            IFS=',，、' read -ra parts <<< "$item_val"
-            for p in "${parts[@]}"; do
-                p_clean="${p#"${p%%[![:space:]]*}"}"
-                p_clean="${p_clean%%(*}"
-                p_clean="${p_clean%%（*}"
-                p_clean="${p_clean%"${p_clean##*[![:space:]]}"}"
-                p_clean="${p_clean%%[[:space:]]*}"
-                if [[ -n "$p_clean" ]]; then
-                    DECLARED_PROJECTS+=("$p_clean")
-                fi
-            done
-        else
-            IN_PROJECT_SECTION=false
-        fi
-    fi
-done
-
-if [[ "$COMMIT_TYPE" =~ ^(feat|fix|refactor|perf)$ ]]; then
-    if [[ "$FOUND_PROJECT_HEADER" == false ]]; then
-        fail_commit_msg "CMG-PRJ-001" "[PROJECT-SCOPE-06] (CMG-PRJ-001) 关键生产级提交 ($COMMIT_TYPE) 缺少项目归属格式区！" "" "[Project: workspace-timing | auto-refactor | WebGames | fractal-git | governance]" "在正文首个结构化区块声明 [Project / 项目归属]"
-    fi
-
-    if [[ ${#DECLARED_PROJECTS[@]} -eq 0 ]]; then
-        fail_commit_msg "CMG-PRJ-001" "[PROJECT-SCOPE-06] (CMG-PRJ-001) [Project / 项目归属] 区块未声明任何项目名称！" "" "workspace-timing | auto-refactor | WebGames | fractal-git | governance" "指定合法的项目归属名称"
-    fi
-fi
-
-if [[ ${#DECLARED_PROJECTS[@]} -gt 0 ]]; then
-    VALID_NORM=" workspace-timing auto-refactor webgames web-games fractal-git fractalgit governance "
-    INVALID_PROJECTS=()
-    for p in "${DECLARED_PROJECTS[@]}"; do
-        p_lower="${p,,}"
-        if [[ ! "$VALID_NORM" =~ [[:space:]]"$p_lower"[[:space:]] ]]; then
-            INVALID_PROJECTS+=("$p")
-        fi
-    done
-
-    if [[ ${#INVALID_PROJECTS[@]} -gt 0 ]]; then
-        INV_STR=$(IFS=', '; echo "${INVALID_PROJECTS[*]}")
-        fail_commit_msg "CMG-PRJ-001" "[PROJECT-SCOPE-06] (CMG-PRJ-001) 声明的项目归属包含未授权/非法的项目标识: $INV_STR" "$INV_STR" "workspace-timing | auto-refactor | WebGames | fractal-git | governance" "纠正项目名称为合法枚举之一"
-    fi
-fi
-
-# --- 正文零批次代号与工期黑话 ---
-if echo "$BODY_TEXT" | grep -iE "\b(phase[0-9]+|st[0-9]+|p[0-9]+|sprint[[:space:]]*[0-9]+|w[1-9]|pass[[:space:]]*[1-6])\b" >/dev/null 2>&1; then
-    fail_commit_msg "CMG-STY-001" "[BATCH-CODE-07] 提交正文包含违规工期代号或批次黑话 (phaseN/stN/pN/sprintN/wN/passN)！" "" "纯客观技术事实" "基于功能特性与交付价值进行纯粹描述，移除批次与工期代号"
+STRUCTURE_OUT=$("$NODE_BIN" "$STRUCTURE_SCRIPT" "$RESOLVED_MSG_FILE" --structure-only --agent 2>&1) || STRUCTURE_STATUS=$?
+STRUCTURE_STATUS=${STRUCTURE_STATUS:-0}
+if [[ "$STRUCTURE_STATUS" -ne 0 ]]; then
+    echo "$STRUCTURE_OUT"
+    print_template_guide
+    exit "$STRUCTURE_STATUS"
 fi
 
 # --- 规则标识反虚构与文本求真联合审查 ---
-ROOT_DIR=$(git rev-parse --show-toplevel 2>/dev/null || (cd "$(dirname "$0")/../.." && pwd))
-RESOLVED_MSG_FILE=$(realpath "$MSG_FILE" 2>/dev/null || readlink -f "$MSG_FILE" 2>/dev/null || echo "$MSG_FILE")
 VALIDATE_ARGS=("$RESOLVED_MSG_FILE")
 if [[ "$IS_AGENT" -eq 1 ]]; then
     VALIDATE_ARGS+=("--agent")
@@ -448,23 +271,17 @@ write_step_verdict "SLANG-GUARD-02" PASS "零黑话与空洞词"
 write_step_banner "BODY-SPLIT-03"
 write_step_verdict "BODY-SPLIT-03" PASS "空行分割契约合规"
 write_step_banner "BODY-DENSITY-04"
-write_step_verdict "BODY-DENSITY-04" PASS "正文实质字数 $BODY_SUBSTANTIVE_CHARS 达标"
+write_step_verdict "BODY-DENSITY-04" PASS "正文实质信息量达标"
 write_step_banner "BODY-SECTIONS-05"
 write_step_verdict "BODY-SECTIONS-05" PASS "结构化区块完整"
 write_step_banner "PROJECT-SCOPE-06"
-if [[ ${#DECLARED_PROJECTS[@]} -gt 0 ]]; then
-    PROJ_STR=$(IFS=', '; echo "${DECLARED_PROJECTS[*]}")
-    write_step_verdict "PROJECT-SCOPE-06" PASS "项目归属合规 ([Project: $PROJ_STR])"
-else
-    write_step_verdict "PROJECT-SCOPE-06" SKIP "免检类型，不强制项目归属"
-fi
+write_step_verdict "PROJECT-SCOPE-06" PASS "项目归属合规"
 write_step_banner "BATCH-CODE-07"
 write_step_verdict "BATCH-CODE-07" PASS "正文零批次代号"
 write_step_banner "RULE-TRUTH-08"
 write_step_verdict "RULE-TRUTH-08" PASS "规则标识反虚构"
 write_step_banner "TEXT-TRUTH-09"
 write_step_verdict "TEXT-TRUTH-09" PASS "文本求真务实与禁词合规"
-echo "================================================================="
 echo "✅ Commit-Msg 检查通过"
 echo "================================================================="
 exit 0

@@ -255,7 +255,8 @@ $code = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/gener
 $codeClosure = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-rule-id-closure.js") -WorkingDirectory $repoRoot -StepId "RULE-CLOSURE-05" -TimeoutSeconds 30
 $codeDocs = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-docs-consistency.js") -WorkingDirectory $repoRoot -StepId "DOCS-CONSISTENCY-06" -TimeoutSeconds 30
 $codeReach = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-rule-reachability.js") -WorkingDirectory $repoRoot -StepId "RULE-REACHABILITY-07" -TimeoutSeconds 60
-if ($code -ne 0 -or $codeClosure -ne 0 -or $codeDocs -ne 0 -or $codeReach -ne 0) {
+$codeSource = Invoke-GateStep -FilePath $nodeCmd -ArgumentList @("scripts/common/validate-rule-source-consistency.js") -WorkingDirectory $repoRoot -StepId "RULE-SOURCE-37" -TimeoutSeconds 30
+if ($code -ne 0 -or $codeClosure -ne 0 -or $codeDocs -ne 0 -or $codeReach -ne 0 -or $codeSource -ne 0) {
     $failed = $true
 }
 
@@ -341,7 +342,7 @@ if ($runFg) {
             $failed = $true
 }
     } else {
-        $code = Invoke-GateStep -FilePath $cargoCmd -ArgumentList @("test", "--manifest-path", "fractal-git/Cargo.toml") -WorkingDirectory $repoRoot -StepId "RUST-TAXIS-19" -TimeoutSeconds 120
+        $code = Invoke-GateStep -FilePath $cargoCmd -ArgumentList @("test", "--workspace", "--manifest-path", "fractal-git/Cargo.toml") -WorkingDirectory $repoRoot -StepId "RUST-TAXIS-19" -TimeoutSeconds 120
         if ($code -ne 0) {
             $failed = $true
 }

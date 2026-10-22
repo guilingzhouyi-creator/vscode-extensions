@@ -38,6 +38,7 @@ const MODULE_GIT_ENV = './git-env';
 const MODULE_STYLE = './validate-commit-msg-style';
 const MODULE_LOG_ROTATOR = './log-rotator';
 const MODULE_DEBT_CORRIDOR = './tech-debt-corridor';
+const MODULE_STRUCTURE = './commit-structure-contract';
 
 const FILE_COMMIT_HISTORY_BASELINE = 'commit-history-baseline.json';
 
@@ -80,6 +81,7 @@ const {
   formatDiagnosticReport,
   runSelfTest: runStyleSelfTest,
 } = require(MODULE_STYLE);
+const { verifyStructure } = require(MODULE_STRUCTURE);
 
 const CATALOG_FILE = path.join(__dirname, FILE_RULE_CATALOG);
 const TERMS_FILE = path.join(__dirname, FILE_FORBIDDEN_TERMS);
@@ -179,17 +181,27 @@ function validateBatchCodename(content) {
 function validateSingleCommitMessage(content, options = {}) {
   const hallucinatedRules = validateRuleAntiHallucination(content);
   const batchFindings = validateBatchCodename(content);
+  const structureFindings = verifyStructure(content, options);
   const styleResult = validateStyleAndTone(content, options);
   const styleFindings = [...batchFindings, ...styleResult.findings];
   const hasCriticalBatch = batchFindings.length > 0;
+  // A structural violation is never elastic: an unknown commit type or a missing project block is
+  // not a wording problem the corridor can absorb. Before this check existed here, `--range` on
+  // push verified only rule truth and forbidden terms, so a commit with no project block or a
+  // malformed header passed the pre-push gate whenever the hook had not run.
+  const hasStructural = structureFindings.length > 0;
   const isPermittedUnderCorridor =
-    !hasCriticalBatch && hallucinatedRules.length === 0 && Boolean(styleResult.isPermittedUnderCorridor);
+    !hasCriticalBatch &&
+    !hasStructural &&
+    hallucinatedRules.length === 0 &&
+    Boolean(styleResult.isPermittedUnderCorridor);
 
   return {
-    valid: hallucinatedRules.length === 0 && !hasCriticalBatch && styleResult.valid,
+    valid: hallucinatedRules.length === 0 && !hasCriticalBatch && !hasStructural && styleResult.valid,
     isPermittedUnderCorridor,
     hallucinatedRules,
     batchFindings,
+    structureFindings,
     styleFindings,
     guardrail: styleResult.guardrail,
     debtVerdict: styleResult.debtVerdict,
@@ -297,6 +309,19 @@ function buildCommitMsgViolations(res, target) {
       expected: EXPECTED_SSOT_RULE,
       message: `提交信息中提及未在单源注册表中登记的虚构/漂移规则 ID: ${h}`,
       actionableFix: FIX_SSOT_RULE,
+      verificationCommand: `node scripts/common/validate-commit-msg.js ${verificationTarget}`,
+    });
+  }
+
+  for (const s of res.structureFindings || []) {
+    violations.push({
+      ruleId: s.ruleId,
+      severity: SEVERITY_BLOCK,
+      step: s.step,
+      actual: s.message,
+      expected: s.detail,
+      message: `[${s.step}] ${s.message}`,
+      actionableFix: s.detail,
       verificationCommand: `node scripts/common/validate-commit-msg.js ${verificationTarget}`,
     });
   }
@@ -530,9 +555,58 @@ function handleSingleCommitValidation(target, content, isAgentMode) {
   process.exit(0);
 }
 
+/**
+ * Runs only the structural contract and reports it in the agent envelope.
+ *
+ * Kept separate from `handleSingleCommitValidation` because the caller is a shell script that has
+ * already announced the nine step banners: this mode must answer "did the structure hold" without
+ * touching the ledger, the corridor, or the style dictionary.
+ *
+ * @param {string[]} args - Full argument vector.
+ * @param {boolean} isAgentMode - Whether to emit the structured envelope.
+ * @returns {void}
+ */
+function handleStructureOnlyMode(args, isAgentMode) {
+  const target = args.find((a) => !a.startsWith('-') || a === STDIN_TOKEN);
+  const content = readCommitContent(target);
+  if (content === null) {
+    console.error('✖ BLOCK 提交信息文件不存在或未提供');
+    process.exit(1);
+  }
+  const findings = verifyStructure(content);
+  const passed = findings.length === 0;
+  if (isAgentMode) {
+    console.log(
+      JSON.stringify(
+        {
+          protocolVersion: PROTOCOL_VERSION,
+          status: passed ? STATUS_PASS : STATUS_BLOCK,
+          gate: 'commit-msg:structure',
+          findings,
+          summary: passed ? 'Structural contract satisfied.' : `${findings.length} structural violation(s).`,
+        },
+        null,
+        2,
+      ),
+    );
+  } else if (!passed) {
+    console.error('✖ BLOCK 提交信息结构契约未通过:');
+    for (const f of findings) console.error(`  • [${f.step}] ${f.message} — ${f.detail}`);
+  }
+  process.exit(passed ? 0 : 1);
+}
+
 function main() {
   const args = process.argv.slice(2);
   const isAgentMode = args.includes(ARG_AGENT) || args.includes(ARG_AGENT_SHORT) || args.includes(ARG_JSON);
+
+  // The shell entry points delegate their seven structural checks here. `--structure-only` keeps the
+  // delegation narrow: the shell has already rendered its step banners, and re-running the style
+  // dictionary would report the same finding twice under two different step ids.
+  if (args.includes('--structure-only')) {
+    handleStructureOnlyMode(args, isAgentMode);
+    return;
+  }
 
   if (args.includes(ARG_TEST)) {
     runStyleSelfTest();

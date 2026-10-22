@@ -254,6 +254,7 @@ elif ! run_gate_step 30 "RULE-CLOSURE-05" "$ROOT_DIR" "$NODE_BIN" scripts/common
 elif ! run_gate_step 30 "DOCS-CONSISTENCY-06" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-docs-consistency.js; then
     FAILED=1
 elif ! run_gate_step 60 "RULE-REACHABILITY-07" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-rule-reachability.js; then
+elif ! run_gate_step 30 "RULE-SOURCE-37" "$ROOT_DIR" "$NODE_BIN" scripts/common/validate-rule-source-consistency.js; then
     FAILED=1
 else
     log_gate "  ✔ 全工作区单源规则目录同步与规则 ID 闭包校验通过"
@@ -360,7 +361,7 @@ if [[ "$RUN_FG" -eq 1 ]]; then
             log_gate "  ✔ fractal-git Rust 工业级门禁通过（格式/静态/分配/回归）"
         fi
     else
-        if ! run_gate_step 120 "RUST-TAXIS-19" "$ROOT_DIR" "$CARGO_BIN" test --manifest-path fractal-git/Cargo.toml; then
+        if ! run_gate_step 120 "RUST-TAXIS-19" "$ROOT_DIR" "$CARGO_BIN" test --workspace --manifest-path fractal-git/Cargo.toml; then
             FAILED=1
         else
             log_gate "  ✔ fractal-git 9大微 Crate 回归测试套件通过（未检测到 gate-rust.sh，仅执行 cargo test）"

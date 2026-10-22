@@ -143,7 +143,8 @@ cases.push({ name: 'block chain guard is clean on the shipped corpus', args: ['s
   cases.push({ name: 'step registry audit is clean', args: ['scripts/common/gate-step-registry.js', '--audit'], expect: 0 });
   cases.push({ name: 'doc metrics renderer matches its sources', args: ['scripts/common/sync-doc-metrics.js'], expect: 0 });
   cases.push({ name: 'docs consistency guard is clean on the shipped corpus', args: ['scripts/common/validate-docs-consistency.js'], expect: 0 });
-  cases.push({ name: 'guard self-proof harness passes', args: ['scripts/common/test-gate-guards.js'], expect: 0 });
+  cases.push({ name: 'rule source consistency is clean', args: ['scripts/common/validate-rule-source-consistency.js'], expect: 0 });
+cases.push({ name: 'guard self-proof harness passes', args: ['scripts/common/test-gate-guards.js'], expect: 0 });
 
   return cases;
 }

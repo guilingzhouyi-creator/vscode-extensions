@@ -127,12 +127,12 @@
         {
           "id": "RULE-TRUTH-08",
           "title": "规则标识反虚构",
-          "ruleId": "CMG-STY-002"
+          "ruleId": "GUARD-SSOT-001"
         },
         {
           "id": "TEXT-TRUTH-09",
           "title": "提交文本求真务实与禁词",
-          "ruleId": "CMG-STY-002"
+          "ruleId": "CMG-STY-001"
         }
       ]
     },
@@ -206,7 +206,7 @@
         {
           "id": "ENGINE-BASELINE-13",
           "title": "auto-refactor 质量基线",
-          "ruleId": "GUARD-BUDGET-001"
+          "ruleId": "GUARD-BASE-001"
         },
         {
           "id": "EXTENSION-TESTS-14",
@@ -322,6 +322,11 @@
           "id": "COMMIT-HISTORY-BASELINE-36",
           "title": "提交历史冻结清单合规",
           "ruleId": "GUARD-MSG-002"
+        },
+        {
+          "id": "RULE-SOURCE-37",
+          "title": "规则源跨目录严重级一致性",
+          "ruleId": "RCFG-RULE-DRIFT"
         }
       ]
     },

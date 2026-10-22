@@ -223,4 +223,22 @@ function main() {
   return 0;
 }
 
-process.exit(main());
+/**
+ * Command line entry point.
+ *
+ * Guarded by `require.main` rather than run unconditionally: this module is `require`d by
+ * `test-gate-guards.js`, and an unconditional `process.exit` there terminated the test harness
+ * mid-run, so every assertion registered after the import silently never executed. A test file
+ * that stops early still exits 0, which reads as a pass.
+ *
+ * @returns {void}
+ */
+function runCli() {
+  process.exit(main());
+}
+
+if (require.main === module) {
+  runCli();
+}
+
+module.exports = Object.freeze({ main, runCli, auditBindingTable, auditResolutionPaths, auditAgentsDocument, probeRuntimeMode });

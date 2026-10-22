@@ -222,6 +222,13 @@
       "title": "项目归属格式区与合法枚举校验",
       "patterns": [],
       "asciiPatterns": [],
+      "controlledProjects": [
+        "workspace-timing",
+        "auto-refactor",
+        "WebGames",
+        "fractal-git",
+        "governance"
+      ],
       "reason": "提交说明必须明确项目归属元数据，杜绝项目归属缺失或捏造不存在的项目标识。",
       "guidance": "请在正文第一区块添加 [Project / 项目归属]，并填入合法项目标识（workspace-timing | auto-refactor | WebGames | governance）。"
     },

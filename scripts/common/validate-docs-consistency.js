@@ -15,6 +15,9 @@
  *   6. Cover figures written without the word 规则 after them (table cells, parentheses and
  *      Latin-qualified prose) whenever the same line talks about rules or analyzers, and read the
  *      `.agents/subagents/**` JSON corpus so subagent presets cannot quote retired totals.
+ *   7. Cover the three claim shapes that carry no 条 at all — a coverage ratio (`362/362`), a
+ *      per-project decomposition (`autoRefactor: 362`) and a canonical/legacy split (`347 规范`) —
+ *      because a figure that never sits beside 条 was invisible to every detector above.
  * Exit Semantics & Design Rationale: 0 = documents quote only live figures and reference only
  *   existing scripts, 1 = drift detected. The previous implementation matched a fixed blacklist of
  *   historical numbers (428/464/468/470), which is exactly the failure mode it was meant to prevent:
@@ -126,6 +129,44 @@ const BARE_RULE_FIGURE = /(\d{2,4})\s*条(?!\s*(?:组|个|项|类|种|套))(?![\
 
 /** A line that is talking about rules or analyzers, so an unqualified 条 figure is a rule total. */
 const RULE_CONTEXT = /(规则|分析器|rule)/i;
+
+/**
+ * A coverage ratio such as `362/362` or `**363 / 363 (100%)**`.
+ *
+ * The ratio is the shape that survived longest: a rule total restated as "how many rules have a
+ * definition line" never puts 条 beside the number, so every detector above skipped it. Two retired
+ * totals (`362/362` in four documents) lived through several audit rounds for exactly that reason.
+ *
+ * Only an equal pair is judged. `362/363` is a status claim about a known gap ("one rule still has
+ * no definition line"), which is a correct sentence that no catalog total can confirm or refute;
+ * demanding it equal a live figure would force the author to delete the very defect they reported.
+ */
+const RULE_RATIO = /(?<![0-9])(\d{2,4})\s*\/\s*(\d{2,4})(?![0-9])/g;
+
+/**
+ * A per-project decomposition such as `autoRefactor: 362, webGames: 50`.
+ *
+ * Also invisible to the 条 detectors: the figure is separated from its project name by a colon and
+ * the sentence as a whole talks about the catalog, so no local anchor marks it as a rule count. The
+ * expected value is that project's own catalog count, not the workspace total.
+ */
+const PROJECT_DECOMPOSITION = /(autoRefactor|workspaceTiming|webGames|globalTooling|fractalGit)\s*[:：]\s*(\d{2,4})/g;
+
+/**
+ * A canonical/legacy split such as `347 规范 + 15 历史别名`.
+ *
+ * The word after the figure is 规范 or 别名, not 条, so the 条 detectors never see it. The left
+ * boundary refuses a figure that ends a rule id or an edition tag (`ADV-RNG-001 规范`, `P71 规范`),
+ * which would otherwise be read as a rule total; the lookahead refuses 规范化 for the same reason.
+ */
+const RULE_SPLIT = /(?<![0-9A-Za-z\-条])(\d{2,4})\s*(?:规范(?!化)|(?:历史)?别名)/g;
+
+/**
+ * Figures after which a group counter turns the claim into a count of containers.
+ *
+ * `163/163 套测试` and `30 个分析器` both contain a rule figure by pattern and neither is one.
+ */
+const GROUP_COUNTER_FOLLOWS = /^\s*(?:组|个|项|类|种|套)/;
 
 /** A rule-family prefix such as `ARCH-` or `FAMILY-TOPIC-NNN`, which only appears in rule prose. */
 const RULE_PREFIX = /\b[A-Z]{2,7}-/;
@@ -431,6 +472,26 @@ function detectorTable(figures) {
       legal: legalRules,
       contextTest: isRuleCountContext,
     },
+    {
+      id: 'rule-ratio',
+      pattern: RULE_RATIO,
+      numberGroups: [1, 2],
+      legal: legalRules,
+      contextTest: isRuleCountContext,
+      pairJudge: judgeRatioPair,
+    },
+    {
+      id: 'project-decomposition',
+      pattern: PROJECT_DECOMPOSITION,
+      numberGroup: 2,
+      legalFor: (match) => singleValue(byProject.get(PROJECT_ALIASES[match[1]] ?? match[1])),
+    },
+    {
+      id: 'rule-split',
+      pattern: RULE_SPLIT,
+      legal: legalRules,
+      contextTest: isRuleCountContext,
+    },
     { id: 'skill-count', pattern: /(\d{1,3})\s*项(?:研发)?技能/g, legal: legalSkills },
     { id: 'step-count', pattern: /(\d{1,3})\s*个语义步骤/g, legal: legalSteps },
     { id: 'iso-pairs', pattern: /(\d{1,3})\s*对(?:跨平台)?同构脚本/g, legal: legalPairs },
@@ -623,6 +684,62 @@ function scanTextForClaims(text, detectors) {
 }
 
 /**
+ * Extracts the figure one match asserts.
+ *
+ * Most detectors assert a single number. A coverage ratio asserts a pair, and reporting both
+ * endpoints of `362/362` would file the same sentence twice; the ratio therefore reports one
+ * representative figure — the first endpoint the catalog does not produce, or the first endpoint
+ * when both are live, which the caller then accepts.
+ *
+ * @param {object} detector - Claim detector.
+ * @param {RegExpExecArray} match - Current match.
+ * @param {Set<number>} legal - Legal figures for this match.
+ * @returns {number} Figure to judge.
+ */
+function claimedFigure(detector, match, legal) {
+  if (!detector.numberGroups) return Number(detector.numberGroup ? match[detector.numberGroup] : match[1]);
+  const figures = detector.numberGroups.map((group) => Number(match[group]));
+  return figures.find((value) => !legal.has(value)) ?? figures[0];
+}
+
+/**
+ * Extracts the figures one match asserts.
+ *
+ * Most detectors assert a single number. A coverage ratio asserts a pair, and both endpoints are
+ * returned so the caller can decide which of them to report.
+ *
+ * @param {object} detector - Claim detector.
+ * @param {RegExpExecArray} match - Current match.
+ * @returns {number[]} Asserted figures.
+ */
+function assertedFigures(detector, match) {
+  if (detector.numberGroups) return detector.numberGroups.map((group) => Number(match[group]));
+  return [Number(detector.numberGroup ? match[detector.numberGroup] : match[1])];
+}
+
+/**
+ * Judges a coverage ratio, returning the figure to report or null to accept the pair.
+ *
+ * An unequal pair is a status claim about a known gap ("one rule still has no definition line"),
+ * which no catalog total can confirm or refute; demanding it equal a live figure would force the
+ * author to delete the very defect they reported. A pair followed by a group counter counts
+ * containers (`163/163 套测试`), not rules. Otherwise the pair must equal a live figure, and the
+ * first endpoint that does not is reported — reporting both would file one sentence twice.
+ *
+ * @param {object} detector - Claim detector (unused; kept for a uniform signature).
+ * @param {RegExpExecArray} match - Current match.
+ * @param {Set<number>} legal - Legal figures for this match.
+ * @param {string} line - Document line, for the trailing-counter test.
+ * @returns {number|null} Figure to report, or null when the pair is acceptable.
+ */
+function judgeRatioPair(detector, match, legal, line) {
+  const figures = assertedFigures(detector, match);
+  if (figures[0] !== figures[1]) return null;
+  if (GROUP_COUNTER_FOLLOWS.test(line.slice(match.index + match[0].length))) return null;
+  return figures.find((value) => !legal.has(value)) ?? null;
+}
+
+/**
  * Collects every figure one detector recognises on one line, with the set it was judged against.
  *
  * Returning the legal set alongside the figure — rather than filtering here — is what lets the
@@ -638,12 +755,16 @@ function matchClaims(detector, line, index) {
   detector.pattern.lastIndex = 0;
   let match;
   while ((match = detector.pattern.exec(line)) !== null) {
-    const claimed = Number(detector.numberGroup ? match[detector.numberGroup] : match[1]);
     const legal = legalSetFor(detector, match);
     if (legal.size === 0) continue;
     if (detector.counterGroup && match[detector.counterGroup]) continue;
     if (detector.qualifierGroup && isCategoryClaim(match[detector.qualifierGroup])) continue;
     if (isRangeMember(line, match.index)) continue;
+    if (detector.skipMatch && detector.skipMatch(line, match)) continue;
+    const claimed = detector.pairJudge
+      ? detector.pairJudge(detector, match, legal, line)
+      : claimedFigure(detector, match, legal);
+    if (claimed === null) continue;
     claims.push({ line: index + 1, claim: detector.id, claimed, legal: [...legal].sort((a, b) => a - b) });
   }
   return claims;

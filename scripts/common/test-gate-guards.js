@@ -398,6 +398,42 @@ check(
   DOCS_CONSISTENCY.scanTextForClaims('这一套方案覆盖 3 个阶段。', claimDetectors).length === 0,
 );
 
+// 三种形态曾同时逃过全部既有探测器：覆盖率比值、按项目分解、规范/别名拆分。它们都不把
+// 「条」写在数字旁边，因此旧正则连匹配都匹配不到，PASS 只证明守卫没看懂这些写法。
+const liveAutoRefactor = JSON.parse(
+  fs.readFileSync(path.join(__dirname, 'rule-catalog.json'), 'utf8'),
+).counts.autoRefactor;
+check(
+  'docs consistency guard reads a coverage ratio',
+  DOCS_CONSISTENCY.scanTextForClaims('| 规则字典覆盖率 | **362 / 362 (100%)** |', claimDetectors).length === 1 &&
+    DOCS_CONSISTENCY.scanTextForClaims(
+      `| 规则字典覆盖率 | **${liveAutoRefactor} / ${liveAutoRefactor} (100%)** |`,
+      claimDetectors,
+    ).length === 0,
+);
+check(
+  'docs consistency guard treats an unequal ratio as a gap report',
+  DOCS_CONSISTENCY.scanTextForClaims('规则定义行覆盖率 362/363，尚有一条待补。', claimDetectors).length === 0,
+);
+check(
+  'docs consistency guard reads a per-project decomposition',
+  DOCS_CONSISTENCY.scanTextForClaims('收录规则 (autoRefactor: 362, webGames: 50)', claimDetectors).length === 1 &&
+    DOCS_CONSISTENCY.scanTextForClaims(
+      `收录规则 (autoRefactor: ${liveAutoRefactor}, webGames: 50)`,
+      claimDetectors,
+    ).length === 0,
+);
+check(
+  'docs consistency guard reads a canonical/legacy split',
+  DOCS_CONSISTENCY.scanTextForClaims('全量规则字典 (347 规范 + 15 历史别名)', claimDetectors).length === 1 &&
+    DOCS_CONSISTENCY.scanTextForClaims('全量规则字典 (348 规范 + 15 历史别名)', claimDetectors).length === 0,
+);
+check(
+  'docs consistency guard leaves a rule-id suffix and a test ratio alone',
+  DOCS_CONSISTENCY.scanTextForClaims('对齐 `ADV-RNG-001` 规范后重跑规则自测', claimDetectors).length === 0 &&
+    DOCS_CONSISTENCY.scanTextForClaims('规则自测全通过 (163/163 套测试)', claimDetectors).length === 0,
+);
+
 // --- 锚点 / 可达性 / 族契约 / 提交历史冻结 / SubAgent 目录 ---
 const ANCHORS = require('./validate-doc-anchors');
 const REACHABILITY = require('./validate-doc-reachability');
@@ -419,6 +455,31 @@ check('doc reachability guard self-probes all match', REACHABILITY.runSelfProbes
 check('family contract guard self-probes all match', FAMILY.runSelfProbes().length === 0);
 check('commit history guard self-probes all match', HISTORY.runSelfProbes().length === 0);
 check('subagent catalog guard self-probes all match', SUBAGENT.runSelfProbes().length === 0);
+
+// --- 结构契约（七项检查的单一实现，双 shell 均委托此处）---
+const STRUCTURE = require('./commit-structure-contract');
+check(
+  'commit structure contract self-probes all match',
+  STRUCTURE.runSelfProbes().length === 0,
+  STRUCTURE.runSelfProbes().join('; '),
+);
+check(
+  'commit structure contract accepts a chinese scope',
+  STRUCTURE.verifyStructure(
+    'fix(门禁): 修复空指针分支的判定顺序\n\n[Project / 项目归属]\n- governance\n\n[Why / 动机背景]\n- 现有判定在空指针分支上缺少保护，构造边界输入时会抛出异常并中断门禁流程。\n\n[Fixed / 修复缺陷]\n- 修复空指针分支缺少保护导致异常穿透到调用方的缺陷，根因是判定顺序先解引用后判空。\n\n[Verification / 验证结论]\n- 以空输入复核，门禁给出结构化阻断而非异常中断。\n',
+  ).length === 0,
+);
+check(
+  'commit structure contract rejects an unknown type',
+  STRUCTURE.verifyStructure('update(gate): 修复空指针分支的判定顺序\n\n[Project / 项目归属]\n- governance\n').some(
+    (f) => f.step === 'HEADER-FORM-01',
+  ),
+);
+check(
+  'commit structure contract reads the controlled project list from the dictionary',
+  STRUCTURE.controlledProjects().includes('governance') &&
+    STRUCTURE.controlledProjects().includes('fractal-git'),
+);
 
 // --- 门面承载（auto-refactor 项目内守卫，无 runSelfProbes 导出，按其纯函数驱动）---
 const FACADE_DIST = path.join(__dirname, '../../auto-refactor/dist/core/architecture/facade-governance-evaluator.js');
@@ -447,6 +508,64 @@ const SHELL_PARITY = require('./validate-shell-parity');
 check(
   'shell parity guard exposes a command registry',
   typeof SHELL_PARITY === 'object' && SHELL_PARITY !== null,
+);
+
+// --- 变异覆盖：文档里每个规则数字改坏后必须被拦下 ---
+// 「干净语料退出 0」无法区分「守卫在检测」与「守卫从不触发」。这里把仓库内每处规则数字
+// 逐一替换成退役值，再问真实探测器是否捕获；捕获不到的站点就是未被看守的存量债。
+// 真源文件（rule-catalog.json 与 rule-sources/*）不参与：改动它们改变的是「活真值」本身。
+const MUTATION_TARGETS = ['503', '363', '348', '15', '17', '24', '49', '50'];
+const RETIRED_FIGURE = '428';
+const unguardedSites = [];
+let mutatedSites = 0;
+
+check(
+  'docs consistency guard catches every rule figure in the governance corpus after mutation',
+  (() => {
+    const root = path.join(__dirname, '../..');
+    const skip = new Set(['node_modules', '.git', 'out', 'dist', 'bin', 'obj', 'target', '.venv', '.audit-logs', 'archive']);
+    const files = [];
+    const walk = (dir) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        if (skip.has(entry.name)) continue;
+        const full = path.join(dir, entry.name);
+        const rel = path.relative(root, full).replace(/\\/g, '/');
+        if (entry.isDirectory()) {
+          if (rel === 'WebGames/docs' || rel === '.agents/plugins') continue;
+          walk(full);
+        } else if (entry.name.endsWith('.md')) {
+          files.push(full);
+        }
+      }
+    };
+    walk(root);
+    const region = /<!--\s*METRICS:BEGIN\s+[a-z0-9-]+\s*-->[\s\S]*?<!--\s*METRICS:END\s+[a-z0-9-]+\s*-->/g;
+    for (const file of files) {
+      const rel = path.relative(root, file).replace(/\\/g, '/');
+      const blanked = fs.readFileSync(file, 'utf8').replace(region, (m) => m.replace(/[^\n]/g, ' '));
+      blanked.split(/\r?\n/).forEach((line, index) => {
+        if (!/规则|分析器|rule|SSOT/i.test(line)) return;
+        const ratioMutated = line.replace(/(?<![0-9])(\d{2,4})\s*\/\s*\1(?![0-9])/g, `${RETIRED_FIGURE} / ${RETIRED_FIGURE}`);
+        if (ratioMutated !== line) {
+          mutatedSites += 1;
+          if (DOCS_CONSISTENCY.scanTextForClaims(ratioMutated, claimDetectors).length === 0) {
+            unguardedSites.push(`${rel}:${index + 1} ratio`);
+          }
+          return;
+        }
+        for (const match of line.matchAll(/(?<![0-9.])(\d{2,4})(?![0-9])/g)) {
+          if (!MUTATION_TARGETS.includes(match[1])) continue;
+          mutatedSites += 1;
+          const mutated = `${line.slice(0, match.index)}${RETIRED_FIGURE}${line.slice(match.index + match[0].length)}`;
+          if (DOCS_CONSISTENCY.scanTextForClaims(mutated, claimDetectors).length === 0) {
+            unguardedSites.push(`${rel}:${index + 1} ${match[1]}`);
+          }
+        }
+      });
+    }
+    return unguardedSites.length === 0;
+  })(),
+  `${mutatedSites} site(s) mutated, unguarded: ${unguardedSites.slice(0, 6).join(', ') || 'none'}`,
 );
 
 const failures = results.filter((r) => !r.ok).length;if (failures > 0) {
