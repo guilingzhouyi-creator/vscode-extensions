@@ -361,8 +361,13 @@ if (args.flags.agent === true) {
 
 if (!args.json && args.flags.agent !== true) {
   process.stderr.write('\n===== 审查摘要 =====\n');
-  for (const r of results) process.stderr.write(`${r.status === STATUS.PASS ? '✅' : (r.status === STATUS.FAIL ? '❌' : '⚠️ ')} ${r.id.padEnd(20)} ${r.status.padEnd(14)} findings=${r.findings.length}\n`);
-  process.stderr.write(`-----\n【门禁结论】${verdictStr}${gateFailures.length ? `（阻断来源: ${gateFailures.join(', ')}）` : ''}\n`);
+  // 呈现层投影：协议层状态词保留六态闭包（PASS/FAIL/SKIP/NOT_AVAILABLE/CONFIG_ERROR/TIMEOUT），
+  // 但通过态不再重复打印大写词 —— 勾号已完整表达结论，重复枚举只会淹没真正的异常行。
+  // 非通过态照常写出状态词：读者必须能一眼定位是哪一层没有通过。
+  const statusColumn = (status: CheckerStatus): string => (status === STATUS.PASS ? '✔ 通过' : status);
+  for (const r of results) process.stderr.write(`${r.status === STATUS.PASS ? '✔' : (r.status === STATUS.FAIL ? '✖' : '⚠️ ')} ${r.id.padEnd(20)} ${statusColumn(r.status).padEnd(14)} findings=${r.findings.length}\n`);
+  const verdictLabel = verdictStr === 'PASS' ? '✔ 通过' : `✖ BLOCK`;
+  process.stderr.write(`-----\n【门禁结论】${verdictLabel}${gateFailures.length ? `（阻断来源: ${gateFailures.join(', ')}）` : ''}\n`);
 }
 
 process.exit(exitCode);
