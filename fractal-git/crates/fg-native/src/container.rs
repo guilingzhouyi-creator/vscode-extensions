@@ -21,11 +21,11 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use crate::checksum::crc32c;
 use crate::constants::{
     FLAG_READ_ONLY, HEADER_LEN, MAX_SECTION_COUNT, MIN_CONTAINER_LEN, SECTION_ALIGNMENT,
     SECTION_ENTRY_LEN, TAXC_FORMAT_VERSION, TAXC_MAGIC, TAXC_MAGIC_WORD, TRAILER_LEN,
 };
-use crate::checksum::crc32c;
 use crate::error::{NativeError, NativeResult};
 use crate::section_tag::SectionTag;
 

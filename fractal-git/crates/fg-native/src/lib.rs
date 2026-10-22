@@ -11,10 +11,10 @@
 //!     so this crate can be tested and evolved without any git semantics in scope.
 //!   - Every fallible entry point returns a strongly-typed NativeError; no production path panics.
 
+pub mod checksum;
 pub mod codec;
 pub mod constants;
 pub mod container;
-pub mod checksum;
 pub mod document;
 pub mod error;
 pub mod junction;
@@ -26,6 +26,7 @@ pub mod sections;
 #[cfg(test)]
 pub mod test_support;
 
+pub use checksum::{crc32c, Crc32cHasher};
 pub use codec::{FieldReader, FieldWriter};
 pub use constants::{
     CONTAINER_FILE_NAME, DEFAULT_BRANCH_REF, FLAG_READ_ONLY, GUARD_FILE_CONTENT, GUARD_FILE_NAME,
@@ -34,7 +35,6 @@ pub use constants::{
     TAXC_MAGIC, TAXC_MAGIC_WORD, TRAILER_LEN,
 };
 pub use container::{ContainerBuilder, ContainerHeader, ContainerView, SectionEntry};
-pub use checksum::{crc32c, Crc32cHasher};
 pub use document::RepoDocument;
 pub use error::{NativeError, NativeResult};
 pub use junction::create_junction;

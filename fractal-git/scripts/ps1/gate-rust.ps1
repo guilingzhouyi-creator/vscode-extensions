@@ -26,6 +26,14 @@ Write-Host "=================================================================" -
 Write-Host "  Fractal Git Rust Industrial Quality Gate (PowerShell 7+)" -ForegroundColor Cyan
 Write-Host "=================================================================" -ForegroundColor Cyan
 
+$RepoRoot = Split-Path -Parent $ProjectRoot
+$gateRuntime = Join-Path $RepoRoot "scripts/ps1/lib/gate-runtime.ps1"
+if (-not (Test-Path $gateRuntime)) {
+    Write-Warning "BLOCK  gate-runtime.ps1 缺失，无法解析 cargo 路径。"
+    exit 1
+}
+. $gateRuntime
+
 $cargoCmd = Resolve-GateCargoCommand
 if (-not $cargoCmd) {
     # 缺少原生工具链时不得静默放行：未执行审查与审查通过必须可区分 (GUARD-SYS-001)。
