@@ -125,7 +125,7 @@ function runGitParityValidation() {
     process.exit(1);
   }
 
-  console.log('✔ PASS Git plumbing binary codec and sorting invariants are 100% equivalent with standard Git.');
+  console.log('✔  Git plumbing binary codec and sorting invariants are 100% equivalent with standard Git.');
   process.exit(0);
 }
 

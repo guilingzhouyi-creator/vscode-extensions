@@ -21,6 +21,8 @@ const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
 
+const { prepareCargo } = require('./resolve-cargo');
+
 const PROJECT_ROOT = path.resolve(__dirname, '../..');
 const REPO_ROOT = path.resolve(PROJECT_ROOT, '..');
 const REPORTS_DIR = path.join(PROJECT_ROOT, 'reports');
@@ -60,10 +62,29 @@ function runStaticChecker(relativeScript) {
  * @returns {object} Test run outcome metrics including counts and output text.
  */
 function runCargoTests(fastMode) {
-  const cargoCmd = process.platform === 'win32' ? 'cargo.exe' : 'cargo';
+  // Resolve through the shared discovery helper rather than assuming `cargo.exe` is on PATH.
+  // A bare name reported "toolchain missing" on machines whose rustup shim directory was absent
+  // from PATH, which made the audit report `BLOCK` while every static checker had passed — an
+  // outcome that reads as a code defect rather than the environment gap it actually was.
+  const cargoResolution = prepareCargo();
+  if (!cargoResolution) {
+    return {
+      totalTests: 0,
+      passedTests: 0,
+      failedTests: 0,
+      isClean: false,
+      output: 'cargo was not found through TAXIS_CARGO_BIN, ~/.cargo/bin, the rustup toolchain root, or PATH.',
+      unresolved: true,
+    };
+  }
+  const cargoCmd = cargoResolution.command;
+  // `--workspace` is mandatory: without it only the root package is compiled, so the ten
+  // micro-crates' unit tests never enter the audit and the reported test count is a fraction of
+  // the suite. Every other Rust gate was corrected to pass it; this caller was missed, which is
+  // exactly the kind of single-site omission a shared invocation would have prevented.
   const args = fastMode
-    ? ['check', '--manifest-path', MANIFEST_PATH, '--all-targets']
-    : ['test', '--manifest-path', MANIFEST_PATH];
+    ? ['check', '--workspace', '--manifest-path', MANIFEST_PATH, '--all-targets']
+    : ['test', '--workspace', '--manifest-path', MANIFEST_PATH];
 
   const res = spawnSync(cargoCmd, args, {
     cwd: PROJECT_ROOT,
@@ -247,6 +268,14 @@ async function main() {
   const passChecks = staticPassCount + testResult.passedTests;
   const isOverallPass = violations.length === 0 && testResult.isClean;
 
+  // A test run that produced no parsed result contributes zero to both counters, so the summary
+  // could read "Checks=4/4, Status=BLOCK" — arithmetic that looks like a contradiction and sends
+  // the reader hunting for a defect in whichever checker is listed. The gate verdict is right; the
+  // denominator was wrong. An unresolved run is counted as one failed check so the figures and the
+  // verdict agree, and the reason stays visible in the violations list.
+  const recordedTotal = testResult.totalTests > 0 ? totalChecks : totalChecks + 1;
+  const recordedPass = passChecks;
+
   const bayesian = computeBayesianCredibleScore(passChecks, totalChecks);
 
   // Invoke genuine deep AST analysis via auto-refactor
@@ -264,13 +293,15 @@ async function main() {
     schema: 'fractal-git-audit-report/v1',
     project: 'fractal-git',
     generatedAt: new Date().toISOString(),
-    status: isOverallPass ? 'PASS' : 'FAIL',
+    status: isOverallPass ? 'PASS' : 'BLOCK',
     summary: {
-      checks: totalChecks,
+      checks: recordedTotal,
       astScanAvailable: astScan !== null,
       byStatus: {
-        PASS: passChecks,
-        FAIL: totalChecks - passChecks,
+        PASS: recordedPass,
+        // 与顶层 status 同词：门禁终态失败只有 BLOCK 一种，写 FAIL 会让读者以为
+        // 存在第二种失败语义，也让本报告与 audit-all 的快照词表不一致。
+        BLOCK: recordedTotal - recordedPass,
       },
 
       bySeverity: {
@@ -307,7 +338,7 @@ async function main() {
   fs.writeFileSync(REPORT_PATH, JSON.stringify(reportPayload, null, 2) + '\n', 'utf8');
 
   console.log(
-    `[fractal-git audit] Status=${reportPayload.status}, Checks=${passChecks}/${totalChecks}, Composite=${finalCompositeScore}, CAI=${caiLabel}`
+    `[fractal-git audit] Status=${reportPayload.status}, Checks=${recordedPass}/${recordedTotal}, Composite=${finalCompositeScore}, CAI=${caiLabel}`
   );
 
 

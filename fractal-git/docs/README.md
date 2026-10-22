@@ -15,6 +15,7 @@
 | [**`04-lockless-in-memory-engine.md`**](04-lockless-in-memory-engine.md) | **无锁内存虚拟索引与 CAS 原子物化内核** | 剖析消除 `.git/index.lock` 锁争用的内存虚拟树数据结构；递归嵌套 Git Tree 规范排序与二进制构建；LayerVFS CAS 快照到 Git Commit 的微秒级原子物化流水线。 |
 | [**`05-advanced-algorithms-and-poset-mathematics.md`**](05-advanced-algorithms-and-poset-mathematics.md) | **数学体系与算法算子第一性原理演进** | 系统推导并落地偏序集单调保序 Corrected Commit Date (CCD v2, 12ns/77.8M op/s)、范畴论推标（Pushout）直和简并、Kirsch-Mitzenmacher 256-bit 路径 Bloom 过滤（161ns/6.2M op/s）、SWAR 64 位整字并行文本差分与 Elias-Fano 准简洁位向量压缩。 |
 | [**`06-anthropic-scion-benchmark-and-parity-spec.md`**](06-anthropic-scion-benchmark-and-parity-spec.md) | **Anthropic Scion 架构解构与 Taxis 五维基准压测规范** | 复盘 Claude 团队高频代码合并场景与 Scion 三级解耦流式架构；确立 Taxis 正式版本五维基准测试套件（检出延迟、高并发合并、路径 Bloom 剪枝、内存零堆分配与离线弹性）及演进路线。 |
+| [**`07-taxis-construction-progress.md`**](07-taxis-construction-progress.md) | **Taxis 1.0 施工进度实测对齐版** | 以代码与门禁实测替换计划书 §十九 的滞后陈述：批次状态总表、`fg-native` 实际构成、六处设计错误修正证据、`relocate` 实现要点与仍未开始部分。 |
 | [**`ARCHITECTURE.md`**](ARCHITECTURE.md) | **系统架构总览与快速规范查阅手册** | 包含 Mermaid 分形拓扑图、生命周期状态转移矩阵与核心接口速查表。 |
 
 ---

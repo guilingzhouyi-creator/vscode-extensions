@@ -13,10 +13,13 @@
 | **`ps1/gate-rust.ps1`** | Windows (pwsh 7+) | **CRLF** | Rust 规范质量门禁（rustfmt, clippy -D warnings, 零堆分配, 单测） | `pwsh -File scripts/ps1/gate-rust.ps1` |
 | **`sh/build.sh`** | Linux / WSL (bash) | **LF** | 遵循 `set -euo pipefail` 的 Linux 完整构建与测试流水线 | `bash scripts/sh/build.sh` |
 | **`sh/gate-rust.sh`** | Linux / WSL (bash) | **LF** | 遵循 `set -euo pipefail` 的 Linux Rust 规范门禁验证 | `bash scripts/sh/gate-rust.sh` |
-| **`common/validate-crate-topology.js`** | 跨平台 (Node.js) | **LF** | 校验 9 大微 Crate 单向无环依赖 DAG 与层级隔离 (`FGT-DEP-001`) | `node scripts/common/validate-crate-topology.js` |
+| **`common/validate-crate-topology.js`** | 跨平台 (Node.js) | **LF** | 校验 10 大微 Crate 单向无环依赖 DAG 与层级隔离 (`FGT-DEP-001`) | `node scripts/common/validate-crate-topology.js` |
 | **`common/validate-git-parity.js`** | 跨平台 (Node.js) | **LF** | 校验 Git Plumbing 编解码与目录尾斜杠排序的 字节严格等价性 (`FGT-OBJ-001`) | `node scripts/common/validate-git-parity.js` |
 | **`common/validate-gate-bridge.js`** | 跨平台 (Node.js) | **LF** | 校验提交预审区门禁桥的规则 SSOT 闭包与延迟预算 (`FGT-BRG-001`) | `node scripts/common/validate-gate-bridge.js` |
 | **`common/check-zero-alloc-boundary.js`** | 跨平台 (Node.js) | **LF** | 静态扫描 Rust 生产代码循环内的瞬态堆分配与裸 unwrap (`FGT-PRF-001`) | `node scripts/common/check-zero-alloc-boundary.js` |
+| **`common/resolve-cargo.js`** | 跨平台 (Node.js) | **LF** | 工具链单一真源解析：按 显式覆盖 → rustup shim → rustup toolchain 根（稳定版优先）→ PATH 的顺序定位 cargo，解析到裸 toolchain 二进制时同步钉住 `RUSTC`；与 `scripts/ps1/lib/gate-runtime.ps1` 的 `Resolve-GateCargoCommand` 逐条对应，避免两个运行时对「有没有工具链」给出不同答案 | `node scripts/common/resolve-cargo.js`、`validate-perf-baseline`、`run-audit-report` |
+| **`common/validate-perf-baseline.js`** | 跨平台 (Node.js) | **LF** | 微基准耗时棘轮：以 15% 容差包络对照 `baselines/taxis-perf.baseline.json`，经 `resolve-cargo` 调用而非假定 PATH 可用 (`TB-REGRESSION`) | `node scripts/common/validate-perf-baseline.js` |
+| **`common/run-audit-report.js`** | 跨平台 (Node.js) | **LF** | 质量报告聚合：静态检查 + `cargo test --workspace` 全量回归 + auto-refactor AST 深扫，产出 `reports/audit-latest.json`；未产出解析结果的测试运行计入失败位，使「检查数」与「终态判定」不相矛盾 | `node scripts/common/run-audit-report.js` |
 
 > **关于根级 `scripts/build.{ps1,sh}`**：该目录下不提供门面调度跳板。此前的跳板有效代码不足 3 行，仅做参数透传，同时违反 `EXT-DIR-001`（`.ps1` 应归 `ps1/`、`.sh` 应归 `sh/`）与 `ARCH-ABS-001`（单行透传跳板消融），也不满足 `ARCH-FAC-001` 的 $\text{ELOC} \ge 15$ 实质承载门限。请直接调用语言域内的脚本：
 > - Windows: `pwsh -File scripts/ps1/build.ps1`

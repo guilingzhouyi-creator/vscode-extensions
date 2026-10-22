@@ -128,7 +128,7 @@ function concludeValidation(violations) {
     }
     process.exit(1);
   }
-  console.log('✔ PASS Gate bridge verification logic is 100% compliant with SSOT rule registry and latency budget.');
+  console.log('✔  Gate bridge verification logic is 100% compliant with SSOT rule registry and latency budget.');
   process.exit(0);
 }
 

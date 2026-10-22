@@ -32,6 +32,7 @@ const CRATE_LAYERS = Object.freeze({
   'fg-index': 1,
   'fg-algorithms': 1,
   'fg-pools': 2,
+  'fg-native': 2,
   'fg-storage': 2,
   'fg-topology': 3,
   'fg-gate': 3,
@@ -47,8 +48,9 @@ const ALLOWED_INTERNAL_DEPS = Object.freeze({
   'fg-index': new Set(['fg-core', 'fg-object']),
   'fg-algorithms': new Set(['fg-core', 'fg-object']),
   'fg-pools': new Set(['fg-core', 'fg-object']),
-  'fg-storage': new Set(['fg-core', 'fg-object', 'fg-index', 'fg-algorithms', 'fg-pools']),
-  'fg-topology': new Set(['fg-core']),
+  'fg-native': new Set(['fg-core']),
+  'fg-storage': new Set(['fg-core', 'fg-object', 'fg-index', 'fg-algorithms', 'fg-pools', 'fg-native']),
+  'fg-topology': new Set(['fg-core', 'fg-native']),
   'fg-gate': new Set(['fg-core', 'fg-object', 'fg-topology']),
   'fg-transport': new Set(['fg-core', 'fg-object', 'fg-topology']),
 });
@@ -156,7 +158,7 @@ function runTopologyValidation() {
     process.exit(1);
   }
 
-  console.log('✔ PASS Micro-crate unidirectional DAG layering is 100% compliant with DIRECTORY_SPEC.md.');
+  console.log('✔  Micro-crate unidirectional DAG layering is 100% compliant with DIRECTORY_SPEC.md.');
   process.exit(0);
 }
 

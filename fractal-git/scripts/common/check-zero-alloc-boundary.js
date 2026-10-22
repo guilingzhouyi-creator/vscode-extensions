@@ -274,7 +274,7 @@ function runZeroAllocBoundaryCheck() {
     process.exit(1);
   }
 
-  console.log('✔ PASS All micro-crates satisfy zero-alloc, safety, doc, and naming contracts.');
+  console.log('✔  All micro-crates satisfy zero-alloc, safety, doc, and naming contracts.');
   process.exit(0);
 }
 

@@ -15,15 +15,16 @@
 | **`crates/fg-index/`** | 索引区与无锁虚拟树 | 消除 `.git/index.lock` 锁争用的无锁内存索引（`InMemoryIndexTree`）、规范四阶段冲突槽（`Stage 0..3`、`ConflictStageSlot`）与目录树生成回调。 | `fg-core`, `fg-object` | 严禁依赖底层物理 I/O、网络传输或业务调度 |
 | **`crates/fg-algorithms/`** | 纯算法与数学算子库 | 对标 `git/xdiff`：FastCDC 变长分块滚动哈希、三方合并（`ThreeWayMerge`，快进检测与冲突判定）、内存树差分（`TreeDiff`）、Unified Diff 补丁生成（`PatchGenerator`）、DAG 拓扑排序与祖先可达性剪枝（`DagWalker`）。 | `fg-core`, `sha1` | 严禁包含物理文件读写或业务状态 |
 | **`crates/fg-pools/`** | 资源池与分配管控 | 纯粹践行 `ADV-PRF-002` 循环内零堆分配：树节点与 AST 对象复用池（`RecyclePool`）、64KB 压缩页面缓冲池（`PageBufferPool`）、预热虚拟工作区沙箱槽位池（`SandboxPool`, `WorktreePool`）。 | `fg-core`, `fg-object`, `parking_lot` | 严禁侵入策略守卫、业务调度或传输协议 |
+| **`crates/fg-native/`** | Taxis 原生二进制真身 | TAXC 分节容器（Header / Section Table / CRC32C / 8 字节对齐）、七类原生节（`META`/`HEAD`/`REFS`/`INDX`/`OPLG`/`PROM`/`WKTR`）、仓库布局（`RepoLayout`、守卫文件、隐藏属性）、Windows junction 与仓库标识（`repo_id` / store 路径）。**不持有任何 git 格式知识**，可脱离兼容投影独立验证。 | `fg-core`, `sha1`, `getrandom` | 严禁依赖对象编解码、传输协议或 CLI 交互 |
 | **`crates/fg-storage/`** | 真实不可变存储底座 | 松散对象存储（`LooseOdb` 原子写入 `.git/objects/`）、不可变 CAS 块后端（`CasBackend`）、崩溃安全事务预写日志（`WalJournal`）、LayerVFS 快照向 Git 对象的原子物化器（`CasToGitMaterializer`）。 | `fg-core`, `fg-object`, `fg-index`, `fg-algorithms` | 严禁依赖传输层协议或 CLI 交互 |
-| **`crates/fg-topology/`** | 自相似分形拓扑 | 自相似四层引用系统（`refs/fractal/{dept}/{cell}/{card}/{agent}`）、合并合法性断言器（`TopologyVerifier`，严守 SubAgent 仅合入父级 Card 铁律）、工作树生命周期状态机（`WorktreeStateMachine`）、以及 Path Jail 沙箱隔离契约（`FractalWorktree`, `PathJail`）。 | `fg-core`, `serde`, `chrono` | 严禁直接依赖物理存储或对象编码实现 |
+| **`crates/fg-topology/`** | 自相似分形拓扑 | 自相似四层引用系统（`refs/fractal/{dept}/{cell}/{card}/{agent}`）、合并合法性断言器（`TopologyVerifier`，严守 SubAgent 仅合入父级 Card 铁律）、工作树生命周期状态机（`WorktreeStateMachine`）、以及 Path Jail 沙箱隔离契约（`FractalWorktree`, `PathJail`）。操作日志、提拔账本与工作树注册表持久化为 `repo.txc` 的原生节。 | `fg-core`, `fg-native`, `serde`, `chrono` | 严禁直接依赖物理存储或对象编码实现 |
 | **`crates/fg-transport/`** | 自托管传输协议栈 | 内部 Agent 零拷贝本地 IPC（`IpcMessage`, `IpcCodec` 4 字节帧协议）与标准 Git Smart Protocol v2（`PacketLine` 4 字节 Hex 流式编解码、`ls-refs`, `fetch` 协商）。 | `fg-core`, `fg-object`, `fg-topology` | 严禁侵入存储物理层与代码审查逻辑 |
 | **`crates/fg-gate/`** | 预审门禁与风控守卫 | 协议层门禁拦截：`PreReceiveGuard` 身份与分支越权拦截（禁止直接推入 Trunk、禁止 `--force` 强推）、微秒级物理卫生与冲突标记守卫（`ConflictGuard` 扫描 `<<<<<<<`, `=======`）、以及从 pools 剥离并归位的并发工作树与磁盘配额守卫（`QuotaGovernor`）。 | `fg-core`, `fg-object`, `fg-topology` | 严禁依赖传输层实现细节或物理存储底层 |
-| **`src/lib.rs` (根)** | 统一门面 (Facade) | 工作区根 Rust 门面（`ARCH-FAC-001`），统摄并平铺导出全量 9 个微 Crate，提供高人机工学的一站式 SDK 接口。 | 全量 `crates/fg-*` | — |
+| **`src/lib.rs` (根)** | 统一门面 (Facade) | 工作区根 Rust 门面（`ARCH-FAC-001`），统摄并平铺导出全量 10 个微 Crate，提供高人机工学的一站式 SDK 接口。 | 全量 `crates/fg-*` | — |
 | **`src/bin/taxis.rs`** | 原生 CLI 与 Git 兼容引擎 | Taxis 原生命令行二进制入口（支持 `st/ci/br/di/co/check/gc/serve` 简写别名、JSON 机器格式输出及标准 `git <cmd>` 原生透明加速路由）。 | 全量 `crates/fg-*`, `serde_json` | 严禁反向被微 Crate 依赖 |
 | **`ts/`** | TypeScript 编排与客户端 | 工业化五层分工：`client/` (Praxis Agent SDK 客户端)、`vfs/` (LayerVFS 虚拟文件系统适配器)、`tui/` (一体两面终端渲染器)、`orchestration/` (多 Agent 打擂提拔器)、`cli/` (终端命令)。 | 顶层契约与原生桥 | 严禁在门面外泄露低级指针 |
 | **`scripts/`** | 工程构建与自测脚本 | 跨平台工程构建（`build.ps1` CRLF / `build.sh` LF `set -euo pipefail`）、自测流水线与门禁检查脚本。 | 外部编译器工具链 | 严禁硬编码规范化完整路径或 Windows 盘符 |
-| **`tests/`** | 双轨集成与基准测试 | Rust 7 大微 Crate 集成测试套件（`tests/rust/`）与 TypeScript 仿真测试（`tests/ts/`）。 | 被测项目各模块 | 严禁生产代码反向依赖测试夹具 |
+| **`tests/`** | 双轨集成与基准测试 | Rust 微 Crate 集成测试套件（`tests/rust/`）与 TypeScript 仿真测试（`tests/ts/`）。 | 被测项目各模块 | 严禁生产代码反向依赖测试夹具 |
 
 ---
 
@@ -57,6 +58,7 @@ flowchart TD
 
   subgraph LAYER_STORAGE["L2: 存储与并发池层"]
     STORAGE["fg-storage (Loose ODB / CAS Backend / WAL Journal)"]
+    NATIVE["fg-native (TAXC Container / Native Sections / Repo Layout)"]
     POOLS["fg-pools (RecyclePool / PageBuffer / SandboxPool)"]
   end
 
@@ -71,6 +73,7 @@ flowchart TD
   ROOT_LIB ==> TRANSPORT
   ROOT_LIB ==> GATE
   ROOT_LIB ==> STORAGE
+  ROOT_LIB ==> NATIVE
   ROOT_LIB ==> TOPOLOGY
   ROOT_LIB ==> INDEX
 
@@ -84,6 +87,8 @@ flowchart TD
   STORAGE --> OBJECT
   STORAGE --> CORE
 
+  NATIVE --> CORE
+
   INDEX --> OBJECT
   INDEX --> CORE
 
@@ -94,6 +99,8 @@ flowchart TD
   ALGO --> CORE
   OBJECT --> CORE
 ```
+
+> `fg-topology` 另有指向 `fg-native` 的依赖：操作日志、提拔账本与工作树注册表都以 `repo.txc` 的原生节持久化，容器原语归 `fg-native` 所有。
 
 ---
 

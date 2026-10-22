@@ -2,7 +2,7 @@
 .SYNOPSIS
     Fractal Git Windows PowerShell Automated Build Pipeline
 .DESCRIPTION
-    Compiles Rust 9 micro-crates, verifies TypeScript facades, and validates DAG topology.
+    Compiles Rust 10 micro-crates, verifies TypeScript facades, and validates DAG topology.
     Adheres strictly to CRLF line endings, explicit working directories, and zero black-box claims.
 #>
 [CmdletBinding()]

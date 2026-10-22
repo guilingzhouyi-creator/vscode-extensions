@@ -26,7 +26,7 @@ Write-Host "=================================================================" -
 Write-Host "  Fractal Git Rust Industrial Quality Gate (PowerShell 7+)" -ForegroundColor Cyan
 Write-Host "=================================================================" -ForegroundColor Cyan
 
-$cargoCmd = if (Get-Command cargo.exe -ErrorAction SilentlyContinue) { "cargo.exe" } elseif (Get-Command cargo -ErrorAction SilentlyContinue) { "cargo" } else { $null }
+$cargoCmd = Resolve-GateCargoCommand
 if (-not $cargoCmd) {
     # 缺少原生工具链时不得静默放行：未执行审查与审查通过必须可区分 (GUARD-SYS-001)。
     Write-Warning "BLOCK  cargo 工具链缺失，Rust 质量门禁无法执行。"
@@ -42,7 +42,7 @@ if ($procFmt.ExitCode -ne 0) {
     Write-Error "✖ BLOCK rustfmt check failed. Run 'cargo fmt --all' to fix formatting."
     exit 1
 }
-Write-Host "✔ PASS rustfmt clean." -ForegroundColor Green
+Write-Host "✔ rustfmt clean." -ForegroundColor Green
 
 # 静态检查 (clippy -D warnings)
 Write-Host "`n=== [gate:rust 2/4] Linter & Static Audit (clippy -D warnings) ===" -ForegroundColor Gray
@@ -51,14 +51,14 @@ if ($procClippy.ExitCode -ne 0) {
     Write-Error "✖ BLOCK cargo clippy reported warnings or errors."
     exit 1
 }
-Write-Host "✔ PASS clippy clean with zero warnings." -ForegroundColor Green
+Write-Host "✔ clippy clean with zero warnings." -ForegroundColor Green
 
 # 零分配与并发边界扫描
 Write-Host "`n=== [gate:rust 3/4] Zero-Allocation & Safety Proof Scanner ===" -ForegroundColor Gray
 $nodeCmd = if (Get-Command node.exe -ErrorAction SilentlyContinue) { "node.exe" } elseif (Get-Command node -ErrorAction SilentlyContinue) { "node" } else { $null }
 $zeroAllocScript = Join-Path $ProjectRoot "scripts\common\check-zero-alloc-boundary.js"
 if (-not $nodeCmd) {
-    Write-Host "[SKIP] node runtime unavailable; zero-allocation boundary scanner skipped." -ForegroundColor Yellow
+    Write-Host "↷ SKIP  node runtime unavailable; zero-allocation boundary scanner skipped." -ForegroundColor Yellow
 } elseif (Test-Path $zeroAllocScript) {
     $procAlloc = Start-Process -FilePath $nodeCmd -ArgumentList $zeroAllocScript -WorkingDirectory $ProjectRoot -NoNewWindow -PassThru -Wait
     if ($procAlloc.ExitCode -ne 0) {
@@ -79,7 +79,7 @@ if ($procTest.ExitCode -ne 0) {
     Write-Error "✖ BLOCK Cargo test suite regression detected."
     exit 1
 }
-Write-Host "✔ PASS All micro-crate unit and integration tests passed." -ForegroundColor Green
+Write-Host "✔ All micro-crate unit and integration tests passed." -ForegroundColor Green
 
 Write-Host "`n=== ALL FRACTAL GIT RUST GATE STAGES PASSED SUCCESSFULLY ===" -ForegroundColor Green
 exit 0

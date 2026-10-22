@@ -11,6 +11,7 @@
     "gate:parity": "node scripts/common/validate-git-parity.js",
     "gate:bridge": "node scripts/common/validate-gate-bridge.js",
     "gate:alloc": "node scripts/common/check-zero-alloc-boundary.js",
+    "gate:perf": "node scripts/common/validate-perf-baseline.js",
     "gate:rust": "node scripts/common/validate-crate-topology.js && cargo test --workspace",
     "gate": "npm run gate:topology && npm run gate:parity && npm run gate:bridge && npm run gate:alloc && npm test",
     "audit": "node scripts/common/run-audit-report.js",

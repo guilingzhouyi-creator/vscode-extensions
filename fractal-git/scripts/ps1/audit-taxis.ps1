@@ -35,8 +35,15 @@ $ManifestPath = Join-Path $ProjectRoot "Cargo.toml"
 $TempLogDir = Join-Path ([System.IO.Path]::GetTempPath()) "taxis-audit-$PID"
 New-Item -ItemType Directory -Path $TempLogDir -Force | Out-Null
 
-Register-EngineEvent -SourceIdentifier PowerShell.Exiting -SupportEvent -Action {
-    Remove-Item -Path $TempLogDir -Recurse -Force -ErrorAction SilentlyContinue
+# 退出钩子在独立作用域执行，直接读取脚本变量会在捕获失败时退化为 $null；
+# 目标经事件数据显式传入，并断言其位于系统临时目录之下，避免清理动作作用于任意路径。
+Register-EngineEvent -SourceIdentifier PowerShell.Exiting -SupportEvent -MessageData $TempLogDir -Action {
+    $cleanupTarget = [string]$Event.MessageData
+    $cleanupRoot = [System.IO.Path]::GetTempPath()
+    if ([string]::IsNullOrWhiteSpace($cleanupTarget)) { return }
+    if (-not $cleanupTarget.StartsWith($cleanupRoot, [System.StringComparison]::OrdinalIgnoreCase)) { return }
+    if (-not (Test-Path -LiteralPath $cleanupTarget)) { return }
+    Remove-Item -LiteralPath $cleanupTarget -Recurse -Force -ErrorAction SilentlyContinue
 } | Out-Null
 
 # 步骤身份、四态判定与超时诊断由共享运行时库提供，禁止在本门禁内复制实现。
@@ -98,7 +105,7 @@ function Read-AuditChildOutput {
     return ""
 }
 
-$cargoCmd = if (Get-Command cargo.exe -ErrorAction SilentlyContinue) { "cargo.exe" } elseif (Get-Command cargo -ErrorAction SilentlyContinue) { "cargo" } else { $null }
+$cargoCmd = Resolve-GateCargoCommand
 $nodeCmd = if (Get-Command node.exe -ErrorAction SilentlyContinue) { "node.exe" } elseif (Get-Command node -ErrorAction SilentlyContinue) { "node" } else { $null }
 
 $failures = [System.Collections.Generic.List[string]]::new()
@@ -149,9 +156,9 @@ if (-not $cargoCmd) {
     $failures.Add("CRATE-REGRESSION-02")
 } else {
     $testArgs = if ($Fast) {
-        @("test", "--manifest-path", $ManifestPath, "--", "--test-threads=4")
+        @("test", "--workspace", "--manifest-path", $ManifestPath, "--", "--test-threads=4")
     } else {
-        @("test", "--manifest-path", $ManifestPath)
+        @("test", "--workspace", "--manifest-path", $ManifestPath)
     }
     $procTest = Invoke-AuditChild -FilePath $cargoCmd -ArgumentList $testArgs -Label "cargo-test"
     if ($procTest.ExitCode -ne 0) {
@@ -175,12 +182,17 @@ if (-not $cargoCmd) {
 # 性能微基准与耗时棘轮
 # -----------------------------------------------------------------------------
 Write-StepBanner -StepId "CRATE-BENCHMARK-03"
-if (-not $cargoCmd) {
+# 微基准的清单路径、基线路径与采样数由 Node 侧单一实现持有：双平台各自拼装命令行会在
+# 基线路径的相对/绝对形式上悄悄分叉，届时「两端同构」只在脚本结构上成立而不在语义上成立。
+$benchScript = Join-Path $ProjectRoot "scripts/common/validate-perf-baseline.js"
+if (-not $nodeCmd) {
+    Write-StepVerdict -StepId "CRATE-BENCHMARK-03" -Status "BLOCK" -Detail "node 运行时缺失，微基准棘轮无法执行"
+    $failures.Add("CRATE-BENCHMARK-03")
+} elseif (-not $cargoCmd) {
     Write-StepVerdict -StepId "CRATE-BENCHMARK-03" -Status "BLOCK" -Detail "cargo 工具链缺失，微基准无法执行"
     $failures.Add("CRATE-BENCHMARK-03")
 } else {
-    $benchArgs = @("run", "--manifest-path", $ManifestPath, "--bin", "taxis", "--", "bench", "-m", "5", "--verify-baseline", "baselines/taxis-perf.baseline.json")
-    $procBench = Invoke-AuditChild -FilePath $cargoCmd -ArgumentList $benchArgs -Label "bench"
+    $procBench = Invoke-AuditChild -FilePath $nodeCmd -ArgumentList @($benchScript) -Label "bench"
     if ($procBench.ExitCode -ne 0) {
         Write-StepVerdict -StepId "CRATE-BENCHMARK-03" -Status "BLOCK" -Detail "TB-REGRESSION 微基准超出容差包络"
         $failures.Add("CRATE-BENCHMARK-03")
@@ -231,8 +243,38 @@ Write-StepBanner -StepId "PROMOTION-BRIDGE-05"
 if ($statusQuality -ne "PASS" -or -not $cargoCmd) {
     Write-StepVerdict -StepId "PROMOTION-BRIDGE-05" -Status "SKIP" -Detail "质量包络不可得或 cargo 缺失，晋级请求无可依附的客观分数"
 } else {
+    # 账本必须落在隔离的临时仓库根内。默认 `.git` 会让自审把晋级账本写进源码树下的
+    # 嵌套目录，既不被版本控制跟踪也永不被清理，且下一次自审会读到上次的陈旧候选。
+    # 子进程写入沙箱可能拒绝系统临时根，却放行其下的 Low 子目录；逐级探测可写位置，
+    # 探测全部失败时退回审计临时目录，并由落盘断言兜底，避免把不可写路径当成成功。
+    $promoBaseRoot = $TempLogDir
+    $promoRootCandidates = @((Join-Path ([System.IO.Path]::GetTempPath()) "Low"), $TempLogDir)
+    foreach ($candidateRoot in $promoRootCandidates) {
+        if (-not (Test-Path -LiteralPath $candidateRoot)) { continue }
+        $probeFile = Join-Path $candidateRoot ".taxis-write-probe"
+        try {
+            Set-Content -LiteralPath $probeFile -Value "probe" -ErrorAction Stop
+            Remove-Item -LiteralPath $probeFile -Force -ErrorAction SilentlyContinue
+            $promoBaseRoot = $candidateRoot
+            break
+        } catch {
+            continue
+        }
+    }
+    $promoLedgerRoot = Join-Path $promoBaseRoot "taxis-promotion-ledger-$PID"
+    New-Item -ItemType Directory -Path $promoLedgerRoot -Force | Out-Null
+    # A promotion is staged into the repository container, so the ledger refuses to run in a
+    # directory that has none. Creating the container through `taxis init` keeps this probe on
+    # the same path an operator takes; hand-writing the file would test a state no command makes.
+    $promoInitArgs = @("run", "--manifest-path", $ManifestPath, "--bin", "taxis", "--", "init", "--dev", "--workspace", $promoLedgerRoot)
+    $procPromoInit = Invoke-AuditChild -FilePath $cargoCmd -ArgumentList $promoInitArgs -Label "promotion-init"
+    if ($procPromoInit.ExitCode -ne 0) {
+        Write-StepVerdict -StepId "PROMOTION-BRIDGE-05" -Status "BLOCK" -Detail "晋级演练仓库初始化失败，无法验证暂存链路"
+        $failures.Add("PROMOTION-BRIDGE-05")
+    }
     $promoArgs = @(
         "run", "--manifest-path", $ManifestPath, "--bin", "taxis", "--", "promotion", "request",
+        "--git-dir", (Join-Path $promoLedgerRoot ".taxis"),
         "--candidate", "1111111111111111111111111111111111111111",
         "--agent", "taxis-auditor",
         "--score", $compositeScore.ToString("F1"),
@@ -240,13 +282,20 @@ if ($statusQuality -ne "PASS" -or -not $cargoCmd) {
         "--ci-lower", $ciLower.ToString("F1"),
         "--summary", "Dogfooding self-audit verified: clean topology, zero-alloc boundary, $passedTotal passing tests, and TB-REGRESSION baseline ratchet preserved."
     )
+    # 落盘断言检查的是容器本身：账本是容器的一个节，不存在独立的账本文件。
+    # 先前这里断言 `fractal/staged_promotions.json`，那个文件在账本二进制化后已不存在，
+    # 于是「命令成功」被固定误判为「未落盘」——断言的名字换了，它看守的对象也必须换。
+    $promoContainerFile = Join-Path (Join-Path $promoLedgerRoot ".taxis") "repo.txc"
     $procPromo = Invoke-AuditChild -FilePath $cargoCmd -ArgumentList $promoArgs -Label "promotion"
     if ($procPromo.ExitCode -ne 0) {
         Write-StepVerdict -StepId "PROMOTION-BRIDGE-05" -Status "BLOCK" -Detail "自举晋级暂存请求失败"
         $failures.Add("PROMOTION-BRIDGE-05")
+    } elseif (-not (Test-Path -LiteralPath $promoContainerFile)) {
+        Write-StepVerdict -StepId "PROMOTION-BRIDGE-05" -Status "BLOCK" -Detail "晋级暂存请求未落盘，仓库容器缺失"
+        $failures.Add("PROMOTION-BRIDGE-05")
     } else {
         $statusPromotion = "PASS"
-        Write-StepVerdict -StepId "PROMOTION-BRIDGE-05" -Status "PASS" -Detail "晋级暂存请求已受理，候选保留于 UAC 暂存账本"
+        Write-StepVerdict -StepId "PROMOTION-BRIDGE-05" -Status "PASS" -Detail "晋级暂存请求已受理并落盘，候选保留于 UAC 暂存账本"
     }
 }
 

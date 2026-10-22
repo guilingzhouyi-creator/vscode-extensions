@@ -16,7 +16,6 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 MANIFEST_PATH="${PROJECT_ROOT}/Cargo.toml"
-BASELINE_PATH="${PROJECT_ROOT}/baselines/taxis-perf.baseline.json"
 
 FAST_MODE=0
 for arg in "$@"; do
@@ -78,9 +77,9 @@ echo ""
 write_step_banner "CRATE-REGRESSION-02"
 TEST_STATUS=0
 if [[ "${FAST_MODE}" -eq 1 ]]; then
-    TEST_OUTPUT="$("${CARGO_CMD}" test --manifest-path "${MANIFEST_PATH}" -- --test-threads=4 2>&1)" || TEST_STATUS=$?
+    TEST_OUTPUT="$("${CARGO_CMD}" test --workspace --manifest-path "${MANIFEST_PATH}" -- --test-threads=4 2>&1)" || TEST_STATUS=$?
 else
-    TEST_OUTPUT="$("${CARGO_CMD}" test --manifest-path "${MANIFEST_PATH}" 2>&1)" || TEST_STATUS=$?
+    TEST_OUTPUT="$("${CARGO_CMD}" test --workspace --manifest-path "${MANIFEST_PATH}" 2>&1)" || TEST_STATUS=$?
 fi
 printf '%s\n' "${TEST_OUTPUT}"
 if [[ "${TEST_STATUS}" -ne 0 ]]; then
@@ -99,8 +98,15 @@ fi
 # -----------------------------------------------------------------------------
 echo ""
 write_step_banner "CRATE-BENCHMARK-03"
+# 微基准的清单路径、基线路径与采样数由 Node 侧单一实现持有：双平台各自拼装命令行会在
+# 基线路径的相对/绝对形式上悄悄分叉，届时「两端同构」只在脚本结构上成立而不在语义上成立。
+BENCH_SCRIPT="${PROJECT_ROOT}/scripts/common/validate-perf-baseline.js"
 BENCH_STATUS=0
-"${CARGO_CMD}" run --manifest-path "${MANIFEST_PATH}" --bin taxis -- bench -m 5 --verify-baseline "${BASELINE_PATH}" || BENCH_STATUS=$?
+if ! command -v node &>/dev/null; then
+    write_step_verdict "CRATE-BENCHMARK-03" BLOCK "node 运行时缺失，微基准棘轮无法执行"
+    exit 1
+fi
+node "${BENCH_SCRIPT}" || BENCH_STATUS=$?
 if [[ "${BENCH_STATUS}" -ne 0 ]]; then
     write_step_verdict "CRATE-BENCHMARK-03" BLOCK "TB-REGRESSION 微基准超出容差包络"
     exit 1
@@ -154,8 +160,21 @@ write_step_banner "PROMOTION-BRIDGE-05"
 if [[ -z "${COMPOSITE_SCORE}" || -z "${CAI_SCORE}" || -z "${CI_LOWER}" ]]; then
     write_step_verdict "PROMOTION-BRIDGE-05" SKIP "质量包络不可得，晋级请求无可依附的客观分数"
 else
+    # A promotion is staged into the repository container, so the ledger refuses to run in a
+    # directory that has none. Creating the container through `taxis init` keeps this probe on
+    # the same path an operator takes. The directory lives under the staging root so the two
+    # implementations stay byte-equivalent in intent.
+    PROMO_ROOT="${TMPDIR:-/tmp}/taxis-promotion-ledger-$$"
+    mkdir -p "${PROMO_ROOT}"
+    PROMO_INIT_STATUS=0
+    "${CARGO_CMD}" run --quiet --manifest-path "${MANIFEST_PATH}" --bin taxis -- init --dev --workspace "${PROMO_ROOT}" >/dev/null 2>&1 || PROMO_INIT_STATUS=$?
+    if [[ "${PROMO_INIT_STATUS}" -ne 0 ]]; then
+        write_step_verdict "PROMOTION-BRIDGE-05" BLOCK "晋级演练仓库初始化失败，无法验证暂存链路"
+        exit 1
+    fi
     PROMO_STATUS=0
     "${CARGO_CMD}" run --manifest-path "${MANIFEST_PATH}" --bin taxis -- promotion request \
+        --git-dir "${PROMO_ROOT}/.taxis" \
         --candidate "1111111111111111111111111111111111111111" \
         --agent "taxis-auditor" \
         --score "${COMPOSITE_SCORE}" \
@@ -165,6 +184,11 @@ else
         || PROMO_STATUS=$?
     if [[ "${PROMO_STATUS}" -ne 0 ]]; then
         write_step_verdict "PROMOTION-BRIDGE-05" BLOCK "自举晋级暂存请求失败"
+        exit 1
+    fi
+    # 落盘断言检查容器本身：账本是容器的一个节，不存在独立的账本文件。
+    if [[ ! -f "${PROMO_ROOT}/.taxis/repo.txc" ]]; then
+        write_step_verdict "PROMOTION-BRIDGE-05" BLOCK "晋级暂存请求未落盘，仓库容器缺失"
         exit 1
     fi
     write_step_verdict "PROMOTION-BRIDGE-05" PASS "晋级暂存请求已受理，候选保留于 UAC 暂存账本"

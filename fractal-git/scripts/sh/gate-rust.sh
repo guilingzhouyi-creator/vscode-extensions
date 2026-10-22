@@ -44,13 +44,13 @@ MANIFEST="${PROJECT_ROOT}/Cargo.toml"
 echo ""
 echo "=== [gate:rust 1/4] Code Formatting Check (rustfmt --check) ==="
 cargo fmt --all --manifest-path "${MANIFEST}" -- --check
-echo "[PASS] rustfmt clean."
+echo "✔ rustfmt clean."
 
 # 静态检查 (clippy -D warnings)
 echo ""
 echo "=== [gate:rust 2/4] Linter & Static Audit (clippy -D warnings) ==="
 cargo clippy --workspace --all-targets --manifest-path "${MANIFEST}" -- -D warnings
-echo "[PASS] clippy clean with zero warnings."
+echo "✔ clippy clean with zero warnings."
 
 # 零分配与并发边界扫描
 echo ""
@@ -67,7 +67,7 @@ if [[ "${FAST_MODE}" -eq 1 ]]; then
 else
     cargo test --workspace --manifest-path "${MANIFEST}"
 fi
-echo "[PASS] All micro-crate unit and integration tests passed."
+echo "✔ All micro-crate unit and integration tests passed."
 
 echo ""
 echo "=== ALL FRACTAL GIT RUST GATE STAGES PASSED SUCCESSFULLY ==="
