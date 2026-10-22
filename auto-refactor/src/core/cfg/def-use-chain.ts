@@ -12,8 +12,6 @@
  */
 
 import type { ControlFlowGraph } from './cfg-builder';
-
-type BlockNode = ControlFlowGraph['blocks'][number];
 import type {
     FlowAnalysisResult,
     FloatingPromiseFinding,
@@ -22,6 +20,9 @@ import type {
     VariableDef,
     VariableUse,
 } from './types';
+
+/** Indexed access to one block of the control flow graph. */
+type BlockNode = ControlFlowGraph['blocks'][number];
 
 /** Unified pattern matching resource allocation or acquisition expressions. */
 const COMBINED_RESOURCE_ALLOC_RE =

@@ -13,6 +13,19 @@
  * Exit Semantics & Design Rationale: Pure deterministic computation completing in < 10ms.
  */
 
+import {
+    ANALYZER_COMMENTS,
+    ANALYZER_NAMING,
+    ANALYZER_STANDARDIZATION,
+    ANALYZER_COMPLEXITY,
+    ANALYZER_PERFORMANCE,
+    ANALYZER_LARGE_FILE,
+    ANALYZER_CONSTANTS,
+    ANALYZER_SECURITY,
+    ANALYZER_ARCHITECTURE,
+    ANALYZER_DEPENDENCY_GRAPH,
+} from '../constants/rule-codes';
+
 /**
  * Single unit of tensor-partitioned execution.
  */
@@ -36,19 +49,6 @@ export interface TensorPartitionPlan {
     readonly maxDependencyDepth: number;
     readonly estimatedTotalComputeCost: number;
 }
-
-import {
-    ANALYZER_COMMENTS,
-    ANALYZER_NAMING,
-    ANALYZER_STANDARDIZATION,
-    ANALYZER_COMPLEXITY,
-    ANALYZER_PERFORMANCE,
-    ANALYZER_LARGE_FILE,
-    ANALYZER_CONSTANTS,
-    ANALYZER_SECURITY,
-    ANALYZER_ARCHITECTURE,
-    ANALYZER_DEPENDENCY_GRAPH,
-} from '../constants/rule-codes';
 
 const CHAR_CODE_SLASH = 47;
 const CHAR_CODE_BACKSLASH = 92;

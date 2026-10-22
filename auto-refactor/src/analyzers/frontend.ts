@@ -21,6 +21,7 @@ import * as path from 'path';
 import type { Analyzer, AnalyzerContext, Issue, Severity } from '../core/types';
 import { SEVERITY_INFO, SEVERITY_WARNING } from '../core/types';
 import { ExposureMessages } from '../core/messages/exposure';
+import { isToolOrTestScript } from '../core/governance/pathScope';
 
 /** Canonical analyzer identifier for frontend UI/UX, A11y, and component architecture audits. */
 export const ANALYZER_FRONTEND_ID = 'frontend';
@@ -136,6 +137,71 @@ const ANTI_SQUASH_RE =
     /\b(?:text-balance|text-wrap:\s*balance\b|textWrap:\s*['"]balance['"]|break-words|overflow-wrap:\s*(?:break-word|anywhere)\b|overflowWrap:\s*['"](?:break-word|anywhere)['"]|word-break:\s*break-word\b)/i;
 const MEDIA_QUERY_RE = /@media\b/i;
 const LOCAL_CLASS_OR_ID_RE = /(?:\.[a-zA-Z_-][\w-]*|#[a-zA-Z_-][\w-]*)\s*\{/;
+
+/**
+ * A line whose first non-space characters open a regular-expression literal.
+ *
+ * The analyzer's own pattern definitions contain the literal text `@media`, so without this guard
+ * the rule reports the constant that implements it.
+ */
+const REGEX_LITERAL_LINE_RE = /^\s*(?:const|let|var)?\s*[\w$]+\s*(?::[^=]+)?=\s*\/(?![*/])/;
+
+/** A line that opens a block comment or continues one; its text is prose, not markup or CSS. */
+const BLOCK_COMMENT_LINE_RE = /^\s*(?:\/\*|\*)/;
+
+/**
+ * A single-quoted or double-quoted string that makes up the whole right-hand side of an assignment.
+ *
+ * `remediation: '改用 &str（或 impl AsRef<str>）。'` is a dictionary value, not a CSS declaration,
+ * even though it contains a colon and CJK text. The colon test in `isTextContainerCarrier` cannot
+ * tell the two apart on its own, so the shape of the line has to.
+ */
+const PURE_STRING_ASSIGNMENT_RE =
+    /^\s*[\w$'"]+\s*:\s*(?:'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*")\s*,?\s*$/;
+
+/**
+ * A whole line that is one string literal, optionally assigned to a name.
+ *
+ * A verification script stores its fixture as `const css = '.card { @media ... }'`. The line is a
+ * string value, not a stylesheet, and the braces inside it are fixture text. Only string literals
+ * are covered; an array or template that embeds markup keeps being treated as markup, which is what
+ * the assertion fixtures need.
+ */
+const STRING_VALUE_LINE_RE =
+    /^\s*(?:(?:const|let|var)\s+[\w$]+(?:\s*:\s*[^=]+)?\s*=\s*)?(?:'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*")\s*;?\s*$/;
+
+/**
+ * Decide whether a line is metadata or a literal rather than executable markup or CSS.
+ *
+ * @param line - Raw source line.
+ * @returns True when the line cannot declare a rendered container.
+ */
+function isNonCarrierLine(line: string): boolean {
+    return (
+        BLOCK_COMMENT_LINE_RE.test(line) ||
+        REGEX_LITERAL_LINE_RE.test(line) ||
+        PURE_STRING_ASSIGNMENT_RE.test(line) ||
+        STRING_VALUE_LINE_RE.test(line)
+    );
+}
+
+/**
+ * Detect whether a line can actually carry a text-container anti-squash property.
+ *
+ * A text container is either a markup element with a tag or a `style`/`className` attribute, or a
+ * selector/CSS declaration block. Bare prose — console messages, log strings, error text, plain
+ * string literals — cannot satisfy the property the rule asks for, so it is not a container.
+ *
+ * @param line - Raw source line under test.
+ * @returns True when the line declares markup or a style declaration.
+ */
+function isTextContainerCarrier(line: string): boolean {
+    if (isNonCarrierLine(line)) return false;
+    if (/<\/?[a-zA-Z][\w-]*(?:\s|>|\/)/.test(line)) return true;
+    if (/\b(?:className|class|style)\s*=/.test(line)) return true;
+    if (/^[^{}]*\{[^{}]*$/.test(line) && /[a-z-]+\s*:\s*\S/.test(line)) return true;
+    return false;
+}
 
 /** Structured parameter context for constructing frontend issues. */
 interface FrontendIssueContext {
@@ -502,37 +568,46 @@ function mediaTargetsLocalComponent(rawLines: string[], startIndex: number): boo
 }
 
 /**
+ * Decide whether a media-query line inside the current brace context targets a local selector.
+ *
+ * @param rawLines - Raw source lines.
+ * @param index - Zero-based index of the media-query line.
+ * @param globalBraceDepth - Brace depth accumulated before this line.
+ * @returns True when the query scopes a local class or id rather than the viewport root.
+ */
+function mediaQueryTargetsLocal(rawLines: string[], index: number, globalBraceDepth: number): boolean {
+    const line = rawLines[index];
+    const mediaIndex = line.search(MEDIA_QUERY_RE);
+    const prefix = mediaIndex > 0 ? line.slice(0, mediaIndex) : '';
+    const suffix = mediaIndex >= 0 ? line.slice(mediaIndex) : '';
+    if (globalBraceDepth > 0 || /\{/.test(prefix)) return true;
+    if (LOCAL_CLASS_OR_ID_RE.test(suffix)) return true;
+    return mediaTargetsLocalComponent(rawLines, index);
+}
+
+/**
  * Audits @media misuse in local components (UI-ENG-008).
+ *
+ * A line that merely mentions `@media` in prose or inside a pattern definition does not use a
+ * media query, so comment and regex-literal lines are skipped before the query is tested.
  */
 function auditMediaQueryDiscipline(file: string, rawLines: string[], issues: Issue[]): void {
     let globalBraceDepth = 0;
     for (let i = 0; i < rawLines.length; i++) {
         const line = rawLines[i];
-        const isMediaLine = MEDIA_QUERY_RE.test(line);
-
-        if (isMediaLine) {
-            const mediaIndex = line.search(MEDIA_QUERY_RE);
-            const prefix = mediaIndex > 0 ? line.slice(0, mediaIndex) : '';
-            const suffix = mediaIndex >= 0 ? line.slice(mediaIndex) : '';
-            const isNestedInSelector = globalBraceDepth > 0 || /\{/.test(prefix);
-            const sameLineTargetsLocal = LOCAL_CLASS_OR_ID_RE.test(suffix);
-            const targetsLocal =
-                isNestedInSelector ||
-                sameLineTargetsLocal ||
-                mediaTargetsLocalComponent(rawLines, i);
-            if (targetsLocal) {
-                issues.push(
-                    makeFrontendIssue({
-                        file,
-                        line: i + 1,
-                        rule: RULE_UI_ENG_008,
-                        severity: SEVERITY_WARNING,
-                        message: `${ExposureMessages.UI_CONTAINER_QUERY_ANTI_SQUASH.message}${MSG_SUFFIX_MEDIA_QUERY_LOCAL}`,
-                        suggestion: ExposureMessages.UI_CONTAINER_QUERY_ANTI_SQUASH.suggestion,
-                        detail: { violation: VIOLATION_MEDIA_QUERY_LOCAL, line: i + 1 },
-                    }),
-                );
-            }
+        const isMediaLine = !isNonCarrierLine(line) && MEDIA_QUERY_RE.test(line);
+        if (isMediaLine && mediaQueryTargetsLocal(rawLines, i, globalBraceDepth)) {
+            issues.push(
+                makeFrontendIssue({
+                    file,
+                    line: i + 1,
+                    rule: RULE_UI_ENG_008,
+                    severity: SEVERITY_WARNING,
+                    message: `${ExposureMessages.UI_CONTAINER_QUERY_ANTI_SQUASH.message}${MSG_SUFFIX_MEDIA_QUERY_LOCAL}`,
+                    suggestion: ExposureMessages.UI_CONTAINER_QUERY_ANTI_SQUASH.suggestion,
+                    detail: { violation: VIOLATION_MEDIA_QUERY_LOCAL, line: i + 1 },
+                }),
+            );
         }
 
         const openCount = (line.match(/\{/g) || []).length;
@@ -557,6 +632,15 @@ function ancestorHasAntiSquash(rawLines: string[], currentIndex: number): boolea
 
 /**
  * Audits CJK text containers lacking text-wrap: balance or overflow-wrap: break-word (UI-ENG-008).
+ *
+ * Only markup and style carriers can express anti-squash properties, so the audit is confined to
+ * lines that actually declare a tag, a style attribute, or a CSS declaration. A CJK message inside
+ * a `console.error(...)` call or a plain string literal is prose, not a text container; flagging it
+ * asked for a CSS property that has nowhere to go.
+ *
+ * @param file - Normalized repository-relative path.
+ * @param rawLines - Raw source lines.
+ * @param issues - Accumulator for emitted findings.
  */
 function auditCjkAntiSquash(file: string, rawLines: string[], issues: Issue[]): void {
     for (let i = 0; i < rawLines.length; i++) {
@@ -565,7 +649,13 @@ function auditCjkAntiSquash(file: string, rawLines: string[], issues: Issue[]): 
         if (trimmed.startsWith('//') || trimmed.startsWith('/*') || trimmed.startsWith('*')) {
             continue;
         }
+        if (isNonCarrierLine(line)) {
+            continue;
+        }
         if (!CJK_CHAR_RE.test(line)) {
+            continue;
+        }
+        if (!isTextContainerCarrier(line)) {
             continue;
         }
         if (ANTI_SQUASH_RE.test(line)) {
@@ -591,8 +681,18 @@ function auditCjkAntiSquash(file: string, rawLines: string[], issues: Issue[]): 
 
 /**
  * Container query & CJK anti-squash discipline audit (UI-ENG-008).
+ *
+ * A verification script must embed markup and CSS to assert that this rule fires; the embedded
+ * sample is the subject of the check, not a rendered container, so tooling and fixture paths are
+ * out of scope. The exemption is limited to this rendering rule: the other frontend audits keep
+ * reporting on tooling sources.
+ *
+ * @param file - Normalized repository-relative path.
+ * @param rawLines - Raw source lines.
+ * @param issues - Accumulator for emitted findings.
  */
 function auditContainerQueryAndAntiSquash(file: string, rawLines: string[], issues: Issue[]): void {
+    if (isToolOrTestScript(file)) return;
     auditMediaQueryDiscipline(file, rawLines, issues);
     auditCjkAntiSquash(file, rawLines, issues);
 }

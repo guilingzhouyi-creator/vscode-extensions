@@ -17,6 +17,7 @@
 export { isOfflineOrMigrationContext } from './dataAccessContext';
 
 import type { Issue, SemanticEvidenceStep, SemanticReviewDetail } from '../types';
+import { isToolOrTestScript } from '../governance/pathScope';
 import type { SemanticGraph } from '../semantic/semanticGraph';
 import type { SemanticNode } from '../semantic/types';
 
@@ -565,11 +566,23 @@ function checkRedundantSerializationSite(site: DataAccessSite): Issue | null {
     });
 }
 
+/**
+ * Flag repeated invariant checks that have no perimeter obligation behind them.
+ *
+ * Assertion-heavy verification code is the opposite of redundant: each assertion states a distinct
+ * expectation, and removing them removes the verification. Test, benchmark, and tooling code is
+ * therefore excluded before counting, so the counter only measures production domain logic.
+ *
+ * @param site - Observed validation site.
+ * @param validationCounts - Per-symbol tally carried across the file.
+ * @returns A finding when the same symbol accumulates more than two internal checks.
+ */
 function checkDefensiveExcessSite(
     site: DataAccessSite,
     validationCounts: Map<string, number>,
 ): Issue | null {
     if (site.operationKind !== OP_KIND_VALIDATION) return null;
+    if (isToolOrTestScript(site.file)) return null;
     const count = (validationCounts.get(site.symbol) ?? 0) + 1;
     validationCounts.set(site.symbol, count);
 

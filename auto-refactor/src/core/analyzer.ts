@@ -61,6 +61,20 @@ import type { QualityWeights } from './scoring/scoringTypes';
 import { ChangeTrajectoryManager } from './trajectory/changeTrajectory';
 import { detectProjectArchetype } from './profiler/projectProfiler';
 import { ALL_BUILTIN_ANALYZERS, routeArchetypeToAnalyzers } from './router/sparseRuleRouter';
+import { pMap, AR_TIMING, nowMs } from './scanner/worker-scheduler';
+import { runFileAnalyzers } from './scanner/analyzer-runner';
+import {
+    mergePerFileResults,
+    printScanTiming,
+    runParseAnalyzeStage,
+    sortIssues,
+} from './scanner/scan-stage';
+import { buildScanReport } from './reporting/reportBuilder';
+import type { ScanWithCacheOptions } from './scanner/cache-scanner';
+import { executeScanWithCache } from './scanner/cache-scanner';
+import type { ScanWithDiffOptions } from './scanner/diff-scanner';
+import { executeScanWithDiff } from './scanner/diff-scanner';
+import type { ScannerContext } from './scanner/scanner-context';
 
 /**
  * Optional analyzer capability consumed by the semantic-complexity post-scan pass.
@@ -86,21 +100,6 @@ export {
     BUILTIN_MODULE_PATHS,
 } from './analyzer-registry';
 export { WorkerPoolManager, WorkerPoolEntry } from './worker-pool';
-
-import { pMap, AR_TIMING, nowMs } from './scanner/worker-scheduler';
-import { runFileAnalyzers } from './scanner/analyzer-runner';
-import {
-    mergePerFileResults,
-    printScanTiming,
-    runParseAnalyzeStage,
-    sortIssues,
-} from './scanner/scan-stage';
-import { buildScanReport } from './reporting/reportBuilder';
-import type { ScanWithCacheOptions } from './scanner/cache-scanner';
-import { executeScanWithCache } from './scanner/cache-scanner';
-import type { ScanWithDiffOptions } from './scanner/diff-scanner';
-import { executeScanWithDiff } from './scanner/diff-scanner';
-import type { ScannerContext } from './scanner/scanner-context';
 
 export { WarmSession, createWarmSession } from './scanner/cache-key-helper';
 export type { ScanWithCacheOptions } from './scanner/cache-scanner';

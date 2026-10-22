@@ -65,6 +65,15 @@ const LOW_LEVEL_FILE_RE = /(?:^|[/\\])(?:shared|utils|common)(?:[/\\]|$|\.)/i;
 const HIGH_LEVEL_IMPORT_RE = /\/(?:domain|app|application)\//i;
 const EXTERNAL_URL_RE = /^(?:https?|wss?):\/\//;
 
+/**
+ * Packages that publish one namespace object through a CommonJS `export =` declaration.
+ *
+ * `typescript` declares `export = ts` at the end of `lib/typescript.d.ts`, so the module has no
+ * per-symbol ESM export surface for a bundler to shake and no named-export list to spell out: the
+ * namespace binding *is* the documented form. Naming members would not reduce the loaded code.
+ */
+const CJS_SINGLE_NAMESPACE_MODULES: ReadonlySet<string> = new Set(['typescript']);
+
 /** Descriptor of an external URL or resource reference. */
 export interface ExternalResourceRef {
     file: string;
@@ -322,6 +331,29 @@ function auditInFunctionImports(
     }
 }
 
+/**
+ * Flag namespace imports that widen the local runtime namespace.
+ *
+ * Two import shapes are exempt because the risk the rule names cannot occur for them.
+ *
+ * A `import type * as ns` binding is erased at compile time and cannot shadow or collide with any
+ * runtime symbol.
+ *
+ * A namespace import of a standard library module is exempt for a different reason: the rule's
+ * stated harms are degraded tree-shaking and a blurred dependency surface, and neither applies.
+ * A runtime core module is one unsplittable unit that no bundler shakes, and the specifier already
+ * names the exact module, so the dependency surface is as explicit as it can get — only the symbol
+ * granularity differs. Rewriting `import * as fs from 'fs'` into named imports would therefore
+ * churn the call sites without changing either risk. This covers the `typescript` package as well:
+ * it declares `export = ts`, a single CommonJS namespace with no per-symbol ESM surface, so naming
+ * its members would not load less code.
+ *
+ * Third-party and internal modules keep being reported, where both harms are real.
+ *
+ * @param imports - Import statements collected from the file.
+ * @param language - Source language identifier.
+ * @param issues - Accumulator for emitted findings.
+ */
 function auditWildcardImports(
     imports: ImportStatementInfo[],
     language: string,
@@ -329,6 +361,9 @@ function auditWildcardImports(
 ): void {
     for (const imp of imports) {
         if (!imp.isWildcard) continue;
+        if (imp.isTypeOnly === true) continue;
+        if (imp.category === CATEGORY_STDLIB) continue;
+        if (CJS_SINGLE_NAMESPACE_MODULES.has(imp.moduleSpecifier)) continue;
         emitDescribedImportIssue(issues, 'DEP-WLD-001', imp, language);
     }
 }

@@ -8,26 +8,6 @@
  * Exit Semantics & Design Rationale: Pure analysis — reads the file descriptor and returns
  *   issues; it performs no I/O and never throws.
  */
-/**
- * Score ceiling applied when a metric saturates.
- */
-const MAX_SCORE_CAP = 80;
-
-/**
- * Module: Core Intelligence — Spatiotemporal Complexity Semantic Analyzer
- * File Path: src/core/intelligence/semanticComplexity.ts
- * Architecture Role: Graph- and AST-driven semantic reasoning engine for time, space, and
- *   lifecycle complexity; derives composite polynomial order across multi-file call chains.
- * Dependencies & Triggers: Imports CallGraph and SymbolIndex from ./callGraph and ./symbolIndex,
- *   core types (Issue, SemanticReviewDetail, SemanticEvidenceStep); invoked during complexity
- *   review and post-scan report finalization.
- * Responsibilities: Differentiate bounded collections from unbounded dynamic input streams;
- *   trace cross-function/cross-file polynomial loops (CPX-TIME-001); detect hot-path transient
- *   allocations (CPX-SPACE-001); detect unbounded recursion cycles (CPX-REC-001); detect
- *   amplification hazards like nested I/O or serialization in call chains (CPX-AMP-001).
- * Exit Semantics & Design Rationale: Pure in-memory graph walk without disk I/O or throwing;
- *   returns structured Issue records conforming strictly to the Section VII result schema.
- */
 
 import type { CallGraph } from './callGraph';
 import type { SymbolIndex } from './symbolIndex';
@@ -35,6 +15,9 @@ import type { Issue, SemanticEvidenceStep, SemanticReviewDetail } from '../types
 import { SEVERITY_WARNING, LANGUAGE_TYPESCRIPT } from '../types';
 import { ANALYZER_COMPLEXITY } from '../scoring/dimensionLiterals';
 import type { LoopSite, SemanticComplexityOptions } from './semanticComplexity';
+
+/** Score ceiling applied when a metric saturates. */
+const MAX_SCORE_CAP = 80;
 /** Evidence-chain step kind for an iterating loop. */
 const KIND_LOOP = 'loop';
 /** Evidence-chain step kind for a call site. */

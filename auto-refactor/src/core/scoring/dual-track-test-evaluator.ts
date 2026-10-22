@@ -18,6 +18,7 @@
 import * as path from 'path';
 import type { IntraFileZoneProfile, SemanticZoneSegment } from '../intelligence/zone-partitioner';
 import { ZONE_EMBEDDED_TEST } from '../intelligence/zone-partitioner';
+import { isToolOrTestScript } from '../governance/pathScope';
 import { RULE_TST_TOP_001 } from './dimensionLiterals';
 
 /** Categorization of code files into testing topology tracks. */
@@ -49,12 +50,61 @@ const PENALTY_UNCONDITIONAL_BUILD = 30;
 const PENALTY_MISSING_INTENT = 15;
 const PENALTY_ROOT_TEST = 20;
 
-const MARKER_DESCRIBE = 'describe(';
-const MARKER_TEST = 'test(';
-const MARKER_IT = 'it(';
 const MARKER_CFG_TEST = '#[cfg(test)]';
 const MARKER_MOD_TESTS = 'mod tests';
 const MARKER_PY_MAIN = 'if __name__ == "__main__":';
+
+/**
+ * Test-framework call site patterns.
+ *
+ * The markers are anchored to a statement position because a bare `test(` substring matches any
+ * identifier ending in `test` followed by a call — `assert(`, `latest(`, `runTest(` — and every
+ * dashboard, benchmark, and verification script contains such identifiers. Requiring the call to
+ * begin a statement (optionally after `await`) keeps the detector on actual test declarations.
+ *
+ * The framework name must be followed by `(` or by a modifier channel such as `.each(`/`.skip(`.
+ * `it.trim()`, `it.map(...)` and similar member calls are ordinary string or array operations that
+ * happen to use a two-letter receiver named `it`, so only framework modifiers count.
+ */
+const TEST_CALL_SITE_RE =
+    /(?:^|[;{}\s])(?:await\s+)?(?:describe|it|test)(?:\.(?:each|skip|only|concurrent|todo|failing|serial))?\s*\(/;
+
+/** Line-leading comment or block-comment continuation, which carries prose rather than code. */
+const COMMENT_LINE_RE = /^\s*(?:\/\/|\/\*|\*)/;
+
+/**
+ * Strip string, template and regular-expression literals plus trailing line comments.
+ *
+ * A fixture string such as `'describe("calc", () => {})'` or a doc comment mentioning `test()`
+ * describes a test without being one, and every verification script in this repository contains
+ * such fixtures. Scanning the raw text therefore reported the fixtures instead of the code, so the
+ * text is reduced to its executable skeleton before the call-site pattern is applied.
+ *
+ * @param line - Raw source line.
+ * @returns The line with literal and comment bodies replaced by placeholders.
+ */
+function stripNonExecutableText(line: string): string {
+    return line
+        .replace(/'(?:\\.|[^'\\])*'/g, "''")
+        .replace(/"(?:\\.|[^"\\])*"/g, '""')
+        .replace(/`(?:\\.|[^`\\])*`/g, '``')
+        .replace(/(^|[(,=:[!&|?{};\s])\/(?![*/])(?:\\.|\[(?:\\.|[^\]\\])*\]|[^/\\\n])+\/[gimsuy]*/g, '$1RE')
+        .replace(/\/\/.*$/, '');
+}
+
+/**
+ * Report whether executable code contains a test-framework call site.
+ *
+ * @param content - Whole file content.
+ * @returns True when some code line declares a test suite or case.
+ */
+function hasTestCallSite(content: string): boolean {
+    for (const line of content.split(/\r\n|\n/)) {
+        if (COMMENT_LINE_RE.test(line)) continue;
+        if (TEST_CALL_SITE_RE.test(stripNonExecutableText(line))) return true;
+    }
+    return false;
+}
 
 const PATH_TESTS_DIR = '/tests/';
 const PATH_TEST_DIR = '/test/';
@@ -195,15 +245,21 @@ function countContentLines(content: string): number {
 
 /**
  * Detects presence of embedded test markers across known language conventions.
+ *
+ * `#[cfg(test)] mod tests` is Rust syntax; in any other language the same text can only appear as
+ * prose or a fixture, so the marker is gated on the Rust extension. Without the gate a TypeScript
+ * comment such as `// Literals carry their text (constants analyzer)` never matched, but a comment
+ * that happens to contain `mod tests` did, and reported a violation the file cannot commit.
+ *
+ * @param content - Whole file content.
+ * @param ext - Lower-case file extension including the dot.
+ * @returns True when the file declares an embedded test zone.
  */
 function hasEmbeddedMarkers(content: string, ext: string): boolean {
-    return (
-        content.includes(MARKER_CFG_TEST) ||
-        content.includes(MARKER_MOD_TESTS) ||
-        content.includes(MARKER_DESCRIBE) ||
-        content.includes(MARKER_IT) ||
-        (ext === '.py' && content.includes(MARKER_PY_MAIN))
-    );
+    if (hasTestCallSite(content)) return true;
+    if (ext === '.py' && content.includes(MARKER_PY_MAIN)) return true;
+    if (ext !== '.rs') return false;
+    return content.includes(MARKER_CFG_TEST) || content.includes(MARKER_MOD_TESTS);
 }
 
 /**
@@ -246,7 +302,7 @@ function createProhibitedEmbeddedResult(params: ProhibitedResultParams): DualTra
     const { filePath, content, ext, lineCount, productionLoc } = params;
     const lines = content.split(/\r\n|\n/);
     const testLineIdx = lines.findIndex(
-        (l) => l.includes(MARKER_DESCRIBE) || l.includes(MARKER_TEST) || l.includes(MARKER_IT),
+        (l) => !COMMENT_LINE_RE.test(l) && TEST_CALL_SITE_RE.test(stripNonExecutableText(l)),
     );
     const lineNum = testLineIdx >= 0 ? testLineIdx + 1 : 1;
 
@@ -420,6 +476,18 @@ export class DualTrackTestEvaluator {
         // 1. First Track: Explicit Standalone Test Files
         if (isExplicitTestFile) {
             return this.evaluateExplicitTestFile(normalizedPath, content, ext);
+        }
+
+        // Repository tooling asserts on embedded test source by design: a verification script must
+        // build a fixture such as `describe('OrderProcessor', ...)` to check that the rule fires.
+        // Such a fixture is the subject of the check, not a test suite smuggled into production
+        // code, so tooling and fixture paths are out of scope for the production topology track.
+        if (isToolOrTestScript(normalizedPath)) {
+            return createPureProductionResult(
+                normalizedPath,
+                ext,
+                countContentLines(content),
+            );
         }
 
         // 2. Second Track: Production Files with possible Embedded Test Zones

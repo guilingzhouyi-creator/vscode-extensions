@@ -15,6 +15,13 @@
  */
 
 import type { ArchitectureLayer, Issue, ScaleGrade } from '../types';
+import {
+    checkHeadlessImports,
+    checkCrossDomainBypass,
+    checkMutableGlobalCoupling,
+    checkLayeringIllusion,
+    checkConfigLeakage,
+} from './architectureBoundaryChecks';
 
 /**
  * UI / presentation frameworks forbidden in headless or pure domain code.
@@ -120,14 +127,6 @@ export function inferSemanticLayer(
 
     return 'domain';
 }
-
-import {
-    checkHeadlessImports,
-    checkCrossDomainBypass,
-    checkMutableGlobalCoupling,
-    checkLayeringIllusion,
-    checkConfigLeakage,
-} from './architectureBoundaryChecks';
 
 /**
  * Verify architecture boundaries across the repository.

@@ -62,6 +62,236 @@ const FN_DEF_RE = /(?:fn|function|def)\s+([a-zA-Z0-9_]+)\s*\(([^)]*)\)/;
 const DEPTH_GUARD_PARAM_RE = /\b(?:depth|level|limit|fuel|recursion_limit|max_depth)\b/i;
 const DEPTH_GUARD_BODY_RE = /\bif\s+.*(?:depth|level|limit|fuel|recursion_limit|max_depth)\b/i;
 
+/**
+ * Entry-point names that are invoked by an external driver rather than by the function itself.
+ *
+ * `main()` calling `main()` never appears in a healthy program, and a top-level `main().catch(...)`
+ * is a call site, not a self-call. Treating the driver's own invocation as recursion made the rule
+ * fire on nearly every script entry point.
+ */
+const ENTRY_POINT_NAMES: ReadonlySet<string> = new Set([
+    'main',
+    'run',
+    'bootstrap',
+    'start',
+    'cli',
+    'entry',
+]);
+
+/** Character codes for brace tracking; comparing codes avoids re-compiling a regex per line. */
+const CODE_OPEN_BRACE = 0x7b;
+const CODE_CLOSE_BRACE = 0x7d;
+
+/**
+ * Strip string, template, regular-expression literals and line comments from one line.
+ *
+ * Braces inside any literal are not code structure. A regex literal in particular carries `{m,n}`
+ * quantifiers and `\{` escapes, so leaving it in place made the per-line brace balance drift
+ * positive and pushed every later function frame onto the wrong depth. That drift is what made
+ * non-recursive helpers look like unguarded recursion.
+ *
+ * The regex pattern is deliberately conservative: the opening slash must follow an operator or an
+ * opening bracket (optionally across whitespace), so division such as `x = a / b / c` is not
+ * mistaken for a literal. A slash preceded by an identifier, digit, `)` or `]` ends an expression,
+ * not starts a pattern.
+ *
+ * @param line - Raw source line.
+ * @returns The line with literal and comment bodies replaced by placeholders.
+ */
+function stripLiteralsAndComments(line: string): string {
+    return line
+        .replace(/'(?:\\.|[^'\\])*'/g, "''")
+        .replace(/"(?:\\.|[^"\\])*"/g, '""')
+        .replace(/`(?:\\.|[^`\\])*`/g, '``')
+        .replace(/(^|[(,=:[!&|?{};\s])\/(?![*/])(?:\\.|\[(?:\\.|[^\]\\])*\]|[^/\\\n])+\/[gimsuy]*/g, '$1RE')
+        .replace(/\/\/.*$/, '');
+}
+
+/**
+ * Locate the first body-opening brace at or after `from`.
+ *
+ * Implemented as a direct character scan to keep the per-line cost flat: the scanner calls this
+ * once per line, so an `indexOf` here would nest a linear string search inside the line loop.
+ *
+ * @param text - Source line with literals and comments removed.
+ * @param from - Zero-based offset to start scanning at.
+ * @returns Zero-based brace offset, or -1 when the line opens no body.
+ */
+function findBodyBrace(text: string, from: number): number {
+    for (let i = from; i < text.length; i++) {
+        if (text.charCodeAt(i) === CODE_OPEN_BRACE) return i;
+    }
+    return -1;
+}
+
+/**
+ * Net brace balance of one already-stripped line.
+ *
+ * @param text - Source line with literals and comments removed.
+ * @returns Open braces minus close braces.
+ */
+function braceDelta(text: string): number {
+    let delta = 0;
+    for (let i = 0; i < text.length; i++) {
+        const code = text.charCodeAt(i);
+        if (code === CODE_OPEN_BRACE) delta++;
+        else if (code === CODE_CLOSE_BRACE) delta--;
+    }
+    return delta;
+}
+
+/** One function body currently being scanned, with the depth its braces opened at. */
+interface RecursionFrame {
+    readonly name: string;
+    readonly bodyDepth: number;
+    /** Matches a bare call of `name`; a member call such as `x.name(` is a different function. */
+    readonly bareCallPattern: RegExp;
+    /** Matches the same call anywhere, used only to tell a member call from an unrelated line. */
+    readonly anyCallPattern: RegExp;
+    guarded: boolean;
+}
+
+/** A reportable recursive self-invocation. */
+interface RecursionSite {
+    readonly functionName: string;
+    readonly line: number;
+}
+
+/**
+ * Build the frame for a function whose body opening brace has just been seen.
+ *
+ * @param name - Declared function name.
+ * @param params - Full parameter list text, including any lines it spanned.
+ * @param depthBefore - Brace depth before the declaration line.
+ * @returns Frame tracking that function body.
+ */
+function buildRecursionFrame(name: string, params: string, depthBefore: number): RecursionFrame {
+    return {
+        name,
+        bodyDepth: depthBefore + 1,
+        bareCallPattern: new RegExp(`(?:^|[^\\w.])${name}\\s*\\(`),
+        anyCallPattern: new RegExp(`\\b${name}\\s*\\(`),
+        guarded: DEPTH_GUARD_PARAM_RE.test(params) || ENTRY_POINT_NAMES.has(name),
+    };
+}
+
+/**
+ * Record the self-invocation of one frame, when the frame is unguarded and the code calls it.
+ *
+ * A bare call is required. `this.target.forwardCall(a, b)` inside `forwardCall` invokes a different
+ * object's method, and `scanner.scan()` inside `analyze` invokes a different type's method; neither
+ * can recurse into the function being scanned, so both are skipped even though the identifier
+ * matches. Only a name that appears without a receiver is a genuine self-invocation.
+ *
+ * @param frame - Innermost open function body.
+ * @param code - Line text with literals and comments removed.
+ * @param line - One-based line number for the finding.
+ * @param sites - Collector receiving discovered sites.
+ */
+function recordSelfCall(
+    frame: RecursionFrame,
+    code: string,
+    line: number,
+    sites: RecursionSite[],
+): void {
+    if (DEPTH_GUARD_BODY_RE.test(code)) {
+        frame.guarded = true;
+        return;
+    }
+    if (frame.guarded) return;
+    if (!frame.anyCallPattern.test(code)) return;
+    if (frame.bareCallPattern.test(code)) sites.push({ functionName: frame.name, line });
+}
+
+/**
+ * Collect recursive self-invocations that lack a depth guard.
+ *
+ * A finding requires the call to sit inside the declared body of the same function. Tracking the
+ * brace depth of each frame is what makes that true: without it a name stayed "current" until the
+ * next declaration or the end of the file, so every later call to the function — including the
+ * driver's own top-level `main().catch(...)` invocation — was read as a self-call. Parameter lists
+ * that span several lines are accumulated until the opening brace, so a guard declared on a
+ * continuation line still suppresses the finding. A body that opens and closes on one line is
+ * inspected immediately, since its frame would otherwise be popped before the line is scanned.
+ *
+ * @param content - Whole file content.
+ * @returns Self-invocations that no guard covers.
+ */
+function collectRecursionSites(content: string): RecursionSite[] {
+    const lines = content.split('\n');
+    const sites: RecursionSite[] = [];
+    const frames: RecursionFrame[] = [];
+    let depth = 0;
+    let pendingName: string | null = null;
+    let pendingParams = '';
+
+    const closeFinishedFrames = (): void => {
+        while (frames.length > 0 && depth < frames[frames.length - 1]!.bodyDepth) frames.pop();
+    };
+
+    const openFrame = (
+        name: string,
+        params: string,
+        depthBefore: number,
+        code: string,
+        openIndex: number,
+        lineNumber: number,
+    ): void => {
+        const frame = buildRecursionFrame(name, params, depthBefore);
+        frames.push(frame);
+        depth = depthBefore + braceDelta(code);
+        if (depth >= frame.bodyDepth) return;
+        recordSelfCall(frame, code.slice(openIndex + 1), lineNumber, sites);
+        frames.pop();
+    };
+
+    for (let i = 0; i < lines.length; i++) {
+        const code = stripLiteralsAndComments(lines[i]);
+        const depthBefore = depth;
+        const lineNumber = i + 1;
+
+        if (pendingName !== null) {
+            const openIndex = findBodyBrace(code, 0);
+            const declaredName: string = pendingName;
+            const params = pendingParams + (openIndex >= 0 ? code.slice(0, openIndex) : code);
+            pendingName = null;
+            if (openIndex >= 0) {
+                openFrame(declaredName, params, depthBefore, code, openIndex, lineNumber);
+            } else {
+                pendingName = declaredName;
+                pendingParams = params;
+                depth = depthBefore + braceDelta(code);
+            }
+            closeFinishedFrames();
+            continue;
+        }
+
+        const declaration = FN_DEF_RE.exec(code);
+        if (declaration !== null) {
+            const openIndex = findBodyBrace(code, declaration.index + declaration[0].length);
+            const params =
+                openIndex >= 0 ? declaration[2] + code.slice(declaration.index, openIndex) : declaration[2];
+            if (openIndex >= 0) {
+                openFrame(declaration[1], params, depthBefore, code, openIndex, lineNumber);
+            } else {
+                pendingName = declaration[1];
+                pendingParams = params;
+                depth = depthBefore + braceDelta(code);
+            }
+            closeFinishedFrames();
+            continue;
+        }
+
+        const frame = frames[frames.length - 1];
+        if (frame !== undefined) recordSelfCall(frame, code, lineNumber, sites);
+
+        depth = depthBefore + braceDelta(code);
+        closeFinishedFrames();
+    }
+
+    return sites;
+}
+
 function isComment(trimmed: string): boolean {
     return /^(?:\/\/|\/\*|\*)/.test(trimmed);
 }
@@ -372,45 +602,23 @@ export class StdlibAnalyzer implements Analyzer {
 
     /**
      * STDLIB-RECURSION-001: Unbounded recursion lacking depth limits.
+     *
+     * Emits one finding per self-invocation that sits inside the declared body of the same
+     * function and carries no depth guard. Brace tracking keeps the function context scoped to its
+     * own body, so a later call site outside that body is not mistaken for recursion.
      */
     private checkUnboundedRecursion(content: string, file: string, issues: Issue[]): void {
-        const lines = content.split('\n');
-        let currentFn = '';
-        let fnHasDepthGuard = false;
-
-        for (let i = 0; i < lines.length; i++) {
-            const line = lines[i];
-            const fnMatch = FN_DEF_RE.exec(line);
-            if (fnMatch) {
-                currentFn = fnMatch[1];
-                fnHasDepthGuard = DEPTH_GUARD_PARAM_RE.test(fnMatch[2]);
-                continue;
-            }
-
-            if (!currentFn || fnHasDepthGuard) continue;
-
-            if (DEPTH_GUARD_BODY_RE.test(line)) {
-                fnHasDepthGuard = true;
-                continue;
-            }
-
-            if (
-                new RegExp(`\\b${currentFn}\\s*\\(`).test(line) &&
-                !line.includes('fn ') &&
-                !line.includes('def ')
-            ) {
-                this.emitIssue(
-                    issues,
-                    file,
-                    i + 1,
-                    'STDLIB-RECURSION-001',
-                    SEVERITY_WARNING,
-                    `Function \`${currentFn}\` has recursive self-invocation without explicit depth limit parameter or guard.`,
-                    'Introduce explicit depth/recursion_limit parameter returning error upon limit, or convert to iterative loop.',
-                    { functionName: currentFn },
-                );
-                currentFn = '';
-            }
+        for (const site of collectRecursionSites(content)) {
+            this.emitIssue(
+                issues,
+                file,
+                site.line,
+                'STDLIB-RECURSION-001',
+                SEVERITY_WARNING,
+                `Function \`${site.functionName}\` has recursive self-invocation without explicit depth limit parameter or guard.`,
+                'Introduce explicit depth/recursion_limit parameter returning error upon limit, or convert to iterative loop.',
+                { functionName: site.functionName },
+            );
         }
     }
 

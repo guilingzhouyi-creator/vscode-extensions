@@ -12,6 +12,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import type { Issue, SemanticEvidenceStep, SemanticReviewDetail } from '../types';
+import { GO_CORE_PACKAGES, NODE_CORE_MODULES } from './dependency-provenance';
+import { PYTHON_STDLIB_MODULES } from './python-stdlib';
 
 /** Import category id for a language standard-library module. */
 const CATEGORY_STDLIB = 'stdlib';
@@ -76,9 +78,6 @@ export interface ImportStatementInfo {
     isWildcard: boolean;
     isTypeOnly?: boolean;
 }
-
-import { GO_CORE_PACKAGES, NODE_CORE_MODULES } from './dependency-provenance';
-import { PYTHON_STDLIB_MODULES } from './python-stdlib';
 
 /** Exemption marker mapping from trigger tokens to canonical exemption reasons. */
 export const EXEMPTION_MARKER_MAP: ReadonlyMap<string, ExemptionReason> = new Map([

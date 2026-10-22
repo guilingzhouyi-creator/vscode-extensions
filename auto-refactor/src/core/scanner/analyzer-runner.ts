@@ -39,14 +39,13 @@ import {
     runStreamingProjected,
     tryCreateProjector,
 } from '../ast/traverse';
+import { materializeSourceFile, runLegacyPhase } from './legacy-analyzers';
+import { shouldExecuteAnalyzer } from './trigger-catalog';
 
 /** `typeof` tag for callable visit/finalize analyzer methods (streaming vs legacy). */
 const TYPEOF_FUNCTION = 'function';
 
 export type { FileContextBase, ParseState, StreamingOutcome };
-
-import { materializeSourceFile, runLegacyPhase } from './legacy-analyzers';
-import { shouldExecuteAnalyzer } from './trigger-catalog';
 
 /**
  * Host surface the runner needs from the Scanner: the resolved plan plus the cross-file stores

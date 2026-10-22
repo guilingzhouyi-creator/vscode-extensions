@@ -95,13 +95,88 @@ function buildEnrichedOptions(
     };
 }
 
+/**
+ * Detect a statement whose initializer is a `require(...)` call.
+ *
+ * CommonJS files express imports as `const path = require('path')`. Such a statement is an import
+ * for layout purposes, so it must not define the import horizon; otherwise every following `import`
+ * is reported as being declared after operational code.
+ *
+ * @param stmt - Top-level statement under test.
+ * @returns True when the statement is a require-based import binding.
+ */
+function isRequireImportStatement(stmt: ts.Statement): boolean {
+    if (!ts.isVariableStatement(stmt)) return false;
+    return stmt.declarationList.declarations.some((decl) => {
+        const init = decl.initializer;
+        if (!init) return false;
+        if (ts.isCallExpression(init)) return init.expression.getText().endsWith('require');
+        return false;
+    });
+}
+
+/**
+ * Decide whether a top-level statement terminates the dependency block.
+ *
+ * The horizon exists to separate the dependency declarations from the file's contract types,
+ * constants, and business logic. A directive prologue (`'use strict'`), a side-effect call that
+ * must run before later `require()` calls resolve, a bootstrap `try` block enabling the compile
+ * cache, and a re-export all belong to the dependency bootstrapping phase rather than to the
+ * file's declarations, so none of them can end the block. Counting them made the rule report every
+ * `const fs = require('fs')` in the repository's scripts as a misplaced import.
+ *
+ * @param stmt - Top-level statement under test.
+ * @returns True when the statement starts the declaration region of the file.
+ */
+function establishesImportHorizon(stmt: ts.Statement): boolean {
+    if (ts.isImportDeclaration(stmt)) return false;
+    if (ts.isImportEqualsDeclaration(stmt)) return false;
+    if (ts.isEmptyStatement(stmt)) return false;
+    if (isRequireImportStatement(stmt)) return false;
+    if (ts.isExportDeclaration(stmt)) return false;
+    if (ts.isTryStatement(stmt)) return false;
+    if (ts.isExpressionStatement(stmt)) return !isBootstrapExpression(stmt.expression);
+    return true;
+}
+
+/**
+ * Recognise a top-level expression that belongs to module bootstrap rather than to declarations.
+ *
+ * @param expr - Expression of a top-level expression statement.
+ * @returns True for directive prologues and `require(...)`-anchored calls.
+ */
+function isBootstrapExpression(expr: ts.Expression): boolean {
+    if (ts.isStringLiteral(expr)) return true;
+    return expressionMentionsRequire(expr);
+}
+
+/**
+ * Test whether an expression is, or is rooted at, a `require(...)` call.
+ *
+ * @param expr - Expression to inspect.
+ * @returns True when the expression depends on a CommonJS `require` call.
+ */
+function expressionMentionsRequire(expr: ts.Expression): boolean {
+    let current: ts.Expression = expr;
+    for (;;) {
+        if (ts.isPropertyAccessExpression(current)) {
+            current = current.expression;
+            continue;
+        }
+        if (ts.isCallExpression(current)) {
+            if (ts.isIdentifier(current.expression) && current.expression.text === 'require') {
+                return true;
+            }
+            current = current.expression;
+            continue;
+        }
+        return ts.isIdentifier(current) && current.text === 'require';
+    }
+}
+
 function findFirstTsDeclarationLine(sf: ts.SourceFile): number | undefined {
     for (const stmt of sf.statements) {
-        if (
-            !ts.isImportDeclaration(stmt) &&
-            !ts.isImportEqualsDeclaration(stmt) &&
-            !ts.isEmptyStatement(stmt)
-        ) {
+        if (establishesImportHorizon(stmt)) {
             return sf.getLineAndCharacterOfPosition(stmt.getStart(sf)).line + 1;
         }
     }

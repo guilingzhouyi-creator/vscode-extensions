@@ -27,6 +27,7 @@
 
 import type { EditRange } from '../diff/edit-diff';
 import { validateEditRanges } from '../diff/edit-diff';
+import { isPureAsciiSWAR64 } from './swar';
 
 // ── UTF-8 encoding boundaries (RFC 3629 / WHATWG decoder) ───────────────────────────
 /** Largest single-byte (ASCII) code point. */
@@ -80,8 +81,6 @@ export function decodeContent(input: string | Buffer | Uint8Array): string {
     if (typeof input === 'string') return input;
     return Buffer.from(input as Uint8Array).toString('utf8');
 }
-
-import { isPureAsciiSWAR64 } from './swar';
 
 /**
  * Fast-path check: is the buffer 100% ASCII (all bytes <= 0x7f)?

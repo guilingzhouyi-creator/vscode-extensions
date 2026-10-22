@@ -14,6 +14,8 @@ import type { LoopSite } from '../core/intelligence/semanticComplexity';
 import { isBoundedCollection } from '../core/intelligence/semanticComplexity';
 import { calculateLoopStateEntropy } from '../core/intelligence/payload-density';
 import { isCommentLine } from '../core/scanner/text-scanner-utils';
+import type { AllocationSiteContext } from '../core/intelligence/resource-pooling-auditor';
+import type { RoutineSemanticDescriptor } from '../core/intelligence/semantic-domain-detector';
 
 /**
  * Maximum window of lines inside a loop body inspected for allocations and blocking I/O.
@@ -360,9 +362,6 @@ export function findLoopSitesInFunction(
 
     return sites;
 }
-
-import type { AllocationSiteContext } from '../core/intelligence/resource-pooling-auditor';
-import type { RoutineSemanticDescriptor } from '../core/intelligence/semantic-domain-detector';
 
 function toAllocSiteContext(fnName: string, loop: LoopSite): AllocationSiteContext {
     return {

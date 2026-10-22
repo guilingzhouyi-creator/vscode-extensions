@@ -8,6 +8,12 @@
  * Exit Semantics & Design Rationale: Pure aggregation over the supplied site list; no I/O, and
  *   the caller keeps the analyzer wiring and severity policy.
  */
+
+import type { Issue, SemanticReviewDetail, TestModernityMetricSummary } from '../types';
+import { SEVERITY_INFO, LANGUAGE_TYPESCRIPT } from '../types';
+import { ANALYZER_TEST_MODERNITY } from '../scoring/dimensionLiterals';
+import type { ActiveSemanticUnit, TestModernityOptions } from './testModernity';
+
 /**
  * Scale factor converting a ratio into per-mille units.
  */
@@ -22,26 +28,6 @@ const PERCENT_SCALE = 100;
  * Score ceiling applied when a metric saturates.
  */
 const MAX_SCORE_CAP = 80;
-
-/**
- * Module: Core Intelligence — Test Modernity & Contract Fulfillment
- * File Path: src/core/intelligence/testModernity.ts
- * Architecture Role: Evaluates test suites for actual business risk mitigation, contract
- *   modernity, Effective Modern Test Density (EMTD), and Current Business Contract Coverage
- *   (CBCR), rejecting raw assertion counts or line counts.
- * Dependencies & Triggers: Core types (Issue, SemanticReviewDetail, SemanticEvidenceStep,
- *   TestModernityMetricSummary, TestDebtTicket); invoked by TestModernityAnalyzer.
- * Responsibilities: Detect test integrity illusions (TST-ILS-001); detect orphaned skipped
- *   tests (TST-SKP-001); detect tautological assertions (TST-TAU-001); compute EMTD and CBCR
- *   scores (TST-DEN-001); track deferred test debts with milestone convergence (TST-DBT-001).
- * Exit Semantics & Design Rationale: Pure computational model and AST pattern analyzer;
- *   returns structured diagnostics and metrics.
- */
-
-import type { Issue, SemanticReviewDetail, TestModernityMetricSummary } from '../types';
-import { SEVERITY_INFO, LANGUAGE_TYPESCRIPT } from '../types';
-import { ANALYZER_TEST_MODERNITY } from '../scoring/dimensionLiterals';
-import type { ActiveSemanticUnit, TestModernityOptions } from './testModernity';
 
 /** Module tag written into the semantic review detail. */
 const MODULE_TEST_SUITE = 'test-suite';

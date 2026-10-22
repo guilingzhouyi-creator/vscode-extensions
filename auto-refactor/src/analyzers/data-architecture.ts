@@ -135,6 +135,26 @@ interface SiteMeta {
 
 type OperationKind = 'query' | 'serialization' | 'validation' | 'driver-call' | 'resource-registry';
 
+/**
+ * A line that is (part of) a regular-expression literal rather than a call expression.
+ *
+ * A pattern such as `/assert(?:\.ok)?\(\s*true\s*\)/` contains the text `assert(` without calling
+ * `assert`, and this repository defines its own detectors that way. The first branch covers a
+ * literal at the start of a statement or argument list, the second covers a continued or closing
+ * fragment whose text ends the literal.
+ */
+const REGEX_LITERAL_LINE_RE = /^\s*\/(?![*/])|\/[gimsuy]*\s*[,;)]?\s*$/;
+
+/**
+ * Report whether the line is regular-expression source instead of executable code.
+ *
+ * @param trimmed - Line text with surrounding whitespace removed.
+ * @returns True when the line cannot contain a real call site.
+ */
+function isRegexLiteralLine(trimmed: string): boolean {
+    return REGEX_LITERAL_LINE_RE.test(trimmed);
+}
+
 function pushSite(
     sites: DataAccessSite[],
     meta: SiteMeta,
@@ -206,17 +226,19 @@ export class DataArchitectureAnalyzer implements Analyzer {
             updateLoopTracker(trimmed, currentIndent, loopTracker);
 
             const inIter = loopTracker.inLoop || ITERATION_METHOD_RE.test(trimmed);
-            checkAndPushSite(
-                trimmed,
-                {
-                    filePath: ctx.filePath,
-                    lineNum: i + 1,
-                    symbol: currentSymbol,
-                    isOnline,
-                    isLoopContext: inIter,
-                },
-                sites,
-            );
+            if (!isRegexLiteralLine(trimmed)) {
+                checkAndPushSite(
+                    trimmed,
+                    {
+                        filePath: ctx.filePath,
+                        lineNum: i + 1,
+                        symbol: currentSymbol,
+                        isOnline,
+                        isLoopContext: inIter,
+                    },
+                    sites,
+                );
+            }
         }
 
         return analyzeDataAccessSites(sites, options);
