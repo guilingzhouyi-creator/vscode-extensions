@@ -21,6 +21,7 @@ import {
     RULE_FAMILY_DEPENDENCY,
     RULE_FAMILY_COMPLEXITY,
     RULE_FAMILY_LARGE_FILE,
+    RULE_FAMILY_VOLUME,
     RULE_FAMILY_PERFORMANCE,
     RULE_FAMILY_CONSTANTS,
     RULE_FAMILY_SECURITY,
@@ -320,6 +321,69 @@ export const PLATFORM_RULES: readonly RuleDefinition[] = [
         remediation:
             'Extract shared contracts into independent submodules or use lazy imports to break dependency cycles.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#import-cycle',
+    }),
+    defineRule({
+        id: 'VOL-ELOC-001',
+        family: RULE_FAMILY_VOLUME,
+        analyzer: ANALYZER_LARGE_FILE,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_ERROR,
+        summary: 'Effective code volume budget guard: single file ELOC must not exceed 900.',
+        remediation:
+            'Decompose the module into cohesive submodules following the Single Responsibility Principle.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#vol-eloc-001',
+    }),
+    defineRule({
+        id: 'VOL-LOC-001',
+        family: RULE_FAMILY_VOLUME,
+        analyzer: ANALYZER_LARGE_FILE,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_ERROR,
+        summary: 'Physical line count budget guard: single file raw LOC must not exceed 1400.',
+        remediation:
+            'Split the file into smaller focused units to reduce cognitive load and formatting bloat.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#vol-loc-001',
+    }),
+    defineRule({
+        id: 'VOL-RATIO-001',
+        family: RULE_FAMILY_VOLUME,
+        analyzer: ANALYZER_LARGE_FILE,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_WARNING,
+        summary:
+            'Dynamic dilution envelope guard: physical line count must not exceed the 1:3 ratio envelope.',
+        remediation:
+            'Consolidate fragmented line breaks or move extended prose documentation into Markdown specifications.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#vol-ratio-001',
+    }),
+    defineRule({
+        id: 'VOL-DIL-001',
+        family: RULE_FAMILY_VOLUME,
+        analyzer: ANALYZER_LARGE_FILE,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_ERROR,
+        summary:
+            'Vertical logic dilution guard: effective logic density must stay inside the dynamic floor, so a file cannot be padded with blank lines or trivial stubs.',
+        remediation:
+            'Remove excessive blank padding, drop trivial stubs, or tighten the vertical layout.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#vol-dil-001',
+    }),
+    defineRule({
+        id: 'VOL-DOC-001',
+        family: RULE_FAMILY_VOLUME,
+        analyzer: ANALYZER_LARGE_FILE,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_ERROR,
+        summary:
+            'High-load logic architecture contract guard: modules with ELOC >= 600 must maintain a comment ratio of at least 8%.',
+        remediation:
+            'Add type contracts, state-machine invariants, or a JSDoc header describing module responsibilities.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#vol-doc-001',
     }),
     defineRule({
         id: 'large-file',

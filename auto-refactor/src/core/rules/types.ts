@@ -152,6 +152,15 @@ export const RULE_FAMILY_VSCODE_EXTENSION = 'VSC';
 export const RULE_FAMILY_UI = 'UI';
 /** Canonical rule-family prefix for production build hygiene rules. */
 export const RULE_FAMILY_PRODUCTION = 'PROD';
+/**
+ * Canonical rule-family prefix for volume-budget rules.
+ *
+ * The `large-file` analyzer owns two measurement families: the legacy aggregate `large-file`
+ * warning, and the precise `VOL-*` budgets that replace the workspace shell script of the same
+ * purpose. Keeping the prefix in this file means the entries module declares a real family instead
+ * of an inline string literal.
+ */
+export const RULE_FAMILY_VOLUME = 'VOL';
 
 /** Canonical legacy reason string for backward-compatible non-canonical ids. */
 export const LEGACY_REASON_ID_NOT_CANONICAL = 'id-not-canonical';

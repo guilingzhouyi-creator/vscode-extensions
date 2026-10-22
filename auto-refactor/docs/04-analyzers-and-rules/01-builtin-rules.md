@@ -457,6 +457,11 @@
 | `high-entropy-token` | <a id="high-entropy-token"></a>`secrets` | `LEGACY` | `warning` | `all` | 高熵字符串疑似密钥/令牌。（计划迁移至 `SEC-ENT-001`） | 移入配置/密钥管理；确为误报时用 matchRule 抑制并写明理由。 |
 | `import-cycle` | <a id="import-cycle"></a>`dependency-graph` | `DEP` | `error` | `all` | 模块级循环依赖（Python 相对导入与包解析同样覆盖）。（计划迁移至 `DEP-CYC-001`） | 把共享契约下沉为独立模块，或用惰性导入打断环（惰性导入不建边）。 |
 | `large-file` | <a id="large-file"></a>`large-file` | `BIG` | `warning` | `all` | 文件行数/函数数超过阈值。（计划迁移至 `BIG-SIZE-001`） | 按职责拆分模块，或把工具函数迁到专属文件。 |
+| `VOL-DIL-001` | <a id="vol-dil-001"></a>`large-file` | `VOL` | `error` | `all` | 垂直逻辑稀释：有效代码行数低于物理行数按目标稀释比反推的动态下限，说明文件被空行或琐碎桩填充。 | 删除多余空行、去除琐碎桩，或收紧纵向排版。 |
+| `VOL-DOC-001` | <a id="vol-doc-001"></a>`large-file` | `VOL` | `error` | `all` | 高负载逻辑缺少架构契约：有效代码行数达到高负载阈值后，注释占比低于契约下限。 | 补充类型契约、状态机不变式或描述模块职责的 JSDoc 头部。 |
+| `VOL-ELOC-001` | <a id="vol-eloc-001"></a>`large-file` | `VOL` | `error` | `all` | 单文件有效代码行数超出体积预算上限。 | 按单一职责原则把模块拆分为高内聚子模块。 |
+| `VOL-LOC-001` | <a id="vol-loc-001"></a>`large-file` | `VOL` | `error` | `all` | 单文件物理行数超出预算上限。 | 将文件拆分为多个聚焦单元，降低认知负荷与排版膨胀。 |
+| `VOL-RATIO-001` | <a id="vol-ratio-001"></a>`large-file` | `VOL` | `warning` | `all` | 物理行数超出按目标稀释比反推的动态包络，纵向排版过于稀疏。 | 合并碎片化换行，或把长段散文式文档移入 Markdown 规格说明。 |
 | `loop-transient-allocation` | <a id="loop-transient-allocation"></a>`performance` | `PRF` | `warning` | `all` | 循环体内瞬态堆分配（ADV-PRF-002），违背零瞬态分配契约。（计划迁移至 `PRF-TRAN-001`） | 将对象实例化提升到循环外或使用对象池模式（ADV-POOL-001）。 |
 | `nested-constant` | <a id="nested-constant"></a>`constants` | `LEGACY` | `warning` | `all` | 严禁常量化嵌套：禁止冗余常量别名引用、深层嵌套常量对象与作用域内部伪常量。（计划迁移至 `CST-NST-001`） | 将常量直接内联或提升至模块顶层单源声明，消除无意义的间接别名与深层对象嵌套。 |
 | `secret-detected` | <a id="secret-detected"></a>`secrets` | `LEGACY` | `error` | `all` | 疑似硬编码凭据（按模式识别）。（计划迁移至 `SEC-TOK-001`） | 撤销并轮换该凭据；改为从环境/密钥管理读取。 |
