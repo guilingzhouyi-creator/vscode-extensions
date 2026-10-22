@@ -229,8 +229,8 @@ export async function selfTestCommand(_args: string[]): Promise<{ code: number; 
                 `auto-refactor self-test (known violation fixtures -> engine hit assertion)`,
                 ...lines,
                 ok
-                    ? 'Conclusion: All expected engine rules fired [PASS]'
-                    : 'Conclusion: Regressed analyzer detected [FAIL]',
+                    ? 'Conclusion: All expected engine rules fired ✔'
+                    : 'Conclusion: Regressed analyzer detected ✖ BLOCK',
             ].join('\n'),
         };
     } catch (err) {

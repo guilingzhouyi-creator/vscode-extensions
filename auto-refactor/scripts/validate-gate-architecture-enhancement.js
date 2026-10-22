@@ -156,7 +156,7 @@ console.log('Testing Gate Architecture Enhancement & Quantification Model...');
   assert.strictEqual(ANALYZER_SLICE_DOMAIN['go-modern'], 'modernity_governance');
   assert.strictEqual(ANALYZER_SLICE_DOMAIN['performance'], 'ast_complexity');
 
-  console.log('  [PASS] 1. Preflight index & sparse activator gate integration');
+  console.log('  ✔ 1. Preflight index & sparse activator gate integration');
 })();
 
 // ── Test 2: Gate Governance Extended Rules ──
@@ -255,7 +255,7 @@ console.log('Testing Gate Architecture Enhancement & Quantification Model...');
       `Hardened gate scripts must clear all 4 new gate rules, remaining: ${JSON.stringify(remainingNewIssues)}`,
     );
 
-    console.log('  [PASS] 2. Gate governance extended rules (GUARD-MSG-002, AST, FAC, PROC)');
+    console.log('  ✔ 2. Gate governance extended rules (GUARD-MSG-002, AST, FAC, PROC)');
   } finally {
     cleanTempDir(dir);
   }
@@ -335,7 +335,7 @@ console.log('Testing Gate Architecture Enhancement & Quantification Model...');
   };
   assert.strictEqual(classifyDebtTier(smellIssue), 3, 'HYG-NAM info must be Tier 3');
 
-  console.log('  [PASS] 3. Ten-dimensional scoring deductions & family routing');
+  console.log('  ✔ 3. Ten-dimensional scoring deductions & family routing');
 })();
 
 // ── Test 4: Bayesian Scope Normalization & Confidence Bounds ──
@@ -383,7 +383,7 @@ console.log('Testing Gate Architecture Enhancement & Quantification Model...');
   assert.ok(ciUpper >= assessment.projectBaseline.mean, 'ciUpper >= mean');
   assert.ok(assessment.projectBaseline.confidence >= 0.6, 'confidence >= 0.60');
 
-  console.log('  [PASS] 4. Bayesian scope normalization & multi-scale confidence bounds');
+  console.log('  ✔ 4. Bayesian scope normalization & multi-scale confidence bounds');
 })();
 
 // ── Test 5: Analyzer Registry & Zero Fracture Verification ──
@@ -418,7 +418,7 @@ console.log('Testing Gate Architecture Enhancement & Quantification Model...');
     );
   }
 
-  console.log('  [PASS] 5. Analyzer registry completeness & zero fracture (30/30 wired)');
+  console.log('  ✔ 5. Analyzer registry completeness & zero fracture (30/30 wired)');
 })();
 
 // ── Test 6: Anti-Gaming & Composite Quality Gate ──
@@ -469,7 +469,7 @@ console.log('Testing Gate Architecture Enhancement & Quantification Model...');
   assert.strictEqual(validResult.passed, true, 'Legitimate change must pass gate');
   assert.strictEqual(validResult.verdictCode, 'PASS');
 
-  console.log('  [PASS] 6. Anti-gaming detection & composite quality gate evaluation');
+  console.log('  ✔ 6. Anti-gaming detection & composite quality gate evaluation');
 })();
 
 console.log('\n ALL GATE ARCHITECTURE ENHANCEMENT VERIFICATION CHECKS PASSED!\n');

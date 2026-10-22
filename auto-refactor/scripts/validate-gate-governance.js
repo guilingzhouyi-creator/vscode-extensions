@@ -49,7 +49,7 @@ console.log('Testing Gate Architecture Governance & Archetype Scaffolding...');
   const analyzer = new GateArchitectureAnalyzer();
   assert.strictEqual(analyzer.name, 'gate-architecture');
   assert.strictEqual(typeof analyzer.finalize, 'function');
-  console.log('  [PASS] 0. GateArchitectureAnalyzer contract and factory initialization');
+  console.log('  ✔ 0. GateArchitectureAnalyzer contract and factory initialization');
 })();
 
 // ── Test 1: Archetype Detection ──
@@ -84,7 +84,7 @@ console.log('Testing Gate Architecture Governance & Archetype Scaffolding...');
     assert.ok(ctx.gateScripts.files.some((f) => f.includes('pre-commit-gate.sh')));
 
     console.log(
-      '  [PASS] 1. Universal repository archetype detection (Node, Rust, Polyglot, Nested Gate Scripts)',
+      '  ✔ 1. Universal repository archetype detection (Node, Rust, Polyglot, Nested Gate Scripts)',
     );
   } finally {
     cleanTempDir(dir);
@@ -118,7 +118,7 @@ console.log('Testing Gate Architecture Governance & Archetype Scaffolding...');
     assert.ok(scaffold.suggestedStructure.ciWorkflow);
 
     console.log(
-      '  [PASS] 2. GUARD-SYS-001: Missing gate system emits full cross-platform scaffold payload',
+      '  ✔ 2. GUARD-SYS-001: Missing gate system emits full cross-platform scaffold payload',
     );
   } finally {
     cleanTempDir(dir);
@@ -145,7 +145,7 @@ console.log('Testing Gate Architecture Governance & Archetype Scaffolding...');
     assert.strictEqual(hookIssue.actionable.code, 'GUARD-HOOK-001');
 
     console.log(
-      '  [PASS] 3. GUARD-HOOK-001: Missing local left-shift Git hooks flagged with warning',
+      '  ✔ 3. GUARD-HOOK-001: Missing local left-shift Git hooks flagged with warning',
     );
   } finally {
     cleanTempDir(dir);
@@ -169,7 +169,7 @@ console.log('Testing Gate Architecture Governance & Archetype Scaffolding...');
     assert.strictEqual(routeIssue.severity, 'error');
 
     console.log(
-      '  [PASS] 4. GUARD-ROUTE-001: Fragile hook routing (powershell.exe) detected and blocked',
+      '  ✔ 4. GUARD-ROUTE-001: Fragile hook routing (powershell.exe) detected and blocked',
     );
   } finally {
     cleanTempDir(dir);
@@ -192,7 +192,7 @@ console.log('Testing Gate Architecture Governance & Archetype Scaffolding...');
     assert.ok(hygIssue, 'Expected GUARD-HYG-001 for missing 0-byte check');
     assert.strictEqual(hygIssue.severity, 'error');
 
-    console.log('  [PASS] 5. GUARD-HYG-001: Pre-commit lacking zero-byte empty file check flagged');
+    console.log('  ✔ 5. GUARD-HYG-001: Pre-commit lacking zero-byte empty file check flagged');
   } finally {
     cleanTempDir(dir);
   }
@@ -213,7 +213,7 @@ console.log('Testing Gate Architecture Governance & Archetype Scaffolding...');
     assert.ok(msgIssue, 'Expected GUARD-MSG-001 for missing commit-msg hook');
     assert.strictEqual(msgIssue.severity, 'warning');
 
-    console.log('  [PASS] 6. GUARD-MSG-001: Missing commit-msg hook flagged');
+    console.log('  ✔ 6. GUARD-MSG-001: Missing commit-msg hook flagged');
   } finally {
     cleanTempDir(dir);
   }
@@ -240,7 +240,7 @@ console.log('Testing Gate Architecture Governance & Archetype Scaffolding...');
     assert.ok(errIssue, 'Expected GUARD-ERR-001 for script lacking set -euo pipefail');
     assert.strictEqual(errIssue.severity, 'error');
 
-    console.log('  [PASS] 7. GUARD-ERR-001: Gate script without strict error flags blocked');
+    console.log('  ✔ 7. GUARD-ERR-001: Gate script without strict error flags blocked');
   } finally {
     cleanTempDir(dir);
   }
@@ -302,7 +302,7 @@ console.log('Testing Gate Architecture Governance & Archetype Scaffolding...');
       cleanTempDir(dirNoCi);
     }
 
-    console.log('  [PASS] 8. GUARD-ISO-001: Discrepancy between CI and local hooks identified');
+    console.log('  ✔ 8. GUARD-ISO-001: Discrepancy between CI and local hooks identified');
   } finally {
     cleanTempDir(dir);
   }
@@ -330,7 +330,7 @@ console.log('Testing Gate Architecture Governance & Archetype Scaffolding...');
     );
 
     console.log(
-      '  [PASS] 9. Gate scaffolding generator generates valid archetype-specific templates',
+      '  ✔ 9. Gate scaffolding generator generates valid archetype-specific templates',
     );
   } finally {
     cleanTempDir(dir);
@@ -359,7 +359,7 @@ console.log('Testing Gate Architecture Governance & Archetype Scaffolding...');
   }
 
   console.log(
-    '  [PASS] 10. Strict Project Neutrality: 0 hardcoded project names detected in all gate governance modules',
+    '  ✔ 10. Strict Project Neutrality: 0 hardcoded project names detected in all gate governance modules',
   );
 })();
 
@@ -382,7 +382,7 @@ console.log('Testing Gate Architecture Governance & Archetype Scaffolding...');
   );
 
   console.log(
-    `  [PASS] 11. Workspace dogfood: local gates detected, CI detected, 0 system-missing defects`,
+    `  ✔ 11. Workspace dogfood: local gates detected, CI detected, 0 system-missing defects`,
   );
 })();
 

@@ -152,7 +152,7 @@ async function main() {
       tsIndex.crossFileReferences >= 2,
       `expected >=2 cross-file call references, got ${tsIndex.crossFileReferences}`,
     );
-    console.log('  [PASS] TypeScript scan fills the index with declarations and call sites');
+    console.log('  ✔ TypeScript scan fills the index with declarations and call sites');
 
     // ── 2. Python: the same questions through another adapter ──
     const pyReport = await scanFixture(pyRoot, PY_FILES);
@@ -162,7 +162,7 @@ async function main() {
       pyIndex.crossFileReferences >= 2,
       `expected Python cross-file calls, got ${pyIndex.crossFileReferences}`,
     );
-    console.log('  [PASS] Python scan fills the same index through its own adapter');
+    console.log('  ✔ Python scan fills the same index through its own adapter');
 
     // ── 3. Provenance: a projection-path scan must not claim materialized completeness ──
     // ── 3b. The DEFAULT config (streaming analyzers only) takes the lazy-projection fast path:
@@ -187,7 +187,7 @@ async function main() {
         `the projection path must feed the call names it materializes, got ${projectedIndex.references}`,
       );
       console.log(
-        `  [PASS] default (projection) path feeds the index (${projectedIndex.definitions} defs)`,
+        `  ✔ default (projection) path feeds the index (${projectedIndex.definitions} defs)`,
       );
     } finally {
       fs.rmSync(projectionRoot, { recursive: true, force: true });
@@ -203,7 +203,7 @@ async function main() {
       oxcReport.summary.symbolIndex.definitions >= 3,
       `the oxc adapter must feed the same index, got ${oxcReport.summary.symbolIndex.definitions}`,
     );
-    console.log(`  [PASS] the oxc adapter feeds the same index (${oxcSource})`);
+    console.log(`  ✔ the oxc adapter feeds the same index (${oxcSource})`);
 
     // ── 4. Public query API resolves both language families ──
     const tsResolved = await querySymbols('computeTotal', {
@@ -222,7 +222,7 @@ async function main() {
       workers: 1,
     });
     assertResolves(pyReport, () => pyResolved, 'compute_total', ['app/helper.py'], ['app/main.py']);
-    console.log('  [PASS] querySymbols resolves definitions and cross-file call sites');
+    console.log('  ✔ querySymbols resolves definitions and cross-file call sites');
 
     // ── 4. The published counters agree with per-file facts ──
     const files = new Set(
@@ -234,7 +234,7 @@ async function main() {
       'number',
       'distinct-name count must be published',
     );
-    console.log('  [PASS] published index counters describe the scanned fixture');
+    console.log('  ✔ published index counters describe the scanned fixture');
   } finally {
     fs.rmSync(tsRoot, { recursive: true, force: true });
     fs.rmSync(pyRoot, { recursive: true, force: true });
@@ -246,6 +246,6 @@ main()
     console.log('\n ALL SYMBOL INDEX CHECKS PASSED SUCCESSFULLY!');
   })
   .catch((error) => {
-    console.error('\n[FAIL]', error && error.message ? error.message : error);
+    console.error('\n✖ BLOCK', error && error.message ? error.message : error);
     process.exit(1);
   });

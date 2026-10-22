@@ -35,7 +35,7 @@ function testZeroAnchorAndRobustness() {
   assert.strictEqual(calculateMarginalDeduction(5, 0), 0);
   assert.strictEqual(compressDimensionDeductions([]), 0);
 
-  console.log('  ✔ [PASS] Zero-anchor and numeric robustness verified.');
+  console.log('  ✔  Zero-anchor and numeric robustness verified.');
 }
 
 function testLinearFidelityZone() {
@@ -51,7 +51,7 @@ function testLinearFidelityZone() {
     );
   }
 
-  console.log('  ✔ [PASS] Linear fidelity for small infractions (<=15) verified.');
+  console.log('  ✔  Linear fidelity for small infractions (<=15) verified.');
 }
 
 function testStrictMonotonicity() {
@@ -67,7 +67,7 @@ function testStrictMonotonicity() {
     previous = current;
   }
 
-  console.log('  ✔ [PASS] Monotonicity verified over dense interval [0, 300].');
+  console.log('  ✔  Monotonicity verified over dense interval [0, 300].');
 }
 
 function testAsymptoticSaturation() {
@@ -102,7 +102,7 @@ function testAsymptoticSaturation() {
     `Custom capacity limit (${customLimit}) must be respected`,
   );
 
-  console.log('  ✔ [PASS] Asymptotic saturation and capacity ceiling verified.');
+  console.log('  ✔  Asymptotic saturation and capacity ceiling verified.');
 }
 
 function testRepetitiveIssueMarginalDeduction() {
@@ -128,7 +128,7 @@ function testRepetitiveIssueMarginalDeduction() {
     `Array compression should produce saturated total around 25-40, got ${compressed}`,
   );
 
-  console.log('  ✔ [PASS] Repetitive violation diminishing returns verified.');
+  console.log('  ✔  Repetitive violation diminishing returns verified.');
 }
 
 function runAll() {
@@ -138,7 +138,7 @@ function runAll() {
   testStrictMonotonicity();
   testAsymptoticSaturation();
   testRepetitiveIssueMarginalDeduction();
-  console.log('\n[PASS] All 5 Logistic Deduction Curve test suites passed successfully!');
+  console.log('\n✔ All 5 Logistic Deduction Curve test suites passed successfully!');
 }
 
 runAll();

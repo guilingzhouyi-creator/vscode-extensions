@@ -243,10 +243,10 @@ async function main() {
   await testStdlibArchetypeProfiling();
   await testStdlibSpecialRulesPositiveAndNegative();
   await testStdlibAutonomyQuantification();
-  console.log('\n[PASS] All standard library & systems runtime tests passed successfully.\n');
+  console.log('\n✔ All standard library & systems runtime tests passed successfully.\n');
 }
 
 main().catch((err) => {
-  console.error('\n[FAIL] Standard library verification failed:\n', err);
+  console.error('\n✖ BLOCK Standard library verification failed:\n', err);
   process.exit(1);
 });

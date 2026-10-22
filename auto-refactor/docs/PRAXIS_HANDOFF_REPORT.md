@@ -35,7 +35,7 @@
 | :--- | :---: | :--- |
 | **内置分析器规模** | **30 个** | [`config.ts`](../src/core/config/config.ts) `BUILTIN_ANALYZERS` 数组 |
 | **注册规则总数** | **363 条** | [`scripts/validate-rules-registry.js`](../scripts/validate-rules-registry.js) 100% 闭环通过 |
-| **规则字典覆盖率** | **363 / 363 (100%)** | 每一个注册规则在文档与规则表中均有定义行（工作区 SSOT 收录 503 条） |
+| **规则字典覆盖率** | **363 / 363 (100%)** | 每一个注册规则在文档与规则表中均有定义行（工作区 SSOT 收录 505 条） |
 | **自动化测试套件** | <!-- METRICS:BEGIN test-suite-count -->**163 套**<!-- METRICS:END test-suite-count -->全量 PASS | 158 套独立并行验证套件 + 4 套串行/状态套件 + 单元套件 (`npm test`) |
 | **高危技术债基线** | **0 项 (Critical = 0, High = 0)** | 零高危债务刚性防线，违者 CI Fail-Closed 阻断 |
 

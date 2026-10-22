@@ -385,10 +385,10 @@ async function main() {
 
   let failed = 0;
   const check = (name, ok, extra) => {
-    if (ok) console.log(`PASS ${name}${extra ? `  ${extra}` : ''}`);
+    if (ok) console.log(`✔ PASS  ${name}${extra ? `  ${extra}` : ''}`);
     else {
       failed++;
-      console.error(`FAIL ${name}${extra ? `  ${extra}` : ''}`);
+      console.error(`✖ BLOCK  ${name}${extra ? `  ${extra}` : ''}`);
     }
   };
 

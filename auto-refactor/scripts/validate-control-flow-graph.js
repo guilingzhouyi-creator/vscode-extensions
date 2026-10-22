@@ -42,7 +42,7 @@ function testBasicBlockPrimitives() {
   assert.strictEqual(b2.isTerminator(), true);
   assert.strictEqual(b2.getTerminator()?.kind, 'return');
 
-  console.log('   [PASS] BasicBlock primitives verified.');
+  console.log('   ✔ BasicBlock primitives verified.');
 }
 
 /**
@@ -80,7 +80,7 @@ function testBranchingCfg() {
     'Should contain false branch edge',
   );
 
-  console.log('   [PASS] Branching CFG verified.');
+  console.log('   ✔ Branching CFG verified.');
 }
 
 /**
@@ -116,7 +116,7 @@ function testFloatingPromiseAnalysis() {
   const negResult = DefUseAnalyzer.analyze(negCfg);
   assert.strictEqual(negResult.floatingPromises.length, 0, 'Compliant code should have 0 findings');
 
-  console.log('   [PASS] Floating promise analysis verified.');
+  console.log('   ✔ Floating promise analysis verified.');
 }
 
 /**
@@ -155,7 +155,7 @@ function testUnguardedNullAnalysis() {
     'Guarded return should have 0 findings',
   );
 
-  console.log('   [PASS] Unguarded null analysis verified.');
+  console.log('   ✔ Unguarded null analysis verified.');
 }
 
 /**
@@ -194,7 +194,7 @@ function testResourceClosureAnalysis() {
     'Clean resource should have 0 findings',
   );
 
-  console.log('   [PASS] Resource closure analysis verified.');
+  console.log('   ✔ Resource closure analysis verified.');
 }
 
 (() => {

@@ -69,15 +69,15 @@ function runAudit() {
   }
 
   if (violations.length > 0) {
-    console.error(`❌ [FAIL] Found ${violations.length} nested constant alias violation(s):`);
+    console.error(`✖ BLOCK  Found ${violations.length} nested constant alias violation(s):`);
     for (const v of violations) {
       console.error(`  - ${v.file}:${v.line} -> '${v.alias}' aliases '${v.target}' (${v.raw})`);
     }
     process.exit(1);
   }
 
-  console.log(`✔ [PASS] Verified ${files.length} source files: 0 nested constant aliases found.`);
-  console.log('✔ [PASS] Zero nested constants cleanliness guard passed completely.');
+  console.log(`✔  Verified ${files.length} source files: 0 nested constant aliases found.`);
+  console.log('✔  Zero nested constants cleanliness guard passed completely.');
 }
 
 runAudit();

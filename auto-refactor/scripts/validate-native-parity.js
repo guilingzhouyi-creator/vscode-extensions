@@ -56,7 +56,7 @@ function compare(label, runNative, runShim) {
   const a = runNative();
   const b = runShim();
   assert.deepStrictEqual(a, b, `${label}: native and shim disagree`);
-  console.log(`  [PASS] ${label} parity`);
+  console.log(`  ✔ ${label} parity`);
 }
 
 /**
@@ -104,7 +104,7 @@ function compareGraphResult(native, shim) {
     shim.isAcyclic,
     'analyzeDependencyGraph: isAcyclic diverges',
   );
-  console.log('  [PASS] analyzeDependencyGraph parity (compared up to SCC ordering)');
+  console.log('  ✔ analyzeDependencyGraph parity (compared up to SCC ordering)');
 }
 
 const SAMPLE = [

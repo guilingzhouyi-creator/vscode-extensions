@@ -94,7 +94,7 @@ function testTokenizationAndThresholds() {
   const normalVar = auditor.auditIdentifier('retryCount', 'variable', 2, 1);
   assert.strictEqual(normalVar, null, 'Normal variable name should not trigger finding');
 
-  console.log('  ✔ [PASS] Tokenization and threshold checks passed.');
+  console.log('  ✔  Tokenization and threshold checks passed.');
 }
 
 function testDomainPrefixClustering() {
@@ -140,7 +140,7 @@ function testDomainPrefixClustering() {
   const sparseFindings = auditor.auditClusters(sparseSymbols);
   assert.strictEqual(sparseFindings.length, 0, 'Clusters under 4 symbols should not trigger');
 
-  console.log('  ✔ [PASS] Domain prefix clustering passed.');
+  console.log('  ✔  Domain prefix clustering passed.');
 }
 
 function testNamingAnalyzerEndToEndTs() {
@@ -194,7 +194,7 @@ export class PlayerInventoryEquipmentItem {}
     'checkDecoupling: false must suppress all NAM-DEC-001 issues',
   );
 
-  console.log('  ✔ [PASS] TypeScript AST end-to-end integration passed.');
+  console.log('  ✔  TypeScript AST end-to-end integration passed.');
 }
 
 function testNamingAnalyzerEndToEndPython() {
@@ -223,7 +223,7 @@ CONFIG_NETWORK_HTTP_REST_API_TIMEOUT_RETRY_INTERVAL_MS = 5000
   );
   assert.strictEqual(decouplingIssues[0].rule, 'NAM-DEC-001');
 
-  console.log('  ✔ [PASS] Python end-to-end integration passed.');
+  console.log('  ✔  Python end-to-end integration passed.');
 }
 
 function testScoringRuleTableRouting() {
@@ -261,7 +261,7 @@ function testScoringRuleTableRouting() {
   );
   assert.ok(stdRule, 'DIMENSION_RULES must map ANALYZER_NAMING into standardization');
 
-  console.log('  ✔ [PASS] Scoring rule table routing verified.');
+  console.log('  ✔  Scoring rule table routing verified.');
 }
 
 function runAll() {
@@ -271,12 +271,12 @@ function runAll() {
   testNamingAnalyzerEndToEndTs();
   testNamingAnalyzerEndToEndPython();
   testScoringRuleTableRouting();
-  console.log('\n[PASS] All 5 Naming Decoupling Architecture test suites passed successfully!');
+  console.log('\n✔ All 5 Naming Decoupling Architecture test suites passed successfully!');
 }
 
 try {
   runAll();
 } catch (err) {
-  console.error('\n[FAIL] Naming decoupling architecture validation failed:', err);
+  console.error('\n✖ BLOCK Naming decoupling architecture validation failed:', err);
   process.exit(1);
 }

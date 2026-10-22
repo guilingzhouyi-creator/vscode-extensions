@@ -149,7 +149,7 @@ function main() {
   testIntraFileZonePartitioner();
   testConfigPenetration();
   console.log(
-    '✔ [PASS] All multi-language elastic LOC & zone partitioner tests passed successfully!',
+    '✔  All multi-language elastic LOC & zone partitioner tests passed successfully!',
   );
 }
 

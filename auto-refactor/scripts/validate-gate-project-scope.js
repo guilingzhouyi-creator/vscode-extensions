@@ -56,7 +56,7 @@ console.log('Testing Workspace Topology Sniffer & Adaptive Gate Governance...');
     assert.strictEqual(topology.monorepoType, 'none');
     assert.strictEqual(topology.projectCount, 1);
     assert.strictEqual(topology.primaryProjectName, path.basename(tempDir));
-    console.log('  [PASS] 1. Topology sniffer correctly classifies Single-Project');
+    console.log('  ✔ 1. Topology sniffer correctly classifies Single-Project');
   } finally {
     cleanTempDir(tempDir);
   }
@@ -85,7 +85,7 @@ console.log('Testing Workspace Topology Sniffer & Adaptive Gate Governance...');
     assert.strictEqual(topology.monorepoType, 'directory-cluster');
     assert.strictEqual(topology.projectCount, 2);
     assert.strictEqual(topology.subprojects.length, 2);
-    console.log('  [PASS] 2. Topology sniffer correctly classifies Directory Cluster Monorepo');
+    console.log('  ✔ 2. Topology sniffer correctly classifies Directory Cluster Monorepo');
   } finally {
     cleanTempDir(tempDir);
   }
@@ -118,7 +118,7 @@ console.log('Testing Workspace Topology Sniffer & Adaptive Gate Governance...');
     assert.strictEqual(topology.isMonorepo, true);
     assert.strictEqual(topology.monorepoType, 'npm-workspaces');
     assert.strictEqual(topology.detectionSource, 'explicit-manifest');
-    console.log('  [PASS] 3. Topology sniffer correctly classifies Explicit Manifest Workspace');
+    console.log('  ✔ 3. Topology sniffer correctly classifies Explicit Manifest Workspace');
   } finally {
     cleanTempDir(tempDir);
   }
@@ -160,7 +160,7 @@ console.log('Testing Workspace Topology Sniffer & Adaptive Gate Governance...');
       undefined,
       'GUARD-MSG-003 must be auto-muted in single-project repository',
     );
-    console.log('  [PASS] 4. GUARD-MSG-003 correctly auto-mutes in Single-Project repository');
+    console.log('  ✔ 4. GUARD-MSG-003 correctly auto-mutes in Single-Project repository');
   } finally {
     cleanTempDir(tempDir);
   }
@@ -207,7 +207,7 @@ console.log('Testing Workspace Topology Sniffer & Adaptive Gate Governance...');
     assert.strictEqual(msg003Issue.severity, 'error');
     assert.strictEqual(msg003Issue.detail.action, 'add_project_scope_gate');
     assert.deepStrictEqual(msg003Issue.detail.detectedSubprojects, ['app1', 'app2']);
-    console.log('  [PASS] 5. GUARD-MSG-003 strictly triggers on Monorepo with actionable payload');
+    console.log('  ✔ 5. GUARD-MSG-003 strictly triggers on Monorepo with actionable payload');
   } finally {
     cleanTempDir(tempDir);
   }
@@ -246,7 +246,7 @@ console.log('Testing Workspace Topology Sniffer & Adaptive Gate Governance...');
     const result = auditGateArchitecture(tempDir);
     const msg003Issue = result.issues.find((i) => i.rule === 'GUARD-MSG-003');
     assert.strictEqual(msg003Issue, undefined, 'GUARD-MSG-003 must pass with [Project] check');
-    console.log('  [PASS] 6. GUARD-MSG-003 passes on compliant Monorepo gate infrastructure');
+    console.log('  ✔ 6. GUARD-MSG-003 passes on compliant Monorepo gate infrastructure');
   } finally {
     cleanTempDir(tempDir);
   }
@@ -281,7 +281,7 @@ console.log('Testing Workspace Topology Sniffer & Adaptive Gate Governance...');
       pairIssues.some((i) => i.location.file.includes('pre-commit-gate')),
       true,
     );
-    console.log('  [PASS] 7. GUARD-PAIR-001 flags missing dual-platform gate script pairing');
+    console.log('  ✔ 7. GUARD-PAIR-001 flags missing dual-platform gate script pairing');
   } finally {
     cleanTempDir(tempDir);
   }
@@ -331,7 +331,7 @@ fi
   assert.strictEqual(eqIssue.severity, 'warning');
 
   console.log(
-    '  [PASS] 8. SH-COND-001 catches regex, logical operators, and non-portable equality',
+    '  ✔ 8. SH-COND-001 catches regex, logical operators, and non-portable equality',
   );
 })();
 

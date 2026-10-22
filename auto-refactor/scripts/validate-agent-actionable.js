@@ -44,7 +44,7 @@ async function main() {
   assert.strictEqual(typeof magicIssue.actionable.targetSymbol, 'string');
   assert.strictEqual(magicIssue.actionable.safeToAutomate, true);
   assert.ok(magicIssue.actionable.patch, 'Must provide patch range');
-  console.log('✔ [PASS] ConstantsAnalyzer emits actionable payload for magic numbers');
+  console.log('✔  ConstantsAnalyzer emits actionable payload for magic numbers');
 
   const stringIssue = report.issues.find((i) => i.rule === 'hardcoded-string' && i.actionable);
   assert.ok(stringIssue, 'Must find hardcoded-string issue with actionable payload');
@@ -52,7 +52,7 @@ async function main() {
   assert.strictEqual(stringIssue.actionable.code, 'AR:CONST:001');
   assert.strictEqual(stringIssue.actionable.targetScope, 'module_top_level');
   assert.strictEqual(stringIssue.actionable.safeToAutomate, true);
-  console.log('✔ [PASS] ConstantsAnalyzer emits actionable payload for hardcoded strings');
+  console.log('✔  ConstantsAnalyzer emits actionable payload for hardcoded strings');
 
   // 2. Test StdlibAnalyzer outputting actionable for panic and unsafe
   const stdlibAnalyzer = new StdlibAnalyzer();
@@ -74,7 +74,7 @@ pub fn dangerous_call() {
   assert.strictEqual(panicIssue.actionable.action, 'replace_token');
   assert.strictEqual(panicIssue.actionable.code, 'AR:STB:001');
   assert.strictEqual(panicIssue.actionable.safeToAutomate, false);
-  console.log('✔ [PASS] StdlibAnalyzer emits actionable payload for panic escaping');
+  console.log('✔  StdlibAnalyzer emits actionable payload for panic escaping');
 
   // 3. Test TsModernAnalyzer outputting actionable
   const { TsModernAnalyzer } = require('../dist/analyzers/ts-modern');
@@ -92,7 +92,7 @@ var legacyBinding = 42;
   assert.ok(varIssue.actionable, 'TSM-VAR-001 must carry actionable payload');
   assert.strictEqual(varIssue.actionable.action, 'replace_token');
   assert.strictEqual(varIssue.actionable.code, 'AR:TSM:001');
-  console.log('✔ [PASS] TsModernAnalyzer emits actionable payload for var statements');
+  console.log('✔  TsModernAnalyzer emits actionable payload for var statements');
 
   // 4. Test SimplifyAnalyzer outputting actionable
   const { SimplifyAnalyzer } = require('../dist/analyzers/simplify');
@@ -114,7 +114,7 @@ var legacyBinding = 42;
   assert.ok(comcIssue.actionable, 'SIM-COMC-001 must carry actionable payload');
   assert.strictEqual(comcIssue.actionable.action, 'replace_token');
   assert.strictEqual(comcIssue.actionable.code, 'AR:SIM:003');
-  console.log('✔ [PASS] SimplifyAnalyzer emits actionable payload for commented code');
+  console.log('✔  SimplifyAnalyzer emits actionable payload for commented code');
 
   // 5. Test RustModernAnalyzer outputting actionable and templateSnippet
   const { RustModernAnalyzer } = require('../dist/analyzers/rust-modern');
@@ -137,7 +137,7 @@ pub fn do_work() -> Result<(), String> {
   assert.strictEqual(tryIssue.actionable.code, 'AR:RSM:001');
   assert.strictEqual(tryIssue.actionable.templateSnippet, '$1?');
   console.log(
-    '✔ [PASS] RustModernAnalyzer emits actionable payload and templateSnippet for try! macro',
+    '✔  RustModernAnalyzer emits actionable payload and templateSnippet for try! macro',
   );
 
   // 6. Test PythonModernAnalyzer outputting actionable and templateSnippet
@@ -160,7 +160,7 @@ def get_path():
   assert.strictEqual(pathIssue.actionable.code, 'AR:PYM:001');
   assert.ok(pathIssue.actionable.templateSnippet, 'Must provide templateSnippet for PYM-PATH-001');
   console.log(
-    '✔ [PASS] PythonModernAnalyzer emits actionable payload and templateSnippet for os.path',
+    '✔  PythonModernAnalyzer emits actionable payload and templateSnippet for os.path',
   );
 
   // 7. Test ArchitectureAnalyzer outputting actionable and templateSnippet
@@ -186,7 +186,7 @@ export * from './internal-sub';
     'Must provide templateSnippet for ARCH-FAC-001',
   );
   console.log(
-    '✔ [PASS] ArchitectureAnalyzer emits actionable payload and templateSnippet for facade rules',
+    '✔  ArchitectureAnalyzer emits actionable payload and templateSnippet for facade rules',
   );
 
   // 8. Test PerformanceAnalyzer outputting actionable and templateSnippet
@@ -215,7 +215,7 @@ function processBatch(items: string[]) {
     'Must provide templateSnippet for loop transient allocation',
   );
   console.log(
-    '✔ [PASS] PerformanceAnalyzer emits actionable payload and templateSnippet for loop allocation',
+    '✔  PerformanceAnalyzer emits actionable payload and templateSnippet for loop allocation',
   );
 
   // 9. Test ShellLintAnalyzer outputting actionable and templateSnippet
@@ -235,10 +235,10 @@ echo $UNQUOTED_VAR
   assert.strictEqual(quoteIssue.actionable.code, 'AR:SHL:002');
   assert.strictEqual(quoteIssue.actionable.templateSnippet, '"$VAR"');
   console.log(
-    '✔ [PASS] ShellLintAnalyzer emits actionable payload and templateSnippet for unquoted variables',
+    '✔  ShellLintAnalyzer emits actionable payload and templateSnippet for unquoted variables',
   );
 
-  console.log('✔ [PASS] All Agent-Actionable diagnostic contracts verified successfully.');
+  console.log('✔  All Agent-Actionable diagnostic contracts verified successfully.');
 }
 
 main().catch((err) => {

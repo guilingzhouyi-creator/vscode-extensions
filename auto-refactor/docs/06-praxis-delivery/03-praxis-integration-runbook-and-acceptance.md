@@ -110,7 +110,7 @@ Praxis 交付以 <!-- METRICS:BEGIN test-suite-count -->**163 套**<!-- METRICS:
 
 | 验收核心域 | 验证命令 / 脚本路径 | 核心断言内容 | 验收标准 |
 | :--- | :--- | :--- | :---: |
-| **规则完整性与注册一致性** | `npm run validate-rules-registry` | 30 个分析器与 363 条注册规则 100% 覆盖无孤儿规则（全工作区 503 条） | **PASS** |
+| **规则完整性与注册一致性** | `npm run validate-rules-registry` | 30 个分析器与 363 条注册规则 100% 覆盖无孤儿规则（全工作区 505 条） | **PASS** |
 | **Praxis 统一 SDK 与双载荷** | `npm run validate-praxis-presentation` | `createPraxisClient` 全工作区、单文件、双载荷与 i18n 汉化 | **PASS** |
 | **11 组语义重叠并查集去重** | `npm run validate-dual-faced-presentation` | 验证并查集 `findRoot`/`union` 正确归并，次级规则沉淀到元数据 | **PASS** |
 | **毫秒级切片与 Sparse MoE 路由** | `npm run validate-self-slice-audit` | 单切片执行时延 **< 10ms**，分析器绕过率 $\ge 70\%$ | **PASS** |

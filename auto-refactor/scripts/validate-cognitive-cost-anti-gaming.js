@@ -27,9 +27,9 @@ function assert(condition, message) {
   totalCount++;
   if (condition) {
     passedCount++;
-    console.log(`  [PASS] ${message}`);
+    console.log(`  ✔ ${message}`);
   } else {
-    console.error(`  [FAIL] ${message}`);
+    console.error(`  ✖ BLOCK ${message}`);
     process.exitCode = 1;
   }
 }

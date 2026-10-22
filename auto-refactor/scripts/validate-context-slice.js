@@ -130,7 +130,7 @@ async function scanAndSlice(root) {
   );
   assert.ok(!slice.truncated, 'a three-region slice must not report truncation');
   console.log(
-    `  [PASS] intent resolved to roles definition/dependency/impact (${slice.regions.length} regions)`,
+    `  ✔ intent resolved to roles definition/dependency/impact (${slice.regions.length} regions)`,
   );
 
   const capped = buildContextSlice('给 alpha 增加超时处理', index, new CallGraph(index), {
@@ -144,7 +144,7 @@ async function scanAndSlice(root) {
     ['zetaUnknown'],
     'unmatched tokens must be reported',
   );
-  console.log('  [PASS] budget truncation and unresolved tokens are explicit');
+  console.log('  ✔ budget truncation and unresolved tokens are explicit');
 
   // ── 2. Integration: a real scan feeds the slice, regions point at existing files ──────────────
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ar-slice-'));
@@ -161,7 +161,7 @@ async function scanAndSlice(root) {
       );
     }
     console.log(
-      `  [PASS] real scan slice: ${real.regions.length} regions, ${real.dependencies.length} dependencies, ${real.impacts.length} impacts`,
+      `  ✔ real scan slice: ${real.regions.length} regions, ${real.dependencies.length} dependencies, ${real.impacts.length} impacts`,
     );
   } finally {
     fs.rmSync(root, { recursive: true, force: true });

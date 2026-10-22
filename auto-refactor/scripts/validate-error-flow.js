@@ -123,13 +123,13 @@ function errorFindings(report) {
       'the finding must not claim verified handling',
     );
     console.log(
-      `  [PASS] duplicate code reported with a ${finding.detail.hops}-hop chain ` +
+      `  ✔ duplicate code reported with a ${finding.detail.hops}-hop chain ` +
         `(${finding.detail.chain.join(' <- ')}) and its boundary`,
     );
 
     const offFindings = errorFindings(await scanFixture(disabledRoot, false));
     assert.strictEqual(offFindings.length, 0, 'the pass must stay opt-in');
-    console.log('  [PASS] the error-propagation pass stays opt-in');
+    console.log('  ✔ the error-propagation pass stays opt-in');
   } finally {
     fs.rmSync(enabledRoot, { recursive: true, force: true });
     fs.rmSync(disabledRoot, { recursive: true, force: true });

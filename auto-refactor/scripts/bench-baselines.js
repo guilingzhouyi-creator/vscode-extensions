@@ -200,7 +200,7 @@ async function runStage1Validate(opts) {
   if (opts.json && spawnResult.stdout) process.stderr.write(spawnResult.stdout.toString());
   const ok = spawnResult.status === 0;
   if (ok) {
-    printProgressMessage('[bench-baselines] stage1 validate ....... PASS (9/9)');
+    printProgressMessage('[bench-baselines] stage1 validate ....... ✔ (9/9)');
     return { ok: true, passed: 9, total: 9, skipped: false };
   }
   console.error('[bench-baselines] 输出已变，性能无效 —— validate 未全 PASS，基准中止');

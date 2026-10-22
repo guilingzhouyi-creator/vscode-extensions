@@ -85,7 +85,7 @@ async function run() {
       !report.issues.some((i) => i.rule === 'LANG-UNSUPPORTED'),
       'markdown must be claimed by an adapter, not reported as an unsupported language',
     );
-    console.log('  [PASS] .md is adapter-claimed (no LANG-UNSUPPORTED)');
+    console.log('  ✔ .md is adapter-claimed (no LANG-UNSUPPORTED)');
 
     const rulesIn = (file) => report.issues.filter((i) => i.location.file === file);
     const broken = rulesIn('broken.md');
@@ -104,16 +104,16 @@ async function run() {
       1,
       'duplicated prose must be reported once per document',
     );
-    console.log('  [PASS] fence, dead reference and duplicate prose are all detected');
+    console.log('  ✔ fence, dead reference and duplicate prose are all detected');
 
     assert.deepStrictEqual(rulesIn('clean.md'), [], 'a healthy document must stay silent');
-    console.log('  [PASS] clean document (balanced fence + resolvable reference) stays silent');
+    console.log('  ✔ clean document (balanced fence + resolvable reference) stays silent');
 
     assert.ok(
       !report.issues.some((i) => i.location.file === 'docs/notes.md'),
       'referenced target document must not be flagged',
     );
-    console.log('  [PASS] referenced target document stays silent');
+    console.log('  ✔ referenced target document stays silent');
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -124,6 +124,6 @@ run()
     console.log('\n ALL DOCUMENTATION KEY POINTS PASSED SUCCESSFULLY!');
   })
   .catch((error) => {
-    console.error('\n[FAIL]', error && error.message ? error.message : error);
+    console.error('\n✖ BLOCK', error && error.message ? error.message : error);
     process.exit(1);
   });

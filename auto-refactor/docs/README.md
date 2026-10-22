@@ -26,7 +26,7 @@
 * [03-praxis-integration-guide.md](./03-incremental-and-diff/03-praxis-integration-guide.md)：`CircularDiffBuffer` 环形缓冲、`Uint8Array` R4 二进制冷存淘汰与 `SemanticPraxisContextEnricher` 作用域富集指南。
 
 ### 🔍 L4. 四层规则金字塔与内置分析器矩阵 (`04-analyzers-and-rules/`)
-* [01-builtin-rules.md](./04-analyzers-and-rules/01-builtin-rules.md)：四层规则金字塔、30 个内置分析器包、机读英文 + 人读中文双轨文案契约，以及 **363 条全量内置规则权威字典（363/363 门禁覆盖，全工作区 SSOT 单源收录 503 条）**。
+* [01-builtin-rules.md](./04-analyzers-and-rules/01-builtin-rules.md)：四层规则金字塔、30 个内置分析器包、机读英文 + 人读中文双轨文案契约，以及 **363 条全量内置规则权威字典（363/363 门禁覆盖，全工作区 SSOT 单源收录 505 条）**。
 * [02-custom-analyzer-plugin.md](./04-analyzers-and-rules/02-custom-analyzer-plugin.md)：声明式 `PatternKernel` 与编程式 `Analyzer` 插件开发规范、`cacheCustom` 安全隔离及评分表接入流程。
 
 ### 📊 L5. 配置契约、三平面质量度量与性能基准 (`05-specs-and-benchmarks/`)

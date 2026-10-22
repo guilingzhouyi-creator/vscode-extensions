@@ -112,14 +112,14 @@ function auditFileVolumeBudget(allFiles) {
   );
 
   if (overBudgetFiles.length > 0) {
-    console.error(`  ❌ [FAIL] ${overBudgetFiles.length} file(s) exceeded volume budget:`);
+    console.error(`  ✖ BLOCK  ${overBudgetFiles.length} file(s) exceeded volume budget:`);
     for (const f of overBudgetFiles) {
       console.error(`     - ${f.relPath}: ${f.reason}`);
     }
     return false;
   }
   console.log(
-    `  ✔ [PASS] 100% files conform to dual-scale volume & bidirectional envelope (Max: ${fileStats[0].eloc} ELOC < ${MAX_ELOC_BUDGET}, ${Math.max(...fileStats.map((f) => f.loc))} LOC < ${MAX_PHYSICAL_LOC_BUDGET})\n`,
+    `  ✔  100% files conform to dual-scale volume & bidirectional envelope (Max: ${fileStats[0].eloc} ELOC < ${MAX_ELOC_BUDGET}, ${Math.max(...fileStats.map((f) => f.loc))} LOC < ${MAX_PHYSICAL_LOC_BUDGET})\n`,
   );
   return true;
 }
@@ -149,12 +149,12 @@ function auditShannonEntropy(allFiles) {
 
   if (lowEntropyFiles.length > 0 || meanEntropy < 3.5 || meanEntropy > 6.5) {
     console.error(
-      `  ❌ [FAIL] Entropy bounds violated: low count: ${lowEntropyFiles.length}, mean: ${meanEntropy}`,
+      `  ✖ BLOCK  Entropy bounds violated: low count: ${lowEntropyFiles.length}, mean: ${meanEntropy}`,
     );
     return false;
   }
   console.log(
-    `  ✔ [PASS] Shannon entropy healthy (mean ${meanEntropy.toFixed(2)} in [3.5, 6.5], 0 files < 3.0)\n`,
+    `  ✔  Shannon entropy healthy (mean ${meanEntropy.toFixed(2)} in [3.5, 6.5], 0 files < 3.0)\n`,
   );
   return true;
 }
@@ -250,7 +250,7 @@ function auditAstDensity(allFiles) {
 
   if (outlierDensityFiles.length > 0 || meanDensity < 1.0 || meanDensity > 20.0) {
     console.error(
-      `  ❌ [FAIL] AST density outliers detected: ${outlierDensityFiles.length}, mean: ${meanDensity}`,
+      `  ✖ BLOCK  AST density outliers detected: ${outlierDensityFiles.length}, mean: ${meanDensity}`,
     );
     for (const item of outlierDensityFiles) {
       console.error(
@@ -260,7 +260,7 @@ function auditAstDensity(allFiles) {
     return false;
   }
   console.log(
-    `  ✔ [PASS] AST syntax density verified (mean ${meanDensity.toFixed(2)} nodes/LOC in [1.0, 20.0])\n`,
+    `  ✔  AST syntax density verified (mean ${meanDensity.toFixed(2)} nodes/LOC in [1.0, 20.0])\n`,
   );
   return true;
 }
@@ -295,14 +295,14 @@ function auditBoundaryInteroperability(allFiles) {
   );
 
   if (boundaryViolations.length > 0) {
-    console.error(`  ❌ [FAIL] Reverse layer coupling detected from core:`);
+    console.error(`  ✖ BLOCK  Reverse layer coupling detected from core:`);
     for (const v of boundaryViolations) {
       console.error(`     - ${v.relPath} imports '${v.target}'`);
     }
     return false;
   }
   console.log(
-    `  ✔ [PASS] Boundary Interoperability clean (BIF = 100.0%, 0 reverse dependencies)\n`,
+    `  ✔  Boundary Interoperability clean (BIF = 100.0%, 0 reverse dependencies)\n`,
   );
   return true;
 }
@@ -325,7 +325,7 @@ function verifyProfileMassAndCorridor(tuner, profile, baseMass, dimensions, Qual
 
   if (Math.abs(tunedMass - baseMass) > 0.001) {
     console.error(
-      `  ❌ [FAIL] Profile '${profile}' violated mass preservation: base=${baseMass}, tuned=${tunedMass}`,
+      `  ✖ BLOCK  Profile '${profile}' violated mass preservation: base=${baseMass}, tuned=${tunedMass}`,
     );
     return false;
   }
@@ -334,7 +334,7 @@ function verifyProfileMassAndCorridor(tuner, profile, baseMass, dimensions, Qual
   const cleanEval = scorer.evaluateFile('dummy.ts', [], null);
   if (!isScoreInHighTrustCorridor(cleanEval.compositeScore)) {
     console.error(
-      `  ❌ [FAIL] Profile '${profile}' clean score was not in high-trust corridor [99.0, 100.0]: ${cleanEval.compositeScore}`,
+      `  ✖ BLOCK  Profile '${profile}' clean score was not in high-trust corridor [99.0, 100.0]: ${cleanEval.compositeScore}`,
     );
     return false;
   }
@@ -346,11 +346,11 @@ function verifyDomainBiasAsymmetry(tuner) {
   const backendWeights = tuner.tuneWeights('backend');
 
   if (frontendWeights.standardization <= backendWeights.standardization) {
-    console.error('  ❌ [FAIL] Frontend standardization bias not greater than backend');
+    console.error('  ✖ BLOCK  Frontend standardization bias not greater than backend');
     return false;
   }
   if (backendWeights.performanceEfficiency <= frontendWeights.performanceEfficiency) {
-    console.error('  ❌ [FAIL] Backend performanceEfficiency bias not greater than frontend');
+    console.error('  ✖ BLOCK  Backend performanceEfficiency bias not greater than frontend');
     return false;
   }
   return true;
@@ -382,7 +382,7 @@ function auditProfileScoringPrecision() {
   }
 
   console.log(
-    `  ✔ [PASS] Profile weight mass invariant preserved (Δ < 0.001) and domain bias asymmetry confirmed\n`,
+    `  ✔  Profile weight mass invariant preserved (Δ < 0.001) and domain bias asymmetry confirmed\n`,
   );
   return true;
 }
@@ -531,56 +531,56 @@ function auditTenDimensionalFidelity() {
   console.log('[CASE-06] Ten-Dimensional Trajectory & Score Fidelity Guard');
   const trajectoryFile = path.join(ROOT, '.refactor-trajectory', 'active-runs.ndjson');
   if (!fs.existsSync(trajectoryFile)) {
-    console.error(`  ❌ [FAIL] Trajectory file not found at ${trajectoryFile}`);
+    console.error(`  ✖ BLOCK  Trajectory file not found at ${trajectoryFile}`);
     return false;
   }
 
   const lines = fs.readFileSync(trajectoryFile, 'utf8').trim().split('\n').filter(Boolean);
   if (lines.length === 0) {
-    console.error('  ❌ [FAIL] Trajectory file is empty');
+    console.error('  ✖ BLOCK  Trajectory file is empty');
     return false;
   }
 
   const latestRun = JSON.parse(lines[lines.length - 1]);
   if (!latestRun.score || !Array.isArray(latestRun.score.vec)) {
-    console.error('  ❌ [FAIL] Latest trajectory entry missing score.vec array');
+    console.error('  ✖ BLOCK  Latest trajectory entry missing score.vec array');
     return false;
   }
 
   const vecResult = validateTrajectoryVector(latestRun.score.vec);
   if (!vecResult.valid) {
-    console.error(`  ❌ [FAIL] ${vecResult.reason}`);
+    console.error(`  ✖ BLOCK  ${vecResult.reason}`);
     return false;
   }
 
   const baselineFile = path.join(ROOT, 'reports', 'self-audit-baseline.json');
   if (!fs.existsSync(baselineFile)) {
-    console.error(`  ❌ [FAIL] Baseline report not found at ${baselineFile}`);
+    console.error(`  ✖ BLOCK  Baseline report not found at ${baselineFile}`);
     return false;
   }
 
   const baseline = JSON.parse(fs.readFileSync(baselineFile, 'utf8'));
   const baselineResult = validateBaselineTenDimensions(baseline);
   if (!baselineResult.valid) {
-    console.error(`  ❌ [FAIL] ${baselineResult.reason}`);
+    console.error(`  ✖ BLOCK  ${baselineResult.reason}`);
     return false;
   }
 
   const consistency = validateVectorConsistency(baseline.tenDimensions, latestRun.score.vec);
   if (!consistency.consistent) {
-    console.error(`  ❌ [FAIL] ${consistency.reason}`);
+    console.error(`  ✖ BLOCK  ${consistency.reason}`);
     return false;
   }
 
   if (!checkCompositeParity(latestRun, baseline)) {
     console.error(
-      `  ❌ [FAIL] Composite score mismatch: baseline=${baseline.metrics.compositeScore}, trajectory=${latestRun.score.aft}`,
+      `  ✖ BLOCK  Composite score mismatch: baseline=${baseline.metrics.compositeScore}, trajectory=${latestRun.score.aft}`,
     );
     return false;
   }
 
   console.log(
-    `  ✔ [PASS] 10-dimensional vector confirmed (10 dims complete, ${vecResult.reactiveCount} reactive dimensions in [${MIN_REACTIVE_DIMENSIONS}, ${MAX_REACTIVE_DIMENSIONS}], baseline vector consistent: [${latestRun.score.vec.join(', ')}])\n`,
+    `  ✔  10-dimensional vector confirmed (10 dims complete, ${vecResult.reactiveCount} reactive dimensions in [${MIN_REACTIVE_DIMENSIONS}, ${MAX_REACTIVE_DIMENSIONS}], baseline vector consistent: [${latestRun.score.vec.join(', ')}])\n`,
   );
   return true;
 }

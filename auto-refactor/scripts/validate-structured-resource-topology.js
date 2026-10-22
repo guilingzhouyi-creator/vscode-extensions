@@ -45,7 +45,7 @@ console.log('=== Running Structured Resource Topology & Scale Invariant Test Sui
     'Snapshot core ELOC must remain invariant under resource stuffing',
   );
   console.log(
-    '  [PASS] Invariant 1: Snapshot-Conditioned Invariance (d(ELOC_core)/d(ELOC(r)) == 0)',
+    '  ✔ Invariant 1: Snapshot-Conditioned Invariance (d(ELOC_core)/d(ELOC(r)) == 0)',
   );
 }
 
@@ -65,7 +65,7 @@ console.log('=== Running Structured Resource Topology & Scale Invariant Test Sui
     23,
     'Difference should only reflect ELOC delta (0.25 * 90 = 22.5)',
   );
-  console.log('  [PASS] Invariant 2: Semantic Volume (SV) Anti-Line-Packing Defense');
+  console.log('  ✔ Invariant 2: Semantic Volume (SV) Anti-Line-Packing Defense');
 }
 
 // 3. Inverted Caller Index & Sparse Graph Test
@@ -80,7 +80,7 @@ console.log('=== Running Structured Resource Topology & Scale Invariant Test Sui
   assert.deepStrictEqual(invertedIndex.get('HTTP_OK'), ['src/a.ts', 'src/b.ts']);
   assert.deepStrictEqual(invertedIndex.get('DB_CONN'), ['src/c.ts']);
   assert.ok(sparseEdges.length > 0, 'Sparse edges must be generated');
-  console.log('  [PASS] Invariant 3: Inverted Caller Index O(|E_s|) Sparse Graph');
+  console.log('  ✔ Invariant 3: Inverted Caller Index O(|E_s|) Sparse Graph');
 }
 
 // 4. Multi-modal Cohesion Formula Test
@@ -90,7 +90,7 @@ console.log('=== Running Structured Resource Topology & Scale Invariant Test Sui
 
   assert.ok(highCohesion >= 0.85, `High cohesion must score >= 0.85 (got ${highCohesion})`);
   assert.ok(lowCohesion <= 0.2, `Low cohesion must score <= 0.20 (got ${lowCohesion})`);
-  console.log('  [PASS] Invariant 4: Multi-modal Cohesion Metric');
+  console.log('  ✔ Invariant 4: Multi-modal Cohesion Metric');
 }
 
 // 5. Tarjan SCC Cycle Decomposition & 6-Strategy Diagnosis Test
@@ -110,7 +110,7 @@ console.log('=== Running Structured Resource Topology & Scale Invariant Test Sui
   assert.strictEqual(diagnosis.stronglyConnectedComponents.length, 2, 'Must find 2 SCC components');
   assert.strictEqual(diagnosis.cyclicComponents.length, 1, 'Must detect 1 cyclic component');
   assert.strictEqual(diagnosis.cyclicComponents[0].strategy, 'TYPE_SINKING');
-  console.log('  [PASS] Invariant 5: Tarjan SCC Dependency Cycle Decomposition');
+  console.log('  ✔ Invariant 5: Tarjan SCC Dependency Cycle Decomposition');
 }
 
 // 6. Bayesian Language Density Prior Update Test
@@ -119,7 +119,7 @@ console.log('=== Running Structured Resource Topology & Scale Invariant Test Sui
   const sampleCppDensity = 2.4;
   const updated = updateLanguageDensityPrior(initialPrior, sampleCppDensity, 0.1);
   assert.strictEqual(updated, 1.14, 'Prior must update smoothly via EMA: 0.9*1.0 + 0.1*2.4 = 1.14');
-  console.log('  [PASS] Invariant 6: Bayesian Language Density Prior EMA Update');
+  console.log('  ✔ Invariant 6: Bayesian Language Density Prior EMA Update');
 }
 
 // 7. 3-Tier Structured Resource Naming Parsing Test
@@ -145,7 +145,7 @@ console.log('=== Running Structured Resource Topology & Scale Invariant Test Sui
   );
   assert.strictEqual(parsedOverDescriptiveResource.isOverDescriptive, true);
   assert.ok(parsedOverDescriptiveResource.extraParts.length > 0);
-  console.log('  [PASS] Invariant 7: 3-Tier Naming Hierarchy & Token Depth Parser');
+  console.log('  ✔ Invariant 7: 3-Tier Naming Hierarchy & Token Depth Parser');
 }
 
 // 8. Tripartite Risk Separation Test
@@ -153,7 +153,7 @@ console.log('=== Running Structured Resource Topology & Scale Invariant Test Sui
   const riskHigh = calculateTripartiteRisk(0.9, 0.8, 0.7);
   const riskLow = calculateTripartiteRisk(0.3, 0.2, 0.1);
   assert.ok(riskHigh.risk > riskLow.risk, 'High risk must exceed low risk');
-  console.log('  [PASS] Invariant 8: Tripartite Orthogonal Risk Separation');
+  console.log('  ✔ Invariant 8: Tripartite Orthogonal Risk Separation');
 }
 
 // 9. Full Audit Runner & Adversarial Findings Test
@@ -216,7 +216,7 @@ console.log('=== Running Structured Resource Topology & Scale Invariant Test Sui
   );
 
   console.log(
-    '  [PASS] Invariant 9: Full Structured Resource Topology Adversarial Audit (4 findings detected)',
+    '  ✔ Invariant 9: Full Structured Resource Topology Adversarial Audit (4 findings detected)',
   );
 }
 

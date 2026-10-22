@@ -168,27 +168,27 @@ ${EXP} let mutableGlobalOrders: any[] = []; // ARCH-GLB-001 (mutable global stat
       ruleCounts.has('CPX-AMP-001'),
       'Expected CPX-AMP-001 (blocking I/O amplification in loop)',
     );
-    console.log('  [PASS] CPX-SPACE-001 and CPX-AMP-001 detected successfully.');
+    console.log('  ✔ CPX-SPACE-001 and CPX-AMP-001 detected successfully.');
 
     // 4. Assertions for Capability 2: Data Architecture
     console.log('2. Checking Data Architecture Modernization (DAT-*)...');
     assert(ruleCounts.has('DAT-NPL-001'), 'Expected DAT-NPL-001 (N+1 query in loop)');
     assert(ruleCounts.has('DAT-QRY-001'), 'Expected DAT-QRY-001 (Unbounded query)');
-    console.log('  [PASS] DAT-NPL-001 and DAT-QRY-001 detected successfully.');
+    console.log('  ✔ DAT-NPL-001 and DAT-QRY-001 detected successfully.');
 
     // 5. Assertions for Capability 3: Test Modernity
     console.log('3. Checking Test Modernity & Business Contract (TST-*)...');
     assert(ruleCounts.has('TST-SKP-001'), 'Expected TST-SKP-001 (orphaned skipped test)');
     assert(ruleCounts.has('TST-TAU-001'), 'Expected TST-TAU-001 (tautological assertion)');
     assert(ruleCounts.has('TST-ILS-001'), 'Expected TST-ILS-001 (mock-only assertion)');
-    console.log('  [PASS] TST-SKP-001, TST-TAU-001, and TST-ILS-001 detected successfully.');
+    console.log('  ✔ TST-SKP-001, TST-TAU-001, and TST-ILS-001 detected successfully.');
 
     // 6. Assertions for Capability 4: Dependency Layout
     console.log('4. Checking Dependency Layout & Managed Resources (DEP-*)...');
     assert(ruleCounts.has('DEP-WLD-001'), 'Expected DEP-WLD-001 (wildcard import)');
     assert(ruleCounts.has('DEP-LAZ-001'), 'Expected DEP-LAZ-001 (unjustified in-function import)');
     assert(ruleCounts.has('DEP-RES-001'), 'Expected DEP-RES-001 (unmanaged external URL)');
-    console.log('  [PASS] DEP-WLD-001, DEP-LAZ-001, and DEP-RES-001 detected successfully.');
+    console.log('  ✔ DEP-WLD-001, DEP-LAZ-001, and DEP-RES-001 detected successfully.');
 
     // 7. Assertions for Capability 5: Architecture & Headless Governance
     console.log('5. Checking Semantic Architecture & Headless Decoupling (ARCH-*)...');
@@ -198,7 +198,7 @@ ${EXP} let mutableGlobalOrders: any[] = []; // ARCH-GLB-001 (mutable global stat
     );
     assert(ruleCounts.has('ARCH-CFG-001'), 'Expected ARCH-CFG-001 (domain reading process.env)');
     assert(ruleCounts.has('ARCH-GLB-001'), 'Expected ARCH-GLB-001 (exported mutable global state)');
-    console.log('  [PASS] ARCH-HDL-001, ARCH-CFG-001, and ARCH-GLB-001 detected successfully.');
+    console.log('  ✔ ARCH-HDL-001, ARCH-CFG-001, and ARCH-GLB-001 detected successfully.');
 
     // 8. Assertions for Constant Governance & Nested Constant Prevention
     console.log('6. Checking Constant Cleanliness & Anti-Nesting Rule (nested-constant)...');
@@ -206,7 +206,7 @@ ${EXP} let mutableGlobalOrders: any[] = []; // ARCH-GLB-001 (mutable global stat
       ruleCounts.has('nested-constant'),
       'Expected nested-constant (redundant constant alias)',
     );
-    console.log('  [PASS] nested-constant detected successfully.');
+    console.log('  ✔ nested-constant detected successfully.');
 
     console.log('\n======================================================');
     console.log(' ALL CORE CAPABILITIES & CONSTANT GOVERNANCE VERIFIED!');

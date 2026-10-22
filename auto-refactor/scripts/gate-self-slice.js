@@ -293,7 +293,7 @@ function reportBlockingSummary(fileCount, severity, code) {
   fs.rmSync(REPORT, { force: true });
   process.stdout.write(
     `[gate:self:slice] targeted-scan (files=${fileCount} ` +
-      `newBlocking(${severity})=${blockingCount}) → ${code === 0 ? 'PASS' : 'FAIL'}\n`,
+      `newBlocking(${severity})=${blockingCount}) → ${code === 0 ? '✔ PASS' : '✖ BLOCK'}\n`,
   );
 }
 

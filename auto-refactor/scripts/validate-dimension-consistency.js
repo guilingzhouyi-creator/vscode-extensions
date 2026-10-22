@@ -109,7 +109,7 @@ function checkFamilyRoutingAgreement() {
       conflicts.join('\n  '),
   );
   console.log(
-    `  [PASS] ${RULE_REGISTRY.length} rule(s) agree with the deduction table on their axis`,
+    `  ✔ ${RULE_REGISTRY.length} rule(s) agree with the deduction table on their axis`,
   );
 }
 
@@ -125,7 +125,7 @@ function checkAnalyzersAreCharged() {
   }
   assert.deepStrictEqual(uncharged, [], `analyzers charged to no axis: ${uncharged.join(', ')}`);
   console.log(
-    `  [PASS] all ${axesByAnalyzer().size} table-owned analyzer(s) deduct at least one axis`,
+    `  ✔ all ${axesByAnalyzer().size} table-owned analyzer(s) deduct at least one axis`,
   );
 }
 
@@ -147,7 +147,7 @@ function checkBareFamilyIdsResolve() {
     `family ids that never match any rule id: ${unresolved.join(', ')}`,
   );
   console.log(
-    `  [PASS] all ${Object.keys(FAMILY_DIMENSIONS).length} family prefix(es) resolve for a bare id`,
+    `  ✔ all ${Object.keys(FAMILY_DIMENSIONS).length} family prefix(es) resolve for a bare id`,
   );
 }
 
@@ -178,7 +178,7 @@ function checkMultiAxisChargingIsBounded() {
   );
   const maxAxes = Math.max(...[...tableAxes.values()].map((a) => a.size));
   console.log(
-    `  [PASS] no analyzer charges one finding to more than ${MAX_AXES_PER_FINDING} axes ` +
+    `  ✔ no analyzer charges one finding to more than ${MAX_AXES_PER_FINDING} axes ` +
       `(current maximum: ${maxAxes})`,
   );
 }

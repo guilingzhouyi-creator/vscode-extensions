@@ -83,7 +83,7 @@ function testOriginalSevenRules() {
     expected.length,
     `Expected exactly 7 rules, got ${rules.length}`,
   );
-  console.log('  [PASS] 1. Original 7 rules detected precisely on canonical snippet');
+  console.log('  ✔ 1. Original 7 rules detected precisely on canonical snippet');
 }
 
 function testMultilineFormatMacro() {
@@ -132,7 +132,7 @@ function testMultilineFormatMacro() {
     'Modern inline format should not trigger RSM-FORMAT-001',
   );
   console.log(
-    '  [PASS] 2. Multiline formatting macros correctly identified and inline captures stay silent',
+    '  ✔ 2. Multiline formatting macros correctly identified and inline captures stay silent',
   );
 }
 
@@ -176,7 +176,7 @@ function testMultilineSignatureAndBoundaryDefense() {
     `Struct fields and local let bindings must not trigger RSM-STR-001, got: ${JSON.stringify(boundaryRules)}`,
   );
   console.log(
-    '  [PASS] 3. Multiline fn signatures trigger RSM-STR-001 while struct fields & locals stay silent',
+    '  ✔ 3. Multiline fn signatures trigger RSM-STR-001 while struct fields & locals stay silent',
   );
 }
 
@@ -296,7 +296,7 @@ function testNewRules() {
   );
 
   console.log(
-    '  [PASS] 4. All 4 new rules (RSM-CAST-001, RSM-ELSE-001, RSM-FIND-001, RSM-LOCK-001) verified',
+    '  ✔ 4. All 4 new rules (RSM-CAST-001, RSM-ELSE-001, RSM-FIND-001, RSM-LOCK-001) verified',
   );
 }
 
@@ -323,7 +323,7 @@ function testRawStringFalsePositiveImmunity() {
     [],
     `Code patterns inside raw string literals must not emit findings, got: ${JSON.stringify(rules)}`,
   );
-  console.log('  [PASS] 5. Raw string false positive immunity verified (0 false positives)');
+  console.log('  ✔ 5. Raw string false positive immunity verified (0 false positives)');
 }
 
 function runAll() {
@@ -338,6 +338,6 @@ function runAll() {
 try {
   runAll();
 } catch (err) {
-  console.error('\n[FAIL]', err);
+  console.error('\n✖ BLOCK', err);
   process.exit(1);
 }

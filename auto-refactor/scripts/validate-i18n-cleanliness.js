@@ -77,7 +77,7 @@ function main() {
     const rel = path.relative(ROOT, file).replace(/\\/g, '/');
     const violations = checkDiagnosticCleanliness(file);
     if (violations.length > 0) {
-      console.error(`✖ [FAIL] Found Chinese in diagnostic field in ${rel}:`);
+      console.error(`✖ BLOCK Found Chinese in diagnostic field in ${rel}:`);
       violations.forEach((v) => {
         console.error(`   Line ${v.line}: ${v.content}`);
       });
@@ -91,7 +91,7 @@ function main() {
     `Found ${totalViolations} Chinese diagnostic strings in engine core. Human text must live in dictionaries.`,
   );
   console.log(
-    `✔ [PASS] Verified ${files.length} engine files: 0 Chinese characters in diagnostics.`,
+    `✔  Verified ${files.length} engine files: 0 Chinese characters in diagnostics.`,
   );
 
   // Check presentation dictionary
@@ -124,10 +124,10 @@ function main() {
   const ruleCount = Object.keys(ZH_CN_RULES).length;
   assert.ok(ruleCount >= 270, `ZH_CN_RULES must cover at least 270 rules, found: ${ruleCount}`);
   console.log(
-    `✔ [PASS] Presentation dictionary is properly populated (${ruleCount} rules decoupled).`,
+    `✔  Presentation dictionary is properly populated (${ruleCount} rules decoupled).`,
   );
 
-  console.log('✔ [PASS] Internationalization cleanliness guard passed completely.');
+  console.log('✔  Internationalization cleanliness guard passed completely.');
 }
 
 try {

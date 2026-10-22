@@ -229,7 +229,7 @@ async function checkNarrowScan(root) {
     'the composite must renormalize over the evaluated weights only',
   );
   console.log(
-    `  [PASS] narrow scan: ${narrow.notEvaluated.length} dimension(s) not evaluated, ` +
+    `  ✔ narrow scan: ${narrow.notEvaluated.length} dimension(s) not evaluated, ` +
       `composite renormalized to ${narrow.compositeScore} over ${evaluated.length} dimension(s)`,
   );
   return narrow;
@@ -314,7 +314,7 @@ async function checkControlScan(root, narrow) {
     'the published formulas must describe the evaluated-dimension weighting',
   );
   console.log(
-    `  [PASS] control scan: coverage=${full.coverage}, confidence=${full.confidence} ` +
+    `  ✔ control scan: coverage=${full.coverage}, confidence=${full.confidence} ` +
       `>= narrow confidence=${narrow.confidence}`,
   );
 }
@@ -358,7 +358,7 @@ async function checkDeductionTable(root) {
     );
   }
   console.log(
-    `  [PASS] ${EXPECTED_DEDUCTIONS.length} representative rule(s) deduct their declared dimension`,
+    `  ✔ ${EXPECTED_DEDUCTIONS.length} representative rule(s) deduct their declared dimension`,
   );
 }
 /**
@@ -420,10 +420,10 @@ function assertReverseEvidenceCoverage(sources) {
       'analyzer that never deducts inflates coverage without ever lowering a score.',
   );
   console.log(
-    `  [PASS] all ${declared.size} declared evidence analyzer(s) can actually deduct (both directions)`,
+    `  ✔ all ${declared.size} declared evidence analyzer(s) can actually deduct (both directions)`,
   );
   console.log(
-    `  [PASS] all ${Object.keys(sources).length} deduction-bearing dimensions declare their evidence`,
+    `  ✔ all ${Object.keys(sources).length} deduction-bearing dimensions declare their evidence`,
   );
 }
 

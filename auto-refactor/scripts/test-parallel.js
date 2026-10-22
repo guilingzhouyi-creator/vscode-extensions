@@ -549,10 +549,10 @@ function recordResult(suite, res, passed, failed) {
   const sec = (res.durationMs / 1000).toFixed(2);
   if (res.ok) {
     passed.push(res);
-    console.log(`  ✔ [PASS] ${suite.name} (${sec}s)`);
+    console.log(`  ✔  ${suite.name} (${sec}s)`);
   } else {
     failed.push(res);
-    console.log(`  ❌ [FAIL] ${suite.name} (${sec}s)`);
+    console.log(`  ✖ BLOCK  ${suite.name} (${sec}s)`);
     console.log(res.stdout);
     if (res.stderr) console.error(res.stderr);
   }

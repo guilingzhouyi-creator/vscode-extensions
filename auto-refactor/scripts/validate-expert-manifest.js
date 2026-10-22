@@ -21,7 +21,7 @@ let manifestModule;
 try {
   manifestModule = require(manifestModulePath);
 } catch (err) {
-  console.error('[FAIL] Unable to load expert-manifest module from dist. Run npm run build first.');
+  console.error('✖ BLOCK Unable to load expert-manifest module from dist. Run npm run build first.');
   console.error(err);
   process.exit(1);
 }
@@ -43,7 +43,7 @@ try {
   validateExpertManifest(EXPERT_MANIFEST);
   console.log(`✓ Manifest structural validation passed (${EXPERT_MANIFEST.length} experts)`);
 } catch (err) {
-  console.error(`[FAIL] validateExpertManifest threw: ${err.message}`);
+  console.error(`✖ BLOCK validateExpertManifest threw: ${err.message}`);
   process.exit(1);
 }
 
@@ -92,5 +92,5 @@ assert(
 );
 console.log('✓ Dynamic archetype matrix derivation verified');
 
-console.log('[PASS] validate-expert-manifest passed all integrity and normative assertions.');
+console.log('✔ validate-expert-manifest passed all integrity and normative assertions.');
 process.exit(0);

@@ -61,7 +61,7 @@ function testModuleScope() {
   assert.strictEqual(root.parent, null, 'root scope has no parent');
   assert.ok(graph.scopeCount >= 1, 'at least one scope (module)');
   passCount++;
-  console.log('  [PASS] module scope exists with correct kind and null parent');
+  console.log('  ✔ module scope exists with correct kind and null parent');
 }
 
 // ─── Test 2: Function scope creation ─────────────────────────────────
@@ -106,7 +106,7 @@ function testFunctionScope() {
   assert.strictEqual(innerScope.kind, 'function', 'inner is a function scope');
 
   passCount++;
-  console.log('  [PASS] function scopes are created with correct bindings and parent chain');
+  console.log('  ✔ function scopes are created with correct bindings and parent chain');
 }
 
 // ─── Test 3: Class scope creation ────────────────────────────────────
@@ -126,7 +126,7 @@ function testClassScope() {
   assert.strictEqual(classScope.parent, root, 'class scope parent is module');
 
   passCount++;
-  console.log('  [PASS] class scopes are created with correct kind and binding');
+  console.log('  ✔ class scopes are created with correct kind and binding');
 }
 
 // ─── Test 4: lookup — current scope ──────────────────────────────────
@@ -146,7 +146,7 @@ function testLookupCurrentScope() {
   assert.strictEqual(innerResult.shadowed, false, 'not shadowed');
 
   passCount++;
-  console.log('  [PASS] lookup finds bindings in the current (local) scope');
+  console.log('  ✔ lookup finds bindings in the current (local) scope');
 }
 
 // ─── Test 5: lookup — parent scope (walk up) ─────────────────────────
@@ -165,7 +165,7 @@ function testLookupParentScope() {
   assert.strictEqual(topResult.shadowed, false);
 
   passCount++;
-  console.log('  [PASS] lookup walks up the parent chain to find outer-scope bindings');
+  console.log('  ✔ lookup walks up the parent chain to find outer-scope bindings');
 }
 
 // ─── Test 6: lookup — not found ──────────────────────────────────────
@@ -180,7 +180,7 @@ function testLookupNotFound() {
   assert.strictEqual(result.shadowed, false, 'not shadowed when not found');
 
   passCount++;
-  console.log('  [PASS] lookup returns null / empty for nonexistent names');
+  console.log('  ✔ lookup returns null / empty for nonexistent names');
 }
 
 // ─── Test 7: isShadowed — shadowed variable ──────────────────────────
@@ -202,7 +202,7 @@ function testShadowedVariable() {
   assert.strictEqual(graph.isShadowed('x', root), false, '"x" is not shadowed from module scope');
 
   passCount++;
-  console.log('  [PASS] isShadowed detects name hiding across scope boundaries');
+  console.log('  ✔ isShadowed detects name hiding across scope boundaries');
 }
 
 // ─── Test 8: isShadowed — not shadowed ───────────────────────────────
@@ -216,7 +216,7 @@ function testNotShadowed() {
   assert.strictEqual(graph.isShadowed('x', fnScope), false, '"x" is not shadowed (only outer)');
 
   passCount++;
-  console.log('  [PASS] isShadowed returns false when there is only one binding in the chain');
+  console.log('  ✔ isShadowed returns false when there is only one binding in the chain');
 }
 
 // ─── Test 9: getScopeAtLine ──────────────────────────────────────────
@@ -251,7 +251,7 @@ function testGetScopeAtLine() {
   assert.strictEqual(line5, innerScope, 'line 5 is in inner function (innermost)');
 
   passCount++;
-  console.log('  [PASS] getScopeAtLine finds the innermost scope containing a line');
+  console.log('  ✔ getScopeAtLine finds the innermost scope containing a line');
 }
 
 // ─── Test 10: scopeCount and bindingCount ────────────────────────────
@@ -285,7 +285,7 @@ function testCounts() {
   assert.strictEqual(graph.bindingCount, 8, 'expected 8 total bindings');
 
   passCount++;
-  console.log('  [PASS] scopeCount and bindingCount report correct totals');
+  console.log('  ✔ scopeCount and bindingCount report correct totals');
 }
 
 // ─── Test 11: Python adapter support ─────────────────────────────────
@@ -317,7 +317,7 @@ function testPythonScope() {
   assert.ok(outerResult.binding, 'lookup finds "outer" function in Python module');
 
   passCount++;
-  console.log('  [PASS] Python adapter yields a valid scope graph with module + function + class');
+  console.log('  ✔ Python adapter yields a valid scope graph with module + function + class');
 }
 
 // ─── Test 12: Shadow detection in Python ─────────────────────────────
@@ -337,7 +337,7 @@ function testPythonShadow() {
   assert.strictEqual(result.all.length, 2, 'two "x" bindings in Python scope chain');
 
   passCount++;
-  console.log('  [PASS] shadow detection works with Python adapter');
+  console.log('  ✔ shadow detection works with Python adapter');
 }
 
 // ─── Test 13: Deep nesting and multi-level lookup ────────────────────
@@ -371,7 +371,7 @@ function testDeepNesting() {
   assert.strictEqual(result.all[3].scope, root, 'fourth is in module');
 
   passCount++;
-  console.log('  [PASS] deep nesting: lookup walks all parent levels correctly');
+  console.log('  ✔ deep nesting: lookup walks all parent levels correctly');
 }
 
 // ─── Test 14: Performance sanity check ───────────────────────────────
@@ -402,7 +402,7 @@ function testPerformance() {
 
   passCount++;
   console.log(
-    `  [PASS] performance: ${graph.scopeCount} scopes / ${graph.bindingCount} bindings built in ${elapsed}ms`,
+    `  ✔ performance: ${graph.scopeCount} scopes / ${graph.bindingCount} bindings built in ${elapsed}ms`,
   );
 }
 
@@ -420,7 +420,7 @@ function testBindingKinds() {
   assert.strictEqual(root.bindings.get('K').kind, 'class', 'class → class binding');
 
   passCount++;
-  console.log('  [PASS] binding kinds correctly distinguish variable / function / class');
+  console.log('  ✔ binding kinds correctly distinguish variable / function / class');
 }
 
 // ─── Run all tests ───────────────────────────────────────────────────

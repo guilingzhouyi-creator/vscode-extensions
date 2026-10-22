@@ -112,7 +112,7 @@ assert.strictEqual(
   'architectureConsistency must equal the published coupling formula',
 );
 console.log(
-  `  [PASS] anti-pattern judged by dimensions: verdict=${coupled.verdict}, ` +
+  `  ✔ anti-pattern judged by dimensions: verdict=${coupled.verdict}, ` +
     `architecture=${coupled.dimensionDeltas.architectureConsistency}, ` +
     `maintainability=${coupled.dimensionDeltas.maintainability}`,
 );
@@ -131,7 +131,7 @@ assert.ok(
   extracted.dimensionDeltas.maintainability >= 0,
   'a local extraction must not lower maintainability',
 );
-console.log('  [PASS] local extraction stays non-negative on architecture and maintainability');
+console.log('  ✔ local extraction stays non-negative on architecture and maintainability');
 
 assert.deepStrictEqual(
   coupled.formulas.weights,
@@ -153,6 +153,6 @@ assert.ok(
   coupled.rationale.every((line) => line.includes('Delta')),
   'each rationale must name the metric it came from',
 );
-console.log('  [PASS] formulas and rationale published for every emitted dimension');
+console.log('  ✔ formulas and rationale published for every emitted dimension');
 
 console.log('\n ALL DIFF SCORE CHECKS PASSED SUCCESSFULLY!\n');

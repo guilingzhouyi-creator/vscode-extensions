@@ -49,7 +49,7 @@ function testFanInScaling() {
     `Massive hub fanInMultiplier must be capped at 6.0, got ${hubRes.fanInMultiplier}`,
   );
 
-  console.log('  ✔ [PASS] Fan-in logarithmic scaling and soft cap verified.');
+  console.log('  ✔  Fan-in logarithmic scaling and soft cap verified.');
 }
 
 function testTemporalChurnAndFrozenLegacy() {
@@ -116,7 +116,7 @@ function testTemporalChurnAndFrozenLegacy() {
     'Frozen legacy should have 0.6x churn relaxation',
   );
 
-  console.log('  ✔ [PASS] Churn acceleration and frozen legacy relaxation verified.');
+  console.log('  ✔  Churn acceleration and frozen legacy relaxation verified.');
 }
 
 function testAgentActionableProposals() {
@@ -147,7 +147,7 @@ function testAgentActionableProposals() {
   assert.ok(res.actionableProposal, 'Actionable proposal must be generated');
   assert.strictEqual(res.actionableProposal.action, 'high_centrality_refactor_guard');
 
-  console.log('  ✔ [PASS] High centrality refactor guard proposal verified.');
+  console.log('  ✔  High centrality refactor guard proposal verified.');
 }
 
 function testQualityScoringImpactIntegration() {
@@ -176,7 +176,7 @@ function testQualityScoringImpactIntegration() {
     `Central hub score (${amplifiedScore.compositeScore}) should be lower than baseline (${baseScore.compositeScore})`,
   );
 
-  console.log('  ✔ [PASS] QualityScorer impact multiplier amplification verified.');
+  console.log('  ✔  QualityScorer impact multiplier amplification verified.');
 }
 
 function runAll() {
@@ -185,7 +185,7 @@ function runAll() {
   testTemporalChurnAndFrozenLegacy();
   testAgentActionableProposals();
   testQualityScoringImpactIntegration();
-  console.log('\n[PASS] All 4 Topological Churn test suites passed successfully!');
+  console.log('\n✔ All 4 Topological Churn test suites passed successfully!');
 }
 
 runAll();

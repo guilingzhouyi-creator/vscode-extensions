@@ -167,7 +167,7 @@ const workspaceRoot = path.resolve(__dirname, '..', '..');
 const findings = scanDirectory(workspaceRoot);
 
 if (findings.length > 0) {
-  console.error(`\n[FAIL] Found ${findings.length} empty or 0-byte files in workspace:`);
+  console.error(`\n✖ BLOCK Found ${findings.length} empty or 0-byte files in workspace:`);
   for (const f of findings) {
     console.error(`  - ${f.path} (${f.reason}, size=${f.size})`);
   }
@@ -179,5 +179,5 @@ assert.strictEqual(
   `Zero empty files invariant violated: Found ${findings.length} empty or 0-byte files!`,
 );
 
-console.log('  [PASS] Gate: Zero physical 0-byte or whitespace-only empty files across workspace');
+console.log('  ✔ Gate: Zero physical 0-byte or whitespace-only empty files across workspace');
 console.log('=== ALL EMPTY FILE GOVERNANCE CHECKS PASSED SUCCESSFULLY! ===\n');

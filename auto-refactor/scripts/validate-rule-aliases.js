@@ -61,7 +61,7 @@ async function main() {
     legacyRuleIds().length > 0,
     'the fixture is meaningless unless the registry still lists legacy ids',
   );
-  console.log('  [PASS] the alias table mirrors the registry legacy set one-to-one');
+  console.log('  ✔ the alias table mirrors the registry legacy set one-to-one');
 
   // ── 2. Targets are canonical, and canonical ids are never themselves aliased ──
   for (const [legacy, target] of Object.entries(LEGACY_RULE_ALIASES)) {
@@ -73,7 +73,7 @@ async function main() {
       `canonicalRuleId(${target}) must be stable`,
     );
   }
-  console.log('  [PASS] alias targets are canonical and chain-free');
+  console.log('  ✔ alias targets are canonical and chain-free');
 
   // ── 3. Resolution is idempotent and keeps unknown ids untouched ──
   for (const legacy of Object.keys(LEGACY_RULE_ALIASES)) {
@@ -82,7 +82,7 @@ async function main() {
   }
   assert.strictEqual(canonicalRuleId('CUSTOM-ZZZ-001'), 'CUSTOM-ZZZ-001');
   assert.strictEqual(canonicalRuleId('anything-goes'), 'anything-goes');
-  console.log('  [PASS] resolution is idempotent and unknown ids resolve to themselves');
+  console.log('  ✔ resolution is idempotent and unknown ids resolve to themselves');
 
   // ── 4. Matching treats both spellings as the same rule, and only those ──
   assert.strictEqual(areAliasForms('large-file', 'BIG-SIZE-001'), true);
@@ -90,11 +90,11 @@ async function main() {
   assert.strictEqual(areAliasForms('large-file', 'large-file'), true);
   assert.strictEqual(areAliasForms('large-file', 'secret-detected'), false);
   assert.strictEqual(areAliasForms('BIG-SIZE-001', 'SEC-TOK-001'), false);
-  console.log('  [PASS] both spellings match the same rule and unrelated ids stay apart');
+  console.log('  ✔ both spellings match the same rule and unrelated ids stay apart');
 
   // ── 5. The published table cannot be mutated at runtime ──
   assert.ok(Object.isFrozen(LEGACY_RULE_ALIASES), 'the alias table must be frozen');
-  console.log('  [PASS] the alias table is frozen against runtime mutation');
+  console.log('  ✔ the alias table is frozen against runtime mutation');
 
   // ── 6. Canonical 3-letter glossary is frozen, non-empty, and sampled accurately ──
   assert.ok(
@@ -107,7 +107,7 @@ async function main() {
   assert.strictEqual(CANONICAL_3LETTER_GLOSSARY['ONREADY'], 'RDY');
   assert.strictEqual(CANONICAL_3LETTER_GLOSSARY['ERROR'], 'ERR');
   assert.strictEqual(CANONICAL_3LETTER_GLOSSARY['INCLUDES'], 'INC');
-  console.log('  [PASS] CANONICAL_3LETTER_GLOSSARY is frozen and samples match specifications');
+  console.log('  ✔ CANONICAL_3LETTER_GLOSSARY is frozen and samples match specifications');
 
   // ── 7. normalizeTopicCode produces 3-letter uppercase for all known non-3 topics
   // and preserves 3-letter ──
@@ -126,7 +126,7 @@ async function main() {
   assert.strictEqual(normalizeTopicCode('MEM'), 'MEM');
   assert.strictEqual(normalizeTopicCode('CYC'), 'CYC');
   console.log(
-    '  [PASS] normalizeTopicCode normalizes non-3-letter topics and preserves 3-letter topics',
+    '  ✔ normalizeTopicCode normalizes non-3-letter topics and preserves 3-letter topics',
   );
 
   // ── 8. toCanonicalRuleId maps family-topic-seq correctly ──
@@ -139,7 +139,7 @@ async function main() {
   assert.strictEqual(toCanonicalRuleId('large-file'), 'BIG-SZE-001');
   assert.strictEqual(pureToCanonicalRuleId('not-a-rule'), 'not-a-rule');
   assert.strictEqual(toCanonicalRuleId('not-a-rule'), 'not-a-rule');
-  console.log('  [PASS] toCanonicalRuleId converts rules to canonical 3-letter format');
+  console.log('  ✔ toCanonicalRuleId converts rules to canonical 3-letter format');
 
   // ── 9. areAliasForms cross-version equivalence & isCanonical3LetterForm verification ──
   assert.strictEqual(areAliasForms('ARCH-DISP-001', 'ARCH-DSP-001'), true);
@@ -159,7 +159,7 @@ async function main() {
   assert.strictEqual(isCanonical3LetterForm(''), false);
   assert.strictEqual(isCanonical3LetterForm(null), false);
   console.log(
-    '  [PASS] areAliasForms cross-version equivalence and isCanonical3LetterForm verified',
+    '  ✔ areAliasForms cross-version equivalence and isCanonical3LetterForm verified',
   );
 }
 
@@ -168,6 +168,6 @@ main()
     console.log('\n ALL RULE ALIAS CHECKS PASSED SUCCESSFULLY!');
   })
   .catch((error) => {
-    console.error('\n[FAIL]', error && error.message ? error.message : error);
+    console.error('\n✖ BLOCK', error && error.message ? error.message : error);
     process.exit(1);
   });

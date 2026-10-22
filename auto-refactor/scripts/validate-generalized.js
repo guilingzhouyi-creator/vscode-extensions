@@ -51,14 +51,14 @@ console.log('1. Testing Project Profiler & Directory Semantics...');
   assert.strictEqual(inferDirectorySemantic('test/unit/user.test.ts'), 'test');
   assert.strictEqual(inferDirectorySemantic('scripts/build.ps1'), 'tooling');
   assert.strictEqual(inferDirectorySemantic('src/utils/helpers.ts'), 'shared');
-  console.log('  [PASS] Directory semantics inferred accurately for DDD/Clean architecture layers');
+  console.log('  ✔ Directory semantics inferred accurately for DDD/Clean architecture layers');
 
   // 1.2 Profiler on current auto-refactor project
   const autoRefactorProfile = detectProjectProfile(path.join(__dirname, '..'));
   assert.strictEqual(autoRefactorProfile.primaryLanguage, 'typescript');
   assert.ok(autoRefactorProfile.buildSystems.includes('npm'));
   console.log(
-    '  [PASS] Auto-refactor profile detected: primaryLanguage=typescript, buildSystems=[npm]',
+    '  ✔ Auto-refactor profile detected: primaryLanguage=typescript, buildSystems=[npm]',
   );
 
   // 1.3 Profiler on WebGames sibling workspace if present
@@ -68,7 +68,7 @@ console.log('1. Testing Project Profiler & Directory Semantics...');
     assert.strictEqual(webGamesProfile.primaryLanguage, 'gdscript');
     assert.ok(webGamesProfile.frameworks.includes('godot-engine'));
     console.log(
-      '  [PASS] WebGames profile detected: primaryLanguage=gdscript, frameworks=[godot-engine]',
+      '  ✔ WebGames profile detected: primaryLanguage=gdscript, frameworks=[godot-engine]',
     );
   } catch (e) {
     console.log('  [SKIP] WebGames path skipped:', e.message);
@@ -110,7 +110,7 @@ console.log('\n2. Testing Scale Tuner & Dynamic Elastic Thresholds...');
   );
 
   console.log(
-    '  [PASS] Scale grades and dynamic thresholds tuned properly across micro -> enterprise',
+    '  ✔ Scale grades and dynamic thresholds tuned properly across micro -> enterprise',
   );
 }
 
@@ -139,7 +139,7 @@ ${'export'} class Order {}
     issues1.some((i) => i.rule === 'ARCH-DIR-001'),
     'Must emit ARCH-DIR-001 for domain -> infra import',
   );
-  console.log('  [PASS] ARCH-DIR-001 caught core inversion violation (Domain -> Infra)');
+  console.log('  ✔ ARCH-DIR-001 caught core inversion violation (Domain -> Infra)');
 
   // 3.2 Domain leaking external framework
   const ctxDomainLeak = {
@@ -155,7 +155,7 @@ ${'export'} class User {}
     issues2.some((i) => i.rule === 'ARCH-LEAK-001'),
     'Must emit ARCH-LEAK-001 for domain importing express',
   );
-  console.log('  [PASS] ARCH-LEAK-001 caught framework leak in domain model');
+  console.log('  ✔ ARCH-LEAK-001 caught framework leak in domain model');
 
   // 3.3 Interface skipping Application to Infrastructure
   const ctxSkipLayer = {
@@ -178,7 +178,7 @@ ${'export'} function handler() { return UserRepo; }
     issues3.some((i) => i.rule === 'ARCH-DIR-002'),
     'Must emit ARCH-DIR-002 for interface -> infra skip layer',
   );
-  console.log('  [PASS] ARCH-DIR-002 caught skip-layer penetration (Interface -> Infra)');
+  console.log('  ✔ ARCH-DIR-002 caught skip-layer penetration (Interface -> Infra)');
 
   // 3.4 GDScript Domain boundary check (extends "res://backend/infrastructure/...")
   const ctxGdArch = {
@@ -199,7 +199,7 @@ ${'export'} function handler() { return UserRepo; }
     issuesGd.some((i) => i.rule === 'ARCH-DIR-001'),
     'Must emit ARCH-DIR-001 for GDScript domain extends infra',
   );
-  console.log('  [PASS] ARCH-DIR-001 caught GDScript domain inheritance inversion');
+  console.log('  ✔ ARCH-DIR-001 caught GDScript domain inheritance inversion');
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -237,7 +237,7 @@ console.log('\n4. Testing Performance Analyzer (Algorithms & I/O)...');
     'Must emit PRF-MEM-001 for transient allocation in loop',
   );
   console.log(
-    '  [PASS] PRF-ALG-001 and PRF-MEM-001 caught algorithmic loop depth & transient allocations',
+    '  ✔ PRF-ALG-001 and PRF-MEM-001 caught algorithmic loop depth & transient allocations',
   );
 
   // 4.2 GDScript loop transient allocation (.duplicate(true))
@@ -252,7 +252,7 @@ console.log('\n4. Testing Performance Analyzer (Algorithms & I/O)...');
     issuesGdPerf.some((i) => i.rule === 'PRF-MEM-001'),
     'Must emit PRF-MEM-001 for .duplicate(true) in GDScript loop',
   );
-  console.log('  [PASS] PRF-MEM-001 caught GDScript transient .duplicate(true) in loop');
+  console.log('  ✔ PRF-MEM-001 caught GDScript transient .duplicate(true) in loop');
 
   // 4.3 Blocking I/O in async function
   const ctxAsyncIO = {
@@ -270,7 +270,7 @@ console.log('\n4. Testing Performance Analyzer (Algorithms & I/O)...');
     issues2.some((i) => i.rule === 'PRF-IO-001'),
     'Must emit PRF-IO-001 for fs.readFileSync in async context',
   );
-  console.log('  [PASS] PRF-IO-001 caught blocking I/O in async context');
+  console.log('  ✔ PRF-IO-001 caught blocking I/O in async context');
 
   // 4.4 Synchronous-I/O policy allow-list: CLI-style paths may legitimately block; the policy
   // key is shared with the governance rule GOV-PRF-004 through the global thresholds layer.
@@ -292,7 +292,7 @@ console.log('\n4. Testing Performance Analyzer (Algorithms & I/O)...');
     notAllowlisted.some((i) => i.rule === 'PRF-IO-001'),
     'the policy must not leak outside the declared globs',
   );
-  console.log('  [PASS] blocking-IO allow-list is path-scoped and shared with GOV-PRF-004');
+  console.log('  ✔ blocking-IO allow-list is path-scoped and shared with GOV-PRF-004');
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -310,7 +310,7 @@ console.log('\n5. Testing Comment Analyzer (Leveled Profiles)...');
     config: { commentLevel: 'off' },
   };
   assert.strictEqual(cmt.analyze(null, ctxOff).length, 0);
-  console.log('  [PASS] commentLevel=off emits 0 issues (zero overhead)');
+  console.log('  ✔ commentLevel=off emits 0 issues (zero overhead)');
 
   // 5.2 Missing export doc in standard
   // Interpolated for the same reason as in Test 3: the fixture must keep an undocumented
@@ -329,7 +329,7 @@ ${'export'} function calculateTotal(items: any[]) { return 100; }
     issuesStd.some((i) => i.rule === 'CMT-DOC-001'),
     'Must emit CMT-DOC-001 for undocumented export',
   );
-  console.log('  [PASS] commentLevel=standard caught undocumented export (CMT-DOC-001)');
+  console.log('  ✔ commentLevel=standard caught undocumented export (CMT-DOC-001)');
 
   // 5.3 Strict mode 6-field header path mismatch
   const ctxStrict = {
@@ -351,7 +351,7 @@ export function pay() { return 0; }
     'Must emit CMT-HDR-003 for declared path mismatch',
   );
   console.log(
-    '  [PASS] commentLevel=strict caught 6-field header declared path mismatch (CMT-HDR-003)',
+    '  ✔ commentLevel=strict caught 6-field header declared path mismatch (CMT-HDR-003)',
   );
 
   // 5.4 Config-level cascade: `--comment-level` / config `commentLevel` must reach the
@@ -364,7 +364,7 @@ export function pay() { return 0; }
   const offCfg = resolveConfig({ root: projectRoot, commentLevel: 'off' });
   assert.strictEqual(offCfg.analyzers.comments.enabled, false);
   console.log(
-    '  [PASS] commentLevel cascades into comments analyzer (strict enables, off disables)',
+    '  ✔ commentLevel cascades into comments analyzer (strict enables, off disables)',
   );
 
   // 5.5 Strict mode escalates a missing file header to warning so the ratchet gate can block it.
@@ -382,7 +382,7 @@ export function pay() { return 0; }
     'warning',
     'Strict mode must escalate CMT-HDR-001 to warning',
   );
-  console.log('  [PASS] strict mode escalates the missing header to warning (CMT-HDR-001)');
+  console.log('  ✔ strict mode escalates the missing header to warning (CMT-HDR-001)');
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -418,7 +418,7 @@ console.log('\n6. Testing Hygiene Analyzer (Code Hygiene & Smells)...');
     'Must emit HYG-STB-002 for phase85 construction jargon',
   );
   console.log(
-    '  [PASS] HYG-DED-001, HYG-STB-001, and HYG-STB-002 caught dead code, TODOs, and dev jargon',
+    '  ✔ HYG-DED-001, HYG-STB-001, and HYG-STB-002 caught dead code, TODOs, and dev jargon',
   );
 
   // 6.2 Code clones (duplicate block)
@@ -434,7 +434,7 @@ console.log('\n6. Testing Hygiene Analyzer (Code Hygiene & Smells)...');
     issues2.some((i) => i.rule === 'HYG-CLN-001'),
     'Must emit HYG-CLN-001 for duplicated block',
   );
-  console.log('  [PASS] HYG-CLN-001 caught duplicate code clone block');
+  console.log('  ✔ HYG-CLN-001 caught duplicate code clone block');
 
   // 6.3 Transient-jargon vocabulary is project-declarable: the built-in set stays generic,
   // a declared list replaces it, and a malformed pattern degrades instead of throwing.
@@ -463,7 +463,7 @@ console.log('\n6. Testing Hygiene Analyzer (Code Hygiene & Smells)...');
     hasJargon('// phase 1 shipped', { jargonPatterns: ['('] }),
     'malformed patterns degrade to the built-in vocabulary instead of throwing',
   );
-  console.log('  [PASS] HYG-STB-002 vocabulary is project-declarable and fails safe');
+  console.log('  ✔ HYG-STB-002 vocabulary is project-declarable and fails safe');
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -509,7 +509,7 @@ console.log('\n7. Testing Python Naming Hygiene Rules...');
   assert.ok(pyRules.includes('HYG-EXC-001@13'), 'non-exc exception variable must be flagged');
   assert.ok(!pyRules.includes('HYG-BLT-001@21'), 'class-body protocol fields stay exempt');
   assert.ok(!pyRules.includes('HYG-SGL-001@9'), 'i stays an allowed loop counter');
-  console.log('  [PASS] HYG-BLT-001 / HYG-SGL-001 / HYG-EXC-001 honor the protocol allow-lists');
+  console.log('  ✔ HYG-BLT-001 / HYG-SGL-001 / HYG-EXC-001 honor the protocol allow-lists');
 
   // Regression: keyword arguments must not read as bindings, and docstring examples must
   // not read as live code — both were false positives before the fix.
@@ -541,7 +541,7 @@ console.log('\n7. Testing Python Naming Hygiene Rules...');
   assert.ok(!kwRules.includes('HYG-BLT-001'), 'call keyword arguments are not bindings');
   assert.ok(!kwRules.includes('HYG-SGL-001'), 'docstring example targets are not bindings');
   assert.ok(!kwRules.includes('HYG-EXC-001'), 'docstring example handlers are not live handlers');
-  console.log('  [PASS] keyword args and docstring examples stay out of the naming rules');
+  console.log('  ✔ keyword args and docstring examples stay out of the naming rules');
 }
 
 console.log('\n ALL GENERALIZED CAPABILITY VERIFICATIONS PASSED SUCCESSFULLY!');

@@ -54,10 +54,10 @@ function test(name, fn) {
   total++;
   try {
     fn();
-    console.log(`  ✓ [PASS] ${name}`);
+    console.log(`  ✓ ✔ ${name}`);
     passed++;
   } catch (e) {
-    console.error(`  ✗ [FAIL] ${name}: ${e.message}`);
+    console.error(`  ✗ ✖ BLOCK ${name}: ${e.message}`);
     if (e.stack) console.error(e.stack);
     process.exit(1);
   }
@@ -687,7 +687,7 @@ async function cacheDisabledLeavesNoLog() {
   }
   total += 1;
   passed += 1;
-  console.log('  ✓ [PASS] cache:false leaves no trace on disk, a default scan still persists');
+  console.log('  ✓ ✔ cache:false leaves no trace on disk, a default scan still persists');
 }
 
 cacheDisabledLeavesNoLog()
@@ -695,6 +695,6 @@ cacheDisabledLeavesNoLog()
     console.log(`\n All ${passed}/${total} Review Memory & Quality System tests PASSED!\n`);
   })
   .catch((error) => {
-    console.error('  x [FAIL] cache:false check:', error && error.message ? error.message : error);
+    console.error('  x ✖ BLOCK cache:false check:', error && error.message ? error.message : error);
     process.exit(1);
   });

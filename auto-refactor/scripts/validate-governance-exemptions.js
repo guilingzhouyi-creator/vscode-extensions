@@ -28,7 +28,7 @@ let exemptions;
 try {
   exemptions = JSON.parse(fs.readFileSync(LEDGER_PATH, 'utf8'));
 } catch (err) {
-  console.error(`[FAIL] governance-exemptions.json is not valid JSON: ${err.message}`);
+  console.error(`✖ BLOCK governance-exemptions.json is not valid JSON: ${err.message}`);
   process.exit(1);
 }
 
@@ -107,7 +107,7 @@ function scanForInlineExemptions(dir, violations = []) {
 
 const inlineViolations = scanForInlineExemptions(SRC_DIR);
 if (inlineViolations.length > 0) {
-  console.error('[FAIL] Prohibited inline self-exemptions detected (N-04):');
+  console.error('✖ BLOCK Prohibited inline self-exemptions detected (N-04):');
   for (const v of inlineViolations) {
     console.error(`  - ${v}`);
   }
@@ -115,5 +115,5 @@ if (inlineViolations.length > 0) {
 }
 
 console.log('✓ Zero prohibited inline self-exemptions detected in src/ (N-04)');
-console.log('[PASS] validate-governance-exemptions passed all checks.');
+console.log('✔ validate-governance-exemptions passed all checks.');
 process.exit(0);

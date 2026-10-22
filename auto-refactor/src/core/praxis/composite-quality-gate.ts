@@ -190,7 +190,7 @@ function formatGateSummaryText(
 ): string {
     const lines: string[] = [
         `==================== COMPOSITE QUALITY GATE [${stage.toUpperCase()}] ====================`,
-        `  Status: ${passed ? '✔ PASSED' : '❌ BLOCKED'} (${verdictCode})`,
+        `  Status: ${passed ? '✔ PASS' : '✖ BLOCK'} (${verdictCode})`,
         `  Score:  ${options.metrics.beforeScore} ➔ ${options.metrics.afterScore} (ΔQ: ${options.metrics.deltaQSemantic >= 0 ? '+' : ''}${options.metrics.deltaQSemantic})`,
         `  ELOC:   Processed=${options.counters.processed} | Semantic=${options.counters.semantic} | Changed=${options.counters.changed}`,
         `  QED:    ${options.metrics.qed} (ROI/semantic ELOC) | ReviewYield: ${options.metrics.reviewYield}`,

@@ -91,10 +91,10 @@ async function testRoleAwareDeduplication() {
       `Config schema property 'id' / 'type' must be exempt, found: ${configDups.length}`,
     );
 
-    console.log('  [PASS] Business module enforces standard duplicate literal extraction');
-    console.log('  [PASS] Test suite benign tokens are exempt from duplicate literal warnings');
+    console.log('  ✔ Business module enforces standard duplicate literal extraction');
+    console.log('  ✔ Test suite benign tokens are exempt from duplicate literal warnings');
     console.log(
-      '  [PASS] Config schema property tokens are exempt from duplicate literal warnings',
+      '  ✔ Config schema property tokens are exempt from duplicate literal warnings',
     );
     console.log('\nALL ROLE-AWARE DEDUPLICATION CHECKS PASSED SUCCESSFULLY!\n');
   } finally {

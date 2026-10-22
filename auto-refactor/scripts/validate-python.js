@@ -115,7 +115,7 @@ async function run() {
 
     const guard = report.issues.filter((i) => i.rule === 'LANG-UNSUPPORTED');
     assert.strictEqual(guard.length, 0, '.py must be claimed by the Python adapter');
-    console.log('  [PASS] .py routes to a real adapter (no LANG-UNSUPPORTED)');
+    console.log('  ✔ .py routes to a real adapter (no LANG-UNSUPPORTED)');
 
     const complexity = report.issues.filter((i) => i.rule === 'high-complexity');
     const byName = new Map(
@@ -127,7 +127,7 @@ async function run() {
       'method CC must be 1 + for + if + and + elif',
     );
     assert.strictEqual(byName.get('classify'), 5, 'function CC must be 1 + for + if + and + elif');
-    console.log('  [PASS] complexity measured exactly (Widget.render=5, classify=5)');
+    console.log('  ✔ complexity measured exactly (Widget.render=5, classify=5)');
 
     const magicSet = new Set(
       report.issues.filter((i) => i.rule === 'magic-number').map((i) => String(i.detail.value)),
@@ -137,7 +137,7 @@ async function run() {
     }
     assert.ok(!magicSet.has('5'), 'MAX_RETRIES = 5 is const-bound and must stay silent');
     assert.ok(!magicSet.has('0') && !magicSet.has('1'), 'trivial numbers stay silent');
-    console.log('  [PASS] const-bound/trivial numbers skipped, real magic numbers reported');
+    console.log('  ✔ const-bound/trivial numbers skipped, real magic numbers reported');
 
     assert.strictEqual(
       report.issues.filter((i) => i.rule === 'duplicate-literal').length,
@@ -149,7 +149,7 @@ async function run() {
       0,
       'docstrings are tolerated and must not be reported as hardcoded strings',
     );
-    console.log('  [PASS] tolerated docstring literals stay silent in every constants pass');
+    console.log('  ✔ tolerated docstring literals stay silent in every constants pass');
 
     const metric = (report.fileMetrics || []).find((m) => m.file === 'sample.py');
     assert.ok(metric, 'large-file must emit a metric row for sample.py');
@@ -163,7 +163,7 @@ async function run() {
       3,
       'underscore helper and imports must not count as exports',
     );
-    console.log('  [PASS] top-level/export metrics respect Python naming conventions');
+    console.log('  ✔ top-level/export metrics respect Python naming conventions');
 
     const resolved = resolveConfig({
       root,
@@ -171,7 +171,7 @@ async function run() {
     });
     assert.strictEqual(resolved.analyzers.complexity.options.complexityWarn, 3);
     assert.strictEqual(resolved.analyzers.constants.options.magicNumberMin, 2);
-    console.log('  [PASS] global thresholds cascade into per-analyzer options');
+    console.log('  ✔ global thresholds cascade into per-analyzer options');
 
     const governance = await scan({
       root,
@@ -198,7 +198,7 @@ async function run() {
       0,
       'a leading Python module docstring satisfies the module-header rule',
     );
-    console.log('  [PASS] governance rules accept dunder markers and docstring headers');
+    console.log('  ✔ governance rules accept dunder markers and docstring headers');
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -209,6 +209,6 @@ run()
     console.log('\n ALL PYTHON ADAPTER KEY POINTS PASSED SUCCESSFULLY!');
   })
   .catch((error) => {
-    console.error('\n[FAIL]', error && error.message ? error.message : error);
+    console.error('\n✖ BLOCK', error && error.message ? error.message : error);
     process.exit(1);
   });

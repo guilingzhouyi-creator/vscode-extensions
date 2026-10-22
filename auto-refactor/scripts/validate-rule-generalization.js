@@ -97,7 +97,7 @@ function testCandidateStateAndScrutiny() {
     'WRAPPER_FIXTURES must include Go language fixture',
   );
 
-  console.log('  [PASS] Candidate state machine & 4-tier scrutiny validated');
+  console.log('  ✔ Candidate state machine & 4-tier scrutiny validated');
 }
 
 function testPatternNormalizer() {
@@ -149,7 +149,7 @@ function testPatternNormalizer() {
   assert.strictEqual(isPseudoCatchStatement('logger.error(err);'), false, 'logging is active');
   assert.strictEqual(isPseudoCatchStatement('throw err;'), false, 'throw is active');
 
-  console.log('  [PASS] Cross-language pattern normalizer validated');
+  console.log('  ✔ Cross-language pattern normalizer validated');
 }
 
 function testHygWrapMultiLanguage() {
@@ -263,7 +263,7 @@ func forwardQuery(id string, count int) Result {
   );
   assert.strictEqual(goGoodIssues.length, 0, 'Go exempt wrapper must pass');
 
-  console.log('  [PASS] HYG-WRAP-001 verified on TypeScript, Python, Rust, Go');
+  console.log('  ✔ HYG-WRAP-001 verified on TypeScript, Python, Rust, Go');
 }
 
 function testHygWrapRedundantDelegation() {
@@ -331,7 +331,7 @@ func refresh() -> void:
   assert.strictEqual(gdIssues[0].rule, HYG_WRAP_REDUNDANT_RULE_ID);
   assert.strictEqual(gdIssues[0].severity, 'info');
 
-  console.log('  [PASS] HYG-WRAP-002 verified on TypeScript, Python, GDScript');
+  console.log('  ✔ HYG-WRAP-002 verified on TypeScript, Python, GDScript');
 }
 
 function testGovExcSilentMultiLanguage() {
@@ -381,7 +381,7 @@ except Exception as e:
   const pyGoodViolations = checkPythonSilentExceptions(pyGood.split('\n'));
   assert.strictEqual(pyGoodViolations.length, 0, 'Python except with rationale marker must pass');
 
-  console.log('  [PASS] GOV-EXC-003 verified on TypeScript & Python');
+  console.log('  ✔ GOV-EXC-003 verified on TypeScript & Python');
 }
 
 function testArchDispMultiLanguage() {
@@ -422,7 +422,7 @@ function dispatch(action: string, payload: any) {
   const goodIssues = auditDispatchComplexity(goodTable, 'src/dispatcher.ts', fakeCtx);
   assert.strictEqual(goodIssues.length, 0, 'Table-driven dispatcher must pass');
 
-  console.log('  [PASS] ARCH-DISP-001 verified on procedural dispatchers');
+  console.log('  ✔ ARCH-DISP-001 verified on procedural dispatchers');
 }
 
 function testArchDspClosureFragmentation() {
@@ -455,7 +455,7 @@ ${closureLines.join('\n')}
     'cli-parser.ts orthogonal switch dispatchers must pass',
   );
 
-  console.log('  [PASS] ARCH-DSP-002 verified on closure fragmentation');
+  console.log('  ✔ ARCH-DSP-002 verified on closure fragmentation');
 }
 
 function testArchTmpMonolithicTemplate() {
@@ -498,7 +498,7 @@ function renderMetricCard(title: string, value: number): string {
   );
   assert.strictEqual(goodIssues.length, 0, 'Small componentized partial must pass ARCH-TMP-001');
 
-  console.log('  [PASS] ARCH-TMP-001 verified on monolithic template vs componentized partial');
+  console.log('  ✔ ARCH-TMP-001 verified on monolithic template vs componentized partial');
 }
 
 function testAnalyzerIntegration() {
@@ -639,7 +639,7 @@ ${Array.from({ length: 130 }, (_, i) => `    out += '<span>tag ${i}</span>';`).j
   assert.strictEqual(archTmpRule.canonical, true);
 
   console.log(
-    `  [PASS] Full analyzer integration & registry lookup (${RULE_REGISTRY.length} rules)`,
+    `  ✔ Full analyzer integration & registry lookup (${RULE_REGISTRY.length} rules)`,
   );
 }
 

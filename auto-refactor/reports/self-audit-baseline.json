@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1792648892648",
-  "timestamp": "2026-10-22T06:01:43.632Z",
+  "snapshotId": "snapshot-v0.4.0-1792673301803",
+  "timestamp": "2026-10-22T12:48:32.193Z",
   "cai": 85.88,
   "polyglotGeneralization": {
     "index": 95.82,
@@ -21,7 +21,7 @@
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
     "filesScanned": 677,
-    "durationMs": 6801
+    "durationMs": 5702
   },
   "metrics": {
     "compositeScore": 98.98,
@@ -35,18 +35,18 @@
       "languageCount": 1
     },
     "effectiveCodeDensity": 0.95,
-    "totalIssues": 4870,
-    "suppressedIssues": 127,
-    "unsuppressedIssues": 4743,
+    "totalIssues": 4878,
+    "suppressedIssues": 133,
+    "unsuppressedIssues": 4745,
     "bySeverity": {
       "info": 557,
-      "warning": 4313,
+      "warning": 4321,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
       "high": 0,
-      "medium": 2637,
+      "medium": 2645,
       "low": 2233
     }
   },
@@ -83,7 +83,7 @@
     "modernity": 99.85,
     "maintainability": 97.67,
     "commentQuality": 100,
-    "duplication": 96.02,
+    "duplication": 96.01,
     "techDebtRisk": 99.91
   },
   "topHotspots": [
@@ -115,6 +115,15 @@
       "effectiveDensity": 0.93
     },
     {
+      "filePath": "scripts/gate-self-slice.js",
+      "domain": "scripts",
+      "totalIssues": 34,
+      "criticalCount": 0,
+      "highCount": 0,
+      "compositeScore": 97.12,
+      "effectiveDensity": 0.93
+    },
+    {
       "filePath": "scripts/validate-warm.js",
       "domain": "scripts",
       "totalIssues": 34,
@@ -139,15 +148,6 @@
       "criticalCount": 0,
       "highCount": 0,
       "compositeScore": 98.02,
-      "effectiveDensity": 0.93
-    },
-    {
-      "filePath": "scripts/gate-self-slice.js",
-      "domain": "scripts",
-      "totalIssues": 32,
-      "criticalCount": 0,
-      "highCount": 0,
-      "compositeScore": 97.17,
       "effectiveDensity": 0.93
     },
     {
@@ -182,7 +182,7 @@
     "summary": {
       "critical": 0,
       "high": 0,
-      "medium": 2637,
+      "medium": 2645,
       "low": 2233
     },
     "criticalItems": [],
@@ -197,7 +197,7 @@
           "architecture": 99.81,
           "maintainability": 98.34,
           "performance": 99.63,
-          "data": 99.31,
+          "data": 99.3,
           "testing": 99.99,
           "reliability": 99.74,
           "security": 99.89,
@@ -597,16 +597,16 @@
       },
       {
         "domainName": "praxis",
-        "compositeScore": 98.38,
+        "compositeScore": 98.37,
         "pillars": {
           "architecture": 97.55,
           "maintainability": 98.37,
           "performance": 99.17,
-          "data": 96.11,
+          "data": 96.07,
           "testing": 99.6,
           "reliability": 99.28,
           "security": 99.89,
-          "extensibility": 96.69
+          "extensibility": 96.66
         },
         "moduleCount": 1
       },
@@ -1004,27 +1004,27 @@
   },
   "trajectory": {
     "runEloc": {
-      "processed": 159136,
+      "processed": 159176,
       "unique": 129240,
-      "changed": 2243,
-      "semantic": 1794,
+      "changed": 7403,
+      "semantic": 5922,
       "relocated": 0,
       "cosmetic": 0,
       "boilerplate": 0,
-      "added": 1122,
+      "added": 3702,
       "deleted": 0,
       "modified": 0
     },
     "lifetime": {
       "weekId": "LIFETIME",
       "startMs": 1791102755050,
-      "endMs": 1792648892644,
+      "endMs": 1792673301794,
       "totalRuns": 353,
       "eloc": {
-        "processedTotal": 49744408,
+        "processedTotal": 49755638,
         "uniqueTotal": 129240,
-        "changedTotal": 507638,
-        "semanticTotal": 406109
+        "changedTotal": 559262,
+        "semanticTotal": 447408
       },
       "qed": {
         "mean": 0.0001,
@@ -1032,12 +1032,12 @@
         "max": 0.18
       },
       "debt": {
-        "totalAdded": 2250,
-        "totalResolved": 3963,
+        "totalAdded": 1617,
+        "totalResolved": 3902,
         "totalRegressions": 0,
-        "netYield": 0.03
+        "netYield": 0.05
       },
-      "meanCompositeScore": 98.8,
+      "meanCompositeScore": 98.81,
       "gatePassRate": 95.75
     },
     "isFirstBaseline": false

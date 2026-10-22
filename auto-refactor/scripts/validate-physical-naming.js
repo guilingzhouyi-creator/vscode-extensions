@@ -106,14 +106,14 @@ function main() {
   assert.strictEqual(
     violations.length,
     0,
-    `Physical Naming Governance FAIL:\n${violations.map((v) => `  - ${v}`).join('\n')}`,
+    `✖ BLOCK  Physical Naming Governance:\n${violations.map((v) => `  - ${v}`).join('\n')}`,
   );
 
-  console.log('✔ [PASS] 100% kebab-case compliance in governed directories');
+  console.log('✔  100% kebab-case compliance in governed directories');
   console.log(
-    `✔ [PASS] Ratchet compliance (${legacyCamelFiles.length}/${LEGACY_CAMEL_CASE_BUDGET} within budget)`,
+    `✔  Ratchet compliance (${legacyCamelFiles.length}/${LEGACY_CAMEL_CASE_BUDGET} within budget)`,
   );
-  console.log('✔ [PASS] Zero transient jargon tokens detected across src/');
+  console.log('✔  Zero transient jargon tokens detected across src/');
   process.exit(0);
 }
 

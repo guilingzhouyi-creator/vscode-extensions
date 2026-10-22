@@ -217,19 +217,19 @@ async function run() {
       'percent-formatting must be flagged',
     );
     assert.deepStrictEqual(byRule('PYM-OPEN-001'), ['legacy.py'], 'bare open() must be flagged');
-    console.log('  [PASS] all six modernization rules fire on the legacy fixture');
+    console.log('  ✔ all six modernization rules fire on the legacy fixture');
 
     assert.ok(
       !report.issues.some((i) => i.location.file === 'modern.py'),
       'the modern twin (pathlib/with/from/await/f-string/sentinel) must stay silent',
     );
-    console.log('  [PASS] modern spellings stay silent on the paired fixture');
+    console.log('  ✔ modern spellings stay silent on the paired fixture');
 
     assert.ok(
       !report.issues.some((i) => i.location.file === 'decoy.ts'),
       'non-Python files are outside this analyzer',
     );
-    console.log('  [PASS] non-Python files are never inspected');
+    console.log('  ✔ non-Python files are never inspected');
 
     const typingHits = (rule) =>
       report.issues.filter((i) => i.rule === rule && i.location.file === 'legacy_typing.py').length;
@@ -243,20 +243,20 @@ async function run() {
     );
     assert.strictEqual(typingHits('PYM-DATETIME-001'), 1, 'timezone.utc must be flagged');
     assert.strictEqual(typingHits('PYM-UNION-001'), 2, 'Optional annotation and Union alias');
-    console.log('  [PASS] typing/dataclass/import modernization rules fire on the legacy fixture');
+    console.log('  ✔ typing/dataclass/import modernization rules fire on the legacy fixture');
 
     assert.ok(
       !report.issues.some((i) => i.location.file === 'modern_typing.py'),
       'the fully modern twin (PEP 585/604, slots, sections, datetime.UTC) must stay silent',
     );
-    console.log('  [PASS] fully modern module stays silent');
+    console.log('  ✔ fully modern module stays silent');
 
     assert.deepStrictEqual(
       rulesIn('edge_cases.py'),
       [],
       'bare re-raise, multi-line `from`, awaited execute and non-query session calls stay silent',
     );
-    console.log('  [PASS] async/raise edge cases produce no false positives');
+    console.log('  ✔ async/raise edge cases produce no false positives');
   } finally {
     cleanupTempDir(root);
   }
@@ -268,6 +268,6 @@ run()
     console.log('\n ALL PYTHON MODERNIZATION KEY POINTS PASSED SUCCESSFULLY!');
   })
   .catch((error) => {
-    console.error('\n[FAIL]', error && error.message ? error.message : error);
+    console.error('\n✖ BLOCK', error && error.message ? error.message : error);
     process.exit(1);
   });

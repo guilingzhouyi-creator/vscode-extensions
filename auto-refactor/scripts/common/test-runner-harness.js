@@ -96,7 +96,7 @@ async function runValidationSuite(options) {
         await run(executionContext);
 
         const durationMs = Date.now() - startTimestampMs;
-        console.log(`[PASS] ${name} (${durationMs}ms)`);
+        console.log(`✔ ${name} (${durationMs}ms)`);
     } finally {
         cleanupTempDir(tempDir);
     }

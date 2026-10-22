@@ -34,7 +34,7 @@ function assert(condition, message) {
     console.log(`  PASS: ${message}`);
   } else {
     failed++;
-    console.error(`  FAIL: ${message}`);
+    console.error(`  ✖ BLOCK : ${message}`);
   }
 }
 

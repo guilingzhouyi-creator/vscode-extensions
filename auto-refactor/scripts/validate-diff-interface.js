@@ -115,7 +115,7 @@ async function main() {
       'full scan must report the import cycle',
     );
     assert.strictEqual(full.summary.ratchetBaselineUsed, true, 'full scan must apply the baseline');
-    console.log('  [PASS] full scan runs dependency-graph + suppressions + baseline');
+    console.log('  ✔ full scan runs dependency-graph + suppressions + baseline');
 
     // ── 2. Content-diff scan (full file set): same suppressions/baseline, no cross-file pass ──
     const diffs = [{ kind: 'full', filePath: 'src/a.ts', oldContent: A_OLD, newContent: A_NEW }];
@@ -141,7 +141,7 @@ async function main() {
     assert.ok(suppressed[0].suppression, 'reasoned suppressions must reach diff reports');
     assert.strictEqual(suppressed[0].severity, 'info', 'suppression downgrade must survive');
     assert.strictEqual(diff.report.summary.ratchetBaselineUsed, true, 'baseline must reach diff');
-    console.log('  [PASS] diff scan keeps suppressions/baseline, skips cross-file passes');
+    console.log('  ✔ diff scan keeps suppressions/baseline, skips cross-file passes');
 
     // ── 3. Delta scan is a strict filter of the diff report ──
     const delta = await scanDiffDelta(diffs, options);
@@ -155,7 +155,7 @@ async function main() {
       ['suppressions', 'baseline'],
       'delta shares the incremental scope',
     );
-    console.log('  [PASS] delta report is a strict filter of the diff report');
+    console.log('  ✔ delta report is a strict filter of the diff report');
 
     // ── 4. CLI changed-set mode: exact paths, incremental scope declared ──
     const gitRoot = createTempTestDir('ar-diffcli-');
@@ -223,7 +223,7 @@ async function main() {
         (cli.summary.warnings || []).some((w) => w.includes('incremental scope')),
         'changed-set mode must declare skipped cross-file passes',
       );
-      console.log('  [PASS] CLI --diff scans only changed paths and declares incremental scope');
+      console.log('  ✔ CLI --diff scans only changed paths and declares incremental scope');
     } finally {
       cleanupTempDir(gitRoot);
     }
@@ -237,6 +237,6 @@ main()
     console.log('\n ALL DIFF INTERFACE CHECKS PASSED SUCCESSFULLY!');
   })
   .catch((error) => {
-    console.error('\n[FAIL]', error && error.message ? error.message : error);
+    console.error('\n✖ BLOCK', error && error.message ? error.message : error);
     process.exit(1);
   });

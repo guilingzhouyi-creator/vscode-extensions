@@ -39,7 +39,7 @@ function testMockBatchParsing() {
   miner.clearCache();
   assert.strictEqual(miner.hasBatchCache(), false, 'Batch cache should be cleared');
 
-  console.log('  ✔ [PASS] Mock batch cache management verified.');
+  console.log('  ✔  Mock batch cache management verified.');
 }
 
 function testRealRepoBatchEquivalence() {
@@ -99,7 +99,7 @@ function testRealRepoBatchEquivalence() {
     );
   }
 
-  console.log('  ✔ [PASS] 100% Equivalence verified across all target files.');
+  console.log('  ✔  100% Equivalence verified across all target files.');
 }
 
 function testCodeEvolutionAnalyzerBatch() {
@@ -143,7 +143,7 @@ function testCodeEvolutionAnalyzerBatch() {
     );
   }
 
-  console.log('  ✔ [PASS] CodeEvolutionAnalyzer.analyzeFilesBatch verified.');
+  console.log('  ✔  CodeEvolutionAnalyzer.analyzeFilesBatch verified.');
 }
 
 function testNonExistentFileFallback() {
@@ -161,7 +161,7 @@ function testNonExistentFileFallback() {
   assert.strictEqual(profile.uniqueAuthorsCount, 0);
   assert.strictEqual(profile.isGitAvailable, miner.isGitRepository(cwd));
 
-  console.log('  ✔ [PASS] Non-existent file handled cleanly with 0 commits.');
+  console.log('  ✔  Non-existent file handled cleanly with 0 commits.');
 }
 
 function runAll() {

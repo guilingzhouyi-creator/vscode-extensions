@@ -146,6 +146,44 @@ const PS_GOOD = [
   '',
 ].join('\n');
 
+/**
+ * PowerShell script using compound approved verbs.
+ *
+ * Every verb here is on Microsoft's approved list with an inner capital (`ConvertTo`,
+ * `ConvertFrom`, `OutTo`). A rule that folds the observed verb to lower case but compares it
+ * against the camel-cased list rejects all of them, and the defect is invisible to a fixture that
+ * only uses single-word verbs — which is exactly how it survived until a real `ConvertTo-` helper
+ * tripped it. This fixture exists so the compound case cannot regress silently.
+ */
+const PS_COMPOUND_VERBS_GOOD = [
+  '$ErrorActionPreference = "Stop"',
+  '',
+  'function ConvertTo-NormalizedPath {',
+  '  [CmdletBinding()]',
+  '  param(',
+  '    [string]$Path',
+  '  )',
+  '  Write-Output $Path',
+  '}',
+  '',
+  'function ConvertFrom-RawValue {',
+  '  [CmdletBinding()]',
+  '  param(',
+  '    [string]$Raw',
+  '  )',
+  '  Write-Output $Raw',
+  '}',
+  '',
+  'function Out-ToDisplay {',
+  '  [CmdletBinding()]',
+  '  param(',
+  '    [string]$Text',
+  '  )',
+  '  Write-Output $Text',
+  '}',
+  '',
+].join('\n');
+
 /** PowerShell module file (.psm1) — should be scanned as PowerShell. */
 const PSM1_BAD = [
   'function Invoke-MyCmd {',
@@ -293,6 +331,7 @@ function writeWorkspace(root) {
   // PowerShell files
   fs.writeFileSync(path.join(root, 'bad.ps1'), PS_BAD);
   fs.writeFileSync(path.join(root, 'good.ps1'), PS_GOOD);
+  fs.writeFileSync(path.join(root, 'compound-verbs.ps1'), PS_COMPOUND_VERBS_GOOD);
   fs.writeFileSync(path.join(root, 'mymodule.psm1'), PSM1_BAD);
   fs.writeFileSync(path.join(root, 'eng_bad.ps1'), PS_ENG_BAD);
   fs.writeFileSync(path.join(root, 'eng_good.ps1'), PS_ENG_GOOD);
@@ -347,37 +386,37 @@ async function run() {
       byRuleInFile('SH-DEPR-001', 'bad.sh') >= 2,
       'SH-DEPR-001 should fire on backticks and `[` test (at least 2 hits)',
     );
-    console.log('    [PASS] SH-DEPR-001 fires on deprecated syntax (backticks + `[`)');
+    console.log('    ✔ SH-DEPR-001 fires on deprecated syntax (backticks + `[`)');
 
     assert.strictEqual(
       byRuleInFile('SH-CMD-001', 'bad.sh'),
       1,
       'SH-CMD-001 should fire once on `cd` without check',
     );
-    console.log('    [PASS] SH-CMD-001 fires on cd without error check');
+    console.log('    ✔ SH-CMD-001 fires on cd without error check');
 
     assert.strictEqual(
       byRuleInFile('SH-READ-001', 'bad.sh'),
       1,
       'SH-READ-001 should fire on `read` without -r',
     );
-    console.log('    [PASS] SH-READ-001 fires on read without -r');
+    console.log('    ✔ SH-READ-001 fires on read without -r');
 
     assert.strictEqual(byRuleInFile('SH-ARRAY-001', 'bad.sh'), 1, 'SH-ARRAY-001 should fire on $*');
-    console.log('    [PASS] SH-ARRAY-001 fires on $* usage');
+    console.log('    ✔ SH-ARRAY-001 fires on $* usage');
 
     assert.strictEqual(
       byRuleInFile('SH-ECHO-001', 'bad.sh'),
       1,
       'SH-ECHO-001 should fire on echo -e',
     );
-    console.log('    [PASS] SH-ECHO-001 fires on echo -e');
+    console.log('    ✔ SH-ECHO-001 fires on echo -e');
 
     assert.ok(
       byRuleInFile('SH-QUOTE-001', 'bad.sh') >= 1,
       'SH-QUOTE-001 should fire on unquoted variable',
     );
-    console.log('    [PASS] SH-QUOTE-001 fires on unquoted variable reference');
+    console.log('    ✔ SH-QUOTE-001 fires on unquoted variable reference');
 
     // Shebang is present in bad.sh so SH-INIT-001 should NOT fire
     assert.strictEqual(
@@ -385,7 +424,7 @@ async function run() {
       0,
       'SH-INIT-001 should NOT fire when shebang is present',
     );
-    console.log('    [PASS] SH-INIT-001 silent when shebang is present');
+    console.log('    ✔ SH-INIT-001 silent when shebang is present');
 
     // set -euo pipefail is NOT present in bad.sh
     assert.strictEqual(
@@ -393,7 +432,7 @@ async function run() {
       1,
       'SH-ERR-001 should fire when set -euo pipefail is missing',
     );
-    console.log('    [PASS] SH-ERR-001 fires on missing set -euo pipefail');
+    console.log('    ✔ SH-ERR-001 fires on missing set -euo pipefail');
 
     // SH-INIT-001 should fire on noshebang.sh
     assert.strictEqual(
@@ -401,7 +440,7 @@ async function run() {
       1,
       'SH-INIT-001 should fire on scripts without shebang',
     );
-    console.log('    [PASS] SH-INIT-001 fires on missing shebang');
+    console.log('    ✔ SH-INIT-001 fires on missing shebang');
 
     // SH-ERR-001 should NOT fire on noshebang.sh (it has set -euo pipefail)
     assert.strictEqual(
@@ -409,7 +448,7 @@ async function run() {
       0,
       'SH-ERR-001 should NOT fire when set -euo pipefail is present',
     );
-    console.log('    [PASS] SH-ERR-001 silent when strict error handling is set');
+    console.log('    ✔ SH-ERR-001 silent when strict error handling is set');
 
     // --- Shell: negative tests (good.sh should be clean) ---
     console.log('  [TEST] Shell negative tests on good.sh');
@@ -419,14 +458,14 @@ async function run() {
       0,
       `good.sh should have zero issues, got: ${goodIssues.map((i) => i.rule).join(', ')}`,
     );
-    console.log('    [PASS] good.sh produces zero findings (all shell rules silent)');
+    console.log('    ✔ good.sh produces zero findings (all shell rules silent)');
 
     // --- Shell: zsh extension ---
     assert.ok(
       byRuleInFile('SH-QUOTE-001', 'zscript.zsh') >= 1,
       '.zsh files should also trigger shell rules',
     );
-    console.log('    [PASS] .zsh extension correctly triggers shell rules');
+    console.log('    ✔ .zsh extension correctly triggers shell rules');
 
     // --- PowerShell: positive tests (bad.ps1 should trigger rules) ---
     console.log('  [TEST] PowerShell positive tests on bad.ps1');
@@ -435,33 +474,44 @@ async function run() {
       byRuleInFile('PS-ALIAS-001', 'bad.ps1') >= 1,
       'PS-ALIAS-001 should fire on alias usage (ls, dir)',
     );
-    console.log('    [PASS] PS-ALIAS-001 fires on cmdlet aliases');
+    console.log('    ✔ PS-ALIAS-001 fires on cmdlet aliases');
 
     assert.strictEqual(
       byRuleInFile('PS-VERB-001', 'bad.ps1'),
       1,
       'PS-VERB-001 should fire on Do-Stuff (Do is not approved)',
     );
-    console.log('    [PASS] PS-VERB-001 fires on unapproved function verb');
+    console.log('    ✔ PS-VERB-001 fires on unapproved function verb');
+
+    // Compound approved verbs must not fire. This is the regression guard for a folding bug:
+    // comparing a lower-cased verb against the camel-cased approved list rejected `ConvertTo`,
+    // `ConvertFrom` and `OutTo` while leaving every single-word verb working, so a fixture with
+    // only `Get-`/`Do-` could not tell the broken rule from a working one.
+    assert.strictEqual(
+      byRuleInFile('PS-VERB-001', 'compound-verbs.ps1'),
+      0,
+      'PS-VERB-001 must accept compound approved verbs (ConvertTo, ConvertFrom, OutTo)',
+    );
+    console.log('    ✔ PS-VERB-001 accepts compound approved verbs');
 
     assert.ok(
       byRuleInFile('PS-CMDLET-001', 'bad.ps1') >= 1,
       'PS-CMDLET-001 should fire on functions missing CmdletBinding',
     );
-    console.log('    [PASS] PS-CMDLET-001 fires on missing CmdletBinding');
+    console.log('    ✔ PS-CMDLET-001 fires on missing CmdletBinding');
 
     assert.ok(
       byRuleInFile('PS-PARAM-001', 'bad.ps1') >= 1,
       'PS-PARAM-001 should fire on untyped parameters',
     );
-    console.log('    [PASS] PS-PARAM-001 fires on untyped parameters');
+    console.log('    ✔ PS-PARAM-001 fires on untyped parameters');
 
     assert.strictEqual(
       byRuleInFile('PS-ERROR-001', 'bad.ps1'),
       1,
       'PS-ERROR-001 should fire on missing ErrorActionPreference',
     );
-    console.log('    [PASS] PS-ERROR-001 fires on missing ErrorActionPreference');
+    console.log('    ✔ PS-ERROR-001 fires on missing ErrorActionPreference');
 
     // --- PowerShell: negative tests (good.ps1 should be clean) ---
     console.log('  [TEST] PowerShell negative tests on good.ps1');
@@ -471,14 +521,14 @@ async function run() {
       0,
       `good.ps1 should have zero issues, got: ${goodPsIssues.map((i) => i.rule).join(', ')}`,
     );
-    console.log('    [PASS] good.ps1 produces zero findings (all PS rules silent)');
+    console.log('    ✔ good.ps1 produces zero findings (all PS rules silent)');
 
     // --- PowerShell: .psm1 extension ---
     assert.ok(
       byRuleInFile('PS-ALIAS-001', 'mymodule.psm1') >= 1,
       '.psm1 files should also trigger PowerShell rules',
     );
-    console.log('    [PASS] .psm1 extension correctly triggers PowerShell rules');
+    console.log('    ✔ .psm1 extension correctly triggers PowerShell rules');
 
     // --- Non-shell/PS files should not be inspected ---
     console.log('  [TEST] Non-shell/PS files are not inspected');
@@ -492,7 +542,7 @@ async function run() {
       0,
       'Python files should produce zero shell-lint findings',
     );
-    console.log('    [PASS] non-shell/PS files are never inspected');
+    console.log('    ✔ non-shell/PS files are never inspected');
 
     // --- Shell: Engineering rules positive tests on eng_bad.sh ---
     console.log('  [TEST] Shell engineering rules positive tests on eng_bad.sh');
@@ -502,42 +552,42 @@ async function run() {
       1,
       'SH-EOL-001 should fire on CRLF in shell script',
     );
-    console.log('    [PASS] SH-EOL-001 fires on CRLF in shell script');
+    console.log('    ✔ SH-EOL-001 fires on CRLF in shell script');
 
     assert.strictEqual(
       byRuleInFile('SH-DOC-001', 'eng_bad.sh'),
       1,
       'SH-DOC-001 should fire on script > 30 lines without module doc header',
     );
-    console.log('    [PASS] SH-DOC-001 fires on missing module doc header');
+    console.log('    ✔ SH-DOC-001 fires on missing module doc header');
 
     assert.strictEqual(
       byRuleInFile('SH-TRAP-001', 'eng_bad.sh'),
       1,
       'SH-TRAP-001 should fire on mktemp without EXIT trap',
     );
-    console.log('    [PASS] SH-TRAP-001 fires on missing EXIT trap for mktemp');
+    console.log('    ✔ SH-TRAP-001 fires on missing EXIT trap for mktemp');
 
     assert.strictEqual(
       byRuleInFile('SH-SEC-001', 'eng_bad.sh'),
       1,
       'SH-SEC-001 should fire on dynamic eval with variable expansion',
     );
-    console.log('    [PASS] SH-SEC-001 fires on dynamic eval with variable');
+    console.log('    ✔ SH-SEC-001 fires on dynamic eval with variable');
 
     assert.strictEqual(
       byRuleInFile('SH-SAFE-001', 'eng_bad.sh'),
       1,
       'SH-SAFE-001 should fire on interactive read without timeout or tty guard',
     );
-    console.log('    [PASS] SH-SAFE-001 fires on read without timeout or tty guard');
+    console.log('    ✔ SH-SAFE-001 fires on read without timeout or tty guard');
 
     assert.strictEqual(
       byRuleInFile('SH-EXIT-001', 'eng_bad.sh'),
       1,
       'SH-EXIT-001 should fire on bare git diff --quiet under set -e',
     );
-    console.log('    [PASS] SH-EXIT-001 fires on bare predicate command under set -e');
+    console.log('    ✔ SH-EXIT-001 fires on bare predicate command under set -e');
 
     // --- Shell: Engineering rules negative tests on eng_good.sh ---
     console.log('  [TEST] Shell engineering rules negative tests on eng_good.sh');
@@ -547,7 +597,7 @@ async function run() {
       0,
       `eng_good.sh should have zero issues, got: ${engGoodShIssues.map((i) => i.rule).join(', ')}`,
     );
-    console.log('    [PASS] eng_good.sh produces zero findings');
+    console.log('    ✔ eng_good.sh produces zero findings');
 
     // --- PowerShell: Engineering rules positive tests on eng_bad.ps1 ---
     console.log('  [TEST] PowerShell engineering rules positive tests on eng_bad.ps1');
@@ -557,28 +607,28 @@ async function run() {
       1,
       'PS-DOC-001 should fire on script > 30 lines without doc header',
     );
-    console.log('    [PASS] PS-DOC-001 fires on missing PowerShell doc header');
+    console.log('    ✔ PS-DOC-001 fires on missing PowerShell doc header');
 
     assert.strictEqual(
       byRuleInFile('PS-TRAP-001', 'eng_bad.ps1'),
       1,
       'PS-TRAP-001 should fire on FileStream creation without finally disposal',
     );
-    console.log('    [PASS] PS-TRAP-001 fires on missing finally for FileStream');
+    console.log('    ✔ PS-TRAP-001 fires on missing finally for FileStream');
 
     assert.strictEqual(
       byRuleInFile('PS-SEC-001', 'eng_bad.ps1'),
       1,
       'PS-SEC-001 should fire on iex with variable input',
     );
-    console.log('    [PASS] PS-SEC-001 fires on dynamic iex with variable input');
+    console.log('    ✔ PS-SEC-001 fires on dynamic iex with variable input');
 
     assert.strictEqual(
       byRuleInFile('PS-SAFE-001', 'eng_bad.ps1'),
       1,
       'PS-SAFE-001 should fire on Read-Host without interactive guard',
     );
-    console.log('    [PASS] PS-SAFE-001 fires on unguarded Read-Host');
+    console.log('    ✔ PS-SAFE-001 fires on unguarded Read-Host');
 
     // --- PowerShell: Engineering rules negative tests on eng_good.ps1 ---
     console.log('  [TEST] PowerShell engineering rules negative tests on eng_good.ps1');
@@ -588,7 +638,7 @@ async function run() {
       0,
       `eng_good.ps1 should have zero issues, got: ${engGoodPsIssues.map((i) => i.rule).join(', ')}`,
     );
-    console.log('    [PASS] eng_good.ps1 produces zero findings');
+    console.log('    ✔ eng_good.ps1 produces zero findings');
 
     // --- Count total test cases ---
     const testCases = [
@@ -638,6 +688,6 @@ run()
     console.log('\n ALL SHELL / POWERSHELL LINT KEY POINTS PASSED SUCCESSFULLY!');
   })
   .catch((error) => {
-    console.error('\n[FAIL]', error && error.message ? error.message : error);
+    console.error('\n✖ BLOCK', error && error.message ? error.message : error);
     process.exit(1);
   });

@@ -56,7 +56,7 @@ export function renderSessionTable(sessions: any[]): string {
     uiIssues[0].message.includes('lacks bounded density or folding controls'),
     true,
   );
-  console.log('  [PASS] 1. VSC-UI-001 flags unbounded collection mapping in Webview markup');
+  console.log('  ✔ 1. VSC-UI-001 flags unbounded collection mapping in Webview markup');
 })();
 
 // ── Test 2: VSC-UI-001 Bounded by .slice() or Folding Toggle ──
@@ -107,7 +107,7 @@ export function renderSessionTable(sessions: any[], isExpanded: boolean): string
     'Fold-controlled collection must not trigger VSC-UI-001',
   );
 
-  console.log('  [PASS] 2. VSC-UI-001 passes when bounded by .slice() or folding toggle');
+  console.log('  ✔ 2. VSC-UI-001 passes when bounded by .slice() or folding toggle');
 })();
 
 // ── Test 3: VSC-UI-002 Hardcoded Theme Colors ──
@@ -131,7 +131,7 @@ export function getWebviewHtml(): string {
   const colorIssues = issues.filter((i) => i.rule === 'VSC-UI-002');
   assert.strictEqual(colorIssues.length >= 1, true, 'Must flag hardcoded monochrome colors');
   assert.strictEqual(colorIssues[0].severity, 'error');
-  console.log('  [PASS] 3. VSC-UI-002 flags hardcoded monochrome colors in Webview markup');
+  console.log('  ✔ 3. VSC-UI-002 flags hardcoded monochrome colors in Webview markup');
 })();
 
 // ── Test 4: VSC-UI-002 Passes with VS Code Theme CSS Variables ──
@@ -153,7 +153,7 @@ export function getWebviewHtml(): string {
 
   const colorIssues = issues.filter((i) => i.rule === 'VSC-UI-002');
   assert.strictEqual(colorIssues.length, 0, 'CSS variables must not trigger VSC-UI-002');
-  console.log('  [PASS] 4. VSC-UI-002 passes with proper VS Code theme CSS variables');
+  console.log('  ✔ 4. VSC-UI-002 passes with proper VS Code theme CSS variables');
 })();
 
 // ── Test 5: VSC-UI-004 Dynamic Border Jitter Guard ──
@@ -202,7 +202,7 @@ export function getStyles(): string {
     'box-shadow inset and border-color transitions must not trigger VSC-UI-004',
   );
   console.log(
-    '  [PASS] 5. VSC-UI-004 flags dynamic border jitter and passes with box-shadow inset',
+    '  ✔ 5. VSC-UI-004 flags dynamic border jitter and passes with box-shadow inset',
   );
 })();
 
@@ -252,7 +252,7 @@ export function getStyles(): string {
   assert.strictEqual(rule004.dimension, DIMENSION_PERFORMANCE_EFFICIENCY);
 
   console.log(
-    '  [PASS] 6. VSC-UI-001, VSC-UI-002, and VSC-UI-004 map to correct scoring quality dimensions',
+    '  ✔ 6. VSC-UI-001, VSC-UI-002, and VSC-UI-004 map to correct scoring quality dimensions',
   );
 })();
 

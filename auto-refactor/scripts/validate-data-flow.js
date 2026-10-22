@@ -85,7 +85,7 @@ function testDataFlowGraphLifecycle() {
   assert.strictEqual(stats.totalEdges, 6);
   assert.strictEqual(stats.stageDistribution.Source, 1);
   assert.strictEqual(stats.stageDistribution.SideEffect, 1);
-  console.log('  [PASS] 7-stage DataFlowGraph lifecycle pipeline verified');
+  console.log('  ✔ 7-stage DataFlowGraph lifecycle pipeline verified');
 }
 
 /** Test 2: Unbounded growth detection for O(t) timer and O(n) loop leaks. */
@@ -209,7 +209,7 @@ function testUnboundedGrowthDetection() {
     'A class-field collection growing with input must be reported',
   );
 
-  console.log('  [PASS] 8 positive/boundary/negative fixtures all match their expectation');
+  console.log('  ✔ 8 positive/boundary/negative fixtures all match their expectation');
 }
 
 /** Test 3: Incremental coupling metrics and rejection of "deleted lines but coupling increased". */
@@ -288,7 +288,7 @@ function testIncrementalCouplingGate() {
     'Extracting a LOCAL module must not be rejected as increased coupling',
   );
 
-  console.log('  [PASS] Anti-pattern rejected; local extraction correctly accepted');
+  console.log('  ✔ Anti-pattern rejected; local extraction correctly accepted');
 }
 
 /** Test 5: Lexical metric semantics — prose must not distort LOC, complexity or coupling. */
@@ -364,7 +364,7 @@ function testLexicalMetricSemantics() {
     `Floor rejection must explain itself: ${flooredDup.rejectionRationale}`,
   );
 
-  console.log('  [PASS] LOC/complexity ignore prose; coupling counts external modules only');
+  console.log('  ✔ LOC/complexity ignore prose; coupling counts external modules only');
 }
 
 /** Test 4: End-to-end integration with templates/consumer/run.mjs --coupling-gate. */
@@ -458,7 +458,7 @@ function testConsumerRunnerCouplingGate() {
       `stdout must report pass: ${passResult.stdout}`,
     );
 
-    console.log('  [PASS] Consumer runner --coupling-gate CLI contract verified');
+    console.log('  ✔ Consumer runner --coupling-gate CLI contract verified');
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }

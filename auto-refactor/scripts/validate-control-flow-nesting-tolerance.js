@@ -74,7 +74,7 @@ export function processPacketState(state: number, event: number, payload: any): 
   const escapeIssue = issues.find((i) => i.rule === 'CPX-NEST-002');
   assert(!nestIssue, 'State machine with depth 4 should be tolerated by elastic budget (up to 5)');
   assert(!escapeIssue, 'State machine local exit should not be flagged as deep long-span escape');
-  console.log('  ✔ [PASS] State machine nesting within elastic budget tolerated.');
+  console.log('  ✔  State machine nesting within elastic budget tolerated.');
 }
 
 function testParserDescentNestingTolerance() {
@@ -114,7 +114,7 @@ export function parseExpressionNode(cursor: any, stream: any): any {
 
   const nestIssue = issues.find((i) => i.rule === 'CPX-NEST-001');
   assert(!nestIssue, 'AST Parser with depth 5 should be tolerated by parser elastic budget');
-  console.log('  ✔ [PASS] AST parser descent nesting within elastic budget tolerated.');
+  console.log('  ✔  AST parser descent nesting within elastic budget tolerated.');
 }
 
 function testShortSpanGuardTolerance() {
@@ -144,7 +144,7 @@ export function quickLockAcquire(mutex: any, timeout: number): boolean {
 
   const nestIssue = issues.find((i) => i.rule === 'CPX-NEST-001');
   assert(!nestIssue, 'Short-span guard routine (loc <= 25) with depth 4 should be exempt');
-  console.log('  ✔ [PASS] Short-span guard tolerance verified.');
+  console.log('  ✔  Short-span guard tolerance verified.');
 }
 
 function testUnboundedBusinessNestingDetection() {
@@ -188,7 +188,7 @@ export class OrderService {
   const nestIssue = issues.find((i) => i.rule === 'CPX-NEST-001');
   assert(nestIssue !== undefined, 'Business logic with depth >= 4 must be flagged by CPX-NEST-001');
   assert(nestIssue.message.includes('exceeding elastic budget 3'), 'Issue message cites budget 3');
-  console.log('  ✔ [PASS] CPX-NEST-001 unbudgeted business nesting flagged.');
+  console.log('  ✔  CPX-NEST-001 unbudgeted business nesting flagged.');
 }
 
 function testStateMachineBranchDiscipline() {
@@ -229,7 +229,7 @@ ${fatCaseBody}
     'Oversized state machine branch (>35 LOC) must trigger CPX-STM-001',
   );
   assert.strictEqual(stmIssue.severity, 'info', 'CPX-STM-001 is reported with severity INFO');
-  console.log('  ✔ [PASS] CPX-STM-001 state machine branch discipline verified.');
+  console.log('  ✔  CPX-STM-001 state machine branch discipline verified.');
 }
 
 function testQuantitativeCFNIScoring() {
@@ -290,7 +290,7 @@ function testQuantitativeCFNIScoring() {
     typeof cognitiveResult.nestingPenalty === 'number',
     'evaluateNetCognitiveCost returns numeric nestingPenalty',
   );
-  console.log('  ✔ [PASS] CFNI quantitative model and scoring integration verified.');
+  console.log('  ✔  CFNI quantitative model and scoring integration verified.');
 }
 
 function runAll() {

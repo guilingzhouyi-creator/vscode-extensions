@@ -86,6 +86,6 @@ if (result.error) {
 
 const code = result.status === null ? 2 : result.status;
 process.stdout.write(
-  `[gate:comments] ${update ? 'baseline updated' : 'strict ratchet'} → ${code === 0 ? 'PASS' : 'FAIL'}\n`,
+  `[gate:comments] ${update ? 'baseline updated' : 'strict ratchet'} → ${code === 0 ? '✔ PASS' : '✖ BLOCK'}\n`,
 );
 process.exit(code);

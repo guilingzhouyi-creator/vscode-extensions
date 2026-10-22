@@ -242,7 +242,7 @@ async function run() {
       paramHits[0].detail.outerLine === 2,
       `outerLine should point to line 2, got ${paramHits[0].detail.outerLine}`,
     );
-    console.log('  [PASS] function parameter shadows outer-function variable');
+    console.log('  ✔ function parameter shadows outer-function variable');
 
     // 2. for-loop variable shadows outer
     const forHits = shadowIn('shadow_for_loop.py');
@@ -254,7 +254,7 @@ async function run() {
       forHits.some((h) => h.detail.name === 'item'),
       `shadowed name should include 'item', got ${JSON.stringify(forHits.map((h) => h.detail.name))}`,
     );
-    console.log('  [PASS] for-loop variable shadows outer-scope variable');
+    console.log('  ✔ for-loop variable shadows outer-scope variable');
 
     // 3. Class method parameter shadows class attribute
     const classHits = shadowIn('shadow_class_method.py');
@@ -266,7 +266,7 @@ async function run() {
       classHits.some((h) => h.detail.name === 'name'),
       `shadowed name should include 'name', got ${JSON.stringify(classHits.map((h) => h.detail.name))}`,
     );
-    console.log('  [PASS] class method parameter shadows class-level variable');
+    console.log('  ✔ class method parameter shadows class-level variable');
 
     // 4. Module-level variable shadowed by function-local
     const modHits = shadowIn('shadow_module_var.py');
@@ -278,7 +278,7 @@ async function run() {
       modHits.some((h) => h.detail.name === 'config'),
       `shadowed name should include 'config', got ${JSON.stringify(modHits.map((h) => h.detail.name))}`,
     );
-    console.log('  [PASS] module-level variable shadowed by function-local assignment');
+    console.log('  ✔ module-level variable shadowed by function-local assignment');
 
     // 8. with ... as target shadows outer
     const withHits = shadowIn('shadow_with_as.py');
@@ -290,7 +290,7 @@ async function run() {
       withHits.some((h) => h.detail.name === 'handle'),
       `shadowed name should include 'handle', got ${JSON.stringify(withHits.map((h) => h.detail.name))}`,
     );
-    console.log('  [PASS] with ... as target shadows outer-scope variable');
+    console.log('  ✔ with ... as target shadows outer-scope variable');
 
     // 9. except ... as target shadows outer
     const exceptHits = shadowIn('shadow_except_as.py');
@@ -302,7 +302,7 @@ async function run() {
       exceptHits.some((h) => h.detail.name === 'error'),
       `shadowed name should include 'error', got ${JSON.stringify(exceptHits.map((h) => h.detail.name))}`,
     );
-    console.log('  [PASS] except ... as target shadows outer-scope variable');
+    console.log('  ✔ except ... as target shadows outer-scope variable');
 
     // 10. Nested function name shadows outer variable
     const nestedHits = shadowIn('shadow_nested_func.py');
@@ -314,7 +314,7 @@ async function run() {
       nestedHits.some((h) => h.detail.name === 'helper'),
       `shadowed name should include 'helper', got ${JSON.stringify(nestedHits.map((h) => h.detail.name))}`,
     );
-    console.log('  [PASS] nested function name shadows outer-scope variable');
+    console.log('  ✔ nested function name shadows outer-scope variable');
 
     // 11. Import shadowed by local variable
     const importHits = shadowIn('shadow_import_local.py');
@@ -326,7 +326,7 @@ async function run() {
       importHits.some((h) => h.detail.name === 'json'),
       `shadowed name should include 'json', got ${JSON.stringify(importHits.map((h) => h.detail.name))}`,
     );
-    console.log('  [PASS] module import shadowed by function-local variable');
+    console.log('  ✔ module import shadowed by function-local variable');
 
     // 13. Async function parameter shadowing
     const asyncHits = shadowIn('shadow_async_param.py');
@@ -338,7 +338,7 @@ async function run() {
       asyncHits.some((h) => h.detail.name === 'url'),
       `shadowed name should include 'url', got ${JSON.stringify(asyncHits.map((h) => h.detail.name))}`,
     );
-    console.log('  [PASS] async function parameter shadows outer-scope variable');
+    console.log('  ✔ async function parameter shadows outer-scope variable');
 
     // --- Should NOT report -------------------------------------------------------
 
@@ -349,7 +349,7 @@ async function run() {
       0,
       `if-block assignment must NOT be flagged (no block scope in Python), got ${ifHits.length}`,
     );
-    console.log('  [PASS] if-block assignment: same scope, no shadowing reported');
+    console.log('  ✔ if-block assignment: same scope, no shadowing reported');
 
     // 6. Whitelisted names
     const wlHits = shadowIn('no_shadow_whitelist.py');
@@ -358,7 +358,7 @@ async function run() {
       0,
       `whitelisted names (self, _, i, e, f, ...) must NOT be flagged, got ${wlHits.length}: ${wlHits.map((h) => h.detail.name).join(', ')}`,
     );
-    console.log('  [PASS] whitelisted idiomatic names are suppressed');
+    console.log('  ✔ whitelisted idiomatic names are suppressed');
 
     // 7. Same-scope reassignment
     const reassignHits = shadowIn('no_shadow_reassign.py');
@@ -367,7 +367,7 @@ async function run() {
       0,
       `same-scope reassignment must NOT be flagged, got ${reassignHits.length}`,
     );
-    console.log('  [PASS] same-scope reassignment is not shadowing');
+    console.log('  ✔ same-scope reassignment is not shadowing');
 
     // 12. Top-level function (no outer scope to shadow)
     const topHits = shadowIn('no_shadow_top_level.py');
@@ -376,7 +376,7 @@ async function run() {
       0,
       `top-level function must have no shadow reports, got ${topHits.length}`,
     );
-    console.log('  [PASS] top-level function with no outer scope stays silent');
+    console.log('  ✔ top-level function with no outer scope stays silent');
 
     // --- Severity & message format check -----------------------------------------
 
@@ -399,7 +399,7 @@ async function run() {
         typeof allShadow[0].detail.outerLine === 'number' && allShadow[0].detail.outerLine > 0,
         `detail.outerLine must be a positive number, got: ${allShadow[0].detail.outerLine}`,
       );
-      console.log('  [PASS] severity=warning, message format includes outer line reference');
+      console.log('  ✔ severity=warning, message format includes outer line reference');
     }
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
@@ -411,6 +411,6 @@ run()
     console.log('\n ALL SHADOWING DETECTION TESTS PASSED SUCCESSFULLY!');
   })
   .catch((error) => {
-    console.error('\n[FAIL]', error && error.message ? error.message : error);
+    console.error('\n✖ BLOCK', error && error.message ? error.message : error);
     process.exit(1);
   });

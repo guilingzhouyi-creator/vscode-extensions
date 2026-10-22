@@ -328,7 +328,7 @@ async function run() {
     assert.strictEqual(long.length, 1, 'exactly one over-long function expected');
     assert.strictEqual(long[0].location.file, 'long.ts');
     assert.ok(long[0].detail.lines >= 66, 'span must cover the whole function');
-    console.log('  [PASS] SIM-LONG-001 flags only the over-long function');
+    console.log('  ✔ SIM-LONG-001 flags only the over-long function');
 
     assert.ok(
       !report.issues.some((i) => i.location.file === 'medium.ts'),
@@ -338,7 +338,7 @@ async function run() {
     const comments = byRule('SIM-COMC-001');
     assert.strictEqual(comments.length, 1, 'only the 3-line code-shaped streak qualifies');
     assert.strictEqual(comments[0].location.file, 'commented.py');
-    console.log('  [PASS] SIM-COMC-001 flags code-shaped streaks, prose stays silent');
+    console.log('  ✔ SIM-COMC-001 flags code-shaped streaks, prose stays silent');
 
     const empty = byRule('SIM-EMPTY-001')
       .map((i) => i.location.file)
@@ -348,7 +348,7 @@ async function run() {
       ['empty.py', 'empty.ts'],
       'both placeholder bodies must be flagged',
     );
-    console.log('  [PASS] SIM-EMPTY-001 covers pass/docstring and {} bodies only');
+    console.log('  ✔ SIM-EMPTY-001 covers pass/docstring and {} bodies only');
 
     assert.ok(
       !report.issues.some(
@@ -358,19 +358,19 @@ async function run() {
       ),
       'ellipsis Protocol stubs and docstring-embedded examples must stay silent',
     );
-    console.log('  [PASS] ellipsis stubs and docstring examples are not empty implementations');
+    console.log('  ✔ ellipsis stubs and docstring examples are not empty implementations');
 
     const debug = byRule('SIM-PRNT-001');
     assert.strictEqual(debug.length, 1, 'only non-CLI debug output qualifies');
     assert.strictEqual(debug[0].location.file, 'debug.py');
-    console.log('  [PASS] SIM-PRNT-001 exempts cli/ and scripts/ paths');
+    console.log('  ✔ SIM-PRNT-001 exempts cli/ and scripts/ paths');
 
     const flat = byRule('SIM-FLAT-002');
     assert.strictEqual(flat.length, 1, 'deeply nested function must trigger SIM-FLAT-002');
     assert.strictEqual(flat[0].location.file, 'deep_nested.ts');
     assert.ok(flat[0].detail.nestingDepth >= 4, 'nesting depth must be at least 4');
     console.log(
-      '  [PASS] SIM-FLAT-002 flags deep conditional nesting and recommends guard clauses',
+      '  ✔ SIM-FLAT-002 flags deep conditional nesting and recommends guard clauses',
     );
 
     const trn = byRule('SIM-TRN-001').filter((i) => i.location.file === 'ternary.ts');
@@ -383,7 +383,7 @@ async function run() {
       trn.every((i) => i.location.file === 'ternary.ts'),
       true,
     );
-    console.log('  [PASS] SIM-TRN-001 identifies safe shallow ternary folding opportunities');
+    console.log('  ✔ SIM-TRN-001 identifies safe shallow ternary folding opportunities');
 
     const imm = byRule('SIM-IMM-001').filter((i) => i.location.file === 'ternary.ts');
     assert.strictEqual(
@@ -393,7 +393,7 @@ async function run() {
     );
     assert.strictEqual(imm[0].detail.canMakeImmutable, true);
     assert.strictEqual(imm[0].detail.rewardBonus, 5);
-    console.log('  [PASS] SIM-IMM-001 detects immutable const conversion with +5 reward bonus');
+    console.log('  ✔ SIM-IMM-001 detects immutable const conversion with +5 reward bonus');
 
     // === SIM-ELSE-001: redundant-else ===
     const redundantElse = byRule('SIM-ELSE-001');
@@ -428,7 +428,7 @@ async function run() {
       true,
       'SIM-ELSE-001 severity must be info',
     );
-    console.log('  [PASS] SIM-ELSE-001 flags redundant else after terminating statements');
+    console.log('  ✔ SIM-ELSE-001 flags redundant else after terminating statements');
 
     // === SIM-BOOL-001: simplify-boolean-return ===
     const boolReturn = byRule('SIM-BOOL-001');
@@ -463,7 +463,7 @@ async function run() {
       true,
       'SIM-BOOL-001 severity must be info',
     );
-    console.log('  [PASS] SIM-BOOL-001 flags simplifiable boolean return patterns');
+    console.log('  ✔ SIM-BOOL-001 flags simplifiable boolean return patterns');
 
     // === SIM-GUARD-001: use-guard-clause ===
     const guardClause = byRule('SIM-GUARD-001');
@@ -498,7 +498,7 @@ async function run() {
       true,
       'SIM-GUARD-001 severity must be info',
     );
-    console.log('  [PASS] SIM-GUARD-001 flags deep conditional nesting at function start');
+    console.log('  ✔ SIM-GUARD-001 flags deep conditional nesting at function start');
 
     const strictConfig = path.join(root, 'strict.config.json');
     fs.writeFileSync(
@@ -524,7 +524,7 @@ async function run() {
       1,
       'a lower threshold must flag the previously acceptable 47-line function',
     );
-    console.log('  [PASS] maxFunctionLines threshold is honoured from config');
+    console.log('  ✔ maxFunctionLines threshold is honoured from config');
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -535,6 +535,6 @@ run()
     console.log('\n ALL SIMPLIFICATION KEY POINTS PASSED SUCCESSFULLY!');
   })
   .catch((error) => {
-    console.error('\n[FAIL]', error && error.message ? error.message : error);
+    console.error('\n✖ BLOCK', error && error.message ? error.message : error);
     process.exit(1);
   });

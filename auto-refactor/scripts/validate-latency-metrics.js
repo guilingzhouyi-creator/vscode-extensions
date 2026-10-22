@@ -70,7 +70,7 @@ console.log(`Found ${count} latencyMs references in src/ (budget ceiling: ${LATE
 
 if (count > LATENCY_MS_BUDGET) {
   console.error(
-    `[FAIL] Legacy latencyMs count (${count}) exceeded budget ceiling (${LATENCY_MS_BUDGET})!`,
+    `✖ BLOCK  Legacy latencyMs count (${count}) exceeded budget ceiling (${LATENCY_MS_BUDGET})!`,
   );
   console.error(
     'New latencyMs references are strictly forbidden. Use latencyUs (hrtime.bigint) instead:',
@@ -84,5 +84,5 @@ if (count > LATENCY_MS_BUDGET) {
 console.log(
   `✓ Monotonic ratchet passed: latencyMs count (${count}) <= ceiling (${LATENCY_MS_BUDGET})`,
 );
-console.log('[PASS] validate-latency-metrics passed all checks.');
+console.log('✔ validate-latency-metrics passed all checks.');
 process.exit(0);

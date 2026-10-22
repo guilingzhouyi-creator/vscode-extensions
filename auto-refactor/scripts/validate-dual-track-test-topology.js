@@ -125,7 +125,7 @@ mod tests {
     'LargeFileAnalyzer MUST NOT report large-file on Rust file whose production LOC is under threshold',
   );
 
-  console.log('  ✔ [PASS] Rust embedded test zone partitioning and LOC decoupling verified.');
+  console.log('  ✔  Rust embedded test zone partitioning and LOC decoupling verified.');
 }
 
 function testRustEmbeddedContracts() {
@@ -169,7 +169,7 @@ pub fn part2_after_test() { 2 }
   const tailFinding = res2.findings.find((f) => f.reason === 'embedded_zone_not_tail_isolated');
   assert.ok(tailFinding, 'Interleaved test block must trigger embedded_zone_not_tail_isolated');
 
-  console.log('  ✔ [PASS] Rust embedded test contracts verified.');
+  console.log('  ✔  Rust embedded test contracts verified.');
 }
 
 function testCrossLanguageDisciplineTsAndGdScript() {
@@ -212,7 +212,7 @@ describe('OrderProcessor', () => {
     'Must suggest extracting test suite to external test file',
   );
 
-  console.log('  ✔ [PASS] Cross-language test paradigm discipline verified.');
+  console.log('  ✔  Cross-language test paradigm discipline verified.');
 }
 
 function testQualityScoringRuleTableRouting() {
@@ -232,7 +232,7 @@ function testQualityScoringRuleTableRouting() {
     'Deduction points must equal DEDUCTION_TEST_TOPOLOGY_DISCIPLINE (15)',
   );
 
-  console.log('  ✔ [PASS] Quality scoring rule table routing verified.');
+  console.log('  ✔  Quality scoring rule table routing verified.');
 }
 
 function runAll() {
@@ -241,12 +241,12 @@ function runAll() {
   testRustEmbeddedContracts();
   testCrossLanguageDisciplineTsAndGdScript();
   testQualityScoringRuleTableRouting();
-  console.log('\n[PASS] All 4 Dual-Track Test Topology test suites passed successfully!');
+  console.log('\n✔ All 4 Dual-Track Test Topology test suites passed successfully!');
 }
 
 try {
   runAll();
 } catch (err) {
-  console.error('\n[FAIL] Dual-track test topology validation failed:', err);
+  console.error('\n✖ BLOCK Dual-track test topology validation failed:', err);
   process.exit(1);
 }

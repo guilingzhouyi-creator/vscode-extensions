@@ -54,9 +54,9 @@ function runStage(label, args, extra = []) {
   console.log(`> ${command.join(' ')}`);
   try {
     execFileSync(command[0], command.slice(1), { cwd: CRATES_DIR, stdio: 'inherit' });
-    console.log(`[PASS] ${label}`);
+    console.log(`✔ ${label}`);
   } catch (_err) {
-    console.error(`[FAIL] ${label} — see the output above.`);
+    console.error(`✖ BLOCK ${label} — see the output above.`);
     process.exit(1);
   }
 }

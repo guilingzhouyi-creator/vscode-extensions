@@ -127,7 +127,7 @@ func process_input():
   assert(animLit, 'attack_animation literal must exist');
   assert.strictEqual(animLit.tolerated, true, 'play("attack_animation") should be tolerated');
 
-  console.log('[PASS] GDScriptAdapter tolerance and subscript validation succeeded.');
+  console.log('✔ GDScriptAdapter tolerance and subscript validation succeeded.');
 }
 
 runTests();

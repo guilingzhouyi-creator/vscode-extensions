@@ -176,6 +176,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error('[FAIL] validate-semantic-ir failed:', err);
+  console.error('✖ BLOCK validate-semantic-ir failed:', err);
   process.exit(1);
 });

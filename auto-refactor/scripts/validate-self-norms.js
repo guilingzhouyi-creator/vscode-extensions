@@ -269,11 +269,11 @@ function main() {
   let failed = false;
   for (const [name, violations] of groups) {
     if (violations.length === 0) {
-      console.log(`  [PASS] ${name}`);
+      console.log(`  ✔ ${name}`);
       continue;
     }
     failed = true;
-    console.log(`  [FAIL] ${name} (${violations.length})`);
+    console.log(`  ✖ BLOCK ${name} (${violations.length})`);
     for (const v of violations.slice(0, 10)) console.log(`      ${v}`);
   }
 

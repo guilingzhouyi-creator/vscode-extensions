@@ -150,7 +150,7 @@ function verifyPresetsLanguageScoped() {
     }
   }
   console.log(
-    '  [PASS] shipped presets are language-scoped (no suppressions, **/-anchored includes)',
+    '  ✔ shipped presets are language-scoped (no suppressions, **/-anchored includes)',
   );
 }
 
@@ -168,7 +168,7 @@ function verifyConventionsAreOptions() {
     hygieneSrc.includes('jargonPatterns'),
     'project jargon vocabulary must be inflowed via hygiene.options.jargonPatterns',
   );
-  console.log('  [PASS] project conventions are declared options, not engine literals');
+  console.log('  ✔ project conventions are declared options, not engine literals');
 }
 
 /**
@@ -187,7 +187,7 @@ function run() {
     [],
     `engine core (src/presets/templates) must stay strictly project-agnostic; consumer identifier found at: ${coreOffenders.join(', ')}`,
   );
-  console.log('  [PASS] engine core (src/presets/templates) is 100% project-agnostic');
+  console.log('  ✔ engine core (src/presets/templates) is 100% project-agnostic');
 
   // 2. Verify scripts and documentation: zero legacy forbidden tokens, and active consumer names
   // allowed only inside explicit integration test harnesses and consumer specs.
@@ -203,7 +203,7 @@ function run() {
     [],
     `scripts and docs carry unauthorized consumer coupling at: ${scriptAndDocOffenders.join(', ')}`,
   );
-  console.log('  [PASS] scripts and docs observe strict consumer boundary constraints');
+  console.log('  ✔ scripts and docs observe strict consumer boundary constraints');
 
   verifyPresetsLanguageScoped();
   verifyConventionsAreOptions();
@@ -213,6 +213,6 @@ try {
   run();
   console.log('\n ALL PROJECT NEUTRALITY CHECKS PASSED SUCCESSFULLY!');
 } catch (error) {
-  console.error('\n[FAIL]', error && error.message ? error.message : error);
+  console.error('\n✖ BLOCK', error && error.message ? error.message : error);
   process.exit(1);
 }

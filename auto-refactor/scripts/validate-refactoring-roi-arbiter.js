@@ -49,7 +49,7 @@ function testAutoApplySafePatch() {
   assert.ok(result.roi.roi >= 2.0);
   assert.strictEqual(result.baseEvaluation.verdict, 'approved');
 
-  console.log('  ✔ [PASS] AUTO_APPLY verdict verified.');
+  console.log('  ✔  AUTO_APPLY verdict verified.');
 }
 
 function testAutoRejectDangerousPatches() {
@@ -90,7 +90,7 @@ function testAutoRejectDangerousPatches() {
     'Maintenance debt injection must be rejected',
   );
 
-  console.log('  ✔ [PASS] AUTO_REJECT verdicts for API drift & debt injection verified.');
+  console.log('  ✔  AUTO_REJECT verdicts for API drift & debt injection verified.');
 }
 
 function testHumanReviewBorderlinePatch() {
@@ -120,7 +120,7 @@ function testHumanReviewBorderlinePatch() {
   );
   assert.ok(result.safety.safetyIndex >= 0.7 && result.safety.safetyIndex < 0.9);
 
-  console.log('  ✔ [PASS] HUMAN_REVIEW verdict verified.');
+  console.log('  ✔  HUMAN_REVIEW verdict verified.');
 }
 
 function runAll() {
@@ -128,7 +128,7 @@ function runAll() {
   testAutoApplySafePatch();
   testAutoRejectDangerousPatches();
   testHumanReviewBorderlinePatch();
-  console.log('\n[PASS] All 3 Change Quality Arbiter test suites passed successfully!');
+  console.log('\n✔ All 3 Change Quality Arbiter test suites passed successfully!');
 }
 
 runAll();

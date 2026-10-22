@@ -126,13 +126,13 @@ async function main() {
       0,
       'a suppressed new finding must not fail the severity gate',
     );
-    console.log('  [PASS] a suppressed new finding keeps the gate green but stays in the report');
+    console.log('  ✔ a suppressed new finding keeps the gate green but stays in the report');
     assert.strictEqual(
       await checkGateExit(controlRoot, false),
       1,
       'the same growth without a suppression must still fail the severity gate',
     );
-    console.log('  [PASS] the control tree still fails, so the suppression is what decides it');
+    console.log('  ✔ the control tree still fails, so the suppression is what decides it');
   } finally {
     fs.rmSync(suppressRoot, { recursive: true, force: true });
     fs.rmSync(controlRoot, { recursive: true, force: true });

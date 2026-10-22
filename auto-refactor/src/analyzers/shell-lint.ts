@@ -32,6 +32,7 @@ import {
     ECHO_FLAG_RE,
     POWERSHELL_ALIASES,
     PS_APPROVED_VERBS,
+    PS_APPROVED_VERBS_FOLDED,
     PS_FUNCTION_RE,
     PS_CMDLET_BINDING_RE,
     PS_PARAM_BLOCK_RE,
@@ -527,9 +528,14 @@ export class ShellLintAnalyzer implements Analyzer {
     private checkApprovedVerb(functionName: string, lineIndex: number, emit: ShellEmitter): void {
         const dashIdx = functionName.indexOf('-');
         const verb = dashIdx > 0 ? functionName.slice(0, dashIdx) : functionName;
-        const verbNormalized = verb.charAt(0).toUpperCase() + verb.slice(1).toLowerCase();
+        // PowerShell verbs are case-insensitive (`convertto`, `ConvertTo` and `CONVERTTO` are the
+        // same verb), but the approved-verb set is stored with its canonical camel case. Comparing
+        // a lower-cased verb against that set reported every compound verb as unapproved:
+        // `ConvertTo` became `Convertto`, which the set does not contain. Folding both sides is the
+        // only form that is correct for single-word (`Get`) and compound (`ConvertTo`) verbs alike.
+        const verbFolded = verb.toLowerCase();
 
-        if (dashIdx > 0 && !PS_APPROVED_VERBS.has(verbNormalized)) {
+        if (dashIdx > 0 && !PS_APPROVED_VERBS_FOLDED.has(verbFolded)) {
             emit(
                 lineIndex,
                 RULE_PS_VERB_001,

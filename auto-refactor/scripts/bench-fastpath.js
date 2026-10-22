@@ -95,7 +95,7 @@ async function checkFixtures() {
     const n0 = JSON.parse(out0).issuesTotal;
     const n1 = JSON.parse(out1).issuesTotal;
     console.log(
-      `${ok ? 'PASS' : 'FAIL'}  fixtures ${fullLabel}: fast=0 issues=${n0}  fast=1 issues=${n1}  byteIdentical=${ok}`,
+      `${ok ? '✔ PASS' : '✖ BLOCK'}  fixtures ${fullLabel}: fast=0 issues=${n0}  fast=1 issues=${n1}  byteIdentical=${ok}`,
     );
   }
   console.log(

@@ -257,7 +257,7 @@ async function runAdapterTests() {
 
   // Test 1: SourceFile root
   assert.strictEqual(ast.root.kind, NodeKind.SourceFile, 'root node must be SourceFile');
-  console.log('  [PASS] 1. SourceFile root node');
+  console.log('  ✔ 1. SourceFile root node');
 
   // Test 2: Function declarations
   const funcs = findNodes(ast, NodeKind.Function);
@@ -271,14 +271,14 @@ async function runAdapterTests() {
     funcNames.includes('processData'),
     `processData must be detected, got ${funcNames.join(', ')}`,
   );
-  console.log(`  [PASS] 2. Function detection (${funcs.length} found)`);
+  console.log(`  ✔ 2. Function detection (${funcs.length} found)`);
 
   // Test 3: Method declarations
   const methods = findNodes(ast, NodeKind.Method);
   assert.ok(methods.length >= 1, `expected >= 1 method, got ${methods.length}`);
   assert.strictEqual(methods[0].name, 'GetUser');
   assert.strictEqual(methods[0].functionLike, true);
-  console.log(`  [PASS] 3. Method detection (${methods.length} found)`);
+  console.log(`  ✔ 3. Method detection (${methods.length} found)`);
 
   // Test 4: Struct declarations
   const structs = findNodes(ast, NodeKind.Struct);
@@ -287,14 +287,14 @@ async function runAdapterTests() {
   assert.ok(structNames.includes('User'), 'User struct must be detected');
   assert.ok(structNames.includes('UserRepository'), 'UserRepository struct must be detected');
   assert.strictEqual(structs[0].isClassDefining, true);
-  console.log(`  [PASS] 4. Struct detection (${structs.length} found)`);
+  console.log(`  ✔ 4. Struct detection (${structs.length} found)`);
 
   // Test 5: Interface declarations
   const ifaces = findNodes(ast, NodeKind.Interface);
   assert.ok(ifaces.length >= 1, `expected >= 1 interface, got ${ifaces.length}`);
   assert.strictEqual(ifaces[0].name, 'Repository');
   assert.strictEqual(ifaces[0].isClassDefining, true);
-  console.log(`  [PASS] 5. Interface detection (${ifaces.length} found)`);
+  console.log(`  ✔ 5. Interface detection (${ifaces.length} found)`);
 
   // Test 6: Variable declarations
   const vars = findNodes(ast, NodeKind.Variable);
@@ -303,7 +303,7 @@ async function runAdapterTests() {
     vars.some((v) => v.name === 'globalCounter'),
     'globalCounter variable must be detected',
   );
-  console.log(`  [PASS] 6. Variable detection (${vars.length} found)`);
+  console.log(`  ✔ 6. Variable detection (${vars.length} found)`);
 
   // Test 7: Constant declarations
   const consts = findNodes(ast, NodeKind.Constant);
@@ -313,7 +313,7 @@ async function runAdapterTests() {
     'MaxRetries constant must be detected',
   );
   assert.strictEqual(consts[0].isConstBound, true);
-  console.log(`  [PASS] 7. Constant detection (${consts.length} found)`);
+  console.log(`  ✔ 7. Constant detection (${consts.length} found)`);
 
   // Test 8: Control flow nodes (if / for / switch / select)
   const cfNodes = findNodes(ast, NodeKind.ControlFlow);
@@ -322,7 +322,7 @@ async function runAdapterTests() {
     cfNodes.every((n) => n.branchWeight >= 1),
     'every control flow node must have branchWeight >= 1',
   );
-  console.log(`  [PASS] 8. ControlFlow detection (${cfNodes.length} found)`);
+  console.log(`  ✔ 8. ControlFlow detection (${cfNodes.length} found)`);
 
   // Test 9: String literals
   const strings = findNodes(ast, NodeKind.StringLiteral);
@@ -331,7 +331,7 @@ async function runAdapterTests() {
     strings.every((s) => s.isString === true),
     'every string literal must have isString=true',
   );
-  console.log(`  [PASS] 9. StringLiteral detection (${strings.length} found)`);
+  console.log(`  ✔ 9. StringLiteral detection (${strings.length} found)`);
 
   // Test 10: Numeric literals
   const numbers = findNodes(ast, NodeKind.NumericLiteral);
@@ -340,7 +340,7 @@ async function runAdapterTests() {
     numbers.every((n) => n.isNumeric === true),
     'every numeric literal must have isNumeric=true',
   );
-  console.log(`  [PASS] 10. NumericLiteral detection (${numbers.length} found)`);
+  console.log(`  ✔ 10. NumericLiteral detection (${numbers.length} found)`);
 
   // Test 11: Struct fields
   const fields = findNodes(ast, NodeKind.Field);
@@ -349,12 +349,12 @@ async function runAdapterTests() {
     fields.some((f) => f.name === 'ID' || f.name === 'Name' || f.name === 'Age'),
     'at least one struct field name must match',
   );
-  console.log(`  [PASS] 11. Field detection (${fields.length} found)`);
+  console.log(`  ✔ 11. Field detection (${fields.length} found)`);
 
   // Test 12: Call expressions
   const calls = findNodes(ast, NodeKind.Call);
   assert.ok(calls.length >= 3, `expected >= 3 call expressions, got ${calls.length}`);
-  console.log(`  [PASS] 12. Call detection (${calls.length} found)`);
+  console.log(`  ✔ 12. Call detection (${calls.length} found)`);
 
   // Test 13: Block nodes (brace tracking)
   const blocks = findNodes(ast, NodeKind.Block);
@@ -363,12 +363,12 @@ async function runAdapterTests() {
     blocks.every((b) => b.increasesNesting === true),
     'every block must have increasesNesting=true',
   );
-  console.log(`  [PASS] 13. Block detection (${blocks.length} found)`);
+  console.log(`  ✔ 13. Block detection (${blocks.length} found)`);
 
   // Test 14: Named literals (true / false / nil / iota)
   const literals = findNodes(ast, NodeKind.Literal);
   assert.ok(literals.length >= 1, `expected >= 1 named literal (nil), got ${literals.length}`);
-  console.log(`  [PASS] 14. Named Literal detection (${literals.length} found)`);
+  console.log(`  ✔ 14. Named Literal detection (${literals.length} found)`);
 
   // Test 15: Adapter registration
   assert.strictEqual(adapter.id, 'go', 'adapter id must be "go"');
@@ -376,7 +376,7 @@ async function runAdapterTests() {
   assert.strictEqual(hasAdapterFor('foo.go'), true, 'hasAdapterFor must return true for .go files');
   const resolved = adapterFor('foo.go');
   assert.strictEqual(resolved.id, 'go', 'adapterFor must resolve to Go adapter');
-  console.log('  [PASS] 15. Adapter registration & extension resolution');
+  console.log('  ✔ 15. Adapter registration & extension resolution');
 }
 
 async function runModernAnalyzerTests() {
@@ -399,7 +399,7 @@ async function runModernAnalyzerTests() {
     errIssues.length >= 2,
     `GOM-ERR-001 should fire at least twice, got ${errIssues.length} (lines: ${errIssues.join(',')})`,
   );
-  console.log(`  [PASS] 16. GOM-ERR-001 (unchecked errors) — ${errIssues.length} findings`);
+  console.log(`  ✔ 16. GOM-ERR-001 (unchecked errors) — ${errIssues.length} findings`);
 
   // Test 17: GOM-CTX-001 context not first arg
   const ctxIssues = byRule('GOM-CTX-001');
@@ -407,7 +407,7 @@ async function runModernAnalyzerTests() {
     ctxIssues.length >= 1,
     `GOM-CTX-001 should fire at least once, got ${ctxIssues.length}`,
   );
-  console.log(`  [PASS] 17. GOM-CTX-001 (context not first arg) — ${ctxIssues.length} findings`);
+  console.log(`  ✔ 17. GOM-CTX-001 (context not first arg) — ${ctxIssues.length} findings`);
 
   // Test 18: GOM-STYLE-001 receiver naming
   const recvIssues = byRule('GOM-STYLE-001');
@@ -415,7 +415,7 @@ async function runModernAnalyzerTests() {
     recvIssues.length >= 1,
     `GOM-STYLE-001 should fire for "self" receiver, got ${recvIssues.length}`,
   );
-  console.log(`  [PASS] 18. GOM-STYLE-001 (receiver naming) — ${recvIssues.length} findings`);
+  console.log(`  ✔ 18. GOM-STYLE-001 (receiver naming) — ${recvIssues.length} findings`);
 
   // Test 19: GOM-STYLE-002 error variable naming
   const errNameIssues = byRule('GOM-STYLE-002');
@@ -423,7 +423,7 @@ async function runModernAnalyzerTests() {
     errNameIssues.length >= 1,
     `GOM-STYLE-002 should fire for non-err-prefixed error var, got ${errNameIssues.length}`,
   );
-  console.log(`  [PASS] 19. GOM-STYLE-002 (error naming) — ${errNameIssues.length} findings`);
+  console.log(`  ✔ 19. GOM-STYLE-002 (error naming) — ${errNameIssues.length} findings`);
 
   // Test 20: GOM-STYLE-003 missing package comment
   const pkgCommentIssues = byRule('GOM-STYLE-003');
@@ -431,7 +431,7 @@ async function runModernAnalyzerTests() {
     pkgCommentIssues.length >= 1,
     `GOM-STYLE-003 should fire for missing package comment, got ${pkgCommentIssues.length}`,
   );
-  console.log(`  [PASS] 20. GOM-STYLE-003 (package comment) — ${pkgCommentIssues.length} findings`);
+  console.log(`  ✔ 20. GOM-STYLE-003 (package comment) — ${pkgCommentIssues.length} findings`);
 
   // Test 21: Compliant code produces zero go-modern issues
   const goodIssues = await scanFixture(
@@ -444,7 +444,7 @@ async function runModernAnalyzerTests() {
     [],
     `compliant Go code should have zero go-modern issues, got ${JSON.stringify(goModernGood)}`,
   );
-  console.log('  [PASS] 21. Compliant Go code triggers zero go-modern issues');
+  console.log('  ✔ 21. Compliant Go code triggers zero go-modern issues');
 
   // Test 22: Non-Go files are ignored by go-modern
   const decoyIssues = await scanFixture(
@@ -453,7 +453,7 @@ async function runModernAnalyzerTests() {
   );
   const goModernDecoy = decoyIssues.filter((i) => i.rule.startsWith('GOM-'));
   assert.deepStrictEqual(goModernDecoy, [], 'go-modern must not inspect TypeScript files');
-  console.log('  [PASS] 22. Non-Go files are ignored by go-modern');
+  console.log('  ✔ 22. Non-Go files are ignored by go-modern');
 
   // Test 23: go-modern is opt-in (no declaration = no findings)
   const offIssues = await scanFixture(
@@ -462,7 +462,7 @@ async function runModernAnalyzerTests() {
   );
   const goModernOff = offIssues.filter((i) => i.rule.startsWith('GOM-'));
   assert.deepStrictEqual(goModernOff, [], 'go-modern must stay off when not declared in config');
-  console.log('  [PASS] 23. go-modern is opt-in (default-off)');
+  console.log('  ✔ 23. go-modern is opt-in (default-off)');
 }
 
 async function runIntegrationTests() {
@@ -475,7 +475,7 @@ async function runIntegrationTests() {
   );
   const unsupported = issues.filter((i) => i.rule === 'LANG-UNSUPPORTED');
   assert.deepStrictEqual(unsupported, [], '.go files must NOT trigger LANG-UNSUPPORTED');
-  console.log('  [PASS] 24. .go files are recognized (no LANG-UNSUPPORTED)');
+  console.log('  ✔ 24. .go files are recognized (no LANG-UNSUPPORTED)');
 
   // Test 25: complexity analyzer produces function metrics for Go
   const complexityIssues = issues.filter((i) => i.analyzer === 'complexity');
@@ -486,7 +486,7 @@ async function runIntegrationTests() {
     issues.length >= 0, // non-throwing is the test
     'scan must complete without error for Go files',
   );
-  console.log('  [PASS] 25. Scan pipeline processes Go files end-to-end');
+  console.log('  ✔ 25. Scan pipeline processes Go files end-to-end');
 }
 
 async function main() {
@@ -496,7 +496,7 @@ async function main() {
     await runIntegrationTests();
     console.log('\n ALL GO SUPPORT CHECKS PASSED SUCCESSFULLY!');
   } catch (error) {
-    console.error('\n[FAIL]', error && error.message ? error.message : error);
+    console.error('\n✖ BLOCK', error && error.message ? error.message : error);
     process.exit(1);
   }
 }

@@ -95,7 +95,7 @@ async function testBlockingAndReportOnly() {
     );
     assert.ok(fs.existsSync(path.join(root, 'report.json')), 'report must be written');
     assert.ok(first.stdout.includes('ratchetNew='), 'summary must print ratchet counters');
-    console.log('  [PASS] blocking findings exit 1 and the report is written');
+    console.log('  ✔ blocking findings exit 1 and the report is written');
 
     // 1b. `--report-only` hands the verdict to the consumer (exit 0 despite findings)
     const reportOnly = await runRunner(root, ['--report-only', '--out', path.join(root, 'report.json')]);
@@ -114,7 +114,7 @@ async function testBlockingAndReportOnly() {
       0,
       '--engine-arg must forward flags verbatim to the engine',
     );
-    console.log('  [PASS] --report-only and --engine-arg behave as documented');
+    console.log('  ✔ --report-only and --engine-arg behave as documented');
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -139,13 +139,13 @@ async function testBaselineFreezeAndRatchet() {
     const ratcheted = await runRunner(root, ['--fail-on-severity', 'warning']);
     assert.strictEqual(ratcheted.status, 0, 'no new findings => exit 0');
     assert.ok(ratcheted.stdout.includes('ratchetNew=0'), 'ratchet must report zero new findings');
-    console.log('  [PASS] baseline freeze + ratchet keeps an unchanged tree green');
+    console.log('  ✔ baseline freeze + ratchet keeps an unchanged tree green');
 
     // 3. A new violation must break the ratchet.
     writeFiles(root, { 'src/regression.py': 'def other_empty():\n    pass\n' });
     const regression = await runRunner(root, ['--fail-on-severity', 'warning']);
     assert.strictEqual(regression.status, 1, 'a new violation must fail the ratchet');
-    console.log('  [PASS] a new violation breaks the ratchet');
+    console.log('  ✔ a new violation breaks the ratchet');
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -180,7 +180,7 @@ async function testConfigurationAndDegradation() {
       { encoding: 'utf8' },
     );
     assert.strictEqual(allowed.status, 0, '--allow-missing-engine opts into degradation');
-    console.log('  [PASS] missing engine is fail-closed unless explicitly allowed');
+    console.log('  ✔ missing engine is fail-closed unless explicitly allowed');
 
     // 5. Threshold parity: divergent global vs analyzer option must be rejected before scanning.
     fs.writeFileSync(
@@ -201,7 +201,7 @@ async function testConfigurationAndDegradation() {
     const divergent = await runRunner(root, ['--check-threshold-parity']);
     assert.strictEqual(divergent.status, 2, 'divergent thresholds must exit 2');
     assert.ok(divergent.stderr.includes('magicNumberMin'), 'divergence must name the key');
-    console.log('  [PASS] threshold double-declaration divergence is caught before scanning');
+    console.log('  ✔ threshold double-declaration divergence is caught before scanning');
 
     // 6. Missing config is a usage error, never a silent pass.
     const noConfig = spawnSync(
@@ -210,7 +210,7 @@ async function testConfigurationAndDegradation() {
       { encoding: 'utf8' },
     );
     assert.strictEqual(noConfig.status, 2, 'missing config must exit 2');
-    console.log('  [PASS] missing config fails loudly');
+    console.log('  ✔ missing config fails loudly');
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -226,6 +226,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error('\n[FAIL]', error && error.message ? error.message : error);
+  console.error('\n✖ BLOCK', error && error.message ? error.message : error);
   process.exit(1);
 });

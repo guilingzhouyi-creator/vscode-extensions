@@ -252,6 +252,19 @@ const PS_VERB_TOKENS =
 
 export const PS_APPROVED_VERBS = new Set(PS_VERB_TOKENS.split(' '));
 
+/**
+ * Case-folded projection of {@link PS_APPROVED_VERBS}.
+ *
+ * PowerShell treats verbs case-insensitively, but the approved list keeps its canonical camel
+ * case because that is how Microsoft publishes it. Any check that folds the observed verb must
+ * fold the reference set the same way; comparing a lower-cased verb against a camel-cased set
+ * rejects every compound verb (`ConvertTo`, `ConvertFrom`) and no single-word verb, which reads
+ * as a spelling rule rather than the case bug it is.
+ */
+export const PS_APPROVED_VERBS_FOLDED = new Set(
+    [...PS_APPROVED_VERBS].map((approvedVerb) => approvedVerb.toLowerCase()),
+);
+
 export const PS_FUNCTION_RE = /^\s*function\s+([A-Za-z][A-Za-z0-9_-]*)\s*(?:\(\))?\s*\{?/;
 export const PS_CMDLET_BINDING_RE = /\[CmdletBinding\s*\(\s*\)\]/;
 export const PS_PARAM_BLOCK_RE = /^\s*param\s*\(/i;

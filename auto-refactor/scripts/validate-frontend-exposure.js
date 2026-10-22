@@ -242,7 +242,7 @@ function testFrontendAnalyzer() {
     'Should flag CJK text without anti-squash properties',
   );
 
-  console.log('  [PASS] FrontendAnalyzer passed all assertions.');
+  console.log('  ✔ FrontendAnalyzer passed all assertions.');
 }
 
 function testProductionHygieneAnalyzer() {
@@ -315,7 +315,7 @@ function testProductionHygieneAnalyzer() {
     'Should flag sensitive backend environment variables in client code',
   );
 
-  console.log('  [PASS] ProductionHygieneAnalyzer passed all assertions.');
+  console.log('  ✔ ProductionHygieneAnalyzer passed all assertions.');
 }
 
 function testClientExposureAnalyzer() {
@@ -410,7 +410,7 @@ function testClientExposureAnalyzer() {
     'Guarded message listener must not trigger SEC-EXP-005',
   );
 
-  console.log('  [PASS] ClientExposureAnalyzer passed all assertions.');
+  console.log('  ✔ ClientExposureAnalyzer passed all assertions.');
 }
 
 function testScoringAndRoutingIntegration() {
@@ -447,7 +447,7 @@ function testScoringAndRoutingIntegration() {
     'Client exposure analyzer must have dimension rules mapped (SEC-EXP-001..005)',
   );
 
-  console.log('  [PASS] Scoring and router integration passed all assertions.');
+  console.log('  ✔ Scoring and router integration passed all assertions.');
 }
 
 function main() {

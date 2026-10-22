@@ -40,14 +40,14 @@ function check(payload, label) {
   const a = JSON.stringify(payload),
     b = JSON.stringify(back);
   if (a !== b) {
-    console.log(`FAIL ${label}: JSON mismatch`);
+    console.log(`✖ BLOCK  ${label}: JSON mismatch`);
     console.log('  orig:', a.slice(0, 300));
     console.log('  back:', b.slice(0, 300));
     process.exitCode = 1;
     return false;
   }
   if (!deepEqualStrict(payload, back)) {
-    console.log(`FAIL ${label}: deep mismatch (suggestion presence/order)`);
+    console.log(`✖ BLOCK  ${label}: deep mismatch (suggestion presence/order)`);
     process.exitCode = 1;
     return false;
   }
@@ -246,7 +246,7 @@ function testSuggestionPresenceFidelity() {
     },
   ];
   const sugBack = decodeResults(encodeResults(sug));
-  console.log(('suggestion' in sugBack[0].issues[0] ? 'FAIL' : 'PASS') + ' suggestion-absent');
+  console.log(('suggestion' in sugBack[0].issues[0] ? '✖ BLOCK' : '✔ PASS') + ' suggestion-absent');
   if ('suggestion' in sugBack[0].issues[0]) process.exitCode = 1;
 }
 
@@ -280,13 +280,13 @@ function testSymbolsGraphFidelity() {
   const sym0HasProp = 'symbols' in symPresBack[0] && symPresBack[0].symbols !== undefined;
   const sym1HasProp = 'symbols' in symPresBack[1];
   if (!sym0HasProp || sym1HasProp) {
-    console.log('FAIL symbols-presence: presence/absence drift');
+    console.log('✖ BLOCK  symbols-presence: presence/absence drift');
     process.exitCode = 1;
   } else {
     console.log('PASS symbols-presence (present preserved, absent stays absent)');
   }
   if (!deepEqualStrict(symPresPayload[0].symbols, symPresBack[0].symbols)) {
-    console.log('FAIL symbols-deep-equivalence: fields or structure drifted');
+    console.log('✖ BLOCK  symbols-deep-equivalence: fields or structure drifted');
     process.exitCode = 1;
   } else {
     console.log('PASS symbols-deep-equivalence (definitions & references 100% preserved)');

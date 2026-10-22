@@ -437,10 +437,10 @@ async function main() {
   await testFiveTierBoundaryHold();
   await testEndToEndScanIntegration();
   await testPolyglotGeneralizationModel();
-  console.log('\n[PASS] All autonomy scorer tests passed successfully.\n');
+  console.log('\n✔ All autonomy scorer tests passed successfully.\n');
 }
 
 main().catch((err) => {
-  console.error('\n[FAIL] Autonomy scorer test failed:\n', err);
+  console.error('\n✖ BLOCK Autonomy scorer test failed:\n', err);
   process.exit(1);
 });

@@ -108,7 +108,7 @@ function assertExtensionIndexMatchesAdapters() {
       `${id} must declare the indexed extension ${extension}`,
     );
   }
-  console.log('  [PASS] extension index matches every adapter declared extensions');
+  console.log('  ✔ extension index matches every adapter declared extensions');
 }
 
 async function run() {
@@ -136,7 +136,7 @@ async function run() {
       'error',
       'default must be fail-closed (error)',
     );
-    console.log('  [PASS] default severity is error (fail-closed)');
+    console.log('  ✔ default severity is error (fail-closed)');
 
     const base = {
       root,
@@ -160,7 +160,7 @@ async function run() {
       !guardIssues(inProcess).some((i) => /\.(py|ts|gd)$/.test(i.location.file)),
       'adapter-claimed extensions (.py/.ts/.gd) must never raise the guard',
     );
-    console.log('  [PASS] in-process scan flags .ps1 and leaves .py/.ts/.gd untouched');
+    console.log('  ✔ in-process scan flags .ps1 and leaves .py/.ts/.gd untouched');
 
     const warned = await scan({
       ...base,
@@ -172,7 +172,7 @@ async function run() {
       guardIssues(warned).map((i) => i.severity),
       ['warning'],
     );
-    console.log("  [PASS] unsupportedLanguage='warning' lowers the severity");
+    console.log("  ✔ unsupportedLanguage='warning' lowers the severity");
 
     const disabled = await scan({
       ...base,
@@ -181,7 +181,7 @@ async function run() {
       unsupportedLanguage: 'off',
     });
     assert.strictEqual(guardIssues(disabled).length, 0);
-    console.log("  [PASS] unsupportedLanguage='off' restores the silent fallback");
+    console.log("  ✔ unsupportedLanguage='off' restores the silent fallback");
 
     const workerMode = await scan({
       ...base,
@@ -193,7 +193,7 @@ async function run() {
       4,
       'worker mode must report every unsupported file',
     );
-    console.log('  [PASS] worker mode reports all four unsupported files');
+    console.log('  ✔ worker mode reports all four unsupported files');
 
     const cachedOn = await scan({
       ...base,
@@ -216,7 +216,7 @@ async function run() {
       0,
       'severity change must invalidate the cached guard issue',
     );
-    console.log('  [PASS] cache fingerprint invalidates when the severity changes');
+    console.log('  ✔ cache fingerprint invalidates when the severity changes');
 
     // The in-process path delegates per-file analysis to scanner/analyzerRunner, so the guard is
     // asserted at BOTH ends: the delegation in analyzer.js and the guard call in the module that
@@ -244,7 +244,7 @@ async function run() {
       workerSource.includes('unsupportedLanguageDiagnostic'),
       '../dist/core/worker.js must stay wired to the fail-closed guard',
     );
-    console.log('  [PASS] both execution paths remain wired to the guard');
+    console.log('  ✔ both execution paths remain wired to the guard');
 
     // Coverage diagnostics: a specialized analyzer that never ran must not look like a clean
     // result. A Python-scoped scan with the Python pack off must name the skipped analyzer and
@@ -280,7 +280,7 @@ async function run() {
       !(enabledPy.summary.warnings || []).some((w) => w.includes('python-modern')),
       'the coverage note disappears once the pack runs',
     );
-    console.log('  [PASS] disabled analyzers are reported, never silently skipped');
+    console.log('  ✔ disabled analyzers are reported, never silently skipped');
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -291,6 +291,6 @@ run()
     console.log('\n ALL UNSUPPORTED-LANGUAGE FAIL-CLOSED CHECKS PASSED SUCCESSFULLY!');
   })
   .catch((error) => {
-    console.error('\n[FAIL]', error && error.message ? error.message : error);
+    console.error('\n✖ BLOCK', error && error.message ? error.message : error);
     process.exit(1);
   });

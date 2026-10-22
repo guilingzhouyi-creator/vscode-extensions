@@ -23,7 +23,7 @@ let patternsModule;
 try {
   patternsModule = require(patternsModulePath);
 } catch (err) {
-  console.error('[FAIL] Unable to load patterns module from dist. Run npm run build first.');
+  console.error('✖ BLOCK Unable to load patterns module from dist. Run npm run build first.');
   console.error(err);
   process.exit(1);
 }

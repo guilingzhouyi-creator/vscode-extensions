@@ -65,7 +65,7 @@ end_of_record
   assert.strictEqual(testedProfile.lineCoverageRatio, 1.0);
   assert.strictEqual(testedProfile.branchCoverageRatio, 1.0);
 
-  console.log('  ✔ [PASS] LCOV parsing and resilient lookup verified.');
+  console.log('  ✔  LCOV parsing and resilient lookup verified.');
 }
 
 function testCoverageDampingFactorKcov() {
@@ -129,7 +129,7 @@ function testCoverageDampingFactorKcov() {
   assert.strictEqual(resUnmonitored.status, 'unmonitored');
   assert.strictEqual(resUnmonitored.dampingMultiplier, 1.0);
 
-  console.log('  ✔ [PASS] K_cov dynamic damping and amplification verified across all tiers.');
+  console.log('  ✔  K_cov dynamic damping and amplification verified across all tiers.');
 }
 
 function testRiskFusionEngineClosedLoop() {
@@ -204,7 +204,7 @@ function testRiskFusionEngineClosedLoop() {
     'Naked high complexity must be escalated to critical risk level',
   );
 
-  console.log('  ✔ [PASS] RiskFusionEngine closed-loop resonance verified.');
+  console.log('  ✔  RiskFusionEngine closed-loop resonance verified.');
 }
 
 function runAll() {
@@ -212,7 +212,7 @@ function runAll() {
   testLcovParsingAndPathLookup();
   testCoverageDampingFactorKcov();
   testRiskFusionEngineClosedLoop();
-  console.log('\n[PASS] All 3 Coverage Telemetry test suites passed successfully!');
+  console.log('\n✔ All 3 Coverage Telemetry test suites passed successfully!');
 }
 
 runAll();

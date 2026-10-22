@@ -33,9 +33,9 @@ function check(desc, fn) {
   try {
     fn();
     passed++;
-    console.log(`  ✔ [PASS] ${desc}`);
+    console.log(`  ✔  ${desc}`);
   } catch (err) {
-    console.error(`  ✖ [FAIL] ${desc}: ${err.message}`);
+    console.error(`  ✖ BLOCK ${desc}: ${err.message}`);
     process.exitCode = 1;
   }
 }

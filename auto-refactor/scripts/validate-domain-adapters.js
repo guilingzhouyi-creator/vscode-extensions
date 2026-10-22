@@ -51,7 +51,7 @@ console.log('=== Validating Domain Adapters (VS Code Extension & GDScript Game) 
   assert(ruleIds.includes('VSC-MEM-001'), 'Expected VSC-MEM-001 (Disposable leak)');
   assert(ruleIds.includes('VSC-PERF-001'), 'Expected VSC-PERF-001 (Blocking fs)');
   assert(ruleIds.includes('VSC-I18N-001'), 'Expected VSC-I18N-001 (Bare notification string)');
-  console.log('  [PASS] all 3 vscode-extension rules fire on positive fixture');
+  console.log('  ✔ all 3 vscode-extension rules fire on positive fixture');
 
   // 2. Compliant test
   const compliantContent = [
@@ -73,7 +73,7 @@ console.log('=== Validating Domain Adapters (VS Code Extension & GDScript Game) 
     options: {},
   });
   assert.strictEqual(compliantIssues.length, 0, 'Expected 0 issues for compliant extension');
-  console.log('  [PASS] compliant VS Code extension forms stay completely silent');
+  console.log('  ✔ compliant VS Code extension forms stay completely silent');
 }
 
 // --- Section 2: GDScript Game Analyzer ---
@@ -110,7 +110,7 @@ console.log('=== Validating Domain Adapters (VS Code Extension & GDScript Game) 
   assert(ruleIds.includes('GDM-POL-001'), 'Expected GDM-POL-001 (Pool contract)');
   assert(ruleIds.includes('GDM-SIG-001'), 'Expected GDM-SIG-001 (Signal leak)');
   assert(ruleIds.includes('GDM-ISO-001'), 'Expected GDM-ISO-001 (Domain decoupling)');
-  console.log('  [PASS] all 4 gdscript-game rules fire on positive fixture');
+  console.log('  ✔ all 4 gdscript-game rules fire on positive fixture');
 
   // 2. Compliant test
   const compliantContent = [
@@ -126,7 +126,7 @@ console.log('=== Validating Domain Adapters (VS Code Extension & GDScript Game) 
     options: {},
   });
   assert.strictEqual(compliantIssues.length, 0, 'Expected 0 issues for compliant domain code');
-  console.log('  [PASS] compliant GDScript domain forms stay completely silent');
+  console.log('  ✔ compliant GDScript domain forms stay completely silent');
 }
 
 // --- Section 3: Default-off configurations ---
@@ -134,7 +134,7 @@ console.log('=== Validating Domain Adapters (VS Code Extension & GDScript Game) 
   const config = resolveConfig({});
   assert.strictEqual(config.analyzers['vscode-extension']?.enabled, false);
   assert.strictEqual(config.analyzers['gdscript-game']?.enabled, false);
-  console.log('  [PASS] domain adapters remain default-off in generic configuration');
+  console.log('  ✔ domain adapters remain default-off in generic configuration');
 }
 
 console.log('\n ALL DOMAIN ADAPTER CHECKS PASSED SUCCESSFULLY!');

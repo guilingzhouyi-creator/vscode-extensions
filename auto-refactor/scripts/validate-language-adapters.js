@@ -187,6 +187,6 @@ def standalone_helper(x, y, z):
 }
 
 main().catch((err) => {
-  console.error('[FAIL] validate-language-adapters failed:', err);
+  console.error('✖ BLOCK validate-language-adapters failed:', err);
   process.exit(1);
 });

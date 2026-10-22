@@ -203,8 +203,8 @@ async function main() {
       fs.rmSync(unknownRoot, { recursive: true, force: true });
     }
 
-    console.log('  [PASS] every supported language is parsed, checked and pack-scoped');
-    console.log('  [PASS] an unclaimed extension stays fail-closed');
+    console.log('  ✔ every supported language is parsed, checked and pack-scoped');
+    console.log('  ✔ an unclaimed extension stays fail-closed');
     console.log('\n  Language coverage matrix:');
     for (const line of summary) console.log(`    ${line}`);
   } finally {
@@ -217,6 +217,6 @@ main()
     console.log('\n ALL LANGUAGE MATRIX CHECKS PASSED SUCCESSFULLY!');
   })
   .catch((error) => {
-    console.error('\n[FAIL]', error && error.message ? error.message : error);
+    console.error('\n✖ BLOCK', error && error.message ? error.message : error);
     process.exit(1);
   });

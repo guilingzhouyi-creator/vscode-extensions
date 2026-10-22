@@ -56,7 +56,7 @@ function testThresholdGating() {
     'Constants already in a constant library should not trigger recommendation',
   );
 
-  console.log('  ✔ [PASS] Threshold gating behaves as expected.');
+  console.log('  ✔  Threshold gating behaves as expected.');
 }
 
 function testDomainClusteringAndScaffolding() {
@@ -125,7 +125,7 @@ function testDomainClusteringAndScaffolding() {
   const barrel = verdict.suggestedModules.find((m) => m.isBarrel);
   assert.ok(barrel, 'Barrel module entry must exist');
 
-  console.log('  ✔ [PASS] Domain slicing and barrel topology generated accurately.');
+  console.log('  ✔  Domain slicing and barrel topology generated accurately.');
 }
 
 function testAgentActionableIssueEmission() {
@@ -160,7 +160,7 @@ function testAgentActionableIssueEmission() {
   assert.ok(issue.actionable.suggestedModules.length > 0, 'suggestedModules must not be empty');
   assert.strictEqual(issue.actionable.safeToAutomate, true);
 
-  console.log('  ✔ [PASS] CONST-LIB-001 Agent-Actionable contract verified.');
+  console.log('  ✔  CONST-LIB-001 Agent-Actionable contract verified.');
 }
 
 function testNestedConstantActionableInAnalyzer() {
@@ -195,7 +195,7 @@ function testNestedConstantActionableInAnalyzer() {
   assert.strictEqual(nested.actionable.code, 'AR:CONST:004');
   assert.strictEqual(nested.actionable.targetSymbol, 'BASE_TIMEOUT');
 
-  console.log('  ✔ [PASS] nested-constant Actionable payload verified.');
+  console.log('  ✔  nested-constant Actionable payload verified.');
 }
 
 function main() {

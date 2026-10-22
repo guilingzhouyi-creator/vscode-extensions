@@ -49,7 +49,7 @@ function buildValidator() {
 function assertValid(validate, report, label) {
   const valid = validate(report);
   if (valid) {
-    console.log(`  [PASS] ${label} conforms to report.schema.json`);
+    console.log(`  ✔ ${label} conforms to report.schema.json`);
     return;
   }
   const detail = (validate.errors || [])
@@ -141,6 +141,6 @@ async function run() {
 }
 
 run().catch((err) => {
-  console.error('\n[FAIL]', err && err.message ? err.message : err);
+  console.error('\n✖ BLOCK', err && err.message ? err.message : err);
   process.exit(1);
 });

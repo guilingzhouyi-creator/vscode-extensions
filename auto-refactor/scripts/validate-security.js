@@ -93,7 +93,7 @@ function testDefaultSecretsDetection() {
       tc.expectedKind,
       `Expected kind '${tc.expectedKind}' for ${tc.name}`,
     );
-    console.log(`  [PASS] ${tc.name} properly detected (${tc.expectedKind})`);
+    console.log(`  ✔ ${tc.name} properly detected (${tc.expectedKind})`);
   }
   console.log('✔ All default secret patterns detected with 100% precision.\n');
 }
@@ -123,7 +123,7 @@ export class TaskProcessor {
     0,
     `Benign code must produce 0 secret issues, found ${issues.length}`,
   );
-  console.log('  [PASS] Benign code produces zero false positives');
+  console.log('  ✔ Benign code produces zero false positives');
 
   // Verify lookalike substrings that contain prefix fragments but do not match full patterns
   const lookalikeCode = `
@@ -139,7 +139,7 @@ const var4 = "BEGIN SOMETHING ELSE";
     0,
     `Lookalike lines under minimum length must produce 0 issues, found ${lookalikeIssues.length}`,
   );
-  console.log('  [PASS] Lookalike fragments correctly filtered without false positives');
+  console.log('  ✔ Lookalike fragments correctly filtered without false positives');
   console.log('✔ Fast preflight filter preserves 100% negative accuracy.\n');
 }
 
@@ -158,7 +158,7 @@ const normal = "let a = 1;";
   const issuesPrefixed = analyzer.analyze(undefined, ctxPrefixed);
   assert.strictEqual(issuesPrefixed.length, 1, 'Custom extra pattern with prefix must match');
   assert.strictEqual(issuesPrefixed[0].detail.kind, 'custom-extra');
-  console.log('  [PASS] Extra pattern with literal prefix matched successfully');
+  console.log('  ✔ Extra pattern with literal prefix matched successfully');
 
   // 2. Extra pattern without literal prefix (pure regex)
   const codeWithNonPrefixedExtra = `
@@ -170,7 +170,7 @@ const hashToken = "abcdef0123456789abcdef0123456789abcdef01";
   const issuesNonPrefixed = analyzer.analyze(undefined, ctxNonPrefixed);
   assert.strictEqual(issuesNonPrefixed.length, 1, 'Custom extra pattern without prefix must match');
   assert.strictEqual(issuesNonPrefixed[0].detail.kind, 'custom-extra');
-  console.log('  [PASS] Extra pattern without literal prefix matched successfully');
+  console.log('  ✔ Extra pattern without literal prefix matched successfully');
 
   // 3. Complete custom patterns replacement
   const codeCustomOnly = [
@@ -183,7 +183,7 @@ const hashToken = "abcdef0123456789abcdef0123456789abcdef01";
   const issuesCustomOnly = analyzer.analyze(undefined, ctxCustomOnly);
   assert.strictEqual(issuesCustomOnly.length, 1, 'Custom pattern replacement must match custom');
   assert.strictEqual(issuesCustomOnly[0].detail.kind, 'custom-1');
-  console.log('  [PASS] Pattern table replacement fully functional');
+  console.log('  ✔ Pattern table replacement fully functional');
   console.log('✔ Caller custom and extra pattern extensions verified.\n');
 }
 

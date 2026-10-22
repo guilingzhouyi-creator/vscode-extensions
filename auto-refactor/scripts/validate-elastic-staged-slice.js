@@ -22,9 +22,9 @@ function assert(condition, message) {
   totalTests++;
   if (condition) {
     passedTests++;
-    console.log(`  ✔ [PASS] ${message}`);
+    console.log(`  ✔  ${message}`);
   } else {
-    console.error(`  ❌ [FAIL] ${message}`);
+    console.error(`  ✖ BLOCK  ${message}`);
     process.exitCode = 1;
   }
 }

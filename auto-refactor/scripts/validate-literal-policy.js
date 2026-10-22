@@ -98,7 +98,7 @@ async function main() {
       ["'/'", "'warning'"],
       `the fixture must expose both duplicates, got ${JSON.stringify(baseline)}`,
     );
-    console.log('  [PASS] duplicate-literal reports both fixture literals by default');
+    console.log('  ✔ duplicate-literal reports both fixture literals by default');
 
     // ── 2. Per-analyzer policy: bare token and quoted literal both match ──
     const perAnalyzer = await literalFindings(root, 'c2.json', {
@@ -113,7 +113,7 @@ async function main() {
       [],
       `analyzers.constants.options.ignoreLiterals must accept bare and quoted forms, got ${JSON.stringify(perAnalyzer)}`,
     );
-    console.log('  [PASS] per-analyzer ignoreLiterals matches bare tokens and quoted literals');
+    console.log('  ✔ per-analyzer ignoreLiterals matches bare tokens and quoted literals');
 
     // ── 3. Global policy: `thresholds.ignoreLiterals` cascades into ctx.options ──
     const globalLayer = await literalFindings(root, 'c3.json', {
@@ -125,7 +125,7 @@ async function main() {
       ["'/'"],
       `thresholds.ignoreLiterals must reach the constants analyzer, got ${JSON.stringify(globalLayer)}`,
     );
-    console.log('  [PASS] global thresholds.ignoreLiterals cascades into the constants analyzer');
+    console.log('  ✔ global thresholds.ignoreLiterals cascades into the constants analyzer');
 
     // ── 4. Precedence: the per-analyzer block still wins over the global layer ──
     const precedence = await literalFindings(root, 'c4.json', {
@@ -141,7 +141,7 @@ async function main() {
       ["'/'"],
       `the per-analyzer block must override the global layer, got ${JSON.stringify(precedence)}`,
     );
-    console.log('  [PASS] per-analyzer ignoreLiterals overrides the global threshold layer');
+    console.log('  ✔ per-analyzer ignoreLiterals overrides the global threshold layer');
 
     // ── 5. Thresholds still gate what is left after ignoring ──
     const threshold = await literalFindings(root, 'c5.json', {
@@ -153,7 +153,7 @@ async function main() {
       [],
       `duplicateLiteralThreshold must gate the remaining findings, got ${JSON.stringify(threshold)}`,
     );
-    console.log('  [PASS] duplicateLiteralThreshold still gates non-ignored duplicates');
+    console.log('  ✔ duplicateLiteralThreshold still gates non-ignored duplicates');
 
     // ── 6. classifyLiterals reaches the duplicate pass: benign delimiters are not extractable ──
     const classified = await literalFindings(root, 'c6.json', {
@@ -165,7 +165,7 @@ async function main() {
       ["'warning'"],
       `classifyLiterals must drop the benign '/' but keep vocabulary, got ${JSON.stringify(classified)}`,
     );
-    console.log('  [PASS] classifyLiterals suppresses benign delimiters in the duplicate pass');
+    console.log('  ✔ classifyLiterals suppresses benign delimiters in the duplicate pass');
 
     // ── 7. Classifier vocabulary: escape spellings and docstring fences are delimiters ──
     // The control characters reach the classifier as the ESCAPE TEXT written in source
@@ -190,7 +190,7 @@ async function main() {
       false,
       'contract vocabulary must stay reportable',
     );
-    console.log('  [PASS] escape spellings and docstring fences classify as benign delimiters');
+    console.log('  ✔ escape spellings and docstring fences classify as benign delimiters');
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -201,6 +201,6 @@ main()
     console.log('\n ALL LITERAL POLICY CHECKS PASSED SUCCESSFULLY!');
   })
   .catch((error) => {
-    console.error('\n[FAIL]', error && error.message ? error.message : error);
+    console.error('\n✖ BLOCK', error && error.message ? error.message : error);
     process.exit(1);
   });

@@ -117,7 +117,7 @@ async function main() {
       true,
       'disabled analyzers must be reported on both paths',
     );
-    console.log('  [PASS] library and CLI agree on suppression, cycles and disabled analyzers');
+    console.log('  ✔ library and CLI agree on suppression, cycles and disabled analyzers');
 
     // ── 2. Baseline ratchet is honored by the library entry point too ──
     const freezeCode = await scanAndRender({
@@ -150,7 +150,7 @@ async function main() {
       normalize(cliRatchet),
       'baseline annotations must match between scan() and the CLI',
     );
-    console.log('  [PASS] baseline ratchet annotations are identical on both entry points');
+    console.log('  ✔ baseline ratchet annotations are identical on both entry points');
 
     // ── 3. A new finding is flagged as new by both paths, once each ──
     writeFiles(root, {
@@ -167,7 +167,7 @@ async function main() {
       'cycle findings must never be duplicated by the post-scan pipeline',
     );
     assert.deepStrictEqual(normalize(libNew), normalize(cliNew), 'new-issue verdicts must match');
-    console.log('  [PASS] new findings are flagged once and identically on both entry points');
+    console.log('  ✔ new findings are flagged once and identically on both entry points');
 
     // ── 4. `matchFile` globs: a directory policy silences only that directory ──
     const globRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ar-glob-suppress-'));
@@ -212,7 +212,7 @@ async function main() {
         1,
         'glob-suppressed findings stay counted in the audit trail',
       );
-      console.log('  [PASS] matchFile accepts globs and stays scoped to the matched directory');
+      console.log('  ✔ matchFile accepts globs and stays scoped to the matched directory');
     } finally {
       fs.rmSync(globRoot, { recursive: true, force: true });
     }
@@ -226,6 +226,6 @@ main()
     console.log('\n ALL POST-SCAN PARITY CHECKS PASSED SUCCESSFULLY!');
   })
   .catch((error) => {
-    console.error('\n[FAIL]', error && error.message ? error.message : error);
+    console.error('\n✖ BLOCK', error && error.message ? error.message : error);
     process.exit(1);
   });

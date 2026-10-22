@@ -243,7 +243,7 @@ async function main() {
 
   const pass = r3x >= 5 && r4x >= 5;
   console.log(
-    pass ? '\nACCEPTANCE: PASS (S3/S4 >= 5x vs S1)' : '\nACCEPTANCE: FAIL (S3/S4 < 5x vs S1)',
+    pass ? '\nACCEPTANCE: ✔ PASS (S3/S4 >= 5x vs S1)' : '\nACCEPTANCE: ✖ BLOCK (S3/S4 < 5x vs S1)',
   );
 
   const history = loadHistory();

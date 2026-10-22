@@ -45,7 +45,7 @@ function testFormatPreserver() {
   assert.strictEqual(FormatPreserver.getLineIndentation('\t\tfunction f() {}'), '\t\t');
   assert.strictEqual(FormatPreserver.getLineIndentation('noIndent();'), '');
 
-  console.log('  ✔ [PASS] FormatPreserver line ending & indentation verified.');
+  console.log('  ✔  FormatPreserver line ending & indentation verified.');
 }
 
 function testTextEditApplier() {
@@ -78,7 +78,7 @@ function testTextEditApplier() {
   assert.strictEqual(conflictResult.skippedCount, 1);
   assert.ok(conflictResult.content.includes('const b = 20;'));
 
-  console.log('  ✔ [PASS] TextEditApplier coordinate offsets & conflict safety verified.');
+  console.log('  ✔  TextEditApplier coordinate offsets & conflict safety verified.');
 }
 
 function testBuiltinTransforms() {
@@ -132,7 +132,7 @@ function testBuiltinTransforms() {
     jsdocFix.edits[0].newText.includes('Concurrency: Single-thread async cooperative execution.'),
   );
 
-  console.log('  ✔ [PASS] Built-in AST transforms output compliant descriptors.');
+  console.log('  ✔  Built-in AST transforms output compliant descriptors.');
 }
 
 function testPatchEngine() {
@@ -171,7 +171,7 @@ function testPatchEngine() {
   assert.strictEqual(filteredResult.appliedFixCount, 0);
   assert.strictEqual(filteredResult.unifiedDiff, '');
 
-  console.log('  ✔ [PASS] PatchEngine diff formatting, dry-run, and whitelist filtering verified.');
+  console.log('  ✔  PatchEngine diff formatting, dry-run, and whitelist filtering verified.');
 }
 
 function runAll() {

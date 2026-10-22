@@ -117,7 +117,7 @@ echo "[GATE] Running Tier 1 Pre-Commit Local Gate..."
 STAGED_FILES=$(git diff --cached --name-only --diff-filter=d || true)
 
 if [ -z "$STAGED_FILES" ]; then
-    echo "[GATE] No staged files to verify. [PASS]"
+    echo "[GATE] No staged files to verify. ✔"
     ${SH_EXIT} 0
 fi
 
@@ -165,7 +165,7 @@ if [ "$CLUTTER_COUNT" -gt 0 ]; then
     ${SH_EXIT} 1
 fi
 
-echo "[GATE] Pre-Commit Physical Hygiene verification passed. [PASS]"
+echo "[GATE] Pre-Commit Physical Hygiene verification passed. ✔"
 ${SH_EXIT} 0
 `;
     return bashRunnerScript;
@@ -192,7 +192,7 @@ Write-Host "[GATE] Running Tier 1 Pre-Commit Local Gate (PowerShell)..." -Foregr
 
 $stagedFiles = @(git diff --cached --name-only --diff-filter=d)
 if ($stagedFiles.Count -eq 0 -or [string]::IsNullOrWhiteSpace($stagedFiles[0])) {
-    Write-Host "[GATE] No staged files to verify. [PASS]" -ForegroundColor Green
+    Write-Host "[GATE] No staged files to verify. ✔" -ForegroundColor Green
     ${SH_EXIT} 0
 }
 
@@ -226,7 +226,7 @@ if ($clutterCount -gt 0) {
     ${SH_EXIT} 1
 }
 
-Write-Host "[GATE] Pre-Commit Physical Hygiene verification passed. [PASS]" -ForegroundColor Green
+Write-Host "[GATE] Pre-Commit Physical Hygiene verification passed. ✔" -ForegroundColor Green
 ${SH_EXIT} 0
 `;
     return pwshRunnerScript;
@@ -268,7 +268,7 @@ if echo "$MSG_CONTENT" | grep -E -i -q "$FORBIDDEN_JARGON"; then
     ${SH_EXIT} 1
 fi
 
-echo "[GATE] Commit-Msg verification passed. [PASS]"
+echo "[GATE] Commit-Msg verification passed. ✔"
 ${SH_EXIT} 0
 `;
     return commitMsgScript;
@@ -315,7 +315,7 @@ echo "[GATE] Running Tier 1 Pre-Push Full Regression Gate..."
 
 ${testCommand}
 
-echo "[GATE] Pre-Push Full Regression passed successfully. [PASS]"
+echo "[GATE] Pre-Push Full Regression passed successfully. ✔"
 ${SH_EXIT} 0
 `;
     return prePushScript;

@@ -94,7 +94,7 @@ async function main() {
 
   const external = edgesOf('app/routes/x.py', 'import os, sys\nfrom flask import Flask\n');
   assert.strictEqual(external.size, 0, 'stdlib/third-party imports never become repo edges');
-  console.log('  [PASS] Python import specifiers resolve to module files and packages');
+  console.log('  ✔ Python import specifiers resolve to module files and packages');
 
   // ── 2. Edges that must NOT exist ──
   const lazy = edgesOf(
@@ -108,7 +108,7 @@ async function main() {
     '"""Example:\n\nimport app.routes.x\nfrom .legacy import thing\n"""\n\nVALUE = 1\n',
   );
   assert.strictEqual(docstring.size, 0, 'imports inside docstrings are examples, not dependencies');
-  console.log('  [PASS] lazy imports and docstring samples stay out of the graph');
+  console.log('  ✔ lazy imports and docstring samples stay out of the graph');
 
   // ── 3. Cycle detection through the real CLI pipeline (`scanAndRender`); the library `scan()`
   // returns raw analysis without the post-scan pipeline and is deliberately not the oracle.
@@ -169,7 +169,7 @@ async function main() {
       'an acyclic tree must stay silent',
     );
     console.log(
-      '  [PASS] Python circular imports are detected end-to-end, acyclic trees stay silent',
+      '  ✔ Python circular imports are detected end-to-end, acyclic trees stay silent',
     );
 
     // ── 4. Documented boundary: no unused-export pass for Python ──
@@ -194,7 +194,7 @@ async function main() {
       0,
       'Python has no export keyword; the unused pass must stay TS/JS-only',
     );
-    console.log('  [PASS] unused-export detection remains TS/JS-only (documented boundary)');
+    console.log('  ✔ unused-export detection remains TS/JS-only (documented boundary)');
   } finally {
     fs.rmSync(root, { recursive: true, force: true });
   }
@@ -205,6 +205,6 @@ main()
     console.log('\n ALL PYTHON IMPORT EXTRACTION CHECKS PASSED SUCCESSFULLY!');
   })
   .catch((error) => {
-    console.error('\n[FAIL]', error && error.message ? error.message : error);
+    console.error('\n✖ BLOCK', error && error.message ? error.message : error);
     process.exit(1);
   });

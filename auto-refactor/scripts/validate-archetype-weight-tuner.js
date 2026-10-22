@@ -89,7 +89,7 @@ function testArchetypeWeightBiases() {
     `demo performance weight must be relaxed`,
   );
 
-  console.log('  ✔ [PASS] Archetype-specific weight biases verified across all archetypes.');
+  console.log('  ✔  Archetype-specific weight biases verified across all archetypes.');
 }
 
 function testWeightMassConservationInvariance() {
@@ -116,7 +116,7 @@ function testWeightMassConservationInvariance() {
     );
   }
 
-  console.log('  ✔ [PASS] Mathematical weight mass conservation verified (|delta| < 0.05).');
+  console.log('  ✔  Mathematical weight mass conservation verified (|delta| < 0.05).');
 }
 
 function testGracefulFallback() {
@@ -130,7 +130,7 @@ function testGracefulFallback() {
   const unknownResult = tuner.tuneWeights('unknown_arbitrary_archetype');
   assert.deepStrictEqual(unknownResult, DEFAULT_QUALITY_WEIGHTS);
 
-  console.log('  ✔ [PASS] Graceful fallback to default weights verified.');
+  console.log('  ✔  Graceful fallback to default weights verified.');
 }
 
 function testQualityScorerArchetypeIntegration() {
@@ -173,7 +173,7 @@ function testQualityScorerArchetypeIntegration() {
     'ScanConfig.archetype dynamically steers effective scoring weights',
   );
 
-  console.log('  ✔ [PASS] QualityScorer archetype integration and composite divergence verified.');
+  console.log('  ✔  QualityScorer archetype integration and composite divergence verified.');
 }
 
 function runAll() {
@@ -182,7 +182,7 @@ function runAll() {
   testWeightMassConservationInvariance();
   testGracefulFallback();
   testQualityScorerArchetypeIntegration();
-  console.log('\n[PASS] All 4 Archetype Weight Tuner test suites passed successfully!');
+  console.log('\n✔ All 4 Archetype Weight Tuner test suites passed successfully!');
 }
 
 runAll();

@@ -210,6 +210,6 @@ export function login(user: string): boolean {
 }
 
 main().catch((err) => {
-  console.error('[FAIL] validate-universal-rules failed:', err);
+  console.error('✖ BLOCK validate-universal-rules failed:', err);
   process.exit(1);
 });

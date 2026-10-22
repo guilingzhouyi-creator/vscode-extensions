@@ -197,12 +197,12 @@ function verifyFileAndDirRules(byRule) {
     'excessively long file name should trigger NAM-FIL-001',
   );
   console.log(
-    '  [PASS] NAM-FIL-001 flags non-conforming file names, invalid lengths, and transient jargon',
+    '  ✔ NAM-FIL-001 flags non-conforming file names, invalid lengths, and transient jargon',
   );
 
   const dirIssues = byRule('NAM-DIR-001');
   assert.ok(dirIssues.length >= 1, 'DirtyCamelDir should trigger NAM-DIR-001');
-  console.log('  [PASS] NAM-DIR-001 flags non-kebab/camelCase directory names');
+  console.log('  ✔ NAM-DIR-001 flags non-kebab/camelCase directory names');
 }
 
 function verifyGlobalsAndTypes(byRule) {
@@ -210,22 +210,22 @@ function verifyGlobalsAndTypes(byRule) {
   assert.ok(glb1.some((i) => i.detail && i.detail.name === 'badConst'));
   assert.ok(!glb1.some((i) => i.detail && i.detail.name === 'GOOD_CONST'));
   assert.ok(!glb1.some((i) => i.detail && i.detail.name === 'arrowFn'));
-  console.log('  [PASS] NAM-GLB-001 flags lowercase module constants, exempting functions');
+  console.log('  ✔ NAM-GLB-001 flags lowercase module constants, exempting functions');
 
   const glb2 = byRule('NAM-GLB-002');
   assert.strictEqual(glb2.length, 1, 'mutableGlobal let should trigger NAM-GLB-002');
-  console.log('  [PASS] NAM-GLB-002 flags mutable top-level let declarations');
+  console.log('  ✔ NAM-GLB-002 flags mutable top-level let declarations');
 
   const typ = byRule('NAM-TYP-001');
   assert.ok(typ.some((i) => i.detail && i.detail.name === 'goodClass'));
   assert.ok(typ.some((i) => i.detail && i.detail.name === 'goodInterface'));
   assert.ok(!typ.some((i) => i.detail && i.detail.name === 'ValidScanner'));
-  console.log('  [PASS] NAM-TYP-001 flags non-PascalCase class and interface definitions');
+  console.log('  ✔ NAM-TYP-001 flags non-PascalCase class and interface definitions');
 
   const mbr = byRule('NAM-MBR-001');
   assert.ok(mbr.some((i) => i.detail && i.detail.name === 'BadMethod'));
   assert.ok(!mbr.some((i) => i.detail && i.detail.name === 'goodMethod'));
-  console.log('  [PASS] NAM-MBR-001 flags non-camelCase methods and members');
+  console.log('  ✔ NAM-MBR-001 flags non-camelCase methods and members');
 }
 
 function verifyVariablesAndCollections(byRule) {
@@ -234,18 +234,18 @@ function verifyVariablesAndCollections(byRule) {
   assert.ok(vag.some((i) => i.detail && i.detail.name === 'data'));
   assert.ok(!vag.some((i) => i.detail && i.detail.name === 'parseResult'));
   assert.ok(!vag.some((i) => i.location.file.includes('destructuring-test.ts')));
-  console.log('  [PASS] NAM-VAG-001 flags vague identifiers and exempts property-destructuring');
+  console.log('  ✔ NAM-VAG-001 flags vague identifiers and exempts property-destructuring');
 
   const sgl = byRule('NAM-SGL-001');
   assert.ok(sgl.some((i) => i.detail && i.detail.name === 'p'));
   assert.ok(!sgl.some((i) => i.detail && i.detail.name === 'i'));
   assert.ok(!sgl.some((i) => i.detail && i.detail.name === '_'));
-  console.log('  [PASS] NAM-SGL-001 flags single letter variables (exempting loop indices)');
+  console.log('  ✔ NAM-SGL-001 flags single letter variables (exempting loop indices)');
 
   const col = byRule('NAM-COL-001');
   assert.ok(col.some((i) => i.detail && i.detail.name === 'myTable'));
   assert.ok(!col.some((i) => i.detail && i.detail.name === 'ruleById'));
-  console.log('  [PASS] NAM-COL-001 checks Map relationship semantics');
+  console.log('  ✔ NAM-COL-001 checks Map relationship semantics');
 }
 
 function verifyJargonRules(byRule) {
@@ -261,7 +261,7 @@ function verifyJargonRules(byRule) {
   assert.ok(jrg.some((i) => i.detail && i.detail.name === 'PhaseOneWorker'));
   assert.ok(jrg.some((i) => i.detail && i.detail.name === 'temp_var'));
   console.log(
-    '  [PASS] NAM-JRG-002 flags transient construction jargon across TS and Python code/tests',
+    '  ✔ NAM-JRG-002 flags transient construction jargon across TS and Python code/tests',
   );
 }
 
@@ -283,7 +283,7 @@ function verifyFunctionLengthRules(byRule) {
     'dunder methods such as __init__ should be exempt from NAM-LEN-002',
   );
   console.log(
-    '  [PASS] NAM-LEN-002 flags short/long Python function names, exempting dunder methods',
+    '  ✔ NAM-LEN-002 flags short/long Python function names, exempting dunder methods',
   );
 }
 
@@ -326,7 +326,7 @@ function verifyScaleTunerNamingOptions() {
   assert.strictEqual(largeOpts.enforceVerbNounContract, true);
   assert.strictEqual(largeOpts.enforceMorphemeCheck, true);
 
-  console.log('  [PASS] scaleTuner provides correct adaptive naming options across tiers');
+  console.log('  ✔ scaleTuner provides correct adaptive naming options across tiers');
 }
 
 function verifyAdaptiveNamingRules(byRule) {
@@ -339,7 +339,7 @@ function verifyAdaptiveNamingRules(byRule) {
     filIssues.some((i) => i.location.file.includes('one-two-three-four-five-six-seven')),
     'excessive word segments file should trigger NAM-FIL-001',
   );
-  console.log('  [PASS] NAM-FIL-001 flags word count bounds and pure-consonant morphemes');
+  console.log('  ✔ NAM-FIL-001 flags word count bounds and pure-consonant morphemes');
 
   const lenIssues = byRule('NAM-LEN-002');
   assert.ok(
@@ -390,7 +390,7 @@ function verifyAdaptiveNamingRules(byRule) {
     ),
     'Rust banana_apple should trigger NAM-LEN-002 for verb-noun contract violation',
   );
-  console.log('  [PASS] NAM-LEN-002 flags verb-noun contract across TS, Python, Go, and Rust');
+  console.log('  ✔ NAM-LEN-002 flags verb-noun contract across TS, Python, Go, and Rust');
 }
 
 function verifyRustPolyglotNaming(byRule) {
@@ -454,7 +454,7 @@ function verifyRustPolyglotNaming(byRule) {
     'Only non-test variable data should trigger NAM-VAG-001; test data must be exempted',
   );
 
-  console.log('  [PASS] NAM-TYP-001, NAM-GLB-001, NAM-SGL-001, NAM-VAG-001 verified for Rust');
+  console.log('  ✔ NAM-TYP-001, NAM-GLB-001, NAM-SGL-001, NAM-VAG-001 verified for Rust');
 }
 
 async function run() {

@@ -50,7 +50,7 @@ function testGitHistoryMinerLogParsing() {
   assert.strictEqual(profile.firstSeenTimestamp, 1700000000 * 1000);
   assert.strictEqual(profile.lastModifiedTimestamp, 1700030000 * 1000);
 
-  console.log('  ✔ [PASS] Git log parsing and profile aggregation verified.');
+  console.log('  ✔  Git log parsing and profile aggregation verified.');
 }
 
 function testHighVulnerabilityHotspotAnalysis() {
@@ -160,7 +160,7 @@ function testHighVulnerabilityHotspotAnalysis() {
   assert.ok(metrics.actionableProposal, 'Should generate actionable proposal for hotspot');
   assert.strictEqual(metrics.actionableProposal.action, 'hotspot_refactor_recommended');
 
-  console.log('  ✔ [PASS] Hotspot detection and actionable proposal verified.');
+  console.log('  ✔  Hotspot detection and actionable proposal verified.');
 }
 
 function testHealthyAndDecayedModules() {
@@ -277,7 +277,7 @@ function testHealthyAndDecayedModules() {
   assert.strictEqual(fallbackMetrics.vulnerabilityMultiplier, 1.0);
   assert.strictEqual(fallbackMetrics.isGitAvailable, false);
 
-  console.log('  ✔ [PASS] Healthy, decay, and non-git fallback behaviors verified.');
+  console.log('  ✔  Healthy, decay, and non-git fallback behaviors verified.');
 }
 
 function testQualityScoringDeductionAmplification() {
@@ -324,7 +324,7 @@ function testQualityScoringDeductionAmplification() {
     'Rationales should display [Vulnerability x1.80]',
   );
 
-  console.log('  ✔ [PASS] Quality scoring amplification with evolution multiplier verified.');
+  console.log('  ✔  Quality scoring amplification with evolution multiplier verified.');
 }
 
 function runAll() {
@@ -333,7 +333,7 @@ function runAll() {
   testHighVulnerabilityHotspotAnalysis();
   testHealthyAndDecayedModules();
   testQualityScoringDeductionAmplification();
-  console.log('\n[PASS] All 4 Code Evolution Quality test suites passed successfully!');
+  console.log('\n✔ All 4 Code Evolution Quality test suites passed successfully!');
 }
 
 runAll();

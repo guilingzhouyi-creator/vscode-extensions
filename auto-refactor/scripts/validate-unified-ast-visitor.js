@@ -118,7 +118,7 @@ function testSimultaneousCollection() {
     'graceful',
   ]);
 
-  console.log('   [PASS] Multi-category collection verified (4 functions, 6 variables in 1 pass).');
+  console.log('   ✔ Multi-category collection verified (4 functions, 6 variables in 1 pass).');
 }
 
 /**
@@ -210,7 +210,7 @@ function testParityWithTraditional() {
   verifySourceParity('Synthetic Fixture', syntheticSource);
   verifySourceParity('Real File (ts-predicates.ts)', realFileSource);
 
-  console.log('   [PASS] 100% strict parity verified across synthetic and real project files.');
+  console.log('   ✔ 100% strict parity verified across synthetic and real project files.');
 }
 
 /**
@@ -278,7 +278,7 @@ function testEnterLeaveInvariants() {
   }
 
   console.log(
-    `   [PASS] LIFO stack and nesting invariants verified (${enterCount} nodes balanced).`,
+    `   ✔ LIFO stack and nesting invariants verified (${enterCount} nodes balanced).`,
   );
 }
 
@@ -327,7 +327,7 @@ function testEdgeCases() {
   assert.ok(leaveOnlyCalled > 0);
   assert.strictEqual(enterOnlyCalled, leaveOnlyCalled);
 
-  console.log('   [PASS] Edge cases and robustness verified.');
+  console.log('   ✔ Edge cases and robustness verified.');
 }
 
 /**
@@ -341,10 +341,10 @@ function main() {
     testEnterLeaveInvariants();
     testEdgeCases();
 
-    console.log('\n[PASS] All UnifiedAstVisitor tests passed cleanly.');
+    console.log('\n✔ All UnifiedAstVisitor tests passed cleanly.');
     process.exit(0);
   } catch (error) {
-    console.error('\n[FAIL] UnifiedAstVisitor validation failed:', error);
+    console.error('\n✖ BLOCK UnifiedAstVisitor validation failed:', error);
     process.exit(1);
   }
 }

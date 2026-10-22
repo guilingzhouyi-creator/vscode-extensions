@@ -127,7 +127,7 @@ function checkFrozenPayload(baselineId, baselineGrouped) {
     { key: 'constants|magic-number|src/a.ts', count: 3, severities: { warning: 3 } },
     'a grouped row must carry both the count and the severity histogram',
   );
-  console.log('  [PASS] freeze records distinct ids plus severity histograms');
+  console.log('  ✔ freeze records distinct ids plus severity histograms');
 }
 
 /**
@@ -168,7 +168,7 @@ async function checkSameLineGrowth(root) {
     1,
     'an extra same-line occurrence must break a grouped baseline too',
   );
-  console.log('  [PASS] same-line growth breaks the ratchet under both granularities');
+  console.log('  ✔ same-line growth breaks the ratchet under both granularities');
 
   const legacyPath = path.join(root, 'legacy-baseline.json');
   fs.writeFileSync(
@@ -185,7 +185,7 @@ async function checkSameLineGrowth(root) {
     'a legacy id list must absorb the three occurrences it recorded and flag only the fourth',
   );
   assert.ok(legacyNew[0].message.includes('999'), 'the fourth occurrence is the new one');
-  console.log('  [PASS] legacy id baselines keep occurrence counting (multiplicity fallback)');
+  console.log('  ✔ legacy id baselines keep occurrence counting (multiplicity fallback)');
 }
 
 /**
@@ -217,7 +217,7 @@ async function checkSeverityEscalation(root) {
     1,
     'a warning->error escalation must break the grouped baseline too',
   );
-  console.log('  [PASS] severity escalation breaks the ratchet under both granularities');
+  console.log('  ✔ severity escalation breaks the ratchet under both granularities');
 
   const shrunkPath = path.join(root, 'shrunk-baseline.json');
   await scan(optionsFor(root, { updateBaseline: shrunkPath, baselineGranularity: 'id' }));
@@ -233,7 +233,7 @@ async function checkSeverityEscalation(root) {
     'warning',
     '450 lines is back to the warn band',
   );
-  console.log('  [PASS] de-escalation is not reported as a new finding');
+  console.log('  ✔ de-escalation is not reported as a new finding');
 }
 
 function assertRemapKeysAndGroups(oldGroups, pathRemap) {
@@ -309,7 +309,7 @@ function checkRenamePathShiftNormalization() {
   assertRemapKeysAndGroups(oldGroups, pathRemap);
   assertRatchetRemapBehavior(oldGroups, pathRemap);
 
-  console.log('  [PASS] GOV-RTC-002: baseline refactoring rename path normalization validated');
+  console.log('  ✔ GOV-RTC-002: baseline refactoring rename path normalization validated');
 }
 
 async function main() {
@@ -345,7 +345,7 @@ async function main() {
     await checkSameLineGrowth(smallRoot);
     await checkSeverityEscalation(bigRoot);
     checkRenamePathShiftNormalization();
-    console.log('  [PASS] ratchet credits cover multiplicity, escalation and legacy payloads');
+    console.log('  ✔ ratchet credits cover multiplicity, escalation and legacy payloads');
   } finally {
     fs.rmSync(smallRoot, { recursive: true, force: true });
     fs.rmSync(bigRoot, { recursive: true, force: true });

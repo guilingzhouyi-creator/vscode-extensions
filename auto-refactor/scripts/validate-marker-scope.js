@@ -62,7 +62,7 @@ function main() {
     if (expectExempt) positives += 1;
     else negatives += 1;
     if (got === expectExempt) {
-      console.log(`  [PASS] ${got ? 'exempt ' : 'reported'}  ${JSON.stringify(line)}`);
+      console.log(`  ✔ ${got ? 'exempt ' : 'reported'}  ${JSON.stringify(line)}`);
       continue;
     }
     failures.push(
@@ -73,13 +73,13 @@ function main() {
 
   if (failures.length === 0) {
     console.log(
-      `  [PASS] ${negatives} applied tags still reported, ${positives} listings still exempt`,
+      `  ✔ ${negatives} applied tags still reported, ${positives} listings still exempt`,
     );
     console.log('  ALL MARKER SCOPE CHECKS PASSED');
     return 0;
   }
 
-  for (const f of failures) console.log(`  [FAIL] ${f}`);
+  for (const f of failures) console.log(`  ✖ BLOCK ${f}`);
   console.log(`  MARKER SCOPE FAILURES = ${failures.length}`);
   return 1;
 }

@@ -145,20 +145,20 @@ async function run() {
       (i) => i.rule === 'NAM-LEN-002' && i.detail?.name === 'fn',
     );
     assert(fnLengthIssue, 'Expected NAM-LEN-002 to be emitted for function "fn"');
-    console.log('  ✔ [PASS] NAM-LEN-002 emitted for short function "fn"');
+    console.log('  ✔  NAM-LEN-002 emitted for short function "fn"');
 
     // 2. Assert NAM-LEN-001 detected on short variable `ab` and long variable
     const shortVarIssue = report.issues.find(
       (i) => i.rule === 'NAM-LEN-001' && i.detail?.name === 'ab',
     );
     assert(shortVarIssue, 'Expected NAM-LEN-001 to be emitted for variable "ab"');
-    console.log('  ✔ [PASS] NAM-LEN-001 emitted for short variable "ab"');
+    console.log('  ✔  NAM-LEN-001 emitted for short variable "ab"');
 
     const longVarIssue = report.issues.find(
       (i) => i.rule === 'NAM-LEN-001' && i.detail?.name && i.detail.name.length >= 30,
     );
     assert(longVarIssue, 'Expected NAM-LEN-001 to be emitted for excessively long variable');
-    console.log('  ✔ [PASS] NAM-LEN-001 emitted for long variable');
+    console.log('  ✔  NAM-LEN-001 emitted for long variable');
 
     // 3. Assert NAM-ABR-001 detected on abbreviation `usr`
     const abrIssue = report.issues.find(
@@ -166,7 +166,7 @@ async function run() {
     );
     assert(abrIssue, 'Expected NAM-ABR-001 to be emitted for unapproved abbreviation "usr"');
     assert(abrIssue.detail?.expanded === 'user', 'Expected expanded recommendation to be "user"');
-    console.log('  ✔ [PASS] NAM-ABR-001 emitted with expanded suggestion "user"');
+    console.log('  ✔  NAM-ABR-001 emitted with expanded suggestion "user"');
 
     // 4. Assert SIM-ARGS-001 detected on renderComplexWidget (>4 params)
     const argsIssue = report.issues.find((i) => i.rule === 'SIM-ARGS-001');
@@ -175,7 +175,7 @@ async function run() {
       argsIssue.actionable?.action === 'introduce_parameter_object',
       'Expected introduce_parameter_object action',
     );
-    console.log('  ✔ [PASS] SIM-ARGS-001 emitted with parameter object remediation template');
+    console.log('  ✔  SIM-ARGS-001 emitted with parameter object remediation template');
 
     // 5. Assert SIM-LONG-001 includes slice boundaries
     const longFnIssue = report.issues.find((i) => i.rule === 'SIM-LONG-001');
@@ -184,7 +184,7 @@ async function run() {
     assert(sliceRange, 'Expected sliceRange to be present on issue detail/actionable');
     assert(sliceRange.startLine > 0, 'Expected valid slice start line');
     console.log(
-      `  ✔ [PASS] SIM-LONG-001 computed slice boundaries: lines ${sliceRange.startLine}-${sliceRange.endLine}`,
+      `  ✔  SIM-LONG-001 computed slice boundaries: lines ${sliceRange.startLine}-${sliceRange.endLine}`,
     );
 
     // 6. Test structured agent directives transformation
@@ -205,12 +205,12 @@ async function run() {
       hasClarificationOrStandardization,
       'Expected structured directives to carry clarification/standardization metadata',
     );
-    console.log('  ✔ [PASS] toStructuredAgentDirectives assembled dual-track directives payload');
+    console.log('  ✔  toStructuredAgentDirectives assembled dual-track directives payload');
 
     // 7. Test CAPP DSL generation
     const cappPrompt = formatCompactAgentPrompt(testFile, report.issues);
     assert(cappPrompt.compactPromptText.length > 0, 'Expected non-empty CAPP prompt');
-    console.log('  ✔ [PASS] CAPP 2.0 DSL prompt generated successfully');
+    console.log('  ✔  CAPP 2.0 DSL prompt generated successfully');
 
     console.log('\n🎉 ALL NAMING STANDARDIZATION & CLARIFICATION DIRECTIVES TESTS PASSED!');
   } finally {

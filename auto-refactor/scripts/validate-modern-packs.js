@@ -146,7 +146,7 @@ async function main() {
       [...RUST_RULE_IDS].sort(),
       `rust-modern must report every rule, got ${JSON.stringify(ruleIds(rustHits))}`,
     );
-    console.log('  [PASS] all seven rust-modern rules fire on their canonical shape');
+    console.log('  ✔ all seven rust-modern rules fire on their canonical shape');
 
     // ── 2. Rust negatives stay silent ──
     const rustSilent = await scanFixture(root, { 'src/negative.rs': RUST_NEGATIVE }, bothPacks);
@@ -155,7 +155,7 @@ async function main() {
       [],
       `comments, strings and modern call sites must stay silent, got ${JSON.stringify(rustSilent)}`,
     );
-    console.log('  [PASS] rust comments, strings and modern call sites stay silent');
+    console.log('  ✔ rust comments, strings and modern call sites stay silent');
 
     // ── 3. Every GDScript rule fires on its Godot 3 shape ──
     const gdHits = await scanFixture(root, { 'src/player.gd': GDSCRIPT_POSITIVE }, bothPacks);
@@ -164,7 +164,7 @@ async function main() {
       [...GDSCRIPT_RULE_IDS].sort(),
       `gdscript-modern must report every rule, got ${JSON.stringify(ruleIds(gdHits))}`,
     );
-    console.log('  [PASS] all seven gdscript-modern rules fire on their Godot 3 shape');
+    console.log('  ✔ all seven gdscript-modern rules fire on their Godot 3 shape');
 
     // ── 4. GDScript negatives and Godot 4 forms stay silent ──
     const gdSilent = await scanFixture(root, { 'src/migrated.gd': GDSCRIPT_NEGATIVE }, bothPacks);
@@ -173,7 +173,7 @@ async function main() {
       [],
       `Godot 4 forms and comments must stay silent, got ${JSON.stringify(gdSilent)}`,
     );
-    console.log('  [PASS] gdscript comments and Godot 4 forms stay silent');
+    console.log('  ✔ gdscript comments and Godot 4 forms stay silent');
 
     // ── 5. Each pack ignores the other pack's extension ──
     const crossed = await scanFixture(
@@ -186,7 +186,7 @@ async function main() {
       [],
       `extension scoping must keep the packs apart, got ${JSON.stringify(crossed)}`,
     );
-    console.log('  [PASS] each pack ignores the other pack’s file extension');
+    console.log('  ✔ each pack ignores the other pack’s file extension');
 
     // ── 6. Both packs are opt-in: no declaration, no finding ──
     const off = await scanFixture(
@@ -195,7 +195,7 @@ async function main() {
       {},
     );
     assert.deepStrictEqual(off, [], 'specialized packs must stay off until they are declared');
-    console.log('  [PASS] modernization packs stay default-off until a config declares them');
+    console.log('  ✔ modernization packs stay default-off until a config declares them');
   } finally {
     cleanupTempDir(root);
   }
@@ -207,6 +207,6 @@ main()
     console.log('\n ALL MODERN PACK CHECKS PASSED SUCCESSFULLY!');
   })
   .catch((error) => {
-    console.error('\n[FAIL]', error && error.message ? error.message : error);
+    console.error('\n✖ BLOCK', error && error.message ? error.message : error);
     process.exit(1);
   });

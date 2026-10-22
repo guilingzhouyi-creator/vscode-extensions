@@ -449,7 +449,7 @@ async function main() {
       fs.mkdirSync(ACTUAL_DIR, { recursive: true });
       const actual = path.join(ACTUAL_DIR, `${s.name}.actual.json`);
       fs.writeFileSync(actual, json);
-      console.error(`FAIL ${s.name} — differs from baseline. Inspect: ${actual}`);
+      console.error(`✖ BLOCK  ${s.name} — differs from baseline. Inspect: ${actual}`);
     }
   }
   console.log(failed ? `\n${failed} scenario(s) FAILED` : '\nALL SCENARIOS PASS');

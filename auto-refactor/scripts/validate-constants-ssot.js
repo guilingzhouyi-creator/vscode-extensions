@@ -41,7 +41,7 @@ function main() {
       `Required constants module ${mod} must exist in src/core/constants/`,
     );
   }
-  console.log(`✔ [PASS] All ${requiredModules.length} core constant modules exist.`);
+  console.log(`✔  All ${requiredModules.length} core constant modules exist.`);
 
   // 2. Check compiled barrel exports
   const constants = require(CONSTANTS_DIST_DIR);
@@ -55,7 +55,7 @@ function main() {
   assert.strictEqual(typeof constants.ANALYZER_CONSTANTS, 'string');
   assert.strictEqual(typeof constants.RULE_MAGIC_NUMBER, 'string');
   assert.strictEqual(typeof constants.CODE_CONST_HARDCODED_STRING, 'string');
-  console.log('✔ [PASS] Core AST, primitive, severity, analyzer, and rule code tokens verified.');
+  console.log('✔  Core AST, primitive, severity, analyzer, and rule code tokens verified.');
 
   // 3. Check rule code format: AR:DOMAIN:ID
   const codeKeys = Object.keys(constants).filter((k) => k.startsWith('CODE_'));
@@ -70,7 +70,7 @@ function main() {
       `Rule code ${k} = '${val}' must match format AR:DOMAIN:ID`,
     );
   }
-  console.log(`✔ [PASS] All ${codeKeys.length} standardized rule codes match AR:DOMAIN:ID format.`);
+  console.log(`✔  All ${codeKeys.length} standardized rule codes match AR:DOMAIN:ID format.`);
 
   // 4. Check zero undefined exports
   const allExportKeys = Object.keys(constants);
@@ -81,9 +81,9 @@ function main() {
   for (const k of allExportKeys) {
     assert.notStrictEqual(constants[k], undefined, `Constant export '${k}' must not be undefined`);
   }
-  console.log(`✔ [PASS] All ${allExportKeys.length} exported constants are defined and non-null.`);
+  console.log(`✔  All ${allExportKeys.length} exported constants are defined and non-null.`);
 
-  console.log('✔ [PASS] Constants SSOT guard passed completely.');
+  console.log('✔  Constants SSOT guard passed completely.');
 }
 
 try {

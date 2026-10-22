@@ -95,7 +95,7 @@ function checkRegisteredScriptsExist(registered) {
     `test-parallel.js registers ${missing.length} script(s) that do not exist:\n  ${missing.join('\n  ')}\n` +
       'Either the suite was removed or it was renamed; drop the entry or fix the path.',
   );
-  console.log(`  [PASS] all ${registered.size} registered suite(s) exist on disk`);
+  console.log(`  ✔ all ${registered.size} registered suite(s) exist on disk`);
 }
 
 /**
@@ -123,7 +123,7 @@ function checkNoOrphanSuites(registered) {
       'Register them in test-parallel.js, or add them to EXEMPT with a reason.',
   );
   console.log(
-    `  [PASS] every script under scripts/ is accounted for (${onDisk.length} total, ` +
+    `  ✔ every script under scripts/ is accounted for (${onDisk.length} total, ` +
       `${registered.size} registered, ${EXEMPT.size} exempt, ${BENCHMARKS.length} benchmarks)`,
   );
 }
@@ -142,7 +142,7 @@ function checkExemptionsAreCurrent() {
     [],
     `EXEMPT lists script(s) that no longer exist: ${stale.join(', ')}`,
   );
-  console.log(`  [PASS] all ${EXEMPT.size} exemption(s) refer to existing files`);
+  console.log(`  ✔ all ${EXEMPT.size} exemption(s) refer to existing files`);
 }
 
 const registered = registeredScripts();

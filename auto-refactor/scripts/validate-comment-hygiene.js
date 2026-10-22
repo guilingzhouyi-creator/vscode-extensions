@@ -64,7 +64,7 @@ function run() {
   const mojibakeIssues = analyze(mojibake, 'standard').filter((i) => i.rule === 'CMT-MOJI-001');
   assert.strictEqual(mojibakeIssues.length, 1, 'replacement character must raise CMT-MOJI-001');
   assert.strictEqual(mojibakeIssues[0].severity, 'error', 'mojibake is an error-severity defect');
-  console.log('  [PASS] mojibake detected at error severity');
+  console.log('  ✔ mojibake detected at error severity');
 
   const longComment = HEADER.concat(['// ' + 'x'.repeat(130), 'export const ok = 1;']).join('\n');
   assert.ok(
@@ -86,7 +86,7 @@ function run() {
     !rulesOf(longCode, 'standard').has('CMT-WID-001'),
     'non-comment code lines are outside the comment-width rule',
   );
-  console.log('  [PASS] comment width applies to comments only, with directive exemption');
+  console.log('  ✔ comment width applies to comments only, with directive exemption');
 
   // Project vocabulary must be declarable, never hardcoded: an undeclared directive token is
   // flagged, and the very same fixture is exempt once the project declares the token.
@@ -108,7 +108,7 @@ function run() {
     !declaredDirective.some((issue) => issue.rule === 'CMT-WID-001'),
     'project-declared directive tokens become exempt',
   );
-  console.log('  [PASS] directive exemption is opt-in per project (no hardcoded tokens)');
+  console.log('  ✔ directive exemption is opt-in per project (no hardcoded tokens)');
 
   const mixed = HEADER.concat([
     '# ── Section A ──',
@@ -129,7 +129,7 @@ function run() {
     !rulesOf(bareOnly, 'standard').has('CMT-SEP-001'),
     'bare divider rules are decorative and exempt',
   );
-  console.log('  [PASS] separator consistency enforced, bare dividers exempt');
+  console.log('  ✔ separator consistency enforced, bare dividers exempt');
 
   const smallBanner = ['# ══════════════════', 'export const a = 1;'].join('\n');
   assert.ok(
@@ -143,7 +143,7 @@ function run() {
     !rulesOf(largeBanner, 'standard').has('CMT-BAN-001'),
     'banners stay allowed in substantial modules (>= 150 lines)',
   );
-  console.log('  [PASS] banner rule scoped to modules under the line limit');
+  console.log('  ✔ banner rule scoped to modules under the line limit');
 
   const basicRules = rulesOf(longComment, 'basic');
   assert.ok(basicRules.has('CMT-MOJI-001') === false, 'mojibake still runs at basic');
@@ -157,13 +157,13 @@ function run() {
     rulesOf(mojibake, 'basic').has('CMT-MOJI-001'),
     'mojibake must be audited from the basic level upward',
   );
-  console.log('  [PASS] level gating: mojibake at basic, stylistic trio at standard');
+  console.log('  ✔ level gating: mojibake at basic, stylistic trio at standard');
 }
 
 try {
   run();
   console.log('\n ALL COMMENT HYGIENE KEY POINTS PASSED SUCCESSFULLY!');
 } catch (error) {
-  console.error('\n[FAIL]', error && error.message ? error.message : error);
+  console.error('\n✖ BLOCK', error && error.message ? error.message : error);
   process.exit(1);
 }

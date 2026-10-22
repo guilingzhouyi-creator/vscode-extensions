@@ -136,7 +136,7 @@ const SYNTHETIC = {
   );
   assert.strictEqual(unresolved[0].calleeFile, null, 'an unresolved callee must not invent a file');
   console.log(
-    `  [PASS] three-hop chain walkable, ${unresolved.length} unresolved edge kept (not dropped)`,
+    `  ✔ three-hop chain walkable, ${unresolved.length} unresolved edge kept (not dropped)`,
   );
 
   const stats = graph.stats();
@@ -195,7 +195,7 @@ const SYNTHETIC = {
       'both traversals must resolve the same cross-file edges',
     );
     console.log(
-      `  [PASS] both paths agree edge-for-edge (${materializedStats.edges} edges, ` +
+      `  ✔ both paths agree edge-for-edge (${materializedStats.edges} edges, ` +
         `${materializedStats.crossFileEdges} cross-file)`,
     );
   } finally {

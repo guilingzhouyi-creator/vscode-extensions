@@ -167,6 +167,6 @@ if (update) {
 
 const finalCode = summary && summary.newBlocking > 0 ? Math.max(1, code) : code;
 process.stdout.write(
-  `[gate:self] ${update ? 'baseline updated' : `self-scan ratchet (severity=${severity})`} → ${finalCode === 0 ? 'PASS' : 'FAIL'}\n`,
+  `[gate:self] ${update ? 'baseline updated' : `self-scan ratchet (severity=${severity})`} → ${finalCode === 0 ? '✔ PASS' : '✖ BLOCK'}\n`,
 );
 process.exit(finalCode);

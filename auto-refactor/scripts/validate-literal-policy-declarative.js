@@ -89,7 +89,7 @@ function runSuite() {
   testDefaultTolerances();
   testCustomDeclarativePolicies();
   process.stdout.write(
-    '✔ [PASS] validate-literal-policy-declarative: All policy decoupling tests passed.\n',
+    '✔  validate-literal-policy-declarative: All policy decoupling tests passed.\n',
   );
 }
 

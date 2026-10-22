@@ -145,7 +145,7 @@ function validateRegistryIntegrity(ids) {
   assert.strictEqual(getRule('GOV-EXC-001').analyzer, 'governance', 'lookup must resolve owners');
   assert.ok(rulesForAnalyzer('hygiene').length >= 8, 'analyzer lookup must group rules');
   console.log(
-    `  [PASS] registry integrity: ${RULE_REGISTRY.length} rules, unique, fully described`,
+    `  ✔ registry integrity: ${RULE_REGISTRY.length} rules, unique, fully described`,
   );
 }
 
@@ -163,7 +163,7 @@ function validateTopicAndSequenceContinuity() {
   );
   assert.strictEqual(audit.valid, true, 'topic taxonomy and sequence continuity must be valid');
   console.log(
-    `  [PASS] topic catalog and sequence continuity: ${Object.keys(CANONICAL_TOPIC_CATALOG).length} families, ${Object.keys(HISTORICAL_SEQUENCE_ANOMALIES).length} locked historical anomalies, 0 gaps`,
+    `  ✔ topic catalog and sequence continuity: ${Object.keys(CANONICAL_TOPIC_CATALOG).length} families, ${Object.keys(HISTORICAL_SEQUENCE_ANOMALIES).length} locked historical anomalies, 0 gaps`,
   );
 }
 
@@ -175,7 +175,7 @@ function validateTopicGlossaryCoverage() {
     'all non-3-letter topics must have canonical 3-letter glossary entries',
   );
   console.log(
-    `  [PASS] non-3-letter topics glossary coverage: ${coverage.nonStandardTopics.length} topics 100% mapped to standard 3-letter codes`,
+    `  ✔ non-3-letter topics glossary coverage: ${coverage.nonStandardTopics.length} topics 100% mapped to standard 3-letter codes`,
   );
 }
 
@@ -196,7 +196,7 @@ function validateEmittedRules(ids) {
     'every legacy id must map to its own canonical target',
   );
   console.log(
-    `  [PASS] alias window declares ${aliasTargets.size} planned canonical ids (not emitted yet)`,
+    `  ✔ alias window declares ${aliasTargets.size} planned canonical ids (not emitted yet)`,
   );
   const missingFromRegistry = [...emitted.keys()].filter((id) => !getRule(id)).sort();
   const neverEmitted = ids.filter((id) => !emitted.has(id)).sort();
@@ -210,7 +210,7 @@ function validateEmittedRules(ids) {
     [],
     `rules registered but never emitted: ${neverEmitted.join(', ')}`,
   );
-  console.log(`  [PASS] registry covers exactly the emitted set (${emitted.size} ids, no orphans)`);
+  console.log(`  ✔ registry covers exactly the emitted set (${emitted.size} ids, no orphans)`);
 }
 
 function validateAnalyzerRegistries() {
@@ -237,7 +237,7 @@ function validateAnalyzerRegistries() {
     `rules owned by analyses without a factory: ${unknownOwners.join(', ')}`,
   );
   console.log(
-    `  [PASS] analyzer registries agree (${factoryIds.length} analyzers across factories/config/router)`,
+    `  ✔ analyzer registries agree (${factoryIds.length} analyzers across factories/config/router)`,
   );
 }
 
@@ -245,7 +245,7 @@ function validateNamingAndDocs(ids) {
   const legacy = RULE_REGISTRY.filter((rule) => !rule.canonical)
     .map((rule) => rule.id)
     .sort();
-  console.log(`  [PASS] canonical ${ids.length - legacy.length} / legacy ${legacy.length}`);
+  console.log(`  ✔ canonical ${ids.length - legacy.length} / legacy ${legacy.length}`);
   if (legacy.length > 0) {
     console.log(`         legacy ids pending an alias window: ${legacy.join(', ')}`);
   }
@@ -260,7 +260,7 @@ function validateNamingAndDocs(ids) {
     covered.length === ids.length
       ? `docs coverage ${covered.length}/${ids.length} (every registered rule has a docs row)`
       : `docs coverage ${covered.length}/${ids.length} (undocumented ids listed below)`;
-  console.log(`  [PASS] ${coverageLabel}`);
+  console.log(`  ✔ ${coverageLabel}`);
   const uncovered = ids.filter((id) => !documented.has(id)).sort();
   if (uncovered.length > 0) {
     console.log(`         undocumented: ${uncovered.join(', ')}`);
@@ -281,6 +281,6 @@ try {
   runAll();
   console.log('\n ALL RULE REGISTRY CONSISTENCY CHECKS PASSED SUCCESSFULLY!');
 } catch (error) {
-  console.error('\n[FAIL]', error && error.message ? error.message : error);
+  console.error('\n✖ BLOCK', error && error.message ? error.message : error);
   process.exit(1);
 }

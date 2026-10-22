@@ -152,7 +152,7 @@ async function scanFixture(root, files, config) {
   assert.strictEqual(shared.crossFile, true, 'value used in three files must be cross-file');
   assert.strictEqual(shared.multiMeaning, true, 'same value in three roles is three meanings');
   assert.strictEqual(shared.meanings.length, 3, 'meanings must not be merged across roles/symbols');
-  console.log('  [PASS] cross-file cluster kept with a 3-way meaning split (8080)');
+  console.log('  ✔ cross-file cluster kept with a 3-way meaning split (8080)');
 
   const single = index.entries().find((entry) => entry.value === '512');
   assert.ok(single && single.crossFile === false, 'single-file value must not be cross-file');
@@ -162,7 +162,7 @@ async function scanFixture(root, files, config) {
     'cross-file cluster must be reported',
   );
   assert.ok(!clusters.some((entry) => entry.value === '512'), 'single-file value must not cluster');
-  console.log(`  [PASS] clusters() reports ${clusters.length} cross-file value(s) only`);
+  console.log(`  ✔ clusters() reports ${clusters.length} cross-file value(s) only`);
 
   const roles = stats.byRole;
   for (const role of ['fixture', 'generated', 'protocol', 'algorithm']) {
@@ -176,7 +176,7 @@ async function scanFixture(root, files, config) {
     LITERAL_ROLE.UNKNOWN,
     'unattributable literals must stay unknown rather than being guessed',
   );
-  console.log(`  [PASS] roles inferred from evidence: ${JSON.stringify(roles)}`);
+  console.log(`  ✔ roles inferred from evidence: ${JSON.stringify(roles)}`);
 
   // ── 2. Materialized traversal feeds the store ────────────────────────────────────────────────
   const materializedRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ar-literals-mat-'));
@@ -197,7 +197,7 @@ async function scanFixture(root, files, config) {
       'the shared fixture value carries several meanings',
     );
     console.log(
-      `  [PASS] materialized path feeds the store (${materialized.occurrences} occurrences, ` +
+      `  ✔ materialized path feeds the store (${materialized.occurrences} occurrences, ` +
         `${materialized.values} values, ${materialized.crossFileValues} cross-file)`,
     );
 
@@ -213,7 +213,7 @@ async function scanFixture(root, files, config) {
     assert.ok(projected.crossFileValues >= 1, 'the projection path must see cross-file values');
     assert.ok(projected.multiMeaningValues >= 1, 'the projection path must keep the meaning split');
     console.log(
-      `  [PASS] projection path feeds the same store (${projected.occurrences} occurrences, ` +
+      `  ✔ projection path feeds the same store (${projected.occurrences} occurrences, ` +
         `${projected.values} values, ${projected.byRole.algorithm ?? 0} algorithm)`,
     );
     // ---- 4. The store is consumed: one finding for the shared multi-meaning value ----
@@ -238,7 +238,7 @@ async function scanFixture(root, files, config) {
     );
     assert.strictEqual(projectedFindings.length, 0, 'the cluster pass must stay opt-in');
     console.log(
-      `  [PASS] clusters consumed into a review finding (${findings[0].detail.meanings.length} meanings, opt-in)`,
+      `  ✔ clusters consumed into a review finding (${findings[0].detail.meanings.length} meanings, opt-in)`,
     );
   } finally {
     fs.rmSync(materializedRoot, { recursive: true, force: true });

@@ -61,7 +61,7 @@ let router;
 try {
   router = require(routerPath);
 } catch (err) {
-  console.error('[FAIL] Unable to load sparseRuleRouter from dist. Run npm run build first.');
+  console.error('✖ BLOCK Unable to load sparseRuleRouter from dist. Run npm run build first.');
   console.error(err);
   process.exit(1);
 }
@@ -161,7 +161,7 @@ let configModule;
 try {
   configModule = require(configPath);
 } catch (err) {
-  console.error('[FAIL] Unable to load config module from dist. Run npm run build first.');
+  console.error('✖ BLOCK Unable to load config module from dist. Run npm run build first.');
   console.error(err);
   process.exit(1);
 }
@@ -219,5 +219,5 @@ assert(
 );
 console.log('✓ customAnalyzers strictly enforces signals and track declarations (N-08)');
 
-console.log('[PASS] validate-fail-closed passed all checks.');
+console.log('✔ validate-fail-closed passed all checks.');
 process.exit(0);

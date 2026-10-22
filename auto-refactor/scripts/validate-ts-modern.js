@@ -123,7 +123,7 @@ async function main() {
       [...ALL_RULE_IDS].sort(),
       `the pack must report every rule, got ${JSON.stringify(hitIds)}`,
     );
-    console.log('  [PASS] all ten ts-modern rules fire on their canonical shape');
+    console.log('  ✔ all ten ts-modern rules fire on their canonical shape');
 
     // ── 2. Literals, comments and lookalike identifiers stay silent ──
     const silent = await scanFixture(root, { 'src/negative.ts': NEGATIVE }, packOn);
@@ -132,7 +132,7 @@ async function main() {
       [],
       `the mask must suppress comments, strings and lookalike names, got ${JSON.stringify(silent)}`,
     );
-    console.log('  [PASS] strings, comments, templates and lookalike names stay silent');
+    console.log('  ✔ strings, comments, templates and lookalike names stay silent');
 
     // ── 3. Language scope: JS keeps the syntax rules, drops the typed ones; .d.ts is excluded ──
     const jsHits = await scanFixture(root, { 'src/positive.js': POSITIVE }, packOn);
@@ -148,12 +148,12 @@ async function main() {
     );
     const declaration = await scanFixture(root, { 'src/positive.d.ts': POSITIVE }, packOn);
     assert.deepStrictEqual(declaration, [], 'declaration files carry no runtime code to modernize');
-    console.log('  [PASS] type rules skip JavaScript and declaration files are excluded');
+    console.log('  ✔ type rules skip JavaScript and declaration files are excluded');
 
     // ── 4. The pack is opt-in: without a declaration no TSM finding may appear ──
     const off = await scanFixture(root, { 'src/positive.ts': POSITIVE }, {});
     assert.deepStrictEqual(off, [], 'the specialized pack must stay off until it is declared');
-    console.log('  [PASS] ts-modern stays default-off until a config declares it');
+    console.log('  ✔ ts-modern stays default-off until a config declares it');
 
     // ── 5. The indexOf boundary rule fires on the modern-worthy comparison only ──
     const boundary = await scanFixture(
@@ -167,7 +167,7 @@ async function main() {
       ['src/boundary-fires.ts'],
       `only the >= 0 comparison is a modernization finding, got ${JSON.stringify(files)}`,
     );
-    console.log('  [PASS] indexOf boundary rule fires on >= 0 and stays silent otherwise');
+    console.log('  ✔ indexOf boundary rule fires on >= 0 and stays silent otherwise');
   } finally {
     cleanupTempDir(root);
   }
@@ -179,6 +179,6 @@ main()
     console.log('\n ALL TS-MODERN CHECKS PASSED SUCCESSFULLY!');
   })
   .catch((error) => {
-    console.error('\n[FAIL]', error && error.message ? error.message : error);
+    console.error('\n✖ BLOCK', error && error.message ? error.message : error);
     process.exit(1);
   });

@@ -55,7 +55,7 @@ export function activate(context: vscode.ExtensionContext) {
   });
   const noLeakIssue = goodIssues.find((i) => i.rule === 'TSM-DISP-001');
   assert(!noLeakIssue, 'Should not flag tracked vscode listener in context.subscriptions.push');
-  console.log('[PASS] TSM-DISP-001 Disposable guard passed.');
+  console.log('✔ TSM-DISP-001 Disposable guard passed.');
 }
 
 function testGodotObjectPoolContract() {
@@ -97,7 +97,7 @@ func reset_state() -> void:
   });
   const noPoolIssue = goodIssues.find((i) => i.rule === 'GDM-POOL-002');
   assert(!noPoolIssue, 'Should not flag reset_state() that calls super.reset_state()');
-  console.log('[PASS] GDM-POOL-002 Object Pool contract passed.');
+  console.log('✔ GDM-POOL-002 Object Pool contract passed.');
 }
 
 function testCommentUrlElasticExemption() {
@@ -125,7 +125,7 @@ function testCommentUrlElasticExemption() {
   });
   const urlIssue = urlIssues.find((i) => i.rule === 'CMT-WID-001');
   assert(!urlIssue, 'Should exempt overwide comment containing standard URL');
-  console.log('[PASS] CMT-WID-001 URL elastic exemption passed.');
+  console.log('✔ CMT-WID-001 URL elastic exemption passed.');
 }
 
 function runAll() {

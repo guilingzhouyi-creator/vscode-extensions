@@ -144,7 +144,7 @@ function testStreamingEquivalenceTS() {
   assertScopeGraphsEqual(standalone, streaming, 'TS streaming vs standalone');
 
   passCount++;
-  console.log('  [PASS] streaming build: TypeScript structural equivalence');
+  console.log('  ✔ streaming build: TypeScript structural equivalence');
 }
 
 // ─── Test 2: Lookup equivalence ──────────────────────────────────────
@@ -179,7 +179,7 @@ function testStreamingLookupEquivalence() {
   assert.strictEqual(resultS.binding.name, resultSt.binding.name, 'closest binding name matches');
 
   passCount++;
-  console.log('  [PASS] streaming build: lookup results are identical');
+  console.log('  ✔ streaming build: lookup results are identical');
 }
 
 // ─── Test 3: Shadow detection equivalence ────────────────────────────
@@ -200,7 +200,7 @@ function testStreamingShadowEquivalence() {
   assert.strictEqual(standalone.isShadowed('x', fnScopeS), true, 'x is shadowed');
 
   passCount++;
-  console.log('  [PASS] streaming build: shadow detection equivalence');
+  console.log('  ✔ streaming build: shadow detection equivalence');
 }
 
 // ─── Test 4: getScopeAtLine equivalence ──────────────────────────────
@@ -231,7 +231,7 @@ function testStreamingScopeAtLine() {
   }
 
   passCount++;
-  console.log('  [PASS] streaming build: getScopeAtLine equivalence');
+  console.log('  ✔ streaming build: getScopeAtLine equivalence');
 }
 
 // ─── Test 5: Python equivalence ──────────────────────────────────────
@@ -255,7 +255,7 @@ function testStreamingEquivalencePython() {
   assertScopeGraphsEqual(standalone, streaming, 'Python streaming vs standalone');
 
   passCount++;
-  console.log('  [PASS] streaming build: Python structural equivalence');
+  console.log('  ✔ streaming build: Python structural equivalence');
 }
 
 // ─── Test 6: Leave hook ordering correctness ─────────────────────────
@@ -304,7 +304,7 @@ function testStreamingLeaveOrder() {
   assert.deepStrictEqual(visitCounts, leaveCounts, 'visit and leave visit the same set of nodes');
 
   passCount++;
-  console.log('  [PASS] streaming build: leave hooks called in correct post-order');
+  console.log('  ✔ streaming build: leave hooks called in correct post-order');
 }
 
 // ─── Test 7: Zero overhead when no analyzer uses leave ───────────────
@@ -332,7 +332,7 @@ function testStreamingZeroOverhead() {
   // The hasAnyLeave flag should be false — functional correctness
   // of the no-leave path verifies the zero-overhead optimization works.
   passCount++;
-  console.log('  [PASS] streaming build: no-leave analyzers work correctly (zero overhead path)');
+  console.log('  ✔ streaming build: no-leave analyzers work correctly (zero overhead path)');
 }
 
 // ─── Test 8: Performance — shared traversal benefit ──────────────────
@@ -392,7 +392,7 @@ function testStreamingPerformance() {
 
   passCount++;
   console.log(
-    `  [PASS] streaming performance: ${standaloneElapsed}ms standalone vs ${streamingElapsed}ms streaming (ratio: ${ratio.toFixed(2)}x)`,
+    `  ✔ streaming performance: ${standaloneElapsed}ms standalone vs ${streamingElapsed}ms streaming (ratio: ${ratio.toFixed(2)}x)`,
   );
 }
 

@@ -196,7 +196,7 @@ const NEGATIVE_FIXTURES = {
     );
     assert.ok(expIssues.some((i) => i.message.includes('nested ternary')));
     assert.ok(expIssues.some((i) => i.message.includes('logical chain')));
-    console.log(`  [OK] CMP-EXP-001 exact count (${expIssues.length})`);
+    console.log(`  ✔ CMP-EXP-001 exact count (${expIssues.length})`);
 
     // 2. Assert CMP-LIN-001 hit
     const linIssues = issues.filter((i) => i.rule === 'CMP-LIN-001');
@@ -205,7 +205,7 @@ const NEGATIVE_FIXTURES = {
       2,
       `Expected exactly 2 CMP-LIN-001, got ${linIssues.length}`,
     );
-    console.log(`  [OK] CMP-LIN-001 exact count (${linIssues.length})`);
+    console.log(`  ✔ CMP-LIN-001 exact count (${linIssues.length})`);
 
     // 3. Assert CMP-CAL-001 hit. Nesting depth is a purely syntactic fact, so this finding must NOT
     //    claim runtime evidence: a conclusion no execution can settle must not be counted as one.
@@ -220,7 +220,7 @@ const NEGATIVE_FIXTURES = {
       true,
       'CMP-CAL-001 is statically decidable and must not claim runtime evidence',
     );
-    console.log(`  [OK] CMP-CAL-001 exact count (${calIssues.length}, no runtime claim)`);
+    console.log(`  ✔ CMP-CAL-001 exact count (${calIssues.length}, no runtime claim)`);
 
     // 4. Assert CMP-DEN-001 hit
     const denIssues = issues.filter((i) => i.rule === 'CMP-DEN-001');
@@ -229,7 +229,7 @@ const NEGATIVE_FIXTURES = {
       1,
       `Expected exactly 1 CMP-DEN-001, got ${denIssues.length}`,
     );
-    console.log(`  [OK] CMP-DEN-001 exact count (${denIssues.length})`);
+    console.log(`  ✔ CMP-DEN-001 exact count (${denIssues.length})`);
 
     // 5. Assert clean file has ZERO CMP-* false positives
     const cleanIssues = issues.filter(
@@ -240,7 +240,7 @@ const NEGATIVE_FIXTURES = {
       0,
       `Clean code triggered CMP false positives: ${JSON.stringify(cleanIssues)}`,
     );
-    console.log(`  [OK] Clean code produced 0 CMP false positives.`);
+    console.log(`  ✔ Clean code produced 0 CMP false positives.`);
 
     console.log('\n=== [2/3] Testing Uncertainty Quantification & Counting ===');
     const uncertainty = report.summary.uncertainty;
@@ -275,7 +275,7 @@ const NEGATIVE_FIXTURES = {
         'averageConfidence must be between 0 and 1',
       );
     }
-    console.log('  [OK] Uncertainty is countable and its confidence claim matches its evidence.');
+    console.log('  ✔ Uncertainty is countable and its confidence claim matches its evidence.');
 
     console.log('\n=== [3/3] False Positive Rate and Real-Corpus Regression Guard ===');
     // The FP rate is measured over ALL CMP emissions with the negative corpus in the numerator.
@@ -300,7 +300,7 @@ const NEGATIVE_FIXTURES = {
     );
     assert.strictEqual(cmpOnNegative, 0, 'idiomatic constructs must produce zero CMP findings');
     console.log(
-      '  [OK] FP rate 0.00% against a negative corpus, with the positive set still firing.',
+      '  ✔ FP rate 0.00% against a negative corpus, with the positive set still firing.',
     );
 
     // Real-corpus guard: every file below produced a CMP false positive before the rules read the
@@ -349,7 +349,7 @@ const NEGATIVE_FIXTURES = {
       0,
       `files that once false-positived must stay clean (got ${productionHits})`,
     );
-    console.log(`  [OK] ${productionSilent.length} previously false-positive files stay clean.`);
+    console.log(`  ✔ ${productionSilent.length} previously false-positive files stay clean.`);
 
     console.log('\nALL COMPRESSION BOUNDS & UNCERTAINTY MODEL CHECKS PASSED.');
   } finally {

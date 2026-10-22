@@ -271,7 +271,7 @@ async function main() {
   let failed = 0;
   const fail = (msg) => {
     failed++;
-    console.log('FAIL', msg);
+    console.log('✖ BLOCK ', msg);
   };
   const pass = (msg) => console.log('PASS', msg);
 
