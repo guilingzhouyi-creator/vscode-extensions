@@ -529,12 +529,14 @@ def _generate_audit_report(
         "schema": "webgames-audit-report/v1",
         "project": "WebGames",
         "generatedAt": datetime.now(timezone.utc).isoformat(),
-        "status": "PASS" if is_passed else "FAIL",
+        # 与 fractal-git 报告同词：门禁终态失败只有 BLOCK 一种，写 FAIL 会让下游
+        # 以为存在第二种失败语义。
+        "status": "PASS" if is_passed else "BLOCK",
         "summary": {
             "checks": total_checks,
             "byStatus": {
                 "PASS": pass_checks,
-                "FAIL": err_count,
+                "BLOCK": err_count,
             },
             "bySeverity": {
                 "warning": warn_count,

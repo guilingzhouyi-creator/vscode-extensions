@@ -859,7 +859,7 @@ def sync_to_disk(webgames_root: Path, capabilities: Dict[str, Any]) -> None:
     # 1. 写入 capabilities.json
     cap_content = format_capabilities_json(capabilities)
     cap_path.write_text(cap_content, encoding="utf-8", newline="\n")
-    print(f"[OK] 已同步能力清单: {cap_path}")
+    print(f"✔ 已同步能力清单: {cap_path}")
 
     # 2. 写入或注入 MOD_SPEC.md
     existing_spec = (
@@ -867,7 +867,7 @@ def sync_to_disk(webgames_root: Path, capabilities: Dict[str, Any]) -> None:
     )
     spec_content = render_full_mod_spec(capabilities, existing_spec)
     spec_path.write_text(spec_content, encoding="utf-8", newline="\n")
-    print(f"[OK] 已同步开发契约规范: {spec_path}")
+    print(f"✔ 已同步开发契约规范: {spec_path}")
 
 
 def main() -> int:
@@ -898,9 +898,9 @@ def main() -> int:
     if args.check_only:
         is_clean, diffs = check_contract_drift(root, capabilities)
         if is_clean:
-            print("[OK] MOD SDK 契约与引擎真源保持 100% 绝对一致，未检测到任何漂移。")
+            print("✔ MOD SDK 契约与引擎真源保持 100% 绝对一致，未检测到任何漂移。")
             return 0
-        print("[FAIL] 检测到 MOD SDK 契约发生漂移！", file=sys.stderr)
+        print("✖ BLOCK 检测到 MOD SDK 契约发生漂移！", file=sys.stderr)
         for diff in diffs:
             print(diff, file=sys.stderr)
         print(

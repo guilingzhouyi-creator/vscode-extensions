@@ -30,8 +30,8 @@ $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RootDir = Split-Path -Parent (Split-Path -Parent $ScriptDir)
 
 $versionOutput = & $Godot --version 2>$null | Select-Object -First 1
-Write-Host "[信息] 使用引擎: $versionOutput"
-Write-Host "[信息] 项目根: $RootDir"
+Write-Host "· 使用引擎: $versionOutput"
+Write-Host "· 项目根: $RootDir"
 
 Push-Location $RootDir
 try {
@@ -42,8 +42,8 @@ try {
 }
 
 if ($code -eq 0) {
-  Write-Host "[通过] 架构护栏审查通过"
+  Write-Host "✔ 架构护栏审查通过"
 } else {
-  Write-Host "[失败] 架构护栏存在违规项（退出码 $code）"
+  Write-Host "✖ BLOCK  架构护栏存在违规项（退出码 $code）"
 }
 exit $code

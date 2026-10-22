@@ -27,16 +27,16 @@ if ! command -v "$GODOT" >/dev/null 2>&1; then
   exit 127
 fi
 
-echo "[信息] 使用引擎: $($GODOT --version 2>/dev/null || echo "$GODOT")"
-echo "[信息] 项目根: $PROJECT_ROOT"
+echo "· 使用引擎: $($GODOT --version 2>/dev/null || echo "$GODOT")"
+echo "· 项目根: $PROJECT_ROOT"
 
 cd "$PROJECT_ROOT" || exit 1
 "$GODOT" --headless -s "res://tests/arch_runner.gd"
 code=$?
 
 if [ $code -eq 0 ]; then
-  echo "[通过] 架构护栏审查通过"
+  echo "✔ 架构护栏审查通过"
 else
-  echo "[失败] 架构护栏存在违规项（退出码 $code）" >&2
+  echo "✖ BLOCK  架构护栏存在违规项（退出码 $code）" >&2
 fi
 exit $code

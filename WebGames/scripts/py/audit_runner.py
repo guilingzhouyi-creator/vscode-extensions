@@ -704,7 +704,7 @@ def _log_task_result(res: TaskResult, is_quiet_mode: bool, extra_tag: str = "") 
     """打印单任务执行结果徽标与耗时。"""
     if is_quiet_mode:
         return
-    badge = f"{C_GREEN}✅ PASS{C_RESET}" if res.returncode == 0 else f"{C_RED}❌ FAIL({res.returncode}){C_RESET}"
+    badge = f"{C_GREEN}✔ PASS{C_RESET}" if res.returncode == 0 else f"{C_RED}✖ BLOCK({res.returncode}){C_RESET}"
     tag_str = f" [{extra_tag}]" if extra_tag else ""
     print(f"  [{badge}] {C_BOLD}{res.task.name:<30s}{C_RESET} ({res.task.script_name}) — {res.elapsed_sec:5.2f}s{tag_str}")
 

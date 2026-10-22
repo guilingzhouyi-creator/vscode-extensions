@@ -584,7 +584,7 @@ def main() -> int:
   print(f"[audit-arch] {domain_title}")
   for r in results:
     passed = r["passed"]
-    print(f"  [{'PASS' if passed else 'FAIL'}] {r['test']}")
+    print(f"  {'✔' if passed else '✖ BLOCK'} {r['test']}")
     if not passed:
       for v in r["violations"]:
         print(f"        - {v}")

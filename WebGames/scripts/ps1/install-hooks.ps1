@@ -85,7 +85,7 @@ if [ `$EXIT_CODE -ne 0 ]; then
     echo "❌ 审查门禁未通过，Git 提交被阻断！请修复后重试。"
     exit 1
 fi
-echo "✅ 审查门禁通过，允许提交。"
+echo "✔ 审查门禁通过，允许提交。"
 exit 0
 "@
 
