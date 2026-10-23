@@ -31,7 +31,8 @@ use fractal_git::constants::cli::CliTag;
 
 use super::common::{fail_io, reject, CliContext};
 use super::repo_view::RepoView;
-use super::status_cmd::{collect_status, flatten_commit_tree, flatten_tree_for_diff};
+use super::status::collect_status;
+use super::tree_view::{flatten_commit_tree, flatten_tree_for_diff, TreeEntry};
 
 /// Parsed options for `taxis checkout`.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -171,8 +172,8 @@ fn resolve_effective_branch(view: &RepoView, opts: &CheckoutOptions) -> Option<S
 /// Removes worktree files and empty parent directories that are absent in the target tree.
 pub(crate) fn remove_stale_files(
     work_root: &Path,
-    current_files: &BTreeMap<String, super::status_cmd::TreeEntry>,
-    new_files: &BTreeMap<String, super::status_cmd::TreeEntry>,
+    current_files: &BTreeMap<String, TreeEntry>,
+    new_files: &BTreeMap<String, TreeEntry>,
 ) {
     for old_path in current_files.keys() {
         if new_files.contains_key(old_path) {
@@ -198,7 +199,7 @@ pub(crate) fn remove_stale_files(
 /// Materializes files into the worktree directory and computes fresh index entries.
 pub(crate) fn materialize_files(
     view: &RepoView,
-    new_files: &BTreeMap<String, super::status_cmd::TreeEntry>,
+    new_files: &BTreeMap<String, TreeEntry>,
 ) -> Vec<IndexEntry> {
     let mut index_entries = Vec::with_capacity(new_files.len());
 

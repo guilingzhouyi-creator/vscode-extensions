@@ -1,5 +1,5 @@
-//! Module: taxis_cmd::projection_cmd — Git Projection Import and Export Dispatchers
-//! File Path: src/bin/taxis_cmd/projection_cmd.rs
+//! Module: taxis_cmd::projection — Git Projection Import and Export Dispatchers
+//! File Path: src/bin/taxis_cmd/projection.rs
 //! Architecture Role: Dispatches `taxis git-export` and `taxis git-import`, bridging native
 //!   TAXC repositories and Git `.git` repositories without calling the Git binary.
 //! Dependencies & Triggers: Dispatched by `taxis git-export` and `taxis git-import`.

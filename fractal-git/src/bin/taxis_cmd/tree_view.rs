@@ -18,24 +18,22 @@
 use std::collections::BTreeMap;
 use std::fs;
 
-use fg_core::error::{FractalError, FractalResult};
+use fg_core::error::FractalResult;
 use fg_core::models::{FileMode, Oid};
 use fg_index::IndexEntry;
-use fg_object::GitTreeRef;
+
+#[allow(unused_imports)]
+pub use fg_algorithms::traverse::{
+    commit_tree_oid, flatten_commit_tree_with, flatten_tree_with, FlattenedTreeEntry,
+};
 
 use super::repo_view::RepoView;
 
 /// ASCII NUL delimiter byte for `-z` command outputs.
 pub const NUL: u8 = 0;
 
-/// One flattened tree entry: mode and object id.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct TreeEntry {
-    /// Mode recorded in the tree.
-    pub mode: FileMode,
-    /// Object the entry points at.
-    pub oid: Oid,
-}
+/// One flattened tree entry: mode and object id. Re-exported from fg_algorithms.
+pub type TreeEntry = FlattenedTreeEntry;
 
 /// A path that exists on one side of a tree comparison, with its payload pre-read for similarity.
 #[derive(Debug, Clone)]
@@ -54,11 +52,7 @@ pub fn flatten_commit_tree(
     view: &RepoView,
     commit: &Oid,
 ) -> FractalResult<BTreeMap<String, TreeEntry>> {
-    let object = view.object(commit)?;
-    let tree_oid = commit_tree_oid(&object.payload)?;
-    let mut flat = BTreeMap::new();
-    flatten_tree(view, &tree_oid, "", &mut flat)?;
-    Ok(flat)
+    flatten_commit_tree_with(commit, &|oid| view.object(oid).map(|o| o.payload))
 }
 
 /// Flattens one tree recursively into `flat`.
@@ -68,27 +62,7 @@ pub fn flatten_tree(
     prefix: &str,
     flat: &mut BTreeMap<String, TreeEntry>,
 ) -> FractalResult<()> {
-    let object = view.object(tree_oid)?;
-    for entry in GitTreeRef::from_bytes(&object.payload).iter() {
-        let entry = entry?;
-        let path = if prefix.is_empty() {
-            entry.name.to_string()
-        } else {
-            format!("{prefix}/{}", entry.name)
-        };
-        if entry.mode.is_tree() {
-            flatten_tree(view, &entry.oid, &path, flat)?;
-            continue;
-        }
-        flat.insert(
-            path,
-            TreeEntry {
-                mode: entry.mode,
-                oid: entry.oid,
-            },
-        );
-    }
-    Ok(())
+    flatten_tree_with(tree_oid, prefix, &|oid| view.object(oid).map(|o| o.payload), flat)
 }
 
 /// Flattens a tree revision that is already known to be a tree into `flat`.
@@ -99,24 +73,6 @@ pub fn flatten_tree_for_diff(
     flat: &mut BTreeMap<String, TreeEntry>,
 ) -> FractalResult<()> {
     flatten_tree(view, tree_oid, prefix, flat)
-}
-
-/// Reads the `tree` header of a commit payload.
-pub fn commit_tree_oid(payload: &[u8]) -> FractalResult<Oid> {
-    let text = std::str::from_utf8(payload).map_err(|utf_err| {
-        FractalError::ObjectCodec(format!("commit payload is not UTF-8: {utf_err}"))
-    })?;
-    for line in text.lines() {
-        if line.is_empty() {
-            break;
-        }
-        if let Some(value) = line.strip_prefix("tree ") {
-            return Oid::from_hex(value.trim());
-        }
-    }
-    Err(FractalError::ObjectCodec(
-        "commit payload has no 'tree' header".to_string(),
-    ))
 }
 
 /// Reports whether the cached size and modification time match filesystem metadata.

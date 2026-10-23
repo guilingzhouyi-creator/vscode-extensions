@@ -1,5 +1,5 @@
-//! Module: taxis_cmd::read_cmd — Native Read Commands
-//! File Path: src/bin/taxis_cmd/read_cmd.rs
+//! Module: taxis_cmd::read — Native Read Commands
+//! File Path: src/bin/taxis_cmd/read.rs
 //! Architecture Role: The object-level inspection commands — `cat-file`, `ls-tree`, `ls-files`,
 //!   `show-ref`, `for-each-ref`, and `check-ignore` — implemented against the native object router
 //!   and index reader.

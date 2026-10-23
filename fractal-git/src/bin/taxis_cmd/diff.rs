@@ -1,5 +1,5 @@
-//! Module: taxis_cmd::diff_cmd — Native Unified Diff
-//! File Path: src/bin/taxis_cmd/diff_cmd.rs
+//! Module: taxis_cmd::diff — Native Unified Diff
+//! File Path: src/bin/taxis_cmd/diff.rs
 //! Architecture Role: Produces `git diff`-shaped unified patches from the native object store and
 //!   the worktree, using the Myers engine in `fg-algorithms`.
 //! Dependencies & Triggers: Dispatched by `taxis diff`; reads what `status` classifies.
@@ -31,7 +31,9 @@ use fractal_git::constants::cli::CliTag;
 use super::common::{reject, CliContext};
 use super::diff_render::{report_json, report_text};
 use super::repo_view::RepoView;
-use super::status_cmd::{flatten_commit_tree, stat_cache_matches, SideBlob, TreeEntry};
+use super::tree_view::{
+    flatten_commit_tree, flatten_tree_for_diff, stat_cache_matches, SideBlob, TreeEntry,
+};
 
 /// Default number of context lines around each hunk.
 const DEFAULT_CONTEXT: usize = 3;
@@ -577,12 +579,12 @@ fn compare_snapshots(old: &Snapshot<'_>, new: &Snapshot<'_>) -> FractalResult<Ve
 /// Reads the mode the worktree currently reports for `path`, or `None` when the path is gone.
 ///
 /// A path that is gone has no mode, which is what makes a deletion distinguishable from an empty
-/// file. The classification itself is [`super::status_cmd::worktree_mode`]: `status` and `diff` must
+/// file. The classification itself is [`super::tree_view::worktree_mode`]: `status` and `diff` must
 /// agree on whether a file's mode changed, and two implementations would drift on the first
 /// `core.filemode` or platform-specific rule either of them learned.
 fn worktree_mode(view: &RepoView, path: &str, staged: FileMode) -> Option<FileMode> {
     let metadata = fs::symlink_metadata(view.work_root().join(path)).ok()?;
-    Some(super::status_cmd::worktree_mode(
+    Some(super::tree_view::worktree_mode(
         &metadata,
         staged,
         view.config().trust_executable_bit(),
@@ -632,7 +634,7 @@ fn resolve_tree_map(view: &RepoView, revision: &str) -> FractalResult<BTreeMap<S
     let object = view.object(&peeled)?;
     if object.kind == fg_core::models::ObjectKind::Tree {
         let mut flat = BTreeMap::new();
-        super::status_cmd::flatten_tree_for_diff(view, &peeled, "", &mut flat)?;
+        flatten_tree_for_diff(view, &peeled, "", &mut flat)?;
         return Ok(flat);
     }
     flatten_commit_tree(view, &peeled)

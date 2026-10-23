@@ -1,9 +1,9 @@
-//! Module: taxis_cmd::log_cmd — Native `log` and `show`
-//! File Path: src/bin/taxis_cmd/log_cmd.rs
+//! Module: taxis_cmd::log — Native `log` and `show`
+//! File Path: src/bin/taxis_cmd/log.rs
 //! Architecture Role: Renders commit history and single-commit inspection from the native object
 //!   store, replacing the former `git log` subprocess.
 //! Dependencies & Triggers: Dispatched by `taxis log` / `taxis show`; consumes `commit_walk` for the
-//!   DAG and `diff_cmd` for the per-commit patch.
+//!   DAG and `diff` for the per-commit patch.
 //! Responsibilities: History ordering, `--oneline` / `-<n>` / `--format` rendering, date formatting
 //!   in the recorded timezone, and `show`'s header + patch composition.
 //! Exit Semantics & Design Rationale:
@@ -24,7 +24,7 @@ use fractal_git::constants::cli::CliTag;
 
 use super::commit_walk::{walk_commits, CommitRecord};
 use super::common::{print_json, reject, CliContext};
-use super::diff_cmd;
+use super::diff;
 use super::repo_view::RepoView;
 
 /// Default number of commits `log` shows when no limit is given.
@@ -441,8 +441,8 @@ pub fn handle_show(ctx: &CliContext) {
     // A root commit has no parent, so its left side is the empty tree. Passing the commit's own
     // tree as the left side would compare the tree against itself and print nothing, which reads as
     // "this commit changed nothing" — the opposite of what a root commit did.
-    let left = parent.unwrap_or_else(|| diff_cmd::EMPTY_TREE_MARKER.to_string());
-    let outcome = diff_cmd::run_revision_diff(&view, &left, &record.oid.to_hex(), &args);
+    let left = parent.unwrap_or_else(|| diff::EMPTY_TREE_MARKER.to_string());
+    let outcome = diff::run_revision_diff(&view, &left, &record.oid.to_hex(), &args);
     match outcome {
         Ok(()) => {}
         Err(diff_err) => reject(CliTag::ERROR, diff_err),

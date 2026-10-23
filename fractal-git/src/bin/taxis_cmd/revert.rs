@@ -1,14 +1,14 @@
-//! Module: taxis_cmd::cherry_pick_cmd — Native 'cherry-pick' Command Dispatcher
-//! File Path: src/bin/taxis_cmd/cherry_pick_cmd.rs
-//! Architecture Role: Implements cherry-pick delta transplant: extracts parent-to-target tree
-//!   diff, reconciles with current HEAD via 3-way merge-ort, crafts atomic child commit
-//!   retaining original author identity, and materializes worktree and index.
-//! Dependencies & Triggers: Dispatched by `taxis cherry-pick` / `taxis cp`.
-//! Responsibilities: Validate worktree cleanliness, 3-way reconcile target delta onto HEAD,
-//!   materialize new commit, update references, and append to OperationGraph.
+//! Module: taxis_cmd::revert — Native 'revert' Command Dispatcher
+//! File Path: src/bin/taxis_cmd/revert.rs
+//! Architecture Role: Implements revert inverse delta: inverts target-to-parent tree diff,
+//!   reconciles with current HEAD via 3-way merge, crafts atomic revert commit, and
+//!   materializes worktree and index.
+//! Dependencies & Triggers: Dispatched by `taxis revert`.
+//! Responsibilities: Validate worktree cleanliness, 3-way reconcile inverse delta onto HEAD,
+//!   create revert commit, update references, and append to OperationGraph.
 //! Exit Semantics & Design Rationale:
-//!   - Fails fast if worktree is dirty.
-//!   - Retains original commit author and message, conforming to Git specification.
+//!   - Produces standard 'Revert "<summary>"' commit messages, matching Git convention.
+//!   - Atomic reference update guarantees zero half-reverted states.
 //!
 //! ### Domain Governance Rules (SSOT):
 //! - `FGT-COR-001`: Core data model and error contract guard
@@ -36,12 +36,12 @@ use super::checkout::{
 use super::commit_walk::parse_commit_record;
 use super::common::{fail_io, print_json, reject, CliContext};
 use super::repo_view::RepoView;
-use super::status_cmd::{flatten_tree_for_diff, TreeEntry};
+use super::tree_view::{flatten_tree_for_diff, TreeEntry};
 
-/// Dispatches the `cherry-pick` command.
-pub fn handle_cherry_pick(ctx: &CliContext) {
+/// Dispatches the `revert` command.
+pub fn handle_revert(ctx: &CliContext) {
     if ctx.args.is_empty() {
-        reject(CliTag::ERROR, "cherry-pick expects a commit revision to pick");
+        reject(CliTag::ERROR, "revert expects a commit revision to revert");
     }
 
     let target_rev = &ctx.args[0];
@@ -69,12 +69,12 @@ pub fn handle_cherry_pick(ctx: &CliContext) {
 
     let parent_oid = match target_record.parents.first() {
         Some(p) => *p,
-        None => reject(CliTag::ERROR, "cannot cherry-pick a root commit without parent"),
+        None => reject(CliTag::ERROR, "cannot revert a root commit without parent"),
     };
 
     let ours_commit = match view.head_commit() {
         Ok(Some(oid)) => oid,
-        _ => reject(CliTag::ERROR, "HEAD has no commit; cannot cherry-pick"),
+        _ => reject(CliTag::ERROR, "HEAD has no commit; cannot revert"),
     };
 
     let effective_branch = view
@@ -83,11 +83,12 @@ pub fn handle_cherry_pick(ctx: &CliContext) {
         .flatten()
         .map(|(branch_name, _)| branch_name);
 
-    let (_, base_tree_oid) = match view.resolve_tree(&parent_oid.to_hex()) {
+    // Invert roles: base is target, theirs is parent
+    let (_, base_tree_oid) = match view.resolve_tree(&target_oid.to_hex()) {
         Ok(res) => res,
         Err(err) => reject(CliTag::ERROR, err),
     };
-    let (_, theirs_tree_oid) = match view.resolve_tree(&target_oid.to_hex()) {
+    let (_, theirs_tree_oid) = match view.resolve_tree(&parent_oid.to_hex()) {
         Ok(res) => res,
         Err(err) => reject(CliTag::ERROR, err),
     };
@@ -115,9 +116,8 @@ pub fn handle_cherry_pick(ctx: &CliContext) {
             reject(
                 CliTag::ERROR,
                 format!(
-                    "error: could not apply {}... {}\nConflicts in: {:?}",
+                    "error: could not revert {}...\nConflicts in: {:?}",
                     &target_oid.to_hex()[..8],
-                    target_record.message.lines().next().unwrap_or(""),
                     conflicts.iter().map(|c| &c.path).collect::<Vec<_>>()
                 ),
             );
@@ -127,78 +127,72 @@ pub fn handle_cherry_pick(ctx: &CliContext) {
     let mut in_mem_index = InMemoryIndexTree::new();
     let mut new_files = BTreeMap::new();
 
-            for (path, oid) in &merged_tree {
-                let mode = theirs_files
-                    .get(path)
-                    .or_else(|| ours_files.get(path))
-                    .map(|e| e.mode)
-                    .unwrap_or(FileMode::RegularFile);
+    for (path, oid) in &merged_tree {
+        let mode = theirs_files
+            .get(path)
+            .or_else(|| ours_files.get(path))
+            .map(|e| e.mode)
+            .unwrap_or(FileMode::RegularFile);
 
-                if let Err(stage_err) = in_mem_index.stage_oid(path, mode, *oid) {
-                    reject(CliTag::ERROR, format!("stage merged file '{path}': {stage_err}"));
-                }
-                new_files.insert(path.clone(), TreeEntry { mode, oid: *oid });
-            }
+        if let Err(stage_err) = in_mem_index.stage_oid(path, mode, *oid) {
+            reject(CliTag::ERROR, format!("stage merged file '{path}': {stage_err}"));
+        }
+        new_files.insert(path.clone(), TreeEntry { mode, oid: *oid });
+    }
 
-            let odb = LooseOdb::new(view.git_dir());
-            let merged_root_tree = match in_mem_index.write_tree_with_persister(|tree| {
-                let payload = serialize_tree_payload(tree);
-                odb.write_object(OBJ_TREE, &payload)?;
-                Ok(())
-            }) {
-                Ok(oid) => oid,
-                Err(err) => fail_io("persist merged tree", err),
-            };
+    let odb = LooseOdb::new(view.git_dir());
+    let merged_root_tree = match in_mem_index.write_tree_with_persister(|tree| {
+        let payload = serialize_tree_payload(tree);
+        odb.write_object(OBJ_TREE, &payload)?;
+        Ok(())
+    }) {
+        Ok(oid) => oid,
+        Err(err) => fail_io("persist merged tree", err),
+    };
 
-            let author = GitSignature::new(
-                target_record.author_name,
-                target_record.author_mailbox,
-                target_record.author_time,
-            );
-            let committer_sec = chrono::Utc::now().timestamp();
-            let committer = GitSignature::new("Taxis Operator", "operator@taxis.internal", committer_sec);
+    let committer_sec = chrono::Utc::now().timestamp();
+    let author = GitSignature::new("Taxis Operator", "operator@taxis.internal", committer_sec);
 
-            let new_commit = GitCommit::new(
-                merged_root_tree,
-                vec![ours_commit],
-                author,
-                committer,
-                target_record.message.clone(),
-                None,
-            );
+    let first_line = target_record.message.lines().next().unwrap_or("").trim();
+    let revert_msg = format!("Revert \"{}\"\n\nThis reverts commit {}.\n", first_line, target_oid.to_hex());
 
-            let commit_payload = serialize_commit_payload(&new_commit);
-            let new_commit_oid = match odb.write_object(OBJ_COMMIT, &commit_payload) {
-                Ok(oid) => oid,
-                Err(err) => fail_io("persist cherry-pick commit", err),
-            };
+    let new_commit = GitCommit::new(
+        merged_root_tree,
+        vec![ours_commit],
+        author.clone(),
+        author,
+        revert_msg.clone(),
+        None,
+    );
 
-            remove_stale_files(view.work_root(), &ours_files, &new_files);
-            let index_entries = materialize_files(&view, &new_files);
-            update_dirc_index(view.git_dir(), &index_entries);
-            update_references(view.git_dir(), new_commit_oid, effective_branch.as_deref());
+    let commit_payload = serialize_commit_payload(&new_commit);
+    let new_commit_oid = match odb.write_object(OBJ_COMMIT, &commit_payload) {
+        Ok(oid) => oid,
+        Err(err) => fail_io("persist revert commit", err),
+    };
 
-            record_cherry_pick_op(&view, new_commit_oid, target_rev, effective_branch.as_deref());
+    remove_stale_files(view.work_root(), &ours_files, &new_files);
+    let index_entries = materialize_files(&view, &new_files);
+    update_dirc_index(view.git_dir(), &index_entries);
+    update_references(view.git_dir(), new_commit_oid, effective_branch.as_deref());
 
-            if ctx.json_mode {
-                print_json(&serde_json::json!({
-                    "engine": "taxis",
-                    "operation": "cherry-pick",
-                    "status": "clean",
-                    "picked_commit": target_oid.to_hex(),
-                    "new_commit": new_commit_oid.to_hex(),
-                }));
-            } else {
-                println!(
-                    "[{}] {}",
-                    &new_commit_oid.to_hex()[..8],
-                    target_record.message.lines().next().unwrap_or("")
-                );
-            }
+    record_revert_op(&view, new_commit_oid, target_rev, effective_branch.as_deref());
+
+    if ctx.json_mode {
+        print_json(&serde_json::json!({
+            "engine": "taxis",
+            "operation": "revert",
+            "status": "clean",
+            "reverted_commit": target_oid.to_hex(),
+            "new_commit": new_commit_oid.to_hex(),
+        }));
+    } else {
+        println!("[{}] {}", &new_commit_oid.to_hex()[..8], first_line);
+    }
 }
 
-/// Records cherry-pick operation into the OperationGraph.
-fn record_cherry_pick_op(
+/// Records revert operation into OperationGraph.
+fn record_revert_op(
     view: &RepoView,
     new_commit: Oid,
     target_rev: &str,
@@ -234,8 +228,8 @@ fn record_cherry_pick_op(
     let _ = op_graph.record_operation(
         view_snapshot,
         "operator".to_string(),
-        "cherry-pick",
-        format!("cherry-pick: {target_rev}"),
+        "revert",
+        format!("revert: {target_rev}"),
         current_time_ms,
     );
 }

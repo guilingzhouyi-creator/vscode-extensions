@@ -2,7 +2,7 @@
 //! File Path: src/bin/taxis_cmd/diff_render.rs
 //! Architecture Role: Turns a list of comparisons into the bytes `git diff` would print, in all
 //!   three output modes (`--name-only`, `--stat`, and the unified patch).
-//! Dependencies & Triggers: Called by `diff_cmd` for `taxis diff` and by `show`.
+//! Dependencies & Triggers: Called by `diff` for `taxis diff` and by `show`.
 //! Responsibilities: Emit the `diff --git` preamble, the metadata block, the `---`/`+++` pair, the
 //!   hunks, the `--stat` rows, and the JSON report.
 //! Exit Semantics & Design Rationale:
@@ -15,12 +15,14 @@
 //!     as a local preference, because the acceptance test for this module is byte equality.
 
 use fg_algorithms::{
-    text_ends_with_newline, PatchGenerator, PatchLineRef, UnifiedPatchRef, MAX_RENAME_SCORE,
+    pprint_rename, stat_graph, text_ends_with_newline, truncate_stat_name, PatchGenerator,
+    PatchLineRef, StatLayout, UnifiedPatchRef, MAX_RENAME_SCORE,
 };
 
 use super::common::print_json;
-use super::diff_cmd::{DiffRequest, DiffScope, FileComparison};
+use super::diff::{DiffRequest, DiffScope, FileComparison};
 use super::repo_view::RepoView;
+use super::tree_view::write_record;
 
 /// Label Git prints for a side that does not exist.
 const DEV_NULL: &str = "/dev/null";
@@ -47,10 +49,10 @@ pub(crate) const MAX_HEADING_LEN: usize = 80;
 /// Renders the text patch.
 pub(crate) fn report_text(request: &DiffRequest, comparisons: &[FileComparison], width: usize) {
     let mut sink = std::io::stdout();
-    let layout = StatLayout::measure(comparisons, terminal_columns());
+    let layout = measure_stat_layout(comparisons, terminal_columns());
     for comparison in comparisons {
         if request.name_only {
-            let _ = super::status_cmd::write_record(
+            let _ = write_record(
                 &mut sink,
                 comparison.path(),
                 request.nul_terminated,
@@ -70,7 +72,7 @@ pub(crate) fn report_text(request: &DiffRequest, comparisons: &[FileComparison],
             "diff --git a/{} b/{}",
             comparison.old_path, comparison.new_path
         );
-        let _ = super::status_cmd::write_record(&mut sink, &header, request.nul_terminated);
+        let _ = write_record(&mut sink, &header, request.nul_terminated);
 
         // A pure mode change has no content difference, so Git prints the metadata and stops. The
         // `index` line is part of that metadata only when the ids differ; for a mode-only change they
@@ -91,7 +93,7 @@ pub(crate) fn report_text(request: &DiffRequest, comparisons: &[FileComparison],
 
         if comparison.is_binary() {
             write_file_header(&mut sink, comparison, width, request.nul_terminated);
-            let _ = super::status_cmd::write_record(
+            let _ = write_record(
                 &mut sink,
                 &format!(
                     "Binary files {} and {} differ",
@@ -148,12 +150,12 @@ fn write_mode_only_header(
         Some(value) => format!("{:06o}", value.to_u32()),
         None => String::new(),
     };
-    let _ = super::status_cmd::write_record(
+    let _ = write_record(
         sink,
         &format!("old mode {}", render(comparison.old_mode)),
         nul_terminated,
     );
-    let _ = super::status_cmd::write_record(
+    let _ = write_record(
         sink,
         &format!("new mode {}", render(comparison.new_mode)),
         nul_terminated,
@@ -204,26 +206,26 @@ fn write_file_header(
     };
     match (&comparison.old_text, &comparison.new_text) {
         (None, Some(_)) => {
-            let _ = super::status_cmd::write_record(
+            let _ = write_record(
                 sink,
                 &format!("new file mode {}", mode_text(comparison.new_mode)),
                 nul_terminated,
             );
         }
         (Some(_), None) => {
-            let _ = super::status_cmd::write_record(
+            let _ = write_record(
                 sink,
                 &format!("deleted file mode {}", mode_text(comparison.old_mode)),
                 nul_terminated,
             );
         }
         _ if comparison.mode_changed() => {
-            let _ = super::status_cmd::write_record(
+            let _ = write_record(
                 sink,
                 &format!("old mode {}", mode_text(comparison.old_mode)),
                 nul_terminated,
             );
-            let _ = super::status_cmd::write_record(
+            let _ = write_record(
                 sink,
                 &format!("new mode {}", mode_text(comparison.new_mode)),
                 nul_terminated,
@@ -232,17 +234,17 @@ fn write_file_header(
         _ => {}
     }
     if let Some(score) = comparison.score {
-        let _ = super::status_cmd::write_record(
+        let _ = write_record(
             sink,
             &format!("similarity index {}%", score * 100 / MAX_RENAME_SCORE),
             nul_terminated,
         );
-        let _ = super::status_cmd::write_record(
+        let _ = write_record(
             sink,
             &format!("rename from {}", comparison.old_path),
             nul_terminated,
         );
-        let _ = super::status_cmd::write_record(
+        let _ = write_record(
             sink,
             &format!("rename to {}", comparison.new_path),
             nul_terminated,
@@ -251,8 +253,8 @@ fn write_file_header(
     // A side that does not exist hashes to zeros, and a side that exists but is empty hashes to the
     // empty blob. Substituting one for the other makes a creation look like an edit of an empty
     // file, which changes how a patch tool treats it.
-    let old_oid = super::diff_cmd::object_id_for(comparison.old_text.as_deref());
-    let new_oid = super::diff_cmd::object_id_for(comparison.new_text.as_deref());
+    let old_oid = super::diff::object_id_for(comparison.old_text.as_deref());
+    let new_oid = super::diff::object_id_for(comparison.new_text.as_deref());
     if old_oid == new_oid {
         return;
     }
@@ -263,7 +265,7 @@ fn write_file_header(
         },
         false => String::new(),
     };
-    let _ = super::status_cmd::write_record(
+    let _ = write_record(
         sink,
         &format!(
             "index {}..{}{shared_mode}",
@@ -293,9 +295,9 @@ fn write_path_lines(
         false => DEV_NULL.to_string(),
     };
     let _ =
-        super::status_cmd::write_record(sink, &format!("{OLD_SIDE} {old_label}"), nul_terminated);
+        write_record(sink, &format!("{OLD_SIDE} {old_label}"), nul_terminated);
     let _ =
-        super::status_cmd::write_record(sink, &format!("{NEW_SIDE} {new_label}"), nul_terminated);
+        write_record(sink, &format!("{NEW_SIDE} {new_label}"), nul_terminated);
 }
 
 /// Writes the hunks of one patch, honouring the requested context width.
@@ -343,7 +345,7 @@ fn render_patch(
             "@@ -{old_range} +{new_range} @@{}",
             heading.map(|text| format!(" {text}")).unwrap_or_default()
         );
-        let _ = super::status_cmd::write_record(sink, &header, nul_terminated);
+        let _ = write_record(sink, &header, nul_terminated);
         let mut old_cursor = hunk.old_start;
         let mut new_cursor = hunk.new_start;
         for line in &hunk.lines {
@@ -364,11 +366,11 @@ fn render_patch(
                     false,
                 ),
             };
-            let _ = super::status_cmd::write_record(sink, &rendered, nul_terminated);
+            let _ = write_record(sink, &rendered, nul_terminated);
             // A context line at the end of both files satisfies both conditions at once, and Git
             // prints the marker once. Emitting it per side would duplicate the line.
             if missing_old || missing_new {
-                let _ = super::status_cmd::write_record(sink, NO_NEWLINE_MARKER, nul_terminated);
+                let _ = write_record(sink, NO_NEWLINE_MARKER, nul_terminated);
             }
             match line {
                 PatchLineRef::Context(_) => {
@@ -519,7 +521,7 @@ fn write_stat_line(
     let name = truncate_stat_name(&stat_label(comparison), layout.name_width);
     let padding = " ".repeat(layout.name_width.saturating_sub(name.chars().count()));
     let separator = if total == 0 { "" } else { " " };
-    let _ = super::status_cmd::write_record(
+    let _ = write_record(
         sink,
         &format!(
             " {name}{padding} | {:>width$}{separator}{}",
@@ -531,62 +533,16 @@ fn write_stat_line(
     );
 }
 
-/// The column widths one `--stat` block uses, derived from every row at once.
-///
-/// Git sizes the three columns from the whole file set, not per row (`show_stats` in `diff.c`): the
-/// name column is the longest name, the number column is the width of the largest change count, and
-/// the bar is scaled against that same maximum so bars are comparable across rows. Rendering each row
-/// independently would give every line its own widths and produce a block Git never emits.
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct StatLayout {
-    /// Width of the change-count field.
-    pub(crate) number_width: usize,
-    /// Width of the bar field; a change count is scaled into it.
-    pub(crate) graph_width: usize,
-    /// Width of the path field, before truncation.
-    pub(crate) name_width: usize,
-    /// Largest change count in the block, which the bar is scaled against.
-    pub(crate) max_change: usize,
-}
-
-impl StatLayout {
-    /// Measures the widths Git's `show_stats` would choose for `comparisons`.
-    ///
-    /// The terminal is assumed to be 80 columns when `COLUMNS` is unset, which is Git's own fallback
-    /// (`diff.c`: `width = options->stat_width ? options->stat_width : 80`). The shrink rules below
-    /// are copied from the same function: the bar may take at most three eighths of the width, and
-    /// the name column absorbs the remainder.
-    pub(crate) fn measure(comparisons: &[FileComparison], columns: usize) -> Self {
-        let mut max_change = 0usize;
-        let mut max_name = 0usize;
-        for comparison in comparisons {
-            let (added, removed) = count_changes(comparison);
-            max_change = max_change.max(added + removed);
-            max_name = max_name.max(stat_label(comparison).chars().count());
-        }
-        let width = columns.max(16 + 6 + decimal_width(max_change));
-        let number_width = decimal_width(max_change);
-        let mut graph_width = max_change;
-        let mut name_width = max_name;
-        if name_width + number_width + 6 + graph_width > width {
-            let ceiling = width * 3 / 8;
-            if graph_width + number_width + 6 > ceiling {
-                graph_width = ceiling.saturating_sub(number_width + 6).max(6);
-            }
-            let remaining = width - number_width - 6;
-            if name_width > remaining.saturating_sub(graph_width) {
-                name_width = remaining.saturating_sub(graph_width);
-            } else {
-                graph_width = remaining - name_width;
-            }
-        }
-        Self {
-            number_width,
-            graph_width,
-            name_width,
-            max_change,
-        }
+/// Measures the column widths for `--stat` layout across all comparisons.
+fn measure_stat_layout(comparisons: &[FileComparison], columns: usize) -> StatLayout {
+    let mut max_change = 0usize;
+    let mut max_name = 0usize;
+    for comparison in comparisons {
+        let (added, removed) = count_changes(comparison);
+        max_change = max_change.max(added + removed);
+        max_name = max_name.max(stat_label(comparison).chars().count());
     }
+    StatLayout::measure_entries(max_change, max_name, columns)
 }
 
 /// Returns the width `--stat` should lay out against.
@@ -604,72 +560,6 @@ fn terminal_columns() -> usize {
     80
 }
 
-/// Number of decimal digits a count needs, with zero counted as one digit.
-fn decimal_width(value: usize) -> usize {
-    match value {
-        0 => 1,
-        other => (other.ilog10() as usize) + 1,
-    }
-}
-
-/// Scales a change count into the bar field, matching `scale_linear` in `diff.c`.
-///
-/// The formula is `1 + count * (width - 1) / max`, not a rounded proportion: it reserves one column
-/// so any change at all prints at least one character. A proportional split would render a
-/// one-line change in a 759-line diff as an empty bar.
-fn scale_linear(count: usize, width: usize, max_change: usize) -> usize {
-    if count == 0 || max_change == 0 {
-        return 0;
-    }
-    1 + count * (width.saturating_sub(1)) / max_change
-}
-
-/// Builds the `+`/`-` bar for one row.
-///
-/// When both sides changed, the total is scaled first and then split, so a row with one addition and
-/// one deletion still shows both characters — Git's `if (total < 2 && add && del) total = 2` guard.
-fn stat_graph(added: usize, removed: usize, layout: StatLayout) -> String {
-    if layout.graph_width > layout.max_change {
-        return format!("{}{}", "+".repeat(added), "-".repeat(removed));
-    }
-    let total = added + removed;
-    let mut scaled = scale_linear(total, layout.graph_width, layout.max_change);
-    if scaled < 2 && added > 0 && removed > 0 {
-        scaled = 2;
-    }
-    let (plus, minus) = match added < removed {
-        true => {
-            let plus = scale_linear(added, layout.graph_width, layout.max_change);
-            (plus, scaled.saturating_sub(plus))
-        }
-        false => {
-            let minus = scale_linear(removed, layout.graph_width, layout.max_change);
-            (scaled.saturating_sub(minus), minus)
-        }
-    };
-    format!("{}{}", "+".repeat(plus), "-".repeat(minus))
-}
-
-/// Shortens a name that does not fit, keeping its tail behind a `...` marker.
-///
-/// Git drops leading characters until the remainder fits and then retreats to the next `/`, so the
-/// shortened name always starts at a path component boundary. Cutting at an arbitrary offset instead
-/// yields names like `...references/praxis-client-and-diff-topology.md` — which is what Git prints,
-/// but for a different reason: it cut at a slash that happened to be there. The boundary rule is what
-/// makes the result stable when the column width changes by one.
-fn truncate_stat_name(name: &str, name_width: usize) -> String {
-    let length = name.chars().count();
-    if length <= name_width {
-        return name.to_string();
-    }
-    let keep = name_width.saturating_sub(3);
-    let trimmed: String = name.chars().skip(length - keep).collect();
-    match trimmed.find('/') {
-        Some(slash) => format!("...{}", &trimmed[slash..]),
-        None => format!("...{trimmed}"),
-    }
-}
-
 /// Renders the path column of a `--stat` row.
 ///
 /// A rename is abbreviated to its changed middle, the way Git's `pprint_rename` does: the shared
@@ -683,65 +573,6 @@ fn stat_label(comparison: &FileComparison) -> String {
         }
         _ => comparison.path().to_string(),
     }
-}
-
-/// Abbreviates a rename to `pfx{old => new}sfx`, matching Git's `pprint_rename`.
-///
-/// The prefix only counts up to a separator, and the suffix likewise, so the braces always enclose
-/// whole path components. A prefix that stopped mid-component would produce `dir{x => y}` for
-/// `dirx` and `diry`, which reads as a rename inside a directory that does not exist.
-pub(crate) fn pprint_rename(old: &str, new: &str) -> String {
-    let old_bytes = old.as_bytes();
-    let new_bytes = new.as_bytes();
-    let mut prefix = 0usize;
-    let mut cursor = 0usize;
-    while cursor < old_bytes.len()
-        && cursor < new_bytes.len()
-        && old_bytes[cursor] == new_bytes[cursor]
-    {
-        if old_bytes[cursor] == b'/' {
-            prefix = cursor + 1;
-        }
-        cursor += 1;
-    }
-    let suffix = shared_suffix_len(old_bytes, new_bytes, prefix);
-    let old_middle = old_bytes.len().saturating_sub(prefix + suffix);
-    let new_middle = new_bytes.len().saturating_sub(prefix + suffix);
-    let mut rendered = String::with_capacity(old.len() + new.len() + 7);
-    if prefix + suffix > 0 {
-        rendered.push_str(&old[..prefix]);
-        rendered.push('{');
-    }
-    rendered.push_str(&old[prefix..prefix + old_middle]);
-    rendered.push_str(" => ");
-    rendered.push_str(&new[prefix..prefix + new_middle]);
-    if prefix + suffix > 0 {
-        rendered.push('}');
-        rendered.push_str(&old[old.len() - suffix..]);
-    }
-    rendered
-}
-
-/// Returns the length of the shared path-component suffix, in bytes.
-///
-/// With a prefix, the walk is allowed to step one byte into it so both sides see the same separating
-/// slash; without one, stepping back would run off the front of the string.
-fn shared_suffix_len(old: &[u8], new: &[u8], prefix: usize) -> usize {
-    let adjust = usize::from(prefix > 0);
-    let floor = prefix.saturating_sub(adjust);
-    let mut suffix = 0usize;
-    let mut back = 0usize;
-    while floor + back < old.len() && floor + back < new.len() {
-        let byte = old[old.len() - 1 - back];
-        if byte != new[new.len() - 1 - back] {
-            break;
-        }
-        if byte == b'/' {
-            suffix = back + 1;
-        }
-        back += 1;
-    }
-    suffix
 }
 
 /// Writes the trailing summary of files and line counts.
@@ -782,7 +613,7 @@ fn write_stat_summary(
         };
         summary.push_str(&format!(", {removed} {noun}"));
     }
-    let _ = super::status_cmd::write_record(sink, &summary, nul_terminated);
+    let _ = write_record(sink, &summary, nul_terminated);
 }
 
 /// Renders the JSON form of the patch.
@@ -821,10 +652,8 @@ pub(crate) fn report_json(view: &RepoView, request: &DiffRequest, comparisons: &
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        decimal_width, heading_search_start, hunk_section_heading, pprint_rename, scale_linear,
-        truncate_stat_name, MAX_HEADING_LEN,
-    };
+    use super::{heading_search_start, hunk_section_heading, MAX_HEADING_LEN};
+    use fg_algorithms::{decimal_width, pprint_rename, scale_linear, truncate_stat_name};
 
     /// Renders the heading of the hunk that starts at 1-based line `start`, using the same
     /// arithmetic `report_text` does: `s1` is the 0-based first old line and the search begins one

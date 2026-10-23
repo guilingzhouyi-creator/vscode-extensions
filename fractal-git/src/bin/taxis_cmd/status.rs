@@ -1,5 +1,5 @@
-//! Module: taxis_cmd::status_cmd — Three-Way Status Report
-//! File Path: src/bin/taxis_cmd/status_cmd.rs
+//! Module: taxis_cmd::status — Three-Way Status Report
+//! File Path: src/bin/taxis_cmd/status.rs
 //! Architecture Role: Compares `HEAD`, the index, and the worktree, which is the definition of a
 //!   status report. Produces `--porcelain=v1 -z` output compatible with Git's.
 //! Dependencies & Triggers: Dispatched by `taxis status`; also supplies the file list `diff` walks.
@@ -159,8 +159,8 @@ impl StatusEntry {
 }
 
 pub use super::tree_view::{
-    flatten_commit_tree, flatten_tree_for_diff, mtime_matches, stat_cache_matches, worktree_mode,
-    write_record, SideBlob, TreeEntry,
+    flatten_commit_tree, mtime_matches, stat_cache_matches, worktree_mode, write_record, SideBlob,
+    TreeEntry,
 };
 
 /// Builds the complete status report for `view`.

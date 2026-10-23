@@ -3,7 +3,7 @@
 //! Architecture Role: Derives the hex width Git prints for an abbreviated object id, so `log` and
 //!   `diff` agree with `git log --abbrev-commit` and the `index` lines of `git diff` on the same
 //!   repository.
-//! Dependencies & Triggers: Called by `log_cmd` for every abbreviated id and by `diff_cmd` for the
+//! Dependencies & Triggers: Called by `log` for every abbreviated id and by `diff` for the
 //!   two ids on each `index` line.
 //! Responsibilities: Map an object count to a width using Git's own formula, and cut an id to it.
 //! Exit Semantics & Design Rationale:

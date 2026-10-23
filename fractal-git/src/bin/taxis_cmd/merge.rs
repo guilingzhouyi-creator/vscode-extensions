@@ -1,5 +1,5 @@
-//! Module: taxis_cmd::merge_cmd — Native 'merge' Command Dispatcher
-//! File Path: src/bin/taxis_cmd/merge_cmd.rs
+//! Module: taxis_cmd::merge — Native 'merge' Command Dispatcher
+//! File Path: src/bin/taxis_cmd/merge.rs
 //! Architecture Role: Full native three-way branch merge operator: DAG lowest-common-ancestor
 //!   (LCA) resolution, fast-forward detection, merge-ort 3-way tree reconciliation,
 //!   2-parent merge commit creation, conflict marker rendering, and DIRC multi-stage indexing.
@@ -20,9 +20,9 @@
 use std::collections::BTreeMap;
 use std::fs;
 
-use fg_algorithms::merge::{ConflictEntry, ThreeWayMerge, ThreeWayMergeResult};
+use fg_algorithms::merge::{ConflictEntry, TextThreeWayMerge, ThreeWayMerge, ThreeWayMergeResult};
 use fg_algorithms::traverse::DagWalker;
-use fg_core::constants::git::{OBJ_COMMIT, OBJ_TREE};
+use fg_core::constants::git::{OBJ_BLOB, OBJ_COMMIT, OBJ_TREE};
 use fg_core::models::{CorrectedCommitDate, FileMode, GitSignature, IndexStage, Oid};
 use fg_core::traits::OdbStore;
 use fg_index::{InMemoryIndexTree, IndexEntry};
@@ -39,7 +39,7 @@ use super::checkout::{
 use super::commit_walk::parse_commit_record;
 use super::common::{fail_io, print_json, reject, CliContext};
 use super::repo_view::RepoView;
-use super::status_cmd::{flatten_commit_tree, flatten_tree_for_diff, TreeEntry};
+use super::tree_view::{flatten_commit_tree, flatten_tree_for_diff, TreeEntry};
 
 /// Options for `taxis merge`.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -317,19 +317,67 @@ fn execute_three_way_merge(
             finish_clean_merge(&m_ctx, &merged_tree);
         }
         ThreeWayMergeResult::Conflicted {
-            merged_tree,
+            mut merged_tree,
             conflicts,
         } => {
-            let c_ctx = ConflictedMergeContext {
-                view,
-                opts,
-                base_files: &base_files,
-                ours_files: &ours_files,
-                theirs_files: &theirs_files,
-                theirs_commit,
-                ctx,
-            };
-            finish_conflicted_merge(&c_ctx, &merged_tree, &conflicts);
+            let mut remaining_conflicts = Vec::new();
+            let odb = LooseOdb::new(view.git_dir());
+
+            for conflict in conflicts {
+                let mut resolved = false;
+                if let (Some(ours_oid), Some(theirs_oid)) = (conflict.ours_oid, conflict.theirs_oid) {
+                    let base_payload = conflict
+                        .base_oid
+                        .and_then(|oid| view.blob_payload(&oid).ok())
+                        .unwrap_or_default();
+                    let ours_payload = view.blob_payload(&ours_oid).unwrap_or_default();
+                    let theirs_payload = view.blob_payload(&theirs_oid).unwrap_or_default();
+
+                    let merge_res = TextThreeWayMerge::merge(
+                        &base_payload,
+                        &ours_payload,
+                        &theirs_payload,
+                        "HEAD",
+                        &opts.target,
+                    );
+
+                    if merge_res.is_clean {
+                        if let Ok(new_oid) = odb.write_object(OBJ_BLOB, &merge_res.content) {
+                            merged_tree.insert(conflict.path.clone(), new_oid);
+                            resolved = true;
+                        }
+                    }
+                }
+
+                if !resolved {
+                    remaining_conflicts.push(conflict);
+                }
+            }
+
+            if remaining_conflicts.is_empty() {
+                let m_ctx = CleanMergeContext {
+                    view,
+                    opts,
+                    ours_files: &ours_files,
+                    theirs_files: &theirs_files,
+                    ours_commit,
+                    theirs_commit,
+                    branch_name,
+                    ctx,
+                };
+                finish_clean_merge(&m_ctx, &merged_tree);
+            } else {
+                let c_ctx = ConflictedMergeContext {
+                    view,
+                    opts,
+                    base_files: &base_files,
+                    ours_files: &ours_files,
+                    theirs_files: &theirs_files,
+                    theirs_commit,
+                    ctx,
+                };
+                finish_conflicted_merge(&c_ctx, &merged_tree, &remaining_conflicts);
+            }
         }
     }
 }
@@ -519,29 +567,44 @@ fn finish_conflicted_merge(
             });
         }
 
-        // Render conflict marker in working tree
+        // Render localized conflict marker in working tree
+        let base_payload = conflict
+            .base_oid
+            .and_then(|oid| c_ctx.view.blob_payload(&oid).ok())
+            .unwrap_or_default();
         let ours_payload = conflict
             .ours_oid
             .and_then(|oid| c_ctx.view.blob_payload(&oid).ok())
-            .unwrap_or_else(Vec::new);
+            .unwrap_or_default();
         let theirs_payload = conflict
             .theirs_oid
             .and_then(|oid| c_ctx.view.blob_payload(&oid).ok())
-            .unwrap_or_else(Vec::new);
+            .unwrap_or_default();
 
-        let ours_str = String::from_utf8_lossy(&ours_payload);
-        let theirs_str = String::from_utf8_lossy(&theirs_payload);
-
-        let marker_content = format!(
-            "<<<<<<< HEAD\n{}=======\n{}>>>>>>> {}\n",
-            ours_str, theirs_str, c_ctx.opts.target
-        );
+        let marker_bytes = if conflict.ours_oid.is_some() && conflict.theirs_oid.is_some() {
+            let merge_res = TextThreeWayMerge::merge(
+                &base_payload,
+                &ours_payload,
+                &theirs_payload,
+                "HEAD",
+                &c_ctx.opts.target,
+            );
+            merge_res.content
+        } else {
+            let ours_str = String::from_utf8_lossy(&ours_payload);
+            let theirs_str = String::from_utf8_lossy(&theirs_payload);
+            format!(
+                "<<<<<<< HEAD\n{}=======\n{}>>>>>>> {}\n",
+                ours_str, theirs_str, c_ctx.opts.target
+            )
+            .into_bytes()
+        };
 
         let target_path = c_ctx.view.work_root().join(&conflict.path);
         if let Some(parent) = target_path.parent() {
             let _ = fs::create_dir_all(parent);
         }
-        let _ = fs::write(target_path, marker_content);
+        let _ = fs::write(target_path, marker_bytes);
     }
 
     update_dirc_index(c_ctx.view.git_dir(), &index_entries);

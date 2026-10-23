@@ -1,5 +1,5 @@
-//! Module: taxis_cmd::rebase_cmd — Native 'rebase' Command Dispatcher
-//! File Path: src/bin/taxis_cmd/rebase_cmd.rs
+//! Module: taxis_cmd::rebase — Native 'rebase' Command Dispatcher
+//! File Path: src/bin/taxis_cmd/rebase.rs
 //! Architecture Role: Implements linear commit replay onto upstream base: DAG ancestor
 //!   filtering, sequential 3-way merge-ort tree application, new commit synthesis,
 //!   and atomic branch tip advancement.
@@ -39,7 +39,7 @@ use super::checkout::{
 use super::commit_walk::{parse_commit_record, walk_commits};
 use super::common::{fail_io, print_json, reject, CliContext};
 use super::repo_view::RepoView;
-use super::status_cmd::{flatten_commit_tree, flatten_tree_for_diff};
+use super::tree_view::{flatten_commit_tree, flatten_tree_for_diff};
 
 /// Dispatches the `rebase` command.
 pub fn handle_rebase(ctx: &CliContext) {

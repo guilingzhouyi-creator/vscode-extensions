@@ -1,5 +1,5 @@
-//! Module: taxis_cmd::tag_cmd — Native 'tag' Command Dispatcher
-//! File Path: src/bin/taxis_cmd/tag_cmd.rs
+//! Module: taxis_cmd::tag — Native 'tag' Command Dispatcher
+//! File Path: src/bin/taxis_cmd/tag.rs
 //! Architecture Role: Implements Git-compatible tag lifecycle: lightweight reference tagging,
 //!   annotated GitTag object serialization with cryptographic/author metadata, tag enumeration,
 //!   and tag deletion.

@@ -20,19 +20,24 @@ pub mod traverse;
 pub use bloom::PathBloomFilter;
 pub use cdc::{apply_edits, ChunkDescriptor, EditOp, FastCdcChunker, FastCdcIter, GEAR_TABLE};
 pub use diff::{
-    detect_renames, split_lines, text_ends_with_newline, BlobRef, ChangeKind, Compaction,
+    decimal_width, detect_renames, pprint_rename, scale_linear, shared_suffix_len, split_lines,
+    stat_graph, text_ends_with_newline, truncate_stat_name, BlobRef, ChangeKind, Compaction,
     DiffEntry, PatchGenerator, PatchHunk, PatchHunkRef, PatchLine, PatchLineRef, RenameHit, Side,
-    TreeDiff, TreeDiffState, UnifiedPatch, UnifiedPatchRef, DEFAULT_HUNK_CONTEXT,
+    StatLayout, TreeDiff, TreeDiffState, UnifiedPatch, UnifiedPatchRef, DEFAULT_HUNK_CONTEXT,
     DEFAULT_RENAME_SCORE, MAX_RENAME_SCORE,
 };
 pub use math::{compute_jeffreys_credible_lower, evaluate_score_envelope, PosteriorScoreEstimate};
 pub use merge::{
     AlgebraicMerge, CanonicalConflictEntry, CanonicalMergeResult, ConflictEntry, FastPathMerge,
-    ThreeWayMerge, ThreeWayMergeResult, VirtualMergeBaseSynthesizer,
+    TextMergeResult, TextThreeWayMerge, ThreeWayMerge, ThreeWayMergeResult,
+    VirtualMergeBaseSynthesizer,
 };
 pub use poset::CorrectedCommitDate;
 pub use synthetic::{
     generate_commit_chain, generate_diamond_dag, generate_monorepo_trees, SyntheticCommitChain,
     SyntheticDag, SyntheticMonorepo,
 };
-pub use traverse::{DagWalker, FastOidHasher, FastOidSet, SmallParentList};
+pub use traverse::{
+    commit_tree_oid, flatten_commit_tree_with, flatten_tree_with, DagWalker, FastOidHasher,
+    FastOidSet, FlattenedTreeEntry, SmallParentList,
+};

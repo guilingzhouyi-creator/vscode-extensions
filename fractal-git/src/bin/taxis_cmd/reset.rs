@@ -1,5 +1,5 @@
-//! Module: taxis_cmd::reset_cmd — Native 'reset' Command Dispatcher
-//! File Path: src/bin/taxis_cmd/reset_cmd.rs
+//! Module: taxis_cmd::reset — Native 'reset' Command Dispatcher
+//! File Path: src/bin/taxis_cmd/reset.rs
 //! Architecture Role: Implements Git-compatible reset mechanics (--soft, --mixed, --hard)
 //!   with atomic reference updates, DIRC v2 index synchronization, worktree materialization,
 //!   and OperationGraph time-travel recording.
@@ -27,7 +27,7 @@ use fractal_git::{DiskRefStore, OperationGraph, RepoViewSnapshot};
 use super::checkout::{materialize_files, remove_stale_files, update_dirc_index, update_references};
 use super::common::{print_json, reject, CliContext};
 use super::repo_view::RepoView;
-use super::status_cmd::{flatten_commit_tree, flatten_tree_for_diff, TreeEntry};
+use super::tree_view::{flatten_commit_tree, flatten_tree_for_diff, TreeEntry};
 
 /// Reset mode indicating how much state to reset.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

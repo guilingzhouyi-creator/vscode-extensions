@@ -1,5 +1,5 @@
-//! Module: taxis_cmd::stash_cmd — Native 'stash' Command Dispatcher
-//! File Path: src/bin/taxis_cmd/stash_cmd.rs
+//! Module: taxis_cmd::stash — Native 'stash' Command Dispatcher
+//! File Path: src/bin/taxis_cmd/stash.rs
 //! Architecture Role: Implements dirty state shelving: captures uncommitted working-tree
 //!   and index changes into synthetic stash commits, advances refs/stash, resets worktree
 //!   to clean HEAD, and provides pop/apply/list/drop lifecycle.
@@ -32,7 +32,8 @@ use super::checkout::{materialize_files, remove_stale_files, update_dirc_index};
 use super::commit_walk::parse_commit_record;
 use super::common::{fail_io, print_json, reject, CliContext};
 use super::repo_view::RepoView;
-use super::status_cmd::{collect_status, flatten_commit_tree, flatten_tree_for_diff};
+use super::status::collect_status;
+use super::tree_view::{flatten_commit_tree, flatten_tree_for_diff};
 
 /// Dispatches the `stash` command.
 pub fn handle_stash(ctx: &CliContext) {

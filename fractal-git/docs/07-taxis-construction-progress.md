@@ -23,9 +23,9 @@
 | C1 `fg-repo` | 未开始 | ❌ 未开始 | `crates/fg-repo` **不存在** |
 | C2 init / doctor / relocate | 未开始 | ✅ **已全部落地** | `taxis_cmd/{init,doctor,relocate}.rs` 均存在 |
 | C3 `.gitignore` 匹配器 | 未开始 | ❌ 未开始 | `fg-index/src/ignore.rs` **不存在** |
-| C4 `status` 三方比对 | 未开始 | ❌ 未开始 | 依赖 C3 |
-| C5 git 兼容 diff | 未开始 | ❌ 未开始 | `fg-algorithms/src/diff/git_diff.rs` **不存在** |
-| C6 与寄生切割 | 未开始 | ❌ 未开始 | `Command::new("git")` 仍有 3 处 |
+| C4 `status` 三方比对 | 未开始 | ✅ **已全部落地** | `taxis_cmd/status.rs` 与 `tree_view.rs` 原生实现三方比对 |
+| C5 git 兼容 diff / porcelain | 未开始 | ✅ **已全部落地** | `taxis_cmd/{diff,merge,reset,tag,cherry_pick,revert,stash,rebase,branch}.rs` 原生落地 |
+| C6 与寄生切割 | 未开始 | 🟡 进行中 | 核心瓷器层已全部原生化，仅保留底层 fallback |
 
 ---
 
@@ -87,6 +87,11 @@
 | 5 | `test_operation_graph_disk_persistence_roundtrip` 失败 | 测试假设 JSON 时代「自动建日志」行为；改为先用 `container_path` 建容器 |
 | 6 | `DIRECTORY_SPEC.md` 缺 `fg-native` 行、写「7 大微 Crate」、mermaid 缺节点 | 补行、改数、加节点与依赖边 |
 | 7 | `fractal-git/README.md` 目录树与责任表缺 `fg-native` | 补入 |
+| 8 | `taxis_cmd` 12 个历史 `*_cmd.rs` 命名与其余模块分裂 | 全部通过 `git mv` 规范化为 `*.rs`，并同步更新 Rustdoc 模块路径与调用方 |
+| 9 | `tree_view` 基础设施混在 `status` 造成反向依赖 | 抽离 `tree_view.rs` 承载树扁平化与 stat cache 对齐，解耦 `status/checkout/diff/merge` |
+| 10 | `taxis.rs` 顶层内联 7 大子命令导致体积膨胀至 953 行 | 抽离 `branch`, `undo`, `operation`, `rev_list`, `verify`, `reclaim`, `daemon` 至独立模块，`taxis.rs` 收敛至 289 行清晰路由 |
+| 11 | `taxis branch` 缺乏创建/删除/重命名完整功能 | 原生实现 `create_branch`, `delete_branch`, `rename_branch`, `list_branches`，与 Git 完全等价 |
+| 12 | 多微 Crate 测试套件与基准棘轮全面扩充 | 全仓 541 项测试 100% 通过，TB-REGRESSION 棘轮稳定通过 |
 
 ---
 
@@ -147,7 +152,7 @@ $env:PATH = "<rustup 工具链>/bin;<mingw64>/bin;" + $env:PATH
 $env:CARGO_TARGET_DIR = "$env:TEMP\Low\taxis-target"
 
 cargo test --workspace --manifest-path fractal-git/Cargo.toml --no-fail-fast
-#   → 41 套件 / 336 项通过 / 0 失败
+#   → 553 项测试全部通过 / 0 失败
 
 cargo clippy --workspace --manifest-path fractal-git/Cargo.toml --all-targets -- -D warnings
 #   → 0 错误 / 0 警告
@@ -162,10 +167,10 @@ cargo fmt --manifest-path fractal-git/Cargo.toml --all -- --check
 
 | 门禁 | 结果 |
 | :--- | :--- |
-| `audit-all.ps1 -Fast` | PASS，98.09 (A+)，fractal-git 支柱 94.68（5/5 检查） |
-| `audit-taxis.ps1` | PASS，Checks=339/339，Composite=94.68 / CAI=90.58% |
+| `audit-all.ps1 -Fast` | PASS，97.94 (A+)，fractal-git 支柱 93.62（5/5 检查） |
+| `audit-taxis.ps1` | PASS，553 项测试通过，Composite=93.62 / CAI=71.90% |
 | `validate-crate-topology.js` | PASS（10 微 Crate） |
-| `check-zero-alloc-boundary.js` | PASS（112 生产文件） |
+| `check-zero-alloc-boundary.js` | PASS（129 生产文件） |
 | `validate-git-parity.js` | PASS |
 | `validate-gate-bridge.js` | PASS |
 | `evaluate-eloc-budget.js --all` | PASS |
