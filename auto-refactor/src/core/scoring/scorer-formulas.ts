@@ -71,6 +71,19 @@ export const PROJECT_SCALE_FACTOR = 20;
 export const DEFAULT_METRIC_LINES = 50;
 /** Percentage scale used when rounding confidence to two decimals. */
 export const PERCENT_SCALE = 100;
+/** Confidence calculation scope identifiers. */
+export const CONFIDENCE_SCOPE_PROJECT = 'project';
+export const CONFIDENCE_SCOPE_FILE = 'file';
+
+const DEFAULT_FALLBACK_RULE = 'metric';
+const ATTACK_SURFACE_BASELINE_LINES = 100;
+const ATTACK_SURFACE_EXPORT_LIMIT = 30;
+const ATTACK_SURFACE_LOC_LIMIT = 500;
+const SMOOTHING_SCALE_MULTIPLIER = 100;
+const SMOOTHING_SCALE_BIAS = 25;
+const SMOOTHING_SCALE_DIVISOR = 125;
+const SCALE_FACTOR_PRECISION = 4;
+const SCALE_MODE_ABSOLUTE_STR = 'absolute';
 
 /**
  * Evaluates whether an analyzer is enabled under the given ScanConfig.
@@ -170,7 +183,11 @@ export function groupDeductionsByDimension(
         const bucket = deductionsByDimension[entry.dimension];
         const points = -entry.delta;
         bucket.points += points;
-        bucket.entries.push({ rule: entry.rule ?? 'metric', points, reason: entry.reason });
+        bucket.entries.push({
+            rule: entry.rule ?? DEFAULT_FALLBACK_RULE,
+            points,
+            reason: entry.reason,
+        });
     }
     for (const dim of ALL_QUALITY_DIMENSIONS) {
         deductionsByDimension[dim].points = linearPoints[dim];
@@ -409,9 +426,9 @@ export const SATURATION_HALFPOINT = 30;
  */
 export function computeSecurityCeiling(metric?: FileMetric | null, scaleFactor = 1): number {
     const expSymbols = metric?.exportedSymbols ?? 0;
-    const lines = metric?.nonBlankLines ?? scaleFactor * 100;
-    const expTerm = 0.6 * Math.min(1.0, expSymbols / 30);
-    const locTerm = 0.4 * Math.min(1.0, lines / 500);
+    const lines = metric?.nonBlankLines ?? scaleFactor * ATTACK_SURFACE_BASELINE_LINES;
+    const expTerm = 0.6 * Math.min(1.0, expSymbols / ATTACK_SURFACE_EXPORT_LIMIT);
+    const locTerm = 0.4 * Math.min(1.0, lines / ATTACK_SURFACE_LOC_LIMIT);
     const discount = 0.5 * (expTerm + locTerm);
     return Math.round((DIMENSION_MAX_SCORE - discount) * SCORE_ROUNDING) / SCORE_ROUNDING;
 }
@@ -445,9 +462,12 @@ export function sanitizeScaleFactor(scaleFactor: number): number {
             : 1;
     if (safeScale < 1.0) {
         // Continuous rational smoothing: safeScale in (0, 1) -> (100 * safeScale + 25) / 125 in (0.2, 1.0)
-        return +( (100 * safeScale + 25) / 125 ).toFixed(4);
+        return +(
+            (SMOOTHING_SCALE_MULTIPLIER * safeScale + SMOOTHING_SCALE_BIAS) /
+            SMOOTHING_SCALE_DIVISOR
+        ).toFixed(SCALE_FACTOR_PRECISION);
     }
-    return +safeScale.toFixed(4);
+    return +safeScale.toFixed(SCALE_FACTOR_PRECISION);
 }
 
 /**
@@ -482,7 +502,7 @@ function computeStandardDimensionScore(
     if (rawPoints <= 0) {
         return DIMENSION_MAX_SCORE;
     }
-    if (DIMENSION_SCALE_MODE[dim] === 'absolute') {
+    if (DIMENSION_SCALE_MODE[dim] === SCALE_MODE_ABSOLUTE_STR) {
         const absoluteScore = Math.max(0, DIMENSION_MAX_SCORE - rawPoints);
         return Number.isFinite(absoluteScore) ? absoluteScore : DIMENSION_MAX_SCORE;
     }

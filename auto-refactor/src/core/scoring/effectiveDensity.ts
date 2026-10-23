@@ -27,7 +27,9 @@ import {
     calculateWeightedTokenPayload,
     calculateFunctionReuseMetrics,
     calculateCompositeEffectiveDensity,
+    evaluateSpatialDensityManifold,
 } from '../intelligence/payload-density';
+import type { DensityAxis } from '../intelligence/density-vector-space';
 
 /**
  * Result of effective code density evaluation.
@@ -48,6 +50,10 @@ export interface EffectiveDensityResult {
     por?: number;
     sufr?: number;
     compositeDensity?: number;
+    spatialDensity?: number;
+    mahalanobisDistance?: number;
+    dominantDeficitAxis?: DensityAxis;
+    fisherSimplexDistance?: number;
 }
 
 /**
@@ -59,6 +65,10 @@ const TRIVIAL_FORWARD_PATTERNS: RegExp[] = [
     /^\s*def\s+\w+\([^)]*\):\s*(?:return\s+(?:self\.)?[\w.]+(?:\([^)]*\))?|pass)\s*$/,
     /^\s*func\s+\w+\([^)]*\)\s*->\s*\w+:\s*return\s+[\w.]+\s*$/,
 ];
+
+const THOUSANDTHS_ROUNDING_FACTOR = 1000;
+const HUNDREDTHS_ROUNDING_FACTOR = 100;
+const MIN_EVALUATION_LOC_THRESHOLD = 15;
 
 /**
  * Checks if a trimmed line is empty or purely a comment.
@@ -103,7 +113,7 @@ function isTrivialForwarder(line: string): boolean {
 export function calculateNoiseIndex(totalLoc: number, usefulLoc: number): number {
     const nonEloc = Math.max(0, totalLoc - usefulLoc);
     const denominator = Math.max(1, usefulLoc);
-    return Math.round((nonEloc / denominator) * 1000) / 1000;
+    return Math.round((nonEloc / denominator) * THOUSANDTHS_ROUNDING_FACTOR) / THOUSANDTHS_ROUNDING_FACTOR;
 }
 
 /**
@@ -124,7 +134,7 @@ export function calculateGaussianDensityHealth(
     const delta = noiseIndex - kappaTarget;
     const variance = 2 * sigma * sigma;
     const health = Math.exp(-(delta * delta) / variance);
-    return Math.round(health * 1000) / 1000;
+    return Math.round(health * THOUSANDTHS_ROUNDING_FACTOR) / THOUSANDTHS_ROUNDING_FACTOR;
 }
 
 const FUNCTION_KEYWORD_SET = new Set(['function', 'def', 'func', 'fn']);
@@ -224,10 +234,10 @@ export function computeEffectiveCodeDensity(
     }
 
     const usefulLoc = Math.max(0, totalLoc - Math.floor(boilerplateLoc));
-    const effectiveDensity = totalLoc > 0 ? Math.round((usefulLoc / totalLoc) * 100) / 100 : 1.0;
+    const effectiveDensity = totalLoc > 0 ? Math.round((usefulLoc / totalLoc) * HUNDREDTHS_ROUNDING_FACTOR) / HUNDREDTHS_ROUNDING_FACTOR : 1.0;
     const noiseIndex = calculateNoiseIndex(totalLoc, usefulLoc);
     const gaussianHealth = calculateGaussianDensityHealth(noiseIndex);
-    const isLowDensity = totalLoc >= 15 && effectiveDensity < 0.55;
+    const isLowDensity = totalLoc >= MIN_EVALUATION_LOC_THRESHOLD && effectiveDensity < 0.55;
 
     // Advanced token density and payload tensor integration
     const tokenStream = tokenizeCode(content, language);
@@ -239,6 +249,10 @@ export function computeEffectiveCodeDensity(
     let por = 0;
     let sufr = 0;
     let compositeDensity = 0;
+    let spatialDensity: number | undefined;
+    let mahalanobisDistance: number | undefined;
+    let dominantDeficitAxis: DensityAxis | undefined;
+    let fisherSimplexDistance: number | undefined;
 
     if (tokenCount > 0) {
         const eloc = Math.max(1, usefulLoc);
@@ -257,14 +271,22 @@ export function computeEffectiveCodeDensity(
         const entropyResult = calculateTokenShannonEntropy(tokenStream.rawTokens);
         const entropyFactor = calculateGoldilocksEntropyFactor(entropyResult.entropy);
 
-        compositeDensity = calculateCompositeEffectiveDensity({
+        const compositeInputs = {
             lineDensity: effectiveDensity,
             columnDensity,
             reuseDensity: fanIns.length > 0 ? reuseMetrics.reuseDensity : effectiveDensity,
             sharedDensity: effectiveDensity,
             payloadDensity: tspr,
             entropyFactor,
-        });
+        };
+
+        compositeDensity = calculateCompositeEffectiveDensity(compositeInputs);
+
+        const spatialEval = evaluateSpatialDensityManifold(compositeInputs);
+        spatialDensity = spatialEval.spatialCompositeDensity;
+        mahalanobisDistance = spatialEval.mahalanobisDistance;
+        dominantDeficitAxis = spatialEval.dominantDeficitAxis;
+        fisherSimplexDistance = spatialEval.fisherSimplexDistance;
     }
 
     return {
@@ -283,5 +305,9 @@ export function computeEffectiveCodeDensity(
         por,
         sufr,
         compositeDensity,
+        spatialDensity,
+        mahalanobisDistance,
+        dominantDeficitAxis,
+        fisherSimplexDistance,
     };
 }

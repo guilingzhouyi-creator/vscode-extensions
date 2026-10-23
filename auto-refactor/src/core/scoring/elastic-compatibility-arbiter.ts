@@ -47,6 +47,17 @@ export interface ElasticContext {
 export type ElasticEnvelopeType =
     'private_leaf' | 'internal_shared' | 'public_api' | 'hotpath_violation' | 'perimeter_relaxed';
 
+export const ENVELOPE_PRIVATE_LEAF: ElasticEnvelopeType = 'private_leaf';
+export const ENVELOPE_INTERNAL_SHARED: ElasticEnvelopeType = 'internal_shared';
+export const ENVELOPE_PUBLIC_API: ElasticEnvelopeType = 'public_api';
+export const ENVELOPE_HOTPATH_VIOLATION: ElasticEnvelopeType = 'hotpath_violation';
+export const ENVELOPE_PERIMETER_RELAXED: ElasticEnvelopeType = 'perimeter_relaxed';
+
+const CHAR_LOWERCASE_V = 118;
+const CHAR_UPPERCASE_V = 86;
+const PRIVATE_LEAF_MAX_FAN_IN = 1;
+const INTERNAL_SHARED_MAX_FAN_IN = 4;
+
 /**
  * Quantified arbitration verdict returned by the elastic arbiter.
  */
@@ -71,7 +82,10 @@ export interface ElasticEvaluationResult {
  */
 function parseSemVer(v: string | undefined): [number, number, number] | null {
     if (!v) return null;
-    const clean = v.charCodeAt(0) === 118 || v.charCodeAt(0) === 86 ? v.slice(1) : v;
+    const clean =
+        v.charCodeAt(0) === CHAR_LOWERCASE_V || v.charCodeAt(0) === CHAR_UPPERCASE_V
+            ? v.slice(1)
+            : v;
     const parts = clean.split('.');
     if (parts.length === 0) return null;
     const major = parseInt(parts[0], 10);
@@ -120,7 +134,7 @@ export function evaluateElasticEnvelope(context: ElasticContext): ElasticEvaluat
         return {
             severity: SEVERITY_ERROR,
             penaltyMultiplier: 2.0,
-            envelope: 'hotpath_violation',
+            envelope: ENVELOPE_HOTPATH_VIOLATION,
             rationale:
                 'Hotpath performance barrier: backward compatibility shim or fallback cascade on critical execution path is vetoed as error.',
             versionsUntilSunset: null,
@@ -128,12 +142,12 @@ export function evaluateElasticEnvelope(context: ElasticContext): ElasticEvaluat
     }
 
     // 2. Private leaf (Fan-in <= 1): absolute zero elasticity
-    if (fanIn <= 1) {
+    if (fanIn <= PRIVATE_LEAF_MAX_FAN_IN) {
         if (isPerimeter) {
             return {
                 severity: SEVERITY_WARNING,
                 penaltyMultiplier: 0.5,
-                envelope: 'perimeter_relaxed',
+                envelope: ENVELOPE_PERIMETER_RELAXED,
                 rationale:
                     'Perimeter private leaf allows transitional accommodation with softened penalty.',
                 versionsUntilSunset: null,
@@ -142,19 +156,19 @@ export function evaluateElasticEnvelope(context: ElasticContext): ElasticEvaluat
         return {
             severity: SEVERITY_ERROR,
             penaltyMultiplier: 1.0,
-            envelope: 'private_leaf',
+            envelope: ENVELOPE_PRIVATE_LEAF,
             rationale: 'Private leaf symbol with fanIn <= 1 has zero compatibility elasticity.',
             versionsUntilSunset: null,
         };
     }
 
     // 3. Internal shared (2 <= Fan-in <= 4): single version grace
-    if (fanIn <= 4) {
+    if (fanIn <= INTERNAL_SHARED_MAX_FAN_IN) {
         if (isPerimeter) {
             return {
                 severity: SEVERITY_INFO,
                 penaltyMultiplier: 0.3,
-                envelope: 'perimeter_relaxed',
+                envelope: ENVELOPE_PERIMETER_RELAXED,
                 rationale: 'Perimeter internal shared symbol grants relaxed transition tolerance.',
                 versionsUntilSunset: null,
             };
@@ -162,7 +176,7 @@ export function evaluateElasticEnvelope(context: ElasticContext): ElasticEvaluat
         return {
             severity: SEVERITY_WARNING,
             penaltyMultiplier: 0.6,
-            envelope: 'internal_shared',
+            envelope: ENVELOPE_INTERNAL_SHARED,
             rationale: 'Internal shared symbol (fanIn 2..4) grants single-version grace period.',
             versionsUntilSunset: null,
         };
@@ -177,7 +191,7 @@ export function evaluateElasticEnvelope(context: ElasticContext): ElasticEvaluat
         return {
             severity: SEVERITY_ERROR,
             penaltyMultiplier: 2.0,
-            envelope: 'public_api',
+            envelope: ENVELOPE_PUBLIC_API,
             rationale: 'Public API symbol (fanIn >= 5) lacks required sunset deprecation schedule.',
             versionsUntilSunset: null,
         };
@@ -187,7 +201,7 @@ export function evaluateElasticEnvelope(context: ElasticContext): ElasticEvaluat
         return {
             severity: SEVERITY_WARNING,
             penaltyMultiplier: 0.5,
-            envelope: 'public_api',
+            envelope: ENVELOPE_PUBLIC_API,
             rationale:
                 'Public API symbol has sunset schedule but current system version is unverified.',
             versionsUntilSunset: 1,
@@ -201,7 +215,7 @@ export function evaluateElasticEnvelope(context: ElasticContext): ElasticEvaluat
         return {
             severity: SEVERITY_ERROR,
             penaltyMultiplier: 2.0,
-            envelope: 'public_api',
+            envelope: ENVELOPE_PUBLIC_API,
             rationale: `Public API deprecation has expired past scheduled sunset version (${sunsetVersion} <= ${currentVersion}).`,
             versionsUntilSunset: dist,
         };
@@ -212,7 +226,7 @@ export function evaluateElasticEnvelope(context: ElasticContext): ElasticEvaluat
         return {
             severity: SEVERITY_INFO,
             penaltyMultiplier: isPerimeter ? 0.2 : 0.3,
-            envelope: isPerimeter ? 'perimeter_relaxed' : 'public_api',
+            envelope: isPerimeter ? ENVELOPE_PERIMETER_RELAXED : ENVELOPE_PUBLIC_API,
             rationale: `Public API deprecation is within compliant transition window (${dist} versions until sunset ${sunsetVersion}).`,
             versionsUntilSunset: dist,
         };
@@ -222,7 +236,7 @@ export function evaluateElasticEnvelope(context: ElasticContext): ElasticEvaluat
     return {
         severity: isPerimeter ? SEVERITY_INFO : SEVERITY_WARNING,
         penaltyMultiplier: isPerimeter ? 0.3 : 0.5,
-        envelope: isPerimeter ? 'perimeter_relaxed' : 'public_api',
+        envelope: isPerimeter ? ENVELOPE_PERIMETER_RELAXED : ENVELOPE_PUBLIC_API,
         rationale: `Public API deprecation is approaching sunset version (${dist} version until sunset ${sunsetVersion}).`,
         versionsUntilSunset: dist,
     };

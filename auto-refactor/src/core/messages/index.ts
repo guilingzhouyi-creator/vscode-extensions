@@ -30,3 +30,8 @@ export * from './trajectory';
 export * from './guidance';
 export * from './naming';
 export * from './exposure';
+export * from './autonomy';
+export * from './risk-fusion';
+export * from './anti-gaming';
+export * from './governance-eval';
+export * from './dual-track-test';

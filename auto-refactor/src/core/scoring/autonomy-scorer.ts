@@ -42,8 +42,8 @@ import {
 } from '../intelligence/import-profiler';
 import { inferFineGrainedFileRole } from '../intelligence/file-role-inference';
 import type { SymbolIndex, SymbolReference } from '../intelligence/symbolIndex';
-import { clampScore } from './bounded-corridor';
-import { computeExactBetaCredibleInterval } from './bayesian-beta-solver';
+import { clampScore, computeExactBetaCredibleInterval } from '../math';
+import { AutonomyGradeDescriptions } from '../messages';
 
 const SCALE_LOC_EXPONENT = 4000;
 const SCALE_FILE_EXPONENT = 8;
@@ -296,35 +296,30 @@ function resolveAutonomyGrade(score: number): {
     if (score >= GRADE_L5_THRESHOLD) {
         return {
             grade: GRADE_L5,
-            description:
-                'Extremely high autonomy: Core architecture and algorithms are entirely proprietary with minimal external SDK coupling',
+            description: AutonomyGradeDescriptions.L5_INDEPENDENT,
         };
     }
     if (score >= GRADE_L4_THRESHOLD) {
         return {
             grade: GRADE_L4,
-            description:
-                'High autonomy: Business logic and domain kernel are fully proprietary, integrating standard open-source ecosystems reasonably',
+            description: AutonomyGradeDescriptions.L4_HIGH_AUTONOMY,
         };
     }
     if (score >= GRADE_L3_THRESHOLD) {
         return {
             grade: GRADE_L3,
-            description:
-                'Balanced autonomy: Core business is proprietary with moderate collaboration with mainstream frameworks and cloud ecosystems',
+            description: AutonomyGradeDescriptions.L3_BALANCED,
         };
     }
     if (score >= GRADE_L2_THRESHOLD) {
         return {
             grade: GRADE_L2,
-            description:
-                'Framework dependent: Substantial business logic is composed as glue code around third-party external SDKs',
+            description: AutonomyGradeDescriptions.L2_FRAMEWORK_DEPENDENT,
         };
     }
     return {
         grade: GRADE_L1,
-        description:
-            'Shallow wrapper: Primarily interface passthrough and third-party implementation references with low proprietary ratio',
+        description: AutonomyGradeDescriptions.L1_SHALLOW_WRAPPER,
     };
 }
 
@@ -595,7 +590,7 @@ function synthesizeAutonomyEvaluation(
         rCritical * w.criticalPathAutonomy
     ).toFixed(2);
 
-    const boundedComposite = Math.max(0, Math.min(100, compositeScore));
+    const boundedComposite = Math.max(0, Math.min(PERCENT_FACTOR, compositeScore));
     const { grade, description } = resolveAutonomyGrade(boundedComposite);
 
     // Rigorous Bayesian Credible Interval via Jeffreys conjugate prior
@@ -802,12 +797,13 @@ function isStdlibOrReceiver(name: string, calleeReceiver?: string | null): boole
     );
 }
 
+const RECEIVER_THIS = 'this';
+const RECEIVER_SELF = 'self';
+const RECEIVER_SUPER = 'super';
+const SELF_RECEIVER_SET = new Set<string>([RECEIVER_THIS, RECEIVER_SELF, RECEIVER_SUPER]);
+
 function isSelfReceiver(calleeReceiver?: string | null): boolean {
-    return (
-        calleeReceiver === 'this' ||
-        calleeReceiver === 'self' ||
-        calleeReceiver === 'super'
-    );
+    return Boolean(calleeReceiver && SELF_RECEIVER_SET.has(calleeReceiver));
 }
 
 function resolveMatchedExtPackage(extPkgs: string[], ref: SymbolReference): string {

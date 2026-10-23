@@ -20,7 +20,8 @@ import {
 } from '../diff/constant-relocation-detector';
 
 import { evaluateEffectiveCommentDensity } from '../comments/comment-density-model';
-import { calculateShannonEntropy } from './modernization-formulas';
+import { calculateShannonEntropy } from '../math';
+import { AntiGamingMessages } from '../messages';
 import { tokenizeCode, calculateTokenShannonEntropy } from '../intelligence/token-entropy';
 
 /**
@@ -200,11 +201,11 @@ function checkArtificialSplitting(
             createGamingIssue({
                 filePath,
                 idSuffix: ID_SUFFIX_DEFAULT,
-                message:
-                    `Anti-gaming violation: detected artificial function splitting with ` +
-                    `${density.forwardingCount} trivial forwarding methods (density: ${density.effectiveDensity}).`,
-                suggestion:
-                    'Avoid mechanically chopping cohesive logic into trivial forwarding wrappers; focus on domain cohesion.',
+                message: AntiGamingMessages.ARTIFICIAL_SPLITTING_MESSAGE(
+                    density.forwardingCount,
+                    density.effectiveDensity,
+                ),
+                suggestion: AntiGamingMessages.ARTIFICIAL_SPLITTING_SUGGESTION,
                 gamingKind: GAMING_KIND_ARTIFICIAL_SPLITTING,
                 detail: {
                     forwardingCount: density.forwardingCount,
@@ -241,11 +242,8 @@ function checkTautologicalTestPadding(
             createGamingIssue({
                 filePath,
                 idSuffix: ID_SUFFIX_TAUTOLOGY,
-                message:
-                    `Anti-gaming violation: detected ${count} tautological non-verifying assertions ` +
-                    `inflating test coverage artificially.`,
-                suggestion:
-                    'Replace tautological assertions with real behavioral input/output assertions.',
+                message: AntiGamingMessages.TAUTOLOGICAL_TEST_MESSAGE(count),
+                suggestion: AntiGamingMessages.TAUTOLOGICAL_TEST_SUGGESTION,
                 gamingKind: GAMING_KIND_TAUTOLOGICAL_TEST,
                 detail: {
                     tautologyCount: count,
@@ -284,11 +282,8 @@ function checkRelocationPadding(params: RelocationPaddingParams): number {
             createGamingIssue({
                 filePath,
                 idSuffix: ID_SUFFIX_RELOCATION,
-                message:
-                    `Anti-gaming violation: detected artificial relocation padding with ` +
-                    `${analysis.relocatedCount} constants moved across lines without functional or semantic changes.`,
-                suggestion:
-                    'Do not artificially move constants to inflate diff volume; pure relocations earn zero positive quality score.',
+                message: AntiGamingMessages.RELOCATION_PADDING_MESSAGE(analysis.relocatedCount),
+                suggestion: AntiGamingMessages.RELOCATION_PADDING_SUGGESTION,
                 gamingKind: GAMING_KIND_RELOCATION_PADDING,
                 detail: {
                     relocatedCount: analysis.relocatedCount,
@@ -316,9 +311,8 @@ function checkTautologicalCommentPadding(
             createGamingIssue({
                 filePath,
                 idSuffix: ID_SUFFIX_DEFAULT,
-                message: `Detected tautological comment padding or water-logging (ECR: ${metrics.effectiveCommentRatio}).`,
-                suggestion:
-                    'Replace tautological line-by-line echoes with substantive design rationale and invariants.',
+                message: AntiGamingMessages.TAUTOLOGICAL_COMMENT_MESSAGE(metrics.effectiveCommentRatio),
+                suggestion: AntiGamingMessages.TAUTOLOGICAL_COMMENT_SUGGESTION,
                 gamingKind: GAMING_KIND_TAUTOLOGICAL_COMMENT,
                 detail: {
                     effectiveCommentRatio: metrics.effectiveCommentRatio,
@@ -357,9 +351,8 @@ function checkNamingEntropyAnomaly(
             createGamingIssue({
                 filePath,
                 idSuffix: ID_SUFFIX_DEFAULT,
-                message: `Anti-gaming violation: detected low-entropy identifier sequence (entropy: ${entropy} bits/char).`,
-                suggestion:
-                    'Use meaningful semantic domain variable names instead of synthetic sequenced identifiers.',
+                message: AntiGamingMessages.NAMING_ENTROPY_MESSAGE(entropy),
+                suggestion: AntiGamingMessages.NAMING_ENTROPY_SUGGESTION,
                 gamingKind: GAMING_KIND_NAMING_ENTROPY,
                 detail: {
                     entropy,
@@ -395,11 +388,8 @@ function checkTautologicalPadding(
             createGamingIssue({
                 filePath,
                 idSuffix: ID_SUFFIX_TAUTOLOGICAL_LOOP,
-                message:
-                    `Anti-gaming violation: detected ${count} tautological empty traversal loops ` +
-                    `inflating iteration volume without state change.`,
-                suggestion:
-                    'Remove vacuous empty traversal loops; loops must mutate domain state or execute purposeful side-effects.',
+                message: AntiGamingMessages.TAUTOLOGICAL_TRAVERSAL_MESSAGE(count),
+                suggestion: AntiGamingMessages.TAUTOLOGICAL_TRAVERSAL_SUGGESTION,
                 gamingKind: GAMING_KIND_TAUTOLOGICAL_TRAVERSAL,
                 detail: {
                     tautologicalLoopCount: count,
@@ -444,11 +434,11 @@ function checkLowEntropyTokenPadding(
             createGamingIssue({
                 filePath,
                 idSuffix: ID_SUFFIX_LOW_ENTROPY,
-                message:
-                    `Anti-gaming violation: detected low-entropy token padding in large file ` +
-                    `(${totalLines} lines, H(T) = ${entropyResult.entropy} < 2.5 bits).`,
-                suggestion:
-                    'Avoid inflating file volume with low-entropy repetitive tokens or repetitive dictionary definitions.',
+                message: AntiGamingMessages.LOW_ENTROPY_TOKEN_MESSAGE(
+                    totalLines,
+                    entropyResult.entropy,
+                ),
+                suggestion: AntiGamingMessages.LOW_ENTROPY_TOKEN_SUGGESTION,
                 gamingKind: GAMING_KIND_LOW_ENTROPY_TOKEN,
                 detail: {
                     totalLines,

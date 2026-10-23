@@ -55,7 +55,13 @@ import {
     SATURATION_HALFPOINT,
     COMPOSITE_INDEX_FLOOR,
     accumulateProjectMetrics,
+    CONFIDENCE_SCOPE_PROJECT,
 } from './scorer-formulas';
+
+const LANG_SHELL = 'shell';
+const DEFAULT_SCALE_REFERENCE_LINES = 100;
+const MAX_REPORTED_RATIONALES = 10;
+const MAX_DISPERSION_SCORE = 100;
 
 /** Files named in the skipped-file warning before the list is truncated. */
 const SKIPPED_FILE_DETAIL_LIMIT = 5;
@@ -83,7 +89,7 @@ function resolveFileLanguage(ext: string): string | null {
         ext === '.bash' ||
         ext === '.zsh'
     ) {
-        return 'shell';
+        return LANG_SHELL;
     }
     return null;
 }
@@ -157,8 +163,8 @@ export class QualityScorer {
             applyMetricDeductions(metric, applyDeduction);
         }
 
-        const lines = metric?.nonBlankLines ?? metric?.lines ?? 100;
-        const scaleFactor = Math.max(1, lines / 100);
+        const lines = metric?.nonBlankLines ?? metric?.lines ?? DEFAULT_SCALE_REFERENCE_LINES;
+        const scaleFactor = Math.max(1, lines / DEFAULT_SCALE_REFERENCE_LINES);
 
         // Snapshot the linear totals before the curve consumes them: the index curve is not
         // invertible from the index alone, so the report has to carry both.
@@ -301,7 +307,7 @@ export class QualityScorer {
         // Project scope: totalWeight is the repository's non-blank line total. Passing it
         // through the file-scoped helper capped it at 300 lines, so baseConfidence was always
         // 1.0 and the published confidence collapsed to exactly coverage.
-        const confidence = calculateConfidenceFromVolume(totalWeight, coverage, 'project');
+        const confidence = calculateConfidenceFromVolume(totalWeight, coverage, CONFIDENCE_SCOPE_PROJECT);
         const polyglotGeneralization = this.computePolyglotMetrics(fileQualityScores);
         const technicalDebt = evaluateTechnicalDebtAssessment(allIssues ?? [], totalWeight);
 
@@ -339,7 +345,7 @@ export class QualityScorer {
             deductionsByDimension,
             evaluatedBy,
             polyglotGeneralization,
-            rationales: allRationales.slice(0, 10),
+            rationales: allRationales.slice(0, MAX_REPORTED_RATIONALES),
             evaluatedAt: Date.now(),
             skippedFileWarning,
         };
@@ -375,7 +381,7 @@ export class QualityScorer {
             activeLangKeys.length;
         const standardDeviation = Math.round(Math.sqrt(variance) * SCORE_ROUNDING) / SCORE_ROUNDING;
         const dispersionPenalty =
-            Math.round(Math.max(0, 1.0 - standardDeviation / 100) * SCORE_ROUNDING) /
+            Math.round(Math.max(0, 1.0 - standardDeviation / MAX_DISPERSION_SCORE) * SCORE_ROUNDING) /
             SCORE_ROUNDING;
 
         return {

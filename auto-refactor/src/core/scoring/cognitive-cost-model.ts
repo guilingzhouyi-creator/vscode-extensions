@@ -15,6 +15,34 @@ import type { Issue } from '../types';
 import { SEVERITY_WARNING } from '../types';
 import { ANALYZER_COMPLEXITY, RULE_CPX_HOP_001 } from './dimensionLiterals';
 
+export const ROLE_BUSINESS = 'business' as const;
+export const ROLE_PARSER = 'parser' as const;
+export const ROLE_STATE_MACHINE = 'state-machine' as const;
+export const ROLE_ALGORITHM = 'algorithm' as const;
+export const ROLE_INFRASTRUCTURE = 'infrastructure' as const;
+export const ROLE_RULE = 'rule' as const;
+
+const CFNI_MAX_SCORE = 100;
+const CFNI_MIN_SCORE = 0;
+const CFNI_PENALTY_MULTIPLIER = 4;
+const CC_FACTOR_BASE = 1;
+const CC_FACTOR_SCALE = 10;
+const NESTING_BUDGET_COMPLEX = 5;
+const NESTING_BUDGET_STANDARD = 3;
+const TRIVIAL_WRAPPER_LINE_LIMIT = 4;
+const TRIVIAL_WRAPPER_LOC_THRESHOLD = 3;
+const HOP_PENALTY_PER_WRAPPER = 1.5;
+const HOP_PENALTY_PER_TRAMPOLINE = 3.0;
+const GAMING_WRAPPER_COUNT_THRESHOLD = 3;
+const MAX_SAMPLE_WRAPPER_NAMES = 4;
+const PRECISION_TWO_DECIMALS = 2;
+const DEFAULT_LOCATION_COLUMN_END = 80;
+
+const RECOMMENDATION_REJECT_GAMING =
+    'Reject superficial CC metric optimization; consolidate pass-through hops.';
+const SUGGESTION_DOMAIN_MODULARIZATION =
+    'Avoid chopping cohesive logic into paper-thin pass-through helpers; focus on domain modularization.';
+
 /**
  * Metric descriptor for a function evaluated for mechanical decomposition and control-flow nesting.
  */
@@ -33,7 +61,12 @@ export interface FunctionDecompositionMetric {
  * Context role for control-flow nesting elasticity.
  */
 export type NestingContextRole =
-    'parser' | 'state-machine' | 'algorithm' | 'infrastructure' | 'rule' | 'business';
+    | 'parser'
+    | 'state-machine'
+    | 'algorithm'
+    | 'infrastructure'
+    | 'rule'
+    | 'business';
 
 /**
  * Result of cognitive cost, CFNI, and anti-gaming evaluation.
@@ -59,25 +92,28 @@ export interface CognitiveCostEvaluation {
  */
 export function calculateControlFlowNestingIndex(
     metrics: Array<FunctionDecompositionMetric>,
-    role: NestingContextRole = 'business',
+    role: NestingContextRole = ROLE_BUSINESS,
 ): { cfni: number; nestingPenalty: number } {
     if (metrics.length === 0) {
-        return { cfni: 100, nestingPenalty: 0 };
+        return { cfni: CFNI_MAX_SCORE, nestingPenalty: 0 };
     }
 
     // Role correction factor kappa
     const kappaMap: Record<NestingContextRole, number> = {
-        parser: 0.4,
-        'state-machine': 0.4,
-        algorithm: 0.6,
-        infrastructure: 0.8,
-        rule: 1.2,
-        business: 1.2,
+        [ROLE_PARSER]: 0.4,
+        [ROLE_STATE_MACHINE]: 0.4,
+        [ROLE_ALGORITHM]: 0.6,
+        [ROLE_INFRASTRUCTURE]: 0.8,
+        [ROLE_RULE]: 1.2,
+        [ROLE_BUSINESS]: 1.2,
     };
     const kappa = kappaMap[role] ?? 1.0;
 
     // Context-aware depth budget
-    const budget = role === 'parser' || role === 'state-machine' ? 5 : 3;
+    const budget =
+        role === ROLE_PARSER || role === ROLE_STATE_MACHINE
+            ? NESTING_BUDGET_COMPLEX
+            : NESTING_BUDGET_STANDARD;
 
     let totalPenalty = 0;
     for (const fn of metrics) {
@@ -86,17 +122,20 @@ export function calculateControlFlowNestingIndex(
         if (excessDepth > 0) {
             const span = fn.nestingSpan ?? fn.loc;
             const spanRatio = fn.loc > 0 ? Math.min(1.0, span / fn.loc) : 1.0;
-            const ccFactor = 1 + (fn.cc || 1) / 10;
+            const ccFactor = CC_FACTOR_BASE + (fn.cc || CC_FACTOR_BASE) / CC_FACTOR_SCALE;
             const fnPenalty = kappa * excessDepth * spanRatio * ccFactor;
             totalPenalty += fnPenalty;
         }
     }
 
     // CFNI starts at 100, smoothly damped by total penalty
-    const cfni = Math.max(0, Math.min(100, Math.round(100 - totalPenalty * 4)));
+    const cfni = Math.max(
+        CFNI_MIN_SCORE,
+        Math.min(CFNI_MAX_SCORE, Math.round(CFNI_MAX_SCORE - totalPenalty * CFNI_PENALTY_MULTIPLIER)),
+    );
     return {
         cfni,
-        nestingPenalty: Number(totalPenalty.toFixed(2)),
+        nestingPenalty: Number(totalPenalty.toFixed(PRECISION_TWO_DECIMALS)),
     };
 }
 
@@ -112,7 +151,7 @@ export function isTrivialForwardingWrapper(content: string): boolean {
         .split('\n')
         .map((l) => l.trim())
         .filter(Boolean);
-    if (lines.length > 4) return false;
+    if (lines.length > TRIVIAL_WRAPPER_LINE_LIMIT) return false;
 
     // Pattern: return (this.)?method(args) or just (this.)?method(args)
     const forwardPattern = /^(?:return\s+)?(?:[a-zA-Z0-9_$.]+)\([^)]*\);?$/;
@@ -136,14 +175,16 @@ export function evaluateNetCognitiveCost(
 ): CognitiveCostEvaluation {
     const issues: Issue[] = [];
     const forwardingWrappers = metrics.filter(
-        (m) => m.isForwardingWrapper || (m.loc <= 3 && Boolean(m.delegatesTo)),
+        (m) =>
+            m.isForwardingWrapper ||
+            (m.loc <= TRIVIAL_WRAPPER_LOC_THRESHOLD && Boolean(m.delegatesTo)),
     );
     const wrapperCount = forwardingWrappers.length;
 
     // Call hop penalty: 1.5 cognitive units per trivial forwarding wrapper,
     // plus 3.0 units per file-level vacuous trampoline hop
-    const fileHopPenalty = fileTrampolineHops * 3.0;
-    const hopPenalty = wrapperCount * 1.5 + fileHopPenalty;
+    const fileHopPenalty = fileTrampolineHops * HOP_PENALTY_PER_TRAMPOLINE;
+    const hopPenalty = wrapperCount * HOP_PENALTY_PER_WRAPPER + fileHopPenalty;
 
     // Current maximum and total CC
     const currentMaxCC = metrics.length > 0 ? Math.max(...metrics.map((m) => m.cc)) : 0;
@@ -154,8 +195,8 @@ export function evaluateNetCognitiveCost(
 
     // Flag mechanical decomposition gaming (CPX-HOP-001)
     // Triggered if there are 3 or more trivial forwarding wrappers created
-    if (wrapperCount >= 3) {
-        const names = forwardingWrappers.map((w) => w.name).slice(0, 4);
+    if (wrapperCount >= GAMING_WRAPPER_COUNT_THRESHOLD) {
+        const names = forwardingWrappers.map((w) => w.name).slice(0, MAX_SAMPLE_WRAPPER_NAMES);
         issues.push({
             id: `complexity:${RULE_CPX_HOP_001}:${filePath}:1`,
             analyzer: ANALYZER_COMPLEXITY,
@@ -168,7 +209,7 @@ export function evaluateNetCognitiveCost(
             location: {
                 file: filePath,
                 start: { line: 1, column: 1 },
-                end: { line: 1, column: 80 },
+                end: { line: 1, column: DEFAULT_LOCATION_COLUMN_END },
             },
             detail: {
                 wrapperCount,
@@ -176,13 +217,13 @@ export function evaluateNetCognitiveCost(
                 netCognitiveGain,
                 wrapperNames: names,
             },
-            suggestion:
-                'Avoid chopping cohesive logic into paper-thin pass-through helpers; focus on domain modularization.',
+            suggestion: SUGGESTION_DOMAIN_MODULARIZATION,
         });
     }
 
     const isGaming =
-        wrapperCount >= 3 && (previousMaxCC !== undefined ? netCognitiveGain <= 0 : true);
+        wrapperCount >= GAMING_WRAPPER_COUNT_THRESHOLD &&
+        (previousMaxCC !== undefined ? netCognitiveGain <= 0 : true);
 
     const { cfni, nestingPenalty } = calculateControlFlowNestingIndex(metrics);
 
@@ -194,8 +235,6 @@ export function evaluateNetCognitiveCost(
         cfni,
         nestingPenalty,
         issues,
-        recommendation: isGaming
-            ? 'Reject superficial CC metric optimization; consolidate pass-through hops.'
-            : undefined,
+        recommendation: isGaming ? RECOMMENDATION_REJECT_GAMING : undefined,
     };
 }

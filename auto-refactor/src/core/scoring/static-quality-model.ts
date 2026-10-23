@@ -13,7 +13,7 @@
  *   2. Synthesize Q_s from fine-grained dimension indices with optional domain overrides.
  *   3. Calculate static issue risk S_i = P_i * C_i * I_i with reach-aware blast radius.
  *   4. Compute vector deltas, Euclidean distances, and cosine similarities between revisions.
- * Exit Semantics & Design Rationale: Bounded [0.0, 100.0] score space and [0.0, 1.0] confidence;
+ * Exit Semantics & Design Rationale: Bounded [-100.0, 100.0] score space and [0.0, 1.0] confidence;
  *   zero external I/O; deterministic mathematical operators with 100% explainable audit trails.
  */
 
@@ -23,8 +23,9 @@ import type { PrimaryQualityPillar } from './eightPillarModel';
 import type { IssueReach } from './riskWeightModel';
 import { mapRuleToPrimaryPillar, REACH_FACTORS } from './riskWeightModel';
 
-const SCORE_SCALE_MIN = 0.0;
-const SCORE_SCALE_MAX = 100.0;
+export const DEFAULT_STATIC_SCORE_CEILING = 100.0;
+export const DEFAULT_STATIC_SCORE_FLOOR = -DEFAULT_STATIC_SCORE_CEILING;
+
 const SCORE_ROUND_FACTOR = 100;
 const COSINE_ROUND_FACTOR = 1000;
 
@@ -298,43 +299,35 @@ export function synthesizeStaticQualityVector(
     indices: Record<QualityDimension, number>,
     overrides: Partial<Record<StaticQualityAxis, number>> = {},
 ): StaticQualityVector {
-    const architectureScore = overrides.A ?? indices.architectureConsistency;
-    const maintainabilityScore = overrides.M ?? indices.maintainability;
-    const performanceScore = overrides.P ?? indices.performanceEfficiency;
+    const sanitizeScore = (raw: number): number =>
+        Math.min(DEFAULT_STATIC_SCORE_CEILING, Math.max(DEFAULT_STATIC_SCORE_FLOOR, raw));
+
+    const architectureScore = sanitizeScore(overrides.A ?? indices.architectureConsistency);
+    const maintainabilityScore = sanitizeScore(overrides.M ?? indices.maintainability);
+    const performanceScore = sanitizeScore(overrides.P ?? indices.performanceEfficiency);
 
     // D: Data Architecture derives from axes describing data quality and purity
-    const dataArchitectureScore =
-        overrides.D ??
-        Math.min(
-            SCORE_SCALE_MAX,
-            Math.max(SCORE_SCALE_MIN, (indices.duplication + indices.semanticPurity) / DATA_AXIS_DIVISOR),
-        );
+    const dataArchitectureScore = sanitizeScore(
+        overrides.D ?? (indices.duplication + indices.semanticPurity) / DATA_AXIS_DIVISOR,
+    );
 
     // T: Test Quality maps to modernity
-    const testQualityScore = overrides.T ?? indices.modernity;
+    const testQualityScore = sanitizeScore(overrides.T ?? indices.modernity);
 
     // R: Reliability synthesizes semantic purity and tech-debt risk
-    const reliabilityScore =
-        overrides.R ??
-        Math.min(
-            SCORE_SCALE_MAX,
-            Math.max(SCORE_SCALE_MIN, (indices.semanticPurity + indices.techDebtRisk) / DATA_AXIS_DIVISOR),
-        );
+    const reliabilityScore = sanitizeScore(
+        overrides.R ?? (indices.semanticPurity + indices.techDebtRisk) / DATA_AXIS_DIVISOR,
+    );
 
     // S: Security Quality maps to codeSecurity
-    const securityScore = overrides.S ?? indices.codeSecurity;
+    const securityScore = sanitizeScore(overrides.S ?? indices.codeSecurity);
 
     // E: Extensibility synthesizes standardization, comment quality, and duplication
-    const extensibilityScore =
+    const extensibilityScore = sanitizeScore(
         overrides.E ??
-        Math.min(
-            SCORE_SCALE_MAX,
-            Math.max(
-                SCORE_SCALE_MIN,
-                (indices.standardization + indices.commentQuality + indices.duplication) /
-                    EXTENSIBILITY_AXIS_DIVISOR,
-            ),
-        );
+            (indices.standardization + indices.commentQuality + indices.duplication) /
+                EXTENSIBILITY_AXIS_DIVISOR,
+    );
 
     return {
         A: Math.round(architectureScore * SCORE_ROUND_FACTOR) / SCORE_ROUND_FACTOR,

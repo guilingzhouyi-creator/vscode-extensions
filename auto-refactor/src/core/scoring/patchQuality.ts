@@ -36,7 +36,14 @@ export type PatchQualityVerdict =
 
 const VERDICT_IMPROVED: PatchQualityVerdict = 'improved';
 const VERDICT_NEUTRAL: PatchQualityVerdict = 'neutral';
+const VERDICT_DEGRADED: PatchQualityVerdict = 'degraded';
+const VERDICT_GAMING_REJECTED: PatchQualityVerdict = 'gaming_rejected';
 const VERDICT_UNAVAILABLE: PatchQualityVerdict = 'unavailable';
+
+const PERCENT_SCALE_FACTOR = 100;
+const THOUSANDTHS_SCALE_FACTOR = 1000;
+const DEFAULT_PATCH_DOMAIN = 'core';
+const DEFAULT_PATCH_MODULE = 'root';
 
 /**
  * Parameters for patch quality evaluation.
@@ -135,16 +142,16 @@ function diffIssues(
  */
 function resolvePatchVerdict(deltaScore: number | null, gamingCount: number): PatchQualityVerdict {
     if (gamingCount > 0) {
-        return 'gaming_rejected';
+        return VERDICT_GAMING_REJECTED;
     }
     if (deltaScore === null) {
         return VERDICT_UNAVAILABLE;
     }
     if (deltaScore > 0.5) {
-        return 'improved';
+        return VERDICT_IMPROVED;
     }
     if (deltaScore < -0.5) {
-        return 'degraded';
+        return VERDICT_DEGRADED;
     }
     return VERDICT_NEUTRAL;
 }
@@ -212,7 +219,7 @@ function buildPatchExplanations(ctx: PatchExplanationContext): string[] {
 
     if (metrics.porDelta !== undefined && metrics.porDelta >= 0.25) {
         explanation.push(
-            `WARNING: Wiring code overhead increased by +${Math.round(metrics.porDelta * 100)}%; ensure new trampolines are avoided.`,
+            `WARNING: Wiring code overhead increased by +${Math.round(metrics.porDelta * PERCENT_SCALE_FACTOR)}%; ensure new trampolines are avoided.`,
         );
     }
 
@@ -270,7 +277,7 @@ function computePatchDensityMetrics(
         afterDetails.densityMetrics?.compositeDensity ?? effectiveDensityAfter,
     );
     const compositeDensityDelta =
-        Math.round((compositeDensityAfter - compositeDensityBefore) * 100) / 100;
+        Math.round((compositeDensityAfter - compositeDensityBefore) * PERCENT_SCALE_FACTOR) / PERCENT_SCALE_FACTOR;
 
     const tsprBefore = clampRatio(
         beforeDetails.densityMetrics?.tspr ?? effectiveDensityBefore,
@@ -278,7 +285,7 @@ function computePatchDensityMetrics(
     const tsprAfter = clampRatio(
         afterDetails.densityMetrics?.tspr ?? effectiveDensityAfter,
     );
-    const tsprDelta = Math.round((tsprAfter - tsprBefore) * 1000) / 1000;
+    const tsprDelta = Math.round((tsprAfter - tsprBefore) * THOUSANDTHS_SCALE_FACTOR) / THOUSANDTHS_SCALE_FACTOR;
 
     const porBefore = clampRatio(
         beforeDetails.densityMetrics?.por ?? Math.max(0, 1.0 - effectiveDensityBefore),
@@ -286,7 +293,7 @@ function computePatchDensityMetrics(
     const porAfter = clampRatio(
         afterDetails.densityMetrics?.por ?? Math.max(0, 1.0 - effectiveDensityAfter),
     );
-    const porDelta = Math.round((porAfter - porBefore) * 1000) / 1000;
+    const porDelta = Math.round((porAfter - porBefore) * THOUSANDTHS_SCALE_FACTOR) / THOUSANDTHS_SCALE_FACTOR;
 
     return {
         compositeDensityBefore,
@@ -305,7 +312,7 @@ function computePillarDeltas(
     for (const pillar of ALL_PRIMARY_PILLARS) {
         const pBefore = beforeDetails.eightPillars.pillars[pillar];
         const pAfter = afterDetails.eightPillars.pillars[pillar];
-        pillarDeltas[pillar] = Math.round((pAfter - pBefore) * 100) / 100;
+        pillarDeltas[pillar] = Math.round((pAfter - pBefore) * PERCENT_SCALE_FACTOR) / PERCENT_SCALE_FACTOR;
     }
     return pillarDeltas;
 }
@@ -317,8 +324,8 @@ export function evaluatePatchQuality(params: EvaluatePatchParams): PatchQualityR
         afterContent,
         existingIssues = [],
         newIssues = [],
-        domainName = 'core',
-        moduleName = 'root',
+        domainName = DEFAULT_PATCH_DOMAIN,
+        moduleName = DEFAULT_PATCH_MODULE,
     } = params;
 
     const beforeDetails = scoreFileQuality({
@@ -356,7 +363,7 @@ export function evaluatePatchQuality(params: EvaluatePatchParams): PatchQualityR
     // narrow analyzer selection. Subtracting it would yield NaN, and a NaN delta satisfies
     // neither `> 0.5` nor `< -0.5`, so the patch would be reported as `neutral`.
     const rawDelta = scoreDelta(beforeScore, afterScore);
-    let deltaScore = rawDelta === null ? null : Math.round(rawDelta * 100) / 100;
+    let deltaScore = rawDelta === null ? null : Math.round(rawDelta * PERCENT_SCALE_FACTOR) / PERCENT_SCALE_FACTOR;
 
     // Pure relocation debouncing: moving constants without quality improvement
     // earns 0 positive score
@@ -367,7 +374,7 @@ export function evaluatePatchQuality(params: EvaluatePatchParams): PatchQualityR
     const effectiveDensityBefore = beforeDetails.effectiveDensity;
     const effectiveDensityAfter = afterDetails.effectiveDensity;
     const effectiveDensityDelta =
-        Math.round((effectiveDensityAfter - effectiveDensityBefore) * 100) / 100;
+        Math.round((effectiveDensityAfter - effectiveDensityBefore) * PERCENT_SCALE_FACTOR) / PERCENT_SCALE_FACTOR;
 
     const patchDensity = computePatchDensityMetrics(
         beforeDetails,

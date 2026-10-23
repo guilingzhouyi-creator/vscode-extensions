@@ -16,9 +16,27 @@
 
 import type { Issue, Severity } from '../types';
 import type { PrimaryQualityPillar } from './eightPillarModel';
-import { ALL_PRIMARY_PILLARS, DIMENSION_TO_PILLAR_MAP } from './eightPillarModel';
+import { ALL_PRIMARY_PILLARS, DIMENSION_TO_PILLAR_MAP, PILLAR_MAINTAINABILITY } from './eightPillarModel';
 import type { QualityDimension } from './scoringTypes';
 import { ALL_QUALITY_DIMENSIONS } from './scoringTypes';
+
+const SEV_ERROR: Severity = 'error';
+const SEV_WARNING: Severity = 'warning';
+const SEV_INFO: Severity = 'info';
+
+const BASE_MINUTES_ERROR = 30;
+const BASE_MINUTES_WARNING = 10;
+const BASE_MINUTES_INFO = 3;
+
+const EFFORT_SEC = 45;
+const EFFORT_ARCH = 35;
+const EFFORT_CPX = 20;
+const EFFORT_PRF = 20;
+const EFFORT_SIM = 12;
+const EFFORT_MOD = 10;
+const EFFORT_GOV = 15;
+const EFFORT_HYG = 5;
+const EFFORT_NAM = 3;
 
 /**
  * Standard baseline engineering investment per Effective Line of Code (ELOC).
@@ -43,28 +61,44 @@ export const SQALE_GRADE_D_THRESHOLD = 0.50; // <= 50% debt ratio
 
 export type SqaleRating = 'A' | 'B' | 'C' | 'D' | 'E';
 
+export const SQALE_RATING_A: SqaleRating = 'A';
+export const SQALE_RATING_B: SqaleRating = 'B';
+export const SQALE_RATING_C: SqaleRating = 'C';
+export const SQALE_RATING_D: SqaleRating = 'D';
+export const SQALE_RATING_E: SqaleRating = 'E';
+
+const ERROR_EFFORT_MULTIPLIER = 1.5;
+const INFO_EFFORT_MULTIPLIER = 0.4;
+const MIN_INFO_REMEDIATION_MINUTES = 2;
+const DEFAULT_FALLBACK_REMEDIATION_MINUTES = 10;
+const HIGH_DEBT_WARNING_THRESHOLD_MINUTES = 20;
+
+const PRECISION_RATIO_DECIMALS = 4;
+const PRECISION_TIME_DECIMALS = 2;
+const MIN_SAFE_ELOC = 1;
+
 /**
  * Baseline remediation effort in minutes calibrated by issue severity.
  */
 const SEVERITY_BASE_MINUTES: Record<Severity, number> = {
-    error: 30,
-    warning: 10,
-    info: 3,
+    [SEV_ERROR]: BASE_MINUTES_ERROR,
+    [SEV_WARNING]: BASE_MINUTES_WARNING,
+    [SEV_INFO]: BASE_MINUTES_INFO,
 };
 
 /**
  * Baseline remediation effort multipliers for specific rule family prefixes.
  */
 const FAMILY_EFFORT_MINUTES: Record<string, number> = {
-    SEC: 45, // Security vulnerability, token breach, prototype pollution
-    ARCH: 35, // Structural circularity, illegal layer penetration
-    CPX: 20, // High cyclomatic complexity, excessive nesting
-    PRF: 20, // Per-frame heap allocation, blocking sync I/O
-    SIM: 12, // Tautological branches, dead assignments, redundant wrappers
-    MOD: 10, // Deprecated API access, fallback chain, modern syntax
-    GOV: 15, // Governance violations, score gaming, process breach
-    HYG: 5, // Code hygiene, whitespace, trailing blank lines
-    NAM: 3, // Identifier casing, single-letter variable names
+    SEC: EFFORT_SEC, // Security vulnerability, token breach, prototype pollution
+    ARCH: EFFORT_ARCH, // Structural circularity, illegal layer penetration
+    CPX: EFFORT_CPX, // High cyclomatic complexity, excessive nesting
+    PRF: EFFORT_PRF, // Per-frame heap allocation, blocking sync I/O
+    SIM: EFFORT_SIM, // Tautological branches, dead assignments, redundant wrappers
+    MOD: EFFORT_MOD, // Deprecated API access, fallback chain, modern syntax
+    GOV: EFFORT_GOV, // Governance violations, score gaming, process breach
+    HYG: EFFORT_HYG, // Code hygiene, whitespace, trailing blank lines
+    NAM: EFFORT_NAM, // Identifier casing, single-letter variable names
 };
 
 /**
@@ -102,27 +136,27 @@ export function resolveIssueRemediationMinutes(
     const prefixMatch = ruleId.match(/^([A-Z]{2,4})-/);
     if (prefixMatch && FAMILY_EFFORT_MINUTES[prefixMatch[1]] !== undefined) {
         const familyMinutes = FAMILY_EFFORT_MINUTES[prefixMatch[1]];
-        if (issue.severity === 'error') {
-            return Math.round(familyMinutes * 1.5);
+        if (issue.severity === SEV_ERROR) {
+            return Math.round(familyMinutes * ERROR_EFFORT_MULTIPLIER);
         }
-        if (issue.severity === 'info') {
-            return Math.max(2, Math.round(familyMinutes * 0.4));
+        if (issue.severity === SEV_INFO) {
+            return Math.max(MIN_INFO_REMEDIATION_MINUTES, Math.round(familyMinutes * INFO_EFFORT_MULTIPLIER));
         }
         return familyMinutes;
     }
 
-    return SEVERITY_BASE_MINUTES[issue.severity] ?? 10;
+    return SEVERITY_BASE_MINUTES[issue.severity] ?? DEFAULT_FALLBACK_REMEDIATION_MINUTES;
 }
 
 /**
  * Resolves SQALE letter rating from computed Technical Debt Ratio.
  */
 export function resolveSqaleGrade(tdr: number): SqaleRating {
-    if (!Number.isFinite(tdr) || tdr <= SQALE_GRADE_A_THRESHOLD) return 'A';
-    if (tdr <= SQALE_GRADE_B_THRESHOLD) return 'B';
-    if (tdr <= SQALE_GRADE_C_THRESHOLD) return 'C';
-    if (tdr <= SQALE_GRADE_D_THRESHOLD) return 'D';
-    return 'E';
+    if (!Number.isFinite(tdr) || tdr <= SQALE_GRADE_A_THRESHOLD) return SQALE_RATING_A;
+    if (tdr <= SQALE_GRADE_B_THRESHOLD) return SQALE_RATING_B;
+    if (tdr <= SQALE_GRADE_C_THRESHOLD) return SQALE_RATING_C;
+    if (tdr <= SQALE_GRADE_D_THRESHOLD) return SQALE_RATING_D;
+    return SQALE_RATING_E;
 }
 
 function initializePillarEffort(): Record<PrimaryQualityPillar, number> {
@@ -162,7 +196,7 @@ function resolveTargetPillar(ruleId: string, analyzer?: string): PrimaryQualityP
             return mapped;
         }
     }
-    return 'maintainability';
+    return PILLAR_MAINTAINABILITY;
 }
 
 function accumulateSeverityDebt(
@@ -170,15 +204,15 @@ function accumulateSeverityDebt(
     minutes: number,
     effortBySeverity: Record<Severity, number>,
 ): number {
-    if (severity === 'error') {
-        effortBySeverity.error += minutes;
+    if (severity === SEV_ERROR) {
+        effortBySeverity[SEV_ERROR] += minutes;
         return minutes;
     }
-    if (severity === 'warning') {
-        effortBySeverity.warning += minutes;
-        return minutes >= 20 ? minutes : 0;
+    if (severity === SEV_WARNING) {
+        effortBySeverity[SEV_WARNING] += minutes;
+        return minutes >= HIGH_DEBT_WARNING_THRESHOLD_MINUTES ? minutes : 0;
     }
-    effortBySeverity.info += minutes;
+    effortBySeverity[SEV_INFO] += minutes;
     return 0;
 }
 
@@ -218,12 +252,18 @@ export function evaluateTechnicalDebtAssessment(
         effortByPillar[targetPillar] += minutes;
     }
 
-    const safeEloc = Math.max(1, Math.round(eloc));
+    const safeEloc = Math.max(MIN_SAFE_ELOC, Math.round(eloc));
     const developmentCostMinutes = safeEloc * devMinutesPerEloc;
-    const technicalDebtRatio = +(totalRemediationMinutes / developmentCostMinutes).toFixed(4);
+    const technicalDebtRatio = +(totalRemediationMinutes / developmentCostMinutes).toFixed(
+        PRECISION_RATIO_DECIMALS,
+    );
     const sqaleGrade = resolveSqaleGrade(technicalDebtRatio);
-    const totalRemediationHours = +(totalRemediationMinutes / MINUTES_PER_HOUR).toFixed(2);
-    const totalRemediationDays = +(totalRemediationHours / WORK_HOURS_PER_DAY).toFixed(2);
+    const totalRemediationHours = +(totalRemediationMinutes / MINUTES_PER_HOUR).toFixed(
+        PRECISION_TIME_DECIMALS,
+    );
+    const totalRemediationDays = +(totalRemediationHours / WORK_HOURS_PER_DAY).toFixed(
+        PRECISION_TIME_DECIMALS,
+    );
 
     return {
         totalRemediationMinutes,

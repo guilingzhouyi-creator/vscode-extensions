@@ -180,15 +180,24 @@ export interface RiskPenaltyResult {
     fatalIssueCount: number;
 }
 
+const DIM_ARCHITECTURE_CONSISTENCY: QualityDimension = 'architectureConsistency';
+const DIM_MAINTAINABILITY: QualityDimension = 'maintainability';
+const DIM_PERFORMANCE_EFFICIENCY: QualityDimension = 'performanceEfficiency';
+const DIM_MODERNITY: QualityDimension = 'modernity';
+const DIM_SEMANTIC_PURITY: QualityDimension = 'semanticPurity';
+const DIM_CODE_SECURITY: QualityDimension = 'codeSecurity';
+const DIM_STANDARDIZATION: QualityDimension = 'standardization';
+const DIM_TECH_DEBT_RISK: QualityDimension = 'techDebtRisk';
+
 const PILLAR_TO_DIMENSION_MAP: Record<PrimaryQualityPillar, QualityDimension> = {
-    architecture: 'architectureConsistency',
-    maintainability: 'maintainability',
-    performance: 'performanceEfficiency',
-    data: 'performanceEfficiency',
-    testing: 'modernity',
-    reliability: 'semanticPurity',
-    security: 'codeSecurity',
-    extensibility: 'standardization',
+    architecture: DIM_ARCHITECTURE_CONSISTENCY,
+    maintainability: DIM_MAINTAINABILITY,
+    performance: DIM_PERFORMANCE_EFFICIENCY,
+    data: DIM_PERFORMANCE_EFFICIENCY,
+    testing: DIM_MODERNITY,
+    reliability: DIM_SEMANTIC_PURITY,
+    security: DIM_CODE_SECURITY,
+    extensibility: DIM_STANDARDIZATION,
 };
 
 /**
@@ -295,7 +304,7 @@ function applyTechDebtPenetration(
     effectivePenalty: number,
     dim: QualityDimension,
 ): void {
-    if (dim === 'techDebtRisk') return;
+    if (dim === DIM_TECH_DEBT_RISK) return;
 
     const ruleNorm = (issue.rule ?? '').toUpperCase();
     const analyzerNorm = (issue.analyzer ?? '').toLowerCase();
@@ -360,7 +369,7 @@ export function computeRiskWeightedPenalties(issues: Issue[]): RiskPenaltyResult
         const dim =
             familyDimensionOf(issue.rule) ||
             PILLAR_TO_DIMENSION_MAP[result.assessment.affectedPillar] ||
-            'maintainability';
+            DIM_MAINTAINABILITY;
         dimensionPenalties[dim] += effectivePenalty;
 
         applyTechDebtPenetration(dimensionPenalties, issue, effectivePenalty, dim);

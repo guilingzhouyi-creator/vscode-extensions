@@ -68,8 +68,14 @@ export interface UnifiedQualityAssessment {
     explanation: string;
 }
 
+export const DOMAIN_CORE_FRAMEWORK = 'core_framework';
+export const STAGE_PRODUCTION = 'production';
+const PERCENT_ROUND_FACTOR = 100;
+const MAX_SCORE_CEILING = 100.0;
+const LABEL_UNOBSERVED = 'unobserved';
+
 const DOMAIN_WEIGHT_MAP: Readonly<Record<string, readonly [number, number, number]>> = Object.freeze({
-    core_framework: [0.55, 0.3, 0.15],
+    [DOMAIN_CORE_FRAMEWORK]: [0.55, 0.3, 0.15],
     algorithm_lib: [0.35, 0.5, 0.15],
     business_app: [0.4, 0.35, 0.25],
     cli_tool: [0.6, 0.25, 0.15],
@@ -114,8 +120,8 @@ export function resolveAdaptiveFusionWeights(
         return { Ws: 1.0, Wd: 0.0, Wf: 0.0 };
     }
 
-    const domain = profile.domain ?? 'core_framework';
-    const stage = profile.stage ?? 'production';
+    const domain = profile.domain ?? DOMAIN_CORE_FRAMEWORK;
+    const stage = profile.stage ?? STAGE_PRODUCTION;
     const [rawWs, rawWd, rawWf] = resolveRawTriplaneWeights(domain, stage);
 
     const effectiveWs = rawWs;
@@ -128,9 +134,9 @@ export function resolveAdaptiveFusionWeights(
     }
 
     return {
-        Ws: Math.round((effectiveWs / sum) * 100) / 100,
-        Wd: Math.round((effectiveWd / sum) * 100) / 100,
-        Wf: Math.round((effectiveWf / sum) * 100) / 100,
+        Ws: Math.round((effectiveWs / sum) * PERCENT_ROUND_FACTOR) / PERCENT_ROUND_FACTOR,
+        Wd: Math.round((effectiveWd / sum) * PERCENT_ROUND_FACTOR) / PERCENT_ROUND_FACTOR,
+        Wf: Math.round((effectiveWf / sum) * PERCENT_ROUND_FACTOR) / PERCENT_ROUND_FACTOR,
     };
 }
 
@@ -159,7 +165,7 @@ export function computeUnifiedQualityScore(
 
     const staticScore = computeStaticQualityScore(staticVector);
     const dynamicScore = hasDynamic ? computeDynamicQualityScore(dynamicVector!) : staticScore;
-    const feedbackScore = hasHistorical ? Math.max(0.0, Math.min(100.0, historicalScore!)) : staticScore;
+    const feedbackScore = hasHistorical ? Math.max(0.0, Math.min(MAX_SCORE_CEILING, historicalScore!)) : staticScore;
 
     const totalRaw =
         weights.Ws * staticScore +
@@ -168,11 +174,11 @@ export function computeUnifiedQualityScore(
 
     const totalScore = Math.round(totalRaw * SCORE_ROUNDING) / SCORE_ROUNDING;
 
-    const dynLabel = hasDynamic ? `${dynamicScore} (${(weights.Wd * 100).toFixed(0)}%)` : 'unobserved';
-    const histLabel = hasHistorical ? `${feedbackScore} (${(weights.Wf * 100).toFixed(0)}%)` : 'unobserved';
+    const dynLabel = hasDynamic ? `${dynamicScore} (${(weights.Wd * PERCENT_ROUND_FACTOR).toFixed(0)}%)` : LABEL_UNOBSERVED;
+    const histLabel = hasHistorical ? `${feedbackScore} (${(weights.Wf * PERCENT_ROUND_FACTOR).toFixed(0)}%)` : LABEL_UNOBSERVED;
     const explanation =
         `Unified quality synthesized: Q_total=${totalScore} ` +
-        `[Static (${(weights.Ws * 100).toFixed(0)}%): ${staticScore}, ` +
+        `[Static (${(weights.Ws * PERCENT_ROUND_FACTOR).toFixed(0)}%): ${staticScore}, ` +
         `Dynamic: ${dynLabel}, ` +
         `Feedback: ${histLabel}]`;
 

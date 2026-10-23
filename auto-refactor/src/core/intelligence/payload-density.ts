@@ -15,6 +15,22 @@
  */
 
 import type { ClassifiedToken } from './token-entropy';
+export {
+    evaluateSpatialDensityManifold,
+    calculateSpatialEffectiveDensity,
+    computeMahalanobisDistance,
+    computeWhitenedCoordinates,
+    computeFisherSimplexDistance,
+    computeRefactoringGradient,
+    logitTransform,
+    inverseLogit,
+} from './density-vector-space';
+export type {
+    DensityAxis,
+    DensityVector5D,
+    SpatialDensityEvaluation,
+    SimplexPoint2D,
+} from './density-vector-space';
 
 /**
  * Weighted token semantic payload ratio (TSPR) and plumbing overhead ratio (POR).

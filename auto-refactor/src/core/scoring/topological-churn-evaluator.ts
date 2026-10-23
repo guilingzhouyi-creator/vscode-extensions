@@ -16,6 +16,41 @@
 
 import type { GitFileHistoryProfile } from '../evolution/git-history-miner';
 
+export const DEFAULT_ALPHA_CHURN = 0.5;
+export const DEFAULT_MU_CHURN = 4.0;
+export const DEFAULT_MAX_FAN_IN_MULTIPLIER = 6.0;
+export const DEFAULT_FROZEN_THRESHOLD_DAYS = 180;
+
+const MS_PER_SECOND = 1000;
+const SECONDS_PER_MINUTE = 60;
+const MINUTES_PER_HOUR = 60;
+const HOURS_PER_DAY = 24;
+const MS_PER_DAY = HOURS_PER_DAY * MINUTES_PER_HOUR * SECONDS_PER_MINUTE * MS_PER_SECOND;
+const CHURN_WINDOW_DAYS = 30;
+
+const FROZEN_LEGACY_MAX_FAN_IN = 2;
+const FROZEN_BASELINE_RELAXATION = 0.6;
+const NEUTRAL_CHURN_MULTIPLIER = 1.0;
+const MIN_COMBINED_IMPACT = 0.5;
+const MAX_COMBINED_IMPACT = 8.0;
+
+const HIGH_CENTRALITY_FAN_IN_THRESHOLD = 15;
+const HIGH_CENTRALITY_CHURN_THRESHOLD = 3;
+const ISOLATE_CHURN_COMMIT_THRESHOLD = 6;
+
+const HOTSPOT_RED_IMPACT_THRESHOLD = 2.5;
+const HOTSPOT_RED_FAN_IN_THRESHOLD = 10;
+const HOTSPOT_RED_CHURN_THRESHOLD = 3;
+const HOTSPOT_YELLOW_IMPACT_THRESHOLD = 1.5;
+const HOTSPOT_YELLOW_CHURN_THRESHOLD = 2;
+
+export const HOTSPOT_CATEGORY_RED = 'red';
+export const HOTSPOT_CATEGORY_YELLOW = 'yellow';
+export const HOTSPOT_CATEGORY_GREEN = 'green';
+
+export const ACTION_HIGH_CENTRALITY_GUARD = 'high_centrality_refactor_guard';
+export const ACTION_ISOLATE_CHURN_HOTSPOT = 'isolate_churn_hotspot';
+
 /**
  * Configuration parameters governing topological churn scoring and fan-in amplification.
  */
@@ -56,10 +91,10 @@ export class TopologicalChurnEvaluator {
     private readonly nowTimestamp: number;
 
     constructor(options?: TopologicalChurnOptions) {
-        this.alphaChurn = options?.alphaChurn ?? 0.5;
-        this.muChurn = options?.muChurn ?? 4.0;
-        this.maxFanInMultiplier = options?.maxFanInMultiplier ?? 6.0;
-        this.frozenThresholdDays = options?.frozenThresholdDays ?? 180;
+        this.alphaChurn = options?.alphaChurn ?? DEFAULT_ALPHA_CHURN;
+        this.muChurn = options?.muChurn ?? DEFAULT_MU_CHURN;
+        this.maxFanInMultiplier = options?.maxFanInMultiplier ?? DEFAULT_MAX_FAN_IN_MULTIPLIER;
+        this.frozenThresholdDays = options?.frozenThresholdDays ?? DEFAULT_FROZEN_THRESHOLD_DAYS;
         this.nowTimestamp = options?.nowTimestamp ?? Date.now();
     }
 
@@ -76,8 +111,8 @@ export class TopologicalChurnEvaluator {
             return { churn30dCommits: 0, isFrozenLegacy: false };
         }
 
-        const thirtyDaysAgo = this.nowTimestamp - 30 * 24 * 3600 * 1000;
-        const frozenThresholdAgo = this.nowTimestamp - this.frozenThresholdDays * 24 * 3600 * 1000;
+        const thirtyDaysAgo = this.nowTimestamp - CHURN_WINDOW_DAYS * MS_PER_DAY;
+        const frozenThresholdAgo = this.nowTimestamp - this.frozenThresholdDays * MS_PER_DAY;
 
         let churn30dCommits = 0;
         for (const commit of history.recentCommits) {
@@ -89,25 +124,25 @@ export class TopologicalChurnEvaluator {
         const isFrozenLegacy =
             history.lastModifiedTimestamp !== null &&
             history.lastModifiedTimestamp < frozenThresholdAgo &&
-            safeFanIn <= 2;
+            safeFanIn <= FROZEN_LEGACY_MAX_FAN_IN;
 
         return { churn30dCommits, isFrozenLegacy };
     }
 
     private calculateChurnMultiplier(churn30dCommits: number, isFrozenLegacy: boolean): number {
         if (isFrozenLegacy) {
-            return 0.6; // Inactive dormant baseline relaxation
+            return FROZEN_BASELINE_RELAXATION; // Inactive dormant baseline relaxation
         }
         if (churn30dCommits > 0) {
             const normalizedChurn = churn30dCommits / this.muChurn;
             return +(1.0 + this.alphaChurn * Math.tanh(normalizedChurn)).toFixed(2);
         }
-        return 1.0;
+        return NEUTRAL_CHURN_MULTIPLIER;
     }
 
     private calculateCombinedImpact(fanInMultiplier: number, churnMultiplier: number): number {
         const impactMultiplier = +(fanInMultiplier * churnMultiplier).toFixed(2);
-        return Math.max(0.5, Math.min(8.0, impactMultiplier));
+        return Math.max(MIN_COMBINED_IMPACT, Math.min(MAX_COMBINED_IMPACT, impactMultiplier));
     }
 
     private resolveProposal(
@@ -116,18 +151,21 @@ export class TopologicalChurnEvaluator {
         churn30dCommits: number,
         impactMultiplier: number,
     ): TopologicalChurnResult['actionableProposal'] {
-        if (safeFanIn >= 15 && churn30dCommits >= 3) {
+        if (
+            safeFanIn >= HIGH_CENTRALITY_FAN_IN_THRESHOLD &&
+            churn30dCommits >= HIGH_CENTRALITY_CHURN_THRESHOLD
+        ) {
             return {
-                action: 'high_centrality_refactor_guard',
+                action: ACTION_HIGH_CENTRALITY_GUARD,
                 rationale:
                     `High-centrality module '${filePath}' has ${safeFanIn} incoming dependencies ` +
                     `and active 30-day churn (${churn30dCommits} commits). Impact amplifier is ${impactMultiplier}x. ` +
                     `Enforce strict interface contracts before refactoring.`,
             };
         }
-        if (churn30dCommits >= 6) {
+        if (churn30dCommits >= ISOLATE_CHURN_COMMIT_THRESHOLD) {
             return {
-                action: 'isolate_churn_hotspot',
+                action: ACTION_ISOLATE_CHURN_HOTSPOT,
                 rationale:
                     `High temporal churn (${churn30dCommits} commits in 30 days) on '${filePath}'. ` +
                     `Consider decoupling volatile subroutines to stabilize core logic.`,
@@ -189,9 +227,20 @@ export class TopologicalChurnEvaluator {
         churn30dCommits: number,
         isFrozen: boolean,
     ): 'red' | 'yellow' | 'green' {
-        if (isFrozen) return 'green';
-        if (impactMultiplier >= 2.5 || (safeFanIn >= 10 && churn30dCommits >= 3)) return 'red';
-        if (impactMultiplier >= 1.5 || churn30dCommits >= 2) return 'yellow';
-        return 'green';
+        if (isFrozen) return HOTSPOT_CATEGORY_GREEN;
+        if (
+            impactMultiplier >= HOTSPOT_RED_IMPACT_THRESHOLD ||
+            (safeFanIn >= HOTSPOT_RED_FAN_IN_THRESHOLD &&
+                churn30dCommits >= HOTSPOT_RED_CHURN_THRESHOLD)
+        ) {
+            return HOTSPOT_CATEGORY_RED;
+        }
+        if (
+            impactMultiplier >= HOTSPOT_YELLOW_IMPACT_THRESHOLD ||
+            churn30dCommits >= HOTSPOT_YELLOW_CHURN_THRESHOLD
+        ) {
+            return HOTSPOT_CATEGORY_YELLOW;
+        }
+        return HOTSPOT_CATEGORY_GREEN;
     }
 }

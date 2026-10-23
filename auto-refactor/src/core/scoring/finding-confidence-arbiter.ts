@@ -155,6 +155,21 @@ export type RuleLifecycleState =
     | 'quarantined'
     | 'deprecated';
 
+export const LIFECYCLE_ACTIVE: RuleLifecycleState = 'active';
+export const LIFECYCLE_CANARY: RuleLifecycleState = 'canary';
+export const LIFECYCLE_EXPERIMENTAL: RuleLifecycleState = 'experimental';
+export const LIFECYCLE_QUARANTINED: RuleLifecycleState = 'quarantined';
+export const LIFECYCLE_DEPRECATED: RuleLifecycleState = 'deprecated';
+
+const RULE_PREFIX_SEC = 'SEC-';
+const RULE_PREFIX_SYN = 'SYN-';
+const RULE_PREFIX_PARSER = 'PARSER-';
+const RULE_PREFIX_CPX = 'CPX-';
+const RULE_HIGH_COMPLEXITY = 'high-complexity';
+const RULE_ARCH_LEAK_002 = 'ARCH-LEAK-002';
+const RULE_SEC_LEAK_001 = 'SEC-LEAK-001';
+const SEVERITY_ERROR_STR = 'error';
+
 /**
  * Line range span for differential slice tracking.
  */
@@ -263,17 +278,17 @@ function normalizePath(rawPath: string): string {
 }
 
 function isSecretLeakMatch(issue: Issue): boolean {
-    if (issue.rule === 'ARCH-LEAK-002' || issue.rule === 'SEC-LEAK-001') {
+    if (issue.rule === RULE_ARCH_LEAK_002 || issue.rule === RULE_SEC_LEAK_001) {
         return true;
     }
-    if (issue.rule.startsWith('SEC-') && issue.severity === 'error') {
+    if (issue.rule.startsWith(RULE_PREFIX_SEC) && issue.severity === SEVERITY_ERROR_STR) {
         return true;
     }
     return SECRET_KEYWORD_PATTERN.test(issue.rule) || SECRET_KEYWORD_PATTERN.test(issue.message);
 }
 
 function isSyntaxOrParserMatch(issue: Issue): boolean {
-    if (issue.rule.startsWith('SYN-') || issue.rule.startsWith('PARSER-')) {
+    if (issue.rule.startsWith(RULE_PREFIX_SYN) || issue.rule.startsWith(RULE_PREFIX_PARSER)) {
         return true;
     }
     return (
@@ -288,8 +303,8 @@ function evaluateComplexityMatch(
     threshold: number,
 ): { isMatch: boolean; rationale: string } {
     const isComplexityRule =
-        issue.rule === 'high-complexity' ||
-        issue.rule.startsWith('CPX-') ||
+        issue.rule === RULE_HIGH_COMPLEXITY ||
+        issue.rule.startsWith(RULE_PREFIX_CPX) ||
         COMPLEXITY_KEYWORD_PATTERN.test(issue.rule);
 
     if (!isComplexityRule) {
@@ -310,7 +325,7 @@ function evaluateComplexityMatch(
         };
     }
 
-    if (issue.rule === 'high-complexity' || issue.severity === 'error') {
+    if (issue.rule === RULE_HIGH_COMPLEXITY || issue.severity === SEVERITY_ERROR_STR) {
         return {
             isMatch: true,
             rationale: `Hard complexity violation: ${issue.rule}`,
@@ -340,7 +355,7 @@ function evaluatePrescriptiveMatch(
         };
     }
 
-    if (issue.severity === 'error' && issue.evidence?.confidence === 1.0) {
+    if (issue.severity === SEVERITY_ERROR_STR && issue.evidence?.confidence === 1.0) {
         return {
             isMatch: true,
             rationale: 'Strict static error with verified confidence 1.0',
@@ -594,7 +609,7 @@ function applyRuleLifecyclePolicy(
     rationale: string;
     isQuarantined: boolean;
 } {
-    if (lifecycleState === 'quarantined') {
+    if (lifecycleState === LIFECYCLE_QUARANTINED) {
         const tier = patch ? TIER_ACTIONABLE : TIER_ADVISORY;
         const confidence = patch ? actionableFloor : advisoryDefault;
         return {
@@ -606,7 +621,7 @@ function applyRuleLifecyclePolicy(
         };
     }
 
-    if (lifecycleState === 'deprecated') {
+    if (lifecycleState === LIFECYCLE_DEPRECATED) {
         return {
             tier: TIER_ADVISORY,
             confidence: advisoryDefault,
@@ -616,7 +631,7 @@ function applyRuleLifecyclePolicy(
         };
     }
 
-    if (lifecycleState === 'canary' || lifecycleState === 'experimental') {
+    if (lifecycleState === LIFECYCLE_CANARY || lifecycleState === LIFECYCLE_EXPERIMENTAL) {
         const tier = patch ? TIER_ACTIONABLE : TIER_ADVISORY;
         const confidence = patch ? actionableFloor : advisoryDefault;
         return {
@@ -959,7 +974,7 @@ export class FindingConfidenceArbiter {
         );
 
         const lifecycleState: RuleLifecycleState =
-            this.ruleLifecycleMap?.get(issue.rule) || 'active';
+            this.ruleLifecycleMap?.get(issue.rule) || LIFECYCLE_ACTIVE;
 
         const policy = suppression.isExpired
             ? resolveExpiredSuppressionPolicy(issue, suppression)

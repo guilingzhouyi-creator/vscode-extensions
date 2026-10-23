@@ -20,6 +20,7 @@ import type { IntraFileZoneProfile, SemanticZoneSegment } from '../intelligence/
 import { ZONE_EMBEDDED_TEST } from '../intelligence/zone-partitioner';
 import { isToolOrTestScript } from '../governance/pathScope';
 import { RULE_TST_TOP_001 } from './dimensionLiterals';
+import { DualTrackTestMessages } from '../messages';
 
 /** Categorization of code files into testing topology tracks. */
 export type TestingTrack = 'EXPLICIT_TEST_FILE' | 'EMBEDDED_TEST_ZONE' | 'PRODUCTION_CODE';
@@ -41,6 +42,7 @@ const REASON_MISSING_INTENT = 'missing_agent_readable_intent';
 const ACTION_EXTRACT_TEST_SUITE = 'extract_test_suite';
 const ACTION_RELOCATE_TEST_ZONE = 'relocate_test_zone';
 const ACTION_ANNOTATE_INTENT = 'annotate_test_intent';
+const REGEX_PLACEHOLDER_TOKEN = '$1RE';
 
 const CHAR_CODE_LF = 10;
 const PERFECT_SCORE = 100;
@@ -88,7 +90,7 @@ function stripNonExecutableText(line: string): string {
         .replace(/'(?:\\.|[^'\\])*'/g, "''")
         .replace(/"(?:\\.|[^"\\])*"/g, '""')
         .replace(/`(?:\\.|[^`\\])*`/g, '``')
-        .replace(/(^|[(,=:[!&|?{};\s])\/(?![*/])(?:\\.|\[(?:\\.|[^\]\\])*\]|[^/\\\n])+\/[gimsuy]*/g, '$1RE')
+        .replace(/(^|[(,=:[!&|?{};\s])\/(?![*/])(?:\\.|\[(?:\\.|[^\]\\])*\]|[^/\\\n])+\/[gimsuy]*/g, REGEX_PLACEHOLDER_TOKEN)
         .replace(/\/\/.*$/, '');
 }
 
@@ -313,13 +315,9 @@ function createProhibitedEmbeddedResult(params: ProhibitedResultParams): DualTra
             column: 1,
             severity: SEVERITY_WARNING,
             reason: REASON_CROSS_LANG,
-            message:
-                `Embedded test code domain prohibited in ${ext} production source file. ` +
-                `Enforce explicit test file topology (e.g. create dedicated *.test.ts).`,
+            message: DualTrackTestMessages.PROHIBITED_EMBEDDED_ZONE_MESSAGE(ext),
             action: ACTION_EXTRACT_TEST_SUITE,
-            rationale:
-                `Extract embedded test assertions from '${filePath}' into an explicit ` +
-                `standalone test suite to maintain clean architectural boundaries.`,
+            rationale: DualTrackTestMessages.PROHIBITED_EMBEDDED_ZONE_RATIONALE(filePath),
         }),
     ];
 
@@ -360,13 +358,9 @@ function checkTailIsolation(
                 column: 1,
                 severity: SEVERITY_WARNING,
                 reason: REASON_NOT_TAIL,
-                message:
-                    `Embedded test zone is interleaved before production code. ` +
-                    `Move embedded test zone to the end of the file.`,
+                message: DualTrackTestMessages.INTERLEAVED_TEST_ZONE_MESSAGE,
                 action: ACTION_RELOCATE_TEST_ZONE,
-                rationale:
-                    `Relocate test block to file tail to maintain modern zone ` +
-                    `partitioning discipline.`,
+                rationale: DualTrackTestMessages.INTERLEAVED_TEST_ZONE_RATIONALE,
             });
         }
     }
@@ -414,11 +408,9 @@ const PERMITTED_ZONE_CONTRACTS: readonly PermittedZoneContractRule[] = [
                         filePath: ctx.filePath,
                         severity: SEVERITY_ERROR,
                         reason: REASON_UNCONDITIONAL_BUILD,
-                        message:
-                            `Rust embedded test module missing #[cfg(test)] conditional compilation ` +
-                            `attribute; risks production binary code bleed.`,
+                        message: DualTrackTestMessages.RUST_MISSING_CFG_TEST_MESSAGE,
                         action: ACTION_RELOCATE_TEST_ZONE,
-                        rationale: `Add #[cfg(test)] attribute to isolate test suite from release builds.`,
+                        rationale: DualTrackTestMessages.RUST_MISSING_CFG_TEST_RATIONALE,
                     }),
                 };
             }
@@ -435,11 +427,9 @@ const PERMITTED_ZONE_CONTRACTS: readonly PermittedZoneContractRule[] = [
                         filePath: ctx.filePath,
                         severity: SEVERITY_WARNING,
                         reason: REASON_MISSING_INTENT,
-                        message:
-                            `Embedded unit tests lack structured doc comments (Case/Assertion), ` +
-                            `inhibiting autonomous agent regression verification.`,
+                        message: DualTrackTestMessages.MISSING_INTENT_MESSAGE,
                         action: ACTION_ANNOTATE_INTENT,
-                        rationale: `Add doc comments with 'Case:' and 'Assertion:' for machine-readability.`,
+                        rationale: DualTrackTestMessages.MISSING_INTENT_RATIONALE,
                     }),
                 };
             }

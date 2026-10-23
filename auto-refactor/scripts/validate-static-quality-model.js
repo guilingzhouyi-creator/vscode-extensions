@@ -94,6 +94,19 @@ async function main() {
   assert.strictEqual(overriddenVector.T, 98.0);
   console.log('✔ Static quality vector overrides verified.');
 
+  // Bounded negative score floor verification
+  const negativeVector = synthesizeStaticQualityVector(fineGrainedIndices, {
+    R: -60.0,
+    E: -90.0,
+  });
+  assert.strictEqual(negativeVector.R, -60.0);
+  assert.strictEqual(negativeVector.E, -90.0);
+  const boundedFloorVector = synthesizeStaticQualityVector(fineGrainedIndices, {
+    R: -250.0,
+  });
+  assert.strictEqual(boundedFloorVector.R, -100.0, 'Score floor must be strictly clamped at -100.0');
+  console.log('✔ Bounded negative score floor (-100.0) verified.');
+
   // 3. Static Issue Risk Confidence Model: S_i = P_i * C_i * I_i
   console.log('3. Testing Static Issue Risk Confidence Formulation S_i = P_i * C_i * I_i...');
 

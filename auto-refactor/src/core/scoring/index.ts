@@ -33,3 +33,4 @@ export * from './topological-churn-evaluator';
 export * from './modernization-formulas';
 export * from './bayesian-beta-solver';
 export * from './technical-debt-ratio';
+export * from './bounded-corridor';

@@ -24,7 +24,15 @@ import {
     TIER_PRESCRIPTIVE,
     TIER_ACTIONABLE,
     TIER_ADVISORY,
+    LIFECYCLE_QUARANTINED,
 } from './finding-confidence-arbiter';
+
+const MIN_NOISY_SAMPLE_COUNT = 3;
+const NOISY_SUPPRESSION_RATIO_THRESHOLD = 0.3;
+const MIN_QUARANTINE_SAMPLE_COUNT = 5;
+const TIER_WEIGHT_PRESCRIPTIVE = 3;
+const TIER_WEIGHT_ACTIONABLE = 2;
+const TIER_WEIGHT_ADVISORY = 1;
 
 /**
  * Internal state accumulator tracking metrics across a batch of arbitrated findings.
@@ -140,7 +148,7 @@ export function computeRuleSuppressionStats(
 
     for (const [rule, stat] of ruleMap.entries()) {
         const ratio = stat.total > 0 ? +(stat.suppressed / stat.total).toFixed(2) : 0;
-        const isNoisy = stat.total >= 3 && ratio >= 0.3;
+        const isNoisy = stat.total >= MIN_NOISY_SAMPLE_COUNT && ratio >= NOISY_SUPPRESSION_RATIO_THRESHOLD;
         stats.push({
             rule,
             total: stat.total,
@@ -151,7 +159,7 @@ export function computeRuleSuppressionStats(
         if (isNoisy) {
             noisyRules.push(rule);
         }
-        if (stat.total >= 5 && ratio >= autoQuarantineThreshold) {
+        if (stat.total >= MIN_QUARANTINE_SAMPLE_COUNT && ratio >= autoQuarantineThreshold) {
             autoQuarantinedRules.push(rule);
         }
     }
@@ -184,7 +192,7 @@ export function applyNoisyRuleDemotions(
             f.confidence = advisoryDefault;
             if (isAutoQuarantine) {
                 f.isQuarantined = true;
-                f.ruleLifecycleState = 'quarantined';
+                f.ruleLifecycleState = LIFECYCLE_QUARANTINED;
                 f.rationale +=
                     ' [TRICORDER DYNAMIC QUARANTINE: Auto-quarantined due to excessive developer suppression ratio >= 50%]';
                 acc.quarantinedCount++;
@@ -211,7 +219,7 @@ function resolveClusterPrimary(cluster: ArbitratedFinding[]): {
     }
 
     const tierWeight = (t: FindingConfidenceTier) =>
-        t === TIER_PRESCRIPTIVE ? 3 : t === TIER_ACTIONABLE ? 2 : 1;
+        t === TIER_PRESCRIPTIVE ? TIER_WEIGHT_PRESCRIPTIVE : t === TIER_ACTIONABLE ? TIER_WEIGHT_ACTIONABLE : TIER_WEIGHT_ADVISORY;
 
     let bestIdx = 0;
     for (let i = 1; i < cluster.length; i++) {

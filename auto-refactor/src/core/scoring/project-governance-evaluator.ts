@@ -14,6 +14,7 @@
  */
 
 import type { Issue } from '../types';
+import { GovernanceEvalMessages } from '../messages';
 import {
     DEDUCTION_DISTRIBUTED_REDUNDANCY,
     DEDUCTION_ROLE_DEVIATION,
@@ -28,6 +29,25 @@ import {
  * 3 Canonical Project Lifecycle Maturity Stages.
  */
 export type ProjectMaturityStage = 'prototype' | 'stable' | 'enterprise';
+
+export const STAGE_PROTOTYPE: ProjectMaturityStage = 'prototype';
+export const STAGE_STABLE: ProjectMaturityStage = 'stable';
+export const STAGE_ENTERPRISE: ProjectMaturityStage = 'enterprise';
+
+const MAX_CLEAN_REUSE_BONUS = 10;
+const BONUS_PER_CLEAN_LIB = 2;
+const BONUS_PER_SOUND_POOL = 2;
+
+const GOV_GRADE_D_MAX = 70;
+const GOV_GRADE_C_MAX = 80;
+const GOV_GRADE_B_MAX = 90;
+const GOV_GRADE_A_MAX = 97;
+
+const SEVERITY_WARNING_STR = 'warning';
+const SEVERITY_INFO_STR = 'info';
+
+const MAX_GOVERNANCE_BASE_SCORE = 100;
+const GOVERNANCE_ROUND_FACTOR = 100;
 
 /**
  * Project-scale governance audit snapshot metrics.
@@ -140,40 +160,39 @@ function calculateCleanReuseBonuses(input: ProjectGovernanceInput): {
     if (input.overAbstractionCount === 0 && input.negativeRoiPoolCount === 0) {
         return {
             cleanReuseBonus: Math.min(
-                10,
-                input.cleanSharedLibraryCount * 2 + input.soundPoolCount * 2,
+                MAX_CLEAN_REUSE_BONUS,
+                input.cleanSharedLibraryCount * BONUS_PER_CLEAN_LIB +
+                    input.soundPoolCount * BONUS_PER_SOUND_POOL,
             ),
             antiGamingWarnings,
         };
     }
 
     if (input.overAbstractionCount > 0) {
-        antiGamingWarnings.push(
-            'Clean reuse bonus nullified due to presence of spurious indirection or cyclic over-abstraction.',
-        );
+        antiGamingWarnings.push(GovernanceEvalMessages.BONUS_NULLIFIED_OVER_ABSTRACTION);
     }
     if (input.negativeRoiPoolCount > 0) {
-        antiGamingWarnings.push(
-            'Clean reuse bonus nullified due to presence of negative-ROI excessive micro-object pooling.',
-        );
+        antiGamingWarnings.push(GovernanceEvalMessages.BONUS_NULLIFIED_NEGATIVE_ROI_POOL);
     }
 
     return { cleanReuseBonus: 0, antiGamingWarnings };
 }
 
 function assignGovernanceGrade(score: number): ProjectGovernanceScoreResult['grade'] {
-    if (score < 70) return 'D';
-    if (score < 80) return 'C';
-    if (score < 90) return 'B';
-    if (score < 97) return 'A';
+    if (score < GOV_GRADE_D_MAX) return 'D';
+    if (score < GOV_GRADE_C_MAX) return 'C';
+    if (score < GOV_GRADE_B_MAX) return 'B';
+    if (score < GOV_GRADE_A_MAX) return 'A';
     return 'A+';
 }
 
 function calibrateStageIssues(issues: Issue[], stage: ProjectMaturityStage): Issue[] {
-    if (stage !== 'prototype') {
+    if (stage !== STAGE_PROTOTYPE) {
         return issues;
     }
-    return issues.map((iss) => (iss.severity === 'warning' ? { ...iss, severity: 'info' } : iss));
+    return issues.map((iss) =>
+        iss.severity === SEVERITY_WARNING_STR ? { ...iss, severity: SEVERITY_INFO_STR } : iss,
+    );
 }
 
 /**
@@ -189,8 +208,14 @@ export function evaluateProjectGovernance(
     const { deductions, totalDeductions } = calculateGovernanceDeductions(input, stageMultiplier);
     const { cleanReuseBonus, antiGamingWarnings } = calculateCleanReuseBonuses(input);
 
-    const rawScore = 100 - totalDeductions + cleanReuseBonus;
-    const compositeScore = Math.max(0, Math.min(100, Math.round(rawScore * 100) / 100));
+    const rawScore = MAX_GOVERNANCE_BASE_SCORE - totalDeductions + cleanReuseBonus;
+    const compositeScore = Math.max(
+        0,
+        Math.min(
+            MAX_GOVERNANCE_BASE_SCORE,
+            Math.round(rawScore * GOVERNANCE_ROUND_FACTOR) / GOVERNANCE_ROUND_FACTOR,
+        ),
+    );
     const grade = assignGovernanceGrade(compositeScore);
     const calibratedIssues = calibrateStageIssues(input.issues, input.stage);
 

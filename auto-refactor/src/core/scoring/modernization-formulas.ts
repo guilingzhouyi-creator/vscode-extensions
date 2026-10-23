@@ -80,7 +80,7 @@ export function calculateRecipeGeneralizationIndex(
     const stability = Math.max(0, Math.min(1.0, 1.0 - normalizedEntropy));
     const safeImpact = Math.max(0, meanImpactScore);
     const index = supportRatio * stability * safeImpact;
-    return Math.round(Math.min(100, index) * SCORE_ROUNDING) / SCORE_ROUNDING;
+    return Math.round(Math.min(PERCENT_SCALE, index) * SCORE_ROUNDING) / SCORE_ROUNDING;
 }
 
 /**

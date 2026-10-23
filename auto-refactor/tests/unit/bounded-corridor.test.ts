@@ -23,6 +23,8 @@ import {
     assertWithinCorridor,
     sanitizeBound,
     DEFAULT_CORRIDOR_EPSILON,
+    DEFAULT_SCORE_FLOOR,
+    MIN_SCORE_FLOOR_LIMIT,
 } from '../../src/core/scoring/bounded-corridor';
 
 describe('boundedCorridor - Mathematical Interval Invariants', () => {
@@ -69,12 +71,21 @@ describe('boundedCorridor - Mathematical Interval Invariants', () => {
     });
 
     describe('clampScore', () => {
-        it('clamps quality scores to [0.0, ceiling] with 0.01 precision rounding', () => {
+        it('clamps quality scores to [0.0, ceiling] by default with 0.01 precision rounding', () => {
             expect(clampScore(95.456)).toBe(95.46);
             expect(clampScore(-15.2)).toBe(0.0);
             expect(clampScore(125.8)).toBe(100.0);
             expect(clampScore(98.5, 95.0)).toBe(95.0);
             expect(clampScore(NaN)).toBe(0.0);
+        });
+
+        it('supports bounded negative score floor when negative bounds are enabled', () => {
+            expect(clampScore(-15.2, 100, -50)).toBe(-15.2);
+            expect(clampScore(-80.0, 100, -50)).toBe(-50.0);
+            expect(clampScore(-150.0, 100, -100)).toBe(-100.0);
+            // Strict lower bound limit prevents unbounded negative infinity
+            expect(clampScore(-999.0, 100, -300)).toBe(MIN_SCORE_FLOOR_LIMIT);
+            expect(clampScore(NaN, 100, -50)).toBe(-50.0);
         });
     });
 

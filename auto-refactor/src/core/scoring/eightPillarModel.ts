@@ -25,48 +25,57 @@ export type PrimaryQualityPillar =
     | 'security'
     | 'extensibility';
 
+export const PILLAR_ARCHITECTURE: PrimaryQualityPillar = 'architecture';
+export const PILLAR_MAINTAINABILITY: PrimaryQualityPillar = 'maintainability';
+export const PILLAR_PERFORMANCE: PrimaryQualityPillar = 'performance';
+export const PILLAR_DATA: PrimaryQualityPillar = 'data';
+export const PILLAR_TESTING: PrimaryQualityPillar = 'testing';
+export const PILLAR_RELIABILITY: PrimaryQualityPillar = 'reliability';
+export const PILLAR_SECURITY: PrimaryQualityPillar = 'security';
+export const PILLAR_EXTENSIBILITY: PrimaryQualityPillar = 'extensibility';
+
 /**
  * All eight primary pillars in canonical order.
  */
 export const ALL_PRIMARY_PILLARS: readonly PrimaryQualityPillar[] = [
-    'architecture',
-    'maintainability',
-    'performance',
-    'data',
-    'testing',
-    'reliability',
-    'security',
-    'extensibility',
+    PILLAR_ARCHITECTURE,
+    PILLAR_MAINTAINABILITY,
+    PILLAR_PERFORMANCE,
+    PILLAR_DATA,
+    PILLAR_TESTING,
+    PILLAR_RELIABILITY,
+    PILLAR_SECURITY,
+    PILLAR_EXTENSIBILITY,
 ] as const;
 
 /**
  * Standard balanced weights across the eight primary pillars (sum = 1.0).
  */
 export const DEFAULT_PILLAR_WEIGHTS: Record<PrimaryQualityPillar, number> = {
-    architecture: 0.15,
-    maintainability: 0.15,
-    performance: 0.15,
-    data: 0.1,
-    testing: 0.15,
-    reliability: 0.1,
-    security: 0.1,
-    extensibility: 0.1,
+    [PILLAR_ARCHITECTURE]: 0.15,
+    [PILLAR_MAINTAINABILITY]: 0.15,
+    [PILLAR_PERFORMANCE]: 0.15,
+    [PILLAR_DATA]: 0.1,
+    [PILLAR_TESTING]: 0.15,
+    [PILLAR_RELIABILITY]: 0.1,
+    [PILLAR_SECURITY]: 0.1,
+    [PILLAR_EXTENSIBILITY]: 0.1,
 };
 
 /**
  * Mapping from the 10 fine-grained dimensions to the 8 primary pillars.
  */
 export const DIMENSION_TO_PILLAR_MAP: Record<QualityDimension, PrimaryQualityPillar> = {
-    architectureConsistency: 'architecture',
-    maintainability: 'maintainability',
-    performanceEfficiency: 'performance',
-    codeSecurity: 'security',
-    semanticPurity: 'reliability',
-    techDebtRisk: 'reliability',
-    standardization: 'extensibility',
-    commentQuality: 'extensibility',
-    duplication: 'extensibility',
-    modernity: 'testing',
+    architectureConsistency: PILLAR_ARCHITECTURE,
+    maintainability: PILLAR_MAINTAINABILITY,
+    performanceEfficiency: PILLAR_PERFORMANCE,
+    codeSecurity: PILLAR_SECURITY,
+    semanticPurity: PILLAR_RELIABILITY,
+    techDebtRisk: PILLAR_RELIABILITY,
+    standardization: PILLAR_EXTENSIBILITY,
+    commentQuality: PILLAR_EXTENSIBILITY,
+    duplication: PILLAR_EXTENSIBILITY,
+    modernity: PILLAR_TESTING,
 };
 
 /**
@@ -88,6 +97,15 @@ export interface PillarCeilingConstraint {
     reason: string;
 }
 
+export const AGGREGATION_MODE_GEOMETRIC = 'geometric';
+export const AGGREGATION_MODE_ARITHMETIC = 'arithmetic';
+export const DEFAULT_AGGREGATION_MODE = 'geometric';
+
+const PILLAR_SCORE_ROUND_FACTOR = 100;
+const COMPOSITE_PILLAR_INDEX_FLOOR = 15;
+const PILLAR_MAX_SCORE = 100;
+const DEFAULT_INITIAL_RAW_SCORE = 100.0;
+
 /**
  * Synthesize eight primary pillar scores from fine-grained dimension indices.
  *
@@ -96,6 +114,7 @@ export interface PillarCeilingConstraint {
  * @param testingScoreOverride - Optional override for the testing pillar score.
  * @param ceilings - Optional ceiling constraints to cap pillars for fatal issues.
  * @param customWeights - Optional custom pillar weight overrides.
+ * @param aggregationMode - Aggregation strategy ('geometric' | 'arithmetic', default: 'geometric').
  * @returns Complete eight-pillar breakdown and synthesized composite score.
  */
 export function synthesizeEightPillars(
@@ -104,7 +123,7 @@ export function synthesizeEightPillars(
     testingScoreOverride?: number,
     ceilings: PillarCeilingConstraint[] = [],
     customWeights: Partial<Record<PrimaryQualityPillar, number>> = {},
-    aggregationMode: 'geometric' | 'arithmetic' = 'geometric',
+    aggregationMode: 'geometric' | 'arithmetic' = DEFAULT_AGGREGATION_MODE,
 ): EightPillarBreakdown {
     const weights: Record<PrimaryQualityPillar, number> = {
         ...DEFAULT_PILLAR_WEIGHTS,
@@ -136,7 +155,7 @@ export function synthesizeEightPillars(
     for (const pillar of ALL_PRIMARY_PILLARS) {
         const values = pillarBuckets[pillar];
         const avg = values.reduce((sum, v) => sum + v, 0) / values.length;
-        pillars[pillar] = Math.round(avg * 100) / 100;
+        pillars[pillar] = Math.round(avg * PILLAR_SCORE_ROUND_FACTOR) / PILLAR_SCORE_ROUND_FACTOR;
     }
 
     const appliedCeilings: { pillar: PrimaryQualityPillar; maxScore: number; reason: string }[] =
@@ -155,17 +174,21 @@ export function synthesizeEightPillars(
     for (const pillar of ALL_PRIMARY_PILLARS) {
         const w = weights[pillar];
         weightedSum += pillars[pillar] * w;
-        const boundedScore = Math.max(15, Math.min(100, pillars[pillar]));
+        const boundedScore = Math.max(
+            COMPOSITE_PILLAR_INDEX_FLOOR,
+            Math.min(PILLAR_MAX_SCORE, pillars[pillar]),
+        );
         logSum += w * Math.log(boundedScore);
         totalWeight += w;
     }
 
-    let rawScore = 100.0;
+    let rawScore = DEFAULT_INITIAL_RAW_SCORE;
     if (totalWeight > 0) {
-        const scoreVal = aggregationMode === 'geometric'
-            ? Math.exp(logSum / totalWeight)
-            : weightedSum / totalWeight;
-        rawScore = Math.round(scoreVal * 100) / 100;
+        const scoreVal =
+            aggregationMode === AGGREGATION_MODE_GEOMETRIC
+                ? Math.exp(logSum / totalWeight)
+                : weightedSum / totalWeight;
+        rawScore = Math.round(scoreVal * PILLAR_SCORE_ROUND_FACTOR) / PILLAR_SCORE_ROUND_FACTOR;
     }
     const compositeScore = rawScore;
 

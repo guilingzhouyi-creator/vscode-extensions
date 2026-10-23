@@ -69,12 +69,17 @@ export interface DiffScore {
     };
 }
 
+const DEFAULT_COUPLING_WEIGHT = 2;
+const DEFAULT_EFFECTIVE_LOC_WEIGHT = 0.5;
+const DEFAULT_COMPLEXITY_WEIGHT = 3;
+const DEFAULT_DUPLICATION_WEIGHT = 1;
+
 /** Default weights; document any change here so the published formula stays meaningful. */
 const DEFAULT_WEIGHTS: DiffScoreWeights = {
-    couplingPerUnit: 2,
-    effectiveLocPerLine: 0.5,
-    complexityPerUnit: 3,
-    duplicationPerLine: 1,
+    couplingPerUnit: DEFAULT_COUPLING_WEIGHT,
+    effectiveLocPerLine: DEFAULT_EFFECTIVE_LOC_WEIGHT,
+    complexityPerUnit: DEFAULT_COMPLEXITY_WEIGHT,
+    duplicationPerLine: DEFAULT_DUPLICATION_WEIGHT,
 };
 
 /** Round dimension deltas to two decimals, matching the snapshot scorer's 0.01 precision. */

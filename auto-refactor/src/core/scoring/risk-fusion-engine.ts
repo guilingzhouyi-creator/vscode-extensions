@@ -18,6 +18,8 @@
 import type { StaticIssueRisk } from './static-quality-model';
 import type { DynamicIssueRisk } from '../dynamic/dynamic-types';
 import type { TopologicalChurnResult } from './topological-churn-evaluator';
+import { computePowerResonance } from '../math';
+import { RiskFusionRationales } from '../messages';
 
 /**
  * Exponent tuning coefficients for risk resonance calculation:
@@ -47,6 +49,36 @@ export const DEFAULT_FUSION_COEFFICIENTS: Readonly<RiskFusionCoefficients> = {
  * Final classified risk levels after cross-plane fusion.
  */
 export type FusedRiskLevel = 'critical' | 'high' | 'medium' | 'low' | 'informational';
+
+export const FUSED_LEVEL_CRITICAL: FusedRiskLevel = 'critical';
+export const FUSED_LEVEL_HIGH: FusedRiskLevel = 'high';
+export const FUSED_LEVEL_MEDIUM: FusedRiskLevel = 'medium';
+export const FUSED_LEVEL_LOW: FusedRiskLevel = 'low';
+export const FUSED_LEVEL_INFORMATIONAL: FusedRiskLevel = 'informational';
+
+const THRESHOLD_CRITICAL = 20.0;
+const THRESHOLD_CRITICAL_DUAL_CONFIRMED = 12.0;
+const THRESHOLD_HIGH = 10.0;
+const THRESHOLD_MEDIUM = 4.0;
+const THRESHOLD_LOW = 1.5;
+
+const MIN_DYNAMIC_RISK = 0.05;
+const DUAL_CONFIRM_THRESHOLD_STATIC = 3.0;
+const DUAL_CONFIRM_THRESHOLD_DYNAMIC = 3.0;
+const DAMPENING_THRESHOLD_STATIC = 2.0;
+const DAMPENING_THRESHOLD_DYNAMIC = 0.5;
+const HIDDEN_BOTTLENECK_STATIC = 1.0;
+const HIDDEN_BOTTLENECK_DYNAMIC = 5.0;
+
+const MIN_HISTORICAL_FACTOR = 0.3;
+const MAX_HISTORICAL_FACTOR = 6.0;
+const MIN_NORMALIZED_STATIC_RISK = 0.1;
+
+const PROPERTY_IMPACT_MULTIPLIER = 'impactMultiplier';
+const MAX_FUSED_SCORE_CEILING = 100.0;
+const SCORE_ROUND_FACTOR = 100;
+const DYNAMIC_RAW_RISK_SCALE = 25.0;
+const MAX_EFFECTIVE_DYNAMIC_RISK = 10.0;
 
 /**
  * Quantified cross-plane fused issue risk evaluation.
@@ -98,67 +130,62 @@ function arbitrateCorroboration(
             D: 1.0,
             isDualConfirmed: false,
             suppressionApplied: false,
-            rationale:
-                'Dynamic telemetry unavailable; risk inferred from static structural ' +
-                'analysis with neutral dynamic baseline.',
+            rationale: RiskFusionRationales.TELEMETRY_UNAVAILABLE,
         };
     }
 
-    const D = Math.max(0.05, dynamicRisk.normalizedRisk);
+    const D = Math.max(MIN_DYNAMIC_RISK, dynamicRisk.normalizedRisk);
     const S = staticRisk.normalizedRisk;
 
-    if (S >= 3.0 && D >= 3.0) {
+    if (S >= DUAL_CONFIRM_THRESHOLD_STATIC && D >= DUAL_CONFIRM_THRESHOLD_DYNAMIC) {
         return {
             D,
             isDualConfirmed: true,
             suppressionApplied: false,
-            rationale:
-                `Dual-plane confirmed: High static structural risk (S=${S.toFixed(1)}) ` +
-                `corroborated by runtime hotspot evidence (D=${D.toFixed(1)}). Risk amplified.`,
+            rationale: RiskFusionRationales.DUAL_CONFIRMED(S, D),
         };
     }
-    if (S >= 2.0 && D <= 0.5) {
+    if (S >= DAMPENING_THRESHOLD_STATIC && D <= DAMPENING_THRESHOLD_DYNAMIC) {
         return {
             D,
             isDualConfirmed: false,
             suppressionApplied: true,
-            rationale:
-                `Single-sided dampening: High static complexity (S=${S.toFixed(1)}) ` +
-                `refuted by cold runtime invocation evidence (D=${D.toFixed(1)}). Severity downgraded.`,
+            rationale: RiskFusionRationales.SINGLE_SIDED_DAMPENED(S, D),
         };
     }
-    if (S <= 1.0 && D >= 5.0) {
+    if (S <= HIDDEN_BOTTLENECK_STATIC && D >= HIDDEN_BOTTLENECK_DYNAMIC) {
         return {
             D,
             isDualConfirmed: false,
             suppressionApplied: false,
-            rationale:
-                `Hidden runtime bottleneck: Low static penalty (S=${S.toFixed(1)}) ` +
-                `overridden by severe runtime latency/contention hotspot (D=${D.toFixed(1)}).`,
+            rationale: RiskFusionRationales.HIDDEN_BOTTLENECK(S, D),
         };
     }
     return {
         D,
         isDualConfirmed: false,
         suppressionApplied: false,
-        rationale: 'Standard dual-plane fusion across static and dynamic indicators.',
+        rationale: RiskFusionRationales.STANDARD_FUSION,
     };
 }
 
 function classifyFusedRiskLevel(fusedScore: number, isDualConfirmed: boolean): FusedRiskLevel {
-    if (fusedScore >= 20.0 || (isDualConfirmed && fusedScore >= 12.0)) {
-        return 'critical';
+    if (
+        fusedScore >= THRESHOLD_CRITICAL ||
+        (isDualConfirmed && fusedScore >= THRESHOLD_CRITICAL_DUAL_CONFIRMED)
+    ) {
+        return FUSED_LEVEL_CRITICAL;
     }
-    if (fusedScore >= 10.0) {
-        return 'high';
+    if (fusedScore >= THRESHOLD_HIGH) {
+        return FUSED_LEVEL_HIGH;
     }
-    if (fusedScore >= 4.0) {
-        return 'medium';
+    if (fusedScore >= THRESHOLD_MEDIUM) {
+        return FUSED_LEVEL_MEDIUM;
     }
-    if (fusedScore >= 1.5) {
-        return 'low';
+    if (fusedScore >= THRESHOLD_LOW) {
+        return FUSED_LEVEL_LOW;
     }
-    return 'informational';
+    return FUSED_LEVEL_INFORMATIONAL;
 }
 
 /**
@@ -186,42 +213,35 @@ export function fuseIssueRisks(
 
     if (typeof historicalFactor === 'number') {
         baseH = historicalFactor;
-    } else if (historicalFactor && typeof historicalFactor === 'object' && 'impactMultiplier' in historicalFactor) {
-        churnMultiplier = historicalFactor.impactMultiplier;
+    } else if (historicalFactor && typeof historicalFactor === 'object' && PROPERTY_IMPACT_MULTIPLIER in historicalFactor) {
+        churnMultiplier = historicalFactor[PROPERTY_IMPACT_MULTIPLIER];
     }
 
-    const S = Math.max(0.1, staticRisk.normalizedRisk);
-    const H = Math.max(0.3, Math.min(6.0, baseH * churnMultiplier));
+    const S = Math.max(MIN_NORMALIZED_STATIC_RISK, staticRisk.normalizedRisk);
+    const H = Math.max(MIN_HISTORICAL_FACTOR, Math.min(MAX_HISTORICAL_FACTOR, baseH * churnMultiplier));
 
     const { D, isDualConfirmed, suppressionApplied, rationale: baseRationale } = arbitrateCorroboration(
         staticRisk,
         dynamicRisk,
     );
 
-    let rawFused = Math.pow(S, coeffs.alpha) * Math.pow(D, coeffs.beta) * Math.pow(H, coeffs.gamma);
-
-    if (suppressionApplied) {
-        rawFused *= 0.35;
-    } else if (isDualConfirmed) {
-        rawFused *= 1.3;
-    }
-
-    const fusedScore = Math.round(Math.min(100.0, rawFused) * 100) / 100;
+    const modifier = suppressionApplied ? 0.35 : isDualConfirmed ? 1.3 : 1.0;
+    const fusedScore = computePowerResonance(S, D, H, coeffs, modifier, MAX_FUSED_SCORE_CEILING);
     const level = classifyFusedRiskLevel(fusedScore, isDualConfirmed);
 
     let rationale = baseRationale;
     if (churnMultiplier < 0.9) {
-        rationale += ` Churn relaxation applied for stable code (${churnMultiplier.toFixed(2)}x).`;
+        rationale += RiskFusionRationales.CHURN_RELAXATION(churnMultiplier);
     } else if (churnMultiplier > 1.1) {
-        rationale += ` Churn amplification applied for active hotspot (${churnMultiplier.toFixed(2)}x).`;
+        rationale += RiskFusionRationales.CHURN_AMPLIFICATION(churnMultiplier);
     }
 
     return {
         issueId: staticRisk.issueId,
         rule: staticRisk.rule,
-        staticRisk: Math.round(staticRisk.normalizedRisk * 100) / 100,
-        dynamicRisk: dynamicRisk ? Math.round(dynamicRisk.normalizedRisk * 100) / 100 : 0.0,
-        historicalFactor: Math.round(H * 100) / 100,
+        staticRisk: Math.round(staticRisk.normalizedRisk * SCORE_ROUND_FACTOR) / SCORE_ROUND_FACTOR,
+        dynamicRisk: dynamicRisk ? Math.round(dynamicRisk.normalizedRisk * SCORE_ROUND_FACTOR) / SCORE_ROUND_FACTOR : 0.0,
+        historicalFactor: Math.round(H * SCORE_ROUND_FACTOR) / SCORE_ROUND_FACTOR,
         fusedScore,
         level,
         isDualConfirmed,
@@ -306,8 +326,8 @@ function buildEffectiveDynamicHotspot(
         F: selfDynamicRisk?.F ?? 2.0,
         R: selfDynamicRisk?.R ?? 2.0,
         V: selfDynamicRisk?.V ?? 2.0,
-        rawRisk: Math.round(effectiveDynamic * 25.0 * 100) / 100,
-        normalizedRisk: Math.round(effectiveDynamic * 100) / 100,
+        rawRisk: Math.round(effectiveDynamic * DYNAMIC_RAW_RISK_SCALE * SCORE_ROUND_FACTOR) / SCORE_ROUND_FACTOR,
+        normalizedRisk: Math.round(effectiveDynamic * SCORE_ROUND_FACTOR) / SCORE_ROUND_FACTOR,
         evidenceConfidence: selfDynamicRisk?.evidenceConfidence ?? (callersCount > 0 ? 0.9 : 0.6),
     };
 }
@@ -333,7 +353,7 @@ export function fuseCascadedRisks(
     const { cascadedDynamicSum, contributingCallers } = aggregateTopologicalCallers(callers);
 
     const selfRiskVal = selfDynamicRisk ? selfDynamicRisk.normalizedRisk : 0.0;
-    const effectiveDynamic = Math.min(10.0, selfRiskVal + cascadedDynamicSum);
+    const effectiveDynamic = Math.min(MAX_EFFECTIVE_DYNAMIC_RISK, selfRiskVal + cascadedDynamicSum);
 
     const effectiveDynamicRiskObj = buildEffectiveDynamicHotspot(
         staticRisk,
@@ -359,8 +379,8 @@ export function fuseCascadedRisks(
     return {
         ...baseFused,
         rationale: updatedRationale,
-        upstreamCascadedDynamicRisk: Math.round(cascadedDynamicSum * 100) / 100,
-        effectiveDynamicRisk: Math.round(effectiveDynamic * 100) / 100,
+        upstreamCascadedDynamicRisk: Math.round(cascadedDynamicSum * SCORE_ROUND_FACTOR) / SCORE_ROUND_FACTOR,
+        effectiveDynamicRisk: Math.round(effectiveDynamic * SCORE_ROUND_FACTOR) / SCORE_ROUND_FACTOR,
         contributingCallers,
     };
 }
