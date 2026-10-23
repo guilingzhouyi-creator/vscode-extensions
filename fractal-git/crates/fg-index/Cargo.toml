@@ -9,3 +9,4 @@ license = "MIT"
 [dependencies]
 fg-core = { path = "../fg-core" }
 fg-object = { path = "../fg-object" }
+sha1 = "0.10"

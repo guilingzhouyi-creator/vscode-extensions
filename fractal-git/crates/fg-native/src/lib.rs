@@ -43,8 +43,9 @@ pub use repo_identity::{
     STORES_DIR_NAME, STORE_DIR_NAME,
 };
 pub use repo_layout::{
-    classify_workspace_entry, container_path, hide_directory, is_directory_hidden, read_guard_file,
-    write_guard_file, InitializedRepository, PhysicalLayout, RepoLayout, WORKSPACE_DIR_NAME,
+    attempt_hide, classify_workspace_entry, container_path, hide_directory, is_directory_hidden,
+    read_guard_file, write_guard_file, InitializedRepository, PhysicalLayout, RepoLayout,
+    WORKSPACE_DIR_NAME,
 };
 pub use section_tag::SectionTag;
 pub use sections::{

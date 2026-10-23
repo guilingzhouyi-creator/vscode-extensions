@@ -171,6 +171,14 @@ impl RepoLayout {
         write_guard_file(&self.repo_dir)?;
 
         document.publish_new(&container_path)?;
+
+        let head_content = match &document.head {
+            crate::HeadState::Symbolic { target } => format!("ref: {target}\n"),
+            crate::HeadState::Detached { oid } => format!("{}\n", oid.to_hex()),
+        };
+        let _ = std::fs::write(self.repo_dir.join("HEAD"), head_content);
+        let _ = std::fs::create_dir_all(self.repo_dir.join("refs/heads"));
+
         let hidden = attempt_hide(&self.repo_dir);
 
         Ok(InitializedRepository {
@@ -188,13 +196,13 @@ impl RepoLayout {
 /// guard file is what keeps Git out, and failing initialization over a cosmetic attribute would
 /// block the very case the guard file protects.
 #[cfg(windows)]
-fn attempt_hide(repo_dir: &Path) -> Option<bool> {
+pub fn attempt_hide(repo_dir: &Path) -> Option<bool> {
     Some(hide_directory(repo_dir).is_ok())
 }
 
 /// Reports nothing off Windows, which has no hidden attribute for this function to set.
 #[cfg(not(windows))]
-fn attempt_hide(_repo_dir: &Path) -> Option<bool> {
+pub fn attempt_hide(_repo_dir: &Path) -> Option<bool> {
     None
 }
 

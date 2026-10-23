@@ -58,6 +58,29 @@ impl GitTreeEntry {
     pub fn oid_hex(&self) -> String {
         self.oid.to_hex()
     }
+
+    /// Compares two tree entries according to Git's canonical binary sorting rule:
+    /// directory entries are compared as if their names ended with a trailing slash (`/`).
+    pub fn cmp_canonical(&self, other: &Self) -> std::cmp::Ordering {
+        let self_is_dir = self.mode.is_tree();
+        let other_is_dir = other.mode.is_tree();
+        if !self_is_dir && !other_is_dir {
+            return self.name.cmp(&other.name);
+        }
+        let self_bytes =
+            self.name
+                .as_bytes()
+                .iter()
+                .copied()
+                .chain(if self_is_dir { Some(b'/') } else { None });
+        let other_bytes = other
+            .name
+            .as_bytes()
+            .iter()
+            .copied()
+            .chain(if other_is_dir { Some(b'/') } else { None });
+        self_bytes.cmp(other_bytes)
+    }
 }
 
 /// Pure Git Tree representation with canonical sorting rules.
@@ -70,23 +93,7 @@ pub struct GitTree {
 impl GitTree {
     /// Builds and sorts a canonical GitTree from an entry collection.
     pub fn new(mut entries: Vec<GitTreeEntry>) -> Self {
-        entries.sort_by(|left_entry, right_entry| {
-            let left_is_dir = left_entry.mode.is_tree();
-            let right_is_dir = right_entry.mode.is_tree();
-            let left_bytes = left_entry
-                .name
-                .as_bytes()
-                .iter()
-                .copied()
-                .chain(if left_is_dir { Some(b'/') } else { None });
-            let right_bytes = right_entry
-                .name
-                .as_bytes()
-                .iter()
-                .copied()
-                .chain(if right_is_dir { Some(b'/') } else { None });
-            left_bytes.cmp(right_bytes)
-        });
+        entries.sort_by(|left_entry, right_entry| left_entry.cmp_canonical(right_entry));
 
         let raw_payload = Self::serialize_entries(&entries);
         let oid = Self::compute_tree_oid(&raw_payload);

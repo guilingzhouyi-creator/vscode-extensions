@@ -124,21 +124,33 @@ impl FastCdcChunker {
         let max_cut = remaining.min(self.max_size);
         let mut cut = self.min_size;
         let mid = self.min_size + (max_cut - self.min_size) / 2;
+        let slice = &input_bytes[*offset..*offset + max_cut];
 
         let mut fingerprint: u64 = 0;
         let mut found = false;
 
-        while cut < max_cut {
-            let byte = input_bytes[*offset + cut];
+        // Phase 1: Small mask normalization window [min_size..mid)
+        while cut < mid {
+            let byte = slice[cut];
             fingerprint = (fingerprint << 1).wrapping_add(GEAR_TABLE[byte as usize]);
-            let mask = if cut < mid { self.mask_s } else { self.mask_l };
-
-            if (fingerprint & mask) == 0 {
-                cut += 1;
+            cut += 1;
+            if (fingerprint & self.mask_s) == 0 {
                 found = true;
                 break;
             }
-            cut += 1;
+        }
+
+        // Phase 2: Large mask normalization window [mid..max_cut)
+        if !found {
+            while cut < max_cut {
+                let byte = slice[cut];
+                fingerprint = (fingerprint << 1).wrapping_add(GEAR_TABLE[byte as usize]);
+                cut += 1;
+                if (fingerprint & self.mask_l) == 0 {
+                    found = true;
+                    break;
+                }
+            }
         }
 
         if !found {

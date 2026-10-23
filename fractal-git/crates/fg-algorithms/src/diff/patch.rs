@@ -1,140 +1,275 @@
-//! Module: fg-algorithms — Myers Unified Diff & Patch Generator
+//! Module: fg-algorithms::diff::patch — Unified Patch Facade
 //! File Path: crates/fg-algorithms/src/diff/patch.rs
-//! Architecture Role: Computes optimal unified diff patches between file versions using
-//!   hash-tokenized Myers diff with common-prefix/suffix pruning and adaptive linear fallback.
-//! Dependencies & Triggers: Consumed by gate verifiers, commit guards, and CLI diff handlers.
-//! Responsibilities: Produces accurate Context, Addition, and Deletion hunks with minimal
-//!   edit script distance.
+//! Architecture Role: Turns two texts into the hunks a unified patch is made of, by running the
+//!   three stages in order: record preparation, bidirectional alignment, and change-group layout.
+//! Dependencies & Triggers: Called by `taxis diff` and `taxis show`; the only public entry point for
+//!   text comparison in the workspace.
+//! Responsibilities: Split each side into records that keep their line terminator, hand them to the
+//!   stages, walk the resulting flags into one aligned stream, and cut that stream into hunks.
 //! Exit Semantics & Design Rationale:
-//!   - Pre-tokenizes lines with 64-bit FNV-1a hashes to compare integers instead of strings.
-//!   - O(N) common prefix and suffix pruning eliminates overhead for common edits.
-//!   - Fallback Threshold: If N * M > 2,000,000 or N + M > 1,500, degrades to chunked linear scan
-//!     to prevent quadratic blowup.
+//!   - A record includes its newline. That single decision is what makes a missing final newline a
+//!     real difference: `"a\nb"` and `"a\nb\n"` produce different records, so the diff reports a
+//!     change where a text-only comparison would report none and the renderer can annotate it.
+//!   - Hunks are cut from an aligned stream rather than from the flags directly. A patch tool reads a
+//!     hunk as replacing one contiguous region, so the old and new line numbers have to be carried
+//!     alongside each entry; recomputing them from a single running index gets one side wrong as
+//!     soon as the diff contains both deletions and additions.
+//!   - Two changes separated by more than twice the context width start a new hunk. Emitting the gap
+//!     as context instead would make one hunk claim a region far larger than the edit.
+//!   - Nothing here is tuned for a particular input size. The alignment stage carries Git's own
+//!     cost-derived limits, so a large rewrite degrades the same way `git diff` degrades instead of
+//!     through a threshold invented here — thresholds on line counts were measured producing a
+//!     1,300-line patch for an edit Git renders in 87 lines.
 
-/// A line in a diff hunk.
+use crate::diff::compact::{Compaction, Side};
+use crate::diff::xdiff::mark_changed;
+use crate::diff::xdiff_prepare::prepare;
+
+/// A line in a diff hunk, owning its text.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PatchLine {
+    /// A line present on both sides.
     Context(String),
+    /// A line only the new side has.
     Addition(String),
+    /// A line only the old side has.
     Deletion(String),
 }
 
-/// Borrowed line slice in a diff hunk, eliminating heap string allocations.
+/// A borrowed line in a diff hunk.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PatchLineRef<'a> {
+    /// A line present on both sides.
     Context(&'a str),
+    /// A line only the new side has.
     Addition(&'a str),
+    /// A line only the old side has.
     Deletion(&'a str),
 }
 
-/// A contiguous hunk of line differences.
+/// A contiguous hunk of owned line differences.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PatchHunk {
+    /// 1-based first line of the hunk on the old side.
     pub old_start: usize,
+    /// Number of old-side lines the hunk covers.
     pub old_count: usize,
+    /// 1-based first line of the hunk on the new side.
     pub new_start: usize,
+    /// Number of new-side lines the hunk covers.
     pub new_count: usize,
+    /// The hunk's lines, in patch order.
     pub lines: Vec<PatchLine>,
 }
 
 /// A contiguous hunk of borrowed line differences.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PatchHunkRef<'a> {
+    /// 1-based first line of the hunk on the old side.
     pub old_start: usize,
+    /// Number of old-side lines the hunk covers.
     pub old_count: usize,
+    /// 1-based first line of the hunk on the new side.
     pub new_start: usize,
+    /// Number of new-side lines the hunk covers.
     pub new_count: usize,
+    /// The hunk's lines, in patch order.
     pub lines: Vec<PatchLineRef<'a>>,
 }
 
-/// A complete unified diff patch for a file.
+/// A complete unified patch for one file, owning its line text.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UnifiedPatch {
+    /// Path the patch applies to.
     pub file_path: String,
+    /// Hunks in file order.
     pub hunks: Vec<PatchHunk>,
 }
 
-/// A complete unified diff patch with zero-copy borrowed slices.
+/// A complete unified patch for one file, borrowing its line text.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UnifiedPatchRef<'a> {
+    /// Path the patch applies to.
     pub file_path: &'a str,
+    /// Hunks in file order.
     pub hunks: Vec<PatchHunkRef<'a>>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum EditOp {
-    Context,
-    Addition,
-    Deletion,
+/// Default number of unchanged lines kept on each side of a change.
+///
+/// Three is Git's default for `diff -U`, and patch tools assume it when a hunk header omits a count.
+pub const DEFAULT_HUNK_CONTEXT: usize = 3;
+
+/// Reports whether a text ends with a line terminator.
+///
+/// An empty text reports `true`: it has no final line, so there is nothing whose terminator could be
+/// missing. Reporting `false` would make the renderer annotate a file that has no lines at all.
+pub fn text_ends_with_newline(text: &str) -> bool {
+    text.is_empty() || text.ends_with('\n')
 }
 
-/// Reusable scratch buffer for Myers diff to eliminate repeated vector allocations.
-#[derive(Debug, Default)]
-pub struct MyersScratch {
-    pub v_diagonals: Vec<isize>,
-    pub next_v_diagonals: Vec<isize>,
-    pub trace_compact: Vec<isize>,
+/// Splits a text into lines the way Git's diff engine does.
+///
+/// Only `\n` ends a line; a carriage return stays inside the line text. `str::lines` strips a
+/// trailing `\r`, which silently rewrites the content of every CRLF payload, so a patch for a path
+/// Git treats as binary (`-text`, or a blob that really stores CRLF) would lose the `\r` on each
+/// emitted line and no longer reproduce the file it claims to describe.
+pub fn split_lines(text: &str) -> Vec<&str> {
+    text.split_inclusive('\n')
+        .map(|record| record.strip_suffix('\n').unwrap_or(record))
+        .collect()
 }
 
-impl MyersScratch {
-    /// Constructs a pre-allocated scratch buffer for Myers edit graph explorations.
-    pub fn new() -> Self {
-        Self {
-            v_diagonals: Vec::with_capacity(256),
-            next_v_diagonals: Vec::with_capacity(256),
-            trace_compact: Vec::with_capacity(1024),
+/// Trims identical 1024-byte blocks from the end of both buffers, ending on a newline boundary.
+///
+/// Mirrors Git's `trim_common_tail` in `xdiff-interface.c`. Git invokes this optimization only
+/// when context length is 0 (`-U0`), so that unchanged trailing blocks on large files do not
+/// skew the line classification counts or waste Myers graph search steps.
+fn trim_common_tail<'a>(a: &'a str, b: &'a str) -> (&'a str, &'a str) {
+    const BLK: usize = 1024;
+    let a_bytes = a.as_bytes();
+    let b_bytes = b.as_bytes();
+    let smaller = a_bytes.len().min(b_bytes.len());
+    let mut trimmed = 0usize;
+
+    while BLK + trimmed <= smaller
+        && a_bytes[a_bytes.len() - trimmed - BLK..a_bytes.len() - trimmed]
+            == b_bytes[b_bytes.len() - trimmed - BLK..b_bytes.len() - trimmed]
+    {
+        trimmed += BLK;
+    }
+
+    if trimmed == 0 {
+        return (a, b);
+    }
+
+    let ap = a_bytes.len() - trimmed;
+    let mut recovered = 0usize;
+    while recovered < trimmed {
+        let ch = a_bytes[ap + recovered];
+        recovered += 1;
+        if ch == b'\n' {
+            break;
         }
     }
 
-    /// Resets all scratch diagonal buffers without deallocating reserved heap capacity.
-    pub fn clear(&mut self) {
-        self.v_diagonals.clear();
-        self.next_v_diagonals.clear();
-        self.trace_compact.clear();
-    }
+    let cut = trimmed - recovered;
+    (&a[..a.len() - cut], &b[..b.len() - cut])
 }
 
-/// Algorithm generator for unified diff patches.
+/// One entry of the aligned stream: the line plus the 1-based line numbers it maps to.
+///
+/// The numbers are recorded while the stream is built rather than derived afterwards, because a
+/// deletion advances only the old side and an addition only the new one.
+#[derive(Debug, Clone, Copy)]
+struct AlignedLine<'a> {
+    /// Line as it appears in the patch body.
+    line: PatchLineRef<'a>,
+    /// 1-based line number in the old file.
+    old_line: usize,
+    /// 1-based line number in the new file.
+    new_line: usize,
+}
+
+/// Algorithm entry point for unified diff patches.
 pub struct PatchGenerator;
 
 impl PatchGenerator {
-    /// Generates a unified patch comparing old and new text with Myers shortest edit script.
+    /// Generates a unified patch with the default context width.
     pub fn generate_patch(file_path: &str, old_text: &str, new_text: &str) -> UnifiedPatch {
-        let mut scratch = MyersScratch::new();
-        Self::generate_patch_with_scratch(file_path, old_text, new_text, &mut scratch)
+        Self::owned_from_ref(Self::generate_patch_ref(file_path, old_text, new_text))
     }
 
-    /// Generates a unified patch reusing an external MyersScratch buffer to avoid allocations.
-    pub fn generate_patch_with_scratch(
-        file_path: &str,
-        old_text: &str,
-        new_text: &str,
-        scratch: &mut MyersScratch,
-    ) -> UnifiedPatch {
-        let patch_ref = Self::generate_patch_ref(file_path, old_text, new_text, scratch);
+    /// Generates a unified patch, borrowing line text from the inputs.
+    pub fn generate_patch_ref<'a>(
+        file_path: &'a str,
+        old_text: &'a str,
+        new_text: &'a str,
+    ) -> UnifiedPatchRef<'a> {
+        Self::generate_patch_ref_with_context(file_path, old_text, new_text, DEFAULT_HUNK_CONTEXT)
+    }
+
+    /// Generates a unified patch with an explicit context width.
+    ///
+    /// `hunk_context` is the number of unchanged lines kept on each side of a change. Two changes
+    /// separated by at most twice that many unchanged lines share one hunk; a wider gap starts a new
+    /// one, because emitting the in-between lines as context would claim a region far larger than the
+    /// edit and waste the reader's attention on text that did not change.
+    pub fn generate_patch_ref_with_context<'a>(
+        file_path: &'a str,
+        old_text: &'a str,
+        new_text: &'a str,
+        hunk_context: usize,
+    ) -> UnifiedPatchRef<'a> {
+        // Identical content needs no search, and an empty pair has nothing to align. Both return
+        // before allocating the per-record arrays the stages need.
+        if old_text == new_text {
+            return UnifiedPatchRef {
+                file_path,
+                hunks: Vec::new(),
+            };
+        }
+
+        let (effective_old, effective_new) = if hunk_context == 0 {
+            trim_common_tail(old_text, new_text)
+        } else {
+            (old_text, new_text)
+        };
+
+        let old_lines: Vec<&'a str> = split_lines(effective_old);
+        let new_lines: Vec<&'a str> = split_lines(effective_new);
+
+        let old_records: Vec<&[u8]> = effective_old
+            .split_inclusive('\n')
+            .map(str::as_bytes)
+            .collect();
+        let new_records: Vec<&[u8]> = effective_new
+            .split_inclusive('\n')
+            .map(str::as_bytes)
+            .collect();
+        let (prepared_old, prepared_new) = prepare(&old_records, &new_records);
+        let (mut old_changed, mut new_changed) = mark_changed(&prepared_old, &prepared_new);
+
+        // Both sides' class ids serve as line identity for the layout pass: two lines are the same
+        // line exactly when they share a class, which is the same relation the alignment used.
+        Compaction::new(
+            Side {
+                hashes: &prepared_old.classes,
+                texts: &old_lines,
+            },
+            Side {
+                hashes: &prepared_new.classes,
+                texts: &new_lines,
+            },
+        )
+        .run(&mut old_changed, &mut new_changed);
+
+        let aligned = Self::align_lines(&old_lines, &new_lines, &old_changed, &new_changed);
+        UnifiedPatchRef {
+            file_path,
+            hunks: split_into_hunks(&aligned, hunk_context),
+        }
+    }
+
+    /// Converts a borrowed patch into an owning one.
+    fn owned_from_ref(patch_ref: UnifiedPatchRef<'_>) -> UnifiedPatch {
         UnifiedPatch {
             file_path: patch_ref.file_path.to_string(),
             hunks: patch_ref
                 .hunks
                 .into_iter()
-                .map(|hunk_item| PatchHunk {
-                    old_start: hunk_item.old_start,
-                    old_count: hunk_item.old_count,
-                    new_start: hunk_item.new_start,
-                    new_count: hunk_item.new_count,
-                    lines: hunk_item
+                .map(|hunk| PatchHunk {
+                    old_start: hunk.old_start,
+                    old_count: hunk.old_count,
+                    new_start: hunk.new_start,
+                    new_count: hunk.new_count,
+                    lines: hunk
                         .lines
                         .into_iter()
-                        .map(|line_ref| match line_ref {
-                            PatchLineRef::Context(text_slice) => {
-                                PatchLine::Context(text_slice.to_string())
-                            }
-                            PatchLineRef::Addition(text_slice) => {
-                                PatchLine::Addition(text_slice.to_string())
-                            }
-                            PatchLineRef::Deletion(text_slice) => {
-                                PatchLine::Deletion(text_slice.to_string())
-                            }
+                        .map(|line| match line {
+                            PatchLineRef::Context(text) => PatchLine::Context(text.to_string()),
+                            PatchLineRef::Addition(text) => PatchLine::Addition(text.to_string()),
+                            PatchLineRef::Deletion(text) => PatchLine::Deletion(text.to_string()),
                         })
                         .collect(),
                 })
@@ -142,396 +277,144 @@ impl PatchGenerator {
         }
     }
 
-    /// Generates a unified patch with zero string copying, borrowing line slices
-    /// directly from input text buffers.
-    pub fn generate_patch_ref<'a>(
-        file_path: &'a str,
-        old_text: &'a str,
-        new_text: &'a str,
-        scratch: &mut MyersScratch,
-    ) -> UnifiedPatchRef<'a> {
-        let old_lines: Vec<&'a str> = old_text.lines().collect();
-        let new_lines: Vec<&'a str> = new_text.lines().collect();
-
-        if old_lines.is_empty() && new_lines.is_empty() {
-            return UnifiedPatchRef {
-                file_path,
-                hunks: Vec::new(),
-            };
-        }
-
-        // Fast-path: Identical content short-circuit
-        if old_text == new_text {
-            let hunk_lines: Vec<PatchLineRef<'a>> = old_lines
-                .iter()
-                .copied()
-                .map(PatchLineRef::Context)
-                .collect();
-            let hunk = PatchHunkRef {
-                old_start: 1,
-                old_count: old_lines.len(),
-                new_start: 1,
-                new_count: new_lines.len(),
-                lines: hunk_lines,
-            };
-            return UnifiedPatchRef {
-                file_path,
-                hunks: vec![hunk],
-            };
-        }
-
-        let old_hashes: Vec<u64> = old_lines
-            .iter()
-            .map(|line_slice| Self::fnv1a(line_slice))
-            .collect();
-        let new_hashes: Vec<u64> = new_lines
-            .iter()
-            .map(|line_slice| Self::fnv1a(line_slice))
-            .collect();
-
-        // 1. SWAR 4-wide 64-bit parallel word alignment for common prefix trimming
-        let prefix_len = Self::swar_trim_prefix(&old_hashes, &new_hashes);
-
-        // 2. SWAR 4-wide 64-bit parallel word alignment for common suffix trimming
-        let suffix_len = Self::swar_trim_suffix(&old_hashes, &new_hashes, prefix_len);
-
-        let mid_old_hashes = &old_hashes[prefix_len..old_hashes.len() - suffix_len];
-        let mid_new_hashes = &new_hashes[prefix_len..new_hashes.len() - suffix_len];
-
-        // 3. Myers Diff on middle slice (reusing external scratch buffer)
-        let mid_edits =
-            Self::compute_myers_middle_with_scratch(mid_old_hashes, mid_new_hashes, scratch);
-
-        // 4. Reconstruct full patch lines borrowing from original text
-        let mut hunk_lines = Vec::with_capacity(old_lines.len() + new_lines.len());
-
-        for line in &old_lines[..prefix_len] {
-            hunk_lines.push(PatchLineRef::Context(line));
-        }
-
-        let mut old_mid_idx = prefix_len;
-        let mut new_mid_idx = prefix_len;
-
-        for edit in mid_edits {
-            match edit {
-                EditOp::Context => {
-                    hunk_lines.push(PatchLineRef::Context(old_lines[old_mid_idx]));
-                    old_mid_idx += 1;
-                    new_mid_idx += 1;
-                }
-                EditOp::Deletion => {
-                    hunk_lines.push(PatchLineRef::Deletion(old_lines[old_mid_idx]));
-                    old_mid_idx += 1;
-                }
-                EditOp::Addition => {
-                    hunk_lines.push(PatchLineRef::Addition(new_lines[new_mid_idx]));
-                    new_mid_idx += 1;
-                }
+    /// Walks the two flag arrays in lockstep to produce the aligned stream.
+    ///
+    /// Deletions are emitted before additions within one run because that is the order Git prints and
+    /// the order readers expect: a replacement shown as `+` then `-` reads as an insertion followed by
+    /// an unrelated loss.
+    fn align_lines<'a>(
+        old_lines: &[&'a str],
+        new_lines: &[&'a str],
+        old_changed: &[bool],
+        new_changed: &[bool],
+    ) -> Vec<AlignedLine<'a>> {
+        let mut aligned = Vec::with_capacity(old_lines.len() + new_lines.len());
+        let mut old_cursor = 0usize;
+        let mut new_cursor = 0usize;
+        while old_cursor < old_lines.len() || new_cursor < new_lines.len() {
+            let takes_old = old_cursor < old_lines.len() && old_changed[old_cursor];
+            let takes_new = new_cursor < new_lines.len() && new_changed[new_cursor];
+            if takes_old {
+                aligned.push(AlignedLine {
+                    line: PatchLineRef::Deletion(old_lines[old_cursor]),
+                    old_line: old_cursor + 1,
+                    new_line: new_cursor + 1,
+                });
+                old_cursor += 1;
+            } else if takes_new || old_cursor >= old_lines.len() {
+                aligned.push(AlignedLine {
+                    line: PatchLineRef::Addition(new_lines[new_cursor]),
+                    old_line: old_cursor + 1,
+                    new_line: new_cursor + 1,
+                });
+                new_cursor += 1;
+            } else {
+                aligned.push(AlignedLine {
+                    line: PatchLineRef::Context(old_lines[old_cursor]),
+                    old_line: old_cursor + 1,
+                    new_line: new_cursor + 1,
+                });
+                old_cursor += 1;
+                new_cursor += 1;
             }
         }
+        aligned
+    }
+}
 
-        for line in &old_lines[old_lines.len() - suffix_len..] {
-            hunk_lines.push(PatchLineRef::Context(line));
+/// Cuts the aligned stream into hunks carrying `context` unchanged lines per side.
+///
+/// Two change runs share a hunk when the gap between them, measured on the **old side**, is at most
+/// twice the context width — that is `xdl_get_hunk`'s rule in `xdiff/xemit.c`, where
+/// `distance = xch->i1 - (xchp->i1 + xchp->chg1)` is compared against `2 * ctxlen`. Measuring the gap
+/// in the aligned stream instead counts new-side entries as if they were old-side lines, so a run of
+/// insertions sitting next to a deletion looks contiguous and the two get merged. At `-U0` that
+/// produces a hunk whose new-line count no longer matches the file: measured on a PowerShell module
+/// where Git emits 11 lines from one anchor and a stream-position rule emits 29.
+fn split_into_hunks<'a>(aligned: &[AlignedLine<'a>], context: usize) -> Vec<PatchHunkRef<'a>> {
+    // One entry per *run* of changed lines, carrying the old-side span it covers. A replacement is a
+    // single run even though its deletions and additions are adjacent: Git holds it as one
+    // `xdchange` with one `i1` and one `chg1`, and measuring the deletions and additions as
+    // separate changes makes the additions look like they start a line later. That produced a
+    // spurious gap of one, split a hunk Git keeps whole, and reported 29 new lines where Git reports
+    // 11 — visible only at `-U0`, where the gap threshold is zero.
+    let mut runs: Vec<(usize, usize, usize, usize)> = Vec::new();
+    let mut old_cursor = 0usize;
+    let mut index = 0usize;
+    while index < aligned.len() {
+        if matches!(aligned[index].line, PatchLineRef::Context(_)) {
+            old_cursor += 1;
+            index += 1;
+            continue;
         }
-
-        let hunk = PatchHunkRef {
-            old_start: 1,
-            old_count: old_lines.len(),
-            new_start: 1,
-            new_count: new_lines.len(),
-            lines: hunk_lines,
-        };
-
-        UnifiedPatchRef {
-            file_path,
-            hunks: vec![hunk],
+        let run_start = index;
+        let old_start = old_cursor;
+        while index < aligned.len() && !matches!(aligned[index].line, PatchLineRef::Context(_)) {
+            if !matches!(aligned[index].line, PatchLineRef::Addition(_)) {
+                old_cursor += 1;
+            }
+            index += 1;
         }
+        runs.push((run_start, index - 1, old_start, old_cursor - old_start));
+    }
+    if runs.is_empty() {
+        return Vec::new();
     }
 
-    #[inline]
-    fn walk_snake(
-        mut x_coord: usize,
-        mut y_coord: usize,
-        old: &[u64],
-        new: &[u64],
-    ) -> (usize, usize) {
-        while x_coord < old.len() && y_coord < new.len() && old[x_coord] == new[y_coord] {
-            x_coord += 1;
-            y_coord += 1;
+    let max_common = context.saturating_mul(2);
+    let mut hunks: Vec<PatchHunkRef<'a>> = Vec::new();
+    let mut first = runs[0];
+    let mut last = runs[0];
+    for &run in &runs[1..] {
+        let distance = run.2.saturating_sub(last.2 + last.3);
+        if distance > max_common {
+            hunks.push(build_hunk(
+                aligned,
+                first.0.saturating_sub(context),
+                last.1 + context,
+            ));
+            first = run;
         }
-        (x_coord, y_coord)
+        last = run;
     }
+    hunks.push(build_hunk(
+        aligned,
+        first.0.saturating_sub(context),
+        last.1 + context,
+    ));
+    hunks
+}
 
-    #[inline]
-    fn select_branch_x(
-        search_depth: usize,
-        diagonal_k: isize,
-        depth_isize: isize,
-        v_diagonals: &[isize],
-        idx: usize,
-    ) -> isize {
-        if search_depth == 0 {
-            0
-        } else if diagonal_k == -depth_isize
-            || (diagonal_k != depth_isize && v_diagonals[idx - 1] < v_diagonals[idx + 1])
-        {
-            v_diagonals[idx + 1]
+/// Builds one hunk from `start..=end` of the aligned stream.
+fn build_hunk<'a>(aligned: &[AlignedLine<'a>], start: usize, end: usize) -> PatchHunkRef<'a> {
+    let end = end.min(aligned.len().saturating_sub(1));
+    let slice = &aligned[start..=end];
+    let first = &slice[0];
+    let old_count = slice
+        .iter()
+        .filter(|entry| !matches!(entry.line, PatchLineRef::Addition(_)))
+        .count();
+    let new_count = slice
+        .iter()
+        .filter(|entry| !matches!(entry.line, PatchLineRef::Deletion(_)))
+        .count();
+    PatchHunkRef {
+        // A hunk with no lines on one side has no first line there, so its start is the line the
+        // hunk would be inserted after. Reporting the next line instead would place the hunk one
+        // line too far when a patch tool applies it.
+        old_start: if old_count == 0 {
+            first.old_line.saturating_sub(1)
         } else {
-            v_diagonals[idx - 1] + 1
-        }
-    }
-
-    fn compute_myers_middle_with_scratch(
-        old: &[u64],
-        new: &[u64],
-        scratch: &mut MyersScratch,
-    ) -> Vec<EditOp> {
-        let old_len = old.len();
-        let new_len = new.len();
-
-        if old_len == 0 && new_len == 0 {
-            return Vec::new();
-        }
-        if old_len == 0 {
-            return vec![EditOp::Addition; new_len];
-        }
-        if new_len == 0 {
-            return vec![EditOp::Deletion; old_len];
-        }
-
-        // Adaptive Fallback Threshold: If N * M > 2,000,000 or N + M > 1,500,
-        // fallback to linear zip.
-        if old_len * new_len > 2_000_000 || old_len + new_len > 1_500 {
-            return Self::linear_fallback(old, new);
-        }
-
-        let max = old_len + new_len;
-        let v_size = 2 * max + 1;
-        let offset = max as isize;
-
-        scratch.clear();
-        if scratch.v_diagonals.len() < v_size {
-            scratch.v_diagonals.resize(v_size, 0);
-            scratch.next_v_diagonals.resize(v_size, 0);
+            first.old_line
+        },
+        old_count,
+        new_start: if new_count == 0 {
+            first.new_line.saturating_sub(1)
         } else {
-            scratch.v_diagonals[..v_size].fill(0);
-            scratch.next_v_diagonals[..v_size].fill(0);
-        }
-
-        let mut found_depth = 0;
-        let mut found_k = 0;
-
-        'outer: for search_depth in 0..=max {
-            scratch.next_v_diagonals[..v_size].copy_from_slice(&scratch.v_diagonals[..v_size]);
-            let depth_isize = search_depth as isize;
-
-            for diagonal_k in (-depth_isize..=depth_isize).step_by(2) {
-                let idx = (diagonal_k + offset) as usize;
-                let x_start = Self::select_branch_x(
-                    search_depth,
-                    diagonal_k,
-                    depth_isize,
-                    &scratch.v_diagonals,
-                    idx,
-                );
-                let y_start = x_start - diagonal_k;
-
-                let (x_end, y_end) = Self::walk_snake(x_start as usize, y_start as usize, old, new);
-                scratch.next_v_diagonals[idx] = x_end as isize;
-
-                if x_end >= old_len && y_end >= new_len {
-                    // Record active diagonals for the terminal step into compact triangular trace
-                    for k_rec in (-depth_isize..=depth_isize).step_by(2) {
-                        scratch
-                            .trace_compact
-                            .push(scratch.next_v_diagonals[(k_rec + offset) as usize]);
-                    }
-                    found_depth = search_depth;
-                    found_k = diagonal_k;
-                    break 'outer;
-                }
-            }
-
-            // Record active diagonals for step search_depth into compact triangular trace
-            for k_rec in (-depth_isize..=depth_isize).step_by(2) {
-                scratch
-                    .trace_compact
-                    .push(scratch.next_v_diagonals[(k_rec + offset) as usize]);
-            }
-            scratch.v_diagonals[..v_size].copy_from_slice(&scratch.next_v_diagonals[..v_size]);
-        }
-
-        // Backtrack edit operations using compact O(D^2) triangular trace
-        Self::backtrack(&scratch.trace_compact, found_depth, found_k)
-    }
-
-    fn backtrack(trace: &[isize], search_depth: usize, diagonal_k: isize) -> Vec<EditOp> {
-        let mut edits = Vec::new();
-        let mut curr_k = diagonal_k;
-
-        for step in (1..=search_depth).rev() {
-            let prev_base = (step - 1) * step / 2;
-            let curr_base = step * (step + 1) / 2;
-            let depth_isize = step as isize;
-
-            let prev_k_left = curr_k - 1;
-            let prev_k_right = curr_k + 1;
-
-            let (prev_k, is_addition) = if curr_k == -depth_isize {
-                (prev_k_right, true)
-            } else if curr_k == depth_isize {
-                (prev_k_left, false)
-            } else {
-                let left_idx = prev_base + ((prev_k_left + (depth_isize - 1)) / 2) as usize;
-                let right_idx = prev_base + ((prev_k_right + (depth_isize - 1)) / 2) as usize;
-                let prev_left = trace[left_idx];
-                let prev_right = trace[right_idx];
-                if prev_left < prev_right {
-                    (prev_k_right, true)
-                } else {
-                    (prev_k_left, false)
-                }
-            };
-
-            let prev_idx = prev_base + ((prev_k + (depth_isize - 1)) / 2) as usize;
-            let curr_idx = curr_base + ((curr_k + depth_isize) / 2) as usize;
-
-            let prev_x = trace[prev_idx];
-            let curr_x = trace[curr_idx];
-
-            // 1. Diagonal matching segment at end of this step
-            let end_match = if is_addition {
-                curr_x - prev_x
-            } else {
-                curr_x - (prev_x + 1)
-            };
-
-            for _ in 0..end_match {
-                edits.push(EditOp::Context);
-            }
-
-            // 2. The single addition or deletion step
-            if is_addition {
-                edits.push(EditOp::Addition);
-            } else {
-                edits.push(EditOp::Deletion);
-            }
-
-            curr_k = prev_k;
-        }
-
-        // Leading diagonal matches from (0, 0) in trace[0]
-        if !trace.is_empty() {
-            let start_match = trace[0] as usize;
-            for _ in 0..start_match {
-                edits.push(EditOp::Context);
-            }
-        }
-
-        edits.reverse();
-        edits
-    }
-
-    fn linear_fallback(old: &[u64], new: &[u64]) -> Vec<EditOp> {
-        let mut edits = Vec::new();
-        let mut i = 0;
-        let mut j = 0;
-
-        while i < old.len() || j < new.len() {
-            if i < old.len() && j < new.len() && old[i] == new[j] {
-                edits.push(EditOp::Context);
-                i += 1;
-                j += 1;
-            } else {
-                if i < old.len() {
-                    edits.push(EditOp::Deletion);
-                    i += 1;
-                }
-                if j < new.len() {
-                    edits.push(EditOp::Addition);
-                    j += 1;
-                }
-            }
-        }
-
-        edits
-    }
-
-    fn fnv1a(input_str: &str) -> u64 {
-        let mut hash: u64 = 0xcbf29ce484222325;
-        for byte in input_str.bytes() {
-            hash ^= byte as u64;
-            hash = hash.wrapping_mul(0x100000001b3);
-        }
-        hash
-    }
-
-    /// SWAR 4-wide 64-bit parallel word alignment for common prefix trimming.
-    #[inline]
-    pub fn swar_trim_prefix(left_hashes: &[u64], right_hashes: &[u64]) -> usize {
-        let min_len = left_hashes.len().min(right_hashes.len());
-        let mut i = 0;
-
-        // 4-wide unrolled chunk comparison
-        while i + 4 <= min_len {
-            if [
-                left_hashes[i],
-                left_hashes[i + 1],
-                left_hashes[i + 2],
-                left_hashes[i + 3],
-            ] == [
-                right_hashes[i],
-                right_hashes[i + 1],
-                right_hashes[i + 2],
-                right_hashes[i + 3],
-            ] {
-                i += 4;
-            } else {
-                break;
-            }
-        }
-
-        // Scalar remainder
-        while i < min_len && left_hashes[i] == right_hashes[i] {
-            i += 1;
-        }
-        i
-    }
-
-    /// SWAR 4-wide 64-bit parallel word alignment for common suffix trimming.
-    #[inline]
-    pub fn swar_trim_suffix(left_hashes: &[u64], right_hashes: &[u64], prefix_len: usize) -> usize {
-        let max_suffix = (left_hashes.len() - prefix_len).min(right_hashes.len() - prefix_len);
-        let mut i = 0;
-
-        // 4-wide unrolled chunk comparison from reverse end
-        while i + 4 <= max_suffix {
-            let a_idx = left_hashes.len() - 4 - i;
-            let b_idx = right_hashes.len() - 4 - i;
-            if [
-                left_hashes[a_idx],
-                left_hashes[a_idx + 1],
-                left_hashes[a_idx + 2],
-                left_hashes[a_idx + 3],
-            ] == [
-                right_hashes[b_idx],
-                right_hashes[b_idx + 1],
-                right_hashes[b_idx + 2],
-                right_hashes[b_idx + 3],
-            ] {
-                i += 4;
-            } else {
-                break;
-            }
-        }
-
-        // Scalar remainder
-        while i < max_suffix
-            && left_hashes[left_hashes.len() - 1 - i] == right_hashes[right_hashes.len() - 1 - i]
-        {
-            i += 1;
-        }
-        i
+            first.new_line
+        },
+        new_count,
+        lines: slice.iter().map(|entry| entry.line).collect(),
     }
 }
 
@@ -539,27 +422,128 @@ impl PatchGenerator {
 mod tests {
     use super::*;
 
+    /// Renders the patch body the way the CLI does, so expectations read like real output.
+    fn body(old_text: &str, new_text: &str) -> Vec<String> {
+        let patch = PatchGenerator::generate_patch_ref("f.txt", old_text, new_text);
+        let mut rendered = Vec::new();
+        for hunk in &patch.hunks {
+            rendered.push(format!(
+                "@@ -{},{} +{},{} @@",
+                hunk.old_start, hunk.old_count, hunk.new_start, hunk.new_count
+            ));
+            for line in &hunk.lines {
+                match line {
+                    PatchLineRef::Context(text) => rendered.push(format!(" {text}")),
+                    PatchLineRef::Addition(text) => rendered.push(format!("+{text}")),
+                    PatchLineRef::Deletion(text) => rendered.push(format!("-{text}")),
+                }
+            }
+        }
+        rendered
+    }
+
     #[test]
-    fn test_patch_ref_zero_copy_and_scratch_reuse() {
-        let old_text = "line 1\nline 2\nline 3\n";
-        let new_text = "line 1\nline 2 modified\nline 3\nline 4\n";
-        let mut scratch = MyersScratch::new();
+    fn identical_text_produces_no_hunks() {
+        assert!(body("a\nb\n", "a\nb\n").is_empty());
+    }
 
-        let patch_ref =
-            PatchGenerator::generate_patch_ref("test.txt", old_text, new_text, &mut scratch);
-        assert_eq!(patch_ref.file_path, "test.txt");
-        assert_eq!(patch_ref.hunks.len(), 1);
-
-        let owned_patch = PatchGenerator::generate_patch_with_scratch(
-            "test.txt",
-            old_text,
-            new_text,
-            &mut scratch,
-        );
-        assert_eq!(owned_patch.hunks.len(), 1);
+    #[test]
+    fn a_replacement_prints_the_deletion_before_the_addition() {
         assert_eq!(
-            owned_patch.hunks[0].lines.len(),
-            patch_ref.hunks[0].lines.len()
+            body("a\nb\nc\n", "a\nz\nc\n"),
+            vec!["@@ -1,3 +1,3 @@", " a", "-b", "+z", " c"]
+        );
+    }
+
+    #[test]
+    fn a_deleted_line_next_to_blank_lines_rests_low() {
+        // Matches `git diff` on the same input: the deletion is printed after the blank line it can
+        // slide across, not before it.
+        assert_eq!(
+            body("a\n\nx\nb\n", "a\n\nb\n"),
+            vec!["@@ -1,4 +1,3 @@", " a", " ", "-x", " b"]
+        );
+    }
+
+    #[test]
+    fn a_hunk_boundary_follows_the_context_width() {
+        let old_text = "1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n";
+        let new_text = "1\nX\n3\n4\n5\n6\n7\n8\n9\nY\n";
+        // Nine unchanged lines separate the two changes, more than twice the three-line context, so
+        // they must not share a hunk.
+        let rendered = body(old_text, new_text);
+        let headers: Vec<&String> = rendered
+            .iter()
+            .filter(|line| line.starts_with("@@"))
+            .collect();
+        assert_eq!(headers.len(), 2, "{rendered:?}");
+    }
+
+    #[test]
+    fn a_final_line_without_a_terminator_is_a_change() {
+        // `"a\nb"` and `"a\nb\n"` differ in one byte; the records keep that byte apart so the diff
+        // reports the difference instead of declaring the files equal.
+        let rendered = body("a\nb", "a\nb\n");
+        assert!(rendered.iter().any(|line| line == "-b"), "{rendered:?}");
+        assert!(rendered.iter().any(|line| line == "+b"), "{rendered:?}");
+    }
+
+    #[test]
+    fn a_carriage_return_stays_inside_the_line() {
+        // `str::lines` strips a trailing `\r`, which would rewrite the payload of a path Git treats
+        // as binary (`-text`) and emit a patch that no longer reproduces the file.
+        assert_eq!(split_lines("a\r\nb\r\n"), vec!["a\r", "b\r"]);
+        assert_eq!(split_lines("a\r\nb"), vec!["a\r", "b"]);
+        assert_eq!(split_lines(""), Vec::<&str>::new());
+        let rendered = body("a\r\nb\r\n", "a\r\nz\r\n");
+        assert!(rendered.iter().any(|line| line == "-b\r"), "{rendered:?}");
+        assert!(rendered.iter().any(|line| line == "+z\r"), "{rendered:?}");
+    }
+
+    #[test]
+    fn a_blank_side_produces_a_pure_addition_hunk() {
+        assert_eq!(body("", "a\nb\n"), vec!["@@ -0,0 +1,2 @@", "+a", "+b"]);
+    }
+
+    #[test]
+    fn an_added_line_at_the_end_keeps_the_leading_context() {
+        assert_eq!(
+            body("a\nb\n", "a\nb\nc\n"),
+            vec!["@@ -1,2 +1,3 @@", " a", " b", "+c"]
+        );
+    }
+
+    #[test]
+    fn the_owned_form_matches_the_borrowed_form() {
+        let borrowed = PatchGenerator::generate_patch_ref("f.txt", "a\nb\n", "a\nc\n");
+        let owned = PatchGenerator::generate_patch("f.txt", "a\nb\n", "a\nc\n");
+        assert_eq!(owned.file_path, borrowed.file_path);
+        assert_eq!(owned.hunks.len(), borrowed.hunks.len());
+        assert_eq!(owned.hunks[0].lines.len(), borrowed.hunks[0].lines.len());
+    }
+
+    #[test]
+    fn trim_common_tail_drops_large_trailing_identical_blocks_at_u0() {
+        let prefix = "head\nline\n";
+        let old_diff = "old_diff\n";
+        let new_diff = "new_diff\n";
+        let common_tail = "unchanged\n".repeat(200);
+        let old = format!("{prefix}{old_diff}{common_tail}");
+        let new = format!("{prefix}{new_diff}{common_tail}");
+
+        let patch_u0 = PatchGenerator::generate_patch_ref_with_context("f.txt", &old, &new, 0);
+        assert_eq!(patch_u0.hunks.len(), 1);
+        let hunk = &patch_u0.hunks[0];
+        assert_eq!(hunk.old_start, 3);
+        assert_eq!(hunk.old_count, 1);
+        assert_eq!(hunk.new_start, 3);
+        assert_eq!(hunk.new_count, 1);
+        assert_eq!(
+            hunk.lines,
+            vec![
+                PatchLineRef::Deletion("old_diff"),
+                PatchLineRef::Addition("new_diff"),
+            ]
         );
     }
 }

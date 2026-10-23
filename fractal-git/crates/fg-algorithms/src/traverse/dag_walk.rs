@@ -104,6 +104,7 @@ impl DagWalker {
 
         let mut visited: FastOidSet = FastOidSet::default();
         let mut heap: BinaryHeap<QueueItem> = BinaryHeap::new();
+        let mut node_cache: FastOidMap<Vec<Oid>> = FastOidMap::default();
 
         heap.push(QueueItem {
             gen: descendant_gen,
@@ -121,8 +122,11 @@ impl DagWalker {
                 return true;
             }
 
-            let parents = match get_node(&item.oid) {
-                Some((_, parents)) => parents,
+            let parents = match node_cache
+                .remove(&item.oid)
+                .or_else(|| get_node(&item.oid).map(|(_, parents)| parents))
+            {
+                Some(parents) => parents,
                 None => continue,
             };
 
@@ -135,12 +139,13 @@ impl DagWalker {
                     continue;
                 }
 
-                if let Some((p_gen, _)) = get_node(&parent) {
+                if let Some((p_gen, p_parents)) = get_node(&parent) {
                     if p_gen >= ancestor_gen {
                         heap.push(QueueItem {
                             gen: p_gen,
                             oid: parent,
                         });
+                        node_cache.insert(parent, p_parents);
                     }
                 }
             }
@@ -174,6 +179,7 @@ impl DagWalker {
 
         let mut visited: FastOidSet = FastOidSet::default();
         let mut heap: BinaryHeap<QueueItem> = BinaryHeap::new();
+        let mut node_cache: FastOidMap<Vec<Oid>> = FastOidMap::default();
 
         heap.push(QueueItem {
             gen: descendant_ccd.0,
@@ -191,8 +197,11 @@ impl DagWalker {
                 return true;
             }
 
-            let parents = match get_node(&item.oid) {
-                Some((_, parents)) => parents,
+            let parents = match node_cache
+                .remove(&item.oid)
+                .or_else(|| get_node(&item.oid).map(|(_, parents)| parents))
+            {
+                Some(parents) => parents,
                 None => continue,
             };
 
@@ -205,12 +214,13 @@ impl DagWalker {
                     continue;
                 }
 
-                if let Some((p_ccd, _)) = get_node(&parent) {
+                if let Some((p_ccd, p_parents)) = get_node(&parent) {
                     if p_ccd.0 >= ancestor_ccd.0 {
                         heap.push(QueueItem {
                             gen: p_ccd.0,
                             oid: parent,
                         });
+                        node_cache.insert(parent, p_parents);
                     }
                 }
             }
@@ -300,11 +310,11 @@ impl DagWalker {
 
         let node_a = get_node(commit_a);
         let node_b = get_node(commit_b);
-        let (ccd_a, _) = match node_a {
+        let (ccd_a, parents_a) = match node_a {
             Some(node) => node,
             None => return Vec::new(),
         };
-        let (ccd_b, _) = match node_b {
+        let (ccd_b, parents_b) = match node_b {
             Some(n) => n,
             None => return Vec::new(),
         };
@@ -318,14 +328,24 @@ impl DagWalker {
             return vec![*commit_b];
         }
 
-        let candidate_bases =
-            Self::collect_candidate_merge_bases(commit_a, commit_b, ccd_a, ccd_b, &mut get_node);
+        let mut node_cache: FastOidMap<(CorrectedCommitDate, Vec<Oid>)> = FastOidMap::default();
+        node_cache.insert(*commit_a, (ccd_a, parents_a));
+        node_cache.insert(*commit_b, (ccd_b, parents_b));
+
+        let candidate_bases = Self::collect_candidate_merge_bases(
+            commit_a,
+            commit_b,
+            ccd_a,
+            ccd_b,
+            &mut get_node,
+            &mut node_cache,
+        );
 
         if candidate_bases.len() <= 1 {
             return candidate_bases;
         }
 
-        Self::prune_redundant_merge_bases(&candidate_bases, get_node)
+        Self::prune_redundant_merge_bases(&candidate_bases, get_node, node_cache)
     }
 
     fn collect_candidate_merge_bases<F>(
@@ -334,6 +354,7 @@ impl DagWalker {
         ccd_a: CorrectedCommitDate,
         ccd_b: CorrectedCommitDate,
         mut get_node: F,
+        node_cache: &mut FastOidMap<(CorrectedCommitDate, Vec<Oid>)>,
     ) -> Vec<Oid>
     where
         F: FnMut(&Oid) -> Option<(CorrectedCommitDate, Vec<Oid>)>,
@@ -384,7 +405,14 @@ impl DagWalker {
                 }
             }
 
-            if let Some((_, parents)) = get_node(&item.oid) {
+            let node = match node_cache.entry(item.oid) {
+                std::collections::hash_map::Entry::Occupied(e) => Some(e.get().clone()),
+                std::collections::hash_map::Entry::Vacant(e) => {
+                    get_node(&item.oid).map(|n| e.insert(n).clone())
+                }
+            };
+
+            if let Some((_, parents)) = node {
                 let parent_flags_to_propagate = if (current_flags & FLAG_COMMON) == FLAG_COMMON {
                     current_flags | FLAG_STALE
                 } else {
@@ -398,7 +426,13 @@ impl DagWalker {
 
                     if new_flags != old_flags {
                         *entry = new_flags;
-                        if let Some((p_ccd, _)) = get_node(&parent) {
+                        let p_node = match node_cache.entry(parent) {
+                            std::collections::hash_map::Entry::Occupied(e) => Some(e.get().clone()),
+                            std::collections::hash_map::Entry::Vacant(e) => {
+                                get_node(&parent).map(|n| e.insert(n).clone())
+                            }
+                        };
+                        if let Some((p_ccd, _)) = p_node {
                             queue.push(QueueItem {
                                 gen: p_ccd.0,
                                 oid: parent,
@@ -412,21 +446,36 @@ impl DagWalker {
         candidate_bases
     }
 
-    fn prune_redundant_merge_bases<F>(candidate_bases: &[Oid], mut get_node: F) -> Vec<Oid>
+    fn prune_redundant_merge_bases<F>(
+        candidate_bases: &[Oid],
+        mut get_node: F,
+        mut node_cache: FastOidMap<(CorrectedCommitDate, Vec<Oid>)>,
+    ) -> Vec<Oid>
     where
         F: FnMut(&Oid) -> Option<(CorrectedCommitDate, Vec<Oid>)>,
     {
         // Post-filter: eliminate any candidate that is an ancestor of another candidate
+        let mut cached_lookup = |oid: &Oid| -> Option<(CorrectedCommitDate, Vec<Oid>)> {
+            if let Some(cached) = node_cache.get(oid) {
+                return Some(cached.clone());
+            }
+            if let Some(loaded) = get_node(oid) {
+                node_cache.insert(*oid, loaded.clone());
+                return Some(loaded);
+            }
+            None
+        };
+
         let mut final_bases = Vec::new();
         for (i, cand) in candidate_bases.iter().enumerate() {
-            let cand_ccd = get_node(cand)
+            let cand_ccd = cached_lookup(cand)
                 .map(|(commit_date, _)| commit_date)
                 .unwrap_or(CorrectedCommitDate(0));
             let mut is_redundant = false;
 
             for (j, other) in candidate_bases.iter().enumerate() {
                 if i != j {
-                    let other_ccd = get_node(other)
+                    let other_ccd = cached_lookup(other)
                         .map(|(commit_date, _)| commit_date)
                         .unwrap_or(CorrectedCommitDate(0));
                     if DagWalker::is_ancestor_with_ccd(
@@ -434,7 +483,7 @@ impl DagWalker {
                         other,
                         cand_ccd,
                         other_ccd,
-                        &mut get_node,
+                        &mut cached_lookup,
                     ) {
                         is_redundant = true;
                         break;

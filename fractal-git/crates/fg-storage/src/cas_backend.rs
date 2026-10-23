@@ -225,7 +225,16 @@ impl CasBackend {
                 return Ok(cached);
             }
         }
+        self.get_block_with_kind(oid).map(|(_, payload)| payload)
+    }
 
+    /// Reads a block from CAS, returning its recorded object kind and payload.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FractalError::ObjectCodec`] when the block is absent, its header is truncated or
+    /// carries an unknown kind, or the recovered bytes do not hash to the requested id.
+    pub fn get_block_with_kind(&self, oid: &Oid) -> FractalResult<(ObjectKind, Vec<u8>)> {
         let path = self.block_path(oid);
         let pfx_path = self.pfx_block_path(oid);
 
@@ -255,7 +264,7 @@ impl CasBackend {
             cache.insert(*oid, block_bytes.clone(), block_bytes.len());
         }
 
-        Ok(block_bytes)
+        Ok((kind, block_bytes))
     }
 
     /// Reconstructs a delta-compressed block and returns the kind it was stored as.
@@ -302,5 +311,60 @@ impl CasBackend {
             }
         }
         self.block_path(oid).exists() || self.pfx_block_path(oid).exists()
+    }
+
+    /// Lists all object ids stored in this CAS instance.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`FractalError::Io`] on filesystem read errors.
+    pub fn list_all_oids(&self) -> FractalResult<Vec<Oid>> {
+        let blocks_dir = if self.root_dir.join("blocks").is_dir() {
+            self.root_dir.join("blocks")
+        } else if self.root_dir.join("objects/blocks").is_dir() {
+            self.root_dir.join("objects/blocks")
+        } else {
+            return Ok(Vec::new());
+        };
+
+        let mut oids = Vec::new();
+        for dir_entry in fs::read_dir(&blocks_dir)? {
+            let dir_entry = dir_entry?;
+            if !dir_entry.file_type()?.is_dir() {
+                continue;
+            }
+            let dir_name = dir_entry.file_name();
+            let dir_str = dir_name.to_string_lossy();
+            if dir_str.len() != 2 {
+                continue;
+            }
+            Self::collect_fanout_oids(&dir_entry.path(), &dir_str, &mut oids)?;
+        }
+        oids.sort();
+        oids.dedup();
+        Ok(oids)
+    }
+
+    /// Gathers OIDs from a single 2-character fanout directory.
+    fn collect_fanout_oids(
+        fanout_dir: &Path,
+        prefix: &str,
+        oids: &mut Vec<Oid>,
+    ) -> FractalResult<()> {
+        for file_entry in fs::read_dir(fanout_dir)? {
+            let file_entry = file_entry?;
+            let file_name = file_entry.file_name();
+            let mut file_str = file_name.to_string_lossy().into_owned();
+            if file_str.ends_with(".pfx") {
+                file_str.truncate(file_str.len() - 4);
+            }
+            if file_str.len() == 38 {
+                let full_hex = format!("{prefix}{file_str}");
+                if let Ok(oid) = Oid::from_hex(&full_hex) {
+                    oids.push(oid);
+                }
+            }
+        }
+        Ok(())
     }
 }

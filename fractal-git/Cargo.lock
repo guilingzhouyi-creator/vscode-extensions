@@ -169,6 +169,7 @@ version = "0.1.0"
 dependencies = [
  "fg-core",
  "fg-object",
+ "sha1",
 ]
 
 [[package]]
@@ -205,9 +206,11 @@ dependencies = [
 name = "fg-storage"
 version = "0.1.0"
 dependencies = [
+ "chrono",
  "fg-algorithms",
  "fg-core",
  "fg-index",
+ "fg-native",
  "fg-object",
  "fg-pools",
  "flate2",

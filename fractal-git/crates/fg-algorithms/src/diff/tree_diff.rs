@@ -174,7 +174,7 @@ impl TreeDiff {
     where
         F: FnMut(&Oid) -> Option<GitTree>,
     {
-        match old_entry.name.cmp(&new_entry.name) {
+        match old_entry.cmp_canonical(new_entry) {
             std::cmp::Ordering::Equal => {
                 Self::process_matching_entry(old_entry, new_entry, lookup_tree, state);
                 (1, 1)

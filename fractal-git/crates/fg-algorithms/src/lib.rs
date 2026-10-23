@@ -20,8 +20,10 @@ pub mod traverse;
 pub use bloom::PathBloomFilter;
 pub use cdc::{apply_edits, ChunkDescriptor, EditOp, FastCdcChunker, FastCdcIter, GEAR_TABLE};
 pub use diff::{
-    ChangeKind, DiffEntry, MyersScratch, PatchGenerator, PatchHunk, PatchHunkRef, PatchLine,
-    PatchLineRef, TreeDiff, TreeDiffState, UnifiedPatch, UnifiedPatchRef,
+    detect_renames, split_lines, text_ends_with_newline, BlobRef, ChangeKind, Compaction,
+    DiffEntry, PatchGenerator, PatchHunk, PatchHunkRef, PatchLine, PatchLineRef, RenameHit, Side,
+    TreeDiff, TreeDiffState, UnifiedPatch, UnifiedPatchRef, DEFAULT_HUNK_CONTEXT,
+    DEFAULT_RENAME_SCORE, MAX_RENAME_SCORE,
 };
 pub use math::{compute_jeffreys_credible_lower, evaluate_score_envelope, PosteriorScoreEstimate};
 pub use merge::{
