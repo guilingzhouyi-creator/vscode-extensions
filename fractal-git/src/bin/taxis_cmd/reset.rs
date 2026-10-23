@@ -25,7 +25,8 @@ use fractal_git::constants::cli::CliTag;
 use fractal_git::{DiskRefStore, OperationGraph, RepoViewSnapshot};
 
 use super::checkout::{
-    materialize_files, remove_stale_files, update_dirc_index, update_references,
+    assert_worktree_cleanliness, materialize_files, remove_stale_files, update_dirc_index,
+    update_references,
 };
 use super::common::{print_json, reject, CliContext};
 use super::repo_view::RepoView;
@@ -47,6 +48,7 @@ pub enum ResetMode {
 struct ResetOptions {
     mode: ResetMode,
     target: String,
+    force: bool,
 }
 
 /// Dispatches the `reset` command.
@@ -67,6 +69,30 @@ pub fn handle_reset(ctx: &CliContext) {
         .ok()
         .flatten()
         .map(|(branch_name, _)| branch_name);
+
+    // Guard 1: Protect System Trunk & Trunk from non-HEAD history rewriting
+    if let Some(ref br) = effective_branch {
+        if br == "main" || br == "trunk" || br == "refs/heads/main" || br == "refs/heads/trunk" {
+            let current_head = view.head_commit().ok().flatten();
+            if current_head != Some(target_commit) && !opts.force {
+                reject(
+                    CliTag::AUTHORITY_BREACH,
+                    format!(
+                        "Resetting protected trunk branch '{br}' backwards to {target_commit} is forbidden. \
+                         Trunk history is append-only; use 'taxis revert' instead."
+                    ),
+                );
+            }
+        }
+    }
+
+    // Guard 2: Protect working tree from silent overwrite in --hard mode unless forced
+    if opts.mode == ResetMode::Hard {
+        assert_worktree_cleanliness(&view, opts.force);
+    }
+
+    // Record snapshot to OperationGraph BEFORE state mutation for 100% reliable undo
+    record_reset_operation(&view, target_commit, &opts, effective_branch.as_deref());
 
     match opts.mode {
         ResetMode::Soft => {
@@ -100,7 +126,6 @@ pub fn handle_reset(ctx: &CliContext) {
         }
     }
 
-    record_reset_operation(&view, target_commit, &opts, effective_branch.as_deref());
     print_reset_feedback(ctx, &opts, target_commit, effective_branch.as_deref());
 }
 
@@ -108,12 +133,14 @@ pub fn handle_reset(ctx: &CliContext) {
 fn parse_reset_options(args: &[String]) -> ResetOptions {
     let mut mode = ResetMode::Mixed;
     let mut target = "HEAD".to_string();
+    let mut force = false;
 
     for arg in args {
         match arg.as_str() {
             "--soft" => mode = ResetMode::Soft,
             "--mixed" => mode = ResetMode::Mixed,
             "--hard" => mode = ResetMode::Hard,
+            "-f" | "--force" => force = true,
             other if !other.starts_with('-') => {
                 target = other.to_string();
             }
@@ -121,7 +148,11 @@ fn parse_reset_options(args: &[String]) -> ResetOptions {
         }
     }
 
-    ResetOptions { mode, target }
+    ResetOptions {
+        mode,
+        target,
+        force,
+    }
 }
 
 /// Rebuilds DIRC index entries for mixed reset without touching working files.

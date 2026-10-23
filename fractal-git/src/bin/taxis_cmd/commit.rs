@@ -24,9 +24,10 @@ use fg_native::sections::refs::RefRecord;
 use fg_native::RepoDocument;
 use fractal_git::constants::cli::CliTag;
 use fractal_git::{
-    materialize_commit, ActorIdentity, AgentPushContext, CommitMaterializationRequest,
-    CommitMessageGuard, DiskRefStore, FractalRef, GitSignature, LooseOdb, OperationGraph,
-    PreReceiveGuard, RepoViewSnapshot, TaxisPolicy, ValidatedCommitWitness,
+    materialize_commit, ActorIdentity, AgentPushContext, BlockProvenanceEntry,
+    BlockProvenanceParams, CommitMaterializationRequest, CommitMessageGuard, DiskProvenanceStore,
+    DiskRefStore, FractalRef, GitSignature, LooseOdb, OperationGraph, PreReceiveGuard,
+    RepoViewSnapshot, TaxisPolicy, ValidatedCommitWitness,
 };
 
 use super::common::{fail_io, find_all_arg_values, find_arg_value, print_json, reject, CliContext};
@@ -41,7 +42,7 @@ pub fn handle_commit(ctx: &CliContext) {
     let agent_id = find_arg_value(&ctx.args, &["--agent"]).unwrap_or("agent-primary");
     let human_author = find_arg_value(&ctx.args, &["--human"]).map(String::from);
     let auth_token = find_arg_value(&ctx.args, &["--token"]).map(String::from);
-    let policy_name = find_arg_value(&ctx.args, &["--policy"]).unwrap_or("rust-strict");
+    let policy_name = find_arg_value(&ctx.args, &["--policy"]).unwrap_or("workspace-strict");
     let explicit_target = find_arg_value(&ctx.args, &["--target"]);
     let target_ref_str = match explicit_target {
         Some(t) => t.to_string(),
@@ -168,6 +169,7 @@ pub fn handle_commit(ctx: &CliContext) {
     }
 
     record_commit_in_operation_graph(ctx, &materialized.commit_oid, &target_ref, &actor, &witness);
+    record_block_provenance(ctx, &materialized, &staged_files, agent_id, cell_id);
 
     output_commit_result(
         ctx,
@@ -185,7 +187,8 @@ fn resolve_commit_policy(policy_name: &str) -> TaxisPolicy {
     match policy_name {
         "conventional" | "conventional-semantic" => TaxisPolicy::conventional_semantic(),
         "native" | "git-native" => TaxisPolicy::git_native(),
-        _ => TaxisPolicy::rust_strict(),
+        "rust-strict" => TaxisPolicy::rust_strict(),
+        _ => TaxisPolicy::workspace_strict(),
     }
 }
 
@@ -437,4 +440,47 @@ fn record_commit_in_operation_graph(
     ) {
         fail_io("record commit operation", record_err);
     }
+}
+
+/// Records mechanical block-level provenance with host nanosecond physical timestamps.
+fn record_block_provenance(
+    ctx: &CliContext,
+    materialized: &fractal_git::MaterializedCommit,
+    staged_files: &[String],
+    agent_id: &str,
+    cell_id: &str,
+) {
+    let physical_timestamp_ns = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|dur| dur.as_nanos() as u64)
+        .unwrap_or(0);
+
+    let work_root = super::repo_view::resolve_work_root(&ctx.git_dir);
+    let mut entries = Vec::with_capacity(staged_files.len());
+    let base_commit = materialized.parent_oid.unwrap_or(Oid::ZERO);
+
+    for (i, file_path) in staged_files.iter().enumerate() {
+        let blob_oid = materialized.blob_oids.get(i).copied().unwrap_or(Oid::ZERO);
+        let full_path = work_root.join(file_path);
+        let line_count = if let Ok(content) = fs::read_to_string(&full_path) {
+            content.lines().count().max(1) as u32
+        } else {
+            1
+        };
+
+        entries.push(BlockProvenanceEntry::new(BlockProvenanceParams {
+            file_path: file_path.clone(),
+            block_id: format!("{file_path}:root"),
+            line_span: (1, line_count),
+            block_hash: blob_oid,
+            physical_timestamp_ns,
+            ccd_generation: 1,
+            agent_uid: agent_id.to_string(),
+            cell_id: cell_id.to_string(),
+            base_commit,
+        }));
+    }
+
+    let store = DiskProvenanceStore::new(&ctx.git_dir);
+    let _ = store.record_batch(entries);
 }

@@ -12,6 +12,7 @@
 
 pub mod abbrev;
 pub mod bench;
+pub mod blackboard;
 pub mod branch;
 pub mod checkout;
 pub mod cherry_pick;

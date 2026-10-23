@@ -214,3 +214,20 @@ cargo fmt --manifest-path fractal-git/Cargo.toml --all -- --check
 | 10 | **C6** 与宿主 Git 彻底切割 | ✅ 彻底切割 | 全源码扫描实测 `Command::new("git")` 彻底归零（0 处引用），未知命令统一由 `reject_unimplemented` 明确拒绝，Taxis 实现 100% 原生自举运行 | 源码静态断言验证 0 处外部 Git 进程依赖 |
 
 **C6 达成证明**：全仓经过架构解耦与算子下沉后，核心与边缘瓷器命令已不再依赖宿主 Git 二进制，所有数据读写、索引匹配、历史遍历、对象序列化均基于 10 微 Crate 内核自举运行。
+
+---
+
+## 九、Taxis 治理强化、假冲突消融、意图黑板与客观时间戳 (Governance V2 闭环)
+
+为保障 Taxis 自举管理自身源码与多 Agent 协作稳定性，全量落地 5 大治理与并发能力：
+
+| 治理支柱 | 核心模块与承载 | 机制与设计契约 | 验证证据 |
+| :--- | :--- | :--- | :--- |
+| **1. 强推/回滚刚性防御** | `crates/fg-gate/src/pre_receive.rs`<br>`src/bin/taxis_cmd/reset.rs` | 对 `SystemTrunk`/`Trunk`/`CellMain` 刚性一票否决强推；Agent 禁止在任何分支强推；`reset --hard` 前置检查工作区洁净度，脏工作区拒绝抹除；误回滚经 OperationGraph 100% 可撤销 | `test_force_push_pre_receive_barriers`<br>`taxis reset --hard` 防误删断言 |
+| **2. 工作区提交信息纪律** | `crates/fg-core/src/models/policy.rs`<br>`crates/fg-gate/src/commit_guard.rs` | 对齐 `AGENTS.md`：强制 `[Project]` 标签（`fractal-git` 等受控项目单源校验）、质性验证契约、中英双语 38 项禁词（`wip`, `temp`, `完美`, `彻底` 等）刚性拦截 | `test_workspace_strict_commit_policy`<br>559 项回归测试覆盖 |
+| **3. 假冲突消融与块级合并** | `crates/fg-algorithms/src/merge/block_merge.rs` | 顶层导入声明无序 Set Union 并集去重；顶层声明块（函数/结构体/类）差分提取与无冲突推标拼接（Pushout Commutativity），同一文件不同区域修改自动共存 | `test_block_three_way_merge_concurrent_modifications`<br>`taxis merge` 自动触发 |
+| **4. 共享意图黑板 (Blackboard)** | `crates/fg-core/src/models/blackboard.rs`<br>`crates/fg-topology/src/blackboard.rs`<br>`src/bin/taxis_cmd/blackboard.rs` | Card 作用域无锁意图声明租约（Claim/Check/Release/List）；细粒度文件+语义 Scope（如 `fn name`）独占探测；TTL 自动过期裁剪与原子暂存落盘 | `test_card_blackboard_and_disk_store`<br>`taxis blackboard` CLI 完整就绪 |
+| **5. 递归分形 Hook 拦截管道** | `crates/fg-gate/src/hook.rs` | 覆盖 L1(`SubToCard`)、L2(`CardToCell`)、L3(`CellToTrunk`) 3 级暂存区；内置 `HygieneConflictHook`、`CommitGovernanceHook`、`UacPromotionGateHook`；开放 `FractalHook` Trait 支持扩展自定义注入 | `test_fractal_hook_pipeline`<br>分级 PASS/BLOCK 阻断验证 |
+| **6. 机械客观代码时间戳 (MCPL)** | `crates/fg-core/src/models/provenance.rs`<br>`crates/fg-topology/src/provenance.rs`<br>`src/bin/taxis_cmd/commit.rs` | 宿主系统内核物理纳秒时间戳（`physical_timestamp_ns`）+ CCD v2 世代号 + 块哈希，脱离模型自觉客观记录至 `.taxis/provenance.json` | `test_mechanical_provenance_store`<br>`taxis commit` 原生自动注入 |
+
+全量测试 559 项 100% 绿灯，`audit-taxis.ps1 -Fast` 5/5 级工业门禁一次性全绿通行，架构零多余 Crate，完整闭环。

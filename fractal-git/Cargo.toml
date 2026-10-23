@@ -113,3 +113,7 @@ path = "tests/rust/test_commit_graph.rs"
 [[test]]
 name = "test_commit_materializer"
 path = "tests/rust/test_commit_materializer.rs"
+
+[[test]]
+name = "test_governance_pipeline"
+path = "tests/rust/test_governance_pipeline.rs"

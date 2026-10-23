@@ -46,15 +46,16 @@ pub fn handle_tag(ctx: &CliContext) {
         Err(open_err) => reject(CliTag::ERROR, open_err),
     };
 
-    if opts.name.is_none() && !opts.delete {
-        list_all_tags(&view, ctx);
-        return;
-    }
-
-    let tag_name = opts.name.clone().unwrap();
+    let Some(ref tag_name) = opts.name else {
+        if !opts.delete {
+            list_all_tags(&view, ctx);
+            return;
+        }
+        reject(CliTag::ERROR, "tag name required for deletion");
+    };
 
     if opts.delete {
-        delete_tag(&view, &tag_name, ctx);
+        delete_tag(&view, tag_name, ctx);
         return;
     }
 
@@ -77,9 +78,9 @@ pub fn handle_tag(ctx: &CliContext) {
     }
 
     if opts.annotated {
-        create_annotated_tag(&view, &ref_store, &tag_name, target_oid, &opts, ctx);
+        create_annotated_tag(&view, &ref_store, tag_name, target_oid, &opts, ctx);
     } else {
-        create_lightweight_tag(&ref_store, &tag_name, target_oid, ctx);
+        create_lightweight_tag(&ref_store, tag_name, target_oid, ctx);
     }
 }
 

@@ -28,9 +28,9 @@ pub use diff::{
 };
 pub use math::{compute_jeffreys_credible_lower, evaluate_score_envelope, PosteriorScoreEstimate};
 pub use merge::{
-    AlgebraicMerge, CanonicalConflictEntry, CanonicalMergeResult, ConflictEntry, FastPathMerge,
-    TextMergeResult, TextThreeWayMerge, ThreeWayMerge, ThreeWayMergeResult,
-    VirtualMergeBaseSynthesizer,
+    AlgebraicMerge, BlockMergeResult, BlockThreeWayMerge, CanonicalConflictEntry,
+    CanonicalMergeResult, ConflictEntry, FastPathMerge, TextMergeResult, TextThreeWayMerge,
+    ThreeWayMerge, ThreeWayMergeResult, VirtualMergeBaseSynthesizer,
 };
 pub use poset::CorrectedCommitDate;
 pub use synthetic::{

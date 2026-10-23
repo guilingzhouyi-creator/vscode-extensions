@@ -18,9 +18,9 @@ use std::path::PathBuf;
 mod taxis_cmd;
 use taxis_cmd::common::{reject, CliContext};
 use taxis_cmd::{
-    bench, branch, checkout, cherry_pick, commit, daemon, diff, doctor, init, log, merge,
-    operation, projection, promotion, read, rebase, reclaim, relocate, reset, rev_list, revert,
-    stash, status, tag, undo, verify, worktree,
+    bench, blackboard, branch, checkout, cherry_pick, commit, daemon, diff, doctor, init, log,
+    merge, operation, projection, promotion, read, rebase, reclaim, relocate, reset, rev_list,
+    revert, stash, status, tag, undo, verify, worktree,
 };
 
 use fractal_git::constants::cli::CliTag;
@@ -55,6 +55,7 @@ fn resolve_canonical_subcommand(raw: &str) -> &str {
         (&["stash"], "stash"),
         (&["wt", "worktree"], "worktree"),
         (&["pm", "promo", "promotion"], "promotion"),
+        (&["bb", "blackboard"], "blackboard"),
         (&["bench", "benchmark"], "bench"),
         (&["undo"], "undo"),
         (&["op", "operation"], "operation"),
@@ -107,6 +108,7 @@ Native Fractal Commands (with Git Alias Mappings):
   verify,   check    Run pre-receive guard, conflict marker scanner & quota checks
   reclaim,  gc       Trigger zero-allocation worktree & sandbox reclamation
   worktree, wt       Display or allocate scoped projection worktree (--scope / --full)
+  blackboard, bb     Manage concurrent SubAgent intent leases (claim, check, release, list)
   promotion, pm      Manage staged promotions to System Trunk with Human GUI UAC gate
   bench,    benchmark Run performance benchmarks (--level <1|2|3|all>, -m <mult>)
   daemon,   serve    Display protocol daemon status & IPC endpoints
@@ -234,6 +236,7 @@ fn dispatch_command(effective_subcommand: &str, ctx: &CliContext) {
         "stash" => stash::handle_stash(ctx),
         "rebase" => rebase::handle_rebase(ctx),
         "worktree" => worktree::handle_worktree(ctx),
+        "blackboard" => blackboard::handle_blackboard(ctx),
         "promotion" => promotion::handle_promotion(ctx),
         "bench" => bench::handle_bench(ctx),
         "undo" => undo::handle_undo(ctx),
@@ -259,7 +262,7 @@ fn reject_unimplemented(subcommand: &str) -> ! {
             "'{subcommand}' has no native implementation in this build. \
              Implemented: init, doctor, relocate, git-export, git-import, status, branch, commit, diff, cat-file, ls-tree, \
              ls-files, show-ref, for-each-ref, check-ignore, log, show, checkout, merge, reset, tag, cherry-pick, revert, \
-             stash, rebase, worktree, promotion, bench, undo, operation, rev-list, verify, reclaim, daemon, version, help."
+             stash, rebase, worktree, blackboard, promotion, bench, undo, operation, rev-list, verify, reclaim, daemon, version, help."
         ),
     )
 }

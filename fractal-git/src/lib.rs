@@ -57,9 +57,10 @@ pub use fg_core::constants;
 pub use fg_core::error::{FractalError, FractalResult};
 pub use fg_core::models::{
     ActorIdentity, AgentCommitMeta, AgentPushContext, AuthorityTier, AutoQualityScoreEnvelope,
-    ChangeId, DiffCoherenceMode, FileMode, GitSignature, HumanUacProof, IndexStage, Oid,
-    PraxisCardContext, StagedPromotionRequest, StagedPromotionStatus, TaxisPolicy,
-    ValidatedCommitWitness,
+    BlackboardCollision, BlockProvenanceEntry, BlockProvenanceParams, CardBlackboard, ChangeId,
+    DiffCoherenceMode, FileMode, GitSignature, HumanUacProof, IndexStage, IntentLease, Oid,
+    PraxisCardContext, ProvenanceLedger, StagedPromotionRequest, StagedPromotionStatus,
+    TaxisPolicy, ValidatedCommitWitness,
 };
 pub use fg_core::traits::{
     GateVerdict, GateVerifier, OdbStore, ReclamationAudit, RefStore, StagedCandidate,
@@ -83,7 +84,8 @@ pub use fg_algorithms::math::{
     compute_jeffreys_credible_lower, evaluate_score_envelope, PosteriorScoreEstimate,
 };
 pub use fg_algorithms::merge::{
-    AlgebraicMerge, CanonicalConflictEntry, CanonicalMergeResult, ConflictEntry, FastPathMerge,
+    AlgebraicMerge, BlockMergeResult, BlockThreeWayMerge, CanonicalConflictEntry,
+    CanonicalMergeResult, ConflictEntry, FastPathMerge, TextMergeResult, TextThreeWayMerge,
     ThreeWayMerge, ThreeWayMergeResult, VirtualMergeBaseSynthesizer,
 };
 pub use fg_algorithms::synthetic::{
@@ -112,8 +114,10 @@ pub use fg_storage::wal_journal::{WalJournal, WalRecord};
 
 // Topology exports
 pub use fg_topology::authorizer::{HumanUacAuthorizer, StandardNonceAuthorizer};
+pub use fg_topology::blackboard::{DiskBlackboardStore, BLACKBOARD_DIR};
 pub use fg_topology::operation::{Operation, OperationGraph, OperationMetadata, RepoViewSnapshot};
 pub use fg_topology::promotion_ledger::{PromotionLedgerData, PromotionStagingLedger};
+pub use fg_topology::provenance::{DiskProvenanceStore, PROVENANCE_FILE};
 pub use fg_topology::refs::{DiskRefStore, FractalRef, HeadState};
 pub use fg_topology::state_machine::{FractalWorkspaceNode, WorktreeState};
 pub use fg_topology::telemetry::{
@@ -130,6 +134,10 @@ pub use fg_transport::smart_protocol::ProtocolV2Handler;
 // Gate & Policy exports
 pub use fg_gate::commit_guard::CommitMessageGuard;
 pub use fg_gate::conflict_guard::ConflictGuard;
+pub use fg_gate::hook::{
+    CommitGovernanceHook, FractalHook, HookContext, HookPipeline, HookTier, HookVerdict,
+    HygieneConflictHook, UacPromotionGateHook,
+};
 pub use fg_gate::pre_receive::PreReceiveGuard;
 pub use fg_gate::quota_governor::QuotaGovernor;
 

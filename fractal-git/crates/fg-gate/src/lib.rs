@@ -9,11 +9,16 @@
 
 pub mod commit_guard;
 pub mod conflict_guard;
+pub mod hook;
 pub mod pre_receive;
 pub mod quota_governor;
 
 pub use commit_guard::CommitMessageGuard;
 pub use conflict_guard::ConflictGuard;
+pub use hook::{
+    CommitGovernanceHook, FractalHook, HookContext, HookPipeline, HookTier, HookVerdict,
+    HygieneConflictHook, UacPromotionGateHook,
+};
 pub use pre_receive::{ActorIdentity, AgentPushContext, PreReceiveGuard};
 pub use quota_governor::{
     QuotaGovernor, DEFAULT_MAX_CONCURRENT_WORKTREES, DEFAULT_MAX_WORKSPACE_DISK_BYTES,

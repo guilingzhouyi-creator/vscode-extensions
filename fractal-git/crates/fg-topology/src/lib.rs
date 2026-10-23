@@ -9,8 +9,10 @@
 //! Exit Semantics & Design Rationale: Exposes high-level state machine interfaces cleanly.
 
 pub mod authorizer;
+pub mod blackboard;
 pub mod operation;
 pub mod promotion_ledger;
+pub mod provenance;
 pub mod refs;
 pub mod state_machine;
 pub mod telemetry;
@@ -18,8 +20,10 @@ pub mod verifier;
 pub mod worktree;
 
 pub use authorizer::{HumanUacAuthorizer, StandardNonceAuthorizer};
+pub use blackboard::{DiskBlackboardStore, BLACKBOARD_DIR};
 pub use operation::{Operation, OperationGraph, OperationMetadata, RepoViewSnapshot};
 pub use promotion_ledger::{PromotionLedgerData, PromotionStagingLedger};
+pub use provenance::{DiskProvenanceStore, PROVENANCE_FILE};
 pub use refs::{DiskRefStore, FractalRef, HeadState};
 pub use state_machine::{FractalWorkspaceNode, WorktreeState};
 pub use telemetry::{

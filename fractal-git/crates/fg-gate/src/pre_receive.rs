@@ -32,15 +32,13 @@ impl PreReceiveGuard {
         actor: &ActorIdentity,
         policy: &TaxisPolicy,
     ) -> FractalResult<()> {
-        // Rule 1: Check force push if agent
-        if let ActorIdentity::Agent(ref ctx) = actor {
-            if ctx.is_force_push {
-                return Err(FractalError::TopologyBreach {
-                    source_ref: ctx.agent_uid.clone(),
-                    target_ref: target_ref.to_git_ref(),
-                    reason: "Force push (--force) is categorically forbidden in fractal git".into(),
-                });
-            }
+        // Rule 1: Check force push
+        if actor.is_force_push() {
+            return Err(FractalError::TopologyBreach {
+                source_ref: actor.display_name(),
+                target_ref: target_ref.to_git_ref(),
+                reason: "Force push (--force) is categorically forbidden in fractal git".into(),
+            });
         }
 
         // Rule 2: Human control boundary on dual trunks
@@ -129,6 +127,35 @@ impl PreReceiveGuard {
         }
 
         Ok(())
+    }
+
+    /// Asserts whether a force-push or forced reference rewrite is legal.
+    /// Force-pushing to SystemTrunk, Trunk, or CellMain is categorically prohibited across all actors.
+    pub fn assert_force_push_allowed(
+        target_ref: &FractalRef,
+        actor: &ActorIdentity,
+    ) -> FractalResult<()> {
+        match target_ref {
+            FractalRef::SystemTrunk { .. } | FractalRef::Trunk | FractalRef::CellMain { .. } => {
+                Err(FractalError::TopologyBreach {
+                    source_ref: actor.display_name(),
+                    target_ref: target_ref.to_git_ref(),
+                    reason: "Force push (--force) is categorically forbidden on trunk and cell-main branches; use 'revert' instead"
+                        .into(),
+                })
+            }
+            FractalRef::SubAgentWorktree { .. } | FractalRef::CardWorktree { .. } => {
+                if actor.is_agent() {
+                    Err(FractalError::TopologyBreach {
+                        source_ref: actor.display_name(),
+                        target_ref: target_ref.to_git_ref(),
+                        reason: "Force push (--force) is categorically forbidden for autonomous agents".into(),
+                    })
+                } else {
+                    Ok(())
+                }
+            }
+        }
     }
 
     /// Rejects a human authority claim that carries no credential.

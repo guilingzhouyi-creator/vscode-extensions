@@ -20,7 +20,9 @@
 use std::collections::BTreeMap;
 use std::fs;
 
-use fg_algorithms::merge::{ConflictEntry, TextThreeWayMerge, ThreeWayMerge, ThreeWayMergeResult};
+use fg_algorithms::merge::{
+    BlockThreeWayMerge, ConflictEntry, TextThreeWayMerge, ThreeWayMerge, ThreeWayMergeResult,
+};
 use fg_algorithms::traverse::DagWalker;
 use fg_core::constants::git::{OBJ_BLOB, OBJ_COMMIT, OBJ_TREE};
 use fg_core::models::{CorrectedCommitDate, FileMode, GitSignature, IndexStage, Oid};
@@ -370,6 +372,21 @@ fn execute_three_way_merge(
                         if let Ok(new_oid) = odb.write_object(OBJ_BLOB, &merge_res.content) {
                             merged_tree.insert(conflict.path.clone(), new_oid);
                             resolved = true;
+                        }
+                    } else {
+                        // Semantic block fallback: reconcile disjoint functions & import set-union
+                        let block_res = BlockThreeWayMerge::merge(
+                            &base_payload,
+                            &ours_payload,
+                            &theirs_payload,
+                            "HEAD",
+                            &opts.target,
+                        );
+                        if block_res.is_clean {
+                            if let Ok(new_oid) = odb.write_object(OBJ_BLOB, &block_res.content) {
+                                merged_tree.insert(conflict.path.clone(), new_oid);
+                                resolved = true;
+                            }
                         }
                     }
                 }

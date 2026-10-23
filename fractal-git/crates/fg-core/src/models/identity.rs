@@ -91,6 +91,14 @@ impl ActorIdentity {
         matches!(self, Self::Agent(_))
     }
 
+    /// Checks if this actor requested a force-push operation.
+    pub fn is_force_push(&self) -> bool {
+        match self {
+            Self::Agent(ctx) => ctx.is_force_push,
+            Self::Human { .. } => false,
+        }
+    }
+
     /// Formats display name for logging and Git signatures.
     pub fn display_name(&self) -> String {
         match self {

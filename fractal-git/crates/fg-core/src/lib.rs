@@ -22,9 +22,10 @@ pub use constants::{
 pub use error::{FractalError, FractalResult};
 pub use models::{
     ActorIdentity, AgentCommitMeta, AgentPushContext, AuthorityTier, AutoQualityScoreEnvelope,
+    BlackboardCollision, BlockProvenanceEntry, BlockProvenanceParams, CardBlackboard,
     DiffCoherenceMode, FastOidHasher, FastOidMap, FastOidSet, FileMode, GitSignature,
-    HumanUacProof, IndexStage, Oid, PraxisCardContext, StagedPromotionRequest,
-    StagedPromotionStatus, TaxisPolicy, ValidatedCommitWitness,
+    HumanUacProof, IndexStage, IntentLease, Oid, PraxisCardContext, ProvenanceLedger,
+    StagedPromotionRequest, StagedPromotionStatus, TaxisPolicy, ValidatedCommitWitness,
 };
 pub use traits::{
     GateVerdict, GateVerifier, OdbStore, ReclamationAudit, RefStore, StagedCandidate,

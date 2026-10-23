@@ -65,11 +65,104 @@ pub struct TaxisPolicy {
 
 impl Default for TaxisPolicy {
     fn default() -> Self {
-        Self::rust_strict()
+        Self::workspace_strict()
     }
 }
 
 impl TaxisPolicy {
+    /// Workspace Strict Policy: Aligned with AGENTS.md, requiring [Project] tag in
+    /// ["fractal-git", "auto-refactor", "workspace-timing", "WebGames"], bilingual forbidden
+    /// terms from commit-msg-forbidden-terms.json, qualitative verification only, and Human UAC gate.
+    pub fn workspace_strict() -> Self {
+        Self {
+            name: "workspace-strict".into(),
+            allowed_types: vec![
+                "feat".into(),
+                "fix".into(),
+                "refactor".into(),
+                "perf".into(),
+                "docs".into(),
+                "test".into(),
+                "chore".into(),
+                "style".into(),
+            ],
+            min_header_chars: 5,
+            max_header_chars: 80,
+            disallow_header_period: true,
+            require_blank_line: true,
+            min_body_chars: 30,
+            production_types: vec![
+                "feat".into(),
+                "fix".into(),
+                "refactor".into(),
+                "perf".into(),
+            ],
+            required_sections: vec![
+                "Project".into(),
+                "Why".into(),
+                "Changed".into(),
+                "Verification".into(),
+            ],
+            require_project_tag: true,
+            allowed_projects: vec![
+                "fractal-git".into(),
+                "auto-refactor".into(),
+                "workspace-timing".into(),
+                "WebGames".into(),
+            ],
+            forbidden_terms: vec![
+                "wip".into(),
+                "temp".into(),
+                "tmp".into(),
+                "quick fix".into(),
+                "hack".into(),
+                "placeholder".into(),
+                "casual commit".into(),
+                "update code".into(),
+                "fix bug".into(),
+                "100% safe".into(),
+                "flawless".into(),
+                "perfect".into(),
+                "never fails".into(),
+                "zero bug".into(),
+                "exit code 0".into(),
+                "all tests passed".into(),
+                "all tests green".into(),
+                "临时".into(),
+                "暂存".into(),
+                "暂时".into(),
+                "凑合".into(),
+                "随便".into(),
+                "粗略".into(),
+                "先这样".into(),
+                "待处理".into(),
+                "后续再看".into(),
+                "占位".into(),
+                "打补丁".into(),
+                "草率".into(),
+                "绝对".into(),
+                "彻底".into(),
+                "完美".into(),
+                "极致".into(),
+                "终极".into(),
+                "史无前例".into(),
+                "彻底解决".into(),
+                "完全消除".into(),
+                "永不".into(),
+                "绝不".into(),
+                "绝无".into(),
+            ],
+            diff_coherence: DiffCoherenceMode::Strict,
+            qualitative_verification_only: true,
+            human_controlled_trunks: true,
+            dual_trunk_enabled: true,
+            uac_required_for_system_trunk: true,
+            staged_promotion_ttl_seconds: 3600,
+            replacement_score_baseline_delta: 5.0,
+            minimum_promotion_score: 80.0,
+        }
+    }
+
     /// Rust-Grade Strict Policy: Complete compile-time type verification,
     /// qualitative verification only, diff-to-scope coherence checking, and human-only dual trunks.
     pub fn rust_strict() -> Self {
