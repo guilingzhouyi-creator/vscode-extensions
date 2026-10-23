@@ -367,6 +367,24 @@ export function computeStaticQualityScore(
 }
 
 /**
+ * Pre-calibrated Precision Matrix P_8 in R^(8x8) for the 8-axis static quality vector Q_s.
+ * Inverts the empirical covariance between Architecture, Maintainability, Performance, Data,
+ * Testing, Reliability, Security, and Extensibility to eliminate collinearity in distance metrics.
+ */
+const STATIC_QUALITY_PRECISION_MATRIX_8X8: readonly (readonly number[])[] = [
+    [0.00725072, -0.0024297, 0.00008305, -0.00206602, 0.00046567, -0.00148577, 0.00044333, -0.00179392],
+    [-0.0024297, 0.00612729, -0.00053356, 0.00048177, -0.00095561, 0.00048988, -0.00035644, -0.00108528],
+    [0.00008305, -0.00053356, 0.00464179, -0.00034919, -0.00023069, -0.00021691, -0.00025382, -0.0002056],
+    [-0.00206602, 0.00048177, -0.00034919, 0.00518974, -0.00041313, 0.00022302, -0.00039677, 0.00023242],
+    [0.00046567, -0.00095561, -0.00023069, -0.00041313, 0.00496588, -0.00123125, 0.00012664, -0.00017355],
+    [-0.00148577, 0.00048988, -0.00021691, 0.00022302, -0.00123125, 0.00592273, -0.00216394, 0.00016948],
+    [0.00044333, -0.00035644, -0.00025382, -0.00039677, 0.00012664, -0.00216394, 0.00538596, -0.00032238],
+    [-0.00179392, -0.00108528, -0.0002056, 0.00023242, -0.00017355, 0.00016948, -0.00032238, 0.00557182],
+] as const;
+
+const STATIC_SCORE_SCALE_REF = 15.0;
+
+/**
  * Metric comparison between two StaticQualityVectors (Before -> After).
  */
 export interface StaticVectorDelta {
@@ -374,6 +392,8 @@ export interface StaticVectorDelta {
     scalarDelta: number;
     euclideanDistance: number;
     cosineSimilarity: number;
+    mahalanobisDistance?: number;
+    dominantShiftAxis?: StaticQualityAxis;
 }
 
 /**
@@ -427,10 +447,43 @@ export function computeStaticVectorDelta(
                 SCORE_ROUND_FACTOR,
         ) / SCORE_ROUND_FACTOR;
 
+    const diffs: readonly number[] = [
+        after.A - before.A,
+        after.M - before.M,
+        after.P - before.P,
+        after.D - before.D,
+        after.T - before.T,
+        after.R - before.R,
+        after.S - before.S,
+        after.E - before.E,
+    ];
+
+    let quadForm = 0;
+    let maxShift = -1;
+    let dominantShiftAxis: StaticQualityAxis = 'A';
+
+    for (let i = 0; i < 8; i++) {
+        const absDiff = Math.abs(diffs[i]);
+        if (absDiff > maxShift) {
+            maxShift = absDiff;
+            dominantShiftAxis = ALL_STATIC_QUALITY_AXES[i];
+        }
+        const row = STATIC_QUALITY_PRECISION_MATRIX_8X8[i];
+        for (let j = 0; j < 8; j++) {
+            quadForm += diffs[i] * row[j] * diffs[j];
+        }
+    }
+
+    const mahalanobisDistance =
+        Math.round(Math.sqrt(Math.max(0, quadForm)) * STATIC_SCORE_SCALE_REF * SCORE_ROUND_FACTOR) /
+        SCORE_ROUND_FACTOR;
+
     return {
         deltaVector,
         scalarDelta,
         euclideanDistance,
         cosineSimilarity,
+        mahalanobisDistance,
+        dominantShiftAxis,
     };
 }

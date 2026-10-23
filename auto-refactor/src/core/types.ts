@@ -186,6 +186,8 @@ export interface AgentActionablePayload {
         tspr?: number;
         por?: number;
         compositeDensity?: number;
+        mahalanobisDistance?: number;
+        dominantDeficitAxis?: string;
         threshold?: number;
     };
     /** Plain technical rationale for automated agent comprehension */

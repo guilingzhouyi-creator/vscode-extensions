@@ -232,8 +232,13 @@ async function main() {
     delta.cosineSimilarity >= 0.95,
     `Cosine similarity should reflect strong directional alignment: ${delta.cosineSimilarity}`,
   );
+  assert.ok(
+    typeof delta.mahalanobisDistance === 'number' && delta.mahalanobisDistance > 0,
+    `Mahalanobis distance must be positive (got ${delta.mahalanobisDistance})`,
+  );
+  assert.strictEqual(delta.dominantShiftAxis, 'M');
   console.log(
-    `✔ Vector delta computed: scalarΔ = +${delta.scalarDelta}, distance = ${delta.euclideanDistance}, cosθ = ${delta.cosineSimilarity}`,
+    `✔ Vector delta computed: scalarΔ = +${delta.scalarDelta}, distance = ${delta.euclideanDistance}, d_M = ${delta.mahalanobisDistance}, dominantAxis = ${delta.dominantShiftAxis}, cosθ = ${delta.cosineSimilarity}`,
   );
 
   // 5. Pillar to Static Axis Mapping

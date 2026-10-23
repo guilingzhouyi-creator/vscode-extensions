@@ -135,6 +135,21 @@ describe('density-vector-space: Refactoring Gradient Field', () => {
 });
 
 describe('density-vector-space: Manifold Evaluator & Composite Synthesis', () => {
+    it('produces exact 1.0 score and zero distance for 1.0 max density code', () => {
+        const evalResult = evaluateSpatialDensityManifold({
+            lineDensity: 1.0,
+            columnDensity: 1.0,
+            reuseDensity: 1.0,
+            sharedDensity: 1.0,
+            payloadDensity: 1.0,
+            entropyFactor: 1.0,
+        });
+
+        expect(evalResult.isIsotropicOptimal).toBe(true);
+        expect(evalResult.mahalanobisDistance).toBe(0);
+        expect(evalResult.spatialCompositeDensity).toBe(1.0);
+    });
+
     it('produces near-ideal score (~1.0) and isotropic optimality for clean code', () => {
         const evalResult = evaluateSpatialDensityManifold({
             lineDensity: 0.90,

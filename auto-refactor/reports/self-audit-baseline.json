@@ -1,6 +1,6 @@
 {
-  "snapshotId": "snapshot-v0.4.0-1792767939284",
-  "timestamp": "2026-10-23T15:05:56.439Z",
+  "snapshotId": "snapshot-v0.4.0-1792770697435",
+  "timestamp": "2026-10-23T15:51:53.097Z",
   "cai": 78.56,
   "autonomy": {
     "compositeAutonomyIndex": 78.56,
@@ -9,7 +9,7 @@
     "dimensions": {
       "effectiveLocAutonomy": 100,
       "symbolCallAutonomy": 97.41,
-      "domainKernelDensity": 62.66,
+      "domainKernelDensity": 62.67,
       "codeOriginality": 20,
       "supplyChainResilience": 77.27,
       "criticalPathAutonomy": 89.47
@@ -69,8 +69,8 @@
       "proprietaryFiles": 706,
       "vendorFiles": 0,
       "generatedFiles": 0,
-      "totalEffectiveLoc": 207726,
-      "proprietaryEffectiveLoc": 207726,
+      "totalEffectiveLoc": 207788,
+      "proprietaryEffectiveLoc": 207788,
       "vendorEffectiveLoc": 0,
       "generatedEffectiveLoc": 0,
       "internalSymbolCalls": 1804,
@@ -100,7 +100,7 @@
   "scope": {
     "root": "C:\\CODE_game-development\\vscode-extensions\\auto-refactor",
     "filesScanned": 706,
-    "durationMs": 14615
+    "durationMs": 11944
   },
   "metrics": {
     "compositeScore": 99.02,
@@ -114,19 +114,19 @@
       "languageCount": 1
     },
     "effectiveCodeDensity": 0.95,
-    "totalIssues": 4700,
+    "totalIssues": 4703,
     "suppressedIssues": 130,
-    "unsuppressedIssues": 4570,
+    "unsuppressedIssues": 4573,
     "bySeverity": {
       "info": 576,
-      "warning": 4124,
+      "warning": 4127,
       "error": 0
     },
     "byDebtTier": {
       "critical": 0,
       "high": 0,
-      "medium": 2411,
-      "low": 2289
+      "medium": 2415,
+      "low": 2288
     }
   },
   "eightPillars": {
@@ -158,7 +158,7 @@
     "semanticPurity": 99.59,
     "codeSecurity": 99.88,
     "performanceEfficiency": 99.65,
-    "standardization": 95.33,
+    "standardization": 95.32,
     "modernity": 99.85,
     "maintainability": 97.66,
     "commentQuality": 100,
@@ -172,7 +172,7 @@
       "totalIssues": 45,
       "criticalCount": 0,
       "highCount": 0,
-      "compositeScore": 94.46,
+      "compositeScore": 94.15,
       "effectiveDensity": 0.96
     },
     {
@@ -261,8 +261,8 @@
     "summary": {
       "critical": 0,
       "high": 0,
-      "medium": 2411,
-      "low": 2289
+      "medium": 2415,
+      "low": 2288
     },
     "criticalItems": [],
     "highItems": []
@@ -544,13 +544,13 @@
         "compositeScore": 98.74,
         "pillars": {
           "architecture": 99.72,
-          "maintainability": 97.59,
+          "maintainability": 97.53,
           "performance": 99.92,
-          "data": 96.4,
+          "data": 96.43,
           "testing": 99.9,
           "reliability": 99.85,
           "security": 99.88,
-          "extensibility": 95.91
+          "extensibility": 95.93
         },
         "moduleCount": 1
       },
@@ -931,16 +931,16 @@
       },
       {
         "domainName": "scoring",
-        "compositeScore": 99.17,
+        "compositeScore": 99.16,
         "pillars": {
           "architecture": 99.81,
           "maintainability": 96.53,
           "performance": 99.86,
-          "data": 99.59,
+          "data": 99.54,
           "testing": 99.9,
           "reliability": 99.83,
           "security": 99.86,
-          "extensibility": 98.41
+          "extensibility": 98.34
         },
         "moduleCount": 1
       },
@@ -1083,27 +1083,27 @@
   },
   "trajectory": {
     "runEloc": {
-      "processed": 163222,
-      "unique": 132156,
-      "changed": 5626,
-      "semantic": 4501,
+      "processed": 163275,
+      "unique": 132213,
+      "changed": 4368,
+      "semantic": 3494,
       "relocated": 0,
       "cosmetic": 0,
       "boilerplate": 0,
-      "added": 2813,
+      "added": 2184,
       "deleted": 0,
       "modified": 0
     },
     "lifetime": {
       "weekId": "LIFETIME",
       "startMs": 1791102755050,
-      "endMs": 1792767939279,
+      "endMs": 1792770697432,
       "totalRuns": 353,
       "eloc": {
-        "processedTotal": 50029007,
-        "uniqueTotal": 132156,
-        "changedTotal": 1078267,
-        "semanticTotal": 862614
+        "processedTotal": 50038841,
+        "uniqueTotal": 132213,
+        "changedTotal": 1083681,
+        "semanticTotal": 866946
       },
       "qed": {
         "mean": 0.0001,
@@ -1111,7 +1111,7 @@
         "max": 0.18
       },
       "debt": {
-        "totalAdded": 1836,
+        "totalAdded": 1832,
         "totalResolved": 2254,
         "totalRegressions": 0,
         "netYield": 0.01

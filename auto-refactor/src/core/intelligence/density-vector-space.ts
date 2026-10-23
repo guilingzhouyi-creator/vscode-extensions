@@ -185,28 +185,34 @@ export function toTangentVector5D(
 
 /**
  * Computes whitened isotropic coordinates z = W * (tangent - target).
+ * When oneSidedDeficit is true, only deficits below the target attractor are penalized,
+ * ensuring that code meeting or exceeding target density is not penalized as an anomaly.
  *
  * @param tangent - Tangent vector of current code.
  * @param target - Reference attractor (defaults to DEFAULT_TARGET_TANGENT_ATTRACTOR).
+ * @param oneSidedDeficit - Whether to evaluate one-sided deficiency (default false).
  * @returns Whitened coordinates in R^5.
  */
 export function computeWhitenedCoordinates(
     tangent: DensityVector5D,
     target: DensityVector5D = DEFAULT_TARGET_TANGENT_ATTRACTOR,
+    oneSidedDeficit: boolean = false,
 ): DensityVector5D {
-    const delta0 = tangent[0] - target[0];
-    const delta1 = tangent[1] - target[1];
-    const delta2 = tangent[2] - target[2];
-    const delta3 = tangent[3] - target[3];
-    const delta4 = tangent[4] - target[4];
+    const raw0 = tangent[0] - target[0];
+    const raw1 = tangent[1] - target[1];
+    const raw2 = tangent[2] - target[2];
+    const raw3 = tangent[3] - target[3];
+    const raw4 = tangent[4] - target[4];
 
-    const deltas: readonly [number, number, number, number, number] = [
-        delta0,
-        delta1,
-        delta2,
-        delta3,
-        delta4,
-    ];
+    const deltas: readonly [number, number, number, number, number] = oneSidedDeficit
+        ? [
+            Math.min(0.0, raw0),
+            Math.min(0.0, raw1),
+            Math.min(0.0, raw2),
+            Math.min(0.0, raw3),
+            Math.min(0.0, raw4),
+        ]
+        : [raw0, raw1, raw2, raw3, raw4];
 
     const z: [number, number, number, number, number] = [0, 0, 0, 0, 0];
 
@@ -228,13 +234,15 @@ export function computeWhitenedCoordinates(
  *
  * @param tangent - Tangent vector of current code.
  * @param target - Target attractor.
+ * @param oneSidedDeficit - Whether to evaluate one-sided deficiency (default false).
  * @returns Non-negative Mahalanobis distance.
  */
 export function computeMahalanobisDistance(
     tangent: DensityVector5D,
     target: DensityVector5D = DEFAULT_TARGET_TANGENT_ATTRACTOR,
+    oneSidedDeficit: boolean = false,
 ): number {
-    const z = computeWhitenedCoordinates(tangent, target);
+    const z = computeWhitenedCoordinates(tangent, target, oneSidedDeficit);
     let normSq = 0.0;
     for (let i = 0; i < 5; i++) {
         normSq += z[i] * z[i];
@@ -349,8 +357,8 @@ export function evaluateSpatialDensityManifold(
 ): SpatialDensityEvaluation {
     const rawVector = toDensityVector5D(inputs);
     const tangentVector = toTangentVector5D(rawVector);
-    const whitenedVector = computeWhitenedCoordinates(tangentVector);
-    const mahalanobisDistance = computeMahalanobisDistance(tangentVector);
+    const whitenedVector = computeWhitenedCoordinates(tangentVector, DEFAULT_TARGET_TANGENT_ATTRACTOR, true);
+    const mahalanobisDistance = computeMahalanobisDistance(tangentVector, DEFAULT_TARGET_TANGENT_ATTRACTOR, true);
 
     // Simplex arc length between payloadDensity (TSPR) and plumbing overhead (POR)
     const tspr = rawVector[4];
