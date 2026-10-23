@@ -343,6 +343,7 @@
 | `GUARD-BUDGET-001` | <a id="gate-budget-001"></a>`gate-architecture` | `GATE` | `warning` | `all` | 预提交门禁运行无界全量回归耗时超标，未实施暂存区分层过滤。 | 实施分层门禁：预提交专注增量暂存切片审查（< 2s），全量回归递延至预推送。 |
 | `GUARD-ERR-001` | <a id="gate-err-001"></a>`gate-architecture` | `GATE` | `error` | `all` | 门禁执行脚本缺失严格错误终止控制标志，存在命令静默失败隐患。 | Shell 脚本声明 set -euo pipefail，PowerShell 声明 $ErrorActionPreference = 'Stop'。 |
 | `GUARD-FAC-001` | <a id="gate-fac-001"></a>`gate-architecture` | `GATE` | `error` | `all` | 门禁流水线缺少门面层实质承载（ELOC >= 15）与空包跳板静态审查。 | 接入 validate-facade-discipline 看守，强制门面层实质承载并消除虚空转发层。 |
+| `GUARD-FBK-001` | <a id="guard-fbk-001"></a>`gate-architecture` | `GATE` | `error` | `all` | 门禁反馈词表守卫：操作者反馈必须使用单一事实源注册表中的语义步骤标识与 PASS/BLOCK/SKIP/WARN 四态闭包，严禁位置代号与非闭包状态词。 | 将位置代号替换为单一事实源注册表中的语义步骤标识，并将状态词收敛为 PASS/BLOCK/SKIP/WARN 四态闭包。 |
 | `GUARD-HOOK-001` | <a id="gate-hook-001"></a>`gate-architecture` | `GATE` | `warning` | `all` | 仓库缺失本地左移 Git Hooks 拦截防线，缺陷反馈过度后置。 | 配置 .githooks 或 .husky 激活本地左移防御，提交前拦截低级卫生与回归缺陷。 |
 | `GUARD-HYG-001` | <a id="gate-hyg-001"></a>`gate-architecture` | `GATE` | `error` | `all` | 预提交门禁缺少 0 字节物理空文件与换行符卫生看守。 | 在 pre-commit 门禁中加入零空文件与换行符契约（CRLF/LF）检查。 |
 | `GUARD-ISO-001` | <a id="gate-iso-001"></a>`gate-architecture` | `GATE` | `error` | `all` | 双层门禁边界不同构，远端 CI 关键检查未在本地钩子中对等镜像。 | 确保本地门禁脚本镜像覆盖远端 CI 关键步骤，实现双层防御同构性。 |
