@@ -25,6 +25,8 @@ const path = require('path');
 const REPO_ROOT = path.resolve(__dirname, '../..');
 const REGISTRY = require('./gate-step-registry');
 
+const MAX_DIAGNOSTIC_SNIPPET_LENGTH = 100;
+
 /** Entry points, resolved from the registry so a new entry is guarded automatically. */
 function collectEntryPoints() {
   const files = [];
@@ -98,7 +100,7 @@ function findStatusTokens(lines) {
     STATUS_TOKEN.lastIndex = 0;
     let match = STATUS_TOKEN.exec(line);
     while (match !== null) {
-      findings.push({ line: index + 1, token: match[1], text: line.trim().slice(0, 100) });
+      findings.push({ line: index + 1, token: match[1], text: line.trim().slice(0, MAX_DIAGNOSTIC_SNIPPET_LENGTH) });
       match = STATUS_TOKEN.exec(line);
     }
   });

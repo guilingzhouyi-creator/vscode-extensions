@@ -44,6 +44,7 @@ const IGNORED_DIRS = new Set(['node_modules', 'dist', 'out', '__pycache__', 'arc
  * contracts actually ran, so it expires exactly like a file count does.
  */
 const COUNT_PATTERN = /\d{1,5}\s*(份|个脚本|项|条规则|文件|张图|步|组)/;
+const MAX_HARDCODED_SNIPPET_LENGTH = 100;
 
 /** Output statements: only these lines reach an operator. */
 const EMIT_PATTERN = /(console\.(log|info|warn|error)|process\.(stdout|stderr)\.write|print\(|Write-Host|Write-Output|Write-Error|Write-Warning|echo\s)/;
@@ -131,11 +132,12 @@ function auditFile(file) {
     if (!COUNT_PATTERN.test(stripped)) return;
     if (STRUCTURAL_ALLOWLIST.some((pattern) => pattern.test(line))) return;
     const match = COUNT_PATTERN.exec(stripped);
+    if (!match) return;
     findings.push({
       type: 'GUARD-COUNT-001',
       file: rel,
       line: index + 1,
-      detail: `写死的规模计数「${match[0]}」应改为由实测数据渲染: ${trimmed.slice(0, 100)}`,
+      detail: `写死的规模计数「${match[0]}」应改为由实测数据渲染: ${trimmed.slice(0, MAX_HARDCODED_SNIPPET_LENGTH)}`,
     });
   });
   return findings;

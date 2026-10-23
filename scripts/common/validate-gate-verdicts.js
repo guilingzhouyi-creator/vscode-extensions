@@ -48,14 +48,14 @@ const STATUS_TOKEN = /"(PASS|BLOCK|SKIP|WARN)"|(?:^|[\s"])(PASS|BLOCK|SKIP|WARN)
  * @returns {string[]} Status tokens found on the line.
  */
 function extractStatuses(line) {
-    const found = [];
-    STATUS_TOKEN.lastIndex = 0;
-    let match = STATUS_TOKEN.exec(line);
-    while (match !== null) {
-        found.push(match[1] || match[2]);
-        match = STATUS_TOKEN.exec(line);
-    }
-    return found;
+  const found = [];
+  STATUS_TOKEN.lastIndex = 0;
+  let match = STATUS_TOKEN.exec(line);
+  while (match !== null) {
+    found.push(match[1] || match[2]);
+    match = STATUS_TOKEN.exec(line);
+  }
+  return found;
 }
 
 /**
@@ -65,31 +65,31 @@ function extractStatuses(line) {
  * @returns {{ banners: Map<string, number[]>, verdicts: Map<string, Array<{ line: number, statuses: string[] }>>, genericRunner: boolean }}
  */
 function indexEntryScript(full) {
-    const banners = new Map();
-    const verdicts = new Map();
-    const referenced = new Set();
-    let genericRunner = false;
-    if (!fs.existsSync(full)) return { banners, verdicts, referenced, genericRunner };
+  const banners = new Map();
+  const verdicts = new Map();
+  const referenced = new Set();
+  let genericRunner = false;
+  if (!fs.existsSync(full)) return { banners, verdicts, referenced, genericRunner };
 
-    const lines = fs.readFileSync(full, 'utf8').split(/\r?\n/);
-    lines.forEach((line, index) => {
-        const lineNo = index + 1;
-        if (GENERIC_RUNNER_DEF.test(line)) genericRunner = true;
+  const lines = fs.readFileSync(full, 'utf8').split(/\r?\n/);
+  lines.forEach((line, index) => {
+    const lineNo = index + 1;
+    if (GENERIC_RUNNER_DEF.test(line)) genericRunner = true;
 
-        const match = ID_PATTERN.exec(line);
-        if (match) {
-            referenced.add(match[1]);
-            if (BANNER_CALL.test(line)) {
-                if (!banners.has(match[1])) banners.set(match[1], []);
-                banners.get(match[1]).push(lineNo);
-            }
-            if (VERDICT_CALL.test(line)) {
-                if (!verdicts.has(match[1])) verdicts.set(match[1], []);
-                verdicts.get(match[1]).push({ line: lineNo, statuses: extractStatuses(line) });
-            }
-        }
-    });
-    return { banners, verdicts, referenced, genericRunner };
+    const match = ID_PATTERN.exec(line);
+    if (match) {
+      referenced.add(match[1]);
+      if (BANNER_CALL.test(line)) {
+        if (!banners.has(match[1])) banners.set(match[1], []);
+        banners.get(match[1]).push(lineNo);
+      }
+      if (VERDICT_CALL.test(line)) {
+        if (!verdicts.has(match[1])) verdicts.set(match[1], []);
+        verdicts.get(match[1]).push({ line: lineNo, statuses: extractStatuses(line) });
+      }
+    }
+  });
+  return { banners, verdicts, referenced, genericRunner };
 }
 
 /**
@@ -105,70 +105,70 @@ function indexEntryScript(full) {
  * @returns {void}
  */
 function auditStep(step, index, context, findings) {
-    const { entryId, platform, file } = context;
-    const bannerLines = index.banners.get(step.id) || [];
-    const verdictLines = index.verdicts.get(step.id) || [];
+  const { entryId, platform, file } = context;
+  const bannerLines = index.banners.get(step.id) || [];
+  const verdictLines = index.verdicts.get(step.id) || [];
 
-    if (index.genericRunner) {
-        // 通用 Runner 由入参决定身份与横幅；调用点额外写显式横幅即为重复宣布。
-        for (const bannerLine of bannerLines) {
-            findings.push({
-                type: 'GUARD-STEP-001',
-                entry: entryId,
-                platform,
-                file,
-                line: bannerLine,
-                detail: `${step.id} 由通用 Runner 渲染横幅，调用点又显式宣布一次，进度序号会重复出现`,
-            });
-        }
-        if (!index.referenced.has(step.id)) {
-            findings.push({
-                type: 'GUARD-STEP-001',
-                entry: entryId,
-                platform,
-                file,
-                line: 0,
-                detail: `${step.id} 在通用 Runner 脚本中既未由 Runner 调用也无判定，该步骤从不被执行`,
-            });
-        }
-        return;
+  if (index.genericRunner) {
+    // 通用 Runner 由入参决定身份与横幅；调用点额外写显式横幅即为重复宣布。
+    for (const bannerLine of bannerLines) {
+      findings.push({
+        type: 'GUARD-STEP-001',
+        entry: entryId,
+        platform,
+        file,
+        line: bannerLine,
+        detail: `${step.id} 由通用 Runner 渲染横幅，调用点又显式宣布一次，进度序号会重复出现`,
+      });
     }
+    if (!index.referenced.has(step.id)) {
+      findings.push({
+        type: 'GUARD-STEP-001',
+        entry: entryId,
+        platform,
+        file,
+        line: 0,
+        detail: `${step.id} 在通用 Runner 脚本中既未由 Runner 调用也无判定，该步骤从不被执行`,
+      });
+    }
+    return;
+  }
 
-    if (bannerLines.length === 0 && verdictLines.length === 0) {
-        findings.push({
-            type: 'GUARD-STEP-001',
-            entry: entryId,
-            platform,
-            file,
-            line: 0,
-            detail: `${step.id} 在 ${platform} 实现中既无横幅也无判定，该步骤从不出现在操作者视野中`,
-        });
-        return;
-    }
+  if (bannerLines.length === 0 && verdictLines.length === 0) {
+    findings.push({
+      type: 'GUARD-STEP-001',
+      entry: entryId,
+      platform,
+      file,
+      line: 0,
+      detail: `${step.id} 在 ${platform} 实现中既无横幅也无判定，该步骤从不出现在操作者视野中`,
+    });
+    return;
+  }
 
-    if (bannerLines.length > 1) {
-        findings.push({
-            type: 'GUARD-STEP-001',
-            entry: entryId,
-            platform,
-            file,
-            line: bannerLines[1],
-            detail: `${step.id} 有 ${bannerLines.length} 条横幅，进度序号会重复出现`,
-        });
-    }
+  if (bannerLines.length > 1) {
+    findings.push({
+      type: 'GUARD-STEP-001',
+      entry: entryId,
+      platform,
+      file,
+      line: bannerLines[1],
+      detail: `${step.id} 有 ${bannerLines.length} 条横幅，进度序号会重复出现`,
+    });
+  }
 
-    const statuses = new Set(verdictLines.flatMap((item) => item.statuses));
-    const hasTerminal = statuses.has('PASS') || statuses.has('BLOCK');
-    if (verdictLines.length > 0 && !hasTerminal) {
-        findings.push({
-            type: 'GUARD-STEP-001',
-            entry: entryId,
-            platform,
-            file,
-            line: verdictLines[0].line,
-            detail: `${step.id} 只有 SKIP/WARN 判定，未执行与已通过无法区分`,
-        });
-    }
+  const statuses = new Set(verdictLines.flatMap((item) => item.statuses || []));
+  const hasTerminal = statuses.has('PASS') || statuses.has('BLOCK');
+  if (verdictLines.length > 0 && !hasTerminal) {
+    findings.push({
+      type: 'GUARD-STEP-001',
+      entry: entryId,
+      platform,
+      file,
+      line: verdictLines[0].line,
+      detail: `${step.id} 只有 SKIP/WARN 判定，未执行与已通过无法区分`,
+    });
+  }
 }
 
 /**
@@ -177,18 +177,18 @@ function auditStep(step, index, context, findings) {
  * @returns {Array<object>} Findings.
  */
 function runAudit() {
-    const findings = [];
-    for (const entryId of REGISTRY.listEntryIds()) {
-        const entry = REGISTRY.getEntry(entryId);
-        for (const [platform, rel] of Object.entries(entry.scripts || {})) {
-            const full = path.join(REPO_ROOT, rel);
-            if (!fs.existsSync(full)) continue;
-            const index = indexEntryScript(full);
-            const context = { entryId, platform, file: rel.replace(/\\/g, '/') };
-            for (const step of entry.steps) auditStep(step, index, context, findings);
-        }
+  const findings = [];
+  for (const entryId of REGISTRY.listEntryIds()) {
+    const entry = REGISTRY.getEntry(entryId);
+    for (const [platform, rel] of Object.entries(entry.scripts || {})) {
+      const full = path.join(REPO_ROOT, rel);
+      if (!fs.existsSync(full)) continue;
+      const index = indexEntryScript(full);
+      const context = { entryId, platform, file: rel.replace(/\\/g, '/') };
+      for (const step of (entry?.steps || [])) auditStep(step, index, context, findings);
     }
-    return findings;
+  }
+  return findings;
 }
 
 /**
@@ -197,38 +197,38 @@ function runAudit() {
  * @returns {void}
  */
 function main() {
-    const isAgent = process.argv.includes('--agent') || process.argv.includes('--json');
-    const findings = runAudit();
-    const passed = findings.length === 0;
+  const isAgent = process.argv.includes('--agent') || process.argv.includes('--json');
+  const findings = runAudit();
+  const passed = findings.length === 0;
 
-    if (isAgent) {
-        console.log(JSON.stringify({
-            protocolVersion: '1.0.0',
-            status: passed ? 'PASS' : 'BLOCK',
-            gate: 'gate-verdict-coverage',
-            findings,
-            summary: passed
-                ? 'Every registered step is reachable and renders a terminal verdict on both platforms.'
-                : `${findings.length} step(s) cannot report a terminal verdict.`,
-        }, null, 2));
-        process.exit(passed ? 0 : 1);
-    }
+  if (isAgent) {
+    console.log(JSON.stringify({
+      protocolVersion: '1.0.0',
+      status: passed ? 'PASS' : 'BLOCK',
+      gate: 'gate-verdict-coverage',
+      findings,
+      summary: passed
+        ? 'Every registered step is reachable and renders a terminal verdict on both platforms.'
+        : `${findings.length} step(s) cannot report a terminal verdict.`,
+    }, null, 2));
+    process.exit(passed ? 0 : 1);
+  }
 
-    if (passed) {
-        console.log('  ✔  gate-verdict-coverage  每个登记步骤在两个平台均可呈现终态判定');
-        process.exit(0);
-    }
+  if (passed) {
+    console.log('  ✔  gate-verdict-coverage  每个登记步骤在两个平台均可呈现终态判定');
+    process.exit(0);
+  }
 
-    console.error('✖ BLOCK  gate-verdict-coverage');
-    for (const item of findings) {
-        const location = item.line > 0 ? `${item.file}:${item.line}` : item.file;
-        console.error(`  - [${item.type}] ${location} ${item.detail}`);
-    }
-    process.exit(1);
+  console.error('✖ BLOCK  gate-verdict-coverage');
+  for (const item of findings) {
+    const location = item.line > 0 ? `${item.file}:${item.line}` : item.file;
+    console.error(`  - [${item.type}] ${location} ${item.detail}`);
+  }
+  process.exit(1);
 }
 
 if (require.main === module) {
-    main();
+  main();
 }
 
 module.exports = Object.freeze({ runAudit, indexEntryScript, extractStatuses });

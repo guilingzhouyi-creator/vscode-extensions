@@ -163,7 +163,8 @@ $ruleStepCodes = @(
     $resDestructive.ExitCode, $resChains.ExitCode, $resCounts.ExitCode, $resParity.ExitCode,
     $resGateProof.ExitCode, $resDocMetrics.ExitCode
 )
-if (@($ruleStepCodes | Where-Object { $_ -ne 0 }).Count -gt 0) {
+$failingRuleSteps = @($ruleStepCodes | Where-Object { $_ -ne 0 })
+if ($failingRuleSteps.Count -gt 0) {
     $statusRules = "BLOCK"
     $failed = $true
 } else {

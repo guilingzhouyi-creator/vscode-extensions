@@ -117,7 +117,8 @@ function blankLine(line, state) {
   let out = '';
   let i = 0;
   while (i < line.length) {
-    const result = SCANNERS[state.mode](line[i], line[i + 1], state, line, i);
+    const scanner = SCANNERS[state.mode] || SCANNERS.normal;
+    const result = scanner(line[i], line[i + 1], state, line, i);
     out += result.text;
     if (result.mode) state.mode = result.mode;
     if (result.quote) state.quote = result.quote;
@@ -211,7 +212,7 @@ function auditSource(source, rel) {
       continue;
     }
 
-    const popped = stack.pop();
+    const popped = stack.length > 0 ? stack.pop() : 'empty';
     const { word } = peekWord(stream, i + 1);
     const kind = word.toLowerCase();
     if (CONTINUATION_START.test(word)) {

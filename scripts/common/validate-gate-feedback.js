@@ -23,6 +23,8 @@ const path = require('path');
 const REPO_ROOT = path.resolve(__dirname, '../..');
 const REGISTRY = require('./gate-step-registry');
 
+const MAX_FEEDBACK_DETAIL_LENGTH = 120;
+
 const SCAN_TARGETS = Object.freeze([
   'scripts/ps1',
   'scripts/sh',
@@ -114,7 +116,7 @@ function auditFile(file) {
   lines.forEach((line, index) => {
     for (const { id, pattern } of patterns) {
       if (pattern.test(line)) {
-        findings.push({ type: id, file: rel, line: index + 1, detail: line.trim().slice(0, 120) });
+        findings.push({ type: id, file: rel, line: index + 1, detail: line.trim().slice(0, MAX_FEEDBACK_DETAIL_LENGTH) });
       }
     }
   });
@@ -147,12 +149,13 @@ function collectStepReferences(file) {
  */
 function auditRegistryBinding(findings) {
   const registryAudit = REGISTRY.auditRegistry();
-  for (const error of registryAudit.errors) {
+  const errors = (registryAudit && Array.isArray(registryAudit.errors)) ? registryAudit.errors : [];
+  for (const error of errors) {
     findings.push({ type: 'GUARD-STEP-001', file: 'scripts/common/gate-step-registry.json', line: 0, detail: error });
   }
   const declared = new Set();
   for (const entryId of REGISTRY.listEntryIds()) {
-    for (const step of REGISTRY.getEntry(entryId).steps) declared.add(step.id);
+    for (const step of (REGISTRY.getEntry(entryId)?.steps || [])) declared.add(step.id);
   }
   for (const target of SCAN_TARGETS) {
     for (const file of collectFiles(path.join(REPO_ROOT, target))) {

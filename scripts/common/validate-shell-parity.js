@@ -26,6 +26,9 @@ const REPO_ROOT = path.resolve(__dirname, '../..');
 const PARITY_LIB = path.join(REPO_ROOT, 'scripts/ps1/lib/linux-parity.ps1');
 const AGENTS_MD = path.join(REPO_ROOT, 'AGENTS.md');
 
+const PWSH_PROBE_TIMEOUT_MS = 60_000;
+const MAX_PROBE_ERROR_LINES = 4;
+
 /**
  * Commands AGENTS.md promises must be bindable. Kept as an explicit list rather than a regex
  * sweep so adding a promise to the document requires adding it here, which is the point.
@@ -128,7 +131,7 @@ function probeRuntimeMode(findings) {
   const result = spawnSync('pwsh', ['-NoProfile', '-NonInteractive', '-Command', script], {
     cwd: REPO_ROOT,
     encoding: 'utf8',
-    timeout: 60000,
+    timeout: PWSH_PROBE_TIMEOUT_MS,
   });
 
   if (result.error) {
@@ -136,7 +139,7 @@ function probeRuntimeMode(findings) {
     return null;
   }
   if (result.status !== 0) {
-    const detail = (result.stderr || result.stdout || '').trim().split(/\r?\n/).slice(0, 4).join(' ');
+    const detail = (result.stderr || result.stdout || '').trim().split(/\r?\n/).slice(0, MAX_PROBE_ERROR_LINES).join(' ');
     addFinding(findings, 'PROBE_FAILED', `pwsh probe exited ${result.status}: ${detail}`);
     return null;
   }

@@ -30,6 +30,10 @@ const DEFAULT_REPO_ROOT = path.resolve(__dirname, '..', '..');
 
 const GIT_BIN = 'git';
 
+const DEFAULT_GIT_BUFFER_BYTES = 10 * 1024 * 1024; // 10 MB
+const STAGED_BUFFER_MAX_BYTES = 32 * 1024 * 1024;  // 32 MB
+const BATCH_CAT_FILE_MAX_BYTES = 256 * 1024 * 1024; // 256 MB
+
 /**
  * Raised when Git cannot resolve an explicitly requested revision range.
  *
@@ -42,7 +46,8 @@ class GitRangeError extends Error {
    * @param {Error} cause - Underlying spawn or exit error.
    */
   constructor(range, cause) {
-    super(`Unable to resolve Git revision range '${range}': ${cause.message.split('\n')[0]}`);
+    const msgSnippet = cause && typeof cause.message === 'string' ? cause.message.split('\n')[0] : String(cause || 'Unknown error');
+    super(`Unable to resolve Git revision range '${range}': ${msgSnippet}`);
     this.name = 'GitRangeError';
     this.range = range;
     this.cause = cause;
@@ -63,7 +68,7 @@ function runGit(args, options) {
     encoding: opts.encoding,
     input: opts.input,
     stdio: opts.stdio || ['ignore', 'pipe', 'ignore'],
-    maxBuffer: opts.maxBuffer || 10 * 1024 * 1024,
+    maxBuffer: opts.maxBuffer || DEFAULT_GIT_BUFFER_BYTES,
     cwd: root,
     env: getSafeGitEnv(root),
   });
@@ -99,7 +104,8 @@ class GitIndexError extends Error {
    * @param {Error} cause - Underlying spawn or exit error.
    */
   constructor(cause) {
-    super(`Unable to enumerate the Git staging area: ${cause.message.split('\n')[0]}`);
+    const msgSnippet = cause && typeof cause.message === 'string' ? cause.message.split('\n')[0] : String(cause || 'Unknown error');
+    super(`Unable to enumerate the Git staging area: ${msgSnippet}`);
     this.name = 'GitIndexError';
     this.cause = cause;
   }
@@ -186,7 +192,7 @@ function readStagedContentSafe(repoRoot, relPath) {
     return runGit(['show', `:${gitPath}`], {
       cwd: root,
       encoding: 'utf8',
-      maxBuffer: 10 * 1024 * 1024,
+      maxBuffer: DEFAULT_GIT_BUFFER_BYTES,
     });
   } catch {
     const fullPath = path.join(root, relPath);
@@ -213,7 +219,7 @@ function readStagedBufferSafe(repoRoot, relPath) {
   try {
     return runGit(['show', `:${gitPath}`], {
       cwd: root,
-      maxBuffer: 32 * 1024 * 1024,
+      maxBuffer: STAGED_BUFFER_MAX_BYTES,
     });
   } catch {
     const fullPath = path.join(root, relPath);
@@ -254,11 +260,12 @@ function readStagedBuffersBatch(repoRoot, relPaths) {
       cwd: root,
       input: request,
       stdio: ['pipe', 'pipe', 'ignore'],
-      maxBuffer: 256 * 1024 * 1024,
+      maxBuffer: BATCH_CAT_FILE_MAX_BYTES,
     });
   } catch {
     return results;
   }
+  if (!raw || !Buffer.isBuffer(raw)) return results;
 
   let offset = 0;
   for (const relPath of targets) {
