@@ -120,7 +120,7 @@ fn parse_checkout_options(args: &[String]) -> CheckoutOptions {
 }
 
 /// Asserts that no unstaged or staged changes exist before checkout proceeds unless force is set.
-fn assert_worktree_cleanliness(view: &RepoView, force: bool) {
+pub(crate) fn assert_worktree_cleanliness(view: &RepoView, force: bool) {
     if force {
         return;
     }
@@ -169,7 +169,7 @@ fn resolve_effective_branch(view: &RepoView, opts: &CheckoutOptions) -> Option<S
 }
 
 /// Removes worktree files and empty parent directories that are absent in the target tree.
-fn remove_stale_files(
+pub(crate) fn remove_stale_files(
     work_root: &Path,
     current_files: &BTreeMap<String, super::status_cmd::TreeEntry>,
     new_files: &BTreeMap<String, super::status_cmd::TreeEntry>,
@@ -196,7 +196,7 @@ fn remove_stale_files(
 }
 
 /// Materializes files into the worktree directory and computes fresh index entries.
-fn materialize_files(
+pub(crate) fn materialize_files(
     view: &RepoView,
     new_files: &BTreeMap<String, super::status_cmd::TreeEntry>,
 ) -> Vec<IndexEntry> {
@@ -262,7 +262,7 @@ fn materialize_files(
 }
 
 /// Persists the materialized entries into the binary DIRC index file.
-fn update_dirc_index(git_dir: &Path, entries: &[IndexEntry]) {
+pub(crate) fn update_dirc_index(git_dir: &Path, entries: &[IndexEntry]) {
     let index_path = git_dir.join("index");
     if let Err(err) = write_dirc_v2(&index_path, entries) {
         fail_io(format!("write index '{}'", index_path.display()), err);
@@ -270,7 +270,7 @@ fn update_dirc_index(git_dir: &Path, entries: &[IndexEntry]) {
 }
 
 /// Updates HEAD and branch references on disk and within the native container if present.
-fn update_references(git_dir: &Path, target_commit: Oid, branch_name: Option<&str>) {
+pub(crate) fn update_references(git_dir: &Path, target_commit: Oid, branch_name: Option<&str>) {
     // 1. Update loose refs on disk
     if let Some(branch) = branch_name {
         let branch_ref_path = git_dir.join("refs/heads").join(branch);

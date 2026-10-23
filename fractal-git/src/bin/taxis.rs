@@ -18,8 +18,9 @@ use std::path::PathBuf;
 mod taxis_cmd;
 use taxis_cmd::common::{fail_io, print_json, reject, CliContext};
 use taxis_cmd::{
-    bench, checkout, commit, commit_walk, diff_cmd, doctor, init, log_cmd, projection_cmd,
-    promotion, read_cmd, relocate, status_cmd, worktree,
+    bench, checkout, cherry_pick_cmd, commit, commit_walk, diff_cmd, doctor, init, log_cmd,
+    merge_cmd, projection_cmd, promotion, read_cmd, rebase_cmd, relocate, reset_cmd, revert_cmd,
+    stash_cmd, status_cmd, tag_cmd, worktree,
 };
 
 use fg_native::RepoDocument;
@@ -54,6 +55,10 @@ fn resolve_canonical_subcommand(raw: &str) -> &str {
         (&["rb", "rebase"], "rebase"),
         (&["mg", "merge"], "merge"),
         (&["cp", "cherry-pick"], "cherry-pick"),
+        (&["reset"], "reset"),
+        (&["tag"], "tag"),
+        (&["revert"], "revert"),
+        (&["stash"], "stash"),
         (&["wt", "worktree"], "worktree"),
         (&["pm", "promo", "promotion"], "promotion"),
         (&["bench", "benchmark"], "bench"),
@@ -96,6 +101,13 @@ Native Fractal Commands (with Git Alias Mappings):
   commit,   ci       Create atomic commit with agent metadata
   diff,     di       Show tree diff or pass through to git diff
   checkout, co       Switch fractal worktree or git reference
+  merge,    mg       3-Way hierarchical branch merge with fast-forward and conflict markers
+  reset              Reset HEAD, index, or worktree (--soft | --mixed | --hard)
+  tag                Create, list, or delete lightweight and annotated Git tags
+  cherry-pick, cp    Apply commit delta onto current HEAD branch
+  revert             Create inverse commit delta reverting a past commit
+  stash              Shelve and restore uncommitted changes (push, pop, apply, list, drop)
+  rebase,   rb       Replay branch commits linearly onto an upstream tip
   undo               Revert repository state to predecessor operation (Jujutsu-style)
   operation, op      Inspect immutable Operation Log DAG history
   verify,   check    Run pre-receive guard, conflict marker scanner & quota checks
@@ -872,6 +884,13 @@ fn dispatch_command(effective_subcommand: &str, ctx: &CliContext) {
         "log" => log_cmd::handle_log(ctx),
         "show" => log_cmd::handle_show(ctx),
         "checkout" | "switch" => checkout::handle_checkout(ctx),
+        "merge" => merge_cmd::handle_merge(ctx),
+        "reset" => reset_cmd::handle_reset(ctx),
+        "tag" => tag_cmd::handle_tag(ctx),
+        "cherry-pick" => cherry_pick_cmd::handle_cherry_pick(ctx),
+        "revert" => revert_cmd::handle_revert(ctx),
+        "stash" => stash_cmd::handle_stash(ctx),
+        "rebase" => rebase_cmd::handle_rebase(ctx),
         "worktree" => worktree::handle_worktree(ctx),
         "promotion" => promotion::handle_promotion(ctx),
         "bench" => bench::handle_bench(ctx),
@@ -903,8 +922,8 @@ fn reject_unimplemented(subcommand: &str) -> ! {
         format!(
             "'{subcommand}' has no native implementation in this build. \
              Implemented: init, doctor, relocate, git-export, git-import, status, branch, commit, diff, cat-file, ls-tree, \
-             ls-files, show-ref, for-each-ref, check-ignore, log, show, checkout, worktree, \
-             promotion, bench, undo, operation, rev-list, verify, reclaim, daemon, version, help."
+             ls-files, show-ref, for-each-ref, check-ignore, log, show, checkout, merge, reset, tag, cherry-pick, revert, \
+             stash, rebase, worktree, promotion, bench, undo, operation, rev-list, verify, reclaim, daemon, version, help."
         ),
     )
 }

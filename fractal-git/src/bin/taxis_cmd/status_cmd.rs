@@ -35,9 +35,8 @@ use std::path::Path;
 
 use fg_algorithms::{detect_renames, BlobRef};
 use fg_core::error::{FractalError, FractalResult};
-use fg_core::models::{compute_object_oid, FileMode, IndexStage, ObjectKind, Oid};
+use fg_core::models::{compute_object_oid, FileMode, IndexStage, ObjectKind};
 use fg_index::{AttributeSet, GitIndex, IgnoreMatcher, IndexEntry};
-use fg_object::GitTreeRef;
 use fractal_git::constants::cli::CliTag;
 
 use super::common::{print_json, reject, CliContext};
@@ -66,9 +65,6 @@ const CODE_UNTRACKED: char = '?';
 
 /// Directory names excluded from the worktree scan.
 const SCAN_SKIP_NAMES: [&str; 2] = [".git", ".taxis"];
-
-/// NUL byte, the `-z` record terminator.
-const NUL: u8 = 0;
 
 /// One report line.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -162,26 +158,10 @@ impl StatusEntry {
     }
 }
 
-/// One flattened tree entry: mode and object id.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct TreeEntry {
-    /// Mode recorded in the tree.
-    pub mode: FileMode,
-    /// Object the entry points at.
-    pub oid: Oid,
-}
-
-/// A path that exists on only one side of a tree comparison, with its payload read up front.
-///
-/// The payload has to be read before rename detection runs: similarity is a content measurement, so
-/// there is no ordering of the paths that could avoid the read for a pair that turns out to match.
-/// `diff` reuses this shape for the same reason, and sharing it keeps the two comparisons from
-/// disagreeing about which payload a gitlink or a symlink contributes.
-pub(crate) struct SideBlob {
-    pub(crate) path: String,
-    pub(crate) entry: TreeEntry,
-    pub(crate) payload: Vec<u8>,
-}
+pub use super::tree_view::{
+    flatten_commit_tree, flatten_tree_for_diff, mtime_matches, stat_cache_matches, worktree_mode,
+    write_record, SideBlob, TreeEntry,
+};
 
 /// Builds the complete status report for `view`.
 ///
@@ -236,87 +216,6 @@ fn empty_index_bytes() -> Vec<u8> {
     bytes.extend_from_slice(&0u32.to_be_bytes());
     bytes.extend_from_slice(&[0u8; 20]);
     bytes
-}
-
-/// Flattens the tree a commit names into a path-to-entry map.
-///
-/// # Errors
-///
-/// Propagates object reads and tree decoding.
-pub fn flatten_commit_tree(
-    view: &RepoView,
-    commit: &Oid,
-) -> FractalResult<BTreeMap<String, TreeEntry>> {
-    let object = view.object(commit)?;
-    let tree_oid = commit_tree_oid(&object.payload)?;
-    let mut flat = BTreeMap::new();
-    flatten_tree(view, &tree_oid, "", &mut flat)?;
-    Ok(flat)
-}
-
-/// Flattens one tree recursively into `flat`.
-fn flatten_tree(
-    view: &RepoView,
-    tree_oid: &Oid,
-    prefix: &str,
-    flat: &mut BTreeMap<String, TreeEntry>,
-) -> FractalResult<()> {
-    let object = view.object(tree_oid)?;
-    for entry in GitTreeRef::from_bytes(&object.payload).iter() {
-        let entry = entry?;
-        let path = if prefix.is_empty() {
-            entry.name.to_string()
-        } else {
-            format!("{prefix}/{}", entry.name)
-        };
-        if entry.mode.is_tree() {
-            flatten_tree(view, &entry.oid, &path, flat)?;
-            continue;
-        }
-        flat.insert(
-            path,
-            TreeEntry {
-                mode: entry.mode,
-                oid: entry.oid,
-            },
-        );
-    }
-    Ok(())
-}
-
-/// Flattens a tree revision that is already known to be a tree.
-///
-/// Exposed for `diff`, which resolves a revision to either a commit or a tree and only then needs
-/// the flattened form. Duplicating the walk there would give two decoders a chance to disagree.
-///
-/// # Errors
-///
-/// Propagates object reads and tree decoding.
-pub fn flatten_tree_for_diff(
-    view: &RepoView,
-    tree_oid: &Oid,
-    prefix: &str,
-    flat: &mut BTreeMap<String, TreeEntry>,
-) -> FractalResult<()> {
-    flatten_tree(view, tree_oid, prefix, flat)
-}
-
-/// Reads the `tree` header of a commit payload.
-fn commit_tree_oid(payload: &[u8]) -> FractalResult<Oid> {
-    let text = std::str::from_utf8(payload).map_err(|utf_err| {
-        FractalError::ObjectCodec(format!("commit payload is not UTF-8: {utf_err}"))
-    })?;
-    for line in text.lines() {
-        if line.is_empty() {
-            break;
-        }
-        if let Some(value) = line.strip_prefix("tree ") {
-            return Oid::from_hex(value.trim());
-        }
-    }
-    Err(FractalError::ObjectCodec(
-        "commit payload has no 'tree' header".to_string(),
-    ))
 }
 
 /// Keeps only stage-0 entries, the ones a worktree comparison can use.
@@ -526,35 +425,6 @@ fn compare_worktree_to_index(
     Ok(entries)
 }
 
-/// Reports whether the cached stat tuple still matches the file on disk.
-///
-/// Only size and timestamps are consulted. The permission bits are deliberately absent: the mode is
-/// compared separately by [`worktree_mode`], and folding it in here would force a rehash for a change
-/// that does not affect content — which is exactly what Git's `MODE_CHANGED`/`DATA_CHANGED` split
-/// exists to avoid.
-pub(crate) fn stat_cache_matches(staged: &IndexEntry, metadata: &fs::Metadata) -> bool {
-    if metadata.len() != u64::from(staged.size) {
-        return false;
-    }
-    mtime_matches(staged, metadata)
-}
-
-/// Reports whether only the modification time still matches, ignoring the size.
-fn mtime_matches(staged: &IndexEntry, metadata: &fs::Metadata) -> bool {
-    let mtime = metadata.modified().ok().and_then(|time| {
-        time.duration_since(std::time::UNIX_EPOCH)
-            .ok()
-            .map(|elapsed| (elapsed.as_secs() as u32, elapsed.subsec_nanos()))
-    });
-    match mtime {
-        Some((seconds, nanos)) => {
-            seconds == staged.mtime_seconds
-                && (staged.mtime_nanos == 0 || nanos == staged.mtime_nanos)
-        }
-        None => false,
-    }
-}
-
 /// Decides whether the worktree file differs from what the index records.
 ///
 /// The order is Git's, and it is not an optimisation detail — it changes the answer. `ie_modified`
@@ -583,42 +453,6 @@ fn worktree_content_changed(
         return Ok(false);
     }
     Ok(!hash_matches(view, staged, attributes)?)
-}
-
-/// Maps filesystem metadata onto the mode a tree would record.
-///
-/// `staged` is the mode the index records, and `trust_executable_bit` comes from `core.filemode`.
-/// With the bit trusted, the worktree mode is read from the filesystem. With it clear, Git keeps the
-/// recorded mode and only fills in the file type (`ce_mode_from_stat` in `read-cache.c`), so a
-/// `100755` entry whose file lost its execute bit is *not* a modification — which is exactly the
-/// case a Windows checkout of a Unix repository hits, since NTFS cannot carry the bit.
-///
-/// Exposed to `diff` because both commands must classify the same file the same way: a worktree mode
-/// this function calls unchanged but `diff` calls changed would produce a `M` in one report and an
-/// empty patch in the other for the same repository.
-pub(crate) fn worktree_mode(
-    metadata: &fs::Metadata,
-    staged: FileMode,
-    trust_executable_bit: bool,
-) -> FileMode {
-    if metadata.file_type().is_symlink() {
-        return FileMode::Symlink;
-    }
-    if !trust_executable_bit {
-        // Only the type comes from the filesystem; the permission bits come from the index.
-        return match staged {
-            FileMode::ExecutableFile => FileMode::ExecutableFile,
-            _ => FileMode::RegularFile,
-        };
-    }
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        if metadata.permissions().mode() & 0o111 != 0 {
-            return FileMode::ExecutableFile;
-        }
-    }
-    FileMode::RegularFile
 }
 
 /// Reports whether a worktree file still hashes to the staged id.
@@ -896,20 +730,6 @@ fn report_json(view: &RepoView, entries: &[StatusEntry]) {
         "entries": rendered,
     });
     print_json(&payload);
-}
-
-/// Writes one record, honouring the `-z` terminator.
-pub fn write_record(
-    sink: &mut impl std::io::Write,
-    text: &str,
-    nul_terminated: bool,
-) -> std::io::Result<()> {
-    sink.write_all(text.as_bytes())?;
-    if nul_terminated {
-        sink.write_all(&[NUL])
-    } else {
-        sink.write_all(b"\n")
-    }
 }
 
 #[cfg(test)]

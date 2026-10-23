@@ -247,24 +247,33 @@ fn resolve_commit_message(args: &[String], card_id: &str) -> String {
 /// Collects every path the caller declares as part of this commit, or reads from index.
 fn collect_staged_files(ctx: &CliContext) -> Vec<String> {
     let declared = find_all_arg_values(&ctx.args, &["--file", "--add"]);
-    if !declared.is_empty() {
-        return declared.into_iter().map(String::from).collect();
-    }
+    let work_root = super::repo_view::resolve_work_root(&ctx.git_dir);
+    let mut files = std::collections::BTreeSet::new();
 
     let index_file = ctx.git_dir.join("index");
     if let Ok(git_index) = fg_index::GitIndex::load(&index_file) {
-        let files: Vec<String> = git_index.entries().iter().map(|e| e.path.clone()).collect();
-        if !files.is_empty() {
-            return files;
+        for e in git_index.entries() {
+            if work_root.join(&e.path).exists() {
+                files.insert(e.path.clone());
+            }
         }
     }
 
     let container_path = fg_native::container_path(&ctx.git_dir);
     if let Ok(doc) = RepoDocument::load(&container_path) {
-        let files: Vec<String> = doc.indx.entries().iter().map(|e| e.path.clone()).collect();
-        if !files.is_empty() {
-            return files;
+        for e in doc.indx.entries() {
+            if work_root.join(&e.path).exists() {
+                files.insert(e.path.clone());
+            }
         }
+    }
+
+    for path in declared {
+        files.insert(path.to_string());
+    }
+
+    if !files.is_empty() {
+        return files.into_iter().collect();
     }
 
     vec![DEFAULT_COMMIT_FILE.to_string()]
