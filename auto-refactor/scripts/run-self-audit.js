@@ -350,6 +350,7 @@ function buildBaselineReport(params) {
     snapshotId: params.snapshot.snapshotId,
     timestamp: new Date().toISOString(),
     cai: params.scanReport.autonomy?.compositeAutonomyIndex ?? null,
+    autonomy: params.scanReport.autonomy ?? null,
     polyglotGeneralization:
       params.scanReport.qualityScore?.polyglotGeneralization ??
       params.projectScore.polyglotGeneralization ??

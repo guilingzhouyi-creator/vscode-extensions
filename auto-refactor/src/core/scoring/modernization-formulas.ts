@@ -513,4 +513,6 @@ export {
     calculateShannonEntropy,
     calculateAstLocDensityIndex,
     calculatePolyglotGeneralizationIndex,
+    POPOVICIU_MAX_SIGMA,
+    DEFAULT_DISPERSION_PENALTY_RATIO,
 } from './modernization-metrics';

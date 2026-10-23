@@ -201,12 +201,18 @@ export class RustAdapter implements LanguageAdapter {
         const fnLike = kind === NodeKind.Function || kind === NodeKind.Method;
         const isClassDefining =
             kind === NodeKind.Impl || kind === NodeKind.Struct || kind === NodeKind.Trait;
+        const isCall = kind === NodeKind.Call;
         // The expensive introducesBinding predicate (a childForFieldName lookup) is computed
         // ONCE and reused by the three fields below, replacing three calls per node; `name`
         // is only materialized for the node classes the analyzers/engine consume.
         const isBinding = this.hasBindingIntroduction(syntaxNode);
+        const callInfo = isCall ? this.resolveRustCallInfo(syntaxNode) : undefined;
         const name =
-            fnLike || isClassDefining || isBinding ? this.getSyntaxNodeName(syntaxNode) : undefined;
+            callInfo !== undefined
+                ? callInfo.name
+                : fnLike || isClassDefining || isBinding
+                    ? this.getSyntaxNodeName(syntaxNode)
+                    : undefined;
 
         const node: NormalizedNode = {
             kind,
@@ -222,6 +228,7 @@ export class RustAdapter implements LanguageAdapter {
                 column: syntaxNode.endPosition.column + 1,
             },
             name,
+            calleeReceiver: callInfo?.calleeReceiver,
             isNumeric: kind === NodeKind.NumericLiteral,
             isString: kind === NodeKind.StringLiteral,
             branchWeight: this.getBranchWeight(syntaxNode),
@@ -356,6 +363,37 @@ export class RustAdapter implements LanguageAdapter {
             if (syntaxType) return syntaxType.text ?? null;
         }
         return null;
+    }
+
+    /**
+     * Resolves the callee function name and optional qualifier/receiver from a call_expression.
+     *
+     * @param syntaxNode - raw tree-sitter call_expression node.
+     * @returns object containing callee name and optional receiver, or undefined when unresolvable.
+     */
+    private resolveRustCallInfo(
+        syntaxNode: TreeSitterNode,
+    ): { name: string; calleeReceiver?: string } | undefined {
+        const fnNode = syntaxNode.childForFieldName
+            ? syntaxNode.childForFieldName('function')
+            : null;
+        if (!fnNode || !fnNode.text) return undefined;
+        let raw = fnNode.text.trim();
+        if (!raw) return undefined;
+        raw = raw.replace(/::\s*<[^>]+>/g, '');
+        const lastColon = raw.lastIndexOf('::');
+        const lastDot = raw.lastIndexOf('.');
+        if (lastColon >= 0 && lastColon > lastDot) {
+            const name = raw.slice(lastColon + 2).trim();
+            const receiver = raw.slice(0, lastColon).trim();
+            return name ? { name, calleeReceiver: receiver || undefined } : undefined;
+        }
+        if (lastDot >= 0 && lastDot > lastColon) {
+            const name = raw.slice(lastDot + 1).trim();
+            const receiver = raw.slice(0, lastDot).trim();
+            return name ? { name, calleeReceiver: receiver || undefined } : undefined;
+        }
+        return { name: raw };
     }
 
     /**

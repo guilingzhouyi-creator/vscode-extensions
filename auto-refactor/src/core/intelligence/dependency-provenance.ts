@@ -294,24 +294,46 @@ function parsePackageJson(manifestPath: string, inventory: ProjectManifestInvent
     }
 }
 
+function parseCargoSection(trimmed: string): 'prod' | 'dev' | 'build' | null {
+    if (/^\[(?:workspace\.)?dependencies\]/i.test(trimmed)) return 'prod';
+    if (/^\[(?:workspace\.)?dev-dependencies\]/i.test(trimmed)) return 'dev';
+    if (/^\[(?:workspace\.)?build-dependencies\]/i.test(trimmed)) return 'build';
+    return null;
+}
+
+function parseCargoDepLine(
+    trimmed: string,
+    currentSection: 'prod' | 'dev' | 'build',
+    inventory: ProjectManifestInventory,
+): void {
+    if (trimmed.startsWith('#')) return;
+    const match = /^([a-zA-Z0-9_-]+)\s*=/.exec(trimmed);
+    if (!match) return;
+    const pkg = match[1].replace(/-/g, '_');
+    inventory.allDependencies.add(pkg);
+    if (currentSection === 'prod') {
+        inventory.prodDependencies.add(pkg);
+    } else if (currentSection === 'dev') {
+        inventory.devDependencies.add(pkg);
+    }
+}
+
 /**
  * Extract external package dependencies declared in Cargo.toml.
  */
-function parseCargoToml(manifestPath: string, target: Set<string>): void {
+function parseCargoToml(manifestPath: string, inventory: ProjectManifestInventory): void {
     try {
         const raw = fs.readFileSync(manifestPath, 'utf8');
-        let inDependencies = false;
+        let currentSection: 'prod' | 'dev' | 'build' | null = null;
         for (const line of raw.split('\n')) {
             const trimmed = line.trim();
+            if (!trimmed) continue;
             if (trimmed.startsWith('[')) {
-                inDependencies = /^\[(?:dependencies|dev-dependencies|build-dependencies)\]/i.test(
-                    trimmed,
-                );
+                currentSection = parseCargoSection(trimmed);
                 continue;
             }
-            if (inDependencies && trimmed && !trimmed.startsWith('#')) {
-                const match = /^([a-zA-Z0-9_-]+)\s*=/.exec(trimmed);
-                if (match) target.add(match[1].replace(/-/g, '_'));
+            if (currentSection) {
+                parseCargoDepLine(trimmed, currentSection, inventory);
             }
         }
     } catch {
@@ -357,21 +379,28 @@ function parseRequirementsDeps(raw: string, target: Set<string>): void {
 /**
  * Extract external package dependencies declared in pyproject.toml and requirements.txt.
  */
-function parsePythonManifests(rootDir: string, target: Set<string>): void {
+function parsePythonManifests(rootDir: string, inventory: ProjectManifestInventory): void {
     const pyproject = tryReadUtf8Text(path.join(rootDir, MANIFEST_PYPROJECT_TOML));
     if (pyproject) {
-        parsePyprojectDeps(pyproject, target);
+        parsePyprojectDeps(pyproject, inventory.allDependencies);
+        parsePyprojectDeps(pyproject, inventory.prodDependencies);
     }
     const reqTxt = tryReadUtf8Text(path.join(rootDir, MANIFEST_REQUIREMENTS_TXT));
     if (reqTxt) {
-        parseRequirementsDeps(reqTxt, target);
+        parseRequirementsDeps(reqTxt, inventory.allDependencies);
+        parseRequirementsDeps(reqTxt, inventory.prodDependencies);
+    }
+    const reqDev = tryReadUtf8Text(path.join(rootDir, 'requirements-dev.txt'));
+    if (reqDev) {
+        parseRequirementsDeps(reqDev, inventory.allDependencies);
+        parseRequirementsDeps(reqDev, inventory.devDependencies);
     }
 }
 
 /**
  * Extract external dependencies declared in go.mod.
  */
-function parseGoMod(manifestPath: string, target: Set<string>): void {
+function parseGoMod(manifestPath: string, inventory: ProjectManifestInventory): void {
     try {
         const raw = fs.readFileSync(manifestPath, 'utf8');
         let inRequire = false;
@@ -387,7 +416,10 @@ function parseGoMod(manifestPath: string, target: Set<string>): void {
             }
             if ((inRequire || trimmed.startsWith(GO_REQUIRE_PREFIX)) && trimmed) {
                 const parts = trimmed.replace(/^require\s+/, '').split(/\s+/);
-                if (parts[0]) target.add(parts[0]);
+                if (parts[0]) {
+                    inventory.allDependencies.add(parts[0]);
+                    inventory.prodDependencies.add(parts[0]);
+                }
             }
         }
     } catch {
@@ -645,12 +677,12 @@ export function loadProjectManifestInventory(rootDir: string): ProjectManifestIn
     if (fs.existsSync(pkgJson)) parsePackageJson(pkgJson, inventory);
 
     const cargoToml = path.join(absRoot, MANIFEST_CARGO_TOML);
-    if (fs.existsSync(cargoToml)) parseCargoToml(cargoToml, inventory.allDependencies);
+    if (fs.existsSync(cargoToml)) parseCargoToml(cargoToml, inventory);
 
-    parsePythonManifests(absRoot, inventory.allDependencies);
+    parsePythonManifests(absRoot, inventory);
 
     const goMod = path.join(absRoot, MANIFEST_GO_MOD);
-    if (fs.existsSync(goMod)) parseGoMod(goMod, inventory.allDependencies);
+    if (fs.existsSync(goMod)) parseGoMod(goMod, inventory);
 
     parsePathAliases(absRoot, inventory.pathAliases);
 

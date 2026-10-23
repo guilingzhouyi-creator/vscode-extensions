@@ -18,6 +18,10 @@ import { checkDeprecatedPackage } from '../../../src/core/intelligence/deprecate
 import {
     evaluateProjectAutonomy,
 } from '../../../src/core/scoring/autonomy-scorer';
+import { extractFileImportProfile } from '../../../src/core/intelligence/import-profiler';
+import { RustAdapter } from '../../../src/core/ast/rust-adapter';
+import { GDScriptAdapter } from '../../../src/core/ast/gdscript-adapter';
+import { collectSymbols } from '../../../src/core/intelligence/symbolIndex';
 import type { FileMetric, Issue, ScanConfig } from '../../../src/core/types';
 
 describe('Dependency Provenance & Path Aliases', () => {
@@ -178,5 +182,96 @@ describe('Unpinned Dependency Version & Monorepo Manifest Intelligence', () => {
         const inventory = findNearestManifestInventory(subprojectFile, repoRoot);
         expect(inventory.allDependencies.size).toBeGreaterThan(0);
         expect(inventory.versionSpecs.size).toBeGreaterThan(0);
+    });
+
+    it('extracts Rust import bindings and symbols correctly into symbolToPackageMap', () => {
+        const rustCode = `
+use sha1::Sha1;
+use parking_lot::Mutex;
+use serde::{Serialize, Deserialize as De};
+use std::sync::Arc;
+
+fn test() {
+    let s = Sha1::new();
+    let m = Mutex::new(42);
+}
+`;
+        const profile = extractFileImportProfile(rustCode, 'src/storage.rs');
+        expect(profile.specifiers).toContain('sha1');
+        expect(profile.specifiers).toContain('parking_lot');
+        expect(profile.specifiers).toContain('serde');
+        expect(profile.specifiers).toContain('std');
+
+        expect(profile.symbolToPackageMap.get('Sha1')).toBe('sha1');
+        expect(profile.symbolToPackageMap.get('Mutex')).toBe('parking_lot');
+        expect(profile.symbolToPackageMap.get('Serialize')).toBe('serde');
+        expect(profile.symbolToPackageMap.get('De')).toBe('serde');
+        expect(profile.symbolToPackageMap.get('Arc')).toBe('std');
+    });
+
+    it('extracts Rust AST call expressions with name and receiver via rust-adapter', () => {
+        const rustCode = `
+fn compute() {
+    let s = Sha1::new();
+    let val = calculate_hash();
+    crate::util::log();
+}
+`;
+        const adapter = new RustAdapter();
+        const ast = adapter.parse(rustCode, 'src/crypto.rs');
+        const symbols = collectSymbols(ast.root, 'src/crypto.rs');
+
+        const callNames = symbols.references.map((r) => r.name);
+        expect(callNames).toContain('new');
+        expect(callNames).toContain('calculate_hash');
+        expect(callNames).toContain('log');
+
+        const newRef = symbols.references.find((r) => r.name === 'new');
+        expect(newRef?.calleeReceiver).toBe('Sha1');
+
+        const logRef = symbols.references.find((r) => r.name === 'log');
+        expect(logRef?.calleeReceiver).toBe('crate::util');
+    });
+
+    it('extracts Go import bindings correctly into symbolToPackageMap', () => {
+        const goCode = `
+package main
+import (
+    "fmt"
+    uuid "github.com/google/uuid"
+    "strings"
+)
+`;
+        const profile = extractFileImportProfile(goCode, 'main.go');
+        expect(profile.specifiers).toContain('fmt');
+        expect(profile.specifiers).toContain('github.com/google/uuid');
+        expect(profile.symbolToPackageMap.get('fmt')).toBe('fmt');
+        expect(profile.symbolToPackageMap.get('uuid')).toBe('github.com/google/uuid');
+        expect(profile.symbolToPackageMap.get('strings')).toBe('strings');
+    });
+
+    it('extracts GDScript preload bindings and AST calls via gdscript-adapter', () => {
+        const gdCode = `
+extends Node
+const Weapon = preload("res://weapon.gd")
+var player = null
+
+func _ready():
+    player.attack()
+    take_damage(10)
+`;
+        const profile = extractFileImportProfile(gdCode, 'scripts/main.gd');
+        expect(profile.symbolToPackageMap.get('Weapon')).toBe('res://weapon.gd');
+
+        const adapter = new GDScriptAdapter();
+        const ast = adapter.parse(gdCode, 'scripts/main.gd');
+        const symbols = collectSymbols(ast.root, 'scripts/main.gd');
+
+        const callNames = symbols.references.map((r) => r.name);
+        expect(callNames).toContain('attack');
+        expect(callNames).toContain('take_damage');
+
+        const attackRef = symbols.references.find((r) => r.name === 'attack');
+        expect(attackRef?.calleeReceiver).toBe('player');
     });
 });

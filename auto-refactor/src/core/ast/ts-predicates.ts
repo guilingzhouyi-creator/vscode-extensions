@@ -216,6 +216,25 @@ export function calleeNameOf(node: ts.Node, sf: ts.SourceFile): string | null {
 }
 
 /**
+ * Callee qualifier/receiver of a call expression, if available (`a.b()` → `a`, `a.b.c()` → `a`).
+ *
+ * @param node - Candidate node.
+ * @param sf - Owning source file, used for text extraction.
+ * @returns The leftmost or immediate receiver identifier, or null when unnamed or direct call.
+ */
+export function calleeReceiverOf(node: ts.Node, sf: ts.SourceFile): string | null {
+    if (!ts.isCallExpression(node)) return null;
+    const expr = node.expression;
+    if (ts.isPropertyAccessExpression(expr)) {
+        const fullExprText = expr.expression.getText(sf);
+        if (!fullExprText) return null;
+        const dot = fullExprText.indexOf('.');
+        return dot > 0 ? fullExprText.slice(0, dot).trim() : fullExprText.trim();
+    }
+    return null;
+}
+
+/**
  * Resolve the declared name of a node for consumers that need it.
  *
  * @param node - Raw TypeScript node that may carry a name field.

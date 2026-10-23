@@ -62,6 +62,9 @@ export interface SymbolReference {
 
     /** 1-based call column, or null when no position was materialized. */
     column?: number | null;
+
+    /** Callee qualifier/receiver, if available (`a.b()` → `a`, `pkg::fn()` → `pkg`). */
+    calleeReceiver?: string | null;
 }
 
 /** Aggregate counters used by the report summary and by callers that assert coverage. */
@@ -149,6 +152,7 @@ function processSymbolFrame(
             column: node.start?.column ?? null,
             kind: 'call',
             caller,
+            calleeReceiver: node.calleeReceiver ?? null,
         });
     }
 

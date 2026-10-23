@@ -53,6 +53,7 @@ import {
     applyScaleDampedScores,
     effectivePenaltyFromIndex,
     SATURATION_HALFPOINT,
+    COMPOSITE_INDEX_FLOOR,
     accumulateProjectMetrics,
 } from './scorer-formulas';
 
@@ -200,13 +201,14 @@ export class QualityScorer {
             technicalDebt,
             formulas: {
                 indexMapping:
-                    'density dims: index = 100 * H / (H + linearPoints / scaleFactor), H = ' +
+                    'density dims (Michaelis-Menten / Hill rational decay): index = 100 * H / (H + linearPoints / scaleFactor), H = ' +
                     `${SATURATION_HALFPOINT}; codeSecurity: index = max(0, securityCeiling - linearPoints); ` +
                     'absolute dims: index = max(0, 100 - linearPoints)',
                 saturationHalfpoint: SATURATION_HALFPOINT,
+                compositeIndexFloor: COMPOSITE_INDEX_FLOOR,
                 dimensionScaleMode: { ...DIMENSION_SCALE_MODE },
                 composite:
-                    'sum(indices[d] * weights[d] for d in evaluated) / sum(weights[d] for d in evaluated)',
+                    'exp(sum(weights[d] * ln(max(COMPOSITE_INDEX_FLOOR, indices[d])) for d in evaluated) / sum(weights[d] for d in evaluated))',
                 coverage: 'sum(weights[d] for d in evaluated) / sum(weights[d] for all dimensions)',
                 confidence: 'clamp(baseConfidenceFromLines * coverage, floor, 1)',
                 gradeCutoffs: [
@@ -285,10 +287,15 @@ export class QualityScorer {
             deductionPoints,
             deductionPoints,
         );
+        const effectiveWeights =
+            config?.archetype && !this.hasExplicitCustomWeights
+                ? this.tuner.tuneWeights(config.archetype, this.weights)
+                : this.weights;
+
         const { compositeScore, coverage } = computeCompositeScore(
             rawScores,
             evaluatedDimensions,
-            this.weights,
+            effectiveWeights,
         );
         const grade = resolveQualityGrade(compositeScore);
         // Project scope: totalWeight is the repository's non-blank line total. Passing it
@@ -303,17 +310,18 @@ export class QualityScorer {
             compositeScore,
             grade,
             confidence,
-            weights: { ...this.weights },
+            weights: { ...effectiveWeights },
             technicalDebt,
             formulas: {
                 indexMapping:
-                    'density dims: index = 100 * H / (H + linearPoints / scaleFactor), H = ' +
+                    'density dims (Michaelis-Menten / Hill rational decay): index = 100 * H / (H + linearPoints / scaleFactor), H = ' +
                     `${SATURATION_HALFPOINT}; codeSecurity: index = max(0, securityCeiling - linearPoints); ` +
                     'absolute dims: index = max(0, 100 - linearPoints)',
                 saturationHalfpoint: SATURATION_HALFPOINT,
+                compositeIndexFloor: COMPOSITE_INDEX_FLOOR,
                 dimensionScaleMode: { ...DIMENSION_SCALE_MODE },
                 composite:
-                    'sum(indices[d] * weights[d] for d in evaluated) / sum(weights[d] for d in evaluated)',
+                    'exp(sum(weights[d] * ln(max(COMPOSITE_INDEX_FLOOR, indices[d])) for d in evaluated) / sum(weights[d] for d in evaluated))',
                 coverage: 'sum(weights[d] for d in evaluated) / sum(weights[d] for all dimensions)',
                 confidence: 'clamp(baseConfidenceFromLines * coverage, floor, 1)',
                 gradeCutoffs: [

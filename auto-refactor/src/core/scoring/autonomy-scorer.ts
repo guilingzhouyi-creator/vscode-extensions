@@ -135,7 +135,7 @@ const ROLE_BUSINESS_MODULE = 'business_module';
 const MIN_RESILIENCE_SCORE = 15.0;
 const MIN_RCALL_SCORE = 10;
 const EXTERNAL_PKG_PENALTY_WEIGHT = 15;
-const MAX_CLONE_PENALTY = 30;
+const MAX_CLONE_PENALTY = 80;
 const CLONE_PENALTY_MULTIPLIER = 1.5;
 const RULE_HYG_CLN_001 = 'HYG-CLN-001';
 const RULE_DUPLICATE_LITERAL = 'duplicate-literal';
@@ -658,17 +658,32 @@ function synthesizeAutonomyEvaluation(
 
 const COMMON_STDLIB_SYMBOLS: ReadonlySet<string> = new Set(
     (
+        // Common ECMAScript / JS / TS built-ins
         'push pop shift unshift slice splice join map filter reduce find includes forEach indexOf ' +
         'lastIndexOf some every concat reverse sort keys values entries assign freeze seal create ' +
         'defineProperty hasOwnProperty toString valueOf trim split replace replaceAll toLowerCase ' +
         'toUpperCase startsWith endsWith substring charAt charCodeAt match test exec now parse ' +
         'stringify log info warn error debug trace floor ceil round abs min max sqrt pow random ' +
         'setTimeout clearTimeout setInterval clearInterval resolve reject then catch finally all race ' +
-        'has get set add delete clear size length bind call apply close open read write'
+        'has get set add delete clear size length bind call apply close open read write ' +
+        // Rust standard library & prelude items
+        'std core alloc Box Rc Arc RefCell Mutex RwLock Option Result Some None Ok Err ' +
+        'Default Clone Copy Send Sync Debug Display Hash PartialEq Eq PartialOrd Ord ' +
+        'String str Vec HashMap HashSet BTreeMap BTreeSet Instant Duration println eprintln ' +
+        'format vec panic assert assert_eq assert_ne ' +
+        // Go standard library & built-in functions
+        'make len cap append copy close delete print println panic recover new Error ' +
+        'Read Write Close Sprint Sprintf Sprintln Print Printf Println ' +
+        // Python built-in functions & methods
+        'range enumerate zip issubclass getattr setattr hasattr dict tuple int ' +
+        'float bool bytes bytearray sum sorted any all ' +
+        // GDScript built-ins
+        'push_error push_warning randf randi randf_range randi_range deg_to_rad rad_to_deg ' +
+        'clamp lerp emit_signal connect disconnect queue_free is_instance_valid get_node has_node'
     ).split(' '),
 );
 
-function selectBalancedSdk(extPkgs: string[], symbolName: string): string {
+function selectBalancedSdk(extPkgs: readonly string[], symbolName: string): string {
     if (extPkgs.length === 1) return extPkgs[0];
     let hash = 0;
     for (let i = 0; i < symbolName.length; i++) {
@@ -780,6 +795,31 @@ function countInternalReference(
     return true;
 }
 
+function isStdlibOrReceiver(name: string, calleeReceiver?: string | null): boolean {
+    return (
+        COMMON_STDLIB_SYMBOLS.has(name) ||
+        (Boolean(calleeReceiver) && COMMON_STDLIB_SYMBOLS.has(calleeReceiver!))
+    );
+}
+
+function isSelfReceiver(calleeReceiver?: string | null): boolean {
+    return (
+        calleeReceiver === 'this' ||
+        calleeReceiver === 'self' ||
+        calleeReceiver === 'super'
+    );
+}
+
+function resolveMatchedExtPackage(extPkgs: string[], ref: SymbolReference): string {
+    if (ref.calleeReceiver && extPkgs.includes(ref.calleeReceiver)) {
+        return ref.calleeReceiver;
+    }
+    if (extPkgs.includes(ref.name)) {
+        return ref.name;
+    }
+    return selectBalancedSdk(extPkgs, ref.name);
+}
+
 /**
  * Count a reference that is not backed by an in-project declaration: import-bound packages,
  * common standard-library symbols, or the file's external SDK packages.
@@ -805,14 +845,22 @@ function countExternalReference(
         fileInv.allDependencies.size > 0 ? fileInv.allDependencies : inputs.manifestDeps;
 
     const profile = inputs.fileToImportProfiles?.get(ref.file);
-    const boundPkg = profile?.symbolToPackageMap.get(ref.name);
+    const boundPkg =
+        profile?.symbolToPackageMap.get(ref.name) ??
+        (ref.calleeReceiver ? profile?.symbolToPackageMap.get(ref.calleeReceiver) : undefined);
     if (boundPkg) {
         processBoundImportRef(boundPkg, ref.file, isCritical, effectiveDeps, fileInv, state);
         return;
     }
 
-    if (COMMON_STDLIB_SYMBOLS.has(ref.name)) {
+    if (isStdlibOrReceiver(ref.name, ref.calleeReceiver)) {
         state.stdlibCalls++;
+        return;
+    }
+
+    if (isSelfReceiver(ref.calleeReceiver)) {
+        state.internalSymbolCalls++;
+        if (isCritical) state.criticalPathInternalCalls++;
         return;
     }
 
@@ -821,8 +869,9 @@ function countExternalReference(
         state.stdlibCalls++;
         return;
     }
-    const chosen = selectBalancedSdk(extPkgs, ref.name);
-    recordSdkCall(state, chosen, ref.file, isCritical);
+
+    const matchedPkg = resolveMatchedExtPackage(extPkgs, ref);
+    recordSdkCall(state, matchedPkg, ref.file, isCritical);
 }
 
 /**

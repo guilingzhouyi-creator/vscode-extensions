@@ -263,27 +263,6 @@ export const DIMENSION_RULES: DimensionRule[] = [
     },
     // Modernity — backward compatibility shims, fallback chains, and deprecated accesses
     {
-        analyzer: 'ts-modern',
-        covers: ruleMatches([RULE_MOD_BWD_001], ['backward', 'shim', 'BWD']),
-        dimension: DIMENSION_MODERNITY,
-        points: DEDUCTION_BACKWARD_SHIM,
-        rationale: ScoringRationales.DEPRECATED_LANGUAGE_FEATURE,
-    },
-    {
-        analyzer: 'ts-modern',
-        covers: ruleMatches([RULE_MOD_FLB_001], ['fallback', 'chain', 'FLB']),
-        dimension: DIMENSION_MODERNITY,
-        points: DEDUCTION_FALLBACK_CHAIN,
-        rationale: ScoringRationales.DEPRECATED_LANGUAGE_FEATURE,
-    },
-    {
-        analyzer: 'ts-modern',
-        covers: ruleMatches([RULE_MOD_DEP_001], ['deprecated', 'access', 'DEP']),
-        dimension: DIMENSION_MODERNITY,
-        points: DEDUCTION_DEPRECATED_ACCESS,
-        rationale: ScoringRationales.DEPRECATED_LANGUAGE_FEATURE,
-    },
-    {
         analyzer: ANALYZER_GOVERNANCE,
         covers: ruleMatches([RULE_MOD_BWD_001], ['backward', 'shim', 'BWD']),
         dimension: DIMENSION_MODERNITY,
@@ -640,12 +619,19 @@ export const DIMENSION_RULES: DimensionRule[] = [
     {
         analyzer: ANALYZER_VSCODE_EXTENSION,
         covers: ruleMatches(
-            ['VSC-PERF-001', 'VSC-UI-001'],
-            ['blocking', 'synchronous', 'main thread', 'fold', 'density'],
+            ['VSC-PERF-001', 'VSC-PERF-002', 'VSC-UI-001'],
+            ['blocking', 'synchronous', 'main thread', 'fold', 'density', 'reflow'],
         ),
         dimension: DIMENSION_PERFORMANCE_EFFICIENCY,
         points: DEDUCTION_MAIN_THREAD_BLOCKING_IO,
         rationale: ScoringRationales.VSCODE_MAIN_THREAD_BLOCKING_IO,
+    },
+    {
+        analyzer: ANALYZER_VSCODE_EXTENSION,
+        covers: ruleMatches(['VSC-UI-003'], ['a11y', 'accessible', 'label']),
+        dimension: DIMENSION_MAINTAINABILITY,
+        points: DEDUCTION_SIMPLIFY_MAINTAINABILITY,
+        rationale: ScoringRationales.UI_COMPONENT_REUSE,
     },
     {
         analyzer: ANALYZER_VSCODE_EXTENSION,

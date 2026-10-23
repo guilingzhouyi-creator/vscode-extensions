@@ -719,12 +719,30 @@ function computeWeightedVariance(context: WeightedVarianceContext): number {
 }
 
 /**
+ * Popoviciu's Inequality on Variances (Popoviciu, 1935):
+ * For any bounded random variable X in [a, b], Var(X) <= 1/4 * (b - a)^2,
+ * which implies theoretical maximum standard deviation sigma_max = (b - a) / 2.
+ * For scores bounded in [0, 100], POPOVICIU_MAX_SIGMA = 50.0.
+ */
+export const POPOVICIU_MAX_SIGMA = 50.0;
+
+/**
+ * Default maximum dispersion penalty ratio gamma in [0, 1].
+ * Setting gamma = 0.5 ensures that even under extreme bimodal catastrophe
+ * (e.g. 50% perfect 100s and 50% complete 0s, yielding sigma_S = 50.0),
+ * the dispersion discount factor D drops from 1.0 down to 0.5 (a 50% penalty),
+ * preserving 50% of the authentic underlying asset quality.
+ */
+export const DEFAULT_DISPERSION_PENALTY_RATIO = 0.5;
+
+/**
  * Compute Polyglot Generalization and Modernization Equilibrium Index.
  *
  * Mathematical formulation:
  * S_{\text{mean}} = \frac{\sum w_i \cdot s_i}{\sum w_i}
  * \sigma_S = \sqrt{\frac{\sum w_i \cdot (s_i - S_{\text{mean}})^2}{\sum w_i}}
- * D = \max\left(0, 1.0 - \frac{\sigma_S}{100}\right)
+ * \tilde{\sigma}_S = \frac{\sigma_S}{\sigma_{\max}}, \quad \sigma_{\max} = 50.0 \quad (\text{Popoviciu, 1935})
+ * D = \max\left(0, 1.0 - \tilde{\sigma}_S \cdot \gamma\right), \quad \gamma = 0.5
  * P_{\text{polyglot}} = S_{\text{mean}} \cdot D
  *
  * Evaluates modernization and standardization equilibrium across multi-language stacks.
@@ -765,7 +783,11 @@ export function computePolyglotIndex(
     });
     const sigmaS = Math.sqrt(Math.max(0, variance));
 
-    const dispersionPenalty = Math.max(0, 1.0 - sigmaS / SCORE_PERFECT_FLOAT);
+    const normalizedDispersion = sigmaS / POPOVICIU_MAX_SIGMA;
+    const dispersionPenalty = Math.max(
+        0,
+        1.0 - normalizedDispersion * DEFAULT_DISPERSION_PENALTY_RATIO,
+    );
     const polyglotScore = sMean * dispersionPenalty;
     return clampScore(polyglotScore);
 }

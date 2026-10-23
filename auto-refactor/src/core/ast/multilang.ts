@@ -57,6 +57,8 @@ export interface NormalizedNode {
     end?: Position;
     /** Declaration or identifier name when applicable. */
     name?: string | null;
+    /** Callee qualifier/receiver for Call nodes (e.g. `obj` in `obj.method()`, `pkg` in `pkg::func()`). */
+    calleeReceiver?: string | null;
     isNumeric?: boolean;
     isString?: boolean;
     /** True when this node's initializer is function-like. */

@@ -57,6 +57,11 @@ const ALL_ANALYZERS = {
   stdlib: { enabled: true },
   'gdscript-game': { enabled: true },
   'vscode-extension': { enabled: true },
+  'gate-architecture': { enabled: true },
+  'production-hygiene': { enabled: true },
+  'client-exposure': { enabled: true },
+  frontend: { enabled: true },
+  'shell-safety': { enabled: true },
   'token-density': { enabled: true },
 };
 
