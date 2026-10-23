@@ -23,32 +23,36 @@ import type { NormalizedNode, LanguageAdapter, NodeProjector, ProjectionPolicy }
 import { NodeKind } from './multilang';
 import { computeEffectiveCodeDensity } from '../scoring/effectiveDensity';
 
+const SEVERITY_ERROR = 'error';
+const SEVERITY_INFO = 'info';
+const RULE_ANALYZER_ERROR = 'analyzer-error';
+const ANALYZER_COMPLEXITY = 'complexity';
+const ANALYZER_CONSTANTS = 'constants';
+const ANALYZER_LARGE_FILE = 'large-file';
+
+/**
+ * Signature for streaming visit and leave AST hooks.
+ */
+export type StreamingVisitHook = (
+    node: NormalizedNode,
+    ctx: AnalyzerContext,
+    parent: NormalizedNode | undefined,
+    grandparent: NormalizedNode | undefined,
+    depth: number,
+    className: string | null,
+    binding: string | null,
+) => void;
+
 /** An analyzer + its per-file merged context, participating in the shared pass. */
 export interface StreamingEntry {
     analyzer: {
         name: string;
-        visit?(
-            node: NormalizedNode,
-            ctx: AnalyzerContext,
-            parent: NormalizedNode | undefined,
-            grandparent: NormalizedNode | undefined,
-            depth: number,
-            className: string | null,
-            binding: string | null,
-        ): void;
+        visit?: StreamingVisitHook;
         /**
          * Post-order hook: called after recursing into children (reverse order of visit).
          * Optional — analyzers that don't need post-order traversal skip it (zero overhead).
          */
-        leave?(
-            node: NormalizedNode,
-            ctx: AnalyzerContext,
-            parent: NormalizedNode | undefined,
-            grandparent: NormalizedNode | undefined,
-            depth: number,
-            className: string | null,
-            binding: string | null,
-        ): void;
+        leave?: StreamingVisitHook;
         finalize?(ctx: AnalyzerContext): Issue[];
     };
     ctx: AnalyzerContext;
@@ -61,25 +65,19 @@ const TYPEOF_FUNCTION = 'function';
  * Narrow an optional hook to its callable type. Control-flow analysis only narrows a direct
  * `typeof x === 'function'` comparison, so the named tag above needs this explicit predicate.
  */
-function isCallable<T extends (...args: never[]) => unknown>(value: T | undefined): value is T {
-    return typeof value === TYPEOF_FUNCTION;
+function isCallable<T extends (...args: never[]) => unknown>(candidateFn: T | undefined): candidateFn is T {
+    return typeof candidateFn === TYPEOF_FUNCTION;
 }
 
 function resolveChildScopeName(node: NormalizedNode, className: string | null): string | null {
-    if (node.isClassDefining) {
-        return node.name ?? className;
-    }
-    return className;
+    return node.isClassDefining ? (node.name ?? className) : className;
 }
 
 function resolveChildScopeBinding(node: NormalizedNode, binding: string | null): string | null {
     if (node.isClassDefining || node.functionLike) {
         return null;
     }
-    if (node.introducesBinding) {
-        return node.bindingName ?? binding;
-    }
-    return binding;
+    return node.introducesBinding ? (node.bindingName ?? binding) : binding;
 }
 
 type NodeHookFn = NonNullable<StreamingEntry['analyzer']['visit']>;
@@ -91,42 +89,25 @@ interface ActiveHook {
     name: string;
 }
 
-function dispatchActiveVisits(
+function dispatchHooks(
     active: ActiveHook[],
     node: NormalizedNode,
     parent: NormalizedNode | undefined,
-    grandparent: NormalizedNode | undefined,
-    depth: number,
-    className: string | null,
-    binding: string | null,
-    pushError: ErrorReporter,
+    ...scope: [
+        grandparent: NormalizedNode | undefined,
+        depth: number,
+        className: string | null,
+        binding: string | null,
+        pushError: ErrorReporter,
+    ]
 ): void {
+    const [grandparent, depth, className, binding, pushError] = scope;
     for (let i = 0; i < active.length; i++) {
-        const h = active[i];
+        const hook = active[i];
         try {
-            h.fn(node, h.ctx, parent, grandparent, depth, className, binding);
+            hook.fn(node, hook.ctx, parent, grandparent, depth, className, binding);
         } catch (e) {
-            pushError(h.name, e, h.ctx);
-        }
-    }
-}
-
-function dispatchActiveLeaves(
-    active: ActiveHook[],
-    node: NormalizedNode,
-    parent: NormalizedNode | undefined,
-    grandparent: NormalizedNode | undefined,
-    depth: number,
-    className: string | null,
-    binding: string | null,
-    pushError: ErrorReporter,
-): void {
-    for (let i = 0; i < active.length; i++) {
-        const h = active[i];
-        try {
-            h.fn(node, h.ctx, parent, grandparent, depth, className, binding);
-        } catch (e) {
-            pushError(h.name, e, h.ctx);
+            pushError(hook.name, e, hook.ctx);
         }
     }
 }
@@ -181,11 +162,11 @@ export function runStreaming(
     const pushError = (name: string, e: unknown, ctx: AnalyzerContext) => {
         if (errored.has(name)) return; // one error issue per analyzer per file
         errored.add(name);
-        const sev = ctx.config.failOnAnalyzerError ? 'error' : 'info';
+        const sev = ctx.config.failOnAnalyzerError ? SEVERITY_ERROR : SEVERITY_INFO;
         issues.push({
             id: `core:analyzer-error:${ctx.filePath}:1`,
             analyzer: name,
-            rule: 'analyzer-error',
+            rule: RULE_ANALYZER_ERROR,
             severity: sev,
             message: `Analyzer "${name}" threw: ${(e as Error).message}`,
             location: {
@@ -201,12 +182,15 @@ export function runStreaming(
         node: NormalizedNode,
         parent: NormalizedNode | undefined,
         grandparent: NormalizedNode | undefined,
-        depth: number,
-        className: string | null,
-        binding: string | null,
+        ...scope: [
+            depth: number,
+            className: string | null,
+            binding: string | null,
+        ]
     ): void => {
+        const [depth, className, binding] = scope;
         if (activeVisits.length > 0) {
-            dispatchActiveVisits(
+            dispatchHooks(
                 activeVisits,
                 node,
                 parent,
@@ -227,7 +211,7 @@ export function runStreaming(
         }
 
         if (hasAnyLeave) {
-            dispatchActiveLeaves(
+            dispatchHooks(
                 activeLeaves,
                 node,
                 parent,
@@ -271,12 +255,15 @@ export class FileMetricCollector {
     visit(
         node: NormalizedNode,
         _ctx: AnalyzerContext,
-        parent: NormalizedNode | undefined,
-        _grandparent: NormalizedNode | undefined,
-        depth: number,
-        _className: string | null,
-        _binding: string | null,
+        parent?: NormalizedNode,
+        ...scope: [
+            _grandparent?: NormalizedNode,
+            depth?: number,
+            _className?: string | null,
+            _binding?: string | null,
+        ]
     ): void {
+        const depth = scope[1] ?? 0;
         if (node.functionLike) this.functions++;
         if (depth > this.maxNesting) this.maxNesting = depth;
         if (parent && parent.kind === NodeKind.SourceFile && node.topLevel) {
@@ -395,11 +382,11 @@ export function runStreamingProjected(
     const pushError = (name: string, e: unknown, ctx: AnalyzerContext) => {
         if (errored.has(name)) return; // one error issue per analyzer per file
         errored.add(name);
-        const sev = ctx.config.failOnAnalyzerError ? 'error' : 'info';
+        const sev = ctx.config.failOnAnalyzerError ? SEVERITY_ERROR : SEVERITY_INFO;
         issues.push({
             id: `core:analyzer-error:${ctx.filePath}:1`,
             analyzer: name,
-            rule: 'analyzer-error',
+            rule: RULE_ANALYZER_ERROR,
             severity: sev,
             message: `Analyzer "${name}" threw: ${(e as Error).message}`,
             location: {
@@ -420,19 +407,22 @@ export function runStreamingProjected(
         raw: unknown,
         parentRaw: unknown | undefined,
         grandparentRaw: unknown | undefined,
-        depth: number,
-        className: string | null,
-        binding: string | null,
-        parentProj: NormalizedNode | undefined,
-        grandparentProj: NormalizedNode | undefined,
-        caller: string | null,
+        ...scope: [
+            depth: number,
+            className: string | null,
+            binding: string | null,
+            parentProj: NormalizedNode | undefined,
+            grandparentProj: NormalizedNode | undefined,
+            caller: string | null,
+        ]
     ): void => {
+        const [depth, className, binding, parentProj, grandparentProj, caller] = scope;
         const node = projector.project(raw, parentRaw, grandparentRaw);
         // Scan-wide consumers (the cross-file symbol index) observe the SAME projected nodes the
         // analyzers see; this is the only point where the lazy path has a NormalizedNode in hand.
         if (onNode) onNode(node, caller);
         if (activeVisits.length > 0) {
-            dispatchActiveVisits(
+            dispatchHooks(
                 activeVisits,
                 node,
                 parentProj,
@@ -454,7 +444,7 @@ export function runStreamingProjected(
         }
 
         if (hasAnyLeave) {
-            dispatchActiveLeaves(
+            dispatchHooks(
                 activeLeaves,
                 node,
                 parentProj,
@@ -523,11 +513,11 @@ export function fastPathEnabled(): boolean {
  *   analyzers: complexity needs complexity/name/position data, constants needs literals and
  *   positions, and large-file needs names only.
  */
-export function policyFromAnalyzers(names: string[]): ProjectionPolicy {
+export function getPolicyFromAnalyzers(names: string[]): ProjectionPolicy {
     const set = new Set(names);
-    const needComplexity = set.has('complexity');
-    const needLiterals = set.has('constants');
-    const needNames = needComplexity || set.has('large-file');
+    const needComplexity = set.has(ANALYZER_COMPLEXITY);
+    const needLiterals = set.has(ANALYZER_CONSTANTS);
+    const needNames = needComplexity || set.has(ANALYZER_LARGE_FILE);
     const needPositions = needComplexity || needLiterals;
     // `needSymbols` is scan-wide: the cross-file symbol index consumes declaration names/
     // positions and call names on every scan, independently of which analyzers are enabled.
@@ -537,6 +527,9 @@ export function policyFromAnalyzers(names: string[]): ProjectionPolicy {
     return { needComplexity, needLiterals, needNames, needPositions, needSymbols: true };
 }
 
+/** Backward-compatible alias for getPolicyFromAnalyzers. */
+export const policyFromAnalyzers = getPolicyFromAnalyzers;
+
 /**
  * Routing gate: build the lazy-projection source for one file, or null when the fast path
  * cannot apply (gate off, ineligible analyzers, adapter without project(), or any projector
@@ -545,10 +538,7 @@ export function policyFromAnalyzers(names: string[]): ProjectionPolicy {
  *   the materialized path.
  * @param content - Full UTF-16 source text to parse lazily.
  * @param filePath - File path passed to the adapter for parser/diagnostic context.
- * @param streamingNames - Names of the enabled streaming analyzers; any name outside
- *   FAST_PATH_ANALYZERS rejects the fast path.
- * @param legacyCount - Number of analyzers using the legacy `analyze()` contract; any
- *   positive count rejects the fast path.
+ * @param rest - Tuple carrying streaming analyzer names and legacy analyzer count.
  * @returns A projector bound to the content, or null when the gate rejects the file or
  *   `adapter.project` throws; null means the caller must parse and run the materialized path.
  */
@@ -556,15 +546,15 @@ export function tryCreateProjector(
     adapter: LanguageAdapter,
     content: string,
     filePath: string,
-    streamingNames: string[],
-    legacyCount: number,
+    ...rest: [streamingNames: string[], legacyCount: number]
 ): NodeProjector | null {
+    const [streamingNames, legacyCount] = rest;
     if (legacyCount > 0) return null;
     if (streamingNames.some((n) => !FAST_PATH_ANALYZERS.has(n))) return null;
     if (!fastPathEnabled()) return null;
     if (!isCallable(adapter.project)) return null;
     try {
-        return adapter.project(content, filePath, policyFromAnalyzers(streamingNames));
+        return adapter.project(content, filePath, getPolicyFromAnalyzers(streamingNames));
     } catch {
         return null;
     }

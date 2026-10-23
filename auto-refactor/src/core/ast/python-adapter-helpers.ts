@@ -13,38 +13,30 @@
 import { NodeKind } from './multilang';
 import type { TreeSitterNode } from './tree-sitter-types';
 
-/** Branch constructs that each add one to a function's cyclomatic complexity. */
-export const BRANCH_TYPES = new Set([
-    'if_statement',
-    'elif_clause',
-    'for_statement',
-    'while_statement',
-    'except_clause',
-    'case_clause',
-    'conditional_expression',
-    'boolean_operator',
-    'for_in_clause',
-    'if_clause',
-]);
-
-/** Control/block nodes whose children sit one nesting level deeper. */
-export const NESTING_TYPES = new Set([
-    'block',
-    'if_statement',
-    'elif_clause',
-    'else_clause',
-    'for_statement',
-    'while_statement',
-    'try_statement',
-    'except_clause',
-    'finally_clause',
-    'with_statement',
-    'match_statement',
-    'case_clause',
-]);
-
 /** tree-sitter-python AST node type for assignment statements. */
 export const PY_ASSIGNMENT = 'assignment';
+const PY_IF_STMT = 'if_statement';
+const PY_ELIF_CLAUSE = 'elif_clause';
+const PY_ELSE_CLAUSE = 'else_clause';
+const PY_FOR_STMT = 'for_statement';
+const PY_WHILE_STMT = 'while_statement';
+const PY_TRY_STMT = 'try_statement';
+const PY_EXCEPT_CLAUSE = 'except_clause';
+const PY_FINALLY_CLAUSE = 'finally_clause';
+const PY_WITH_STMT = 'with_statement';
+const PY_MATCH_STMT = 'match_statement';
+const PY_CASE_CLAUSE = 'case_clause';
+const PY_CONDITIONAL_EXPR = 'conditional_expression';
+const PY_BOOLEAN_OP = 'boolean_operator';
+const PY_FOR_IN_CLAUSE = 'for_in_clause';
+const PY_IF_CLAUSE = 'if_clause';
+const PY_TYPE_ALIAS_STMT = 'type_alias_statement';
+const PY_KEYWORD_ARGUMENT = 'keyword_argument';
+const PY_COMPARISON_OP = 'comparison_operator';
+const PY_ARGUMENT_LIST = 'argument_list';
+const PY_INTERPOLATION = 'interpolation';
+const PY_FORMAT_SPECIFIER = 'format_specifier';
+const SPECIAL_MODULE_MAIN = '__main__';
 
 const PY_CLASS_DEFINITION = 'class_definition';
 const PY_IDENTIFIER = 'identifier';
@@ -73,13 +65,43 @@ const FIELD_RIGHT = 'right';
 const FIELD_FUNCTION = 'function';
 const FIELD_KEY = 'key';
 
+/** Branch constructs that each add one to a function's cyclomatic complexity. */
+export const BRANCH_TYPES = new Set([
+    PY_IF_STMT,
+    PY_ELIF_CLAUSE,
+    PY_FOR_STMT,
+    PY_WHILE_STMT,
+    PY_EXCEPT_CLAUSE,
+    PY_CASE_CLAUSE,
+    PY_CONDITIONAL_EXPR,
+    PY_BOOLEAN_OP,
+    PY_FOR_IN_CLAUSE,
+    PY_IF_CLAUSE,
+]);
+
+/** Control/block nodes whose children sit one nesting level deeper. */
+export const NESTING_TYPES = new Set([
+    PY_BLOCK,
+    PY_IF_STMT,
+    PY_ELIF_CLAUSE,
+    PY_ELSE_CLAUSE,
+    PY_FOR_STMT,
+    PY_WHILE_STMT,
+    PY_TRY_STMT,
+    PY_EXCEPT_CLAUSE,
+    PY_FINALLY_CLAUSE,
+    PY_WITH_STMT,
+    PY_MATCH_STMT,
+    PY_CASE_CLAUSE,
+]);
+
 /** Declaration node types that count as a top-level symbol when they sit at module scope. */
 const TOP_LEVEL_TYPES = new Set([
     PY_FUNCTION_DEF,
     PY_CLASS_DEFINITION,
     PY_DECORATED_DEF,
-    'if_statement',
-    'type_alias_statement',
+    PY_IF_STMT,
+    PY_TYPE_ALIAS_STMT,
 ]);
 
 /** `MAX_RETRIES`-style names: Python's conventional module-level constant shape. */
@@ -96,145 +118,161 @@ export interface MapContext {
 /**
  * Compute the cyclomatic branch weight of a node.
  *
- * @param sn - Raw tree-sitter node.
+ * @param syntaxNode - Raw tree-sitter node.
  * @returns `1` for branch constructs, otherwise `0`.
  */
-export function branchWeightOf(sn: TreeSitterNode): number {
-    return BRANCH_TYPES.has(sn.type) ? 1 : 0;
+export function computePythonBranchWeight(syntaxNode: TreeSitterNode): number {
+    return BRANCH_TYPES.has(syntaxNode.type) ? 1 : 0;
 }
+
+/** Backward-compatible alias for computePythonBranchWeight. */
+export const branchWeightOf = computePythonBranchWeight;
 
 /**
  * Resolve whether a function is a direct member of a class body.
  *
- * @param sn - Raw `function_definition` node.
+ * @param syntaxNode - Raw `function_definition` node.
  * @returns `true` when the nearest enclosing declaration is a class definition.
  */
-export function isClassMember(sn: TreeSitterNode): boolean {
-    let p = sn.parent;
-    while (p && (p.type === PY_DECORATED_DEF || p.type === PY_BLOCK)) {
-        p = p.parent;
+export function isClassMember(syntaxNode: TreeSitterNode): boolean {
+    let currentParent = syntaxNode.parent;
+    while (currentParent && (currentParent.type === PY_DECORATED_DEF || currentParent.type === PY_BLOCK)) {
+        currentParent = currentParent.parent;
     }
-    return Boolean(p && p.type === PY_CLASS_DEFINITION);
+    return Boolean(currentParent && currentParent.type === PY_CLASS_DEFINITION);
 }
 
 /**
  * Resolve whether a node is a module-scope declaration.
  *
- * @param sn - Raw tree-sitter node.
+ * @param syntaxNode - Raw tree-sitter node.
  * @returns `true` for declarations directly under the module.
  */
-export function isTopLevel(sn: TreeSitterNode): boolean {
-    const p = sn.parent;
-    if (!p || p.type !== PY_MODULE) return false;
-    if (TOP_LEVEL_TYPES.has(sn.type)) return true;
+export function isTopLevel(syntaxNode: TreeSitterNode): boolean {
+    const parentNode = syntaxNode.parent;
+    if (!parentNode || parentNode.type !== PY_MODULE) return false;
+    if (TOP_LEVEL_TYPES.has(syntaxNode.type)) return true;
     return (
-        sn.type === PY_EXPR_STMT && Boolean(sn.namedChildren?.some((c) => c.type === PY_ASSIGNMENT))
+        syntaxNode.type === PY_EXPR_STMT &&
+        Boolean(syntaxNode.namedChildren?.some((child) => child.type === PY_ASSIGNMENT))
     );
 }
 
 /**
  * Resolve whether an assignment targets a module-level constant name.
  *
- * @param sn - Raw `assignment` node.
+ * @param syntaxNode - Raw `assignment` node.
  * @returns `true` when the left-hand side is a single `UPPER_SNAKE_CASE` identifier.
  */
-export function isConstTarget(sn: TreeSitterNode): boolean {
-    const left = sn.childForFieldName ? sn.childForFieldName(FIELD_LEFT) : null;
+export function isConstTarget(syntaxNode: TreeSitterNode): boolean {
+    const leftChild = syntaxNode.childForFieldName ? syntaxNode.childForFieldName(FIELD_LEFT) : null;
     return Boolean(
-        left && left.type === PY_IDENTIFIER && left.text && CONSTANT_NAME_RE.test(left.text),
+        leftChild &&
+            leftChild.type === PY_IDENTIFIER &&
+            leftChild.text &&
+            CONSTANT_NAME_RE.test(leftChild.text),
     );
 }
 
 /**
  * Callee name of a tree-sitter `call` node, reduced to its final segment.
  *
- * @param sn - `call` syntax node.
+ * @param syntaxNode - `call` syntax node.
  * @returns Callee text (final segment for attribute access), or null when absent.
  */
-export function callNameOf(sn: TreeSitterNode): string | null {
-    const fn =
-        typeof sn.childForFieldName === 'function' ? sn.childForFieldName(FIELD_FUNCTION) : null;
-    const text = fn && typeof fn.text === 'string' ? fn.text : null;
-    if (!text) return null;
-    const dot = text.lastIndexOf('.');
-    return dot >= 0 ? text.slice(dot + 1) : text;
+export function callNameOf(syntaxNode: TreeSitterNode): string | null {
+    const fnNode =
+        typeof syntaxNode.childForFieldName === 'function'
+            ? syntaxNode.childForFieldName(FIELD_FUNCTION)
+            : null;
+    const textValue = fnNode && typeof fnNode.text === 'string' ? fnNode.text : null;
+    if (!textValue) return null;
+    const dotIndex = textValue.lastIndexOf('.');
+    return dotIndex >= 0 ? textValue.slice(dotIndex + 1) : textValue;
 }
 
 /**
  * Resolve name from decorated definition.
  *
- * @param sn - Decorated definition node.
+ * @param syntaxNode - Decorated definition node.
  * @returns Extracted inner definition name, or null.
  */
-function resolveDecoratedName(sn: TreeSitterNode): string | null {
-    const inner = sn.namedChildren?.find(
-        (c) => c.type === PY_FUNCTION_DEF || c.type === PY_CLASS_DEFINITION,
+function resolveDecoratedName(syntaxNode: TreeSitterNode): string | null {
+    const innerDefinition = syntaxNode.namedChildren?.find(
+        (child) => child.type === PY_FUNCTION_DEF || child.type === PY_CLASS_DEFINITION,
     );
-    return inner ? nameOf(inner) : null;
+    return innerDefinition ? nameOf(innerDefinition) : null;
 }
 
 /**
  * Resolve name from assignment left-hand side.
  *
- * @param sn - Assignment node.
+ * @param syntaxNode - Assignment node.
  * @returns Identifier text, or null.
  */
-function resolveAssignmentName(sn: TreeSitterNode): string | null {
-    const left = sn.childForFieldName ? sn.childForFieldName(FIELD_LEFT) : null;
-    if (!left) return null;
-    if (left.type === PY_IDENTIFIER) return left.text ?? null;
-    const id = left.namedChildren?.find((c) => c.type === PY_IDENTIFIER);
-    return id?.text ?? null;
+function resolveAssignmentName(syntaxNode: TreeSitterNode): string | null {
+    const leftChild = syntaxNode.childForFieldName ? syntaxNode.childForFieldName(FIELD_LEFT) : null;
+    if (!leftChild) return null;
+    if (leftChild.type === PY_IDENTIFIER) return leftChild.text ?? null;
+    const identifierChild = leftChild.namedChildren?.find((child) => child.type === PY_IDENTIFIER);
+    return identifierChild?.text ?? null;
 }
 
 /**
  * Resolve the declared name of a node for naming consumers.
  *
- * @param sn - Raw tree-sitter node.
+ * @param syntaxNode - Raw tree-sitter node.
  * @returns The resolved non-empty name, or null when the node has none.
  */
-export function nameOf(sn: TreeSitterNode): string | null {
-    if (sn.type === PY_DECORATED_DEF) return resolveDecoratedName(sn);
-    if (sn.type === PY_EXPR_STMT) {
-        const inner = sn.namedChildren?.find((c) => c.type === PY_ASSIGNMENT);
-        return inner ? nameOf(inner) : null;
+export function getPythonNodeName(syntaxNode: TreeSitterNode): string | null {
+    if (syntaxNode.type === PY_DECORATED_DEF) return resolveDecoratedName(syntaxNode);
+    if (syntaxNode.type === PY_EXPR_STMT) {
+        const innerAssignment = syntaxNode.namedChildren?.find((child) => child.type === PY_ASSIGNMENT);
+        return innerAssignment ? getPythonNodeName(innerAssignment) : null;
     }
-    const name = sn.childForFieldName ? sn.childForFieldName(FIELD_NAME) : null;
-    if (name && name.type === PY_IDENTIFIER) return name.text ?? null;
-    if (sn.type === PY_ASSIGNMENT) return resolveAssignmentName(sn);
+    const nameChild = syntaxNode.childForFieldName ? syntaxNode.childForFieldName(FIELD_NAME) : null;
+    if (nameChild && nameChild.type === PY_IDENTIFIER) return nameChild.text ?? null;
+    if (syntaxNode.type === PY_ASSIGNMENT) return resolveAssignmentName(syntaxNode);
     return null;
 }
+
+/** Backward-compatible alias for getPythonNodeName. */
+export const nameOf = getPythonNodeName;
 
 /**
  * Report whether a name is private by Python convention.
  *
- * @param name - Resolved symbol name, or null when the node has none.
+ * @param symbolName - Resolved symbol name, or null when the node has none.
  * @returns `true` for underscore-prefixed names.
  */
-export function isPrivateName(name: string | null): boolean {
-    return Boolean(name && name.startsWith('_'));
+export function isPrivateName(symbolName: string | null): boolean {
+    return Boolean(symbolName && symbolName.startsWith('_'));
 }
 
 /**
  * Report whether a `lambda` is bound to a name by its assignment.
  *
- * @param sn - Raw tree-sitter node.
+ * @param syntaxNode - Raw tree-sitter node.
  * @returns `true` for `handler = lambda ...`.
  */
-export function introducesBinding(sn: TreeSitterNode): boolean {
-    if (sn.type !== PY_ASSIGNMENT) return false;
-    const right = sn.childForFieldName ? sn.childForFieldName(FIELD_RIGHT) : null;
-    return Boolean(right && right.type === PY_LAMBDA);
+export function introducesBinding(syntaxNode: TreeSitterNode): boolean {
+    if (syntaxNode.type !== PY_ASSIGNMENT) return false;
+    const rightChild = syntaxNode.childForFieldName ? syntaxNode.childForFieldName(FIELD_RIGHT) : null;
+    return Boolean(rightChild && rightChild.type === PY_LAMBDA);
 }
 
 /**
  * Report whether a `true`/`false`/`none` node is a real atom literal.
  *
- * @param sn - Raw tree-sitter node.
+ * @param syntaxNode - Raw tree-sitter node.
  * @returns Always true for primitive atom literals.
  */
-export function isAtomLiteral(sn: TreeSitterNode): boolean {
-    return sn.type === PY_TRUE || sn.type === PY_FALSE || sn.type === PY_NONE;
+export function isAtomLiteral(syntaxNode: TreeSitterNode): boolean {
+    return (
+        syntaxNode.type === PY_TRUE ||
+        syntaxNode.type === PY_FALSE ||
+        syntaxNode.type === PY_NONE
+    );
 }
 
 const CLI_FLAG_PATTERN = /^--?[a-zA-Z0-9_.-]+$/;
@@ -246,78 +284,92 @@ const SYSTEM_CALL_NAME_PATTERN =
 /**
  * Report whether the enclosing call is a known system/IO/logging API.
  *
- * @param ancestor - Node whose parent chain should contain the `call`.
+ * @param ancestorNode - Node whose parent chain should contain the `call`.
  * @returns `true` when the nearest `call` ancestor resolves to a tolerated callee.
  */
-function isSystemCallAncestor(ancestor: TreeSitterNode | null | undefined): boolean {
-    if (!ancestor || ancestor.type !== 'call') return false;
-    const fnName = callNameOf(ancestor);
+function isSystemCallAncestor(ancestorNode: TreeSitterNode | null | undefined): boolean {
+    if (!ancestorNode || ancestorNode.type !== PY_CALL) return false;
+    const fnName = callNameOf(ancestorNode);
     return Boolean(fnName && SYSTEM_CALL_NAME_PATTERN.test(fnName));
 }
 
 /**
  * Report whether a keyword argument carries a CLI flag or a system-level parameter name.
  *
- * @param sn - Literal node under inspection.
- * @param parent - Raw `keyword_argument` node.
+ * @param syntaxNode - Literal node under inspection.
+ * @param parentNode - Raw `keyword_argument` node.
  * @returns `true` for `--flag` values and for parameters of known system APIs.
  */
-function isKeywordArgumentTolerated(sn: TreeSitterNode, parent: TreeSitterNode): boolean {
-    if (parent.type !== 'keyword_argument') return false;
-    const raw = sn.text ? sn.text.replace(/^['"]|['"]$/g, '') : '';
-    if (raw && CLI_FLAG_PATTERN.test(raw)) return true;
-    const argName = parent.childForFieldName ? parent.childForFieldName('name') : null;
-    const nameText = argName?.text || parent.namedChildren?.[0]?.text;
+function isKeywordArgumentTolerated(
+    syntaxNode: TreeSitterNode,
+    parentNode: TreeSitterNode,
+): boolean {
+    if (parentNode.type !== PY_KEYWORD_ARGUMENT) return false;
+    const rawText = syntaxNode.text ? syntaxNode.text.replace(/^['"]|['"]$/g, '') : '';
+    if (rawText && CLI_FLAG_PATTERN.test(rawText)) return true;
+    const argNameNode = parentNode.childForFieldName
+        ? parentNode.childForFieldName(FIELD_NAME)
+        : null;
+    const nameText = argNameNode?.text || parentNode.namedChildren?.[0]?.text;
     if (nameText && SYSTEM_ARG_NAME_PATTERN.test(nameText)) return true;
-    return isSystemCallAncestor(parent.parent?.parent);
+    return isSystemCallAncestor(parentNode.parent?.parent);
 }
 
-function isComparisonTolerated(sn: TreeSitterNode, parent: TreeSitterNode): boolean {
-    if (parent.type !== 'comparison_operator') return false;
-    const text = sn.text ? sn.text.replace(/^['"]|['"]$/g, '') : '';
-    return text === '__main__' || text === '';
+function isComparisonTolerated(syntaxNode: TreeSitterNode, parentNode: TreeSitterNode): boolean {
+    if (parentNode.type !== PY_COMPARISON_OP) return false;
+    const textValue = syntaxNode.text ? syntaxNode.text.replace(/^['"]|['"]$/g, '') : '';
+    return textValue === SPECIAL_MODULE_MAIN || textValue === '';
 }
 
-function isArgumentListTolerated(sn: TreeSitterNode, parent: TreeSitterNode): boolean {
-    if (parent.type !== 'argument_list') return false;
-    const text = sn.text ? sn.text.replace(/^['"]|['"]$/g, '') : '';
-    if (text && CLI_FLAG_PATTERN.test(text)) return true;
-    return isSystemCallAncestor(parent.parent);
+function isArgumentListTolerated(
+    syntaxNode: TreeSitterNode,
+    parentNode: TreeSitterNode,
+): boolean {
+    if (parentNode.type !== PY_ARGUMENT_LIST) return false;
+    const textValue = syntaxNode.text ? syntaxNode.text.replace(/^['"]|['"]$/g, '') : '';
+    if (textValue && CLI_FLAG_PATTERN.test(textValue)) return true;
+    return isSystemCallAncestor(parentNode.parent);
 }
 
 /**
  * Resolve whether a literal sits in a tolerated context.
  *
- * @param sn - Literal node to classify.
- * @param parent - Raw parent; undefined means the literal has no parent context.
+ * @param syntaxNode - Literal node to classify.
+ * @param parentNode - Raw parent; undefined means the literal has no parent context.
  * @param ctx - Optional map context carrying the enclosing test-function scope.
  * @returns `true` for docstrings/bare expressions, decorator arguments, subscript indices,
  *     keyword arguments, CLI flags, standard comparisons, and dictionary keys.
  */
 export function isToleratedOf(
-    sn: TreeSitterNode,
-    parent?: TreeSitterNode,
+    syntaxNode: TreeSitterNode,
+    parentNode?: TreeSitterNode,
     ctx?: MapContext,
 ): boolean {
     if (ctx?.isTestFunction) return true;
-    if (!parent) return false;
-    if (parent.type === PY_EXPR_STMT) return true;
-    if (parent.type === PY_DECORATOR) return true;
-    if (parent.type === PY_SUBSCRIPT) return true;
-    if (isKeywordArgumentTolerated(sn, parent)) return true;
-    if (isComparisonTolerated(sn, parent)) return true;
-    if (parent.type === PY_PAIR) {
-        const key = parent.childForFieldName ? parent.childForFieldName(FIELD_KEY) : null;
-        return Boolean(key && key.startIndex === sn.startIndex);
-    }
-    if (parent.type === 'binary_operator') {
-        const op = parent.children?.find((c) => c.type === '/' || c.text === '/');
-        if (op) return true;
-    }
-    if (parent.type === 'interpolation' || parent.type === 'format_specifier') {
+    if (!parentNode) return false;
+    if (
+        parentNode.type === PY_EXPR_STMT ||
+        parentNode.type === PY_DECORATOR ||
+        parentNode.type === PY_SUBSCRIPT
+    ) {
         return true;
     }
-    return isArgumentListTolerated(sn, parent);
+    if (isKeywordArgumentTolerated(syntaxNode, parentNode)) return true;
+    if (isComparisonTolerated(syntaxNode, parentNode)) return true;
+    if (parentNode.type === PY_PAIR) {
+        const keyNode = parentNode.childForFieldName
+            ? parentNode.childForFieldName(FIELD_KEY)
+            : null;
+        return Boolean(keyNode && keyNode.startIndex === syntaxNode.startIndex);
+    }
+    if (parentNode.type === PY_BINARY_OP) {
+        const slashOperator = parentNode.children?.find((child) => child.type === '/' || child.text === '/');
+        if (slashOperator) return true;
+    }
+    if (parentNode.type === PY_INTERPOLATION || parentNode.type === PY_FORMAT_SPECIFIER) {
+        return true;
+    }
+    return isArgumentListTolerated(syntaxNode, parentNode);
 }
 
 /** Static lookup table mapping AST node types to normalized kinds. */
@@ -340,18 +392,22 @@ const STATIC_NODE_KIND_MAP = new Map<string, NodeKind>([
 /**
  * Map a tree-sitter node type to the normalized NodeKind.
  *
- * @param sn - Raw tree-sitter node.
+ * @param syntaxNode - Raw tree-sitter node.
  * @returns The normalized kind; branch types map to ControlFlow, unknown types to Other.
  */
-export function kindOfPythonNode(sn: TreeSitterNode): NodeKind {
-    const staticKind = STATIC_NODE_KIND_MAP.get(sn.type);
+export function getPythonNodeKind(syntaxNode: TreeSitterNode): NodeKind {
+    const staticKind = STATIC_NODE_KIND_MAP.get(syntaxNode.type);
     if (staticKind !== undefined) return staticKind;
-    if (sn.type === PY_FUNCTION_DEF) {
-        return isClassMember(sn) ? NodeKind.Method : NodeKind.Function;
+    if (syntaxNode.type === PY_FUNCTION_DEF) {
+        return isClassMember(syntaxNode) ? NodeKind.Method : NodeKind.Function;
     }
-    if (sn.type === PY_ASSIGNMENT) {
-        return isConstTarget(sn) ? NodeKind.Constant : NodeKind.Variable;
+    if (syntaxNode.type === PY_ASSIGNMENT) {
+        return isConstTarget(syntaxNode) ? NodeKind.Constant : NodeKind.Variable;
     }
-    if (BRANCH_TYPES.has(sn.type)) return NodeKind.ControlFlow;
-    return NodeKind.Other;
+    return BRANCH_TYPES.has(syntaxNode.type) ? NodeKind.ControlFlow : NodeKind.Other;
 }
+
+/**
+ * Backward compatibility alias for getPythonNodeKind.
+ */
+export const kindOfPythonNode = getPythonNodeKind;

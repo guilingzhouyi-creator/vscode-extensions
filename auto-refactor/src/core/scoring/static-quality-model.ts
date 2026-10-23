@@ -23,6 +23,29 @@ import type { PrimaryQualityPillar } from './eightPillarModel';
 import type { IssueReach } from './riskWeightModel';
 import { mapRuleToPrimaryPillar, REACH_FACTORS } from './riskWeightModel';
 
+const SCORE_SCALE_MIN = 0.0;
+const SCORE_SCALE_MAX = 100.0;
+const SCORE_ROUND_FACTOR = 100;
+const COSINE_ROUND_FACTOR = 1000;
+
+const PROBABILITY_MIN = 0.1;
+const PROBABILITY_MAX = 1.0;
+const RISK_SCALE_MAX = 10.0;
+const DEFAULT_IMPACT_FACTOR = 2.0;
+
+const REACH_FACTOR_LOCAL = 1.0;
+const REACH_FACTOR_FILE = 2.5;
+const REACH_FACTOR_CROSS_DOMAIN = 7.5;
+
+const CONFIDENCE_GRAPH = 1.0;
+const CONFIDENCE_AST = 0.9;
+const CONFIDENCE_STRUCTURAL = 0.85;
+const CONFIDENCE_DEFAULT = 0.8;
+const CONFIDENCE_HEURISTIC = 0.75;
+
+const DATA_AXIS_DIVISOR = 2;
+const EXTENSIBILITY_AXIS_DIVISOR = 3;
+
 /**
  * Seven primary strategic axes for the Static Analysis Plane (SAP):
  * - A: Architecture Quality (boundaries, layering, dependency direction)
@@ -50,18 +73,27 @@ export const ALL_STATIC_QUALITY_AXES: readonly StaticQualityAxis[] = [
     'E',
 ] as const;
 
+const AXIS_NAME_ARCHITECTURE = 'architectureQuality';
+const AXIS_NAME_MAINTAINABILITY = 'maintainability';
+const AXIS_NAME_PERFORMANCE = 'algorithmAndPerformance';
+const AXIS_NAME_DATA = 'dataArchitecture';
+const AXIS_NAME_TEST = 'testQuality';
+const AXIS_NAME_RELIABILITY = 'reliability';
+const AXIS_NAME_SECURITY = 'securityQuality';
+const AXIS_NAME_EXTENSIBILITY = 'extensibility';
+
 /**
  * Full descriptive names for each static quality axis.
  */
 export const STATIC_AXIS_NAMES: Readonly<Record<StaticQualityAxis, string>> = {
-    A: 'architectureQuality',
-    M: 'maintainability',
-    P: 'algorithmAndPerformance',
-    D: 'dataArchitecture',
-    T: 'testQuality',
-    R: 'reliability',
-    S: 'securityQuality',
-    E: 'extensibility',
+    A: AXIS_NAME_ARCHITECTURE,
+    M: AXIS_NAME_MAINTAINABILITY,
+    P: AXIS_NAME_PERFORMANCE,
+    D: AXIS_NAME_DATA,
+    T: AXIS_NAME_TEST,
+    R: AXIS_NAME_RELIABILITY,
+    S: AXIS_NAME_SECURITY,
+    E: AXIS_NAME_EXTENSIBILITY,
 };
 
 /**
@@ -140,7 +172,7 @@ export interface StaticIssueRisk {
  * @param pillar - Strategic primary quality pillar.
  * @returns Corresponding single-character StaticQualityAxis.
  */
-export function pillarToStaticAxis(pillar: PrimaryQualityPillar): StaticQualityAxis {
+export function mapPillarToStaticAxis(pillar: PrimaryQualityPillar): StaticQualityAxis {
     switch (pillar) {
         case 'architecture':
             return 'A';
@@ -164,6 +196,11 @@ export function pillarToStaticAxis(pillar: PrimaryQualityPillar): StaticQualityA
 }
 
 /**
+ * Backward compatibility alias for mapPillarToStaticAxis.
+ */
+export const pillarToStaticAxis = mapPillarToStaticAxis;
+
+/**
  * Maps an auto-refactor analyzer or rule name to its default semantic confidence C_i.
  */
 function resolveDefaultSemanticConfidence(analyzer: string): number {
@@ -171,21 +208,21 @@ function resolveDefaultSemanticConfidence(analyzer: string): number {
         case 'architecture':
         case 'dependency-graph':
         case 'dependency-layout':
-            return 1.0; // Whole-system graph resolution
+            return CONFIDENCE_GRAPH;
         case 'governance':
         case 'complexity':
         case 'performance':
         case 'data-architecture':
-            return 0.9; // AST & control-flow analysis
+            return CONFIDENCE_AST;
         case 'test-modernity':
         case 'large-file':
-            return 0.85; // Structural metric evaluation
+            return CONFIDENCE_STRUCTURAL;
         case 'constants':
         case 'hygiene':
         case 'comments':
-            return 0.75; // Heuristic / pattern matching
+            return CONFIDENCE_HEURISTIC;
         default:
-            return 0.8;
+            return CONFIDENCE_DEFAULT;
     }
 }
 
@@ -194,20 +231,19 @@ function resolveDefaultSemanticConfidence(analyzer: string): number {
  */
 function resolveImpactFactor(scope?: IssueReach | number): number {
     if (typeof scope === 'number') {
-        return Math.max(1.0, Math.min(10.0, scope));
+        return Math.max(REACH_FACTOR_LOCAL, Math.min(RISK_SCALE_MAX, scope));
     }
     if (scope && REACH_FACTORS[scope]) {
-        // Map local (1.0), file (1.5), cross_domain (2.5) to blast radius scale [1.0, 8.0]
         switch (scope) {
             case 'local':
-                return 1.0;
+                return REACH_FACTOR_LOCAL;
             case 'file':
-                return 2.5;
+                return REACH_FACTOR_FILE;
             case 'cross_domain':
-                return 7.5;
+                return REACH_FACTOR_CROSS_DOMAIN;
         }
     }
-    return 2.0; // Default file-level reach
+    return DEFAULT_IMPACT_FACTOR;
 }
 
 /**
@@ -222,22 +258,28 @@ export function computeStaticIssueRisk(
     issue: Issue,
     options: StaticRiskOptions = {},
 ): StaticIssueRisk {
-    const P = Math.max(0.1, Math.min(1.0, options.ruleProbability ?? 1.0));
+    const probabilityScore = Math.max(
+        PROBABILITY_MIN,
+        Math.min(PROBABILITY_MAX, options.ruleProbability ?? PROBABILITY_MAX),
+    );
     const defaultConfidence = resolveDefaultSemanticConfidence(issue.analyzer);
-    const C = Math.max(0.1, Math.min(1.0, options.semanticConfidence ?? defaultConfidence));
-    const I = resolveImpactFactor(options.impactScope);
+    const confidenceScore = Math.max(
+        PROBABILITY_MIN,
+        Math.min(PROBABILITY_MAX, options.semanticConfidence ?? defaultConfidence),
+    );
+    const impactScore = resolveImpactFactor(options.impactScope);
 
-    const rawRisk = P * C * I;
-    const normalizedRisk = Math.min(10.0, rawRisk);
+    const rawRisk = probabilityScore * confidenceScore * impactScore;
+    const normalizedRisk = Math.min(RISK_SCALE_MAX, rawRisk);
     const pillar = mapRuleToPrimaryPillar(issue.rule);
     const affectedAxis = pillarToStaticAxis(pillar);
 
     return {
         issueId: issue.id,
         rule: issue.rule,
-        P,
-        C,
-        I,
+        P: probabilityScore,
+        C: confidenceScore,
+        I: impactScore,
         rawRisk,
         normalizedRisk,
         affectedAxis,
@@ -256,48 +298,53 @@ export function synthesizeStaticQualityVector(
     indices: Record<QualityDimension, number>,
     overrides: Partial<Record<StaticQualityAxis, number>> = {},
 ): StaticQualityVector {
-    const A = overrides.A ?? indices.architectureConsistency;
-    const M = overrides.M ?? indices.maintainability;
-    const P = overrides.P ?? indices.performanceEfficiency;
+    const architectureScore = overrides.A ?? indices.architectureConsistency;
+    const maintainabilityScore = overrides.M ?? indices.maintainability;
+    const performanceScore = overrides.P ?? indices.performanceEfficiency;
 
-    // D: Data Architecture had no QualityDimension of its own and defaulted to
-    // architectureConsistency, making this axis identical to A. It now derives from the axes
-    // that describe data quality, matching the eight-pillar model's data bucket.
-    const D =
+    // D: Data Architecture derives from axes describing data quality and purity
+    const dataArchitectureScore =
         overrides.D ??
-        Math.min(100.0, Math.max(0.0, (indices.duplication + indices.semanticPurity) / 2));
+        Math.min(
+            SCORE_SCALE_MAX,
+            Math.max(SCORE_SCALE_MIN, (indices.duplication + indices.semanticPurity) / DATA_AXIS_DIVISOR),
+        );
 
     // T: Test Quality maps to modernity
-    const T = overrides.T ?? indices.modernity;
+    const testQualityScore = overrides.T ?? indices.modernity;
 
     // R: Reliability synthesizes semantic purity and tech-debt risk
-    const R =
+    const reliabilityScore =
         overrides.R ??
-        Math.min(100.0, Math.max(0.0, (indices.semanticPurity + indices.techDebtRisk) / 2));
+        Math.min(
+            SCORE_SCALE_MAX,
+            Math.max(SCORE_SCALE_MIN, (indices.semanticPurity + indices.techDebtRisk) / DATA_AXIS_DIVISOR),
+        );
 
     // S: Security Quality maps to codeSecurity
-    const S = overrides.S ?? indices.codeSecurity;
+    const securityScore = overrides.S ?? indices.codeSecurity;
 
     // E: Extensibility synthesizes standardization, comment quality, and duplication
-    const E =
+    const extensibilityScore =
         overrides.E ??
         Math.min(
-            100.0,
+            SCORE_SCALE_MAX,
             Math.max(
-                0.0,
-                (indices.standardization + indices.commentQuality + indices.duplication) / 3,
+                SCORE_SCALE_MIN,
+                (indices.standardization + indices.commentQuality + indices.duplication) /
+                    EXTENSIBILITY_AXIS_DIVISOR,
             ),
         );
 
     return {
-        A: Math.round(A * 100) / 100,
-        M: Math.round(M * 100) / 100,
-        P: Math.round(P * 100) / 100,
-        D: Math.round(D * 100) / 100,
-        T: Math.round(T * 100) / 100,
-        R: Math.round(R * 100) / 100,
-        S: Math.round(S * 100) / 100,
-        E: Math.round(E * 100) / 100,
+        A: Math.round(architectureScore * SCORE_ROUND_FACTOR) / SCORE_ROUND_FACTOR,
+        M: Math.round(maintainabilityScore * SCORE_ROUND_FACTOR) / SCORE_ROUND_FACTOR,
+        P: Math.round(performanceScore * SCORE_ROUND_FACTOR) / SCORE_ROUND_FACTOR,
+        D: Math.round(dataArchitectureScore * SCORE_ROUND_FACTOR) / SCORE_ROUND_FACTOR,
+        T: Math.round(testQualityScore * SCORE_ROUND_FACTOR) / SCORE_ROUND_FACTOR,
+        R: Math.round(reliabilityScore * SCORE_ROUND_FACTOR) / SCORE_ROUND_FACTOR,
+        S: Math.round(securityScore * SCORE_ROUND_FACTOR) / SCORE_ROUND_FACTOR,
+        E: Math.round(extensibilityScore * SCORE_ROUND_FACTOR) / SCORE_ROUND_FACTOR,
     };
 }
 
@@ -322,8 +369,8 @@ export function computeStaticQualityScore(
         weightedScore += vector[axis] * w;
     }
 
-    if (weightSum <= 0) return 0;
-    return Math.round((weightedScore / weightSum) * 100) / 100;
+    const rawScore = weightSum <= 0 ? 0 : weightedScore / weightSum;
+    return Math.round(rawScore * SCORE_ROUND_FACTOR) / SCORE_ROUND_FACTOR;
 }
 
 /**
@@ -348,14 +395,14 @@ export function computeStaticVectorDelta(
     after: StaticQualityVector,
 ): StaticVectorDelta {
     const deltaVector: StaticQualityVector = {
-        A: Math.round((after.A - before.A) * 100) / 100,
-        M: Math.round((after.M - before.M) * 100) / 100,
-        P: Math.round((after.P - before.P) * 100) / 100,
-        D: Math.round((after.D - before.D) * 100) / 100,
-        T: Math.round((after.T - before.T) * 100) / 100,
-        R: Math.round((after.R - before.R) * 100) / 100,
-        S: Math.round((after.S - before.S) * 100) / 100,
-        E: Math.round((after.E - before.E) * 100) / 100,
+        A: Math.round((after.A - before.A) * SCORE_ROUND_FACTOR) / SCORE_ROUND_FACTOR,
+        M: Math.round((after.M - before.M) * SCORE_ROUND_FACTOR) / SCORE_ROUND_FACTOR,
+        P: Math.round((after.P - before.P) * SCORE_ROUND_FACTOR) / SCORE_ROUND_FACTOR,
+        D: Math.round((after.D - before.D) * SCORE_ROUND_FACTOR) / SCORE_ROUND_FACTOR,
+        T: Math.round((after.T - before.T) * SCORE_ROUND_FACTOR) / SCORE_ROUND_FACTOR,
+        R: Math.round((after.R - before.R) * SCORE_ROUND_FACTOR) / SCORE_ROUND_FACTOR,
+        S: Math.round((after.S - before.S) * SCORE_ROUND_FACTOR) / SCORE_ROUND_FACTOR,
+        E: Math.round((after.E - before.E) * SCORE_ROUND_FACTOR) / SCORE_ROUND_FACTOR,
     };
 
     let sumDiffSq = 0;
@@ -373,14 +420,19 @@ export function computeStaticVectorDelta(
         normAfterSq += a * a;
     }
 
-    const euclideanDistance = Math.round(Math.sqrt(sumDiffSq) * 100) / 100;
+    const euclideanDistance =
+        Math.round(Math.sqrt(sumDiffSq) * SCORE_ROUND_FACTOR) / SCORE_ROUND_FACTOR;
     const denominator = Math.sqrt(normBeforeSq) * Math.sqrt(normAfterSq);
     const cosineSimilarity =
-        denominator > 0 ? Math.round((dotProduct / denominator) * 1000) / 1000 : 1.0;
+        denominator > 0
+            ? Math.round((dotProduct / denominator) * COSINE_ROUND_FACTOR) / COSINE_ROUND_FACTOR
+            : 1.0;
 
     const scalarDelta =
-        Math.round((computeStaticQualityScore(after) - computeStaticQualityScore(before)) * 100) /
-        100;
+        Math.round(
+            (computeStaticQualityScore(after) - computeStaticQualityScore(before)) *
+                SCORE_ROUND_FACTOR,
+        ) / SCORE_ROUND_FACTOR;
 
     return {
         deltaVector,
