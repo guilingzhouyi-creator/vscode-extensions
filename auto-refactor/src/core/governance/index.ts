@@ -29,3 +29,4 @@ export * from './rules/compressionBounds';
 export * from './repo-archetype';
 export * from './gate-scaffold';
 export * from './gate-governance';
+export * from './gate-feedback';

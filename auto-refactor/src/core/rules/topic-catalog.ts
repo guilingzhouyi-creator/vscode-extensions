@@ -150,6 +150,7 @@ export const CANONICAL_TOPIC_CATALOG: Readonly<Record<string, readonly string[]>
         'DESTR',
         'ERR',
         'FAC',
+        'FBK',
         'HOOK',
         'HYG',
         'ISO',

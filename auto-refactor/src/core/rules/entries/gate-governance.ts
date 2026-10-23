@@ -18,7 +18,8 @@
  *   - GUARD-SSOT-001: Rule SSOT catalog synchronization;
  *   - GUARD-AST-001: Pre-commit AST staged slice complexity and nesting budget guard;
  *   - GUARD-FAC-001: Gate pipeline facade substantive bearing and vacuous forwarding elimination;
- *   - GUARD-PROC-001: PowerShell gate script non-interactive execution safety guard.
+ *   - GUARD-PROC-001: PowerShell gate script non-interactive execution safety guard;
+ *   - GUARD-FBK-001: Gate feedback vocabulary and closed four-state status closure guard.
  * Exit Semantics & Design Rationale: Pure metadata; zero runtime execution logic.
  */
 
@@ -254,6 +255,19 @@ export const GATE_GOVERNANCE_RULES: readonly RuleDefinition[] = [
         remediation:
             'Delete a path the source names literally or builds from a directory the script created, and refuse the operation when the resolved path is a root, a home directory, or empty.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#guard-destr-001',
+    }),
+    defineRule({
+        id: 'GUARD-FBK-001',
+        family: RULE_FAMILY_GATE,
+        analyzer: ANALYZER_GATE_ARCHITECTURE,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_ERROR,
+        summary:
+            'Gate feedback vocabulary guard: operator-facing feedback must carry semantic step identifiers and a closed four-state status vocabulary, never positional labels or status synonyms.',
+        remediation:
+            'Replace positional labels (Gate 3, Rule 5.1, Stage 1:) with registered semantic step identifiers from gate-step-registry.json, and replace bracketed status synonyms with PASS, BLOCK, SKIP, or WARN.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#guard-fbk-001',
     }),
     defineRule({
         id: 'GUARD-VAR-001',

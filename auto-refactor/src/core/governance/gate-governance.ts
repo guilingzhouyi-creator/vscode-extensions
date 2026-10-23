@@ -26,6 +26,7 @@ import { SEVERITY_ERROR, SEVERITY_WARNING } from '../types';
 import type { RepoArchetypeContext } from './repo-archetype';
 import { inspectRepoArchetype } from './repo-archetype';
 import { generateGateScaffold } from './gate-scaffold';
+import { auditFeedbackVocabulary } from './gate-feedback';
 
 /** Canonical analyzer identifier for gate architecture governance. */
 export const ANALYZER_GATE_ARCHITECTURE = 'gate-architecture';
@@ -47,7 +48,7 @@ const MANIFEST_PACKAGE_JSON = 'package.json';
 const MANIFEST_CARGO_TOML = 'Cargo.toml';
 const REPO_ROOT_DIR = '.';
 
-const TOTAL_RULES_AUDITED = 15;
+const TOTAL_RULES_AUDITED = 16;
 
 /** Options configuring gate architecture audit. */
 export interface GateGovernanceOptions {
@@ -64,6 +65,7 @@ export interface GateGovernanceOptions {
     enforceProcessGuard?: boolean;
     enforceMonorepoScope?: boolean;
     enforcePairing?: boolean;
+    enforceFeedbackVocabulary?: boolean;
 }
 
 /** Comprehensive audit result. */
@@ -1024,6 +1026,7 @@ export function auditGateArchitecture(
         if (options.enforceFacadeDiscipline !== false) auditFacadeDisciplineGuard(context, issues);
         if (options.enforceProcessGuard !== false) auditProcessInteractiveSafety(context, issues);
         if (options.enforcePairing !== false) auditDualPlatformPairing(context, issues);
+        if (options.enforceFeedbackVocabulary !== false) auditFeedbackVocabulary(context, issues);
     }
 
     const hasLocalGates = context.hooks.allHookFiles.length > 0;
