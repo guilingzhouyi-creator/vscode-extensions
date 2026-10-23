@@ -226,7 +226,14 @@ export function fuseIssueRisks(
     );
 
     const modifier = suppressionApplied ? 0.35 : isDualConfirmed ? 1.3 : 1.0;
-    const fusedScore = computePowerResonance(S, D, H, coeffs, modifier, MAX_FUSED_SCORE_CEILING);
+    const fusedScore = computePowerResonance({
+        staticScore: S,
+        dynamicScore: D,
+        historicalScore: H,
+        coeffs,
+        modifier,
+        ceiling: MAX_FUSED_SCORE_CEILING,
+    });
     const level = classifyFusedRiskLevel(fusedScore, isDualConfirmed);
 
     let rationale = baseRationale;

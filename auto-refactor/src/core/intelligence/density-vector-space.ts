@@ -1,26 +1,27 @@
 /**
- * Module: Core Intelligence — High-Dimensional Code Density Vector Space & Riemannian Manifold Solver
+ * Module: Core Intelligence — High-Dimensional Code Density Vector Space & Riemannian Manifold
  * File Path: src/core/intelligence/density-vector-space.ts
- * Architecture Role: Provides the formal mathematical space solution for code density quantification,
- *   mapping the 5D density tensor (lineDensity, columnDensity, reuseDensity, sharedDensity, payloadDensity)
- *   into a whitened isotropic Riemannian manifold via Logit tangent expansion and Mahalanobis whitening.
+ * Architecture Role: Provides the formal mathematical space solution for code density,
+ *   mapping the 5D density tensor (line, column, reuse, shared, payload) into a whitened
+ *   isotropic Riemannian manifold via Logit tangent expansion and Mahalanobis whitening.
  * Dependencies & Triggers: Consumes CompositeDensityInputs from ./payload-density; consumed by
  *   code-density-analyzer and refactoring prioritization engines.
  * Responsibilities:
- *   1. Map bounded [0.0, 1.0] density indicators to unconstrained tangent space via logit transform.
+ *   1. Map bounded [0.0, 1.0] density indicators to unconstrained tangent space via logit.
  *   2. Compute Cholesky-whitened coordinates z = W(y - mu_0) eliminating inter-metric collinearity.
  *   3. Calculate exact Mahalanobis distance d_M and Fisher-Rao simplex spherical arc distances.
- *   4. Compute Riemannian pullback refactoring gradient nabla_d Phi and identify the dominant deficit axis.
+ *   4. Compute Riemannian pullback refactoring gradient and identify the dominant deficit axis.
  *   5. Synthesize continuous Gaussian manifold composite density rho_space in [0.0, 1.0].
- * Exit Semantics & Design Rationale: Bounded [0.0, 1.0] and strictly zero transient heap allocations
- *   in linear algebra evaluation inner paths; robust to extreme boundary values [0, 1].
+ * Exit Semantics & Design Rationale: Bounded [0.0, 1.0] and strictly zero transient heap
+ *   allocations in linear algebra inner paths; robust to extreme boundary values [0, 1].
  */
 
 import type { CompositeDensityInputs } from './payload-density';
 
-/**
- * Five canonical axes of the code density vector space.
- */
+/** Dimensionality of the canonical code density vector space. */
+export const DENSITY_SPACE_DIMENSIONS = 5;
+
+/** Five canonical axes of the code density vector space. */
 export type DensityAxis =
     | 'lineDensity'
     | 'columnDensity'
@@ -28,14 +29,10 @@ export type DensityAxis =
     | 'sharedDensity'
     | 'payloadDensity';
 
-/**
- * Ordered tuple representation of the five canonical density dimensions.
- */
+/** Ordered tuple representation of the five canonical density dimensions. */
 export type DensityVector5D = readonly [number, number, number, number, number];
 
-/**
- * Ordered array of canonical density axes.
- */
+/** Ordered array of canonical density axes. */
 export const CANONICAL_DENSITY_AXES: readonly DensityAxis[] = [
     'lineDensity',
     'columnDensity',
@@ -44,17 +41,16 @@ export const CANONICAL_DENSITY_AXES: readonly DensityAxis[] = [
     'payloadDensity',
 ] as const;
 
-/**
- * Two-element probability simplex coordinate (p_1, p_2) where p_1 + p_2 = 1.0.
- */
+/** Default dominant density axis fallback. */
+export const DEFAULT_DOMINANT_AXIS: DensityAxis = 'payloadDensity';
+
+/** Two-element probability simplex coordinate on the unit 1-simplex. */
 export interface SimplexPoint2D {
-    readonly p1: number;
-    readonly p2: number;
+    readonly primary: number;
+    readonly secondary: number;
 }
 
-/**
- * Comprehensive result of evaluating code density on the Riemannian manifold.
- */
+/** Comprehensive result of evaluating code density on the Riemannian manifold. */
 export interface SpatialDensityEvaluation {
     readonly rawVector: DensityVector5D;
     readonly tangentVector: DensityVector5D;
@@ -80,10 +76,6 @@ export const OPTIMAL_MAHALANOBIS_TOLERANCE = 0.50;
 const ROUNDING_PRECISION = 1e6;
 
 /** Target optimal attractor probabilities for clean, well-factored code. */
-const TARGET_LINE_DENSITY = 0.90;
-const TARGET_COLUMN_DENSITY = 0.90;
-const TARGET_REUSE_DENSITY = 0.85;
-const TARGET_SHARED_DENSITY = 0.85;
 const TARGET_PAYLOAD_DENSITY = 0.90;
 
 /**
@@ -91,11 +83,7 @@ const TARGET_PAYLOAD_DENSITY = 0.90;
  * mu_0,i = ln(p_i / (1 - p_i)).
  */
 export const DEFAULT_TARGET_TANGENT_ATTRACTOR: DensityVector5D = [
-    2.197225, // logit(0.90)
-    2.197225, // logit(0.90)
-    1.734601, // logit(0.85)
-    1.734601, // logit(0.85)
-    2.197225, // logit(0.90)
+    2.197225, 2.197225, 1.734601, 1.734601, 2.197225,
 ] as const;
 
 /**
@@ -123,30 +111,39 @@ const PRECISION_MATRIX: readonly (readonly number[])[] = [
 ] as const;
 
 /**
- * Maps a bounded probability p in [0.0, 1.0] to unconstrained tangent space via Logit.
+ * Maps a bounded probability into unconstrained tangent space via Logit.
  *
- * @param p - Bounded probability or density ratio.
+ * @param probability - Bounded probability or density ratio.
  * @param epsilon - Safeguard clamping threshold.
  * @returns Real-valued tangent coordinate y in (-inf, +inf).
  */
-export function logitTransform(p: number, epsilon: number = DEFAULT_LOGIT_EPSILON): number {
-    const clamped = Math.min(1.0 - epsilon, Math.max(epsilon, Number.isFinite(p) ? p : epsilon));
+export function transformLogit(
+    probability: number,
+    epsilon: number = DEFAULT_LOGIT_EPSILON,
+): number {
+    const clamped = Math.min(1.0 - epsilon, Math.max(epsilon, Number.isFinite(probability) ? probability : epsilon));
     return Math.log(clamped / (1.0 - clamped));
 }
 
+/** Historical alias for transformLogit. */
+export const logitTransform = transformLogit;
+
 /**
- * Inverts a tangent space coordinate y back to bounded probability p in (0.0, 1.0).
+ * Inverts a tangent space coordinate back to bounded probability in (0.0, 1.0).
  *
- * @param y - Real-valued tangent coordinate.
+ * @param logitCoord - Real-valued tangent coordinate.
  * @returns Bounded probability ratio.
  */
-export function inverseLogit(y: number): number {
-    if (!Number.isFinite(y)) {
-        return y > 0 ? 1.0 : 0.0;
+export function computeInverseLogit(logitCoord: number): number {
+    if (!Number.isFinite(logitCoord)) {
+        return logitCoord > 0 ? 1.0 : 0.0;
     }
-    const expNegY = Math.exp(-y);
-    return 1.0 / (1.0 + expNegY);
+    const expNeg = Math.exp(-logitCoord);
+    return 1.0 / (1.0 + expNeg);
 }
+
+/** Historical alias for computeInverseLogit. */
+export const inverseLogit = computeInverseLogit;
 
 /**
  * Transforms CompositeDensityInputs into a canonical 5D density tuple.
@@ -155,12 +152,12 @@ export function inverseLogit(y: number): number {
  * @returns 5D density vector in [0.0, 1.0]^5.
  */
 export function toDensityVector5D(inputs: CompositeDensityInputs): DensityVector5D {
-    const l = Math.min(1.0, Math.max(0.0, Number.isFinite(inputs.lineDensity) ? inputs.lineDensity : 0.0));
-    const c = Math.min(1.0, Math.max(0.0, Number.isFinite(inputs.columnDensity) ? inputs.columnDensity : 0.0));
-    const r = Math.min(1.0, Math.max(0.0, Number.isFinite(inputs.reuseDensity) ? inputs.reuseDensity : 0.0));
-    const s = Math.min(1.0, Math.max(0.0, Number.isFinite(inputs.sharedDensity) ? inputs.sharedDensity : 0.0));
-    const p = Math.min(1.0, Math.max(0.0, Number.isFinite(inputs.payloadDensity) ? inputs.payloadDensity : 0.0));
-    return [l, c, r, s, p];
+    const line = Math.min(1.0, Math.max(0.0, Number.isFinite(inputs.lineDensity) ? inputs.lineDensity : 0.0));
+    const col = Math.min(1.0, Math.max(0.0, Number.isFinite(inputs.columnDensity) ? inputs.columnDensity : 0.0));
+    const reuse = Math.min(1.0, Math.max(0.0, Number.isFinite(inputs.reuseDensity) ? inputs.reuseDensity : 0.0));
+    const shared = Math.min(1.0, Math.max(0.0, Number.isFinite(inputs.sharedDensity) ? inputs.sharedDensity : 0.0));
+    const payload = Math.min(1.0, Math.max(0.0, Number.isFinite(inputs.payloadDensity) ? inputs.payloadDensity : 0.0));
+    return [line, col, reuse, shared, payload];
 }
 
 /**
@@ -175,18 +172,17 @@ export function toTangentVector5D(
     epsilon: number = DEFAULT_LOGIT_EPSILON,
 ): DensityVector5D {
     return [
-        logitTransform(raw[0], epsilon),
-        logitTransform(raw[1], epsilon),
-        logitTransform(raw[2], epsilon),
-        logitTransform(raw[3], epsilon),
-        logitTransform(raw[4], epsilon),
+        transformLogit(raw[0], epsilon),
+        transformLogit(raw[1], epsilon),
+        transformLogit(raw[2], epsilon),
+        transformLogit(raw[3], epsilon),
+        transformLogit(raw[4], epsilon),
     ];
 }
 
 /**
  * Computes whitened isotropic coordinates z = W * (tangent - target).
- * When oneSidedDeficit is true, only deficits below the target attractor are penalized,
- * ensuring that code meeting or exceeding target density is not penalized as an anomaly.
+ * When oneSidedDeficit is true, only deficits below target attractor are penalized.
  *
  * @param tangent - Tangent vector of current code.
  * @param target - Reference attractor (defaults to DEFAULT_TARGET_TANGENT_ATTRACTOR).
@@ -214,18 +210,18 @@ export function computeWhitenedCoordinates(
         ]
         : [raw0, raw1, raw2, raw3, raw4];
 
-    const z: [number, number, number, number, number] = [0, 0, 0, 0, 0];
+    const whitenedCoords: [number, number, number, number, number] = [0, 0, 0, 0, 0];
 
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < DENSITY_SPACE_DIMENSIONS; i++) {
         let sum = 0.0;
         const row = WHITENING_MATRIX_LOWER[i];
         for (let j = 0; j <= i; j++) {
             sum += row[j] * deltas[j];
         }
-        z[i] = sum;
+        whitenedCoords[i] = sum;
     }
 
-    return z;
+    return whitenedCoords;
 }
 
 /**
@@ -242,43 +238,43 @@ export function computeMahalanobisDistance(
     target: DensityVector5D = DEFAULT_TARGET_TANGENT_ATTRACTOR,
     oneSidedDeficit: boolean = false,
 ): number {
-    const z = computeWhitenedCoordinates(tangent, target, oneSidedDeficit);
+    const whitened = computeWhitenedCoordinates(tangent, target, oneSidedDeficit);
     let normSq = 0.0;
-    for (let i = 0; i < 5; i++) {
-        normSq += z[i] * z[i];
+    for (let i = 0; i < DENSITY_SPACE_DIMENSIONS; i++) {
+        normSq += whitened[i] * whitened[i];
     }
     return Math.sqrt(normSq);
 }
 
 /**
  * Computes Fisher-Rao geodesic spherical arc length between two 2D probability simplex points:
- * d_FR(p, q) = 2 * arccos( sqrt(p1 * q1) + sqrt(p2 * q2) ).
+ * d_FR(p, q) = 2 * arccos( sqrt(primary * q_primary) + sqrt(secondary * q_secondary) ).
  *
- * @param p1 - First point primary probability.
- * @param p2 - First point secondary probability.
- * @param q1 - Target primary probability (default 0.90).
- * @param q2 - Target secondary probability (default 0.10).
+ * @param samplePrimary - First point primary probability.
+ * @param sampleSecondary - First point secondary probability.
+ * @param targetPrimary - Target primary probability (default 0.90).
+ * @param targetSecondary - Target secondary probability (default 0.10).
  * @returns Geodesic distance in [0.0, pi].
  */
 export function computeFisherSimplexDistance(
-    p1: number,
-    p2: number,
-    q1: number = TARGET_PAYLOAD_DENSITY,
-    q2: number = 1.0 - TARGET_PAYLOAD_DENSITY,
+    samplePrimary: number,
+    sampleSecondary: number,
+    targetPrimary: number = TARGET_PAYLOAD_DENSITY,
+    targetSecondary: number = 1.0 - TARGET_PAYLOAD_DENSITY,
 ): number {
-    const safeP1 = Math.min(1.0, Math.max(0.0, Number.isFinite(p1) ? p1 : 0.0));
-    const safeP2 = Math.min(1.0, Math.max(0.0, Number.isFinite(p2) ? p2 : 0.0));
-    const sumP = safeP1 + safeP2;
-    const normP1 = sumP > 0 ? safeP1 / sumP : 0.5;
-    const normP2 = sumP > 0 ? safeP2 / sumP : 0.5;
+    const safePrimary = Math.min(1.0, Math.max(0.0, Number.isFinite(samplePrimary) ? samplePrimary : 0.0));
+    const safeSecondary = Math.min(1.0, Math.max(0.0, Number.isFinite(sampleSecondary) ? sampleSecondary : 0.0));
+    const sumPrimarySecondary = safePrimary + safeSecondary;
+    const normPrimary = sumPrimarySecondary > 0 ? safePrimary / sumPrimarySecondary : 0.5;
+    const normSecondary = sumPrimarySecondary > 0 ? safeSecondary / sumPrimarySecondary : 0.5;
 
-    const bhattacharyya = Math.sqrt(normP1 * q1) + Math.sqrt(normP2 * q2);
+    const bhattacharyya = Math.sqrt(normPrimary * targetPrimary) + Math.sqrt(normSecondary * targetSecondary);
     const clampedCosine = Math.min(1.0, Math.max(-1.0, bhattacharyya));
     return 2.0 * Math.acos(clampedCosine);
 }
 
 /**
- * Computes the refactoring gradient vector nabla_d Phi pulling code state toward the optimal attractor.
+ * Computes refactoring gradient pulling code state toward the optimal attractor.
  * Identifies which density axis provides the steepest marginal improvement if refactored.
  *
  * @param raw - Raw physical density vector in [0.0, 1.0]^5.
@@ -291,26 +287,20 @@ export function computeRefactoringGradient(
     tangent: DensityVector5D,
     target: DensityVector5D = DEFAULT_TARGET_TANGENT_ATTRACTOR,
 ): { gradient: Record<DensityAxis, number>; dominantAxis: DensityAxis } {
-    const delta0 = tangent[0] - target[0];
-    const delta1 = tangent[1] - target[1];
-    const delta2 = tangent[2] - target[2];
-    const delta3 = tangent[3] - target[3];
-    const delta4 = tangent[4] - target[4];
-
     const deltas: readonly [number, number, number, number, number] = [
-        delta0,
-        delta1,
-        delta2,
-        delta3,
-        delta4,
+        tangent[0] - target[0],
+        tangent[1] - target[1],
+        tangent[2] - target[2],
+        tangent[3] - target[3],
+        tangent[4] - target[4],
     ];
 
     const gradY: [number, number, number, number, number] = [0, 0, 0, 0, 0];
 
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < DENSITY_SPACE_DIMENSIONS; i++) {
         let sum = 0.0;
         const row = PRECISION_MATRIX[i];
-        for (let j = 0; j < 5; j++) {
+        for (let j = 0; j < DENSITY_SPACE_DIMENSIONS; j++) {
             sum += row[j] * deltas[j];
         }
         gradY[i] = sum;
@@ -325,17 +315,18 @@ export function computeRefactoringGradient(
     };
 
     let maxDeficit = -Infinity;
-    let dominantAxis: DensityAxis = 'payloadDensity';
+    let dominantAxis: DensityAxis = DEFAULT_DOMINANT_AXIS;
 
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < DENSITY_SPACE_DIMENSIONS; i++) {
         const axis = CANONICAL_DENSITY_AXES[i];
-        const p = Math.min(1.0 - DEFAULT_LOGIT_EPSILON, Math.max(DEFAULT_LOGIT_EPSILON, raw[i]));
-        const jacobian = 1.0 / (p * (1.0 - p));
+        const prob = Math.min(1.0 - DEFAULT_LOGIT_EPSILON, Math.max(DEFAULT_LOGIT_EPSILON, raw[i]));
+        const jacobian = 1.0 / (prob * (1.0 - prob));
         const physGrad = gradY[i] * jacobian;
         const roundedGrad = Math.round(physGrad * ROUNDING_PRECISION) / ROUNDING_PRECISION;
         gradient[axis] = roundedGrad;
 
-        // When code is in deficit (delta < 0), gradY is negative; the steepest deficit corresponds to most negative grad
+        // When code is in deficit (delta < 0), gradY is negative.
+        // Steepest deficit corresponds to the most negative gradient.
         const deficitPayoff = -physGrad;
         if (deficitPayoff > maxDeficit) {
             maxDeficit = deficitPayoff;

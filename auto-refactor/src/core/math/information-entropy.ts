@@ -5,7 +5,8 @@
  *   and Simpson diversity index for token analysis, compression estimation, and anti-gaming.
  * Dependencies & Triggers: Zero external dependencies; consumes standard IEEE 754 math.
  * Responsibilities:
- *   1. Calculate Shannon Information Entropy H(X) = -sum(p_i * log2(p_i)) over character/token streams.
+ *   1. Calculate Shannon Information Entropy H(X) = -sum(p_i * log2(p_i))
+ *      over character/token streams.
  *   2. Calculate Simpson Diversity Index D = 1 - sum(p_i^2) for distribution evenness.
  *   3. Defend against NaN and empty string edge cases with clean 0.0 fallbacks.
  * Exit Semantics & Design Rationale: Pure math functions; O(N) single-pass frequency count;

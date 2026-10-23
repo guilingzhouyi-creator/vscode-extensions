@@ -23,7 +23,9 @@ import type { PrimaryQualityPillar } from './eightPillarModel';
 import type { IssueReach } from './riskWeightModel';
 import { mapRuleToPrimaryPillar, REACH_FACTORS } from './riskWeightModel';
 
+/** Maximum theoretical ceiling bound for static quality scoring (+100.0). */
 export const DEFAULT_STATIC_SCORE_CEILING = 100.0;
+/** Minimum theoretical floor bound for static quality scoring (-100.0). */
 export const DEFAULT_STATIC_SCORE_FLOOR = -DEFAULT_STATIC_SCORE_CEILING;
 
 const SCORE_ROUND_FACTOR = 100;
@@ -383,6 +385,7 @@ const STATIC_QUALITY_PRECISION_MATRIX_8X8: readonly (readonly number[])[] = [
 ] as const;
 
 const STATIC_SCORE_SCALE_REF = 15.0;
+const QUALITY_AXES_COUNT = 8;
 
 /**
  * Metric comparison between two StaticQualityVectors (Before -> After).
@@ -394,6 +397,33 @@ export interface StaticVectorDelta {
     cosineSimilarity: number;
     mahalanobisDistance?: number;
     dominantShiftAxis?: StaticQualityAxis;
+}
+
+function computeQualityMahalanobisDelta(diffs: readonly number[]): {
+    mahalanobisDistance: number;
+    dominantShiftAxis: StaticQualityAxis;
+} {
+    let quadForm = 0;
+    let maxShift = -1;
+    let dominantShiftAxis: StaticQualityAxis = 'A';
+
+    for (let i = 0; i < QUALITY_AXES_COUNT; i++) {
+        const absDiff = Math.abs(diffs[i]);
+        if (absDiff > maxShift) {
+            maxShift = absDiff;
+            dominantShiftAxis = ALL_STATIC_QUALITY_AXES[i];
+        }
+        const row = STATIC_QUALITY_PRECISION_MATRIX_8X8[i];
+        for (let j = 0; j < QUALITY_AXES_COUNT; j++) {
+            quadForm += diffs[i] * row[j] * diffs[j];
+        }
+    }
+
+    const mahalanobisDistance =
+        Math.round(Math.sqrt(Math.max(0, quadForm)) * STATIC_SCORE_SCALE_REF * SCORE_ROUND_FACTOR) /
+        SCORE_ROUND_FACTOR;
+
+    return { mahalanobisDistance, dominantShiftAxis };
 }
 
 /**
@@ -458,25 +488,7 @@ export function computeStaticVectorDelta(
         after.E - before.E,
     ];
 
-    let quadForm = 0;
-    let maxShift = -1;
-    let dominantShiftAxis: StaticQualityAxis = 'A';
-
-    for (let i = 0; i < 8; i++) {
-        const absDiff = Math.abs(diffs[i]);
-        if (absDiff > maxShift) {
-            maxShift = absDiff;
-            dominantShiftAxis = ALL_STATIC_QUALITY_AXES[i];
-        }
-        const row = STATIC_QUALITY_PRECISION_MATRIX_8X8[i];
-        for (let j = 0; j < 8; j++) {
-            quadForm += diffs[i] * row[j] * diffs[j];
-        }
-    }
-
-    const mahalanobisDistance =
-        Math.round(Math.sqrt(Math.max(0, quadForm)) * STATIC_SCORE_SCALE_REF * SCORE_ROUND_FACTOR) /
-        SCORE_ROUND_FACTOR;
+    const { mahalanobisDistance, dominantShiftAxis } = computeQualityMahalanobisDelta(diffs);
 
     return {
         deltaVector,

@@ -35,6 +35,9 @@ export const DEFAULT_INFLECTION_POINT = 45;
 export const DEFAULT_CURVE_STEEPNESS = 0.03;
 /** Default linear fidelity threshold under which deductions remain exact. */
 export const DEFAULT_LINEAR_THRESHOLD = 15;
+/** Default semi-saturation constant where rational score reaches 50% decay. */
+export const DEFAULT_HALF_SATURATION_CONSTANT = 30;
+const SCORE_PERCENT_PRECISION = 100;
 
 /** Default parameters for zero-anchored logistic saturation scoring curves. */
 export const DEFAULT_CURVE_OPTIONS: Required<LogisticCurveOptions> = {
@@ -66,26 +69,26 @@ export function applyLogisticSaturation(rawPoints: number, options?: LogisticCur
         return 0;
     }
 
-    const L = options?.capacityLimit ?? DEFAULT_CURVE_OPTIONS.capacityLimit;
-    const x0 = options?.inflectionPoint ?? DEFAULT_CURVE_OPTIONS.inflectionPoint;
-    const k = options?.steepness ?? DEFAULT_CURVE_OPTIONS.steepness;
+    const capacityLimit = options?.capacityLimit ?? DEFAULT_CURVE_OPTIONS.capacityLimit;
+    const inflectionPoint = options?.inflectionPoint ?? DEFAULT_CURVE_OPTIONS.inflectionPoint;
+    const curveSteepness = options?.steepness ?? DEFAULT_CURVE_OPTIONS.steepness;
     const linearThreshold = options?.linearThreshold ?? DEFAULT_CURVE_OPTIONS.linearThreshold;
 
     // Preserve exact linear deduction for early/minor warnings
     if (rawPoints <= linearThreshold) {
-        return Math.min(L, rawPoints);
+        return Math.min(capacityLimit, rawPoints);
     }
 
     // Zero offset anchor: offset0 = 1 / (1 + exp(k * x0))
-    const offset0 = 1 / (1 + Math.exp(k * x0));
-    const sigmoidX = 1 / (1 + Math.exp(-k * (rawPoints - x0)));
+    const offset0 = 1 / (1 + Math.exp(curveSteepness * inflectionPoint));
+    const sigmoidX = 1 / (1 + Math.exp(-curveSteepness * (rawPoints - inflectionPoint)));
 
     const normalized = (sigmoidX - offset0) / (1 - offset0);
-    const saturated = L * Math.max(0, Math.min(1, normalized));
+    const saturated = capacityLimit * Math.max(0, Math.min(1, normalized));
 
     // Guarantee that smoothed curve is at least as large as linearThreshold at junction
-    const result = Math.max(linearThreshold, saturated);
-    return Math.min(L, +result.toFixed(2));
+    const saturatedResult = Math.max(linearThreshold, saturated);
+    return Math.min(capacityLimit, +saturatedResult.toFixed(2));
 }
 
 /**
@@ -152,36 +155,43 @@ export function compressDimensionDeductions(
  */
 export function computeMichaelisMentenRational(
     density: number,
-    halfSaturation: number = 30,
-    maxScore: number = 100,
+    halfSaturation: number = DEFAULT_HALF_SATURATION_CONSTANT,
+    maxScore: number = DEFAULT_CAPACITY_LIMIT,
 ): number {
     if (!Number.isFinite(density) || density <= 0) {
         return maxScore;
     }
-    const safeH = Number.isFinite(halfSaturation) && halfSaturation > 0 ? halfSaturation : 30;
-    const safeMax = Number.isFinite(maxScore) && maxScore > 0 ? maxScore : 100;
+    const safeH = Number.isFinite(halfSaturation) && halfSaturation > 0
+        ? halfSaturation
+        : DEFAULT_HALF_SATURATION_CONSTANT;
+    const safeMax = Number.isFinite(maxScore) && maxScore > 0 ? maxScore : DEFAULT_CAPACITY_LIMIT;
     const score = safeMax * (safeH / (safeH + density));
-    return Math.max(0, Math.min(safeMax, Math.round(score * 100) / 100));
+    return Math.max(0, Math.min(safeMax, Math.round(score * SCORE_PERCENT_PRECISION) / SCORE_PERCENT_PRECISION));
 }
 
 /**
  * Evaluates a Gaussian normal distribution density envelope:
  * G(x) = exp( - (x - mu)^2 / (2 * sigma^2) )
  *
- * @param value - Measured metric value x.
+ * @param metricValue - Measured metric value x.
  * @param targetMean - Target optimal mean mu.
  * @param standardDeviation - Tolerance standard deviation sigma.
  * @returns Envelope response strictly bounded in (0.0, 1.0].
  */
 export function computeGaussianBellDensity(
-    value: number,
+    metricValue: number,
     targetMean: number,
     standardDeviation: number,
 ): number {
-    if (!Number.isFinite(value) || !Number.isFinite(targetMean) || !Number.isFinite(standardDeviation) || standardDeviation <= 0) {
+    if (
+        !Number.isFinite(metricValue) ||
+        !Number.isFinite(targetMean) ||
+        !Number.isFinite(standardDeviation) ||
+        standardDeviation <= 0
+    ) {
         return 0.0;
     }
-    const diff = value - targetMean;
+    const diff = metricValue - targetMean;
     const exponent = -(diff * diff) / (2.0 * standardDeviation * standardDeviation);
     return Math.max(0.0, Math.min(1.0, Math.exp(exponent)));
 }

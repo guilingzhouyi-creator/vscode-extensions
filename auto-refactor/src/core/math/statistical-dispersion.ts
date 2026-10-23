@@ -3,7 +3,8 @@
  * File Path: src/core/math/statistical-dispersion.ts
  * Architecture Role: Mathematical formulation of non-compensatory geometric aggregation
  *   and Popoviciu variance inequality dispersion bounding for multi-stack equilibrium.
- * Dependencies & Triggers: Consumes numerical-corridor (clamp, safeDivide); zero external dependencies.
+ * Dependencies & Triggers: Consumes numerical-corridor (clamp, safeDivide);
+ *   zero external dependencies.
  * Responsibilities:
  *   1. Calculate weighted geometric mean (MCDA non-compensatory scoring) with positive floor.
  *   2. Compute Popoviciu variance inequality bounds (sigma_max = 50.0 for [0, 100]).
@@ -35,8 +36,7 @@ interface WeightedLogAccumulator {
 }
 
 function hasValidVectors(scores?: readonly number[], weights?: readonly number[]): boolean {
-    if (!scores || !weights) return false;
-    return scores.length > 0 && weights.length > 0;
+    return Boolean(scores && weights && scores.length > 0 && weights.length > 0);
 }
 
 function accumulateLogEntry(

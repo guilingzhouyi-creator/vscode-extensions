@@ -37,28 +37,27 @@ export const MIN_SCORE_FLOOR_LIMIT = -DEFAULT_SCORE_CEILING;
  * 2. If min > max, the boundaries are automatically normalized to [max, min].
  * 3. The returned value is mathematically guaranteed to satisfy min <= result <= max.
  *
- * @param value - Arbitrary numeric input.
- * @param min - Lower bound of the closed interval.
- * @param max - Upper bound of the closed interval.
- * @returns Bounded finite number strictly within [min, max].
+ * @param numericValue - Arbitrary numeric input.
+ * @param minBound - Lower bound of the closed interval.
+ * @param maxBound - Upper bound of the closed interval.
+ * @returns Bounded finite number strictly within [minBound, maxBound].
  */
-export function clamp(value: number, min: number, max: number): number {
-    const safeMin = Number.isFinite(min) ? min : 0;
-    const safeMax = Number.isFinite(max) ? max : safeMin;
+export function clampRange(numericValue: number, minBound: number, maxBound: number): number {
+    const safeMin = Number.isFinite(minBound) ? minBound : 0;
+    const safeMax = Number.isFinite(maxBound) ? maxBound : safeMin;
     const lower = safeMin <= safeMax ? safeMin : safeMax;
     const upper = safeMin <= safeMax ? safeMax : safeMin;
 
-    if (Number.isNaN(value)) {
+    if (Number.isNaN(numericValue) || numericValue < lower) {
         return lower;
     }
-    if (value < lower) {
-        return lower;
-    }
-    if (value > upper) {
-        return upper;
-    }
-    return value;
+    return numericValue > upper ? upper : numericValue;
 }
+
+/**
+ * Historical alias for clampRange.
+ */
+export const clamp = clampRange;
 
 /**
  * Clamps a normalized ratio into the unit interval [0.0, 1.0].
@@ -112,8 +111,8 @@ export function safeDivide(numerator: number, denominator: number, fallback = 0)
     if (!Number.isFinite(numerator) || !Number.isFinite(denominator) || denominator === 0) {
         return fallback;
     }
-    const result = numerator / denominator;
-    return Number.isFinite(result) ? result : fallback;
+    const quotient = numerator / denominator;
+    return Number.isFinite(quotient) ? quotient : fallback;
 }
 
 /**

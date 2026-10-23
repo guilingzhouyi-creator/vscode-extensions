@@ -182,11 +182,18 @@ describe('Core Math — Pure Mathematical Operators', () => {
         it('computePowerResonance evaluates non-linear multi-plane interaction', () => {
             const coeffs = { alpha: 1.0, beta: 1.2, gamma: 0.8 };
             // S=2, D=2, H=1 => 2^1 * 2^1.2 * 1^0.8 = 2 * 2.2974 = 4.59
-            const res = computePowerResonance(2, 2, 1, coeffs);
+            const res = computePowerResonance({ staticScore: 2, dynamicScore: 2, historicalScore: 1, coeffs });
             expect(res).toBeCloseTo(4.59, 1);
 
             // Ceiling clamp
-            const saturated = computePowerResonance(100, 100, 10, coeffs, 1.0, 100.0);
+            const saturated = computePowerResonance({
+                staticScore: 100,
+                dynamicScore: 100,
+                historicalScore: 10,
+                coeffs,
+                modifier: 1.0,
+                ceiling: 100.0,
+            });
             expect(saturated).toBe(100.0);
         });
     });

@@ -25,28 +25,37 @@ export interface PowerResonanceCoefficients {
 }
 
 /**
+ * Structured parameter inputs for multi-plane power-law resonance evaluation.
+ */
+export interface PowerResonanceInput {
+    readonly staticScore: number;
+    readonly dynamicScore: number;
+    readonly historicalScore: number;
+    readonly coeffs: PowerResonanceCoefficients;
+    readonly modifier?: number;
+    readonly ceiling?: number;
+}
+
+/**
  * Computes non-linear power-law resonance across three factors:
  * Result = (S^alpha * D^beta * H^gamma) * modifier
  *
- * @param s - Base factor S (e.g. static risk >= 0).
- * @param d - Multiplier factor D (e.g. dynamic evidence >= 0).
- * @param h - Multiplier factor H (e.g. historical factor >= 0).
- * @param coeffs - Exponents alpha, beta, gamma.
- * @param modifier - Optional post-exponential scale modifier (e.g. dampening or amplification).
- * @param ceiling - Maximum ceiling bound (default 100.0).
+ * @param input - Structured power resonance parameter object.
  * @returns Bounded resonance score rounded to 2 decimal places.
  */
-export function computePowerResonance(
-    s: number,
-    d: number,
-    h: number,
-    coeffs: PowerResonanceCoefficients,
-    modifier: number = 1.0,
-    ceiling: number = DEFAULT_CEILING,
-): number {
-    const safeS = Number.isFinite(s) && s > 0 ? s : 0.0;
-    const safeD = Number.isFinite(d) && d > 0 ? d : 0.0;
-    const safeH = Number.isFinite(h) && h > 0 ? h : 0.0;
+export function computePowerResonance(input: PowerResonanceInput): number {
+    const {
+        staticScore,
+        dynamicScore,
+        historicalScore,
+        coeffs,
+        modifier = 1.0,
+        ceiling = DEFAULT_CEILING,
+    } = input;
+
+    const safeS = Number.isFinite(staticScore) && staticScore > 0 ? staticScore : 0.0;
+    const safeD = Number.isFinite(dynamicScore) && dynamicScore > 0 ? dynamicScore : 0.0;
+    const safeH = Number.isFinite(historicalScore) && historicalScore > 0 ? historicalScore : 0.0;
     const safeMod = Number.isFinite(modifier) && modifier > 0 ? modifier : 1.0;
     const safeCeiling = Number.isFinite(ceiling) && ceiling > 0 ? ceiling : DEFAULT_CEILING;
 
