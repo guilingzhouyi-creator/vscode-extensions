@@ -16,9 +16,7 @@
 use std::collections::HashMap;
 
 use fractal_git::constants::cli::CliTag;
-use fractal_git::{
-    CommitCounter, CommitTelemetryConfig, FractalRef, Oid, TelemetryCommitNode,
-};
+use fractal_git::{CommitCounter, CommitTelemetryConfig, FractalRef, Oid, TelemetryCommitNode};
 
 use super::commit_walk::walk_commits;
 use super::common::{print_json, reject, CliContext};

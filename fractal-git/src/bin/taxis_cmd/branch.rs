@@ -154,13 +154,19 @@ fn verify_branch_merge(src: &str, dst: &str) {
 /// Creates a new branch reference pointing to the specified start point (or HEAD).
 fn create_branch(view: &RepoView, name: &str, start_point: Option<&str>, ctx: &CliContext) {
     if name.is_empty() || name.contains(' ') || name.contains('~') || name.contains('^') {
-        reject(CliTag::ERROR, format!("fatal: '{name}' is not a valid branch name."));
+        reject(
+            CliTag::ERROR,
+            format!("fatal: '{name}' is not a valid branch name."),
+        );
     }
 
     let target_oid = match start_point {
         Some(rev) => match view.resolve(rev) {
             Ok(oid) => oid,
-            Err(err) => reject(CliTag::ERROR, format!("fatal: Cannot resolve '{rev}': {err}")),
+            Err(err) => reject(
+                CliTag::ERROR,
+                format!("fatal: Cannot resolve '{rev}': {err}"),
+            ),
         },
         None => match view.head_commit() {
             Ok(Some(oid)) => oid,
@@ -180,7 +186,10 @@ fn create_branch(view: &RepoView, name: &str, start_point: Option<&str>, ctx: &C
     }
 
     if let Err(write_err) = ref_store.update_ref(&full_ref, &target_oid, None) {
-        reject(CliTag::ERROR, format!("failed to write branch ref: {write_err}"));
+        reject(
+            CliTag::ERROR,
+            format!("failed to write branch ref: {write_err}"),
+        );
     }
 
     // Also persist into native container if present
@@ -213,7 +222,10 @@ fn delete_branch(view: &RepoView, name: &str, _force: bool, ctx: &CliContext) {
         if curr == name {
             reject(
                 CliTag::ERROR,
-                format!("error: Cannot delete branch '{name}' checked out at '{}'", view.work_root().display()),
+                format!(
+                    "error: Cannot delete branch '{name}' checked out at '{}'",
+                    view.work_root().display()
+                ),
             );
         }
     }
@@ -252,7 +264,11 @@ fn delete_branch(view: &RepoView, name: &str, _force: bool, ctx: &CliContext) {
             "deleted_oid": existing_oid.to_hex(),
         }));
     } else {
-        println!("Deleted branch {} (was {}).", name, &existing_oid.to_hex()[..8]);
+        println!(
+            "Deleted branch {} (was {}).",
+            name,
+            &existing_oid.to_hex()[..8]
+        );
     }
 }
 
@@ -273,7 +289,10 @@ fn rename_branch(view: &RepoView, old_name: Option<&str>, new_name: &str, ctx: &
 
     let oid = match ref_store.get_ref(&old_full_ref) {
         Ok(Some(oid)) => oid,
-        _ => reject(CliTag::ERROR, format!("error: branch '{effective_old}' not found.")),
+        _ => reject(
+            CliTag::ERROR,
+            format!("error: branch '{effective_old}' not found."),
+        ),
     };
 
     if let Ok(Some(_)) = ref_store.get_ref(&new_full_ref) {

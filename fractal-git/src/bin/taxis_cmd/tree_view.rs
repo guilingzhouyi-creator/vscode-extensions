@@ -62,7 +62,12 @@ pub fn flatten_tree(
     prefix: &str,
     flat: &mut BTreeMap<String, TreeEntry>,
 ) -> FractalResult<()> {
-    flatten_tree_with(tree_oid, prefix, &|oid| view.object(oid).map(|o| o.payload), flat)
+    flatten_tree_with(
+        tree_oid,
+        prefix,
+        &|oid| view.object(oid).map(|o| o.payload),
+        flat,
+    )
 }
 
 /// Flattens a tree revision that is already known to be a tree into `flat`.

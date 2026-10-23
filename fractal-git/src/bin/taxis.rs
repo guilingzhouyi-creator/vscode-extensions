@@ -19,7 +19,7 @@ mod taxis_cmd;
 use taxis_cmd::common::{reject, CliContext};
 use taxis_cmd::{
     bench, branch, checkout, cherry_pick, commit, daemon, diff, doctor, init, log, merge,
-    operation, projection, promotion, read, rebase, reclaim, relocate, reset, revert, rev_list,
+    operation, projection, promotion, read, rebase, reclaim, relocate, reset, rev_list, revert,
     stash, status, tag, undo, verify, worktree,
 };
 

@@ -52,11 +52,7 @@ pub(crate) fn report_text(request: &DiffRequest, comparisons: &[FileComparison],
     let layout = measure_stat_layout(comparisons, terminal_columns());
     for comparison in comparisons {
         if request.name_only {
-            let _ = write_record(
-                &mut sink,
-                comparison.path(),
-                request.nul_terminated,
-            );
+            let _ = write_record(&mut sink, comparison.path(), request.nul_terminated);
             continue;
         }
 
@@ -294,10 +290,8 @@ fn write_path_lines(
         true => format!("b/{}", comparison.new_path),
         false => DEV_NULL.to_string(),
     };
-    let _ =
-        write_record(sink, &format!("{OLD_SIDE} {old_label}"), nul_terminated);
-    let _ =
-        write_record(sink, &format!("{NEW_SIDE} {new_label}"), nul_terminated);
+    let _ = write_record(sink, &format!("{OLD_SIDE} {old_label}"), nul_terminated);
+    let _ = write_record(sink, &format!("{NEW_SIDE} {new_label}"), nul_terminated);
 }
 
 /// Writes the hunks of one patch, honouring the requested context width.

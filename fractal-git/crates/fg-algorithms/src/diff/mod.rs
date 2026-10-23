@@ -26,7 +26,7 @@ pub use rename::{
     detect_renames, BlobRef, RenameHit, DEFAULT_RENAME_SCORE, MAX_SCORE as MAX_RENAME_SCORE,
 };
 pub use stat_layout::{
-    decimal_width, pprint_rename, scale_linear, shared_suffix_len, stat_graph,
-    truncate_stat_name, StatLayout,
+    decimal_width, pprint_rename, scale_linear, shared_suffix_len, stat_graph, truncate_stat_name,
+    StatLayout,
 };
 pub use tree_diff::{ChangeKind, DiffEntry, TreeDiff, TreeDiffState};

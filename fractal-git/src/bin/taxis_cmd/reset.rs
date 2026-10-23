@@ -24,7 +24,9 @@ use fg_index::IndexEntry;
 use fractal_git::constants::cli::CliTag;
 use fractal_git::{DiskRefStore, OperationGraph, RepoViewSnapshot};
 
-use super::checkout::{materialize_files, remove_stale_files, update_dirc_index, update_references};
+use super::checkout::{
+    materialize_files, remove_stale_files, update_dirc_index, update_references,
+};
 use super::common::{print_json, reject, CliContext};
 use super::repo_view::RepoView;
 use super::tree_view::{flatten_commit_tree, flatten_tree_for_diff, TreeEntry};

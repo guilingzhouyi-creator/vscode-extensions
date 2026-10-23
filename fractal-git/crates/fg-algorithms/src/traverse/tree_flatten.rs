@@ -129,7 +129,11 @@ mod tests {
     #[test]
     fn test_flatten_tree_hierarchical() {
         let blob_oid = Oid::from_hex("1111111111111111111111111111111111111111").unwrap();
-        let sub_entries = vec![GitTreeEntry::new(FileMode::RegularFile, "file.txt", blob_oid)];
+        let sub_entries = vec![GitTreeEntry::new(
+            FileMode::RegularFile,
+            "file.txt",
+            blob_oid,
+        )];
         let sub_tree_bytes = serialize_tree(&sub_entries);
         let sub_tree_oid = Oid::from_hex("2222222222222222222222222222222222222222").unwrap();
 

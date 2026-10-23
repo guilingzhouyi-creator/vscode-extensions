@@ -147,7 +147,12 @@ fn handle_stash_push(view: &RepoView, ctx: &CliContext) {
     let timestamp_sec = chrono::Utc::now().timestamp();
     let author = GitSignature::new("Taxis Operator", "operator@taxis.internal", timestamp_sec);
     let head_summary = head_rec.message.lines().next().unwrap_or("").trim();
-    let stash_msg = format!("WIP on {}: {} {}", branch_name, &head_oid.to_hex()[..7], head_summary);
+    let stash_msg = format!(
+        "WIP on {}: {} {}",
+        branch_name,
+        &head_oid.to_hex()[..7],
+        head_summary
+    );
 
     let stash_commit = GitCommit::new(
         stash_tree_oid,

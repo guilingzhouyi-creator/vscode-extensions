@@ -41,7 +41,10 @@ use super::tree_view::{flatten_tree_for_diff, TreeEntry};
 /// Dispatches the `cherry-pick` command.
 pub fn handle_cherry_pick(ctx: &CliContext) {
     if ctx.args.is_empty() {
-        reject(CliTag::ERROR, "cherry-pick expects a commit revision to pick");
+        reject(
+            CliTag::ERROR,
+            "cherry-pick expects a commit revision to pick",
+        );
     }
 
     let target_rev = &ctx.args[0];
@@ -54,7 +57,10 @@ pub fn handle_cherry_pick(ctx: &CliContext) {
 
     let target_oid = match view.resolve(target_rev) {
         Ok(oid) => oid,
-        Err(err) => reject(CliTag::ERROR, format!("cannot resolve revision '{target_rev}': {err}")),
+        Err(err) => reject(
+            CliTag::ERROR,
+            format!("cannot resolve revision '{target_rev}': {err}"),
+        ),
     };
 
     let target_obj = match view.object(&target_oid) {
@@ -69,7 +75,10 @@ pub fn handle_cherry_pick(ctx: &CliContext) {
 
     let parent_oid = match target_record.parents.first() {
         Some(p) => *p,
-        None => reject(CliTag::ERROR, "cannot cherry-pick a root commit without parent"),
+        None => reject(
+            CliTag::ERROR,
+            "cannot cherry-pick a root commit without parent",
+        ),
     };
 
     let ours_commit = match view.head_commit() {
@@ -104,9 +113,14 @@ pub fn handle_cherry_pick(ctx: &CliContext) {
     let _ = flatten_tree_for_diff(&view, &theirs_tree_oid, "", &mut theirs_files);
     let _ = flatten_tree_for_diff(&view, &ours_tree_oid, "", &mut ours_files);
 
-    let base_map: BTreeMap<String, Oid> = base_files.iter().map(|(p, e)| (p.clone(), e.oid)).collect();
-    let theirs_map: BTreeMap<String, Oid> = theirs_files.iter().map(|(p, e)| (p.clone(), e.oid)).collect();
-    let ours_map: BTreeMap<String, Oid> = ours_files.iter().map(|(p, e)| (p.clone(), e.oid)).collect();
+    let base_map: BTreeMap<String, Oid> =
+        base_files.iter().map(|(p, e)| (p.clone(), e.oid)).collect();
+    let theirs_map: BTreeMap<String, Oid> = theirs_files
+        .iter()
+        .map(|(p, e)| (p.clone(), e.oid))
+        .collect();
+    let ours_map: BTreeMap<String, Oid> =
+        ours_files.iter().map(|(p, e)| (p.clone(), e.oid)).collect();
 
     let merged_tree = match ThreeWayMerge::merge(&base_map, &ours_map, &theirs_map) {
         ThreeWayMergeResult::Clean { merged_tree } => merged_tree,
@@ -127,74 +141,82 @@ pub fn handle_cherry_pick(ctx: &CliContext) {
     let mut in_mem_index = InMemoryIndexTree::new();
     let mut new_files = BTreeMap::new();
 
-            for (path, oid) in &merged_tree {
-                let mode = theirs_files
-                    .get(path)
-                    .or_else(|| ours_files.get(path))
-                    .map(|e| e.mode)
-                    .unwrap_or(FileMode::RegularFile);
+    for (path, oid) in &merged_tree {
+        let mode = theirs_files
+            .get(path)
+            .or_else(|| ours_files.get(path))
+            .map(|e| e.mode)
+            .unwrap_or(FileMode::RegularFile);
 
-                if let Err(stage_err) = in_mem_index.stage_oid(path, mode, *oid) {
-                    reject(CliTag::ERROR, format!("stage merged file '{path}': {stage_err}"));
-                }
-                new_files.insert(path.clone(), TreeEntry { mode, oid: *oid });
-            }
-
-            let odb = LooseOdb::new(view.git_dir());
-            let merged_root_tree = match in_mem_index.write_tree_with_persister(|tree| {
-                let payload = serialize_tree_payload(tree);
-                odb.write_object(OBJ_TREE, &payload)?;
-                Ok(())
-            }) {
-                Ok(oid) => oid,
-                Err(err) => fail_io("persist merged tree", err),
-            };
-
-            let author = GitSignature::new(
-                target_record.author_name,
-                target_record.author_mailbox,
-                target_record.author_time,
+        if let Err(stage_err) = in_mem_index.stage_oid(path, mode, *oid) {
+            reject(
+                CliTag::ERROR,
+                format!("stage merged file '{path}': {stage_err}"),
             );
-            let committer_sec = chrono::Utc::now().timestamp();
-            let committer = GitSignature::new("Taxis Operator", "operator@taxis.internal", committer_sec);
+        }
+        new_files.insert(path.clone(), TreeEntry { mode, oid: *oid });
+    }
 
-            let new_commit = GitCommit::new(
-                merged_root_tree,
-                vec![ours_commit],
-                author,
-                committer,
-                target_record.message.clone(),
-                None,
-            );
+    let odb = LooseOdb::new(view.git_dir());
+    let merged_root_tree = match in_mem_index.write_tree_with_persister(|tree| {
+        let payload = serialize_tree_payload(tree);
+        odb.write_object(OBJ_TREE, &payload)?;
+        Ok(())
+    }) {
+        Ok(oid) => oid,
+        Err(err) => fail_io("persist merged tree", err),
+    };
 
-            let commit_payload = serialize_commit_payload(&new_commit);
-            let new_commit_oid = match odb.write_object(OBJ_COMMIT, &commit_payload) {
-                Ok(oid) => oid,
-                Err(err) => fail_io("persist cherry-pick commit", err),
-            };
+    let author = GitSignature::new(
+        target_record.author_name,
+        target_record.author_mailbox,
+        target_record.author_time,
+    );
+    let committer_sec = chrono::Utc::now().timestamp();
+    let committer = GitSignature::new("Taxis Operator", "operator@taxis.internal", committer_sec);
 
-            remove_stale_files(view.work_root(), &ours_files, &new_files);
-            let index_entries = materialize_files(&view, &new_files);
-            update_dirc_index(view.git_dir(), &index_entries);
-            update_references(view.git_dir(), new_commit_oid, effective_branch.as_deref());
+    let new_commit = GitCommit::new(
+        merged_root_tree,
+        vec![ours_commit],
+        author,
+        committer,
+        target_record.message.clone(),
+        None,
+    );
 
-            record_cherry_pick_op(&view, new_commit_oid, target_rev, effective_branch.as_deref());
+    let commit_payload = serialize_commit_payload(&new_commit);
+    let new_commit_oid = match odb.write_object(OBJ_COMMIT, &commit_payload) {
+        Ok(oid) => oid,
+        Err(err) => fail_io("persist cherry-pick commit", err),
+    };
 
-            if ctx.json_mode {
-                print_json(&serde_json::json!({
-                    "engine": "taxis",
-                    "operation": "cherry-pick",
-                    "status": "clean",
-                    "picked_commit": target_oid.to_hex(),
-                    "new_commit": new_commit_oid.to_hex(),
-                }));
-            } else {
-                println!(
-                    "[{}] {}",
-                    &new_commit_oid.to_hex()[..8],
-                    target_record.message.lines().next().unwrap_or("")
-                );
-            }
+    remove_stale_files(view.work_root(), &ours_files, &new_files);
+    let index_entries = materialize_files(&view, &new_files);
+    update_dirc_index(view.git_dir(), &index_entries);
+    update_references(view.git_dir(), new_commit_oid, effective_branch.as_deref());
+
+    record_cherry_pick_op(
+        &view,
+        new_commit_oid,
+        target_rev,
+        effective_branch.as_deref(),
+    );
+
+    if ctx.json_mode {
+        print_json(&serde_json::json!({
+            "engine": "taxis",
+            "operation": "cherry-pick",
+            "status": "clean",
+            "picked_commit": target_oid.to_hex(),
+            "new_commit": new_commit_oid.to_hex(),
+        }));
+    } else {
+        println!(
+            "[{}] {}",
+            &new_commit_oid.to_hex()[..8],
+            target_record.message.lines().next().unwrap_or("")
+        );
+    }
 }
 
 /// Records cherry-pick operation into the OperationGraph.

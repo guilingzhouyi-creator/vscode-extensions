@@ -54,7 +54,10 @@ pub fn handle_revert(ctx: &CliContext) {
 
     let target_oid = match view.resolve(target_rev) {
         Ok(oid) => oid,
-        Err(err) => reject(CliTag::ERROR, format!("cannot resolve revision '{target_rev}': {err}")),
+        Err(err) => reject(
+            CliTag::ERROR,
+            format!("cannot resolve revision '{target_rev}': {err}"),
+        ),
     };
 
     let target_obj = match view.object(&target_oid) {
@@ -105,9 +108,14 @@ pub fn handle_revert(ctx: &CliContext) {
     let _ = flatten_tree_for_diff(&view, &theirs_tree_oid, "", &mut theirs_files);
     let _ = flatten_tree_for_diff(&view, &ours_tree_oid, "", &mut ours_files);
 
-    let base_map: BTreeMap<String, Oid> = base_files.iter().map(|(p, e)| (p.clone(), e.oid)).collect();
-    let theirs_map: BTreeMap<String, Oid> = theirs_files.iter().map(|(p, e)| (p.clone(), e.oid)).collect();
-    let ours_map: BTreeMap<String, Oid> = ours_files.iter().map(|(p, e)| (p.clone(), e.oid)).collect();
+    let base_map: BTreeMap<String, Oid> =
+        base_files.iter().map(|(p, e)| (p.clone(), e.oid)).collect();
+    let theirs_map: BTreeMap<String, Oid> = theirs_files
+        .iter()
+        .map(|(p, e)| (p.clone(), e.oid))
+        .collect();
+    let ours_map: BTreeMap<String, Oid> =
+        ours_files.iter().map(|(p, e)| (p.clone(), e.oid)).collect();
 
     let merged_tree = match ThreeWayMerge::merge(&base_map, &ours_map, &theirs_map) {
         ThreeWayMergeResult::Clean { merged_tree } => merged_tree,
@@ -135,7 +143,10 @@ pub fn handle_revert(ctx: &CliContext) {
             .unwrap_or(FileMode::RegularFile);
 
         if let Err(stage_err) = in_mem_index.stage_oid(path, mode, *oid) {
-            reject(CliTag::ERROR, format!("stage merged file '{path}': {stage_err}"));
+            reject(
+                CliTag::ERROR,
+                format!("stage merged file '{path}': {stage_err}"),
+            );
         }
         new_files.insert(path.clone(), TreeEntry { mode, oid: *oid });
     }
@@ -154,7 +165,11 @@ pub fn handle_revert(ctx: &CliContext) {
     let author = GitSignature::new("Taxis Operator", "operator@taxis.internal", committer_sec);
 
     let first_line = target_record.message.lines().next().unwrap_or("").trim();
-    let revert_msg = format!("Revert \"{}\"\n\nThis reverts commit {}.\n", first_line, target_oid.to_hex());
+    let revert_msg = format!(
+        "Revert \"{}\"\n\nThis reverts commit {}.\n",
+        first_line,
+        target_oid.to_hex()
+    );
 
     let new_commit = GitCommit::new(
         merged_root_tree,
@@ -176,7 +191,12 @@ pub fn handle_revert(ctx: &CliContext) {
     update_dirc_index(view.git_dir(), &index_entries);
     update_references(view.git_dir(), new_commit_oid, effective_branch.as_deref());
 
-    record_revert_op(&view, new_commit_oid, target_rev, effective_branch.as_deref());
+    record_revert_op(
+        &view,
+        new_commit_oid,
+        target_rev,
+        effective_branch.as_deref(),
+    );
 
     if ctx.json_mode {
         print_json(&serde_json::json!({
@@ -192,12 +212,7 @@ pub fn handle_revert(ctx: &CliContext) {
 }
 
 /// Records revert operation into OperationGraph.
-fn record_revert_op(
-    view: &RepoView,
-    new_commit: Oid,
-    target_rev: &str,
-    branch_name: Option<&str>,
-) {
+fn record_revert_op(view: &RepoView, new_commit: Oid, target_rev: &str, branch_name: Option<&str>) {
     let ref_store = DiskRefStore::new(view.git_dir());
     let mut op_graph = match OperationGraph::load_or_init(view.git_dir()) {
         Ok(graph) => graph,

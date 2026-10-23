@@ -62,7 +62,10 @@ pub fn handle_rebase(ctx: &CliContext) {
 
     let upstream_commit = match view.resolve(upstream_arg) {
         Ok(oid) => oid,
-        Err(err) => reject(CliTag::ERROR, format!("cannot resolve upstream '{upstream_arg}': {err}")),
+        Err(err) => reject(
+            CliTag::ERROR,
+            format!("cannot resolve upstream '{upstream_arg}': {err}"),
+        ),
     };
 
     let ours_commit = match view.head_commit() {
@@ -87,7 +90,10 @@ pub fn handle_rebase(ctx: &CliContext) {
 
     let bases = DagWalker::find_merge_bases_with_ccd(&ours_commit, &upstream_commit, &mut get_node);
     if bases.is_empty() {
-        reject(CliTag::ERROR, "fatal: refusing to rebase unrelated histories");
+        reject(
+            CliTag::ERROR,
+            "fatal: refusing to rebase unrelated histories",
+        );
     }
 
     let merge_base = bases[0];
@@ -122,7 +128,12 @@ pub fn handle_rebase(ctx: &CliContext) {
         update_dirc_index(view.git_dir(), &index_entries);
         update_references(view.git_dir(), upstream_commit, effective_branch.as_deref());
 
-        record_rebase_op(&view, upstream_commit, upstream_arg, effective_branch.as_deref());
+        record_rebase_op(
+            &view,
+            upstream_commit,
+            upstream_arg,
+            effective_branch.as_deref(),
+        );
 
         if ctx.json_mode {
             print_json(&serde_json::json!({
@@ -132,7 +143,10 @@ pub fn handle_rebase(ctx: &CliContext) {
                 "new_head": upstream_commit.to_hex(),
             }));
         } else {
-            println!("Fast-forwarded branch to {}", &upstream_commit.to_hex()[..8]);
+            println!(
+                "Fast-forwarded branch to {}",
+                &upstream_commit.to_hex()[..8]
+            );
         }
         return;
     }
@@ -187,15 +201,23 @@ pub fn handle_rebase(ctx: &CliContext) {
         let _ = flatten_tree_for_diff(&view, &theirs_tree_oid, "", &mut theirs_files);
         let _ = flatten_tree_for_diff(&view, &ours_tree_oid, "", &mut ours_files);
 
-        let base_map: BTreeMap<String, Oid> = base_files.iter().map(|(p, e)| (p.clone(), e.oid)).collect();
-        let theirs_map: BTreeMap<String, Oid> = theirs_files.iter().map(|(p, e)| (p.clone(), e.oid)).collect();
-        let ours_map: BTreeMap<String, Oid> = ours_files.iter().map(|(p, e)| (p.clone(), e.oid)).collect();
+        let base_map: BTreeMap<String, Oid> =
+            base_files.iter().map(|(p, e)| (p.clone(), e.oid)).collect();
+        let theirs_map: BTreeMap<String, Oid> = theirs_files
+            .iter()
+            .map(|(p, e)| (p.clone(), e.oid))
+            .collect();
+        let ours_map: BTreeMap<String, Oid> =
+            ours_files.iter().map(|(p, e)| (p.clone(), e.oid)).collect();
 
         let merged_tree = match ThreeWayMerge::merge(&base_map, &ours_map, &theirs_map) {
             ThreeWayMergeResult::Clean { merged_tree } => merged_tree,
             ThreeWayMergeResult::FastForward => theirs_map.clone(),
             ThreeWayMergeResult::Conflicted { conflicts, .. } => {
-                let _ = fs::write(view.git_dir().join("REBASE_HEAD"), format!("{}\n", rec.oid.to_hex()));
+                let _ = fs::write(
+                    view.git_dir().join("REBASE_HEAD"),
+                    format!("{}\n", rec.oid.to_hex()),
+                );
                 reject(
                     CliTag::ERROR,
                     format!(
@@ -233,7 +255,8 @@ pub fn handle_rebase(ctx: &CliContext) {
             rec.author_time,
         );
         let committer_sec = chrono::Utc::now().timestamp();
-        let committer = GitSignature::new("Taxis Operator", "operator@taxis.internal", committer_sec);
+        let committer =
+            GitSignature::new("Taxis Operator", "operator@taxis.internal", committer_sec);
 
         let rebased_commit = GitCommit::new(
             new_tree_oid,
@@ -266,7 +289,12 @@ pub fn handle_rebase(ctx: &CliContext) {
     update_dirc_index(view.git_dir(), &index_entries);
     update_references(view.git_dir(), current_tip, effective_branch.as_deref());
 
-    record_rebase_op(&view, current_tip, upstream_arg, effective_branch.as_deref());
+    record_rebase_op(
+        &view,
+        current_tip,
+        upstream_arg,
+        effective_branch.as_deref(),
+    );
 
     if ctx.json_mode {
         print_json(&serde_json::json!({
@@ -296,12 +324,7 @@ fn handle_rebase_abort(ctx: &CliContext) {
 }
 
 /// Records rebase operation into OperationGraph.
-fn record_rebase_op(
-    view: &RepoView,
-    new_head: Oid,
-    upstream: &str,
-    branch_name: Option<&str>,
-) {
+fn record_rebase_op(view: &RepoView, new_head: Oid, upstream: &str, branch_name: Option<&str>) {
     let ref_store = DiskRefStore::new(view.git_dir());
     let mut op_graph = match OperationGraph::load_or_init(view.git_dir()) {
         Ok(graph) => graph,

@@ -125,11 +125,14 @@ impl TextThreeWayMerge {
             return Self::binary_conflict_fallback(ours, theirs, ours_label, theirs_label);
         }
 
-        let (base_str, ours_str, theirs_str) =
-            match (std::str::from_utf8(base), std::str::from_utf8(ours), std::str::from_utf8(theirs)) {
-                (Ok(b), Ok(o), Ok(t)) => (b, o, t),
-                _ => return Self::binary_conflict_fallback(ours, theirs, ours_label, theirs_label),
-            };
+        let (base_str, ours_str, theirs_str) = match (
+            std::str::from_utf8(base),
+            std::str::from_utf8(ours),
+            std::str::from_utf8(theirs),
+        ) {
+            (Ok(b), Ok(o), Ok(t)) => (b, o, t),
+            _ => return Self::binary_conflict_fallback(ours, theirs, ours_label, theirs_label),
+        };
 
         Self::merge_utf8(base_str, ours_str, theirs_str, ours_label, theirs_label)
     }
@@ -165,7 +168,8 @@ impl TextThreeWayMerge {
             };
         }
 
-        let mut all_edits: Vec<TaggedEdit<'_>> = Vec::with_capacity(ours_edits.len() + theirs_edits.len());
+        let mut all_edits: Vec<TaggedEdit<'_>> =
+            Vec::with_capacity(ours_edits.len() + theirs_edits.len());
         for &edit in &ours_edits {
             all_edits.push(TaggedEdit {
                 side: EditSide::Ours,
@@ -372,7 +376,10 @@ impl TextThreeWayMerge {
         }
 
         let old_records: Vec<&[u8]> = base_str.split_inclusive('\n').map(str::as_bytes).collect();
-        let new_records: Vec<&[u8]> = target_str.split_inclusive('\n').map(str::as_bytes).collect();
+        let new_records: Vec<&[u8]> = target_str
+            .split_inclusive('\n')
+            .map(str::as_bytes)
+            .collect();
         let (prepared_old, prepared_new) = prepare(&old_records, &new_records);
         let (mut old_changed, mut new_changed) = mark_changed(&prepared_old, &prepared_new);
 
@@ -508,7 +515,8 @@ mod tests {
         assert_eq!(result.conflict_count, 1);
 
         let merged_str = std::str::from_utf8(&result.content).unwrap();
-        let expected = "line1\n<<<<<<< HEAD\nOURS_VAL\n=======\nTHEIRS_VAL\n>>>>>>> feature\nline3\n";
+        let expected =
+            "line1\n<<<<<<< HEAD\nOURS_VAL\n=======\nTHEIRS_VAL\n>>>>>>> feature\nline3\n";
         assert_eq!(merged_str, expected);
     }
 

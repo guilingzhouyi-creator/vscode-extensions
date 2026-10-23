@@ -65,7 +65,10 @@ pub fn handle_merge(ctx: &CliContext) {
     }
 
     if opts.target.is_empty() {
-        reject(CliTag::ERROR, "merge expects a branch or commit to merge in");
+        reject(
+            CliTag::ERROR,
+            "merge expects a branch or commit to merge in",
+        );
     }
 
     assert_worktree_cleanliness(&view, false);
@@ -74,7 +77,10 @@ pub fn handle_merge(ctx: &CliContext) {
         Ok(oid) => oid,
         Err(resolve_err) => reject(
             CliTag::ERROR,
-            format!("could not resolve revision '{}': {resolve_err}", opts.target),
+            format!(
+                "could not resolve revision '{}': {resolve_err}",
+                opts.target
+            ),
         ),
     };
 
@@ -115,7 +121,10 @@ pub fn handle_merge(ctx: &CliContext) {
     if bases.is_empty() {
         reject(
             CliTag::ERROR,
-            format!("fatal: refusing to merge unrelated histories between ours and '{}'", opts.target),
+            format!(
+                "fatal: refusing to merge unrelated histories between ours and '{}'",
+                opts.target
+            ),
         );
     }
 
@@ -135,7 +144,14 @@ pub fn handle_merge(ctx: &CliContext) {
 
     // Check Fast-Forward (ours is an ancestor of theirs)
     if bases.contains(&ours_commit) && !opts.no_ff {
-        execute_fast_forward(&view, &opts, ours_commit, theirs_commit, effective_branch.as_deref(), ctx);
+        execute_fast_forward(
+            &view,
+            &opts,
+            ours_commit,
+            theirs_commit,
+            effective_branch.as_deref(),
+            ctx,
+        );
         return;
     }
 
@@ -198,7 +214,10 @@ fn parse_merge_options(args: &[String]) -> MergeOptions {
 fn handle_merge_abort(view: &RepoView) {
     let merge_head_file = view.git_dir().join("MERGE_HEAD");
     if !merge_head_file.is_file() {
-        reject(CliTag::ERROR, "fatal: There is no merge to abort (MERGE_HEAD missing).");
+        reject(
+            CliTag::ERROR,
+            "fatal: There is no merge to abort (MERGE_HEAD missing).",
+        );
     }
 
     let _ = fs::remove_file(&merge_head_file);
@@ -295,9 +314,14 @@ fn execute_three_way_merge(
     let _ = flatten_tree_for_diff(view, &ours_tree_oid, "", &mut ours_files);
     let _ = flatten_tree_for_diff(view, &theirs_tree_oid, "", &mut theirs_files);
 
-    let base_map: BTreeMap<String, Oid> = base_files.iter().map(|(p, e)| (p.clone(), e.oid)).collect();
-    let ours_map: BTreeMap<String, Oid> = ours_files.iter().map(|(p, e)| (p.clone(), e.oid)).collect();
-    let theirs_map: BTreeMap<String, Oid> = theirs_files.iter().map(|(p, e)| (p.clone(), e.oid)).collect();
+    let base_map: BTreeMap<String, Oid> =
+        base_files.iter().map(|(p, e)| (p.clone(), e.oid)).collect();
+    let ours_map: BTreeMap<String, Oid> =
+        ours_files.iter().map(|(p, e)| (p.clone(), e.oid)).collect();
+    let theirs_map: BTreeMap<String, Oid> = theirs_files
+        .iter()
+        .map(|(p, e)| (p.clone(), e.oid))
+        .collect();
 
     match ThreeWayMerge::merge(&base_map, &ours_map, &theirs_map) {
         ThreeWayMergeResult::FastForward => {
@@ -325,7 +349,8 @@ fn execute_three_way_merge(
 
             for conflict in conflicts {
                 let mut resolved = false;
-                if let (Some(ours_oid), Some(theirs_oid)) = (conflict.ours_oid, conflict.theirs_oid) {
+                if let (Some(ours_oid), Some(theirs_oid)) = (conflict.ours_oid, conflict.theirs_oid)
+                {
                     let base_payload = conflict
                         .base_oid
                         .and_then(|oid| view.blob_payload(&oid).ok())
@@ -395,10 +420,7 @@ struct CleanMergeContext<'a> {
 }
 
 /// Completes a clean merge: synthesizes trees and creates 2-parent merge commit.
-fn finish_clean_merge(
-    m_ctx: &CleanMergeContext<'_>,
-    merged_tree: &BTreeMap<String, Oid>,
-) {
+fn finish_clean_merge(m_ctx: &CleanMergeContext<'_>, merged_tree: &BTreeMap<String, Oid>) {
     let mut in_mem_index = InMemoryIndexTree::new();
     let mut new_files = BTreeMap::new();
 
@@ -411,7 +433,10 @@ fn finish_clean_merge(
             .unwrap_or(FileMode::RegularFile);
 
         if let Err(stage_err) = in_mem_index.stage_oid(path, mode, *oid) {
-            reject(CliTag::ERROR, format!("stage merged file '{path}': {stage_err}"));
+            reject(
+                CliTag::ERROR,
+                format!("stage merged file '{path}': {stage_err}"),
+            );
         }
         new_files.insert(path.clone(), TreeEntry { mode, oid: *oid });
     }
@@ -451,7 +476,12 @@ fn finish_clean_merge(
     update_dirc_index(m_ctx.view.git_dir(), &index_entries);
     update_references(m_ctx.view.git_dir(), commit_oid, m_ctx.branch_name);
 
-    record_merge_operation(m_ctx.view, commit_oid, &m_ctx.opts.target, m_ctx.branch_name);
+    record_merge_operation(
+        m_ctx.view,
+        commit_oid,
+        &m_ctx.opts.target,
+        m_ctx.branch_name,
+    );
 
     if m_ctx.ctx.json_mode {
         print_json(&serde_json::json!({
@@ -527,7 +557,11 @@ fn finish_conflicted_merge(
         if let Some(base_oid) = conflict.base_oid {
             index_entries.push(IndexEntry {
                 path: conflict.path.clone(),
-                mode: c_ctx.base_files.get(&conflict.path).map(|e| e.mode).unwrap_or(mode),
+                mode: c_ctx
+                    .base_files
+                    .get(&conflict.path)
+                    .map(|e| e.mode)
+                    .unwrap_or(mode),
                 oid: base_oid,
                 stage: IndexStage::Base,
                 size: 0,
@@ -541,7 +575,11 @@ fn finish_conflicted_merge(
         if let Some(ours_oid) = conflict.ours_oid {
             index_entries.push(IndexEntry {
                 path: conflict.path.clone(),
-                mode: c_ctx.ours_files.get(&conflict.path).map(|e| e.mode).unwrap_or(mode),
+                mode: c_ctx
+                    .ours_files
+                    .get(&conflict.path)
+                    .map(|e| e.mode)
+                    .unwrap_or(mode),
                 oid: ours_oid,
                 stage: IndexStage::Ours,
                 size: 0,
@@ -555,7 +593,11 @@ fn finish_conflicted_merge(
         if let Some(theirs_oid) = conflict.theirs_oid {
             index_entries.push(IndexEntry {
                 path: conflict.path.clone(),
-                mode: c_ctx.theirs_files.get(&conflict.path).map(|e| e.mode).unwrap_or(mode),
+                mode: c_ctx
+                    .theirs_files
+                    .get(&conflict.path)
+                    .map(|e| e.mode)
+                    .unwrap_or(mode),
                 oid: theirs_oid,
                 stage: IndexStage::Theirs,
                 size: 0,
@@ -608,10 +650,21 @@ fn finish_conflicted_merge(
     }
 
     update_dirc_index(c_ctx.view.git_dir(), &index_entries);
-    let _ = fs::write(c_ctx.view.git_dir().join("MERGE_HEAD"), format!("{}\n", c_ctx.theirs_commit.to_hex()));
+    let _ = fs::write(
+        c_ctx.view.git_dir().join("MERGE_HEAD"),
+        format!("{}\n", c_ctx.theirs_commit.to_hex()),
+    );
     let _ = fs::write(
         c_ctx.view.git_dir().join("MERGE_MSG"),
-        format!("Merge branch '{}'\n\n# Conflicts:\n#\t{}\n", c_ctx.opts.target, conflicts.iter().map(|c| c.path.as_str()).collect::<Vec<_>>().join("\n#\t")),
+        format!(
+            "Merge branch '{}'\n\n# Conflicts:\n#\t{}\n",
+            c_ctx.opts.target,
+            conflicts
+                .iter()
+                .map(|c| c.path.as_str())
+                .collect::<Vec<_>>()
+                .join("\n#\t")
+        ),
     );
 
     if c_ctx.ctx.json_mode {

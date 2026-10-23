@@ -13,8 +13,8 @@
 //! - `FGT-GAT-001`: Fractal Git domain gate guard
 
 use fractal_git::{
-    ActorIdentity, AgentPushContext, CommitMessageGuard, ConflictGuard, FractalRef, PreReceiveGuard,
-    QuotaGovernor, TaxisPolicy,
+    ActorIdentity, AgentPushContext, CommitMessageGuard, ConflictGuard, FractalRef,
+    PreReceiveGuard, QuotaGovernor, TaxisPolicy,
 };
 
 use super::common::{print_json, CliContext};

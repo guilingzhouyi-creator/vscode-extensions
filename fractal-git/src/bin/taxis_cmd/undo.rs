@@ -55,7 +55,7 @@ pub fn handle_undo(ctx: &CliContext) {
                     let target_files = flatten_commit_tree(&view, &head_oid).unwrap_or_default();
                     remove_stale_files(view.work_root(), &current_files, &target_files);
                     let index_entries = materialize_files(&view, &target_files);
-                    let _ = update_dirc_index(view.git_dir(), &index_entries);
+                    update_dirc_index(view.git_dir(), &index_entries);
                 }
             }
 
