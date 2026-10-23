@@ -173,7 +173,7 @@ SubAgent 汇报任务完成并返回消息后，主 Agent **绝对不能盲目�
    - 若涉及 `auto-refactor`，执行 `node auto-refactor/scripts/gate-self.js`，确保 `0 newBlocking error`，全仓历史基线单调收敛；
    - 全仓刚性看守：严禁引入任何 High/Critical 技术债务反弹，历史性清零（0 项）红线一票否决；
 7. **⑦ 受影响领域自动化回归测试 (Domain Test Suite Regression)**：
-   - `auto-refactor`：`cd auto-refactor && npm test`（<!-- METRICS:BEGIN test-suite-count -->**165 套**<!-- METRICS:END test-suite-count -->测试并发/串行绿色通过，TS/Rust 100% 字节等价）；
+   - `auto-refactor`：`cd auto-refactor && npm test`（<!-- METRICS:BEGIN test-suite-count -->**166 套**<!-- METRICS:END test-suite-count -->测试并发/串行绿色通过，TS/Rust 100% 字节等价）；
    - `workspace-timing`：`cd workspace-timing && npm run test:fast`（<!-- METRICS:BEGIN ws-test-case-count -->**205 项**<!-- METRICS:END ws-test-case-count -->用例绿色通过）；
    - `WebGames`：`cd WebGames && pwsh scripts/ps1/audit-all.ps1`；
 8. **⑧ 工作区全量统一审查 (Workspace Unified Audit)**：执行 `pwsh -File scripts/ps1/audit-all.ps1 -Fast`，<!-- METRICS:BEGIN pillar-count -->**6 大支柱**<!-- METRICS:END pillar-count -->（物理卫生、单源规则、auto-refactor、workspace-timing、WebGames、fractal-git）综合评分必须 $\ge 98$ 分，全绿通行。

@@ -12,7 +12,7 @@
  *   2. Verify GUARD-MSG-002, GUARD-AST-001, GUARD-FAC-001, GUARD-PROC-001 rule logic.
  *   3. Verify scoring deduction mappings for gate-architecture, shell-lint, simplify, go-modern.
  *   4. Verify Bayesian Gaussian belief updating and multi-scale confidence clamping [0.60, 1.00].
- *   5. Verify zero analyzer fracture across all 30 built-in analyzers in BUILTIN_FACTORIES.
+ *   5. Verify zero analyzer fracture across all 31 built-in analyzers in BUILTIN_FACTORIES.
  *   6. Verify composite quality gate anti-gaming detection and verdict resolution.
  * Exit Semantics & Design Rationale: Exits 0 on all assertions passed; exits 1 on error.
  */
@@ -391,8 +391,8 @@ console.log('Testing Gate Architecture Enhancement & Quantification Model...');
   const factoryKeys = Object.keys(BUILTIN_FACTORIES);
   assert.strictEqual(
     factoryKeys.length,
-    30,
-    `Expected exactly 30 built-in analyzers in BUILTIN_FACTORIES, found ${factoryKeys.length}`,
+    31,
+    `Expected exactly 31 built-in analyzers in BUILTIN_FACTORIES, found ${factoryKeys.length}`,
   );
 
   for (const name of factoryKeys) {
@@ -406,7 +406,7 @@ console.log('Testing Gate Architecture Enhancement & Quantification Model...');
     assert.ok(hasAnalyzeOrFinalize, `Analyzer ${name} must implement analyze or finalize`);
   }
 
-  // Verify all 30 appear in DIMENSION_ANALYZERS
+  // Verify all 31 appear in DIMENSION_ANALYZERS
   const allDeclaredAnalyzers = new Set();
   for (const analyzers of Object.values(DIMENSION_ANALYZERS)) {
     for (const a of analyzers) allDeclaredAnalyzers.add(a);
@@ -418,7 +418,7 @@ console.log('Testing Gate Architecture Enhancement & Quantification Model...');
     );
   }
 
-  console.log('  ✔ 5. Analyzer registry completeness & zero fracture (30/30 wired)');
+  console.log('  ✔ 5. Analyzer registry completeness & zero fracture (31/31 wired)');
 })();
 
 // ── Test 6: Anti-Gaming & Composite Quality Gate ──

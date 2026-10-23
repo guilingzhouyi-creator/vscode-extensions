@@ -57,6 +57,7 @@ import {
     ANALYZER_FRONTEND,
     ANALYZER_PRODUCTION_HYGIENE,
     ANALYZER_CLIENT_EXPOSURE,
+    ANALYZER_SHELL_SAFETY,
 } from '../scoring/dimensionLiterals';
 
 export {
@@ -103,6 +104,7 @@ export const SPECIALIZED_ANALYZERS = new Set<string>([
     ANALYZER_FRONTEND,
     ANALYZER_PRODUCTION_HYGIENE,
     ANALYZER_CLIENT_EXPOSURE,
+    ANALYZER_SHELL_SAFETY,
 ]);
 
 /** Auto-tune estimate: source lines per profiled language entry. */

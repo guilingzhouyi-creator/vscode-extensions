@@ -30,7 +30,7 @@ import {
     SEVERITY_ERROR,
     SEVERITY_WARNING,
 } from '../types';
-import { ANALYZER_GATE_ARCHITECTURE } from '../../scoring/dimensionLiterals';
+import { ANALYZER_GATE_ARCHITECTURE, ANALYZER_SHELL_SAFETY } from '../../scoring/dimensionLiterals';
 
 /**
  * Gate system architecture and engineering governance rule definitions.
@@ -241,5 +241,30 @@ export const GATE_GOVERNANCE_RULES: readonly RuleDefinition[] = [
         remediation:
             'Provide isomorphic dual-platform gate script implementations across scripts/sh and scripts/ps1.',
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#gate-pair-001',
+    }),
+    defineRule({
+        id: 'GUARD-DESTR-001',
+        family: RULE_FAMILY_GATE,
+        analyzer: ANALYZER_SHELL_SAFETY,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_ERROR,
+        summary:
+            'Recursive delete operand is a filesystem root, an ancestor directory, a home or profile directory, or an expression derived from one through assignments or loop aliases.',
+        remediation:
+            'Delete a path the source names literally or builds from a directory the script created, and refuse the operation when the resolved path is a root, a home directory, or empty.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#guard-destr-001',
+    }),
+    defineRule({
+        id: 'GUARD-VAR-001',
+        family: RULE_FAMILY_GATE,
+        analyzer: ANALYZER_SHELL_SAFETY,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_ERROR,
+        summary:
+            'PowerShell binding writes a read-only automatic variable, so the write throws and the name keeps its previous value.',
+        remediation: 'Rename the binding so it no longer collides with the read-only automatic variable.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#guard-var-001',
     }),
 ];

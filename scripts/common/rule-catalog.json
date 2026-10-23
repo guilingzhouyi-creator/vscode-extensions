@@ -1,13 +1,13 @@
 {
   "schema": "workspace-rule-catalog/v1",
-  "generatedAt": "2026-10-23T04:39:11.082Z",
+  "generatedAt": "2026-10-23T05:16:34.342Z",
   "totalRules": 505,
   "counts": {
-    "autoRefactor": 369,
+    "autoRefactor": 371,
     "workspaceTiming": 49,
     "webGames": 50,
     "fractalGit": 17,
-    "globalTooling": 20
+    "globalTooling": 18
   },
   "rules": [
     {
@@ -2064,10 +2064,10 @@
     },
     {
       "id": "GUARD-DESTR-001",
-      "project": "global-tooling",
+      "project": "auto-refactor",
       "family": "GUARD",
       "severity": "error",
-      "summary": "Destructive operand provenance guard: a recursive delete may not name a filesystem root, an ancestor directory, a home or profile directory, or an operand derived from any of those through assignments or loop aliases, because the source then never states which path is being destroyed.",
+      "summary": "Recursive delete operand is a filesystem root, an ancestor directory, a home or profile directory, or an expression derived from one through assignments or loop aliases.",
       "canonical": true
     },
     {
@@ -2224,10 +2224,10 @@
     },
     {
       "id": "GUARD-VAR-001",
-      "project": "global-tooling",
+      "project": "auto-refactor",
       "family": "GUARD",
       "severity": "error",
-      "summary": "Read-only automatic variable shadowing guard: assigning to $HOME, $PSHOME, $PID, $Host, $Error, $ExecutionContext, $ShellId, $PSVersionTable, $IsWindows, $IsLinux, $IsMacOS, $PSCulture, $PSUICulture or $PSEdition throws, so the name keeps its previous value and every later read silently addresses a different object than the author intended.",
+      "summary": "PowerShell binding writes a read-only automatic variable, so the write throws and the name keeps its previous value.",
       "canonical": true
     },
     {

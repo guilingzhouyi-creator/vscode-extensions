@@ -1,4 +1,4 @@
-# 01. 四层规则金字塔、30 个内置分析器与 369 条全量规则字典 (354 规范 + 15 历史别名)
+# 01. 四层规则金字塔、31 个内置分析器与 371 条全量规则字典 (356 规范 + 15 历史别名)
 
 > **所属层级**：L4 规则引擎与内置分析器 (`docs/04-analyzers-and-rules/`)  
 > **对应代码真源**：`src/core/rules/registry.ts`、`src/core/rules/entries/*.ts`、`src/core/analyzer-registry.ts`、`src/analyzers/*.ts`
@@ -7,7 +7,7 @@
 
 ## 1. 四层规则金字塔与双轨文案架构
 
-`auto-refactor` 将全部 **369 条内置规则**（含 **354 条规范化 `FAMILY-TOPIC-NNN` 规则**与 **15 条向后兼容别名规则**）统一收拢于 `src/core/rules/registry.ts` 单一真源注册表中，并由 `npm run validate-rules-registry` 门禁在每次构建时强制校验「发射集 = 注册集 = 文档覆盖集（369/369）」。在工作区全域单源规则目录快照（`scripts/common/rule-catalog.json`）中，活跃规则规模保持 **505 条全仓 SSOT 活跃规则**。
+`auto-refactor` 将全部 **371 条内置规则**（含 **356 条规范化 `FAMILY-TOPIC-NNN` 规则**与 **15 条向后兼容别名规则**）统一收拢于 `src/core/rules/registry.ts` 单一真源注册表中，并由 `npm run validate-rules-registry` 门禁在每次构建时强制校验「发射集 = 注册集 = 文档覆盖集（371/371）」。在工作区全域单源规则目录快照（`scripts/common/rule-catalog.json`）中，活跃规则规模保持 **505 条全仓 SSOT 活跃规则**。
 
 ### 1.1 四层规则金字塔拓扑
 
@@ -15,7 +15,7 @@
 | :--- | :---: | :--- | :--- |
 | **Layer 1：全域安全与卫生底线** | 69 条 | `SEC` / `HYG` / `ERR` / `CMT` / `DOC` / `SIM` | 凭证防泄露、注入防御、错误吞没拦截、代码物理卫生、注释质量 (ECD-C) 与文档结构完整性 |
 | **Layer 2：语言族现代化与标准库** | 112 条 | `TSM` / `MOD` / `PYM` / `RSM` / `GOM` / `GDM` / `SH` / `PS` (`SHL`) / `STDLIB` (`STD`) / `UI` / `PROD` | TypeScript、Python、Rust、Go、GDScript、Shell、PowerShell 现代语法惯用法、标准库手写轮子替换与前端工程现代化 |
-| **Layer 3：架构拓扑、治理、数据与性能** | 167 条 | `ARCH` / `GOV` / `DAT` / `PRF` / `DEP` / `NAM` / `CONST` / `CPX` / `GATE` / `CMP` / `NUM` / `GUARD` / `ENG` / `EXT` / `BIG` | 分层单向依赖、架构防腐、多 Agent 协作防冲突 (`GOV-AGN-001`)、切片破坏防范 (`GOV-SLC-001`)、轨迹回归检验 (`GOV-TRJ-001`)、N+1 数据库查询阻断与热循环零分配 |
+| **Layer 3：架构拓扑、治理、数据与性能** | 169 条 | `ARCH` / `GOV` / `DAT` / `PRF` / `DEP` / `NAM` / `CONST` / `CPX` / `GATE` / `CMP` / `NUM` / `GUARD` / `ENG` / `EXT` / `BIG` | 分层单向依赖、架构防腐、多 Agent 协作防冲突 (`GOV-AGN-001`)、切片破坏防范 (`GOV-SLC-001`)、轨迹回归检验 (`GOV-TRJ-001`)、N+1 数据库查询阻断与热循环零分配 |
 | **Layer 4：领域专精、测试现代性与历史兼容** | 16 条 | `VSC` / `TST` + 15 条 Legacy Aliases | Godot 4 游戏引擎运行态契约、VS Code 扩展清单与事件规范、测试有效覆盖深度与历史规则平滑迁移过渡窗口 |
 
 ### 1.2 双轨文案分层契约（Dual-Track Wording Architecture）
@@ -65,7 +65,7 @@
 
 ## 2. 四阶段分析器流水线拓扑与装配矩阵（共 30 个）
 
-注册于 `src/core/analyzer-registry.ts` 的 30 个内置分析器统一按四阶段流水线拓扑编排装配，具备严格的阶段依赖与短路熔断机制：
+注册于 `src/core/analyzer-registry.ts` 的 31 个内置分析器统一按四阶段流水线拓扑编排装配，具备严格的阶段依赖与短路熔断机制：
 
 ### 2.1 四阶段流水线装配与短路机制
 
@@ -78,7 +78,7 @@
 
 ---
 
-## 3. 全量 369 条内置规则权威字典（由门禁自动核验）
+## 3. 全量 371 条内置规则权威字典（由门禁自动核验）
 
 ### Layer 1 — 全域安全、密钥与卫生底线层 (Universal Safety & Hygiene)
 
@@ -338,6 +338,8 @@
 | `DEP-WLD-001` | <a id="dep-wld-001"></a>`dependency-layout` | `DEP` | `warning` | `all` | 使用通配符导入破坏显式依赖跟踪与树摇优化。 | 改用显式具名导入 (Named Imports)，明确模块依赖面。 |
 | `GUARD-AST-001` | <a id="gate-ast-001"></a>`gate-architecture` | `GATE` | `error` | `all` | 预提交门禁缺少暂存区 AST 局部切片复杂度与嵌套深度刚性预算检查（CC <= 15, Depth <= 4）。 | 在 pre-commit 钩子中配置 validate-staged-slice 切片看守，阻断超标改动。 |
 | `GUARD-BASE-001` | <a id="gate-base-001"></a>`gate-architecture` | `GATE` | `error` | `all` | 多维自审（体积预算、反向分层耦合、规范化平衡）跌破冻结基线时缺少单调棘轮看守。 | 恢复跌破的维度，或以书面理由登记一次经批准的基线更新。 |
+| `GUARD-DESTR-001` | <a id="guard-destr-001"></a>`shell-safety` | `GATE` | `error` | `all` | 递归删除的操作数是文件系统根目录、祖先目录、家目录或个人配置目录，或经由赋值链与循环别名从这些表达式派生而来。 | 只删除源码字面命名的路径或脚本自身创建的目录，并在解析结果为空、为根目录或为家目录时拒绝执行。 |
+| `GUARD-VAR-001` | <a id="guard-var-001"></a>`shell-safety` | `GATE` | `error` | `all` | PowerShell 绑定写入只读自动变量，写入抛出异常而该名称保留先前取值。 | 重命名绑定，使其不再与只读自动变量同名。 |
 | `GUARD-BUDGET-001` | <a id="gate-budget-001"></a>`gate-architecture` | `GATE` | `warning` | `all` | 预提交门禁运行无界全量回归耗时超标，未实施暂存区分层过滤。 | 实施分层门禁：预提交专注增量暂存切片审查（< 2s），全量回归递延至预推送。 |
 | `GUARD-ERR-001` | <a id="gate-err-001"></a>`gate-architecture` | `GATE` | `error` | `all` | 门禁执行脚本缺失严格错误终止控制标志，存在命令静默失败隐患。 | Shell 脚本声明 set -euo pipefail，PowerShell 声明 $ErrorActionPreference = 'Stop'。 |
 | `GUARD-FAC-001` | <a id="gate-fac-001"></a>`gate-architecture` | `GATE` | `error` | `all` | 门禁流水线缺少门面层实质承载（ELOC >= 15）与空包跳板静态审查。 | 接入 validate-facade-discipline 看守，强制门面层实质承载并消除虚空转发层。 |

@@ -43,6 +43,7 @@ import {
     ANALYZER_FRONTEND,
     ANALYZER_PRODUCTION_HYGIENE,
     ANALYZER_CLIENT_EXPOSURE,
+    ANALYZER_SHELL_SAFETY,
 } from '../scoring/dimensionLiterals';
 
 const TRACK_FAST = 'fast' as const;
@@ -400,6 +401,17 @@ export const EXPERT_MANIFEST: readonly ExpertManifestEntry[] = [
         isSecurityFamily: false,
         description:
             'Shell script and PowerShell governance, error trapping, and cross-platform safety',
+    },
+    {
+        id: ANALYZER_SHELL_SAFETY,
+        signals: [SIG_GENERAL_CODE],
+        track: TRACK_FAST,
+        steadyCostUs: COST_60,
+        weight: 2.0,
+        fallback: FALLBACK_BLOCK,
+        isSecurityFamily: true,
+        description:
+            'Destructive delete operand provenance and read-only automatic variable shadowing',
     },
     {
         id: ANALYZER_GATE_ARCHITECTURE,

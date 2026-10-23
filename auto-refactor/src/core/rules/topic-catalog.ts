@@ -147,6 +147,7 @@ export const CANONICAL_TOPIC_CATALOG: Readonly<Record<string, readonly string[]>
         'AST',
         'BASE',
         'BUDGET',
+        'DESTR',
         'ERR',
         'FAC',
         'HOOK',
@@ -158,6 +159,7 @@ export const CANONICAL_TOPIC_CATALOG: Readonly<Record<string, readonly string[]>
         'ROUTE',
         'SSOT',
         'SYS',
+        'VAR',
     ],
     GDM: [
         'BAR',
@@ -369,6 +371,7 @@ export const CANONICAL_3LETTER_GLOSSARY: TopicGlossary = Object.freeze({
     DEAD: 'DED',
     DEFAULT: 'DFT',
     DEPR: 'DPR',
+    DESTR: 'DST',
     DISP: 'DSP',
     ECHO: 'ECH',
     ELSE: 'ELS',

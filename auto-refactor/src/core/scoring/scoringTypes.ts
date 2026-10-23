@@ -84,6 +84,7 @@ const ANALYZER_FRONTEND = 'frontend';
 const ANALYZER_LARGE_FILE = 'large-file';
 const ANALYZER_DOCS = 'docs';
 const ANALYZER_SHELL_LINT = 'shell-lint';
+const ANALYZER_SHELL_SAFETY = 'shell-safety';
 const ANALYZER_SIMPLIFY = 'simplify';
 const ANALYZER_TS_MODERN = 'ts-modern';
 const ANALYZER_PYTHON_MODERN = 'python-modern';
@@ -134,6 +135,7 @@ export const DIMENSION_ANALYZERS: Record<QualityDimension, readonly string[]> = 
         ANALYZER_SECRETS,
         ANALYZER_PRODUCTION_HYGIENE,
         ANALYZER_CLIENT_EXPOSURE,
+        ANALYZER_SHELL_SAFETY,
     ],
     performanceEfficiency: [
         ANALYZER_PERFORMANCE,
@@ -153,6 +155,7 @@ export const DIMENSION_ANALYZERS: Record<QualityDimension, readonly string[]> = 
         ANALYZER_DOCS,
         ANALYZER_GATE_ARCHITECTURE,
         ANALYZER_SHELL_LINT,
+        ANALYZER_SHELL_SAFETY,
         ANALYZER_SIMPLIFY,
         ANALYZER_FRONTEND,
     ],
@@ -174,6 +177,7 @@ export const DIMENSION_ANALYZERS: Record<QualityDimension, readonly string[]> = 
         ANALYZER_GDSCRIPT_GAME,
         ANALYZER_GATE_ARCHITECTURE,
         ANALYZER_SHELL_LINT,
+        ANALYZER_SHELL_SAFETY,
         ANALYZER_SIMPLIFY,
         ANALYZER_FRONTEND,
         ANALYZER_PRODUCTION_HYGIENE,

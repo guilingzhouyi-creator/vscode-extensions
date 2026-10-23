@@ -171,6 +171,10 @@ export const FAMILY_DIMENSIONS: Record<string, QualityDimension> = {
     'GUARD-SSOT': DIMENSION_STANDARDIZATION,
     'GATE-HYG': DIMENSION_STANDARDIZATION,
     'GUARD-HYG': DIMENSION_STANDARDIZATION,
+    // A recursive delete that can reach a home or drive root is a data-destruction defect, so the
+    // GUARD-DESTR family is charged to security rather than to gate standardization. GUARD-VAR
+    // stays with the gate family: a shadowed automatic variable breaks the script's own contract.
+    'GUARD-DESTR': DIMENSION_CODE_SECURITY,
     GATE: DIMENSION_STANDARDIZATION,
     GUARD: DIMENSION_STANDARDIZATION,
     // Shell / PowerShell Lint Governance

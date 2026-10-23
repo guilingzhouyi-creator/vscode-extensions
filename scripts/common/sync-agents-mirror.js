@@ -31,9 +31,24 @@ const CATALOG_FILE = path.join(REPO_ROOT, 'scripts/common/rule-catalog.json');
 const STALE_FIGURE_PATTERNS = Object.freeze([
   { label: 'rule total', pattern: /(\d{3,4})\s*条(?:内置)?规则/g, expected: (c) => liveRuleFigures(c) },
   { label: 'rule total in parentheses', pattern: /（(\d{3,4})\s*条/g, expected: (c) => liveRuleFigures(c) },
-  { label: 'analyzer count', pattern: /(\d{1,3})\s*(?:个)?(?:内置)?分析器/g, expected: () => new Set([30]) },
+  { label: 'analyzer count', pattern: /(\d{1,3})\s*(?:个)?(?:内置)?分析器/g, expected: () => liveAnalyzerFigures() },
   { label: 'pillar count', pattern: /(\d)\s*大支柱/g, expected: () => new Set([6]) },
 ]);
+
+/**
+ * Collects every built-in analyzer total a document may legitimately quote.
+ *
+ * The figure is read from the router's registry rather than remembered here: a hand-written count
+ * goes stale the moment a pack is added, and the resulting failure reads as a document defect when
+ * the document is right and the guard is wrong.
+ *
+ * @returns {Set<number>} Live analyzer count.
+ */
+function liveAnalyzerFigures() {
+  const { countBuiltinAnalyzers } = require('./sync-doc-metrics');
+  const live = countBuiltinAnalyzers();
+  return live > 0 ? new Set([live]) : new Set();
+}
 
 /**
  * Collects every rule total a document may legitimately quote.

@@ -144,6 +144,7 @@ export {
     ANALYZER_FRONTEND,
     ANALYZER_PRODUCTION_HYGIENE,
     ANALYZER_CLIENT_EXPOSURE,
+    ANALYZER_SHELL_SAFETY,
 } from '../constants/rule-codes';
 
 /**  */
@@ -644,6 +645,8 @@ export const DEDUCTION_GATE_STANDARDIZATION = 12;
 export const DEDUCTION_SHELL_ERROR_DISCIPLINE = 12;
 /** Points deducted for shell script standardization or non-interactive guard breach. */
 export const DEDUCTION_SHELL_STANDARDIZATION = 10;
+/** Points deducted for a recursive delete whose operand traces to a root or home expression. */
+export const DEDUCTION_DESTRUCTIVE_OPERAND = 25;
 
 /** Points deducted for code simplification maintainability defects. */
 export const DEDUCTION_SIMPLIFY_MAINTAINABILITY = 10;

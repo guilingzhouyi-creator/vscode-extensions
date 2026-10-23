@@ -77,6 +77,8 @@ export const ANALYZER_FRONTEND = 'frontend';
 export const ANALYZER_PRODUCTION_HYGIENE = 'production-hygiene';
 /** Built-in analyzer name for client-exposure. */
 export const ANALYZER_CLIENT_EXPOSURE = 'client-exposure';
+/** Built-in analyzer name for shell-safety. */
+export const ANALYZER_SHELL_SAFETY = 'shell-safety';
 
 // Domain / Specialized analyzer identifiers
 /** Built-in / domain analyzer name for config. */
@@ -98,7 +100,7 @@ export const ANALYZER_STANDARDIZATION = 'standardization';
 /** Built-in / domain analyzer name for praxis. */
 export const ANALYZER_PRAXIS = 'praxis';
 
-/** Complete collection of built-in analyzer identifiers (30 built-in analyzers). */
+/** Complete collection of built-in analyzer identifiers (31 built-in analyzers). */
 export const BUILTIN_ANALYZERS = Object.freeze([
     ANALYZER_CONSTANTS,
     ANALYZER_LARGE_FILE,
@@ -130,6 +132,7 @@ export const BUILTIN_ANALYZERS = Object.freeze([
     ANALYZER_FRONTEND,
     ANALYZER_PRODUCTION_HYGIENE,
     ANALYZER_CLIENT_EXPOSURE,
+    ANALYZER_SHELL_SAFETY,
 ] as const);
 
 // ============================================================================

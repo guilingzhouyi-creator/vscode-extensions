@@ -505,6 +505,8 @@ export const ScoringRationales = {
         `Shell script error discipline or trap exit guard breached: ${msg}`,
     SHELL_STANDARDIZATION: (msg: string) =>
         `Shell script standardization or non-interactive guard breach: ${msg}`,
+    DESTRUCTIVE_OPERAND: (msg: string) =>
+        `Destructive delete operand provenance or automatic variable shadow breach: ${msg}`,
 
     // ── Code Simplification & Structure Smells ──────────────────────────────────
     SIMPLIFY_MAINTAINABILITY: (msg: string) => `Code simplification maintainability defect: ${msg}`,

@@ -67,6 +67,7 @@ import {
     ANALYZER_FRONTEND,
     ANALYZER_PRODUCTION_HYGIENE,
     ANALYZER_CLIENT_EXPOSURE,
+    ANALYZER_SHELL_SAFETY,
 } from '../scoring/dimensionLiterals';
 import {
     applySemanticAndSecurityLevels,
@@ -97,6 +98,7 @@ export const BUILTIN_ANALYZERS = [
     // Stage 0: Physical Hygiene & Critical Security
     ANALYZER_HYGIENE,
     ANALYZER_SHELL_LINT,
+    ANALYZER_SHELL_SAFETY,
     ANALYZER_LARGE_FILE,
     ANALYZER_SECRETS,
     ANALYZER_SECURITY,

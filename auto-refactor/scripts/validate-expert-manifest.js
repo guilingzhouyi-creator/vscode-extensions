@@ -34,8 +34,8 @@ console.log('=== Validating MoE Expert Manifest Integrity (C-01, C-02, C-04, N-0
 assert(Array.isArray(EXPERT_MANIFEST), 'EXPERT_MANIFEST must be an array');
 assert.strictEqual(
   EXPERT_MANIFEST.length,
-  30,
-  `Expected exactly 30 experts, found ${EXPERT_MANIFEST.length}`,
+  31,
+  `Expected exactly 31 experts, found ${EXPERT_MANIFEST.length}`,
 );
 
 // 1. Validate manifest integrity constraints

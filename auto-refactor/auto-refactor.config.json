@@ -70,6 +70,9 @@
     "hygiene": {
       "enabled": true
     },
+    "shell-safety": {
+      "enabled": true
+    },
     "simplify": {
       "enabled": true
     },

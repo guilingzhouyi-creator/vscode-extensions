@@ -49,6 +49,7 @@ import {
     ANALYZER_NAMING,
     ANALYZER_GATE_ARCHITECTURE,
     ANALYZER_SHELL_LINT,
+    ANALYZER_SHELL_SAFETY,
     ANALYZER_SIMPLIFY,
     ANALYZER_GO_MODERN,
     RULE_CPX_TIME_001,
@@ -133,6 +134,8 @@ import {
     DEDUCTION_GATE_STANDARDIZATION,
     DEDUCTION_SHELL_ERROR_DISCIPLINE,
     DEDUCTION_SHELL_STANDARDIZATION,
+    DEDUCTION_DESTRUCTIVE_OPERAND,
+    DIMENSION_CODE_SECURITY,
     DEDUCTION_SIMPLIFY_MAINTAINABILITY,
     DEDUCTION_SIMPLIFY_COMMENT,
     DEDUCTION_SIMPLIFY_STANDARDIZATION,
@@ -722,6 +725,22 @@ export const DIMENSION_RULES: DimensionRule[] = [
         dimension: DIMENSION_STANDARDIZATION,
         points: DEDUCTION_SHELL_STANDARDIZATION,
         rationale: ScoringRationales.SHELL_STANDARDIZATION,
+    },
+
+    // ── Destructive Delete Operand Provenance ────────────────────────────────────
+    {
+        analyzer: ANALYZER_SHELL_SAFETY,
+        covers: ruleMatches(['GUARD-DESTR-001'], ['destr']),
+        dimension: DIMENSION_CODE_SECURITY,
+        points: DEDUCTION_DESTRUCTIVE_OPERAND,
+        rationale: ScoringRationales.DESTRUCTIVE_OPERAND,
+    },
+    {
+        analyzer: ANALYZER_SHELL_SAFETY,
+        covers: ruleMatches(['GUARD-VAR-001'], ['var']),
+        dimension: DIMENSION_STANDARDIZATION,
+        points: DEDUCTION_GATE_STANDARDIZATION,
+        rationale: ScoringRationales.GATE_STANDARDIZATION_INTEGRITY,
     },
 
     // ── Code Simplification & Structure Smells ──────────────────────────────────

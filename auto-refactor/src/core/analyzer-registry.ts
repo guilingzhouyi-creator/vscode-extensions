@@ -43,6 +43,7 @@ import { GateArchitectureAnalyzer } from '../analyzers/gate-architecture';
 import { FrontendAnalyzer } from '../analyzers/frontend';
 import { ProductionHygieneAnalyzer } from '../analyzers/production-hygiene';
 import { ClientExposureAnalyzer } from '../analyzers/client-exposure';
+import { ShellSafetyAnalyzer } from '../analyzers/shell-safety';
 
 /** Resolved metadata and fresh instance factory for a declared analyzer. */
 export interface ResolvedAnalyzer {
@@ -66,6 +67,7 @@ const ANALYZER_MODULE_PREFIX = '../analyzers/';
 const ANALYZER_NAMES_TEMPLATE = `
 hygiene
 shell-lint
+shell-safety
 large-file
 secrets
 security
@@ -99,6 +101,7 @@ governance
 const ANALYZER_CLASSES: AnalyzerConstructor[] = [
     HygieneAnalyzer,
     ShellLintAnalyzer,
+    ShellSafetyAnalyzer,
     LargeFileAnalyzer,
     SecretsAnalyzer,
     SecurityAnalyzer,
