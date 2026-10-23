@@ -728,10 +728,10 @@ export const POPOVICIU_MAX_SIGMA = 50.0;
 
 /**
  * Default maximum dispersion penalty ratio gamma in [0, 1].
- * Setting gamma = 0.5 ensures that even under extreme bimodal catastrophe
- * (e.g. 50% perfect 100s and 50% complete 0s, yielding sigma_S = 50.0),
+ * Setting gamma = 0.5 ensures that even under maximal bimodal divergence
+ * (for example, half 100s and half 0s, yielding sigma_S = 50.0),
  * the dispersion discount factor D drops from 1.0 down to 0.5 (a 50% penalty),
- * preserving 50% of the authentic underlying asset quality.
+ * preserving 50% of the underlying asset quality.
  */
 export const DEFAULT_DISPERSION_PENALTY_RATIO = 0.5;
 
@@ -741,7 +741,8 @@ export const DEFAULT_DISPERSION_PENALTY_RATIO = 0.5;
  * Mathematical formulation:
  * S_{\text{mean}} = \frac{\sum w_i \cdot s_i}{\sum w_i}
  * \sigma_S = \sqrt{\frac{\sum w_i \cdot (s_i - S_{\text{mean}})^2}{\sum w_i}}
- * \tilde{\sigma}_S = \frac{\sigma_S}{\sigma_{\max}}, \quad \sigma_{\max} = 50.0 \quad (\text{Popoviciu, 1935})
+ * \tilde{\sigma}_S = \frac{\sigma_S}{\sigma_{\max}}, \quad
+ *   \sigma_{\max} = 50.0 \quad (\text{Popoviciu, 1935})
  * D = \max\left(0, 1.0 - \tilde{\sigma}_S \cdot \gamma\right), \quad \gamma = 0.5
  * P_{\text{polyglot}} = S_{\text{mean}} \cdot D
  *

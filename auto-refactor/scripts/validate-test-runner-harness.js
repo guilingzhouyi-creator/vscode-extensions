@@ -14,7 +14,7 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
-const { runValidationSuite, createTempTestDir, cleanupTempDir } = require('./common/test-runner-harness');
+const { runValidationSuite } = require('./common/test-runner-harness');
 
 async function main() {
     let observedTempDir = '';

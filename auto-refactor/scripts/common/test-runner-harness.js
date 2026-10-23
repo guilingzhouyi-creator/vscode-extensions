@@ -4,7 +4,7 @@
  * Architecture Role: Shared verification infrastructure providing isolated temporary
  *     workspaces, synthetic fixture deployment, deterministic timer measurement,
  *     and standardized assertion runners across all validator scripts.
- * Dependencies & Triggers: Node.js standard libraries (fs, path, os, assert);
+ * Dependencies & Triggers: Node.js standard libraries (fs, path, os);
  *     imported by scripts/validate-*.js test suites.
  * Responsibilities: Provide clean temporary workspaces for scanner tests; automate
  *     fixture creation and teardown; eliminate boilerplate clone smells (HYG-CLN-001);
@@ -15,7 +15,6 @@
  */
 'use strict';
 
-const assert = require('assert');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -43,7 +42,7 @@ function cleanupTempDir(dirPath) {
     try {
         fs.rmSync(dirPath, { recursive: true, force: true });
     } catch {
-        // Suppress transient Windows file lock errors during teardown
+        // best-effort: ignore transient Windows file lock errors during teardown
     }
 }
 

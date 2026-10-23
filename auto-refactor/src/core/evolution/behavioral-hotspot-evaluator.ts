@@ -129,90 +129,238 @@ export interface HotspotEvaluatorOptions {
     nowTimestamp?: number;
 }
 
+// ── Weight Defaults ─────────────────────────────────────────────────────────
 const DEFAULT_WEIGHT_COMPLEXITY = 0.4;
 const DEFAULT_WEIGHT_ELOC = 0.3;
 const DEFAULT_WEIGHT_DEFECTS = 0.3;
+
+// ── Normalization Half-Points ───────────────────────────────────────────────
 const DEFAULT_ACTIVITY_HALF_POINT = 10;
 const DEFAULT_COMPLEXITY_HALF_POINT = 20;
 const DEFAULT_ELOC_HALF_POINT = 600;
 const DEFAULT_DEFECT_HALF_POINT = 5;
-const DEFAULT_MAX_INTEREST_MULTIPLIER = 5.0;
 const CHURN_LINES_HALF_POINT = 200;
+
+// ── Scaling, Ceilings, and Baselines ─────────────────────────────────────────
+const DEFAULT_MAX_INTEREST_MULTIPLIER = 5.0;
+const BASE_INTEREST_MULTIPLIER = 1.0;
+const SCORE_SCALE_MAX = 100.0;
+const SCORE_SCALE_MIN = 0.0;
+const DEFAULT_CYCLOMATIC_COMPLEXITY = 1;
+const FALLBACK_DEFECT_COUNT = 0;
+const FALLBACK_FILE_PATH = 'unknown';
+
+// ── Time Windows and Intervals ──────────────────────────────────────────────
 const MILLIS_PER_DAY = 24 * 60 * 60 * 1000;
 const WINDOW_30_DAYS_MS = 30 * MILLIS_PER_DAY;
 const WINDOW_7_DAYS_MS = 7 * MILLIS_PER_DAY;
+const DAYS_IN_WEEK = 7;
+const DAYS_IN_MONTH = 30;
+const MIN_COMMITS_BASELINE_RATE = 1 / DAYS_IN_MONTH;
+
+// ── Statistical and Precision Standards ─────────────────────────────────────
+const PRECISION_STATISTICAL = 4;
+const PRECISION_VELOCITY = 2;
+const PRECISION_SCORE = 1;
+const ENTROPY_MIN_VALUE = 0.0;
+const ENTROPY_MAX_VALUE = 1.0;
+const PRIMARY_RATIO_MONOPOLY = 1.0;
+
+// ── Severity Thresholds ─────────────────────────────────────────────────────
+const SEVERITY_CRITICAL_SCORE_THRESHOLD = 60;
+const SEVERITY_CRITICAL_MULTIPLIER_THRESHOLD = 3.0;
+const SEVERITY_HIGH_SCORE_THRESHOLD = 40;
+const SEVERITY_HIGH_MULTIPLIER_THRESHOLD = 2.0;
+const SEVERITY_MEDIUM_SCORE_THRESHOLD = 20;
+const SEVERITY_MEDIUM_MULTIPLIER_THRESHOLD = 1.4;
+
+// ── Severity Tier Identifiers ───────────────────────────────────────────────
+const SEVERITY_CRITICAL: HotspotSeverity = 'critical';
+const SEVERITY_HIGH: HotspotSeverity = 'high';
+const SEVERITY_MEDIUM: HotspotSeverity = 'medium';
+const SEVERITY_LOW: HotspotSeverity = 'low';
+
+// ── Recommendation Thresholds ───────────────────────────────────────────────
+const RECOMMENDATION_SPLIT_ELOC_THRESHOLD = 800;
+const RECOMMENDATION_SPLIT_CC_THRESHOLD = 30;
+const RECOMMENDATION_COVERAGE_DEFECT_THRESHOLD = 3;
+const RECOMMENDATION_COVERAGE_COMMITS_THRESHOLD = 5;
+
+// ── Action Recommendations ──────────────────────────────────────────────────
+const ACTION_IMMEDIATE_REFACTOR = 'immediate_refactor';
+const ACTION_SPLIT_MODULE = 'split_module';
+const ACTION_ADD_TEST_COVERAGE = 'add_test_coverage';
+const ACTION_MONITOR = 'monitor';
+
+// ── Burst Spike Modifier Constants ──────────────────────────────────────────
+const BURST_ACCELERATION_THRESHOLD = 2.0;
+const BURST_MIN_COMMITS_7_DAYS = 3;
+const BURST_SPIKE_MULTIPLIER_FACTOR = 1.25;
+
+// ── Author Diffusion Modifier Constants ─────────────────────────────────────
+const DIFFUSION_ENTROPY_THRESHOLD = 0.75;
+const DIFFUSION_MIN_COMMITS_30_DAYS = 10;
+const DIFFUSION_MULTIPLIER_FACTOR = 1.15;
+
+// ── Rapid Decay Modifier Constants ──────────────────────────────────────────
+const ACCELERATION_BASELINE = 1.0;
+const DECAY_DEFECT_WEIGHT = 0.5;
+const RAPID_DECAY_VELOCITY_THRESHOLD = 2.0;
+const RAPID_DECAY_MIN_DEFECTS = 2;
+const RAPID_DECAY_MULTIPLIER_FACTOR = 1.15;
+
+// ── Developer Congestion Modifier Constants ─────────────────────────────────
+const MIN_CONGESTION_AUTHOR_COUNT = 2;
+const CONGESTION_MIN_AUTHORS = 4;
+const CONGESTION_MIN_COMMITS_30_DAYS = 8;
+const CONGESTION_MULTIPLIER_FACTOR = 1.15;
+
+// ── Activity Scoring Weights and Factors ────────────────────────────────────
+const ACTIVITY_COMMIT_WEIGHT = 0.7;
+const ACTIVITY_CHURN_WEIGHT = 0.3;
+const ACTIVITY_EXPONENT_FACTOR = 0.8;
+
+// ── Diagnostics and Textual Annotations ─────────────────────────────────────
+const ANNOTATION_BURST_SPIKE =
+    '[BURST SPIKE: Short-term commit frequency accelerating]';
+const ANNOTATION_AUTHOR_DIFFUSION =
+    '[AUTHOR DIFFUSION: Highly fragmented ownership across concurrent contributors]';
+const ANNOTATION_RAPID_DECAY =
+    '[RAPID DECAY: Code health deteriorating rapidly under high churn acceleration and defects]';
+const DEFAULT_MONITOR_SUMMARY =
+    'Current complexity and churn are within manageable bounds. Monitor in release cycles.';
+const DEFAULT_BASELINE_SUMMARY =
+    'Baseline status; insufficient behavioral or complexity history available.';
+
+/**
+ * Helper to compute Shannon entropy from an array of positive counts and total sum.
+ *
+ * @param counts - Array of positive commit counts.
+ * @param totalSum - Total sum of all counts.
+ * @returns Normalized Shannon entropy in [0.0, 1.0].
+ */
+function computeShannonEntropy(counts: number[], totalSum: number): number {
+    let shannon = 0;
+    const activeAuthorCount = counts.length;
+    for (let i = 0; i < activeAuthorCount; i++) {
+        const commitShare = counts[i] / totalSum;
+        if (commitShare > 0) {
+            shannon -= commitShare * Math.log2(commitShare);
+        }
+    }
+    const maxTheoreticalEntropy = Math.log2(activeAuthorCount);
+    return maxTheoreticalEntropy > 0 ? shannon / maxTheoreticalEntropy : ENTROPY_MIN_VALUE;
+}
 
 /**
  * Calculate Shannon entropy and dominant author ratio over author commit counts.
  * Returns normalized entropy in [0.0, 1.0], where 0 indicates single-owner monopoly
  * and 1.0 indicates maximum dispersion/fragmentation across multiple authors.
+ *
+ * @param authorCounts - Mapping of author identifier to commit count.
+ * @returns Object with normalized entropy and dominant author ratio.
  */
 export function calculateAuthorEntropy(authorCounts?: Record<string, number>): {
     entropy: number;
     primaryAuthorRatio: number;
 } {
     if (!authorCounts || typeof authorCounts !== 'object') {
-        return { entropy: 0.0, primaryAuthorRatio: 1.0 };
+        return { entropy: ENTROPY_MIN_VALUE, primaryAuthorRatio: PRIMARY_RATIO_MONOPOLY };
     }
 
     const counts = Object.values(authorCounts).filter((c) => typeof c === 'number' && c > 0);
-    const n = counts.length;
-    if (n <= 1) {
-        return { entropy: 0.0, primaryAuthorRatio: 1.0 };
+    const activeAuthorCount = counts.length;
+    if (activeAuthorCount <= 1) {
+        return { entropy: ENTROPY_MIN_VALUE, primaryAuthorRatio: PRIMARY_RATIO_MONOPOLY };
     }
 
-    let total = 0;
-    let maxCount = 0;
-    for (let i = 0; i < n; i++) {
-        const c = counts[i];
-        total += c;
-        if (c > maxCount) {
-            maxCount = c;
+    let totalCommitSum = 0;
+    let dominantAuthorCommitCount = 0;
+    for (let i = 0; i < activeAuthorCount; i++) {
+        const commitCount = counts[i];
+        totalCommitSum += commitCount;
+        if (commitCount > dominantAuthorCommitCount) {
+            dominantAuthorCommitCount = commitCount;
         }
     }
 
-    if (total <= 0) {
-        return { entropy: 0.0, primaryAuthorRatio: 1.0 };
+    if (totalCommitSum <= 0) {
+        return { entropy: ENTROPY_MIN_VALUE, primaryAuthorRatio: PRIMARY_RATIO_MONOPOLY };
     }
 
-    let shannon = 0;
-    for (let i = 0; i < n; i++) {
-        const p = counts[i] / total;
-        if (p > 0) {
-            shannon -= p * Math.log2(p);
-        }
-    }
-
-    const maxEntropy = Math.log2(n);
-    const normalizedEntropy = maxEntropy > 0 ? shannon / maxEntropy : 0.0;
-    const primaryRatio = maxCount / total;
+    const normalizedEntropy = computeShannonEntropy(counts, totalCommitSum);
+    const primaryAuthorRatio = dominantAuthorCommitCount / totalCommitSum;
 
     return {
-        entropy: +Math.min(1.0, Math.max(0.0, normalizedEntropy)).toFixed(4),
-        primaryAuthorRatio: +Math.min(1.0, Math.max(0.0, primaryRatio)).toFixed(4),
+        entropy: +Math.min(
+            ENTROPY_MAX_VALUE,
+            Math.max(ENTROPY_MIN_VALUE, normalizedEntropy),
+        ).toFixed(PRECISION_STATISTICAL),
+        primaryAuthorRatio: +Math.min(
+            ENTROPY_MAX_VALUE,
+            Math.max(ENTROPY_MIN_VALUE, primaryAuthorRatio),
+        ).toFixed(PRECISION_STATISTICAL),
     };
 }
 
-function sanitizeNonNegative(val: unknown, fallback = 0): number {
-    if (typeof val !== 'number' || Number.isNaN(val) || !Number.isFinite(val) || val < 0) {
-        return fallback;
+/**
+ * Sanitizes an unknown input candidate into a non-negative finite numeric value.
+ *
+ * @param candidateValue - Raw input to validate.
+ * @param fallbackValue - Fallback number if validation fails.
+ * @returns Validated non-negative number.
+ */
+function sanitizeNonNegative(candidateValue: unknown, fallbackValue = 0): number {
+    if (
+        typeof candidateValue !== 'number' ||
+        Number.isNaN(candidateValue) ||
+        !Number.isFinite(candidateValue) ||
+        candidateValue < 0
+    ) {
+        return fallbackValue;
     }
-    return val;
+    return candidateValue;
 }
 
-function resolveHotspotSeverity(hotspotScore: number, interestMultiplier: number): HotspotSeverity {
-    if (hotspotScore >= 60 || interestMultiplier >= 3.0) {
-        return 'critical';
+/**
+ * Resolves severity classification from composite hotspot score and interest multiplier.
+ *
+ * @param hotspotScore - Normalized composite score in [0.0, 100.0].
+ * @param interestMultiplier - Compounding interest multiplier in [1.0, maxCap].
+ * @returns HotspotSeverity classification.
+ */
+function resolveHotspotSeverity(
+    hotspotScore: number,
+    interestMultiplier: number,
+): HotspotSeverity {
+    if (
+        hotspotScore >= SEVERITY_CRITICAL_SCORE_THRESHOLD ||
+        interestMultiplier >= SEVERITY_CRITICAL_MULTIPLIER_THRESHOLD
+    ) {
+        return SEVERITY_CRITICAL;
     }
-    if (hotspotScore >= 40 || interestMultiplier >= 2.0) {
-        return 'high';
+    if (
+        hotspotScore >= SEVERITY_HIGH_SCORE_THRESHOLD ||
+        interestMultiplier >= SEVERITY_HIGH_MULTIPLIER_THRESHOLD
+    ) {
+        return SEVERITY_HIGH;
     }
-    if (hotspotScore >= 20 || interestMultiplier >= 1.4) {
-        return 'medium';
+    if (
+        hotspotScore >= SEVERITY_MEDIUM_SCORE_THRESHOLD ||
+        interestMultiplier >= SEVERITY_MEDIUM_MULTIPLIER_THRESHOLD
+    ) {
+        return SEVERITY_MEDIUM;
     }
-    return 'low';
+    return SEVERITY_LOW;
 }
 
+/**
+ * Resolves actionable refactoring recommendation for an identified behavioral hotspot.
+ *
+ * @param severity - Classified hotspot severity tier.
+ * @param metrics - Cleaned file hotspot metric snapshot.
+ * @returns Actionable HotspotRecommendation.
+ */
 function resolveHotspotRecommendation(
     severity: HotspotSeverity,
     metrics: {
@@ -223,37 +371,50 @@ function resolveHotspotRecommendation(
         defectCount: number;
     },
 ): HotspotRecommendation {
-    if (severity === 'critical') {
+    if (severity === SEVERITY_CRITICAL) {
         return {
-            action: 'immediate_refactor',
+            action: ACTION_IMMEDIATE_REFACTOR,
             summary:
                 `Critical behavioral hotspot with high churn (${metrics.commits30Days} commits in 30d) ` +
                 `and compounded debt (CC: ${metrics.cyclomaticComplexity}, ELOC: ${metrics.eloc}, defects: ${metrics.defectCount}). ` +
                 `Immediate modular decomposition required to halt compounding debt interest.`,
         };
     }
-    if (metrics.eloc > 800 || metrics.cyclomaticComplexity > 30) {
+    if (
+        metrics.eloc > RECOMMENDATION_SPLIT_ELOC_THRESHOLD ||
+        metrics.cyclomaticComplexity > RECOMMENDATION_SPLIT_CC_THRESHOLD
+    ) {
         return {
-            action: 'split_module',
+            action: ACTION_SPLIT_MODULE,
             summary:
                 `File exceeds maintainability thresholds (ELOC: ${metrics.eloc}, CC: ${metrics.cyclomaticComplexity}) ` +
                 `in active development. Decompose into focused single-responsibility submodules.`,
         };
     }
-    if (metrics.defectCount >= 3 && metrics.commits30Days >= 5) {
+    if (
+        metrics.defectCount >= RECOMMENDATION_COVERAGE_DEFECT_THRESHOLD &&
+        metrics.commits30Days >= RECOMMENDATION_COVERAGE_COMMITS_THRESHOLD
+    ) {
         return {
-            action: 'add_test_coverage',
+            action: ACTION_ADD_TEST_COVERAGE,
             summary:
                 `Elevated defect count (${metrics.defectCount}) with ongoing modifications. ` +
                 `Establish comprehensive regression tests before further feature expansion.`,
         };
     }
     return {
-        action: 'monitor',
-        summary: `Current complexity and churn are within manageable bounds. Monitor in release cycles.`,
+        action: ACTION_MONITOR,
+        summary: DEFAULT_MONITOR_SUMMARY,
     };
 }
 
+/** Clean metric subset required by evolution modifiers. */
+interface ModifierCleanMetrics {
+    readonly commits30Days: number;
+    readonly defectCount: number;
+}
+
+/** Full composite evolution modifier state record. */
 interface EvolutionModifierState {
     effectiveMultiplier: number;
     burstSpike: boolean;
@@ -267,114 +428,212 @@ interface EvolutionModifierState {
     annotations: string[];
 }
 
+/** State tracking accumulated interest multipliers and diagnostics. */
 interface ModifierAccumulator {
     effectiveMultiplier: number;
-    annotations: string[];
+    readonly annotations: string[];
 }
 
+/** Context parameters for evaluating burst spikes (SIM-ARGS-001). */
+interface BurstSpikeParams {
+    readonly accumulator: ModifierAccumulator;
+    readonly input: FileHotspotInput;
+    readonly cleanMetrics: ModifierCleanMetrics;
+    readonly maxCap: number;
+}
+
+/** Context parameters for evaluating author diffusion (SIM-ARGS-001). */
+interface AuthorDiffusionParams {
+    readonly accumulator: ModifierAccumulator;
+    readonly input: FileHotspotInput;
+    readonly cleanMetrics: ModifierCleanMetrics;
+    readonly maxCap: number;
+}
+
+/** Context parameters for evaluating rapid code health decay (SIM-ARGS-001). */
+interface RapidDecayParams {
+    readonly accumulator: ModifierAccumulator;
+    readonly churnAcceleration: number;
+    readonly cleanMetrics: ModifierCleanMetrics;
+    readonly maxCap: number;
+}
+
+/** Context parameters for evaluating developer congestion (SIM-ARGS-001). */
+interface DeveloperCongestionParams {
+    readonly accumulator: ModifierAccumulator;
+    readonly authorCount: number;
+    readonly cleanMetrics: ModifierCleanMetrics;
+    readonly maxCap: number;
+}
+
+/** Parameter object for evolution modifier calculations (SIM-ARGS-001). */
+interface EvolutionModifierParams {
+    readonly baseMultiplier: number;
+    readonly input: FileHotspotInput;
+    readonly cleanMetrics: ModifierCleanMetrics;
+    readonly maxCap: number;
+}
+
+/**
+ * Evaluates short-term burst spike acceleration over a 7-day window.
+ *
+ * @param params - Contextual parameters for burst spike calculation.
+ * @returns Object containing burst spike flag and normalized churn acceleration.
+ */
 function evaluateBurstSpike(
-    acc: ModifierAccumulator,
-    input: FileHotspotInput,
-    cleanMetrics: { commits30Days: number; defectCount: number },
-    maxCap: number,
+    params: BurstSpikeParams,
 ): { burstSpike: boolean; churnAcceleration: number } {
     let burstSpike = false;
-    let churnAcceleration = 1.0;
+    let churnAcceleration = ACCELERATION_BASELINE;
+    const { accumulator, input, cleanMetrics, maxCap } = params;
+
     if (typeof input.commits7Days === 'number' && input.commits7Days > 0) {
         const safeCommits7 = sanitizeNonNegative(input.commits7Days);
-        const rate7 = safeCommits7 / 7;
-        const rate30 = Math.max(1 / 30, cleanMetrics.commits30Days / 30);
-        churnAcceleration = +(rate7 / rate30).toFixed(2);
-        if (churnAcceleration >= 2.0 && safeCommits7 >= 3) {
+        const rate7 = safeCommits7 / DAYS_IN_WEEK;
+        const rate30 = Math.max(MIN_COMMITS_BASELINE_RATE, cleanMetrics.commits30Days / DAYS_IN_MONTH);
+        churnAcceleration = +(rate7 / rate30).toFixed(PRECISION_VELOCITY);
+        if (churnAcceleration >= BURST_ACCELERATION_THRESHOLD && safeCommits7 >= BURST_MIN_COMMITS_7_DAYS) {
             burstSpike = true;
-            acc.effectiveMultiplier = +Math.min(maxCap, acc.effectiveMultiplier * 1.25).toFixed(2);
-            acc.annotations.push('[BURST SPIKE: Short-term commit frequency accelerating]');
+            accumulator.effectiveMultiplier = +Math.min(
+                maxCap,
+                accumulator.effectiveMultiplier * BURST_SPIKE_MULTIPLIER_FACTOR,
+            ).toFixed(PRECISION_VELOCITY);
+            accumulator.annotations.push(ANNOTATION_BURST_SPIKE);
         }
     }
     return { burstSpike, churnAcceleration };
 }
 
+/**
+ * Evaluates author diffusion where ownership is heavily fragmented across contributors.
+ *
+ * @param params - Contextual parameters for author diffusion evaluation.
+ * @returns Whether code ownership exhibits high author diffusion.
+ */
 function evaluateAuthorDiffusion(
-    acc: ModifierAccumulator,
-    input: FileHotspotInput,
-    cleanMetrics: { commits30Days: number; defectCount: number },
-    maxCap: number,
+    params: AuthorDiffusionParams,
 ): boolean {
+    const { accumulator, input, cleanMetrics, maxCap } = params;
     if (
         typeof input.authorEntropy === 'number' &&
-        input.authorEntropy >= 0.75 &&
-        cleanMetrics.commits30Days >= 10
+        input.authorEntropy >= DIFFUSION_ENTROPY_THRESHOLD &&
+        cleanMetrics.commits30Days >= DIFFUSION_MIN_COMMITS_30_DAYS
     ) {
-        acc.effectiveMultiplier = +Math.min(maxCap, acc.effectiveMultiplier * 1.15).toFixed(2);
-        acc.annotations.push('[AUTHOR DIFFUSION: Highly fragmented ownership across concurrent contributors]');
+        accumulator.effectiveMultiplier = +Math.min(
+            maxCap,
+            accumulator.effectiveMultiplier * DIFFUSION_MULTIPLIER_FACTOR,
+        ).toFixed(PRECISION_VELOCITY);
+        accumulator.annotations.push(ANNOTATION_AUTHOR_DIFFUSION);
         return true;
     }
     return false;
 }
 
+/**
+ * Evaluates rapid code health decay under compounding churn acceleration and defect density.
+ *
+ * @param params - Contextual parameters for rapid decay calculation.
+ * @returns Object containing rapid decay flag and computed decay velocity.
+ */
 function evaluateRapidDecay(
-    acc: ModifierAccumulator,
-    churnAcceleration: number,
-    cleanMetrics: { commits30Days: number; defectCount: number },
-    maxCap: number,
+    params: RapidDecayParams,
 ): { rapidDecay: boolean; decayVelocity: number } {
     let rapidDecay = false;
-    let decayVelocity = 1.0;
-    if (churnAcceleration > 1.0) {
+    let decayVelocity = ACCELERATION_BASELINE;
+    const { accumulator, churnAcceleration, cleanMetrics, maxCap } = params;
+
+    if (churnAcceleration > ACCELERATION_BASELINE) {
         const defectRatio = cleanMetrics.defectCount / Math.max(1, cleanMetrics.commits30Days);
-        decayVelocity = +(churnAcceleration * (1.0 + defectRatio * 0.5)).toFixed(2);
-        if (decayVelocity >= 2.0 && cleanMetrics.defectCount >= 2) {
+        decayVelocity = +(churnAcceleration * (1.0 + defectRatio * DECAY_DEFECT_WEIGHT)).toFixed(
+            PRECISION_VELOCITY,
+        );
+        if (decayVelocity >= RAPID_DECAY_VELOCITY_THRESHOLD && cleanMetrics.defectCount >= RAPID_DECAY_MIN_DEFECTS) {
             rapidDecay = true;
-            acc.effectiveMultiplier = +Math.min(maxCap, acc.effectiveMultiplier * 1.15).toFixed(2);
-            acc.annotations.push('[RAPID DECAY: Code health deteriorating rapidly under high churn acceleration and defects]');
+            accumulator.effectiveMultiplier = +Math.min(
+                maxCap,
+                accumulator.effectiveMultiplier * RAPID_DECAY_MULTIPLIER_FACTOR,
+            ).toFixed(PRECISION_VELOCITY);
+            accumulator.annotations.push(ANNOTATION_RAPID_DECAY);
         }
     }
     return { rapidDecay, decayVelocity };
 }
 
+/**
+ * Evaluates developer coordination congestion per Brooks' Law pairwise channels.
+ *
+ * @param params - Contextual parameters for developer congestion evaluation.
+ * @returns Object containing developer congestion flag and active coordination path count.
+ */
 function evaluateDeveloperCongestion(
-    acc: ModifierAccumulator,
-    authorCount: number,
-    cleanMetrics: { commits30Days: number; defectCount: number },
-    maxCap: number,
+    params: DeveloperCongestionParams,
 ): { developerCongestion: boolean; coordinationPaths: number } {
-    const coordinationPaths = authorCount >= 2 ? (authorCount * (authorCount - 1)) / 2 : 0;
+    const { accumulator, authorCount, cleanMetrics, maxCap } = params;
+    const coordinationPaths =
+        authorCount >= MIN_CONGESTION_AUTHOR_COUNT
+            ? (authorCount * (authorCount - 1)) / 2
+            : 0;
     let developerCongestion = false;
-    if (authorCount >= 4 && cleanMetrics.commits30Days >= 8) {
+
+    if (authorCount >= CONGESTION_MIN_AUTHORS && cleanMetrics.commits30Days >= CONGESTION_MIN_COMMITS_30_DAYS) {
         developerCongestion = true;
-        acc.effectiveMultiplier = +Math.min(maxCap, acc.effectiveMultiplier * 1.15).toFixed(2);
-        acc.annotations.push(
+        accumulator.effectiveMultiplier = +Math.min(
+            maxCap,
+            accumulator.effectiveMultiplier * CONGESTION_MULTIPLIER_FACTOR,
+        ).toFixed(PRECISION_VELOCITY);
+        accumulator.annotations.push(
             `[DEVELOPER CONGESTION: Elevated coordination friction with ${authorCount} active authors and ${coordinationPaths} communication channels]`,
         );
     }
     return { developerCongestion, coordinationPaths };
 }
 
+/**
+ * Synthesizes all evolution modifiers into a unified modifier state.
+ *
+ * @param params - Input parameters for computing evolution modifiers.
+ * @returns Unified state record of all applied evolution modifiers.
+ */
 function computeEvolutionModifiers(
-    baseMultiplier: number,
-    input: FileHotspotInput,
-    cleanMetrics: { commits30Days: number; defectCount: number },
-    maxCap: number,
+    params: EvolutionModifierParams,
 ): EvolutionModifierState {
-    const acc: ModifierAccumulator = {
+    const { baseMultiplier, input, cleanMetrics, maxCap } = params;
+    const accumulator: ModifierAccumulator = {
         effectiveMultiplier: baseMultiplier,
         annotations: [],
     };
 
-    const { burstSpike, churnAcceleration } = evaluateBurstSpike(acc, input, cleanMetrics, maxCap);
-    const authorDiffusion = evaluateAuthorDiffusion(acc, input, cleanMetrics, maxCap);
-    const { rapidDecay, decayVelocity } = evaluateRapidDecay(acc, churnAcceleration, cleanMetrics, maxCap);
+    const { burstSpike, churnAcceleration } = evaluateBurstSpike({
+        accumulator,
+        input,
+        cleanMetrics,
+        maxCap,
+    });
+
+    const authorDiffusion = evaluateAuthorDiffusion({
+        accumulator,
+        input,
+        cleanMetrics,
+        maxCap,
+    });
+
+    const { rapidDecay, decayVelocity } = evaluateRapidDecay({
+        accumulator,
+        churnAcceleration,
+        cleanMetrics,
+        maxCap,
+    });
 
     const authorCount = sanitizeNonNegative(input.activeAuthorsCount);
-    const { developerCongestion, coordinationPaths } = evaluateDeveloperCongestion(
-        acc,
+    const { developerCongestion, coordinationPaths } = evaluateDeveloperCongestion({
+        accumulator,
         authorCount,
         cleanMetrics,
         maxCap,
-    );
+    });
 
     return {
-        effectiveMultiplier: acc.effectiveMultiplier,
+        effectiveMultiplier: accumulator.effectiveMultiplier,
         burstSpike,
         churnAcceleration,
         authorDiffusion,
@@ -383,7 +642,7 @@ function computeEvolutionModifiers(
         developerCongestion,
         activeAuthorsCount: authorCount,
         coordinationPaths,
-        annotations: acc.annotations,
+        annotations: accumulator.annotations,
     };
 }
 
@@ -401,6 +660,11 @@ export class BehavioralHotspotEvaluator {
     private readonly maxInterestMultiplier: number;
     private readonly nowTimestamp: number;
 
+    /**
+     * Initializes the BehavioralHotspotEvaluator with configurable weights and half-points.
+     *
+     * @param options - Optional evaluator configuration options.
+     */
     constructor(options?: HotspotEvaluatorOptions) {
         this.weightComplexity = options?.weightComplexity ?? DEFAULT_WEIGHT_COMPLEXITY;
         this.weightEloc = options?.weightEloc ?? DEFAULT_WEIGHT_ELOC;
@@ -416,26 +680,38 @@ export class BehavioralHotspotEvaluator {
 
     /**
      * Compute normalized activity intensity [0.0, 1.0] from 30-day commits and churn.
+     *
+     * @param commits30Days - Number of commits in the 30-day window.
+     * @param churnLines - Lines of code churned in the window.
+     * @returns Normalized activity intensity score in [0.0, 1.0].
      */
     public calculateActivityScore(commits30Days: number, churnLines?: number): number {
         const safeCommits = sanitizeNonNegative(commits30Days);
         const safeChurn = sanitizeNonNegative(churnLines);
 
         if (safeCommits === 0 && safeChurn === 0) {
-            return 0.0;
+            return SCORE_SCALE_MIN;
         }
 
         const commitSaturation = safeCommits / (safeCommits + this.activityHalfPoint);
         if (safeChurn > 0) {
             const churnSaturation = safeChurn / (safeChurn + CHURN_LINES_HALF_POINT);
-            return +(0.7 * commitSaturation + 0.3 * churnSaturation).toFixed(4);
+            return +(
+                ACTIVITY_COMMIT_WEIGHT * commitSaturation +
+                ACTIVITY_CHURN_WEIGHT * churnSaturation
+            ).toFixed(PRECISION_STATISTICAL);
         }
 
-        return +commitSaturation.toFixed(4);
+        return +commitSaturation.toFixed(PRECISION_STATISTICAL);
     }
 
     /**
      * Compute normalized static debt score [0.0, 1.0] from CC, ELOC, and defect count.
+     *
+     * @param cyclomaticComplexity - Aggregate or peak cyclomatic complexity.
+     * @param eloc - Effective lines of code.
+     * @param defectCount - Count of known static or historical defects.
+     * @returns Normalized static debt score in [0.0, 1.0].
      */
     public calculateStaticDebtScore(
         cyclomaticComplexity: number,
@@ -450,27 +726,34 @@ export class BehavioralHotspotEvaluator {
         const normEloc = safeEloc / (safeEloc + this.elocHalfPoint);
         const normDefects = safeDefects / (safeDefects + this.defectHalfPoint);
 
-        const totalWeight = this.weightComplexity + this.weightEloc + this.weightDefects || 1.0;
+        const totalWeight =
+            this.weightComplexity + this.weightEloc + this.weightDefects || BASE_INTEREST_MULTIPLIER;
         const weightedDebt =
             (this.weightComplexity * normCc +
                 this.weightEloc * normEloc +
                 this.weightDefects * normDefects) /
             totalWeight;
 
-        return +Math.min(1.0, Math.max(0.0, weightedDebt)).toFixed(4);
+        return +Math.min(
+            ENTROPY_MAX_VALUE,
+            Math.max(ENTROPY_MIN_VALUE, weightedDebt),
+        ).toFixed(PRECISION_STATISTICAL);
     }
 
     /**
      * Calculate composite Hotspot score [0.0, 100.0] as the intersection of activity and debt.
+     *
+     * @param input - File hotspot metrics input record.
+     * @returns Composite hotspot score in [0.0, 100.0].
      */
     public calculateHotspotScore(input: FileHotspotInput): number {
         if (!input || typeof input !== 'object') {
-            return 0.0;
+            return SCORE_SCALE_MIN;
         }
 
         const activityScore = this.calculateActivityScore(input.commits30Days, input.churnLines);
-        if (activityScore <= 0.0) {
-            return 0.0;
+        if (activityScore <= SCORE_SCALE_MIN) {
+            return SCORE_SCALE_MIN;
         }
 
         const debtScore = this.calculateStaticDebtScore(
@@ -480,22 +763,28 @@ export class BehavioralHotspotEvaluator {
         );
 
         // CodeScene Hotspot principle: Activity x Static Debt
-        const rawScore = 100.0 * Math.pow(activityScore, 0.8) * debtScore;
-        return +Math.min(100.0, Math.max(0.0, rawScore)).toFixed(1);
+        const rawScore = SCORE_SCALE_MAX * Math.pow(activityScore, ACTIVITY_EXPONENT_FACTOR) * debtScore;
+        return +Math.min(
+            SCORE_SCALE_MAX,
+            Math.max(SCORE_SCALE_MIN, rawScore),
+        ).toFixed(PRECISION_SCORE);
     }
 
     /**
      * Calculate technical debt compounding interest multiplier [1.0, maxCap].
      * Represents recurring maintenance tax paid on each change.
+     *
+     * @param input - File hotspot metrics input record.
+     * @returns Compounding interest multiplier in [1.0, maxCap].
      */
     public calculateInterestMultiplier(input: FileHotspotInput): number {
         if (!input || typeof input !== 'object') {
-            return 1.0;
+            return BASE_INTEREST_MULTIPLIER;
         }
 
         const activityScore = this.calculateActivityScore(input.commits30Days, input.churnLines);
-        if (activityScore <= 0.0) {
-            return 1.0;
+        if (activityScore <= SCORE_SCALE_MIN) {
+            return BASE_INTEREST_MULTIPLIER;
         }
 
         const debtScore = this.calculateStaticDebtScore(
@@ -504,17 +793,23 @@ export class BehavioralHotspotEvaluator {
             input.defectCount,
         );
 
-        const spread = Math.max(0.0, this.maxInterestMultiplier - 1.0);
-        const multiplier = 1.0 + spread * (activityScore * debtScore);
-        return +Math.min(this.maxInterestMultiplier, Math.max(1.0, multiplier)).toFixed(2);
+        const spread = Math.max(0.0, this.maxInterestMultiplier - BASE_INTEREST_MULTIPLIER);
+        const multiplier = BASE_INTEREST_MULTIPLIER + spread * (activityScore * debtScore);
+        return +Math.min(
+            this.maxInterestMultiplier,
+            Math.max(BASE_INTEREST_MULTIPLIER, multiplier),
+        ).toFixed(PRECISION_VELOCITY);
     }
 
     /**
      * Evaluate single file hotspot metrics with ranking defaulted to 1.
+     *
+     * @param input - Target file hotspot metrics input.
+     * @returns Full hotspot evaluation result.
      */
     public evaluateSingle(input: FileHotspotInput): HotspotEvaluationResult {
         if (!input || typeof input !== 'object' || typeof input.filePath !== 'string') {
-            return this.createDefaultResult(input?.filePath || 'unknown');
+            return this.createDefaultResult(input?.filePath || FALLBACK_FILE_PATH);
         }
 
         const hotspotScore = this.calculateHotspotScore(input);
@@ -529,33 +824,33 @@ export class BehavioralHotspotEvaluator {
             defectCount: sanitizeNonNegative(input.defectCount),
         };
 
-        const mod = computeEvolutionModifiers(
-            interestMultiplier,
+        const modifierState = computeEvolutionModifiers({
+            baseMultiplier: interestMultiplier,
             input,
             cleanMetrics,
-            this.maxInterestMultiplier,
-        );
+            maxCap: this.maxInterestMultiplier,
+        });
 
         const recommendation = resolveHotspotRecommendation(severity, cleanMetrics);
-        for (let i = 0; i < mod.annotations.length; i++) {
-            recommendation.summary += ' ' + mod.annotations[i];
+        for (const annotation of modifierState.annotations) {
+            recommendation.summary += ' ' + annotation;
         }
 
         return {
             filePath: input.filePath,
             hotspotScore,
-            interestMultiplier: mod.effectiveMultiplier,
+            interestMultiplier: modifierState.effectiveMultiplier,
             rank: 1,
             severity,
-            burstSpike: mod.burstSpike,
-            churnAcceleration: mod.churnAcceleration,
-            decayVelocity: mod.decayVelocity,
-            rapidDecay: mod.rapidDecay,
+            burstSpike: modifierState.burstSpike,
+            churnAcceleration: modifierState.churnAcceleration,
+            decayVelocity: modifierState.decayVelocity,
+            rapidDecay: modifierState.rapidDecay,
             authorEntropy: input.authorEntropy,
-            authorDiffusion: mod.authorDiffusion,
-            activeAuthorsCount: mod.activeAuthorsCount,
-            coordinationPaths: mod.coordinationPaths,
-            developerCongestion: mod.developerCongestion,
+            authorDiffusion: modifierState.authorDiffusion,
+            activeAuthorsCount: modifierState.activeAuthorsCount,
+            coordinationPaths: modifierState.coordinationPaths,
+            developerCongestion: modifierState.developerCongestion,
             metrics: cleanMetrics,
             recommendation,
         };
@@ -563,6 +858,9 @@ export class BehavioralHotspotEvaluator {
 
     /**
      * Evaluate a batch of files and compute relative Hotspot rankings (rank 1 = hottest).
+     *
+     * @param inputs - Array of file hotspot metric inputs.
+     * @returns Sorted and ranked array of evaluation results.
      */
     public evaluateBatch(inputs: FileHotspotInput[]): HotspotEvaluationResult[] {
         if (!Array.isArray(inputs) || inputs.length === 0) {
@@ -570,23 +868,23 @@ export class BehavioralHotspotEvaluator {
         }
 
         const results: HotspotEvaluationResult[] = [];
-        for (const input of inputs) {
-            results.push(this.evaluateSingle(input));
+        for (const candidateInput of inputs) {
+            results.push(this.evaluateSingle(candidateInput));
         }
 
         // Sort descending: highest hotspot score first;
         // tiebreak by interest multiplier then commits
-        results.sort((a, b) => {
-            if (b.hotspotScore !== a.hotspotScore) {
-                return b.hotspotScore - a.hotspotScore;
+        results.sort((resultA, resultB) => {
+            if (resultB.hotspotScore !== resultA.hotspotScore) {
+                return resultB.hotspotScore - resultA.hotspotScore;
             }
-            if (b.interestMultiplier !== a.interestMultiplier) {
-                return b.interestMultiplier - a.interestMultiplier;
+            if (resultB.interestMultiplier !== resultA.interestMultiplier) {
+                return resultB.interestMultiplier - resultA.interestMultiplier;
             }
-            if (b.metrics.commits30Days !== a.metrics.commits30Days) {
-                return b.metrics.commits30Days - a.metrics.commits30Days;
+            if (resultB.metrics.commits30Days !== resultA.metrics.commits30Days) {
+                return resultB.metrics.commits30Days - resultA.metrics.commits30Days;
             }
-            return a.filePath.localeCompare(b.filePath);
+            return resultA.filePath.localeCompare(resultB.filePath);
         });
 
         // Assign ordinal ranks
@@ -599,6 +897,10 @@ export class BehavioralHotspotEvaluator {
 
     /**
      * Evaluate hotspot status from GitFileHistoryProfiles paired with static code metrics.
+     *
+     * @param profiles - Array of mined git file history profiles.
+     * @param staticMetricsMap - Map of file path to static code complexity metrics.
+     * @returns Ranked array of hotspot evaluation results.
      */
     public evaluateFromGitProfiles(
         profiles: GitFileHistoryProfile[],
@@ -615,7 +917,7 @@ export class BehavioralHotspotEvaluator {
         for (const profile of profiles) {
             const staticMetrics = staticMetricsMap.get(profile.filePath) || {
                 eloc: 0,
-                cyclomaticComplexity: 1,
+                cyclomaticComplexity: DEFAULT_CYCLOMATIC_COMPLEXITY,
                 defectCount: profile.bugFixCommits,
             };
 
@@ -644,6 +946,9 @@ export class BehavioralHotspotEvaluator {
 
     /**
      * Count commits within the last 30 days from a GitFileHistoryProfile.
+     *
+     * @param profile - Target git file history profile.
+     * @returns Count of commits within the 30-day window.
      */
     public extract30DayCommitsFromProfile(profile: GitFileHistoryProfile): number {
         if (!profile || !profile.isGitAvailable || !Array.isArray(profile.recentCommits)) {
@@ -662,6 +967,9 @@ export class BehavioralHotspotEvaluator {
 
     /**
      * Count commits within the last 7 days from a GitFileHistoryProfile for burst spike detection.
+     *
+     * @param profile - Target git file history profile.
+     * @returns Count of commits within the 7-day window.
      */
     public extract7DayCommitsFromProfile(profile: GitFileHistoryProfile): number {
         if (!profile || !profile.isGitAvailable || !Array.isArray(profile.recentCommits)) {
@@ -679,22 +987,42 @@ export class BehavioralHotspotEvaluator {
     }
 
     /**
+     * Helper to count distinct active authors within cutoff window.
+     *
+     * @param commits - List of recent commit summaries.
+     * @param cutoffTimestamp - Timestamp threshold.
+     * @returns Count of distinct authors.
+     */
+    private countRecentActiveAuthors(
+        commits: { timestamp: number; author?: string }[],
+        cutoffTimestamp: number,
+    ): number {
+        const activeSet = new Set<string>();
+        for (const commit of commits) {
+            if (commit.timestamp >= cutoffTimestamp && commit.author) {
+                activeSet.add(commit.author);
+            }
+        }
+        return activeSet.size;
+    }
+
+    /**
      * Count distinct active authors contributing within the 30-day window.
+     *
+     * @param profile - Target git file history profile.
+     * @returns Count of unique active authors.
      */
     public extractActiveAuthorsFromProfile(profile: GitFileHistoryProfile): number {
-        if (!profile || !profile.isGitAvailable) {
+        if (!profile?.isGitAvailable) {
             return 0;
         }
         if (Array.isArray(profile.recentCommits) && profile.recentCommits.length > 0) {
-            const cutoffTimestamp = this.nowTimestamp - WINDOW_30_DAYS_MS;
-            const activeSet = new Set<string>();
-            for (const commit of profile.recentCommits) {
-                if (commit.timestamp >= cutoffTimestamp && commit.author) {
-                    activeSet.add(commit.author);
-                }
-            }
-            if (activeSet.size > 0) {
-                return activeSet.size;
+            const count = this.countRecentActiveAuthors(
+                profile.recentCommits,
+                this.nowTimestamp - WINDOW_30_DAYS_MS,
+            );
+            if (count > 0) {
+                return count;
             }
         }
         if (profile.authorCommitCounts && typeof profile.authorCommitCounts === 'object') {
@@ -705,15 +1033,18 @@ export class BehavioralHotspotEvaluator {
 
     /**
      * Produce safe baseline Hotspot evaluation result for unversioned or degraded environments.
+     *
+     * @param filePath - Target file path.
+     * @returns Baseline fallback HotspotEvaluationResult.
      */
     public createDefaultResult(filePath: string): HotspotEvaluationResult {
         return {
             filePath,
-            hotspotScore: 0.0,
-            interestMultiplier: 1.0,
+            hotspotScore: SCORE_SCALE_MIN,
+            interestMultiplier: BASE_INTEREST_MULTIPLIER,
             rank: 1,
-            severity: 'low',
-            decayVelocity: 1.0,
+            severity: SEVERITY_LOW,
+            decayVelocity: ACCELERATION_BASELINE,
             rapidDecay: false,
             developerCongestion: false,
             activeAuthorsCount: 0,
@@ -723,12 +1054,11 @@ export class BehavioralHotspotEvaluator {
                 churnLines: 0,
                 eloc: 0,
                 cyclomaticComplexity: 0,
-                defectCount: 0,
+                defectCount: FALLBACK_DEFECT_COUNT,
             },
             recommendation: {
-                action: 'monitor',
-                summary:
-                    'Baseline status; insufficient behavioral or complexity history available.',
+                action: ACTION_MONITOR,
+                summary: DEFAULT_BASELINE_SUMMARY,
             },
         };
     }
