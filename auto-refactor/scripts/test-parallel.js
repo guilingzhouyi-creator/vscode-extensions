@@ -95,6 +95,7 @@ const PARALLEL_SUITES = [
   { name: 'validate-code-density', script: 'scripts/validate-code-density.js' },
   { name: 'validate-effective-loc', script: 'scripts/validate-effective-loc.js' },
   { name: 'validate-volume-budgets', script: 'scripts/validate-volume-budgets.js' },
+  { name: 'validate-empty-directory-audit', script: 'scripts/validate-empty-directory-audit.js' },
   { name: 'validate-sparse-scheduler', script: 'scripts/validate-sparse-scheduler.js' },
   { name: 'validate-scheduler-pools', script: 'scripts/validate-scheduler-pools.js' },
   { name: 'validate-ring-buffer-bus', script: 'scripts/validate-ring-buffer-bus.js' },

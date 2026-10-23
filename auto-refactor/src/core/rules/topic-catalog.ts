@@ -213,6 +213,7 @@ export const CANONICAL_TOPIC_CATALOG: Readonly<Record<string, readonly string[]>
         'CLN',
         'CLT',
         'DED',
+        'DIR',
         'EMP',
         'EOL',
         'EXC',

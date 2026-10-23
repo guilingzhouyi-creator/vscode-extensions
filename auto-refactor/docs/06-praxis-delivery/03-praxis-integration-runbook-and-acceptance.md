@@ -100,17 +100,17 @@ export const SEMANTIC_OVERLAP_GROUPS: ReadonlyArray<ReadonlySet<string>> = Objec
    - 选举集合内严重度最高的卡片作为唯一主卡展示，其余次级规则写入主卡的 `correlatedRules: string[]` 元数据。
 3. **双端差异化消费原则**：
    - **UI 呈现端**：仅渲染主卡，在折叠标签中显示「同时关联：X 规则」，界面清晰清爽；
-   - **Agent 执行端**：底层仍保留完整的 363 条细粒度规则诊断与 `sourceAgentDirective`，确保 AI 智能体拥有 100% 的准确依据以产出无遗漏的补丁。
+   - **Agent 执行端**：底层仍保留完整的 369 条细粒度规则诊断与 `sourceAgentDirective`，确保 AI 智能体拥有 100% 的准确依据以产出无遗漏的补丁。
 
 ---
 
 ## 4. 交付验收矩阵与全量自动化门禁
 
-Praxis 交付以 <!-- METRICS:BEGIN test-suite-count -->**163 套**<!-- METRICS:END test-suite-count -->自动化门禁套件（158 套独立并行验证套件 + 4 套串行守护进程套件 + vitest 单元套件）为刚性验收基线：
+Praxis 交付以 <!-- METRICS:BEGIN test-suite-count -->**165 套**<!-- METRICS:END test-suite-count -->自动化门禁套件（158 套独立并行验证套件 + 4 套串行守护进程套件 + vitest 单元套件）为刚性验收基线：
 
 | 验收核心域 | 验证命令 / 脚本路径 | 核心断言内容 | 验收标准 |
 | :--- | :--- | :--- | :---: |
-| **规则完整性与注册一致性** | `npm run validate-rules-registry` | 30 个分析器与 363 条注册规则 100% 覆盖无孤儿规则（全工作区 505 条） | **PASS** |
+| **规则完整性与注册一致性** | `npm run validate-rules-registry` | 30 个分析器与 369 条注册规则 100% 覆盖无孤儿规则（全工作区 505 条） | **PASS** |
 | **Praxis 统一 SDK 与双载荷** | `npm run validate-praxis-presentation` | `createPraxisClient` 全工作区、单文件、双载荷与 i18n 汉化 | **PASS** |
 | **11 组语义重叠并查集去重** | `npm run validate-dual-faced-presentation` | 验证并查集 `findRoot`/`union` 正确归并，次级规则沉淀到元数据 | **PASS** |
 | **毫秒级切片与 Sparse MoE 路由** | `npm run validate-self-slice-audit` | 单切片执行时延 **< 10ms**，分析器绕过率 $\ge 70\%$ | **PASS** |
@@ -119,7 +119,7 @@ Praxis 交付以 <!-- METRICS:BEGIN test-suite-count -->**163 套**<!-- METRICS:
 | **Rust N-API 与纯 TS 字节等价性** | `npm run validate-native-parity` | 6 大原生算子与纯 TS Shim 逐字节等价无漂移 | **PASS** |
 | **自研率 CAI 与贝叶斯置信区间** | `npm run validate-autonomy-scorer` | 6 维正交自研率、L1~L5 边界、Jeffreys Beta(0.5, 0.5) 置信下界 | **PASS** |
 | **三平面风险融合与共振放大** | `npm run validate-risk-fusion-engine` | $Risk = S^{1.0} \cdot D^{1.2} \cdot H^{0.8}$，双向确认升级 Critical | **PASS** |
-| **全量自动化测试套件矩阵** | `npm test` | <!-- METRICS:BEGIN test-suite-count -->**163 套**<!-- METRICS:END test-suite-count -->全量测试套件并行与串行回归验证 | **PASS** |
+| **全量自动化测试套件矩阵** | `npm test` | <!-- METRICS:BEGIN test-suite-count -->**165 套**<!-- METRICS:END test-suite-count -->全量测试套件并行与串行回归验证 | **PASS** |
 
 ---
 

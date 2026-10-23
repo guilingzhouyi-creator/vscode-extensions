@@ -2,7 +2,7 @@
 name: test-benchmark-engineering
 description: >-
   测试工程化、确定性隔离与性能基准回归守卫规范。指导 Agent 落实跨项目零孤儿用例管理、
-  固定时钟与伪随机数隔离、耗时回归棘轮 (TB-REGRESSION) 与 auto-refactor 363 规则自测防护。
+  固定时钟与伪随机数隔离、耗时回归棘轮 (TB-REGRESSION) 与 auto-refactor 369 规则自测防护。
 ---
 
 # test-benchmark-engineering — 测试工程化、确定性隔离与基准回归工作流
@@ -40,10 +40,10 @@ description: >-
 
 工作区对测试用例实行严格的**全量纳管、零孤儿用例**原则：
 
-1. **`auto-refactor` (363 规则自测全纳管)**：
+1. **`auto-refactor` (369 规则自测全纳管)**：
    - 规则自测用例位于 `auto-refactor/tests/rules/`；
    - 必须在 `auto-refactor/scripts/test-parallel.js` 或并行自测清单中注册；
-   - 保证 <!-- METRICS:BEGIN test-suite-count -->**163 套**<!-- METRICS:END test-suite-count -->测试套件并发/串行绿色通过，0 挂起，纯 TS shim 与 Rust 算子 100% 字节等价。
+   - 保证 <!-- METRICS:BEGIN test-suite-count -->**165 套**<!-- METRICS:END test-suite-count -->测试套件并发/串行绿色通过，0 挂起，纯 TS shim 与 Rust 算子 100% 字节等价。
 2. **`workspace-timing` (<!-- METRICS:BEGIN ws-test-case-count -->**205 项**<!-- METRICS:END ws-test-case-count -->单元测试全纳管)**：
    - 单元测试位于 `workspace-timing/src/test/`；
    - 必须通过 `npm run test:fast` 极速套件与 `npm run review` 全量覆盖；
@@ -92,7 +92,7 @@ pwsh -File scripts/ps1/audit-all.ps1 -Fast
 ```
 
 **质性断言标准**：
-- auto-refactor <!-- METRICS:BEGIN test-suite-count -->**163 套**<!-- METRICS:END test-suite-count -->测试绿色通过，0 孤儿用例；
+- auto-refactor <!-- METRICS:BEGIN test-suite-count -->**165 套**<!-- METRICS:END test-suite-count -->测试绿色通过，0 孤儿用例；
 - workspace-timing <!-- METRICS:BEGIN ws-test-case-count -->**205 项**<!-- METRICS:END ws-test-case-count -->单元测试 100% 通过；
 - 测试过程零未决异步句柄挂起，环境沙箱自动清理干净；
 - 全工作区 High/Critical 技术债务保持 0 项基线，严禁引入技术债务反弹。

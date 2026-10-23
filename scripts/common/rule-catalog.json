@@ -1,13 +1,13 @@
 {
   "schema": "workspace-rule-catalog/v1",
-  "generatedAt": "2026-10-22T11:27:36.963Z",
+  "generatedAt": "2026-10-23T04:39:11.082Z",
   "totalRules": 505,
   "counts": {
-    "autoRefactor": 363,
+    "autoRefactor": 369,
     "workspaceTiming": 49,
     "webGames": 50,
     "fractalGit": 17,
-    "globalTooling": 26
+    "globalTooling": 20
   },
   "rules": [
     {
@@ -2349,10 +2349,10 @@
     },
     {
       "id": "HYG-DIR-001",
-      "project": "global-tooling",
+      "project": "auto-refactor",
       "family": "HYG",
       "severity": "error",
-      "summary": "Lingering empty directory guard: active source and tooling directories must not retain zero-file lingering empty folders",
+      "summary": "Lingering empty directory: an active source or tooling directory keeps no entries once ignored trees are excluded.",
       "canonical": true
     },
     {
@@ -4066,42 +4066,42 @@
     },
     {
       "id": "VOL-DIL-001",
-      "project": "global-tooling",
+      "project": "auto-refactor",
       "family": "VOL",
       "severity": "error",
-      "summary": "Vertical logic dilution guard: token density tau must not fall below 2.5 tokens per effective line (tau < 2.5 signals excessive line fragmentation).",
+      "summary": "Vertical logic dilution guard: effective logic density must stay inside the dynamic floor, so a file cannot be padded with blank lines or trivial stubs.",
       "canonical": true
     },
     {
       "id": "VOL-DOC-001",
-      "project": "global-tooling",
+      "project": "auto-refactor",
       "family": "VOL",
       "severity": "error",
-      "summary": "High-load logic architecture contract guard: modules with ELOC >= 600 must maintain comment ratio >= 8%",
+      "summary": "High-load logic architecture contract guard: modules with ELOC >= 600 must maintain a comment ratio of at least 8%.",
       "canonical": true
     },
     {
       "id": "VOL-ELOC-001",
-      "project": "global-tooling",
+      "project": "auto-refactor",
       "family": "VOL",
       "severity": "error",
-      "summary": "Effective code volume budget guard: single file ELOC must not exceed 900",
+      "summary": "Effective code volume budget guard: single file ELOC must not exceed 900.",
       "canonical": true
     },
     {
       "id": "VOL-LOC-001",
-      "project": "global-tooling",
+      "project": "auto-refactor",
       "family": "VOL",
       "severity": "error",
-      "summary": "Physical line count budget guard: single file raw LOC must not exceed 1400",
+      "summary": "Physical line count budget guard: single file raw LOC must not exceed 1400.",
       "canonical": true
     },
     {
       "id": "VOL-RATIO-001",
-      "project": "global-tooling",
+      "project": "auto-refactor",
       "family": "VOL",
       "severity": "warning",
-      "summary": "Dynamic dilution envelope guard: physical line count must not exceed dynamic ratio 1:3 envelope",
+      "summary": "Dynamic dilution envelope guard: physical line count must not exceed the 1:3 ratio envelope.",
       "canonical": true
     },
     {

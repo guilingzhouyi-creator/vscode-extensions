@@ -20,6 +20,7 @@ import { globToRegExp } from '../file-discovery';
 import { runCyclePass } from '../dependency-graph';
 import type { ObservedConstantDeclaration } from '../architecture/constant-library-auditor';
 import { inspectConstantLibraryTopology } from '../architecture/constant-library-auditor';
+import { auditEmptyDirectories, toIgnoredDirectoryName } from '../intelligence/empty-directory-audit';
 import {
     BASELINE_GRANULARITY_GROUPED,
     groupCounts,
@@ -52,6 +53,7 @@ export type PostScanScope = typeof POST_SCAN_SCOPE_FULL | typeof POST_SCAN_SCOPE
 const PASS_DEPENDENCY_GRAPH = 'dependency-graph';
 const PASS_LITERAL_CLUSTERS = 'literal-clusters';
 const PASS_CONSTANT_LIBRARY_TOPOLOGY = 'constant-library-topology';
+const PASS_EMPTY_DIRECTORIES = 'empty-directories';
 const PASS_ERROR_FLOW = 'error-flow';
 const PASS_SEMANTIC_COMPLEXITY = 'semantic-complexity';
 const PASS_SUPPRESSIONS = 'suppressions';
@@ -68,6 +70,7 @@ const OPT_CROSS_FILE_LITERAL_CLUSTERS = 'crossFileLiteralClusters';
 const OPT_CHECK_CONSTANT_TOPOLOGY = 'checkConstantTopology';
 const OPT_ERROR_PROPAGATION = 'errorPropagation';
 const OPT_CROSS_FN_COMPLEXITY = 'checkCrossFunctionComplexity';
+const OPT_CHECK_EMPTY_DIRECTORIES = 'checkEmptyDirectories';
 
 /** Default baseline comparison granularity. */
 const DEFAULT_BASELINE_GRANULARITY = 'id';
@@ -126,6 +129,7 @@ const MSG_LITERAL_CLUSTER_ISSUES = 'cross-file literal cluster issue(s)';
 const MSG_CONST_TOPOLOGY_RECS = 'constant library recommendation(s)';
 const MSG_ERROR_FLOW_ISSUES = 'error propagation chain issue(s)';
 const MSG_SEMANTIC_COMPLEXITY_ISSUES = 'cross-function complexity issue(s)';
+const MSG_EMPTY_DIRECTORY_ISSUES = 'lingering empty directory finding(s)';
 
 /** Empty string constant for fallback representation. */
 const EMPTY_STRING = '';
@@ -365,6 +369,38 @@ function applySemanticComplexityPass(context: PostScanPassContext): void {
         logDescriptor: MSG_SEMANTIC_COMPLEXITY_ISSUES,
         collectIssues: (scanner) => scanner.getSemanticComplexityIssues(targetOptions),
     });
+}
+
+/**
+ * Reports directories that keep no live entries, completing the physical hygiene matrix.
+ *
+ * The hygiene analyzer is a per-file pass, so it can reach seven of the eight hygiene dimensions;
+ * a lingering empty directory has no file to attach to. The whole-tree view exists only here,
+ * which is why the rule lives in the post-scan channel and is skipped for incremental scopes: a
+ * changed-file subset has no tree to judge.
+ *
+ * @param context - Execution context of the current post-scan cycle.
+ */
+function applyEmptyDirectoryPass(context: PostScanPassContext): void {
+    const { report, config, logger, scope, postScanPasses } = context;
+    const targetConfig = scope === POST_SCAN_SCOPE_FULL ? config.analyzers[ANALYZER_HYGIENE] : undefined;
+    const targetOptions = targetConfig?.options as Record<string, unknown> | undefined;
+    if (!targetConfig?.enabled || targetOptions?.[OPT_CHECK_EMPTY_DIRECTORIES] === false) {
+        return;
+    }
+
+    postScanPasses.push(PASS_EMPTY_DIRECTORIES);
+    const issues = auditEmptyDirectories(config.root, {
+        ignoredDirectoryNames: config.exclude
+            .map((entry) => toIgnoredDirectoryName(entry))
+            .filter((entry): entry is string => entry !== null),
+    });
+    if (issues.length === 0) {
+        return;
+    }
+    report.issues.push(...issues);
+    computeSummary(report);
+    logger.info(`${PASS_EMPTY_DIRECTORIES}: ${issues.length} ${MSG_EMPTY_DIRECTORY_ISSUES}`);
 }
 
 /** Pre-indexed fast lookup structure for suppression rules. */
@@ -819,6 +855,7 @@ export async function finalizeReport(
     applyConstTopologyPass(passContext);
     applyErrorFlowPass(passContext);
     applySemanticComplexityPass(passContext);
+    applyEmptyDirectoryPass(passContext);
 
     postScanPasses.push(PASS_SUPPRESSIONS);
     const suppressedCount = await applySuppressions(report, config.suppressions ?? []);

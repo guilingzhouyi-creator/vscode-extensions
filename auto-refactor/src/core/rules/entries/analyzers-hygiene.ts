@@ -253,6 +253,19 @@ export const ANALYZER_HYGIENE_RULES: readonly RuleDefinition[] = [
         docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#hyg-clt-001',
     }),
     defineRule({
+        id: 'HYG-DIR-001',
+        family: RULE_FAMILY_HYGIENE,
+        analyzer: ANALYZER_HYGIENE,
+        canonical: true,
+        languages: ALL_LANGUAGES,
+        defaultSeverity: SEVERITY_ERROR,
+        summary:
+            'Lingering empty directory: an active source or tooling directory keeps no entries once ignored trees are excluded.',
+        remediation:
+            'Delete the empty directory, or add and commit the file it was created to hold.',
+        docsAnchor: 'docs/04-analyzers-and-rules/01-builtin-rules.md#hyg-dir-001',
+    }),
+    defineRule({
         id: 'EXT-DIR-001',
         family: RULE_FAMILY_EXTENSION,
         analyzer: ANALYZER_HYGIENE,

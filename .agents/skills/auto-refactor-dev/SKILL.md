@@ -8,7 +8,7 @@ description: >-
 
 # auto-refactor-dev — 静态重构引擎与双轨算子开发规范
 
-本技能规范了 `auto-refactor/` 静态代码分析与治理引擎的核心架构原则、双轨算子等价性约束、<!-- METRICS:BEGIN analyzer-count -->**30 个**<!-- METRICS:END analyzer-count -->的四阶段流水线拓扑（Stage 0~3）、<!-- METRICS:BEGIN rule-auto-refactor -->**363 条规则**<!-- METRICS:END rule-auto-refactor -->治理体系（<!-- METRICS:BEGIN test-suite-count -->**163 套**<!-- METRICS:END test-suite-count -->测试）、Praxis 客户端 SDK 与表现层语义聚合引擎、一体两面三层拓扑 Diff 引擎、高精度时间戳规范、暂存分流原子落盘以及 12 项热路径与内存治理范式。
+本技能规范了 `auto-refactor/` 静态代码分析与治理引擎的核心架构原则、双轨算子等价性约束、<!-- METRICS:BEGIN analyzer-count -->**30 个**<!-- METRICS:END analyzer-count -->的四阶段流水线拓扑（Stage 0~3）、<!-- METRICS:BEGIN rule-auto-refactor -->**369 条规则**<!-- METRICS:END rule-auto-refactor -->治理体系（<!-- METRICS:BEGIN test-suite-count -->**165 套**<!-- METRICS:END test-suite-count -->测试）、Praxis 客户端 SDK 与表现层语义聚合引擎、一体两面三层拓扑 Diff 引擎、高精度时间戳规范、暂存分流原子落盘以及 12 项热路径与内存治理范式。
 
 ---
 
@@ -30,7 +30,7 @@ description: >-
 `auto-refactor` 采用 TypeScript 调度编排与 Rust N-API 原生算子内核结合的双轨架构：
 - **L1 原生算子层**：`crates/auto-refactor-core` 与 `crates/ops-{diff,graph,pattern,mask,clone}`；
 - **L2 语法与语义层**：`NormalizedNode` 统一语法树与 `SemanticGraph` 跨语言（8 种语言）图底座；
-- **L3 规则与分析器**：<!-- METRICS:BEGIN analyzer-count -->**30 个**<!-- METRICS:END analyzer-count -->与 <!-- METRICS:BEGIN rule-auto-refactor -->**363 条规则**<!-- METRICS:END rule-auto-refactor -->金字塔治理体系；
+- **L3 规则与分析器**：<!-- METRICS:BEGIN analyzer-count -->**30 个**<!-- METRICS:END analyzer-count -->与 <!-- METRICS:BEGIN rule-auto-refactor -->**369 条规则**<!-- METRICS:END rule-auto-refactor -->金字塔治理体系；
 - **L4 调度与快轨**：Sparse MoE 变更熵密门禁路由器与 `<10ms` AST 切片快轨；
 - **L5 质量度量平面**：静态（10 支柱）+ 动态证据 + 演化（CAI 指数）；
 - **L6 Praxis 交付层**：统一客户端 SDK、多 Agent 冲突仲裁、轨迹配方学习与级联回滚。
@@ -110,7 +110,7 @@ description: >-
    - 常规增量校验优先读取 `.refactor-cache/baseline-self-audit.json` 快照，仅对暂存区增量文件执行 `<100ms` AST 切片差分；
    - 当 `src/core/rules/`、`src/analyzers/` 或 `crates/` 发生变更（或显式传 `--force-audit`）时自动触发全量重建。
 2. **项目中立性守卫 (`validate-project-neutrality.js`)**：分析器严禁硬编码特定业务仓库路径；框架专属规则必须通过探测标准配置特征（如 `project.godot` 或 `vscode` 依赖）推断 `Archetype Context`。
-3. **防孤儿单测契约 (`validate-suite-manifest.js`)**：所有 `scripts/validate-*.js` 必须在 `scripts/test-parallel.js`（158 个并行套件 + 5 个串行套件 + 1 个 vitest 套件 = 163 套测试）显式纳管。
+3. **防孤儿单测契约 (`validate-suite-manifest.js`)**：所有 `scripts/validate-*.js` 必须在 `scripts/test-parallel.js`（158 个并行套件 + 5 个串行套件 + 1 个 vitest 套件 = 165 套测试）显式纳管。
 4. **三平面质量模型、贝叶斯统计与长程轨迹检测**：
    - 从 0 纯客观累加符号调用，外部 SDK 调用基于全局 `symbolIndex` 精确追踪；
    - 采用无信息 Jeffreys 先验 $\text{Beta}(0.5, 0.5)$ 共轭后验（$\alpha = 0.5 + k, \beta = 0.5 + n - k$）动态计算后验均值与 95% 置信区间；
