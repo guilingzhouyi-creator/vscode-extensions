@@ -1,52 +1,49 @@
-# 经典无信息 Jeffreys Beta 共轭后验统计建模数学指南
+# 无信息 Jeffreys Beta 共轭后验推导与反刷分熔断 (`BLOCK_GAMING_DETECTED`) 深度指南
 
-本指南详细推导度量评估系统中的贝叶斯共轭后验数学模型，杜绝人工写死主观常数误差，建立主流统计学置信区间与方差估计标准。
-
----
-
-## 一、 背景与主观伪造痛点
-
-在很多静态代码分析或自主度量系统（如 CAI 自研率、自治评分器）中，常存在以下统计学劣质实践：
-- **固定常数误差注水**：直接写死置信区间为 `score ± 5.0%` 或 `confidence = 0.95`；
-- **小样本严重失真**：当仅分析了 2~3 个符号时，样本量过小却给出极高的置信度；
-- **非概率性截断**：未对概率边界 $[0, 1]$ 进行测度论保护，导致区间越界。
-
-为了确保度量评估在主流学术界与工业界均具备无可辩驳的数学纯洁性，必须采用**经典无信息 Jeffreys 先验共轭贝叶斯模型**。
+> 本指南整合了无信息 Jeffreys 先验共轭贝叶斯置信区间推导与自治评分反刷分熔断机制。
 
 ---
 
-## 二、 数学推导与公式体系
+## 一、 无信息 Jeffreys 先验 $\text{Beta}(0.5, 0.5)$ 数学推导
 
-### 1. 无信息 Jeffreys 先验分布
-对于二项分布样本模型（成功数 $s$，失败数 $f$，样本总量 $n = s + f$），Fisher 信息矩阵决定的无信息尺度不变量先验为 Jeffreys 先验：
-$$p(\theta) \propto \sqrt{I(\theta)} \propto \theta^{-1/2} (1 - \theta)^{-1/2} = \text{Beta}(0.5, 0.5)$$
-
-Jeffreys 先验具备重参数化不变性（Reparameterization Invariance），在无任何主观偏见的前提下赋予参数空间最客观的中立权值。
-
-### 2. 共轭后验更新
-根据贝叶斯定理，当似然函数为二项分布 $\text{Binomial}(n, \theta)$ 时，Beta 先验与二项似然构成天然共轭：
-$$p(\theta \mid s, f) \propto \theta^s (1 - \theta)^f \cdot \theta^{0.5 - 1} (1 - \theta)^{0.5 - 1} = \theta^{(s + 0.5) - 1} (1 - \theta)^{(f + 0.5) - 1}$$
-后验分布严格服从：
-$$\theta \mid s, f \sim \text{Beta}(\alpha^*, \beta^*) = \text{Beta}(s + 0.5, f + 0.5)$$
-
-### 3. 后验均值与后验方差
-- **后验均值（点估计）**：
-  $$\mu = \mathbb{E}[\theta] = \frac{\alpha^*}{\alpha^* + \beta^*} = \frac{s + 0.5}{n + 1}$$
-- **后验方差（不确定性度量）**：
-  $$\sigma^2 = \text{Var}(\theta) = \frac{\alpha^* \beta^*}{(\alpha^* + \beta^*)^2 (\alpha^* + \beta^* + 1)} = \frac{(s + 0.5)(f + 0.5)}{(n + 1)^2 (n + 2)}$$
-- **后验标准差**：
-  $$\sigma = \sqrt{\sigma^2}$$
-
-### 4. 95% 置信区间 (Credible Interval)
-利用标准正态近似或 Beta 分布分位数函数构建双侧 95% 置信区间（$z_{0.975} \approx 1.95996$）：
-$$\text{Lower} = \max\left(0.0, \mu - z \cdot \sigma\right)$$
-$$\text{Upper} = \min\left(1.0, \mu + z \cdot \sigma\right)$$
-
-当样本极小（如 $n < 5$）时，后验标准差 $\sigma$ 天然较大，区间变宽，真实客观反映高不确定性；随着样本量 $n$ 增加，$\sigma \to 0$，置信区间迅速收敛。
+1. **重参数化不变性先验**：
+   对二项分布似然 $\text{Binomial}(n, \theta)$，由 Fisher 信息矩阵 $I(\theta) = \frac{n}{\theta(1-\theta)}$ 导出的无信息先验为：
+   $$p(\theta) \propto \sqrt{I(\theta)} \propto \theta^{-1/2}(1 - \theta)^{-1/2} = \text{Beta}(0.5, 0.5)$$
+2. **共轭后验更新与区间估计**：
+   观测到 $s$ 次成功与 $f$ 次失败（$n = s + f$）后，后验分布服从 $\text{Beta}(\alpha^*, \beta^*) = \text{Beta}(s + 0.5, f + 0.5)$：
+   $$\mu = \frac{s + 0.5}{n + 1}, \quad \sigma = \sqrt{\frac{(s + 0.5)(f + 0.5)}{(n + 1)^2(n + 2)}}, \quad \text{CI}_{95\%} = [\max(0, \mu - 1.95996\sigma),\; \min(1, \mu + 1.95996\sigma)]$$
+   当小样本 $n < 5$ 时，$\sigma$ 自然较大，如实暴露高不确定性；严禁人工写死 `± 5%` 常数误差或注入 `1.2x` 权重放大。
 
 ---
 
-## 三、 零注水公理与 AST 符号追踪
+## 二、 三类刷分攻击向量与 `BLOCK_GAMING_DETECTED` 熔断判据
 
-1. **零加权倍率**：自研代码比例度量中，自研符号与外部依赖符号的权值从 0 纯客观统计，严禁乘 1.2 或 1.5 倍虚假放大；
-2. **符号索引真实溯源 (`symbolIndex`)**：外部依赖调用数必须基于真实的 TypeScript/JavaScript 抽象语法树符号索引节点逐项检索，严禁基于粗暴正则行匹配计数。
+1. **三类典型刷分反模式**：
+   - **纯格式与空白搬移 (Trivial Churn)**：批量调换等价参数或空行刷高改动文件数；
+   - **微改动冒充架构重构**：仅改 1~2 个局部变量名却申报模块级重构；
+   - **删减契约注释压减 LOC (`CMT-VMD-001`)**：为压低物理行数粗暴删除六字段 JSDoc 或状态机不变式注释。
+2. **刚性熔断公式**：
+   ```typescript
+   if (semanticRatio <= 0.15 && netDebtEliminated <= 0) {
+     return { status: 'FROZEN', code: 'BLOCK_GAMING_DETECTED' };
+   }
+   ```
+   凡语义有效行改动占比 $\le 15\%$ 且未产生真实技术债净消除（$\Delta_{\text{Debt}} \le 0$），一律冻结评分并阻断。
+
+---
+
+## 三、 Popoviciu 方差界与非线性双曲饱和衰减推导
+
+1. **Popoviciu 方差不等式证明 (Popoviciu, 1935)**：
+   设随机变量 $X$ 概率测度支撑集为闭区间 $[a, b]$。对任意实数 $c$，均有 $\text{Var}(X) \le E[(X - c)^2]$。
+   令 $c = \frac{a + b}{2}$，则对任意 $x \in [a, b]$，有 $|x - c| \le \frac{b - a}{2}$，从而：
+   $$\text{Var}(X) \le E\left[\left(X - \frac{a+b}{2}\right)^2\right] \le \frac{(b - a)^2}{4}$$
+   等号成立当且仅当 $P(X = a) = P(X = b) = \frac{1}{2}$（极端两极分化对半分布）。
+   在评分测度空间 $[0, 100]$ 中：
+   $$\sigma_{\max} = \frac{100 - 0}{2} = 50.0$$
+   因此，离散度惩罚因子 $D = 1.0 - \left(\frac{\sigma_S}{\sigma_{\max}}\right) \times \gamma$（当 $\gamma = 0.5$ 时，$D = 1.0 - \frac{\sigma_S}{100}$）确保在理论最严重崩溃极值下，折减系数恰好下探至 0.5，既能严厉惩罚偏科，又客观捍卫剩余 50% 资产存量底线。
+
+2. **Michaelis-Menten / Hill 饱和衰减与一阶/二阶导数证明**：
+   $$S(D) = \frac{100 H}{H + D}, \quad H = 30, \; D \ge 0$$
+   - 一阶导数：$\frac{dS}{dD} = -\frac{100 H}{(H + D)^2} < 0$，在 $[0, \infty)$ 严格单调递减，保证在任意超大缺陷密度下偏序严格单调不变（严禁 Sigmoid 触底截断为 0 造成梯度消失）；
+   - 二阶导数：$\frac{d^2S}{dD^2} = \frac{200 H}{(H + D)^3} > 0$，处处严格下凸，体现边际扣分递减与容错韧性。

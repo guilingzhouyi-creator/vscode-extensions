@@ -1,9 +1,10 @@
 /**
- * Universal Spring Physics & Damped Harmonic Oscillator Presets
- * 
- * 经典二阶阻尼谐振子参数化动力学模型：
- *   m * x'' + c * x' + k * (x - x_target) = 0
- *   阻尼比 ζ = c / (2 * sqrt(m * k))
+ * Module: Interaction Design Physics — Second-Order Damped Harmonic Oscillator Presets
+ * File Path: .agents/skills/interaction-design-physics/templates/spring-physics-presets.ts
+ * Architecture Role: Analytic spring-mass-damper motion solver and canonical preset catalog.
+ * Dependencies & Triggers: Pure mathematical utility module; imported by UI transition controllers.
+ * Responsibilities: Solve normalized displacement for underdamped, critically damped, and overdamped regimes.
+ * Exit Semantics & Design Rationale: Closed-form analytical solution avoiding frame-rate-dependent Euler integration drift.
  */
 
 export interface SpringConfig {

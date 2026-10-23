@@ -32,10 +32,10 @@ if [[ -d "$SUBPROJECT" ]]; then
   STATUS=0
   (cd "$SUBPROJECT" && npm test) || STATUS=$?
   if [[ "$STATUS" -ne 0 ]]; then
-    echo "✖ BLOCK  子项目测试失败" >&2
+    echo "✖ BLOCK [AR-TEST-02] 子项目测试失败" >&2
     exit "$STATUS"
   fi
 fi
 
-echo "✔ 全部检查通过"
+echo "✔ PASS  [AR-TEST-02] 全部检查通过"
 exit 0

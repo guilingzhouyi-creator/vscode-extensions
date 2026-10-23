@@ -18,33 +18,33 @@ extends Control
 var _current_tab_index: int = 0
 
 func _ready() -> void:
-	if _tab_bar == null:
-		push_error("TabBar node not found")
-		return
-	_tab_bar.tab_changed.connect(_on_tab_changed)
-	_update_tab_visibility()
+    if _tab_bar == null:
+        push_error("TabBar node not found")
+        return
+    _tab_bar.tab_changed.connect(_on_tab_changed)
+    _update_tab_visibility()
 
 ## 唯一数据注入入口: 纯快照单向传递 (零业务计算)
 func apply_snapshot(snapshot: Dictionary) -> void:
-	if snapshot.is_empty():
-		return
-	
-	if snapshot.has("overview") and _overview_tab != null:
-		if _overview_tab.has_method("apply_snapshot"):
-			_overview_tab.apply_snapshot(snapshot.get("overview", {}))
-	
-	if snapshot.has("details") and _details_tab != null:
-		if _details_tab.has_method("apply_snapshot"):
-			_details_tab.apply_snapshot(snapshot.get("details", {}))
+    if snapshot.is_empty():
+        return
+
+    if snapshot.has("overview") and _overview_tab != null:
+        if _overview_tab.has_method("apply_snapshot"):
+            _overview_tab.apply_snapshot(snapshot.get("overview", {}))
+
+    if snapshot.has("details") and _details_tab != null:
+        if _details_tab.has_method("apply_snapshot"):
+            _details_tab.apply_snapshot(snapshot.get("details", {}))
 
 func _on_tab_changed(index: int) -> void:
-	if index == _current_tab_index:
-		return
-	_current_tab_index = index
-	_update_tab_visibility()
+    if index == _current_tab_index:
+        return
+    _current_tab_index = index
+    _update_tab_visibility()
 
 func _update_tab_visibility() -> void:
-	if _overview_tab != null:
-		_overview_tab.visible = (_current_tab_index == 0)
-	if _details_tab != null:
-		_details_tab.visible = (_current_tab_index == 1)
+    if _overview_tab != null:
+        _overview_tab.visible = (_current_tab_index == 0)
+    if _details_tab != null:
+        _details_tab.visible = (_current_tab_index == 1)

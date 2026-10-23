@@ -1,12 +1,10 @@
 /**
- * Universal Container Responsive Matrix & CJK Text Preservation
- * File Path: templates/container-responsive-matrix.css
- * 
- * 4 阶容器查询响应梯队与 CJK 防挤压排版契约：
- *   - Tier 1 (< 576px): 中屏/双栏模式，外边距收窄，操作区弹性紧凑化
- *   - Tier 2 (< 480px): 紧凑容器，双列降级单列，图标与文字微缩
- *   - Tier 3 (< 384px): 窄侧边栏/小窗，隐藏辅助性文字标签，保留关键图标
- *   - Tier 4 (< 320px): 极限极小容器，单列平铺，绝对禁止水平溢出
+ * Module: Interaction Design Physics — 4-Tier Container Responsive Matrix & CJK Typography
+ * File Path: .agents/skills/interaction-design-physics/templates/container-responsive-matrix.css
+ * Architecture Role: Container-query responsive layout system replacing viewport @media queries.
+ * Dependencies & Triggers: Applied to .interactive-pane-root containers across narrow sidebars and split panes.
+ * Responsibilities: Enforce 4-tier @container breakpoints (576px/480px/384px/320px) and CJK text preservation.
+ * Exit Semantics & Design Rationale: Pure CSS layout tokens guaranteeing zero horizontal overflow down to 320px.
  */
 
 /* 1. 容器上下文声明与自适应根基 */

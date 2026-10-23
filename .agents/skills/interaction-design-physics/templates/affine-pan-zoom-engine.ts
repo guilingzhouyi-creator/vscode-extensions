@@ -30,22 +30,38 @@ export interface PointerScreenPoint {
     readonly clientY: number;
 }
 
+export interface AffineEngineConfig {
+    readonly minScale?: number;
+    readonly maxScale?: number;
+    readonly deadzonePx?: number;
+    readonly overflowDamping?: number;
+}
+
+export interface ZoomAtAnchorParams {
+    readonly viewport: AffineViewport;
+    readonly currentState: AffineTransformState;
+    readonly targetScale: number;
+    readonly anchor: PointerScreenPoint;
+}
+
+export interface ApplyPanParams {
+    readonly viewport: AffineViewport;
+    readonly currentState: AffineTransformState;
+    readonly deltaX: number;
+    readonly deltaY: number;
+}
+
 export class AffinePanZoomEngine {
     private readonly minScale: number;
     private readonly maxScale: number;
     private readonly deadzonePx: number;
     private readonly overflowDamping: number;
 
-    public constructor(
-        minScale: number = 0.25,
-        maxScale: number = 8.0,
-        deadzonePx: number = 4.0,
-        overflowDamping: number = 0.7,
-    ) {
-        this.minScale = minScale;
-        this.maxScale = maxScale;
-        this.deadzonePx = deadzonePx;
-        this.overflowDamping = overflowDamping;
+    public constructor(config: AffineEngineConfig = {}) {
+        this.minScale = config.minScale ?? 0.25;
+        this.maxScale = config.maxScale ?? 8.0;
+        this.deadzonePx = config.deadzonePx ?? 4.0;
+        this.overflowDamping = config.overflowDamping ?? 0.7;
     }
 
     /**
@@ -60,12 +76,8 @@ export class AffinePanZoomEngine {
     /**
      * Solve fixed-anchor zoom preserving pointer position (Ox, Oy) in screen space.
      */
-    public zoomAtAnchor(
-        viewport: AffineViewport,
-        currentState: AffineTransformState,
-        targetScale: number,
-        anchor: PointerScreenPoint,
-    ): AffineTransformState {
+    public zoomAtAnchor(params: ZoomAtAnchorParams): AffineTransformState {
+        const { viewport, currentState, targetScale, anchor } = params;
         const clampedScale = Math.min(this.maxScale, Math.max(this.minScale, targetScale));
         const ratio = clampedScale / currentState.scale;
 
@@ -96,12 +108,8 @@ export class AffinePanZoomEngine {
     /**
      * Apply pan translation with 4px deadzone guard.
      */
-    public applyPan(
-        viewport: AffineViewport,
-        currentState: AffineTransformState,
-        deltaX: number,
-        deltaY: number,
-    ): AffineTransformState {
+    public applyPan(params: ApplyPanParams): AffineTransformState {
+        const { viewport, currentState, deltaX, deltaY } = params;
         const distance = Math.hypot(deltaX, deltaY);
         if (distance < this.deadzonePx) {
             return currentState;

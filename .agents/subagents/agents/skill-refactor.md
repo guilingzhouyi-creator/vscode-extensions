@@ -23,7 +23,7 @@ model: inherit
 ## 核心重构契约与刚性红线
 1. **上下文降维与反膨胀**：将超长 `SKILL.md` 中的冗长接口/代码下沉至 `references/` 与 `templates/`，消除跨技能重复叙述；
 2. **三层泛化对齐**：通用方法论技能保持跨语言泛化，领域特化技能仅保留子项目专有边界；
-3. **样板代码合规 (`GATE-AST-001`)**：`templates/` 下的代码样板严格满足 $\text{CC} \le 15, \text{Depth} \le 4$、六字段 JSDoc 头部及 1:3 动态包络；
+3. **样板代码合规 (`GUARD-AST-001`)**：`templates/` 下的代码样板严格满足 $\text{CC} \le 15, \text{Depth} \le 4$、六字段 JSDoc 头部及 1:3 动态包络；
 4. **双副本同步闭环**：重构后必须执行 `sync-skills.js` 与 `validate-skills.js` 确保 100% 绿色通过。
 
 ## 强制离线验证命令

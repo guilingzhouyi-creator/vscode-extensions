@@ -38,7 +38,7 @@
 | :--- | :--- | :--- | :--- |
 | **`DEP`** | 依赖方向与供应链 | 基础设施不得反向依赖上层；禁 devDependency 进生产、禁循环导入、禁幽灵/未固定/高危许可证依赖。族内 17 个 ID，跨 2 个项目（auto-refactor、fractal-git） | `DEP-INV-001` |
 | **`CONST`** | 常量单源与分层 | 同类字面量必须提取、跨文件同义常量零漂移、常量声明区固定、禁厨房水槽式常量仓。族内 10 个 ID，仅 auto-refactor | `CONST-CLU-001` |
-| **`VOL`** | 双轨体积预算 | ELOC 与 LOC 双轨上限、1:3 动态包络、注释不得为避让行数而被删。族内 5 个 ID，仅 global-tooling | `VOL-DOC-001` |
+| **`VOL`** | 双轨体积预算 | ELOC 与 LOC 双轨上限、1:3 动态包络、注释不得为避让行数而被删。族内 8 个 ID，仅 auto-refactor | `VOL-DOC-001` |
 | **`BIG`** | 超大文件 | 单文件超限必须按领域拆分，而非机械切碎。族内 1 个 ID，仅 auto-refactor | `large-file` |
 | **`CMP`** | 表达式与语句密度 | 禁深层内联回调链、禁位运算与三元堆叠、禁单行多语句。族内 4 个 ID，仅 auto-refactor | `CMP-CAL-001` |
 | **`CPX`** | 复杂度与空间 | CC ≤ 15、Depth ≤ 4、循环内零瞬态堆分配、递归必须有收敛证明。族内 13 个 ID，仅 auto-refactor | `CPX-REC-001` |
@@ -73,8 +73,8 @@
 | 家族 (Family) | 领域职责 | 约束范围与规模 | 典型代表规则 (SSOT 已登记) |
 | :--- | :--- | :--- | :--- |
 | **`GOV`** | 运行时治理契约 | 异常不得吞、日志必须可脱敏、类型契约不得双写、防刷分熔断必须真实触发。族内 36 个 ID，跨 2 个项目（auto-refactor、WebGames） | `GOV-AGN-001` |
-| **`GUARD`** | 门禁与守卫 | AST 切片预算、语义步骤登记、反馈状态词闭包、双平台同构对、SSOT 零漂移。族内 23 个 ID，跨 2 个项目（auto-refactor、global-tooling） | `GUARD-AST-001` |
-| **`HYG`** | 物理卫生 | 零空文件、`.ps1` CRLF 其余 LF、UTF-8 无 BOM、单 EOF、纯空格缩进、目录名 kebab-case。族内 19 个 ID，跨 2 个项目（auto-refactor、global-tooling） | `HYG-BOM-001` |
+| **`GUARD`** | 门禁与守卫 | AST 切片预算、语义步骤登记、反馈状态词闭包、双平台同构对、SSOT 零漂移。族内 26 个 ID，跨 2 个项目（auto-refactor、global-tooling） | `GUARD-AST-001` |
+| **`HYG`** | 物理卫生 | 零空文件、`.ps1` CRLF 其余 LF、UTF-8 无 BOM、单 EOF、纯空格缩进、目录名 kebab-case。族内 19 个 ID，仅 auto-refactor | `HYG-BOM-001` |
 | **`CMG`** | 提交说明规范 | 必填项目归属、实质字数下限、零黑话、零夸大、验证段禁流水账。族内 9 个 ID，仅 global-tooling | `CMG-PRJ-001` |
 | **`RCFG`** | 规则元治理 | 规则 ID 双向闭包、计数口径与真源一致、表现层与底层诊断去重。族内 7 个 ID，跨 2 个项目（workspace-timing、global-tooling），layer L3 | `L3-REVIEW-CONFIG` |
 | **`SCR`** | 脚本库标准（layer: L3） | 脚本命名、头契约与注册表双向完备：既无孤儿也无悬空。族内 5 个 ID，仅 workspace-timing，layer L3 | `L3-SCRIPT-STANDARD` |

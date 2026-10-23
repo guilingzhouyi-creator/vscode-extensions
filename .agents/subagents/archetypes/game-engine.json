@@ -2,20 +2,31 @@
   "archetype": "game-engine",
   "displayName": "Godot 4.7 卡拉尔世界引擎纯逻辑 (WebGames，非Web游戏)",
   "rootDirectory": "WebGames",
-  "allowedExtensions": [".gd", ".py", ".json", ".sh", ".ps1", ".md"],
+  "allowedExtensions": [
+    ".gd",
+    ".py",
+    ".json",
+    ".sh",
+    ".ps1",
+    ".md"
+  ],
   "pathJail": {
-    "allowedPrefixes": ["WebGames/"],
-    "forbiddenPrefixes": ["workspace-timing/", "auto-refactor/", "scripts/"]
+    "allowedPrefixes": [
+      "WebGames/"
+    ],
+    "forbiddenPrefixes": [
+      "workspace-timing/",
+      "auto-refactor/",
+      "scripts/",
+      "fractal-git/"
+    ]
   },
   "associatedSkills": [
     "webgames-workflow",
+    "state-concurrency-and-crash-recovery",
     "algorithmic-operator-engineering",
     "spec-driven-development",
-    "test-driven-development",
-    "code-simplification",
     "debugging-and-error-recovery",
-    "doubt-driven-development",
-    "context-engineering",
     "constraint-driven-development",
     "coding-craft",
     "complexity-budget",

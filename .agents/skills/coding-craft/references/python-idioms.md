@@ -1,172 +1,38 @@
-# Python 现代惯用法
+# 七域编程工艺深水区范例与 Python 现代惯用法指南
 
-> 对应 `PYM` 族 <!-- METRICS:BEGIN rule-family-pym -->**13 条**<!-- METRICS:END rule-family-pym -->规则。工作区内的 `.py` 文件集中在 `WebGames/scripts` 与 `mod_sdk`，属项目工具链，文件数随实现增长故不作规模真值；写法仍须与规则一致。
-
----
-
-## 一、 类型注解
-
-| 旧写法 | 现代写法 | 规则 |
-| :--- | :--- | :--- |
-| `from typing import List, Dict, Set, Tuple` | 内建泛型 `list[int]`、`dict[str, int]` | `PYM-GENERIC-001`（error） |
-| `Optional[X]` / `Union[X, Y]` | `X \| None` / `X \| Y` | `PYM-UNION-001`（error） |
-| `from typing import Iterable` | `from collections.abc import Iterable` | `PYM-ABC-001`（error） |
-
-```python
-# 旧
-from typing import List, Optional, Dict
-def load(paths: List[str]) -> Optional[Dict[str, int]]: ...
-
-# 新
-from collections.abc import Sequence
-def load(paths: Sequence[str]) -> dict[str, int] | None: ...
-```
+> 本指南整合了七域编程工艺（命名契约、失败语义层级、判别联合穷尽、最小暴露面、依赖倒置、可测性注入）的标准改写范式，以及 `PYM` 族 <!-- METRICS:BEGIN rule-family-pym -->**13 条**<!-- METRICS:END rule-family-pym -->现代 Python 规则的完整迁移对照。
 
 ---
 
-## 二、 资源管理
+## 一、 七域编程工艺标准改写范式
 
-| 旧写法 | 现代写法 | 规则 |
-| :--- | :--- | :--- |
-| `f = open(p); ...; f.close()` | `with open(p) as f:` | `PYM-OPEN-001` |
-| `os.path.join` / `os.path.exists` | `pathlib.Path` | `PYM-PATH-001` |
-| `datetime.timezone.utc` | `datetime.UTC`（3.11+） | `PYM-DATETIME-001`（error） |
-
-```python
-# 旧
-import os
-if os.path.exists(os.path.join(base, "rules.json")):
-    with open(os.path.join(base, "rules.json")) as f:
-        data = f.read()
-
-# 新
-from pathlib import Path
-target = Path(base) / "rules.json"
-if target.is_file():
-    data = target.read_text(encoding="utf-8")
-```
+1. **命名即契约 (`NAM-*`)**：
+   - 纯计算用 `computeXxx` / `deriveXxx`；副作用写入用 `applyXxx` / `persistXxx`；布尔用 `is/has/can`；映射用 `ruleByFamily`（禁止 `handleData`、`res`、`tmp`、`list1`）；
+   - 重命名必须同步更新声明处、调用处、文档指针与测试描述，严禁“半重命名”。
+2. **失败语义三层模型 (`ERR-*` / `RSM-*`)**：
+   - 统一划分为 `ValidationError`（输入违约，可恢复）、`InfrastructureError`（I/O 失败，有界重试 `NUM-BND-001` + 幂等去重 `UUID-REENTRANT-001`）、`InvariantError`（内部不变量破坏，快速失败）；
+   - 错误消息公式：`<动作> <对象> 失败：期望 <期望>，实际 <实际>（<定位>）`（`ERR-MSG-001`）。
+3. **判别联合收窄与边界校验 (`TSM-*`)**：
+   ```typescript
+   function assertNever(value: never): never {
+     throw new Error(`Unhandled variant: ${JSON.stringify(value)}`);
+   }
+   ```
+   外部数据（`JSON.parse`、环境变量、IPC 载荷）在系统边界执行一次 Schema 解析收窄，内部禁止 `as` 强转与 `!` 非空断言。
+4. **最小导出面与依赖倒置 (`EXP-*` / `DEP-*` / `MOD-*`)**：
+   - 严禁 `export *` 与“为测试而导出私有实现”；公开函数签名引用的类型必须公开导出，防止内部类型泄漏；
+   - 领域层（L2）定义 `Clock` / `RuleStore` 接口，基础设施层（L1）实现接口并由入口（L4）注入；L1 反向 import L2 即触发 `DEP-INV-001`（error 级阻断），严禁用动态 `import()` 掩盖循环依赖（`DEP-LAZ-001` / `import-cycle`）。
 
 ---
 
-## 三、 异步
+## 二、 Python 现代惯用法（`PYM` 族 13 条规则对照）
 
-| 反模式 | 问题 | 规则 |
-| :--- | :--- | :--- |
-| `time.sleep()` 在 `async def` 内 | 阻塞整个事件循环 | `PYM-ASYNC-001`（error） |
-| 调用协程但未 `await` | 静默不执行 | `PYM-ASYNC-001` |
-| `requests.get()` 在 `async def` 内 | 同步阻塞 | `PYM-ASYNC-001` |
-
-```python
-# 旧
-async def fetch(url):
-    time.sleep(1)            # 阻塞事件循环
-    return requests.get(url) # 同步阻塞
-
-# 新
-async def fetch(client, url):
-    await asyncio.sleep(1)
-    return await client.get(url)
-```
-
----
-
-## 四、 函数签名
-
-| 反模式 | 问题 | 规则 |
-| :--- | :--- | :--- |
-| `def f(items=[])` | 可变默认参数在调用间共享 | `PYM-DEFAULT-001` |
-| 参数名遮蔽内建（`list`、`id`、`type`） | 后续无法使用内建 | `PYM-SHADOW-001` |
-| `raise ValueError("x")` 在 `except` 内 | 丢失因果链 | `PYM-RAISE-001` |
-
-```python
-# 旧
-def append_rule(rule, bucket=[]):
-    bucket.append(rule)
-    return bucket
-
-# 新
-def append_rule(rule, bucket: list[str] | None = None) -> list[str]:
-    target = bucket if bucket is not None else []
-    target.append(rule)
-    return target
-```
-
----
-
-## 五、 字符串与格式
-
-| 旧写法 | 现代写法 | 规则 |
-| :--- | :--- | :--- |
-| `"%s: %d" % (name, count)` | `f"{name}: {count}"` | `PYM-FSTRING-001` |
-| `"{0}".format(x)` | `f"{x}"` | `PYM-FSTRING-001` |
-
----
-
-## 六、 数据类
-
-```python
-# 旧：无 slots，每个实例带 __dict__
-@dataclass
-class Rule:
-    id: str
-    severity: str
-
-# 新：slots=True 降低内存与属性查找开销
-@dataclass(slots=True, frozen=True)
-class Rule:
-    id: str
-    severity: str
-```
-
-规则 `PYM-SLOTS-001`：不继承的数据类应声明 `slots=True`。
-
----
-
-## 七、 导入顺序
-
-`PYM-IMPORT-001` 要求三段式分组并组内字母序：
-
-```python
-# 1. 标准库
-import json
-from pathlib import Path
-
-# 2. 第三方
-import pytest
-
-# 3. 本地
-from .catalog import load_rules
-```
-
----
-
-## 八、 错误处理
-
-```python
-# 旧
-try:
-    data = json.loads(text)
-except Exception:
-    pass
-
-# 新
-try:
-    data = json.loads(text)
-except json.JSONDecodeError as err:
-    raise CatalogError(f"rule-catalog.json 第 {err.lineno} 行不是合法 JSON") from err
-```
-
-对应 `PYM-RAISE-001`（保留因果链）与 `ERR-FLT-001`（禁空捕获）。
-
----
-
-## 九、 迁移检查清单
-
-- [ ] `typing.List/Dict/Set/Tuple` 是否清零？（`PYM-GENERIC-001`）
-- [ ] `Optional` / `Union` 是否改为 `|`？（`PYM-UNION-001`）
-- [ ] `typing.Iterable/Sequence/Mapping` 是否改为 `collections.abc`？（`PYM-ABC-001`）
-- [ ] `async def` 内是否零阻塞调用？（`PYM-ASYNC-001`）
-- [ ] `timezone.utc` 是否改为 `datetime.UTC`？（`PYM-DATETIME-001`）
-- [ ] 可变默认参数是否清零？（`PYM-DEFAULT-001`）
-- [ ] `open()` 是否全部在 `with` 内？（`PYM-OPEN-001`）
-- [ ] `os.path` 是否改为 `pathlib`？（`PYM-PATH-001`）
+| 领域 | 旧写法（违规） | 现代标准写法（合规） | 对应规则 |
+| :--- | :--- | :--- | :--- |
+| **泛型与联合类型** | `from typing import List, Dict, Optional, Union` | `list[int]`、`dict[str, int]`、`X \| None` | `PYM-GENERIC-001`、`PYM-UNION-001` |
+| **抽象容器接口** | `from typing import Iterable, Sequence, Mapping` | `from collections.abc import Iterable, Sequence, Mapping` | `PYM-ABC-001` |
+| **文件与路径管理** | `f = open(p); f.close()`、`os.path.join/exists` | `with open(p, encoding="utf-8") as f:`、`pathlib.Path` | `PYM-OPEN-001`、`PYM-PATH-001` |
+| **UTC 时间与异步** | `datetime.timezone.utc`、`async def` 内调 `time.sleep` / `requests` | `datetime.UTC`、`await asyncio.sleep()` / 异步客户端 | `PYM-DATETIME-001`、`PYM-ASYNC-001` |
+| **默认参数与内建名** | `def f(items=[])`、参数名用 `list` / `id` / `type` | `items: list[str] \| None = None`、避免遮蔽内建符号 | `PYM-DEFAULT-001`、`PYM-SHADOW-001` |
+| **异常链与格式化** | `except Exception: raise ValueError("x")`、`"%s" % x` | `raise CatalogError(...) from err`、`f"{name}: {count}"` | `PYM-RAISE-001`、`PYM-FSTRING-001` |
+| **数据类与导入分组** | `@dataclass` 无 slots、导入顺序混乱 | `@dataclass(slots=True, frozen=True)`、标准库/第三方/本地三段式 | `PYM-SLOTS-001`、`PYM-IMPORT-001` |

@@ -1,107 +1,65 @@
 ---
 name: test-benchmark-engineering
 description: >-
-  测试工程化、确定性隔离与性能基准回归守卫规范。指导 Agent 落实跨项目零孤儿用例管理、
-  固定时钟与伪随机数隔离、耗时回归棘轮 (TB-REGRESSION) 与 auto-refactor 371 规则自测防护。
+  测试驱动开发（红-绿-重构）、确定性隔离、零孤儿用例管理与性能基准耗时棘轮 (TB-REGRESSION) 规范。
+  指导 Agent 先写确定性失败用例，锁定虚拟时钟与伪随机种子，看守 auto-refactor 374 规则自测与单调耗时预算。
 ---
 
-# test-benchmark-engineering — 测试工程化、确定性隔离与基准回归工作流
+# test-benchmark-engineering — 测试驱动开发、确定性隔离与基准棘轮规范
 
-本技能确立了全工作区测试套件工程化标准、测试用例防孤儿纳管机制、时钟与随机数虚拟化隔离原则以及**性能基准单调耗时棘轮（`TB-REGRESSION`）**防线。
+本技能将**测试驱动开发（TDD 红-绿-重构闭环）**、**确定性环境隔离（时钟/PRNG/沙箱虚拟化）**、**全仓零孤儿用例纳管**以及**性能基准单调耗时棘轮（`TB-REGRESSION`）**整合为统一的测试工程化体系。
 
 ---
 
 ## 一、 适用场景与触发条件
 
-在以下任一场景中，必须激活本技能：
-1. **编写或重构单元测试与集成测试**：为新功能补齐测试用例，重构既有测试消除偶发脆弱性（Flakiness）；
-2. **测试时钟与随机数虚拟化**：涉及跨天、跨时区、定时器调度、会话休眠或随机算法逻辑测试；
-3. **性能微基准与耗时测试编写**：为高频核心循环或 AST 分析算子编写微基准并看守耗时预算；
-4. **测试清单纳管与孤儿排查**：新增测试文件后确保其纳入对应子项目自测套件，严禁平铺孤儿测试；
-5. **门禁拦截排查**：触发测试失败、测试超时或性能基准退化告警（`TB-REGRESSION`）。
+1. **新增业务逻辑或修复缺陷**：执行红-绿-重构闭环（先写复现缺陷或验证契约的失败用例，亲眼确认红灯后再写最小实现）；
+2. **时钟、随机与外部 I/O 隔离**：涉及跨午夜、定时器、随机抽样或文件系统沙箱的确定性测试；
+3. **性能微基准与耗时回归排查**：为高频算子编写基准或排查 `TB-REGRESSION` 超时阻断；
+4. **测试套件注册与防孤儿核查**：确保所有新增测试纳入对应子项目总清单。
 
 ---
 
-## 二、 确定性测试隔离公理 (Deterministic Isolation)
+## 二、 核心 TDD 红-绿-重构闭环与确定性隔离公理
 
-所有自动化测试必须具备 100% 确定性，严禁因宿主环境抖动导致偶发失败：
+```text
+1. 红灯 (RED): 编写确定性失败用例并验证红灯 ──▶ 2. 绿灯 (GREEN): 最小生产实现使测试变绿 ──▶ 3. 重构 (REFACTOR): 平铺控制流并过三重门禁
+```
 
 | 隔离维度 | 刚性契约指标 | 架构职责与防范目标 |
 | :--- | :--- | :--- |
-| **时钟虚拟化** | `withFixedNow` / fakeTimers | 必须锁定离散时间基准点，严禁直接依赖系统物理时钟造成跨午夜/跨时区竞态 |
-| **伪随机数种子** | 固定种子 PRNG (Mulberry32) | 随机测试必须采用固定 Seed 初始化，确保失败用例能够 100% 稳定复现 |
-| **异步竞态规避** | 零硬编码固定延时 (`sleep`) | 严禁使用固定 `setTimeout(100)` 盲等异步结果，必须通过 Promise 条件自愈等待 |
-| **沙箱临时文件** | 独立隔离并强制清理 | 测试临时文件写入带随机后缀的独立目录，在 `finally`/`afterEach` 中干净清理 |
-| **并发任务汇合** | 显式 `pump()` / `flush()` | 异步/多线程派发服务必须在测试套件结束前显式汇合并排空，严禁孤儿任务阻断进程退出 |
+| **时钟虚拟化** | `withFixedNow` / 注入 `Clock` | 锁定离散时间基准点，严禁直调 `Date.now()` 导致跨午夜或延迟抖动（`TST-DEN-001`） |
+| **伪随机数种子** | 固定种子 PRNG (Mulberry32) | 随机测试固定初始化 Seed，严禁无种子 `Math.random()`，确保失败 100% 可复现 |
+| **异步竞态规避** | 零硬编码 `sleep` / 内存桩 | 单元测试 100% 内存化隔离外部 I/O；异步等待使用条件驱动，禁止 `setTimeout(100)` 盲等 |
+| **沙箱与并发汇合** | `try/finally` + `pump()/flush()` | 临时目录写于 `os.tmpdir()` 并在 `finally` 清理；后台派发器在测试结束前显式排空 |
+| **断言有效性** | 禁 `it.skip` 与同义反复断言 | 严禁跳过用例（`TST-SKP-001`）或仅断言 `toBeTruthy()`（`TST-TAU-001`） |
+
+> **测试通过非达标公理**：测试全绿仅为逻辑未断裂的最低底线；交割前必须同时通过静态编译、复杂度体积预算（$\text{CC}\le 15, \text{Depth}\le 4$）与全仓静态门禁审查。
 
 ---
 
-## 三、 防孤儿用例与清单注册机制 (Zero Orphan Tests)
+## 三、 全仓零孤儿用例纳管 (`TST-ORC-001`) 与耗时棘轮 (`TB-REGRESSION`)
 
-工作区对测试用例实行严格的**全量纳管、零孤儿用例**原则：
-
-1. **`auto-refactor` (371 规则自测全纳管)**：
-   - 规则自测用例位于 `auto-refactor/tests/rules/`；
-   - 必须在 `auto-refactor/scripts/test-parallel.js` 或并行自测清单中注册；
-   - 保证 <!-- METRICS:BEGIN test-suite-count -->**166 套**<!-- METRICS:END test-suite-count -->测试套件并发/串行绿色通过，0 挂起，纯 TS shim 与 Rust 算子 100% 字节等价。
-2. **`workspace-timing` (<!-- METRICS:BEGIN ws-test-case-count -->**205 项**<!-- METRICS:END ws-test-case-count -->单元测试全纳管)**：
-   - 单元测试位于 `workspace-timing/src/test/`；
-   - 必须通过 `npm run test:fast` 极速套件与 `npm run review` 全量覆盖；
-   - 必须覆盖跨午夜/跨周双轨守恒、RingBuffer 满载清退与 StorageCoordinator 级联兜底边界。
-3. **`WebGames` (全域测试清单纳管)**：
-   - 所有测试套件继承 `TestCase`，并在 `config/infrastructure/domains.json` 与 `test_registry.gd` 中双向注册；
-   - 严禁在 `tests/unit/` 根目录平铺散落未注册脚本。
+1. **四大受控项目全量纳管**：
+   - **`auto-refactor`**：规则与单元用例必须在 `scripts/test-parallel.js` 注册，保障 <!-- METRICS:BEGIN test-suite-count -->**169 套**<!-- METRICS:END test-suite-count -->测试并发/串行全绿且 TS/Rust 100% 字节等价；
+   - **`workspace-timing`**：`src/test/` 下 <!-- METRICS:BEGIN ws-test-case-count -->**205 项**<!-- METRICS:END ws-test-case-count -->单元测试由 `npm run test:fast` 与 `npm run review` 全量覆盖；
+   - **`WebGames`**：继承 `TestCase` 并在 `config/infrastructure/domains.json` 与 `test_registry.gd` 双向注册，严禁 `tests/unit/` 根目录散落脚本；
+   - **`fractal-git`**：10 微 Crate 测试与并发 CAS/零分配校验统一纳管于 Cargo Workspace 与 `audit-taxis.ps1`。
+2. **性能耗时棘轮 (`TB-REGRESSION`) 与超时尾日志转储**：
+   - 纯逻辑单测单项 $\le 10\text{ms}$；本地流式门禁内存判定约 $1\text{ms}$、端到端（含 Node 启动约 $80\text{ms}$）约 $160\text{ms}$；
+   - 套件总耗时受 $1.15 \times \text{Baseline}$ 单调棘轮约束，超限触发 `TB-REGRESSION` 阻断；
+   - 子进程或无头测试超时被杀时，驱动脚本必须自动截取并打印临时日志末尾最后 50 行以暴露死锁调用栈。
 
 ---
 
-## 四、 性能基准与回归耗时棘轮 (`TB-REGRESSION`)
-
-为了保护极速开发体验与自动化门禁性能，测试耗时受到单调棘轮机制看守：
-
-### 1. 单用例耗时上限与热路径微基准
-- 纯逻辑单元测试单项耗时应严格控制在 $10\text{ms}$ 以内；
-- 内存流式预审门禁的判定本身耗时控制在 $\text{1 ms}$ 级，端到端（含 Node 启动约 $80\text{ms}$）约 $160\text{ms}$；两个口径必须同时给出，只报小口径会描述一个调用方从未体验过的预算；
-- `auto-refactor` 热路径微基准（`node auto-refactor/scripts/bench-hot-paths.js`）专门看守 `mask-source`、`governance-scan` 与 `cmp-rules` 吞吐表现。
-
-### 2. 基准耗时棘轮与阻断 (`TB-REGRESSION`)
-- 子项目测试基线记录历史测试耗时快照；
-- 允许 $15\%$ 的环境硬件测量波动容差；
-- 若单次改动导致套件总耗时突破容差阈值，触发 `TB-REGRESSION` 警告与门禁阻断，强制排查未释放的定时器或死循环。
-
-### 3. 测试进程超时诊断与转储规范
-当自动化测试套件（尤其是无头引擎或子进程调用）遭遇非预期超时（Timeout）被宿主强行终止时：
-- 测试驱动脚本严禁静默退出或仅打印“Timeout detected”；
-- 必须使用 `tail -n 50` 或 PowerShell `Get-Content -Tail 50` 自动抓取并输出临时日志最后记录，暴露死锁、线程未退出或未决异步回调的具体函数调用栈。
-
----
-
-## 五、 常用测试运行与验证命令矩阵
+## 四、 常用验证命令与参考资产
 
 ```bash
-# 1. auto-refactor 全量测试套件与热路径基准
 cd auto-refactor && npm test && node scripts/bench-hot-paths.js
-
-# 2. workspace-timing 极速单元测试
 cd workspace-timing && npm run test:fast
-
-# 3. auto-refactor 规则自审棘轮基线看守
-node auto-refactor/scripts/gate-self.js
-
-# 4. 全工作区统一质量审查 (含全项目测试与基准验证)
-pwsh -File scripts/ps1/audit-all.ps1 -Fast
+pwsh -File fractal-git/scripts/ps1/audit-taxis.ps1
 ```
 
-**质性断言标准**：
-- auto-refactor <!-- METRICS:BEGIN test-suite-count -->**166 套**<!-- METRICS:END test-suite-count -->测试绿色通过，0 孤儿用例；
-- workspace-timing <!-- METRICS:BEGIN ws-test-case-count -->**205 项**<!-- METRICS:END ws-test-case-count -->单元测试 100% 通过；
-- 测试过程零未决异步句柄挂起，环境沙箱自动清理干净；
-- 全工作区 High/Critical 技术债务保持 0 项基线，严禁引入技术债务反弹。
-
----
-
-## 六、 关联模板与参考指引
-
-- [deterministic-test-isolation.md](references/deterministic-test-isolation.md)：确定性测试隔离与时钟/RNG 虚拟化指南；
-- [test-duration-ratchet-mechanics.md](references/test-duration-ratchet-mechanics.md)：测试耗时基准棘轮与防回归机制；
-- [deterministic-unit-test.ts](templates/deterministic-unit-test.ts)：确定性单元测试标准样板代码；
-- [benchmark-suite-skeleton.js](templates/benchmark-suite-skeleton.js)：性能微基准套件标准骨架。
+- [deterministic-test-isolation.md](references/deterministic-test-isolation.md)：时钟/PRNG 虚拟化、内存存储桩与 `TB-REGRESSION` 单调耗时棘轮深度指南；
+- [deterministic-unit-test.ts](templates/deterministic-unit-test.ts)：红-绿-重构确定性单元测试标准样板；
+- [benchmark-suite-skeleton.js](templates/benchmark-suite-skeleton.js)：热路径性能微基准套件标准骨架。

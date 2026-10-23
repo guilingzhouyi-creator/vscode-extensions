@@ -1,11 +1,10 @@
 /**
- * Substantial Contract Facade Template
- *
- * Demonstrates a compliant facade adhering to ARCH-FAC-001:
- * 1. Substantive business logic & orchestration (ELOC >= 15).
- * 2. Aggregates >= 3 orthogonal subdomains.
- * 3. Defensive runtime contract validation (guard clauses).
- * 4. Deep immutability guarantees via Object.freeze.
+ * Module: Facade Discipline — Substantial Contract Facade Template
+ * File Path: .agents/skills/facade-discipline/templates/contract-facade.ts
+ * Architecture Role: Unified domain facade aggregating configuration, telemetry, and task coordination.
+ * Dependencies & Triggers: Consumes ConfigService, TelemetryService, and TaskCoordinator interfaces.
+ * Responsibilities: Enforce runtime input contracts, orchestrate >= 3 orthogonal subdomains, and freeze output snapshots.
+ * Exit Semantics & Design Rationale: Compliant with ARCH-FAC-001 (ELOC >= 15 and Object.freeze immutability).
  */
 
 // Simulated subdomains (orthogonal domain modules)
@@ -37,18 +36,21 @@ export interface FacadeOptions {
     readonly maxConcurrentTasks?: number;
 }
 
+export interface CoreSystemFacadeDeps {
+    readonly config: ConfigService;
+    readonly telemetry: TelemetryService;
+    readonly coordinator: TaskCoordinator;
+    readonly options?: FacadeOptions;
+}
+
 export class CoreSystemFacade {
     private readonly config: ConfigService;
     private readonly telemetry: TelemetryService;
     private readonly coordinator: TaskCoordinator;
     private readonly options: FacadeOptions;
 
-    constructor(
-        config: ConfigService,
-        telemetry: TelemetryService,
-        coordinator: TaskCoordinator,
-        options: FacadeOptions = {}
-    ) {
+    constructor(deps: CoreSystemFacadeDeps) {
+        const { config, telemetry, coordinator, options = {} } = deps;
         // 1. 运行时输入防御性契约断言与参数守卫 (ARCH-FAC-001)
         if (!config || !telemetry || !coordinator) {
             throw new Error('CoreSystemFacade requires all 3 domain services to be initialized.');

@@ -8,17 +8,17 @@
     "forbiddenPrefixes": ["workspace-timing/", "auto-refactor/", "WebGames/", "scripts/", ".agents/plugins/"]
   },
   "associatedSkills": [
+    "fractal-git-dev",
     "rust-engineering",
+    "state-concurrency-and-crash-recovery",
+    "defensive-security-and-taint-safety",
     "algorithmic-operator-engineering",
     "coding-craft",
     "complexity-budget",
-    "test-driven-development",
     "test-benchmark-engineering",
     "spec-driven-development",
-    "doubt-driven-development",
     "constraint-driven-development",
     "facade-discipline",
-    "code-simplification",
     "debugging-and-error-recovery"
   ],
   "rigidAxioms": [

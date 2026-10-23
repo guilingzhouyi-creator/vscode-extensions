@@ -6,116 +6,63 @@ description: >-
   异构系统多语言均衡指数与离散度惩罚模型、基于 AST symbolIndex 的 CAI 符号追踪、以及 BLOCK_GAMING_DETECTED 虚假重构熔断。
 ---
 
-# telemetry-statistical-modeling — 度量评估、贝叶斯统计建模与反刷分工作流
+# telemetry-statistical-modeling — 客观度量、贝叶斯统计建模与反刷分规范
 
-本技能确立了全工作区质量度量、自研率（CAI）分析与自主自治评分系统的数学理论根基，坚决落实**客观度量零注水**、**主流无信息 Jeffreys Beta 共轭后验区间建模**以及**反刷分熔断防御**。
-
----
-
-## 一、 适用场景与触发条件
-
-在以下任一场景中，必须激活本技能：
-1. **开发或重构度量评估模型**：涉及质量评分器、自治评分器（Autonomy Scorer）或代码自研率（CAI）算法；
-2. **计算度量置信区间与方差估计**：对小样本或全量样本进行统计区间估计，严禁硬编码常数误差；
-3. **符号依赖调用分析**：追踪外部依赖与自研核心之间的符号调用关系图；
-4. **排查反刷分熔断阻断**：系统触发 `BLOCK_GAMING_DETECTED` 熔断或评分被强制冻结。
+本技能确立全工作区质量度量、代码自研率（CAI）分析与自治评分系统的数学根基，落实**从 0 纯客观统计**、**无信息 Jeffreys $\text{Beta}(0.5, 0.5)$ 共轭后验置信区间**、**异构多语言均衡指数**及**反刷分熔断防御（`BLOCK_GAMING_DETECTED`）**。
 
 ---
 
-## 二、 客观统计零注水与符号溯源公理
-
-所有质量评分与代码指标统计必须遵循求真公理：
+## 一、 客观统计零注水与 AST 符号溯源公理
 
 | 治理支柱 | 刚性约束指标 | 架构职责与防范目标 |
 | :--- | :--- | :--- |
-| **基数从零纯客观** | 零倍率放大 / 零虚假加分 | 符号与质量得分从 0 起算，严禁人为注入基数放大或保底伪造 |
-| **真实 AST 符号追踪** | 基于 `symbolIndex` 真实索引 | 外部依赖调用必须基于 AST 真实符号索引精确追踪，严禁正则盲扫 |
-| **小样本真实不确定性** | 严禁写死固定误差常数 | 样本不足时如实输出大置信区间，样本充沛时收敛，严禁固定 $\pm 5\%$ |
-| **概率测度封闭性** | 严格钳制于 $[0.0, 1.0]$ | 评分与置信区间必须受测度空间截断保护，杜绝出现负值或超上限值 |
+| **基数从零纯客观** | 零倍率放大 / 零保底加分 | 符号与质量得分从 0 起算，严禁乘 1.2/1.5 倍虚假放大或写死保底分 |
+| **AST 符号索引追踪** | 基于 `symbolIndex` 真实节点 | 外部依赖调用必须基于 AST 符号索引精确追踪，严禁正则行匹配盲扫 |
+| **小样本真实不确定性** | 严禁写死固定误差常数 | 样本不足时如实输出宽置信区间，严禁硬编码 `score ± 5%` |
+| **概率测度封闭性** | 严格钳制于 $[0.0, 1.0]$ | 评分与置信区间受测度截断保护，杜绝出现负值或超上限值 |
 
 ---
 
-## 三、 主流统计学 Jeffreys Beta(0.5, 0.5) 共轭后验数学公理
+## 二、 Jeffreys Beta(0.5, 0.5) 共轭后验与 Popoviciu 多语言均衡模型
 
-对于二项分布样本（$s$ 次成功、$f$ 次失败，样本总量 $n = s + f$），采用经典无信息 Jeffreys 先验共轭后验建模：
-
-### 1. 先验与后验分布
-- **无信息 Jeffreys 先验**：$\text{Beta}(0.5, 0.5)$；
-- **共轭后验更新**：$\theta \mid s, f \sim \text{Beta}(s + 0.5, f + 0.5)$。
-
-### 2. 均值、方差与 95% 置信区间
-- **后验均值**：
-  $$\mu = \frac{s + 0.5}{n + 1}$$
-- **后验方差**：
-  $$\sigma^2 = \frac{(s + 0.5)(f + 0.5)}{(n + 1)^2 (n + 2)}$$
-- **双侧 95% 置信区间**（$z \approx 1.95996$）：
-  $$\text{Interval} = \left[\max(0.0, \mu - z\sigma), \; \min(1.0, \mu + z\sigma)\right]$$
+1. **无信息 Jeffreys 先验共轭后验**（成功 $s$，失败 $f$，样本量 $n = s + f$）：
+   - 后验分布：$\theta \mid s, f \sim \text{Beta}(s + 0.5, f + 0.5)$；
+   - 后验均值与方差：$\mu = \frac{s + 0.5}{n + 1}$，$\sigma^2 = \frac{(s + 0.5)(f + 0.5)}{(n + 1)^2 (n + 2)}$；
+   - 双侧 95% 置信区间（$z \approx 1.95996$）：$\left[\max(0.0, \mu - z\sigma),\; \min(1.0, \mu + z\sigma)\right]$。
+2. **Popoviciu 方差界与异构多语言均衡指数 (`calculatePolyglotGeneralizationIndex`)**：
+   - 根据 Popoviciu 方差不等式 (Popoviciu, 1935)，对取值在 $[0, 100]$ 的任意有界变量，理论最大标准差为 $\sigma_{\max} = \frac{100 - 0}{2} = 50.0$；
+   - 设 $M$ 个活跃技术栈得分为 $S_i \in [0, 100]$、对数规模权重 $w_i = \ln(\text{LOC}_i + 10)$，加权均值 $\mu = \frac{\sum w_i S_i}{\sum w_i}$，加权标准差 $\sigma = \sqrt{\frac{\sum w_i (S_i - \mu)^2}{\sum w_i}}$；
+   - 归一化离散度 $\tilde{\sigma} = \frac{\sigma}{\sigma_{\max}}$，最大惩罚弹性 $\gamma = 0.5$（确保极端极化下仍保留 50% 资产存量底色）：
+     $$D = \max\left(0.0,\; 1.0 - \tilde{\sigma} \cdot \gamma\right) = \max\left(0.0,\; 1.0 - \frac{\sigma}{100}\right), \quad S_{\text{balanced}} = \mu \times D$$
 
 ---
 
-## 四、 异构多系统/多语言均衡指数数学模型 (Polyglot / Multi-System Balanced Generalization Index)
+## 三、 Michaelis-Menten 双曲饱和衰减与加权几何平均非补偿评级
 
-针对跨多语言、多微服务或多组件架构中“单一模块刷高分掩盖弱势模块短板”的单点偏倚风险，度量系统引入加权均衡指数数学模型（`calculatePolyglotGeneralizationIndex`）：
-
-### 1. 加权均值与样本标准差
-设系统由 $M$ 个子领域/语言组成，各模块规范化得分为 $S_i \in [0, 100]$，权重为 $w_i > 0$：
-- **加权均值**：
-  $$\mu = \frac{\sum_{i=1}^M w_i S_i}{\sum_{i=1}^M w_i}$$
-- **加权样本标准差（离散度）**：
-  $$\sigma = \sqrt{\frac{\sum_{i=1}^M w_i (S_i - \mu)^2}{\sum_{i=1}^M w_i}}$$
-
-### 2. 离散度惩罚与均衡综合得分
-- **均衡性惩罚因子 $D$**：
-  $$D = \max\left(0.0, \; 1.0 - \frac{\sigma}{100}\right)$$
-- **均衡综合得分**：
-  $$S_{\text{balanced}} = \mu \times D$$
-- **数学性质与治理导向**：
-  - 当 $M \le 1$ 时，返回单模块原始截断得分，无离散度惩罚；
-  - 当各技术栈/子系统协同并进时（$\sigma \to 0$），$D \to 1.0$，综合得分保持高位；
-  - 当某技术栈严重掉队（如 TS=95, Py=35）时，标准差 $\sigma$ 增大导致 $D$ 折损，压低综合得分，坚决杜绝“单点过度工程掩盖全局缺陷”的伪现代化。
+1. **Michaelis-Menten / Hill 双曲有理饱和衰减**：
+   - 缺陷密度扣分采用双曲有理形式：$S = 100 \times \frac{H}{H + \text{density}}$（$H = 30$ 为半饱和常数）；
+   - 数学特性：处处严格下凸（$\frac{d^2S}{dD^2} > 0$）且全域单调递减（$\frac{dS}{dD} < 0$），在无穷远处严格保持偏序梯度，彻底消除传统 Sigmoid 饱和触底为 0 导致多劣质文件不可区分的弊端。
+2. **加权几何平均非补偿评级模型 (MCDA)**：
+   - 综合分采用加权几何平均：$S_{\text{composite}} = \exp\left(\frac{\sum w_i \ln(\max(15, S_i))}{\sum w_i}\right)$；
+   - 避免传统算术平均下“9 个 100 分掩盖 1 个 0 分塌陷轴（均分 90 仍得 A）”的虚假健康，对单项短板产生非线性拖拽。
+3. **SQALE 技术债务比率 (TDR, ISO/IEC 25010)**：
+   - 与 SonarQube 同构，基于 $30\text{ min/ELOC}$ 研发成本基线，标准等级切分：$\le 5\%$ (A), $\le 10\%$ (B), $\le 20\%$ (C), $\le 50\%$ (D), $> 50\%$ (E)。
 
 ---
 
-## 五、 反刷分熔断防御机制 (`BLOCK_GAMING_DETECTED`)
+## 四、 反刷分熔断防御机制 (`BLOCK_GAMING_DETECTED`)
 
-为防范在自动化重构中通过轻微编辑虚增活跃度或骗取自治评分，系统设置反刷分熔断防线：
-
-### 1. 触发判定条件
-当且仅当同时满足以下两项条件时，系统强制判定为虚假刷分并触发熔断：
-1. **语义代码改动比例极低**：
-   $$\text{Ratio}_{semantic} = \frac{\text{ELOC}_{changed}}{\text{ELOC}_{total}} \le 15\%$$
-2. **净技术债务消除为零或为负**：
-   $$\Delta_{\text{Debt}} \le 0$$
-
-### 2. 处置动作
-- 立即冻结本次改动的评分收益；
-- 抛出 `BLOCK_GAMING_DETECTED` 告警；
-- 要求必须消除实质性代码异味或优化控制流圈复杂度后方可计分。
+当自动化重构或提交同时满足以下两项条件时，立即判定为虚假刷分并冻结评分收益：
+1. **语义代码改动比例极低**：$\text{Ratio}_{\text{semantic}} = \frac{\text{ELOC}_{\text{changed}}}{\text{ELOC}_{\text{total}}} \le 15\%$；
+2. **真实技术债务净消除非正**：$\Delta_{\text{Debt}} \le 0$（未消除任何规则违规、循环堆分配或复杂度超标）。
 
 ---
 
-## 六、 本地验证指令与断言标准
-
-在提交度量评估相关代码前，执行本地验证：
+## 五、 验证命令与关联资产
 
 ```powershell
-# 1. 验证自治评分器与数学模型测试
-node auto-refactor/scripts/validate-autonomy-scorer.js
-
-# 2. 验证项目中立性与无注水公理
-node auto-refactor/scripts/validate-project-neutrality.js
+node auto-refactor/scripts/validate-autonomy-scorer.js && node auto-refactor/scripts/validate-project-neutrality.js
 ```
 
-**质性断言标准**：
-- 控制台输出 `✔ [PASS] Autonomy scorer validation passed`；
-- 置信区间严格通过 Beta 共轭后验数学公式计算生成；
-- 反刷分熔断机制正常运行，对 $\text{ELOC}_{semantic} \le 15\%$ 的无净债务微改动精准拦截；
-- 全工作区 High/Critical 技术债务保持 0 项历史归零基线，严禁引入债务反弹。
-
----
-
-## 七、 关联模板与参考指引
-
-- [jeffreys-beta-credible-interval.md](references/jeffreys-beta-credible-interval.md)：无信息 Jeffreys 先验共轭后验详细数学推导指南；
-- [anti-gaming-detection-mechanics.md](references/anti-gaming-detection-mechanics.md)：反刷分熔断判定机制与作弊特征指南；
-- [bayesian-confidence-evaluator.ts](templates/bayesian-confidence-evaluator.ts)：开箱即用的贝叶斯置信度计算与反刷分判定模板。
+- [jeffreys-beta-credible-interval.md](references/jeffreys-beta-credible-interval.md)：Fisher 信息矩阵 Jeffreys 先验推导与 `BLOCK_GAMING_DETECTED` 反刷分攻击向量剖析；
+- [bayesian-confidence-evaluator.ts](templates/bayesian-confidence-evaluator.ts)：贝叶斯置信区间计算与反刷分熔断评估器标准模板。

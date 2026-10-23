@@ -2,12 +2,33 @@
   "archetype": "infra-tool",
   "displayName": "工程效能、门禁脚本与跨平台调用 (scripts/)",
   "rootDirectory": "scripts",
-  "allowedExtensions": [".js", ".ps1", ".sh", ".py", ".json", ".md"],
+  "allowedExtensions": [
+    ".js",
+    ".ps1",
+    ".sh",
+    ".py",
+    ".json",
+    ".md"
+  ],
   "pathJail": {
-    "allowedPrefixes": ["scripts/"],
-    "forbiddenPrefixes": ["workspace-timing/", "auto-refactor/", "WebGames/", ".agents/"]
+    "allowedPrefixes": [
+      "scripts/"
+    ],
+    "forbiddenPrefixes": [
+      "workspace-timing/",
+      "auto-refactor/",
+      "WebGames/",
+      ".agents/",
+      "fractal-git/"
+    ]
   },
-  "associatedSkills": ["gate-governance", "release-package-workflow", "coding-craft"],
+  "associatedSkills": [
+    "gate-governance",
+    "defensive-security-and-taint-safety",
+    "state-concurrency-and-crash-recovery",
+    "release-package-workflow",
+    "coding-craft"
+  ],
   "rigidAxioms": [
     "子进程工作目录显式隔离：父级调用必须显式传递 -WorkingDirectory (PowerShell) 或 (cd dir && ...) (Bash)",
     "PowerShell 优先使用跨平台 pwsh (PowerShell 7+)，严禁回退至 PS 5.1；磁盘上 .ps1 严格保持 CRLF 换行",

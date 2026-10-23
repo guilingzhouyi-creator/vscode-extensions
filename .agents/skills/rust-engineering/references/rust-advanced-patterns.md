@@ -129,15 +129,16 @@ impl BufferPool {
 }
 
 impl<'a> std::ops::Deref for PooledBuffer<'a> {
-    type Target = Vec<u8>;
+    type Target = [u8];
     fn deref(&self) -> &Self::Target {
-        self.buf.as_ref().unwrap()
+        self.buf.as_deref().unwrap_or(&[])
     }
 }
 
-impl<'a> std::ops::DerefMut for PooledBuffer<'a> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        self.buf.as_mut().unwrap()
+impl<'a> PooledBuffer<'a> {
+    /// 获取可变缓冲区引用（通过 `Option::as_mut` 显式暴露生命周期，零裸 `unwrap`）
+    pub fn buffer_mut(&mut self) -> Option<&mut Vec<u8>> {
+        self.buf.as_mut()
     }
 }
 

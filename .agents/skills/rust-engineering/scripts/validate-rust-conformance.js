@@ -19,11 +19,34 @@ const fs = require('fs');
 const path = require('path');
 
 const REPO_ROOT = path.resolve(__dirname, '../../../../');
+const RULE_CATALOG_PATH = path.join(REPO_ROOT, 'scripts/common/rule-catalog.json');
 const RUST_DIRS = [
   path.join(REPO_ROOT, 'fractal-git/crates'),
   path.join(REPO_ROOT, 'fractal-git/src'),
   path.join(REPO_ROOT, 'auto-refactor/crates'),
 ];
+
+const RULE_ID_RE = /\b([A-Z]{2,4}-[A-Z0-9]{2,6}-\d{3})\b/g;
+const PROTOCOL_ALLOWLIST = new Set([
+  'SHA-256',
+  'SHA-512',
+  'AES-256',
+  'AES-128',
+  'UTF-8',
+  'UTF-16',
+  'ISO-8601',
+  'RFC-7231',
+  'RFC-3339',
+  'IEEE-754',
+]);
+
+function loadRegisteredRules() {
+  if (!fs.existsSync(RULE_CATALOG_PATH)) {
+    return new Set();
+  }
+  const catalog = JSON.parse(fs.readFileSync(RULE_CATALOG_PATH, 'utf8'));
+  return new Set((catalog.rules || []).map((r) => r.id));
+}
 
 /**
  * Collect all .rs files under a directory recursively, excluding test targets.
@@ -57,55 +80,102 @@ function collectRustFiles(dir) {
   return result;
 }
 
+function countChar(str, ch) {
+  let count = 0;
+  for (let i = 0; i < str.length; i++) {
+    if (str[i] === ch) count++;
+  }
+  return count;
+}
+
+/**
+ * Check rule ID drift against catalog.
+ */
+function checkRuleDrift(line, lineNum, filePath, registeredRules, errors) {
+  if (registeredRules.size === 0) return;
+  RULE_ID_RE.lastIndex = 0;
+  let match;
+  while ((match = RULE_ID_RE.exec(line)) !== null) {
+    const ruleId = match[1];
+    if (!PROTOCOL_ALLOWLIST.has(ruleId) && !registeredRules.has(ruleId)) {
+      errors.push(`${filePath}:${lineNum}: Unregistered rule ID '${ruleId}' (RCFG-RULE-DRIFT)`);
+    }
+  }
+}
+
+/**
+ * Check bare unwrap / expect in production code.
+ */
+function checkUnwrapExpect(trimmed, lineNum, filePath, errors) {
+  if (!/\.(?:unwrap|expect)\(/.test(trimmed) || trimmed.startsWith('//')) return;
+  if (!trimmed.includes('.lock().unwrap()') && !trimmed.includes('.read().unwrap()')) {
+    errors.push(`${filePath}:${lineNum}: Prohibited unwrap/expect in production path (FGT-ERR-001)`);
+  }
+}
+
+/**
+ * Check unsafe block safety invariant documentation.
+ */
+function checkUnsafeSafety(trimmed, lines, lineIndex, filePath, errors) {
+  if (!/\bunsafe\s*\{/.test(trimmed) || trimmed.startsWith('//')) return;
+  let hasSafetyDoc = false;
+  for (let j = Math.max(0, lineIndex - 4); j < lineIndex; j++) {
+    if (lines[j].includes('SAFETY:')) {
+      hasSafetyDoc = true;
+      break;
+    }
+  }
+  if (!hasSafetyDoc) {
+    errors.push(`${filePath}:${lineIndex + 1}: Bare unsafe block without preceding '// SAFETY:' invariant proof (FGT-SAF-001)`);
+  }
+}
+
 /**
  * Validate a single Rust file against conformance invariants.
  *
  * @param {string} filePath - Absolute path to .rs file.
+ * @param {Set<string>} registeredRules - Set of valid rule IDs from rule-catalog.json.
  * @returns {string[]} List of detected violations.
  */
-function validateRustFile(filePath) {
+function validateRustFile(filePath, registeredRules) {
   const errors = [];
   const content = fs.readFileSync(filePath, 'utf8');
   const lines = content.split('\n');
 
+  let pendingTestAttr = false;
   let insideTestModule = false;
+  let testBraceDepth = 0;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     const trimmed = line.trim();
 
-    if (trimmed.startsWith('#[cfg(test)]') || trimmed.includes('mod tests {')) {
+    if (trimmed.startsWith('#[cfg(test)]')) {
+      pendingTestAttr = true;
+    }
+    if ((pendingTestAttr && trimmed.includes('{')) || trimmed.includes('mod tests {')) {
       insideTestModule = true;
+      pendingTestAttr = false;
+      testBraceDepth = 0;
     }
-    if (insideTestModule) continue;
+    if (insideTestModule) {
+      testBraceDepth += countChar(line, '{') - countChar(line, '}');
+      if (testBraceDepth <= 0) {
+        insideTestModule = false;
+      }
+      continue;
+    }
 
-    // Check FGT-ERR-001: bare unwrap / expect in production code
-    if (/\.(?:unwrap|expect)\(/.test(trimmed) && !trimmed.startsWith('//')) {
-      // Allow atomic or harmless thread lock unwrap if explicitly guarded
-      if (!trimmed.includes('.lock().unwrap()') && !trimmed.includes('.read().unwrap()')) {
-        errors.push(`${filePath}:${i + 1}: Prohibited unwrap/expect in production path (FGT-ERR-001)`);
-      }
-    }
-
-    // Check FGT-SAF-001: undocumented unsafe block
-    if (/\bunsafe\s*\{/.test(trimmed) && !trimmed.startsWith('//')) {
-      let hasSafetyDoc = false;
-      for (let j = Math.max(0, i - 4); j < i; j++) {
-        if (lines[j].includes('SAFETY:')) {
-          hasSafetyDoc = true;
-          break;
-        }
-      }
-      if (!hasSafetyDoc) {
-        errors.push(`${filePath}:${i + 1}: Bare unsafe block without preceding '// SAFETY:' invariant proof (FGT-SAF-001)`);
-      }
-    }
+    checkRuleDrift(line, i + 1, filePath, registeredRules, errors);
+    checkUnwrapExpect(trimmed, i + 1, filePath, errors);
+    checkUnsafeSafety(trimmed, lines, i, filePath, errors);
   }
 
   return errors;
 }
 
 function run() {
+  const registeredRules = loadRegisteredRules();
   const allErrors = [];
   let fileCount = 0;
 
@@ -113,7 +183,7 @@ function run() {
     const files = collectRustFiles(dir);
     fileCount += files.length;
     for (const f of files) {
-      allErrors.push(...validateRustFile(f));
+      allErrors.push(...validateRustFile(f, registeredRules));
     }
   }
 

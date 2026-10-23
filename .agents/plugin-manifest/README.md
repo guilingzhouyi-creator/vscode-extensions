@@ -1,6 +1,6 @@
 # Workspace Governance & Engineering Suite (`workspace-governance`)
 
-全工作区一体化治理、多智能体协同与研发工程套件。将工作区内离散的 27 项技能、治理规则、23 份 SubAgent 专员文档、四模式 DSH 治理模式族以及 MCP 工具整合为单一生命周期可控的插件包（Plugin Bundle）。
+全工作区一体化治理、多智能体协同与研发工程套件。将工作区内离散的 <!-- METRICS:BEGIN skill-count -->**24 项**<!-- METRICS:END skill-count -->、治理规则、<!-- METRICS:BEGIN subagent-preset-count -->**27 条**<!-- METRICS:END subagent-preset-count --> SubAgent 专员文档、四模式 DSH 治理模式族以及 MCP 工具整合为单一生命周期可控的插件包（Plugin Bundle）。
 
 > **资产归属说明（诚实边界）**：本目录是**工作区文档与资产套件**，不是 DSH 运行时
 > 插件。DSH 的插件装载只认 npm 包（profile `package.json` 的 `dsh.profile.bundles`），
@@ -20,29 +20,33 @@
 │   └── logo.svg                # 矢量品牌徽标 (128x128)
 ├── rules/
 │   └── AGENTS.md               # 工作区治理总规与指针查询总枢 (SSOT)
-├── agents/                     # 预设专属 SubAgent 专员（共 23 份 .md，下表为节选）
-│   ├── workspace-guardian.md   # 全仓五大支柱统一审查与单源规则总看守
+├── agents/                     # 预设专属 SubAgent 专员（共 27 份 .md，下表为节选）
+│   ├── workspace-guardian.md   # 全仓六大支柱统一审查与单源规则总看守
 │   ├── infra-guardian.md       # 跨平台工程脚本与预提交双层门禁守卫
 │   ├── wt-construct.md         # workspace-timing 特性研发专员
 │   ├── ar-construct.md         # auto-refactor CLI/算子研发专员
-│   └── wg-construct.md         # WebGames 游戏系统研发专员
-└── skills/                     # 27 项内聚研发技能全集（下表为节选）
+│   ├── wg-construct.md         # WebGames 游戏系统研发专员
+│   └── fg-construct.md         # fractal-git 存储内核研发专员
+└── skills/                     # 24 项内聚研发技能全集（下表为节选）
     ├── auto-refactor-dev/      # auto-refactor 引擎与算子研发
     ├── batch-commit/           # Git 拓扑分批原子提交与风格审查
     ├── complexity-budget/      # 双轨体积、AST 复杂度与 JSDoc 预算
+    ├── defensive-security-and-taint-safety/ # 污点防御与破坏操作守卫
     ├── docs-archive-governance/# 蓝图与历史全宗元数据治理
     ├── facade-discipline/      # 门面实质承载与跳板文件消融
+    ├── fractal-git-dev/        # fractal-git 10 微 Crate 与 Plumbing 协议
     ├── gate-governance/        # 跨平台自动化门禁与环境隔离
     ├── release-package-workflow/# 扩展打包、热同步自愈与发布流
     ├── rule-catalog-governance/# 单源规则字典与元治理
     ├── skill-governance/       # 技能四件套架构与同构同步治理
+    ├── state-concurrency-and-crash-recovery/# 原子状态事务与崩溃自愈
     ├── subagent-orchestration/ # 四重防线与 (Archetype × Posture) 编排
     ├── webgames-workflow/      # Godot 引擎配置驱动与四阶段方案流
     └── workspace-timing-dev/   # VS Code 扩展五层解耦与双语字典
 ```
 
 > 本节计数以实测为准（`.agents/skills/` 与 `.agents/plugins/workspace-governance/skills/`
-> 两处镜像各 27 份 `SKILL.md`，由 `validate-skills.js` 的同构配对校验覆盖）。
+> 两处镜像各 <!-- METRICS:BEGIN skill-count -->**24 项**<!-- METRICS:END skill-count --> `SKILL.md`，由 `validate-skills.js` 的同构配对校验覆盖）。
 > DSH 治理模式族的单源位于 [`../../dsh/presets/`](../../dsh/presets/)，不在本目录内。
 
 ---
@@ -67,15 +71,19 @@
 - **`docs-archive-governance`**：顶层蓝图、交付物归档与历史全宗治理；
 - **`workspace-timing-dev`**：`workspace-timing/` 扩展专有研发规范；
 - **`auto-refactor-dev`**：`auto-refactor/` 静态分析引擎专有研发规范；
-- **`webgames-workflow`**：`WebGames/` Godot 引擎四阶段方案与配置驱动。
+- **`webgames-workflow`**：`WebGames/` Godot 引擎四阶段方案与配置驱动；
+- **`fractal-git-dev`**：`fractal-git/` 10 微 Crate 分层与 Plumbing 二进制协议规范；
+- **`defensive-security-and-taint-safety`**：污点数据流隔离与破坏操作前置守卫；
+- **`state-concurrency-and-crash-recovery`**：原子状态跃迁、重入锁与崩溃恢复。
 
 ### 3. 预设专员 Agent (`agents/`)
-共 23 份专员文档，按 (Archetype × Posture) 正交命名；下列为领域原型入口：
+共 <!-- METRICS:BEGIN subagent-preset-count -->**27 条**<!-- METRICS:END subagent-preset-count -->专员文档，按 (Archetype × Posture) 正交命名；下列为领域原型入口：
 - **`workspace-guardian`**：全仓审查（`audit-all.ps1`）、规则一致性核验与物理卫生看守；
 - **`infra-guardian`**：门禁脚本（`pre-commit-gate.ps1`）、子进程目录隔离巡检；
 - **`wt-construct`**：`workspace-timing/` 业务特性增量构建专员；
 - **`ar-construct`**：`auto-refactor/` 新分析器与原生算子研发专员；
-- **`wg-construct`**：`WebGames/` 游戏逻辑与配置驱动编码专员。
+- **`wg-construct`**：`WebGames/` 游戏逻辑与配置驱动编码专员；
+- **`fg-construct`**：`fractal-git/` Crate 拓扑演进与 Rust 内核增量构建专员。
 
 ### 4. 外部工具服务 (`mcp_config.json`)
 提供前缀隔离的 MCP 服务：
@@ -118,7 +126,7 @@
 
 ### 启用与禁用
 在 Antigravity 插件管理页面，或者通过语言服务/配置文件控制：
-- 启用插件时，插件内的全部 27 项技能、AGENTS.md 规则、MCP 工具与 23 份专员文档同时激活；
+- 启用插件时，插件内的全部 <!-- METRICS:BEGIN skill-count -->**24 项**<!-- METRICS:END skill-count -->、AGENTS.md 规则、MCP 工具与 <!-- METRICS:BEGIN subagent-preset-count -->**27 条**<!-- METRICS:END subagent-preset-count -->专员文档同时激活；
 - 禁用插件时，整个功能包作为一个整体彻底下线，不留残留影响。
 
 > 上述「启用/禁用」只作用于本工作区文档套件；DSH 模式族的装载与启停由
@@ -126,7 +134,7 @@
 
 ### 常用验证与自测命令
 ```powershell
-# 执行全工作区五大支柱统一审查
+# 执行全工作区六大支柱统一审查
 pwsh -File scripts/ps1/audit-all.ps1 -Fast
 
 # 验证单源规则目录一致性

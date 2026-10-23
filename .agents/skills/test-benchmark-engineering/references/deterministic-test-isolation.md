@@ -1,59 +1,47 @@
-# 确定性测试隔离与时钟/RNG 虚拟化指南 (Deterministic Test Isolation Guide)
+# 确定性测试隔离、内存桩与耗时基准棘轮 (`TB-REGRESSION`) 深度指南
 
-本指南规范了工作区各子系统单元测试与集成测试中的环境隔离标准，确保自动化测试具备 100% 确定性（Determinism）、零偶发失败（Flakiness）与无副作用清理。
-
----
-
-## 一、 时钟虚拟化与固定时间注入 (`withFixedNow`)
-
-### 1. 真实系统时钟的危害
-直接在业务代码或测试断言中读取 `Date.now()`、`new Date()` 或 `performance.now()` 会导致：
-- **跨午夜/跨时区竞态**：在 UTC 23:59:59 附近运行测试可能偶发跨天，导致切分逻辑断言失败；
-- **执行延迟抖动**：因机器负载差异，执行时长在 10ms 与 100ms 间波动，导致绝对耗时断言偶发失败。
-
-### 2. 标准注入范式
-所有涉及时间计算的模块必须支持时间抽象注入或通过上下文包裹函数执行：
-
-```typescript
-export async function withFixedNow<T>(
-  fixedTimestampMs: number,
-  fn: () => Promise<T> | T,
-): Promise<T> {
-  const originalNow = Date.now;
-  try {
-    Date.now = () => fixedTimestampMs;
-    return await fn();
-  } finally {
-    Date.now = originalNow;
-  }
-}
-```
-
-在测试中通过 `withFixedNow(1700000000000, async () => { ... })` 锁定离散时间基准点，断言输出具有数学级确定性。
+本指南规范了工作区单元测试与集成测试中的时钟/随机数虚拟化、内存存储桩隔离以及测试耗时单调棘轮（`TB-REGRESSION`）防回归机制。
 
 ---
 
-## 二、 伪随机数种子隔离 (PRNG Seed Isolation)
+## 一、 时钟虚拟化 (`withFixedNow`) 与伪随机种子隔离 (Mulberry32)
 
-在涉及游戏逻辑、蒙特卡洛抽样或随机测试用例生成的场景下：
-- **严禁**：裸调用无种子的 `Math.random()`；
-- **必须**：引入可重现的伪随机数发生器（如 XorShift128+ 或 Mulberry32），在测试套件头部固定初始化 Seed：
-  ```typescript
-  function mulberry32(seed: number) {
-    return function() {
-      let t = (seed += 0x6D2B79F5);
-      t = Math.imul(t ^ (t >>> 15), t | 1);
-      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    };
-  }
-  ```
+1. **固定时间注入（消除跨午夜与负载抖动）**：
+   ```typescript
+   export async function withFixedNow<T>(
+     fixedTimestampMs: number,
+     fn: () => Promise<T> | T,
+   ): Promise<T> {
+     const originalNow = Date.now;
+     try {
+       Date.now = () => fixedTimestampMs;
+       return await fn();
+     } finally {
+       Date.now = originalNow;
+     }
+   }
+   ```
+2. **固定种子 PRNG（严禁裸调 `Math.random()`）**：
+   ```typescript
+   export function mulberry32(seed: number): () => number {
+     return () => {
+       let t = (seed += 0x6d2b79f5);
+       t = Math.imul(t ^ (t >>> 15), t | 1);
+       t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+       return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+     };
+   }
+   ```
+3. **内存存储桩与临时沙箱对称清理**：
+   单元测试优先使用 `Map<string, T>` 内存桩替代磁盘 I/O；集成测试必须在 `os.tmpdir()` 下创建带随机后缀的独立沙箱目录，并在 `try ... finally` 或 `afterEach` 中彻底清理文件与事件监听器。
 
 ---
 
-## 三、 文件系统与进程沙箱清理契约
+## 二、 耗时基准单调棘轮 (`TB-REGRESSION`) 设计原理
 
-1. **独占临时工作目录**：
-   测试产生的所有临时文件、快照或测试数据库必须建立在带随机后缀的独立临时目录（如 `os.tmpdir()/test-<uuid>/`）；
-2. **两阶段资源清理保证**：
-   无论测试成功与否，必须在 `afterEach` 或 `try ... finally` 中物理清理临时文件与监听器，严禁污染源码树或系统临时目录。
+1. **分层预算基线**：
+   - **纯逻辑单测**：单项执行耗时 $\le 10\text{ms}$；
+   - **本地流式门禁**：内存判定约 $1\text{ms}$，端到端（含 Node 启动约 $80\text{ms}$）约 $160\text{ms}$（必须同时报告双口径）；
+   - **套件耗时棘轮**：基线快照记录历史耗时，允许 $15\%$ 硬件波动容差（$\le 1.15 \times \text{Baseline}$）；突破阈值即触发 `TB-REGRESSION` 阻断，强制排查未释放定时器或 $O(N^2)$ 退化。
+2. **单向棘轮更新**：
+   当算子重构使执行耗时显著下降时，同步收紧基线快照，确保性能水位单调不退。

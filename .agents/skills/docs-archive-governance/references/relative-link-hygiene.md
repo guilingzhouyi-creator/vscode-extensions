@@ -1,10 +1,10 @@
-# 文档超链接存活性与相对路径避坑指南 (`LINK-DEAD` / `LINK-ABS-FILE-URI`)
+# 文档超链接存活性与相对路径避坑指南 (`DOC-LNK-001` / `HC-ABS-PATH`)
 
 本指南规范了在工作区 Markdown 文档中编写超链接与相对路径的标准实践，防止触发静态文档门禁阻断。
 
 ---
 
-## 一、 严禁绝对路径与本地协议 URI (`LINK-ABS-FILE-URI`)
+## 一、 严禁绝对路径与本地协议 URI (`DOC-LNK-001` / `HC-ABS-PATH`)
 
 在自动化文档门禁（`audit_docs.py` / `validate-docs.js`）中：
 - **违规特征**：包含 `file:///`、Windows 盘符（如 `C:\...`、`c:/...`）或特定机器的用户根目录（如 `/Users/...`）；
@@ -34,7 +34,7 @@
 
 ---
 
-## 三、 锚点链接与标题对齐规则 (`LINK-ANCHOR-DEAD`)
+## 三、 锚点链接与标题对齐规则 (`DOC-LNK-001`)
 
 1. **标题存在性校验**：锚点（`#section-name`）指向的 Markdown 标题必须在目标文档中真实存在；
 2. **标准 GitHub Slug 规则**：

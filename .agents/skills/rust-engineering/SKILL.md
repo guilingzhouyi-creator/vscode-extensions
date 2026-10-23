@@ -8,14 +8,14 @@ description: >-
 
 # rust-engineering — Rust 工业级高级编程风格与系统工程规范
 
-本技能确立了全工作区 Rust 代码库（包括 `fractal-git` 10 大微 Crate 矩阵与 `auto-refactor` 原生内核 `ops-clone`）的高级编程范式、内存安全契约、零瞬态堆分配复用池与工业级门禁标准。指导 Agent 突破语法级编写思维，内化资深系统级软件工程师的高级工程风格与防线意识。
+本技能确立了全工作区 Rust 代码库（包括 `fractal-git` 10 大微 Crate 矩阵与 `auto-refactor` 原生内核 6 大 Crate：`auto-refactor-core`、`ops-diff`、`ops-graph`、`ops-pattern`、`ops-mask`、`ops-clone`）的高级编程范式、内存安全契约、零瞬态堆分配复用池与工业级门禁标准。指导 Agent 突破语法级编写思维，内化资深系统级软件工程师的高级工程风格与防线意识。
 
 ---
 
 ## 一、 适用场景与触发条件
 
 在以下任一场景中，必须激活本技能：
-1. **`fractal-git` (Taxis) 核心与微 Crate 开发**：设计或重构对象存储（`fg-object`）、无锁内存树（`fg-index`）、拓扑与引用（`fg-topology`）、门禁守卫（`fg-gate`）、复用池（`fg-pools`）、存储引擎（`fg-storage`）与算法引擎（`fg-algorithms`）；
+1. **`fractal-git` (Taxis) 核心与 10 大微 Crate 开发**：设计或重构核心原语（`fg-core`）、对象存储（`fg-object`）、无锁内存树（`fg-index`）、拓扑与引用（`fg-topology`）、门禁守卫（`fg-gate`）、复用池（`fg-pools`）、存储引擎（`fg-storage`）、算法引擎（`fg-algorithms`）、传输层（`fg-transport`）与原生桥接（`fg-native`）；
 2. **`auto-refactor` 原生内核与算子突破**：编写或加速基于 Rust 的词法扫描、AST 转换、Myers Diff SWAR 位并行算子与 N-API 原生导出；
 3. **Rust 模块接口与错误处理设计**：定义跨模块公开 API、定义强类型领域错误、重构裸字符串常数或消除运行时 Panic 隐患；
 4. **并发控制与无锁数据结构设计**：涉及原子变量（Atomic）、CAS 快照物化、并发无锁索引或线程局部复用池。
@@ -69,7 +69,7 @@ description: >-
   3. *边界与类型证明*：切片长度或内存字节严格在分配边界之内。
 
 ### 6. 领域切片常量集中化与单源防漂移 (`RCFG-RULE-DRIFT`)
-- **严禁裸写伪规则与状态标签**：严禁在代码、日志、错误文案中硬编码未在工作区 `rule-catalog.json` 登记的伪规则 ID（如 `L3-CONFLICT` 这类凭空构造的标识）；已登记的规则 ID 可以自由引用，登记状态以 `rule-catalog.json` 为唯一判据；
+- **严禁裸写伪规则与状态标签**：严禁在代码、日志、错误文案中硬编码未在工作区 `rule-catalog.json` 登记的伪规则 ID（如凭空构造的自造三段或层前缀代号）；已登记的规则 ID 可以自由引用，登记状态以 `rule-catalog.json` 为唯一判据；
 - **常量目录收敛于 `constants/`**：Git 协议常数、引用命名空间、性能基准指标、合规规则与终端状态标签（`CliTag`），必须统一定义在 `crates/fg-core/src/constants/` 下，暴露强类型常量供全仓引用；
 - **双端镜像等价**：TS 绑定层通过不可变冻结字典（如 `fractal-git/ts/constants.ts`）镜像映射，确保全技术栈常量单源一致。
 

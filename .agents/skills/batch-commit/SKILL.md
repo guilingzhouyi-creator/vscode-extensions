@@ -79,7 +79,7 @@ git add path/to/contract.ts path/to/storage.ts
 关键生产级提交（feat/fix/refactor）正文首个结构化区块必须显式声明项目归属，枚举严格受限四大项目：
 ```markdown
 [Project]
-- <workspace-timing | auto-refactor | WebGames | governance>
+- <workspace-timing | auto-refactor | WebGames | fractal-git | governance>
 ```
 *若遗漏或填写未受控名称，强制触发 `CMG-PRJ-001` 一票否决。*
 

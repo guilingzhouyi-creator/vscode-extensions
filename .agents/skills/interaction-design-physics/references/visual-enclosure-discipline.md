@@ -1,92 +1,50 @@
-# 单闭合边框公理与抗套娃视觉边界纪律 (Visual Enclosure Discipline)
+# 界面交互物理学深水区指南：单闭合边框、二阶谐振子、感知幂律遮罩与 IME 互锁
 
-## 一、 背景与认知痛点
-
-在很多现代化前端界面与 AI 自动生成的页面中，“界面粗糙廉价、视觉压抑”的最主要诱因往往不是颜色搭配，而是**无休止的灰色线条嵌套（Russian-Doll Borders）**：
-* 整个页面卡片套了一层边框；
-* 卡片内的消息气泡套了一层边框；
-* 气泡底部的工具栏套了一层边框；
-* 工具栏里的每一个次级按钮和 Tag 再套一层边框。
-
-视线在穿透内容时被无数条 1px 灰色硬线切割得支离破碎，用户的视觉认知负荷极速膨胀。
+> 本指南整合了单闭合边框防套娃公理、二阶阻尼谐振子解析方程、7 档韦伯-费希纳幂律渐隐遮罩、光标不动点仿射变换及跨平台 CJK 输入法合成态互锁守卫。
 
 ---
 
-## 二、 核心公理：单闭合边框原则 (The 1-Border Rule)
+## 一、 单闭合边框公理与视网膜发丝高光 (Visual Enclosure Discipline)
 
-> **刚性公理**：在从主背景画布向内部穿透的任何一条单向视线路径上，**至多只能穿过 1 层闭合的矩形边框**。
+1. **单闭合边框原则 (The 1-Border Rule)**：从画布背景向内穿透的任意单向视线上，至多穿过 **1 层闭合矩形边框**。外层容器（卡片、搜索框、弹窗）具备独立边界后，内部次级按钮降级为表面微明度填充，图标动作降级为 `Ghost`（常态透明），输入区剥离原生轮廓（`border-0 outline-none`），内部分组仅用单向 `1px` 分割细线。
+2. **暗色模式内嵌顶光倒角与 Retina 发丝补偿**：
+   ```css
+   :root { --hairline-width: 1px; }
+   @media (min-resolution: 2dppx) { :root { --hairline-width: 0.5px; } }
+   @media (min-resolution: 3dppx) { :root { --hairline-width: calc(1px / 3); } }
 
-```
-[主背景画布]
-  │
-  ├── 📦 外层容器实体 (输入框 / 卡片 / 弹窗) ──【第 1 层边框：合法】
-  │     │
-  │     ├── 🚫 内联操作按钮 ──【严禁再带边框！降级为 Ghost 或 Surface 填充】
-  │     ├── 🚫 输入区域 ────【border-0 outline-none】
-  │     └── ➖ 内部结构分割 ──【严禁闭合框！仅采用 1px 单向分割细线】
-```
-
-### 1. 容器内子控件自动降级协议
-一旦外层容器已经成为一个具备独立边界的物理实体（如搜索栏、输入框、Modal 对话框、代码块）：
-- **次级操作按钮 (Secondary Button)**：严禁使用 `border border-neutral-300`，改用表面微明度差填充（如 `bg-neutral-100 hover:bg-neutral-200`）；
-- **内联小图标与辅助动作 (Ghost Action)**：常态必须为完全透明（`bg-transparent border-0`），仅在悬停（Hover）时展现 5%~10% 的微弱背景衬底；
-- **内部输入区 (Textarea / Input)**：彻底剥离原生轮廓（`border-0 outline-none ring-0`）。
-
-### 2. 单向细线替代原则 (Hairline Divider)
-容器内部需要进行视觉分组时，严禁使用闭合方框包裹子元素，一律采用单向细线：
-- 工具栏与输入区分隔：`border-t border-neutral-200/60`；
-- 列表项横向分割：`border-b border-neutral-100`；
-- 左右分栏中缝：`border-r border-neutral-200`。
+   .elevation-popover {
+     box-shadow: 0 0 0 var(--hairline-width) rgba(0, 0, 0, 0.08), 0 8px 24px rgba(0, 0, 0, 0.12);
+   }
+   [data-mode="dark"] .elevation-popover {
+     box-shadow: inset 0 0 0 var(--hairline-width) rgba(255, 255, 255, 0.10), 0 8px 28px rgba(0, 0, 0, 0.65);
+   }
+   ```
 
 ---
 
-## 三、 暗色模式下的物理高光倒角逆转
+## 二、 二阶阻尼谐振子微分方程 ($m\ddot{x} + c\dot{x} + k(x - x_{\text{target}}) = 0$)
 
-在暗色（Dark Mode）环境下，1px 的实线白色或浅灰边框会产生强烈的荧光刺眼感。
-
-工业设计中，黑暗环境下的物体轮廓是由于**边缘倒角捕捉到环境顶光产生的微弱反光**。在前端实现中，必须使用内嵌阴影模拟这种物理反光：
-
-```css
-/* 浅色模式：外环微边框 + 向下落差柔和阴影 */
-.elevation-popover {
-  box-shadow: 
-    0 0 0 1px rgba(0, 0, 0, 0.08),
-    0 8px 24px rgba(0, 0, 0, 0.12);
-}
-
-/* 深色模式：消除外层突兀白线，转为内嵌 1px 发丝高光 */
-[data-mode="dark"] .elevation-popover {
-  box-shadow: 
-    inset 0 0 0 1px rgba(255, 255, 255, 0.10),
-    0 8px 28px rgba(0, 0, 0, 0.65);
-}
-```
+设固有角频率 $\omega_0 = \sqrt{k/m}$，无量纲阻尼比 $\zeta = \frac{c}{2\sqrt{mk}}$：
+- **欠阻尼 ($\zeta < 1$)**：$x(t) = 1 - e^{-\zeta\omega_0 t}\left(\cos(\omega_d t) + \frac{\zeta}{\sqrt{1-\zeta^2}}\sin(\omega_d t)\right)$，超调量 $\exp\left(-\frac{\pi\zeta}{\sqrt{1-\zeta^2}}\right)$（对应 `Snappy` $\zeta=0.612$、`Gentle` $\zeta=0.783$、`Bouncy` $\zeta=0.462$）；
+- **临界阻尼 ($\zeta = 1$)**：$x(t) = 1 - e^{-\omega_0 t}(1 + \omega_0 t)$，最快无振荡收敛；
+- **过阻尼 ($\zeta > 1$)**：双指数单调衰减，严格 $0\%$ 超调（对应分栏磁吸 `HeavySnap` $\zeta=3.65$）。
 
 ---
 
-## 四、 视网膜高分屏发丝细边补偿 (Retina Hairline Ring)
+## 三、 7 档感知幂律遮罩 ($y \approx x^{1.5}$) 与不动点仿射缩放
 
-在 2x / 3x 视网膜屏上，传统的 `1px` 边框在物理上占据了 2 到 3 个发光像素，视觉感受笨拙厚重。此外，动态切换 `border` 会计入盒模型排版计算，引发 1px 的尺寸抖动。
+1. **7 档幂律 Alpha 采样阶梯（消除双色线性渐变马赫带断层）**：
+   在 $28\text{px}$ 羽化距离内依次排布：`0% (0.000) -> 15% (0.051) -> 30% (0.149) -> 45% (0.302) -> 60% (0.502) -> 75% (0.702) -> 87% (0.851) -> 100% (1.000)`，触顶/触底时通过状态属性动态将对应遮罩高度归零。
+2. **光标不动点仿射变换方程**：
+   以指针 $(O_x, O_y)$ 为静止中心，缩放比 $r = S_{\text{target}} / S_{\text{current}}$：
+   $$\text{idealTx} = O_x - (O_x - \text{tx}) \cdot r, \quad \text{idealTy} = O_y - (O_y - \text{ty}) \cdot r$$
+   最大平移边界 $\text{maxTx} = \max(0, (\text{contentWidth}\cdot S - \text{viewportWidth})/2)$，越界施加 $0.7$ 阻尼衰减，平移初段施加 $\Delta d \le 4\text{px}$ 微颤死区。
 
-### 规避方案：
-采用 `box-shadow` 代替 `border`，并根据设备像素比实施动态补偿：
-```css
-:root {
-  --hairline-width: 1px;
-}
-@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 2dppx), (resolution >= 2x) {
-  :root {
-    --hairline-width: 0.5px;
-  }
-}
-@media (-webkit-min-device-pixel-ratio: 3), (min-resolution: 3dppx), (resolution >= 3x) {
-  :root {
-    --hairline-width: calc(1px / 3);
-  }
-}
+---
 
-.hairline-card {
-  box-shadow: inset 0 0 0 var(--hairline-width) var(--color-border);
-}
-```
-该方案完全脱离盒模型排版，在状态切换时实现真正的零尺寸抖动与微观顺滑感。
+## 四、 跨平台 CJK 输入法合成态互锁守卫 (IME Guard)
+
+中日韩输入法挑选候选词按回车时，`e.isComposing` 可能已重置但 `e.keyCode === 229`。提交条件必须满足双重互锁：
+$$\text{CanSubmit} = (\text{key} === \text{'Enter'}) \land (\neg\text{shiftKey}) \land (\neg\text{isComposing}) \land (\text{keyCode} \ne 229)$$
+同时在 `isImePending` 期间拦截 `Escape` 的 `stopPropagation()` 防止误关外层弹窗；移动端/WebKit 输入框声明 `font-size: max(16px, var(--font-size-body))` 与 `field-sizing: content`。

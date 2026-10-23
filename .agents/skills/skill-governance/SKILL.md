@@ -8,7 +8,7 @@ description: >-
 
 # skill-governance — 技能集工程化结构与生命周期治理规范
 
-本技能确立了全工作区 <!-- METRICS:BEGIN skill-count -->**27 项**<!-- METRICS:END skill-count -->研发技能集（Skills）的标准物理架构、YAML 元数据契约、JIT 渐进式披露（Progressive Disclosure）与防 Token 膨胀原则、根目录与插件包双副本 100% 字节等价同步机制以及自动化校验门禁标准。这些技能共含 <!-- METRICS:BEGIN skill-doc-count -->**102 篇**<!-- METRICS:END skill-doc-count -->技能文档，全部纳入同一份门禁检查。
+本技能确立了全工作区 <!-- METRICS:BEGIN skill-count -->**24 项**<!-- METRICS:END skill-count -->研发技能集（Skills）的标准物理架构、YAML 元数据契约、JIT 渐进式披露（Progressive Disclosure）与防 Token 膨胀原则、根目录与插件包双副本 100% 字节等价同步机制以及自动化校验门禁标准。这些技能共含 <!-- METRICS:BEGIN skill-doc-count -->**62 篇**<!-- METRICS:END skill-doc-count -->技能文档，全部纳入同一份门禁检查。
 
 ---
 
@@ -25,13 +25,13 @@ description: >-
 
 ## 二、 三层泛化技能拓扑与标准物理架构（Generalization + Unification）
 
-为同时实现**跨领域高度泛化复用**与**全工作区刚性契约单源统一**，<!-- METRICS:BEGIN skill-count -->**27 项**<!-- METRICS:END skill-count -->研发技能按职责解耦为三层正交拓扑（严禁在领域技能中重复抄写通用方法论，彻底杜绝 Token 堆积与多处统计数字硬编码漂移）：
+为同时实现**跨领域高度泛化复用**与**全工作区刚性契约单源统一**，<!-- METRICS:BEGIN skill-count -->**24 项**<!-- METRICS:END skill-count -->研发技能按职责解耦为三层正交拓扑（严禁在领域技能中重复抄写通用方法论，彻底杜绝 Token 堆积与多处统计数字硬编码漂移）：
 
 | 拓扑层级 | 技能数量与定位 | 包含技能集 | 泛化与统一机制 |
 | :--- | :--- | :--- | :--- |
-| **Layer 1: 通用工程与算法突破层**<br/>*(Universal Methodology)* | **14 项** — 跨语言、跨项目通用认知、编程工艺、交互物理学与算子原语 | `algorithmic-operator-engineering`, `code-simplification`, `coding-craft`, `complexity-budget`, `constraint-driven-development`, `context-engineering`, `debugging-and-error-recovery`, `doubt-driven-development`, `facade-discipline`, `interaction-design-physics`, `interview-me`, `spec-driven-development`, `telemetry-statistical-modeling`, `test-driven-development` | 仅定义恒定不变的工程/数学/算法公理；通过映射表桥接不同语言栈，零项目特定硬编码 |
-| **Layer 2: 工作区统一治理底座层**<br/>*(Workspace Unified Governance)* | **9 项** — 全仓同构门禁、单源目录与多智能体协同 | `batch-commit`, `docs-archive-governance`, `gate-governance`, `product-release-docs`, `release-package-workflow`, `rule-catalog-governance`, `skill-governance`, `subagent-orchestration`, `test-benchmark-engineering` | 唯一绑定 `AGENTS.md`、`rule-catalog.json` 与 `subagent-catalog.json` 动态真源 (SSOT) |
-| **Layer 3: 子项目领域适配器层**<br/>*(Domain Adapters)* | **4 项** — 四大受控项目专属架构红线与系统工程规范 | `auto-refactor-dev` (Node/Rust), `workspace-timing-dev` (VS Code), `webgames-workflow` (Godot 4.7 GDScript), `rust-engineering` (Rust 10大微 Crate / Taxis / 系统内核) | 声明子项目与技术栈专有拓扑、生命周期与领域边界，通用复杂度/算子/门面能力通过指针委托至 Layer 1/2 |
+| **Layer 1: 通用工程与算法突破层**<br/>*(Universal Methodology)* | **11 项** — 跨语言、跨项目通用认知、编程工艺、交互物理学与算子原语 | `algorithmic-operator-engineering`, `coding-craft`, `complexity-budget`, `constraint-driven-development`, `debugging-and-error-recovery`, `defensive-security-and-taint-safety`, `facade-discipline`, `interaction-design-physics`, `spec-driven-development`, `state-concurrency-and-crash-recovery`, `telemetry-statistical-modeling` | 仅定义恒定不变的工程/数学/算法公理；通过映射表桥接不同语言栈，零项目特定硬编码 |
+| **Layer 2: 工作区统一治理底座层**<br/>*(Workspace Unified Governance)* | **8 项** — 全仓同构门禁、单源目录与多智能体协同 | `batch-commit`, `docs-archive-governance`, `gate-governance`, `release-package-workflow`, `rule-catalog-governance`, `skill-governance`, `subagent-orchestration`, `test-benchmark-engineering` | 唯一绑定 `AGENTS.md`、`rule-catalog.json` 与 `subagent-catalog.json` 动态真源 (SSOT) |
+| **Layer 3: 子项目领域适配器层**<br/>*(Domain Adapters)* | **5 项** — 四大受控项目专属架构红线与系统工程规范 | `auto-refactor-dev` (Node/Rust), `workspace-timing-dev` (VS Code), `webgames-workflow` (Godot 4.7 GDScript), `fractal-git-dev` (Taxis 10 微 Crate), `rust-engineering` (Rust 系统工程规范) | 声明子项目与技术栈专有拓扑、生命周期与领域边界，通用复杂度/算子/门面能力通过指针委托至 Layer 1/2 |
 
 每个技能必须作为一个高内聚的自包含工程单元存在，位于 `.agents/skills/<skill-name>/` 下，标准“四件套”目录结构如下：
 
@@ -89,7 +89,7 @@ description: >-
 1. **严格换行符**：Markdown（`.md`）、JSON（`.json`）、TypeScript/JavaScript（`.ts`/`.js`）及 Bash（`.sh`）磁盘文件必须严格保持 **LF 换行**；严禁写入 CRLF；
 2. **零空文件**：严禁创建或保留 0 字节物理空文件或纯空白字符文件（`HYG-EMP-001`）；
 3. **单源规则反虚构 (`RCFG-RULE-DRIFT`)**：技能正文中提及的所有大写规则 ID（如 `ARCH-FAC-001`、`ADV-PRF-002`、`GUARD-AST-001`）必须在 `scripts/common/rule-catalog.json` 中真实登记；
-4. **相对链接卫生 (`LINK-ABS-FILE-URI`)**：所有超链接必须为有效的相对路径，严禁使用 Windows 盘符绝对路径或 `file:///` URI；目标物理文件必须真实存在；
+4. **相对链接卫生 (`DOC-LNK-001` / `HC-ABS-PATH`)**：所有超链接必须为有效的相对路径，严禁使用 Windows 盘符绝对路径或 `file:///` URI；目标物理文件必须真实存在；
 5. **零黑话与零敏捷代号**：严禁使用 `Phase_{NN}`、`ST{NN}`、`p[0-9]+` 等敏捷施工临时代号，一律采用客观技术主题命名；
 6. **单文件双轨体积与契约注释密度**：技能模板与伴生代码文件同样受 $\text{ELOC} \le 900, \text{LOC} \le 1400$ 双轨体积红线与 1:3 动态反推包络约束；高负荷代码（$\text{ELOC} \ge 600$）契约注释密度必须达到 8% 及以上；
 7. **全仓零高危技术债务与防反弹红线**：全工作区 High/Critical 技术债务历史性归零（0 项），技能演进与重构坚决捍卫 0 项基线，严禁引入任何高危债务反弹。

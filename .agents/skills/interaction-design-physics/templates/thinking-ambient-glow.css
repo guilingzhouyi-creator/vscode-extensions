@@ -2,10 +2,12 @@
  * Module: Thinking Ambient Glow & Three-Phase Differential Pulse Stylesheet
  * File Path: .agents/skills/interaction-design-physics/templates/thinking-ambient-glow.css
  * Architecture Role: Ambient visual feedback for deep reasoning and stream generation states.
+ * Dependencies & Triggers: Attached to active thinking/streaming status bars and pulse indicators.
  * Responsibilities:
  *   1. Implement asymmetric charge-penetrate easing cubic-bezier(0.714, 0.121, 0.211, 0.888).
  *   2. Implement 3-phase differential pulse across child wave elements (0s, 0.35s, 0.7s offsets).
  *   3. Rely on vendor-neutral semantic design tokens for dark and high-contrast environments.
+ * Exit Semantics & Design Rationale: GPU-composited transform/opacity keyframes with zero layout reflow.
  */
 
 :root {

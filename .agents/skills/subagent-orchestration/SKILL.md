@@ -1,211 +1,70 @@
 ---
 name: subagent-orchestration
 description: >-
-  通用泛化 SubAgent 动态装配与多智能体调度工作流。指导 Agent 基于 (Archetype x Posture) 正交派生专员，
-  同构继承模型、注入独占 Zero-Intersection Path Jail 物理防冲突、只读与写入协同流及 8 步交叉复审闭环 SOP。
+  五层上下文预算治理（75% 阈值脱水）、泛化 SubAgent 动态装配 (Archetype x Posture) 与多智能体调度工作流。
+  指导 Agent 同构继承模型、注入独占 Zero-Intersection Path Jail 物理防冲突、可重入章节检查点及 8 步交叉复审闭环。
 ---
 
-# subagent-orchestration — 全工作区泛化 SubAgent 调度规范
+# subagent-orchestration — 五层上下文治理与泛化 SubAgent 调度规范
 
-> **架构地位**：本规范指导 Agent 在当前及未来全新会话中，基于工作区 `.agents/subagents/` 配置库动态装配并调度符合工作区治理契约的专属 SubAgent，杜绝提示词硬编码、模型滥用与越界施工冲突。
-> **文档边界特别声明**：`docs/` 下的各类架构蓝图是 Praxis 团队的历史随笔与参考文档；本工作区的实际工程刚性依据唯一收口于 `AGENTS.md` 与本规范。
-
----
-
-## 一、 四重防线约束机制 (Four-Layer Defense Architecture)
-
-在 VS Code Antigravity (Agy) 体系中，约束**绝不仅是一段普通的提示词**，而是层层递进的四重立体防御：
-
-```text
-┌────────────────────────────────────────────────────────┐
-│ 防线 1: Agy 平台级工作区规则 (Workspace Rule Injection) │
-│ • AGENTS.md 自动由 Agy 内核无条件注入到所有 Agent/SubAgent│
-│ • 刚性确立 SUB-AGENT 约束与 12 项一票否决红线          │
-├────────────────────────────────────────────────────────┤
-│ 防线 2: Runtime 工具链物理门控 (Tool Gating)           │
-│ • 审查 (review) / 探索 (explore) 姿态物理关闭写工具    │
-│ • enable_write_tools: false 彻底拔除写入/改写工具      │
-│ • 锁定 enable_subagent_tools: false 防递归泛滥         │
-├────────────────────────────────────────────────────────┤
-│ 防线 3: 系统级长效身份契约 (define_subagent.system_prompt)│
-│ • 注入 5-Layer System Contract                         │
-│ • Path Jail 物理禁区、领域专属公理、交割强制自检命令   │
-├────────────────────────────────────────────────────────┤
-│ 防线 4: 结构化单次任务外壳与模型同构 (Task Defense Shell & Model Lock) │
-│ • Task Scope 明确范围、质量清单、本地验证命令         │
-│ • Model: "inherit" 同构继承主会话 (Gemini 3.8 Flash, effort=High) │
-└────────────────────────────────────────────────────────┘
-```
+本技能将**五层上下文分级与 75% 预算防衰减治理**与**全工作区 (Archetype × Posture) 泛化 SubAgent 动态装配、独占 Path Jail 防冲突及主 Agent 8 步交叉复审闭环**统一收口。
 
 ---
 
-## 二、 核心正交派生模型 (Archetype × Posture)
+## 一、 五层上下文分级架构与四重立体防线
 
-任何子任务的 SubAgent 均由**领域原型**与**作业姿态**正交计算派生，**默认采用 `inherit` 同构继承主会话模型（当前为 Gemini 3.8 Flash，思考强度 effort=High）**，兼顾深度推理精度与轻量成本：
+1. **五层上下文分级与 75% 阈值脱水预算**：
+   - 按持久度从高到低分为：**L1 全局公理 (`AGENTS.md`) $\to$ L2 规格说明 (`SPEC.md` 按需章节) $\to$ L3 目标源码与局部 AST 切片 $\to$ L4 关键错误栈前 5 行 $\to$ L5 会话历史**；
+   - **75% 预警脱水**：上下文达 75% 容量时主动淘汰无效试错过程与冗长控制台流水账，仅保留【原始目标、根因结论、刚性红线】；将刚性总规置于开头（Primacy）、当前原子任务与自检命令置于末尾（Recency），规避中间迷失效应（Lost-in-the-Middle）。
+2. **SubAgent 四重立体防御**：
+   - **防线 1（平台级规则注入）**：`AGENTS.md` 无条件注入所有主/子 Agent；
+   - **防线 2（Runtime 工具物理门控）**：`review` / `explore` 姿态强制 `enable_write_tools: false` 物理拔除写权限，且锁定 `enable_subagent_tools: false`；
+   - **防线 3（5 层系统契约 `system_prompt`）**：由 `synthesize-subagent.js` 动态注入全局公理、六大规范性思维约束、Path Jail、领域公理与验证命令；
+   - **防线 4（任务外壳与同构模型锁定）**：强制 `Model: "inherit"` 同构继承主会话模型，并在任务完成后执行主 Agent 8 步独立交叉复审。
 
-| 领域原型 (`archetype`) | 适用项目与物理沙箱 (Path Jail) | 关联 SSOT 技能 | 典型本地门禁验证命令 |
+---
+
+## 二、 核心正交派生矩阵 (Archetype × Posture)
+
+<!-- METRICS:BEGIN subagent-archetype-count -->**7 个**<!-- METRICS:END subagent-archetype-count -->领域原型 × 5 种作业姿态正交派生 <!-- METRICS:BEGIN subagent-preset-count -->**27 条**<!-- METRICS:END subagent-preset-count -->预置专员（单源真源为 `.agents/subagents/agents/*.md`，由 `sync-agents-mirror.js` 单向镜像至插件包；DSH 四模式 `wg-{construct,refactor,review,explore}` 见 [.agents/dsh/README.md](../../dsh/README.md)）：
+
+| 领域原型 (`archetype`) | 物理沙箱 (Path Jail) | 预置专员 (`presets`) | 核心本地验证命令 |
 | :--- | :--- | :--- | :--- |
-| **`vs-extension`** | `workspace-timing/` (VS Code 扩展) | `workspace-timing-dev`, `complexity-budget` | `npm run compile && npm run test:fast && npm run review` |
-| **`cli-engine`** | `auto-refactor/` (Node/Rust 双轨静态分析) | `auto-refactor-dev`, `facade-discipline` | `npm run build && node scripts/gate-self.js && npm test` |
-| **`game-engine`** | `WebGames/` (Godot 4 游戏引擎与配置驱动) | `webgames-workflow`, `complexity-budget` | `python scripts/py/audit_config.py --strict && pwsh scripts/ps1/audit-all.ps1` |
-| **`infra-tool`** | `scripts/` (全仓跨平台门禁与打包脚本) | `gate-governance`, `release-package-workflow` | `pwsh -File scripts/ps1/audit-all.ps1 -Fast` |
-| **`workspace-meta`** | 全仓顶层元治理、单源规则总目录、物理卫生 | `rule-catalog-governance`, `complexity-budget` | `node scripts/common/generate-rule-catalog.js` |
-| **`skill-governance`** | `.agents/skills/`, 插件包 `skills/` | `skill-governance`, `rule-catalog-governance` | `node scripts/common/validate-skills.js && node scripts/common/sync-skills.js --check` |
-| **`git-kernel`** | `fractal-git/` (Rust 10 微 Crate 内核与 TS 门面) | `rust-engineering`, `algorithmic-operator-engineering` | `pwsh -File fractal-git/scripts/ps1/audit-taxis.ps1 && cargo test --workspace --manifest-path fractal-git/Cargo.toml` |
-
-| 作业姿态 (`posture`) | 姿态意图与权限控制 | 核心行为准则 | 推荐工具开关 |
-| :--- | :--- | :--- | :--- |
-| **`explore`** | 只读探索与依赖图分析 | 严禁写文件；仅输出调用拓扑与死代码证据 | `enable_write_tools: false` |
-| **`construct`** | 业务特性与增量代码生产 | 严格限制在 Path Jail 内；强制平铺控制流 (CC<=15, Depth<=4) | `enable_write_tools: true` |
-| **`review`** | 静态审查与规则匹配分析 | 严禁直接改代码；对照规则库输出精确行号与质性依据 | `enable_write_tools: false` |
-| **`refactor`** | 结构消融与复杂度平铺 | 优先消除循环内瞬态分配；消除空包跳板；动态稀释比 <= 1:3 | `enable_write_tools: true` |
-| **`guardian`** | 复合门禁防御与质量裁决 | 严禁改业务代码；执行测试与门禁并执行一票否决裁决 | `enable_write_tools: true` (限测试) |
+| **`vs-extension`** | `workspace-timing/` | `wt-construct`, `wt-review`, `wt-refactor`, `wt-explore` | `cd workspace-timing && npm run compile && npm run test:fast && npm run review` |
+| **`cli-engine`** | `auto-refactor/` | `ar-construct`, `ar-review`, `ar-refactor`, `ar-explore` | `cd auto-refactor && npm run build && node scripts/gate-self.js && npm test` |
+| **`game-engine`** | `WebGames/` | `wg-construct`, `wg-review`, `wg-refactor`, `wg-explore` | `cd WebGames && python scripts/py/audit_config.py --strict && pwsh scripts/ps1/audit-all.ps1` |
+| **`git-kernel`** | `fractal-git/` | `fg-construct`, `fg-review`, `fg-refactor`, `fg-explore` | `pwsh -File fractal-git/scripts/ps1/audit-taxis.ps1 && cargo test --workspace --manifest-path fractal-git/Cargo.toml` |
+| **`infra-tool`** | `scripts/` | `infra-construct`, `infra-review`, `infra-refactor`, `infra-explore`, `infra-guardian` | `pwsh -File scripts/ps1/pre-commit-gate.ps1 && pwsh -File scripts/ps1/audit-all.ps1 -Fast` |
+| **`workspace-meta`** | 全仓顶层元治理 | `workspace-review`, `workspace-refactor`, `workspace-guardian` | `node scripts/common/generate-rule-catalog.js --check-only` |
+| **`skill-governance`** | `.agents/skills/` | `skill-construct`, `skill-review`, `skill-refactor` | `node scripts/common/validate-skills.js && node scripts/common/sync-skills.js --check` |
 
 ---
 
-## 三、 独占 Zero-Intersection Path Jail 物理防冲突机制与只读/写入协同流
+## 三、 独占 Zero-Intersection Path Jail、可重入检查点与焦点防抢占
 
-多智能体协作的核心是**严格的物理隔离**与**有序的读写协同**，避免多 Agent 并发写入导致代码被踩踏或越界修改：
-
-### 1. 独占 Zero-Intersection Path Jail 物理防冲突机制
-- **显式独占授权**：向具有写权限的 SubAgent 下发任务时，主 Agent 必须在 Task Scope 中声明绝对严密、颗粒度到具体文件路径的独占文件列表（Exclusive File List）：
-  ```markdown
-  [Task Scope & Zero-Intersection Path Jail]
-  - 授权独占文件列表（严格两两互斥，禁止触碰任何其它文件）：
-    1. path/to/fileA.ts
-    2. path/to/fileB.ts
-  - 严禁触碰路径前缀（越界操作立即阻断）：
-    - auto-refactor/
-    - workspace-timing/
-    - WebGames/
-    - scripts/
-  ```
-- **两两完全正交公理 ($\text{Jail}_A \cap \text{Jail}_B = \emptyset$)**：
-  并行派发多个写专员时，各 SubAgent 的 Path Jail 文件集合必须两两正交，交集必须严格为空集：
-  $$\forall i \ne j, \quad \text{Jail}_i \cap \text{Jail}_j = \emptyset$$
-  严禁任何重叠文件授权或模糊目录宽泛授权，从根源消除并发写入踩踏与代码冲突；
-- **系统契约刚性硬绑定**：SubAgent 的 System Prompt Layer 1 强制注入 Path Jail Guard，越界修改任何非授权文件将触发一票阻断，主 Agent 在复审阶段执行强制回滚。
-
-### 2. 只读审查与施工重构协同工作流
-在大型特性演进或复杂重构中，推荐实施 **Explore/Review 先行 $\rightarrow$ Construct/Refactor 施工 $\rightarrow$ Guardian 复核** 闭环流：
-1. **第一阶段：只读审查勘测 (`enable_write_tools: false`)**：
-   - 调度 `review` 或 `explore` 姿态专员，物理拔除写入工具；
-   - 专员全量读取 AST、跨文件引用图与规则库，输出精确违规行号、调用链以及质性重构方案；
-2. **第二阶段：定点施工重构 (`enable_write_tools: true`)**：
-   - 调度 `construct` 或 `refactor` 姿态专员，赋予独占文件列表的写权限；
-   - 专员严格按第一阶段输出的方案在 Path Jail 范围内实施小步改动，禁止蔓延扩写；
-3. **第三阶段：门禁自检与证据交割**：
-   - 施工专员在自身沙箱执行对应的 Layer 4 门禁自检命令，产出执行通过的日志证据后汇报主 Agent。
-
-### 3. 长程任务分卷章节标记协议 (mark_chapter 规范)
-面对多模块、跨层级的大型长程重构或批量施工任务，SubAgent 严禁一口气全量改写到底导致不可逆混乱与注意力耗尽，必须在关键拓扑检查点（如契约固化、底层算子重构、分批提交前夕）显式进行分卷章节标记（`mark_chapter`）：
-- **检查点状态快照**：显式声明当前章节编号（如 `Chapter 1: 底层契约落地`）、本章已验证通过的测试断言、受影响独占文件集合以及未决事项；
-- **断点续传与精准回退**：若后续章节发生回归或门禁阻断，主 Agent 可精准定位至上一章节标记点进行增量排错或单章回滚，杜绝“牵一发而动全身”式推倒重来。
+1. **两两完全正交公理 ($\forall i \ne j,\ \text{Jail}_i \cap \text{Jail}_j = \emptyset$)**：并行派发多个写入专员（`construct`/`refactor`）时，必须在 Task Scope 中列出精确到具名文件的独占列表，严禁整目录宽泛授权或重叠文件授权；跨顶级项目并行时可使用 `Workspace: "branch"`；
+2. **读写协同与可重入章节检查点 (`mark_chapter`)**：复杂任务遵循 `Explore/Review 只读勘测 -> Construct/Refactor 定点施工 -> Guardian 复核`；长程跨层任务必须在关键拓扑节点输出章节检查点（已完成文件基线、已通过自检断言、下一原子任务契约），支持随时无损交接或单章回滚；
+3. **后台 Agent 焦点防抢占守卫**：后台或只读 SubAgent 严禁弹出系统模态框、强制激活窗口或滥用 `element.focus()` 抢夺人类前台光标。
 
 ---
 
-## 四、 标准调度流水线与主 Agent 交叉复审 SOP
+## 四、 JIT 动态装配命令与主 Agent 8 步交叉复审 SOP
 
-### 步骤 1：JIT 合成 SubAgent 契约元数据（动态真源绑定 + 细粒度独占沙箱）
-在终端运行工作区装配脚本（脚本自动从 `scripts/common/rule-catalog.json` 读取实时规则总数，并支持 `--files` 注入细粒度独占文件集）：
 ```bash
-# 模式 A: 自然语言意图自动推导 + 动态注入独占文件列表 (推荐)
-node .agents/skills/subagent-orchestration/scripts/synthesize-subagent.js --intent "用 256-LUT 与位并行优化 auto-refactor 算子" --files "auto-refactor/src/core/mask-source.ts" --task "消除多趟扫描" --json
+# 1. 动态合成 SubAgent 契约与任务外壳
+node .agents/skills/subagent-orchestration/scripts/synthesize-subagent.js --preset fg-construct --files "fractal-git/crates/fg-index/src/lib.rs" --task "优化无锁索引" --json
 
-# 模式 B: 精确预置别名装配
-node .agents/skills/subagent-orchestration/scripts/synthesize-subagent.js --preset wt-refactor --files "workspace-timing/src/core/aggregator.ts" --task "优化时钟调度" --json
-
-# 模式 C: 全仓专员批量导出
-node .agents/skills/subagent-orchestration/scripts/synthesize-subagent.js --all
+# 2. 校验全仓 SubAgent 目录、原型、姿态与单源模板 1:1 合规
+node .agents/skills/subagent-orchestration/scripts/validate-subagent-catalog.js
 ```
 
-常用预置别名速查矩阵（<!-- METRICS:BEGIN subagent-preset-count -->**27 条**<!-- METRICS:END subagent-preset-count -->预置）。单源真源为 `.agents/subagents/agents/*.md`（已入库），由 `sync-agents-mirror.js` 单向镜像至 gitignored 的 `.agents/plugins/workspace-governance/agents/`；反向书写会在干净 clone 上丢失：
-* **`vs-extension`**：`wt-construct` / `wt-review` / `wt-refactor` / `wt-explore`
-* **`cli-engine`**：`ar-construct` / `ar-review` / `ar-refactor` / `ar-explore`
-* **`game-engine`**：`wg-construct` / `wg-review` / `wg-refactor` / `wg-explore`
-* **`infra-tool`**：`infra-construct` / `infra-review` / `infra-refactor` / `infra-explore` / `infra-guardian`
-* **`workspace-meta`**：`workspace-review` / `workspace-refactor` / `workspace-guardian`
-* **`skill-governance`**：`skill-construct` / `skill-review` / `skill-refactor`
-* **`git-kernel`**：`fg-construct` / `fg-review` / `fg-refactor` / `fg-explore`
-
-DSH 四模式（`wg-construct` / `wg-refactor` / `wg-review` / `wg-explore`）是上述预置的执行体，其挂载、Jail 守卫与投放验证见 [.agents/dsh/README.md](../../dsh/README.md)。
-
-### 步骤 2：注册定义动态 SubAgent (`define_subagent`)
-使用脚本输出的 `defineArgs` 调用 `define_subagent` 工具：
-```typescript
-define_subagent({
-  name: result.defineArgs.name,
-  description: result.defineArgs.description,
-  system_prompt: result.defineArgs.system_prompt,
-  enable_write_tools: result.defineArgs.enable_write_tools,
-  enable_mcp_tools: false,
-  enable_subagent_tools: false
-});
-```
-
-### 步骤 3：启动隔离运行 (`invoke_subagent`)
-调用 `invoke_subagent` 委派具体任务。**必须指定 `Model: 'inherit'` 继承主会话配置**，并传入装配好的结构化任务 Prompt：
-```typescript
-invoke_subagent({
-  Subagents: [{
-    TypeName: result.subagentName,
-    Role: result.displayName,
-    Model: "inherit",                // 严格同构继承主会话 (Gemini 3.8 Flash, effort=High)
-    Workspace: "inherit",            // 或在并行写入时指定 "branch"
-    Prompt: result.invokeArgs.Prompt // 结构化任务外壳
-  }]
-});
-```
-
-### 步骤 4：主 Agent 8 步交叉复审 SOP (Cross-Review Closed-Loop)
-SubAgent 汇报任务完成并返回消息后，主 Agent **绝对不能盲目信任其汇报文本**，必须严格独立执行 8 步交叉复审闭环（依据所属领域自适应路由）：
-1. **① 沙箱隔离审计 (Path Jail Guard Audit)**：主 Agent 执行 `git status` 与 `git diff --name-only`，比对修改文件是否严格局限于独占 Path Jail 授权列表，严禁发生跨领域越界修改；
-2. **② 领域编译构建自检 (Domain Build & Compile Gate)**：在受影响项目子目录执行类型与编译检查（`workspace-timing`: `npm run compile`; `auto-refactor`: `npm run build`; `WebGames`: `python scripts/py/audit_config.py --strict`；`scripts/`: 平台语法检查），确保 0 编译错误，0 类型告警；
-3. **③ 体积与复杂度双轨预算 (Complexity & Volume Budget Gate)**：执行 `node scripts/common/evaluate-eloc-budget.js`，核查单文件双轨体积（$\text{ELOC} \le 900 / \text{LOC} \le 1400$）、AST 切片守卫（$\text{CC} \le 15, \text{Depth} \le 4, \text{Noise} \le 4.0$）、1:3 动态包络及高负荷注释密度 $\ge 8\%$；
-4. **④ 单源规则目录与防虚构校验 (Rule Catalog Anti-Drift Gate)**：执行 `node scripts/common/generate-rule-catalog.js --check-only`，核实规则目录计数零漂移，任何汇报与提交说明零虚构规则 ID（`RCFG-RULE-DRIFT`）；
-5. **⑤ 领域专属架构守卫 (Domain Specialized Architectural Guard)**：
-   - `auto-refactor`：执行 `node auto-refactor/scripts/validate-facade-governance.js`（消融空包跳板 `ARCH-ABS-001`）与 `node auto-refactor/scripts/validate-project-neutrality.js`（项目中立性）；
-   - `workspace-timing`：执行 `cd workspace-timing && npm run review`（五层解耦与双语字典覆盖）；
-   - `WebGames`：执行 `cd WebGames && python scripts/py/audit_runner.py`（配置驱动与循环零瞬态堆分配 `ADV-PRF-002`）；
-   - `infra-tool`：执行 `pwsh -File scripts/ps1/pre-commit-gate.ps1`；
-   - `skill-governance`：执行 `node scripts/common/validate-skills.js` 与 `node scripts/common/sync-skills.js --check`；
-6. **⑥ 自审棘轮基线防反弹 (Monotonic Ratchet Baseline & Zero-High-Debt Gate)**：
-   - 若涉及 `auto-refactor`，执行 `node auto-refactor/scripts/gate-self.js`，确保 `0 newBlocking error`，全仓历史基线单调收敛；
-   - 全仓刚性看守：严禁引入任何 High/Critical 技术债务反弹，历史性清零（0 项）红线一票否决；
-7. **⑦ 受影响领域自动化回归测试 (Domain Test Suite Regression)**：
-   - `auto-refactor`：`cd auto-refactor && npm test`（<!-- METRICS:BEGIN test-suite-count -->**166 套**<!-- METRICS:END test-suite-count -->测试并发/串行绿色通过，TS/Rust 100% 字节等价）；
-   - `workspace-timing`：`cd workspace-timing && npm run test:fast`（<!-- METRICS:BEGIN ws-test-case-count -->**205 项**<!-- METRICS:END ws-test-case-count -->用例绿色通过）；
-   - `WebGames`：`cd WebGames && pwsh scripts/ps1/audit-all.ps1`；
-8. **⑧ 工作区全量统一审查 (Workspace Unified Audit)**：执行 `pwsh -File scripts/ps1/audit-all.ps1 -Fast`，<!-- METRICS:BEGIN pillar-count -->**6 大支柱**<!-- METRICS:END pillar-count -->（物理卫生、单源规则、auto-refactor、workspace-timing、WebGames、fractal-git）综合评分必须 $\ge 98$ 分，全绿通行。
+SubAgent 返回后，主 Agent **严禁盲信其文字汇报**，必须独立执行 **8 步交叉复审**：
+① **沙箱越界审计**（`git status` / `git diff --name-only` 比对独占列表）$\to$ ② **领域编译自检** $\to$ ③ **体积与复杂度预算**（`evaluate-eloc-budget.js` / `validate-code-density.js`）$\to$ ④ **规则目录零漂移**（`validate-rule-id-closure.js`）$\to$ ⑤ **领域专属架构守卫** $\to$ ⑥ **自审棘轮与零 High/Critical 债务防反弹** $\to$ ⑦ **领域回归测试**（`auto-refactor` <!-- METRICS:BEGIN test-suite-count -->**169 套**<!-- METRICS:END test-suite-count -->、`workspace-timing` <!-- METRICS:BEGIN ws-test-case-count -->**205 项**<!-- METRICS:END ws-test-case-count -->）$\to$ ⑧ **全仓 <!-- METRICS:BEGIN pillar-count -->**6 大支柱**<!-- METRICS:END pillar-count -->统一审查**（`audit-all.ps1 -Fast`）。
 
 ---
 
-## 五、 防冲突与质量保障铁律
+## 五、 关联参考与模板资产
 
-1. **同构模型继承纪律**：工作区委派 SubAgent 必须严格指定 `Model: "inherit"` 继承主会话（当前主会话为 Gemini 3.8 Flash，思考强度 effort=High），完整保留深度推理能力同时锁定 Flash 算力成本，严禁擅自切换未受控模型；
-2. **物理沙箱禁越界**：SubAgent 提示词中已注入 Path Jail 严禁列表。SubAgent 若修改越界目录文件，主 Agent 必须在合入时予以拦截或还原；
-3. **完成自检交割**：任何具有写权限的 SubAgent，在向主 Agent 汇报前必须在其自身提示词 Layer 4 的验证命令下完成全量自检并附带真实执行通过证据；
-4. **单源一致性守护**：修改配置或扩展原型时，随时运行：
-   ```bash
-   node .agents/skills/subagent-orchestration/scripts/validate-subagent-catalog.js
-   ```
-   确保 100% 通过验证；
-5. **长程重构分卷标记纪律**：跨批次长程重构任务必须在每个逻辑拓扑层完成并自检通过后，显式输出 `mark_chapter` 进度锚点，清晰汇报当前章节输入输出与下一章节执行契约；
-6. **后台 Agent 焦点防抢占守卫 (Background Agent Focus Shield)**：SubAgent 以后台异步、守护进程或只读审查姿态运行时，严禁执行任何会抢占操作系统全局焦点、桌面顶层窗口或活动编辑器光标的操作（包括弹出系统级模态对话框、执行强制窗口激活、或在 Webview/DOM 中滥用 `element.focus()` 抢夺人类光标），确保人类工程师在前台编程时的注意力流（Flow State）零被打断。
-
----
-
-## 六、 渐进披露参考指南与实操样板 (References & Templates)
-
-为遵循 JIT 渐进披露原则并降低 Agent 顶层上下文负荷，深水区设计理论与开箱即用骨架已全面收口下沉至子目录：
-
-### 1. 技术参考指南 (`references/`)
-- [四重防线立体防御机制](references/four-layer-defense-architecture.md)：平台工具剥夺、沙箱约束、系统契约与交叉复审的分层设计；
-- [独占 Zero-Intersection Path Jail 机制](references/zero-intersection-path-jail.md)：数学正交公理、路径粒度规范与跨项目并行隔离模式；
-- [主 Agent 8 步交叉复审协议](references/cross-review-closed-loop-protocol.md)：领域自适应路由矩阵与历史债务单调收敛原则。
-
-### 2. 开箱即用实操样板 (`templates/`)
-- [施工类独占文件任务外壳](templates/task-shell-construct.md)：增量生产与定点重构的标准任务 Prompt 外壳；
-- [审查类只读客观事实任务外壳](templates/task-shell-review.md)：静态审查与规则匹配的只读任务 Prompt 外壳；
-- [新增领域原型配置脚手架](templates/archetype-scaffold.json)：新增业务领域原型时的标准 JSON 模式模板；
-- [新增作业姿态配置脚手架](templates/posture-scaffold.json)：新增作业姿态时的标准 JSON 模式模板。
+- [cross-review-closed-loop-protocol.md](references/cross-review-closed-loop-protocol.md)：四重防线、五层上下文信任分级、Path Jail 正交公理与 8 步交叉复审领域路由全表；
+- [task-shell-construct.md](templates/task-shell-construct.md)：施工/只读审查双态任务外壳与可重入会话交接检查点样板；
+- [archetype-scaffold.json](templates/archetype-scaffold.json)：领域原型与作业姿态 JSON 配置脚手架。

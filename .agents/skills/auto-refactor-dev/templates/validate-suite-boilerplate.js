@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 /**
  * Module: Verification Suite — Example Custom Rule
- * File Path: scripts/validate-example-custom.js
- * Architecture Role: Regression test suite for custom analyzer rules
- * Dependencies: assert, path
- * Exit Semantics: 0 = PASS, non-zero = FAIL
+ * File Path: .agents/skills/auto-refactor-dev/templates/validate-suite-boilerplate.js
+ * Architecture Role: Regression test suite boilerplate for custom analyzer rules.
+ * Dependencies & Triggers: Invoked via test-parallel.js; depends on Node.js assert.
+ * Responsibilities: Verify positive rule detection on anti-patterns and zero false positives on clean fixtures.
+ * Exit Semantics & Design Rationale: 0 = PASS, non-zero = FAIL; registered in test-parallel.js to prevent orphan suites.
  */
 'use strict';
 

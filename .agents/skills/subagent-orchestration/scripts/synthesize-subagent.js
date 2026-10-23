@@ -72,7 +72,7 @@ function resolveIntent(intent) {
 
   if (/skill|技能|skills/.test(text)) {
     archKey = 'skill-governance';
-  } else if (/fractal-git|\bfg\b|微\s*crate|plumbing|cargo|\bunsafe\b|\bcas\b|对象池|索引拓扑/.test(text)) {
+  } else if (/fractal-git|taxis|\bfg\b|微\s*crate|plumbing|cargo|\bunsafe\b|\bcas\b|对象池|索引拓扑/.test(text)) {
     archKey = 'git-kernel';
   } else if (/workspace-timing|timing|\bwt\b|vscode|扩展|插件|时钟|计时|双语|webview|i18n/.test(text)) {
     archKey = 'vs-extension';
@@ -199,7 +199,13 @@ ${verifyCommands}`;
 3. 门面设计：门面层必须满足 ELOC >= 15 或 Object.freeze 不可变保障，严禁 <= 3 行空包跳板 (ARCH-ABS-001 / ARCH-FAC-001)；
 4. 真实性纪律：单源规则目录 (rule-catalog.json) 权威收录 ${totalRules} 条规则，严禁虚构规则 ID (RCFG-RULE-DRIFT)，禁止敷衍/夸大词汇与施工临时黑话；
 5. 零高危技术债：全工作区 High/Critical 债务历史性归零 (0 项)，严禁引入任何技术债务反弹 (一票否决)；
-6. 资深工程规范与防线公理：测试全绿仅为功能底线，绝不等同于符合 Auto 审查或通过门禁系统；编码必须内化资深工程师纪律（卫语句平铺控制流、循环内零瞬态堆分配 CPX-SPACE-001、消融空包跳板 ARCH-ABS-001、六字段 JSDoc 契约）；交割前必须通过本地域三重自检。
+6. 六大高级编程规范性思维约束：
+  - 状态空间闭合：先用判别联合/Type-State 让非法状态不可表示，状态扫描成对声明进入与退出归位条件；
+  - 单源派生与双向闭包：修改枚举/注册表时同步闭环 SSOT 真源、自动派生投影与双向差集守卫；
+  - 反机械应付 (Anti-Gaming)：靠控制流代数化简降复杂度，严禁删注释或拆出 <= 3 行透传跳板凑指标；
+  - 负空间与污点防御：先写退化短路、超时强杀与路径三步污点守卫 (GUARD-DESTR-001)，再写主干逻辑；
+  - 对称生命周期与零分配：获取与释放 (off/disconnect/flush/teardown) 同级对称，循环体零瞬态堆分配；
+  - 可证伪自检探针：编写门禁或校验器必须内置 runSelfProbes() 正反样本自证检出能力。
 
 ## 🛡️ Layer 1: 物理路径沙箱约束 (Path Jail Guard)
 * 授权操作路径前缀：
@@ -218,7 +224,8 @@ ${verifySection}
 `;
 }
 
-function buildTaskPromptTemplate(taskGoal, archetypeObj, postureObj, exclusiveFiles = null) {
+function buildTaskPromptTemplate(params) {
+  const { taskGoal, archetypeObj, postureObj, exclusiveFiles = null } = params;
   const totalRules = getTotalRuleCount();
   const goalText = taskGoal || '<请在此处填写针对性技术任务描述与预期验收条件>';
   const allowed = (archetypeObj.pathJail?.allowedPrefixes || []).join(', ');
@@ -249,13 +256,22 @@ ${goalText}
 4. 架构契约与自解释性：核心模块配备标准六字段 JSDoc 头部契约，算法边界显式声明退化保护阈值，严禁假分支幽灵注释与敏捷代号黑话；
 5. 提交与汇报保持纯客观技术事实，严禁施工批次代号，引用规则 ID 必须在 rule-catalog.json 中真实登记 (RCFG-RULE-DRIFT)；
 6. 严禁引入任何 High/Critical 技术债务反弹，保持 0 项刚性基线；
-7. 【四重防线公理】测试通过绝不等同于符合 Auto 审查或通过门禁系统；交割前必须自主闭环本地域三重验证（构建 + 测试 + 静态分析），测试全绿只是最基础的必要条件。
+7. 【六大规范性思维与四重防线】落实状态空间闭合、单源双向闭包、反机械应付、负空间污点防御、对称生命周期及可证伪自检探针；测试通过绝不等同于符合 Auto 审查或通过门禁系统，交割前必须自主闭环本地域三重验证（构建 + 测试 + 静态分析）。
 
 ${preDeliverySection}
 `;
 }
 
-function synthesizeSingle(archKey, postKey, cliOptions, catalog, presetKey = null, defaultDesc = '', presetDshMode = null) {
+function synthesizeSingle(params) {
+  const {
+    archKey,
+    postKey,
+    cliOptions,
+    catalog,
+    presetKey = null,
+    defaultDesc = '',
+    presetDshMode = null,
+  } = params;
   const archRel = catalog.archetypes[archKey];
   const postRel = catalog.postures[postKey];
   if (!archRel) throw new Error(`Unknown archetype: ${archKey}`);
@@ -267,12 +283,12 @@ function synthesizeSingle(archKey, postKey, cliOptions, catalog, presetKey = nul
   const subagentName = cliOptions.name || presetKey || `${archKey}-${postKey}`;
   const subagentDesc = defaultDesc || `${archetypeObj.displayName} 的 ${postureObj.displayName}`;
   const systemPrompt = buildSystemPrompt(archetypeObj, postureObj);
-  const taskPrompt = buildTaskPromptTemplate(
-    cliOptions.taskGoal,
+  const taskPrompt = buildTaskPromptTemplate({
+    taskGoal: cliOptions.taskGoal,
     archetypeObj,
     postureObj,
-    cliOptions.exclusiveFiles
-  );
+    exclusiveFiles: cliOptions.exclusiveFiles,
+  });
 
   const targetModel = cliOptions.model || postureObj.model || catalog.defaultModel || 'inherit';
   const dshMode = resolveDshMode(presetDshMode, cliOptions, catalog);
@@ -357,15 +373,15 @@ function synthesize(cliOptions) {
   if (cliOptions.dumpAll) {
     const allResults = {};
     for (const [pKey, preset] of Object.entries(catalog.presets)) {
-      allResults[pKey] = synthesizeSingle(
-        preset.archetype,
-        preset.posture,
+      allResults[pKey] = synthesizeSingle({
+        archKey: preset.archetype,
+        postKey: preset.posture,
         cliOptions,
         catalog,
-        pKey,
-        preset.description,
-        preset.dshMode || null
-      );
+        presetKey: pKey,
+        defaultDesc: preset.description,
+        presetDshMode: preset.dshMode || null,
+      });
     }
     return { dumpAll: true, presets: allResults };
   }
@@ -374,7 +390,15 @@ function synthesize(cliOptions) {
     cliOptions,
     catalog
   );
-  return synthesizeSingle(archKey, postKey, cliOptions, catalog, matchedPresetKey, defaultDesc, dshMode);
+  return synthesizeSingle({
+    archKey,
+    postKey,
+    cliOptions,
+    catalog,
+    presetKey: matchedPresetKey,
+    defaultDesc,
+    presetDshMode: dshMode,
+  });
 }
 
 function run() {

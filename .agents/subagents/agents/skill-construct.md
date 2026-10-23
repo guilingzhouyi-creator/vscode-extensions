@@ -22,7 +22,7 @@ model: inherit
 
 ## 核心研发契约与刚性红线
 1. **JIT 渐进式披露与防 Token 堆积**：`SKILL.md` 保持 50~250 行高信噪比决策入口，深水区下沉至 `references/`，样板收口至 `templates/`；
-2. **单源规则反虚构 (`RCFG-RULE-DRIFT`)**：引用的所有规则 ID 必须在 `scripts/common/rule-catalog.json`（505 条规则）中真实登记；
+2. **单源规则反虚构 (`RCFG-RULE-DRIFT`)**：引用的所有规则 ID 必须在 `scripts/common/rule-catalog.json`（508 条规则）中真实登记；
 3. **双目录 100% 字节等价**：修改后必须运行 `sync-skills.js` 保持根目录与插件包镜像完全一致；
 4. **物理卫生与排版契约**：所有 `.md`, `.json`, `.ts`, `.js` 严格保持 LF 换行，零死链、零空文件。
 

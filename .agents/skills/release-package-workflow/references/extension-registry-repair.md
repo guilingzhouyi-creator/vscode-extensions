@@ -1,50 +1,24 @@
-# VS Code 扩展本地注册表自愈与热同步原理解析
+# 扩展注册表冲突自愈原理与面向用户变更日志编写指南
 
-本指南阐述了本地开发阶段 VS Code 与 Cursor 扩展注册表的结构特征、幽灵条目（Ghost Entries）成因及 `-HotSync` 内置自愈算法的工作机制。
-
----
-
-## 一、 为什么需要注册表自愈？
-
-VS Code 与 Cursor 在用户本地目录维护扩展生命周期与状态：
-- **扩展物理存储路径**：`$env:USERPROFILE\.vscode\extensions\<publisher>.<extension-name>-<version>/`
-- **扩展元数据注册表**：`$env:USERPROFILE\.vscode\extensions\extensions.json`
-
-在频繁的本地编译调试、版本演进或物理删除旧版扩展目录时，宿主编辑器的 `extensions.json` 往往无法即时同步，极易残留指向已失效物理目录的孤儿引用指针（Ghost Entries）。
-
-### 幽灵条目引发的典型故障：
-1. **加载静默失败**：宿主编辑器在 UI 上显示扩展已安装，但实际上功能未激活；
-2. **命令与视图丢失**：快捷命令（Command Palette）或侧边栏自定义视图无法呈现；
-3. **清单解析报错**：编辑器在启动或重新加载窗口时报告扩展清单解析错误（Manifest load error）。
+本指南涵盖 `-HotSync` 本地扩展注册表（`extensions.json`）幽灵条目自愈机制，以及终端产品 `CHANGELOG.md` 的用户价值转化方法。
 
 ---
 
-## 二、 自愈算法工作机制 (`Repair-ExtensionRegistry`)
+## 一、 宿主扩展注册表幽灵条目自愈 (`Repair-ExtensionRegistry`)
 
-在 `package.ps1` 与 `package.sh` 的 `-HotSync` 执行链路中，注册表自愈算法在产物覆盖前自动运行：
+1. **故障成因**：本地多次打包、版本号升级或手动删除旧版扩展目录后，VS Code / Cursor 的 `~/.vscode/extensions/extensions.json` 仍保留指向已删除目录的 `relativeLocation` 指针，导致新版本被遮蔽、命令报错 `command not found` 或状态栏图标消失；
+2. **三步自愈流水线**：
+   - 解析宿主 `extensions.json` 数组；
+   - 对每条记录拼接物理路径并校验目录及 `package.json` 是否真实存在；
+   - 过滤失效幽灵条目，按 UTF-8 无 BOM 格式原子写回注册表，随后将最新构建产物同步至目标版本目录。
 
-### 1. 扫描与探测
-算法遍历开发机上的宿主扩展根目录：
-- VS Code：`$env:USERPROFILE\.vscode\extensions`
-- Cursor：`$env:USERPROFILE\.cursor\extensions`
+---
 
-### 2. 流式解析注册表
-读取并解析 `extensions.json` 文件（强制采用无 BOM UTF-8 编码，防止编码漂移）。
+## 二、 面向终端用户的变更日志（Keep-a-Changelog）转化对照
 
-### 3. 有效性探测与孤儿过滤
-对注册表内登记的目标扩展条目，检验其相对物理路径是否依然存在：
-```powershell
-$valid = @($entries | Where-Object {
-  if ($_.identifier.id -eq $FullExtId) {
-    $targetDir = Join-Path $ideDir $_.relativeLocation
-    return (Test-Path $targetDir)
-  }
-  return $true
-})
-```
-
-### 4. 紧凑原子写回
-若检测到失效的幽灵条目，将其从数组中剥离，并将清洗后的干净数据以紧凑格式原子写回 `extensions.json` 文件。
-
-### 5. 覆盖式热同步装载
-清洗完成后，脚本将本次编译生成的最新构建产物与清单直接复制至宿主扩展目录，使 VS Code 与 Cursor 重载窗口后能够立即无缝识别并激活最新扩展。
+1. **内部工程表述 $\to$ 终端用户收益转化表**：
+   - ❌ `重构 TimeAggregator.ts 消除循环内瞬态堆分配，ELOC 降至 450 行`
+   - ✅ `显著优化长周期统计数据的加载计算性能，大型工作区秒级渲染`
+   - ❌ `修复 L3-HARDCODE 门禁报错，将中文提取至 zh-CN.ts 字典`
+   - ✅ `完善状态栏与仪表板界面的多语言本地化翻译，中英文切换更加自然`
+2. **六大标准语义分组**：`Added`（新特性）、`Changed`（交互或性能优化）、`Deprecated`（弃用预告）、`Removed`（移除旧特性）、`Fixed`（用户可见缺陷修复）、`Security`（本地落盘防丢与权限加固）。

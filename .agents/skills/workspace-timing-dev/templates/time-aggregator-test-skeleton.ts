@@ -1,8 +1,8 @@
 /**
  * Module: Unit Tests — Time Aggregator Natural Day Splitting Skeleton
- * File Path: test/unit/time-aggregator.test.ts
+ * File Path: .agents/skills/workspace-timing-dev/templates/time-aggregator-test-skeleton.ts
  * Architecture Role: Deterministic regression test suite for timing conservation
- * Dependencies: assert, TimeAggregator
+ * Dependencies & Triggers: Invoked by npm run test:fast; depends on assert and TimeAggregator
  * Responsibilities: Verify cross-midnight session splitting and duration conservation
  * Exit Semantics & Design Rationale: Pure deterministic test with withFixedNow mock clock
  */

@@ -74,11 +74,11 @@ description: >-
 
 所有 Markdown 文档中的超链接必须遵守严格的静态门禁守卫：
 
-| 门禁规则 / 守卫契约 | 违规场景与模式 | 刚性指标与治理规范 |
+| 门禁规则 / 守卫维度 | 违规场景与模式 | 刚性指标与治理规范 |
 | :--- | :--- | :--- |
-| **`LINK-ABS-FILE-URI`** | 包含 Windows 盘符（`c:/...`）、`file:///` 或机器绝对路径 | **一票否决阻断**。绝对路径无法在跨平台或远端 CI 解析，必须统一采用项目相对路径（如 [blueprint](../../../docs/agent-native-system-blueprint.md)） |
-| **`LINK-DEAD`** | 链接指向的文件在磁盘不存在 | **一票否决阻断**。重命名或移动文档时，必须全局批量更新所有相对路径引用 |
-| **`LINK-ANCHOR-DEAD`** | 锚点链接（如 `#section`）在目标文档中无对应标题 | 锚点必须严格对齐目标文档中真实存在的 Markdown 标题 |
+| **`DOC-LNK-001` / `HC-ABS-PATH`（禁绝对路径与本地 URI）** | 包含 Windows 盘符（`c:/...`）、`file:///` 或机器绝对路径 | **一票否决阻断**。绝对路径无法在跨平台或远端 CI 解析，必须统一采用项目相对路径（如 [blueprint](../../../docs/agent-native-system-blueprint.md)） |
+| **`DOC-LNK-001`（禁死链目标文件）** | 链接指向的文件在磁盘不存在 | **一票否决阻断**。重命名或移动文档时，必须全局批量更新所有相对路径引用 |
+| **`DOC-LNK-001`（禁失效标题锚点）** | 锚点链接（如 `#section`）在目标文档中无对应标题 | 锚点必须严格对齐目标文档中真实存在的 Markdown 标题 |
 
 详见避坑指引：[relative-link-hygiene.md](references/relative-link-hygiene.md)。
 

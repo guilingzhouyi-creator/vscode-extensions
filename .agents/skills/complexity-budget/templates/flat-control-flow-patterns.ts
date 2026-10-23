@@ -1,9 +1,10 @@
 /**
- * Control Flow Flattening Patterns & Guard Clauses Guide
- *
- * Demonstrates standard patterns to eliminate deep nesting (Depth <= 4),
- * excessive cyclomatic complexity (CC <= 15), and transient heap allocations
- * in loops (CPX-SPACE-001).
+ * Module: Complexity Budget — Control Flow Flattening & Guard Clause Patterns
+ * File Path: .agents/skills/complexity-budget/templates/flat-control-flow-patterns.ts
+ * Architecture Role: Reference template illustrating flat control-flow refactoring and loop zero-allocation.
+ * Dependencies & Triggers: Pure TypeScript reference module; consumed during complexity refactoring.
+ * Responsibilities: Demonstrate guard clauses (Depth <= 4, CC <= 15), strategy dispatch maps, and pre-allocated loop buffers.
+ * Exit Semantics & Design Rationale: Pure functions with deterministic return contracts; eliminates nested pyramids and += loop allocations.
  */
 
 export interface ValidationContext {
@@ -88,20 +89,30 @@ export function consumeTrajectoryStream(lines: readonly string[]): TrajectorySte
 // Pattern 3: Strategy Dispatch Map (Eliminating Giant Switch/If-Else)
 // -----------------------------------------------------------------------------
 
-type HandlerFn = (data: unknown) => void;
+type HandlerFn = (state: Record<string, string>, payload: string) => void;
 
 const ACTION_HANDLERS: Readonly<Record<string, HandlerFn>> = Object.freeze({
-    INIT: (_d: unknown): void => { /* handle init */ },
-    START: (_d: unknown): void => { /* handle start */ },
-    PAUSE: (_d: unknown): void => { /* handle pause */ },
-    STOP: (_d: unknown): void => { /* handle stop */ },
-    RESET: (_d: unknown): void => { /* handle reset */ },
+    INIT: (state: Record<string, string>, payload: string): void => {
+        state.status = `initialized:${payload}`;
+    },
+    START: (state: Record<string, string>, payload: string): void => {
+        state.status = `running:${payload}`;
+    },
+    PAUSE: (state: Record<string, string>, payload: string): void => {
+        state.status = `paused:${payload}`;
+    },
+    STOP: (state: Record<string, string>, payload: string): void => {
+        state.status = `stopped:${payload}`;
+    },
+    RESET: (state: Record<string, string>): void => {
+        state.status = 'idle';
+    },
 });
 
-export function dispatchActionFlat(actionType: string, data: unknown): void {
+export function dispatchActionFlat(actionType: string, state: Record<string, string>, payload: string): void {
     const handler = ACTION_HANDLERS[actionType];
     if (handler) {
-        handler(data);
+        handler(state, payload);
     }
 }
 

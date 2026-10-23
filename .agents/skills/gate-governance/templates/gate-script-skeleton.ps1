@@ -46,16 +46,20 @@ if (Test-Path $targetProject) {
 
   # 有界等待：无界 -Wait 会让挂起的测试永久阻塞调用方。
   if (-not $proc.WaitForExit(180000)) {
-    try { $proc.Kill($true) } catch { }
-    Write-Host "▲ WARN  子项目测试超过 180s 已终止" -ForegroundColor Yellow
+    try {
+      $proc.Kill($true)
+    } catch {
+      Write-Verbose "进程已提前退出或清理完成: $($_.Exception.Message)"
+    }
+    Write-Host "▲ WARN  [AR-TEST-02] 子项目测试超过 180s 已终止" -ForegroundColor Yellow
     exit 124
   }
 
   if ($proc.ExitCode -ne 0) {
-    Write-Host "✖ BLOCK  子项目测试失败" -ForegroundColor Red
+    Write-Host "✖ BLOCK [AR-TEST-02] 子项目测试失败" -ForegroundColor Red
     exit $proc.ExitCode
   }
 }
 
-Write-Host "✔ 全部检查通过" -ForegroundColor Green
+Write-Host "✔ PASS  [AR-TEST-02] 全部检查通过" -ForegroundColor Green
 exit 0

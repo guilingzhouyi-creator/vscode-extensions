@@ -1,10 +1,10 @@
 /**
- * Universal 999px Pill Segmented Control
- * 
- * 核心机制：
- * 1. 999px 全圆角轨道，严格 2px 几何内边距；
- * 2. 纯几何绝对定位，120ms 瞬时咬合；
- * 3. 容器查询 @container 自适应收缩。
+ * Module: Interaction Design Physics — 999px Pill Segmented Control Component
+ * File Path: .agents/skills/interaction-design-physics/templates/segmented-control-pill.tsx
+ * Architecture Role: Accessible tablist pill component with geometric sliding indicator.
+ * Dependencies & Triggers: Depends on React; rendered inside toolbar and filter headers.
+ * Responsibilities: Compute percentage-based indicator geometry with 2px inset padding and container-query support.
+ * Exit Semantics & Design Rationale: Pure controlled React component; avoids layout thrashing during tab switches.
  */
 
 import React from 'react';

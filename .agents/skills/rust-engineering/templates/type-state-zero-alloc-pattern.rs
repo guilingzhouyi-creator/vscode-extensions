@@ -2,11 +2,14 @@
 //! File Path: .agents/skills/rust-engineering/templates/type-state-zero-alloc-pattern.rs
 //! Architecture Role: Reference scaffolding demonstrating type-state zero-cost state machines,
 //!   zero-transient-allocation buffer borrowing, and strict safety proof discipline.
+//! Dependencies & Triggers: Depends on std::marker::PhantomData, std::sync::atomic, thiserror;
+//!   used as an architectural reference template for fractal-git and auto-refactor crates.
 //! Responsibilities:
 //!   1. Enforce compile-time lifecycle transitions via zero-sized phantom state types.
 //!   2. Eliminate hot-loop allocations using reusable capacity-preserved buffers.
 //!   3. Propagate strong-typed crate errors with thiserror derivation.
 //!   4. Document every unsafe operation with formal safety invariants.
+//! Exit Semantics & Design Rationale: Pure library module returning Result<T, TemplateError>; zero runtime panic.
 
 use std::marker::PhantomData;
 use std::sync::atomic::{AtomicU64, Ordering};

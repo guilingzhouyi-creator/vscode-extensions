@@ -2,34 +2,38 @@
  * Module: 7-Stop Non-Linear Power-Law Scroll Fade Mask Stylesheet
  * File Path: .agents/skills/interaction-design-physics/templates/scroll-fade-container.css
  * Architecture Role: Edge fade styling implementing Weber-Fechner y ≈ x^1.5 perceptual curve.
+ * Dependencies & Triggers: Consumed by scrollable containers with data-scroll-top / data-scroll-bottom attributes.
  * Responsibilities:
  *   1. Define 7-stop non-linear Alpha gradient across 28px feather distance.
  *   2. Dynamically collapse edge masks when container touches top/bottom boundary.
  *   3. Eliminate color banding, Mach bands, and hairline clipping on Retina displays.
+ * Exit Semantics & Design Rationale: Uses composite mask-image variables to prevent harsh linear gradient Mach bands.
  */
 
 :root {
   --scroll-fade-distance: 28px;
   --scroll-fade-mask-top: linear-gradient(
     to bottom,
-    rgba(0, 0, 0, 0) 0%,
-    rgba(0, 0, 0, 0.051) 15%,
-    rgba(0, 0, 0, 0.149) 30%,
-    rgba(0, 0, 0, 0.302) 45%,
-    rgba(0, 0, 0, 0.502) 60%,
-    rgba(0, 0, 0, 0.702) 75%,
-    rgba(0, 0, 0, 0.851) 87%,
+    rgba(0, 0, 0, 0) 0px,
+    rgba(0, 0, 0, 0.051) calc(var(--scroll-fade-distance) * 0.15),
+    rgba(0, 0, 0, 0.149) calc(var(--scroll-fade-distance) * 0.30),
+    rgba(0, 0, 0, 0.302) calc(var(--scroll-fade-distance) * 0.45),
+    rgba(0, 0, 0, 0.502) calc(var(--scroll-fade-distance) * 0.60),
+    rgba(0, 0, 0, 0.702) calc(var(--scroll-fade-distance) * 0.75),
+    rgba(0, 0, 0, 0.851) calc(var(--scroll-fade-distance) * 0.87),
+    rgba(0, 0, 0, 1) var(--scroll-fade-distance),
     rgba(0, 0, 0, 1) 100%
   );
   --scroll-fade-mask-bottom: linear-gradient(
     to top,
-    rgba(0, 0, 0, 0) 0%,
-    rgba(0, 0, 0, 0.051) 15%,
-    rgba(0, 0, 0, 0.149) 30%,
-    rgba(0, 0, 0, 0.302) 45%,
-    rgba(0, 0, 0, 0.502) 60%,
-    rgba(0, 0, 0, 0.702) 75%,
-    rgba(0, 0, 0, 0.851) 87%,
+    rgba(0, 0, 0, 0) 0px,
+    rgba(0, 0, 0, 0.051) calc(var(--scroll-fade-distance) * 0.15),
+    rgba(0, 0, 0, 0.149) calc(var(--scroll-fade-distance) * 0.30),
+    rgba(0, 0, 0, 0.302) calc(var(--scroll-fade-distance) * 0.45),
+    rgba(0, 0, 0, 0.502) calc(var(--scroll-fade-distance) * 0.60),
+    rgba(0, 0, 0, 0.702) calc(var(--scroll-fade-distance) * 0.75),
+    rgba(0, 0, 0, 0.851) calc(var(--scroll-fade-distance) * 0.87),
+    rgba(0, 0, 0, 1) var(--scroll-fade-distance),
     rgba(0, 0, 0, 1) 100%
   );
 }
@@ -38,46 +42,22 @@
   position: relative;
   overflow-y: auto;
   overflow-x: hidden;
-  mask-image: linear-gradient(to bottom,
-    transparent 0px,
-    black var(--scroll-fade-distance),
-    black calc(100% - var(--scroll-fade-distance)),
-    transparent 100%
-  );
-  -webkit-mask-image: linear-gradient(to bottom,
-    transparent 0px,
-    black var(--scroll-fade-distance),
-    black calc(100% - var(--scroll-fade-distance)),
-    transparent 100%
-  );
+  mask-image: var(--scroll-fade-mask-top), var(--scroll-fade-mask-bottom);
+  mask-composite: intersect;
+  -webkit-mask-image: var(--scroll-fade-mask-top), var(--scroll-fade-mask-bottom);
+  -webkit-mask-composite: source-in;
 }
 
 /* Dynamic sensor: Top boundary reached, collapse top fade */
 .scroll-fade-container[data-scroll-top="true"] {
-  mask-image: linear-gradient(to bottom,
-    black 0px,
-    black calc(100% - var(--scroll-fade-distance)),
-    transparent 100%
-  );
-  -webkit-mask-image: linear-gradient(to bottom,
-    black 0px,
-    black calc(100% - var(--scroll-fade-distance)),
-    transparent 100%
-  );
+  mask-image: var(--scroll-fade-mask-bottom);
+  -webkit-mask-image: var(--scroll-fade-mask-bottom);
 }
 
 /* Dynamic sensor: Bottom boundary reached, collapse bottom fade */
 .scroll-fade-container[data-scroll-bottom="true"] {
-  mask-image: linear-gradient(to bottom,
-    transparent 0px,
-    black var(--scroll-fade-distance),
-    black 100%
-  );
-  -webkit-mask-image: linear-gradient(to bottom,
-    transparent 0px,
-    black var(--scroll-fade-distance),
-    black 100%
-  );
+  mask-image: var(--scroll-fade-mask-top);
+  -webkit-mask-image: var(--scroll-fade-mask-top);
 }
 
 /* Dynamic sensor: Fully contained, both top and bottom collapsed */

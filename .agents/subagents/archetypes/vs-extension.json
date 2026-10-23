@@ -2,27 +2,36 @@
   "archetype": "vs-extension",
   "displayName": "VS Code 扩展领域 (workspace-timing)",
   "rootDirectory": "workspace-timing",
-  "allowedExtensions": [".ts", ".js", ".json", ".md"],
+  "allowedExtensions": [
+    ".ts",
+    ".js",
+    ".json",
+    ".md"
+  ],
   "pathJail": {
-    "allowedPrefixes": ["workspace-timing/"],
-    "forbiddenPrefixes": ["auto-refactor/", "WebGames/", "scripts/", ".agents/"]
+    "allowedPrefixes": [
+      "workspace-timing/"
+    ],
+    "forbiddenPrefixes": [
+      "auto-refactor/",
+      "WebGames/",
+      "scripts/",
+      ".agents/",
+      "fractal-git/"
+    ]
   },
   "associatedSkills": [
     "workspace-timing-dev",
+    "state-concurrency-and-crash-recovery",
+    "defensive-security-and-taint-safety",
     "algorithmic-operator-engineering",
     "spec-driven-development",
-    "test-driven-development",
-    "code-simplification",
     "debugging-and-error-recovery",
-    "interview-me",
-    "doubt-driven-development",
-    "context-engineering",
     "constraint-driven-development",
     "facade-discipline",
     "coding-craft",
     "complexity-budget",
     "interaction-design-physics",
-    "product-release-docs",
     "release-package-workflow",
     "test-benchmark-engineering"
   ],
