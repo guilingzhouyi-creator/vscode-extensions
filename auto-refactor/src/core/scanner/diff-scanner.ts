@@ -495,36 +495,13 @@ async function runDiffRoutingPass(ctx: DiffRoutingPassContext): Promise<void> {
         const diffInput = ctx.hintsMap.get(relPath);
         if (diffInput) {
             await processChangedFileHint(
-                relPath,
-                diffInput,
-                fileIdx,
-                ctx.absRoot,
-                ctx.fpContext,
-                ctx.opts,
-                ctx.incBucket,
-                ctx.sessionBucket,
-                ctx.perFile,
-                ctx.cache,
-                ctx.routingState,
-                ctx.incEnabled,
-                ctx.incMinLines,
-                statEntry,
-                ctx.scanner,
+                { rel: relPath, diffInput, fileIndex: fileIdx, statEntry },
+                ctx,
             );
         } else {
             await processUnchangedFile(
-                relPath,
-                fileIdx,
-                statEntry,
-                ctx.absRoot,
-                ctx.fpContext,
-                ctx.incBucket,
-                ctx.sessionBucket,
-                ctx.perFile,
-                ctx.cache,
-                ctx.routingState,
-                ctx.incEnabled,
-                ctx.incMinLines,
+                { rel: relPath, fileIndex: fileIdx, statEntry },
+                ctx,
             );
         }
     }

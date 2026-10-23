@@ -26,6 +26,18 @@ import type {
     StructuralMatch,
 } from './types';
 
+const CHAR_DOLLAR = 36;
+const CHAR_UPPER_A = 65;
+const CHAR_UPPER_Z = 90;
+const CHAR_LOWER_A = 97;
+const CHAR_LOWER_Z = 122;
+const CHAR_DIGIT_0 = 48;
+const CHAR_DIGIT_9 = 57;
+const CHAR_UNDERSCORE = 95;
+const DEFAULT_MAX_MATCHES = 1000;
+const DEFAULT_FALLBACK_FILE = 'source.ts';
+const VIRTUAL_TARGET_FILE = '__target__.tsx';
+
 /**
  * Compiled representation of a pattern rule containing parsed AST root.
  */
@@ -45,15 +57,15 @@ export interface CompiledPatternRule {
  * @returns True if text adheres to metavariable naming syntax.
  */
 export function isMetavariableName(text: string): boolean {
-    if (text.length < 2 || text.charCodeAt(0) !== 36) {
+    if (text.length < 2 || text.charCodeAt(0) !== CHAR_DOLLAR) {
         return false;
     }
     for (let i = 1; i < text.length; i++) {
         const code = text.charCodeAt(i);
-        const isUpper = code >= 65 && code <= 90;
-        const isLower = code >= 97 && code <= 122;
-        const isDigit = code >= 48 && code <= 57;
-        const isUnderscore = code === 95;
+        const isUpper = code >= CHAR_UPPER_A && code <= CHAR_UPPER_Z;
+        const isLower = code >= CHAR_LOWER_A && code <= CHAR_LOWER_Z;
+        const isDigit = code >= CHAR_DIGIT_0 && code <= CHAR_DIGIT_9;
+        const isUnderscore = code === CHAR_UNDERSCORE;
         if (!isUpper && !isLower && !isDigit && !isUnderscore) {
             return false;
         }
@@ -148,25 +160,24 @@ export function compilePattern(spec: PatternSpec): CompiledPatternRule {
 function matchMetavariable(
     pNode: ts.Identifier,
     targetNode: ts.Node,
-    targetSf: ts.SourceFile,
-    bindings: Map<string, MetavariableBinding>,
+    ctx: PatternMatchContext,
 ): boolean {
     const name = pNode.text;
     if (name === '$_') {
         return true;
     }
 
-    const targetText = targetNode.getText(targetSf).trim();
-    const existing = bindings.get(name);
+    const targetText = targetNode.getText(ctx.targetSf).trim();
+    const existing = ctx.bindings.get(name);
     if (existing !== undefined) {
         return normalizeCode(existing.value) === normalizeCode(targetText);
     }
 
-    bindings.set(name, {
+    ctx.bindings.set(name, {
         name,
         value: targetText,
         nodeKind: ts.SyntaxKind[targetNode.kind],
-        range: computeRange(targetNode, targetSf),
+        range: computeRange(targetNode, ctx.targetSf),
     });
     return true;
 }
@@ -195,14 +206,21 @@ function matchLiteralsAndIdentifiers(
 }
 
 /**
+ * Context container carrying pattern and target source files alongside captured bindings.
+ */
+export interface PatternMatchContext {
+    readonly patternSf: ts.SourceFile;
+    readonly targetSf: ts.SourceFile;
+    readonly bindings: Map<string, MetavariableBinding>;
+}
+
+/**
  * Matches binary expressions comparing operator kind and sub-expressions.
  */
 function matchBinaryExpression(
     pNode: ts.BinaryExpression,
     tNode: ts.Node,
-    patternSf: ts.SourceFile,
-    targetSf: ts.SourceFile,
-    bindings: Map<string, MetavariableBinding>,
+    ctx: PatternMatchContext,
 ): boolean {
     if (!ts.isBinaryExpression(tNode)) {
         return false;
@@ -210,10 +228,10 @@ function matchBinaryExpression(
     if (pNode.operatorToken.kind !== tNode.operatorToken.kind) {
         return false;
     }
-    if (!matchNode(pNode.left, tNode.left, patternSf, targetSf, bindings)) {
+    if (!matchNode(pNode.left, tNode.left, ctx)) {
         return false;
     }
-    return matchNode(pNode.right, tNode.right, patternSf, targetSf, bindings);
+    return matchNode(pNode.right, tNode.right, ctx);
 }
 
 /**
@@ -222,20 +240,18 @@ function matchBinaryExpression(
 function matchConditionalExpression(
     pNode: ts.ConditionalExpression,
     tNode: ts.Node,
-    patternSf: ts.SourceFile,
-    targetSf: ts.SourceFile,
-    bindings: Map<string, MetavariableBinding>,
+    ctx: PatternMatchContext,
 ): boolean {
     if (!ts.isConditionalExpression(tNode)) {
         return false;
     }
-    if (!matchNode(pNode.condition, tNode.condition, patternSf, targetSf, bindings)) {
+    if (!matchNode(pNode.condition, tNode.condition, ctx)) {
         return false;
     }
-    if (!matchNode(pNode.whenTrue, tNode.whenTrue, patternSf, targetSf, bindings)) {
+    if (!matchNode(pNode.whenTrue, tNode.whenTrue, ctx)) {
         return false;
     }
-    return matchNode(pNode.whenFalse, tNode.whenFalse, patternSf, targetSf, bindings);
+    return matchNode(pNode.whenFalse, tNode.whenFalse, ctx);
 }
 
 /**
@@ -244,9 +260,7 @@ function matchConditionalExpression(
 function matchPrefixUnaryExpression(
     pNode: ts.PrefixUnaryExpression,
     tNode: ts.Node,
-    patternSf: ts.SourceFile,
-    targetSf: ts.SourceFile,
-    bindings: Map<string, MetavariableBinding>,
+    ctx: PatternMatchContext,
 ): boolean {
     if (!ts.isPrefixUnaryExpression(tNode)) {
         return false;
@@ -254,7 +268,7 @@ function matchPrefixUnaryExpression(
     if (pNode.operator !== tNode.operator) {
         return false;
     }
-    return matchNode(pNode.operand, tNode.operand, patternSf, targetSf, bindings);
+    return matchNode(pNode.operand, tNode.operand, ctx);
 }
 
 /**
@@ -263,9 +277,7 @@ function matchPrefixUnaryExpression(
 function matchGeneralChildren(
     pNode: ts.Node,
     tNode: ts.Node,
-    patternSf: ts.SourceFile,
-    targetSf: ts.SourceFile,
-    bindings: Map<string, MetavariableBinding>,
+    ctx: PatternMatchContext,
 ): boolean {
     const pChildren: ts.Node[] = [];
     ts.forEachChild(pNode, (child) => {
@@ -278,14 +290,14 @@ function matchGeneralChildren(
     });
 
     if (pChildren.length === 0 && tChildren.length === 0) {
-        return matchLiteralsAndIdentifiers(pNode, tNode, patternSf, targetSf);
+        return matchLiteralsAndIdentifiers(pNode, tNode, ctx.patternSf, ctx.targetSf);
     }
     if (pChildren.length !== tChildren.length) {
         return false;
     }
 
     for (let i = 0; i < pChildren.length; i++) {
-        if (!matchNode(pChildren[i], tChildren[i], patternSf, targetSf, bindings)) {
+        if (!matchNode(pChildren[i], tChildren[i], ctx)) {
             return false;
         }
     }
@@ -294,26 +306,17 @@ function matchGeneralChildren(
 
 /**
  * Core recursive structural pattern matcher comparing pattern AST against candidate target AST.
- *
- * @param patternNode - Pattern AST node.
- * @param targetNode - Candidate target AST node.
- * @param patternSf - Pattern source file context.
- * @param targetSf - Target document source file context.
- * @param bindings - Mutable binding accumulator map.
- * @returns True if candidate structurally matches pattern.
  */
 function tryMatchSingleStatementBlock(
     pNode: ts.Node,
     tNode: ts.Node,
-    patternSf: ts.SourceFile,
-    targetSf: ts.SourceFile,
-    bindings: Map<string, MetavariableBinding>,
+    ctx: PatternMatchContext,
 ): boolean | undefined {
     if (ts.isBlock(pNode) && pNode.statements.length === 1 && !ts.isBlock(tNode)) {
-        return matchNode(pNode.statements[0], tNode, patternSf, targetSf, bindings);
+        return matchNode(pNode.statements[0], tNode, ctx);
     }
     if (!ts.isBlock(pNode) && ts.isBlock(tNode) && tNode.statements.length === 1) {
-        return matchNode(pNode, tNode.statements[0], patternSf, targetSf, bindings);
+        return matchNode(pNode, tNode.statements[0], ctx);
     }
     return undefined;
 }
@@ -321,37 +324,41 @@ function tryMatchSingleStatementBlock(
 function matchSpecializedExpression(
     pNode: ts.Node,
     tNode: ts.Node,
-    patternSf: ts.SourceFile,
-    targetSf: ts.SourceFile,
-    bindings: Map<string, MetavariableBinding>,
+    ctx: PatternMatchContext,
 ): boolean | undefined {
     if (ts.isBinaryExpression(pNode)) {
-        return matchBinaryExpression(pNode, tNode, patternSf, targetSf, bindings);
+        return matchBinaryExpression(pNode, tNode, ctx);
     }
     if (ts.isConditionalExpression(pNode)) {
-        return matchConditionalExpression(pNode, tNode, patternSf, targetSf, bindings);
+        return matchConditionalExpression(pNode, tNode, ctx);
     }
     if (ts.isPrefixUnaryExpression(pNode)) {
-        return matchPrefixUnaryExpression(pNode, tNode, patternSf, targetSf, bindings);
+        return matchPrefixUnaryExpression(pNode, tNode, ctx);
     }
     return undefined;
 }
 
+/**
+ * Recursively matches a declarative pattern AST against a target AST node.
+ *
+ * @param patternNode - Pattern AST node to match from.
+ * @param targetNode - Target candidate AST node.
+ * @param ctx - Context carrying source files and metavariable bindings.
+ * @returns True if candidate structurally matches pattern.
+ */
 export function matchNode(
     patternNode: ts.Node,
     targetNode: ts.Node,
-    patternSf: ts.SourceFile,
-    targetSf: ts.SourceFile,
-    bindings: Map<string, MetavariableBinding>,
+    ctx: PatternMatchContext,
 ): boolean {
     if (ts.isIdentifier(patternNode) && isMetavariableName(patternNode.text)) {
-        return matchMetavariable(patternNode, targetNode, targetSf, bindings);
+        return matchMetavariable(patternNode, targetNode, ctx);
     }
 
     const pNode = unwrapParentheses(patternNode);
     const tNode = unwrapParentheses(targetNode);
 
-    const blockMatch = tryMatchSingleStatementBlock(pNode, tNode, patternSf, targetSf, bindings);
+    const blockMatch = tryMatchSingleStatementBlock(pNode, tNode, ctx);
     if (blockMatch !== undefined) {
         return blockMatch;
     }
@@ -360,12 +367,12 @@ export function matchNode(
         return false;
     }
 
-    const specialized = matchSpecializedExpression(pNode, tNode, patternSf, targetSf, bindings);
+    const specialized = matchSpecializedExpression(pNode, tNode, ctx);
     if (specialized !== undefined) {
         return specialized;
     }
 
-    return matchGeneralChildren(pNode, tNode, patternSf, targetSf, bindings);
+    return matchGeneralChildren(pNode, tNode, ctx);
 }
 
 /**
@@ -388,10 +395,7 @@ function checkSingleConstraint(
             return false;
         }
     }
-    if (constraint.predicate !== undefined && !constraint.predicate(binding)) {
-        return false;
-    }
-    return true;
+    return constraint.predicate === undefined || constraint.predicate(binding);
 }
 
 /**
@@ -482,7 +486,7 @@ export function findMatches(
     maxReplacements: number,
 ): StructuralMatch[] {
     const matches: StructuralMatch[] = [];
-    const scratchBindings = new Map<string, MetavariableBinding>();
+    const scratchVarToBindingMap = new Map<string, MetavariableBinding>();
 
     function visit(node: ts.Node): void {
         if (matches.length >= maxReplacements) {
@@ -491,11 +495,15 @@ export function findMatches(
 
         for (let i = 0; i < rules.length; i++) {
             const rule = rules[i];
-            scratchBindings.clear();
-            const matched = matchNode(rule.patternNode, node, rule.patternSf, targetSf, scratchBindings);
+            scratchVarToBindingMap.clear();
+            const matched = matchNode(rule.patternNode, node, {
+                patternSf: rule.patternSf,
+                targetSf,
+                bindings: scratchVarToBindingMap,
+            });
 
-            if (matched && evaluateConstraints(rule.spec.where, scratchBindings)) {
-                matches.push(createStructuralMatch(rule, node, targetSf, scratchBindings));
+            if (matched && evaluateConstraints(rule.spec.where, scratchVarToBindingMap)) {
+                matches.push(createStructuralMatch(rule, node, targetSf, scratchVarToBindingMap));
                 return;
             }
         }
@@ -602,6 +610,56 @@ function createNoopRewriteResult(
     });
 }
 
+interface PreparedMatchEnvironment {
+    targetSf: ts.SourceFile;
+    compiledRules: CompiledPatternRule[];
+    rawRules: readonly PatternSpec[];
+}
+
+function prepareMatchEnvironment(
+    sourceCode: string,
+    ruleSpec: PatternSpec | readonly PatternSpec[],
+): PreparedMatchEnvironment {
+    const rawRules = Array.isArray(ruleSpec) ? ruleSpec : [ruleSpec];
+    const compiledRules: CompiledPatternRule[] = [];
+    for (let i = 0; i < rawRules.length; i++) {
+        compiledRules.push(compilePattern(rawRules[i]));
+    }
+
+    const targetSf = ts.createSourceFile(
+        VIRTUAL_TARGET_FILE,
+        sourceCode,
+        ts.ScriptTarget.Latest,
+        true,
+        ts.ScriptKind.TSX,
+    );
+    return { targetSf, compiledRules, rawRules };
+}
+
+function applySortedEdits(sourceCode: string, sortedMatches: StructuralMatch[]): string {
+    let transformed = sourceCode;
+    for (let i = 0; i < sortedMatches.length; i++) {
+        const m = sortedMatches[i];
+        transformed =
+            transformed.substring(0, m.range.start) +
+            m.replacementText +
+            transformed.substring(m.range.end);
+    }
+    return transformed;
+}
+
+function buildPatchEdits(matches: StructuralMatch[]): PatchEdit[] {
+    return matches.map((m) => ({
+        range: {
+            startLine: m.range.startLine,
+            startCol: m.range.startCol,
+            endLine: m.range.endLine,
+            endCol: m.range.endCol,
+        },
+        newText: m.replacementText,
+    }));
+}
+
 /**
  * Pure declarative structural matching and rewriting engine.
  * Inspects sourceCode with ruleSpec, captures metavariables, applies safe non-overlapping
@@ -617,25 +675,12 @@ export function matchAndRewrite(
     ruleSpec: PatternSpec | readonly PatternSpec[],
     options?: MatchAndRewriteOptions,
 ): RewriteResult {
-    const rawRules = Array.isArray(ruleSpec) ? ruleSpec : [ruleSpec];
+    const { targetSf, compiledRules, rawRules } = prepareMatchEnvironment(sourceCode, ruleSpec);
     if (rawRules.length === 0) {
         throw new Error('matchAndRewrite requires at least one PatternSpec rule');
     }
 
-    const compiledRules: CompiledPatternRule[] = [];
-    for (let i = 0; i < rawRules.length; i++) {
-        compiledRules.push(compilePattern(rawRules[i]));
-    }
-
-    const targetSf = ts.createSourceFile(
-        '__target__.tsx',
-        sourceCode,
-        ts.ScriptTarget.Latest,
-        true,
-        ts.ScriptKind.TSX,
-    );
-
-    const maxReplacements = options?.maxReplacements ?? 1000;
+    const maxReplacements = options?.maxReplacements ?? DEFAULT_MAX_MATCHES;
     const matches = findMatches(targetSf, targetSf, compiledRules, maxReplacements);
 
     if (matches.length === 0) {
@@ -643,26 +688,10 @@ export function matchAndRewrite(
     }
 
     const sortedMatches = [...matches].sort((a, b) => b.range.start - a.range.start);
-    let transformed = sourceCode;
-    for (let i = 0; i < sortedMatches.length; i++) {
-        const m = sortedMatches[i];
-        transformed =
-            transformed.substring(0, m.range.start) +
-            m.replacementText +
-            transformed.substring(m.range.end);
-    }
+    const transformed = applySortedEdits(sourceCode, sortedMatches);
+    const edits = buildPatchEdits(matches);
 
-    const edits: PatchEdit[] = matches.map((m) => ({
-        range: {
-            startLine: m.range.startLine,
-            startCol: m.range.startCol,
-            endLine: m.range.endLine,
-            endCol: m.range.endCol,
-        },
-        newText: m.replacementText,
-    }));
-
-    const filePath = options?.filePath ?? 'source.ts';
+    const filePath = options?.filePath ?? DEFAULT_FALLBACK_FILE;
     const unifiedDiff = generateUnifiedDiff(filePath, sourceCode, transformed);
 
     const actionablePatch: ActionablePatch = Object.freeze({
@@ -723,7 +752,7 @@ export function rewriteUntilFixpoint(
         return createNoopRewriteResult(sourceCode, rawRules);
     }
 
-    const filePath = options?.filePath ?? 'source.ts';
+    const filePath = options?.filePath ?? DEFAULT_FALLBACK_FILE;
     const unifiedDiff = generateUnifiedDiff(filePath, sourceCode, currentSource);
 
     const actionablePatch: ActionablePatch = Object.freeze({
@@ -755,22 +784,9 @@ export function rewriteUntilFixpoint(
 export function matchPattern(
     sourceCode: string,
     ruleSpec: PatternSpec | readonly PatternSpec[],
-    maxMatches: number = 1000,
+    maxMatches: number = DEFAULT_MAX_MATCHES,
 ): readonly StructuralMatch[] {
-    const rawRules = Array.isArray(ruleSpec) ? ruleSpec : [ruleSpec];
-    const compiledRules: CompiledPatternRule[] = [];
-    for (let i = 0; i < rawRules.length; i++) {
-        compiledRules.push(compilePattern(rawRules[i]));
-    }
-
-    const targetSf = ts.createSourceFile(
-        '__target__.tsx',
-        sourceCode,
-        ts.ScriptTarget.Latest,
-        true,
-        ts.ScriptKind.TSX,
-    );
-
+    const { targetSf, compiledRules } = prepareMatchEnvironment(sourceCode, ruleSpec);
     return Object.freeze(findMatches(targetSf, targetSf, compiledRules, maxMatches));
 }
 

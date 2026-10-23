@@ -202,7 +202,36 @@ function extractPythonImportProfile(
     }
 }
 
-function extractGoImportProfile(content: string, specifiers: Set<string>): void {
+function resolveGoImportLine(trimmed: string, inBlock: boolean): string | null {
+    if (inBlock) return trimmed;
+    if (trimmed.startsWith('import ')) return trimmed.slice(7).trim();
+    return null;
+}
+
+function recordGoImport(
+    targetLine: string,
+    specifiers: Set<string>,
+    symbolToPkg: Map<string, string>,
+): void {
+    const match = /^(?:([A-Za-z0-9_]+)\s+)?["']([^'"]+)["']/.exec(targetLine);
+    if (!match) return;
+
+    const alias = match[1];
+    const pkgPath = match[2];
+    specifiers.add(pkgPath);
+
+    const pathParts = pkgPath.split('/');
+    const boundSym = alias || pathParts[pathParts.length - 1];
+    if (boundSym && boundSym !== '.' && boundSym !== '_') {
+        symbolToPkg.set(boundSym, pkgPath);
+    }
+}
+
+function extractGoImportProfile(
+    content: string,
+    specifiers: Set<string>,
+    symbolToPkg: Map<string, string>,
+): void {
     const lines = content.split('\n');
     let inBlock = false;
     for (const line of lines) {
@@ -216,31 +245,91 @@ function extractGoImportProfile(content: string, specifiers: Set<string>): void 
             inBlock = false;
             continue;
         }
-        if (inBlock) {
-            const match = /["']([^'"]+)["']/.exec(trimmed);
-            if (match) specifiers.add(match[1]);
-            continue;
+        const targetLine = resolveGoImportLine(trimmed, inBlock);
+        if (targetLine) {
+            recordGoImport(targetLine, specifiers, symbolToPkg);
         }
-        const singleMatch = /^import\s+(?:[A-Za-z0-9_.]+\s+)?["']([^'"]+)["']/.exec(trimmed);
-        if (singleMatch) specifiers.add(singleMatch[1]);
     }
 }
 
-function extractRustImportProfile(content: string, specifiers: Set<string>): void {
+function parseRustUseRemainder(
+    rootPkg: string,
+    remainder: string,
+    symbolToPkg: Map<string, string>,
+): void {
+    const groupMatch = /\{([\s\S]*?)\}/.exec(remainder);
+    if (groupMatch) {
+        const items = groupMatch[1].split(',');
+        for (const item of items) {
+            const clean = item.trim();
+            if (!clean || clean === 'self' || clean === '*') continue;
+            const asMatch = /([A-Za-z0-9_:]+)\s+as\s+([A-Za-z0-9_]+)/.exec(clean);
+            if (asMatch) {
+                symbolToPkg.set(asMatch[2].trim(), rootPkg);
+            } else {
+                const segs = clean.split('::');
+                const sym = segs[segs.length - 1].trim();
+                if (sym) symbolToPkg.set(sym, rootPkg);
+            }
+        }
+        return;
+    }
+    const singleAs = /([A-Za-z0-9_:]+)\s+as\s+([A-Za-z0-9_]+)/.exec(remainder);
+    if (singleAs) {
+        symbolToPkg.set(singleAs[2].trim(), rootPkg);
+    } else {
+        const segs = remainder.split('::');
+        const sym = segs[segs.length - 1].trim();
+        if (sym && sym !== '*') {
+            symbolToPkg.set(sym, rootPkg);
+        }
+    }
+}
+
+function extractRustImportProfile(
+    content: string,
+    specifiers: Set<string>,
+    symbolToPkg: Map<string, string>,
+): void {
     const lines = content.split('\n');
     for (const line of lines) {
         const trimmed = line.trim();
         if (!trimmed || trimmed.startsWith('//')) continue;
-        const useMatch = /^\s*(?:pub\s+)?use\s+([A-Za-z0-9_]+)::/.exec(trimmed);
-        if (useMatch) specifiers.add(useMatch[1]);
+        const useMatch = /^\s*(?:pub\s+)?use\s+([A-Za-z0-9_]+)::(.+);/.exec(trimmed);
+        if (!useMatch) {
+            const directMatch =
+                /^\s*(?:pub\s+)?use\s+([A-Za-z0-9_]+)(?:\s+as\s+([A-Za-z0-9_]+))?;/.exec(trimmed);
+            if (directMatch) {
+                const pkg = directMatch[1];
+                specifiers.add(pkg);
+                symbolToPkg.set(directMatch[2] || pkg, pkg);
+            }
+            continue;
+        }
+        const rootPkg = useMatch[1];
+        specifiers.add(rootPkg);
+        parseRustUseRemainder(rootPkg, useMatch[2].trim(), symbolToPkg);
     }
 }
 
-function extractGdScriptImportProfile(content: string, specifiers: Set<string>): void {
+function extractGdScriptImportProfile(
+    content: string,
+    specifiers: Set<string>,
+    symbolToPkg: Map<string, string>,
+): void {
     const lines = content.split('\n');
     for (const line of lines) {
         const trimmed = line.trim();
         if (!trimmed || trimmed.startsWith('#')) continue;
+        const declMatch =
+            /^(?:const|var)\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*(?:preload|load)\s*\(\s*['"]([^'"]+)['"]\s*\)/.exec(
+                trimmed,
+            );
+        if (declMatch) {
+            specifiers.add(declMatch[2]);
+            symbolToPkg.set(declMatch[1], declMatch[2]);
+            continue;
+        }
         const match = /(?:preload|load)\s*\(\s*['"]([^'"]+)['"]\s*\)/.exec(trimmed);
         if (match) specifiers.add(match[1]);
     }
@@ -261,11 +350,11 @@ export function extractFileImportProfile(content: string, filePath: string): Fil
     if (ext === '.py') {
         extractPythonImportProfile(content, specifiers, symbolToPackageMap);
     } else if (ext === '.go') {
-        extractGoImportProfile(content, specifiers);
+        extractGoImportProfile(content, specifiers, symbolToPackageMap);
     } else if (ext === '.rs') {
-        extractRustImportProfile(content, specifiers);
+        extractRustImportProfile(content, specifiers, symbolToPackageMap);
     } else if (ext === '.gd') {
-        extractGdScriptImportProfile(content, specifiers);
+        extractGdScriptImportProfile(content, specifiers, symbolToPackageMap);
     } else {
         extractTsJsImportProfile(content, specifiers, symbolToPackageMap);
     }

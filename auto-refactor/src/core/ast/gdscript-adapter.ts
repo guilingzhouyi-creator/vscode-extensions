@@ -42,6 +42,29 @@ const CLASS_NAME_RE = /^\s*class_name\s+([a-zA-Z_][a-zA-Z0-9_]*)/;
 const INNER_CLASS_RE = /^\s*class\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*:/;
 const CONST_DECL_RE = /^\s*const\s+([a-zA-Z_][a-zA-Z0-9_]*)/;
 const CONTROL_RE = /^\s*(if|elif|while|for|match)\b/;
+const GDSCRIPT_CALL_KEYWORD_EXCLUSIONS = new Set([
+    'if',
+    'elif',
+    'while',
+    'for',
+    'return',
+    'match',
+    'func',
+    'var',
+    'const',
+    'signal',
+    'enum',
+    'class',
+    'extends',
+    'is',
+    'as',
+    'in',
+    'pass',
+    'assert',
+    'preload',
+    'load',
+    'breakpoint',
+]);
 
 interface ScopeFrame {
     indent: number;
@@ -356,9 +379,29 @@ export class GDScriptAdapter implements LanguageAdapter {
             parentNode.children.push(stmtNode);
 
             this.extractLiterals(rawLine, lineNum, stmtNode, isConstBound);
+            this.extractCalls(rawLine, lineNum, stmtNode);
         }
 
         return { root: rootNode };
+    }
+
+    private extractCalls(rawLine: string, lineNum: number, stmtNode: NormalizedNode): void {
+        const clean = rawLine.replace(/#.*$/, '');
+        const callRegex = /(?:([a-zA-Z_][a-zA-Z0-9_]*)\.)?([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/g;
+        let match: RegExpExecArray | null;
+        const children = stmtNode.children ?? (stmtNode.children = []);
+        while ((match = callRegex.exec(clean)) !== null) {
+            const receiver = match[1];
+            const callName = match[2];
+            if (GDSCRIPT_CALL_KEYWORD_EXCLUSIONS.has(callName)) continue;
+            children.push({
+                kind: NodeKind.Call,
+                name: callName,
+                calleeReceiver: receiver || undefined,
+                start: { line: lineNum, column: match.index + 1 },
+                end: { line: lineNum, column: match.index + match[0].length + 1 },
+            });
+        }
     }
 
     root(ast: NormalizedAst): NormalizedNode {
@@ -416,6 +459,7 @@ export class GDScriptAdapter implements LanguageAdapter {
         const isLegacyToleratedLine =
             /\b(preload|load|get_node|push_error|push_warning|print|printerr)\b|\$/.test(rawLine);
         const tolerantSpans = collectTolerantCallSpans(rawLine);
+        const children = parentNode.children ?? (parentNode.children = []);
 
         // String literals ("..." or '...')
         const strRegex = /"([^"\\]*(?:\\.[^"\\]*)*)"|'([^'\\]*(?:\\.[^'\\]*)*)'/g;
@@ -444,8 +488,7 @@ export class GDScriptAdapter implements LanguageAdapter {
                 start: { line: lineNum, column: col },
                 end: { line: lineNum, column: col + fullText.length },
             };
-            parentNode.children ||= [];
-            parentNode.children.push(litNode);
+            children.push(litNode);
         }
 
         // Numeric literals (integer, float, hex)
@@ -474,8 +517,7 @@ export class GDScriptAdapter implements LanguageAdapter {
                 start: { line: lineNum, column: col },
                 end: { line: lineNum, column: col + numText.length },
             };
-            parentNode.children ||= [];
-            parentNode.children.push(litNode);
+            children.push(litNode);
         }
     }
 

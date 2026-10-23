@@ -25,6 +25,7 @@ import {
     kindOf,
     branchWeightOf,
     calleeNameOf,
+    calleeReceiverOf,
     nameOf,
     isConstBoundOf,
     isToleratedOf,
@@ -548,13 +549,10 @@ export class TsNodeProjector implements NodeProjector {
         node.tolerated = isToleratedOf(astNode, parentRaw, this.sf, grandparentRaw);
     }
 
-    private applyCheapNonFunctionProps(
+    private applyDefinitionOrCallProps(
         node: NormalizedNode,
         astNode: ts.Node,
         kindMeta: TsKindInfo,
-        parentRaw: ts.Node | undefined,
-        grandparentRaw: ts.Node | undefined,
-        isLiteral: boolean,
     ): void {
         if (kindMeta.isClassDefining) {
             node.isClassDefining = true;
@@ -564,18 +562,41 @@ export class TsNodeProjector implements NodeProjector {
             if (this.policy.needNames) node.bindingName = bindingName(astNode, this.sf);
         } else if (kindMeta.kind === NodeKind.Call) {
             node.name = calleeNameOf(astNode, this.sf) ?? undefined;
+            node.calleeReceiver = calleeReceiverOf(astNode, this.sf) ?? undefined;
             node.start = posOf(astNode.getStart(this.sf), this.sf);
             node.end = posOf(astNode.getEnd(), this.sf);
         }
+    }
+
+    private applyLiteralOrKeywordProps(
+        node: NormalizedNode,
+        astNode: ts.Node,
+        parentRaw: ts.Node | undefined,
+        grandparentRaw: ts.Node | undefined,
+    ): void {
+        const isLiteral = kindInfoFor(astNode).literal !== 0;
         if (isLiteral) {
             this.applyCheapLiteralProps(node, astNode, parentRaw, grandparentRaw);
-        } else if (astNode.kind === ts.SyntaxKind.FunctionKeyword) {
+            return;
+        }
+        if (astNode.kind === ts.SyntaxKind.FunctionKeyword) {
             if (this.policy.needComplexity) node.rawKind = 'FunctionKeyword';
             if (this.policy.needPositions) {
                 node.start = posOf(astNode.getStart(this.sf), this.sf);
                 node.end = posOf(astNode.getEnd(), this.sf);
             }
         }
+    }
+
+    private applyCheapNonFunctionProps(
+        node: NormalizedNode,
+        astNode: ts.Node,
+        kindMeta: TsKindInfo,
+        parentRaw: ts.Node | undefined,
+        grandparentRaw: ts.Node | undefined,
+    ): void {
+        this.applyDefinitionOrCallProps(node, astNode, kindMeta);
+        this.applyLiteralOrKeywordProps(node, astNode, parentRaw, grandparentRaw);
     }
 
     private cheapProject(
@@ -607,7 +628,6 @@ export class TsNodeProjector implements NodeProjector {
                 kindMeta,
                 parentRaw,
                 grandparentRaw,
-                isLiteral,
             );
         }
 

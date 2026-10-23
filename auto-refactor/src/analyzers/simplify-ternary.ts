@@ -138,69 +138,55 @@ function getStatementPositionRange(
     };
 }
 
+interface CandidateFormatOptions {
+    prefix: string;
+    condText: string;
+    pair: TernaryBranchPair;
+    sf: ts.SourceFile;
+    maxLen: number;
+}
+
 /**
  * Format a ternary statement candidate and verify line length constraints.
- *
- * @param prefix - Prefix statement text (e.g. `return ` or `x = `).
- * @param condText - Evaluated condition expression text.
- * @param trueExpr - Expression for true branch.
- * @param falseExpr - Expression for false branch.
- * @param sf - Source file for expression text extraction.
- * @param maxLen - Maximum line length threshold.
- * @returns Formatted statement string if within maxLen, else null.
  */
-function formatTernaryCandidate(
-    prefix: string,
-    condText: string,
-    trueExpr: ts.Expression,
-    falseExpr: ts.Expression,
-    sf: ts.SourceFile,
-    maxLen: number,
-): string | null {
-    const text = `${prefix}${condText} ? ${trueExpr.getText(sf).trim()} : ${falseExpr.getText(sf).trim()};`;
-    return text.length <= maxLen ? text : null;
+function formatTernaryCandidate(opts: CandidateFormatOptions): string | null {
+    const trueText = opts.pair.trueExpr.getText(opts.sf).trim();
+    const falseText = opts.pair.falseExpr.getText(opts.sf).trim();
+    const text = `${opts.prefix}${opts.condText} ? ${trueText} : ${falseText};`;
+    return text.length <= opts.maxLen ? text : null;
+}
+
+interface SimplifyIssueOptions {
+    rule: string;
+    message: string;
+    suggestion: string;
+    pos: StatementPositionRange;
+    opportunity: string;
+    canMakeImmutable: boolean;
+    candidate: string;
 }
 
 /**
  * Construct a standardized simplify issue with cognitive and reward scoring metrics.
- *
- * @param file - Relative file path.
- * @param rule - Rule identifier.
- * @param message - Descriptive issue message.
- * @param suggestion - Remediation advice.
- * @param pos - Statement position range.
- * @param opportunity - Descriptive refactoring opportunity tag.
- * @param canMakeImmutable - Whether refactoring allows const declaration.
- * @param candidate - Formatted suggested replacement code.
- * @returns Standardized simplify issue record.
  */
-function makeSimplifyIssue(
-    file: string,
-    rule: string,
-    message: string,
-    suggestion: string,
-    pos: StatementPositionRange,
-    opportunity: string,
-    canMakeImmutable: boolean,
-    candidate: string,
-): Issue {
-    const start = { line: pos.start.line + 1, column: pos.start.character + 1 };
-    const end = { line: pos.end.line + 1, column: pos.end.character + 1 };
+function makeSimplifyIssue(ctx: TernaryMatcherContext, opts: SimplifyIssueOptions): Issue {
+    const start = { line: opts.pos.start.line + 1, column: opts.pos.start.character + 1 };
+    const end = { line: opts.pos.end.line + 1, column: opts.pos.end.character + 1 };
     return {
-        id: `simplify:${rule}:${file}:${start.line}`,
+        id: `simplify:${opts.rule}:${ctx.file}:${start.line}`,
         analyzer: ANALYZER_SIMPLIFY,
-        rule,
+        rule: opts.rule,
         severity: SEVERITY_INFO,
-        message,
-        location: { file, start, end },
+        message: opts.message,
+        location: { file: ctx.file, start, end },
         detail: {
-            opportunity,
-            canMakeImmutable,
-            cognitiveDelta: canMakeImmutable ? COGNITIVE_DELTA_IMMUTABLE : COGNITIVE_DELTA_SHALLOW,
-            rewardBonus: canMakeImmutable ? REWARD_BONUS_IMMUTABLE : REWARD_BONUS_SHALLOW,
-            suggestedCode: candidate,
+            opportunity: opts.opportunity,
+            canMakeImmutable: opts.canMakeImmutable,
+            cognitiveDelta: opts.canMakeImmutable ? COGNITIVE_DELTA_IMMUTABLE : COGNITIVE_DELTA_SHALLOW,
+            rewardBonus: opts.canMakeImmutable ? REWARD_BONUS_IMMUTABLE : REWARD_BONUS_SHALLOW,
+            suggestedCode: opts.candidate,
         },
-        suggestion,
+        suggestion: opts.suggestion,
     };
 }
 
@@ -220,89 +206,77 @@ interface FoldedCandidate {
     pos: StatementPositionRange;
 }
 
+interface FoldCandidateParams {
+    stmt: ts.IfStatement;
+    prefix: string;
+    condText: string;
+    pair: TernaryBranchPair;
+}
+
 /**
  * Attempt to fold expressions into a candidate ternary with position metadata.
- *
- * @param stmt - Enclosing if-statement node.
- * @param prefix - Target assignment or return prefix.
- * @param condText - Condition expression string.
- * @param pair - True and false branch expression pair.
- * @param sf - Source file for formatting.
- * @param maxLen - Maximum line length threshold.
- * @returns Folded candidate record, or null if impure or exceeds length.
  */
 function tryFoldTernaryCandidate(
-    stmt: ts.IfStatement,
-    prefix: string,
-    condText: string,
-    pair: TernaryBranchPair,
-    sf: ts.SourceFile,
-    maxLen: number,
+    ctx: TernaryMatcherContext,
+    params: FoldCandidateParams,
 ): FoldedCandidate | null {
-    if (!isPureShallowExpression(pair.trueExpr) || !isPureShallowExpression(pair.falseExpr)) {
+    if (!isPureShallowExpression(params.pair.trueExpr) || !isPureShallowExpression(params.pair.falseExpr)) {
         return null;
     }
-    const candidate = formatTernaryCandidate(
-        prefix,
-        condText,
-        pair.trueExpr,
-        pair.falseExpr,
-        sf,
-        maxLen,
-    );
+    const candidate = formatTernaryCandidate({
+        prefix: params.prefix,
+        condText: params.condText,
+        pair: params.pair,
+        sf: ctx.sf,
+        maxLen: ctx.maxLen,
+    });
     if (!candidate) {
         return null;
     }
-    return { candidate, pos: getStatementPositionRange(sf, stmt, stmt) };
+    return { candidate, pos: getStatementPositionRange(ctx.sf, params.stmt, params.stmt) };
+}
+
+interface ReturnBranchPair {
+    stmt: ts.IfStatement;
+    thenStmt: ts.Statement;
+    elseStmt: ts.Statement;
+    condText: string;
 }
 
 /**
  * Attempt to fold if (c) return a; else return b; into a ternary return.
- *
- * @param stmt - Parent if statement node.
- * @param thenStmt - Then branch statement.
- * @param elseStmt - Else branch statement.
- * @param condText - Condition expression text.
- * @param ctx - Context carrying analysis options and issue accumulator.
- * @returns True if successfully matched and recorded finding.
  */
 function tryFoldReturnTernary(
-    stmt: ts.IfStatement,
-    thenStmt: ts.Statement,
-    elseStmt: ts.Statement,
-    condText: string,
     ctx: TernaryMatcherContext,
+    branches: ReturnBranchPair,
 ): boolean {
-    if (!ts.isReturnStatement(thenStmt) || !ts.isReturnStatement(elseStmt)) {
+    if (!ts.isReturnStatement(branches.thenStmt) || !ts.isReturnStatement(branches.elseStmt)) {
         return false;
     }
-    if (!thenStmt.expression || !elseStmt.expression) {
+    if (!branches.thenStmt.expression || !branches.elseStmt.expression) {
         return false;
     }
 
-    const folded = tryFoldTernaryCandidate(
-        stmt,
-        PREFIX_RETURN,
-        condText,
-        { trueExpr: thenStmt.expression, falseExpr: elseStmt.expression },
-        ctx.sf,
-        ctx.maxLen,
-    );
+    const folded = tryFoldTernaryCandidate(ctx, {
+        stmt: branches.stmt,
+        prefix: PREFIX_RETURN,
+        condText: branches.condText,
+        pair: { trueExpr: branches.thenStmt.expression, falseExpr: branches.elseStmt.expression },
+    });
     if (!folded) {
         return false;
     }
 
     ctx.issues.push(
-        makeSimplifyIssue(
-            ctx.file,
-            RULE_SIM_TRN,
-            'Conditional return can be simplified to a shallow ternary return.',
-            `Fold into shallow ternary return: \`${folded.candidate}\``,
-            folded.pos,
-            OPPORTUNITY_CONDITIONAL_RETURN,
-            false,
-            folded.candidate,
-        ),
+        makeSimplifyIssue(ctx, {
+            rule: RULE_SIM_TRN,
+            message: 'Conditional return can be simplified to a shallow ternary return.',
+            suggestion: `Fold into shallow ternary return: \`${folded.candidate}\``,
+            pos: folded.pos,
+            opportunity: OPPORTUNITY_CONDITIONAL_RETURN,
+            canMakeImmutable: false,
+            candidate: folded.candidate,
+        }),
     );
     return true;
 }
@@ -364,76 +338,85 @@ function matchAssignmentBranchPair(
     return { targetName: t.left.text, trueExpr: t.right, falseExpr: e.right };
 }
 
+interface AssignmentIssueParams {
+    targetName: string;
+    candidate: string;
+    canMakeImmutable: boolean;
+    pos: StatementPositionRange;
+}
+
 function emitAssignmentTernaryIssues(
-    targetName: string,
-    candidate: string,
-    canMakeImmutable: boolean,
-    pos: StatementPositionRange,
     ctx: TernaryMatcherContext,
+    params: AssignmentIssueParams,
 ): void {
-    if (canMakeImmutable) {
+    if (params.canMakeImmutable) {
         ctx.issues.push(
-            makeSimplifyIssue(
-                ctx.file,
-                RULE_SIM_IMM,
-                `Conditional assignment to '${targetName}' can be folded into an immutable const declaration with a ternary.`,
-                `Fold into const declaration: \`${candidate}\``,
-                pos,
-                OPPORTUNITY_CONDITIONAL_ASSIGNMENT_IMMUTABLE,
-                true,
-                candidate,
-            ),
+            makeSimplifyIssue(ctx, {
+                rule: RULE_SIM_IMM,
+                message: `Conditional assignment to '${params.targetName}' can be folded into an immutable const declaration with a ternary.`,
+                suggestion: `Fold into const declaration: \`${params.candidate}\``,
+                pos: params.pos,
+                opportunity: OPPORTUNITY_CONDITIONAL_ASSIGNMENT_IMMUTABLE,
+                canMakeImmutable: true,
+                candidate: params.candidate,
+            }),
         );
     }
 
     ctx.issues.push(
-        makeSimplifyIssue(
-            ctx.file,
-            RULE_SIM_TRN,
-            `Conditional assignment to '${targetName}' can be simplified to a shallow ternary assignment.`,
-            `Fold into ternary assignment: \`${candidate}\``,
-            pos,
-            OPPORTUNITY_CONDITIONAL_ASSIGNMENT,
-            false,
-            candidate,
-        ),
+        makeSimplifyIssue(ctx, {
+            rule: RULE_SIM_TRN,
+            message: `Conditional assignment to '${params.targetName}' can be simplified to a shallow ternary assignment.`,
+            suggestion: `Fold into ternary assignment: \`${params.candidate}\``,
+            pos: params.pos,
+            opportunity: OPPORTUNITY_CONDITIONAL_ASSIGNMENT,
+            canMakeImmutable: false,
+            candidate: params.candidate,
+        }),
     );
 }
 
+interface AssignmentBranchPairParams {
+    stmt: ts.IfStatement;
+    thenStmt: ts.Statement;
+    elseStmt: ts.Statement;
+    prevStmt: ts.Statement | undefined;
+    condText: string;
+}
+
 function tryFoldAssignmentTernary(
-    stmt: ts.IfStatement,
-    thenStmt: ts.Statement,
-    elseStmt: ts.Statement,
-    prevStmt: ts.Statement | undefined,
-    condText: string,
     ctx: TernaryMatcherContext,
+    params: AssignmentBranchPairParams,
 ): boolean {
-    const pair = matchAssignmentBranchPair(thenStmt, elseStmt);
+    const pair = matchAssignmentBranchPair(params.thenStmt, params.elseStmt);
     if (!pair) {
         return false;
     }
 
-    const canMakeImmutable = isPrecedingLetDeclaration(prevStmt, pair.targetName);
+    const canMakeImmutable = isPrecedingLetDeclaration(params.prevStmt, pair.targetName);
     const prefix = canMakeImmutable ? `const ${pair.targetName} = ` : `${pair.targetName} = `;
 
-    const folded = tryFoldTernaryCandidate(
-        stmt,
+    const folded = tryFoldTernaryCandidate(ctx, {
+        stmt: params.stmt,
         prefix,
-        condText,
-        { trueExpr: pair.trueExpr, falseExpr: pair.falseExpr },
-        ctx.sf,
-        ctx.maxLen,
-    );
+        condText: params.condText,
+        pair: { trueExpr: pair.trueExpr, falseExpr: pair.falseExpr },
+    });
     if (!folded) {
         return false;
     }
 
     const pos =
-        canMakeImmutable && prevStmt
-            ? getStatementPositionRange(ctx.sf, prevStmt, stmt)
+        canMakeImmutable && params.prevStmt
+            ? getStatementPositionRange(ctx.sf, params.prevStmt, params.stmt)
             : folded.pos;
 
-    emitAssignmentTernaryIssues(pair.targetName, folded.candidate, canMakeImmutable, pos, ctx);
+    emitAssignmentTernaryIssues(ctx, {
+        targetName: pair.targetName,
+        candidate: folded.candidate,
+        canMakeImmutable,
+        pos,
+    });
     return true;
 }
 
@@ -458,11 +441,11 @@ function checkIfElseTernary(
     }
 
     const condText = cond.getText(ctx.sf).trim();
-    if (tryFoldReturnTernary(stmt, thenStmt, elseStmt, condText, ctx)) {
+    if (tryFoldReturnTernary(ctx, { stmt, thenStmt, elseStmt, condText })) {
         return;
     }
 
-    tryFoldAssignmentTernary(stmt, thenStmt, elseStmt, prevStmt, condText, ctx);
+    tryFoldAssignmentTernary(ctx, { stmt, thenStmt, elseStmt, prevStmt, condText });
 }
 
 function isSequentialReturnCandidate(
@@ -503,41 +486,38 @@ function checkSequentialReturnTernary(
         return;
     }
 
-    const candidate = formatTernaryCandidate(
-        PREFIX_RETURN,
-        cond.getText(ctx.sf).trim(),
-        returnThen.expression!,
-        returnNext.expression!,
-        ctx.sf,
-        ctx.maxLen,
-    );
+    const candidate = formatTernaryCandidate({
+        prefix: PREFIX_RETURN,
+        condText: cond.getText(ctx.sf).trim(),
+        pair: {
+            trueExpr: returnThen.expression!,
+            falseExpr: returnNext.expression!,
+        },
+        sf: ctx.sf,
+        maxLen: ctx.maxLen,
+    });
     if (!candidate) {
         return;
     }
 
     const pos = getStatementPositionRange(ctx.sf, stmt, returnNext);
     ctx.issues.push(
-        makeSimplifyIssue(
-            ctx.file,
-            RULE_SIM_TRN,
-            'Guard conditional return followed by fallthrough return can be simplified to a shallow ternary return.',
-            `Fold into shallow ternary return: \`${candidate}\``,
+        makeSimplifyIssue(ctx, {
+            rule: RULE_SIM_TRN,
+            message: 'Guard conditional return followed by fallthrough return can be simplified to a shallow ternary return.',
+            suggestion: `Fold into shallow ternary return: \`${candidate}\``,
             pos,
-            OPPORTUNITY_SEQUENTIAL_RETURN,
-            false,
+            opportunity: OPPORTUNITY_SEQUENTIAL_RETURN,
+            canMakeImmutable: false,
             candidate,
-        ),
+        }),
     );
 }
 
 function scanStatements(
     statements: readonly ts.Statement[],
-    sf: ts.SourceFile,
-    file: string,
-    maxLen: number,
-    issues: Issue[],
+    ctx: TernaryMatcherContext,
 ): void {
-    const ctx: TernaryMatcherContext = { sf, file, maxLen, issues };
     for (let i = 0; i < statements.length; i++) {
         const stmt = statements[i];
         if (ts.isIfStatement(stmt)) {
@@ -552,18 +532,15 @@ function scanStatements(
 
 function walkNode(
     node: ts.Node,
-    sf: ts.SourceFile,
-    file: string,
-    maxLen: number,
-    issues: Issue[],
+    ctx: TernaryMatcherContext,
 ): void {
     if (ts.isBlock(node) || ts.isSourceFile(node) || ts.isModuleBlock(node)) {
-        scanStatements(node.statements, sf, file, maxLen, issues);
+        scanStatements(node.statements, ctx);
     } else if (ts.isCaseClause(node) || ts.isDefaultClause(node)) {
-        scanStatements(node.statements, sf, file, maxLen, issues);
+        scanStatements(node.statements, ctx);
     }
 
-    ts.forEachChild(node, (child) => walkNode(child, sf, file, maxLen, issues));
+    ts.forEachChild(node, (child) => walkNode(child, ctx));
 }
 
 /**
@@ -583,5 +560,6 @@ export function detectTernaryOpportunities(
     if (opts.checkTernarySimplification === false) return;
     const maxLen = opts.maxTernaryLength ?? DEFAULT_MAX_TERNARY_LENGTH;
     const file = ctx.filePath.replace(/\\/g, '/');
-    walkNode(sf, sf, file, maxLen, issues);
+    const matcherCtx: TernaryMatcherContext = { sf, file, maxLen, issues };
+    walkNode(sf, matcherCtx);
 }

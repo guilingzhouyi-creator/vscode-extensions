@@ -116,115 +116,120 @@ function recordLineMigration(b: ConstantEntity, a: ConstantEntity, map: Map<numb
     }
 }
 
-function createTransition(
-    classification: RelocationClassification,
-    before: ConstantEntity | undefined,
-    after: ConstantEntity | undefined,
-    rationale: string,
-    isPureRelocation = false,
-): ConstantTransition {
-    return { classification, before, after, isPureRelocation, rationale };
+interface TransitionOptions {
+    classification: RelocationClassification;
+    before?: ConstantEntity;
+    after?: ConstantEntity;
+    rationale: string;
+    isPureRelocation?: boolean;
+}
+
+interface MatchContext {
+    before: ConstantEntity[];
+    after: ConstantEntity[];
+    matchedBefore: Set<number>;
+    matchedAfter: Set<number>;
+    lineMigrationMap: Map<number, number>;
+    transitions: ConstantTransition[];
+}
+
+function createTransition(options: TransitionOptions): ConstantTransition {
+    return {
+        classification: options.classification,
+        before: options.before,
+        after: options.after,
+        isPureRelocation: options.isPureRelocation ?? false,
+        rationale: options.rationale,
+    };
 }
 
 function applyMatchTransition(
     kind: MatchKind,
     b: ConstantEntity,
     a: ConstantEntity,
-    map: Map<number, number>,
-    out: ConstantTransition[],
+    ctx: MatchContext,
 ): void {
     if (kind === MATCH_KIND_IDENTICAL) {
         const isShift =
             b.identity.line !== a.identity.line || b.identity.codeDomain !== a.identity.codeDomain;
         if (isShift) {
-            recordLineMigration(b, a, map);
-            out.push(
-                createTransition(
-                    CLASSIFICATION_RELOCATED,
-                    b,
-                    a,
-                    `Constant '${b.identity.name}' relocated.`,
-                    true,
-                ),
+            recordLineMigration(b, a, ctx.lineMigrationMap);
+            ctx.transitions.push(
+                createTransition({
+                    classification: CLASSIFICATION_RELOCATED,
+                    before: b,
+                    after: a,
+                    rationale: `Constant '${b.identity.name}' relocated.`,
+                    isPureRelocation: true,
+                }),
             );
         } else {
-            out.push(
-                createTransition(
-                    CLASSIFICATION_UNCHANGED,
-                    b,
-                    a,
-                    `Constant '${b.identity.name}' unchanged.`,
-                ),
+            ctx.transitions.push(
+                createTransition({
+                    classification: CLASSIFICATION_UNCHANGED,
+                    before: b,
+                    after: a,
+                    rationale: `Constant '${b.identity.name}' unchanged.`,
+                }),
             );
         }
         return;
     }
     if (kind === MATCH_KIND_RENAMED) {
-        recordLineMigration(b, a, map);
-        out.push(
-            createTransition(
-                CLASSIFICATION_RENAMED,
-                b,
-                a,
-                `Constant renamed from '${b.identity.name}' to '${a.identity.name}'.`,
-            ),
+        recordLineMigration(b, a, ctx.lineMigrationMap);
+        ctx.transitions.push(
+            createTransition({
+                classification: CLASSIFICATION_RENAMED,
+                before: b,
+                after: a,
+                rationale: `Constant renamed from '${b.identity.name}' to '${a.identity.name}'.`,
+            }),
         );
         return;
     }
-    out.push(
-        createTransition(CLASSIFICATION_MUTATED, b, a, `Constant '${b.identity.name}' mutated.`),
+    ctx.transitions.push(
+        createTransition({
+            classification: CLASSIFICATION_MUTATED,
+            before: b,
+            after: a,
+            rationale: `Constant '${b.identity.name}' mutated.`,
+        }),
     );
 }
 
-function runMatchKind(
-    kind: MatchKind,
-    before: ConstantEntity[],
-    after: ConstantEntity[],
-    mb: Set<number>,
-    ma: Set<number>,
-    map: Map<number, number>,
-    out: ConstantTransition[],
-): void {
-    for (let b = 0; b < before.length; b++) {
-        if (mb.has(b)) continue;
-        const be = before[b];
-        const a = findFirstMatch(kind, be, after, ma);
+function runMatchKind(kind: MatchKind, ctx: MatchContext): void {
+    for (let b = 0; b < ctx.before.length; b++) {
+        if (ctx.matchedBefore.has(b)) continue;
+        const be = ctx.before[b];
+        const a = findFirstMatch(kind, be, ctx.after, ctx.matchedAfter);
         if (a >= 0) {
-            mb.add(b);
-            ma.add(a);
-            applyMatchTransition(kind, be, after[a], map, out);
+            ctx.matchedBefore.add(b);
+            ctx.matchedAfter.add(a);
+            applyMatchTransition(kind, be, ctx.after[a], ctx);
         }
     }
 }
 
-function collectUnmatchedTransitions(
-    beforeEntities: ConstantEntity[],
-    afterEntities: ConstantEntity[],
-    matchedBefore: Set<number>,
-    matchedAfter: Set<number>,
-    transitions: ConstantTransition[],
-): void {
-    for (let b = 0; b < beforeEntities.length; b++) {
-        if (!matchedBefore.has(b)) {
-            transitions.push(
-                createTransition(
-                    CLASSIFICATION_DELETED,
-                    beforeEntities[b],
-                    undefined,
-                    `Constant '${beforeEntities[b].identity.name}' deleted.`,
-                ),
+function collectUnmatchedTransitions(ctx: MatchContext): void {
+    for (let b = 0; b < ctx.before.length; b++) {
+        if (!ctx.matchedBefore.has(b)) {
+            ctx.transitions.push(
+                createTransition({
+                    classification: CLASSIFICATION_DELETED,
+                    before: ctx.before[b],
+                    rationale: `Constant '${ctx.before[b].identity.name}' deleted.`,
+                }),
             );
         }
     }
-    for (let a = 0; a < afterEntities.length; a++) {
-        if (!matchedAfter.has(a)) {
-            transitions.push(
-                createTransition(
-                    CLASSIFICATION_INSERTED,
-                    undefined,
-                    afterEntities[a],
-                    `New constant '${afterEntities[a].identity.name}' introduced.`,
-                ),
+    for (let a = 0; a < ctx.after.length; a++) {
+        if (!ctx.matchedAfter.has(a)) {
+            ctx.transitions.push(
+                createTransition({
+                    classification: CLASSIFICATION_INSERTED,
+                    after: ctx.after[a],
+                    rationale: `New constant '${ctx.after[a].identity.name}' introduced.`,
+                }),
             );
         }
     }
@@ -257,33 +262,23 @@ export function analyzeConstantTransitions(
     beforeEntities: ConstantEntity[],
     afterEntities: ConstantEntity[],
 ): RelocationAnalysisResult {
-    const transitions: ConstantTransition[] = [];
-    const lineMigrationMap = new Map<number, number>();
-    const matchedAfter = new Set<number>();
-    const matchedBefore = new Set<number>();
+    const ctx: MatchContext = {
+        before: beforeEntities,
+        after: afterEntities,
+        matchedBefore: new Set<number>(),
+        matchedAfter: new Set<number>(),
+        lineMigrationMap: new Map<number, number>(),
+        transitions: [],
+    };
 
     const kinds: MatchKind[] = [MATCH_KIND_IDENTICAL, MATCH_KIND_RENAMED, MATCH_KIND_MUTATED];
     for (let k = 0; k < kinds.length; k++) {
-        runMatchKind(
-            kinds[k],
-            beforeEntities,
-            afterEntities,
-            matchedBefore,
-            matchedAfter,
-            lineMigrationMap,
-            transitions,
-        );
+        runMatchKind(kinds[k], ctx);
     }
 
-    collectUnmatchedTransitions(
-        beforeEntities,
-        afterEntities,
-        matchedBefore,
-        matchedAfter,
-        transitions,
-    );
+    collectUnmatchedTransitions(ctx);
 
-    const counts = aggregateTransitionCounts(transitions);
+    const counts = aggregateTransitionCounts(ctx.transitions);
     const hasPureRelocationsOnly =
         counts.relocatedCount > 0 &&
         counts.renamedCount === 0 &&
@@ -292,9 +287,9 @@ export function analyzeConstantTransitions(
         counts.deletedCount === 0;
 
     return {
-        transitions,
+        transitions: ctx.transitions,
         ...counts,
         hasPureRelocationsOnly,
-        lineMigrationMap,
+        lineMigrationMap: ctx.lineMigrationMap,
     };
 }
