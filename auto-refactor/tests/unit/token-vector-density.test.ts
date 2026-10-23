@@ -87,6 +87,48 @@ describe('token-entropy: Tokenizer & Shannon Entropy', () => {
         expect(stream.tokenCountsByCategory.CALC_FLOW).toBeGreaterThanOrEqual(4);
     });
 
+    it('reads a quote inside a regex character class as a literal, not as a string opener', () => {
+        // Regression: without a regex-literal branch the quote inside the class opened a bogus
+        // string that only closed at the next quote, swallowing the rest of the file into one
+        // token. tau then collapsed and every density index built on it reported dilution.
+        const code = [
+            "const QUOTES_RE = /['\"]+/g;",
+            'const after = compute(alpha, beta);',
+            'export function tail(delta: number): number { return delta + 1; }',
+        ].join('\n');
+        const stream = tokenizeCode(code, 'ts');
+        expect(stream.rawTokens).toContain("/['\"]+/g");
+        expect(stream.rawTokens).toContain('tail');
+        expect(stream.rawTokens.length).toBeGreaterThan(15);
+        for (const token of stream.rawTokens) {
+            expect(token.includes('\n')).toBe(false);
+        }
+    });
+
+    it('keeps division distinct from a regex literal', () => {
+        const code = 'const ratio = total / count / scale;\nconst ok = 1;';
+        const stream = tokenizeCode(code, 'ts');
+        expect(stream.rawTokens.filter((token) => token === '/')).toHaveLength(2);
+    });
+
+    it('reads a slash inside a character class as part of the literal', () => {
+        const stream = tokenizeCode('const q = /[/]/; const y = 2;', 'ts');
+        expect(stream.rawTokens).toContain('/[/]/');
+    });
+
+    it('reads an escaped slash as part of the literal', () => {
+        const stream = tokenizeCode('const esc = /a\\/b/g;', 'ts');
+        expect(stream.rawTokens).toContain('/a\\/b/g');
+    });
+
+    it('declines an unterminated literal and keeps the division reading', () => {
+        // A literal cannot span a line break, so the candidate is rejected rather than swallowing
+        // the remainder of the file.
+        const stream = tokenizeCode('const bad = /abc\nconst next = 1;', 'ts');
+        expect(stream.rawTokens).toContain('/');
+        expect(stream.rawTokens).toContain('next');
+    });
+
     it('calculates Shannon entropy and normalized entropy correctly', () => {
         const tokens = ['A', 'B', 'C', 'D'];
         const res = calculateTokenShannonEntropy(tokens);

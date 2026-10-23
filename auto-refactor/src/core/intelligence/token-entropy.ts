@@ -4,7 +4,8 @@
  * Architecture Role: Primary lexical tokenizer and information-theoretic entropy analyzer
  *   providing language-agnostic token classification, cognitive flux bandwidth tuning,
  *   and log-normal column density calculation.
- * Dependencies & Triggers: Pure native mathematical utility; zero external dependencies;
+ * Dependencies & Triggers: Pure native mathematical utility; consumes readRegexLiteral from
+ *   ./regex-literal-scanner to disambiguate division from regular-expression literals;
  *   invoked by analyzers and scoring modules to evaluate semantic density.
  * Responsibilities: Tokenize multi-language source code into four semantic categories
  *   (CALC_FLOW, DOMAIN_LITERAL, DELIMITER, WIRING); compute Shannon entropy and normalized
@@ -14,6 +15,8 @@
  *   handles empty or invalid inputs gracefully with zero values; avoids division by zero;
  *   optimized with lookup tables and pre-compiled regex for sub-millisecond execution.
  */
+
+import { readRegexLiteral } from './regex-literal-scanner';
 
 /**
  * Semantic classification categories for lexical tokens.
@@ -234,7 +237,7 @@ export function tokenizeCode(content: string, _language?: string): TokenStream {
     }
 
     const tokenRegex =
-        /(?:\/\/.*?$|#.*?$|\/\*[\s\S]*?\*\/)|("(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[^`\\])*`)|(0x[0-9a-fA-F]+|0b[01]+|\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)|([a-zA-Z_$][a-zA-Z0-9_$]*)|(===|!==|>>>|<<=|>>=|\*\*=|&&=|\|\|=|\?\?=|==|!=|<=|>=|=>|->|<-|:=|\+=|-=|\*=|\/=|%=|&=|\|=|\^=|<<|>>|\*\*|&&|\|\||\?\?|\?\.|--|\+\+|[+\-*/%&|^~!=<>?:])|([()[\]{};,.])/gmu;
+        /(?:\/\/.*?$|#.*?$|\/\*[\s\S]*?\*\/)|("(?:\\.|[^"\\\n])*"|'(?:\\.|[^'\\\n])*'|`(?:\\.|[^`\\])*`)|(0x[0-9a-fA-F]+|0b[01]+|\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)|([a-zA-Z_$][a-zA-Z0-9_$]*)|(===|!==|>>>|<<=|>>=|\*\*=|&&=|\|\|=|\?\?=|==|!=|<=|>=|=>|->|<-|:=|\+=|-=|\*=|\/=|%=|&=|\|=|\^=|<<|>>|\*\*|&&|\|\||\?\?|\?\.|--|\+\+|[+\-*/%&|^~!=<>?:])|([()[\]{};,.])/gmu;
 
     const classifiedTokens: ClassifiedToken[] = [];
     const rawTokensList: string[] = [];
@@ -246,11 +249,17 @@ export function tokenizeCode(content: string, _language?: string): TokenStream {
     };
 
     const state: TokenParserState = { inWiringContext: false, braceDepth: 0, lastIndex: 0 };
+    let previousToken = '';
     let match: RegExpExecArray | null;
     while ((match = tokenRegex.exec(content)) !== null) {
-        const rawToken = extractRawToken(match);
+        const literal = readRegexLiteral(content, match, previousToken);
+        const rawToken = literal ?? extractRawToken(match);
         if (!rawToken) {
             continue;
+        }
+        if (literal !== null) {
+            // The literal spans further than the matched `/`, so the cursor must jump past it.
+            tokenRegex.lastIndex = match.index + literal.length;
         }
 
         updateWiringState(state, rawToken, match.index, content);
@@ -261,6 +270,7 @@ export function tokenizeCode(content: string, _language?: string): TokenStream {
         classifiedTokens.push({ text: rawToken, category, weight });
         rawTokensList.push(rawToken);
         counts[category]++;
+        previousToken = rawToken;
     }
 
     return {
