@@ -168,6 +168,23 @@ function isExemptPath(file: string): boolean {
 }
 
 /**
+ * Checks whether an SVG markup fragment belongs to a standalone SVG graphic rather than a Webview document.
+ */
+function isStandaloneSvgLine(line: string, rawLines: string[], index: number): boolean {
+    if (line.includes('xmlns="http://www.w3.org/2000/svg"') || line.includes("xmlns='http://www.w3.org/2000/svg'")) {
+        return true;
+    }
+    const start = Math.max(0, index - 10);
+    const end = Math.min(rawLines.length, index + 10);
+    for (let j = start; j < end; j++) {
+        if (/xmlns=['"]http:\/\/www\.w3\.org\/2000\/svg['"]/.test(rawLines[j])) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
  * VS Code extension domain analyzer enforcing lifecycle subscriptions,
  * async I/O performance, and multi-language internationalization.
  */
@@ -384,6 +401,9 @@ export class VscodeExtensionAnalyzer implements Analyzer {
         for (let i = 0; i < rawLines.length; i++) {
             const line = rawLines[i];
             if (!/<(?:div|span|p|table|td|th|tr|svg|path|circle|rect|style)\b/i.test(line)) {
+                continue;
+            }
+            if (isStandaloneSvgLine(line, rawLines, i)) {
                 continue;
             }
             const m = colorRe.exec(line);

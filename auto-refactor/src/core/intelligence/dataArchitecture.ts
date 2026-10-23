@@ -110,6 +110,9 @@ function isDatabaseQueryLine(line: string): boolean {
     if (/\b(?:findByIds|findAllById|batchFind|bulkQuery|queryIn)\b/.test(line)) {
         return false;
     }
+    if (/\b(?:index|cache|memory|map|local|token|entry|ast|symbol)Store\b/i.test(line)) {
+        return false;
+    }
     const hasPersistenceTarget =
         /(?:repo|repository|db|database|pool|client|model|dao|collection|prisma|table|session|orm|store)\s*\.\s*(?:find|findAll|select|query|fetch|get|filter)\w*\s*\(/i.test(
             line,
@@ -976,6 +979,9 @@ export function auditDataArchitectureSource(
     content: string,
     options: DataArchitectureOptions = {},
 ): Issue[] {
+    if (isToolOrTestScript(filePath)) {
+        return [];
+    }
     const issues: Issue[] = [];
     const lines = content.split(/\r?\n/);
     const isOnline = isOnlinePath(filePath, content, options);

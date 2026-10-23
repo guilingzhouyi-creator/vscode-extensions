@@ -15,6 +15,7 @@
 
 import type * as ts from 'typescript';
 import type { Analyzer, AnalyzerContext, Issue } from '../core/types';
+import { isToolOrTestScript } from '../core/governance/pathScope';
 import type {
     DataAccessSite,
     DataArchitectureOptions,
@@ -28,6 +29,10 @@ import {
 /** Pattern detecting query or fetch calls against database/storage. */
 const QUERY_CALL_RE =
     /(?:(?:repo|repository|db|database|pool|client|model|dao|collection|prisma|table|session|orm|store)\s*\.\s*(?:find|findAll|select|query|fetch|get)\w*|\.(?:findById|findOne|findFirst|findMany|fetchRecords|getBy\w+|queryAll))\s*\(/i;
+
+/** Excludes in-memory store receivers (caches, AST indexes, token tables) from persistent DB query hazards. */
+const MEMORY_STORE_RECEIVER_RE =
+    /\b(?:index|cache|memory|map|local|token|entry|ast|symbol)Store\b/i;
 
 /** Pattern detecting unpaginated/unbounded query keywords. */
 const UNBOUNDED_QUERY_RE =
@@ -178,7 +183,7 @@ function checkAndPushSite(trimmed: string, meta: SiteMeta, sites: DataAccessSite
     if (DRIVER_CALL_RE.test(trimmed)) {
         pushSite(sites, meta, trimmed, 'driver-call');
     }
-    if (QUERY_CALL_RE.test(trimmed)) {
+    if (QUERY_CALL_RE.test(trimmed) && !MEMORY_STORE_RECEIVER_RE.test(trimmed)) {
         pushSite(sites, meta, trimmed, 'query', UNBOUNDED_QUERY_RE.test(trimmed));
     }
     if (SERIALIZATION_RE.test(trimmed)) {
@@ -200,6 +205,9 @@ export class DataArchitectureAnalyzer implements Analyzer {
 
     analyze(sf: ts.SourceFile | undefined, ctx: AnalyzerContext): Issue[] {
         void sf;
+        if (isToolOrTestScript(ctx.filePath)) {
+            return [];
+        }
         const options = (ctx.config.analyzers['data-architecture']?.options ||
             {}) as DataArchitectureOptions;
         const content = ctx.content;
@@ -223,9 +231,14 @@ export class DataArchitectureAnalyzer implements Analyzer {
             }
 
             const currentIndent = line.search(/\S/);
+            const inLoopBefore = loopTracker.inLoop;
             updateLoopTracker(trimmed, currentIndent, loopTracker);
 
-            const inIter = loopTracker.inLoop || ITERATION_METHOD_RE.test(trimmed);
+            // Expressions on the loop header itself (e.g. for (const x of coll)) execute once outside iteration
+            const inIter =
+                inLoopBefore ||
+                (loopTracker.inLoop && !LOOP_HEADER_RE.test(trimmed)) ||
+                ITERATION_METHOD_RE.test(trimmed);
             if (!isRegexLiteralLine(trimmed)) {
                 checkAndPushSite(
                     trimmed,
