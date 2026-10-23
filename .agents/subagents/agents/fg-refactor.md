@@ -15,20 +15,23 @@ model: inherit
 
 ## 物理沙箱 (Path Jail)
 - **授权操作路径**：
+  - `fractal-git/crates/`
   - `fractal-git/src/`
+  - `fractal-git/tests/`
   - `fractal-git/ts/`
-- **只读审阅路径**：全工作区顶层规范
+- **只读审阅路径**：全工作区顶层规范与 SSOT 指针
 - **禁止直接改动**：`workspace-timing/`, `auto-refactor/`, `WebGames/`, `scripts/`, `.agents/plugins/`
 
 ## 核心重构契约与刚性红线
-1. **循环零堆分配 (`FGT-PRF-001`)**：循环体内严禁 `Vec`/`String`/`Box` 即时构造，一律预分配并复用；
-2. **CAS 热路径**：无锁路径的失败重试必须收敛，不得以自旋代替退避；
-3. **体积与密度预算**：单文件 $\text{ELOC} \le 900$、$\text{LOC} \le 1400$，导出接口 $\text{CC} \le 15$、$\text{Depth} \le 4$；
-4. **等价性零退让**：任何性能重构都必须保持 Rust 与 TS 的 100% 字节等价，差分基准先行；
-5. **注释契约随行**：架构职责注释与 `// SAFETY:` 证明随实质代码搬迁，不因精简而删除。
+1. **循环零堆分配与借用优化 (`FGT-PRF-001` / `RSM-STR-001` / `RSM-CLONE-001`)**：循环体内严禁 `Vec`/`String`/`Box` 瞬态构造，一律通过 `fg-pools` 复用；形参降维为切片借用，严禁为比较而调用 `.clone()`；
+2. **CAS 世代防 ABA 与收敛退避 (`FGT-LCK-001` / `FGT-CAS-001`)**：无锁路径必须携带世代号单调递增，竞争重试必须指数退避，严禁阻塞锁与空自旋；
+3. **卫语句与控制流平铺 (`RSM-ELSE-001`)**：解构嵌套强制使用 `let-else` 卫语句平铺，严格控制 $\text{CC} \le 15$、$\text{Depth} \le 4$、单文件 $\text{ELOC} \le 900$、$\text{LOC} \le 1400$；
+4. **等价性零退让与系统规则闭环 (`FGT-ALG-001`)**：任何重构必须保持 Rust 与 TS 100% 字节等价，严格遵从 `FGT-*` 与 `RSM-*` 规则体系，生产路径零裸 `unwrap`/`panic!`；
+5. **注释契约与证明随行 (`FGT-SAF-001` / `RSM-SAF-001`)**：模块职责注释与每处 `unsafe` 的 `// SAFETY:` 形式证明随实质代码搬迁，严禁因重构而删除证明。
 
 ## 强制离线验证命令
 ```powershell
-cargo test --workspace --manifest-path fractal-git/Cargo.toml
+node .agents/skills/rust-engineering/scripts/validate-rust-conformance.js
 node fractal-git/scripts/common/check-zero-alloc-boundary.js
+cargo test --workspace --manifest-path fractal-git/Cargo.toml
 ```

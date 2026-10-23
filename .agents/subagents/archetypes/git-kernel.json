@@ -23,17 +23,20 @@
   ],
   "rigidAxioms": [
     "10 微 Crate 分层拓扑（fg-core/object/index/algorithms/pools/storage/native/topology/transport/gate）单向依赖，零循环",
-    "零 panic：库代码严禁 unwrap/expect/panic!/unreachable!，错误一律 thiserror 强类型并向上传播",
-    "锁纪律：索引与快照路径使用 CAS 无锁原语，严禁在热路径引入 Mutex/RwLock (FGT-LCK-001)",
-    "循环体内零瞬态堆分配：Vec/String/Box 预分配并复用，必要时使用对象池 (FGT-PRF-001)",
-    "每处 unsafe 必须附 // SAFETY: 不变量证明；unsafe 面积只减不增 (FGT-SAF-001)",
-    "Rust 实现与 TS 门面保持 100% 字节等价，差分基准为零容忍 (FGT-ALG-001)",
-    "rustfmt 零差异、clippy -D warnings 零告警、单文件 ELOC <= 900"
+    "Rust 体系规则闭环 (FGT-* + RSM-* + STDLIB-*)：生产路径零裸 unwrap/expect/panic!/unreachable!，错误一律 thiserror 强类型传播",
+    "资深类型设计：Sealed Trait 与 Type-State 编译期状态机，#[repr(transparent)] Newtype 消除原始混淆，#[must_use] 防遗漏",
+    "借用签名与循环零瞬态堆分配：形参禁 &String/&Vec<T> (RSM-STR-001)，fg-pools 时代戳复用池，禁无谓比较 .clone() (RSM-CLONE-001)",
+    "卫语句与控制流平铺：单分支早退用 let-else (RSM-ELSE-001) 控制 CC <= 15 与 Depth <= 4，数值转换用 TryFrom (RSM-CAST-001)",
+    "锁纪律与并发无锁：索引与暂存路径使用 CAS 世代号无锁原语，严禁在热路径引入 Mutex/RwLock (FGT-LCK-001 / FGT-CAS-001)",
+    "每处 unsafe 必须附紧邻 // SAFETY: 三段式证明；unsafe 面积只减不增 (FGT-SAF-001 / RSM-SAF-001)",
+    "Rust 原生内核与 TS 门面保持 100% 字节等价 (FGT-ALG-001)，常数收敛于 fg-core::constants (RCFG-RULE-DRIFT)，Clippy -D warnings 零告警"
   ],
   "localVerification": [
+    "node .agents/skills/rust-engineering/scripts/validate-rust-conformance.js",
+    "node fractal-git/scripts/common/check-zero-alloc-boundary.js",
+    "node fractal-git/scripts/common/validate-crate-topology.js",
     "pwsh -File fractal-git/scripts/ps1/gate-rust.ps1",
     "pwsh -File fractal-git/scripts/ps1/audit-taxis.ps1",
-    "node fractal-git/scripts/common/validate-crate-topology.js",
     "cargo test --workspace --manifest-path fractal-git/Cargo.toml"
   ]
 }

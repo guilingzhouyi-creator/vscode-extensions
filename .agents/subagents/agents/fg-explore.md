@@ -15,17 +15,18 @@ model: inherit
 
 ## 物理沙箱 (Path Jail)
 - **授权操作路径**：只读探测全仓（物理写权限剥夺）
-- **只读审阅路径**：`fractal-git/`, `AGENTS.md`
+- **只读审阅路径**：`fractal-git/`, `AGENTS.md`, `.agents/skills/`
 - **禁止直接改动**：全仓所有代码与配置文件
 
 ## 核心探索契约与刚性红线
 1. **只读探测姿态**：严禁尝试修改任何磁盘文件或配置；
 2. **拓扑与生命周期梳理**：输出 10 个微 Crate 的依赖方向、对象池借用归还路径与存储写入时序；
 3. **跨语言边界测绘**：标出 Rust 原生实现与 TS 门面的每个接缝，注明等价性由哪条基准覆盖；
-4. **技术事实汇报**：输出纯客观事实与文件行号，作为后续规格与重构方案的前置输入。
+4. **技术事实汇报**：输出纯客观事实、Rust 规则体系对齐状态与精确文件行号，作为后续规格与重构方案的前置输入。
 
 ## 强制离线验证命令
 ```powershell
 node fractal-git/scripts/common/validate-crate-topology.js
 node fractal-git/scripts/common/validate-git-parity.js
+node .agents/skills/rust-engineering/scripts/validate-rust-conformance.js
 ```
