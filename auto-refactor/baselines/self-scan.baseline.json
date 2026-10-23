@@ -1,7 +1,7 @@
 {
   "version": "1.2.0",
   "granularity": "grouped",
-  "timestamp": "2026-10-17T11:03:20.959Z",
+  "timestamp": "2026-10-23T16:42:39.362Z",
   "groups": [
     {
       "key": "comments|CMT-HDR-001|crates/auto-refactor-core/build.rs",
@@ -39,13 +39,6 @@
       }
     },
     {
-      "key": "governance|GOV-FIL-002|crates/auto-refactor-core/src/tests.rs",
-      "count": 1,
-      "severities": {
-        "info": 1
-      }
-    },
-    {
       "key": "comments|CMT-VMD-001|crates/auto-refactor-core/src/tests.rs",
       "count": 1,
       "severities": {
@@ -74,13 +67,6 @@
       }
     },
     {
-      "key": "governance|GOV-FIL-002|crates/ops-clone/src/lib.rs",
-      "count": 1,
-      "severities": {
-        "info": 1
-      }
-    },
-    {
       "key": "large-file|large-file|crates/ops-clone/src/lib.rs",
       "count": 1,
       "severities": {
@@ -96,9 +82,9 @@
     },
     {
       "key": "constants|magic-number|crates/ops-clone/src/lib.rs",
-      "count": 138,
+      "count": 15,
       "severities": {
-        "warning": 138
+        "warning": 15
       }
     },
     {
@@ -215,16 +201,9 @@
     },
     {
       "key": "constants|hardcoded-string|crates/ops-diff/src/lib.rs",
-      "count": 18,
+      "count": 14,
       "severities": {
-        "warning": 18
-      }
-    },
-    {
-      "key": "governance|GOV-FIL-002|crates/ops-graph/src/lib.rs",
-      "count": 1,
-      "severities": {
-        "info": 1
+        "warning": 14
       }
     },
     {
@@ -291,13 +270,6 @@
       }
     },
     {
-      "key": "governance|GOV-EXC-002|crates/ops-graph/src/lib.rs",
-      "count": 15,
-      "severities": {
-        "warning": 15
-      }
-    },
-    {
       "key": "constants|hardcoded-string|crates/ops-graph/src/lib.rs",
       "count": 4,
       "severities": {
@@ -309,13 +281,6 @@
       "count": 5,
       "severities": {
         "warning": 5
-      }
-    },
-    {
-      "key": "governance|GOV-FIL-002|crates/ops-mask/src/lib.rs",
-      "count": 1,
-      "severities": {
-        "info": 1
       }
     },
     {
@@ -375,24 +340,10 @@
       }
     },
     {
-      "key": "governance|GOV-FIL-002|crates/ops-pattern/src/lib.rs",
-      "count": 1,
-      "severities": {
-        "info": 1
-      }
-    },
-    {
       "key": "comments|CMT-DOC-001|crates/ops-pattern/src/lib.rs",
       "count": 1,
       "severities": {
         "info": 1
-      }
-    },
-    {
-      "key": "complexity|CPX-SPACE-001|crates/ops-pattern/src/lib.rs",
-      "count": 1,
-      "severities": {
-        "warning": 1
       }
     },
     {
@@ -522,13 +473,6 @@
       }
     },
     {
-      "key": "constants|magic-number|scripts/gate-self-slice.js",
-      "count": 3,
-      "severities": {
-        "warning": 3
-      }
-    },
-    {
       "key": "simplify|SIM-TRN-001|scripts/gate-self-slice.js",
       "count": 1,
       "severities": {
@@ -578,13 +522,6 @@
       }
     },
     {
-      "key": "simplify|SIM-COMC-001|scripts/validate-agent-actionable.js",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "governance|GOV-PRF-003|scripts/validate-agent-quota-gateway.js",
       "count": 1,
       "severities": {
@@ -621,13 +558,6 @@
     },
     {
       "key": "simplify|SIM-LONG-001|scripts/validate-capabilities.js",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "simplify|SIM-EMPTY-001|scripts/validate-capabilities.js",
       "count": 1,
       "severities": {
         "warning": 1
@@ -691,13 +621,6 @@
     },
     {
       "key": "simplify|SIM-LONG-001|scripts/validate-config-driven-architecture.js",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "simplify|SIM-LONG-001|scripts/validate-consumer-runner.js",
       "count": 1,
       "severities": {
         "warning": 1
@@ -795,13 +718,6 @@
       }
     },
     {
-      "key": "simplify|SIM-EMPTY-001|scripts/validate-dual-track-test-topology.js",
-      "count": 5,
-      "severities": {
-        "warning": 5
-      }
-    },
-    {
       "key": "simplify|SIM-LONG-001|scripts/validate-dynamic-quality-model.js",
       "count": 1,
       "severities": {
@@ -883,13 +799,6 @@
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "simplify|SIM-EMPTY-001|scripts/validate-generalized.js",
-      "count": 2,
-      "severities": {
-        "warning": 2
       }
     },
     {
@@ -1236,13 +1145,6 @@
       }
     },
     {
-      "key": "simplify|SIM-BOOL-001|scripts/validate-review-memory.js",
-      "count": 1,
-      "severities": {
-        "info": 1
-      }
-    },
-    {
       "key": "hygiene|HYG-CLN-001|scripts/validate-review-memory.js",
       "count": 1,
       "severities": {
@@ -1488,13 +1390,6 @@
       }
     },
     {
-      "key": "simplify|SIM-BOOL-001|scripts/validate-simplify.js",
-      "count": 1,
-      "severities": {
-        "info": 1
-      }
-    },
-    {
       "key": "simplify|SIM-LONG-001|scripts/validate-simplify.js",
       "count": 1,
       "severities": {
@@ -1691,20 +1586,6 @@
       }
     },
     {
-      "key": "simplify|SIM-BOOL-001|src/analyzers/constants.ts",
-      "count": 1,
-      "severities": {
-        "info": 1
-      }
-    },
-    {
-      "key": "simplify|SIM-TRN-001|src/analyzers/constants.ts",
-      "count": 1,
-      "severities": {
-        "info": 1
-      }
-    },
-    {
       "key": "hygiene|HYG-CLN-001|src/analyzers/constants.ts",
       "count": 1,
       "severities": {
@@ -1762,9 +1643,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/analyzers/dependency-layout.ts",
-      "count": 4,
+      "count": 3,
       "severities": {
-        "warning": 4
+        "warning": 3
       }
     },
     {
@@ -1817,20 +1698,6 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|src/analyzers/gdscript-game.ts",
-      "count": 18,
-      "severities": {
-        "warning": 18
-      }
-    },
-    {
-      "key": "governance|GOV-DAT-001|src/analyzers/gdscript-game.ts",
-      "count": 1,
-      "severities": {
-        "info": 1
-      }
-    },
-    {
       "key": "constants|hardcoded-string|src/analyzers/governance.ts",
       "count": 2,
       "severities": {
@@ -1849,13 +1716,6 @@
       "count": 2,
       "severities": {
         "warning": 2
-      }
-    },
-    {
-      "key": "hygiene|HYG-CLN-001|src/analyzers/naming-path-helper.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
       }
     },
     {
@@ -1894,20 +1754,6 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|src/analyzers/shell-lint.ts",
-      "count": 2,
-      "severities": {
-        "warning": 2
-      }
-    },
-    {
-      "key": "constants|magic-number|src/analyzers/shell-lint.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "large-file|large-file|src/analyzers/simplify-linecheck.ts",
       "count": 1,
       "severities": {
@@ -1922,21 +1768,7 @@
       }
     },
     {
-      "key": "governance|GOV-DAT-001|src/analyzers/simplify-ternary.ts",
-      "count": 4,
-      "severities": {
-        "info": 4
-      }
-    },
-    {
       "key": "large-file|large-file|src/analyzers/simplify.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/analyzers/simplify.ts",
       "count": 1,
       "severities": {
         "warning": 1
@@ -1985,17 +1817,10 @@
       }
     },
     {
-      "key": "governance|GOV-TYP-003|src/analyzers/stdlib.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "constants|hardcoded-string|src/analyzers/stdlib.ts",
-      "count": 14,
+      "count": 7,
       "severities": {
-        "warning": 14
+        "warning": 7
       }
     },
     {
@@ -2021,9 +1846,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/analyzers/vscode-extension.ts",
-      "count": 10,
+      "count": 2,
       "severities": {
-        "warning": 10
+        "warning": 2
       }
     },
     {
@@ -2031,13 +1856,6 @@
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "governance|GOV-DAT-001|src/analyzers/vscode-extension.ts",
-      "count": 1,
-      "severities": {
-        "info": 1
       }
     },
     {
@@ -2083,13 +1901,6 @@
       }
     },
     {
-      "key": "governance|GOV-TYP-003|src/core/analyzer.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "constants|hardcoded-string|src/core/analyzer.ts",
       "count": 1,
       "severities": {
@@ -2105,9 +1916,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/architecture/constant-library-auditor.ts",
-      "count": 24,
+      "count": 9,
       "severities": {
-        "warning": 24
+        "warning": 9
       }
     },
     {
@@ -2202,20 +2013,6 @@
       }
     },
     {
-      "key": "simplify|SIM-BOOL-001|src/core/ast/gdscript-adapter.ts",
-      "count": 1,
-      "severities": {
-        "info": 1
-      }
-    },
-    {
-      "key": "simplify|SIM-TRN-001|src/core/ast/gdscript-adapter.ts",
-      "count": 1,
-      "severities": {
-        "info": 1
-      }
-    },
-    {
       "key": "simplify|SIM-LONG-001|src/core/ast/gdscript-adapter.ts",
       "count": 1,
       "severities": {
@@ -2251,20 +2048,6 @@
       }
     },
     {
-      "key": "simplify|SIM-BOOL-001|src/core/ast/go-adapter-parser.ts",
-      "count": 1,
-      "severities": {
-        "info": 1
-      }
-    },
-    {
-      "key": "simplify|SIM-TRN-001|src/core/ast/go-adapter-parser.ts",
-      "count": 1,
-      "severities": {
-        "info": 1
-      }
-    },
-    {
       "key": "constants|hardcoded-string|src/core/ast/language-support.ts",
       "count": 2,
       "severities": {
@@ -2290,27 +2073,6 @@
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "governance|GOV-TYP-003|src/core/ast/oxc-types.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "simplify|SIM-TRN-001|src/core/ast/python-adapter-helpers.ts",
-      "count": 2,
-      "severities": {
-        "info": 2
-      }
-    },
-    {
-      "key": "simplify|SIM-GUARD-001|src/core/ast/python-adapter-helpers.ts",
-      "count": 1,
-      "severities": {
-        "info": 1
       }
     },
     {
@@ -2370,13 +2132,6 @@
       }
     },
     {
-      "key": "simplify|SIM-COMC-001|src/core/ast/scope-graph.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "hygiene|HYG-CLN-001|src/core/ast/scope-graph.ts",
       "count": 1,
       "severities": {
@@ -2395,20 +2150,6 @@
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/ast/traverse.ts",
-      "count": 8,
-      "severities": {
-        "warning": 8
-      }
-    },
-    {
-      "key": "governance|GOV-DAT-001|src/core/ast/traverse.ts",
-      "count": 5,
-      "severities": {
-        "info": 5
       }
     },
     {
@@ -2462,48 +2203,13 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/cache-key.ts",
-      "count": 6,
+      "count": 5,
       "severities": {
-        "warning": 6
-      }
-    },
-    {
-      "key": "hygiene|HYG-WRAP-001|src/core/cache-key.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "governance|GOV-DAT-001|src/core/cache-key.ts",
-      "count": 2,
-      "severities": {
-        "info": 2
-      }
-    },
-    {
-      "key": "simplify|SIM-TRN-001|src/core/cache-key.ts",
-      "count": 2,
-      "severities": {
-        "info": 2
+        "warning": 5
       }
     },
     {
       "key": "large-file|large-file|src/core/cache.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "simplify|SIM-TRN-001|src/core/cache.ts",
-      "count": 2,
-      "severities": {
-        "info": 2
-      }
-    },
-    {
-      "key": "hygiene|HYG-CLN-001|src/core/cache.ts",
       "count": 1,
       "severities": {
         "warning": 1
@@ -2629,13 +2335,6 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|src/core/comments/comment-density-model.ts",
-      "count": 11,
-      "severities": {
-        "warning": 11
-      }
-    },
-    {
       "key": "simplify|SIM-LONG-001|src/core/comments/comment-density-model.ts",
       "count": 1,
       "severities": {
@@ -2720,13 +2419,6 @@
       }
     },
     {
-      "key": "simplify|SIM-COMC-001|src/core/config/metric-parser.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "large-file|large-file|src/core/dependency-graph.ts",
       "count": 1,
       "severities": {
@@ -2738,13 +2430,6 @@
       "count": 1,
       "severities": {
         "info": 1
-      }
-    },
-    {
-      "key": "governance|GOV-DAT-001|src/core/diff/constant-relocation-detector.ts",
-      "count": 4,
-      "severities": {
-        "info": 4
       }
     },
     {
@@ -2773,13 +2458,6 @@
       "count": 2,
       "severities": {
         "info": 2
-      }
-    },
-    {
-      "key": "governance|GOV-TYP-003|src/core/diff/diff.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
       }
     },
     {
@@ -2896,13 +2574,6 @@
     },
     {
       "key": "simplify|SIM-TRN-001|src/core/file-discovery.ts",
-      "count": 2,
-      "severities": {
-        "info": 2
-      }
-    },
-    {
-      "key": "simplify|SIM-BOOL-001|src/core/file-discovery.ts",
       "count": 1,
       "severities": {
         "info": 1
@@ -3014,13 +2685,6 @@
       }
     },
     {
-      "key": "simplify|SIM-ELSE-001|src/core/governance/rules/performance.ts",
-      "count": 2,
-      "severities": {
-        "info": 2
-      }
-    },
-    {
       "key": "hygiene|HYG-CLN-001|src/core/governance/rules/performance.ts",
       "count": 1,
       "severities": {
@@ -3078,9 +2742,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/governance/semanticLiterals.ts",
-      "count": 15,
+      "count": 8,
       "severities": {
-        "warning": 15
+        "warning": 8
       }
     },
     {
@@ -3088,20 +2752,6 @@
       "count": 1,
       "severities": {
         "info": 1
-      }
-    },
-    {
-      "key": "governance|GOV-TYP-003|src/core/governance/types.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/intelligence/apiQueries.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
       }
     },
     {
@@ -3127,9 +2777,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/intelligence/callChainImpactTracer.ts",
-      "count": 6,
+      "count": 3,
       "severities": {
-        "warning": 6
+        "warning": 3
       }
     },
     {
@@ -3169,16 +2819,16 @@
     },
     {
       "key": "constants|duplicate-literal|src/core/intelligence/code-density-analyzer.ts",
-      "count": 2,
+      "count": 1,
       "severities": {
-        "warning": 2
+        "warning": 1
       }
     },
     {
       "key": "constants|hardcoded-string|src/core/intelligence/code-density-analyzer.ts",
-      "count": 11,
+      "count": 1,
       "severities": {
-        "warning": 11
+        "warning": 1
       }
     },
     {
@@ -3253,9 +2903,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/intelligence/dependencyLayout.ts",
-      "count": 4,
+      "count": 2,
       "severities": {
-        "warning": 4
+        "warning": 2
       }
     },
     {
@@ -3400,13 +3050,6 @@
     },
     {
       "key": "simplify|SIM-TRN-001|src/core/intelligence/near-literal-cluster.ts",
-      "count": 2,
-      "severities": {
-        "info": 2
-      }
-    },
-    {
-      "key": "simplify|SIM-BOOL-001|src/core/intelligence/near-literal-cluster.ts",
       "count": 1,
       "severities": {
         "info": 1
@@ -3477,9 +3120,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/intelligence/testModernity.ts",
-      "count": 8,
+      "count": 7,
       "severities": {
-        "warning": 8
+        "warning": 7
       }
     },
     {
@@ -3693,13 +3336,6 @@
       }
     },
     {
-      "key": "simplify|SIM-ELSE-001|src/core/native/native-clone-shim.ts",
-      "count": 1,
-      "severities": {
-        "info": 1
-      }
-    },
-    {
       "key": "governance|GOV-DAT-001|src/core/native/native-clone-shim.ts",
       "count": 1,
       "severities": {
@@ -3764,16 +3400,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/pipeline/escalationChannel.ts",
-      "count": 6,
+      "count": 5,
       "severities": {
-        "warning": 6
-      }
-    },
-    {
-      "key": "governance|GOV-TYP-003|src/core/pipeline/escalationChannel.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
+        "warning": 5
       }
     },
     {
@@ -3855,9 +3484,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/praxis/presentation/presentation-adapter.ts",
-      "count": 17,
+      "count": 13,
       "severities": {
-        "warning": 17
+        "warning": 13
       }
     },
     {
@@ -3865,20 +3494,6 @@
       "count": 1,
       "severities": {
         "info": 1
-      }
-    },
-    {
-      "key": "governance|GOV-TYP-003|src/core/praxis/presentation/presentation-adapter.ts",
-      "count": 3,
-      "severities": {
-        "warning": 3
-      }
-    },
-    {
-      "key": "governance|GOV-TYP-005|src/core/praxis/presentation/presentation-adapter.ts",
-      "count": 3,
-      "severities": {
-        "warning": 3
       }
     },
     {
@@ -3904,9 +3519,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/praxis/sliceAuditService.ts",
-      "count": 6,
+      "count": 3,
       "severities": {
-        "warning": 6
+        "warning": 3
       }
     },
     {
@@ -3921,13 +3536,6 @@
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/profiler/loadGovernor.ts",
-      "count": 4,
-      "severities": {
-        "warning": 4
       }
     },
     {
@@ -4149,27 +3757,13 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/rules/entries/analyzers.ts",
-      "count": 18,
+      "count": 16,
       "severities": {
-        "warning": 18
+        "warning": 16
       }
     },
     {
       "key": "hygiene|HYG-CLN-001|src/core/rules/entries/analyzers.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "hygiene|HYG-STB-001|src/core/rules/entries/analyzers.ts",
-      "count": 1,
-      "severities": {
-        "info": 1
-      }
-    },
-    {
-      "key": "hygiene|HYG-STB-002|src/core/rules/entries/analyzers.ts",
       "count": 1,
       "severities": {
         "warning": 1
@@ -4302,13 +3896,6 @@
       }
     },
     {
-      "key": "governance|GOV-PRF-004|src/core/scanner/cache-key-helper.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "simplify|SIM-LONG-001|src/core/scanner/cache-scanner.ts",
       "count": 1,
       "severities": {
@@ -4320,13 +3907,6 @@
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "governance|GOV-DAT-001|src/core/scanner/diff-hints.ts",
-      "count": 9,
-      "severities": {
-        "info": 9
       }
     },
     {
@@ -4401,9 +3981,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/scheduler/dynamic-partitioner.ts",
-      "count": 14,
+      "count": 9,
       "severities": {
-        "warning": 14
+        "warning": 9
       }
     },
     {
@@ -4478,9 +4058,9 @@
     },
     {
       "key": "constants|hardcoded-string|src/core/scheduler/sparse-orchestrator.ts",
-      "count": 14,
+      "count": 5,
       "severities": {
-        "warning": 14
+        "warning": 5
       }
     },
     {
@@ -4540,13 +4120,6 @@
       }
     },
     {
-      "key": "constants|magic-number|src/core/scoring/autonomy-scorer.ts",
-      "count": 3,
-      "severities": {
-        "warning": 3
-      }
-    },
-    {
       "key": "hygiene|HYG-CLN-001|src/core/scoring/autonomy-scorer.ts",
       "count": 1,
       "severities": {
@@ -4582,34 +4155,6 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|src/core/scoring/cognitive-cost-model.ts",
-      "count": 3,
-      "severities": {
-        "warning": 3
-      }
-    },
-    {
-      "key": "constants|magic-number|src/core/scoring/cognitive-cost-model.ts",
-      "count": 9,
-      "severities": {
-        "warning": 9
-      }
-    },
-    {
-      "key": "constants|duplicate-literal|src/core/scoring/cognitive-cost-model.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|magic-number|src/core/scoring/diffScore.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "hygiene|HYG-DED-001|src/core/scoring/dimensionFamilyDeductions.ts",
       "count": 1,
       "severities": {
@@ -4631,101 +4176,10 @@
       }
     },
     {
-      "key": "constants|magic-number|src/core/scoring/effectiveDensity.ts",
-      "count": 3,
-      "severities": {
-        "warning": 3
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/scoring/eightPillarModel.ts",
-      "count": 10,
-      "severities": {
-        "warning": 10
-      }
-    },
-    {
-      "key": "constants|duplicate-literal|src/core/scoring/eightPillarModel.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
       "key": "governance|GOV-DAT-001|src/core/scoring/eightPillarModel.ts",
       "count": 1,
       "severities": {
         "info": 1
-      }
-    },
-    {
-      "key": "constants|magic-number|src/core/scoring/eightPillarModel.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/scoring/fusion-scorer.ts",
-      "count": 3,
-      "severities": {
-        "warning": 3
-      }
-    },
-    {
-      "key": "constants|duplicate-literal|src/core/scoring/fusion-scorer.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|magic-number|src/core/scoring/fusion-scorer.ts",
-      "count": 2,
-      "severities": {
-        "warning": 2
-      }
-    },
-    {
-      "key": "governance|GOV-DAT-001|src/core/scoring/hierarchicalScorer.ts",
-      "count": 1,
-      "severities": {
-        "info": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/scoring/hierarchicalScorer.ts",
-      "count": 5,
-      "severities": {
-        "warning": 5
-      }
-    },
-    {
-      "key": "constants|magic-number|src/core/scoring/hierarchicalScorer.ts",
-      "count": 3,
-      "severities": {
-        "warning": 3
-      }
-    },
-    {
-      "key": "constants|duplicate-literal|src/core/scoring/hierarchicalScorer.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|magic-number|src/core/scoring/logistic-deduction-curve.ts",
-      "count": 4,
-      "severities": {
-        "warning": 4
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/scoring/patchQuality.ts",
-      "count": 5,
-      "severities": {
-        "warning": 5
       }
     },
     {
@@ -4743,38 +4197,10 @@
       }
     },
     {
-      "key": "governance|GOV-DAT-001|src/core/scoring/patchQuality.ts",
-      "count": 1,
-      "severities": {
-        "info": 1
-      }
-    },
-    {
       "key": "simplify|SIM-LONG-001|src/core/scoring/patchQuality.ts",
       "count": 1,
       "severities": {
         "warning": 1
-      }
-    },
-    {
-      "key": "constants|duplicate-literal|src/core/scoring/patchQuality.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/scoring/project-governance-evaluator.ts",
-      "count": 3,
-      "severities": {
-        "warning": 3
-      }
-    },
-    {
-      "key": "constants|magic-number|src/core/scoring/project-governance-evaluator.ts",
-      "count": 5,
-      "severities": {
-        "warning": 5
       }
     },
     {
@@ -4799,49 +4225,7 @@
       }
     },
     {
-      "key": "constants|magic-number|src/core/scoring/qualityScorer.ts",
-      "count": 3,
-      "severities": {
-        "warning": 3
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/scoring/qualityScorer.ts",
-      "count": 2,
-      "severities": {
-        "warning": 2
-      }
-    },
-    {
       "key": "hygiene|HYG-CLN-001|src/core/scoring/qualityScorer.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/scoring/risk-fusion-engine.ts",
-      "count": 4,
-      "severities": {
-        "warning": 4
-      }
-    },
-    {
-      "key": "constants|magic-number|src/core/scoring/risk-fusion-engine.ts",
-      "count": 11,
-      "severities": {
-        "warning": 11
-      }
-    },
-    {
-      "key": "simplify|SIM-TRN-001|src/core/scoring/risk-fusion-engine.ts",
-      "count": 1,
-      "severities": {
-        "info": 1
-      }
-    },
-    {
-      "key": "constants|duplicate-literal|src/core/scoring/risk-fusion-engine.ts",
       "count": 1,
       "severities": {
         "warning": 1
@@ -4855,17 +4239,10 @@
       }
     },
     {
-      "key": "constants|hardcoded-string|src/core/scoring/riskWeightModel.ts",
-      "count": 6,
-      "severities": {
-        "warning": 6
-      }
-    },
-    {
       "key": "constants|hardcoded-string|src/core/scoring/scorer-formulas.ts",
-      "count": 4,
+      "count": 3,
       "severities": {
-        "warning": 4
+        "warning": 3
       }
     },
     {
@@ -4880,48 +4257,6 @@
       "count": 1,
       "severities": {
         "info": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/scoring/static-quality-model.ts",
-      "count": 7,
-      "severities": {
-        "warning": 7
-      }
-    },
-    {
-      "key": "constants|magic-number|src/core/scoring/static-quality-model.ts",
-      "count": 9,
-      "severities": {
-        "warning": 9
-      }
-    },
-    {
-      "key": "constants|duplicate-literal|src/core/scoring/static-quality-model.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
-      }
-    },
-    {
-      "key": "simplify|SIM-TRN-001|src/core/scoring/static-quality-model.ts",
-      "count": 1,
-      "severities": {
-        "info": 1
-      }
-    },
-    {
-      "key": "constants|hardcoded-string|src/core/scoring/topological-churn-evaluator.ts",
-      "count": 2,
-      "severities": {
-        "warning": 2
-      }
-    },
-    {
-      "key": "constants|magic-number|src/core/scoring/topological-churn-evaluator.ts",
-      "count": 14,
-      "severities": {
-        "warning": 14
       }
     },
     {
@@ -5048,13 +4383,6 @@
       "count": 9,
       "severities": {
         "warning": 9
-      }
-    },
-    {
-      "key": "governance|GOV-TYP-003|src/core/trajectory/anomalyDetector.ts",
-      "count": 1,
-      "severities": {
-        "warning": 1
       }
     },
     {
